@@ -110,9 +110,9 @@ export const WEAPONS = {
     shotCue: "zb26",
     ammo: "Mauser792",
     lengthM: 1.165, barrelM: 0.602, massKg: 10.5,
-    magazine: 20, reloadKind: "topMag",       // 20 发弧形弹匣**上方**插入
+    magazine: 20, reloadKind: "topMag", reloadNeedsCharge: false, // Cocked open bolt; magazine change alone resumes fire
     damage: 70, headMultiplier: 2.2, effectiveRangeM: 800,
-    rpm: 500, fireIntervalS: 60 / 500, reloadTimeS: 2.65,
+    rpm: 500, fireIntervalS: 60 / 500, reloadTimeS: 2.35,
     recoil: { pitch: 0.85, yaw: 0.34, kick: 0.02, recoverS: 0.11, recoverFrac: 1.0 },
     swayScale: 1.35, adsTimeS: 0.40, adsFovScale: 0.80,
     spreadHipDeg: 4.2, spreadAdsDeg: 0.55, bipod: true,

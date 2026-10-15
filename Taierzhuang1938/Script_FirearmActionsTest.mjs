@@ -38,6 +38,11 @@ assert.equal(partialEvents.find(event=>event.id==="loaded").at,.70);
 assert.equal(partialEvents.filter(event=>event.id==="loaded").length,1);
 const alreadyOpen=new FirearmReloadTimeline(WEAPONS.HanYang,{startedOpen:true});
 assert.ok(!alreadyOpen.events.some(event=>event.id==="open"),"an already open bolt must not replay its opening cue");
+for(const roundsRemaining of [0,3]) {
+  const zb=new FirearmReloadTimeline(WEAPONS.Zb26,{roundsRemaining});
+  assert.ok(!zb.events.some(event=>event.id==="close"),"ZB26 stays cocked during empty and partial magazine changes");
+  assert.equal(zb.events.find(event=>event.id==="loaded").at,.76);
+}
 assert.equal(RecoilAfterInput(12, -10), 2);
 assert.equal(RecoilAfterInput(2, -10), 0);
 assert.equal(RecoilAfterInput(-4, 3), -1);

@@ -96,6 +96,26 @@ try {
       Check(maxTurn<20,`${id}: normal bolt hand turns ${maxTurn.toFixed(1)} degrees per frame`);
       boltMotion.push({id,maxStep,maxTurn,worstAt});
     }
+    const magazines=[];
+    for(const remaining of [0,3]) {
+      editor.SetWeapon("Zb26");Step(remaining,90);vm.TriggerReload({remainingRounds:remaining});
+      let maxCharge=0,tossed=false,stowed=false;
+      while(vm.action) {
+        Step(remaining);const t=vm.action?.t??1;
+        maxCharge=Math.max(maxCharge,Math.abs(vm.rig.parts.bolt.position.z));
+        tossed ||= !!vm.action?.tossed;
+        if(t>=.40&&t<.43) {
+          const mag=vm.rig.parts.magazine;
+          if(remaining>0) {
+            Check(mag.position.distanceTo(new THREE.Vector3(.15,-.31,.14))<.001,"Zb26: partially loaded magazine is not stowed at the pouch");
+            stowed=true;
+          }
+        }
+      }
+      Check(maxCharge<1e-6,"Zb26: an already cocked open bolt is charged again after changing magazines");
+      Check(remaining>0?stowed&&!tossed:tossed,"Zb26: retain a partly loaded magazine and discard only the empty one");
+      magazines.push({remaining,maxCharge,tossed,stowed});
+    }
     // Type 11 takes complete horizontal chargers. Independent vertex bounds
     // catch the previous six vertical clips with disappearing loose rounds.
     const hopper=[];
@@ -141,7 +161,7 @@ try {
       Check(worldError<1e-6,"released packet follows the player's view instead of remaining in world space");
       game.camera.quaternion.copy(rotation);game.camera.position.copy(cameraPosition);vm._StepDebris(0);
     }
-    return {cases,boltMotion,hopper,worldError,failures};
+    return {cases,boltMotion,magazines,hopper,worldError,failures};
   });
   await fs.writeFile(path.join(output,"Data_Mechanics.json"),JSON.stringify({...report,errors},null,2));
   assert.deepEqual(errors,[],"no page errors");assert.deepEqual(report.failures,[],"rifle mechanical authenticity");

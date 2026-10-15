@@ -3494,30 +3494,40 @@ export class Viewmodel {
     const mag = rig.parts.magazine;
     const motion=FPS_TOP_MAG_RELOAD;
     this._PoseReloadMotion(t,motion);
+    const retain=this.action.roundsRemaining>0,charges=this.weapon.reloadNeedsCharge!==false;
+    const releaseAt=retain?motion.stowAt:motion.discardAt;
 
     if (mag) {
-      const track=t<motion.drawAt?motion.oldMagazine:motion.newMagazine;
+      const track=t<motion.drawAt?(retain?motion.retainedMagazine:motion.oldMagazine):motion.newMagazine;
       mag.position.set(...[1,2,3].map(column=>ReloadTrack(track,t,column)));
-      if(t>=motion.discardAt&&t<motion.drawAt&&this.action&&!this.action.tossed) {
+      if(!retain&&t>=motion.discardAt&&t<motion.drawAt&&this.action&&!this.action.tossed) {
         this.action.tossed=true;this._SpawnClipToss(true);
       }
-      mag.visible=t<motion.discardAt||t>=motion.drawAt;
+      mag.visible=t<releaseAt||t>=motion.drawAt;
     }
 
-    const charge = ReloadTrack(motion.charge,t);
+    const charge = charges?ReloadTrack(motion.charge,t):0;
     if (rig.parts.bolt) rig.parts.bolt.position.z = charge * rig.boltTravel;
     const held = this._HandPlacement("magazine",mag?.position || new THREE.Vector3());
     const belt = this._HandPlacement("magazine",new THREE.Vector3().fromArray(motion.newMagazine[0].slice(1)));
-    this._WorkingHandPath("right",t,[
+    const frames=[
       {at:0.10,...held,shape:"relax",through:true},
       {at:0.16,...held},
-      {at:0.32,...held},
+      {at:releaseAt,...held},
       {at:0.43,...belt,shape:"relax",through:true},
       {at:0.46,...held},
       {at:motion.holdUntil,...held},
-      {at:0.815,position:this._BoltHandPoint(),shape:"bolt"},
-      {at:0.945,position:this._BoltHandPoint(),shape:"bolt"},
-    ]);
+    ];
+    if(charges)frames.push({at:.815,position:this._BoltHandPoint(),shape:"bolt"},
+      {at:.945,position:this._BoltHandPoint(),shape:"bolt"});
+    else {
+      const rotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(...held.rotation,"YXZ"))
+        .slerp(new THREE.Quaternion().setFromEuler(this.handBaseRot.right),.55);
+      frames.push({at:.87,position:held.position.clone().lerp(this.handBase.right,.55).add(new THREE.Vector3(.012,.015,.018)),
+        rotation:new THREE.Euler().setFromQuaternion(rotation,"YXZ").toArray().slice(0,3),shape:"recover",through:true},
+        {at:motion.handBackAt,position:this.handBase.right,rotation:this.handBaseRot.right.toArray().slice(0,3),weight:0,shape:"recover"});
+    }
+    this._WorkingHandPath("right",t,frames);
   }
 
   /** 盒式弹匣手枪：底部退匣 → 腰间取新匣 → 插匣 → 拉套筒。 */

@@ -28,6 +28,9 @@
 - [Forgotten Weapons：Type 11 Nambu LMG](https://www.forgottenweapons.com/light-machine-guns/type-11-nambu-lmg/)
   及其链接的 [Japanese Infantry Weapons 手册](https://www.forgottenweapons.com/wp-content/uploads/2012/02/Japanese%20Infantry%20Weapons%20report%20%28English%29.pdf)：
   六个五发桥夹逐层叠放，供弹时才脱离桥夹，空夹从底部排出。
+- [ZB-26 原厂手册](https://www.forgottenweapons.com/wp-content/uploads/manuals/ZB%2026%20manual.pdf)，
+  印刷页 10、14–15：最后一发射击后机构仍处于开膛待发位置，插入新匣即可继续；
+  不需要在普通空匣/余弹换匣后再次拉动机柄。
 
 ## 与主机的视觉接口
 
@@ -82,7 +85,9 @@ Blender 原始工程保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/RifleR
 三八式 `.07 / 1.28 s`；总循环仍为 `1.02 / 1.25 / 1.35 s`，保留既有射速。
 
 捷克式先握住旧弹匣再拔出，新弹匣从补给位置抬至插口上方、对齐后压入；
-完整弹匣几何与拉机柄读取新版源模型。十一年式先抬压弹板，六个桥夹的五发弹始终留在夹内，
+完整弹匣几何与拉机柄读取新版源模型。正常换匣保持待发，直接回握；
+余弹旧匣收回补给位置，空匣才抛弃。初次装填所需的手动拉机柄仍有独立 `TriggerCharge` 动作。
+十一年式先抬压弹板，六个桥夹的五发弹始终留在夹内，
 在同一 X/Z 位置沿 Y 叠放；有余弹时先取走旧叠夹，再装满。每五发供完后从底部落下一只空夹。
 九二式继续使用独立横向保弹板及主机事件接口。
 
@@ -104,7 +109,7 @@ Blender 原始工程保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/RifleR
 | 汉阳造 | 3.80 s | 3.10 s |
 | 中正式 | 3.40 s | 2.85 s |
 | 三八式 | 3.50 s | 2.95 s |
-| 捷克式 | 3.00 s | 2.65 s |
+| 捷克式 | 3.00 s | 2.35 s |
 | 十一年式 | 5.20 s | 4.65 s |
 | 九二式 | 4.40 s | 4.00 s |
 
@@ -115,6 +120,16 @@ Blender 原始工程保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/RifleR
 避免全程加速后最后一次转腕过急。
 验收在 `ReloadTempo/` 保存原始连续帧；连续动作门禁按新的真实时长采满中段，单帧跳动/转角阈值保持。
 
+### 捷克式待发状态与余弹匣
+
+原厂资料复核后，普通换匣去掉多余的拉机柄动作与相应闭栓声音；
+`WEAPONS.Zb26.reloadNeedsCharge=false` 同时控制动作和事件过滤，初次待发准备走单独动作。
+空匣在 `.32` 释放；有余弹的匣在 `.40` 到达补给位置后收起；新匣仍于 `.76` 入账。
+工作手从弹匣沿连续经过点回到握把，不再先绕到机柄。
+此项仅改变视觉流程，主机弹量、备弹、取消与射速接口保持。
+`MachineGunReload/` 保存两种连续预览；机械门禁检查整个过程中机柄不被重复后拉，
+并分别确认空匣抛弃、余弹匣收回；皮肤接触门禁追加捷克式余弹换匣。
+
 ## 本地证据
 
 本轮路径 `Taierzhuang1938/_shots/ReloadRealism/`，仅留本地；上一轮证据保存在
@@ -123,7 +138,7 @@ Blender 原始工程保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/RifleR
 
 本轮实际完成的检查：
 
-- `FpsHandContactTest`：15 个握持/开火姿势；提速后 1,718 帧换弹和拉栓，手指与实际机件接触、骨长及可达性通过。
+- `FpsHandContactTest`：15 个握持/开火姿势；提速后 1,840 帧换弹和拉栓（含捷克式余弹换匣），手指与实际机件接触、骨长及可达性通过。
 - `FpsArmTest`、`FpsSleeveTest`、`AdsSightTest`：完整姿势与袖口检查通过；汉阳造空仓/余弹和两种轻机枪均测连续回手。
 - `FpsReloadMechanicsTest`：六个空仓/余弹步枪循环、三支枪的普通拉栓、六层完整桥夹、世界释放及正常场景深度通过。
 - `MuzzleFlashTest`：四把枪、腰射/ADS、高/低画质共 16 个实际射击光照场景和四个 4 秒连射场景通过。
