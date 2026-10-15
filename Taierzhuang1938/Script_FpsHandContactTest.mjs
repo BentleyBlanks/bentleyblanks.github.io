@@ -77,7 +77,7 @@ try {
           facing:normal.z,holdingDrift:pose==="ads"?point.distanceTo(hip):0,triggerTravel:pose==="fire"?point.distanceTo(hip):0,wrist:{...arms.wristBend}});
       }
       editor.SetPose("hip");for(let i=0;i<90;i++)editor.Update(1/60);
-      for(const action of ["reload",...(["ZhongZheng","HanYang","Type38","Zb26"].includes(id)?["reloadPartial"]:[]),
+      for(const action of ["reload",...(["ZhongZheng","HanYang","Type38","Zb26","Type11"].includes(id)?["reloadPartial"]:[]),
         ...(["ZhongZheng","HanYang","Type38"].includes(id)?["bolt"]:[])]){
         if(action.startsWith("reload"))vm.TriggerReload({remainingRounds:action==="reloadPartial"?3:0});else vm.TriggerBolt();
         const row={id,action,maxGrip:0,maxWrist:0,maxFingerTranslation:0,unreachable:0,propSamples:[],worstGrip:null,worstWrist:null};
@@ -107,6 +107,10 @@ try {
             }else if(id==="Type11"&&t>.20&&t<.80&&((t-.20)%.10)<.032){prop=vm.clipProp.userData.body;kind="hopperClip";}
           }
           if(prop){const triangles=Triangles(prop);for(const digit of digits)row.propSamples.push({t,kind,digit,distance:Nearest(Pad(side,digit),triangles)});}
+          if(id==="Type11"&&action.startsWith("reload")&&t>.09&&t<.875) {
+            const triangles=Triangles(vm.rig.parts.hopperFollower);
+            for(const digit of [0,1,2])row.propSamples.push({t,kind:"follower",digit,distance:Nearest(Pad("l",digit),triangles)});
+          }
         }
         result.actions.push(row);for(let i=0;i<60;i++)editor.Update(1/60);
       }

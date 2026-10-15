@@ -28,6 +28,8 @@
 - [Forgotten Weapons：Type 11 Nambu LMG](https://www.forgottenweapons.com/light-machine-guns/type-11-nambu-lmg/)
   及其链接的 [Japanese Infantry Weapons 手册](https://www.forgottenweapons.com/wp-content/uploads/2012/02/Japanese%20Infantry%20Weapons%20report%20%28English%29.pdf)：
   六个五发桥夹逐层叠放，供弹时才脱离桥夹，空夹从底部排出。
+- [Forgotten Weapons：Vintage Saturday: Type 11 Nambu](https://www.forgottenweapons.com/vintage-saturday-type-11-nambu/)，
+  Ian McCollum，2012-03-31：说明装填时需要扶住漏斗盖；动画采用左手持续抓住压弹板外缘、右手放夹的姿势。
 - [ZB-26 原厂手册](https://www.forgottenweapons.com/wp-content/uploads/manuals/ZB%2026%20manual.pdf)，
   印刷页 10、14–15：最后一发射击后机构仍处于开膛待发位置，插入新匣即可继续；
   不需要在普通空匣/余弹换匣后再次拉动机柄。
@@ -89,6 +91,11 @@ Blender 原始工程保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/RifleR
 余弹旧匣收回补给位置，空匣才抛弃。初次装填所需的手动拉机柄仍有独立 `TriggerCharge` 动作。
 十一年式先抬压弹板，六个桥夹的五发弹始终留在夹内，
 在同一 X/Z 位置沿 Y 叠放；有余弹时先取走旧叠夹，再装满。每五发供完后从底部落下一只空夹。
+左手抓住压弹板外缘并随它抬起、保持和放下，前臂留在机匣下方；枪托向身体收拢。
+最后一夹放入后，右手先沿弧线回握，左手再回到前托；不让弹簧压弹板悬空停住。
+扶板手型独立保存在 `FPS_HAND_SHAPES.hopperFollower`，基于实际蒙皮指腹与原板面校准，
+同时约束关闭、抬起、打开和放下阶段的腕角；拇指与食指、中指相对扣住板沿，其余两指保持放松。
+靠近与回收时掌位、朝向同步插值，余弹流程也先抓稳再抬板。静态托枪与所有手指骨段长度保持。
 九二式继续使用独立横向保弹板及主机事件接口。
 
 释放的弹壳、漏夹、桥夹和弹匣保留释放帧变换，转移到世界场景，使用正常场景深度与运动矢量；
@@ -138,7 +145,8 @@ Blender 原始工程保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/RifleR
 
 本轮实际完成的检查：
 
-- `FpsHandContactTest`：15 个握持/开火姿势；提速后 1,840 帧换弹和拉栓（含捷克式余弹换匣），手指与实际机件接触、骨长及可达性通过。
+- `FpsHandContactTest`：15 个握持/开火姿势；提速后 2,119 帧换弹和拉栓（含捷克式与十一年式余弹装填），手指与实际机件接触、骨长及可达性通过。
+  十一年式扶板三指的最大取样距离为 7.90 mm，双手全程腕角小于 65°，无不可达帧。
 - `FpsArmTest`、`FpsSleeveTest`、`AdsSightTest`：完整姿势与袖口检查通过；汉阳造空仓/余弹和两种轻机枪均测连续回手。
 - `FpsReloadMechanicsTest`：六个空仓/余弹步枪循环、三支枪的普通拉栓、六层完整桥夹、世界释放及正常场景深度通过。
 - `MuzzleFlashTest`：四把枪、腰射/ADS、高/低画质共 16 个实际射击光照场景和四个 4 秒连射场景通过。
@@ -147,5 +155,11 @@ Blender 原始工程保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/RifleR
 - `FirearmActionsTest`、`FirearmResponseBrowserTest`、`MotionVectorContractTest`、`TerrainBlendTest`、
   `AssetStandardsTest`、`ModelFacingTest`、`ModuleGraphTest`、`TestRunnerTest` 通过；浏览器包构建成功。
 - 原始连续帧及空仓/余弹、ADS 起手关键帧均保留在本地；观察预览等比缩小，素材原图保留。
+
+本次机枪衔接修订在 `MachineGunReload/Data_GatesV4.log` 定向重跑双臂、皮肤接触、
+机械流程、主机枪械响应、架枪及模块图六项，全部通过且无基线失败。
+机械流程同时确认捷克式手动拉机柄仍有约 59.8 mm 的完整行程，十一年式分别检查空仓与 13 发余弹。
+高画质连续帧在 `MachineGunReload/FinalEmpty`、`HopperFinal` 和 `HopperPartialFinal`；
+正常与半速视频仅留本地，不进入发布包。
 
 Blender 源工程已保存。本任务的 `Script_BlenderMcp status --scan` 无自有存活实例；其它会话的实例未操作。

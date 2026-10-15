@@ -161,6 +161,7 @@ export const FPS_TOP_MAG_RELOAD = Object.freeze({
 // FW Type 11 Nambu and Japanese Infantry Weapons, Intelligence Bulletin.
 // Hopper bounds measured on the private, grip-normalized imported mesh.
 export const FPS_HOPPER_RELOAD = Object.freeze({
+  supportHand:"right",
   blend:[[0,0],[.16,1],[.88,1],[1,0]],
   bodyOffset:{shoulders:{right:[.004,.012,-.030],left:[0,.012,0]},elbowPoles:{right:[.04,.02,0],left:[-.02,0,0]}},
   support:[
@@ -174,9 +175,9 @@ export const FPS_HOPPER_RELOAD = Object.freeze({
     [.88,-.020,.009,.055,.12,.22,-.27],[1,0,0,0,0,0,0],
   ],
   seat:[-.118,-.063,-.120], layerPitchM:.0131,
-  // The rear handle lifts the follower up and forward around its front hinge.
+  // The left hand lifts the rear rim up and forward around the front hinge.
   followerPivot:[-.113,.0245,-.1698], followerAngleRad:-1.42,
-  followerHandleOffset:[-.015,0,.038],
+  followerRimOffset:[-.060,0,.038],
   follower:[[0,0],[.07,0],[.16,1],[.80,1],[.88,0],[1,0]],
   drawAt:.20, cycle:.10, alignPhase:.35, seatPhase:.60, releasePhase:.64, clearPhase:.76,
   approachHeightM:.075,

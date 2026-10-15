@@ -3337,10 +3337,11 @@ export class Viewmodel {
    * 一发一发往里塞是错的（史料明确写了是桥夹压入）。
    */
   _PoseReloadMotion(t, motion) {
-    // 左掌支撑护木；取夹卸力、压弹下沉、推栓回带，最后才回到据枪。
+    // Rotate about the supporting grip. Type 11 rests its stock against the
+    // body while the left forearm cradles the receiver and holds the follower.
     const raise = ReloadTrack(motion.blend, t);
     const pose = Array.from({ length: 6 }, (_, i) => ReloadTrack(motion.support, t, i + 1));
-    this._PoseReload("left", 1, ...pose, raise);
+    this._PoseReload(motion.supportHand || "left", 1, ...pose, raise);
     if (this.riggedArms) {
       const body=motion.bodyOffset;
       this.riggedArms.reloadBodyOffset = motion.elbows ? {...body,elbowPoles:{
@@ -3578,7 +3579,7 @@ export class Viewmodel {
     this._PoseReloadMotion(t,spec);
     const follower=this.rig.parts.hopperFollower;
     const remaining=this.action.roundsRemaining,partial=remaining>0;
-    const followerT=partial&&t<.16?Math.min(.16,t*.16/.115):t;
+    const followerT = partial && t < .16 ? .07 + .09 * Ease.Seg(t,.07,.115) : t;
     if(follower)follower.rotation.x=spec.followerAngleRad*ReloadTrack(spec.follower,followerT);
     const spacing=FPS_RELOAD_PROPS.profiles.Type38.spacing;
     const seat=new THREE.Vector3(spec.seat[0]+2*spacing,spec.seat[1],spec.seat[2]);
@@ -3606,12 +3607,25 @@ export class Viewmodel {
     if(phase<spec.alignPhase)prop.position.lerpVectors(pouch,above,Ease.InOut(phase/spec.alignPhase));
     else prop.position.lerpVectors(above,target,Ease.InOut(Ease.Seg(phase,spec.alignPhase,spec.seatPhase)));
     const Grip=(anchor)=>this._HandPlacement("clip",anchor,turn);
-    const followerPoint=new THREE.Vector3().fromArray(spec.followerPivot).add(new THREE.Vector3().fromArray(spec.followerHandleOffset).applyAxisAngle(new THREE.Vector3(1,0,0),spec.followerAngleRad*ReloadTrack(spec.follower,followerT)));
+    const followerTurn=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),spec.followerAngleRad*ReloadTrack(spec.follower,followerT));
+    const followerPoint=new THREE.Vector3().fromArray(spec.followerPivot).add(new THREE.Vector3().fromArray(spec.followerRimOffset).applyQuaternion(followerTurn));
+    const held=this._HandPlacement("hopperFollower",followerPoint,followerTurn);
+    const leftBaseRotation=this.handBaseRot.left.toArray().slice(0,3);
+    const LeftRotation=weight=>new THREE.Euler().setFromQuaternion(
+      new THREE.Quaternion().setFromEuler(this.handBaseRot.left).slerp(
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(...held.rotation,"YXZ")),weight),"YXZ").toArray().slice(0,3);
+    this._WorkingHandPath("left",t,[
+      {at:.04,position:this.handBase.left.clone().lerp(held.position,.45).add(new THREE.Vector3(-.012,.012,0)),
+        rotation:LeftRotation(.45),shape:"relax",through:true},
+      {at:.07,...held},{at:.88,...held},
+      {at:.94,position:held.position.clone().lerp(this.handBase.left,.65).add(new THREE.Vector3(-.008,.012,0)),
+        rotation:LeftRotation(.35),shape:"recover",through:true},
+      {at:.985,position:this.handBase.left,rotation:leftBaseRotation,weight:0,shape:"recover"},
+    ]);
     const frames=partial
-      ? [{at:.07,...Grip(followerPoint)},{at:.115,...Grip(followerPoint)},
+      ? [{at:.115,...Grip(oldGrip||pouch),shape:"relax",through:true},
         {at:.13,...Grip(oldGrip||pouch)},{at:.19,...Grip(oldGrip||pouch)},{at:.195,...Grip(pouch)}]
-      : [{at:.07,...Grip(followerPoint)},{at:.16,...Grip(followerPoint)},
-        {at:.19,...Grip(pouch),shape:"relax",through:true}];
+      : [{at:.19,...Grip(pouch),shape:"relax",through:true}];
     for(let i=0;i<6;i++) {
       const at=spec.drawAt+i*spec.cycle,position=seat.clone();position.y+=i*spec.layerPitchM;
       const carried=position.clone().add(new THREE.Vector3(0,spec.approachHeightM,0));
@@ -3620,8 +3634,10 @@ export class Viewmodel {
         {at:at+spec.releasePhase*spec.cycle,...Grip(position)},
         {at:at+spec.clearPhase*spec.cycle,...Grip(position.clone().add(new THREE.Vector3().fromArray(spec.clearOffset))),shape:"relax",through:true});
     }
-    frames.push({at:.80,...Grip(followerPoint)},{at:.88,...Grip(followerPoint)},
-      {at:.94,...Grip(clear),shape:"relax",through:true});
+    const rightBaseRotation=this.handBaseRot.right.toArray().slice(0,3);
+    const topClear=clear.clone().add(new THREE.Vector3(0,5*spec.layerPitchM,0));
+    frames.push({at:.82,position:topClear.lerp(this.handBase.right,.5),rotation:rightBaseRotation,shape:"recover",through:true},
+      {at:.875,position:this.handBase.right,rotation:rightBaseRotation,weight:0,shape:"recover"});
     this._WorkingHandPath("right",t,frames);
   }
 

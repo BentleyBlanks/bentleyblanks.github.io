@@ -147,12 +147,15 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
         if (!traceMotion) return;
         const hand = vm.handRight.group, gun = vm.reloadPivot;
         const current = { t: vm.action?.t ?? 1, hand: hand.position.clone(), rotation: hand.quaternion.clone(),
+          leftHand:vm.handLeft.group.position.clone(),leftRotation:vm.handLeft.group.quaternion.clone(),
           gun: gun.position.clone(), gunRotation: gun.quaternion.clone() };
         if (previous) {
-          const handStep = current.hand.distanceTo(previous.hand);
+          const handStep = Math.max(current.hand.distanceTo(previous.hand),
+            weapon === "Type11" ? current.leftHand.distanceTo(previous.leftHand) : 0);
           if (handStep > motion.maxHandStepM) motion.handStepAt = current.t;
           motion.maxHandStepM = Math.max(motion.maxHandStepM, handStep);
           motion.maxHandTurnDeg = Math.max(motion.maxHandTurnDeg, THREE.MathUtils.radToDeg(current.rotation.angleTo(previous.rotation)));
+          if(weapon === "Type11")motion.maxHandTurnDeg=Math.max(motion.maxHandTurnDeg,THREE.MathUtils.radToDeg(current.leftRotation.angleTo(previous.leftRotation)));
           const gunTurn = current.gunRotation.angleTo(previous.gunRotation), gunStep = current.gun.distanceTo(previous.gun);
           motion.maxGunTurnDeg = Math.max(motion.maxGunTurnDeg, THREE.MathUtils.radToDeg(gunTurn));
           if (previous.t >= 0.30 && current.t <= 0.80) {
@@ -181,6 +184,8 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
           cameraLayerRotation: Math.hypot(vm.actionPivot.rotation.x, vm.actionPivot.rotation.y, vm.actionPivot.rotation.z),
           workingHandTravelM: workingHand.position.distanceTo(vm.handBase[working]),
           supportWeight: arms.contactWeight[support === "right" ? "r" : "l"],
+          supportOperation: arms.operationPose[support === "right" ? "r" : "l"]?.shape,
+          supportNextOperation: arms.operationPose[support === "right" ? "r" : "l"]?.nextShape,
           action: vm.action?.kind, pivotRotation: vm.reloadPivot
             ? Math.hypot(vm.reloadPivot.rotation.x, vm.reloadPivot.rotation.y, vm.reloadPivot.rotation.z) : 0,
         });
@@ -239,9 +244,16 @@ for (const entry of report.reloadCases) {
     checks.push([`${label} 动作完整收回`, entry.action === null && entry.neutral, JSON.stringify(entry)]);
     continue;
   }
-  checks.push([`${label} 支撑手不随相机轴横飞`, entry.supportTravelM < 0.11
-    && entry.cameraLayerRotation < 1e-8 && entry.supportWeight > 0.99,
-  `travel=${entry.supportTravelM.toFixed(4)}m cameraRotation=${entry.cameraLayerRotation.toFixed(4)}`]);
+  if(entry.weapon === "Type11") {
+    // The spring follower needs a real hand throughout loading. Finger pads
+    // against its mesh are independently checked by FpsHandContactTest.
+    checks.push([`${label} 左手扶压弹板或连续回收`, entry.cameraLayerRotation < 1e-8
+      && entry.supportWeight < .01 && (entry.t < .88 ? entry.supportOperation === "hopperFollower"
+        : entry.supportNextOperation === "recover"),
+    `operation=${entry.supportOperation} weight=${entry.supportWeight}`]);
+  } else checks.push([`${label} 支撑手不随相机轴横飞`, entry.supportTravelM < 0.11
+      && entry.cameraLayerRotation < 1e-8 && entry.supportWeight > 0.99,
+    `travel=${entry.supportTravelM.toFixed(4)}m cameraRotation=${entry.cameraLayerRotation.toFixed(4)}`]);
   checks.push([`${label} 保留真实取弹动作`, entry.action === "reload" && entry.pivotRotation > 0.01
     && (entry.t !== 0.62 || entry.workingHandTravelM > 0.015),
   `hand=${entry.workingHandTravelM.toFixed(4)}m tilt=${entry.pivotRotation.toFixed(4)}`]);

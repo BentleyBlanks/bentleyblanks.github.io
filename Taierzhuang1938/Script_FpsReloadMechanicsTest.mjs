@@ -116,32 +116,40 @@ try {
       Check(remaining>0?stowed&&!tossed:tossed,"Zb26: retain a partly loaded magazine and discard only the empty one");
       magazines.push({remaining,maxCharge,tossed,stowed});
     }
+    Check(vm.TriggerCharge(),"Zb26: removing the reload charging stroke disabled manual cocking");
+    let manualChargeTravelM=0;
+    while(vm.action) {Step(20);manualChargeTravelM=Math.max(manualChargeTravelM,vm.rig.parts.bolt.position.z);}
+    Check(manualChargeTravelM>vm.rig.boltTravel*.98,"Zb26: manual cocking no longer uses the full charging stroke");
     // Type 11 takes complete horizontal chargers. Independent vertex bounds
     // catch the previous six vertical clips with disappearing loose rounds.
     const hopper=[];
-    editor.SetWeapon("Type11");Step(0,90);vm.TriggerReload({remainingRounds:0});
-    Check(!!vm.rig.parts.hopperFollower,"Type11: hopper follower is a static cap");
-    for(let layer=1;layer<=6;layer++) {
-      const target=.27+(layer-1)*.10;
-      while(vm.action&&vm.action.t<target)Step(0);
-      const props=vm.hopperClips.filter(prop=>prop.visible);
-      Check(props.length===layer,`Type11: expected ${layer} retained chargers, got ${props.length}`);
-      Check(vm.rig.parts.hopperFollower.rotation.x< -1,"Type11: follower must open up and forward before loading");
-      for(let i=0;i<props.length;i++) {
-        const prop=props[i],rounds=prop.userData.rounds,points=[];
-        rounds.traverse(mesh=>{if(mesh.isMesh)for(let j=0;j<mesh.geometry.attributes.position.count;j++)
-          points.push(Point(mesh,new THREE.Vector3().fromBufferAttribute(mesh.geometry.attributes.position,j)));});
-        const bounds=new THREE.Box3().setFromPoints(points),size=bounds.getSize(new THREE.Vector3());
-        Check(size.x>.050&&size.y<.013,"Type11: five-round charger is standing upright");
-        Check(rounds.visible&&rounds.position.lengthSq()===0,"Type11: rounds stripped from charger during loading");
-        if(i)Check(Math.abs(prop.position.y-props[i-1].position.y-.0131)<1e-5,"Type11: chargers do not form a vertical stack");
+    for(const remaining of [0,13]) {
+      editor.SetWeapon("Type11");Step(remaining,90);vm.TriggerReload({remainingRounds:remaining});
+      Check(!!vm.rig.parts.hopperFollower,"Type11: hopper follower is a static cap");
+      for(let layer=1;layer<=6;layer++) {
+        const target=.27+(layer-1)*.10;
+        while(vm.action&&vm.action.t<target)Step(remaining);
+        const props=vm.hopperClips.filter(prop=>prop.visible);
+        Check(props.length===layer,`Type11: expected ${layer} retained chargers, got ${props.length}`);
+        Check(vm.rig.parts.hopperFollower.rotation.x< -1,"Type11: follower must open up and forward before loading");
+        Check(vm.riggedArms.operationPose.l?.shape==="hopperFollower"&&vm.riggedArms.contactWeight.l<.01,
+          "Type11: left hand must support the spring follower while the right hand loads");
+        for(let i=0;i<props.length;i++) {
+          const prop=props[i],rounds=prop.userData.rounds,points=[];
+          rounds.traverse(mesh=>{if(mesh.isMesh)for(let j=0;j<mesh.geometry.attributes.position.count;j++)
+            points.push(Point(mesh,new THREE.Vector3().fromBufferAttribute(mesh.geometry.attributes.position,j)));});
+          const bounds=new THREE.Box3().setFromPoints(points),size=bounds.getSize(new THREE.Vector3());
+          Check(size.x>.050&&size.y<.013,"Type11: five-round charger is standing upright");
+          Check(rounds.visible&&rounds.position.lengthSq()===0,"Type11: rounds stripped from charger during loading");
+          if(i)Check(Math.abs(prop.position.y-props[i-1].position.y-.0131)<1e-5,"Type11: chargers do not form a vertical stack");
+        }
+        hopper.push({remaining,t:vm.action.t,chargers:props.length});
       }
-      hopper.push({t:vm.action.t,chargers:props.length});
+      while(vm.action)Step(30);
+      Step(30);Step(25);
+      Check(vm.hopperClips.filter(prop=>prop.visible).length===5,"Type11: empty bottom charger does not advance the stack");
+      Check(vm.debris.some(d=>d.alive>0&&d.mesh.userData.debrisKind==="hopperCharger"),"Type11: empty charger does not drop from the hopper bottom");
     }
-    while(vm.action)Step(30);
-    Step(30);Step(25);
-    Check(vm.hopperClips.filter(prop=>prop.visible).length===5,"Type11: empty bottom charger does not advance the stack");
-    Check(vm.debris.some(d=>d.alive>0&&d.mesh.userData.debrisKind==="hopperCharger"),"Type11: empty charger does not drop from the hopper bottom");
     editor.SetWeapon("HanYang"); vm.autoBolt=true; Step(2,90);
     vm.TriggerFire();
     let packet=null;
@@ -161,7 +169,7 @@ try {
       Check(worldError<1e-6,"released packet follows the player's view instead of remaining in world space");
       game.camera.quaternion.copy(rotation);game.camera.position.copy(cameraPosition);vm._StepDebris(0);
     }
-    return {cases,boltMotion,magazines,hopper,worldError,failures};
+    return {cases,boltMotion,magazines,manualChargeTravelM,hopper,worldError,failures};
   });
   await fs.writeFile(path.join(output,"Data_Mechanics.json"),JSON.stringify({...report,errors},null,2));
   assert.deepEqual(errors,[],"no page errors");assert.deepEqual(report.failures,[],"rifle mechanical authenticity");
