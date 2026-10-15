@@ -42,19 +42,64 @@ const SUPPORT = V(48, 66, 42);
 const TRIGGER = V(16, 22, 10);
 // Thumb on the upper edge, index supporting the lower edge. Fitted against
 // the complete scanned finger skin and the loaded packet, not pad markers.
-const PacketClip = Freeze({ side:"r",palmOffset:V(.067,.014,.0012),rotation:V(-.336,3.076,.714),
+const HopperClip = Freeze({ side:"r",palmOffset:V(.067,.014,.0012),rotation:V(-.336,3.076,.714),
   fingers:Freeze([V(0,14.5,.5),V(75,50,27.5),V(77.5,35,19.25),V(55,75,41.25),V(58,78,42.9)]),
   thumbDirection:V(1.020,-.096,.732),thumbRoll:-20,fingerSplay:Freeze([0,9,-15.25,-3,-6]) });
+// Counter the scan's bind fan (+7.46/-4.74/-15.34/-29.63 degrees). These
+// increments leave a small ordered fan instead of crossing the finger rows.
+const PacketFingerSplay = Freeze([0,-4.5,4.7,12.3,23.6]);
+const PacketClip = Freeze({side:"r",palmOffset:V(.065,.023,-.014),rotation:V(-.25,3.14,1.35),
+  fingers:Freeze([V(0,16,8),V(40,52,27),V(43,56,28),V(45,55,27),V(45,55,27)]),
+  thumbDirection:V(-.2,-1,.45),thumbRoll:0,fingerSplay:PacketFingerSplay});
 // Working-hand poses are blended with the per-weapon holding pose. The thumb
 // opposes the fingers independently. MCP/PIP/DIP angles are ordered
 // thumb/index/middle/ring/little; offsets and rotations are in prop space.
 export const FPS_HAND_SHAPES = Freeze({
   packetClip: PacketClip,
-  hopperClip: PacketClip,
+  hopperClip: HopperClip,
   // Keep the palm above the receiver; only the opposed thumb loads the packet.
-  packetPress: Freeze({side:"r",palmOffset:V(.0186,.0479,-.0282),rotation:V(-.12,3.14,.2),
-    fingers:Freeze([V(0,25,15),V(8,22,12),V(12,28,15),V(18,34,18),V(24,40,22)]),
-    thumbDirection:V(-.25,-.8,.5),thumbRoll:-26.16,fingerSplay:Freeze([0,5,0,-3,-6])}),
+  packetPress: Freeze({side:"r",palmOffset:V(.0846,.032,-.035),rotation:V(-.12,3.14,.2),
+    fingers:Freeze([V(0,12,4),V(42,62,32),V(44,66,34),V(46,70,36),V(48,72,38)]),
+    thumbDirection:V(.65,-.65,.35),thumbRoll:0,fingerSplay:PacketFingerSplay}),
+  packetRelax: Freeze({side:"r",fingers:Freeze([V(0,14,8),V(18,32,16),V(24,42,22),V(30,48,25),V(36,54,28)]),
+    thumbDirection:V(.4,-.45,.65),thumbRoll:0,fingerSplay:PacketFingerSplay}),
+  packetRecover: Freeze({side:"r",fingers:Freeze([V(0,18,10),V(36,54,28),V(40,60,32),V(44,64,34),V(48,68,36)]),
+    thumbDirection:V(.35,-.5,.65),thumbRoll:0,fingerSplay:PacketFingerSplay}),
+  // The finger row runs diagonally outside the cocking piece. Opposed pads
+  // surround the knob while the ring/little fingers clear the receiver.
+  packetBolt: Freeze({side:"r",palmOffset:V(.053730633,-.025207960,.005244321),rotation:V(.403990256,2.830473596,.901371334),
+    fingers:Freeze([V(0,20,12),V(48,68,38),V(54,72,42),V(52,70,40),V(48,66,38)]),
+    thumbDirection:V(-.4,-.35,.9),thumbRoll:0,fingerSplay:PacketFingerSplay}),
+  packetLatch: Freeze({side:"r",fingers:Freeze([V(0,12,8),V(6,18,10),V(40,58,30),V(45,64,34),V(50,68,36)]),
+    thumbDirection:V(-.15,-.30,.90),thumbRoll:0,fingerSplay:PacketFingerSplay}),
+  packetClear: Freeze({side:"r",fingers:Freeze([V(0,18,12),V(6,12,8),V(10,18,10),V(14,22,12),V(18,26,14)]),
+    thumbDirection:V(.053441512,-.171495334,1.066645843),thumbRoll:4.8,fingerSplay:PacketFingerSplay}),
+  packetBoltClear: Freeze({side:"r",fingers:Freeze([V(0,20,12),V(20,32,18),V(28,40,22),V(36,48,26),V(40,52,28)]),
+    thumbDirection:V(-.4,-.35,.9),thumbRoll:0,fingerSplay:PacketFingerSplay}),
+  // Grasp the broad face above the magazine well. The wrist exits on the
+  // receiver's right side, leaving the little finger and sleeve above it.
+  zbMagazine: Freeze({side:"r",palmOffset:V(.054,.141,-.278),rotation:V(-.08,3.36,1.60),
+    fingers:Freeze([V(0,16,10),V(52,65,35.75),V(46,68,37.4),V(52,72,39.6),V(54,74,40.7)]),
+    thumbDirection:V(-.09,-.53,.77),thumbRoll:0,fingerSplay:PacketFingerSplay}),
+  // Unbend each authored grip joint along its captured bind hinge, preserving
+  // the original finger row and roll. The grip thumb keeps its exact rotations.
+  zbClear: Freeze({side:"r",fingers:Freeze([V(0,32.25,12),V(8,12,8),V(20,18,22),V(22,22,12),V(12,16,4)]),
+    thumbDirection:V(-.058124,.450695,.884954),thumbRoll:-13.0004,fingerSplay:PacketFingerSplay,
+    fingerRotations:Freeze({
+      ...Object.fromEntries(["0","01","02"].map(key=>[key,FPS_WEAPON_GRIPS.Zb26.right.fingerRotations[key]])),
+      "1":Freeze([-.016169886,-.118555750,.124584069,.984967958]),
+      "11":Freeze([-.002679957,-.002521407,.104687547,.994498355]),
+      "12":Freeze([-.001789341,-.001681872,.069938331,.997548294]),
+      "2":Freeze([-.017270044,-.092514613,.230440099,.968524730]),
+      "21":Freeze([.002768088,-.004682115,.189910727,.981786296]),
+      "22":Freeze([.003141644,-.005843648,.197149309,.980351025]),
+      "3":Freeze([-.006527867,-.045820774,.277088269,.959729095]),
+      "31":Freeze([.009766736,-.009548865,.196770840,.980354358]),
+      "32":Freeze([.005281024,-.005300893,.110801385,.993814401]),
+      "4":Freeze([-.007171534,.056464231,.183696092,.981333840]),
+      "41":Freeze([.012466040,-.013966697,.144420672,.989339274]),
+      "42":Freeze([.003079800,-.003543144,.041155251,.999141735]),
+    })}),
   open: Freeze({ fingers: Freeze([V(0,10,8),V(6,12,8),V(10,18,10),V(14,22,12),V(18,26,14)]), thumbDirection: V(0.4,-0.38,0.83), thumbRoll: 0, side: "r" }),
   latch: Freeze({ fingers: Freeze([V(0,30,20),V(0,8,6),V(55,65,40),V(55,65,40),V(55,65,40)]), thumbDirection: V(-0.2,-0.7,0.1), thumbRoll: -60, side: "r" }),
   relax: Freeze({ fingers: Freeze([V(0,20,18),V(18,30,15),V(26,36,18),V(34,42,20),V(38,46,22)]), thumbDirection: V(0.1,-0.55,0.6), thumbRoll: -20, side: "r" }),

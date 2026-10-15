@@ -17,6 +17,7 @@ import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
 import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS, FPS_BAYONET_SUPPORT } from "./Data_FpsArmPoses.mjs";
 import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Script_FpsAnatomy.mjs";
+import { StepElbowArc } from "./Script_FpsElbowArc.mjs";
 import { LoadFpsSkeletalAnimations } from "./Script_FpsSkeletalAnimation.mjs";
 
 const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=20261015194000", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
@@ -774,8 +775,10 @@ export class FpsArmRig {
     chosen.normalize();
     const previousPlane = chosen.clone();
     const SignedAngle = (from,to) => Math.atan2(direction.dot(new THREE.Vector3().crossVectors(from,to)),from.dot(to));
+    const authoredReload=this.poseState.reload&&this.reloadBodyOffset?.authoredElbows?.[side==="r"?"right":"left"];
+    this.elbowArcState ||= {};this.elbowArcState[side]=null;
     if (this.videoBody) chosen.copy(pole);
-    else if (computeGoal) chosen.applyAxisAngle(direction,THREE.MathUtils.clamp(SignedAngle(chosen,pole),
+    else if (computeGoal && !authoredReload) chosen.applyAxisAngle(direction,THREE.MathUtils.clamp(SignedAngle(chosen,pole),
       -FPS_ARM_LIMITS.elbowReturnRadPerS*this.solveDt,FPS_ARM_LIMITS.elbowReturnRadPerS*this.solveDt));
     const axial = handDirection.dot(direction);
     const radius = upper*Math.sin(angle);
@@ -784,17 +787,29 @@ export class FpsArmRig {
       preferred.normalize();
       const baseCos = axial*(solvedDistance-upper*Math.cos(angle))/lower;
       const minimumBend = THREE.MathUtils.radToDeg(Math.acos(THREE.MathUtils.clamp(baseCos+amplitude,-1,1)));
-      const desiredBend = this.videoBody?.authoredElbows ? FPS_ARM_LIMITS.wristBendDeg-1
+      const desiredBend = this.videoBody?.authoredElbows || authoredReload ? FPS_ARM_LIMITS.wristBendDeg-1
         : Math.min(FPS_ARM_LIMITS.wristBendDeg-1,
           Math.max(FPS_ARM_LIMITS.wristRelaxedDeg,minimumBend+FPS_ARM_LIMITS.wristPoseSlackDeg));
       const threshold = Math.cos(desiredBend*DEG);
       const allowed = Math.acos(THREE.MathUtils.clamp((threshold-baseCos)/amplitude,-1,1));
-      const offset = SignedAngle(preferred,chosen);
-      if (Math.abs(offset)>allowed) chosen.copy(preferred).applyAxisAngle(direction,Math.sign(offset)*allowed);
+      if(authoredReload){
+        // Track the authored pole through the connected hard-feasible arc.
+        // A direct clamp can switch endpoints across +/-pi in one frame.
+        const step=StepElbowArc({center:SignedAngle(previousPlane,preferred),halfWidth:allowed,
+          target:SignedAngle(previousPlane,pole),maxStep:computeGoal?FPS_ARM_LIMITS.elbowSpeedRadPerS*this.solveDt:0});
+        if((Math.cos((FPS_ARM_LIMITS.wristBendDeg-1)*DEG)-baseCos)/amplitude>1+1e-9)
+          Object.assign(step,{feasible:false,emptyWristArc:true});
+        chosen.copy(previousPlane).applyAxisAngle(direction,step.angle);
+        this.elbowArcState[side]=step;
+      }else{
+        if(this.elbowArcState)this.elbowArcState[side]=null;
+        const offset = SignedAngle(preferred,chosen);
+        if (Math.abs(offset)>allowed) chosen.copy(preferred).applyAxisAngle(direction,Math.sign(offset)*allowed);
+      }
       // An authored pole is already a sampled trajectory. History-dependent
       // steering can take the other side of the wrist-feasible arc and wrap
       // the support elbow over the hilt; it also makes seeking differ from play.
-      if (previous && computeGoal && !this.videoBody?.authoredElbows) {
+      if (previous && computeGoal && !this.videoBody?.authoredElbows && !authoredReload) {
         const delta = SignedAngle(previousPlane,chosen);
         const maximum = FPS_ARM_LIMITS.elbowSpeedRadPerS*this.solveDt;
         chosen.copy(previousPlane).applyAxisAngle(direction,THREE.MathUtils.clamp(delta,-maximum,maximum));

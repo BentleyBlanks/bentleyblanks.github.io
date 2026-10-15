@@ -277,3 +277,67 @@ Blender 源工程已保存。本任务的 `Script_BlenderMcp status --scan` 无�
 整站 `BootTest` 仍有既有失败：第 0 切片的 VFX 贴图等待超时，1–6 切片缺少日军远景材质标记。
 本轮树和干净的 `f5a47d7d` 基线都复现相同断言失败；换弹专项及发布包启动均通过。
 两份日志保留为 `HandInertiaBoot.log` / `HandInertiaBootBaseline.log`，未修改开机断言。
+
+## 手指重新摆形与完整路线检查（2026-10-16）
+
+用户再次指出汉阳造手指扭曲、捷克式大面积穿模。上一轮指腹接触数字不能代表手型自然，
+也没有覆盖自由转移中的整掌、腕部与衣袖；本轮针对这两件武器重新检查。
+
+扫描 bind 本身已有约 `+7.46/-4.74/-15.34/-29.63°` 的四指张角。
+汉阳造操作姿势改为相同的小幅有序指扇，拇指沿对握方向动作，减少轴向滚转；
+夹弹与压弹分开，抓柄时环、小指留在枪尾外侧。离开木颈前先解握，在枪外转腕，
+抓柄、移出机柄和重新闭握都有连续过渡。余弹退旧夹与取新夹重新分配节拍，
+按扣声移到 `.305`，原压入、弹药提交与取消规则保持，汉阳造仍为 3.1 秒。
+原来与汉阳造共用的 `hopperClip` 已独立保存，不能据此声称本轮重做了十一年式全部手型。
+
+捷克式使用专属 `zbMagazine`，握点抬到弹匣中上部，腕根退出机匣右侧。
+解握姿势沿原作者骨轴展开四指，保留原指列与滚转；拇指先保留握枪时的三个局部四元数，
+避免在木柄内改换拇指对掌方向。持匣后从枪右侧下降回握，空匣向左释放，
+避免弃匣与撤手相撞。换弹仍为 2.35 秒，原弹匣行程、待发状态与余弹匣保留规则不变。
+
+右肘直接复制目标 pole 会产生可见跳变。本轮的 `Script_FpsElbowArc.mjs` 在同一展开的腕硬限
+可行弧内逐步接近作者 pole，保留 10 rad/s 的肘平面限速；不跨越禁止缺口，
+不因角度表示从 `-pi` 切为 `+pi` 而跳到另一端。无法同时满足硬腕限与步速时明确记录失败。
+该分支仅用于捷克式右臂换弹；普通姿态继续使用原舒适腕角策略。
+20/30/60/120 fps 实际循环均无不可行弧，右腕最大约 57.8°，骨段长度保持。
+
+`FpsReloadClearanceTest` 每 60fps 帧量测真实蒙皮的右指、Hand、混合腕、Forearm 及衣袖，
+检查可见枪体、运动弹匣和弃匣。源网格按焊接边连通壳分组；闭壳按多方向双向一致包含及
+闭壳并集判断，开放壳只记录真实有限三角面的横穿。不再使用 12mm 深度早退。
+非均匀缩放或剪切的弃匣先变换到武器空间再量测距离；预期握持分类不豁免穿插。
+默认成功只表示生成诊断，不能替代画面验收，也不能把开放壳内证据不足当成净空。
+
+接触门禁使用捷克式实际拇、食、中指远节皮肤，汉阳造新旧弹包承力面包含金属后缘与弹壳；
+3mm 接触、2mm 整指穿插门限保留。CPU 圆弧门禁覆盖 142,951 个角度、路径和速率检查。
+本地正常/半速 60fps 录像及原始帧位于 `ReloadHandsFixed_20261016`，不进入发布包。
+
+### 本轮最终验收
+
+最终捷克式空仓、7 发余弹两案各量测 154 帧：包括起始帧、完整 60fps 换弹，
+以及动作结束后继续求解的 12 帧（0.2 秒）。两案闭壳最大穿入深度均约 1.749 mm，
+通过原 2 mm 门限；报告继续保留横穿与接触分类，不将通过深度门限写成零交叉。
+最终数据为 `_shots/FpsReloadClearance/Data_ReloadClearance.json`；
+仓库根目录 `tmp/ReloadRealism/Data_FinalClearanceGateV2.log` 记录实际门禁通过。
+汉阳造另按空仓、余弹及普通拉栓分别检查 187、187、57 帧，最大闭壳穿入深度
+约 1.401、1.794、0.279 mm，详本地 `Data_HanYangFinalComplete10.json`。
+
+本轮八项浏览器专项全部通过：`FpsArmTest`、`FpsHandContactTest`、
+`FpsReloadMechanicsTest`、`FpsSleeveTest`、`AdsSightTest`、`MotionVectorContractTest`、
+`EmplacementViewBrowserTest`、`FirearmResponseBrowserTest`，日志为
+`tmp/ReloadRealism/Data_FinalBrowserGatesV4.log`。另行实际运行的
+`CarriagePropVelocityTest` 通过（190.2 秒，`Data_FinalCarriageVelocity.log`）；
+这九项仅代表所列专项通过，不代表全项目通过。
+严格 staging 发布包也实际播放了两枪完整换弹并检查中心化弃匣，
+通过记录为 `Data_StageAcceptanceFinalV2.log`，构建戳 `1371076439052971`。
+
+本地媒体清单 `ReloadHandsFixed_20261016/Data_DeliveryManifest.json` 保存四案的
+8 条正常/半速 MP4、4 张等比预览及逐帧时间线。656 张原始 JPEG 已逐字节核对，
+视频均为 1280×720、60fps；汉阳造原捕获包含一个结束帧，187 帧视频约 3.1167 秒，
+动作仍为 3.1 秒；捷克式 141 帧视频为 2.35 秒。半速仅重复帧，未插值运动。
+最终捕获 SHA-256 为 `0180d26e14dff4b4495d2a267dd6c77515a5de4877acf442aed6ebd18d6cf259`；
+媒体核验在本地 `Data_FinalHandMediaVerification.json`，旧捕获原帧另按哈希目录保留。
+
+完整 `prepush` 未跑完：在既有 `SpeakerGestureTest` 的
+`FrontObservation.02: luo gestured on his previous line too` 断言处终止，
+记录为 `tmp/ReloadRealism/Data_FinalPrepush.log`。本轮未修改该剧情手势断言，
+也未以换弹专项通过代替整项目验收或真实/3A 目标的完成证明。

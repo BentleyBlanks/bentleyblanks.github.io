@@ -22,7 +22,7 @@ export const RELOAD_EVENTS = Object.freeze({
   ]),
   enBlocPartial: Object.freeze([
     Event(0.085,"open","bolt",{maxDuration:0.28,volume:0.45}),
-    Event(0.275,"releasePacket","bolt",{maxDuration:0.06,volume:0.30}),
+    Event(0.305,"releasePacket","bolt",{maxDuration:0.06,volume:0.30}),
     Event(0.54,"insert","stripperLoad",{maxDuration:0.55,volume:0.75}),
     Event(0.70,"loaded"),
     Event(0.825,"close","bolt",{offset:0.50,maxDuration:0.18,volume:0.45}),

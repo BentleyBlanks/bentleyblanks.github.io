@@ -21,7 +21,10 @@ try {
   await page.waitForFunction(()=>window.Taierzhuang?.state?.ready,null,{timeout:240000});
   const report=await page.evaluate(async({only,shelved})=>{
     const THREE=await import("./vendor/three/build/three.module.js");
+    const {FPS_PACKET_RELOAD}=await import("./Data_Tuning_FpsReload.mjs");
     const {MeasureZbContactGeometry}=await import("./Script_FpsZbContactGeometry.mjs");
+    const {CreateReloadClearanceProbe,CreateReloadClearanceGeometry}=await import("./Script_FpsReloadClearanceGeometry.mjs");
+    const magazineClearance=CreateReloadClearanceProbe(THREE);
     const T=window.Taierzhuang,vm=T.viewmodel;let arms=vm.riggedArms;
     T.Debug.OpenEditor("firstPerson");const editor=T.editor.active;
     const probes={ZhongZheng:[.002,-.023,-.0558],HanYang:[.002,-.019,-.0838],Type38:[.003,-.021,-.1288],
@@ -59,20 +62,23 @@ try {
     // A fixed box-derived marker can sit inside a thick thumb, or on its nail
     // side after opposition. Inspect the actual distal skin for these newly
     // fitted grips, and separately reject penetration of the whole finger.
-    const DistalGap=(side,digit,triangles)=>{
+    const SkinGap=(side,digit,triangles,distalOnly=true)=>{
       let distance=Infinity,vertices=0;
       arms.root.traverse(mesh=>{
         if(!mesh.isSkinnedMesh)return;const a=mesh.geometry.attributes;
-        const bone=mesh.skeleton.bones.findIndex(b=>b.name.toLowerCase().replace(/[^a-z0-9]/g,"").endsWith(side+"finger"+digit+"2"));
-        if(bone<0)return;
+        const bones=new Set(mesh.skeleton.bones.map((b,i)=>{
+          const name=b.name.toLowerCase().replace(/[^a-z0-9]/g,"");
+          return (distalOnly?name.endsWith(side+"finger"+digit+"2"):new RegExp(side+"finger"+digit+"[012]?$").test(name))?i:-1;
+        }).filter(i=>i>=0));
+        if(!bones.size)return;
         for(let i=0;i<a.position.count;i++){
-          let weight=0;for(let k=0;k<4;k++)if(a.skinIndex.getComponent(i,k)===bone)weight+=a.skinWeight.getComponent(i,k);
+          let weight=0;for(let k=0;k<4;k++)if(bones.has(a.skinIndex.getComponent(i,k)))weight+=a.skinWeight.getComponent(i,k);
           if(weight<.95)continue;vertices++;
           const point=vm.rig.group.worldToLocal(mesh.getVertexPosition(i,new THREE.Vector3()).applyMatrix4(mesh.matrixWorld));
           distance=Math.min(distance,Nearest(point,triangles));
         }
       });
-      if(vertices<20)throw new Error("Missing distal skin: "+side+digit);
+      if(vertices<20)throw new Error("Missing finger skin: "+side+digit);
       return distance;
     };
     const FingerPenetration=(side,part)=>{
@@ -95,6 +101,30 @@ try {
           if(hits.length%2){inside++;maxDepth=Math.max(maxDepth,depth);}
         }
       });return {vertices,inside,maxDepth};
+    };
+    const MagazineFingerPenetration=part=>{
+      // Only the real magazine subtree is an obstacle here. Per-shell BVH
+      // containment inspects all depths and mixed finger skin, with no 12mm
+      // early exit and no receiver/contact-region exemption.
+      const sample=magazineClearance.Measure({weaponGroup:vm.rig.group,arms,roots:[part],magazine:part,contactClass:"magazineGrip"});
+      const fingers=sample.rows.filter(row=>/^Finger[0-4]$/.test(row.region));
+      return {vertices:Object.entries(sample.coverage).filter(([region])=>/^Finger[0-4]$/.test(region)).reduce((sum,[,count])=>sum+count,0),
+        inside:fingers.reduce((sum,row)=>sum+row.interiorVertices,0),maxDepth:Math.max(0,...fingers.map(row=>row.maxDepthMm))/1000,
+        closedComponents:sample.obstacles.reduce((sum,row)=>sum+row.closedComponents,0),
+        openComponents:sample.obstacles.reduce((sum,row)=>sum+row.openComponents,0),
+        crossingTriangles:fingers.reduce((sum,row)=>sum+row.crossingSkinTriangles,0),coverage:sample.coverage};
+    };
+    const BoltKnobTriangles=part=>{
+      const center=vm.rig.group.worldToLocal(vm.rig.boltHandleNode.getWorldPosition(new THREE.Vector3()));
+      const surface=CreateReloadClearanceGeometry(THREE).Surface(Triangles(part));
+      const sphere=surface.components.find(component=>{
+        const size=component.tree.box.getSize(new THREE.Vector3());
+        return component.closed&&[size.x,size.y,size.z].every(v=>v>.018&&v<.028)
+          &&component.tree.box.getCenter(new THREE.Vector3()).distanceTo(center)<.002;
+      });
+      if(!sphere)throw Error('Missing real closed Hanyang bolt knob');
+      const triangles=[],Read=node=>{if(node.list)triangles.push(...node.list.map(item=>item.triangle));else{Read(node.left);Read(node.right);}};
+      Read(sphere.tree);return triangles;
     };
     const TriggerPoint=(id)=>{
       const origin=new THREE.Vector3(...probes[id]);origin.z-=.012;
@@ -143,11 +173,17 @@ try {
           if(action.startsWith("reload")){
             if(["ZhongZheng","HanYang","Type38"].includes(id)){
               const packet=id==="HanYang",partial=packet&&action==="reloadPartial",held=packet?vm.packetProp:vm.clipProp;
-              if((t>(partial ? .40 : .33)&&t<(partial ? .52 : .48))||(!packet&&t>.71&&t<.75)){
-                prop=held.userData.body;kind=packet?"packet":"clip";
+              const packetHand=FPS_PACKET_RELOAD.tactical.hand;
+              const partialClipAt=packetHand.find(point=>point.anchor==="clip").at;
+              const partialOldAt=packetHand.find(point=>point.anchor==="oldClip").at;
+              if((t>(partial ? partialClipAt+.005 : .33)&&t<(partial ? .52 : .48))||(!packet&&t>.71&&t<.75)){
+                // A rigid loaded packet is supported on its rear frame and
+                // cartridge cases; the index can bear on a case rather than
+                // the metal frame. Query that complete assembly at the same 3mm gate.
+                prop=packet?held:held.userData.body;kind=packet?"packet":"clip";
               }else if(t>(partial ? .60 : .56)&&t<(partial ? .68 : .63)){prop=held.userData.rounds;digits=[0];kind="press";}
-              else if(partial&&t>.32&&t<.35){prop=vm.usedPacketProp.userData.body;kind="oldPacket";}
-            }else if(id==="Zb26"&&((t>.17&&t<.30)||(t>.58&&t<.73))){prop=vm.rig.parts.magazine;digits=[0,2];kind="magazine";}
+              else if(partial&&t>partialOldAt+.005&&t<FPS_PACKET_RELOAD.tactical.oldClipVisible[1]){prop=vm.usedPacketProp;kind="oldPacket";}
+            }else if(id==="Zb26"&&((t>.17&&t<.30)||(t>.58&&t<.73))){prop=vm.rig.parts.magazine;digits=[0,1,2];kind="magazine";}
             else if(id==="ServicePistol"){
               side="l";
               if((t>.17&&t<.27)||(t>.52&&t<.69)){prop=vm.magazineProp;kind="pistolMagazine";}
@@ -155,13 +191,21 @@ try {
             }else if(id==="Type11"&&t>.20&&t<.80&&((t-.20)%.10)<.032){prop=vm.clipProp.userData.body;kind="hopperClip";}
           }
           if(prop){
-            const skinContact=(id==="HanYang"&&["packet","oldPacket","press"].includes(kind))||kind==="hopperClip";
-            const triangles=Triangles(prop);
+            const zbMagazine=id==="Zb26"&&kind==="magazine";
+            const hanBolt=id==="HanYang"&&kind==="bolt";
+            const skinContact=(id==="HanYang"&&["packet","oldPacket","press","bolt"].includes(kind))||kind==="hopperClip"||zbMagazine;
+            // The opposed knob grip bears on the volar thumb across its IP
+            // crease. Measure that actual skin against the isolated knob,
+            // rather than a box-derived marker on the other side of the digit.
+            const triangles=hanBolt?BoltKnobTriangles(prop):Triangles(prop);
             for(const digit of digits)row.propSamples.push({t,kind,digit,skinContact,
-              distance:skinContact?DistalGap(side,digit,triangles):Nearest(Pad(side,digit),triangles)});
+              distance:skinContact?SkinGap(side,digit,triangles,!hanBolt):Nearest(Pad(side,digit),triangles)});
             if(skinContact&&frame%15===0){
-              const whole=kind==="press"?vm.packetProp:kind==="oldPacket"?vm.usedPacketProp:kind==="packet"?vm.packetProp:vm.clipProp;
-              row.skinSamples.push({t,kind,...FingerPenetration("r",whole)});
+              if(zbMagazine||hanBolt)row.skinSamples.push({t,kind,...MagazineFingerPenetration(prop)});
+              else {
+                const whole=kind==="press"?vm.packetProp:kind==="oldPacket"?vm.usedPacketProp:kind==="packet"?vm.packetProp:vm.clipProp;
+                row.skinSamples.push({t,kind,...FingerPenetration("r",whole)});
+              }
             }
           }
           if(id==="Type11"&&action.startsWith("reload")&&t>.09&&t<(action==="reloadPartial"?.875:.837)) {
@@ -200,6 +244,19 @@ try {
       const loading=action.skinSamples.filter(sample=>sample.kind!=="operatingHandle");
       Check(loading.length>0&&loading.every(sample=>sample.vertices>4000),`${action.id}: loading grip did not inspect complete finger skin`);
       for(const sample of loading)Check(sample.maxDepth<.002,`${action.id} ${sample.kind}: finger skin penetrates ammunition ${(sample.maxDepth*1000).toFixed(2)} mm at ${sample.t.toFixed(3)}`);
+    }
+    if(action.id==="Zb26"&&action.action.startsWith("reload")){
+      const loading=action.skinSamples.filter(sample=>sample.kind==="magazine"),contacts=action.propSamples.filter(sample=>sample.kind==="magazine");
+      Check([0,1,2].every(digit=>contacts.some(sample=>sample.digit===digit&&sample.skinContact)),"Zb26: magazine contact must sample actual thumb/index/middle distal skin");
+      Check(loading.length>0&&loading.every(sample=>sample.vertices>4000&&[0,1,2,3,4].every(digit=>sample.coverage["Finger"+digit]>0)),"Zb26: magazine grip did not inspect complete finger skin");
+      for(const sample of loading){
+        Check(sample.closedComponents>0&&sample.openComponents===0,"Zb26: real magazine must provide closed-shell penetration evidence");
+        Check(sample.maxDepth<.002,`Zb26 magazine: finger skin penetrates ${(sample.maxDepth*1000).toFixed(2)} mm at ${sample.t.toFixed(3)}`);
+      }
+    }
+    if(action.id==="HanYang"&&action.action==="bolt"){
+      Check(action.skinSamples.length>0&&action.skinSamples.every(sample=>sample.vertices>4000),"HanYang: knob grasp must inspect complete finger skin");
+      for(const sample of action.skinSamples)Check(sample.maxDepth<.002,`HanYang bolt: finger skin penetrates ${(sample.maxDepth*1000).toFixed(2)} mm`);
     }
     if(action.id==="Type11"&&action.action==="reload") {
       const handle=action.skinSamples.filter(sample=>sample.kind==="operatingHandle");

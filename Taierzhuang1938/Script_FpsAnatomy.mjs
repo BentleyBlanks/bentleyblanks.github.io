@@ -93,6 +93,15 @@ export function ApplyAnatomicalFingers(rig) {
       const finger = Number(match[1]); const segment = Number(match[2] || 0);
       const authored = contact?.fingerRotations?.[match[1]+(match[2]||'')];
       const authoredTrigger = contact?.triggerRotations?.[match[1]+(match[2]||'')];
+      const workingKey=match[1]+(match[2]||'');
+      const BlendWorkingRotation=()=>{
+        const from=shape?.fingerRotations?.[workingKey],to=next?.fingerRotations?.[workingKey];
+        if(!from&&!to)return;
+        const digitMix=DigitMix(finger),weight=from&&to?1:from?1-digitMix:digitMix;
+        const target=new THREE.Quaternion().fromArray(from||to).normalize();
+        if(from&&to)target.slerp(new THREE.Quaternion().fromArray(to).normalize(),digitMix);
+        bone.quaternion.slerp(target,weight);
+      };
       const AuthoredRotation = () => {
         const rotation = new THREE.Quaternion().fromArray(authored).normalize();
         return authoredTrigger && fire ? rotation.slerp(new THREE.Quaternion().fromArray(authoredTrigger).normalize(),fire) : rotation;
@@ -122,7 +131,7 @@ export function ApplyAnatomicalFingers(rig) {
         bone.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(direction,target).multiply(rest));
         const roll = THREE.MathUtils.lerp(contact?.thumbRoll || 0,working?.thumbRoll || 0,workingBlend);
         if (roll) bone.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(target, roll*Math.PI/180));
-        BlendAuthored();
+        BlendWorkingRotation();BlendAuthored();
         continue;
       }
       const degrees = finger === 0 && !contact?.fingers && !working ? (rig.unarmed ? (segment === 1 ? 32 : 22) : firearm ? (segment === 1 ? 12 : 8) : 28) : curl[segment];
@@ -133,7 +142,7 @@ export function ApplyAnatomicalFingers(rig) {
           + (finger === 1 ? (contact?.triggerSplay || 0) * fire : 0);
         if (spread) bone.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(spreadAxis, spread * Math.PI/180));
       }
-      BlendAuthored();
+      BlendWorkingRotation();BlendAuthored();
     }
   }
 }

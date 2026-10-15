@@ -3204,19 +3204,40 @@ export class Viewmodel {
     // 右手：握把 → 机柄 → 跟着栓走 → 回握把
     const placement = this._BoltHandPlacement(), grip = placement.position, rotation = placement.rotation;
     const releaseAt=holdOpen?Math.min(.78,backEnd+.08):lockEnd+FPS_BOLT_HAND.releaseGap;
-    const clearRotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(...rotation,"YXZ"))
-      .slerp(new THREE.Quaternion().setFromEuler(this.handBaseRot.right),.55);
-    const approachRotation=new THREE.Quaternion().setFromEuler(this.handBaseRot.right)
-      .slerp(new THREE.Quaternion().setFromEuler(new THREE.Euler(...rotation,"YXZ")),FPS_BOLT_HAND.approachFraction);
-    this._WorkingHandPath("right", t, [
-      { at:graspAt*FPS_BOLT_HAND.approachFraction, position:this.handBase.right.clone().lerp(grip,FPS_BOLT_HAND.approachFraction)
-        .add(new THREE.Vector3().fromArray(FPS_BOLT_HAND.clearOffset)), shape:"relax",
-        rotation:new THREE.Euler().setFromQuaternion(approachRotation,"YXZ").toArray().slice(0,3), through:true },
-      { at:graspAt, ...placement },
-      { at:releaseAt, ...placement },
-      { at:Mix(releaseAt,1,FPS_BOLT_HAND.clearFraction), position:grip.clone().add(new THREE.Vector3().fromArray(FPS_BOLT_HAND.clearOffset)),
-        shape:"relax", rotation:new THREE.Euler().setFromQuaternion(clearRotation,"YXZ").toArray().slice(0,3), through:true },
-    ]);
+    if(this.weaponId==="HanYang"){
+      const clearance=FPS_PACKET_RELOAD.handClearance;
+      const holdingClear={position:this.handBase.right.clone().add(new THREE.Vector3(...clearance.grip)),
+        rotation:this.handBaseRot.right.toArray().slice(0,3),shape:"packetClear"};
+      const holdingUnwrap={...holdingClear,position:this.handBase.right.clone().add(new THREE.Vector3(...clearance.unwrap))};
+      const boltClear={...placement,position:grip.clone().add(new THREE.Vector3(...clearance.bolt)),shape:"packetBoltClear"};
+      // Keep the original holding digits while moving away from the stock;
+      // change the thumb's opposition only after the whole palm is outside.
+      // The inverse ordering prevents the releasing thumb sweeping the knob.
+      this._WorkingHandPath("right",t,[
+        {at:graspAt*.12,...holdingUnwrap},
+        {at:graspAt*clearance.boltEntryExitAt,...holdingClear},
+        {at:graspAt*clearance.boltEntryTurnAt,...boltClear},
+        {at:graspAt,...placement},
+        {at:releaseAt,...placement},
+        {at:Mix(releaseAt,1,.15),...placement,shape:"packetBoltClear"},
+        {at:Mix(releaseAt,1,clearance.boltReleaseExitAt),...boltClear},
+        {at:Mix(releaseAt,1,clearance.boltReturnReadyAt),...holdingClear},
+      ]);
+    }else{
+      const clearRotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(...rotation,"YXZ"))
+        .slerp(new THREE.Quaternion().setFromEuler(this.handBaseRot.right),.55);
+      const approachRotation=new THREE.Quaternion().setFromEuler(this.handBaseRot.right)
+        .slerp(new THREE.Quaternion().setFromEuler(new THREE.Euler(...rotation,"YXZ")),FPS_BOLT_HAND.approachFraction);
+      this._WorkingHandPath("right", t, [
+        { at:graspAt*FPS_BOLT_HAND.approachFraction, position:this.handBase.right.clone().lerp(grip,FPS_BOLT_HAND.approachFraction)
+          .add(new THREE.Vector3().fromArray(FPS_BOLT_HAND.clearOffset)), shape:"relax",
+          rotation:new THREE.Euler().setFromQuaternion(approachRotation,"YXZ").toArray().slice(0,3), through:true },
+        { at:graspAt, ...placement },
+        { at:releaseAt, ...placement },
+        { at:Mix(releaseAt,1,FPS_BOLT_HAND.clearFraction), position:grip.clone().add(new THREE.Vector3().fromArray(FPS_BOLT_HAND.clearOffset)),
+          shape:"relax", rotation:new THREE.Euler().setFromQuaternion(clearRotation,"YXZ").toArray().slice(0,3), through:true },
+      ]);
+    }
 
     // 整枪：拉栓时枪身会被带得往右后仰一点（右手在使劲）
     const load = Ease.Pulse(t);
@@ -3255,7 +3276,7 @@ export class Viewmodel {
     const knob = this._BoltHandPoint().sub(offset);
     const turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1),
       (this.rig.parts.bolt?.rotation.z || 0) - FPS_RIFLE_RELOAD.boltContactReferenceRad);
-    return this._HandPlacement("bolt", knob, turn);
+    return this._HandPlacement(this.weaponId==="HanYang"?"packetBolt":"bolt", knob, turn);
   }
 
   _HandPlacement(shape, anchor, quaternion = null) {
@@ -3376,6 +3397,7 @@ export class Viewmodel {
       const body=motion.bodyOffset;
       this.riggedArms.reloadBodyOffset = {
         shoulders:{},elbowPoles:{},
+        authoredElbows:body.authoredElbows,
       };
       for(const side of ["right","left"])for(const group of ["shoulders","elbowPoles"]){
         this.riggedArms.reloadBodyOffset[group][side]=body[group][side].map((value,axis)=>{
@@ -3407,8 +3429,11 @@ export class Viewmodel {
   }
 
   _ReloadHandFrames(t, motion, anchors) {
+    const packetShapes=this.weaponId==="HanYang"
+      ?{relax:"packetRelax",recover:"packetRecover",bolt:"packetBolt",latch:"packetLatch"}:null;
     this._WorkingHandPath("right", t, motion.hand.map(frame => {
       const point = { ...anchors[frame.anchor], ...frame };
+      if(packetShapes?.[point.shape])point.shape=packetShapes[point.shape];
       if (frame.toward) {
         const target=anchors[frame.toward],mix=frame.anchorMix;
         point.position=point.position.clone().lerp(target.position,mix);
@@ -3510,8 +3535,16 @@ export class Viewmodel {
     const clear = { ...push, position: push.position.clone().add(new THREE.Vector3().fromArray(base.clearOffset)) };
     const latch = { position: this.handBase.right.clone().add(new THREE.Vector3().fromArray(base.latchOffset)),
       rotation: this.handBaseRot.right.toArray().slice(0, 3), shape: "latch" };
-    this._ReloadHandFrames(t, motion, { clip: this._ReloadClipGrip(packet), oldClip: this._ReloadClipGrip(used),
-      press: push, clear, latch, bolt: this._BoltHandPlacement() });
+    const clip=this._ReloadClipGrip(packet),oldClip=this._ReloadClipGrip(used),bolt=this._BoltHandPlacement();
+    const clearance=base.handClearance;
+    const Outside=(placement,offset)=>({...placement,position:placement.position.clone().add(new THREE.Vector3(...offset))});
+    const gripClear={position:this.handBase.right.clone().add(new THREE.Vector3(...clearance.grip)),
+      rotation:this.handBaseRot.right.toArray().slice(0,3),shape:"packetClear"};
+    const gripUnwrap={...gripClear,position:this.handBase.right.clone().add(new THREE.Vector3(...clearance.unwrap))};
+    this._ReloadHandFrames(t, motion, {clip,oldClip,press:push,clear,latch,bolt,gripClear,gripUnwrap,
+      boltClear:{...Outside(bolt,clearance.bolt),shape:"packetBoltClear"},clipClear:Outside(clip,clearance.prop),
+      oldClipClear:Outside(oldClip,clearance.prop),pressClear:Outside(push,clearance.press),
+      latchClear:Outside(latch,clearance.latch)});
   }
 
   _EjectReloadChamber() {
@@ -3548,26 +3581,40 @@ export class Viewmodel {
 
     const charge = charges?ReloadTrack(motion.charge,t):0;
     if (rig.parts.bolt) rig.parts.bolt.position.z = charge * rig.boltTravel;
-    const held = this._HandPlacement("magazine",mag?.position || new THREE.Vector3());
-    const belt = this._HandPlacement("magazine",new THREE.Vector3().fromArray(motion.newMagazine[0].slice(1)));
+    const magazineShape=this.weaponId==="Zb26"?"zbMagazine":"magazine";
+    const held = this._HandPlacement(magazineShape,mag?.position || new THREE.Vector3());
+    const home = this._HandPlacement(magazineShape,new THREE.Vector3());
+    const belt = this._HandPlacement(magazineShape,new THREE.Vector3().fromArray(motion.newMagazine[0].slice(1)));
+    const gripRotation=this.handBaseRot.right.toArray().slice(0,3);
+    const FreeFrame=frame=>{
+      const anchor=frame.anchor==="grip"?this.handBase.right:home.position;
+      const rotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(...home.rotation,"YXZ"))
+        .slerp(new THREE.Quaternion().setFromEuler(this.handBaseRot.right),frame.gripRotationMix);
+      return {...frame,position:anchor.clone().add(new THREE.Vector3().fromArray(frame.offset)),
+        rotation:new THREE.Euler().setFromQuaternion(rotation,"YXZ").toArray().slice(0,3)};
+    };
     const frames=[
-      {at:0.10,...held,shape:"relax",through:true},
-      {at:0.16,...held},
+      ...motion.handApproach.map(FreeFrame),
+      {at:motion.handGraspAt,...held},
       {at:releaseAt,...held},
-      {at:0.43,...belt,shape:"relax",through:true},
-      {at:0.46,...held},
-      {at:motion.holdUntil,...held},
     ];
+    if(!retain){
+      const clear=motion.emptyHandClear;
+      const released=this._HandPlacement(magazineShape,new THREE.Vector3(...[1,2,3]
+        .map(column=>ReloadTrack(motion.oldMagazine,motion.discardAt,column))));
+      frames.push({...clear,...released,position:released.position.clone()
+        .add(new THREE.Vector3().fromArray(clear.offset)),shape:clear.shape});
+    }
+    frames.push({at:motion.drawAt,...belt},
+      {at:motion.handNewGraspAt,...held},{at:motion.holdUntil,...held});
     if(charges)frames.push({at:.815,position:this._BoltHandPoint(),shape:"bolt"},
       {at:.945,position:this._BoltHandPoint(),shape:"bolt"});
     else {
-      const rotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(...held.rotation,"YXZ"))
-        .slerp(new THREE.Quaternion().setFromEuler(this.handBaseRot.right),.55);
-      frames.push({at:.87,position:held.position.clone().lerp(this.handBase.right,.55).add(new THREE.Vector3(.012,.015,.018)),
-        rotation:new THREE.Euler().setFromQuaternion(rotation,"YXZ").toArray().slice(0,3),shape:"recover",through:true},
-        {at:motion.handBackAt,position:this.handBase.right,rotation:this.handBaseRot.right.toArray().slice(0,3),weight:0,shape:"recover"});
+      frames.push(...motion.handReturn.map(FreeFrame),
+        {at:motion.handBackAt,position:this.handBase.right,rotation:gripRotation,weight:0,shape:this.weaponId==="Zb26"?"zbClear":"recover"});
     }
-    this._WorkingHandPath("right",t,frames);
+    this._WorkingHandPath("right",t,this.weaponId==="Zb26"?frames.map(frame=>({...frame,
+      shape:frame.shape==="relax"?"packetRelax":frame.shape==="recover"?"packetRecover":frame.shape})):frames);
   }
 
   /** 盒式弹匣手枪：底部退匣 → 腰间取新匣 → 插匣 → 拉套筒。 */
@@ -4116,9 +4163,10 @@ export class Viewmodel {
     const source = isMagazine ? this.rig.parts.magazine : this.clipProp.userData.body;
     if (!source) return;
     const shape = isMagazine ? this._MagazineDebrisGeometry(source) : {geometry: source.geometry, material: source.material};
-    slot.velocity.fromArray(FPS_RELOAD_PROPS.clipReleaseVelocity).multiplyScalar(0.85 + rnd() * 0.3);
+    const velocity=isMagazine&&this.weaponId==="Zb26"?FPS_TOP_MAG_RELOAD.discardVelocity:FPS_RELOAD_PROPS.clipReleaseVelocity;
+    slot.velocity.fromArray(velocity).multiplyScalar(0.85 + rnd() * 0.3);
     slot.spin.set(5 + rnd() * 4, 3 + rnd() * 3, 7 + rnd() * 4);
-    this._ReleaseDebris(slot, source, shape.geometry, shape.material, null, isMagazine ? "magazine" : "charger");
+    this._ReleaseDebris(slot, source, shape.geometry, shape.material, shape.offset || null, isMagazine ? "magazine" : "charger");
   }
 
   _SpawnCartridge(rnd) {
@@ -4168,7 +4216,12 @@ export class Viewmodel {
     const geometry = MergeGeometries(geometries);
     geometry.clearGroups();
     for (const group of groups) geometry.addGroup(group.start, group.count, group.materialIndex);
-    const shape = { geometry, material: materials };
+    // The imported vertices use the rifle origin, not the magazine's geometry
+    // centre. Preserve the release pose while spinning about the actual item.
+    geometry.computeBoundingBox();
+    const center=geometry.boundingBox.getCenter(new THREE.Vector3());
+    geometry.translate(-center.x,-center.y,-center.z);
+    const shape = { geometry, material: materials, offset:center };
     this.reloadMagazineGeometry.set(key, shape);
     return shape;
   }

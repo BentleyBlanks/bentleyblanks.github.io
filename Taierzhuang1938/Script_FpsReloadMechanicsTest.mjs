@@ -160,11 +160,16 @@ try {
     const magazines=[];
     for(const remaining of [0,3]) {
       editor.SetWeapon("Zb26");Step(remaining,90);vm.TriggerReload({remainingRounds:remaining});
-      let maxCharge=0,tossed=false,stowed=false;
+      let maxCharge=0,tossed=false,stowed=false,maxMagazinePivotError=0;
       while(vm.action) {
         Step(remaining);const t=vm.action?.t??1;
         maxCharge=Math.max(maxCharge,Math.abs(vm.rig.parts.bolt.position.z));
         tossed ||= !!vm.action?.tossed;
+        const dropped=vm.debris.find(slot=>slot.alive>0&&slot.mesh.userData.debrisKind==="magazine");
+        if(dropped){
+          dropped.mesh.geometry.computeBoundingBox();
+          maxMagazinePivotError=Math.max(maxMagazinePivotError,dropped.mesh.geometry.boundingBox.getCenter(new THREE.Vector3()).length());
+        }
         if(t>=.40&&t<.43) {
           const mag=vm.rig.parts.magazine;
           if(remaining>0) {
@@ -175,7 +180,8 @@ try {
       }
       Check(maxCharge<1e-6,"Zb26: an already cocked open bolt is charged again after changing magazines");
       Check(remaining>0?stowed&&!tossed:tossed,"Zb26: retain a partly loaded magazine and discard only the empty one");
-      magazines.push({remaining,maxCharge,tossed,stowed});
+      Check(maxMagazinePivotError<1e-6,"Zb26: discarded magazine spins around the rifle origin instead of its own centre");
+      magazines.push({remaining,maxCharge,tossed,stowed,maxMagazinePivotError});
     }
     Check(vm.TriggerCharge(),"Zb26: removing the reload charging stroke disabled manual cocking");
     let manualChargeTravelM=0;
