@@ -71,7 +71,7 @@ export const WEAPONS = {
     damage: 78, headMultiplier: 2.6, effectiveRangeM: 500,
     boltDelayS: 0.07, boltTimeS: 1.18,       // Same 1.25 s total cycle, including hand recovery
     fireIntervalS: 1.25,
-    reloadTimeS: 3.4,
+    reloadTimeS: 2.85,
     recoil: { pitch: 2.9, yaw: 0.55, kick: 0.055, recoverS: 0.24, recoverFrac: 1.0 },
     swayScale: 1.0, adsTimeS: 0.28, adsFovScale: 0.72,
     spreadHipDeg: 2.6, spreadAdsDeg: 0.18,
@@ -94,7 +94,7 @@ export const WEAPONS = {
     // 从旧 0.20 s 等待中借 0.13 s 给手部动作，总周期仍为 1.02 s，射击间隔不变。
     // 2026-09-13 那版是一整条录音，动作要硬等 1.65 s、间隔 2.50 s —— 玩家嫌开完枪「有个延迟」。
     shotCue: "rifleHanYang", boltCue: "boltHanYang",
-    boltDelayS: 0.07, boltTimeS: 0.95, fireIntervalS: 1.05, reloadTimeS: 3.8,
+    boltDelayS: 0.07, boltTimeS: 0.95, fireIntervalS: 1.05, reloadTimeS: 3.1,
     recoil: { pitch: 3.1, yaw: 0.62, kick: 0.06, recoverS: 0.26, recoverFrac: 1.0 },
     swayScale: 1.12, adsTimeS: 0.32, adsFovScale: 0.74,
     spreadHipDeg: 3.0, spreadAdsDeg: 0.26,
@@ -112,7 +112,7 @@ export const WEAPONS = {
     lengthM: 1.165, barrelM: 0.602, massKg: 10.5,
     magazine: 20, reloadKind: "topMag",       // 20 发弧形弹匣**上方**插入
     damage: 70, headMultiplier: 2.2, effectiveRangeM: 800,
-    rpm: 500, fireIntervalS: 60 / 500, reloadTimeS: 3.0,
+    rpm: 500, fireIntervalS: 60 / 500, reloadTimeS: 2.65,
     recoil: { pitch: 0.85, yaw: 0.34, kick: 0.02, recoverS: 0.11, recoverFrac: 1.0 },
     swayScale: 1.35, adsTimeS: 0.40, adsFovScale: 0.80,
     spreadHipDeg: 4.2, spreadAdsDeg: 0.55, bipod: true,
@@ -211,7 +211,7 @@ export const WEAPONS = {
     lengthM: 1.276, bayonetTotalM: 1.663, massKg: 3.73,
     magazine: 5, reloadKind: "stripper",
     damage: 72, headMultiplier: 2.6, effectiveRangeM: 460,
-    boltDelayS: 0.07, boltTimeS: 1.28, fireIntervalS: 1.35, reloadTimeS: 3.5,
+    boltDelayS: 0.07, boltTimeS: 1.28, fireIntervalS: 1.35, reloadTimeS: 2.95,
     aiAccuracy: 0.62, aiBurstMin: 1, aiBurstMax: 2, aiAimTimeS: 0.85,
     bayonet: true, bayonetLengthM: 0.51,
     note: "机匣上方有防尘滑盖，拉栓时随之前后滑动 —— 这是它最强的剪影特征。",
@@ -227,7 +227,7 @@ export const WEAPONS = {
     lengthM: 1.100, massKg: 10.2,
     magazine: 30, reloadKind: "hopper",        // 左侧漏斗，装 6 个 5 发桥夹
     damage: 66, headMultiplier: 2.2, effectiveRangeM: 600,
-    rpm: 500, fireIntervalS: 60 / 500, reloadTimeS: 5.2,
+    rpm: 500, fireIntervalS: 60 / 500, reloadTimeS: 4.65,
     overheatShots: 200, coolDownS: 8.0,        // 不能换枪管，约 200 发须冷却
     aiAccuracy: 0.5, aiBurstMin: 4, aiBurstMax: 9, aiAimTimeS: 0.7,
     note: "左上方一个敞口方斗 + 顶部压弹板，枪托向右偏。日军一个分队通常 1 挺。",
@@ -244,7 +244,7 @@ export const WEAPONS = {
     magazine: 30, reloadKind: "stripFeed",     // 30 发金属保弹板横向供弹
     damage: 92, headMultiplier: 2.0, effectiveRangeM: 1200,
     rpm: 200,                                   // 实际射速，"啄木鸟"节奏
-    fireIntervalS: 60 / 200, reloadTimeS: 4.4,
+    fireIntervalS: 60 / 200, reloadTimeS: 4.0,
     aiAccuracy: 0.55, aiBurstMin: 5, aiBurstMax: 14, aiAimTimeS: 1.1,
     emplaced: true,
     note: "气冷，枪管外粗大散热片。射声明显慢，中方老兵记它像啄木鸟。",

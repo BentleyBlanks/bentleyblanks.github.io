@@ -3257,7 +3257,8 @@ export class Viewmodel {
     const frames = [base,...points,{...base,at:1}];
     const index = Math.max(1,frames.findIndex(p=>p.at>=t));
     const start = frames[index-1], end = frames[index];
-    const u = Ease.Seg(t,start.at,end.at), mix = Ease.InOut(u);
+    const u = Ease.Seg(t,start.at,end.at);
+    const mix = end.flow ? u*u*(3-2*u) : Ease.InOut(u);
     const position = value => Array.isArray(value) ? new THREE.Vector3().fromArray(value) : value;
     const hand = side === "right" ? this.handRight.group : this.handLeft.group;
     hand.position.lerpVectors(position(start.position),position(end.position),mix);
@@ -3335,7 +3336,13 @@ export class Viewmodel {
     const raise = ReloadTrack(motion.blend, t);
     const pose = Array.from({ length: 6 }, (_, i) => ReloadTrack(motion.support, t, i + 1));
     this._PoseReload("left", 1, ...pose, raise);
-    if (this.riggedArms) this.riggedArms.reloadBodyOffset = motion.bodyOffset;
+    if (this.riggedArms) {
+      const body=motion.bodyOffset;
+      this.riggedArms.reloadBodyOffset = motion.elbows ? {...body,elbowPoles:{
+        right:body.elbowPoles.right.map((value,axis)=>value+ReloadTrack(motion.elbows,t,axis+1)),
+        left:body.elbowPoles.left.map((value,axis)=>value+ReloadTrack(motion.elbows,t,axis+4)),
+      }} : body;
+    }
   }
 
   _PoseRifleReload(t, motion) {
@@ -3357,6 +3364,14 @@ export class Viewmodel {
   _ReloadHandFrames(t, motion, anchors) {
     this._WorkingHandPath("right", t, motion.hand.map(frame => {
       const point = { ...anchors[frame.anchor], ...frame };
+      if (frame.toward) {
+        const target=anchors[frame.toward],mix=frame.anchorMix;
+        point.position=point.position.clone().lerp(target.position,mix);
+        const rotation=new THREE.Quaternion().setFromEuler(new THREE.Euler(...point.rotation,"YXZ"))
+          .slerp(new THREE.Quaternion().setFromEuler(new THREE.Euler(...target.rotation,"YXZ")),mix);
+        point.rotation=new THREE.Euler().setFromQuaternion(rotation,"YXZ").toArray().slice(0,3);
+      }
+      if (frame.gripPositionMix) point.position=point.position.clone().lerp(this.handBase.right,frame.gripPositionMix);
       if (frame.offset) point.position = point.position.clone().add(new THREE.Vector3().fromArray(frame.offset));
       if (frame.gripRotationMix) {
         const rotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(...point.rotation, "YXZ"));
@@ -3438,7 +3453,10 @@ export class Viewmodel {
       const loaded = new THREE.Vector3(seat.x, seat.y + 0.010 - depth, seat.z);
       const caught = new THREE.Vector3(seat.x, seat.y + 0.016, seat.z);
       const pouch = new THREE.Vector3(seat.x + 0.140, seat.y - 0.220, seat.z + 0.140);
-      const catchBlend = Ease.InOut(phase <= 1 ? phase : phase - 1);
+      // One stow curve: applying easing again to an already eased phase caused
+      // a sudden rush through the middle and a long, rigid pause at the pouch.
+      const stow=Ease.Seg(t,motion.oldClip[1][0],motion.oldClip[2][0]);
+      const catchBlend = phase <= 1 ? Ease.InOut(phase) : stow*stow*(3-2*stow);
       used.position.lerpVectors(phase <= 1 ? loaded : caught, phase <= 1 ? caught : pouch, catchBlend);
       used.rotation.set(phase <= 1 ? 0 : 0.5 * catchBlend, 0, phase <= 1 ? 0 : 0.7 * catchBlend, "YXZ");
       used.visible = t >= motion.oldClipVisible[0] && t < motion.oldClipVisible[1];
@@ -3489,7 +3507,7 @@ export class Viewmodel {
       {at:0.10,...held,shape:"relax",through:true},
       {at:0.16,...held},
       {at:0.32,...held},
-      {at:0.43,...belt,shape:"relax"},
+      {at:0.43,...belt,shape:"relax",through:true},
       {at:0.46,...held},
       {at:motion.holdUntil,...held},
       {at:0.815,position:this._BoltHandPoint(),shape:"bolt"},

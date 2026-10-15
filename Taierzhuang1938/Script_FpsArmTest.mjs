@@ -251,8 +251,9 @@ for (const entry of report.reloadMotion) {
   checks.push([`${label} 连续回手和转腕`, entry.maxHandStepM < 0.055 && entry.maxHandTurnDeg < 20
     && entry.maxGunTurnDeg < 6,
   `hand=${(entry.maxHandStepM * 1000).toFixed(1)}mm at ${entry.handStepAt.toFixed(3)} turn=${entry.maxHandTurnDeg.toFixed(1)}° gun=${entry.maxGunTurnDeg.toFixed(1)}°/frame`]);
-  const minimumFrames = ["Zb26", "Type11"].includes(entry.weapon)
-    ? Math.min(90, WEAPONS[entry.weapon].reloadTimeS * 60 * .45) : 90;
+  // Cover the entire middle half at 60 Hz, allowing two boundary frames.
+  // A shorter authored reload contains fewer frames, not less test coverage.
+  const minimumFrames = Math.floor(WEAPONS[entry.weapon].reloadTimeS * 60 * .5)-2;
   checks.push([`${label} 装填发力带动支撑手`, entry.midFrames > minimumFrames && entry.midSupportTravelM > 0.025
     && entry.longestStillS < 0.25,
   `travel=${(entry.midSupportTravelM * 1000).toFixed(1)}mm longest hold=${entry.longestStillS.toFixed(3)}s`]);

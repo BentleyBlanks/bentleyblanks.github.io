@@ -7,21 +7,21 @@ export const FIRE_CONTROL = Object.freeze({
 const Event = (at, id, cue = null, extra = {}) => Object.freeze({ at, id, cue, ...extra });
 export const RELOAD_EVENTS = Object.freeze({
   stripper: Object.freeze([
-    Event(0.105, "open", "bolt", { offset: 0, maxDuration: 0.28, volume: 0.45 }),
+    Event(0.085, "open", "bolt", { offset: 0, maxDuration: 0.28, volume: 0.45 }),
     Event(0.50, "insert", "stripperLoad", { maxDuration: 0.55, volume: 0.75 }),
     Event(0.65, "loaded"),
     Event(0.825, "close", "bolt", { offset: 0.50, maxDuration: 0.18, volume: 0.45 }),
     Event(0.925, "lock", "bolt", { offset: 0.70, maxDuration: 0.06, volume: 0.5 }),
   ]),
   enBloc: Object.freeze([
-    Event(0.105, "open", "bolt", { maxDuration: 0.28, volume: 0.45 }),
+    Event(0.085, "open", "bolt", { maxDuration: 0.28, volume: 0.45 }),
     Event(0.50, "insert", "stripperLoad", { maxDuration: 0.55, volume: 0.75 }),
     Event(0.65, "loaded"),
     Event(0.825, "close", "bolt", { offset: 0.50, maxDuration: 0.18, volume: 0.45 }),
     Event(0.925, "lock", "bolt", { offset: 0.70, maxDuration: 0.06, volume: 0.5 }),
   ]),
   enBlocPartial: Object.freeze([
-    Event(0.105,"open","bolt",{maxDuration:0.28,volume:0.45}),
+    Event(0.085,"open","bolt",{maxDuration:0.28,volume:0.45}),
     Event(0.275,"releasePacket","bolt",{maxDuration:0.06,volume:0.30}),
     Event(0.54,"insert","stripperLoad",{maxDuration:0.55,volume:0.75}),
     Event(0.70,"loaded"),
