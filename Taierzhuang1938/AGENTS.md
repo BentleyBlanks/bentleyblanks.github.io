@@ -6,7 +6,9 @@
 
 ## 当前入口与任务范围
 
-- **汉阳造指节与扫描皮肤续修（2026-10-16）**：配方 v2 先重放中指 PIP 岛右 80／左 70 个点的纠权，再对右手 20 个导出点局部重分配 MCP 根节分支；两阶段有 2 个重叠点，共 168 个唯一导出点。MCP 阶段严格保留 Hand、PIP/DIP 的逐骨权重与 MCP 总质量，逆恢复先锁回已发布 v1 的完整哈希，再恢复 Git 基准。Blender 源同步按实际导出微权重阈值、Top4 和 float32 归一化校验，不能放宽误差或删源微权重凑一致。原几何、衣袖及 morph 保留。左手关节与 Idle 的 16 条恒定指轨沿用已发布版；新掌框尚未通过完整皮肤验收。`FpsHandPoseTest` 检查实际骨架铰链；`FpsHandSelfContactTest --motion-report` 须保留真实 contactWeight、poseState、digitMix 和逐骨四元数。`HanYangReloadClearanceTest --max-depth-mm=2` 检查四案完整双臂与衣袖。混合指蹼、同指折叠及开放枪壳证据限制见 [换弹真实度](docs/Data_RifleReloadRealism.md)，不能以纯指零交叉或接触距离声明整手自然。
+- **汉阳造左掌与前木托支撑（2026-10-16）**：重设左掌框及 15 指姿势，把托点放到弹仓前的木托，完整手面须同时检查木面与开放钢面，不能只看闭壳深度。19 条左骨轨与两条左手控制在单一 Idle Action 中重烘，其余 JSON 字段精确保留；源入口 `_blender/Script_FpsIdleLeftSupportBake.py` 用实际量化父链重组姿势并调用原导出器，Text 归档前先保存 Action checkpoint。源全 241×53 骨复核、四案全帧双臂／衣袖及持枪→换弹→持枪衔接的证据与残余掌纹面限制见 [换弹真实度](docs/Data_RifleReloadRealism.md)。
+
+- **汉阳造指节与扫描皮肤续修（2026-10-16）**：配方 v2 先重放中指 PIP 岛右 80／左 70 个点的纠权，再对右手 20 个导出点局部重分配 MCP 根节分支；两阶段有 2 个重叠点，共 168 个唯一导出点。MCP 阶段严格保留 Hand、PIP/DIP 的逐骨权重与 MCP 总质量，逆恢复先锁回已发布 v1 的完整哈希，再恢复 Git 基准。Blender 源同步按实际导出微权重阈值、Top4 和 float32 归一化校验，不能放宽误差或删源微权重凑一致。原几何、衣袖及 morph 保留。左手掌框及完整左链 Idle 由上方前木托支撑条目接续；右手局部修权保持本条版本。`FpsHandPoseTest` 检查实际骨架铰链；`FpsHandSelfContactTest --motion-report` 须保留真实 contactWeight、poseState、digitMix 和逐骨四元数。`HanYangReloadClearanceTest --max-depth-mm=2` 检查四案完整双臂与衣袖。混合指蹼、同指折叠及开放枪壳证据限制见 [换弹真实度](docs/Data_RifleReloadRealism.md)，不能以纯指零交叉或接触距离声明整手自然。
 
 - **汉阳造手指与捷克式整臂净空续修（2026-10-16）**：汉阳造各操作手型抵消扫描 bind 已有的指扇，夹弹、压弹、抓柄、解握分别校准；先松指再退出握把，枪外才转腕。捷克式右手握住弹匣中上部，空匣向左抛、右手从枪右侧回握。右肘按固定骨长、腕硬限及连续可行弧步进；禁止直接切换可行弧两端或绕过角速度限制。原静态握枪与瞄准接触保留，汉阳造余弹按扣声随新 `.305` 拍点，弹药提交、取消及总时长保留。完整蒙皮诊断 `FpsReloadClearanceTest` 覆盖指、掌、腕、前臂、衣袖和弃匣，默认只出报告，不能当作无穿插证明；CPU 门禁 `FpsElbowArcTest`，其余定向入口与证据见 [第一人称换弹真实度](docs/Data_RifleReloadRealism.md)。
 

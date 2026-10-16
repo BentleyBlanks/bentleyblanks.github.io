@@ -502,3 +502,74 @@ MCP 根组的分配，其他源骨权逐值保留。重建入口仍是
 纯指木托交叉，但全掌／蹼复核揭示 42 片木托交叉及较大拇指掌褶折叠，也未采用。
 生产左握姿、Idle、动作时长、机构与弹药规则保持上一节版本。本轮仍不构成
 真实／3A 总目标完成或整手零穿模的证明。
+
+## 汉阳造左掌朝向与前木托支撑（2026-10-16）
+
+旧左手的掌框让手指沿枪管方向伸出，再用不同指根的过量折弯抵消，造成拇指及
+指蹼扭转。本轮重设掌框与全部 15 根左指骨，让四指围住木托、拇指从另一侧承托。
+新托点为枪局部 `[-0.02092540575837977,-0.005995575331498684,-0.306]` m；
+YXZ 掌框 `[-1.0784622197727305,-2.117256855514797,-2.3270421954446845]` rad。
+本轮不改扫描网格、骨长、皮权、贴图、morph、右手姿势或弹药／机构时序。
+
+只检查木托并不足够：较早的自然掌框候选仍把掌根放在弹仓底部，虽然木面零交叉，
+却有 253 个手面交叉开放钢件；实际压入新弹夹时左掌闭壳深度达到 1.839 mm。
+因此该中间候选未发布。最终托点相对它前移 37 mm、上移 1.5 mm，落在前木托上，
+保留已审查的掌框和指骨旋转。完整 15,152 个左手面（其中 7,907 个为掌／蹼混合面）
+重新与真实木托和钢件有限三角形相交，二者均为 0，闭壳深度为 0；相对掌垫到木托
+的拇／食／中／环／小指间隙为 3.197／2.492／2.306／2.218／3.138 mm，原 4 mm
+接触限值不变。报告 `tmp/ReloadRealism/Data_LeftSupportSteelClearedFinalAudit.json`。
+完整非邻接左手仍有 1 对极小掌纹面交叉，不能表述为整手完全无自交。
+
+持枪循环须同步整条左链，避免换弹后回到旧掌框。新的 4 s／60 fps／241 帧输入
+在实际运行时 IK 中采样两遍，保留第二遍：左腕最大 63.3008°，全程可达，选中链
+首尾差为 0，所有非左链骨骼的输入变化为 0。只合并 19 条左骨轨与
+`handLeft`／`contactLeft`，其他骨轨、控制、显隐、接触状态、时长逐字段精确保留。
+重建入口为 [_blender/Script_FpsIdleLeftSupportBake.py](../_blender/Script_FpsIdleLeftSupportBake.py)，
+仍调用原 `ExportFpsAnimation`；新可编辑 Action 源目录为
+`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/FpsHandForwardSupport_20261016/`。
+扫描几何源仍在上一节独立工程中，本 Action 工程不声明几何预览与当前 GLB 一致。
+
+
+最终动画 SHA-256 为
+`ce955ce961759bbbd42e0ba59a97d8556c2ef37e9fce0d32131c2b14f9ebae81`，
+465,902 bytes；直接与 ac8 发布基准比较，累计仍只有上述 19 左骨与两条左控变化。
+独立 CPU 审查使用生产中实际量化的指骨四元数和控制位姿，再查完整手面，木／钢
+交叉仍各为 0。`tmp/ReloadRealism/Data_FinalForwardSupportProductionAudit.json`
+保存跨两次烘焙的精确字段保护、静止指骨位移、逐帧误差和循环检查。
+
+Blender 源重新打开后，独立全 241×53 骨姿态审计实际通过：位置最大误差
+0.752 µm、世界旋转 7.399e-6 rad、缩放 8.382e-9；原 1 µm／2e-5 rad／1e-7
+阈值不变。父链按已存储 float32 TRS 向前重组，避免把理想父矩阵的量化差在后续
+骨段重复累计。归档前先保存完整 Action checkpoint，原始 JSON 按原字节落盘；
+嵌入 Blender Text 的 JSON 改为有界行可读格式并记录原始／嵌入双哈希，避免巨型
+单行文本阻塞。源审计报告位于同源目录 `Data_FpsIdleLeftSupportSourceAudit.json`。
+
+最终四案均重跑实际 60 fps 动作，加结束后 12 帧，覆盖双侧全部手、前臂、上臂和
+衣袖。空仓／余弹／留后装填／普通拉栓的 R/L 最大闭壳深度分别为
+1.850/0、1.850/0、1.850/0、1.030/0 mm，显式 2 mm 门禁通过；左侧有限表面
+交叉全帧亦为 0，未设置接触豁免。右侧仍有开放枪壳交叉及混合掌褶待处理，不能
+把本轮左手证据扩大为右手或全手自然度通过。记录在
+`tmp/ReloadRealism/ForwardSupportClearance/Data_HanYangReloadClearance.json`。
+
+
+冻结最终动画后，12 项专项实际通过：骨轨／循环、1,786 个铰链姿态、皮权逆恢复、
+既有 morph、上述四案全帧净空、两侧各 674 帧真实指骨重放、汉阳造手部接触、
+双臂、持枪时间轴、瞄准及衣袖；记录为
+`tmp/ReloadRealism/Data_ForwardFinalHanyangGates.json`，同时记录实际动画与姿势 SHA。
+MotionVector 的 49 个 GPU 场景另行通过，记录 `Data_ForwardMotionVector.log`。
+最终文件下完整 prepush 实际重跑仍在既有
+`SpeakerGestureTest: FrontObservation.02: luo gestured on his previous line too`
+处终止（此前 8 项通过），未修改剧情或放宽断言；不能写成全项目全绿。
+本任务 Blender 实例已全部关闭，`status --scan` 的本 worktree instances 为空，
+其他任务的四个 Blender 进程保持原样。
+
+
+严格 high 画质 staging 亦实际通过：汉阳造与捷克式完整换弹、三种汉阳造动作的
+持枪前 48 帧与结束后 60 帧，实际加载最终动画 ce955ce9… 与手资产 dffb45e2…；
+36 张 GPU 贴图、19 条 bundle/vendor 脚本，无源码回退、缺资源、页面／控制台／
+网络错误。本地构建戳 4405668552876071，gameplay SHA-256
+`fa6eea517a02741abfd3691eb8317286c74568776cebd8ec2e6f2a29d13a094d`。证据为
+`tmp/ReloadRealism/ForwardSupportStageAcceptance/Data_StagedHandAcceptance.json`。
+本地 `HanyangForwardSupport_20261016` 保存 1280×720／60fps 正常与半速六份录像，
+完整解码无错误；半速重复原帧，未合成中间动作。已检查关键阶段蒙太奇、持枪和
+压弹帧及掌侧／背侧／下方近景。该局部交付不构成右手或真实／3A 总目标完成。
