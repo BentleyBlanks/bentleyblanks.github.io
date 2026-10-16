@@ -9,6 +9,10 @@ import {FPS_WEAPON_GRIPS} from './Data_FpsWeaponGrips.mjs';
 const project=path.dirname(fileURLToPath(import.meta.url));
 const out=process.argv.slice(2).find(a=>!a.startsWith('--'))||path.join(project,'_shots','GripRepair');
 const ids=(process.argv.find(a=>a.startsWith('--only='))?.slice(7)||'Grenade,GrenadeBundle,Dadao,Zb26').split(',');
+// Local palm-frame calibration against the actual skinned production asset.
+// --palm-candidates=<json> contains [{name, weapon, contact}]; no source writeback.
+const palmFile=process.argv.find(a=>a.startsWith('--palm-candidates='))?.slice(18);
+const palmCandidates=palmFile?JSON.parse(await fs.readFile(palmFile,'utf8')):null;
 await fs.mkdir(out,{recursive:true});
 await fs.writeFile(path.join(out,'Data_GripConfig.json'),JSON.stringify(FPS_WEAPON_GRIPS));
 const server=await ServeRoot(path.dirname(project),0),browser=await LaunchBrowser();
@@ -20,6 +24,30 @@ try{
  console.log('READY');
  await page.evaluate(()=>{const T=Taierzhuang;T.Debug.OpenEditor('firstPerson');T.StepFrames(2);});
  await page.addStyleTag({content:'.edMenuBar,.edGear{display:none!important}'});
+ if(palmCandidates){
+  const results=[];
+  for(const candidate of palmCandidates){
+   if(!/^[A-Za-z0-9_-]+$/.test(candidate.name)||!ids.includes(candidate.weapon))throw Error('Invalid palm candidate');
+   const result=await page.evaluate(({weapon,contact,leftShoulder,shoulderByState,bodyByState})=>{
+    const T=Taierzhuang,e=T.editor.active;e.SetWeapon(weapon);e.SetPose('hip');e.SetView('player');e.SetAnimationClean(true);
+    const vm=T.viewmodel,a=vm.riggedArms,spec=structuredClone(vm.armPose);
+    vm.skeletalAnimationDisabled=true;vm.skeletalAnimation.preview=null;
+    spec.contacts.left=contact;for(const state of ['hip','ads','sprint'])spec[state].contacts.left=contact;
+    if(leftShoulder)for(const state of ['hip','ads','sprint'])spec[state].body.shoulders.left=leftShoulder;
+    if(shoulderByState)for(const state of ['hip','ads','sprint'])spec[state].body.shoulders.left=shoulderByState[state];
+    if(bodyByState)for(const state of ['hip','ads','sprint']){spec[state].body.shoulders.left=bodyByState[state].shoulder;spec[state].body.elbowPoles.left=bodyByState[state].pole;}
+    vm.armPose=spec;a.poseSpec=spec;vm.handBase.left.fromArray(contact.position);vm.handBaseRot.left.set(...contact.rotation,'YXZ');
+    a.elbowDirections.l=null;for(let i=0;i<120;i++)e.Update(1/60);T.StepFrames(1);
+    const states={};
+    for(const state of ['hip','ads','sprint']){e.SetPose(state);a.elbowDirections.l=null;for(let i=0;i<120;i++){e.Update(1/60);vm.gripContactLeft.rotation.copy(vm.handBaseRot.left);a.Update(1/60);}states[state]={wrist:a.wristBend.l,reach:a.reachRatio.l,goal:a.handGoalPosition.l.toArray(),direction:[0,0,1],quaternion:a.gripGoalAnchorQuaternion.l.toArray(),lengths:a.armLength.l,shoulder:spec[state].body.shoulders.left};}
+    e.SetPose('hip');for(let i=0;i<120;i++)e.Update(1/60);T.StepFrames(1);
+    return {wrist:{...a.wristBend},reach:{...a.reachRatio},reachable:{...a.reachable},gripError:{...a.gripError},states};
+   },candidate);
+   await page.screenshot({path:path.join(out,`Image_${candidate.name}.png`)});
+   results.push({...candidate,...result});console.log(candidate.name,JSON.stringify(result));
+  }
+  await fs.writeFile(path.join(out,'Data_PalmCandidates.json'),JSON.stringify(results,null,2));
+ }else{
  for(const id of ids){
   await page.evaluate(({id,clean})=>{const T=Taierzhuang,e=T.editor.active;e.SetWeapon(id);e.SetPose('hip');e.SetView('player');if(clean)e.SetAnimationClean(true);for(let i=0;i<90;i++)e.Update(1/60);T.StepFrames(1);},{id,clean:process.argv.includes('--clean')});
   const pkg=await page.evaluate(async()=>{
@@ -76,6 +104,7 @@ try{
    await page.evaluate(p=>{const T=Taierzhuang,e=T.editor.active;e.SetView('inspect');e.SetInspectPreset(p);T.StepFrames(2);},preset);
    await page.screenshot({path:path.join(out,`Image_${id}_${preset}.png`)});
   }
+ }
  }
  if(errors.length)throw Error(errors.join('\n'));
 }finally{await browser.close();await new Promise(r=>server.close(r));}
