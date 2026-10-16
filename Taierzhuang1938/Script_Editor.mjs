@@ -106,6 +106,7 @@ export class EditorSuite {
     this.activeId = null;
     this.overlays = new Map();
     this.panelOpen = false;
+    this.inspectorCollapsed = false;
     this.entries = new Map();
     this.menus = new Map();
     this.openMenuId = null;
@@ -309,6 +310,32 @@ export class EditorSuite {
 
     this.workHost = El("div");
     root.appendChild(this.workHost);
+
+    // 展开时与关闭按钮并排，收起后留在画面右上角；不退出或重建当前工具。
+    this.inspectorToggle = El("button", "edInspectorToggle");
+    this.inspectorToggle.type = "button";
+    this.inspectorToggle.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>';
+    this.inspectorToggle.addEventListener("click", () => {
+      this.OpenMenu(null);
+      this.SetInspectorCollapsed(!this.inspectorCollapsed);
+    });
+    root.appendChild(this.inspectorToggle);
+  }
+
+  SetInspectorCollapsed(collapsed) {
+    const keepFocus = document.activeElement === this.inspectorToggle;
+    this.inspectorCollapsed = !!collapsed;
+    const target = this.inspectorCollapsed ? this.menuBar
+      : this.active ? this.inspectorElement?.querySelector(".edHead") : this.root;
+    if (target && this.inspectorToggle.parentElement !== target) {
+      target.insertBefore(this.inspectorToggle, target === this.menuBar ? this.menuBar.querySelector(".edMenuExit") : null);
+    }
+    this.root.classList.toggle("inspectorCollapsed", this.inspectorCollapsed);
+    const label = this.inspectorCollapsed ? "展开 Inspector" : "收起 Inspector";
+    this.inspectorToggle.title = label;
+    this.inspectorToggle.setAttribute("aria-label", label);
+    this.inspectorToggle.setAttribute("aria-expanded", String(!this.inspectorCollapsed));
+    if (keepFocus) this.inspectorToggle.focus({ preventScroll: !this.inspectorCollapsed });
   }
 
   /** 展开一个下拉菜单；null = 全部收起。 */
@@ -362,6 +389,12 @@ export class EditorSuite {
     if (this.closeToolItem) this.closeToolItem.disabled = !this.active;
     if (this.gear) this.gear.classList.toggle("on", this.Capturing);
     if (this.emptyInspector) this.emptyInspector.hidden = !this.panelOpen || !!this.active;
+    this.inspectorToggle.hidden = !this.panelOpen || this.activeId === AssetStandardsEditor.id;
+    const inspector = this.workHost.querySelector(".edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards)") || this.emptyInspector;
+    this.inspectorElement = inspector;
+    if (!inspector.id) inspector.id = inspector === this.emptyInspector ? "edInspectorEmpty" : "edInspectorPanel";
+    this.inspectorToggle.setAttribute("aria-controls", inspector.id);
+    this.SetInspectorCollapsed(this.inspectorCollapsed);
     if (!this.panelOpen) this.OpenMenu(null);
     // 暂停 = 背景层也得停。玩法停了声音不停是两条独立的通道：
     // 环境床是一张自己在跑的 WebAudio 图 + 一个 400 ms 的调度器，
@@ -392,7 +425,10 @@ export class EditorSuite {
     const next = force === undefined ? !this.panelOpen : !!force;
     if (next) {
       // 工作台接管整张画面：从主菜单 / 暂停菜单进来时先把菜单交接掉（返回层由装配层记着）。
-      if (!this.panelOpen) this.host.game.PrepareEditor?.();
+      if (!this.panelOpen) {
+        this.host.game.PrepareEditor?.();
+        this.inspectorCollapsed = false;
+      }
       this.panelOpen = true;
       this.host.ReleasePointerLock();
       this.RefreshStatus();
@@ -493,6 +529,7 @@ export class EditorSuite {
     this.host.ReleasePointerLock();
     this.active = new Editor(this.editorHost);
     this.activeId = id;
+    this.inspectorCollapsed = false;
     this.viewport.enabled = true;
     try {
       this.active.Enter(this.workHost);

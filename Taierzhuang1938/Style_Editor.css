@@ -324,6 +324,7 @@
 .edFpsLegend::after { content: attr(data-view); color: var(--ui-muted); }
 body.edFpsClean #edRoot .edPanel,
 body.edFpsClean #edRoot .edMenuBar,
+body.edFpsClean #edRoot .edInspectorToggle,
 body.edFpsClean #weaponRangePanel,
 body.edFpsClean #edRoot .edGear,
 body.edFpsClean #edRoot .edHint { display: none !important; }
@@ -457,6 +458,24 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
 #edRoot.toolsOpen .edHint { top: calc(var(--ed-bar-h) + 14px); }
 [hidden].edPanel { display: none !important; }
 
+/* 折叠只影响右侧 Inspector；隐藏后图标留在画面右上角。 */
+#edRoot.inspectorCollapsed { --ed-inspector-w: 0px; --ed-inspector-wide: 0px; }
+#edRoot.inspectorCollapsed :is(.edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards), .edPanel.edInspectorEmpty) { display: none; }
+.edInspectorToggle {
+  position: absolute; top: calc(var(--ed-bar-h) + 14px); right: 14px; z-index: 1;
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  pointer-events: auto; cursor: pointer; border: 0; border-radius: 0; background: none; color: #bbbbae;
+}
+.edInspectorToggle svg { width: 24px; height: 24px; }
+.edMenuBar > .edInspectorToggle { position: static; flex: 0 0 32px; align-self: center; }
+#edRoot.inspectorCollapsed .edInspectorToggle svg { transform: rotate(180deg); }
+.edInspectorToggle[hidden] { display: none; }
+.edInspectorToggle:hover { color: var(--ed-gold-hi); }
+.edInspectorToggle:focus-visible { outline: 1px solid var(--ed-gold); outline-offset: 2px; }
+#edRoot .edHead:has(> .edInspectorToggle) { grid-template-columns: minmax(0, 1fr) 32px 32px; column-gap: 6px; }
+#edRoot .edHead:has(> .edInspectorToggle) .edX { grid-column: 3; }
+#edRoot .edHead > .edInspectorToggle { position: static; grid-column: 2; grid-row: 1 / span 2; align-self: start; }
+
 /* 空 Inspector：一枚图标 + 衬线标题 + 两句说明 + 快捷键 */
 #edRoot .edInspectorEmpty .edHead { display: none; }
 #edRoot .edInspectorEmpty .edBody { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 72px 30px 24px; }
@@ -583,6 +602,7 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
 
 @media (max-width: 600px) {
   /* 窄屏：Inspector 改成底部抽屉，上面留出画面 */
+  #edRoot:not(.inspectorCollapsed) > .edInspectorToggle { top: calc(48vh + 14px); }
   #edRoot :is(.edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards), .edPanel.edInspectorEmpty),
   #edRoot .edPanel.work.wide:not(.debugRendering):not(.ai):not(.assetStandards) {
     left: 0; right: 0; width: auto; top: auto; height: 52vh; border-left: 0; border-top: 1px solid var(--ed-rule);
