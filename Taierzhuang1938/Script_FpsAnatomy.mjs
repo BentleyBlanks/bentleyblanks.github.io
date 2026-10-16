@@ -107,17 +107,20 @@ export function ApplyAnatomicalFingers(rig) {
         return authoredTrigger && fire ? rotation.slerp(new THREE.Quaternion().fromArray(authoredTrigger).normalize(),fire) : rotation;
       };
       const BlendAuthored = () => {
-        if (authored) bone.quaternion.copy(AuthoredRotation().slerp(bone.quaternion, workingBlend));
+        if (authored) bone.quaternion.copy(AuthoredRotation().slerp(bone.quaternion.normalize(), workingBlend));
       };
       if (authored && workingBlend === 0) {
         bone.quaternion.copy(AuthoredRotation());
         continue;
       }
+      // An authored grip is blended below. Build its pure working target here;
+      // mixing the grip into that target first applies the release weight twice.
+      const proceduralBlend = authored ? 1 : workingBlend;
       const baseCurl = contact?.fingers?.[finger] || (rig.unarmed ? [55, 76, 40].map((value,index)=>THREE.MathUtils.lerp([18,28,18][index],value,rig.poseState.sprint)) : firearm && side === "r" && finger === 1
         ? [14, 28, 20] : (contact?.curl || [56, 74, 46]));
       const curl = baseCurl.map((value,index) => THREE.MathUtils.lerp(
         THREE.MathUtils.lerp(value, finger === 1 ? (contact?.triggerFingers?.[index] ?? value) : value, fire),
-        working?.fingers?.[finger]?.[index] ?? value, workingBlend));
+        working?.fingers?.[finger]?.[index] ?? value, proceduralBlend));
       // Thumb opposition comes from its CMC joint, independently of the four
       // finger hinges. Keep it along the grip instead of crossing the slide.
       if ((firearm || rig.unarmed || contact?.thumbDirection) && finger === 0 && segment === 0) {
@@ -125,11 +128,11 @@ export function ApplyAnatomicalFingers(rig) {
           : new THREE.Vector3(0,rig.unarmed ? -0.50 : -0.28,1));
         if (working?.thumbDirection) {
           const thumb = new THREE.Vector3().fromArray(working.thumbDirection);
-          target.lerp(thumb, workingBlend);
+          target.lerp(thumb, proceduralBlend);
         }
         target.normalize().applyQuaternion(rig.anatomy[side].frame.quaternion);
         bone.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(direction,target).multiply(rest));
-        const roll = THREE.MathUtils.lerp(contact?.thumbRoll || 0,working?.thumbRoll || 0,workingBlend);
+        const roll = THREE.MathUtils.lerp(contact?.thumbRoll || 0,working?.thumbRoll || 0,proceduralBlend);
         if (roll) bone.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(target, roll*Math.PI/180));
         BlendWorkingRotation();BlendAuthored();
         continue;
@@ -137,8 +140,8 @@ export function ApplyAnatomicalFingers(rig) {
       const degrees = finger === 0 && !contact?.fingers && !working ? (rig.unarmed ? (segment === 1 ? 32 : 22) : firearm ? (segment === 1 ? 12 : 8) : 28) : curl[segment];
       bone.quaternion.copy(rest).multiply(new THREE.Quaternion().setFromAxisAngle(axis, degrees * Math.PI / 180));
       if (segment === 0) {
-        const spread = (contact?.fingerSplay?.[finger] || 0) * (1-workingBlend)
-          + (working?.fingerSplay?.[finger] || 0) * workingBlend
+        const spread = (contact?.fingerSplay?.[finger] || 0) * (1-proceduralBlend)
+          + (working?.fingerSplay?.[finger] || 0) * proceduralBlend
           + (finger === 1 ? (contact?.triggerSplay || 0) * fire : 0);
         if (spread) bone.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(spreadAxis, spread * Math.PI/180));
       }

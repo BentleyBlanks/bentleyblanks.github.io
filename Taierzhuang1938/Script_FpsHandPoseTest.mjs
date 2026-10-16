@@ -98,6 +98,33 @@ Inspect("l", { kind: "leftHolding" });
 Inspect("r", { kind: "rightHolding" });
 sampledPoses++;
 
+// Contact weight is a pose weight. Authored digits must make the same progress
+// as their palm when entering a working pose; blending an already mixed target
+// again makes a 50% release advance only 25% and rush at the end.
+let authoredBlendComparisons = 0;
+for (const side of ['r', 'l']) for (const name of Object.keys(FPS_HAND_SHAPES).filter(name => name.startsWith('packet'))) {
+  rig.poseState.fire = 0;
+  rig.operationPose[side] = { shape: name, nextShape: name, shapeMix: 0 };
+  const selected = rig.anatomy[side].curls.filter(({bone}) => {
+    const key = bone.name.match(/finger(\d)(\d)?$/i);
+    return FPS_ARM_POSES.HanYang.contacts[side === 'r' ? 'right' : 'left'].fingerRotations?.[key[1] + (key[2] || '')];
+  });
+  rig.contactWeight[side] = 1; ApplyAnatomicalFingers(rig);
+  const held = selected.map(({bone}) => bone.quaternion.clone());
+  rig.contactWeight[side] = 0; ApplyAnatomicalFingers(rig);
+  const working = selected.map(({bone}) => bone.quaternion.clone());
+  for (const amount of [.1, .25, .5, .75, .9]) {
+    rig.contactWeight[side] = 1 - amount; ApplyAnatomicalFingers(rig);
+    for (const [i, {bone}] of selected.entries()) {
+      const expected = held[i].clone().slerp(working[i], amount);
+      assert(bone.quaternion.angleTo(expected) < 1e-6,
+        `${side} ${bone.name} ${name}: authored release must advance ${(amount * 100).toFixed(0)}% exactly once`);
+      authoredBlendComparisons++;
+    }
+  }
+  rig.contactWeight[side] = 1; rig.operationPose[side] = null;
+}
+
 const aliases = { relax: "packetRelax", recover: "packetRecover", bolt: "packetBolt", latch: "packetLatch" };
 const anchorShapes = {
   gripUnwrap: "packetClear", gripClear: "packetClear", boltClear: "packetBoltClear", bolt: "packetBolt",
@@ -143,7 +170,7 @@ for (const [key, range] of ranges) {
 const report = {
   sourceAsset: "Model/Model_FpsHanYangHands.glb", skinSha256: crypto.createHash("sha256").update(bytes).digest("hex"),
   method: "Production CaptureAnatomy/ApplyAnatomicalFingers on actual GLB default bind nodes. Swing/twist decomposition of rest^-1 * localPose around each captured local hinge. All packet endpoints, production adjacent reload/bolt shapes, shape mix and holding-contact weights are swept without a renderer.",
-  limits: { minimumFlexDeg, maximumOffHingeDeg }, sampledPoses, transitions: [...transitions.values()], joints: Object.fromEntries(ranges), failures,
+  limits: { minimumFlexDeg, maximumOffHingeDeg }, sampledPoses, authoredBlendComparisons, transitions: [...transitions.values()], joints: Object.fromEntries(ranges), failures,
   limitations: ["CMC/MCP roots are recorded but exempt from hinge-only limits; their abduction/opposition needs separate physical/visual evaluation.",
     "This gate does not validate skin weights, mesh deformation, contact, collision or a natural-looking gesture. Those need actual skin geometry and rendered motion review."],
 };

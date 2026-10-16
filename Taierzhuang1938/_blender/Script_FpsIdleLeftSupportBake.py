@@ -1,4 +1,4 @@
-"""Bake one captured HanYang Idle Action, then merge only reviewed left tracks.
+"""Bake one captured HanYang Idle Action, then merge only reviewed tracks.
 
 Run in an independently copied Animation_HanYangHands.blend. The copy's parent
 directory and scene['BlenderMcpTask'] must both equal FPS_IDLE_SUPPORT_TASK.
@@ -8,9 +8,9 @@ The capture uses the same native model reference as Data_HanYangHoldingPose:
 Three.js column-major arms.root.inverse * bone.world matrices, plus local p/q.
 This script authors real Blender pose/control/preview keyframes in one existing
 Idle Action and calls the original ExportFpsAnimation. The exporter writes only
-the two JSON files in the copy's Stage directory. Only the 19 selected left bone
-tracks and handLeft/contactLeft controls are merged into the verified baseline.
-No other clip, right track, visibility/state/contact field or timing is changed.
+the two JSON files in the copy's Stage directory. Missing scope defaults to
+LeftSupport (19 left bones plus handLeft/contactLeft); RightIndexRing selects
+only six right index/ring bones and no controls. All other fields stay exact.
 """
 
 import copy
@@ -83,12 +83,31 @@ def normalized_loop_track(track, count, label, finger_position=None):
     return result
 
 
-def protected_fields(document, selected_indices):
+def capture_selection(capture, names):
+    """Allow only the two reviewed publication scopes, never an arbitrary list."""
+    scope = capture.get('scope', 'LeftSupport')
+    if scope == 'LeftSupport':
+        pattern = r'l(clavicle|upperarm|forearm|hand|finger[0-4][12]?)$'
+        expected_count, selected_controls = 19, SELECTED_CONTROLS
+    elif scope == 'RightIndexRing':
+        pattern = r'rfinger[13][12]?$'
+        expected_count, selected_controls = 6, ()
+    else:
+        raise AssertionError(('Unsupported capture publication scope', scope))
+    selected = [index for index, name in enumerate(names) if re.search(pattern, normalize(name))]
+    assert len(selected) == expected_count, (scope, 'Exact reviewed bone inventory')
+    assert len(capture['selectedBones']) == expected_count
+    assert set(capture['selectedBones']) == {names[index] for index in selected}, (scope, 'Exact reviewed bone selection')
+    assert capture.get('selectedControls', list(selected_controls)) == list(selected_controls), (scope, 'Exact reviewed control selection')
+    return scope, selected, selected_controls
+
+
+def protected_fields(document, selected_indices, selected_controls=SELECTED_CONTROLS):
     result = copy.deepcopy(document)
     clip = result['clips']['Idle']
     for index in selected_indices:
         clip['bones'][index] = None
-    for key in SELECTED_CONTROLS:
+    for key in selected_controls:
         clip['controls'][key] = None
     return result
 
@@ -102,15 +121,11 @@ def validate_capture(capture, baseline):
     assert list(baseline['clips']) == ['Idle'], 'Only the existing single Idle is authorized'
     clip = baseline['clips']['Idle']
     assert clip['duration'] == 4 and clip['count'] == 241 and len(clip['bones']) == 53
-    selected = [index for index, name in enumerate(names)
-                if re.search(r'l(clavicle|upperarm|forearm|hand|finger[0-4][12]?)$', normalize(name))]
-    assert len(selected) == 19
-    assert len(capture['selectedBones']) == 19
-    assert set(capture['selectedBones']) == {names[index] for index in selected}, 'Exactly the complete left support chain'
+    _, selected, selected_controls = capture_selection(capture, names)
     frames = capture['frames']
     assert len(frames) == 241
     control_keys = set(clip['controls'])
-    assert set(SELECTED_CONTROLS) <= control_keys
+    assert set(selected_controls) <= control_keys
     for index, frame in enumerate(frames):
         assert abs(frame['time'] - index / 60) < 1e-8
         assert len(frame['bones']) == 53
@@ -132,7 +147,7 @@ def validate_capture(capture, baseline):
         a, b = frames[0]['bones'][bone_index]['local'], frames[-1]['bones'][bone_index]['local']
         assert max(abs(x - y) for x, y in zip(a[:3], b[:3])) <= NATIVE_POSITION_TOLERANCE
         assert quaternion_error(a[3:], b[3:]) <= ROTATION_TOLERANCE_RAD
-    for key in SELECTED_CONTROLS:
+    for key in selected_controls:
         a, b = frames[0]['controls'][key]['transform'], frames[-1]['controls'][key]['transform']
         assert max(abs(x - y) for x, y in zip(a[:3], b[:3])) <= 1e-6
         assert quaternion_error(a[3:], b[3:]) <= ROTATION_TOLERANCE_RAD
@@ -160,6 +175,7 @@ def bake_idle_left_support(project_root, input_path, task):
     assert sha256(baseline_raw) == capture['baselineSha256'], 'Exact capture baseline hash'
     baseline = json.loads(baseline_raw.decode('utf-8-sig'))
     selected = validate_capture(capture, baseline)
+    scope, _, selected_controls = capture_selection(capture, baseline['bones'])
     asset = project / 'Animation/FirstPerson' / ASSET_NAME
     manifest_path = asset.with_name(MANIFEST_NAME)
     assert sha256(asset.read_bytes()) == capture['baselineSha256'], 'Production Idle changed since this capture'
@@ -227,7 +243,7 @@ def bake_idle_left_support(project_root, input_path, task):
     action = bpy.data.actions.new(ACTION_NAME)
     action.use_fake_user = True
     action['duration'] = 4.0
-    action['authorizedScope'] = 'One captured HanYang Idle; left support chain publication only'
+    action['authorizedScope'] = 'One captured HanYang Idle; ' + scope + ' publication only'
     for obj in managed:
         slot = action.slots.new(id_type='OBJECT', name=obj.name)
         obj.animation_data_create()
@@ -367,7 +383,7 @@ def bake_idle_left_support(project_root, input_path, task):
             expected = frame['bones'][bone_index]['local']
             baked_local_position_error = max(baked_local_position_error, *(abs(a - b) for a, b in zip(values[:3], expected[:3])))
             baked_local_rotation_error = max(baked_local_rotation_error, quaternion_error(values[3:], expected[3:]))
-    for key in SELECTED_CONTROLS:
+    for key in selected_controls:
         output_clip['controls'][key] = normalized_loop_track(new_clip['controls'][key], 241, key)
         for index, frame in enumerate(capture['frames']):
             actual = sample(output_clip['controls'][key], index, 241)
@@ -376,7 +392,7 @@ def bake_idle_left_support(project_root, input_path, task):
             assert quaternion_error(actual[3:], expected[3:]) <= ROTATION_TOLERANCE_RAD
     assert baked_local_position_error <= NATIVE_POSITION_TOLERANCE
     assert baked_local_rotation_error <= ROTATION_TOLERANCE_RAD
-    assert protected_fields(result, selected) == protected_fields(baseline, selected), 'Every non-selected JSON field stays exact'
+    assert protected_fields(result, selected, selected_controls) == protected_fields(baseline, selected, selected_controls), 'Every non-selected JSON field stays exact'
     output_raw = json.dumps(result, separators=(',', ':'), allow_nan=False).encode('utf-8')
     final_manifest = copy.deepcopy(manifest)
     final_manifest['HanYang']['bytes'] = len(output_raw)
@@ -391,11 +407,11 @@ def bake_idle_left_support(project_root, input_path, task):
     temporary.write_bytes(output_raw)
     temporary.replace(asset)
     manifest_path.write_text(json.dumps(final_manifest, indent=2) + '\n', encoding='utf-8')
-    report = {'version': 1, 'source': str(source_path), 'task': task, 'action': ACTION_NAME,
+    report = {'version': 1, 'source': str(source_path), 'task': task, 'action': ACTION_NAME, 'scope': scope,
               'clipsCreated': 0, 'frames': 241, 'fps': 60, 'duration': 4,
               'keyedBones': 53, 'keyedControls': list(controls), 'actionSlots': len(action.slots),
               'parentQuantizationMode': 'ForwardFromStoredBasis',
-              'selectedBones': [baseline['bones'][index] for index in selected], 'selectedControls': list(SELECTED_CONTROLS),
+              'selectedBones': [baseline['bones'][index] for index in selected], 'selectedControls': list(selected_controls),
               'input': str(capture_path), 'inputSha256': sha256(capture_raw),
               'baseline': str(baseline_path), 'baselineSha256': sha256(baseline_raw),
               'output': str(asset), 'outputSha256': sha256(output_raw),

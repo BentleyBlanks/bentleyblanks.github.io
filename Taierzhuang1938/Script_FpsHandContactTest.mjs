@@ -158,6 +158,54 @@ try {
         }
       });return {vertices,inside,maxDepth};
     };
+    const rightTriggerCache=new WeakMap();
+    const HanYangTriggerSkin=(target,fixed=null)=>{
+      let entries=rightTriggerCache.get(arms);
+      if(!entries){
+        entries=[];const hand=arms.bones.r.hand,dorsal=new THREE.Vector3(0,1,0).applyQuaternion(arms.anatomy.r.frame.quaternion).normalize();
+        arms.root.traverse(mesh=>{
+          if(!mesh.isSkinnedMesh)return;const bones=mesh.skeleton.bones,handIndex=bones.indexOf(hand);
+          const distal=bones.findIndex(b=>b.name.toLowerCase().replace(/[^a-z0-9]/g,'').endsWith('rfinger12'));
+          if(handIndex<0||distal<0)return;
+          const a=mesh.geometry.attributes,g=mesh.geometry,bindToHand=mesh.skeleton.boneInverses[handIndex].clone().multiply(mesh.bindMatrix);
+          const bind=Array.from({length:a.position.count},(_,i)=>new THREE.Vector3().fromBufferAttribute(a.position,i).applyMatrix4(bindToHand));
+          const normals=bind.map(()=>new THREE.Vector3()),index=g.index;
+          for(let i=0;i<(index?.count||a.position.count);i+=3){
+            const ids=[0,1,2].map(k=>index?index.getX(i+k):i+k),[p,q,r]=ids.map(j=>bind[j]);
+            const n=q.clone().sub(p).cross(r.clone().sub(p));for(const j of ids)normals[j].add(n);
+          }
+          const selected=[];
+          for(let i=0;i<a.position.count;i++){
+            let weight=0;for(let k=0;k<4;k++)if(a.skinIndex.getComponent(i,k)===distal)weight+=a.skinWeight.getComponent(i,k);
+            if(weight>.95&&normals[i].normalize().dot(dorsal)<-.3)selected.push(i);
+          }
+          if(selected.length)entries.push({mesh,selected});
+        });
+        if(entries.reduce((s,e)=>s+e.selected.length,0)<20)throw Error('Missing actual right index distal volar skin');
+        rightTriggerCache.set(arms,entries);
+      }
+      const inverse=vm.rig.group.matrixWorld.clone().invert();let best=null,volarVertices=0;
+      for(const entry of entries){
+        const {mesh,selected}=entry,g=mesh.geometry,index=g.index;
+        const points=Array.from({length:g.attributes.position.count},(_,i)=>mesh.getVertexPosition(i,new THREE.Vector3()).applyMatrix4(mesh.matrixWorld).applyMatrix4(inverse));
+        const normals=points.map(()=>new THREE.Vector3());
+        for(let i=0;i<(index?.count||points.length);i+=3){
+          const ids=[0,1,2].map(k=>index?index.getX(i+k):i+k),[p,q,r]=ids.map(j=>points[j]);
+          const n=q.clone().sub(p).cross(r.clone().sub(p));for(const j of ids)normals[j].add(n);
+        }
+        volarVertices+=selected.length;
+        for(const i of selected){
+          if(fixed&&(fixed.mesh!==mesh||fixed.index!==i))continue;
+          const point=points[i],normal=normals[i].normalize(),distance=point.distanceTo(target);
+          const facing=normal.z,toTarget=distance>1e-12?normal.dot(target.clone().sub(point).divideScalar(distance)):1;
+          const signedSeparation=target.z-point.z;
+          if(!fixed&&(facing<=.45||toTarget<=.25||signedSeparation<-.0002))continue;
+          if(!best||distance<best.distance)best={point:point.clone(),normal:normal.toArray(),distance,facing,toTarget,signedSeparation,witness:{mesh,index:i}};
+        }
+      }
+      if(!best)throw Error('No actual volar index surface facing the real trigger');
+      return {...best,volarVertices,method:'Fixed bind-selected >95% DIP volar skin; actual posed triangle normals; one hip witness tracked through ADS/fire'};
+    };
     const MagazineFingerPenetration=(part,includeHand=false)=>{
       // Only the actual prop subtree is an obstacle here. Per-shell BVH
       // containment inspects all depths and mixed finger skin, with no 12mm
@@ -244,11 +292,16 @@ try {
     for(const id of Object.keys(probes).filter(id=>(!only||only.includes(id))&&!shelved.includes(id))){
       editor.SetWeapon(id);arms=vm.riggedArms;editor.SetPose("hip");editor.SetView("player");for(let i=0;i<90;i++)editor.Update(1/60);Refresh();
       const target=TriggerPoint(id),hip=Pad("r",1),originalPositions=arms.fingerBones.r.concat(arms.fingerBones.l).map(b=>b.position.clone());
+      let hipTriggerSkin=null,hipTriggerJoints=null;
       for(const pose of ["hip","ads","fire"]){
         editor.SetPose(pose==="ads"?"ads":"hip");for(let i=0;i<90;i++)editor.Update(1/60);
         if(pose==="fire"){vm.TriggerFire();editor.Update(1/120);}
-        Refresh();const point=Pad("r",1),bone=pads[id+'r1'].bone;
+        Refresh();let point=Pad("r",1);const markerPoint=point.clone(),bone=pads[id+'r1'].bone;
         const normal=new THREE.Vector3(0,1,0).transformDirection(vm.rig.group.matrixWorld.clone().invert().multiply(bone.matrixWorld));
+        const indexJoints=arms.fingerBones.r.filter(b=>/finger1[12]?$/i.test(b.name));
+        const actualTrigger=id==='HanYang'?HanYangTriggerSkin(target,hipTriggerSkin?.witness):null;
+        if(actualTrigger&&pose==='hip'){hipTriggerSkin=actualTrigger;hipTriggerJoints=indexJoints.map(b=>b.quaternion.clone());}
+        if(actualTrigger)point=actualTrigger.point;
         const gunSurface=id!=="ServicePistol"&&id!=="Zb26"?Triangles(vm.rig.group,o=>o.name.startsWith(id+"_")):null;
         const markerDistances=gunSurface?[0,1,2,3,4].map(digit=>Nearest(Pad("l",digit),gunSurface)):[];
         const supportSamples=id==="HanYang"?markerDistances.map((markerDistance,digit)=>({digit,markerDistance,...HanYangLeftVolarGap(digit,gunSurface)}))
@@ -256,7 +309,14 @@ try {
         const support=supportSamples.map(sample=>sample.distance);
         const zbContact=id==='Zb26'?MeasureZbContactGeometry(THREE,{weaponGroup:vm.rig.group,arms}):null;
         result.poses.push({id,pose,support,supportSamples,supportPoints:gunSurface?[0,1,2,3,4].map(digit=>Pad("l",digit).toArray()):[],point:point.toArray(),trigger:target?.toArray(),distance:target?point.distanceTo(target):Infinity,
-          facing:normal.z,holdingDrift:pose==="ads"?point.distanceTo(hip):0,triggerTravel:pose==="fire"?point.distanceTo(hip):0,wrist:{...arms.wristBend},supportSkin:zbContact?.support??null,triggerSkin:zbContact?.trigger??null});
+          facing:actualTrigger?.facing??normal.z,holdingDrift:pose==="ads"?point.distanceTo(actualTrigger?hipTriggerSkin.point:hip):0,
+          triggerTravel:pose==="fire"?point.distanceTo(actualTrigger?hipTriggerSkin.point:hip):0,
+          legacyTriggerMarkerDistance:target?markerPoint.distanceTo(target):Infinity,
+          actualTriggerSkin:actualTrigger?{method:actualTrigger.method,volarVertices:actualTrigger.volarVertices,mesh:actualTrigger.witness.mesh.name,index:actualTrigger.witness.index,
+            normal:actualTrigger.normal,normalDotToTarget:actualTrigger.toTarget,signedSeparation:actualTrigger.signedSeparation,
+            sameHipWitness:actualTrigger.witness.mesh===hipTriggerSkin.witness.mesh&&actualTrigger.witness.index===hipTriggerSkin.witness.index,
+            jointRotationChangeRad:Math.max(...indexJoints.map((b,i)=>b.quaternion.angleTo(hipTriggerJoints[i])))}:null,
+          wrist:{...arms.wristBend},supportSkin:zbContact?.support??null,triggerSkin:zbContact?.trigger??null});
       }
       editor.SetPose("hip");for(let i=0;i<90;i++)editor.Update(1/60);
       for(const action of ["reload",...(["ZhongZheng","HanYang","Type38","Zb26","Type11"].includes(id)?["reloadPartial"]:[]),
@@ -351,7 +411,13 @@ try {
   await fs.writeFile(path.join(output,"Data_Contacts.json"),JSON.stringify({...report,errors},null,2));
   const failures=[];const Check=(condition,message)=>{if(!condition)failures.push(message);};
   for(const pose of report.poses){
-    if(pose.id!=='Zb26')Check(pose.distance<.006,`${pose.id} ${pose.pose}: index pad misses trigger by ${(pose.distance*1000).toFixed(1)} mm`);
+    if(pose.id!=='Zb26')Check(pose.distance<(pose.id==='HanYang'?.004:.006),`${pose.id} ${pose.pose}: index pad misses trigger by ${(pose.distance*1000).toFixed(1)} mm`);
+    if(pose.id==='HanYang'){
+      const skin=pose.actualTriggerSkin;
+      Check(skin?.volarVertices>=20&&skin.sameHipWitness,`${pose.id} ${pose.pose}: actual fixed volar skin witness required`);
+      Check(skin?.normalDotToTarget>.25&&skin.signedSeparation>=-.0002,`${pose.id} ${pose.pose}: trigger must lie in front of the actual palm pad`);
+      if(pose.pose==='fire')Check(skin?.jointRotationChangeRad>.001,`${pose.id}: firing must rotate the actual index joints`);
+    }
     Check(pose.facing>.45,`${pose.id} ${pose.pose}: index pad does not face the trigger (${pose.facing.toFixed(2)})`);
     Check(pose.holdingDrift<.001,`${pose.id}: ADS changes the finger contact`);
     if(pose.pose==="fire")Check(pose.triggerTravel>.0001,`${pose.id}: firing does not flex the trigger finger`);
