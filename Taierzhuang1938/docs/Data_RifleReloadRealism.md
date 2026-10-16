@@ -448,3 +448,57 @@ poseState，以及真实 15 根指骨四元数；左右各引用 674 帧，各�
 视频在本地 `HanyangFingers_20261016`，半速通过重复原帧实现；完整动作蒙太奇与近景
 已实际查看。混合指蹼仍有局部拉伸小三角形（约 0.876% 面积超过 3 倍拉伸），
 连同同指折叠继续保留为源网格改进项，本节不构成真实／3A 总目标的完成证明。
+
+## 右手 MCP 局部权重连续性（2026-10-16）
+
+在上一版的完整皮肤复核中，食／中指及中／环指根附近仍有局部权重跳变。
+本轮只处理 4 个问题面所在的 12 个焊接点、20 个导出顶点；按绑定表面邻接的
+逆边长权场混合 0.2、迭代 2 次，只重新分配同侧非拇指 MCP 根节的现有总质量。
+Hand、PIP/DIP 及其他每个骨权保持原值，未改变几何、法线、UV、衣袖、贴图或既有 morph。
+这项修正不是对全手刷平，亦不包含未通过验收的新左掌框。
+
+夹弹问题面的最长边从约 14.85 降到 10.25 mm，抓柄对应边从约 20.43 降到
+13.82 mm；四个关键姿态中，低于原面积 25% 的压缩面积均下降，超过 3 倍的
+拉伸面积均未增加。完整非邻接皮肤交叉配对为持枪 334→324、夹弹 346→344、
+压弹 396→392、抓柄 356→344；一个过渡相位 370→372，但交线总长和最长交段
+下降。因此只声明局部拉伸改善，不声明所有皮褶或所有离散交叉数量单调改善。
+这些几何量来自原绑定表面与实际骨骼姿态，配对数和局部平面交越幅度不是闭壳深度。
+
+[修权配方](../Model/Data_FpsHandSkinWeights.json) 升级为严格两阶段：前 150 条保持
+原 Index→Middle 规则，后 20 条为 `McpBranchContinuity`。9619／9620 在两阶段重叠，
+故 170 条操作对应 168 个唯一导出点；第二阶段逆写后必须完整恢复 `a3c6d339…` 的
+已发布资产，再逆写旧阶段恢复 `7c727aa4` 的原始 Git GLB。最终相对基准仅改变
+585 字节（328 JOINTS、257 WEIGHTS）；MCP 总量的 float32 最大误差为
+`4.842877388e-8`，非 MCP 逐骨权重差为 0。最终 GLB SHA-256 为
+`dffb45e2edc89050feefed0a49230175eb17e42a96b46fcdfaff872187d01a38`。
+
+新的几何源工程为
+`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/FpsHandSkinWeights_20261016/Model_FpsHandMcpContinuity_Final.blend`。
+从未修权原始源副本顺序重放两阶段，168 个导出点精确映射到 131 个源点，误差 0；
+两个阶段分别涉及 120／12 个源点。源保留 Blender 导出时会裁掉的微权重：校验先
+准确复现官方导出的 `weight <= 0.0001` 剔除、Top4 及 float32 求和／归一化，再
+模拟旧阶段字节映射，不能把已合并的源重新 Top4 当作相同顺序。新阶段只更新源
+MCP 根组的分配，其他源骨权逐值保留。重建入口仍是
+[_blender/Script_FpsHandSkinWeightsBake.py](../_blender/Script_FpsHandSkinWeightsBake.py)，
+从同目录 `Model_FpsHanYangHands_Basis7c727aa4.glb` 重放，已实际生成
+`Model_FpsHandMcpContinuity_Rebuilt.glb` 并核对与游戏资产完整哈希一致。
+
+冻结最终资产后，四案全帧双臂／衣袖的显式 2 mm 门禁实际通过，最大深度仍为
+空仓 1.833/0.194、余弹 1.797/0.194、留后开栓 1.850/0.194、拉栓 1.030/0.194 mm。
+另有 11 项实际回归通过：1,786 姿态、两阶段逆恢复、既有 morph 保护、右手真实
+674 帧骨骼重放及跨指皮肤、全部装备手部接触、全部双臂、手榴弹、大刀挥砍与投影、
+汉阳造瞄准和 MotionVector。记录为 `tmp/ReloadRealism/Data_McpRegressionGates.json`，
+新的实际帧报告在 `McpCandidateClearance/Data_HanYangReloadClearance.json`；
+不沿用上一节旧资产的通过日志。正式 high 画质近景的原版／候选逐阶段对照已查看。
+严格 high 画质 staging 的完整汉阳造／捷克式换弹及三种汉阳造逐帧捕获亦已实际通过：
+无源码回退、缺失资源或页面／控制台／网络错误，实载手部哈希为上述 `dffb45e2…`。
+本地构建戳 `3250157317977365`，gameplay SHA-256 为
+`b8c003866f5154c2465c0b78143c99f3a82741a6663602c48dbf9cbe3d5f837c`，
+记录 `tmp/ReloadRealism/McpStageAcceptance/Data_StagedHandAcceptance.json`。
+完整 prepush 再次在既有 `SpeakerGestureTest` 同一断言处终止，
+`Data_McpPrepush.log` 保留实际失败，不将本轮专项通过描述成全项目通过。
+
+左手新掌框仍在研究：正向候选有 99° 腕弯，已否决；负向候选虽解除了腕弯与
+纯指木托交叉，但全掌／蹼复核揭示 42 片木托交叉及较大拇指掌褶折叠，也未采用。
+生产左握姿、Idle、动作时长、机构与弹药规则保持上一节版本。本轮仍不构成
+真实／3A 总目标完成或整手零穿模的证明。

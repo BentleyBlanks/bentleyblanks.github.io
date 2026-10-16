@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "asset": "Model/Model_FpsHanYangHands.glb",
   "basis": {
     "git": {
@@ -10,14 +10,14 @@
     "binarySha256": "5f481d883455822e03b6fb64e78921c110459afcf3c34b1f9c43df60cc41580a"
   },
   "output": {
-    "sha256": "a3c6d33938aee6e1c7a547224c1e377d7ada24c52ae0aeb74cd05a33fd1e5350",
-    "binarySha256": "c445d10986302e6d09180efc9ced5f4ed136a73f7ce8bacb572b5e56215cc985"
+    "sha256": "dffb45e2edc89050feefed0a49230175eb17e42a96b46fcdfaff872187d01a38",
+    "binarySha256": "25062b7a12590ca24fabf25c808eeed46f970bf36faa15f36adc63c9ac11a92e"
   },
   "selection": {
     "method": "Bilateral middle-finger PIP skin weight-island correction by distal connected component; no pose compensation or smoothing",
     "skinMaterial": "Material_HanYangScanSkin",
     "sourceObject": "Mesh_FpsScanUnifiedSkin",
-    "sourceBlend": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/FpsHandSkinWeights_20261016/Model_FpsHandSkinWeights_Final.blend",
+    "sourceBlend": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/FpsHandSkinWeights_20261016/Model_FpsHandMcpContinuity_Final.blend",
     "distalCut": {
       "nearestSegmentRootFraction": 0.6,
       "excludeThumb": true
@@ -49,7 +49,23 @@
         "dominantWrongBranchVertices": 50,
         "exportedEdits": 70
       }
-    ]
+    ],
+    "mcpContinuity": {
+      "id": "triangles_a0.2_n2",
+      "welds": 12,
+      "exportedVertices": 20,
+      "alpha": 0.2,
+      "iterations": 2,
+      "triangles": [
+        9790,
+        9796,
+        9928,
+        11951
+      ],
+      "constraints": "Exact unchanged individual Hand/PIP/DIP/non-MCP influence weights; unchanged aggregate MCP root total (float32 rounding). UV bind-weld group consistency; no geometry/UV/normals/material changes. Selected roots share inverse-edge weighted topological neighbor field.",
+      "sourceRecipeSha256": "77af045165c02417dd487d351110c65beb3596206479be9326e87994feb32e6a",
+      "operation": "Second ordered phase; only same-side non-thumb MCP branch allocation changes; Hand/PIP/DIP per-bone mass remains exact. Entire repaired v1 intermediate is byte-recoverable."
+    }
   },
   "edits": [
     {
@@ -4401,6 +4417,631 @@
         0.02239040844142437,
         0.0005640775198116899
       ]
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 9619,
+      "weld": 7835,
+      "jointsBefore": [
+        44,
+        37,
+        45,
+        44
+      ],
+      "weightsBefore": [
+        0.9091600775718689,
+        0.07161571085453033,
+        0.017976466566324234,
+        0.0012477501295506954
+      ],
+      "jointsAfter": [
+        37,
+        45,
+        44,
+        41
+      ],
+      "weightsAfter": [
+        0.07161571085453033,
+        0.017976466566324234,
+        0.8832544088363647,
+        0.027153417468070984
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 9620,
+      "weld": 7835,
+      "jointsBefore": [
+        44,
+        37,
+        45,
+        44
+      ],
+      "weightsBefore": [
+        0.9091600775718689,
+        0.07161571085453033,
+        0.017976466566324234,
+        0.0012477501295506954
+      ],
+      "jointsAfter": [
+        37,
+        45,
+        44,
+        41
+      ],
+      "weightsAfter": [
+        0.07161571085453033,
+        0.017976466566324234,
+        0.8832544088363647,
+        0.027153417468070984
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 11017,
+      "weld": 9063,
+      "jointsBefore": [
+        44,
+        37,
+        41,
+        0
+      ],
+      "weightsBefore": [
+        0.8981620669364929,
+        0.09740332514047623,
+        0.004434600938111544,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        44,
+        41,
+        0
+      ],
+      "weightsAfter": [
+        0.09740332514047623,
+        0.8383750915527344,
+        0.0642215684056282,
+        0
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 11018,
+      "weld": 9063,
+      "jointsBefore": [
+        44,
+        37,
+        41,
+        0
+      ],
+      "weightsBefore": [
+        0.8981620669364929,
+        0.09740332514047623,
+        0.004434600938111544,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        44,
+        41,
+        0
+      ],
+      "weightsAfter": [
+        0.09740332514047623,
+        0.8383750915527344,
+        0.0642215684056282,
+        0
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 11035,
+      "weld": 9077,
+      "jointsBefore": [
+        41,
+        37,
+        42,
+        44
+      ],
+      "weightsBefore": [
+        0.8856573104858398,
+        0.10823433846235275,
+        0.0033727495465427637,
+        0.0027356441132724285
+      ],
+      "jointsAfter": [
+        37,
+        42,
+        41,
+        44
+      ],
+      "weightsAfter": [
+        0.10823433846235275,
+        0.0033727495465427637,
+        0.5692499876022339,
+        0.3191429674625397
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 11124,
+      "weld": 9138,
+      "jointsBefore": [
+        41,
+        37,
+        44,
+        42
+      ],
+      "weightsBefore": [
+        0.5917187333106995,
+        0.39196351170539856,
+        0.016151385381817818,
+        0.00016636020154692233
+      ],
+      "jointsAfter": [
+        37,
+        42,
+        41,
+        44
+      ],
+      "weightsAfter": [
+        0.39196351170539856,
+        0.00016636020154692233,
+        0.47792401909828186,
+        0.12994608283042908
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 11106,
+      "weld": 9121,
+      "jointsBefore": [
+        44,
+        37,
+        41,
+        0
+      ],
+      "weightsBefore": [
+        0.6577474474906921,
+        0.3264569640159607,
+        0.015795528888702393,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        44,
+        41,
+        0
+      ],
+      "weightsAfter": [
+        0.3264569640159607,
+        0.5545589923858643,
+        0.11898395419120789,
+        0
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 11105,
+      "weld": 9120,
+      "jointsBefore": [
+        41,
+        37,
+        44,
+        0
+      ],
+      "weightsBefore": [
+        0.5640831589698792,
+        0.4180181324481964,
+        0.01789863593876362,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        41,
+        44,
+        0
+      ],
+      "weightsAfter": [
+        0.4180181324481964,
+        0.5208253264427185,
+        0.0611564964056015,
+        0
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 13674,
+      "weld": 11377,
+      "jointsBefore": [
+        44,
+        37,
+        47,
+        0
+      ],
+      "weightsBefore": [
+        0.7258226275444031,
+        0.2590336799621582,
+        0.015143714845180511,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        44,
+        47,
+        0
+      ],
+      "weightsAfter": [
+        0.2590336799621582,
+        0.6945468187332153,
+        0.04641948267817497,
+        0
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 13675,
+      "weld": 11377,
+      "jointsBefore": [
+        44,
+        37,
+        47,
+        0
+      ],
+      "weightsBefore": [
+        0.7258226275444031,
+        0.2590336799621582,
+        0.015143714845180511,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        44,
+        47,
+        0
+      ],
+      "weightsAfter": [
+        0.2590336799621582,
+        0.6945468187332153,
+        0.04641948267817497,
+        0
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 13676,
+      "weld": 11377,
+      "jointsBefore": [
+        44,
+        37,
+        47,
+        0
+      ],
+      "weightsBefore": [
+        0.7258226275444031,
+        0.2590336799621582,
+        0.015143714845180511,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        44,
+        47,
+        0
+      ],
+      "weightsAfter": [
+        0.2590336799621582,
+        0.6945468187332153,
+        0.04641948267817497,
+        0
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 13677,
+      "weld": 11377,
+      "jointsBefore": [
+        44,
+        37,
+        47,
+        0
+      ],
+      "weightsBefore": [
+        0.7258226275444031,
+        0.2590336799621582,
+        0.015143714845180511,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        44,
+        47,
+        0
+      ],
+      "weightsAfter": [
+        0.2590336799621582,
+        0.6945468187332153,
+        0.04641948267817497,
+        0
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 13665,
+      "weld": 11372,
+      "jointsBefore": [
+        47,
+        37,
+        44,
+        48
+      ],
+      "weightsBefore": [
+        0.8303089141845703,
+        0.16027529537677765,
+        0.007151015102863312,
+        0.002264790702611208
+      ],
+      "jointsAfter": [
+        37,
+        48,
+        47,
+        44
+      ],
+      "weightsAfter": [
+        0.16027529537677765,
+        0.002264790702611208,
+        0.7750848531723022,
+        0.06237512454390526
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 13694,
+      "weld": 11386,
+      "jointsBefore": [
+        44,
+        37,
+        47,
+        0
+      ],
+      "weightsBefore": [
+        0.7773978114128113,
+        0.21063566207885742,
+        0.011966555379331112,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        44,
+        47,
+        0
+      ],
+      "weightsAfter": [
+        0.21063566207885742,
+        0.6580634117126465,
+        0.1313009262084961,
+        0
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 13695,
+      "weld": 11386,
+      "jointsBefore": [
+        44,
+        37,
+        47,
+        0
+      ],
+      "weightsBefore": [
+        0.7773978114128113,
+        0.21063566207885742,
+        0.011966555379331112,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        44,
+        47,
+        0
+      ],
+      "weightsAfter": [
+        0.21063566207885742,
+        0.6580634117126465,
+        0.1313009262084961,
+        0
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 11028,
+      "weld": 9070,
+      "jointsBefore": [
+        44,
+        37,
+        41,
+        0
+      ],
+      "weightsBefore": [
+        0.8018369078636169,
+        0.18867656588554382,
+        0.009486555121839046,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        44,
+        41,
+        0
+      ],
+      "weightsAfter": [
+        0.18867656588554382,
+        0.8014425039291382,
+        0.00988095998764038,
+        0
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 11038,
+      "weld": 9080,
+      "jointsBefore": [
+        44,
+        37,
+        41,
+        0
+      ],
+      "weightsBefore": [
+        0.8168330788612366,
+        0.17509149014949799,
+        0.008075445890426636,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        44,
+        41,
+        0
+      ],
+      "weightsAfter": [
+        0.17509149014949799,
+        0.8153964877128601,
+        0.009512048214673996,
+        0
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 11039,
+      "weld": 9080,
+      "jointsBefore": [
+        44,
+        37,
+        41,
+        0
+      ],
+      "weightsBefore": [
+        0.8168330788612366,
+        0.17509149014949799,
+        0.008075445890426636,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        44,
+        41,
+        0
+      ],
+      "weightsAfter": [
+        0.17509149014949799,
+        0.8153964877128601,
+        0.009512048214673996,
+        0
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 11024,
+      "weld": 9068,
+      "jointsBefore": [
+        44,
+        37,
+        41,
+        0
+      ],
+      "weightsBefore": [
+        0.8549706935882568,
+        0.13731254637241364,
+        0.007716793101280928,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        44,
+        41,
+        0
+      ],
+      "weightsAfter": [
+        0.13731254637241364,
+        0.8536518812179565,
+        0.009035632014274597,
+        0
+      ],
+      "kind": "McpBranchContinuity"
+    },
+    {
+      "meshIndex": 0,
+      "primitiveIndex": 0,
+      "vertex": 11025,
+      "weld": 9068,
+      "jointsBefore": [
+        44,
+        37,
+        41,
+        0
+      ],
+      "weightsBefore": [
+        0.8549706935882568,
+        0.13731254637241364,
+        0.007716793101280928,
+        0
+      ],
+      "jointsAfter": [
+        37,
+        44,
+        41,
+        0
+      ],
+      "weightsAfter": [
+        0.13731254637241364,
+        0.8536518812179565,
+        0.009035632014274597,
+        0
+      ],
+      "kind": "McpBranchContinuity"
     }
-  ]
+  ],
+  "mcpBasis": {
+    "sha256": "a3c6d33938aee6e1c7a547224c1e377d7ada24c52ae0aeb74cd05a33fd1e5350",
+    "binarySha256": "c445d10986302e6d09180efc9ced5f4ed136a73f7ce8bacb572b5e56215cc985",
+    "legacyEdits": 150
+  }
 }
