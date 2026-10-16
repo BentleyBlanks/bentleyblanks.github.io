@@ -9,8 +9,10 @@ Three.js column-major arms.root.inverse * bone.world matrices, plus local p/q.
 This script authors real Blender pose/control/preview keyframes in one existing
 Idle Action and calls the original ExportFpsAnimation. The exporter writes only
 the two JSON files in the copy's Stage directory. Missing scope defaults to
-LeftSupport (19 left bones plus handLeft/contactLeft); RightIndexRing selects
-only six right index/ring bones and no controls. All other fields stay exact.
+LeftSupport (19 left bones plus handLeft/contactLeft); explicit
+selectedSides=['l','r'] selects BothHands (38 bones and four hand controls).
+RightIndexRing selects only six right index/ring bones and no controls.
+All other fields stay exact.
 """
 
 import copy
@@ -83,23 +85,38 @@ def normalized_loop_track(track, count, label, finger_position=None):
     return result
 
 
+def selected_controls(capture):
+    if capture.get('scope') == 'RightIndexRing':
+        return ()
+    sides = tuple(capture.get('selectedSides', ['l']))
+    assert sides in (('l',), ('l', 'r')), 'Only explicit left or both-hand scope'
+    return tuple(key for side in sides for key in
+                 (('handLeft', 'contactLeft') if side == 'l' else ('handRight', 'contactRight')))
+
+
 def capture_selection(capture, names):
-    """Allow only the two reviewed publication scopes, never an arbitrary list."""
-    scope = capture.get('scope', 'LeftSupport')
+    """Allow exact 19/2, 38/4 or six-finger/no-control publication scopes."""
+    sides = tuple(capture.get('selectedSides', ['l']))
+    scope = capture.get('scope', 'BothHands' if sides == ('l', 'r') else 'LeftSupport')
     if scope == 'LeftSupport':
+        assert sides == ('l',), 'LeftSupport requires the left chain only'
         pattern = r'l(clavicle|upperarm|forearm|hand|finger[0-4][12]?)$'
-        expected_count, selected_controls = 19, SELECTED_CONTROLS
+        expected_count, controls = 19, SELECTED_CONTROLS
+    elif scope == 'BothHands':
+        assert sides == ('l', 'r'), 'BothHands requires explicit selectedSides'
+        pattern = r'[lr](clavicle|upperarm|forearm|hand|finger[0-4][12]?)$'
+        expected_count, controls = 38, selected_controls(capture)
     elif scope == 'RightIndexRing':
         pattern = r'rfinger[13][12]?$'
-        expected_count, selected_controls = 6, ()
+        expected_count, controls = 6, ()
     else:
         raise AssertionError(('Unsupported capture publication scope', scope))
     selected = [index for index, name in enumerate(names) if re.search(pattern, normalize(name))]
     assert len(selected) == expected_count, (scope, 'Exact reviewed bone inventory')
     assert len(capture['selectedBones']) == expected_count
     assert set(capture['selectedBones']) == {names[index] for index in selected}, (scope, 'Exact reviewed bone selection')
-    assert capture.get('selectedControls', list(selected_controls)) == list(selected_controls), (scope, 'Exact reviewed control selection')
-    return scope, selected, selected_controls
+    assert capture.get('selectedControls', list(controls)) == list(controls), (scope, 'Exact reviewed control selection')
+    return scope, selected, controls
 
 
 def protected_fields(document, selected_indices, selected_controls=SELECTED_CONTROLS):

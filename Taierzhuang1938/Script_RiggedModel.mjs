@@ -20,7 +20,7 @@ import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Scr
 import { StepElbowArc } from "./Script_FpsElbowArc.mjs";
 import { LoadFpsSkeletalAnimations } from "./Script_FpsSkeletalAnimation.mjs";
 
-const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=20261016094500", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
+const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=20261016094500", fpsHanYangRepaired: "./Model/Model_FpsHanYangHandsRepaired.glb?v=20261017063001", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
 const PROFILE_CLIPS = Object.freeze({
   rifle: "RifleIdle",
   lmg: "MachineGunFire",
@@ -226,10 +226,11 @@ function Inspect(gltf) {
 export async function LoadRiggedAssets() {
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
-    const [fpsArms, fpsBody, fpsHanYang, fpsAnimations] = await Promise.all([LoadOne("fpsArms"), LoadOne("fpsBody"), LoadOne("fpsHanYang"),
+    const [fpsArms, fpsBody, fpsHanYang, fpsHanYangRepaired, fpsAnimations] = await Promise.all([LoadOne("fpsArms"), LoadOne("fpsBody"), LoadOne("fpsHanYang"), LoadOne("fpsHanYangRepaired"),
       LoadFpsSkeletalAnimations().catch(error=>{console.warn(`[RiggedModel] FPS clips unavailable: ${error.message}`);return null;})]);
     if(fpsHanYang&&fpsArms)fpsHanYang.animations=fpsArms.animations;
-    return { fpsArms, fpsBody, fpsHanYang, fpsAnimations, report: { fpsArms: Inspect(fpsArms), fpsBody: Inspect(fpsBody) } };
+    if(fpsHanYangRepaired&&fpsArms)fpsHanYangRepaired.animations=fpsArms.animations;
+    return { fpsArms, fpsBody, fpsHanYang, fpsHanYangRepaired, fpsAnimations, report: { fpsArms: Inspect(fpsArms), fpsBody: Inspect(fpsBody) } };
   })();
   return loadPromise;
 }
@@ -641,6 +642,17 @@ export class FpsArmRig {
       },
     });
     const body = MixBody(MixBody(hip, ads, this.poseState.ads), sprint, this.poseState.sprint);
+    // A repaired holding wrist can use a different elbow plane from loading.
+    // Follow the existing release weight so the operating arm retains its
+    // reviewed route outside the receiver before returning to the new grip.
+    const operating = this.poseSpec.actions?.operatingBody;
+    const released = this.operationPose.r ? 1 - this.contactWeight.r : 0;
+    if (operating && released > 0) {
+      const blend = released * released * (3 - 2 * released);
+      for (const group of ["shoulders", "elbowPoles"]) for (const side of ["right", "left"]) {
+        if (operating[group]?.[side]) body[group][side] = MixVector(body[group][side], operating[group][side], blend);
+      }
+    }
     const offset = this.poseState.reload && this.reloadBodyOffset;
     if (offset) for (const group of ["shoulders", "elbowPoles"]) for (const side of ["right", "left"])
       body[group][side] = body[group][side].map((value, axis) => value + (offset[group]?.[side]?.[axis] || 0) * this.poseState.reloadBlend);

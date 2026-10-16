@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\FpsHandSurfaceRepair_20261017\\Model_FpsHandSurfaceRepair.blend",
+  "basisSha256": "dffb45e2edc89050feefed0a49230175eb17e42a96b46fcdfaff872187d01a38",
+  "output": "C:\\Users\\Bentl\\Documents\\Codex\\2026-10-16\\new-chat-2\\work\\bentleyblanks_Codex_CodRifleView_20261016\\Taierzhuang1938\\Model\\Model_FpsHanYangHandsRepaired.glb",
+  "outputSha256": "eaff847f50a42da0469b9d43286c9baa4951aa5ba75785be97310a4f775c55ae",
+  "vertices": 29019,
+  "changedWeightVertices": 19253,
+  "thumbProfileVertices": 1018,
+  "wristProfileVertices": 5550,
+  "regions": {
+    "l": {
+      "wristPalm": 5865,
+      "fingers": [
+        1228,
+        1124,
+        1492,
+        1357,
+        1162
+      ]
+    },
+    "r": {
+      "wristPalm": 5980,
+      "fingers": [
+        1202,
+        1267,
+        1536,
+        1314,
+        1036
+      ]
+    }
+  },
+  "skinBindFrameMaximumError": 5.529185816977034e-07,
+  "protectedSkeletonClothingMaterialsAndTopology": true,
+  "maximumBindDisplacementM": 0.013727280157719079
+}

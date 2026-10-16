@@ -1683,7 +1683,7 @@ export class Viewmodel {
         this.armRigs.default=this.riggedArms;
         if(riggedAssets.fpsHanYang){
           this.armRigs.ZhongZheng=new FpsArmRig(riggedAssets.fpsHanYang,library);
-          this.armRigs.HanYang=new FpsArmRig(riggedAssets.fpsHanYang,library);
+          this.armRigs.HanYang=new FpsArmRig(riggedAssets.fpsHanYangRepaired||riggedAssets.fpsHanYang,library);
           this.armRigs.Type38=new FpsArmRig(riggedAssets.fpsHanYang,library);
           this.armRigs.Grenade=new FpsArmRig(riggedAssets.fpsHanYang,library);
           this.armRigs.GrenadeBundle=new FpsArmRig(riggedAssets.fpsHanYang,library);

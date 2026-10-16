@@ -8,6 +8,7 @@ import * as THREE from './vendor/three/build/three.module.js';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
 const project=path.dirname(fileURLToPath(import.meta.url));
+const only=new Set((process.argv.find(a=>a.startsWith('--only='))?.slice(7)||'').split(',').filter(Boolean));
 const out=path.join(project,'_shots','FpsSleeves');await fs.mkdir(out,{recursive:true});
 const bytes=await fs.readFile(path.join(project,'Model/Model_FpsHanYangHands.glb'));
 const jsonLength=bytes.readUInt32LE(12),doc=JSON.parse(bytes.subarray(20,20+jsonLength).toString()),bin=28+jsonLength;
@@ -51,7 +52,7 @@ try{
  await page.waitForFunction(()=>window.Taierzhuang?.state?.ready,null,{timeout:240000});
  await page.evaluate(()=>{Taierzhuang.Debug.OpenEditor('firstPerson');Taierzhuang.editor.active.SetAnimationClean(true);});
  const materials=[];
- for(const id of ['Grenade','GrenadeBundle','Dadao','Zb26','Type11']){
+ for(const id of ['HanYang','Grenade','GrenadeBundle','Dadao','Zb26','Type11'].filter(id=>!only.size||only.has(id))){
   const report=await page.evaluate(id=>{
    const T=Taierzhuang,e=T.editor.active;e.SetWeapon(id);e.SetPose('hip');e.SetView('player');e.SetAnimationClean(true);
    for(let i=0;i<90;i++)e.Update(1/60);T.StepFrames(1);
@@ -60,9 +61,10 @@ try{
     if(m.userData.nraUniformDetailProfile)cloth.push({name:m.name,profile:m.userData.nraUniformDetailProfile,normal:m.normalScale?.toArray()});
     if(m.userData.characterSurface?.role==='skin')skin.push({name:m.name,profile:m.userData.characterSkinDetailProfile,roughness:m.roughness});
    }});
-   return {id,fixed:r.fixedRestLengths,grip:{...r.gripError},cloth,skin};
+   return {id,fixed:r.fixedRestLengths,grip:{...r.gripError},cloth,skin,surfaceRepair:r.gltf.parser?.json?.asset?.extras?.handSurfaceRepair||null};
   },id);
   assert(report.fixed&&Math.max(...Object.values(report.grip))<.006,`${id}: changing the sleeve disturbed grip/bone length`);
+  if(id==='HanYang')assert(report.surfaceRepair?.weapon==='HanYang','HanYang sleeve review must use the repaired production skin');
   assert(report.cloth.length&&report.cloth.every(m=>m.profile==='firstPerson'&&Math.abs(Math.abs(m.normal[0])-.28)<1e-6),`${id}: FPS material profile is missing`);
   assert(report.skin.length&&report.skin.every(m=>m.profile==='firstPerson'&&Math.abs(m.roughness-.62)<1e-6),`${id}: close-up skin profile is missing`);
   materials.push(report);
