@@ -201,8 +201,10 @@ const FpSheet = async (entry) => page.evaluate(async ({ w }) => {
   const shots = [
     ["腰射", () => { editor.ads = 0; }, 26],
     ["开镜", () => { editor.ads = 1; }, 40],
-    ["开火", () => { editor.ads = 0; editor.Trigger("fire"); }, 2],
-    ["拉栓", () => { editor.Trigger("bolt"); }, 14],
+    // Return fully from ADS before measuring hip fire; otherwise the two-frame
+    // capture is still showing the preceding ADS pose and misleadingly tiny gun.
+    ["开火", () => { editor.ads = 0; T.StepFrames(50); editor.Trigger("fire"); }, 2],
+    ["拉栓", () => { T.StepFrames(100); editor.Trigger("bolt"); }, 14],
   ];
   for (let i = 0; i < shots.length; i += 1) {
     shots[i][1]();

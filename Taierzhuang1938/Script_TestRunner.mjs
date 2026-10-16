@@ -391,6 +391,7 @@ export const testDefs = {
   SprintViewmodelTest: { file: "Script_SprintViewmodelTest.mjs", desc: "冲刺第一人称持械视觉回归" },
   FirstPersonEmbodimentTest: { file: "Script_FirstPersonEmbodimentTest.mjs", desc: "全枪人体关节、空手摆臂与低头身体回归" },
   FpsArmTest: { file: "Script_FpsArmTest.mjs", desc: "第一人称国军 01 双手：手扣在枪上、腕袖不糊屏" },
+  FpsRifleViewTest: { file: "Script_FpsRifleViewTest.mjs", timeoutMs: 360000, desc: "COD reference framing, world-FOV invariance and ADS/sprint release for three rifles" },
   FpsSleeveTest: { file: "Script_FpsSleeveTest.mjs", desc: "第一人称袖口净空、实体轮廓与近景棉布材质" },
   FpsHandAnatomyTest: { file: "Script_FpsHandAnatomyTest.mjs", desc: "第一人称双手掌厚、指节横截面与骨长对称性" },
   FpsHandContactTest: { file: "Script_FpsHandContactTest.mjs", desc: "实际指腹与扳机、枪栓、桥夹、弹匣及套筒的接触与动作可达性" },
@@ -579,7 +580,7 @@ export const browserTests = new Set([
   "MachineGunCaptivesAnimationTest",
   "CarriagePropVelocityTest",
   "DraftCartEditorTest",
-  "MotionVectorContractTest",
+  "MotionVectorContractTest", "FpsRifleViewTest",
   "BrowserBundleTest",
 
   "CoverLeanBrowserTest", "MovementRangeTest",
@@ -751,7 +752,7 @@ export const domains = {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tier2Tests:["FpsReloadClearanceTest","HanYangReloadClearanceTest"],
     tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmActionsTest", "FirearmHandlingBrowserTest", "FirearmResponseBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsGripCorrectiveAssetTest", "FpsHandSkinWeightsTest", "FpsHandSelfContactTest", "FpsHandLeftSelfContactTest", "FpsHandPoseTest", "FpsSleeveTest", "FpsHandAnatomyTest", "FpsHandContactTest", "FpsElbowArcTest", "FpsReloadMechanicsTest", "FpsGripEditorTest", "FpsAnimationTest", "FpsDadaoProjectionTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
+      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsRifleViewTest", "FpsGripCorrectiveAssetTest", "FpsHandSkinWeightsTest", "FpsHandSelfContactTest", "FpsHandLeftSelfContactTest", "FpsHandPoseTest", "FpsSleeveTest", "FpsHandAnatomyTest", "FpsHandContactTest", "FpsElbowArcTest", "FpsReloadMechanicsTest", "FpsGripEditorTest", "FpsAnimationTest", "FpsDadaoProjectionTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "ModelFacingTest",
       // 受击物理反应挂在 TakeHit/Kill/Actor.Update 上：碰伤害口径、人物动画、死亡的改动连着它们一起跑。
       "HitReactionTest", "HitReactionBrowserTest",
@@ -905,7 +906,7 @@ const changedDomainRules = [
   {domain:"firstLevel",pattern:/FirstLevelFrontPressure|FirstLevelBackdropSquads|FirstLevelEnemyIdleProbe/},
   {domain:"ai",pattern:/FirstLevelFrontPressure|FirstLevelBackdropSquads/},
   {domain:"missionGuide",pattern:/FirstLevelLeaderGuide|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelMissionRuntime|Script_FirstLevelMissionVoice|NpcMissionGuide|NpcGuideGesture|Tuning_MissionGuide/},
-  { domain: "combat", pattern: /FirearmHandling|FirearmActions|FirearmResponse|MuzzleFlash|Headshot/i },
+  { domain: "combat", pattern: /FirearmHandling|FirearmActions|FirearmResponse|MuzzleFlash|Headshot|FpsRifleView/i },
   {domain:"firstLevel",pattern:/Type89Damage/},
   {domain:"characterSpeech",pattern:/CharacterSpeech|CharacterFacial|CharacterFaceBlood|SpeechEnvelope|NraFacial|Nra05Facial|Lugou\w*Facial|SpeakerBinder|SpeakerHeadLayer|SpeakerGesture|SpeakingCast|FaceTrack|Script_FirstLevelMissionVoice|Script_Audio\.mjs|Script_CharacterModel/},
   // Script_LayeredGait（分层步态，docs/Data_ActorLocomotion.md）由 ActorLocomotionTest 验收：2026-09-28 补上映射。

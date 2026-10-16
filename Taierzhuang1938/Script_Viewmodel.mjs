@@ -21,8 +21,9 @@ import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 // 只能在同一台相机下"伪造"窄 FOV。
 //   关键推导：**绕相机原点的等比缩放不改变画面一个像素**（透视投影对 t·p 与 p 同解）。
 //   所以想改变观感 FOV，只能改**深度方向相对于横向的比例**。
-//   设 k = tan(fovVm/2) / tan(fovWorld/2)，把 z 拉伸 1/k（物体推远、深度也拉长同倍），
-//   横向尺寸不动 —— 屏幕占比不变、而前后面的发散比变成窄镜头的比值。这就是窄 FOV 的观感。
+//   Camera-space z must scale by k = tan(fovVm/2) / tan(fovWorld/2).
+//   The three authored rifle profiles use this exact projection. Older equipment
+//   retains its existing compensation until its own framing is recalibrated.
 // 又因为等比缩放免费（画面不变），我们再整体乘一个 s < 1 把整支枪"缩到眼前"，
 // 让最深的枪口落在 depthBudget 之内 —— **画面一模一样，但枪不再插进墙里**。
 //
@@ -31,6 +32,7 @@ import { ManagedTextureLoader } from "./Script_TextureImports.mjs";
 // 不用 Math.random。视觉审查靠逐轮截图比对，画面自己在抖就没法判断版本好坏。
 
 import * as THREE from "three";
+import { FPS_RIFLE_VIEW, RifleViewDepthScale, RifleActionFraming } from "./Data_FpsRifleView.mjs";
 import { CharacterWounds } from "./Script_CharacterWounds.mjs";
 import { SampleMeleeFirstPerson, SampleMeleeVideo } from "./Script_MeleeAnimation.mjs";
 import { FPS_GRENADE_THROW } from "./Data_FpsGrenadeThrow.mjs";
@@ -1553,6 +1555,10 @@ export class Viewmodel {
     // 而 MuzzleWorld / 抛壳都是走 root 的 world<->local 往返，挂在 root 上
     // 它们自动跟着偏 —— 枪口焰、弹壳、弹着点这才是同一个方向。
     this.fovRig = new THREE.Group();           // FOV 伪造 + 深度压缩（非等比缩放）
+    this.rifleViewPivot = new THREE.Group();   // Complete rifle/arms camera framing
+    this.rifleViewPivot.name = "RifleViewFraming";
+    this.rifleViewPosition = new THREE.Vector3();
+    this.rifleViewRotation = new THREE.Quaternion();
     this.swayPivot = new THREE.Group();        // 鼠标摇摆（滞后 + 过冲）
     this.bobPivot = new THREE.Group();         // 步伐晃动
     this.statePivot = new THREE.Group();       // 落地 / 腾空 / 掏枪 / 蹲
@@ -1582,7 +1588,8 @@ export class Viewmodel {
     this.armAnchor = new THREE.Group();
     this.armAnchor.name = "ArmAnchor";
     this.root.add(this.fovRig);
-    this.fovRig.add(this.swayPivot);
+    this.fovRig.add(this.rifleViewPivot);
+    this.rifleViewPivot.add(this.swayPivot);
     this.swayPivot.add(this.bobPivot);
     this.bobPivot.add(this.statePivot);
     this.statePivot.add(this.actionPivot);
@@ -1978,6 +1985,8 @@ export class Viewmodel {
    */
   Equip(weaponId, variant = 0, { armPose = null, instant = false } = {}) {
     ResetDeathHands(this);
+    this.rifleViewPivot.position.set(0, 0, 0);
+    this.rifleViewPivot.quaternion.identity();
     // 换枪重建整棵 rig：上一帧刷好的世界矩阵指的是另一棵树。
     this._rootMatrixFresh = false;
     if(this.skeletalAnimation){this.skeletalAnimation.preview=null;this.skeletalAnimation.current=null;}
@@ -2137,6 +2146,7 @@ export class Viewmodel {
     // 姿态表
     const kind = PoseKindOf(this.weapon);
     this.hipPose = this._PoseFromSpec(this.armPose.hip.weapon);
+    this._ConfigureRifleView();
     this.adsPose = this._MakeAdsPose(kind, this.armPose.ads.weapon);
     this.sprintPose = this._PoseFromSpec(this.armPose.sprint.weapon);
 
@@ -2284,7 +2294,7 @@ export class Viewmodel {
   }
 
   /**
-   * 深度拉伸倍率 = 1/k，k = tan(fovVm/2)/tan(fovWorld/2)。
+   * Rifle projection uses k; legacy equipment keeps its authored 1/k framing.
    * 开镜时调用方会把世界 FOV 收窄，如果这里还按固定 fovVm 算，
    * 拉伸倍率会反向变化、正好抵消掉那次缩放 —— 结果是"开了镜准星却没变大"。
    * 所以视图模型 FOV 要按世界 FOV 的**比例**跟着收。
@@ -2292,9 +2302,35 @@ export class Viewmodel {
   _DepthStretch(worldFov) {
     if (!worldFov || worldFov <= 1) return 1;
     if (!this.worldFovBase) this.worldFovBase = worldFov;
-    const vmFov = Clamp(this.fov * (worldFov / this.worldFovBase), 8, 120);
+    const profile = FPS_RIFLE_VIEW[this.weaponId];
+    const vmFov = Clamp((profile?.fovDeg ?? this.fov) * (worldFov / this.worldFovBase), 8, 120);
+    if (profile) return RifleViewDepthScale(worldFov, vmFov);
     const k = Math.tan(vmFov * 0.5 * DEG) / Math.tan(worldFov * 0.5 * DEG);
     return Clamp(1 / Math.max(0.2, k), 0.7, 1.45);
+  }
+
+  _ConfigureRifleView() {
+    const profile = FPS_RIFLE_VIEW[this.weaponId];
+    this.rifleViewPosition.set(0, 0, 0);
+    this.rifleViewRotation.identity();
+    if (profile) {
+      const source = this.armPose.hip.weapon;
+      const from = new THREE.Quaternion().setFromEuler(new THREE.Euler(...source.rotation, "YXZ"));
+      const to = new THREE.Quaternion().setFromEuler(new THREE.Euler(...profile.hip.rotation, "YXZ"));
+      this.rifleViewRotation.copy(to).multiply(from.invert());
+      this.rifleViewPosition.fromArray(source.position).applyQuaternion(this.rifleViewRotation)
+        .negate().add(new THREE.Vector3().fromArray(profile.hip.position));
+    }
+    this._UpdateRifleView(0, 0);
+  }
+
+  _UpdateRifleView(ads, sprint) {
+    const weight = FPS_RIFLE_VIEW[this.weaponId] && !this.mount
+      ? (1 - Clamp01(ads)) * (1 - Clamp01(sprint))
+        * RifleActionFraming(this.action?.kind, this.action?.t) : 0;
+    this.rifleViewPivot.position.copy(this.rifleViewPosition).multiplyScalar(weight);
+    this.rifleViewPivot.quaternion.identity().slerp(this.rifleViewRotation, weight);
+    this._rootMatrixFresh = false;
   }
 
   /**
@@ -2858,6 +2894,7 @@ export class Viewmodel {
     this.wallPivot.position.z += this.wallLower * WALL_CARRY.backM;
 
     // --- FOV 补偿（世界 FOV 变了要重算）-------------------------------------
+    this._UpdateRifleView(ads, sprintValue);
     if (!this.mount && Math.abs(worldFov - (this._lastWorldFov || 0)) > 0.05) {
       this._lastWorldFov = worldFov;
       if (adsInput < 0.02) this.worldFovBase = worldFov;   // 只在没开镜时校准基准
