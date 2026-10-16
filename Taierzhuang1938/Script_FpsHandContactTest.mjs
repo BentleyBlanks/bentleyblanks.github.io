@@ -29,7 +29,13 @@ try {
     T.Debug.OpenEditor("firstPerson");const editor=T.editor.active;
     const probes={ZhongZheng:[.002,-.023,-.0558],HanYang:[.002,-.019,-.0838],Type38:[.003,-.021,-.1288],
       Zb26:[.002,-.045,-.1229],Type11:[.002,-.040,-.124],ServicePistol:[.002,-.007,-.0531]};
-    const result={poses:[],actions:[],samples:0};
+    const result={poses:[],actions:[],samples:0,hanYangDirectionDiagnostics:{schema:1,
+      frame:"Actual hand bone matrix multiplied by its captured anatomical palm frame; +Z is palm-forward and +Y dorsal. Full matrix inversion removes foreground/FOV scale.",
+      method:"Every actual 60fps frame touching a packetClip/packetPress/packetBolt transition: all five posed MCP/PIP/DIP joints and a fixed bind-selected distal skin cap (most distal 10% of >95%-weighted distal vertices). Directions are normalized in the current palm frame.",
+      interpretation:"contactProbeDigits lists the distance probes, not measured forces. Other digits are non-bearing candidates for review. Directions/angles have no naturalness thresholds and do not test axial twist, nail orientation or skin self-intersection."},
+      hanYangLeftSupportDiagnostics:{distalWeightMinimum:.95,maximumBindDorsalDot:-.3,minimumVolarVertices:20,
+        method:"Actual GLB bind NORMAL transformed by NormalMatrix(handInverseBind * mesh.bindMatrix) into hand-rest-local coordinates. Four fingers reject normals with dorsal dot >= -0.3. Thumb uses its own captured distal hinge axis cross bind longitudinal direction as palmar reference.",
+        gate:"Only actual posed distal volar skin uses the unchanged 4mm support limit. allSkinGap and markerDistance are diagnostics, never fallback acceptance."}};
     const pads={};
     const Refresh=()=>{vm.root.updateMatrixWorld(true);arms.root.traverse(mesh=>{if(mesh.isSkinnedMesh)mesh.skeleton.update();});};
     const Pad=(side,digit)=>{
@@ -81,6 +87,56 @@ try {
       if(vertices<20)throw new Error("Missing finger skin: "+side+digit);
       return distance;
     };
+    const leftVolarCache=new WeakMap();
+    const HanYangLeftVolarGap=(digit,triangles)=>{
+      let entries=leftVolarCache.get(arms);
+      if(!entries){
+        entries=Array.from({length:5},()=>({selected:[],allDistalVertices:0,meshes:[]}));
+        const hand=arms.bones.l.hand,dorsal=new THREE.Vector3(0,1,0).applyQuaternion(arms.anatomy.l.frame.quaternion).normalize();
+        arms.root.traverse(mesh=>{
+          if(!mesh.isSkinnedMesh)return;
+          const bones=mesh.skeleton.bones,inverses=mesh.skeleton.boneInverses,handIndex=bones.indexOf(hand);
+          if(handIndex<0)return;
+          const a=mesh.geometry.attributes,normalMatrix=new THREE.Matrix3().getNormalMatrix(inverses[handIndex].clone().multiply(mesh.bindMatrix));
+          for(let d=0;d<5;d++){
+            const distal=bones.findIndex(bone=>bone.name.toLowerCase().replace(/[^a-z0-9]/g,"").endsWith("lfinger"+d+"2"));
+            if(distal<0)continue;
+            if(!a.normal)throw Error("Missing actual bind normals for Hanyang left support");
+            let normalReference=dorsal.clone(),reference="captured palm dorsal";
+            if(d===0){
+              const curl=arms.anatomy.l.curls.find(entry=>entry.bone===bones[distal]);
+              if(!curl)throw Error("Missing actual thumb distal hinge frame");
+              const boneToHandBind=inverses[handIndex].clone().multiply(inverses[distal].clone().invert()),rotation=new THREE.Quaternion();
+              boneToHandBind.decompose(new THREE.Vector3(),rotation,new THREE.Vector3());
+              // The thumb pad is rotated relative to the four-finger palm.
+              // Positive flexion sweeps its longitudinal direction toward
+              // hingeAxis x longitudinal; negate it to retain the dorsal-dot test.
+              normalReference=curl.axis.clone().applyQuaternion(rotation).cross(curl.direction).normalize().negate();
+              reference="captured thumb02 hingeAxis cross bind longitudinal (negated palmar)";
+            }
+            let all=0,volar=0;
+            for(let i=0;i<a.position.count;i++){
+              let weight=0;for(let k=0;k<4;k++)if(a.skinIndex.getComponent(i,k)===distal)weight+=a.skinWeight.getComponent(i,k);
+              if(weight<.95)continue;all++;
+              const bindNormal=new THREE.Vector3().fromBufferAttribute(a.normal,i).applyMatrix3(normalMatrix).normalize();
+              if(bindNormal.dot(normalReference)<-.3){entries[d].selected.push({mesh,index:i});volar++;}
+            }
+            entries[d].allDistalVertices+=all;
+            if(all)entries[d].meshes.push({mesh:mesh.name,allDistalVertices:all,volarVertices:volar,
+              bindNormalReference:reference,bindDorsalReferenceHandRest:normalReference.toArray()});
+          }
+        });
+        for(let d=0;d<5;d++)if(entries[d].selected.length<20)throw Error("Missing actual distal volar skin: l"+d+" has "+entries[d].selected.length+" vertices");
+        leftVolarCache.set(arms,entries);
+      }
+      const entry=entries[digit];let distance=Infinity;
+      for(const {mesh,index} of entry.selected){
+        const point=vm.rig.group.worldToLocal(mesh.getVertexPosition(index,new THREE.Vector3()).applyMatrix4(mesh.matrixWorld));
+        distance=Math.min(distance,Nearest(point,triangles));
+      }
+      return {distance,allSkinGap:SkinGap("l",digit,triangles,true),volarVertices:entry.selected.length,
+        allDistalVertices:entry.allDistalVertices,maximumBindDorsalDot:-.3,method:"actual distal volar skin",meshes:entry.meshes};
+    };
     const FingerPenetration=(side,part)=>{
       const triangles=Triangles(part),direction=new THREE.Vector3(1,.371,.137).normalize(),hit=new THREE.Vector3();
       let vertices=0,inside=0,maxDepth=0;
@@ -102,17 +158,67 @@ try {
         }
       });return {vertices,inside,maxDepth};
     };
-    const MagazineFingerPenetration=part=>{
-      // Only the real magazine subtree is an obstacle here. Per-shell BVH
+    const MagazineFingerPenetration=(part,includeHand=false)=>{
+      // Only the actual prop subtree is an obstacle here. Per-shell BVH
       // containment inspects all depths and mixed finger skin, with no 12mm
       // early exit and no receiver/contact-region exemption.
       const sample=magazineClearance.Measure({weaponGroup:vm.rig.group,arms,roots:[part],magazine:part,contactClass:"magazineGrip"});
-      const fingers=sample.rows.filter(row=>/^Finger[0-4]$/.test(row.region));
-      return {vertices:Object.entries(sample.coverage).filter(([region])=>/^Finger[0-4]$/.test(region)).reduce((sum,[,count])=>sum+count,0),
+      // MCP skin blended with the palm may be classified as Hand. Include it
+      // for Hanyang loading, rather than losing it through a dominant-bone label.
+      const Region=region=>/^Finger[0-4]$/.test(region)||(includeHand&&region==="Hand");
+      const fingers=sample.rows.filter(row=>Region(row.region));
+      return {vertices:Object.entries(sample.coverage).filter(([region])=>Region(region)).reduce((sum,[,count])=>sum+count,0),
         inside:fingers.reduce((sum,row)=>sum+row.interiorVertices,0),maxDepth:Math.max(0,...fingers.map(row=>row.maxDepthMm))/1000,
         closedComponents:sample.obstacles.reduce((sum,row)=>sum+row.closedComponents,0),
         openComponents:sample.obstacles.reduce((sum,row)=>sum+row.openComponents,0),
-        crossingTriangles:fingers.reduce((sum,row)=>sum+row.crossingSkinTriangles,0),coverage:sample.coverage};
+        crossingTriangles:fingers.reduce((sum,row)=>sum+row.crossingSkinTriangles,0),coverage:sample.coverage,
+        measuredRegions:includeHand?["Hand","Finger0","Finger1","Finger2","Finger3","Finger4"]:["Finger0","Finger1","Finger2","Finger3","Finger4"]};
+    };
+    const directionCache=new WeakMap();
+    const HanYangFingerDirections=()=>{
+      let entries=directionCache.get(arms);
+      if(!entries){
+        entries=Array.from({length:5},(_,digit)=>{
+          const mcp=arms._FingerRoot("r",digit),pip=mcp.children.find(bone=>bone.isBone),dip=pip?.children.find(bone=>bone.isBone);
+          if(!pip||!dip)throw Error("Missing actual Hanyang finger chain: "+digit);
+          const entry={digit,mcp,pip,dip,tips:[],distalAxis:null};
+          arms.root.traverse(mesh=>{
+            if(!mesh.isSkinnedMesh)return;
+            const distal=mesh.skeleton.bones.indexOf(dip),middle=mesh.skeleton.bones.indexOf(pip);
+            if(distal<0||middle<0)return;
+            const inverses=mesh.skeleton.boneInverses,dipBind=inverses[distal].clone().invert(),pipBind=inverses[middle].clone().invert();
+            const axis=new THREE.Vector3().setFromMatrixPosition(dipBind)
+              .sub(new THREE.Vector3().setFromMatrixPosition(pipBind)).transformDirection(inverses[distal]);
+            entry.distalAxis ||= axis;
+            const a=mesh.geometry.attributes,candidates=[];
+            for(let i=0;i<a.position.count;i++){
+              let weight=0;for(let k=0;k<4;k++)if(a.skinIndex.getComponent(i,k)===distal)weight+=a.skinWeight.getComponent(i,k);
+              if(weight<.95)continue;
+              const bindPoint=new THREE.Vector3().fromBufferAttribute(a.position,i).applyMatrix4(mesh.bindMatrix).applyMatrix4(inverses[distal]);
+              candidates.push({mesh,index:i,along:bindPoint.dot(axis)});
+            }
+            candidates.sort((a,b)=>b.along-a.along);
+            entry.tips.push(...candidates.slice(0,Math.max(3,Math.ceil(candidates.length*.10))));
+          });
+          if(entry.tips.length<3||!entry.distalAxis)throw Error("Missing actual Hanyang distal skin: "+digit);
+          return entry;
+        });
+        directionCache.set(arms,entries);
+      }
+      const hand=arms.bones.r.hand,frame=arms.anatomy.r.frame;
+      const palmInverse=hand.matrixWorld.clone().multiply(new THREE.Matrix4().compose(frame.position,frame.quaternion,new THREE.Vector3(1,1,1))).invert();
+      const Point=bone=>bone.getWorldPosition(new THREE.Vector3()).applyMatrix4(palmInverse);
+      return entries.map(entry=>{
+        const mcp=Point(entry.mcp),pip=Point(entry.pip),dip=Point(entry.dip),tip=new THREE.Vector3();
+        for(const {mesh,index} of entry.tips)tip.add(mesh.getVertexPosition(index,new THREE.Vector3()).applyMatrix4(mesh.matrixWorld).applyMatrix4(palmInverse));
+        tip.divideScalar(entry.tips.length);
+        const direction=tip.clone().sub(dip).normalize();
+        return {digit:entry.digit,tipSkinVertices:entry.tips.length,
+          mcpToPipPalm:pip.clone().sub(mcp).normalize().toArray(),pipToDipPalm:dip.clone().sub(pip).normalize().toArray(),
+          distalBoneAxisPalm:entry.dip.localToWorld(entry.distalAxis.clone()).applyMatrix4(palmInverse).sub(dip).normalize().toArray(),
+          distalSkinTipPalm:direction.toArray(),distalSagittalDeg:THREE.MathUtils.radToDeg(Math.atan2(-direction.y,direction.z)),
+          distalLateralDeg:THREE.MathUtils.radToDeg(Math.atan2(direction.x,Math.hypot(direction.y,direction.z)))};
+      });
     };
     const BoltKnobTriangles=part=>{
       const center=vm.rig.group.worldToLocal(vm.rig.boltHandleNode.getWorldPosition(new THREE.Vector3()));
@@ -144,9 +250,12 @@ try {
         Refresh();const point=Pad("r",1),bone=pads[id+'r1'].bone;
         const normal=new THREE.Vector3(0,1,0).transformDirection(vm.rig.group.matrixWorld.clone().invert().multiply(bone.matrixWorld));
         const gunSurface=id!=="ServicePistol"&&id!=="Zb26"?Triangles(vm.rig.group,o=>o.name.startsWith(id+"_")):null;
-        const support=gunSurface?[0,1,2,3,4].map(digit=>Nearest(Pad("l",digit),gunSurface)):[];
+        const markerDistances=gunSurface?[0,1,2,3,4].map(digit=>Nearest(Pad("l",digit),gunSurface)):[];
+        const supportSamples=id==="HanYang"?markerDistances.map((markerDistance,digit)=>({digit,markerDistance,...HanYangLeftVolarGap(digit,gunSurface)}))
+          :markerDistances.map((distance,digit)=>({digit,distance,markerDistance:distance,method:"legacy pad marker"}));
+        const support=supportSamples.map(sample=>sample.distance);
         const zbContact=id==='Zb26'?MeasureZbContactGeometry(THREE,{weaponGroup:vm.rig.group,arms}):null;
-        result.poses.push({id,pose,support,supportPoints:gunSurface?[0,1,2,3,4].map(digit=>Pad("l",digit).toArray()):[],point:point.toArray(),trigger:target?.toArray(),distance:target?point.distanceTo(target):Infinity,
+        result.poses.push({id,pose,support,supportSamples,supportPoints:gunSurface?[0,1,2,3,4].map(digit=>Pad("l",digit).toArray()):[],point:point.toArray(),trigger:target?.toArray(),distance:target?point.distanceTo(target):Infinity,
           facing:normal.z,holdingDrift:pose==="ads"?point.distanceTo(hip):0,triggerTravel:pose==="fire"?point.distanceTo(hip):0,wrist:{...arms.wristBend},supportSkin:zbContact?.support??null,triggerSkin:zbContact?.trigger??null});
       }
       editor.SetPose("hip");for(let i=0;i<90;i++)editor.Update(1/60);
@@ -159,6 +268,7 @@ try {
         }
         if(action.startsWith("reload"))vm.TriggerReload({remainingRounds:action==="reloadPartial"?3:0});else vm.TriggerBolt();
         const row={id,action,maxGrip:0,maxWrist:0,maxFingerTranslation:0,unreachable:0,propSamples:[],skinSamples:[],worstGrip:null,worstWrist:null};
+        if(id==="HanYang")row.handDirectionSamples=[];
         for(let frame=0;vm.action&&frame<1200;frame++){
           editor.Update(1/60);Refresh();result.samples++;
           const t=vm.action?.t??1,grip=Math.max(arms.gripError.r,arms.gripError.l),wrist=Math.max(arms.wristBend.r,arms.wristBend.l);
@@ -167,6 +277,20 @@ try {
           row.maxGrip=Math.max(row.maxGrip,grip);row.maxWrist=Math.max(row.maxWrist,wrist);
           if(!arms.reachable.r||!arms.reachable.l)row.unreachable++;
           arms.fingerBones.r.concat(arms.fingerBones.l).forEach((b,i)=>row.maxFingerTranslation=Math.max(row.maxFingerTranslation,b.position.distanceTo(originalPositions[i])));
+          if(id==="HanYang"&&vm.action){
+            const operation=arms.operationPose.r,phase={packetClip:"packet",packetPress:"press",packetBolt:"bolt"};
+            const dominant=(operation?.shapeMix||0)<.5?operation?.shape:operation?.nextShape;
+            let kind=phase[dominant]||phase[operation?.shape]||phase[operation?.nextShape];
+            if(kind){
+              if(kind==="packet"&&vm.usedPacketProp.visible)kind="oldPacket";
+              const contactDigits=kind==="press"?[0]:[0,1];
+              row.handDirectionSamples.push({frame,t,kind,side:"r",shape:operation.shape,nextShape:operation.nextShape,
+                shapeMix:operation.shapeMix,digitMix:operation.digitMix,contactWeight:arms.contactWeight.r,
+                packetVisible:vm.packetProp.visible,oldPacketVisible:vm.usedPacketProp.visible,
+                contactProbeDigits:contactDigits,nonContactProbeDigits:[0,1,2,3,4].filter(digit=>!contactDigits.includes(digit)),
+                digits:HanYangFingerDirections()});
+            }
+          }
           if(frame%5||!vm.action)continue;
           let prop=null,side="r",digits=[0,1],kind="";
           if(action==="bolt"&&t>.25&&t<.78){prop=vm.rig.parts.bolt;kind="bolt";}
@@ -193,6 +317,7 @@ try {
           if(prop){
             const zbMagazine=id==="Zb26"&&kind==="magazine";
             const hanBolt=id==="HanYang"&&kind==="bolt";
+            const hanLoading=id==="HanYang"&&["packet","oldPacket","press"].includes(kind);
             const skinContact=(id==="HanYang"&&["packet","oldPacket","press","bolt"].includes(kind))||kind==="hopperClip"||zbMagazine;
             // The opposed knob grip bears on the volar thumb across its IP
             // crease. Measure that actual skin against the isolated knob,
@@ -201,11 +326,11 @@ try {
             for(const digit of digits)row.propSamples.push({t,kind,digit,skinContact,
               distance:skinContact?SkinGap(side,digit,triangles,!hanBolt):Nearest(Pad(side,digit),triangles)});
             if(skinContact&&frame%15===0){
-              if(zbMagazine||hanBolt)row.skinSamples.push({t,kind,...MagazineFingerPenetration(prop)});
-              else {
-                const whole=kind==="press"?vm.packetProp:kind==="oldPacket"?vm.usedPacketProp:kind==="packet"?vm.packetProp:vm.clipProp;
-                row.skinSamples.push({t,kind,...FingerPenetration("r",whole)});
-              }
+              if(hanLoading){
+                const whole=kind==="oldPacket"?vm.usedPacketProp:vm.packetProp;
+                row.skinSamples.push({t,kind,sourceProp:kind==="oldPacket"?"usedPacketProp":"packetProp",...MagazineFingerPenetration(whole,true)});
+              }else if(zbMagazine||hanBolt)row.skinSamples.push({t,kind,...MagazineFingerPenetration(prop)});
+              else row.skinSamples.push({t,kind,...FingerPenetration("r",vm.clipProp)});
             }
           }
           if(id==="Type11"&&action.startsWith("reload")&&t>.09&&t<(action==="reloadPartial"?.875:.837)) {
@@ -243,6 +368,11 @@ try {
     if(["HanYang","Type11"].includes(action.id)&&action.action.startsWith("reload")){
       const loading=action.skinSamples.filter(sample=>sample.kind!=="operatingHandle");
       Check(loading.length>0&&loading.every(sample=>sample.vertices>4000),`${action.id}: loading grip did not inspect complete finger skin`);
+      if(action.id==="HanYang")for(const sample of loading){
+        Check([0,1,2,3,4].every(digit=>sample.coverage?.["Finger"+digit]>0)&&sample.coverage?.Hand>0,
+          `HanYang ${sample.kind}: all five fingers and mixed palm/MCP skin must be measured against the actual prop`);
+        Check(sample.closedComponents>0,`HanYang ${sample.kind}: actual ammunition must provide closed-component containment evidence`);
+      }
       for(const sample of loading)Check(sample.maxDepth<.002,`${action.id} ${sample.kind}: finger skin penetrates ammunition ${(sample.maxDepth*1000).toFixed(2)} mm at ${sample.t.toFixed(3)}`);
     }
     if(action.id==="Zb26"&&action.action.startsWith("reload")){
@@ -257,6 +387,13 @@ try {
     if(action.id==="HanYang"&&action.action==="bolt"){
       Check(action.skinSamples.length>0&&action.skinSamples.every(sample=>sample.vertices>4000),"HanYang: knob grasp must inspect complete finger skin");
       for(const sample of action.skinSamples)Check(sample.maxDepth<.002,`HanYang bolt: finger skin penetrates ${(sample.maxDepth*1000).toFixed(2)} mm`);
+    }
+    if(action.id==="HanYang"){
+      Check(action.handDirectionSamples.length>0,"HanYang: no actual palm-frame finger directions recorded");
+      for(const sample of action.handDirectionSamples)Check(sample.digits.length===5&&sample.digits.every(digit=>
+        digit.tipSkinVertices>=3&&[...digit.mcpToPipPalm,...digit.pipToDipPalm,...digit.distalBoneAxisPalm,...digit.distalSkinTipPalm,
+          digit.distalSagittalDeg,digit.distalLateralDeg].every(Number.isFinite)),
+      `HanYang ${sample.kind}: actual finger direction diagnostics are incomplete at ${sample.t.toFixed(3)}`);
     }
     if(action.id==="Type11"&&action.action==="reload") {
       const handle=action.skinSamples.filter(sample=>sample.kind==="operatingHandle");

@@ -49,7 +49,7 @@ const HopperClip = Freeze({ side:"r",palmOffset:V(.067,.014,.0012),rotation:V(-.
 // increments leave a small ordered fan instead of crossing the finger rows.
 const PacketFingerSplay = Freeze([0,-4.5,4.7,12.3,23.6]);
 const PacketClip = Freeze({side:"r",palmOffset:V(.065,.023,-.014),rotation:V(-.25,3.14,1.35),
-  fingers:Freeze([V(0,16,8),V(40,52,27),V(43,56,28),V(45,55,27),V(45,55,27)]),
+  fingers:Freeze([V(0,16,8),V(40,52,27),V(65,85,44),V(67,88,46),V(68,90,48)]),
   thumbDirection:V(-.2,-1,.45),thumbRoll:0,fingerSplay:PacketFingerSplay});
 // Working-hand poses are blended with the per-weapon holding pose. The thumb
 // opposes the fingers independently. MCP/PIP/DIP angles are ordered
@@ -57,9 +57,10 @@ const PacketClip = Freeze({side:"r",palmOffset:V(.065,.023,-.014),rotation:V(-.2
 export const FPS_HAND_SHAPES = Freeze({
   packetClip: PacketClip,
   hopperClip: HopperClip,
-  // Keep the palm above the receiver; only the opposed thumb loads the packet.
+  // Thumb loads the packet; the other digits fold back into a loose fist.
+  // Half-extended MCPs with strongly bent tips read as hooks from the player view.
   packetPress: Freeze({side:"r",palmOffset:V(.0846,.032,-.035),rotation:V(-.12,3.14,.2),
-    fingers:Freeze([V(0,12,4),V(42,62,32),V(44,66,34),V(46,70,36),V(48,72,38)]),
+    fingers:Freeze([V(0,12,4),V(62,78,38),V(65,82,42),V(68,84,44),V(70,86,46)]),
     thumbDirection:V(.65,-.65,.35),thumbRoll:0,fingerSplay:PacketFingerSplay}),
   packetRelax: Freeze({side:"r",fingers:Freeze([V(0,14,8),V(18,32,16),V(24,42,22),V(30,48,25),V(36,54,28)]),
     thumbDirection:V(.4,-.45,.65),thumbRoll:0,fingerSplay:PacketFingerSplay}),
@@ -68,8 +69,8 @@ export const FPS_HAND_SHAPES = Freeze({
   // The finger row runs diagonally outside the cocking piece. Opposed pads
   // surround the knob while the ring/little fingers clear the receiver.
   packetBolt: Freeze({side:"r",palmOffset:V(.053730633,-.025207960,.005244321),rotation:V(.403990256,2.830473596,.901371334),
-    fingers:Freeze([V(0,20,12),V(48,68,38),V(54,72,42),V(52,70,40),V(48,66,38)]),
-    thumbDirection:V(-.4,-.35,.9),thumbRoll:0,fingerSplay:PacketFingerSplay}),
+    fingers:Freeze([V(0,20,12),V(48,68,38),V(50,60,35),V(66,84,43),V(68,86,44)]),
+    thumbDirection:V(-.4,-.35,.9),thumbRoll:0,fingerSplay:Freeze([0,-4.5,3,12.3,23.6])}),
   packetLatch: Freeze({side:"r",fingers:Freeze([V(0,12,8),V(6,18,10),V(40,58,30),V(45,64,34),V(50,68,36)]),
     thumbDirection:V(-.15,-.30,.90),thumbRoll:0,fingerSplay:PacketFingerSplay}),
   packetClear: Freeze({side:"r",fingers:Freeze([V(0,18,12),V(6,12,8),V(10,18,10),V(14,22,12),V(18,26,14)]),
@@ -169,8 +170,8 @@ export const FPS_ARM_POSES = Freeze({
   // Blender anatomy refinement: balanced hand volume, support pads fitted to the fore-end.
   HanYang: WeaponPose({
     family: "boltRifle", hip: FixedPose(V(0.105, -0.145, -0.335), V(0.050, -0.055, 0.025)), ads: Sight(0.550), sprint: RifleSprint,
-    right: Contact(V(0.01577,-0.03173,-0.02896), V(0.2,3.392992654,1.957596327), CLOSED, TRIGGER, {"fingers":[[0,18,12],[0,0,50.96],[50,78,35],[55,75,32],[60,70,28]],"fingerSplay":[0,-21.53,0,-4,-8],"thumbDirection":[0.053441512,-0.171495334,1.066645843],"thumbRoll":4.8,"triggerFingers":[0,2,51.96],"triggerSplay":0}),
-    left: Contact(V(-0.0115,-0.0005,-0.355), V(0.087127039,3.116151099,-2.174507012), CLOSED, TRIGGER, {"fingerRotations":{"0":[0.584930062,0.25950411,0.273574293,0.718102694],"1":[-0.077376783,-0.276052058,-0.025057677,0.957695246],"2":[-0.092728823,-0.264378667,0.021161094,0.959717393],"3":[0.2379308864395547,0.19481360193863959,-0.30371120908111715,-0.9017738381968436],"4":[0.35636097807836736,0.0250322552484593,-0.6567035718778519,-0.6641691487739222],"11":[-0.090998307,-0.036726102,0.228453204,0.968596756],"12":[-0.0008899,-0.042534195,0.256081671,0.965718508],"21":[0.007791099,-0.040486895,0.528135359,0.848158717],"22":[-0.011539826,-0.035814185,0.458645582,0.88782227],"31":[-0.0086088431743153,-0.08669741297867638,0.6139635926484847,0.7845114105633969],"32":[-0.017702647048509962,3.180982215142699e-05,0.20802032582209282,0.9779642934793078],"41":[-0.12898605707446698,-0.02037216627869153,0.39990682741214606,0.9072056554666356],"42":[0.04184646143162705,-0.07240810007607132,-0.22058699327965245,0.9717753439478014],"01":[-0.133148074,-0.186109349,0.048395045,0.972261667],"02":[-0.0050059,-0.031646799,-0.026343998,0.999139309]}}),
+    right: Contact(V(0.01577,-0.03173,-0.02896), V(0.2,3.392992654,1.957596327), CLOSED, TRIGGER, {"fingers":[[0,18,12],[0,0,50.96],[50,78,35],[55,75,32],[60,70,28]],"fingerSplay":[0,-21.53,0,-4,-7],"thumbDirection":[0.053441512,-0.171495334,1.066645843],"thumbRoll":4.8,"triggerFingers":[0,2,51.96],"triggerSplay":0,"fingerRotations":{"4":[0.15517406913825724,0.16468921262003677,0.5468049961951889,0.8061034472384094]}}),
+    left: Contact(V(-0.0115,-0.0005,-0.355), V(0.087127039,3.116151099,-2.174507012), CLOSED, TRIGGER, {"fingerRotations":{"0":[0.568898651209449,0.137299913922691,0.27916156095223355,0.7612961849212196],"1":[0.01058743431653428,0.13299548611337708,0.0767643079653243,0.9880826624987732],"2":[-0.013334289703200908,-0.15524122434837015,0.08611933222080237,0.9840253145111528],"3":[-0.09635998613740832,-0.11302646417129074,0.5115309675750797,0.8463308104283084],"4":[-0.20790880206954815,-0.1531682075269092,0.6445217471022978,0.719656270546711],"11":[0.007172953567438894,0.006751250200905115,0.27987231303095284,0.9599866966560258],"12":[0.004562567612136738,0.004291079322856268,0.17805469183155984,0.9840006587049613],"21":[-0.0055408338037883295,0.009374858820132228,0.34515614702767267,0.9384820964471687],"22":[-0.0020065495990434484,0.0037330153681916544,0.1283204849881481,0.9917236971492481],"31":[-0.026363320624582944,0.02577903580258495,0.5193423579351409,0.8537704210694479],"32":[-0.016449087259278117,0.016513127561567583,0.33094668182524034,0.9433615626764402],"41":[-0.04713916479352548,0.052810479606344087,0.5270137465633512,0.8469034557253715],"42":[-0.02097685781840655,0.024137735987079793,0.24190927163225742,0.96977174914298],"01":[0.008333094237191821,0.041894098706750316,-0.010873553919076283,0.9990281326665191],"02":[0.010673953311254739,0.06747130484171486,-0.005550737400422737,0.9976486751647481]}}),
     bodyHip: HanYangBody(), bodyAds: HanYangBody(), bodySprint: HanYangBody(),
     // Full 90-degree unlock/lock, with longer turns inside the same firing cycle.
     actions: { bolt: { family: "turnBolt", timing: V(0.2721, 0.51737, 0.675), lockEnd: 0.83 }, reload: { family: "enBloc", timing: V(0.52, 0.66, 0.79) }, bayonet: "hanYang" },

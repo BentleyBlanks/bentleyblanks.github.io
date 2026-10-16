@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **汉阳造指节与扫描皮肤续修（2026-10-16）**：中指 PIP 皮肤岛右 80／左 70 个导出点从误绑食指改回中指，仅变更登记的 283 个 JOINTS 字节；recipe、确定性 baker 与独立逆恢复门禁共同保护原几何、权重数值、衣袖和 morph。左手去除 PIP 侧拧与小指 DIP 反折，右手非承力指自然回收；持枪 Idle 的 16 条恒定指轨随握姿同步。`FpsHandPoseTest` 检查实际骨架铰链，`FpsHandSelfContactTest`／`--side=l` 检查纯指皮肤自交，`--motion-report` 必须保留实际 contactWeight、poseState、digitMix 和真实指骨四元数，不能假定压弹／开火状态为零。`HanYangReloadClearanceTest --max-depth-mm=2` 检查四种完整动作的双臂与衣袖。混合指蹼、同指折叠及开放枪壳证据限制见 [换弹真实度](docs/Data_RifleReloadRealism.md)，不能以接触距离或单项通过声明整手自然。
+
 - **汉阳造手指与捷克式整臂净空续修（2026-10-16）**：汉阳造各操作手型抵消扫描 bind 已有的指扇，夹弹、压弹、抓柄、解握分别校准；先松指再退出握把，枪外才转腕。捷克式右手握住弹匣中上部，空匣向左抛、右手从枪右侧回握。右肘按固定骨长、腕硬限及连续可行弧步进；禁止直接切换可行弧两端或绕过角速度限制。原静态握枪与瞄准接触保留，汉阳造余弹按扣声随新 `.305` 拍点，弹药提交、取消及总时长保留。完整蒙皮诊断 `FpsReloadClearanceTest` 覆盖指、掌、腕、前臂、衣袖和弃匣，默认只出报告，不能当作无穿插证明；CPU 门禁 `FpsElbowArcTest`，其余定向入口与证据见 [第一人称换弹真实度](docs/Data_RifleReloadRealism.md)。
 
 - **换弹机构与手部（2026-10-15）**：汉阳造带孔机匣尾片回到固定枪体，抬柄补全 90°，普通拉栓以小幅收枪配合；持枪呼吸保留留后枪机状态。十一年式复用扫描手与固定骨段，逐指校准握持与扶板路线；空仓补齐独立左侧操作柄、抓柄后拉和送回，余弹保持待发。两枪右手按实拍重做上缘拇指与下缘食指夹持、掌心抬起压弹和逐指松手，枪体受力后肘肩错时跟随；皮肤接触与整根手指穿插同时验收。源工程、重建入口与量测见 [第一人称换弹真实度](docs/Data_RifleReloadRealism.md)；定向验收 `_blender/Verify.mjs` / `FpsAnimationTest` / `FpsArmTest` / `FpsHandContactTest` / `FpsReloadMechanicsTest` / `FpsSleeveTest` / `AdsSightTest` / `MotionVectorContractTest`。

@@ -264,6 +264,11 @@ export const testDefs = {
   TelegraphTest: { file: "Script_TelegraphTest.mjs", desc: "发报：码组推进、接头松脱与重连、报码纸勾选、走开进度保留、两个交互点预制、音效降级（纯 Node，毫秒级）" },
   RiggedModelTest: { file: "Script_RiggedModelTest.mjs", desc: "第一人称手臂 GLB 的二进制契约（纯 Node，秒级）" },
   FpsGripCorrectiveAssetTest: { file: "Script_FpsGripCorrectiveAssetTest.mjs", desc: "握持 ShapeKey：原 GLB 前缀与描述不变、默认关闭、三通道与手部权重隔离（纯 Node）" },
+  FpsHandSkinWeightsTest: { file: "Script_FpsHandSkinWeightsTest.mjs", desc: "扫描手局部权重：逐字节反还原、正确手侧、归一化及仅批准顶点变化" },
+  FpsHandSelfContactTest: { file: "Script_FpsHandSelfContactTest.mjs", desc: "汉阳造真实蒙皮：工作手型及过渡中十对纯指皮肤横穿（纯 Node）" },
+  FpsHandLeftSelfContactTest: { file: "Script_FpsHandSelfContactTest.mjs", args:["--side=l"], desc: "汉阳造左手承托：十对真实纯指皮肤零横穿（纯 Node）" },
+  FpsHandPoseTest: { file: "Script_FpsHandPoseTest.mjs", desc: "汉阳造真实绑定逐指关节：混合姿态屈伸及铰链外扭转（纯 Node）" },
+  HanYangReloadClearanceTest: { file: "Script_HanYangReloadClearanceTest.mjs", timeoutMs: 1200000, desc: "汉阳造四种动作完整双臂逐帧净空、皮肤覆盖和腕肘可行性（默认报告）" },
   ProneCrawlTest: { file: "Script_ProneCrawlTest.mjs", timeoutMs: 300000, desc: "Shared Blender crawl: visible limbs, distance clock, terrain contact, fixed bone lengths and loop seam" },
   ActorLocomotionTest: { file: "Script_ActorLocomotionTest.mjs", timeoutMs: 240000, desc: "实测步幅、世界支撑脚、转弯与位移时钟" },
   IjaAlertGaitTest: { file: "Script_IjaAlertGaitTest.mjs", desc: "01 日军先头兵警戒持枪小跑/走/站（BlenderMCP 烘焙）：循环接缝、双手够到枪且每步不拧袖、枪口朝前下、头扫视、小跑有腾空、七套模型骨名能绑、导演入场用 alert+trot 并到位甩枪上背" },
@@ -574,7 +579,7 @@ export const browserTests = new Set([
   "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPaperTest", "BootInteractionTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
-  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsSleeveTest", "FpsHandContactTest", "FpsReloadMechanicsTest", "FpsReloadClearanceTest", "FpsGripEditorTest",
+  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsSleeveTest", "FpsHandContactTest", "FpsReloadMechanicsTest", "FpsReloadClearanceTest", "HanYangReloadClearanceTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest",
   "BlastFeedbackTest", "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
@@ -672,6 +677,7 @@ export const tier0 = [...tier0Browser, ...tier0Fast];
 
 export const tier2 = [
   "FpsReloadClearanceTest",
+  "HanYangReloadClearanceTest",
   "OpeningActorPerformanceBrowserTest",
   "FrontStoryboardShotsTest",
   "OpeningClipsBrowserTest",
@@ -718,9 +724,9 @@ export const domains = {
   },
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
-    tier2Tests:["FpsReloadClearanceTest"],
+    tier2Tests:["FpsReloadClearanceTest","HanYangReloadClearanceTest"],
     tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmActionsTest", "FirearmHandlingBrowserTest", "FirearmResponseBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsGripCorrectiveAssetTest", "FpsSleeveTest", "FpsHandAnatomyTest", "FpsHandContactTest", "FpsElbowArcTest", "FpsReloadMechanicsTest", "FpsGripEditorTest", "FpsAnimationTest", "FpsDadaoProjectionTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
+      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsGripCorrectiveAssetTest", "FpsHandSkinWeightsTest", "FpsHandSelfContactTest", "FpsHandLeftSelfContactTest", "FpsHandPoseTest", "FpsSleeveTest", "FpsHandAnatomyTest", "FpsHandContactTest", "FpsElbowArcTest", "FpsReloadMechanicsTest", "FpsGripEditorTest", "FpsAnimationTest", "FpsDadaoProjectionTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "ModelFacingTest",
       // 受击物理反应挂在 TakeHit/Kill/Actor.Update 上：碰伤害口径、人物动画、死亡的改动连着它们一起跑。
       "HitReactionTest", "HitReactionBrowserTest",
@@ -815,7 +821,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
-  { domain: "combat", pattern: /FpsGripCorrective|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },
+  { domain: "combat", pattern: /FpsGripCorrective|FpsHandSkinWeights|FpsHandSelfContact|FpsHandPose|HanYangReloadClearance|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },
   {domain:"historyCodex",pattern:/HistoryCodex|HistoryBook|HistoryConscription|page-flip|Texture\/Menu\/History\//},
   { domain: "combat", pattern: /AircraftGeometry|OptimizeKi21|OptimizeKi30|Model_MitsubishiKi(21Ia|30)/ },
   {domain:"textureAssets",pattern:/(?:AssetPublish|BuildPublishAssets|ValidatePublishAssets|PublishCache|PublishAssets|ModelImports)/},

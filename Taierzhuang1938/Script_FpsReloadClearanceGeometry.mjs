@@ -144,7 +144,9 @@ export function CreateReloadClearanceGeometry(THREE) {
   return {Surface,Nearest,Interior,Crossing,constants:{weldM,rayEpsilonM,crossingEpsilonM,rays:directions.length}};
 }
 
-export function CreateReloadClearanceProbe(THREE) {
+export function CreateReloadClearanceProbe(THREE, {side = 'r', includeUpperArm = false} = {}) {
+  if (side !== 'r' && side !== 'l') throw new RangeError('Reload clearance side must be r or l');
+  const boneRole = new RegExp(side+'(finger[0-4][0-2]?|hand|forearm'+(includeUpperArm?'|upperarm':'')+')$');
   const geometry = CreateReloadClearanceGeometry(THREE), obstacles = new WeakMap(), skins = new WeakMap();
   const Visible = object => {
     for (let item = object; item; item = item.parent) if (!item.visible) return false;
@@ -182,8 +184,8 @@ export function CreateReloadClearanceProbe(THREE) {
     const g = mesh.geometry, a = g.attributes, selectedCandidates = [], roles = new Map();
     mesh.skeleton.bones.forEach((bone,i) => {
       const name = bone.name.toLowerCase().replace(/[^a-z0-9]/g,'');
-      const found = name.match(/r(finger[0-4][0-2]?|hand|forearm)$/);
-      if (found) roles.set(i,found[1].startsWith('finger')?'Finger'+found[1][6]:found[1] === 'hand'?'Hand':'Forearm');
+      const found = name.match(boneRole);
+      if (found) roles.set(i,found[1].startsWith('finger')?'Finger'+found[1][6]:found[1] === 'hand'?'Hand':found[1] === 'upperarm'?'UpperArm':'Forearm');
     });
     const role = new Array(a.position.count), faces = [];
     for (let i = 0; i < a.position.count; i++) {

@@ -2,6 +2,7 @@
   "version": 1,
   "asset": "Model/Model_FpsHanYangHands.glb",
   "baker": "_blender/Script_FpsGripCorrectiveBake.py",
+  "skinWeightRepair": "Model/Data_FpsHandSkinWeights.json",
   "basis": {
     "git": {
       "commit": "39439df5266709417b72c558c5da752ec1d0b0a2",

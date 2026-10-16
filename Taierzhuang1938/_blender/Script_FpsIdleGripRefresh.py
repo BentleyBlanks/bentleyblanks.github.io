@@ -1,31 +1,31 @@
 """Bake the Blender-fitted constant digits into the existing holding loop.
 
-Only the nine corrected HanYang support-finger rotation tracks are replaced.
+Only the explicitly selected constant HanYang holding-finger tracks are replaced.
 Breathing, arm transforms, all positions, control tracks and timing stay exact.
 """
 import bpy,json,copy,re,hashlib
 from pathlib import Path
 from mathutils import Quaternion
-assert bpy.context.scene.get('BlenderMcpTask')=='FpsHandAnatomy_20261015'
+assert bpy.context.scene.get('BlenderMcpTask')==globals().get('FPS_IDLE_GRIP_TASK','FpsHandAnatomy_20261015')
 root=Path(FPS_PROJECT_ROOT);folder=Path(bpy.data.filepath).parent
 output=root/'Animation/FirstPerson/Data_FpsHanYangAnimations.json'
-baseline=folder/'Data_HanYangIdleBeforeAnatomy.json'
+baseline=folder/globals().get('FPS_IDLE_GRIP_BASELINE','Data_HanYangIdleBeforeAnatomy.json')
 if not baseline.exists():baseline.write_bytes(output.read_bytes())
 before=json.loads(baseline.read_text(encoding='utf-8'));after=copy.deepcopy(before)
 assert list(before['clips'])==['Idle'] and len(before['bones'])==53
-corrections=json.loads((folder/'Data_FpsAnatomyFingerCorrections.json').read_text())['HanYang']
+corrections=json.loads((folder/globals().get('FPS_IDLE_GRIP_CORRECTIONS','Data_FpsAnatomyFingerCorrections.json')).read_text())['HanYang']
 changed=[]
 for index,name in enumerate(before['bones']):
- match=re.search(r'l[_ ]?finger(\d)(\d)?$',name,re.I)
+ match=re.search(r'([rl])[_ ]?finger(\d)(\d)?$',name,re.I)
  if not match:continue
- key=match[1]+(match[2] or '')
+ key=('r' if match[1].lower()=='r' else '')+match[2]+(match[3] or '')
  if key not in corrections:continue
  values=after['clips']['Idle']['bones'][index]
  assert len(values)==7, 'A moving digit requires a full Action edit, not a constant correction.'
  q=corrections[key];rotation=Quaternion((q[3],*q[:3])).normalized()
  values[3:7]=[rotation.x,rotation.y,rotation.z,rotation.w]
  changed.append(index)
-assert len(changed)==9
+assert len(changed)==globals().get('FPS_IDLE_GRIP_EXPECTED_TRACKS',9)
 for index,(a,b) in enumerate(zip(before['clips']['Idle']['bones'],after['clips']['Idle']['bones'])):
  if index in changed:assert a[:3]==b[:3]
  else:assert a==b

@@ -341,3 +341,110 @@ Blender 源工程已保存。本任务的 `Script_BlenderMcp status --scan` 无�
 `FrontObservation.02: luo gestured on his previous line too` 断言处终止，
 记录为 `tmp/ReloadRealism/Data_FinalPrepush.log`。本轮未修改该剧情手势断言，
 也未以换弹专项通过代替整项目验收或真实/3A 目标的完成证明。
+
+## 汉阳造手指续修（2026-10-16，本地验收通过）
+
+用户再次指出汉阳造手指扭曲。本轮将右手的承力指与其余手指分开处理：夹包、抓机柄保留
+拇指和食指的接触，收拢中、环、小指；拇指压弹时，其余四指收回成松拳，避免停在
+“近节前伸、远节向下勾”的半握姿势。取夹采用 8/16/24/30 ms 的逐指错时，抓柄采用
+4/12/20/28 ms；转入压弹时拇指延后 20 ms 落压，手指不再同时整齐开合。
+换弹总时长仍为 3.1 秒，普通拉栓仍为 0.95 秒，机构行程、弹量提交及取消规则保留。
+
+左手原静态握姿也存在真实的关节问题。食、环、小指 PIP 含约 12–14° 的铰链外旋转，
+小指 DIP 沿真实 bind 轴分解约为 −27.34°，不能用接触距离很小来证明姿势自然。
+本轮去掉这些 PIP 的侧拧，拇指 MCP/IP 改为正向 5/8°，由 CMC 的小幅多自由度对掌
+补回前托接触，不把 CMC 当作单轴铰链。四指进一步用 bind 正向铰链和 MCP 掌背轴张角
+重建，不保留原先凑接触的根节轴拧。左掌位置、朝向及骨段长度保留；接触验收改用实际
+远节掌侧皮肤，旧指腹标记仅留作诊断。
+
+扫描皮肤还定位到一块中指 PIP 连通皮肤岛误受食指对应节段驱动，手指分开运动时会被
+跨指拉扯。修复清单 [Data_FpsHandSkinWeights.json](../Model/Data_FpsHandSkinWeights.json)
+记录右侧 80、左侧 70，共 150 个导出顶点；仅把这些点非零的同侧食指
+`Finger1/11/12` joint slots 改回同侧中指 `Finger2/21/22`。双侧重建只改变 283 个
+`JOINTS_0` 字节，`WEIGHTS_0` 数值、几何、法线、UV、衣袖、材质与 morph 均不变，
+不采用全手最近骨骼重绑或平滑权重替代这项定点修复。
+当前双侧资产 SHA-256 为
+`a3c6d33938aee6e1c7a547224c1e377d7ada24c52ae0aeb74cd05a33fd1e5350`。
+
+源工程为
+`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/FpsHandSkinWeights_20261016/Model_FpsHandSkinWeights_Final.blend`。
+正式重建入口是 [_blender/Script_FpsHandSkinWeightsBake.py](../_blender/Script_FpsHandSkinWeightsBake.py)，
+以同目录的 `Model_FpsHanYangHands_Basis7c727aa4.glb` 和上述 recipe 重放字节修复，
+支持 `--restore` 严格逆向恢复；发布时不重新导出整只手。
+[_blender/Script_FpsHandSkinSourceSync.py](../_blender/Script_FpsHandSkinSourceSync.py)
+用于在这份独立 Blender 源工程中同步相同的骨组归属。最终源从未修权副本重建，
+右 80／左 70 共 150 个导出点精确映射到 120 个源点，最大位置误差为 0；
+源工程的 `Data_FpsHandSkinSourceSync.json` 记录该同步，几何和形态键保持原值。
+
+持枪呼吸同时用 `Script_FpsIdleGripRefresh.py` 重烘 16 条恒定指轨：左侧 15 条及右小指
+根节。原呼吸、肩臂、全部位置、控制、时长与 241 帧循环保持原值；源内保存原始
+`Data_HanYangIdleBeforeFingerSync.json`、当前握姿参数和同步报告。右小指根另作 1°
+展开修正，消除原持枪环／小指皮肤交叉；其余右持枪关节及扳机食指皮肤位置不变。
+
+左手接触还增加了指腹与木托有限表面的独立复核。只看最近距离会把横穿木托的点误判为
+贴合：双侧修权后，旧握姿的食／中／环指分别仍有 24／38／19 片纯指三角形横穿完整
+`body_wood`。木件存在开口，这里记录真实有限三角形交叉，不把开放木面称为闭壳内部。
+掌侧点从 bind 远节权重超过 95% 的实际皮肤中选择：四指采用捕获掌框的掌侧法线，
+拇指采用 `thumb02` 正向铰链轴与纵轴叉乘所得的独立指腹法线；点积大于 0.3，排除
+指甲侧。候选复核还要求当前皮肤法线与最近木面法线相对，点积小于 −0.25。
+
+CPU 复核通过的自然比例候选保留原左掌框与上述拇指设置，食／中／环／小指的
+MCP、张角、PIP、DIP 分别为 `2.5/−5.5/32.5/20.5`、`2.5/18/36.5/14`、
+`52/9/62/38`、`76/9.5/63.5/27.5` 度；伸直后扇形方向按四指顺序递增。
+该候选在真实双侧 GLB 上，十组跨指纯皮肤三角形交叉为 0，五指对完整木托的有限
+表面交叉均为 0；拇／食／中／环／小指相对朝向的真实指腹间距约为
+1.721／1.311／1.205／1.081／2.144 mm，完整左掌及手指对真实枪体闭壳的最大
+内部深度约 0.194 mm。随后将木托交叉复核扩大到三个顶点各自超过 99.99% 左掌及
+手指总权重的全部 15,152 片皮肤三角形，包含 7,907 片混合掌／指蹼三角形，仍为 0。
+完整左皮肤的非邻接三角形自交复核还记录了残余问题：排除共享 bind 焊点的相邻片后，
+横穿配对由旧握姿 438 对降到 189 对，其中混合掌／蹼 100 对、环指同指 38 对、
+小指同指 51 对，不再含不同纯指间的交叉。配对数不等于深度或视觉严重度；混合蹼与
+掌侧关节折叠仍需近景逐处检查，动态衣袖另由全帧测试核对，不能把静态木托净空及
+纯指跨指结果扩大为全动作或自然观感已经完成。
+
+当前已经实际通过的 CPU 检查是
+[Script_FpsHandPoseTest.mjs](../Script_FpsHandPoseTest.mjs) 的 1,786 个姿态：直接使用实际
+GLB bind 与生产 `CaptureAnatomy` / `ApplyAnatomicalFingers`，扫描右手工作形状、相邻
+过渡及接触权重，并检查左手握姿。PIP/DIP 的反弯容忍仍为 −5°，铰链外旋转上限为 8°；
+CMC/MCP 根节另作多自由度记录，不套用铰链限制。独立的
+[Script_FpsHandSkinWeightsTest.mjs](../Script_FpsHandSkinWeightsTest.mjs) 也已通过：按清单
+逆写后逐字节恢复原 Git 基准，核对左右归属与权重归一，并拒绝无关字节损坏。
+骨架姿态门禁不检查皮肤自交，权重恢复门禁也不证明手型自然，两者不能互相替代。
+
+本轮新增正式 [Script_HanYangReloadClearanceTest.mjs](../Script_HanYangReloadClearanceTest.mjs)，
+覆盖空仓、3 发余弹、留后开栓换弹及普通拉栓四案，每 60fps 帧检查完整左右双臂、
+混合腕部与衣袖对可见枪体和实际弹包的关系，并继续检查结束后的 12 帧。
+`FpsHandContactTest` 同步增加左手五指真实远节皮肤接触、右手全部五指与掌根对整包的
+包含检查，以及每帧掌框内的关节方向和远节皮肤方向记录；承力指与放松指分开登记，
+旧 marker 不再作为保留错误姿势的理由。
+
+最终资产及姿态冻结后，`tmp/ReloadRealism/Data_FinalHanyangGates.json` 记录本轮
+12/12 项实际通过：动画 CPU、1,786 姿态、修权逆恢复、原修形保护、四案完整净空、
+左右实际动作纯指自交、真实指腹接触、双臂、Idle 播放、瞄准和衣袖。四案净空显式执行
+`--max-depth-mm=2`；空仓、3 发余弹、留后开栓、普通拉栓的右／左最大内部深度分别为
+1.833/0.194、1.797/0.194、1.850/0.194、1.030/0.194 mm，包含上臂衣袖及结束后 12 帧，
+没有接触豁免。开放枪壳的表面交叉另行报告，不能由闭壳深度推导为零穿插。
+
+实际动作自交复核保留每帧 operation、contactWeight、digitMix、开火／瞄准／冲刺
+poseState，以及真实 15 根指骨四元数；左右各引用 674 帧，各完成 10,110 次实际骨骼
+与 CPU 回放比较，跨纯指皮肤交叉均为 0。抓柄中指改为 50/60/35°、张角 3° 后，
+本轮此前的拇／中指交叉也已消除。该门禁不覆盖上文的混合蹼和同指折叠残余。
+实际接触浏览器检查通过 3 个静态／开火姿态及 618 帧动作；原 4 mm 指腹接触限值保留。
+
+共享手资产的双侧修权后，另行回归通过完整 `FpsArmTest` 的 992 项、
+中正式／三八式／捷克式／十一年式的 `FpsHandContactTest`、`GrenadeThrowTest`、
+`DadaoSwingTest` 和 `FpsDadaoProjectionTest`；记录为
+`tmp/ReloadRealism/Data_BilateralSharedRegression.json`。
+`TestRunnerTest`（632 项，344/344 文件）、ModuleGraph、BootPayload、AssetStandards
+及比例检查亦通过。完整 prepush 实际重跑仍在上述既有 `SpeakerGestureTest` 断言处
+终止，未修改剧情或放宽断言；专项通过不能写成全项目通过。
+
+严格 high 画质 staging 已运行真实汉阳造及捷克式完整换弹，36 张 GPU 贴图、
+19 条 bundle/vendor 脚本，无源码回退、staging 缺失、页面／控制台／网络错误。
+结果为 `tmp/ReloadRealism/StageAcceptance/Data_StagedHandAcceptance.json`，
+游戏构建戳 `2596551631327207`，gameplay SHA-256 为
+`9398cc9a04fe79d2ac2160babab1a3dad971965e2dbc4a353930f2a8363ad7ed`；
+实载手资产哈希与本节双侧 GLB 一致。三种汉阳造动作的 1280×720、60fps 正常及半速
+视频在本地 `HanyangFingers_20261016`，半速通过重复原帧实现；完整动作蒙太奇与近景
+已实际查看。混合指蹼仍有局部拉伸小三角形（约 0.876% 面积超过 3 倍拉伸），
+连同同指折叠继续保留为源网格改进项，本节不构成真实／3A 总目标的完成证明。
