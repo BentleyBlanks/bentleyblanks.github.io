@@ -330,7 +330,7 @@ export class EditorBlockout {
     else this.bakeWait = { frames: 0, since: null };
     this.map.FitBounds();
     this.ui.SetKeyframes(this.KeyframeList(), Math.max(0, this.index));
-    this.map.SetKeyframes(this.doc.keyframes.map(kf => ({ id: kf.id, stage: kf.stage, player: { x: kf.player.x, z: kf.player.z } })), Math.max(0, this.index));
+    this.map.SetKeyframes(this.doc.keyframes.map(kf => ({ id: kf.id, stage: kf.stage, stageLabel: kf.stageLabel, player: { x: kf.player.x, z: kf.player.z } })), Math.max(0, this.index));
   }
 
   /** 烘这一关的纸面静态层（空闲分块；同一关已经烘过直接回来）。 */
@@ -520,7 +520,7 @@ export class EditorBlockout {
 
   SetupLevelLists() {
     this.ui.SetKeyframes(this.KeyframeList(), Math.max(0, this.index));
-    this.map.SetKeyframes(this.doc.keyframes.map(kf => ({ id: kf.id, stage: kf.stage, player: { x: kf.player.x, z: kf.player.z } })), Math.max(0, this.index));
+    this.map.SetKeyframes(this.doc.keyframes.map(kf => ({ id: kf.id, stage: kf.stage, stageLabel: kf.stageLabel, player: { x: kf.player.x, z: kf.player.z } })), Math.max(0, this.index));
   }
 
   /**
@@ -554,7 +554,7 @@ export class EditorBlockout {
   // 关键帧
 
   KeyframeList() {
-    return (this.doc?.keyframes || []).map(kf => ({ id: kf.id, stage: kf.stage, stageTitle: kf.stageTitle, name: kf.name }));
+    return (this.doc?.keyframes || []).map(kf => ({ id: kf.id, stage: kf.stage, stageTitle: kf.stageTitle, stageLabel: kf.stageLabel, name: kf.name }));
   }
 
   ResolvePending(value) {
@@ -593,7 +593,7 @@ export class EditorBlockout {
     this.markers.SetPois(kf.pois);
     this.markers.SetNext(kf.next && Number.isFinite(kf.next.x) ? kf.next : null);
     this.ui.SetKeyframes(this.KeyframeList(), index);
-    this.map.SetKeyframes(this.doc.keyframes.map(k => ({ id: k.id, stage: k.stage, player: { x: k.player.x, z: k.player.z } })), index);
+    this.map.SetKeyframes(this.doc.keyframes.map(k => ({ id: k.id, stage: k.stage, stageLabel: k.stageLabel, player: { x: k.player.x, z: k.player.z } })), index);
     // 地图开着时跳关键帧：图跟着挪到新站位（比例不变）
     if (this.mapOpen) this.FocusMapOnPlayer();
     this.cardKey = "";
@@ -778,7 +778,7 @@ export class EditorBlockout {
     if (!force && key === this.cardKey) return;
     this.cardKey = key;
     this.ui.SetCard({
-      stage: kf.stage, stageTitle: kf.stageTitle, name: kf.name, what: kf.what,
+      stage: kf.stage, stageTitle: kf.stageTitle, stageLabel: kf.stageLabel, name: kf.name, what: kf.what,
       next, how: kf.how, notes: kf.notes, guessCount: kf.units.filter(u => u.guess).length,
     });
   }

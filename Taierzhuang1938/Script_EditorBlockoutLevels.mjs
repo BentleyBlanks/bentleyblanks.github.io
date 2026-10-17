@@ -18,7 +18,12 @@ export const BLOCKOUT_LEVELS = Object.freeze([
   Object.freeze({ key: "FirstLevel", label: "第一关 · 往南的路", configUrl: "./Blockout/FirstLevel.json",
     scene: Object.freeze({ kind: "firstLevelMission" }) }),
   Object.freeze({ key: "SecondLevel", label: "第二关 · 手榴弹雨（空间草稿）", configUrl: "./Blockout/SecondLevel.json",
-    scene: Object.freeze({ kind: "file", url: "./Blockout/SecondLevel.scene.json" }) }),
+    scene: Object.freeze({ kind: "file", url: "./Blockout/SecondLevel.scene.json",
+      placeholder: Object.freeze({ bounds: { minX: 400, maxX: 640, minZ: -250, maxZ: 60 }, spawn: { x: 470, z: -65, yawDeg: -90 } }) }) }),
+  // 2026-10-18：按 Notion 定稿的 01–05（空间拓扑关系）新建的独立场地，坐标原点在沟口；不碰游戏里的第一关
+  Object.freeze({ key: "FirstLevel0105", label: "第一关 01–05 · 撤退（新剧本）", configUrl: "./Blockout/FirstLevel0105.json",
+    scene: Object.freeze({ kind: "file", url: "./Blockout/FirstLevel0105.scene.json",
+      placeholder: Object.freeze({ bounds: { minX: -110, maxX: 190, minZ: -235, maxZ: 200 }, spawn: { x: 66.5, z: 64.2, yawDeg: 90 } }) }) }),
 ]);
 
 // 存档口只认 BLOCKOUT_LEVEL_KEYS。这里只报不抛：Script_Main 开机就 import 本模块，抛了整个游戏起不来。
@@ -191,10 +196,21 @@ export function LayoutFromSceneDoc(doc) {
   const ground = { x: t.minX + w / 2, z: t.minZ + d / 2, w, d, h: 1, y: -0.5, semantic: "ground" };
   const tint = { lo: sampler.minY, hi: Math.max(sampler.minY + 0.5, sampler.maxY) };
   // 水块同第一关（BlockoutBlock）：盒子不画（灰盒子读不出是水，还会和水面打架），总控在顶面另铺水面
-  const blocks = doc.blocks.map(block => {
+  // 可选 y（2026-10-18）：显式给了就用块中心的这个高度（架在坑上的洞顶、横木），没给就按 GroundedBlock 落地。
+  const Placed = (block) => {
     const grounded = GroundedBlock(block, sampler);
+    return Number.isFinite(block.y) ? { ...grounded, y: block.y } : grounded;
+  };
+  const blocks = doc.blocks.map(block => {
+    const grounded = Placed(block);
     return grounded.semantic === "water" ? { ...grounded, visual: false, blockoutWater: true } : grounded;
   });
+  // 随信号出现 / 消失的体块（塌洞、坑沿被炸、战车残骸）：走 FirstLevelWhiteboxField 现成的 gate（signal / appearSignal）。
+  const gates = (doc.gates || []).map(gate => ({
+    ...Placed(gate),
+    ...(gate.signal ? { signal: gate.signal } : {}),
+    ...(gate.appearSignal ? { appearSignal: gate.appearSignal } : {}),
+  }));
   return {
     id: `Blockout${doc.level}`,
     level: doc.level,
@@ -213,7 +229,7 @@ export function LayoutFromSceneDoc(doc) {
     semanticColors: { ...MISSION_LAYOUT.semanticColors },
     semanticSurfaces: { ...(MISSION_LAYOUT.semanticSurfaces || {}) },
     blocks,
-    gates: [],
+    gates,
     walkableSurfaces: [],
     scenario: null,
     trenchPlacements: [],
@@ -231,8 +247,8 @@ export function LayoutFromSceneDoc(doc) {
 
 const BLOCKOUT_SKY = "firstLevelBattleDay";
 const LOADOUT = Object.freeze({ primary: "HanYang", secondary: null, melee: "Dadao", throwables: Object.freeze({ Grenade: 3 }), spareClips: 12 });
-// 第二关在场景文件读进来之前的占位范围与出生点（§9）；Prepare 读完场景后改成文件里的。
-const SECOND_LEVEL_PLACEHOLDER = Object.freeze({ bounds: { minX: 400, maxX: 640, minZ: -250, maxZ: 60 }, spawn: { x: 470, z: -65, yawDeg: -90 } });
+// 文件场景在场景文件读进来之前的占位范围与出生点（注册表 scene.placeholder）；Prepare 读完场景后改成文件里的。
+const FILE_SCENE_PLACEHOLDER = Object.freeze({ bounds: { minX: 400, maxX: 640, minZ: -250, maxZ: 60 }, spawn: { x: 470, z: -65, yawDeg: -90 } });
 
 function SpawnFrom(point) {
   return { x: point.x, z: point.z, ry: (Number.isFinite(point.yawDeg) ? point.yawDeg : 0) * Math.PI / 180 };
@@ -253,8 +269,9 @@ function ApplyLayout(phase, layout) {
 
 export function MakeBlockoutPhase(level) {
   const firstLevel = level.scene.kind === "firstLevelMission";
-  const bounds = firstLevel ? { ...MISSION_LAYOUT.bounds } : { ...SECOND_LEVEL_PLACEHOLDER.bounds };
-  const spawn = firstLevel ? { x: MISSION_ANCHORS.bunker.x, z: MISSION_ANCHORS.bunker.z, ry: 0 } : SpawnFrom(SECOND_LEVEL_PLACEHOLDER.spawn);
+  const placeholder = level.scene.placeholder || FILE_SCENE_PLACEHOLDER;
+  const bounds = firstLevel ? { ...MISSION_LAYOUT.bounds } : { ...placeholder.bounds };
+  const spawn = firstLevel ? { x: MISSION_ANCHORS.bunker.x, z: MISSION_ANCHORS.bunker.z, ry: 0 } : SpawnFrom(placeholder.spawn);
   const phase = {
     id: `Blockout_${level.key}`,
     label: level.label,

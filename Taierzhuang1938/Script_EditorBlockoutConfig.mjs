@@ -8,7 +8,7 @@
 
 export const BLOCKOUT_SCHEMA = "tengxian-blockout/1";
 export const BLOCKOUT_SCENE_SCHEMA = "tengxian-blockout-scene/1";
-export const BLOCKOUT_LEVEL_KEYS = Object.freeze(["FirstLevel", "SecondLevel"]);
+export const BLOCKOUT_LEVEL_KEYS = Object.freeze(["FirstLevel", "SecondLevel", "FirstLevel0105"]);
 export const BLOCKOUT_LEVEL_RE = /^[A-Za-z0-9]+$/;
 export const BLOCKOUT_CONFIG_FILE_RE = /^Taierzhuang1938\/Blockout\/[A-Za-z0-9]+\.json$/;
 export const BLOCKOUT_KEYFRAME_ID_RE = /^[A-Za-z0-9_-]+$/;
@@ -23,6 +23,8 @@ export const BLOCKOUT_MG_WEAPONS = Object.freeze(["Type11", "Type92Hmg", "Zb26"]
 export const BLOCKOUT_DEFAULT_SPEED = Object.freeze({ ija: 2.8, nra: 2.4, civ: 1.6, litter: 1.2, tank: 2.0 });
 /** 过渡时长夹取（秒），§5.2。 */
 export const BLOCKOUT_TRANSITION = Object.freeze({ minS: 0.6, maxS: 8, turnS: 0.4, stayEpsM: 0.05 });
+/** 拍号显示（可选 keyframes[].stageLabel，如「02末」）：导航栏与卡片用它代替两位阶段号，最多这么多字。 */
+export const BLOCKOUT_STAGE_LABEL_MAX = 6;
 /** 文字长度：超过只报警告。 */
 export const BLOCKOUT_TEXT_LIMITS = Object.freeze({ what: 80, next: 40 });
 
@@ -165,6 +167,7 @@ function CheckKeyframe(errors, warnings, at, kf) {
   if (!Number.isInteger(kf.stage) || kf.stage < 1 || kf.stage > 99) errors.push(`${at}.stage 要是 1–99 的整数`);
   if (typeof kf.name !== "string" || !kf.name) errors.push(`${at}.name 要是非空字符串`);
   if (kf.stageTitle !== undefined && typeof kf.stageTitle !== "string") errors.push(`${at}.stageTitle 要是字符串`);
+  if (kf.stageLabel !== undefined && (typeof kf.stageLabel !== "string" || !kf.stageLabel || kf.stageLabel.length > BLOCKOUT_STAGE_LABEL_MAX)) errors.push(`${at}.stageLabel 要是 1–${BLOCKOUT_STAGE_LABEL_MAX} 个字的字符串`);
   if (!IsObject(kf.player) || !Finite(kf.player.x) || !Finite(kf.player.z)) errors.push(`${at}.player 要带有限的 x / z`);
   else {
     CheckYaw(errors, `${at}.player`, kf.player);
@@ -271,19 +274,31 @@ export function ValidateBlockoutScene(doc) {
       if (bytes !== expectBytes) errors.push(`terrain.data 应当是 ${expectBytes} 字节（(cols+1)×(rows+1) 个 int16），现在约 ${bytes}`);
     }
   }
+  const ids = new Set();
+  const CheckBlock = (block, at) => {
+    if (!IsObject(block)) { errors.push(`${at} 要是对象`); return false; }
+    if (typeof block.id !== "string" || !block.id) errors.push(`${at}.id 要是非空字符串`);
+    else if (ids.has(block.id)) errors.push(`${at}.id 重复：${block.id}`);
+    else ids.add(block.id);
+    for (const k of ["x", "z", "w", "d", "h"]) if (!Finite(block[k])) errors.push(`${at}.${k} 要是有限数字`);
+    if ((Finite(block.w) && block.w <= 0) || (Finite(block.d) && block.d <= 0) || (Finite(block.h) && block.h <= 0)) errors.push(`${at} 的 w / d / h 要大于 0`);
+    if (block.ry !== undefined && !Finite(block.ry)) errors.push(`${at}.ry 要是有限数字（弧度）`);
+    if (typeof block.semantic !== "string" || !block.semantic) errors.push(`${at}.semantic 要是非空字符串`);
+    return true;
+  };
   if (!Array.isArray(doc.blocks)) errors.push("blocks 要是数组");
-  else {
-    const ids = new Set();
-    doc.blocks.forEach((block, i) => {
-      const at = `blocks[${i}]`;
-      if (!IsObject(block)) { errors.push(`${at} 要是对象`); return; }
-      if (typeof block.id !== "string" || !block.id) errors.push(`${at}.id 要是非空字符串`);
-      else if (ids.has(block.id)) errors.push(`${at}.id 重复：${block.id}`);
-      else ids.add(block.id);
-      for (const k of ["x", "z", "w", "d", "h"]) if (!Finite(block[k])) errors.push(`${at}.${k} 要是有限数字`);
-      if ((Finite(block.w) && block.w <= 0) || (Finite(block.d) && block.d <= 0) || (Finite(block.h) && block.h <= 0)) errors.push(`${at} 的 w / d / h 要大于 0`);
-      if (block.ry !== undefined && !Finite(block.ry)) errors.push(`${at}.ry 要是有限数字（弧度）`);
-      if (typeof block.semantic !== "string" || !block.semantic) errors.push(`${at}.semantic 要是非空字符串`);
+  else doc.blocks.forEach((block, i) => CheckBlock(block, `blocks[${i}]`));
+  // 可选 gates（§2.2，2026-10-18）：随场景信号出现 / 消失的体块。signal = 信号到了就消失；appearSignal = 信号到了才出现。
+  if (doc.gates !== undefined) {
+    if (!Array.isArray(doc.gates)) errors.push("gates 要是数组");
+    else doc.gates.forEach((gate, i) => {
+      const at = `gates[${i}]`;
+      if (!CheckBlock(gate, at)) return;
+      const hasSignal = typeof gate.signal === "string" && !!gate.signal;
+      const hasAppear = typeof gate.appearSignal === "string" && !!gate.appearSignal;
+      if (gate.signal !== undefined && !hasSignal) errors.push(`${at}.signal 要是非空字符串`);
+      if (gate.appearSignal !== undefined && !hasAppear) errors.push(`${at}.appearSignal 要是非空字符串`);
+      if (!hasSignal && !hasAppear) errors.push(`${at} 要带 signal（到了就消失）或 appearSignal（到了才出现）`);
     });
   }
   return { ok: errors.length === 0, errors, warnings };
@@ -349,6 +364,7 @@ export function NormalizeBlockout(doc, { arcMode = "default" } = {}) {
       ...kf,
       index,
       stageTitle: typeof kf.stageTitle === "string" ? kf.stageTitle : "",
+      stageLabel: typeof kf.stageLabel === "string" && kf.stageLabel ? kf.stageLabel : "",
       what: typeof kf.what === "string" ? kf.what : "",
       notes: typeof kf.notes === "string" ? kf.notes : "",
       how: Array.isArray(kf.how) ? kf.how.filter(item => typeof item === "string") : [],

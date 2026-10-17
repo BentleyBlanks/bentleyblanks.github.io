@@ -258,7 +258,7 @@ export class BlockoutMap {
   /** @param {Array<{id, stage, player:{x,z}, name?}>} list */
   SetKeyframes(list, index = 0) {
     this.keyframes = (Array.isArray(list) ? list : []).map((kf, i) => ({
-      i, id: String(kf?.id ?? i), stage: kf?.stage, name: kf?.name || "",
+      i, id: String(kf?.id ?? i), stage: kf?.stage, stageLabel: kf?.stageLabel || "", name: kf?.name || "",
       x: kf?.player?.x, z: kf?.player?.z,
     })).filter(kf => Finite(kf.x) && Finite(kf.z));
     this.kfIndex = Number.isInteger(index) ? index : -1;
@@ -843,7 +843,7 @@ export class BlockoutMap {
     for (const kf of [...order, ...top, ...current]) {
       const p = Project(view, kf.x, kf.z);
       if (p.x < -24 || p.y < -24 || p.x > view.w + 24 || p.y > view.h + 24) continue;
-      const label = String(kf.stage ?? "").padStart(2, "0");
+      const label = kf.stageLabel || String(kf.stage ?? "").padStart(2, "0");
       if (kf.i === this.kfIndex) {
         // 当前关键帧：空心金环（玩家箭头站在环里），阶段号挂在右上角的金色小牌上
         ctx.beginPath();

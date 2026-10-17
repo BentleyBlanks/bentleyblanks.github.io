@@ -80,6 +80,8 @@ function Button(className, { icon = "", text = "", tip = "", label = "" } = {}) 
 }
 
 function Pad2(n) { return Number.isFinite(n) ? String(Math.trunc(n)).padStart(2, "0") : "--"; }
+/** 拍号：有 stageLabel（如「02末」）用它，否则两位阶段号。 */
+function StageText(kf) { return kf && typeof kf.stageLabel === "string" && kf.stageLabel ? kf.stageLabel : Pad2(kf?.stage); }
 function Kbd(text) { return El("kbd", "boKbd", text); }
 
 export class BlockoutUi {
@@ -406,9 +408,9 @@ export class BlockoutUi {
   SetKeyframes(list, index) {
     const next = (Array.isArray(list) ? list : []).map((kf, i) => ({
       i, id: String(kf?.id ?? i), stage: Number.isFinite(kf?.stage) ? kf.stage : null,
-      stageTitle: kf?.stageTitle || "", name: kf?.name || "",
+      stageTitle: kf?.stageTitle || "", stageLabel: kf?.stageLabel || "", name: kf?.name || "",
     }));
-    const sig = next.map(k => `${k.id}|${k.stage}|${k.name}|${k.stageTitle}`).join("\n");
+    const sig = next.map(k => `${k.id}|${k.stage}|${k.stageLabel}|${k.name}|${k.stageTitle}`).join("\n");
     let rebuilt = false;
     if (sig !== this.kfSig) {
       this.kfSig = sig;
@@ -427,8 +429,8 @@ export class BlockoutUi {
     const segs = [];
     for (const kf of this.keyframes) {
       const last = segs[segs.length - 1];
-      if (last && last.stage === kf.stage) last.items.push(kf);
-      else segs.push({ stage: kf.stage, start: kf.i, items: [kf] });
+      if (last && last.stage === kf.stage && last.stageLabel === kf.stageLabel) last.items.push(kf);
+      else segs.push({ stage: kf.stage, stageLabel: kf.stageLabel, start: kf.i, items: [kf] });
     }
     this.track.replaceChildren();
     this.stageNums.replaceChildren();
@@ -444,7 +446,7 @@ export class BlockoutUi {
         return t;
       });
       this.track.append(el);
-      const num = El("span", "boStageNum", Pad2(seg.stage));
+      const num = El("span", "boStageNum", StageText(seg));
       num.style.flexGrow = String(seg.items.length);
       this.stageNums.append(num);
       return { ...seg, el, num };
@@ -480,11 +482,11 @@ export class BlockoutUi {
     const kf = this.keyframes[idx];
     if (kf) {
       const seg = this.segments.find(s => idx >= s.start && idx < s.start + s.items.length);
-      this.elCount.textContent = `${Pad2(kf.stage)} · ${idx - seg.start + 1}/${seg.items.length}`;
+      this.elCount.textContent = `${StageText(kf)} · ${idx - seg.start + 1}/${seg.items.length}`;
       this.trackWrap.setAttribute("aria-valuemin", "1");
       this.trackWrap.setAttribute("aria-valuemax", String(n));
       this.trackWrap.setAttribute("aria-valuenow", String(idx + 1));
-      this.trackWrap.setAttribute("aria-valuetext", `${Pad2(kf.stage)} · ${kf.name}`);
+      this.trackWrap.setAttribute("aria-valuetext", `${StageText(kf)} · ${kf.name}`);
     } else {
       this.elCount.textContent = "—";
     }
@@ -515,7 +517,7 @@ export class BlockoutUi {
     const kf = this.keyframes[index];
     const x = this.TickX(index);
     if (!kf || x === null) { this.HideNavTip(); return; }
-    this.navTip.textContent = kf.name ? `${Pad2(kf.stage)} · ${kf.name}` : `${Pad2(kf.stage)} · ${kf.id}`;
+    this.navTip.textContent = kf.name ? `${StageText(kf)} · ${kf.name}` : `${StageText(kf)} · ${kf.id}`;
     this.navTip.style.left = `${x}px`;
     this.navTip.classList.add("on");
     for (const seg of this.segments) for (const t of seg.ticks) t.classList.toggle("hover", Number(t.dataset.index) === index);
@@ -570,7 +572,7 @@ export class BlockoutUi {
     if (!c) return;
     const prev = this.card || {};
     const Text = (el, value, key) => { if (prev[key] !== value) el.textContent = value; };
-    const stage = Pad2(c.stage);
+    const stage = StageText(c);
     Text(this.elStage, stage, "_stage");
     Text(this.elStageTitle, c.stageTitle || "", "stageTitle");
     Text(this.elPlace, c.name ? `· ${c.name}` : "", "_place");
