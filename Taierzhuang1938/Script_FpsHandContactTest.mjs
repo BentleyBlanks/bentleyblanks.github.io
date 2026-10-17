@@ -16,10 +16,11 @@ const server=await ServeRoot(path.resolve(project,".."),0),browser=await LaunchB
 const page=await browser.newPage({viewport:{width:1600,height:1000}}),errors=[];
 page.on("pageerror",e=>errors.push(String(e)));
 const only=process.argv.find(a=>a.startsWith("--only="))?.slice(7).split(",");
+const holdingOnly=process.argv.includes('--holding-only');
 try {
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?weapons=1&shot=1&manual=1&quality=medium&scale=small`,{timeout:120000});
   await page.waitForFunction(()=>window.Taierzhuang?.state?.ready,null,{timeout:240000});
-  const report=await page.evaluate(async({only,shelved})=>{
+  const report=await page.evaluate(async({only,shelved,holdingOnly})=>{
     const THREE=await import("./vendor/three/build/three.module.js");
     const {FPS_PACKET_RELOAD}=await import("./Data_Tuning_FpsReload.mjs");
     const {MeasureZbContactGeometry}=await import("./Script_FpsZbContactGeometry.mjs");
@@ -223,6 +224,43 @@ try {
         measuredRegions:includeHand?["Hand","Finger0","Finger1","Finger2","Finger3","Finger4"]:["Finger0","Finger1","Finger2","Finger3","Finger4"]};
     };
     const directionCache=new WeakMap();
+    const thumbFrameCache=new WeakMap();
+    const HanYangThumbFrames=()=>{
+      let entries=thumbFrameCache.get(arms);
+      if(!entries){
+        entries=['l','r'].map(side=>{
+          const bone=arms.anatomy[side].curls.find(c=>c.bone.name.toLowerCase().endsWith('finger02')).bone;
+          const hand=arms.bones[side].hand,entry={side,bone,cap:[],padBone:null};
+          arms.root.traverse(mesh=>{
+            if(!mesh.isSkinnedMesh)return;
+            const bones=mesh.skeleton.bones,distal=bones.indexOf(bone),handIndex=bones.indexOf(hand);
+            if(distal<0||handIndex<0)return;
+            const inv=mesh.skeleton.boneInverses,toHand=inv[handIndex].clone().multiply(inv[distal].clone().invert()),rotation=new THREE.Quaternion();
+            toHand.decompose(new THREE.Vector3(),rotation,new THREE.Vector3());
+            const curl=arms.anatomy[side].curls.find(c=>c.bone===bone),axis=curl.direction.clone().applyQuaternion(rotation.clone().invert()).normalize();
+            entry.padBone ||= new THREE.Vector3().crossVectors(curl.axis,axis).normalize();
+            const a=mesh.geometry.attributes,vertices=[];
+            for(let i=0;i<a.position.count;i++){
+              let weight=0;for(let k=0;k<4;k++)if(a.skinIndex.getComponent(i,k)===distal)weight+=a.skinWeight.getComponent(i,k);
+              if(weight>.95){const p=new THREE.Vector3().fromBufferAttribute(a.position,i).applyMatrix4(mesh.bindMatrix).applyMatrix4(inv[distal]);vertices.push({mesh,index:i,along:p.dot(axis)});}
+            }
+            vertices.sort((a,b)=>b.along-a.along);entry.cap.push(...vertices.slice(0,Math.max(3,Math.ceil(vertices.length*.10))));
+          });
+          if(entry.cap.length<3||!entry.padBone)throw Error('Missing actual Hanyang thumb end cap');
+          return entry;
+        });thumbFrameCache.set(arms,entries);
+      }
+      const wood=Triangles(vm.rig.group,o=>o.name==='HanYang_body_wood');
+      if(!wood.length)throw Error('Missing Hanyang wood surface for thumb frame review');
+      const inverse=vm.rig.group.matrixWorld.clone().invert();
+      return entries.map(({side,bone,padBone,cap})=>{
+        const tip=new THREE.Vector3();for(const {mesh,index}of cap)tip.add(mesh.getVertexPosition(index,new THREE.Vector3()).applyMatrix4(mesh.matrixWorld).applyMatrix4(inverse));tip.divideScalar(cap.length);
+        let distance=Infinity;const closest=new THREE.Vector3(),point=new THREE.Vector3();
+        for(const tri of wood){tri.closestPointToPoint(tip,point);const d=point.distanceToSquared(tip);if(d<distance){distance=d;closest.copy(point);}}
+        const pad=padBone.clone().applyMatrix3(new THREE.Matrix3().getNormalMatrix(inverse.clone().multiply(bone.matrixWorld))).normalize(),toward=closest.sub(tip).normalize();
+        return {side,capVertices:cap.length,tip:tip.toArray(),padNormal:pad.toArray(),towardWood:toward.toArray(),facing:pad.dot(toward),method:'Actual distal skin cap centroid and captured thumb hinge/longitudinal pad frame in gun coordinates; prevents a sideways or nail-first thumb from passing distance alone'};
+      });
+    };
     const HanYangFingerDirections=()=>{
       let entries=directionCache.get(arms);
       if(!entries){
@@ -316,8 +354,9 @@ try {
             normal:actualTrigger.normal,normalDotToTarget:actualTrigger.toTarget,signedSeparation:actualTrigger.signedSeparation,
             sameHipWitness:actualTrigger.witness.mesh===hipTriggerSkin.witness.mesh&&actualTrigger.witness.index===hipTriggerSkin.witness.index,
             jointRotationChangeRad:Math.max(...indexJoints.map((b,i)=>b.quaternion.angleTo(hipTriggerJoints[i])))}:null,
-          wrist:{...arms.wristBend},supportSkin:zbContact?.support??null,triggerSkin:zbContact?.trigger??null});
+          wrist:{...arms.wristBend},supportSkin:zbContact?.support??null,triggerSkin:zbContact?.trigger??null,thumbFrames:id==='HanYang'?HanYangThumbFrames():null});
       }
+      if(holdingOnly)continue;
       editor.SetPose("hip");for(let i=0;i<90;i++)editor.Update(1/60);
       for(const action of ["reload",...(["ZhongZheng","HanYang","Type38","Zb26","Type11"].includes(id)?["reloadPartial"]:[]),
         ...(["ZhongZheng","HanYang","Type38"].includes(id)?["reloadOpen","bolt"]:[])]){
@@ -326,12 +365,18 @@ try {
           while(vm.action)editor.Update(1/60);
           if(!vm.boltOpen)throw new Error(id+": the open-bolt reload contact case did not start open");
         }
+        const previousThumb=id==='HanYang'?arms._FingerRoot('r',0).quaternion.clone():null;
         if(action.startsWith("reload"))vm.TriggerReload({remainingRounds:action==="reloadPartial"?3:0});else vm.TriggerBolt();
         const row={id,action,maxGrip:0,maxWrist:0,maxFingerTranslation:0,unreachable:0,propSamples:[],skinSamples:[],worstGrip:null,worstWrist:null};
-        if(id==="HanYang")row.handDirectionSamples=[];
+        if(id==="HanYang"){row.handDirectionSamples=[];row.thumbBoundarySamples=[];row.maxThumbBoundaryStepDeg=0;}
         for(let frame=0;vm.action&&frame<1200;frame++){
           editor.Update(1/60);Refresh();result.samples++;
           const t=vm.action?.t??1,grip=Math.max(arms.gripError.r,arms.gripError.l),wrist=Math.max(arms.wristBend.r,arms.wristBend.l);
+          if(id==='HanYang'){
+            const q=arms._FingerRoot('r',0).quaternion,stepDeg=previousThumb.angleTo(q)*180/Math.PI;
+            if(t<.12||t>.89){row.maxThumbBoundaryStepDeg=Math.max(row.maxThumbBoundaryStepDeg,stepDeg);row.thumbBoundarySamples.push({frame,t,stepDeg,contactWeight:arms.contactWeight.r,thumbHoldingWeight:arms.operationPose.r?.thumbHoldingWeight??null});}
+            previousThumb.copy(q);
+          }
           if(grip>row.maxGrip)row.worstGrip={t,grip};
           if(wrist>row.maxWrist)row.worstWrist={t,wrist,bySide:{...arms.wristBend},reach:{...arms.reachRatio}};
           row.maxGrip=Math.max(row.maxGrip,grip);row.maxWrist=Math.max(row.maxWrist,wrist);
@@ -345,7 +390,7 @@ try {
               if(kind==="packet"&&vm.usedPacketProp.visible)kind="oldPacket";
               const contactDigits=kind==="press"?[0]:[0,1];
               row.handDirectionSamples.push({frame,t,kind,side:"r",shape:operation.shape,nextShape:operation.nextShape,
-                shapeMix:operation.shapeMix,digitMix:operation.digitMix,contactWeight:arms.contactWeight.r,
+                shapeMix:operation.shapeMix,digitMix:operation.digitMix,contactWeight:arms.contactWeight.r,thumbHoldingWeight:operation.thumbHoldingWeight??null,
                 packetVisible:vm.packetProp.visible,oldPacketVisible:vm.usedPacketProp.visible,
                 contactProbeDigits:contactDigits,nonContactProbeDigits:[0,1,2,3,4].filter(digit=>!contactDigits.includes(digit)),
                 digits:HanYangFingerDirections()});
@@ -407,7 +452,7 @@ try {
       }
     }
     return result;
-  },{only,shelved:SHELVED_WEAPONS});
+  },{only,shelved:SHELVED_WEAPONS,holdingOnly});
   await fs.writeFile(path.join(output,"Data_Contacts.json"),JSON.stringify({...report,errors},null,2));
   const failures=[];const Check=(condition,message)=>{if(!condition)failures.push(message);};
   for(const pose of report.poses){
@@ -422,9 +467,11 @@ try {
     Check(pose.holdingDrift<.001,`${pose.id}: ADS changes the finger contact`);
     if(pose.pose==="fire")Check(pose.triggerTravel>.0001,`${pose.id}: firing does not flex the trigger finger`);
     for(const [digit,distance] of pose.support.entries())Check(distance<.004,`${pose.id} ${pose.pose}: support digit ${digit} is ${(distance*1000).toFixed(1)} mm from the fore-end surface`);
+    if(pose.id==='HanYang')for(const thumb of pose.thumbFrames)Check(thumb.facing>.55,`HanYang ${pose.pose} ${thumb.side}: thumb pad/nail frame faces sideways to the stock (${thumb.facing.toFixed(3)})`);
     if(pose.id==='Zb26')failures.push(...ZbContactGeometryFailures({support:pose.supportSkin,trigger:pose.triggerSkin},`Zb26 ${pose.pose}`));
   }
   for(const action of report.actions){
+    if(action.id==='HanYang')Check(action.maxThumbBoundaryStepDeg<30,`HanYang ${action.action}: thumb holding/action handoff jumps ${action.maxThumbBoundaryStepDeg.toFixed(2)}deg in one 60fps frame`);
     Check(action.maxGrip<FPS_ARM_LIMITS.positionResidualM,`${action.id} ${action.action}: hand leaves target ${JSON.stringify(action.worstGrip)}`);
     Check(action.maxWrist<FPS_ARM_LIMITS.wristBendDeg,`${action.id} ${action.action}: wrist bends beyond its limit ${JSON.stringify(action.worstWrist)}`);
     Check(action.maxFingerTranslation<1e-6,`${action.id}: finger bone lengths change during animation`);

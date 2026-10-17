@@ -91,6 +91,9 @@ export const FPS_RIFLE_RELOAD = Object.freeze({
 // A partial packet is removed before a fresh packet is brought to the action.
 export const FPS_PACKET_RELOAD = Object.freeze({
   ...FPS_RIFLE_RELOAD,
+  // Thumb opposition leaves/returns to the current authored holding pose
+  // independently of the already-authored spatial hand contact path.
+  thumbHandoff: {releaseEnd:.060,recoverStart:.948},
   seatedAt: 0.50,
   retainedAt: 0.68,
   clearOffset: [0.030, 0.045, 0.025],
@@ -195,6 +198,7 @@ export const FPS_BOLT_HAND = Object.freeze({
   // Bring the rifle slightly toward the shoulder while the bolt is worked;
   // a fully lifted handle must not force a straight arm or stretch the wrist.
   supportOffsetByWeapon: { HanYang: [0, 0, 0.020] },
+  thumbHandoffByWeapon: {HanYang:{releaseEnd:.100,recoverStart:.840}},
   graspAt: .140, approachFraction:.60, liftLead:.105, releaseGap: .010, clearFraction: .40,
   liftLeadByWeapon:{HanYang:.160},
   clearOffset: [.016,.008,.020],

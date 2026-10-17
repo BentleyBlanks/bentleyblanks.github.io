@@ -82,8 +82,8 @@ export function ApplyAnatomicalFingers(rig) {
       fingerSplay: Array.from({length:5},(_,i)=>THREE.MathUtils.lerp(shape.fingerSplay?.[i] || 0,next.fingerSplay?.[i] || 0,DigitMix(i))),
       side: shape.side || next.side || "r",
     } : shape || next;
-    const workingBlend = working ? 1-rig.contactWeight[side] : 0;
-    const fire = firearm && side === "r" ? (rig.poseState.fire || 0) * (1-workingBlend) : 0;
+    const operationBlend = working ? 1-rig.contactWeight[side] : 0;
+    const fire = firearm && side === "r" ? (rig.poseState.fire || 0) * (1-operationBlend) : 0;
     for (const {bone, axis, spreadAxis, position, rest, direction} of rig.anatomy[side].curls) {
       // Digit rest translations belong to this baked mesh. Animate rotations
       // so the calibrated finger reach stays constant throughout each action.
@@ -91,6 +91,7 @@ export function ApplyAnatomicalFingers(rig) {
       const match = bone.name.match(/finger(\d)(\d)?$/i);
       if (!match) continue;
       const finger = Number(match[1]); const segment = Number(match[2] || 0);
+      const workingBlend=operationBlend*(finger===0?1-THREE.MathUtils.clamp(operation?.thumbHoldingWeight??0,0,1):1);
       const authored = contact?.fingerRotations?.[match[1]+(match[2]||'')];
       const authoredTrigger = contact?.triggerRotations?.[match[1]+(match[2]||'')];
       const workingKey=match[1]+(match[2]||'');

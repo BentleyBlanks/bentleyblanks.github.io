@@ -124,6 +124,7 @@ if(Option('motion-report')){
         for(const field of ['shape','nextShape'])if(operation[field]!==undefined)assert(typeof operation[field]==='string'&&FPS_HAND_SHAPES[operation[field]],label+': unknown '+field+' '+operation[field]);
         assert(operation.shape!==undefined||operation.nextShape!==undefined,label+': working operation has no actual shape');
         Unit(operation.shapeMix,label+' operation.'+side+'.shapeMix');
+        if(operation.thumbHoldingWeight!==undefined)Unit(operation.thumbHoldingWeight,label+' operation.'+side+'.thumbHoldingWeight');
         if(operation.digitMix!==undefined){assert(Array.isArray(operation.digitMix)&&operation.digitMix.length===5,label+': digitMix must retain all five actual digits');operation.digitMix.forEach((mix,digit)=>Unit(mix,label+' digitMix['+digit+']'));}
       }
       assert(frame.poseState&&typeof frame.poseState==='object',label+': capture the actual fire/ADS/sprint finger state');

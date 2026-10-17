@@ -3378,7 +3378,15 @@ export class Viewmodel {
         const at=start.at+Math.min(delay/(this.action?.duration||1),(end.at-start.at)*.7);
         const phase=Ease.Seg(t,at,end.at);return phase*phase*(3-2*phase);
       });
-      this.riggedArms.operationPose[key] = {shape:start.shape || end.shape,nextShape:end.shape || start.shape,shapeMix:mix,digitMix};
+      const handoff=side==='right'&&this.weaponId==='HanYang'
+        ?this.action?.kind==='reload'?FPS_PACKET_RELOAD.thumbHandoff
+          :this.action?.kind==='bolt'?FPS_BOLT_HAND.thumbHandoffByWeapon.HanYang:null
+        :null;
+      const ThumbPhase=(start,end)=>{const u=Ease.Seg(t,start,end);return u*u*(3-2*u);};
+      const thumbHoldingWeight=handoff
+        ?1-ThumbPhase(0,handoff.releaseEnd)+ThumbPhase(handoff.recoverStart,1)
+        :undefined;
+      this.riggedArms.operationPose[key] = {shape:start.shape || end.shape,nextShape:end.shape || start.shape,shapeMix:mix,digitMix,thumbHoldingWeight};
     }
   }
 

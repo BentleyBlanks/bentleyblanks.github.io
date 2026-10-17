@@ -20,7 +20,7 @@ import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Scr
 import { StepElbowArc } from "./Script_FpsElbowArc.mjs";
 import { LoadFpsSkeletalAnimations } from "./Script_FpsSkeletalAnimation.mjs";
 
-const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=20261016094500", fpsHanYangRepaired: "./Model/Model_FpsHanYangHandsRepaired.glb?v=20261017063001", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
+const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=20261016094500", fpsHanYangRepaired: "./Model/Model_FpsHanYangHandsRepaired.glb?v=20261017113002", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
 const PROFILE_CLIPS = Object.freeze({
   rifle: "RifleIdle",
   lmg: "MachineGunFire",

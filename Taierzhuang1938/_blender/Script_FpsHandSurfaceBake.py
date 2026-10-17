@@ -17,7 +17,7 @@ import numpy as np
 from mathutils import Matrix, Quaternion, Vector
 
 project = Path(FPS_PROJECT_ROOT).resolve()
-task = 'FpsHandSurfaceRepair_20261017'
+task = globals().get('FPS_HAND_SURFACE_TASK', 'FpsHandSurfaceRepair_20261017')
 assert bpy.context.scene.get('BlenderMcpTask') == task
 folder = Path(r'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938') / task
 folder.mkdir(parents=True, exist_ok=True)
@@ -74,7 +74,9 @@ smooth = lambda x: np.clip(x, 0, 1) ** 2 * (3 - 2 * np.clip(x, 0, 1))
 metric = .7
 new_joints, new_weights = joints.copy(), weights.copy()
 new_positions = positions.copy()
-changed_weights, thumb_changed, wrist_changed = [], [], []
+changed_weights, thumb_changed, wrist_changed, thumb_base_changed = [], [], [], []
+thumb_root_changed = []
+thumb_root_displacements = {}
 regions = {}
 
 for side in ['l', 'r']:
@@ -168,7 +170,7 @@ for side in ['l', 'r']:
                 cumulative += chain_lengths[segment]
             along_curve = best_curve[1]
             l0, l1, l2 = chain_lengths
-            root_blend = float(smooth((along_curve + .010 / metric) / (.022 / metric)))
+            root_blend = float(smooth((along_curve - .002 / metric) / (.027 / metric))) if d == 0 else float(smooth((along_curve + .010 / metric) / (.022 / metric)))
             pip_blend = float(smooth((along_curve - l0 + .006 / metric) / (.012 / metric)))
             dip_blend = float(smooth((along_curve - l0 - l1 + .005 / metric) / (.010 / metric)))
             field = {hand_id: 1 - root_blend, chain[0]: root_blend * (1 - pip_blend), chain[1]: root_blend * pip_blend * (1 - dip_blend), chain[2]: root_blend * pip_blend * dip_blend}
@@ -216,6 +218,56 @@ for side in ['l', 'r']:
                 new_positions[vertex] = (np.linalg.inv(mesh_matrix) @ np.r_[q, 1])[:3]
                 if np.linalg.norm(moved) > 1e-9:
                     thumb_changed.append(int(vertex))
+        # The scan's thumb-metacarpal flesh must not rotate as a rigid fist
+        # lobe. Fair its broad dorsal volume while preserving the palmar web
+        # and distal pad. The matching root field above keeps the eminence
+        # attached to the palm until the actual MCP hinge.
+        thumb_mass = float(digit_mass[vertex, 0])
+        if thumb_mass > .05:
+            chain, curve, chain_lengths = curves[0]
+            choices = []
+            cumulative = 0.
+            for segment in range(3):
+                vector = curve[segment+1] - curve[segment]
+                t = float(np.dot(p-curve[segment], vector) / np.dot(vector, vector))
+                center = curve[segment] + vector * np.clip(t, 0., 1.)
+                choices.append((float(np.linalg.norm(p-center)), cumulative + t*chain_lengths[segment], center, vector/chain_lengths[segment]))
+                cumulative += chain_lengths[segment]
+            distance, thumb_along, center, axis = min(choices, key=lambda row: row[0])
+            field = float(smooth((thumb_mass-.05)/.70) * smooth((thumb_along+.008/metric)/(.014/metric)) * (1-smooth((thumb_along-.028/metric)/(.020/metric))))
+            if field > 1e-8:
+                dorsal = normal * (-1 if side == 'l' else 1)
+                transverse = dorsal - axis*np.dot(dorsal, axis)
+                transverse /= np.linalg.norm(transverse)
+                lateral = np.cross(axis, transverse)
+                radial = p-center
+                moved = -field * (.24*transverse*np.dot(radial,transverse) + .12*lateral*np.dot(radial,lateral))
+                current = (mesh_matrix @ np.r_[new_positions[vertex], 1])[:3]
+                new_positions[vertex] = (np.linalg.inv(mesh_matrix) @ np.r_[current+moved, 1])[:3]
+                if np.linalg.norm(moved) > 1e-9:
+                    thumb_base_changed.append(int(vertex))
+        # The radial CMC silhouette includes palm-owned skin, not just vertices
+        # labelled as thumb. The v2 ownership-only fairing left a vertical shelf
+        # above the wrist. Author a compact C1 relief across that actual palm /
+        # metacarpal transition, in anatomical bind-space millimetres. Preserve
+        # the distal thumb, other digits, opposite hand and all bone transforms.
+        if side == 'r':
+            relative = p - wrist
+            radial_m = float(np.dot(relative, across) * metric)
+            depth_m = float(np.dot(relative, normal) * metric)
+            axial_m = float(axial * metric)
+            field = float(
+                smooth((axial_m + .010) / .025)
+                * (1 - smooth((axial_m - .022) / .025))
+                * smooth((radial_m - .018) / .020)
+                * (1 - smooth((abs(depth_m + .010) - .022) / .014))
+                * (1 - smooth(float(digit_mass[vertex, 1:].sum()) / .20))
+            )
+            if field > 1e-8:
+                moved = field * (-across * .0065 + forward * .0020) / metric
+                thumb_root_displacements[int(vertex)] = moved
+                if np.linalg.norm(moved) > 1e-9:
+                    thumb_root_changed.append(int(vertex))
     regions[side] = side_count
 
 # A small welded one-ring filter removes scan-weight noise while keeping the
@@ -250,6 +302,45 @@ for vertex in changed_weights:
     value = row[top].astype(np.float32)
     value /= value.sum(dtype=np.float32)
     new_joints[vertex], new_weights[vertex] = top, value
+
+# Sculpt the root in the actual holding deformation, then inverse-skin the
+# displacement into the editable Basis. Applying one bind-space vector through
+# differently rotated Hand/CMC weights crowds the pre-existing web folds.
+# Read the authoritative Blender Idle rotations instead of maintaining a
+# second finger solver or a screenshot-dependent calibration asset.
+calibration_path = project / 'Animation/FirstPerson/Data_FpsHanYangAnimations.json'
+calibration_bytes = calibration_path.read_bytes()
+calibration = json.loads(calibration_bytes)
+clip = calibration['clips']['Idle']
+assert clip['count'] == 241 and clip['duration'] == 4
+holding_rotations = {}
+for name, track in zip(calibration['bones'], clip['bones']):
+    key = normalize(name)
+    if re.search(r'rfinger[0-4][12]?$', key):
+        node_id = next(i for i, n in enumerate(doc['nodes']) if normalize(n.get('name', '')) == key)
+        holding_rotations[node_id] = Quaternion((track[6], *track[3:6])).normalized()
+assert len(holding_rotations) == 15
+holding_world = {}
+
+def HoldingWorld(index):
+    if index not in holding_rotations:
+        return NodeWorld(index)
+    if index not in holding_world:
+        node = doc['nodes'][index]
+        assert 'matrix' not in node
+        local = Matrix.LocRotScale(Vector(node.get('translation', (0, 0, 0))), holding_rotations[index], Vector(node.get('scale', (1, 1, 1))))
+        holding_world[index] = HoldingWorld(parent[index]) @ local
+    return holding_world[index]
+
+holding_matrices = np.asarray([np.asarray(HoldingWorld(i), dtype=np.float64) for i in skin['joints']]) @ inverse_binds
+maximum_holding_relief_error = 0.
+for vertex, displacement in thumb_root_displacements.items():
+    blended = np.sum(holding_matrices[new_joints[vertex]] * new_weights[vertex, :, None, None], axis=0)
+    assert abs(np.linalg.det(blended[:3, :3])) > 1e-10
+    correction = np.linalg.solve(blended[:3, :3], displacement)
+    new_positions[vertex] += correction
+    maximum_holding_relief_error = max(maximum_holding_relief_error, float(np.linalg.norm(blended[:3, :3] @ correction - displacement)))
+assert maximum_holding_relief_error < 1e-8
 
 # Area-weighted geometric normal changes preserve the scan's original smoothing.
 def GeometryNormals(p):
@@ -331,15 +422,18 @@ for key in ['skins', 'nodes', 'materials', 'textures', 'images', 'animations', '
     assert doc.get(key) == before_doc.get(key), key + ' is protected'
 assert doc['meshes'] == before_doc['meshes'], 'Topology, UV/morph pointers and clothing descriptors stay exact'
 doc['asset'].setdefault('extras', {})['handSurfaceRepair'] = {
-    'version': 1, 'weapon': 'HanYang', 'source': '_blender/Script_FpsHandSurfaceBake.py',
+    'version': 3, 'weapon': 'HanYang', 'source': '_blender/Script_FpsHandSurfaceBake.py',
     'basisSha256': hashlib.sha256(original).hexdigest(), 'thumbTerminalLengthM': .0218,
     'binding': 'Continuous scan branch ownership, same-digit hinge fields, welded one-ring smoothing',
     'wristProfile': 'Smooth 59 x 38 mm wrist transition; skeleton and cuff unchanged',
+    'thumbWeb': 'Palm-anchored metacarpal weights and continuous dorsal volume fairing',
+    'rightThumbRoot': 'Inverse-skinned holding-space CMC relief across palm ownership; anatomical C1 field, 6.5 mm inward / 2 mm forward maximum; distal thumb and other digits preserved',
+    'thumbRootCalibration': {'source': 'Animation/FirstPerson/Data_FpsHanYangAnimations.json', 'sha256': hashlib.sha256(calibration_bytes).hexdigest(), 'frame': 0, 'fingerBones': 15},
 }
 output = project / 'Model/Model_FpsHanYangHandsRepaired.glb'
 codec.WriteGlb(output, doc, binary)
 raw = output.read_bytes()
-report = {'version': 1, 'source': str(source_path), 'basisSha256': hashlib.sha256(original).hexdigest(), 'output': str(output), 'outputSha256': hashlib.sha256(raw).hexdigest(), 'vertices': len(positions), 'changedWeightVertices': len(set(changed_weights)), 'thumbProfileVertices': len(set(thumb_changed)), 'wristProfileVertices': len(set(wrist_changed)), 'regions': regions, 'skinBindFrameMaximumError': rest_frame_error, 'protectedSkeletonClothingMaterialsAndTopology': True, 'maximumBindDisplacementM': float(np.linalg.norm(new_positions - positions, axis=1).max())}
+report = {'version': 3, 'source': str(source_path), 'basisSha256': hashlib.sha256(original).hexdigest(), 'output': str(output), 'outputSha256': hashlib.sha256(raw).hexdigest(), 'vertices': len(positions), 'changedWeightVertices': len(set(changed_weights)), 'thumbProfileVertices': len(set(thumb_changed)), 'wristProfileVertices': len(set(wrist_changed)), 'thumbBaseVertices': len(set(thumb_base_changed)), 'rightThumbRootVertices': len(set(thumb_root_changed)), 'thumbRootCalibrationSha256': hashlib.sha256(calibration_bytes).hexdigest(), 'holdingReliefMaximumError': maximum_holding_relief_error, 'regions': regions, 'skinBindFrameMaximumError': rest_frame_error, 'protectedSkeletonClothingMaterialsAndTopology': True, 'maximumBindDisplacementM': float(np.linalg.norm(new_positions - positions, axis=1).max())}
 (folder / 'Data_HandSurfaceBake.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
 (project / 'Model/Data_FpsHanYangHandRepair.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
 print(json.dumps(report))

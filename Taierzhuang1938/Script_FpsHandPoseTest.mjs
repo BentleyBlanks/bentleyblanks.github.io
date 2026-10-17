@@ -151,12 +151,12 @@ for (const [name, frames] of [["emptyReload", FPS_PACKET_RELOAD.hand], ["partial
 // The ordinary bolt controller has these same released/contact endpoint shapes.
 for (const [from, to] of [["packetClear", "packetBoltClear"], ["packetBoltClear", "packetBolt"],
   ["packetBolt", "packetBoltClear"], ["packetBoltClear", "packetClear"]]) AddTransition(from, to, "ordinaryBolt");
-for (const { from, to } of transitions.values()) for (let step = 0; step <= 20; step++) for (const contactWeight of [0, .25, .5, .75, 1]) {
+for (const { from, to } of transitions.values()) for (let step = 0; step <= 20; step++) for (const contactWeight of [0, .25, .5, .75, 1]) for(const thumbHoldingWeight of [0,.25,.5,.75,1]) {
   const mix = step / 20;
-  rig.operationPose.r = { shape: from, nextShape: to, shapeMix: mix };
+  rig.operationPose.r = { shape: from, nextShape: to, shapeMix: mix, thumbHoldingWeight };
   rig.contactWeight.r = contactWeight;
   ApplyAnatomicalFingers(rig);
-  Inspect("r", { kind: "workingBlend", from, to, mix, contactWeight });
+  Inspect("r", { kind: "workingBlend", from, to, mix, contactWeight, thumbHoldingWeight });
   sampledPoses++;
 }
 const failures = [];
