@@ -1,15 +1,16 @@
 {
-  "version": 3,
-  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\FpsHandThumbRoot_20261017\\Model_FpsHandSurfaceRepair.blend",
+  "version": 4,
+  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\FpsHandThumbRoots_20261017\\Model_FpsHandSurfaceRepair.blend",
   "basisSha256": "dffb45e2edc89050feefed0a49230175eb17e42a96b46fcdfaff872187d01a38",
   "output": "C:\\Users\\Bentl\\Documents\\Codex\\2026-10-16\\new-chat-2\\work\\bentleyblanks_Codex_CodRifleView_20261016\\Taierzhuang1938\\Model\\Model_FpsHanYangHandsRepaired.glb",
-  "outputSha256": "fe5bec548149d5aad3788ab9e614b3fbd8437e6b128ec73d818d553f21d5933a",
+  "outputSha256": "9f3a881499a0754dca120c6cea9a97ac6a67d060e250361b2dd850b39af11f65",
   "vertices": 29019,
   "changedWeightVertices": 19253,
   "thumbProfileVertices": 1018,
   "wristProfileVertices": 5550,
   "thumbBaseVertices": 3333,
   "rightThumbRootVertices": 1969,
+  "leftThumbRootVertices": 1229,
   "thumbRootCalibrationSha256": "52e7f820bebea78b803251ac5360830115699f096bbfc355967d14d8548acd6d",
   "holdingReliefMaximumError": 3.576224061345498e-18,
   "regions": {
@@ -36,5 +37,5 @@
   },
   "skinBindFrameMaximumError": 5.529185816977034e-07,
   "protectedSkeletonClothingMaterialsAndTopology": true,
-  "maximumBindDisplacementM": 0.018130029493556115
+  "maximumBindDisplacementM": 0.01813111573098985
 }

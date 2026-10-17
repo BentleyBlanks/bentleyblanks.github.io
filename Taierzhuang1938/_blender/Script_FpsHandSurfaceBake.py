@@ -77,6 +77,7 @@ new_positions = positions.copy()
 changed_weights, thumb_changed, wrist_changed, thumb_base_changed = [], [], [], []
 thumb_root_changed = []
 thumb_root_displacements = {}
+thumb_root_regions = {'l': [], 'r': []}
 regions = {}
 
 for side in ['l', 'r']:
@@ -250,17 +251,22 @@ for side in ['l', 'r']:
         # labelled as thumb. The v2 ownership-only fairing left a vertical shelf
         # above the wrist. Author a compact C1 relief across that actual palm /
         # metacarpal transition, in anatomical bind-space millimetres. Preserve
-        # the distal thumb, other digits, opposite hand and all bone transforms.
-        if side == 'r':
+        # the distal thumbs, other digits and all bone transforms.
+        if side in {'l', 'r'}:
             relative = p - wrist
             radial_m = float(np.dot(relative, across) * metric)
             depth_m = float(np.dot(relative, normal) * metric)
+            depth_center_m = .010 if side == 'l' else -.010
             axial_m = float(axial * metric)
+            # The left first-web scan pleat at 39--43 mm is distal to the
+            # visible CMC shelf. End its relief before that pleat so the
+            # proximal silhouette correction cannot crowd existing folds.
+            axial_release_m, axial_falloff_m = (.020, .016) if side == 'l' else (.022, .025)
             field = float(
                 smooth((axial_m + .010) / .025)
-                * (1 - smooth((axial_m - .022) / .025))
+                * (1 - smooth((axial_m - axial_release_m) / axial_falloff_m))
                 * smooth((radial_m - .018) / .020)
-                * (1 - smooth((abs(depth_m + .010) - .022) / .014))
+                * (1 - smooth((abs(depth_m - depth_center_m) - .022) / .014))
                 * (1 - smooth(float(digit_mass[vertex, 1:].sum()) / .20))
             )
             if field > 1e-8:
@@ -268,6 +274,7 @@ for side in ['l', 'r']:
                 thumb_root_displacements[int(vertex)] = moved
                 if np.linalg.norm(moved) > 1e-9:
                     thumb_root_changed.append(int(vertex))
+                    thumb_root_regions[side].append(int(vertex))
     regions[side] = side_count
 
 # A small welded one-ring filter removes scan-weight noise while keeping the
@@ -316,10 +323,10 @@ assert clip['count'] == 241 and clip['duration'] == 4
 holding_rotations = {}
 for name, track in zip(calibration['bones'], clip['bones']):
     key = normalize(name)
-    if re.search(r'rfinger[0-4][12]?$', key):
+    if re.search(r'[lr]finger[0-4][12]?$', key):
         node_id = next(i for i, n in enumerate(doc['nodes']) if normalize(n.get('name', '')) == key)
         holding_rotations[node_id] = Quaternion((track[6], *track[3:6])).normalized()
-assert len(holding_rotations) == 15
+assert len(holding_rotations) == 30
 holding_world = {}
 
 def HoldingWorld(index):
@@ -393,7 +400,7 @@ for vertex in range(len(new_positions)):
 modifier = candidate.modifiers.new('Armature_ReviewedHandSurface', 'ARMATURE'); modifier.object = rig
 candidate['nativeVertexOrder'] = 'Exact GLB skin accessor and index order'
 candidate['basisSha256'] = hashlib.sha256(original).hexdigest()
-candidate['recipe'] = 'Geometric same-finger hinge fields, no foreign digit ownership at wrist; smooth thumb terminal profile'
+candidate['recipe'] = 'Geometric same-finger hinge fields; smooth thumb terminal / wrist profiles; bilateral holding-space CMC relief inverse-skinned into Basis'
 source_mesh.hide_set(True); source_mesh.hide_render = True
 bpy.context.scene['BlenderMcpTask'] = task
 bpy.context.scene['handSurfaceRecipe'] = json.dumps(regions, separators=(',', ':'))
@@ -422,18 +429,19 @@ for key in ['skins', 'nodes', 'materials', 'textures', 'images', 'animations', '
     assert doc.get(key) == before_doc.get(key), key + ' is protected'
 assert doc['meshes'] == before_doc['meshes'], 'Topology, UV/morph pointers and clothing descriptors stay exact'
 doc['asset'].setdefault('extras', {})['handSurfaceRepair'] = {
-    'version': 3, 'weapon': 'HanYang', 'source': '_blender/Script_FpsHandSurfaceBake.py',
+    'version': 4, 'weapon': 'HanYang', 'source': '_blender/Script_FpsHandSurfaceBake.py',
     'basisSha256': hashlib.sha256(original).hexdigest(), 'thumbTerminalLengthM': .0218,
     'binding': 'Continuous scan branch ownership, same-digit hinge fields, welded one-ring smoothing',
     'wristProfile': 'Smooth 59 x 38 mm wrist transition; skeleton and cuff unchanged',
     'thumbWeb': 'Palm-anchored metacarpal weights and continuous dorsal volume fairing',
     'rightThumbRoot': 'Inverse-skinned holding-space CMC relief across palm ownership; anatomical C1 field, 6.5 mm inward / 2 mm forward maximum; distal thumb and other digits preserved',
-    'thumbRootCalibration': {'source': 'Animation/FirstPerson/Data_FpsHanYangAnimations.json', 'sha256': hashlib.sha256(calibration_bytes).hexdigest(), 'frame': 0, 'fingerBones': 15},
+    'leftThumbRoot': 'Inverse-skinned holding-space CMC relief across palm ownership; proximal anatomical C1 field ending before MCP first-web folds at 36 mm, 6.5 mm inward / 2 mm forward maximum; distal thumb and other digits preserved',
+    'thumbRootCalibration': {'source': 'Animation/FirstPerson/Data_FpsHanYangAnimations.json', 'sha256': hashlib.sha256(calibration_bytes).hexdigest(), 'frame': 0, 'fingerBones': 30},
 }
 output = project / 'Model/Model_FpsHanYangHandsRepaired.glb'
 codec.WriteGlb(output, doc, binary)
 raw = output.read_bytes()
-report = {'version': 3, 'source': str(source_path), 'basisSha256': hashlib.sha256(original).hexdigest(), 'output': str(output), 'outputSha256': hashlib.sha256(raw).hexdigest(), 'vertices': len(positions), 'changedWeightVertices': len(set(changed_weights)), 'thumbProfileVertices': len(set(thumb_changed)), 'wristProfileVertices': len(set(wrist_changed)), 'thumbBaseVertices': len(set(thumb_base_changed)), 'rightThumbRootVertices': len(set(thumb_root_changed)), 'thumbRootCalibrationSha256': hashlib.sha256(calibration_bytes).hexdigest(), 'holdingReliefMaximumError': maximum_holding_relief_error, 'regions': regions, 'skinBindFrameMaximumError': rest_frame_error, 'protectedSkeletonClothingMaterialsAndTopology': True, 'maximumBindDisplacementM': float(np.linalg.norm(new_positions - positions, axis=1).max())}
+report = {'version': 4, 'source': str(source_path), 'basisSha256': hashlib.sha256(original).hexdigest(), 'output': str(output), 'outputSha256': hashlib.sha256(raw).hexdigest(), 'vertices': len(positions), 'changedWeightVertices': len(set(changed_weights)), 'thumbProfileVertices': len(set(thumb_changed)), 'wristProfileVertices': len(set(wrist_changed)), 'thumbBaseVertices': len(set(thumb_base_changed)), 'rightThumbRootVertices': len(set(thumb_root_regions['r'])), 'leftThumbRootVertices': len(set(thumb_root_regions['l'])), 'thumbRootCalibrationSha256': hashlib.sha256(calibration_bytes).hexdigest(), 'holdingReliefMaximumError': maximum_holding_relief_error, 'regions': regions, 'skinBindFrameMaximumError': rest_frame_error, 'protectedSkeletonClothingMaterialsAndTopology': True, 'maximumBindDisplacementM': float(np.linalg.norm(new_positions - positions, axis=1).max())}
 (folder / 'Data_HandSurfaceBake.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
 (project / 'Model/Data_FpsHanYangHandRepair.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
 print(json.dumps(report))
