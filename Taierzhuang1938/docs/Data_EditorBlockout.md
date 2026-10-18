@@ -487,6 +487,7 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
 - 2026-10-13（用户反馈第一轮）：锁不住鼠标的窗口退化成按住右键拖动转视角；全关总图打开时对准玩家、导航栏压在总图上面仍可用；导航栏加重播按钮（同 `Y`）。
 - 2026-10-13（复制当前位置）：卡片加「复制当前位置」按钮与 `P` 键（§4.2），文字末行带整份 JSON；入口加 `pose=` 参数，「重现」链接原样打开回到同一机位。
 - 2026-10-13（地图开着鼠标漏到游戏）：遮罩改成盖满整屏（导航栏两边那条原来露着，点一下会重新锁鼠标 / 在面板里直接开枪）；`Script_Main` 加 `BlockoutMouseCaptured()` 闸住抢锁、开枪、转头与滚轮换枪。
+- 2026-10-18（01–05 返工）：§13 FirstLevel0105 按用户当天改稿重做地形、关键帧与预演（南沿迂回、两人并排拖单被、日常摆件、干沟集结处、路口板桥）。
 - 2026-10-18（01–05 新剧本白盒）：新关卡 `FirstLevel0105`（§13）；场景文件加可选 `gates` 与块的显式 `y`，布局 `hideOpenGates`（§2.2）；关键帧可选 `stageLabel`、单位可选 `castId`（§3）；预演（§14，用户 10-18 拍板：编辑器里加预演，缺的动作先用现成动作顶上）。
 
 ## 13. 01–05 新剧本白盒（关卡键 `FirstLevel0105`，2026-10-18）
@@ -495,13 +496,15 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
 
 | 文件 | 是什么 | 怎么来 |
 | --- | --- | --- |
-| `Data_EditorBlockoutFirstLevel0105Space.mjs` | 空间锚点（唯一口径）：原点 = 沟口，X 东 Z 南；前沿沟 / 交通沟 / 支沟 / 爬沟中心线、路、机枪坑三射位、防炮洞、坡顶、集结处、03 远处日军、场景信号名 | 集成负责人按 Notion 图（约 2.2 px/米）换算，表头注释列着与草算尺寸的对照 |
-| `Script_EditorBlockoutFirstLevel0105Scene.mjs` → `Blockout/FirstLevel0105.scene.json` | 0.5 m 高度网格（四条沟用 `Script_TrenchPlan.CompileTrenchNetwork` 烘进去；坑、散兵坑、洞是平底开挖）+ 体块 + 随信号体块 | `node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene FirstLevel0105 --force` |
+| `Data_EditorBlockoutFirstLevel0105Space.mjs` | 空间锚点（唯一口径）：原点 = 沟口，X 东 Z 南；前沿沟 / 交通沟 / 支沟 / 爬沟中心线、路、机枪坑三射位、防炮洞、坡顶、集结处干沟（+ 南岸枯树、东南头凹路）、路口板桥、支沟南沿土垄、沟里日常摆件表、02 迂回组爬出点、03 远处日军、场景信号名 | 集成负责人按 Notion 图（约 2.2 px/米）换算，表头注释列着与草算尺寸的对照 |
+| `Script_EditorBlockoutFirstLevel0105Scene.mjs` → `Blockout/FirstLevel0105.scene.json` | 0.5 m 高度网格（四条沟用 `Script_TrenchPlan.CompileTrenchNetwork` 烘进去；坑、散兵坑、洞是平底开挖；干沟与凹路算自然地形）+ 体块（日常摆件、板桥横木与门板、枯树）+ 随信号体块 | `node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene FirstLevel0105 --force` |
 | `Script_EditorBlockoutFirstLevel0105Keyframes.mjs` → `Blockout/FirstLevel0105.json` | 25 个关键帧（01-1…05-4，02末用 `stageLabel`），坐标全从锚点算 | `... export FirstLevel0105 --force`（**会覆盖手改**；以后以 JSON 为准，手改后别再重导） |
 | `Data_EditorBlockoutFirstLevel0105Lines.mjs` + `Script_EditorBlockoutFirstLevel0105Voice.mjs` → `Audio/Blockout0105/*.mp3` + `Blockout/FirstLevel0105.voice.json` | 01–05 全部台词的占位配音（SeedAudio，整段一次生成后按逐字时间戳切句），清单给预演用 | 见脚本头注；默认只生成缺的场 |
 | `Blockout/FirstLevel0105.previz.json` | 每个关键帧的预演时间线（§14） | 预演数据生成器 / 手改 |
 
-场景信号：`DugoutCollapsed`（01 塌洞）、`PitShelled`（03 末战车一炮打塌坑沿）、`TankDisabled`（05 战车瘫在路口）。场景文件里对应的块写在 `gates`（§2.2）。
+场景信号：`DugoutCollapsed`（01 塌洞）、`PitShelled`（03 末战车一炮打塌坑沿）、`TankDisabled`（05 战车瘫在桥头，桥面两块门板压断下沉）。场景文件里对应的块写在 `gates`（§2.2）。
+
+**2026-10-18 返工（用户当天改稿，Notion 文字已改、图还是旧的）**：02 反冲改成南沿迂回（何有田带一个弟兄留在支沟口台阶上顺支沟压住北沿机枪，班长带刘文财和两个弟兄从支沟口往南 10 m 爬出交通沟、贴支沟南沿土垄外侧往东爬到审问处对面，「打！」从南沿上来）；拖单被改成顺子和何有田并排站在被子头上往前拖、班长倒退断后，三处躲：支沟里一垛弹药箱、支沟口台阶拐角、拐角 2；沟里铺日常摆件（弹药箱垛、土袋垛、靠沟壁的门板、水缸、木头堆、塌方土堆，能挡子弹的齐腰高，每段 ≥15 m 直沟至少一件，留 ≥2.2 m 通道；不要猫耳洞）；集结处从坡后浅洼地改成一道东西向干沟（沟底约 15×50 m、比坡顶低 4 m、两岸 2.5 m 陡坎、南岸一排枯树、东南头接往南的凹路），交通沟顺北岸切成坡道下到沟底；路口交通沟上搭板桥（顺路三根横木 + 门板，桥面 3.8 m 宽、与路面齐平，桥下沟底到横木底约 1.8 m），05 班长判断「只有走那座板桥」、带顺子钻到桥下趴着，车刚过桥甩手榴弹，车瘫在桥头（这一拍剧本用户还没最后拍板，白盒先这样做）。两条视线（集结处看不见前沿、南边平地 1.6 m 眼高看不进沟底）与北沿机枪看不见南沿土垄外爬的人，由场景生成器 notes 与 `Script_EditorBlockoutFirstLevel0105SceneTest.mjs` 核对。
 
 ## 14. 预演（previz，2026-10-18）
 

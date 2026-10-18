@@ -12,7 +12,7 @@
 | `SecondLevel.json` | 第二关的 4 个空间占位关键帧（流程未定稿，只放地标，不放人） | `scene SecondLevel` 一起写出 |
 | `SecondLevel.scene.json` | 第二关的草稿场景：1 m 一格的高度网格 + 院落级体块 + 道路 | `scene SecondLevel` 从城区地面函数与东关数据烘出来 |
 | `FirstLevel0105.json` | 第一关 01–05 新剧本（Notion 10-18 定稿）的 25 个关键帧，按拍号 01-1…05-4，02末是 `02E-1/02E-2`（`stageLabel: "02末"`） | `export FirstLevel0105` 从空间锚点生成，之后以手改的 JSON 为准 |
-| `FirstLevel0105.scene.json` | 01–05 的独立场地：0.5 m 高度网格（前沿沟、交通沟、支沟、机枪坑、防炮洞、坡顶、集结处、路）+ 体块 + 随信号出现 / 消失的体块（塌洞、坑沿被炸、路口沟沿被碾） | `scene FirstLevel0105` 按 `Data_EditorBlockoutFirstLevel0105Space.mjs` 烘出来 |
+| `FirstLevel0105.scene.json` | 01–05 的独立场地：0.5 m 高度网格（前沿沟、交通沟、支沟与南沿土垄、机枪坑、防炮洞、坡顶、集结处干沟与东南头的凹路、路）+ 体块（沟里的弹药箱垛 / 土袋垛 / 门板 / 水缸等日常摆件、路口板桥、干沟南岸枯树）+ 随信号出现 / 消失的体块（塌洞、坑沿被炸、战车压断桥面门板） | `scene FirstLevel0105` 按 `Data_EditorBlockoutFirstLevel0105Space.mjs` 烘出来 |
 | `FirstLevel0105.voice.json` | 01–05 台词的占位配音清单（每句：说话人、字幕、mp3、时长、录音里的原始间隔），mp3 在 `../Audio/Blockout0105/` | `Script_EditorBlockoutFirstLevel0105Voice.mjs`（SeedAudio 整段生成后切句） |
 | `FirstLevel0105.previz.json` | 01–05 每个关键帧的预演：镜头、人物调度、动作片段、台词时间、事件（契约 §14） | `Script_EditorBlockoutFirstLevel0105Previz.mjs` 生成，之后可手改 |
 

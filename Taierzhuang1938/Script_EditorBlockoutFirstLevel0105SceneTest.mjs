@@ -1,12 +1,19 @@
 // Script_EditorBlockoutFirstLevel0105SceneTest.mjs —— 01–05 白盒场景生成器的 node 回归（只给场景包自验用）
 // 跑法：node Taierzhuang1938/Script_EditorBlockoutFirstLevel0105SceneTest.mjs
-// 查：生成两次逐字相同（generatedAt 固定）、过 ValidateBlockoutScene、锚点处高度、沟底宽、坡顶视线、塌洞净空。
+// 查：生成两次逐字相同（generatedAt 固定）、过 ValidateBlockoutScene、锚点处高度、沟底宽、塌洞净空；
+// 10-18 返工：干沟尺寸与两条视线（集结处看不见前沿、南边平地看不进沟底）、支沟南沿土垄挡住北沿机枪、
+// 板桥（宽、与地面齐平、桥下净空、TankDisabled 压断两块）、日常摆件（高度、通道 ≥ 2.2 m、≥15 m 直沟至少一件）。
 
 import assert from "node:assert/strict";
 import { ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
 import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
-import { BuildFirstLevel0105Scene, FloorWidthAt, SightBlock, NaturalHeight } from "./Script_EditorBlockoutFirstLevel0105Scene.mjs";
-import { L0105_PLACES as P, L0105_HEIGHTS as H, L0105_TRENCH_SECTION as S } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
+import {
+  BuildFirstLevel0105Scene, FloorWidthAt, NaturalHeight, L0105SightChecks, GullyFloorExtent, PropPassage, PropsPerStraight,
+} from "./Script_EditorBlockoutFirstLevel0105Scene.mjs";
+import {
+  L0105_PLACES as P, L0105_HEIGHTS as H, L0105_TRENCH_SECTION as S, L0105_GULLY as G, L0105_BRIDGE as BR,
+  L0105_PROPS, L0105_PROP_KINDS, L0105_SUNKEN_LANE,
+} from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 const opts = { commit: "test", generatedAt: "2026-10-18T00:00:00.000Z" };
 const a = await BuildFirstLevel0105Scene({ ...opts, notes: [] });
@@ -24,31 +31,102 @@ Near(Cut(P.fireC), P.fireC.depth, 0.08, "散兵坑深");
 Near(Cut({ x: 12.5, z: 32 }), S.traffic.depth, 0.15, "交通沟深");
 Near(Cut({ x: 42, z: BranchZ(42) }), S.branch.depth, 0.15, "支沟深");
 Near(Cut(P.crest), S.trafficAtCrest.depth, 0.15, "坡顶沟深");
-Near(sample(P.crest.x + 12, P.crest.z) - sample(P.assembly.x, P.assembly.z), H.crest - H.assemblyFloor, 0.35, "坡顶−集结处");
-assert.ok(Cut(P.assemblyEntry) < 0.3, "交通沟在集结处入口爬出来");
+Near(Cut({ x: 35, z: 116.5 }), S.trafficAtCrossing.depth, 0.15, "板桥下沟深");
 
+// --- 干沟 ---
+const floorY = sample(P.assembly.x, P.assembly.z);
+Near(floorY, H.assemblyFloor, 0.05, "干沟沟底");
+Near(sample(P.crest.x + 12, P.crest.z) - floorY, H.crest - H.assemblyFloor, 0.3, "坡顶−干沟沟底");
+for (const x of [20, 46, 55]) { // 避开交通沟坡道（x 35 两边各 5 m）
+  Near(sample(x, G.northRimZ - 0.5) - floorY, H.gullyRim - H.assemblyFloor, 0.25, `北岸坎高 x${x}`);
+  Near(sample(x, G.southRimZ + 0.5) - floorY, H.gullyRim - H.assemblyFloor, 0.25, `南岸坎高 x${x}`);
+  // 坎要陡：坎顶往沟里 3 m 内落差 ≥ 2 m
+  assert.ok(sample(x, G.northRimZ) - sample(x, G.northRimZ + 3) >= 2, `北岸坎不够陡 x${x}`);
+  assert.ok(sample(x, G.southRimZ) - sample(x, G.southRimZ - 3) >= 2, `南岸坎不够陡 x${x}`);
+}
+const ext = GullyFloorExtent(sample);
+assert.ok(ext.width >= 14 && ext.width <= 18, `干沟沟底南北宽 ${ext.width}（要约 15 m）`);
+assert.ok(ext.length >= 48 && ext.length <= 56, `干沟沟底东西长 ${ext.length}（要约 50 m）`);
+assert.ok(Math.abs(sample(P.assemblyEntry.x, P.assemblyEntry.z) - H.assemblyFloor) < 0.2, "交通沟坡道下到干沟沟底");
+// 凹路：东南头接上沟底，往南一路比两边低 ≥ 1 m
+Near(sample(P.laneHead.x, P.laneHead.z), H.assemblyFloor, 0.15, "凹路口接干沟沟底");
+for (const [x, z, sideX] of [[83, 168, 91], [82.5, 185, 90], [70, 155, 70]]) {
+  const side = sideX === x ? sample(x, z - 6) : sample(sideX, z);
+  assert.ok(side - sample(x, z) >= 1.0, `凹路 (${x},${z}) 不够凹：${(side - sample(x, z)).toFixed(2)}`);
+}
+void L0105_SUNKEN_LANE;
+
+// --- 视线 ---
+const sights = L0105SightChecks(sample);
+assert.ok(sights.assembly.worst > 0.5, `集结处看得见前沿：${JSON.stringify(sights.assembly.worstRow)}`);
+assert.ok(sights.south.worst > 0, `南边平地看得进沟底：${JSON.stringify(sights.south.worstRow)}`);
+assert.ok(sights.southObservers >= 25, "南边平地的观察点太少（凹路排除得太宽？）");
+assert.ok(sights.mgToCrawl.worst > 0.1, `北沿机枪看得见南沿土垄外爬的人：${JSON.stringify(sights.mgToCrawl.worstRow)}`);
+assert.ok(sights.pinnedToSteps.worst <= 0, "洞口趴着要能顺着支沟看见台阶那头的人");
+
+// --- 沟底宽 ---
 for (const [x, z, nx, nz, min] of [[-30.5, 0, 0, 1, 3.4], [56, 0, 0.5, 1, 3.4], [-62, -12, 1, 0, 3.4], [12.5, 32, 23, 1, 3.4],
-  [26, 76.6, 42, -18, 3.4], [35, 128, 1, 0, 3.4], [42, 65.8, 2.6, 41.1, 3.4]]) {
+  [26, 76.6, 42, -18, 3.4], [35, 128, 1, 0, 3.4], [35, 116.5, 1, 0, 3.4], [42, 65.8, 2.6, 41.1, 3.4]]) {
   const r = FloorWidthAt(sample, x, z, nx, nz);
   assert.ok(r.width >= min, `沟底宽 (${x},${z}) ${r.width} < ${min}`);
 }
-for (const from of [{ x: 35, z: 158 }, { x: 20, z: 148 }, { x: 52, z: 168 }, { x: 35, z: 146 }]) {
-  for (const to of [{ x: 0, z: -7 }, { x: 0, z: 0 }, { x: 40, z: 0 }]) {
-    const r = SightBlock(sample, { ...from, eye: 1.6 }, { ...to, eye: 1.5 });
-    assert.ok(r.block > 0.5, `集结处 (${from.x},${from.z}) 看得见前沿 (${to.x},${to.z})`);
-  }
-}
+
 const all = [...a.blocks, ...a.gates];
 const byId = new Map(all.map((x) => [x.id, x]));
-const floor = sample(P.dugout.x, P.dugout.z);
+assert.equal(byId.size, all.length, "块 id 全关唯一");
+
+// --- 洞 ---
+const dugFloor = sample(P.dugout.x, P.dugout.z);
 const roof = byId.get("DugoutRoofTimber");
-assert.ok(roof.y - roof.h / 2 - floor >= 2.1, "洞里净高 ≥ 2.1");
+assert.ok(roof.y - roof.h / 2 - dugFloor >= 2.1, "洞里净高 ≥ 2.1");
 const beam = byId.get("DugoutCollapseBeam");
-const gap = beam.y - beam.h / 2 - floor;
+const gap = beam.y - beam.h / 2 - dugFloor;
 assert.ok(gap >= 0.3 && gap <= 0.5, `塌洞横木离地 ${gap}`);
 assert.equal(byId.get("DugoutLintel").signal, "DugoutCollapsed");
 assert.equal(byId.get("ParapetMiddle").signal, "PitShelled");
 assert.ok(a.gates.every((g) => g.signal || g.appearSignal));
-console.log(`ok：${a.blocks.length} 块 + ${a.gates.length} 随信号块，${a.terrain.cols}×${a.terrain.rows} 网格`);
+
+// --- 板桥 ---
+const boards = all.filter((x) => /^BridgeDoorBoard_/.test(x.id));
+const stringers = all.filter((x) => /^BridgeStringer_/.test(x.id));
+assert.ok(boards.length >= 9 && stringers.length >= 3, "板桥：门板 ≥ 9 块、横木 ≥ 3 根");
+assert.ok(boards.every((x) => x.w >= 3.5 && x.w <= 4.0), "桥面宽 3.5–4 m（驴车、担架过得去）");
+const r = BR.yawDeg * Math.PI / 180, fx = -Math.sin(r), fz = -Math.cos(r);
+const deckTop = boards[0].y + boards[0].h / 2;
+for (const s of [-1, 1]) {
+  const end = sample(BR.x + fx * s * (BR.spanM / 2 + 0.5), BR.z + fz * s * (BR.spanM / 2 + 0.5));
+  assert.ok(Math.abs(deckTop - end) <= 0.2, `桥面与桥头地面不齐：桥面 ${deckTop.toFixed(2)} vs ${end.toFixed(2)}`);
+}
+const under = sample(BR.x, BR.z);
+const clear = Math.min(...stringers.map((x) => x.y - x.h / 2)) - under;
+assert.ok(clear >= 1.6, `桥下横木底离沟底 ${clear.toFixed(2)} m（人要能在桥下沟底趴着、弯腰过）`);
+assert.ok(deckTop - under >= 2.0, "桥下照常是沟");
+const brokenOff = boards.filter((x) => x.signal === "TankDisabled");
+const brokenOn = all.filter((x) => x.appearSignal === "TankDisabled");
+assert.ok(brokenOff.length >= 1 && brokenOff.length <= 2 && brokenOn.length >= 1, "TankDisabled：一两块门板压断下沉");
+assert.ok(brokenOn.every((x) => x.y < deckTop - 0.2), "断板要往下塌");
+
+// --- 日常摆件 ---
+const COVER_KINDS = new Set(Object.entries(L0105_PROP_KINDS).filter(([, k]) => k.cover).map(([n]) => n));
+for (const p of L0105_PROPS) {
+  const blk = byId.get(p.id);
+  assert.ok(blk, `摆件 ${p.id} 没出块`);
+  const k = L0105_PROP_KINDS[p.kind];
+  assert.ok(k, `摆件 ${p.id} 的种类 ${p.kind} 没定义`);
+  if (k.cover) {
+    assert.ok(blk.h >= 0.8 && blk.h <= 1.1, `能挡子弹的摆件要齐腰高 0.8–1.1 m：${p.id} ${blk.h}`);
+    assert.ok(blk.cover && Number.isFinite(blk.cover.faceX), `${p.id} 要写 cover 朝向`);
+  }
+  const w = PropPassage(sample, p);
+  assert.ok(w >= 2.2, `${p.id} 旁边只剩 ${w} m 通道（要 ≥ 2.2）`);
+}
+assert.ok(L0105_PROPS.filter((p) => COVER_KINDS.has(p.kind)).length >= 20, "能挡子弹的摆件太少");
+for (const row of PropsPerStraight(15)) assert.ok(row.count >= 1, `${row.on} (${row.from.x},${row.from.z})→(${row.to.x},${row.to.z}) ${row.len} m 的直沟没有摆件`);
+for (const id of ["CrateStack_B1", "SandbagStack_J1", "SandbagStack_C2"]) assert.ok(COVER_KINDS.has(byId.get(id)?.prop), `02 拖单被要用的掩体 ${id} 不在`);
+assert.ok(!all.some((x) => /foxhole|FoxHole|猫耳/i.test(x.id)), "不要猫耳洞");
+assert.ok(all.filter((x) => /^DeadTree_/.test(x.id) && x.z > G.maxZ).length >= 8, "干沟南岸一排树");
+
+console.log(`ok：${a.blocks.length} 块 + ${a.gates.length} 随信号块，${a.terrain.cols}×${a.terrain.rows} 网格；干沟 ${ext.width}×${ext.length} m；`
+  + `视线 ① 最少挡 ${sights.assembly.worst} m、② 最少挡 ${sights.south.worst} m；桥下净空 ${clear.toFixed(2)} m；摆件 ${L0105_PROPS.length}`);
 
 function BranchZ(x) { return 67.1 + (64.5 - 67.1) * (x - 21.9) / (63 - 21.9); }

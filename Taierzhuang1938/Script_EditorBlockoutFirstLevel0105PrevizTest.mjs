@@ -128,7 +128,44 @@ export async function CheckPreviz(doc, { config, voice }) {
     rows.push(`${seq.keyframe} · ${seq.durationS} s · 镜头 ${seq.camera.length} · 台词 ${seq.lines.length} · 片段 ${[...clipsUsed].sort().join("、") || "（无）"}`);
   }
   if (doc.sequences.length !== config.keyframes.length) errors.push(`预演 ${doc.sequences.length} 段，关键帧 ${config.keyframes.length} 个`);
+  DesignChecks(doc, config, errors);
   return { errors, warnings, rows };
+}
+
+/** 10-18 返工的设计口径（只查 FirstLevel0105）：南沿迂回、两人并排拖单被、板桥。 */
+function DesignChecks(doc, config, errors) {
+  if (doc.level !== "FirstLevel0105") return;
+  const Seq = id => doc.sequences.find(s => s.keyframe === id);
+  const Keys = (seq, id) => seq?.actors.find(a => a.id === id)?.keys || [];
+  // 02-2：台阶那头先打、停火半秒，「打！」从南沿上来；班长从南沿跳进沟里
+  {
+    const s = Seq("02-2");
+    const fire = s.lines.find(l => l.line === "Counter.01")?.t;
+    const steps = s.events.filter(e => e.type === "muzzle" && ["HeYoutian", "Squad1"].includes(e.actor)).map(e => e.t);
+    if (!steps.length || fire === undefined) errors.push("02-2：要先有台阶那头（何有田 / 弟兄）的枪口火光，再有「打！」");
+    else if (fire - Math.max(...steps.filter(t => t < fire)) < 0.5) errors.push("02-2：「打！」之前台阶那头要停火至少半秒");
+    const luoXZ = Keys(s, "Luo").filter(k => k.x !== undefined);
+    const branchZ = x => 67.1 + (64.5 - 67.1) * (x - 21.9) / (63 - 21.9);
+    if (!luoXZ.some(k => k.z - branchZ(k.x) > 3.5) || !luoXZ.some(k => Math.abs(k.z - branchZ(k.x)) < 1.6)) errors.push("02-2：班长要先在南沿上、再跳进沟里");
+  }
+  // 02-3…02-7：何有田揪被角（carryRole front）往前拖，被子跟着走；02-4…02-6 每段有「后头！」和玩家回身开枪
+  for (const id of ["02-4", "02-5", "02-6", "02-7"]) {
+    const s = Seq(id);
+    if (!Keys(s, "HeYoutian").some(k => k.carryRole === "front")) errors.push(`${id}：何有田要揪着被角（carryRole front）`);
+    if (!Keys(s, "Blanket").some(k => k.x !== undefined && k.move === "walk")) errors.push(`${id}：被子要在身后跟着往前滑`);
+    if (!Keys(s, "Luo").some(k => k.move === "drag")) errors.push(`${id}：班长要倒退着断后`);
+    if (id !== "02-7" && !s.events.some(e => e.type === "muzzle" && e.actor === "player")) errors.push(`${id}：玩家要松手回身开枪`);
+  }
+  // 05-2：战车压上板桥，震、土从板缝往下漏、说明字
+  {
+    const s = Seq("05-2");
+    const has = (type, f = () => true) => s.events.some(e => e.type === type && f(e));
+    if (!has("shake") || !has("sfx", e => e.name === "dirtFall") || !has("smoke", e => e.kind === "SmokeDust") || !has("caption")) errors.push("05-2：车压上板桥要有震屏、dirtFall、落土烟和说明字");
+    const tk = Keys(s, "Tank").filter(k => k.x !== undefined);
+    if (!tk.some(k => Math.hypot(k.x - 35, k.z - 116) < 0.5)) errors.push("05-2：战车要经过板桥中间");
+  }
+  if (!Seq("05-3").events.some(e => e.type === "signal" && e.name === "TankDisabled" && e.on)) errors.push("05-3：甩手榴弹后要打开 TankDisabled");
+  void config;
 }
 
 async function Main(argv) {

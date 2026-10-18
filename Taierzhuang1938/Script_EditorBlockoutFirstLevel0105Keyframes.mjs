@@ -25,6 +25,7 @@ import { BLOCKOUT_SCHEMA, PlanTransition, NormalizeBlockout, YawDegFromTo } from
 import {
   L0105_LEVEL_KEY, L0105_TITLE, L0105_BOUNDS, L0105_PLACES as PL, L0105_TRENCHES as TR, L0105_TRENCH_SECTION,
   L0105_ROAD, L0105_FRONT_LOST_FROM_X, L0105_SIGNALS as SIG, PointAlong, LineLength,
+  L0105_GULLY, L0105_PROPS, L0105_BRIDGE,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 export const FIRST_LEVEL_0105_GENERATOR = "Script_EditorBlockoutCli.mjs export FirstLevel0105";
@@ -94,13 +95,15 @@ function FrontAtX(x, lat = 0) {
 const TRAFFIC = TR.traffic;
 const BRANCH = TR.branch;
 const BRANCH_LEN = LineLength(BRANCH);
-/** 拖单被的路线：防炮洞口 → 支沟 → 支沟口 → 交通沟往南 → 拐角 2 → 路口 → 坡顶 → 集结处入口 → 集结处。 */
-const DRAG = Object.freeze([
+/** 拖单被的路线：防炮洞口 → 支沟 → 支沟口 → 交通沟往南 → 拐角 2 → 路口（板桥底下）→ 坡顶 → 坡道下到干沟 → 集结处。 */
+export const DRAG = Object.freeze([
   PL.dugoutMouth, PL.branchMouth,
   ...TRAFFIC.slice(TRAFFIC.findIndex((p) => p.x === PL.corner2.x && p.z === PL.corner2.z)),
   PL.assembly,
 ].map((p) => Object.freeze({ x: p.x, z: p.z })));
 const D_BRANCH_MOUTH = BRANCH_LEN;                                                  // 约 41 m（Notion 43）
+const PROP = (id) => L0105_PROPS.find((p) => p.id === id);
+const D_CRATE = BRANCH_LEN - PROP("CrateStack_B1").d;                               // 约 22 m：支沟里那垛弹药箱（第一次躲）
 const D_CORNER2 = Station(DRAG, PL.corner2);                                        // 约 62 m（Notion 63）
 const D_CROSSING = Station(DRAG, PL.crossing);                                      // 约 92 m（Notion 93）
 const D_CREST = Station(DRAG, PL.crest);                                            // 约 107 m（Notion 108）
@@ -115,7 +118,8 @@ const T_END = LineLength(TRAFFIC);
 
 const T = (d, lat = 0) => Along(TRAFFIC, d, lat);       // 交通沟（往南走，左手 = 东）
 const B = (d, lat = 0) => Along(BRANCH, d, lat);        // 支沟（从支沟口往东走，左手 = 北）
-const D = (d, lat = 0) => Along(DRAG, d, lat);          // 拖行路线（从洞口往西 / 南走）
+const D = (d, lat = 0) => Along(DRAG, d, lat);          // 拖行路线（从洞口往西 / 南走；支沟里左手 = 南，交通沟里左手 = 东）
+export { Along as AlongLine };
 
 /** 路：取离路口 m 米（往东北回溯为正）的点，朝向 = 往西南开。 */
 const ROAD_D_CROSSING = Station(L0105_ROAD, PL.crossing);
@@ -130,18 +134,18 @@ const PIT_LINKS = Object.freeze([
   [PL.pit, PL.fireA], [PL.pit, PL.zb26], [PL.pit, TR.crawlSap[0]],
   [TR.crawlSap[TR.crawlSap.length - 1], PL.fireC],
   [PL.dugoutMouth, PL.dugout, { x: PL.dugout.x + PL.dugout.w / 2 - 1, z: PL.dugout.z }], // 洞口 → 洞里
-  [TRAFFIC[TRAFFIC.length - 1], PL.assembly],                                            // 集结处入口 → 洼地
+  [TRAFFIC[TRAFFIC.length - 1], PL.assembly],                                            // 交通沟坡道口 → 干沟沟底
 ]);
 const NET_LINES = Object.freeze([TR.front, TRAFFIC, BRANCH, TR.crawlSap, ...PIT_LINKS]);
 /** 「在沟里」的余量：沟底半宽 + 0.6 m。 */
 const NET_SNAP_M = L0105_TRENCH_SECTION.traffic.floorW / 2 + 0.6;
-/** 能自由走动的开挖区（坑、洞、散兵坑、集结处洼地）：在里面就算在网上。 */
+/** 能自由走动的开挖区（坑、洞、散兵坑）：在里面就算在网上（集结处干沟另算，见 ASSEMBLY_AREA）。 */
 const OPEN_AREAS = Object.freeze([
   { x: PL.pit.x, z: PL.pit.z, hw: PL.pit.w / 2 + 0.3, hd: PL.pit.d / 2 + 0.3 },
   { x: PL.dugout.x, z: PL.dugout.z, hw: PL.dugout.w / 2 + 0.3, hd: PL.dugout.d / 2 + 0.3 },
   { x: PL.fireC.x, z: PL.fireC.z, hw: PL.fireC.radiusM + 0.3, hd: PL.fireC.radiusM + 0.3 },
 ]);
-const ASSEMBLY_AREA = { x: PL.assembly.x, z: PL.assembly.z, hw: PL.assembly.w / 2, hd: PL.assembly.d / 2 };
+const ASSEMBLY_AREA = { x: (L0105_GULLY.minX + L0105_GULLY.maxX) / 2, z: (L0105_GULLY.minZ + L0105_GULLY.maxZ) / 2, hw: (L0105_GULLY.maxX - L0105_GULLY.minX) / 2, hd: (L0105_GULLY.maxZ - L0105_GULLY.minZ) / 2 };
 const InArea = (a, p) => Math.abs(p.x - a.x) <= a.hw && Math.abs(p.z - a.z) <= a.hd;
 
 const NET = (() => {
@@ -356,11 +360,18 @@ const BURIED = Pt(PL.dugoutMouth.x + 0.6, PL.dugoutMouth.z + 1.0);
 const MG_AT = Pt(PL.enemyBranchGun.x, PL.enemyBranchGun.z);
 const MG_LOADER_AT = Pt(PL.enemyBranchGun.x + 1.3, PL.enemyBranchGun.z - 0.2);
 const MG_ARC = ArcTo(MG_AT, PL.branchMouth, 5, 4);
-// 01-4 被压在支沟口两侧交通沟里的班（往北 / 往南几米，躲开顺支沟打过来的那条线）
-const PINNED_SQUAD = Object.freeze({
-  Luo: T(T_BRANCH - 4.5, 0.6), LiuWencai: T(T_BRANCH + 4.5, 0.5), HeYoutian: T(T_BRANCH + 8, -0.5),
-  Squad1: T(T_BRANCH - 8.5, -0.4), Squad2: T(T_BRANCH + 11.5, 0.4),
-});
+// 01-4 起罗班长的人分两拨：
+//   压制组（何有田 + 一个弟兄）留在支沟口台阶上，一直顺着笔直的支沟朝洞口打，把北沿那挺机枪钉住；
+//   迂回组（班长、刘文财 + 两个弟兄）在支沟口往南 10 m 处爬出交通沟，贴支沟南沿土垄外侧往东爬三十多米到审问处对面。
+const STEPS_GROUP = Object.freeze({ HeYoutian: B(1.2, 1.1), Squad1: B(1.0, -1.1) });
+const OUTFLANK_IDS = Object.freeze(["Luo", "LiuWencai", "Squad2", "Squad3"]);
+/** 南沿土垄外侧的爬行线：沿支沟从支沟口量 d、往南偏 6.2 m（场景生成器 L0105_OUTFLANK_CRAWL_LAT 同值）。 */
+export const OUTFLANK_CRAWL_LAT = -6.2;
+export const OUTFLANK_FIRE_LAT = -6.4;      // 02-1 趴在土垄背后等（再往里沟底的人就看得见枪管）
+export const OUTFLANK_RIM_LAT = -4.2;       // 02-2 起身到土垄顶 / 南沿上往下打
+const Crawl = (d, lat = OUTFLANK_CRAWL_LAT) => B(d, lat);
+const OUTFLANK_CRAWL_014 = Object.freeze({ Luo: 14.0, LiuWencai: 12.4, Squad2: 10.8, Squad3: 9.2 });   // 01-4：刚爬出来
+export const OUTFLANK_FIRE_021 = Object.freeze({ Luo: 35.4, LiuWencai: 33.2, Squad2: 37.6, Squad3: 31.0 });   // 02-1：审问处（d≈35.6）正对面
 // 坑里（03）
 const PIT = Object.freeze({
   gunner: Pt(PL.zb26.x, PL.zb26.z + 0.2),
@@ -400,8 +411,8 @@ const TrenchClearers = (xs, o = {}) => xs.map((x, i) => J(`IjaTrench${i + 1}`, F
   group: "trenchClear", role: "rifleman", yaw: 90, aim: i === 0, to: i === 0 && o.to ? o.to : undefined,
 }));
 
-// 02 末 / 03-1 交通沟里往南撤的人流的去向
-const SOUTH_OUT = T(T_END - 1);
+// 02 末 / 03-1 交通沟里往南撤的人流的去向：下到干沟里
+const SOUTH_OUT = Pt(PL.assembly.x - 6, PL.assembly.z + 2);
 
 // ---------------------------------------------------------------------------
 // 关键帧
@@ -484,17 +495,23 @@ function Keyframes() {
     pois: [POI.dugout(), POI.frontLost("01"), POI.mouth()],
   });
 
-  // 01-4：塌洞后醒来，先头部队清沟
+  // 01-4：塌洞后醒来，先头部队清沟；后沟那头罗班长的人已经分成两拨
   const yiAt = B(BRANCH_LEN - 2.8, 0.3);
   const jiaAt = B(BRANCH_LEN - 10, 0.7);
   const dingAt = B(BRANCH_LEN - 17, -0.6);
+  const StepsGroup = (o = {}) => [
+    N("HeYoutian", STEPS_GROUP.HeYoutian, { face: MG_AT, stance: "crouch", aim: true, ...o }),
+    N("Squad1", STEPS_GROUP.Squad1, { face: MG_AT, stance: "crouch", aim: true, guess: true, ...o }),
+  ];
   Add({
     id: "01-4", ...s01, name: "塌洞后醒来：先头部队清沟",
     player: { x: PINNED.x, z: PINNED.z, yawDeg: Yaw(PINNED, PL.branchMouth) - 6, pitchDeg: -2, stance: "prone" },
-    what: "塌洞醒来，腰被横木压住。四五个鬼子从路那边跳进支沟，机枪架上沟沿朝西打。",
+    what: "塌洞醒来，腰被横木压住。四五个鬼子从路那边跳进支沟，机枪架上北沿朝西打。",
     next: { text: "只能转头看" },
-    how: ["耳鸣里枪炮声慢慢回来", "枪在一臂开外，够不着", "乙见到趴着的人就往背上扎一刀", "后沟有枪在还：班长他们过不来"],
-    notes: "全程只能转头（卧姿机位）。日军打手势分开：丁往拐角后甩手榴弹、甲守岔口、乙顺沟走过来补刀（分工按剧本，谁干哪样是推测）；机枪组把两具尸体垫上沟沿。班长、刘文财、何有田被这挺机枪压在支沟口两侧的交通沟里。冬瓜埋在洞口南半边的塌土里。",
+    how: ["耳鸣里枪炮声慢慢回来", "枪在一臂开外，够不着", "乙见到趴着的人就往背上扎一刀", "支沟口那头有枪在还：台阶上的枪口火光"],
+    notes: "全程只能转头（卧姿机位）。日军打手势分开：丁往拐角后甩手榴弹、甲守岔口、乙顺沟走过来补刀（分工按剧本，谁干哪样是推测）；机枪组把两具尸体垫上北沿。"
+      + "罗班长的人分两拨：何有田带一个弟兄留在支沟口台阶上顺着笔直的支沟朝洞口打（顺子看得见台阶那头的枪口火光）；"
+      + "班长带刘文财和两个弟兄在支沟口往南 10 m 处爬出交通沟，贴支沟南沿土垄外侧往东爬（土垄挡住北沿机枪，顺子也看不见他们）。冬瓜埋在洞口南半边的塌土里。",
     signals: [SIG.dugoutCollapsed],
     units: [
       N("Donggua", BURIED, { yaw: 90, down: true, buried: true }),
@@ -503,13 +520,12 @@ function Keyframes() {
       J("IjaDing", dingAt, { face: PL.branchMouth, aim: true, guess: true }),
       J("IjaMgGunner", MG_AT, { yaw: 90, stance: "prone", aim: true, arc: MG_ARC }),
       J("IjaMgLoader", MG_LOADER_AT, { yaw: 90, stance: "prone" }),
-      N("Luo", PINNED_SQUAD.Luo, { face: PL.steps, stance: "crouch", aim: true }),
-      N("LiuWencai", PINNED_SQUAD.LiuWencai, { face: PL.steps, stance: "crouch", aim: true }),
-      N("HeYoutian", PINNED_SQUAD.HeYoutian, { face: PL.steps, stance: "crouch" }),
-      N("Squad1", PINNED_SQUAD.Squad1, { face: PL.steps, stance: "crouch", guess: true }),
-      N("Squad2", PINNED_SQUAD.Squad2, { face: PL.steps, stance: "crouch", guess: true }),
+      ...StepsGroup(),
+      ...OUTFLANK_IDS.map((id) => N(id, Crawl(OUTFLANK_CRAWL_014[id]), { yaw: -88, stance: "prone", climb: true, group: "outflank",
+        guess: id.startsWith("Squad"), ...(id === "Squad3" ? { from: PL.outflankExit, fromStraight: true } : {}) })),
     ],
-    pois: [POI.branchGun(), POI.branchMouth("poi"), Poi("Rifle", "顺子的枪（一臂开外）", "poi", Pt(PINNED.x - 1.2, PINNED.z - 0.4), 0.5)],
+    pois: [POI.branchGun(), POI.branchMouth("poi"), Poi("Rifle", "顺子的枪（一臂开外）", "poi", Pt(PINNED.x - 1.2, PINNED.z - 0.4), 0.5),
+      Poi("OutflankExit", "迂回组爬出交通沟", "poi", PL.outflankExit, 1.5), Poi("SouthBerm", "支沟南沿土垄（挡住机枪）", "landmark", B(24, -4.2), 2)],
   });
 
   // ======================= 02 枪到手里 =======================
@@ -521,8 +537,9 @@ function Keyframes() {
     player: { ...pinnedView, yawDeg: Yaw(PINNED, interrogation), pitchDeg: 2 },
     what: "冬瓜被拖出来按跪在沟壁下，翻译蹲在他面前连珠炮地问后沟有多少人。",
     next: { text: "盯着支沟口那头", x: PL.steps.x, z: PL.steps.z, radiusM: 2.5 },
-    how: ["翻译说北方话，日军说日语", "冬瓜啐唾沫，挨一枪托", "甲朝后沟那边看一眼", "后沟的还击越来越密"],
-    notes: "同一站位还要演：甲发现顺子活着、乙揪头发、两记耳光；丁被逼着练刺刀扎冬瓜肩膀和肚子，甲把刀抵上冬瓜喉咙（不另起关键帧）。翻译从路边跳进支沟（来路推测）。",
+    how: ["翻译说北方话，日军说日语", "冬瓜啐唾沫，挨一枪托", "甲朝后沟那边看一眼", "台阶那头的枪一直没停"],
+    notes: "同一站位还要演：甲发现顺子活着、乙揪头发、两记耳光；丁被逼着练刺刀扎冬瓜肩膀和肚子，甲把刀抵上冬瓜喉咙（不另起关键帧）。翻译从路边跳进支沟（来路推测）。"
+      + "这段时间里迂回组贴着南沿土垄外侧爬到审问处正对面，趴在土垄背后等；台阶上的压制组一直朝北沿机枪打（预演里顺子顺着支沟能看见那头的枪口火光）。",
     signals: [SIG.dugoutCollapsed],
     units: [
       N("Donggua", interrogation, { yaw: 0, stance: "crouch", path: [Pt(BURIED.x - 1.6, BURIED.z - 0.2), interrogation] }),
@@ -532,33 +549,32 @@ function Keyframes() {
       J("IjaDing", Pt(interrogation.x + 1.2, interrogation.z + 0.9), { face: interrogation }),
       J("IjaMgGunner", MG_AT, { yaw: 90, stance: "prone", aim: true, arc: MG_ARC }),
       J("IjaMgLoader", MG_LOADER_AT, { yaw: 90, stance: "prone" }),
-      N("Luo", PINNED_SQUAD.Luo, { face: PL.steps, stance: "crouch", aim: true }),
-      N("LiuWencai", PINNED_SQUAD.LiuWencai, { face: PL.steps, stance: "crouch", aim: true }),
-      N("HeYoutian", PINNED_SQUAD.HeYoutian, { face: PL.steps, stance: "crouch" }),
-      N("Squad1", PINNED_SQUAD.Squad1, { face: PL.steps, stance: "crouch", guess: true }),
-      N("Squad2", PINNED_SQUAD.Squad2, { face: PL.steps, stance: "crouch", guess: true }),
+      ...StepsGroup(),
+      ...OUTFLANK_IDS.map((id) => N(id, B(OUTFLANK_FIRE_021[id], OUTFLANK_FIRE_LAT), { face: B(OUTFLANK_FIRE_021[id], 0), stance: "prone", group: "outflank",
+        straight: true, guess: id.startsWith("Squad") })),
     ],
-    pois: [POI.branchGun(), POI.branchMouth("poi"), Poi("Interrogation", "审问处", "poi", interrogation, 1.5)],
+    pois: [POI.branchGun(), POI.branchMouth("poi"), Poi("Interrogation", "审问处", "poi", interrogation, 1.5), Poi("SouthBerm", "支沟南沿土垄（迂回组趴在背后）", "landmark", B(34, -4.2), 2.5)],
   });
 
-  // 02-2 反冲：日军全倒。尸体摆开，免得 02-3 的单被压上去
+  // 02-2 反冲（布设 = 打完那一刻）：日军全倒；班长从南沿跳进沟里，刘文财还在南沿上，何有田顺着支沟冲过来第一个到顺子身边扒土
   const DGround = Station(DRAG, interrogation);                              // 冬瓜摔回泥里那一点的拖行里程（约 5.5 m）
   const bodies = {
-    IjaJia: D(DGround - 2.4, -1.2), IjaYi: D(DGround + 2.9, 0.6), IjaDing: D(1.6, -0.4),
+    IjaJia: D(DGround - 2.4, -1.2), IjaYi: D(DGround - 2.9, 1.2), IjaDing: D(1.6, -0.4),   // 乙从洞口那头挺刺刀冲班长，倒在班长东边
     Interpreter: D(DGround + 2.0, -1.3),
   };
-  const charge = {
-    Luo: D(DGround - 3.2, -0.2), LiuWencai: D(DGround + 5.0, -0.5), HeYoutian: D(DGround + 7.5, 0.6),
-    Squad1: D(DGround + 10, -0.4), Squad2: D(DGround + 12.5, 0.4),
-  };
   const DGfall = D(DGround, 0.3);
+  const heDig = Pt(PINNED.x - 0.9, PINNED.z - 0.7);   // 蹲在顺子北边（洞口北半边），别挡住他看南沿
+  // 机枪手和副射手中枪后栽进沟里（停在北壁脚下）
+  const MG_FELL = Pt(PL.enemyBranchGun.x, PL.enemyBranchGun.z + 2.0), MG_LOADER_FELL = Pt(PL.enemyBranchGun.x + 1.4, PL.enemyBranchGun.z + 2.1);
   Add({
-    id: "02-2", ...s02, name: "反冲",
-    player: { ...pinnedView, yawDeg: Yaw(PINNED, PL.steps), pitchDeg: 1 },
-    what: "台阶上一声「打！」：机枪组先倒，丁倒在顺子面前，甲乙倒下，班长抡刀冲在最前。",
+    id: "02-2", ...s02, name: "反冲：南沿上一排枪",
+    player: { ...pinnedView, yawDeg: Yaw(PINNED, B(OUTFLANK_FIRE_021.Luo, OUTFLANK_RIM_LAT)), pitchDeg: 8 },
+    what: "台阶那头枪声一停，机枪手抬头往西看；南沿上「打！」一排枪打下来，班长抡刀跳进沟里。",
     next: { text: "等何有田来扒土" },
-    how: ["后沟的枪声忽然停了半秒", "「杀——！」一片吼声从台阶压下来", "刘文财「顺子在底下！」", "自动演出，玩家只能看"],
-    notes: "罗班长本来就在带人反冲、夺回丢掉的那段沟，冬瓜的嚎声让他们冲得更急。甲中枪还去摸手榴弹，被班长一刀劈倒；乙挺刺刀迎上来，被刘文财一枪打倒。何有田接着去扒土抬木头（下一帧他在被角）。",
+    how: ["台阶那头的枪声忽然停了半秒", "南沿上「打！」——一排枪从头顶打下来", "台阶那头的人顺着支沟冲过来", "自动演出，玩家只能看"],
+    notes: "架机枪的先倒（栽进沟里），丁胸口中弹倒在顺子面前，甲胳膊中弹、手一松冬瓜摔回泥里。甲中枪还去摸手榴弹，被跳下来的班长一刀劈倒；"
+      + "乙挺刺刀迎上来，被南沿上的刘文财一枪打倒，翻译想跑也被打倒。压制组顺着支沟冲过来，何有田第一个到顺子身边扒土（下一帧他抬木头）。"
+      + "顺子趴在洞口只看得见台阶那头的火光，看不见绕过来的人——南沿开火那一下才知道他们在头顶。",
     signals: [SIG.dugoutCollapsed],
     units: [
       N("Donggua", DGfall, { yaw: 90, down: true }),
@@ -566,183 +582,192 @@ function Keyframes() {
       J("IjaJia", bodies.IjaJia, { yaw: 90, down: true }),
       J("IjaYi", bodies.IjaYi, { yaw: 90, down: true }),
       J("IjaDing", bodies.IjaDing, { yaw: -90, down: true }),
-      J("IjaMgGunner", MG_AT, { yaw: 90, stance: "prone", down: true, arc: MG_ARC }),
-      J("IjaMgLoader", MG_LOADER_AT, { yaw: 90, down: true }),
-      N("Luo", charge.Luo, { yaw: -86, aim: true }),
-      N("LiuWencai", charge.LiuWencai, { yaw: -86, aim: true }),
-      N("HeYoutian", charge.HeYoutian, { yaw: -86 }),
-      N("Squad1", charge.Squad1, { yaw: -86, aim: true, guess: true }),
-      N("Squad2", charge.Squad2, { yaw: -86, aim: true, guess: true }),
+      J("IjaMgGunner", MG_FELL, { yaw: 90, stance: "prone", down: true, arc: MG_ARC, climb: true }),
+      J("IjaMgLoader", MG_LOADER_FELL, { yaw: 90, down: true, climb: true }),
+      N("Luo", D(DGround - 1.5, -0.3), { yaw: -86, aim: true, climb: true, group: "outflank" }),
+      N("LiuWencai", B(OUTFLANK_FIRE_021.LiuWencai + 0.6, OUTFLANK_RIM_LAT), { face: PINNED, stance: "crouch", aim: true, climb: true, group: "outflank" }),
+      N("Squad3", B(OUTFLANK_FIRE_021.Squad3, OUTFLANK_RIM_LAT), { face: B(OUTFLANK_FIRE_021.Squad3 + 3, 0), stance: "crouch", aim: true, climb: true, group: "outflank", guess: true }),
+      N("Squad2", B(32.5, -0.6), { yaw: -86, aim: true, climb: true, group: "outflank", guess: true }),
+      N("HeYoutian", heDig, { face: PINNED, stance: "crouch" }),
+      N("Squad1", B(BRANCH_LEN - 12, 0.4), { yaw: -86, aim: true, guess: true }),
     ],
-    pois: [POI.branchMouth("poi")],
+    pois: [POI.branchMouth("poi"), Poi("SouthRim", "南沿（迂回组从这里开火、跳沟）", "poi", B(OUTFLANK_FIRE_021.Luo, OUTFLANK_RIM_LAT), 3)],
   });
 
-  // 02-3 起：单被（litter，bearers 0 只画被子）；何有田蹲在前头被角，后头被角是玩家；冬瓜躺在被子上
-  const Drag = (dCenter, lat = 0, { towardWall = 0 } = {}) => {
-    const c = D(dCenter, lat + towardWall);
-    const rear = D(dCenter - 1.75, lat);
-    const front = D(dCenter + 1.6, lat + towardWall);
-    return { center: c, rear, front, yaw: c.heading };
+  // 02-3 起：单被（litter，bearers 0 只画被子）；顺子和何有田并排站在被子头上，各揪一个被角，面朝支沟口往前拖，
+  // 被子在身后贴着脚后跟滑，冬瓜躺在上面；班长在冬瓜后头倒退着走、面朝洞口断后。
+  // 拖行里程 d 是两人站的位置；被子中心在身后 PULL_TO_CENTER 米；左右各偏 PULL_HALF_GAP（支沟里左手 = 南）。
+  const PULL_HALF_GAP = 0.55, PULL_TO_CENTER = 1.6, LUO_BEHIND = 4.4;
+  const Formation = (d, { lat = 0, luoLat = 0.5 } = {}) => {
+    const center = D(d - PULL_TO_CENTER, lat);
+    return { d, center, he: D(d, lat + PULL_HALF_GAP), me: D(d, lat - PULL_HALF_GAP), luo: D(d - PULL_TO_CENTER - LUO_BEHIND, luoLat), yaw: center.heading };
   };
   const BodiesStay = () => [
     J("Interpreter", bodies.Interpreter, { yaw: -60, down: true }),
     J("IjaJia", bodies.IjaJia, { yaw: 90, down: true }),
     J("IjaYi", bodies.IjaYi, { yaw: 90, down: true }),
     J("IjaDing", bodies.IjaDing, { yaw: -90, down: true }),
-    J("IjaMgGunner", MG_AT, { yaw: 90, stance: "prone", down: true }),
-    J("IjaMgLoader", MG_LOADER_AT, { yaw: 90, down: true }),
+    J("IjaMgGunner", MG_FELL, { yaw: 90, stance: "prone", down: true }),
+    J("IjaMgLoader", MG_LOADER_FELL, { yaw: 90, down: true }),
   ];
-  // 单被只画被子（bearers 0）；何有田是独立单位，蹲在前头被角处朝前进方向拽（预演里他要动嘴、单独演松手）
-  const Blanket = (at, o = {}) => N("Blanket", at.center, { kind: "litter", name: o.name ?? "单被", bearers: o.bearers ?? 0, yaw: at.yaw, speed: 1.2, ...o.extra });
-  const HeAtCorner = (at, o = {}) => N("HeYoutian", at.front, { yaw: at.yaw, stance: "crouch", speed: 1.2, ...o });
-  const OnBlanket = (at, o = {}) => N("Donggua", at.center, { yaw: at.yaw, down: true, speed: 1.2, onLitter: "Blanket", ...o });
+  // 单被只画被子（bearers 0）；何有田是独立单位（castId heyoutian），站在被子头上揪一个被角往前拽（预演里他要动嘴、单独演拽到掩体后）
+  const Blanket = (at, o = {}) => N("Blanket", at.center ?? at, { kind: "litter", name: o.name ?? "单被", bearers: 0, yaw: o.yaw ?? at.yaw, speed: 1.2, ...o.extra });
+  // 倒地姿态的身子横在朝向的左右（演员 dead 姿态），要顺着被子躺就得比被子转 90°
+  const OnBlanket = (at, o = {}) => N("Donggua", at.center ?? at, { down: true, speed: 1.2, onLitter: "Blanket", ...o, yaw: R1((((o.yaw ?? at.yaw) + 90 + 540) % 360) - 180) });
+  const HePulling = (at, o = {}) => N("HeYoutian", at.he, { yaw: at.yaw, speed: 1.2, ...o });
+  const Ahead = (d0, o = {}) => [
+    N("LiuWencai", D(d0, -0.4), { yaw: D(d0).heading, guess: true, ...o }),
+    N("Squad1", D(d0 + 3, 0.5), { yaw: D(d0 + 3).heading, guess: true, ...o }),
+    N("Squad2", D(d0 + 5.5, -0.5), { yaw: D(d0 + 5.5).heading, guess: true, ...o }),
+    N("Squad3", D(d0 + 8, 0.4), { yaw: D(d0 + 8).heading, guess: true, ...o }),
+  ];
 
-  const g3 = Drag(DGround, 0.3);
+  const g3 = Formation(DGround + PULL_TO_CENTER, { lat: 0.2 });
   Add({
     id: "02-3", ...s02, name: "接枪、揪被角",
-    player: { x: g3.rear.x, z: g3.rear.z, yawDeg: g3.yaw, pitchDeg: -10, stance: "stand" },
+    player: { x: g3.me.x, z: g3.me.z, yawDeg: g3.yaw, pitchDeg: -6, stance: "stand" },
     what: "何有田抬开木头，冬瓜被挪上单被。班长把枪塞进顺子手里：「跟到老子，走！」",
     next: { text: "揪住被角往支沟口拖", x: PL.steps.x, z: PL.steps.z, radiusM: 2.5 },
     how: ["何有田「顺儿，揪到那头！」", "冬瓜「顺子……表丢下我」然后手松开", "拖的时候手上没枪", "玩家拿回操作"],
-    notes: "单被用 litter + bearers 0（只画被子）；何有田蹲在前头被角拽，后头被角是玩家。冬瓜（倒地）躺在被子上。班长在洞口方向断后；刘文财和两个弟兄在前头开路（推测）。",
+    notes: "两人并排站在被子头上（何有田一个被角、顺子一个被角），面朝支沟口往前拖，被子在身后贴着脚后跟滑，冬瓜躺在上面；"
+      + "班长在冬瓜后头倒退着走、面朝洞口断后。单被 = litter + bearers 0（只画被子），何有田是独立单位。刘文财和几个弟兄在前头开路（推测）。",
     signals: [SIG.dugoutCollapsed],
     units: [
       Blanket(g3),
       OnBlanket(g3),
-      HeAtCorner(g3),
-      N("Luo", D(DGround - 3.6, 0.9), { yaw: -86, aim: true }),
-      N("LiuWencai", D(DGround + 9, -0.4), { yaw: 93, guess: true }),
-      N("Squad1", D(DGround + 13, 0.5), { yaw: 93, guess: true }),
-      N("Squad2", D(DGround + 16, -0.5), { yaw: 93, guess: true }),
+      HePulling(g3),
+      N("Luo", g3.luo, { yaw: R1(g3.yaw + 180), aim: true }),
+      ...Ahead(DGround + 9),
       ...BodiesStay(),
     ],
-    pois: [POI.branchMouth("objective")],
+    pois: [POI.branchMouth("objective"), Poi("CrateB1", "弹药箱垛（第一处能躲的）", "landmark", B(PROP("CrateStack_B1").d, PROP("CrateStack_B1").lat), 1.2)],
   });
 
-  const g4 = Drag(20, 0, { towardWall: 1.0 });
+  // 02-4：第一处——支沟里一垛弹药箱。何有田把被子拽到箱垛后头（西边、贴南壁），顺子松手转身，和班长蹲在箱垛后朝洞口那头打
+  const crate = B(PROP("CrateStack_B1").d, PROP("CrateStack_B1").lat);
   const pursuers4 = [D(3.0, 0.7), D(4.6, -0.8), D(6.4, 0.3)];
-  const p4 = D(17.5, -0.5);
+  const blanket4 = D(D_CRATE + 3.3, 1.0);
+  const p4 = D(D_CRATE + 1.45, 1.3);
   Add({
-    id: "02-4", ...s02, name: "支沟里第一次回身打",
-    player: { x: p4.x, z: p4.z, yawDeg: Yaw(p4, pursuers4[0]), pitchDeg: 0, stance: "stand" },
-    what: "班长喊「后头！」——追兵从洞口那头露头，子弹打在被子边上的土里。",
-    next: { text: "松手回身，把追兵打回去", x: pursuers4[0].x, z: pursuers4[0].z, radiusM: 3 },
-    how: ["班长先开枪，喊「后头！」", "冬瓜疼得叫", "松手时被子停在原地", "何有田一个人拽着往沟壁靠"],
-    notes: "拖行约 20 m（Notion：18–28 m 第一次打）。这一段教会玩家：拖人时手上没枪，要开枪就得松手——这里松手是对的；14 同一个本能害死冬瓜。追兵的子弹只打在被子旁边，冬瓜不会在这一段死。追兵从洞旁路边绕过洞顶跳进支沟（来路推测）。",
+    id: "02-4", ...s02, name: "弹药箱垛后头第一次回身打",
+    player: { x: p4.x, z: p4.z, yawDeg: Yaw(p4, pursuers4[0]), pitchDeg: 0, stance: "crouch" },
+    what: "刚拖到弹药箱垛，班长喊「后头！」——追兵从洞口那头露头，子弹打在被子边上的土里。",
+    next: { text: "松手，蹲在箱垛后把追兵打回去", x: pursuers4[0].x, z: pursuers4[0].z, radiusM: 3 },
+    how: ["班长先开枪，喊「后头！」", "何有田把被子往箱垛后头一拽", "冬瓜疼得叫", "箱垛齐腰高，蹲下藏得住"],
+    notes: "拖行约 22 m（Notion：第一次打在支沟里一垛弹药箱后头）。这一段教会玩家：拖人时手上没枪，要开枪就得松手——这里松手是对的；14 同一个本能害死冬瓜。"
+      + "追兵的子弹只打在被子旁边，冬瓜不会在这一段死。追兵从洞旁路边绕过洞顶跳进支沟（来路推测）。箱垛是沟里本来就有的弹药箱（CrateStack_B1），不是专门摆的。",
     signals: [SIG.dugoutCollapsed],
     units: [
-      Blanket(g4),
-      OnBlanket(g4),
-      HeAtCorner(g4),
-      N("Luo", D(14.0, 0.8), { yaw: -86, aim: true }),
-      N("LiuWencai", D(29, -0.4), { yaw: 93, guess: true }),
-      N("Squad1", D(33, 0.5), { yaw: 93, guess: true }),
-      N("Squad2", D(36, -0.5), { yaw: 93, guess: true }),
-      ...pursuers4.map((p, i) => J(`Pursuer${i + 1}`, p, { face: PL.branchMouth, aim: i < 2, group: "pursuers", role: "rifleman", climb: true, from: ROADSIDE_IN, fromStraight: true, guess: true })),
+      Blanket(blanket4, { yaw: blanket4.heading }),
+      OnBlanket(blanket4, { yaw: blanket4.heading }),
+      N("HeYoutian", D(D_CRATE + 5.0, 0.6), { face: blanket4, stance: "crouch", speed: 1.2 }),
+      N("Luo", D(D_CRATE + 1.3, 0.55), { face: pursuers4[0], stance: "crouch", aim: true }),
+      ...Ahead(D_CRATE + 9),
+      ...pursuers4.map((p, i) => J(`Pursuer${i + 1}`, p, { face: crate, aim: i < 2, group: "pursuers", role: "rifleman", climb: true, from: ROADSIDE_IN, fromStraight: true, guess: true })),
       ...BodiesStay(),
     ],
-    pois: [POI.branchMouth("landmark"), Poi("DragFight1", "第一次打（18–28 m）", "poi", D(23), 5)],
+    pois: [Poi("CrateB1", "弹药箱垛（第一次躲）", "poi", crate, 1.2), POI.branchMouth("landmark")],
   });
 
-  const g5 = Drag(45, 0, { towardWall: 0.9 });
-  const p5 = D(D_BRANCH_MOUTH + 0.2, 0.3);
-  const pursuers5 = [D(14, 0.6), D(17.5, -0.7), D(21, 0.2)];
+  // 02-5：第二处——支沟口台阶拐角。被子拖上台阶、拐进交通沟往南；顺子和班长蹲在拐角，探出去顺着支沟朝东打
+  const pursuers5 = [B(PROP("CrateStack_B1").d + 1.4, 0.6), B(PROP("CrateStack_B1").d - 2.2, -0.2), B(PROP("CrateStack_B1").d + 4.5, 0.4)];
+  const blanket5 = T(T_BRANCH + 6.6, -0.75);
+  const p5 = T(T_BRANCH + 2.6, 1.15);
   Add({
-    id: "02-5", ...s02, name: "支沟口第二次打",
-    player: { x: p5.x, z: p5.z, yawDeg: Yaw(p5, pursuers5[0]), pitchDeg: 0, stance: "stand" },
-    what: "拖到支沟口，追兵顺着笔直的支沟打过来。坡上坑里的捷克式还在一阵一阵响。",
-    next: { text: "顺着支沟打回去", x: pursuers5[0].x, z: pursuers5[0].z, radiusM: 3 },
-    how: ["捷克式一阵一阵响（北边坡上的坑）", "班长回头看了一眼，没说话", "支沟笔直，追兵没处躲"],
-    notes: "拖行约 43–50 m（Notion 第二次打）。坑里是幺娃和机枪组——这时还在顶着；POI 标出坑的方向。",
+    id: "02-5", ...s02, name: "台阶拐角第二次打",
+    player: { x: p5.x, z: p5.z, yawDeg: Yaw(p5, pursuers5[0]), pitchDeg: 0, stance: "crouch" },
+    what: "刚把被子拖上台阶拐进交通沟，追兵又顺着笔直的支沟打过来。坡上坑里的捷克式还在一阵一阵响。",
+    next: { text: "在拐角探身，顺着支沟打回去", x: pursuers5[0].x, z: pursuers5[0].z, radiusM: 3 },
+    how: ["班长「后头！又来了！」", "被子拐过拐角就挨不着支沟里的子弹", "支沟笔直，追兵没处躲，只能缩在那垛弹药箱后头", "捷克式一阵一阵响（北边坡上的坑）"],
+    notes: "拖行约 41–48 m（Notion 第二次打：支沟口的台阶拐角）。拐角就是掩体（旁边交通沟东壁下有一垛土袋 SandbagStack_J1）。"
+      + "追兵这次缩在刚才我们躲过的那垛弹药箱后头。坑里是幺娃和机枪组——这时还在顶着；POI 标出坑的方向。",
     signals: [SIG.dugoutCollapsed],
     units: [
-      Blanket(g5),
-      OnBlanket(g5),
-      HeAtCorner(g5),
-      N("Luo", B(Station(BRANCH, PL.steps) + 0.8, 0.6), { yaw: -86, aim: true }),
-      N("LiuWencai", D(54, -0.4), { yaw: 160, guess: true }),
-      N("Squad1", D(57, 0.5), { yaw: 160, guess: true }),
-      N("Squad2", D(59.5, -0.5), { yaw: 160, guess: true }),
-      ...pursuers5.map((p, i) => J(`Pursuer${i + 1}`, p, { face: PL.branchMouth, aim: true, group: "pursuers", role: "rifleman", guess: true })),
+      Blanket(blanket5, { yaw: blanket5.heading }),
+      OnBlanket(blanket5, { yaw: blanket5.heading }),
+      N("HeYoutian", T(T_BRANCH + 8.3, -0.6), { face: blanket5, stance: "crouch", speed: 1.2 }),
+      N("Luo", T(T_BRANCH + 3.4, 0.35), { face: pursuers5[0], stance: "crouch", aim: true }),
+      ...Ahead(D_BRANCH_MOUTH + 13),
+      ...pursuers5.map((p, i) => J(`Pursuer${i + 1}`, p, { face: PL.branchMouth, aim: true, stance: i === 1 ? "crouch" : undefined, group: "pursuers", role: "rifleman", guess: true })),
     ],
-    pois: [POI.branchMouth("landmark"), POI.pit("poi", "机枪坑（捷克式还在响）"), Poi("DragFight2", "第二次打（43–50 m）", "poi", D(46.5), 4)],
+    pois: [POI.branchMouth("landmark"), POI.pit("poi", "机枪坑（捷克式还在响）"), Poi("CornerSteps", "台阶拐角（第二次躲）", "poi", p5, 1.5)],
   });
 
-  const g6 = Drag(D_CORNER2 + 3.4, 0, { towardWall: 0.9 });
-  const p6 = D(D_CORNER2 + 0.4, -0.3);
-  const pursuers6 = [D(D_CORNER2 - 13, 0.6), D(D_CORNER2 - 10.5, -0.6), D(D_CORNER2 - 8, 0.3)];
+  // 02-6：第三处——拐角 2。被子拖过拐角往南；顺子和班长蹲在拐角那垛土袋后头，朝来路（北）打
+  const bag2 = PROP("SandbagStack_C2");
+  const p6 = T(bag2.d + 1.5, 1.3);
+  const pursuers6 = [T(T_BRANCH + 11, 0.6), T(T_BRANCH + 8.5, -0.6), T(T_BRANCH + 6, 0.3)];
+  const blanket6 = T(T_CORNER2 + 6.4, -0.8);
   Add({
     id: "02-6", ...s02, name: "拐角 2 第三次打",
-    player: { x: p6.x, z: p6.z, yawDeg: Yaw(p6, pursuers6[2]), pitchDeg: 0, stance: "stand" },
-    what: "拖到拐角 2，追兵又追上来露头，第三次松手回身打。",
-    next: { text: "在拐角回身打退追兵", x: pursuers6[2].x, z: pursuers6[2].z, radiusM: 3 },
-    how: ["班长「后头！」", "子弹打在被子边上的土里", "冬瓜疼得叫"],
-    notes: "拖行约 63–70 m（Notion 第三次打）。",
+    player: { x: p6.x, z: p6.z, yawDeg: Yaw(p6, pursuers6[0]), pitchDeg: 0, stance: "crouch" },
+    what: "刚拖过拐角 2，追兵又追上来露头，第三次松手，蹲在土袋垛后回身打。",
+    next: { text: "在土袋后头回身打退追兵", x: pursuers6[0].x, z: pursuers6[0].z, radiusM: 3 },
+    how: ["班长「后头——！」", "子弹打在被子边上的土里", "冬瓜疼得叫", "土袋垛齐腰高"],
+    notes: "拖行约 62–68 m（Notion 第三次打：拐角 2）。土袋垛 SandbagStack_C2 本来就码在拐角下（交通沟东壁）。",
     signals: [SIG.dugoutCollapsed],
     units: [
-      Blanket(g6),
-      OnBlanket(g6),
-      HeAtCorner(g6),
-      N("Luo", D(D_CORNER2 - 2.8, 0.7), { yaw: BackYaw(DRAG, D_CORNER2 - 2.8), aim: true }),
-      N("LiuWencai", D(D_CORNER2 + 13, -0.4), { yaw: 170, guess: true }),
-      N("Squad1", D(D_CORNER2 + 16, 0.5), { yaw: 170, guess: true }),
-      N("Squad2", D(D_CORNER2 + 19, -0.5), { yaw: 170, guess: true }),
-      ...pursuers6.map((p, i) => J(`Pursuer${i + 1}`, p, { yaw: BackYaw(DRAG, D_CORNER2 - 10) + 180, aim: true, group: "pursuers", role: "rifleman", guess: true })),
+      Blanket(blanket6, { yaw: blanket6.heading }),
+      OnBlanket(blanket6, { yaw: blanket6.heading }),
+      N("HeYoutian", T(T_CORNER2 + 8.1, -0.7), { face: blanket6, stance: "crouch", speed: 1.2 }),
+      N("Luo", T(bag2.d + 1.6, 0.4), { face: pursuers6[0], stance: "crouch", aim: true }),
+      ...Ahead(D_CORNER2 + 14),
+      ...pursuers6.map((p, i) => J(`Pursuer${i + 1}`, p, { yaw: R1(p.heading + 180), aim: true, group: "pursuers", role: "rifleman", guess: true })),
     ],
-    pois: [POI.corner2("landmark"), Poi("DragFight3", "第三次打（63–70 m）", "poi", D(D_CORNER2 + 4), 4), POI.crest("poi")],
+    pois: [POI.corner2("landmark"), Poi("SandbagC2", "土袋垛（第三次躲）", "poi", T(bag2.d, bag2.lat), 1.2), POI.crest("poi")],
   });
 
-  const g7 = Drag(D_CREST + 3.2, 0);
-  const p7 = D(D_CREST - 0.5, -0.5);
+  const g7 = Formation(D_CREST + 3.4);
   const crestPosts = PL.crestPosts.map((p) => Pt(p.x, p.z));
   const pursuers7 = [D(D_CORNER2 - 3.2, 0.6), D(D_CORNER2 - 5.0, -0.6), D(D_CORNER2 - 6.8, 0.3)];
   const ROADSIDE_OUT = [B(BRANCH_LEN - 4.5), ...ROADSIDE_IN.slice().reverse().slice(1), ROADSIDE];
   const CrestNra = (i, o = {}) => N(`CrestNra${i + 1}`, crestPosts[i], { castId: i === 0 ? "shouter" : undefined, face: PL.corner2, stance: "prone", aim: true, group: "crestPost", straight: true, ...o });
   Add({
     id: "02-7", ...s02, name: "翻坡顶：快过来！",
-    player: { x: p7.x, z: p7.z, yawDeg: Yaw(p7, PL.corner2), pitchDeg: -3, stance: "stand" },
-    what: "翻上坡顶，别的班趴在坡沿上喊「快过来！」；追兵在拐角 2 一露头就挨枪，缩回去了。",
-    next: { text: "把冬瓜拖下集结处", x: PL.assembly.x, z: PL.assembly.z, radiusM: 5 },
+    player: { x: g7.me.x, z: g7.me.z, yawDeg: Yaw(g7.me, PL.corner2), pitchDeg: -3, stance: "stand" },
+    what: "拖着冬瓜从板桥底下钻过去、翻上坡顶，别的班趴在坡沿上喊「快过来！」；追兵在拐角 2 一露头就挨枪，缩回去了。",
+    next: { text: "把冬瓜拖下干沟", x: PL.assembly.x, z: PL.assembly.z, radiusM: 5 },
     how: ["坡沿上的兵喊「快过来！」", "顺子他们一翻过去，这几个兵就朝拐角 2 开枪", "追兵缩回去"],
-    notes: "追来的是先头部队剩下的几个：缩回洞旁路边等战车（03 战车就从这条路露头）——去向画回支沟、从洞口西边翻出北沿、绕过洞顶到路边。Notion 拖行：拐角 2 63 m → 路口 93 → 坡顶 108 → 集结处 130 m。",
+    notes: "追来的是先头部队剩下的几个：缩回洞旁路边等战车（03 战车就从这条路露头）——去向画回支沟、从洞口西边翻出北沿、绕过洞顶到路边。"
+      + "Notion 拖行：拐角 2 63 m → 路口 93 → 坡顶 108 → 集结处 130 m（本白盒：坡顶 107、干沟 125）。",
     signals: [SIG.dugoutCollapsed],
     units: [
       Blanket(g7),
       OnBlanket(g7),
-      HeAtCorner(g7),
-      N("Luo", D(D_CREST - 2.6, 0.7), { yaw: BackYaw(DRAG, D_CREST - 2.6), aim: true }),
-      N("LiuWencai", D(D_CREST + 10, -0.4), { yaw: 180, guess: true }),
-      N("Squad1", D(D_CREST + 12.5, 0.5), { yaw: 180, guess: true }),
-      N("Squad2", D(D_CREST + 15, -0.5), { yaw: 180, guess: true }),
+      HePulling(g7),
+      N("Luo", g7.luo, { yaw: R1(g7.yaw + 180), aim: true }),
+      ...Ahead(D_CREST + 11, { yaw: 180 }),
       ...crestPosts.map((_, i) => CrestNra(i, { from: Pt(crestPosts[i].x, crestPosts[i].z + 6) })),
       ...pursuers7.map((p, i) => J(`Pursuer${i + 1}`, p, { yaw: BackYaw(DRAG, D_CORNER2 - 4) + 180, aim: i === 0, group: "pursuers", role: "rifleman", climb: true,
         to: ROADSIDE_OUT.map((q, k) => (k === ROADSIDE_OUT.length - 1 ? Pt(q.x + i * 1.2, q.z - i * 1.0) : q)), guess: true })),
     ],
-    pois: [POI.crest("landmark"), POI.corner2("danger"), POI.assembly("objective")],
+    pois: [POI.crest("landmark"), POI.corner2("danger"), POI.assembly("objective"), Poi("Bridge", "路口板桥", "landmark", PL.crossing, 3)],
   });
 
-  // ======================= 02 末 集结处 =======================
+  // ======================= 02 末 集结处（坡后干沟） =======================
   const s02e = { stage: 2, stageLabel: "02末", stageTitle: "集结处" };
-  const restAt = { center: Pt(PL.assembly.x - 1, PL.assembly.z), yaw: 90 };
+  const A = PL.assembly;
+  const restAt = { center: Pt(A.x - 5, A.z + 1), yaw: 90 };
   const medicAt = Pt(restAt.center.x - 0.8, restAt.center.z - 1.4);
-  const pE = Pt(restAt.center.x - 3.6, restAt.center.z - 5.4);
+  const pE = Pt(restAt.center.x - 3.6, restAt.center.z - 4.4);
   const heE = Pt(restAt.center.x + 1.8, restAt.center.z - 1.5);
   const luoE = Pt(pE.x - 1.9, pE.z + 2.7);
   const liuE = Pt(pE.x - 3.2, pE.z + 1.0);
-  const A = PL.assembly;
-  const wounded = [[-15, -8], [-11, 4], [4, 1], [11, -5], [15, 3], [-17, 11], [3, -9]].map(([dx, dz]) => Pt(A.x + dx, A.z + dz));
+  const wounded = [[-17, -4], [-12, 4], [6, 2], [12, -4], [17, 3], [-20, 5], [2, -5]].map(([dx, dz]) => Pt(A.x + dx, A.z + dz));
   const roadsideWait = [0, 1, 2].map((i) => Pt(ROADSIDE.x + i * 1.2, ROADSIDE.z - i * 1.0));
-  const stretcherAt = Pt(A.x + 6, A.z + 9);
-  const stretcherOut = Pt(A.x + 6, Math.min(L0105_BOUNDS.maxZ - 5, A.z + A.d / 2 + 14));
+  const stretcherAt = Pt(A.x + 8, A.z + 3);
+  const stretcherOut = [Pt(PL.laneHead.x, PL.laneHead.z), Pt(L0105_GULLY.maxX + 12, PL.laneHead.z + 0.4)];
   const Wounded = (o = {}) => wounded.map((p, i) => N(`Wounded${i + 1}`, p, { yaw: (i * 77) % 360 - 180, down: i % 3 !== 2, stance: i % 3 === 2 ? "crouch" : undefined, group: "wounded", straight: true, ...o }));
   const RestBlanket = () => [Blanket(restAt), OnBlanket(restAt)];
+  const squadE = { Squad1: Pt(A.x - 9, A.z - 5), Squad2: Pt(A.x + 9, A.z - 4), Squad3: Pt(A.x + 3, A.z + 5) };
   Add({
     id: "02E-1", ...s02e, name: "集结处：幺娃回来没得？",
     player: { x: pE.x, z: pE.z, yawDeg: Yaw(pE, restAt.center), pitchDeg: -12, stance: "stand" },
-    what: "背坡洼地满地伤员。卫生兵背对顺子蹲在冬瓜身边；班长问：「幺娃回来没得？」",
-    next: { text: "看交通沟口那头", x: PL.assemblyEntry.x, z: PL.assemblyEntry.z, radiusM: 2.5 },
-    how: ["没人吭声，刘文财摇了摇头", "坡顶那边一挺机枪一直在响", "担架员「下一趟就抬拉。」", "担架抬走一副，空手跑回来抬下一副"],
-    notes: "人多、担架少、交通沟一次只过一个人。担架往后方（南）抬——派单写「担架往坡顶方向」，按剧本「担架员抬走一副」理解成往后送，待定。何有田从被角那头放下被子，留在冬瓜身边。追兵此时退在洞旁路边等战车。",
+    what: "坡后干沟里满地伤员。卫生兵背对顺子蹲在冬瓜身边；班长问：「幺娃回来没得？」",
+    next: { text: "看交通沟下来的坡道", x: PL.assemblyEntry.x, z: PL.assemblyEntry.z, radiusM: 2.5 },
+    how: ["没人吭声，刘文财摇了摇头", "坡顶那边一挺机枪一直在响", "担架员「下一趟就抬拉。」", "担架顺着东南头的凹路抬走一副，空手跑回来抬下一副"],
+    notes: "集结处是坡顶背后一道东西向干沟（沟底约 15×50 m、两岸 2.5 m 陡坎、南岸一排枯树）：看不见前沿，南边平地上也看不进沟底。"
+      + "人多、担架少、交通沟一次只过一个人。担架往东南头的凹路（后送路）抬。何有田放下被角，留在冬瓜身边。追兵此时退在洞旁路边等战车。",
     signals: [SIG.dugoutCollapsed],
     units: [
       ...RestBlanket(),
@@ -750,22 +775,23 @@ function Keyframes() {
       N("HeYoutian", heE, { face: restAt.center, stance: "crouch" }),
       N("Luo", luoE, { face: Pt(A.x + 8, A.z + 2) }),
       N("LiuWencai", liuE, { face: luoE }),
-      N("Squad1", Pt(A.x - 9, A.z - 10), { face: restAt.center, stance: "crouch", guess: true }),
-      N("Squad2", Pt(A.x + 9, A.z - 9), { face: restAt.center, guess: true }),
+      N("Squad1", squadE.Squad1, { face: restAt.center, stance: "crouch", guess: true }),
+      N("Squad2", squadE.Squad2, { face: restAt.center, guess: true }),
+      N("Squad3", squadE.Squad3, { face: restAt.center, stance: "crouch", guess: true }),
       ...Wounded(),
-      N("Stretcher1", stretcherAt, { kind: "litter", name: "担架", yaw: 180, toStraight: true, to: stretcherOut, straight: true }),
+      N("Stretcher1", stretcherAt, { kind: "litter", name: "担架", yaw: Yaw(stretcherAt, PL.laneHead), toStraight: true, to: stretcherOut, straight: true }),
       ...crestPosts.map((_, i) => CrestNra(i)),
       ...roadsideWait.map((p, i) => J(`Pursuer${i + 1}`, p, { face: PL.crossing, stance: "crouch", group: "pursuers", role: "rifleman", guess: true })),
     ],
-    pois: [POI.assembly("landmark"), POI.crest("poi"), Poi("AssemblyEntry", "交通沟口", "poi", PL.assemblyEntry, 2)],
+    pois: [POI.assembly("landmark"), POI.crest("poi"), Poi("AssemblyEntry", "交通沟下到干沟的坡道", "poi", PL.assemblyEntry, 2), Poi("LaneHead", "凹路口（往后送）", "landmark", PL.laneHead, 2.5)],
   });
 
   const runnerE = Pt(PL.assemblyEntry.x - 0.4, PL.assemblyEntry.z + 4.0);
   Add({
     id: "02E-2", ...s02e, name: "传令兵报坑，班长带人上去",
     player: { x: pE.x, z: pE.z, yawDeg: Yaw(pE, runnerE), pitchDeg: -2, stance: "stand" },
-    what: "传令兵逆着人流挤下来：沟口那个坑，东头鬼子要绕过去了，幺娃和机枪组在里头。",
-    next: { text: "跟班长回交通沟往北", x: PL.assemblyEntry.x, z: PL.assemblyEntry.z, radiusM: 2.5 },
+    what: "传令兵逆着人流从坡道挤下来：沟口那个坑，东头鬼子要绕过去了，幺娃和机枪组在里头。",
+    next: { text: "跟班长从坡道回交通沟往北", x: PL.assemblyEntry.x, z: PL.assemblyEntry.z, radiusM: 2.5 },
     how: ["传令兵满身是泥", "班长看了一眼满地的伤员：「那个坑，丢不得。」", "何有田留下看冬瓜", "上去的人本来该是顺子"],
     notes: "传令兵原话剧本没写，配音占位「沟口那个坑，东头的鬼子要绕过去了！幺娃跟机枪组都在里头！」。班长：「前头人还没下完，伤员也没抬完。」顺子一句话也没说，跟上了。",
     signals: [SIG.dugoutCollapsed],
@@ -776,37 +802,39 @@ function Keyframes() {
       N("Runner", runnerE, { face: luoE, from: T(T_CREST - 2) }),
       N("Luo", Pt(luoE.x + 0.6, luoE.z - 1.0), { face: runnerE }),
       N("LiuWencai", liuE, { face: runnerE }),
-      N("Squad1", Pt(A.x - 9, A.z - 10), { face: runnerE, stance: "crouch", guess: true }),
-      N("Squad2", Pt(A.x + 9, A.z - 9), { face: runnerE, guess: true }),
+      N("Squad1", squadE.Squad1, { face: runnerE, stance: "crouch", guess: true }),
+      N("Squad2", squadE.Squad2, { face: runnerE, guess: true }),
+      N("Squad3", squadE.Squad3, { face: runnerE, stance: "crouch", guess: true }),
       ...Wounded(),
       ...crestPosts.map((_, i) => CrestNra(i)),
       ...roadsideWait.map((p, i) => J(`Pursuer${i + 1}`, p, { face: PL.crossing, stance: "crouch", group: "pursuers", role: "rifleman", guess: true })),
     ],
-    pois: [POI.assembly("landmark"), Poi("AssemblyEntry", "交通沟口", "objective", PL.assemblyEntry, 2)],
+    pois: [POI.assembly("landmark"), Poi("AssemblyEntry", "交通沟下到干沟的坡道", "objective", PL.assemblyEntry, 2)],
   });
 
   // ======================= 03 逆着人流上去，守坑 =======================
   const s03 = { stage: 3, stageTitle: "逆着人流上去，守坑" };
-  const p31 = T(40.5, 0.3);
+  // 03-1：从干沟上坡道回交通沟往北；人流顺着交通沟往南下到干沟里
+  const p31 = T(T_END - 4, 0.3);
   const crowd = [
-    ["RetreatNra1", T(36.8, -0.9), {}], ["WalkWounded1", T(32.8, 0.6), { name: undefined, role: "walkingWounded" }],
-    ["RetreatHelper1", T(32.8, -0.5), { role: "helper" }], ["RetreatNra2", T(46.5, 0.9), {}],
-    ["RetreatNra3", T(21, -0.6), {}], ["RetreatNra4", T(15.5, 0.6), {}], ["RetreatNra5", T(52, -0.7), {}],
+    ["RetreatNra2", T(T_END - 5.8, -0.95), {}], ["RetreatNra1", T(T_END - 10.5, -0.8), {}],
+    ["WalkWounded1", T(T_END - 14.5, 0.55), { role: "walkingWounded" }], ["RetreatHelper1", T(T_END - 14.5, -0.55), { role: "helper" }],
+    ["RetreatNra3", T(T_END - 23, -0.6), {}], ["RetreatNra4", T(T_CROSSING - 1.5, 0.6), {}], ["RetreatNra5", T(T_END - 1.6, 0.95), {}],
   ];
   Add({
     id: "03-1", ...s03, name: "逆着人流",
-    player: { x: p31.x, z: p31.z, yawDeg: BackYaw(TRAFFIC, 40.5), pitchDeg: 0, stance: "stand" },
-    what: "交通沟里挤满往南撤的人：拎枪的、架着走的伤员、担架。只有我们三个往北挤。",
+    player: { x: p31.x, z: p31.z, yawDeg: BackYaw(TRAFFIC, T_END - 4), pitchDeg: 2, stance: "stand" },
+    what: "从干沟上坡道回交通沟：沟里挤满往南撤的人，拎枪的、架着走的伤员、担架。只有我们三个往北挤。",
     next: { text: "挤到沟口的机枪坑", x: PL.pit.x, z: PL.pit.z, radiusM: 4 },
     how: ["挨撞挨骂「往哪走！」", "越往上枪声越近", "人流里的伤越来越重", "三个人侧着身子挤"],
-    notes: "玩家第一次看清：整条线在撤，只有我们在往回走。人流的具体人数、担架位置是推测。",
+    notes: "玩家第一次看清：整条线在撤，只有我们在往回走。出干沟、翻坡顶、钻过板桥底下，一路往北（预演里挤到板桥一带）。人流的具体人数、担架位置是推测。",
     units: [
-      N("Luo", T(37.6, 0.9), { yaw: BackYaw(TRAFFIC, 37.6) }),
-      N("LiuWencai", T(44.2, -0.5), { yaw: BackYaw(TRAFFIC, 44.2) }),
+      N("Luo", T(T_END - 7.5, 0.9), { yaw: BackYaw(TRAFFIC, T_END - 7.5) }),
+      N("LiuWencai", T(T_END - 0.8, -0.4), { yaw: BackYaw(TRAFFIC, T_END - 0.8) }),
       ...crowd.map(([id, p, o]) => N(id, p, { yaw: p.heading, group: "retreat", to: SOUTH_OUT, guess: true, ...o })),
-      N("Stretcher2", T(26.5), { kind: "litter", name: "担架", yaw: T(26.5).heading, group: "retreat", to: SOUTH_OUT, guess: true }),
+      N("Stretcher2", T(T_END - 19), { kind: "litter", name: "担架", yaw: T(T_END - 19).heading, group: "retreat", to: SOUTH_OUT, guess: true }),
     ],
-    pois: [POI.pit("objective"), POI.corner1("landmark")],
+    pois: [POI.pit("objective"), POI.crest("landmark"), Poi("Bridge", "路口板桥", "landmark", PL.crossing, 3)],
   });
 
   // 03-2 进坑就挨一发掷弹筒
@@ -991,25 +1019,31 @@ function Keyframes() {
     pois: [POI.corner2("landmark"), POI.crossing("poi"), Poi("TankRoad", "战车（路上）", "danger", tank43, 4)],
   });
 
-  // ======================= 05 沟里伏击战车 =======================
+  // ======================= 05 沟里伏击战车（路口板桥） =======================
+  // 班长判断：战车要追上来，交通沟太宽、车跨不过去，只有走路口那座板桥才过得了沟——带顺子钻到桥下的沟底趴着等；
+  // 幺娃架着机枪手缩在桥南几步。战车压上板桥，板子嘎吱、土从板缝往下漏；车刚过桥，顺子从桥边探身把那捆手榴弹甩上车尾，
+  // 车瘫在桥头（TankDisabled，桥面两块门板压断下沉），横着把路堵死。剧本这一拍用户还没最后拍板，白盒先按这个做。
   const s05 = { stage: 5, stageTitle: "沟里伏击战车" };
-  const p51 = T(T_CROSSING + 2.4, -0.3);
-  const luo51 = T(T_CROSSING + 3.6, 0.9);
-  const yaowa51 = T(T_CROSSING + 8.5, 0.45), gunner51 = T(T_CROSSING + 8.5, -0.45);
+  const BRIDGE_C = Pt(L0105_BRIDGE.x, L0105_BRIDGE.z);
+  const BRIDGE_YAW = L0105_BRIDGE.yawDeg;
+  const underMe = T(T_CROSSING + 0.6, -0.5);                 // 桥面底下、中间那根横木旁边
+  const underLuo = T(T_CROSSING - 0.9, 0.55);
+  const yaowa51 = T(T_CROSSING + 7, 0.45), gunner51 = T(T_CROSSING + 7, -0.45);
   const tank51 = RoadBack(15);
   Add({
-    id: "05-1", ...s05, name: "路口：缩在沟底",
-    player: { x: p51.x, z: p51.z, yawDeg: Yaw(p51, tank51), pitchDeg: 18, stance: "prone" },
-    what: "班长带顺子缩在路口的沟底；战车顺着路逼近，要从头顶这段沟上过。",
-    next: { text: "趴在沟底别动" },
-    how: ["履带声越来越近", "土从沟沿往下掉", "幺娃架着机枪手缩在后面几步", "它一过沟，坡后撤下去的人就全在枪口底下"],
-    notes: "Notion 待定：路口那段交通沟要不要盖木板，让战车从板上压过去（八九式能跨多宽的沟没查到）；场景现在没盖。幺娃和机枪手放在路口南边几步（往坡顶那边）——Notion 快照画在路口北边，按剧本「后面几步」与 04 的前后顺序放南边。",
+    id: "05-1", ...s05, name: "板桥底下：缩在沟底",
+    player: { x: underMe.x, z: underMe.z, yawDeg: Yaw(underMe, tank51), pitchDeg: 18, stance: "prone" },
+    what: "班长看了一眼路上的战车：「它要过来，只有走那座板桥。」带顺子钻到桥下的沟底趴着。",
+    next: { text: "趴在桥下别动" },
+    how: ["履带声越来越近", "桥面门板缝里透光", "幺娃架着机枪手缩在桥南几步", "它一过沟，坡后撤下去的人就全在枪口底下"],
+    notes: "路口那段交通沟上搭了一座简易板桥：三根顺路方向的横木上铺门板，桥面 3.8 m 宽、与两头路面齐平，驴车和担架都过得去；桥下照常是沟，沟底到横木底约 1.8 m。"
+      + "交通沟太宽，战车只能走板桥过沟。班长的判断不新增配音，预演里用说明字。剧本这一拍用户还没最后拍板（Notion 待定：路口要不要盖木板），白盒先按这个做。",
     signals: [SIG.pitShelled],
     units: [
-      N("Luo", luo51, { face: tank51, stance: "crouch" }),
+      N("Luo", underLuo, { face: tank51, stance: "crouch" }),
       N("LiuWencai", T(T_CREST + 3, -0.4), { yaw: T(T_CREST + 3).heading, guess: true }),
-      N("Gunner", gunner51, { face: tank51, stance: "crouch" }),
-      N("Yaowa", yaowa51, { face: tank51, stance: "crouch" }),
+      N("Gunner", gunner51, { face: BRIDGE_C, stance: "crouch" }),
+      N("Yaowa", yaowa51, { face: BRIDGE_C, stance: "crouch" }),
       J("IjaTrench2", T(T_CORNER2 + 8, -0.5), { yaw: T(T_CORNER2 + 8).heading, aim: true }),
       J("IjaTrench3", T(T_CORNER2 + 3, 0.4), { yaw: T(T_CORNER2 + 3).heading }),
       J("Tank", tank51, { yaw: ROAD_YAW, straight: true, path: RoadRoute(tank43, tank51) }),
@@ -1018,63 +1052,62 @@ function Keyframes() {
     pois: [POI.crossing("landmark"), POI.crest("poi")],
   });
 
-  const tank52 = Pt(PL.crossing.x, PL.crossing.z);
-  const p52 = T(T_CROSSING + 3.6, -0.3);   // 往南挪一点，仰头看得见车底压过沟沿
   Add({
-    id: "05-2", ...s05, name: "战车从头顶碾过去",
-    player: { x: p52.x, z: p52.z, yawDeg: Yaw(p52, tank52), pitchDeg: 26, stance: "prone" },
-    what: "战车从头顶沟沿上碾过去，土往下掉。",
-    next: { text: "车一过去就甩那捆手榴弹" },
-    how: ["履带从头顶压过去", "土往下掉", "车底就在眼前"],
-    notes: "战车车身正压在路口那段沟的上方；跟车步兵还在车后。",
+    id: "05-2", ...s05, name: "战车压上板桥",
+    player: { x: underMe.x, z: underMe.z, yawDeg: Yaw(underMe, BRIDGE_C), pitchDeg: 32, stance: "prone" },
+    what: "战车压上板桥，门板嘎吱响，土从板缝往下漏，车底就在头顶。",
+    next: { text: "车一过桥就甩那捆手榴弹" },
+    how: ["履带从头顶压过去", "板子嘎吱响、往下弯", "土从板缝往下漏"],
+    notes: "战车车身正压在板桥上（桥面上、车底离顺子不到 2 m）；跟车步兵还在车后。人在桥下沟底，摆位检查按高差认作「在桥下」，不算站在车身脚印里。",
     signals: [SIG.pitShelled],
     units: [
-      N("Luo", luo51, { face: tank52, stance: "crouch" }),
+      N("Luo", underLuo, { face: BRIDGE_C, stance: "prone" }),
       N("LiuWencai", T(T_CREST + 3, -0.4), { yaw: T(T_CREST + 3).heading, guess: true }),
-      N("Gunner", gunner51, { face: tank52, stance: "crouch" }),
-      N("Yaowa", yaowa51, { face: tank52, stance: "crouch" }),
+      N("Gunner", gunner51, { face: BRIDGE_C, stance: "crouch" }),
+      N("Yaowa", yaowa51, { face: BRIDGE_C, stance: "crouch" }),
       J("IjaTrench2", T(T_CORNER2 + 13, -0.5), { yaw: T(T_CORNER2 + 13).heading, aim: true }),
       J("IjaTrench3", T(T_CORNER2 + 8.5, 0.4), { yaw: T(T_CORNER2 + 8.5).heading }),
-      J("Tank", tank52, { yaw: ROAD_YAW, straight: true, path: RoadRoute(tank51, tank52) }),
+      J("Tank", BRIDGE_C, { yaw: BRIDGE_YAW, straight: true, path: RoadRoute(tank51, BRIDGE_C) }),
       tankInf(7, 0, { path: RoadRoute(RoadBack(21, -1.6), RoadBack(7, -1.6)) }), tankInf(11, 1, { path: RoadRoute(RoadBack(25, 1.6), RoadBack(11, 1.6)) }), tankInf(15, 2, { path: RoadRoute(RoadBack(29, -1.6), RoadBack(15, -1.6)) }),
     ],
     pois: [POI.crossing("danger")],
   });
 
-  const p53 = T(T_CROSSING + 3.0, -0.2);
-  const tankRear = Pt(TANK_STOP.x - Math.sin((PL.tankStop.yawDeg + 180) * Math.PI / 180) * 2.9, TANK_STOP.z - Math.cos((PL.tankStop.yawDeg + 180) * Math.PI / 180) * 2.9);
+  const p53 = T(T_CROSSING + 4.6, -1.5);   // 桥面西南边沿外一步、贴西壁站起来探身（站直了眼睛刚好够得着车尾顶）
+  const stopR = PL.tankStop.yawDeg * Math.PI / 180;
+  const tankRear = Pt(TANK_STOP.x + Math.sin(stopR) * 2.9, TANK_STOP.z + Math.cos(stopR) * 2.9);
   const blocked = [RoadBack(9, -1.6), RoadBack(12, 1.6), RoadBack(15, -1.6)];
   Add({
     id: "05-3", ...s05, name: "甩手榴弹炸车尾",
-    player: { x: p53.x, z: p53.z, yawDeg: Yaw(p53, tankRear), pitchDeg: 10, stance: "crouch" },
-    what: "那捆手榴弹炸在车尾，战车瘫在路口横着把路堵死，后面的鬼子跟不上来。",
+    player: { x: p53.x, z: p53.z, yawDeg: Yaw(p53, tankRear), pitchDeg: 22, stance: "stand" },
+    what: "车刚过桥，顺子从桥边探身把那捆手榴弹甩上车尾。战车瘫在桥头，横着把路堵死。",
     next: { text: "搭把手，架机枪手翻坡顶", x: PL.crest.x, z: PL.crest.z, radiusM: 3 },
-    how: ["幺娃「顺儿哥，搭把手！」", "车体残骸横在路上", "跟车步兵和沟里追来的鬼子被堵在后头"],
-    notes: "TankDisabled：战车停在锚点 tankStop（横在路口），场景 gates 里沟沿被压塌两块。",
+    how: ["幺娃「顺儿哥，搭把手！」", "车体残骸斜在桥头路上", "桥面压断了两块门板", "跟车步兵和沟里追来的鬼子被堵在桥那头"],
+    notes: "TankDisabled：战车停在锚点 tankStop（桥头西南、车身斜着堵住路），场景 gates 里桥面中间两块门板压断下沉——后面的人过不了沟。",
     signals: [SIG.pitShelled, SIG.tankDisabled],
     units: [
-      N("Luo", T(T_CROSSING + 5.0, 0.8), { face: tankRear, aim: true }),
+      N("Luo", T(T_CROSSING + 1.2, 0.6), { face: tankRear, aim: true }),
       N("LiuWencai", T(T_CREST + 3, -0.4), { yaw: BackYaw(TRAFFIC, T_CREST + 3), guess: true }),
       N("Gunner", gunner51, { face: p53, stance: "crouch" }),
       N("Yaowa", yaowa51, { face: p53 }),
       J("IjaTrench2", T(T_CROSSING - 13, -0.5), { yaw: T(T_CROSSING - 13).heading, aim: true }),
       J("IjaTrench3", T(T_CROSSING - 17, 0.4), { yaw: T(T_CROSSING - 17).heading }),
-      J("Tank", TANK_STOP, { name: "战车（瘫）", yaw: PL.tankStop.yawDeg, straight: true, arc: null }),
-      ...blocked.map((p, i) => J(`TankInf${i + 1}`, p, { group: "tankEscort", role: "rifleman", face: TANK_STOP, stance: i === 1 ? "crouch" : undefined, straight: true })),
+      J("Tank", TANK_STOP, { name: "战车（瘫）", yaw: PL.tankStop.yawDeg, straight: true, arc: null, path: [Pt(BRIDGE_C.x, BRIDGE_C.z), TANK_STOP].slice(1) }),
+      ...blocked.map((p, i) => J(`TankInf${i + 1}`, p, { group: "tankEscort", role: "rifleman", face: BRIDGE_C, stance: i === 1 ? "crouch" : undefined, straight: true })),
     ],
-    pois: [Poi("TankWreck", "战车（瘫在路口）", "landmark", TANK_STOP, 4), POI.crest("objective")],
+    pois: [Poi("TankWreck", "战车（瘫在桥头）", "landmark", TANK_STOP, 4), Poi("BrokenBoards", "压断的门板", "danger", BRIDGE_C, 2), POI.crest("objective")],
   });
 
-  const p54 = Pt(PL.assemblyEntry.x + 0.8, PL.assemblyEntry.z + 2.0);
-  const crestIja = [[-6, -2.5], [3, -3], [9, -1.5], [-12, -1]].map(([dx, dz]) => Pt(PL.crest.x + dx, PL.crest.z + dz));
+  const p54 = Pt(PL.assemblyEntry.x + 0.8, PL.assemblyEntry.z + 3.0);
+  const crestIja = [[-7, -2.5], [5.5, -3], [10, -1.5], [-12, -1]].map(([dx, dz]) => Pt(PL.crest.x + dx, PL.crest.z + dz));
   const crestIjaIds = ["TankInf1", "TankInf2", "TankInf3", "IjaTrench2"];
   Add({
-    id: "05-4", ...s05, name: "翻过坡顶回头：不撵了？",
-    player: { x: p54.x, z: p54.z, yawDeg: Yaw(p54, PL.crest), pitchDeg: 9, stance: "stand" },
-    what: "翻过坡顶回头：鬼子停在坡顶上架枪，没追下来。刘文财：「……不撵了？」",
-    next: { text: "「表看了，走！」下集结处", x: PL.assembly.x, z: PL.assembly.z, radiusM: 6 },
+    id: "05-4", ...s05, name: "翻过坡顶下到干沟，回头：不撵了？",
+    player: { x: p54.x, z: p54.z, yawDeg: Yaw(p54, PL.crest), pitchDeg: 14, stance: "stand" },
+    what: "翻过坡顶、下到干沟里回头：鬼子停在坡顶上架枪，没追下来。刘文财：「……不撵了？」",
+    next: { text: "「表看了，走！」顺干沟往东", x: PL.laneHead.x, z: PL.laneHead.z, radiusM: 4 },
     how: ["班长「表看了，走！」", "鬼子趴在坡顶上架枪", "顺子和幺娃架着机枪手，最后一个回来"],
-    notes: "坡顶上的鬼子是跟车步兵和沟里追来的那几个，绕过战车残骸上了坡顶（位置推测）。",
+    notes: "坡顶上的鬼子是跟车步兵和沟里追来的那几个，绕过战车残骸、从桥下的沟里爬上坡顶（位置推测）。干沟两岸陡坎挡着，他们得走到坎沿上才看得见沟底。06 接着在这条干沟里（冬瓜头一趟就抬走了）。",
     signals: [SIG.pitShelled, SIG.tankDisabled],
     units: [
       N("Luo", Pt(p54.x - 1.4, p54.z + 2.6), { yaw: 180 }),
@@ -1085,7 +1118,7 @@ function Keyframes() {
       ...crestIja.map((p, i) => J(crestIjaIds[i], p, { group: "crestHold", role: "rifleman", face: PL.assembly, stance: "prone", aim: true, straight: true, guess: true, climb: true,
         path: i === 3 ? [T(T_CROSSING - 2), T(T_CROSSING + 6), p] : undefined })),
     ],
-    pois: [POI.crest("danger"), POI.assembly("objective"), Poi("TankWreck", "战车（瘫在路口）", "landmark", TANK_STOP, 4)],
+    pois: [POI.crest("danger"), POI.assembly("landmark"), Poi("LaneHead", "凹路口（往后送）", "objective", PL.laneHead, 2.5), Poi("TankWreck", "战车（瘫在桥头）", "landmark", TANK_STOP, 4)],
   });
 
   return K;
@@ -1131,7 +1164,7 @@ const ZONES = Object.freeze([
   { id: "A", name: "前沿沟与机枪坑", stages: [3, 4], box: { minX: -70, maxX: 125, minZ: -28, maxZ: 14 } },
   { id: "B", name: "支沟与防炮洞", stages: [1, 2], box: { minX: 18, maxX: 75, minZ: 56, maxZ: 74 } },
   { id: "C", name: "交通沟", stages: [2, 5], box: { minX: -6, maxX: 42, minZ: 0, maxZ: 131 } },
-  { id: "D", name: "坡顶与集结处", stages: [2, 5], box: { minX: 10, maxX: 70, minZ: 112, maxZ: 175 } },
+  { id: "D", name: "路口板桥、坡顶与干沟（集结处）", stages: [2, 5], box: { minX: 8, maxX: 86, minZ: 110, maxZ: 162 } },
   { id: "E", name: "坑北开阔地（03 日军）", stages: [3, 3], box: { minX: -60, maxX: 60, minZ: -222, maxZ: -28 } },
 ]);
 
@@ -1252,6 +1285,14 @@ function SegDist(p, a, b) {
   const t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2)) : 0;
   return Math.hypot(p.x - a.x - dx * t, p.z - a.z - dz * t);
 }
+/** 车身脚印上中心、四角、四边中点 9 处取最高的地面（同运行时 TankGroundY，只看高度场）。 */
+function TankFootGround(ground, v) {
+  const r = v.yawDeg * Math.PI / 180, fx = -Math.sin(r), fz = -Math.cos(r), sx = -fz, sz = fx;
+  const hl = L0105_CHECK.tank.d / 2, hw = L0105_CHECK.tank.w / 2;
+  let best = -Infinity;
+  for (const a of [-1, 0, 1]) for (const b of [-1, 0, 1]) best = Math.max(best, ground(v.x + fx * hl * a + sx * hw * b, v.z + fz * hl * a + sz * hw * b));
+  return best;
+}
 function OnTank(p, v, margin) {
   const r = v.yawDeg * Math.PI / 180, fx = -Math.sin(r), fz = -Math.cos(r);
   const dx = p.x - v.x, dz = p.z - v.z;
@@ -1295,8 +1336,11 @@ export function FirstLevel0105Issues(doc, { scene = null, meta = new Map() } = {
       if (Dist(l, kf.player) < C.litterM - 0.2) out.push(`${kf.id} 玩家站在 ${l.id} 上`);
     }
     for (const v of kf.units.filter((u) => u.kind === "tank")) {
-      for (const u of people) if (OnTank(u, v, C.tank.marginM)) out.push(`${kf.id} ${u.id} 站在车身 ${v.id} 下 / 上`);
-      if (OnTank(kf.player, v, 0)) out.push(`${kf.id} 玩家在车身 ${v.id} 的脚印里`);
+      // 桥下的沟底（比车身脚下低 ≥ 1.5 m）不算：05 战车压过板桥时人趴在桥下
+      const tankY = ground ? TankFootGround(ground, v) : null;
+      const Under = (p) => tankY !== null && ground(p.x, p.z) < tankY - 1.5;
+      for (const u of people) if (OnTank(u, v, C.tank.marginM) && !Under(u)) out.push(`${kf.id} ${u.id} 站在车身 ${v.id} 下 / 上`);
+      if (OnTank(kf.player, v, 0) && !Under(kf.player)) out.push(`${kf.id} 玩家在车身 ${v.id} 的脚印里`);
     }
     if (Number.isFinite(kf.next?.x) && Dist(kf.next, kf.player) < C.nextM) out.push(`${kf.id} 下一步目标离玩家不到 ${C.nextM} m（只写文字）`);
     // 实心块
