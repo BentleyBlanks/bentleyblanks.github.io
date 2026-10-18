@@ -1,0 +1,143 @@
+{
+  "schema": "tengxian-independent-prop-v1",
+  "id": "SichuanBlanketPack",
+  "version": "20261018",
+  "title": "1938 Sichuan Army folded single-blanket pack",
+  "asset": "Model_SichuanBlanketPack.glb",
+  "textureManifest": "Data_SichuanBlanketPackTextures.json",
+  "units": "metres",
+  "upAxis": "+Y",
+  "outwardAxis": "+Z",
+  "bodyContactPlane": "Z=0, facing -Z",
+  "pivotM": [
+    0,
+    0,
+    0
+  ],
+  "nominalBundleDimensionsM": {
+    "width": 0.38,
+    "height": 0.3,
+    "thickness": 0.13
+  },
+  "actualBundleDimensionsM": {
+    "width": 0.38,
+    "height": 0.3,
+    "thickness": 0.1311,
+    "includes": "fold lips, one repair patch and its cotton stitches"
+  },
+  "triangles": {
+    "total": 2976,
+    "limit": 3000,
+    "includesAllOptionalParts": true,
+    "byPart": {
+      "Pack_Bundle": 954,
+      "Pack_Binding": 1174,
+      "Pack_Jacket": 164,
+      "Pack_StrawMat": 260,
+      "Pack_Sandals": 424
+    }
+  },
+  "parts": [
+    {
+      "node": "Pack_Bundle",
+      "description": "One thin folded homespun cotton single blanket, with side-fold ridges and one stitched repair patch; planar back"
+    },
+    {
+      "node": "Pack_Binding",
+      "description": "A connected long grey cloth strip makes two horizontal and two vertical outward passes, two shoulder loops and a small side knot; no metal fittings"
+    },
+    {
+      "node": "Pack_Sandals",
+      "description": "Exactly two open woven-straw shoes, traditional tied uppers and one thin suspension cord per shoe"
+    },
+    {
+      "node": "Pack_StrawMat",
+      "description": "Horizontal rolled woven-straw sleeping mat with rolled end edges; its two top fastening loops hide with the mat",
+      "visibility": "Hide this node and descendants"
+    },
+    {
+      "node": "Pack_Jacket",
+      "description": "Complete civilian indigo short jacket inside the blanket fold; only one corner and one cloth knot button show at rest",
+      "visibility": "Hide this node and descendants",
+      "withdrawal": "Translate this original node; all jacket geometry, visible corner and cloth button move together",
+      "exampleWorldTranslationM": [
+        0,
+        0.36,
+        0.3
+      ]
+    }
+  ],
+  "materials": {
+    "suite": "SichuanBlanketPack",
+    "size": [
+      1024,
+      1024
+    ],
+    "channels": [
+      "Base (sRGB)",
+      "Normal (linear/OpenGL)",
+      "Orm (linear R=AO G=roughness B=metallic)"
+    ],
+    "dielectrics": true,
+    "ormRgb": [
+      255,
+      242,
+      0
+    ],
+    "embeddedInGlb": true,
+    "sharedAtlas": "Blanket, folds and patch use the upper-left cotton quadrant; binding, straw and indigo occupy the other three quadrants",
+    "sourceProvider": "Built-in image_gen__imagegen",
+    "sharedExistingBlanketRequirement": "Withdrawn by user; this asset has its own independently generated texture set"
+  },
+  "source": {
+    "blend": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Scene_SichuanBlanketPack.blend",
+    "texturesPacked": true,
+    "reference": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Source/Image_SichuanBlanketPackThreeViewV02.png",
+    "nativeAxes": "Blender X right, Z up, -Y outward",
+    "rebuild": "../../_blender/Script_SichuanBlanketPackBake.py",
+    "attachments": "../../_blender/Script_SichuanPackAttachments.py",
+    "textureRebuild": "../../_import/Script_SichuanBlanketPackTextureBake.py"
+  },
+  "commandsFromRepositoryRoot": [
+    "node scripts/Script_BlenderMcp.mjs start \"C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Scene_SichuanBlanketPack.blend\" --task SichuanBlanketPack",
+    "node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_SichuanBlanketPackBake.py",
+    "node scripts/Script_BlenderMcp.mjs stop --save",
+    "node Taierzhuang1938/_blender/Script_SichuanBlanketPackVerify.mjs"
+  ],
+  "review": {
+    "scope": "Independent asset",
+    "localPage": "/tmp/SichuanBlanketPack/Review/Preview.html",
+    "evidenceDirectory": "tmp/SichuanBlanketPack/Review/",
+    "screenshotsLocalOnly": true,
+    "browserChecks": [
+      "front/back/side/top and three-quarter rendering",
+      "wireframe",
+      "straw mat hidden",
+      "jacket hidden",
+      "original complete jacket extracted"
+    ],
+    "referenceApprovedByUser": "2026-10-18, ThreeViewV02"
+  },
+  "historicalReferences": [
+    {
+      "url": "https://sichuan.scol.com.cn/ggxw/202509/83113537.html",
+      "basis": "Sichuan Museum archival departure photo: soft folded carried bundles; no precise date or strap count can be resolved"
+    },
+    {
+      "url": "https://www.chinanews.com/cul/2014/09-03/6558063.shtml",
+      "basis": "Later museum interview supports single blanket, straw mat and straw-shoe kit"
+    }
+  ],
+  "reconstructionScope": "Exact size, grey tic-tac-toe binding route, patch, hanging arrangement and indigo jacket corner follow the user's approved design; they are not claimed as a measured 1938 army issue specification.",
+  "noModernComponents": [
+    "zippers",
+    "metal buckles",
+    "leather",
+    "modern backpack pockets or padded harness",
+    "text",
+    "logos"
+  ],
+  "assetUrl": "./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261018",
+  "assetBytes": 1170920,
+  "assetSha256": "1768f66774b720dbd1f24808a71e77e31cdbcf193a4aab52d3abed96fa17f4f7"
+}

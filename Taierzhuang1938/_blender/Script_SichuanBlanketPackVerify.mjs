@@ -1,0 +1,202 @@
+// Pure Node audit of the delivered GLB, independent of baker self-reports.
+// Usage: node Taierzhuang1938/_blender/Script_SichuanBlanketPackVerify.mjs [model.glb]
+// Reports stay in ignored tmp/. No browser, Blender, or image-decoder dependency.
+import fs from 'node:fs';
+import path from 'node:path';
+import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+import {LoadGlb,ReadAccessor,ReadAccessorInt} from '../_import/Script_LugouGlbPose.mjs';
+
+const projectDir=fileURLToPath(new URL('../',import.meta.url));
+const defaultFile=path.join(projectDir,'Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb');
+const modelFile=path.resolve(process.argv[2]??defaultFile);
+const outDir=path.resolve(projectDir,'../tmp/SichuanBlanketPack/Review');
+const textureManifestFile=path.join(projectDir,'Model/SichuanBlanketPack/Data_SichuanBlanketPackTextures.json');
+const report={file:modelFile,checks:[],parts:{},materials:[],images:[],externalMaps:[],uvPrimitives:[],totalTriangles:0};
+const Hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+// Independently decoded on 2026-10-18 with the existing baker's Pillow:
+// all 1,048,576 RGB pixels have extrema R=[255,255], G=[242,242], B=[0,0].
+// Pin the ENTIRE encoded payload, not the manifest's unverified uniqueRgb
+// claim. A recompression requires independent pixel verification and a new
+// golden digest. Exact bytes + 1024 dimensions prove this map stays metal=0.
+const dryOrmGolden={sha256:'fa1284094b372b556c7756743d02575e2c4e0509b454069b83be28af99e2676a',width:1024,height:1024,rgb:[255,242,0]};
+const atlasRegions={cloth:{id:'Blanket',uv:[.02,.52,.48,.98]},straw:{id:'Straw',uv:[.52,.52,.98,.98]},binding:{id:'Binding',uv:[.02,.02,.48,.48]},jacket:{id:'Jacket',uv:[.52,.02,.98,.48]}};
+const materialRegions={Material_SichuanCloth:'cloth',Material_SichuanClothPatch:'cloth',Material_SichuanStraw:'straw',Material_SichuanBinding:'binding',Material_SichuanJacket:'jacket'};
+function Check(ok,label,detail=null){report.checks.push({ok:!!ok,label,...(detail===null?{}:{detail})});if(!ok)console.error(`FAIL ${label}${detail===null?'':`  ${typeof detail==='string'?detail:JSON.stringify(detail)}`}`);}
+const identity=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];
+const Near=(a,b,epsilon=1e-6)=>a.length===b.length&&a.every((value,index)=>Math.abs(value-b[index])<=epsilon);
+function Multiply(a,b){const out=Array(16).fill(0);for(let row=0;row<4;row++)for(let col=0;col<4;col++)for(let k=0;k<4;k++)out[col*4+row]+=a[k*4+row]*b[col*4+k];return out;}
+function NodeMatrix(node){
+  if(node.matrix)return node.matrix;
+  const [x,y,z,w]=node.rotation??[0,0,0,1],[sx,sy,sz]=node.scale??[1,1,1],[tx,ty,tz]=node.translation??[0,0,0];
+  return [(1-2*(y*y+z*z))*sx,2*(x*y+w*z)*sx,2*(x*z-w*y)*sx,0,2*(x*y-w*z)*sy,(1-2*(x*x+z*z))*sy,2*(y*z+w*x)*sy,0,2*(x*z+w*y)*sz,2*(y*z-w*x)*sz,(1-2*(x*x+y*y))*sz,0,tx,ty,tz,1];
+}
+function Transform(m,p){return [m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12],m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13],m[2]*p[0]+m[6]*p[1]+m[10]*p[2]+m[14]];}
+function Bounds(points){if(!points.length)return null;const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];for(const point of points)for(let axis=0;axis<3;axis++){min[axis]=Math.min(min[axis],point[axis]);max[axis]=Math.max(max[axis],point[axis]);}return {min,max,size:max.map((value,index)=>value-min[index]),center:max.map((value,index)=>(value+min[index])/2)};}
+function ImageSize(bytes){
+  if(bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))return {format:'png',width:bytes.readUInt32BE(16),height:bytes.readUInt32BE(20)};
+  if(bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP'){
+    for(let offset=12;offset+8<=bytes.length;){const chunk=bytes.toString('ascii',offset,offset+4),length=bytes.readUInt32LE(offset+4),body=offset+8;
+      if(chunk==='VP8X')return {format:'webp',width:1+bytes.readUIntLE(body+4,3),height:1+bytes.readUIntLE(body+7,3)};
+      if(chunk==='VP8L'){const packed=bytes.readUInt32LE(body+1);return {format:'webp',width:1+(packed&0x3fff),height:1+((packed>>>14)&0x3fff)};}
+      if(chunk==='VP8 ')return {format:'webp',width:bytes.readUInt16LE(body+6)&0x3fff,height:bytes.readUInt16LE(body+8)&0x3fff};
+      offset=body+length+(length%2);
+    }
+  }
+  if(bytes[0]===0xff&&bytes[1]===0xd8){
+    let offset=2;while(offset+4<bytes.length){if(bytes[offset]!==0xff){offset++;continue;}const marker=bytes[offset+1];offset+=2;if(marker===0xd8||marker===0xd9)continue;const length=bytes.readUInt16BE(offset);if([0xc0,0xc1,0xc2,0xc3,0xc5,0xc6,0xc7,0xc9,0xca,0xcb,0xcd,0xce,0xcf].includes(marker))return {format:'jpeg',height:bytes.readUInt16BE(offset+3),width:bytes.readUInt16BE(offset+5)};offset+=length;}
+  }
+  throw Error('Unsupported or invalid source image encoding');
+}
+
+try{
+  Check(fs.existsSync(modelFile),'GLB exists',modelFile);
+  if(!fs.existsSync(modelFile))throw Error('Model has not been generated');
+  const glb=LoadGlb(modelFile),g=glb.json;
+  report.sha256=Hash(glb.buffer);
+  const textureManifest=JSON.parse(fs.readFileSync(textureManifestFile,'utf8'));
+  const bakeRecord=JSON.parse(fs.readFileSync(path.join(projectDir,textureManifest.bakeRecord),'utf8'));
+  const externalMaps=new Map();
+  Check(textureManifest.normalConvention==='gl','Manifest declares OpenGL tangent-space normals');
+  Check(textureManifest.atlas?.uvOrigin==='bottom-left','Manifest atlas coordinates are Blender bottom-left UVs');
+  for(const [key,region] of Object.entries(atlasRegions)){
+    const declared=textureManifest.atlas?.quadrants?.find(value=>value.id===region.id);
+    Check(!!declared&&Near(declared.uvBounds,region.uv),`${key} atlas region matches the material contract`,declared?.uvBounds);
+  }
+  for(const channel of ['Base','Normal','Orm']){
+    const entries=textureManifest.files.filter(entry=>entry.channel===channel);
+    Check(entries.length===1,`Exactly one external ${channel} map is registered`,entries.length);
+    if(entries.length!==1)continue;
+    const entry=entries[0],file=path.join(projectDir,entry.path),bytes=fs.readFileSync(file),size=ImageSize(bytes),sha256=Hash(bytes);
+    const baked=bakeRecord.outputs?.find(value=>value.channel===channel);
+    const actual={channel,file,...size,bytes:bytes.length,sha256};report.externalMaps.push(actual);
+    externalMaps.set(channel,{...actual,data:bytes,name:path.basename(file)});
+    Check(size.width===1024&&size.height===1024,`External ${channel} image is really 1024 square`,size);
+    Check(entry.width===size.width&&entry.height===size.height&&entry.bytes===bytes.length,`External ${channel} size matches its manifest`,actual);
+    Check(sha256===entry.sha256,`Entire external ${channel} SHA-256 matches its manifest`,{actual:sha256,expected:entry.sha256});
+    Check(!!baked&&sha256===baked.sha256&&bytes.length===baked.bytes&&size.width===baked.width&&size.height===baked.height,`Entire external ${channel} matches the independent bake record`,baked);
+    Check(entry.colorSpace===(channel==='Base'?'sRGB':'linear'),`External ${channel} has the correct documented color-space semantic`,entry.colorSpace);
+  }
+  const orm=externalMaps.get('Orm');
+  report.ormProof={method:'Entire payload equals an independently pixel-decoded constant-map golden SHA-256',...dryOrmGolden};
+  Check(!!orm&&orm.sha256===dryOrmGolden.sha256&&orm.width===dryOrmGolden.width&&orm.height===dryOrmGolden.height,'Actual ORM is the independently verified all-pixel [255,242,0] dielectric map',report.ormProof);
+  Check(glb.buffer.readUInt32LE(4)===2&&glb.buffer.readUInt32LE(8)===glb.buffer.length,'GLB 2 header and byte length are valid');
+  Check(g.asset?.version==='2.0','glTF 2.0 asset');
+  Check(!(g.skins?.length),'Rigid parts have no skin dependency');
+  Check(!(g.extensionsRequired??[]).some(name=>/draco|meshopt|basisu/i.test(name)),'Uncompressed source geometry and ordinary source images can be audited');
+  const names=['Pack_Root','Pack_Bundle','Pack_Binding','Pack_Sandals','Pack_StrawMat','Pack_Jacket'];
+  const nodeIds=Object.fromEntries(names.map(name=>[name,(g.nodes??[]).flatMap((node,index)=>node.name===name?[index]:[])]));
+  for(const name of names)Check(nodeIds[name].length===1,`Exactly one ${name}`,nodeIds[name]);
+  const rootId=nodeIds.Pack_Root[0],roots=g.scenes[g.scene??0]?.nodes??[];
+  Check(roots.length===1&&roots[0]===rootId,'The active scene root is Pack_Root',roots);
+  if(rootId===undefined)throw Error('Cannot audit absent Pack_Root');
+  Check(Near(NodeMatrix(g.nodes[rootId]),identity),'Pack_Root origin and axes are identity (meters, Y-up)');
+  const parent=new Map(),world=new Map(),reachable=new Set(),allTriangles=[],usedMaterials=new Set();
+  function Walk(index,matrix,partName=null){
+    if(reachable.has(index))throw Error(`Repeated scene node ${index}`);reachable.add(index);
+    const node=g.nodes[index],next=Multiply(matrix,NodeMatrix(node));world.set(index,next);
+    const owner=names.slice(1).includes(node.name)?node.name:partName;
+    if(owner&&!report.parts[owner])report.parts[owner]={node:nodeIds[owner][0],points:[],triangles:[],meshNodes:[],materials:[]};
+    if(node.mesh!==undefined){
+      Check(!!owner,`Mesh ${node.name??index} belongs to a named independently controllable part`);
+      const part=report.parts[owner];if(part)part.meshNodes.push(index);
+      for(const primitive of g.meshes[node.mesh].primitives){
+        const mode=primitive.mode??4;Check(mode===4,`${node.name} uses triangle primitives`,mode);if(mode!==4)continue;
+        for(const attr of ['POSITION','NORMAL','TEXCOORD_0'])Check(primitive.attributes[attr]!==undefined,`${node.name} has ${attr}`);
+        if(primitive.attributes.POSITION===undefined)continue;
+        const accessor=g.accessors[primitive.attributes.POSITION];Check(!accessor.sparse,`${node.name} POSITION is directly readable`);
+        const positions=ReadAccessor(glb,primitive.attributes.POSITION),points=[];
+        for(let index=0;index<positions.count;index++){const point=Array.from(positions.data.subarray(index*3,index*3+3));if(!point.every(Number.isFinite))throw Error('Nonfinite geometry');points.push(Transform(next,point));}
+        if(primitive.attributes.TEXCOORD_0!==undefined){
+          const uvId=primitive.attributes.TEXCOORD_0,uvAccessor=g.accessors[uvId],uv=ReadAccessor(glb,uvId);
+          const material=g.materials[primitive.material],regionKey=materialRegions[material?.name],region=atlasRegions[regionKey];
+          Check(uvAccessor.type==='VEC2'&&!uvAccessor.sparse&&uv.count===positions.count,`${node.name} has one directly readable UV pair per actual vertex`);
+          Check(!!region&&material?.extras?.AtlasRegion===regionKey,`${material?.name??primitive.material} declares its expected atlas region`,regionKey);
+          if(region){
+            // Blender UVs are bottom-left; exported glTF texture coordinates
+            // use the image's top-left origin. Audit real exported UVs after
+            // this V conversion, rather than comparing incompatible frames.
+            const [u0,v0,u1,v1]=region.uv,expected=[u0,1-v1,u1,1-v0];
+            const min=[Infinity,Infinity],max=[-Infinity,-Infinity];let outside=0;
+            for(let vertex=0;vertex<uv.count;vertex++){
+              const u=uv.data[vertex*2],v=uv.data[vertex*2+1];
+              if(!Number.isFinite(u)||!Number.isFinite(v)||u<expected[0]-1e-6||v<expected[1]-1e-6||u>expected[2]+1e-6||v>expected[3]+1e-6)outside++;
+              min[0]=Math.min(min[0],u);min[1]=Math.min(min[1],v);max[0]=Math.max(max[0],u);max[1]=Math.max(max[1],v);
+            }
+            const measured={node:node.name,material:material.name,region:regionKey,origin:'glTF top-left image coordinates',expected,bounds:[...min,...max],vertices:uv.count,outside};
+            report.uvPrimitives.push(measured);
+            Check(outside===0,`${node.name} actual UVs remain inside the ${regionKey} quadrant with a 20-pixel border`,measured);
+          }
+        }
+        const indices=primitive.indices!==undefined?Array.from(ReadAccessorInt(glb,primitive.indices).data):Array.from({length:positions.count},(_,index)=>index);
+        Check(indices.length%3===0&&indices.every(value=>Number.isInteger(value)&&value>=0&&value<positions.count),`${node.name} triangle indices are in range`);
+        report.totalTriangles+=indices.length/3;
+        const triangles=[];for(let corner=0;corner<indices.length;corner+=3)triangles.push(indices.slice(corner,corner+3).map(index=>points[index]));
+        allTriangles.push(...triangles);
+        if(part){part.points.push(...points);part.triangles.push(...triangles);if(primitive.material!==undefined)part.materials.push(primitive.material);}
+        Check(primitive.material!==undefined,`${node.name} has an assigned material`);
+        if(primitive.material!==undefined)usedMaterials.add(primitive.material);
+      }
+    }
+    for(const child of node.children??[]){parent.set(child,index);Walk(child,next,owner);}
+  }
+  for(const root of roots)Walk(root,identity);
+  for(const name of names.slice(1)){
+    const id=nodeIds[name][0];let cursor=id;const ancestors=[];while(parent.has(cursor)){cursor=parent.get(cursor);ancestors.push(cursor);}
+    Check(id!==undefined&&reachable.has(id)&&ancestors.includes(rootId),`${name} is below Pack_Root`);
+    Check(!names.slice(1).some(other=>other!==name&&ancestors.includes(nodeIds[other][0])),`${name} is independent of the other four named parts`);
+    const part=report.parts[name];Check((part?.triangles.length??0)>0,`${name} contains real triangle geometry`);
+    if(part){part.bounds=Bounds(part.points);part.triangleCount=part.triangles.length;part.materials=[...new Set(part.materials)];}
+  }
+  Check(report.totalTriangles>0&&report.totalTriangles<=3000,'All five parts combined are at most 3000 triangles (including hidden candidates)',report.totalTriangles);
+  const bundle=report.parts.Pack_Bundle,box=bundle?.bounds;
+  if(box){
+    Check(Near(box.size,[.38,.30,.13],.002),'Bundle actual X/Y/Z bounds are 0.38 / 0.30 / 0.13 m (2 mm tolerance)',box);
+    Check(Math.abs(box.center[0])<=.001&&Math.abs(box.center[1])<=.001&&Math.abs(box.min[2])<=.001,'Root is centered on the actual back plane (1 mm tolerance)',{center:box.center,backZ:box.min[2]});
+    let backArea=0,degenerate=0;
+    for(const [a,b,c] of bundle.triangles){
+      const ab=b.map((v,i)=>v-a[i]),ac=c.map((v,i)=>v-a[i]);
+      const cross=[ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0]];
+      if(Math.hypot(...cross)<1e-12)degenerate++;
+      if([a,b,c].every(point=>Math.abs(point[2])<=.001)&&cross[2]<0)backArea+=-cross[2]/2;
+    }
+    report.backPlane={areaM2:backArea,requiredM2:.38*.30*.55,degenerateBundleTriangles:degenerate};
+    Check(backArea>=.38*.30*.55,'At least 55% of nominal back area is real flat z=0 surface facing -Z',report.backPlane);
+    Check(degenerate===0,'Bundle has no zero-area triangles',degenerate);
+  }
+  const neededImages=new Set(),imageChannels=new Map();
+  function SourceOfTexture(index){const texture=g.textures?.[index];return texture?.extensions?.EXT_texture_webp?.source??texture?.source;}
+  for(const id of usedMaterials){
+    const material=g.materials[id],pbr=material.pbrMetallicRoughness??{};
+    const slots={base:pbr.baseColorTexture?.index,normal:material.normalTexture?.index,orm:pbr.metallicRoughnessTexture?.index,ao:material.occlusionTexture?.index};
+    const slotInfo={base:pbr.baseColorTexture,normal:material.normalTexture,orm:pbr.metallicRoughnessTexture,ao:material.occlusionTexture};
+    report.materials.push({id,name:material.name,slots,metallicFactor:pbr.metallicFactor??1,roughnessFactor:pbr.roughnessFactor??1});
+    for(const [slot,index] of Object.entries(slots)){Check(index!==undefined,`${material.name??id} has ${slot} texture`);if(index!==undefined){const source=SourceOfTexture(index);Check(source!==undefined,`${material.name??id} ${slot} source image exists`);if(source!==undefined)neededImages.add(source);}}
+    for(const [slot,info] of Object.entries(slotInfo)){
+      Check(!!info&&(info.texCoord??0)===0&&!info.extensions?.KHR_texture_transform,`${material.name??id} ${slot} actually samples the audited TEXCOORD_0 without a transform`);
+      if(info){const source=SourceOfTexture(info.index),channel={base:'Base',normal:'Normal',orm:'Orm',ao:'Orm'}[slot];if(source!==undefined){if(!imageChannels.has(source))imageChannels.set(source,new Set());imageChannels.get(source).add(channel);}}
+    }
+    Check(slots.orm!==undefined&&SourceOfTexture(slots.orm)===SourceOfTexture(slots.ao),`${material.name??id} AO and metallic-roughness use one ORM image`);
+  }
+  for(const id of neededImages){
+    const image=g.images[id];let bytes;
+    if(image.bufferView!==undefined){const view=g.bufferViews[image.bufferView];bytes=glb.bin.subarray(view.byteOffset??0,(view.byteOffset??0)+view.byteLength);}
+    else if(image.uri?.startsWith('data:')){const comma=image.uri.indexOf(',');bytes=Buffer.from(image.uri.slice(comma+1),image.uri.slice(0,comma).includes(';base64')?'base64':'utf8');}
+    else if(image.uri&&!/^[a-z]+:/i.test(image.uri)){bytes=fs.readFileSync(path.resolve(path.dirname(modelFile),decodeURIComponent(image.uri)));}
+    else throw Error(`Image ${id} has no locally readable payload`);
+    const size=ImageSize(bytes),sha256=Hash(bytes),channels=[...(imageChannels.get(id)??[])];
+    report.images.push({id,name:image.name,mimeType:image.mimeType,...size,bytes:bytes.length,sha256,channels});
+    Check(size.width===1024&&size.height===1024,`Material image ${image.name??id} is exactly 1024 square`,size);
+    Check(channels.length===1,`Image ${image.name??id} is not reused across incompatible PBR channel semantics`,channels);
+    for(const channel of channels){const external=externalMaps.get(channel);Check(!!external&&sha256===external.sha256&&bytes.equals(external.data),`Entire embedded ${channel} image equals its delivered external WebP byte for byte`,{embedded:sha256,external:external?.sha256});}
+    if(channels.includes('Orm'))Check(sha256===dryOrmGolden.sha256,'Embedded ORM also proves metallic=0 for every pixel',sha256);
+  }
+  report.bounds=Bounds(allTriangles.flat());
+  // Keep audit JSON compact and independent of source geometry duplication.
+  for(const part of Object.values(report.parts)){delete part.points;delete part.triangles;}
+}catch(error){Check(false,'Audit completed without parsing/runtime errors',error.message);}
+report.passed=report.checks.every(check=>check.ok);
+report.failed=report.checks.filter(check=>!check.ok).length;
+fs.mkdirSync(outDir,{recursive:true});fs.writeFileSync(path.join(outDir,'Data_Validation.json'),JSON.stringify(report,null,2)+'\n');
+console.log(JSON.stringify({passed:report.passed,checks:report.checks.length,failed:report.failed,totalTriangles:report.totalTriangles,report:path.join(outDir,'Data_Validation.json')}));
+process.exitCode=report.passed?0:1;

@@ -1,0 +1,55 @@
+{
+  "schema": "tengxian-model-textures-v1",
+  "id": "SichuanBlanketPack",
+  "date": "2026-10-18",
+  "pathsRelativeTo": "Taierzhuang1938/",
+  "scope": "Independent GLB authoring textures, embedded in Model_SichuanBlanketPack.glb; no existing game or level requests these images.",
+  "source": {
+    "provider": "imagegen",
+    "ref": "exec-05a5a655-3d97-47d8-ac5f-80a668a3163d.png",
+    "date": "2026-10-18",
+    "width": 1254,
+    "height": 1254,
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Source/Texture_SichuanBlanketPackSource.png",
+    "sha256": "2d50aad393320cb7f02a14249c55a70c663b18d1757cde7bb2767c96e207ac09",
+    "prompt": "_import/SichuanBlanketPack/Prompt_SichuanBlanketPackAtlas.txt",
+    "persistentPrompt": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Source/Prompt_SichuanBlanketPackAtlas.txt"
+  },
+  "bake": "_import/Script_SichuanBlanketPackTextureBake.py",
+  "bakeRecord": "_import/SichuanBlanketPack/Data_SichuanBlanketPackTextureBake.json",
+  "sharedBaker": "_import/Script_BakePbrTexture.py",
+  "preset": "sichuanBlanketPackAtlas",
+  "embeddedAsset": "Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb",
+  "consumers": [{"file": "_blender/Script_SichuanBlanketPackBake.py", "token": "SichuanBlanketPack"}],
+  "toneClass": null,
+  "metersPerTile": null,
+  "normalConvention": "gl",
+  "normalMeaning": "OpenGL tangent-space normal, RGB = n * 0.5 + 0.5; green points toward the image top. Fine cloth/straw relief is derived from a high-frequency albedo band-pass rather than full-colour quadrant differences.",
+  "atlasReason": "Four distinct authored UV material quadrants deliberately differ in albedo and do not tile into one another. The source is flat and unlit; no seamless blending, low-frequency flattening or palette matching is applied.",
+  "atlas": {
+    "imageOrigin": "top-left",
+    "imageBoundsOrder": "left,top,right,bottom; normalized",
+    "uvOrigin": "bottom-left",
+    "uvBoundsOrder": "uMin,vMin,uMax,vMax; normalized",
+    "quadrants": [
+      {"id": "Blanket", "material": "worn light homespun cotton", "imageBounds": [0, 0, 0.5, 0.5], "uvBounds": [0.02, 0.52, 0.48, 0.98]},
+      {"id": "Straw", "material": "dry woven straw mat and sandals", "imageBounds": [0.5, 0, 1, 0.5], "uvBounds": [0.52, 0.52, 0.98, 0.98]},
+      {"id": "Binding", "material": "plain grey cloth binding and shoulder straps", "imageBounds": [0, 0.5, 0.5, 1], "uvBounds": [0.02, 0.02, 0.48, 0.48]},
+      {"id": "Jacket", "material": "civilian indigo homespun cotton", "imageBounds": [0.5, 0.5, 1, 1], "uvBounds": [0.52, 0.02, 0.98, 0.48]}
+    ],
+    "blanketSharing": "Blanket face cloth, folded blanket body and its cloth patch reuse the same upper-left quadrant and PBR set."
+  },
+  "files": [
+    {"path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackBase.webp", "channel": "Base", "width": 1024, "height": 1024, "colorSpace": "sRGB", "encoding": "WebP quality 86", "bytes": 439962, "sha256": "2d9311ccdeb876a3788222e77b176f6c21a4c72c5cead4bd26594d02d7a98715"},
+    {"path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackNormal.webp", "channel": "Normal", "width": 1024, "height": 1024, "colorSpace": "linear", "encoding": "lossless WebP", "bytes": 508588, "sha256": "f3fc7358791ad4fd2bd8ed63a03d54642ac299848406a50879352bd7284beb76"},
+    {"path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackOrm.webp", "channel": "Orm", "width": 1024, "height": 1024, "colorSpace": "linear", "encoding": "lossless WebP", "bytes": 88, "sha256": "fa1284094b372b556c7756743d02575e2c4e0509b454069b83be28af99e2676a", "packing": {"R": "AO", "G": "roughness", "B": "metallic"}, "uniqueRgb": [255, 242, 0]}
+  ],
+  "totalBytes": 948638,
+  "physicalMeaning": "All four dry materials are rough dielectrics. ORM is AO=1, roughness=242/255 and metal=0; contact shadows and fold occlusion come from geometry and the renderer, not stains or quadrant colour.",
+  "verification": {
+    "sourceViewed": "640-square albedo preview checked: material boundaries are exact; no directional cast shadows, labels, fold lighting or modern bag graphics.",
+    "allMaps1024": true,
+    "allMetalZero": true,
+    "sharedTextureBudgetChanged": false
+  }
+}

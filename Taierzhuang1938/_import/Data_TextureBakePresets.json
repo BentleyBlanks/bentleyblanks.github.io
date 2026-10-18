@@ -90,6 +90,14 @@
       "reliefM": 0.002, "rough": 0.95, "roughVar": 0.03, "roughLumaK": 0.0, "ao": 0.35, "metal": 0.0,
       "seamless": "blend", "rowFlatten": false, "flattenSigma": 0.088, "isotropic": true, "heightFromLuma": "direct"
     },
+    "sichuanBlanketPackAtlas": {
+      "label": "独立川军被包四材质作者UV图集：灰白旧土布、草编、灰布带、靛蓝短褂；分区色差不代表烘入光照",
+      "mean": [0.49, 0.47, 0.42], "contrast": 0.19,
+      "lumaRange": [0.30, 0.60], "satRange": [0.03, 0.38], "stdRange": [0.10, 0.27],
+      "texelsPerMeter": [128, 4096],
+      "reliefM": 0.00035, "rough": 0.95, "roughVar": 0.0, "roughLumaK": 0.0, "ao": 0.0, "metal": 0.0,
+      "seamless": "none", "rowFlatten": false, "flattenSigma": 0.088, "isotropic": false, "heightFromLuma": "direct"
+    },
     "menuCloth": {
       "label": "菜单近景帽服布料（25 cm 布样，最多 1K；可近距检视纤维）",
       "mean": [0.47, 0.445, 0.40], "contrast": 0.062,
