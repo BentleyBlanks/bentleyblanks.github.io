@@ -18,6 +18,8 @@ export const BLOCKOUT_KINDS = Object.freeze(["soldier", "officer", "civilian", "
 export const BLOCKOUT_STANCES = Object.freeze(["stand", "crouch", "prone"]);
 export const BLOCKOUT_POI_KINDS = Object.freeze(["objective", "poi", "landmark", "danger"]);
 export const BLOCKOUT_MG_WEAPONS = Object.freeze(["Type11", "Type92Hmg", "Zb26"]);
+/** 倒地的人怎么躺（§3 可选 lie，2026-10-18）："along" = 身体顺着朝向躺、头朝 yawDeg 的前方；不写 = 演员倒地姿态原样（身子横在朝向两侧）。 */
+export const BLOCKOUT_LIE_MODES = Object.freeze(["along"]);
 
 /** 过渡缺省速度（米 / 秒），§3 单位表。 */
 export const BLOCKOUT_DEFAULT_SPEED = Object.freeze({ ija: 2.8, nra: 2.4, civ: 1.6, litter: 1.2, tank: 2.0 });
@@ -160,6 +162,7 @@ function CheckUnit(errors, warnings, at, unit) {
   if (unit.castId !== undefined && (typeof unit.castId !== "string" || !/^[A-Za-z][A-Za-z0-9]*$/.test(unit.castId))) errors.push(`${at}.castId 要是定妆角色 id（字母开头的字母数字）`);
   if (unit.guess !== undefined && typeof unit.guess !== "boolean") warnings.push(`${at}.guess 应当是 true / false`);
   if (unit.bearers !== undefined && !(Number.isInteger(unit.bearers) && unit.bearers >= 0 && unit.bearers <= 2)) errors.push(`${at}.bearers 要是 0–2 的整数`);
+  if (unit.lie !== undefined && !BLOCKOUT_LIE_MODES.includes(unit.lie)) errors.push(`${at}.lie 要是 ${BLOCKOUT_LIE_MODES.join(" / ")}（不写 = 演员倒地姿态原样）`);
 }
 
 function CheckKeyframe(errors, warnings, at, kf) {
@@ -330,6 +333,8 @@ function NormalizeUnit(raw, arcMode) {
   if (unit.kind === "litter") unit.bearers = Number.isInteger(unit.bearers) && unit.bearers >= 0 && unit.bearers <= 2 ? unit.bearers : 2;
   else delete unit.bearers;
   if (unit.weapon === undefined) unit.weapon = DefaultWeapon(unit.side, unit.kind);
+  // lie 只认 "along"；没写或写错都去掉（= 原来的倒地样子，已有数据不变）
+  if (!BLOCKOUT_LIE_MODES.includes(unit.lie)) delete unit.lie;
   unit.yawDeg = NormalizeYawFrom(unit, unit);
   delete unit.faceTo;
   unit.speedMps = Finite(unit.speedMps) && unit.speedMps > 0 ? unit.speedMps : DefaultSpeed(unit);

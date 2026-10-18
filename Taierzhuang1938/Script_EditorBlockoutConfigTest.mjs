@@ -609,5 +609,16 @@ Check("复制当前位置：左右朝向、pose 往返、文字带齐、末行 J
   assert.ok(bare.includes("关键帧：（没有）") && bare.includes("准星对着：天空"), bare);
 });
 
+Check("单位可选 lie（2026-10-18）：只认 along；不写的单位归一化后也没有 lie，已有关卡没人写", () => {
+  const base = { schema: BLOCKOUT_SCHEMA, level: "T", title: "t", keyframes: [{ id: "a", stage: 1, name: "a", player: { x: 0, z: 0 }, units: [] }] };
+  const With = (unit) => ({ ...base, keyframes: [{ ...base.keyframes[0], units: [unit] }] });
+  assert.ok(ValidateBlockout(With({ id: "A", side: "nra", x: 0, z: 0, state: "down", lie: "along" })).ok);
+  const bad = ValidateBlockout(With({ id: "A", side: "nra", x: 0, z: 0, state: "down", lie: "sideways" }));
+  assert.ok(!bad.ok && bad.errors.some((e) => e.includes("units[0].lie")), bad.errors.join("; "));
+  assert.equal(NormalizeBlockout(With({ id: "A", side: "nra", x: 0, z: 0, state: "down", lie: "along" })).keyframes[0].units[0].lie, "along");
+  assert.ok(!("lie" in NormalizeBlockout(With({ id: "A", side: "nra", x: 0, z: 0, state: "down" })).keyframes[0].units[0]));
+  for (const level of ["FirstLevel", "SecondLevel"]) for (const k of COMMITTED[level].keyframes) for (const u of k.units) assert.ok(!("lie" in u), `${level} ${k.id} ${u.id} 不该有 lie`);
+});
+
 console.log(unitWarnings.length ? `警告：${unitWarnings.length} 个单位落在实心块里（不算失败）：\n  ${unitWarnings.join("\n  ")}` : "单位都不在实心块里");
 console.log(`EditorBlockoutConfigTest 通过：${checks} 组检查`);

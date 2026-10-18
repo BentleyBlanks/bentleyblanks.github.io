@@ -27,7 +27,9 @@ export const PREVIZ_SFX_ALIASES = Object.freeze([
   "artilleryFar", "artilleryNear", "shellBlast", "tinnitus", "mgBurstFar", "mgBurstNear", "rifleVolley", "rifleShot",
   "mortarPop", "mortarImpact", "grenadeBlast", "tankTracks", "tankGun", "dirtFall", "slap", "stab", "bodyFall",
 ]);
-const KEY_FIELDS = ["stance", "aim", "state", "visible", "carryRole", "woundedWalk", "talking", "clip"];
+const KEY_FIELDS = ["stance", "aim", "state", "visible", "carryRole", "woundedWalk", "talking", "clip", "lie", "weapon"];
+/** 倒地怎么躺（同配置 §3 的 lie）："along" = 顺着朝向躺、头朝前；null = 演员倒地姿态原样。 */
+export const PREVIZ_LIE_MODES = Object.freeze(["along"]);
 const ID_RE = /^[A-Za-z0-9_-]+$/;
 
 const Finite = (v) => typeof v === "number" && Number.isFinite(v);
@@ -203,6 +205,8 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
         if (k.clip !== undefined && k.clip !== null && (typeof k.clip !== "string" || !k.clip)) errors.push(`${kat}.clip 要是片段名或 null`);
         if (k.clipFrom !== undefined && !(Finite(k.clipFrom) && k.clipFrom >= 0)) errors.push(`${kat}.clipFrom 要是非负数`);
         if (k.clipHold !== undefined && typeof k.clipHold !== "boolean") errors.push(`${kat}.clipHold 要是 true / false`);
+        if (k.lie !== undefined && k.lie !== null && !PREVIZ_LIE_MODES.includes(k.lie)) errors.push(`${kat}.lie 要是 ${PREVIZ_LIE_MODES.join(" / ")} 或 null`);
+        if (k.weapon !== undefined && k.weapon !== null && (typeof k.weapon !== "string" || !k.weapon)) errors.push(`${kat}.weapon 要是武器 id（如 Dadao / HanYang）或 null（空手）`);
       });
     });
     // 台词
@@ -413,7 +417,9 @@ function StepField(track, name, t) {
 /**
  * 演员 entry 在 t 秒（序列时间）的状态。baseUnit = 当前关键帧里这个单位（归一化后的）；带 spawn 的 entry 用 spawn。
  * opts：resolve(id) → {x,z}（faceTo 指单位 id / "player" 时用）；clipDuration(name) → 秒；turnS。
- * @returns {{x,z,yawDeg,stance,aim,state,visible,carryRole,woundedWalk,talking,clip,clipSeconds,clipHold,moving,speedMps,move}}
+ * lie：阶跃，没写过就沿用 baseUnit.lie（"along" / null）；weapon：阶跃，**只有键里写过才有值**（undefined = 用造人时那把，
+ * 关键帧单位的缺省武器不在这里回填 —— 否则空手的翻译会被塞一支 Type38）。
+ * @returns {{x,z,yawDeg,stance,aim,state,lie,weapon,visible,carryRole,woundedWalk,talking,clip,clipSeconds,clipHold,moving,speedMps,move}}
  */
 export function SamplePrevizActor(entry, t, baseUnit, opts = {}) {
   const track = CompilePrevizActor(entry, baseUnit);
@@ -443,6 +449,8 @@ export function SamplePrevizActor(entry, t, baseUnit, opts = {}) {
     stance,
     aim: !!Value("aim", !!base.aim),
     state: Value("state", base.state === "down" ? "down" : "alive"),
+    lie: PREVIZ_LIE_MODES.includes(Value("lie", base.lie)) ? Value("lie", base.lie) : null,
+    weapon: Value("weapon", undefined),
     visible: Value("visible", true) !== false,
     carryRole: Value("carryRole", null) || null,
     woundedWalk: !!Value("woundedWalk", false),

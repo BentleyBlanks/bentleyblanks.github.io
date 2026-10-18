@@ -5,8 +5,8 @@
   "source": {
     "generator": "Script_EditorBlockoutCli.mjs export FirstLevel0105",
     "gameVersion": "Notion 01–05 剧本 + 空间拓扑关系（2026-10-18）",
-    "commit": "999aa655d26be7178a83e55e1a71605348097ef5",
-    "generatedAt": "2026-10-18T10:17:23.228Z"
+    "commit": "68c2f28d8a4a9304a293054627fadbafdd54235c",
+    "generatedAt": "2026-10-18T11:07:01.518Z"
   },
   "zones": [
     {
@@ -1406,8 +1406,8 @@
       "player": {
         "x": 63.3,
         "z": 63.8,
-        "yawDeg": 132.2,
-        "pitchDeg": 8,
+        "yawDeg": 113.1,
+        "pitchDeg": 6,
         "stance": "prone"
       },
       "what": "台阶那头枪声一停，机枪手抬头往西看；南沿上「打！」一排枪打下来，班长抡刀跳进沟里。",
@@ -1597,6 +1597,7 @@
           "castId": "luo",
           "role": "squadLeader",
           "group": "outflank",
+          "weapon": "Dadao",
           "x": 58.95,
           "z": 64.46,
           "yawDeg": -86,
@@ -1783,8 +1784,9 @@
           "role": "comrade",
           "x": 57.48,
           "z": 65.05,
-          "yawDeg": -176.4,
+          "yawDeg": 93.6,
           "state": "down",
+          "lie": "along",
           "speedMps": 1.2
         },
         {
@@ -2082,8 +2084,9 @@
           "role": "comrade",
           "x": 37.63,
           "z": 67.11,
-          "yawDeg": -176.4,
+          "yawDeg": 93.6,
           "state": "down",
+          "lie": "along",
           "speedMps": 1.2,
           "path": [
             {
@@ -2487,8 +2490,9 @@
           "role": "comrade",
           "x": 23.81,
           "z": 73.46,
-          "yawDeg": -66.8,
+          "yawDeg": -156.8,
           "state": "down",
+          "lie": "along",
           "speedMps": 1.2,
           "path": [
             {
@@ -2849,8 +2853,9 @@
           "role": "comrade",
           "x": 30.26,
           "z": 92.44,
-          "yawDeg": -80.5,
+          "yawDeg": -170.5,
           "state": "down",
+          "lie": "along",
           "speedMps": 1.2,
           "path": [
             {
@@ -3209,8 +3214,9 @@
           "role": "comrade",
           "x": 35,
           "z": 132.8,
-          "yawDeg": -90,
+          "yawDeg": -180,
           "state": "down",
+          "lie": "along",
           "speedMps": 1.2,
           "path": [
             {
@@ -3758,8 +3764,9 @@
           "role": "comrade",
           "x": 32,
           "z": 149.5,
-          "yawDeg": -180,
+          "yawDeg": 90,
           "state": "down",
+          "lie": "along",
           "speedMps": 1.2,
           "path": [
             {
@@ -4247,8 +4254,9 @@
           "role": "comrade",
           "x": 32,
           "z": 149.5,
-          "yawDeg": -180,
+          "yawDeg": 90,
           "state": "down",
+          "lie": "along",
           "speedMps": 1.2
         },
         {

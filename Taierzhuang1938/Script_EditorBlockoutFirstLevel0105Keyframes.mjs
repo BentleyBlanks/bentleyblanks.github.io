@@ -250,11 +250,12 @@ export function TrenchRoute(a, b) {
 // 单位与 POI
 
 const META = new WeakMap();
-const UNIT_KEY_ORDER = ["id", "side", "kind", "name", "castId", "role", "group", "weapon", "x", "z", "yawDeg", "stance", "aim", "state", "bearers", "arc", "speedMps", "path", "intent", "guess"];
+const UNIT_KEY_ORDER = ["id", "side", "kind", "name", "castId", "role", "group", "weapon", "x", "z", "yawDeg", "stance", "aim", "state", "lie", "bearers", "arc", "speedMps", "path", "intent", "guess"];
 
 /**
  * 一个单位。at = {x,z}；o：
- *   face {x,z} | yaw   朝向；name / castId（定妆角色，预演动嘴用）/ kind / role / group / weapon / stance / aim / down / bearers / arc / speed / guess
+ *   face {x,z} | yaw   朝向；name / castId（定妆角色，预演动嘴用）/ kind / role / group / weapon / stance / aim / down / lie / bearers / arc / speed / guess
+ *                      （lie:"along" = 倒地的人顺着朝向躺、头朝前，§3；被子上 / 担架上的伤员用）
  *   from {x,z}|[..]   只在本帧出现：从这里走进来（path 起点）
  *   path [..]          显式来路（不含上一帧的起点）
  *   to {x,z}|[..]      即将去：沿壕沟网排 intent（数组 = 依次经过，每段都沿网排）
@@ -275,6 +276,7 @@ function U(id, side, at, o = {}) {
   if (o.stance && o.stance !== "stand") u.stance = o.stance;
   if (o.aim) u.aim = true;
   if (o.down) u.state = "down";
+  if (o.down && o.lie) u.lie = o.lie;
   if (o.bearers !== undefined) u.bearers = o.bearers;
   if (o.arc) u.arc = o.arc;
   if (o.speed) u.speedMps = o.speed;
@@ -568,7 +570,10 @@ function Keyframes() {
   const MG_FELL = Pt(PL.enemyBranchGun.x, PL.enemyBranchGun.z + 2.0), MG_LOADER_FELL = Pt(PL.enemyBranchGun.x + 1.4, PL.enemyBranchGun.z + 2.1);
   Add({
     id: "02-2", ...s02, name: "反冲：南沿上一排枪",
-    player: { ...pinnedView, yawDeg: Yaw(PINNED, B(OUTFLANK_FIRE_021.Luo, OUTFLANK_RIM_LAT)), pitchDeg: 8 },
+    // 10-18 第二轮：原来正对南沿（132°）、何有田蹲在右手边占了半屏，沟里倒下的人看不见。改成顺着支沟往西偏南看：
+    // 左上是南沿上开火的人，中间是跳下来的班长，沟底一路倒着的人；何有田出了画面右边。顺子仍趴在洞口。
+    player: { ...pinnedView, yawDeg: Yaw(PINNED, { x: 0.7 * D(DGround - 1.5, -0.3).x + 0.3 * B(OUTFLANK_FIRE_021.Luo, OUTFLANK_RIM_LAT).x,
+      z: 0.7 * D(DGround - 1.5, -0.3).z + 0.3 * B(OUTFLANK_FIRE_021.Luo, OUTFLANK_RIM_LAT).z }), pitchDeg: 6 },
     what: "台阶那头枪声一停，机枪手抬头往西看；南沿上「打！」一排枪打下来，班长抡刀跳进沟里。",
     next: { text: "等何有田来扒土" },
     how: ["台阶那头的枪声忽然停了半秒", "南沿上「打！」——一排枪从头顶打下来", "台阶那头的人顺着支沟冲过来", "自动演出，玩家只能看"],
@@ -584,7 +589,8 @@ function Keyframes() {
       J("IjaDing", bodies.IjaDing, { yaw: -90, down: true }),
       J("IjaMgGunner", MG_FELL, { yaw: 90, stance: "prone", down: true, arc: MG_ARC, climb: true }),
       J("IjaMgLoader", MG_LOADER_FELL, { yaw: 90, down: true, climb: true }),
-      N("Luo", D(DGround - 1.5, -0.3), { yaw: -86, aim: true, climb: true, group: "outflank" }),
+      // 班长是抡着大刀从南沿跳下来的（剧本）：这一帧手里还是大刀，02-3 把枪塞给顺子之前才换回步枪
+      N("Luo", D(DGround - 1.5, -0.3), { yaw: -86, aim: true, climb: true, group: "outflank", weapon: "Dadao" }),
       N("LiuWencai", B(OUTFLANK_FIRE_021.LiuWencai + 0.6, OUTFLANK_RIM_LAT), { face: PINNED, stance: "crouch", aim: true, climb: true, group: "outflank" }),
       N("Squad3", B(OUTFLANK_FIRE_021.Squad3, OUTFLANK_RIM_LAT), { face: B(OUTFLANK_FIRE_021.Squad3 + 3, 0), stance: "crouch", aim: true, climb: true, group: "outflank", guess: true }),
       N("Squad2", B(32.5, -0.6), { yaw: -86, aim: true, climb: true, group: "outflank", guess: true }),
@@ -612,8 +618,8 @@ function Keyframes() {
   ];
   // 单被只画被子（bearers 0）；何有田是独立单位（castId heyoutian），站在被子头上揪一个被角往前拽（预演里他要动嘴、单独演拽到掩体后）
   const Blanket = (at, o = {}) => N("Blanket", at.center ?? at, { kind: "litter", name: o.name ?? "单被", bearers: 0, yaw: o.yaw ?? at.yaw, speed: 1.2, ...o.extra });
-  // 倒地姿态的身子横在朝向的左右（演员 dead 姿态），要顺着被子躺就得比被子转 90°
-  const OnBlanket = (at, o = {}) => N("Donggua", at.center ?? at, { down: true, speed: 1.2, onLitter: "Blanket", ...o, yaw: R1((((o.yaw ?? at.yaw) + 90 + 540) % 360) - 180) });
+  // 冬瓜顺着被子躺（lie:"along"，§3）：头朝被子头 = 拖的人那头，朝向就是被子的朝向（10-18 第二轮：不再比被子转 90°）
+  const OnBlanket = (at, o = {}) => N("Donggua", at.center ?? at, { down: true, lie: "along", speed: 1.2, onLitter: "Blanket", ...o, yaw: R1(o.yaw ?? at.yaw) });
   const HePulling = (at, o = {}) => N("HeYoutian", at.he, { yaw: at.yaw, speed: 1.2, ...o });
   const Ahead = (d0, o = {}) => [
     N("LiuWencai", D(d0, -0.4), { yaw: D(d0).heading, guess: true, ...o }),

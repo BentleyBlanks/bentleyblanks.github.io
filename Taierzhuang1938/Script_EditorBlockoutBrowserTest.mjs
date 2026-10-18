@@ -22,6 +22,8 @@
 //  10. 预演（§14，2026-10-18）：第一关没有预演文件时按钮不出现；page.route 注入一段最小的预演（不改盘上的数据）后：
 //      播放中相机被接管、台词字幕出现、导航栏锁住、标记藏起；Seek 后单位位置等于 SamplePrevizActor（< 0.1 m）、
 //      同一 t 两次取样一样；播完按 then 跳到下一个关键帧；中断（Esc）后相机、枪模、HUD 交还。
+//      10-18 第二轮：倒地的人（state down、lie:"along"）被拖着走时一直躺着（dead、骨盆贴地、头朝朝向）、位置连续；
+//      预演键 weapon 切换后演员手里的武器变了，交还驱动后换回关键帧那把。
 // 顺带量：开机到就绪、第一次烘图的最长帧、03-2 上 120 帧的帧时、外部修改的同步耗时、切关耗时。
 // ===========================================================================
 
@@ -731,8 +733,10 @@ try {
         keyframe: "03-1", title: "预演测试", then: "next", durationS: 4,
         camera: [{ t: 0, dur: 4, from: { x: -40, z: -98, h: 3 }, to: { x: -36, z: -98, h: 3 }, look: { actor: "luo", offset: [0, 1.2, 0] }, fov: 50 }],
         actors: [
-          { id: "luo", keys: [{ t: 0.5, faceTo: "player" }, { t: 3, x: -28, z: -110, move: "run", path: [{ x: -29, z: -109 }] }] },
+          { id: "luo", keys: [{ t: 0.5, faceTo: "player" }, { t: 1.5, weapon: "Dadao" }, { t: 3, x: -28, z: -110, move: "run", path: [{ x: -29, z: -109 }] }] },
           { id: "PrevizExtra", spawn: { side: "nra", x: -33, z: -101, yawDeg: 0 }, keys: [{ t: 1, x: -33, z: -104, move: "walk" }] },
+          // 倒地、顺着朝向躺的人被拖着往西走 4 m（walk 1.4 m/s：约 0.64 s 出发、3.5 s 到）
+          { id: "PrevizBody", spawn: { side: "nra", x: -33, z: -100, yawDeg: 90, state: "down", lie: "along" }, keys: [{ t: 3.5, x: -37, z: -100, move: "walk" }] },
         ],
         lines: [{ t: 0.3, line: "PrevizTest.01", actor: "luo" }],
         events: [{ t: 2.5, type: "flash", dur: 0.3 }, { t: 2.6, type: "sfx", name: "rifleShot" }],
@@ -792,6 +796,32 @@ try {
     Check("同一 t 两次 Seek：相机与单位一样（确定性）", JSON.stringify(s1.cam) === JSON.stringify(s2.cam) && JSON.stringify(s1.units) === JSON.stringify(s2.units),
       JSON.stringify({ a: s1.cam, b: s2.cam }));
     await page.screenshot({ path: path.join(shotDir, "Previz_03-1_seek2.6.png") });
+    // 倒地的人被拖：一口气按 0.25 s 取样（同一次 evaluate 里），一直躺着、位置连续、头朝朝向
+    const bodyRows = await B(async () => {
+      const Bl = window.Tengxian.Debug.Blockout, out = [];
+      for (let t = 0.25; t <= 3.75; t += 0.25) {
+        await Bl.Previz.Seek(t);
+        const p = Bl.Probe("PrevizBody");
+        out.push({ t, x: p.x, z: p.z, yawDeg: p.yawDeg, headYawDeg: p.headYawDeg, down: p.down, dead: p.dead, moving: p.moving, pelvis: p.pelvisAboveGround, currentId: p.currentId });
+      }
+      return out;
+    });
+    const wantBody = (t) => SamplePrevizActor(seq.actors[2], t, null);
+    const Wrap = (d) => ((d + 540) % 360) - 180;
+    let bodyBad = bodyRows.filter(r => !r.down || !r.dead || !(r.pelvis < 0.45) || Math.hypot(r.x - wantBody(r.t).x, r.z - wantBody(r.t).z) > 0.05
+      || Math.abs(Wrap(r.headYawDeg - r.yawDeg)) > 12);
+    for (let i = 1; i < bodyRows.length; i++) if (Math.hypot(bodyRows[i].x - bodyRows[i - 1].x, bodyRows[i].z - bodyRows[i - 1].z) > 1.4 * 0.25 + 0.05) bodyBad.push({ jump: bodyRows[i] });
+    const bodyMoved = Math.hypot(bodyRows.at(-1).x - bodyRows[0].x, bodyRows.at(-1).z - bodyRows[0].z);
+    Check("预演里倒地的人（lie:along）被拖着走：一直躺着（dead、骨盆 < 0.45 m、头朝朝向）、位置连续地平移（每 0.25 s ≤ 0.4 m，不瞬移）",
+      bodyBad.length === 0 && bodyMoved > 3.5 && bodyRows.some(r => r.moving), JSON.stringify({ moved: bodyMoved, bad: bodyBad.slice(0, 3), sample: bodyRows[6] }));
+    // 预演键 weapon：t 1.5 起罗班长手里换成大刀
+    const weaponRows = await B(async () => {
+      const Bl = window.Tengxian.Debug.Blockout, out = {};
+      for (const t of [1.0, 2.0]) { await Bl.Previz.Seek(t); out[t] = Bl.Probe("luo").weapon; }
+      return out;
+    });
+    const luoWeapon = kf31.units.find(u => u.id === "luo").weapon;
+    Check("预演键 weapon 切换后演员手里的武器变了（1.0 s 关键帧那把 → 2.0 s 大刀）", weaponRows[1] === luoWeapon && weaponRows[2] === "Dadao", JSON.stringify({ ...weaponRows, luoWeapon }));
     // 播完：按 then 跳到下一个关键帧，相机交还
     await B(() => window.Tengxian.Debug.Blockout.Previz.Resume());
     await WaitSync(() => window.__previzDone !== null, null, 10000);
@@ -803,8 +833,13 @@ try {
         nav: document.querySelector(".boNav")?.classList.contains("locked") };
     });
     Check("播完按 then 跳到下一个关键帧（03-2），临时加的人回收，相机、枪模、HUD、导航栏交还",
-      after.done === true && after.id === "03-2" && !after.playing && !after.units.includes("PrevizExtra") && after.camToEye < 0.3 && !after.hud && after.vm === true && !after.nav,
+      after.done === true && after.id === "03-2" && !after.playing && !after.units.includes("PrevizExtra") && !after.units.includes("PrevizBody") && after.camToEye < 0.3 && !after.hud && after.vm === true && !after.nav,
       JSON.stringify(after));
+    {
+      const luo32 = configDoc.keyframes[K("03-2")].units.find(u => u.id === "luo");
+      const w = await B(() => window.Tengxian.Debug.Blockout.Probe("luo")?.weapon ?? null);
+      Check("预演交还后罗班长手里换回关键帧那把", !luo32 || w === (luo32.weapon ?? null), JSON.stringify({ w, want: luo32?.weapon }));
+    }
     // 中断：N 播、Esc 中断
     await GoTo("03-1");
     await page.waitForTimeout(150);

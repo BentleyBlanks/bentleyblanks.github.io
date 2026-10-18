@@ -234,6 +234,32 @@ Test("站人取地：高度场 + 一步能踩上的实心块顶面（按 ry 判�
   Near(at(40, 0), -1.24, 1e-9, "坑沿炸了不算"); Near(at(50, 0), -0.74, 1e-9, "残骸出现后算");
 });
 
+// 2026-10-18：lie（倒地怎么躺）与 weapon（手里换武器）是阶跃键
+Test("lie / weapon 键：校验、阶跃、缺省", () => {
+  const bad = ValidateBlockoutPreviz({ schema: BLOCKOUT_PREVIZ_SCHEMA, level: "Test", sequences: [{ keyframe: "01-1",
+    actors: [{ id: "Luo", keys: [{ t: 0, lie: "across" }, { t: 1, weapon: 3 }, { t: 2, weapon: "" }] }] }] }, { config });
+  assert.ok(bad.errors.some(e => e.includes("keys[0].lie")), bad.errors.join("; "));
+  assert.ok(bad.errors.some(e => e.includes("keys[1].weapon")) && bad.errors.some(e => e.includes("keys[2].weapon")), bad.errors.join("; "));
+  const ok = ValidateBlockoutPreviz({ schema: BLOCKOUT_PREVIZ_SCHEMA, level: "Test", sequences: [{ keyframe: "01-1",
+    actors: [{ id: "Luo", keys: [{ t: 0, lie: "along", weapon: "Dadao" }, { t: 1, weapon: null }, { t: 2, lie: null, weapon: "HanYang" }] }] }] }, { config });
+  assert.ok(ok.ok, ok.errors.join("; "));
+  const entry = { id: "Luo", keys: [{ t: 1, weapon: "Dadao", state: "down", lie: "along" }, { t: 3, weapon: "HanYang" }, { t: 4, lie: null }] };
+  const base = config.keyframes[0].units[0];
+  const S = (t) => SamplePrevizActor(entry, t, base);
+  assert.equal(S(0.5).weapon, undefined, "没写过 weapon 前是 undefined（用造人时那把，不回填缺省武器）");
+  assert.equal(S(0.5).lie, null);
+  assert.equal(S(1).weapon, "Dadao"); assert.equal(S(2.9).weapon, "Dadao"); assert.equal(S(3).weapon, "HanYang");
+  assert.equal(S(1.5).lie, "along"); assert.equal(S(4.2).lie, null);
+  // 关键帧单位写了 lie:"along"，没键时沿用
+  const down = { ...base, state: "down", lie: "along" };
+  assert.equal(SamplePrevizActor({ id: "Luo", keys: [] }, 1, down).lie, "along");
+  // 配置：lie 校验与归一化（只认 along，不写不加）
+  const cfg = NormalizeBlockout({ schema: "tengxian-blockout/1", level: "T", title: "t", keyframes: [{ id: "a", stage: 1, name: "a", player: { x: 0, z: 0 },
+    units: [{ id: "A", side: "nra", x: 0, z: 0, state: "down", lie: "along" }, { id: "B", side: "nra", x: 1, z: 0, state: "down" }] }] });
+  assert.equal(cfg.keyframes[0].units[0].lie, "along");
+  assert.ok(!("lie" in cfg.keyframes[0].units[1]), "没写 lie 的单位归一化后也没有 lie");
+});
+
 // 仓库里有预演文件时（预演数据包写的），它要对着配置与清单过校验
 for (const level of ["FirstLevel0105", "FirstLevel", "SecondLevel"]) {
   const file = path.join(projectDir, "Blockout", `${level}.previz.json`);

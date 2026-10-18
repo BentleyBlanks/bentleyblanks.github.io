@@ -2,17 +2,19 @@
 // 跑法：node Taierzhuang1938/Script_EditorBlockoutFirstLevel0105SceneTest.mjs
 // 查：生成两次逐字相同（generatedAt 固定）、过 ValidateBlockoutScene、锚点处高度、沟底宽、塌洞净空；
 // 10-18 返工：干沟尺寸与两条视线（集结处看不见前沿、南边平地看不进沟底）、支沟南沿土垄挡住北沿机枪、
-// 板桥（宽、与地面齐平、桥下净空、TankDisabled 压断两块）、日常摆件（高度、通道 ≥ 2.2 m、≥15 m 直沟至少一件）。
+// 板桥（宽、与地面齐平、桥下净空、TankDisabled 压断两块、门板之间 4–6 cm 缝）、日常摆件（高度、通道 ≥ 2.2 m、≥15 m 直沟至少一件）。
+// 10-18 第二轮：南岸坎顶一道 0.6–0.8 m 的连续矮土埂（烘进高度场），南边平地看沟底的余量 ≥ 0.6 m。
 
 import assert from "node:assert/strict";
 import { ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
 import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
 import {
   BuildFirstLevel0105Scene, FloorWidthAt, NaturalHeight, L0105SightChecks, GullyFloorExtent, PropPassage, PropsPerStraight,
+  GullySouthBerm, GullySouthBermTop, L0105_GULLY_SOUTH_BERM_LENGTH,
 } from "./Script_EditorBlockoutFirstLevel0105Scene.mjs";
 import {
   L0105_PLACES as P, L0105_HEIGHTS as H, L0105_TRENCH_SECTION as S, L0105_GULLY as G, L0105_BRIDGE as BR,
-  L0105_PROPS, L0105_PROP_KINDS, L0105_SUNKEN_LANE,
+  L0105_PROPS, L0105_PROP_KINDS, L0105_SUNKEN_LANE, L0105_GULLY_SOUTH_BERM as SB, PointBeside,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 const opts = { commit: "test", generatedAt: "2026-10-18T00:00:00.000Z" };
@@ -39,7 +41,8 @@ Near(floorY, H.assemblyFloor, 0.05, "干沟沟底");
 Near(sample(P.crest.x + 12, P.crest.z) - floorY, H.crest - H.assemblyFloor, 0.3, "坡顶−干沟沟底");
 for (const x of [20, 46, 55]) { // 避开交通沟坡道（x 35 两边各 5 m）
   Near(sample(x, G.northRimZ - 0.5) - floorY, H.gullyRim - H.assemblyFloor, 0.25, `北岸坎高 x${x}`);
-  Near(sample(x, G.southRimZ + 0.5) - floorY, H.gullyRim - H.assemblyFloor, 0.25, `南岸坎高 x${x}`);
+  // 南岸坎顶上多了一道土埂：坎本身仍是 2.5 m（扣掉土埂）
+  Near(sample(x, G.southRimZ + 0.5) - GullySouthBerm(x, G.southRimZ + 0.5) - floorY, H.gullyRim - H.assemblyFloor, 0.25, `南岸坎高 x${x}`);
   // 坎要陡：坎顶往沟里 3 m 内落差 ≥ 2 m
   assert.ok(sample(x, G.northRimZ) - sample(x, G.northRimZ + 3) >= 2, `北岸坎不够陡 x${x}`);
   assert.ok(sample(x, G.southRimZ) - sample(x, G.southRimZ - 3) >= 2, `南岸坎不够陡 x${x}`);
@@ -56,10 +59,22 @@ for (const [x, z, sideX] of [[83, 168, 91], [82.5, 185, 90], [70, 155, 70]]) {
 }
 void L0105_SUNKEN_LANE;
 
+// --- 南岸土埂：连续、顶高 0.6–0.8 m、底宽约 2 m、烘进了网格 ---
+for (let d = SB.taperM; d <= L0105_GULLY_SOUTH_BERM_LENGTH - 10; d += 0.5) {
+  const c = PointBeside(SB.line, d, 0);
+  const top = GullySouthBerm(c.x, c.z);
+  assert.ok(top >= 0.6 && top <= 0.8, `南岸土埂在弧长 ${d} m (${c.x.toFixed(1)},${c.z.toFixed(1)}) 顶高 ${top.toFixed(2)}（要 0.6–0.8）`);
+  assert.ok(Math.abs(sample(c.x, c.z) - NaturalHeight(c.x, c.z)) < 0.15 || c.x > 76, `南岸土埂 (${c.x.toFixed(1)},${c.z.toFixed(1)}) 没烘进网格`);
+}
+assert.ok(SB.w >= 1.8 && SB.w <= 2.4 && SB.h >= 0.6 && SB.h <= 0.8, "土埂底宽约 2 m、高 0.6–0.8 m");
+assert.ok(GullySouthBermTop(0) !== GullySouthBermTop(7), "土埂顶高要有起伏（形状自然）");
+// 凹路照旧是开口：凹路底不被土埂垫高
+Near(sample(83, 159), sample(83, 162), 0.25, "凹路拐弯处不被土埂堵上");
+
 // --- 视线 ---
 const sights = L0105SightChecks(sample);
 assert.ok(sights.assembly.worst > 0.5, `集结处看得见前沿：${JSON.stringify(sights.assembly.worstRow)}`);
-assert.ok(sights.south.worst > 0, `南边平地看得进沟底：${JSON.stringify(sights.south.worstRow)}`);
+assert.ok(sights.south.worst >= 0.6, `南边平地看沟底的余量不到 0.6 m：${JSON.stringify(sights.south.worstRow)}`);
 assert.ok(sights.southObservers >= 25, "南边平地的观察点太少（凹路排除得太宽？）");
 assert.ok(sights.mgToCrawl.worst > 0.1, `北沿机枪看得见南沿土垄外爬的人：${JSON.stringify(sights.mgToCrawl.worstRow)}`);
 assert.ok(sights.pinnedToSteps.worst <= 0, "洞口趴着要能顺着支沟看见台阶那头的人");
@@ -101,6 +116,14 @@ const under = sample(BR.x, BR.z);
 const clear = Math.min(...stringers.map((x) => x.y - x.h / 2)) - under;
 assert.ok(clear >= 1.6, `桥下横木底离沟底 ${clear.toFixed(2)} m（人要能在桥下沟底趴着、弯腰过）`);
 assert.ok(deckTop - under >= 2.0, "桥下照常是沟");
+// 门板之间 4–6 cm 的缝（每块门板单独一个块），桥下仰看透得出天光
+{
+  const sorted = boards.map((x) => ({ x, s: (x.x - BR.x) * fx + (x.z - BR.z) * fz })).sort((p, q) => p.s - q.s);
+  for (let i = 1; i < sorted.length; i++) {
+    const gapM = (sorted[i].s - sorted[i - 1].s) - (sorted[i].x.d + sorted[i - 1].x.d) / 2;
+    assert.ok(gapM >= 0.035 && gapM <= 0.065, `门板 ${sorted[i - 1].x.id}–${sorted[i].x.id} 缝 ${(gapM * 100).toFixed(1)} cm（要 4–6 cm）`);
+  }
+}
 const brokenOff = boards.filter((x) => x.signal === "TankDisabled");
 const brokenOn = all.filter((x) => x.appearSignal === "TankDisabled");
 assert.ok(brokenOff.length >= 1 && brokenOff.length <= 2 && brokenOn.length >= 1, "TankDisabled：一两块门板压断下沉");

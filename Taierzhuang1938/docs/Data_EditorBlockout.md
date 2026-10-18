@@ -160,9 +160,10 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
 | `name` | 可选短标签（罗班长、破墙机枪…）；无名的普通兵只显示图标 |
 | `castId` | 可选（2026-10-18）：定妆角色 id（`Data_FirstLevelSpeakingCast` 的键，如 `luo` / `yaowa` / `comrade` / `ijaA`）。给了就用那个角色固定的身体与面部（同一个人每一帧长一个样），预演里台词才能动嘴（§14） |
 | `role` / `group` | 可选，自由文本 / 遭遇组 id（俯视图图例、筛选用） |
-| `weapon` | 可选，缺省：ija `Type38`、nra `HanYang`、civ 无 |
+| `weapon` | 可选，缺省：ija `Type38`、nra `HanYang`、civ 无；`Dadao`（大刀）同开场 01–02 罗班长的挂法（`actor.SetWeapon("Dadao")`），站着不动、没播片段时摆原生白刃戒备（§5.6） |
 | `x, z, yawDeg | faceTo` | 位置与朝向 |
-| `stance` / `aim` / `state` | `"stand"|"crouch"|"prone"`；`aim` 举枪；`state: "down"` = 倒地（伤 / 亡） |
+| `stance` / `aim` / `state` | `"stand"|"crouch"|"prone"`；`aim` 举枪；`state: "down"` = 倒地（伤 / 亡）；倒地的人在过渡 / 预演里换位置**只平移、保持躺姿**（被拖、被抬，§5.6） |
+| `lie` | 可选（2026-10-18），只对倒地的人有意义：`"along"` = 身体顺着朝向躺、头朝 `yawDeg` 的前方、骨盆落在 `x,z`（被子 / 担架上被拖着走的伤员用：朝向写成拖的方向）；不写 = 原来的样子（演员倒地姿态原样，身子横在朝向两侧，已有数据不变）。校验只认 `"along"`；归一化时没写或写错都去掉 |
 | `arc` | 可选射界 `{ halfDeg, rangeM, yawDeg? }`（中心缺省 = 朝向）；缺省时只有机枪手（Type11/Type92Hmg/Zb26）和战车按 §5.3 默认画 |
 | `path` | 可选：从**上一关键帧**的位置走到这里的折线（不含起点，可含终点）；没有则直线 |
 | `intent` | 可选：此刻「即将去」的折线，画成虚线箭头；没有且下一关键帧里这个人换了位置，则自动取下一关键帧的 `path`/直线 |
@@ -187,6 +188,7 @@ export function PlanTransition(prevKf, nextKf, opts); // 见 §5.2
 export function PathLength(points); export function SamplePath(points, distanceM); // → {x,z,headingYawDeg}
 export function YawDegFromTo(a, b); export function ForwardFromYawDeg(yawDeg);    // → {x,z}
 export function DefaultArc(unit);                   // §5.3
+export const BLOCKOUT_LIE_MODES;                    // ["along"]（§3 lie）
 ```
 
 ## 4. 界面（`Script_EditorBlockoutUi.mjs` + `Style_EditorBlockout.css`）
@@ -317,6 +319,12 @@ export class BlockoutMarkers {
 - `kind`：`officer` → `ijaOfficer`/`nraOfficer`；`civilian`/`child` → `civilian`（child 缩放 0.62，若安全）；`tank` → 简单体块车身 5.75×2.18×1.9 + 炮塔块；`litter` → 担架块 2.1×0.7 + 前后两名抬担架的 NRA 演员；`cart` → 车块 + 可选 `animal` 块。
 - `state: "down"`：倒地姿态（用现有 `dead`/`prone` 状态，实现时选能用的）。2026-10-18：倒地的人放在身体周围 0.9 m 内**最低**的地面上（不再悬在土埂斜坡上方；陡沟壁上仍会斜躺，数据里把倒地位置放到沟底）。
 - 2026-10-18：演员脚下的地面 = max(高度场, 点落在其脚印内、顶面比高度场高不超过 1.0 m 的实心块顶面)（`Script_EditorBlockoutPrevizPlan.BlockStandSampler`，总控 `standAt`；脚印按 `ry` 旋转判，gates 只算此刻在场的，水 / 空气墙不算）：机枪坑射击台、台阶上的人站在台上，洞顶、胸墙这种高块不算。关键帧摆人、预演的 eye 镜头与锚点、倒地、战车、3D 标记都用它；俯视图、地形上色、水面仍按纯高度场。战车按车身脚印上中心、四角、四边中点 9 处取**最高**的地面放（`TankGroundY`），压过沟时停在沟沿上而不是掉进沟底；蹲、卧的人一律按戒备姿态（原生 `KneelHold` / `CrouchIdle`），不被友军步态换成扛枪半蹲；有 `castId` 的单位用定妆身体（`SpeakingCastOptions`），按需下载的身体（如翻译 NRA06）先下完再造人（`PrepareCasts`），翻译不拿枪。
+- 2026-10-18（第二轮）：
+  - **倒地的人移动只平移**：`state: "down"` 的人在关键帧过渡和预演里换位置时 `moveSpeed` 记 0、`dead` 照旧（原来一「走动」就不算倒地、会站起来走），姿态保持躺着，位置平滑滑过去（拖被子、抬担架）。
+  - **`lie: "along"`**（单位或预演键）：倒地姿态是按种子抽的死亡片段，头朝哪边不固定。人倒下落定后（造出来就直接落定）量一次头相对骨盆在人物本地的方向，以后每帧把整个人转到「头朝 `yawDeg` 的前方」、骨盆放在单位位置上；在播片段时不转（片段自己定姿势）。不写 `lie` 的照旧。
+  - **武器**：预演键 `weapon`（阶跃）调 `actor.SetWeapon(id)` 换手里的家伙（`null` = 空手），没写过 = 造人时 / 关键帧那把，交还驱动时换回去。关键帧之间同一个人武器变了：两把都不是空手就地 `SetWeapon`，不再整个重造（空手 ↔ 拿武器要换步态，照旧重造）。
+  - **大刀戒备**：手里是近战家伙（`weaponData.kind === "melee"`，如 `Dadao`）、站着不动、没播片段、不在抬担架时，给 `actor.Update` 带 `meleeCombat: { weapon, state: "idle", action: "Guard", clip: "DadaoGuard", … }`、`aim: 0`（同开场导演的 `meleeGuard`），不再端着大刀摆步枪据枪。
+  - `Probe(id)` 多给：`down`、`lie`、`moving`、`dead`（已倒地落定）、`weapon`、骨盆 / 头的世界 xz、`headYawDeg`（头相对骨盆的世界朝向，`lie:"along"` 时 ≈ `yawDeg`）、`rootYawDeg`。
 - 距离分级：60 m 外每 3 帧更新一次动画，阴影只在 25 m 内开；单关同时上限 120 个演员，超出时远处的只留地环与标签（报警告）。
 - 切关、重载配置时全部回收；同一关切关键帧时按 `id` 复用。
 
@@ -487,6 +495,7 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
 - 2026-10-13（用户反馈第一轮）：锁不住鼠标的窗口退化成按住右键拖动转视角；全关总图打开时对准玩家、导航栏压在总图上面仍可用；导航栏加重播按钮（同 `Y`）。
 - 2026-10-13（复制当前位置）：卡片加「复制当前位置」按钮与 `P` 键（§4.2），文字末行带整份 JSON；入口加 `pose=` 参数，「重现」链接原样打开回到同一机位。
 - 2026-10-13（地图开着鼠标漏到游戏）：遮罩改成盖满整屏（导航栏两边那条原来露着，点一下会重新锁鼠标 / 在面板里直接开枪）；`Script_Main` 加 `BlockoutMouseCaptured()` 闸住抢锁、开枪、转头与滚轮换枪。
+- 2026-10-18（01–05 第二轮修补）：§3 单位加可选 `lie`、`weapon` 写 `Dadao` 摆白刃戒备；§5.6 倒地的人移动只平移、`lie:"along"` 顺着躺、预演 / 关键帧换武器就地 `SetWeapon`、Probe 多给几项；§14.1 演员键加 `lie`、`weapon`（阶跃）；§13 干沟南岸坎顶加矮土埂（南边平地看沟底余量 0.16 → 0.78 m）、板桥门板之间 5 cm 缝、05-2 桥下仰看与 05-3 甩手榴弹换机位、冬瓜顺着被子躺平滑跟着走、班长 02-2 抡大刀跳沟。
 - 2026-10-18（01–05 返工）：§13 FirstLevel0105 按用户当天改稿重做地形、关键帧与预演（南沿迂回、两人并排拖单被、日常摆件、干沟集结处、路口板桥）。
 - 2026-10-18（01–05 新剧本白盒）：新关卡 `FirstLevel0105`（§13）；场景文件加可选 `gates` 与块的显式 `y`，布局 `hideOpenGates`（§2.2）；关键帧可选 `stageLabel`、单位可选 `castId`（§3）；预演（§14，用户 10-18 拍板：编辑器里加预演，缺的动作先用现成动作顶上）。
 
@@ -505,6 +514,13 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
 场景信号：`DugoutCollapsed`（01 塌洞）、`PitShelled`（03 末战车一炮打塌坑沿）、`TankDisabled`（05 战车瘫在桥头，桥面两块门板压断下沉）。场景文件里对应的块写在 `gates`（§2.2）。
 
 **2026-10-18 返工（用户当天改稿，Notion 文字已改、图还是旧的）**：02 反冲改成南沿迂回（何有田带一个弟兄留在支沟口台阶上顺支沟压住北沿机枪，班长带刘文财和两个弟兄从支沟口往南 10 m 爬出交通沟、贴支沟南沿土垄外侧往东爬到审问处对面，「打！」从南沿上来）；拖单被改成顺子和何有田并排站在被子头上往前拖、班长倒退断后，三处躲：支沟里一垛弹药箱、支沟口台阶拐角、拐角 2；沟里铺日常摆件（弹药箱垛、土袋垛、靠沟壁的门板、水缸、木头堆、塌方土堆，能挡子弹的齐腰高，每段 ≥15 m 直沟至少一件，留 ≥2.2 m 通道；不要猫耳洞）；集结处从坡后浅洼地改成一道东西向干沟（沟底约 15×50 m、比坡顶低 4 m、两岸 2.5 m 陡坎、南岸一排枯树、东南头接往南的凹路），交通沟顺北岸切成坡道下到沟底；路口交通沟上搭板桥（顺路三根横木 + 门板，桥面 3.8 m 宽、与路面齐平，桥下沟底到横木底约 1.8 m），05 班长判断「只有走那座板桥」、带顺子钻到桥下趴着，车刚过桥甩手榴弹，车瘫在桥头（这一拍剧本用户还没最后拍板，白盒先这样做）。两条视线（集结处看不见前沿、南边平地 1.6 m 眼高看不进沟底）与北沿机枪看不见南沿土垄外爬的人，由场景生成器 notes 与 `Script_EditorBlockoutFirstLevel0105SceneTest.mjs` 核对。
+
+**2026-10-18 第二轮修补（用户「没改的都改好」）**：
+- 干沟南岸坎顶堆一道连续的矮土埂（锚点 `L0105_GULLY_SOUTH_BERM`，烘进高度场，不用体块）：顶高 0.6–0.8 m（按弧长起伏）、底宽约 2.2 m、顶宽 0.8 m；中心线从干沟西头的缓坎绕过西南角、顺南岸坎顶一直堆到凹路拐弯处，凹路把它切开（凹路本身是开口）；树照旧在南岸。南边平地（离南岸 ≥ 12 m、眼高 1.6）看沟底站着的人：最少多挡 0.16 → 0.78 m；SceneTest 门槛从 `> 0` 提到 `≥ 0.6`，另查土埂连续、高度、坎高扣掉土埂仍 2.5 m。
+- 板桥门板每块单独一个块，顺路之间留 `L0105_BRIDGE.gapM` = 5 cm 的缝（SceneTest 查 4–6 cm）。
+- 冬瓜在单被上 `lie: "along"`、朝向 = 被子朝向（头朝拖的人）；预演里跟被子同一条路、同一个时间窗的 walk 位置键（去掉原来的 90° 补偿与 0.25 s 一步的瞬移）。03-4 幺娃拖机枪手同理（`lie: "along"`，crawl 慢速匀速滑过去）。
+- 02-2：关键帧班长 `weapon: "Dadao"`；预演里爬上南沿、跳沟（`DadaoAmbush` 举刀）、落地冲过去（`CreepDadao`）、劈甲（`LuoDadaoChopRear`）都是大刀；台词按剧本「打！」→「敌袭！」→「杀——！」（何有田在台阶那头喊，压制组同时往前冲，镜头扫一眼台阶）→ 班长跳沟落地「砍！」。02-3 开场接着拿大刀，走到顺子跟前时换回 `HanYang`，再 `LuoHandRifle` 把枪塞过去。02-2 关键帧玩家视角改成顺着支沟往西偏南（113°、仰 6°），看得见南沿开火的人、跳下来的班长和沟里倒下的人。
+- 05-2：桥下仰看的 eye 挪到桥面南沿往南约 2 m 的沟底（蹲姿眼高）、朝西北 38°、仰 26–30°、视场 76°：画面从下往上是门板底面、桥沿、压在桥上的车身、天空；落土是烟 + 说明字。05-3：甩手榴弹换成顺子身后沟上方的宽镜头（视场 72°），前景顺子替身探身（没有扔手榴弹的片段，`PointBlockade` 顶上），越过沟沿是车尾和那块铁板。
 
 ## 14. 预演（previz，2026-10-18）
 
@@ -555,6 +571,7 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
   - 位置：`x, z`（`path` 是途经点；`move`：`"walk"` / `"run"` / `"crawl"` / `"drag"`（倒退着拖，朝向反过来）/ `"cut"`（到点瞬移），缺省 `walk`）。**带位置的键的 `t` 是到达时刻**：从上一个带位置的键（没有就是关键帧布设、t = 0）出发，按 `move` 的自然速度走（walk 1.4、run 3.5、crawl 0.5、drag 0.9 m/s），出发时刻 = max(上一个位置键的 t, 本键 t − 路长 / 速度)；窗口不够就从上一个位置键起匀速赶到。`t = 0` 的位置键 = 开场直接摆到那里（瞬移）。要控制「几点出发」，在出发时刻加一个同位置的键。`crawl` 走动时强制卧姿。
   - 朝向：`yawDeg` 或 `faceTo`（点 `{x,z}` 或单位 id 或 `"player"`）。走动中顺着行进方向（`drag` 反向），到点后 0.4 s 转到本键的朝向；本键没写朝向就保持到达时的行进方向，等后面的朝向键再转。
   - 姿态与状态：`stance`、`aim`、`state`（`"down"` 倒地）、`visible`、`carryRole`（`"front"` / `"rear"`，抬担架 / 拖单被）、`woundedWalk`、`talking`。这些与 `clip` 都是**阶跃**：取 t 之前最近写过这个字段的键。
+  - 2026-10-18（第二轮）：`lie`（`"along"` / `null`，阶跃；没写过沿用关键帧单位 / spawn 的 `lie`）—— 倒地的人顺着朝向躺，见 §3、§5.6；倒地的人带位置的键照常写 `move`（`walk` 跟拖的人同速），运行时只平移、不起身，走动中朝向 = 行进方向（`drag` 反向），所以「头朝拖的人」= 用 `walk`。`weapon`（武器 id 或 `null`，阶跃）—— 换手里的武器（如班长 `Dadao` → `HanYang`）；**只有键里写过才有值**，`SamplePrevizActor` 在第一个 `weapon` 键之前返回 `undefined`（= 用造人时那把，不回填关键帧的缺省武器）。
   - 动作片段：`clip`（开场动作库等现成片段名，`null` = 清掉回原生动画）、`clipFrom`（从片段第几秒起）、`clipHold`（播完停在最后一帧；不写则播完回原生动画）。片段按骨架分：有 `castId` 的单位骨架固定，片段不在这具骨架上时退回原生动画并在状态里报一次（`Debug.Blockout.Previz.State().missingClips`）。
 - **台词** `lines[]`：`line` 是 `voice` 清单里的句子 id；`actor` 可省（省了 = 当前关键帧里 `castId` 等于这句 `who` 的单位；找不到就从玩家头上放、不动嘴）。字幕显示这句的 `speaker` + `subtitle`；有口型轨按 sha256 用口型轨，否则用音频包络张嘴（单位要有带面部的身体：`castId` 属于 `Data_FirstLevelSpeakingCast`）。
 - **事件** `events[]`（`type` 必填）：
@@ -562,7 +579,7 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
   - `explosion` `{x, z, kind?, radius?}`（`kind` 同 `VfxSystem.Explosion`）；`smoke` `{x, z, kind?, dur?}`（`SmokeDust` / `SmokeWhite` / `SmokeBlack`）；`muzzle` `{actor | x,z,h, count?, interval?}` 枪口火；`shake` `{dur, strength}`。
   - `signal` `{name, on}`：在这一刻把场景信号打开 / 关掉（塌洞、坑沿被炸、战车瘫），播完或中断时恢复到 `then` 那个关键帧的 `signals`。
   - `sfx` `{name, x?, z?, volume?}`：`name` 用 §14.3 的别名。
-- 校验：`Script_EditorBlockoutPrevizPlan.mjs`（纯，node 与浏览器共用）导出 `BLOCKOUT_PREVIZ_SCHEMA`、`ValidateBlockoutPreviz(doc, { config?, voice? })`（给了配置就核对 `keyframe` / 单位 id，给了清单就核对 `line`）、`NormalizeBlockoutPreviz(doc)`、`SamplePrevizActor(actorEntry, t, baseUnit)`、`SamplePrevizCamera(camera, t, resolve)`。
+- 校验：`Script_EditorBlockoutPrevizPlan.mjs`（纯，node 与浏览器共用）导出 `BLOCKOUT_PREVIZ_SCHEMA`、`PREVIZ_LIE_MODES`、`ValidateBlockoutPreviz(doc, { config?, voice? })`（给了配置就核对 `keyframe` / 单位 id，给了清单就核对 `line`）、`NormalizeBlockoutPreviz(doc)`、`SamplePrevizActor(actorEntry, t, baseUnit)`、`SamplePrevizCamera(camera, t, resolve)`。
 
 ### 14.2 播放（`Script_EditorBlockoutPreviz.mjs` + 总控）
 

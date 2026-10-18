@@ -8,7 +8,8 @@
 // 坐标与尺寸只读 Data_EditorBlockoutFirstLevel0105Space（唯一口径）；本文件不另造锚点，只定「怎么烘」：
 //   1. 自然地面 NaturalHeight：前沿 0、坑北开阔地略低、z −206 东西向土坎、z 60→131 缓升到坡顶、
 //      坡顶往南落到 +1.5 的台地，台地里一道东西向干沟（集结处，沟底 −1.0、两岸 2.5 m 陡坎），干沟东南头接一条往南的凹路，
-//      南岸再往南十来米落到平地 0；叠一层确定性的低频起伏（几条固定频率的正弦，不用随机数）。
+//      南岸再往南十来米落到平地 0；南岸坎顶堆一道连续的矮土埂（0.6–0.8 m，L0105_GULLY_SOUTH_BERM，凹路处被切开）；
+//      叠一层确定性的低频起伏（几条固定频率的正弦，不用随机数）。
 //   2. 路面：路宽内压低一点，两侧路肩略起。
 //   3. 壕沟：复用 Script_TrenchPlan.CompileTrenchNetwork（与游戏第一关同一套断面、弃土垄与位置噪声）。
 //      交通沟在板桥底下加深 0.3 m、过坡顶那段变浅、末端顺着干沟北岸的坎切成坡道下到沟底：不拆段，而是给 Apply 的
@@ -28,7 +29,7 @@ import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
 import {
   L0105_LEVEL_KEY, L0105_BOUNDS, L0105_CELL_M, L0105_HEIGHTS, L0105_TRENCH_SECTION, L0105_TRENCHES,
   L0105_ROAD, L0105_ROAD_WIDTH_M, L0105_PLACES, L0105_SIGNALS, L0105_SPAWN,
-  L0105_GULLY, L0105_GULLY_TREES, L0105_SUNKEN_LANE, L0105_BRIDGE, L0105_BRANCH_SOUTH_BERM,
+  L0105_GULLY, L0105_GULLY_TREES, L0105_GULLY_SOUTH_BERM, L0105_SUNKEN_LANE, L0105_BRIDGE, L0105_BRANCH_SOUTH_BERM,
   L0105_PROPS, L0105_PROP_KINDS, PointBeside, LineLength,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
@@ -85,6 +86,40 @@ function Undulation(x, z) {
   return raw * crestCalm * gullyCalm * frontCalm;
 }
 
+/**
+ * 南岸坎顶土埂加多少高（米）：横断面平顶 topW、两侧落到底宽 w；顶高按弧长慢慢起伏（确定性正弦），西头收尖。
+ * 东头不收：一直堆到凹路，由 LaneCap 切开。
+ */
+const SB = L0105_GULLY_SOUTH_BERM;
+const SB_LEN = (() => { let n = 0; for (let i = 1; i < SB.line.length; i++) n += Math.hypot(SB.line[i].x - SB.line[i - 1].x, SB.line[i].z - SB.line[i - 1].z); return n; })();
+export function GullySouthBermTop(along) {
+  return SB.h + 0.06 * Math.sin(along * 0.29 + 0.7) + 0.03 * Math.sin(along * 0.83 + 2.2);
+}
+/** 点到土埂中心线：→ { d 横向距离, along 弧长 }。 */
+function BermStation(x, z) {
+  let best = Infinity, at = 0, walked = 0;
+  for (let i = 1; i < SB.line.length; i++) {
+    const a = SB.line[i - 1], b = SB.line[i];
+    const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
+    const t = Clamp01(((x - a.x) * dx + (z - a.z) * dz) / (len * len));
+    const d = Math.hypot(x - a.x - dx * t, z - a.z - dz * t);
+    if (d < best) { best = d; at = walked + len * t; }
+    walked += len;
+  }
+  return { d: best, along: at };
+}
+export function GullySouthBerm(x, z) {
+  const halfBase = SB.w / 2;
+  if (x < 2 || x > 86 || z < 143 || z > 161) return 0;
+  const { d, along } = BermStation(x, z);
+  if (d >= halfBase) return 0;
+  const halfTop = SB.topW / 2;
+  const k = d <= halfTop ? 1 : 1 - Smooth((d - halfTop) / (halfBase - halfTop));
+  const ends = Smooth(along / SB.taperM) * Smooth((SB_LEN - along) / 1.5);
+  return GullySouthBermTop(along) * k * ends;
+}
+export const L0105_GULLY_SOUTH_BERM_LENGTH = SB_LEN;
+
 /** 凹路：路底按弧长从 fromY 缓降到 toY，路底宽 floorW，两壁 wallM 内陡起。返回这一点开挖后的高度上限（不在路上 = Infinity）。 */
 const LANE = L0105_SUNKEN_LANE;
 const LANE_LEN = (() => { let s = 0; for (let i = 1; i < LANE.line.length; i++) s += Math.hypot(LANE.line[i].x - LANE.line[i - 1].x, LANE.line[i].z - LANE.line[i - 1].z); return s; })();
@@ -126,6 +161,8 @@ export function NaturalHeight(x, z) {
   }
   h += SouthProfile(z);
   h += Undulation(x, z);
+  // 南岸坎顶土埂（在干沟 / 凹路开挖之前堆：坎里那一侧被干沟削掉一点，凹路处整个切开）
+  h += GullySouthBerm(x, z);
   // 干沟：沟底平 assemblyFloor
   {
     const w = GullyWeight(x, z);
@@ -303,8 +340,8 @@ export function L0105Ground() {
     if (Math.hypot(x - L0105_BRIDGE.x, z - L0105_BRIDGE.z) < L0105_BRIDGE.spanM && DistanceToPolyline(x, z, L0105_ROAD) < L0105_ROAD_WIDTH_M / 2 + 1.2) {
       h = Math.min(h, natural + RoadDelta(x, z));
     }
-    // 干沟里压平：交通沟末端的弃土垄别堆在沟底（坡道是往下挖的，不受影响）
-    { const w = GullyWeight(x, z); if (w > 0) h = Math.min(h, Lerp(h, H.assemblyFloor, w)); }
+    // 干沟里压平：交通沟末端的弃土垄别堆在沟底（坡道是往下挖的，不受影响）；南岸土埂脚下不再削第二遍（NaturalHeight 已按干沟削过）
+    { const w = GullyWeight(x, z); if (w > 0 && !(GullySouthBerm(x, z) > 0)) h = Math.min(h, Lerp(h, H.assemblyFloor, w)); }
     h = CarveBox(h, x, z, PIT_BOX, pitFloorY, PIT_WALL_M);
     h = CarveDisc(h, x, z, FIREC.x, FIREC.z, FIREC.radiusM - 0.35, fireCFloorY, 0.35);
     h = CarveBox(h, x, z, DUG_BOX, dugoutFloorY, DUG_WALL_M);
@@ -497,7 +534,8 @@ export function BridgeBlocks(sample) {
   for (let i = 0; i < rows; i++) {
     const s = -half + B.boardM * (i + 0.5);
     const id = `BridgeDoorBoard_${String(i + 1).padStart(2, "0")}`;
-    const b = Block(id, B.x + fx * s, B.z + fz * s, B.deckW, B.boardM - 0.04, B.boardT, "timber", { ry: R2(ry), y: R2(deckY) });
+    // 每块门板单独一个块，之间留 gapM 的缝（R2 只到厘米：d 取 boardM − gapM 正好）
+    const b = Block(id, B.x + fx * s, B.z + fz * s, B.deckW, B.boardM - B.gapM, B.boardT, "timber", { ry: R2(ry), y: R2(deckY) });
     if (broken.has(i)) gates.push({ ...b, signal: L0105_SIGNALS.tankDisabled });
     else blocks.push(b);
   }
@@ -668,10 +706,22 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
   notes.push(`沟底：拐角1 ${at(P.corner1)} · 南直段 ${at({ x: 12.5, z: 32 })} · 支沟口（交通沟） ${R2(trafficFloorAtJunction)} · 台阶脚（支沟） ${R2(branchFloorAtSteps)}（落差 ${R2(facts.stepRise)}，${STEP_COUNT} 级）`
     + ` · 拐角2 ${at(P.corner2)} · 板桥下 ${at(P.crossing)}（沟深 ${R2(nat(P.crossing) - at(P.crossing))}）· 坡顶沟底 ${at(P.crest)}（坡顶自然 ${nat(P.crest)}，沟深 ${R2(nat(P.crest) - at(P.crest))}）· 干沟口 ${at(P.assemblyEntry)}`);
   const crestTop = R2(sample(P.crest.x + 12, P.crest.z)), floor = R2(sample(P.assembly.x, P.assembly.z));
-  const rimN = R2(sample(P.assembly.x + 8, L0105_GULLY.northRimZ - 0.5)), rimS = R2(sample(P.assembly.x + 8, L0105_GULLY.southRimZ + 0.5));
+  const rimN = R2(sample(P.assembly.x + 8, L0105_GULLY.northRimZ - 0.5));
+  const bermS = R2(GullySouthBerm(P.assembly.x + 8, L0105_GULLY.southRimZ + 0.5));
+  const rimS = R2(sample(P.assembly.x + 8, L0105_GULLY.southRimZ + 0.5) - bermS);   // 南岸坎顶（扣掉上面那道土埂）
   const gw = GullyFloorExtent(sample);
-  notes.push(`干沟：坡顶（沟东 12 m）${crestTop} · 沟底 ${floor} → 高差 ${R2(crestTop - floor)} m（锚点 ${R2(H.crest - H.assemblyFloor)}）；北岸坎顶 ${rimN}、南岸坎顶 ${rimS} → 坎高 ${R2(rimN - floor)} / ${R2(rimS - floor)} m；`
+  notes.push(`干沟：坡顶（沟东 12 m）${crestTop} · 沟底 ${floor} → 高差 ${R2(crestTop - floor)} m（锚点 ${R2(H.crest - H.assemblyFloor)}）；北岸坎顶 ${rimN}、南岸坎顶 ${rimS}（上面再堆 ${bermS} m 土埂）→ 坎高 ${R2(rimN - floor)} / ${R2(rimS - floor)} m；`
     + `沟底（离 −1.0 在 15 cm 内）南北宽 ${gw.width} m、东西长 ${gw.length} m；凹路口 ${at(P.laneHead)}、凹路 (83,170) 底 ${R2(sample(83, 170))} / 旁边地面 ${R2(sample(91, 170))}`);
+  {
+    const tops = [];
+    let low = 0;
+    for (let along = SB.taperM; along <= SB_LEN - 10; along += 1) {
+      tops.push(R2(GullySouthBermTop(along)));
+      if (GullySouthBermTop(along) < 0.6) low += 1;
+    }
+    notes.push(`南岸土埂：中心线 ${R2(SB_LEN)} m（西头顺缓坎往北 ${SB.taperM} m 收尖、绕过西南角顺南岸到 x ${SB.line[SB.line.length - 1].x}，东头凹路切开），`
+      + `顶高 ${Math.min(...tops)}…${Math.max(...tops)} m、底宽 ${SB.w} m、顶宽 ${SB.topW} m；低于 0.6 m 的地方 ${low} 处`);
+  }
   notes.push(`坑北开阔地 (0,−80) ${R2(sample(0, -80))} · 土坎顶 (28,−206) ${R2(sample(BANK.x, BANK.z))}、坎北掷弹筒 ${at(P.mortar)} · 东轻机枪弹坑底 ${at(P.enemyLmgEast)}`);
   const widths = [
     ["前沿沟 x−30", -30.5, 0, 0, 1], ["前沿沟 x60", 56, 0, 0.5, 1], ["前沿沟西折", -62, -12, 1, 0],
@@ -699,7 +749,7 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
       commit,
       notes: `01–05 新剧本白盒：锚点 Data_EditorBlockoutFirstLevel0105Space；高度 ${L0105_CELL_M} m 网格（${minM}…${maxM} m）；`
         + "壕沟 = Script_TrenchPlan.CompileTrenchNetwork（前沿两段 + 交通 + 支沟 + 爬沟；交通沟板桥下加深、坡顶变浅、坡道下到干沟靠改基准面；支沟弃土只堆南沿成土垄）；"
-        + "集结处 = 坡后干沟（沟底 −1.0、两岸 2.5 m 陡坎、南岸枯树、东南头接凹路）；坑 / 散兵坑 / 洞为平底开挖；沟里日常摆件；路口板桥（白盒先做，剧本这一拍待拍板）；"
+        + "集结处 = 坡后干沟（沟底 −1.0、两岸 2.5 m 陡坎、南岸坎顶一道 0.6–0.8 m 矮土埂、南岸枯树、东南头接凹路）；坑 / 散兵坑 / 洞为平底开挖；沟里日常摆件；路口板桥（白盒先做，剧本这一拍待拍板）；"
         + "gates：DugoutCollapsed / PitShelled / TankDisabled（桥面两块门板压断）。",
     },
     bounds: { ...L0105_BOUNDS },
