@@ -161,6 +161,7 @@
 14. **贴图资产规范（2026-09-28）**：`Texture/` 下每个文件都登记在 `Data_TextureManifest.mjs`（套名、通道打包、加载层、来源与提示词、消费方）；新贴图按 `Texture_<PascalCase><Base|Normal|Orm|Orh…>.webp` 命名，经 `_import/Script_BakePbrTexture.py` 烘焙（写 `_import/TextureBakes/` 记录），默认进关卡按需集（`Data_LevelTextureSets` + `MaterialLibrary.LoadLevelSets`），不进开机 `PBR_SETS`；运行时 URL 带 `?v=`；legacy 名单只许变短。口径 [贴图资产规范](docs/Data_TextureAssetStandard.md)，验收 `Script_TextureStandardsTest.mjs`。
 
 15. **拾枪 / 换枪 / 拿弹药一律单击 F（tap），不按住（2026-09-29 用户定，通用机制）。** 内建拾枪（`Script_Interact.PickupCandidate`）只有 tap、`Press` 按下即完成，没有进度环，`INTERACT.weaponPickupHoldS` 已删；注册点里凡是「拿起 / 换上一件武器」的交互同样写 `gesture: "tap"`，提示条写「F」而不是「按住 F」。按住（hold / confirm）只留给止血、搬运、补给、拆板、接线这类过程。口径见 [系统参考](docs/Data_AgentReference.md) 的武器槽一节，验收 `Script_CarryTest.mjs`、`Script_WeaponPickupTest.mjs`、`Script_HudPromptTest.mjs`。
+16. **史实与创作跟着内容一起改（2026-10-18 用户定）。** 改剧本、大纲、节拍表、空间设计，或做带史料含义的资产（军装、背包、武器、工事摆件）时，同一轮把新出现的事件、做法、物件补进 Notion「史实与创作对照表」和资料馆条目 `HistoryAndCreation`（`Data_HistoryCodex.mjs`）。标注只按核过的出处定：Notion 或资产契约附的链接先打开看，对不上就不挂、往下降一级；查不到的标「创作」或「出处待查」，不往史实那边靠；资产按设计定的尺寸、捆法、配色写成创作。主要人物的生死不进资料馆。口径与核对记录见 [资料馆「史实与创作」](docs/Data_HistoryCodex.md)，验收 `HistoryCodexBrowserTest`。
 
 人物外观必须遵循[用户确认的选模清单](docs/Data_CharacterSelection.md)，运行时与编辑器共用 `Data_CharacterSelection.mjs`；保留的源模型或动作参考不等于允许重新启用其人物外观。
 
