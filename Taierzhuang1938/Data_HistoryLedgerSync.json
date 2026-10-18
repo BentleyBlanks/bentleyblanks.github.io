@@ -1,20 +1,20 @@
 {
   "schema": "tengxian-history-ledger-sync-v1",
   "about": "史实与创作对照的同步记号。Script_HistoryLedgerAudit.mjs 读它决定从哪里开始看改动、--check 读它拦已否决的链接；skill tengxian-fact-fiction-sync 核对完用 --mark-reviewed 写回。",
-  "reviewedAt": "2026-10-18T14:50:25.867Z",
-  "repoCommit": "1ee4d790c70bd2306c5a1234fc3aa754da4391ab",
+  "reviewedAt": "2026-10-18T17:51:05.378Z",
+  "repoCommit": "4c5601ff100aefe39c5f7aef9bbe0bfbfae30fe1",
   "notionPages": [
     {
       "id": "3fd60335331c818fa24deadb6d72ca70",
       "title": "史实与创作",
       "role": "ledgerParent",
-      "lastEdited": "2026-10-18T14:47:00.000Z"
+      "lastEdited": "2026-10-18T17:48:39.288Z"
     },
     {
       "id": "3fd60335331c8194aa82f0b238084d34",
       "title": "史实与创作对照表",
       "role": "ledgerTable",
-      "lastEdited": "2026-10-18T14:47:00.000Z"
+      "lastEdited": "2026-10-18T17:48:27.571Z"
     },
     {
       "id": "3c360335331c81be876fcf4cb0928e1b",
@@ -27,26 +27,25 @@
       "id": "3f960335331c81d8bd65e07e7288f7d2",
       "title": "全剧故事大纲",
       "role": "source",
-      "lastEdited": "2026-10-18T14:30:12.173Z"
+      "lastEdited": "2026-10-18T17:41:04.806Z"
     },
     {
       "id": "3f960335331c81bfa32efb286dffc0a6",
       "title": "全剧节拍表",
       "role": "source",
-      "lastEdited": "2026-10-18T10:54:13.860Z",
-      "note": "14:29 又改过，这轮没重读；下次整页读"
+      "lastEdited": "2026-10-18T17:40:54.296Z"
     },
     {
       "id": "3fb60335331c81faa38dfe84c25d29f0",
       "title": "第一关｜往南的路 · 剧本",
       "role": "source",
-      "lastEdited": "2026-10-18T14:29:46.604Z"
+      "lastEdited": "2026-10-18T17:40:10.030Z"
     },
     {
       "id": "3fc60335331c814f8be8e23d43500eb5",
       "title": "空间拓扑关系（第一关 01–05）",
       "role": "source",
-      "lastEdited": "2026-10-18T14:13:03.701Z"
+      "lastEdited": "2026-10-18T17:40:35.358Z"
     },
     {
       "id": "3c360335331c80988907c6e9b5ee9aca",
