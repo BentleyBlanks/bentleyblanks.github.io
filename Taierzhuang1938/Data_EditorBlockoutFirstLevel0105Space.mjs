@@ -84,7 +84,7 @@ export const L0105_PLACES = Object.freeze({
   bend: Object.freeze({ name: "斜折", x: 13, z: 21 }),
   southLegEnd: Object.freeze({ name: "南直段尽头", x: 12, z: 44 }),
   branchMouth: Object.freeze({ name: "支沟口（台阶）", x: 21.9, z: 67.1 }),
-  steps: Object.freeze({ name: "台阶", x: 24.4, z: 66.9, yawDeg: 90, count: 3, riseM: 0.6 }), // 从支沟往西上到交通沟
+  steps: Object.freeze({ name: "台阶", x: 24.4, z: 66.9, yawDeg: 90, count: 3, riseM: 0.4 }), // 从支沟往西上到交通沟（落差 = 支沟深 2.4 − 交通沟深 2.0）
   corner2: Object.freeze({ name: "拐角 2", x: 30, z: 86 }),
   crossing: Object.freeze({ name: "路口", x: 35, z: 116 }),
   crest: Object.freeze({ name: "坡顶", x: 35, z: 131 }),

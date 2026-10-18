@@ -157,6 +157,7 @@ function CheckUnit(errors, warnings, at, unit) {
   CheckPoints(errors, `${at}.path`, unit.path);
   CheckPoints(errors, `${at}.intent`, unit.intent);
   if (unit.name !== undefined && typeof unit.name !== "string") errors.push(`${at}.name 要是字符串`);
+  if (unit.castId !== undefined && (typeof unit.castId !== "string" || !/^[A-Za-z][A-Za-z0-9]*$/.test(unit.castId))) errors.push(`${at}.castId 要是定妆角色 id（字母开头的字母数字）`);
   if (unit.guess !== undefined && typeof unit.guess !== "boolean") warnings.push(`${at}.guess 应当是 true / false`);
   if (unit.bearers !== undefined && !(Number.isInteger(unit.bearers) && unit.bearers >= 0 && unit.bearers <= 2)) errors.push(`${at}.bearers 要是 0–2 的整数`);
 }

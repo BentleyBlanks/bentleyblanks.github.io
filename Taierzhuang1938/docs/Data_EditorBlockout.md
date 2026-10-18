@@ -96,7 +96,8 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
 ```
 
 - 高度：`(cols+1)×(rows+1)` 个 int16 小端，单位厘米，`heights[iz*(cols+1)+ix]`。`LayoutFromSceneDoc` 给出 `terrain: "P012Heightfield"`、`terrainSampler: HeightGridSampler(terrain)`、`terrainSpec: null`、`gates: []`、`walkableSurfaces: []`、`legend: false`、`fortifications: false`、`materialLooks: false`。
-- 块的 `y` 在加载时算：脚落在中心与四角中最低的地面上，`y = 最低地面 + h/2`（同 Layout 的 `GroundedBlock`）。
+- 块的 `y` 在加载时算：脚落在中心与四角中最低的地面上，`y = 最低地面 + h/2`（同 Layout 的 `GroundedBlock`）。**2026-10-18**：块可以显式写 `y`（块中心高度，米），给架在坑上的洞顶、悬着的横木用；写了就不落地。
+- **2026-10-18 可选 `gates`**：与 `blocks` 同字段，再带 `signal`（信号到了就消失）或 `appearSignal`（信号到了才出现），id 与 `blocks` 一起全关唯一。`LayoutFromSceneDoc` 把它们原样交给 `FirstLevelWhiteboxField` 的 gate（与第一关的门同一套 `SyncScenario` / `RestoreScenario`），并给布局 `hideOpenGates: true`：文件场景里「打开」的 gate 是塌掉 / 炸掉的东西，直接隐藏，不走第一关「白门升起 1.2 m」的老画法。关键帧的 `signals` 决定此刻哪些信号为真（§5.4）。
 - `Data_FirstLevelP012Terrain.CreateP012Terrain` 加一个钩子：`layout.terrainSampler` 存在时，节点高度与 `RefineCells` 的细分高度都用它；**不存在时逐位不变**（`Script_FirstLevelWhiteboxTerrainTest --digest` 前后一致）。
 
 ## 3. 配置文件（`Blockout/<Level>.json`）
@@ -139,6 +140,7 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
 | --- | --- |
 | `keyframes[].id` | 唯一，`[A-Za-z0-9_-]+`，建议 `<阶段两位>-<序号>` |
 | `stage` / `stageTitle` / `name` | 公开阶段号（导航栏按它分段）、阶段标题、站位名 |
+| `stageLabel` | 可选（2026-10-18），1–6 字的拍号，如节拍表里的「02末」：导航栏、卡片、俯视图用它代替两位阶段号；导航栏按 `stage` + `stageLabel` 分段 |
 | `player` | `x, z, yawDeg, pitchDeg?(默认 0), stance?("stand"|"crouch"|"prone")` |
 | `what` | 此时发生了什么，≤ 40 字为宜（校验 > 80 字报警告） |
 | `next` | 下一步：`text`（≤ 20 字为宜）+ 目标点 `x,z` + `radiusM?`；没有移动目标时只写 `text` |
@@ -156,6 +158,7 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
 | `side` | `"ija"` 敌 / `"nra"` 友 / `"civ"` 百姓 |
 | `kind` | `"soldier"`(缺省) `"officer"` `"civilian"` `"child"` `"tank"` `"litter"`(担架，含两名抬担架的人) `"cart"` `"animal"` |
 | `name` | 可选短标签（罗班长、破墙机枪…）；无名的普通兵只显示图标 |
+| `castId` | 可选（2026-10-18）：定妆角色 id（`Data_FirstLevelSpeakingCast` 的键，如 `luo` / `yaowa` / `comrade` / `ijaA`）。给了就用那个角色固定的身体与面部（同一个人每一帧长一个样），预演里台词才能动嘴（§14） |
 | `role` / `group` | 可选，自由文本 / 遭遇组 id（俯视图图例、筛选用） |
 | `weapon` | 可选，缺省：ija `Type38`、nra `HanYang`、civ 无 |
 | `x, z, yawDeg | faceTo` | 位置与朝向 |
@@ -483,3 +486,100 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
 - 2026-10-13（用户反馈第一轮）：锁不住鼠标的窗口退化成按住右键拖动转视角；全关总图打开时对准玩家、导航栏压在总图上面仍可用；导航栏加重播按钮（同 `Y`）。
 - 2026-10-13（复制当前位置）：卡片加「复制当前位置」按钮与 `P` 键（§4.2），文字末行带整份 JSON；入口加 `pose=` 参数，「重现」链接原样打开回到同一机位。
 - 2026-10-13（地图开着鼠标漏到游戏）：遮罩改成盖满整屏（导航栏两边那条原来露着，点一下会重新锁鼠标 / 在面板里直接开枪）；`Script_Main` 加 `BlockoutMouseCaptured()` 闸住抢锁、开枪、转头与滚轮换枪。
+- 2026-10-18（01–05 新剧本白盒）：新关卡 `FirstLevel0105`（§13）；场景文件加可选 `gates` 与块的显式 `y`，布局 `hideOpenGates`（§2.2）；关键帧可选 `stageLabel`、单位可选 `castId`（§3）；预演（§14，用户 10-18 拍板：编辑器里加预演，缺的动作先用现成动作顶上）。
+
+## 13. 01–05 新剧本白盒（关卡键 `FirstLevel0105`，2026-10-18）
+
+用户 10-18 在 Notion 定稿了第一关 01–05（剧本 + 子页「空间拓扑关系」的总图、按拍快照与草算尺寸表）。游戏里的第一关和 `Blockout/FirstLevel.json`（10-13 的旧剧情）都不动，另建一片独立场地：
+
+| 文件 | 是什么 | 怎么来 |
+| --- | --- | --- |
+| `Data_EditorBlockoutFirstLevel0105Space.mjs` | 空间锚点（唯一口径）：原点 = 沟口，X 东 Z 南；前沿沟 / 交通沟 / 支沟 / 爬沟中心线、路、机枪坑三射位、防炮洞、坡顶、集结处、03 远处日军、场景信号名 | 集成负责人按 Notion 图（约 2.2 px/米）换算，表头注释列着与草算尺寸的对照 |
+| `Script_EditorBlockoutFirstLevel0105Scene.mjs` → `Blockout/FirstLevel0105.scene.json` | 0.5 m 高度网格（四条沟用 `Script_TrenchPlan.CompileTrenchNetwork` 烘进去；坑、散兵坑、洞是平底开挖）+ 体块 + 随信号体块 | `node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene FirstLevel0105 --force` |
+| `Script_EditorBlockoutFirstLevel0105Keyframes.mjs` → `Blockout/FirstLevel0105.json` | 25 个关键帧（01-1…05-4，02末用 `stageLabel`），坐标全从锚点算 | `... export FirstLevel0105 --force`（**会覆盖手改**；以后以 JSON 为准，手改后别再重导） |
+| `Data_EditorBlockoutFirstLevel0105Lines.mjs` + `Script_EditorBlockoutFirstLevel0105Voice.mjs` → `Audio/Blockout0105/*.mp3` + `Blockout/FirstLevel0105.voice.json` | 01–05 全部台词的占位配音（SeedAudio，整段一次生成后按逐字时间戳切句），清单给预演用 | 见脚本头注；默认只生成缺的场 |
+| `Blockout/FirstLevel0105.previz.json` | 每个关键帧的预演时间线（§14） | 预演数据生成器 / 手改 |
+
+场景信号：`DugoutCollapsed`（01 塌洞）、`PitShelled`（03 末战车一炮打塌坑沿）、`TankDisabled`（05 战车瘫在路口）。场景文件里对应的块写在 `gates`（§2.2）。
+
+## 14. 预演（previz，2026-10-18）
+
+用户 10-18 拍板：白盒编辑器默认仍是「走关键帧看布设」（§1 的「完全不要过场动画」对普通浏览照旧成立）；**每个关键帧可以挂一段预演**，按卡片上的「预演」按钮或 `V` 播放：镜头轨、人物调度（走位 / 姿态 / 现成动作片段）、台词（字幕 + 占位配音 + 口型）、事件（白光、黑场、爆炸、烟、枪口火、塌洞等场景信号、震屏、音效）。播完按 `then` 跳到下一个关键帧（直接到位），玩家又能走。缺的动作先用现成动作顶上（用户 10-18），缺口列清单，白盒走顺了再补正式动画。
+
+### 14.1 文件（`Blockout/<Level>.previz.json`，可选）
+
+编辑器切到某关时顺手读 `./Blockout/<key>.previz.json?t=…`（404 = 这关没有预演，按钮不出现）；页面可见时和配置一起每 2 s 查一次，变了就重读（正在播的那段播完才换）。
+
+```json
+{
+  "schema": "tengxian-blockout-previz/1",
+  "level": "FirstLevel0105",
+  "voice": "./Blockout/FirstLevel0105.voice.json",
+  "faceTracks": "./Audio/Blockout0105/Data_Blockout0105FaceTracks.json",
+  "sequences": [
+    {
+      "keyframe": "01-3",
+      "title": "最后两个人：今天就跑",
+      "durationS": 41.5,
+      "then": "next",
+      "camera": [
+        { "t": 0, "dur": 8, "eye": { "x": 66.2, "z": 64.4, "stance": "crouch", "yawDeg": 120, "pitchDeg": -8, "toYawDeg": 95 } },
+        { "t": 8, "dur": 4, "from": { "actor": "Donggua", "offset": [1.2, 1.1, -0.6] }, "look": { "actor": "Donggua", "offset": [0, 1.0, 0] }, "fov": 45, "ease": "inOut" }
+      ],
+      "actors": [
+        { "id": "Donggua", "keys": [ { "t": 0, "stance": "crouch", "clip": "WoundedSitRifleIdle" }, { "t": 6.5, "faceTo": "player" } ] },
+        { "id": "Luo", "keys": [ { "t": 2, "faceTo": "player" }, { "t": 9, "x": 61.5, "z": 64.6, "move": "walk", "path": [ { "x": 62.6, "z": 64.5 } ] } ] },
+        { "id": "ExtraShell", "spawn": { "side": "nra", "kind": "soldier", "x": 60, "z": 64.5 }, "keys": [ { "t": 0, "visible": false } ] }
+      ],
+      "lines": [ { "t": 1.2, "line": "LastTwo.01" }, { "t": 4.0, "line": "LastTwo.02", "actor": "Luo" } ],
+      "events": [
+        { "t": 36.0, "type": "flash", "dur": 0.35 },
+        { "t": 36.1, "type": "signal", "name": "DugoutCollapsed", "on": true },
+        { "t": 36.2, "type": "black", "dur": 4.0, "fade": 0.15 }
+      ]
+    }
+  ]
+}
+```
+
+- `keyframe`：从这个关键帧的布设（单位、玩家机位、信号）起播；一个关键帧最多一段。`durationS` 可省（= 所有轨道、台词、事件的最晚结束）。`then`：`"next"`（缺省，播完直接到下一个关键帧）/ 某个关键帧 id / `"stay"`（留在这一帧，单位回到关键帧布设）。
+- 点 `{x, z, h?}`：`h` 是离地高（米，缺省 1.6；地面按场景高度场取）。演员锚 `{ "actor": "<单位 id>", "offset": [dx, dy, dz] }`：偏移按世界轴、相对演员脚下，不随演员转身（同 `Data_CutsceneRedo.md` 的 `fromActor`）；`"actor": "player"` = 顺子（玩家机位）。
+- **镜头** `camera[]`（按 `t` 排，每条管 `[t, t+dur)`，空档沿用上一条的最后一帧）：
+  - `eye`：顺子的眼睛（第一人称）。`stance` 定眼高（stand 1.62 / crouch 1.05 / prone 0.32 m，离地），`yawDeg` / `pitchDeg` 起始朝向，`toYawDeg` / `toPitchDeg` 可选（这一条里转头过去）；受困拍就这么写。
+  - 否则 `from`（必填）/ `to`（可选，机位移动）+ `look`（必填）/ `lookTo`（可选）；`fov` 垂直视场度数（缺省 60）；`ease`：`"linear"` / `"inOut"`（缺省）；`shake` 0–1。
+- **演员** `actors[]`：`id` 是当前关键帧里的单位 id，或带 `spawn`（§3 单位字段，`x/z` 必填）临时加一个人（只活在这段预演里）。`keys[]` 按 `t` 排，每个键只写变了的字段：
+  - 位置：`x, z`（与上一个有位置的键之间按 `move` 插值；`path` 是途经点；`move`：`"walk"` / `"run"` / `"crawl"` / `"drag"`（倒退着拖，朝向反过来）/ `"cut"`（到点瞬移），缺省 `walk`）。走动时朝向顺着行进方向，到点后转到 `yawDeg` / `faceTo`。
+  - 朝向：`yawDeg` 或 `faceTo`（点 `{x,z}` 或单位 id 或 `"player"`）。
+  - 姿态与状态：`stance`、`aim`、`state`（`"down"` 倒地）、`visible`、`carryRole`（`"front"` / `"rear"`，抬担架 / 拖单被）、`woundedWalk`、`talking`。
+  - 动作片段：`clip`（开场动作库等现成片段名，`null` = 清掉回原生动画）、`clipFrom`（从片段第几秒起）、`clipHold`（播完停在最后一帧）。片段按骨架分：有 `castId` 的单位骨架固定，片段不在这具骨架上时退回原生动画并在状态里报一次（`Debug.Blockout.Previz.State().missingClips`）。
+- **台词** `lines[]`：`line` 是 `voice` 清单里的句子 id；`actor` 可省（省了 = 当前关键帧里 `castId` 等于这句 `who` 的单位；找不到就从玩家头上放、不动嘴）。字幕显示这句的 `speaker` + `subtitle`；有口型轨按 sha256 用口型轨，否则用音频包络张嘴（单位要有带面部的身体：`castId` 属于 `Data_FirstLevelSpeakingCast`）。
+- **事件** `events[]`（`type` 必填）：
+  - `flash` `{dur, strength?}` 白光；`black` `{dur, fade?}` 黑场（`fade` 渐入渐出秒数）；`caption` `{text, dur}` 非台词的说明字（弱显示，如「（耳鸣）」）。
+  - `explosion` `{x, z, kind?, radius?}`（`kind` 同 `VfxSystem.Explosion`）；`smoke` `{x, z, kind?, dur?}`（`SmokeDust` / `SmokeWhite` / `SmokeBlack`）；`muzzle` `{actor | x,z,h, count?, interval?}` 枪口火；`shake` `{dur, strength}`。
+  - `signal` `{name, on}`：在这一刻把场景信号打开 / 关掉（塌洞、坑沿被炸、战车瘫），播完或中断时恢复到 `then` 那个关键帧的 `signals`。
+  - `sfx` `{name, x?, z?, volume?}`：`name` 用 §14.3 的别名。
+- 校验：`Script_EditorBlockoutPrevizPlan.mjs`（纯，node 与浏览器共用）导出 `BLOCKOUT_PREVIZ_SCHEMA`、`ValidateBlockoutPreviz(doc, { config?, voice? })`（给了配置就核对 `keyframe` / 单位 id，给了清单就核对 `line`）、`NormalizeBlockoutPreviz(doc)`、`SamplePrevizActor(actorEntry, t, baseUnit)`、`SamplePrevizCamera(camera, t, resolve)`。
+
+### 14.2 播放（`Script_EditorBlockoutPreviz.mjs` + 总控）
+
+- 播：卡片上的「预演」按钮或 `V`（当前关键帧有预演时）；再按 `V` 或 `Esc` 中断。播放期间：相机归预演（`Script_Main` 在玩家相机写完之后调 `blockout?.ApplyCamera?.(camera)`，返回 true 表示这一帧相机已被接管）、第一人称枪模藏起来、鼠标归预演（同全关总图：不开枪、不转头、不抢锁）、玩家站在原地不吃 WASD、3D 标记与头顶标签藏起来、卡片换成「预演 · 标题 · 进度」、导航栏不响应。
+- 单位就是当前关键帧的演员（`BlockoutPuppets`），预演按 `SamplePrevizActor` 每帧摆位；播完 / 中断时恢复：`then` 指的关键帧直接到位（§5.1 的 `GoTo(..., { animate: false })`）。
+- 字幕由预演自己的 DOM 显示（编辑器模式隐藏游戏字幕的规则不动）：底部居中、导航栏上方，「说话人 · 字幕」，与编辑器同一套视觉。
+- `window.Tengxian.Debug.Blockout.Previz`：`Has(idOrIndex)`、`Play(idOrIndex)` → Promise（播完 resolve）、`Stop()`、`Seek(t)`（暂停在 t 秒，确定性求值，截图用）、`Resume()`、`State()` → `{ playing, paused, keyframe, t, durationS, missingClips, missingLines }`。
+
+### 14.3 音效别名（`sfx.name`）
+
+运行时把别名映射到现有音频库的键（映射表在 `Script_EditorBlockoutPreviz.mjs` 头部）；找不到的别名静默跳过并记进 `State().missingSfx`。
+
+| 别名 | 用在 |
+| --- | --- |
+| `artilleryFar` / `artilleryNear` | 01 炮声一阵接一阵、近处落一发 |
+| `shellBlast` | 塌洞那一发 |
+| `tinnitus` | 塌洞后耳鸣 |
+| `mgBurstFar` / `mgBurstNear` | 坑里捷克式、支沟沿日军机枪、坡顶机枪 |
+| `rifleVolley` / `rifleShot` | 02「打！」一排枪、零星枪声 |
+| `mortarPop` / `mortarImpact` | 03 掷弹筒「嘭」与落地 |
+| `grenadeBlast` | 手榴弹 |
+| `tankTracks` / `tankGun` | 04–05 履带声、03 战车一炮 |
+| `dirtFall` | 05 履带碾过、土往下掉 |
+| `slap` / `stab` / `bodyFall` | 02 审问 |

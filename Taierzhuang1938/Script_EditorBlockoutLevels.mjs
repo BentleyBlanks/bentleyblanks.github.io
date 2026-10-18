@@ -230,6 +230,7 @@ export function LayoutFromSceneDoc(doc) {
     semanticSurfaces: { ...(MISSION_LAYOUT.semanticSurfaces || {}) },
     blocks,
     gates,
+    hideOpenGates: true,
     walkableSurfaces: [],
     scenario: null,
     trenchPlacements: [],

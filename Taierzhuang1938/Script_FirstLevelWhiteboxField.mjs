@@ -798,7 +798,8 @@ export class FirstLevelWhiteboxField {
     const gate = this.gates.get(id);
     if (!gate || gate.open) return false;
     gate.open = true;
-    if (this.layout.scenario || this.layout.terrainSpec) gate.mesh.visible = false;
+    // hideOpenGates：白盒文件场景（LayoutFromSceneDoc）的随信号体块是塌掉 / 炸掉的东西，消失而不是「白门升起」。
+    if (this.layout.scenario || this.layout.terrainSpec || this.layout.hideOpenGates) gate.mesh.visible = false;
     else gate.mesh.position.y = gate.spec.y + gate.spec.h + 1.2;
     const handle = gate.collider._physicsHandle;
     if (this.physics && handle !== null && handle !== undefined) this.physics.RemoveSolid(handle);
