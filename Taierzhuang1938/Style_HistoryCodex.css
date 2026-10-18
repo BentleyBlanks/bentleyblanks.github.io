@@ -150,6 +150,32 @@
 .hcRestoration { padding:20px; background:#090c0866; color:#c3c3b8; font-size:14px; line-height:1.9; }
 .hcRestoration h2 { color:#e5e4da; font-size:var(--menu-font-heading); }.hcRestoration h4 { color:#edca83; font-size:var(--menu-font-section); }
 .hcImageError { color:#c9bea5; padding:20px; text-align:center; }.hcBroken { opacity:.5; }
+/* Fact and invention: the game's own notes. Marks read full, half, hollow, dashed, as on the card. */
+.hcKind-creation { grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); }
+.hcMarkPanel { min-width:0; min-height:0; overflow:auto; scrollbar-width:thin; padding-right:6px; font-size:var(--menu-font-body); line-height:1.65; }
+.hcMarkPanel .hcSection:first-child { border-top:0; padding-top:0; }
+.hcMarkPanel .hcSection p { color:#d5d4ca; }
+.hcMarks { display:flex; flex-direction:column; gap:7px; margin-top:8px; }
+.hcMarks button { display:grid; grid-template-columns:16px minmax(0,1fr) auto; align-items:center; gap:4px 12px; text-align:left; padding:10px 14px 11px; border:1px solid #c1bdab44; border-left:4px solid transparent; }
+.hcMarks button:hover { background:#d8d4c30c; }
+.hcMarks button.selected { border-color:#dbc18d99; border-left-color:#edca83; background:#d8d4c30c; }
+.hcMarkName { font-size:var(--menu-font-section); }
+.hcMarks button.selected .hcMarkName { color:#edca83; }
+.hcMarkCount { color:#d5d4ca; font-size:var(--menu-font-meta); white-space:nowrap; }
+.hcMarks small { grid-column:2 / 4; color:#aaa99b; font-size:var(--menu-font-small); line-height:1.55; }
+.hcMark { display:inline-block; flex:none; width:15px; height:15px; border-radius:50%; border:2px solid #e1c17e; }
+.hcMark-recorded { background:#e1c17e; }
+.hcMark-similar { background:linear-gradient(90deg,#e1c17e 50%,transparent 50%); }
+.hcMark-invented { border-color:#e3d6b3; }
+.hcMark-pending { border-style:dashed; border-color:#b4a281; }
+.hcMarkHead { margin:6px 0 4px; }
+.hcMarkHead h3 { display:flex; align-items:center; gap:10px; }
+.hcMarkItem h3 { color:#eeeee7; }
+.hcMarkItem p { color:#d5d4ca; }
+.hcMarkItem .hcMarkRefs { display:flex; flex-wrap:wrap; gap:4px 18px; margin-top:8px; font-size:var(--menu-font-meta); }
+.hcMarkRefs > span { color:#aaa99b; }
+.hcMarkRefs a { color:#edca83; text-decoration:none; overflow-wrap:anywhere; }
+.hcMarkRefs a:hover { text-decoration:underline; }
 @media(max-height:760px) and (min-width:901px) {
   .hcRoot { padding-top:2vh; }.hcHeader p { font-size:var(--menu-font-section); }.hcHeader h1 { font-size:var(--menu-font-page); }
   .hcCategories { min-height:53px; }.hcCategories button { font-size:var(--menu-font-nav-small); }
@@ -171,7 +197,7 @@
   .hcCardArt { flex-basis:40%; }.hcCardArt img,.hcCardArt svg { max-height:240px; }
   .hcDetail { height:auto; min-height:100%; }.hcDetailBody { display:flex; flex-direction:column; padding:18px; gap:25px; }
   .hcArticle { overflow:visible; font-size:var(--menu-font-body); }.hcArticle h2 { font-size:var(--menu-font-heading); }.hcSubtitle { font-size:var(--menu-font-section); }
-  .hcKind-people .hcArticle,.hcBiographyCopy { display:block; overflow:visible; }
+  .hcKind-people .hcArticle,.hcBiographyCopy,.hcMarkPanel { display:block; overflow:visible; }
   .hcPortrait img { max-height:50vh; width:auto; }.hcReader { height:65vh; min-height:390px; flex:none; }
   .hcMap { max-height:350px; flex:auto; }.hcBattleVisual { overflow:visible; }
   .hcReader.expanded { height:auto; min-height:0; }.hcFooter { gap:10px; padding-top:8px; }.hcFooterEnd { gap:15px; }

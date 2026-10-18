@@ -2,7 +2,9 @@
 // Images are documentary reproductions; the approved Imagegen concepts are layout references only.
 export const HISTORY_CODEX_VERSION = "2026101501";
 const Image = name => `./Texture/Menu/History/Texture_History${name}Image.webp?v=${HISTORY_CODEX_VERSION}`;
-export const HISTORY_CODEX_CATEGORIES = ["people", "history", "documents", "press", "photos"];
+export const HISTORY_CODEX_CATEGORIES = ["people", "history", "documents", "press", "photos", "creation"];
+// Fact-and-invention marks, in reading order. Notion "待核" is shown to players as "出处待查", never as a fact.
+export const HISTORY_CODEX_MARKS = ["recorded", "similar", "invented", "pending"];
 export const HISTORY_CODEX_TUNING = Object.freeze({ zoomMin: 1, zoomMax: 4, zoomStep: .25, wheelStep: .15 });
 export const HISTORY_BOOK_TUNING = Object.freeze({ pageWidth: 800, pageHeight: 1200, minPageWidth: 260, maxPageWidth: 1000, turnMs: 720, shadowOpacity: .38, warmRadius: 3, dragThreshold: 5, cornerFraction: .18, swipeCommitFraction: .35, zoomStep: .25, zoomMax: 4, doubleZoom: 2 });
 
@@ -125,6 +127,65 @@ export const HISTORY_CODEX_ENTRIES = [
     sources: [
       { title: "抗日战争纪念网：1938年武汉公祭殉国将领王铭章", url: "https://www.krzzjn.com/show-1209-76894.html", note: "网络转载图集，并非原底片扫描；具体摄日、摄影者尚未确认。" },
       { title: "新华社人物报道（国防部转载）", url: "https://www.mod.gov.cn/2018gfbztlbmb/2018-11/04/content_4828585.htm", note: "互证王铭章殉国后，灵柩返乡途中汉口举行公祭的事件性质。" },
+    ],
+  },
+  // The game's own ledger, from the Notion pages 史实与创作 / 史实与创作对照表 (2026-10-18). Item refs index entry.sources;
+  // a mark changes only with a checked source. Links that did not hold up when checked were left out, and the item moved down a mark.
+  {
+    id: "HistoryAndCreation", category: "creation", title: "史实与创作对照", subtitle: "游戏里哪些来自史料，哪些是创作",
+    summary: "按四种标注逐条说明，附查到的出处。", caption: "制作说明 · 本作整理，不是史料", imageAlt: "四种标注及各自的条数",
+    sections: [
+      { title: "取材", text: "本作取材于1938年3月14日至18日的滕县保卫战。战役的时间、地点和大的经过，以史料为准；顺子、冬瓜、罗班长、幺娃、刘文财、何有田、老耿、妮儿、小秦这些人物和他们的经历，都是虚构的。" },
+      { title: "怎么标", text: "每一条只按查到的出处标注；查不到的标「创作」或「出处待查」，不往史实那边靠。游戏不在每个场景里自我辩解，想知道某一段的出处，就在这里查。" },
+    ],
+    marks: [
+      { id: "recorded", title: "有记载", text: "查到了出处，附链接。", items: [
+        { title: "战役时间线", text: "日军沿津浦铁路南下，外围阻击、东关争夺、城内巷战，3月18日滕县失守。", refs: [0, 1] },
+        { title: "南门、北门堵死", text: "王铭章下令把南、北两门堵死，东、西两门暂留通路、随时准备封闭；“没有我的手令，谁也不准出城”。下这道命令的人，另有孙震一说。", refs: [2, 3] },
+        { title: "东关城墙被炸开", text: "3月16日10时半，东关城墙被炸开一二十米的缺口。", refs: [1] },
+        { title: "西城门楼失守，王铭章殉国", text: "3月17日17时，日军夺取西城门楼，师长王铭章在西关中弹殉国。牺牲的具体地点和经过，各家说法不一。", refs: [1] },
+        { title: "出川时的随身装备", text: "川军出川时，每人只有粗布单衣两套、单被一条、草席一张、草鞋两双、斗笠一顶，身背大刀、斗笠和背包。游戏把单被捏成方块当背包，是推断；没找到1938年川军背包的照片。", refs: [4] },
+        { title: "伤兵后送", text: "伤兵后送途中找不到救助站，腹部重伤的人只拿毛巾塞住伤口赶路。这是川军老兵的回忆，说的是1939年的江西前线，不是滕县。", refs: [5] },
+        { title: "八九式掷弹筒", text: "发射时一声“嘭”，筒身固定45度，专用榴弹最远约670米。这些多是太平洋战场美军的说法和普及文章；有效射程，各家说法差得远。", refs: [6, 7] },
+      ] },
+      { id: "similar", title: "创作，有类似记载", text: "滕县没查到，但同一时期别处有记载，附那条记载。", items: [
+        { title: "救护点处决伤兵", text: "日军在前沿救护点处决走不动的伤兵和救护人员，是本作有意保留的创作性还原，滕县本地没查到记载。日军在南京凭头上的帽箍印、手上的老茧辨认中国军人并屠杀，有大量记载；伤兵那句“日本人看手，看脑壳上的帽子印”，台词是创作，背景出自这类记载。", refs: [8] },
+        { title: "冬瓜的伤口只塞一条毛巾", text: "放在滕县往南的路上，是创作。同类的事见「有记载」里的伤兵后送，说的是1939年的江西前线。", refs: [5] },
+      ] },
+      { id: "invented", title: "创作", text: "虚构，或没找到任何记载。", items: [
+        { title: "人物与对白", text: "顺子、冬瓜、罗班长、幺娃、刘文财、何有田、老耿、妮儿、小秦、排长等人物，他们的经历和对白都是虚构的，包括顺子想回家、冬瓜他舅的船、欠下的八个铜板。王铭章是真实人物，他在终章里的问话是创作。" },
+        { title: "日机扫射白布担架", text: "日机认出盖着白布的担架、医护人员和百姓后仍然扫射，是本作有意保留的创作性还原。滕县没查到这样的记载；别处的类似记载，出处还在核对。" },
+        { title: "东关夜战的照明弹", text: "东关夜战里日军打照明弹、敌我突然暴露，是本作有意保留的创作性还原。滕县本地没查到记载，别处的类似记载也还没找到。" },
+        { title: "欠租拿女儿抵债", text: "顺子家里欠租、拿女儿抵债，是创作，四川的具体记载没查到。这里附的是周而复长篇小说《上海的早晨》里无锡农家被逼拿女儿抵租债的情节，那是文学作品，不算史料记载。", refs: [9] },
+        { title: "第一关前沿的地形", text: "一折一折的前沿沟、唯一的交通沟、沟口外的机枪坑、支沟尽头的防炮洞、坡后干沟里的集结处，是关卡的空间设计，参考了一战西线的堑壕做法（Waldron《Elements of Trench Warfare》1917年的插图），不是滕县某处阵地的复原。壕里的弹药箱、土袋垛、门板、水缸，是按常见做法推断的摆设。" },
+        { title: "撤退与反冲", text: "东段失守后日军沿沟往西清、顺路绕到背后，全线往后撤，是战术上的推演；滕县外围各阵地的具体经过，没能对到这么细。幺娃替顺子去坑里传令、冬瓜和顺子商量跑路、班长带人从沟外绕到南沿反冲、坡顶别的班接应，都是创作。" },
+        { title: "日军清沟与审问", text: "日军先头部队摸进支沟清洞、沿沟补刀、拿尸体垫机枪，翻译逼问、新兵拿俘虏练刺刀，都是创作。日军拿俘虏练刺刀的同类记载，还没核对。" },
+        { title: "用单被拖人", text: "顺子用冬瓜自己的单被拖他撤退。单被是有记载的随身装备，拿它拖人是创作。" },
+        { title: "沟里伏击战车", text: "路口交通沟上横木加门板搭的板桥、在沟里伏击战车、用一捆手榴弹炸车尾、战车瘫在路口堵住后面的日军，都是创作。用门板搭工事是推断；用集束手榴弹炸战车，滕县的记载还没查。抱着一捆手榴弹死在坑沿外的弟兄，也是创作。" },
+        { title: "掷弹筒落地前的几秒", text: "听到“嘭”到炮弹落地的那几秒，是按物理估算的，不是史料。" },
+        { title: "老耿一家与北沙河浮桥", text: "老耿一家、被征来拉弹药的驴车、耿家庄的巷战、北沙河浮桥和桥头接收伤兵的院子，都是创作。" },
+        { title: "第五关城门口的回头", text: "第五关城门口的回头、终章里由玩家亲手发报，都是创作。" },
+      ] },
+      { id: "pending", title: "出处待查", text: "还没查实，或几种说法对不上。查实之前不当作史实；查不到，就改标「创作」。", items: [
+        { title: "王铭章最后的电报", text: "网上多有转述电文“决以死拼，以报国家，以报知遇”，还没找到原件或可靠史料集里的原文。" },
+        { title: "八九式中战车", text: "越野每小时约10—15公里、炮塔靠手摇转动，出处还没附上；它能跨多宽的沟，没查到。" },
+        { title: "掷弹筒配到哪一级", text: "资料多说每个小队（排）配2—3具，剧本里另有配到分队一级的写法，两边对不上，还没核实。" },
+        { title: "东关守城的细节", text: "百姓推独轮车运沙土、挖交通壕，老乡挑大饼和开水送上城墙，冒着枪弹上来抬伤员：按有史料来写，出处还没附上。集中投弹时“再近点”“甩！”的口令和第一次白刃战，细节还没查。" },
+        { title: "日军的投降传单", text: "滕县有没有投过传单、写了什么，还没查。" },
+      ] },
+    ],
+    related: ["TengxianBattle", "WangMingzhang"],
+    sources: [
+      { title: "山东地方志：滕县保卫战", url: "https://shandong-chorography.org/database/a/section/17/article/418/", note: "战役时间线：3月14日开始攻击，18日滕县城陷落。" },
+      { title: "维基百科：滕县保卫战", url: "https://zh.wikipedia.org/zh-cn/%E6%BB%95%E5%8E%BF%E4%BF%9D%E5%8D%AB%E6%88%98", note: "战役时间线、3月16日东关缺口、3月17日西城门楼失守与王铭章殉国。百科条目，宜与地方志、亲历者回忆互核。" },
+      { title: "共产党员网：王铭章——以身殉国为民族争光", url: "https://www.12371.cn/2018/11/04/ARTI1541314073032534.shtml", note: "王铭章命令堵死南门、北门，东、西城门暂留通路。" },
+      { title: "百度百科：滕县保卫战", url: "https://baike.baidu.com/item/%E6%BB%95%E5%8E%BF%E4%BF%9D%E5%8D%AB%E6%88%98/2591237", note: "“没有我的手令，谁也不准出城”记作王铭章对张宣武所说。百科条目；下令者另有孙震一说。" },
+      { title: "中新网：川军踏草鞋背大刀抗战", url: "https://www.chinanews.com/cul/2014/09-03/6558063.shtml", note: "转载《成都商报》2014年9月3日报道，记者探访建川博物馆的馆藏川军装备。" },
+      { title: "出川抗战亲历记", url: "http://sxmgwyh.cn/htm/news_507_3160.htm", note: "陕西民革网站刊载的川军老兵回忆：新编第14师，1939年江西前线。事后回忆，不是滕县战场的记录。" },
+      { title: "Wikipedia：Type 89 grenade discharger", url: "https://en.wikipedia.org/wiki/Type_89_grenade_discharger", note: "45度固定射角、专用榴弹最大射程670米、发射时的声响；多据美军战时资料。" },
+      { title: "网易：八九式掷弹筒普及文章", url: "https://www.163.com/dy/article/H0E06NR00552C4OU.html", note: "普及文章，射程写作有效260米、最大700米，与其他资料不一。" },
+      { title: "维基百科：南京大屠杀", url: "https://zh.wikipedia.org/zh-hans/%E5%8D%97%E4%BA%AC%E5%A4%A7%E5%B1%A0%E6%AE%BA", note: "日军搜捕“便衣兵”时，凭头上帽箍、手上老茧判断是否军人。" },
+      { title: "周而复《上海的早晨》第一部第3章", url: "https://www.marxists.org/chinese/reference-books/shanghaidezaochen/1-03.htm", note: "长篇小说，文学作品，不是史料记载。" },
     ],
   },
 ];

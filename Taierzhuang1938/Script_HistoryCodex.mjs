@@ -7,6 +7,13 @@ const Clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const Content = (entry, key) => Localize(`historyCodex.${entry.id}.${key}`, String(key.split(".").reduce((value, field) => value?.[field], entry) ?? ""));
 const Copy = (entry, key) => Escape(Content(entry, key));
 const Category = id => T(`menu.codex.category.${id}`);
+// Fact-and-invention marks drawn on the card: full, half, hollow, dashed. The detail tabs draw the same shapes in CSS.
+const LEDGER_GLYPHS = {
+  recorded: '<circle r="11" fill="#e1c17e" stroke="#e3d6b3" stroke-width="2"/>',
+  similar: '<circle r="11" fill="none" stroke="#e1c17e" stroke-width="2"/><path d="M0 -11A11 11 0 0 0 0 11Z" fill="#e1c17e"/>',
+  invented: '<circle r="11" fill="none" stroke="#e3d6b3" stroke-width="2"/>',
+  pending: '<circle r="11" fill="none" stroke="#b4a281" stroke-width="2" stroke-dasharray="4 3.5"/>',
+};
 
 /** A DOM archive shared by the standalone title screen and the in-game pause menu. */
 export class HistoryCodex {
@@ -53,8 +60,20 @@ export class HistoryCodex {
     </svg>`;
   }
 
+  Ledger(entry) {
+    const rows = entry.marks.map((mark, i) => {
+      const y = 58 + i * 64;
+      return `<g transform="translate(52 ${y})">${LEDGER_GLYPHS[mark.id]}</g><text x="84" y="${y + 7}" fill="#eee9d9" font-size="21">${Copy(entry, `marks.${i}.title`)}</text>
+        <text x="352" y="${y + 7}" fill="#e1c17e" font-size="21" text-anchor="end">${Escape(T("menu.codex.markCount", {count: mark.items.length}))}</text>`;
+    }).join("");
+    return `<svg class="hcMap small" viewBox="0 0 390 330" role="img" aria-label="${Copy(entry, "imageAlt")}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="390" height="330" fill="#534b37"/><path d="M24 26H366M24 90H366M24 154H366M24 218H366M24 282H366" stroke="#b4a281" stroke-width="1" opacity=".3"/>${rows}
+      <text x="30" y="310" fill="#dbcfb7" font-size="13">${Escape(T("menu.codex.ledger"))}</text>
+    </svg>`;
+  }
+
   Card(entry, index) {
-    const art = entry.image ? this.Image(entry) : this.Map(entry, true);
+    const art = entry.image ? this.Image(entry) : entry.marks ? this.Ledger(entry) : this.Map(entry, true);
     return `<button type="button" class="hcCard${index === 0 ? " selected" : ""}" data-hc-action="open" data-hc-id="${entry.id}" aria-label="${Escape(T("menu.codex.openEntry", {title: Content(entry, "title")}))}">
       <span class="hcCardArt">${art}</span><span class="hcCardCopy"><span class="hcKicker">${Escape(Category(entry.category))}</span>
       <span class="hcCardTitle">${Copy(entry, "title")}</span><span class="hcCardDate">${Copy(entry, "subtitle")}</span>
@@ -114,10 +133,26 @@ export class HistoryCodex {
       ${this.readTab === "sourceInfo" ? `<div class="hcSourceInfo">${this.SourceList(entry)}</div>` : `${this.Sections(entry)}<nav class="hcContents" aria-label="${Escape(T("menu.codex.contents"))}">${entry.contents.map((item, i) => `<button data-hc-action="page" data-hc-index="${item.page}" class="${this.page === item.page ? "selected" : ""}">${Copy(entry, `contents.${i}.title`)}</button>`).join("")}</nav>`}<p class="hcSourceNote">${Copy(entry, "sourceNote")}</p></article>`;
     } else if (entry.category === "press") {
       content = `${this.Reader(entry)}<article class="hcArticle">${title}<h3 class="hcHeadline">${Copy(entry, "headline")}</h3><p class="hcSourceNote">${Copy(entry, "caption")}</p><section class="hcSection"><h3>${Escape(T("menu.codex.excerpt"))}</h3><blockquote>${Copy(entry, "excerpt")}</blockquote></section>${this.Sections(entry)}<p class="hcSourceNote">${Copy(entry, "sourceNote")}</p></article>`;
+    } else if (entry.category === "creation") {
+      content = this.Marks(entry, title);
     } else {
       content = `${this.Reader(entry)}<article class="hcArticle">${title}<p class="hcDescription">${Copy(entry, "description")}</p><dl class="hcMetadata">${entry.metadata.map((_, i) => `<dt>${Copy(entry, `metadata.${i}.title`)}</dt><dd>${Copy(entry, `metadata.${i}.text`)}</dd>`).join("")}</dl><p class="hcSourceNote">${Copy(entry, "sourceNote")}</p>${this.Related(entry)}</article>`;
     }
     return `<section class="hcDetail"><div class="hcDetailHead"><button data-hc-action="back">‹ ${Escape(T("menu.codex.backList"))}</button><span>${Escape(Category(entry.category))} / ${Copy(entry, "title")}</span></div><div class="hcDetailBody hcKind-${entry.category}">${content}</div></section>`;
+  }
+
+  // Left: what the ledger is and the four marks; right: the selected mark's items with their own links.
+  Marks(entry, title) {
+    const index = Math.max(0, entry.marks.findIndex(mark => mark.id === this.mark)), mark = entry.marks[index];
+    const tabs = entry.marks.map((item, i) => `<button role="tab" data-hc-action="mark" data-hc-id="${item.id}" aria-selected="${i === index}" class="${i === index ? "selected" : ""}">
+      <i class="hcMark hcMark-${item.id}" aria-hidden="true"></i><span class="hcMarkName">${Copy(entry, `marks.${i}.title`)}</span><span class="hcMarkCount">${Escape(T("menu.codex.markCount", {count: item.items.length}))}</span><small>${Copy(entry, `marks.${i}.text`)}</small></button>`).join("");
+    const items = mark.items.map((item, i) => {
+      const key = `marks.${index}.items.${i}`;
+      const refs = item.refs?.length ? `<p class="hcMarkRefs"><span>${Escape(T("menu.codex.markRefs"))}</span>${item.refs.map(ref => `<a href="${Escape(entry.sources[ref].url)}" target="_blank" rel="noopener noreferrer">${Copy(entry, `sources.${ref}.title`)} <span aria-hidden="true">↗</span></a>`).join("")}</p>` : "";
+      return `<section class="hcSection hcMarkItem"><h3>${Copy(entry, `${key}.title`)}</h3><p>${Copy(entry, `${key}.text`)}</p>${refs}</section>`;
+    }).join("");
+    return `<div class="hcMarkPanel">${this.Sections(entry)}<div class="hcMarks" role="tablist" aria-label="${Escape(T("menu.codex.markTabs"))}">${tabs}</div></div>
+      <article class="hcArticle" role="tabpanel">${title}<div class="hcStage hcMarkHead"><h3><i class="hcMark hcMark-${mark.id}" aria-hidden="true"></i>${Copy(entry, `marks.${index}.title`)}</h3><p>${Copy(entry, `marks.${index}.text`)}</p></div>${items}${this.Related(entry)}</article>`;
   }
 
   SourceList(entry) {
@@ -154,7 +189,7 @@ export class HistoryCodex {
   OpenEntry(id) {
     if (!HISTORY_CODEX_ENTRIES.some(entry => entry.id === id)) return;
     if (!this.entryId) this.scrollTop = this.root.querySelector(".hcScroll")?.scrollTop || 0;
-    this.entryId = id; this.page = 0; this.stage = 2; this.readTab = "summary"; this.restoration = false;
+    this.entryId = id; this.page = 0; this.stage = 2; this.readTab = "summary"; this.restoration = false; this.mark = this.Entry.marks?.[0].id;
     this.Render('[data-hc-action="back"]');
   }
 
@@ -197,6 +232,12 @@ export class HistoryCodex {
     else if (action === "restoration") {this.restoration = true; this.Render('[data-hc-action="back"]');}
     else if (action === "stage") {this.stage = Number(button.dataset.hcIndex); this.Render(`[data-hc-action="stage"][data-hc-index="${this.stage}"]`);}
     else if (action === "readTab") {this.readTab = button.dataset.hcId; this.Render(`[data-hc-action="readTab"][data-hc-id="${this.readTab}"]`);}
+    else if (action === "mark") {
+      // Phones read the tabs and list in one scroll; keep the tapped tab where it was.
+      const scroll = this.root.querySelector(".hcScroll").scrollTop;
+      this.mark = button.dataset.hcId; this.Render(`[data-hc-action="mark"][data-hc-id="${this.mark}"]`);
+      this.root.querySelector(".hcScroll").scrollTop = scroll;
+    }
     else if (action === "page") this.ChangePage(Number(button.dataset.hcIndex));
     else if (action === "previous" || action === "next") { if (this.book) this.book.Turn(action === "next" ? 1 : -1); else this.ChangePage(this.page + (action === "next" ? 1 : -1)); }
     else if (action === "zoomIn" || action === "zoomOut") this.Zoom((this.reader?.scale || 1) + (action === "zoomIn" ? 1 : -1) * HISTORY_CODEX_TUNING.zoomStep);
@@ -258,6 +299,11 @@ export class HistoryCodex {
     if (event.code === "KeyF" && (this.reader || this.book) && !event.repeat) {event.preventDefault(); this.ToggleExpanded(); return;}
     if (this.book && ["PageDown", "PageUp", "ArrowRight", "ArrowLeft"].includes(event.key) && !event.target.closest?.('[data-hc-action="category"]')) {
       event.preventDefault(); if (!event.repeat) this.book.Turn(["PageDown", "ArrowRight"].includes(event.key) ? 1 : -1); return;
+    }
+    const markTab = event.target.closest?.('[data-hc-action="mark"]');
+    if (markTab && ["ArrowDown", "ArrowUp"].includes(event.key)) {
+      const tabs = [...this.root.querySelectorAll('[data-hc-action="mark"]')], index = tabs.indexOf(markTab);
+      event.preventDefault(); tabs[(index + (event.key === "ArrowDown" ? 1 : tabs.length - 1)) % tabs.length].click(); return;
     }
     if (this.Entry?.pages && ["PageDown", "PageUp"].includes(event.key)) {event.preventDefault(); this.ChangePage(this.page + (event.key === "PageDown" ? 1 : -1)); return;}
     const nav = event.target.closest?.('[data-hc-action="category"]');
