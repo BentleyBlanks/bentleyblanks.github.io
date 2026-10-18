@@ -1,0 +1,810 @@
+{
+ "schema": 2,
+ "version": "20261019PrevizCareV1",
+ "fps": 24,
+ "actorForward": [
+  0,
+  0,
+  -1
+ ],
+ "blendSeconds": 0.12,
+ "floorClearanceM": 0.003,
+ "coordinates": {
+  "values": "glTF node-local bone transforms (p xyz, q xyzw), stride 7",
+  "props": "glTF scene space = rig.root local, source metres: origin xyz, axis xyz, up xyz, visible",
+  "stages": "runtime metres in the anchor actor frame (+x right, +y up, -z forward); yawDeg + = turn left",
+  "contacts": "clip seconds; partner parts are contactPoints names; standoffM = runtime metres along the patch normal where the knuckle centroid (finger roots) sits"
+ },
+ "clips": {
+  "PvSitOfferArm": {
+   "duration": 2.0,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0105 previz",
+   "role": "donggua",
+   "props": [
+    "weapon"
+   ],
+   "holdLoop": [
+    0.8,
+    2.0
+   ],
+   "holdExit": "pose.holdUntil lets it go; the clip ends on the held pose (play WoundedSitRifleIdle-like sit after).",
+   "notes": "01 dugout: Donggua sits against the wall and holds his wounded left arm out to be bandaged, the right hand under the left elbow, the face turned away to his right (wincing). Settled at 0.8 s; 0.8-2.0 s is a breathing hold loop. Rifle leaning on the wall at his left (weapon track, not in his hands).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "f3262cd790c71c3c1ab9779d60f47376318c7c49cc4d191c166df27d9408802e"
+    }
+   }
+  },
+  "PvSitStuffPack": {
+   "duration": 3.0,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0105 previz",
+   "role": "donggua",
+   "props": [
+    "weapon"
+   ],
+   "notes": "01-3: seated against the wall, the right hand stuffing things into the pack at his right hip (two pushes a loop, the second with a frustrated shove), the left arm limp in the lap. Rifle leaning at his left.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "cda62b3d7363390488a4e8fab53f33ddf655435bb15aff633530e92b86cf34d9"
+    }
+   }
+  },
+  "PvSitGrabHand": {
+   "duration": 2.5,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0105 previz",
+   "role": "donggua",
+   "props": [
+    "weapon"
+   ],
+   "holdLoop": [
+    1.0,
+    2.5
+   ],
+   "contacts": [
+    {
+     "t": 0.62,
+     "limb": "handR",
+     "action": "grip",
+     "partnerRole": "shunzi",
+     "part": "wrist",
+     "point": "GRAB_WRIST runtime (0.12, 0.50, -0.42)"
+    }
+   ],
+   "notes": "01-3: seated, the right hand shoots forward and clamps the wrist of the man crouched in front (0.62 s), holds on; the head comes up to his face. Held from 1.0 s (breathing hold loop 1.0-2.5 s).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "1a3a8352ca58f11f2b28397204a5c174b4d2cd5bc1c3e0dec6b8b573a1d74280"
+    }
+   }
+  },
+  "PvLieGrabSleeve": {
+   "duration": 3.0,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0105 previz",
+   "role": "donggua",
+   "holdLoop": [
+    0.8,
+    2.2
+   ],
+   "holdExit": "pose.holdUntil: plays the 2.2-3.0 s release (the hand lets go and drops onto the blanket).",
+   "contacts": [
+    {
+     "t": 0.8,
+     "limb": "handR",
+     "action": "grip",
+     "part": "sleeve",
+     "point": "SLEEVE runtime (0.44, 0.54, 0.28)"
+    },
+    {
+     "t": 2.2,
+     "limb": "handR",
+     "action": "release"
+    }
+   ],
+   "notes": "02-3: lying on his back on the blanket, the right hand comes up and fists the sleeve of the man crouched at his right (0.8 s), holds (0.8-2.2 s, hold loop, a tremor in the fist), lets go and the arm drops back onto the blanket (2.2-3.0 s). The head turns to that man.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "353d3c577e500f0d23deb05f1d7d2501e60724819015da1c33ca9d63b8cd0348"
+    }
+   }
+  },
+  "PvKneelDig": {
+   "duration": 2.0,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0105 previz",
+   "role": "rescuer",
+   "slungRifle": true,
+   "notes": "02-1: kneeling, both hands clawing the earth in front and flinging it out to the sides, alternating (two scoops per hand a loop). Rifle on the back (runtime slung list).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "3265a15c052e24c7f664ae36e436663280fe5aa19e15b3d74dc2fb7c673e401b"
+    }
+   }
+  },
+  "PvKneelPullBlanket": {
+   "duration": 3.0,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0105 previz",
+   "role": "rescuer",
+   "slungRifle": true,
+   "events": [
+    {
+     "t": 0.55,
+     "kind": "packOpen"
+    },
+    {
+     "t": 1.0,
+     "kind": "blanketOut"
+    },
+    {
+     "t": 1.75,
+     "kind": "blanketShake"
+    },
+    {
+     "t": 2.55,
+     "kind": "blanketDown"
+    }
+   ],
+   "notes": "02-3: kneeling, a pack on the ground at his right knee: flips it open, pulls out a folded single blanket, shakes it open forward and lays it flat on the ground in front (blanketDown 2.55 s; the blanket lies 0.41-1.32 m in front of the root). Rifle on the back.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "76ecf049083166b5232fe4360003a7dd8a0ab09bddde2ec950aea3ac2e521acf"
+    }
+   }
+  },
+  "PvKneelHaulBody": {
+   "duration": 2.5,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0105 previz",
+   "role": "rescuer",
+   "slungRifle": true,
+   "notes": "02-3: kneeling, both fists in the shoulder cloth of the man lying in front (head toward the kneeler) and hauling him toward the knees, a heave a loop (grab 0.25 s, haul 0.45-1.25 s, reach again). Rifle on the back.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "46cf1fdfcbad0de06a1e5f1d8f8badc86bd1d76eb128a5f257ee4df6f062b5ff"
+    }
+   }
+  },
+  "PvBlanketDragL": {
+   "duration": 1.2,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0105 previz",
+   "role": "dragger",
+   "slungRifle": true,
+   "referenceSpeedMps": 0.8,
+   "notes": "02-3..02-7: the LEFT man of the two dragging Donggua on the blanket: walks forward leaning into it, the LEFT fist behind and low at his outer side gripping the blanket corner (stage blanketDrag), the right arm pumping. In place (root fixed), two steps a loop; referenceSpeedMps 0.8. Rifle on the back.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "28a53982e76f02ed29dc9a20c59381ff2e7c0e4cb06394c14629aaaaecfc7453"
+    }
+   }
+  },
+  "PvBlanketDragR": {
+   "duration": 1.2,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0105 previz",
+   "role": "dragger",
+   "slungRifle": true,
+   "referenceSpeedMps": 0.8,
+   "notes": "Mirror of PvBlanketDragL for the RIGHT man: the RIGHT fist on the outer corner. Same phase as the left one.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "88afdc13819a28fdad1f7581ea5d9de64c95df4e739eb04939bbcbd7594c033f"
+    }
+   }
+  },
+  "PvBlanketReleaseTurn": {
+   "duration": 2.0,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0105 previz",
+   "role": "dragger",
+   "props": [
+    "weapon"
+   ],
+   "prev": [
+    "PvBlanketDragL"
+   ],
+   "weaponState": "back->twoHand",
+   "endHold": "twoHand",
+   "holdLoop": [
+    1.85,
+    2.0
+   ],
+   "notes": "02-4..02-6: from PvBlanketDragL frame 0 the left fist lets go of the corner, he turns about 170 deg to his LEFT (away from the blanket) in three steps and drops to a half crouch, the right hand pulls the rifle off the back over the right shoulder (0.45-0.95 s), the left takes the handguard (1.0 s) and he comes up aiming the way he came at 1.6 s. Last frame held. `weapon` track: on the back -> both hands. Root does not move; the end facing is the root yaw + ~170 deg (manifest models root.end).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": "baked:PvBlanketDragL",
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "eb46650db96b80798396c2f5dc795c7a592c88633ad32df939e48b7d40dc4b14"
+    }
+   }
+  },
+  "PvCrouchGripLitter": {
+   "duration": 2.0,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0105 previz",
+   "role": "bearer",
+   "slungRifle": true,
+   "holdLoop": [
+    0.6,
+    2.0
+   ],
+   "notes": "02 end, collection point: from standing he squats beside a litter on the ground (stage litterSide) and takes the near pole in both hands, ready to lift; settled at 0.6 s, breathing hold 0.6-2.0 s. Rifle on the back.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "bbf6163fe1cf5acea25c9e4ec539d50684f703ce6980e21124a35a357f309b12"
+    }
+   }
+  }
+ },
+ "stages": {
+  "blanketDrag": {
+   "anchor": "blanket",
+   "notes": "PvBlanketDragL (left man, He Youtian) and PvBlanketDragR (right man) side by side, both facing the drag direction, same phase (they step together), referenceSpeedMps 0.8: roots 0.55 m either side of the blanket centre line (1.10 m apart, = previz PULL.half). Each fist holds the OUTER head corner 0.26 m outboard of his own root, 0.04 m behind it, 0.77 m up (hip height, the arm straight back-down); the cloth falls from the fist to the ground about 0.5 m further back. So the blanket is 1.6 m wide (2 x (0.55 + 0.26); for a 1.5 m single quilt use PULL.half 0.50), its head edge lies on the ground about 0.55 m behind the roots and its centre about 1.55 m behind them (2.0 m long) -- previz PULL.toCenter 1.6 fits.",
+   "actors": {
+    "left": {
+     "clip": "PvBlanketDragL",
+     "x": -0.55,
+     "z": 0.0,
+     "yawDeg": 0
+    },
+    "right": {
+     "clip": "PvBlanketDragR",
+     "x": 0.55,
+     "z": 0.0,
+     "yawDeg": 0
+    }
+   },
+   "fistM": {
+    "outboard": 0.26,
+    "behind": 0.04,
+    "height": 0.77
+   },
+   "blanketM": {
+    "width": 1.6,
+    "length": 2.0,
+    "headEdgeBehind": 0.55,
+    "centreBehind": 1.55
+   }
+  },
+  "sitWall": {
+   "anchor": "wall",
+   "wallBehindM": 0.385,
+   "notes": "PvSitOfferArm / PvSitStuffPack / PvSitGrabHand: the root 0.385 m in front of the dugout wall, his back to it (as WoundedSitRifleIdle). The rifle leans on the wall at his left (weapon track); the pack (review box) at his right hip."
+  },
+  "litterSide": {
+   "anchor": "litter",
+   "notes": "PvCrouchGripLitter: the root 0.40 m from the near pole axis, facing it (the pole runs across his front at 0.13 m height, his hands 0.48 m apart on it)."
+  }
+ },
+ "props": {},
+ "models": [
+  {
+   "id": "TengxianNra02",
+   "file": "Animation_TengxianNra02PrevizCare.json",
+   "sha256": "567389c19e1b4e53f94a0041650818c10abd90ab411e285a7e2d5cec3951b664",
+   "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\PrevizCare_20261019\\Scene_TengxianNra02PrevizCare.blend",
+   "contactPoints": {},
+   "clips": [
+    {
+     "clip": "PvSitOfferArm",
+     "frames": 49,
+     "footSlideM": 0.0029,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0005,
+     "pelvisMaxStepM": 0.0006,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.00314,
+     "root": {
+      "start": [
+       0.0,
+       0.0457,
+       2.29,
+       0.1171
+      ],
+      "end": [
+       0.0,
+       0.0457,
+       2.29,
+       0.1142
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.0
+      ],
+      [
+       "R",
+       0,
+       2.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvSitStuffPack",
+     "frames": 73,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0131,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0,
+       0.0457,
+       2.29,
+       0.1142
+      ],
+      "end": [
+       0.0,
+       0.0457,
+       2.29,
+       0.1142
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.0
+      ],
+      [
+       "R",
+       0,
+       3.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvSitGrabHand",
+     "frames": 61,
+     "footSlideM": 0.0029,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0005,
+     "pelvisMaxStepM": 0.0017,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.00314,
+     "root": {
+      "start": [
+       0.0,
+       0.0457,
+       2.29,
+       0.1171
+      ],
+      "end": [
+       0.0,
+       0.0457,
+       2.29,
+       0.1142
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.5
+      ],
+      [
+       "R",
+       0,
+       2.5
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvLieGrabSleeve",
+     "frames": 73,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0011,
+     "floorCorrectionMin": 0.04388,
+     "floorCorrectionMax": 0.04982,
+     "root": {
+      "start": [
+       -0.0,
+       0.0,
+       -0.0,
+       0.154
+      ],
+      "end": [
+       -0.0,
+       0.0,
+       -0.0,
+       0.1549
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvKneelDig",
+     "frames": 49,
+     "footSlideM": 0.0045,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.05327,
+     "pelvisMaxStepM": 0.0115,
+     "floorCorrectionMin": 0.03632,
+     "floorCorrectionMax": 0.04146,
+     "root": {
+      "start": [
+       0.0083,
+       -0.0309,
+       0.0,
+       0.4631
+      ],
+      "end": [
+       0.0083,
+       -0.0309,
+       0.0,
+       0.4631
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.0
+      ],
+      [
+       "R",
+       0,
+       2.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvKneelPullBlanket",
+     "frames": 73,
+     "footSlideM": 0.0185,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.14566,
+     "pelvisMaxStepM": 0.035,
+     "floorCorrectionMin": 0.01638,
+     "floorCorrectionMax": 0.05409,
+     "root": {
+      "start": [
+       -0.0021,
+       0.0325,
+       0.0,
+       0.447
+      ],
+      "end": [
+       -0.0,
+       -0.0357,
+       0.0,
+       0.464
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.0
+      ],
+      [
+       "R",
+       0,
+       3.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvKneelHaulBody",
+     "frames": 61,
+     "footSlideM": 0.0271,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.06544,
+     "pelvisMaxStepM": 0.0175,
+     "floorCorrectionMin": 0.0421,
+     "floorCorrectionMax": 0.07178,
+     "root": {
+      "start": [
+       -0.0,
+       -0.0221,
+       0.0,
+       0.4615
+      ],
+      "end": [
+       -0.0,
+       -0.0218,
+       0.0,
+       0.4614
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.5
+      ],
+      [
+       "R",
+       0,
+       2.5
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvBlanketDragL",
+     "frames": 30,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0284,
+     "floorCorrectionMin": -2e-05,
+     "floorCorrectionMax": 0.0474,
+     "root": {
+      "start": [
+       -0.0,
+       0.0274,
+       0.0,
+       0.841
+      ],
+      "end": [
+       -0.0,
+       0.0274,
+       0.0,
+       0.841
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvBlanketDragR",
+     "frames": 30,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0284,
+     "floorCorrectionMin": -2e-05,
+     "floorCorrectionMax": 0.0474,
+     "root": {
+      "start": [
+       -0.0,
+       0.0274,
+       0.0,
+       0.841
+      ],
+      "end": [
+       -0.0,
+       0.0274,
+       0.0,
+       0.841
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvBlanketReleaseTurn",
+     "frames": 49,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.03366,
+     "pelvisMaxStepM": 0.0524,
+     "floorCorrectionMin": -0.012,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0274,
+       0.0,
+       0.8053
+      ],
+      "end": [
+       -0.0535,
+       0.1015,
+       170.0,
+       0.5888
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.52
+      ],
+      [
+       "R",
+       1.18,
+       2.0
+      ],
+      [
+       "L",
+       0.9,
+       2.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvCrouchGripLitter",
+     "frames": 49,
+     "footSlideM": 0.0101,
+     "contactErrorM": 0.0216,
+     "gripSolveErrorM": 0.02163,
+     "pelvisMaxStepM": 0.0892,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.3654
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.0
+      ],
+      [
+       "R",
+       0,
+       2.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    }
+   ],
+   "clipIds": [
+    "PvSitOfferArm",
+    "PvSitStuffPack",
+    "PvSitGrabHand",
+    "PvLieGrabSleeve",
+    "PvKneelDig",
+    "PvKneelPullBlanket",
+    "PvKneelHaulBody",
+    "PvBlanketDragL",
+    "PvBlanketDragR",
+    "PvBlanketReleaseTurn",
+    "PvCrouchGripLitter"
+   ]
+  }
+ ]
+}

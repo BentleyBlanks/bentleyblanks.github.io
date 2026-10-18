@@ -20,6 +20,7 @@ import { FIRST_LEVEL_SPEAKING_CAST } from "./Data_FirstLevelSpeakingCast.mjs";
 import { CharacterClipModelId } from "./Data_CharacterSelection.mjs";
 import { SamplePrevizActor, NormalizeBlockoutPreviz, PREVIZ_THROW } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { L0105_BRIDGE } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
+import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES } from "./Data_BlockoutPrevizClips.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const Load = f => JSON.parse(readFileSync(join(HERE, f), "utf8"));
@@ -34,6 +35,17 @@ function ClipTable() {
   const durations = new Map(Object.entries(lib.clips).map(([k, c]) => [c.name || k, c.duration]));
   const sets = [...byModel.values()];
   const common = new Set([...sets[0]].filter(c => sets.every(s => s.has(c))));
+  // 预演额外加载的库（Data_BlockoutPrevizClips）：只烘了 TengxianNra02，但五具骨架骨名一致、哪具身体都能播 → 算通用片段。
+  // 库还没烘出来（清单不在盘上）就跳过。
+  for (const extra of BLOCKOUT_PREVIZ_CLIP_LIBRARIES) {
+    const file = join(HERE, extra.base, extra.manifest);
+    if (!existsSync(file)) continue;
+    const manifest = JSON.parse(readFileSync(file, "utf8"));
+    for (const [name, meta] of Object.entries(manifest.clips || {})) {
+      for (const set of [...sets, common]) set.add(name);
+      if (!durations.has(name)) durations.set(name, meta.duration);
+    }
+  }
   return { byModel, common, durations };
 }
 

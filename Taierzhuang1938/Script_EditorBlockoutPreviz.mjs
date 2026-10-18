@@ -33,6 +33,7 @@ import { SampleSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
 import { LoadFaceTracks, SampleLineFaceTrack } from "./Script_FaceTrack.mjs";
 import { SOUND_NAMES } from "./Script_Audio.mjs";
 import { BlockoutPrevizFx } from "./Script_EditorBlockoutPrevizFx.mjs";
+import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES, PREVIZ_WEAPON_SLUNG } from "./Data_BlockoutPrevizClips.mjs";
 
 export const PREVIZ_KEY = "KeyN";
 export const PREVIZ_KEY_LABEL = "N";
@@ -245,6 +246,36 @@ export class BlockoutPreviz {
     return run.promise;
   }
 
+  /**
+   * 开场库读完之后：按 Data_BlockoutPrevizClips 逐个读预演用的动作库（清单 + TengxianNra02 那份记录），
+   * 用 AddOpeningClipLibrary 并进开场库（骨名一致的每具骨架都并）。某个库读不到（还没烘出来，404）就跳过，只警告一次；
+   * 预演照常播，那些片段退回原生动画（missingClips 照常记）。
+   */
+  async LoadExtraClipLibraries(api) {
+    if (typeof api?.AddOpeningClipLibrary !== "function") return;
+    this.clipLibrariesWarned ||= new Set();
+    const Read = async (url) => {
+      const response = await fetch(url);
+      if (!response.ok) throw Error(`${response.status}`);
+      return response.json();
+    };
+    const Warn = (name, why) => {
+      if (this.clipLibrariesWarned.has(name)) return;
+      this.clipLibrariesWarned.add(name);
+      console.warn(`[BlockoutPreviz] 动作库 ${name} 读不到（${why}），它的片段退回原生动画`);
+    };
+    await Promise.all(BLOCKOUT_PREVIZ_CLIP_LIBRARIES.map(async (lib) => {
+      try {
+        const v = `?v=${encodeURIComponent(lib.version)}`;
+        const config = await Read(lib.base + lib.manifest + v);
+        const row = (config.models || []).find(m => m.id === "TengxianNra02") || config.models?.[0];
+        if (!row?.file) throw Error("清单里没有骨架记录");
+        const record = await Read(lib.base + row.file + v);
+        api.AddOpeningClipLibrary(config, record, { weaponSlung: PREVIZ_WEAPON_SLUNG });
+      } catch (error) { Warn(lib.name, String(error?.message || error).slice(0, 120)); }
+    }));
+  }
+
   /** 播之前：句子解码进声库、口型轨、开场动作库（这一段用到片段时）。 */
   async Prepare(seq) {
     const audio = this.host.audio;
@@ -270,6 +301,7 @@ export class BlockoutPreviz {
       jobs.push((async () => {
         const api = await import("./Script_OpeningStoryboardAnimation.mjs");
         const library = await api.LoadOpeningStoryboardAnimation();
+        await this.LoadExtraClipLibraries(api);
         this.opening = { api, library };
         this.editor.puppets.SetOpeningLibrary(this.opening);
       })().catch(error => console.warn("[BlockoutPreviz] 开场动作库读不到，片段退回原生动画", error)));
@@ -389,10 +421,21 @@ export class BlockoutPreviz {
       this.fx.Update(run.seq, t, {
         standAt: this.editor.standAt, baseOf: (id) => run.units.get(id),
         drawBlasts: BlockoutPrevizFx.BlastsHidden(this.host.post),
-        actorOpts: { resolve: (id) => this.ResolveUnit(id), clipDuration: (clip) => this.opening?.api.OpeningClipMeta(clip)?.duration ?? null },
+        actorOpts: { resolve: (id) => this.ResolveUnit(id), clipDuration: (clip) => this.ClipDuration(clip) },
         muzzleAt: (e) => this.MuzzleAt(e),
       });
     } catch (error) { console.warn("[BlockoutPreviz] fx failed", error); }
+  }
+
+  /**
+   * 片段时长给 SamplePrevizActor（过了时长：clipHold 停在末帧，否则清掉回原生动画）。循环片段（清单 loop: true）
+   * 返回 null = 一直循环到下一个 clip 键（说话、包扎这类循环片段常常要放得比一轮长）。
+   * 带停住段的不循环片段（holdLoop，如 PvStandPointL）照旧按时长：要停住就写 clipHold。
+   */
+  ClipDuration(clip) {
+    const meta = this.opening?.api.OpeningClipMeta(clip);
+    if (!meta || meta.loop === true) return null;
+    return meta.duration ?? null;
   }
 
   ResolveUnit(id) {
@@ -405,7 +448,7 @@ export class BlockoutPreviz {
     const run = this.run, puppets = this.editor.puppets;
     const opts = {
       resolve: (id) => this.ResolveUnit(id),
-      clipDuration: (clip) => this.opening?.api.OpeningClipMeta(clip)?.duration ?? null,
+      clipDuration: (clip) => this.ClipDuration(clip),
     };
     for (const entry of run.actors) {
       const state = SamplePrevizActor(entry, t, run.units.get(entry.id), opts);

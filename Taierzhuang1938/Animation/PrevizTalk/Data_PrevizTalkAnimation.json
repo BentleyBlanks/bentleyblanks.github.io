@@ -1,0 +1,734 @@
+{
+ "schema": 2,
+ "version": "20261019PrevizTalkV1",
+ "fps": 24,
+ "actorForward": [
+  0,
+  0,
+  -1
+ ],
+ "blendSeconds": 0.12,
+ "floorClearanceM": 0.003,
+ "coordinates": {
+  "values": "glTF node-local bone transforms (p xyz, q xyzw), stride 7",
+  "props": "glTF scene space = rig.root local, source metres: origin xyz, axis xyz, up xyz, visible",
+  "stages": "runtime metres in the anchor actor frame (+x right, +y up, -z forward); yawDeg + = turn left",
+  "contacts": "clip seconds; partner parts are contactPoints names; standoffM = runtime metres along the patch normal where the knuckle centroid (finger roots) sits"
+ },
+ "clips": {
+  "PvStandTalkLowRifle": {
+   "duration": 4.0,
+   "loop": true,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "lowRight",
+   "notes": "Standing, talking: rifle low in the right hand (weapon track: the fist round the wrist of the stock, muzzle down and forward); the left hand comes up in front of the belly and makes small open-palm beats with the words, the head nods a little. Seamless loop.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "0eca5e59bf0e288a5df3709ba201bf19c4c3b3525de51248d471332586f7cd96"
+    }
+   }
+  },
+  "PvStandTalkSlung": {
+   "duration": 4.0,
+   "loop": true,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "slungBack",
+   "weaponSlung": true,
+   "notes": "Standing, talking where nobody is fighting (the dugout, the collection point): rifle slung across the back (weapon track), both hands making small gestures in front of the belly, the right half a beat after the left. Seamless loop.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "2106433ff6941a0394c81ba15ff62df955f91638102300076fd860bac658af4e"
+    }
+   }
+  },
+  "PvStandPointL": {
+   "duration": 3.0,
+   "loop": false,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "lowRight",
+   "holdLoop": [
+    0.8,
+    3.0
+   ],
+   "notes": "Standing, rifle low in the right hand (weapon track: the fist round the wrist of the stock, muzzle down and forward); the left arm comes up to shoulder height and points straight ahead (index finger out) by 0.8 s, then holds (0.8-3.0 s hold loop: breathing only).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "d4ebe5cda1a021d4c3f67de4e5acd2e0942880c4ddd4226e23118c44fe3c6c4a"
+    }
+   }
+  },
+  "PvStandWaveOnL": {
+   "duration": 1.8,
+   "loop": true,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "lowRight",
+   "notes": "Standing, rifle low in the right hand (weapon track: the fist round the wrist of the stock, muzzle down and forward); the left hand swings from beside the head forward and down, twice a loop (\"go on, follow\"), the trunk leaning into each swing.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "f282fec589aa663594ca04e149031e43c400f57b7fe3bec47921522779e6ee0c"
+    }
+   }
+  },
+  "PvStandBeckonL": {
+   "duration": 1.8,
+   "loop": true,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "lowRight",
+   "notes": "Standing half turned to his left (chest and head toward the people he calls), rifle low in the right hand (weapon track: the fist round the wrist of the stock, muzzle down and forward); the left arm out toward them, the hand drawn back toward himself twice a loop, palm toward him (\"over here\").",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "e58c66e86626952108d3e7419a7cbc1005950907e187238541bbc80340716e6d"
+    }
+   }
+  },
+  "PvStandHaltL": {
+   "duration": 1.6,
+   "loop": false,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "lowRight",
+   "holdLoop": [
+    0.4,
+    1.6
+   ],
+   "notes": "Standing, rifle low in the right hand (weapon track: the fist round the wrist of the stock, muzzle down and forward); the left palm comes up flat in front of the chest, fingers up (\"stop\") by 0.4 s, then holds (0.4-1.6 s hold loop).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "2b54ffc7a2bfef5d3d84f611ad8b2f5bea1352d06e70e59fdb3928d6b91e19b4"
+    }
+   }
+  },
+  "PvStandShakeHead": {
+   "duration": 1.6,
+   "loop": false,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "lowRight",
+   "notes": "Standing, rifle low in the right hand (weapon track: the fist round the wrist of the stock, muzzle down and forward); the head drops a little and shakes twice (no), eyes down; first and last frames neutral.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "d62362b736f9bf8812b96cbbeafe48c7cc115ec38225f1fa359154dcf7244750"
+    }
+   }
+  },
+  "PvCrouchTalkRifle": {
+   "duration": 4.0,
+   "loop": true,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "upright",
+   "notes": "Down on the right knee, the left foot forward, rifle upright at his right, butt on the ground, the right hand round the handguard (weapon track); the left forearm over the left knee, the hand beating small with the words. Seamless loop.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "687149524e7b529db4e3187d119ce13f5e016f7e29b5cffe2505b887e109efa1"
+    }
+   }
+  },
+  "PvCrouchPointL": {
+   "duration": 2.0,
+   "loop": false,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "upright",
+   "holdLoop": [
+    0.6,
+    2.0
+   ],
+   "notes": "The PvCrouchTalkRifle kneel, rifle upright at his right, butt on the ground, the right hand round the handguard (weapon track); the left arm points to the front left by 0.6 s, then holds (0.6-2.0 s hold loop).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "2010813dcb68ca0d2c60f7cd848e06960b732dcb94d2344a2add2cbed135e4fb"
+    }
+   }
+  },
+  "PvCrouchCountFingers": {
+   "duration": 3.0,
+   "loop": true,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "upright",
+   "notes": "The PvCrouchTalkRifle kneel, rifle upright at his right, butt on the ground, the right hand round the handguard (weapon track); the left hand up in front of the chest counting on its fingers: a fist, one finger, the open hand, twice a loop (01: Yaowa counting the guns).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "42f2da78057f4503ec3070c97b17eac7c8f1a0e7e5e767874411c2a67c80bf2f"
+    }
+   }
+  },
+  "PvProneBeckonL": {
+   "duration": 1.6,
+   "loop": true,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "ground",
+   "notes": "Prone on the lip, the rifle lying on the ground in front of him at his right (weapon track), the right hand on its stock; the left forearm up off the ground, the hand calling toward himself twice a loop, the head turned to his left toward whoever he calls.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "392cd1db4ac278a2120a9796672ae818960b444715fa23f4b83852fcc506422c"
+    }
+   }
+  }
+ },
+ "stages": {},
+ "props": {},
+ "models": [
+  {
+   "id": "TengxianNra02",
+   "file": "Animation_TengxianNra02PrevizTalk.json",
+   "sha256": "f4f7e52c7c186a7a2c55e48b84ea3a0d307b86efd283f2462319d17151cca565",
+   "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\PrevizTalk_20261019\\Scene_TengxianNra02PrevizTalk.blend",
+   "contactPoints": {},
+   "clips": [
+    {
+     "clip": "PvStandTalkLowRifle",
+     "frames": 97,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.001,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0002,
+       0.0179,
+       0.0,
+       0.8361
+      ],
+      "end": [
+       0.0002,
+       0.0179,
+       0.0,
+       0.8361
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       4.0
+      ],
+      [
+       "R",
+       0,
+       4.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvStandTalkSlung",
+     "frames": 97,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       4.0
+      ],
+      [
+       "R",
+       0,
+       4.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvStandPointL",
+     "frames": 73,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0009,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0002,
+       0.0179,
+       0.0,
+       0.8361
+      ],
+      "end": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.0
+      ],
+      [
+       "R",
+       0,
+       3.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvStandWaveOnL",
+     "frames": 45,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       1.8
+      ],
+      [
+       "R",
+       0,
+       1.8
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvStandBeckonL",
+     "frames": 45,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       10.31,
+       0.8373
+      ],
+      "end": [
+       -0.0,
+       0.0183,
+       10.31,
+       0.8373
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       1.8
+      ],
+      [
+       "R",
+       0,
+       1.8
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvStandHaltL",
+     "frames": 40,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.001,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0002,
+       0.0179,
+       0.0,
+       0.8361
+      ],
+      "end": [
+       0.0002,
+       0.0179,
+       0.0,
+       0.8361
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       1.6
+      ],
+      [
+       "R",
+       0,
+       1.6
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvStandShakeHead",
+     "frames": 40,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.001,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0002,
+       0.0179,
+       0.0,
+       0.8361
+      ],
+      "end": [
+       0.0002,
+       0.0179,
+       0.0,
+       0.8361
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       1.6
+      ],
+      [
+       "R",
+       0,
+       1.6
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvCrouchTalkRifle",
+     "frames": 97,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": 0.01638,
+     "floorCorrectionMax": 0.01638,
+     "root": {
+      "start": [
+       -0.0,
+       -0.032,
+       0.0,
+       0.5438
+      ],
+      "end": [
+       -0.0,
+       -0.032,
+       0.0,
+       0.5438
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       4.0
+      ]
+     ],
+     "kneePlants": [
+      [
+       "R",
+       0,
+       4.0
+      ]
+     ],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvCrouchPointL",
+     "frames": 49,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": 0.01638,
+     "floorCorrectionMax": 0.01638,
+     "root": {
+      "start": [
+       -0.0,
+       -0.032,
+       0.0,
+       0.5438
+      ],
+      "end": [
+       -0.0,
+       -0.032,
+       0.0,
+       0.5438
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.0
+      ]
+     ],
+     "kneePlants": [
+      [
+       "R",
+       0,
+       2.0
+      ]
+     ],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvCrouchCountFingers",
+     "frames": 73,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": 0.01638,
+     "floorCorrectionMax": 0.01638,
+     "root": {
+      "start": [
+       -0.0,
+       -0.032,
+       0.0,
+       0.5438
+      ],
+      "end": [
+       -0.0,
+       -0.032,
+       0.0,
+       0.5438
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.0
+      ]
+     ],
+     "kneePlants": [
+      [
+       "R",
+       0,
+       3.0
+      ]
+     ],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvProneBeckonL",
+     "frames": 40,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": 0.06016,
+     "floorCorrectionMax": 0.06016,
+     "root": {
+      "start": [
+       0.0,
+       0.0,
+       0.0,
+       0.26
+      ],
+      "end": [
+       0.0,
+       0.0,
+       0.0,
+       0.26
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    }
+   ],
+   "clipIds": [
+    "PvStandTalkLowRifle",
+    "PvStandTalkSlung",
+    "PvStandPointL",
+    "PvStandWaveOnL",
+    "PvStandBeckonL",
+    "PvStandHaltL",
+    "PvStandShakeHead",
+    "PvCrouchTalkRifle",
+    "PvCrouchPointL",
+    "PvCrouchCountFingers",
+    "PvProneBeckonL"
+   ]
+  }
+ ]
+}

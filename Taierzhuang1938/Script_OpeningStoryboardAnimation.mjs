@@ -121,6 +121,33 @@ export function LoadOpeningStoryboardAnimation(){
     return library={config,models};
   })();
 }
+// Clips merged in from another library (AddOpeningClipLibrary) that carry the rifle on the back instead of in the hands
+// (the white-box previz's talking / first-aid clips: Data_BlockoutPrevizClips.PREVIZ_WEAPON_SLUNG). The game's own opening
+// never adds any, so its slung rule stays InterrogateCrouch alone.
+const slungClips=new Set();
+/** Whether `clip` carries the rifle slung on the back (InterrogateCrouch, an added library's slung list, or manifest
+ *  `weaponSlung: true`). */
+export function IsOpeningSlungClip(clip){return clip==="InterrogateCrouch"||slungClips.has(clip)||OpeningClipMeta(clip)?.weaponSlung===true;}
+/**
+ * Merge another clip library (same baker, same TengxianHumanoidV1 skeleton -- PrevizTalk, CollectionCare, ...) into the
+ * loaded opening library: every rig record whose bone-name array equals `record.bones` gets the clips it does not have yet,
+ * and the manifest rows go into config.clips (OpeningClipMeta: duration, holdLoop, weaponHold). Clips that already exist
+ * are never overwritten. opts.weaponSlung: clip names that play with the rifle on the back.
+ * Call after LoadOpeningStoryboardAnimation resolved. → { added: [names], rigs: [modelIds] }.
+ */
+export function AddOpeningClipLibrary(config,record,{weaponSlung=[]}={}){
+  if(!library)throw Error("AddOpeningClipLibrary: the opening library is not loaded");
+  const bones=JSON.stringify(record?.bones||null),added=new Set(),rigs=[];
+  for(const [id,target] of library.models){
+    if(JSON.stringify(target.bones)!==bones)continue;
+    rigs.push(id);
+    for(const [name,row] of Object.entries(record.clips||{}))if(!target.clips[name]){target.clips[name]=row;added.add(name);}
+  }
+  const clips=library.config.clips ||= {};
+  for(const [name,meta] of Object.entries(config?.clips||{}))clips[name] ||= meta;
+  for(const name of weaponSlung)slungClips.add(name);
+  return {added:[...added],rigs};
+}
 export function UpdateOpeningStoryboardCorpse(soldier){
   const actor=soldier?.actor,rig=actor?.characterRig,pose=soldier?.openingStoryboardPose;
   if(soldier?.alive||!rig||!IsOpeningTerminalClip(pose?.clip)||soldier.deadTime<=.9||soldier.corpse)return;
@@ -251,7 +278,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
     if(rig.openingSlungRifle)rig.openingSlungRifle.visible=false;
     if(!pose&&soldier.openingStoryboardTravel==null&&!soldier.openingActorPerformance){
       if(rig.relaxedGaitRifle)UpdateRelaxedGaitWeapon(soldier,false);
-      if(lastKey==="InterrogateCrouch"&&actor.weaponGroup)actor.weaponGroup.visible=true;
+      if(lastKey&&IsOpeningSlungClip(lastKey)&&actor.weaponGroup)actor.weaponGroup.visible=true;
       rig.openingProps?.HideAll();
       // Handed back to the AI: ease from the last shown pose into the native one (Luo's forearm turned 149 deg
       // in the hand-back frame, 2026-09-28 probe), on the same actor root, then let the native pose stand alone.
@@ -428,7 +455,9 @@ export function InstallOpeningStoryboardAnimation(soldier){
     }
     soldier.openingStoryboardContact?.();
     if(actor.weaponGroup){
-      const slung=pose?.clip==="InterrogateCrouch";
+      // InterrogateCrouch, or a clip an added library plays with the rifle on the back (AddOpeningClipLibrary). A clip
+      // with its own weapon track is the track's business (no second rifle on the back).
+      const slung=!!pose&&!clipRow?.props?.weapon&&IsOpeningSlungClip(pose.clip);
       // A clip with a `weapon` track decides visibility itself (a rifle thrown away, a
       // planted dadao); a dropped weapon stays hidden; everything else keeps the 0922
       // slung-rifle rule.

@@ -1,0 +1,724 @@
+{
+ "schema": 2,
+ "version": "20261019PrevizIjaV1",
+ "fps": 24,
+ "actorForward": [
+  0,
+  0,
+  -1
+ ],
+ "blendSeconds": 0.12,
+ "floorClearanceM": 0.003,
+ "coordinates": {
+  "values": "glTF node-local bone transforms (p xyz, q xyzw), stride 7",
+  "props": "glTF scene space = rig.root local, source metres: origin xyz, axis xyz, up xyz, visible",
+  "stages": "runtime metres in the anchor actor frame (+x right, +y up, -z forward); yawDeg + = turn left",
+  "contacts": "clip seconds; partner parts are contactPoints names; standoffM = runtime metres along the patch normal where the knuckle centroid (finger roots) sits"
+ },
+ "clips": {
+  "PvIjaSignalSplit": {
+   "duration": 2.0,
+   "loop": false,
+   "weaponHold": "oneHandRight",
+   "role": "ijaA",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "events": [
+    {
+     "t": 0.55,
+     "kind": "signalLeft"
+    },
+    {
+     "t": 1.2,
+     "kind": "signalRight"
+    }
+   ],
+   "notes": "01-4: standing, the rifle low in the right hand by the wrist of the stock (muzzle forward, a little down); the left arm comes up and sweeps out to his left (0.55 s), then across to his right (1.2 s), and drops. The head follows the hand.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "8e626d61791719fd9d78e9a5d3b6a8c5251ee0d35a2b1c91a02ca3a774b84fe3"
+    }
+   }
+  },
+  "PvIjaBayonetRaiseThreat": {
+   "duration": 1.4,
+   "loop": false,
+   "weaponHold": "twoHand",
+   "role": "ijaB",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "holdLoop": [
+    0.6,
+    1.4
+   ],
+   "notes": "02-1: from low ready both hands lift the rifle high, the bayonet point down at a man on the ground (tip about 1.3 m ahead, 0.40 m up at 0.6 s), pulled up for the thrust and stopped. 0.6-1.4 s is a seamless hold loop (breathing, the point trembling).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "52b7453841765ef0f4f07cd7e5f05ea65f8b31a85b2891a2f6034bad4b0b542f"
+    }
+   }
+  },
+  "PvIjaButtStrikeFace": {
+   "duration": 1.0,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaB",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "stage": "buttFace",
+   "weaponState": "twoHand",
+   "contacts": [
+    {
+     "t": 0.42,
+     "limb": "butt",
+     "action": "strike",
+     "partnerRole": "captive",
+     "part": "face"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.42,
+     "kind": "buttHit"
+    }
+   ],
+   "next": [
+    "PvIjaBayonetRaiseThreat"
+   ],
+   "notes": "02-1: from low ready the rifle swings muzzle-up, the butt is cocked at the chest and driven forward-down into the face of the man kneeling 0.80 m ahead (contact 0.42 s, stage buttFace), then back to low ready.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "ba8a2707695feb2b7755dd325a18215cc462d20fb8a55ff0c48a956982117b63"
+    }
+   }
+  },
+  "PvIjaCrouchHairLift": {
+   "duration": 3.5,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaB",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "weaponState": "slungBack",
+   "holdLoop": [
+    1.5,
+    3.5
+   ],
+   "player": true,
+   "contacts": [
+    {
+     "t": 0.95,
+     "limb": "handL",
+     "action": "grab",
+     "partnerRole": "shunzi",
+     "part": "crown"
+    },
+    {
+     "t": 1.5,
+     "limb": "handL",
+     "action": "hold",
+     "partnerRole": "shunzi",
+     "part": "crown"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.95,
+     "kind": "grabHair"
+    },
+    {
+     "t": 0.95,
+     "kind": "liftHead",
+     "untilT": 1.5
+    },
+    {
+     "t": 2.15,
+     "kind": "shake"
+    },
+    {
+     "t": 3.0,
+     "kind": "shake"
+    }
+   ],
+   "notes": "02-1: standing at the man's head (rifle on the back), squats, the left hand closes in the hair on his crown (0.95 s) and hauls the head up (eye 0.30 -> 0.56 m high, 0.70 -> 0.71 m ahead) by 1.50 s; 1.5-3.5 s is a seamless hold loop with two shakes. The right hand rests on the right knee. Player track: head (eye), crown.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "d45c2eb78cace60db82378d2a78ab700aa81bcabb923931894c0bfbe4b640ea5"
+    }
+   }
+  },
+  "PvIjaLauncherFire": {
+   "duration": 2.0,
+   "loop": true,
+   "weaponHold": "track",
+   "role": "gunner",
+   "props": [
+    "launcher",
+    "weapon"
+   ],
+   "rootMotion": false,
+   "stage": "launcherCrew",
+   "weaponState": "slungBack",
+   "events": [
+    {
+     "t": 1.48,
+     "kind": "triggerSqueeze"
+    },
+    {
+     "t": 1.6,
+     "kind": "fire",
+     "weapon": "Type89Launcher"
+    }
+   ],
+   "notes": "03: Type89 discharger gunner on the right knee, the base plate on the ground ahead of the left foot, tube 45 deg up; left hand round the tube, right hand on the trigger body. Holds, squeezes, fires at 1.60 s: the tube jolts down its axis and the shoulders kick, settles by the loop end. One shot per loop. Rifle on his back.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "ad3bfe8c8cb54968031c5e9e928dc196047d4b38d2ae4e05fcf11a8a8376343a"
+    }
+   }
+  },
+  "PvIjaLauncherLoad": {
+   "duration": 2.0,
+   "loop": true,
+   "weaponHold": "track",
+   "role": "loader",
+   "props": [
+    "shell",
+    "weapon"
+   ],
+   "rootMotion": false,
+   "stage": "launcherCrew",
+   "weaponState": "slungBack",
+   "events": [
+    {
+     "t": 0.4,
+     "kind": "shellOut"
+    },
+    {
+     "t": 0.92,
+     "kind": "shellIn"
+    }
+   ],
+   "notes": "03: loader on both knees at the gunner's right, turned toward the tube: the right hand takes a shell from the pouch at the front of his belt (0.40 s), lifts it over the muzzle and lets it slide in (0.92 s), snaps the hand back and turns his face away for the shot (1.60 s). Rifle on his back.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "dc08dc4841c24e43e5f8b0de87980cc5aa6619e0c6d0d81d5b8536aa39799e8d"
+    }
+   }
+  },
+  "PvIjaLungeParriedFall": {
+   "duration": 2.2,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaTrench",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "weaponState": "twoHand->dropped",
+   "weaponDropFrom": "PvIjaLungeParriedFall",
+   "terminal": true,
+   "events": [
+    {
+     "t": 0.42,
+     "kind": "parried"
+    },
+    {
+     "t": 0.86,
+     "kind": "stabbed"
+    },
+    {
+     "t": 0.98,
+     "kind": "weaponLost"
+    },
+    {
+     "t": 1.62,
+     "kind": "groundImpact"
+    }
+   ],
+   "notes": "04-2: lunges with the bayonet (left foot forward), the rifle is beaten aside to his left at 0.42 s and he lurches after it; a bayonet in the chest at 0.86 s doubles him and throws him back, the rifle falls out of his hands (0.98 s, `weapon` track to the ground ahead-left), he staggers back and falls on his back (1.62 s); the last frame is the corpse.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "e829d8357886a53b7709d25caee83100af5111d4f5c182a15b421f20a5e9f221"
+    }
+   }
+  },
+  "PvCaptiveButtHit": {
+   "duration": 1.4,
+   "loop": false,
+   "weaponHold": "free",
+   "role": "captive",
+   "rootMotion": false,
+   "stage": "buttFace",
+   "terminal": false,
+   "events": [
+    {
+     "t": 0.04,
+     "kind": "hitFace"
+    },
+    {
+     "t": 0.72,
+     "kind": "handOnGround"
+    }
+   ],
+   "notes": "02-1: kneeling (sat a little back on the heels, hands on the thighs); the butt hits his face at 0.04 s: the head snaps back, the trunk rocks back and twists, he topples onto his left side and catches himself on the left hand (0.72 s), right hand to the face. The last frame holds.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "694d40d67e6f1053dc91bdaa488785d9cfbcdcdabf26fedce0b4d61167fe10ea"
+    }
+   }
+  }
+ },
+ "stages": {
+  "buttFace": {
+   "anchor": "ijaB",
+   "notes": "PvIjaButtStrikeFace + PvCaptiveButtHit (02-1, line 582-584): the captive kneels 0.80 m straight ahead of ijaB facing him; the butt meets the face at ijaB 0.42 s = captive 0.04 s (the captive clip starts 0.38 s after ijaB's).",
+   "actors": {
+    "ijaB": {
+     "rig": "TengxianNra02",
+     "clip": "PvIjaButtStrikeFace",
+     "x": 0.0,
+     "z": 0.0,
+     "yawDeg": 0
+    },
+    "captive": {
+     "rig": "TengxianNra02",
+     "clip": "PvCaptiveButtHit",
+     "x": 0.0,
+     "z": -0.8,
+     "yawDeg": 180,
+     "offsetS": 0.38
+    }
+   }
+  },
+  "launcherCrew": {
+   "anchor": "gunner",
+   "notes": "PvIjaLauncherFire + PvIjaLauncherLoad (03): both 2 s loops start together; the shell drops into the muzzle at 0.92 s, the shot at 1.60 s. The discharger (prop track `launcher` of the gunner clip) stands on its base plate 0.36 m ahead and 0.04 m right of the gunner root, tube 45 deg up toward -z.",
+   "actors": {
+    "gunner": {
+     "rig": "TengxianNra02",
+     "clip": "PvIjaLauncherFire",
+     "x": 0.0,
+     "z": 0.0,
+     "yawDeg": 0
+    },
+    "loader": {
+     "rig": "TengxianNra02",
+     "clip": "PvIjaLauncherLoad",
+     "x": 0.46,
+     "z": -0.3,
+     "yawDeg": 50.0
+    }
+   }
+  }
+ },
+ "props": {
+  "launcher": {
+   "model": "Model_Type89Launcher",
+   "notes": "track origin = model origin (gripR, the trigger body); axis = model -Z (muzzle direction); up = model +Y. Base plate end 0.185 m behind the origin."
+  },
+  "shell": {
+   "notes": "Type89 shell in the loader's right fist: centre, axis = nose direction, up. Hidden outside the carry (it is in the pouch, then in the tube)."
+  }
+ },
+ "models": [
+  {
+   "id": "TengxianNra02",
+   "file": "Animation_TengxianNra02PrevizIja.json",
+   "sha256": "52db6f6b65d25ee205437d146b60bb50b3f6ed70eefdc566adc4c42d4f0ce0e0",
+   "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\PrevizIja_20261019\\Scene_TengxianNra02PrevizIja.blend",
+   "contactPoints": {},
+   "clips": [
+    {
+     "clip": "PvIjaSignalSplit",
+     "frames": 49,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0094,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.0
+      ],
+      [
+       "R",
+       0,
+       2.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvIjaBayonetRaiseThreat",
+     "frames": 35,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0206,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.057,
+       -0.0988,
+       0.0,
+       0.7515
+      ],
+      "end": [
+       0.0585,
+       -0.1159,
+       0.0,
+       0.7289
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       1.4
+      ],
+      [
+       "R",
+       0,
+       1.4
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "probes": {
+      "tipToMark": [
+       0.0228,
+       0.7824
+      ]
+     }
+    },
+    {
+     "clip": "PvIjaButtStrikeFace",
+     "frames": 25,
+     "footSlideM": 0.0102,
+     "contactErrorM": 0.0626,
+     "gripSolveErrorM": 0.06262,
+     "pelvisMaxStepM": 0.0879,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.057,
+       -0.0988,
+       0.0,
+       0.7515
+      ],
+      "end": [
+       0.057,
+       -0.0988,
+       0.0,
+       0.7515
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       1.0
+      ],
+      [
+       "R",
+       0,
+       1.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "probes": {
+      "buttToFace": [
+       0.0106,
+       0.4167
+      ]
+     }
+    },
+    {
+     "clip": "PvIjaCrouchHairLift",
+     "frames": 85,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0161,
+     "gripSolveErrorM": 0.01607,
+     "pelvisMaxStepM": 0.0548,
+     "floorCorrectionMin": 0.02081,
+     "floorCorrectionMax": 0.02081,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8563
+      ],
+      "end": [
+       0.0268,
+       -0.0142,
+       0.0,
+       0.3053
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.5
+      ],
+      [
+       "R",
+       0,
+       3.5
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "lookErrorDeg": 0.42,
+     "headTurnDeg": 54.69
+    },
+    {
+     "clip": "PvIjaLauncherFire",
+     "frames": 49,
+     "footSlideM": 0.0054,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.02479,
+     "pelvisMaxStepM": 0.012,
+     "floorCorrectionMin": 0.02632,
+     "floorCorrectionMax": 0.03265,
+     "root": {
+      "start": [
+       -0.0603,
+       -0.1068,
+       -3.44,
+       0.4669
+      ],
+      "end": [
+       -0.0571,
+       -0.1171,
+       -3.44,
+       0.4672
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.0
+      ]
+     ],
+     "kneePlants": [
+      [
+       "R",
+       0,
+       2.0
+      ]
+     ],
+     "kneeSlideM": 0.0019
+    },
+    {
+     "clip": "PvIjaLauncherLoad",
+     "frames": 49,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": 0.04319,
+     "floorCorrectionMax": 0.04319,
+     "root": {
+      "start": [
+       -0.0,
+       0.0979,
+       0.0,
+       0.4165
+      ],
+      "end": [
+       -0.0,
+       0.0979,
+       0.0,
+       0.4165
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [
+      [
+       "L",
+       0,
+       2.0
+      ],
+      [
+       "R",
+       0,
+       2.0
+      ]
+     ],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvIjaLungeParriedFall",
+     "frames": 54,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0914,
+     "floorCorrectionMin": -0.08631,
+     "floorCorrectionMax": 0.11704,
+     "root": {
+      "start": [
+       0.0249,
+       -0.0541,
+       0.0,
+       0.7998
+      ],
+      "end": [
+       -0.0183,
+       0.4111,
+       0.0,
+       0.2165
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       0.86
+      ],
+      [
+       "L",
+       0.3,
+       0.62
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvCaptiveButtHit",
+     "frames": 35,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0289,
+     "floorCorrectionMin": 0.01638,
+     "floorCorrectionMax": 0.08952,
+     "root": {
+      "start": [
+       0.0,
+       0.0872,
+       0.0,
+       0.4225
+      ],
+      "end": [
+       -0.2741,
+       0.1329,
+       5.73,
+       0.2067
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [
+      [
+       "R",
+       0,
+       0.25
+      ]
+     ],
+     "kneeSlideM": 0.0144
+    }
+   ],
+   "clipIds": [
+    "PvIjaSignalSplit",
+    "PvIjaBayonetRaiseThreat",
+    "PvIjaButtStrikeFace",
+    "PvIjaCrouchHairLift",
+    "PvIjaLauncherFire",
+    "PvIjaLauncherLoad",
+    "PvIjaLungeParriedFall",
+    "PvCaptiveButtHit"
+   ]
+  }
+ ]
+}
