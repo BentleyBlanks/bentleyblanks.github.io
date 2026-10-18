@@ -6,9 +6,12 @@
 //        [--pick=Scene:n] [--no-judge] [--face]
 //
 //   --dry-run      只打印每场的请求（提示词全文、参考音文件与 sha），不发请求、不含密钥
-//   （缺省）       只生成还没有原始返回的场；已有原始返回的场直接重新母带、切句、核对、写清单（不发请求）
+//   （缺省）       只生成还没有原始返回的场；已有原始返回的场直接重新母带、切句、核对、写清单（不发请求）。
+//                  「已有」按提示词 sha 认：台词 / 表演说明 / 场景一改，旧返回就不算这一场的（文件留在 tmp 里，编号继续往后排），
+//                  只改挂的关键帧不动提示词，照旧复用（2026-10-19 第二版改稿起）
 //   --force=S      重抽这一场：在已有生成之后再生成一次（每场最多 3 次 = 1 次 + 重抽 2 次），装最新那次
 //   --pick=S:n     这一场装第 n 次生成（缺省装最新那次）
+//   写完清单会把 Audio/Blockout0610 里清单没引用的 AudioVoice_Blockout0610*.mp3 删掉（删掉的场、减少的句）
 //   --no-judge     不跑 whisper 转写与音色核对（快；核对表里那两列留空）
 //   --face         切好以后用 Script_FirstLevelFaceTrackBake.py 烘口型轨到 Audio/Blockout0610/Data_Blockout0610FaceTracks.json
 //
@@ -144,10 +147,16 @@ function TargetDb(scene) {
 const RawFile = (scene, n) => path.join(work, `${scene.id}_${n}.raw.mp3`);
 const MetaFile = (scene, n) => path.join(work, `${scene.id}_${n}.json`);
 const CutDir = (scene, n) => path.join(work, `${scene.id}_${n}`);
-function Attempts(scene) {
+/** tmp 里这一场的全部生成编号（不管提示词是哪一版），下一次生成接着往后编。 */
+function AllAttempts(scene) {
   const list = [];
   for (let n = 1; n <= 9; n++) if (fs.existsSync(RawFile(scene, n)) && fs.existsSync(MetaFile(scene, n))) list.push(n);
   return list;
+}
+/** 这一场当前提示词的生成（提示词 sha 对得上的才算；台词改了，旧返回就不是这一场的了）。 */
+function Attempts(scene) {
+  const hash = Hash(ScenePrompt(scene));
+  return AllAttempts(scene).filter((n) => ReadJson(MetaFile(scene, n))?.promptHash === hash);
 }
 async function Generate(scene, n) {
   const prompt = ScenePrompt(scene), refs = References(scene);
@@ -335,11 +344,11 @@ async function Main() {
   fs.mkdirSync(work, { recursive: true });
   fs.mkdirSync(outDir, { recursive: true });
   for (const scene of scenes) {
-    const have = Attempts(scene);
-    if (!have.length) await Generate(scene, 1);
+    const have = Attempts(scene), next = Math.max(0, ...AllAttempts(scene)) + 1;
+    if (!have.length) await Generate(scene, next);
     else if (forced.has(scene.id)) {
       if (have.length >= MAX_ATTEMPTS) console.warn(`${scene.id}: 已生成 ${have.length} 次，到上限，不再重抽`);
-      else await Generate(scene, Math.max(...have) + 1);
+      else await Generate(scene, next);
     }
   }
   const results = scenes.map((scene) => {
@@ -356,14 +365,21 @@ async function Main() {
     Install(r, manifest, timings);
   }
   const order = L0610_VOICE_SCENES.map((s) => s.id);
+  // 台词表里已经没有的场（改稿删掉或改名的）从清单里拿掉，不管这次 --only 跑的是哪几场。
+  manifest.scenes = manifest.scenes.filter((s) => order.includes(s.id));
   manifest.scenes.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   manifest.generatedAt = new Date().toISOString();
   manifest.requests = (manifest.requests || 0) + requestStats.requests;
   const ordered = { schema: manifest.schema, level: manifest.level, generatedAt: manifest.generatedAt, requests: manifest.requests,
-    note: "占位配音（SeedAudio seed-audio-1.0，整段一次生成后按逐字时间戳切句）。file 相对 Taierzhuang1938/index.html；gapBeforeS 是录音里与上一句的原始间隔；keyframe 是契约 §4 的关键帧 id。",
+    note: "占位配音（SeedAudio seed-audio-1.0，整段一次生成后按逐字时间戳切句）。file 相对 Taierzhuang1938/index.html；gapBeforeS 是录音里与上一句的原始间隔；keyframe 是第二版改稿契约 §3 的关键帧 id（06-1…10-6）。",
     scenes: manifest.scenes };
   fs.writeFileSync(manifestPath, JSON.stringify(ordered, null, 1) + "\n");
   fs.writeFileSync(path.join(work, "LineTimings.json"), JSON.stringify(timings, null, 1));
+  // 清单没引用的旧片段（删掉的场、句数变少的场）一起删掉；只碰 AudioVoice_Blockout0610*.mp3。
+  const live = new Set(ordered.scenes.flatMap((s) => s.lines.map((l) => path.basename(l.file))));
+  const stale = fs.readdirSync(outDir).filter((f) => /^AudioVoice_Blockout0610.*\.mp3$/.test(f) && !live.has(f));
+  for (const f of stale) fs.rmSync(path.join(outDir, f));
+  if (stale.length) console.log(`删掉清单没引用的旧片段 ${stale.length} 个：${stale.join("、")}`);
   console.log(`\n清单 → ${Rel(manifestPath)}；本次请求 ${requestStats.requests} 次（重试 ${requestStats.retries}，失败 ${requestStats.failures}）`);
   if (face) FaceBake(ordered);
 }
