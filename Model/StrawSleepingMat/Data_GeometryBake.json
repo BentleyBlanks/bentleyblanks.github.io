@@ -1,0 +1,48 @@
+{
+  "coordinateSystem": "glTF +Y up, metres; local origin at bottom-centre",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\HistoricalProps\\StrawSleepingMat\\Scene_StrawSleepingMat.blend",
+  "assets": [
+    {
+      "file": "Model_StrawSleepingMatFlat.glb",
+      "triangles": 1888,
+      "triangleLimit": 2000,
+      "blenderDimensions": [
+        1.8146262168884277,
+        0.9143253564834595,
+        0.021400563418865204
+      ],
+      "rootLocation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rootScale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "minimumZ": 0.0
+    },
+    {
+      "file": "Model_StrawSleepingMatRolled.glb",
+      "triangles": 1200,
+      "triangleLimit": 1200,
+      "blenderDimensions": [
+        0.9115805625915527,
+        0.14517484605312347,
+        0.2235185205936432
+      ],
+      "rootLocation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rootScale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "minimumZ": 0.0
+    }
+  ]
+}

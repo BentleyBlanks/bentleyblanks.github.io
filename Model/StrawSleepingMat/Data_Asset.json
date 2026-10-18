@@ -1,0 +1,73 @@
+{
+  "asset": "StrawSleepingMat",
+  "descriptionZh": "1930年代中国南方士兵随身单人草席；蒲草/稻草平纹，草绳锁边，晒褪黄褐色，磨损断草、泥渍与雨水晕痕",
+  "referenceApproval": "参考图可以 极致的对标以后才能算完成",
+  "deliveryType": "Two independent reusable game assets",
+  "coordinateSystem": {
+    "unit": "metre",
+    "up": "+Y",
+    "longAxis": "+X",
+    "pivot": "bottom-centre of the complete object bounds",
+    "rootTransform": "identity"
+  },
+  "models": [
+    {
+      "file": "Model_StrawSleepingMatFlat.glb",
+      "state": "laid on ground, slight undulation and curled edges",
+      "nominalLength": 1.8,
+      "nominalWidth": 0.9,
+      "sheetThickness": 0.005,
+      "triangles": 1888,
+      "triangleLimit": 2000,
+      "textureSet": "Flat",
+      "boundsNote": "Loose broken fibre tips extend slightly beyond the nominal sheet. Curl makes full height larger than the 5mm sheet thickness."
+    },
+    {
+      "file": "Model_StrawSleepingMatRolled.glb",
+      "state": "folded once and tightly rolled, two straw-cord ties and one carrying loop",
+      "nominalAxisLength": 0.9,
+      "nominalBodyDiameter": 0.135,
+      "diameterIncludingCords": 0.1452,
+      "triangles": 1200,
+      "triangleLimit": 1200,
+      "bindings": 2,
+      "carryingLoops": 1,
+      "fold": "Fold the 1.8m length once into a 0.9m x 0.9m double-layer square, then roll with the axis along the original width.",
+      "textureSet": "Rolled",
+      "boundsNote": "Complete height includes the carrying loop; loose fibre tips extend the 0.9m body slightly."
+    }
+  ],
+  "pbr": {
+    "resolution": [1024,1024],
+    "sets": ["Flat","Rolled"],
+    "channels": ["BaseColor","Normal","Roughness","AO"],
+    "naming": "Texture/Texture_StrawSleepingMat<Flat|Rolled><Channel>.png",
+    "baseColorSpace": "sRGB",
+    "dataColorSpace": "linear, non-color",
+    "normalConvention": "OpenGL +Y tangent space",
+    "metallic": 0,
+    "glbPacking": "Self-contained GLB embeds albedo, normal, and ORM (R AO / G roughness / B zero metallic). Four separate requested channels are retained externally.",
+    "atlas": "Upper half is sheet/exterior; lower left is rolled cut end; lower right is straw cord.",
+    "geometryDetail": "Thickness, curl, edge cord, cut-end silhouette, bindings, knots, tails and carrying loop are geometry. Dense woven fibres and compact coiled-layer relief are represented in the aligned material maps."
+  },
+  "provenance": {
+    "imageGeneration": "built-in image_gen__imagegen",
+    "textureSources": "Source/Texture_*.png",
+    "texturePrompts": "Source/Data_*ImagegenPrompt*.json and Source/Data_ImagegenPrompts.json",
+    "historicalSources": [
+      "https://m.krzzjn.com/show-1104-31418.html",
+      "https://www.chinanews.com/cul/2014/09-03/6558063.shtml",
+      "https://www.fengshun.gov.cn/zjfs/mfms/content/post_2871798.html",
+      "https://www.chinanews.com/sh/2019/06-05/8856506.shtml"
+    ],
+    "historicalLimit": "Sources support soldiers carrying small straw mats and traditional southern grass weaving. Exact dimensions, two ties and carrying loop follow the user's approved reconstruction."
+  },
+  "rebuild": {
+    "pythonDependencies": ["numpy","Pillow"],
+    "textureCommand": "python Model/StrawSleepingMat/Script_StrawSleepingMatTextures.py --scratch tmp/StrawSleepingMat",
+    "blenderWorkflow": "Start this task's isolated .blend with scripts/Script_BlenderMcp.mjs, set scene['StrawMatRoot'] to this directory, then execute Script_StrawSleepingMatBake.py through BlenderMCP.",
+    "verificationCommand": "python Model/StrawSleepingMat/Script_StrawSleepingMatVerify.py --report tmp/StrawSleepingMat/Data_ExportVerification.json",
+    "blenderSource": "C:/Users/Bentl/OneDrive/AI/Models/Blender/HistoricalProps/StrawSleepingMat/Scene_StrawSleepingMat.blend",
+    "localReview": "tmp/StrawSleepingMat/index.html; screenshots and reference sheets remain local"
+  }
+}

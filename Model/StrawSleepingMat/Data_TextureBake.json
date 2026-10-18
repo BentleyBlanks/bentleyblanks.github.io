@@ -1,0 +1,112 @@
+{
+  "resolution": [
+    1024,
+    1024
+  ],
+  "normalConvention": "OpenGL +Y",
+  "atlas": {
+    "sheetV": [
+      0.5,
+      1.0
+    ],
+    "cordUV": [
+      [
+        0.5,
+        1.0
+      ],
+      [
+        0.0,
+        0.5
+      ]
+    ],
+    "endUV": [
+      [
+        0.0,
+        0.5
+      ],
+      [
+        0.0,
+        0.5
+      ]
+    ]
+  },
+  "sourceProvider": "built-in image_gen__imagegen",
+  "sets": {
+    "Flat": {
+      "BaseColor": {
+        "file": "Texture_StrawSleepingMatFlatBaseColor.png",
+        "size": [
+          1024,
+          1024
+        ],
+        "sha256": "958b1583728a4cc222822461bece2d6b7fc785bac822b15d521ea974e47c668d",
+        "colorSpace": "sRGB"
+      },
+      "Normal": {
+        "file": "Texture_StrawSleepingMatFlatNormal.png",
+        "size": [
+          1024,
+          1024
+        ],
+        "sha256": "1136ea13e9a0b12e21ce26c8b23b26b63f5ca207be731b32e2c9fbb3d8ab0653",
+        "colorSpace": "linear data"
+      },
+      "Roughness": {
+        "file": "Texture_StrawSleepingMatFlatRoughness.png",
+        "size": [
+          1024,
+          1024
+        ],
+        "sha256": "b3cef2e33e80ef3bbd4ff28a1a32bc008e97af66d79e8080ae79672d35a01248",
+        "colorSpace": "linear data"
+      },
+      "AO": {
+        "file": "Texture_StrawSleepingMatFlatAO.png",
+        "size": [
+          1024,
+          1024
+        ],
+        "sha256": "bf84914832f2780607909b27a5690846d23dbb5aa05e911cba57dc8661f91922",
+        "colorSpace": "linear data"
+      }
+    },
+    "Rolled": {
+      "BaseColor": {
+        "file": "Texture_StrawSleepingMatRolledBaseColor.png",
+        "size": [
+          1024,
+          1024
+        ],
+        "sha256": "71b646dd439c608ae95619b4535d78cd02c57e706bdff73806659268561db42b",
+        "colorSpace": "sRGB"
+      },
+      "Normal": {
+        "file": "Texture_StrawSleepingMatRolledNormal.png",
+        "size": [
+          1024,
+          1024
+        ],
+        "sha256": "a108b522db9e4b64b0ca2c9a5ebd004a0d99b8614cce4c72bb998541c719cbbc",
+        "colorSpace": "linear data"
+      },
+      "Roughness": {
+        "file": "Texture_StrawSleepingMatRolledRoughness.png",
+        "size": [
+          1024,
+          1024
+        ],
+        "sha256": "03bae7825a3734d7c023befc6dd7fc484582b7f46e007f51219b2e22a377a04d",
+        "colorSpace": "linear data"
+      },
+      "AO": {
+        "file": "Texture_StrawSleepingMatRolledAO.png",
+        "size": [
+          1024,
+          1024
+        ],
+        "sha256": "20f5375707a55cb7e57b09a0ceb1f641f8792f145f426a279612f8c7ea2735be",
+        "colorSpace": "linear data"
+      }
+    }
+  }
+}
