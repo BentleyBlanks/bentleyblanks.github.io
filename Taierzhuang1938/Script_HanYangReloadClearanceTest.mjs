@@ -4,6 +4,8 @@
 // --max-depth-mm=2 explicitly gates confirmed closed-shell depth only; open
 // shell crossings/ambiguity still require review and never imply clearance.
 // --shots saves at most two 1280x720 JPEGs per case; --output=<directory>.
+// --case=HanYangBolt (or another exact case id) isolates an amended action;
+// omitting it always retains all four complete actions.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -17,6 +19,8 @@ const depthOption=Value('--max-depth-mm'),maximumDepthMm=depthOption===undefined
 assert(maximumDepthMm===null||(Number.isFinite(maximumDepthMm)&&maximumDepthMm>=0),'--max-depth-mm must be a finite nonnegative number');
 const output=path.resolve(Value('--output')||path.join(project,'_shots','HanYangReloadClearance'));
 const shots=process.argv.includes('--shots');
+const selectedCase=Value('--case');
+assert(selectedCase===undefined||['HanYangEmpty','HanYangPartial3','HanYangOpenReload','HanYangBolt'].includes(selectedCase),'Unknown HanYang action case');
 await fs.mkdir(output,{recursive:true});
 let server=null,browser=null,page=null,report=null;
 const pageErrors=[],consoleErrors=[];
@@ -28,7 +32,7 @@ try {
   page.on('console',message=>{if(message.type()==='error')consoleErrors.push(message.text());if(message.text().startsWith('--- HanYang clearance '))console.log(message.text());});
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?weapons=1&shot=1&manual=1&quality=medium&scale=small`,{timeout:120000});
   await page.waitForFunction(()=>window.Taierzhuang?.state?.ready,null,{timeout:240000});
-  report=await page.evaluate(async()=>{
+  report=await page.evaluate(async selectedCase=>{
     const THREE=await import('./vendor/three/build/three.module.js');
     const {CreateReloadClearanceProbe}=await import('./Script_FpsReloadClearanceGeometry.mjs');
     const T=window.Taierzhuang,vm=T.viewmodel;
@@ -101,7 +105,7 @@ try {
       {role:'gun',root:vm.rig.group},{role:'newPacket',root:vm.packetProp},{role:'oldPacket',root:vm.usedPacketProp},
       ...vm.debris.filter(slot=>slot.alive>0).map((slot,index)=>({role:'liveDebris/'+(slot.mesh.userData.debrisKind||'unknown')+'/'+index,root:slot.mesh})),
     ];
-    const audit=window.__hanYangReloadClearanceAudit={schema:1,mode:'report_only',weapon:'HanYang',fps:60,postActionFrames:12,cases:[],
+    const audit=window.__hanYangReloadClearanceAudit={schema:1,mode:'report_only',weapon:'HanYang',fps:60,postActionFrames:12,selectedCase:selectedCase??null,cases:[],
       method:'Both actual skinned arms: every rendered vertex influenced >=5% by the selected side Finger/Hand/Forearm/UpperArm, mixed-weight Wrist and all skin/sleeve faces. Visible real gun, actual new/old Mannlicher packets and every live released case/cartridge/clip/debris mesh. BVH finite surface crossing plus per-edge-connected closed-shell bidirectional 4/5-ray containment; no depth early exit, no contact exemptions.',
       limitations:[
         'Closed-shell depth is nearest surface distance inside each confirmed watertight component, not the exterior depth of a union of overlapping solids.',
@@ -119,7 +123,7 @@ try {
       {id:'HanYangPartial3',action:'reload',remaining:3,startedOpen:false},
       {id:'HanYangOpenReload',action:'reload',remaining:0,startedOpen:true},
       {id:'HanYangBolt',action:'bolt',remaining:4,startedOpen:false},
-    ]){
+    ].filter(spec=>!selectedCase||spec.id===selectedCase)){
       Prepare(spec);
       const probes={r:CreateReloadClearanceProbe(THREE,{side:'r',includeUpperArm:true}),l:CreateReloadClearanceProbe(THREE,{side:'l',includeUpperArm:true})};
       const row={...spec,fps:60,inventory:{r:Inventory('r'),l:Inventory('l')},frames:[]};audit.cases.push(row);
@@ -171,7 +175,7 @@ try {
       const update=editor.Update;editor.Update=()=>{};try{T.StepFrames(1);}finally{editor.Update=update;}
     };
     return audit;
-  });
+  },selectedCase);
   const protocolFailures=[],depthFailures=[];
   const Check=(condition,message)=>{if(!condition)protocolFailures.push(message);};
   for(const row of report.cases){
@@ -181,6 +185,7 @@ try {
     Check(row.actionFrameCount>=Math.floor(row.duration*60),row.id+': incomplete actual 60fps action');
     Check(row.frames.filter(frame=>frame.phase==='settle').length===12,row.id+': missing post-action frames');
     Check(row.frames.at(-1).settleFrame===12,row.id+': did not finish the full settle interval');
+    if(maximumDepthMm!==null)Check(row.holding.crossingTriangleObstaclePairs===0,row.id+': the actual complete holding arms/wrists/sleeves cross the gun before the action');
     for(const side of ['r','l']){
       const inventory=row.inventory[side];
       Check(inventory.meshes.some(mesh=>mesh.surface==='skin'||mesh.surface==='mixed'),row.id+': no actual '+side+' scan skin inventory');

@@ -20,7 +20,7 @@ import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Scr
 import { StepElbowArc } from "./Script_FpsElbowArc.mjs";
 import { LoadFpsSkeletalAnimations } from "./Script_FpsSkeletalAnimation.mjs";
 
-const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=20261016094500", fpsHanYangRepaired: "./Model/Model_FpsHanYangHandsRepaired.glb?v=20261017113004", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
+const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=20261016094500", fpsHanYangRepaired: "./Model/Model_FpsHanYangHandsRepaired.glb?v=20261018035000", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
 const PROFILE_CLIPS = Object.freeze({
   rifle: "RifleIdle",
   lmg: "MachineGunFire",
@@ -357,6 +357,8 @@ export class FpsArmRig {
     TagCharacterSurface(this.root, hanYangHands ? "FpsHanYang" : "FpsArms");
     this.root.traverse((object) => {
       if (!object.isMesh) return;
+      const nailSurface = [].concat(object.material).every(material => material?.name === "Material_HanYangScanSkin_Nails");
+      object.userData.firstPersonNailSurface = nailSurface;
       object.frustumCulled = false;
       object.castShadow = false;
       object.receiveShadow = false;
@@ -369,7 +371,7 @@ export class FpsArmRig {
       // 粗糙度下限沿用原来手写的 0.78。
       this.materialLibrary?.ConfigureExternalPbr?.(object.material, {
         metalness: 0,
-        minRoughness: 0.78,
+        minRoughness: nailSurface ? 0 : 0.78,
         // 手是皮肤、袖子是布：交出网格，材质库才换得了类并接上预积分散射。
         mesh: object,
       });
@@ -381,7 +383,7 @@ export class FpsArmRig {
         if (material.isMeshStandardMaterial) {
           material.envMapIntensity = Math.min(material.envMapIntensity ?? 1, 0.55);
           // 与上面 minRoughness 同一个数：材质库缺席时（离线单测）这一行独自兜底。
-          material.roughness = Math.max(material.roughness, 0.78);
+          material.roughness = Math.max(material.roughness, nailSurface ? 0 : 0.78);
         }
         material.needsUpdate = true;
       }
@@ -976,6 +978,16 @@ export class FpsArmRig {
       const shoulder=this._InAnchor(chain.upperArm,new THREE.Vector3());
       const elbow=this._InAnchor(chain.forearm,new THREE.Vector3());
       const wrist=this._InAnchor(chain.hand,new THREE.Vector3());
+      // Native playback replaces the actual elbow pose. The procedural
+      // handoff must continue from that measured plane, not a stale plane
+      // left by an earlier weapon/state before the clip took control.
+      const shoulderAxis=wrist.clone().sub(shoulder).normalize();
+      const elbowPlane=elbow.clone().sub(shoulder);
+      elbowPlane.addScaledVector(shoulderAxis,-elbowPlane.dot(shoulderAxis));
+      if(elbowPlane.lengthSq()>1e-10){
+        this.elbowDirections ||= {r:null,l:null};
+        this.elbowDirections[side]=elbowPlane.normalize();
+      }
       const direction=new THREE.Vector3(0,0,1).applyQuaternion(this._InAnchorBasisQuaternion(this.gripNodes[side],new THREE.Quaternion()));
       const axis=wrist.clone().sub(elbow).normalize();
       this.wristBend[side]=THREE.MathUtils.radToDeg(direction.angleTo(axis));

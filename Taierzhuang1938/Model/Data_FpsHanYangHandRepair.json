@@ -1,41 +1,588 @@
 {
-  "version": 4,
-  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\FpsHandThumbRoots_20261017\\Model_FpsHandSurfaceRepair.blend",
+  "version": 8,
   "basisSha256": "dffb45e2edc89050feefed0a49230175eb17e42a96b46fcdfaff872187d01a38",
-  "output": "C:\\Users\\Bentl\\Documents\\Codex\\2026-10-16\\new-chat-2\\work\\bentleyblanks_Codex_CodRifleView_20261016\\Taierzhuang1938\\Model\\Model_FpsHanYangHandsRepaired.glb",
-  "outputSha256": "9f3a881499a0754dca120c6cea9a97ac6a67d060e250361b2dd850b39af11f65",
-  "vertices": 29019,
-  "changedWeightVertices": 19253,
-  "thumbProfileVertices": 1018,
-  "wristProfileVertices": 5550,
-  "thumbBaseVertices": 3333,
-  "rightThumbRootVertices": 1969,
-  "leftThumbRootVertices": 1229,
-  "thumbRootCalibrationSha256": "52e7f820bebea78b803251ac5360830115699f096bbfc355967d14d8548acd6d",
-  "holdingReliefMaximumError": 3.576224061345498e-18,
-  "regions": {
-    "l": {
-      "wristPalm": 5865,
-      "fingers": [
-        1228,
-        1124,
-        1492,
-        1357,
-        1162
+  "outputSha256": "a58235a4d5003fe0124f200385794db519e604eb4a21604f4863cd1858eba41f",
+  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\FpsHanYangStockGrip_20261018\\Model_FpsHanYangStockGrip.blend",
+  "originalPalmOutsideThumbRootAndAllSkinWeightsPreserved": true,
+  "originalSkeletonUvsTexturesAndMorphsPreserved": true,
+  "fingerVerticesChanged": 8846,
+  "fingerProfiles": [
+    {
+      "side": "l",
+      "digit": 0,
+      "segment": 0,
+      "widthBeforeMm": 28.356260397923496,
+      "depthBeforeMm": 37.047852599694444,
+      "widthScale": 1.0,
+      "depthScale": 1.0,
+      "widthAfterMm": 28.356260397923496,
+      "depthAfterMm": 37.047852599694444
+    },
+    {
+      "side": "l",
+      "digit": 0,
+      "segment": 1,
+      "widthBeforeMm": 17.513768618165642,
+      "depthBeforeMm": 16.855410692753782,
+      "widthScale": 1.0,
+      "depthScale": 1.0,
+      "widthAfterMm": 17.513768618165617,
+      "depthAfterMm": 16.85541069275376
+    },
+    {
+      "side": "l",
+      "digit": 0,
+      "segment": 2,
+      "widthBeforeMm": 17.940525303695615,
+      "depthBeforeMm": 15.564992063790907,
+      "widthScale": 1.0,
+      "depthScale": 1.0,
+      "widthAfterMm": 17.940525303695416,
+      "depthAfterMm": 15.56499206379087
+    },
+    {
+      "side": "l",
+      "digit": 1,
+      "segment": 0,
+      "widthBeforeMm": 19.898488607636306,
+      "depthBeforeMm": 17.22042535498454,
+      "widthScale": 1.0,
+      "depthScale": 1.02,
+      "widthAfterMm": 19.898488607636256,
+      "depthAfterMm": 17.52927693615826
+    },
+    {
+      "side": "l",
+      "digit": 1,
+      "segment": 1,
+      "widthBeforeMm": 19.542334200143667,
+      "depthBeforeMm": 15.046171280423025,
+      "widthScale": 0.94,
+      "depthScale": 1.02,
+      "widthAfterMm": 18.506041073535815,
+      "depthAfterMm": 15.347798720632463
+    },
+    {
+      "side": "l",
+      "digit": 1,
+      "segment": 2,
+      "widthBeforeMm": 17.953789793806184,
+      "depthBeforeMm": 10.973320386740046,
+      "widthScale": 0.86,
+      "depthScale": 1.02,
+      "widthAfterMm": 15.440259222673316,
+      "depthAfterMm": 11.193387524370296
+    },
+    {
+      "side": "l",
+      "digit": 2,
+      "segment": 0,
+      "widthBeforeMm": 22.138534592796482,
+      "depthBeforeMm": 17.31414567599538,
+      "widthScale": 0.97,
+      "depthScale": 1.02,
+      "widthAfterMm": 21.530864843204252,
+      "depthAfterMm": 17.600509246962766
+    },
+    {
+      "side": "l",
+      "digit": 2,
+      "segment": 1,
+      "widthBeforeMm": 23.57611411527216,
+      "depthBeforeMm": 14.997002315242565,
+      "widthScale": 0.91,
+      "depthScale": 1.02,
+      "widthAfterMm": 21.454263844897657,
+      "depthAfterMm": 15.29694833746524
+    },
+    {
+      "side": "l",
+      "digit": 2,
+      "segment": 2,
+      "widthBeforeMm": 21.48860048027932,
+      "depthBeforeMm": 11.800359192444457,
+      "widthScale": 0.89,
+      "depthScale": 1.1,
+      "widthAfterMm": 19.377236895545146,
+      "depthAfterMm": 12.922214198504683
+    },
+    {
+      "side": "l",
+      "digit": 3,
+      "segment": 0,
+      "widthBeforeMm": 19.252189485331673,
+      "depthBeforeMm": 16.050216901357356,
+      "widthScale": 0.98,
+      "depthScale": 1.04,
+      "widthAfterMm": 18.9792700788371,
+      "depthAfterMm": 16.591736555751236
+    },
+    {
+      "side": "l",
+      "digit": 3,
+      "segment": 1,
+      "widthBeforeMm": 18.87671581169353,
+      "depthBeforeMm": 14.379981650559742,
+      "widthScale": 0.95,
+      "depthScale": 1.04,
+      "widthAfterMm": 17.907375548437624,
+      "depthAfterMm": 14.955180916582181
+    },
+    {
+      "side": "l",
+      "digit": 3,
+      "segment": 2,
+      "widthBeforeMm": 16.357005253183264,
+      "depthBeforeMm": 12.140093080036934,
+      "widthScale": 0.89,
+      "depthScale": 1.02,
+      "widthAfterMm": 14.800866155225174,
+      "depthAfterMm": 12.38288667734445
+    },
+    {
+      "side": "l",
+      "digit": 4,
+      "segment": 0,
+      "widthBeforeMm": 16.270404092338573,
+      "depthBeforeMm": 14.748427171546632,
+      "widthScale": 1.0,
+      "depthScale": 1.05,
+      "widthAfterMm": 16.268554321032457,
+      "depthAfterMm": 15.139295793411927
+    },
+    {
+      "side": "l",
+      "digit": 4,
+      "segment": 1,
+      "widthBeforeMm": 17.045291268800337,
+      "depthBeforeMm": 12.677371237788684,
+      "widthScale": 0.98,
+      "depthScale": 1.05,
+      "widthAfterMm": 16.70539412035136,
+      "depthAfterMm": 13.309630129784162
+    },
+    {
+      "side": "l",
+      "digit": 4,
+      "segment": 2,
+      "widthBeforeMm": 13.432490249503074,
+      "depthBeforeMm": 11.088838394364355,
+      "widthScale": 0.92,
+      "depthScale": 1.04,
+      "widthAfterMm": 12.357891029542834,
+      "depthAfterMm": 11.47840831601701
+    },
+    {
+      "side": "r",
+      "digit": 0,
+      "segment": 0,
+      "widthBeforeMm": 28.53285024183123,
+      "depthBeforeMm": 36.50767622965128,
+      "widthScale": 1.0,
+      "depthScale": 1.0,
+      "widthAfterMm": 28.53285024183123,
+      "depthAfterMm": 36.50767622965128
+    },
+    {
+      "side": "r",
+      "digit": 0,
+      "segment": 1,
+      "widthBeforeMm": 17.86399004590984,
+      "depthBeforeMm": 17.09974363623604,
+      "widthScale": 1.0,
+      "depthScale": 1.0,
+      "widthAfterMm": 17.86399004590994,
+      "depthAfterMm": 17.099743636236116
+    },
+    {
+      "side": "r",
+      "digit": 0,
+      "segment": 2,
+      "widthBeforeMm": 18.703403082054106,
+      "depthBeforeMm": 15.301160503889935,
+      "widthScale": 1.0,
+      "depthScale": 1.0,
+      "widthAfterMm": 18.703403082054106,
+      "depthAfterMm": 15.301160503889786
+    },
+    {
+      "side": "r",
+      "digit": 1,
+      "segment": 0,
+      "widthBeforeMm": 20.234567734388783,
+      "depthBeforeMm": 16.77234587467026,
+      "widthScale": 1.0,
+      "depthScale": 1.02,
+      "widthAfterMm": 20.234567734388733,
+      "depthAfterMm": 17.05522042435083
+    },
+    {
+      "side": "r",
+      "digit": 1,
+      "segment": 1,
+      "widthBeforeMm": 19.624237708485616,
+      "depthBeforeMm": 15.036157755999216,
+      "widthScale": 0.94,
+      "depthScale": 1.02,
+      "widthAfterMm": 18.640297959292845,
+      "depthAfterMm": 15.335548222617854
+    },
+    {
+      "side": "r",
+      "digit": 1,
+      "segment": 2,
+      "widthBeforeMm": 18.047899201026468,
+      "depthBeforeMm": 10.87326487141141,
+      "widthScale": 0.86,
+      "depthScale": 1.02,
+      "widthAfterMm": 15.52119331288275,
+      "depthAfterMm": 11.09073016883948
+    },
+    {
+      "side": "r",
+      "digit": 2,
+      "segment": 0,
+      "widthBeforeMm": 22.116823880021403,
+      "depthBeforeMm": 17.255737684284632,
+      "widthScale": 0.97,
+      "depthScale": 1.02,
+      "widthAfterMm": 21.51397998074467,
+      "depthAfterMm": 17.54462848334771
+    },
+    {
+      "side": "r",
+      "digit": 2,
+      "segment": 1,
+      "widthBeforeMm": 23.5577397710116,
+      "depthBeforeMm": 14.995918763929364,
+      "widthScale": 0.91,
+      "depthScale": 1.02,
+      "widthAfterMm": 21.437543191620577,
+      "depthAfterMm": 15.29584457052261
+    },
+    {
+      "side": "r",
+      "digit": 2,
+      "segment": 2,
+      "widthBeforeMm": 21.623346869432975,
+      "depthBeforeMm": 11.80033442075232,
+      "widthScale": 0.89,
+      "depthScale": 1.1,
+      "widthAfterMm": 19.43719971447473,
+      "depthAfterMm": 12.915943636244247
+    },
+    {
+      "side": "r",
+      "digit": 3,
+      "segment": 0,
+      "widthBeforeMm": 19.17079374721818,
+      "depthBeforeMm": 16.32004217192225,
+      "widthScale": 0.98,
+      "depthScale": 1.04,
+      "widthAfterMm": 18.85789263298462,
+      "depthAfterMm": 16.80523256227391
+    },
+    {
+      "side": "r",
+      "digit": 3,
+      "segment": 1,
+      "widthBeforeMm": 18.727483960747584,
+      "depthBeforeMm": 14.369795306858727,
+      "widthScale": 0.95,
+      "depthScale": 1.04,
+      "widthAfterMm": 17.751026799087885,
+      "depthAfterMm": 14.94458711913307
+    },
+    {
+      "side": "r",
+      "digit": 3,
+      "segment": 2,
+      "widthBeforeMm": 16.22933266931808,
+      "depthBeforeMm": 12.052683849832608,
+      "widthScale": 0.89,
+      "depthScale": 1.02,
+      "widthAfterMm": 14.754813635989626,
+      "depthAfterMm": 12.293737526829347
+    },
+    {
+      "side": "r",
+      "digit": 4,
+      "segment": 0,
+      "widthBeforeMm": 16.178823782822143,
+      "depthBeforeMm": 14.983473953477782,
+      "widthScale": 1.0,
+      "depthScale": 1.05,
+      "widthAfterMm": 16.178390434856603,
+      "depthAfterMm": 15.503201992935589
+    },
+    {
+      "side": "r",
+      "digit": 4,
+      "segment": 1,
+      "widthBeforeMm": 16.73535257147302,
+      "depthBeforeMm": 12.718403411006491,
+      "widthScale": 0.98,
+      "depthScale": 1.05,
+      "widthAfterMm": 16.46017770214326,
+      "depthAfterMm": 13.353959427589126
+    },
+    {
+      "side": "r",
+      "digit": 4,
+      "segment": 2,
+      "widthBeforeMm": 13.150849421104462,
+      "depthBeforeMm": 11.094760130487865,
+      "widthScale": 0.92,
+      "depthScale": 1.04,
+      "widthAfterMm": 12.098781467416117,
+      "depthAfterMm": 11.51023414131458
+    }
+  ],
+  "thumbTerminalShortening": 0.0,
+  "thumbRootVertices": [],
+  "thumbRootMaximumDisplacementMm": 0,
+  "nailVertices": 1940,
+  "nailTriangles": 3840,
+  "nails": [
+    {
+      "side": "l",
+      "digit": 0,
+      "bone": "Bip002 L Finger02",
+      "vertices": [
+        0,
+        194
+      ],
+      "lengthMm": 14.000000000000002,
+      "widthMm": 12.4,
+      "thicknessMm": 0.23,
+      "surfaceOffsetMm": 0.18,
+      "rayFallbacks": 0,
+      "longitudinalBoneLocal": [
+        0.9879270181626545,
+        -0.14674136004439214,
+        0.04967071608672352
+      ],
+      "dorsalBoneLocal": [
+        -0.07791141405267284,
+        -0.19348748867879906,
+        0.9780042961485826
       ]
     },
-    "r": {
-      "wristPalm": 5980,
-      "fingers": [
-        1202,
-        1267,
-        1536,
-        1314,
-        1036
+    {
+      "side": "l",
+      "digit": 1,
+      "bone": "Bip002 L Finger12",
+      "vertices": [
+        194,
+        194
+      ],
+      "lengthMm": 12.5,
+      "widthMm": 10.0,
+      "thicknessMm": 0.23,
+      "surfaceOffsetMm": 0.18,
+      "rayFallbacks": 0,
+      "longitudinalBoneLocal": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "dorsalBoneLocal": [
+        -0.0,
+        -1.0,
+        -0.0
+      ]
+    },
+    {
+      "side": "l",
+      "digit": 2,
+      "bone": "Bip002 L Finger22",
+      "vertices": [
+        388,
+        194
+      ],
+      "lengthMm": 13.2,
+      "widthMm": 10.8,
+      "thicknessMm": 0.23,
+      "surfaceOffsetMm": 0.18,
+      "rayFallbacks": 0,
+      "longitudinalBoneLocal": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "dorsalBoneLocal": [
+        -0.0,
+        -1.0,
+        -0.0
+      ]
+    },
+    {
+      "side": "l",
+      "digit": 3,
+      "bone": "Bip002 L Finger32",
+      "vertices": [
+        582,
+        194
+      ],
+      "lengthMm": 12.5,
+      "widthMm": 10.0,
+      "thicknessMm": 0.23,
+      "surfaceOffsetMm": 0.18,
+      "rayFallbacks": 0,
+      "longitudinalBoneLocal": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "dorsalBoneLocal": [
+        -0.0,
+        -1.0,
+        -0.0
+      ]
+    },
+    {
+      "side": "l",
+      "digit": 4,
+      "bone": "Bip002 L Finger42",
+      "vertices": [
+        776,
+        194
+      ],
+      "lengthMm": 10.2,
+      "widthMm": 8.2,
+      "thicknessMm": 0.23,
+      "surfaceOffsetMm": 0.18,
+      "rayFallbacks": 0,
+      "longitudinalBoneLocal": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "dorsalBoneLocal": [
+        -0.0,
+        -1.0,
+        -0.0
+      ]
+    },
+    {
+      "side": "r",
+      "digit": 0,
+      "bone": "Bip002 R Finger02",
+      "vertices": [
+        970,
+        194
+      ],
+      "lengthMm": 14.0,
+      "widthMm": 12.4,
+      "thicknessMm": 0.23,
+      "surfaceOffsetMm": 0.18,
+      "rayFallbacks": 0,
+      "longitudinalBoneLocal": [
+        0.987922813292457,
+        -0.14677119192650948,
+        -0.04966620779553224
+      ],
+      "dorsalBoneLocal": [
+        -0.07791294585662085,
+        -0.19348623846921914,
+        -0.9780044214577845
+      ]
+    },
+    {
+      "side": "r",
+      "digit": 1,
+      "bone": "Bip002 R Finger12",
+      "vertices": [
+        1164,
+        194
+      ],
+      "lengthMm": 12.5,
+      "widthMm": 10.0,
+      "thicknessMm": 0.23,
+      "surfaceOffsetMm": 0.18,
+      "rayFallbacks": 0,
+      "longitudinalBoneLocal": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "dorsalBoneLocal": [
+        -0.0,
+        -1.0,
+        -0.0
+      ]
+    },
+    {
+      "side": "r",
+      "digit": 2,
+      "bone": "Bip002 R Finger22",
+      "vertices": [
+        1358,
+        194
+      ],
+      "lengthMm": 13.2,
+      "widthMm": 10.8,
+      "thicknessMm": 0.23,
+      "surfaceOffsetMm": 0.18,
+      "rayFallbacks": 0,
+      "longitudinalBoneLocal": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "dorsalBoneLocal": [
+        -0.0,
+        -1.0,
+        -0.0
+      ]
+    },
+    {
+      "side": "r",
+      "digit": 3,
+      "bone": "Bip002 R Finger32",
+      "vertices": [
+        1552,
+        194
+      ],
+      "lengthMm": 12.5,
+      "widthMm": 10.0,
+      "thicknessMm": 0.23,
+      "surfaceOffsetMm": 0.18,
+      "rayFallbacks": 0,
+      "longitudinalBoneLocal": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "dorsalBoneLocal": [
+        -0.0,
+        -1.0,
+        -0.0
+      ]
+    },
+    {
+      "side": "r",
+      "digit": 4,
+      "bone": "Bip002 R Finger42",
+      "vertices": [
+        1746,
+        194
+      ],
+      "lengthMm": 10.2,
+      "widthMm": 8.2,
+      "thicknessMm": 0.23,
+      "surfaceOffsetMm": 0.18,
+      "rayFallbacks": 0,
+      "longitudinalBoneLocal": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "dorsalBoneLocal": [
+        -0.0,
+        -1.0,
+        -0.0
       ]
     }
-  },
-  "skinBindFrameMaximumError": 5.529185816977034e-07,
-  "protectedSkeletonClothingMaterialsAndTopology": true,
-  "maximumBindDisplacementM": 0.01813111573098985
+  ]
 }

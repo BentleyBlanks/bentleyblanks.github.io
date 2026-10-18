@@ -198,7 +198,7 @@ export const FPS_BOLT_HAND = Object.freeze({
   // Bring the rifle slightly toward the shoulder while the bolt is worked;
   // a fully lifted handle must not force a straight arm or stretch the wrist.
   supportOffsetByWeapon: { HanYang: [0, 0, 0.020] },
-  thumbHandoffByWeapon: {HanYang:{releaseEnd:.100,recoverStart:.840}},
+  thumbHandoffByWeapon: {HanYang:{releaseEnd:.100,recoverStart:.900}},
   graspAt: .140, approachFraction:.60, liftLead:.105, releaseGap: .010, clearFraction: .40,
   liftLeadByWeapon:{HanYang:.160},
   clearOffset: [.016,.008,.020],

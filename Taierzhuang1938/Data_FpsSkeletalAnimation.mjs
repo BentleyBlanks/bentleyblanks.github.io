@@ -1,6 +1,6 @@
 // Blender-authored first-person animation assets and presentation settings.
 export const FPS_SKELETAL_ANIMATION = Object.freeze({
-  version: '20261017110002', fps: 60,
+  version: "20261018035000", fps: 60,
   weaponIds: Object.freeze(['HanYang']),
   clips: Object.freeze(['Idle']),
   runtimeEnabled: true,
