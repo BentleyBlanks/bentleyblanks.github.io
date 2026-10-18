@@ -17,6 +17,9 @@
 | `FirstLevel0105.previz.json` | 01–05 每个关键帧的预演：镜头、人物调度、动作片段、台词时间、事件（契约 §14） | `Script_EditorBlockoutFirstLevel0105Previz.mjs` 生成，之后可手改 |
 | `FirstLevel0610.json` | 第一关 06–10 新剧本（Notion 10-18 晚）的 20 个关键帧 06-1…10-4：干沟 → 凹路后送队 → 村口 → 巷子 / 邻院 / 老耿家 → 石碾后压住东街 → 后门 | `export FirstLevel0610` 从 `Data_EditorBlockoutFirstLevel0610Space.mjs` 的锚点生成，之后以手改的 JSON 为准 |
 | `FirstLevel0610.scene.json` | 06–10 的场地（与 0105 同一套坐标，北半截逐点等于 0105）：0.5 m 高度网格（干沟、凹路南段、河汊子、整村压平的耿家庄、地瓜窖）+ 体块（院墙带门窗洞 / 狗洞 / 墙缝 / 侧门、房子、老耿家三间空心屋与平顶、石磨、窖沿与盖板、日常摆件、南岸枯树）+ 随信号体块（CartDeparted / SideGateOpen / CellarBlast / MgSilenced / BackDoorOpen，契约 §15） | `scene FirstLevel0610` |
+| `FirstLevel1218.json` | 第一关 12–18 新剧本（10-19 扩写稿，还没进 Notion）的 19 个关键帧 12-1…18-5：出村 → 北沙河北岸大路上的车边 → 空袭、松手 → 排水沟 → 桥头接收院、过门槛、门槛上 → 守桥头、过浮桥、炸桥 → 北门 | `export FirstLevel1218` 从 `Data_EditorBlockoutFirstLevel1218Space.mjs` 的锚点生成，之后以手改的 JSON 为准 |
+| `FirstLevel1218.scene.json` | 12–18 的场地（与 0105 / 0610 同一套坐标，村南那一截逐点等于 0610）：0.5 m 高度网格（出村小路、大路与路边浅沟、拐弯往西的河汊子、排水沟、两道河堤、北沙河、浮桥引道、散兵坑、土坎）+ 体块（14 段浮桥与船、接收院与厢房门槛、旁边院子、远处铁路桥、北门城墙与门洞、日常摆件）+ 随信号体块（CartOverturned / ChargesSet / BridgeBlown，契约 §16） | `scene FirstLevel1218` |
+| `FirstLevel1218.voice.json` | 12–18 台词的占位配音清单，mp3 在 `../Audio/Blockout1218/` | `Script_EditorBlockoutFirstLevel1218Voice.mjs` |
 
 第一关（`FirstLevel`）的场景就是游戏里的第一关（换成白盒画法），没有单独的场景文件。`FirstLevel0105` 是另一片场地，坐标原点在沟口，和游戏里的第一关无关。
 

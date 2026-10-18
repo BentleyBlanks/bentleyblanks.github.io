@@ -312,7 +312,7 @@ Test("throw：飞行从出手点到落点、两端时刻对、中间往上拱", 
 });
 
 // 仓库里有预演文件时（预演数据包写的），它要对着配置与清单过校验
-for (const level of ["FirstLevel0105", "FirstLevel0610", "FirstLevel", "SecondLevel"]) {
+for (const level of ["FirstLevel0105", "FirstLevel0610", "FirstLevel1218", "FirstLevel", "SecondLevel"]) {
   const file = path.join(projectDir, "Blockout", `${level}.previz.json`);
   let text = null;
   try { text = await fs.readFile(file, "utf8"); } catch { /* 没有 = 这关没有预演 */ }

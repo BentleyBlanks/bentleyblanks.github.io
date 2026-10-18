@@ -61,6 +61,12 @@ export const PREVIZ_SFX = Object.freeze({
   slap: { cue: "slap" },
   stab: { cue: "bayonetStabBody" },
   bodyFall: { cue: "bodyFall" },
+  // 2026-10-19（12–18 空袭）：飞机远远嗡嗡、俯冲下来、扫射一串打在土里
+  planeDrone: { cue: "planeDrone" },
+  planeDive: { cue: "planeDive" },
+  strafeNear: { cue: "strafeNear" },
+  strafeFar: { cue: "strafeFar" },
+  strafeDirt: { cue: "strafeDirt" },
 });
 const SMOKE_KIND = Object.freeze({ SmokeDust: "dust", SmokeWhite: "screen", SmokeBlack: "black" });
 const SMOKE_DEFAULT_S = 6;

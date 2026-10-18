@@ -27,6 +27,7 @@ export const PREVIZ_SMOKE_KINDS = Object.freeze(["SmokeDust", "SmokeWhite", "Smo
 export const PREVIZ_SFX_ALIASES = Object.freeze([
   "artilleryFar", "artilleryNear", "shellBlast", "tinnitus", "mgBurstFar", "mgBurstNear", "rifleVolley", "rifleShot",
   "mortarPop", "mortarImpact", "grenadeBlast", "tankTracks", "tankGun", "dirtFall", "slap", "stab", "bodyFall",
+  "planeDrone", "planeDive", "strafeNear", "strafeFar", "strafeDirt",
 ]);
 /**
  * 投弹（演员键 throw，2026-10-18 第三轮）：throw 键的 t = 开始抡（播步兵投弹片段 GrenadeThrow，Script_InfantryAnimation「背枪投弹」）。

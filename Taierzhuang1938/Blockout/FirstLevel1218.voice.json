@@ -1,0 +1,1711 @@
+{
+ "schema": "tengxian-blockout-voice/1",
+ "level": "FirstLevel1218",
+ "generatedAt": "2026-10-18T19:13:59.892Z",
+ "requests": 35,
+ "note": "占位配音（SeedAudio seed-audio-1.0，整段一次生成后按逐字时间戳切句）。file 相对 Taierzhuang1938/index.html；gapBeforeS 是录音里与上一句的原始间隔；keyframe 是契约 §4 的关键帧 id。",
+ "scenes": [
+  {
+   "id": "RoadWest",
+   "beat": "12",
+   "keyframe": "12-1",
+   "label": "12 出村：推门了、还有好远",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "liuwencai"
+     ],
+     "owner": "liuwencai",
+     "castSha256": "fa79d46b054e3a5a80c67062498097b15711adbce8cc2b48259af5da5d5da285"
+    },
+    {
+     "who": [
+      "geng"
+     ],
+     "owner": "geng",
+     "castSha256": "3ed097856b7a56b65285ef604e2eed302f564f880a74c3c5f66fdecd64a5acea"
+    }
+   ],
+   "targetDb": -19,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [
+    "RoadWest.02 是单句补录（刘文财，RoadWest02Pickup#1），不在整段录音里"
+   ],
+   "lines": [
+    {
+     "id": "RoadWest.01",
+     "keyframe": "12-1",
+     "who": "liuwencai",
+     "speaker": "刘文财",
+     "lang": "zh",
+     "subtitle": "推门了……班长他们出来了。",
+     "text": "推门了……班长他们出来了。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218RoadWest_01.mp3",
+     "durationS": 2.62,
+     "gapBeforeS": 0,
+     "sha256": "c1c6a486fc9403ff5ffc090b39c5093e8f7e371dec3319354c2138cdababe4b2",
+     "speakerCos": 0.852,
+     "cer": 0.2,
+     "transcript": "推门了,白帐他们出来了。"
+    },
+    {
+     "id": "RoadWest.02",
+     "keyframe": "12-1",
+     "who": "liuwencai",
+     "speaker": "刘文财",
+     "lang": "zh",
+     "subtitle": "还有好远？脚杆都走断了。",
+     "text": "还有好远？脚杆都走断了。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218RoadWest_02.mp3",
+     "durationS": 3.946,
+     "gapBeforeS": 1.59,
+     "sha256": "0885240eb794b4411c4bb30fdc132157390fd3f60618d8eceb7db55de009b5e8",
+     "speakerCos": 0.874,
+     "cer": 0.4,
+     "transcript": "还有好愿,酒干都走短了。",
+     "issues": [
+      "字错率 0.4 待人耳核对"
+     ],
+     "pickup": {
+      "scene": "RoadWest02Pickup",
+      "attempt": 1,
+      "attempts": 1
+     }
+    },
+    {
+     "id": "RoadWest.03",
+     "keyframe": "12-1",
+     "who": "geng",
+     "speaker": "老耿",
+     "lang": "zhNorth",
+     "subtitle": "瞅见桥头那几间屋没？伤兵都往那儿送，大夫在那儿。",
+     "text": "瞅见桥头那几间屋没？伤兵都往那儿送，大夫在那儿。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218RoadWest_03.mp3",
+     "durationS": 4.351,
+     "gapBeforeS": 0.72,
+     "sha256": "7e5d763e6ceea30b5193c2c8921f7b817ec6428c1d3e065948636772e4f5ea81",
+     "speakerCos": 0.873,
+     "cer": 0.1429,
+     "transcript": "瞅见桥头那几间屋门,商兵都往那送,大夫在那儿。"
+    }
+   ]
+  },
+  {
+   "id": "ShortJacket",
+   "beat": "12",
+   "keyframe": "12-2",
+   "label": "12 短褂：妮儿拽袖子、顺子夺回来",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "shunzi"
+     ],
+     "owner": "shunzi",
+     "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "ShortJacket.01",
+     "keyframe": "12-2",
+     "who": "shunzi",
+     "speaker": "顺子",
+     "lang": "zh",
+     "subtitle": "表动！妈卖批，松手！",
+     "text": "表动！妈卖批，松手！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218ShortJacket_01.mp3",
+     "durationS": 3.2,
+     "gapBeforeS": 0,
+     "sha256": "a17624e5b47b98721783bf543988e9efcb4adccaa3f112ad83ef35f751f7ffc8",
+     "speakerCos": 0.733,
+     "cer": 0.5714,
+     "transcript": "不要动!马卖皮!松手!",
+     "issues": [
+      "字错率 0.5714 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "PaddedCoat",
+   "beat": "12",
+   "keyframe": "12-2",
+   "label": "12 棉袄：谢了、别谢",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "comradeWounded"
+     ],
+     "owner": "comradeWounded",
+     "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6"
+    },
+    {
+     "who": [
+      "geng"
+     ],
+     "owner": "geng",
+     "castSha256": "3ed097856b7a56b65285ef604e2eed302f564f880a74c3c5f66fdecd64a5acea"
+    }
+   ],
+   "targetDb": -20.33,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "PaddedCoat.01",
+     "keyframe": "12-2",
+     "who": "comradeWounded",
+     "speaker": "冬瓜",
+     "lang": "zh",
+     "subtitle": "……谢了。",
+     "text": "……谢了。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218PaddedCoat_01.mp3",
+     "durationS": 1.85,
+     "gapBeforeS": 0,
+     "sha256": "b6ce4eced62d10be1378b231b4002298c631faf9a73260fcdbd7366abdb91acb",
+     "speakerCos": 0.429,
+     "cer": 0,
+     "transcript": "谢了。"
+    },
+    {
+     "id": "PaddedCoat.02",
+     "keyframe": "12-2",
+     "who": "geng",
+     "speaker": "老耿",
+     "lang": "zhNorth",
+     "subtitle": "别谢。冻死在俺车上，晦气。",
+     "text": "别谢。冻死在俺车上，晦气。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218PaddedCoat_02.mp3",
+     "durationS": 2.521,
+     "gapBeforeS": 0.82,
+     "sha256": "435786172421f29c323b1928b3c6209c53dfffb4fbfbac4b4ec05c79fdd7d972",
+     "speakerCos": 0.869,
+     "cer": 0.1,
+     "transcript": "别信,冻死在俺车上,晦气。"
+    }
+   ]
+  },
+  {
+   "id": "Lincheng",
+   "beat": "12",
+   "keyframe": "12-2",
+   "label": "12 临城：说胡话",
+   "attempt": 2,
+   "attempts": 2,
+   "references": [
+    {
+     "who": [
+      "comradeWounded"
+     ],
+     "owner": "comradeWounded",
+     "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6"
+    },
+    {
+     "who": [
+      "liuwencai"
+     ],
+     "owner": "liuwencai",
+     "castSha256": "fa79d46b054e3a5a80c67062498097b15711adbce8cc2b48259af5da5d5da285"
+    },
+    {
+     "who": [
+      "shunzi"
+     ],
+     "owner": "shunzi",
+     "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
+    }
+   ],
+   "targetDb": -23.67,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "Lincheng.01",
+     "keyframe": "12-2",
+     "who": "comradeWounded",
+     "speaker": "冬瓜",
+     "lang": "zh",
+     "subtitle": "……临城再换……查得紧……",
+     "text": "……临城再换……查得紧……",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218Lincheng_01.mp3",
+     "durationS": 3.82,
+     "gapBeforeS": 0,
+     "sha256": "0c20ce8af90202515504f0906ed30f398b56aa9b66fe245f26a93b500eedbfe5",
+     "speakerCos": 0.669,
+     "cer": 0.4286,
+     "transcript": "凌晨再换,插得紧。",
+     "issues": [
+      "字错率 0.4286 待人耳核对"
+     ]
+    },
+    {
+     "id": "Lincheng.02",
+     "keyframe": "12-2",
+     "who": "liuwencai",
+     "speaker": "刘文财",
+     "lang": "zh",
+     "subtitle": "他说啥子？",
+     "text": "他说啥子？",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218Lincheng_02.mp3",
+     "durationS": 0.75,
+     "gapBeforeS": 0.19,
+     "sha256": "cb3b1282ffe3c708586a9d4d4b05cd0ddbe959ea09242039f74cc2e248164d27",
+     "speakerCos": 0.69,
+     "cer": 0,
+     "transcript": "他说啥子?"
+    },
+    {
+     "id": "Lincheng.03",
+     "keyframe": "12-2",
+     "who": "shunzi",
+     "speaker": "顺子",
+     "lang": "zh",
+     "subtitle": "冷糊涂了，说胡话。",
+     "text": "冷糊涂了，说胡话。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218Lincheng_03.mp3",
+     "durationS": 1.356,
+     "gapBeforeS": 0.17,
+     "sha256": "eae321e26bf396159715495d22269190d18908c35aee63b09f4f74984837e18e",
+     "speakerCos": 0.736,
+     "cer": 0.7143,
+     "transcript": "冷浮屠龙,说浮华。",
+     "issues": [
+      "字错率 0.7143 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "StubbornMule",
+   "beat": "12",
+   "keyframe": "12-3",
+   "label": "12 犟种：犟得跟我妹儿一样",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "geng"
+     ],
+     "owner": "geng",
+     "castSha256": "3ed097856b7a56b65285ef604e2eed302f564f880a74c3c5f66fdecd64a5acea"
+    },
+    {
+     "who": [
+      "shunzi"
+     ],
+     "owner": "shunzi",
+     "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
+    }
+   ],
+   "targetDb": -22.2,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [
+    "StubbornMule.02 是单句补录（顺子，StubbornMule02Pickup#1），不在整段录音里"
+   ],
+   "lines": [
+    {
+     "id": "StubbornMule.01",
+     "keyframe": "12-3",
+     "who": "geng",
+     "speaker": "老耿",
+     "lang": "zhNorth",
+     "subtitle": "犟种。",
+     "text": "犟种。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218StubbornMule_01.mp3",
+     "durationS": 0.7,
+     "gapBeforeS": 0,
+     "sha256": "46a6242f354f46b08b18fe1fd42d1e385c99d5ac0c3eb178bc01d3651c4e02a8",
+     "speakerCos": 0.722,
+     "cer": 1,
+     "transcript": "简总。",
+     "issues": [
+      "有声 0.58 s，太短不判嗓子",
+      "字错率 1 待人耳核对"
+     ]
+    },
+    {
+     "id": "StubbornMule.02",
+     "keyframe": "12-3",
+     "who": "shunzi",
+     "speaker": "顺子",
+     "lang": "zh",
+     "subtitle": "……犟得跟我妹儿一个鬼样。",
+     "text": "……犟得跟我妹儿一个鬼样。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218StubbornMule_02.mp3",
+     "durationS": 1.96,
+     "gapBeforeS": 0.68,
+     "sha256": "349f42e1bc1951401d6054510c69a73029470c9025851f97d5b8f9e213e0289d",
+     "speakerCos": 0.698,
+     "cer": 0.6,
+     "transcript": "将在跟我们一个龟一样。",
+     "issues": [
+      "字错率 0.6 待人耳核对"
+     ],
+     "pickup": {
+      "scene": "StubbornMule02Pickup",
+      "attempt": 1,
+      "attempts": 1
+     }
+    }
+   ]
+  },
+  {
+   "id": "BridgeJam",
+   "beat": "12",
+   "keyframe": "12-3",
+   "label": "12 桥窄：咋又不走了",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "runner"
+     ],
+     "owner": "runner",
+     "castSha256": "e54cced12c7babfdc154891a3bd49c59256836a9b48033fe83be742870a00e79"
+    },
+    {
+     "who": [
+      "zhou"
+     ],
+     "owner": "zhou",
+     "castSha256": "1c7a96ad905af020a01e9a6d0a7ede031b09292f8f9351d4838835500502e3ee"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "BridgeJam.01",
+     "keyframe": "12-3",
+     "who": "runner",
+     "speaker": "前头有人",
+     "lang": "zh",
+     "subtitle": "咋又不走了？日他妈！",
+     "text": "咋又不走了？日他妈！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218BridgeJam_01.mp3",
+     "durationS": 1.76,
+     "gapBeforeS": 0,
+     "sha256": "54cb1f6423cf00b0c8405e23536f415dd52e7fbe20f9af7a993eebec6e7dffb8",
+     "speakerCos": 0.629,
+     "cer": 0.5,
+     "transcript": "再有不周了,是他妈。",
+     "issues": [
+      "字错率 0.5 待人耳核对"
+     ]
+    },
+    {
+     "id": "BridgeJam.02",
+     "keyframe": "12-3",
+     "who": "zhou",
+     "speaker": "担架员",
+     "lang": "zh",
+     "subtitle": "桥窄！一回只过得到一副！挤你妈啥子！",
+     "text": "桥窄！一回只过得到一副！挤你妈啥子！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218BridgeJam_02.mp3",
+     "durationS": 4.6,
+     "gapBeforeS": 0.89,
+     "sha256": "271ea53f1b177ffe44f77e22bf32a231050f9795ec638e3bf7d235a0315371d8",
+     "speakerCos": 0.671,
+     "cer": 0.4,
+     "transcript": "乔仔,一回之过的到一府,记你妈啥子!",
+     "issues": [
+      "字错率 0.4 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "AirRaidWarning",
+   "beat": "13",
+   "keyframe": "13-1",
+   "label": "13 飞机！趴倒！",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "zhou"
+     ],
+     "owner": "zhou",
+     "castSha256": "1c7a96ad905af020a01e9a6d0a7ede031b09292f8f9351d4838835500502e3ee"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "AirRaidWarning.01",
+     "keyframe": "13-1",
+     "who": "zhou",
+     "speaker": "担架员",
+     "lang": "zh",
+     "subtitle": "飞机！飞机！趴倒！",
+     "text": "飞机！飞机！趴倒！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218AirRaidWarning_01.mp3",
+     "durationS": 2.212,
+     "gapBeforeS": 0,
+     "sha256": "c567f7611f51ac14118f718bb80f8e5e15c38e728c953bd3d9d7bd5de897db9e",
+     "speakerCos": 0.76,
+     "cer": 0.3333,
+     "transcript": "飞机 飞机"
+    }
+   ]
+  },
+  {
+   "id": "NierScream",
+   "beat": "13",
+   "keyframe": "13-2",
+   "label": "13 妮儿看见黑子倒了（呜咽）",
+   "attempt": 2,
+   "attempts": 2,
+   "references": [],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "NierScream.01",
+     "keyframe": "13-2",
+     "who": "nier",
+     "speaker": "妮儿",
+     "lang": "zhNorth",
+     "subtitle": "（妮儿呜咽：啊——啊——）",
+     "text": "啊——啊——",
+     "vocal": true,
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218NierScream_01.mp3",
+     "durationS": 2.11,
+     "gapBeforeS": 0,
+     "sha256": "264719bb0b0baa61a44b1bd5f7e033cf4f3746d31ae059d3af2317e67a8094b4",
+     "cer": 0,
+     "transcript": "啊!啊!"
+    }
+   ]
+  },
+  {
+   "id": "IntoTheGully",
+   "beat": "13",
+   "keyframe": "13-2",
+   "label": "13 顺着沟走、抬",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "geng"
+     ],
+     "owner": "geng",
+     "castSha256": "3ed097856b7a56b65285ef604e2eed302f564f880a74c3c5f66fdecd64a5acea"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "IntoTheGully.01",
+     "keyframe": "13-2",
+     "who": "geng",
+     "speaker": "老耿",
+     "lang": "zhNorth",
+     "subtitle": "顺着沟走！这沟通河边！",
+     "text": "顺着沟走！这沟通河边！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218IntoTheGully_01.mp3",
+     "durationS": 2.82,
+     "gapBeforeS": 0,
+     "sha256": "2afd24a71a824915c2391bf6d5b153ad49495fa578c44aa536104332b3dd1c90",
+     "speakerCos": 0.738,
+     "cer": 0.2222,
+     "transcript": "顺着狗走,这狗通河边。"
+    },
+    {
+     "id": "IntoTheGully.02",
+     "keyframe": "13-2",
+     "who": "geng",
+     "speaker": "老耿",
+     "lang": "zhNorth",
+     "subtitle": "抬！",
+     "text": "抬！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218IntoTheGully_02.mp3",
+     "durationS": 0.449,
+     "gapBeforeS": 0.58,
+     "sha256": "f382441f12aebe7cc910219b3aa4e7936015c70780d83684d2531cc8a192ea0f",
+     "speakerCos": 0.453,
+     "cer": 2,
+     "transcript": "还有。",
+     "issues": [
+      "有声 0.34 s，太短不判嗓子",
+      "字错率 2 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "Faster",
+   "beat": "14",
+   "keyframe": "14-1",
+   "label": "14 快！快些！",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "geng"
+     ],
+     "owner": "geng",
+     "castSha256": "3ed097856b7a56b65285ef604e2eed302f564f880a74c3c5f66fdecd64a5acea"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "Faster.01",
+     "keyframe": "14-1",
+     "who": "geng",
+     "speaker": "老耿",
+     "lang": "zhNorth",
+     "subtitle": "快！快些！",
+     "text": "快！快些！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218Faster_01.mp3",
+     "durationS": 1.927,
+     "gapBeforeS": 0,
+     "sha256": "c2aa21dd949ff569284e1e3ea10b61250a3bf2d379982dcec1aa2af7c115c61a",
+     "speakerCos": 0.837,
+     "cer": 1.3333,
+     "transcript": "坏,坏什么?",
+     "issues": [
+      "字错率 1.3333 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "GullyBottom",
+   "beat": "15",
+   "keyframe": "15-1",
+   "label": "15 沟底：你松啥子手、八个抵了",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "liuwencai"
+     ],
+     "owner": "liuwencai",
+     "castSha256": "fa79d46b054e3a5a80c67062498097b15711adbce8cc2b48259af5da5d5da285"
+    },
+    {
+     "who": [
+      "comradeWounded"
+     ],
+     "owner": "comradeWounded",
+     "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6"
+    }
+   ],
+   "targetDb": -21.93,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [
+    "GullyBottom.01 是单句补录（刘文财，GullyBottom01Pickup#1），不在整段录音里"
+   ],
+   "lines": [
+    {
+     "id": "GullyBottom.01",
+     "keyframe": "15-1",
+     "who": "liuwencai",
+     "speaker": "刘文财",
+     "lang": "zh",
+     "subtitle": "又没着打到，你松你妈啥子手？",
+     "text": "又没着打到，你松你妈啥子手？",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GullyBottom_01.mp3",
+     "durationS": 4.411,
+     "gapBeforeS": 0,
+     "sha256": "5537ccc9e756ba8e8c3e85b3875f9f54f4e1b76d350fcfeb089b86c04fca7c7a",
+     "speakerCos": 0.889,
+     "cer": 0.5,
+     "transcript": "有没做大道?你送你妈?啥子说?",
+     "issues": [
+      "字错率 0.5 待人耳核对"
+     ],
+     "pickup": {
+      "scene": "GullyBottom01Pickup",
+      "attempt": 1,
+      "attempts": 1
+     }
+    },
+    {
+     "id": "GullyBottom.02",
+     "keyframe": "15-1",
+     "who": "comradeWounded",
+     "speaker": "冬瓜",
+     "lang": "zh",
+     "subtitle": "龟儿子……手恁个滑……",
+     "text": "龟儿子……手恁个滑……",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GullyBottom_02.mp3",
+     "durationS": 2.82,
+     "gapBeforeS": 0.21,
+     "sha256": "59fc08d5e3a637771a05822bb356f2bbb11b30e336e8df35503ef9f6953a4b82",
+     "speakerCos": 0.74,
+     "cer": 0.7143,
+     "transcript": "鬼儿子,搜了么花?",
+     "issues": [
+      "字错率 0.7143 待人耳核对"
+     ]
+    },
+    {
+     "id": "GullyBottom.03",
+     "keyframe": "15-1",
+     "who": "comradeWounded",
+     "speaker": "冬瓜",
+     "lang": "zh",
+     "subtitle": "……八个……抵了。",
+     "text": "……八个……抵了。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GullyBottom_03.mp3",
+     "durationS": 1.92,
+     "gapBeforeS": 0.46,
+     "sha256": "3c18de392e45eeb1e959e6c6a85409310b7967f5685cbbf0f2694d857b68e081",
+     "speakerCos": 0.673,
+     "cer": 0.5,
+     "transcript": "八个, 地楼。",
+     "issues": [
+      "字错率 0.5 待人耳核对"
+     ]
+    },
+    {
+     "id": "GullyBottom.04",
+     "keyframe": "15-1",
+     "who": "liuwencai",
+     "speaker": "刘文财",
+     "lang": "zh",
+     "subtitle": "老人家，你牵到她。我来。",
+     "text": "老人家，你牵到她。我来。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GullyBottom_04.mp3",
+     "durationS": 2.99,
+     "gapBeforeS": 0.32,
+     "sha256": "5ceb5abcbc9399e18de7a1186122e74c1be3d58c356a4768ffc22c0bf53fa0a5",
+     "speakerCos": 0.891,
+     "cer": 0.2222,
+     "transcript": "老人家,你钱到他,我来。"
+    }
+   ]
+  },
+  {
+   "id": "GateQueue",
+   "beat": "15",
+   "keyframe": "15-3",
+   "label": "15 接收院门口：等到、画的黑子嗦、一斤铜板",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "guard"
+     ],
+     "owner": "guard",
+     "castSha256": "18917d10a6f543eb30c418b592cffcbfee8248b142865edcf7613248d142aeb9"
+    },
+    {
+     "who": [
+      "liuwencai"
+     ],
+     "owner": "liuwencai",
+     "castSha256": "fa79d46b054e3a5a80c67062498097b15711adbce8cc2b48259af5da5d5da285"
+    },
+    {
+     "who": [
+      "bearer"
+     ],
+     "owner": "bearer",
+     "castSha256": "8dd0add9c18311c4cfc49317bad9918e548209095b9ee413d469f147eda9b035"
+    }
+   ],
+   "targetDb": -18.33,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "GateQueue.01",
+     "keyframe": "15-3",
+     "who": "guard",
+     "speaker": "守门的兵",
+     "lang": "zh",
+     "subtitle": "等到！里头满起了！挤你妈啥子！",
+     "text": "等到！里头满起了！挤你妈啥子！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GateQueue_01.mp3",
+     "durationS": 3.78,
+     "gapBeforeS": 0,
+     "sha256": "969e4c848fdf02a3026185664b8ce72a657de3e18021802ea1d795f7b5c20783",
+     "speakerCos": 0.704,
+     "cer": 0.25,
+     "transcript": "等到,里头满气了,急你妈傻子。"
+    },
+    {
+     "id": "GateQueue.02",
+     "keyframe": "15-3",
+     "who": "liuwencai",
+     "speaker": "刘文财",
+     "lang": "zh",
+     "subtitle": "画的黑子嗦？",
+     "text": "画的黑子嗦？",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GateQueue_02.mp3",
+     "durationS": 0.96,
+     "gapBeforeS": 0.12,
+     "sha256": "4a553e62b56406a7dd991e5979fd8890764519d008a59f07aff070b73e21c2e0",
+     "speakerCos": 0.741,
+     "cer": 0.8,
+     "transcript": "华人孩子说,",
+     "issues": [
+      "字错率 0.8 待人耳核对"
+     ]
+    },
+    {
+     "id": "GateQueue.03",
+     "keyframe": "15-3",
+     "who": "liuwencai",
+     "speaker": "刘文财",
+     "lang": "zh",
+     "subtitle": "一个壳子三四钱重，四五十个才一斤。收破烂的，一斤给你几个铜板……",
+     "text": "一个壳子三四钱重，四五十个才一斤。收破烂的，一斤给你几个铜板……",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GateQueue_03.mp3",
+     "durationS": 6.22,
+     "gapBeforeS": 0.62,
+     "sha256": "022436e3a737bf03e7863b0a8ea71f3fe9f5b4e018d12236dcdc669895dcda27",
+     "speakerCos": 0.924,
+     "cer": 0.4074,
+     "transcript": "一个壳子三十千种,十五十个才已经收破烂了,已经给你几个同伴。",
+     "issues": [
+      "字错率 0.4074 待人耳核对"
+     ]
+    },
+    {
+     "id": "GateQueue.04",
+     "keyframe": "15-3",
+     "who": "liuwencai",
+     "speaker": "刘文财",
+     "lang": "zh",
+     "subtitle": "你攒到出嫁，也换不到一条驴腿。",
+     "text": "你攒到出嫁，也换不到一条驴腿。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GateQueue_04.mp3",
+     "durationS": 2.69,
+     "gapBeforeS": 0.2,
+     "sha256": "b2c3bf570aecd77c8fa774454098e9aba2da526cab766fa5b51c679eff3a3362",
+     "speakerCos": 0.893,
+     "cer": 0.4615,
+     "transcript": "你栽到醋甲,也还不到一条履退。",
+     "issues": [
+      "字错率 0.4615 待人耳核对"
+     ]
+    },
+    {
+     "id": "GateQueue.05",
+     "keyframe": "15-3",
+     "who": "liuwencai",
+     "speaker": "刘文财",
+     "lang": "zh",
+     "subtitle": "……犟。",
+     "text": "……犟。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GateQueue_05.mp3",
+     "durationS": 0.53,
+     "gapBeforeS": 0.55,
+     "sha256": "dffd878993e1550e219f6d8d354b7b50a30e0f2736ecf22c423c09b4534f63d7",
+     "speakerCos": 0.677,
+     "cer": 1,
+     "transcript": "讲",
+     "issues": [
+      "有声 0.42 s，太短不判嗓子",
+      "字错率 1 待人耳核对"
+     ]
+    },
+    {
+     "id": "GateQueue.06",
+     "keyframe": "15-3",
+     "who": "bearer",
+     "speaker": "门里有人",
+     "lang": "zh",
+     "subtitle": "下一副！",
+     "text": "下一副！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GateQueue_06.mp3",
+     "durationS": 0.969,
+     "gapBeforeS": 0.55,
+     "sha256": "c25ea798f0ffd81d23ae79acac89435b9cbb5e57139d632cebd253aa27822476",
+     "speakerCos": 0.553,
+     "cer": 0.3333,
+     "transcript": "下一幅"
+    }
+   ]
+  },
+  {
+   "id": "Threshold",
+   "beat": "16",
+   "keyframe": "16-1",
+   "label": "16 过门槛：抬进去、脚慢点",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "bearer"
+     ],
+     "owner": "bearer",
+     "castSha256": "8dd0add9c18311c4cfc49317bad9918e548209095b9ee413d469f147eda9b035"
+    },
+    {
+     "who": [
+      "comradeWounded"
+     ],
+     "owner": "comradeWounded",
+     "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6"
+    },
+    {
+     "who": [
+      "shunzi"
+     ],
+     "owner": "shunzi",
+     "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
+    }
+   ],
+   "targetDb": -19.57,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [
+    "Threshold.01 与邻句贴着，在能量最低处切",
+    "Threshold.02 与邻句贴着，在能量最低处切"
+   ],
+   "lines": [
+    {
+     "id": "Threshold.01",
+     "keyframe": "16-1",
+     "who": "bearer",
+     "speaker": "军医",
+     "lang": "zh",
+     "subtitle": "肚子上的？抬进去！表堵到门口！",
+     "text": "肚子上的？抬进去！表堵到门口！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218Threshold_01.mp3",
+     "durationS": 3.495,
+     "gapBeforeS": 0,
+     "sha256": "9dfe7510aea843b8ef5ed12fc0b1e4cab1f66f291737e16e83418d530fa1a924",
+     "speakerCos": 0.83,
+     "cer": 0.3333,
+     "transcript": "肚子上勒,踩进去,不要堵到门口。"
+    },
+    {
+     "id": "Threshold.02",
+     "keyframe": "16-1",
+     "who": "comradeWounded",
+     "speaker": "冬瓜",
+     "lang": "zh",
+     "subtitle": "脚……慢点。",
+     "text": "脚……慢点。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218Threshold_02.mp3",
+     "durationS": 1.765,
+     "gapBeforeS": 0,
+     "sha256": "d2752e4d0998bf75b74c95e6ad772c4133f2d745f028d584390e43520a27ea24",
+     "speakerCos": 0.569,
+     "cer": 0,
+     "transcript": "脚,慢点。"
+    },
+    {
+     "id": "Threshold.03",
+     "keyframe": "16-1",
+     "who": "shunzi",
+     "speaker": "顺子",
+     "lang": "zh",
+     "subtitle": "……有门槛。抬高点。",
+     "text": "……有门槛。抬高点。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218Threshold_03.mp3",
+     "durationS": 2.07,
+     "gapBeforeS": 0.38,
+     "sha256": "8fe076c9863a63828dd3fd6b52222e4b6290beb9d5e389fbbd04d8edc90d0fac",
+     "speakerCos": 0.561,
+     "cer": 0.1667,
+     "transcript": "有门看,抬高点。"
+    }
+   ]
+  },
+  {
+   "id": "Gone",
+   "beat": "17",
+   "keyframe": "17-1",
+   "label": "17 没了：下一副、还在说话",
+   "attempt": 3,
+   "attempts": 3,
+   "references": [
+    {
+     "who": [
+      "bearer"
+     ],
+     "owner": "bearer",
+     "castSha256": "8dd0add9c18311c4cfc49317bad9918e548209095b9ee413d469f147eda9b035"
+    },
+    {
+     "who": [
+      "liuwencai"
+     ],
+     "owner": "liuwencai",
+     "castSha256": "fa79d46b054e3a5a80c67062498097b15711adbce8cc2b48259af5da5d5da285"
+    }
+   ],
+   "targetDb": -19.67,
+   "cutMethod": "subtitle",
+   "hard": [
+    "Gone.02 疑似念错（字错率 0.8）"
+   ],
+   "flags": [],
+   "lines": [
+    {
+     "id": "Gone.01",
+     "keyframe": "17-1",
+     "who": "bearer",
+     "speaker": "军医",
+     "lang": "zh",
+     "subtitle": "……没了。",
+     "text": "……没了。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218Gone_01.mp3",
+     "durationS": 0.49,
+     "gapBeforeS": 0,
+     "sha256": "128441f8e63efc9d71b3e4fc126b8949b4db526af388147080c052ad1ded448a",
+     "speakerCos": 0.27,
+     "cer": 0,
+     "transcript": "没了。",
+     "issues": [
+      "有声 0.38 s，太短不判嗓子"
+     ]
+    },
+    {
+     "id": "Gone.02",
+     "keyframe": "17-1",
+     "who": "bearer",
+     "speaker": "军医",
+     "lang": "zh",
+     "subtitle": "下一副！日你妈，表堵到门！",
+     "text": "下一副！日你妈，表堵到门！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218Gone_02.mp3",
+     "durationS": 3.44,
+     "gapBeforeS": 0.69,
+     "sha256": "cecf8ed4a12a9a57d5c168e98a2ac10d70be7a717171c9f8872b8dda8dba8e21",
+     "speakerCos": 0.743,
+     "cer": 0.8,
+     "transcript": "下一幅。",
+     "issues": [
+      "疑似念错（字错率 0.8）"
+     ]
+    },
+    {
+     "id": "Gone.03",
+     "keyframe": "17-1",
+     "who": "liuwencai",
+     "speaker": "刘文财",
+     "lang": "zh",
+     "subtitle": "刚才过门槛，还在说话……",
+     "text": "刚才过门槛，还在说话……",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218Gone_03.mp3",
+     "durationS": 2.572,
+     "gapBeforeS": 1.24,
+     "sha256": "4e92c92e0d567f556a8fb446916c090c6c3584e088fe92fe3c85ea43068eb227",
+     "speakerCos": 0.88,
+     "cer": 0.2222,
+     "transcript": "刚才国门开,还在说话。"
+    }
+   ]
+  },
+  {
+   "id": "GetUp",
+   "beat": "17",
+   "keyframe": "17-3",
+   "label": "17 跟斗走：咋个搞的、狗日的、起来",
+   "attempt": 2,
+   "attempts": 2,
+   "references": [
+    {
+     "who": [
+      "luo"
+     ],
+     "owner": "luo",
+     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
+    },
+    {
+     "who": [
+      "liuwencai"
+     ],
+     "owner": "liuwencai",
+     "castSha256": "fa79d46b054e3a5a80c67062498097b15711adbce8cc2b48259af5da5d5da285"
+    }
+   ],
+   "targetDb": -20.25,
+   "cutMethod": "subtitle",
+   "hard": [
+    "GetUp.04 有声 0.44 s，太短不判嗓子；疑似念错（字错率 2.5）"
+   ],
+   "flags": [
+    "GetUp.01 与邻句贴着，在能量最低处切",
+    "GetUp.02 与邻句贴着，在能量最低处切"
+   ],
+   "lines": [
+    {
+     "id": "GetUp.01",
+     "keyframe": "17-3",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "咋个搞的？",
+     "text": "咋个搞的？",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GetUp_01.mp3",
+     "durationS": 0.765,
+     "gapBeforeS": 0,
+     "sha256": "b5f06e27e8d10ab79604d2dac6d8f1b9e3aeb36883cddcb8cdb63aaf82730c8f",
+     "speakerCos": 0.756,
+     "cer": 0.25,
+     "transcript": "咋个搞定?",
+     "issues": [
+      "有声 0.44 s，太短不判嗓子"
+     ]
+    },
+    {
+     "id": "GetUp.02",
+     "keyframe": "17-3",
+     "who": "liuwencai",
+     "speaker": "刘文财",
+     "lang": "zh",
+     "subtitle": "……飞机。",
+     "text": "……飞机。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GetUp_02.mp3",
+     "durationS": 0.735,
+     "gapBeforeS": 0,
+     "sha256": "5eef15b2918ecad2dcb678102784869119f1c50f7c5996a4b2c6278eff028191",
+     "speakerCos": 0.657,
+     "cer": 0.5,
+     "transcript": "肥机",
+     "issues": [
+      "字错率 0.5 待人耳核对"
+     ]
+    },
+    {
+     "id": "GetUp.03",
+     "keyframe": "17-3",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "狗日的。",
+     "text": "狗日的。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GetUp_03.mp3",
+     "durationS": 0.84,
+     "gapBeforeS": 0.6,
+     "sha256": "8a6a80a4da85752e0b397a38974e28d78a5fd42923333c2af03220f52537eb3c",
+     "speakerCos": 0.459,
+     "cer": 0.6667,
+     "transcript": "勾字的。",
+     "issues": [
+      "字错率 0.6667 待人耳核对"
+     ]
+    },
+    {
+     "id": "GetUp.04",
+     "keyframe": "17-3",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "顺儿。",
+     "text": "顺儿。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GetUp_04.mp3",
+     "durationS": 0.56,
+     "gapBeforeS": 0.54,
+     "sha256": "b3dc39dd7cca6d106db2322cb3f5d8aacd9a24ca8057c0ea6db053a7f9ffff15",
+     "speakerCos": 0.62,
+     "cer": 2.5,
+     "transcript": "Sorry",
+     "issues": [
+      "有声 0.44 s，太短不判嗓子",
+      "疑似念错（字错率 2.5）"
+     ]
+    },
+    {
+     "id": "GetUp.05",
+     "keyframe": "17-3",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "……起来，跟斗走。",
+     "text": "……起来，跟斗走。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218GetUp_05.mp3",
+     "durationS": 2.17,
+     "gapBeforeS": 0.78,
+     "sha256": "3cc6e1ef2731adacd3f079ae05f59dc99006ceed0dd784318c13a580a6792223",
+     "speakerCos": 0.849,
+     "cer": 0.6,
+     "transcript": "是。起来,跟着我走。",
+     "issues": [
+      "字错率 0.6 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "BridgeOrders",
+   "beat": "18",
+   "keyframe": "18-1",
+   "label": "18 桥头的命令：铁路桥炸了、顶到这儿",
+   "attempt": 3,
+   "attempts": 3,
+   "references": [
+    {
+     "who": [
+      "guard"
+     ],
+     "owner": "guard",
+     "castSha256": "18917d10a6f543eb30c418b592cffcbfee8248b142865edcf7613248d142aeb9"
+    },
+    {
+     "who": [
+      "luo"
+     ],
+     "owner": "luo",
+     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
+    },
+    {
+     "who": [
+      "heyoutian"
+     ],
+     "owner": "heyoutian",
+     "castSha256": "1ad7b156126131843240afb42dddc9d8f296ae43075b3cb8833606264eb1edbf"
+    }
+   ],
+   "targetDb": -16.95,
+   "cutMethod": "subtitle",
+   "hard": [
+    "BridgeOrders.01 更像罗班长（本人 0.357 / 0.632）"
+   ],
+   "flags": [],
+   "lines": [
+    {
+     "id": "BridgeOrders.01",
+     "keyframe": "18-1",
+     "who": "guard",
+     "speaker": "桥头军官",
+     "lang": "zh",
+     "subtitle": "铁路桥炸了。",
+     "text": "铁路桥炸了。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218BridgeOrders_01.mp3",
+     "durationS": 1.05,
+     "gapBeforeS": 0,
+     "sha256": "5130a444f0a8d70d88e146e3e9be155bba58b96296bd0540e0a77dca05a26680",
+     "speakerCos": 0.357,
+     "cer": 0.2,
+     "transcript": "铁路桥咋了?",
+     "issues": [
+      "更像罗班长（本人 0.357 / 0.632）"
+     ]
+    },
+    {
+     "id": "BridgeOrders.02",
+     "keyframe": "18-1",
+     "who": "guard",
+     "speaker": "桥头军官",
+     "lang": "zh",
+     "subtitle": "哪部分的？……正好，给老子顶到这儿！后头还有人在撤，等他们过完，这座也炸！",
+     "text": "哪部分的？……正好，给老子顶到这儿！后头还有人在撤，等他们过完，这座也炸！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218BridgeOrders_02.mp3",
+     "durationS": 6.47,
+     "gapBeforeS": 0.56,
+     "sha256": "2c22fc3200d6b53384c0cb00667aa90bce32fc1065821893745515379dfc7845",
+     "speakerCos": 0.899,
+     "cer": 0.1724,
+     "transcript": "那部分呢,正好,给老子盯到这儿,后头还有人在车,等他们过完,这座也砸。"
+    },
+    {
+     "id": "BridgeOrders.03",
+     "keyframe": "18-1",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "后头还有好多？",
+     "text": "后头还有好多？",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218BridgeOrders_03.mp3",
+     "durationS": 0.85,
+     "gapBeforeS": 0.39,
+     "sha256": "fff5ab67dabdc5344753a7df44d6a9f3ef0c0f47bae302724e1ca462348a5141",
+     "speakerCos": 0.642,
+     "cer": 0.3333,
+     "transcript": "好多还有好多。"
+    },
+    {
+     "id": "BridgeOrders.04",
+     "keyframe": "18-1",
+     "who": "guard",
+     "speaker": "桥头军官",
+     "lang": "zh",
+     "subtitle": "晓得个锤子！看到是自己人就让他过！",
+     "text": "晓得个锤子！看到是自己人就让他过！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218BridgeOrders_04.mp3",
+     "durationS": 3.63,
+     "gapBeforeS": 0.77,
+     "sha256": "702dd979177f0456c017da5265148b35124fc762a194fb6f4ccca1e30ed4d679",
+     "speakerCos": 0.902,
+     "cer": 0.2,
+     "transcript": "小的个锤子,看到是自己人就让他裹。"
+    },
+    {
+     "id": "BridgeOrders.05",
+     "keyframe": "18-1",
+     "who": "heyoutian",
+     "speaker": "何有田",
+     "lang": "zh",
+     "subtitle": "顶到啥时候嘛？",
+     "text": "顶到啥时候嘛？",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218BridgeOrders_05.mp3",
+     "durationS": 1.21,
+     "gapBeforeS": 1.01,
+     "sha256": "2ab9f1a1a1c4b12fc7083f18b03eeb6ef73dcea0325e3510c8bfa17de76f3ed0",
+     "speakerCos": 0.475,
+     "cer": 0.1667,
+     "transcript": "听到啥时候嘛?"
+    },
+    {
+     "id": "BridgeOrders.06",
+     "keyframe": "18-1",
+     "who": "guard",
+     "speaker": "桥头军官",
+     "lang": "zh",
+     "subtitle": "顶到最后一个过桥！……城里头说了，援兵在路上了。",
+     "text": "顶到最后一个过桥！……城里头说了，援兵在路上了。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218BridgeOrders_06.mp3",
+     "durationS": 5.05,
+     "gapBeforeS": 0.25,
+     "sha256": "cc371bd32d5912dbfbf319818738fa27b60e6d14f203da8582c04039b09faebb",
+     "speakerCos": 0.8,
+     "cer": 0.3158,
+     "transcript": "丁到最后一个国桥。成立投所了,援兵在路上了。"
+    },
+    {
+     "id": "BridgeOrders.07",
+     "keyframe": "18-1",
+     "who": "heyoutian",
+     "speaker": "何有田",
+     "lang": "zh",
+     "subtitle": "在路上？日他妈，老子也在路上。",
+     "text": "在路上？日他妈，老子也在路上。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218BridgeOrders_07.mp3",
+     "durationS": 3.77,
+     "gapBeforeS": 0.49,
+     "sha256": "2bdb60c10665931cd387349347b8d79194ffe42fdf3bd05c90d42df821cde430",
+     "speakerCos": 0.885,
+     "cer": 0.4167,
+     "transcript": "在炉上?老子也在炉上?",
+     "issues": [
+      "字错率 0.4167 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "HoldTheBridge",
+   "beat": "18",
+   "keyframe": "18-2",
+   "label": "18 等：准备点火、炸、还有人、那挺机枪",
+   "attempt": 2,
+   "attempts": 3,
+   "references": [
+    {
+     "who": [
+      "guard"
+     ],
+     "owner": "guard",
+     "castSha256": "18917d10a6f543eb30c418b592cffcbfee8248b142865edcf7613248d142aeb9"
+    },
+    {
+     "who": [
+      "luo"
+     ],
+     "owner": "luo",
+     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [
+    "HoldTheBridge.05 更像桥头军官（本人 0.579 / 0.843）；字错率 0.5 待人耳核对"
+   ],
+   "flags": [],
+   "lines": [
+    {
+     "id": "HoldTheBridge.01",
+     "keyframe": "18-2",
+     "who": "guard",
+     "speaker": "桥头军官",
+     "lang": "zh",
+     "subtitle": "准备点火！",
+     "text": "准备点火！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218HoldTheBridge_01.mp3",
+     "durationS": 0.84,
+     "gapBeforeS": 0,
+     "sha256": "f168ea1768eaa578c48870dd2ce2a68e9083c435be2c640197bf3aca1a5f59fd",
+     "speakerCos": 0.709,
+     "cer": 1,
+     "transcript": "遵北电货!",
+     "issues": [
+      "字错率 1 待人耳核对"
+     ]
+    },
+    {
+     "id": "HoldTheBridge.02",
+     "keyframe": "18-2",
+     "who": "guard",
+     "speaker": "桥头军官",
+     "lang": "zh",
+     "subtitle": "炸！不等了！",
+     "text": "炸！不等了！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218HoldTheBridge_02.mp3",
+     "durationS": 1.51,
+     "gapBeforeS": 0.97,
+     "sha256": "e4bd5e9d37896e96d8114c336ec9d8bc27bd34b3bb8a951e8a877c358d958079",
+     "speakerCos": 0.775,
+     "cer": 0.5,
+     "transcript": "咋?不登了!",
+     "issues": [
+      "字错率 0.5 待人耳核对"
+     ]
+    },
+    {
+     "id": "HoldTheBridge.03",
+     "keyframe": "18-2",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "还有人！",
+     "text": "还有人！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218HoldTheBridge_03.mp3",
+     "durationS": 0.61,
+     "gapBeforeS": 0.18,
+     "sha256": "e7585e7ece474422d0531a11b59413bbf0d2812261772da754d510dbae4007cc",
+     "speakerCos": 0.318,
+     "cer": 0,
+     "transcript": "还有人!",
+     "issues": [
+      "有声 0.46 s，太短不判嗓子"
+     ]
+    },
+    {
+     "id": "HoldTheBridge.04",
+     "keyframe": "18-2",
+     "who": "guard",
+     "speaker": "桥头军官",
+     "lang": "zh",
+     "subtitle": "鬼子都上来了！",
+     "text": "鬼子都上来了！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218HoldTheBridge_04.mp3",
+     "durationS": 1.14,
+     "gapBeforeS": 0.31,
+     "sha256": "5a237cf8ac486be6841a7ff4a91bb3f4cffb2f21b9bc23dab8639758c7455f2d",
+     "speakerCos": 0.659,
+     "cer": 0.5,
+     "transcript": "鬼子的赏赖了!",
+     "issues": [
+      "字错率 0.5 待人耳核对"
+     ]
+    },
+    {
+     "id": "HoldTheBridge.05",
+     "keyframe": "18-2",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "再等一哈！……顺儿！那挺机枪！",
+     "text": "再等一哈！……顺儿！那挺机枪！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218HoldTheBridge_05.mp3",
+     "durationS": 2.785,
+     "gapBeforeS": 0.1,
+     "sha256": "3f03a4d0e1129b16b2564f1bdf3538e60651faf1be1b5bd3221bb6192f5239c4",
+     "speakerCos": 0.579,
+     "cer": 0.5,
+     "transcript": "再等一会儿。是,拉丁机枪。",
+     "issues": [
+      "更像桥头军官（本人 0.579 / 0.843）",
+      "字错率 0.5 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "LastOnes",
+   "beat": "18",
+   "keyframe": "18-2",
+   "label": "18 最后一拨：快过来、后头没得人了",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "yaowa"
+     ],
+     "owner": "yaowa",
+     "castSha256": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706"
+    },
+    {
+     "who": [
+      "runner"
+     ],
+     "owner": "runner",
+     "castSha256": "e54cced12c7babfdc154891a3bd49c59256836a9b48033fe83be742870a00e79"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "LastOnes.01",
+     "keyframe": "18-2",
+     "who": "yaowa",
+     "speaker": "幺娃",
+     "lang": "zh",
+     "subtitle": "快过来！快过来！",
+     "text": "快过来！快过来！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218LastOnes_01.mp3",
+     "durationS": 2.21,
+     "gapBeforeS": 0,
+     "sha256": "79b2cc454aa0d9c7877ec28cb4bb5c68b4d0dbd91455988c9031a6d75d3b589b",
+     "speakerCos": 0.617,
+     "cer": 0,
+     "transcript": "快过来!快过来!"
+    },
+    {
+     "id": "LastOnes.02",
+     "keyframe": "18-2",
+     "who": "runner",
+     "speaker": "领头的兵",
+     "lang": "zh",
+     "subtitle": "后头没得人了！",
+     "text": "后头没得人了！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218LastOnes_02.mp3",
+     "durationS": 1.621,
+     "gapBeforeS": 1.18,
+     "sha256": "21badc8a8cf234441ee21d70bad15c014d1f2d59d92bd78c28475b78d95930dd",
+     "speakerCos": 0.703,
+     "cer": 0.5,
+     "transcript": "好头目的人了!",
+     "issues": [
+      "字错率 0.5 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "CrossNow",
+   "beat": "18",
+   "keyframe": "18-3",
+   "label": "18 过桥：撤、点",
+   "attempt": 3,
+   "attempts": 3,
+   "references": [
+    {
+     "who": [
+      "luo"
+     ],
+     "owner": "luo",
+     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
+    },
+    {
+     "who": [
+      "guard"
+     ],
+     "owner": "guard",
+     "castSha256": "18917d10a6f543eb30c418b592cffcbfee8248b142865edcf7613248d142aeb9"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "CrossNow.01",
+     "keyframe": "18-3",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "撤！过桥！",
+     "text": "撤！过桥！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218CrossNow_01.mp3",
+     "durationS": 1.45,
+     "gapBeforeS": 0,
+     "sha256": "63453edfa344c8346c6731780f4ac579e944cc23729b0385152987db1debd792",
+     "speakerCos": 0.631,
+     "cer": 1,
+     "transcript": "吹,国俏!",
+     "issues": [
+      "字错率 1 待人耳核对"
+     ]
+    },
+    {
+     "id": "CrossNow.02",
+     "keyframe": "18-3",
+     "who": "guard",
+     "speaker": "桥头军官",
+     "lang": "zh",
+     "subtitle": "点！",
+     "text": "点！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218CrossNow_02.mp3",
+     "durationS": 0.83,
+     "gapBeforeS": 0.26,
+     "sha256": "68a5ee91dffa7abb62135a5402f4d31cf5e0515b70492c72599783a77f884af8",
+     "speakerCos": 0.508,
+     "cer": 1,
+     "transcript": "爹!",
+     "issues": [
+      "有声 0.38 s，太短不判嗓子",
+      "字错率 1 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "KeepMoving",
+   "beat": "18",
+   "keyframe": "18-4",
+   "label": "18 对岸：走！看你妈啥子",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "luo"
+     ],
+     "owner": "luo",
+     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "KeepMoving.01",
+     "keyframe": "18-4",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "走！看你妈啥子，走！",
+     "text": "走！看你妈啥子，走！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218KeepMoving_01.mp3",
+     "durationS": 3.397,
+     "gapBeforeS": 0,
+     "sha256": "ad7f56b70f6cdfaa1927e646c888c7907fc6daedfb688e291a98ff9d0170f2d3",
+     "speakerCos": 0.773,
+     "cer": 0,
+     "transcript": "走!看你妈啥子!走!"
+    }
+   ]
+  },
+  {
+   "id": "NorthGate",
+   "beat": "18",
+   "keyframe": "18-5",
+   "label": "18 夜里，北门：进城、有地方歇脚",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "yaowa"
+     ],
+     "owner": "yaowa",
+     "castSha256": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706"
+    },
+    {
+     "who": [
+      "geng"
+     ],
+     "owner": "geng",
+     "castSha256": "3ed097856b7a56b65285ef604e2eed302f564f880a74c3c5f66fdecd64a5acea"
+    },
+    {
+     "who": [
+      "zhou"
+     ],
+     "owner": "zhou",
+     "castSha256": "1c7a96ad905af020a01e9a6d0a7ede031b09292f8f9351d4838835500502e3ee"
+    }
+   ],
+   "targetDb": -18.17,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "NorthGate.01",
+     "keyframe": "18-5",
+     "who": "yaowa",
+     "speaker": "幺娃",
+     "lang": "zh",
+     "subtitle": "老人家，你嗯往哪儿走？",
+     "text": "老人家，你嗯往哪儿走？",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218NorthGate_01.mp3",
+     "durationS": 2.42,
+     "gapBeforeS": 0,
+     "sha256": "e59393023407477f6455f3ba881424b4e2fdccca322832d9598e4654d0b3ffd4",
+     "speakerCos": 0.793,
+     "cer": 0.2222,
+     "transcript": "老人家,你往哪走?"
+    },
+    {
+     "id": "NorthGate.02",
+     "keyframe": "18-5",
+     "who": "geng",
+     "speaker": "老耿",
+     "lang": "zhNorth",
+     "subtitle": "进城。城里有城墙，比庄上牢靠。",
+     "text": "进城。城里有城墙，比庄上牢靠。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218NorthGate_02.mp3",
+     "durationS": 4.49,
+     "gapBeforeS": 0.24,
+     "sha256": "f13facc4560f523bfe96c03e39e0de68f4564ec5a26dc89ec85ec6264c4209c4",
+     "speakerCos": 0.858,
+     "cer": 0.0833,
+     "transcript": "进城,城里有城墙,比装上牢靠。"
+    },
+    {
+     "id": "NorthGate.03",
+     "keyframe": "18-5",
+     "who": "zhou",
+     "speaker": "带路的兵",
+     "lang": "zh",
+     "subtitle": "有地方歇脚！跟我来！",
+     "text": "有地方歇脚！跟我来！",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218NorthGate_03.mp3",
+     "durationS": 2.079,
+     "gapBeforeS": 0.23,
+     "sha256": "ef2eff9ab351738c9934f30ff630e038d485ee054d4dd4496d577c8692e9553f",
+     "speakerCos": 0.508,
+     "cer": 0.25,
+     "transcript": "有地方协助,跟我来!"
+    }
+   ]
+  }
+ ]
+}
