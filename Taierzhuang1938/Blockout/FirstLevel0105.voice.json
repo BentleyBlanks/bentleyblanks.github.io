@@ -1,8 +1,8 @@
 {
  "schema": "tengxian-blockout-voice/1",
  "level": "FirstLevel0105",
- "generatedAt": "2026-10-18T01:44:59.761Z",
- "requests": 18,
+ "generatedAt": "2026-10-18T16:12:35.221Z",
+ "requests": 19,
  "note": "占位配音（SeedAudio seed-audio-1.0，整段一次生成后按逐字时间戳切句）。file 相对 Taierzhuang1938/index.html；gapBeforeS 是录音里与上一句的原始间隔。",
  "scenes": [
   {
@@ -721,7 +721,7 @@
   {
    "id": "Counter",
    "beat": "02",
-   "label": "02 反冲：班长带人从台阶上压下来",
+   "label": "02 反冲：班长带人从南沿上打下来、跳进沟",
    "attempt": 1,
    "attempts": 1,
    "references": [
@@ -750,10 +750,12 @@
    "targetDb": -16,
    "cutMethod": "subtitle",
    "hard": [
-    "Counter.03 更像日军（本人 -0.069 / 0.163）；字错率 2 待人耳核对",
+    "Counter.03 疑似念错（字错率 81）",
     "Counter.05 更像日军（本人 0.325 / 0.545）；字错率 0.4 待人耳核对"
    ],
-   "flags": [],
+   "flags": [
+    "Counter.03 是单句补录（罗班长，Counter03Pickup#1），不在整段录音里"
+   ],
    "lines": [
     {
      "id": "Counter.01",
@@ -793,22 +795,26 @@
     },
     {
      "id": "Counter.03",
-     "who": "heyoutian",
-     "speaker": "何有田",
+     "who": "luo",
+     "speaker": "罗班长",
      "lang": "zh",
      "subtitle": "杀——！",
      "text": "杀——！",
      "file": "./Audio/Blockout0105/AudioVoice_Blockout0105Counter_03.mp3",
-     "durationS": 1.42,
+     "durationS": 2.264,
      "gapBeforeS": 0.26,
-     "sha256": "e20be74241c1b42c3505748623cb45cf57ecc0e35d5d62c372a92dac02c8eca1",
-     "speakerCos": -0.069,
-     "cer": 2,
-     "transcript": "撒啊!",
+     "sha256": "68252762b18dc7daf6961d55c9d8fbef64af678909bf0e60f9b5fdb558135957",
+     "speakerCos": 0.232,
+     "cer": 81,
+     "transcript": "Saaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
      "issues": [
-      "更像日军（本人 -0.069 / 0.163）",
-      "字错率 2 待人耳核对"
-     ]
+      "疑似念错（字错率 81）"
+     ],
+     "pickup": {
+      "scene": "Counter03Pickup",
+      "attempt": 1,
+      "attempts": 1
+     }
     },
     {
      "id": "Counter.04",

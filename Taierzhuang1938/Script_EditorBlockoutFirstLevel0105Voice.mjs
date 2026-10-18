@@ -10,6 +10,10 @@
 //   --no-judge     不跑 whisper 转写与音色核对（快；核对表里那两列留空）
 //   --face         切好以后用 Script_FirstLevelFaceTrackBake.py 烘口型轨到 Audio/Blockout0105/Data_Blockout0105FaceTracks.json
 //
+// 单句补录（台词表里带 pickup 的句子）：这一句另发一次单人请求（同一场景说明、只这一句、只挂说话人自己的定妆音），
+// 当成一场叫 <场id><两位序号>Pickup 的小场生成、母带、切句（--force / --pick 照样认这个名字），装进父场这一句的位置；
+// 父场其余几句照旧用整场录音。整场重配以后把 pickup 去掉即可。
+//
 // 台词：Data_EditorBlockoutFirstLevel0105Lines.mjs。定妆参考音只读复用 Audio/FirstLevel/Cast（Data_FirstLevelVoiceCastManifest.json），
 // 游戏第一关的配音、cue 表、定妆表一律不改。做法与游戏 01–06 相同（docs/Data_FirstLevelVoiceSync20260919.md §0）：
 // 最多 3 条定妆参考音、台词行以 @音频N 开头指派说话人、干声不烘环境、整段只做一次母带（按各句音量档字数加权的目标电平，
@@ -132,6 +136,10 @@ function TargetDb(scene) {
 // ---------------------------------------------------------------------------
 // 生成
 // ---------------------------------------------------------------------------
+/** 带 pickup 的句子各自成一个单句小场（id 不带点，进文件名）。 */
+const Pickups = (scene) => scene.lines.filter((l) => l.pickup).map((line) => Object.freeze({
+  id: `${scene.id}${line.id.split(".")[1]}Pickup`, beat: scene.beat, label: `${scene.label}（${line.id} 单句补录）`,
+  context: scene.context, cast: Object.freeze([line.who]), lines: Object.freeze([line]), pickupOf: line.id }));
 const RawFile = (scene, n) => path.join(work, `${scene.id}_${n}.raw.mp3`);
 const MetaFile = (scene, n) => path.join(work, `${scene.id}_${n}.json`);
 const CutDir = (scene, n) => path.join(work, `${scene.id}_${n}`);
@@ -261,8 +269,10 @@ function Judge(results) {
 // ---------------------------------------------------------------------------
 const LineFile = (scene, i) => path.join(outDir, `AudioVoice_Blockout0105${scene.id}_${String(i + 1).padStart(2, "0")}.mp3`);
 function Install(r, manifest, timings) {
+  // 参考音记实际发出去的那几条（台词表后来换了说话人，References 算出来的就不是录音时的了）
+  const sent = ReadJson(MetaFile(r.scene, r.n))?.references;
   const entry = { id: r.scene.id, beat: r.scene.beat, label: r.scene.label, attempt: r.n, attempts: Attempts(r.scene).length,
-    references: References(r.scene).map((ref) => ({ who: ref.who, owner: ref.owner, castSha256: ref.sha256 })),
+    references: sent || References(r.scene).map((ref) => ({ who: ref.who, owner: ref.owner, castSha256: ref.sha256 })),
     targetDb: r.master.targetDb, cutMethod: r.master.cutMethod, hard: r.hard, flags: r.flags, lines: [] };
   r.slices.forEach((s, i) => {
     const line = r.scene.lines[i], dest = LineFile(r.scene, i);
@@ -271,7 +281,7 @@ function Install(r, manifest, timings) {
     entry.lines.push({ id: line.id, who: line.who, speaker: line.speaker, lang: line.lang, subtitle: line.subtitle, text: line.text,
       file: `./Audio/Blockout0105/${path.basename(dest)}`, durationS, gapBeforeS: s.gapBeforeS, sha256,
       ...(s.speakerCos != null ? { speakerCos: s.speakerCos } : {}), ...(s.cer != null ? { cer: s.cer, transcript: s.transcript } : {}),
-      ...(s.issues?.length ? { issues: s.issues } : {}) });
+      ...(s.issues?.length ? { issues: s.issues } : {}), ...(s.pickup ? { pickup: s.pickup } : {}) });
     if (s.chars?.length) timings[sha256] = { lineId: line.id, who: line.who, lang: line.lang === "ja" ? "ja" : "zh", seconds: durationS,
       source: s.charSource, chars: s.chars };
   });
@@ -313,8 +323,9 @@ function FaceBake(manifest) {
 
 async function Main() {
   const scenes = L0105_VOICE_SCENES.filter((s) => !only || only.includes(s.id));
+  const pickups = scenes.flatMap(Pickups);
   if (dry) {
-    for (const scene of scenes) {
+    for (const scene of [...scenes, ...pickups]) {
       const refs = References(scene), prompt = ScenePrompt(scene);
       console.log(`\n=== ${scene.id}（${scene.beat}，${scene.lines.length} 句，提示词 ${prompt.length} 字，已有生成 ${Attempts(scene).length} 次）`);
       refs.forEach((r, i) => console.log(`  @音频${i + 1} = ${r.who.join("/")} ← ${Rel(r.file)} sha ${r.sha256.slice(0, 12)}`));
@@ -324,7 +335,7 @@ async function Main() {
   }
   fs.mkdirSync(work, { recursive: true });
   fs.mkdirSync(outDir, { recursive: true });
-  for (const scene of scenes) {
+  for (const scene of [...scenes, ...pickups]) {
     const have = Attempts(scene);
     if (!have.length) await Generate(scene, 1);
     else if (forced.has(scene.id)) {
@@ -332,10 +343,21 @@ async function Main() {
       else await Generate(scene, Math.max(...have) + 1);
     }
   }
-  const results = scenes.map((scene) => {
+  const CutPicked = (scene) => {
     const have = Attempts(scene), n = picks.get(scene.id) ?? Math.max(...have);
     return Cut(scene, n);
-  });
+  };
+  const results = scenes.map(CutPicked);
+  // 补录装进父场那一句的位置（与上一句的间隔沿用整场录音里的）；补录有硬错误就不装，父场整场不装
+  for (const p of pickups.map(CutPicked)) {
+    const r = results.find((x) => x.scene.lines.some((l) => l.id === p.scene.pickupOf));
+    const i = r.scene.lines.findIndex((l) => l.id === p.scene.pickupOf);
+    console.log(`${p.scene.id}#${p.n}: ${p.hard.length ? "HARD " + p.hard.join("；") : "ok"}`);
+    if (!p.slices || p.hard.length) { r.hard.push(`${p.scene.pickupOf} 单句补录没过：${p.hard.join("；")}`); r.slices = null; continue; }
+    if (!r.slices) continue;
+    r.slices[i] = { ...p.slices[0], gapBeforeS: r.slices[i].gapBeforeS, pickup: { scene: p.scene.id, attempt: p.n, attempts: Attempts(p.scene).length } };
+    r.flags.push(`${p.scene.pickupOf} 是单句补录（${r.scene.lines[i].speaker}，${p.scene.id}#${p.n}），不在整段录音里`);
+  }
   if (judge) Judge(results);
   const manifest = ReadJson(manifestPath, null) || { schema: "tengxian-blockout-voice/1", level: "FirstLevel0105", scenes: [] };
   const timings = ReadJson(path.join(work, "LineTimings.json"), {});

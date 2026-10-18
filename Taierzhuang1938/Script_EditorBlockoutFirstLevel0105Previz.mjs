@@ -709,20 +709,24 @@ function S0202(ctx) {
   s.Key("Donggua", v + 0.55, { state: "down", clip: null });
   s.Go("Donggua", v + 0.55, v + 1.0, K("Donggua").x, K("Donggua").z, { move: "cut", yawDeg: 90 });
   s.Eye(v + 0.6, 0.6, { stance: "prone", look: rimLook, pitch: 24, toLook: { x: 59.3, z: 64.0 }, toPitch: 6, shake: 0.15 });
-  // 剧本顺序：「打！」→ 日军「敌袭！」→ 台阶那头「杀——！」（压制组同时往前冲）→ 班长抡着大刀跳进沟「砍！」
+  // 剧本顺序：「打！」→ 日军「敌袭！」→「杀——！」→ 班长抡着大刀跳进沟「砍！」
   s.Say("Counter.02", "IjaYi", v + 1.0);
   s.Key("IjaYi", v + 0.8, { yawDeg: -150 });
-  // 「杀——！」何有田从台阶那头的压制组喊出来，压制组同时起身顺着支沟往前冲；镜头往台阶那头扫一眼
-  const roar = s.Say("Counter.03", "HeYoutian", v + 1.9);
+  // 机枪一哑，台阶上的压制组起身顺着支沟往前冲；镜头往台阶那头扫一眼
+  const surge = R(v + 1.2);
   const heTo = K("HeYoutian"), sq1 = K("Squad1");
-  s.Go("HeYoutian", roar, roar + 12.0, heTo.x, heTo.z, { move: "run", path: [BP(12, 0.4), BP(26, 0.4), BP(36.5, 1.2)], depart: { stance: "stand", aim: false }, stance: "crouch", faceTo: "player" });
-  s.Go("Squad1", roar + 0.1, roar + 9.0, sq1.x, sq1.z, { move: "run", path: [BP(12, -0.4)], depart: { stance: "stand" }, aim: true, yawDeg: -86 });
-  s.Eye(roar - 0.1, 0.4, { stance: "prone", look: { x: 59.3, z: 64.0 }, pitch: 6, toLook: STEPS, toPitch: 1 });
+  s.Go("HeYoutian", surge, surge + 12.0, heTo.x, heTo.z, { move: "run", path: [BP(12, 0.4), BP(26, 0.4), BP(36.5, 1.2)], depart: { stance: "stand", aim: false }, stance: "crouch", faceTo: "player" });
+  s.Go("Squad1", surge + 0.1, surge + 9.0, sq1.x, sq1.z, { move: "run", path: [BP(12, -0.4)], depart: { stance: "stand" }, aim: true, yawDeg: -86 });
+  s.Eye(surge, 0.4, { stance: "prone", look: { x: 59.3, z: 64.0 }, pitch: 6, toLook: STEPS, toPitch: 1 });
+  // 「杀——！」班长在南沿上撑起身子吼（2026-10-19 用户定：何有田留在台阶上，这一声改给班长，单句补录）；镜头转回南沿
+  const rimLuo = BP(OUTFLANK_021_AT.Luo, OUTFLANK_RIM_LAT);
+  const roar = s.Say("Counter.03", "Luo", v + 2.3);
+  s.Key("Luo", roar - 0.1, { stance: "stand", clip: null });
+  s.Eye(roar - 0.4, 0.4, { stance: "prone", look: STEPS, pitch: 1, toLook: rimLuo, toPitch: 22 });
   // 班长抡着大刀从南沿上跳进沟里，落地就是一声「砍！」
   const land = BP(OUTFLANK_021_AT.Luo - 1.0, -1.1);
   const chop = s.Say("Counter.04", "Luo", roar + 1.45);
   const jump = R(chop - 0.7);
-  s.Eye(jump - 0.45, 0.45, { stance: "prone", look: STEPS, pitch: 1, toLook: BP(OUTFLANK_021_AT.Luo, OUTFLANK_RIM_LAT), toPitch: 22 });
   // 跳下来就抡起刀（DadaoAmbush：举刀往下劈的那一下，所有骨架都有），落地冲到甲跟前再一刀（LuoDadaoChopRear）
   s.Go("Luo", jump, jump + 0.7, land.x, land.z, { move: "run", depart: { clip: "DadaoAmbush", weapon: "Dadao" }, stance: "stand", faceTo: "IjaJia" });
   s.Eye(jump, 1.2, { stance: "prone", look: BP(OUTFLANK_021_AT.Luo, OUTFLANK_RIM_LAT), pitch: 22, toLook: land, toPitch: 4 });

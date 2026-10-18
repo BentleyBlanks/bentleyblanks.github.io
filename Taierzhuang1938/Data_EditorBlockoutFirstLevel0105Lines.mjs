@@ -16,7 +16,9 @@
 //   line   { id: "<场id>.<两位序号>", who: 定妆 id（Data_FirstLevelVoiceCast；冬瓜 01 用 comrade、02 起重伤用 comradeWounded；
 //            喊「炮！趴下」的 shouter 共用传令兵的嗓子）, speaker: 显示名, lang: "zh"|"ja"|"zhNorth", text: 实际念的字,
 //            subtitle: 屏幕字幕（中文）, direction: 表演提示（先身体后情绪）, projection: shout|normal|low|breath（音量档，
-//            提示词用词 + 整段母带电平）, kanji?: 日语稿面, vocal?: true = 非词人声（嚎、痛叫），时间戳对不上字不算漏句 }
+//            提示词用词 + 整段母带电平）, kanji?: 日语稿面, vocal?: true = 非词人声（嚎、痛叫），时间戳对不上字不算漏句,
+//            pickup?: 原因 = 这一句不用整场录音里切出来的那段，单独补录一条（换了说话人、又不想整场重配时用；
+//            Voice 脚本把补录装进这一句的位置，其余几句照旧用整场录音。哪天整场重配了，就把 pickup 去掉） }
 
 const L = (who, speaker, lang, text, subtitle, direction, projection = "normal", extra = {}) =>
   Object.freeze({ who, speaker, lang, text, subtitle, direction, projection, ...extra });
@@ -117,12 +119,13 @@ export const L0105_VOICE_SCENES = Object.freeze([
       L("comradeWounded", "冬瓜", "zh", "啊——！啊啊——！", "（冬瓜嚎叫）",
         "倒在泥里蜷着，肚子挨了刺刀，撕心裂肺地嚎；剧痛、恨", "shout", { vocal: true }),
     ]),
-  Scene("Counter", "02", "02 反冲：班长带人从台阶上压下来",
-    "交通沟里，罗班长带人从台阶上一排枪打下来再冲下来；沟底的日军挨了打乱喊；刘文财看见泥里的顺子",
+  Scene("Counter", "02", "02 反冲：班长带人从南沿上打下来、跳进沟",
+    "支沟里，罗班长带几个人从支沟南沿的土垄上一排枪打下来，再抡着大刀跳进沟里；何有田留在台阶上压着机枪；沟底的日军挨了打乱喊；刘文财在南沿上看见泥里的顺子",
     [
-      L("luo", "罗班长", "zh", "打！", "打！", "在台阶上压低身子，一声令下；短、狠", "shout"),
+      L("luo", "罗班长", "zh", "打！", "打！", "趴在南沿土垄上压低身子，一声令下；短、狠", "shout"),
       JA("ijaB", "日军", "てきしゅう！", "敵襲！", "敌袭！", "中枪的同伴倒下，回身大喊；惊", "shout"),
-      L("heyoutian", "何有田", "zh", "杀——！", "杀——！", "跳下台阶往下冲，拼尽力气吼；杀红了眼", "shout"),
+      L("luo", "罗班长", "zh", "杀——！", "杀——！", "从南沿上撑起身子、抡起大刀要往沟里跳，拼尽力气吼；杀红了眼", "shout",
+        { pickup: "2026-10-19 换说话人：整场录音里这句是何有田的嗓子；改空间后何有田留在台阶上压机枪，剧本里这一声挨着班长跳沟，改给班长，单独补录" }),
       L("luo", "罗班长", "zh", "砍！", "砍！", "冲在最前头抡大刀，劈下去时吼；狠", "shout"),
       L("liuwencai", "刘文财", "zh", "顺子在底下！", "顺子在底下！", "边冲边指着泥里，喊给大家听；急", "shout"),
     ]),
