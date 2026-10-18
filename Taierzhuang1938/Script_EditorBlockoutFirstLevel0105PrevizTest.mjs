@@ -8,6 +8,8 @@
 // （有 castId 的按 Data_FirstLevelSpeakingCast 的骨架，没有 castId 的只许五具骨架都有的通用片段）；
 // 同一段里台词不互相压；演员走位点在场地范围内、不落在沟壁斜坡上；走位要求的速度不离谱；
 // 说话的人在那一刻是可见的。
+// 10-18 第三轮：05-3 顺子替身用投弹片段（throw）甩那捆手榴弹、落点后才炸；冬瓜在被子上不播片段、不转身；
+// 04-3…05-4 在桥底下（板桥脚印内、沟底比桥面低 1 m 以上）的人任何时刻都是蹲 / 趴（关键帧布设 + 预演每 0.1 s + 关键帧之间的过渡）。
 // ===========================================================================
 
 import { readFileSync, existsSync } from "node:fs";
@@ -16,6 +18,8 @@ import { fileURLToPath } from "node:url";
 import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
 import { FIRST_LEVEL_SPEAKING_CAST } from "./Data_FirstLevelSpeakingCast.mjs";
 import { CharacterClipModelId } from "./Data_CharacterSelection.mjs";
+import { SamplePrevizActor, NormalizeBlockoutPreviz, PREVIZ_THROW } from "./Script_EditorBlockoutPrevizPlan.mjs";
+import { L0105_BRIDGE } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const Load = f => JSON.parse(readFileSync(join(HERE, f), "utf8"));
@@ -165,6 +169,69 @@ function DesignChecks(doc, config, errors) {
     if (!tk.some(k => Math.hypot(k.x - 35, k.z - 116) < 0.5)) errors.push("05-2：战车要经过板桥中间");
   }
   if (!Seq("05-3").events.some(e => e.type === "signal" && e.name === "TankDisabled" && e.on)) errors.push("05-3：甩手榴弹后要打开 TankDisabled");
+  // 10-18 第三轮：05-3 顺子替身播投弹片段（不再拿 PointBlockade 顶），弹落地后才炸、炸在落点
+  {
+    const s = Seq("05-3"), keys = Keys(s, "Shunzi");
+    const th = keys.find(k => k.throw);
+    if (!th) errors.push("05-3：顺子替身要用 throw（投弹片段）甩那捆手榴弹");
+    else {
+      const land = th.t + PREVIZ_THROW.releaseS + (th.throw.flightS ?? 0);
+      if (!s.events.some(e => e.type === "explosion" && Math.abs(e.t - land) <= 0.25 && Math.hypot(e.x - th.throw.x, e.z - th.throw.z) < 0.5)) errors.push(`05-3：落点 (${th.throw.x}, ${th.throw.z}) 在 ${R(land)} s 要有爆炸`);
+    }
+    if (keys.some(k => k.clip === "PointBlockade")) errors.push("05-3：顺子替身不再用 PointBlockade 顶投弹");
+  }
+  // 冬瓜在被子上（02-3 被子铺开起到 02末）：不播片段、不转身、一直倒着
+  for (const id of ["02-3", "02-4", "02-5", "02-6", "02-7", "02E-1", "02E-2"]) {
+    const s = Seq(id);
+    const shown = id === "02-3" ? (Keys(s, "Blanket").find(k => k.visible === true)?.t ?? 0) : 0;
+    for (const k of Keys(s, "Donggua")) {
+      if (k.t < shown) continue;
+      if (typeof k.clip === "string") errors.push(`${id}：冬瓜在被子上 @${k.t} 不能播片段（${k.clip}：坐起来、身子出了被子）`);
+      if (k.faceTo !== undefined) errors.push(`${id}：冬瓜在被子上 @${k.t} 不能转身（faceTo）`);
+      if (k.state === "alive" || k.stance) errors.push(`${id}：冬瓜在被子上 @${k.t} 不能起身`);
+    }
+  }
+  // 桥底下的人一律蹲 / 趴：板桥脚印（顺路 spanM + 1 m 横木，横路 deckW + 0.3 m）内、脚下比桥面低 1 m 以上 = 在桥底下
+  {
+    const B = L0105_BRIDGE, r = B.yawDeg * Math.PI / 180, fx = -Math.sin(r), fz = -Math.cos(r);
+    const scene = Load("Blockout/FirstLevel0105.scene.json"), ground = HeightGridSampler(scene.terrain);
+    const deckTop = Math.max(...scene.blocks.filter(b => /^BridgeDoorBoard_/.test(b.id)).map(b => b.y + b.h / 2));
+    const Under = (x, z) => {
+      const dx = x - B.x, dz = z - B.z, along = dx * fx + dz * fz, across = dx * fz - dz * fx;
+      return Math.abs(along) <= (B.spanM + 1) / 2 && Math.abs(across) <= (B.deckW + 0.3) / 2 && deckTop - ground(x, z) > 1.0;
+    };
+    // 关键帧之间的过渡（PlanTransition：走动时姿态 = 目标是站就站着走，否则蹲着走）：从桥底下过的不许站着走
+    for (const [fromId, toId] of [["04-2", "04-3"], ["04-3", "05-1"], ["05-1", "05-2"], ["05-2", "05-3"], ["05-3", "05-4"]]) {
+      const from = config.keyframes.find(k => k.id === fromId), to = config.keyframes.find(k => k.id === toId);
+      for (const u of to.units) {
+        const prev = from.units.find(v => v.id === u.id);
+        if (!prev || u.kind === "tank" || u.state === "down" || (u.stance || "stand") !== "stand") continue;
+        const route = [prev, ...(u.path || []), u];
+        let hit = null;
+        for (let i = 1; i < route.length && !hit; i++) {
+          const a = route[i - 1], b = route[i], n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.2);
+          for (let k = 0; k <= n && !hit; k++) { const x = a.x + (b.x - a.x) * k / Math.max(1, n), z = a.z + (b.z - a.z) * k / Math.max(1, n); if (Under(x, z)) hit = { x: R(x), z: R(z) }; }
+        }
+        if (hit) errors.push(`${fromId}→${toId}：${u.id} 过渡里站着从桥底下走过（${hit.x}, ${hit.z}）`);
+      }
+    }
+    const norm = NormalizeBlockoutPreviz(doc);
+    for (const id of ["04-3", "05-1", "05-2", "05-3", "05-4"]) {
+      const kf = config.keyframes.find(k => k.id === id);
+      for (const u of kf.units) if (u.kind !== "tank" && u.state !== "down" && Under(u.x, u.z) && (u.stance || "stand") === "stand") errors.push(`${id}：${u.id} 在桥底下站着（关键帧布设）`);
+      const s = norm.sequences.find(q => q.keyframe === id);
+      for (const a of s.actors) {
+        const base = a.spawn || kf.units.find(u => u.id === a.id);
+        if (!base || base.kind === "tank") continue;
+        let bad = null;
+        for (let t = 0; t <= s.durationS + 1e-6 && !bad; t += 0.1) {
+          const st = SamplePrevizActor(a, t, base);
+          if (st.visible && st.state !== "down" && st.stance === "stand" && Under(st.x, st.z)) bad = t;
+        }
+        if (bad !== null) errors.push(`${id}：${a.id} @${R(bad)} s 在桥底下站着（桥下横木底离沟底只有 1.76 m，要蹲 / 趴）`);
+      }
+    }
+  }
   void config;
 }
 

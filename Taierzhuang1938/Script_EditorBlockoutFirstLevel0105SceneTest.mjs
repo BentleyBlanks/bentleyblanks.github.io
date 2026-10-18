@@ -2,7 +2,7 @@
 // 跑法：node Taierzhuang1938/Script_EditorBlockoutFirstLevel0105SceneTest.mjs
 // 查：生成两次逐字相同（generatedAt 固定）、过 ValidateBlockoutScene、锚点处高度、沟底宽、塌洞净空；
 // 10-18 返工：干沟尺寸与两条视线（集结处看不见前沿、南边平地看不进沟底）、支沟南沿土垄挡住北沿机枪、
-// 板桥（宽、与地面齐平、桥下净空、TankDisabled 压断两块、门板之间 4–6 cm 缝）、日常摆件（高度、通道 ≥ 2.2 m、≥15 m 直沟至少一件）。
+// 板桥（宽、与地面齐平、桥下净空、TankDisabled 压断两块、门板之间 6–10 cm 缝、旧门板厚薄高低不一）、日常摆件（高度、通道 ≥ 2.2 m、≥15 m 直沟至少一件）。
 // 10-18 第二轮：南岸坎顶一道 0.6–0.8 m 的连续矮土埂（烘进高度场），南边平地看沟底的余量 ≥ 0.6 m。
 
 import assert from "node:assert/strict";
@@ -107,7 +107,7 @@ const stringers = all.filter((x) => /^BridgeStringer_/.test(x.id));
 assert.ok(boards.length >= 9 && stringers.length >= 3, "板桥：门板 ≥ 9 块、横木 ≥ 3 根");
 assert.ok(boards.every((x) => x.w >= 3.5 && x.w <= 4.0), "桥面宽 3.5–4 m（驴车、担架过得去）");
 const r = BR.yawDeg * Math.PI / 180, fx = -Math.sin(r), fz = -Math.cos(r);
-const deckTop = boards[0].y + boards[0].h / 2;
+const deckTop = Math.max(...boards.map((x) => x.y + x.h / 2));
 for (const s of [-1, 1]) {
   const end = sample(BR.x + fx * s * (BR.spanM / 2 + 0.5), BR.z + fz * s * (BR.spanM / 2 + 0.5));
   assert.ok(Math.abs(deckTop - end) <= 0.2, `桥面与桥头地面不齐：桥面 ${deckTop.toFixed(2)} vs ${end.toFixed(2)}`);
@@ -116,13 +116,24 @@ const under = sample(BR.x, BR.z);
 const clear = Math.min(...stringers.map((x) => x.y - x.h / 2)) - under;
 assert.ok(clear >= 1.6, `桥下横木底离沟底 ${clear.toFixed(2)} m（人要能在桥下沟底趴着、弯腰过）`);
 assert.ok(deckTop - under >= 2.0, "桥下照常是沟");
-// 门板之间 4–6 cm 的缝（每块门板单独一个块），桥下仰看透得出天光
+// 门板之间 6–10 cm 的缝（每块门板单独一个块），桥下仰看透得出天光（10-18 第三轮：5 cm 在白盒灰里看不出一块块板）
+let gapMin = Infinity, gapMax = 0;
 {
   const sorted = boards.map((x) => ({ x, s: (x.x - BR.x) * fx + (x.z - BR.z) * fz })).sort((p, q) => p.s - q.s);
   for (let i = 1; i < sorted.length; i++) {
     const gapM = (sorted[i].s - sorted[i - 1].s) - (sorted[i].x.d + sorted[i - 1].x.d) / 2;
-    assert.ok(gapM >= 0.035 && gapM <= 0.065, `门板 ${sorted[i - 1].x.id}–${sorted[i].x.id} 缝 ${(gapM * 100).toFixed(1)} cm（要 4–6 cm）`);
+    gapMin = Math.min(gapMin, gapM); gapMax = Math.max(gapMax, gapM);
+    assert.ok(gapM >= 0.055 && gapM <= 0.105, `门板 ${sorted[i - 1].x.id}–${sorted[i].x.id} 缝 ${(gapM * 100).toFixed(1)} cm（要 6–10 cm）`);
   }
+}
+// 旧门板：厚薄、高低各家不一（至少两种厚度、顶面高低差 ≥ 2 cm），但顶面高低差 ≤ 4 cm、底面不压到横木上（净空不变）
+{
+  const tops = boards.map((x) => x.y + x.h / 2), bottoms = boards.map((x) => x.y - x.h / 2);
+  const stringerTop = Math.max(...stringers.map((x) => x.y + x.h / 2));
+  assert.ok(new Set(boards.map((x) => x.h)).size >= 2, "门板厚度要有差别");
+  assert.ok(Math.max(...tops) - Math.min(...tops) >= 0.02, "门板顶面高低要略有差别");
+  assert.ok(Math.max(...tops) - Math.min(...tops) <= 0.04 + 1e-9, "门板顶面高低差 ≤ 4 cm（桥面照样平；块中心高只到厘米）");
+  assert.ok(Math.min(...bottoms) >= stringerTop - 0.011, `门板底面压进横木：${Math.min(...bottoms).toFixed(3)} < 横木顶 ${stringerTop.toFixed(3)}`);
 }
 const brokenOff = boards.filter((x) => x.signal === "TankDisabled");
 const brokenOn = all.filter((x) => x.appearSignal === "TankDisabled");
@@ -150,6 +161,6 @@ assert.ok(!all.some((x) => /foxhole|FoxHole|猫耳/i.test(x.id)), "不要猫耳�
 assert.ok(all.filter((x) => /^DeadTree_/.test(x.id) && x.z > G.maxZ).length >= 8, "干沟南岸一排树");
 
 console.log(`ok：${a.blocks.length} 块 + ${a.gates.length} 随信号块，${a.terrain.cols}×${a.terrain.rows} 网格；干沟 ${ext.width}×${ext.length} m；`
-  + `视线 ① 最少挡 ${sights.assembly.worst} m、② 最少挡 ${sights.south.worst} m；桥下净空 ${clear.toFixed(2)} m；摆件 ${L0105_PROPS.length}`);
+  + `视线 ① 最少挡 ${sights.assembly.worst} m、② 最少挡 ${sights.south.worst} m；桥下净空 ${clear.toFixed(2)} m；门板缝 ${(gapMin * 100).toFixed(0)}–${(gapMax * 100).toFixed(0)} cm；摆件 ${L0105_PROPS.length}`);
 
 function BranchZ(x) { return 67.1 + (64.5 - 67.1) * (x - 21.9) / (63 - 21.9); }

@@ -534,8 +534,10 @@ export function BridgeBlocks(sample) {
   for (let i = 0; i < rows; i++) {
     const s = -half + B.boardM * (i + 0.5);
     const id = `BridgeDoorBoard_${String(i + 1).padStart(2, "0")}`;
-    // 每块门板单独一个块，之间留 gapM 的缝（R2 只到厘米：d 取 boardM − gapM 正好）
-    const b = Block(id, B.x + fx * s, B.z + fz * s, B.deckW, B.boardM - B.gapM, B.boardT, "timber", { ry: R2(ry), y: R2(deckY) });
+    // 每块门板单独一个块，之间留 gapM 的缝（R2 只到厘米：d 取 boardM − gapM 正好）；
+    // 旧门板厚薄、高低、长短、歪斜逐块不同（boardJitter）：底面 = 桥面顶 − boardT + lift（压在横木顶上或垫高一点，横木与净空不变）
+    const [lift, T, dW, dRy] = B.boardJitter?.[i] || [0, B.boardT, 0, 0];
+    const b = Block(id, B.x + fx * s, B.z + fz * s, B.deckW + dW, B.boardM - B.gapM, T, "timber", { ry: R2(ry + dRy), y: R2(deckTop - B.boardT + lift + T / 2) });
     if (broken.has(i)) gates.push({ ...b, signal: L0105_SIGNALS.tankDisabled });
     else blocks.push(b);
   }

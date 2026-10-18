@@ -8,6 +8,7 @@
 //   SamplePrevizCamera(camera, t, resolve)          镜头在 t 秒的机位 / 朝向 / 视场
 //   PrevizSequenceDuration(seq, {lineDuration?})    序列时长
 //   PrevizOverlays(seq, t)           白光 / 黑场 / 说明字 / 震屏在 t 秒的确定性取值
+//   PrevizThrows(seq, base, standAt) 演员键 throw（2026-10-18 第三轮）：投弹动作的出手点 → 落点抛物线；SampleThrowFlight 取 t 秒位置
 //
 // 位置键的时间语义（运行时包与集成负责人 10-18 对齐）：带 x / z 的键的 t = 到达时刻。
 // 从上一个有位置的键（没有就是关键帧布设、t = 0）出发，按 move 的自然速度走，
@@ -27,6 +28,16 @@ export const PREVIZ_SFX_ALIASES = Object.freeze([
   "artilleryFar", "artilleryNear", "shellBlast", "tinnitus", "mgBurstFar", "mgBurstNear", "rifleVolley", "rifleShot",
   "mortarPop", "mortarImpact", "grenadeBlast", "tankTracks", "tankGun", "dirtFall", "slap", "stab", "bodyFall",
 ]);
+/**
+ * 投弹（演员键 throw，2026-10-18 第三轮）：throw 键的 t = 开始抡（播步兵投弹片段 GrenadeThrow，Script_InfantryAnimation「背枪投弹」）。
+ * releaseS 与 Script_InfantryAnimation.INFANTRY_RELEASE_SECONDS 一致（PrevizPlanTest 核对）：这一刻弹脱手，按抛物线飞到 throw 的落点；
+ * clipS = 片段全长（GrenadeThrow 实测 4.23 s；之后交还原生动画）。出手点 = 演员此刻脚下 + 离地 releaseH、朝向前方 releaseFwd、右手 releaseRight（按片段脱手帧量的）。
+ * 飞行时间缺省按水平距离：flightBaseS + 距离 × flightPerM，夹在 [flightMinS, flightMaxS]；弧顶比两端连线高 max(arcMinM, 距离 × arcPerM)。
+ */
+export const PREVIZ_THROW = Object.freeze({
+  releaseS: 2.15, clipS: 4.2, releaseH: 1.95, releaseFwd: 0.25, releaseRight: 0.2,
+  flightBaseS: 0.55, flightPerM: 0.06, flightMinS: 0.6, flightMaxS: 1.8, arcMinM: 1.2, arcPerM: 0.22, targetH: 0.15,
+});
 const KEY_FIELDS = ["stance", "aim", "state", "visible", "carryRole", "woundedWalk", "talking", "clip", "lie", "weapon"];
 /** 倒地怎么躺（同配置 §3 的 lie）："along" = 顺着朝向躺、头朝前；null = 演员倒地姿态原样。 */
 export const PREVIZ_LIE_MODES = Object.freeze(["along"]);
@@ -207,6 +218,15 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
         if (k.clipHold !== undefined && typeof k.clipHold !== "boolean") errors.push(`${kat}.clipHold 要是 true / false`);
         if (k.lie !== undefined && k.lie !== null && !PREVIZ_LIE_MODES.includes(k.lie)) errors.push(`${kat}.lie 要是 ${PREVIZ_LIE_MODES.join(" / ")} 或 null`);
         if (k.weapon !== undefined && k.weapon !== null && (typeof k.weapon !== "string" || !k.weapon)) errors.push(`${kat}.weapon 要是武器 id（如 Dadao / HanYang）或 null（空手）`);
+        if (k.throw !== undefined) {
+          const th = k.throw;
+          if (!IsPoint(th)) errors.push(`${kat}.throw 要是落点 {x, z, h?, flightS?}`);
+          else {
+            if (th.h !== undefined && !Finite(th.h)) errors.push(`${kat}.throw.h 要是有限数字`);
+            if (th.flightS !== undefined && !(Finite(th.flightS) && th.flightS > 0 && th.flightS <= 5)) errors.push(`${kat}.throw.flightS 要是 0–5 秒`);
+          }
+          if (k.clip !== undefined && k.clip !== null) errors.push(`${kat}.throw 与 clip 不能写在同一个键（投弹自己就是一个片段）`);
+        }
       });
     });
     // 台词
@@ -232,7 +252,11 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
       if (e.type === "flash") { NeedDur(); if (e.strength !== undefined && !(Finite(e.strength) && e.strength >= 0 && e.strength <= 1)) errors.push(`${eat}.strength 要在 0–1`); }
       else if (e.type === "black") { NeedDur(); if (e.fade !== undefined && !(Finite(e.fade) && e.fade >= 0)) errors.push(`${eat}.fade 要是非负数`); }
       else if (e.type === "caption") { NeedDur(); if (typeof e.text !== "string" || !e.text) errors.push(`${eat}.text 要是非空字符串`); }
-      else if (e.type === "explosion") { NeedPoint(); if (e.radius !== undefined && !(Finite(e.radius) && e.radius > 0)) errors.push(`${eat}.radius 要是正数`); }
+      else if (e.type === "explosion") {
+        NeedPoint();
+        if (e.radius !== undefined && !(Finite(e.radius) && e.radius > 0)) errors.push(`${eat}.radius 要是正数`);
+        if (e.h !== undefined && !(Finite(e.h) && e.h >= 0 && e.h <= 10)) errors.push(`${eat}.h 要是 0–10 米（爆点离地高）`);
+      }
       else if (e.type === "smoke") {
         NeedPoint();
         if (e.kind !== undefined && !PREVIZ_SMOKE_KINDS.includes(e.kind)) errors.push(`${eat}.kind 要是 ${PREVIZ_SMOKE_KINDS.join(" / ")}`);
@@ -308,7 +332,7 @@ export function PrevizSequenceDuration(seq, { lineDuration = null } = {}) {
   if (Finite(seq.durationS) && seq.durationS > 0) return seq.durationS;
   let end = 0;
   for (const c of seq.camera || []) end = Math.max(end, c.t + (c.dur || 0));
-  for (const a of seq.actors || []) for (const k of a.keys || []) end = Math.max(end, k.t);
+  for (const a of seq.actors || []) for (const k of a.keys || []) end = Math.max(end, k.t + (IsPoint(k.throw) ? PREVIZ_THROW.clipS : 0));
   for (const l of seq.lines || []) end = Math.max(end, l.t + (lineDuration?.(l.line) ?? 2));
   for (const e of seq.events || []) end = Math.max(end, e.t + (Finite(e.dur) ? e.dur : 0) + (e.type === "black" && Finite(e.fade) ? 0 : 0));
   return Math.max(0.1, end);
@@ -352,7 +376,8 @@ export function CompilePrevizActor(entry, baseUnit) {
   for (const f of KEY_FIELDS) fields[f] = keys.filter(k => k[f] !== undefined);
   // 朝向「换目标」的时刻：朝向键、移动段的起止
   const changes = [...new Set([...facing.map(k => k.t), ...segments.flatMap(s => (s.cut ? [s.t1] : [s.t0, s.t1]))])].sort((a, b) => a - b);
-  const track = { base, baseYaw, segments, facing, fields, changes };
+  const throws = keys.filter(k => IsPoint(k.throw));
+  const track = { base, baseYaw, segments, facing, fields, changes, throws };
   compiled.set(entry, { key: cacheKey, track });
   return track;
 }
@@ -419,7 +444,8 @@ function StepField(track, name, t) {
  * opts：resolve(id) → {x,z}（faceTo 指单位 id / "player" 时用）；clipDuration(name) → 秒；turnS。
  * lie：阶跃，没写过就沿用 baseUnit.lie（"along" / null）；weapon：阶跃，**只有键里写过才有值**（undefined = 用造人时那把，
  * 关键帧单位的缺省武器不在这里回填 —— 否则空手的翻译会被塞一支 Type38）。
- * @returns {{x,z,yawDeg,stance,aim,state,lie,weapon,visible,carryRole,woundedWalk,talking,clip,clipSeconds,clipHold,moving,speedMps,move}}
+ * throw：throw 键起 PREVIZ_THROW.clipS 秒内 = { seconds（抡了几秒）, x, z（落点）}，期间 clip 让位、stance 记 stand；否则 null。
+ * @returns {{x,z,yawDeg,stance,aim,state,lie,weapon,visible,carryRole,woundedWalk,talking,clip,clipSeconds,clipHold,throw,moving,speedMps,move}}
  */
 export function SamplePrevizActor(entry, t, baseUnit, opts = {}) {
   const track = CompilePrevizActor(entry, baseUnit);
@@ -444,6 +470,11 @@ export function SamplePrevizActor(entry, t, baseUnit, opts = {}) {
       else { clip = null; clipSeconds = 0; }
     }
   }
+  // 投弹：最近一个 throw 键起 clipS 秒内在抡（抡的时候站着、不播开场片段）
+  let thrown = null;
+  for (const k of track.throws) if (k.t <= time && time < k.t + PREVIZ_THROW.clipS) thrown = k;
+  const throwState = thrown ? { seconds: time - thrown.t, x: thrown.throw.x, z: thrown.throw.z } : null;
+  if (throwState) { clip = null; clipSeconds = 0; clipHold = false; stance = "stand"; }
   return {
     x: at.x, z: at.z, yawDeg,
     stance,
@@ -456,9 +487,43 @@ export function SamplePrevizActor(entry, t, baseUnit, opts = {}) {
     woundedWalk: !!Value("woundedWalk", false),
     talking: !!Value("talking", false),
     clip, clipSeconds, clipHold,
+    throw: throwState,
     moving, move,
     speedMps: at.seg ? at.seg.length / Math.max(1e-6, at.seg.t1 - at.seg.t0) : 0,
   };
+}
+
+/**
+ * 一段预演里所有投弹的飞行：→ [{ actor, t0（脱手）, t1（落地）, from {x,y,z}, to {x,y,z}, arcM }]。
+ * baseOf(id) → 关键帧单位（spawn 的人用 entry.spawn）；standAt(x,z) → 脚下地面。确定性（Seek 也对得上）。
+ */
+export function PrevizThrows(seq, baseOf, standAt, opts = {}) {
+  const out = [];
+  const T = PREVIZ_THROW;
+  for (const entry of seq?.actors || []) {
+    const base = entry.spawn && IsObject(entry.spawn) ? entry.spawn : baseOf?.(entry.id) || {};
+    for (const k of entry.keys || []) {
+      if (!IsObject(k) || !Finite(k.t) || !IsPoint(k.throw)) continue;
+      const t0 = k.t + T.releaseS;
+      const s = SamplePrevizActor(entry, t0, base, opts);
+      const r = s.yawDeg * Math.PI / 180, fx = -Math.sin(r), fz = -Math.cos(r);
+      const fromX = s.x + fx * T.releaseFwd - fz * T.releaseRight, fromZ = s.z + fz * T.releaseFwd + fx * T.releaseRight;
+      const from = { x: fromX, y: standAt(s.x, s.z) + T.releaseH, z: fromZ };
+      const to = { x: k.throw.x, y: standAt(k.throw.x, k.throw.z) + (Finite(k.throw.h) ? k.throw.h : T.targetH), z: k.throw.z };
+      const dist = Math.hypot(to.x - from.x, to.z - from.z);
+      const flight = Finite(k.throw.flightS) && k.throw.flightS > 0 ? k.throw.flightS
+        : Math.min(T.flightMaxS, Math.max(T.flightMinS, T.flightBaseS + dist * T.flightPerM));
+      out.push({ actor: entry.id, t0, t1: t0 + flight, from, to, arcM: Math.max(T.arcMinM, dist * T.arcPerM) });
+    }
+  }
+  return out;
+}
+
+/** 飞行中的弹在 t 秒的位置（t 不在 [t0, t1] 里 → null）：两端连线 + 4·arc·u(1−u) 的抛物线。 */
+export function SampleThrowFlight(flight, t) {
+  if (!flight || !(t >= flight.t0) || t > flight.t1) return null;
+  const u = (t - flight.t0) / Math.max(1e-6, flight.t1 - flight.t0);
+  return { x: Lerp(flight.from.x, flight.to.x, u), y: Lerp(flight.from.y, flight.to.y, u) + 4 * flight.arcM * u * (1 - u), z: Lerp(flight.from.z, flight.to.z, u), u };
 }
 
 // ---------------------------------------------------------------------------

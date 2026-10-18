@@ -2,6 +2,7 @@
 // 跑法：node Taierzhuang1938/Script_EditorBlockoutPrevizPlanTest.mjs
 // 钉住：校验器正反例（中文路径）、归一化、演员取样（位置键 = 到达时刻、途经点、move、朝向、阶跃字段、片段秒数 / 停帧）、
 // 镜头取样（eye 与 from/look、ease、空档沿用）、序列时长、遮罩与信号；仓库里有预演文件时它要过校验。
+// 2026-10-18 第三轮：演员键 throw（校验、抡的窗口、出手点 → 落点的抛物线）、爆炸事件 h。
 
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -11,8 +12,9 @@ import { fileURLToPath } from "node:url";
 import {
   BLOCKOUT_PREVIZ_SCHEMA, ValidateBlockoutPreviz, NormalizeBlockoutPreviz, SamplePrevizActor, SamplePrevizCamera,
   PrevizSequenceDuration, PrevizOverlays, PrevizActiveLines, PrevizSignalsAt, PREVIZ_MOVE_SPEED, PREVIZ_EYE_HEIGHT, PrevizShakeOffset,
-  BlockStandSampler,
+  BlockStandSampler, PREVIZ_THROW, PrevizThrows, SampleThrowFlight,
 } from "./Script_EditorBlockoutPrevizPlan.mjs";
+import { INFANTRY_RELEASE_SECONDS } from "./Script_InfantryAnimation.mjs";
 import { NormalizeBlockout } from "./Script_EditorBlockoutConfig.mjs";
 
 const ReadText = (file) => readFileSync(file, "utf8");
@@ -258,6 +260,55 @@ Test("lie / weapon 键：校验、阶跃、缺省", () => {
     units: [{ id: "A", side: "nra", x: 0, z: 0, state: "down", lie: "along" }, { id: "B", side: "nra", x: 1, z: 0, state: "down" }] }] });
   assert.equal(cfg.keyframes[0].units[0].lie, "along");
   assert.ok(!("lie" in cfg.keyframes[0].units[1]), "没写 lie 的单位归一化后也没有 lie");
+});
+
+Test("throw：校验正反例；脱手时刻与游戏投弹片段一致", () => {
+  assert.equal(PREVIZ_THROW.releaseS, INFANTRY_RELEASE_SECONDS, "PREVIZ_THROW.releaseS 要等于 Script_InfantryAnimation.INFANTRY_RELEASE_SECONDS");
+  const Doc = (key, ev = []) => ({ schema: BLOCKOUT_PREVIZ_SCHEMA, level: "Test", sequences: [{ keyframe: "01-1", actors: [{ id: "Luo", keys: [key] }], events: ev }] });
+  assert.ok(ValidateBlockoutPreviz(Doc({ t: 1, throw: { x: 5, z: -4, h: 1.5, flightS: 0.9 } }), { config }).ok);
+  const bad = [
+    [{ t: 1, throw: { x: 5 } }, "throw 要是落点"],
+    [{ t: 1, throw: { x: 5, z: 1, flightS: 9 } }, "flightS"],
+    [{ t: 1, throw: { x: 5, z: 1 }, clip: "PointBlockade" }, "throw 与 clip"],
+  ];
+  for (const [key, want] of bad) {
+    const r = ValidateBlockoutPreviz(Doc(key), { config });
+    assert.ok(!r.ok && r.errors.some(e => e.includes(want)), `${JSON.stringify(key)} → ${r.errors.join("；")}`);
+  }
+  assert.ok(ValidateBlockoutPreviz(Doc({ t: 0 }, [{ t: 1, type: "explosion", x: 1, z: 2, h: 1.5 }]), { config }).ok, "爆炸 h");
+  const r = ValidateBlockoutPreviz(Doc({ t: 0 }, [{ t: 1, type: "explosion", x: 1, z: 2, h: -1 }]), { config });
+  assert.ok(!r.ok && r.errors.some(e => e.includes(".h")), r.errors.join("；"));
+});
+
+Test("throw：抡的窗口里给 seconds、clip 让位、站着；之后交还", () => {
+  const entry = { id: "Luo", keys: [{ t: 0, stance: "crouch", clip: "PointBlockade" }, { t: 1, throw: { x: 0, z: -8 } }] };
+  const base = config.keyframes[0].units[0];
+  const before = SamplePrevizActor(entry, 0.5, base);
+  assert.equal(before.throw, null); assert.equal(before.stance, "crouch"); assert.equal(before.clip, "PointBlockade");
+  const mid = SamplePrevizActor(entry, 2.5, base);
+  Near(mid.throw.seconds, 1.5, 1e-9, "抡了几秒");
+  assert.equal(mid.clip, null); assert.equal(mid.stance, "stand");
+  assert.deepEqual([mid.throw.x, mid.throw.z], [0, -8]);
+  const after = SamplePrevizActor(entry, 1 + PREVIZ_THROW.clipS + 0.01, base);
+  assert.equal(after.throw, null); assert.equal(after.stance, "crouch", "抡完回到之前的姿态");
+  const seq = { actors: [entry], camera: [], lines: [], events: [] };
+  Near(PrevizSequenceDuration(seq), 1 + PREVIZ_THROW.clipS, 1e-9, "序列时长算上抡完");
+});
+
+Test("throw：飞行从出手点到落点、两端时刻对、中间往上拱", () => {
+  const seq = { actors: [{ id: "Luo", keys: [{ t: 1, throw: { x: 0, z: -8, h: 1.5, flightS: 0.9 } }] }], camera: [], lines: [], events: [] };
+  const flights = PrevizThrows(seq, () => ({ x: 0, z: 0, yawDeg: 0 }), () => 0.5);
+  assert.equal(flights.length, 1);
+  const f = flights[0];
+  Near(f.t0, 1 + PREVIZ_THROW.releaseS, 1e-9, "脱手"); Near(f.t1, 1 + PREVIZ_THROW.releaseS + 0.9, 1e-9, "落地");
+  Near(f.from.y, 0.5 + PREVIZ_THROW.releaseH, 1e-9, "出手高"); Near(f.from.z, -PREVIZ_THROW.releaseFwd, 1e-9, "出手点往前（朝北 = −z）");
+  Near(f.to.y, 2.0, 1e-9, "落点 = 地面 + h"); Near(f.to.z, -8, 1e-9);
+  assert.equal(SampleThrowFlight(f, f.t0 - 0.01), null); assert.equal(SampleThrowFlight(f, f.t1 + 0.01), null);
+  const mid = SampleThrowFlight(f, (f.t0 + f.t1) / 2);
+  assert.ok(mid.y > (f.from.y + f.to.y) / 2 + 1, `中点要比两端连线高 1 m 以上：${mid.y}`);
+  // 缺省飞行时间按距离、夹在上下限之间
+  const g = PrevizThrows({ actors: [{ id: "A", spawn: { x: 0, z: 0, yawDeg: 0 }, keys: [{ t: 0, throw: { x: 0, z: -100 } }] }] }, () => null, () => 0)[0];
+  Near(g.t1 - g.t0, PREVIZ_THROW.flightMaxS, 1e-9, "远处夹上限");
 });
 
 // 仓库里有预演文件时（预演数据包写的），它要对着配置与清单过校验

@@ -27,6 +27,13 @@
 //     挂在右手武器挂点上，片段 LuoDadaoChopRear 驱动手）；没写过 = 造人时那把，交还驱动时换回去。关键帧之间武器换了
 //     （都不是空手）就地 SetWeapon，不再整个重造。手里是近战家伙（大刀）、站着不动、没在播片段时摆原生白刃戒备
 //     （meleeCombat Guard，同开场导演的 meleeGuard），不再端着大刀摆步枪据枪姿势。
+//   · 2026-10-18 第三轮：预演键 throw（Script_EditorBlockoutPrevizPlan.PREVIZ_THROW）→ 播步兵投弹片段 GrenadeThrow（「背枪投弹」，
+//     游戏里 BeginGrenadeThrow / AI 齐投同一个片段）：ForceClip 定住片段，片段时间按 drive.throw.seconds 直接设（Seek 确定），
+//     手里的手榴弹由 Actor._UpdateInfantryProps 照游戏原样挂在片段的 grenade 挂点上、脱手帧后藏掉；飞出去的那颗由预演自己画。
+//     骨架上没有这个片段 → 记进 missingClips，照原生动画。
+//   · Probe 多给头 / 骨盆的世界高度（headY / pelvisY）、两脚的世界坐标（feet）与倒地片段（deathVariant），量桥下净空、被子范围用。
+//   · lie:"along" 摆法改成「头、骨盆、两脚」的包围框中心落在单位位置上、身体轴取骨盆→头 ±8° 里最窄的方向，倒地片段固定用
+//     腿蜷得最窄的 DeathCollapseC（LIE_DEATH_VARIANT）；倒着的人换成 lie:"along" 时重造一次。冬瓜在 0.7 m 宽的单被上不再伸出一只脚。
 
 import * as THREE from "three";
 import { SampleTransition } from "./Script_EditorBlockoutConfig.mjs";
@@ -42,6 +49,14 @@ const DOWN_REACH_M = 0.9;
 /** 倒地动作在这么多秒内落定（Actor.Ragdoll 的时长 ≤ 0.8 s）：lie:"along" 的人造出来就直接摆成落定后的样子。 */
 const LIE_SETTLE_S = 2;
 const _lieV = new THREE.Vector3(), _lieP = new THREE.Vector3(), _lieM = new THREE.Matrix4();
+/**
+ * lie:"along" 的人倒地用哪段倒地片段（2026-10-18 第三轮）：四段倒地片段（Script_CharacterModel DEATH_COLLAPSE_CLIP_IDS）
+ * 都是侧身蜷腿，两脚离身体轴（骨盆→头）的横向距离实测：C 0.41–0.44 m、B 0.48–0.53、D 0.55–0.59、A 0.56–0.59。
+ * 躺在单被 / 担架（宽 0.7 m）上的人用最窄的 C，按种子抽到 A / D 会有一只脚伸出被子外。
+ */
+const LIE_DEATH_VARIANT = "DeathCollapseC";
+/** 量躺姿时身体轴最多偏离「骨盆→头」多少度去找最窄的方向（BrowserTest 要求头朝向与朝向差 ≤ 12°）。 */
+const LIE_FIT_MAX_DEG = 8;
 
 export const BLOCKOUT_PUPPETS = Object.freeze({
   maxActors: 120,
@@ -144,6 +159,7 @@ export class BlockoutPuppets {
     this.elapsed = 0;
     this.warning = null;
     this.actorCount = 0;
+    this.missingClips = new Set();
   }
 
   get transitioning() { return !!this.plan; }
@@ -291,6 +307,8 @@ export class BlockoutPuppets {
         || (oldWeapon !== newWeapon && !swapInPlace) || (puppet.unit.castId ?? null) !== (unit.castId ?? null)
         || (unit.kind === "litter" && LitterSlots(puppet.unit).length !== LitterSlots(unit).length)
         || (puppet.down && unit.state !== "down")
+        // 倒着的人换成 lie:"along"（02-2 → 02-3 冬瓜挪上被子）：重造，好按 LIE_DEATH_VARIANT 重新倒一次
+        || (puppet.down && unit.state === "down" && unit.lie === "along" && (puppet.unit.lie ?? null) !== "along")
         || (puppet.noActor && wantActors > 0) || (!puppet.noActor && wantActors === 0 && puppet.humans.length > 0));
       if (stale) { this._Destroy(puppet); this.puppets.delete(unit.id); puppet = null; }
       if (!puppet) { puppet = this._Create(unit, wantActors); this.puppets.set(unit.id, puppet); }
@@ -417,13 +435,19 @@ export class BlockoutPuppets {
       const litter = unit.kind === "litter";
       const aim = drive ? !!drive.aim : !!unit.aim;
       const carryRole = litter ? human.slot : drive?.carryRole || null;
-      const clipState = this._ApplyClip(human, drive, mps, step);
+      // 要顺着躺的人还没倒下：倒地片段换成腿蜷得最窄的那段（LIE_DEATH_VARIANT），躺在被子 / 担架上不伸出去
+      if (puppet.down && human.slot === "main" && !actor.ragdollState && (drive ? drive.lie : unit.lie) === "along") {
+        const rig = actor.characterRig;
+        if (rig?.deathClipById?.has?.(LIE_DEATH_VARIANT)) rig.deathVariantId = LIE_DEATH_VARIANT;
+      }
+      const throwing = this._ApplyThrow(human, drive, step);
+      const clipState = throwing ? null : this._ApplyClip(human, drive, mps, step);
       // 友军步态（AllyGait）把「不戒备」的蹲着待着换成 AllyCrouchCarryStand（扛枪半蹲，骨盆离地 0.66 m，
       // 看着是站着的）：蹲 / 卧的人也当戒备，落到原生 KneelHold / CrouchIdle（骨盆 0.36–0.45 m）。
       human.soldier.missionCombatAlert = aim || (!carryRole && puppet.stance !== "stand");
       const state = {
         moveSpeed: mps / 3.6, moveSpeedMps: mps, locomotionTracked: true, elapsed: this.elapsed,
-        aim: aim && !carryRole ? 1 : 0,
+        aim: aim && !carryRole && !throwing ? 1 : 0,
         crouch: !carryRole && puppet.stance === "crouch" ? 1 : 0,
         prone: !carryRole && puppet.stance === "prone" ? 1 : 0,
         grounded: true, lookYaw: 0, lookPitch: 0, firing: false,
@@ -434,7 +458,7 @@ export class BlockoutPuppets {
         ...(clipState?.bayonetFixed ? { bayonetFixed: true } : {}),
       };
       // 手里是大刀这类近战家伙、站着不动、没在播片段：摆原生白刃戒备（同开场导演的 meleeGuard），不按步枪据枪
-      if (actor.weaponData?.kind === "melee" && !clipState && !puppet.down && mps < 0.05 && !carryRole) {
+      if (actor.weaponData?.kind === "melee" && !clipState && !throwing && !puppet.down && mps < 0.05 && !carryRole) {
         state.aim = 0;
         state.meleeCombat = { weapon: actor.weaponId, state: "idle", action: "Guard", clip: "DadaoGuard", normalized: this.elapsed % 1, t: this.elapsed, weight: 1 };
       }
@@ -505,6 +529,30 @@ export class BlockoutPuppets {
     return { bayonetFixed };
   }
 
+  /**
+   * 投弹（预演键 throw）：GrenadeThrow 片段按 drive.throw.seconds 定时间（这一步 mixer 再推 step 正好到那一秒）。
+   * → 这一帧是不是在抡。只管主角本人。
+   */
+  _ApplyThrow(human, drive, step) {
+    const th = human.slot === "main" ? drive?.throw : null;
+    const actor = human.actor, rig = actor.characterRig;
+    if (th && rig) {
+      const clip = rig.clipById?.get?.("GrenadeThrow");
+      if (!clip) { this.missingClips.add("GrenadeThrow"); return false; }
+      if (rig.forcedClip !== "GrenadeThrow") {
+        if (human.openingInstalled === true) { human.soldier.openingStoryboardPose = null; human.soldier.openingStoryboardTravel = null; }
+        actor.PlayImportedAnimation("GrenadeThrow");
+        human.throwing = true;
+      }
+      if (rig.currentAction && rig.currentId === "GrenadeThrow") {
+        rig.currentAction.time = Math.max(0, Math.min(clip.duration, th.seconds - Math.max(0, step)));
+      }
+      return true;
+    }
+    if (human.throwing) { try { actor.ClearImportedAnimation(); } catch (error) { /* 已回收 */ } human.throwing = false; }
+    return false;
+  }
+
   /** 这个人此刻要不要按 lie:"along" 摆：倒地、不是担架上的抬杆人、没在播片段。 */
   _LieAlong(puppet, human, drive) {
     if (!puppet.down || puppet.unit.kind === "litter" || human.slot !== "main" || drive?.clip) return false;
@@ -519,18 +567,41 @@ export class BlockoutPuppets {
     const actor = human.actor, rig = actor.characterRig;
     const head = rig?.bones?.head || actor.head, pelvis = rig?.bones?.pelvis || actor.hips;
     if (!head || !pelvis) return null;
+    const points = [];
     try {
       actor.root.updateWorldMatrix(true, true);
       _lieM.copy(actor.root.matrixWorld).invert();
       head.getWorldPosition(_lieV).applyMatrix4(_lieM);
       pelvis.getWorldPosition(_lieP).applyMatrix4(_lieM);
+      points.push([_lieV.x, _lieV.z], [_lieP.x, _lieP.z]);
+      for (const name of ["footL", "footR"]) {
+        const bone = rig?.bones?.[name];
+        if (bone) { const v = bone.getWorldPosition(new THREE.Vector3()).applyMatrix4(_lieM); points.push([v.x, v.z]); }
+      }
     } catch (error) { return null; }
     const vx = _lieV.x - _lieP.x, vz = _lieV.z - _lieP.z;
     if (Math.hypot(vx, vz) < 0.15) return null;
-    return { a: Math.atan2(-vx, -vz), px: _lieP.x, pz: _lieP.z };
+    // 2026-10-18 第三轮：不再把骨盆放在单位位置上，而是把「头、骨盆、两脚」的包围框中心放上去，
+    // 身体轴在「骨盆→头」±LIE_FIT_MAX_DEG 里取横向最窄的方向（倒地片段都是侧身蜷腿，骨盆居中时脚伸出 0.7 m 宽的被子）。
+    const a0 = Math.atan2(-vx, -vz);
+    let best = null;
+    for (let deg = -LIE_FIT_MAX_DEG; deg <= LIE_FIT_MAX_DEG; deg += 1) {
+      const a = a0 + deg * DEG, fx = -Math.sin(a), fz = -Math.cos(a), sx = -fz, sz = fx;   // 前（头）与横向
+      let fMin = Infinity, fMax = -Infinity, sMin = Infinity, sMax = -Infinity;
+      for (const [x, z] of points) {
+        const f = x * fx + z * fz, l = x * sx + z * sz;
+        fMin = Math.min(fMin, f); fMax = Math.max(fMax, f); sMin = Math.min(sMin, l); sMax = Math.max(sMax, l);
+      }
+      const width = sMax - sMin + Math.abs(deg) * 1e-4;   // 一样窄时取偏得少的
+      if (!best || width < best.width) {
+        const f = (fMin + fMax) / 2, l = (sMin + sMax) / 2;
+        best = { width, a, px: f * fx + l * sx, pz: f * fz + l * sz };
+      }
+    }
+    return { a: best.a, px: best.px, pz: best.pz };
   }
 
-  /** lie:"along"：把人转到「头朝 ry 的前方」，骨盆落在 (x, z)。 */
+  /** lie:"along"：把人转到「头朝 ry 的前方」，身体（头、骨盆、两脚）的包围框中心落在 (x, z)。 */
   _PlaceLying(human, x, z, ry) {
     const actor = human.actor, L = human.lieLocal, k = actor.root.scale.x || 1;
     const r = ry - L.a, c = Math.cos(r), s = Math.sin(r);
@@ -603,6 +674,7 @@ export class BlockoutPuppets {
       puppet.drive = null;
       for (const human of puppet.humans) {
         if (human.openingInstalled === true) { human.soldier.openingStoryboardPose = null; human.soldier.openingStoryboardTravel = null; }
+        if (human.throwing) { try { human.actor.ClearImportedAnimation(); } catch (error) { /* */ } human.throwing = false; }
         const facial = human.actor.characterRig?.facial;
         if (facial && human.facialBound) { facial.source = null; human.facialBound = false; }
       }
@@ -625,10 +697,15 @@ export class BlockoutPuppets {
     const rig = human?.actor.characterRig;
     const ground = puppet.unit.kind === "tank" ? TankGroundY(this.groundAt, puppet.x, puppet.z, puppet.yawDeg) : this.groundAt(puppet.x, puppet.z);
     let pelvisY = null, headY = null, pelvisXZ = null, headXZ = null;
+    const feet = [];
     try {
       human?.actor.root.updateWorldMatrix(true, true);
       if (rig?.bones?.pelvis) { const v = rig.bones.pelvis.getWorldPosition(new THREE.Vector3()); pelvisY = v.y; pelvisXZ = { x: v.x, z: v.z }; }
       if (rig?.bones?.head) { const v = rig.bones.head.getWorldPosition(new THREE.Vector3()); headY = v.y; headXZ = { x: v.x, z: v.z }; }
+      for (const name of ["footL", "footR"]) {
+        const bone = rig?.bones?.[name];
+        if (bone) { const v = bone.getWorldPosition(new THREE.Vector3()); feet.push({ x: v.x, y: v.y, z: v.z }); }
+      }
     } catch (error) { /* 取证不影响运行 */ }
     // 头相对骨盆的世界朝向（yaw 口径）：lie:"along" 时应当 ≈ yawDeg
     const headYawDeg = pelvisXZ && headXZ ? Math.atan2(-(headXZ.x - pelvisXZ.x), -(headXZ.z - pelvisXZ.z)) / DEG : null;
@@ -642,6 +719,9 @@ export class BlockoutPuppets {
       down: !!puppet.down, lie: (puppet.drive ? puppet.drive.lie : puppet.unit.lie) || null, moving: !!puppet.moving,
       pelvis: pelvisXZ, head: headXZ, headYawDeg, rootYawDeg: human ? human.actor.root.rotation.y / DEG : null,
       weapon: human?.actor.weaponId ?? null, dead: !!human?.actor.ragdollState,
+      headY, pelvisY, feet, throwing: !!human?.throwing, deathVariant: rig?.deathVariantId ?? null,
+      grenadeVisible: !!human?.actor.grenadeGroup?.visible,
+      throwClipS: rig?.clipById?.get?.("GrenadeThrow")?.duration ?? null,
     };
   }
 

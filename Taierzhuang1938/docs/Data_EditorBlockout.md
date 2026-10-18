@@ -325,6 +325,10 @@ export class BlockoutMarkers {
   - **武器**：预演键 `weapon`（阶跃）调 `actor.SetWeapon(id)` 换手里的家伙（`null` = 空手），没写过 = 造人时 / 关键帧那把，交还驱动时换回去。关键帧之间同一个人武器变了：两把都不是空手就地 `SetWeapon`，不再整个重造（空手 ↔ 拿武器要换步态，照旧重造）。
   - **大刀戒备**：手里是近战家伙（`weaponData.kind === "melee"`，如 `Dadao`）、站着不动、没播片段、不在抬担架时，给 `actor.Update` 带 `meleeCombat: { weapon, state: "idle", action: "Guard", clip: "DadaoGuard", … }`、`aim: 0`（同开场导演的 `meleeGuard`），不再端着大刀摆步枪据枪。
   - `Probe(id)` 多给：`down`、`lie`、`moving`、`dead`（已倒地落定）、`weapon`、骨盆 / 头的世界 xz、`headYawDeg`（头相对骨盆的世界朝向，`lie:"along"` 时 ≈ `yawDeg`）、`rootYawDeg`。
+- 2026-10-18（第三轮，用户「小毛病全都修掉」）：
+  - **`lie:"along"` 摆法**：原来骨盆落在单位位置上；倒地片段都是侧身蜷腿，骨盆居中时一只脚伸出 0.7 m 宽的单被（冬瓜，脚离被边 −0.24 m）。改成量一次「头、骨盆、两脚」，把它们的包围框中心放在单位位置上，身体轴在「骨盆→头」±8° 里取横向最窄的方向（头朝向仍与 `yawDeg` 差 ≤ 8°）；要顺着躺的人倒地片段固定用腿蜷得最窄的 `DeathCollapseC`（四段实测两脚离身体轴：C 0.41–0.44 m、B 0.48–0.53、D 0.55–0.59、A 0.56–0.59），倒着的人在关键帧之间换成 `lie:"along"` 时重造一次（好按 C 重新倒）。
+  - **投弹**：预演键 `throw`（§14.1）→ 主角本人播步兵投弹片段 `GrenadeThrow`（`Script_InfantryAnimation`「背枪投弹」，游戏里 `Actor.BeginGrenadeThrow` / AI 齐投同一个片段，实测 4.23 s）：`actor.PlayImportedAnimation("GrenadeThrow")` 定住片段，片段时间按 `drive.throw.seconds` 直接设（Seek 确定）；手里的手榴弹由 `Actor._UpdateInfantryProps` 照游戏原样挂在片段的 grenade 挂点上、2.15 s 脱手后藏掉；抡的时候不举枪、不播开场片段。骨架上没有这个片段 → 记进 `Previz.State().missingClips`，照原生动画。
+  - `Probe(id)` 再多给：`headY` / `pelvisY`（世界高度）、`feet`（两脚世界坐标）、`deathVariant`、`throwing`、`grenadeVisible`、`throwClipS`。
 - 距离分级：60 m 外每 3 帧更新一次动画，阴影只在 25 m 内开；单关同时上限 120 个演员，超出时远处的只留地环与标签（报警告）。
 - 切关、重载配置时全部回收；同一关切关键帧时按 `id` 复用。
 
@@ -365,6 +369,8 @@ Config()                     // → 归一化后的配置（深拷贝）
 PlacePlayer(pose)            // 把玩家摆到任意机位，不改关键帧（相机要等下一帧才转过去）
 Snapshot(); SnapshotText()   // §4.2 快照对象 / 贴给 agent 的文字（取的是相机当前朝向：摆完人先等一帧）
 CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "clipboard"|"execCommand"|null, text }>
+Probe(id)                    // 某个演员此刻的样子（§5.6）
+StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证用）
 ```
 
 ### 6.2 总控（`Script_EditorBlockout.mjs`）
@@ -495,6 +501,7 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
 - 2026-10-13（用户反馈第一轮）：锁不住鼠标的窗口退化成按住右键拖动转视角；全关总图打开时对准玩家、导航栏压在总图上面仍可用；导航栏加重播按钮（同 `Y`）。
 - 2026-10-13（复制当前位置）：卡片加「复制当前位置」按钮与 `P` 键（§4.2），文字末行带整份 JSON；入口加 `pose=` 参数，「重现」链接原样打开回到同一机位。
 - 2026-10-13（地图开着鼠标漏到游戏）：遮罩改成盖满整屏（导航栏两边那条原来露着，点一下会重新锁鼠标 / 在面板里直接开枪）；`Script_Main` 加 `BlockoutMouseCaptured()` 闸住抢锁、开枪、转头与滚轮换枪。
+- 2026-10-18（01–05 第三轮，「小毛病全都修掉」）：§14.2 白盒画质下预演的爆炸看得见了（`Script_EditorBlockoutPrevizFx` 在调试叠加层另画简易爆炸，只在编辑器、只在白盒特效关时画）；§14.1 演员键 `throw`（播投弹片段 + 弹的抛物线）、爆炸事件 `h`；§5.6 `lie:"along"` 按身体包围框居中、固定用 `DeathCollapseC`，Probe 再多给几项；§13 板桥门板缝 5 → 9 cm、旧门板厚薄高低不一，冬瓜在被子上一直躺着，桥下的人一律蹲 / 趴，05-3 顺子替身播投弹片段；补：白盒下的烟与枪口火、05-4 鬼子绕桥东头、04-3 刘文财猫腰过桥底。
 - 2026-10-18（01–05 第二轮修补）：§3 单位加可选 `lie`、`weapon` 写 `Dadao` 摆白刃戒备；§5.6 倒地的人移动只平移、`lie:"along"` 顺着躺、预演 / 关键帧换武器就地 `SetWeapon`、Probe 多给几项；§14.1 演员键加 `lie`、`weapon`（阶跃）；§13 干沟南岸坎顶加矮土埂（南边平地看沟底余量 0.16 → 0.78 m）、板桥门板之间 5 cm 缝、05-2 桥下仰看与 05-3 甩手榴弹换机位、冬瓜顺着被子躺平滑跟着走、班长 02-2 抡大刀跳沟。
 - 2026-10-18（01–05 返工）：§13 FirstLevel0105 按用户当天改稿重做地形、关键帧与预演（南沿迂回、两人并排拖单被、日常摆件、干沟集结处、路口板桥）。
 - 2026-10-18（01–05 新剧本白盒）：新关卡 `FirstLevel0105`（§13）；场景文件加可选 `gates` 与块的显式 `y`，布局 `hideOpenGates`（§2.2）；关键帧可选 `stageLabel`、单位可选 `castId`（§3）；预演（§14，用户 10-18 拍板：编辑器里加预演，缺的动作先用现成动作顶上）。
@@ -521,6 +528,14 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
 - 冬瓜在单被上 `lie: "along"`、朝向 = 被子朝向（头朝拖的人）；预演里跟被子同一条路、同一个时间窗的 walk 位置键（去掉原来的 90° 补偿与 0.25 s 一步的瞬移）。03-4 幺娃拖机枪手同理（`lie: "along"`，crawl 慢速匀速滑过去）。
 - 02-2：关键帧班长 `weapon: "Dadao"`；预演里爬上南沿、跳沟（`DadaoAmbush` 举刀）、落地冲过去（`CreepDadao`）、劈甲（`LuoDadaoChopRear`）都是大刀；台词按剧本「打！」→「敌袭！」→「杀——！」（何有田在台阶那头喊，压制组同时往前冲，镜头扫一眼台阶）→ 班长跳沟落地「砍！」。02-3 开场接着拿大刀，走到顺子跟前时换回 `HanYang`，再 `LuoHandRifle` 把枪塞过去。02-2 关键帧玩家视角改成顺着支沟往西偏南（113°、仰 6°），看得见南沿开火的人、跳下来的班长和沟里倒下的人。
 - 05-2：桥下仰看的 eye 挪到桥面南沿往南约 2 m 的沟底（蹲姿眼高）、朝西北 38°、仰 26–30°、视场 76°：画面从下往上是门板底面、桥沿、压在桥上的车身、天空；落土是烟 + 说明字。05-3：甩手榴弹换成顺子身后沟上方的宽镜头（视场 72°），前景顺子替身探身（没有扔手榴弹的片段，`PointBlockade` 顶上），越过沟沿是车尾和那块铁板。
+
+**2026-10-18 第三轮修补（用户「小毛病全都修掉」）**：
+- **爆炸看得见**：默认白盒画质（特效关）把 VfxSystem 整棵藏掉（`Script_Vfx` 的 `scene.onBeforeRender` 读 `scene.userData.whiteboxEffects`，`WhiteboxSceneRenderer` 还把 Points / Sprite / 半透明特效网格逐个藏掉），预演里 03 掷弹筒落点、05-3 炸车尾都看不见。编辑器预演另画一份简易爆炸（§14.2），游戏本身的爆炸不动。验收（1280×720，爆前 0.05 s 与爆后对比，爆点投到屏幕、半径 140 px 内隔一个像素取样，RGB 差之和 > 60 算变色）：03-2 掷弹筒落点爆后 0.12 s 变色 5567 / 15400 个取样点（其中偏暖的火光色 4070），爆后 1 s 土柱 10150 / 15379；05-3 车尾爆后 0.12 s 4543 / 15392（火光色 2638），爆后 1 s 10364 / 15393。
+- **板桥门板**：缝 5 → 9 cm（`L0105_BRIDGE.gapM`；块中心只到厘米，实测 8–9 cm），每块门板逐块给 `boardJitter`：厚 6–9 cm、底面压在横木顶上或垫高 1–2 cm、顶面高低差 3 cm 上下、横向长短 ±10 cm、歪 ±0.9°。板比缝薄，桥下仰看斜着也透得出天光；从上往下看一块块板之间露出沟底。横木位置不变，桥下净空（横木底离沟底）仍是 1.76 m。SceneTest 查缝 6–10 cm、至少两种厚度、顶面高低差 2–4 cm、门板底面不压进横木。
+- **冬瓜躺在被子上**：02-3 攥顺子袖子那一下原来播 `WoundedReach`（坐起来伸手、半个身子在被子外）且转身面朝顺子，改成不播片段、不转身，只动嘴 + 说明字「（冬瓜躺在被子上，一把攥住顺子的袖子）」；`lie:"along"` 按身体包围框居中、固定用 `DeathCollapseC`（§5.6）。实测（02-3 被子铺开起到 02E-2，预演每 0.25 s + 关键帧之间的过渡全程）：骨盆、头、两脚全在被子（0.7 × 2.1 m）里，离被边最少 0.124 m（原来左脚出去 0.24 m）；骨盆离地 ≤ 0.21 m、头 ≤ 0.23 m，一直是躺着。
+- **烟与枪口火**：白盒下 `smoke` / `muzzle` 事件原来同爆炸一样看不见（VfxSystem 的烟源、枪口火整棵被藏），预演里另画（§14.2）。验收同爆炸（前后成对截图数变色）：05-2 板缝漏土，桥下仰看 6.55 s → 7.8 s 变色 7665 / 11683，侧看 5.75 s → 6.3 s 5648 / 15383；04-1 鬼子开枪，枪口那一下（+0.03 s）半径 60 px 内 741 / 2823。掷弹筒出膛的白烟在预演原来的机位里被坑沿胸墙和土坎挡着（本来就看不见），换一个旁观机位（测试时临时注入，预演文件没改）验：1.35 s → 2.9 s 变色 761 / 11309；05-3 车尾黑烟旁观机位 4.55 s → 9 s 2439 / 20101。
+- **投弹**：05-3 顺子替身在 1.5 s 起播投弹片段（`throw`，§14.1），3.65 s 脱手，那捆手榴弹沿抛物线飞 0.9 s 落在车尾铁板上（离地 1.5 m），4.6 s 在那里炸（爆炸事件 `h: 1.5`）。全 01–05 里别的「扔手榴弹」：02-1 甲甩手榴弹、02-2 甲咬弦都是日军现成片段（`IjaGrenadeKnockThrow` / `IjaGrenadeBitePin`，不动）；04-1 / 04-2「手榴弹扔进来」镜头里没有扔的人（只有落点爆炸 + 说明字），没有顶替的片段，不在这一轮换。
+- **桥下头顶**：桥下的人头顶（头骨点 + 0.2 m）离上方门板 / 横木 / 压断塌下来的门板底面一律 ≥ 0.1 m，身子不穿横木。改动：05-1 班长、幺娃、机枪手钻桥底时出发就猫腰（原来走到地方才蹲）；05-2 班长一直蹲着（原来车压上桥时趴下、过后再蹲起来：从趴到蹲那一下动作库先站起来再跪）；05-3 班长钻出桥底、在桥面南沿外一步蹲着端枪（原来站在桥下正中，站直了头顶贴着桥板）；04-3 班长挪到板桥北沿外一步回身招呼，刘文财跑到桥北沿外、猫腰钻过桥底、在桥南几步蹲下（关键帧里也是蹲着）；05-4 坡顶上的四个鬼子（跟车步兵三个 + 沟里追来的一个）关键帧 `path` 与预演都改成绕桥东头（`Script_EditorBlockoutFirstLevel0105Keyframes.BRIDGE_EAST_DETOUR`：沿路走到横木端头外 1.25 m、横过路面往东南、从沟东边绕上坡顶；沟里那个先绕过靠沟壁的门板、从沟东沿爬出来），不再直线穿过桥头横木端头、不再从桥底钻。实测余量（预演每 0.2 s + 关键帧过渡全程；头或骨盆落在桥的块的脚印内 0.15 m 都算）：04-3 刘文财 0.53 m；05-1 班长 0.64、幺娃 0.48、机枪手 0.62；05-2 班长 0.88；05-3、05-4 没人在桥底下；过渡 04-2→04-3 刘文财 0.38、04-3→05-1 最少 0.32（机枪手）、05-1→05-2 0.88、05-2→05-3 班长 0.13（蹲着从压断塌下来的门板底下钻过去）、05-3→05-4 没有人进桥底也没有人碰到横木（原来班长 0.02 m、跟车步兵穿横木端头 −0.43 m）。0105 PrevizTest 另查：04-3…05-4 的关键帧布设、预演每 0.1 s、关键帧之间的过渡路线（过渡里目标是站就站着走）都不许站着从桥底下过。
 
 ## 14. 预演（previz，2026-10-18）
 
@@ -572,14 +587,15 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
   - 朝向：`yawDeg` 或 `faceTo`（点 `{x,z}` 或单位 id 或 `"player"`）。走动中顺着行进方向（`drag` 反向），到点后 0.4 s 转到本键的朝向；本键没写朝向就保持到达时的行进方向，等后面的朝向键再转。
   - 姿态与状态：`stance`、`aim`、`state`（`"down"` 倒地）、`visible`、`carryRole`（`"front"` / `"rear"`，抬担架 / 拖单被）、`woundedWalk`、`talking`。这些与 `clip` 都是**阶跃**：取 t 之前最近写过这个字段的键。
   - 2026-10-18（第二轮）：`lie`（`"along"` / `null`，阶跃；没写过沿用关键帧单位 / spawn 的 `lie`）—— 倒地的人顺着朝向躺，见 §3、§5.6；倒地的人带位置的键照常写 `move`（`walk` 跟拖的人同速），运行时只平移、不起身，走动中朝向 = 行进方向（`drag` 反向），所以「头朝拖的人」= 用 `walk`。`weapon`（武器 id 或 `null`，阶跃）—— 换手里的武器（如班长 `Dadao` → `HanYang`）；**只有键里写过才有值**，`SamplePrevizActor` 在第一个 `weapon` 键之前返回 `undefined`（= 用造人时那把，不回填关键帧的缺省武器）。
+  - 投弹（2026-10-18 第三轮）：`throw: { x, z, h?, flightS? }`（一次性，键的 `t` = 开始抡）。这个人播步兵投弹片段 `GrenadeThrow`（游戏里扔手榴弹的同一个片段，§5.6），手里看得到手榴弹；`PREVIZ_THROW.releaseS`（2.15 s，= `INFANTRY_RELEASE_SECONDS`）脱手，弹沿抛物线飞到落点（地面 + `h`，缺省 0.15 m），飞行 `flightS` 秒（缺省按水平距离 0.55 + 0.06 × 米，夹在 0.6–1.8 s），弧顶比两端连线高 max(1.2, 0.22 × 距离) m；出手点 = 这一刻脚下 + 1.95 m、往前 0.25 m、往右 0.2 m。抡的 `PREVIZ_THROW.clipS`（4.2 s）里 `SamplePrevizActor` 给 `throw: { seconds, x, z }`、`clip` 让位、`stance` 记 `stand`。落点的爆炸照旧另写 `explosion` 事件，`t` = throw 的 `t` + 2.15 + 飞行秒数。`throw` 不能和 `clip` 写在同一个键。
   - 动作片段：`clip`（开场动作库等现成片段名，`null` = 清掉回原生动画）、`clipFrom`（从片段第几秒起）、`clipHold`（播完停在最后一帧；不写则播完回原生动画）。片段按骨架分：有 `castId` 的单位骨架固定，片段不在这具骨架上时退回原生动画并在状态里报一次（`Debug.Blockout.Previz.State().missingClips`）。
 - **台词** `lines[]`：`line` 是 `voice` 清单里的句子 id；`actor` 可省（省了 = 当前关键帧里 `castId` 等于这句 `who` 的单位；找不到就从玩家头上放、不动嘴）。字幕显示这句的 `speaker` + `subtitle`；有口型轨按 sha256 用口型轨，否则用音频包络张嘴（单位要有带面部的身体：`castId` 属于 `Data_FirstLevelSpeakingCast`）。
 - **事件** `events[]`（`type` 必填）：
   - `flash` `{dur, strength?}` 白光；`black` `{dur, fade?}` 黑场（`fade` 渐入渐出秒数）；`caption` `{text, dur}` 非台词的说明字（弱显示，如「（耳鸣）」）。
-  - `explosion` `{x, z, kind?, radius?}`（`kind` 同 `VfxSystem.Explosion`）；`smoke` `{x, z, kind?, dur?}`（`SmokeDust` / `SmokeWhite` / `SmokeBlack`）；`muzzle` `{actor | x,z,h, count?, interval?}` 枪口火；`shake` `{dur, strength}`。
+  - `explosion` `{x, z, h?, kind?, radius?}`（`kind` 同 `VfxSystem.Explosion`；`h` 2026-10-18 第三轮加，爆点离地高 0–10 m，如炸在车尾铁板上写 1.5，缺省 0.3）；`smoke` `{x, z, kind?, dur?}`（`SmokeDust` / `SmokeWhite` / `SmokeBlack`）；`muzzle` `{actor | x,z,h, count?, interval?}` 枪口火；`shake` `{dur, strength}`。
   - `signal` `{name, on}`：在这一刻把场景信号打开 / 关掉（塌洞、坑沿被炸、战车瘫），播完或中断时恢复到 `then` 那个关键帧的 `signals`。
   - `sfx` `{name, x?, z?, volume?}`：`name` 用 §14.3 的别名。
-- 校验：`Script_EditorBlockoutPrevizPlan.mjs`（纯，node 与浏览器共用）导出 `BLOCKOUT_PREVIZ_SCHEMA`、`PREVIZ_LIE_MODES`、`ValidateBlockoutPreviz(doc, { config?, voice? })`（给了配置就核对 `keyframe` / 单位 id，给了清单就核对 `line`）、`NormalizeBlockoutPreviz(doc)`、`SamplePrevizActor(actorEntry, t, baseUnit)`、`SamplePrevizCamera(camera, t, resolve)`。
+- 校验：`Script_EditorBlockoutPrevizPlan.mjs`（纯，node 与浏览器共用）导出 `BLOCKOUT_PREVIZ_SCHEMA`、`PREVIZ_LIE_MODES`、`PREVIZ_THROW`、`PrevizThrows(seq, baseOf, standAt, opts)`（这一段所有投弹的飞行：出手 / 落地时刻与两端点）、`SampleThrowFlight(flight, t)`、`ValidateBlockoutPreviz(doc, { config?, voice? })`（给了配置就核对 `keyframe` / 单位 id，给了清单就核对 `line`）、`NormalizeBlockoutPreviz(doc)`、`SamplePrevizActor(actorEntry, t, baseUnit)`、`SamplePrevizCamera(camera, t, resolve)`。
 
 ### 14.2 播放（`Script_EditorBlockoutPreviz.mjs` + 总控）
 
@@ -593,6 +609,7 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
   - `Seek` 只对**持续状态**确定（演员、镜头、白光、黑场、说明字、字幕、嘴、信号、持续的烟）；一次性的爆炸、枪口火、音效 Seek 时不补放。按走过的距离推身体的走路片段（带 `referenceSpeedMps`，如 `IjaWalkStabProne`）Seek 时身体停帧，正常播放没问题。
   - 嘴：previz 文件写了 `faceTracks` 就按 mp3 sha256 用口型轨，没有就用配音的音频包络。
   - 预演期间小地图照常显示。
+- 简易爆炸与飞行中的手榴弹（2026-10-18 第三轮，`Script_EditorBlockoutPrevizFx.mjs`）：默认白盒画质（特效关）出画前把 VfxSystem 整棵藏掉，`vfx.Explosion` 在白盒下什么都画不出来。预演自己在 `post.AddDebugOverlay` 的调试叠加层里另画：爆炸 = 一团火光（橙、0.3–0.5 s 胀大退掉，半径 = 0.22 × radius，夹在 0.25–2 m）+ 土柱 / 烟尘（7 团褐灰球往上冒、胀大变淡，2.6 s，顶高 0.75 × radius）+ 贴地尘环（写了 `h` > 0.5 的不画）；`radius ≤ 1` 的「子弹打在土里」只有一小团土（0.6 s）。**只在白盒且特效关时画**（`post.whiteboxScene.config.effects === false`；其它画质 VfxSystem 自己画得出来，不叠两份）；游戏本身各画质的爆炸不动。演员键 `throw` 的弹（一捆五根深色短圆柱 + 一条淡色拖尾）任何画质都画。两样都按预演时间求值：**Seek 到爆炸那一秒也看得见**（VfxSystem 的爆炸、枪口火、音效 Seek 时照旧不补放）。同一轮补了**烟**（`smoke` 事件：窗口 `[t, t + dur)` 里每个烟源 9 个槽位等间隔冒烟球，每团往上冒、往外飘、胀大、先浓后淡，窗口结束后已冒出来的散完；`SmokeDust` 褐黄土雾（冒 1.4 m、寿命 2.4 s）、`SmokeWhite` 灰白烟（掷弹筒出膛，冒 4.5 m、3 s）、`SmokeBlack` 黑烟柱（冒 5.5 m、3.6 s），表在 `PREVIZ_SMOKE_LOOK`）与**枪口火**（`muzzle` 事件：每一发 0.07 s 亮黄火光 + 0.6 s 一小团灰烟，位置取演员枪口，顺子自己开枪不画），同爆炸只在白盒特效关时画、按 t 求值。`Previz.State().fx` → `{ blasts, grenades, smokes, muzzles, blastsDrawn }`（这一帧画了几团爆炸、几颗弹、几个烟源、几下枪口火，白盒简易特效开没开）。
 
 ### 14.3 音效别名（`sfx.name`）
 

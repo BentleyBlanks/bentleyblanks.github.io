@@ -9,6 +9,10 @@
 //     嘴：有口型轨（faceTracks，按 mp3 sha256）用口型轨，否则用这句干声的包络；按预演时间取样，Seek 也对得上；
 //   · 事件：白光 / 黑场 / 说明字（确定性遮罩）、爆炸 / 烟 / 枪口火（VfxSystem）、震屏、场景信号（播完 / 中断按 then 的关键帧恢复）、
 //     音效（§14.3 别名 → 现有音频库的键，表在下面 PREVIZ_SFX；找不到记进 State().missingSfx）。
+//     2026-10-18 第三轮：默认白盒画质（特效关）把 VfxSystem 整棵藏掉，爆炸看不见 —— 这时由 Script_EditorBlockoutPrevizFx
+//     在调试叠加层里另画一份简易爆炸（火光 + 土柱 / 烟尘 + 尘环，按 t 求值，Seek 也看得见）；演员键 throw 的手榴弹飞行
+//     （抛物线 + 拖尾）也由它画，任何画质都画。游戏本身的爆炸表现不动。同一轮补了烟（smoke 事件）与枪口火（muzzle 事件），
+//     同爆炸只在白盒特效关时画，Seek 也看得见。
 //   · 播完 / 中断：交还演员与相机，按 then 跳关键帧（直接到位）。
 //
 // Seek(t) 暂停在 t 秒并确定性求值（演员、镜头、遮罩、字幕、嘴、信号、持续的烟；一次性的爆炸 / 枪口火 / 音效不补放），
@@ -28,6 +32,7 @@ import { DialoguePlayer } from "./Script_DialoguePlayer.mjs";
 import { SampleSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
 import { LoadFaceTracks, SampleLineFaceTrack } from "./Script_FaceTrack.mjs";
 import { SOUND_NAMES } from "./Script_Audio.mjs";
+import { BlockoutPrevizFx } from "./Script_EditorBlockoutPrevizFx.mjs";
 
 export const PREVIZ_KEY = "KeyN";
 export const PREVIZ_KEY_LABEL = "N";
@@ -88,6 +93,9 @@ export class BlockoutPreviz {
     this._v = new THREE.Vector3();
     this._d = new THREE.Vector3();
     this.dialogue = null;
+    this.fx = null;
+    try { this.fx = new BlockoutPrevizFx({ post: editor.host.post, scene: editor.host.scene }); }
+    catch (error) { console.warn("[BlockoutPreviz] 简易爆炸层建不起来", error); }
     this.BuildDom();
   }
 
@@ -275,6 +283,7 @@ export class BlockoutPreviz {
     for (const handle of run.smoke.values()) { try { this.host.vfx?.RemoveSmokeSource(handle); } catch (error) { /* 已回收 */ } }
     run.smoke.clear();
     this.editor.puppets.ReleaseDrive();
+    this.fx?.Clear();
     this.editor.SetPrevizSignals(null);
     this.host.SetViewmodelVisible?.(true);
     document.body.classList.remove("blockoutPreviz");
@@ -362,7 +371,22 @@ export class BlockoutPreviz {
     const lines = PrevizActiveLines(run.seq, t, id => this.LineDuration(id) ?? 2);
     this.BindMouths(lines);
     if (seek) this.editor.puppets.Settle(10, 0.05, this.editor._cam);
+    this.UpdateFx(t);
     this.RenderOverlays(PrevizOverlays(run.seq, t), lines);
+  }
+
+  /** 简易爆炸（白盒特效关时）与飞行中的手榴弹：按 t 求值。 */
+  UpdateFx(t) {
+    const run = this.run;
+    if (!this.fx || !run) return;
+    try {
+      this.fx.Update(run.seq, t, {
+        standAt: this.editor.standAt, baseOf: (id) => run.units.get(id),
+        drawBlasts: BlockoutPrevizFx.BlastsHidden(this.host.post),
+        actorOpts: { resolve: (id) => this.ResolveUnit(id), clipDuration: (clip) => this.opening?.api.OpeningClipMeta(clip)?.duration ?? null },
+        muzzleAt: (e) => this.MuzzleAt(e),
+      });
+    } catch (error) { console.warn("[BlockoutPreviz] fx failed", error); }
   }
 
   ResolveUnit(id) {
@@ -385,6 +409,7 @@ export class BlockoutPreviz {
     }
     // 片段不在这具骨架上：开场动作库自己记一份（console 一次 + window.__openingMissingClips）
     if (this.opening) for (const key of this.opening.api.OpeningMissingClips?.() || []) this.missingClips.add(key);
+    for (const key of puppets.missingClips || []) this.missingClips.add(key);
   }
 
   // -------------------------------------------------------------------------
@@ -460,13 +485,26 @@ export class BlockoutPreviz {
     try {
       if (e.type === "explosion" && vfx) {
         const y = this.editor.standAt(e.x, e.z);
-        vfx.Explosion(new THREE.Vector3(e.x, y + 0.3, e.z), { radius: Number.isFinite(e.radius) ? e.radius : 6,
+        // h（2026-10-18 第三轮，可选）：爆点离地高（炸在车尾铁板上这种）；缺省 0.3 同原来
+        const lift = Number.isFinite(e.h) ? e.h : 0.3;
+        vfx.Explosion(new THREE.Vector3(e.x, y + lift, e.z), { radius: Number.isFinite(e.radius) ? e.radius : 6,
           kind: EXPLOSION_KINDS.has(e.kind) ? e.kind : "shell", groundY: y });
       } else if (e.type === "muzzle" && vfx) {
         const count = Number.isInteger(e.count) ? e.count : 1, interval = Number.isFinite(e.interval) ? e.interval : 0.12;
         for (let i = 0; i < count; i++) setTimeout(() => { if (this.run) this.Muzzle(e); }, i * interval * 1000);
       } else if (e.type === "sfx") this.PlaySfx(e);
     } catch (error) { console.warn("[BlockoutPreviz] event failed", e.type, error); }
+  }
+
+  /** 枪口火的世界位置（简易枪口火用）：演员枪口 → 演员身上 + h → 事件点；找不到 null。 */
+  MuzzleAt(e) {
+    if (e.actor === "player") return null;   // 顺子自己开枪：镜头就在枪后头，不画
+    const puppet = typeof e.actor === "string" ? this.editor.puppets.Get(e.actor) : null;
+    const actor = puppet?.humans?.[0]?.actor;
+    if (actor?.MuzzleWorld && puppet.visible !== false) { actor.MuzzleWorld(this._v); return { x: this._v.x, y: this._v.y, z: this._v.z }; }
+    const at = puppet ? { x: puppet.x, z: puppet.z } : { x: e.x, z: e.z };
+    if (!Number.isFinite(at.x) || !Number.isFinite(at.z)) return null;
+    return { x: at.x, y: this.editor.standAt(at.x, at.z) + (Number.isFinite(e.h) ? e.h : 1.3), z: at.z };
   }
 
   Muzzle(e) {
@@ -603,11 +641,13 @@ export class BlockoutPreviz {
       missingClips: [...this.missingClips], missingLines: [...this.missingLines], missingSfx: [...this.missingSfx],
       errors: this.validation?.errors?.slice(0, 20) ?? [], warnings: this.validation?.warnings?.length ?? 0,
       voices: this.loadedVoices.size,
+      fx: this.fx ? { ...this.fx.stats, blastsDrawn: BlockoutPrevizFx.BlastsHidden(this.host.post) } : null,
     };
   }
 
   Dispose() {
     this.Stop({ restore: false });
+    this.fx?.Dispose();
     this.elOverlay.remove(); this.elCaption.remove(); this.elSubs.remove();
   }
 }

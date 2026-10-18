@@ -392,6 +392,16 @@ const LMG_W = Pt(PL.enemyLmgWest.x, PL.enemyLmgWest.z), LMG_E = Pt(PL.enemyLmgEa
 const MORTAR_1 = Pt(PL.mortar.x - 1, PL.mortar.z), MORTAR_2 = Pt(PL.mortar.x + 1.2, PL.mortar.z - 0.6);
 const TANK_SEEN = Pt(PL.tankFirstSeen.x, PL.tankFirstSeen.z);
 const TANK_STOP = Pt(PL.tankStop.x, PL.tankStop.z);
+/** 板桥本地坐标 → 世界：along 顺路（往西南为正），across 横着桥面（往东南为正）。 */
+function BridgePt(along, across) {
+  const r = L0105_BRIDGE.yawDeg * Math.PI / 180, fx = -Math.sin(r), fz = -Math.cos(r);
+  return Pt(L0105_BRIDGE.x + fx * along + fz * across, L0105_BRIDGE.z + fz * along - fx * across);
+}
+/**
+ * 绕桥东头（10-18 第三轮）：05-3 → 05-4 跟车步兵与沟里追来的鬼子原来按直线穿过桥头横木端头（−0.43 m）、从桥底下钻过去。
+ * 改成沿路走到横木端头外 1.25 m（横木顺路伸出桥面中心 5.25 m），横过路面往东南，再从沟东边绕到坡顶：桥底、横木一样都不碰。
+ */
+export const BRIDGE_EAST_DETOUR = Object.freeze([BridgePt(-6.5, 0), BridgePt(-6.5, 6), Pt(40.5, 124)]);
 const ROAD_YAW = R1(Along(L0105_ROAD, ROAD_D_CROSSING).heading);   // 路口那一段往西南开的朝向
 // 先头部队剩下的几个退回去等战车的路边；从支沟北沿翻出去，绕开洞顶
 const ROADSIDE = Pt(PL.roadsideNearDugout.x, PL.roadsideNearDugout.z);
@@ -1012,8 +1022,10 @@ function Keyframes() {
     notes: "战车离路口约 40 m（推测）；跟车步兵三人在车后。战车从 03 露头处顺路开过来。",
     signals: [SIG.pitShelled],
     units: [
-      N("Luo", T(T_CROSSING - 2, 0.6), { yaw: BackYaw(TRAFFIC, T_CROSSING - 2) }),
-      N("LiuWencai", T(T_CROSSING + 6, -0.4), { yaw: T(T_CROSSING + 6).heading }),
+      // 10-18 第三轮：班长先到路口、站在板桥北沿外一步回身招呼（原来站在桥面北沿底下，站直了头顶贴着横木）
+      N("Luo", T(T_CROSSING - 3.6, 0.6), { yaw: BackYaw(TRAFFIC, T_CROSSING - 3.6) }),
+      // 10-18 第三轮：刘文财先过了板桥、在桥南几步蹲着等（从北边过来要钻桥底：过渡里按目标姿态蹲着走，头顶不贴横木）
+      N("LiuWencai", T(T_CROSSING + 6, -0.4), { yaw: T(T_CROSSING + 6).heading, stance: "crouch" }),
       N("Gunner", T(T_CORNER2 + 6, -0.45), { yaw: T(T_CORNER2 + 6).heading }),
       N("Yaowa", T(T_CORNER2 + 6, 0.45), { yaw: T(T_CORNER2 + 6).heading }),
       J("IjaTrench1", T(T_SOUTH_END - 6, 0.5), { yaw: 0, down: true }),
@@ -1067,7 +1079,8 @@ function Keyframes() {
     notes: "战车车身正压在板桥上（桥面上、车底离顺子不到 2 m）；跟车步兵还在车后。人在桥下沟底，摆位检查按高差认作「在桥下」，不算站在车身脚印里。",
     signals: [SIG.pitShelled],
     units: [
-      N("Luo", underLuo, { face: BRIDGE_C, stance: "prone" }),
+      // 10-18 第三轮：蹲着缩在桥下（原来趴着：从趴到蹲那一下动作库先站起来再跪，头顶贴着横木）
+      N("Luo", underLuo, { face: BRIDGE_C, stance: "crouch" }),
       N("LiuWencai", T(T_CREST + 3, -0.4), { yaw: T(T_CREST + 3).heading, guess: true }),
       N("Gunner", gunner51, { face: BRIDGE_C, stance: "crouch" }),
       N("Yaowa", yaowa51, { face: BRIDGE_C, stance: "crouch" }),
@@ -1092,7 +1105,9 @@ function Keyframes() {
     notes: "TankDisabled：战车停在锚点 tankStop（桥头西南、车身斜着堵住路），场景 gates 里桥面中间两块门板压断下沉——后面的人过不了沟。",
     signals: [SIG.pitShelled, SIG.tankDisabled],
     units: [
-      N("Luo", T(T_CROSSING + 1.2, 0.6), { face: tankRear, aim: true }),
+      // 10-18 第三轮：班长原来站在桥下正中、站直了头顶贴着桥板（桥下横木底离沟底只有 1.76 m，压断的两块门板塌下来后只剩 1.5 m）：
+      // 改成钻出桥底、在桥面南沿外一步蹲着端枪（05-2 → 05-3 蹲着走过去；05-3 → 05-4 往南走不再从桥底过）
+      N("Luo", T(T_CROSSING + 3.2, 0.6), { face: tankRear, aim: true, stance: "crouch" }),
       N("LiuWencai", T(T_CREST + 3, -0.4), { yaw: BackYaw(TRAFFIC, T_CREST + 3), guess: true }),
       N("Gunner", gunner51, { face: p53, stance: "crouch" }),
       N("Yaowa", yaowa51, { face: p53 }),
@@ -1113,7 +1128,7 @@ function Keyframes() {
     what: "翻过坡顶、下到干沟里回头：鬼子停在坡顶上架枪，没追下来。刘文财：「……不撵了？」",
     next: { text: "「表看了，走！」顺干沟往东", x: PL.laneHead.x, z: PL.laneHead.z, radiusM: 4 },
     how: ["班长「表看了，走！」", "鬼子趴在坡顶上架枪", "顺子和幺娃架着机枪手，最后一个回来"],
-    notes: "坡顶上的鬼子是跟车步兵和沟里追来的那几个，绕过战车残骸、从桥下的沟里爬上坡顶（位置推测）。干沟两岸陡坎挡着，他们得走到坎沿上才看得见沟底。06 接着在这条干沟里（冬瓜头一趟就抬走了）。",
+    notes: "坡顶上的鬼子是跟车步兵和沟里追来的那几个，桥面压断了过不来，从桥东头绕过沟爬上坡顶（位置推测）。干沟两岸陡坎挡着，他们得走到坎沿上才看得见沟底。06 接着在这条干沟里（冬瓜头一趟就抬走了）。",
     signals: [SIG.pitShelled, SIG.tankDisabled],
     units: [
       N("Luo", Pt(p54.x - 1.4, p54.z + 2.6), { yaw: 180 }),
@@ -1121,8 +1136,9 @@ function Keyframes() {
       N("Gunner", Pt(p54.x + 0.9, p54.z - 0.6), { face: PL.assembly, stance: "crouch" }),
       N("Yaowa", Pt(p54.x + 1.8, p54.z - 1.2), { face: PL.crest }),
       J("Tank", TANK_STOP, { name: "战车（瘫）", yaw: PL.tankStop.yawDeg, straight: true, arc: null }),
+      // 10-18 第三轮：都绕桥东头上坡顶（BRIDGE_EAST_DETOUR），沟里追来的那个先绕过靠沟壁的门板、从沟东沿爬出来
       ...crestIja.map((p, i) => J(crestIjaIds[i], p, { group: "crestHold", role: "rifleman", face: PL.assembly, stance: "prone", aim: true, straight: true, guess: true, climb: true,
-        path: i === 3 ? [T(T_CROSSING - 2), T(T_CROSSING + 6), p] : undefined })),
+        path: [...(i === 3 ? [T(T_CROSSING - 11.4, 0), T(T_CROSSING - 10.6, 5)] : []), ...BRIDGE_EAST_DETOUR, p] })),
     ],
     pois: [POI.crest("danger"), POI.assembly("landmark"), Poi("LaneHead", "凹路口（往后送）", "objective", PL.laneHead, 2.5), Poi("TankWreck", "战车（瘫在桥头）", "landmark", TANK_STOP, 4)],
   });

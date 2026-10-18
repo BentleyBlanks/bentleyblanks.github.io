@@ -245,6 +245,8 @@ export class EditorBlockout {
       Marked: () => this.liveUnits.map(u => ({ id: u.id, name: u.name, side: u.side, kind: u.kind, x: u.x, z: u.z, arc: !!u.arc })),
       // 取证用：某个演员此刻的样子（播的动作、姿态、脚下高度、定妆身体、骨盆离地）。
       Probe: (id) => this.puppets.Probe(id),
+      // 取证用（2026-10-18 第三轮）：站人的地面（高度场 + 一步能踩上的块顶，§5.6）
+      StandAt: (x, z) => this.standAt(x, z),
     };
     // 预演（§14.2）：Has / Play / Stop / Seek / Resume / State；Reload 重读预演文件，CameraPose 取某一秒的机位。
     this.api.Previz = {

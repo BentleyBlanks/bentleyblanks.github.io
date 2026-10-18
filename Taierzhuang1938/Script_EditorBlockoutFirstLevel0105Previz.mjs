@@ -25,7 +25,8 @@ import { fileURLToPath } from "node:url";
 import {
   L0105_PLACES as PL, L0105_TRENCHES, L0105_ROAD, L0105_BRIDGE, L0105_PROPS, PointBeside, LineLength,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
-import { DRAG, OUTFLANK_FIRE_021, OUTFLANK_FIRE_LAT, OUTFLANK_RIM_LAT } from "./Script_EditorBlockoutFirstLevel0105Keyframes.mjs";
+import { PREVIZ_THROW } from "./Script_EditorBlockoutPrevizPlan.mjs";
+import { BRIDGE_EAST_DETOUR, DRAG, OUTFLANK_FIRE_021, OUTFLANK_FIRE_LAT, OUTFLANK_RIM_LAT } from "./Script_EditorBlockoutFirstLevel0105Keyframes.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const PREVIZ_FILE = join(HERE, "Blockout", "FirstLevel0105.previz.json");
@@ -801,9 +802,10 @@ function S0203(ctx) {
   const nearAt = DP(StationOn(DRAG, DG) - 1.1, -0.6);
   s.Cam(near - 1.6, 1.8, { from: { x: up.x, z: up.z, h: 1.05 }, to: { x: nearAt.x, z: nearAt.z, h: 1.05 }, look: { x: DG.x, z: DG.z, h: 0.3 } });
   s.Eye(near + 0.2, 3.4, { stance: "crouch", x: nearAt.x, z: nearAt.z, look: DG, pitch: -38 });
-  s.Key("Donggua", near - 0.2, { clip: "WoundedReach", faceTo: "player" });
+  // 10-18 第三轮：冬瓜已经躺在被子上（lie:"along"，头朝拖的那头）。原来这一下播 WoundedReach（坐起来伸手、半个身子出了被子），
+  // 现成片段里没有「躺着伸手」的，就不播片段：保持躺姿、只动嘴，伸手攥袖子用说明字交代（不转身，不然头脚离开被子）。
+  s.Caption(near - 0.2, 2.2, "（冬瓜躺在被子上，一把攥住顺子的袖子）");
   s.Say("Release.04", "Donggua", near + 0.3);
-  s.Key("Donggua", s.End("Release.04") + 0.2, { clip: null });
   s.Caption(s.End("Release.04"), 2.0, "（然后手松开了）");
   // 班长站到顺子面前：还能打不？把枪塞进顺子手里
   const luo = s.End("Release.04") + 0.2;
@@ -866,7 +868,8 @@ function CamAhead(s, t0, t1, dFrom, dTo, ahead, h) {
 }
 /** 关键帧布设 → 开场摆位（被子、冬瓜、何有田、班长、玩家机位）。 */
 function PlaceFromKf(s, ctx, kfId, ids) {
-  for (const id of ids) { const u = KU(ctx, kfId, id); s.Place(id, 0, u.x, u.z, { yawDeg: u.yawDeg, stance: u.stance || "stand", aim: !!u.aim }); }
+  // 倒着的人（被子上的冬瓜）只摆位置朝向，不写 stance / aim（10-18 第三轮：不留「站着」的阶跃值）
+  for (const id of ids) { const u = KU(ctx, kfId, id); s.Place(id, 0, u.x, u.z, u.state === "down" ? { yawDeg: u.yawDeg } : { yawDeg: u.yawDeg, stance: u.stance || "stand", aim: !!u.aim }); }
 }
 /** 重新揪起被角：何有田、被子回到拖行线上排好（短挪动）。返回排好的时刻。 */
 function ReForm(s, t0, dHead, lat = 0) {
@@ -1499,8 +1502,11 @@ function S0403(ctx) {
   s.Cam(0, 4.4, { from: { x: 24.6, z: 72.4, h: 1.4 }, to: { x: 30.36, z: 86.95, h: 1.4 }, look: { actor: "Yaowa", offset: [0, 1.2, 0] }, ease: "linear" });
   s.Go("Gunner", 0, 8.0, 30.54, 91.99, { move: "walk", woundedWalk: true, path: [{ x: 29.6, z: 85.6 }] });
   s.Go("Yaowa", 0, 8.0, 31.43, 91.84, { move: "walk", path: [{ x: 30.4, z: 85.4 }] });
-  s.Go("Luo", 0, 6.0, 35.26, 113.93, { move: "run", yawDeg: 9.5 });
-  s.Go("LiuWencai", 0, 10.0, 34.6, 122, { move: "run" });
+  { const l = KU(ctx, "04-3", "Luo"); s.Go("Luo", 0, 6.0, l.x, l.z, { move: "run", yawDeg: l.yawDeg }); }  // 板桥北沿外一步（10-18 第三轮挪出桥底）
+  // 10-18 第三轮：跑到板桥北沿外，猫腰钻过桥底（桥下横木底离沟底只有 1.76 m），在桥南几步蹲下
+  { const l = KU(ctx, "04-3", "LiuWencai"), n = TP(T_CROSSING - 3.6, -0.3);
+    s.Go("LiuWencai", 0, 7.4, n.x, n.z, { move: "run" });
+    s.Go("LiuWencai", 7.6, 14.6, l.x, l.z, { move: "walk", stance: "crouch", depart: { stance: "crouch" }, yawDeg: l.yawDeg }); }
   // 回身看追兵
   s.Eye(4.4, 1.0, { stance: "crouch", yaw: 170, pitch: 0, toLook: { x: 23.02, z: 70.97 }, toPitch: 2 });
   s.Go("IjaTrench2", 0, 5.4, 23.02, 70.97, { move: "run", aim: true, yawDeg: -156.8 });
@@ -1518,7 +1524,7 @@ function S0403(ctx) {
   s.Go("TankInf2", 9.0, 20.0, 72.48, 82.86, { move: "walk" });
   s.Go("TankInf3", 9.0, 20.0, 73.19, 77.79, { move: "walk" });
   s.Eye(11.0, 2.4, { stance: "crouch", look: { x: 23.02, z: 70.97 }, pitch: 2, toYaw: -92.7, toPitch: 4 });
-  s.Eye(19.0, 1.6, { stance: "crouch", yaw: -92.7, pitch: 4, toLook: { x: 35.26, z: 113.93 }, toPitch: 1 });
+  s.Eye(19.0, 1.6, { stance: "crouch", yaw: -92.7, pitch: 4, toLook: KU(ctx, "04-3", "Luo"), toPitch: 1 });
   s.Key("Luo", 19.0, { faceTo: "player", clip: "PointBlockade" });
   return s.Done({ durationS: 22.4 });
 }
@@ -1547,9 +1553,10 @@ function S0501(ctx) {
   s.Caption(1.6, 3.6, "（班长看了一眼路上的战车：它要过来，只有走那座板桥——沟太宽，车跨不过去）");
   s.Key("Luo", 4.0, { clip: null });
   // 他拽着顺子钻到桥下的沟底趴着；幺娃架着机枪手从桥下钻过去，缩在桥南几步
-  s.Go("Luo", 4.4, 6.4, luo.x, luo.z, { move: "walk", stance: "crouch", faceTo: RoadBack(15) });
-  s.Go("Gunner", 4.0, 12.5, K("Gunner").x, K("Gunner").z, { move: "walk", woundedWalk: true, stance: "crouch", faceTo: BRIDGE });
-  s.Go("Yaowa", 4.0, 12.5, K("Yaowa").x, K("Yaowa").z, { move: "walk", stance: "crouch", faceTo: BRIDGE });
+  // 10-18 第三轮：桥下横木底离沟底只有 1.76 m，钻进桥底之前就猫下腰（出发那一刻就蹲，走的是蹲姿），头顶离横木底 ≥ 0.1 m
+  s.Go("Luo", 4.4, 6.4, luo.x, luo.z, { move: "walk", stance: "crouch", faceTo: RoadBack(15), depart: { stance: "crouch", clip: null } });
+  s.Go("Gunner", 4.0, 12.5, K("Gunner").x, K("Gunner").z, { move: "walk", woundedWalk: true, stance: "crouch", faceTo: BRIDGE, depart: { stance: "crouch" } });
+  s.Go("Yaowa", 4.0, 12.5, K("Yaowa").x, K("Yaowa").z, { move: "walk", stance: "crouch", faceTo: BRIDGE, depart: { stance: "crouch" } });
   s.Cam(4.6, 2.2, { from: { ...TP(T_CROSSING - 5.6, -0.2), h: 1.2 }, to: { x: ME.x, z: ME.z, h: 0.45 }, look: { ...RoadBack(18), h: 1.4 }, lookTo: { ...BRIDGE, h: 2.4 } });
   s.Caption(5.2, 2.4, "（班长拽着顺子钻到桥下的沟底趴着）");
   s.Eye(6.8, 3.4, { stance: "prone", look: { ...BRIDGE, x: BRIDGE.x + 0.4 }, pitch: 60, toLook: RoadBack(15), toPitch: 16 });
@@ -1591,9 +1598,10 @@ function S0502(ctx) {
   for (const [dt, dx, dz, dur] of [[0.2, 0.2, 0.3, 4], [1.0, -0.8, 0.9, 3.5], [1.8, 0.9, -0.7, 3.5], [2.6, -0.2, -0.4, 3]]) {
     s.Ev(on + dt, "smoke", { x: R(BRIDGE.x + dx), z: R(BRIDGE.z + dz), kind: "SmokeDust", dur });
   }
-  s.Key("Luo", on - 0.2, { stance: "prone" });
+  // 班长蹲着缩在桥下不动（10-18 第三轮：原来车压上桥时趴下、过后再蹲起来，从趴到蹲那一下动作库先站起来再跪，头顶贴着横木）
+  s.Key("Luo", on - 0.2, { stance: "crouch", aim: false });
   // 桥下仰看（10-18 第二轮）：机位挪到桥面南沿下（沟底，南沿往南约 0.8 m），往上往北看。画面从下往上：
-  // 门板底面（板缝 5 cm，透出车底和天光）→ 桥面南沿 → 压在桥上的车身 / 履带 → 一块天空；土从板缝往下漏（落土烟 + 说明字）。
+  // 门板底面（板缝 9 cm，透出车底和天光）→ 桥面南沿 → 压在桥上的车身 / 履带 → 一块天空；土从板缝往下漏（落土烟 + 说明字）。
   const r = bridgeYaw * Math.PI / 180, acrossZ = Math.sin(r);       // 横着桥面的方向（往东南）每往南 1 m 走多少
   const under = TP(T_CROSSING + (L0105_BRIDGE.deckW / 2 + 2.0) / acrossZ, 0);   // 离南沿约 2 m：沿下的车身露得出来
   // 朝西北（正对桥面南沿，沿一下成一条横线）、仰 28°：下半是门板底面，中间是桥沿，上面是车身，再往上是天
@@ -1601,7 +1609,6 @@ function S0502(ctx) {
   s.Ev(6.6, "smoke", { x: R(under.x - 1.0), z: R(under.z - 2.2), kind: "SmokeDust", dur: 3.5 });
   s.Go("Tank", 7.6, 10.4, past.x, past.z, { move: "walk", yawDeg: 128 });
   s.Eye(9.4, 1.6, { stance: "crouch", x: under.x, z: under.z, yaw: 38, pitch: 30, toLook: past, toPitch: 14, fov: 76 });
-  s.Key("Luo", 10.0, { stance: "crouch" });
   return s.Done({ durationS: 11.2 });
 }
 
@@ -1620,20 +1627,23 @@ function S0503(ctx) {
   const under = KP(ctx, "05-2");
   s.Cam(0, 1.6, { from: { x: under.x, z: under.z, h: 0.4 }, to: { x: ME.x, z: ME.z, h: 1.62 }, look: { ...BRIDGE, h: 2.6 }, lookTo: { ...rear, h: 2.6 } });
   // 甩手榴弹（10-18 第二轮：原来第一人称贴着车尾，满屏车屁股）：换成顺子身后斜上方的宽镜头，
-  // 一个画面里看得出「顺子从沟沿探身 → 车尾 → 那捆手榴弹落在车尾铁板上」。顺子用替身（没有扔手榴弹的片段，PointBlockade 顶上）。
+  // 一个画面里看得出「顺子从沟沿探身 → 车尾 → 那捆手榴弹落在车尾铁板上」。
+  // 10-18 第三轮：顺子替身播步兵投弹片段（throw 键 → GrenadeThrow「背枪投弹」，游戏里 BeginGrenadeThrow 同一个片段；
+  // 原来没有投弹片段，拿 PointBlockade 顶着）：抡 2.15 s 脱手，那捆手榴弹顺抛物线飞 0.9 s 落在车尾铁板上（离地 1.5 m）再炸。
   s.Spawn("Shunzi", { side: "nra", x: ME.x, z: ME.z, faceTo: rear, name: "顺子（替身）" }, { visible: false });
-  s.Key("Shunzi", 1.5, { visible: true, faceTo: rear, stance: "crouch" });
-  s.Key("Shunzi", 1.9, { stance: "stand", clip: "PointBlockade" });
-  s.Key("Shunzi", 3.4, { stance: "crouch", clip: null });
+  s.Key("Shunzi", 1.2, { visible: true, faceTo: rear, stance: "crouch" });
+  const lob = 1.5, flightS = 0.9;
+  s.Key("Shunzi", lob, { throw: { x: rear.x, z: rear.z, h: 1.5, flightS } });
+  const land = R(lob + PREVIZ_THROW.releaseS + flightS);
+  s.Key("Shunzi", R(lob + PREVIZ_THROW.clipS), { stance: "crouch" });
   // 机位在顺子身后（东南）沟上方约 3 m、往西北压下来看：前景是沟里探身的顺子，越过沟沿是车尾和那块铁板（手榴弹落点）
   const away = { x: ME.x - rear.x, z: ME.z - rear.z }, awayL = Math.hypot(away.x, away.z);
   const back = { x: R(ME.x + away.x / awayL * 3.6 + away.z / awayL * 1.2), z: R(ME.z + away.z / awayL * 3.6 - away.x / awayL * 1.2) };
   const mid = { x: R(rear.x * 0.45 + ME.x * 0.55), z: R(rear.z * 0.45 + ME.z * 0.55) };
-  s.Cam(1.5, 3.3, { from: { ...back, h: 4.6 }, to: { ...back, h: 4.8 }, look: { ...mid, h: 0.1 }, lookTo: { ...mid, h: 0.4 }, fov: 72 });
-  s.Caption(1.6, 2.2, "（顺子从桥边探身，把那捆手榴弹甩到车屁股后头那块铁板上）");
-  s.Shake(1.8, 0.3, 0.15);
-  const boom = 3.6;
-  s.Sfx(boom, "grenadeBlast", rear); s.Ev(boom, "explosion", { x: rear.x, z: rear.z, kind: "grenade", radius: 5 });
+  s.Cam(1.2, R(land + 0.7 - 1.2), { from: { ...back, h: 4.6 }, to: { ...back, h: 4.8 }, look: { ...mid, h: 0.4 }, lookTo: { ...mid, h: 0.6 }, fov: 72 });
+  s.Caption(1.6, 2.4, "（顺子从桥边探身，把那捆手榴弹甩到车屁股后头那块铁板上）");
+  const boom = R(land + 0.05);
+  s.Sfx(boom, "grenadeBlast", rear); s.Ev(boom, "explosion", { x: rear.x, z: rear.z, h: 1.5, kind: "grenade", radius: 5 });
   s.Shake(boom, 0.8, 0.8);
   s.Ev(boom + 0.1, "smoke", { x: rear.x, z: rear.z, kind: "SmokeBlack", dur: 20 });
   s.Ev(boom + 0.1, "signal", { name: "TankDisabled", on: true });
@@ -1670,10 +1680,11 @@ function S0504(ctx) {
   s.Cam(0, 6.0, { from: { ...TP(T_CROSSING + 4, 0), h: 1.5 }, to: { ...TP(T_CREST, 0), h: 1.6 }, look: { actor: "Gunner", offset: [0, 1.0, 1.6] }, ease: "linear" });
   s.Cam(6.0, 6.8, { from: { ...TP(T_CREST, 0), h: 1.6 }, to: { x: ME.x, z: ME.z, h: 1.62 }, look: { actor: "Gunner", offset: [0, 1.0, 1.6] }, ease: "linear" });
   s.Caption(0.4, 3.0, "（顺子和幺娃一边一个架着机枪手翻坡顶，顺坡道下到干沟里）");
-  // 鬼子绕过战车残骸、从桥下的沟里爬上坡顶，停在坡顶上架枪，没有追下来
+  // 鬼子绕过战车残骸、从桥东头绕过沟爬上坡顶，停在坡顶上架枪，没有追下来
   for (const [id] of enemies0) {
     const to = K(id);
-    s.Go(id, 3.0, 14.0, to.x, to.z, { move: "run", stance: "prone", aim: true, faceTo: PL.assembly, ...(id === "IjaTrench2" ? { path: [TP(T_CROSSING + 6)] } : {}) });
+    // 10-18 第三轮：桥面压断了，绕桥东头过沟（不从桥底、不穿横木端头），同 05-4 关键帧的 path
+    s.Go(id, 3.0, 14.0, to.x, to.z, { move: "run", stance: "prone", aim: true, faceTo: PL.assembly, path: [...(id === "IjaTrench2" ? [TP(T_CROSSING - 11.4, 0), TP(T_CROSSING - 10.6, 5)] : []), ...BRIDGE_EAST_DETOUR] });
   }
   // 回头
   s.Eye(12.8, 1.4, { stance: "stand", yaw: 175, pitch: 0, toLook: PL.crest, toPitch: 14 });
