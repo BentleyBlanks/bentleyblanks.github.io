@@ -1,0 +1,940 @@
+{
+ "schema": 2,
+ "version": "20261019PrevizCombatV1",
+ "fps": 24,
+ "actorForward": [
+  0,
+  0,
+  -1
+ ],
+ "blendSeconds": 0.12,
+ "floorClearanceM": 0.003,
+ "coordinates": {
+  "values": "glTF node-local bone transforms (p xyz, q xyzw), stride 7",
+  "props": "glTF scene space = rig.root local, source metres: origin xyz, axis xyz, up xyz, visible",
+  "stages": "runtime metres in the anchor actor frame (+x right, +y up, -z forward); yawDeg + = turn left",
+  "contacts": "clip seconds; partner parts are contactPoints names; standoffM = runtime metres along the patch normal where the knuckle centroid (finger roots) sits"
+ },
+ "clips": {
+  "PvBlastThrownBack": {
+   "duration": 1.6,
+   "loop": false,
+   "weaponHold": "twoHand",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "role": "pitNra",
+   "rootMotion": true,
+   "terminal": false,
+   "props": [
+    "weapon"
+   ],
+   "weaponState": "twoHand->dropped",
+   "weaponDropFrom": "PvBlastThrownBack",
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handsLR",
+     "action": "hold",
+     "target": "weapon"
+    },
+    {
+     "t": 0.08,
+     "limb": "handsLR",
+     "action": "release",
+     "target": "weapon"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.0,
+     "kind": "blast",
+     "from": "front"
+    },
+    {
+     "t": 0.08,
+     "kind": "weaponLost"
+    },
+    {
+     "t": 0.46,
+     "kind": "down",
+     "sound": "bodyFall"
+    },
+    {
+     "t": 1.1,
+     "kind": "still"
+    }
+   ],
+   "holdLoop": [
+    1.2000000000000002,
+    1.6
+   ],
+   "notes": "Crouched ready with the rifle in both hands; at 0 s a round bursts in front of him (-z): the blast throws him up and back off his feet, arms flung forward, the rifle torn out of his hands (0.08 s, weapon track: it flies up and lands 0.8 m to his right rear, weaponDropFrom); seat on the ground 0.46 s, back and head slam 0.60 s, the legs come down, a last stir, still from 1.10 s on his back, arms out, the right knee half up. Root motion: the pelvis ends 0.95 m behind the root (+z). The last frame is the lying pose (hold it; holdLoop 1.2-1.6 is still).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "08240443e23b25a575beedca8caa01540264d92a4bc15be9b27a890ba4343895"
+    }
+   }
+  },
+  "PvLegHitKneelClutch": {
+   "duration": 2.0,
+   "loop": false,
+   "weaponHold": "twoHand",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "role": "gunner",
+   "rootMotion": false,
+   "props": [
+    "weapon"
+   ],
+   "weaponState": "twoHand->dropped",
+   "weaponDropFrom": "PvLegHitKneelClutch",
+   "holdLoop": [
+    1.2,
+    2.0
+   ],
+   "holdExit": "pose.holdUntil is not needed: the hold loop is the clutching kneel itself (play another clip to leave it)",
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handsLR",
+     "action": "hold",
+     "target": "weapon"
+    },
+    {
+     "t": 0.12,
+     "limb": "handsLR",
+     "action": "release",
+     "target": "weapon"
+    },
+    {
+     "t": 0.55,
+     "limb": "handsLR",
+     "action": "hold",
+     "target": "self",
+     "part": "thighR"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.05,
+     "kind": "shot",
+     "at": "thighR"
+    },
+    {
+     "t": 0.12,
+     "kind": "weaponLost"
+    },
+    {
+     "t": 0.38,
+     "kind": "kneeDown",
+     "sound": "bodyFall"
+    }
+   ],
+   "notes": "Standing ready with the rifle in both hands; 0.05 s a round into the right thigh: the right knee gives and he drops onto it (knee on the ground 0.38 s, the left foot still planted), the rifle falls out of his hands (0.12 s) to the ground at his right front (weapon track, weaponDropFrom); both hands go to the right thigh (0.55 s), the left knee comes down too (0.70 s) and he sits back on his heels (kneel-sit), hunched over the thigh, both hands round it; from 1.2 s the hold loop: rocking with short breaths (1.2-2.0 s loops seamlessly). No root motion.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "7422df77792aee1570e987647a86c7b3d70559e5263e5043bd906e0bbf3468bb"
+    }
+   }
+  },
+  "PvStandToProneDive": {
+   "duration": 1.2,
+   "loop": false,
+   "weaponHold": "twoHand",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "role": "any",
+   "rootMotion": true,
+   "props": [
+    "weapon"
+   ],
+   "weaponState": "twoHand",
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handsLR",
+     "action": "hold",
+     "target": "weapon"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.36,
+     "kind": "kneesDown",
+     "sound": "bodyFall"
+    },
+    {
+     "t": 0.72,
+     "kind": "prone",
+     "sound": "bodyFall"
+    }
+   ],
+   "holdLoop": [
+    1.0,
+    1.2
+   ],
+   "notes": "A running stride with the rifle at port (both hands), he drops: knees on the ground 0.36 s, the rifle and forearms out in front 0.52 s, flat on his chest 0.72 s, the head up looking forward, the rifle held in front of the face pointing forward (right hand at the stock wrist by the right cheek, left hand on the handguard, elbows on the ground). Root motion: the pelvis ends 0.80 m ahead of the root (the feet end about where he started). Last frame = prone hold (1.0-1.2 s still).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "9ef9b23294d7e182ae9187aa01a413f5c5cb310234c2d3e4061a77089d5f21be"
+    }
+   }
+  },
+  "PvCrawlCarryBundle": {
+   "duration": 2.0,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "role": "bundleMan",
+   "rootMotion": false,
+   "referenceSpeedMps": 0.3,
+   "props": [
+    "bundle"
+   ],
+   "slung": true,
+   "notes": "Face down, the chest a little off the ground, a bundle of stick grenades hugged against the right side of the chest in the right arm (prop track `bundle`: centre, axis along the handles, up = away from the chest; the runtime needs a mesh for it), the rifle slung on the back (back-sling list). Crawls on the LEFT elbow and the RIGHT knee: the left forearm reaches forward and pulls, the right knee draws up to the side and pushes; two strokes per 2 s loop. In place: the root stays put, the planted elbow and knee slide back at referenceSpeedMps 0.30 (runtime m/s); play rate = actual speed / 0.30.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "eab04c4619d4c64002cb6e2d4ebff4a9643bf2f1474bc8e67b6ea5cc27228098"
+    }
+   }
+  },
+  "PvClimbOutTrench": {
+   "duration": 2.5,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "role": "any",
+   "rootMotion": false,
+   "slung": true,
+   "rootPath": {
+    "note": "IN PLACE: the previz moves the root (runtime m, along the actor's facing and up) by these keys (monotone cubic between them); the clip's own trench wall and lip ride with it",
+    "keys": [
+     [
+      0.0,
+      0.0,
+      0.0
+     ],
+     [
+      0.55,
+      0.0,
+      0.0
+     ],
+     [
+      0.8,
+      0.04,
+      0.18
+     ],
+     [
+      1.1,
+      0.16,
+      0.62
+     ],
+     [
+      1.4,
+      0.32,
+      1.08
+     ],
+     [
+      1.75,
+      0.55,
+      1.36
+     ],
+     [
+      2.1,
+      0.78,
+      1.4
+     ],
+     [
+      2.3,
+      0.85,
+      1.4
+     ],
+     [
+      2.5,
+      0.85,
+      1.4
+     ]
+    ]
+   },
+   "ground": {
+    "wallAheadM": 0.4,
+    "lipM": 1.4,
+    "note": "frame 0: the wall face 0.40 m ahead of the root, the lip 1.40 m over the trench floor; the root ends 0.85 m ahead of its start, 1.40 m up"
+   },
+   "contacts": [
+    {
+     "t": 0.35,
+     "limb": "handsLR",
+     "action": "plant",
+     "target": "lip"
+    },
+    {
+     "t": 0.8,
+     "limb": "footR",
+     "action": "push",
+     "target": "trenchWall"
+    },
+    {
+     "t": 1.4,
+     "limb": "kneeR",
+     "action": "plant",
+     "target": "lip"
+    },
+    {
+     "t": 1.8,
+     "limb": "handsLR",
+     "action": "release",
+     "target": "lip"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.35,
+     "kind": "handsOnLip"
+    },
+    {
+     "t": 1.4,
+     "kind": "kneeOnLip"
+    },
+    {
+     "t": 2.1,
+     "kind": "onLip"
+    }
+   ],
+   "notes": "Facing the trench wall (0.40 m ahead, the lip 1.40 m up), rifle slung on the back (back-sling list): both hands onto the lip (0.35 s), a dip, the right foot up onto the wall (0.80 s), arms and leg drive him up, the chest over the lip, the right knee onto it (1.40 s), the left leg comes up (1.75 s), he rises into a crouch on the lip (2.1 s) and holds it, looking ahead. Authored IN PLACE: play it with the root moved along rootPath (forward 0.85 m, up 1.40 m: 0.55-2.1 s), the last frame is a crouch on the lip at the moved root.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "0c63a5cb2cefdb9ecbe157f5f2b03f4619baf3e6ddab17e12b7bbc911f2b38ef"
+    }
+   }
+  },
+  "PvSupportWalkL": {
+   "duration": 1.2,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "role": "supporterL",
+   "rootMotion": false,
+   "referenceSpeedMps": 0.9,
+   "slung": true,
+   "stage": "supportWalk",
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handR",
+     "action": "hold",
+     "partnerRole": "wounded",
+     "part": "beltBackL"
+    },
+    {
+     "t": 0.0,
+     "limb": "handL",
+     "action": "hold",
+     "partnerRole": "wounded",
+     "part": "handL"
+    }
+   ],
+   "notes": "The supporter on the wounded man's LEFT (the wounded man on his right): walks leaning a little toward him, his right arm round the wounded man's back (hand on the belt behind the wounded man's left hip), his left hand up at his own left shoulder holding the wounded man's left hand that hangs over it. Rifle slung on the back. In place: the root stays put, the stance foot slides back at referenceSpeedMps 0.9 (runtime m/s); play rate = actual speed / 0.9, all three at the same rate. Stage supportWalk has the spacing.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "fd635f06843e3ab9bc0ada9b6a3870faba22bf73bb57abb630e6f117e3fe8f3a"
+    }
+   }
+  },
+  "PvSupportWalkR": {
+   "duration": 1.2,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "role": "supporterR",
+   "rootMotion": false,
+   "referenceSpeedMps": 0.9,
+   "slung": true,
+   "stage": "supportWalk",
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handL",
+     "action": "hold",
+     "partnerRole": "wounded",
+     "part": "beltBackR"
+    },
+    {
+     "t": 0.0,
+     "limb": "handR",
+     "action": "hold",
+     "partnerRole": "wounded",
+     "part": "handR"
+    }
+   ],
+   "notes": "Mirror of PvSupportWalkL: on the wounded man's RIGHT, the left arm round his back, the right hand holding the wounded man's right hand over his own right shoulder. Rifle slung on the back. In place: the root stays put, the stance foot slides back at referenceSpeedMps 0.9 (runtime m/s); play rate = actual speed / 0.9, all three at the same rate. Stage supportWalk has the spacing.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "9ab04f23057ec46c4e1ea88999ffd039cd8f6faea8b5aac453e48ae77e448d81"
+    }
+   }
+  },
+  "PvSupportedHop": {
+   "duration": 1.2,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "role": "wounded",
+   "rootMotion": false,
+   "referenceSpeedMps": 0.9,
+   "stage": "supportWalk",
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handL",
+     "action": "hold",
+     "partnerRole": "supporterL",
+     "part": "shoulderL"
+    },
+    {
+     "t": 0.0,
+     "limb": "handR",
+     "action": "hold",
+     "partnerRole": "supporterR",
+     "part": "shoulderR"
+    }
+   ],
+   "notes": "The wounded man between them: both arms over their shoulders, hunched, hopping on the LEFT foot (two hops a loop, off the ground 0.23 s each), the right leg (wounded) bent and held off the ground behind. No rifle. In place: the root stays put, the stance foot slides back at referenceSpeedMps 0.9 (runtime m/s); play rate = actual speed / 0.9, all three at the same rate. Stage supportWalk has the spacing.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:1b7d48e7",
+     "valuesSha256": "163300c6bdfd9dd751f63c9d3db77a59ae149da21a0747548c8d4af47f3e8c28"
+    }
+   }
+  },
+  "PvShoulderShove": {
+   "duration": 1.2,
+   "loop": false,
+   "weaponHold": "oneHandRight",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "role": "shover",
+   "rootMotion": false,
+   "referenceSpeedMps": 1.0,
+   "props": [
+    "weapon"
+   ],
+   "weaponState": "oneHandRight",
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handR",
+     "action": "hold",
+     "target": "weapon"
+    },
+    {
+     "t": 0.42,
+     "limb": "handL",
+     "action": "shove",
+     "target": "chestFront",
+     "atM": [
+      -0.12,
+      1.25,
+      -0.5
+     ]
+    }
+   ],
+   "events": [
+    {
+     "t": 0.42,
+     "kind": "shove"
+    }
+   ],
+   "notes": "Walking (in place, referenceSpeedMps 1.0), the rifle carried low in the right hand (stock wrist, muzzle forward and down; weapon track); turns his left shoulder in and shoves with the left hand: contact 0.42 s at 0.12 m to his left, 1.25 m up, 0.50 m ahead: the oncoming man's chest), the head turned at him; back to walking by 1.0 s. The previz keeps moving him through it (the shove is a beat while walking past).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "878e0d17d5c605a3a39f1e346673b131c13224aec455a00b8c318b81f0ae36c0"
+    }
+   }
+  },
+  "PvCrouchRunPullBehind": {
+   "duration": 1.0,
+   "loop": true,
+   "weaponHold": "oneHandRight",
+   "rig": "TengxianNra02",
+   "rigs": [
+    "TengxianNra02"
+   ],
+   "role": "luo",
+   "rootMotion": false,
+   "referenceSpeedMps": 1.4,
+   "props": [
+    "weapon",
+    "collar"
+   ],
+   "weaponState": "oneHandRight",
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handR",
+     "action": "hold",
+     "target": "weapon"
+    },
+    {
+     "t": 0.0,
+     "limb": "handL",
+     "action": "hold",
+     "target": "player",
+     "part": "collarBack"
+    }
+   ],
+   "notes": "Crouched run (in place, referenceSpeedMps 1.4), the chest turned a little to his left, the left arm back with the fist in the collar of the man behind him (Shunzi, first person): the fist stays about 0.22 m to his left, 0.18 m behind the root, 0.90 m up (prop track `collar`: the fist point; the first-person camera can be pulled by it), tugging with each stride. The rifle in the right hand, low and forward (stock wrist, weapon track).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "fee3565370f8a8453bac9cda53231fcbce04cdf2c979e04152bf8ae791378ec0"
+    }
+   }
+  }
+ },
+ "stages": {
+  "supportWalk": {
+   "anchor": "wounded",
+   "notes": "Three abreast, all facing the wounded man's facing and moving together at the same speed: the left supporter (PvSupportWalkL) 0.50 m to the wounded man's left and 0.06 m ahead, the right one (PvSupportWalkR) mirrored. The three clips share one clock (start them together; same loop length 1.2 s, same referenceSpeedMps 0.9). The wounded man's left arm lies over the left supporter's shoulders, the hand on top of the supporter's left shoulder (the supporter's left hand holds it); the supporter's right arm round the wounded man's back, the hand on his belt behind the left hip. Mirrored on the right.",
+   "actors": {
+    "wounded": {
+     "rig": "TengxianNra02",
+     "clip": "PvSupportedHop",
+     "x": 0.0,
+     "z": 0.0,
+     "yawDeg": 0
+    },
+    "supporterL": {
+     "rig": "TengxianNra02",
+     "clip": "PvSupportWalkL",
+     "x": -0.5,
+     "z": -0.06,
+     "yawDeg": 0
+    },
+    "supporterR": {
+     "rig": "TengxianNra02",
+     "clip": "PvSupportWalkR",
+     "x": 0.5,
+     "z": -0.06,
+     "yawDeg": 0
+    }
+   }
+  }
+ },
+ "props": {},
+ "models": [
+  {
+   "id": "TengxianNra02",
+   "file": "Animation_TengxianNra02PrevizCombat.json",
+   "sha256": "e057f6cd7ddf898bfe992632009b0f4ce81ac33a93213b19ef092786a6401dd1",
+   "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\PrevizCombat_20261019\\Scene_TengxianNra02PrevizCombat.blend",
+   "contactPoints": {},
+   "clips": [
+    {
+     "clip": "PvBlastThrownBack",
+     "frames": 40,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.2448,
+     "floorCorrectionMin": -0.00769,
+     "floorCorrectionMax": 0.09342,
+     "root": {
+      "start": [
+       0.0264,
+       -0.0377,
+       0.0,
+       0.7155
+      ],
+      "end": [
+       -0.0,
+       0.95,
+       3.44,
+       0.1534
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.05
+      ],
+      [
+       "R",
+       0,
+       0.05
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvLegHitKneelClutch",
+     "frames": 49,
+     "footSlideM": 0.0401,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1078,
+     "floorCorrectionMin": -0.01362,
+     "floorCorrectionMax": 0.04353,
+     "root": {
+      "start": [
+       0.025,
+       -0.0605,
+       0.0,
+       0.6683
+      ],
+      "end": [
+       -0.0,
+       0.2053,
+       -3.44,
+       0.3292
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.4
+      ]
+     ],
+     "kneePlants": [
+      [
+       "R",
+       0.43,
+       0.5
+      ],
+      [
+       "L",
+       0.75,
+       2.0
+      ]
+     ],
+     "kneeSlideM": 0.0062
+    },
+    {
+     "clip": "PvStandToProneDive",
+     "frames": 30,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1253,
+     "floorCorrectionMin": 0.01166,
+     "floorCorrectionMax": 0.11888,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       -2.86,
+       0.8495
+      ],
+      "end": [
+       0.0,
+       -0.8,
+       0.0,
+       0.2175
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvCrawlCarryBundle",
+     "frames": 49,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0211,
+     "floorCorrectionMin": 0.01116,
+     "floorCorrectionMax": 0.05601,
+     "root": {
+      "start": [
+       0.0091,
+       -0.0,
+       -2.86,
+       0.2382
+      ],
+      "end": [
+       0.0091,
+       -0.0,
+       -2.86,
+       0.2382
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvClimbOutTrench",
+     "frames": 61,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0382,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.2661,
+     "pelvisMaxStepM": 0.0504,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.08134,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       -0.0,
+       0.0,
+       0.0,
+       0.4385
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvSupportWalkL",
+     "frames": 30,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0173,
+     "floorCorrectionMin": -4e-05,
+     "floorCorrectionMax": 0.03381,
+     "root": {
+      "start": [
+       0.0103,
+       0.0183,
+       -0.89,
+       0.7697
+      ],
+      "end": [
+       0.0103,
+       0.0183,
+       -0.89,
+       0.7697
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvSupportWalkR",
+     "frames": 30,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0173,
+     "floorCorrectionMin": -4e-05,
+     "floorCorrectionMax": 0.03381,
+     "root": {
+      "start": [
+       -0.0103,
+       0.0183,
+       -0.89,
+       0.7697
+      ],
+      "end": [
+       -0.0103,
+       0.0183,
+       -0.89,
+       0.7697
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvSupportedHop",
+     "frames": 30,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0086,
+     "gripSolveErrorM": 0.00864,
+     "pelvisMaxStepM": 0.0256,
+     "floorCorrectionMin": -0.00643,
+     "floorCorrectionMax": 0.02854,
+     "root": {
+      "start": [
+       -0.0411,
+       0.0548,
+       -2.29,
+       0.8007
+      ],
+      "end": [
+       -0.0411,
+       0.0548,
+       -2.29,
+       0.8007
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvShoulderShove",
+     "frames": 30,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0768,
+     "gripSolveErrorM": 0.01723,
+     "pelvisMaxStepM": 0.0179,
+     "floorCorrectionMin": -0.00011,
+     "floorCorrectionMax": 0.03396,
+     "root": {
+      "start": [
+       -0.0034,
+       0.0183,
+       -0.89,
+       0.8337
+      ],
+      "end": [
+       0.0028,
+       0.0183,
+       0.73,
+       0.845
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "PvCrouchRunPullBehind",
+     "frames": 25,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0159,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.03335,
+     "root": {
+      "start": [
+       -0.0009,
+       0.0365,
+       4.67,
+       0.7098
+      ],
+      "end": [
+       -0.0009,
+       0.0365,
+       4.67,
+       0.7098
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    }
+   ],
+   "clipIds": [
+    "PvBlastThrownBack",
+    "PvLegHitKneelClutch",
+    "PvStandToProneDive",
+    "PvCrawlCarryBundle",
+    "PvClimbOutTrench",
+    "PvSupportWalkL",
+    "PvSupportWalkR",
+    "PvSupportedHop",
+    "PvShoulderShove",
+    "PvCrouchRunPullBehind"
+   ]
+  }
+ ]
+}
