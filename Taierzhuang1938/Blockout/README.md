@@ -15,6 +15,8 @@
 | `FirstLevel0105.scene.json` | 01–05 的独立场地：0.5 m 高度网格（前沿沟、交通沟、支沟与南沿土垄、机枪坑、防炮洞、坡顶、集结处干沟与南岸坎顶的矮土埂、东南头的凹路、路）+ 体块（沟里的弹药箱垛 / 土袋垛 / 门板 / 水缸等日常摆件、路口板桥（门板之间留 5 cm 缝）、干沟南岸枯树）+ 随信号出现 / 消失的体块（塌洞、坑沿被炸、战车压断桥面门板） | `scene FirstLevel0105` 按 `Data_EditorBlockoutFirstLevel0105Space.mjs` 烘出来 |
 | `FirstLevel0105.voice.json` | 01–05 台词的占位配音清单（每句：说话人、字幕、mp3、时长、录音里的原始间隔），mp3 在 `../Audio/Blockout0105/` | `Script_EditorBlockoutFirstLevel0105Voice.mjs`（SeedAudio 整段生成后切句） |
 | `FirstLevel0105.previz.json` | 01–05 每个关键帧的预演：镜头、人物调度、动作片段、台词时间、事件（契约 §14） | `Script_EditorBlockoutFirstLevel0105Previz.mjs` 生成，之后可手改 |
+| `FirstLevel0610.json` | 第一关 06–10 新剧本（Notion 10-18 晚）的 20 个关键帧 06-1…10-4：干沟 → 凹路后送队 → 村口 → 巷子 / 邻院 / 老耿家 → 石碾后压住东街 → 后门 | `export FirstLevel0610` 从 `Data_EditorBlockoutFirstLevel0610Space.mjs` 的锚点生成，之后以手改的 JSON 为准 |
+| `FirstLevel0610.scene.json` | 06–10 的场地（与 0105 同一套坐标，北半截逐点等于 0105）：0.5 m 高度网格（干沟、凹路南段、河汊子、整村压平的耿家庄、地瓜窖）+ 体块（院墙带门窗洞 / 狗洞 / 墙缝 / 侧门、房子、老耿家三间空心屋与平顶、石磨、窖沿与盖板、日常摆件、南岸枯树）+ 随信号体块（CartDeparted / SideGateOpen / CellarBlast / MgSilenced / BackDoorOpen，契约 §15） | `scene FirstLevel0610` |
 
 第一关（`FirstLevel`）的场景就是游戏里的第一关（换成白盒画法），没有单独的场景文件。`FirstLevel0105` 是另一片场地，坐标原点在沟口，和游戏里的第一关无关。
 

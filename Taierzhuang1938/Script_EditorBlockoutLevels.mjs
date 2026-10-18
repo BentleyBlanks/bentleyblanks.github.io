@@ -24,6 +24,10 @@ export const BLOCKOUT_LEVELS = Object.freeze([
   Object.freeze({ key: "FirstLevel0105", label: "第一关 01–05 · 撤退（新剧本）", configUrl: "./Blockout/FirstLevel0105.json",
     scene: Object.freeze({ kind: "file", url: "./Blockout/FirstLevel0105.scene.json",
       placeholder: Object.freeze({ bounds: { minX: -110, maxX: 190, minZ: -235, maxZ: 200 }, spawn: { x: 66.5, z: 64.2, yawDeg: 90 } }) }) }),
+  // 2026-10-18：06–10 新剧本（干沟 → 凹路 → 耿家庄），与 0105 同一套坐标、另一片场地；锚点 Data_EditorBlockoutFirstLevel0610Space
+  Object.freeze({ key: "FirstLevel0610", label: "第一关 06–10 · 耿家庄（新剧本）", configUrl: "./Blockout/FirstLevel0610.json",
+    scene: Object.freeze({ kind: "file", url: "./Blockout/FirstLevel0610.scene.json",
+      placeholder: Object.freeze({ bounds: { minX: -20, maxX: 250, minZ: 120, maxZ: 560 }, spawn: { x: 35, z: 147, yawDeg: -90 } }) }) }),
 ]);
 
 // 存档口只认 BLOCKOUT_LEVEL_KEYS。这里只报不抛：Script_Main 开机就 import 本模块，抛了整个游戏起不来。

@@ -6,7 +6,9 @@
 //   node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene SecondLevel [--force]
 //   node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene FirstLevel0105 [--force]    （只写场景文件）
 //   node Taierzhuang1938/Script_EditorBlockoutCli.mjs export FirstLevel0105 [--force]   （只写配置；之后以手改的 JSON 为准）
-//   node Taierzhuang1938/Script_EditorBlockoutCli.mjs validate [FirstLevel|SecondLevel|FirstLevel0105|all]
+//   node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene FirstLevel0610 [--force]    （06–10 耿家庄：只写场景文件）
+//   node Taierzhuang1938/Script_EditorBlockoutCli.mjs export FirstLevel0610 [--force]   （06–10：只写配置）
+//   node Taierzhuang1938/Script_EditorBlockoutCli.mjs validate [FirstLevel|SecondLevel|FirstLevel0105|FirstLevel0610|all]
 //   node Taierzhuang1938/Script_EditorBlockoutCli.mjs summary [FirstLevel|SecondLevel]
 //   node Taierzhuang1938/Script_EditorBlockoutCli.mjs kf <Level> <keyframeId>
 // 通用选项：--commit=<sha>（缺省读 git HEAD）、--generated-at=<ISO>（缺省现在）。只有这个 CLI 读时钟与 git。
@@ -100,9 +102,35 @@ async function CmdScene0105(options) {
   for (const line of notes) console.log(`  ${line}`);
 }
 
+/** 06–10 新剧本白盒（FirstLevel0610）：与 0105 同一套做法，锚点 Data_EditorBlockoutFirstLevel0610Space。 */
+async function CmdExport0610(options) {
+  const { BuildFirstLevel0610Config } = await import("./Script_EditorBlockoutFirstLevel0610Keyframes.mjs");
+  const issues = [];
+  const doc = await BuildFirstLevel0610Config({ ...SourceOptions(options), issues });
+  const result = ValidateBlockout(doc);
+  if (!result.ok) throw new Error(`生成的配置没过校验：\n  ${result.errors.join("\n  ")}`);
+  const out = typeof options.out === "string" ? path.resolve(process.cwd(), options.out) : ConfigFile("FirstLevel0610");
+  WriteGuarded(out, StringifyBlockout(doc), !!options.force);
+  console.log(`写出 ${path.relative(process.cwd(), out)}：${doc.keyframes.length} 个关键帧，${doc.keyframes.reduce((s, k) => s + k.units.length, 0)} 个单位位次，警告 ${result.warnings.length}，摆位问题 ${issues.length}`);
+  for (const w of result.warnings) console.log(`  警告 ${w}`);
+  for (const line of issues) console.log(`  问题 ${line}`);
+}
+
+async function CmdScene0610(options) {
+  const { BuildFirstLevel0610Scene } = await import("./Script_EditorBlockoutFirstLevel0610Scene.mjs");
+  const notes = [];
+  const scene = await BuildFirstLevel0610Scene({ ...SourceOptions(options), notes });
+  const check = ValidateBlockoutScene(scene);
+  if (!check.ok) throw new Error(`生成的场景没过校验：\n  ${check.errors.join("\n  ")}`);
+  WriteGuarded(SceneFile("FirstLevel0610"), StringifyBlockout(scene), !!options.force);
+  console.log(`写出 ${path.relative(process.cwd(), SceneFile("FirstLevel0610"))}：${scene.terrain.cols}×${scene.terrain.rows} 格高度（${scene.terrain.cellM} m）、${scene.blocks.length} 个体块、${(scene.gates || []).length} 个随信号体块`);
+  for (const line of notes) console.log(`  ${line}`);
+}
+
 async function CmdExport(level, options) {
   if (level === "FirstLevel0105") return CmdExport0105(options);
-  if (level !== "FirstLevel") throw new Error("export 只支持 FirstLevel / FirstLevel0105（第二关的配置随 scene SecondLevel 一起写）");
+  if (level === "FirstLevel0610") return CmdExport0610(options);
+  if (level !== "FirstLevel") throw new Error("export 只支持 FirstLevel / FirstLevel0105 / FirstLevel0610（第二关的配置随 scene SecondLevel 一起写）");
   const { BuildFirstLevelBlockoutConfig } = await import("./Script_EditorBlockoutFirstLevel.mjs");
   const issues = [];
   const doc = BuildFirstLevelBlockoutConfig({ ...SourceOptions(options), issues });
@@ -125,7 +153,8 @@ async function PrintFirstLevelIssues(doc) {
 
 async function CmdScene(level, options) {
   if (level === "FirstLevel0105") return CmdScene0105(options);
-  if (level !== "SecondLevel") throw new Error("scene 只支持 SecondLevel / FirstLevel0105（第一关的场景就是游戏里的第一关）");
+  if (level === "FirstLevel0610") return CmdScene0610(options);
+  if (level !== "SecondLevel") throw new Error("scene 只支持 SecondLevel / FirstLevel0105 / FirstLevel0610（第一关的场景就是游戏里的第一关）");
   const { BuildSecondLevelBlockout, SampleSecondLevelGroundChecks } = await import("./Script_EditorBlockoutSecondLevel.mjs");
   const { scene, config } = await BuildSecondLevelBlockout(SourceOptions(options));
   const sceneCheck = ValidateBlockoutScene(scene);
@@ -240,6 +269,8 @@ export async function Main(argv = process.argv.slice(2)) {
         "  scene SecondLevel [--force]                  生成第二关草稿场景与占位配置",
         "  scene FirstLevel0105 [--force]               生成 01–05 新剧本白盒的场景文件（地形 + 体块 + 塌洞等随信号体块）",
         "  export FirstLevel0105 [--force]              生成 01–05 新剧本白盒的关键帧配置（会覆盖手改）",
+        "  scene FirstLevel0610 [--force]               生成 06–10 新剧本白盒（耿家庄）的场景文件",
+        "  export FirstLevel0610 [--force]              生成 06–10 新剧本白盒的关键帧配置（会覆盖手改）",
         "  validate [FirstLevel|SecondLevel|all]        校验配置（与场景文件）；第一关另列摆位 / 走位问题",
         "  summary [Level]                              每个关键帧一行：玩家机位、各阵营人数、推测、POI、警告",
         "  kf <Level> <id>                              看一个关键帧的全部单位与 POI",

@@ -338,6 +338,8 @@ export const testDefs = {
   EditorBlockoutFirstLevel0105SceneTest: { file: "Script_EditorBlockoutFirstLevel0105SceneTest.mjs", desc: "01–05 新剧本白盒场地：生成两次逐字相同、锚点处沟 / 坑 / 洞深度、沟底宽 ≥3.4 m、坡顶挡住集结处看前沿的视线（纯 Node）" },
   EditorBlockoutFirstLevel0105KeyframesTest: { file: "Script_EditorBlockoutFirstLevel0105KeyframesTest.mjs", desc: "01–05 新剧本白盒关键帧：生成可复现、校验通过、人不进实心块 / 不重叠、走位沿沟不翻沟壁（纯 Node）" },
   EditorBlockoutFirstLevel0105PrevizTest: { file: "Script_EditorBlockoutFirstLevel0105PrevizTest.mjs", desc: "01–05 预演数据：过校验、片段在该骨架上存在、台词不互压、走位点在地面上与场地内、说话人在画面里（纯 Node）" },
+  EditorBlockoutFirstLevel0610SceneTest: { file: "Script_EditorBlockoutFirstLevel0610SceneTest.mjs", desc: "06–10 新剧本白盒场地：生成两次逐字相同、与 0105 北半截逐点接上、凹路 / 河汊子 / 窖的深度、狗洞大人钻不过、侧门 / 门缝 / 墙缝 / 北窗 / 石碾五条视线、东街净空（纯 Node）" },
+  EditorBlockoutFirstLevel0610KeyframesTest: { file: "Script_EditorBlockoutFirstLevel0610KeyframesTest.mjs", desc: "06–10 新剧本白盒关键帧：生成可复现、校验通过、摆位 / 走位 0 问题、信号按拍起、所有人脚下在地面上、关键视线（纯 Node）" },
   EditorBlockoutMapTest: { file: "Script_EditorBlockoutMapTest.mjs", timeoutMs: 300000, desc: "白盒关卡编辑器纸面俯视图与界面：纸色 / 块 / 旋转块 / 等高线 / 各阵营标记数像素，小地图跟玩家，全关总图缩放平移拾取，导航栏刻度与输入隔离" },
   EditorBlockoutBrowserTest: { file: "Script_EditorBlockoutBrowserTest.mjs", timeoutMs: 600000, desc: "白盒关卡编辑器实机：?editor=blockout 不起任务与过场、关键帧传送、过渡连续不瞬移、切第二关再切回、外部改配置自动同步、高级工具入口、存档退化、无未捕获错误" },
   AiCombatBrowserTest: {
@@ -626,6 +628,8 @@ export const tier0Fast = [
   "EditorBlockoutFirstLevel0105SceneTest",
   "EditorBlockoutFirstLevel0105KeyframesTest",
   "EditorBlockoutFirstLevel0105PrevizTest",
+  "EditorBlockoutFirstLevel0610SceneTest",
+  "EditorBlockoutFirstLevel0610KeyframesTest",
   "AutoQualityTest",
   "TextGatherCheck",
   "BootPayloadTest",
