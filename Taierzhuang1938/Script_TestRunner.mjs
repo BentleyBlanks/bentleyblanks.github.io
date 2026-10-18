@@ -178,6 +178,7 @@ export const testDefs = {
   FirstLevelVoiceAudioTest: {file:'Script_FirstLevelVoiceTest.mjs',args:['--audio'],desc:'第一关配音资产严格门：01–06 逐句干声（定妆音/提示词哈希、真峰值、档位电平、信噪比、字错率、音色余弦、逐字时间）+ 07–18 整段录音哈希与对齐'},
   FirstLevelMissionBrowserTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--audio'],timeoutMs:1800000,desc:'新版第一关真实输入、掩蔽部、壕沟路线、作战与通关'},
   TextGatherCheck: { file: "Script_TextGather.mjs", args: ["--check"], desc: "内容文本清单：id 全局唯一、无空文本、与运行时 Localize 同一口径（纯 Node，毫秒级）" },
+  HistoryLedgerCheck: { file: "Script_HistoryLedgerAudit.mjs", args: ["--check"], desc: "资料馆史实与创作对照：四种标注齐全、出处全被引用、没挂核对时否决的链接、小说只挂在创作下（纯 Node）" },
   TextTest: { file: "Script_TextTest.mjs", desc: "文本数据驱动闸门：语言表键/占位符、T() 静态引用、闸门模块零中文字面量（纯 Node，毫秒级）" },
   MovementRangeTest: { file: "Script_MovementRangeTest.mjs", timeoutMs: 240000, desc: "操作白盒：实体标尺、真实跳跃跑跳、翻越边界、姿态通行与复位" },
   PontoonBridgeTest: {file:"Script_PontoonBridgeTest.mjs",desc:"18 pontoon bridge (replaced the rail bridge 2026-09-30): baked GLB/sidecar/terrain agreement, boats/sinking/north-swing/debris at rest, real GLB detonation timeline (boats fly, neighbours sink, north section swings, cues, wreck merge, reset/restore), particle budget"},
@@ -634,6 +635,7 @@ export const tier0Fast = [
   "EditorBlockoutFirstLevel0610PrevizTest",
   "AutoQualityTest",
   "TextGatherCheck",
+  "HistoryLedgerCheck",
   "BootPayloadTest",
   "TerrainLayersTest",
   "TerrainTrailRulesTest",
@@ -707,7 +709,7 @@ export const tier2 = [
 ];
 
 export const domains = {
-  historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
+  historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
   whiteboxQuality: { label: "白盒画质配置与实机", tests: ["WhiteboxQualityTest", "WhiteboxQualityBrowserTest", "WhiteboxShaderWarmTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
@@ -836,7 +838,7 @@ export const domains = {
 
 const changedDomainRules = [
   { domain: "combat", pattern: /FpsGripCorrective|FpsHandSkinWeights|FpsHandSelfContact|FpsHandPose|HanYangReloadClearance|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },
-  {domain:"historyCodex",pattern:/HistoryCodex|HistoryBook|HistoryConscription|page-flip|Texture\/Menu\/History\//},
+  {domain:"historyCodex",pattern:/HistoryCodex|HistoryBook|HistoryConscription|HistoryLedger|page-flip|Texture\/Menu\/History\//},
   { domain: "combat", pattern: /AircraftGeometry|OptimizeKi21|OptimizeKi30|Model_MitsubishiKi(21Ia|30)/ },
   {domain:"textureAssets",pattern:/(?:AssetPublish|BuildPublishAssets|ValidatePublishAssets|PublishCache|PublishAssets|ModelImports)/},
   {domain: "menu", pattern: /(?:StartupRouting|MenuStartup|Script_Entry|GameGraphics|CameraLens|About)/},

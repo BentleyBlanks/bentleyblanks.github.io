@@ -98,3 +98,14 @@ node Taierzhuang1938/Script_HistoryCodexBrowserTest.mjs
 - 「后几关的情节」合并第二关到终章的创作情节；「日军分队的火力配置」把剧本标作有记载、但没附链接的「分队一挺轻机枪」放进出处待查。
 
 以后同类改动按 `AGENTS.md` 跨系统契约第16条走：剧本、大纲、节拍表、空间设计或带史料含义的资产一改，同一轮补 Notion 对照表和本条目。
+
+### 同步流程做成 skill（2026-10-18）
+
+用户要求把「查 Notion 和实现里哪些是创作、更新对照表对应章节、同步资料馆」做成自动化流程。入口是项目 skill `.claude/skills/tengxian-fact-fiction-sync/`（SKILL.md 是流程，`references/` 是页面与文件地图、标注规则）；Codex 等不用 Claude skill 的 agent 直接照 SKILL.md 走。
+
+仓库侧的两件工具：
+
+- `Data_HistoryLedgerSync.json`：同步记号。记上次核对到哪个提交、各 Notion 页当时的编辑时间，以及核对时否决的链接（`rejectedSources`）和只能当文学作品看的链接（`literatureSources`）。
+- `Script_HistoryLedgerAudit.mjs`：默认出报告（上次核对以来动过的台词、白盒、资产契约与新加的玩家文字，资产契约里的史料边界，资料馆现有条目，要比对的 Notion 页）；`--check` 是闸门，登记为 `HistoryLedgerCheck`（tier0Fast，historyCodex 领域）；`--mark-reviewed --notion=<id>=<时间>` 核完写回记号。
+
+跑法分「同步」（默认，查完改 Notion、改条目、验证上线）和「只查不改」。剧本、大纲末尾各自的「史料与创作」小节不归这条流程改（用户 10-18 定）。
