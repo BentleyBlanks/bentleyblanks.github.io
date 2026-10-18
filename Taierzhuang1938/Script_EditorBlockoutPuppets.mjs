@@ -7,11 +7,30 @@
 //
 // 距离分级：60 m 外每 3 帧才推一次动画（累计 dt），影子只在 25 m 内开；一关同时最多
 // 120 个人物，超出时远处的只留地环与标签（标记层照画），并报一次警告。
+//
+// 2026-10-18：
+//   · 单位带 castId（§3）时用定妆身体（Data_FirstLevelSpeakingCast.SpeakingCastOptions：固定模型号 + 面部蒙皮，
+//     种子按 castId 定、不从对象池拿），同一个人每一帧一个样子；没有 castId 照旧按 id 出种子。
+//   · 战车按车身脚印（中心、四角、四边中点）里**最高**的地面放：原来只取中心一点，停在沟口时整辆车掉进沟底。
+//   · 预演（§14）的外部驱动：Drive(id, 状态) 每帧摆位 / 姿态 / 动作片段（开场动作库）/ 可见；Spawn(unit) 临时加人；
+//     ReleaseDrive() 交还（临时加的人回收，其余等总控 Apply 关键帧布设）。
+//   · 蹲姿：NRA 步枪兵「蹲着待着」原来被友军步态换成 AllyCrouchCarryStand（扛枪半蹲，骨盆 0.66 m，看着像站着），
+//     蹲 / 卧的人一律当戒备（missionCombatAlert），落到原生 KneelHold / CrouchIdle。
+//   · 只在要它的关卡才下载的定妆模型（翻译的 NRA06，manifest loadOnDemand）：PrepareCasts(units) 先下完再造人，
+//     否则出来的是方块占位人；翻译不拿枪、走「空手」步态（同开场导演的 unarmed）。
+//   · 倒地（state:"down"）的人放在身体投影范围（中心 ± 0.9 m）里最低的地面上：斜坡上不再斜着悬在半空（宁可略埋进坡里）。
 
 import * as THREE from "three";
 import { SampleTransition } from "./Script_EditorBlockoutConfig.mjs";
 import { InstallAllyGait } from "./Script_AllyGait.mjs";
 import { SetRelaxedGait, EnsureRelaxedGait } from "./Script_RelaxedGait.mjs";
+import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
+import { LoadLugouCastModels } from "./Script_CharacterModel.mjs";
+
+/** 不拿枪的定妆角色（开场导演 Spawn 时给 unarmed:true 的那几个）。 */
+const UNARMED_CASTS = new Set(["interpreter"]);
+/** 倒地的人身体投影的半长（米）：放在这个范围里最低的地面上。 */
+const DOWN_REACH_M = 0.9;
 
 export const BLOCKOUT_PUPPETS = Object.freeze({
   maxActors: 120,
@@ -28,6 +47,9 @@ export const BLOCKOUT_PUPPETS = Object.freeze({
 const DEG = Math.PI / 180;
 
 function ActorKind(unit) {
+  // 定妆角色按定妆表的人物种类（翻译官穿 NRA06，阵营却是 ija）
+  const cast = unit.castId && Object.hasOwn(FIRST_LEVEL_SPEAKING_CAST, unit.castId) ? FIRST_LEVEL_SPEAKING_CAST[unit.castId] : null;
+  if (cast && unit.kind !== "officer") return cast.actorKind;
   if (unit.kind === "officer") return unit.side === "ija" ? "ijaOfficer" : "nraOfficer";
   if (unit.kind === "civilian" || unit.kind === "child" || unit.side === "civ") return "civilian";
   return unit.side === "ija" ? "ija" : "nra";
@@ -54,6 +76,24 @@ export function LitterPose(unit, down = unit?.state === "down") {
   }
   return { y: l.y, tilt: 0 };
 }
+
+/** 战车脚印上取地面的几处（车身局部坐标，米）：中心、四角、四边中点。 */
+export function TankFootprintPoints() {
+  const t = BLOCKOUT_PUPPETS.tank, hw = t.w / 2 + 0.08, hd = t.d / 2;
+  const out = [];
+  for (const lx of [-hw, 0, hw]) for (const lz of [-hd, 0, hd]) out.push([lx, lz]);
+  return out;
+}
+
+/** 战车放在脚印里最高的地面上（车身不陷进沟里）。groundAt(x,z) → y。 */
+export function TankGroundY(groundAt, x, z, yawDeg) {
+  const ry = yawDeg * DEG, c = Math.cos(ry), s = Math.sin(ry);
+  let best = -Infinity;
+  for (const [lx, lz] of TankFootprintPoints()) best = Math.max(best, groundAt(x + lx * c + lz * s, z - lx * s + lz * c));
+  return best;
+}
+
+const litter0 = (unit) => unit.kind === "litter";
 
 function HashSeed(text) {
   let h = 2166136261;
@@ -102,8 +142,12 @@ export class BlockoutPuppets {
 
   _MakeHuman(unit, slot, kind = ActorKind(unit), weapon = unit.weapon ?? null) {
     let actor = null;
+    if (slot === "main" && UNARMED_CASTS.has(unit.castId)) weapon = null;
+    // 定妆角色：固定模型号与面部蒙皮，种子也按 castId 定（同一个人每一帧一个样子）；不从对象池拿（池里的人身高脸型是预建时抽的）
+    const cast = slot === "main" && unit.castId ? SpeakingCastOptions(unit.castId) : {};
+    const seed = cast.castId ? HashSeed(`cast:${cast.castId}`) : HashSeed(`${unit.id}:${slot}`);
     try {
-      actor = this.actorFactory.Create(kind, { seed: HashSeed(`${unit.id}:${slot}`), weapon });
+      actor = this.actorFactory.Create(kind, { seed, weapon, ...cast, ...(cast.castId ? { noPool: true } : {}) });
     } catch (error) {
       console.warn("[BlockoutPuppets] actor create failed", unit.id, error);
       return null;
@@ -112,13 +156,14 @@ export class BlockoutPuppets {
     this.root.add(actor.root);
     // 步态安装器吃一个「假士兵」：只要 id / actor / position / yaw 与几个开关。
     const soldier = { id: `blockout:${unit.id}:${slot}`, actor, position: actor.root.position, yaw: 0, alive: true,
-      side: unit.side, missionCombatAlert: !!unit.aim };
+      side: unit.side, missionCombatAlert: !!unit.aim, castId: cast.castId || null };
     try {
       // 步态库是异步下载的：下不来就用缺省动作，不能留一条未处理的 rejection。
-      if (kind === "nra" || kind === "nraOfficer") InstallAllyGait(soldier)?.catch?.(() => {});
+      if (!weapon && kind !== "civilian") SetRelaxedGait(soldier, "unarmed");
+      else if (kind === "nra" || kind === "nraOfficer") InstallAllyGait(soldier)?.catch?.(() => {});
       else if (kind === "ija") SetRelaxedGait(soldier, unit.aim ? null : "alert");
     } catch (error) { /* 同上 */ }
-    return { actor, soldier, kind, slot, animDt: 0 };
+    return { actor, soldier, kind, slot, animDt: 0, castId: cast.castId || null };
   }
 
   _MakeBody(unit) {
@@ -229,7 +274,7 @@ export class BlockoutPuppets {
       let puppet = this.puppets.get(unit.id);
       const wantActors = allow.get(unit.id) ?? 0;
       const stale = puppet && (puppet.unit.kind !== unit.kind || puppet.unit.side !== unit.side
-        || (puppet.unit.weapon ?? null) !== (unit.weapon ?? null)
+        || (puppet.unit.weapon ?? null) !== (unit.weapon ?? null) || (puppet.unit.castId ?? null) !== (unit.castId ?? null)
         || (unit.kind === "litter" && LitterSlots(puppet.unit).length !== LitterSlots(unit).length)
         || (puppet.down && unit.state !== "down")
         || (puppet.noActor && wantActors > 0) || (!puppet.noActor && wantActors === 0 && puppet.humans.length > 0));
@@ -241,7 +286,7 @@ export class BlockoutPuppets {
         if (human.kind === "ija") SetRelaxedGait(human.soldier, unit.aim ? null : "alert");
       }
     }
-    for (const [id, puppet] of this.puppets) if (!keep.has(id)) { this._Destroy(puppet); this.puppets.delete(id); }
+    for (const [id, puppet] of this.puppets) if (!keep.has(id) && !puppet.temp) { this._Destroy(puppet); this.puppets.delete(id); }
   }
 
   // -------------------------------------------------------------------------
@@ -308,7 +353,13 @@ export class BlockoutPuppets {
 
   /** 把 puppet 的位姿写进体块与人物，并推动画（dt 已含 playbackRate）。 */
   _Pose(puppet, dt, force = false, cameraPosition = null) {
-    const y = this.groundAt(puppet.x, puppet.z);
+    const drive = puppet.drive;
+    if (drive) {
+      puppet.x = drive.x; puppet.z = drive.z; puppet.yawDeg = drive.yawDeg; puppet.stance = drive.stance;
+      puppet.moving = !!drive.moving; puppet.speedMps = drive.speedMps || 0; puppet.visible = drive.visible !== false;
+      puppet.down = drive.state === "down";
+    }
+    const y = puppet.unit.kind === "tank" ? TankGroundY(this.groundAt, puppet.x, puppet.z, puppet.yawDeg) : this.groundAt(puppet.x, puppet.z);
     const ry = puppet.yawDeg * DEG;
     if (puppet.body) {
       puppet.body.visible = puppet.visible;
@@ -333,10 +384,10 @@ export class BlockoutPuppets {
         x += fx * offset * sign; z += fz * offset * sign;
       }
       actor.root.visible = puppet.visible;
-      actor.root.position.set(x, this.groundAt(x, z), z);
+      actor.root.position.set(x, puppet.down && !litter0(unit) ? this.DownGround(x, z) : this.groundAt(x, z), z);
       actor.root.rotation.y = ry;
       human.soldier.yaw = ry;
-      if (human.kind === "ija") EnsureRelaxedGait(human.soldier);
+      if (human.kind === "ija" || human.soldier.relaxedGait) EnsureRelaxedGait(human.soldier);
       human.animDt += dt;
       const far = distance > BLOCKOUT_PUPPETS.farAnimM;
       if (!force && far && (this.frame + puppet.stagger) % BLOCKOUT_PUPPETS.farAnimEvery !== 0) continue;
@@ -345,14 +396,23 @@ export class BlockoutPuppets {
       if (!puppet.visible) continue;
       const mps = puppet.moving ? puppet.speedMps : 0;
       const litter = unit.kind === "litter";
+      const aim = drive ? !!drive.aim : !!unit.aim;
+      const carryRole = litter ? human.slot : drive?.carryRole || null;
+      const clipState = this._ApplyClip(human, drive, mps, step);
+      // 友军步态（AllyGait）把「不戒备」的蹲着待着换成 AllyCrouchCarryStand（扛枪半蹲，骨盆离地 0.66 m，
+      // 看着是站着的）：蹲 / 卧的人也当戒备，落到原生 KneelHold / CrouchIdle（骨盆 0.36–0.45 m）。
+      human.soldier.missionCombatAlert = aim || (!carryRole && puppet.stance !== "stand");
       actor.Update(step, {
         moveSpeed: mps / 3.6, moveSpeedMps: mps, locomotionTracked: true, elapsed: this.elapsed,
-        aim: unit.aim && !litter ? 1 : 0,
-        crouch: !litter && puppet.stance === "crouch" ? 1 : 0,
-        prone: !litter && puppet.stance === "prone" ? 1 : 0,
+        aim: aim && !carryRole ? 1 : 0,
+        crouch: !carryRole && puppet.stance === "crouch" ? 1 : 0,
+        prone: !carryRole && puppet.stance === "prone" ? 1 : 0,
         grounded: true, lookYaw: 0, lookPitch: 0, firing: false,
-        dead: !!puppet.down && !puppet.moving,
-        ...(litter ? { carryRole: human.slot } : {}),
+        dead: !!puppet.down && !puppet.moving && !drive?.clip,
+        ...(carryRole ? { carryRole } : {}),
+        ...(drive?.woundedWalk ? { woundedWalk: 1 } : {}),
+        ...(drive?.talking ? { talking: 1 } : {}),
+        ...(clipState?.bayonetFixed ? { bayonetFixed: true } : {}),
       });
       if (cameraPosition) actor.SetShadowEnabled(distance < BLOCKOUT_PUPPETS.shadowM);
     }
@@ -369,6 +429,136 @@ export class BlockoutPuppets {
     }
     this.elapsed += dt * rate;
     for (const puppet of this.puppets.values()) this._Pose(puppet, dt * rate, false, cameraPosition);
+  }
+
+  // -------------------------------------------------------------------------
+  // 预演的外部驱动（§14.2）
+
+  /** 开场动作库的片段（clip / clipSeconds）：第一次要片段时才给这个人装那一层（库没下完前照原生动画）。 */
+  _ApplyClip(human, drive, mps, dt = 0) {
+    const soldier = human.soldier;
+    const clip = drive?.clip || null;
+    if (clip && !human.openingInstalled && this.opening?.library) {
+      try { this.opening.api.InstallOpeningStoryboardAnimation(soldier); human.openingInstalled = true; }
+      catch (error) { console.warn("[BlockoutPuppets] opening layer install failed", error); human.openingInstalled = "failed"; }
+    }
+    if (human.openingInstalled !== true) return null;
+    if (!clip) {
+      soldier.openingStoryboardPose = null;
+      soldier.openingStoryboardTravel = null;
+      human.clipSeconds = null;
+      return null;
+    }
+    const seconds = Math.max(0, drive.clipSeconds || 0);
+    const meta = this.opening.api.OpeningClipMeta(clip) || {};
+    const pose = { clip, seconds };
+    // 走着放的片段（manifest referenceSpeedMps，如 IjaWalkStabProne）：开场动作层按「走了多远」推它的身体时钟，
+    // 而枪道具按 pose.seconds 取 —— 原地放时身体停在第一帧、枪跑到后面的帧，枪就脱手悬空。
+    // 照开场导演的握法：身体时钟按片段秒数的增量喂（openingStoryboardTravel），枪交给双手（weaponHold）。
+    let travel = mps > 0.05 ? mps : null;
+    if (meta.referenceSpeedMps > 0) {
+      const last = human.clipName === clip && Number.isFinite(human.clipSeconds) ? human.clipSeconds : seconds;
+      const advance = Math.max(0, seconds - last);
+      travel = dt > 1e-4 ? meta.referenceSpeedMps * advance / dt : 0;
+      pose.weaponHold = meta.weaponHold || "twoHand";
+    }
+    human.clipName = clip; human.clipSeconds = seconds;
+    soldier.openingStoryboardPose = pose;
+    // 走着放站姿片段：腿交给原生步态
+    soldier.openingStoryboardTravel = travel;
+    // 拿刺刀扎人的片段（contacts 里有 blade / stab）要上刺刀，开场导演造这个人时就给 bayonetFixed
+    const bayonetFixed = (meta.contacts || []).some(c => c.limb === "blade" && c.action === "stab");
+    return { bayonetFixed };
+  }
+
+  /** 倒地的人：身体投影范围（中心与前后左右 0.9 m）里最低的地面。 */
+  DownGround(x, z) {
+    const r = DOWN_REACH_M;
+    return Math.min(this.groundAt(x, z), this.groundAt(x + r, z), this.groundAt(x - r, z), this.groundAt(x, z + r), this.groundAt(x, z - r));
+  }
+
+  /**
+   * 要在本关下载的定妆模型（loadOnDemand：翻译的 NRA06）先下完：units 里带 castId 的人都算上。
+   * 没下完就造人出来的是方块占位人。→ Promise（失败也 resolve，造出来照旧是占位）。
+   */
+  async PrepareCasts(units) {
+    const library = this.actorFactory?.characterAssets;
+    const specs = [...new Set((units || []).map(u => u?.castId).filter(id => id && Object.hasOwn(FIRST_LEVEL_SPEAKING_CAST, id)))]
+      .map(id => FIRST_LEVEL_SPEAKING_CAST[id]);
+    if (!library || !specs.length) return [];
+    try { return await LoadLugouCastModels(library, specs); }
+    catch (error) { console.warn("[BlockoutPuppets] cast model load failed", error); return []; }
+  }
+
+  /** 开场动作库（Script_OpeningStoryboardAnimation）：预演用到片段时由预演交进来 { api, library }。 */
+  SetOpeningLibrary(opening) { this.opening = opening || null; }
+
+  /** 按 id 取演员（预演找嘴、找头、找枪口用）。 */
+  Get(id) { return this.puppets.get(id) || null; }
+
+  /** 临时加一个人（预演 spawn，只活在这段预演里；ReleaseDrive 时回收）。 */
+  Spawn(unit, cameraPosition = null) {
+    let puppet = this.puppets.get(unit.id);
+    if (puppet && !puppet.temp) return puppet;
+    if (puppet) { this._Destroy(puppet); this.puppets.delete(unit.id); }
+    const need = unit.kind === "litter" ? LitterSlots(unit).length : ["tank", "cart", "animal"].includes(unit.kind) ? 0 : 1;
+    puppet = this._Create(unit, this.actorCount + need <= BLOCKOUT_PUPPETS.maxActors ? need : 0);
+    puppet.temp = true;
+    this.puppets.set(unit.id, puppet);
+    this._Pose(puppet, 0, true, cameraPosition);
+    return puppet;
+  }
+
+  /** 外部驱动这一帧的状态（SamplePrevizActor 的结果）；null = 不再驱动。 */
+  Drive(id, state) {
+    const puppet = this.puppets.get(id);
+    if (!puppet) return false;
+    puppet.drive = state || null;
+    return true;
+  }
+
+  /** 预演结束：临时加的人回收，被驱动的人交还（位置由随后的 Apply 摆回关键帧布设）。 */
+  ReleaseDrive() {
+    for (const [id, puppet] of this.puppets) {
+      if (puppet.temp) { this._Destroy(puppet); this.puppets.delete(id); continue; }
+      puppet.drive = null;
+      for (const human of puppet.humans) {
+        if (human.openingInstalled === true) { human.soldier.openingStoryboardPose = null; human.soldier.openingStoryboardTravel = null; }
+        const facial = human.actor.characterRig?.facial;
+        if (facial && human.facialBound) { facial.source = null; human.facialBound = false; }
+      }
+    }
+  }
+
+  /** 确定性取样（预演 Seek）：按当前驱动状态连推几步小 dt，让动作层 / 片段混合收敛到同一个姿态。 */
+  Settle(steps = 10, dt = 0.05, cameraPosition = null) {
+    for (let i = 0; i < steps; i++) for (const puppet of this.puppets.values()) {
+      for (const human of puppet.humans) human.animDt = 0;
+      this._Pose(puppet, dt, true, cameraPosition);
+    }
+  }
+
+  /** 取证：某个演员此刻的样子（播的动作、姿态、脚下高度、定妆身体、骨盆 / 头离地）。 */
+  Probe(id) {
+    const puppet = this.puppets.get(id);
+    if (!puppet) return null;
+    const human = puppet.humans[0];
+    const rig = human?.actor.characterRig;
+    const ground = puppet.unit.kind === "tank" ? TankGroundY(this.groundAt, puppet.x, puppet.z, puppet.yawDeg) : this.groundAt(puppet.x, puppet.z);
+    let pelvisY = null, headY = null;
+    try {
+      human?.actor.root.updateWorldMatrix(true, true);
+      if (rig?.bones?.pelvis) pelvisY = rig.bones.pelvis.getWorldPosition(new THREE.Vector3()).y;
+      if (rig?.bones?.head) headY = rig.bones.head.getWorldPosition(new THREE.Vector3()).y;
+    } catch (error) { /* 取证不影响运行 */ }
+    return {
+      id, kind: puppet.unit.kind, x: puppet.x, z: puppet.z, yawDeg: puppet.yawDeg, stance: puppet.stance, visible: puppet.visible,
+      driven: !!puppet.drive, temp: !!puppet.temp, ground, centerGround: this.groundAt(puppet.x, puppet.z),
+      bodyY: puppet.body ? puppet.body.position.y : null, actors: puppet.humans.length,
+      clip: human?.soldier.openingStoryboardPose?.clip || null, currentId: rig?.currentId || null, modelId: rig?.modelId || null,
+      castId: human?.castId || null, facial: !!rig?.facial, modelVariant: human?.actor.modelVariant ?? null,
+      pelvisAboveGround: pelvisY !== null ? pelvisY - ground : null, headAboveGround: headY !== null ? headY - ground : null,
+    };
   }
 
   /** 演员现场位置（标记层与俯视图读）。 */

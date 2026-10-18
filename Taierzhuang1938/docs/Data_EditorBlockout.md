@@ -204,7 +204,7 @@ export function DefaultArc(unit);                   // §5.3
 
 - 游戏 HUD：编辑器模式给 `body` 加 `blockoutMode` 类，隐藏任务字、简报卡、字幕、旧小地图、人数池等；保留准星、弹药、受伤反馈。
 - 指针锁：锁定时编辑器界面可见但不可点（`pointer-events:none`）；Esc 解锁后可点；点 3D 画面重新锁定（现有逻辑）。窗口不给锁（Claude 桌面应用的内置浏览器面板会报 `SecurityError` / `WrongDocumentError`「root document … not valid for pointer lock」）时，`Script_Main` 改成**按住右键拖动转视角**、左键照常开枪，提示一次 `hud.hint.dragLook`；正常浏览器不受影响。编辑器 DOM 上的 `mousedown`/`wheel`/`keydown` 必须 `stopPropagation`，否则会触发抢锁、滚轮换枪。
-- 按键（锁定 / 未锁定都有效）：`.` 下一个（带过渡动画）、`,` 上一个（直接到位）、`M` 全关总图（替代原 M 小地图）、`Y` 重播进入当前关键帧的过渡、`P` 复制当前位置（§4.2）。不得占用 `KEYMAP` 已绑的键。
+- 按键（锁定 / 未锁定都有效）：`.` 下一个（带过渡动画）、`,` 上一个（直接到位）、`M` 全关总图（替代原 M 小地图）、`Y` 重播进入当前关键帧的过渡、`P` 复制当前位置（§4.2）、`N` 播 / 中断当前关键帧的预演（§14，2026-10-18；`V` 是近战键）。不得占用 `KEYMAP` 已绑的键。
 
 ```js
 export class BlockoutUi {
@@ -315,7 +315,8 @@ export class BlockoutMarkers {
 - 独立演员：`host.actorFactory.Create(kind, { seed, weapon, modelVariant })`，挂在编辑器自己的 `Group` 下；**不进 `ai.soldiers`**（不被子弹打中、不挡人，这是有意的：这里只看布设）。
 - 每帧 `actor.Update(dt, { moveSpeed: mps/3.6, moveSpeedMps: mps, locomotionTracked: true, aim, crouch, prone, grounded: true, ... })`；IJA 慢走装 `SetRelaxedGait(p, "alert")`，NRA 装 `InstallAllyGait(p)`（接受假 soldier 对象，实现时核对）。
 - `kind`：`officer` → `ijaOfficer`/`nraOfficer`；`civilian`/`child` → `civilian`（child 缩放 0.62，若安全）；`tank` → 简单体块车身 5.75×2.18×1.9 + 炮塔块；`litter` → 担架块 2.1×0.7 + 前后两名抬担架的 NRA 演员；`cart` → 车块 + 可选 `animal` 块。
-- `state: "down"`：倒地姿态（用现有 `dead`/`prone` 状态，实现时选能用的）。
+- `state: "down"`：倒地姿态（用现有 `dead`/`prone` 状态，实现时选能用的）。2026-10-18：倒地的人放在身体周围 0.9 m 内**最低**的地面上（不再悬在土埂斜坡上方；陡沟壁上仍会斜躺，数据里把倒地位置放到沟底）。
+- 2026-10-18：演员脚下的地面 = max(高度场, 点落在其脚印内、顶面比高度场高不超过 1.0 m 的实心块顶面)（`Script_EditorBlockoutPrevizPlan.BlockStandSampler`，总控 `standAt`；脚印按 `ry` 旋转判，gates 只算此刻在场的，水 / 空气墙不算）：机枪坑射击台、台阶上的人站在台上，洞顶、胸墙这种高块不算。关键帧摆人、预演的 eye 镜头与锚点、倒地、战车、3D 标记都用它；俯视图、地形上色、水面仍按纯高度场。战车按车身脚印上中心、四角、四边中点 9 处取**最高**的地面放（`TankGroundY`），压过沟时停在沟沿上而不是掉进沟底；蹲、卧的人一律按戒备姿态（原生 `KneelHold` / `CrouchIdle`），不被友军步态换成扛枪半蹲；有 `castId` 的单位用定妆身体（`SpeakingCastOptions`），按需下载的身体（如翻译 NRA06）先下完再造人（`PrepareCasts`），翻译不拿枪。
 - 距离分级：60 m 外每 3 帧更新一次动画，阴影只在 25 m 内开；单关同时上限 120 个演员，超出时远处的只留地环与标签（报警告）。
 - 切关、重载配置时全部回收；同一关切关键帧时按 `id` 复用。
 
@@ -504,11 +505,11 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
 
 ## 14. 预演（previz，2026-10-18）
 
-用户 10-18 拍板：白盒编辑器默认仍是「走关键帧看布设」（§1 的「完全不要过场动画」对普通浏览照旧成立）；**每个关键帧可以挂一段预演**，按卡片上的「预演」按钮或 `V` 播放：镜头轨、人物调度（走位 / 姿态 / 现成动作片段）、台词（字幕 + 占位配音 + 口型）、事件（白光、黑场、爆炸、烟、枪口火、塌洞等场景信号、震屏、音效）。播完按 `then` 跳到下一个关键帧（直接到位），玩家又能走。缺的动作先用现成动作顶上（用户 10-18），缺口列清单，白盒走顺了再补正式动画。
+用户 10-18 拍板：白盒编辑器默认仍是「走关键帧看布设」（§1 的「完全不要过场动画」对普通浏览照旧成立）；**每个关键帧可以挂一段预演**，按卡片上的「预演」按钮或 `N` 播放（`V` 是近战键，§4 不许占）：镜头轨、人物调度（走位 / 姿态 / 现成动作片段）、台词（字幕 + 占位配音 + 口型）、事件（白光、黑场、爆炸、烟、枪口火、塌洞等场景信号、震屏、音效）。播完按 `then` 跳到下一个关键帧（直接到位），玩家又能走。缺的动作先用现成动作顶上（用户 10-18），缺口列清单，白盒走顺了再补正式动画。
 
 ### 14.1 文件（`Blockout/<Level>.previz.json`，可选）
 
-编辑器切到某关时顺手读 `./Blockout/<key>.previz.json?t=…`（404 = 这关没有预演，按钮不出现）；页面可见时和配置一起每 2 s 查一次，变了就重读（正在播的那段播完才换）。
+编辑器切到某关时顺手读 `./Blockout/<key>.previz.json?t=…`（404 = 这关没有预演，按钮不出现）；有文件时页面可见期间和配置一起每 2 s 查一次，变了就重读（正在播的那段播完才换）；没有文件时不每 2 s 轮询（浏览器每次 404 都在控制台报错），只在配置变化、`Reload`、切关时和每 30 s 再查一次。
 
 ```json
 {
@@ -548,10 +549,10 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
   - `eye`：顺子的眼睛（第一人称）。`stance` 定眼高（stand 1.62 / crouch 1.05 / prone 0.32 m，离地），`yawDeg` / `pitchDeg` 起始朝向，`toYawDeg` / `toPitchDeg` 可选（这一条里转头过去）；受困拍就这么写。
   - 否则 `from`（必填）/ `to`（可选，机位移动）+ `look`（必填）/ `lookTo`（可选）；`fov` 垂直视场度数（缺省 60）；`ease`：`"linear"` / `"inOut"`（缺省）；`shake` 0–1。
 - **演员** `actors[]`：`id` 是当前关键帧里的单位 id，或带 `spawn`（§3 单位字段，`x/z` 必填）临时加一个人（只活在这段预演里）。`keys[]` 按 `t` 排，每个键只写变了的字段：
-  - 位置：`x, z`（与上一个有位置的键之间按 `move` 插值；`path` 是途经点；`move`：`"walk"` / `"run"` / `"crawl"` / `"drag"`（倒退着拖，朝向反过来）/ `"cut"`（到点瞬移），缺省 `walk`）。走动时朝向顺着行进方向，到点后转到 `yawDeg` / `faceTo`。
-  - 朝向：`yawDeg` 或 `faceTo`（点 `{x,z}` 或单位 id 或 `"player"`）。
-  - 姿态与状态：`stance`、`aim`、`state`（`"down"` 倒地）、`visible`、`carryRole`（`"front"` / `"rear"`，抬担架 / 拖单被）、`woundedWalk`、`talking`。
-  - 动作片段：`clip`（开场动作库等现成片段名，`null` = 清掉回原生动画）、`clipFrom`（从片段第几秒起）、`clipHold`（播完停在最后一帧）。片段按骨架分：有 `castId` 的单位骨架固定，片段不在这具骨架上时退回原生动画并在状态里报一次（`Debug.Blockout.Previz.State().missingClips`）。
+  - 位置：`x, z`（`path` 是途经点；`move`：`"walk"` / `"run"` / `"crawl"` / `"drag"`（倒退着拖，朝向反过来）/ `"cut"`（到点瞬移），缺省 `walk`）。**带位置的键的 `t` 是到达时刻**：从上一个带位置的键（没有就是关键帧布设、t = 0）出发，按 `move` 的自然速度走（walk 1.4、run 3.5、crawl 0.5、drag 0.9 m/s），出发时刻 = max(上一个位置键的 t, 本键 t − 路长 / 速度)；窗口不够就从上一个位置键起匀速赶到。`t = 0` 的位置键 = 开场直接摆到那里（瞬移）。要控制「几点出发」，在出发时刻加一个同位置的键。`crawl` 走动时强制卧姿。
+  - 朝向：`yawDeg` 或 `faceTo`（点 `{x,z}` 或单位 id 或 `"player"`）。走动中顺着行进方向（`drag` 反向），到点后 0.4 s 转到本键的朝向；本键没写朝向就保持到达时的行进方向，等后面的朝向键再转。
+  - 姿态与状态：`stance`、`aim`、`state`（`"down"` 倒地）、`visible`、`carryRole`（`"front"` / `"rear"`，抬担架 / 拖单被）、`woundedWalk`、`talking`。这些与 `clip` 都是**阶跃**：取 t 之前最近写过这个字段的键。
+  - 动作片段：`clip`（开场动作库等现成片段名，`null` = 清掉回原生动画）、`clipFrom`（从片段第几秒起）、`clipHold`（播完停在最后一帧；不写则播完回原生动画）。片段按骨架分：有 `castId` 的单位骨架固定，片段不在这具骨架上时退回原生动画并在状态里报一次（`Debug.Blockout.Previz.State().missingClips`）。
 - **台词** `lines[]`：`line` 是 `voice` 清单里的句子 id；`actor` 可省（省了 = 当前关键帧里 `castId` 等于这句 `who` 的单位；找不到就从玩家头上放、不动嘴）。字幕显示这句的 `speaker` + `subtitle`；有口型轨按 sha256 用口型轨，否则用音频包络张嘴（单位要有带面部的身体：`castId` 属于 `Data_FirstLevelSpeakingCast`）。
 - **事件** `events[]`（`type` 必填）：
   - `flash` `{dur, strength?}` 白光；`black` `{dur, fade?}` 黑场（`fade` 渐入渐出秒数）；`caption` `{text, dur}` 非台词的说明字（弱显示，如「（耳鸣）」）。
@@ -562,10 +563,16 @@ CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "cl
 
 ### 14.2 播放（`Script_EditorBlockoutPreviz.mjs` + 总控）
 
-- 播：卡片上的「预演」按钮或 `V`（当前关键帧有预演时）；再按 `V` 或 `Esc` 中断。播放期间：相机归预演（`Script_Main` 在玩家相机写完之后调 `blockout?.ApplyCamera?.(camera)`，返回 true 表示这一帧相机已被接管）、第一人称枪模藏起来、鼠标归预演（同全关总图：不开枪、不转头、不抢锁）、玩家站在原地不吃 WASD、3D 标记与头顶标签藏起来、卡片换成「预演 · 标题 · 进度」、导航栏不响应。
+- 播：卡片上的「预演」按钮或 `N`（当前关键帧有预演时；键码集中在 `Script_EditorBlockoutPreviz.mjs` 头部的 `PREVIZ_KEY`）；再按 `N` 或 `Esc` 中断。播放期间：相机归预演（`Script_Main` 在玩家相机写完之后调 `blockout?.ApplyCamera?.(camera)`，返回 true 表示这一帧相机已被接管）、第一人称枪模藏起来、鼠标归预演（同全关总图：不开枪、不转头、不抢锁）、玩家站在原地不吃 WASD、3D 标记与头顶标签藏起来、卡片换成「预演 · 标题 · 进度」、导航栏不响应。
 - 单位就是当前关键帧的演员（`BlockoutPuppets`），预演按 `SamplePrevizActor` 每帧摆位；播完 / 中断时恢复：`then` 指的关键帧直接到位（§5.1 的 `GoTo(..., { animate: false })`）。
 - 字幕由预演自己的 DOM 显示（编辑器模式隐藏游戏字幕的规则不动）：底部居中、导航栏上方，「说话人 · 字幕」，与编辑器同一套视觉。
-- `window.Tengxian.Debug.Blockout.Previz`：`Has(idOrIndex)`、`Play(idOrIndex)` → Promise（播完 resolve）、`Stop()`、`Seek(t)`（暂停在 t 秒，确定性求值，截图用）、`Resume()`、`State()` → `{ playing, paused, keyframe, t, durationS, missingClips, missingLines }`。
+- `window.Tengxian.Debug.Blockout.Previz`：`Has(idOrIndex)`、`Play(idOrIndex)` → Promise（播完 resolve）、`Stop()`、`Seek(t)`（暂停在 t 秒，确定性求值，截图用）、`Resume()`、`Reload()`、`CameraPose(t)`、`State()` → `{ playing, paused, keyframe, t, durationS, missingClips, missingLines, missingSfx }`；`Debug.Blockout.Probe(id)` 查一个演员的现场状态（取证用）。
+- 实现口径（2026-10-18 运行时包）：
+  - `Script_Main` 的钩子：`BlockoutInputCaptured()`（预演中键位动作、走动、冲刺、开火、开镜、姿态切换都清零），玩家相机写完之后 `blockout?.ApplyCamera?.(camera)`，预演中第一人称枪模与身体一起藏；鼠标走全关总图那套 `CapturesMouse()` 闸。
+  - 中断与播完一样按 `then` 跳关键帧。
+  - `Seek` 只对**持续状态**确定（演员、镜头、白光、黑场、说明字、字幕、嘴、信号、持续的烟）；一次性的爆炸、枪口火、音效 Seek 时不补放。按走过的距离推身体的走路片段（带 `referenceSpeedMps`，如 `IjaWalkStabProne`）Seek 时身体停帧，正常播放没问题。
+  - 嘴：previz 文件写了 `faceTracks` 就按 mp3 sha256 用口型轨，没有就用配音的音频包络。
+  - 预演期间小地图照常显示。
 
 ### 14.3 音效别名（`sfx.name`）
 

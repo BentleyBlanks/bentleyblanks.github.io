@@ -11,8 +11,14 @@
 | `FirstLevel.json` | 第一关的 44 个关键帧：每一站玩家站哪、看哪，此时发生了什么，下一步去哪，敌我各在哪、朝哪、要往哪去 | 生成器从游戏数据算出来（`export FirstLevel`），之后可以手改 |
 | `SecondLevel.json` | 第二关的 4 个空间占位关键帧（流程未定稿，只放地标，不放人） | `scene SecondLevel` 一起写出 |
 | `SecondLevel.scene.json` | 第二关的草稿场景：1 m 一格的高度网格 + 院落级体块 + 道路 | `scene SecondLevel` 从城区地面函数与东关数据烘出来 |
+| `FirstLevel0105.json` | 第一关 01–05 新剧本（Notion 10-18 定稿）的 25 个关键帧，按拍号 01-1…05-4，02末是 `02E-1/02E-2`（`stageLabel: "02末"`） | `export FirstLevel0105` 从空间锚点生成，之后以手改的 JSON 为准 |
+| `FirstLevel0105.scene.json` | 01–05 的独立场地：0.5 m 高度网格（前沿沟、交通沟、支沟、机枪坑、防炮洞、坡顶、集结处、路）+ 体块 + 随信号出现 / 消失的体块（塌洞、坑沿被炸、路口沟沿被碾） | `scene FirstLevel0105` 按 `Data_EditorBlockoutFirstLevel0105Space.mjs` 烘出来 |
+| `FirstLevel0105.voice.json` | 01–05 台词的占位配音清单（每句：说话人、字幕、mp3、时长、录音里的原始间隔），mp3 在 `../Audio/Blockout0105/` | `Script_EditorBlockoutFirstLevel0105Voice.mjs`（SeedAudio 整段生成后切句） |
+| `FirstLevel0105.previz.json` | 01–05 每个关键帧的预演：镜头、人物调度、动作片段、台词时间、事件（契约 §14） | `Script_EditorBlockoutFirstLevel0105Previz.mjs` 生成，之后可手改 |
 
-第一关的场景就是游戏里的第一关（换成白盒画法），没有单独的场景文件。
+第一关（`FirstLevel`）的场景就是游戏里的第一关（换成白盒画法），没有单独的场景文件。`FirstLevel0105` 是另一片场地，坐标原点在沟口，和游戏里的第一关无关。
+
+**预演**：有 `<关卡>.previz.json` 的关卡，关键帧卡片上会出现「预演」按钮（或按 `N`），播这一拍的镜头、走位、台词字幕和占位配音，播完跳到下一个关键帧；再按 `N` 或 `Esc` 中断。改 previz 文件同样 2 秒内同步（正在播的那段播完才换）。
 
 ## 配置长什么样
 
@@ -73,6 +79,14 @@
 | `RailBridgeDestroyed` | 北沙河浮桥被炸断 | 18-3 |
 | `NightGateShown` | 夜里北门那一片出现 | 18-4 |
 
+`FirstLevel0105` 的场景信号（场景文件 `gates` 里对应的块随它出现 / 消失）：
+
+| 信号 | 意思 | 从哪个关键帧起 |
+| --- | --- | --- |
+| `DugoutCollapsed` | 防炮洞口塌了：横楣与洞口顶盖没了，塌下的横木压住顺子，洞口南半边一堆土 | 01-4 |
+| `PitShelled` | 战车一炮打塌机枪坑北沿一截胸墙 | 03-4 |
+| `TankDisabled` | 战车瘫在路口：路口那段交通沟两侧沟沿被碾塌 | 05-3 |
+
 切到下一个关键帧时，两边都有的人沿 `path` 走过去（各按自己的速度，整段超过 8 秒就整体快进）；只在新关键帧里有的人原地出现，写了 `path` 的从 `path` 起点走进来；只在旧关键帧里有的人消失，写了 `intent` 的先走完再消失。
 
 ## 第一关的摆位规矩（测试按这些判失败）
@@ -106,6 +120,9 @@ node Taierzhuang1938/Script_EditorBlockoutCli.mjs kf FirstLevel 03-2            
 node Taierzhuang1938/Script_EditorBlockoutCli.mjs export FirstLevel --force     # 从游戏数据重新生成第一关（会丢掉手改）
 node Taierzhuang1938/Script_EditorBlockoutCli.mjs export FirstLevel --out=tmp/FirstLevel.json   # 生成到别处对比，不碰这里
 node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene SecondLevel --force     # 重新生成第二关草稿场景与占位配置
+node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene FirstLevel0105 --force  # 重新烘 01–05 场地（只写场景文件）
+node Taierzhuang1938/Script_EditorBlockoutCli.mjs export FirstLevel0105 --force # 从锚点重新生成 01–05 关键帧（会丢掉手改）
+node Taierzhuang1938/Script_EditorBlockoutCli.mjs summary FirstLevel0105        # 01–05 每个关键帧一行
 node Taierzhuang1938/Script_EditorBlockoutConfigTest.mjs                        # 格式、生成器与这里几份文件的测试
 ```
 

@@ -19,6 +19,9 @@
 //   7. 切到 SecondLevel 之后场景边界与地形都换了，再切回来；没有本机存档口时退化成本地草稿；
 //   8. §10 视觉组截图（01-2、02-1、03-2、08-2、12-1、18-2）：近处的射界扇淡掉、远处的照常；
 //   9. 全程没有未捕获错误；Blockout/FirstLevel.json 前后逐字节相同。截图存 _shots/EditorBlockout/。
+//  10. 预演（§14，2026-10-18）：第一关没有预演文件时按钮不出现；page.route 注入一段最小的预演（不改盘上的数据）后：
+//      播放中相机被接管、台词字幕出现、导航栏锁住、标记藏起；Seek 后单位位置等于 SamplePrevizActor（< 0.1 m）、
+//      同一 t 两次取样一样；播完按 then 跳到下一个关键帧；中断（Esc）后相机、枪模、HUD 交还。
 // 顺带量：开机到就绪、第一次烘图的最长帧、03-2 上 120 帧的帧时、外部修改的同步耗时、切关耗时。
 // ===========================================================================
 
@@ -39,6 +42,7 @@ import { BLOCKOUT_EDITOR } from "./Script_EditorBlockout.mjs";
 import { LitterSlots, LitterPose, BLOCKOUT_PUPPETS } from "./Script_EditorBlockoutPuppets.mjs";
 import { FanFade, BLOCKOUT_FAN } from "./Script_EditorBlockoutMarkers.mjs";
 import { ParseBlockoutSnapshot } from "./Script_EditorBlockoutSnapshot.mjs";
+import { NormalizeBlockoutPreviz, SamplePrevizActor, ValidateBlockoutPreviz } from "./Script_EditorBlockoutPrevizPlan.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -159,6 +163,8 @@ page.on("console", (message) => {
   if (/__blockout/.test(url) || /__blockout/.test(message.text())) return;
   // 「文件暂时没了」那一段故意回 404
   if (allowConfig404 && CONFIG_RE.test(url)) return;
+  // 这一关没有预演文件（§14.1：404 = 没有预演）
+  if (/\.previz\.json(\?|$)/.test(url) && /404/.test(message.text())) return;
   errors.push(`CONSOLE ${message.text().slice(0, 240)} @ ${url}`);
 });
 
@@ -205,6 +211,10 @@ try {
   Check("关键帧数与配置一致", boot.state.count === configDoc.keyframes.length, `${boot.state.count} / ${configDoc.keyframes.length}`);
   Check("配置载入无错", boot.state.configState === "ok", boot.state.configMessage);
   Check("读配置时按原始字节算出版本号（sha1，与盘上文件一致）", boot.state.revision === originalRevision, `${boot.state.revision} / ${originalRevision}`);
+  {
+    const pz = await B(() => ({ state: window.Tengxian.Debug.Blockout.Previz.State(), button: !document.querySelector(".boPrevizBtn")?.hidden }));
+    Check("第一关没有预演文件：预演按钮不出现", !pz.state.present && !pz.button && pz.state.sequences.length === 0, JSON.stringify({ present: pz.state.present, button: pz.button }));
+  }
 
   // 1b) 第一次烘纸面地图：加载画面收掉 1.5 s 之后才开始；量烘图期间的最长帧
   console.log("--- first map bake");
@@ -708,6 +718,122 @@ try {
       JSON.stringify(fan));
   }
   Check("视觉组里远处单位的射界扇照常画", fansTotal > 0, `共 ${fansTotal} 片`);
+
+  // 10) 预演（§14）：注入一段最小的预演（page.route，不碰盘上的数据）
+  console.log("--- previz");
+  {
+    const voice = { schema: "tengxian-blockout-voice/1", level: "FirstLevel", scenes: [{ id: "PrevizTest", lines: [
+      { id: "PrevizTest.01", who: "luo", speaker: "罗班长", subtitle: "跟紧，莫抬头。", durationS: 1.6 },
+    ] }] };
+    const previzDoc = {
+      schema: "tengxian-blockout-previz/1", level: "FirstLevel", voice: "./Blockout/__PrevizTest.voice.json",
+      sequences: [{
+        keyframe: "03-1", title: "预演测试", then: "next", durationS: 4,
+        camera: [{ t: 0, dur: 4, from: { x: -40, z: -98, h: 3 }, to: { x: -36, z: -98, h: 3 }, look: { actor: "luo", offset: [0, 1.2, 0] }, fov: 50 }],
+        actors: [
+          { id: "luo", keys: [{ t: 0.5, faceTo: "player" }, { t: 3, x: -28, z: -110, move: "run", path: [{ x: -29, z: -109 }] }] },
+          { id: "PrevizExtra", spawn: { side: "nra", x: -33, z: -101, yawDeg: 0 }, keys: [{ t: 1, x: -33, z: -104, move: "walk" }] },
+        ],
+        lines: [{ t: 0.3, line: "PrevizTest.01", actor: "luo" }],
+        events: [{ t: 2.5, type: "flash", dur: 0.3 }, { t: 2.6, type: "sfx", name: "rifleShot" }],
+      }],
+    };
+    const previzCheck = ValidateBlockoutPreviz(previzDoc, { config: configDoc, voice });
+    Check("测试用预演过校验", previzCheck.ok, previzCheck.errors.join("；"));
+    await page.route(/\/Blockout\/FirstLevel\.previz\.json/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(previzDoc) }));
+    await page.route(/\/Blockout\/__PrevizTest\.voice\.json/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(voice) }));
+    await B(() => window.Tengxian.Debug.Blockout.Previz.Reload());
+    await GoTo("03-1");
+    await page.waitForTimeout(200);
+    const ready = await B(() => ({ has: window.Tengxian.Debug.Blockout.Previz.Has("03-1"), hasOther: window.Tengxian.Debug.Blockout.Previz.Has("03-2"),
+      button: !document.querySelector(".boPrevizBtn")?.hidden }));
+    Check("注入预演后：03-1 有预演、卡片出现预演按钮；别的关键帧没有", ready.has && !ready.hasOther && ready.button, JSON.stringify(ready));
+    // 播：相机接管、字幕、导航栏锁住、标记藏起
+    await B(() => { window.__previzDone = null; window.Tengxian.Debug.Blockout.Previz.Play("03-1").then(v => { window.__previzDone = v; }); });
+    await WaitSync(() => { const s = window.Tengxian.Debug.Blockout.Previz.State(); return s.playing && s.t > 0.6; }, null, 15000);
+    const live = await B(() => {
+      const T = window.Tengxian, Bl = T.Debug.Blockout, P = Bl.Previz, s = P.State();
+      const pose = P.CameraPose(s.t), cam = T.camera.position, eye = T.player.position;
+      return { s, pose, cam: { x: cam.x, y: cam.y, z: cam.z }, eye: { x: eye.x, z: eye.z },
+        subDom: [...document.querySelectorAll(".boPrevizSub .boPrevizText")].map(e => e.textContent),
+        navLocked: document.querySelector(".boNav")?.classList.contains("locked"), labels: getComputedStyle(document.querySelector(".blockoutLabels")).display,
+        card: document.querySelector(".boCard")?.classList.contains("previz"), mouse: Bl.State().previz, hud: document.body.classList.contains("blockoutPreviz"),
+        viewmodel: T.viewmodel?.root?.visible ?? null };
+    });
+    // 相机是这一帧开头按上一帧的 t 摆的：比位置只要在镜头轨上（x 在 -40…-36、高 3 m 左右、离玩家几米）
+    Check("预演播放中相机被接管（在镜头轨上，不在玩家眼睛那里）", live.s.playing && live.cam.x >= -40.05 && live.cam.x <= -35.95 && Math.abs(live.cam.z + 98) < 0.05
+      && Math.hypot(live.cam.x - live.eye.x, live.cam.z - live.eye.z) > 3, JSON.stringify({ cam: live.cam, pose: live.pose?.position, t: live.s.t }));
+    Check("预演播放中台词字幕出现（说话人 · 字幕）", live.s.subtitles.includes("跟紧，莫抬头。") && live.subDom.includes("跟紧，莫抬头。"), JSON.stringify(live.subDom));
+    Check("预演播放中：卡片换成预演进度、导航栏锁住、头顶标签藏起、枪模与 HUD 让开、鼠标归预演",
+      live.card && live.navLocked && live.labels === "none" && live.hud && live.mouse && live.viewmodel === false, JSON.stringify({ card: live.card, nav: live.navLocked, labels: live.labels, hud: live.hud, mouse: live.mouse, vm: live.viewmodel }));
+    const indexDuring = (await State()).index;
+    await page.keyboard.press("Period");
+    Check("预演播放中按 . 不翻关键帧", (await State()).index === indexDuring);
+    // Seek：单位位置 = SamplePrevizActor；同一 t 两次一样
+    const seq = NormalizeBlockoutPreviz(previzDoc).sequences[0];
+    const kf31 = configDoc.keyframes[K("03-1")];
+    const playerAt = await PlayerPos();
+    const SeekAt = (t) => B(async (t) => {
+      const Bl = window.Tengxian.Debug.Blockout;
+      await Bl.Previz.Seek(t);
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const units = Object.fromEntries(Bl.Units().map(u => [u.id, { x: u.x, z: u.z, yawDeg: u.yawDeg, visible: u.visible }]));
+      const cam = window.Tengxian.camera;
+      return { units, cam: { x: cam.position.x, y: cam.position.y, z: cam.position.z, rx: cam.rotation.x, ry: cam.rotation.y, fov: cam.fov }, state: Bl.Previz.State() };
+    }, t);
+    const s1 = await SeekAt(2.6), s2 = await SeekAt(2.6);
+    const resolve = (id) => (id === "player" ? playerAt : null);
+    const wantLuo = SamplePrevizActor(seq.actors[0], 2.6, kf31.units.find(u => u.id === "luo"), { resolve });
+    const wantExtra = SamplePrevizActor(seq.actors[1], 2.6, null);
+    const errLuo = Math.hypot(s1.units.luo.x - wantLuo.x, s1.units.luo.z - wantLuo.z);
+    const errExtra = Math.hypot(s1.units.PrevizExtra.x - wantExtra.x, s1.units.PrevizExtra.z - wantExtra.z);
+    Check("Seek(2.6) 后单位位置（罗班长跑到半路）等于 SamplePrevizActor（< 0.1 m，含临时加的人）", errLuo < 0.1 && errExtra < 0.1 && s1.state.paused,
+      JSON.stringify({ luo: s1.units.luo, wantLuo: { x: wantLuo.x, z: wantLuo.z }, extra: s1.units.PrevizExtra, wantExtra: { x: wantExtra.x, z: wantExtra.z } }));
+    Check("同一 t 两次 Seek：相机与单位一样（确定性）", JSON.stringify(s1.cam) === JSON.stringify(s2.cam) && JSON.stringify(s1.units) === JSON.stringify(s2.units),
+      JSON.stringify({ a: s1.cam, b: s2.cam }));
+    await page.screenshot({ path: path.join(shotDir, "Previz_03-1_seek2.6.png") });
+    // 播完：按 then 跳到下一个关键帧，相机交还
+    await B(() => window.Tengxian.Debug.Blockout.Previz.Resume());
+    await WaitSync(() => window.__previzDone !== null, null, 10000);
+    await page.waitForTimeout(150);
+    const after = await B(() => {
+      const T = window.Tengxian, s = T.Debug.Blockout.State(), cam = T.camera.position, p = T.player.position;
+      return { done: window.__previzDone, id: s.id, playing: T.Debug.Blockout.Previz.State().playing, units: T.Debug.Blockout.Units().map(u => u.id),
+        camToEye: Math.hypot(cam.x - p.x, cam.z - p.z), hud: document.body.classList.contains("blockoutPreviz"), vm: T.viewmodel?.root?.visible ?? null,
+        nav: document.querySelector(".boNav")?.classList.contains("locked") };
+    });
+    Check("播完按 then 跳到下一个关键帧（03-2），临时加的人回收，相机、枪模、HUD、导航栏交还",
+      after.done === true && after.id === "03-2" && !after.playing && !after.units.includes("PrevizExtra") && after.camToEye < 0.3 && !after.hud && after.vm === true && !after.nav,
+      JSON.stringify(after));
+    // 中断：N 播、Esc 中断
+    await GoTo("03-1");
+    await page.waitForTimeout(150);
+    await page.keyboard.press("KeyN");
+    await WaitSync(() => window.Tengxian.Debug.Blockout.Previz.State().playing, null, 10000);
+    await page.waitForTimeout(400);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(150);
+    const stopped = await B(() => {
+      const T = window.Tengxian, cam = T.camera.position, p = T.player.position;
+      return { playing: T.Debug.Blockout.Previz.State().playing, id: T.Debug.Blockout.State().id, camToEye: Math.hypot(cam.x - p.x, cam.z - p.z),
+        hud: document.body.classList.contains("blockoutPreviz"), labels: getComputedStyle(document.querySelector(".blockoutLabels")).display,
+        units: T.Debug.Blockout.Units().map(u => u.id) };
+    });
+    Check("N 播、Esc 中断：停在 then 的关键帧，相机与界面交还，临时的人回收", !stopped.playing && stopped.id === "03-2" && stopped.camToEye < 0.3 && !stopped.hud
+      && stopped.labels !== "none" && !stopped.units.includes("PrevizExtra"), JSON.stringify(stopped));
+    // 蹲着的友军步枪兵是真蹲（KneelHold / CrouchIdle），不是友军步态的扛枪半蹲（AllyCrouchCarryStand，骨盆 0.66 m，看着像站着）
+    const crouchKf = configDoc.keyframes.find(k => k.units.some(u => u.side === "nra" && u.kind === "soldier" && u.stance === "crouch" && u.state !== "down" && !u.aim));
+    if (crouchKf) {
+      const unit = crouchKf.units.find(u => u.side === "nra" && u.kind === "soldier" && u.stance === "crouch" && u.state !== "down" && !u.aim);
+      await GoTo(crouchKf.id);
+      await page.waitForTimeout(1200);
+      const probe = await B((id) => window.Tengxian.Debug.Blockout.Probe(id), unit.id);
+      Check(`蹲着的友军是真蹲（${crouchKf.id} ${unit.id}）`, probe && probe.currentId !== "AllyCrouchCarryStand" && probe.pelvisAboveGround < 0.55,
+        JSON.stringify({ currentId: probe?.currentId, pelvis: probe?.pelvisAboveGround }));
+    }
+    await page.unroute(/\/Blockout\/FirstLevel\.previz\.json/);
+    await page.unroute(/\/Blockout\/__PrevizTest\.voice\.json/);
+  }
 
   // 4) 切关
   console.log("--- switch level");

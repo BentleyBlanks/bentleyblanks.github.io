@@ -10,6 +10,9 @@
 //   「记下当前机位」把玩家现在的位置 / 朝向 / 姿态写回当前关键帧并保存（带上读配置时的版本号，§7）；
 //   「复制当前位置」（P）把关卡 / 关键帧 / 机位 / 准星落点 / 附近的人整理成一段文字放进剪贴板，贴给 agent 用（§4.2）；
 //   地址栏带 pose=x,z,朝向,俯仰,姿态 时，落到关键帧后再把玩家摆到这个机位（那段文字里的「重现」链接就是它）。
+//   预演（§14，Script_EditorBlockoutPreviz）：读 Blockout/<Level>.previz.json（404 = 没有），卡片上的「预演」按钮或 N 播，
+//   播放中相机经 ApplyCamera 归预演、鼠标与 WASD 归预演（CapturesMouse / CapturesInput）、3D 标记与头顶标签藏起来、
+//   导航栏与翻关键帧的键不响应；N / Esc 中断，播完 / 中断按 then 跳关键帧。
 //
 // 界面（Script_EditorBlockoutUi）与纸面俯视图（Script_EditorBlockoutMap）只走 §4 / §4.1 的接口；
 // 全关总图上的鼠标（滚轮缩放、拖动平移、双击看全图、点关键帧）归地图模块，点选经 onMapPick 回到这里。
@@ -28,9 +31,12 @@ import { BlockoutMarkers } from "./Script_EditorBlockoutMarkers.mjs";
 import { BlockoutStore } from "./Script_EditorBlockoutStore.mjs";
 import { BlockoutUi } from "./Script_EditorBlockoutUi.mjs";
 import { BlockoutMap } from "./Script_EditorBlockoutMap.mjs";
+import { BlockoutPreviz, PREVIZ_KEY } from "./Script_EditorBlockoutPreviz.mjs";
+import { BlockStandSampler } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { BuildWhiteboxWater } from "./Script_FirstLevelWhiteboxLooks.mjs";
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
+import { STANCE } from "./Data_Tuning_Player.mjs";
 
 const DEG = Math.PI / 180;
 /** 打开全关总图时短边大约看多少米（玩家附近一片，不是全图）。 */
@@ -170,6 +176,17 @@ export class EditorBlockout {
       if (!field) return 0;
       return field.BaseGroundHeight ? field.BaseGroundHeight(x, z) : field.GroundHeight(x, z);
     };
+    // 站人的地面（演员、预演镜头、倒地）：高度场 + 能一步踩上去（≤ 1 m）的实心块顶面（射击台、台阶），
+    // gates 只算此刻还在场上的。地图、地形上色、水面仍用纯高度场 groundAt。
+    this.standAt = (x, z) => {
+      const layout = this.game.battlefield?.layout;
+      if (!layout) return this.groundAt(x, z);
+      if (this.standLayout !== layout) {
+        this.standLayout = layout;
+        this.standSampler = BlockStandSampler(layout.blocks, layout.gates, this.groundAt, (name) => this.Signalled(name));
+      }
+      return this.standSampler(x, z);
+    };
 
     this.root = document.createElement("div");
     this.root.id = "blockoutRoot";
@@ -179,27 +196,30 @@ export class EditorBlockout {
     this.labelRoot.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:30;overflow:hidden;";
     this.root.appendChild(this.labelRoot);
 
-    this.puppets = new BlockoutPuppets({ scene: host.scene, actorFactory: host.actorFactory, groundAt: this.groundAt });
-    this.markers = new BlockoutMarkers({ post: host.post, camera: host.camera, groundAt: this.groundAt, labelRoot: this.labelRoot });
+    this.puppets = new BlockoutPuppets({ scene: host.scene, actorFactory: host.actorFactory, groundAt: this.standAt });
+    this.markers = new BlockoutMarkers({ post: host.post, camera: host.camera, groundAt: this.standAt, labelRoot: this.labelRoot });
     this.map = new BlockoutMap();
     this.ui = new BlockoutUi(this.root, {
-      onPrev: () => { this.Prev(); },
-      onNext: () => { this.Next(); },
-      onSeek: (index) => { this.GoTo(index, { animate: index === this.index + 1 }); },
+      onPrev: () => { if (!this.previz?.playing) this.Prev(); },
+      onNext: () => { if (!this.previz?.playing) this.Next(); },
+      onSeek: (index) => { if (!this.previz?.playing) this.GoTo(index, { animate: index === this.index + 1 }); },
       onLevel: (key) => { this.SwitchLevel(key); },
       onLayer: (name, on) => { this.SetLayers({ [name]: on }); },
       onSavePose: () => { this.SavePose(); },
       onCopy: () => { this.CopySnapshot(); },
-      onReplay: () => { this.Replay(); },
+      onReplay: () => { if (!this.previz?.playing) this.Replay(); },
       onOpenMap: () => { this.ToggleMap(true); },
       onCloseMap: () => { this.ToggleMap(false); },
-      onMapPick: (index) => { this.GoTo(index, { animate: false }); },
+      onMapPick: (index) => { if (!this.previz?.playing) this.GoTo(index, { animate: false }); },
+      onPreviz: () => { this.previz.Toggle(); },
     });
+    this.previz = new BlockoutPreviz(this);
+    this.previzSignals = null;
     this.BindKeys();
 
     this.api = {
       State: () => this.State(),
-      GoTo: (idOrIndex, options) => this.GoTo(idOrIndex, options),
+      GoTo: (idOrIndex, options) => { this.previz?.Stop({ restore: false }); return this.GoTo(idOrIndex, options); },
       Next: () => this.Next(),
       Prev: () => this.Prev(),
       Replay: () => this.Replay(),
@@ -223,6 +243,19 @@ export class EditorBlockout {
       MapPoint: (idOrIndex) => this.MapPoint(idOrIndex),
       // 测试用：标记层与俯视图正在用的单位（演员现场位置 + 关键帧数据）。
       Marked: () => this.liveUnits.map(u => ({ id: u.id, name: u.name, side: u.side, kind: u.kind, x: u.x, z: u.z, arc: !!u.arc })),
+      // 取证用：某个演员此刻的样子（播的动作、姿态、脚下高度、定妆身体、骨盆离地）。
+      Probe: (id) => this.puppets.Probe(id),
+    };
+    // 预演（§14.2）：Has / Play / Stop / Seek / Resume / State；Reload 重读预演文件，CameraPose 取某一秒的机位。
+    this.api.Previz = {
+      Has: (idOrIndex) => this.previz.Has(idOrIndex),
+      Play: (idOrIndex) => this.previz.Play(idOrIndex),
+      Stop: () => this.previz.Stop(),
+      Seek: (t) => this.previz.Seek(t),
+      Resume: () => this.previz.Resume(),
+      State: () => this.previz.State(),
+      Reload: () => this.previz.Load({ force: true }),
+      CameraPose: (t) => this.previz.CameraPose(t),
     };
   }
 
@@ -240,6 +273,7 @@ export class EditorBlockout {
     this.started = true;
     await this.LoadConfig();
     this.SetupLevel();
+    await this.previz.Load({ force: true });
     const kf = this.params.get("kf");
     // 「重现」链接带来的机位：落到关键帧之后再摆（地址栏里的 pose 由 ReplaceUrl 去掉，之后翻关键帧不再套用）
     const pose = ParsePoseParam(this.params.get("pose"));
@@ -262,6 +296,12 @@ export class EditorBlockout {
   async LoadConfig() {
     const result = await this.store.Load(this.levelKey);
     this.ApplyLoaded(result, { keepOnError: false });
+    await this.PrepareCasts();
+  }
+
+  /** 这一关用到的、要按需下载的定妆模型（翻译的 NRA06）先下完，否则造出来是方块占位人。 */
+  PrepareCasts() {
+    return this.puppets.PrepareCasts((this.doc?.keyframes || []).flatMap(kf => kf.units || []));
   }
 
   /**
@@ -433,6 +473,7 @@ export class EditorBlockout {
     if (this.switching) await this.switching.catch(() => {});
     const run = (async () => {
       this.ResolvePending(false);
+      this.previz.Stop({ restore: false });
       this.ui.SetStatus({ state: "loading", message: "正在切换关卡", writable: !!this.writable, saveReason: this.saveReason || "" });
       this.puppets.Apply([]);
       this.markers.SetUnits([]);
@@ -455,6 +496,7 @@ export class EditorBlockout {
       }
       this.ReplaceUrl();
       this.SetupLevel();
+      await this.previz.Load({ force: true });
       this.ui.SetLevels(BLOCKOUT_LEVELS.map(({ key: k, label }) => ({ key: k, label })), this.levelKey);
       await this.GoTo(0, { animate: false });
       this.ui.Toast(`已切到${this.level.label}`, "info");
@@ -483,7 +525,10 @@ export class EditorBlockout {
       if (!quiet) this.ui.Toast(result.message, "error");
       return false;
     }
-    return this.Resync(result, { external: false, holdPlayer, quiet });
+    const applied = await this.Resync(result, { external: false, holdPlayer, quiet });
+    await this.previz.Load({ force: true });
+    this.UpdateCard(true);
+    return applied;
   }
 
   /**
@@ -505,6 +550,7 @@ export class EditorBlockout {
     const sameKeyframe = index >= 0;
     if (!sameKeyframe) index = Math.min(Math.max(0, this.index), this.doc.keyframes.length - 1);
     const keepPlayer = holdPlayer || (sameKeyframe && JSON.stringify(this.doc.keyframes[index].player) === playerBefore);
+    await this.PrepareCasts();
     this.index = -1;
     this.SetupLevelLists();
     await this.GoTo(index, { animate: false, keepPlayer });
@@ -536,8 +582,8 @@ export class EditorBlockout {
       const result = await this.store.Load(levelKey, { knownText: this.configText ?? undefined });
       // 网络抖一下不算「外部修改」；切关途中读到的是上一关的；读的时候存过档，读到的可能是旧文
       if (this.switching || this.saving || gen !== this.saveGen || levelKey !== this.levelKey) return;
-      if (result.state === "error" || result.state === "same") return;
-      if ((result.text ?? null) === this.configText) return;
+      if (result.state === "error" || result.state === "same" || (result.text ?? null) === this.configText) { this.previz.Poll(); return; }
+      this.previz.Poll({ configChanged: true });
       const t0 = performance.now();
       if (await this.Resync(result, { external: true })) {
         this.syncCount += 1;
@@ -572,6 +618,8 @@ export class EditorBlockout {
     if (!this.doc || this.rebuilding) return Promise.resolve(false);
     const index = KeyframeIndex(this.doc, idOrIndex);
     if (index < 0) return Promise.resolve(false);
+    // 预演播放中别处要跳关键帧（外部同步重摆等）：先中断预演（不再按 then 跳）
+    if (this.previz?.playing) this.previz.Stop({ restore: false });
     const prevIndex = this.index;
     const prevKf = this.doc.keyframes[prevIndex] || null;
     const kf = this.doc.keyframes[index];
@@ -644,7 +692,25 @@ export class EditorBlockout {
 
   /** §5.4：当前关键帧的信号视为已发生。集合变了就整份还原一次场景态与门，再刷导航。 */
   ApplySignals(kf) {
+    this.previzSignals = null;
+    this.previzSignalsKey = "";
+    this.ApplySignalSet(new Set(kf.signals || []));
+  }
+
+  /** 预演改过的信号（Map name → on；null = 回到关键帧的信号）。 */
+  SetPrevizSignals(overrides) {
+    const kf = this.keyframe;
+    if (!kf) return;
+    const key = overrides ? [...overrides].map(([n, on]) => n + ":" + (on ? 1 : 0)).sort().join("|") : "";
+    if (key === (this.previzSignalsKey || "")) return;
+    this.previzSignalsKey = key;
+    this.previzSignals = overrides;
     const next = new Set(kf.signals || []);
+    for (const [name, on] of overrides || []) { if (on) next.add(name); else next.delete(name); }
+    this.ApplySignalSet(next);
+  }
+
+  ApplySignalSet(next) {
     const prev = this.signals;
     this.signals = next;
     if (prev && prev.size === next.size && [...prev].every(name => next.has(name))) return;
@@ -685,7 +751,15 @@ export class EditorBlockout {
     player.aimYaw = 0;
     player.aimPitch = 0;
     player.velocity?.set?.(0, 0, 0);
-    player.SetStance?.(pose.stance || "stand");
+    // 关键帧机位是设计者写死的：姿态直接到位（卧姿的坡度闸在这里不拦；眼高、身宽不再从上一个姿态慢慢收过去，
+    // 否则跳关键帧后头几帧镜头还是站着的眼高，关键帧截图就拍成站着的）
+    const stance = STANCE[pose.stance] ? pose.stance : "stand";
+    if (player.SetStance && !player.SetStance(stance) && player.alive !== false) { player.bipod = false; player.stance = stance; }
+    if (player.stance === stance) {
+      player.eyeHeight = STANCE[stance].eye;
+      player.radius = STANCE[stance].radius;
+      if (player.stanceBlend) { player.stanceBlend.crouch = stance === "crouch" ? 1 : 0; player.stanceBlend.prone = stance === "prone" ? 1 : 0; }
+    }
   }
 
   /** 机位埋进墙里时就近挪：0.1 m 一圈、每圈 16 个方向，最多 0.7 m。→ {x,y,z,moved} | null */
@@ -717,6 +791,8 @@ export class EditorBlockout {
     camera.getWorldPosition(this._cam);
     const locked = !!this.PointerLocked();
     if (locked !== this.locked) { this.locked = locked; this.ui.SetInteractive(!locked); }
+    // 预演先摆这一帧的演员状态，演员层再按它出姿势
+    this.previz.Update(dt);
     this.puppets.Update(dt, this._cam);
     if (!this.puppets.transitioning && this.toUnitData) { this.unitData = this.toUnitData; this.toUnitData = null; }
     if (this.pending && !this.puppets.transitioning) this.ResolvePending(true);
@@ -777,6 +853,8 @@ export class EditorBlockout {
     const key = `${this.index}|${next ? `${Math.round(next.distanceM ?? -1)}|${Math.round((next.relYawDeg ?? 0) / 3)}` : "-"}`;
     if (!force && key === this.cardKey) return;
     this.cardKey = key;
+    const seq = this.previz?.Sequence(this.index);
+    this.ui.SetPreviz?.({ available: !!seq, title: seq?.title || "" });
     this.ui.SetCard({
       stage: kf.stage, stageTitle: kf.stageTitle, stageLabel: kf.stageLabel, name: kf.name, what: kf.what,
       next, how: kf.how, notes: kf.notes, guessCount: kf.units.filter(u => u.guess).length,
@@ -831,7 +909,36 @@ export class EditorBlockout {
   }
 
   /** Script_Main 问：鼠标现在是不是归编辑器（全关总图开着时游戏不转头、不开枪、不抢锁、滚轮不换枪）。 */
-  CapturesMouse() { return this.mapOpen; }
+  CapturesMouse() { return this.mapOpen || !!this.previz?.playing; }
+
+  /** Script_Main 问：走动 / 姿态 / 开火的键是不是归编辑器（预演播放中玩家站在原地）。 */
+  CapturesInput() { return !!this.previz?.playing; }
+
+  /** Script_Main 在玩家相机写完之后调：预演播放中相机归预演。→ true = 这一帧接管了。 */
+  ApplyCamera(camera) { return this.previz?.ApplyCamera(camera) || false; }
+
+  // ---- 预演的界面钩子（Script_EditorBlockoutPreviz 调） ----
+  OnPrevizStart(run) {
+    this.ToggleMap(false);
+    this.markers.SetHidden?.(true);
+    this.labelRoot.style.display = "none";
+    this.previzProgressKey = "";
+    this.ui.SetPrevizPlaying({ active: true, title: run.seq.title || run.seq.keyframe, t: 0, durationS: run.durationS });
+  }
+  OnPrevizProgress(run) {
+    const key = run.t.toFixed(1) + "|" + (run.paused ? 1 : 0);
+    if (key === this.previzProgressKey) return;
+    this.previzProgressKey = key;
+    this.ui.SetPrevizPlaying({ active: true, title: run.seq.title || run.seq.keyframe, t: run.t, durationS: run.durationS, paused: run.paused });
+  }
+  OnPrevizEnd() {
+    this.previzProgressKey = "";
+    this.markers.SetHidden?.(false);
+    this.labelRoot.style.display = "";
+    this.ui.SetPrevizPlaying({ active: false });
+    this.UpdateCard(true);
+  }
+  OnPrevizStatus() { this.UpdateCard(true); }
 
   /** 全关总图对准玩家当前位置：比例用上次留下的，没有就让短边看到约 MAP_FOCUS_SPAN_M 米。 */
   FocusMapOnPlayer() {
@@ -850,6 +957,15 @@ export class EditorBlockout {
       const target = event.target;
       if (target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName || "")) return;
       if (this.host.launcherOpen) return;
+      // 预演：N 播 / 中断，Esc 中断；播放中翻关键帧、重播、复制位置、地图的键都不理
+      if (event.code === PREVIZ_KEY && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (this.previz.playing || this.previz.Has()) { event.preventDefault(); this.previz.Toggle(); }
+        return;
+      }
+      if (this.previz.playing) {
+        if (event.code === "Escape") { event.preventDefault(); this.previz.Stop(); }
+        return;
+      }
       if (event.code === "Period") { event.preventDefault(); this.Next(); }
       else if (event.code === "Comma") { event.preventDefault(); this.Prev(); }
       else if (event.code === "KeyY") { event.preventDefault(); this.Replay(); }
@@ -1050,7 +1166,7 @@ export class EditorBlockout {
       layers: { ...this.layers }, signals: [...(this.signals || [])], syncCount: this.syncCount,
       syncRejected: this.syncRejected, lastSyncMs: this.lastSyncMs, staleConfig: this.staleConfig,
       revision: this.revision ?? null, saving: this.saving,
-      lastPlan: this.lastPlan || null, writable: this.writable,
+      lastPlan: this.lastPlan || null, writable: this.writable, previz: !!this.previz?.playing,
     };
   }
 
@@ -1071,6 +1187,7 @@ export class EditorBlockout {
     clearInterval(this.pollTimer);
     clearTimeout(this.syncedTimer);
     document.removeEventListener("keydown", this.onKeyDown);
+    this.previz.Dispose();
     this.ResolvePending(false);
     this.puppets.Dispose();
     this.markers.Dispose();

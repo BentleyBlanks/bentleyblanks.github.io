@@ -1004,6 +1004,11 @@ function BlockoutMouseCaptured() {
   return BLOCKOUT && !!blockout?.CapturesMouse?.();
 }
 
+/** 白盒编辑器的预演播放中：玩家站在原地，走动 / 姿态 / 开火 / 键位动作都不吃（预演自己的 N / Esc 在编辑器模块里）。 */
+function BlockoutInputCaptured() {
+  return BLOCKOUT && !!blockout?.CapturesInput?.();
+}
+
 /** 开发工具层（齿轮、Debug Rendering 浮窗等）跟着菜单藏 / 现。没有开发工具时什么也不做。 */
 function SetDevToolsHidden(hidden) {
   editor?.SetHidden(hidden || !!SHOT);
@@ -7071,6 +7076,7 @@ const router = new InputRouter({
     // 滚滚轮会真的切枪 —— 而这两件事在暂停的世界里做，退出编辑器时状态已经错了。
     if (UiCapturing()) return;
     if (action === "cycleSlot" && BlockoutMouseCaptured()) return;
+    if (BlockoutInputCaptured()) return;
     if (["crouch", "prone", "traverse"].includes(action) || action.startsWith("stance:")) {
       if (!state.running || state.menu || !player.Alive || meleeCombat?.Active || emplacement?.Mounted) return;
     }
@@ -8947,6 +8953,10 @@ function Frame(dt, render = true) {
   // 右键照 COD 新作的固定机枪：贴着照门收窄视野精瞄。它不走 player.ads ——
   // 那条是手上步枪的开镜（视图模型、两脚架闸、准心淡出），枪这会儿背在背上；
   // 这里只把意图记进 emplacedAds 给相机 FOV，并按同一张 FREE_AIM.adsLookScale 压转向。
+  if (BlockoutInputCaptured()) {
+    input.forward = 0; input.strafe = 0; input.sprint = false; input.fire = false; input.ads = false;
+    input.crouchPressed = false; input.pronePressed = false; input.stanceRequested = null;
+  }
   emplacedAds = !!emplacement?.Mounted && !!input.ads && player.Alive;
   if (emplacement?.Mounted) {
     input.forward = 0; input.strafe = 0; input.sprint = false; input.ads = false;
@@ -9281,6 +9291,8 @@ function Frame(dt, render = true) {
   profiler.B("story/mission");
   missionRuntime?.Update(dt);
   missionRuntime?.opening.ApplyCamera();
+  // 白盒编辑器的预演：玩家相机写完之后接管（docs/Data_EditorBlockout.md §14.2）
+  blockout?.ApplyCamera?.(camera);
   profiler.E("story/mission");
   if(missionRuntime?.completed){profiler.E('story');return;}
   if (p012Flow) {
@@ -9604,7 +9616,8 @@ function RenderScene(dt) {
 
 function RenderSceneContent(dt) {
   missionRuntime?.frontShow?.bunker.BeforeRender();
-  const openingBody=player?.Alive && missionRuntime?.frontShow?.bunker.CameraActive;
+  // 白盒编辑器的预演播放中：相机不在玩家身上，枪模与第一人称身体一起藏（播完 / 中断由编辑器还原枪模）
+  const openingBody=(player?.Alive && missionRuntime?.frontShow?.bunker.CameraActive) || BlockoutInputCaptured();
   if(openingBody&&viewmodel)viewmodel.root.visible=false;
   if (viewmodel?.body) viewmodel.body.root.visible = !openingBody && !!player?.Alive && !(player.meleeCameraDrop > 0.05) && !state.cutscene && !state.menu && !UiCapturing();
   const phase = PHASE_TABLE[state.phaseIndex];

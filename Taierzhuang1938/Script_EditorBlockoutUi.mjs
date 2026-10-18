@@ -10,6 +10,8 @@
 //         左右箭头、计数、过渡中的「快进 ×n」、极小的按键提示
 //   全屏  全关总图外框（地图模块往 fullCanvas 里画；关闭按钮、M / Esc 关闭）
 //   中上  提示条（2.5 s 淡出）
+//   预演（§14.2，2026-10-18）：当前关键帧挂了预演时卡片右上多一个「预演」按钮（N）；播放中卡片换成
+//         「预演 · 标题 · 进度条 · 秒数」，导航栏不响应（.locked），按键只认 N / Esc（中断）。
 //
 // 输入约定：
 // - 本界面 DOM 上的 mousedown / wheel / keydown 一律 stopPropagation —— 游戏的按键路由挂在
@@ -44,6 +46,8 @@ const ICONS = Object.freeze({
   xray: SVG('<path d="M1.8 8s2.3-4 6.2-4 6.2 4 6.2 4-2.3 4-6.2 4-6.2-4-6.2-4z"/><circle cx="8" cy="8" r="1.9"/>'),
   arrow: SVG('<path d="M8 13V3.4M4.4 6.8 8 3.2l3.6 3.6"/>'),
   guess: SVG('<circle cx="8" cy="8" r="5.2" stroke-dasharray="2.2 2"/>'),
+  play: SVG('<path d="M5.2 3.6v8.8L12.4 8z" fill="currentColor" fill-opacity=".85"/>'),
+  stop: SVG('<rect x="4.4" y="4.4" width="7.2" height="7.2" fill="currentColor" fill-opacity=".85"/>'),
 });
 
 const LAYER_DEFS = Object.freeze([
@@ -60,7 +64,7 @@ const ARC_TIPS = Object.freeze({
 });
 const STATUS_TEXT = Object.freeze({ ok: "配置已载入", synced: "配置在外部改过，已同步", error: "配置有错", loading: "正在读配置" });
 
-const KEY_ACTIONS = Object.freeze({ Period: "next", NumpadDecimal: "next", Comma: "prev", KeyM: "map", KeyY: "replay", KeyP: "copy", Escape: "escape" });
+const KEY_ACTIONS = Object.freeze({ Period: "next", NumpadDecimal: "next", Comma: "prev", KeyM: "map", KeyY: "replay", KeyP: "copy", KeyN: "previz", Escape: "escape" });
 
 function El(tag, className = "", text = "") {
   const el = document.createElement(tag);
@@ -171,6 +175,9 @@ export class BlockoutUi {
     const action = KEY_ACTIONS[e.code];
     if (!action) return;
     e.preventDefault();
+    // 预演播放中只认 N / Esc（中断）
+    if (this.previzActive) { if (action === "previz" || action === "escape") this.Call("onPreviz"); return; }
+    if (action === "previz") { if (this.previzAvailable) this.Call("onPreviz"); return; }
     if (action === "next") this.Call("onNext");
     else if (action === "prev") this.Call("onPrev");
     else if (action === "replay") this.Call("onReplay");
@@ -198,7 +205,29 @@ export class BlockoutUi {
     this.btnCopy = Button("boIconBtn boCopy", { icon: "copy", tip: "复制当前位置，贴给 agent（P）" });
     this.btnCopy.dataset.tipSide = "left";
     this.Listen(this.btnCopy, "click", () => this.Call("onCopy"));
-    head.append(titleWrap, this.btnCopy, this.btnSave);
+    this.btnPreviz = Button("boIconBtn boPrevizBtn", { icon: "play", tip: "预演这一段（N）" });
+    this.btnPreviz.dataset.tipSide = "left";
+    this.btnPreviz.hidden = true;
+    this.Listen(this.btnPreviz, "click", () => this.Call("onPreviz"));
+    head.append(titleWrap, this.btnPreviz, this.btnCopy, this.btnSave);
+
+    // 预演播放中的那一行：「预演 · 标题」+ 进度条 + 秒数 + 中断按钮
+    const bar = El("div", "boPrevizBar");
+    const top = El("div", "boPrevizTop");
+    top.append(El("span", "boPrevizTag", "预演"));
+    this.elPrevizTitle = El("span", "boPrevizTitle");
+    this.elPrevizTime = El("span", "boPrevizTime");
+    this.btnPrevizStop = Button("boIconBtn boPrevizStop", { icon: "stop", tip: "中断（N / Esc）" });
+    this.btnPrevizStop.dataset.tipSide = "left";
+    this.Listen(this.btnPrevizStop, "click", () => this.Call("onPreviz"));
+    top.append(this.elPrevizTitle, this.elPrevizTime, this.btnPrevizStop);
+    const track = El("div", "boPrevizTrack");
+    this.elPrevizFill = El("i", "boPrevizFill");
+    track.append(this.elPrevizFill);
+    const hint = El("div", "boPrevizHint");
+    hint.append(Kbd("N"), El("span", "", "或"), Kbd("Esc"), El("span", "", "中断，播完跳到下一个关键帧"));
+    bar.append(top, track, hint);
+    this.previzBar = bar;
 
     const what = El("div", "boLine boWhat");
     what.append(El("span", "boKey", "此时"));
@@ -225,7 +254,7 @@ export class BlockoutUi {
     this.elGuess.append(gi, this.elGuessText);
     this.elEmpty = El("div", "boEmpty", "没有关键帧");
 
-    card.append(head, what, next, this.elHow, this.elNotes, this.elGuess, this.elEmpty);
+    card.append(head, what, next, this.elHow, this.elNotes, this.elGuess, this.elEmpty, this.previzBar);
     this.cardEl = card;
     this.root.appendChild(card);
   }
@@ -319,6 +348,10 @@ export class BlockoutUi {
     counter.append(this.elFast, this.elCount);
     const keys = El("div", "boKeys");
     keys.append(Kbd(","), Kbd("."), El("span", "", "切换"), Kbd("Y"), El("span", "", "重播"), Kbd("P"), El("span", "", "复制位置"), Kbd("M"), El("span", "", "地图"), Kbd("Esc"), El("span", "", "鼠标"));
+    this.elKeysPreviz = El("span", "boKeysPreviz");
+    this.elKeysPreviz.append(Kbd("N"), El("span", "", "预演"));
+    this.elKeysPreviz.hidden = true;
+    keys.prepend(this.elKeysPreviz);
     side.append(counter, keys);
 
     nav.append(this.btnPrev, wrap, this.btnNext, this.btnReplay, side);
@@ -662,6 +695,32 @@ export class BlockoutUi {
       void this.elStatusDot.offsetWidth;
       this.elStatusDot.classList.add("flash");
     }
+  }
+
+  /** 当前关键帧有没有预演（§14.2）：有才显示「预演」按钮与按键提示。 */
+  SetPreviz({ available = false, title = "" } = {}) {
+    this.previzAvailable = !!available;
+    this.btnPreviz.hidden = !available || !!this.previzActive;
+    this.btnPreviz.dataset.tip = available ? (title ? "预演：" + title + "（N）" : "预演这一段（N）") : "";
+    this.btnPreviz.setAttribute("aria-label", this.btnPreviz.dataset.tip || "预演");
+    this.elKeysPreviz.hidden = !available;
+  }
+
+  /** 预演播放中：卡片换成「预演 · 标题 · 进度」，导航栏不响应。active:false 收回。 */
+  SetPrevizPlaying({ active = false, title = "", t = 0, durationS = 0, paused = false, loading = false } = {}) {
+    const was = !!this.previzActive;
+    this.previzActive = !!active;
+    this.cardEl.classList.toggle("previz", this.previzActive);
+    this.navEl.classList.toggle("locked", this.previzActive);
+    this.root.classList.toggle("previzOn", this.previzActive);
+    this.btnPreviz.hidden = !this.previzAvailable || this.previzActive;
+    if (!this.previzActive) { if (was) this.HideNavTip(); return; }
+    if (this.elPrevizTitle.textContent !== title) this.elPrevizTitle.textContent = title;
+    const time = loading ? "准备中" : (paused ? "暂停 " : "") + t.toFixed(1) + " / " + durationS.toFixed(1) + " s";
+    if (this.elPrevizTime.textContent !== time) this.elPrevizTime.textContent = time;
+    const k = durationS > 0 ? Math.max(0, Math.min(1, t / durationS)) : 0;
+    this.elPrevizFill.style.width = (k * 100).toFixed(2) + "%";
+    if (!was) { this.CloseLevelMenu(); this.HideNavTip(); }
   }
 
   /** 过渡中：rate > 1 时显示「快进 ×n」（§5.2）。本方法是对 §4 接口的补充。 */

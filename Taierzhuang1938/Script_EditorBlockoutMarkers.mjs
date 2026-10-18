@@ -444,8 +444,15 @@ export class BlockoutMarkers {
   // -------------------------------------------------------------------------
   // 每帧
 
+  /** 预演播放中整层藏起来（3D 地环 / 射界 / 光柱；头顶标签由总控藏 labelRoot）。2026-10-18。 */
+  SetHidden(hidden) {
+    this.hidden = !!hidden;
+    this.root.visible = !this.hidden;
+  }
+
   Update(dt) {
     this.time += dt;
+    if (this.hidden) return;
     if (this.next) { this.chunks.set("next", { sig: "", chunk: this._NextChunk() }); this.dirty = true; }
     if (this.flashes?.length) {
       this.flashes = this.flashes.filter(f => this.time - f.t0 < FLASH_S);
