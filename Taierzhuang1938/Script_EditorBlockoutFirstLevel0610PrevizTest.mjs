@@ -9,7 +9,7 @@
 // 百姓 / 军官是程序化身体、一个片段都不许）；同一段里台词不互相压；演员走位点在场地范围内、不落在沟壁 / 坎上、
 // 身子不进实心块（按那一刻的信号算随信号体块，路线按 0.5 m 取样）；走位要求的速度不离谱；说话的人在那一刻是可见的；
 // 机位点不在实心块里；门缝 / 墙缝那几段的眼睛真能从缝里看到演的东西（2D 视线不被 ≥1 m 高的块挡）；
-// 剧本要求的事件（信号按拍开、掷弹筒越落越近、09 的「响了才走」节奏）都在。
+// 剧本要求的事件（六个信号按拍开、掷弹筒越落越近、09 的「响了才走」节奏、07 边走边说、07-4 非第一人称短过场、08 手榴弹与喊人的可见段、10 东街 25–70 m）都在。第二版 2026-10-19 按 25 帧重写。
 // ===========================================================================
 
 import { readFileSync, existsSync } from "node:fs";
@@ -258,89 +258,186 @@ export async function CheckPreviz(doc, { config, voice }) {
   return { errors, warnings, rows };
 }
 
-/** 剧本要求的设计口径（只查 FirstLevel0610）。 */
+/** 剧本要求的设计口径（只查 FirstLevel0610；第二版 2026-10-19 的 25 帧）。 */
 function DesignChecks(doc, norm, config, layout, errors) {
   if (doc.level !== "FirstLevel0610") return;
   const Seq = id => doc.sequences.find(s => s.keyframe === id);
   const NSeq = id => norm.sequences.find(s => s.keyframe === id);
   const Keys = (seq, id) => seq?.actors.find(a => a.id === id)?.keys || [];
-  const Has = (seq, type, f = () => true) => seq.events.some(e => e.type === type && f(e));
+  const PosKeys = (seq, id) => Keys(seq, id).filter(k => k.x !== undefined);
+  const Has = (seq, type, f = () => true) => !!seq && seq.events.some(e => e.type === type && f(e));
+  const HasLine = (seq, id) => !!seq && seq.lines.some(l => l.line === id);
+  const LineT = (seq, id) => seq?.lines.find(l => l.line === id)?.t;
   const SignalOn = (id, name) => Has(Seq(id), "signal", e => e.name === name && e.on === true);
-  // 信号按拍开
+  const Unit = (kfId, id) => config.keyframes.find(k => k.id === kfId)?.units.find(u => u.id === id);
+  const Near = (a, b, m) => !!a && !!b && Math.hypot(a.x - b.x, a.z - b.z) <= m;
+  const ROLLER = { x: 113.2, z: 465.7 }, SHRINE = { x: 192, z: 466.4 }, CART = { x: 100.8, z: 446 }, POCKET_GATE = { x: 108, z: 452 };
+  const Moves = seq => (seq?.camera || []).filter(c => c.from && c.to);
+  const Bursts = seq => (seq?.events || []).filter(e => e.type === "muzzle" && e.actor === "MgGunner").map(e => e.t);
+  const Order = (seq, ids) => { for (let i = 1; i < ids.length; i++) { const a = LineT(seq, ids[i - 1]), b = LineT(seq, ids[i]); if (a === undefined || b === undefined || b < a) return false; } return true; };
+  // 六个信号按拍开
   if (!SignalOn("06-3", "CartDeparted")) errors.push("06-3：老耿赶车走要打开 CartDeparted");
-  if (!SignalOn("09-3", "CellarBlast")) errors.push("09-3：窖里闷响要打开 CellarBlast");
-  if (!SignalOn("09-4", "SideGateOpen")) errors.push("09-4：门闩拉开要打开 SideGateOpen");
+  if (!SignalOn("09-4", "CellarBlast")) errors.push("09-4：窖里闷响要打开 CellarBlast");
+  if (!SignalOn("09-5", "SideGateOpen")) errors.push("09-5：门闩拉开要打开 SideGateOpen");
   if (!SignalOn("10-1", "MgSilenced")) errors.push("10-1：打掉机枪组要打开 MgSilenced");
-  if (!SignalOn("10-4", "BackDoorOpen")) errors.push("10-4：挪开水缸、拔门要打开 BackDoorOpen");
-  // 06：何有田喊、老耿拍肩膀（老耿爬到坎顶妮儿身边）、传令兵跑来、老耿第一个赶车走
+  if (!SignalOn("10-4", "NorthYardGatesBroken")) errors.push("10-4：北边三道门砸倒要打开 NorthYardGatesBroken");
+  if (!SignalOn("10-6", "BackDoorOpen")) errors.push("10-6：挪开水缸、拔门要打开 BackDoorOpen");
+  // 06：何有田喊、老耿走到妮儿身边拍肩膀、传令兵跑来报信、老耿的车第一个走、班长「都跟斗走」
   {
+    const s1 = Seq("06-1");
+    if (!HasLine(s1, "GullyEmptyAsk.01") || !HasLine(s1, "GullyEmptyAnswer.01")) errors.push("06-1：顺子问冬瓜、何有田答都要有");
     const s = Seq("06-2");
-    if (!s.lines.some(l => l.line === "CartAndNier.01")) errors.push("06-2：要有何有田喊「女娃子，让一哈」");
-    const nier = config.keyframes.find(k => k.id === "06-2").units.find(u => u.id === "Nier");
-    if (!Keys(s, "Geng").some(k => k.x !== undefined && Math.hypot(k.x - nier.x, k.z - nier.z) < 1.5)) errors.push("06-2：老耿要走到坎顶妮儿身边拍她肩膀");
+    if (!HasLine(s, "CartAndNier.01")) errors.push("06-2：要有何有田喊「女娃子，让一哈」");
+    const nier = Unit("06-2", "Nier");
+    if (!PosKeys(s, "Geng").some(k => Near(k, nier, 1.5))) errors.push("06-2：老耿要走到沟沿上妮儿身边拍她肩膀");
+    if (!PosKeys(s, "Nier").some(k => k.move === "walk")) errors.push("06-2：妮儿要挪开");
     const s3 = Seq("06-3");
-    const run = Keys(s3, "Runner").find(k => k.x !== undefined && k.move === "run");
-    if (!run || !s3.lines.some(l => l.line === "RunnerSouth.01")) errors.push("06-3：传令兵要从凹路跑来报信");
-    // 出发时刻 = 第一个 t > 0 的位置键（Go 在出发时刻补的同位置 cut 键）
-    const cart = Keys(s3, "GengCart").filter(k => k.x !== undefined && k.t > 0);
-    const squad = Keys(s3, "Luo").filter(k => k.x !== undefined && k.t > 0);
+    const run = PosKeys(s3, "Runner").find(k => k.move === "run");
+    if (!run || !HasLine(s3, "RunnerSouth.01")) errors.push("06-3：传令兵要从凹路跑来报信");
+    if (!HasLine(s3, "RunnerSouth.02")) errors.push("06-3：班长要喊「都跟斗走」");
+    const cart = PosKeys(s3, "GengCart").filter(k => k.t > 0), squad = PosKeys(s3, "Luo").filter(k => k.t > 0);
     if (!cart.length || !squad.length || cart[0].t > squad[0].t) errors.push("06-3：老耿的车要第一个走，班长他们在后头跟");
   }
-  // 07：掀被角有说明字；边走边说：顺子替身在 CopperCoins 大段里一直在走
-  if (!Has(Seq("07-2"), "caption", e => /掀/.test(e.text))) errors.push("07-2：掀被角的按键时刻要有说明字");
-  {
-    const s = Seq("07-3");
-    const walk = Keys(s, "Shunzi").filter(k => k.x !== undefined && k.move === "walk");
-    const first = s.lines.find(l => l.line === "CopperCoins.01"), last = s.lines.find(l => l.line === "CopperCoins.12");
-    if (!walk.length || !first || !last) errors.push("07-3：顺子替身要边走边说");
-    else {
-      const walked = walk.at(-1).t;
-      if (walked < last.t - 16) errors.push(`07-3：对话说到 ${last.t} s，人 ${walked} s 就走完站住了（要一直走）`);
-      if (!Keys(s, "Yaowa").some(k => k.x !== undefined && k.move === "walk")) errors.push("07-3：幺娃要并排走");
+  // 07-1 / 07-2：边走边说——眼睛（from/to 机位）停停走走地往前，一直看着车尾的妮儿；车、妮儿、幺娃都在走；台词按关键帧挂
+  for (const [id, lines] of [["07-1", ["RoadMutters.01", "RoadMutters.02", "RoadMutters.03", "CopperCoins.01", "CopperCoins.05", "CopperCoins.10"]], ["07-2", ["CopperCoins.11", "CopperCoins.12", "CopperCoins.13"]]]) {
+    const s = Seq(id);
+    for (const l of lines) if (!HasLine(s, l)) errors.push(`${id}：要有台词 ${l}`);
+    const moves = Moves(s);
+    if (moves.length < 3) errors.push(`${id}：眼睛要分几段走（from/to 机位 ≥ 3 段），现在 ${moves.length}`);
+    if (!s.camera.every(c => c.look?.actor === "Nier")) errors.push(`${id}：边走边说的镜头要一直看着车尾的妮儿（look 演员锚 Nier）`);
+    for (const who of ["GengCart", "Nier", "Yaowa", "Luo"]) if (!PosKeys(s, who).some(k => k.move === "walk")) errors.push(`${id}：${who} 要跟着往前走`);
+    // 车在眼睛前头 5–7 m：每段走动结束时车的位置键与机位 to 的距离
+    for (const c of moves) {
+      const cart = PosKeys(s, "GengCart").find(k => Math.abs(k.t - (c.t + c.dur)) < 0.05);
+      if (!cart) continue;
+      const d = Math.hypot(cart.x - c.to.x, cart.z - c.to.z);
+      if (d < 4.5 || d > 8.5) errors.push(`${id}：${c.t} s 那段走完车离眼睛 ${R(d)} m（要 5–7 m 左右）`);
     }
   }
-  // 08：村民跑、被打倒、一个滚进凹路；老耿「那是……俺家」；老耿蹲下比划；妮儿钻进巷子；幺娃拽住
+  {
+    const s = Seq("07-2");
+    const sis = LineT(s, "CopperCoins.11");
+    const cam = sis === undefined ? null : [...s.camera].filter(c => c.t <= sis + 0.01).at(-1);
+    if (!cam || cam.look?.actor !== "Nier" || cam.to) errors.push("07-2：说「我妹今年十二」时眼睛要站着、正对车尾的妮儿");
+    const e12 = s.lines.find(l => l.line === "CopperCoins.12"), t13 = LineT(s, "CopperCoins.13");
+    if (!e12 || t13 === undefined || t13 < e12.t + 12.55 + 3.0) errors.push("07-2：「我没听到」要在上一句说完 3 s 以后才说（过了好一会儿）");
+  }
+  // 07-3：掀被角有说明字；冬瓜、卫生兵、排长、班长的话都在；班长回头吼完起身往前
+  {
+    const s = Seq("07-3");
+    if (!Has(s, "caption", e => /掀/.test(e.text))) errors.push("07-3：掀被角的按键时刻要有说明字");
+    for (const l of ["StretcherDonggua.01", "StretcherDonggua.02", "StretcherDonggua.03", "BankLookoutOfficer.01", "BankLookoutLuo.01"]) if (!HasLine(s, l)) errors.push(`07-3：要有台词 ${l}`);
+    if (!Order(s, ["StretcherDonggua.01", "StretcherDonggua.02", "StretcherDonggua.03", "BankLookoutOfficer.01", "BankLookoutLuo.01"])) errors.push("07-3：台词顺序要是 顺子 → 卫生兵 → 冬瓜 → 排长 → 班长");
+    if (!PosKeys(s, "Luo").some(k => k.move === "walk" && k.z > 312.5)) errors.push("07-3：班长吼完要从坎上下来往前走");
+  }
+  // 07-4：短过场——前 18 s 全是机位（非第一人称）、三段机位；人往坎底缩（小队 prone 键）、妮儿最后一个；跑（run 键）；村子冒烟；最后切回眼睛趴在路沟沿
+  {
+    const s = Seq("07-4");
+    const cams = s.camera.filter(c => !c.eye);
+    if (cams.length < 3) errors.push("07-4：短过场要有三个镜头（非第一人称机位）");
+    if (s.camera.some(c => c.eye && c.t < 18)) errors.push("07-4：前 18 s 不能有第一人称眼睛");
+    const last = [...s.camera].sort((a, b) => a.t - b.t).at(-1);
+    if (!last?.eye || last.eye.stance !== "prone" || Math.abs(last.eye.z - 384.3) > 1) errors.push("07-4：最后要切回第一人称，趴在村口路沟沿上");
+    const proneT = ["Luo", "Yaowa", "Squad1", "Walker01", "Walker16"].map(id => Keys(s, id).find(k => k.stance === "prone")?.t);
+    if (proneT.some(t => t === undefined)) errors.push("07-4：小队和后送队都要趴下（stance prone 键）");
+    const nierLook = Keys(s, "Nier").find(k => k.yawDeg === 0)?.t;
+    if (nierLook === undefined || proneT.some(t => t !== undefined && t > nierLook)) errors.push("07-4：妮儿要在别人都趴下之后才抬头（百姓趴不下，用抬头朝北顶）");
+    if (!Has(s, "caption", e => /飞机/.test(e.text))) errors.push("07-4：飞机没有模型，要有说明字");
+    if (!PosKeys(s, "Luo").some(k => k.move === "run") || !PosKeys(s, "GengCart").some(k => k.move === "walk")) errors.push("07-4：全班要顺凹路往前跑、车跟在后头");
+    if (s.events.filter(e => e.type === "smoke" && e.kind === "SmokeBlack").length < 2) errors.push("07-4：望见耿家庄要有几处房顶冒烟（SmokeBlack ≥ 2）");
+  }
+  // 08-1：村民跑、倒两个、一个滚进沟；村民的话；老耿「那是……俺家」
   {
     const s = Seq("08-1");
     const down = ["Villager2", "Villager3"].filter(id => Keys(s, id).some(k => k.state === "down"));
     if (down.length !== 2 || !Has(s, "muzzle", e => e.actor === "MgGunner")) errors.push("08-1：窗口机枪要打倒两个跑出来的村民");
-    if (!Keys(s, "Villager1").some(k => k.x !== undefined && k.move === "run")) errors.push("08-1：一个村民要滚进凹路");
-    if (!Seq("08-2").lines.some(l => l.line === "NoWayAround.01")) errors.push("08-2：老耿要说「那是……俺家」");
-    const s3 = Seq("08-3");
-    if (!Keys(s3, "Geng").some(k => k.stance === "crouch")) errors.push("08-3：老耿要蹲下来给妮儿比划");
-    if (!Has(s3, "caption", e => /手在抖/.test(e.text))) errors.push("08-3：比划的手在抖要有说明字");
-    const nierRun = Keys(s3, "Nier").find(k => k.x !== undefined && k.move === "run");
-    if (!nierRun || nierRun.x > 90) errors.push("08-3：妮儿要跑进巷子口");
-    if (!s3.lines.some(l => l.line === "DogHole.05") || !s3.lines.some(l => l.line === "DogHole.06")) errors.push("08-3：幺娃拽顺子、顺子甩开要有台词");
+    if (!PosKeys(s, "Villager1").some(k => k.move === "run")) errors.push("08-1：一个村民要滚进路沟");
+    if (!HasLine(s, "VillageMouth.01") || !HasLine(s, "GengHome.01")) errors.push("08-1：村民「东头……过来的」和老耿「那是……俺家」都要有");
   }
-  // 09-1：响了才走、停了贴墙：每段挪动都紧跟一梭机枪
+  // 08-2：问路那段对白按顺序；最后班长下令
+  {
+    const s = Seq("08-2");
+    const ids = ["NoWayAround.01", "NoWayAround.02", "NoWayAround.03", "DecideShunzi.01", "DecideMedic.01", "DecideLuo.01"];
+    for (const l of ids) if (!HasLine(s, l)) errors.push(`08-2：要有台词 ${l}`);
+    if (!Order(s, ids)) errors.push("08-2：对白顺序要是 班长问 → 老耿 → 排长 → 顺子 → 卫生兵 → 班长下令");
+    if (!Has(s, "caption", e => /狗洞/.test(e.text))) errors.push("08-2：要有说明字：墙根有个狗洞，老耿没想起来");
+  }
+  // 08-3：玩家打；班长四人分几段摸到大车后；窗口机枪打沟沿也打班长；过道里甩手榴弹（throw 键）炸在车边、一个兵倒；两句台词
+  {
+    const s = Seq("08-3");
+    if (!Has(s, "muzzle", e => e.actor === "player")) errors.push("08-3：玩家要朝窗口打");
+    const luo = PosKeys(s, "Luo").filter(k => k.move === "run");
+    if (luo.length < 3 || !luo.some(k => k.z < 400) || !Near(luo.at(-1), Unit("08-3", "Luo"), 0.5)) errors.push("08-3：班长要分 ≥3 段从街口摸到大车后头");
+    if (!PosKeys(s, "HeYoutian").some(k => k.move === "run") || !PosKeys(s, "Escort1").some(k => k.move === "run")) errors.push("08-3：何有田和后送队的兵要跟着班长往前摸");
+    if (Bursts(s).length < 4) errors.push("08-3：窗口机枪要一直打（≥ 4 梭）");
+    if (!HasLine(s, "PressWindow.01") || !HasLine(s, "PressWindow.02")) errors.push("08-3：「压到起」「卡到了」都要有");
+    const toss = Keys(s, "GateIja1").find(k => k.throw);
+    const boom = s.events.find(e => e.type === "explosion" && Near(e, CART, 4.5) && e.radius > 1);
+    if (!toss || !boom || boom.t < toss.t + 2.15) errors.push("08-3：大门过道里要甩出一颗手榴弹（throw 键）炸在大车边");
+    const fall = Keys(s, "Escort2").find(k => k.state === "down");
+    if (!fall || !boom || fall.t < boom.t) errors.push("08-3：手榴弹炸了以后一个兵要倒");
+    if (!Has(s, "caption", e => /停火/.test(e.text))) errors.push("08-3：要有说明字教玩家：一停火机枪就掉头打班长");
+  }
+  // 08-4：喊人的鬼子先贴西墙往街里跑几步（大车西边、沟沿看得见）再拐去东街；幺娃、刘文财两句
+  {
+    const s = Seq("08-4");
+    const run = PosKeys(s, "GateIja2").filter(k => k.move === "run");
+    if (!run.some(k => k.x < 99.4 && k.z > 448 && k.z < 462)) errors.push("08-4：喊人的鬼子要先贴西墙往街里跑几步（大车西边那几步从沟沿看得见）");
+    if (!run.some(k => k.x > 125)) errors.push("08-4：他最后要拐去东街");
+    if (!HasLine(s, "RunnerEast.01") || !HasLine(s, "RunnerEast.02")) errors.push("08-4：幺娃「跑了一个」、刘文财「喊人去了」都要有");
+  }
+  // 08-5：伤兵中枪；妮儿顺沟底往西跑进巷子口、子弹追脚后跟；老耿爬出去被拽回；四句台词按顺序；最后眼睛冲向巷子口
+  {
+    const s = Seq("08-5");
+    if (!Keys(s, "Walker04").some(k => k.state === "down")) errors.push("08-5：妮儿身边的伤兵要中枪倒下");
+    const nier = PosKeys(s, "Nier").filter(k => k.move === "run");
+    if (!nier.length || nier.at(-1).x > 81) errors.push("08-5：妮儿要顺路沟往西跑进巷子");
+    const dep = nier.length ? Math.min(...PosKeys(s, "Nier").filter(k => k.t > 0).map(k => k.t)) : 0;
+    if (s.events.filter(e => e.type === "explosion" && e.radius <= 1 && e.t > dep && e.x < 100).length < 3) errors.push("08-5：子弹要追着她的脚后跟打在土里（≥ 3 小土点）");
+    const geng = PosKeys(s, "Geng").filter(k => k.t > 0 && k.move !== "cut");
+    if (geng.length < 2 || !geng.some(k => k.z > 383)) errors.push("08-5：老耿要爬出沟去追、再被拽回来");
+    const ids = ["NierRuns.01", "NierRuns.02", "NierRuns.03", "NierRuns.04"];
+    for (const l of ids) if (!HasLine(s, l)) errors.push(`08-5：要有台词 ${l}`);
+    if (!Order(s, ids)) errors.push("08-5：台词顺序要是 妮儿！→ 不要命了嗦 → 老总！俺妮儿 → 往哪跑");
+    const dash = Moves(s).filter(c => c.to.x < 90);
+    if (!dash.length || LineT(s, "NierRuns.04") === undefined || dash[0].t > LineT(s, "NierRuns.04")) errors.push("08-5：顺子要先往巷子口冲，刘文财才在后头吼");
+  }
+  // 09-1：妮儿跑在前头进邻院小门；响了才走、停了贴墙：每段挪动都紧跟一梭机枪；听见窖口的吼
   {
     const s = Seq("09-1");
-    const bursts = s.events.filter(e => e.type === "muzzle" && e.actor === "MgGunner").map(e => e.t);
-    const moves = s.camera.filter(c => c.from && c.to);
+    const nier = PosKeys(s, "Nier").filter(k => k.move === "run");
+    if (!nier.length || !Near(nier.at(-1), Unit("09-1", "Nier"), 0.6)) errors.push("09-1：妮儿要跑在前头拐进邻院敞着的小门");
+    const bursts = Bursts(s), moves = Moves(s);
     if (moves.length < 3 || !bursts.length) errors.push("09-1：要有 ≥3 段贴墙挪动和窗口的机枪声");
     for (const m of moves) if (!bursts.some(b => m.t - b >= 0 && m.t - b < 2.5)) errors.push(`09-1：${m.t} s 的挪动前 2.5 s 内没有机枪响（要响了才走）`);
-    if (!s.lines.some(l => l.line === "CellarShout.01")) errors.push("09-1：巷子里要听见窖口的鬼子吼「出来」");
+    if (!HasLine(s, "CellarShout.01")) errors.push("09-1：巷子里要听见窖口的鬼子吼「出来」");
   }
-  // 09-2 / 09-3：镜头一直是眼睛（没有第三人称机位看进院子）、眼睛在缝后、演的东西在缝的扇面里
+  // 09-2：妮儿钻狗洞（墙那一下硬切）、缩到柴垛后；顺子从缝里找她
+  {
+    const s = Seq("09-2");
+    const through = PosKeys(s, "Nier").find(k => k.move === "cut" && k.t > 0 && k.x > 81.5);
+    const hide = PosKeys(s, "Nier").at(-1);
+    if (!through || !Near(hide, Unit("09-3", "Nier"), 1.0)) errors.push("09-2：妮儿要钻过狗洞（硬切）、缩到柴垛后头");
+    if (!Has(s, "caption", e => /狗洞/.test(e.text)) || !Moves(s).length) errors.push("09-2：要有狗洞的说明字，顺子要贴墙挪到墙缝外");
+  }
+  // 09-3 / 09-4：镜头一直是眼睛（没有第三人称机位看进院子）、眼睛在缝后、演的东西在缝的扇面里
   const solidsAll = SolidsFor(layout, []);
   const wallX = 81.5;
   // [关键帧, 缝的 z, [[演员, 要看得见的键的最晚 t]]]：之后他们走出扇面（回屋、挪到尸体边）不算
-  for (const [id, slitZ, targets] of [["09-2", 496.5, [["CellarMan", 12]]], ["09-3", 499.575, [["CellarIja2", 12], ["Bundle", 99], ["Nier", 99]]]]) {
+  // 妮儿在 09-4 开头缩在柴垛后（缝里本来就看不见），挪到门边（t ≥ 20）才要看得见
+  for (const [id, slitZ, targets] of [["09-3", 496.5, [["CellarMan", 12]]], ["09-4", 499.575, [["CellarIja2", 12], ["Bundle", 99], ["Nier", 99, 20]]]]) {
     const s = Seq(id), n = NSeq(id);
     const eyes = s.camera.filter(c => c.eye);
     if (!eyes.length) { errors.push(`${id}：要用顺子的眼睛看`); continue; }
     for (const c of s.camera) if (c.from && c.from.x !== undefined && c.from.x > wallX) errors.push(`${id}：机位 @${c.t} 跑到墙那边去了（不给特写）`);
     for (const c of eyes) {
       if (!(c.eye.x < wallX && c.eye.x > wallX - 1.2 && Math.abs(c.eye.z - slitZ) < 0.6)) errors.push(`${id}：眼睛 @${c.t} 不在缝后头（(${c.eye.x}, ${c.eye.z})，缝在 (${wallX}, ${slitZ})）`);
-      // 缝的扇面里能看到窖口
       const hits = LineHits(solidsAll, c.eye, { x: 90.5, z: 499.5 }, { eyeY: 1.5 });
       if (hits.length) errors.push(`${id}：眼睛 @${c.t} 从缝里看不到窖口，被 ${hits.join("、")} 挡住`);
     }
-    // 演员动作点：在那一刻的眼睛到这个点的视线不被块挡
-    for (const [actorId, tMax] of targets) {
+    for (const [actorId, tMax, tMin = 0] of targets) {
       const entry = s.actors.find(a => a.id === actorId);
-      const keys = (entry?.keys || []).filter(k => k.x !== undefined && k.t <= tMax && (k.move !== "cut" || k.t === 0));
+      const keys = (entry?.keys || []).filter(k => k.x !== undefined && k.t <= tMax && k.t >= tMin && (k.move !== "cut" || k.t === 0));
       if (entry?.spawn && !keys.length) keys.push({ t: 0, x: entry.spawn.x, z: entry.spawn.z });
       if (!keys.length) errors.push(`${id}：${actorId} 没有位置键，查不了缝里看得见`);
       for (const k of keys) {
@@ -353,45 +450,117 @@ function DesignChecks(doc, norm, config, layout, errors) {
   }
   {
     const s = Seq("09-3");
-    if (!Keys(s, "Bundle").some(k => k.visible === true)) errors.push("09-3：襁褓占位要在挑起来甩到窖沿时露面");
-    if (!Keys(s, "CellarGranny").some(k => k.state === "down")) errors.push("09-3：老太太要炸在窖里");
-    if (!Keys(s, "CellarIja3").some(k => k.x !== undefined && k.x > 105)) errors.push("09-3：拖人的鬼子要把媳妇拖进偏屋");
-    if (!Keys(s, "Nier").some(k => k.x !== undefined && k.move === "walk")) errors.push("09-3：妮儿要贴着墙根往门这边挪");
+    if (!Keys(s, "CellarMan").some(k => k.state === "down")) errors.push("09-3：汉子刚爬出来就要被捅倒");
+    if (!HasLine(s, "LeaderCallsMen.01")) errors.push("09-3：前屋的分队长要吼着调人");
+    const s4 = Seq("09-4");
+    if (!Keys(s4, "Bundle").some(k => k.visible === true)) errors.push("09-4：襁褓占位要在挑起来甩到窖沿时露面");
+    if (!Keys(s4, "CellarGranny").some(k => k.state === "down")) errors.push("09-4：老太太要炸在窖里");
+    if (!PosKeys(s4, "CellarIja3").some(k => k.x > 105)) errors.push("09-4：拖人的鬼子要把媳妇拖进偏屋");
+    if (!PosKeys(s4, "CellarIja1").some(k => k.x > 94 && k.z < 492)) errors.push("09-4：拎手榴弹的扔完要跑去前屋");
+    if (!PosKeys(s4, "Nier").some(k => k.move === "walk" && k.x < 83)) errors.push("09-4：妮儿要从柴垛后头挪到门边");
   }
-  // 09-4：撒尿的鬼子、妮儿呜咽、捂嘴说明字；09-5 第二次呜咽；09-6 罐子掉地、扑倒、咬手腕、拔大刀
+  // 09-5：门开（SideGateOpen）、撒尿的看守、妮儿呜咽、捂嘴说明字；演「按到了」：看守进偏屋、不说「嗯？」；「没按到」只有一句说明字
   {
-    const s = Seq("09-4");
-    if (!s.lines.some(l => l.line === "NierWhimperFirst.01")) errors.push("09-4：妮儿要呜咽");
-    if (!Has(s, "caption", e => /捂住她的嘴/.test(e.text))) errors.push("09-4：捂嘴的按键时刻要有说明字");
-    if (!s.lines.some(l => l.line === "PisserGrunt.01")) errors.push("09-4：撒尿的鬼子要「嗯？」");
-    const s5 = Seq("09-5");
-    if (!s5.lines.some(l => l.line === "NierWhimperAgain.01") || !Has(s5, "caption", e => /捂嘴/.test(e.text))) errors.push("09-5：第二次呜咽与捂嘴说明字");
-    const s6 = Seq("09-6");
-    if (!Has(s6, "caption", e => /罐/.test(e.text))) errors.push("09-6：罐子掉地要有说明字");
-    const lunge = s6.lines.find(l => l.line === "KitchenLunge.01"), bite = s6.lines.find(l => l.line === "KitchenBitten.01");
-    if (!lunge || !bite || bite.t < lunge.t + 4) errors.push("09-6：先扑出来吼，压一会儿刺刀，再被咬惨叫");
-    if (!s6.camera.some(c => c.eye?.stance === "prone" && c.eye.pitchDeg > 20)) errors.push("09-6：要有倒地仰视的镜头");
-    if (!Has(s6, "caption", e => /大刀/.test(e.text))) errors.push("09-6：拔大刀砍的玩家操作时刻要有说明字");
-    if (!Keys(s6, "KitchenIja").some(k => k.state === "down")) errors.push("09-6：鬼子要倒");
+    const s = Seq("09-5");
+    if (!HasLine(s, "NierWhimperFirst.01")) errors.push("09-5：妮儿要呜咽");
+    if (!Has(s, "caption", e => /捂住她的嘴/.test(e.text))) errors.push("09-5：捂嘴的按键时刻要有说明字");
+    if (!Has(s, "caption", e => /撒尿/.test(e.text))) errors.push("09-5：撒尿的看守要有说明字");
+    if (HasLine(s, "PisserGrunt.01") || HasLine(s, "PisserGrunt.02")) errors.push("09-5：演的是「按到了」那支，看守不该「嗯？」");
+    if (!Has(s, "caption", e => /没按到/.test(e.text))) errors.push("09-5：「没按到」那支要在说明字里写一句");
+    const go = PosKeys(s, "CellarIja2").filter(k => k.move === "walk");
+    const whimper = LineT(s, "NierWhimperFirst.01");
+    if (!go.length || go.at(-1).x < 107 || whimper === undefined || go[0].t < whimper) errors.push("09-5：看守要在呜咽之后系好裤子往偏屋去");
   }
-  // 10：从背后打掉机枪组；班长吼「调过来」；掷弹筒越落越近；何有田接机枪；后送队进院；老耿看一眼；挪水缸开门
+  // 09-6：攥衣角、「屁股对到老子」、蹲在 (86,497) 看前屋南门、石磨老汉说明字、第二次呜咽 + 捂嘴、响了才挪
+  {
+    const s = Seq("09-6");
+    if (!Has(s, "caption", e => /衣角/.test(e.text))) errors.push("09-6：妮儿攥衣角往后坠要有说明字");
+    if (!HasLine(s, "ButtToMe.01")) errors.push("09-6：要有「屁股对到老子」");
+    const sight = s.camera.find(c => c.eye && Near(c.eye, { x: 86, z: 497 }, 0.4) && c.eye.stance === "crouch");
+    if (!sight) errors.push("09-6：要蹲在 (86,497) 透过前屋南门看机枪组的后背");
+    if (!Has(s, "caption", e => /石磨/.test(e.text))) errors.push("09-6：石磨上绑着的老汉要有说明字");
+    if (!HasLine(s, "NierWhimperAgain.01") || !Has(s, "caption", e => /捂嘴/.test(e.text))) errors.push("09-6：第二次呜咽与捂嘴说明字");
+    const bursts = Bursts(s), moves = Moves(s).filter(c => c.t > 4);
+    if (moves.length < 3) errors.push("09-6：贴西墙往前屋摸要分 ≥3 段");
+    for (const m of moves) if (!bursts.some(b => m.t - b >= 0 && m.t - b < 2.5)) errors.push(`09-6：${m.t} s 的挪动前 2.5 s 内没有机枪响（要响了才走）`);
+    if (!PosKeys(s, "Nier").some(k => k.move === "walk" && k.z < 490)) errors.push("09-6：妮儿要跟着挪到灶屋跟前");
+  }
+  // 09-7：罐子掉地、扑倒、压刺刀、咬手腕、拔大刀
+  {
+    const s6 = Seq("09-7");
+    if (!Has(s6, "caption", e => /罐/.test(e.text))) errors.push("09-7：罐子掉地要有说明字");
+    const lunge = s6.lines.find(l => l.line === "KitchenLunge.01"), bite = s6.lines.find(l => l.line === "KitchenBitten.01");
+    if (!lunge || !bite || bite.t < lunge.t + 4) errors.push("09-7：先扑出来吼，压一会儿刺刀，再被咬惨叫");
+    if (!s6.camera.some(c => c.eye?.stance === "prone" && c.eye.pitchDeg > 20)) errors.push("09-7：要有倒地仰视的镜头");
+    if (!Has(s6, "caption", e => /大刀/.test(e.text))) errors.push("09-7：拔大刀砍的玩家操作时刻要有说明字");
+    if (!Keys(s6, "KitchenIja").some(k => k.state === "down")) errors.push("09-7：鬼子要倒");
+  }
+  // 10-1：从背后打掉机枪组和过道里的人；班长「机枪哑了！冲！」从大车后冲上来；剩一个往东街跑
   {
     const s = Seq("10-1");
-    if (!Has(s, "muzzle", e => e.actor === "player") || !Keys(s, "MgGunner").some(k => k.state === "down")) errors.push("10-1：玩家要从背后打掉机枪组");
-    const s2 = Seq("10-2");
-    if (!s2.lines.some(l => l.line === "TurnEast.01")) errors.push("10-2：班长要吼「调过来！朝东打！」");
-    const impacts = s2.events.filter(e => e.type === "sfx" && e.name === "mortarImpact").sort((a, b) => a.t - b.t);
-    if (impacts.length < 3) errors.push("10-2：掷弹筒至少落三发");
-    for (let i = 1; i < impacts.length; i++) if (Math.hypot(impacts[i].x - 113.2, impacts[i].z - 465.7) >= Math.hypot(impacts[i - 1].x - 113.2, impacts[i - 1].z - 465.7)) errors.push("10-2：掷弹筒落点要越来越近");
-    if (!s2.events.some(e => e.type === "sfx" && e.name === "mortarPop")) errors.push("10-2：掷弹筒要有「嘭」");
-    if (!Keys(s2, "EastIja7").some(k => k.x !== undefined && k.x < 225)) errors.push("10-2：东头的鬼子要从东头过来");
-    const s3 = Seq("10-3");
-    if (!Keys(s3, "HeYoutian").some(k => k.weapon === "Type11")) errors.push("10-3：何有田要接过机枪（weapon Type11）");
-    if (!Keys(s3, "Litter12").some(k => k.x !== undefined && k.z > 478)) errors.push("10-3：后送队的担架要进后院");
-    if (!Has(s3, "caption", e => /看了一眼/.test(e.text))) errors.push("10-3：老耿看一眼地上的人要有说明字");
-    const s4 = Seq("10-4");
-    if (!Keys(s4, "LitterDonggua").some(k => k.x !== undefined && k.z > 506)) errors.push("10-4：担架要抬出后门");
-    if (s4.then !== "stay") errors.push("10-4：最后一段 then 要是 stay");
+    if (!Has(s, "muzzle", e => e.actor === "player")) errors.push("10-1：玩家要从背后开打");
+    for (const id of ["MgGunner", "MgLoader", "Leader", "GateIja1"]) if (!Keys(s, id).some(k => k.state === "down")) errors.push(`10-1：${id} 要倒`);
+    if (!HasLine(s, "MgSilenced.01")) errors.push("10-1：班长要吼「机枪哑了！冲！」");
+    const luo = PosKeys(s, "Luo").filter(k => k.move === "run");
+    if (!luo.length || !luo.some(k => k.z > 450)) errors.push("10-1：班长要从大车后头冲上来");
+    if (!PosKeys(s, "Rifle2").some(k => k.move === "run" && k.x > 110)) errors.push("10-1：剩下的一个要从大门往东街跑");
+  }
+  // 10-2：调过来；先头五六个顺东街冲（run 键）、倒 2–3 个、落点在石碾 25–70 m；剩下缩到土地庙后；喊人的那个在庙后
+  {
+    const s = Seq("10-2");
+    for (const l of ["TurnEast.01", "EastEndCharge.01", "EastEndOfficer.01"]) if (!HasLine(s, l)) errors.push(`10-2：要有台词 ${l}`);
+    const east = ["EastIja1", "EastIja2", "EastIja3", "EastIja4", "EastIja5", "GateIja2", "EastIja6"];
+    const charging = east.filter(id => PosKeys(s, id).some(k => k.move === "run"));
+    if (charging.length < 5) errors.push("10-2：先头五六个要顺着东街往前跳");
+    const downs = east.filter(id => Keys(s, id).some(k => k.state === "down"));
+    if (downs.length < 2 || downs.length > 3) errors.push(`10-2：要倒两三个，现在 ${downs.length}`);
+    for (const id of downs) { const p = PosKeys(s, id).at(-1); const d = p ? Math.hypot(p.x - ROLLER.x, p.z - ROLLER.z) : 0; if (d < 25 || d > 70) errors.push(`10-2：${id} 倒在离石碾 ${R(d)} m 处（要 25–70 m）`); }
+    for (const id of ["EastIja4", "EastIja5", "GateIja2"]) if (!Near(PosKeys(s, id).at(-1), SHRINE, 6)) errors.push(`10-2：${id} 最后要缩到土地庙后头`);
+    if (!Has(s, "muzzle", e => e.actor === "player" && e.count >= 4)) errors.push("10-2：玩家要用机枪扫（muzzle count ≥ 4）");
+  }
+  // 10-3：掷弹筒「嘭」（麦秸垛后冒烟）、至少三发、越落越近；军官交代；弹斗说明字
+  {
+    const s = Seq("10-3");
+    if (!HasLine(s, "EastEndOfficer.02")) errors.push("10-3：军官要交代掷弹筒");
+    const impacts = s.events.filter(e => e.type === "sfx" && e.name === "mortarImpact").sort((a, b) => a.t - b.t);
+    if (impacts.length < 3) errors.push("10-3：掷弹筒至少落三发");
+    for (let i = 1; i < impacts.length; i++) if (Math.hypot(impacts[i].x - ROLLER.x, impacts[i].z - ROLLER.z) >= Math.hypot(impacts[i - 1].x - ROLLER.x, impacts[i - 1].z - ROLLER.z)) errors.push("10-3：掷弹筒落点要越来越近");
+    if (impacts.length && Math.hypot(impacts[0].x - ROLLER.x, impacts[0].z - ROLLER.z) < 10) errors.push("10-3：第一发要落在十几米外");
+    if (!Has(s, "sfx", e => e.name === "mortarPop")) errors.push("10-3：掷弹筒要有「嘭」");
+    if (!Has(s, "smoke", e => Math.hypot(e.x - 164.2, e.z - 456.6) < 3)) errors.push("10-3：麦秸垛后头要冒烟（从石碾看不见垛子，只看得见烟）");
+    if (!Has(s, "caption", e => /弹斗/.test(e.text))) errors.push("10-3：弹斗见底要有说明字");
+  }
+  // 10-4：砸门声往西挪、门倒（信号）、北边那伙人穿院子链钻到北角院门外；班长叫文财、幺娃堵；两人到北角口
+  {
+    const s = Seq("10-4");
+    for (const l of ["EastEndOfficer.03", "HoldEastStreet.01"]) if (!HasLine(s, l)) errors.push(`10-4：要有台词 ${l}`);
+    const bash = s.events.filter(e => e.type === "sfx" && e.name === "bodyFall").sort((a, b) => a.t - b.t);
+    if (bash.length < 3) errors.push("10-4：砸门声至少三处（用重物落地声顶）");
+    for (let i = 1; i < bash.length; i++) if (bash[i].x > bash[i - 1].x + 0.01) errors.push("10-4：砸门声要一个院子一个院子往西挪");
+    const on = s.events.find(e => e.type === "signal" && e.name === "NorthYardGatesBroken" && e.on)?.t;
+    const n1 = PosKeys(s, "NorthIja1").filter(k => k.move === "run");
+    if (on === undefined || !n1.length || n1[0].t < on || !Near(n1.at(-1), Unit("10-4", "NorthIja1"), 0.6)) errors.push("10-4：门倒了以后最前头的鬼子要钻到北角院门外");
+    for (const id of ["LiuWencai", "Yaowa"]) if (!Near(PosKeys(s, id).at(-1), Unit("10-4", id), 0.6)) errors.push(`10-4：${id} 要蹲到北角口上堵`);
+  }
+  // 10-5：南边翻墙、何有田去守后门；后送队进院（担架到过道 / 后院）；妮儿抱老耿的腿；老耿看一眼
+  {
+    const s = Seq("10-5");
+    for (const l of ["EastEndOfficer.04", "HoldEastStreet.02"]) if (!HasLine(s, l)) errors.push(`10-5：要有台词 ${l}`);
+    if (!Near(PosKeys(s, "HeYoutian").at(-1), Unit("10-5", "HeYoutian"), 0.6)) errors.push("10-5：何有田要去守后门");
+    if (!Near(PosKeys(s, "SouthIja1").at(-1), { x: 126, z: 490 }, 1.5)) errors.push("10-5：南边要有人翻南院墙");
+    if (!PosKeys(s, "LitterDonggua").some(k => k.z > 478) || !PosKeys(s, "Litter01").some(k => k.z > 470)) errors.push("10-5：担架要从大门过道抬进院子");
+    const geng = Unit("10-5", "Geng");
+    if (!PosKeys(s, "Nier").some(k => k.move === "run" && Near(k, geng, 1.5))) errors.push("10-5：妮儿要扑过去抱住老耿的腿");
+    if (!Has(s, "caption", e => /看了一眼/.test(e.text))) errors.push("10-5：老耿看一眼地上的人要有说明字");
+  }
+  // 10-6：挪缸开门、担架抬出后门、幺娃接过机枪（weapon Type11）、then stay
+  {
+    const s4 = Seq("10-6");
+    if (!HasLine(s4, "HoldEastStreet.03")) errors.push("10-6：班长要喊「幺娃，接到！」");
+    if (!Keys(s4, "Yaowa").some(k => k.weapon === "Type11")) errors.push("10-6：幺娃要接过机枪（weapon Type11）");
+    if (!PosKeys(s4, "LitterDonggua").some(k => k.z > 506)) errors.push("10-6：担架要抬出后门");
+    if (!Has(s4, "caption", e => /接 11/.test(e.text))) errors.push("10-6：末尾要有「接 11」的说明字");
+    if (s4.then !== "stay") errors.push("10-6：最后一段 then 要是 stay");
   }
   // 大段的镜头轨：每一刻都能采样（没有空档让 SamplePrevizCamera 报错）
   const ground = layout.terrainSampler;
