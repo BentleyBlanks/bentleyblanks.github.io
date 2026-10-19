@@ -37,4 +37,26 @@ export const BLOCKOUT_PREVIZ_CLIP_LIBRARIES = Object.freeze([
  */
 export const PREVIZ_WEAPON_SLUNG = Object.freeze([
   "PvStandTalkSlung",
+  // PrevizCare（清单 slungRifle: true）：扒土、铺被子、挪人、拖被子、蹲下抓担架杆
+  "PvKneelDig", "PvKneelPullBlanket", "PvKneelHaulBody", "PvBlanketDragL", "PvBlanketDragR", "PvCrouchGripLitter",
+  // PrevizCombat（说明表「背枪」）：抱手榴弹捆爬、翻沟、架伤员；被架的机枪手手里也不拿枪
+  "PvCrawlCarryBundle", "PvClimbOutTrench", "PvSupportWalkL", "PvSupportWalkR", "PvSupportedHop",
+  // CollectionCare：医护包扎 / 按伤口（2026-10-19 起 02末卫生兵用 CareMedicPress）
+  "CareMedicPress", "CareMedicBandage",
+]);
+
+/**
+ * 播这些片段时手里、背上都不显示枪（2026-10-19）：趴着 / 躺着的空手片段。背枪名单那把枪是竖着挂在背后的（开场库 InterrogateCrouch
+ * 的挂法），人一趴下就戳上天；这几条干脆不画（Script_EditorBlockoutPuppets 在动作层之后藏）。
+ */
+export const PREVIZ_WEAPON_HIDDEN = Object.freeze([
+  "PvCrawlCarryBundle", "PvLieGrabSleeve",
+]);
+
+/**
+ * 躺着播的片段（2026-10-19）：顺着躺（lie:"along"）的倒地的人播它们时，运行时照样按头的方向把身子摆顺
+ * （Script_EditorBlockoutPuppets 量片段里头 / 骨盆 / 两脚的方向）。0105 PrevizTest 只许被子上的冬瓜播这一类。
+ */
+export const PREVIZ_LYING_CLIPS = Object.freeze([
+  "PvLieGrabSleeve",
 ]);

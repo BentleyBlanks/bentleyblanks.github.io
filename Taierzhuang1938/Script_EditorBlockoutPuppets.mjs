@@ -41,6 +41,7 @@ import { InstallAllyGait } from "./Script_AllyGait.mjs";
 import { SetRelaxedGait, EnsureRelaxedGait } from "./Script_RelaxedGait.mjs";
 import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { LoadLugouCastModels } from "./Script_CharacterModel.mjs";
+import { PREVIZ_WEAPON_HIDDEN } from "./Data_BlockoutPrevizClips.mjs";
 
 /** 不拿枪的定妆角色（开场导演 Spawn 时给 unarmed:true 的那几个）。 */
 const UNARMED_CASTS = new Set(["interpreter"]);
@@ -422,6 +423,10 @@ export class BlockoutPuppets {
       actor.root.rotation.y = ry;
       human.soldier.yaw = ry;
       if (lieAlong && human.lieLocal) this._PlaceLying(human, x, z, ry);
+      // 2026-10-19：顺着躺的人播躺姿片段（PvLieGrabSleeve）照样按头的方向摆；片段带 rootPath（PvClimbOutTrench）按它挪根
+      const lieClip = this._LieClip(puppet, human, drive);
+      if (lieClip && human.lieClip?.clip === drive.clip && human.lieClip.L) this._PlaceLying(human, x, z, ry, human.lieClip.L);
+      this._ApplyRootPath(human, drive, ry);
       this._SyncWeapon(human, drive);
       if (human.kind === "ija" || human.soldier.relaxedGait) EnsureRelaxedGait(human.soldier);
       human.animDt += dt;
@@ -463,6 +468,20 @@ export class BlockoutPuppets {
         state.meleeCombat = { weapon: actor.weaponId, state: "idle", action: "Guard", clip: "DadaoGuard", normalized: this.elapsed % 1, t: this.elapsed, weight: 1 };
       }
       actor.Update(step, state);
+      // 2026-10-19：趴着 / 躺着播的空手片段（抱捆爬、躺着攥袖子）手里、背上都不挂枪（背枪那把是竖着挂的，趴下会戳上天）
+      if (drive?.clip && PREVIZ_WEAPON_HIDDEN.includes(drive.clip) && human.openingInstalled === true) {
+        if (actor.weaponGroup) actor.weaponGroup.visible = false;
+        const rig = actor.characterRig;
+        if (rig?.openingSlungRifle) rig.openingSlungRifle.visible = false;
+        if (rig?.relaxedGaitRifle) rig.relaxedGaitRifle.visible = false;
+      }
+      if (lieClip &&!(human.lieClip?.clip === drive.clip && human.lieClip.done)) {
+        // 片段淡入期间每帧量一次头 / 骨盆 / 两脚，淡入完了缓存（同一片段之后不再量）
+        const L = this._MeasureLie(human);
+        const done = (actor.characterRig?.openingBlendState?.mix ?? 1) >= 0.99;
+        human.lieClip = { clip: drive.clip, L, done };
+        if (L) this._PlaceLying(human, x, z, ry, L);
+      }
       if (lieAlong) {
         if (!actor.ragdollState) human.lieLocal = null;
         else if (!human.lieLocal) {
@@ -518,6 +537,9 @@ export class BlockoutPuppets {
       const last = human.clipName === clip && Number.isFinite(human.clipSeconds) ? human.clipSeconds : seconds;
       const advance = Math.max(0, seconds - last);
       travel = dt > 1e-4 ? meta.referenceSpeedMps * advance / dt : 0;
+      // 2026-10-19：原地循环的走 / 爬片段（拖被子、架伤员、抱捆爬、猫腰拽人）跟着人走：身体时钟按实际速度推
+      // （播放速率 = 实际速度 / referenceSpeedMps，开场动作层自己换算），站住就停在那一帧，脚不滑。
+      if (meta.loop === true) travel = mps > 0.05 ? mps : 0;
       pose.weaponHold = meta.weaponHold || "twoHand";
     }
     human.clipName = clip; human.clipSeconds = seconds;
@@ -601,9 +623,37 @@ export class BlockoutPuppets {
     return { a: best.a, px: best.px, pz: best.pz };
   }
 
+  /** 2026-10-19：顺着躺（lie:"along"）的倒地的人正在播片段（躺姿片段，如 PvLieGrabSleeve）：按片段里身体的方向摆。 */
+  _LieClip(puppet, human, drive) {
+    if (!puppet.down || puppet.unit.kind === "litter" || human.slot !== "main" || !drive?.clip) return false;
+    return drive.lie === "along" || (drive.lie === undefined && puppet.unit.lie === "along");
+  }
+
+  /**
+   * 2026-10-19：原地播的翻沟片段（清单 rootPath.keys = [[t, 往前, 往上], …]，运行时米）：根顺着朝向往前、往上挪。
+   * 片段按 1.4 m 深的沟写；往上的量按「片段末尾那一点的地面 − 起点地面」等比放大 / 缩小（沟深 2 m 就放大到 2 m）。
+   * 预演在片段播完时把人用位置键挪到末尾那一点（Script_EditorBlockoutFirstLevel0105Previz ClimbOut）。
+   */
+  _ApplyRootPath(human, drive, ry) {
+    const clip = drive?.clip;
+    const keys = clip && this.opening?.api.OpeningClipMeta(clip)?.rootPath?.keys;
+    if (!Array.isArray(keys) || keys.length < 2 || human.slot !== "main") return;
+    const t = Math.max(0, drive.clipSeconds || 0);
+    let i = 1;
+    while (i < keys.length - 1 && keys[i][0] < t) i++;
+    const a = keys[i - 1], b = keys[i], span = b[0] - a[0];
+    const w = span > 1e-6 ? Math.max(0, Math.min(1, (t - a[0]) / span)) : 1, s = w * w * (3 - 2 * w);
+    const fwd = a[1] + (b[1] - a[1]) * s, up = a[2] + (b[2] - a[2]) * s;
+    const end = keys[keys.length - 1], fx = -Math.sin(ry), fz = -Math.cos(ry);
+    const root = human.actor.root, x0 = root.position.x, z0 = root.position.z, y0 = root.position.y;
+    const rise = this.groundAt(x0 + fx * end[1], z0 + fz * end[1]) - y0;
+    const k = end[2] > 1e-3 && rise > 0.2 ? Math.max(0.5, Math.min(2.5, rise / end[2])) : 1;
+    root.position.set(x0 + fx * fwd, y0 + up * k, z0 + fz * fwd);
+  }
+
   /** lie:"along"：把人转到「头朝 ry 的前方」，身体（头、骨盆、两脚）的包围框中心落在 (x, z)。 */
-  _PlaceLying(human, x, z, ry) {
-    const actor = human.actor, L = human.lieLocal, k = actor.root.scale.x || 1;
+  _PlaceLying(human, x, z, ry, L = human.lieLocal) {
+    const actor = human.actor, k = actor.root.scale.x || 1;
     const r = ry - L.a, c = Math.cos(r), s = Math.sin(r);
     const ox = (L.px * c + L.pz * s) * k, oz = (-L.px * s + L.pz * c) * k;
     actor.root.position.x = x - ox;

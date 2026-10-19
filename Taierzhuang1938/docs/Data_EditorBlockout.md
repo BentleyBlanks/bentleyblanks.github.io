@@ -538,6 +538,18 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 - **投弹**：05-3 顺子替身在 1.5 s 起播投弹片段（`throw`，§14.1），3.65 s 脱手，那捆手榴弹沿抛物线飞 0.9 s 落在车尾铁板上（离地 1.5 m），4.6 s 在那里炸（爆炸事件 `h: 1.5`）。全 01–05 里别的「扔手榴弹」：02-1 甲甩手榴弹、02-2 甲咬弦都是日军现成片段（`IjaGrenadeKnockThrow` / `IjaGrenadeBitePin`，不动）；04-1 / 04-2「手榴弹扔进来」镜头里没有扔的人（只有落点爆炸 + 说明字），没有顶替的片段，不在这一轮换。
 - **桥下头顶**：桥下的人头顶（头骨点 + 0.2 m）离上方门板 / 横木 / 压断塌下来的门板底面一律 ≥ 0.1 m，身子不穿横木。改动：05-1 班长、幺娃、机枪手钻桥底时出发就猫腰（原来走到地方才蹲）；05-2 班长一直蹲着（原来车压上桥时趴下、过后再蹲起来：从趴到蹲那一下动作库先站起来再跪）；05-3 班长钻出桥底、在桥面南沿外一步蹲着端枪（原来站在桥下正中，站直了头顶贴着桥板）；04-3 班长挪到板桥北沿外一步回身招呼，刘文财跑到桥北沿外、猫腰钻过桥底、在桥南几步蹲下（关键帧里也是蹲着）；05-4 坡顶上的四个鬼子（跟车步兵三个 + 沟里追来的一个）关键帧 `path` 与预演都改成绕桥东头（`Script_EditorBlockoutFirstLevel0105Keyframes.BRIDGE_EAST_DETOUR`：沿路走到横木端头外 1.25 m、横过路面往东南、从沟东边绕上坡顶；沟里那个先绕过靠沟壁的门板、从沟东沿爬出来），不再直线穿过桥头横木端头、不再从桥底钻。实测余量（预演每 0.2 s + 关键帧过渡全程；头或骨盆落在桥的块的脚印内 0.15 m 都算）：04-3 刘文财 0.53 m；05-1 班长 0.64、幺娃 0.48、机枪手 0.62；05-2 班长 0.88；05-3、05-4 没人在桥底下；过渡 04-2→04-3 刘文财 0.38、04-3→05-1 最少 0.32（机枪手）、05-1→05-2 0.88、05-2→05-3 班长 0.13（蹲着从压断塌下来的门板底下钻过去）、05-3→05-4 没有人进桥底也没有人碰到横木（原来班长 0.02 m、跟车步兵穿横木端头 −0.43 m）。0105 PrevizTest 另查：04-3…05-4 的关键帧布设、预演每 0.1 s、关键帧之间的过渡路线（过渡里目标是站就站着走）都不许站着从桥底下过。
 
+**2026-10-19 占位动作接进预演（用户：「哪怕是白盒，很多需要的人物动作你还是按照文档里要求的来占位制作一下」「我看到一个讲话还拿着枪的很出戏」）**：四个占位动作库（PrevizTalk / PrevizCare / PrevizCombat / PrevizIja，§14.1）接进 0105 预演，凡是拿别的片段顶着、或者只有说明字的地方都换成了新片段，并定了说话姿态规矩（§14.4）。换了什么：
+- 01：冬瓜伸膀子 `PvSitOfferArm`、塞背包 `PvSitStuffPack`、按住顺子的手 `PvSitGrabHand`、说「今天就跑」那一串坐着 `WoundedSitRifleIdle`；幺娃数炮 `PvCrouchCountFingers`；班长在洞里说话 `PvStandTalkSlung`、指人 `PvStandPointL`、挥手让幺娃走 `PvStandWaveOnL`、洞口叫人 `PvStandBeckonL`；幺娃「我去！」`PvStandTalkSlung`；01-4 甲打手势分开 `PvIjaSignalSplit`；迂回组四个人翻出交通沟 `PvClimbOutTrench`（运行时按清单 `rootPath` 把根往前、往上挪，往上的量按沟深等比放大，播完用位置键挪到沟沿）。
+- 02-1：乙举刺刀 `PvIjaBayonetRaiseThreat`、甲抬手拦 `PvStandHaltL`；枪托砸脸成对（乙 `PvIjaButtStrikeFace` + 冬瓜 `PvCaptiveButtHit`，冬瓜先转过来冲着乙，乙站在他正前 0.8 m，冬瓜晚 0.38 s 起播，砸完侧倒，不再切回跪姿）；揪头发 `PvIjaCrouchHairLift`（乙在顺子眼睛前 0.70 m；顺子眼高拽到 0.56 m，原来镜头拽到 0.72 m，后面整段第一人称眼高跟着改成 0.56）；甲「没时间了」「丁。刺刀。」`PvStandTalkLowRifle`、「下一个，他」`PvStandPointL`。
+- 02-2：副射手被掀下沟沿 `PvBlastThrownBack`（原来 `ShotCollapse` + 走位挪人）；乙「敌袭！」边喊边开枪、刘文财「顺子在底下！」边喊边开枪（打仗当下端枪喊）；班长「杀——！」`PvStandWaveOnL`；何有田扒土 `PvKneelDig`。
+- 02-3：何有田扒土 `PvKneelDig`、跪着喊 `PvCrouchTalkRifle`、铺被子 `PvKneelPullBlanket`（被子在 2.55 s 落地那一刻才出现）、班长和何有田挪人 `PvKneelHaulBody`；冬瓜躺着攥顺子袖子 `PvLieGrabSleeve`（原来只有说明字；说完清掉片段 = 松手；顺子蹲到他右肩旁，镜头看脸和手）；班长「还能打不？」`PvStandTalkLowRifle`、「跟到老子，走！」`PvStandWaveOnL`。
+- 拖被子（02-3 末…02-7）：何有田 `PvBlanketDragL`、顺子替身 `PvBlanketDragR`，速度 1.4 → **1.2 m/s**（片段基准 0.8 m/s，播放约 1.5 倍；生成器 `DRAG_MPS`）；到了掩体何有田松开被角回身取枪 `PvBlanketReleaseTurn`（原来 `PullComrade`），播完再退到掩体后；02-7 坡顶的兵「快过来！」`PvProneBeckonL`（原来端着枪对着顺子）。
+- 02末：卫生兵跪在冬瓜胸口旁按伤口 `CareMedicPress`（CollectionCare，跪在靠顺子那一侧）；担架员 `PvCrouchGripLitter`；班长问话 `PvStandTalkSlung`、指何有田 `PvStandPointL`；刘文财摇头 `PvStandShakeHead`（原来两个转身键）。
+- 03：挤人「往哪走！」`PvShoulderShove`；远处的掷弹筒组（关键帧里的 `IjaMortar1/2`）`PvIjaLauncherFire` + `PvIjaLauncherLoad`（2 s 一发，`Mortar()` 的「嘭」对齐 1.60 s 发射；03-3 两发挪了 0.6 / 1.0 s 对齐）；03-2 坑沿的兵被掀翻 `PvBlastThrownBack`；机枪手边打边喊「丢弹筒！」；正面日军跃进后扑倒 `PvStandToProneDive`；刘文财「左边沟里头有人！」`PvCrouchPointL`；03-4 机枪手腿中弹 `PvLegHitKneelClutch`；抱捆的弟兄猫腰到坑沿 → 扑出去 → `PvCrawlCarryBundle` 抱着那捆爬；03-5 班长「走了！」不再端枪对着顺子，`PvStandWaveOnL`。
+- 03-5…05-4 幺娃架机枪手走：机枪手 `PvSupportedHop`、幺娃在他左边 0.5 m `PvSupportWalkL`（生成器 `SupportGo`；05-1 钻桥底那段仍是蹲着走）。
+- 04：班长回身招呼 `PvStandBeckonL`（04-1、04-3）；拼刺刀一条到底 `PvIjaLungeParriedFall`（原来 `BayonetClearWood` + `ShotCollapse`）。05-1：班长判断 `PvStandPointL`、拽顺子钻桥底 `PvCrouchRunPullBehind`；05-3 幺娃「搭把手！」`PvStandBeckonL`；05-4 刘文财 `PvStandTalkLowRifle`、班长「表看了，走！」`PvStandWaveOnL`。
+- 时长：总长 749 → 773 s；01-4 40.9 → 51.5 s（翻沟）；02（02-1…02-7）236 → 249 s，连 02末 295 → 308 s（约 5.1 分钟，节拍表给 02 整拍约 3.5 分钟，长出来的主要是 02-1 审问 70 s 和四段拖被子）。
+
 ## 14. 预演（previz，2026-10-18）
 
 用户 10-18 拍板：白盒编辑器默认仍是「走关键帧看布设」（§1 的「完全不要过场动画」对普通浏览照旧成立）；**每个关键帧可以挂一段预演**，按卡片上的「预演」按钮或 `N` 播放（`V` 是近战键，§4 不许占）：镜头轨、人物调度（走位 / 姿态 / 现成动作片段）、台词（字幕 + 占位配音 + 口型）、事件（白光、黑场、爆炸、烟、枪口火、塌洞等场景信号、震屏、音效）。播完按 `then` 跳到下一个关键帧（直接到位），玩家又能走。缺的动作先用现成动作顶上（用户 10-18），缺口列清单，白盒走顺了再补正式动画。
@@ -631,6 +643,20 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 | `slap` / `stab` / `bodyFall` | 02 审问 |
 | `planeDrone` / `planeDive` | 12–14 飞机远远嗡嗡、顺着大路俯冲下来（2026-10-19） |
 | `strafeNear` / `strafeFar` / `strafeDirt` | 13–14 扫射：近处一串、远处一串、子弹打在土里（2026-10-19） |
+
+### 14.4 占位动作与说话姿态（2026-10-19）
+
+- **说话姿态**（用户 10-19）：说话那一刻正在开枪的（前后 1.5 s 内有他的 `muzzle` 事件）可以端枪；其余说话的人一律不端枪：不打仗的地方（01 防炮洞、02末集结处、03-1 交通沟里走）站着 `PvStandTalkSlung`、跪 / 蹲 `PvCrouchTalkRifle`、坐着 `WoundedSitRifleIdle` 这类；打仗的地方站着 `PvStandTalkLowRifle`，要指 / 挥 / 招 / 拦用 `PvStandPointL` / `PvStandWaveOnL` / `PvStandBeckonL` / `PvStandHaltL`（蹲着 `PvCrouchPointL`、趴着 `PvProneBeckonL`）。绝不能枪口对着顺子说话。
+- **门禁**：`Script_EditorBlockoutFirstLevel0105PrevizTest.mjs` 的 `TalkPostureChecks`：每句写了说话人的台词开始时，说话人要么在播片段，要么倒地 / 在投弹，要么前后 1.5 s 内自己开过枪；跑着喊、没据枪的也算（`moving && !aim`）。端着枪（`aim`）又没开枪 → 错；没播片段干站 / 干蹲着拿枪 → 错。片段过了时长的算法同运行时（循环片段一直放，不循环的过了时长没写 `clipHold` 就清掉）。被子上的冬瓜那条放开给躺姿片段（`PREVIZ_LYING_CLIPS`）。
+- **运行时补的能力**（只做加法）：
+  - 走 / 爬循环片段（清单 `loop: true` 且有 `referenceSpeedMps`：拖被子、架伤员、抱捆爬、猫腰拽人）在走位途中照样播，身体时钟按实际速度推（播放速率 = 实际速度 / referenceSpeedMps），站住就停在那一帧，脚不滑（`Script_EditorBlockoutPuppets._ApplyClip`）。
+  - 顺着躺（`lie: "along"`）的倒地的人播片段时，照样按片段里头 / 骨盆 / 两脚的方向把身子摆顺（`_LieClip`；淡入期间每帧量，淡完缓存）。
+  - 片段带 `rootPath`（`PvClimbOutTrench`）：根顺着朝向往前、往上挪，往上的量按「末尾那一点的地面 − 起点地面」等比放大（`_ApplyRootPath`）；播完由生成器用位置键挪到末尾那一点（`ClimbOut`）。自带位移的 `PvBlastThrownBack` / `PvStandToProneDive` 同样：前者一直留着片段（`clipHold`），后者播完挪到片段末尾（`Dive`）。
+  - 道具轨的网格：`Script_OpeningProps.RegisterOpeningProp`（只做加法，游戏不登记）+ 新模块 `Script_EditorBlockoutPrevizProps.mjs`：`launcher`（八九式掷弹筒，武器网格）、`shell`（弹）、`bundle`（一捆手榴弹）。掉地上的枪按片段的 `weapon` 轨落地（片段一直 `clipHold` 着）。
+  - 背枪名单 `PREVIZ_WEAPON_SLUNG` 补上各库标「背枪」、又不带 weapon 道具轨的片段；`PREVIZ_WEAPON_HIDDEN`（抱捆爬、躺着攥袖子）手里、背上都不画枪（背枪那把是竖着挂的，趴下会戳上天）。
+  - 预演里循环片段一直循环到下一个 `clip` 键（`ClipDuration`）。
+- 生成器小工具（`Script_EditorBlockoutFirstLevel0105Previz.mjs`）：`Off`（往前 / 往右偏）、`SupportGo`（架伤员）、`Dive`、`ClimbOut`、`MortarCrew`；常量 `TALK_SLUNG` / `TALK_LOW` / `TALK_CROUCH`、`DRAG_MPS`。
+- 截图验收：`_shots/EditorBlockout0105/Clips2/`（不提交）：`<拍号>_<人物>_<片段>_t<秒>.png`，第一人称的带 `FP_` 前缀。
 
 ## 15. 06–10 新剧本白盒（关卡键 `FirstLevel0610`，2026-10-18）
 

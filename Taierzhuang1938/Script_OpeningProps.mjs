@@ -223,6 +223,12 @@ function LeaveInWorld(object) {
 }
 
 /** The extra props one actor shows while playing opening clips. Built lazily, per actor. */
+// Props other libraries' clips carry that this file does not build (2026-10-19, the white-box previz: the Type 89 launcher,
+// its shell, the grenade bundle): name -> build(actor) -> { object, axis?, geometries?, materials? }. The game registers none.
+const EXTRA_PROPS = new Map();
+/** Register a builder for a prop track name OpeningPropSet does not know (additive; the game's own props win). */
+export function RegisterOpeningProp(name, build) { if (typeof build === "function") EXTRA_PROPS.set(name, build); }
+
 export class OpeningPropSet {
   constructor(actor, propsSpec = {}) {
     this.actor = actor;
@@ -249,6 +255,10 @@ export class OpeningPropSet {
       const built = BuildRedraftProp(name, { factory: actor.factory, materials: actor.materials, wearer: actor });
       if (!built) return null;
       item = { object: built.object, axis: built.axis, owned: built };
+    } else if (EXTRA_PROPS.has(name)) {
+      const built = EXTRA_PROPS.get(name)(actor);
+      if (!built?.object) return null;
+      item = { object: built.object, axis: built.axis || new THREE.Vector3(0, 0, -1), owned: built };
     } else return null;
     item.object.visible = false;
     (actor.root || actor.characterRig?.root)?.add(item.object);

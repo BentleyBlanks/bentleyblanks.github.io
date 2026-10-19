@@ -254,6 +254,11 @@ export class BlockoutPreviz {
   async LoadExtraClipLibraries(api) {
     if (typeof api?.AddOpeningClipLibrary !== "function") return;
     this.clipLibrariesWarned ||= new Set();
+    // 2026-10-19：片段自带的掷弹筒 / 弹 / 手榴弹捆道具轨要有网格（开场道具层只认识开场那几样）
+    try {
+      const [props, previzProps] = await Promise.all([import("./Script_OpeningProps.mjs"), import("./Script_EditorBlockoutPrevizProps.mjs")]);
+      previzProps.RegisterPrevizProps(props.RegisterOpeningProp);
+    } catch (error) { console.warn("[BlockoutPreviz] 预演道具网格登记失败", error); }
     const Read = async (url) => {
       const response = await fetch(url);
       if (!response.ok) throw Error(`${response.status}`);

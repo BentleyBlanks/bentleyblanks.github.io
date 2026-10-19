@@ -243,6 +243,68 @@ function Shot(s, t, actor, { count = 1, interval, sfx = "rifleShot", at } = {}) 
 }
 
 // ---------------------------------------------------------------------------
+// 2026-10-19 占位动作（Data_BlockoutPrevizClips：PrevizTalk / PrevizCare / PrevizCombat / PrevizIja + CollectionCare）
+// 说话姿态（用户 10-19：「讲话还拿着枪的很出戏」）：说话那一刻正在开枪的（前后 1.5 s 内有他的枪口火）可以端枪；其余说话的人
+// 一律不端枪 —— 不打仗的地方（01 防炮洞、02末集结处、03-1 交通沟里走）站着 PvStandTalkSlung、跪 / 蹲 PvCrouchTalkRifle、
+// 坐着 WoundedSitRifleIdle 这类；打仗的地方站着 PvStandTalkLowRifle，要指 / 挥 / 招 / 拦就用对应的手势片段。
+// 0105 PrevizTest 的 TalkPostureChecks 钉住这条。
+const TALK_SLUNG = "PvStandTalkSlung", TALK_LOW = "PvStandTalkLowRifle", TALK_CROUCH = "PvCrouchTalkRifle";
+/** 拖被子的速度（m/s）：片段 PvBlanketDragL/R 的基准 0.8 m/s；这里 1.2（播放约 1.5 倍，原来 1.4–1.9 m/s 腿倒得飞快）。 */
+export const DRAG_MPS = 1.2;
+/** p 往朝向 yaw 的前方 f 米、右边 r 米（yaw 口径同 Yaw()：0 北，+90 西）。 */
+function Off(p, yaw, f, r = 0) {
+  const a = yaw * Math.PI / 180;
+  return { x: R(p.x - Math.sin(a) * f + Math.cos(a) * r), z: R(p.z - Math.cos(a) * f - Math.sin(a) * r) };
+}
+/**
+ * 架伤员（PrevizCombat stage supportWalk）：机枪手播 PvSupportedHop，幺娃在他左边 0.5 m、靠前 6 cm 播 PvSupportWalkL；
+ * 同一时刻起、同一个时间窗、幺娃的路线 = 机枪手的路线往左平移（运行时两条都按实际速度 / 0.9 推身体时钟）。
+ * 到了站住：片段停在那一帧，人还架着。
+ */
+function SupportGo(s, t0, t1, to, { path = [], faceTo, yawDeg, stance = "stand" } = {}) {
+  const g0 = s.pos.get("Gunner");
+  const pts = [g0, ...path, to];
+  const segYaw = i => Yaw(pts[Math.max(0, i - 1)], pts[Math.max(1, i)]);
+  const side = (p, i) => Off(p, segYaw(i), 0.06, -0.5);
+  const y0 = side(g0, 0), yPath = path.map((p, k) => side(p, k + 1)), yTo = side(to, pts.length - 1);
+  const end = { ...(faceTo ? { faceTo } : {}), ...(yawDeg !== undefined ? { yawDeg } : {}) };
+  s.Key("Yaowa", t0, { x: y0.x, z: y0.z, move: "cut", stance, clip: "PvSupportWalkL", yawDeg: segYaw(1) });
+  s.Go("Gunner", t0, t1, to.x, to.z, { move: "walk", ...(path.length ? { path } : {}), depart: { clip: "PvSupportedHop", woundedWalk: false, stance, yawDeg: segYaw(1) }, stance, ...end });
+  s.Go("Yaowa", t0, t1, yTo.x, yTo.z, { move: "walk", ...(yPath.length ? { path: yPath } : {}), stance, ...end });
+}
+/** 扑倒（PvStandToProneDive：骨盆往前带 0.8 m）：t 起扑，1.2 s 播完把人挪到片段末尾那一点、趴着、清掉片段（after 并进那个键）。 */
+function Dive(s, id, t, yaw, after = {}) {
+  const end = Off(s.pos.get(id), yaw, 0.8);
+  s.Key(id, t, { clip: "PvStandToProneDive", yawDeg: yaw });
+  s.Key(id, t + 1.2, { x: end.x, z: end.z, move: "cut", stance: "prone", clip: null, ...after });
+  return end;
+}
+/**
+ * 翻出沟（PvClimbOutTrench：原地动作，运行时按清单 rootPath 把根往前 0.85 m、往上挪到沟沿，往上的量按沟深等比放大）：
+ * t 起播（朝向 yaw 先转好），2.5 s 播完把人挪到沟沿上那一点、清掉片段（after 并进那个键）。
+ */
+function ClimbOut(s, id, t, yaw, after = {}) {
+  const end = Off(s.pos.get(id), yaw, 0.85);
+  s.Key(id, R(t - 0.45), { yawDeg: yaw });
+  s.Key(id, t, { clip: "PvClimbOutTrench", stance: "stand" });
+  s.Key(id, t + 2.5, { x: end.x, z: end.z, move: "cut", clip: null, ...after });
+  return end;
+}
+/**
+ * 03 远处的掷弹筒组（PrevizIja stage launcherCrew）：射手 PvIjaLauncherFire（2 s 一循环、1.60 s 发射），装填手在射手右前
+ * (0.46, 0.30)、左转 50° 播 PvIjaLauncherLoad，同一时刻起播。firstPop = 这一段第一发「嘭」：片段 clipFrom 对齐它，之后每 2 s 一发
+ * （这一段 Mortar() 的「嘭」都要落在 firstPop + 2k 上）。
+ */
+function MortarCrew(s, firstPop) {
+  // 关键帧里的 IjaMortar1（射手）/ IjaMortar2（装填手）
+  const g = s.pos.get("IjaMortar1"), yaw = Yaw(g, { x: 0, z: -8 });
+  const from = R((((1.6 - firstPop) % 2) + 2) % 2);
+  const ld = Off(g, yaw, 0.30, 0.46);
+  s.Place("IjaMortar1", 0, g.x, g.z, { yawDeg: yaw, stance: "crouch", aim: false, clip: "PvIjaLauncherFire", clipFrom: from });
+  s.Place("IjaMortar2", 0, ld.x, ld.z, { yawDeg: R(yaw + 50), stance: "crouch", aim: false, clip: "PvIjaLauncherLoad", clipFrom: from });
+}
+
+// ---------------------------------------------------------------------------
 // 01 洞里，塌洞
 
 function S0101(ctx) {
@@ -260,7 +322,7 @@ function S0101(ctx) {
   s.Eye(0, 4.5, { stance: "crouch", look: { x: 67.1, z: 65.2 }, pitch: -14 });
   s.Eye(4.5, 2.0, { stance: "crouch", look: { x: 67.1, z: 65.2 }, pitch: -14, toPitch: -20 });
   // 冬瓜把膀子伸过来
-  s.Key("Donggua", 5.6, { clip: "WoundedReach", faceTo: "player" });
+  s.Key("Donggua", 5.6, { clip: "PvSitOfferArm", clipHold: true, faceTo: "player" });
   s.Say("CaveWake.02", "Donggua", 6.0);
   // 绑绷带：开场唯一的交互
   s.Eye(6.5, 6.5, { stance: "crouch", look: { x: 67.0, z: 65.1 }, pitch: -20, toPitch: -34 });
@@ -270,9 +332,9 @@ function S0101(ctx) {
   // 炮光一闪一闪照出别人：幺娃数炮
   s.Ev(13.8, "flash", { dur: 0.22, strength: 0.28 }); s.Sfx(13.8, "artilleryFar");
   s.Eye(13.6, 1.4, { stance: "crouch", look: { x: 67.0, z: 65.1 }, pitch: -30, toLook: { x: 64.9, z: 63.1 }, toPitch: -6 });
-  s.Key("Yaowa", 14.6, { talking: true });
+  s.Key("Yaowa", 14.6, { talking: true, clip: "PvCrouchCountFingers" });
   s.Say("CaveWake.04", "Yaowa", 15.4);
-  s.Key("Yaowa", 17.6, { talking: false });
+  s.Key("Yaowa", 17.6, { talking: false, clip: TALK_CROUCH });
   // 刘文财分子弹
   s.Eye(17.4, 1.2, { stance: "crouch", look: { x: 64.9, z: 63.1 }, pitch: -6, toLook: { x: 68.5, z: 63.2 }, toPitch: -8 });
   s.Key("LiuWencai", 18.2, { clip: "LiuDivideAmmoToss", faceTo: "player" });
@@ -305,31 +367,31 @@ function S0102(ctx) {
   s.Sfx(1.2, "rifleShot", { x: 30, z: 66 }); s.Sfx(1.6, "mgBurstFar", { x: 37, z: -3 }); s.Sfx(2.4, "artilleryNear", { volume: 0.7 });
   s.Go("Runner", 0.4, 4.0, 61.4, 64.8, { move: "run" });
   s.Key("Runner", 4.0, { stance: "crouch", clip: "MessengerReport", faceTo: "Luo" });
-  s.Key("Luo", 3.0, { faceTo: "Runner" });
+  s.Key("Luo", 3.0, { faceTo: "Runner", clip: TALK_SLUNG });
   const t2 = s.Say("RunnerOrder.02", "Runner", 4.3);
   // 班长下令，转身看着顺子
   s.Eye(4.0, 4.5, { stance: "crouch", look: { x: 61.4, z: 64.8 }, pitch: -2 });
   s.Eye(t2 + 4.4, 1.0, { stance: "crouch", look: { x: 61.4, z: 64.8 }, pitch: -2, toLook: { x: 64.1, z: 65.1 }, toPitch: 4 });
   s.Say("RunnerOrder.03", "Luo");
-  s.Key("Luo", s.End("RunnerOrder.03") - 0.6, { faceTo: "player", clip: "InterpreterPoint" });
+  s.Key("Luo", s.End("RunnerOrder.03") - 0.6, { faceTo: "player", clip: "PvStandPointL", clipHold: true });
   const t4 = s.Say("RunnerOrder.04", "Luo");
   // 顺子手上还在给冬瓜打结，慢了半拍
   const slow = s.End("RunnerOrder.04");
   s.Eye(slow, 1.3, { stance: "crouch", look: { x: 64.1, z: 65.1 }, pitch: 4, toLook: { x: 67.1, z: 65.2 }, toPitch: -30 });
-  s.Key("Luo", slow, { clip: null });
+  s.Key("Luo", slow, { clip: TALK_SLUNG });
   // 幺娃一下站起来
-  s.Key("Yaowa", slow + 0.6, { stance: "stand", faceTo: "Luo" });
+  s.Key("Yaowa", slow + 0.6, { stance: "stand", faceTo: "Luo", clip: TALK_SLUNG });
   s.Eye(slow + 1.3, 1.0, { stance: "crouch", look: { x: 67.1, z: 65.2 }, pitch: -30, toLook: { x: 64.4, z: 63.6 }, toPitch: 6 });
   const t5 = s.Say("RunnerOrder.05", "Yaowa", slow + 1.0);
   // 班长看了顺子一眼，没说话，挥手让幺娃跟传令兵走
   const look = t5 + 2.0;
   s.Key("Luo", look, { faceTo: "player" });
   s.Eye(t5 + 1.4, 2.4, { stance: "crouch", look: { x: 64.4, z: 63.6 }, pitch: 6, toLook: { x: 64.1, z: 65.1 }, toPitch: 4 });
-  s.Key("Luo", look + 1.6, { faceTo: "Yaowa", clip: "PointBlockade" });
+  s.Key("Luo", look + 1.6, { faceTo: "Yaowa", clip: "PvStandWaveOnL" });
   s.Key("Luo", look + 4.4, { clip: null });
   const go = look + 2.2;
   s.Key("Runner", go - 0.2, { stance: "stand", clip: null });
-  s.Go("Yaowa", go, go + 6.5, 30, BZ(30), { move: "run", path: [{ x: 62, z: 64.6 }, mouthOut] });
+  s.Go("Yaowa", go, go + 6.5, 30, BZ(30), { move: "run", path: [{ x: 62, z: 64.6 }, mouthOut], depart: { clip: null } });
   s.Go("Runner", go + 0.3, go + 6.8, 28.5, BZ(28.5) + 0.6, { move: "run", path: [{ x: 52, z: BZ(52) + 0.5 }] });
   s.Key("Yaowa", go + 6.9, { visible: false });
   s.Key("Runner", go + 7.1, { visible: false });
@@ -351,12 +413,12 @@ function S0103(ctx) {
   const LUO = { x: 62.4, z: 64.5 };
   // 冬瓜单手往背包里塞东西，塞不进去，顺子帮他捆好
   s.Place("Donggua", 0, DG.x, DG.z, { stance: "crouch" });
-  s.Key("Donggua", 0, { clip: "WoundedReach", faceTo: { x: 66.3, z: 64.6 } });
+  s.Key("Donggua", 0, { clip: "PvSitStuffPack", faceTo: { x: 66.3, z: 64.6 } });
   s.Eye(0, 3.0, { stance: "crouch", look: DG, pitch: -30 });
   s.Caption(0.3, 2.6, "（冬瓜单手塞背包，塞不进去，顺子帮他捆好）");
   // 班长在洞口回头
   s.Eye(2.6, 1.0, { stance: "crouch", look: DG, pitch: -30, toLook: LUO, toPitch: 2 });
-  s.Key("Luo", 2.6, { clip: "InterpreterPoint" });
+  s.Key("Luo", 2.6, { clip: "PvStandBeckonL" });
   s.Say("LastTwo.01", "Luo", 3.0);
   s.Say("LastTwo.02"); // 顺子：来了！
   // 班长看了他们俩一会儿，走了
@@ -370,7 +432,7 @@ function S0103(ctx) {
   s.Caption(bag, 2.6, "（包口露出一件老百姓的短褂，顺子往里塞）");
   // 冬瓜一把按住他的手
   const grab = bag + 2.6;
-  s.Key("Donggua", grab, { clip: "WoundedReach", faceTo: "player" });
+  s.Key("Donggua", grab, { clip: "PvSitGrabHand", clipHold: true, faceTo: "player" });
   s.Eye(grab, 1.0, { stance: "crouch", yaw: 160, pitch: -50, toLook: DG, toPitch: -8 });
   s.Key("Donggua", grab + 0.4, { talking: true });
   s.Say("LastTwo.03", "Donggua", grab + 0.5);
@@ -379,7 +441,7 @@ function S0103(ctx) {
   s.Eye(glance, 0.5, { stance: "crouch", look: DG, pitch: -8, toLook: DUG_MOUTH, toPitch: 0 });
   s.Eye(glance + 0.8, 0.5, { stance: "crouch", look: DUG_MOUTH, pitch: 0, toLook: DG, toPitch: -8 });
   s.Say("LastTwo.04", null, glance + 1.4);
-  s.Key("Donggua", s.End("LastTwo.04"), { clip: null });
+  s.Key("Donggua", s.End("LastTwo.04"), { clip: "WoundedSitRifleIdle" });
   for (const id of ["LastTwo.05", "LastTwo.06", "LastTwo.07", "LastTwo.08", "LastTwo.09", "LastTwo.10"]) {
     s.Say(id, id === "LastTwo.06" || id === "LastTwo.09" ? null : "Donggua");
   }
@@ -397,7 +459,8 @@ function S0103(ctx) {
   // 洞外的兵喊：炮！趴下——！
   s.Spawn("Shouter", { side: "nra", x: 50, z: BZ(50), yawDeg: 90, stance: "stand" }, { visible: false });
   s.Key("Shouter", run0 - 0.6, { visible: true });
-  s.Go("Shouter", run0 - 0.6, run0 + 3.0, 57.5, BZ(57.5), { move: "run", yawDeg: -90 });
+  // 跑着喊（walk = 整个窗口匀速约 2 m/s 小跑过来；run 会等到最后 2 s 才出发，喊的时候还干站着）
+  s.Go("Shouter", run0 - 0.6, run0 + 3.0, 57.5, BZ(57.5), { move: "walk", yawDeg: -90 });
   const shout = s.Say("LastTwo.12", "Shouter", run0 + 0.6);
   // 洞口外一道白光，一声闷响；冬瓜被气浪拍在沟壁上；黑场，耳鸣
   const blast = shout + 1.6;
@@ -437,10 +500,11 @@ function S0104(ctx) {
   s.Go("IjaYi", drop + 0.4, drop + 1.6, 58.6, 64.6, { move: "run", yawDeg: -90 });
   s.Key("IjaDing", drop + 0.8, { stance: "stand", clip: "IjaDropInStand" });
   s.Go("IjaDing", drop + 0.8, drop + 2.2, 54.8, 65.2, { move: "run", yawDeg: 90 });
+  s.Key("IjaJia", drop + 1.3, { clip: "PvIjaSignalSplit" });
   // 一声不吭，打着手势分开：丁守岔口，甲往前甩手榴弹
   s.Eye(drop + 2.2, 2.0, { stance: "prone", look: { x: 57, z: 62 }, pitch: 9, toLook: { x: 54, z: 65 }, toPitch: 2 });
   s.Go("IjaDing", drop + 3.5, drop + 10.5, 46.07, 66.17, { move: "walk", aim: true });
-  s.Go("IjaJia", drop + 3.0, drop + 6.5, 52.98, 64.43, { move: "walk" });
+  s.Go("IjaJia", drop + 3.3, drop + 6.5, 52.98, 64.43, { move: "walk", depart: { clip: null } });
   s.Key("IjaJia", drop + 6.8, { clip: "IjaGrenadeKnockThrow", yawDeg: 94.9 });
   const gb = drop + 10.4;
   s.Sfx(gb, "grenadeBlast", { x: 36, z: BZ(36) }); s.Ev(gb, "explosion", { x: 36, z: BZ(36), kind: "grenade", radius: 4 });
@@ -514,11 +578,14 @@ function OutflankCrawl(s, ctx, { tClimb = 0, from, toD, toLat = CRAWL_LAT, start
     if (from === "trench") {
       s.Place(id, 0, ...Object.values(TP(T_BRANCH + 8.5 + k * 1.3, k % 2 ? -0.2 : 0.9)), { stance: "crouch", aim: false, yawDeg: 160 });
       const tUp = tClimb + k * 1.4;
-      s.Go(id, tUp, tUp + 2.2, exit.x, exit.z, { move: "walk", stance: "prone" });
+      // 2026-10-19：翻出交通沟（PvClimbOutTrench，按 rootPath 挪到沟沿），再趴下爬到出口
+      const rim = ClimbOut(s, id, tUp, Yaw(s.pos.get(id), exit), { stance: "prone" });
+      const tExit = R(tUp + 2.5 + Math.max(0.8, Dist(rim, exit) / 0.5));
+      s.Go(id, tUp + 2.5, tExit, exit.x, exit.z, { move: "crawl" });
       const via = BP(9 - k * 0.8, CRAWL_LAT);
       const end = BP(toD[id], toLat);
       const len = Dist(exit, via) + Dist(via, end);
-      const t0 = tUp + 2.6;
+      const t0 = tExit + 0.2;
       s.Go(id, t0, R(t0 + len / 0.5), end.x, end.z, { move: "crawl", path: [via], yawDeg: -88 });
     } else {
       const st = BP(startD[id], CRAWL_LAT);
@@ -548,8 +615,8 @@ function S0201(ctx) {
   OutflankCrawl(s, ctx, { tClimb: 2.0, from: "crawl", startD: OUTFLANK_014_END, toD: OUTFLANK_021_AT, toLat: OUTFLANK_021_LAT });
   { const rim = BP(OUTFLANK_021_AT.Luo, OUTFLANK_RIM_LAT + 0.6); s.Sfx(31.6, "dirtFall", { x: rim.x, z: rim.z, volume: 0.35 }); s.Caption(31.8, 3.0, "（南沿上滚下来几块土，鬼子没往那边看）"); }
   // 乙举起刺刀，甲抬手拦住
-  s.Key("IjaYi", 1.2, { clip: "ButtThreat" });
-  s.Key("IjaJia", 1.8, { clip: "InterpreterPoint" });
+  s.Key("IjaYi", 1.2, { clip: "PvIjaBayonetRaiseThreat", clipHold: true });
+  s.Key("IjaJia", 1.8, { clip: "PvStandHaltL", clipHold: true });
   s.Say("Interrogation.01", "IjaJia", 2.4);
   s.Key("IjaJia", s.End("Interrogation.01"), { clip: null });
   // 冬瓜被拖出来，按着跪在沟壁下（甲揪领子拖，成对片段）
@@ -561,7 +628,8 @@ function S0201(ctx) {
   s.Go("Donggua", drag + 0.6, drag + 4.4, DGK.x, DGK.z, { move: "drag" });
   s.Key("Donggua", drag + 4.5, { stance: "crouch", clip: "CaptiveKneelMud", yawDeg: 0 });
   s.Go("IjaJia", drag + 4.6, drag + 6.0, 59.1, 64.4, { move: "walk", faceTo: "Donggua" });
-  s.Go("IjaYi", drag + 1.0, drag + 4.5, 56.0, 64.5, { move: "walk", faceTo: "Donggua" });
+  const buttAt = { x: R(DGK.x - 0.8), z: DGK.z };
+  s.Go("IjaYi", drag + 1.0, drag + 4.5, buttAt.x, buttAt.z, { move: "walk", faceTo: "Donggua", depart: { clip: null } });
   s.Go("IjaDing", drag + 1.5, drag + 4.6, 58.7, 66.2, { move: "walk", faceTo: "Donggua" });
   s.Eye(drag, 4.6, { stance: "prone", look: { x: 62.3, z: 65.4 }, pitch: -4, toLook: DGK, toPitch: 3 });
   // 后沟的还击越来越密，甲朝那边看了一眼；翻译蹲到冬瓜面前连珠炮
@@ -579,10 +647,10 @@ function S0201(ctx) {
   // 乙一枪托砸在他脸上
   const butt = s.End("Interrogation.03") + 0.1;
   s.Key("Donggua", butt, { talking: false });
-  s.Key("IjaYi", butt - 0.5, { clip: "ButtThreat" });
-  s.Sfx(butt + 0.5, "slap", { x: DGK.x, z: DGK.z });
-  s.Key("Donggua", butt + 0.5, { clip: "CaptiveHeadPulledBack" });
-  s.Key("Donggua", butt + 2.4, { clip: "CaptiveKneelMud" });
+  s.Key("Donggua", butt - 0.9, { yawDeg: 90 });
+  s.Key("IjaYi", butt - 0.5, { clip: "PvIjaButtStrikeFace", faceTo: "Donggua" });
+  s.Sfx(butt - 0.08, "slap", { x: DGK.x, z: DGK.z });
+  s.Key("Donggua", butt - 0.12, { clip: "PvCaptiveButtHit", clipHold: true });
   s.Key("Interpreter", butt + 0.3, { clip: "InterpreterCrouchAsk" });
   // 甲扫了一眼沟底，看见顺子的眼睛在动
   const found = butt + 1.6;
@@ -591,39 +659,43 @@ function S0201(ctx) {
   s.Say("Interrogation.04", "IjaJia", found + 0.5);
   // 乙揪住顺子的头发，把头拽起来；翻译转过来问同样的话
   const hair = s.End("Interrogation.04") + 0.2;
-  s.Go("IjaYi", hair - 2.6, hair, 62.4, 63.4, { move: "walk", faceTo: "player" });
-  s.Key("IjaYi", hair, { stance: "crouch", clip: "InterrogateCrouch", aim: false });
-  s.Cam(hair, 0.6, { from: { actor: "player", offset: [0, 0.34, 0] }, to: { actor: "player", offset: [0, 0.72, 0] }, look: { x: 61.0, z: 64.2, h: 1.0 }, lookTo: { x: 61.2, z: 64.4, h: 1.0 }, shake: 0.2 });
+  const pp = s.player, yiFrom = { x: 62.4, z: 63.4 }, yiD = Dist(yiFrom, pp);
+  const yiAt = { x: R(pp.x + (yiFrom.x - pp.x) / yiD * 0.70), z: R(pp.z + (yiFrom.z - pp.z) / yiD * 0.70) };
+  s.Go("IjaYi", hair - 2.6, hair, yiAt.x, yiAt.z, { move: "walk", faceTo: "player" });
+  s.Key("IjaYi", hair, { stance: "crouch", clip: "PvIjaCrouchHairLift", clipHold: true, aim: false });
+  s.Cam(hair, 0.95, { from: { actor: "player", offset: [0, 0.30, 0] }, look: { x: 61.0, z: 64.2, h: 1.0 }, shake: 0.1 });
+  s.Cam(hair + 0.95, 0.55, { from: { actor: "player", offset: [0, 0.30, 0] }, to: { actor: "player", offset: [0, 0.56, 0] }, look: { x: 61.0, z: 64.2, h: 1.0 }, lookTo: { x: 61.2, z: 64.4, h: 1.0 }, shake: 0.2 });
   s.Go("Interpreter", hair - 0.8, hair + 2.4, 61.9, 64.4, { move: "walk", depart: { stance: "stand", clip: null }, stance: "crouch", faceTo: "player" });
   s.Key("Interpreter", hair + 2.5, { clip: "InterpreterCrouchAsk" });
-  s.Cam(hair + 0.6, 2.4, { from: { actor: "player", offset: [0, 0.72, 0] }, look: { x: 61.2, z: 64.4, h: 1.0 }, lookTo: { actor: "Interpreter", offset: [0, 0.9, 0] } });
+  s.Cam(hair + 1.5, 1.5, { from: { actor: "player", offset: [0, 0.56, 0] }, look: { x: 61.2, z: 64.4, h: 1.0 }, lookTo: { actor: "Interpreter", offset: [0, 0.9, 0] } });
   const ask = s.Say("Interrogation.05", "Interpreter", hair + 2.6);
-  s.Cam(hair + 3.0, s.End("Interrogation.05") - hair - 3.0 + 0.5, { from: { actor: "player", offset: [0, 0.72, 0] }, look: { actor: "Interpreter", offset: [0, 0.9, 0] } });
+  s.Cam(hair + 3.0, s.End("Interrogation.05") - hair - 3.0 + 0.5, { from: { actor: "player", offset: [0, 0.56, 0] }, look: { actor: "Interpreter", offset: [0, 0.9, 0] } });
   // 顺子不吭声，挨了两记耳光，画面发晕
   const slap = s.End("Interrogation.05") + 0.6;
   s.Go("IjaJia", slap - 2.2, slap, 62.5, 63.0, { move: "walk", faceTo: "player" });
   s.Key("IjaJia", slap, { clip: "IjaSlapForehand" });
   s.Key("IjaJia", slap + 1.5, { clip: "IjaSlapBackhand" });
   for (const dt of [0.7, 2.2]) { s.Sfx(slap + dt, "slap", { x: P0(s).x, z: P0(s).z }); s.Shake(slap + dt, 0.45, 0.6); }
-  s.Cam(slap + 0.5, 0.4, { from: { actor: "player", offset: [0, 0.72, 0] }, look: { actor: "IjaJia", offset: [0, 1.4, 0] }, lookTo: { actor: "IjaJia", offset: [0.9, 0.9, 1.2] }, shake: 0.5, ease: "linear" });
-  s.Cam(slap + 0.9, 1.3, { from: { actor: "player", offset: [0, 0.72, 0] }, look: { actor: "IjaJia", offset: [0.9, 0.9, 1.2] }, lookTo: { actor: "IjaJia", offset: [0, 1.3, 0] }, shake: 0.3 });
-  s.Cam(slap + 2.2, 0.4, { from: { actor: "player", offset: [0, 0.72, 0] }, look: { actor: "IjaJia", offset: [0, 1.3, 0] }, lookTo: { actor: "IjaJia", offset: [-1.0, 0.8, -1.0] }, shake: 0.6, ease: "linear" });
-  s.Cam(slap + 2.6, 2.4, { from: { actor: "player", offset: [0, 0.6, 0] }, look: { actor: "IjaJia", offset: [-1.0, 0.8, -1.0] }, lookTo: { actor: "IjaJia", offset: [0, 1.1, 0] }, shake: 0.35, fov: 66 });
+  s.Cam(slap + 0.5, 0.4, { from: { actor: "player", offset: [0, 0.56, 0] }, look: { actor: "IjaJia", offset: [0, 1.4, 0] }, lookTo: { actor: "IjaJia", offset: [0.9, 0.9, 1.2] }, shake: 0.5, ease: "linear" });
+  s.Cam(slap + 0.9, 1.3, { from: { actor: "player", offset: [0, 0.56, 0] }, look: { actor: "IjaJia", offset: [0.9, 0.9, 1.2] }, lookTo: { actor: "IjaJia", offset: [0, 1.3, 0] }, shake: 0.3 });
+  s.Cam(slap + 2.2, 0.4, { from: { actor: "player", offset: [0, 0.56, 0] }, look: { actor: "IjaJia", offset: [0, 1.3, 0] }, lookTo: { actor: "IjaJia", offset: [-1.0, 0.8, -1.0] }, shake: 0.6, ease: "linear" });
+  s.Cam(slap + 2.6, 2.4, { from: { actor: "player", offset: [0, 0.48, 0] }, look: { actor: "IjaJia", offset: [-1.0, 0.8, -1.0] }, lookTo: { actor: "IjaJia", offset: [0, 1.1, 0] }, shake: 0.35, fov: 66 });
   s.Caption(slap + 2.7, 2.6, "（画面发晕）");
   // 后沟的枪声又近了一点。甲：没时间了。
   s.Sfx(slap + 3.6, "rifleVolley", { x: 30, z: 66, volume: 0.6 });
+  s.Key("IjaJia", slap + 3.8, { clip: TALK_LOW });
   const late = s.Say("Interrogation.06", "IjaJia", slap + 4.4);
   s.Key("IjaYi", late + 0.6, { stance: "stand", clip: null, aim: true });
   s.Go("IjaYi", late + 0.8, late + 2.6, 60.4, 65.6, { move: "walk", faceTo: "Donggua" });
   s.Eye(late + 0.8, 1.2, { stance: "prone", look: { x: 61.5, z: 63.6 }, pitch: 8, toLook: DGK, toPitch: 3 });
-  s.Go("IjaJia", late + 0.6, late + 3.0, 59.1, 64.4, { move: "walk", faceTo: "IjaDing" });
+  s.Go("IjaJia", late + 0.6, late + 3.0, 59.1, 64.4, { move: "walk", faceTo: "IjaDing", depart: { clip: null }, clip: TALK_LOW });
   s.Go("Interpreter", late + 1.0, late + 3.4, 57.0, 63.8, { move: "walk", depart: { stance: "stand", clip: null }, stance: "crouch", faceTo: "Donggua" });
   // 丁。刺刀。丁不敢上，挨了甲一耳光
   const ding = s.Say("Interrogation.07", "IjaJia", late + 3.0);
   s.Key("IjaDing", ding + 0.8, { faceTo: "IjaJia" });
   const recruit = s.End("Interrogation.07") + 0.9;
   s.Key("IjaJia", recruit - 0.3, { faceTo: "IjaDing" });
-  s.Go("IjaJia", recruit - 1.0, recruit - 0.1, 59.0, 65.4, { move: "walk", faceTo: "IjaDing" });
+  s.Go("IjaJia", recruit - 1.0, recruit - 0.1, 59.0, 65.4, { move: "walk", faceTo: "IjaDing", depart: { clip: null } });
   s.Key("IjaJia", recruit, { clip: "IjaSlapRecruit" });
   s.Key("IjaDing", recruit + 0.1, { clip: "IjaRecruitSlapped" });
   s.Sfx(recruit + 0.6, "slap", { x: 58.7, z: 66.2 });
@@ -633,16 +705,16 @@ function S0201(ctx) {
   s.Go("IjaDing", charge, charge + 1.0, 58.2, 65.9, { move: "walk", faceTo: "Donggua" });
   const st1 = charge + 1.4, st2 = charge + 3.0;
   s.Sfx(st1, "stab", DGK); s.Sfx(st2, "stab", DGK);
-  s.Key("Donggua", st1, { clip: "CaptiveStabbedCurl", clipHold: true });
+  s.Key("Donggua", st1, { clip: "CaptiveStabbedCurl", clipHold: true, yawDeg: 0 });
   s.Eye(charge - 0.8, 1.0, { stance: "prone", look: DGK, pitch: 3, toLook: { x: 58.0, z: 65.6 }, toPitch: 1 });
   const howl = s.Say("InterrogationHowl.01", "Donggua", st2 + 0.4);
   s.Key("Donggua", st2 + 2.0, { state: "down", clip: null });
   // 甲指了指顺子：下一个，他。然后揪起冬瓜的头发，把刀抵上他的喉咙
-  s.Key("IjaJia", howl + 2.2, { faceTo: "player", clip: "InterpreterPoint" });
+  s.Key("IjaJia", howl + 2.2, { faceTo: "player", clip: "PvStandPointL", clipHold: true });
   const next = s.Say("Interrogation.08", "IjaJia", s.End("InterrogationHowl.01") + 0.3);
   s.Eye(next - 0.6, 0.8, { stance: "prone", look: { x: 58.0, z: 65.6 }, pitch: 1, toLook: { x: 59.0, z: 65.4 }, toPitch: 8 });
   const throat = s.End("Interrogation.08") + 0.4;
-  s.Go("IjaJia", throat - 1.0, throat, 57.9, 64.7, { move: "walk", faceTo: "Donggua" });
+  s.Go("IjaJia", throat - 1.0, throat, 57.9, 64.7, { move: "walk", faceTo: "Donggua", depart: { clip: null } });
   s.Key("IjaJia", throat, { stance: "crouch", clip: "IjaCrouchHairHold", clipHold: true });
   s.Key("Donggua", throat + 0.1, { state: "alive", stance: "crouch", clip: "CaptiveCurledPulledUp", clipHold: true });
   s.Eye(throat - 0.6, 1.2, { stance: "prone", look: { x: 59.0, z: 65.4 }, pitch: 8, toLook: { x: 57.7, z: 65.0 }, toPitch: 2 });
@@ -696,9 +768,9 @@ function S0202(ctx) {
   s.Key("IjaMgGunner", v + 0.08, { clip: "IjaLmgGunnerShotOnGun", clipHold: true });
   s.Go("IjaMgGunner", v + 0.1, v + 1.9, K("IjaMgGunner").x, K("IjaMgGunner").z, { move: "walk" });
   s.Key("IjaMgGunner", v + 2.1, { state: "down", clip: null });
-  s.Key("IjaMgLoader", v + 0.2, { clip: "ShotCollapse" });
-  s.Go("IjaMgLoader", v + 0.2, v + 1.7, K("IjaMgLoader").x, K("IjaMgLoader").z, { move: "walk" });
-  s.Key("IjaMgLoader", v + 1.9, { state: "down", clip: null });
+  // 副射手挨了一枪被掀下沟沿（PvBlastThrownBack：往后掀 0.95 m、枪脱手按 weapon 轨落地；片段一直留着，不再 cut 挪人）
+  s.Key("IjaMgLoader", v + 0.15, { stance: "stand", yawDeg: 92 });
+  s.Key("IjaMgLoader", v + 0.2, { clip: "PvBlastThrownBack", clipHold: true });
   // 丁胸口中弹，倒在顺子面前
   s.Key("IjaDing", v + 0.3, { clip: "ShotCollapse", clipHold: true });
   s.Go("IjaDing", v + 0.3, v + 1.3, K("IjaDing").x, K("IjaDing").z, { move: "walk" });
@@ -710,6 +782,7 @@ function S0202(ctx) {
   s.Go("Donggua", v + 0.55, v + 1.0, K("Donggua").x, K("Donggua").z, { move: "cut", yawDeg: 90 });
   s.Eye(v + 0.6, 0.6, { stance: "prone", look: rimLook, pitch: 24, toLook: { x: 59.3, z: 64.0 }, toPitch: 6, shake: 0.15 });
   // 剧本顺序：「打！」→ 日军「敌袭！」→「杀——！」→ 班长抡着大刀跳进沟「砍！」
+  Shot(s, v + 1.1, "IjaYi");   // 乙边喊边朝南沿开枪（打仗当下端枪喊）
   s.Say("Counter.02", "IjaYi", v + 1.0);
   s.Key("IjaYi", v + 0.8, { yawDeg: -150 });
   // 机枪一哑，台阶上的压制组起身顺着支沟往前冲；镜头往台阶那头扫一眼
@@ -721,7 +794,7 @@ function S0202(ctx) {
   // 「杀——！」班长在南沿上撑起身子吼（2026-10-19 用户定：何有田留在台阶上，这一声改给班长，单句补录）；镜头转回南沿
   const rimLuo = BP(OUTFLANK_021_AT.Luo, OUTFLANK_RIM_LAT);
   const roar = s.Say("Counter.03", "Luo", v + 2.3);
-  s.Key("Luo", roar - 0.1, { stance: "stand", clip: null });
+  s.Key("Luo", roar - 0.1, { stance: "stand", clip: "PvStandWaveOnL" });
   s.Eye(roar - 0.4, 0.4, { stance: "prone", look: STEPS, pitch: 1, toLook: rimLuo, toPitch: 22 });
   // 班长抡着大刀从南沿上跳进沟里，落地就是一声「砍！」
   const land = BP(OUTFLANK_021_AT.Luo - 1.0, -1.1);
@@ -746,6 +819,7 @@ function S0202(ctx) {
   s.Key("IjaJia", jump + 4.8, { state: "down", clip: null, yawDeg: 90 });
   s.Eye(jump + 1.4, 1.4, { stance: "prone", look: land, pitch: 4, toLook: { x: 59.0, z: 64.2 }, toPitch: 8 });
   // 刘文财在南沿上看见泥里的顺子
+  Shot(s, jump + 3.0, "LiuWencai");   // 他在开枪：可以端枪喊
   s.Say("Counter.05", "LiuWencai", jump + 3.4);
   // 乙挺着刺刀从洞口那头冲班长，被南沿上的刘文财一枪打倒
   const yi = R(jump + 4.0);
@@ -761,7 +835,7 @@ function S0202(ctx) {
   s.Go("Luo", end, end + 1.2, K("Luo").x, K("Luo").z, { move: "walk", depart: { clip: null }, yawDeg: -86, aim: true });
   s.Go("LiuWencai", end - 0.6, end + 0.6, K("LiuWencai").x, K("LiuWencai").z, { move: "walk", faceTo: "player" });
   s.Go("Squad2", end - 1.0, end + 1.4, K("Squad2").x, K("Squad2").z, { move: "run", yawDeg: -86 });
-  s.Key("HeYoutian", roar + 12.1, { clip: "WoundedReach" });
+  s.Key("HeYoutian", roar + 12.1, { clip: "PvKneelDig" });
   s.Eye(end + 1.0, 2.6, { stance: "prone", look: { x: 60.4, z: 65.0 }, pitch: 10, toLook: { x: heTo.x - 1.2, z: heTo.z }, toPitch: 4 });
   s.Eye(roar + 11.0, 2.0, { stance: "prone", look: { x: heTo.x - 1.2, z: heTo.z }, pitch: 4, toLook: heTo, toPitch: 14 });
   void PIN;
@@ -780,7 +854,7 @@ function S0203(ctx) {
   s.Key("Blanket", 0, { visible: false });
   s.Eye(0, 2.6, { stance: "prone", x: ME.x, z: ME.z, look: he0, pitch: 12 });
   // 何有田扒开土，看见了顺子
-  s.Key("HeYoutian", 0.4, { clip: "WoundedReach" });
+  s.Key("HeYoutian", 0.4, { clip: "PvKneelDig" });
   s.Say("Release.01", "HeYoutian", 1.0);
   // 抬起木头，顺子撑着地挣出来
   s.Key("HeYoutian", 2.5, { clip: "HeLiftTimber" });
@@ -789,44 +863,49 @@ function S0203(ctx) {
   s.Cam(out - 0.2, 2.2, { from: { x: ME.x, z: ME.z, h: 0.32 }, to: { x: up.x, z: up.z, h: 1.05 }, look: { x: DG.x + 3.2, z: DG.z, h: 0.6 }, lookTo: { x: DG.x + 0.6, z: DG.z, h: 0.6 } });
   // 何有田扑到冬瓜身边
   const heAtDG = DP(StationOn(DRAG, DG) + 1.2, -0.6);
-  s.Go("HeYoutian", out + 0.8, out + 3.2, heAtDG.x, heAtDG.z, { move: "run", faceTo: "Donggua", depart: { clip: null } });
+  s.Go("HeYoutian", out + 0.8, out + 3.2, heAtDG.x, heAtDG.z, { move: "run", faceTo: "Donggua", depart: { clip: null }, stance: "crouch", clip: TALK_CROUCH });
   const hold = s.Say("Release.03", "HeYoutian", out + 3.0);
   s.Eye(out + 2.0, 3.5, { stance: "crouch", x: up.x, z: up.z, look: { x: DG.x + 0.6, z: DG.z }, pitch: -6, toLook: DG, toPitch: -8 });
   // 扯开冬瓜的背包，抽出那床单被铺在沟底，几个人把冬瓜挪上去
   const blanket = s.End("Release.03") + 0.6;
-  s.Key("HeYoutian", blanket - 0.4, { clip: "WoundedReach" });
-  s.Key("Blanket", blanket, { visible: true });
+  s.Key("HeYoutian", blanket - 0.4, { clip: "PvKneelPullBlanket", clipHold: true });
+  const spread = R(blanket - 0.4 + 2.55);
+  s.Key("Blanket", spread, { visible: true });
+  s.Key("Donggua", spread, { weapon: null });
   const luoAtDG = DP(StationOn(DRAG, DG) - 1.0, 0.7);
   s.Go("Luo", blanket, blanket + 1.4, luoAtDG.x, luoAtDG.z, { move: "walk", faceTo: "Donggua", depart: { aim: false } });
-  s.Key("Luo", blanket + 1.4, { clip: "PullComrade" });
-  s.Key("HeYoutian", blanket + 1.4, { clip: "PullComrade" });
+  s.Key("Luo", blanket + 2.4, { stance: "crouch", clip: "PvKneelHaulBody" });
+  s.Key("HeYoutian", blanket + 2.4, { clip: "PvKneelHaulBody", faceTo: "Donggua" });
   s.Caption(blanket, 3.0, "（何有田抽出单被铺在沟底，几个人把冬瓜挪上去）");
-  // 顺子过去；冬瓜一把攥住顺子的袖子
-  const near = blanket + 3.4;
-  const nearAt = DP(StationOn(DRAG, DG) - 1.1, -0.6);
+  // 顺子过去，蹲在冬瓜右肩旁（他头朝西仰躺，右手边 = 南）；冬瓜一把攥住顺子的袖子
+  const near = blanket + 4.4;
+  const nearAt = DP(StationOn(DRAG, DG) + 0.45, 0.55);
   s.Cam(near - 1.6, 1.8, { from: { x: up.x, z: up.z, h: 1.05 }, to: { x: nearAt.x, z: nearAt.z, h: 1.05 }, look: { x: DG.x, z: DG.z, h: 0.3 } });
-  s.Eye(near + 0.2, 3.4, { stance: "crouch", x: nearAt.x, z: nearAt.z, look: DG, pitch: -38 });
-  // 10-18 第三轮：冬瓜已经躺在被子上（lie:"along"，头朝拖的那头）。原来这一下播 WoundedReach（坐起来伸手、半个身子出了被子），
-  // 现成片段里没有「躺着伸手」的，就不播片段：保持躺姿、只动嘴，伸手攥袖子用说明字交代（不转身，不然头脚离开被子）。
-  s.Caption(near - 0.2, 2.2, "（冬瓜躺在被子上，一把攥住顺子的袖子）");
+  // 看他的脸和攥过来的手（头朝西：胸口在被子中心往西约 0.3 m），不看腿
+  s.Eye(near + 0.2, 3.4, { stance: "crouch", x: nearAt.x, z: nearAt.z, look: { x: DG.x - 0.3, z: DG.z }, pitch: -52 });
+  // 冬瓜躺在被子上（lie:"along"，头朝拖的那头）。2026-10-19：播躺姿片段 PvLieGrabSleeve（仰躺、右手攥住右边蹲着那人的袖子、
+  // 头转过去看他；运行时照样按头的方向摆顺）；说完松手 = 清掉片段回到躺姿。
+  s.Key("Donggua", near - 0.2, { clip: "PvLieGrabSleeve", clipHold: true });
   s.Say("Release.04", "Donggua", near + 0.3);
+  s.Key("Donggua", s.End("Release.04") + 0.3, { clip: null });
   s.Caption(s.End("Release.04"), 2.0, "（然后手松开了）");
   // 班长站到顺子面前：还能打不？把枪塞进顺子手里
   const luo = s.End("Release.04") + 0.2;
   const luoFace = DP(StationOn(DRAG, nearAt) - 1.4, -0.2);
-  s.Go("Luo", luo - 1.2, luo + 0.6, luoFace.x, luoFace.z, { move: "walk", faceTo: "player", depart: { clip: null, weapon: "HanYang" } });
-  s.Eye(luo - 0.2, 1.0, { stance: "crouch", x: nearAt.x, z: nearAt.z, look: DG, pitch: -38, toLook: luoFace, toPitch: 8 });
+  s.Go("Luo", luo - 1.2, luo + 0.4, luoFace.x, luoFace.z, { move: "walk", faceTo: "player", depart: { clip: null, weapon: "HanYang", stance: "stand" }, clip: TALK_LOW });
+  s.Eye(luo - 0.2, 1.0, { stance: "crouch", x: nearAt.x, z: nearAt.z, look: { x: DG.x - 0.3, z: DG.z }, pitch: -52, toLook: luoFace, toPitch: 8 });
   const can = s.Say("Release.05", "Luo", luo + 0.5);
   s.Key("Luo", can + 1.4, { clip: "LuoHandRifle" });
   s.Caption(can + 2.6, 2.4, "（班长把枪塞进顺子手里）");
   s.Eye(can + 2.6, 1.2, { stance: "crouch", x: nearAt.x, z: nearAt.z, look: luoFace, pitch: 8, toPitch: -25 });
   const go = s.Say("Release.06", "Luo");
+  s.Key("Luo", go - 0.2, { clip: "PvStandWaveOnL" });
   // 顺子站起来（玩家拿回操作）；班长退到冬瓜后头、面朝洞口断后
   s.Eye(go + 0.2, 1.4, { stance: "stand", x: END.x, z: END.z, look: K3("HeYoutian"), pitch: -4 });
   s.Go("Luo", go + 1.6, go + 3.4, K3("Luo").x, K3("Luo").z, { move: "drag", yawDeg: K3("Luo").yawDeg, depart: { clip: null }, aim: true });
   // 何有田揪起一个被角，站到被子头上：顺儿，揪到那头！
   s.Go("HeYoutian", go, go + 1.2, K3("HeYoutian").x, K3("HeYoutian").z, { move: "walk", yawDeg: K3("HeYoutian").yawDeg, depart: { clip: null, stance: "stand" } });
-  s.Key("HeYoutian", go + 1.3, { carryRole: "front" });
+  s.Key("HeYoutian", go + 1.3, { carryRole: "front", clip: "PvBlanketDragL" });
   s.Say("Release.07", "HeYoutian", go + 1.4);
   s.Eye(go + 1.6, 1.4, { stance: "stand", x: END.x, z: END.z, look: K3("HeYoutian"), pitch: -4, toLook: K3("Blanket"), toPitch: -22 });
   // 前头开路的几个往支沟口那头走（布设里在前头）
@@ -845,16 +924,16 @@ function S0203(ctx) {
  */
 const PULL = { half: 0.55, toCenter: 1.6, luoBehind: 4.4 };
 function DragLeg2(s, t0, dFrom, dTo, { lat = 0, luoLat = 0.5, ahead = 4.2, camH = 1.6 } = {}) {
-  const t1 = R(t0 + (dTo - dFrom) / 1.4);
+  const t1 = R(t0 + (dTo - dFrom) / DRAG_MPS);
   const he = DP(dTo, lat + PULL.half), bl = DP(dTo - PULL.toCenter, lat);
   const luo = DP(dTo - PULL.toCenter - PULL.luoBehind, luoLat);
-  s.Go("HeYoutian", t0, t1, he.x, he.z, { move: "walk", path: DragPath(dFrom, dTo, lat + PULL.half), depart: { carryRole: "front", stance: "stand", clip: null } });
+  s.Go("HeYoutian", t0, t1, he.x, he.z, { move: "walk", path: DragPath(dFrom, dTo, lat + PULL.half), depart: { carryRole: "front", stance: "stand", clip: "PvBlanketDragL" } });
   s.Go("Blanket", t0, t1, bl.x, bl.z, { move: "walk", path: DragPath(dFrom - PULL.toCenter, dTo - PULL.toCenter, lat) });
   CarryOnBlanket(s, t0, t1, [...DragPath(dFrom - PULL.toCenter, dTo - PULL.toCenter, lat), bl]);
   if (s.pos.has("Shunzi")) {
     const me = DP(dTo, lat - PULL.half);
     s.Key("Shunzi", t0, { visible: true });
-    s.Go("Shunzi", t0, t1, me.x, me.z, { move: "walk", path: DragPath(dFrom, dTo, lat - PULL.half), depart: { carryRole: "front", stance: "stand" } });
+    s.Go("Shunzi", t0, t1, me.x, me.z, { move: "walk", path: DragPath(dFrom, dTo, lat - PULL.half), depart: { carryRole: "front", stance: "stand", clip: "PvBlanketDragR" } });
   }
   s.Go("Luo", t0, t1, luo.x, luo.z, { move: "drag", path: DragPath(dFrom - PULL.toCenter - PULL.luoBehind, dTo - PULL.toCenter - PULL.luoBehind, luoLat), depart: { aim: true, stance: "stand", clip: null } });
   CamAhead(s, t0, t1, dFrom, dTo, ahead, camH);
@@ -878,13 +957,13 @@ function PlaceFromKf(s, ctx, kfId, ids) {
 /** 重新揪起被角：何有田、被子回到拖行线上排好（短挪动）。返回排好的时刻。 */
 function ReForm(s, t0, dHead, lat = 0) {
   const he = DP(dHead, lat + PULL.half), bl = DP(dHead - PULL.toCenter, lat);
-  s.Go("HeYoutian", t0, t0 + 1.0, he.x, he.z, { move: "walk", depart: { stance: "stand", clip: null }, carryRole: "front", yawDeg: DragYaw(dHead) });
+  s.Go("HeYoutian", t0, t0 + 1.0, he.x, he.z, { move: "walk", depart: { stance: "stand", clip: "PvBlanketDragL" }, carryRole: "front", yawDeg: DragYaw(dHead) });
   s.Go("Blanket", t0 + 0.2, t0 + 1.0, bl.x, bl.z, { move: "walk", yawDeg: DragYaw(dHead) });
   CarryOnBlanket(s, t0 + 0.2, t0 + 1.0, [bl], DragYaw(dHead));
   if (s.pos.has("Shunzi")) {
     const me = DP(dHead, lat - PULL.half);
     // 替身到这一刻才露面（镜头此前在顺子眼里），直接摆到被角上
-    s.Key("Shunzi", t0 + 0.9, { x: me.x, z: me.z, move: "cut", stance: "stand", carryRole: "front", yawDeg: DragYaw(dHead), visible: true });
+    s.Key("Shunzi", t0 + 0.9, { x: me.x, z: me.z, move: "cut", stance: "stand", carryRole: "front", yawDeg: DragYaw(dHead), visible: true, clip: "PvBlanketDragR" });
   }
   return R(t0 + 1.1);
 }
@@ -903,11 +982,11 @@ function CarryOnBlanket(s, t0, t1, route, yaw = null) {
 /** 到了掩体：何有田把被子往掩体后头一拽、蹲下；顺子松手转身蹲下；班长退到掩体后。kfId = 布设（到位后的样子）。 */
 function TakeCover(s, ctx, t, kfId) {
   const K = id => KU(ctx, kfId, id);
-  s.Key("HeYoutian", t, { carryRole: null, clip: "PullComrade" });
+  s.Key("HeYoutian", t, { carryRole: null, clip: "PvBlanketReleaseTurn", clipHold: true });
+  if (s.pos.has("Shunzi")) s.Key("Shunzi", t, { carryRole: null, clip: null });
   s.Go("Blanket", t + 0.1, t + 1.4, K("Blanket").x, K("Blanket").z, { move: "walk", yawDeg: K("Blanket").yawDeg });
   CarryOnBlanket(s, t + 0.1, t + 1.4, [K("Donggua")], K("Blanket").yawDeg);
-  s.Go("HeYoutian", t + 0.1, t + 1.4, K("HeYoutian").x, K("HeYoutian").z, { move: "drag", stance: "crouch", faceTo: "Donggua" });
-  s.Key("HeYoutian", t + 1.6, { clip: null });
+  s.Go("HeYoutian", t + 2.0, t + 2.8, K("HeYoutian").x, K("HeYoutian").z, { move: "drag", stance: "crouch", faceTo: "Donggua", depart: { clip: null } });
   s.Go("Luo", t + 0.2, t + 1.8, K("Luo").x, K("Luo").z, { move: "drag", stance: "crouch", aim: true, yawDeg: K("Luo").yawDeg });
 }
 
@@ -1058,9 +1137,9 @@ function S0207(ctx) {
   s.Sfx(3.0, "mgBurstFar", { x: PIT_GUN.x, z: PIT_GUN.z, volume: 0.7 });
   // 坡沿上趴着别的班的几个兵：快过来！
   const callT = R(t1 - 8.0);
-  s.Key("CrestNra1", callT - 0.4, { faceTo: "player" });
+  s.Key("CrestNra1", callT - 0.4, { faceTo: "player", aim: false, clip: "PvProneBeckonL" });
   s.Say("DragBack.04", "CrestNra1", callT);
-  s.Key("CrestNra1", callT + 2.2, { yawDeg: KU(ctx, "02-7", "CrestNra1").yawDeg });
+  s.Key("CrestNra1", callT + 2.2, { yawDeg: KU(ctx, "02-7", "CrestNra1").yawDeg, clip: null, aim: true });
   // 一翻过去，这几个兵就朝拐角 2 开枪；追兵一露头就挨枪，缩回去了
   const peek = R(t1 - 2.4);
   ["Pursuer1", "Pursuer2", "Pursuer3"].forEach((id, k) => {
@@ -1094,7 +1173,11 @@ function S02E1(ctx) {
   const lane = { x: PL.laneHead.x, z: PL.laneHead.z };
   const laneOut = { x: PL.laneHead.x + 14, z: PL.laneHead.z + 0.4 };
   // 干沟里满地伤员；卫生兵背对着顺子蹲在冬瓜身边处理伤口
-  s.Key("Medic", 0, { clip: "ClipLoad" });
+  // 卫生兵跪在冬瓜胸口旁边、双手按住伤口（CollectionCare 的 CareMedicPress，stage press：伤员胸口在他前方约 0.3 m）；
+  // 跪在靠顺子这一侧，背对着顺子
+  { const chest = Off(rest, rest.yawDeg, 0.35), sides = [Off(chest, rest.yawDeg, 0, 0.45), Off(chest, rest.yawDeg, 0, -0.45)];
+    const m = Dist(sides[0], P) < Dist(sides[1], P) ? sides[0] : sides[1];
+    s.Place("Medic", 0, m.x, m.z, { stance: "crouch", faceTo: chest, clip: "CareMedicPress" }); }
   s.Eye(0, 4.0, { stance: "stand", look: rest, pitch: -12, toPitch: -16 });
   // 坡顶那边有一挺机枪一直在响
   for (const t of [2.0, 9.5, 17.0, 24.5, 31.0]) s.Sfx(t, "mgBurstFar", { x: 50, z: 126 });
@@ -1113,11 +1196,11 @@ function S02E1(ctx) {
   s.Go("Bearer2", 15.0, 23.0, b2.x, b2.z, { move: "run", faceTo: "Donggua", path: [lane] });
   s.Eye(14.0, 7.4, { stance: "stand", look: lane, pitch: -2, toLook: rest, toPitch: -12 });
   // 担架员：下一趟就抬拉（冬瓜还躺在单被上）
-  s.Key("Bearer1", 23.2, { stance: "crouch", clip: "WoundedReach" });
-  s.Key("Bearer2", 23.4, { stance: "crouch" });
+  s.Key("Bearer1", 23.2, { stance: "crouch", clip: "PvCrouchGripLitter", clipHold: true });
+  s.Key("Bearer2", 23.4, { stance: "crouch", clip: "PvCrouchGripLitter", clipHold: true });
   s.Say("Gathering.01", "Bearer1", 23.6);
   // 班长扫了一眼周围的人：幺娃回来没得？
-  s.Key("Luo", 23.8, { faceTo: { x: luo.x + 4, z: luo.z - 3 } });
+  s.Key("Luo", 23.8, { faceTo: { x: luo.x + 4, z: luo.z - 3 }, clip: TALK_SLUNG });
   s.Eye(24.6, 1.0, { stance: "stand", look: rest, pitch: -12, toLook: luo, toPitch: 2 });
   s.Key("Luo", 25.0, { faceTo: "LiuWencai" });
   const ask = s.Say("Gathering.02", "Luo");
@@ -1125,9 +1208,8 @@ function S02E1(ctx) {
   s.Key("Luo", ask + 1.5, { faceTo: "player" });
   s.Eye(ask + 1.6, 1.0, { stance: "stand", look: luo, pitch: 2, toLook: liu, toPitch: 2 });
   s.Key("LiuWencai", ask + 2.2, { faceTo: "Luo" });
-  s.Key("LiuWencai", ask + 3.4, { yawDeg: R(liu.yawDeg - 50) });
-  s.Key("LiuWencai", ask + 4.0, { yawDeg: R(liu.yawDeg + 30) });
-  s.Key("LiuWencai", ask + 4.6, { faceTo: PL.crest });
+  s.Key("LiuWencai", ask + 3.0, { clip: "PvStandShakeHead" });
+  s.Key("LiuWencai", ask + 4.8, { faceTo: PL.crest, clip: null });
   s.Caption(ask + 1.4, 4.0, "（没人吭声。刘文财摇了摇头）");
   void P;
   return s.Done({ durationS: ask + 7.0 });
@@ -1150,12 +1232,12 @@ function S02E2(ctx) {
   s.Key("Luo", 4.2, { faceTo: "Runner" });
   // 班长看了一眼满地的伤员
   const look = s.End("Gathering.03") + 0.2;
-  s.Key("Luo", look, { faceTo: PL.assembly });
+  s.Key("Luo", look, { faceTo: PL.assembly, clip: TALK_SLUNG });
   s.Eye(look, 1.2, { stance: "stand", look: runner, pitch: 0, toLook: luo, toPitch: 2 });
   s.Say("Gathering.04", "Luo", look + 0.9);
   // 他留下何有田看着冬瓜，带顺子、刘文财从坡道往上走
   const go = s.End("Gathering.04") + 0.3;
-  s.Key("Luo", go, { faceTo: "HeYoutian", clip: "InterpreterPoint" });
+  s.Key("Luo", go, { faceTo: "HeYoutian", clip: "PvStandPointL", clipHold: true });
   s.Key("HeYoutian", go + 0.4, { faceTo: "Luo" });
   s.Go("Luo", go + 2.0, go + 7.5, ramp.x, ramp.z, { move: "walk", depart: { clip: null } });
   s.Go("LiuWencai", go + 2.6, go + 8.0, ramp.x - 0.6, ramp.z + 1.4, { move: "walk" });
@@ -1202,6 +1284,8 @@ function S0301(ctx) {
   const shoverAt = TP(T_CREST + 2, -0.5);
   s.Spawn("Shover", { x: shoverAt.x, z: shoverAt.z, yawDeg: 180 });
   s.Go("Shover", 0, 7.0, ramp.x - 0.6, ramp.z + 1.5, { move: "walk", path: [TP(T_END - 3, -0.6)] });
+  s.Key("Shover", 4.98, { clip: "PvShoulderShove" });
+  s.Key("Shover", 6.2, { clip: null });
   s.Say("PitHold.01", "Shover", 5.4);
   s.Shake(5.6, 0.3, 0.25);
   // 越往上枪声越近
@@ -1219,18 +1303,19 @@ function S0302(ctx) {
   s.Go("Luo", 0, 4.4, -1.6, -4.7, { move: "walk", stance: "crouch", yawDeg: -28.1 });
   s.Go("LiuWencai", 0.4, 5.2, -2.8, -4.6, { move: "walk", stance: "crouch", yawDeg: -38 });
   s.Place("PitNra2", 0, 3.0, -9.2, { state: "alive", stance: "stand", aim: true, yawDeg: 0 });
+  MortarCrew(s, 1.4);
   s.Key("Yaowa", 0, { clip: "YaowaSitLoad", faceTo: "Gunner" });
   s.Cam(0, 4.4, { from: { x: 0.6, z: 6.5, h: 1.6 }, to: { x: 0.9, z: -5, h: 1.05 }, look: { x: 0.6, z: -12, h: 1.2 }, ease: "linear" });
   for (const t of [0.6, 4.2]) { Shot(s, t, "Gunner", { count: 5, sfx: "mgBurstNear" }); }
   s.Sfx(1.0, "mgBurstFar", { x: -30, z: -118 });
   // 掷弹筒：远处冒烟、嘭——约 5.5 s 后落在坑沿，把一个弟兄掀翻
   const hit = Mortar(s, 1.4, { x: 3.2, z: -10.4 }, { radius: 4, shake: 0.6 });
-  s.Key("PitNra2", hit + 0.02, { clip: "ShotCollapse", clipHold: true });
-  s.Go("PitNra2", hit + 0.02, hit + 0.9, 2.8, -5.6, { move: "cut" });
-  s.Key("PitNra2", hit + 1.2, { state: "down", clip: null, yawDeg: -150 });
+  // 被掀翻（PvBlastThrownBack：面朝爆点，片段自己往后掀 0.95 m、枪脱手按 weapon 轨落地；片段一直留着，不再 cut 挪人）
+  s.Key("PitNra2", hit + 0.02, { clip: "PvBlastThrownBack", clipHold: true, aim: false });
   s.Key("Luo", hit + 0.1, { clip: "DuckBlast" });
   s.Eye(4.4, hit - 4.4 + 0.2, { stance: "crouch", look: { x: 0.6, z: -12 }, pitch: 2, toLook: { x: 3.0, z: -9.6 }, toPitch: 2 });
   // 有人喊：丢弹筒！挪起走！
+  Shot(s, hit + 1.2, "Gunner", { count: 5, sfx: "mgBurstNear" });   // 机枪手边打边喊
   s.Say("PitHold.02", "Gunner", hit + 0.8);
   s.Eye(hit + 0.6, 1.0, { stance: "crouch", look: { x: 3.0, z: -9.6 }, pitch: 2, toLook: { x: -1.2, z: -9.2 }, toPitch: 4 });
   Shot(s, hit + 3.6, "Gunner", { count: 6, sfx: "mgBurstNear" });
@@ -1255,14 +1340,17 @@ function S0303(ctx) {
   for (const t of [2.6, 5.8, 9.2, 12.8]) Shot(s, t, "player");
   Shot(s, 1.4, "Gunner", { count: 6, sfx: "mgBurstNear" }); Shot(s, 7.6, "Gunner", { count: 6, sfx: "mgBurstNear" });
   // 正面的步兵一段一段往前冲（跃进 → 卧倒）
-  const bound = (ids, t, d) => {
+  // 跃进 → 扑倒（PvStandToProneDive，往前带 0.8 m；播完挪到片段末尾那一点趴着）
+  const bound = (ids, t, d, noDive = []) => {
     for (const id of ids) {
       const p = s.pos.get(id);
-      s.Go(id, t, t + 3.2, p.x, p.z + d, { move: "run", depart: { stance: "stand", aim: false }, stance: "prone", aim: true });
+      if (noDive.includes(id)) { s.Go(id, t, t + 3.2, p.x, p.z + d, { move: "run", depart: { stance: "stand", aim: false }, stance: "prone", aim: true }); continue; }
+      s.Go(id, t, t + 2.4, p.x, p.z + d - 0.8, { move: "run", depart: { stance: "stand", aim: false } });
+      Dive(s, id, t + 2.4, 180, { aim: true });
     }
   };
   bound(["IjaRush1", "IjaRush2", "IjaRush5", "IjaRush6"], 2.0, 9);
-  bound(["IjaRush3", "IjaRush4", "IjaRush7", "IjaRush8"], 10.0, 9);
+  bound(["IjaRush3", "IjaRush4", "IjaRush7", "IjaRush8"], 10.0, 9, ["IjaRush4"]);
   bound(["IjaRush1", "IjaRush2", "IjaRush5", "IjaRush6"], 30.0, 9);
   bound(["IjaRush3", "IjaRush7", "IjaRush8"], 44.0, 9);
   // 倒下一个马上有人补上
@@ -1277,9 +1365,10 @@ function S0303(ctx) {
     Shot(s, t, id, { count: 6, sfx: "mgBurstFar" });
     Puff(s, t + 0.35, t < 19 ? { x: 0.2 + (t % 3) - 1, z: -11.0 } : t < 41 ? { x: -10.4, z: -16.4 } : { x: 5.6, z: -1.8 });
   }
-  // 掷弹筒：一发比一发近
+  // 掷弹筒：一发比一发近（远处的掷弹筒组 2 s 一循环，「嘭」都落在 4 + 2k 上）
+  MortarCrew(s, 4.0);
   Mortar(s, 4.0, { x: 7, z: -17.5 }, { shake: 0.25 });
-  Mortar(s, 10.6, { x: 2.6, z: -12.9 }, { shake: 0.55 });
+  Mortar(s, 10.0, { x: 2.6, z: -12.9 }, { shake: 0.55 });
   // 坑西边开阔地上，日军侧翼兵从西北摸过来（丙位散兵坑外）
   const flank = [["IjaFlank1", -34, -36, -19.5, -25.5], ["IjaFlank2", -38, -31, -22.5, -21.5], ["IjaFlank3", -31, -41, -17.0, -29.0]];
   for (const [id, x0, z0] of flank) s.Spawn(id, { side: "ija", x: x0, z: z0, yawDeg: -130, stance: "prone" }, { visible: false });
@@ -1289,7 +1378,8 @@ function S0303(ctx) {
   });
   // 他们一露头：左边沟里头有人！
   const shout = s.Say("PitHold.03", "LiuWencai", 16.4);
-  s.Key("LiuWencai", shout - 0.3, { faceTo: { x: -20, z: -25 } });
+  s.Key("LiuWencai", shout - 0.3, { faceTo: { x: -20, z: -25 }, clip: "PvCrouchPointL", clipHold: true });
+  s.Key("LiuWencai", shout + 2.6, { clip: null });
   s.Eye(15.0, 1.2, { stance: "stand", x: A.x, z: A.z, yaw: -14, pitch: 1, toLook: { x: -20, z: -25 }, toPitch: 0 });
   Shot(s, 17.6, "IjaFlank1"); Puff(s, 17.7, { x: -1.6, z: -10.8 });
   // 换到丙位（散兵坑，朝西北）：沿爬沟过去，原来守丙位的兵让到坑里
@@ -1319,7 +1409,7 @@ function S0303(ctx) {
   Shot(s, 49.2, "Luo"); Shot(s, 53.0, "Luo"); Shot(s, 50.0, "IjaTrench1"); Puff(s, 50.05, { x: 5.4, z: 0.9 });
   s.Go("IjaTrench1", 54.0, 55.0, 14.7, -2.4, { move: "walk", stance: "crouch" });
   Mortar(s, 46.0, { x: 9.0, z: -6.5 }, { shake: 0.3 });
-  Mortar(s, 53.0, { x: 5.4, z: -2.6 }, { shake: 0.7 });
+  Mortar(s, 54.0, { x: 5.4, z: -2.6 }, { shake: 0.7 });
   // 身后：撤下来的人一个个从沟口过去，越来越稀
   for (const [id, t] of [["RetreatPass1", 6.0], ["RetreatPass2", 30.0]]) {
     s.Spawn(id, { x: -20, z: -1.4, yawDeg: -80 }, { visible: false });
@@ -1338,13 +1428,15 @@ function S0304(ctx) {
   s.Place("PitNra4", 0, -0.6, -6.4, { state: "alive", stance: "crouch", yawDeg: -8 });
   s.Place("PitNra1", 0, -2.6, -8.95, { aim: true, yawDeg: 0 }); // 让开顺子的视线（布设里他在顺子右手 0.9 m）；站在射击台平处，别贴着坑壁
   s.Place("Tank", 0, 175, -40, { visible: false });
+  MortarCrew(s, 0.8);
   s.Eye(0, 5, { stance: "stand", look: { x: 0, z: -40 }, pitch: 1, toYaw: 20 }); // 站在射击台上才看得出胸墙
   Shot(s, 0.4, "Gunner", { count: 6, sfx: "mgBurstNear" }); Shot(s, 3.4, "Gunner", { count: 6, sfx: "mgBurstNear" });
   Shot(s, 1.6, "player"); Shot(s, 4.2, "player");
   // 一发掷弹筒弹落在捷克式旁边，机枪手腿上中弹
   const hit = Mortar(s, 0.8, { x: -1.8, z: -10.9 }, { shake: 0.6 });
-  s.Key("Gunner", hit + 0.02, { clip: "ShotCollapse", clipHold: true, aim: false });
-  s.Key("Gunner", hit + 1.4, { state: "down", lie: "along", clip: null });
+  // 腿上中弹，跪坐抱腿（PvLegHitKneelClutch，枪脱手按 weapon 轨落在右前）；幺娃来拖的时候才放倒
+  s.Key("Gunner", hit + 0.02, { clip: "PvLegHitKneelClutch", clipHold: true, aim: false });
+  s.Key("Gunner", hit + 2.0, { state: "down", lie: "along", clip: null, weapon: null });
   s.Eye(hit - 0.4, 1.0, { stance: "crouch", yaw: 20, pitch: 3, toLook: { x: -1.2, z: -9.2 }, toPitch: -6 });
   // 幺娃把他往后拖
   const pull = hit + 1.6;
@@ -1369,13 +1461,16 @@ function S0304(ctx) {
   s.Shake(gun + 0.25, 0.9, 1);
   s.Ev(gun + 0.3, "smoke", { x: 0.3, z: -10.8, kind: "SmokeDust", dur: 5 });
   // 一个弟兄抱着一捆手榴弹爬出去，死在坑沿外，那捆手榴弹落在沟沿上
+  // 2026-10-19：猫腰到坑沿 → 扑出去（PvStandToProneDive）→ 抱着那捆爬（PvCrawlCarryBundle，右臂夹着手榴弹捆，枪背着）
   const crawl = gun + 2.6;
-  s.Key("PitNra4", crawl - 0.2, { stance: "prone" });
-  s.Go("PitNra4", crawl, crawl + 5.4, 0.6, -13.6, { move: "crawl" });
+  const lip = { x: 0.4, z: -10.2 }, out = { x: 0.6, z: -13.6 };
+  s.Go("PitNra4", crawl - 3.4, crawl - 0.5, lip.x, lip.z, { move: "walk", depart: { stance: "crouch" }, stance: "crouch" });
+  Dive(s, "PitNra4", crawl - 0.4, Yaw(lip, out), { clip: "PvCrawlCarryBundle" });
+  s.Go("PitNra4", crawl + 0.8, crawl + 5.4, out.x, out.z, { move: "crawl" });
   s.Eye(crawl - 0.4, 1.4, { stance: "stand", yaw: -61, pitch: 1, toLook: { x: 0.4, z: -12 }, toPitch: -14 });
   Shot(s, crawl + 5.6, "IjaLmgWest", { count: 5, sfx: "mgBurstFar" });
   Puff(s, crawl + 5.9, { x: 0.9, z: -14.2 });
-  s.Key("PitNra4", crawl + 6.0, { state: "down" });
+  s.Key("PitNra4", crawl + 6.0, { state: "down", clip: null });
   s.Caption(crawl + 6.6, 3.0, "（那捆手榴弹落在坑沿外）");
   return s.Done({ durationS: crawl + 10.0 });
 }
@@ -1396,15 +1491,14 @@ function S0305(ctx) {
   s.Say("PitLeave.01", "RearguardNra", 4.8);
   s.Go("RearguardNra", 7.0, 11.0, 0.8, 12.0, { move: "run", path: [{ x: 0.2, z: 1.0 }] });
   // 班长：走了！把那捆捡起！
-  s.Go("Luo", 3.2, 6.8, 0.67, 1.47, { move: "walk", faceTo: "player" });
+  s.Go("Luo", 3.2, 6.8, 0.67, 1.47, { move: "walk", faceTo: "player", depart: { aim: false }, clip: "PvStandWaveOnL" });
   s.Eye(6.6, 1.0, { stance: "crouch", look: { x: -2, z: -0.2 }, pitch: 2, toLook: { x: 0.67, z: 1.47 }, toPitch: 4 });
   const go = s.Say("PitLeave.02", "Luo", 7.0);
-  s.Key("Luo", s.End("PitLeave.02") + 0.3, { yawDeg: 4.5 });
+  s.Key("Luo", s.End("PitLeave.02") + 0.3, { yawDeg: 4.5, clip: null });
   // 幺娃架着机枪手，其他人顺交通沟往下走
   const leave = go + 1.0;
-  s.Key("Gunner", leave - 0.5, { state: "alive", stance: "stand", woundedWalk: true });
-  s.Go("Gunner", leave, leave + 7.5, -0.31, 3.02, { move: "walk", woundedWalk: true, yawDeg: -177.4 });
-  s.Go("Yaowa", leave, leave + 7.5, 0.59, 2.98, { move: "walk", stance: "stand", yawDeg: -177.4 });
+  s.Key("Gunner", leave - 0.5, { state: "alive", stance: "stand" });
+  SupportGo(s, leave, leave + 7.5, { x: -0.31, z: 3.02 }, { yawDeg: -177.4 });
   s.Go("LiuWencai", leave - 0.6, leave + 6.6, -0.15, 5.51, { move: "walk", stance: "stand" });
   s.Go("PitNra1", leave + 0.2, leave + 7.0, 0.86, 7.97, { move: "walk", aim: false });
   s.Go("PitNra3", leave + 0.4, leave + 7.0, -0.05, 10.01, { move: "walk", stance: "stand" });
@@ -1426,8 +1520,7 @@ function S0401(ctx) {
   for (const id of ["IjaRush1", "IjaRush2", "IjaTrench1"]) s.Key(id, 0, { visible: false });
   // 坑丢了，往拐角 1 跑
   s.Cam(0, 3.6, { from: { x: 2.2, z: -5.2, h: 1.3 }, to: { x: 1.62, z: 12.16, h: 1.4 }, look: { actor: "Yaowa", offset: [0, 1.2, 0] }, ease: "linear" });
-  s.Go("Gunner", 0, 9.0, 5.29, 15.41, { move: "walk", woundedWalk: true, path: [{ x: 0.5, z: 11 }] });
-  s.Go("Yaowa", 0, 9.0, 5.86, 14.71, { move: "walk", path: [{ x: 1.3, z: 10.6 }] });
+  SupportGo(s, 0, 9.0, { x: 5.29, z: 15.41 }, { path: [{ x: 0.5, z: 11 }] });
   s.Go("LiuWencai", 0, 6.0, 8.85, 18.19, { move: "walk", path: [{ x: 0.8, z: 11.6 }] });
   s.Go("Luo", 0, 4.0, 13.57, 21.63, { move: "run", path: [{ x: 1.0, z: 11.4 }], faceTo: "player" });
   // 回身顶：鬼子在坑里顺第一段沟往下打
@@ -1439,10 +1532,9 @@ function S0401(ctx) {
   Shot(s, 7.4, "IjaRush1"); Shot(s, 10.0, "IjaRush2"); Puff(s, 10.05, { x: 0.6, z: 9.8 });
   Shot(s, 13.0, "IjaTrench1"); Puff(s, 13.05, { x: 2.8, z: 11.4 });
   // 前头两个人走得慢，一直在顺子眼前；班长先到下一个拐角回身喊人
-  s.Key("Luo", 6.0, { clip: "PointBlockade" });
+  s.Key("Luo", 6.0, { clip: "PvStandBeckonL" });
   s.Caption(12.0, 3.0, "（班长在下个拐角回身招呼：走！）");
-  s.Go("Gunner", 9.0, 18.0, 12.6, 22.4, { move: "walk", woundedWalk: true });
-  s.Go("Yaowa", 9.0, 18.0, 13.2, 21.8, { move: "walk" });
+  SupportGo(s, 9.0, 18.0, { x: 12.6, z: 22.4 });
   // 手榴弹扔进来要躲
   const g = 16.0;
   s.Eye(g - 0.6, 0.6, { stance: "crouch", yaw: 0, pitch: 2, toYaw: 150, toPitch: -6 });
@@ -1462,8 +1554,7 @@ function S0402(ctx) {
   s.Place("LiuWencai", 0, 12.4, 44.6); s.Place("Luo", 0, 13.6, 47.0);
   s.Place("IjaTrench1", 0, 13.0, 27.0, { aim: false }); s.Place("IjaTrench2", 0, 12.7, 22.5); s.Place("IjaTrench3", 0, 13.0, 21.0);
   s.Cam(0, 3.0, { from: { x: 12.9, z: 37.6, h: 1.4 }, to: { x: 12.66, z: 45.02, h: 1.5 }, look: { actor: "Yaowa", offset: [0, 1.2, 0] }, ease: "linear" });
-  s.Go("Gunner", 0, 10.0, 14.34, 50.61, { move: "walk", woundedWalk: true });
-  s.Go("Yaowa", 0, 10.0, 15.17, 50.26, { move: "walk" });
+  SupportGo(s, 0, 10.0, { x: 14.34, z: 50.61 });
   s.Go("LiuWencai", 0, 6.0, 16.75, 56.11, { move: "walk" });
   s.Go("Luo", 0, 6.0, 21.66, 65.03, { move: "run", yawDeg: 23.2 });
   // 回身：鬼子跳进沟里追上来
@@ -1479,21 +1570,19 @@ function S0402(ctx) {
   s.Shake(7.4, 0.6, 0.7); s.Ev(7.5, "smoke", { x: 11.37, z: 42.47, kind: "SmokeDust", dur: 4 });
   // 拼刺刀：鬼子冲过拐角
   s.Cam(8.6, 0.8, { from: { x: 14.2, z: 47.6, h: 1.05 }, to: { x: 12.66, z: 45.02, h: 1.62 }, look: { x: 16.0, z: 52.0, h: 1.0 }, lookTo: { x: 12.8, z: 40.0, h: 1.4 } });
-  s.Go("IjaTrench1", 8.4, 10.4, 12.74, 42.6, { move: "run", aim: false });
-  s.Key("IjaTrench1", 10.2, { clip: "BayonetClearWood" });
+  s.Go("IjaTrench1", 8.4, 10.2, 12.74, 42.6, { move: "run", aim: false });
+  // 拼刺刀：一条到底（PvIjaLungeParriedFall：突刺 → 0.42 s 被格开 → 0.86 s 胸口中刺 → 枪脱手按 weapon 轨落地 → 仰面倒，末帧是尸体）
+  s.Key("IjaTrench1", 10.2, { clip: "PvIjaLungeParriedFall", clipHold: true });
   s.Shake(10.8, 0.3, 0.4);
   s.Cam(10.8, 0.5, { from: { x: 12.66, z: 45.02, h: 1.62 }, to: { x: 12.68, z: 44.0, h: 1.55 }, look: { actor: "IjaTrench1", offset: [0, 1.2, 0] }, ease: "linear" });
-  s.Sfx(11.3, "stab", { x: 12.74, z: 42.6 });
-  s.Key("IjaTrench1", 11.35, { clip: "ShotCollapse", clipHold: true });
-  s.Key("IjaTrench1", 13.0, { state: "down", clip: null });
+  s.Sfx(11.06, "stab", { x: 12.74, z: 42.6 });
   s.Caption(10.4, 2.4, "（拼刺刀：格开、捅回去）");
   s.Eye(11.4, 2.4, { stance: "stand", x: 12.68, z: 44.0, look: { x: 12.74, z: 42.6 }, pitch: -20, toLook: { x: 12.4, z: 31 }, toPitch: 0 });
   Shot(s, 13.2, "player"); Shot(s, 13.6, "IjaTrench2"); Puff(s, 13.7, { x: 13.6, z: 44.6 });
   s.Go("IjaTrench2", 14.0, 15.0, 12.0, 30.4, { move: "walk", stance: "crouch" });
   // 跟班长退到拐角 2
   s.Cam(15.4, 4.6, { from: { x: 12.68, z: 44.0, h: 1.4 }, to: { x: 16.6, z: 53.4, h: 1.4 }, look: { actor: "Yaowa", offset: [0, 1.2, 0] }, ease: "linear" });
-  s.Go("Gunner", 14.0, 22.0, 19.6, 60.2, { move: "walk", woundedWalk: true });
-  s.Go("Yaowa", 14.0, 22.0, 20.4, 59.8, { move: "walk" });
+  SupportGo(s, 14.0, 22.0, { x: 19.6, z: 60.2 });
   return s.Done({ durationS: 21.0 });
 }
 
@@ -1504,8 +1593,7 @@ function S0403(ctx) {
   s.Place("IjaTrench2", 0, 18.0, 56.0, { aim: false }); s.Place("IjaTrench3", 0, 16.6, 52.6);
   s.Place("Tank", 0, 86.4, 67.0); s.Place("TankInf1", 0, 90.0, 61.8); s.Place("TankInf2", 0, 95.0, 61.4); s.Place("TankInf3", 0, 95.6, 56.2);
   s.Cam(0, 4.4, { from: { x: 24.6, z: 72.4, h: 1.4 }, to: { x: 30.36, z: 86.95, h: 1.4 }, look: { actor: "Yaowa", offset: [0, 1.2, 0] }, ease: "linear" });
-  s.Go("Gunner", 0, 8.0, 30.54, 91.99, { move: "walk", woundedWalk: true, path: [{ x: 29.6, z: 85.6 }] });
-  s.Go("Yaowa", 0, 8.0, 31.43, 91.84, { move: "walk", path: [{ x: 30.4, z: 85.4 }] });
+  SupportGo(s, 0, 8.0, { x: 30.54, z: 91.99 }, { path: [{ x: 29.6, z: 85.6 }] });
   { const l = KU(ctx, "04-3", "Luo"); s.Go("Luo", 0, 6.0, l.x, l.z, { move: "run", yawDeg: l.yawDeg }); }  // 板桥北沿外一步（10-18 第三轮挪出桥底）
   // 10-18 第三轮：跑到板桥北沿外，猫腰钻过桥底（桥下横木底离沟底只有 1.76 m），在桥南几步蹲下
   { const l = KU(ctx, "04-3", "LiuWencai"), n = TP(T_CROSSING - 3.6, -0.3);
@@ -1529,7 +1617,7 @@ function S0403(ctx) {
   s.Go("TankInf3", 9.0, 20.0, 73.19, 77.79, { move: "walk" });
   s.Eye(11.0, 2.4, { stance: "crouch", look: { x: 23.02, z: 70.97 }, pitch: 2, toYaw: -92.7, toPitch: 4 });
   s.Eye(19.0, 1.6, { stance: "crouch", yaw: -92.7, pitch: 4, toLook: KU(ctx, "04-3", "Luo"), toPitch: 1 });
-  s.Key("Luo", 19.0, { faceTo: "player", clip: "PointBlockade" });
+  s.Key("Luo", 19.0, { faceTo: "player", clip: "PvStandBeckonL" });
   return s.Done({ durationS: 22.4 });
 }
 
@@ -1553,12 +1641,13 @@ function S0501(ctx) {
   s.Cam(0, 4.6, { from: { ...me0, h: 1.3 }, to: { ...TP(T_CROSSING - 5.6, -0.2), h: 1.2 }, look: { actor: "Luo", offset: [0, 1.3, 0] }, lookTo: { ...RoadBack(18), h: 1.4 } });
   for (const [t, v] of [[0.6, 0.55], [4.6, 0.7], [8.6, 0.85], [12.6, 1.0]]) s.Sfx(t, "tankTracks", { x: RoadBack(24).x, z: RoadBack(24).z, volume: v });
   // 班长的判断（不新增配音，用说明字）
-  s.Key("Luo", 1.4, { clip: "PointBlockade", faceTo: BRIDGE });
+  s.Key("Luo", 1.4, { clip: "PvStandPointL", clipHold: true, faceTo: BRIDGE });
   s.Caption(1.6, 3.6, "（班长看了一眼路上的战车：它要过来，只有走那座板桥——沟太宽，车跨不过去）");
   s.Key("Luo", 4.0, { clip: null });
   // 他拽着顺子钻到桥下的沟底趴着；幺娃架着机枪手从桥下钻过去，缩在桥南几步
   // 10-18 第三轮：桥下横木底离沟底只有 1.76 m，钻进桥底之前就猫下腰（出发那一刻就蹲，走的是蹲姿），头顶离横木底 ≥ 0.1 m
-  s.Go("Luo", 4.4, 6.4, luo.x, luo.z, { move: "walk", stance: "crouch", faceTo: RoadBack(15), depart: { stance: "crouch", clip: null } });
+  // 猫腰拽着顺子钻进桥底（PvCrouchRunPullBehind：左手往身后拽，右手低提枪；按实际速度 / 1.4 推）
+  s.Go("Luo", 4.4, 6.4, luo.x, luo.z, { move: "walk", stance: "crouch", faceTo: RoadBack(15), depart: { stance: "crouch", clip: "PvCrouchRunPullBehind" }, clip: null });
   s.Go("Gunner", 4.0, 12.5, K("Gunner").x, K("Gunner").z, { move: "walk", woundedWalk: true, stance: "crouch", faceTo: BRIDGE, depart: { stance: "crouch" } });
   s.Go("Yaowa", 4.0, 12.5, K("Yaowa").x, K("Yaowa").z, { move: "walk", stance: "crouch", faceTo: BRIDGE, depart: { stance: "crouch" } });
   s.Cam(4.6, 2.2, { from: { ...TP(T_CROSSING - 5.6, -0.2), h: 1.2 }, to: { x: ME.x, z: ME.z, h: 0.45 }, look: { ...RoadBack(18), h: 1.4 }, lookTo: { ...BRIDGE, h: 2.4 } });
@@ -1660,7 +1749,7 @@ function S0503(ctx) {
   s.Eye(boom + 0.8, 2.6, { stance: "stand", look: rear, pitch: 14, toLook: across, toPitch: 8, fov: 70 });
   // 幺娃：顺儿哥，搭把手！
   const ask = s.Say("TankAmbush.01", "Yaowa", boom + 4.2);
-  s.Key("Yaowa", ask - 0.3, { faceTo: "player" });
+  s.Key("Yaowa", ask - 0.6, { faceTo: "player", clip: "PvStandBeckonL" });
   s.Eye(ask - 0.6, 1.0, { stance: "stand", look: across, pitch: 8, toLook: K("Yaowa"), toPitch: -6 });
   s.Cam(s.End("TankAmbush.01") + 0.4, 2.4, { from: { x: ME.x, z: ME.z, h: 1.62 }, to: { ...TP(T_CROSSING + 5.5, -0.2), h: 1.4 }, look: { actor: "Gunner", offset: [0, 0.9, 0] } });
   return s.Done({ durationS: s.End("TankAmbush.01") + 3.2 });
@@ -1679,8 +1768,8 @@ function S0504(ctx) {
   const enemies0 = [["TankInf1", RoadBack(9, -1.6)], ["TankInf2", RoadBack(12, 1.6)], ["TankInf3", RoadBack(15, -1.6)], ["IjaTrench2", TP(T_CROSSING - 13, -0.5)]];
   for (const [id, p] of enemies0) s.Place(id, 0, p.x, p.z, { stance: "stand", aim: false });
   const gEnd = K("Gunner"), yEnd = K("Yaowa");
-  s.Go("Gunner", 0, 13.0, gEnd.x, gEnd.z, { move: "walk", woundedWalk: true, path: [TP(T_CREST, -0.45), ramp], stance: "crouch", faceTo: PL.assembly });
-  s.Go("Yaowa", 0, 13.0, yEnd.x, yEnd.z, { move: "walk", path: [TP(T_CREST, 0.45), { x: ramp.x + 0.9, z: ramp.z }], faceTo: PL.crest });
+  SupportGo(s, 0, 13.0, gEnd, { path: [TP(T_CREST, -0.45), ramp], faceTo: PL.assembly });
+  void yEnd;
   s.Cam(0, 6.0, { from: { ...TP(T_CROSSING + 4, 0), h: 1.5 }, to: { ...TP(T_CREST, 0), h: 1.6 }, look: { actor: "Gunner", offset: [0, 1.0, 1.6] }, ease: "linear" });
   s.Cam(6.0, 6.8, { from: { ...TP(T_CREST, 0), h: 1.6 }, to: { x: ME.x, z: ME.z, h: 1.62 }, look: { actor: "Gunner", offset: [0, 1.0, 1.6] }, ease: "linear" });
   s.Caption(0.4, 3.0, "（顺子和幺娃一边一个架着机枪手翻坡顶，顺坡道下到干沟里）");
@@ -1694,14 +1783,15 @@ function S0504(ctx) {
   s.Eye(12.8, 1.4, { stance: "stand", yaw: 175, pitch: 0, toLook: PL.crest, toPitch: 14 });
   s.Eye(14.2, 4.0, { stance: "stand", look: PL.crest, pitch: 14 });
   s.Go("Luo", 3.0, 11.0, K("Luo").x, K("Luo").z, { move: "walk", yawDeg: 0 });
-  s.Go("LiuWencai", 6.0, 11.0, K("LiuWencai").x, K("LiuWencai").z, { move: "walk", faceTo: PL.crest });
+  s.Go("LiuWencai", 6.0, 11.0, K("LiuWencai").x, K("LiuWencai").z, { move: "walk", faceTo: PL.crest, clip: TALK_LOW });
   const q = s.Say("TankAmbush.02", "LiuWencai", 16.4);
   s.Eye(q + 1.6, 1.2, { stance: "stand", look: PL.crest, pitch: 14, toLook: K("Luo"), toPitch: 0 });
+  s.Key("Luo", s.End("TankAmbush.02") + 0.1, { clip: "PvStandWaveOnL" });
   s.Say("TankAmbush.03", "Luo");
   s.Key("Luo", s.End("TankAmbush.03") + 0.4, { faceTo: PL.laneHead });
   const lane = { x: PL.laneHead.x, z: PL.laneHead.z };
-  s.Go("Luo", s.End("TankAmbush.03") + 0.8, s.End("TankAmbush.03") + 6.0, lane.x - 12, lane.z - 1.0, { move: "walk" });
-  s.Go("LiuWencai", s.End("TankAmbush.03") + 1.2, s.End("TankAmbush.03") + 6.4, lane.x - 13.5, lane.z - 2.4, { move: "walk" });
+  s.Go("Luo", s.End("TankAmbush.03") + 0.8, s.End("TankAmbush.03") + 6.0, lane.x - 12, lane.z - 1.0, { move: "walk", depart: { clip: null } });
+  s.Go("LiuWencai", s.End("TankAmbush.03") + 1.2, s.End("TankAmbush.03") + 6.4, lane.x - 13.5, lane.z - 2.4, { move: "walk", depart: { clip: null } });
   return s.Done({ durationS: s.End("TankAmbush.03") + 5.4, then: "stay" });
 }
 

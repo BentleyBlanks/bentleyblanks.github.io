@@ -20,7 +20,7 @@ import { FIRST_LEVEL_SPEAKING_CAST } from "./Data_FirstLevelSpeakingCast.mjs";
 import { CharacterClipModelId } from "./Data_CharacterSelection.mjs";
 import { SamplePrevizActor, NormalizeBlockoutPreviz, PREVIZ_THROW } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { L0105_BRIDGE } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
-import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES } from "./Data_BlockoutPrevizClips.mjs";
+import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES, PREVIZ_LYING_CLIPS } from "./Data_BlockoutPrevizClips.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const Load = f => JSON.parse(readFileSync(join(HERE, f), "utf8"));
@@ -33,6 +33,7 @@ function ClipTable() {
   const lib = Load("Animation/OpeningStoryboards/Data_OpeningStoryboardsAnimation.json");
   const byModel = new Map(lib.models.map(m => [m.id, new Set(m.clipIds)]));
   const durations = new Map(Object.entries(lib.clips).map(([k, c]) => [c.name || k, c.duration]));
+  const metaTable = new Map(Object.entries(lib.clips));
   const sets = [...byModel.values()];
   const common = new Set([...sets[0]].filter(c => sets.every(s => s.has(c))));
   // 预演额外加载的库（Data_BlockoutPrevizClips）：只烘了 TengxianNra02，但五具骨架骨名一致、哪具身体都能播 → 算通用片段。
@@ -44,9 +45,10 @@ function ClipTable() {
     for (const [name, meta] of Object.entries(manifest.clips || {})) {
       for (const set of [...sets, common]) set.add(name);
       if (!durations.has(name)) durations.set(name, meta.duration);
+      if (!metaTable.has(name)) metaTable.set(name, meta);
     }
   }
-  return { byModel, common, durations };
+  return { byModel, common, durations, meta: metaTable };
 }
 
 function ClipSetFor(unit, table) {
@@ -144,8 +146,38 @@ export async function CheckPreviz(doc, { config, voice }) {
     rows.push(`${seq.keyframe} · ${seq.durationS} s · 镜头 ${seq.camera.length} · 台词 ${seq.lines.length} · 片段 ${[...clipsUsed].sort().join("、") || "（无）"}`);
   }
   if (doc.sequences.length !== config.keyframes.length) errors.push(`预演 ${doc.sequences.length} 段，关键帧 ${config.keyframes.length} 个`);
+  TalkPostureChecks(doc, config, table, errors);
   DesignChecks(doc, config, errors);
   return { errors, warnings, rows };
+}
+
+/**
+ * 说话姿态（2026-10-19，用户：「我看到一个讲话还拿着枪的很出戏」）：每句有说话人的台词开始那一刻，说话人要么在播片段
+ * （说话 / 手势 / 坐着 / 跪着 / 审问这类，见 Data_BlockoutPrevizClips 与 docs/Data_EditorBlockout.md §14.4），要么倒在地上、
+ * 在扔手榴弹，要么前后 1.5 s 内自己开过枪（打仗当下端着枪喊）；跑着喊、手上没据枪的也算。端着枪（aim）又没在开枪 → 错。
+ * 片段过了时长的算法同运行时：循环片段一直放，不循环的过了时长没写 clipHold 就清掉。
+ */
+export const TALK_FIRE_WINDOW_S = 1.5;
+function TalkPostureChecks(doc, config, table, errors) {
+  const clipDuration = clip => { const m = table.meta.get(clip); return !m || m.loop === true ? null : m.duration ?? null; };
+  for (const seq of doc.sequences) {
+    const kf = config.keyframes.find(k => k.id === seq.keyframe);
+    if (!kf) continue;
+    const units = new Map((kf.units || []).map(u => [u.id, u]));
+    for (const l of seq.lines) {
+      const id = l.actor;
+      if (!id) continue;
+      const a = seq.actors.find(x => x.id === id);
+      const base = a?.spawn || units.get(id);
+      if (!base) continue;
+      const st = a ? SamplePrevizActor(a, l.t, base, { clipDuration }) : { stance: base.stance, aim: !!base.aim, state: base.state, visible: true };
+      if (st.visible === false) continue;
+      const fired = seq.events.some(e => e.type === "muzzle" && e.actor === id && Math.abs(e.t - l.t) <= TALK_FIRE_WINDOW_S + 1e-6);
+      if (st.state === "down" || st.clip || st.throw || fired) continue;
+      if (st.moving && !st.aim) continue;
+      errors.push(`${seq.keyframe}：${l.line}（${id}@${l.t}）${st.aim ? "端着枪说话、前后 1.5 s 没开枪" : "说话时没播片段（手里拿着枪干站 / 干蹲着）"}`);
+    }
+  }
 }
 
 /** 10-18 返工的设计口径（只查 FirstLevel0105）：南沿迂回、两人并排拖单被、板桥。 */
@@ -198,7 +230,8 @@ function DesignChecks(doc, config, errors) {
     const shown = id === "02-3" ? (Keys(s, "Blanket").find(k => k.visible === true)?.t ?? 0) : 0;
     for (const k of Keys(s, "Donggua")) {
       if (k.t < shown) continue;
-      if (typeof k.clip === "string") errors.push(`${id}：冬瓜在被子上 @${k.t} 不能播片段（${k.clip}：坐起来、身子出了被子）`);
+      // 2026-10-19：躺姿片段（PREVIZ_LYING_CLIPS，运行时照样按头的方向摆顺）放开
+      if (typeof k.clip === "string" && !PREVIZ_LYING_CLIPS.includes(k.clip)) errors.push(`${id}：冬瓜在被子上 @${k.t} 不能播片段（${k.clip}：坐起来、身子出了被子；只许躺姿片段）`);
       if (k.faceTo !== undefined) errors.push(`${id}：冬瓜在被子上 @${k.t} 不能转身（faceTo）`);
       if (k.state === "alive" || k.stance) errors.push(`${id}：冬瓜在被子上 @${k.t} 不能起身`);
     }
