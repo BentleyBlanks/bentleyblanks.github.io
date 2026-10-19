@@ -24,6 +24,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   L0105_PLACES as PL, L0105_TRENCHES, L0105_ROAD, L0105_BRIDGE, L0105_PROPS, PointBeside, LineLength,
+  L0105_GULLY, L0105_GULLY_POCKETS, L0105_SUNKEN_LANE,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 import { PREVIZ_THROW, SamplePrevizActor, NormalizeBlockoutPreviz } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES } from "./Data_BlockoutPrevizClips.mjs";
@@ -1173,7 +1174,7 @@ function S02E1(ctx) {
   const P = KP(ctx, "02E-1");
   const rest = K("Donggua"), luo = K("Luo"), liu = K("LiuWencai");
   const lane = { x: PL.laneHead.x, z: PL.laneHead.z };
-  const laneOut = { x: PL.laneHead.x + 14, z: PL.laneHead.z + 0.4 };
+  const laneOut = PointBeside(L0105_SUNKEN_LANE.line, 14, 0);   // 凹路口往东 14 m（凹路在台地里往东走）
   // 干沟里满地伤员；卫生兵背对着顺子蹲在冬瓜身边处理伤口
   // 卫生兵跪在冬瓜胸口旁边、双手按住伤口（CollectionCare 的 CareMedicPress，stage press：伤员胸口在他前方约 0.3 m）；
   // 跪在靠顺子这一侧，背对着顺子
@@ -1232,7 +1233,7 @@ function S02E2(ctx) {
   const top = TP(T_CREST + 5);
   s.Place("Runner", 0, top.x, top.z, { yawDeg: 180 });
   s.Spawn("DownWounded", { x: TP(T_CREST + 7).x, z: TP(T_CREST + 7).z, yawDeg: 180, woundedWalk: true });
-  s.Go("DownWounded", 0, 9.0, ramp.x - 3.6, ramp.z + 6.0, { move: "walk", path: [ramp], woundedWalk: true });
+  s.Go("DownWounded", 0, 9.0, L0105_GULLY_POCKETS.a.x - 2.5, L0105_GULLY_POCKETS.a.z + 2.0, { move: "walk", path: [ramp], woundedWalk: true });
   s.Go("Runner", 0.4, 4.2, runner.x, runner.z, { move: "run", faceTo: "Luo", path: [ramp] });
   s.Key("Runner", 4.2, { clip: "MessengerReport" });
   s.Eye(0, 4.2, { stance: "stand", look: ramp, pitch: 6, toLook: runner, toPitch: 0 });
@@ -1247,12 +1248,14 @@ function S02E2(ctx) {
   const go = s.End("Gathering.04") + 0.3;
   s.Key("Luo", go, { faceTo: "HeYoutian", clip: "PvStandPointL", clipHold: true });
   s.Key("HeYoutian", go + 0.4, { faceTo: "Luo" });
-  s.Go("Luo", go + 2.0, go + 7.5, ramp.x, ramp.z, { move: "walk", depart: { clip: null } });
-  s.Go("LiuWencai", go + 2.6, go + 8.0, ramp.x - 0.6, ramp.z + 1.4, { move: "walk" });
-  s.Eye(go + 2.0, 3.0, { stance: "stand", look: luo, pitch: 2, toLook: ramp, toPitch: 4 });
-  s.Caption(go + 4.6, 3.4, "（顺子一句话也没说，跟上了。上去的人本来该是他）");
+  // 10-20 弯沟：从中弯顺沟底走回坡道约 18 m（沿中心线，不翻坎）
+  const back = [PointBeside(L0105_GULLY.line, 12, 0.4)];
+  s.Go("Luo", go + 2.0, go + 15.0, ramp.x, ramp.z, { move: "walk", depart: { clip: null }, path: back });
+  s.Go("LiuWencai", go + 2.6, go + 15.6, ramp.x - 0.6, ramp.z + 1.4, { move: "walk", path: back });
+  s.Eye(go + 2.0, 4.0, { stance: "stand", look: luo, pitch: 2, toLook: ramp, toPitch: 4 });
+  s.Caption(go + 9.0, 3.4, "（顺子一句话也没说，跟上了。上去的人本来该是他）");
   void he;
-  return s.Done({ durationS: go + 8.6 });
+  return s.Done({ durationS: go + 16.2 });
 }
 
 // ---------------------------------------------------------------------------
@@ -1267,11 +1270,11 @@ function S0301(ctx) {
   const camFrom = KP(ctx, "03-1");
   s.Cam(0, 12, { from: { x: camFrom.x, z: camFrom.z, h: 1.6 }, to: { ...TP(T_CREST + 1, 0.2), h: 1.6 }, look: { actor: "Luo", offset: [0, 1.4, -3.0] }, ease: "linear" });
   s.Cam(12, 12, { from: { ...TP(T_CREST + 1, 0.2), h: 1.6 }, to: { ...TP(T_CROSSING + 6, 0.3), h: 1.55 }, look: { actor: "Luo", offset: [0, 1.3, -3.0] }, ease: "linear" });
-  const gully = { x: PL.assembly.x - 6, z: PL.assembly.z + 2 };
   const ramp = { x: PL.assemblyEntry.x, z: PL.assemblyEntry.z };
+  // 10-20 弯沟：下到沟底以后顺沟往东散开（坑窝 A 到中弯之间），两两一堆贴着坎，不排方阵
   const south = (id, t0, t1, extra = {}) => {
     const k = ["RetreatNra1", "RetreatNra2", "RetreatNra3", "RetreatNra4", "RetreatNra5", "WalkWounded1", "RetreatHelper1", "Stretcher2"].indexOf(id);
-    const to = { x: gully.x - 3 + (k % 4) * 1.6, z: gully.z - 2 + Math.floor(k / 4) * 2.2 };
+    const to = PointBeside(L0105_GULLY.line, 9 + k * 2.2, k % 2 ? 1.4 : -1.2);
     s.Go(id, t0, t1, to.x, to.z, { move: "walk", path: [ramp], ...extra });
   };
   south("RetreatNra2", 0, 9); south("RetreatNra1", 0, 13); south("RetreatNra5", 0, 6);
@@ -1797,9 +1800,10 @@ function S0504(ctx) {
   s.Key("Luo", s.End("TankAmbush.02") + 0.1, { clip: "PvStandWaveOnL" });
   s.Say("TankAmbush.03", "Luo");
   s.Key("Luo", s.End("TankAmbush.03") + 0.4, { faceTo: PL.laneHead });
-  const lane = { x: PL.laneHead.x, z: PL.laneHead.z };
-  s.Go("Luo", s.End("TankAmbush.03") + 0.8, s.End("TankAmbush.03") + 6.0, lane.x - 12, lane.z - 1.0, { move: "walk", depart: { clip: null } });
-  s.Go("LiuWencai", s.End("TankAmbush.03") + 1.2, s.End("TankAmbush.03") + 6.4, lane.x - 13.5, lane.z - 2.4, { move: "walk", depart: { clip: null } });
+  // 10-20 弯沟：顺沟底往东（沿中心线到坑窝 A 东边那一弯），不抄直线翻坎
+  const east1 = PointBeside(L0105_GULLY.line, 16, 0.6), east2 = PointBeside(L0105_GULLY.line, 14.5, -0.8);
+  s.Go("Luo", s.End("TankAmbush.03") + 0.8, s.End("TankAmbush.03") + 6.0, east1.x, east1.z, { move: "walk", depart: { clip: null } });
+  s.Go("LiuWencai", s.End("TankAmbush.03") + 1.2, s.End("TankAmbush.03") + 6.4, east2.x, east2.z, { move: "walk", depart: { clip: null } });
   return s.Done({ durationS: s.End("TankAmbush.03") + 5.4, then: "stay" });
 }
 

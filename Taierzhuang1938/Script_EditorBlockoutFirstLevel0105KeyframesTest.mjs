@@ -8,7 +8,7 @@ import fs from "node:fs";
 import { ValidateBlockout } from "./Script_EditorBlockoutConfig.mjs";
 import { BuildFirstLevel0105Config, TrenchRoute, LoadSceneLayout } from "./Script_EditorBlockoutFirstLevel0105Keyframes.mjs";
 import { SightBlock } from "./Script_EditorBlockoutFirstLevel0105Scene.mjs";
-import { L0105_BOUNDS as B, L0105_PLACES as P } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
+import { L0105_BOUNDS as B, L0105_PLACES as P, L0105_GULLY_POCKETS, InGullyFloor, GullyU } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 const issues = [];
 const a = await BuildFirstLevel0105Config({ commit: "test", generatedAt: "A", issues });
@@ -81,11 +81,21 @@ for (const [id, near] of [["02-4", { x: 40.9, z: 67.2 }], ["02-6", null]]) {
   assert.equal(k.player.stance, "crouch", `${id} 玩家蹲在掩体后`);
   if (near) assert.ok(DistXZ(k.player, near) < 2.5, `${id} 玩家要在那垛弹药箱旁边`);
 }
-// 干沟：02末的人都在沟底；05-4 下到干沟
+// 干沟：02末的人都在沟底（担架可以在凹路口）；10-20 人分三小堆（坑窝 A / 中弯 + 支沟 / 坑窝 B），伤员大多在支沟里
 for (const id of ["02E-1", "02E-2"]) {
-  for (const u of KF(id).units.filter((x) => !/^CrestNra|^Pursuer/.test(x.id))) {
-    assert.ok(u.x >= 12 && u.x <= 62 && u.z >= 141 && u.z <= 156, `${id} ${u.id} 不在干沟里 (${u.x},${u.z})`);
+  const units = KF(id).units.filter((x) => !/^CrestNra|^Pursuer/.test(x.id));
+  for (const u of units) {
+    const inLane = Math.hypot(u.x - P.laneHead.x, u.z - P.laneHead.z) < 4;
+    assert.ok(InGullyFloor(u, 0.5) || inLane, `${id} ${u.id} 不在干沟沟底 (${u.x},${u.z})`);
   }
+  const Near = (p, r) => (u) => Math.hypot(u.x - p.x, u.z - p.z) <= r;
+  const near = (test) => units.filter(test).length;
+  const pa = near(Near(L0105_GULLY_POCKETS.a, 6)), pb = near(Near(L0105_GULLY_POCKETS.b, 6));
+  const pm = near((u) => Near(L0105_GULLY_POCKETS.mid, 6)(u) || Near(P.woundedBay, 5)(u));
+  assert.ok(pa >= 2 && pb >= 2 && pm >= 4, `${id} 人要分三小堆：坑窝 A ${pa}、中弯/支沟 ${pm}、坑窝 B ${pb}`);
+  assert.ok(pa + pm + pb >= units.length - 2, `${id} 还有人不在这三堆里（${units.length - pa - pm - pb}）`);
+  const bayWounded = units.filter((u) => /^Wounded/.test(u.id) && GullyU(u.x, u.z) <= 0 && Math.hypot(u.x - P.woundedBay.x, u.z - P.woundedBay.z) < 4.5).length;
+  assert.ok(bayWounded >= 4, `${id} 伤员要放在支沟里（现在 ${bayWounded} 个）`);
 }
 assert.ok(KF("05-4").player.z > 141, "05-4 下到干沟");
 assert.ok(KF("03-1").player.z > 135 && KF("03-1").player.yawDeg > -45 && KF("03-1").player.yawDeg < 45, "03-1 从干沟口往北走");

@@ -460,19 +460,19 @@ function S0601(ctx) {
   s.Key("HeYoutian", 0, { yawDeg: -80, clip: SIT_STUFF_PACK });
   s.Say("GullyEmptyAnswer.01", "HeYoutian", q + 2.3);
   s.Caption(s.End("GullyEmptyAnswer.01") + 0.2, 2.2, "（他手上还在收拾东西，没回头）");
-  // 最后两副担架正往东南头的凹路抬；南岸树底下停着一辆驴车
+  // 最后两副担架正往支沟南头的凹路口抬（10-20 弯沟）；南岸树底下停着一辆驴车
   s.Go("Litter01", 0.5, 8.5, 58.6, 154.0, { move: "walk", path: [Pt(55, 152.6)] });
-  s.Go("Litter02", 1.5, 9.5, 52.4, 153.6, { move: "walk" });
+  s.Go("Litter02", 1.5, 9.5, 55.6, 151.4, { move: "walk", path: [Pt(50, 149.2)] });
   const lookLitter = s.End("GullyEmptyAnswer.01") + 1.2;
   s.Eye(lookLitter, 1.2, { stance: "stand", look: he, pitch: -4, toLook: Pt(52, 152), toPitch: -2 });
   s.Eye(lookLitter + 3.6, 1.4, { stance: "stand", look: Pt(52, 152), pitch: -2, toLook: CART, toPitch: -1 });
   s.Caption(lookLitter + 4.2, 3.0, "（南岸那排树底下停着一辆驴车，停在树底下是为了躲飞机）");
-  // 班长带头往凹路口走；其余人跟上（走到 06-2 的位置）
-  ["Luo", "LiuWencai", "Yaowa", "Squad1", "Squad2", "Squad3"].forEach((id, k) => {
-    const cur = s.pos.get(id), t0 = lookLitter + 1.0 + (id === "Luo" ? 0 : 1.2);
-    s.Go(id, t0, t0 + 6.0, cur.x + 8.0, cur.z + (k % 2 ? 0.6 : -0.4), { move: "walk", yawDeg: -90 });
+  // 班长带头往凹路口走；其余人跟上（走到 06-2 的位置；10-20 弯沟：顺沟底走，不直着往东撞北岸）
+  ["Luo", "LiuWencai", "Yaowa", "Squad1", "Squad2", "Squad3"].forEach((id) => {
+    const to = UP(KU(ctx, "06-2", id)), t0 = lookLitter + 1.0 + (id === "Luo" ? 0 : 1.2);
+    s.Go(id, t0, t0 + 8.5, to.x, to.z, { move: "walk", yawDeg: -90 });
   });
-  return s.Done({ durationS: lookLitter + 8.0 });
+  return s.Done({ durationS: lookLitter + 10.5 });
 }
 
 function S0602(ctx) {
@@ -520,7 +520,7 @@ function S0603(ctx) {
   s.Signal(0, SIG.cartDeparted, false);
   s.Place("GengCart", 0, CART.x, CART.z, { yawDeg: -90 });
   s.Place("Geng", 0, 56.4, 153.6, { faceTo: CART });
-  s.Place("Nier", 0, 58.3, 157.6, { stance: "crouch", faceTo: CART, clip: VIL.crouch });
+  s.Place("Nier", 0, NIER_RIM.x, NIER_RIM.z, { stance: "crouch", faceTo: CART, clip: VIL.crouch });
   const r0 = LZ(178);
   s.Place("Runner", 0, r0.x, r0.z, { stance: "stand" });
   const arrive = s.Walk("Runner", 0, runnerAt, { move: "run", faceTo: "Luo" });
@@ -530,8 +530,8 @@ function S0603(ctx) {
   const call = s.Say("RunnerSouth.01", "Runner", Math.max(2.6, arrive - 4.6));
   s.Key("Runner", arrive, { clip: "MessengerReport", faceTo: "Luo" });
   s.Key("Runner", arrive + 3.0, { clip: null });
-  s.Eye(2.0, 1.0, { stance: "stand", look: Pt(83, 160), pitch: -1, toLook: Pt(80, 156), toPitch: -1 });
-  s.Eye(arrive - 1.4, 1.6, { stance: "stand", look: Pt(80, 156), pitch: -1, toLook: runnerAt, toPitch: -3 });
+  s.Eye(2.0, 1.0, { stance: "stand", look: Pt(83, 160), pitch: -1, toLook: Pt(80, 158.6), toPitch: -1 });
+  s.Eye(arrive - 1.4, 1.6, { stance: "stand", look: Pt(80, 158.6), pitch: -1, toLook: runnerAt, toPitch: -3 });
   s.Key("Luo", call, { faceTo: "Runner" });
   s.Key("Yaowa", call + 0.4, { faceTo: "Runner" });
   s.Key("LiuWencai", call + 0.2, { faceTo: "Runner" });
@@ -552,11 +552,11 @@ function S0603(ctx) {
   s.Go("GengCart", go, cartT1, cartRoute.end.x, cartRoute.end.z, { move: "walk", path: cartRoute.path });
   const gengRoute = Route(head, LZ(162.5, -1.6));
   s.Go("Geng", go, cartT1, gengRoute.end.x, gengRoute.end.z, { move: "walk", path: gengRoute.path });
-  const nierRoute = Route(Pt(58.3, 157.6), LZ(165.5, 1.3));
+  const nierRoute = Route(NIER_RIM, LZ(165.5, 1.3));
   s.Go("Nier", go + 0.8, cartT1 + 0.6, nierRoute.end.x, nierRoute.end.z, { move: "walk", path: nierRoute.path, depart: { stance: "stand", clip: null } });
   s.Caption(go + 0.6, 3.2, "（第一个赶着车往南走；车上那几箱弹药跟着车走了）");
-  s.Eye(go - 0.2, 1.4, { stance: "stand", look: Pt(56.4, 153.6), pitch: -4, toLook: Pt(66, 155.2), toPitch: -2 });
-  s.Eye(go + 4.0, 3.0, { stance: "stand", look: Pt(66, 155.2), pitch: -2, toLook: Pt(83, 164), toPitch: -1 });
+  s.Eye(go - 0.2, 1.4, { stance: "stand", look: Pt(56.4, 153.6), pitch: -4, toLook: Pt(66, 157.7), toPitch: -2 });
+  s.Eye(go + 4.0, 3.0, { stance: "stand", look: Pt(66, 157.7), pitch: -2, toLook: Pt(83, 164), toPitch: -1 });
   // 班长：都跟斗走！（朝南一挥手）全班跟着最后两副担架和车往南赶
   const order = s.Say("RunnerSouth.02", "Luo", go + 1.6);
   s.Key("Luo", order - 0.3, { faceTo: "player", clip: WAVE_ON });

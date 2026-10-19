@@ -25,7 +25,7 @@ import { BLOCKOUT_SCHEMA, PlanTransition, NormalizeBlockout, YawDegFromTo } from
 import {
   L0105_LEVEL_KEY, L0105_TITLE, L0105_BOUNDS, L0105_PLACES as PL, L0105_TRENCHES as TR, L0105_TRENCH_SECTION,
   L0105_ROAD, L0105_FRONT_LOST_FROM_X, L0105_SIGNALS as SIG, PointAlong, LineLength,
-  L0105_GULLY, L0105_PROPS, L0105_BRIDGE,
+  L0105_GULLY, L0105_GULLY_POCKETS, L0105_SUNKEN_LANE, L0105_PROPS, L0105_BRIDGE, InGullyFloor, PointBeside,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 export const FIRST_LEVEL_0105_GENERATOR = "Script_EditorBlockoutCli.mjs export FirstLevel0105";
@@ -95,11 +95,12 @@ function FrontAtX(x, lat = 0) {
 const TRAFFIC = TR.traffic;
 const BRANCH = TR.branch;
 const BRANCH_LEN = LineLength(BRANCH);
-/** 拖单被的路线：防炮洞口 → 支沟 → 支沟口 → 交通沟往南 → 拐角 2 → 路口（板桥底下）→ 坡顶 → 坡道下到干沟 → 集结处。 */
+/** 拖单被的路线：防炮洞口 → 支沟 → 支沟口 → 交通沟往南 → 拐角 2 → 路口（板桥底下）→ 坡顶 → 坡道下到干沟 → 顺沟底往东（坑窝 A → 中弯）→ 支沟里冬瓜躺的地方。 */
 export const DRAG = Object.freeze([
   PL.dugoutMouth, PL.branchMouth,
   ...TRAFFIC.slice(TRAFFIC.findIndex((p) => p.x === PL.corner2.x && p.z === PL.corner2.z)),
-  PL.assembly,
+  ...L0105_GULLY.line.slice(1, L0105_GULLY.line.findIndex((p) => p.x === L0105_GULLY_POCKETS.mid.x && p.z === L0105_GULLY_POCKETS.mid.z) + 1),
+  PL.donguaRest,
 ].map((p) => Object.freeze({ x: p.x, z: p.z })));
 const D_BRANCH_MOUTH = BRANCH_LEN;                                                  // 约 41 m（Notion 43）
 const PROP = (id) => L0105_PROPS.find((p) => p.id === id);
@@ -134,18 +135,18 @@ const PIT_LINKS = Object.freeze([
   [PL.pit, PL.fireA], [PL.pit, PL.zb26], [PL.pit, TR.crawlSap[0]],
   [TR.crawlSap[TR.crawlSap.length - 1], PL.fireC],
   [PL.dugoutMouth, PL.dugout, { x: PL.dugout.x + PL.dugout.w / 2 - 1, z: PL.dugout.z }], // 洞口 → 洞里
-  [TRAFFIC[TRAFFIC.length - 1], PL.assembly],                                            // 交通沟坡道口 → 干沟沟底
+  [TRAFFIC[TRAFFIC.length - 1], L0105_GULLY.line[1]],                                   // 交通沟坡道口 → 干沟沟底
 ]);
-const NET_LINES = Object.freeze([TR.front, TRAFFIC, BRANCH, TR.crawlSap, ...PIT_LINKS]);
+// 干沟（弯沟）中心线与支沟也算在网上：沟底里沿中心线走，不抄直线翻坎
+const NET_LINES = Object.freeze([TR.front, TRAFFIC, BRANCH, TR.crawlSap, L0105_GULLY.line, L0105_GULLY.branch, ...PIT_LINKS]);
 /** 「在沟里」的余量：沟底半宽 + 0.6 m。 */
 const NET_SNAP_M = L0105_TRENCH_SECTION.traffic.floorW / 2 + 0.6;
-/** 能自由走动的开挖区（坑、洞、散兵坑）：在里面就算在网上（集结处干沟另算，见 ASSEMBLY_AREA）。 */
+/** 能自由走动的开挖区（坑、洞、散兵坑）：在里面就算在网上（集结处干沟另算，见 InGullyFloor）。 */
 const OPEN_AREAS = Object.freeze([
   { x: PL.pit.x, z: PL.pit.z, hw: PL.pit.w / 2 + 0.3, hd: PL.pit.d / 2 + 0.3 },
   { x: PL.dugout.x, z: PL.dugout.z, hw: PL.dugout.w / 2 + 0.3, hd: PL.dugout.d / 2 + 0.3 },
   { x: PL.fireC.x, z: PL.fireC.z, hw: PL.fireC.radiusM + 0.3, hd: PL.fireC.radiusM + 0.3 },
 ]);
-const ASSEMBLY_AREA = { x: (L0105_GULLY.minX + L0105_GULLY.maxX) / 2, z: (L0105_GULLY.minZ + L0105_GULLY.maxZ) / 2, hw: (L0105_GULLY.maxX - L0105_GULLY.minX) / 2, hd: (L0105_GULLY.maxZ - L0105_GULLY.minZ) / 2 };
 const InArea = (a, p) => Math.abs(p.x - a.x) <= a.hw && Math.abs(p.z - a.z) <= a.hd;
 
 const NET = (() => {
@@ -424,8 +425,8 @@ const TrenchClearers = (xs, o = {}) => xs.map((x, i) => J(`IjaTrench${i + 1}`, F
   group: "trenchClear", role: "rifleman", yaw: 90, aim: i === 0, to: i === 0 && o.to ? o.to : undefined,
 }));
 
-// 02 末 / 03-1 交通沟里往南撤的人流的去向：下到干沟里
-const SOUTH_OUT = Pt(PL.assembly.x - 6, PL.assembly.z + 2);
+// 02 末 / 03-1 交通沟里往南撤的人流的去向：下到干沟里，往东散开（坑窝 A 东边那一弯）
+const SOUTH_OUT = Pt(47.5, 147);
 
 // ---------------------------------------------------------------------------
 // 关键帧
@@ -764,33 +765,42 @@ function Keyframes() {
   // ======================= 02 末 集结处（坡后干沟） =======================
   const s02e = { stage: 2, stageLabel: "02末", stageTitle: "集结处" };
   const A = PL.assembly;
-  const restAt = { center: Pt(A.x - 5, A.z + 1), yaw: 90 };
-  const medicAt = Pt(restAt.center.x - 0.8, restAt.center.z - 1.4);
-  const pE = Pt(restAt.center.x - 3.6, restAt.center.z - 4.4);
-  const heE = Pt(restAt.center.x + 1.8, restAt.center.z - 1.5);
-  const luoE = Pt(pE.x - 1.9, pE.z + 2.7);
-  const liuE = Pt(pE.x - 3.2, pE.z + 1.0);
-  const wounded = [[-17, -4], [-12, 4], [6, 2], [12, -4], [17, 3], [-20, 5], [2, -5]].map(([dx, dz]) => Pt(A.x + dx, A.z + dz));
+  // 10-20：人不挤在一处，分三小堆，都贴北岸陡坎（北边是坡顶，那边来的炮弹打不进坎根）：
+  //   坑窝 A（坡道东边）：刚撤下来的两个兵 + 一个伤员；中弯 + 支沟：伤员都放支沟里，冬瓜、卫生兵、何有田、班长一伙在这；坑窝 B（东头）：两个坐着的轻伤 + 两个兵
+  const PA = L0105_GULLY_POCKETS.a, PB = L0105_GULLY_POCKETS.b;
+  const restAt = { center: Pt(PL.donguaRest.x, PL.donguaRest.z), yaw: PL.donguaRest.yawDeg };
+  const medicAt = Pt(restAt.center.x - 1.2, restAt.center.z - 0.9);
+  const pE = Pt(restAt.center.x - 2.6, restAt.center.z - 4.6);
+  const heE = Pt(restAt.center.x + 1.5, restAt.center.z - 0.6);
+  const luoE = Pt(pE.x - 2.2, pE.z - 1.6);
+  const liuE = Pt(pE.x - 3.4, pE.z + 0.2);
+  const BayAt = (d, lat) => { const p = PointBeside(L0105_GULLY.branch, d, lat); return Pt(p.x, p.z); };
+  const wounded = [
+    BayAt(1.8, 1.4), BayAt(0.6, -1.8), BayAt(5.0, 1.5), BayAt(4.9, -0.4),   // 支沟里躺着的（冬瓜在西侧）
+    Pt(PA.x - 2.0, PA.z - 2.6),                                            // 坑窝 A 坎根下躺着一个
+    Pt(PB.x - 1.6, PB.z - 3.2), Pt(PB.x + 1.4, PB.z - 3.4),                // 坑窝 B 坎根下坐着两个轻伤
+  ];
   const roadsideWait = [0, 1, 2].map((i) => Pt(ROADSIDE.x + i * 1.2, ROADSIDE.z - i * 1.0));
-  const stretcherAt = Pt(A.x + 8, A.z + 3);
-  const stretcherOut = [Pt(PL.laneHead.x, PL.laneHead.z), Pt(L0105_GULLY.maxX + 12, PL.laneHead.z + 0.4)];
-  const Wounded = (o = {}) => wounded.map((p, i) => N(`Wounded${i + 1}`, p, { yaw: (i * 77) % 360 - 180, down: i % 3 !== 2, stance: i % 3 === 2 ? "crouch" : undefined, group: "wounded", straight: true, ...o }));
+  const stretcherAt = Pt(PL.laneHead.x + 1.5, PL.laneHead.z + 0.2);
+  const stretcherOut = [Pt(PL.laneHead.x, PL.laneHead.z), Pt(L0105_SUNKEN_LANE.line[1].x, L0105_SUNKEN_LANE.line[1].z), Pt(L0105_SUNKEN_LANE.line[2].x - 2, L0105_SUNKEN_LANE.line[2].z)];
+  const Wounded = (o = {}) => wounded.map((p, i) => N(`Wounded${i + 1}`, p, { yaw: i < 4 ? R1(PL.donguaRest.yawDeg + (i % 2 ? 180 : 0)) : 180, down: i !== 5 && i !== 6, stance: i === 5 || i === 6 ? "crouch" : undefined, group: "wounded", straight: true, ...o }));
   const RestBlanket = () => [Blanket(restAt), OnBlanket(restAt)];
-  const squadE = { Squad1: Pt(A.x - 9, A.z - 5), Squad2: Pt(A.x + 9, A.z - 4), Squad3: Pt(A.x + 3, A.z + 5) };
+  const squadE = { Squad1: Pt(PA.x + 1.2, PA.z - 3.0), Squad2: Pt(PB.x, PB.z - 1.6), Squad3: Pt(PA.x + 2.8, PA.z - 2.2) };
   Add({
     id: "02E-1", ...s02e, name: "集结处：幺娃回来没得？",
     player: { x: pE.x, z: pE.z, yawDeg: Yaw(pE, restAt.center), pitchDeg: -12, stance: "stand" },
-    what: "坡后干沟里满地伤员。卫生兵背对顺子蹲在冬瓜身边；班长问：「幺娃回来没得？」",
+    what: "坡后干沟里，人三三两两贴着北边的陡坎，伤员都放在往南那条支沟里。卫生兵背对顺子蹲在冬瓜身边；班长问：「幺娃回来没得？」",
     next: { text: "看交通沟下来的坡道", x: PL.assemblyEntry.x, z: PL.assemblyEntry.z, radiusM: 2.5 },
     how: ["没人吭声，刘文财摇了摇头", "坡顶那边一挺机枪一直在响", "担架员「下一趟就抬拉。」", "担架顺着东南头的凹路抬走一副，空手跑回来抬下一副"],
-    notes: "集结处是坡顶背后一道东西向干沟（沟底约 15×50 m、两岸 2.5 m 陡坎、南岸一排枯树）：看不见前沿，南边平地上也看不进沟底。"
-      + "人多、担架少、交通沟一次只过一个人。担架往东南头的凹路（后送路）抬。何有田放下被角，留在冬瓜身边。追兵此时退在洞旁路边等战车。",
+    notes: "集结处是坡顶背后一道雨水冲出来的弯沟（沟底宽 5–15 m、两岸 2.5 m 陡坎、两岸疏疏落落几棵枯树）：看不见前沿，南边平地上也看不进沟底。"
+      + "人分三小堆贴北岸坎根（坑窝 A、中弯、坑窝 B），不挤一处；伤员放中弯往南的支沟里，支沟南头就是凹路口（后送路），担架从那抬走。"
+      + "人多、担架少、交通沟一次只过一个人。何有田放下被角，留在冬瓜身边。追兵此时退在洞旁路边等战车。（形状与摆法是创作，见对照表）",
     signals: [SIG.dugoutCollapsed],
     units: [
       ...RestBlanket(),
-      N("Medic", medicAt, { face: restAt.center, stance: "crouch", from: Pt(A.x + 8, A.z + 6), fromStraight: true }),
+      N("Medic", medicAt, { face: restAt.center, stance: "crouch", from: BayAt(4.4, 0), fromStraight: true }),
       N("HeYoutian", heE, { face: restAt.center, stance: "crouch" }),
-      N("Luo", luoE, { face: Pt(A.x + 8, A.z + 2) }),
+      N("Luo", luoE, { face: Pt(PL.woundedBay.x, PL.woundedBay.z) }),
       N("LiuWencai", liuE, { face: luoE }),
       N("Squad1", squadE.Squad1, { face: restAt.center, stance: "crouch", guess: true }),
       N("Squad2", squadE.Squad2, { face: restAt.center, guess: true }),
@@ -1279,7 +1289,7 @@ function BodyHit(blocks, ground, x, z, body, tallM = 0) {
 }
 
 function InCorridor(p) {
-  if (OPEN_AREAS.some((a) => InArea(a, p)) || InArea(ASSEMBLY_AREA, p)) return true;
+  if (OPEN_AREAS.some((a) => InArea(a, p)) || InGullyFloor(p, 0.3)) return true;
   return NearestOnNet(p).dist <= NET_SNAP_M;
 }
 

@@ -15,6 +15,7 @@ import {
   BuildFirstLevel0610Scene, CompareWith0105, LaneDepthAt, RiverSectionAt, DitchSectionAt, L0610SightChecks, BlockSight, BlockCenterY, SolidBlocks,
   RIVER_FLOOR_Y, CELLAR_FLOOR_Y, L0610_MOUTH_SHOOTERS,
 } from "./Script_EditorBlockoutFirstLevel0610Scene.mjs";
+import { GullyBankHeights } from "./Script_EditorBlockoutFirstLevel0105Scene.mjs";
 import {
   L0610_PLACES as P, L0610_HEIGHTS as H, L0610_VILLAGE as V, L0610_GENG as G, L0610_STREETS as ST, L0610_SIGNALS as SIG, L0610_FROM_0105,
   L0610_DITCH as DT, L0610_EAST_YARDS as EY, L0610_STREET_YARDS as SY,
@@ -36,9 +37,10 @@ Near(sample(P.assembly.x, P.assembly.z), H0105.assemblyFloor, 0.05, "干沟沟�
 Near(sample(P.assemblyEntry.x, P.assemblyEntry.z), H0105.assemblyFloor, 0.2, "交通沟坡道口");
 Near(sample(P.laneHead.x, P.laneHead.z), H0105.assemblyFloor, 0.15, "凹路口接干沟沟底");
 Near(sample(P.cartStop.x, P.cartStop.z), H0105.assemblyFloor, 0.1, "老耿的车停在沟底（南岸树底下）");
-assert.ok(sample(P.nierRim.x, P.nierRim.z) > H0105.assemblyFloor + 0.3 && sample(P.nierRim.x, P.nierRim.z) < H0105.gullyRim, "妮儿蹲在南岸坎脚的斜坡上（沟沿）");
+assert.ok(sample(P.nierRim.x, P.nierRim.z) > H0105.assemblyFloor + 0.3 && sample(P.nierRim.x, P.nierRim.z) < H0105.gullyRim, "妮儿蹲在支沟南头坎脚的斜坡上（沟沿）");
 assert.ok(Math.hypot(P.nierRim.x - P.laneHead.x, P.nierRim.z - P.laneHead.z) < 4, "妮儿挡在凹路口边上");
-for (const x of [20, 46, 55]) assert.ok(sample(x, G0105.northRimZ) - sample(x, G0105.northRimZ + 3) >= 2, `北岸坎不够陡 x${x}`);
+for (const bank of GullyBankHeights(sample)) assert.ok(bank.steep >= 2, `${bank.name}不够陡：3 m 内只落 ${bank.steep} m`);   // 10-20 弯沟：坎的量法与 0105 同一个
+void G0105;
 const cmp = CompareWith0105(sample);
 if (cmp) assert.ok(cmp.worst <= 0.02, `与 0105 场景文件在北半截不一致：最大差 ${cmp.worst} m（(${cmp.at.x},${cmp.at.z})）`);
 else console.log("提示：没有 Blockout/FirstLevel0105.scene.json，跳过接缝比对");

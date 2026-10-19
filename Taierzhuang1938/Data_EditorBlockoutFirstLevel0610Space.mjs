@@ -286,10 +286,10 @@ export const L0610_SIGNALS = Object.freeze({
 export const L0610_PLACES = Object.freeze({
   assembly: L0105_PLACES.assembly,                                           // 集结处（干沟）
   assemblyEntry: L0105_PLACES.assemblyEntry,                                 // 交通沟坡道下到干沟
-  gullyRest: P(L0105_PLACES.assembly.x - 5, L0105_PLACES.assembly.z + 1),    // 02 末冬瓜躺的地方（空了）
+  gullyRest: P(L0105_PLACES.donguaRest.x, L0105_PLACES.donguaRest.z),     // 02 末冬瓜躺的地方（支沟里，空了）
   laneHead: L0105_PLACES.laneHead,                                           // 凹路口
-  cartStop: Object.freeze({ name: "老耿的驴车（南岸树底下）", x: 54.5, z: 155, yawDeg: -90 }),   // 干沟沟底贴着南壁，头顶就是南岸那排枯树
-  nierRim: Object.freeze({ name: "妮儿捡弹壳的沟沿", x: 56.5, z: 157.3 }),  // 凹路口边上，干沟南岸的坎脚（挡着往凹路走的路）
+  cartStop: Object.freeze({ name: "老耿的驴车（南岸树底下）", x: 54.5, z: 155, yawDeg: -90 }),   // 10-20 弯沟：支沟口西壁坎根，头顶是南岸坎顶那棵枯树 (52.5,158.5)
+  nierRim: Object.freeze({ name: "妮儿捡弹壳的沟沿", x: 58.5, z: 160.6 }),  // 10-20 弯沟：支沟南头的坎脚斜坡，离凹路口 3–4 m（挡着往凹路走的路）
   villageMouth: Object.freeze({ name: "村北口（街口坡道顶）", x: 100, z: 385 }),
   laneEnd: Object.freeze({ name: "凹路尽头（接进路沟）", x: 100, z: 376 }),
   ditch: Object.freeze({ name: "村口路沟", x: 100, z: L0610_DITCH.z }),

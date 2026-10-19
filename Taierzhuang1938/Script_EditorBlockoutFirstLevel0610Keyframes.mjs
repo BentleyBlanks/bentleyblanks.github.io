@@ -44,7 +44,7 @@ const Off = (p, dx, dz) => Pt(p.x + dx, p.z + dz);
 const LZ = (z, lat = 0) => { const p = LanePointAtZ(z, lat); return { x: R2(p.x), z: R2(p.z), heading: R1(p.headingYawDeg) }; };
 
 // ---------------------------------------------------------------------------
-// 路网：凹路 + 路沟 + 街口坡道 + 街 + 巷子 + 各道门；院子 / 屋里 / 干沟 / 路沟是能自由走动的区域，门是区域的出入口。
+// 路网：干沟中心线 + 凹路 + 路沟 + 街口坡道 + 街 + 巷子 + 各道门；院子 / 屋里 / 路沟是能自由走动的区域，门是区域的出入口。
 
 const GULLY = L0610_FROM_0105.gully;
 const DOOR_OUT = 1.3;   // 门两侧各放一个路点，离墙中线这么远
@@ -60,6 +60,16 @@ const Area = (name, box, ...portals) => areas.push({ name, box, portals: portals
 // 凹路（从凹路口到路沟北沿）
 L0610_LANE.line.forEach((p, i) => Node(`Lane${i}`, p.x, p.z));
 for (let i = 1; i < L0610_LANE.line.length; i++) Edge(`Lane${i - 1}`, `Lane${i}`);
+// 干沟（10-20 改弯沟，不再是一个矩形区域）：沟底中心线 + 中弯往南的支沟，支沟南头接凹路口（Lane0）
+GULLY.line.forEach((p, i) => Node(`Gully${i}`, p.x, p.z));
+for (let i = 1; i < GULLY.line.length; i++) Edge(`Gully${i - 1}`, `Gully${i}`);
+{
+  const mid = GULLY.line.findIndex((p) => p.x === GULLY.branch[0].x && p.z === GULLY.branch[0].z);
+  GULLY.branch.forEach((p, i) => { if (i > 0) Node(`GullyBay${i}`, p.x, p.z); });
+  Edge(`Gully${mid}`, "GullyBay1");
+  for (let i = 2; i < GULLY.branch.length; i++) Edge(`GullyBay${i - 1}`, `GullyBay${i}`);
+  Edge(`GullyBay${GULLY.branch.length - 1}`, "Lane0");
+}
 const LANE_END = `Lane${L0610_LANE.line.length - 1}`;
 // 村口路沟（沟底）→ 街口坡道 → 主街（过翻倒的大车走西边）→ 小空地 → 北角 / 东街
 Node("DitchW", DT.fromX + 4, DT.z); Node("DitchAlley", ST.alleyNorth.x, DT.z); Node("DitchMid", 92, DT.z); Node("DitchStreet", ST.main.x, DT.z); Node("DitchE", DT.toX - 2, DT.z);
@@ -91,9 +101,8 @@ Edge("Square", "GateOut"); Chain("GateOut", "GateIn", "PassageEnd");
 Chain("KitchenDoorYard", "KitchenDoorOut", "KitchenDoorIn"); Chain("SideRoomDoorYard", "SideRoomDoorOut", "SideRoomDoorIn"); Chain("BackDoorIn", "BackDoorOut", "BackLaneS");
 // 过道尽头直通后院的各个口（过道的盒子和后院的盒子在 z 481 搭着一点，站在那条线上的人也要能走到后门）
 for (const n of ["BackDoorIn", "RoomYardDoorOut", "KitchenDoorYard", "SideRoomDoorYard", "SideGateE"]) Edge("PassageEnd", n);
-// 区域：干沟（集结处）、路沟、小空地、北角、邻院、后院、前屋、灶屋、偏屋、过道
+// 区域：路沟、小空地、北角、邻院、后院、前屋、灶屋、偏屋、过道（干沟 10-20 起是弯沟，走中心线，见上）
 const Box = (minX, maxX, minZ, maxZ) => ({ minX, maxX, minZ, maxZ });
-Area("Gully", Box(GULLY.minX, GULLY.maxX + 2, GULLY.minZ, GULLY.maxZ + 1), "Lane0");
 Area("Ditch", Box(DT.fromX + 1, DT.toX - 1, DT.z - DT.floorW / 2 - 0.2, DT.z + DT.floorW / 2 + 0.2), "DitchW", "DitchAlley", "DitchMid", "DitchStreet", "DitchE", LANE_END);
 Area("Square", Box(ST.square.box.minX + 0.5, ST.square.box.maxX, ST.square.box.minZ + 0.3, ST.square.box.maxZ), "StreetS", "Square", "EastMouth", "FrontDoorOut", "GateOut", "Pocket");
 Area("Pocket", Box(ST.pocket.box.minX + 0.4, ST.pocket.box.maxX - 0.4, ST.pocket.box.minZ + 0.4, ST.pocket.box.maxZ - 0.1), "Pocket");
@@ -488,14 +497,14 @@ function Keyframes() {
 
   // ======================= 06 回到集结处 =======================
   const s06 = { stage: 6, stageTitle: "回到集结处" };
-  const p61 = Pt(35, 147);
+  const p61 = Pt(39, 145.2);   // 10-20 弯沟：坡道下来往东几步，坑窝 A（沟底宽 ~10 m）
   Add({
     id: "06-1", ...s06, name: "回到干沟",
     player: { x: p61.x, z: p61.z, yawDeg: -90, pitchDeg: -4, stance: "stand" },
     what: "干沟空了：血迹、绷带、空水壶，冬瓜不在。何有田：头一趟就抬起走了。",
     next: { text: "去凹路口", x: PL.laneHead.x - 2, z: PL.laneHead.z - 1.5, radiusM: 3 },
-    how: ["冬瓜躺过的地方只剩一片血", "最后两副担架正往东南头的凹路抬", "南岸树底下停着一辆驴车", "何有田答话时没回头"],
-    notes: "05-4 的人原样下到干沟。沟底的血迹 / 绷带 / 空水壶是场景摆件。老耿的车停在南岸树底下躲飞机（沟底贴着南壁）；妮儿已经蹲在凹路口边上的沟沿上捡弹壳。",
+    how: ["冬瓜躺过的地方只剩一片血", "最后两副担架正往支沟南头的凹路口抬", "南岸树底下停着一辆驴车", "何有田答话时没回头"],
+    notes: "05-4 的人原样下到干沟。沟底的血迹 / 绷带 / 空水壶是场景摆件。10-20 干沟改弯沟：冬瓜躺过的地方在中弯往南的支沟里；老耿的车停在支沟口西壁的坎根、头顶是南岸那棵枯树；妮儿已经蹲在支沟南头的坎脚上捡弹壳（离凹路口三四米）。",
     signals: [],
     units: [
       N("Luo", Off(p61, 2.6, -0.9), { yaw: -90 }),
@@ -505,8 +514,8 @@ function Keyframes() {
       N("Squad1", Off(p61, -1.6, 1.8), { yaw: -90, guess: true }),
       N("Squad2", Off(p61, 5.8, 1.9), { yaw: -90, guess: true }),
       N("Squad3", Off(p61, -2.4, -0.6), { yaw: -90, guess: true }),
-      N("Litter01", Pt(48, 151), { kind: "litter", name: "担架", yaw: Yaw(Pt(48, 151), PL.laneHead), group: "convoy", to: LZ(175) }),
-      N("Litter02", Pt(42, 153.4), { kind: "litter", yaw: Yaw(Pt(42, 153.4), PL.laneHead), group: "convoy", to: LZ(175) }),
+      N("Litter01", Pt(50.5, 149.6), { kind: "litter", name: "担架", yaw: Yaw(Pt(50.5, 149.6), PL.laneHead), group: "convoy", to: LZ(175) }),
+      N("Litter02", Pt(47.4, 147.9), { kind: "litter", yaw: Yaw(Pt(47.4, 147.9), PL.laneHead), group: "convoy", to: LZ(175) }),
       C("GengCart", CART, { yaw: PL.cartStop.yawDeg, straight: true }),
       C("Geng", Off(CART, -1.6, -1.2), { face: CART }),
       C("Nier", NIER_RIM, { stance: "crouch", yaw: 20, climb: true }),
@@ -514,8 +523,8 @@ function Keyframes() {
     pois: [POI.assembly(), POI.gullyRest(), POI.laneHead("objective"), POI.cart("landmark")],
   });
 
-  // 06-2：契约 (58,153) 朝东；车挪到南岸树底下 (54.5,155) 以后玩家站 (50,152.5) 朝东才同时看得见车和妮儿
-  const p62 = Pt(50, 152.5);
+  // 06-2：契约 (58,153) 朝东；10-20 弯沟：车在支沟口 (54.5,155)、妮儿在支沟南头坎脚，玩家站中弯西边 (50.5,149.2) 朝东南才同时看得见车和妮儿
+  const p62 = Pt(50.5, 149.2);
   Add({
     id: "06-2", ...s06, name: "树底下的驴车",
     player: { x: p62.x, z: p62.z, yawDeg: Yaw(p62, Off(CART, 1, 1)), pitchDeg: -2, stance: "stand" },
@@ -533,7 +542,7 @@ function Keyframes() {
       N("Squad2", Off(p62, -0.4, 2.0), { face: CART, guess: true }),
       N("Squad3", Off(p62, -5.2, -1.2), { yaw: -90, guess: true }),
       N("Litter01", LZ(172, 0.6), { kind: "litter", group: "convoy", speed: 1.2 }),
-      N("Litter02", Pt(63.5, 154.7), { kind: "litter", yaw: -90, group: "convoy", speed: 1.2 }),
+      N("Litter02", Pt(63.5, 157.6), { kind: "litter", yaw: -99, group: "convoy", speed: 1.2 }),
       C("GengCart", CART, { yaw: PL.cartStop.yawDeg, straight: true }),
       C("Geng", Off(NIER_RIM, -0.9, -0.7), { face: NIER_RIM, climb: true }),
       C("Nier", NIER_RIM, { stance: "crouch", yaw: 20, climb: true }),
@@ -542,10 +551,10 @@ function Keyframes() {
   });
 
   // 06-3：传令兵从凹路跑来报信；老耿第一个赶车往南
-  // 凹路从干沟东南角往东这一截中线在 z≈154.8、路底 z 152.8…156.8：人都摆在路底里
-  const p63 = Pt(70, 156);
-  const cart63 = Pt(77.5, 155.2);
-  const runner63 = Pt(73.4, 155.6);
+  // 凹路从支沟南头往东这一截（10-20 弯沟）中线在 z 157.7…158.6、路底宽 4 m：人都摆在路底里
+  const p63 = Pt(70, 159.8);
+  const cart63 = Pt(77.5, 158.9);
+  const runner63 = Pt(73.4, 159.3);
   Add({
     id: "06-3", ...s06, name: "往南赶",
     player: { x: p63.x, z: p63.z, yawDeg: Yaw(p63, runner63), pitchDeg: -2, stance: "stand" },
@@ -556,18 +565,18 @@ function Keyframes() {
     signals: [SIG.cartDeparted],
     units: [
       N("Runner", runner63, { face: Off(p63, 1.2, -1.2), from: LZ(185), speed: 3.2 }),
-      N("Luo", Pt(71.2, 154.0), { face: runner63 }),
-      N("Yaowa", Pt(68.6, 154.6), { face: runner63 }),
-      N("HeYoutian", Pt(67.4, 155.9), { face: runner63 }),
-      N("LiuWencai", Pt(72.6, 153.4), { face: runner63 }),
-      N("Squad1", Pt(65.8, 154.2), { yaw: -90, guess: true }),
-      N("Squad2", Pt(66.6, 156.3), { yaw: -90, guess: true }),
-      N("Squad3", Pt(64.4, 155.4), { yaw: -90, guess: true }),
+      N("Luo", Pt(71.2, 157.8), { face: runner63 }),
+      N("Yaowa", Pt(68.6, 158.2), { face: runner63 }),
+      N("HeYoutian", Pt(67.4, 159.4), { face: runner63 }),
+      N("LiuWencai", Pt(72.6, 157.2), { face: runner63 }),
+      N("Squad1", Pt(65.8, 157.5), { yaw: -90, guess: true }),
+      N("Squad2", Pt(66.6, 159.7), { yaw: -90, guess: true }),
+      N("Squad3", Pt(64.4, 158.5), { yaw: -90, guess: true }),
       N("Litter01", LZ(178, 0.6), { kind: "litter", group: "convoy", speed: 1.2 }),
       N("Litter02", LZ(166, -0.6), { kind: "litter", group: "convoy", speed: 1.2 }),
       C("GengCart", cart63, { yaw: -90, straight: true, speed: 1.6 }),
-      C("Geng", Pt(80.1, 154.1), { yaw: -90 }),
-      C("Nier", Pt(75.9, 156.5), { yaw: -90, climb: true }),
+      C("Geng", Pt(80.1, 157.8), { yaw: -90 }),
+      C("Nier", Pt(75.9, 160.2), { yaw: -90, climb: true }),
     ],
     pois: [POI.laneHead("landmark"), POI.cart("poi"), POI.villageMouth("landmark")],
   });
