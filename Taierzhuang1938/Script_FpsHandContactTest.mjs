@@ -191,12 +191,13 @@ try {
       });return {vertices,inside,maxDepth};
     };
     const rightTriggerCache=new WeakMap();
-    const HanYangTriggerSkin=(target,fixed=null)=>{
+    const HanYangTriggerSkin=(triangles,fixed=null)=>{
       let entries=rightTriggerCache.get(arms);
       if(!entries){
         entries=[];const hand=arms.bones.r.hand,dorsal=new THREE.Vector3(0,1,0).applyQuaternion(arms.anatomy.r.frame.quaternion).normalize();
         arms.root.traverse(mesh=>{
-          if(!mesh.isSkinnedMesh)return;const bones=mesh.skeleton.bones,handIndex=bones.indexOf(hand);
+          if(!mesh.isSkinnedMesh||![].concat(mesh.material).some(m=>m.userData.characterSurface?.role==='skin'))return;
+          const bones=mesh.skeleton.bones,handIndex=bones.indexOf(hand);
           const distal=bones.findIndex(b=>b.name.toLowerCase().replace(/[^a-z0-9]/g,'').endsWith('rfinger12'));
           if(handIndex<0||distal<0)return;
           const a=mesh.geometry.attributes,g=mesh.geometry,bindToHand=mesh.skeleton.boneInverses[handIndex].clone().multiply(mesh.bindMatrix);
@@ -228,15 +229,16 @@ try {
         volarVertices+=selected.length;
         for(const i of selected){
           if(fixed&&(fixed.mesh!==mesh||fixed.index!==i))continue;
-          const point=points[i],normal=normals[i].normalize(),distance=point.distanceTo(target);
-          const facing=normal.z,toTarget=distance>1e-12?normal.dot(target.clone().sub(point).divideScalar(distance)):1;
-          const signedSeparation=target.z-point.z;
-          if(!fixed&&(facing<=.45||toTarget<=.25||signedSeparation<-.0002))continue;
-          if(!best||distance<best.distance)best={point:point.clone(),normal:normal.toArray(),distance,facing,toTarget,signedSeparation,witness:{mesh,index:i}};
+          const point=points[i],normal=normals[i].normalize(),target=new THREE.Vector3(),closest=new THREE.Vector3();let distance=Infinity;
+          for(const tri of triangles){tri.closestPointToPoint(point,closest);const gap=point.distanceTo(closest);if(gap<distance){distance=gap;target.copy(closest);}}
+          const toward=target.clone().sub(point),toTarget=distance>1e-12?normal.dot(toward.clone().divideScalar(distance)):1;
+          const facing=toTarget,signedSeparation=normal.dot(toward);
+          if(!fixed&&(facing<=.45||signedSeparation<-.0002))continue;
+          if(!best||distance<best.distance)best={point:point.clone(),target:target.clone(),normal:normal.toArray(),distance,facing,toTarget,signedSeparation,witness:{mesh,index:i}};
         }
       }
       if(!best)throw Error('No actual volar index surface facing the real trigger');
-      return {...best,volarVertices,method:'Fixed bind-selected >95% DIP volar skin; actual posed triangle normals; one hip witness tracked through ADS/fire'};
+      return {...best,volarVertices,method:'Fixed bind-selected >95% DIP volar skin and actual posed normals against the isolated trigger triangles; one hip witness tracked through ADS/fire; nails excluded'};
     };
     const MagazineFingerPenetration=(part,includeHand=false)=>{
       // Only the actual prop subtree is an obstacle here. Per-shell BVH
@@ -382,7 +384,7 @@ try {
         Refresh();let point=Pad("r",1);const markerPoint=point.clone(),bone=pads[id+'r1'].bone;
         const normal=new THREE.Vector3(0,1,0).transformDirection(vm.rig.group.matrixWorld.clone().invert().multiply(bone.matrixWorld));
         const indexJoints=arms.fingerBones.r.filter(b=>/finger1[12]?$/i.test(b.name));
-        const actualTrigger=id==='HanYang'?HanYangTriggerSkin(target,hipTriggerSkin?.witness):null;
+        const actualTrigger=id==='HanYang'?HanYangTriggerSkin(HanYangTriggerTriangles(),hipTriggerSkin?.witness):null;
         if(actualTrigger&&pose==='hip'){hipTriggerSkin=actualTrigger;hipTriggerJoints=indexJoints.map(b=>b.quaternion.clone());}
         if(actualTrigger)point=actualTrigger.point;
         const gunSurface=id!=="ServicePistol"&&id!=="Zb26"?Triangles(vm.rig.group,o=>o.name.startsWith(id+"_")):null;
@@ -395,7 +397,7 @@ try {
           const measured=hanYangHoldingProbes[side].Measure({weaponGroup:vm.rig.group,arms,roots:[vm.rig.group],magazine:null,contactClass:'hanYangHoldingNoExemptions'});
           return {side,maxDepthMm:measured.maxDepthMm,crossings:measured.crossingTriangleObstaclePairs,witnesses:measured.rows.filter(row=>row.crossingSkinTriangles||row.maxDepthMm)};
         })}:null;
-        result.poses.push({id,pose,support,supportSamples,supportPoints:gunSurface?[0,1,2,3,4].map(digit=>Pad("l",digit).toArray()):[],point:point.toArray(),trigger:target?.toArray(),distance:target?point.distanceTo(target):Infinity,
+        result.poses.push({id,pose,support,supportSamples,supportPoints:gunSurface?[0,1,2,3,4].map(digit=>Pad("l",digit).toArray()):[],point:point.toArray(),trigger:actualTrigger?.target.toArray()??target?.toArray(),distance:actualTrigger?.distance??(target?point.distanceTo(target):Infinity),
           facing:actualTrigger?.facing??normal.z,holdingDrift:pose==="ads"?point.distanceTo(actualTrigger?hipTriggerSkin.point:hip):0,
           triggerTravel:pose==="fire"?point.distanceTo(actualTrigger?hipTriggerSkin.point:hip):0,
           legacyTriggerMarkerDistance:target?markerPoint.distanceTo(target):Infinity,
@@ -508,6 +510,7 @@ try {
     if(!['Zb26','HanYang'].includes(pose.id))Check(pose.distance<.006,`${pose.id} ${pose.pose}: index pad misses trigger by ${(pose.distance*1000).toFixed(1)} mm`);
     if(pose.id==='HanYang'){
       const skin=pose.actualTriggerSkin;
+      Check(pose.distance<.003,`${pose.id} ${pose.pose}: tracked actual volar skin misses the isolated trigger`);
       Check(skin?.volarVertices>=20&&skin.sameHipWitness,`${pose.id} ${pose.pose}: actual fixed volar skin witness required`);
       Check(skin?.normalDotToTarget>.25&&skin.signedSeparation>=-.0002,`${pose.id} ${pose.pose}: trigger must lie in front of the actual palm pad`);
       if(pose.pose==='fire')Check(skin?.jointRotationChangeRad>.001,`${pose.id}: firing must rotate the actual index joints`);
