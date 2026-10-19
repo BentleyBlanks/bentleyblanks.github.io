@@ -186,6 +186,7 @@ function CheckUnit(errors, warnings, at, unit) {
   if (unit.castId !== undefined && (typeof unit.castId !== "string" || !/^[A-Za-z][A-Za-z0-9]*$/.test(unit.castId))) errors.push(`${at}.castId 要是定妆角色 id（字母开头的字母数字）`);
   if (unit.guess !== undefined && typeof unit.guess !== "boolean") warnings.push(`${at}.guess 应当是 true / false`);
   if (unit.bearers !== undefined && !(Number.isInteger(unit.bearers) && unit.bearers >= 0 && unit.bearers <= 2)) errors.push(`${at}.bearers 要是 0–2 的整数`);
+  if (unit.draft !== undefined && !["ox", "horse"].includes(unit.draft)) errors.push(`${at}.draft 要是 "ox" 或 "horse"`);
   if (unit.lie !== undefined && !BLOCKOUT_LIE_MODES.includes(unit.lie)) errors.push(`${at}.lie 要是 ${BLOCKOUT_LIE_MODES.join(" / ")}（不写 = 演员倒地姿态原样）`);
   if (unit.body !== undefined && !BLOCKOUT_BODY_MODES.includes(unit.body)) errors.push(`${at}.body 要是 ${BLOCKOUT_BODY_MODES.join(" / ")}（百姓 / 小孩的身体：骨骼占位 / 旧的程序化；不写 = rig）`);
   // ride（2026-10-20）：挂到车 / 战车 / 担架上；对方要在同一帧里（CheckKeyframe 核对）

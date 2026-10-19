@@ -171,6 +171,7 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
 | `speedMps` | 可选过渡速度；缺省 ija 2.8、nra 2.4、civ 1.6、litter 1.2、tank 2.0 |
 | `guess` | 可选 `true`：位置是推测的（游戏数据里没写），界面上用虚线圈 + 「?」 |
 | `bearers` | 只对 `kind: "litter"`：抬担架的人数 0–2（缺省 2）；`0` = 担架放在地上 / 床边、没人抬；`1` = 只画前面一个抬担架的人（后头由玩家或别的单位抬着，或搁在地上）。担架的 `state: "down"` 只表示抬担架的人倒了 |
+| `draft` | 可选（2026-10-20），只对 `kind: "cart"`：拉车的牲口模型 `"ox"` / `"horse"`；不写时名字带「牛」用牛、其余用马（§5.6） |
 | `ride` | 可选（2026-10-20），人或担架**挂到车上**：`{ "on": "<车的单位 id>", "x", "z"（车本地米，+x 右、−z 前，缺省 0）, "y"（演员根离车底下地面多高，缺省 0）, "yawDeg"（相对车头，缺省 0） }`，`null` / 不写 = 不挂。`on` 要是**同一帧里**的 `cart` / `tank` / `litter`，不能是自己，不许一层层挂（挂着的担架再被人挂 → 错）。挂着时每帧位置 / 朝向 = 车当前位姿 ∘ 本地偏移，不贴地，自己的 `x, z` 只当备用（车不在场时）；人照常播片段（坐、抖、趴）。坐车尾的 `y` 怎么算见 §5.6（`BLOCKOUT_CART_SEATS`）。挂着的担架 `bearers` 应写 0（否则只警告） |
 
 `Script_EditorBlockoutConfig.mjs`（纯，node 与浏览器共用，LocalPreview 也要 import，**导入时不得抛错、不得碰 DOM / three**）：
@@ -322,6 +323,17 @@ export class BlockoutMarkers {
 - 独立演员：`host.actorFactory.Create(kind, { seed, weapon, modelVariant })`，挂在编辑器自己的 `Group` 下；**不进 `ai.soldiers`**（不被子弹打中、不挡人，这是有意的：这里只看布设）。
 - 每帧 `actor.Update(dt, { moveSpeed: mps/3.6, moveSpeedMps: mps, locomotionTracked: true, aim, crouch, prone, grounded: true, ... })`；IJA 慢走装 `SetRelaxedGait(p, "alert")`，NRA 装 `InstallAllyGait(p)`（接受假 soldier 对象，实现时核对）。
 - `kind`：`officer` → `ijaOfficer`/`nraOfficer`；`civilian`/`child` → `civilian`（child 缩放 0.62，若安全）；`tank` → 简单体块车身 5.75×2.18×1.9 + 炮塔块；`litter` → 担架块 2.1×0.7 + 前后两名抬担架的 NRA 演员；`cart` → 车块 + 可选 `animal` 块。
+- 2026-10-20 正式模型（用户：白盒里的战车、飞机、树、牛车马车都用项目里现成的模型 + 动画）：`BLOCKOUT_PUPPETS.models`（缺省开）。
+  - `tank` = 八九式 `Type89Tank`（`actorFactory.ModelInstance`，材质同 `Script_FirstLevelMissionView.BuildTank`）；炮塔转向 `arc.yawDeg`。车身摆法照旧（`TankGroundY`）。
+  - `cart` = `Model_WoodenEvacCart` + 牛 / 马（`Script_DraftCartModel`，Walk 动画按走过的路程推，车轮跟着转，不滑步）；牲口取单位可选字段 `draft`（`"ox"` / `"horse"`），没写时名字带「牛」用牛、其余用马（驴车照游戏里老耿的车用马）；`animal: false` 不带牲口；车前 `hitchedAnimalM`（4 m）内另有 `animal` 单位时车自己的牲口藏起来（老耿的黑子拉车）。真车板顶 1.12 m，比 `BLOCKOUT_CART_SEATS` 的体块车板高约 0.1 m（坐车尾的人略低，数据没改）。
+  - `animal` = 单独一匹马；`state: "down"` 侧躺、不迈腿。
+  - 模型异步下载，下完前照旧是体块，载不进来就一直是体块；组上标 `whiteboxCharacter`，白盒画质里保留贴图。Probe 多给 `model`（`"Type89Tank"` / `"ox"` / `"horse"` / null）、`draftAnimalVisible`、`draftTravelM`。
+  - 预演的飞机本来就是游戏机队的三菱 Ki-30 克隆（§14.2，`Script_EditorBlockoutPrevizAircraft`），不变。
+
+### 5.7 树（`Script_EditorBlockoutTrees.mjs`，2026-10-20）
+
+- 布局里标 `blockoutTree` 的块：第一关的 `treeModel` 树干块（`BlockoutBlock`，树高 `treeHeightM` = `treeModel.heightM`），场景文件里细高的 `foliage` 块（`IsSceneTreeBlock`：脚印 ≤ 1 m、高 ≥ 2 m，即 `DeadTree_xx`，树高 = 块高）。这些块 `visual: false`：只留碰撞，不画盒子。
+- 同一位置种游戏里的枯树（`Model_BreakableDeadTree.glb` 的 Stump + Crown 树皮，不要断口盖），按树高 ÷ `BREAKABLE_TREES.heightM` 等比缩放，朝向按 id 散开，根埋 0.09 m；一关一只 `InstancedMesh`，`battlefield.layout` 换了就重种。不会被炸断。`Stats().trees` = `{ ready, failed, count }`。
 - `state: "down"`：倒地姿态（用现有 `dead`/`prone` 状态，实现时选能用的）。2026-10-18：倒地的人放在身体周围 0.9 m 内**最低**的地面上（不再悬在土埂斜坡上方；陡沟壁上仍会斜躺，数据里把倒地位置放到沟底）。
 - 2026-10-18：演员脚下的地面 = max(高度场, 点落在其脚印内、顶面比高度场高不超过 1.0 m 的实心块顶面)（`Script_EditorBlockoutPrevizPlan.BlockStandSampler`，总控 `standAt`；脚印按 `ry` 旋转判，gates 只算此刻在场的，水 / 空气墙不算）：机枪坑射击台、台阶上的人站在台上，洞顶、胸墙这种高块不算。关键帧摆人、预演的 eye 镜头与锚点、倒地、战车、3D 标记都用它；俯视图、地形上色、水面仍按纯高度场。战车按车身脚印上中心、四角、四边中点 9 处取**最高**的地面放（`TankGroundY`），压过沟时停在沟沿上而不是掉进沟底；蹲、卧的人一律按戒备姿态（原生 `KneelHold` / `CrouchIdle`），不被友军步态换成扛枪半蹲；有 `castId` 的单位用定妆身体（`SpeakingCastOptions`），按需下载的身体（如翻译 NRA06）先下完再造人（`PrepareCasts`），翻译不拿枪。
 - 2026-10-18（第二轮）：
@@ -354,7 +366,7 @@ export class BlockoutMarkers {
 
 ```js
 export class BlockoutPuppets {
-  constructor({ scene, actorFactory, groundAt })
+  constructor({ scene, actorFactory, groundAt, library })   // library：战车材质（2026-10-20）
   Apply(units)                 // 直接到位
   Transition(plan, fromUnits, toUnits)
   get transitioning()
@@ -527,6 +539,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 - 2026-10-13（复制当前位置）：卡片加「复制当前位置」按钮与 `P` 键（§4.2），文字末行带整份 JSON；入口加 `pose=` 参数，「重现」链接原样打开回到同一机位。
 - 2026-10-13（地图开着鼠标漏到游戏）：遮罩改成盖满整屏（导航栏两边那条原来露着，点一下会重新锁鼠标 / 在面板里直接开枪）；`Script_Main` 加 `BlockoutMouseCaptured()` 闸住抢锁、开枪、转头与滚轮换枪。
 - 2026-10-19（12–18 新剧本白盒）：新关卡 `FirstLevel1218`（§16）；§14.3 预演音效别名加 `planeDrone` / `planeDive` / `strafeNear` / `strafeFar` / `strafeDirt`（飞机与扫射，映射到游戏音频库现成的键）。
+- 2026-10-20（正式模型）：§5.6 战车 / 车 / 牲口换游戏里的八九式、撤运车 + 牛 / 马（带 Walk 动画），单位可选 `draft`；§5.7 树换枯树模型（树干块只留碰撞）；关键帧机位的蹲 / 趴走开就站起来（§7）。
 - 2026-10-18（01–05 第三轮，「小毛病全都修掉」）：§14.2 白盒画质下预演的爆炸看得见了（`Script_EditorBlockoutPrevizFx` 在调试叠加层另画简易爆炸，只在编辑器、只在白盒特效关时画）；§14.1 演员键 `throw`（播投弹片段 + 弹的抛物线）、爆炸事件 `h`；§5.6 `lie:"along"` 按身体包围框居中、固定用 `DeathCollapseC`，Probe 再多给几项；§13 板桥门板缝 5 → 9 cm、旧门板厚薄高低不一，冬瓜在被子上一直躺着，桥下的人一律蹲 / 趴，05-3 顺子替身播投弹片段；补：白盒下的烟与枪口火、05-4 鬼子绕桥东头、04-3 刘文财猫腰过桥底。
 - 2026-10-18（01–05 第二轮修补）：§3 单位加可选 `lie`、`weapon` 写 `Dadao` 摆白刃戒备；§5.6 倒地的人移动只平移、`lie:"along"` 顺着躺、预演 / 关键帧换武器就地 `SetWeapon`、Probe 多给几项；§14.1 演员键加 `lie`、`weapon`（阶跃）；§13 干沟南岸坎顶加矮土埂（南边平地看沟底余量 0.16 → 0.78 m）、板桥门板之间 5 cm 缝、05-2 桥下仰看与 05-3 甩手榴弹换机位、冬瓜顺着被子躺平滑跟着走、班长 02-2 抡大刀跳沟。
 - 2026-10-18（01–05 返工）：§13 FirstLevel0105 按用户当天改稿重做地形、关键帧与预演（南沿迂回、两人并排拖单被、日常摆件、干沟集结处、路口板桥）。

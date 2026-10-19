@@ -130,14 +130,19 @@ export function HeightGridSampler(terrain) {
 
 const TREE_TRUNK = Object.freeze({ w: 0.5, d: 0.5, heightM: 6 });
 
-/** 树换成普通树干块（保留碰撞与地标作用）；水块不画（总控另铺一条水面）。 */
+/**
+ * 树换成普通树干块（保留碰撞与地标作用）；水块不画（总控另铺一条水面）。
+ * 2026-10-20：树干块不再画盒子（visual:false），编辑器在同一位置种游戏里的枯树模型（Script_EditorBlockoutTrees），
+ * 树高 treeHeightM 用 treeModel.heightM（块高只是树干那一截）。
+ */
 function BlockoutBlock(block) {
   if (block.treeModel) {
     const { treeModel, ...rest } = block;
     const h = Number.isFinite(block.h) && block.h > 0 ? block.h : TREE_TRUNK.heightM;
     const foot = block.y - block.h / 2;
     return { ...rest, w: TREE_TRUNK.w, d: TREE_TRUNK.d, h, y: foot + h / 2, solid: true, semantic: "foliage",
-      tag: block.tag || "whiteboxWall", blockoutTree: true };
+      tag: block.tag || "whiteboxWall", blockoutTree: true, visual: false,
+      treeHeightM: Number.isFinite(treeModel?.heightM) && treeModel.heightM > 0 ? treeModel.heightM : h };
   }
   if (block.semantic === "water") return { ...block, visual: false, blockoutWater: true };
   return block;
@@ -203,6 +208,12 @@ function GroundedBlock(block, groundAt) {
 }
 
 /** 场景文件 → FirstLevelWhiteboxField 吃的布局。校验不过直接抛（Prepare 把错误交给总控显示）。 */
+/** 场景文件里算「树」的块：foliage、脚印不超过这么宽（苇丛、灌木是大块，不算）。 */
+export const BLOCKOUT_TREE_MAX_FOOT_M = 1;
+export function IsSceneTreeBlock(block) {
+  return block?.semantic === "foliage" && Math.max(block.w, block.d) <= BLOCKOUT_TREE_MAX_FOOT_M && block.h >= 2;
+}
+
 export function LayoutFromSceneDoc(doc) {
   const check = ValidateBlockoutScene(doc);
   if (!check.ok) throw new Error(`场景文件有 ${check.errors.length} 处错误：${check.errors.slice(0, 3).join("；")}`);
@@ -217,9 +228,12 @@ export function LayoutFromSceneDoc(doc) {
     const grounded = GroundedBlock(block, sampler);
     return Number.isFinite(block.y) ? { ...grounded, y: block.y } : grounded;
   };
+  // 细高的 foliage 块（DeadTree_xx，脚印 ≤ BLOCKOUT_TREE_MAX_FOOT_M）是树：只留碰撞，编辑器种枯树模型（2026-10-20，同 BlockoutBlock）
   const blocks = doc.blocks.map(block => {
     const grounded = Placed(block);
-    return grounded.semantic === "water" ? { ...grounded, visual: false, blockoutWater: true } : grounded;
+    if (grounded.semantic === "water") return { ...grounded, visual: false, blockoutWater: true };
+    if (IsSceneTreeBlock(grounded)) return { ...grounded, visual: false, blockoutTree: true, treeHeightM: grounded.h };
+    return grounded;
   });
   // 随信号出现 / 消失的体块（塌洞、坑沿被炸、战车残骸）：走 FirstLevelWhiteboxField 现成的 gate（signal / appearSignal）。
   const gates = (doc.gates || []).map(gate => ({

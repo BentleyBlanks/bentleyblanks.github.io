@@ -51,6 +51,16 @@
 //     （_CarrierPose，不读它的 three 对象，所以先摆谁都一样）。挂着的担架平放（不按 LitterPose 抬 / 斜）。
 //   · 车的尺寸实测写成 BLOCKOUT_CART_SEATS：车板顶 1.025 m（车板 0.55 厚、中心 0.75）、车尾在本地 z = +1.2；坐车尾的人
 //     y = 车板顶 − 片段坐高 × 缩放（VilSitEdge 坐高 0.90，小孩 0.62 → 1.025 − 0.558 = 0.467）。Probe 多给 ride / seat。
+//
+// 2026-10-20（换正式模型，用户：白盒里的战车、飞机、树、牛车马车都直接用项目里已有的正式模型 + 动画）：
+//   · 战车 = 游戏里那辆八九式（actorFactory.ModelInstance("Type89Tank")，材质照 MissionView.BuildTank 从 library 取，
+//     开机就预读了）；炮塔转向射界扇的方向（unit.arc.yawDeg），车身摆法不变（脚印最高点）。
+//   · 车 = 撤运牛车 / 驴车用的 Model_WoodenEvacCart + Model_WorkingOx / Model_WorkingHorse（Script_DraftCartModel，
+//     带 Walk 动画，按走过的路程推：一个步幅一圈，不滑步，车轮跟着转）。牲口：unit.draft（"ox" / "horse"），
+//     没写时名字带「牛」用牛、其余用马（驴车照游戏里老耿的车用马）；animal:false 不带牲口；车前 4 m 内另有一个 animal
+//     单位（老耿的黑子）时车自己的牲口藏起来，不叠两匹。单独的 animal 单位 = 只有那匹马；倒地（state down）侧躺、不迈腿。
+//   · 模型异步下载：下完之前照旧是体块，下完那一帧换掉（体块藏起，不删）；模型载不进来就一直是体块。
+//     组上标 whiteboxCharacter：白盒画质里也保留贴图（同预演的飞机）。
 
 import * as THREE from "three";
 import { SampleTransition } from "./Script_EditorBlockoutConfig.mjs";
@@ -59,6 +69,7 @@ import { SetRelaxedGait, EnsureRelaxedGait } from "./Script_RelaxedGait.mjs";
 import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { LoadLugouCastModels } from "./Script_CharacterModel.mjs";
 import { PREVIZ_WEAPON_HIDDEN } from "./Data_BlockoutPrevizClips.mjs";
+import { LoadDraftCartAssets, CreateDraftCartInstance } from "./Script_DraftCartModel.mjs";
 
 /** 不拿枪的定妆角色（开场导演 Spawn 时给 unarmed:true 的那几个）。 */
 const UNARMED_CASTS = new Set(["interpreter"]);
@@ -88,6 +99,15 @@ export const BLOCKOUT_PUPPETS = Object.freeze({
   litter: { w: 0.7, d: 2.1, y: 0.78, groundY: 0.12, bearerGapM: 0.55 },
   cart: { w: 1.5, d: 2.4, h: 0.55, y: 0.75, wheel: 0.62 },
   animal: { w: 0.6, d: 1.7, h: 0.75, y: 0.95, head: 0.55 },
+  /** 战车 / 车 / 牲口用正式模型（false = 全用体块）。 */
+  models: true,
+  tankModel: "Type89Tank",
+  /** 车前这么远内另有 animal 单位时，车自己的牲口藏起来。 */
+  hitchedAnimalM: 4,
+  /** 倒地的牲口侧躺：绕身体纵轴转这么多、抬这么高（模型原点在蹄底）。 */
+  animalDown: { rollRad: 1.45, liftM: 0.32 },
+  /** 两帧之间挪超过这么远算瞬移（跳关键帧），不算走路，不推步子。 */
+  teleportM: 3,
 });
 
 const DEG = Math.PI / 180;
@@ -217,9 +237,12 @@ function Box(group, material, w, h, d, x, y, z) {
 }
 
 export class BlockoutPuppets {
-  constructor({ scene, actorFactory, groundAt }) {
+  constructor({ scene, actorFactory, groundAt, library = null }) {
     this.scene = scene;
     this.actorFactory = actorFactory;
+    this.library = library;
+    this.draftAssets = null;
+    this.draftLoading = null;
     this.groundAt = groundAt;
     this.root = new THREE.Group();
     this.root.name = "BlockoutPuppets";
@@ -294,12 +317,15 @@ export class BlockoutPuppets {
     const group = new THREE.Group();
     group.name = `BlockoutPuppet_${unit.id}`;
     const side = unit.side === "ija" ? m.ija : unit.side === "civ" ? m.civ : m.nra;
+    // 战车 / 车 / 牲口的体块放进子组：正式模型到了就整组藏起来（_DressModel）
+    const boxes = unit.kind === "litter" ? group : new THREE.Group();
+    if (boxes !== group) { boxes.name = "BlockoutBoxes"; group.add(boxes); group.userData.boxes = boxes; }
     if (unit.kind === "tank") {
       const t = P.tank;
-      Box(group, side, t.w, t.h, t.d, 0, 0.35 + t.h / 2, 0);
-      Box(group, m.dark, t.w + 0.16, 0.7, t.d * 0.96, 0, 0.35, 0);
-      Box(group, side, t.turretW, t.turretH, t.turretD, 0, 0.35 + t.h + t.turretH / 2, 0.35);
-      Box(group, m.dark, 0.14, 0.14, t.barrel, 0, 0.35 + t.h + t.turretH / 2, 0.35 - t.turretD / 2 - t.barrel / 2);
+      Box(boxes, side, t.w, t.h, t.d, 0, 0.35 + t.h / 2, 0);
+      Box(boxes, m.dark, t.w + 0.16, 0.7, t.d * 0.96, 0, 0.35, 0);
+      Box(boxes, side, t.turretW, t.turretH, t.turretD, 0, 0.35 + t.h + t.turretH / 2, 0.35);
+      Box(boxes, m.dark, 0.14, 0.14, t.barrel, 0, 0.35 + t.h + t.turretH / 2, 0.35 - t.turretD / 2 - t.barrel / 2);
     } else if (unit.kind === "litter") {
       // 担架单独一个组：抬着 / 一头着地 / 放在地上 由 _Pose 摆高度与倾角（LitterPose）
       const l = P.litter;
@@ -313,20 +339,20 @@ export class BlockoutPuppets {
     } else if (unit.kind === "cart" || unit.kind === "animal") {
       if (unit.kind === "cart") {
         const c = P.cart;
-        Box(group, m.wood, c.w, c.h, c.d, 0, c.y, 0);
+        Box(boxes, m.wood, c.w, c.h, c.d, 0, c.y, 0);
         for (const sx of [-1, 1]) {
           const wheel = new THREE.Mesh(new THREE.CylinderGeometry(c.wheel / 2, c.wheel / 2, 0.08, 14), m.dark);
           wheel.rotation.z = Math.PI / 2; wheel.position.set(sx * (c.w / 2 + 0.06), c.wheel / 2, 0.2);
-          wheel.castShadow = true; group.add(wheel);
+          wheel.castShadow = true; boxes.add(wheel);
         }
-        Box(group, m.wood, 0.06, 0.06, 1.6, -0.35, c.y - 0.1, -c.d / 2 - 0.8);
-        Box(group, m.wood, 0.06, 0.06, 1.6, 0.35, c.y - 0.1, -c.d / 2 - 0.8);
+        Box(boxes, m.wood, 0.06, 0.06, 1.6, -0.35, c.y - 0.1, -c.d / 2 - 0.8);
+        Box(boxes, m.wood, 0.06, 0.06, 1.6, 0.35, c.y - 0.1, -c.d / 2 - 0.8);
       }
       if (unit.kind === "animal" || unit.animal !== false) {
         const a = P.animal, z = unit.kind === "cart" ? -P.cart.d / 2 - 1.35 : 0;
-        Box(group, m.civ, a.w, a.h, a.d, 0, a.y, z);
-        Box(group, m.civ, 0.3, 0.45, a.head, 0, a.y + 0.35, z - a.d / 2 - 0.15);
-        for (const [lx, lz] of [[-0.2, -0.6], [0.2, -0.6], [-0.2, 0.6], [0.2, 0.6]]) Box(group, m.civ, 0.12, a.y - a.h / 2, 0.12, lx, (a.y - a.h / 2) / 2, z + lz);
+        Box(boxes, m.civ, a.w, a.h, a.d, 0, a.y, z);
+        Box(boxes, m.civ, 0.3, 0.45, a.head, 0, a.y + 0.35, z - a.d / 2 - 0.15);
+        for (const [lx, lz] of [[-0.2, -0.6], [0.2, -0.6], [-0.2, 0.6], [0.2, 0.6]]) Box(boxes, m.civ, 0.12, a.y - a.h / 2, 0.12, lx, (a.y - a.h / 2) / 2, z + lz);
       }
     }
     this.root.add(group);
@@ -364,7 +390,11 @@ export class BlockoutPuppets {
     this.actorCount -= puppet.humans.length;
     puppet.humans.length = 0;
     if (puppet.body) {
-      puppet.body.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
+      // 正式模型：车 / 牲口的几何与骨架是共用的（CloneSkinnedRig），只停动画摘下来；战车是每辆现造的几何，照拆。材质都是共用的，不拆。
+      const model = puppet.body.userData.model;
+      if (model?.draft) model.draft.Dispose();
+      else if (model?.tank) model.tank.root.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
+      (puppet.body.userData.boxes || puppet.body).traverse(o => { if (o.isMesh) o.geometry.dispose(); });
       puppet.body.removeFromParent();
       puppet.body = null;
     }
@@ -501,6 +531,7 @@ export class BlockoutPuppets {
       puppet.body.visible = puppet.visible;
       puppet.body.position.set(puppet.x, y, puppet.z);
       puppet.body.rotation.y = ry;
+      if (BLOCKOUT_PUPPETS.models) this._PoseModel(puppet);
       const bed = puppet.body.userData.stretcher;
       if (bed) {
         // 挂在车上的担架平放（担架组原点 = 布中心）；地上 / 手上的照 LitterPose
@@ -610,6 +641,85 @@ export class BlockoutPuppets {
     }
     this.elapsed += dt * rate;
     for (const puppet of this.puppets.values()) this._Pose(puppet, dt * rate, false, cameraPosition);
+  }
+
+  // -------------------------------------------------------------------------
+  // 正式模型（2026-10-20，文件头）
+
+  /** 车的牲口：unit.draft 优先，名字带「牛」用牛，其余用马。 */
+  _DraftKind(unit) {
+    if (unit.draft === "ox" || unit.draft === "horse") return unit.draft;
+    return /牛/.test(unit.name || "") ? "ox" : "horse";
+  }
+
+  _LoadDraft() {
+    if (this.draftLoading) return;
+    this.draftLoading = LoadDraftCartAssets().then((assets) => { this.draftAssets = assets; })
+      .catch((error) => { console.warn("[BlockoutPuppets] draft cart models failed; carts stay blocks", error); this.draftAssets = false; });
+  }
+
+  /** 体块换正式模型（只试一次；车与牲口要等模型下完）。→ userData.model = { tank, turret } | { draft, kind, … } | null */
+  _DressModel(puppet) {
+    const body = puppet.body, unit = puppet.unit;
+    if (!body?.userData.boxes || body.userData.model !== undefined) return;
+    let model = null;
+    if (unit.kind === "tank") {
+      const library = this.library;
+      if (!library?.Get) { body.userData.model = null; return; }
+      const armor = library.Get("Type89Armor", { side: THREE.DoubleSide });
+      const tank = this.actorFactory?.ModelInstance?.(BLOCKOUT_PUPPETS.tankModel,
+        { type89Armor: armor, type89Barrel: armor, type89Track: library.Get("Type89Track", { side: THREE.DoubleSide }) }) || null;
+      if (tank) {
+        tank.root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        body.add(tank.root);
+        model = { tank, turret: tank.nodes?.get?.("turret") || null };
+      }
+    } else if (unit.kind === "cart" || unit.kind === "animal") {
+      if (this.draftAssets === null) { this._LoadDraft(); return; }
+      if (this.draftAssets) {
+        const kind = unit.kind === "animal" ? "horse" : this._DraftKind(unit);
+        const draft = CreateDraftCartInstance(this.draftAssets, kind);
+        draft.cartRoot.position.set(0, 1, 0);   // 车模型里垫了 −1（车轴高的翻车枢轴）：车底贴着 body 的地面
+        if (unit.kind === "animal") { draft.cartRoot.visible = false; draft.animalRoot.position.set(0, 0, 0); }
+        else draft.animalRoot.position.set(0, 0, -draft.teamOffsetM);
+        body.add(draft.root);
+        model = { draft, kind, travelM: 0, last: null };
+      }
+    }
+    body.userData.model = model;
+    if (model) { body.userData.boxes.visible = false; body.userData.whiteboxCharacter = true; }
+  }
+
+  /** 每帧：炮塔对着射界扇；车轮、牲口按走过的路程迈步；倒地的牲口侧躺；车前另有牲口单位时藏自己的。 */
+  _PoseModel(puppet) {
+    this._DressModel(puppet);
+    const model = puppet.body.userData.model;
+    if (!model) return;
+    const unit = puppet.unit;
+    if (model.turret) {
+      const arcYaw = Number.isFinite(unit.arc?.yawDeg) ? unit.arc.yawDeg : puppet.yawDeg;
+      model.turret.rotation.y = (arcYaw - puppet.yawDeg) * DEG;
+    }
+    if (!model.draft) return;
+    const P = BLOCKOUT_PUPPETS, draft = model.draft;
+    const step = model.last ? Math.hypot(puppet.x - model.last.x, puppet.z - model.last.z) : 0;
+    const walking = step > 1e-4 && step < P.teleportM && !puppet.down;
+    if (walking) model.travelM += step;
+    model.last = { x: puppet.x, z: puppet.z };
+    draft.SetMotion(model.travelM, walking);
+    if (unit.kind === "animal") {
+      draft.animalRoot.rotation.z = puppet.down ? P.animalDown.rollRad : 0;
+      draft.animalRoot.position.y = puppet.down ? P.animalDown.liftM : 0;
+    } else {
+      let hitched = unit.animal === false;
+      if (!hitched) {
+        const ry = puppet.yawDeg * DEG, hx = puppet.x - Math.sin(ry) * draft.teamOffsetM, hz = puppet.z - Math.cos(ry) * draft.teamOffsetM;
+        for (const other of this.puppets.values()) {
+          if (other.unit.kind === "animal" && other.visible && Math.hypot(other.x - hx, other.z - hz) < P.hitchedAnimalM) { hitched = true; break; }
+        }
+      }
+      draft.animalRoot.visible = !hitched;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -929,6 +1039,10 @@ export class BlockoutPuppets {
       ride: (() => { const r = this._RideOf(puppet); return r ? { on: r.on, x: r.x ?? 0, z: r.z ?? 0, y: r.y ?? 0, yawDeg: r.yawDeg ?? 0 } : null; })(),
       seat: puppet.seat ? { ...puppet.seat } : null,
       rootY: human ? human.actor.root.position.y : (puppet.body ? puppet.body.position.y : null),
+      // 2026-10-20：正式模型（"Type89Tank" / "ox" / "horse"；null = 还是体块）与车自己的牲口显不显示
+      model: (() => { const m = puppet.body?.userData.model; return m?.tank ? BLOCKOUT_PUPPETS.tankModel : m?.kind ?? null; })(),
+      draftAnimalVisible: puppet.body?.userData.model?.draft ? puppet.body.userData.model.draft.animalRoot.visible : null,
+      draftTravelM: puppet.body?.userData.model?.draft ? puppet.body.userData.model.travelM : null,
       rootAboveCarrierGround: puppet.seat && (human || puppet.body) ? (human ? human.actor.root.position.y : puppet.body.position.y) - puppet.seat.carrierY : null,
     };
   }
