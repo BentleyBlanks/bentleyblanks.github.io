@@ -509,19 +509,8 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
   background-size: 48px 48px;
   mask-image: radial-gradient(90% 80% at 30% 20%, #000 30%, transparent 85%);
 }
-.edHomeInner { position: relative; max-width: 1280px; margin: 0 auto; padding: 64px 56px 40px; box-sizing: border-box; }
+.edHomeInner { position: relative; max-width: 1280px; margin: 0 auto; padding: 48px 56px 48px; box-sizing: border-box; }
 
-.edHomeHead { padding-bottom: 30px; margin-bottom: 34px; border-bottom: 1px solid var(--ed-rule); }
-.edHomeEyebrow { color: var(--ed-gold-text); font-size: 12px; letter-spacing: 0.32em; }
-.edHomeTitle {
-  margin: 14px 0 0; color: var(--ed-text-hi); font: 700 56px/1.1 var(--ed-serif); letter-spacing: 0.22em;
-}
-.edHomeLead { margin: 16px 0 0; color: var(--ed-text-2); font-size: 15px; line-height: 1.9; letter-spacing: 0.08em; }
-.edHomeLegend {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 22px;
-  color: var(--ed-text-4); font-size: 12px; letter-spacing: 0.08em;
-}
-.edHomeLegend > span:not(.edHomeTag) { margin-right: 16px; }
 
 .edHomeTag {
   flex: 0 0 auto; display: inline-flex; align-items: center; height: 19px; padding: 0 7px; box-sizing: border-box;
@@ -538,7 +527,6 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
   border-bottom: 1px solid var(--ed-rule-2);
 }
 .edHomeGroupLabel { color: var(--ed-text-hi); font: 700 19px/1.3 var(--ed-serif); letter-spacing: 0.16em; }
-.edHomeGroupCount { color: var(--ed-text-4); font: 12px/1 var(--ui-mono); letter-spacing: 0.1em; }
 
 .edHomeTool {
   cursor: pointer; display: flex; flex-direction: column; gap: 5px; width: 100%; box-sizing: border-box;
@@ -556,15 +544,6 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
-.edHomeFoot {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; margin-top: 44px; padding-top: 18px;
-  border-top: 1px solid var(--ed-rule-2); color: var(--ed-text-4); font-size: 12px; letter-spacing: 0.08em;
-}
-.edHomeFoot kbd {
-  display: inline-block; min-width: 20px; padding: 2px 7px; margin-right: 7px; box-sizing: border-box;
-  border: 1px solid var(--ed-edge); background: #13140b88; color: var(--ed-text); font: 11px/16px var(--ui-mono); text-align: center;
-}
-.edHomeFootNote { margin-left: auto; }
 
 /* 「载入哪一关」：盖在首页上的一张单子 */
 .edHomeSheet {
@@ -577,8 +556,7 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
   padding: 28px 30px 24px; background: linear-gradient(180deg, #11120ef7, #090a08f7);
   border: 1px solid var(--ed-edge); border-top: 2px solid var(--ed-gold); box-shadow: 0 30px 70px #000c;
 }
-.edHomeSheetTitle { margin: 12px 0 0; color: var(--ed-text-hi); font: 700 23px/1.4 var(--ed-serif); letter-spacing: 0.08em; }
-.edHomeSheetLead { margin: 10px 0 18px; color: var(--ed-text-3); font-size: 13px; line-height: 1.8; letter-spacing: 0.06em; }
+.edHomeSheetTitle { margin: 0 0 16px; color: var(--ed-text-hi); font: 700 23px/1.4 var(--ed-serif); letter-spacing: 0.08em; }
 .edHomeSheetList { display: flex; flex-direction: column; border-top: 1px solid var(--ed-rule-2); }
 .edHomeChoice {
   cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; box-sizing: border-box;
@@ -598,11 +576,8 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
 .edHomeCancel:hover, .edHomeCancel:focus-visible { border-color: var(--ed-gold); color: var(--ed-gold); outline: none; }
 
 @media (max-width: 760px) {
-  .edHomeInner { padding: 36px 16px 28px; }
-  .edHomeTitle { font-size: 38px; letter-spacing: 0.16em; }
-  .edHomeLead { font-size: 14px; }
+  .edHomeInner { padding: 24px 16px 28px; }
   .edHomeGrid { grid-template-columns: 1fr; gap: 26px; }
-  .edHomeFootNote { margin-left: 0; }
   .edHomeSheetBox { padding: 22px 18px 18px; }
 }
 

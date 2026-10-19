@@ -52,15 +52,6 @@ export class ToolsHome {
     const inner = El("div", "edHomeInner");
     root.appendChild(inner);
 
-    const head = El("header", "edHomeHead");
-    head.appendChild(El("div", "edHomeEyebrow", "台儿庄：血战滕县 · 开发工具"));
-    head.appendChild(El("h1", "edHomeTitle", "高级工具"));
-    head.appendChild(El("p", "edHomeLead", "现在没有载入任何场景。挑一个工具，它要什么才载入什么。"));
-    const legend = El("div", "edHomeLegend");
-    legend.append(Tag("载入关卡", "level"), El("span", "", "要先选一关，整页切换过去"), Tag("↗", "win"), El("span", "", "独立窗口或整页切换"));
-    head.appendChild(legend);
-    inner.appendChild(head);
-
     const grid = El("div", "edHomeGrid");
     inner.appendChild(grid);
     this.cards = new Map();
@@ -69,7 +60,7 @@ export class ToolsHome {
       const group = El("div", "edHomeGroup");
       group.dataset.group = menu.id;
       const title = El("h2", "edHomeGroupTitle");
-      title.append(El("span", "edHomeGroupLabel", menu.label), El("span", "edHomeGroupCount", String(menu.items.length).padStart(2, "0")));
+      title.append(El("span", "edHomeGroupLabel", menu.label));
       group.appendChild(title);
       for (const Editor of menu.items) {
         const choices = HomeLevelChoices(Editor.id, window.location.href);
@@ -89,15 +80,6 @@ export class ToolsHome {
       }
       grid.appendChild(group);
     }
-
-    const foot = El("footer", "edHomeFoot");
-    for (const [key, text] of [["`", "打开 / 退出"], ["Esc", "回主菜单"]]) {
-      const item = El("span");
-      item.append(El("kbd", "", key), text);
-      foot.appendChild(item);
-    }
-    foot.appendChild(El("span", "edHomeFootNote", "Debug工具（Profiler、Frame Debugger、敌军 AI……）要进关后从 设置 → Debug工具 打开"));
-    inner.appendChild(foot);
 
     // 选关卡：盖在首页上的一张单子
     this.sheet = El("div", "edHomeSheet");
@@ -125,9 +107,7 @@ export class ToolsHome {
     if (!choices) { this.onOpen(Editor.id); return; }
     this.sheet.replaceChildren();
     const box = El("div", "edHomeSheetBox");
-    box.appendChild(El("div", "edHomeEyebrow", "载入关卡"));
-    box.appendChild(El("h2", "edHomeSheetTitle", `${ToolLabel(Editor)}要在哪一关里打开？`));
-    box.appendChild(El("p", "edHomeSheetLead", "选好后整页切换过去，载入完自动打开这个工具。"));
+    box.appendChild(El("h2", "edHomeSheetTitle", `${ToolLabel(Editor)} · 选关卡`));
     const list = El("div", "edHomeSheetList");
     for (const choice of choices) {
       const row = El("button", "edHomeChoice");
