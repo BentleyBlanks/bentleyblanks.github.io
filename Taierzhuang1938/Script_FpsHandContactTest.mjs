@@ -520,6 +520,9 @@ try {
     if(pose.pose==="fire")Check(pose.triggerTravel>.0001,`${pose.id}: firing does not flex the trigger finger`);
     for(const [digit,distance] of pose.support.entries())Check(distance<.004,`${pose.id} ${pose.pose}: support digit ${digit} is ${(distance*1000).toFixed(1)} mm from the fore-end surface`);
     if(pose.id==='HanYang'){
+      // A new procedural palm frame can look correct while the native Idle
+      // silently restores the previous, over-bent support wrist.
+      if(pose.pose==='hip')Check(pose.wrist.l<33,`HanYang hip: the published Idle restores an over-bent support wrist (${pose.wrist.l.toFixed(2)}deg)`);
       // The real volar patch can bear beside the tip. A box marker or end-cap
       // axis alone cannot decide contact or whether the nail faces the stock.
       Check(pose.hanYangContact.trigger.opposedDistance<.003,`HanYang ${pose.pose}: actual opposed index skin misses the isolated trigger`);
