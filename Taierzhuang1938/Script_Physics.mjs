@@ -441,27 +441,33 @@ export class PhysicsWorld {
       const z = origin.z + direction.z * t;
       const gap = y - this.groundAt(x, z);
       if (gap <= 0) {
-        // 二分到 1 cm 以内
+        // 二分到 2 mm 以内。弹孔贴花就放在这一点上，再按预通道深度 1—2 cm 的容差裁边：
+        // 停在 1 cm 时命中点能埋进土面将近 1 cm，贴花被墙面挡掉一截。
         let lo = prevT, hi = t;
-        for (let k = 0; k < 12 && hi - lo > 0.01; k += 1) {
+        for (let k = 0; k < 12 && hi - lo > 0.002; k += 1) {
           const mid = (lo + hi) * 0.5;
           const my = origin.y + direction.y * mid;
           const mg = my - this.groundAt(origin.x + direction.x * mid, origin.z + direction.z * mid);
           if (mg <= 0) hi = mid; else lo = mid;
         }
-        const hitT = hi;
+        const hitT = (lo + hi) * 0.5;
         const hx = origin.x + direction.x * hitT;
         const hz = origin.z + direction.z * hitT;
-        return { t: hitT, normal: this.TerrainNormal(hx, hz), box: TERRAIN_RECORD };
+        // 命中法线要贴着这一点取（臂长 3 cm）。0.5 m 的平滑法线在壕沟壁、沟沿上会跨过
+        // 坎顶 / 坎脚，偏出 5—35°；贴花顺着它摆就是斜插进墙里的一张片，上半截埋进墙、
+        // 下半截悬空被深度裁掉，墙上只剩半个弹孔（2026-10-20 白盒实测，与渲染网格三角形法线对齐）。
+        return { t: hitT, normal: this.TerrainNormal(hx, hz, null, 0.03), box: TERRAIN_RECORD };
       }
       prevT = t; prevGap = gap;
     }
     return null;
   }
 
-  /** 解析地表在 (x,z) 的法线（中心差分，0.5 m 的臂长足够平滑）。 */
-  TerrainNormal(x, z, out = null) {
-    const e = 0.5;
+  /**
+   * 解析地表在 (x,z) 的法线（中心差分）。默认 0.5 m 臂长，给脚部 IK / 站立面用，要平滑；
+   * 射线命中点传小臂长，要的是这一点所在那块面的真实朝向。
+   */
+  TerrainNormal(x, z, out = null, e = 0.5) {
     const hL = this.groundAt(x - e, z), hR = this.groundAt(x + e, z);
     const hD = this.groundAt(x, z - e), hU = this.groundAt(x, z + e);
     let nx = (hL - hR) / (2 * e), ny = 1, nz = (hD - hU) / (2 * e);
