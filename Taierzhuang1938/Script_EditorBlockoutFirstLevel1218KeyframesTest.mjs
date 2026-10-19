@@ -54,6 +54,29 @@ const DistXZ = (p, q) => Math.hypot(p.x - q.x, p.z - q.z);
 for (const id of IDS) { assert.ok(Unit(id, "Geng")?.kind === "civilian", `${id} 老耿要在`); assert.ok(Unit(id, "Nier")?.kind === "child", `${id} 妮儿要在`); }
 for (const id of IDS) assert.equal(!!Unit(id, "GengCart"), IDS.indexOf(id) <= IDS.indexOf("13-1"), `${id} 立着的驴车只到 13-1（翻车后是随信号体块）`);
 for (const id of IDS.slice(0, 7)) assert.ok(Unit(id, "Heizi")?.kind === "animal", `${id} 黑子要在`);
+// --- 车上的东西（2026-10-20 ride）：12-1…13-1 冬瓜那副担架 + 冬瓜 + 另两副担架和上面的伤员都挂在 GengCart 上（担架 bearers 0、横搁、布 y 1.075 / 人 1.125），
+//     12-1 / 12-2 妮儿坐车尾沿（z +1.2、y 0.467、背对车头），12-3 起她在驴头前（不挂）；13-2 起车翻了，谁都不挂
+const RideOn = (id, uid) => Unit(id, uid)?.ride;
+for (const id of IDS.slice(0, IDS.indexOf("13-1") + 1)) {
+  for (const uid of ["LitterDonggua", "CartLitter1", "CartLitter2"]) {
+    const r = RideOn(id, uid), u = Unit(id, uid);
+    assert.ok(r && r.on === "GengCart" && r.y === 1.075 && Math.abs(r.yawDeg) === 90 && u.bearers === 0, `${id} ${uid} 要横搁在车板上（ride GengCart、y 1.075、bearers 0）：${JSON.stringify(r)}`);
+  }
+  for (const uid of ["Donggua", "CartWounded1", "CartWounded2"]) {
+    const r = RideOn(id, uid), u = Unit(id, uid);
+    assert.ok(r && r.on === "GengCart" && r.y === 1.125 && u.state === "down" && u.lie === "along", `${id} ${uid} 要躺在车上的担架上（ride GengCart、y 1.125、down、顺着躺）：${JSON.stringify(r)}`);
+  }
+  assert.equal(RideOn(id, "LitterDonggua").z, 0.75, `${id} 冬瓜那副靠车尾（本地 z 0.75）`);
+  assert.ok(new Set(["LitterDonggua", "CartLitter1", "CartLitter2"].map((uid) => RideOn(id, uid).z)).size === 3, `${id} 三副担架各占一格`);
+  assert.deepEqual(RideOn(id, "Donggua"), { ...RideOn(id, "LitterDonggua"), y: 1.125 }, `${id} 冬瓜躺在自己那副担架上（同一格）`);
+}
+for (const id of ["12-1", "12-2"]) assert.deepEqual(RideOn(id, "Nier"), { on: "GengCart", x: 0, z: 1.2, y: 0.467, yawDeg: 180 }, `${id} 妮儿坐车尾沿（ride）`);
+assert.ok(!RideOn("12-3", "Nier") && !RideOn("13-1", "Nier"), "12-3 起妮儿下了车（牵驴 / 站在路当中）");
+for (const id of IDS.slice(IDS.indexOf("13-2"))) for (const u of KF(id).units) assert.ok(!u.ride, `${id} ${u.id} 车翻了以后谁都不挂在车上`);
+for (const id of IDS.slice(IDS.indexOf("13-2"))) assert.ok(!Unit(id, "CartLitter1") && !Unit(id, "CartWounded1"), `${id} 车上那两副担架翻车后不再摆（13-2 预演里被滚上别的担架抬走）`);
+// --- 军医跪在麦秸上一个伤员身边（CareMedicPress 的站位）；17-1 跪在冬瓜右边（担架西边）---
+for (const id of ["15-3", "16-1", "17-2", "17-3", "18-1"]) assert.ok(DistXZ(Unit(id, "Doctor"), Unit(id, "YardWounded09")) < 0.6, `${id} 军医在 YardWounded09 身边`);
+assert.ok(DistXZ(Unit("17-1", "Doctor"), Unit("17-1", "Donggua")) < 0.6 && Unit("17-1", "Doctor").x < Unit("17-1", "Donggua").x && Unit("17-1", "Doctor").stance === "crouch", "17-1 军医跪在冬瓜西边");
 for (const id of ["13-2", "14-1", "14-2"]) assert.equal(Unit(id, "Heizi").state, "down", `${id} 黑子倒了`);
 
 // --- 信号按表起 ---
@@ -214,7 +237,7 @@ if (fs.existsSync(file)) {
   const onDisk = JSON.parse(fs.readFileSync(file, "utf8"));
   if (Strip({ ...onDisk, source: { ...onDisk.source, commit: "test" } }) !== Strip(a)) console.log("提示：Blockout/FirstLevel1218.json 与生成器输出不同（手改过，或没重新 export）");
   // 盘上的 JSON 没有生成器的内部标记（躺在担架上），按手改的口径查只该多报这一类
-  const known = /Donggua 站在 LitterDonggua/;
+  const known = /Donggua 站在 LitterDonggua|CartWounded\d 站在 CartLitter\d|(Doctor 和 YardWounded09|Donggua 和 Doctor) 重叠|Doctor 站在 LitterDonggua/;   // 生成器内部标记（onLitter / tending）盘上没有
   const extra = FirstLevel1218Issues(onDisk, { scene }).filter((line) => !known.test(line));
   assert.deepEqual(extra, [], `盘上的 JSON 多报了：\n  ${extra.join("\n  ")}`);
 }

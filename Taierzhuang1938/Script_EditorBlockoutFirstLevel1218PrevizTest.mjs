@@ -20,8 +20,9 @@ import { fileURLToPath } from "node:url";
 import { HeightGridSampler, LayoutFromSceneDoc } from "./Script_EditorBlockoutLevels.mjs";
 import { FIRST_LEVEL_SPEAKING_CAST } from "./Data_FirstLevelSpeakingCast.mjs";
 import { CharacterClipModelId } from "./Data_CharacterSelection.mjs";
-import { BlockStandSampler, PrevizSignalsAt, NormalizeBlockoutPreviz, SamplePrevizCamera, PREVIZ_EYE_HEIGHT } from "./Script_EditorBlockoutPrevizPlan.mjs";
-import { L1218_RIVER as RV, L1218_BRIDGE as BR, L1218_HEIGHTS as HT } from "./Data_EditorBlockoutFirstLevel1218Space.mjs";
+import { BlockStandSampler, PrevizSignalsAt, NormalizeBlockoutPreviz, SamplePrevizCamera, SamplePrevizActor, SamplePrevizAircraft, PrevizStrafeImpacts, PREVIZ_EYE_HEIGHT } from "./Script_EditorBlockoutPrevizPlan.mjs";
+import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES } from "./Data_BlockoutPrevizClips.mjs";
+import { L1218_RIVER as RV, L1218_BRIDGE as BR, L1218_HEIGHTS as HT, L1218_ROAD as RD, L1218_YARD as Y } from "./Data_EditorBlockoutFirstLevel1218Space.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const Load = f => JSON.parse(readFileSync(join(HERE, f), "utf8"));
@@ -30,17 +31,33 @@ const R = v => Math.round(v * 100) / 100;
 const MODEL_ID = { nra: { 1: "TengxianNra02", 4: "TengxianNra05", 5: "TengxianNra06" }, ija: { 0: "TengxianIja01", 1: "TengxianIja02", 2: "TengxianIja03", 5: "TengxianIja06" } };
 const SPEED = { walk: 1.4, run: 3.5, crawl: 0.5, drag: 0.9 };
 const PEOPLE = new Set(["soldier", "officer", "civilian", "child", undefined]);
+const ROAD_Z = RD.line[0].z;
+/** 妮儿坐车尾沿的 ride（关键帧生成器 NIER_TAIL_RIDE：车尾沿 z +1.2、根离地 0.467 = 1.025 − 0.9 × 0.62、背对车头）。 */
+const NIER_RIDE = { on: "GengCart", x: 0, z: 1.2, y: 0.467, yawDeg: 180 };
 
 function ClipTable() {
   const lib = Load("Animation/OpeningStoryboards/Data_OpeningStoryboardsAnimation.json");
   const byModel = new Map(lib.models.map(m => [m.id, new Set(m.clipIds)]));
+  const metaTable = new Map(Object.entries(lib.clips));
   const sets = [...byModel.values()];
   const common = new Set([...sets[0]].filter(c => sets.every(s => s.has(c))));
-  return { byModel, common };
+  // 预演额外加载的库（Data_BlockoutPrevizClips）：只烘了 TengxianNra02，但五具骨架骨名一致、哪具身体都能播 → 算通用片段。库还没烘出来就跳过。
+  for (const extra of BLOCKOUT_PREVIZ_CLIP_LIBRARIES) {
+    const file = join(HERE, extra.base, extra.manifest);
+    if (!existsSync(file)) continue;
+    const manifest = JSON.parse(readFileSync(file, "utf8"));
+    for (const [name, meta] of Object.entries(manifest.clips || {})) {
+      for (const set of [...sets, common]) set.add(name);
+      if (!metaTable.has(name)) metaTable.set(name, meta);
+    }
+  }
+  return { byModel, common, meta: metaTable };
 }
 
 function ClipSetFor(unit, table) {
-  if (unit?.side === "civ" || unit?.kind === "civilian" || unit?.kind === "child" || unit?.kind === "officer") return { name: "程序化身体（没有动作库）", clips: new Set() };
+  // 2026-10-19 运行时补齐：百姓 / 小孩默认是 NRA02 骨架的占位身体（§5.6）、军官本来就是骨骼身体 —— 都能播通用片段；只有写了 body:"procedural" 的还是旧身体
+  if ((unit?.side === "civ" || unit?.kind === "civilian" || unit?.kind === "child") && unit?.body === "procedural") return { name: "程序化身体（没有动作库）", clips: new Set() };
+  if (unit?.side === "civ" || unit?.kind === "civilian" || unit?.kind === "child" || unit?.kind === "officer") return { name: "骨骼占位身体（只许通用片段）", clips: table.common };
   const castId = unit?.castId;
   const spec = castId && FIRST_LEVEL_SPEAKING_CAST[castId];
   if (!spec) return { name: "随机骨架（只许通用片段）", clips: table.common };
@@ -108,7 +125,26 @@ const YawTo = (a, b) => Math.atan2(-(b.x - a.x), -(b.z - a.z)) * 180 / Math.PI;
  * 演员在 t 时的大致位置（按预演键：取 t 之前最后一个带位置的键；在两个位置键之间按直线插值），没有键就是布设 / spawn。
  * 够核「说话的人在不在镜头里」用，不是运行时的精确采样。
  */
-function ActorAt(entry, base, t) {
+function RideAt(entry, base, t) {
+  let r = base?.ride ?? null;
+  for (const k of entry?.keys || []) { if (k.t > t + 1e-6) break; if (k.ride !== undefined) r = k.ride; }
+  return r && r.on ? r : null;
+}
+function YawAt(entry, base, t) {
+  let yaw = base?.yawDeg ?? 0;
+  for (const k of entry?.keys || []) { if (k.t > t + 1e-6) break; if (k.yawDeg !== undefined) yaw = k.yawDeg; }
+  return yaw;
+}
+/** 挂在车上的人（ride）：按车那一刻的位置 ∘ 本地偏移（车的朝向取最后一个 yawDeg 键 / 布设）。ctx = { seq, units }。 */
+function ActorAt(entry, base, t, ctx = null) {
+  const ride = ctx ? RideAt(entry, base, t) : null;
+  if (ride) {
+    const cEntry = ctx.seq.actors.find(a => a.id === ride.on), cBase = ctx.units.get(ride.on) || cEntry?.spawn;
+    if (cBase) {
+      const c = ActorAt(cEntry, cBase, t, null), r = YawAt(cEntry, cBase, t) * Math.PI / 180, lx = ride.x || 0, lz = ride.z || 0;
+      return { x: c.x + lx * Math.cos(r) + lz * Math.sin(r), z: c.z - lx * Math.sin(r) + lz * Math.cos(r) };
+    }
+  }
   const keys = (entry?.keys || []).filter(k => k.x !== undefined);
   let prev = { x: base.x, z: base.z, t: 0 }, next = null;
   for (const k of keys) { if (k.t <= t + 1e-6) prev = k; else { next = k; break; } }
@@ -120,11 +156,18 @@ function VisibleAt(entry, spawn, t) {
   const visKeys = (entry?.keys || []).filter(k => k.visible !== undefined && k.t <= t + 0.01);
   return visKeys.length ? visKeys[visKeys.length - 1].visible : (spawn?.visible ?? true);
 }
-/** 镜头锚点 → {x,y,z}：点按站立面 + h，演员锚按演员那一刻的位置 + offset，"player" 按关键帧机位。 */
+/** 镜头锚点 → {x,y,z}：点按站立面 + h，演员锚按演员那一刻的位置 + offset，"player" 按关键帧机位，飞机锚按 SamplePrevizAircraft 在那一刻的机身 + offset。 */
 function CameraResolver(kf, seq, stand, tRef = { t: 0 }) {
   const at = id => (id === "player" ? { unit: kf.player, entry: null } : { unit: (kf.units || []).find(u => u.id === id) || seq.actors.find(a => a.id === id)?.spawn || null, entry: seq.actors.find(a => a.id === id) });
   return anchor => {
     if (!anchor) return null;
+    if (anchor.aircraft) {
+      const entry = (seq.aircraft || []).find(p => p.id === anchor.aircraft);
+      if (!entry) return null;
+      const pose = SamplePrevizAircraft(entry, tRef.t, { groundAt: stand });
+      const [dx, dy, dz] = anchor.offset || [0, 0, 0];
+      return { x: pose.x + dx, y: pose.y + dy, z: pose.z + dz };
+    }
     if (anchor.actor) {
       const { unit, entry } = at(anchor.actor);
       if (!unit) return null;
@@ -240,7 +283,7 @@ export async function CheckPreviz(doc, { config, voice }) {
         const sig = SignalsAt(tRef.t);
         const shot = SamplePrevizCamera(nseq.camera, tRef.t, CameraResolver(kf, nseq, StandFor(sig), tRef));
         if (!shot) { errors.push(`${at}：${l.line} 说话时没有镜头`); continue; }
-        const p = ActorAt(a, base, tRef.t);
+        const p = ActorAt(a, base, tRef.t, { seq, units });
         const d = Math.hypot(p.x - shot.position.x, p.z - shot.position.z);
         const off = Math.abs(WrapDeg(YawTo(shot.position, p) - shot.yawDeg));
         const half = (shot.fov ?? 60) * 0.5 + 20;
@@ -275,20 +318,52 @@ export async function CheckPreviz(doc, { config, voice }) {
     rows.push(`${seq.keyframe} · ${seq.durationS} s · 镜头 ${seq.camera.length} · 台词 ${seq.lines.length} · 片段 ${[...clipsUsed].sort().join("、") || "（无）"}`);
   }
   if (doc.sequences.length !== config.keyframes.length) errors.push(`预演 ${doc.sequences.length} 段，关键帧 ${config.keyframes.length} 个`);
-  DesignChecks(doc, norm, config, layout, ground, StandFor, errors);
+  TalkPostureChecks(doc, config, table, errors);
+  DesignChecks(doc, norm, config, layout, ground, StandFor, lines, errors);
   return { errors, warnings, rows };
 }
 
+/**
+ * 说话姿态（§14.4，照 0105 / 0610 的 TalkPostureChecks）：每句有说话人的台词开始那一刻，说话人要么在播片段（说话 / 手势 / 跪着 / 坐着 / 救护），
+ * 要么倒在地上、在投弹，要么前后 1.5 s 内自己开过枪；跑着喊、手上没据枪的也算。端着枪（aim）又没在开枪 → 错；
+ * 没播片段干站 / 干蹲着拿枪 → 错。片段过了时长的算法同运行时：循环片段一直放，不循环的过了时长没写 clipHold 就清掉。
+ */
+export const TALK_FIRE_WINDOW_S = 1.5;
+function TalkPostureChecks(doc, config, table, errors) {
+  const clipDuration = clip => { const m = table.meta.get(clip); return !m || m.loop === true ? null : m.duration ?? null; };
+  for (const seq of doc.sequences) {
+    const kf = config.keyframes.find(k => k.id === seq.keyframe);
+    if (!kf) continue;
+    const units = new Map((kf.units || []).map(u => [u.id, u]));
+    for (const l of seq.lines) {
+      const id = l.actor;
+      if (!id) continue;
+      const a = seq.actors.find(x => x.id === id);
+      const base = a?.spawn || units.get(id);
+      if (!base) continue;
+      const st = a ? SamplePrevizActor(a, l.t, base, { clipDuration }) : { stance: base.stance, aim: !!base.aim, state: base.state, visible: true };
+      if (st.visible === false) continue;
+      const fired = seq.events.some(e => e.type === "muzzle" && e.actor === id && Math.abs(e.t - l.t) <= TALK_FIRE_WINDOW_S + 1e-6);
+      if (st.state === "down" || st.clip || st.throw || fired) continue;
+      if (st.moving && !st.aim) continue;
+      errors.push(`${seq.keyframe}：${l.line}（${id}@${l.t}）${st.aim ? "端着枪说话、前后 1.5 s 没开枪" : "说话时没播片段（手里拿着枪干站 / 干蹲着）"}`);
+    }
+  }
+}
+
 /** 剧本要求的设计口径（只查 FirstLevel1218）。 */
-function DesignChecks(doc, norm, config, layout, ground, StandFor, errors) {
+function DesignChecks(doc, norm, config, layout, ground, StandFor, voiceLines, errors) {
   if (doc.level !== "FirstLevel1218") return;
   const Seq = id => doc.sequences.find(s => s.keyframe === id);
   const NSeq = id => norm.sequences.find(s => s.keyframe === id);
   const KF = id => config.keyframes.find(k => k.id === id);
+  const Unit = (kfId, uid) => KF(kfId)?.units.find(u => u.id === uid);
   const Keys = (seq, id) => seq?.actors.find(a => a.id === id)?.keys || [];
+  const PosKeys = (seq, id) => Keys(seq, id).filter(k => k.x !== undefined);
   const Has = (seq, type, f = () => true) => seq.events.some(e => e.type === type && f(e));
   const SignalEv = (id, name, on) => Seq(id).events.find(e => e.type === "signal" && e.name === name && e.on === on);
   const Line = (seq, id) => seq.lines.find(l => l.line === id);
+  const LineEnd = (seq, id) => { const l = Line(seq, id); return l ? l.t + (voiceLines.get(id)?.durationS ?? 0) : undefined; };
   /** 镜头在 t 时的采样（站立面按那一刻的信号）。 */
   const ShotAt = (id, t) => {
     const n = NSeq(id), kf = KF(id);
@@ -356,8 +431,12 @@ function DesignChecks(doc, norm, config, layout, ground, StandFor, errors) {
       if (!Keys(s, "Geng").some(k => k.stance === "prone")) errors.push("14-2：老耿要扑到冬瓜身上（stance prone；百姓做不到就看说明字）");
       if (!Has(s, "caption", e => /扑上去/.test(e.text))) errors.push("14-2：老耿扑上去要有说明字");
       if (!Has(s, "caption", e => /弹孔/.test(e.text))) errors.push("14-2：弹孔离担架一步远要有说明字");
-      const ptsNear = s.events.filter(e => e.type === "explosion" && (e.radius ?? 1) <= 1 && Math.hypot(e.x - dongBase.x, e.z - dongBase.z) < 4);
-      if (ptsNear.length < 3) errors.push("14-2：担架 / 冬瓜旁边要有一串小土（弹孔）");
+      // 弹孔那一串由飞机的扫射段画（2026-10-20）：弹着点从冬瓜与担架之间犁过去，离他们一步远
+      const impacts = (s.aircraft || []).flatMap(p => PrevizStrafeImpacts(p));
+      const near = impacts.filter(e => Math.hypot(e.x - dongBase.x, e.z - dongBase.z) < 4);
+      if (near.length < 3) errors.push("14-2：担架 / 冬瓜旁边要有一串弹着（飞机 strafe 犁过去）");
+      const litterBase = kf.units.find(u => u.id === "LitterDonggua");
+      if (!(s.aircraft || []).some(p => (p.strafe || []).some(st => st.from.z > dongBase.z && st.from.z < litterBase.z))) errors.push("14-2：弹着那条线要在冬瓜与担架之间（离谁都一步远）");
       if (!Has(s, "caption", e => /飞机过去了/.test(e.text))) errors.push("14-2：末尾要有「飞机过去了……抬进沟里」说明字");
     }
   }
@@ -402,7 +481,7 @@ function DesignChecks(doc, norm, config, layout, ground, StandFor, errors) {
     if (!Keys(s, "Doctor").some(k => k.stance === "crouch")) errors.push("17-1：军医要蹲在担架边");
     const gone = Line(s, "Gone.01"), shout = Line(s, "Gone.02");
     if (!gone || !shout || shout.t < gone.t) errors.push("17-1：先「没了」再冲门口吼");
-    if (!Keys(s, "Doctor").some(k => k.x !== undefined && k.t > (shout?.t ?? 0) && k.z < 620)) errors.push("17-1：军医吼完要走回院里");
+    if (!Keys(s, "Doctor").some(k => k.x !== undefined && k.t > (shout?.t ?? 0) && k.z < Y.xiang.box.minZ - 2)) errors.push("17-1：军医吼完要走回院里");
     if (!Has(s, "caption", e => /棉袄/.test(e.text) && /脸/.test(e.text))) errors.push("17-1：老耿拉棉袄盖脸要有说明字");
     if (!Keys(s, "Nier").filter(k => k.faceTo !== undefined).length >= 2) errors.push("17-1：妮儿要看看这个大人、又看看那个");
     const s2 = Seq("17-2");
@@ -512,6 +591,128 @@ function DesignChecks(doc, norm, config, layout, ground, StandFor, errors) {
     void last;
   }
   for (const s of doc.sequences) if (s.keyframe !== "18-5" && s.then !== "next") errors.push(`${s.keyframe}：播完要 then: next`);
+  // ---- 2026-10-20 第二版：飞机、慢动作、挂车、片段、院里的担架 ----
+  // 飞机：13-1 / 13-2 / 14-1 / 14-2 各两架九七式轻爆；13-1、14-2 的扫射段顺着大路从东往西犁；13-2 / 14-1 不开枪；每段都有一条镜头锚在飞机上；不再手放飞机音效
+  for (const id of ["13-1", "13-2", "14-1", "14-2"]) {
+    const s = Seq(id), planes = s.aircraft || [];
+    if (planes.length !== 2 || planes.some(p => p.model !== "MitsubishiKi30")) errors.push(`${id}：要有两架九七式轻爆（aircraft[]），现在 ${planes.length}`);
+    for (const p of planes) {
+      if ((p.path || []).length < 3) errors.push(`${id}：${p.id} 的航点太少`);
+      if (p.sound?.drone === false) errors.push(`${id}：${p.id} 的引擎声要跟着飞机走`);
+    }
+    const strafes = planes.flatMap(p => p.strafe || []);
+    if (id === "13-1" || id === "14-2") {
+      if (!strafes.length) errors.push(`${id}：要有扫射段（strafe）`);
+      for (const st of strafes) if (!(Math.abs(st.from.z - ROAD_Z) <= RD.halfW && Math.abs(st.to.z - ROAD_Z) <= RD.halfW && st.from.x > st.to.x + 20)) errors.push(`${id}：扫射要顺着大路从东往西犁（from (${st.from.x}, ${st.from.z}) → to (${st.to.x}, ${st.to.z})）`);
+      // 扫射时飞机在天上、在弹着的后头（东边）、低空
+      for (const st of strafes) for (const p of planes.filter(q => (q.strafe || []).includes(st))) {
+        const pose = SamplePrevizAircraft(p, st.t0, { groundAt: ground });
+        if (!pose.visible || pose.x < st.from.x || pose.y - ground(pose.x, pose.z) > 60) errors.push(`${id}：${p.id} 扫射时要在弹着后头的低空（t ${st.t0}：x ${R(pose.x)}、高 ${R(pose.y)}）`);
+      }
+    } else if (strafes.length) errors.push(`${id}：飞机兜圈子 / 冲过来这一拍不开枪`);
+    if (!s.camera.some(c => c.look?.aircraft || c.lookTo?.aircraft)) errors.push(`${id}：要有一条镜头看着飞机（look / lookTo 用飞机锚）`);
+    if (s.events.some(e => e.type === "sfx" && /^(planeDrone|planeDive|strafe)/.test(e.name))) errors.push(`${id}：飞机有轨了，别再手放 planeDrone / planeDive / strafe 音效`);
+  }
+  {
+    const s = Seq("13-1"), cart = SignalEv("13-1", "CartOverturned", true), st = (s.aircraft || []).flatMap(p => p.strafe || [])[0];
+    if (cart && st && !(cart.t >= st.t0 && cart.t <= st.t1 + 0.5)) errors.push(`13-1：车要在那一串弹着犁过去时翻（弹着 ${st.t0}–${st.t1}，翻车 ${cart.t}）`);
+  }
+  // 14-2 慢动作：一个窗口，盖住杠子脱手（说明字）与担架前头着地（LitterDonggua 的切位键），三成速，窗口里没有台词
+  {
+    const s = Seq("14-2"), slow = s.slowmo || [];
+    if (slow.length !== 1) errors.push(`14-2：要有一个慢动作窗口（slowmo），现在 ${slow.length}`);
+    else {
+      const w = slow[0], drop = s.events.find(e => e.type === "caption" && /杠子从手里脱出去/.test(e.text));
+      const litterDown = PosKeys(s, "LitterDonggua").find(k => k.move === "cut" && k.t > 0.5);
+      if (!(w.rate <= 0.5 && w.dur >= 1.0 && w.dur <= 3.0)) errors.push(`14-2：慢动作要放慢到五成以下、1–3 s（现在 ×${w.rate}、${w.dur} s）`);
+      if (drop && !(drop.t >= w.t && drop.t < w.t + w.dur)) errors.push("14-2：慢动作要盖住杠子脱手那一下");
+      if (litterDown && !(litterDown.t >= w.t && litterDown.t < w.t + w.dur)) errors.push("14-2：慢动作要盖住担架前头着地那一下");
+      for (const l of s.lines) if (l.t >= w.t && l.t < w.t + w.dur) errors.push(`14-2：慢动作窗口里不能排台词（${l.line}）`);
+    }
+  }
+  // 挂到车上（关键帧 §3 ride）：12-1 / 12-2 妮儿坐车尾沿，12-1…13-1 冬瓜那副担架和冬瓜在车板上；预演里挂着时不写位置键
+  const RideWarnFree = (id, who) => {
+    let riding = !!Unit(id, who)?.ride;
+    for (const k of Keys(Seq(id), who)) { if (k.ride !== undefined) riding = k.ride !== null; else if (riding && k.x !== undefined) errors.push(`${id}：${who} @${k.t} 挂在车上还写了位置键（不管用，要下车先写 ride: null）`); }
+    return riding;
+  };
+  for (const id of ["12-1", "12-2"]) {
+    if (JSON.stringify(Unit(id, "Nier")?.ride) !== JSON.stringify(NIER_RIDE)) errors.push(`${id}：关键帧里妮儿要坐在车尾沿上（ride ${JSON.stringify(NIER_RIDE)}）`);
+    if (Keys(Seq(id), "Nier")[0]?.clip !== "VilSitEdge") errors.push(`${id}：妮儿开场要坐在车尾（第一个键 VilSitEdge）`);
+    if (RideWarnFree(id, "Nier") !== true) errors.push(`${id}：妮儿整段都坐在车上（不下车）`);
+  }
+  for (const id of ["12-1", "12-2", "12-3", "13-1"]) for (const who of ["LitterDonggua", "Donggua", "CartLitter1", "CartWounded1"]) {
+    const r = Unit(id, who)?.ride;
+    if (r?.on !== "GengCart") errors.push(`${id}：关键帧里 ${who} 要挂在 GengCart 上`);
+    const riding = RideWarnFree(id, who);
+    if (id !== "13-1" && riding !== true) errors.push(`${id}：${who} 整段都在车上`);
+    if (id === "13-1" && riding !== false) errors.push(`13-1：${who} 翻车时要下车（ride: null）`);
+  }
+  {
+    const s = Seq("12-3"), keys = Keys(s, "Nier");
+    if (!(keys[0]?.t === 0 && keys[0].ride?.on === "GengCart" && keys[0].clip === "VilSitEdge")) errors.push("12-3：妮儿开场要先挂回车尾坐着（预演键 ride + VilSitEdge）");
+    const off = keys.find(k => k.ride === null);
+    if (!off || off.x === undefined || off.move !== "cut" || off.t > 2.0) errors.push("12-3：妮儿要在头两秒从车尾溜下去（ride: null + 切到车尾外）");
+    if (off && keys.some(k => k.x !== undefined && k.t < off.t)) errors.push("12-3：下车前不许写位置键");
+  }
+  {
+    const s = Seq("13-1"), hide = Keys(s, "GengCart").find(k => k.visible === false);
+    for (const who of ["LitterDonggua", "Donggua", "CartLitter1", "CartLitter2", "CartWounded1", "CartWounded2"]) {
+      const off = Keys(s, who).find(k => k.ride === null);
+      if (!off || off.x === undefined || !hide || Math.abs(off.t - hide.t) > 0.3) errors.push(`13-1：车翻那一下 ${who} 要下车（ride: null + 甩出去的位置，和藏车同一刻）`);
+    }
+    const s2 = Seq("13-2");
+    for (const [who, litter] of [["CartWounded1", "Litter01"], ["CartWounded2", "Litter02"]]) {
+      const a = s2.actors.find(x => x.id === who);
+      if (!a?.spawn || a.spawn.state !== "down") errors.push(`13-2：${who} 要躺在车旁的路肩上（spawn down）`);
+      if (!Keys(s2, who).some(k => k.ride?.on === litter)) errors.push(`13-2：${who} 要被滚上 ${litter} 抬走（ride 到担架上）`);
+    }
+  }
+  // 百姓 / 小孩 / 军官 / 兵在指定的拍放片段（片段名照各库清单）
+  const NeedClip = (id, who, clip, note) => { if (!Keys(Seq(id), who).some(k => k.clip === clip)) errors.push(`${id}：${who} 要放 ${clip}（${note}）`); };
+  NeedClip("12-2", "Nier", "PvSitGrabHand", "攥着袖子往外拽"); NeedClip("12-2", "Donggua", "CareLieWrithe", "在车上抖"); NeedClip("12-3", "Nier", "VilClingHem", "攥着笼头不撒");
+  NeedClip("13-1", "Geng", "VilDuckProne", "往浅沟里扑"); NeedClip("13-1", "QCiv01", "VilDuckProne", "路上的百姓扑倒"); NeedClip("13-1", "Walker04", "PvStandPointL", "指着天喊");
+  NeedClip("13-2", "Geng", "PvKneelHaulBody", "把冬瓜翻回担架"); NeedClip("13-2", "Geng", "PvStandPointL", "指着沟口"); NeedClip("13-2", "Geng", "PvCrouchGripLitter", "抓起后头的杠子"); NeedClip("13-2", "Nier", "VilCowerWhimper", "在怀里挣");
+  NeedClip("14-1", "Nier", "VilDuckProne", "趴在沟沿上"); NeedClip("14-2", "Geng", "VilDuckProne", "扑上去趴在冬瓜身上"); NeedClip("14-2", "Geng", "PvCrouchGripLitter", "飞机过去再抓杠子");
+  NeedClip("15-1", "Geng", "CareMedicPress", "跪着把毛巾按回伤口"); NeedClip("15-1", "Donggua", "PvLieGrabSleeve", "伸手攥袖子"); NeedClip("15-1", "Nier", "VilCrouchHold", "蹲在沟里");
+  NeedClip("15-3", "Geng", "PvSitRestRifle", "靠墙坐着抱胳膊"); NeedClip("15-3", "Nier", "PvKneelDig", "蹲着画驴"); NeedClip("15-3", "LiuWencai", "PvCrouchCountFingers", "算驴腿的账"); NeedClip("15-3", "GateGuard", "PvStandHaltL", "把人往外推");
+  NeedClip("16-1", "Doctor", "PvStandPointL", "指厢房"); NeedClip("16-1", "Doctor", "CareMedicPress", "按伤口");
+  NeedClip("17-1", "Doctor", "CareMedicPress", "蹲下看伤口"); NeedClip("17-1", "Doctor", "PvStandPointL", "冲门口吼"); NeedClip("17-1", "Geng", "PvKneelPullBlanket", "拉棉袄盖脸");
+  NeedClip("18-1", "BridgeOfficer", "PvStandTalkSlung", "背着枪说话"); NeedClip("18-1", "BridgeOfficer", "PvStandPointL", "给老子顶到这儿"); NeedClip("18-1", "Sapper1", "PvKneelDig", "跪在船上绑炸药");
+  NeedClip("18-2", "Refugee1", "VilPanicRun", "百姓慌跑"); NeedClip("18-2", "Straggler1", "VilNraCarryOnBack", "背着伤员"); NeedClip("18-2", "Straggler2", "VilRideOnBack", "被背着"); NeedClip("18-2", "Yaowa", "PvStandBeckonL", "挥手快过来");
+  NeedClip("18-3", "Luo", "PvStandWaveOnL", "撤！过桥！"); NeedClip("18-5", "Guide", "PvStandBeckonL", "跟我来");
+  // 15-1 冬瓜攥袖子：说完「抵了」才放开停住段（clipRelease），放完停末帧
+  {
+    const s = Seq("15-1"), grab = Keys(s, "Donggua").find(k => k.clip === "PvLieGrabSleeve"), end = LineEnd(s, "GullyBottom.03");
+    if (grab && (!(grab.clipRelease > 0.8) || grab.clipHold !== true || end === undefined || Math.abs(grab.t + grab.clipRelease - end) > 0.6)) errors.push(`15-1：攥袖子要在「抵了」说完（${R(end ?? 0)} s）那一刻放开（clipRelease）、停末帧（clipHold）`);
+  }
+  // 13-1 扑倒的人不许在飞机过去之前起来；妮儿是最后被按倒的（刘文财抱着滚进沟）
+  {
+    const s = Seq("13-1"), ducks = ["Geng", "Walker01", "QCiv01"].map(id => Keys(s, id).find(k => k.clip === "VilDuckProne")?.t ?? -1);
+    const strafeT0 = (s.aircraft || []).flatMap(p => p.strafe || [])[0]?.t0 ?? 0;
+    if (ducks.some(t => t < 0 || t > strafeT0)) errors.push("13-1：路上的人要在弹着犁过来之前扑倒");
+  }
+  // 18-2「等」：接收院里的担架从院门走出去、插进队里上桥到南岸，军医跟着最后一副出院门；镜头在 9–15 s 里看着院门
+  {
+    const s = Seq("18-2");
+    for (const id of ["YardLitter1", "YardLitter2", "YardLitter3"]) { const last = PosKeys(s, id).at(-1); if (!last || last.z < BR.southFootZ) errors.push(`18-2：${id} 要抬过桥到南岸`); }
+    const l3 = PosKeys(s, "YardLitter3"), doc3 = PosKeys(s, "Doctor");
+    const inYard = k => k.x < Y.box.maxX - 1 && k.z > Y.box.minZ && k.z < Y.box.maxZ;
+    if (!l3[0] || l3[0].t !== 0 || !inYard(l3[0])) errors.push("18-2：最后一副担架（YardLitter3）开场要在院门里侧");
+    if (!doc3[0] || doc3[0].t !== 0 || !inYard(doc3[0])) errors.push("18-2：军医开场要在院里");
+    const outGate = k => k.path?.some(p => Math.abs(p.z - Y.gate.z) < 1.5 && Math.abs(p.x - Y.box.maxX) < 2.5);
+    if (!l3.some(outGate) || !doc3.some(outGate)) errors.push("18-2：担架与军医要从院门走出去（路线过院门）");
+    const l3Go = l3.find(k => k.t > 0 && k.move !== "cut")?.t, docGo = doc3.find(k => k.t > 0 && k.move !== "cut")?.t;
+    const l3Dep = l3.find(k => k.t > 0)?.t, docDep = doc3.find(k => k.t > 0)?.t;
+    if (!(docDep > l3Dep)) errors.push(`18-2：军医要跟在最后一副担架后头出门（担架 ${l3Dep} s、军医 ${docDep} s）`);
+    const last = doc3.at(-1);
+    if (!last || last.z < BR.southFootZ) errors.push("18-2：军医要跟着过桥到南岸");
+    let seen = 0;
+    for (let t = 9; t <= 15; t += 0.25) { const shot = ShotAt("18-2", t); if (shot && Math.abs(WrapDeg(YawTo(shot.position, { x: -162, z: 616 }) - shot.yawDeg)) < 12) seen += 0.25; }
+    if (seen < 2.0) errors.push(`18-2：镜头要在院门方向看两三秒担架抬出来（现在 ${R(seen)} s）`);
+    if (!Has(s, "caption", e => /抬出来/.test(e.text) && /军医/.test(e.text))) errors.push("18-2：院里担架抬出来、军医跟着出门要有说明字");
+    void l3Go; void docGo;
+  }
   // 大段的镜头轨：每一刻都能采样（没有空档让 SamplePrevizCamera 报错）
   for (const n of norm.sequences) {
     for (let t = 0; t <= n.durationS; t += 1.0) {

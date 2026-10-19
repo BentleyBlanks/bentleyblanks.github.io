@@ -180,7 +180,8 @@ export function StreetRoute(a, b) {
 // 单位与 POI
 
 const META = new WeakMap();
-const UNIT_KEY_ORDER = ["id", "side", "kind", "name", "castId", "role", "group", "weapon", "x", "z", "yawDeg", "stance", "aim", "state", "lie", "bearers", "arc", "speedMps", "path", "intent", "guess"];
+const UNIT_KEY_ORDER = ["id", "side", "kind", "name", "castId", "role", "group", "weapon", "x", "z", "yawDeg", "stance", "aim", "state", "lie", "bearers", "ride", "arc", "speedMps", "path", "intent", "guess"];
+const WrapDeg = (d) => { const v = ((d + 180) % 360 + 360) % 360 - 180; return v === -180 ? 180 : v; };
 
 /**
  * 一个单位。at = {x,z}；o：
@@ -189,6 +190,8 @@ const UNIT_KEY_ORDER = ["id", "side", "kind", "name", "castId", "role", "group",
  *   path [..]          显式来路；to / intent 去向（to 沿路网排）；toStraight 直线
  *   straight           上一帧过来走直线（不排路网）
  *   climb              来去要爬坎 / 翻墙（不报高差）；onLitter 躺在哪副担架上（不报「站在担架上」）
+ *   ride               §3 挂到车上 { on, x, z, y, yawDeg }（x / z 仍写车上那一点的世界坐标，车不在场时的备用）；挂着的人不查重叠 / 车身 / 实心块
+ *   tending            跪在哪个伤员身边照料（不报与他重叠）
  */
 function U(id, side, at, o = {}) {
   const u = { id, side, x: R2(at.x), z: R2(at.z) };
@@ -204,6 +207,7 @@ function U(id, side, at, o = {}) {
   if (o.down) u.state = "down";
   if (o.down && o.lie) u.lie = o.lie;
   if (o.bearers !== undefined) u.bearers = o.bearers;
+  if (o.ride) u.ride = { on: o.ride.on, x: R2(o.ride.x ?? 0), z: R2(o.ride.z ?? 0), y: Math.round((o.ride.y ?? 0) * 1000) / 1000, yawDeg: R1(o.ride.yawDeg ?? 0) };
   if (o.arc) u.arc = o.arc;
   if (o.speed) u.speedMps = o.speed;
   if (o.path) u.path = o.path.map((p) => Pt(p.x, p.z));
@@ -223,7 +227,7 @@ function U(id, side, at, o = {}) {
     u.intent = route;
   }
   if (o.guess) u.guess = true;
-  META.set(u, { straight: !!o.straight, climb: !!o.climb, explicitPath: !!(o.path || o.from), onLitter: o.onLitter || null });
+  META.set(u, { straight: !!o.straight, climb: !!o.climb, explicitPath: !!(o.path || o.from), onLitter: o.onLitter || null, tending: o.tending || null });
   return u;
 }
 
@@ -305,6 +309,40 @@ const DongguaOnLitter = (at, { bearers = 0, yaw = 90, extra = {} } = {}) => [
   N("LitterDonggua", at, { kind: "litter", name: "冬瓜的担架", bearers, yaw, group: "convoy", speed: 1.2, ...extra }),
   N("Donggua", at, { down: true, lie: "along", onLitter: "LitterDonggua", speed: 1.2, yaw, ...extra }),
 ];
+/**
+ * 车上的东西（2026-10-20 起用 §3 的 ride 挂到 GengCart 上，不再摆在车尾外一步）：三副担架横搁在车板上——担架 2.1 m 长、车板 1.5 m 宽，
+ * 只能横着搁，三副 0.7 m 宽正好铺满 2.4 m 长的车板；冬瓜那副靠车尾。妮儿坐车尾沿、背对车头、两条腿悬在外头。
+ * 车本地坐标 +x 右、−z 前（车辕）；车板顶 1.025 m（Script_EditorBlockoutPuppets BLOCKOUT_CART_SEATS）：担架布底贴车板 y 1.075、
+ * 躺在布上的人 1.125；坐车尾的小孩 y = 1.025 − 0.90 × 0.62 = 0.467（VilSitEdge 坐高 0.9）。单位的 x / z 仍写车上那一点的世界坐标（备用）。
+ */
+const CART_RIDE_Y = Object.freeze({ litter: 1.075, lying: 1.125, nierSit: 0.467 });
+const CART_TAIL_LOCAL_Z = 1.2;
+const CART_LITTER_SLOTS = Object.freeze([{ z: 0.75, yaw: 90 }, { z: 0, yaw: -90 }, { z: -0.75, yaw: 90 }]);   // [0] 靠车尾 = 冬瓜那副
+export const NIER_TAIL_RIDE = Object.freeze({ on: "GengCart", x: 0, z: CART_TAIL_LOCAL_Z, y: CART_RIDE_Y.nierSit, yawDeg: 180 });
+/** 车本地点 → 世界坐标（同 Puppets RideWorldPose）。 */
+export function CartWorld(cart, cartYaw, local) {
+  const r = cartYaw * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+  return Pt(cart.x + local.x * c + local.z * s, cart.z - local.x * s + local.z * c);
+}
+const CartRide = (local, y, yaw = 0) => ({ on: "GengCart", x: local.x, z: local.z, y, yawDeg: yaw });
+/** 冬瓜那副担架横搁在车板上靠车尾，冬瓜躺在上面（都挂在 GengCart 上）。 */
+const DongguaOnCart = (cart, cartYaw) => {
+  const slot = CART_LITTER_SLOTS[0], local = { x: 0, z: slot.z }, at = CartWorld(cart, cartYaw, local), yaw = R1(WrapDeg(cartYaw + slot.yaw));
+  return [
+    N("LitterDonggua", at, { kind: "litter", name: "冬瓜的担架", bearers: 0, yaw, group: "convoy", speed: 1.2, ride: CartRide(local, CART_RIDE_Y.litter, slot.yaw) }),
+    N("Donggua", at, { down: true, lie: "along", onLitter: "LitterDonggua", speed: 1.2, yaw, ride: CartRide(local, CART_RIDE_Y.lying, slot.yaw) }),
+  ];
+};
+/** 车板上另外两副担架与上面的伤员（13-2 被担架员滚上别的担架抬走）。 */
+const CartLitters = (cart, cartYaw) => CART_LITTER_SLOTS.slice(1).flatMap((slot, i) => {
+  const local = { x: 0, z: slot.z }, at = CartWorld(cart, cartYaw, local), yaw = R1(WrapDeg(cartYaw + slot.yaw));
+  return [
+    N(`CartLitter${i + 1}`, at, { kind: "litter", bearers: 0, yaw, group: "cart", speed: 1.4, ride: CartRide(local, CART_RIDE_Y.litter, slot.yaw) }),
+    N(`CartWounded${i + 1}`, at, { role: "wounded", group: "cart", down: true, lie: "along", onLitter: `CartLitter${i + 1}`, speed: 1.4, yaw, ride: CartRide(local, CART_RIDE_Y.lying, slot.yaw) }),
+  ];
+});
+/** 妮儿坐在车尾沿上。 */
+const NierOnTail = (cart, cartYaw) => C("Nier", CartWorld(cart, cartYaw, { x: 0, z: CART_TAIL_LOCAL_Z }), { yaw: R1(WrapDeg(cartYaw + 180)), ride: { ...NIER_TAIL_RIDE } });
 /** 冬瓜不在担架上（摔在车旁 / 滑到路当中）：担架在他旁边。 */
 const DongguaOff = (body, litterAt, { yaw = 90, litterYaw = 90 } = {}) => [
   N("LitterDonggua", litterAt, { kind: "litter", name: "冬瓜的担架", bearers: 0, yaw: litterYaw, group: "convoy", speed: 1.2 }),
@@ -382,8 +420,21 @@ const WOUNDED_SPOTS = Object.freeze([
   Pt(-189.6, 608.4), Pt(-186.2, 609.0), Pt(-182.6, 608.3), Pt(-170.4, 609.2), Pt(-167.2, 611.6),
   Pt(-189.8, 613.2), Pt(-186.6, 614.0), Pt(-189.4, 618.2), Pt(-186.0, 621.6), Pt(-167.0, 620.4),
 ]);
-const YardPeople = ({ doctorAt = DOCTOR, doctorFace = Pt(Y.gate.z ? PL.yardGate.x : 0, PL.yardGate.z), doctorStance = "stand", boardTo = null } = {}) => [
-  N("Doctor", doctorAt, { face: doctorFace, stance: doctorStance }),
+/**
+ * 救护片段的站位（Animation/CollectionCare 清单 stages.press：CareMedicPress 跪在 CareLieTreated 的右边，
+ * 医护根 = 伤员根 + (0.42 x, 0.36 z)（伤员本地系），朝向 = 伤员朝向 + 90°）。预演生成器也用它（15-1 老耿按毛巾、17-1 军医看伤口）。
+ */
+export const PRESS_STAGE = Object.freeze({ x: 0.42, z: 0.36, yawDeg: 90 });
+export function PressPose(patient, patientYaw) {
+  const r = patientYaw * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+  return { x: R2(patient.x + PRESS_STAGE.x * c + PRESS_STAGE.z * s), z: R2(patient.z - PRESS_STAGE.x * s + PRESS_STAGE.z * c), yawDeg: R1(WrapDeg(patientYaw + PRESS_STAGE.yawDeg)) };
+}
+/** 军医在院里：跪在麦秸上第 9 个伤员（WOUNDED_SPOTS[8]，离厢房门口 6 m）身边按伤口（15-3 … 18-1；17 他去厢房看冬瓜再回来）。 */
+const DOCTOR_PATIENT_I = 8;
+export const DOCTOR_PRESS = Object.freeze(PressPose(WOUNDED_SPOTS[DOCTOR_PATIENT_I], (DOCTOR_PATIENT_I % 4) * 45));
+const DOCTOR_PATIENT_ID = `YardWounded${String(DOCTOR_PATIENT_I + 1).padStart(2, "0")}`;
+const YardPeople = ({ doctorAt = DOCTOR_PRESS, doctorFace = null, doctorStance = "crouch", boardTo = null } = {}) => [
+  N("Doctor", doctorAt, { ...(doctorFace ? { face: doctorFace } : { yaw: DOCTOR_PRESS.yawDeg }), stance: doctorStance, tending: DOCTOR_PATIENT_ID }),
   C("Civ1", Pt(Y.kitchen.box.maxX + 1.2, Y.kitchen.box.minZ + 6.2), { name: "烧水的", face: Pt(Y.kitchen.box.maxX, Y.kitchen.box.minZ + 6.2) }),
   C("Civ2", Pt(-170.6, 616.4), { name: "抱门板的", yaw: -90, ...(boardTo ? { to: boardTo } : {}) }),
   C("Civ3", Pt(-188.4, 624.6), { yaw: 0, stance: "crouch" }),
@@ -429,15 +480,16 @@ function Keyframes() {
     what: "驴车出后门往南；身后机枪停了、轰一声，老耿家方向冒烟。",
     next: { text: "跟着驴车往西去桥头", x: 40, z: ROAD_Z, radiusM: 4 },
     how: ["车板上横搁着三副担架，冬瓜那副靠车尾，妮儿坐车尾两条腿悬着", "刘文财跟在身后半步，顺子停他也停", "身后村里机枪声停了、「轰」一声闷响", "老耿回头看一眼冒烟的方向，鞭杆搭一下接着走"],
-    notes: "车上没法摆东西（编辑器的车是一个块）：冬瓜那副担架（bearers 0）和冬瓜摆在车尾外一步、妮儿站在车尾边上。黑子用 kind animal 单独一个单位走在车前头。"
+    notes: "车板上三副担架横搁着（ride 挂在 GengCart 上，车板顶 1.025 m）：冬瓜那副靠车尾，另两副（CartLitter1 / 2）上各躺一个伤员；妮儿坐车尾沿（ride，两条腿悬在外头）。黑子用 kind animal 单独一个单位走在车前头。"
       + "后送队 8 副担架 + 7 个走着的伤兵跟在车后头（从小路一直排到村南口）。",
     signals: [],
     units: [
       C("GengCart", cart121, { yaw: 180, speed: 1.4 }),
       C("Heizi", heizi121, { yaw: 180, speed: 1.4 }),
       C("Geng", Off(heizi121, 1.1, 0.2), { yaw: 180 }),
-      ...DongguaOnLitter(tail121, { yaw: 180 }),
-      C("Nier", Pt(97.0, 590.8), { yaw: 180 }),
+      ...DongguaOnCart(cart121, 180),
+      ...CartLitters(cart121, 180),
+      NierOnTail(cart121, 180),
       N("LiuWencai", Pt(100.0, 588.0), { yaw: 180 }),
       ...Convoy(BackLine(Pt(98, 589.2)), "walk", 180),
     ],
@@ -446,21 +498,22 @@ function Keyframes() {
 
   // 12-2：大路上往西；妮儿扯短褂，顺子夺回来；老耿脱棉袄盖冬瓜
   const p122 = Pt(39.8, 614.4);
-  const cart122 = RP(37.5), nier122 = RP(39.9, 0.6), tail122 = RP(40.0, -0.6);
+  const cart122 = RP(37.5), nier122 = CartWorld(cart122, 90, { x: 0, z: CART_TAIL_LOCAL_Z }), tail122 = RP(40.0, -0.6);
   Add({
     id: "12-2", ...s12, name: "短褂",
     player: { x: p122.x, z: p122.z, yawDeg: Yaw(p122, nier122), pitchDeg: -6, stance: "stand" },
     what: "妮儿扯短褂，顺子夺回来；老耿脱棉袄盖冬瓜。",
     next: { text: "跟着车往西", x: 2, z: 613, radiusM: 4 },
     how: ["背后被扯一下，镜头一顿，回头是妮儿攥着那截蓝布袖子", "短过场：攥手腕、夺回来、塞回包底", "老耿把鞭子往车辕一插，脱棉袄扔过去盖严", "冬瓜：「临城再换……查得紧……」刘文财：「他说啥子？」"],
-    notes: "车已拐上大路朝西。妮儿站在车尾边上（车上坐不了人，站着顶替），冬瓜的担架在车尾外一步。短过场里的手是 09 捂她嘴的那只手。",
+    notes: "车已拐上大路朝西。妮儿坐在车尾沿上（ride），冬瓜那副担架横搁在车板上靠车尾（ride）。短过场里的手是 09 捂她嘴的那只手。",
     signals: [],
     units: [
       C("GengCart", cart122, { yaw: 90, speed: 1.4 }),
       C("Heizi", RP(35.0), { yaw: 90, speed: 1.4 }),
       C("Geng", RP(41.2, -1.4), { face: tail122 }),
-      ...DongguaOnLitter(tail122, { yaw: 90 }),
-      C("Nier", nier122, { face: p122 }),
+      ...DongguaOnCart(cart122, 90),
+      ...CartLitters(cart122, 90),
+      NierOnTail(cart122, 90),
       N("LiuWencai", Pt(41.4, 614.8), { face: p122 }),
       ...Convoy(BackLine(RP(38.7)), "walk", 90),
     ],
@@ -483,7 +536,8 @@ function Keyframes() {
       C("Heizi", heizi123, { yaw: 90, speed: 1.2 }),
       C("GengCart", cart123, { yaw: 90, speed: 1.2 }),
       C("Geng", RP(1.8, -1.4), { yaw: 90 }),
-      ...DongguaOnLitter(RP(4.4, -0.6), { yaw: 90 }),
+      ...DongguaOnCart(cart123, 90),
+      ...CartLitters(cart123, 90),
       N("LiuWencai", Pt(6.4, 614.9), { yaw: 90 }),
       ...Convoy(BackLine(RP(4.2)), "walk", 90),
       ...Queue("stand"),
@@ -503,14 +557,15 @@ function Keyframes() {
     what: "两架日机顺着大路扫，妮儿站在路当中，刘文财扑出去。",
     next: { text: "趴着，等飞机过去" },
     how: ["声音先到，路上的人一个接一个抬头；「飞机！趴倒！」（卧倒提示 Z，07 教过就不出）", "一串弹着点从路那头犁过来，从白布担架中间穿过去", "妮儿听不见，站在路当中四下看", "刘文财从沟里跳出去拦腰抱住她滚进路沟；弹着扫过黑子，车翻了"],
-    notes: "飞机没有单位：POI（danger）标在路上方，声音先到。路上的人都趴进路两边的浅沟（z 608.6 / 615.4），担架来不及抬下路，搁在路上（bearers 0）。"
-      + "玩家趴在路南浅沟边（z 616.8，沟边的平地上）。刘文财在北边浅沟里、intent 指向妮儿。黑子还立着、车还立着（翻车是这一拍末，CartOverturned 从 13-2 起）。",
+    notes: "飞机在预演里是 aircraft 轨（两架 Ki-30 顺着大路压下来、一架扫射），关键帧里只有 POI（danger）标在路上方。路上的人都趴进路两边的浅沟（z 608.6 / 615.4），担架来不及抬下路，搁在路上（bearers 0）。"
+      + "玩家趴在路南浅沟边（z 616.8，沟边的平地上）。刘文财在北边浅沟里、intent 指向妮儿。黑子还立着、车还立着，三副担架还在车板上（翻车是这一拍末，CartOverturned 从 13-2 起）。",
     signals: [],
     units: [
       C("Nier", nier131, { face: p131 }),
       C("Heizi", heizi131, { yaw: 90 }),
       C("GengCart", cart131, { yaw: 90 }),
-      ...DongguaOnLitter(RP(cart131.x + CART_TAIL + 0.6, -0.6), { yaw: 90 }),
+      ...DongguaOnCart(cart131, 90),
+      ...CartLitters(cart131, 90),
       C("Geng", geng131, { stance: "prone", face: nier131 }),
       N("LiuWencai", liu131, { stance: "prone", face: nier131, intent: [RP(-16.6, -1.2), RP(nier131.x - 0.6, -RD.gutterOffset + 0.2)] }),
       ...Convoy(BackLine(RP(cart131.x + CART_TAIL)), "prone", 90),
@@ -652,7 +707,7 @@ function Keyframes() {
     what: "院门口墙根排着担架；妮儿画驴摆弹壳，刘文财算驴腿的账。",
     next: { text: "等着进院" },
     how: ["守门的兵把人往外推：「等到！里头满起了！」", "冬瓜搁在墙根排在别人后头，顺子在担架头上蹲下（自动）；老耿靠墙坐下抱着胳膊发抖", "妮儿拿树枝画驴，掏出弹壳在驴旁边摆一排；刘文财：「画的黑子嗦？」「你攒到出嫁，也换不到一条驴腿。」", "门里有人喊：「下一副！」"],
-    notes: `院门外东墙根从 z ${Y.queueFromZ} 排到 ${Y.queueToZ}：${QUEUE_Z.length} 副担架（bearers 0），冬瓜那副第 ${DONGGUA_QUEUE_I + 1}。妮儿「蹲在地上画」：百姓蹲不下，站着顶替；老耿「靠墙坐」也是站着。`
+    notes: `院门外东墙根从 z ${Y.queueFromZ} 排到 ${Y.queueToZ}：${QUEUE_Z.length} 副担架（bearers 0），冬瓜那副第 ${DONGGUA_QUEUE_I + 1}。妮儿「蹲在地上画」、老耿「靠墙坐」关键帧里都是站着，预演里用骨骼占位身体放片段（PvKneelDig / PvSitRestRifle）。`
       + "院里：军医、烧水抱门板的百姓、麦秸上躺着 10 个伤员。",
     signals: [SIG.cartOverturned],
     units: [
@@ -672,7 +727,7 @@ function Keyframes() {
   const s16 = { stage: 16, stageTitle: "过门槛" };
   const p161 = Pt(Y.xiang.door.x, 625.6);
   const litter161 = Pt(Y.xiang.door.x, 624.3), liu161 = Pt(Y.xiang.door.x, 623.0);
-  const doctor161 = Pt(-177.5, 619.4);
+  const doctor161 = Pt(DOCTOR_PRESS.x, DOCTOR_PRESS.z);   // 从麦秸上那个伤员身边站起来（预演里先跪着按伤口）
   Add({
     id: "16-1", ...s16, name: "门槛",
     player: { x: p161.x, z: p161.z, yawDeg: 180, pitchDeg: -22, stance: "stand" },
@@ -684,7 +739,7 @@ function Keyframes() {
     units: [
       ...DongguaOnLitter(litter161, { yaw: 180, extra: { speed: 0.8 } }),
       N("LiuWencai", liu161, { yaw: 180, speed: 0.8 }),
-      N("Doctor", doctor161, { face: p161 }),
+      N("Doctor", doctor161, { face: p161, tending: DOCTOR_PATIENT_ID }),
       C("Geng", Pt(-165.5, 617.0), { face: p161 }),
       C("Nier", Pt(-165.0, 618.4), { face: p161 }),
       N("GateGuard", GATE_GUARD, { yaw: -90 }),
@@ -699,18 +754,19 @@ function Keyframes() {
   const s17 = { stage: 17, stageTitle: "门槛上" };
   const inside = Pt(Y.dongguaInside.x, Y.dongguaInside.z);
   const p171 = Pt(-180.2, 629);
-  const doctor171 = Pt(-183.6, 629.2), geng171 = Pt(-184.0, 631.9), nier171 = Pt(Y.xiang.door.x, 628.4), liu171 = Pt(-179.2, 628.2);
+  const doctorPress171 = PressPose(inside, 180);   // 跪在冬瓜右边（担架西边）按伤口的站位（CareMedicPress）
+  const doctor171 = Pt(doctorPress171.x, doctorPress171.z), geng171 = Pt(-184.0, 631.9), nier171 = Pt(Y.xiang.door.x, 628.4), liu171 = Pt(-179.2, 628.2);
   Add({
     id: "17-1", ...s17, name: "没了",
     player: { x: p171.x, z: p171.z, yawDeg: Yaw(p171, inside), pitchDeg: -26, stance: "stand" },
     what: "军医：……没了。老耿用自己的棉袄盖住冬瓜的脸。",
     next: { text: "（在门槛上坐下）", x: Y.thresholdSeat.x, z: Y.thresholdSeat.z, radiusM: 1 },
     how: ["军医蹲下掀开棉袄看一眼伤口，又摸摸脖子，停了一会儿：「……没了。」", "他站起来冲门口吼：「下一副！日你妈，表堵到门！」转身去看别人；院子里没人停下来", "刘文财：「刚才过门槛，还在说话……」没人答", "老耿把棉袄往上拉盖住脸，没拿回去；妮儿站在门边看这个大人的脸、又看那个"],
-    notes: "担架放在厢房里靠墙（dongguaInside），冬瓜 down、盖着脸从这一帧起就不动了。军医「蹲下」：NRA 身体能蹲，蹲在担架西边。老耿在担架边（站着）。",
+    notes: "担架放在厢房里靠墙（dongguaInside），冬瓜 down、盖着脸从这一帧起就不动了。军医跪在担架西边（CareMedicPress 的站位）看伤口，看完回院里那个伤员身边。老耿在担架边（预演里跪着拉棉袄）。",
     signals: [SIG.cartOverturned],
     units: [
       ...DongguaOnLitter(inside, { yaw: 180 }),
-      N("Doctor", doctor171, { stance: "crouch", face: inside, to: Pt(-176.4, 616.6) }),
+      N("Doctor", doctor171, { stance: "crouch", yaw: doctorPress171.yawDeg, to: Pt(DOCTOR_PRESS.x, DOCTOR_PRESS.z), tending: "Donggua" }),
       C("Geng", geng171, { face: inside }),
       C("Nier", nier171, { face: geng171 }),
       N("LiuWencai", liu171, { face: inside }),
@@ -734,7 +790,7 @@ function Keyframes() {
     signals: [SIG.cartOverturned],
     units: [
       ...DongguaOnLitter(inside, { yaw: 180 }),
-      N("Doctor", Pt(-176.4, 616.6), { face: WOUNDED_SPOTS[3], stance: "crouch" }),
+      N("Doctor", Pt(DOCTOR_PRESS.x, DOCTOR_PRESS.z), { yaw: DOCTOR_PRESS.yawDeg, stance: "crouch", tending: DOCTOR_PATIENT_ID }),
       C("Geng", geng171, { face: inside }),
       C("Nier", nier171, { face: seat }),
       N("LiuWencai", liu171, { face: seat }),
@@ -764,7 +820,7 @@ function Keyframes() {
       N("Squad1", Pt(-167.0, 617.6), { face: seat, from: gateOutside, guess: true }),
       N("Squad2", Pt(-165.6, 619.8), { yaw: 90, from: gateOutside, guess: true }),
       ...DongguaOnLitter(inside, { yaw: 180 }),
-      N("Doctor", Pt(-176.4, 616.6), { face: WOUNDED_SPOTS[3], stance: "crouch" }),
+      N("Doctor", Pt(DOCTOR_PRESS.x, DOCTOR_PRESS.z), { yaw: DOCTOR_PRESS.yawDeg, stance: "crouch", tending: DOCTOR_PATIENT_ID }),
       C("Geng", geng171, { face: inside }),
       C("Nier", nier171, { face: luo173 }),
       N("LiuWencai", liu171, { face: luo173 }),
@@ -805,7 +861,7 @@ function Keyframes() {
       N("Straggler2", RP(-62, 0.9), { role: "walkingWounded", group: "stragglers", yaw: 90, to: SQUARE_C }),
       C("Refugee1", RP(-70, 0.6), { role: "refugee", group: "stragglers", yaw: 90, to: SQUARE_C }),
       ...GateQueue(),
-      ...YardPeople({ doctorAt: Pt(-176.4, 616.6), doctorStance: "crouch", doctorFace: WOUNDED_SPOTS[3] }),
+      ...YardPeople(),
     ],
     pois: [POI.railBlast(), POI.trench("objective"), Poi("Sappers", "工兵在第一条船上绑炸药", "poi", SAPPER1, 2), POI.bridge()],
   });
@@ -1161,27 +1217,33 @@ export function FirstLevel1218Issues(doc, { scene = null, meta = new Map() } = {
     const M = (u) => meta.get(`${kf.id}/${u.id}`) || {};
     if (!InBounds(kf.player)) out.push(`${kf.id} 玩家出界 (${kf.player.x}, ${kf.player.z})`);
     for (const u of kf.units) if (!InBounds(u)) out.push(`${kf.id} ${u.id} 出界 (${u.x}, ${u.z})`);
+    // 挂在车上的人 / 担架（§3 ride）跟着车走、不贴地：不查重叠、不查站在担架 / 车身里、不查实心块（x / z 只是备用）
+    const Riding = (u) => !!(u.ride && u.ride.on);
     const people = kf.units.filter((u) => PEOPLE.has(u.kind));
     for (const u of people) {
+      if (Riding(u)) continue;
       const d = Dist(u, kf.player), limit = u.state === "down" ? C.playerDownM : C.playerM;
       if (d < limit) out.push(`${kf.id} ${u.id} 离玩家 ${R2(d)} m（< ${limit}）`);
     }
     for (let a = 0; a < people.length; a++) for (let c = a + 1; c < people.length; c++) {
+      if (Riding(people[a]) || Riding(people[c])) continue;
+      if (M(people[a]).tending === people[c].id || M(people[c]).tending === people[a].id) continue;   // 跪在伤员身边照料
       const d = Dist(people[a], people[c]);
       if (d < C.personM) out.push(`${kf.id} ${people[a].id} 和 ${people[c].id} 重叠 ${R2(d)} m（< ${C.personM}）`);
     }
     for (const l of kf.units.filter((u) => u.kind === "litter")) {
       const seg = CarrySegment(l);
       for (const u of people) {
-        if (M(u).onLitter === l.id) continue;
+        if (Riding(u) || M(u).onLitter === l.id) continue;
+        if (M(u).tending && people.some((p) => p.id === M(u).tending && M(p).onLitter === l.id)) continue;   // 跪在担架边照料上面的人
         const d = Dist(u, l);
         if (d < C.litterM) out.push(`${kf.id} ${u.id} 站在 ${l.id} 上（${R2(d)} m）`);
         else if (seg && SegDist(u, seg[0], seg[1]) < C.carryM) out.push(`${kf.id} ${u.id} 站在 ${l.id} 抬的人身上`);
       }
-      if (Dist(l, kf.player) < C.litterM - 0.2) out.push(`${kf.id} 玩家站在 ${l.id} 上`);
+      if (!Riding(l) && Dist(l, kf.player) < C.litterM - 0.2) out.push(`${kf.id} 玩家站在 ${l.id} 上`);
     }
     for (const v of kf.units.filter((u) => u.kind === "cart")) {
-      for (const u of people) if (OnCart(u, v, 0.2)) out.push(`${kf.id} ${u.id} 站在车身 ${v.id} 里`);
+      for (const u of people) if (!Riding(u) && OnCart(u, v, 0.2)) out.push(`${kf.id} ${u.id} 站在车身 ${v.id} 里`);
       if (OnCart(kf.player, v, 0)) out.push(`${kf.id} 玩家在车身 ${v.id} 里`);
     }
     if (Number.isFinite(kf.next?.x) && Dist(kf.next, kf.player) < C.nextM) out.push(`${kf.id} 下一步目标离玩家不到 ${C.nextM} m（只写文字）`);
@@ -1193,6 +1255,7 @@ export function FirstLevel1218Issues(doc, { scene = null, meta = new Map() } = {
       if (InRiver(kf.player, ground)) out.push(`${kf.id} 玩家站在河里`);
       for (const u of kf.units) {
         if (!PEOPLE.has(u.kind) && u.kind !== "litter") continue;
+        if (Riding(u)) continue;
         if (InRiver(u, ground)) out.push(`${kf.id} ${u.id} 在河里 (${u.x}, ${u.z})`);
         if (!PEOPLE.has(u.kind)) continue;
         const h = BodyHit(solids, ground, u.x, u.z, C.body, C.body.unitTallM);
@@ -1206,6 +1269,7 @@ export function FirstLevel1218Issues(doc, { scene = null, meta = new Map() } = {
     for (const entry of PlanTransition(prev, kf).units) {
       const unit = entry.unitTo || entry.unitFrom;
       if (!PEOPLE.has(unit.kind) && unit.kind !== "litter") continue;
+      if (Riding(unit) || (entry.unitFrom && Riding(entry.unitFrom))) continue;   // 挂着的跟车走，没有自己的路线
       if (entry.route.length < 2) continue;
       const m0 = meta.get(`${prev.id}/${entry.id}`) || {}, m1 = meta.get(`${kf.id}/${entry.id}`) || {};
       const climb = !!(m0.climb || m1.climb);

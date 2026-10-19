@@ -167,6 +167,15 @@
    ],
    "actors": [
     {
+     "id": "Nier",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "VilSitEdge"
+      }
+     ]
+    },
+    {
      "id": "GengCart",
      "keys": [
       {
@@ -217,119 +226,6 @@
        "z": 612,
        "move": "walk",
        "yawDeg": 90
-      }
-     ]
-    },
-    {
-     "id": "LitterDonggua",
-     "keys": [
-      {
-       "t": 1,
-       "x": 98.2,
-       "z": 590.9,
-       "move": "cut"
-      },
-      {
-       "t": 13.2,
-       "x": 98.2,
-       "z": 607.9,
-       "move": "walk"
-      },
-      {
-       "t": 22,
-       "x": 91,
-       "z": 611.4,
-       "move": "walk",
-       "path": [
-        {
-         "x": 98,
-         "z": 607.9
-        },
-        {
-         "x": 98,
-         "z": 612
-        },
-        {
-         "x": 91,
-         "z": 612
-        }
-       ],
-       "yawDeg": 90
-      }
-     ]
-    },
-    {
-     "id": "Donggua",
-     "keys": [
-      {
-       "t": 1,
-       "x": 98.2,
-       "z": 590.9,
-       "move": "cut"
-      },
-      {
-       "t": 13.2,
-       "x": 98.2,
-       "z": 607.9,
-       "move": "walk"
-      },
-      {
-       "t": 22,
-       "x": 91,
-       "z": 611.4,
-       "move": "walk",
-       "path": [
-        {
-         "x": 98,
-         "z": 607.9
-        },
-        {
-         "x": 98,
-         "z": 612
-        },
-        {
-         "x": 91,
-         "z": 612
-        }
-       ],
-       "yawDeg": 90
-      }
-     ]
-    },
-    {
-     "id": "Nier",
-     "keys": [
-      {
-       "t": 1,
-       "x": 97,
-       "z": 590.8,
-       "move": "cut"
-      },
-      {
-       "t": 13.2,
-       "x": 97,
-       "z": 607.8,
-       "move": "walk"
-      },
-      {
-       "t": 22,
-       "x": 90.9,
-       "z": 612.6,
-       "move": "walk",
-       "path": [
-        {
-         "x": 98,
-         "z": 607.8
-        },
-        {
-         "x": 98,
-         "z": 612
-        },
-        {
-         "x": 90.9,
-         "z": 612
-        }
-       ]
       }
      ]
     },
@@ -896,8 +792,8 @@
       "stance": "stand",
       "yawDeg": 87.66,
       "pitchDeg": 0,
-      "toYawDeg": -3.18,
-      "toPitchDeg": -14
+      "toYawDeg": 24.62,
+      "toPitchDeg": -4
      }
     },
     {
@@ -912,7 +808,7 @@
       "actor": "Nier",
       "offset": [
        0,
-       0.9,
+       1.4,
        0
       ]
      },
@@ -931,10 +827,10 @@
       "x": 34.2,
       "z": 614.4,
       "stance": "stand",
-      "yawDeg": -3.18,
-      "pitchDeg": -14,
-      "toYawDeg": -3.81,
-      "toPitchDeg": -16
+      "yawDeg": 24.62,
+      "pitchDeg": -4,
+      "toYawDeg": 32.86,
+      "toPitchDeg": -10
      }
     },
     {
@@ -944,8 +840,8 @@
       "x": 34.2,
       "z": 614.4,
       "stance": "stand",
-      "yawDeg": -3.81,
-      "pitchDeg": -16
+      "yawDeg": 32.86,
+      "pitchDeg": -10
      }
     },
     {
@@ -955,8 +851,8 @@
       "x": 34.2,
       "z": 614.4,
       "stance": "stand",
-      "yawDeg": -3.81,
-      "pitchDeg": -16,
+      "yawDeg": 32.86,
+      "pitchDeg": -10,
       "toYawDeg": -104.04,
       "toPitchDeg": -2
      }
@@ -996,6 +892,46 @@
     }
    ],
    "actors": [
+    {
+     "id": "Nier",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "VilSitEdge"
+      },
+      {
+       "t": 4.4,
+       "ride": {
+        "on": "GengCart",
+        "x": 0,
+        "z": 1,
+        "y": 1.025,
+        "yawDeg": 180
+       },
+       "clip": "PvSitGrabHand"
+      },
+      {
+       "t": 10,
+       "ride": {
+        "on": "GengCart",
+        "x": 0,
+        "z": 1.2,
+        "y": 0.467,
+        "yawDeg": 180
+       },
+       "clip": "VilSitEdge"
+      }
+     ]
+    },
+    {
+     "id": "Donggua",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "CareLieWrithe"
+      }
+     ]
+    },
     {
      "id": "GengCart",
      "keys": [
@@ -1108,109 +1044,6 @@
      ]
     },
     {
-     "id": "LitterDonggua",
-     "keys": [
-      {
-       "t": 0.4,
-       "x": 40,
-       "z": 611.4,
-       "move": "cut"
-      },
-      {
-       "t": 4.4,
-       "x": 34.4,
-       "z": 611.4,
-       "move": "walk"
-      },
-      {
-       "t": 33.78,
-       "x": 34.4,
-       "z": 611.4,
-       "move": "cut"
-      },
-      {
-       "t": 39.49,
-       "x": 26.4,
-       "z": 611.4,
-       "move": "walk",
-       "yawDeg": 90
-      }
-     ]
-    },
-    {
-     "id": "Donggua",
-     "keys": [
-      {
-       "t": 0.4,
-       "x": 40,
-       "z": 611.4,
-       "move": "cut"
-      },
-      {
-       "t": 4.4,
-       "x": 34.4,
-       "z": 611.4,
-       "move": "walk"
-      },
-      {
-       "t": 33.78,
-       "x": 34.4,
-       "z": 611.4,
-       "move": "cut"
-      },
-      {
-       "t": 39.49,
-       "x": 26.4,
-       "z": 611.4,
-       "move": "walk",
-       "yawDeg": 90
-      }
-     ]
-    },
-    {
-     "id": "Nier",
-     "keys": [
-      {
-       "t": 0.4,
-       "x": 39.9,
-       "z": 612.6,
-       "move": "cut"
-      },
-      {
-       "t": 4.4,
-       "x": 34.3,
-       "z": 612.6,
-       "move": "walk"
-      },
-      {
-       "t": 9.8,
-       "x": 34.3,
-       "z": 612.6,
-       "move": "cut"
-      },
-      {
-       "t": 10.4,
-       "x": 33.9,
-       "z": 612.3,
-       "move": "walk",
-       "faceTo": "Donggua"
-      },
-      {
-       "t": 33.78,
-       "x": 33.9,
-       "z": 612.3,
-       "move": "cut"
-      },
-      {
-       "t": 39.49,
-       "x": 25.9,
-       "z": 612.3,
-       "move": "walk",
-       "yawDeg": 90
-      }
-     ]
-    },
-    {
      "id": "LiuWencai",
      "keys": [
       {
@@ -1227,11 +1060,13 @@
       },
       {
        "t": 30,
-       "faceTo": "player"
+       "faceTo": "player",
+       "clip": "PvStandTalkSlung"
       },
       {
        "t": 33.58,
-       "yawDeg": 90
+       "yawDeg": 90,
+       "clip": null
       },
       {
        "t": 33.78,
@@ -1705,7 +1540,7 @@
       "kind": "soldier",
       "x": 34.2,
       "z": 614.4,
-      "yawDeg": -3.18,
+      "yawDeg": 24.62,
       "name": "顺子（替身）"
      },
      "keys": [
@@ -1724,9 +1559,9 @@
        "move": "cut"
       },
       {
-       "t": 7.2,
-       "x": 34.6,
-       "z": 613.5,
+       "t": 7.9,
+       "x": 34.1,
+       "z": 612.35,
        "move": "walk",
        "faceTo": "Nier",
        "clip": "CollarControl"
@@ -1971,36 +1806,55 @@
      "keys": [
       {
        "t": 0,
-       "x": 5,
-       "z": 612.9,
-       "move": "cut",
-       "faceTo": {
-        "x": -0.9,
-        "z": 612.4
-       }
+       "ride": {
+        "on": "GengCart",
+        "x": 0,
+        "z": 1.2,
+        "y": 0.467,
+        "yawDeg": 180
+       },
+       "clip": "VilSitEdge"
       },
       {
        "t": 1,
-       "x": 5,
-       "z": 612.9,
+       "ride": null,
+       "x": 4.7,
+       "z": 612.6,
+       "move": "cut",
+       "yawDeg": 90,
+       "stance": "stand",
+       "clip": null
+      },
+      {
+       "t": 1.2,
+       "x": 4.7,
+       "z": 612.6,
        "move": "cut"
       },
       {
-       "t": 2.9,
+       "t": 3,
        "x": -0.9,
        "z": 612.4,
        "move": "run",
        "path": [
         {
          "x": 3,
-         "z": 613.7
+         "z": 613.5
         },
         {
          "x": 0.4,
-         "z": 613.5
+         "z": 613.4
         }
        ],
        "faceTo": "Heizi"
+      },
+      {
+       "t": 3.2,
+       "clip": "VilClingHem"
+      },
+      {
+       "t": 14.24,
+       "clip": null
       },
       {
        "t": 14.34,
@@ -2036,6 +1890,14 @@
       {
        "t": 2.9,
        "faceTo": "Nier"
+      },
+      {
+       "t": 9,
+       "clip": "PvStandTalkSlung"
+      },
+      {
+       "t": 14.14,
+       "clip": null
       },
       {
        "t": 14.34,
@@ -2122,68 +1984,6 @@
        "t": 29.34,
        "x": -12.4,
        "z": 612,
-       "move": "walk",
-       "yawDeg": 90
-      }
-     ]
-    },
-    {
-     "id": "LitterDonggua",
-     "keys": [
-      {
-       "t": 14.34,
-       "x": 4.4,
-       "z": 611.4,
-       "move": "cut"
-      },
-      {
-       "t": 20.34,
-       "x": -4,
-       "z": 611.4,
-       "move": "walk",
-       "yawDeg": 90
-      },
-      {
-       "t": 24.34,
-       "x": -4,
-       "z": 611.4,
-       "move": "cut"
-      },
-      {
-       "t": 29.34,
-       "x": -11,
-       "z": 611.4,
-       "move": "walk",
-       "yawDeg": 90
-      }
-     ]
-    },
-    {
-     "id": "Donggua",
-     "keys": [
-      {
-       "t": 14.34,
-       "x": 4.4,
-       "z": 611.4,
-       "move": "cut"
-      },
-      {
-       "t": 20.34,
-       "x": -4,
-       "z": 611.4,
-       "move": "walk",
-       "yawDeg": 90
-      },
-      {
-       "t": 24.34,
-       "x": -4,
-       "z": 611.4,
-       "move": "cut"
-      },
-      {
-       "t": 29.34,
-       "x": -11,
-       "z": 611.4,
        "move": "walk",
        "yawDeg": 90
       }
@@ -2684,6 +2484,36 @@
        "yawDeg": 90
       }
      ]
+    },
+    {
+     "id": "QWalker01",
+     "keys": [
+      {
+       "t": 20.34,
+       "clip": "PvStandTalkSlung",
+       "faceTo": "QWalker02"
+      },
+      {
+       "t": 28.59,
+       "clip": null,
+       "yawDeg": 90
+      }
+     ]
+    },
+    {
+     "id": "QWalker02",
+     "keys": [
+      {
+       "t": 20.54,
+       "clip": "PvStandTalkSlung",
+       "faceTo": "QWalker01"
+      },
+      {
+       "t": 28.59,
+       "clip": null,
+       "yawDeg": 90
+      }
+     ]
     }
    ],
    "lines": [
@@ -2793,27 +2623,21 @@
     },
     {
      "t": 2.6,
-     "dur": 0.9,
-     "eye": {
+     "dur": 2.4,
+     "from": {
       "x": -6,
-      "z": 616.2,
-      "stance": "stand",
-      "yawDeg": 60.75,
-      "pitchDeg": 0,
-      "toYawDeg": -40,
-      "toPitchDeg": 18
-     }
-    },
-    {
-     "t": 3.5,
-     "dur": 1.5,
-     "eye": {
-      "x": -6,
-      "z": 616.2,
-      "stance": "stand",
-      "yawDeg": -40,
-      "pitchDeg": 18
-     }
+      "z": 616.4,
+      "h": 1.5
+     },
+     "look": {
+      "aircraft": "Ki30A",
+      "offset": [
+       0,
+       0,
+       0
+      ]
+     },
+     "ease": "inOut"
     },
     {
      "t": 5,
@@ -2882,7 +2706,10 @@
      "keys": [
       {
        "t": 0,
-       "stance": "stand",
+       "stance": "stand"
+      },
+      {
+       "t": 0,
        "faceTo": {
         "x": -18,
         "z": 612.3
@@ -2890,7 +2717,7 @@
       },
       {
        "t": 5.2,
-       "stance": "prone"
+       "stance": "crouch"
       },
       {
        "t": 5.6,
@@ -2900,7 +2727,7 @@
        "stance": "stand"
       },
       {
-       "t": 8,
+       "t": 7.9,
        "x": -17.3,
        "z": 612,
        "move": "run",
@@ -2908,17 +2735,17 @@
        "faceTo": "Nier"
       },
       {
-       "t": 8.1,
+       "t": 8,
        "clip": null
       },
       {
-       "t": 8.1,
+       "t": 8,
        "x": -17.3,
        "z": 612,
        "move": "cut"
       },
       {
-       "t": 9.1,
+       "t": 9,
        "x": -19.1,
        "z": 608.9,
        "move": "run",
@@ -2932,14 +2759,19 @@
      "keys": [
       {
        "t": 0,
-       "stance": "stand",
+       "stance": "stand"
+      },
+      {
+       "t": 0,
        "faceTo": {
         "x": -18,
         "z": 612.3
        }
       },
       {
-       "t": 5.2,
+       "t": 5,
+       "clip": "VilDuckProne",
+       "clipHold": true,
        "stance": "prone"
       }
      ]
@@ -2949,11 +2781,114 @@
      "keys": [
       {
        "t": 0,
-       "stance": "stand",
+       "stance": "stand"
+      },
+      {
+       "t": 0,
        "yawDeg": -90
       },
       {
        "t": 5.2,
+       "clip": "VilDuckProne",
+       "clipHold": true,
+       "stance": "prone"
+      }
+     ]
+    },
+    {
+     "id": "Walker02",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "stand"
+      },
+      {
+       "t": 4.8,
+       "clip": "VilDuckProne",
+       "clipHold": true,
+       "stance": "prone"
+      }
+     ]
+    },
+    {
+     "id": "Walker03",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "stand"
+      },
+      {
+       "t": 5.5,
+       "clip": "VilDuckProne",
+       "clipHold": true,
+       "stance": "prone"
+      }
+     ]
+    },
+    {
+     "id": "Walker04",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "stand"
+      },
+      {
+       "t": 3,
+       "clip": "PvStandPointL",
+       "faceTo": {
+        "x": 200,
+        "z": 598
+       }
+      },
+      {
+       "t": 5.3,
+       "clip": "VilDuckProne",
+       "clipHold": true,
+       "stance": "prone"
+      }
+     ]
+    },
+    {
+     "id": "QCiv01",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "stand"
+      },
+      {
+       "t": 5.1,
+       "clip": "VilDuckProne",
+       "clipHold": true,
+       "stance": "prone"
+      }
+     ]
+    },
+    {
+     "id": "QCiv02",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "stand"
+      },
+      {
+       "t": 5.7,
+       "clip": "VilDuckProne",
+       "clipHold": true,
+       "stance": "prone"
+      }
+     ]
+    },
+    {
+     "id": "QWalker01",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "stand"
+      },
+      {
+       "t": 5.4,
+       "clip": "VilDuckProne",
+       "clipHold": true,
        "stance": "prone"
       }
      ]
@@ -2962,18 +2897,42 @@
      "id": "Nier",
      "keys": [
       {
-       "t": 8.1,
+       "t": 0,
+       "clip": "VilClingHem",
+       "faceTo": "Heizi"
+      },
+      {
+       "t": 5.8,
+       "clip": null,
+       "faceTo": {
+        "x": -12,
+        "z": 610.3
+       }
+      },
+      {
+       "t": 7,
+       "faceTo": "player"
+      },
+      {
+       "t": 8,
        "x": -18,
        "z": 612.3,
        "move": "cut"
       },
       {
-       "t": 9.2,
+       "t": 9.1,
        "x": -19.8,
        "z": 608.4,
        "move": "run",
        "stance": "prone",
        "faceTo": "Heizi"
+      },
+      {
+       "t": 9.3,
+       "clip": "VilDuckProne",
+       "clipFrom": 1.3,
+       "clipHold": true,
+       "stance": "prone"
       }
      ]
     },
@@ -2981,11 +2940,11 @@
      "id": "Heizi",
      "keys": [
       {
-       "t": 8.39,
+       "t": 8.13,
        "state": "down"
       },
       {
-       "t": 8.44,
+       "t": 8.18,
        "x": -16.2,
        "z": 613.4,
        "move": "cut",
@@ -2997,7 +2956,7 @@
      "id": "GengCart",
      "keys": [
       {
-       "t": 8.44,
+       "t": 8.18,
        "visible": false
       }
      ]
@@ -3006,7 +2965,8 @@
      "id": "Donggua",
      "keys": [
       {
-       "t": 8.54,
+       "t": 8.23,
+       "ride": null,
        "x": -10.4,
        "z": 613,
        "move": "cut",
@@ -3019,11 +2979,66 @@
      "id": "LitterDonggua",
      "keys": [
       {
-       "t": 8.54,
+       "t": 8.23,
+       "ride": null,
        "x": -9,
        "z": 611.6,
        "move": "cut",
        "yawDeg": 90
+      }
+     ]
+    },
+    {
+     "id": "CartLitter1",
+     "keys": [
+      {
+       "t": 8.23,
+       "ride": null,
+       "x": -15.6,
+       "z": 610.2,
+       "move": "cut",
+       "yawDeg": 30
+      }
+     ]
+    },
+    {
+     "id": "CartWounded1",
+     "keys": [
+      {
+       "t": 8.23,
+       "ride": null,
+       "x": -14.6,
+       "z": 610.6,
+       "move": "cut",
+       "yawDeg": 60,
+       "lie": "along"
+      }
+     ]
+    },
+    {
+     "id": "CartLitter2",
+     "keys": [
+      {
+       "t": 8.23,
+       "ride": null,
+       "x": -10.4,
+       "z": 610.3,
+       "move": "cut",
+       "yawDeg": 150
+      }
+     ]
+    },
+    {
+     "id": "CartWounded2",
+     "keys": [
+      {
+       "t": 8.23,
+       "ride": null,
+       "x": -11.8,
+       "z": 610.8,
+       "move": "cut",
+       "yawDeg": 110,
+       "lie": "along"
       }
      ]
     }
@@ -3032,31 +3047,15 @@
     {
      "t": 3.4,
      "line": "AirRaidWarning.01",
-     "actor": "Walker01"
+     "actor": "Walker04"
     }
    ],
    "events": [
-    {
-     "t": 0,
-     "type": "sfx",
-     "name": "planeDrone",
-     "x": 60,
-     "z": 598,
-     "volume": 0.7
-    },
     {
      "t": 0.4,
      "type": "caption",
      "text": "（声音先到，路上的人一个接一个抬头）",
      "dur": 2.6
-    },
-    {
-     "t": 2.4,
-     "type": "sfx",
-     "name": "planeDive",
-     "x": 40,
-     "z": 600,
-     "volume": 0.9
     },
     {
      "t": 4.4,
@@ -3071,155 +3070,19 @@
      "dur": 1.8
     },
     {
-     "t": 6.8,
-     "type": "sfx",
-     "name": "strafeFar",
-     "x": 20,
-     "z": 612,
-     "volume": 0.7
-    },
-    {
-     "t": 7.4,
-     "type": "explosion",
-     "x": 24,
-     "z": 611.56,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 7.47,
-     "type": "explosion",
-     "x": 21.4,
-     "z": 612,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 7.53,
-     "type": "explosion",
-     "x": 18.8,
-     "z": 612.44,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 7.6,
-     "type": "explosion",
-     "x": 16.2,
-     "z": 611.78,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
      "t": 7.6,
      "type": "caption",
      "text": "（两架日机从身后顺着大路压下来，一串弹着点从路那头一路犁过来）",
      "dur": 1.8
     },
     {
-     "t": 7.66,
-     "type": "explosion",
-     "x": 13.6,
-     "z": 612.22,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 7.73,
-     "type": "explosion",
-     "x": 11,
-     "z": 611.56,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 7.79,
-     "type": "explosion",
-     "x": 8.4,
-     "z": 612,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 7.86,
-     "type": "explosion",
-     "x": 5.8,
-     "z": 612.44,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 7.92,
-     "type": "explosion",
-     "x": 3.2,
-     "z": 611.78,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 7.99,
-     "type": "explosion",
-     "x": 0.6,
-     "z": 612.22,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.05,
-     "type": "explosion",
-     "x": -2,
-     "z": 611.56,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.1,
+     "t": 7.91,
      "type": "shake",
      "dur": 1.2,
      "strength": 0.45
     },
     {
-     "t": 8.12,
-     "type": "explosion",
-     "x": -4.6,
-     "z": 612,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.15,
-     "type": "sfx",
-     "name": "strafeNear",
-     "x": -8,
-     "z": 612,
-     "volume": 1
-    },
-    {
-     "t": 8.18,
-     "type": "explosion",
-     "x": -7.2,
-     "z": 612.44,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.25,
-     "type": "explosion",
-     "x": -9.8,
-     "z": 611.78,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.31,
-     "type": "explosion",
-     "x": -12.4,
-     "z": 612.22,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.34,
+     "t": 8.08,
      "type": "explosion",
      "x": -13.5,
      "z": 612.4,
@@ -3228,45 +3091,13 @@
      "h": 0.3
     },
     {
-     "t": 8.35,
-     "type": "sfx",
-     "name": "strafeDirt",
-     "x": -14,
-     "z": 613,
-     "volume": 0.9
-    },
-    {
-     "t": 8.38,
-     "type": "explosion",
-     "x": -15,
-     "z": 611.56,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.44,
-     "type": "explosion",
-     "x": -17.6,
-     "z": 612,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.44,
+     "t": 8.18,
      "type": "signal",
      "name": "CartOverturned",
      "on": true
     },
     {
-     "t": 8.51,
-     "type": "explosion",
-     "x": -20.2,
-     "z": 612.44,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.54,
+     "t": 8.28,
      "type": "sfx",
      "name": "bodyFall",
      "x": -12,
@@ -3274,88 +3105,125 @@
      "volume": 0.8
     },
     {
-     "t": 8.57,
-     "type": "explosion",
-     "x": -22.8,
-     "z": 611.78,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.64,
-     "type": "explosion",
-     "x": -25.4,
-     "z": 612.22,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.64,
+     "t": 8.38,
      "type": "caption",
      "text": "（黑子惨叫着往旁边一挣，车翻进路边，车板上的担架连人一起甩出去，冬瓜摔在车旁的土里）",
      "dur": 3.2
     },
     {
-     "t": 8.7,
-     "type": "explosion",
-     "x": -28,
-     "z": 611.56,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.77,
-     "type": "explosion",
-     "x": -30.6,
-     "z": 612,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.83,
-     "type": "explosion",
-     "x": -33.2,
-     "z": 612.44,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.9,
-     "type": "explosion",
-     "x": -35.8,
-     "z": 611.78,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 8.96,
-     "type": "explosion",
-     "x": -38.4,
-     "z": 612.22,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 9.8,
-     "type": "sfx",
-     "name": "planeDive",
-     "x": -60,
-     "z": 600,
-     "volume": 0.6
-    },
-    {
-     "t": 11.94,
+     "t": 11.68,
      "type": "caption",
      "text": "（飞机拉起来，往西去了）",
      "dur": 2.2
+    }
+   ],
+   "aircraft": [
+    {
+     "id": "Ki30A",
+     "model": "MitsubishiKi30",
+     "path": [
+      {
+       "t": 1,
+       "x": 520,
+       "y": 170,
+       "z": 596
+      },
+      {
+       "t": 4.6,
+       "x": 280,
+       "y": 95,
+       "z": 604
+      },
+      {
+       "t": 7,
+       "x": 90,
+       "y": 42,
+       "z": 610
+      },
+      {
+       "t": 8.6,
+       "x": -30,
+       "y": 24,
+       "z": 612
+      },
+      {
+       "t": 10.4,
+       "x": -165,
+       "y": 40,
+       "z": 609
+      },
+      {
+       "t": 13.4,
+       "x": -360,
+       "y": 120,
+       "z": 580
+      }
+     ],
+     "strafe": [
+      {
+       "t0": 7.4,
+       "t1": 8.56,
+       "from": {
+        "x": 24,
+        "z": 612
+       },
+       "to": {
+        "x": -40,
+        "z": 612
+       },
+       "hz": 24
+      }
+     ],
+     "sound": {
+      "drone": true,
+      "diveT": 6.2
+     }
     },
     {
-     "t": 12.2,
-     "type": "sfx",
-     "name": "planeDrone",
-     "x": -110,
-     "z": 598,
-     "volume": 0.4
+     "id": "Ki30B",
+     "model": "MitsubishiKi30",
+     "path": [
+      {
+       "t": 2.4,
+       "x": 520,
+       "y": 178,
+       "z": 574
+      },
+      {
+       "t": 6,
+       "x": 280,
+       "y": 103,
+       "z": 582
+      },
+      {
+       "t": 8.4,
+       "x": 90,
+       "y": 50,
+       "z": 588
+      },
+      {
+       "t": 10,
+       "x": -30,
+       "y": 32,
+       "z": 590
+      },
+      {
+       "t": 11.8,
+       "x": -165,
+       "y": 48,
+       "z": 587
+      },
+      {
+       "t": 14.8,
+       "x": -360,
+       "y": 128,
+       "z": 558
+      }
+     ],
+     "sound": {
+      "drone": true,
+      "diveT": 7.6
+     }
     }
    ]
   },
@@ -3368,26 +3236,43 @@
     {
      "t": 0,
      "dur": 3,
-     "eye": {
+     "from": {
       "x": -11,
       "z": 616.4,
-      "stance": "stand",
-      "yawDeg": 81.44,
-      "pitchDeg": 10
-     }
+      "h": 1.62
+     },
+     "look": {
+      "aircraft": "Ki30A",
+      "offset": [
+       0,
+       0,
+       0
+      ]
+     },
+     "ease": "linear"
     },
     {
      "t": 3,
      "dur": 2,
-     "eye": {
+     "from": {
       "x": -11,
       "z": 616.4,
-      "stance": "stand",
-      "yawDeg": 81.44,
-      "pitchDeg": 10,
-      "toYawDeg": 60.02,
-      "toPitchDeg": -10
-     }
+      "h": 1.62
+     },
+     "look": {
+      "aircraft": "Ki30A",
+      "offset": [
+       0,
+       0,
+       0
+      ]
+     },
+     "lookTo": {
+      "x": -16.2,
+      "z": 613.4,
+      "h": 0.4
+     },
+     "ease": "inOut"
     },
     {
      "t": 5,
@@ -3501,6 +3386,15 @@
    ],
    "actors": [
     {
+     "id": "Nier",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "VilCowerWhimper"
+      }
+     ]
+    },
+    {
      "id": "LiuWencai",
      "keys": [
       {
@@ -3510,35 +3404,76 @@
      ]
     },
     {
-     "id": "Nier",
+     "id": "CartLitter1",
+     "spawn": {
+      "side": "nra",
+      "kind": "litter",
+      "bearers": 0,
+      "x": -15.6,
+      "z": 610.2,
+      "yawDeg": 30
+     },
+     "keys": []
+    },
+    {
+     "id": "CartWounded1",
+     "spawn": {
+      "side": "nra",
+      "kind": "soldier",
+      "role": "wounded",
+      "state": "down",
+      "lie": "along",
+      "x": -14.6,
+      "z": 610.6,
+      "yawDeg": 60
+     },
      "keys": [
       {
-       "t": 6.2,
-       "x": -19.8,
-       "z": 608.4,
-       "move": "cut"
-      },
+       "t": 10.77,
+       "ride": {
+        "on": "Litter01",
+        "x": 0,
+        "z": 0,
+        "y": 0.05,
+        "yawDeg": 0
+       }
+      }
+     ]
+    },
+    {
+     "id": "CartLitter2",
+     "spawn": {
+      "side": "nra",
+      "kind": "litter",
+      "bearers": 0,
+      "x": -10.4,
+      "z": 610.3,
+      "yawDeg": 150
+     },
+     "keys": []
+    },
+    {
+     "id": "CartWounded2",
+     "spawn": {
+      "side": "nra",
+      "kind": "soldier",
+      "role": "wounded",
+      "state": "down",
+      "lie": "along",
+      "x": -11.8,
+      "z": 610.8,
+      "yawDeg": 110
+     },
+     "keys": [
       {
-       "t": 6.9,
-       "x": -19.3,
-       "z": 608.9,
-       "move": "walk",
-       "stance": "crouch",
-       "faceTo": "Heizi"
-      },
-      {
-       "t": 7.3,
-       "x": -19.3,
-       "z": 608.9,
-       "move": "cut"
-      },
-      {
-       "t": 8,
-       "x": -19.8,
-       "z": 608.4,
-       "move": "walk",
-       "stance": "crouch",
-       "faceTo": "Heizi"
+       "t": 11.72,
+       "ride": {
+        "on": "Litter02",
+        "x": 0,
+        "z": 0,
+        "y": 0.05,
+        "yawDeg": 0
+       }
       }
      ]
     },
@@ -3592,6 +3527,9 @@
        "x": -15.2,
        "z": 608.6,
        "move": "cut",
+       "clip": "VilDuckProne",
+       "clipFrom": 1.3,
+       "clipHold": true,
        "stance": "prone",
        "faceTo": {
         "x": -16.2,
@@ -3600,7 +3538,8 @@
       },
       {
        "t": 2.8,
-       "stance": "stand"
+       "stance": "stand",
+       "clip": null
       },
       {
        "t": 3,
@@ -3620,15 +3559,26 @@
        "faceTo": "Donggua"
       },
       {
+       "t": 11.2,
+       "clip": "PvKneelHaulBody",
+       "faceTo": "Donggua"
+      },
+      {
+       "t": 13.8,
+       "clip": null
+      },
+      {
        "t": 14.4,
        "faceTo": {
         "x": -40,
         "z": 619.5
-       }
+       },
+       "clip": "PvStandPointL"
       },
       {
        "t": 16.8,
-       "faceTo": "Donggua"
+       "faceTo": "Donggua",
+       "clip": null
       },
       {
        "t": 17,
@@ -3644,7 +3594,12 @@
        "yawDeg": 90
       },
       {
-       "t": 18.7,
+       "t": 18.5,
+       "clip": "PvCrouchGripLitter"
+      },
+      {
+       "t": 19.6,
+       "clip": null,
        "carryRole": "rear"
       }
      ]
@@ -3688,14 +3643,6 @@
    ],
    "events": [
     {
-     "t": 0,
-     "type": "sfx",
-     "name": "planeDrone",
-     "x": -120,
-     "z": 600,
-     "volume": 0.7
-    },
-    {
      "t": 0.5,
      "type": "caption",
      "text": "（飞机拉起来，在西边的红天底下拐了个大弯。它没走，在兜圈子）",
@@ -3738,14 +3685,6 @@
      "dur": 2.4
     },
     {
-     "t": 16,
-     "type": "sfx",
-     "name": "planeDrone",
-     "x": -140,
-     "z": 580,
-     "volume": 0.5
-    },
-    {
      "t": 18.8,
      "type": "caption",
      "text": "（刘文财怀里抱着人，腾不出手。老耿弯腰抓起担架后头的两根杠子；顺子抓起前头）",
@@ -3756,6 +3695,134 @@
      "type": "caption",
      "text": "（把冬瓜抬进沟里）",
      "dur": 2.6
+    }
+   ],
+   "aircraft": [
+    {
+     "id": "Ki30A",
+     "model": "MitsubishiKi30",
+     "path": [
+      {
+       "t": 0,
+       "x": -235.77,
+       "y": 80,
+       "z": 593.11
+      },
+      {
+       "t": 3,
+       "x": -350.52,
+       "y": 85,
+       "z": 514.62
+      },
+      {
+       "t": 6,
+       "x": -413.36,
+       "y": 90,
+       "z": 390.6
+      },
+      {
+       "t": 9,
+       "x": -408.81,
+       "y": 95,
+       "z": 251.65
+      },
+      {
+       "t": 12,
+       "x": -337.99,
+       "y": 100,
+       "z": 132.01
+      },
+      {
+       "t": 15,
+       "x": -218.35,
+       "y": 105,
+       "z": 61.19
+      },
+      {
+       "t": 18,
+       "x": -79.4,
+       "y": 110,
+       "z": 56.64
+      },
+      {
+       "t": 21,
+       "x": 44.62,
+       "y": 115,
+       "z": 119.48
+      },
+      {
+       "t": 24,
+       "x": 123.11,
+       "y": 120,
+       "z": 234.23
+      }
+     ],
+     "sound": {
+      "drone": true
+     }
+    },
+    {
+     "id": "Ki30B",
+     "model": "MitsubishiKi30",
+     "path": [
+      {
+       "t": 1.6,
+       "x": -235.77,
+       "y": 90,
+       "z": 563.11
+      },
+      {
+       "t": 4.6,
+       "x": -350.52,
+       "y": 95,
+       "z": 484.62
+      },
+      {
+       "t": 7.6,
+       "x": -413.36,
+       "y": 100,
+       "z": 360.6
+      },
+      {
+       "t": 10.6,
+       "x": -408.81,
+       "y": 105,
+       "z": 221.65
+      },
+      {
+       "t": 13.6,
+       "x": -337.99,
+       "y": 110,
+       "z": 102.01
+      },
+      {
+       "t": 16.6,
+       "x": -218.35,
+       "y": 115,
+       "z": 31.19
+      },
+      {
+       "t": 19.6,
+       "x": -79.4,
+       "y": 120,
+       "z": 26.64
+      },
+      {
+       "t": 22.6,
+       "x": 44.62,
+       "y": 125,
+       "z": 89.48
+      },
+      {
+       "t": 25.6,
+       "x": 123.11,
+       "y": 130,
+       "z": 204.23
+      }
+     ],
+     "sound": {
+      "drone": true
+     }
     }
    ]
   },
@@ -3826,9 +3893,12 @@
       "h": 1.55
      },
      "lookTo": {
-      "x": 40,
-      "z": 596,
-      "h": 30
+      "aircraft": "Ki30A",
+      "offset": [
+       0,
+       0,
+       0
+      ]
      },
      "ease": "inOut"
     },
@@ -3841,9 +3911,12 @@
       "h": 1.55
      },
      "look": {
-      "x": 40,
-      "z": 596,
-      "h": 30
+      "aircraft": "Ki30A",
+      "offset": [
+       0,
+       0,
+       0
+      ]
      },
      "to": {
       "x": -30.84,
@@ -3870,6 +3943,18 @@
     }
    ],
    "actors": [
+    {
+     "id": "Nier",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "VilDuckProne",
+       "clipFrom": 1.3,
+       "clipHold": true,
+       "stance": "prone"
+      }
+     ]
+    },
     {
      "id": "Geng",
      "keys": [
@@ -3940,14 +4025,6 @@
    ],
    "events": [
     {
-     "t": 0,
-     "type": "sfx",
-     "name": "planeDrone",
-     "x": -100,
-     "z": 600,
-     "volume": 0.45
-    },
-    {
      "t": 0.3,
      "type": "caption",
      "text": "（两只手攥着杠子，枪背在背上，只能慢走，能转头）",
@@ -3960,26 +4037,10 @@
      "dur": 2.8
     },
     {
-     "t": 4,
-     "type": "sfx",
-     "name": "planeDrone",
-     "x": -40,
-     "z": 575,
-     "volume": 0.6
-    },
-    {
      "t": 5.4,
      "type": "caption",
      "text": "（往后看：冬瓜躺在担架上，老耿在后头抬着，喘得厉害）",
      "dur": 2.8
-    },
-    {
-     "t": 8,
-     "type": "sfx",
-     "name": "planeDrone",
-     "x": 10,
-     "z": 594,
-     "volume": 0.8
     },
     {
      "t": 8.4,
@@ -3988,18 +4049,139 @@
      "dur": 3
     },
     {
-     "t": 11,
-     "type": "sfx",
-     "name": "planeDive",
-     "x": 30,
-     "z": 604,
-     "volume": 0.9
-    },
-    {
      "t": 11.6,
      "type": "caption",
      "text": "（飞机声越来越响，沟口眼看就到了）",
      "dur": 2
+    }
+   ],
+   "aircraft": [
+    {
+     "id": "Ki30A",
+     "model": "MitsubishiKi30",
+     "path": [
+      {
+       "t": 2,
+       "x": 318.51,
+       "y": 130,
+       "z": 106.38
+      },
+      {
+       "t": 3.45,
+       "x": 379.01,
+       "y": 120.63,
+       "z": 168.9
+      },
+      {
+       "t": 4.9,
+       "x": 417.41,
+       "y": 111.25,
+       "z": 246.97
+      },
+      {
+       "t": 6.35,
+       "x": 429.98,
+       "y": 101.88,
+       "z": 333.05
+      },
+      {
+       "t": 7.8,
+       "x": 415.53,
+       "y": 92.5,
+       "z": 418.85
+      },
+      {
+       "t": 9.25,
+       "x": 375.44,
+       "y": 83.13,
+       "z": 496.06
+      },
+      {
+       "t": 10.7,
+       "x": 313.59,
+       "y": 73.75,
+       "z": 557.24
+      },
+      {
+       "t": 12.15,
+       "x": 235.94,
+       "y": 64.38,
+       "z": 596.48
+      },
+      {
+       "t": 13.6,
+       "x": 150,
+       "y": 55,
+       "z": 610
+      }
+     ],
+     "sound": {
+      "drone": true,
+      "diveT": 12
+     }
+    },
+    {
+     "id": "Ki30B",
+     "model": "MitsubishiKi30",
+     "path": [
+      {
+       "t": 3.4,
+       "x": 318.51,
+       "y": 138,
+       "z": 82.38
+      },
+      {
+       "t": 4.85,
+       "x": 379.01,
+       "y": 128.63,
+       "z": 144.9
+      },
+      {
+       "t": 6.3,
+       "x": 417.41,
+       "y": 119.25,
+       "z": 222.97
+      },
+      {
+       "t": 7.75,
+       "x": 429.98,
+       "y": 109.88,
+       "z": 309.05
+      },
+      {
+       "t": 9.2,
+       "x": 415.53,
+       "y": 100.5,
+       "z": 394.85
+      },
+      {
+       "t": 10.65,
+       "x": 375.44,
+       "y": 91.13,
+       "z": 472.06
+      },
+      {
+       "t": 12.1,
+       "x": 313.59,
+       "y": 81.75,
+       "z": 533.24
+      },
+      {
+       "t": 13.55,
+       "x": 235.94,
+       "y": 72.38,
+       "z": 572.48
+      },
+      {
+       "t": 15,
+       "x": 150,
+       "y": 63,
+       "z": 586
+      }
+     ],
+     "sound": {
+      "drone": true
+     }
     }
    ]
   },
@@ -4065,15 +4247,25 @@
     {
      "t": 4.2,
      "dur": 2,
-     "eye": {
+     "from": {
       "x": -31.6,
       "z": 617,
-      "stance": "prone",
-      "yawDeg": 104.04,
-      "pitchDeg": 12,
-      "toYawDeg": 45,
-      "toPitchDeg": -14
-     }
+      "h": 0.32
+     },
+     "look": {
+      "aircraft": "Ki30B",
+      "offset": [
+       0,
+       0,
+       0
+      ]
+     },
+     "lookTo": {
+      "x": -32.5,
+      "z": 616.1,
+      "h": 0
+     },
+     "ease": "inOut"
     },
     {
      "t": 6.2,
@@ -4347,11 +4539,14 @@
       },
       {
        "t": 12.1,
+       "clip": "VilDuckProne",
+       "clipHold": true,
        "stance": "prone"
       },
       {
        "t": 21.2,
-       "stance": "stand"
+       "stance": "stand",
+       "clip": null
       },
       {
        "t": 22,
@@ -4368,6 +4563,11 @@
       },
       {
        "t": 23.3,
+       "clip": "PvCrouchGripLitter"
+      },
+      {
+       "t": 24.1,
+       "clip": null,
        "carryRole": "rear"
       },
       {
@@ -4385,19 +4585,26 @@
      ]
     },
     {
-     "id": "LiuWencai",
+     "id": "Nier",
      "keys": [
       {
-       "t": 17.2,
+       "t": 0,
+       "clip": "VilDuckProne",
+       "clipFrom": 1.3,
+       "clipHold": true,
+       "stance": "prone"
+      },
+      {
+       "t": 17.4,
        "faceTo": "player"
       }
      ]
     },
     {
-     "id": "Nier",
+     "id": "LiuWencai",
      "keys": [
       {
-       "t": 17.4,
+       "t": 17.2,
        "faceTo": "player"
       }
      ]
@@ -4406,79 +4613,7 @@
    "lines": [],
    "events": [
     {
-     "t": 0.6,
-     "type": "sfx",
-     "name": "planeDive",
-     "x": -6,
-     "z": 604,
-     "volume": 1
-    },
-    {
-     "t": 1.5,
-     "type": "sfx",
-     "name": "strafeNear",
-     "x": -20,
-     "z": 613,
-     "volume": 1
-    },
-    {
-     "t": 1.5,
-     "type": "explosion",
-     "x": -8,
-     "z": 613.86,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 1.57,
-     "type": "explosion",
-     "x": -10.6,
-     "z": 614.3,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 1.63,
-     "type": "explosion",
-     "x": -13.2,
-     "z": 614.74,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 1.7,
-     "type": "explosion",
-     "x": -15.8,
-     "z": 614.08,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 1.76,
-     "type": "explosion",
-     "x": -18.4,
-     "z": 614.52,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 1.83,
-     "type": "explosion",
-     "x": -21,
-     "z": 613.86,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 1.89,
-     "type": "explosion",
-     "x": -23.6,
-     "z": 614.3,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 1.9,
+     "t": 1.79,
      "type": "shake",
      "dur": 1.6,
      "strength": 0.8
@@ -4490,67 +4625,11 @@
      "dur": 2.4
     },
     {
-     "t": 1.96,
-     "type": "explosion",
-     "x": -26.2,
-     "z": 614.74,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 2.02,
-     "type": "explosion",
-     "x": -28.8,
-     "z": 614.08,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 2.09,
-     "type": "explosion",
-     "x": -31.4,
-     "z": 614.52,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 2.15,
-     "type": "explosion",
-     "x": -34,
-     "z": 613.86,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
      "t": 2.2,
      "type": "sfx",
      "name": "bodyFall",
      "x": -32.5,
      "z": 616.1,
-     "volume": 1
-    },
-    {
-     "t": 2.22,
-     "type": "explosion",
-     "x": -36.6,
-     "z": 614.3,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 2.28,
-     "type": "explosion",
-     "x": -39.2,
-     "z": 614.74,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 2.3,
-     "type": "sfx",
-     "name": "strafeDirt",
-     "x": -33.1,
-     "z": 618,
      "volume": 1
     },
     {
@@ -4570,26 +4649,10 @@
      "radius": 0.8
     },
     {
-     "t": 2.35,
-     "type": "explosion",
-     "x": -41.8,
-     "z": 614.08,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
      "t": 2.36,
      "type": "explosion",
      "x": -35.9,
      "z": 618.8,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 2.41,
-     "type": "explosion",
-     "x": -44.4,
-     "z": 614.52,
      "kind": "grenade",
      "radius": 0.8
     },
@@ -4636,18 +4699,115 @@
      "dur": 2.8
     },
     {
-     "t": 19.6,
-     "type": "sfx",
-     "name": "planeDrone",
-     "x": -100,
-     "z": 560,
-     "volume": 0.35
-    },
-    {
      "t": 20.6,
      "type": "caption",
      "text": "（飞机过去了。顺子爬回去，和老耿把冬瓜抬进沟里）",
      "dur": 4
+    }
+   ],
+   "aircraft": [
+    {
+     "id": "Ki30A",
+     "model": "MitsubishiKi30",
+     "path": [
+      {
+       "t": 0,
+       "x": 140,
+       "y": 52,
+       "z": 603
+      },
+      {
+       "t": 1.5,
+       "x": 30,
+       "y": 28,
+       "z": 611
+      },
+      {
+       "t": 2.8,
+       "x": -62,
+       "y": 22,
+       "z": 614
+      },
+      {
+       "t": 4.6,
+       "x": -190,
+       "y": 45,
+       "z": 606
+      },
+      {
+       "t": 8.5,
+       "x": -430,
+       "y": 130,
+       "z": 560
+      }
+     ],
+     "strafe": [
+      {
+       "t0": 1.5,
+       "t1": 2.2,
+       "from": {
+        "x": -8,
+        "z": 614.3
+       },
+       "to": {
+        "x": -46,
+        "z": 614.3
+       },
+       "hz": 30
+      }
+     ],
+     "sound": {
+      "drone": true,
+      "diveT": 0.6
+     }
+    },
+    {
+     "id": "Ki30B",
+     "model": "MitsubishiKi30",
+     "path": [
+      {
+       "t": 1.3,
+       "x": 140,
+       "y": 60,
+       "z": 583
+      },
+      {
+       "t": 2.8,
+       "x": 30,
+       "y": 36,
+       "z": 591
+      },
+      {
+       "t": 4.1,
+       "x": -62,
+       "y": 30,
+       "z": 594
+      },
+      {
+       "t": 5.9,
+       "x": -190,
+       "y": 53,
+       "z": 586
+      },
+      {
+       "t": 9.8,
+       "x": -430,
+       "y": 138,
+       "z": 540
+      }
+     ],
+     "sound": {
+      "drone": true,
+      "diveT": 1.9
+     }
+    }
+   ],
+   "slowmo": [
+    {
+     "t": 1.7,
+     "dur": 1.7,
+     "rate": 0.3,
+     "fade": 0.3
     }
    ]
   },
@@ -4773,13 +4933,20 @@
      "keys": [
       {
        "t": 0,
-       "faceTo": "Donggua"
+       "x": -47.24,
+       "z": 619.59,
+       "move": "cut",
+       "yawDeg": 180,
+       "stance": "crouch",
+       "clip": "CareMedicPress"
       },
       {
        "t": 31.29,
-       "x": -45.6,
-       "z": 619.87,
-       "move": "cut"
+       "x": -47.24,
+       "z": 619.59,
+       "move": "cut",
+       "clip": null,
+       "stance": "stand"
       },
       {
        "t": 32.69,
@@ -4791,46 +4958,17 @@
      ]
     },
     {
-     "id": "LiuWencai",
+     "id": "Donggua",
      "keys": [
       {
-       "t": 6,
-       "faceTo": "Donggua"
+       "t": 0,
+       "clip": "CareLieTreated"
       },
       {
-       "t": 8.2,
-       "faceTo": "player"
-      },
-      {
-       "t": 20.8,
-       "faceTo": "Nier"
-      },
-      {
-       "t": 24.49,
-       "x": -52,
-       "z": 620.3,
-       "move": "cut"
-      },
-      {
-       "t": 28.89,
-       "x": -46.3,
-       "z": 619.92,
-       "move": "walk",
-       "path": [
-        {
-         "x": -51,
-         "z": 619.68
-        },
-        {
-         "x": -47.4,
-         "z": 619.44
-        }
-       ],
-       "yawDeg": 90
-      },
-      {
-       "t": 29.19,
-       "carryRole": "rear"
+       "t": 13,
+       "clip": "PvLieGrabSleeve",
+       "clipRelease": 5.6,
+       "clipHold": true
       }
      ]
     },
@@ -4838,10 +4976,17 @@
      "id": "Nier",
      "keys": [
       {
+       "t": 0,
+       "stance": "crouch",
+       "clip": "VilCrouchHold"
+      },
+      {
        "t": 21.6,
        "x": -53.6,
        "z": 620.41,
-       "move": "cut"
+       "move": "cut",
+       "clip": null,
+       "stance": "stand"
       },
       {
        "t": 28.2,
@@ -4863,6 +5008,52 @@
         }
        ],
        "faceTo": "Geng"
+      }
+     ]
+    },
+    {
+     "id": "LiuWencai",
+     "keys": [
+      {
+       "t": 6,
+       "faceTo": "Donggua"
+      },
+      {
+       "t": 8.2,
+       "faceTo": "player",
+       "clip": "PvStandTalkSlung"
+      },
+      {
+       "t": 20.8,
+       "faceTo": "Nier"
+      },
+      {
+       "t": 24.49,
+       "x": -52,
+       "z": 620.3,
+       "move": "cut",
+       "clip": null
+      },
+      {
+       "t": 28.89,
+       "x": -46.3,
+       "z": 619.92,
+       "move": "walk",
+       "path": [
+        {
+         "x": -51,
+         "z": 619.68
+        },
+        {
+         "x": -47.4,
+         "z": 619.44
+        }
+       ],
+       "yawDeg": 90
+      },
+      {
+       "t": 29.19,
+       "carryRole": "rear"
       }
      ]
     }
@@ -5644,6 +5835,44 @@
       {
        "t": 0,
        "faceTo": "player"
+      },
+      {
+       "t": 0.8,
+       "clip": "PvStandHaltL"
+      },
+      {
+       "t": 5,
+       "clip": null
+      }
+     ]
+    },
+    {
+     "id": "Geng",
+     "keys": [
+      {
+       "t": 0,
+       "x": -161.4,
+       "z": 625.9,
+       "move": "cut",
+       "yawDeg": -90,
+       "clip": "PvSitRestRifle"
+      },
+      {
+       "t": 34.32,
+       "faceTo": {
+        "x": -154.4,
+        "z": 629.9
+       }
+      }
+     ]
+    },
+    {
+     "id": "Nier",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "crouch",
+       "clip": "PvKneelDig"
       }
      ]
     },
@@ -5656,26 +5885,45 @@
        "faceTo": {
         "x": -156.4,
         "z": 627.2
-       }
+       },
+       "clip": "PvCrouchTalkRifle"
+      },
+      {
+       "t": 19.38,
+       "clip": "PvCrouchCountFingers"
+      },
+      {
+       "t": 26.1,
+       "clip": "PvCrouchTalkRifle"
       }
      ]
     },
     {
-     "id": "Geng",
+     "id": "Doctor",
      "keys": [
       {
        "t": 0,
-       "faceTo": {
-        "x": -156.4,
-        "z": 627.2
-       }
-      },
+       "clip": "CareMedicPress"
+      }
+     ]
+    },
+    {
+     "id": "Civ1",
+     "keys": [
       {
-       "t": 34.32,
-       "faceTo": {
-        "x": -162.4,
-        "z": 637.9
-       }
+       "t": 0,
+       "stance": "crouch",
+       "clip": "VilCrouchHold"
+      }
+     ]
+    },
+    {
+     "id": "Civ3",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "crouch",
+       "clip": "VilCrouchHold"
       }
      ]
     }
@@ -5769,7 +6017,7 @@
       "x": -164.48,
       "z": 616.55,
       "stance": "stand",
-      "yawDeg": 102.35,
+      "yawDeg": 104.38,
       "pitchDeg": -6
      }
     },
@@ -6057,35 +6305,52 @@
       {
        "t": 0,
        "stance": "crouch",
-       "faceTo": {
-        "x": -170.4,
-        "z": 609.2
-       }
+       "yawDeg": 90,
+       "clip": "CareMedicPress"
       },
       {
        "t": 3.4,
        "stance": "stand",
+       "clip": null,
        "faceTo": "Donggua"
       },
       {
-       "t": 8.1,
-       "x": -177.5,
-       "z": 619.4,
-       "move": "cut"
-      },
-      {
-       "t": 12.1,
-       "x": -176.4,
-       "z": 616.6,
-       "move": "walk",
+       "t": 4,
+       "clip": "PvStandPointL",
        "faceTo": {
-        "x": -170.4,
-        "z": 609.2
+        "x": -181,
+        "z": 627
        }
       },
       {
-       "t": 12.3,
-       "stance": "crouch"
+       "t": 8.3,
+       "clip": null,
+       "stance": "crouch",
+       "yawDeg": 90
+      },
+      {
+       "t": 8.7,
+       "clip": "CareMedicPress"
+      }
+     ]
+    },
+    {
+     "id": "Civ1",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "crouch",
+       "clip": "VilCrouchHold"
+      }
+     ]
+    },
+    {
+     "id": "Civ3",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "crouch",
+       "clip": "VilCrouchHold"
       }
      ]
     },
@@ -6205,7 +6470,7 @@
       "x": -180.2,
       "z": 629,
       "stance": "stand",
-      "yawDeg": 93.37,
+      "yawDeg": 115.33,
       "pitchDeg": -22
      }
     },
@@ -6216,9 +6481,9 @@
       "x": -180.2,
       "z": 629,
       "stance": "stand",
-      "yawDeg": 93.37,
+      "yawDeg": 115.33,
       "pitchDeg": -22,
-      "toYawDeg": 93.37,
+      "toYawDeg": 115.33,
       "toPitchDeg": -6
      }
     },
@@ -6229,7 +6494,7 @@
       "x": -180.2,
       "z": 629,
       "stance": "stand",
-      "yawDeg": 93.37,
+      "yawDeg": 115.33,
       "pitchDeg": -6
      }
     },
@@ -6240,7 +6505,7 @@
       "x": -180.2,
       "z": 629,
       "stance": "stand",
-      "yawDeg": 93.37,
+      "yawDeg": 115.33,
       "pitchDeg": -6,
       "toYawDeg": -51.34,
       "toPitchDeg": -8
@@ -6321,7 +6586,8 @@
        "faceTo": {
         "x": -182.4,
         "z": 630.6
-       }
+       },
+       "clip": null
       },
       {
        "t": 0.4,
@@ -6331,8 +6597,8 @@
       },
       {
        "t": 3.2,
-       "x": -183.6,
-       "z": 629.2,
+       "x": -182.82,
+       "z": 630.24,
        "move": "walk",
        "path": [
         {
@@ -6340,20 +6606,17 @@
          "z": 628
         }
        ],
-       "faceTo": "Donggua"
+       "yawDeg": -90
       },
       {
        "t": 3.4,
        "stance": "crouch",
-       "clip": "InterrogateCrouch"
+       "clip": "CareMedicPress"
       },
       {
-       "t": 9.3,
-       "clip": null
-      },
-      {
-       "t": 9.7,
+       "t": 9.59,
        "stance": "stand",
+       "clip": "PvStandPointL",
        "faceTo": {
         "x": -181,
         "z": 627
@@ -6361,14 +6624,15 @@
       },
       {
        "t": 13.72,
-       "x": -183.6,
-       "z": 629.2,
-       "move": "cut"
+       "x": -182.82,
+       "z": 630.24,
+       "move": "cut",
+       "clip": null
       },
       {
        "t": 18.72,
-       "x": -176.4,
-       "z": 616.6,
+       "x": -185.58,
+       "z": 621.96,
        "move": "walk",
        "path": [
         {
@@ -6380,14 +6644,32 @@
          "z": 625.6
         }
        ],
-       "faceTo": {
-        "x": -170.4,
-        "z": 609.2
-       }
+       "yawDeg": 90
       },
       {
        "t": 18.92,
-       "stance": "crouch"
+       "stance": "crouch",
+       "clip": "CareMedicPress"
+      }
+     ]
+    },
+    {
+     "id": "Civ1",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "crouch",
+       "clip": "VilCrouchHold"
+      }
+     ]
+    },
+    {
+     "id": "Civ3",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "crouch",
+       "clip": "VilCrouchHold"
       }
      ]
     },
@@ -6396,7 +6678,12 @@
      "keys": [
       {
        "t": 14.72,
-       "faceTo": "Donggua"
+       "faceTo": "Donggua",
+       "clip": "PvStandTalkSlung"
+      },
+      {
+       "t": 18.89,
+       "clip": null
       }
      ]
     },
@@ -6405,7 +6692,10 @@
      "keys": [
       {
        "t": 19.49,
-       "faceTo": "Donggua"
+       "faceTo": "Donggua",
+       "stance": "crouch",
+       "clip": "PvKneelPullBlanket",
+       "clipHold": true
       }
      ]
     },
@@ -6665,6 +6955,35 @@
        "z": 616.4,
        "move": "walk",
        "yawDeg": -90
+      }
+     ]
+    },
+    {
+     "id": "Doctor",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "CareMedicPress"
+      }
+     ]
+    },
+    {
+     "id": "Civ1",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "crouch",
+       "clip": "VilCrouchHold"
+      }
+     ]
+    },
+    {
+     "id": "Civ3",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "crouch",
+       "clip": "VilCrouchHold"
       }
      ]
     }
@@ -6933,12 +7252,13 @@
       },
       {
        "t": 22.97,
-       "clip": null
+       "clip": "PvCrouchTalkRifle"
       },
       {
        "t": 29.67,
        "stance": "stand",
-       "faceTo": "player"
+       "faceTo": "player",
+       "clip": "PvStandTalkSlung"
       }
      ]
     },
@@ -7090,6 +7410,35 @@
      ]
     },
     {
+     "id": "Doctor",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "CareMedicPress"
+      }
+     ]
+    },
+    {
+     "id": "Civ1",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "crouch",
+       "clip": "VilCrouchHold"
+      }
+     ]
+    },
+    {
+     "id": "Civ3",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "crouch",
+       "clip": "VilCrouchHold"
+      }
+     ]
+    },
+    {
      "id": "Nier",
      "keys": [
       {
@@ -7106,7 +7455,12 @@
      "keys": [
       {
        "t": 23.37,
-       "faceTo": "player"
+       "faceTo": "player",
+       "clip": "PvStandTalkSlung"
+      },
+      {
+       "t": 25.43,
+       "clip": null
       }
      ]
     }
@@ -7372,6 +7726,90 @@
    ],
    "actors": [
     {
+     "id": "Sapper1",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvKneelDig"
+      },
+      {
+       "t": 9.45,
+       "faceTo": {
+        "x": -244,
+        "z": 676
+       }
+      }
+     ]
+    },
+    {
+     "id": "Sapper2",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvKneelDig"
+      },
+      {
+       "t": 9.45,
+       "faceTo": {
+        "x": -244,
+        "z": 676
+       }
+      }
+     ]
+    },
+    {
+     "id": "Nier",
+     "keys": [
+      {
+       "t": 0,
+       "x": -156.75,
+       "z": 619.24,
+       "move": "cut",
+       "faceTo": {
+        "x": -146,
+        "z": 630.5
+       },
+       "clip": "VilClingHem"
+      },
+      {
+       "t": 9.45,
+       "faceTo": {
+        "x": -244,
+        "z": 676
+       }
+      }
+     ]
+    },
+    {
+     "id": "Doctor",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "CareMedicPress"
+      }
+     ]
+    },
+    {
+     "id": "Civ1",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "crouch",
+       "clip": "VilCrouchHold"
+      }
+     ]
+    },
+    {
+     "id": "Civ3",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "crouch",
+       "clip": "VilCrouchHold"
+      }
+     ]
+    },
+    {
      "id": "LitterCross",
      "keys": [
       {
@@ -7481,8 +7919,34 @@
        }
       },
       {
+       "t": 13.6,
+       "clip": "PvStandTalkSlung"
+      },
+      {
        "t": 15.21,
-       "faceTo": "Luo"
+       "faceTo": {
+        "x": -132,
+        "z": 616.5
+       },
+       "clip": "PvStandPointL"
+      },
+      {
+       "t": 23.79,
+       "faceTo": "Luo",
+       "clip": "PvStandTalkSlung"
+      },
+      {
+       "t": 29.89,
+       "faceTo": {
+        "x": -150,
+        "z": 680
+       },
+       "clip": "PvStandPointL"
+      },
+      {
+       "t": 41.1,
+       "clip": null,
+       "faceTo": "Sapper1"
       }
      ]
     },
@@ -7499,6 +7963,14 @@
       {
        "t": 15.61,
        "faceTo": "BridgeOfficer"
+      },
+      {
+       "t": 22.17,
+       "clip": "PvStandTalkLowRifle"
+      },
+      {
+       "t": 40.1,
+       "clip": null
       },
       {
        "t": 40.3,
@@ -7559,6 +8031,14 @@
       {
        "t": 16.01,
        "faceTo": "BridgeOfficer"
+      },
+      {
+       "t": 28.43,
+       "clip": "PvStandTalkLowRifle"
+      },
+      {
+       "t": 40.1,
+       "clip": null
       },
       {
        "t": 40.8,
@@ -7731,46 +8211,10 @@
      ]
     },
     {
-     "id": "Nier",
-     "keys": [
-      {
-       "t": 9.45,
-       "faceTo": {
-        "x": -244,
-        "z": 676
-       }
-      }
-     ]
-    },
-    {
      "id": "GateGuard",
      "keys": [
       {
        "t": 9.3,
-       "faceTo": {
-        "x": -244,
-        "z": 676
-       }
-      }
-     ]
-    },
-    {
-     "id": "Sapper1",
-     "keys": [
-      {
-       "t": 9.45,
-       "faceTo": {
-        "x": -244,
-        "z": 676
-       }
-      }
-     ]
-    },
-    {
-     "id": "Sapper2",
-     "keys": [
-      {
-       "t": 9.45,
        "faceTo": {
         "x": -244,
         "z": 676
@@ -7937,13 +8381,37 @@
     },
     {
      "t": 10,
-     "dur": 1.4,
+     "dur": 1.2,
      "eye": {
       "x": -131.6,
       "z": 616.5,
       "stance": "stand",
       "yawDeg": 159.22,
       "pitchDeg": -2,
+      "toYawDeg": 89.06,
+      "toPitchDeg": -1
+     }
+    },
+    {
+     "t": 11.2,
+     "dur": 3.4,
+     "eye": {
+      "x": -131.6,
+      "z": 616.5,
+      "stance": "stand",
+      "yawDeg": 89.06,
+      "pitchDeg": -1
+     }
+    },
+    {
+     "t": 14.6,
+     "dur": 1.4,
+     "eye": {
+      "x": -131.6,
+      "z": 616.5,
+      "stance": "stand",
+      "yawDeg": 89.06,
+      "pitchDeg": -1,
       "toYawDeg": -90,
       "toPitchDeg": 0
      }
@@ -8240,13 +8708,22 @@
      "id": "Straggler1",
      "keys": [
       {
+       "t": 0,
+       "x": -108,
+       "z": 611.2,
+       "move": "cut",
+       "yawDeg": 90,
+       "stance": "stand",
+       "clip": "VilNraCarryOnBack"
+      },
+      {
        "t": 1,
        "x": -108,
        "z": 611.2,
        "move": "cut"
       },
       {
-       "t": 36.46,
+       "t": 71.93,
        "x": -150.4,
        "z": 641,
        "move": "walk",
@@ -8267,7 +8744,8 @@
          "x": -150,
          "z": 641
         }
-       ]
+       ],
+       "yawDeg": 180
       }
      ]
     },
@@ -8275,19 +8753,28 @@
      "id": "Straggler2",
      "keys": [
       {
-       "t": 1.4,
-       "x": -96,
-       "z": 612.9,
+       "t": 0,
+       "x": -108,
+       "z": 611.2,
+       "move": "cut",
+       "yawDeg": 90,
+       "stance": "stand",
+       "clip": "VilRideOnBack"
+      },
+      {
+       "t": 1,
+       "x": -108,
+       "z": 611.2,
        "move": "cut"
       },
       {
-       "t": 35.96,
-       "x": -149.5,
+       "t": 71.93,
+       "x": -150.4,
        "z": 641,
        "move": "walk",
        "path": [
         {
-         "x": -96,
+         "x": -108,
          "z": 612
         },
         {
@@ -8302,7 +8789,8 @@
          "x": -150,
          "z": 641
         }
-       ]
+       ],
+       "yawDeg": 180
       }
      ]
     },
@@ -8310,16 +8798,20 @@
      "id": "Refugee1",
      "keys": [
       {
+       "t": 1.7,
+       "clip": "VilPanicRun"
+      },
+      {
        "t": 1.8,
        "x": -102,
        "z": 612.6,
        "move": "cut"
       },
       {
-       "t": 36.62,
+       "t": 28.58,
        "x": -150.4,
        "z": 641,
-       "move": "walk",
+       "move": "run",
        "path": [
         {
          "x": -102,
@@ -8338,6 +8830,10 @@
          "z": 641
         }
        ]
+      },
+      {
+       "t": 28.78,
+       "clip": null
       }
      ]
     },
@@ -8380,16 +8876,20 @@
      "id": "Refugee2",
      "keys": [
       {
+       "t": 2.5,
+       "clip": "VilPanicRun"
+      },
+      {
        "t": 2.6,
        "x": -58,
        "z": 612.8,
        "move": "cut"
       },
       {
-       "t": 59.57,
+       "t": 46.42,
        "x": -149.5,
        "z": 641,
-       "move": "walk",
+       "move": "run",
        "path": [
         {
          "x": -58,
@@ -8408,6 +8908,10 @@
          "z": 641
         }
        ]
+      },
+      {
+       "t": 46.62,
+       "clip": null
       }
      ]
     },
@@ -8457,6 +8961,158 @@
        "x": -150,
        "z": 740,
        "move": "walk",
+       "yawDeg": 180
+      }
+     ]
+    },
+    {
+     "id": "Sapper1",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvKneelDig"
+      },
+      {
+       "t": 38.2,
+       "clip": null
+      }
+     ]
+    },
+    {
+     "id": "Sapper2",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvKneelDig"
+      },
+      {
+       "t": 38.2,
+       "clip": null
+      }
+     ]
+    },
+    {
+     "id": "YardLitter3",
+     "keys": [
+      {
+       "t": 0,
+       "x": -166,
+       "z": 616.2,
+       "move": "cut",
+       "yawDeg": -90
+      },
+      {
+       "t": 8,
+       "x": -166,
+       "z": 616.2,
+       "move": "cut"
+      },
+      {
+       "t": 88.51,
+       "x": -150,
+       "z": 710,
+       "move": "walk",
+       "path": [
+        {
+         "x": -163.3,
+         "z": 616
+        },
+        {
+         "x": -160.7,
+         "z": 616
+        },
+        {
+         "x": -150,
+         "z": 624
+        }
+       ],
+       "yawDeg": 180
+      }
+     ]
+    },
+    {
+     "id": "Doctor",
+     "keys": [
+      {
+       "t": 0,
+       "x": -168.4,
+       "z": 615.6,
+       "move": "cut",
+       "yawDeg": -90,
+       "stance": "stand",
+       "clip": null
+      },
+      {
+       "t": 9.6,
+       "x": -168.4,
+       "z": 615.6,
+       "move": "cut"
+      },
+      {
+       "t": 86.08,
+       "x": -149,
+       "z": 709,
+       "move": "walk",
+       "path": [
+        {
+         "x": -163.3,
+         "z": 616
+        },
+        {
+         "x": -160.7,
+         "z": 616
+        },
+        {
+         "x": -150,
+         "z": 624
+        },
+        {
+         "x": -150,
+         "z": 709
+        }
+       ],
+       "yawDeg": 180
+      }
+     ]
+    },
+    {
+     "id": "YardLitter1",
+     "keys": [
+      {
+       "t": 0.5,
+       "x": -150,
+       "z": 652.5,
+       "move": "cut"
+      },
+      {
+       "t": 73.42,
+       "x": -150,
+       "z": 740,
+       "move": "walk",
+       "yawDeg": 180
+      }
+     ]
+    },
+    {
+     "id": "YardLitter2",
+     "keys": [
+      {
+       "t": 2,
+       "x": -152,
+       "z": 628,
+       "move": "cut"
+      },
+      {
+       "t": 77.38,
+       "x": -150,
+       "z": 724,
+       "move": "walk",
+       "path": [
+        {
+         "x": -150,
+         "z": 628
+        }
+       ],
        "yawDeg": 180
       }
      ]
@@ -8514,7 +9170,7 @@
        "aim": true
       },
       {
-       "t": 19.3,
+       "t": 22.8,
        "state": "down"
       },
       {
@@ -8585,7 +9241,7 @@
        "aim": true
       },
       {
-       "t": 21.3,
+       "t": 24.3,
        "state": "down"
       },
       {
@@ -8848,11 +9504,30 @@
      "keys": [
       {
        "t": 37,
-       "faceTo": "Sapper1"
+       "faceTo": "Sapper1",
+       "clip": "PvStandPointL"
+      },
+      {
+       "t": 38.84,
+       "clip": null
       },
       {
        "t": 47.7,
-       "faceTo": "Luo"
+       "faceTo": "Luo",
+       "clip": "PvStandTalkSlung"
+      },
+      {
+       "t": 50.31,
+       "faceTo": {
+        "x": -100,
+        "z": 612
+       },
+       "clip": "PvStandPointL"
+      },
+      {
+       "t": 52.25,
+       "clip": null,
+       "faceTo": "Sapper1"
       }
      ]
     },
@@ -8861,7 +9536,17 @@
      "keys": [
       {
        "t": 49.39,
-       "faceTo": "BridgeOfficer"
+       "faceTo": {
+        "x": -77.6,
+        "z": 604
+       },
+       "aim": false,
+       "clip": "PvStandPointL"
+      },
+      {
+       "t": 51.7,
+       "faceTo": "BridgeOfficer",
+       "clip": "PvStandTalkLowRifle"
       },
       {
        "t": 53.2,
@@ -8872,7 +9557,13 @@
        "faceTo": {
         "x": -40,
         "z": 606.4
-       }
+       },
+       "clip": "PvStandPointL"
+      },
+      {
+       "t": 55.89,
+       "clip": null,
+       "aim": true
       }
      ]
     },
@@ -8915,7 +9606,7 @@
       },
       {
        "t": 59.09,
-       "clip": "PointBlockade"
+       "clip": "PvStandBeckonL"
       },
       {
        "t": 62.5,
@@ -9121,9 +9812,9 @@
      "volume": 0.45
     },
     {
-     "t": 11,
+     "t": 10.6,
      "type": "caption",
-     "text": "（鬼子跟上来了：路两边麦地里的枪口火一闪一闪，先是零星几枪，后来连成一片；鬼子散开往前跃进）",
+     "text": "（接收院里的担架也一副一副抬出来，插进队里上桥；军医跟着最后一副出了院门，没回头。院门敞着，马灯还在里头亮着）",
      "dur": 5
     },
     {
@@ -9205,6 +9896,12 @@
      "volume": 0.7
     },
     {
+     "t": 16,
+     "type": "caption",
+     "text": "（鬼子跟上来了：路两边麦地里的枪口火一闪一闪，先是零星几枪，后来连成一片；鬼子散开往前跃进）",
+     "dur": 4
+    },
+    {
      "t": 16.1,
      "type": "muzzle",
      "actor": "LiuWencai"
@@ -9231,12 +9928,6 @@
      "volume": 0.45
     },
     {
-     "t": 16.8,
-     "type": "caption",
-     "text": "（打那些冲在前头、朝撤下来的人开枪的鬼子）",
-     "dur": 3
-    },
-    {
      "t": 17.14,
      "type": "muzzle",
      "actor": "Ija3"
@@ -9248,19 +9939,6 @@
      "x": -16,
      "z": 602.6,
      "volume": 0.45
-    },
-    {
-     "t": 17.5,
-     "type": "muzzle",
-     "actor": "player"
-    },
-    {
-     "t": 17.5,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": -131.6,
-     "z": 616.5,
-     "volume": 0.9
     },
     {
      "t": 18,
@@ -9297,19 +9975,6 @@
      "volume": 0.7
     },
     {
-     "t": 19,
-     "type": "muzzle",
-     "actor": "player"
-    },
-    {
-     "t": 19,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": -131.6,
-     "z": 616.5,
-     "volume": 0.9
-    },
-    {
      "t": 19.2,
      "type": "muzzle",
      "actor": "Ija7"
@@ -9321,6 +9986,12 @@
      "x": -30,
      "z": 618.6,
      "volume": 0.45
+    },
+    {
+     "t": 20.2,
+     "type": "caption",
+     "text": "（打那些冲在前头、朝撤下来的人开枪的鬼子）",
+     "dur": 3
     },
     {
      "t": 20.2,
@@ -9375,10 +10046,17 @@
      "volume": 0.45
     },
     {
-     "t": 22,
-     "type": "caption",
-     "text": "（撤下来的人一个个从顺子身边跑过去，越来越稀，跟 03 那个坑一样）",
-     "dur": 3.4
+     "t": 22.5,
+     "type": "muzzle",
+     "actor": "player"
+    },
+    {
+     "t": 22.5,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": -131.6,
+     "z": 616.5,
+     "volume": 0.9
     },
     {
      "t": 22.77,
@@ -9407,6 +10085,12 @@
      "volume": 0.7
     },
     {
+     "t": 23.6,
+     "type": "caption",
+     "text": "（撤下来的人一个个从顺子身边跑过去，越来越稀，跟 03 那个坑一样）",
+     "dur": 3.4
+    },
+    {
      "t": 23.8,
      "type": "muzzle",
      "actor": "Ija5"
@@ -9418,6 +10102,19 @@
      "x": 0,
      "z": 604,
      "volume": 0.45
+    },
+    {
+     "t": 24,
+     "type": "muzzle",
+     "actor": "player"
+    },
+    {
+     "t": 24,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": -131.6,
+     "z": 616.5,
+     "volume": 0.9
     },
     {
      "t": 25,
@@ -9922,6 +10619,19 @@
     },
     {
      "t": 46,
+     "type": "muzzle",
+     "actor": "Luo"
+    },
+    {
+     "t": 46,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": -132,
+     "z": 618.6,
+     "volume": 0.7
+    },
+    {
+     "t": 46,
      "type": "sfx",
      "name": "mortarPop",
      "x": 6,
@@ -9974,19 +10684,6 @@
      "x": -10,
      "z": 617.8,
      "volume": 0.45
-    },
-    {
-     "t": 50,
-     "type": "muzzle",
-     "actor": "Luo"
-    },
-    {
-     "t": 50,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": -132,
-     "z": 618.6,
-     "volume": 0.7
     },
     {
      "t": 50.37,
@@ -10571,7 +11268,14 @@
       },
       {
        "t": 0.2,
-       "faceTo": "player"
+       "faceTo": "player",
+       "aim": false,
+       "clip": "PvStandWaveOnL"
+      },
+      {
+       "t": 2.4,
+       "clip": null,
+       "aim": true
       },
       {
        "t": 3,
@@ -10996,35 +11700,19 @@
      ]
     },
     {
-     "id": "BridgeOfficer",
-     "keys": [
-      {
-       "t": 40.29,
-       "faceTo": "Sapper1"
-      },
-      {
-       "t": 42.72,
-       "x": -148.6,
-       "z": 709.5,
-       "move": "cut"
-      },
-      {
-       "t": 45.12,
-       "x": -148.6,
-       "z": 721.4,
-       "move": "run",
-       "yawDeg": 0
-      }
-     ]
-    },
-    {
      "id": "Sapper1",
      "keys": [
+      {
+       "t": 0,
+       "clip": "PvCrouchGripLitter"
+      },
       {
        "t": 42.52,
        "x": -150.9,
        "z": 703.2,
-       "move": "cut"
+       "move": "cut",
+       "clip": null,
+       "stance": "stand"
       },
       {
        "t": 44.92,
@@ -11032,6 +11720,30 @@
        "z": 719.8,
        "move": "run",
        "stance": "stand",
+       "yawDeg": 0
+      }
+     ]
+    },
+    {
+     "id": "BridgeOfficer",
+     "keys": [
+      {
+       "t": 40.29,
+       "faceTo": "Sapper1",
+       "clip": "PvStandPointL"
+      },
+      {
+       "t": 42.72,
+       "x": -148.6,
+       "z": 709.5,
+       "move": "cut",
+       "clip": null
+      },
+      {
+       "t": 45.12,
+       "x": -148.6,
+       "z": 721.4,
+       "move": "run",
        "yawDeg": 0
       }
      ]
@@ -11851,7 +12563,13 @@
      "keys": [
       {
        "t": 12.6,
-       "faceTo": "player"
+       "faceTo": "player",
+       "aim": false,
+       "clip": "PvStandWaveOnL"
+      },
+      {
+       "t": 17.6,
+       "clip": null
       },
       {
        "t": 17.8,
@@ -12719,6 +13437,15 @@
        "yawDeg": 180
       },
       {
+       "t": 15.56,
+       "faceTo": "Yaowa",
+       "clip": "PvStandTalkSlung"
+      },
+      {
+       "t": 21.15,
+       "clip": null
+      },
+      {
        "t": 21.35,
        "x": -151,
        "z": 850.4,
@@ -13245,6 +13972,14 @@
        "faceTo": "Geng"
       },
       {
+       "t": 12.8,
+       "clip": "PvStandTalkSlung"
+      },
+      {
+       "t": 21.15,
+       "clip": null
+      },
+      {
        "t": 21.35,
        "x": -148.6,
        "z": 849.8,
@@ -13355,7 +14090,8 @@
      "keys": [
       {
        "t": 28.82,
-       "faceTo": "player"
+       "faceTo": "player",
+       "clip": "PvStandBeckonL"
       }
      ]
     }
