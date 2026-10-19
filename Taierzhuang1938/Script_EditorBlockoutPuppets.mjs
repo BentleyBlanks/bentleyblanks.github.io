@@ -92,6 +92,8 @@ export const BLOCKOUT_PUPPETS = Object.freeze({
   farAnimM: 60,
   farAnimEvery: 3,
   shadowM: 25,
+  /** 趴着的人离镜头超过这么远就不做逐顶点防陷地（ProneGroundContact 量皮肤那一步，一人约 0.5 ms）；身体顺坡、手脚贴地照做。 */
+  proneSkinFitM: 25,
   childScale: 0.62,
   /** 百姓 / 小孩的身体缺省："rig" = NRA 骨架占位身体（能放片段）；"procedural" = 旧的程序化 tzm 身体。单位字段 body 可覆盖。 */
   civilianBody: "rig",
@@ -591,6 +593,7 @@ export class BlockoutPuppets {
         crouch: !carryRole && puppet.stance === "crouch" ? 1 : 0,
         prone: !carryRole && puppet.stance === "prone" ? 1 : 0,
         grounded: true, lookYaw: 0, lookPitch: 0, firing: false,
+        proneSkinFit: !cameraPosition || distance < BLOCKOUT_PUPPETS.proneSkinFitM,
         dead: !!puppet.down && !drive?.clip,
         ...(carryRole ? { carryRole } : {}),
         ...(drive?.woundedWalk ? { woundedWalk: 1 } : {}),

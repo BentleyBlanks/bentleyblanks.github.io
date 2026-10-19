@@ -361,7 +361,7 @@ export class BlockoutMarkers {
     ```
     预演里下车：`{ "t": 12, "ride": null }`，之后再写位置键才管用；临时上车：`{ "t": 3, "ride": { "on": "GengCart", "z": 1.2, "y": 0.467, "yawDeg": 180 }, "clip": "VilSitEdge" }`。挂到车上的担架（12–18 冬瓜那副）：`{ "kind": "litter", "bearers": 0, "ride": { "on": "GengCart", "z": -0.2, "y": 1.075 } }`，上面躺的人另写 `ride` 到同一辆车（`y` = 1.075 + 0.05，`state: "down"`、`lie: "along"`）。
   - `RideWorldPose(carrier, ride)` 是纯函数（本地 → 世界，与 `TankGroundY` 的脚印旋转同式）。`Probe(id)` 多给 `ride`（写的是什么）、`seat`（这一帧算出的世界位姿 + `carrierY` 车底下地面）、`rootY`、`rootAboveCarrierGround`。实测（RuntimeBrowserTest）：小孩 `VilSitEdge` 的骨盆落在车板顶上下 0.1 m 内、车走 5 s 两处取样位置误差 < 0.05 m。
-- 距离分级：60 m 外每 3 帧更新一次动画，阴影只在 25 m 内开；单关同时上限 120 个演员，超出时远处的只留地环与标签（报警告）。
+- 距离分级：60 m 外每 3 帧更新一次动画，阴影只在 25 m 内开；趴着的人 25 m 外（`proneSkinFitM`）不做逐顶点防陷地（传 `proneSkinFit: false` 给 `ProneGroundContact`，身体顺坡与手脚贴地照做——2026-10-20，07-4 飞机过顶全队卧倒那一拍原来一帧 50 ms 花在这）；单关同时上限 120 个演员，超出时远处的只留地环与标签（报警告）。
 - 切关、重载配置时全部回收；同一关切关键帧时按 `id` 复用。
 
 ```js

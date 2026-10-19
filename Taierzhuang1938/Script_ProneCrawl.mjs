@@ -4,6 +4,26 @@ export { PRONE_CRAWL } from './Data_Tuning_ProneCrawl.mjs';
 
 let libraryPromise;
 const skinProbeCache=new WeakMap();
+const skinPackCache=new WeakMap();
+/** Probe vertices as flat arrays (bind-space position, 4 influences, region) — shared per geometry. */
+function SkinProbePack(geometry,vertices) {
+  let pack=skinPackCache.get(geometry);
+  if(pack)return pack;
+  const position=geometry.attributes.position,indices=geometry.attributes.skinIndex,weights=geometry.attributes.skinWeight;
+  const count=vertices.length,used=new Set();
+  pack={geometry,count,pos:new Float64Array(count*3),skin:new Uint16Array(count*4),weight:new Float64Array(count*4),region:new Int8Array(count),used:null};
+  vertices.forEach(({index,region},i)=>{
+    pack.pos[i*3]=position.getX(index);pack.pos[i*3+1]=position.getY(index);pack.pos[i*3+2]=position.getZ(index);
+    for(let k=0;k<4;k++){
+      const w=weights.getComponent(index,k);pack.weight[i*4+k]=w;pack.skin[i*4+k]=indices.getComponent(index,k);
+      if(w!==0)used.add(pack.skin[i*4+k]);
+    }
+    pack.region[i]=region;
+  });
+  pack.used=Uint16Array.from(used);
+  skinPackCache.set(geometry,pack);
+  return pack;
+}
 export function LoadProneCrawl() {
   return libraryPromise ||= fetch(`./Animation/ProneCrawl/Animation_TengxianHumanoidV1ProneCrawl.json?v=${PRONE_CRAWL.version}`)
     .then(r=>{if(!r.ok)throw new Error(`ProneCrawl HTTP ${r.status}`);return r.json();})
@@ -72,8 +92,42 @@ export class ProneGroundContact {
       vertices=[...unique.values()];
       skinProbeCache.set(mesh.geometry,vertices);
       }
-      this.skin.push({mesh,vertices});
+      this.skin.push({mesh,vertices,pack:SkinProbePack(mesh.geometry,vertices),boneN:new Float64Array(mesh.skeleton.bones.length*16)});
     });
+  }
+  // Lowest skinned probe (minus floor) per region. Same sum as SkinnedMesh.getVertexPosition
+  // (every non-zero influence, bindMatrix → bone → bindMatrixInverse → matrixWorld), but with
+  // per-bone matrices folded once per pass: ~1.5–2k probes per soldier made three's per-vertex
+  // path the whole cost of a prone squad (07-4 blockout, 29 prone ≈ 47 ms/frame).
+  _SkinLows(lows,floorAt) {
+    const m=this.m4||=new THREE.Matrix4(),w=this.w4||=new THREE.Matrix4(),p=this.v[9];
+    for(const {mesh,vertices,pack,boneN} of this.skin){
+      const morph=mesh.geometry.morphAttributes.position&&mesh.morphTargetInfluences?.some(v=>v!==0);
+      if(morph||pack.geometry!==mesh.geometry||boneN.length<mesh.skeleton.bones.length*16){
+        for(const {index,region} of vertices){
+          mesh.getVertexPosition(index,p).applyMatrix4(mesh.matrixWorld);
+          const id=region<0?4:region;lows[id]=Math.min(lows[id],p.y-floorAt(p.x,p.z));
+        }
+        continue;
+      }
+      const bones=mesh.skeleton.bones,inverses=mesh.skeleton.boneInverses;
+      for(const j of pack.used){m.multiplyMatrices(bones[j].matrixWorld,inverses[j]).multiply(mesh.bindMatrix);boneN.set(m.elements,j*16);}
+      const e=w.multiplyMatrices(mesh.matrixWorld,mesh.bindMatrixInverse).elements;
+      const {count,pos,skin,weight,region}=pack;
+      for(let i=0;i<count;i++){
+        const x=pos[i*3],y=pos[i*3+1],z=pos[i*3+2];
+        let sx=0,sy=0,sz=0;
+        for(let k=i*4,end=k+4;k<end;k++){
+          const wk=weight[k];if(wk===0)continue;
+          const o=skin[k]*16;
+          sx+=wk*(boneN[o]*x+boneN[o+4]*y+boneN[o+8]*z+boneN[o+12]);
+          sy+=wk*(boneN[o+1]*x+boneN[o+5]*y+boneN[o+9]*z+boneN[o+13]);
+          sz+=wk*(boneN[o+2]*x+boneN[o+6]*y+boneN[o+10]*z+boneN[o+14]);
+        }
+        const wx=e[0]*sx+e[4]*sy+e[8]*sz+e[12],wy=e[1]*sx+e[5]*sy+e[9]*sz+e[13],wz=e[2]*sx+e[6]*sy+e[10]*sz+e[14];
+        const id=region[i]<0?4:region[i];lows[id]=Math.min(lows[id],wy-floorAt(wx,wz));
+      }
+    }
   }
   Restore() {
     for(const {bone,p,q} of this.saved){bone.position.copy(p);bone.quaternion.copy(q);}
@@ -216,36 +270,42 @@ export class ProneGroundContact {
     }
     // Clothing is not identical across the shared skeleton. Correct against this
     // actor's visible skin, so a thicker puttee cannot sink into the same pose.
-    const surfaces=[centre,...targets.flatMap(t=>[t.end,t.pole])].map(point=>{
+    // state.proneSkinFit === false (distant crowds) keeps the contact fit above, skips this.
+    if(state.proneSkinFit===false){this.active=true;return;}
+    // Surface i as [x, z, y, n0, n2, max(.5, n1)] — flat, since floorAt runs once per skin probe.
+    const surfaces=this.surfaces||=new Float64Array(9*6);
+    [centre,...targets.flatMap(t=>[t.end,t.pole])].forEach((point,i)=>{
       const hit=probe(point.x,point.z,rootY),n=hit?.normal||[0,1,0];
-      return {x:point.x,z:point.z,y:hit?.y??rootY,n};
+      surfaces.set([point.x,point.z,hit?.y??rootY,n[0],n[2],Math.max(.5,n[1])],i*6);
     });
-    const floorAt=p=>{
+    const floorAt=(px,pz)=>{
       // A continuous field avoids jumping between nearest tangent planes on
       // small humps, which previously fed discontinuous height into the IK.
       let height=0,total=0;
-      for(const s of surfaces){
-        const d=(p.x-s.x)**2+(p.z-s.z)**2,w=1/(d+.025)**3;
-        height+=w*(s.y-(s.n[0]*(p.x-s.x)+s.n[2]*(p.z-s.z))/Math.max(.5,s.n[1]));total+=w;
+      for(let o=0;o<surfaces.length;o+=6){
+        const dx=px-surfaces[o],dz=pz-surfaces[o+1],t=dx*dx+dz*dz+.025,w=1/(t*t*t);
+        height+=w*(surfaces[o+2]-(surfaces[o+3]*dx+surfaces[o+4]*dz)/surfaces[o+5]);total+=w;
       }
       return height/total;
     };
+    const lows=this.lows||=new Float64Array(5);
     for(let pass=0;pass<2;pass++){
       rig.root.updateWorldMatrix(true,false);rig.root.updateMatrixWorld(true);
-      const lows=[Infinity,Infinity,Infinity,Infinity,Infinity];
-      for(const {mesh,vertices} of this.skin){mesh.skeleton.update();for(const {index,region} of vertices){
-        const p=mesh.getVertexPosition(index,this.v[9]).applyMatrix4(mesh.matrixWorld);
-        const id=region<0?4:region;lows[id]=Math.min(lows[id],p.y-floorAt(p));
-      }}
+      lows.fill(Infinity);
+      this._SkinLows(lows,floorAt);
       const bodyLift=Math.max(0,PRONE_CRAWL.clearanceM-lows[4]);
       if(bodyLift>0){pelvis.getWorldPosition(centre);centre.y+=Math.min(.08,bodyLift);pelvis.position.copy(pelvis.parent.worldToLocal(this.v[10].copy(centre)));}
+      let lifted=bodyLift>0;
       for(let i=0;i<targets.length;i++){
         const {l,end,pole,rotation}=targets[i],lift=Math.min(.08,Math.max(0,PRONE_CRAWL.clearanceM-lows[i]));
         if(!lift&&!bodyLift)continue;
+        lifted=true;
         end.y+=lift;pole.y+=lift;
         this.Solve(l,end,pole);
         this.OrientEnd(l,rotation);
       }
+      // Nothing moved: a second measurement would read the same lows.
+      if(!lifted)break;
     }
     this.active=true;
   }

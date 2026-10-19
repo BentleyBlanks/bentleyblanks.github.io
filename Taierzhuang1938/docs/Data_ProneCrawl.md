@@ -141,3 +141,19 @@ V4 动画域 prepush 共 61 项：首次 58 通过、3 未通过。MissionNotesT
 
 合入 `f46c630d` 的新远景合批后，ProneCrawl、ActorPose、ActorCrowd、MotionVectorContract、
 ModuleGraph 5 项再次全部通过（225.9 秒）；匍匐专项仍是六套外观 × 五种地形。
+
+## 2026-10-20 皮肤探针提速
+
+白盒 0610 的 07-4（飞机过顶，29 人同时卧倒）一帧 47 ms 花在接触层最后的皮肤防陷地：
+每人 1.5–2 k 个探针顶点、量两遍，每个顶点走 three 的 `SkinnedMesh.getVertexPosition`。改动：
+
+- 探针按几何体打成平铺数组（绑定空间位置、四个影响、区域），每遍只把用到的骨骼矩阵
+  （骨骼世界 × 骨骼逆 × bindMatrix）算一次，顶点内联加权求和；公式与 three 相同（全部非零影响，
+  再乘 bindMatrixInverse 与 matrixWorld）。有非零变形目标或几何体换了时退回 three 的逐顶点路径。
+- 地面场 `floorAt` 改平铺数组、`**3` 改连乘；去掉每遍的 `skeleton.update()`
+  （`getVertexPosition` 读骨骼 matrixWorld，不读 boneMatrices；渲染时 three 自己会更新）。
+- 第一遍没有任何抬升就不量第二遍（量出来一模一样）。
+- `state.proneSkinFit === false` 跳过这一步（游戏本体不传，行为不变；白盒演员 25 m 外传）。
+
+ProneCrawlTest 新旧对比：全部读数只在小数第 15–16 位有差（浮点舍入），单人姿态 p95 约 5 → 1.5 ms。
+07-4 白盒：趴姿合计 47 → 13 ms/帧；剩下的主要是近处约 10 人各 1 ms，大头是 `Solve` 里反复取骨骼世界坐标。
