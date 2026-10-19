@@ -1,0 +1,16 @@
+[
+  {
+    "state": "Flat",
+    "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\HistoricalProps\\StrawSleepingMat\\References\\Reference_StrawSleepingMatFlat.png",
+    "output": "Texture_StrawFlatReferenceProjection.png",
+    "method": "Blender emission UV projection from user-approved imagegen reference",
+    "broadLightRemoval": "none"
+  },
+  {
+    "state": "Rolled",
+    "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\HistoricalProps\\StrawSleepingMat\\References\\Reference_StrawSleepingMatRolled.png",
+    "output": "Texture_StrawRolledReferenceProjection.png",
+    "method": "Blender emission UV projection from user-approved imagegen reference",
+    "broadLightRemoval": "Row-median cubic lighting profile, linear colour, factor .85..5; stains and fine woven fibres preserved"
+  }
+]

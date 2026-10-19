@@ -17,7 +17,7 @@
       "nominalLength": 1.8,
       "nominalWidth": 0.9,
       "sheetThickness": 0.005,
-      "triangles": 1888,
+      "triangles": 2000,
       "triangleLimit": 2000,
       "textureSet": "Flat",
       "boundsNote": "Loose broken fibre tips extend slightly beyond the nominal sheet. Curl makes full height larger than the 5mm sheet thickness."
@@ -27,7 +27,7 @@
       "state": "folded once and tightly rolled, two straw-cord ties and one carrying loop",
       "nominalAxisLength": 0.9,
       "nominalBodyDiameter": 0.135,
-      "diameterIncludingCords": 0.1452,
+      "diameterIncludingCords": 0.1493,
       "triangles": 1200,
       "triangleLimit": 1200,
       "bindings": 2,
@@ -48,11 +48,12 @@
     "metallic": 0,
     "glbPacking": "Self-contained GLB embeds albedo, normal, and ORM (R AO / G roughness / B zero metallic). Four separate requested channels are retained externally.",
     "atlas": "Upper half is sheet/exterior; lower left is rolled cut end; lower right is straw cord.",
-    "geometryDetail": "Thickness, curl, edge cord, cut-end silhouette, bindings, knots, tails and carrying loop are geometry. Dense woven fibres and compact coiled-layer relief are represented in the aligned material maps."
+    "geometryDetail": "Thickness, irregular curls, thick bound edge and whipstitches are geometry. The rolled mat has actual raised paired spiral strips and a joined inner fold over a recessed fibre backing, two-strand ties, overhand knots, frayed tails and a two-strand carrying loop. Dense woven fibres remain in normal maps.",
+    "referenceMatching": "Production sheet and exterior colour are UV-projected from the approved imagegen reference sheets. Cylindrical foreshortening and broad photographic lighting are removed in Blender before the aligned PBR data bake."
   },
   "provenance": {
     "imageGeneration": "built-in image_gen__imagegen",
-    "textureSources": "Source/Texture_*.png",
+    "textureSources": "Source/Texture_StrawFlatReferenceProjection.png, Texture_StrawRolledReferenceProjection.png, Texture_StrawRopeSource.png and Texture_StrawRollEndSource.png",
     "texturePrompts": "Source/Data_*ImagegenPrompt*.json and Source/Data_ImagegenPrompts.json",
     "historicalSources": [
       "https://m.krzzjn.com/show-1104-31418.html",
@@ -67,7 +68,8 @@
     "textureCommand": "python Model/StrawSleepingMat/Script_StrawSleepingMatTextures.py --scratch tmp/StrawSleepingMat",
     "blenderWorkflow": "Start this task's isolated .blend with scripts/Script_BlenderMcp.mjs, set scene['StrawMatRoot'] to this directory, then execute Script_StrawSleepingMatBake.py through BlenderMCP.",
     "verificationCommand": "python Model/StrawSleepingMat/Script_StrawSleepingMatVerify.py --report tmp/StrawSleepingMat/Data_ExportVerification.json",
-    "blenderSource": "C:/Users/Bentl/OneDrive/AI/Models/Blender/HistoricalProps/StrawSleepingMat/Scene_StrawSleepingMat.blend",
+    "projectionCommand": "Run Script_StrawReferenceProjection.py through the isolated BlenderMCP scene to reproject the approved reference files kept in the Blender project References directory.",
+    "blenderSource": "C:/Users/Bentl/OneDrive/AI/Models/Blender/HistoricalProps/StrawSleepingMat/Scene_StrawSleepingMatRefined.blend",
     "localReview": "tmp/StrawSleepingMat/index.html; screenshots and reference sheets remain local"
   }
 }

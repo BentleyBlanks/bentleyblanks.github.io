@@ -29,8 +29,8 @@ def BakeChannels(color, strength):
     normal = np.stack((-dx * strength, dy * strength, np.ones_like(dx)), axis=-1)
     normal /= np.linalg.norm(normal, axis=-1, keepdims=True)
     normal = np.uint8(np.clip(normal * 0.5 + 0.5, 0, 1) * 255 + 0.5)
-    roughness = np.uint8(np.clip(0.90 - height * 0.17 + (1 - broad) * 0.018, 0.82, 0.97) * 255)
-    ao = np.uint8(np.clip(0.965 + height * 0.48, 0.84, 1.0) * 255)
+    roughness = np.uint8(np.clip(0.88 - height * 0.20 + (1 - broad) * 0.025, 0.80, 0.97) * 255)
+    ao = np.uint8(np.clip(1.0 + np.minimum(height,0)*0.90, 0.76, 1.0) * 255)
     return normal, roughness, ao
 
 
@@ -52,13 +52,13 @@ def Bake(root, scratch):
     report = {'resolution': [1024, 1024], 'normalConvention': 'OpenGL +Y',
               'atlas': {'sheetV': [0.5, 1.0], 'cordUV': [[0.5,1.0],[0.0,0.5]], 'endUV': [[0.0,0.5],[0.0,0.5]]},
               'sourceProvider': 'built-in image_gen__imagegen', 'sets': {}}
-    for state,sourceName in [('Flat','Texture_StrawWeaveSource.png'),('Rolled','Texture_StrawRollWeaveFineSource.png')]:
+    for state,sourceName in [('Flat','Texture_StrawFlatReferenceProjection.png'),('Rolled','Texture_StrawRolledReferenceProjection.png')]:
         body = Image.open(source/sourceName).convert('RGB').resize((1024,512),Image.Resampling.LANCZOS)
         atlas = Image.new('RGB',(1024,1024))
         atlas.paste(body,(0,0))
         atlas.paste(end,(0,512))
         atlas.paste(rope,(512,512))
-        bodyData = BakeChannels(body,6.8)
+        bodyData = BakeChannels(body,9.0)
         normal = np.concatenate([bodyData[0],np.concatenate([endData[0],ropeData[0]],axis=1)])
         roughness = np.concatenate([bodyData[1],np.concatenate([endData[1],ropeData[1]],axis=1)])
         ao = np.concatenate([bodyData[2],np.concatenate([endData[2],ropeData[2]],axis=1)])
