@@ -6,7 +6,7 @@ from mathutils import Vector
 
 def BuildFoldedCloth(CreateMesh,FrontDepth,clothMaterial,backMaterial,foldMaterial,parent):
     profile=[]
-    frontZ=[.145,.135,.11,.063,.05,.037,-.015,-.047,-.06,-.073,-.10,-.133,-.143]
+    frontZ=[.145,.135,.11,.063,.037,-.015,-.047,-.06,-.073,-.10,-.133,-.143]
     for z in frontZ:profile.append((-.119,z,.011,'front'))
     sections=[
         [(-.116,-.138),(-.095,-.140),(-.052,-.139),(-.023,-.135),(-.013,-.128)],
@@ -24,7 +24,7 @@ def BuildFoldedCloth(CreateMesh,FrontDepth,clothMaterial,backMaterial,foldMateri
         half=.011 if sectionIndex<2 else .009 if sectionIndex<6 else .007
         kind='back' if sectionIndex==1 else 'fold'
         for y,z in points:profile.append((y,z,half,kind))
-    xDetailed=[-.184,-.166,-.13,-.116,-.103,-.09,-.056,-.012,.04,.076,.089,.102,.13,.166,.184]
+    xDetailed=[-.184,-.166,-.13,-.116,-.09,-.056,-.012,.04,.076,.102,.13,.166,.184]
     verts=[];uvs=[];faces=[];roles=[];rows=[];outerEdges=[];innerEdges=[]
     for index,(y,z,half,kind) in enumerate(profile):
         previous=Vector(profile[max(0,index-1)][:2]);following=Vector(profile[min(len(profile)-1,index+1)][:2])
@@ -32,7 +32,7 @@ def BuildFoldedCloth(CreateMesh,FrontDepth,clothMaterial,backMaterial,foldMateri
         normal=Vector((-tangent.y,tangent.x))
         if kind=='back':normal=Vector((-1,0))
         outer=Vector((y,z))-normal*half;inner=Vector((y,z))+normal*half
-        xValues=xDetailed if kind=='front' else [-.184,0,.184] if index<26 or kind=='back' else [-.184,.184]
+        xValues=xDetailed if kind=='front' else [-.184,0,.184] if index<26 and kind!='back' else [-.184,.184]
         row=[]
         edgeZ=outer.y
         pressure=sum(math.exp(-((edgeZ-band)/.021)**2) for band in (.050,-.060))
@@ -93,7 +93,16 @@ def BuildFoldedCloth(CreateMesh,FrontDepth,clothMaterial,backMaterial,foldMateri
             grid.append(row)
         for z in range(2):
             for y in range(2):faces.append((grid[z][y],grid[z][y+1],grid[z+1][y+1],grid[z+1][y]));roles.append('fold')
-    verts=[(x,y,max(-.1498,min(.1498,z))) for x,y,z in verts]
+    rounded=[]
+    for x,y,z in verts:
+        z=max(-.1498,min(.1498,z))
+        if abs(x)>.165 and abs(z)>.125:
+            delta=Vector((abs(x)-.165,abs(z)-.125))
+            if delta.length>.025:
+                delta*=.025/delta.length
+                x=math.copysign(.165+delta.x,x);z=math.copysign(.125+delta.y,z)
+        rounded.append((x,y,z))
+    verts=rounded
     obj=CreateMesh('Pack_Bundle',verts,faces,uvs,clothMaterial,parent)
     # The exposed cut edge and main cloth share normals at their seam.
     bm=bmesh.new();bm.from_mesh(obj.data)

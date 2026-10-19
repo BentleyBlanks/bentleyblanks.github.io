@@ -6,6 +6,8 @@ CreateMesh/AddTube/AddRibbon functions map them into the material atlas.
 """
 
 import math
+import bmesh
+from mathutils import Vector
 
 
 def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
@@ -82,7 +84,7 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
         spiralVerts = []
         spiralUvs = []
         spiralFaces = []
-        segments = 44
+        segments = 37
         turns = 3.20
         for pointIndex in range(segments + 1):
             fraction = (pointIndex / segments)**.65
@@ -127,12 +129,12 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
     # A shoe is modelled in its own basis.  Width runs diagonally across the
     # pack's side; the sole points partly toward the observer so both members
     # of the hanging pair remain readable from the front three-quarter view.
-    shoeWidth = (0.96, -0.28, 0.0)
-    shoeNormal = (-0.28, -0.96, 0.0)
+    shoeWidth = (.8660254, -.50, 0.0)
+    shoeNormal = (-.50, -.8660254, 0.0)
 
     def ShoePoint(center, width, length, outward):
-        width *= 1.08
-        length *= 1.25
+        width *= .95
+        length *= 1.12
         return (
             center[0] + shoeWidth[0] * width + shoeNormal[0] * outward,
             center[1] + shoeWidth[1] * width + shoeNormal[1] * outward,
@@ -179,36 +181,50 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
                            radius,ropeMaterial,parent=sandalRoot,
                            sides=4)
 
-        # Two crossed forefoot cords and a broad multi-point toe binding.
-        # The raised lacing describes the open upper of an unworn sandal.
-        Lace('ToeCrossLeft', ((-0.023, 0.036, 0.009),
-                             (-0.008, 0.046, 0.025),
-                             (0.021, 0.026, 0.010)))
-        Lace('ToeCrossRight', ((0.024, 0.040, 0.009),
-                              (0.007, 0.046, 0.027),
-                              (-0.022, 0.024, 0.010)))
+        # A plaited open upper, with braided front/back selvages. Its width
+        # and actual curved surface distinguish it from a pair of wire laces.
+        upperVerts=[];upperUvs=[];upperFaces=[]
+        for length in (.023,.040,.057):
+            halfWidth=.024-(length-.023)*.04
+            for across in (-1,-.5,0,.5,1):
+                width=across*halfWidth
+                upperVerts.append(LocalPoint(width,length,.010+.009*(1-across*across)))
+                upperUvs.append((.5+width/.056,(length+.079)/.158))
+        for row in range(2):
+            for across in range(4):
+                a=row*5+across;upperFaces.append((a,a+1,a+6,a+5))
+        upper=CreateMesh(name+'PlaitedUpper',upperVerts,upperFaces,upperUvs,sandalMaterial,parent=sandalRoot)
+        bm=bmesh.new();bm.from_mesh(upper.data)
+        outward=Vector(shoeNormal)
+        for face in bm.faces:
+            if face.normal.dot(outward)<0:face.normal_flip()
+        bm.to_mesh(upper.data);bm.free()
+        for border,length in enumerate((.023,.057)):
+            halfWidth=.024-(length-.023)*.04
+            points=[LocalPoint(across*halfWidth,length,.011+.009*(1-across*across)) for across in (-1,-.5,0,.5,1)]
+            AddTube(name+'UpperBraid%d'%border,points,.0024,ropeMaterial,parent=sandalRoot,sides=3)
         Lace('ForefootBinding', ((-0.024, 0.017, 0.005),
-                                (-0.020, 0.011, 0.021),
-                                (0.000, 0.008, 0.030),
-                                (0.019, 0.011, 0.021),
+                                (-0.020, 0.011, 0.015),
+                                (0.000, 0.008, 0.019),
+                                (0.019, 0.011, 0.015),
                                 (0.021, 0.017, 0.005)), 0.0036)
 
         # The heel yoke, attached at both sides, makes this a tied grass shoe
         # rather than a modern thong sandal.  Its loose cord crosses the
         # instep, and follows the outline of the absent wearer's heel.
         Lace('HeelYoke', ((-0.019, -0.024, 0.008),
-                         (-0.017, -0.060, 0.025),
-                         (0.000, -0.071, 0.031),
-                         (0.016, -0.058, 0.025),
+                         (-0.017, -0.060, 0.016),
+                         (0.000, -0.071, 0.019),
+                         (0.016, -0.058, 0.016),
                          (0.019, -0.022, 0.008)), 0.0032)
         Lace('InstepLace', ((-0.019, -0.024, 0.009),
-                           (0.009, -0.007, 0.029),
-                           (0.014, -0.028, 0.020),
+                           (0.009, -0.007, 0.019),
+                           (0.014, -0.028, 0.015),
                            (0.017, -0.057, 0.011)), 0.0022)
         return LocalPoint(0.000,0.069,0.012)
 
-    firstHang = MakeSandal(1,(-0.205,-0.144,-0.014))
-    secondHang = MakeSandal(2,(-0.213,-0.105,-0.006))
+    firstHang = MakeSandal(1,(-.225,-.070,-.008))
+    secondHang = MakeSandal(2,(-.214,-.051,0))
     anchor = (-0.194, -0.088, 0.113)
     for number, end in enumerate((firstHang, secondHang), start=1):
         AddTube('Pack_SandalHangingCord%02d' % number,

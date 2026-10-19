@@ -1,7 +1,7 @@
 {
   "schema": "tengxian-model-textures-v2",
   "id": "SichuanBlanketPack",
-  "date": "2026-10-19",
+  "date": "2026-10-20",
   "pathsRelativeTo": "Taierzhuang1938/",
   "scope": "Independent GLB authoring textures, embedded in Model_SichuanBlanketPack.glb; no existing game or level requests these images.",
   "source": {
@@ -53,8 +53,8 @@
       "width": 1024,
       "height": 1024,
       "colorSpace": "sRGB",
-      "bytes": 340770,
-      "sha256": "d639f627194619a9386691f055efc010bf69a1ac4a0f5f7cb01d1b6bc2e5f789",
+      "bytes": 319944,
+      "sha256": "cad16cc6bbf6d3c51ab3d092736959b0043da045c311bde3b15f2a99aa0ffde7",
       "encoding": "WebP q92"
     },
     {
@@ -63,8 +63,8 @@
       "width": 1024,
       "height": 1024,
       "colorSpace": "linear",
-      "bytes": 972808,
-      "sha256": "4213fca770c76577474ba6f3b39300f792adfe7b75b6a1b66f9e138073d75ad0",
+      "bytes": 885084,
+      "sha256": "34cd9b44a96b52fb59174056a0f04d890eb6426a7a617c8955143963b073137f",
       "encoding": "lossless WebP"
     },
     {
@@ -73,19 +73,19 @@
       "width": 1024,
       "height": 1024,
       "colorSpace": "linear",
-      "bytes": 412450,
-      "sha256": "bca1aa99b1c92e88aa7946e55edc44cf590170d826ddf530b585b2854fee30c8",
+      "bytes": 409400,
+      "sha256": "c264c07200784bc2a61d16d8d968cb6a4550627f1626f4ebb8479a3885e91aff",
       "encoding": "lossless WebP"
     }
   ],
-  "totalBytes": 1726028,
+  "totalBytes": 1614428,
   "physicalMeaning": "Rough nonmetal natural fibres. ORM R is real surface occlusion; G is 242/255; B is zero. Broad reference illumination is normalized; fine crease shading remains an approximation.",
   "verification": {
     "allMaps1024": true,
     "allMetalZero": true,
     "surfaceUvReprojected": true,
     "aoRange": [
-      5,
+      4,
       255
     ]
   },

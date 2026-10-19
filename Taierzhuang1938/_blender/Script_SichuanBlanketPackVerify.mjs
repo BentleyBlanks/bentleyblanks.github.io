@@ -184,6 +184,16 @@ try{
     if(part){part.bounds=Bounds(part.points);part.triangleCount=part.triangles.length;part.materials=[...new Set(part.materials)];}
   }
   Check(report.totalTriangles>0&&report.totalTriangles<=3000,'All five parts combined are at most 3000 triangles (including hidden candidates)',report.totalTriangles);
+  const jacketPart=report.parts.Pack_Jacket;
+  if(jacketPart){
+    let jacketArea=0;
+    for(const [a,b,c] of jacketPart.triangles){
+      const ab=b.map((value,index)=>value-a[index]),ac=c.map((value,index)=>value-a[index]);
+      jacketArea+=Math.hypot(ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0])/2;
+    }
+    jacketPart.surfaceAreaM2=jacketArea;
+    Check(jacketArea>=.65&&jacketArea<=1.25,'The folded civilian jacket retains full-size cloth area rather than a miniature flat silhouette',jacketArea);
+  }
   const bindingBox=report.parts.Pack_Binding?.bounds;
   Check(!!bindingBox&&bindingBox.max[1]<=.158,'The main cloth binding has no floating fin above the blanket top (the separate mat loops are excluded)',bindingBox);
   const bundle=report.parts.Pack_Bundle,box=bundle?.bounds;

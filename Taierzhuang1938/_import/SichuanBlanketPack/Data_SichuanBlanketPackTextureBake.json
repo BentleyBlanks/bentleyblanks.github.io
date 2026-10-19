@@ -80,24 +80,24 @@
       "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\SichuanBlanketPack\\Texture_SichuanBlanketPackBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 340770,
-      "sha256": "d639f627194619a9386691f055efc010bf69a1ac4a0f5f7cb01d1b6bc2e5f789"
+      "bytes": 319944,
+      "sha256": "cad16cc6bbf6d3c51ab3d092736959b0043da045c311bde3b15f2a99aa0ffde7"
     },
     {
       "channel": "Normal",
       "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\SichuanBlanketPack\\Texture_SichuanBlanketPackNormal.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 972808,
-      "sha256": "4213fca770c76577474ba6f3b39300f792adfe7b75b6a1b66f9e138073d75ad0"
+      "bytes": 885084,
+      "sha256": "34cd9b44a96b52fb59174056a0f04d890eb6426a7a617c8955143963b073137f"
     },
     {
       "channel": "Orm",
       "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\SichuanBlanketPack\\Texture_SichuanBlanketPackOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 412450,
-      "sha256": "bca1aa99b1c92e88aa7946e55edc44cf590170d826ddf530b585b2854fee30c8"
+      "bytes": 409400,
+      "sha256": "c264c07200784bc2a61d16d8d968cb6a4550627f1626f4ebb8479a3885e91aff"
     }
   ],
   "totalBytes": 972164,
@@ -183,15 +183,16 @@
       242
     ],
     "aoRange": [
-      5,
+      4,
       255
     ],
     "albedoContainsLighting": "Broad illumination normalized; fine reference crease shading is an approximation, not a measured intrinsic albedo",
     "normalEncoding": "Lossless WebP; vector channels remain exact after decode",
     "subpixelCoverageRepair": {
-      "texels": 1,
+      "texels": 0,
       "method": "Fill only uncovered raster texels inside actual triangles or their 1.5px edge padding, using the already-baked median of the same source material"
-    }
+    },
+    "date": "2026-10-20"
   },
   "strawStudy": {
     "provider": "Built-in image_gen__imagegen",

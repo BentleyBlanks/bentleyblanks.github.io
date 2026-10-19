@@ -77,6 +77,7 @@ cottonSideBase=bpy.data.images.load(str(sourcePath/'Source/MaterialAtlasV03/Text
 cottonSideNormal=bpy.data.images.load(str(sourcePath/'Source/MaterialAtlasV03/Texture_ReferenceCottonSideNormal.png'),check_existing=False);cottonSideNormal.colorspace_settings.name='Non-Color'
 patchBase=bpy.data.images.load(str(sourcePath/'Source/MaterialAtlasV03/Texture_ReferencePatchBase.png'),check_existing=False)
 patchNormal=bpy.data.images.load(str(sourcePath/'Source/MaterialAtlasV03/Texture_ReferencePatchNormal.png'),check_existing=False);patchNormal.colorspace_settings.name='Non-Color'
+indigoBase=bpy.data.images.load(str(sourcePath/'Source/MaterialAtlasV03/Texture_ReferenceIndigoBase.png'),check_existing=False)
 strawImages={}
 subprocess.run([shutil.which('python'),str(projectPath/'_import/Script_SichuanStrawStudy.py'),'--source',str(sourcePath/'Source/MaterialAtlasV04/Image_SichuanStrawStudyV04.png'),'--out',str(sourcePath/'Source/MaterialAtlasV04')],check=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
 for role in ('Sole','End','Weave','Cord'):
@@ -126,6 +127,15 @@ def MakeMaterial(key, tint=(1,1,1,1), suffix='', normalStrength=.85):
         strawVector=repeat.outputs[0] if strawRole=='End' else fract.outputs[0]
         base.image=strawImages[(strawRole,'Base')];base.extension='EXTEND' if strawRole=='End' else 'REPEAT'
         links.new(strawVector,base.inputs['Vector']);baseColor=base.outputs['Color']
+    if key=='jacket':
+        uv=nodes.new('ShaderNodeUVMap');uv.uv_map='UVMap'
+        origin=nodes.new('ShaderNodeVectorMath');origin.operation='SUBTRACT';origin.inputs[1].default_value=(.52,.02,0)
+        repeat=nodes.new('ShaderNodeVectorMath');repeat.operation='MULTIPLY';repeat.inputs[1].default_value=((.1 if suffix=='Button' else 12)/.46,(.1 if suffix=='Button' else 6)/.46,1)
+        fract=nodes.new('ShaderNodeVectorMath');fract.operation='FRACTION'
+        scale=nodes.new('ShaderNodeVectorMath');scale.operation='MULTIPLY';scale.inputs[1].default_value=(.46,.46,1)
+        offset=nodes.new('ShaderNodeVectorMath');offset.operation='ADD';offset.inputs[1].default_value=(.52,.02,0)
+        links.new(uv.outputs['UV'],origin.inputs[0]);links.new(origin.outputs[0],repeat.inputs[0]);links.new(repeat.outputs[0],fract.inputs[0]);links.new(fract.outputs[0],scale.inputs[0]);links.new(scale.outputs[0],offset.inputs[0]);jacketVector=offset.outputs[0]
+        colour=nodes.new('ShaderNodeTexImage');colour.image=indigoBase;links.new(fract.outputs[0],colour.inputs['Vector']);baseColor=colour.outputs['Color']
     if key=='binding':
         uv=nodes.new('ShaderNodeUVMap');uv.uv_map='UVMap'
         subtract=nodes.new('ShaderNodeVectorMath');subtract.operation='SUBTRACT';subtract.inputs[1].default_value=(.2132,.02,0)
@@ -157,8 +167,10 @@ def MakeMaterial(key, tint=(1,1,1,1), suffix='', normalStrength=.85):
     if key=='straw':
         normal.image=strawImages[(strawRole,'Normal')]
         normal.extension='EXTEND' if strawRole=='End' else 'REPEAT';links.new(strawVector,normal.inputs['Vector'])
+    if key=='jacket':links.new(jacketVector,normal.inputs['Vector'])
     if key=='cloth':normal.image=patchNormal if suffix=='Patch' else cottonSideNormal if suffix=='Fold' else cottonNormal;normal.extension='EXTEND';links.new(clothVector,normal.inputs['Vector'])
     normalMap = nodes.new('ShaderNodeNormalMap'); normalMap.inputs['Strength'].default_value = normalStrength
+    if key=='jacket':normalMap.inputs['Strength'].default_value=.55
     links.new(normal.outputs['Color'], normalMap.inputs['Color'])
     links.new(normalMap.outputs['Normal'], shader.inputs['Normal'])
     if suffix=='End' and key=='straw':
@@ -210,7 +222,7 @@ def CreateMesh(name, verts, faces, uvs, material, parent=None):
         uvLayer.data[loop.index].uv = (rect[0]+max(0,min(1,uValue))*(rect[2]-rect[0]), rect[1]+max(0,min(1,vValue))*(rect[3]-rect[1]))
     bm = bmesh.new(); bm.from_mesh(mesh)
     bmesh.ops.triangulate(bm, faces=list(bm.faces))
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    if name!='Pack_IndigoShortJacket':bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     if name=='Pack_ContinuousClothStrap':
         for face in bm.faces:
             if face.calc_center_median().y<-.08 and face.normal.y>0:face.normal_flip()
@@ -365,38 +377,21 @@ bindingRoot=BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,mate
 jacketRoot=MakeRoot('Pack_Jacket',packRoot)
 jacketRoot['Control']='Hide this node or translate it upward/outward to withdraw the original garment'
 jacketRoot['Garment']='Civilian indigo homespun short jacket; cloth knot button'
-outline=[(-.035,.12),(-.075,.12),(-.098,.101),(-.158,.061),(-.145,.015),(-.082,.046),(-.076,-.116),(.078,-.116),(.083,.046),(.145,.014),(.159,.061),(.099,.101),(.075,.12),(.035,.12),(.025,.10),(-.025,.10)]
-jacketVerts=[];jacketUvs=[]
-def JacketY(xValue,zValue,back=False):
-    return -.049+(.003 if back else 0)
-for back in (False,True):
-    for xValue,zValue in outline:
-        jacketVerts.append((xValue+.015,JacketY(xValue,zValue,back),zValue+.012));jacketUvs.append(((xValue+.16)/.32,(zValue+.12)/.25))
-length=len(outline)
-jacketFaces=[tuple(range(length)),tuple(reversed(range(length,length*2)))]
-for index in range(length):jacketFaces.append((index,(index+1)%length,(index+1)%length+length,index+length))
-# An attached folded upper corner reaches out of the blanket fold, while the
-# full jacket remains inside. These triangles share the shoulder edge.
-cornerStart=len(jacketVerts)
-jacketVerts.extend([(.120,-.1195,.144),(.178,-.1195,.141),(.171,-.1195,.085)])
-jacketUvs.extend([(.62,.92),(.94,.92),(.94,.60)])
-jacketFaces.extend([(11,cornerStart,cornerStart+1),(11,cornerStart+1,cornerStart+2),(11,cornerStart+2,12),(cornerStart,cornerStart+1,cornerStart+2)])
-jacket=CreateMesh('Pack_IndigoShortJacket',jacketVerts,jacketFaces,jacketUvs,materials['jacket'],jacketRoot)
-# Front opening seam and a small folded hem are geometric, not printed labels.
-AddRibbon('Pack_JacketFrontPlacket',[(.016,-.052,-.10),(.016,-.052,.07),(.027,-.056,.10)],.009,materials['jacket'],jacketRoot)
+BuildCivilianJacket=runpy.run_path(str(projectPath/'_blender/Script_SichuanCivilianJacket.py'))['BuildCivilianJacket']
+jacket=BuildCivilianJacket(CreateMesh,materials['jacket'],jacketRoot)
 buttonCenter=Vector((.156,-.124,.126))
 buttonVerts=[];buttonUvs=[];buttonFaces=[]
 for latitude in range(1,4):
     phi=math.pi*latitude/4
-    for segment in range(8):
-        angle=math.tau*segment/8
+    for segment in range(6):
+        angle=math.tau*segment/6
         rumple=1+.06*math.sin(segment*2.3+latitude)
         buttonVerts.append(tuple(buttonCenter+Vector((math.cos(angle)*math.sin(phi)*.0045*rumple,math.cos(phi)*.0025,math.sin(angle)*math.sin(phi)*.0038*rumple))))
-        buttonUvs.append((segment/8,latitude/4))
+        buttonUvs.append((segment/6,latitude/4))
 for latitude in range(2):
-    for segment in range(8):
-        a=latitude*8+segment;b=latitude*8+(segment+1)%8;buttonFaces.append((a,b,b+8,a+8))
-buttonFaces.extend([tuple(reversed(range(8))),tuple(16+i for i in range(8))])
+    for segment in range(6):
+        a=latitude*6+segment;b=latitude*6+(segment+1)%6;buttonFaces.append((a,b,b+6,a+6))
+buttonFaces.extend([tuple(reversed(range(6))),tuple(12+i for i in range(6))])
 CreateMesh('Pack_ClothKnotButton',buttonVerts,buttonFaces,buttonUvs,buttonMaterial,jacketRoot)
 buttonLoop=[]
 for index in range(13):
@@ -427,7 +422,7 @@ if preflight>3000:raise RuntimeError('All-parts pre-bake triangle budget exceede
 if scene.get('SichuanSurfaceBake',True):
     BakeSurfaces=runpy.run_path(str(projectPath/'_blender/Script_SichuanPackSurfaceBake.py'))['BakeSurfaces']
     BakeSurfaces(packRoot,projectPath,reviewPath)
-for filename in ('Script_SichuanBlanketPackBake.py','Script_SichuanFoldedCloth.py','Script_SichuanPackBinding.py','Script_SichuanPackAttachments.py','Script_SichuanPackSurfaceBake.py'):
+for filename in ('Script_SichuanBlanketPackBake.py','Script_SichuanFoldedCloth.py','Script_SichuanPackBinding.py','Script_SichuanCivilianJacket.py','Script_SichuanPackAttachments.py','Script_SichuanPackSurfaceBake.py'):
     text=bpy.data.texts.get(filename) or bpy.data.texts.new(filename)
     text.clear();text.write((projectPath/'_blender'/filename).read_text(encoding='utf-8'))
 for filename in ('Script_SichuanPackReferenceCloth.py','Script_SichuanStrawStudy.py','Script_SichuanPackSurfaceMaps.py'):
@@ -461,7 +456,7 @@ bpy.ops.wm.save_as_mainfile(filepath=str(sourcePath/'Scene_SichuanBlanketPack.bl
 (reviewPath/'Data_BlenderBuild.json').write_text(json.dumps({'triangles':triangles,'totalTriangles':sum(triangles.values()),'blend':bpy.data.filepath,'glb':str(modelPath/'Model_SichuanBlanketPack.glb'),'nativeAxes':'Z up; -Y outward','exportAxes':'Y up; +Z outward; back Z=0','unitScale':1},indent=2),encoding='utf-8')
 contractPath=modelPath/'Data_SichuanBlanketPack.json'
 contract=json.loads(contractPath.read_text(encoding='utf-8'))
-contract['version']='20261019ReferenceMatchV3'
+contract['version']='20261020ReferenceMatchV4'
 contract['triangles']={'total':sum(triangles.values()),'limit':3000,'includesAllOptionalParts':True,'byPart':triangles}
 points=[bundle.matrix_world@vertex.co for vertex in bundle.data.vertices]
 sizes=[max(point[axis] for point in points)-min(point[axis] for point in points) for axis in range(3)]
@@ -474,9 +469,16 @@ contract['source']['surfaceEncoder']='../../_import/Script_SichuanPackSurfaceMap
 contract['source']['foldedCloth']='../../_blender/Script_SichuanFoldedCloth.py'
 contract['source']['binding']='../../_blender/Script_SichuanPackBinding.py'
 contract['source']['strawStudy']='../../_import/Script_SichuanStrawStudy.py'
+contract['source']['civilianJacket']='../../_blender/Script_SichuanCivilianJacket.py'
+for part in contract['parts']:
+    if part['node']=='Pack_Jacket':
+        part['description']='Full-size long-sleeved civilian indigo jacket, with sleeves and side panels folded inward and the hem folded underneath; the approved corner and cloth knot remain exposed'
+        part['patternDimensionsM']=[1.24,.56]
+        part.pop('refinementStatus',None)
 contract['parts'][0]['description']='One continuous folded homespun cotton sheet with exposed nested cut edges, a conforming sewn repair patch and a planar contact leaf'
 contract['review']['sameHeightComparison']=['Texture_ReferenceCompare_front.jpg','Texture_ReferenceCompare_side.jpg','Texture_ReferenceCompare_back.jpg']
-contract['assetUrl']='./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261019ReferenceMatchV3'
+contract['review']['status']='RebuiltAwaitingVisualReview'
+contract['assetUrl']='./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261020ReferenceMatchV4'
 payload=(modelPath/'Model_SichuanBlanketPack.glb').read_bytes();contract['assetBytes']=len(payload);contract['assetSha256']=hashlib.sha256(payload).hexdigest()
 contractPath.write_text(json.dumps(contract,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 print('SICHUAN_PACK_BUILD',json.dumps(triangles),'TOTAL',sum(triangles.values()),'BLEND',bpy.data.filepath)

@@ -78,7 +78,16 @@ def Main():
     px=np.gradient(patchHeight,axis=1)/(.044/patchHeight.shape[1]);py=np.gradient(patchHeight,axis=0)/(.05/patchHeight.shape[0])
     pn=np.stack((-px,py,np.ones_like(px)),axis=-1);pn/=np.linalg.norm(pn,axis=-1,keepdims=True)
     Image.fromarray(np.rint((pn*.5+.5)*255).clip(0,255).astype(np.uint8)).save(args.out/'Texture_ReferencePatchNormal.png')
+    blueRegion=np.asarray(reference.crop((500,190,680,340)),dtype=np.float64)
+    blueMask=(blueRegion[...,2]>blueRegion[...,0]+8)&(blueRegion[...,2]>blueRegion[...,1]+3)&(blueRegion[...,0]<110)&(blueRegion[...,2]<140)
+    indigoTarget=np.median(blueRegion[blueMask],axis=0)/255
+    indigoStudy=Image.open(args.out/'Texture_SichuanBlanketPackBase.webp').convert('RGB').crop((532,532,1004,1004))
+    indigoLinear=SrgbToLinear(np.asarray(indigoStudy,dtype=np.float64)/255)
+    indigoDetail=np.clip(indigoLinear/np.maximum(GaussianPeriodic(indigoLinear,16),.002),.45,1.65)
+    indigoAlbedo=SrgbToLinear(indigoTarget)*1.70*(0.68+0.32*indigoDetail)
+    Image.fromarray(np.rint(LinearToSrgb(np.clip(indigoAlbedo,0,1))*255).clip(0,255).astype(np.uint8)).save(args.out/'Texture_ReferenceIndigoBase.png')
     record={'source':str(args.reference),'sourceProvider':'approved built-in imagegen reference','frontPixels':box,'backPixels':backBox,'sidePixels':sideBox,'accessoriesMasked':True,'deLightSigmaPixels':48,'deLightStrength':.65,'physicalCottonExtentM':[.38,.30],'microReliefMeters':[.00008,.00045],'sideReliefMeters':[.00010,.0012],'referenceUnmodified':True}
+    record['indigo']={'referenceRegion':[500,190,680,340],'maskedBlueMedianSrgb':np.rint(indigoTarget*255).astype(int).tolist(),'linearAlbedoExposureCompensation':1.70,'tileRepeat':[12,6],'tileExtentM':[1.24/12,.56/6],'process':'Imagegen blue-cloth weave, low-frequency normalization and approved-reference pigment calibration'}
     (args.out/'Data_ReferenceCottonStudy.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8')
 
 

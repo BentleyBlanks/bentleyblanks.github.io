@@ -1,7 +1,7 @@
 {
   "schema": "tengxian-independent-prop-v1",
   "id": "SichuanBlanketPack",
-  "version": "20261019ReferenceMatchV3",
+  "version": "20261020ReferenceMatchV4",
   "title": "1938 Sichuan Army folded single-blanket pack",
   "asset": "Model_SichuanBlanketPack.glb",
   "textureManifest": "Data_SichuanBlanketPackTextures.json",
@@ -21,20 +21,20 @@
   },
   "actualBundleDimensionsM": {
     "width": 0.3813689947128296,
-    "height": 0.2992594987154007,
+    "height": 0.29912494122982025,
     "thickness": 0.12947143614292145,
     "includes": "continuous folded sheet, conforming repair patch and cotton stitches"
   },
   "triangles": {
-    "total": 3000,
+    "total": 2993,
     "limit": 3000,
     "includesAllOptionalParts": true,
     "byPart": {
-      "Pack_Bundle": 1048,
+      "Pack_Bundle": 958,
       "Pack_Binding": 582,
-      "Pack_Jacket": 186,
-      "Pack_StrawMat": 532,
-      "Pack_Sandals": 652
+      "Pack_Jacket": 269,
+      "Pack_StrawMat": 476,
+      "Pack_Sandals": 708
     }
   },
   "parts": [
@@ -57,7 +57,7 @@
     },
     {
       "node": "Pack_Jacket",
-      "description": "Complete civilian indigo short jacket inside the blanket fold; only one corner and one cloth knot button show at rest",
+      "description": "Full-size long-sleeved civilian indigo jacket, with sleeves and side panels folded inward and the hem folded underneath; the approved corner and cloth knot remain exposed",
       "visibility": "Hide this node and descendants",
       "withdrawal": "Translate this original node; all jacket geometry, visible corner and cloth button move together",
       "exampleWorldTranslationM": [
@@ -65,7 +65,10 @@
         0.36,
         0.3
       ],
-      "refinementStatus": "Hide and withdrawal controls verified; garment fold construction remains in progress"
+      "patternDimensionsM": [
+        1.24,
+        0.56
+      ]
     }
   ],
   "materials": {
@@ -98,7 +101,8 @@
     "surfaceEncoder": "../../_import/Script_SichuanPackSurfaceMaps.py",
     "foldedCloth": "../../_blender/Script_SichuanFoldedCloth.py",
     "binding": "../../_blender/Script_SichuanPackBinding.py",
-    "strawStudy": "../../_import/Script_SichuanStrawStudy.py"
+    "strawStudy": "../../_import/Script_SichuanStrawStudy.py",
+    "civilianJacket": "../../_blender/Script_SichuanCivilianJacket.py"
   },
   "commandsFromRepositoryRoot": [
     "node scripts/Script_BlenderMcp.mjs start \"C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Scene_SichuanBlanketPack.blend\" --task SichuanBlanketPack",
@@ -124,11 +128,18 @@
       "Texture_ReferenceCompare_side.jpg",
       "Texture_ReferenceCompare_back.jpg"
     ],
-    "status": "ReferenceFidelityInProgress",
-    "remainingRefinements": [
-      "Civilian jacket panel folds after withdrawal",
-      "Denser and more natural straw-sandal binding",
-      "Homespun fibre definition at the final 1024 atlas resolution"
+    "status": "ReferenceMatchReviewed",
+    "remainingRefinements": [],
+    "reviewedDate": "2026-10-20",
+    "technicalChecks": 146,
+    "sourceReopenVerified": true,
+    "referenceCorrespondence": [
+      "Folded blanket construction, two horizontal and two vertical grey cloth passes",
+      "Two continuous shoulder loops and a cloth side knot",
+      "Worn grey/khaki homespun cotton, stains and one sewn repair patch",
+      "Paired woven straw sandals positioned on the side and occluded in the opposite view",
+      "Independent rolled straw mat with coiled ends",
+      "Independent full-size folded civilian indigo jacket; exposed corner and cloth knot button preserved"
     ]
   },
   "historicalReferences": [
@@ -150,7 +161,7 @@
     "text",
     "logos"
   ],
-  "assetUrl": "./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261019ReferenceMatchV3",
-  "assetBytes": 1964260,
-  "assetSha256": "53d16aa7fbb855e93204884928a955247095b587862d86dbf5cf7bdff07eac1a"
+  "assetUrl": "./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261020ReferenceMatchV4",
+  "assetBytes": 1863680,
+  "assetSha256": "9233b78b2a8c727b0c10b6c71d9e7a198221fb848327368907e3e0c95cd95b1f"
 }

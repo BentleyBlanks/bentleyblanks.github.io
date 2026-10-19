@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 import hashlib
 import json
+from datetime import datetime
 import numpy as np
 from PIL import Image
 
@@ -87,10 +88,11 @@ def Main():
     record['surfaceBake']={'generator':'Script_SichuanPackSurfaceBake.py@3','resolution':[1024,1024],'intermediateResolution':[2048,2048],'padding':'16 source pixels of co-valid colour/normal/AO coverage dilation; outward-hemisphere unit-normal downsampling for thin two-sided cotton','uv':'Unique non-overlapping GameUV','ao':'Cycles AmbientOcclusion, 0.025 metre distance; garment uses self only','metallicPixels':[0,0],'roughnessPixels':[242,242],'aoRange':[int(ao.min()),int(ao.max())],'albedoContainsLighting':False,'normalEncoding':'Lossless WebP; vector channels remain exact after decode'}
     record['surfaceBake']['subpixelCoverageRepair']={'texels':repaired,'method':'Fill only uncovered raster texels inside actual triangles or their 1.5px edge padding, using the already-baked median of the same source material'}
     record['surfaceBake']['albedoContainsLighting']='Broad illumination normalized; fine reference crease shading is an approximation, not a measured intrinsic albedo'
+    record['surfaceBake']['date']=datetime.now().astimezone().date().isoformat()
     recordPath.write_text(json.dumps(record,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     manifestPath=modelPath/'Data_SichuanBlanketPackTextures.json'
     manifest=json.loads(manifestPath.read_text(encoding='utf-8'))
-    manifest['schema']='tengxian-model-textures-v2';manifest['date']='2026-10-19'
+    manifest['schema']='tengxian-model-textures-v2';manifest['date']=record['surfaceBake']['date']
     if 'quadrants' in manifest.get('atlas',{}):manifest['materialStudyAtlas']=manifest['atlas']
     manifest['atlas']={'layout':'unique-surface-uv','uvOrigin':'bottom-left','uvSet':'GameUV','texCoord':1,'packing':'Minimum-stretch unwrap; six-direction self-visibility allocates 1.90 density to the outer front and 0.20 to concealed cloth; non-overlapping concave islands, explicit 0.003 fractional margin','bakeResolution':[2048,2048],'runtimeResolution':[1024,1024]}
     manifest['source']['ref']='exec-dd140b53-c21e-4bf7-96e2-2eac2e0f8ab6.png'

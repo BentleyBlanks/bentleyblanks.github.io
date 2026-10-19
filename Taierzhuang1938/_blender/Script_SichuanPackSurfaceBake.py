@@ -27,8 +27,11 @@ def BakeSurfaces(packRoot,projectPath,reviewPath):
     bpy.ops.object.mode_set(mode='OBJECT')
     facePriorities={}
     for obj in meshes:
-        priorities={polygon.index:.40 if 'ClothButton' in obj.name else 1.10 for polygon in obj.data.polygons}
-        if obj.name=='Pack_Bundle':
+        owner=obj
+        while owner.parent and owner.name not in ('Pack_Bundle','Pack_Jacket'):owner=owner.parent
+        isJacket=owner.name=='Pack_Jacket'
+        priorities={polygon.index:.40 if isJacket else 1.10 for polygon in obj.data.polygons}
+        if obj.name=='Pack_Bundle' or isJacket:
             bvh=BVHTree.FromObject(obj,bpy.context.evaluated_depsgraph_get())
             directions=[Vector(value) for value in ((0,-1,0),(0,1,0),(1,0,0),(-1,0,0),(0,0,1),(0,0,-1))]
             for polygon in obj.data.polygons:
@@ -37,10 +40,10 @@ def BakeSurfaces(packRoot,projectPath,reviewPath):
                 for index,direction in enumerate(directions):
                     hit=bvh.ray_cast(center+direction*.6,-direction,1.2)
                     if hit[0] is not None and (hit[0]-center).length<.00035:visible.append(index)
-                priorities[polygon.index]=1.90 if 0 in visible and polygon.normal.y<-.35 else 1.10 if 1 in visible and polygon.normal.y>.35 else 1.35 if visible else .20
-        elif 'ClothButton' in obj.name:
-            for polygon in obj.data.polygons:
-                priorities[polygon.index]=1.70 if polygon.center.y<-.105 else .40
+                if isJacket:
+                    priorities[polygon.index]=1.70 if center.y<-.105 else .40 if visible else .08
+                else:
+                    priorities[polygon.index]=1.90 if 0 in visible and polygon.normal.y<-.35 else 1.10 if 1 in visible and polygon.normal.y>.35 else 1.35 if visible else .20
         facePriorities[obj.name]=priorities
         edgeOwners={edge.index:[] for edge in obj.data.edges}
         keys={tuple(sorted(edge.vertices)):edge.index for edge in obj.data.edges}
@@ -71,7 +74,7 @@ def BakeSurfaces(packRoot,projectPath,reviewPath):
                 for index in neighbors[stack.pop()]:
                     if index in unseen:unseen.remove(index);island.add(index);stack.append(index)
             area=sum(obj.data.polygons[index].area for index in island)
-            hiddenArea=sum(obj.data.polygons[index].area for index in island if priorities[index]==.20)
+            hiddenArea=sum(obj.data.polygons[index].area for index in island if priorities[index]<.30)
             internal=hiddenArea>area*.8
             priority=sum(obj.data.polygons[index].area*priorities[index] for index in island)/max(area,1e-9)
             loopIds={loop for index in island for loop in obj.data.polygons[index].loop_indices}
