@@ -18,7 +18,7 @@ import bpy
 from mathutils import Euler, Matrix, Vector
 from mathutils.kdtree import KDTree
 
-projectDir = Path(globals().get("SingleBlanketProject", Path(__file__).resolve().parents[1]))
+projectDir = Path(globals()["SingleBlanketProject"]) if "SingleBlanketProject" in globals() else Path(__file__).resolve().parents[1]
 sourceDir = Path("C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SingleBlanket")
 xColumns = (0.70, 0.2333, -0.2333, -0.70)
 yRows = (-0.95, -0.57, -0.19, 0.19, 0.57, 0.95)

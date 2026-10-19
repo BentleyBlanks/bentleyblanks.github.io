@@ -18,7 +18,7 @@ python Taierzhuang1938/_import/Script_SingleBlanketTextureBake.py
 
 # 带窗口制作走MCP；一轮结束后stop
 node scripts/Script_BlenderMcp.mjs start --blender "<Blender 5.1.2/blender.exe>" --task SingleBlanket
-node scripts/Script_BlenderMcp.mjs exec --file "<设置__file__后执行重建脚本的包装脚本>"
+node scripts/Script_BlenderMcp.mjs exec --code "import runpy; runpy.run_path('Taierzhuang1938/_blender/Script_SingleBlanketBake.py', run_name='__main__')"
 node scripts/Script_BlenderMcp.mjs stop
 
 # 无界面复建仍由同一入口管理进程；从空场景建网格/骨架/动作、载入贴图、导出与导回校验
