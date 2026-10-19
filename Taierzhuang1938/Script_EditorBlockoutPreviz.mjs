@@ -284,8 +284,10 @@ export class BlockoutPreviz {
     if (typeof api?.AddOpeningClipLibrary !== "function") return;
     this.clipLibrariesWarned ||= new Set();
     // 2026-10-19：片段自带的掷弹筒 / 弹 / 手榴弹捆道具轨要有网格（开场道具层只认识开场那几样）
+    let previzProps = null;
     try {
-      const [props, previzProps] = await Promise.all([import("./Script_OpeningProps.mjs"), import("./Script_EditorBlockoutPrevizProps.mjs")]);
+      const [props, mod] = await Promise.all([import("./Script_OpeningProps.mjs"), import("./Script_EditorBlockoutPrevizProps.mjs")]);
+      previzProps = mod;
       previzProps.RegisterPrevizProps(props.RegisterOpeningProp);
     } catch (error) { console.warn("[BlockoutPreviz] 预演道具网格登记失败", error); }
     const Read = async (url) => {
@@ -306,6 +308,7 @@ export class BlockoutPreviz {
         if (!row?.file) throw Error("清单里没有骨架记录");
         const record = await Read(lib.base + row.file + v);
         api.AddOpeningClipLibrary(config, record, { weaponSlung: PREVIZ_WEAPON_SLUNG });
+        previzProps?.SetPrevizPropScales?.(config.props);   // 清单 props.<名>.scale（掷弹筒按真实全长放大 1.4699）
       } catch (error) { Warn(lib.name, String(error?.message || error).slice(0, 120)); }
     }));
   }

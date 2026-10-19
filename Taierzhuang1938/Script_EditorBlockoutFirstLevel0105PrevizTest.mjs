@@ -147,6 +147,7 @@ export async function CheckPreviz(doc, { config, voice }) {
   }
   if (doc.sequences.length !== config.keyframes.length) errors.push(`预演 ${doc.sequences.length} 段，关键帧 ${config.keyframes.length} 个`);
   TalkPostureChecks(doc, config, table, errors);
+  await RestBeatChecks(doc, config, errors);
   DesignChecks(doc, config, errors);
   return { errors, warnings, rows };
 }
@@ -176,6 +177,39 @@ function TalkPostureChecks(doc, config, table, errors) {
       if (st.state === "down" || st.clip || st.throw || fired) continue;
       if (st.moving && !st.aim) continue;
       errors.push(`${seq.keyframe}：${l.line}（${id}@${l.t}）${st.aim ? "端着枪说话、前后 1.5 s 没开枪" : "说话时没播片段（手里拿着枪干站 / 干蹲着）"}`);
+    }
+  }
+}
+
+/**
+ * 不打仗的拍子（2026-10-19 第二轮，生成器 PREVIZ_REST_BEATS：01 防炮洞、02末集结处、03-1）：任何人在任何时刻都不许据枪（aim），
+ * 也不许蹲着干待着不播片段（会落到原生的端枪戒备）。坡顶守着的兵、日军除外（RestExempt）。两个片段之间不到 0.6 s 的空档
+ * （淡入淡出本身约 0.3 s，原生姿态露不出来）不算。
+ */
+async function RestBeatChecks(doc, config, errors) {
+  const gen = await import("./Script_EditorBlockoutFirstLevel0105Previz.mjs");
+  const norm = NormalizeBlockoutPreviz(doc);
+  for (const seq of norm.sequences) {
+    if (!gen.PREVIZ_REST_BEATS[seq.keyframe]) continue;
+    const kf = config.keyframes.find(k => k.id === seq.keyframe);
+    const units = new Map((kf.units || []).map(u => [u.id, u]));
+    const raw = doc.sequences.find(s => s.keyframe === seq.keyframe);
+    const ids = new Set([...units.keys(), ...seq.actors.map(a => a.id)]);
+    for (const id of ids) {
+      const a = seq.actors.find(x => x.id === id), base = a?.spawn || units.get(id);
+      if (!base || (base.kind && base.kind !== "soldier") || gen.RestExempt(id, base)) continue;
+      const aimKey = raw.actors.find(x => x.id === id)?.keys.find(k => k.aim === true);
+      if ((!a && base.aim) || aimKey) errors.push(`${seq.keyframe}：${id} 在不打仗的拍子里据枪（aim）${aimKey ? `@${aimKey.t}` : "（关键帧布设）"}`);
+      let from = null;
+      for (let t = 0; t <= seq.durationS + 1e-6; t += 0.1) {
+        const st = a ? SamplePrevizActor(a, t, base, { clipDuration: gen.PrevizClipDuration }) : { stance: base.stance || "stand", state: base.state, visible: true };
+        const idle = base.state !== "down" && gen.IdleCrouching(st);
+        if (idle && from === null) from = t;
+        if ((!idle || t + 0.1 > seq.durationS + 1e-6) && from !== null) {
+          if (t - from >= 0.6 || t + 0.1 > seq.durationS + 1e-6 && idle) { errors.push(`${seq.keyframe}：${id} @${R(from)}–${R(t)} s 蹲着干待着（没播片段，会端着枪戒备）`); }
+          from = null;
+        }
+      }
     }
   }
 }

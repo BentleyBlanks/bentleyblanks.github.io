@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20261019PrevizIjaV1",
+ "version": "20261019PrevizIjaV2",
  "fps": 24,
  "actorForward": [
   0,
@@ -198,15 +198,15 @@
      "weapon": "Type89Launcher"
     }
    ],
-   "notes": "03: Type89 discharger gunner on the right knee, the base plate on the ground ahead of the left foot, tube 45 deg up; left hand round the tube, right hand on the trigger body. Holds, squeezes, fires at 1.60 s: the tube jolts down its axis and the shoulders kick, settles by the loop end. One shot per loop. Rifle on his back.",
+   "notes": "03 (V2, real 0.61 m discharger = Model_Type89Launcher x 1.4699): gunner on the right knee sat back toward the right heel, left knee up, the base plate on the ground 0.22 m right and 0.24 m ahead of his root, tube 45 deg up; left hand round the middle of the barrel, right hand at the foot of the barrel on the trigger. Holds, squeezes, fires at 1.60 s: the tube jolts down its axis and the shoulders kick, settles by the loop end. One shot per loop. Rifle on his back.",
    "bake": {
     "TengxianNra02": {
      "solverVersion": "20260928LimbContinuity",
      "seed": null,
      "twistMax": 320.0,
      "seedAnyHand": "",
-     "commit": "after:1b7d48e7",
-     "valuesSha256": "ad3bfe8c8cb54968031c5e9e928dc196047d4b38d2ae4e05fcf11a8a8376343a"
+     "commit": "after:343fc13c",
+     "valuesSha256": "3f994dc706ad591c877e9906531558500a341e3121c93cb47ff45472ada745cb"
     }
    }
   },
@@ -232,15 +232,15 @@
      "kind": "shellIn"
     }
    ],
-   "notes": "03: loader on both knees at the gunner's right, turned toward the tube: the right hand takes a shell from the pouch at the front of his belt (0.40 s), lifts it over the muzzle and lets it slide in (0.92 s), snaps the hand back and turns his face away for the shot (1.60 s). Rifle on his back.",
+   "notes": "03 (V2): loader on both knees 0.82 m out at the gunner's right and 0.86 m ahead, turned 107 deg left to face the muzzle from the side, rising off his heels for the reach. The right hand takes a shell from the pouch at the front of his belt (0.40 s), lifts it over the muzzle and lets it slide in (0.92 s), snaps the hand back and turns his face away for the shot (1.60 s). Rifle on his back.",
    "bake": {
     "TengxianNra02": {
      "solverVersion": "20260928LimbContinuity",
      "seed": null,
      "twistMax": 320.0,
      "seedAnyHand": "",
-     "commit": "after:1b7d48e7",
-     "valuesSha256": "dc08dc4841c24e43e5f8b0de87980cc5aa6619e0c6d0d81d5b8536aa39799e8d"
+     "commit": "after:343fc13c",
+     "valuesSha256": "d4313ff3eed2d22e452424822872a4b121e5ba560cb20816a8d77d9737d104d6"
     }
    }
   },
@@ -341,7 +341,7 @@
   },
   "launcherCrew": {
    "anchor": "gunner",
-   "notes": "PvIjaLauncherFire + PvIjaLauncherLoad (03): both 2 s loops start together; the shell drops into the muzzle at 0.92 s, the shot at 1.60 s. The discharger (prop track `launcher` of the gunner clip) stands on its base plate 0.36 m ahead and 0.04 m right of the gunner root, tube 45 deg up toward -z.",
+   "notes": "PvIjaLauncherFire + PvIjaLauncherLoad (03): both 2 s loops start together; the shell drops into the muzzle at 0.92 s, the shot at 1.60 s. The discharger (prop track `launcher` of the gunner clip) stands on its base plate 0.24 m ahead and 0.22 m right of the gunner root, tube 45 deg up toward -z.",
    "actors": {
     "gunner": {
      "rig": "TengxianNra02",
@@ -353,9 +353,9 @@
     "loader": {
      "rig": "TengxianNra02",
      "clip": "PvIjaLauncherLoad",
-     "x": 0.46,
-     "z": -0.3,
-     "yawDeg": 50.0
+     "x": 0.82,
+     "z": -0.86,
+     "yawDeg": 107.0
     }
    }
   }
@@ -363,7 +363,8 @@
  "props": {
   "launcher": {
    "model": "Model_Type89Launcher",
-   "notes": "track origin = model origin (gripR, the trigger body); axis = model -Z (muzzle direction); up = model +Y. Base plate end 0.185 m behind the origin."
+   "scale": 1.4699,
+   "notes": "Model_Type89Launcher scaled uniformly by 1.4699 (0.413 m model -> 0.610 m real overall). Track origin = model origin (the trigger body); axis = model -Z (muzzle direction); up = model +Y. Base plate end 0.272 m behind the origin, muzzle 0.338 m ahead (scaled)."
   },
   "shell": {
    "notes": "Type89 shell in the loader's right fist: centre, axis = nose direction, up. Hidden outside the carry (it is in the pouch, then in the tube)."
@@ -373,7 +374,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02PrevizIja.json",
-   "sha256": "52db6f6b65d25ee205437d146b60bb50b3f6ed70eefdc566adc4c42d4f0ce0e0",
+   "sha256": "932c0b9e5544afbdc0fd6d36bea23e5a635131630d02e1234beac326f1c7e02a",
    "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\PrevizIja_20261019\\Scene_TengxianNra02PrevizIja.blend",
    "contactPoints": {},
@@ -555,24 +556,24 @@
     {
      "clip": "PvIjaLauncherFire",
      "frames": 49,
-     "footSlideM": 0.0054,
+     "footSlideM": 0.0199,
      "contactErrorM": 0.0,
-     "gripSolveErrorM": 0.02479,
-     "pelvisMaxStepM": 0.012,
-     "floorCorrectionMin": 0.02632,
-     "floorCorrectionMax": 0.03265,
+     "gripSolveErrorM": 0.0086,
+     "pelvisMaxStepM": 0.0128,
+     "floorCorrectionMin": 0.02717,
+     "floorCorrectionMax": 0.04973,
      "root": {
       "start": [
-       -0.0603,
-       -0.1068,
+       0.0966,
+       0.0898,
        -3.44,
-       0.4669
+       0.4102
       ],
       "end": [
-       -0.0571,
-       -0.1171,
+       0.0951,
+       0.089,
        -3.44,
-       0.4672
+       0.4108
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -591,7 +592,7 @@
        2.0
       ]
      ],
-     "kneeSlideM": 0.0019
+     "kneeSlideM": 0.0089
     },
     {
      "clip": "PvIjaLauncherLoad",
@@ -599,9 +600,9 @@
      "footSlideM": 0.0,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.0,
+     "pelvisMaxStepM": 0.0481,
      "floorCorrectionMin": 0.04319,
-     "floorCorrectionMax": 0.04319,
+     "floorCorrectionMax": 0.06802,
      "root": {
       "start": [
        -0.0,
@@ -631,7 +632,7 @@
        2.0
       ]
      ],
-     "kneeSlideM": 0.0
+     "kneeSlideM": 0.0091
     },
     {
      "clip": "PvIjaLungeParriedFall",

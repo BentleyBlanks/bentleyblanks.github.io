@@ -25,7 +25,8 @@ import { fileURLToPath } from "node:url";
 import {
   L0105_PLACES as PL, L0105_TRENCHES, L0105_ROAD, L0105_BRIDGE, L0105_PROPS, PointBeside, LineLength,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
-import { PREVIZ_THROW } from "./Script_EditorBlockoutPrevizPlan.mjs";
+import { PREVIZ_THROW, SamplePrevizActor, NormalizeBlockoutPreviz } from "./Script_EditorBlockoutPrevizPlan.mjs";
+import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES } from "./Data_BlockoutPrevizClips.mjs";
 import { BRIDGE_EAST_DETOUR, DRAG, OUTFLANK_FIRE_021, OUTFLANK_FIRE_LAT, OUTFLANK_RIM_LAT } from "./Script_EditorBlockoutFirstLevel0105Keyframes.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -291,17 +292,18 @@ function ClimbOut(s, id, t, yaw, after = {}) {
   return end;
 }
 /**
- * 03 远处的掷弹筒组（PrevizIja stage launcherCrew）：射手 PvIjaLauncherFire（2 s 一循环、1.60 s 发射），装填手在射手右前
- * (0.46, 0.30)、左转 50° 播 PvIjaLauncherLoad，同一时刻起播。firstPop = 这一段第一发「嘭」：片段 clipFrom 对齐它，之后每 2 s 一发
+ * 03 远处的掷弹筒组（PrevizIja stage launcherCrew，V2）：射手 PvIjaLauncherFire（2 s 一循环、1.60 s 发射），装填手在射手右前
+ * (0.82, 0.86)、左转 107° 播 PvIjaLauncherLoad，同一时刻起播。firstPop = 这一段第一发「嘭」：片段 clipFrom 对齐它，之后每 2 s 一发
  * （这一段 Mortar() 的「嘭」都要落在 firstPop + 2k 上）。
  */
 function MortarCrew(s, firstPop) {
   // 关键帧里的 IjaMortar1（射手）/ IjaMortar2（装填手）
   const g = s.pos.get("IjaMortar1"), yaw = Yaw(g, { x: 0, z: -8 });
   const from = R((((1.6 - firstPop) % 2) + 2) % 2);
-  const ld = Off(g, yaw, 0.30, 0.46);
+  // PrevizIja V2（10-19 第二轮，掷弹筒按真实全长 0.61 m 重烘）：装填手在射手右前 (0.82, 0.86)、左转 107°
+  const ld = Off(g, yaw, 0.86, 0.82);
   s.Place("IjaMortar1", 0, g.x, g.z, { yawDeg: yaw, stance: "crouch", aim: false, clip: "PvIjaLauncherFire", clipFrom: from });
-  s.Place("IjaMortar2", 0, ld.x, ld.z, { yawDeg: R(yaw + 50), stance: "crouch", aim: false, clip: "PvIjaLauncherLoad", clipFrom: from });
+  s.Place("IjaMortar2", 0, ld.x, ld.z, { yawDeg: R(yaw + 107), stance: "crouch", aim: false, clip: "PvIjaLauncherLoad", clipFrom: from });
 }
 
 // ---------------------------------------------------------------------------
@@ -1175,9 +1177,7 @@ function S02E1(ctx) {
   // 干沟里满地伤员；卫生兵背对着顺子蹲在冬瓜身边处理伤口
   // 卫生兵跪在冬瓜胸口旁边、双手按住伤口（CollectionCare 的 CareMedicPress，stage press：伤员胸口在他前方约 0.3 m）；
   // 跪在靠顺子这一侧，背对着顺子
-  { const chest = Off(rest, rest.yawDeg, 0.35), sides = [Off(chest, rest.yawDeg, 0, 0.45), Off(chest, rest.yawDeg, 0, -0.45)];
-    const m = Dist(sides[0], P) < Dist(sides[1], P) ? sides[0] : sides[1];
-    s.Place("Medic", 0, m.x, m.z, { stance: "crouch", faceTo: chest, clip: "CareMedicPress" }); }
+  MedicPress(s, rest, P);
   s.Eye(0, 4.0, { stance: "stand", look: rest, pitch: -12, toPitch: -16 });
   // 坡顶那边有一挺机枪一直在响
   for (const t of [2.0, 9.5, 17.0, 24.5, 31.0]) s.Sfx(t, "mgBurstFar", { x: 50, z: 126 });
@@ -1215,9 +1215,17 @@ function S02E1(ctx) {
   return s.Done({ durationS: ask + 7.0 });
 }
 
+/** 02末：卫生兵跪在冬瓜胸口旁边、靠顺子（P）那一侧，播 CareMedicPress。 */
+function MedicPress(s, rest, P) {
+  const chest = Off(rest, rest.yawDeg, 0.35), sides = [Off(chest, rest.yawDeg, 0, 0.45), Off(chest, rest.yawDeg, 0, -0.45)];
+  const m = Dist(sides[0], P) < Dist(sides[1], P) ? sides[0] : sides[1];
+  s.Place("Medic", 0, m.x, m.z, { stance: "crouch", faceTo: chest, clip: "CareMedicPress" });
+}
+
 function S02E2(ctx) {
   const s = new Seq(ctx, "02E-2", "传令兵报坑，班长带人上去");
   const K = id => KU(ctx, "02E-2", id);
+  MedicPress(s, K("Donggua"), KP(ctx, "02E-1"));
   const runner = K("Runner"), luo = K("Luo"), he = K("HeYoutian");
   const ramp = { x: PL.assemblyEntry.x, z: PL.assemblyEntry.z };
   // 传令兵逆着人流从坡道挤下来，满身是泥
@@ -1795,6 +1803,74 @@ function S0504(ctx) {
   return s.Done({ durationS: s.End("TankAmbush.03") + 5.4, then: "stay" });
 }
 
+// ---------------------------------------------------------------------------
+// 2026-10-19 第二轮：不打仗的拍子里不说话的人歇着（用户：洞里、集结处不说话的人还平端着枪对着空气）
+
+/**
+ * 不打仗的拍子：01 防炮洞、02末集结处、03-1 交通沟里往回走。这些拍子里没人据枪（aim 一律 false），蹲着 / 跪着没在播片段的人
+ * 播 PvCrouchRestRifle，sit 名单里的人（背后有洞壁）播 PvSitRestRifle。exempt：坡顶上守着的兵（CrestNra*，他们在打）、日军。
+ * 0105 PrevizTest 的 RestBeatChecks 按同一张表查。
+ */
+export const PREVIZ_REST_BEATS = Object.freeze({
+  "01-1": { sit: ["HeYoutian"] }, "01-2": { sit: ["HeYoutian"], clip: { Donggua: "WoundedSitRifleIdle" } }, "01-3": {},
+  "02E-1": {}, "02E-2": {}, "03-1": {},
+});
+/** 干待着不到这么久（两个片段之间的空档）就不插歇着的片段（插进去只闪一下）。 */
+const REST_MIN_S = 0.6;
+export const RestExempt = (id, base) => /^Crest/.test(id) || base?.side === "ija";
+const REST_CROUCH = "PvCrouchRestRifle", REST_SIT = "PvSitRestRifle";
+let clipMetaCache = null;
+/** 片段清单（开场库 + 预演额外库）：名字 → { duration, loop }，按运行时的口径算片段什么时候清掉。 */
+export function PrevizClipMeta() {
+  if (clipMetaCache) return clipMetaCache;
+  const meta = new Map(Object.entries(LoadJson(join(HERE, "Animation/OpeningStoryboards/Data_OpeningStoryboardsAnimation.json")).clips));
+  for (const lib of BLOCKOUT_PREVIZ_CLIP_LIBRARIES) {
+    const file = join(HERE, lib.base, lib.manifest);
+    if (existsSync(file)) for (const [name, m] of Object.entries(LoadJson(file).clips || {})) if (!meta.has(name)) meta.set(name, m);
+  }
+  return (clipMetaCache = meta);
+}
+export const PrevizClipDuration = clip => { const m = PrevizClipMeta().get(clip); return !m || m.loop === true ? null : m.duration ?? null; };
+/** 这一刻是不是「蹲着、没在播片段、干待着」（会落到原生的端枪戒备）。 */
+export function IdleCrouching(st) {
+  return st.visible !== false && st.state !== "down" && !st.clip && !st.throw && !st.moving && st.stance === "crouch";
+}
+function RestPass(ctx, seq) {
+  const rule = PREVIZ_REST_BEATS[seq.keyframe];
+  if (!rule) return;
+  const kf = ctx.config.keyframes.find(k => k.id === seq.keyframe);
+  const humans = (kf.units || []).filter(u => !u.kind || u.kind === "soldier");
+  for (const u of humans) if (!seq.actors.some(a => a.id === u.id)) seq.actors.push({ id: u.id, keys: [] });
+  const norm = NormalizeBlockoutPreviz({ schema: "tengxian-blockout-previz/1", level: "FirstLevel0105", sequences: [seq] }).sequences[0];
+  for (const a of seq.actors) {
+    const base = a.spawn || humans.find(u => u.id === a.id);
+    if (!base || RestExempt(a.id, base) || base.state === "down") continue;
+    // 不据枪
+    for (const k of a.keys) if (k.aim === true) k.aim = false;
+    if (base.aim) a.keys.unshift({ t: 0, aim: false });
+    const na = norm.actors.find(x => x.id === a.id);
+    const rest = rule.clip?.[a.id] || ((rule.sit || []).includes(a.id) ? REST_SIT : REST_CROUCH);
+    const add = [];
+    let from = null;
+    const step = 0.1, n = Math.ceil(seq.durationS / step);
+    for (let i = 0; i <= n; i++) {
+      const t = R(Math.min(seq.durationS, i * step));
+      const idle = IdleCrouching(SamplePrevizActor(na, t, base, { clipDuration: PrevizClipDuration }));
+      if (idle && from === null) from = t;
+      if ((!idle || i === n) && from !== null) {
+        if (t - from >= REST_MIN_S || i === n || from === 0) {
+          add.push({ t: from, clip: rest });
+          if (!idle && !a.keys.some(k => k.t > t - step - 1e-6 && k.t <= t + 1e-6 && k.clip !== undefined)) add.push({ t, clip: null });
+        }
+        from = null;
+      }
+    }
+    a.keys.push(...add);
+    a.keys.sort((p, q) => p.t - q.t);
+  }
+  seq.actors = seq.actors.filter(a => a.keys.length || a.spawn);
+}
+
 export const SEQUENCE_BUILDERS = Object.freeze([
   S0101, S0102, S0103, S0104, S0201, S0202, S0203, S0204, S0205, S0206, S0207, S02E1, S02E2,
   S0301, S0302, S0303, S0304, S0305, S0401, S0402, S0403, S0501, S0502, S0503, S0504,
@@ -1804,6 +1880,7 @@ export const SEQUENCE_BUILDERS = Object.freeze([
 export function BuildPreviz({ config, voice }) {
   const ctx = { config, voice: VoiceIndex(voice) };
   const sequences = SEQUENCE_BUILDERS.map(build => build(ctx));
+  for (const seq of sequences) RestPass(ctx, seq);
   const order = config.keyframes.map(k => k.id);
   sequences.sort((a, b) => order.indexOf(a.keyframe) - order.indexOf(b.keyframe));
   return {

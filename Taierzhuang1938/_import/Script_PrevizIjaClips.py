@@ -166,15 +166,23 @@ HAIR_CROWN_OFF = (0.0, -.08, .12)
 HAIR_CROWN_N = (0.0, .35, .94)
 HAIR_GRAB_T, HAIR_LIFT_T, HAIR_HOLD = .95, 1.50, (1.50, 3.50)
 # 03 Type89 discharger, gunner frame: the base plate on the ground here, the tube 45 deg up straight ahead.
-LAUNCHER_LEN = (.185, .23)             # base plate end / muzzle from the model origin (gripR), Model_Type89Launcher
-LAUNCHER_GRIPL = .07
-LAUNCHER_BASE = (-.04, -.36, .0)
+# Real size (2026-10-19 V2): overall 610 mm, barrel 254 mm, fixed 45 deg (en.wikipedia Type 89 grenade discharger, IMFDB,
+# ww2db). Model_Type89Launcher.tzm.json is 0.413 m (muzzle node -0.23, base plate end +0.185 from the origin): the previz
+# shows it scaled up uniformly by LAUNCHER_SCALE, and these clips hold the scaled tube.
+LAUNCHER_REAL_M = .610
+LAUNCHER_MODEL = (.185, .23)           # model: base plate end / muzzle from the model origin (gripR, the trigger body)
+LAUNCHER_SCALE = LAUNCHER_REAL_M / (LAUNCHER_MODEL[0] + LAUNCHER_MODEL[1])
+LAUNCHER_LEN = (LAUNCHER_MODEL[0] * LAUNCHER_SCALE, LAUNCHER_MODEL[1] * LAUNCHER_SCALE)
+LAUNCHER_GRIPR = .09                   # right fist: trigger at the foot of the barrel, from the origin toward the muzzle
+LAUNCHER_GRIPL = .22                   # left fist: the middle of the 254 mm barrel
+LAUNCHER_BASE = (-.22, -.24, .0)
 LAUNCHER_PITCH = 45.0
 FIRE_T = 1.60                          # PvIjaLauncherFire: the shot (both 2 s loops start together)
 DROP_T = .92                           # PvIjaLauncherLoad: the shell lets go into the muzzle
-# The loader kneels at the gunner's right, a little ahead, turned 40 deg left toward the tube.
-LOADER_AT = (-.46, -.30)               # Blender x, y in the gunner frame (runtime m)
-LOADER_YAW = 50.0                      # deg, + = turned left (toward the gunner's muzzle)
+# The loader kneels 0.80 m out at the gunner's right, level with the muzzle, turned 90 deg left: the muzzle is straight
+# ahead of him and he reaches in from the side.
+LOADER_AT = (-.82, -.86)               # Blender x, y in the gunner frame (runtime m)
+LOADER_YAW = 107.0                      # deg, + = turned left (toward the gunner's muzzle)
 # 04-2 PvIjaLungeParriedFall: the bayonet is beaten aside at this time, the chest stab lands at STAB_T.
 PARRY_T, STAB_T = .42, .86
 
@@ -188,11 +196,12 @@ def LauncherAt(T, recoil=0.0, pitchKick=0.0):
     base = Vector(RT(T, LAUNCHER_BASE)) + Vector((0, T.R(recoil) * math.cos(p), 0))
     o = base + a * T.R(LAUNCHER_LEN[0])
     return {'origin': tuple(o), 'axis': tuple(a), 'base': tuple(base), 'muzzle': tuple(o + a * T.R(LAUNCHER_LEN[1])),
-            'gripR': tuple(o), 'gripL': tuple(o + a * T.R(LAUNCHER_GRIPL)), 'up': tuple(Vector((0, math.sin(p), math.cos(p))))}
+            'gripR': tuple(o + a * T.R(LAUNCHER_GRIPR)), 'gripL': tuple(o + a * T.R(LAUNCHER_GRIPL)),
+            'up': tuple(Vector((0, math.sin(p), math.cos(p))))}
 
 
 def LauncherReview(L):
-    return [('cyl', L['base'], L['muzzle'], .045), ('box', L['base'], (.12, .08, .02), 0)]
+    return [('cyl', L['base'], L['muzzle'], .03), ('box', L['base'], (.14, .10, .02), 0)]
 
 
 def GunnerToLoader(T, p):
@@ -218,8 +227,10 @@ STAGES['launcherCrew'] = {
     'actors': {'gunner': {'rig': 'TengxianNra02', 'clip': 'PvIjaLauncherFire', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
                'loader': {'rig': 'TengxianNra02', 'clip': 'PvIjaLauncherLoad', 'x': -LOADER_AT[0], 'z': LOADER_AT[1],
                           'yawDeg': LOADER_YAW}}}
-PROPS['launcher'] = {'model': 'Model_Type89Launcher', 'notes': 'track origin = model origin (gripR, the trigger body); '
-                     'axis = model -Z (muzzle direction); up = model +Y. Base plate end 0.185 m behind the origin.'}
+PROPS['launcher'] = {'model': 'Model_Type89Launcher', 'scale': round(LAUNCHER_SCALE, 4),
+                     'notes': 'Model_Type89Launcher scaled uniformly by %.4f (0.413 m model -> 0.610 m real overall). Track '
+                     'origin = model origin (the trigger body); axis = model -Z (muzzle direction); up = model +Y. Base plate '
+                     'end %.3f m behind the origin, muzzle %.3f m ahead (scaled).' % (LAUNCHER_SCALE, LAUNCHER_LEN[0], LAUNCHER_LEN[1])}
 PROPS['shell'] = {'notes': 'Type89 shell in the loader\'s right fist: centre, axis = nose direction, up. Hidden outside '
                   'the carry (it is in the pouch, then in the tube).'}
 
@@ -257,14 +268,17 @@ Meta('PvIjaCrouchHairLift', 3.5, False, 'track', role='ijaB', props=['weapon'], 
 Meta('PvIjaLauncherFire', 2.0, True, 'track', role='gunner', props=['launcher', 'weapon'], rootMotion=False,
      stage='launcherCrew', weaponState='slungBack',
      events=[{'t': FIRE_T - .12, 'kind': 'triggerSqueeze'}, {'t': FIRE_T, 'kind': 'fire', 'weapon': 'Type89Launcher'}],
-     notes='03: Type89 discharger gunner on the right knee, the base plate on the ground ahead of the left foot, tube 45 '
-           'deg up; left hand round the tube, right hand on the trigger body. Holds, squeezes, fires at %.2f s: the tube '
-           'jolts down its axis and the shoulders kick, settles by the loop end. One shot per loop. Rifle on his back.'
-           % FIRE_T)
+     notes='03 (V2, real 0.61 m discharger = Model_Type89Launcher x %.4f): gunner on the right knee sat back toward the '
+           'right heel, left knee up, the base plate on the ground %.2f m right and %.2f m ahead of his root, tube 45 deg '
+           'up; left hand round the middle of the barrel, right hand at the foot of the barrel on the trigger. Holds, '
+           'squeezes, fires at %.2f s: the tube jolts down its axis and the shoulders kick, settles by the loop end. One shot '
+           'per loop. Rifle on his back.' % (LAUNCHER_SCALE, -LAUNCHER_BASE[0], -LAUNCHER_BASE[1], FIRE_T))
 Meta('PvIjaLauncherLoad', 2.0, True, 'track', role='loader', props=['shell', 'weapon'], rootMotion=False,
      stage='launcherCrew', weaponState='slungBack',
      events=[{'t': .40, 'kind': 'shellOut'}, {'t': DROP_T, 'kind': 'shellIn'}],
-     notes='03: loader on both knees at the gunner\'s right, turned toward the tube: the right hand takes a shell from '
+     notes='03 (V2): loader on both knees %.2f m out at the gunner\'s right and %.2f m ahead, turned %d deg left to face '
+           'the muzzle from the side, rising off his heels for the reach. ' % (-LOADER_AT[0], -LOADER_AT[1], LOADER_YAW) +
+           'The right hand takes a shell from '
            'the pouch at the front of his belt (0.40 s), lifts it over the muzzle and lets it slide in (%.2f s), snaps '
            'the hand back and turns his face away for the shot (%.2f s). Rifle on his back.' % (DROP_T, FIRE_T))
 Meta('PvIjaLungeParriedFall', 2.2, False, 'track', role='ijaTrench', props=['weapon'], rootMotion=False,
@@ -631,16 +645,17 @@ def BuildCrouchHairLift(T, name):
 # 03 Type89 discharger crew
 # =================================================================================================================
 def GunnerKneel(T):
-    """On the right knee, the left foot planted ahead and out, sat back toward the right heel, hunched over the tube."""
+    """On the right knee, the left foot planted ahead and out, trunk near upright leaning a little over the tube."""
     K = T.K
     H, A = T.H, T.A
     kz, ky = K['kneelPelvisZ'], K['kneelPelvisY']
     kp = K['toeKneelPitch'] - K['toeStandPitch']
     f = Standing(T)
-    f.update({'pelvis': (-.02, ky - .12, kz), 'ankle.L': (H + .14, ky - .50, A), 'legPole.L': (H + .45, -1.2, .9),
-              'foot.L': (0, 18, 0), 'ankle.R': K['kneelAnkle'](-1), 'legPole.R': K['kneelPole'](-1), 'foot.R': (kp, 0, 0),
-              'bend': 1.50, 'pelvisTilt': (.45, 0, -.06), 'twist': -.06, 'lean': 0.0, 'shrug': .06,
-              'neck': (-.25, 0, 0), 'head': (-.30, 0, 0), 'handRel.L': None, 'handRel.R': None})
+    heel = K['kneelAnkle'](-1)
+    f.update({'pelvis': (-.04, heel[1] - .10, .40), 'ankle.L': (H + .20, ky - .40, A), 'legPole.L': (H + .60, -1.2, .9),
+              'foot.L': (0, 22, 0), 'ankle.R': K['kneelAnkle'](-1), 'legPole.R': K['kneelPole'](-1), 'foot.R': (kp, 0, 0),
+              'bend': .80, 'pelvisTilt': (.40, 0, -.06), 'twist': .0, 'lean': .10, 'shrug': .05,
+              'neck': (-.05, 0, 0), 'head': (-.10, 0, 0), 'handRel.L': None, 'handRel.R': None})
     return f
 
 
@@ -669,8 +684,8 @@ def BuildLauncherFire(T, name):
         up = Vector(g['up'])
         side = a.cross(up).normalized()            # the tube's right side (gunner's right)
         # left fist round the tube from above-left, 0.11 m up from the origin; right hand on the trigger body from the right
-        left = Vector(g['origin']) + a * T.R(.15) + up * T.R(.035) - side * T.R(.02)
-        right = Vector(g['origin']) + a * T.R(.045) + up * T.R(.01) + side * T.R(.045)
+        left = Vector(g['gripL']) + up * T.R(.035) - side * T.R(.025)
+        right = Vector(g['gripR']) - up * T.R(.005) + side * T.R(.040)
         f['grip.L'], f['grip.R'] = tuple(left), tuple(right)
         f['palmF.L'], f['palmN.L'], f['curl.L'] = tuple(side), tuple(-up), 1.0
         f['palmF.R'], f['palmN.R'], f['curl.R'] = tuple(-up * .7 + a * .3), tuple(-side), Mix(.70, 1.05, squeeze(t))
@@ -688,7 +703,7 @@ def BuildLauncherFire(T, name):
     def Check(t):
         return {}
     spec = {'pose': Pose, 'props': Props, 'plants': [('L', 0, 2.0)], 'kneePlants': [('R', 0, 2.0)],
-            'reach': {'fraction': .92, 'travel': .16, 'bend': .35, 'sink': 0.0},
+            'reach': {'fraction': .93, 'travel': .14, 'bend': .30, 'sink': 0.0},
             'reviewProps': lambda t: LauncherReview(L(t)) + RifleReview(T, SlungRifle(T, 'back')[0]),
             'reviewViews': Views(cy=-.30, cz=.45, far=3.0, h=.8), 'reviewScale': 2.2,
             'reviewFrames': lambda n: [0, int(round(n * (FIRE_T - .1) / 2)), int(round(n * (FIRE_T + .04) / 2)),
@@ -714,17 +729,21 @@ def BuildLauncherLoad(T, name):
     a.normalize()
     kz = base['pelvis'][2]
     pouch = (-(H + .02), base['pelvis'][1] - .17, kz + .06)          # the cartridge pouch at the front right of the belt
-    over = tuple(muzzle + a * T.R(.20))                               # the shell's centre held over the muzzle (wrist target ~)
-    into = tuple(muzzle + a * T.R(.12))
+    over = tuple(muzzle + a * T.R(.13))                               # the wrist held up the tube's line over the muzzle
+    into = tuple(muzzle + a * T.R(.07))
     away = (-(SX - .02), base['pelvis'][1] - .22, kz + .30)
     restL = (H + .10, base['pelvis'][1] - .28, kz + .02)
     ready = (-(H - .02), base['pelvis'][1] - .28, kz + .12)
     hand = [(0.0, ready), (.30, Add3(pouch, (0, -.02, .06))), (.40, pouch), (.50, Add3(pouch, (0, -.02, .08))),
             (.75, Add3(over, (0, .03, .06))), (.84, over), (DROP_T, into), (1.10, away), (FIRE_T, away), (1.85, ready), (2.0, ready)]
+    up = KneelFlat(T, 0.0, 0.0, sit=0.0)['pelvis']
+    reachP = (up[0], up[1] - .15, up[2] - .03)        # up off the heels, hips forward over the knees for the reach
+    p0 = base['pelvis']
     body = Tracks(base, {
+        'pelvis': [(0.0, p0), (.45, p0), (.75, reachP), (DROP_T, reachP), (1.20, p0), (2.0, p0)],
         'hand.R': hand,
-        'twist': [(0.0, .25), (.30, .05), (.40, .02), (.80, .30), (DROP_T, .32), (1.10, .10), (FIRE_T, .06), (2.0, .25)],
-        'bend': [(0.0, .42), (.40, .55), (.72, .80), (.84, .85), (DROP_T, .88), (1.15, .30), (FIRE_T, .28), (FIRE_T + .1, .36), (2.0, .42)],
+        'twist': [(0.0, .05), (.30, .10), (.40, .10), (.80, -.12), (DROP_T, -.14), (1.10, .10), (FIRE_T, .12), (2.0, .05)],
+        'bend': [(0.0, .42), (.40, .55), (.72, .58), (.84, .62), (DROP_T, .64), (1.15, .35), (FIRE_T, .30), (FIRE_T + .1, .38), (2.0, .42)],
         'head': [(0.0, (-.05, 0, .10)), (.40, (.25, 0, -.20)), (.80, (.10, 0, .10)), (DROP_T, (.10, 0, .10)),
                  (1.15, (.20, 0, -.45)), (FIRE_T, (.25, 0, -.50)), (1.85, (-.05, 0, .10)), (2.0, (-.05, 0, .10))],
         'shrug': [(0.0, .04), (1.10, .14), (FIRE_T, .16), (FIRE_T + .10, .20), (2.0, .04)],
@@ -761,7 +780,7 @@ def BuildLauncherLoad(T, name):
         return [('cyl', tuple(c - ax), tuple(c + ax), T.R(.025))]
     tube = lambda: [('cyl', GunnerToLoader(T, L0['base']), GunnerToLoader(T, L0['muzzle']), .045)]
     spec = {'pose': Pose, 'props': Props, 'plants': [], 'kneePlants': [('L', 0, 2.0), ('R', 0, 2.0)],
-            'reach': {'fraction': .92, 'travel': .18, 'bend': .30, 'sink': .02},
+            'reach': {'fraction': .93, 'travel': .26, 'bend': .35, 'sink': .02},
             'check': lambda t: {},
             'reviewProps': lambda t: tube() + [('point', tuple(muzzle), None, .025)] + RifleReview(T, SlungRifle(T, 'back')[0])
             + ShellReview(T, Props(t)['shell']),

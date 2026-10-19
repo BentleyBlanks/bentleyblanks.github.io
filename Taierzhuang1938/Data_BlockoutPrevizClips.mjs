@@ -15,18 +15,18 @@
 
 import { COLLECTION_CARE_ANIMATION } from "./Data_FirstLevelCollectionCare.mjs";
 
-const Previz = name => Object.freeze({
+const Previz = (name, rev = "V1") => Object.freeze({
   name,
   base: `./Animation/${name}/`,
   manifest: `Data_${name}Animation.json`,
-  version: `20261019${name}V1`,
+  version: `20261019${name}${rev}`,
 });
 
 export const BLOCKOUT_PREVIZ_CLIP_LIBRARIES = Object.freeze([
-  Previz("PrevizTalk"),
+  Previz("PrevizTalk", "V2"),   // V2（10-19 第二轮）：加歇着的 PvCrouchRestRifle / PvSitRestRifle
   Previz("PrevizCare"),
   Previz("PrevizCombat"),
-  Previz("PrevizIja"),
+  Previz("PrevizIja", "V2"),    // V2（10-19 第二轮）：掷弹筒组按真实尺寸（0.61 m）重烘、装填手挪开
   // 0610 村子的占位库（百姓 / 妮儿 / 老耿 / 后送兵 / 村里的日军，片段名 Vil 开头；门禁 Script_PrevizVillageClipsTest）
   Previz("PrevizVillage"),
   // 06 集结处的救护库（CareMedicPress / CareMedicBandage / CareLieTreated / CareLieWrithe …）
@@ -48,11 +48,11 @@ export const PREVIZ_WEAPON_SLUNG = Object.freeze([
 ]);
 
 /**
- * 播这些片段时手里、背上都不显示枪（2026-10-19）：趴着 / 躺着的空手片段。背枪名单那把枪是竖着挂在背后的（开场库 InterrogateCrouch
- * 的挂法），人一趴下就戳上天；这几条干脆不画（Script_EditorBlockoutPuppets 在动作层之后藏）。
+ * 播这些片段时手里、背上都不显示枪（2026-10-19）：躺着的空手片段（Script_EditorBlockoutPuppets 在动作层之后藏）。10-19 第二轮起背枪斜贴着背、跟着上身走
+ * （Script_OpeningStoryboardAnimation PlaceSlungAcrossBack），抱捆爬改回背着枪。
  */
 export const PREVIZ_WEAPON_HIDDEN = Object.freeze([
-  "PvCrawlCarryBundle", "PvLieGrabSleeve",
+  "PvLieGrabSleeve",
 ]);
 
 /**

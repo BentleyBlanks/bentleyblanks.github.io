@@ -5,8 +5,8 @@
   "source": {
     "generator": "Script_EditorBlockoutCli.mjs export FirstLevel0105",
     "gameVersion": "Notion 01–05 剧本 + 空间拓扑关系（2026-10-18）",
-    "commit": "57ec2b295c5f5d1207ec4c340241df470f075edd",
-    "generatedAt": "2026-10-18T14:51:08.756Z"
+    "commit": "343fc13ce45b02306167ea832bd0375e3229eeb1",
+    "generatedAt": "2026-10-19T00:25:18.041Z"
   },
   "zones": [
     {
@@ -5013,10 +5013,11 @@
         {
           "id": "PitNra2",
           "side": "nra",
-          "x": 2.8,
-          "z": -5.6,
-          "yawDeg": -150,
+          "x": 3,
+          "z": -4.8,
+          "yawDeg": 180,
           "state": "down",
+          "lie": "along",
           "guess": true
         },
         {
@@ -5305,7 +5306,7 @@
           "id": "ShellHit",
           "name": "掷弹筒弹落点（坑沿）",
           "kind": "danger",
-          "x": 3.2,
+          "x": 3.4,
           "z": -10.4,
           "radiusM": 1.5
         }
@@ -5423,10 +5424,11 @@
         {
           "id": "PitNra2",
           "side": "nra",
-          "x": 2.8,
-          "z": -5.6,
-          "yawDeg": -150,
+          "x": 3,
+          "z": -4.8,
+          "yawDeg": 180,
           "state": "down",
+          "lie": "along",
           "guess": true
         },
         {
@@ -5813,10 +5815,11 @@
         {
           "id": "PitNra2",
           "side": "nra",
-          "x": 2.8,
-          "z": -5.6,
-          "yawDeg": -150,
+          "x": 3,
+          "z": -4.8,
+          "yawDeg": 180,
           "state": "down",
+          "lie": "along",
           "guess": true
         },
         {
@@ -6345,10 +6348,11 @@
         {
           "id": "PitNra2",
           "side": "nra",
-          "x": 2.8,
-          "z": -5.6,
-          "yawDeg": -150,
+          "x": 3,
+          "z": -4.8,
+          "yawDeg": 180,
           "state": "down",
+          "lie": "along",
           "guess": true
         },
         {

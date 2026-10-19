@@ -143,6 +143,10 @@
        }
       },
       {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      },
+      {
        "t": 14.6,
        "talking": true,
        "clip": "PvCrouchCountFingers"
@@ -155,6 +159,10 @@
       {
        "t": 24.3,
        "clip": "DuckBlast"
+      },
+      {
+       "t": 25.6,
+       "clip": "PvCrouchRestRifle"
       }
      ]
     },
@@ -171,9 +179,17 @@
      "id": "LiuWencai",
      "keys": [
       {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      },
+      {
        "t": 18.2,
        "clip": "LiuDivideAmmoToss",
        "faceTo": "player"
+      },
+      {
+       "t": 22.3,
+       "clip": "PvCrouchRestRifle"
       }
      ]
     },
@@ -181,8 +197,34 @@
      "id": "HeYoutian",
      "keys": [
       {
+       "t": 0,
+       "clip": "PvSitRestRifle"
+      },
+      {
        "t": 24.5,
        "clip": "HeHelmetSleepSitUp"
+      },
+      {
+       "t": 30.8,
+       "clip": "PvSitRestRifle"
+      }
+     ]
+    },
+    {
+     "id": "Squad1",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      }
+     ]
+    },
+    {
+     "id": "Squad2",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
       }
      ]
     }
@@ -550,11 +592,19 @@
      "id": "HeYoutian",
      "keys": [
       {
+       "t": 0,
+       "clip": "PvSitRestRifle"
+      },
+      {
        "t": 21.83,
        "x": 69.1,
        "z": 65.7,
        "move": "cut",
        "stance": "stand"
+      },
+      {
+       "t": 21.9,
+       "clip": null
       },
       {
        "t": 30.33,
@@ -573,6 +623,10 @@
     {
      "id": "LiuWencai",
      "keys": [
+      {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      },
       {
        "t": 22.03,
        "clip": "LiuBoxUpGo"
@@ -602,11 +656,19 @@
      "id": "Squad1",
      "keys": [
       {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      },
+      {
        "t": 23.83,
        "x": 64.7,
        "z": 66.1,
        "move": "cut",
        "stance": "stand"
+      },
+      {
+       "t": 23.9,
+       "clip": null
       },
       {
        "t": 29.33,
@@ -626,11 +688,19 @@
      "id": "Squad2",
      "keys": [
       {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      },
+      {
        "t": 25.33,
        "x": 67.4,
        "z": 62.9,
        "move": "cut",
        "stance": "stand"
+      },
+      {
+       "t": 25.4,
+       "clip": null
       },
       {
        "t": 33.33,
@@ -643,6 +713,15 @@
          "z": 64.6
         }
        ]
+      }
+     ]
+    },
+    {
+     "id": "Donggua",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "WoundedSitRifleIdle"
       }
      ]
     }
@@ -8535,6 +8614,51 @@
        "clip": null
       }
      ]
+    },
+    {
+     "id": "HeYoutian",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      }
+     ]
+    },
+    {
+     "id": "Squad1",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      }
+     ]
+    },
+    {
+     "id": "Squad3",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      }
+     ]
+    },
+    {
+     "id": "Wounded3",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      }
+     ]
+    },
+    {
+     "id": "Wounded6",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      }
+     ]
     }
    ],
    "lines": [
@@ -8641,6 +8765,23 @@
    ],
    "actors": [
     {
+     "id": "Medic",
+     "keys": [
+      {
+       "t": 0,
+       "x": 31.65,
+       "z": 149.05,
+       "move": "cut",
+       "stance": "crouch",
+       "faceTo": {
+        "x": 31.65,
+        "z": 149.5
+       },
+       "clip": "CareMedicPress"
+      }
+     ]
+    },
+    {
      "id": "Runner",
      "keys": [
       {
@@ -8744,6 +8885,10 @@
      "id": "HeYoutian",
      "keys": [
       {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      },
+      {
        "t": 18.61,
        "faceTo": "Luo"
       }
@@ -8763,6 +8908,42 @@
        "x": 34.4,
        "z": 142.9,
        "move": "walk"
+      }
+     ]
+    },
+    {
+     "id": "Squad1",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      }
+     ]
+    },
+    {
+     "id": "Squad3",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      }
+     ]
+    },
+    {
+     "id": "Wounded3",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
+      }
+     ]
+    },
+    {
+     "id": "Wounded6",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "PvCrouchRestRifle"
       }
      ]
     }
@@ -9488,10 +9669,10 @@
      "keys": [
       {
        "t": 0,
-       "x": 26.5,
-       "z": -212.76,
+       "x": 26.07,
+       "z": -212.25,
        "move": "cut",
-       "yawDeg": 222.5,
+       "yawDeg": 279.5,
        "stance": "crouch",
        "aim": false,
        "clip": "PvIjaLauncherLoad",
@@ -10339,10 +10520,10 @@
      "keys": [
       {
        "t": 0,
-       "x": 26.5,
-       "z": -212.76,
+       "x": 26.07,
+       "z": -212.25,
        "move": "cut",
-       "yawDeg": 222.5,
+       "yawDeg": 279.5,
        "stance": "crouch",
        "aim": false,
        "clip": "PvIjaLauncherLoad",
@@ -11651,10 +11832,10 @@
      "keys": [
       {
        "t": 0,
-       "x": 26.5,
-       "z": -212.76,
+       "x": 26.07,
+       "z": -212.25,
        "move": "cut",
-       "yawDeg": 222.5,
+       "yawDeg": 279.5,
        "stance": "crouch",
        "aim": false,
        "clip": "PvIjaLauncherLoad",

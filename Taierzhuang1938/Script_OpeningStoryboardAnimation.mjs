@@ -481,12 +481,52 @@ export function InstallOpeningStoryboardAnimation(soldier){
       }
       if(rig.openingSlungRifle){
         const prop=rig.openingSlungRifle;prop.visible=slung;
-        if(slung){rig.bones.chest.getWorldPosition(prop.position);actor.root.worldToLocal(prop.position);prop.position.x-=.23;prop.position.z+=.18;prop.rotation.set(Math.PI/2,0,-.12,"YXZ");}
+        // InterrogateCrouch keeps its 0922 placement; the clips an added library slings (the previz) wear it across the back,
+        // following the upper body (PlaceSlungAcrossBack).
+        if(slung&&(pose.clip==="InterrogateCrouch"||!PlaceSlungAcrossBack(actor,rig,prop))){rig.bones.chest.getWorldPosition(prop.position);actor.root.worldToLocal(prop.position);prop.position.x-=.23;prop.position.z+=.18;prop.rotation.set(Math.PI/2,0,-.12,"YXZ");}
       }
     }
     rig.openingStoryboardState=pose?{...performer?.state,clipId:pose.clip,seconds:pose.seconds,blend:mix}:null;
     return result;
   };
+}
+
+/**
+ * 2026-10-19 (white-box previz): a rifle slung across the back that follows the upper body -- the opening library's
+ * SlungRifle 'back' layout: the grip at the lower left of the back, the muzzle up over the right shoulder, the sights
+ * facing away from the back; the frame is the posed torso (pelvis -> neck up, the shoulders' left), so a man bent 40 deg
+ * over a blanket carries it bent with him. Returns false when a bone is missing (the caller falls back).
+ */
+const SlungP=new Vector3(),SlungUp=new Vector3(),SlungLeft=new Vector3(),SlungBack=new Vector3(),SlungAxis=new Vector3(),SlungA=new Vector3(),SlungB=new Vector3();
+const SlungSrcAxis=new Vector3(),SlungSrcUp=new Vector3(),SlungSrcRight=new Vector3(),SlungRight=new Vector3();
+const SlungFrameSrc=new Matrix4(),SlungFrameDst=new Matrix4(),SlungQ=new Quaternion(),SlungParentQ=new Quaternion();
+function PlaceSlungAcrossBack(actor,rig,prop){
+  const b=rig.bones||{};
+  if(!b.pelvis||!b.neck||!b.chest||!b.upperArmL||!b.upperArmR||!prop.parent)return false;
+  rig.root.updateWorldMatrix(true,true);
+  b.pelvis.getWorldPosition(SlungA);b.neck.getWorldPosition(SlungB);
+  SlungUp.subVectors(SlungB,SlungA).normalize();
+  b.upperArmL.getWorldPosition(SlungA);b.upperArmR.getWorldPosition(SlungB);
+  SlungLeft.subVectors(SlungA,SlungB);SlungLeft.addScaledVector(SlungUp,-SlungLeft.dot(SlungUp)).normalize();
+  SlungBack.crossVectors(SlungUp,SlungLeft).normalize();
+  if(SlungUp.lengthSq()<.5||SlungLeft.lengthSq()<.5)return false;
+  // muzzle up over the right shoulder, the stock across the left of the lower back
+  SlungAxis.copy(SlungUp).multiplyScalar(.93).addScaledVector(SlungLeft,-.37).normalize();
+  b.chest.getWorldPosition(SlungP);
+  SlungP.addScaledVector(SlungBack,.15).addScaledVector(SlungLeft,.09).addScaledVector(SlungUp,-.22);
+  // model frame: muzzle along weaponMuzzle (local -Z for the rifles), sights +Y
+  SlungSrcAxis.copy(actor.weaponMuzzle?.lengthSq?.()>1e-8?actor.weaponMuzzle:SlungSrcAxis.set(0,0,-1)).normalize();
+  SlungSrcUp.set(0,1,0).addScaledVector(SlungSrcAxis,-SlungSrcAxis.y).normalize();
+  SlungSrcRight.crossVectors(SlungSrcUp,SlungSrcAxis).normalize();
+  SlungRight.crossVectors(SlungBack,SlungAxis).normalize();
+  SlungB.crossVectors(SlungAxis,SlungRight).normalize();          // target up: the sights away from the back
+  SlungFrameSrc.makeBasis(SlungSrcRight,SlungSrcUp,SlungSrcAxis);
+  SlungFrameDst.makeBasis(SlungRight,SlungB,SlungAxis);
+  SlungQ.setFromRotationMatrix(SlungFrameDst.multiply(SlungFrameSrc.invert()));
+  prop.parent.updateWorldMatrix(true,false);prop.parent.getWorldQuaternion(SlungParentQ).invert();
+  prop.quaternion.copy(SlungParentQ).multiply(SlungQ);
+  prop.position.copy(prop.parent.worldToLocal(SlungP));
+  return true;
 }
 
 /** Additive layer: q = q_base * inverse(q_reference) * q_additive(t) on the clip's masked bones.

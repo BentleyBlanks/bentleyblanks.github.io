@@ -9,6 +9,18 @@
 import * as THREE from "three";
 
 let registered = false;
+/**
+ * 道具网格的等比放大（2026-10-19 第二轮）：清单 props.<名>.scale。八九式掷弹筒的游戏模型从筒口到底钣只有 0.415 m，
+ * 真家伙全长 0.610 m，PrevizIja V2 按 1.4699 倍重烘了掷弹筒组，道具轨里已经是放大后的位置。没读到清单时用这个缺省值。
+ */
+const PROP_SCALE = { launcher: 1.4699 };
+/** 读一个动作库清单的 props：有 scale 的记下来（之后新建的道具按它放大）。 */
+export function SetPrevizPropScales(props) {
+  for (const [name, spec] of Object.entries(props || {})) {
+    const k = Number(spec?.scale);
+    if (Object.hasOwn(PROP_SCALE, name) && Number.isFinite(k) && k > 0) PROP_SCALE[name] = k;
+  }
+}
 
 function Owned() { return { geometries: [], materials: [] }; }
 function Mat(owned, color, roughness = 0.8, metalness = 0.1) {
@@ -30,8 +42,13 @@ function Rod(owned, material, radius, z0, z1, x = 0, y = 0, segments = 8) {
 /** 掷弹筒：游戏里的武器网格（同 Script_OpeningProps WeaponObject 的建法）；没有工厂时用一根短管顶上。 */
 function BuildLauncher(actor) {
   const owned = Owned();
+  // 外层跟道具轨走（开场道具层按真实大小摆、会改外层的 scale），网格挂在等比放大的内层里，绕模型原点（扳机体）放大
+  const outer = new THREE.Group();
+  outer.name = "PrevizProp_launcher";
   const group = new THREE.Group();
-  group.name = "PrevizProp_launcher";
+  group.name = "PrevizProp_launcherScaled";
+  group.scale.setScalar(PROP_SCALE.launcher);
+  outer.add(group);
   const factory = actor?.factory;
   const built = factory?.WeaponGeometry?.("Type89Launcher", 0, {});
   let axis = new THREE.Vector3(0, 0, -1);
@@ -49,7 +66,7 @@ function BuildLauncher(actor) {
     group.add(Rod(owned, steel, 0.025, 0.06, -0.35));
     group.add(Rod(owned, steel, 0.05, 0.16, 0.19, 0, -0.02));
   }
-  return Object.assign(owned, { object: group, axis });
+  return Object.assign(owned, { object: outer, axis });
 }
 
 /** 弹：直径 5 cm、长 18 cm，弹头朝 −Z。 */

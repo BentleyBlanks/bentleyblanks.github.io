@@ -20,6 +20,6 @@ project = Path(os.environ['OPENING_PROJECT'])
 os.environ['OPENING_LIBRARY'] = str(project / '_import/Script_PrevizIjaClips.py')
 os.environ['OPENING_LIBRARY_NAME'] = 'PrevizIja'
 os.environ.setdefault('OPENING_LIBRARY_MODELS', 'TengxianNra02')
-os.environ.setdefault('OPENING_VERSION', '20261019PrevizIjaV1')
+os.environ.setdefault('OPENING_VERSION', '20261019PrevizIjaV2')
 os.environ.setdefault('OPENING_BLEND_DIR', 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/PrevizIja_20261019')
 runpy.run_path(str(project / '_import/Script_OpeningStoryboardBake.py'), run_name='__main__')

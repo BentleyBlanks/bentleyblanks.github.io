@@ -685,6 +685,14 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 - 生成器小工具（`Script_EditorBlockoutFirstLevel0105Previz.mjs`）：`Off`（往前 / 往右偏）、`SupportGo`（架伤员）、`Dive`、`ClimbOut`、`MortarCrew`；常量 `TALK_SLUNG` / `TALK_LOW` / `TALK_CROUCH`、`DRAG_MPS`。
 - 截图验收：`_shots/EditorBlockout0105/Clips2/`（不提交）：`<拍号>_<人物>_<片段>_t<秒>.png`，第一人称的带 `FP_` 前缀。
 
+**第二轮（2026-10-19）**：
+- **背枪跟着上身走**：用 `AddOpeningClipLibrary` 登记的背枪片段、清单写了 `weaponSlung` 的片段、`PREVIZ_WEAPON_SLUNG` 里的片段，背上那把枪按开场库 `SlungRifle` 'back' 的挂法斜贴着背：枪托在后腰偏左、枪口从右肩后伸出去、准星朝外；姿态框架每帧从骨盆→脖子、左右上臂量（`Script_OpeningStoryboardAnimation.PlaceSlungAcrossBack`），人弯腰、趴下枪跟着倒。游戏开场的 `InterrogateCrouch` 照旧原来的挂法。抱捆爬改回背着枪（`PREVIZ_WEAPON_HIDDEN` 只剩躺着攥袖子）。
+- **不打仗的拍子里不说话的人歇着**：PrevizTalk V2（`20261019PrevizTalkV2`）加 `PvCrouchRestRifle`（单膝跪，枪竖在身前、枪托着地，两手叠在护木上歇着，4 s 循环）、`PvSitRestRifle`（背靠沟壁 / 洞壁坐，枪竖在两膝之间两手抱着，根离墙 0.35 m，4 s 循环）。生成器 `PREVIZ_REST_BEATS`（01-1 / 01-2 / 01-3 防炮洞、02末-1 / 02末-2 集结处、03-1 交通沟里往回走）收尾时过一遍（`RestPass`）：这些拍子里所有人 `aim` 一律 false，蹲着干待着（没播片段、没在走）满 0.6 s 的空档插 `PvCrouchRestRifle`（洞里何有田背后是洞壁，用 `PvSitRestRifle`；01-2 冬瓜 `WoundedSitRifleIdle`），一走动就清掉。坡顶守着的兵（`CrestNra*`）和日军不管。02末-2 卫生兵接着按伤口（同 02末-1 的站位）。
+- **门禁**：0105 PrevizTest 加 `RestBeatChecks`：这些拍子里任何人任何时刻不许据枪，也不许蹲着干待着不播片段（不到 0.6 s 的空档不算）。打仗的拍子里不说话的人照旧端枪。
+- **03-3 刘文财和被掀翻的兵分开**：关键帧 `PitNra2` 从坑里 (2.8, 1.4) 挪到 (3.0, 2.2)（坑的本地坐标），朝向 180°、`lie: "along"`（倒地动作原来把身子甩回刘文财那边）；实测骨盆离刘文财 0.97 m、脚离他约 0.85 m（03-2…03-5 四帧，`export FirstLevel0105` 重导，其余单位一个没变）。
+- **05-1 桥下头顶余量**（头骨点 + 0.2 m 到上方门板 / 横木底面，0.1 s 一采样，整段最小）：班长 0.42 m（钻桥底那一下播 `PvCrouchRunPullBehind`）、幺娃 0.47 m、机枪手 0.62 m，都 ≥ 0.1 m，不用改。
+- **掷弹筒组按真实尺寸**（PrevizIja V2，`20261019PrevizIjaV2`）：八九式全长 0.610 m，游戏模型从筒口到底钣只有 0.415 m，`Script_EditorBlockoutPrevizProps.mjs` 把网格挂在一个等比放大 1.4699 倍的内层里（外层跟 `launcher` 道具轨走；倍数读清单 `props.launcher.scale`，`SetPrevizPropScales`）；装填手在射手右前 (0.82, 0.86) m、左转 107°（生成器 `MortarCrew`）。发射 1.60 s、弹进筒口 0.92 s 没变，「嘭」的对齐不动。
+
 ## 15. 06–10 新剧本白盒（关卡键 `FirstLevel0610`，2026-10-18）
 
 按 Notion 06–10（10-18 晚定稿）与集成负责人的搭建契约 §3–§4，照 §13 的做法另建一片场地：干沟 → 凹路 → 耿家庄。**坐标与 `FirstLevel0105` 同一套**（原点 = 沟口，X 东 Z 南），06 的干沟、南岸枯树、凹路头一段从 `Data_EditorBlockoutFirstLevel0105Space.mjs` import，不抄数字；北半截（z < 205）的地面直接调 0105 的 `L0105Ground`，所以两片白盒在干沟一带逐点一致（场景生成器 notes 与测试抽 4000 点比对，差 0）。游戏里的第一关、`FirstLevel`、`FirstLevel0105` 都不动。

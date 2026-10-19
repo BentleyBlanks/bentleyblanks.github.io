@@ -102,6 +102,16 @@ Meta('PvProneBeckonL', 1.6, True, role='talker', weaponState='ground',
      notes='Prone on the lip, the rifle lying on the ground in front of him at his right (weapon track), the right hand on '
            'its stock; the left forearm up off the ground, the hand calling toward himself twice a loop, the head turned '
            'to his left toward whoever he calls.')
+# 2026-10-19 V2: resting poses for the men who do NOT talk where nobody is fighting (the dugout, the collection point):
+# no rifle held at the ready.
+Meta('PvCrouchRestRifle', 4.0, True, role='rest', weaponState='upright',
+     notes='Down on the right knee, the left foot forward, the rifle upright in front of him (butt on the ground between the '
+           'knees, leaning back toward the chest), both hands resting stacked on the handguard, the head a little down; '
+           'slow breathing only. Seamless loop.')
+Meta('PvSitRestRifle', 4.0, True, role='rest', weaponState='upright', env={'wallBehindM': .35},
+     notes='Seated on the ground with his back to the trench / dugout wall (root 0.35 m in front of the wall face, as '
+           'WoundedSitRifleIdle), knees up, the rifle upright between the knees, butt in the dirt, both arms round it '
+           '(right hand on the handguard, left hand below it); slow breathing, the head nodding a little. Seamless loop.')
 
 
 def R(T, v):
@@ -514,6 +524,61 @@ def BuildProneBeckon(T, name):
     return {'pose': Pose, 'props': lambda t: {'weapon': T.Track(rifle, up=(1, 0, 0))}, 'plants': [],
             'reviewProps': lambda t: T.RifleProps(rifle), 'reviewViews': views, 'reviewScale': 2.6,
             'reviewFrames': lambda n: [0, int(n * .25)], 'check': lambda t: {'R': tuple(grip)}}
+
+
+# =================================================================================
+# V2: resting (not talking) where nobody is fighting
+# =================================================================================
+def RestKneelRifle(T):
+    """Butt on the ground in front between the knees, leaning back toward the chest."""
+    ky = T.K['kneelPelvisY']
+    return T.RifleFromButt((-.06, ky - .36, .012), Unit((.03, .22, 1.0)))
+
+
+@Builder('PvCrouchRestRifle')
+def BuildCrouchRest(T, name):
+    D = 4.0
+    base = KneelBase(T)
+    rifle = RestKneelRifle(T)
+    kz = T.K['kneelPelvisZ']
+    gR = T.Along(rifle, (kz + .24) * T.s)
+    gL = T.Along(rifle, (kz + .36) * T.s)
+    base.update({'handRel.L': None, 'handRel.R': None, 'bend': .16, 'head': (.16, 0, 0), 'neck': (.06, 0, 0),
+                 'grip.R': gR, 'palmF.R': Unit((.9, -.35, .08)), 'palmN.R': Unit((.35, -.93, 0)), 'curl.R': 1.0,
+                 'armPole.R': (-(T.SX + .45), .05, kz + .05),
+                 'grip.L': gL, 'palmF.L': Unit((-.9, -.35, .08)), 'palmN.L': Unit((-.35, -.93, 0)), 'curl.L': .9,
+                 'armPole.L': (T.SX + .45, .05, kz + .05)})
+    h = base['head']
+    keys = [(0.0, {}), (2.0, {'head': (h[0] + .05, 0, .04)}), (D, {})]
+    anim = Anim(base, keys, {'head': .1}, periodic=True)
+
+    def Pose(t):
+        return T.Nest(Breathe(anim(t), t, 4.0, 1.2))
+    return {'pose': Pose, 'props': lambda t: {'weapon': T.Track(rifle, up=(0, 1, 0))},
+            'plants': [('L', 0, D)], 'kneePlants': [('R', 0, D)],
+            'reviewProps': lambda t: T.RifleProps(rifle), 'reviewViews': KNEEL_VIEWS, 'reviewScale': 2.2,
+            'reviewFrames': lambda n: [0, n // 2], 'check': lambda t: {'R': gR, 'L': gL}}
+
+
+@Builder('PvSitRestRifle')
+def BuildSitRest(T, name):
+    D = 4.0
+    base = _base['SitBase'](T)
+    rifle = _base['SitRifle'](T)
+    gL = T.Along(rifle, .50)
+    base.update({'grip.L': gL, 'palmF.L': Unit((-.9, -.35, .08)), 'palmN.L': Unit((-.35, -.93, 0)), 'curl.L': .95,
+                 'armPole.L': (T.SX + .50, -.05, .12), 'handRel.L': None, 'hand.L': gL,
+                 'head': (.26, .02, -.04), 'neck': (.12, 0, 0)})
+    h = base['head']
+    keys = [(0.0, {}), (2.0, {'head': (h[0] + .06, h[1], h[2] + .03)}), (D, {})]
+    anim = Anim(base, keys, {'head': .1}, periodic=True)
+
+    def Pose(t):
+        return T.Nest(Breathe(anim(t), t, 4.0, 1.0))
+    return {'pose': Pose, 'props': lambda t: {'weapon': T.Track(rifle, up=(0, 1, 0))},
+            'plants': [('L', 0, D), ('R', 0, D)], 'walls': _base['SIT_WALL'],
+            'reviewProps': _base['SitReview'](T, rifle), 'reviewViews': _base['SIT_VIEWS'], 'reviewScale': 2.0,
+            'reviewFrames': lambda n: [0, n // 2], 'check': lambda t: {'R': base['grip.R'], 'L': gL}}
 
 
 def MakeClips(K):
