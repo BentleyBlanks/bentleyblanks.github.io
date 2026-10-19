@@ -317,17 +317,22 @@ export class BlockoutPreviz {
       this.clipLibrariesWarned.add(name);
       console.warn(`[BlockoutPreviz] 动作库 ${name} 读不到（${why}），它的片段退回原生动画`);
     };
-    await Promise.all(BLOCKOUT_PREVIZ_CLIP_LIBRARIES.map(async (lib) => {
+    // 并行下载，按表的顺序并库：同名片段表里靠前的赢（2026-10-20 起 PrevizKimodo 排第一，顶掉手 K 的同名片段；
+    // 生成器 PrevizClipMeta 与各 PrevizTest 读清单也是表里靠前的赢）
+    const loaded = await Promise.all(BLOCKOUT_PREVIZ_CLIP_LIBRARIES.map(async (lib) => {
       try {
         const v = `?v=${encodeURIComponent(lib.version)}`;
         const config = await Read(lib.base + lib.manifest + v);
         const row = (config.models || []).find(m => m.id === "TengxianNra02") || config.models?.[0];
         if (!row?.file) throw Error("清单里没有骨架记录");
-        const record = await Read(lib.base + row.file + v);
-        api.AddOpeningClipLibrary(config, record, { weaponSlung: PREVIZ_WEAPON_SLUNG });
-        previzProps?.SetPrevizPropScales?.(config.props);   // 清单 props.<名>.scale（掷弹筒按真实全长放大 1.4699）
-      } catch (error) { Warn(lib.name, String(error?.message || error).slice(0, 120)); }
+        return { config, record: await Read(lib.base + row.file + v) };
+      } catch (error) { Warn(lib.name, String(error?.message || error).slice(0, 120)); return null; }
     }));
+    for (const lib of loaded) {
+      if (!lib) continue;
+      api.AddOpeningClipLibrary(lib.config, lib.record, { weaponSlung: PREVIZ_WEAPON_SLUNG });
+      previzProps?.SetPrevizPropScales?.(lib.config.props);   // 清单 props.<名>.scale（掷弹筒按真实全长放大 1.4699）
+    }
   }
 
   /** 播之前：句子解码进声库、口型轨、开场动作库（这一段用到片段时）。 */

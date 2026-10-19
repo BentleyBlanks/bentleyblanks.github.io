@@ -1,0 +1,183 @@
+{
+  "schema": 1,
+  "model": "Kimodo-SOMA-RP-v1.2",
+  "notes": "Kimodo text-to-motion prompts for the blockout previz generic clips (docs/Data_EditorBlockout.md §14.5). Each clip replaces the hand-keyed clip of the same name; the retarget keeps the old clip's fingers and weapon attachment. samples = how many seeds were drawn; pick = the sample shipped (chosen from the contact sheets). knee = the knee the old clip kneels on, hand = the gesturing hand of the old clip; a sample that kneels / gestures on the other side is mirrored left/right (knee first). Clips with `rejected` were drawn but kept hand-keyed (the reason is the contact-sheet verdict, 2026-10-20); the retarget skips them.",
+  "clips": [
+    {
+      "clip": "PvStandTalkLowRifle",
+      "library": "PrevizTalk",
+      "seconds": 7,
+      "samples": 3,
+      "seed": 101,
+      "prompt": "A man stands in place and talks to someone in front of him, his right arm hanging relaxed at his side, his left hand making small gestures in front of his belly while he speaks, nodding a little.",
+      "hand": "L",
+      "pick": 1
+    },
+    {
+      "clip": "PvStandTalkSlung",
+      "library": "PrevizTalk",
+      "seconds": 7,
+      "samples": 3,
+      "seed": 102,
+      "prompt": "A man stands in place and talks calmly with someone, making small gestures with both hands in front of his belly, shifting his weight slightly.",
+      "pick": 0
+    },
+    {
+      "clip": "PvStandPointL",
+      "library": "PrevizTalk",
+      "seconds": 4,
+      "samples": 3,
+      "seed": 103,
+      "prompt": "A man stands still with his right arm hanging at his side, raises his left arm and points straight ahead at shoulder height, and keeps pointing.",
+      "hand": "L",
+      "pick": 0
+    },
+    {
+      "clip": "PvStandWaveOnL",
+      "library": "PrevizTalk",
+      "seconds": 6,
+      "samples": 3,
+      "seed": 104,
+      "prompt": "A man stands in place with his right arm down at his side and repeatedly swings his left arm forward from beside his head, waving people to move forward.",
+      "hand": "L",
+      "pick": 0
+    },
+    {
+      "clip": "PvStandBeckonL",
+      "library": "PrevizTalk",
+      "seconds": 6,
+      "samples": 3,
+      "seed": 105,
+      "prompt": "A man stands turned a little to his left, his right arm down at his side, and repeatedly beckons with his left hand toward himself, calling people to come over.",
+      "hand": "L",
+      "rejected": "samples rub the head / salute instead of beckoning"
+    },
+    {
+      "clip": "PvStandHaltL",
+      "library": "PrevizTalk",
+      "seconds": 3,
+      "samples": 3,
+      "seed": 106,
+      "prompt": "A man standing with his right arm at his side raises his left hand in front of his chest, palm forward, signalling stop, and holds it there.",
+      "hand": "L",
+      "pick": 1
+    },
+    {
+      "clip": "PvStandShakeHead",
+      "library": "PrevizTalk",
+      "seconds": 2.6,
+      "samples": 3,
+      "seed": 107,
+      "prompt": "A man stands still with his arms at his sides, looks down and shakes his head no.",
+      "rejected": "no head shake in any sample (head yaw within ±4°)"
+    },
+    {
+      "clip": "PvCrouchTalkRifle",
+      "library": "PrevizTalk",
+      "seconds": 7,
+      "samples": 4,
+      "seed": 108,
+      "prompt": "A man kneels on his right knee with his left foot forward, his left forearm resting on his left knee, and talks, his left hand making small gestures, his right hand resting at his right side.",
+      "hand": "L",
+      "knee": "R",
+      "rejected": "kneeling body hunches far from the authored upright rifle; the IK'd grip twists the arms"
+    },
+    {
+      "clip": "PvCrouchPointL",
+      "library": "PrevizTalk",
+      "seconds": 3,
+      "samples": 4,
+      "seed": 109,
+      "prompt": "A man kneeling on his right knee with his left foot forward raises his left arm and points ahead to the left, and keeps pointing.",
+      "hand": "L",
+      "knee": "R",
+      "rejected": "same as PvCrouchTalkRifle"
+    },
+    {
+      "clip": "PvCrouchCountFingers",
+      "library": "PrevizTalk",
+      "seconds": 6,
+      "samples": 4,
+      "seed": 110,
+      "prompt": "A man kneels on his right knee with his left foot forward, holds his left hand up in front of his chest and counts on his fingers while talking.",
+      "hand": "L",
+      "knee": "R",
+      "rejected": "same as PvCrouchTalkRifle; Kimodo has no finger motion either"
+    },
+    {
+      "clip": "PvProneBeckonL",
+      "library": "PrevizTalk",
+      "seconds": 5,
+      "samples": 4,
+      "seed": 111,
+      "prompt": "A man lies on his stomach on the ground, props himself on his right forearm, turns his head to the left and waves his left hand toward himself, calling someone over.",
+      "hand": "L",
+      "rejected": "lies flat or pushes up; no beckon"
+    },
+    {
+      "clip": "PvCrouchRestRifle",
+      "library": "PrevizTalk",
+      "seconds": 7,
+      "samples": 4,
+      "seed": 112,
+      "prompt": "A tired man kneels on his right knee with his left foot forward, both hands resting together in front of his chest, his head a little down, breathing slowly.",
+      "knee": "R",
+      "rejected": "same as PvCrouchTalkRifle"
+    },
+    {
+      "clip": "PvSitRestRifle",
+      "library": "PrevizTalk",
+      "seconds": 7,
+      "samples": 4,
+      "seed": 113,
+      "prompt": "A tired man sits on the ground with his back leaning against a wall, knees bent up, both arms resting around his knees, breathing slowly with his head nodding a little.",
+      "rejected": "leans far back, arms cannot reach the authored rifle"
+    },
+    {
+      "clip": "VilCrouchHold",
+      "library": "PrevizVillage",
+      "seconds": 6,
+      "samples": 3,
+      "seed": 114,
+      "prompt": "A frightened man squats down on his heels hugging his knees with both arms, his head tucked down, breathing slowly and staying still.",
+      "rejected": "kneels upright instead of squatting with arms round the shins"
+    },
+    {
+      "clip": "VilCowerWhimper",
+      "library": "PrevizVillage",
+      "seconds": 5,
+      "samples": 3,
+      "seed": 115,
+      "prompt": "A terrified person crouches low with both hands covering the mouth, shoulders hunched and trembling, head pulled down.",
+      "rejected": "stands hunched instead of the deep squat"
+    },
+    {
+      "clip": "VilPanicRun",
+      "library": "PrevizVillage",
+      "seconds": 4,
+      "samples": 3,
+      "seed": 116,
+      "prompt": "A panicked person runs forward hunched over with the head ducked, the arms flailing.",
+      "pick": 0
+    },
+    {
+      "clip": "VilIjaShoutPoint",
+      "library": "PrevizVillage",
+      "seconds": 5,
+      "samples": 3,
+      "seed": 117,
+      "prompt": "An angry man stands with his right arm down at his side, thrusts his left arm forward pointing straight ahead and shouts, jabbing the arm forward again and again.",
+      "hand": "L",
+      "rejected": "no pointing arm"
+    },
+    {
+      "clip": "VilDuckProne",
+      "library": "PrevizVillage",
+      "seconds": 3,
+      "samples": 3,
+      "seed": 118,
+      "prompt": "A man standing suddenly throws himself down onto the ground, lies flat on his stomach and covers the back of his head with both hands, trembling.",
+      "pick": 0
+    }
+  ]
+}

@@ -528,6 +528,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 
 ## 12. 变更记录
 
+- 2026-10-20（通用动作换成 Kimodo）：§14.5 本机 Kimodo 文生动作换掉 7 条手 K 的预演通用片段（说话 ×2、指、挥手前进、停止手势、逃跑、卧倒），新库 `Animation/PrevizKimodo` 排在预演动作库表第一；运行时改成并行下载、按表顺序并库（原来谁先下完谁先并，同名片段归属不确定）。另 11 条生成了但不如手 K，保留旧的。
 - 2026-10-20（12–18 预演第二版）：§16 用上 `ride`（三副担架横搁车板、妮儿坐车尾、13-2 伤员挂到担架上被抬走；关键帧生成器 `CartWorld` / `NIER_TAIL_RIDE` / `PressPose` / `DOCTOR_PRESS`，摆位检查跳过挂着的人、`tending` 不报与伤员重叠）、`aircraft`（13-1 / 14-2 两架 Ki-30 顺着大路扫、13-2 / 14-1 兜圈子，弹着由 strafe 画）、`slowmo`（14-2 松手那 1.7 s）、百姓 / 小孩 / 军官 / 兵的占位片段、`clipRelease`（冬瓜攥袖子）、18-2 院里担架出院门上桥；PrevizTest 加飞机 / 慢动作 / 挂车 / 片段 / 院里担架 / `TalkPostureChecks`，KeyframesTest 加挂车与军医站位断言。
 - 2026-10-20（挂到车上 + 预演音效直接放文件，运行时包 M）：§3 单位加可选 `ride`（挂到 `cart` / `tank` / `litter` 上，`Script_EditorBlockoutConfig` 校验 / 归一化，`RideIssues` / `NormalizeRide` / `BLOCKOUT_RIDE_CARRIER_KINDS`）；§5.6 `BlockoutPuppets` 按车位姿摆挂着的人与担架、驴车尺寸实测 `BLOCKOUT_CART_SEATS`（车板顶 1.025 m）、`SitRootY` / `RideWorldPose`、Probe 多给 `ride` / `seat` / `rootAboveCarrierGround`；§14.1 预演键 `ride`（阶跃，挂着写位置键报警告）；§14.3 `PREVIZ_SFX` 可写 `{ url }` 直接放 `Audio/BlockoutPreviz/` 的文件（解码进声库、按位置放、读不到只警告一次），别名加 `babyCry` / `cellarSob` / `gateSmash` / `jarShatter`；门禁 ConfigTest / PrevizPlanTest 加用例、`PrevizRuntimeBrowserTest` 加车 + 挂人 + url 音效（不再带 `audio=0`）。0610 的数据（07 妮儿坐车尾改成 `ride`）由之后的集成一路改。
 - 2026-10-19（白盒预演补齐，运行时包）：§5.6 百姓 / 小孩换成能放片段的 NRA02 骨架占位身体（布换百姓色、帽徽 / 枪套 / 带子藏掉，军帽摘不掉），§3 单位 / spawn 可选 `body: "procedural"` 退回旧身体；军官片段不再被拦；§14.1 段里加 `aircraft[]`（机型 + 按时间航点 + 扫射段 + 引擎声，纯函数取样，镜头可锚飞机）与 `slowmo[]`（窗口倍率 + 渐变，人物 / 片段 / 特效 / 飞机 / 镜头一起慢，台词与音效照常）；§14.2 新模块 `Script_EditorBlockoutPrevizAircraft`、`State()` 多给 `timeScale` / `wallT` / `aircraft`；`Script_Actor.Create` 认 `options.uniformPalette`、`Script_UniformColors` 认十六进制色（不给 = 老路）；门禁 `Script_EditorBlockoutPrevizRuntimeBrowserTest`，0610 PrevizTest 放宽成「百姓 / 军官只许通用片段」。
@@ -730,6 +731,21 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 - **03-3 刘文财和被掀翻的兵分开**：关键帧 `PitNra2` 从坑里 (2.8, 1.4) 挪到 (3.0, 2.2)（坑的本地坐标），朝向 180°、`lie: "along"`（倒地动作原来把身子甩回刘文财那边）；实测骨盆离刘文财 0.97 m、脚离他约 0.85 m（03-2…03-5 四帧，`export FirstLevel0105` 重导，其余单位一个没变）。
 - **05-1 桥下头顶余量**（头骨点 + 0.2 m 到上方门板 / 横木底面，0.1 s 一采样，整段最小）：班长 0.42 m（钻桥底那一下播 `PvCrouchRunPullBehind`）、幺娃 0.47 m、机枪手 0.62 m，都 ≥ 0.1 m，不用改。
 - **掷弹筒组按真实尺寸**（PrevizIja V2，`20261019PrevizIjaV2`）：八九式全长 0.610 m，游戏模型从筒口到底钣只有 0.415 m，`Script_EditorBlockoutPrevizProps.mjs` 把网格挂在一个等比放大 1.4699 倍的内层里（外层跟 `launcher` 道具轨走；倍数读清单 `props.launcher.scale`，`SetPrevizPropScales`）；装填手在射手右前 (0.82, 0.86) m、左转 107°（生成器 `MortarCrew`）。发射 1.60 s、弹进筒口 0.92 s 没变，「嘭」的对齐不动。
+
+### 14.5 通用动作换成 Kimodo 文生动作（2026-10-20）
+
+用户：「白盒工具里的通用动作用本地 Kimodo 生成，替换掉不够好的。」本机 Kimodo（`C:/Users/Bentl/kimodo` 的 venv，模型 `Kimodo-SOMA-RP-v1.2`，12 GB 显卡上文字模型放 CPU）一次只能跑一份——Kimodo 网页演示（`KimodoWorkbench/kimodo_demo.bat`）也占一份 8B 文字模型，生成前先关掉。
+
+- **流水线**（都在 `_import/`）：
+  1. `Data_KimodoPrevizPrompts.json`：每条片段的英文提示词、生成秒数、样本数、种子；`knee` / `hand` 写旧片段跪哪条腿 / 哪只手比划（Kimodo 偶尔左右搞反：跪姿先按膝盖、再按哪只手动得多，反了就整段左右镜像）；`pick` = 定稿用第几个样本，`rejected` = 生成过、但不如手 K、保留旧片段（写了原因）。
+  2. `Script_KimodoPrevizGenerate.py`（Kimodo venv）：模型只加载一次，逐条生成 SOMA77 npz 到 `tmp/KimodoPreviz/<片段>/`（不提交）。18 条 × 3–4 样本约 12 分钟。
+  3. `Script_KimodoPrevizRetarget.py`（普通 Python + numpy，SOMA77 中性站姿在 `Data_KimodoSoma77Neutral.json`）：Kimodo 全局旋转是相对它自己的 T 字中性站姿的，换算 `W目标(t) = H · R源(t) · A_b · W静止目标`：手脚按「骨头→子骨头」方向对齐（T 字 vs 游戏骨架静止姿势），躯干 / 颈 / 头两边静止都是站直朝前、直接一一对应（按方向对齐会把头往后仰约 15°）；骨盆高度按腿长比缩放。手指沿用旧片段；循环片段在样本里找首尾最接近、且手一直在动（≥ 最忙窗口的 60%）的一段再交叉淡化接缝；带停住段（`holdLoop`）的按「手停下来」的那一刻对齐旧的停住起点，最多加速 1.6 倍，再快就把停住段往后挪、片段跟着变长（清单的 `holdLoop` / `duration` 写新的）。整段按脚 / 膝 / 骨盆 / 胸 / 头的着地高度统一抬落。
+     枪：`lowRight`（右手低提）右手两骨 IK 到旧片段的握枪位置（随骨盆朝向走），枪刚性跟手；`slungBack` 枪跟胸（运行时照旧按背枪挂法摆）；`upright` / `ground` 道具轨照旧、手 IK 上去。产物 `Animation/PrevizKimodo/`（同手 K 库的记录 + 清单格式，清单每条带 `source`：提示词、种子、样本、原始 npz 的 sha256、换的是哪个库的哪条）。
+  4. 挑样本：`Script_KimodoPrevizRetarget.py --all-samples --out tmp/KimodoPreviz/lib` 出全部样本，`node Taierzhuang1938/_import/Script_KimodoPrevizShot.mjs <片段,…>` 出真模型联系图（第一行旧的手 K、往下各样本，6 个时刻，`tmp/KimodoPreviz/shots/`），`Script_KimodoPrevizSheet.py` 出火柴人图。
+- **怎么替换**：`Data_BlockoutPrevizClips.BLOCKOUT_PREVIZ_CLIP_LIBRARIES` 第一项是 `PrevizKimodo`，片段名与被换的手 K 片段相同。运行时 `LoadExtraClipLibraries` 并行下载、**按表的顺序**并库（`AddOpeningClipLibrary` 同名不覆盖 → 表里靠前的赢）；生成器 `PrevizClipMeta` 和三关 PrevizTest 读清单本来就是靠前的赢，口径一致。删掉那一行就整套退回手 K。
+- **这一轮换了 7 条**：`PvStandTalkLowRifle`、`PvStandTalkSlung`、`PvStandPointL`、`PvStandWaveOnL`、`PvStandHaltL`（停住段 0.4 → 0.81 s 起，片段 2.01 s）、`VilPanicRun`（参考速度 2.89 m/s）、`VilDuckProne`（停住段 1.35 s 起，人往前扑 0.77 m）。三关预演里共 112 处用到。
+- **生成了但没换的**（`rejected` 写了原因）：跪 / 坐 / 趴着手扶固定道具枪的五条（Kimodo 的身体离旧的枪太远，IK 上去胳膊拧着）、`PvStandBeckonL`（像摸头敬礼）、`PvStandShakeHead`（样本里根本没摇头）、`VilCrouchHold` / `VilCowerWhimper`（没蹲下去）、`VilIjaShoutPoint`（没伸手指）。
+- 已知：游戏骨架胳膊比 Kimodo 的人短约 6 cm、肩更高，Kimodo 自然垂下的手落在腰胯处，看着像叉腰（肘角两边逐帧一致，不是换算错）。
 
 ## 15. 06–10 新剧本白盒（关卡键 `FirstLevel0610`，2026-10-18）
 

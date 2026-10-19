@@ -1,0 +1,389 @@
+{
+ "schema": 2,
+ "version": "20261020PrevizKimodoV1",
+ "fps": 24,
+ "actorForward": [
+  0,
+  0,
+  -1
+ ],
+ "blendSeconds": 0.12,
+ "floorClearanceM": 0.003,
+ "coordinates": {
+  "values": "glTF node-local bone transforms (p xyz, q xyzw), stride 7",
+  "props": "glTF scene space = rig.root local, source metres: origin xyz, axis xyz, up xyz, visible",
+  "stages": "runtime metres in the anchor actor frame (+x right, +y up, -z forward); yawDeg + = turn left",
+  "contacts": "clip seconds; partner parts are contactPoints names; standoffM = runtime metres along the patch normal where the knuckle centroid (finger roots) sits"
+ },
+ "stages": {},
+ "props": {},
+ "clips": {
+  "PvStandTalkLowRifle": {
+   "duration": 3.5333,
+   "loop": true,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "lowRight",
+   "notes": "Kimodo text-to-motion (replaces the hand-keyed PrevizTalk clip). Old intent: Standing, talking: rifle low in the right hand (weapon track: the fist round the wrist of the stock, muzzle down and forward); the left hand comes up in front of the belly and makes small open-palm beats with the words, the head nods a little. Seamless loop.",
+   "source": {
+    "kimodo": "Kimodo-SOMA-RP-v1.2",
+    "prompt": "A man stands in place and talks to someone in front of him, his right arm hanging relaxed at his side, his left hand making small gestures in front of his belly while he speaks, nodding a little.",
+    "seed": 101,
+    "sample": 1,
+    "raw": "tmp/KimodoPreviz/PvStandTalkLowRifle/PvStandTalkLowRifle_01.npz",
+    "rawSha256": "ca48958e63f3b0b53cac9aa70cb7508ebf0c995397000b0cc78ae7b1fd3ce42d",
+    "replaces": "PrevizTalk/PvStandTalkLowRifle",
+    "mirrored": false,
+    "window": [
+     1.6,
+     5.133
+    ],
+    "seamError": 0.2211,
+    "floorShiftM": -0.001,
+    "rightHand": "IK onto the old grip (pelvis frame)",
+    "weapon": "rigid to Bip001 R Hand"
+   }
+  },
+  "PvStandTalkSlung": {
+   "duration": 3.3333,
+   "loop": true,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "slungBack",
+   "weaponSlung": true,
+   "notes": "Kimodo text-to-motion (replaces the hand-keyed PrevizTalk clip). Old intent: Standing, talking where nobody is fighting (the dugout, the collection point): rifle slung across the back (weapon track), both hands making small gestures in front of the belly, the right half a beat after the left. Seamless loop.",
+   "source": {
+    "kimodo": "Kimodo-SOMA-RP-v1.2",
+    "prompt": "A man stands in place and talks calmly with someone, making small gestures with both hands in front of his belly, shifting his weight slightly.",
+    "seed": 102,
+    "sample": 0,
+    "raw": "tmp/KimodoPreviz/PvStandTalkSlung/PvStandTalkSlung_00.npz",
+    "rawSha256": "453c1ff673566773e503d662989e24ac915da2ee66c3fd0bbb3f73f2b51853d2",
+    "replaces": "PrevizTalk/PvStandTalkSlung",
+    "mirrored": false,
+    "window": [
+     3.033,
+     6.367
+    ],
+    "seamError": 0.5098,
+    "floorShiftM": -0.0016,
+    "weapon": "rigid to Bip001 Spine2"
+   }
+  },
+  "PvStandPointL": {
+   "duration": 3.0,
+   "loop": false,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "lowRight",
+   "holdLoop": [
+    0.8,
+    3.0
+   ],
+   "notes": "Kimodo text-to-motion (replaces the hand-keyed PrevizTalk clip). Old intent: Standing, rifle low in the right hand (weapon track: the fist round the wrist of the stock, muzzle down and forward); the left arm comes up to shoulder height and points straight ahead (index finger out) by 0.8 s, then holds (0.8-3.0 s hold loop: breathing only).",
+   "source": {
+    "kimodo": "Kimodo-SOMA-RP-v1.2",
+    "prompt": "A man stands still with his right arm hanging at his side, raises his left arm and points straight ahead at shoulder height, and keeps pointing.",
+    "seed": 103,
+    "sample": 0,
+    "raw": "tmp/KimodoPreviz/PvStandPointL/PvStandPointL_00.npz",
+    "rawSha256": "9453864156f2416199ef17480638de281779322c0b87940ce07ab4882c52b3cd",
+    "replaces": "PrevizTalk/PvStandPointL",
+    "mirrored": false,
+    "sourceSettleS": 0.867,
+    "timeScale": 1.083,
+    "holdLoop": [
+     0.8,
+     3.0
+    ],
+    "floorShiftM": -0.0011,
+    "rightHand": "IK onto the old grip (pelvis frame)",
+    "weapon": "rigid to Bip001 R Hand"
+   }
+  },
+  "PvStandWaveOnL": {
+   "duration": 1.9333,
+   "loop": true,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "lowRight",
+   "notes": "Kimodo text-to-motion (replaces the hand-keyed PrevizTalk clip). Old intent: Standing, rifle low in the right hand (weapon track: the fist round the wrist of the stock, muzzle down and forward); the left hand swings from beside the head forward and down, twice a loop (\"go on, follow\"), the trunk leaning into each swing.",
+   "source": {
+    "kimodo": "Kimodo-SOMA-RP-v1.2",
+    "prompt": "A man stands in place with his right arm down at his side and repeatedly swings his left arm forward from beside his head, waving people to move forward.",
+    "seed": 104,
+    "sample": 0,
+    "raw": "tmp/KimodoPreviz/PvStandWaveOnL/PvStandWaveOnL_00.npz",
+    "rawSha256": "96ecb0169453dd967fcb2476d7cdc136b575fa6cc0ebe9621a3ae3f13c5ebb9e",
+    "replaces": "PrevizTalk/PvStandWaveOnL",
+    "mirrored": false,
+    "window": [
+     1.6,
+     3.533
+    ],
+    "seamError": 0.266,
+    "floorShiftM": -0.0017,
+    "rightHand": "IK onto the old grip (pelvis frame)",
+    "weapon": "rigid to Bip001 R Hand"
+   }
+  },
+  "PvStandHaltL": {
+   "duration": 2.0125,
+   "loop": false,
+   "weaponHold": "track",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "role": "talker",
+   "weaponState": "lowRight",
+   "holdLoop": [
+    0.812,
+    2.013
+   ],
+   "notes": "Kimodo text-to-motion (replaces the hand-keyed PrevizTalk clip). Old intent: Standing, rifle low in the right hand (weapon track: the fist round the wrist of the stock, muzzle down and forward); the left palm comes up flat in front of the chest, fingers up (\"stop\") by 0.4 s, then holds (0.4-1.6 s hold loop).",
+   "source": {
+    "kimodo": "Kimodo-SOMA-RP-v1.2",
+    "prompt": "A man standing with his right arm at his side raises his left hand in front of his chest, palm forward, signalling stop, and holds it there.",
+    "seed": 106,
+    "sample": 1,
+    "raw": "tmp/KimodoPreviz/PvStandHaltL/PvStandHaltL_01.npz",
+    "rawSha256": "8662c0c5e2413b8585a822fab5692b70cddd7ec566d3f828960083d0b4723514",
+    "replaces": "PrevizTalk/PvStandHaltL",
+    "mirrored": false,
+    "sourceSettleS": 1.3,
+    "timeScale": 1.601,
+    "holdLoop": [
+     0.812,
+     2.013
+    ],
+    "floorShiftM": 0.0003,
+    "rightHand": "IK onto the old grip (pelvis frame)",
+    "weapon": "rigid to Bip001 R Hand"
+   }
+  },
+  "VilPanicRun": {
+   "duration": 0.5333,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "villager",
+   "referenceSpeedMps": 2.894,
+   "notes": "Kimodo text-to-motion (replaces the hand-keyed PrevizVillage clip). Old intent: 08 villagers fleeing, 08-5 Nier running: a hunched panic run in place (referenceSpeedMps 3.0, one stride a loop), the arms flailing out of time with the legs, the head ducked.",
+   "source": {
+    "kimodo": "Kimodo-SOMA-RP-v1.2",
+    "prompt": "A panicked person runs forward hunched over with the head ducked, the arms flailing.",
+    "seed": 116,
+    "sample": 0,
+    "raw": "tmp/KimodoPreviz/VilPanicRun/VilPanicRun_00.npz",
+    "rawSha256": "d19704223ae648eb88e94d6041d5a0b9d4b6e0f53ad37a7d44b836c6df57baa6",
+    "replaces": "PrevizVillage/VilPanicRun",
+    "mirrored": false,
+    "window": [
+     1.533,
+     2.067
+    ],
+    "seamError": 0.7321,
+    "floorShiftM": -0.0141
+   }
+  },
+  "VilDuckProne": {
+   "duration": 2.0542,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "villager",
+   "holdLoop": [
+    1.354,
+    2.054
+   ],
+   "notes": "Kimodo text-to-motion (replaces the hand-keyed PrevizVillage clip). Old intent: 07-4 the plane overhead: from standing he throws himself down -- knees (0.45 s), hands on the ground, flat on his face (1.0 s), both hands clasped over the back of his head by 1.3 s; 1.3-2.0 s is a trembling hold loop.",
+   "source": {
+    "kimodo": "Kimodo-SOMA-RP-v1.2",
+    "prompt": "A man standing suddenly throws himself down onto the ground, lies flat on his stomach and covers the back of his head with both hands, trembling.",
+    "seed": 118,
+    "sample": 0,
+    "raw": "tmp/KimodoPreviz/VilDuckProne/VilDuckProne_00.npz",
+    "rawSha256": "c47514cb363e33be9d0439f229a1f0e87ce4003e2fe4f62ee16c4c2ae105280f",
+    "replaces": "PrevizVillage/VilDuckProne",
+    "mirrored": false,
+    "sourceSettleS": 2.167,
+    "timeScale": 1.6,
+    "holdLoop": [
+     1.354,
+     2.054
+    ],
+    "floorShiftM": 0.0332
+   }
+  }
+ },
+ "models": [
+  {
+   "id": "TengxianNra02",
+   "file": "Animation_TengxianNra02PrevizKimodo.json",
+   "sha256": "ab388418a8851f6aa144af29e9fa5e3b3a9fce740f6ee55df7feca1a46b9745c",
+   "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
+   "contactPoints": {},
+   "clips": [
+    {
+     "clip": "PvStandTalkLowRifle",
+     "frames": 86,
+     "duration": 3.533,
+     "sample": 1,
+     "mirrored": false,
+     "window": [
+      1.6,
+      5.133
+     ],
+     "seamError": 0.2211,
+     "floorShiftM": -0.001,
+     "rightHand": "IK onto the old grip (pelvis frame)",
+     "weapon": "rigid to Bip001 R Hand",
+     "pelvisY": [
+      0.932,
+      0.935
+     ],
+     "pelvisXZDrift": 0.0
+    },
+    {
+     "clip": "PvStandTalkSlung",
+     "frames": 81,
+     "duration": 3.333,
+     "sample": 0,
+     "mirrored": false,
+     "window": [
+      3.033,
+      6.367
+     ],
+     "seamError": 0.5098,
+     "floorShiftM": -0.0016,
+     "weapon": "rigid to Bip001 Spine2",
+     "pelvisY": [
+      0.937,
+      0.941
+     ],
+     "pelvisXZDrift": 0.0
+    },
+    {
+     "clip": "PvStandPointL",
+     "frames": 73,
+     "duration": 3.0,
+     "sample": 0,
+     "mirrored": false,
+     "sourceSettleS": 0.867,
+     "timeScale": 1.083,
+     "holdLoop": [
+      0.8,
+      3.0
+     ],
+     "floorShiftM": -0.0011,
+     "rightHand": "IK onto the old grip (pelvis frame)",
+     "weapon": "rigid to Bip001 R Hand",
+     "pelvisY": [
+      0.937,
+      0.94
+     ],
+     "pelvisXZDrift": 0.003
+    },
+    {
+     "clip": "PvStandWaveOnL",
+     "frames": 47,
+     "duration": 1.933,
+     "sample": 0,
+     "mirrored": false,
+     "window": [
+      1.6,
+      3.533
+     ],
+     "seamError": 0.266,
+     "floorShiftM": -0.0017,
+     "rightHand": "IK onto the old grip (pelvis frame)",
+     "weapon": "rigid to Bip001 R Hand",
+     "pelvisY": [
+      0.93,
+      0.94
+     ],
+     "pelvisXZDrift": 0.0
+    },
+    {
+     "clip": "PvStandHaltL",
+     "frames": 49,
+     "duration": 2.013,
+     "sample": 1,
+     "mirrored": false,
+     "sourceSettleS": 1.3,
+     "timeScale": 1.601,
+     "holdLoop": [
+      0.812,
+      2.013
+     ],
+     "floorShiftM": 0.0003,
+     "rightHand": "IK onto the old grip (pelvis frame)",
+     "weapon": "rigid to Bip001 R Hand",
+     "pelvisY": [
+      0.922,
+      0.927
+     ],
+     "pelvisXZDrift": 0.051
+    },
+    {
+     "clip": "VilPanicRun",
+     "frames": 14,
+     "duration": 0.533,
+     "sample": 0,
+     "mirrored": false,
+     "window": [
+      1.533,
+      2.067
+     ],
+     "seamError": 0.7321,
+     "floorShiftM": -0.0141,
+     "pelvisY": [
+      0.83,
+      0.861
+     ],
+     "pelvisXZDrift": 0.0
+    },
+    {
+     "clip": "VilDuckProne",
+     "frames": 50,
+     "duration": 2.054,
+     "sample": 0,
+     "mirrored": false,
+     "sourceSettleS": 2.167,
+     "timeScale": 1.6,
+     "holdLoop": [
+      1.354,
+      2.054
+     ],
+     "floorShiftM": 0.0332,
+     "pelvisY": [
+      0.244,
+      1.048
+     ],
+     "pelvisXZDrift": 0.771
+    }
+   ]
+  }
+ ]
+}

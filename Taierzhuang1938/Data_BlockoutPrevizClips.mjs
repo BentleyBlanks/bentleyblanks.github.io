@@ -1,7 +1,7 @@
 // 白盒预演（docs/Data_EditorBlockout.md §14）额外加载的动作库。纯数据，无 three。
 //
 // 预演先读开场动作库（Script_OpeningStoryboardAnimation.LoadOpeningStoryboardAnimation），再按这张表逐个读下面的库，
-// 用 AddOpeningClipLibrary 把它们的片段并进开场库（骨名数组一致的每一具骨架都并；已有的同名片段不覆盖）。
+// 按表的顺序用 AddOpeningClipLibrary 把它们的片段并进开场库（骨名数组一致的每一具骨架都并；已有的同名片段不覆盖，所以表里靠前的赢）。
 // 这些库都只烘了参考身体 TengxianNra02：五具 TengxianHumanoidV1 骨架骨名一致，所以国军、日军身体都能播。
 // 某个库还没烘出来（清单 404）时预演跳过它、只警告一次，片段退回原生动画（State().missingClips 照常记）。
 //
@@ -23,6 +23,10 @@ const Previz = (name, rev = "V1") => Object.freeze({
 });
 
 export const BLOCKOUT_PREVIZ_CLIP_LIBRARIES = Object.freeze([
+  // 2026-10-20：通用动作换成本机 Kimodo 文生动作（说话 / 手势 / 歇着 / 百姓蹲躲 / 逃跑 / 卧倒 …），片段名与被换的手 K 片段相同；
+  // 排第一：同名片段表里靠前的赢（运行时按表顺序并库，生成器与 PrevizTest 读清单同样靠前的赢），删掉这一行就退回手 K。
+  // 提示词与换算：_import/Data_KimodoPrevizPrompts.json、_import/Script_KimodoPrevizRetarget.py（docs/Data_EditorBlockout.md §14.5）
+  Object.freeze({ name: "PrevizKimodo", base: "./Animation/PrevizKimodo/", manifest: "Data_PrevizKimodoAnimation.json", version: "20261020PrevizKimodoV1" }),
   Previz("PrevizTalk", "V2"),   // V2（10-19 第二轮）：加歇着的 PvCrouchRestRifle / PvSitRestRifle
   Previz("PrevizCare"),
   Previz("PrevizCombat"),
