@@ -6,7 +6,7 @@
 //
 // 查（照 0105 的 PrevizTest，加了场地专有的几条）：运行时包的 ValidateBlockoutPreviz（关键帧 / 单位 / 台词 id / 字段）；
 // 每个片段在那具骨架上烘过（有 castId 的按 Data_FirstLevelSpeakingCast 的骨架，没有 castId 的士兵只许五具骨架都有的通用片段，
-// 百姓 / 军官是程序化身体、一个片段都不许）；同一段里台词不互相压；演员走位点在场地范围内、不落在沟壁 / 坎上、
+// 百姓 / 小孩 / 军官 2026-10-19 起是骨骼占位身体、只许通用片段，只有 body:"procedural" 的百姓一个片段都不许）；同一段里台词不互相压；演员走位点在场地范围内、不落在沟壁 / 坎上、
 // 身子不进实心块（按那一刻的信号算随信号体块，路线按 0.5 m 取样）；走位要求的速度不离谱；说话的人在那一刻是可见的；
 // 机位点不在实心块里；门缝 / 墙缝那几段的眼睛真能从缝里看到演的东西（2D 视线不被 ≥1 m 高的块挡）；
 // 剧本要求的事件（六个信号按拍开、掷弹筒越落越近、09 的「响了才走」节奏、07 边走边说、07-4 非第一人称短过场、08 手榴弹与喊人的可见段、10 东街 25–70 m）都在。第二版 2026-10-19 按 25 帧重写。
@@ -46,7 +46,10 @@ function ClipTable() {
 }
 
 function ClipSetFor(unit, table) {
-  if (unit?.side === "civ" || unit?.kind === "civilian" || unit?.kind === "child" || unit?.kind === "officer") return { name: "程序化身体（没有动作库）", clips: new Set() };
+  // 2026-10-19 运行时补齐：百姓 / 小孩默认换成 NRA02 骨架的占位身体（§5.6），军官本来就是骨骼身体 —— 都能播五具骨架共有的通用片段；
+  // 只有明确写 body:"procedural" 的百姓还是旧的程序化身体，一个片段都不许。
+  if ((unit?.side === "civ" || unit?.kind === "civilian" || unit?.kind === "child") && unit?.body === "procedural") return { name: "程序化身体（没有动作库）", clips: new Set() };
+  if (unit?.side === "civ" || unit?.kind === "civilian" || unit?.kind === "child" || unit?.kind === "officer") return { name: "骨骼占位身体（只许通用片段）", clips: table.common };
   const castId = unit?.castId;
   const spec = castId && FIRST_LEVEL_SPEAKING_CAST[castId];
   if (!spec) return { name: "随机骨架（只许通用片段）", clips: table.common };

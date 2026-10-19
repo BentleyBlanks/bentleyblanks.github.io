@@ -164,6 +164,7 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
 | `x, z, yawDeg | faceTo` | 位置与朝向 |
 | `stance` / `aim` / `state` | `"stand"|"crouch"|"prone"`；`aim` 举枪；`state: "down"` = 倒地（伤 / 亡）；倒地的人在过渡 / 预演里换位置**只平移、保持躺姿**（被拖、被抬，§5.6） |
 | `lie` | 可选（2026-10-18），只对倒地的人有意义：`"along"` = 身体顺着朝向躺、头朝 `yawDeg` 的前方、骨盆落在 `x,z`（被子 / 担架上被拖着走的伤员用：朝向写成拖的方向）；不写 = 原来的样子（演员倒地姿态原样，身子横在朝向两侧，已有数据不变）。校验只认 `"along"`；归一化时没写或写错都去掉 |
+| `body` | 可选（2026-10-19），只对百姓 / 小孩（`civilian` / `child` / `side:"civ"`）有意义：`"rig"`（缺省）= 能放动作库片段的骨骼占位身体（§5.6）；`"procedural"` = 旧的程序化 tzm 身体（放不了片段、蹲不下）。预演 `spawn` 里也能写。校验只认这两个值；归一化时没写或写错都去掉 |
 | `arc` | 可选射界 `{ halfDeg, rangeM, yawDeg? }`（中心缺省 = 朝向）；缺省时只有机枪手（Type11/Type92Hmg/Zb26）和战车按 §5.3 默认画 |
 | `path` | 可选：从**上一关键帧**的位置走到这里的折线（不含起点，可含终点）；没有则直线 |
 | `intent` | 可选：此刻「即将去」的折线，画成虚线箭头；没有且下一关键帧里这个人换了位置，则自动取下一关键帧的 `path`/直线 |
@@ -329,6 +330,11 @@ export class BlockoutMarkers {
   - **`lie:"along"` 摆法**：原来骨盆落在单位位置上；倒地片段都是侧身蜷腿，骨盆居中时一只脚伸出 0.7 m 宽的单被（冬瓜，脚离被边 −0.24 m）。改成量一次「头、骨盆、两脚」，把它们的包围框中心放在单位位置上，身体轴在「骨盆→头」±8° 里取横向最窄的方向（头朝向仍与 `yawDeg` 差 ≤ 8°）；要顺着躺的人倒地片段固定用腿蜷得最窄的 `DeathCollapseC`（四段实测两脚离身体轴：C 0.41–0.44 m、B 0.48–0.53、D 0.55–0.59、A 0.56–0.59），倒着的人在关键帧之间换成 `lie:"along"` 时重造一次（好按 C 重新倒）。
   - **投弹**：预演键 `throw`（§14.1）→ 主角本人播步兵投弹片段 `GrenadeThrow`（`Script_InfantryAnimation`「背枪投弹」，游戏里 `Actor.BeginGrenadeThrow` / AI 齐投同一个片段，实测 4.23 s）：`actor.PlayImportedAnimation("GrenadeThrow")` 定住片段，片段时间按 `drive.throw.seconds` 直接设（Seek 确定）；手里的手榴弹由 `Actor._UpdateInfantryProps` 照游戏原样挂在片段的 grenade 挂点上、2.15 s 脱手后藏掉；抡的时候不举枪、不播开场片段。骨架上没有这个片段 → 记进 `Previz.State().missingClips`，照原生动画。
   - `Probe(id)` 再多给：`headY` / `pelvisY`（世界高度）、`feet`（两脚世界坐标）、`deathVariant`、`throwing`、`grenadeVisible`、`throwClipS`。
+- 2026-10-19（白盒预演补齐，运行时包）：
+  - **百姓 / 小孩换成能放片段的骨骼占位身体**（`kind` civilian / child、`side:"civ"`，含担架上百姓的抬杆人）：用 NRA 士兵骨架造人（`actorFactory.Create("nra", { modelVariant: 1 /* TengxianNra02，预演动作库都烘在它上面 */, weapon: null, noPool: true, uniformPalette: <十六进制色> })`），走空手步态；外观改成一眼认得出是老百姓：军装布按种子换成百姓的深蓝 / 黑 / 土布 / 靛青（`CIVILIAN_RIG_LOOK.cloth`，`Script_Actor.Create` 新认 `options.uniformPalette`，`Script_UniformColors.UniformMaterial` 新认十六进制色；不给 = 游戏老路一字不变）、帽徽 / 腰间枪套 / 胸前带子按材质名藏掉（`CIVILIAN_RIG_LOOK.hideMaterials`）。**军帽摘不掉**：它与军装是同一个网格、同一张图集，占位接受。`child` 照旧整体缩到 0.62。只在白盒编辑器里当占位，不进 `Data_CharacterSelection`、不影响游戏正片。旧的程序化身体留作开关：单位 / 预演 `spawn` 写 `body: "procedural"`（§3），缺省 `BLOCKOUT_PUPPETS.civilianBody = "rig"`；两种之间切换时重造。
+  - **军官**（nraOfficer / ijaOfficer，NRA05 / IJA01）本来就是骨骼身体，预演额外动作库并进它们的骨架后片段照播，运行时不拦；0610 的 PrevizTest 已放宽成「百姓 / 军官只许通用片段」（0105 的不动）。
+  - `Probe(id)` 再多给：`body`（`"rig"` / `"procedural"`）、`bodyKind`、`rigged`、两手世界坐标 `handR` / `handL`、`mixerTime`（动画时钟，量慢动作）、`shownClip` / `shownClipSeconds`（开场动作层此刻真在播的片段）、`hiddenParts`。
+  - 门禁：`Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs`（§10）。
 - 距离分级：60 m 外每 3 帧更新一次动画，阴影只在 25 m 内开；单关同时上限 120 个演员，超出时远处的只留地环与标签（报警告）。
 - 切关、重载配置时全部回收；同一关切关键帧时按 `id` 复用。
 
@@ -475,6 +481,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 | `Script_EditorBlockoutSaveTest.mjs` | 纯 node | 起真 LocalPreview（`--root=<临时目录>`）：status 可写、save 写对文件、各种拒绝（坏 level、`..`、超大、坏文档、GET、错误 Content-Type、外来 Origin / Host、revision 不符）零字节落盘、无 `.tmp` 残留、仓库里的 `Blockout/` 前后逐字节相同；`/__notes/status`、`/__tuning/status` 仍正常 |
 | `Script_EditorBlockoutMapTest.mjs` | 浏览器（临时 harness 页） | 纸面底色、块脚印、旋转块、等高线、各阵营标记颜色按像素数计（不看 `.visible`）；小地图以玩家为中心；全关总图缩放 / 平移 / 关键帧拾取 |
 | `Script_EditorBlockoutBrowserTest.mjs` | 浏览器（游戏） | `?editor=blockout&level=FirstLevel&quality=whitebox&scale=small&audio=0` 启动；没有任务运行时、没有过场；关键帧数与配置一致；`GoTo` 后玩家位置误差 < 0.5 m；`Next` 过渡中单位位置连续变化（不瞬移）、结束后到位；切到 `SecondLevel` 后场景边界与地形变化、再切回；小地图与卡片像素非空；配置文件被外部改写后 3 s 内同步；全程无未捕获错误；截图存 `_shots/EditorBlockout/` |
+| `Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs`（2026-10-19） | 浏览器（游戏） | `FirstLevel0610` 的 06-2 上注入一段预演（page.route）：百姓 / 小孩 / 国军军官 / 日军军官都能播预演动作库的片段且姿态真的变了（蹲下片段骨盆比站着低 ≥ 0.25 m、举手片段手比没片段时高 ≥ 0.25 m、趴下片段骨盆 < 0.3 m）、`body:"procedural"` 的百姓还是程序化身体；飞机模型载进来、Seek 到航线中段位置等于 `SamplePrevizAircraft`、在视锥里且正对 `look` 飞机锚、扫射段画出土点、过了末航点不可见；慢动作窗口里 `timeScale` = rate、墙上跑 0.9 s 预演只走 0.3 倍、人物动画时钟与走路同倍率；中断后克隆还回机队；全程无未捕获错误；截图存 `_shots/EditorBlockoutPrevizRuntime/` |
 
 - 新模块登记 `index.html` import map（带 `?v=`）；`Style_EditorBlockout.css` 加 `<link>`；`Script_TestRunner` 登记上面四个测试与 `changedDomainRules`（`Blockout/` 目录归 editor 域）。
 - 验收只跑覆盖改动的测试（用户口径）；浏览器整趟每项 ≤ 2 次。
@@ -494,6 +501,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 
 ## 12. 变更记录
 
+- 2026-10-19（白盒预演补齐，运行时包）：§5.6 百姓 / 小孩换成能放片段的 NRA02 骨架占位身体（布换百姓色、帽徽 / 枪套 / 带子藏掉，军帽摘不掉），§3 单位 / spawn 可选 `body: "procedural"` 退回旧身体；军官片段不再被拦；§14.1 段里加 `aircraft[]`（机型 + 按时间航点 + 扫射段 + 引擎声，纯函数取样，镜头可锚飞机）与 `slowmo[]`（窗口倍率 + 渐变，人物 / 片段 / 特效 / 飞机 / 镜头一起慢，台词与音效照常）；§14.2 新模块 `Script_EditorBlockoutPrevizAircraft`、`State()` 多给 `timeScale` / `wallT` / `aircraft`；`Script_Actor.Create` 认 `options.uniformPalette`、`Script_UniformColors` 认十六进制色（不给 = 老路）；门禁 `Script_EditorBlockoutPrevizRuntimeBrowserTest`，0610 PrevizTest 放宽成「百姓 / 军官只许通用片段」。
 - 2026-10-13：初版（入口、数据格式、接口、界面、第一关 44 个关键帧、第二关草稿、测试与分工）。
 - 2026-10-13：追加「设置 → 高级工具」面板入口；`Script_EditorBlockoutConfig.mjs` 由集成负责人先写好；过渡改为按自然速度 + 整段快进；`Script_EditorBlockoutStore.mjs` 归 B 包。
 - 2026-10-13（合 master）：高级工具改成菜单栏后入口挪进「关卡」菜单；按开发工具隔离规则，`Script_Main` 不再直接 import 编辑器模块，关卡表与总控经 `Script_DevTools.BlockoutPhases / BlockoutStartIndex / CreateBlockoutEditor` 取（剔除版返回空表 / null）。
@@ -609,7 +617,23 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
   - `explosion` `{x, z, h?, kind?, radius?}`（`kind` 同 `VfxSystem.Explosion`；`h` 2026-10-18 第三轮加，爆点离地高 0–10 m，如炸在车尾铁板上写 1.5，缺省 0.3）；`smoke` `{x, z, kind?, dur?}`（`SmokeDust` / `SmokeWhite` / `SmokeBlack`）；`muzzle` `{actor | x,z,h, count?, interval?}` 枪口火；`shake` `{dur, strength}`。
   - `signal` `{name, on}`：在这一刻把场景信号打开 / 关掉（塌洞、坑沿被炸、战车瘫），播完或中断时恢复到 `then` 那个关键帧的 `signals`。
   - `sfx` `{name, x?, z?, volume?}`：`name` 用 §14.3 的别名。
-- 校验：`Script_EditorBlockoutPrevizPlan.mjs`（纯，node 与浏览器共用）导出 `BLOCKOUT_PREVIZ_SCHEMA`、`PREVIZ_LIE_MODES`、`PREVIZ_THROW`、`PrevizThrows(seq, baseOf, standAt, opts)`（这一段所有投弹的飞行：出手 / 落地时刻与两端点）、`SampleThrowFlight(flight, t)`、`ValidateBlockoutPreviz(doc, { config?, voice? })`（给了配置就核对 `keyframe` / 单位 id，给了清单就核对 `line`）、`NormalizeBlockoutPreviz(doc)`、`SamplePrevizActor(actorEntry, t, baseUnit)`、`SamplePrevizCamera(camera, t, resolve)`。
+- **飞机** `aircraft[]`（2026-10-19，用户「有飞机模型，你自己看下」）：一段里可以放几架，每架一条轨：
+  ```json
+  "aircraft": [{
+    "id": "Ki30A", "model": "MitsubishiKi30",
+    "path": [ { "t": 6, "x": 60, "h": 120, "z": -150 }, { "t": 12, "x": 58, "h": 60, "z": 150 }, { "t": 18, "x": 50, "h": 95, "z": 450 } ],
+    "strafe": [ { "t0": 10, "t1": 11.5, "from": { "x": 60, "z": 120 }, "to": { "x": 60, "z": 175 }, "hz": 15 } ],
+    "sound": { "drone": true, "diveT": 9 }
+  }]
+  ```
+  - `model`：`Data_AircraftAssets` 的 id（`MitsubishiKi30` 九七式轻爆 / `MitsubishiKi21Ia` 九七式重爆 / `NakajimaKi43` 隼），缺省 Ki-30；模型借游戏自己的机队（`Script_Aircraft.AircraftFlight.AcquireClone`，白盒关卡里原机本来藏着），播完 / 中断还回池子。
+  - `path`：≥ 2 个按时间**严格升序**的航点 `{t, x, z, y | h}`（`y` 世界高、`h` 离那一点地面的高，二选一）。位置是按时间的样条（非均匀 Catmull-Rom），**机头顺着速度方向、爬升角按高度变化、转弯时按偏航角速度带坡度**（`PREVIZ_AIRCRAFT.bankPerRadPerS`，夹 ±0.7 rad；在这套坐标里左转为正）。第一个航点之前 / 最后一个之后飞机不在天上（`visible: false`），要「从远处来」就把第一个航点放远。
+  - `strafe[]`（可选）：扫射段 `{t0, t1, from:{x,z}, to:{x,z}, hz?}`，`[t0, t1)` 里弹着点沿 `from → to` 匀速推进、每秒 `hz`（缺省 15）发、横向确定性散布 ±0.8 m；地上的土点由 §14.2 的简易特效当「子弹打在土里」画（Seek 也看得见），开始那一刻按机身离听者远近放 `strafeNear` / `strafeFar`，每 3 发一声 `strafeDirt`。时间不在航线里只警告。
+  - `sound`（可选）：`drone`（缺省 true）= 飞机在天上时 `planeDrone` 一直响、每帧跟着机身搬位置 + 按速度做多普勒；`diveT` = 那一秒放一次 `planeDive`（录好多普勒的通场）。别名就是 §14.3 的那五个，不另加。
+  - 镜头锚可以指飞机：`{ "aircraft": "Ki30A", "offset": [dx, dy, dz] }`（`from` / `to` / `look` / `lookTo` 都行）。
+  - `SamplePrevizAircraft(entry, t, { groundAt })` 是纯函数：Seek 到哪一秒飞机就在哪儿、机头朝哪儿；`PrevizStrafeImpacts(entry)` 给全部弹着点。
+- **慢动作** `slowmo[]`（2026-10-19，用户「慢动作你直接做一个」）：`[{ "t": 12.0, "dur": 1.5, "rate": 0.3, "fade": 0.25 }]` —— 窗口 `[t, t + dur)` 里预演时钟按 `rate` 倍走（0.05–1），进出各 `fade` 秒线性渐变（缺省 0.25，夹到 `dur/2`）。人物走位、动作片段、特效、飞机、镜头都按预演时间求值，所以**一起慢**；台词照常速放（慢动作里排了台词校验报警告）；音效照常（没做变闷）。`durationS`、`Seek`、进度条都按**预演时间**，墙上时间更长（`PrevizWallTime(seq, t)` / `PrevizTimeFromWall(seq, wall)` 精确换算，`PrevizTimeScale(seq, t)` 是那一刻的倍率）。窗口不许重叠。
+- 校验：`Script_EditorBlockoutPrevizPlan.mjs`（纯，node 与浏览器共用）导出 `BLOCKOUT_PREVIZ_SCHEMA`、`PREVIZ_LIE_MODES`、`PREVIZ_THROW`、`PrevizThrows(seq, baseOf, standAt, opts)`（这一段所有投弹的飞行：出手 / 落地时刻与两端点）、`SampleThrowFlight(flight, t)`、`ValidateBlockoutPreviz(doc, { config?, voice? })`（给了配置就核对 `keyframe` / 单位 id，给了清单就核对 `line`）、`NormalizeBlockoutPreviz(doc)`、`SamplePrevizActor(actorEntry, t, baseUnit)`、`SamplePrevizCamera(camera, t, resolve)`；2026-10-19 加 `PREVIZ_AIRCRAFT`、`SamplePrevizAircraft`、`PrevizStrafeImpacts`、`PREVIZ_SLOWMO`、`PrevizTimeScale`、`PrevizWallTime`、`PrevizTimeFromWall`。
 
 ### 14.2 播放（`Script_EditorBlockoutPreviz.mjs` + 总控）
 
@@ -624,6 +648,9 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
   - 嘴：previz 文件写了 `faceTracks` 就按 mp3 sha256 用口型轨，没有就用配音的音频包络。
   - 预演期间小地图照常显示。
 - 简易爆炸与飞行中的手榴弹（2026-10-18 第三轮，`Script_EditorBlockoutPrevizFx.mjs`）：默认白盒画质（特效关）出画前把 VfxSystem 整棵藏掉，`vfx.Explosion` 在白盒下什么都画不出来。预演自己在 `post.AddDebugOverlay` 的调试叠加层里另画：爆炸 = 一团火光（橙、0.3–0.5 s 胀大退掉，半径 = 0.22 × radius，夹在 0.25–2 m）+ 土柱 / 烟尘（7 团褐灰球往上冒、胀大变淡，2.6 s，顶高 0.75 × radius）+ 贴地尘环（写了 `h` > 0.5 的不画）；`radius ≤ 1` 的「子弹打在土里」只有一小团土（0.6 s）。**只在白盒且特效关时画**（`post.whiteboxScene.config.effects === false`；其它画质 VfxSystem 自己画得出来，不叠两份）；游戏本身各画质的爆炸不动。演员键 `throw` 的弹（一捆五根深色短圆柱 + 一条淡色拖尾）任何画质都画。两样都按预演时间求值：**Seek 到爆炸那一秒也看得见**（VfxSystem 的爆炸、枪口火、音效 Seek 时照旧不补放）。同一轮补了**烟**（`smoke` 事件：窗口 `[t, t + dur)` 里每个烟源 9 个槽位等间隔冒烟球，每团往上冒、往外飘、胀大、先浓后淡，窗口结束后已冒出来的散完；`SmokeDust` 褐黄土雾（冒 1.4 m、寿命 2.4 s）、`SmokeWhite` 灰白烟（掷弹筒出膛，冒 4.5 m、3 s）、`SmokeBlack` 黑烟柱（冒 5.5 m、3.6 s），表在 `PREVIZ_SMOKE_LOOK`）与**枪口火**（`muzzle` 事件：每一发 0.07 s 亮黄火光 + 0.6 s 一小团灰烟，位置取演员枪口，顺子自己开枪不画），同爆炸只在白盒特效关时画、按 t 求值。`Previz.State().fx` → `{ blasts, grenades, smokes, muzzles, blastsDrawn }`（这一帧画了几团爆炸、几颗弹、几个烟源、几下枪口火，白盒简易特效开没开）。
+
+- 飞机与慢动作的运行时（2026-10-19）：飞机在 `Script_EditorBlockoutPrevizAircraft.mjs`（借 `editorHost.aircraft`——`Script_Main` 的 `game.aircraft` 取值器、`Script_Editor.editorHost` 转出——的 `AcquireClone` / `ReleaseClone`，自己的组标 `whiteboxCharacter` 所以白盒画质里保留贴图；引擎声 `audio.Play("planeDrone")` 起一条 voice 后每帧 `MoveVoice` 搬到机身、离场 / 中断 `StopVoice` 淡出；`audio=0` 时只画不响）。慢动作在 `Script_EditorBlockoutPreviz.Update`：`run.t += dt × PrevizTimeScale(seq, run.t)`，总控把 `dt × previz.TimeScale()` 喂给演员层（`BlockoutPuppets.Update`），所以人物步态 / 片段 / 动画时钟一起慢；卡片的秒数前写「慢 ×0.3」。`Previz.State()` 多给 `timeScale`、`wallT`（墙上已播秒数）、`aircraft[]`（每架的机型 / 可见 / 位置 / 模型有没有载进来）、`missingModels`。模型还没载进来（机队异步下载）那一帧跳过、下一帧再试。
+- 门禁：`Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs`（§10）。
 
 ### 14.3 音效别名（`sfx.name`）
 

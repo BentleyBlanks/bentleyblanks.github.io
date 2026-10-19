@@ -707,7 +707,7 @@ export class BlockoutUi {
   }
 
   /** 预演播放中：卡片换成「预演 · 标题 · 进度」，导航栏不响应。active:false 收回。 */
-  SetPrevizPlaying({ active = false, title = "", t = 0, durationS = 0, paused = false, loading = false } = {}) {
+  SetPrevizPlaying({ active = false, title = "", t = 0, durationS = 0, paused = false, loading = false, rate = 1 } = {}) {
     const was = !!this.previzActive;
     this.previzActive = !!active;
     this.cardEl.classList.toggle("previz", this.previzActive);
@@ -716,7 +716,9 @@ export class BlockoutUi {
     this.btnPreviz.hidden = !this.previzAvailable || this.previzActive;
     if (!this.previzActive) { if (was) this.HideNavTip(); return; }
     if (this.elPrevizTitle.textContent !== title) this.elPrevizTitle.textContent = title;
-    const time = loading ? "准备中" : (paused ? "暂停 " : "") + t.toFixed(1) + " / " + durationS.toFixed(1) + " s";
+    // 慢动作（2026-10-19）：倍率 < 1 时在秒数前写「慢 ×0.3」；秒数是预演时间（墙上时间更长）
+    const slow = rate < 0.995 ? "慢 ×" + rate.toFixed(2).replace(/0$/, "") + " " : "";
+    const time = loading ? "准备中" : (paused ? "暂停 " : "") + slow + t.toFixed(1) + " / " + durationS.toFixed(1) + " s";
     if (this.elPrevizTime.textContent !== time) this.elPrevizTime.textContent = time;
     const k = durationS > 0 ? Math.max(0, Math.min(1, t / durationS)) : 0;
     this.elPrevizFill.style.width = (k * 100).toFixed(2) + "%";

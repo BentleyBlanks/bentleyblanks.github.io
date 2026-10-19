@@ -13,8 +13,10 @@ import {
   BLOCKOUT_PREVIZ_SCHEMA, ValidateBlockoutPreviz, NormalizeBlockoutPreviz, SamplePrevizActor, SamplePrevizCamera,
   PrevizSequenceDuration, PrevizOverlays, PrevizActiveLines, PrevizSignalsAt, PREVIZ_MOVE_SPEED, PREVIZ_EYE_HEIGHT, PrevizShakeOffset,
   BlockStandSampler, PREVIZ_THROW, PrevizThrows, SampleThrowFlight,
+  PREVIZ_AIRCRAFT, SamplePrevizAircraft, PrevizStrafeImpacts, PREVIZ_SLOWMO, PrevizTimeScale, PrevizWallTime, PrevizTimeFromWall,
 } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { INFANTRY_RELEASE_SECONDS } from "./Script_InfantryAnimation.mjs";
+import { AIRCRAFT_ASSETS } from "./Data_AircraftAssets.mjs";
 import { NormalizeBlockout } from "./Script_EditorBlockoutConfig.mjs";
 
 const ReadText = (file) => readFileSync(file, "utf8");
@@ -309,6 +311,95 @@ Test("throw：飞行从出手点到落点、两端时刻对、中间往上拱", 
   // 缺省飞行时间按距离、夹在上下限之间
   const g = PrevizThrows({ actors: [{ id: "A", spawn: { x: 0, z: 0, yawDeg: 0 }, keys: [{ t: 0, throw: { x: 0, z: -100 } }] }] }, () => null, () => 0)[0];
   Near(g.t1 - g.t0, PREVIZ_THROW.flightMaxS, 1e-9, "远处夹上限");
+});
+
+// 2026-10-19：飞机轨（aircraft）与慢动作（slowmo）
+const PLANE = { id: "Ki30A", model: "MitsubishiKi30",
+  path: [{ t: 2, x: 100, y: 120, z: 100 }, { t: 8, x: 100, y: 70, z: 400 }, { t: 12, x: 160, y: 90, z: 560 }, { t: 16, x: 300, h: 140, z: 600 }],
+  strafe: [{ t0: 6, t1: 7.5, from: { x: 100, z: 300 }, to: { x: 100, z: 380 } }], sound: { diveT: 5.5 } };
+const Doc = (seq) => ({ schema: BLOCKOUT_PREVIZ_SCHEMA, level: "Test", sequences: [{ keyframe: "01-1", ...seq }] });
+
+Test("飞机：机型名单与 Data_AircraftAssets 一致；校验正反例（航点升序、y / h 二选一、strafe、sound、飞机锚）", () => {
+  assert.deepEqual([...PREVIZ_AIRCRAFT.models].sort(), AIRCRAFT_ASSETS.map(a => a.id).sort());
+  const ok = ValidateBlockoutPreviz(Doc({ aircraft: [PLANE], camera: [{ t: 0, dur: 3, from: { x: 0, z: 0, h: 2 }, look: { aircraft: "Ki30A", offset: [0, 0, 0] } }] }), { config });
+  assert.ok(ok.ok, ok.errors.join("；"));
+  const bad = ValidateBlockoutPreviz(Doc({ aircraft: [
+    { id: "B", model: "Zero", path: [{ t: 3, x: 0, y: 1, z: 0 }, { t: 2, x: 1, z: 1 }, { t: 4, x: 1, y: 1, h: 1, z: 1 }], strafe: [{ t0: 1, t1: 0.5, from: { x: 0 } }], sound: { drone: "yes" } },
+    { id: "B", path: [{ t: 0, x: 0, y: 1, z: 0 }, { t: 1, x: 1, y: 1, z: 0 }] },
+  ], camera: [{ t: 0, dur: 1, from: { x: 0, z: 0 }, look: { aircraft: "Nope" } }] }), { config });
+  const all = bad.errors.join("\n");
+  for (const want of ["aircraft[0].model", "aircraft[0].path[1].t 要比上一个航点晚", "aircraft[0].path[1] 的 y（世界高）和 h（离地高）二选一", "aircraft[0].path[2] 的 y（世界高）和 h",
+    "aircraft[0].strafe[0] 的 t0 / t1", "aircraft[0].strafe[0] 的 from / to", "aircraft[0].sound.drone", "aircraft[1].id 重复", "camera[0].look.aircraft 在这一段的 aircraft 里找不到"]) {
+    assert.ok(all.includes(want), `缺：${want}\n${all}`);
+  }
+});
+
+Test("飞机：取样纯函数——机头顺着速度方向、爬升角与高度变化一致、转弯带坡度（左转正）、首尾之外不可见、同一 t 两次一样", () => {
+  const n = NormalizeBlockoutPreviz(Doc({ aircraft: [PLANE] })).sequences[0];
+  const plane = n.aircraft[0];
+  assert.equal(plane.model, "MitsubishiKi30"); assert.equal(plane.sound.drone, true); Near(plane.sound.diveT, 5.5);
+  const groundAt = () => 10;
+  const before = SamplePrevizAircraft(plane, 1, { groundAt }), start = SamplePrevizAircraft(plane, 2, { groundAt }), end = SamplePrevizAircraft(plane, 16, { groundAt }), after = SamplePrevizAircraft(plane, 17, { groundAt });
+  assert.equal(before.visible, false); assert.equal(start.visible, true); assert.equal(end.visible, true); assert.equal(after.visible, false);
+  Near(start.x, 100); Near(start.y, 120); Near(start.z, 100);
+  Near(end.y, 150, 1e-6, "h 按地面 + 离地高");
+  // 第一段直飞向南（+z）、往下降：机头 180、爬升为负；位置的有限差分与速度一致
+  const a = SamplePrevizAircraft(plane, 4, { groundAt }), b = SamplePrevizAircraft(plane, 4.01, { groundAt });
+  assert.ok(Math.abs(a.yawDeg) > 170, `向南 ${a.yawDeg}`); assert.ok(a.climb < 0, "下降");
+  const fd = { x: (b.x - a.x) / 0.01, y: (b.y - a.y) / 0.01, z: (b.z - a.z) / 0.01 };
+  const yawFd = Math.atan2(-fd.x, -fd.z) * 180 / Math.PI;
+  assert.ok(Math.abs(((yawFd - a.yawDeg + 540) % 360) - 180) < 2, `机头 ${a.yawDeg} 与位移方向 ${yawFd} 一致`);
+  assert.ok(Math.abs(Math.hypot(fd.x, fd.y, fd.z) - a.speedMps) < 1, `速度 ${a.speedMps} vs 差分 ${Math.hypot(fd.x, fd.y, fd.z)}`);
+  // 8 → 16 s 从南转向东（在这套坐标里是左转）：坡度为正、不超上限
+  const turn = SamplePrevizAircraft(plane, 12, { groundAt });
+  assert.ok(turn.bank > 0.2 && turn.bank <= PREVIZ_AIRCRAFT.bankMax, `坡度 ${turn.bank}`);
+  assert.ok(Math.abs(start.bank) < 1e-9 && Math.abs(end.bank) < 1e-9, "端点不压坡");
+  assert.deepEqual(SamplePrevizAircraft(plane, 9.37, { groundAt }), SamplePrevizAircraft(plane, 9.37, { groundAt }));
+  // 右转（东 → 南）坡度为负
+  const right = { id: "R", path: [{ t: 0, x: 0, y: 50, z: 0 }, { t: 4, x: 200, y: 50, z: 0 }, { t: 8, x: 300, y: 50, z: 150 }, { t: 12, x: 300, y: 50, z: 400 }] };
+  assert.ok(SamplePrevizAircraft(right, 6).bank < -0.1, `右转坡度 ${SamplePrevizAircraft(right, 6).bank}`);
+});
+
+Test("飞机：扫射弹着点按 hz 沿线落、在窗口里、横向散布不超限、每几发一声打土；序列时长算上航线", () => {
+  const n = NormalizeBlockoutPreviz(Doc({ aircraft: [PLANE] })).sequences[0];
+  const hits = PrevizStrafeImpacts(n.aircraft[0]);
+  assert.equal(hits.length, Math.floor(1.5 * PREVIZ_AIRCRAFT.strafeHz));
+  for (const h of hits) {
+    assert.ok(h.t >= 6 && h.t < 7.5, `t ${h.t}`);
+    assert.ok(h.z >= 300 - 1e-9 && h.z <= 380 + 1e-9, `沿线 z ${h.z}`);
+    assert.ok(Math.abs(h.x - 100) <= PREVIZ_AIRCRAFT.strafeSpreadM + 1e-9, `横向 ${h.x}`);
+  }
+  assert.equal(hits.filter(h => h.dirt).length, Math.ceil(hits.length / PREVIZ_AIRCRAFT.strafeDirtEvery));
+  assert.deepEqual(PrevizStrafeImpacts(n.aircraft[0]), hits);
+  Near(PrevizSequenceDuration(n), 16, 1e-9, "最后一个航点");
+});
+
+Test("慢动作：校验（rate 范围、重叠、台词在窗口里只警告）、归一化夹值与 fade 缺省、时长算到窗口结束", () => {
+  const bad = ValidateBlockoutPreviz(Doc({ slowmo: [{ t: 1, dur: 2, rate: 0.3 }, { t: 2, dur: 1, rate: 2 }, { t: 9, dur: 0, rate: 0.5 }, { t: 10, dur: 1, rate: 0.5, fade: -1 }], lines: [{ t: 1.5, line: "L" }] }), { config });
+  const all = bad.errors.join("\n");
+  for (const want of ["slowmo[1].rate", "slowmo[1] 与别的慢动作窗口重叠", "slowmo[2].dur", "slowmo[3].fade"]) assert.ok(all.includes(want), `缺：${want}\n${all}`);
+  assert.ok(bad.warnings.some(w => w.includes("slowmo[0] 里排了台词 L")), bad.warnings.join("\n"));
+  const ok = ValidateBlockoutPreviz(Doc({ slowmo: [{ t: 12, dur: 1.5, rate: 0.3, fade: 0.2 }] }), { config });
+  assert.ok(ok.ok, ok.errors.join("；"));
+  const n = NormalizeBlockoutPreviz(Doc({ slowmo: [{ t: 3, dur: 1, rate: 0.01 }, { t: 1, dur: 0.2, rate: 0.5 }] })).sequences[0];
+  assert.deepEqual(n.slowmo, [{ t: 1, dur: 0.2, rate: 0.5, fade: 0.1 }, { t: 3, dur: 1, rate: PREVIZ_SLOWMO.rateMin, fade: PREVIZ_SLOWMO.fadeDefaultS }]);
+  Near(PrevizSequenceDuration(n), 4, 1e-9, "慢动作窗口结束");
+});
+
+Test("慢动作：倍率在窗口外是 1、平台是 rate、渐变连续；预演时间 ↔ 墙上时间互为反函数且与数值积分一致", () => {
+  const seq = NormalizeBlockoutPreviz(Doc({ slowmo: [{ t: 5, dur: 1.5, rate: 0.3, fade: 0.25 }] })).sequences[0];
+  Near(PrevizTimeScale(seq, 4.99), 1); Near(PrevizTimeScale(seq, 5), 1); Near(PrevizTimeScale(seq, 5.125), 0.65); Near(PrevizTimeScale(seq, 5.25), 0.3);
+  Near(PrevizTimeScale(seq, 6), 0.3); Near(PrevizTimeScale(seq, 6.375), 0.65); Near(PrevizTimeScale(seq, 6.5), 1); Near(PrevizTimeScale(seq, 7), 1);
+  // 连续：每 1 ms 的变化不超过渐变斜率
+  for (let t = 4.9; t < 6.6; t += 0.001) assert.ok(Math.abs(PrevizTimeScale(seq, t + 0.001) - PrevizTimeScale(seq, t)) < 0.7 / 0.25 * 0.001 + 1e-9, `跳变 @${t}`);
+  Near(PrevizWallTime(seq, 5), 5); assert.ok(PrevizWallTime(seq, 7) > 7 + 1.5 * (1 / 0.3 - 1) * 0.6, "慢动作里墙上时间更长");
+  let numeric = 0;
+  for (let u = 0; u < 7; u += 0.0005) numeric += 0.0005 / PrevizTimeScale(seq, u + 0.00025);
+  Near(PrevizWallTime(seq, 7), numeric, 2e-3, "与数值积分一致");
+  for (const t of [0, 4.2, 5.1, 5.7, 6.4, 6.6, 9]) Near(PrevizTimeFromWall(seq, PrevizWallTime(seq, t)), t, 1e-5, `反函数 @${t}`);
+  // 没有慢动作：两条时钟相同
+  const plain = NormalizeBlockoutPreviz(Doc({})).sequences[0];
+  Near(PrevizWallTime(plain, 3.3), 3.3); Near(PrevizTimeFromWall(plain, 3.3), 3.3); Near(PrevizTimeScale(plain, 1), 1);
 });
 
 // 仓库里有预演文件时（预演数据包写的），它要对着配置与清单过校验

@@ -793,9 +793,9 @@ export class EditorBlockout {
     camera.getWorldPosition(this._cam);
     const locked = !!this.PointerLocked();
     if (locked !== this.locked) { this.locked = locked; this.ui.SetInteractive(!locked); }
-    // 预演先摆这一帧的演员状态，演员层再按它出姿势
+    // 预演先摆这一帧的演员状态，演员层再按它出姿势；慢动作里演员的动画 dt 跟预演时钟一起缩（TimeScale < 1）
     this.previz.Update(dt);
-    this.puppets.Update(dt, this._cam);
+    this.puppets.Update(dt * (this.previz.TimeScale?.() ?? 1), this._cam);
     if (!this.puppets.transitioning && this.toUnitData) { this.unitData = this.toUnitData; this.toUnitData = null; }
     if (this.pending && !this.puppets.transitioning) this.ResolvePending(true);
     this.UpdateTransitionBadge();
@@ -928,10 +928,11 @@ export class EditorBlockout {
     this.ui.SetPrevizPlaying({ active: true, title: run.seq.title || run.seq.keyframe, t: 0, durationS: run.durationS });
   }
   OnPrevizProgress(run) {
-    const key = run.t.toFixed(1) + "|" + (run.paused ? 1 : 0);
+    const rate = run.timeScale ?? 1;
+    const key = run.t.toFixed(1) + "|" + (run.paused ? 1 : 0) + "|" + rate.toFixed(2);
     if (key === this.previzProgressKey) return;
     this.previzProgressKey = key;
-    this.ui.SetPrevizPlaying({ active: true, title: run.seq.title || run.seq.keyframe, t: run.t, durationS: run.durationS, paused: run.paused });
+    this.ui.SetPrevizPlaying({ active: true, title: run.seq.title || run.seq.keyframe, t: run.t, durationS: run.durationS, paused: run.paused, rate });
   }
   OnPrevizEnd() {
     this.previzProgressKey = "";

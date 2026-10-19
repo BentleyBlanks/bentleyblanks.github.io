@@ -1,0 +1,2469 @@
+{
+ "schema": 2,
+ "version": "20261019PrevizVillageV1",
+ "fps": 24,
+ "actorForward": [
+  0,
+  0,
+  -1
+ ],
+ "blendSeconds": 0.12,
+ "floorClearanceM": 0.003,
+ "coordinates": {
+  "values": "glTF node-local bone transforms (p xyz, q xyzw), stride 7",
+  "props": "glTF scene space = rig.root local, source metres: origin xyz, axis xyz, up xyz, visible",
+  "stages": "runtime metres in the anchor actor frame (+x right, +y up, -z forward); yawDeg + = turn left",
+  "contacts": "clip seconds; partner parts are contactPoints names; standoffM = runtime metres along the patch normal where the knuckle centroid (finger roots) sits"
+ },
+ "clips": {
+  "VilCrouchHold": {
+   "duration": 3.0,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "villager",
+   "scaleNote": "Nier at .62 too",
+   "notes": "09 Nier behind the firewood stack, villagers crouching: squatting on the heels, knees together, both arms wrapped round the shins below the knees, the head down between them; a slow breathing loop.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "1ceb7645c9ecf2ee1a65d39a2a76f4bce6c2e0f70f9665e2f5487c13df9c9787"
+    }
+   }
+  },
+  "VilDuckProne": {
+   "duration": 2.0,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "villager",
+   "holdLoop": [
+    1.3,
+    2.0
+   ],
+   "events": [
+    {
+     "t": 0.45,
+     "kind": "kneesDown"
+    },
+    {
+     "t": 1.0,
+     "kind": "flat"
+    }
+   ],
+   "notes": "07-4 the plane overhead: from standing he throws himself down -- knees (0.45 s), hands on the ground, flat on his face (1.0 s), both hands clasped over the back of his head by 1.3 s; 1.3-2.0 s is a trembling hold loop.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "b35301571748ce0c4795bf7f2714e80e5cda7ab2648b3b76a6fe2ab18acd7d3e"
+    }
+   }
+  },
+  "VilSitEdge": {
+   "duration": 2.4,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "nier",
+   "stage": "sitEdge",
+   "scaleNote": "Nier at .62: the seat is then .56 m high",
+   "notes": "07 Nier on the cart tail: sitting on a 0.90 m edge, hands on the edge beside the hips, the legs hanging and swinging alternately forward and back (one swing each a loop), looking down at her feet. groundWeight 0 (nothing on the ground).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "d95f39d43b7f20b63d17b527967df5dc372dc34bf0fc8d8911d8e28de2cd09e3"
+    }
+   }
+  },
+  "VilPanicRun": {
+   "duration": 0.7,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "villager",
+   "referenceSpeedMps": 3.0,
+   "notes": "08 villagers fleeing, 08-5 Nier running: a hunched panic run in place (referenceSpeedMps 3.0, one stride a loop), the arms flailing out of time with the legs, the head ducked.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "7c33202665e815196d368fdc3891fdcfe22d521b0184104340fe63bd2c91f039"
+    }
+   }
+  },
+  "VilCrawlHole": {
+   "duration": 3.0,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": true,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "nier",
+   "stage": "dogHole",
+   "events": [
+    {
+     "t": 0.3,
+     "kind": "crawlStart"
+    },
+    {
+     "t": 2.3,
+     "kind": "crawlEnd"
+    },
+    {
+     "t": 3.0,
+     "kind": "squatUp"
+    }
+   ],
+   "notes": "09-2 the dog hole: from prone, a hands-and-knees belly crawl 1.5 m forward (0.3-2.3 s; the back stays under 0.40 m), then up onto the haunches into a squat (3.0 s). Root motion: the pelvis ends 1.5 m ahead.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "76f0a29912e3dba927068f6228da3a225ff48abe2e685a2c1000be943558b0f1"
+    }
+   }
+  },
+  "VilHandsUpClimbOut": {
+   "duration": 4.0,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": true,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "villager",
+   "stage": "cellarPit",
+   "holdLoop": [
+    3.2,
+    4.0
+   ],
+   "events": [
+    {
+     "t": 2.8,
+     "kind": "onRim"
+    }
+   ],
+   "notes": "09-3 the family out of the cellar: both hands up the whole time; from the pit floor 1.5 m down he climbs the 45 deg ramp in four steps (0.3-2.6 s), stands up straight on the rim at 2.8 s; 3.2-4.0 s is a breathing hold loop, hands up.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "335ff011354004e471df2c5dc482405a74c11692dd35b58b2f7d29b45cd0da2e"
+    }
+   }
+  },
+  "VilStabbedFall": {
+   "duration": 2.4,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "villager",
+   "stage": "bayonetVictim",
+   "terminal": true,
+   "contacts": [
+    {
+     "t": 0.5,
+     "limb": "belly",
+     "action": "stabbed",
+     "partnerRole": "ija",
+     "part": "bayonet"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.5,
+     "kind": "stabbed"
+    },
+    {
+     "t": 1.15,
+     "kind": "knees"
+    },
+    {
+     "t": 1.9,
+     "kind": "groundImpact"
+    }
+   ],
+   "notes": "09-3 the man: standing, hands half raised, the bayonet goes into his belly at 0.50 s: he folds over it, hands to the wound, the knees go (1.15 s), he topples onto his left side (1.9 s) and lies still; the last frame is the corpse.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "e92d1c94204a44648beb6fd0a2c6af78319ff85735da00e97f40bf2d678e17fe"
+    }
+   }
+  },
+  "VilDraggedByArm": {
+   "duration": 1.2,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "villager",
+   "stage": "dragByArm",
+   "referenceSpeedMps": 0.7,
+   "notes": "09-4 the wife: on her back, the right arm hauled up over her head toward the IJA, sliding head first; the heels kick and scrape at the ground, the left hand claws at the ground and at the gripped arm. In place, one kick each a loop.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "8627ad490f655e701c06e29d83657c3f354e04dab224d343a10eab2cc0aaa874"
+    }
+   }
+  },
+  "VilKneelCrawlToPit": {
+   "duration": 2.4,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "villager",
+   "referenceSpeedMps": 0.35,
+   "notes": "09-4 the old woman: crawling forward on her knees (in place, two knee steps a loop, referenceSpeedMps 0.35), the right hand on the ground, the left arm clutching a bundle to her chest, the head down.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "6b3e56a3a30158d03623159ef57462a0baa888a3d6e8645ff188a2b6d73e3703"
+    }
+   }
+  },
+  "VilCowerWhimper": {
+   "duration": 2.0,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "nier",
+   "scaleNote": "Nier at .62",
+   "notes": "09-5 Nier whimpering: a deep squat, both hands cupped over the mouth, shivering (a fast tremor on the trunk and shoulders), the head pulled down; a loop.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "f4fe5ee31aa2d3c14026feeebf459444960e556b9bfbd54c8f1bd5d4fe380f91"
+    }
+   }
+  },
+  "VilUnboltDoor": {
+   "duration": 2.6,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "nier",
+   "stage": "door",
+   "events": [
+    {
+     "t": 0.6,
+     "kind": "boltGrab"
+    },
+    {
+     "t": 1.3,
+     "kind": "boltOpen"
+    },
+    {
+     "t": 1.7,
+     "kind": "doorPush"
+    }
+   ],
+   "notes": "09-5 Nier at the door: standing, the right hand reaches up to the bolt (1.25 m up, 0.6 s), slides it 0.25 m to her left (1.3 s), then both hands push the door (1.7 s) with a step forward; ends leaning into the open door.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "9f00fcc59a375dfcb14249a2176ac208cd68eb9e03e23d01691a5b2d6afe3a7b"
+    }
+   }
+  },
+  "VilClingHem": {
+   "duration": 2.0,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "nier",
+   "stage": "clingHem",
+   "scaleNote": "Nier at .62",
+   "notes": "09-6 Nier clinging: standing behind the man ahead, both fists in his coat at the small of his back, the body hung back from the fists (weight on the heels, trunk leaning back), head down; a tugging breathing loop.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "29ecefe3a4c45a573de96dde8497c8696ef8ce0a5dc9f9bd3c3e56757f62c952"
+    }
+   }
+  },
+  "VilBiteWrist": {
+   "duration": 1.6,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "nier",
+   "stage": "pinBite",
+   "holdLoop": [
+    1.3,
+    1.6
+   ],
+   "scaleNote": "Nier at .62",
+   "contacts": [
+    {
+     "t": 0.5,
+     "limb": "mouth",
+     "action": "bite",
+     "partnerRole": "ija",
+     "part": "wristR"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.5,
+     "kind": "bite"
+    },
+    {
+     "t": 0.75,
+     "kind": "shake"
+    },
+    {
+     "t": 1.05,
+     "kind": "shake"
+    }
+   ],
+   "notes": "09-7 Nier bites: lunges forward and down, the mouth closes on the wrist 0.55 m ahead, 1.13 m up (full-size rig; 0.34 / 0.70 at scale .62) at 0.50 s, shakes the head twice, hangs on; the hands grab the forearm.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "2db33d19802b3960f5dd426d8cdc38b49fdd3960b60f4b6f15e4f9ab2cb76bcb"
+    }
+   }
+  },
+  "VilHugLegs": {
+   "duration": 2.0,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "nier",
+   "stage": "hugLegs",
+   "holdLoop": [
+    1.2,
+    2.0
+   ],
+   "scaleNote": "Nier at .62",
+   "events": [
+    {
+     "t": 1.0,
+     "kind": "hug"
+    }
+   ],
+   "notes": "10-5 Nier hugs Geng's legs: two quick steps forward, drops onto both knees and throws both arms round the legs 0.55 m ahead at 0.50 m up (1.0 s), the face pressed against them; 1.2-2.0 s is a sobbing hold loop.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "135d504e9b0a09df939ac65447b5012bce7a105a7cbaf80637a0f04d90bcd273"
+    }
+   }
+  },
+  "VilPushVat": {
+   "duration": 3.2,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "geng",
+   "stage": "vatDoor",
+   "events": [
+    {
+     "t": 0.4,
+     "kind": "handsOnVat"
+    },
+    {
+     "t": 1.4,
+     "kind": "vatMoved"
+    },
+    {
+     "t": 2.6,
+     "kind": "boltOpen"
+    },
+    {
+     "t": 3.0,
+     "kind": "doorOpen"
+    }
+   ],
+   "notes": "10-6 Geng: both hands on the vat ahead-right, a lunge sideways shoving it 0.60 m to his right (0.4-1.4 s, the right foot stepping out with it), straightens, the right hand to the bolt (2.2 s), slides it (2.6 s), pushes the door (3.0 s).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "b22d0124c1c324a585e7690b6bb4cce8fdb04b23ec521f027a71ece32a1c3abf"
+    }
+   }
+  },
+  "VilReachPinned": {
+   "duration": 2.4,
+   "loop": false,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": true,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "geng",
+   "stage": "yankBack",
+   "events": [
+    {
+     "t": 1.4,
+     "kind": "yanked"
+    },
+    {
+     "t": 2.1,
+     "kind": "down"
+    }
+   ],
+   "notes": "08-5 Geng: on hands and knees at the lip, the chest over it, the right arm thrust forward and up shouting (0.4-1.3 s); hauled back by the belt at 1.40 s: the pelvis flies back, he lands sitting on his heels / half fallen (2.1 s). Root motion: root.end is about 0.65 m behind.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "e958bf311249df6047ae569ea0d31ee6391dbb8d1dcb0cc0bfa052507b1be614"
+    }
+   }
+  },
+  "VilNraYankBack": {
+   "duration": 2.4,
+   "loop": false,
+   "weaponHold": "track",
+   "rig": "TengxianNra02",
+   "rootMotion": true,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "yaowa",
+   "stage": "yankBack",
+   "slungRifle": true,
+   "weaponSlung": true,
+   "props": [
+    "weapon"
+   ],
+   "contacts": [
+    {
+     "t": 1.1,
+     "limb": "handR",
+     "action": "grip",
+     "partnerRole": "reacher",
+     "part": "belt"
+    },
+    {
+     "t": 1.4,
+     "limb": "handR",
+     "action": "yank"
+    }
+   ],
+   "events": [
+    {
+     "t": 1.1,
+     "kind": "grabBelt"
+    },
+    {
+     "t": 1.4,
+     "kind": "yank"
+    },
+    {
+     "t": 2.1,
+     "kind": "down"
+    }
+   ],
+   "notes": "08-5 Yaowa: kneeling behind Geng, both hands reach and grip his belt (1.1 s), the heave at 1.40 s throws himself back onto his seat (2.1 s), the hands let go as they land (1.75 s). Rifle on the back. Root motion: root.end about 0.6 m behind.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "4e3564ec8383c0503b37a3235d53cc7d56e9a6757388d6bf3e85f7ec05106ab4"
+    }
+   }
+  },
+  "VilNraCarryOnBack": {
+   "duration": 1.2,
+   "loop": true,
+   "weaponHold": "track",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "bearer",
+   "stage": "carryOnBack",
+   "referenceSpeedMps": 0.9,
+   "props": [
+    "weapon"
+   ],
+   "notes": "07 the evacuation: walking bent forward under a man on his back (in place, referenceSpeedMps 0.9, two steps a loop), both hands hooked under the rider's knees at his hips. Rifle slung from the right shoulder (weapon track).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "c26382c4ea8da6eef0e238bc582f15cd154613641d6cb16d2db40a4b6fa09736"
+    }
+   }
+  },
+  "VilRideOnBack": {
+   "duration": 1.2,
+   "loop": true,
+   "weaponHold": "free",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "wounded",
+   "stage": "carryOnBack",
+   "referenceSpeedMps": 0.9,
+   "notes": "07 the wounded man carried: chest on the carrier's back, arms over his shoulders hanging down his chest, knees forward round his hips, the head drooping on his shoulder; bobs with the carrier's steps. groundWeight 0.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "feb363d7a338c1bf7b026c0f984c8200878bdfdd7011679cf0a83eac7f00f1b4"
+    }
+   }
+  },
+  "VilNraWaveCharge": {
+   "duration": 1.6,
+   "loop": false,
+   "weaponHold": "track",
+   "rig": "TengxianNra02",
+   "rootMotion": true,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "squadLeader",
+   "props": [
+    "weapon"
+   ],
+   "events": [
+    {
+     "t": 0.45,
+     "kind": "up"
+    },
+    {
+     "t": 0.75,
+     "kind": "wave"
+    }
+   ],
+   "notes": "10-1 the squad leader: crouched behind cover, rifle low in the right hand; springs up (0.45 s), the left arm sweeps forward over the head (0.75 s) and he goes forward two running steps. Root motion: the pelvis ends 0.8 m ahead, mid stride (hand on to a run).",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "2d742e7fd59fe7005e33c35cfdeece0e1a5842b7fb4e6288aa13825bec178f1c"
+    }
+   }
+  },
+  "VilIjaBayonetThrust": {
+   "duration": 1.4,
+   "loop": false,
+   "weaponHold": "track",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "ija",
+   "stage": "bayonetVictim",
+   "props": [
+    "weapon"
+   ],
+   "weaponState": "twoHand",
+   "contacts": [
+    {
+     "t": 0.5,
+     "limb": "blade",
+     "action": "stab",
+     "partnerRole": "victim",
+     "part": "belly"
+    },
+    {
+     "t": 0.95,
+     "limb": "blade",
+     "action": "release"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.5,
+     "kind": "thrust"
+    },
+    {
+     "t": 0.95,
+     "kind": "pullOut"
+    }
+   ],
+   "notes": "09-3: from guard the left foot lunges and the rifle drives forward, the point into the belly of the man 1.92 m ahead at 0.50 s; held 0.2 s, wrenched out (0.95 s), back to guard.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "7da6ebe420699f096423df5783414647145212969a0a32b620cd8d30befead5d"
+    }
+   }
+  },
+  "VilIjaDragByArm": {
+   "duration": 1.2,
+   "loop": true,
+   "weaponHold": "track",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "ija",
+   "stage": "dragByArm",
+   "props": [
+    "weapon"
+   ],
+   "weaponState": "slungBack",
+   "weaponSlung": true,
+   "referenceSpeedMps": 0.7,
+   "notes": "09-4: walking backwards in place (referenceSpeedMps 0.7), bent and leaning back, both hands on the wrist of the woman on the ground ahead (stage dragByArm). Rifle on the back.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "892c2bd453eae4215147c8dc606028f6563a20d1449e717158a9bec1e238686e"
+    }
+   }
+  },
+  "VilIjaHelmetGrenadeLob": {
+   "duration": 2.0,
+   "loop": false,
+   "weaponHold": "track",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "ija",
+   "props": [
+    "grenade",
+    "weapon"
+   ],
+   "weaponState": "slungBack",
+   "weaponSlung": true,
+   "events": [
+    {
+     "t": 0.55,
+     "kind": "knock"
+    },
+    {
+     "t": 1.2,
+     "kind": "release"
+    }
+   ],
+   "notes": "09-4: standing at the pit edge, rifle on the back; the right fist knocks the grenade's fuze on the helmet (0.55 s), the arm swings back and lobs it forward-down into the pit (release 1.2 s; `grenade` track flies to 1.5 m ahead, 1.5 m down, hidden from 1.7 s), a half step forward with it.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "4d8f39008312de739edc658e609b967a550e232757770305f5c829839a93863e"
+    }
+   }
+  },
+  "VilIjaBayonetLiftFling": {
+   "duration": 2.2,
+   "loop": false,
+   "weaponHold": "track",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "ija",
+   "props": [
+    "weapon"
+   ],
+   "weaponState": "twoHand",
+   "events": [
+    {
+     "t": 0.5,
+     "kind": "stab"
+    },
+    {
+     "t": 1.1,
+     "kind": "lift"
+    },
+    {
+     "t": 1.5,
+     "kind": "fling"
+    }
+   ],
+   "notes": "09-4: the bayonet driven down into the bundle on the ground 1.1 m ahead (0.5 s), hooked up to chest height (1.1 s) and flung off the point to his left (1.5 s); back to low ready. No baby prop.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "7cf460e136bcdff60ade8da226594f190043b8ee75600442b36ce1f58c20aaba"
+    }
+   }
+  },
+  "VilIjaPissStand": {
+   "duration": 3.0,
+   "loop": false,
+   "weaponHold": "track",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "ija",
+   "props": [
+    "weapon"
+   ],
+   "weaponState": "slungBack",
+   "weaponSlung": true,
+   "holdLoop": [
+    0.0,
+    2.0
+   ],
+   "holdExit": "pose.holdUntil: plays 2.0-3.0 s (hands to the belt, a half turn of the head over the left shoulder).",
+   "events": [
+    {
+     "t": 2.0,
+     "kind": "done"
+    },
+    {
+     "t": 2.6,
+     "kind": "lookBack"
+    }
+   ],
+   "notes": "09-5 the sentry: standing (back to the yard: the director turns the root), both hands at the crotch, the body swaying a little; 0-2.0 s is the hold loop. Exit: the hands come up to the belt and fasten (2.0-2.6 s), the head turns over his left shoulder (2.6-3.0 s). Rifle on the back.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "2d98ba47f0f4af369adbc23f4a1d9353eaee5a847fb1768b26fbe5840d03c401"
+    }
+   }
+  },
+  "VilIjaPinBayonet": {
+   "duration": 3.0,
+   "loop": false,
+   "weaponHold": "track",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "ija",
+   "stage": "pinBite",
+   "props": [
+    "weapon"
+   ],
+   "weaponState": "twoHand",
+   "holdLoop": [
+    0.0,
+    2.0
+   ],
+   "holdExit": "pose.holdUntil at or before 2.0 s: 2.0-3.0 s is the bite exit (the right hand flung up, the scream, reared back).",
+   "contacts": [
+    {
+     "t": 2.0,
+     "limb": "wristR",
+     "action": "bitten",
+     "partnerRole": "nier",
+     "part": "mouth"
+    }
+   ],
+   "events": [
+    {
+     "t": 2.0,
+     "kind": "bitten"
+    },
+    {
+     "t": 2.15,
+     "kind": "scream"
+    }
+   ],
+   "notes": "09-7: kneeling astride the man on the ground, both hands pressing the rifle down across him (the right fist 0.68 m up), straining with a tremor; 0-2.0 s hold loop. At 2.0 s the right wrist is bitten: the hand flies up and back, the head back in a scream, the trunk rears back, the rifle left in the left hand; held from 2.6 s.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "435691513d6809f7aadcb4cd7c438dd577630c963e428fb5a705a8e8e5218cd8"
+    }
+   }
+  },
+  "VilIjaShoulderCharge": {
+   "duration": 1.4,
+   "loop": false,
+   "weaponHold": "track",
+   "rig": "TengxianNra02",
+   "rootMotion": true,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "ija",
+   "props": [
+    "weapon"
+   ],
+   "weaponState": "twoHand",
+   "notes": "09-7: bursts out of the doorway, the right shoulder leading, three driving steps; the rifle held across the chest. Root motion: the pelvis ends 1.2 m ahead, mid stride.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "a205e9d75aa1d67715e5f6219f7a10b070c43e29061a29ce4f33f4e05f023e47"
+    }
+   }
+  },
+  "VilIjaGateSmash": {
+   "duration": 2.4,
+   "loop": false,
+   "weaponHold": "track",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "ija",
+   "stage": "gate",
+   "props": [
+    "weapon"
+   ],
+   "weaponState": "twoHand",
+   "events": [
+    {
+     "t": 0.45,
+     "kind": "buttHit"
+    },
+    {
+     "t": 0.95,
+     "kind": "buttHit"
+    },
+    {
+     "t": 1.6,
+     "kind": "kick"
+    }
+   ],
+   "notes": "10-4: at the gate 0.55 m ahead: the rifle swings muzzle-up and the butt slams the gate twice (0.45, 0.95 s), then a front kick with the right foot (1.6 s), back to the stance.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "f652a746d6524aacab70b5c937a41ae181c1fc3ef8b626a7e7cba4ced201d7e7"
+    }
+   }
+  },
+  "VilIjaClimbWall": {
+   "duration": 3.4,
+   "loop": false,
+   "weaponHold": "track",
+   "rig": "TengxianNra02",
+   "rootMotion": true,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "ija",
+   "stage": "villageWall",
+   "props": [
+    "weapon"
+   ],
+   "weaponState": "slungBack",
+   "weaponSlung": true,
+   "events": [
+    {
+     "t": 0.5,
+     "kind": "gripTop"
+    },
+    {
+     "t": 1.5,
+     "kind": "pulledUp"
+    },
+    {
+     "t": 2.1,
+     "kind": "astride"
+    },
+    {
+     "t": 3.2,
+     "kind": "landed"
+    }
+   ],
+   "notes": "10-5: the 2.2 m wall 0.35 m ahead: a step and a jump, both hands on the top (0.5 s), feet against the face, pull up (1.5 s), the right leg over, astride the top (2.1 s), the left leg over, hangs on the far side, lets go at 2.9 s and drops (landed 3.2 s), stands. Rifle on the back. Root motion: root.end 1.05 m ahead. groundWeight 0 while off the ground.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "3a7f3fc215e46bb328da379a9a5912802c13ac5dcaba9579118448fb25c8fda6"
+    }
+   }
+  },
+  "VilIjaShoutPoint": {
+   "duration": 2.0,
+   "loop": true,
+   "weaponHold": "track",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "placeholder": "20261019 FirstLevel0610 previz",
+   "role": "ija",
+   "props": [
+    "weapon"
+   ],
+   "weaponState": "lowRight",
+   "notes": "09-3 the squad leader, 10 the officer: rifle low in the right hand, the left arm pointing straight ahead at shoulder height, the head thrust forward shouting -- two jabs of the arm and trunk a loop.",
+   "bake": {
+    "TengxianNra02": {
+     "solverVersion": "20260928LimbContinuity",
+     "seed": null,
+     "twistMax": 320.0,
+     "seedAnyHand": "",
+     "commit": "after:6d7742ae",
+     "valuesSha256": "5c3b7715c90b3a11f757fb4effd527c8d3322f5c7bb9b09e203b689d3e1f8bde"
+    }
+   }
+  }
+ },
+ "stages": {
+  "bayonetVictim": {
+   "anchor": "ija",
+   "notes": "VilIjaBayonetThrust + VilStabbedFall (09-3): the villager stands 1.92 m ahead of the IJA, 0.12 m to his right, facing him; the point goes into his belly at 0.50 s of both clips (they start together); the tip at the thrust is 0.85 m up.",
+   "actors": {
+    "ija": {
+     "rig": "TengxianNra02",
+     "clip": "VilIjaBayonetThrust",
+     "x": 0,
+     "z": 0,
+     "yawDeg": 0
+    },
+    "victim": {
+     "rig": "TengxianNra02",
+     "clip": "VilStabbedFall",
+     "x": 0.122,
+     "z": -1.922,
+     "yawDeg": 180
+    }
+   }
+  },
+  "dragByArm": {
+   "anchor": "ija",
+   "notes": "VilIjaDragByArm + VilDraggedByArm (09-4): both 1.2 s loops, same phase, referenceSpeedMps 0.7; the pair moves toward the IJA's BACK (he walks backwards). The woman lies on her back, her root 1.05 m ahead of the IJA root, 0.15 m to his left, same yaw (her head toward him, her feet away); her right wrist, which both his hands hold, is 0.20 m ahead of his root, 0.50 m up.",
+   "actors": {
+    "ija": {
+     "rig": "TengxianNra02",
+     "clip": "VilIjaDragByArm",
+     "x": 0,
+     "z": 0,
+     "yawDeg": 0,
+     "referenceSpeedMps": 0.7
+    },
+    "victim": {
+     "rig": "TengxianNra02",
+     "clip": "VilDraggedByArm",
+     "x": -0.15,
+     "z": -1.05,
+     "yawDeg": 0,
+     "referenceSpeedMps": 0.7
+    }
+   }
+  },
+  "pinBite": {
+   "anchor": "ija",
+   "notes": "VilIjaPinBayonet + VilBiteWrist (09-7): the IJA kneels astride the man on the ground pressing the rifle down; his right wrist is 0.20 m to his right, 0.38 m ahead, 0.70 m up. Nier (child body, scale 0.62) stands at his right side facing his centre line (yaw +90), her root 0.54 m right / 0.38 m ahead of his, and starts 1.5 s after him: her bite (0.5 s) lands on the wrist at his 2.0 s, the end of his hold loop; his exit (scream, the hand flung up) follows.",
+   "actors": {
+    "ija": {
+     "rig": "TengxianNra02",
+     "clip": "VilIjaPinBayonet",
+     "x": 0,
+     "z": 0,
+     "yawDeg": 0
+    },
+    "nier": {
+     "rig": "TengxianNra02",
+     "clip": "VilBiteWrist",
+     "x": 0.541,
+     "z": -0.38,
+     "yawDeg": 90.0,
+     "offsetS": 1.5,
+     "scale": 0.62
+    }
+   }
+  },
+  "yankBack": {
+   "anchor": "reacher",
+   "notes": "VilReachPinned + VilNraYankBack (08-5): Geng on hands and knees at the trench lip reaching forward; Yaowa kneels 0.75 m behind him facing the same way, grabs his belt at 1.40 s of both clips (same start) and hauls: both roots end about 0.6 m further back (manifest root.end: Geng 0.66, Yaowa 0.58), sat back on the heels in the trench.",
+   "actors": {
+    "reacher": {
+     "rig": "TengxianNra02",
+     "clip": "VilReachPinned",
+     "x": 0,
+     "z": 0,
+     "yawDeg": 0
+    },
+    "yanker": {
+     "rig": "TengxianNra02",
+     "clip": "VilNraYankBack",
+     "x": 0,
+     "z": 0.75,
+     "yawDeg": 0
+    }
+   }
+  },
+  "carryOnBack": {
+   "anchor": "carrier",
+   "notes": "VilNraCarryOnBack + VilRideOnBack (07): same root, same yaw, same phase, both 1.2 s loops, referenceSpeedMps 0.9. The rider's pelvis rides 0.22 m behind and 0.98 m above the carrier root, his chest on the carrier's back, arms over the shoulders, knees forward round the carrier's hips (the carrier's hands under them).",
+   "actors": {
+    "carrier": {
+     "rig": "TengxianNra02",
+     "clip": "VilNraCarryOnBack",
+     "x": 0,
+     "z": 0,
+     "yawDeg": 0,
+     "referenceSpeedMps": 0.9
+    },
+    "rider": {
+     "rig": "TengxianNra02",
+     "clip": "VilRideOnBack",
+     "x": 0,
+     "z": 0,
+     "yawDeg": 0,
+     "referenceSpeedMps": 0.9
+    }
+   }
+  },
+  "clingHem": {
+   "anchor": "clinger",
+   "notes": "VilClingHem (09-6): the one she hangs on (any standing clip) is 0.45 m ahead facing the same way; her fists are on his coat at the small of his back, 0.95 m up (full-size rig; at scale .62 the fists are 0.59 m up and 0.28 m ahead -- put the child 0.17 m closer).",
+   "actors": {
+    "clinger": {
+     "rig": "TengxianNra02",
+     "clip": "VilClingHem",
+     "x": 0,
+     "z": 0,
+     "yawDeg": 0
+    },
+    "front": {
+     "rig": "TengxianNra02",
+     "clip": null,
+     "x": 0.0,
+     "z": -0.45,
+     "yawDeg": 0
+    }
+   }
+  },
+  "hugLegs": {
+   "anchor": "nier",
+   "notes": "VilHugLegs (10-5): Geng stands facing her 0.55 m ahead (full-size rig); the child body at scale 0.62 reaches 0.34 m, so place him 0.34 m ahead of her root; her arms close round his legs 0.50 m up at 1.0 s (scaled 0.31).",
+   "actors": {
+    "nier": {
+     "rig": "TengxianNra02",
+     "clip": "VilHugLegs",
+     "x": 0,
+     "z": 0,
+     "yawDeg": 0,
+     "scale": 0.62
+    },
+    "geng": {
+     "rig": "TengxianNra02",
+     "clip": null,
+     "x": 0.0,
+     "z": -0.341,
+     "yawDeg": 180
+    }
+   }
+  },
+  "sitEdge": {
+   "anchor": "seat",
+   "seatHeightM": 0.9,
+   "notes": "VilSitEdge: the root on the ground under the pelvis; the edge (cart tail) runs left-right through the root at 0.90 m, the cart body behind (+z). No grounding (groundWeight 0): feet dangle."
+  },
+  "dogHole": {
+   "anchor": "crawler",
+   "holeHeightM": 0.4,
+   "rootMotionM": 1.5,
+   "notes": "VilCrawlHole: the hole (0.40 m clear) spans 0.4-1.0 m ahead of the start root; he crawls 1.5 m forward and comes up into a squat (manifest root.end)."
+  },
+  "cellarPit": {
+   "anchor": "climber",
+   "pitDepthM": 1.5,
+   "notes": "VilHandsUpClimbOut: the root is on the rim; the pit floor is 1.5 m down, reached by a 45 deg earth ramp from the rim (y 0) back to 1.5 m behind. He starts on the pit floor 1.75 m behind the root (root.start) and ends standing on the rim, hands up."
+  },
+  "villageWall": {
+   "anchor": "climber",
+   "wallHeightM": 2.2,
+   "wallFaceM": 0.35,
+   "wallThickM": 0.3,
+   "notes": "VilIjaClimbWall: the wall face 0.35 m ahead of the root, 2.20 m high, 0.30 m thick; he lands 1.05 m ahead of the root (root.end)."
+  },
+  "gate": {
+   "anchor": "ija",
+   "gateM": 0.55,
+   "notes": "VilIjaGateSmash: the gate plane 0.55 m ahead; butt strikes 0.45 / 0.95 s, kick 1.6 s."
+  },
+  "door": {
+   "anchor": "opener",
+   "doorM": 0.45,
+   "boltHeightM": 1.25,
+   "notes": "VilUnboltDoor: the door plane 0.45 m ahead, the bolt handle 1.25 m up near the centre; it slides 0.25 m to his left (1.3 s), the push (1.7 s) swings the door away."
+  },
+  "vatDoor": {
+   "anchor": "geng",
+   "notes": "VilPushVat: the vat (radius 0.32, 0.90 m high) stands 0.55 m ahead, 0.05 m right of the root in front of the door (0.70 m ahead); it is pushed 0.60 m to his right (0.4-1.4 s), then the bolt (2.6 s) and the door (3.0 s)."
+  }
+ },
+ "props": {
+  "grenade": {
+   "notes": "VilIjaHelmetGrenadeLob: Type 91 grenade in the right fist (centre, axis = fuze cap direction, up); flies into the pit 1.5 m ahead / 1.5 m down after the release (1.2 s), hidden from 1.7 s."
+  },
+  "weapon": {
+   "notes": "The IJA / NRA rifle: origin = gripR (wrist of the stock), axis = muzzle direction, up."
+  }
+ },
+ "models": [
+  {
+   "id": "TengxianNra02",
+   "file": "Animation_TengxianNra02PrevizVillage.json",
+   "sha256": "e3c6f9dc3ebe8ac7cf04a8f912f1de4f66ecdf624369d3ab029be88eb088c862",
+   "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\PrevizVillage_20261019\\Scene_TengxianNra02PrevizVillage.blend",
+   "contactPoints": {},
+   "clips": [
+    {
+     "clip": "VilCrouchHold",
+     "frames": 73,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0003,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0,
+       0.1096,
+       0.0,
+       0.2832
+      ],
+      "end": [
+       0.0,
+       0.1096,
+       0.0,
+       0.2832
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.0
+      ],
+      [
+       "R",
+       0,
+       3.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilDuckProne",
+     "frames": 49,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0715,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.15407,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       -0.0,
+       0.2741,
+       0.0,
+       0.265
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.2
+      ],
+      [
+       "R",
+       0,
+       0.2
+      ]
+     ],
+     "kneePlants": [
+      [
+       "L",
+       1.05,
+       2.0
+      ],
+      [
+       "R",
+       1.05,
+       2.0
+      ]
+     ],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilSitEdge",
+     "frames": 59,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": -0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0,
+       0.0,
+       1.0005
+      ],
+      "end": [
+       -0.0,
+       0.0,
+       0.0,
+       1.0005
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilPanicRun",
+     "frames": 18,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0407,
+     "floorCorrectionMin": -0.00148,
+     "floorCorrectionMax": 0.0523,
+     "root": {
+      "start": [
+       -0.0,
+       -0.0183,
+       0.0,
+       0.8306
+      ],
+      "end": [
+       -0.0,
+       -0.0183,
+       0.0,
+       0.8306
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilCrawlHole",
+     "frames": 73,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.29181,
+     "pelvisMaxStepM": 0.0578,
+     "floorCorrectionMin": -3e-05,
+     "floorCorrectionMax": 0.20136,
+     "root": {
+      "start": [
+       0.0,
+       0.0,
+       0.0,
+       0.404
+      ],
+      "end": [
+       0.0,
+       -1.5183,
+       0.0,
+       0.3996
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilHandsUpClimbOut",
+     "frames": 97,
+     "footSlideM": 0.0124,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0709,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0136,
+     "root": {
+      "start": [
+       -0.0,
+       1.7375,
+       0.0,
+       -0.6756
+      ],
+      "end": [
+       0.0,
+       -0.137,
+       0.0,
+       0.819
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.3
+      ],
+      [
+       "L",
+       0.65,
+       1.1
+      ],
+      [
+       "L",
+       1.45,
+       1.95
+      ],
+      [
+       "R",
+       0.0,
+       0.7
+      ],
+      [
+       "R",
+       1.05,
+       1.5
+      ],
+      [
+       "R",
+       1.85,
+       2.35
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilStabbedFall",
+     "frames": 59,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1086,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.26553,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       -0.2741,
+       0.1279,
+       5.73,
+       0.3613
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.5
+      ],
+      [
+       "R",
+       0,
+       0.5
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilDraggedByArm",
+     "frames": 30,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0115,
+     "floorCorrectionMin": 0.03517,
+     "floorCorrectionMax": 0.06131,
+     "root": {
+      "start": [
+       0.0,
+       0.0,
+       -0.0,
+       0.1839
+      ],
+      "end": [
+       0.0,
+       0.0,
+       -0.0,
+       0.1839
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilKneelCrawlToPit",
+     "frames": 59,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.11775,
+     "pelvisMaxStepM": 0.0124,
+     "floorCorrectionMin": 0.01638,
+     "floorCorrectionMax": 0.04869,
+     "root": {
+      "start": [
+       0.0082,
+       0.002,
+       0.0,
+       0.4595
+      ],
+      "end": [
+       0.0082,
+       0.002,
+       0.0,
+       0.4595
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilCowerWhimper",
+     "frames": 49,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.1096,
+       0.0,
+       0.3106
+      ],
+      "end": [
+       -0.0,
+       0.1096,
+       0.0,
+       0.3106
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.0
+      ],
+      [
+       "R",
+       0,
+       2.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilUnboltDoor",
+     "frames": 64,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.001,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0527,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       -0.0,
+       -0.201,
+       0.0,
+       0.8099
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       1.55
+      ],
+      [
+       "R",
+       0,
+       2.6
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilClingHem",
+     "frames": 49,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 1e-05,
+     "pelvisMaxStepM": 0.0012,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       -0.0183,
+       0.0,
+       0.7779
+      ],
+      "end": [
+       -0.0,
+       -0.0183,
+       0.0,
+       0.7779
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.0
+      ],
+      [
+       "R",
+       0,
+       2.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilBiteWrist",
+     "frames": 40,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0226,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       -0.0,
+       -0.1279,
+       0.0,
+       0.7276
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.08
+      ],
+      [
+       "R",
+       0,
+       1.6
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "lookErrorDeg": 178.34,
+     "headTurnDeg": 50.0
+    },
+    {
+     "clip": "VilHugLegs",
+     "frames": 49,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.01109,
+     "pelvisMaxStepM": 0.0846,
+     "floorCorrectionMin": -0.00389,
+     "floorCorrectionMax": 0.12346,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       -0.0146,
+       -0.3086,
+       0.0,
+       0.5029
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.1
+      ],
+      [
+       "R",
+       0.0,
+       0.3
+      ]
+     ],
+     "kneePlants": [
+      [
+       "L",
+       0.95,
+       2.0
+      ],
+      [
+       "R",
+       0.95,
+       2.0
+      ]
+     ],
+     "kneeSlideM": 0.0059
+    },
+    {
+     "clip": "VilPushVat",
+     "frames": 78,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.04,
+     "gripSolveErrorM": 0.05506,
+     "pelvisMaxStepM": 0.0705,
+     "floorCorrectionMin": -0.01221,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       -0.0,
+       -0.201,
+       0.0,
+       0.8099
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0.0,
+       0.45
+      ],
+      [
+       "R",
+       0.75,
+       1.55
+      ],
+      [
+       "L",
+       0.0,
+       0.2
+      ],
+      [
+       "L",
+       0.45,
+       1.75
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilReachPinned",
+     "frames": 59,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.17104,
+     "pelvisMaxStepM": 0.0896,
+     "floorCorrectionMin": 0.01638,
+     "floorCorrectionMax": 0.04991,
+     "root": {
+      "start": [
+       0.0,
+       -0.0167,
+       0.0,
+       0.4608
+      ],
+      "end": [
+       -0.0,
+       0.6564,
+       0.0,
+       0.3489
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [
+      [
+       "L",
+       0,
+       1.4
+      ],
+      [
+       "R",
+       0,
+       1.4
+      ]
+     ],
+     "kneeSlideM": 0.0097
+    },
+    {
+     "clip": "VilNraYankBack",
+     "frames": 59,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0333,
+     "gripSolveErrorM": 0.03332,
+     "pelvisMaxStepM": 0.0881,
+     "floorCorrectionMin": 0.01638,
+     "floorCorrectionMax": 0.08507,
+     "root": {
+      "start": [
+       -0.0,
+       0.0172,
+       0.0,
+       0.4544
+      ],
+      "end": [
+       -0.0,
+       0.5774,
+       0.0,
+       0.3575
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [
+      [
+       "L",
+       0,
+       1.4
+      ],
+      [
+       "R",
+       0,
+       1.4
+      ]
+     ],
+     "kneeSlideM": 0.07
+    },
+    {
+     "clip": "VilNraCarryOnBack",
+     "frames": 30,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0276,
+     "floorCorrectionMin": -2e-05,
+     "floorCorrectionMax": 0.04749,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8136
+      ],
+      "end": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8136
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilRideOnBack",
+     "frames": 30,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.005,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": -0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.22,
+       0.0,
+       0.991
+      ],
+      "end": [
+       -0.0,
+       0.22,
+       0.0,
+       0.991
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilNraWaveCharge",
+     "frames": 40,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0584,
+     "gripSolveErrorM": 0.05838,
+     "pelvisMaxStepM": 0.0865,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0548,
+       0.0,
+       0.4385
+      ],
+      "end": [
+       0.0001,
+       -0.7957,
+       0.0,
+       0.787
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.75
+      ],
+      [
+       "L",
+       0.98,
+       1.32
+      ],
+      [
+       "R",
+       0.0,
+       0.45
+      ],
+      [
+       "R",
+       0.7,
+       1.02
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilIjaBayonetThrust",
+     "frames": 35,
+     "footSlideM": 0.0187,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0921,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0249,
+       -0.0541,
+       0.0,
+       0.7998
+      ],
+      "end": [
+       0.0249,
+       -0.0541,
+       0.0,
+       0.7998
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       1.4
+      ],
+      [
+       "L",
+       0,
+       0.18
+      ],
+      [
+       "L",
+       0.4,
+       1.05
+      ],
+      [
+       "L",
+       1.28,
+       1.4
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "probes": {
+      "tipToBelly": [
+       0.0008,
+       0.4941
+      ]
+     }
+    },
+    {
+     "clip": "VilIjaDragByArm",
+     "frames": 30,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0297,
+     "gripSolveErrorM": 0.02971,
+     "pelvisMaxStepM": 0.0042,
+     "floorCorrectionMin": -0.01012,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0041,
+       0.1102,
+       0.0,
+       0.623
+      ],
+      "end": [
+       -0.0048,
+       0.1104,
+       0.0,
+       0.623
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilIjaHelmetGrenadeLob",
+     "frames": 49,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0906,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0379,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       -0.0,
+       -0.0731,
+       0.0,
+       0.819
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       1.0
+      ],
+      [
+       "R",
+       0,
+       2.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilIjaBayonetLiftFling",
+     "frames": 54,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.019,
+     "gripSolveErrorM": 0.01899,
+     "pelvisMaxStepM": 0.0837,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.057,
+       -0.0988,
+       0.0,
+       0.7515
+      ],
+      "end": [
+       0.057,
+       -0.0988,
+       0.0,
+       0.7515
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.2
+      ],
+      [
+       "R",
+       0,
+       2.2
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilIjaPissStand",
+     "frames": 73,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0012,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.0
+      ],
+      [
+       "R",
+       0,
+       3.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilIjaPinBayonet",
+     "frames": 73,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0264,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0146,
+     "floorCorrectionMin": 0.01638,
+     "floorCorrectionMax": 0.01638,
+     "root": {
+      "start": [
+       -0.0,
+       0.0443,
+       0.0,
+       0.4352
+      ],
+      "end": [
+       0.0076,
+       0.0813,
+       0.0,
+       0.4371
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [
+      [
+       "L",
+       0,
+       3.0
+      ],
+      [
+       "R",
+       0,
+       3.0
+      ]
+     ],
+     "kneeSlideM": 0.0216
+    },
+    {
+     "clip": "VilIjaShoulderCharge",
+     "frames": 35,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0518,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0183,
+       0.0183,
+       0.0,
+       0.7551
+      ],
+      "end": [
+       0.0183,
+       -1.2,
+       0.0,
+       0.7345
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.35
+      ],
+      [
+       "L",
+       0.6,
+       0.95
+      ],
+      [
+       "R",
+       0.0,
+       0.05
+      ],
+      [
+       "R",
+       0.3,
+       0.65
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilIjaGateSmash",
+     "frames": 59,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0341,
+     "gripSolveErrorM": 0.03407,
+     "wallPenetrationM": 0.1687,
+     "pelvisMaxStepM": 0.06,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.057,
+       -0.0988,
+       0.0,
+       0.7515
+      ],
+      "end": [
+       0.057,
+       -0.0988,
+       0.0,
+       0.7515
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.4
+      ],
+      [
+       "R",
+       0,
+       1.3
+      ],
+      [
+       "R",
+       2.05,
+       2.4
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "probes": {
+      "buttToGate": [
+       0.0091,
+       0.4552
+      ]
+     }
+    },
+    {
+     "clip": "VilIjaClimbWall",
+     "frames": 83,
+     "footSlideM": 0.0377,
+     "contactErrorM": 0.1177,
+     "gripSolveErrorM": 0.11774,
+     "wallPenetrationM": 0.0,
+     "pelvisMaxStepM": 0.19,
+     "floorCorrectionMin": -0.00137,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       0.0,
+       -1.05,
+       0.0,
+       0.8236
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.22
+      ],
+      [
+       "R",
+       0,
+       0.2
+      ],
+      [
+       "L",
+       3.26,
+       3.4
+      ],
+      [
+       "R",
+       3.26,
+       3.4
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "VilIjaShoutPoint",
+     "frames": 49,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0035,
+     "floorCorrectionMin": 0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "end": [
+       -0.0,
+       0.0183,
+       0.0,
+       0.8373
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.0
+      ],
+      [
+       "R",
+       0,
+       2.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    }
+   ],
+   "clipIds": [
+    "VilCrouchHold",
+    "VilDuckProne",
+    "VilSitEdge",
+    "VilPanicRun",
+    "VilCrawlHole",
+    "VilHandsUpClimbOut",
+    "VilStabbedFall",
+    "VilDraggedByArm",
+    "VilKneelCrawlToPit",
+    "VilCowerWhimper",
+    "VilUnboltDoor",
+    "VilClingHem",
+    "VilBiteWrist",
+    "VilHugLegs",
+    "VilPushVat",
+    "VilReachPinned",
+    "VilNraYankBack",
+    "VilNraCarryOnBack",
+    "VilRideOnBack",
+    "VilNraWaveCharge",
+    "VilIjaBayonetThrust",
+    "VilIjaDragByArm",
+    "VilIjaHelmetGrenadeLob",
+    "VilIjaBayonetLiftFling",
+    "VilIjaPissStand",
+    "VilIjaPinBayonet",
+    "VilIjaShoulderCharge",
+    "VilIjaGateSmash",
+    "VilIjaClimbWall",
+    "VilIjaShoutPoint"
+   ]
+  }
+ ]
+}

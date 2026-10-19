@@ -32,6 +32,16 @@
 //     手里的手榴弹由 Actor._UpdateInfantryProps 照游戏原样挂在片段的 grenade 挂点上、脱手帧后藏掉；飞出去的那颗由预演自己画。
 //     骨架上没有这个片段 → 记进 missingClips，照原生动画。
 //   · Probe 多给头 / 骨盆的世界高度（headY / pelvisY）、两脚的世界坐标（feet）与倒地片段（deathVariant），量桥下净空、被子范围用。
+//
+// 2026-10-19（白盒预演补齐，运行时包）：
+//   · 百姓 / 小孩（kind civilian / child、side civ）默认换成**能放动作库片段的骨骼身体**：用 NRA 士兵的骨架身体（TengxianNra02，
+//     预演额外动作库都烘在它上面、五具骨架骨名一致所以哪具都能播）、不拿武器、走空手步态，外观改成能一眼认出是老百姓：
+//     军装布换成百姓的深蓝 / 黑 / 土布色（Create 的 uniformPalette 直接给十六进制色，Script_UniformColors 认数字）、
+//     帽徽 / 腰间枪套 / 胸前那条带子藏掉（CIVILIAN_RIG_LOOK.hideMaterials，按材质名）。军帽本身与军装是同一个网格、同一张图集，
+//     摘不掉——占位接受。child 照旧整体缩到 0.62。只在白盒编辑器里当占位（不进 Data_CharacterSelection、不影响游戏正片）。
+//     旧的程序化 tzm 身体留作开关：单位 / 预演 spawn 写 `body: "procedural"`（§3）；缺省 `body: "rig"`（BLOCKOUT_PUPPETS.civilianBody）。
+//   · 军官（nraOfficer / ijaOfficer）本来就是骨骼身体（NRA05 / IJA01），片段并进它们的骨架后照样能播，运行时不拦。
+//   · Probe 再多给 body（"rig" / "procedural"）、rigged、两手的世界坐标（handR / handL）、mixerTime（量慢动作里动画是不是真慢了）。
 //   · lie:"along" 摆法改成「头、骨盆、两脚」的包围框中心落在单位位置上、身体轴取骨盆→头 ±8° 里最窄的方向，倒地片段固定用
 //     腿蜷得最窄的 DeathCollapseC（LIE_DEATH_VARIANT）；倒着的人换成 lie:"along" 时重造一次。冬瓜在 0.7 m 宽的单被上不再伸出一只脚。
 
@@ -65,6 +75,8 @@ export const BLOCKOUT_PUPPETS = Object.freeze({
   farAnimEvery: 3,
   shadowM: 25,
   childScale: 0.62,
+  /** 百姓 / 小孩的身体缺省："rig" = NRA 骨架占位身体（能放片段）；"procedural" = 旧的程序化 tzm 身体。单位字段 body 可覆盖。 */
+  civilianBody: "rig",
   tank: { w: 2.18, d: 5.75, h: 1.2, turretW: 1.5, turretD: 1.7, turretH: 0.75, barrel: 1.6 },
   litter: { w: 0.7, d: 2.1, y: 0.78, groundY: 0.12, bearerGapM: 0.55 },
   cart: { w: 1.5, d: 2.4, h: 0.55, y: 0.75, wheel: 0.62 },
@@ -72,6 +84,23 @@ export const BLOCKOUT_PUPPETS = Object.freeze({
 });
 
 const DEG = Math.PI / 180;
+
+/**
+ * 百姓的骨骼占位身体长什么样（2026-10-19）：NRA 士兵骨架（modelVariant 1 = TengxianNra02，预演动作库烘在它上面）、
+ * 军装布换成百姓色（按种子抽一种）、帽徽 / 腰间枪套 / 胸前带子按材质名藏掉。
+ */
+export const CIVILIAN_RIG_LOOK = Object.freeze({
+  bodyKind: "nra",
+  modelVariant: 1,
+  cloth: Object.freeze([0x2a3147, 0x232326, 0x5b4b36, 0x3a4a5e]),   // 深蓝、黑、土布、靛青
+  hideMaterials: Object.freeze(["Material #1721585500", "Material #29", "Material #1721585343"]),
+});
+export const BLOCKOUT_BODY_MODES = Object.freeze(["rig", "procedural"]);
+
+/** 这个单位的百姓身体用哪种：单位 / spawn 的 body 字段 → 缺省 BLOCKOUT_PUPPETS.civilianBody。 */
+export function CivilianBodyMode(unit) {
+  return BLOCKOUT_BODY_MODES.includes(unit?.body) ? unit.body : BLOCKOUT_PUPPETS.civilianBody;
+}
 
 function ActorKind(unit) {
   // 定妆角色按定妆表的人物种类（翻译官穿 NRA06，阵营却是 ija）
@@ -174,12 +203,19 @@ export class BlockoutPuppets {
     // 定妆角色：固定模型号与面部蒙皮，种子也按 castId 定（同一个人每一帧一个样子）；不从对象池拿（池里的人身高脸型是预建时抽的）
     const cast = slot === "main" && unit.castId ? SpeakingCastOptions(unit.castId) : {};
     const seed = cast.castId ? HashSeed(`cast:${cast.castId}`) : HashSeed(`${unit.id}:${slot}`);
+    // 百姓的骨骼占位身体（2026-10-19，文件头）：造一个空手的 NRA02，布换百姓色；body:"procedural" 还是旧的 tzm 身体
+    const civilianRig = kind === "civilian" && CivilianBodyMode(unit) === "rig";
+    const bodyKind = civilianRig ? CIVILIAN_RIG_LOOK.bodyKind : kind;
+    const look = civilianRig ? { modelVariant: CIVILIAN_RIG_LOOK.modelVariant, noPool: true, weapon: null,
+      uniformPalette: CIVILIAN_RIG_LOOK.cloth[seed % CIVILIAN_RIG_LOOK.cloth.length] } : {};
+    if (civilianRig) weapon = null;
     try {
-      actor = this.actorFactory.Create(kind, { seed, weapon, ...cast, ...(cast.castId ? { noPool: true } : {}) });
+      actor = this.actorFactory.Create(bodyKind, { seed, weapon, ...cast, ...(cast.castId ? { noPool: true } : {}), ...look });
     } catch (error) {
       console.warn("[BlockoutPuppets] actor create failed", unit.id, error);
       return null;
     }
+    if (civilianRig) this._DressCivilian(actor);
     if (unit.kind === "child") actor.root.scale.setScalar(BLOCKOUT_PUPPETS.childScale);
     this.root.add(actor.root);
     // 步态安装器吃一个「假士兵」：只要 id / actor / position / yaw 与几个开关。
@@ -187,11 +223,24 @@ export class BlockoutPuppets {
       side: unit.side, missionCombatAlert: !!unit.aim, castId: cast.castId || null };
     try {
       // 步态库是异步下载的：下不来就用缺省动作，不能留一条未处理的 rejection。
-      if (!weapon && kind !== "civilian") SetRelaxedGait(soldier, "unarmed");
-      else if (kind === "nra" || kind === "nraOfficer") InstallAllyGait(soldier)?.catch?.(() => {});
-      else if (kind === "ija") SetRelaxedGait(soldier, unit.aim ? null : "alert");
+      if (!weapon && bodyKind !== "civilian") SetRelaxedGait(soldier, "unarmed");
+      else if (bodyKind === "nra" || bodyKind === "nraOfficer") InstallAllyGait(soldier)?.catch?.(() => {});
+      else if (bodyKind === "ija") SetRelaxedGait(soldier, unit.aim ? null : "alert");
     } catch (error) { /* 同上 */ }
-    return { actor, soldier, kind, slot, animDt: 0, castId: cast.castId || null, baseWeapon: actor.weaponId ?? weapon ?? null, lieLocal: null };
+    return { actor, soldier, kind, bodyKind, slot, animDt: 0, castId: cast.castId || null, baseWeapon: actor.weaponId ?? weapon ?? null, lieLocal: null,
+      body: actor.characterRig ? "rig" : "procedural" };
+  }
+
+  /** 百姓占位身体的外观：按材质名藏掉帽徽 / 枪套 / 胸前带子（军帽与军装同一网格，摘不掉）。布色在 Create 时就换了。 */
+  _DressCivilian(actor) {
+    const rig = actor.characterRig;
+    if (!rig?.root) return;
+    const hide = new Set(CIVILIAN_RIG_LOOK.hideMaterials);
+    rig.root.traverse((object) => {
+      if (!object.isMesh) return;
+      const names = (Array.isArray(object.material) ? object.material : [object.material]).map(m => m?.name);
+      if (names.length && names.every(n => hide.has(n))) { object.visible = false; object.userData.blockoutCivilianHidden = true; }
+    });
   }
 
   _MakeBody(unit) {
@@ -310,6 +359,8 @@ export class BlockoutPuppets {
         || (puppet.down && unit.state !== "down")
         // 倒着的人换成 lie:"along"（02-2 → 02-3 冬瓜挪上被子）：重造，好按 LIE_DEATH_VARIANT 重新倒一次
         || (puppet.down && unit.state === "down" && unit.lie === "along" && (puppet.unit.lie ?? null) !== "along")
+        // 百姓身体种类变了（rig ↔ procedural，2026-10-19）
+        || CivilianBodyMode(puppet.unit) !== CivilianBodyMode(unit)
         || (puppet.noActor && wantActors > 0) || (!puppet.noActor && wantActors === 0 && puppet.humans.length > 0));
       if (stale) { this._Destroy(puppet); this.puppets.delete(unit.id); puppet = null; }
       if (!puppet) { puppet = this._Create(unit, wantActors); this.puppets.set(unit.id, puppet); }
@@ -746,7 +797,7 @@ export class BlockoutPuppets {
     const human = puppet.humans[0];
     const rig = human?.actor.characterRig;
     const ground = puppet.unit.kind === "tank" ? TankGroundY(this.groundAt, puppet.x, puppet.z, puppet.yawDeg) : this.groundAt(puppet.x, puppet.z);
-    let pelvisY = null, headY = null, pelvisXZ = null, headXZ = null;
+    let pelvisY = null, headY = null, pelvisXZ = null, headXZ = null, handR = null, handL = null;
     const feet = [];
     try {
       human?.actor.root.updateWorldMatrix(true, true);
@@ -756,6 +807,9 @@ export class BlockoutPuppets {
         const bone = rig?.bones?.[name];
         if (bone) { const v = bone.getWorldPosition(new THREE.Vector3()); feet.push({ x: v.x, y: v.y, z: v.z }); }
       }
+      // 两手的世界坐标（2026-10-19：量片段是不是真把手举起来 / 放下去了）
+      if (rig?.bones?.handR) { const v = rig.bones.handR.getWorldPosition(new THREE.Vector3()); handR = { x: v.x, y: v.y, z: v.z }; }
+      if (rig?.bones?.handL) { const v = rig.bones.handL.getWorldPosition(new THREE.Vector3()); handL = { x: v.x, y: v.y, z: v.z }; }
     } catch (error) { /* 取证不影响运行 */ }
     // 头相对骨盆的世界朝向（yaw 口径）：lie:"along" 时应当 ≈ yawDeg
     const headYawDeg = pelvisXZ && headXZ ? Math.atan2(-(headXZ.x - pelvisXZ.x), -(headXZ.z - pelvisXZ.z)) / DEG : null;
@@ -772,6 +826,11 @@ export class BlockoutPuppets {
       headY, pelvisY, feet, throwing: !!human?.throwing, deathVariant: rig?.deathVariantId ?? null,
       grenadeVisible: !!human?.actor.grenadeGroup?.visible,
       throwClipS: rig?.clipById?.get?.("GrenadeThrow")?.duration ?? null,
+      // 2026-10-19：身体种类、两手、动画时钟（慢动作取证）、开场动作层正在播的片段与进度
+      body: human?.body ?? null, bodyKind: human?.bodyKind ?? null, rigged: !!rig, handR, handL,
+      mixerTime: rig?.mixer?.time ?? null,
+      shownClip: rig?.openingStoryboardState?.clipId ?? null, shownClipSeconds: rig?.openingStoryboardState?.seconds ?? null,
+      hiddenParts: rig ? (() => { let n = 0; rig.root.traverse(o => { if (o.userData?.blockoutCivilianHidden) n++; }); return n; })() : 0,
     };
   }
 

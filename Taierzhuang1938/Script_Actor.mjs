@@ -3802,7 +3802,10 @@ export class ActorFactory {
   Create(kind, options = {}) {
     const resolved = KIND_SPEC[kind] ? kind : "nra";
     const actor = this._FromPool(resolved, options) || new Actor(this, resolved, options);
-    ApplyNraUniform(actor.characterRig?.root, NraUniformPalette(resolved, actor.modelVariant, options.castId));
+    // options.uniformPalette（2026-10-19，白盒编辑器的百姓占位身体用）：配色名或十六进制色，覆盖按 kind / castId 挑的军装色；
+    // 不给 = 老路，游戏正片一个字不变。
+    const palette = options.uniformPalette !== undefined ? options.uniformPalette : NraUniformPalette(resolved, actor.modelVariant, options.castId);
+    ApplyNraUniform(actor.characterRig?.root, palette);
     // 合批层（Script_ActorBatch）在这里挂钩：造出来就登记，Dispose 时摘掉。
     // 挂在工厂上而不是各个调用点上 —— 人物有五个建造口（AI／过场／人群／
     // 编辑器两处），漏掉一个的后果是那批人在画面上整个消失，而不是掉帧。

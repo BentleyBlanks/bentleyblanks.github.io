@@ -14,6 +14,9 @@
 //     （抛物线 + 拖尾）也由它画，任何画质都画。游戏本身的爆炸表现不动。同一轮补了烟（smoke 事件）与枪口火（muzzle 事件），
 //     同爆炸只在白盒特效关时画，Seek 也看得见。
 //   · 播完 / 中断：交还演员与相机，按 then 跳关键帧（直接到位）。
+//   · 2026-10-19：飞机（段里的 aircraft[]，Script_EditorBlockoutPrevizAircraft：借游戏机队的模型克隆、按 PrevizPlan 的纯函数取样摆位、
+//     引擎声 MoveVoice 跟着机身、扫射的弹着点交给简易特效当土点画）与慢动作（段里的 slowmo[]：预演时钟按 PrevizTimeScale 走，
+//     人物、片段、特效、飞机、镜头都按预演时间 t 求值所以一起慢；台词照常速；音效照常；进度条按预演时间）。
 //
 // Seek(t) 暂停在 t 秒并确定性求值（演员、镜头、遮罩、字幕、嘴、信号、持续的烟；一次性的爆炸 / 枪口火 / 音效不补放），
 // 同一 t 两次截图一样，供验收。Debug.Blockout.Previz：Has / Play / Stop / Seek / Resume / State（+ Reload）。
@@ -24,8 +27,9 @@
 import * as THREE from "three";
 import {
   ValidateBlockoutPreviz, NormalizeBlockoutPreviz, PrevizSequenceFor, PrevizSequenceDuration, SamplePrevizActor, SamplePrevizCamera,
-  PrevizOverlays, PrevizShakeOffset, PrevizActiveLines, PrevizSignalsAt, PREVIZ_EYE_HEIGHT, PREVIZ_DEFAULTS,
+  PrevizOverlays, PrevizShakeOffset, PrevizActiveLines, PrevizSignalsAt, PREVIZ_EYE_HEIGHT, PREVIZ_DEFAULTS, PrevizTimeScale, PrevizWallTime,
 } from "./Script_EditorBlockoutPrevizPlan.mjs";
+import { BlockoutPrevizAircraft } from "./Script_EditorBlockoutPrevizAircraft.mjs";
 import { KeyframeIndex } from "./Script_EditorBlockoutConfig.mjs";
 import { TankGroundY } from "./Script_EditorBlockoutPuppets.mjs";
 import { DialoguePlayer } from "./Script_DialoguePlayer.mjs";
@@ -103,8 +107,31 @@ export class BlockoutPreviz {
     this.fx = null;
     try { this.fx = new BlockoutPrevizFx({ post: editor.host.post, scene: editor.host.scene }); }
     catch (error) { console.warn("[BlockoutPreviz] 简易爆炸层建不起来", error); }
+    // 飞机（2026-10-19）：模型借游戏机队，声音走 PREVIZ_SFX 别名表（planeDrone 是持续声，起一条 voice 逐帧搬）
+    this.air = null;
+    try {
+      this.air = new BlockoutPrevizAircraft({
+        scene: editor.host.scene, aircraft: () => this.host.aircraft,
+        sfx: {
+          Play: (name, at) => this.PlayCue(name, at ? this.CuePosition(at) : null, 1),
+          StartLoop: (name, at) => this.StartLoopCue(name, this.CuePosition(at)),
+          MoveLoop: (voice, at, velocity) => { this.host.audio?.MoveVoice?.(voice, this.CuePosition(at), { velocity }); },
+          StopLoop: (voice) => { this.host.audio?.StopVoice?.(voice, 1.0); },
+        },
+      });
+    } catch (error) { console.warn("[BlockoutPreviz] 飞机层建不起来", error); }
     this.BuildDom();
   }
+
+  /** 音效位置：{x,y,z} 直接用；{x,z,ground:true} = 地面 + 0.2（弹着点）；{x,z} = 地面 + 1。 */
+  CuePosition(at) {
+    if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.z)) return null;
+    if (Number.isFinite(at.y) && !at.ground) return { x: at.x, y: at.y, z: at.z };
+    return { x: at.x, y: this.editor.standAt(at.x, at.z) + (at.ground ? 0.2 : 1), z: at.z };
+  }
+
+  /** 预演时钟此刻走多快（慢动作里 < 1）；没在播 = 1。演员层按它缩 dt（Script_EditorBlockout.Update）。 */
+  TimeScale() { return this.run ? PrevizTimeScale(this.run.seq, this.run.t) : 1; }
 
   get host() { return this.editor.host; }
   get game() { return this.editor.game; }
@@ -225,8 +252,10 @@ export class BlockoutPreviz {
     const run = this.run = {
       seq, index, kf, durationS, t: 0, prevT: -1e-6, paused: false, smoke: new Map(), signals: null,
       units: new Map(kf.units.map(u => [u.id, u])), actors: [], done: null, finished: false, speaking: new Map(),
+      timeScale: 1, wallT: 0,
     };
     run.promise = new Promise(resolve => { run.done = resolve; });
+    this.air?.Begin(seq);
     for (const entry of seq.actors) {
       if (entry.spawn) {
         const spawn = { id: entry.id, side: "nra", kind: "soldier", stance: "stand", yawDeg: 0, aim: false, state: "alive", ...entry.spawn };
@@ -327,6 +356,7 @@ export class BlockoutPreviz {
     run.smoke.clear();
     this.editor.puppets.ReleaseDrive();
     this.fx?.Clear();
+    this.air?.Clear();
     this.editor.SetPrevizSignals(null);
     this.host.SetViewmodelVisible?.(true);
     document.body.classList.remove("blockoutPreviz");
@@ -359,6 +389,7 @@ export class BlockoutPreviz {
     this.dialogue?.StopAll();
     run.t = Math.max(0, Math.min(run.durationS, Number(t) || 0));
     run.prevT = run.t;
+    run.wallT = PrevizWallTime(run.seq, run.t);
     this.Evaluate(run.t, { fire: false, seek: true });
     return this.State();
   }
@@ -379,7 +410,11 @@ export class BlockoutPreviz {
     if (!run) return;
     if (!run.paused) {
       const prev = run.t;
-      run.t = Math.min(run.durationS, run.t + dt);
+      // 慢动作：预演时钟按这一刻的倍率走（人物 / 片段 / 特效 / 飞机 / 镜头都按预演时间求值，一起慢）；台词照常速
+      const scale = PrevizTimeScale(run.seq, run.t);
+      run.timeScale = scale;
+      run.t = Math.min(run.durationS, run.t + dt * scale);
+      run.wallT += dt;
       run.prevT = prev;
       this.dialogue?.Update(dt);
       this.Evaluate(run.t, { fire: true, from: prev });
@@ -414,11 +449,14 @@ export class BlockoutPreviz {
     const lines = PrevizActiveLines(run.seq, t, id => this.LineDuration(id) ?? 2);
     this.BindMouths(lines);
     if (seek) this.editor.puppets.Settle(10, 0.05, this.editor._cam);
+    // 飞机：摆位 + 引擎声跟着走 + 跨过的一次性声音（Seek 不放）
+    try { this.air?.Update(t, { fire, from, groundAt: this.editor.standAt, listener: this.editor._cam }); }
+    catch (error) { console.warn("[BlockoutPreviz] aircraft failed", error); }
     this.UpdateFx(t);
     this.RenderOverlays(PrevizOverlays(run.seq, t), lines);
   }
 
-  /** 简易爆炸（白盒特效关时）与飞行中的手榴弹：按 t 求值。 */
+  /** 简易爆炸（白盒特效关时）与飞行中的手榴弹：按 t 求值。飞机扫射的弹着点也从这里当土点画。 */
   UpdateFx(t) {
     const run = this.run;
     if (!this.fx || !run) return;
@@ -428,6 +466,7 @@ export class BlockoutPreviz {
         drawBlasts: BlockoutPrevizFx.BlastsHidden(this.host.post),
         actorOpts: { resolve: (id) => this.ResolveUnit(id), clipDuration: (clip) => this.ClipDuration(clip) },
         muzzleAt: (e) => this.MuzzleAt(e),
+        extraBlasts: this.air?.Blasts() || null,
       });
     } catch (error) { console.warn("[BlockoutPreviz] fx failed", error); }
   }
@@ -581,19 +620,36 @@ export class BlockoutPreviz {
   }
 
   PlaySfx(e) {
-    const audio = this.host.audio;
-    const spec = PREVIZ_SFX[e.name];
-    if (!spec) { this.missingSfx.add(e.name); return; }
-    if (spec.deafen) { if (audio?.ctx) audio.Deafen?.(spec.deafen); return; }
-    if (!SOUND_NAMES.includes(spec.cue)) { this.missingSfx.add(`${e.name}→${spec.cue}`); return; }
-    if (!audio?.ctx) return;
     const position = Number.isFinite(e.x) && Number.isFinite(e.z) ? { x: e.x, y: this.editor.standAt(e.x, e.z) + 1, z: e.z } : null;
-    const volume = Number.isFinite(e.volume) ? e.volume : 1;
+    this.PlayCue(e.name, position, Number.isFinite(e.volume) ? e.volume : 1);
+  }
+
+  /** 别名 → 现有音频库的键，按 PREVIZ_SFX 放（burst 连发；deafen 耳鸣）。position 可空（居中）。→ 第一条 voice | null。 */
+  PlayCue(name, position, volume = 1) {
+    const audio = this.host.audio;
+    const spec = PREVIZ_SFX[name];
+    if (!spec) { this.missingSfx.add(name); return null; }
+    if (spec.deafen) { if (audio?.ctx) audio.Deafen?.(spec.deafen); return null; }
+    if (!SOUND_NAMES.includes(spec.cue)) { this.missingSfx.add(`${name}→${spec.cue}`); return null; }
+    if (!audio?.ctx) return null;
     const n = spec.burst || 1;
+    let first = null;
     for (let i = 0; i < n; i++) {
       const delay = i * (spec.interval || 0) + (spec.jitter && i ? ((i * 0.618) % 1) * 0.05 : 0);
-      audio.Play(spec.cue, { position, volume, delay });
+      const voice = audio.Play(spec.cue, { position, volume, delay });
+      first ||= voice || null;
     }
+    return first;
+  }
+
+  /** 持续声（飞机引擎 planeDrone）：起一条 voice 交给调用方逐帧 MoveVoice。没有音频 / 键不在 → null。 */
+  StartLoopCue(name, position) {
+    const audio = this.host.audio;
+    const spec = PREVIZ_SFX[name];
+    if (!spec?.cue || !SOUND_NAMES.includes(spec.cue)) { this.missingSfx.add(name); return null; }
+    if (!audio?.ctx || !position) return null;
+    try { return audio.Play(spec.cue, { position, volume: 0.9 }) || null; }
+    catch (error) { console.warn("[BlockoutPreviz] loop cue failed", name, error); return null; }
   }
 
   // -------------------------------------------------------------------------
@@ -601,6 +657,13 @@ export class BlockoutPreviz {
 
   ResolveAnchor(anchor) {
     const editor = this.editor, player = this.game.player;
+    if (typeof anchor.aircraft === "string") {
+      // 飞机锚（2026-10-19）：机身位置 + 世界轴偏移；这一段里没有这架 → 原点（校验已拦）
+      const pose = this.air?.PoseOf(anchor.aircraft);
+      const off = anchor.offset || [0, 0, 0];
+      if (!pose) return { x: off[0], y: off[1], z: off[2] };
+      return { x: pose.x + off[0], y: pose.y + off[1], z: pose.z + off[2] };
+    }
     if (anchor.actor === "player" || anchor.actor === undefined && anchor.eye) {
       const p = player?.position || { x: 0, y: 0, z: 0 };
       const off = anchor.offset || [0, 0, 0];
@@ -696,12 +759,18 @@ export class BlockoutPreviz {
       errors: this.validation?.errors?.slice(0, 20) ?? [], warnings: this.validation?.warnings?.length ?? 0,
       voices: this.loadedVoices.size,
       fx: this.fx ? { ...this.fx.stats, blastsDrawn: BlockoutPrevizFx.BlastsHidden(this.host.post) } : null,
+      // 2026-10-19：慢动作倍率与墙上时间、飞机
+      timeScale: run ? +(run.timeScale ?? PrevizTimeScale(run.seq, run.t)).toFixed(3) : 1,
+      wallT: run ? +run.wallT.toFixed(3) : 0,
+      aircraft: this.air ? this.air.State() : [],
+      missingModels: this.air ? [...this.air.missingModels] : [],
     };
   }
 
   Dispose() {
     this.Stop({ restore: false });
     this.fx?.Dispose();
+    this.air?.Dispose();
     this.elOverlay.remove(); this.elCaption.remove(); this.elSubs.remove();
   }
 }

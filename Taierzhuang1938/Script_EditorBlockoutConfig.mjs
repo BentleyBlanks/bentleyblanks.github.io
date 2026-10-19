@@ -20,6 +20,8 @@ export const BLOCKOUT_POI_KINDS = Object.freeze(["objective", "poi", "landmark",
 export const BLOCKOUT_MG_WEAPONS = Object.freeze(["Type11", "Type92Hmg", "Zb26"]);
 /** 倒地的人怎么躺（§3 可选 lie，2026-10-18）："along" = 身体顺着朝向躺、头朝 yawDeg 的前方；不写 = 演员倒地姿态原样（身子横在朝向两侧）。 */
 export const BLOCKOUT_LIE_MODES = Object.freeze(["along"]);
+/** 百姓 / 小孩的身体（§3 可选 body，2026-10-19）："rig" = 能放动作片段的骨骼占位身体（缺省）；"procedural" = 旧的程序化 tzm 身体。 */
+export const BLOCKOUT_BODY_MODES = Object.freeze(["rig", "procedural"]);
 
 /** 过渡缺省速度（米 / 秒），§3 单位表。 */
 export const BLOCKOUT_DEFAULT_SPEED = Object.freeze({ ija: 2.8, nra: 2.4, civ: 1.6, litter: 1.2, tank: 2.0 });
@@ -163,6 +165,7 @@ function CheckUnit(errors, warnings, at, unit) {
   if (unit.guess !== undefined && typeof unit.guess !== "boolean") warnings.push(`${at}.guess 应当是 true / false`);
   if (unit.bearers !== undefined && !(Number.isInteger(unit.bearers) && unit.bearers >= 0 && unit.bearers <= 2)) errors.push(`${at}.bearers 要是 0–2 的整数`);
   if (unit.lie !== undefined && !BLOCKOUT_LIE_MODES.includes(unit.lie)) errors.push(`${at}.lie 要是 ${BLOCKOUT_LIE_MODES.join(" / ")}（不写 = 演员倒地姿态原样）`);
+  if (unit.body !== undefined && !BLOCKOUT_BODY_MODES.includes(unit.body)) errors.push(`${at}.body 要是 ${BLOCKOUT_BODY_MODES.join(" / ")}（百姓 / 小孩的身体：骨骼占位 / 旧的程序化；不写 = rig）`);
 }
 
 function CheckKeyframe(errors, warnings, at, kf) {
@@ -335,6 +338,8 @@ function NormalizeUnit(raw, arcMode) {
   if (unit.weapon === undefined) unit.weapon = DefaultWeapon(unit.side, unit.kind);
   // lie 只认 "along"；没写或写错都去掉（= 原来的倒地样子，已有数据不变）
   if (!BLOCKOUT_LIE_MODES.includes(unit.lie)) delete unit.lie;
+  // body（2026-10-19）只认 rig / procedural；没写或写错都去掉（= 运行时缺省 rig）
+  if (!BLOCKOUT_BODY_MODES.includes(unit.body)) delete unit.body;
   unit.yawDeg = NormalizeYawFrom(unit, unit);
   delete unit.faceTo;
   unit.speedMps = Finite(unit.speedMps) && unit.speedMps > 0 ? unit.speedMps : DefaultSpeed(unit);

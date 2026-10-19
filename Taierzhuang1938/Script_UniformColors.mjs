@@ -69,7 +69,9 @@ function UniformMaterial(material, palette) {
   if (!choices) { choices = new Map(); variants.set(source, choices); }
   if (choices.has(palette)) return choices.get(palette);
   const tinted = CloneShadedMaterial(source);
-  const target = new THREE.Color(NRA_UNIFORM_COLORS[palette]);
+  // palette 也可以直接是一个十六进制色（2026-10-19，白盒编辑器的百姓占位身体：军装布染成百姓的深蓝 / 黑 / 土布色）；
+  // 配色名仍查 NRA_UNIFORM_COLORS。数字配色没有自己的污渍错位，按 [0, 0]。
+  const target = new THREE.Color(Number.isFinite(palette) ? palette : NRA_UNIFORM_COLORS[palette]);
   const base = new THREE.Color(NRA_UNIFORM_COLORS.sourceBlue);
   const baseLuma = base.r * .2126 + base.g * .7152 + base.b * .0722;
   const firstPerson = /^Fps/.test(CharacterSurfaceOf(source)?.modelId || "");

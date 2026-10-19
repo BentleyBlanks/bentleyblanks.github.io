@@ -23,7 +23,7 @@ import { PrevizThrows, SampleThrowFlight } from "./Script_EditorBlockoutPrevizPl
 
 /** 简易爆炸的参数（米 / 秒）。 */
 export const PREVIZ_FX = Object.freeze({
-  maxBlasts: 8,
+  maxBlasts: 16,        // 2026-10-19：飞机扫射 15 发 / 秒的土点也从这里出，8 个不够同时亮
   puffsPerBlast: 7,
   fireS: 0.38,          // 火光寿命
   fireRadius: 0.22,     // 火光最大半径 = radius × 这个（夹在 0.25–2.0 m）
@@ -159,10 +159,12 @@ export class BlockoutPrevizFx {
    * 按预演时间 t 摆一遍。seq = 归一化后的序列；standAt(x,z) → 地面；baseOf(id) → 关键帧单位；
    * drawBlasts = 要不要画爆炸、烟与枪口火（白盒特效关时才画）；muzzleAt(event) → 枪口世界坐标 {x,y,z}（找不到 null）。
    */
-  Update(seq, t, { standAt, baseOf, drawBlasts = true, actorOpts = {}, muzzleAt = null } = {}) {
+  Update(seq, t, { standAt, baseOf, drawBlasts = true, actorOpts = {}, muzzleAt = null, extraBlasts = null } = {}) {
     let used = 0;
     if (seq && drawBlasts) {
-      for (const e of seq.events || []) {
+      // extraBlasts（2026-10-19）：事件表之外的爆点（飞机扫射的弹着点 [{t,x,z,radius}]），当「子弹打在土里」画
+      const blasts = extraBlasts?.length ? [...(seq.events || []), ...extraBlasts.map(b => ({ type: "explosion", ...b }))] : (seq.events || []);
+      for (const e of blasts) {
         if (e.type !== "explosion" || used >= this.blasts.length) continue;
         const local = t - e.t;
         const radius = Number.isFinite(e.radius) ? e.radius : 6;

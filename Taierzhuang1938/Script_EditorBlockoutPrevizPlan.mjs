@@ -9,6 +9,8 @@
 //   PrevizSequenceDuration(seq, {lineDuration?})    序列时长
 //   PrevizOverlays(seq, t)           白光 / 黑场 / 说明字 / 震屏在 t 秒的确定性取值
 //   PrevizThrows(seq, base, standAt) 演员键 throw（2026-10-18 第三轮）：投弹动作的出手点 → 落点抛物线；SampleThrowFlight 取 t 秒位置
+//   SamplePrevizAircraft(entry, t, opts)  飞机轨（2026-10-19）：按时间航点取位置 / 机头 / 爬升 / 坡度；PrevizStrafeImpacts 取扫射弹着点
+//   PrevizTimeScale(seq, t) / PrevizWallTime(seq, t) / PrevizTimeFromWall(seq, wall)  慢动作（2026-10-19）：预演时间 ↔ 墙上时间
 //
 // 位置键的时间语义（运行时包与集成负责人 10-18 对齐）：带 x / z 的键的 t = 到达时刻。
 // 从上一个有位置的键（没有就是关键帧布设、t = 0）出发，按 move 的自然速度走，
@@ -39,6 +41,22 @@ export const PREVIZ_THROW = Object.freeze({
   releaseS: 2.15, clipS: 4.2, releaseH: 1.95, releaseFwd: 0.25, releaseRight: 0.2,
   flightBaseS: 0.55, flightPerM: 0.06, flightMinS: 0.6, flightMaxS: 1.8, arcMinM: 1.2, arcPerM: 0.22, targetH: 0.15,
 });
+/**
+ * 飞机轨（2026-10-19，§14.1 aircraft）。models：Data_AircraftAssets 的 id（纯模块不 import 它：三个 id 写死在这里，PrevizPlanTest 核对）。
+ * bankPerRadPerS：转弯时的坡度 = 偏航角速度（rad/s）× 这个，夹在 ±bankMax；strafe 弹着 hz 缺省、横向散布、几发一声打土声。
+ * minVisibleSpeedMps：航点之间速度低于它时机头沿用上一段方向（两点重合 / 悬停不转头）。
+ */
+export const PREVIZ_AIRCRAFT = Object.freeze({
+  models: Object.freeze(["MitsubishiKi30", "MitsubishiKi21Ia", "NakajimaKi43"]),
+  bankPerRadPerS: 1.6, bankMax: 0.7, headingEpsS: 0.05,
+  strafeHz: 15, strafeSpreadM: 0.8, strafeImpactRadius: 0.6, strafeDirtEvery: 3, strafeNearM: 150,
+  minVisibleSpeedMps: 0.5,
+});
+/**
+ * 慢动作（2026-10-19，§14.1 slowmo）：窗口 [t, t + dur) 里预演时钟按 rate 走（墙上 1 s = 预演 rate s），进出各 fade 秒线性渐变
+ *（夹到 dur/2）。rate 下限 rateMin（再慢就是定格）；台词不排在慢动作里（校验报警告）。
+ */
+export const PREVIZ_SLOWMO = Object.freeze({ rateMin: 0.05, rateMax: 1, fadeDefaultS: 0.25 });
 const KEY_FIELDS = ["stance", "aim", "state", "visible", "carryRole", "woundedWalk", "talking", "clip", "lie", "weapon"];
 /** 倒地怎么躺（同配置 §3 的 lie）："along" = 顺着朝向躺、头朝前；null = 演员倒地姿态原样。 */
 export const PREVIZ_LIE_MODES = Object.freeze(["along"]);
@@ -90,6 +108,12 @@ function CheckFaceTo(errors, at, v) {
 function CheckAnchor(errors, at, v, required) {
   if (v === undefined) { if (required) errors.push(`${at} 必填`); return; }
   if (!IsObject(v)) { errors.push(`${at} 要是点 {x,z,h?} 或演员锚 {actor, offset?}`); return; }
+  if (v.aircraft !== undefined) {
+    // 飞机锚（2026-10-19）：{ aircraft: "<飞机轨 id>", offset? }，偏移按世界轴、相对机身
+    if (typeof v.aircraft !== "string" || !v.aircraft) errors.push(`${at}.aircraft 要是飞机轨的 id`);
+    if (v.offset !== undefined && !(Array.isArray(v.offset) && v.offset.length === 3 && v.offset.every(Finite))) errors.push(`${at}.offset 要是 3 个有限数字`);
+    return;
+  }
   if (v.actor !== undefined) {
     if (typeof v.actor !== "string" || !v.actor) errors.push(`${at}.actor 要是单位 id 或 "player"`);
     if (v.offset !== undefined && !(Array.isArray(v.offset) && v.offset.length === 3 && v.offset.every(Finite))) errors.push(`${at}.offset 要是 3 个有限数字`);
@@ -168,8 +192,67 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
       for (const key of ["from", "to", "look", "lookTo"]) {
         const actor = c[key]?.actor;
         if (units && typeof actor === "string" && actor !== "player" && !units.has(actor) && !SpawnIds(seq).has(actor)) errors.push(`${cat}.${key}.actor 在关键帧 ${seq.keyframe} 里找不到：${actor}`);
+        const plane = c[key]?.aircraft;
+        if (typeof plane === "string" && plane && !AircraftIds(seq).has(plane)) errors.push(`${cat}.${key}.aircraft 在这一段的 aircraft 里找不到：${plane}`);
       }
     });
+    // 飞机（2026-10-19）
+    if (seq.aircraft !== undefined && !Array.isArray(seq.aircraft)) errors.push(`${at}.aircraft 要是数组`);
+    const planeIds = new Set();
+    (Array.isArray(seq.aircraft) ? seq.aircraft : []).forEach((p, pi) => {
+      const pat = `${at}.aircraft[${pi}]`;
+      if (!IsObject(p)) { errors.push(`${pat} 要是对象`); return; }
+      if (typeof p.id !== "string" || !ID_RE.test(p.id)) errors.push(`${pat}.id 要是 [A-Za-z0-9_-]+`);
+      else { if (planeIds.has(p.id)) errors.push(`${pat}.id 重复：${p.id}`); planeIds.add(p.id); }
+      if (p.model !== undefined && !PREVIZ_AIRCRAFT.models.includes(p.model)) errors.push(`${pat}.model 要是 ${PREVIZ_AIRCRAFT.models.join(" / ")}`);
+      if (!Array.isArray(p.path) || p.path.length < 2) errors.push(`${pat}.path 要是 ≥ 2 个航点 {t, x, y | h, z}`);
+      else {
+        let last = -Infinity;
+        p.path.forEach((w, wi) => {
+          const wat = `${pat}.path[${wi}]`;
+          if (!IsObject(w)) { errors.push(`${wat} 要是对象`); return; }
+          if (!Finite(w.t) || w.t < 0) errors.push(`${wat}.t 要是非负数`);
+          else { if (w.t <= last) errors.push(`${wat}.t 要比上一个航点晚（航点按时间升序）`); last = w.t; }
+          if (!Finite(w.x) || !Finite(w.z)) errors.push(`${wat} 要带有限的 x / z`);
+          if ((w.y === undefined) === (w.h === undefined)) errors.push(`${wat} 的 y（世界高）和 h（离地高）二选一`);
+          else if (!Finite(w.y ?? w.h)) errors.push(`${wat} 的 y / h 要是有限数字`);
+        });
+      }
+      if (p.strafe !== undefined && !Array.isArray(p.strafe)) errors.push(`${pat}.strafe 要是数组`);
+      (Array.isArray(p.strafe) ? p.strafe : []).forEach((s, si) => {
+        const sat = `${pat}.strafe[${si}]`;
+        if (!IsObject(s)) { errors.push(`${sat} 要是对象`); return; }
+        if (!Finite(s.t0) || !Finite(s.t1) || s.t0 < 0 || s.t1 <= s.t0) errors.push(`${sat} 的 t0 / t1 要是 0 ≤ t0 < t1`);
+        if (!IsPoint(s.from) || !IsPoint(s.to)) errors.push(`${sat} 的 from / to 要是地面上的点 {x, z}`);
+        if (s.hz !== undefined && !(Finite(s.hz) && s.hz > 0 && s.hz <= 60)) errors.push(`${sat}.hz 要是 0–60`);
+        if (Array.isArray(p.path) && p.path.length >= 2 && Finite(s.t0) && Finite(s.t1)) {
+          const t0 = p.path[0]?.t, t1 = p.path[p.path.length - 1]?.t;
+          if (Finite(t0) && Finite(t1) && (s.t0 < t0 || s.t1 > t1)) warnings.push(`${sat} 的时间不在航线 [${t0}, ${t1}] 里（飞机不在天上时弹着照画）`);
+        }
+      });
+      if (p.sound !== undefined) {
+        if (!IsObject(p.sound)) errors.push(`${pat}.sound 要是对象 {drone?, diveT?}`);
+        else {
+          if (p.sound.drone !== undefined && typeof p.sound.drone !== "boolean") errors.push(`${pat}.sound.drone 要是 true / false`);
+          if (p.sound.diveT !== undefined && !(Finite(p.sound.diveT) && p.sound.diveT >= 0)) errors.push(`${pat}.sound.diveT 要是非负数`);
+        }
+      }
+    });
+    // 慢动作（2026-10-19）
+    if (seq.slowmo !== undefined && !Array.isArray(seq.slowmo)) errors.push(`${at}.slowmo 要是数组`);
+    const slow = (Array.isArray(seq.slowmo) ? seq.slowmo : []).filter(IsObject);
+    slow.forEach((s, si) => {
+      const sat = `${at}.slowmo[${si}]`;
+      if (!Finite(s.t) || s.t < 0) errors.push(`${sat}.t 要是非负数`);
+      if (!(Finite(s.dur) && s.dur > 0)) errors.push(`${sat}.dur 要是正数`);
+      if (!(Finite(s.rate) && s.rate >= PREVIZ_SLOWMO.rateMin && s.rate <= PREVIZ_SLOWMO.rateMax)) errors.push(`${sat}.rate 要在 ${PREVIZ_SLOWMO.rateMin}–${PREVIZ_SLOWMO.rateMax}（倍率，0.3 = 放慢到三成）`);
+      if (s.fade !== undefined && !(Finite(s.fade) && s.fade >= 0)) errors.push(`${sat}.fade 要是非负数`);
+      if (Finite(s.t) && Finite(s.dur)) {
+        for (const o of slow.slice(0, si)) if (Finite(o.t) && Finite(o.dur) && s.t < o.t + o.dur && o.t < s.t + s.dur) errors.push(`${sat} 与别的慢动作窗口重叠`);
+        for (const l of Array.isArray(seq.lines) ? seq.lines : []) if (IsObject(l) && Finite(l.t) && l.t >= s.t && l.t < s.t + s.dur) warnings.push(`${sat} 里排了台词 ${l.line}（慢动作里台词照常速放，听着对不上）`);
+      }
+    });
+    (Array.isArray(seq.slowmo) ? seq.slowmo : []).forEach((s, si) => { if (!IsObject(s)) errors.push(`${at}.slowmo[${si}] 要是对象`); });
     // 演员
     if (seq.actors !== undefined && !Array.isArray(seq.actors)) errors.push(`${at}.actors 要是数组`);
     const actorIds = new Set();
@@ -286,6 +369,9 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
 function SpawnIds(seq) {
   return new Set((Array.isArray(seq?.actors) ? seq.actors : []).filter(a => IsObject(a) && a.spawn && typeof a.id === "string").map(a => a.id));
 }
+function AircraftIds(seq) {
+  return new Set((Array.isArray(seq?.aircraft) ? seq.aircraft : []).filter(p => IsObject(p) && typeof p.id === "string").map(p => p.id));
+}
 
 // ---------------------------------------------------------------------------
 // 归一化
@@ -313,6 +399,21 @@ export function NormalizeBlockoutPreviz(doc) {
       .map(a => ({ ...a, keys: StableSortByT((Array.isArray(a.keys) ? a.keys : []).filter(k => IsObject(k) && Finite(k.t))) }));
     seq.lines = StableSortByT((Array.isArray(seq.lines) ? seq.lines : []).filter(l => IsObject(l) && Finite(l.t) && typeof l.line === "string"));
     seq.events = StableSortByT((Array.isArray(seq.events) ? seq.events : []).filter(e => IsObject(e) && Finite(e.t) && PREVIZ_EVENT_TYPES.includes(e.type)));
+    // 飞机轨：航点按 t 排、去掉坏航点；model 缺省 Ki-30；strafe 按 t0 排
+    seq.aircraft = (Array.isArray(seq.aircraft) ? seq.aircraft : []).filter(p => IsObject(p) && typeof p.id === "string" && p.id)
+      .map(p => ({
+        ...p,
+        model: PREVIZ_AIRCRAFT.models.includes(p.model) ? p.model : PREVIZ_AIRCRAFT.models[0],
+        path: StableSortByT((Array.isArray(p.path) ? p.path : []).filter(w => IsObject(w) && Finite(w.t) && Finite(w.x) && Finite(w.z) && (Finite(w.y) || Finite(w.h)))),
+        strafe: (Array.isArray(p.strafe) ? p.strafe : []).filter(s => IsObject(s) && Finite(s.t0) && Finite(s.t1) && s.t1 > s.t0 && IsPoint(s.from) && IsPoint(s.to))
+          .sort((a, b) => a.t0 - b.t0),
+        sound: { drone: p.sound?.drone !== false, diveT: Finite(p.sound?.diveT) ? p.sound.diveT : null },
+      }))
+      .filter(p => p.path.length >= 2);
+    // 慢动作：按 t 排、rate 夹进范围、fade 缺省
+    seq.slowmo = StableSortByT((Array.isArray(seq.slowmo) ? seq.slowmo : []).filter(s => IsObject(s) && Finite(s.t) && Finite(s.dur) && s.dur > 0 && Finite(s.rate)))
+      .map(s => ({ t: s.t, dur: s.dur, rate: Math.min(PREVIZ_SLOWMO.rateMax, Math.max(PREVIZ_SLOWMO.rateMin, s.rate)),
+        fade: Math.min(s.dur / 2, Finite(s.fade) && s.fade >= 0 ? s.fade : PREVIZ_SLOWMO.fadeDefaultS) }));
     seq.durationS = Finite(seq.durationS) && seq.durationS > 0 ? seq.durationS : null;
     out.sequences.push(seq);
   }
@@ -336,7 +437,200 @@ export function PrevizSequenceDuration(seq, { lineDuration = null } = {}) {
   for (const a of seq.actors || []) for (const k of a.keys || []) end = Math.max(end, k.t + (IsPoint(k.throw) ? PREVIZ_THROW.clipS : 0));
   for (const l of seq.lines || []) end = Math.max(end, l.t + (lineDuration?.(l.line) ?? 2));
   for (const e of seq.events || []) end = Math.max(end, e.t + (Finite(e.dur) ? e.dur : 0) + (e.type === "black" && Finite(e.fade) ? 0 : 0));
+  // 飞机：最后一个航点；扫射段的结束。慢动作：窗口结束（按预演时间算，墙上时间更长）
+  for (const p of seq.aircraft || []) {
+    for (const w of p.path || []) if (Finite(w?.t)) end = Math.max(end, w.t);
+    for (const s of p.strafe || []) if (Finite(s?.t1)) end = Math.max(end, s.t1);
+  }
+  for (const s of seq.slowmo || []) if (Finite(s?.t) && Finite(s?.dur)) end = Math.max(end, s.t + s.dur);
   return Math.max(0.1, end);
+}
+
+// ---------------------------------------------------------------------------
+// 飞机（2026-10-19）
+
+/** 航点的世界高：y 直接用；h = 离地高，按 groundAt(x, z) 加（纯测试里不给 groundAt 就当地面 0）。 */
+function WaypointY(w, groundAt) {
+  if (Finite(w.y)) return w.y;
+  return (Finite(w.h) ? w.h : 0) + (typeof groundAt === "function" ? groundAt(w.x, w.z) : 0);
+}
+
+/**
+ * 时间参数的 Catmull-Rom（非均匀节点）：航点之间平滑穿过，端点用相邻差分。→ {x,y,z} 与导数 {vx,vy,vz}（m/s）。
+ * pts：[{t,x,y,z}] 按 t 升序、t 严格递增。t 在首尾之外时夹到端点（调用方另判可见）。
+ */
+function SampleSpline(pts, t) {
+  const n = pts.length;
+  if (n === 1) return { x: pts[0].x, y: pts[0].y, z: pts[0].z, vx: 0, vy: 0, vz: 0 };
+  let i = 0;
+  while (i < n - 2 && t >= pts[i + 1].t) i++;
+  const p1 = pts[i], p2 = pts[i + 1];
+  const p0 = pts[i - 1] || null, p3 = pts[i + 2] || null;
+  const h = Math.max(1e-6, p2.t - p1.t);
+  const u = Math.min(1, Math.max(0, (t - p1.t) / h));
+  // 切线（单位：每秒）：中间点取相邻两段的中心差分，端点取那一段的斜率
+  const Slope = (q, r) => { const dt = Math.max(1e-6, r.t - q.t); return { x: (r.x - q.x) / dt, y: (r.y - q.y) / dt, z: (r.z - q.z) / dt }; };
+  const Tan = (a, b, c) => (a && c ? Slope(a, c) : a ? Slope(a, b) : Slope(b, c));
+  const m1 = Tan(p0, p1, p2), m2 = Tan(p1, p2, p3);
+  const u2 = u * u, u3 = u2 * u;
+  const h00 = 2 * u3 - 3 * u2 + 1, h10 = u3 - 2 * u2 + u, h01 = -2 * u3 + 3 * u2, h11 = u3 - u2;
+  const d00 = 6 * u2 - 6 * u, d10 = 3 * u2 - 4 * u + 1, d01 = -6 * u2 + 6 * u, d11 = 3 * u2 - 2 * u;
+  const P = (k) => h00 * p1[k] + h10 * h * m1[k] + h01 * p2[k] + h11 * h * m2[k];
+  const D = (k) => (d00 * p1[k] + d10 * h * m1[k] + d01 * p2[k] + d11 * h * m2[k]) / h;
+  return { x: P("x"), y: P("y"), z: P("z"), vx: D("x"), vy: D("y"), vz: D("z") };
+}
+
+const aircraftCompiled = new WeakMap();
+function AircraftPoints(entry, groundAt) {
+  const key = typeof groundAt === "function" ? groundAt : null;
+  const hit = aircraftCompiled.get(entry);
+  if (hit && hit.key === key) return hit.pts;
+  const pts = StableSortByT((entry?.path || []).filter(w => IsObject(w) && Finite(w.t) && Finite(w.x) && Finite(w.z)))
+    .map(w => ({ t: w.t, x: w.x, z: w.z, y: WaypointY(w, groundAt) }));
+  // 同一时刻两个航点：后一个顶掉前一个（样条要严格递增的节点）
+  const out = [];
+  for (const p of pts) { if (out.length && p.t - out[out.length - 1].t <= 1e-6) out[out.length - 1] = p; else out.push(p); }
+  aircraftCompiled.set(entry, { key, pts: out });
+  return out;
+}
+
+/** 速度向量 → 机头偏航（yaw 口径同演员：0 = 朝北 −Z）与爬升角（弧度，抬头为正）。速度太小时 null。 */
+function HeadingOf(v) {
+  const flat = Math.hypot(v.vx, v.vz);
+  if (Math.hypot(flat, v.vy) < PREVIZ_AIRCRAFT.minVisibleSpeedMps) return null;
+  return { yawDeg: WrapDeg(Math.atan2(-v.vx, -v.vz) * 180 / Math.PI), climb: Math.atan2(v.vy, Math.max(1e-6, flat)) };
+}
+
+/**
+ * 飞机轨在 t 秒的姿态（纯函数、确定性）。opts.groundAt(x,z) 给航点 h 换成世界高。
+ * 机头顺着速度方向（过了航点之间的样条），转弯时按偏航角速度带一点坡度（左转压左翼：bank 为正 = 向左滚，
+ * 与 Script_AircraftStrafe 的 bank 同号：rotation.z 为正）。首个航点之前 / 末个航点之后 visible: false（位置夹在端点上）。
+ * @returns {{id, model, visible, x, y, z, yawDeg, climb, bank, dirX, dirZ, speedMps}}
+ */
+export function SamplePrevizAircraft(entry, t, opts = {}) {
+  const pts = AircraftPoints(entry, opts.groundAt);
+  const id = entry?.id ?? "", model = PREVIZ_AIRCRAFT.models.includes(entry?.model) ? entry.model : PREVIZ_AIRCRAFT.models[0];
+  if (!pts.length) return { id, model, visible: false, x: 0, y: 0, z: 0, yawDeg: 0, climb: 0, bank: 0, dirX: 0, dirZ: -1, speedMps: 0 };
+  const time = Finite(t) ? t : 0;
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+  const tc = Math.min(t1, Math.max(t0, time));
+  const s = SampleSpline(pts, tc);
+  // 机头：速度方向；速度太小（两点重合）就往前后找一个有速度的时刻
+  let head = HeadingOf(s);
+  for (let k = 1; !head && k <= 8; k++) head = HeadingOf(SampleSpline(pts, Math.min(t1, Math.max(t0, tc + k * 0.25)))) || HeadingOf(SampleSpline(pts, Math.min(t1, Math.max(t0, tc - k * 0.25))));
+  const yawDeg = head ? head.yawDeg : 0, climb = head ? head.climb : 0;
+  // 坡度：偏航角速度（中心差分）× 系数，夹上限；端点外不转
+  let bank = 0;
+  if (head && pts.length > 2 && tc > t0 && tc < t1) {
+    const e = PREVIZ_AIRCRAFT.headingEpsS;
+    const a = HeadingOf(SampleSpline(pts, Math.max(t0, tc - e))), b = HeadingOf(SampleSpline(pts, Math.min(t1, tc + e)));
+    if (a && b) {
+      const rate = WrapDeg(b.yawDeg - a.yawDeg) * Math.PI / 180 / Math.max(1e-6, Math.min(t1, tc + e) - Math.max(t0, tc - e));
+      bank = Math.max(-PREVIZ_AIRCRAFT.bankMax, Math.min(PREVIZ_AIRCRAFT.bankMax, rate * PREVIZ_AIRCRAFT.bankPerRadPerS));
+    }
+  }
+  const r = yawDeg * Math.PI / 180;
+  return {
+    id, model, visible: time >= t0 && time <= t1,
+    x: s.x, y: s.y, z: s.z, yawDeg, climb, bank,
+    dirX: -Math.sin(r), dirZ: -Math.cos(r),
+    vx: s.vx, vy: s.vy, vz: s.vz,
+    speedMps: Math.hypot(s.vx, s.vy, s.vz),
+    t0, t1,
+  };
+}
+
+/**
+ * 一条飞机轨的全部扫射弹着点（确定性）：每段 strafe 在 [t0, t1) 里按 hz 落点，沿 from → to 匀速推进，
+ * 横向按确定性散布 ±strafeSpreadM。→ [{ t, x, z, segment, index, dirt }]（dirt = 这一发要不要放打土声，每 strafeDirtEvery 发一声）。
+ */
+export function PrevizStrafeImpacts(entry) {
+  const out = [];
+  (entry?.strafe || []).forEach((s, segment) => {
+    if (!IsObject(s) || !Finite(s.t0) || !Finite(s.t1) || s.t1 <= s.t0 || !IsPoint(s.from) || !IsPoint(s.to)) return;
+    const hz = Finite(s.hz) && s.hz > 0 ? Math.min(60, s.hz) : PREVIZ_AIRCRAFT.strafeHz;
+    const n = Math.max(1, Math.floor((s.t1 - s.t0) * hz));
+    const dx = s.to.x - s.from.x, dz = s.to.z - s.from.z, len = Math.hypot(dx, dz);
+    const sx = len > 1e-6 ? -dz / len : 1, sz = len > 1e-6 ? dx / len : 0;   // 横向
+    for (let i = 0; i < n; i++) {
+      const t = s.t0 + i / hz;
+      const u = (t - s.t0) / (s.t1 - s.t0);
+      const hash = Math.sin(i * 12.9898 + segment * 78.233) * 43758.5453;
+      const lateral = ((hash - Math.floor(hash)) * 2 - 1) * PREVIZ_AIRCRAFT.strafeSpreadM;
+      out.push({ t, x: s.from.x + dx * u + sx * lateral, z: s.from.z + dz * u + sz * lateral, segment, index: i, dirt: i % PREVIZ_AIRCRAFT.strafeDirtEvery === 0 });
+    }
+  });
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// 慢动作（2026-10-19）
+
+/** 一个慢动作窗口在预演时间 t 的倍率（1 = 常速）：进出各 fade 秒线性渐变到 rate。 */
+function SlowmoRateAt(s, t) {
+  if (t < s.t || t >= s.t + s.dur) return 1;
+  const fade = Math.min(Finite(s.fade) ? s.fade : PREVIZ_SLOWMO.fadeDefaultS, s.dur / 2);
+  const rate = Math.min(PREVIZ_SLOWMO.rateMax, Math.max(PREVIZ_SLOWMO.rateMin, s.rate));
+  if (fade <= 1e-9) return rate;
+  const inK = Math.min(1, (t - s.t) / fade), outK = Math.min(1, (s.t + s.dur - t) / fade);
+  const k = Math.min(inK, outK);
+  return 1 + (rate - 1) * k;
+}
+
+/** 预演时间 t 这一刻预演时钟走多快（墙上 1 s = 预演 PrevizTimeScale s）；没有慢动作 = 1。 */
+export function PrevizTimeScale(seq, t) {
+  let scale = 1;
+  for (const s of seq?.slowmo || []) if (IsObject(s) && Finite(s.t) && Finite(s.dur) && Finite(s.rate)) scale = Math.min(scale, SlowmoRateAt(s, Finite(t) ? t : 0));
+  return scale;
+}
+
+/** 线性倍率 r(u) = a + b·u 在 [u0, u1] 上 ∫ du / r(u)（墙上时间）。 */
+function WallIntegral(a, b, u0, u1) {
+  if (u1 <= u0) return 0;
+  if (Math.abs(b) < 1e-12) return (u1 - u0) / a;
+  return (Math.log(a + b * u1) - Math.log(a + b * u0)) / b;
+}
+
+/** 预演时间 t 对应的墙上时间（从 0 起）：慢动作窗口里每一秒预演要花 1/rate 秒墙上时间，渐变段精确积分。单调递增。 */
+export function PrevizWallTime(seq, t) {
+  const T = Math.max(0, Finite(t) ? t : 0);
+  const windows = (seq?.slowmo || []).filter(s => IsObject(s) && Finite(s.t) && Finite(s.dur) && s.dur > 0 && Finite(s.rate)).slice().sort((a, b) => a.t - b.t);
+  let wall = 0, cursor = 0;
+  for (const s of windows) {
+    if (cursor >= T) break;
+    const start = Math.max(cursor, s.t), end = Math.min(T, s.t + s.dur);
+    if (start > cursor) wall += Math.min(T, start) - cursor;
+    cursor = Math.max(cursor, Math.min(T, start));
+    if (end <= start) continue;
+    const fade = Math.min(Finite(s.fade) ? s.fade : PREVIZ_SLOWMO.fadeDefaultS, s.dur / 2);
+    const rate = Math.min(PREVIZ_SLOWMO.rateMax, Math.max(PREVIZ_SLOWMO.rateMin, s.rate));
+    // 三段：渐入 [s.t, s.t+fade]、平台、渐出 [s.t+dur-fade, s.t+dur]
+    const pieces = fade > 1e-9
+      ? [[s.t, s.t + fade, 1, (rate - 1) / fade], [s.t + fade, s.t + s.dur - fade, rate, 0], [s.t + s.dur - fade, s.t + s.dur, rate, (1 - rate) / fade]]
+      : [[s.t, s.t + s.dur, rate, 0]];
+    for (const [p0, p1, a0, b] of pieces) {
+      const u0 = Math.max(start, p0), u1 = Math.min(end, p1);
+      if (u1 <= u0) continue;
+      // 倍率在这一段里写成 a + b·(u − p0)
+      wall += WallIntegral(a0, b, u0 - p0, u1 - p0);
+    }
+    cursor = end;
+  }
+  if (cursor < T) wall += T - cursor;
+  return wall;
+}
+
+/** 墙上时间 → 预演时间（PrevizWallTime 的反函数，二分到 1e-6 s）。 */
+export function PrevizTimeFromWall(seq, wall) {
+  const W = Math.max(0, Finite(wall) ? wall : 0);
+  if (!(seq?.slowmo || []).length) return W;
+  let lo = 0, hi = W;   // 预演时间 ≤ 墙上时间（倍率 ≤ 1）
+  if (PrevizWallTime(seq, hi) < W) return W;
+  for (let i = 0; i < 60 && hi - lo > 1e-6; i++) {
+    const mid = (lo + hi) / 2;
+    if (PrevizWallTime(seq, mid) < W) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
 }
 
 // ---------------------------------------------------------------------------

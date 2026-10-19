@@ -27,6 +27,8 @@ export const BLOCKOUT_PREVIZ_CLIP_LIBRARIES = Object.freeze([
   Previz("PrevizCare"),
   Previz("PrevizCombat"),
   Previz("PrevizIja"),
+  // 0610 村子的占位库（百姓 / 妮儿 / 老耿 / 后送兵 / 村里的日军，片段名 Vil 开头；门禁 Script_PrevizVillageClipsTest）
+  Previz("PrevizVillage"),
   // 06 集结处的救护库（CareMedicPress / CareMedicBandage / CareLieTreated / CareLieWrithe …）
   Object.freeze({ name: "CollectionCare", ...COLLECTION_CARE_ANIMATION }),
 ]);

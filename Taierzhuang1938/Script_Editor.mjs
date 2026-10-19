@@ -148,6 +148,8 @@ export class EditorSuite {
       gi: host.game.gi, profiler: host.profiler,
       // 物理走取值器：换关会整个重建 PhysicsWorld，Debug Rendering 的碰撞体层每帧要认的是当前那个
       get physics() { return host.game.physics ?? null; },
+      // 机队同理走取值器（白盒预演的飞机借它的模型克隆）
+      get aircraft() { return host.game.aircraft ?? null; },
       actorFactory: host.actorFactory, viewmodel: host.viewmodel,
       audio: host.audio, cutscene: host.cutscene, destruction: host.destruction,
       game: host.game,
