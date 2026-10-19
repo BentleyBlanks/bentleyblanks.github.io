@@ -171,6 +171,7 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
 | `speedMps` | 可选过渡速度；缺省 ija 2.8、nra 2.4、civ 1.6、litter 1.2、tank 2.0 |
 | `guess` | 可选 `true`：位置是推测的（游戏数据里没写），界面上用虚线圈 + 「?」 |
 | `bearers` | 只对 `kind: "litter"`：抬担架的人数 0–2（缺省 2）；`0` = 担架放在地上 / 床边、没人抬；`1` = 只画前面一个抬担架的人（后头由玩家或别的单位抬着，或搁在地上）。担架的 `state: "down"` 只表示抬担架的人倒了 |
+| `ride` | 可选（2026-10-20），人或担架**挂到车上**：`{ "on": "<车的单位 id>", "x", "z"（车本地米，+x 右、−z 前，缺省 0）, "y"（演员根离车底下地面多高，缺省 0）, "yawDeg"（相对车头，缺省 0） }`，`null` / 不写 = 不挂。`on` 要是**同一帧里**的 `cart` / `tank` / `litter`，不能是自己，不许一层层挂（挂着的担架再被人挂 → 错）。挂着时每帧位置 / 朝向 = 车当前位姿 ∘ 本地偏移，不贴地，自己的 `x, z` 只当备用（车不在场时）；人照常播片段（坐、抖、趴）。坐车尾的 `y` 怎么算见 §5.6（`BLOCKOUT_CART_SEATS`）。挂着的担架 `bearers` 应写 0（否则只警告） |
 
 `Script_EditorBlockoutConfig.mjs`（纯，node 与浏览器共用，LocalPreview 也要 import，**导入时不得抛错、不得碰 DOM / three**）：
 
@@ -190,6 +191,9 @@ export function PathLength(points); export function SamplePath(points, distanceM
 export function YawDegFromTo(a, b); export function ForwardFromYawDeg(yawDeg);    // → {x,z}
 export function DefaultArc(unit);                   // §5.3
 export const BLOCKOUT_LIE_MODES;                    // ["along"]（§3 lie）
+export const BLOCKOUT_RIDE_CARRIER_KINDS;           // ["cart", "tank", "litter"]（§3 ride 能挂到谁身上，2026-10-20）
+export function RideIssues(ride, at);               // ride 的毛病清单（空 = 合法；null / undefined 不算错）；预演校验也用它
+export function NormalizeRide(ride);                // → { on, x, z, y, yawDeg } | null（缺的补 0）
 ```
 
 ## 4. 界面（`Script_EditorBlockoutUi.mjs` + `Style_EditorBlockout.css`）
@@ -335,6 +339,16 @@ export class BlockoutMarkers {
   - **军官**（nraOfficer / ijaOfficer，NRA05 / IJA01）本来就是骨骼身体，预演额外动作库并进它们的骨架后片段照播，运行时不拦；0610 的 PrevizTest 已放宽成「百姓 / 军官只许通用片段」（0105 的不动）。
   - `Probe(id)` 再多给：`body`（`"rig"` / `"procedural"`）、`bodyKind`、`rigged`、两手世界坐标 `handR` / `handL`、`mixerTime`（动画时钟，量慢动作）、`shownClip` / `shownClipSeconds`（开场动作层此刻真在播的片段）、`hiddenParts`。
   - 门禁：`Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs`（§10）。
+- 2026-10-20（挂到车上，用户「人挂不到车上」）：
+  - **`ride`**（单位字段 §3 / 预演键 §14.1）：这个人或担架每帧的位姿 = 车（`cart` / `tank` / `litter`）**当前**位姿 ∘ 本地偏移 `{x, z, yawDeg}`，根高 = 车底下地面 + `y`，**不贴地、不走路**（关键帧过渡与预演的位置键都不管用：预演校验报警告、运行时 `Drive` 报一次），片段照播。车的位姿从车那个 puppet 自己的状态算（`_CarrierPose`：预演驱动值优先，不读它的 three 对象），所以同一帧先摆谁都一样；`Apply` / 过渡取样改成「先写完所有人的状态再摆」。挂着的担架平放（不按 `LitterPose` 抬 / 斜），担架组原点 = 布中心。车不在场时按自己的 `x, z` 落地。
+  - **驴车尺寸实测**（`BLOCKOUT_CART_SEATS`，从 `BLOCKOUT_PUPPETS.cart` 量）：车板一整块 1.5 宽 × 2.4 长 × 0.55 厚、中心离地 0.75 → **车板顶 1.025 m**、车板底 0.475 m；白盒车没另做尾板，**车尾板顶 = 车板顶 1.025 m**，车尾沿在本地 `z = +1.2`（`tail: { x: 0, z: 1.2, y: 1.025, yawDeg: 180 }`），车辕朝 −z；车板中间 `bed: { x: 0, z: 0, y: 1.025 }`；担架平放车板上 `litterY = 1.075`（布 0.1 厚、布底贴车板）。
+  - **坐车尾的人怎么算 `y`**：`y = 车尾板顶 − 片段坐高 × 缩放`（`SitRootY(seatY, clipSitH, scale)`）。`VilSitEdge` 的根在屁股正下方的地上、坐沿在根上方 **0.90 m**（清单 notes），小孩缩 0.62 → `y = 1.025 − 0.90 × 0.62 = 0.467`；大人坐车尾 `y = 0.125`。例（妮儿 07 坐车尾、背对车头）：
+    ```json
+    { "id": "Nier", "side": "civ", "kind": "child", "x": 54.5, "z": 156.2, "yawDeg": 90,
+      "ride": { "on": "GengCart", "x": 0, "z": 1.2, "y": 0.467, "yawDeg": 180 } }
+    ```
+    预演里下车：`{ "t": 12, "ride": null }`，之后再写位置键才管用；临时上车：`{ "t": 3, "ride": { "on": "GengCart", "z": 1.2, "y": 0.467, "yawDeg": 180 }, "clip": "VilSitEdge" }`。挂到车上的担架（12–18 冬瓜那副）：`{ "kind": "litter", "bearers": 0, "ride": { "on": "GengCart", "z": -0.2, "y": 1.075 } }`，上面躺的人另写 `ride` 到同一辆车（`y` = 1.075 + 0.05，`state: "down"`、`lie: "along"`）。
+  - `RideWorldPose(carrier, ride)` 是纯函数（本地 → 世界，与 `TankGroundY` 的脚印旋转同式）。`Probe(id)` 多给 `ride`（写的是什么）、`seat`（这一帧算出的世界位姿 + `carrierY` 车底下地面）、`rootY`、`rootAboveCarrierGround`。实测（RuntimeBrowserTest）：小孩 `VilSitEdge` 的骨盆落在车板顶上下 0.1 m 内、车走 5 s 两处取样位置误差 < 0.05 m。
 - 距离分级：60 m 外每 3 帧更新一次动画，阴影只在 25 m 内开；单关同时上限 120 个演员，超出时远处的只留地环与标签（报警告）。
 - 切关、重载配置时全部回收；同一关切关键帧时按 `id` 复用。
 
@@ -481,7 +495,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 | `Script_EditorBlockoutSaveTest.mjs` | 纯 node | 起真 LocalPreview（`--root=<临时目录>`）：status 可写、save 写对文件、各种拒绝（坏 level、`..`、超大、坏文档、GET、错误 Content-Type、外来 Origin / Host、revision 不符）零字节落盘、无 `.tmp` 残留、仓库里的 `Blockout/` 前后逐字节相同；`/__notes/status`、`/__tuning/status` 仍正常 |
 | `Script_EditorBlockoutMapTest.mjs` | 浏览器（临时 harness 页） | 纸面底色、块脚印、旋转块、等高线、各阵营标记颜色按像素数计（不看 `.visible`）；小地图以玩家为中心；全关总图缩放 / 平移 / 关键帧拾取 |
 | `Script_EditorBlockoutBrowserTest.mjs` | 浏览器（游戏） | `?editor=blockout&level=FirstLevel&quality=whitebox&scale=small&audio=0` 启动；没有任务运行时、没有过场；关键帧数与配置一致；`GoTo` 后玩家位置误差 < 0.5 m；`Next` 过渡中单位位置连续变化（不瞬移）、结束后到位；切到 `SecondLevel` 后场景边界与地形变化、再切回；小地图与卡片像素非空；配置文件被外部改写后 3 s 内同步；全程无未捕获错误；截图存 `_shots/EditorBlockout/` |
-| `Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs`（2026-10-19） | 浏览器（游戏） | `FirstLevel0610` 的 06-2 上注入一段预演（page.route）：百姓 / 小孩 / 国军军官 / 日军军官都能播预演动作库的片段且姿态真的变了（蹲下片段骨盆比站着低 ≥ 0.25 m、举手片段手比没片段时高 ≥ 0.25 m、趴下片段骨盆 < 0.3 m）、`body:"procedural"` 的百姓还是程序化身体；飞机模型载进来、Seek 到航线中段位置等于 `SamplePrevizAircraft`、在视锥里且正对 `look` 飞机锚、扫射段画出土点、过了末航点不可见；慢动作窗口里 `timeScale` = rate、墙上跑 0.9 s 预演只走 0.3 倍、人物动画时钟与走路同倍率；中断后克隆还回机队；全程无未捕获错误；截图存 `_shots/EditorBlockoutPrevizRuntime/` |
+| `Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs`（2026-10-19） | 浏览器（游戏） | `FirstLevel0610` 的 06-2 上注入一段预演（page.route）：百姓 / 小孩 / 国军军官 / 日军军官都能播预演动作库的片段且姿态真的变了（蹲下片段骨盆比站着低 ≥ 0.25 m、举手片段手比没片段时高 ≥ 0.25 m、趴下片段骨盆 < 0.3 m）、`body:"procedural"` 的百姓还是程序化身体；飞机模型载进来、Seek 到航线中段位置等于 `SamplePrevizAircraft`、在视锥里且正对 `look` 飞机锚、扫射段画出土点、过了末航点不可见；慢动作窗口里 `timeScale` = rate、墙上跑 0.9 s 预演只走 0.3 倍、人物动画时钟与走路同倍率；中断后克隆还回机队；**2026-10-20**：一辆 spawn 的驴车走起来，坐车尾的小孩（`VilSitEdge`，`ride.y` 0.467）与车板上的担架（`y` 1.075）两个时刻都跟着车（位置 = 车位姿 ∘ 本地偏移，误差 < 0.05 m）、小孩骨盆落在车板顶 ±0.1 m、不走路；url 音效 `babyCry`（`page.route` 喂生成的 WAV）装进声库并真放出一条 voice、`cellarSob` 404 只警告一次并进 `missingSfx`（这一趟因此**不带 `audio=0`**）；全程无未捕获错误；截图存 `_shots/EditorBlockoutPrevizRuntime/` |
 
 - 新模块登记 `index.html` import map（带 `?v=`）；`Style_EditorBlockout.css` 加 `<link>`；`Script_TestRunner` 登记上面四个测试与 `changedDomainRules`（`Blockout/` 目录归 editor 域）。
 - 验收只跑覆盖改动的测试（用户口径）；浏览器整趟每项 ≤ 2 次。
@@ -501,6 +515,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 
 ## 12. 变更记录
 
+- 2026-10-20（挂到车上 + 预演音效直接放文件，运行时包 M）：§3 单位加可选 `ride`（挂到 `cart` / `tank` / `litter` 上，`Script_EditorBlockoutConfig` 校验 / 归一化，`RideIssues` / `NormalizeRide` / `BLOCKOUT_RIDE_CARRIER_KINDS`）；§5.6 `BlockoutPuppets` 按车位姿摆挂着的人与担架、驴车尺寸实测 `BLOCKOUT_CART_SEATS`（车板顶 1.025 m）、`SitRootY` / `RideWorldPose`、Probe 多给 `ride` / `seat` / `rootAboveCarrierGround`；§14.1 预演键 `ride`（阶跃，挂着写位置键报警告）；§14.3 `PREVIZ_SFX` 可写 `{ url }` 直接放 `Audio/BlockoutPreviz/` 的文件（解码进声库、按位置放、读不到只警告一次），别名加 `babyCry` / `cellarSob` / `gateSmash` / `jarShatter`；门禁 ConfigTest / PrevizPlanTest 加用例、`PrevizRuntimeBrowserTest` 加车 + 挂人 + url 音效（不再带 `audio=0`）。0610 的数据（07 妮儿坐车尾改成 `ride`）由之后的集成一路改。
 - 2026-10-19（白盒预演补齐，运行时包）：§5.6 百姓 / 小孩换成能放片段的 NRA02 骨架占位身体（布换百姓色、帽徽 / 枪套 / 带子藏掉，军帽摘不掉），§3 单位 / spawn 可选 `body: "procedural"` 退回旧身体；军官片段不再被拦；§14.1 段里加 `aircraft[]`（机型 + 按时间航点 + 扫射段 + 引擎声，纯函数取样，镜头可锚飞机）与 `slowmo[]`（窗口倍率 + 渐变，人物 / 片段 / 特效 / 飞机 / 镜头一起慢，台词与音效照常）；§14.2 新模块 `Script_EditorBlockoutPrevizAircraft`、`State()` 多给 `timeScale` / `wallT` / `aircraft`；`Script_Actor.Create` 认 `options.uniformPalette`、`Script_UniformColors` 认十六进制色（不给 = 老路）；门禁 `Script_EditorBlockoutPrevizRuntimeBrowserTest`，0610 PrevizTest 放宽成「百姓 / 军官只许通用片段」。
 - 2026-10-13：初版（入口、数据格式、接口、界面、第一关 44 个关键帧、第二关草稿、测试与分工）。
 - 2026-10-13：追加「设置 → 高级工具」面板入口；`Script_EditorBlockoutConfig.mjs` 由集成负责人先写好；过渡改为按自然速度 + 整段快进；`Script_EditorBlockoutStore.mjs` 归 B 包。
@@ -608,6 +623,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
   - 朝向：`yawDeg` 或 `faceTo`（点 `{x,z}` 或单位 id 或 `"player"`）。走动中顺着行进方向（`drag` 反向），到点后 0.4 s 转到本键的朝向；本键没写朝向就保持到达时的行进方向，等后面的朝向键再转。
   - 姿态与状态：`stance`、`aim`、`state`（`"down"` 倒地）、`visible`、`carryRole`（`"front"` / `"rear"`，抬担架 / 拖单被）、`woundedWalk`、`talking`。这些与 `clip` 都是**阶跃**：取 t 之前最近写过这个字段的键。
   - 2026-10-18（第二轮）：`lie`（`"along"` / `null`，阶跃；没写过沿用关键帧单位 / spawn 的 `lie`）—— 倒地的人顺着朝向躺，见 §3、§5.6；倒地的人带位置的键照常写 `move`（`walk` 跟拖的人同速），运行时只平移、不起身，走动中朝向 = 行进方向（`drag` 反向），所以「头朝拖的人」= 用 `walk`。`weapon`（武器 id 或 `null`，阶跃）—— 换手里的武器（如班长 `Dadao` → `HanYang`）；**只有键里写过才有值**，`SamplePrevizActor` 在第一个 `weapon` 键之前返回 `undefined`（= 用造人时那把，不回填关键帧的缺省武器）。
+  - `ride`（2026-10-20，阶跃）：`{ on, x?, z?, y?, yawDeg? }` 挂到车 / 战车 / 担架上跟着走，`null` 下车；没写过沿用关键帧单位 / `spawn` 的 `ride`（`spawn` 里也能写）。口径同 §3、§5.6；`on` 要是关键帧里的单位或这一段 `spawn` 的、种类是 `cart` / `tank` / `litter`。**挂着时位置键不管用**（校验按键的顺序跟踪「此刻挂在谁身上」，挂着写 `x, z` 报警告「要下车先写 ride: null」）。`SamplePrevizActor` 多给 `ride`（归一化后的对象或 `null`）。
   - 投弹（2026-10-18 第三轮）：`throw: { x, z, h?, flightS? }`（一次性，键的 `t` = 开始抡）。这个人播步兵投弹片段 `GrenadeThrow`（游戏里扔手榴弹的同一个片段，§5.6），手里看得到手榴弹；`PREVIZ_THROW.releaseS`（2.15 s，= `INFANTRY_RELEASE_SECONDS`）脱手，弹沿抛物线飞到落点（地面 + `h`，缺省 0.15 m），飞行 `flightS` 秒（缺省按水平距离 0.55 + 0.06 × 米，夹在 0.6–1.8 s），弧顶比两端连线高 max(1.2, 0.22 × 距离) m；出手点 = 这一刻脚下 + 1.95 m、往前 0.25 m、往右 0.2 m。抡的 `PREVIZ_THROW.clipS`（4.2 s）里 `SamplePrevizActor` 给 `throw: { seconds, x, z }`、`clip` 让位、`stance` 记 `stand`。落点的爆炸照旧另写 `explosion` 事件，`t` = throw 的 `t` + 2.15 + 飞行秒数。`throw` 不能和 `clip` 写在同一个键。
   - 动作片段：`clip`（开场动作库等现成片段名，`null` = 清掉回原生动画）、`clipFrom`（从片段第几秒起）、`clipHold`（播完停在最后一帧；不写则播完回原生动画）。片段按骨架分：有 `castId` 的单位骨架固定，片段不在这具骨架上时退回原生动画并在状态里报一次（`Debug.Blockout.Previz.State().missingClips`）。
   - `clipRelease`（2026-10-19，片段秒数）：只对清单里带停住段（`holdLoop [a, b]`）的片段有用——片段播到这一秒放开停住段、接着放出口（开场动作层的 `pose.holdUntil`）；不写就一直在停住段里循环（0105 的 `PvStandPointL` 等靠这个停住）。0610 的撒尿看守（`VilIjaPissStand`）、压刺刀的鬼子（`VilIjaPinBayonet`）最后一遍写 `clipRelease: 2, clipHold: true`：系好裤子回头 / 被咬甩手后仰，放完停末帧。
@@ -655,7 +671,9 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 
 ### 14.3 音效别名（`sfx.name`）
 
-运行时把别名映射到现有音频库的键（映射表在 `Script_EditorBlockoutPreviz.mjs` 头部）；找不到的别名静默跳过并记进 `State().missingSfx`。
+运行时把别名映射到现有音频库的键（映射表 `PREVIZ_SFX` 在 `Script_EditorBlockoutPreviz.mjs` 头部）；找不到的别名静默跳过并记进 `State().missingSfx`。
+
+**2026-10-20 直接放文件**：`PREVIZ_SFX` 里的一项也可以写 `{ url: "./Audio/BlockoutPreviz/xxx.mp3" }`（相对页面）。播这一段之前（`Prepare`）把用到的文件解码进游戏音频引擎的声库（`audio.LoadVoices`，键 `blockoutPrevizSfx.<别名>`，缓存戳 `PREVIZ_SFX_URL_VERSION`，文件重做了就抬），放的时候走 `audio.Play("voice.blockoutPrevizSfx.<别名>", { position, volume })`，所以照样按事件的 `x / z` 定位（地面 + 1 m）、`volume` 起作用、受引擎的距离衰减 / 预算闸。文件读不到或解不开**只警告一次**（console）、记进 `missingSfx`（`别名→url`），预演照常播；`audio=0` 时不装不报。`State().urlSfx` → `{ loaded, failed, loading, played }`、`State().audioState`（音频上下文状态）。两张表（`PREVIZ_SFX_ALIASES` 与 `PREVIZ_SFX`）要一致，`PrevizPlanTest` 核对。
 
 | 别名 | 用在 |
 | --- | --- |
@@ -671,6 +689,10 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 | `slap` / `stab` / `bodyFall` | 02 审问 |
 | `planeDrone` / `planeDive` | 12–14 飞机远远嗡嗡、顺着大路俯冲下来（2026-10-19） |
 | `strafeNear` / `strafeFar` / `strafeDirt` | 13–14 扫射：近处一串、远处一串、子弹打在土里（2026-10-19） |
+| `babyCry` | 09-3 / 09-4 窖里的婴儿哭（文件 `Audio/BlockoutPreviz/Sfx_BabyCry.mp3`，2026-10-20） |
+| `cellarSob` | 09-3 / 09-4 地底下压着嗓子的哭（`Sfx_CellarSob.mp3`） |
+| `gateSmash` | 10-4 枪托砸门、一脚踹（`Sfx_GateSmash.mp3`，代替原来拿重物落地顶的） |
+| `jarShatter` | 09-7 陶罐摔碎、弹壳撒一地（`Sfx_JarShatter.mp3`，代替碎屑声） |
 
 ### 14.4 占位动作与说话姿态（2026-10-19）
 

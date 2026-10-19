@@ -22,6 +22,28 @@ export const BLOCKOUT_MG_WEAPONS = Object.freeze(["Type11", "Type92Hmg", "Zb26"]
 export const BLOCKOUT_LIE_MODES = Object.freeze(["along"]);
 /** 百姓 / 小孩的身体（§3 可选 body，2026-10-19）："rig" = 能放动作片段的骨骼占位身体（缺省）；"procedural" = 旧的程序化 tzm 身体。 */
 export const BLOCKOUT_BODY_MODES = Object.freeze(["rig", "procedural"]);
+/**
+ * 挂到车上（§3 可选 ride，2026-10-20）：能被人 / 担架挂上去的单位种类（车、战车、担架）。
+ * ride = { on: "<那个单位的 id>", x, z（车本地米，+x 右、−z 前）, y（演员根离车底下地面多高）, yawDeg（相对车头） }，null = 下车。
+ */
+export const BLOCKOUT_RIDE_CARRIER_KINDS = Object.freeze(["cart", "tank", "litter"]);
+
+/** ride 的毛病清单（空数组 = 合法）。at 是报错路径前缀（如 keyframes[3].units[2].ride）。null / undefined 不算错（= 不挂）。 */
+export function RideIssues(ride, at = "ride") {
+  if (ride === undefined || ride === null) return [];
+  if (!IsObject(ride)) return [`${at} 要是 { on, x?, z?, y?, yawDeg? } 或 null`];
+  const out = [];
+  if (typeof ride.on !== "string" || !ride.on) out.push(`${at}.on 要是车 / 战车 / 担架的单位 id`);
+  for (const k of ["x", "z", "y", "yawDeg"]) if (ride[k] !== undefined && !Finite(ride[k])) out.push(`${at}.${k} 要是有限数字`);
+  return out;
+}
+
+/** ride 归一化：{ on, x, z, y, yawDeg }（缺的补 0），不合法 / null → null。 */
+export function NormalizeRide(ride) {
+  if (!IsObject(ride) || typeof ride.on !== "string" || !ride.on) return null;
+  const n = (v) => (Finite(v) ? v : 0);
+  return { on: ride.on, x: n(ride.x), z: n(ride.z), y: n(ride.y), yawDeg: WrapDeg(n(ride.yawDeg)) };
+}
 
 /** 过渡缺省速度（米 / 秒），§3 单位表。 */
 export const BLOCKOUT_DEFAULT_SPEED = Object.freeze({ ija: 2.8, nra: 2.4, civ: 1.6, litter: 1.2, tank: 2.0 });
@@ -166,6 +188,25 @@ function CheckUnit(errors, warnings, at, unit) {
   if (unit.bearers !== undefined && !(Number.isInteger(unit.bearers) && unit.bearers >= 0 && unit.bearers <= 2)) errors.push(`${at}.bearers 要是 0–2 的整数`);
   if (unit.lie !== undefined && !BLOCKOUT_LIE_MODES.includes(unit.lie)) errors.push(`${at}.lie 要是 ${BLOCKOUT_LIE_MODES.join(" / ")}（不写 = 演员倒地姿态原样）`);
   if (unit.body !== undefined && !BLOCKOUT_BODY_MODES.includes(unit.body)) errors.push(`${at}.body 要是 ${BLOCKOUT_BODY_MODES.join(" / ")}（百姓 / 小孩的身体：骨骼占位 / 旧的程序化；不写 = rig）`);
+  // ride（2026-10-20）：挂到车 / 战车 / 担架上；对方要在同一帧里（CheckKeyframe 核对）
+  errors.push(...RideIssues(unit.ride, `${at}.ride`));
+  if (IsObject(unit.ride) && unit.ride.on === unit.id) errors.push(`${at}.ride.on 不能是自己`);
+  if (IsObject(unit.ride) && unit.ride.on && BLOCKOUT_RIDE_CARRIER_KINDS.includes(unit.kind) && unit.kind !== "litter") errors.push(`${at}.ride：${unit.kind} 不能挂到别的单位上（只有人和担架能挂）`);
+  if (IsObject(unit.ride) && unit.ride.on && unit.kind === "litter" && Number.isInteger(unit.bearers) && unit.bearers > 0) warnings.push(`${at} 挂在车上的担架 bearers 应当是 0（抬担架的人会悬在车边）`);
+}
+
+/** 同一帧里 ride.on 指的单位要存在、是车 / 战车 / 担架、自己没再挂到别人身上（不许链）。 */
+function CheckRideTargets(errors, at, units) {
+  const byId = new Map();
+  for (const u of units) if (IsObject(u) && typeof u.id === "string") byId.set(u.id, u);
+  units.forEach((u, i) => {
+    if (!IsObject(u) || !IsObject(u.ride) || typeof u.ride.on !== "string" || !u.ride.on || u.ride.on === u.id) return;
+    const carrier = byId.get(u.ride.on);
+    if (!carrier) { errors.push(`${at}.units[${i}].ride.on 在这一帧里找不到：${u.ride.on}`); return; }
+    const kind = BLOCKOUT_KINDS.includes(carrier.kind) ? carrier.kind : "soldier";
+    if (!BLOCKOUT_RIDE_CARRIER_KINDS.includes(kind)) errors.push(`${at}.units[${i}].ride.on 指的 ${u.ride.on} 是 ${kind}，只能挂到 ${BLOCKOUT_RIDE_CARRIER_KINDS.join(" / ")} 上`);
+    if (IsObject(carrier.ride) && carrier.ride.on) errors.push(`${at}.units[${i}].ride.on 指的 ${u.ride.on} 自己也挂在别的单位上（不许一层层挂）`);
+  });
 }
 
 function CheckKeyframe(errors, warnings, at, kf) {
@@ -207,6 +248,7 @@ function CheckKeyframe(errors, warnings, at, kf) {
           seen.add(unit.id);
         }
       });
+      CheckRideTargets(errors, at, kf.units);
     }
   }
   if (kf.pois !== undefined) {
@@ -340,6 +382,9 @@ function NormalizeUnit(raw, arcMode) {
   if (!BLOCKOUT_LIE_MODES.includes(unit.lie)) delete unit.lie;
   // body（2026-10-19）只认 rig / procedural；没写或写错都去掉（= 运行时缺省 rig）
   if (!BLOCKOUT_BODY_MODES.includes(unit.body)) delete unit.body;
+  // ride（2026-10-20）：{ on, x, z, y, yawDeg } 补齐缺省；没写 / null / 写错都去掉（= 不挂）
+  const ride = NormalizeRide(unit.ride);
+  if (ride && ride.on !== unit.id) unit.ride = ride; else delete unit.ride;
   unit.yawDeg = NormalizeYawFrom(unit, unit);
   delete unit.faceTo;
   unit.speedMps = Finite(unit.speedMps) && unit.speedMps > 0 ? unit.speedMps : DefaultSpeed(unit);

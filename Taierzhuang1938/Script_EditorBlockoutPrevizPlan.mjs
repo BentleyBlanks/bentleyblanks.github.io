@@ -12,10 +12,16 @@
 //   SamplePrevizAircraft(entry, t, opts)  飞机轨（2026-10-19）：按时间航点取位置 / 机头 / 爬升 / 坡度；PrevizStrafeImpacts 取扫射弹着点
 //   PrevizTimeScale(seq, t) / PrevizWallTime(seq, t) / PrevizTimeFromWall(seq, wall)  慢动作（2026-10-19）：预演时间 ↔ 墙上时间
 //
+// 2026-10-20：演员键 ride（阶跃，{ on, x, z, y, yawDeg } | null，口径同配置 §3 的 ride，校验 / 归一化借 Script_EditorBlockoutConfig）：
+//   挂在车 / 战车 / 担架上跟着走，位置键不管用（校验报警告）；SamplePrevizActor 多给 ride。音效别名加 babyCry / cellarSob /
+//   gateSmash / jarShatter（运行时 PREVIZ_SFX 直接放音频文件）。
+//
 // 位置键的时间语义（运行时包与集成负责人 10-18 对齐）：带 x / z 的键的 t = 到达时刻。
 // 从上一个有位置的键（没有就是关键帧布设、t = 0）出发，按 move 的自然速度走，
 // 出发时刻 = max(上一个位置键 t, 本键 t − 路长 / 速度)；窗口不够就从上一个位置键起匀速赶到。
 // t = 0 的位置键 = 开场直接摆在那里。move:"cut" = 到点瞬移。
+
+import { RideIssues, NormalizeRide, BLOCKOUT_RIDE_CARRIER_KINDS } from "./Script_EditorBlockoutConfig.mjs";
 
 export const BLOCKOUT_PREVIZ_SCHEMA = "tengxian-blockout-previz/1";
 
@@ -30,6 +36,8 @@ export const PREVIZ_SFX_ALIASES = Object.freeze([
   "artilleryFar", "artilleryNear", "shellBlast", "tinnitus", "mgBurstFar", "mgBurstNear", "rifleVolley", "rifleShot",
   "mortarPop", "mortarImpact", "grenadeBlast", "tankTracks", "tankGun", "dirtFall", "slap", "stab", "bodyFall",
   "planeDrone", "planeDive", "strafeNear", "strafeFar", "strafeDirt",
+  // 2026-10-20（06–10 耿家庄）：直接放 Audio/BlockoutPreviz/ 里的文件（运行时 PREVIZ_SFX 写 url）
+  "babyCry", "cellarSob", "gateSmash", "jarShatter",
 ]);
 /**
  * 投弹（演员键 throw，2026-10-18 第三轮）：throw 键的 t = 开始抡（播步兵投弹片段 GrenadeThrow，Script_InfantryAnimation「背枪投弹」）。
@@ -57,7 +65,7 @@ export const PREVIZ_AIRCRAFT = Object.freeze({
  *（夹到 dur/2）。rate 下限 rateMin（再慢就是定格）；台词不排在慢动作里（校验报警告）。
  */
 export const PREVIZ_SLOWMO = Object.freeze({ rateMin: 0.05, rateMax: 1, fadeDefaultS: 0.25 });
-const KEY_FIELDS = ["stance", "aim", "state", "visible", "carryRole", "woundedWalk", "talking", "clip", "lie", "weapon"];
+const KEY_FIELDS = ["stance", "aim", "state", "visible", "carryRole", "woundedWalk", "talking", "clip", "lie", "weapon", "ride"];
 /** 倒地怎么躺（同配置 §3 的 lie）："along" = 顺着朝向躺、头朝前；null = 演员倒地姿态原样。 */
 export const PREVIZ_LIE_MODES = Object.freeze(["along"]);
 const ID_RE = /^[A-Za-z0-9_-]+$/;
@@ -276,6 +284,12 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
       } else if (units && typeof a.id === "string" && !units.has(a.id)) errors.push(`${aat}.id 在关键帧 ${seq.keyframe} 里找不到（临时加人要写 spawn）：${a.id}`);
       if (!Array.isArray(a.keys)) { errors.push(`${aat}.keys 要是数组`); return; }
       let lastT = -Infinity;
+      // ride（2026-10-20）：从关键帧单位 / spawn 的 ride 起，按键的顺序跟踪「此刻挂在谁身上」，挂着时写位置键只报警告（运行时不管它）
+      let riding = NormalizeRide(a.spawn?.ride ?? (units && typeof a.id === "string" ? KeyframeUnit(config, seq.keyframe, a.id)?.ride : null));
+      StableSortByT(a.keys.filter(k => IsObject(k) && Finite(k.t))).forEach((k) => {
+        if (k.ride !== undefined) riding = NormalizeRide(k.ride);
+        else if (riding && k.x !== undefined) warnings.push(`${aat} t=${k.t} 的位置键不管用：这时挂在 ${riding.on} 上（要下车先写 ride: null）`);
+      });
       a.keys.forEach((k, ki) => {
         const kat = `${aat}.keys[${ki}]`;
         if (!IsObject(k)) { errors.push(`${kat} 要是对象`); return; }
@@ -283,6 +297,19 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
         else { if (k.t < lastT) warnings.push(`${kat}.t 比上一个键早（会按 t 重新排序）`); lastT = k.t; }
         if ((k.x === undefined) !== (k.z === undefined)) errors.push(`${kat} 的 x / z 要同时给`);
         else if (k.x !== undefined && (!Finite(k.x) || !Finite(k.z))) errors.push(`${kat} 的 x / z 要是有限数字`);
+        if (k.ride !== undefined && k.ride !== null) {
+          errors.push(...RideIssues(k.ride, `${kat}.ride`));
+          const on = IsObject(k.ride) ? k.ride.on : null;
+          if (typeof on === "string" && on) {
+            if (on === a.id) errors.push(`${kat}.ride.on 不能是自己`);
+            else if (units && !units.has(on) && !SpawnIds(seq).has(on)) errors.push(`${kat}.ride.on 在关键帧 ${seq.keyframe} 里找不到：${on}`);
+            else {
+              const carrier = SpawnOf(seq, on) || (config ? KeyframeUnit(config, seq.keyframe, on) : null);
+              const kind = carrier ? (carrier.kind || "soldier") : null;
+              if (kind && !BLOCKOUT_RIDE_CARRIER_KINDS.includes(kind)) errors.push(`${kat}.ride.on 指的 ${on} 是 ${kind}，只能挂到 ${BLOCKOUT_RIDE_CARRIER_KINDS.join(" / ")} 上`);
+            }
+          }
+        }
         if (k.path !== undefined) {
           if (!Array.isArray(k.path)) errors.push(`${kat}.path 要是 {x,z} 数组`);
           else k.path.forEach((p, pi) => { if (!IsPoint(p)) errors.push(`${kat}.path[${pi}] 要带有限的 x / z`); });
@@ -370,6 +397,16 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
 
 function SpawnIds(seq) {
   return new Set((Array.isArray(seq?.actors) ? seq.actors : []).filter(a => IsObject(a) && a.spawn && typeof a.id === "string").map(a => a.id));
+}
+/** 这一段里 id 的 spawn（带 kind 等字段）；没有 → null。 */
+function SpawnOf(seq, id) {
+  const a = (Array.isArray(seq?.actors) ? seq.actors : []).find(a => IsObject(a) && IsObject(a.spawn) && a.id === id);
+  return a ? a.spawn : null;
+}
+/** 配置里某关键帧的某个单位；没有 → null。 */
+function KeyframeUnit(config, keyframeId, unitId) {
+  const kf = config?.keyframes?.find(k => k?.id === keyframeId);
+  return kf ? (kf.units || []).find(u => u?.id === unitId) || null : null;
 }
 function AircraftIds(seq) {
   return new Set((Array.isArray(seq?.aircraft) ? seq.aircraft : []).filter(p => IsObject(p) && typeof p.id === "string").map(p => p.id));
@@ -742,7 +779,9 @@ function StepField(track, name, t) {
  * lie：阶跃，没写过就沿用 baseUnit.lie（"along" / null）；weapon：阶跃，**只有键里写过才有值**（undefined = 用造人时那把，
  * 关键帧单位的缺省武器不在这里回填 —— 否则空手的翻译会被塞一支 Type38）。
  * throw：throw 键起 PREVIZ_THROW.clipS 秒内 = { seconds（抡了几秒）, x, z（落点）}，期间 clip 让位、stance 记 stand；否则 null。
- * @returns {{x,z,yawDeg,stance,aim,state,lie,weapon,visible,carryRole,woundedWalk,talking,clip,clipSeconds,clipHold,throw,moving,speedMps,move}}
+ * ride（2026-10-20）：阶跃，没写过沿用 baseUnit / spawn 的 ride；归一化成 { on, x, z, y, yawDeg } 或 null。挂着时 x / z / yawDeg / moving
+ * 照位置键算（运行时不用它们，按车的位姿摆人，位置键写了由校验报警告）。
+ * @returns {{x,z,yawDeg,stance,aim,state,lie,weapon,ride,visible,carryRole,woundedWalk,talking,clip,clipSeconds,clipHold,throw,moving,speedMps,move}}
  */
 export function SamplePrevizActor(entry, t, baseUnit, opts = {}) {
   const track = CompilePrevizActor(entry, baseUnit);
@@ -782,6 +821,7 @@ export function SamplePrevizActor(entry, t, baseUnit, opts = {}) {
     state: Value("state", base.state === "down" ? "down" : "alive"),
     lie: PREVIZ_LIE_MODES.includes(Value("lie", base.lie)) ? Value("lie", base.lie) : null,
     weapon: Value("weapon", undefined),
+    ride: NormalizeRide(Value("ride", base.ride ?? null)),
     visible: Value("visible", true) !== false,
     carryRole: Value("carryRole", null) || null,
     woundedWalk: !!Value("woundedWalk", false),

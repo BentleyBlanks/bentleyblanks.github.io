@@ -14,6 +14,7 @@ import {
   PrevizSequenceDuration, PrevizOverlays, PrevizActiveLines, PrevizSignalsAt, PREVIZ_MOVE_SPEED, PREVIZ_EYE_HEIGHT, PrevizShakeOffset,
   BlockStandSampler, PREVIZ_THROW, PrevizThrows, SampleThrowFlight,
   PREVIZ_AIRCRAFT, SamplePrevizAircraft, PrevizStrafeImpacts, PREVIZ_SLOWMO, PrevizTimeScale, PrevizWallTime, PrevizTimeFromWall,
+  PREVIZ_SFX_ALIASES,
 } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { INFANTRY_RELEASE_SECONDS } from "./Script_InfantryAnimation.mjs";
 import { AIRCRAFT_ASSETS } from "./Data_AircraftAssets.mjs";
@@ -416,6 +417,61 @@ Test("慢动作：倍率在窗口外是 1、平台是 rate、渐变连续；预�
   // 没有慢动作：两条时钟相同
   const plain = NormalizeBlockoutPreviz(Doc({})).sequences[0];
   Near(PrevizWallTime(plain, 3.3), 3.3); Near(PrevizTimeFromWall(plain, 3.3), 3.3); Near(PrevizTimeScale(plain, 1), 1);
+});
+
+// 2026-10-20：挂到车上（演员键 ride）与直接放文件的音效别名
+Test("ride：合法键通过；on 找不到 / 不是车 / 自己 报错；挂着时写位置键只警告；SamplePrevizActor 的 ride 阶跃且沿用关键帧单位的", () => {
+  const cfg = NormalizeBlockout({
+    schema: "tengxian-blockout/1", level: "Test", title: "t",
+    keyframes: [{ id: "k", stage: 1, name: "a", player: { x: 0, z: 0 }, units: [
+      { id: "Cart", side: "civ", kind: "cart", x: 10, z: 10, yawDeg: -90 },
+      { id: "Kid", side: "civ", kind: "child", x: 0, z: 0, ride: { on: "Cart", z: 1.2, y: 0.467, yawDeg: 180 } },
+      { id: "Man", side: "nra", x: 2, z: 2 },
+    ] }],
+  });
+  const Doc = (actors) => ({ schema: BLOCKOUT_PREVIZ_SCHEMA, level: "Test", sequences: [{ keyframe: "k", actors }] });
+  const good = Doc([
+    { id: "Man", keys: [{ t: 1, ride: { on: "Cart", x: 0.3, z: -0.5, y: 1.025 } }, { t: 8, ride: null }, { t: 9, x: 5, z: 5 }] },
+    { id: "Kid", keys: [{ t: 3, ride: null }, { t: 6, x: 1, z: 1 }] },
+    { id: "L", spawn: { side: "nra", kind: "litter", bearers: 0, x: 0, z: 0 }, keys: [{ t: 0, ride: { on: "Cart", y: 1.075 } }] },
+    { id: "Man2", spawn: { side: "nra", x: 0, z: 0 }, keys: [{ t: 0, ride: { on: "L" } }] },   // 挂到 spawn 的担架上（校验按 spawn 的 kind）
+  ]);
+  const r = ValidateBlockoutPreviz(good, { config: cfg });
+  assert.ok(r.ok, r.errors.join("；"));
+  assert.equal(r.warnings.filter(w => w.includes("位置键不管用")).length, 0, r.warnings.join("；"));
+  // 挂着时写位置键：警告（关键帧里就挂着的 Kid 没先写 ride:null 就走）
+  const warned = ValidateBlockoutPreviz(Doc([{ id: "Kid", keys: [{ t: 2, x: 1, z: 1 }] }, { id: "Man", keys: [{ t: 0, ride: { on: "Cart" } }, { t: 1, x: 3, z: 3 }] }]), { config: cfg });
+  assert.ok(warned.ok);
+  assert.equal(warned.warnings.filter(w => w.includes("位置键不管用")).length, 2, warned.warnings.join("；"));
+  const bad = ValidateBlockoutPreviz(Doc([
+    { id: "Man", keys: [{ t: 0, ride: { on: "Nobody" } }, { t: 1, ride: { on: "Man" } }, { t: 2, ride: { on: "Kid" } }, { t: 3, ride: "Cart" }, { t: 4, ride: { on: "Cart", y: "x" } }] },
+  ]), { config: cfg });
+  const all = bad.errors.join("\n");
+  for (const want of ["keys[0].ride.on 在关键帧 k 里找不到：Nobody", "keys[1].ride.on 不能是自己", "keys[2].ride.on 指的 Kid 是 child", "keys[3].ride 要是 { on", "keys[4].ride.y 要是有限数字"]) assert.ok(all.includes(want), `缺：${want}\n${all}`);
+  // 取样：Man 1 s 起挂、8 s 下车；Kid 关键帧里就挂着、3 s 下车
+  const n = NormalizeBlockoutPreviz(good).sequences[0];
+  const man = n.actors[0], kid = n.actors[1];
+  const baseOf = (id) => cfg.keyframes[0].units.find(u => u.id === id);
+  assert.equal(SamplePrevizActor(man, 0.5, baseOf("Man")).ride, null);
+  assert.deepEqual(SamplePrevizActor(man, 1, baseOf("Man")).ride, { on: "Cart", x: 0.3, z: -0.5, y: 1.025, yawDeg: 0 });
+  assert.deepEqual(SamplePrevizActor(man, 7.9, baseOf("Man")).ride, { on: "Cart", x: 0.3, z: -0.5, y: 1.025, yawDeg: 0 });
+  assert.equal(SamplePrevizActor(man, 8, baseOf("Man")).ride, null);
+  assert.deepEqual(SamplePrevizActor(kid, 0, baseOf("Kid")).ride, { on: "Cart", x: 0, z: 1.2, y: 0.467, yawDeg: 180 });
+  assert.equal(SamplePrevizActor(kid, 3, baseOf("Kid")).ride, null);
+  // spawn 的 ride 也沿用
+  assert.deepEqual(SamplePrevizActor(n.actors[3], 0, null).ride, { on: "L", x: 0, z: 0, y: 0, yawDeg: 0 });
+});
+
+Test("音效别名：§14.3 的四个新别名在 PREVIZ_SFX_ALIASES 里；运行时 PREVIZ_SFX 两张表一致，新别名是 Audio/BlockoutPreviz 下的 url", () => {
+  for (const name of ["babyCry", "cellarSob", "gateSmash", "jarShatter"]) assert.ok(PREVIZ_SFX_ALIASES.includes(name), name);
+  const src = ReadText(path.join(projectDir, "Script_EditorBlockoutPreviz.mjs"));
+  const table = src.slice(src.indexOf("export const PREVIZ_SFX = Object.freeze({"), src.indexOf("});", src.indexOf("export const PREVIZ_SFX = Object.freeze({")));
+  for (const name of PREVIZ_SFX_ALIASES) assert.ok(new RegExp(`^\\s+${name}:\\s*\\{`, "m").test(table), `PREVIZ_SFX 里没有 ${name}`);
+  const keys = [...table.matchAll(/^\s+([A-Za-z]+):\s*\{/gm)].map(m => m[1]);
+  for (const k of keys) assert.ok(PREVIZ_SFX_ALIASES.includes(k), `PREVIZ_SFX_ALIASES 里没有 ${k}`);
+  for (const [name, file] of [["babyCry", "Sfx_BabyCry"], ["cellarSob", "Sfx_CellarSob"], ["gateSmash", "Sfx_GateSmash"], ["jarShatter", "Sfx_JarShatter"]]) {
+    assert.ok(new RegExp(`^\\s+${name}:\\s*\\{\\s*url:\\s*"\\./Audio/BlockoutPreviz/${file}\\.mp3"`, "m").test(table), `${name} 应当是 url ./Audio/BlockoutPreviz/${file}.mp3`);
+  }
 });
 
 // 仓库里有预演文件时（预演数据包写的），它要对着配置与清单过校验

@@ -44,6 +44,13 @@
 //   · Probe 再多给 body（"rig" / "procedural"）、rigged、两手的世界坐标（handR / handL）、mixerTime（量慢动作里动画是不是真慢了）。
 //   · lie:"along" 摆法改成「头、骨盆、两脚」的包围框中心落在单位位置上、身体轴取骨盆→头 ±8° 里最窄的方向，倒地片段固定用
 //     腿蜷得最窄的 DeathCollapseC（LIE_DEATH_VARIANT）；倒着的人换成 lie:"along" 时重造一次。冬瓜在 0.7 m 宽的单被上不再伸出一只脚。
+//
+// 2026-10-20（挂到车上，§3 / §5.6 ride）：
+//   · 单位 / 预演键 ride = { on, x, z, y, yawDeg }：这个人（或担架）每帧的位姿 = 车（cart / tank / litter）当前位姿 ∘ 本地偏移，
+//     不贴地、不走路（位置键不管用，Drive 时报一次警告），片段照播（坐、抖、趴）。车的位姿从车那个 puppet 自己的状态算
+//     （_CarrierPose，不读它的 three 对象，所以先摆谁都一样）。挂着的担架平放（不按 LitterPose 抬 / 斜）。
+//   · 车的尺寸实测写成 BLOCKOUT_CART_SEATS：车板顶 1.025 m（车板 0.55 厚、中心 0.75）、车尾在本地 z = +1.2；坐车尾的人
+//     y = 车板顶 − 片段坐高 × 缩放（VilSitEdge 坐高 0.90，小孩 0.62 → 1.025 − 0.558 = 0.467）。Probe 多给 ride / seat。
 
 import * as THREE from "three";
 import { SampleTransition } from "./Script_EditorBlockoutConfig.mjs";
@@ -84,6 +91,45 @@ export const BLOCKOUT_PUPPETS = Object.freeze({
 });
 
 const DEG = Math.PI / 180;
+
+/**
+ * 驴车（kind:"cart"，_MakeBody）上能坐人的地方（车本地米：+x 右、−z 前；y 离车底下地面）。2026-10-20 从 BLOCKOUT_PUPPETS.cart 量出来：
+ * 车板一整块 1.5 宽 × 2.4 长 × 0.55 厚，中心离地 0.75 → 车板顶 1.025 m、车板底 0.475 m；车尾板顶 = 车板顶（白盒车没另做尾板），
+ * 车尾沿在本地 z = +1.2，车辕朝 −z。坐车尾的人 ride.y = SitRootY(车尾板顶, 片段坐高, 缩放)：VilSitEdge 坐高 0.90 m（根在屁股正下方的地上，
+ * 坐沿在根上方 0.90 m），小孩 × 0.62 → 0.467。躺在车板上的担架 ride.y = litterY（担架布 0.1 厚、布底贴车板）。
+ */
+export const BLOCKOUT_CART_SEATS = Object.freeze((() => {
+  const c = BLOCKOUT_PUPPETS.cart;
+  const bedTopY = c.y + c.h / 2, bedBottomY = c.y - c.h / 2;
+  return {
+    w: c.w, d: c.d, bedTopY, bedBottomY, tailZ: c.d / 2,
+    /** 车尾板：坐沿在车尾沿上（屁股在车板顶、腿垂在车外、背对车头 = yawDeg 180）。 */
+    tail: Object.freeze({ x: 0, z: c.d / 2, y: bedTopY, yawDeg: 180 }),
+    /** 车板中间（坐 / 趴在货上）。 */
+    bed: Object.freeze({ x: 0, z: 0, y: bedTopY, yawDeg: 0 }),
+    /** 担架平放在车板上时的 ride.y（担架组原点在布的中心，布 0.1 厚）。 */
+    litterY: bedTopY + 0.05,
+    /** VilSitEdge 这类坐沿片段的坐高（根 → 坐沿，米，缩放 1）。 */
+    sitEdgeClipH: 0.9,
+  };
+})());
+
+/** 坐在 seatY 高的沿上、片段坐高 clipSitH（缩放前）的人，根应当离车底下地面多高：seatY − clipSitH × scale。 */
+export function SitRootY(seatY, clipSitH = BLOCKOUT_CART_SEATS.sitEdgeClipH, scale = 1) {
+  return seatY - clipSitH * scale;
+}
+
+/**
+ * ride 的本地偏移 → 世界位姿（纯函数）：carrier = { x, z, yawDeg, y（车底下地面；担架时是担架面） }。
+ * → { x, z, y, yawDeg }（yawDeg 已 wrap）。本地 +x 右、−z 前，与 TankGroundY 的脚印旋转同式。
+ */
+export function RideWorldPose(carrier, ride) {
+  const ry = carrier.yawDeg * DEG, c = Math.cos(ry), s = Math.sin(ry);
+  const lx = ride.x || 0, lz = ride.z || 0;
+  let yaw = carrier.yawDeg + (ride.yawDeg || 0);
+  yaw = ((yaw + 180) % 360 + 360) % 360 - 180;
+  return { x: carrier.x + lx * c + lz * s, z: carrier.z - lx * s + lz * c, y: carrier.y + (ride.y || 0), yawDeg: yaw };
+}
 
 /**
  * 百姓的骨骼占位身体长什么样（2026-10-19）：NRA 士兵骨架（modelVariant 1 = TengxianNra02，预演动作库烘在它上面）、
@@ -382,12 +428,12 @@ export class BlockoutPuppets {
     this.plan = null;
     this.planTime = 0;
     this._Sync(units, cameraPosition);
+    // 先把所有人的状态写好再摆（挂在车上的人要读车的状态，顺序不能影响结果）
     for (const unit of units) {
-      const puppet = this.puppets.get(unit.id);
-      Object.assign(puppet, { x: unit.x, z: unit.z, yawDeg: unit.yawDeg, stance: unit.stance, moving: false, speedMps: 0, visible: true,
+      Object.assign(this.puppets.get(unit.id), { x: unit.x, z: unit.z, yawDeg: unit.yawDeg, stance: unit.stance, moving: false, speedMps: 0, visible: true,
         down: unit.state === "down" });
-      this._Pose(puppet, 0, true);
     }
+    for (const unit of units) this._Pose(this.puppets.get(unit.id), 0, true);
   }
 
   /**
@@ -413,8 +459,9 @@ export class BlockoutPuppets {
       if (!puppet) continue;
       puppet.x = s.x; puppet.z = s.z; puppet.yawDeg = s.yawDeg; puppet.stance = s.stance;
       puppet.moving = s.moving; puppet.speedMps = s.speedMps; puppet.visible = s.visible;
-      if (snap) this._Pose(puppet, 0, true);
     }
+    // 状态全写完再摆（挂在车上的人读车的状态）
+    if (snap) for (const s of states) { const puppet = this.puppets.get(s.id); if (puppet) this._Pose(puppet, 0, true); }
   }
 
   _Finish() {
@@ -444,7 +491,11 @@ export class BlockoutPuppets {
       puppet.moving = !!drive.moving; puppet.speedMps = drive.speedMps || 0; puppet.visible = drive.visible !== false;
       puppet.down = drive.state === "down";
     }
-    const y = puppet.unit.kind === "tank" ? TankGroundY(this.groundAt, puppet.x, puppet.z, puppet.yawDeg) : this.groundAt(puppet.x, puppet.z);
+    // 2026-10-20 挂到车上（ride）：位姿 = 车当前位姿 ∘ 本地偏移，不贴地、不走路；位置键不管用
+    const seat = this._Seat(puppet);
+    puppet.seat = seat;
+    if (seat) { puppet.x = seat.x; puppet.z = seat.z; puppet.yawDeg = seat.yawDeg; puppet.moving = false; puppet.speedMps = 0; }
+    const y = seat ? seat.y : puppet.unit.kind === "tank" ? TankGroundY(this.groundAt, puppet.x, puppet.z, puppet.yawDeg) : this.groundAt(puppet.x, puppet.z);
     const ry = puppet.yawDeg * DEG;
     if (puppet.body) {
       puppet.body.visible = puppet.visible;
@@ -452,7 +503,8 @@ export class BlockoutPuppets {
       puppet.body.rotation.y = ry;
       const bed = puppet.body.userData.stretcher;
       if (bed) {
-        const pose = LitterPose(puppet.unit, !!puppet.down);
+        // 挂在车上的担架平放（担架组原点 = 布中心）；地上 / 手上的照 LitterPose
+        const pose = seat ? { y: 0, tilt: 0 } : LitterPose(puppet.unit, !!puppet.down);
         bed.position.y = pose.y;
         bed.rotation.x = pose.tilt;
       }
@@ -470,14 +522,15 @@ export class BlockoutPuppets {
       }
       actor.root.visible = puppet.visible;
       const lieAlong = this._LieAlong(puppet, human, drive);
-      actor.root.position.set(x, puppet.down && !litter0(unit) ? this.DownGround(x, z) : this.groundAt(x, z), z);
+      // 挂在车上：根放在车底下地面 + ride.y（不贴地）；否则倒地的取身体范围里最低的地面、站着的取脚下
+      actor.root.position.set(x, seat ? seat.y : puppet.down && !litter0(unit) ? this.DownGround(x, z) : this.groundAt(x, z), z);
       actor.root.rotation.y = ry;
       human.soldier.yaw = ry;
       if (lieAlong && human.lieLocal) this._PlaceLying(human, x, z, ry);
       // 2026-10-19：顺着躺的人播躺姿片段（PvLieGrabSleeve）照样按头的方向摆；片段带 rootPath（PvClimbOutTrench）按它挪根
       const lieClip = this._LieClip(puppet, human, drive);
       if (lieClip && human.lieClip?.clip === drive.clip && human.lieClip.L) this._PlaceLying(human, x, z, ry, human.lieClip.L);
-      this._ApplyRootPath(human, drive, ry);
+      if (!seat) this._ApplyRootPath(human, drive, ry);
       this._SyncWeapon(human, drive);
       if (human.kind === "ija" || human.soldier.relaxedGait) EnsureRelaxedGait(human.soldier);
       human.animDt += dt;
@@ -557,6 +610,40 @@ export class BlockoutPuppets {
     }
     this.elapsed += dt * rate;
     for (const puppet of this.puppets.values()) this._Pose(puppet, dt * rate, false, cameraPosition);
+  }
+
+  // -------------------------------------------------------------------------
+  // 挂到车上（§3 / §5.6 ride，2026-10-20）
+
+  /** 这个 puppet 此刻挂在谁身上：预演驱动写了 ride 用它（null = 下车），否则用关键帧单位的。→ { on, x, z, y, yawDeg } | null */
+  _RideOf(puppet) {
+    const drive = puppet.drive;
+    const r = drive && drive.ride !== undefined ? drive.ride : puppet.unit.ride;
+    return r && typeof r.on === "string" && r.on && r.on !== puppet.id ? r : null;
+  }
+
+  /**
+   * 车（cart / tank / litter）此刻的位姿，从它自己的状态算（驱动值优先；不读 three 对象，所以这一帧先摆谁都一样）。
+   * y = 车底下地面（战车按脚印最高点）；担架当车时 y 是担架面中心。depth 防一层层挂（校验本来就不许）。→ { x, z, y, yawDeg } | null
+   */
+  _CarrierPose(id, depth = 0) {
+    const carrier = this.puppets.get(id);
+    if (!carrier || depth > 2) return null;
+    const d = carrier.drive;
+    const x = d ? d.x : carrier.x, z = d ? d.z : carrier.z, yawDeg = d ? d.yawDeg : carrier.yawDeg;
+    const ride = this._RideOf(carrier);
+    const above = ride ? this._CarrierPose(ride.on, depth + 1) : null;
+    const pose = above ? RideWorldPose(above, ride) : { x, z, yawDeg, y: carrier.unit.kind === "tank" ? TankGroundY(this.groundAt, x, z, yawDeg) : this.groundAt(x, z) };
+    if (carrier.unit.kind === "litter") pose.y += above ? 0 : LitterPose(carrier.unit, d ? d.state === "down" : !!carrier.down).y;
+    return pose;
+  }
+
+  /** 挂着时这个 puppet 的世界位姿（含 y）；没挂 / 车不在场 → null。 */
+  _Seat(puppet) {
+    const ride = this._RideOf(puppet);
+    if (!ride) return null;
+    const carrier = this._CarrierPose(ride.on);
+    return carrier ? { ...RideWorldPose(carrier, ride), on: ride.on, carrierY: carrier.y } : null;
   }
 
   // -------------------------------------------------------------------------
@@ -767,6 +854,11 @@ export class BlockoutPuppets {
     const puppet = this.puppets.get(id);
     if (!puppet) return false;
     puppet.drive = state || null;
+    // 挂在车上时位置键不管用：报一次（校验那头也会警告）
+    if (state?.ride && state.moving && !puppet.rideMoveWarned) {
+      puppet.rideMoveWarned = true;
+      console.warn(`[BlockoutPuppets] ${id} 挂在 ${state.ride.on} 上，预演里的位置键不管用（要下车先写 ride: null）`);
+    }
     return true;
   }
 
@@ -833,6 +925,11 @@ export class BlockoutPuppets {
       mixerTime: rig?.mixer?.time ?? null,
       shownClip: rig?.openingStoryboardState?.clipId ?? null, shownClipSeconds: rig?.openingStoryboardState?.seconds ?? null,
       hiddenParts: rig ? (() => { let n = 0; rig.root.traverse(o => { if (o.userData?.blockoutCivilianHidden) n++; }); return n; })() : 0,
+      // 2026-10-20：挂在车上 —— ride 写的是什么、这一帧算出来的座位（世界位姿 + 车底下地面）、根离车底下地面多高
+      ride: (() => { const r = this._RideOf(puppet); return r ? { on: r.on, x: r.x ?? 0, z: r.z ?? 0, y: r.y ?? 0, yawDeg: r.yawDeg ?? 0 } : null; })(),
+      seat: puppet.seat ? { ...puppet.seat } : null,
+      rootY: human ? human.actor.root.position.y : (puppet.body ? puppet.body.position.y : null),
+      rootAboveCarrierGround: puppet.seat && (human || puppet.body) ? (human ? human.actor.root.position.y : puppet.body.position.y) - puppet.seat.carrierY : null,
     };
   }
 

@@ -620,5 +620,35 @@ Check("单位可选 lie（2026-10-18）：只认 along；不写的单位归一�
   for (const level of ["FirstLevel", "SecondLevel"]) for (const k of COMMITTED[level].keyframes) for (const u of k.units) assert.ok(!("lie" in u), `${level} ${k.id} ${u.id} 不该有 lie`);
 });
 
+Check("单位可选 ride（2026-10-20）：挂到车 / 战车 / 担架上；对方要在同一帧、不许自己挂自己、不许一层层挂、车不能挂；归一化补齐 x/z/y/yawDeg", () => {
+  const base = { schema: BLOCKOUT_SCHEMA, level: "T", title: "t", keyframes: [{ id: "a", stage: 1, name: "a", player: { x: 0, z: 0 }, units: [] }] };
+  const With = (...units) => ({ ...base, keyframes: [{ ...base.keyframes[0], units }] });
+  const cart = { id: "Cart", side: "civ", kind: "cart", x: 10, z: 10, yawDeg: -90 };
+  const kid = { id: "Kid", side: "civ", kind: "child", x: 0, z: 0, ride: { on: "Cart", z: 1.2, y: 0.467, yawDeg: 180 } };
+  assert.ok(ValidateBlockout(With(cart, kid)).ok, ValidateBlockout(With(cart, kid)).errors.join("; "));
+  // 担架也能挂到车上（bearers 0）；bearers > 0 只警告
+  const litter = { id: "L", side: "nra", kind: "litter", bearers: 0, x: 0, z: 0, ride: { on: "Cart", y: 1.075 } };
+  assert.ok(ValidateBlockout(With(cart, litter)).ok);
+  assert.ok(ValidateBlockout(With(cart, { ...litter, bearers: 2 })).warnings.some(w => w.includes("bearers 应当是 0")));
+  // 反例
+  const Bad = (...units) => ValidateBlockout(With(...units));
+  assert.ok(Bad(cart, { ...kid, ride: { on: "Nobody" } }).errors.some(e => e.includes("units[1].ride.on 在这一帧里找不到：Nobody")));
+  assert.ok(Bad(cart, { ...kid, ride: { on: "Kid" } }).errors.some(e => e.includes("units[1].ride.on 不能是自己")));
+  assert.ok(Bad(cart, { ...kid, ride: { on: "Cart", y: "high" } }).errors.some(e => e.includes("units[1].ride.y 要是有限数字")));
+  assert.ok(Bad(cart, { ...kid, ride: "Cart" }).errors.some(e => e.includes("units[1].ride 要是 { on")));
+  assert.ok(Bad({ id: "Man", side: "nra", x: 0, z: 0 }, { ...kid, ride: { on: "Man" } }).errors.some(e => e.includes("只能挂到 cart / tank / litter 上")));
+  assert.ok(Bad({ ...cart, ride: { on: "Tank" } }, { id: "Tank", side: "ija", kind: "tank", x: 5, z: 5 }).errors.some(e => e.includes("cart 不能挂到别的单位上")));
+  assert.ok(Bad(cart, { ...litter }, { ...kid, ride: { on: "L" } }).errors.some(e => e.includes("自己也挂在别的单位上")));
+  // 归一化
+  const n = NormalizeBlockout(With(cart, kid)).keyframes[0].units;
+  assert.deepEqual(n[1].ride, { on: "Cart", x: 0, z: 1.2, y: 0.467, yawDeg: 180 });
+  assert.ok(!("ride" in n[0]));
+  assert.ok(!("ride" in NormalizeBlockout(With(cart, { ...kid, ride: null })).keyframes[0].units[1]));
+  // 车走到哪，坐车尾的人就在哪（RideWorldPose 是运行时的；这里只钉本地 → 世界的旋转口径：车头朝东（−90），车尾 +z 本地 = 世界 −x）
+  const fwd = ForwardFromYawDeg(-90);
+  assert.ok(near(fwd.x, 1) && near(fwd.z, 0));
+  for (const level of ["FirstLevel", "SecondLevel"]) for (const k of COMMITTED[level].keyframes) for (const u of k.units) assert.ok(!("ride" in u), `${level} ${k.id} ${u.id} 不该有 ride`);
+});
+
 console.log(unitWarnings.length ? `警告：${unitWarnings.length} 个单位落在实心块里（不算失败）：\n  ${unitWarnings.join("\n  ")}` : "单位都不在实心块里");
 console.log(`EditorBlockoutConfigTest 通过：${checks} 组检查`);

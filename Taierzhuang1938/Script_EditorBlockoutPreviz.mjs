@@ -18,6 +18,11 @@
 //     引擎声 MoveVoice 跟着机身、扫射的弹着点交给简易特效当土点画）与慢动作（段里的 slowmo[]：预演时钟按 PrevizTimeScale 走，
 //     人物、片段、特效、飞机、镜头都按预演时间 t 求值所以一起慢；台词照常速；音效照常；进度条按预演时间）。
 //
+//   · 2026-10-20：音效别名可以直接指一个音频文件（PREVIZ_SFX 里写 { url }，如 babyCry → Audio/BlockoutPreviz/Sfx_BabyCry.mp3）：
+//     Prepare 时按这一段用到的别名把文件解码进游戏音频引擎的声库（audio.LoadVoices，键 blockoutPrevizSfx.<别名>），
+//     放的时候走 audio.Play("voice.blockoutPrevizSfx.<别名>")，所以照样按事件的 x / z 定位、volume 起作用；
+//     文件读不到只警告一次、记进 State().missingSfx（别名→url），预演照常播。
+//
 // Seek(t) 暂停在 t 秒并确定性求值（演员、镜头、遮罩、字幕、嘴、信号、持续的烟；一次性的爆炸 / 枪口火 / 音效不补放），
 // 同一 t 两次截图一样，供验收。Debug.Blockout.Previz：Has / Play / Stop / Seek / Resume / State（+ Reload）。
 //
@@ -45,9 +50,14 @@ export const PREVIZ_KEY_LABEL = "N";
 export const PREVIZ_ABSENT_RECHECK_S = 30;
 
 /**
- * §14.3 音效别名 → 现有音频库（Script_Audio RECIPES / 采样）的键。
+ * §14.3 音效别名 → 现有音频库（Script_Audio RECIPES / 采样）的键，或（2026-10-20）直接一个音频文件 { url }。
  * burst：连发几响（interval 秒一响，jitter 时略错开，像一排人各打各的）；deafen：耳鸣（audio.Deafen 的秒数），不是一个声音键。
+ * url：相对页面的音频文件地址（Audio/BlockoutPreviz/ 下，代理 S 产的占位音效）；Prepare 时解码进声库，放的时候同样按 x / z 定位。
+ * 两张表（这里与 Script_EditorBlockoutPrevizPlan.PREVIZ_SFX_ALIASES）要一致（PrevizPlanTest 核对）。
  */
+/** url 音效文件的缓存戳（文件重做了就抬）。 */
+export const PREVIZ_SFX_URL_VERSION = "20261020010000";
+const URL_CUE_PREFIX = "blockoutPrevizSfx.";
 export const PREVIZ_SFX = Object.freeze({
   artilleryFar: { cue: "explosionFar" },
   artilleryNear: { cue: "explosionNear" },
@@ -72,6 +82,11 @@ export const PREVIZ_SFX = Object.freeze({
   strafeNear: { cue: "strafeNear" },
   strafeFar: { cue: "strafeFar" },
   strafeDirt: { cue: "strafeDirt" },
+  // 2026-10-20（06–10 耿家庄）：婴儿哭、窖里压着嗓子的哭、枪托砸门、陶罐摔碎 —— 直接放文件
+  babyCry: { url: "./Audio/BlockoutPreviz/Sfx_BabyCry.mp3" },
+  cellarSob: { url: "./Audio/BlockoutPreviz/Sfx_CellarSob.mp3" },
+  gateSmash: { url: "./Audio/BlockoutPreviz/Sfx_GateSmash.mp3" },
+  jarShatter: { url: "./Audio/BlockoutPreviz/Sfx_JarShatter.mp3" },
 });
 const SMOKE_KIND = Object.freeze({ SmokeDust: "dust", SmokeWhite: "screen", SmokeBlack: "black" });
 const SMOKE_DEFAULT_S = 6;
@@ -101,6 +116,8 @@ export class BlockoutPreviz {
     this.missingClips = new Set();
     this.missingLines = new Set();
     this.missingSfx = new Set();
+    this.urlCues = new Map();     // 别名 → { state: "loading" | "ok" | "failed" | "noAudio", key, promise }（2026-10-20 url 音效）
+    this.urlSfxPlayed = 0;
     this._v = new THREE.Vector3();
     this._d = new THREE.Vector3();
     this.dialogue = null;
@@ -329,6 +346,8 @@ export class BlockoutPreviz {
         for (const e of entries) if (audio.voiceBank?.get(e.key)) this.loadedVoices.add(e.key.slice(VOICE_KEY_PREFIX.length));
       }).catch(() => {}));
     }
+    // 2026-10-20：这一段用到的 url 音效先解码进声库（读不到只警告一次）
+    jobs.push(this.LoadUrlCues(seq.events.filter(e => e.type === "sfx" && PREVIZ_SFX[e.name]?.url).map(e => e.name)));
     const faceUrl = this.doc?.faceTracks;
     if (faceUrl && !this.faceTracksLoaded.has(faceUrl)) {
       this.faceTracksLoaded.add(faceUrl);
@@ -627,11 +646,59 @@ export class BlockoutPreviz {
     this.PlayCue(e.name, position, Number.isFinite(e.volume) ? e.volume : 1);
   }
 
-  /** 别名 → 现有音频库的键，按 PREVIZ_SFX 放（burst 连发；deafen 耳鸣）。position 可空（居中）。→ 第一条 voice | null。 */
+  /**
+   * url 音效（PREVIZ_SFX 里写 { url } 的别名）：把文件解码进游戏音频引擎的声库（audio.LoadVoices，键 blockoutPrevizSfx.<别名>）。
+   * 每个别名只装一次；读不到 / 解不开只警告一次并记进 missingSfx（别名→url）。没有音频上下文（audio=0）记 noAudio、不报。→ Promise
+   */
+  async LoadUrlCues(names) {
+    const audio = this.host.audio;
+    const jobs = [];
+    for (const name of new Set(names || [])) {
+      const spec = PREVIZ_SFX[name];
+      if (!spec?.url || this.urlCues.has(name)) continue;
+      const key = URL_CUE_PREFIX + name;
+      if (!audio?.ctx || typeof audio.LoadVoices !== "function") { this.urlCues.set(name, { state: "noAudio", key, promise: Promise.resolve() }); continue; }
+      const entry = { state: "loading", key, promise: null };
+      entry.promise = audio.LoadVoices("", [{ key, file: spec.url, kind: "story", version: PREVIZ_SFX_URL_VERSION }]).then(() => {
+        if (audio.voiceBank?.get(key)) { entry.state = "ok"; return; }
+        entry.state = "failed";
+        this.missingSfx.add(`${name}→${spec.url}`);
+        console.warn(`[BlockoutPreviz] 音效文件读不到：${name} → ${spec.url}（这条音效跳过）`);
+      }).catch((error) => {
+        entry.state = "failed";
+        this.missingSfx.add(`${name}→${spec.url}`);
+        console.warn(`[BlockoutPreviz] 音效文件读不到：${name} → ${spec.url}`, error?.message || error);
+      });
+      this.urlCues.set(name, entry);
+      jobs.push(entry.promise);
+    }
+    await Promise.all(jobs);
+  }
+
+  /** 放一条 url 音效：装好了直接放；还在装就等装好再放（这时预演还在播才放）。→ voice | null（等装的那次返回 null）。 */
+  PlayUrlCue(name, spec, position, volume) {
+    const audio = this.host.audio;
+    if (!audio?.ctx) return null;
+    let entry = this.urlCues.get(name);
+    if (!entry) { this.LoadUrlCues([name]); entry = this.urlCues.get(name); }
+    if (!entry || entry.state === "failed" || entry.state === "noAudio") return null;
+    const Fire = () => {
+      if (entry.state !== "ok") return null;
+      const voice = audio.Play("voice." + entry.key, { position, volume }) || null;
+      if (voice) this.urlSfxPlayed += 1;
+      return voice;
+    };
+    if (entry.state === "ok") return Fire();
+    entry.promise?.then(() => { if (this.run) Fire(); });
+    return null;
+  }
+
+  /** 别名 → 现有音频库的键，按 PREVIZ_SFX 放（burst 连发；deafen 耳鸣；url 直接放文件）。position 可空（居中）。→ 第一条 voice | null。 */
   PlayCue(name, position, volume = 1) {
     const audio = this.host.audio;
     const spec = PREVIZ_SFX[name];
     if (!spec) { this.missingSfx.add(name); return null; }
+    if (spec.url) return this.PlayUrlCue(name, spec, position, volume);
     if (spec.deafen) { if (audio?.ctx) audio.Deafen?.(spec.deafen); return null; }
     if (!SOUND_NAMES.includes(spec.cue)) { this.missingSfx.add(`${name}→${spec.cue}`); return null; }
     if (!audio?.ctx) return null;
@@ -649,6 +716,8 @@ export class BlockoutPreviz {
   StartLoopCue(name, position) {
     const audio = this.host.audio;
     const spec = PREVIZ_SFX[name];
+    // url 音效当持续声：装好了才起（没装好这一次就不响）
+    if (spec?.url) { const e = this.urlCues.get(name); return e?.state === "ok" && audio?.ctx && position ? (audio.Play("voice." + e.key, { position, volume: 0.9 }) || null) : null; }
     if (!spec?.cue || !SOUND_NAMES.includes(spec.cue)) { this.missingSfx.add(name); return null; }
     if (!audio?.ctx || !position) return null;
     try { return audio.Play(spec.cue, { position, volume: 0.9 }) || null; }
@@ -767,6 +836,14 @@ export class BlockoutPreviz {
       wallT: run ? +run.wallT.toFixed(3) : 0,
       aircraft: this.air ? this.air.State() : [],
       missingModels: this.air ? [...this.air.missingModels] : [],
+      // 2026-10-20：url 音效装了哪些 / 坏了哪些 / 放过几次；音频上下文状态（null = audio=0）
+      urlSfx: {
+        loaded: [...this.urlCues].filter(([, e]) => e.state === "ok").map(([n]) => n),
+        failed: [...this.urlCues].filter(([, e]) => e.state === "failed").map(([n]) => n),
+        loading: [...this.urlCues].filter(([, e]) => e.state === "loading").map(([n]) => n),
+        played: this.urlSfxPlayed,
+      },
+      audioState: this.host.audio?.ctx?.state ?? null,
     };
   }
 
