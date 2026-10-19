@@ -1,7 +1,7 @@
 {
   "schema": "tengxian-independent-prop-v1",
   "id": "SichuanBlanketPack",
-  "version": "20261018",
+  "version": "20261019ReferenceMatchV2",
   "title": "1938 Sichuan Army folded single-blanket pack",
   "asset": "Model_SichuanBlanketPack.glb",
   "textureManifest": "Data_SichuanBlanketPackTextures.json",
@@ -20,21 +20,21 @@
     "thickness": 0.13
   },
   "actualBundleDimensionsM": {
-    "width": 0.38,
-    "height": 0.3,
-    "thickness": 0.1311,
-    "includes": "fold lips, one repair patch and its cotton stitches"
+    "width": 0.37979768216609955,
+    "height": 0.2999653071165085,
+    "thickness": 0.129534512758255,
+    "includes": "cloth gathers, folded edges, repair patch and its stitches"
   },
   "triangles": {
-    "total": 2976,
+    "total": 2998,
     "limit": 3000,
     "includesAllOptionalParts": true,
     "byPart": {
-      "Pack_Bundle": 954,
-      "Pack_Binding": 1174,
-      "Pack_Jacket": 164,
-      "Pack_StrawMat": 260,
-      "Pack_Sandals": 424
+      "Pack_Bundle": 1430,
+      "Pack_Binding": 488,
+      "Pack_Jacket": 140,
+      "Pack_StrawMat": 420,
+      "Pack_Sandals": 520
     }
   },
   "parts": [
@@ -79,15 +79,11 @@
       "Orm (linear R=AO G=roughness B=metallic)"
     ],
     "dielectrics": true,
-    "ormRgb": [
-      255,
-      242,
-      0
-    ],
     "embeddedInGlb": true,
-    "sharedAtlas": "Blanket, folds and patch use the upper-left cotton quadrant; binding, straw and indigo occupy the other three quadrants",
+    "sharedAtlas": "Unique non-overlapping GameUV surface atlas, reprojected from the imagegen material study and approved unshadowed cotton samples",
     "sourceProvider": "Built-in image_gen__imagegen",
-    "sharedExistingBlanketRequirement": "Withdrawn by user; this asset has its own independently generated texture set"
+    "sharedExistingBlanketRequirement": "Withdrawn by user; this asset has its own independently generated texture set",
+    "ormSemantics": "R=baked surface occlusion, G=242/255 roughness, B=0 metallic"
   },
   "source": {
     "blend": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Scene_SichuanBlanketPack.blend",
@@ -96,7 +92,9 @@
     "nativeAxes": "Blender X right, Z up, -Y outward",
     "rebuild": "../../_blender/Script_SichuanBlanketPackBake.py",
     "attachments": "../../_blender/Script_SichuanPackAttachments.py",
-    "textureRebuild": "../../_import/Script_SichuanBlanketPackTextureBake.py"
+    "textureRebuild": "../../_import/Script_SichuanBlanketPackTextureBake.py",
+    "surfaceBake": "../../_blender/Script_SichuanPackSurfaceBake.py",
+    "surfaceEncoder": "../../_import/Script_SichuanPackSurfaceMaps.py"
   },
   "commandsFromRepositoryRoot": [
     "node scripts/Script_BlenderMcp.mjs start \"C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Scene_SichuanBlanketPack.blend\" --task SichuanBlanketPack",
@@ -116,7 +114,12 @@
       "jacket hidden",
       "original complete jacket extracted"
     ],
-    "referenceApprovedByUser": "2026-10-18, ThreeViewV02"
+    "referenceApprovedByUser": "2026-10-18, ThreeViewV02",
+    "sameHeightComparison": [
+      "Texture_ReferenceCompare_front.jpg",
+      "Texture_ReferenceCompare_side.jpg",
+      "Texture_ReferenceCompare_back.jpg"
+    ]
   },
   "historicalReferences": [
     {
@@ -137,7 +140,7 @@
     "text",
     "logos"
   ],
-  "assetUrl": "./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261018",
-  "assetBytes": 1170920,
-  "assetSha256": "1768f66774b720dbd1f24808a71e77e31cdbcf193a4aab52d3abed96fa17f4f7"
+  "assetUrl": "./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261019ReferenceMatchV2",
+  "assetBytes": 1312704,
+  "assetSha256": "b1e3f6c10240d043f34cf9ead8e8758759add58e747d88c0b23434e937fa55bd"
 }

@@ -1,23 +1,23 @@
 {
-  "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-10-18",
+  "generator": "Script_SichuanBlanketPackTextureBake.py@2",
+  "date": "2026-10-19",
   "name": "SichuanBlanketPack",
   "preset": "sichuanBlanketPackAtlas",
   "source": {
-    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Source/Texture_SichuanBlanketPackSource.png",
-    "sha256": "2d50aad393320cb7f02a14249c55a70c663b18d1757cde7bb2767c96e207ac09",
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Source/Texture_SichuanBlanketPackSourceV03.png",
+    "sha256": "1f54cc97c245a83fbc03e163a8c3c485e50c19b25882da8eafeb663e18ea55db",
     "metrics": {
       "meanSrgb": [
-        0.5047,
-        0.4612,
-        0.4136
+        0.4806,
+        0.4189,
+        0.3592
       ],
-      "luma": 0.4598,
-      "lumaStd": 0.2158,
-      "sat": 0.1806,
-      "clipLow": 0.0013,
+      "luma": 0.4196,
+      "lumaStd": 0.1978,
+      "sat": 0.2526,
+      "clipLow": 0.0049,
       "clipHigh": 0.0,
-      "lowFreq": 0.2944
+      "lowFreq": 0.3293
     }
   },
   "heightSource": null,
@@ -77,50 +77,119 @@
   "outputs": [
     {
       "channel": "Base",
-      "file": "Texture_SichuanBlanketPackBase.webp",
+      "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\SichuanBlanketPack\\Texture_SichuanBlanketPackBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 439962,
-      "sha256": "2d9311ccdeb876a3788222e77b176f6c21a4c72c5cead4bd26594d02d7a98715"
+      "bytes": 343002,
+      "sha256": "0e5882d1ca5dd15c4fb6ab94149a98a2feaa892b6a5d84dfb4069bef818dad48"
     },
     {
       "channel": "Normal",
-      "file": "Texture_SichuanBlanketPackNormal.webp",
+      "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\SichuanBlanketPack\\Texture_SichuanBlanketPackNormal.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 508588,
-      "sha256": "f3fc7358791ad4fd2bd8ed63a03d54642ac299848406a50879352bd7284beb76"
+      "bytes": 297704,
+      "sha256": "990758cd446da429a6d3153fce4447ae29483a23ee444be48ba9ccbfd8e3e5de"
     },
     {
       "channel": "Orm",
-      "file": "Texture_SichuanBlanketPackOrm.webp",
+      "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\SichuanBlanketPack\\Texture_SichuanBlanketPackOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 88,
-      "sha256": "fa1284094b372b556c7756743d02575e2c4e0509b454069b83be28af99e2676a"
+      "bytes": 438430,
+      "sha256": "f3f70aac74e07c63486a3dcbacaf73624f715c969bf8f995c488416ea059bef9"
     }
   ],
-  "totalBytes": 948638,
+  "totalBytes": 972164,
   "metrics": {
     "meanSrgb": [
-      0.5046,
-      0.4619,
-      0.4134
+      0.4807,
+      0.4196,
+      0.3595
     ],
-    "luma": 0.46,
-    "lumaStd": 0.2163,
-    "sat": 0.1807,
-    "clipLow": 0.0012,
+    "luma": 0.4199,
+    "lumaStd": 0.1976,
+    "sat": 0.2522,
+    "clipLow": 0.0022,
     "clipHigh": 0.0,
-    "lowFreq": 0.2943,
-    "seam": 0.2852,
-    "interior": 0.2269,
-    "seamRatio": 1.257,
-    "border": 0.955,
-    "swing": 0.0278,
+    "lowFreq": 0.3289,
+    "seam": 0.2975,
+    "interior": 0.2011,
+    "seamRatio": 1.479,
+    "border": 0.888,
+    "swing": 0.0325,
     "aoMean": 1.0,
     "roughMean": 0.95,
     "texelsPerMeter": 1347.4
   },
-  "gateProblems": []
+  "gateProblems": [],
+  "baseGenerator": "Script_BakePbrTexture.py@1",
+  "surfaceRelief": {
+    "generator": "Script_SichuanPackReliefBake.py@2",
+    "normalConvention": "gl",
+    "physicalClothExtentM": [
+      0.38,
+      0.3
+    ],
+    "creaseCount": 13,
+    "maximumCreaseHeightM": 0.0016677113456543369,
+    "sourceAlbedoChanged": false,
+    "encoding": "WebP",
+    "quality": "lossless",
+    "angularError": {
+      "meanDegrees": 1.953834822667262,
+      "p99Degrees": 11.221072571621285
+    }
+  },
+  "materialStudyOutputs": [
+    {
+      "channel": "Base",
+      "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV03\\Texture_SichuanBlanketPackBase.webp",
+      "bytes": 400966,
+      "sha256": "261feb94429e6c60e1e93cba3bf9f76c7991fe3acd1b7cf7b05d50040c2417e9"
+    },
+    {
+      "channel": "Normal",
+      "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV03\\Texture_SichuanBlanketPackNormal.webp",
+      "bytes": 1221536,
+      "sha256": "ae8f6230f0992c36278678bf24a478dda377ea674fc8f0b3151bcba56afa4335"
+    },
+    {
+      "channel": "Orm",
+      "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV03\\Texture_SichuanBlanketPackOrm.webp",
+      "bytes": 88,
+      "sha256": "fa1284094b372b556c7756743d02575e2c4e0509b454069b83be28af99e2676a"
+    }
+  ],
+  "surfaceBake": {
+    "generator": "Script_SichuanPackSurfaceBake.py@2",
+    "resolution": [
+      1024,
+      1024
+    ],
+    "intermediateResolution": [
+      2048,
+      2048
+    ],
+    "padding": "16 source pixels of co-valid colour/normal/AO coverage dilation; outward-hemisphere unit-normal downsampling for thin two-sided cotton",
+    "uv": "Unique non-overlapping GameUV",
+    "ao": "Cycles AmbientOcclusion, 0.025 metre distance; garment uses self only",
+    "metallicPixels": [
+      0,
+      0
+    ],
+    "roughnessPixels": [
+      242,
+      242
+    ],
+    "aoRange": [
+      7,
+      255
+    ],
+    "albedoContainsLighting": false,
+    "subpixelCoverageRepair": {
+      "texels": 4,
+      "method": "Fill only uncovered raster texels inside actual triangles or their 1.5px edge padding, using the already-baked median of the same source material"
+    }
+  }
 }

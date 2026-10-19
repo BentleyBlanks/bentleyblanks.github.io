@@ -8,7 +8,7 @@
 
 - **汉阳造掌面承托与双拇指 v10（2026-10-18 修复，2026-10-19 授权发布）**：用户否决 v9 后掌悬空和拇指朝向。只改汉阳造：原共享扫描拇指皮肤恢复，四指保留逐指渐缩；后掌贴回木托，后三指包握，食指接触独立扳机，前掌仍沿三八式方向承托。两只拇指以真实纵轴／铰链掌侧框重设 opposition；指甲沿真实指背冠部拟合，不能再把拇指当四指的局部 -Y 轴。原皮肤权重、骨架、腕部、UV、纹理和五个 morph 保留。正式单一 Idle 同步双链 38 骨／4 控，其余字段与时钟保护。原生骨轨量测须同步实际肘平面供后续 IK 接管；汉阳造 ADS 左肩向外调整 20 mm 清除袖口相交。`FpsHandContactTest` 追加实际掌面承托、指甲朝向与完整双臂／混合掌腕／衣袖静态零相交门禁，不能用指尖接触代替掌心贴托或忽略腕部。源工程、实际验证和限制见 [近镜握持续修](docs/Data_FpsRifleView20261016.md)。用户已授权推送；验收图与临时预览仍留本地。
 
-- **川军折被背包独立资产（2026-10-18）**：用户确认三视图 V02 后以 BlenderMCP 重建，全部部件共 2976 三角，三张独立 1024 PBR 图集；包体约 38×30×13 cm、米制 Y-up、贴背平面 z=0、根轴心为该面中心。草席和完整民用短褂各有独立节点，短褂可隐藏或直接移动抽出。资产、部件控制、史料边界与重建命令见 [资产契约](Model/SichuanBlanketPack/Data_SichuanBlanketPack.json)；源 `.blend` 与生成源图外置到根规范指定的 OneDrive 目录，贴图同时打包进 `.blend`。重建 `_blender/Script_SichuanBlanketPackBake.py`，实物检查 `_blender/Script_SichuanBlanketPackVerify.mjs`；交互验收与截图保留在忽略目录 `tmp/SichuanBlanketPack/Review/`。
+- **川军折被背包独立资产（2026-10-19 修订中）**：用户确认三视图 V02 后以 BlenderMCP 重建，当前全部部件共 2998 三角，三张 1024 PBR 通过独立 GameUV 表面烘焙记录颜色、法线与遮蔽；包体约 38×30×13 cm、米制 Y-up、贴背平面 z=0、根轴心为该面中心。草席和完整民用短褂各有独立节点，短褂可隐藏或直接移动抽出。资产、部件控制、史料边界与重建命令见 [资产契约](Model/SichuanBlanketPack/Data_SichuanBlanketPack.json)；源 `.blend` 与生成源图外置到根规范指定的 OneDrive 目录，贴图同时打包进 `.blend`。重建 `_blender/Script_SichuanBlanketPackBake.py`，实物检查 `_blender/Script_SichuanBlanketPackVerify.mjs`；交互验收、同等包体高度的三视对照与截图保留在忽略目录 `tmp/SichuanBlanketPack/Review/`。141 项数据检查通过不能代替用户要求的参考图视觉对标，当前仍需细化自然折层与草鞋编结。
 
 - **汉阳造右食／环指及过渡收尾（2026-10-16）**：食指把孤立末节钩弯分配到 PIP/DIP，环指减少过卷，保留真实扣扳机旋转。`ApplyAnatomicalFingers` 对已作者指型只混合一次；`FpsHandPoseTest` 检查实际权重进度。Idle 的 `RightIndexRing` scope 仅允许六根右指骨且不选控制轨。汉阳造扳机检查使用固定 bind 掌侧皮肤及同点开火位移，旧包围盒 marker 只保留诊断。右拇／中指与掌褶仍有残留，不能称全右手零穿模；源、回归与限制见 [换弹真实度](docs/Data_RifleReloadRealism.md)。
 

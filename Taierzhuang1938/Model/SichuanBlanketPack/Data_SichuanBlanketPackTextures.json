@@ -1,18 +1,18 @@
 {
-  "schema": "tengxian-model-textures-v1",
+  "schema": "tengxian-model-textures-v2",
   "id": "SichuanBlanketPack",
-  "date": "2026-10-18",
+  "date": "2026-10-19",
   "pathsRelativeTo": "Taierzhuang1938/",
   "scope": "Independent GLB authoring textures, embedded in Model_SichuanBlanketPack.glb; no existing game or level requests these images.",
   "source": {
     "provider": "imagegen",
-    "ref": "exec-05a5a655-3d97-47d8-ac5f-80a668a3163d.png",
-    "date": "2026-10-18",
+    "ref": "exec-dd140b53-c21e-4bf7-96e2-2eac2e0f8ab6.png",
+    "date": "2026-10-19",
     "width": 1254,
     "height": 1254,
-    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Source/Texture_SichuanBlanketPackSource.png",
-    "sha256": "2d50aad393320cb7f02a14249c55a70c663b18d1757cde7bb2767c96e207ac09",
-    "prompt": "_import/SichuanBlanketPack/Prompt_SichuanBlanketPackAtlas.txt",
+    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\Texture_SichuanBlanketPackSourceV03.png",
+    "sha256": "1f54cc97c245a83fbc03e163a8c3c485e50c19b25882da8eafeb663e18ea55db",
+    "prompt": "_import/SichuanBlanketPack/Prompt_SichuanBlanketPackAtlasV03.txt",
     "persistentPrompt": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Source/Prompt_SichuanBlanketPackAtlas.txt"
   },
   "bake": "_import/Script_SichuanBlanketPackTextureBake.py",
@@ -20,36 +20,173 @@
   "sharedBaker": "_import/Script_BakePbrTexture.py",
   "preset": "sichuanBlanketPackAtlas",
   "embeddedAsset": "Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb",
-  "consumers": [{"file": "_blender/Script_SichuanBlanketPackBake.py", "token": "SichuanBlanketPack"}],
+  "consumers": [
+    {
+      "file": "_blender/Script_SichuanBlanketPackBake.py",
+      "token": "SichuanBlanketPack"
+    }
+  ],
   "toneClass": null,
   "metersPerTile": null,
   "normalConvention": "gl",
   "normalMeaning": "OpenGL tangent-space normal, RGB = n * 0.5 + 0.5; green points toward the image top. Fine cloth/straw relief is derived from a high-frequency albedo band-pass rather than full-colour quadrant differences.",
   "atlasReason": "Four distinct authored UV material quadrants deliberately differ in albedo and do not tile into one another. The source is flat and unlit; no seamless blending, low-frequency flattening or palette matching is applied.",
   "atlas": {
+    "layout": "unique-surface-uv",
+    "uvOrigin": "bottom-left",
+    "uvSet": "GameUV",
+    "texCoord": 1,
+    "packing": "Minimum-stretch unwrap of all five components, non-overlapping islands, 0.0045 pack margin",
+    "bakeResolution": [
+      2048,
+      2048
+    ],
+    "runtimeResolution": [
+      1024,
+      1024
+    ]
+  },
+  "files": [
+    {
+      "path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackBase.webp",
+      "channel": "Base",
+      "width": 1024,
+      "height": 1024,
+      "colorSpace": "sRGB",
+      "bytes": 343002,
+      "sha256": "0e5882d1ca5dd15c4fb6ab94149a98a2feaa892b6a5d84dfb4069bef818dad48",
+      "encoding": "WebP q92"
+    },
+    {
+      "path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackNormal.webp",
+      "channel": "Normal",
+      "width": 1024,
+      "height": 1024,
+      "colorSpace": "linear",
+      "bytes": 297704,
+      "sha256": "990758cd446da429a6d3153fce4447ae29483a23ee444be48ba9ccbfd8e3e5de",
+      "encoding": "WebP q98"
+    },
+    {
+      "path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackOrm.webp",
+      "channel": "Orm",
+      "width": 1024,
+      "height": 1024,
+      "colorSpace": "linear",
+      "bytes": 438430,
+      "sha256": "f3f70aac74e07c63486a3dcbacaf73624f715c969bf8f995c488416ea059bef9",
+      "encoding": "lossless WebP"
+    }
+  ],
+  "totalBytes": 1079136,
+  "physicalMeaning": "Rough nonmetal natural fibres. ORM R is real surface occlusion; G is 242/255; B is zero. Base colour excludes the studio illumination.",
+  "verification": {
+    "allMaps1024": true,
+    "allMetalZero": true,
+    "surfaceUvReprojected": true,
+    "aoRange": [
+      7,
+      255
+    ]
+  },
+  "materialStudyAtlas": {
     "imageOrigin": "top-left",
     "imageBoundsOrder": "left,top,right,bottom; normalized",
     "uvOrigin": "bottom-left",
     "uvBoundsOrder": "uMin,vMin,uMax,vMax; normalized",
     "quadrants": [
-      {"id": "Blanket", "material": "worn light homespun cotton", "imageBounds": [0, 0, 0.5, 0.5], "uvBounds": [0.02, 0.52, 0.48, 0.98]},
-      {"id": "Straw", "material": "dry woven straw mat and sandals", "imageBounds": [0.5, 0, 1, 0.5], "uvBounds": [0.52, 0.52, 0.98, 0.98]},
-      {"id": "Binding", "material": "plain grey cloth binding and shoulder straps", "imageBounds": [0, 0.5, 0.5, 1], "uvBounds": [0.02, 0.02, 0.48, 0.48]},
-      {"id": "Jacket", "material": "civilian indigo homespun cotton", "imageBounds": [0.5, 0.5, 1, 1], "uvBounds": [0.52, 0.02, 0.98, 0.48]}
+      {
+        "id": "Blanket",
+        "material": "worn light homespun cotton",
+        "imageBounds": [
+          0,
+          0,
+          0.5,
+          0.5
+        ],
+        "uvBounds": [
+          0.02,
+          0.52,
+          0.48,
+          0.98
+        ]
+      },
+      {
+        "id": "Straw",
+        "material": "dry woven straw mat and sandals",
+        "imageBounds": [
+          0.5,
+          0,
+          1,
+          0.5
+        ],
+        "uvBounds": [
+          0.52,
+          0.52,
+          0.98,
+          0.98
+        ]
+      },
+      {
+        "id": "Binding",
+        "material": "plain grey cloth binding and shoulder straps",
+        "imageBounds": [
+          0,
+          0.5,
+          0.5,
+          1
+        ],
+        "uvBounds": [
+          0.02,
+          0.02,
+          0.48,
+          0.48
+        ]
+      },
+      {
+        "id": "Jacket",
+        "material": "civilian indigo homespun cotton",
+        "imageBounds": [
+          0.5,
+          0.5,
+          1,
+          1
+        ],
+        "uvBounds": [
+          0.52,
+          0.02,
+          0.98,
+          0.48
+        ]
+      }
     ],
     "blanketSharing": "Blanket face cloth, folded blanket body and its cloth patch reuse the same upper-left quadrant and PBR set."
   },
-  "files": [
-    {"path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackBase.webp", "channel": "Base", "width": 1024, "height": 1024, "colorSpace": "sRGB", "encoding": "WebP quality 86", "bytes": 439962, "sha256": "2d9311ccdeb876a3788222e77b176f6c21a4c72c5cead4bd26594d02d7a98715"},
-    {"path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackNormal.webp", "channel": "Normal", "width": 1024, "height": 1024, "colorSpace": "linear", "encoding": "lossless WebP", "bytes": 508588, "sha256": "f3fc7358791ad4fd2bd8ed63a03d54642ac299848406a50879352bd7284beb76"},
-    {"path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackOrm.webp", "channel": "Orm", "width": 1024, "height": 1024, "colorSpace": "linear", "encoding": "lossless WebP", "bytes": 88, "sha256": "fa1284094b372b556c7756743d02575e2c4e0509b454069b83be28af99e2676a", "packing": {"R": "AO", "G": "roughness", "B": "metallic"}, "uniqueRgb": [255, 242, 0]}
-  ],
-  "totalBytes": 948638,
-  "physicalMeaning": "All four dry materials are rough dielectrics. ORM is AO=1, roughness=242/255 and metal=0; contact shadows and fold occlusion come from geometry and the renderer, not stains or quadrant colour.",
-  "verification": {
-    "sourceViewed": "640-square albedo preview checked: material boundaries are exact; no directional cast shadows, labels, fold lighting or modern bag graphics.",
-    "allMaps1024": true,
-    "allMetalZero": true,
-    "sharedTextureBudgetChanged": false
-  }
+  "referenceSamples": {
+    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\Image_SichuanBlanketPackThreeViewV02.png",
+    "provider": "imagegen, approved reference",
+    "cottonPixels": [
+      248,
+      394,
+      484,
+      508
+    ],
+    "greyClothPixels": [
+      209,
+      218,
+      232,
+      315
+    ],
+    "use": "Unshadowed interior material samples, blended with the generated albedo study; no whole concept projection",
+    "cottonFacePixels": [
+      77,
+      194,
+      680,
+      695
+    ],
+    "cottonProcess": "Accessory/strap masks, replacement cotton, low-frequency scalar de-lighting and physical cotton micro-normal; documented by Data_ReferenceCottonStudy.json"
+  },
+  "surfaceBake": "_blender/Script_SichuanPackSurfaceBake.py",
+  "surfaceEncoder": "_import/Script_SichuanPackSurfaceMaps.py",
+  "referenceClothBake": "_import/Script_SichuanPackReferenceCloth.py"
 }

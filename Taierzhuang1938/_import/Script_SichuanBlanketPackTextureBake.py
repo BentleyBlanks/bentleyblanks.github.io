@@ -55,6 +55,12 @@ def Main():
             str(projectPath / "_import/TextureBakes/Texture_SichuanBlanketPack.json"),
             str(recordPath),
         )
+        from Script_SichuanPackReliefBake import BakeRelief
+        BakeRelief(projectPath)
+        seedPath=args.source.resolve().parent/'MaterialAtlasV03';seedPath.mkdir(parents=True,exist_ok=True)
+        for channel in ('Base','Normal','Orm'):
+            filename='Texture_SichuanBlanketPack'+channel+'.webp'
+            shutil.copy2(outputPath/filename,seedPath/filename)
         print(f"Independent model texture record: {recordPath}")
     return result.returncode
 

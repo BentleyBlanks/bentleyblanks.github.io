@@ -1,10 +1,12 @@
 // Pure Node audit of the delivered GLB, independent of baker self-reports.
 // Usage: node Taierzhuang1938/_blender/Script_SichuanBlanketPackVerify.mjs [model.glb]
-// Reports stay in ignored tmp/. No browser, Blender, or image-decoder dependency.
+// Reports stay in ignored tmp/. Uses the repository's sharp dependency to
+// independently decode real pixel data, without a browser or Blender.
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
+import sharp from 'sharp';
 import {LoadGlb,ReadAccessor,ReadAccessorInt} from '../_import/Script_LugouGlbPose.mjs';
 
 const projectDir=fileURLToPath(new URL('../',import.meta.url));
@@ -14,14 +16,11 @@ const outDir=path.resolve(projectDir,'../tmp/SichuanBlanketPack/Review');
 const textureManifestFile=path.join(projectDir,'Model/SichuanBlanketPack/Data_SichuanBlanketPackTextures.json');
 const report={file:modelFile,checks:[],parts:{},materials:[],images:[],externalMaps:[],uvPrimitives:[],totalTriangles:0};
 const Hash=bytes=>createHash('sha256').update(bytes).digest('hex');
-// Independently decoded on 2026-10-18 with the existing baker's Pillow:
-// all 1,048,576 RGB pixels have extrema R=[255,255], G=[242,242], B=[0,0].
-// Pin the ENTIRE encoded payload, not the manifest's unverified uniqueRgb
-// claim. A recompression requires independent pixel verification and a new
-// golden digest. Exact bytes + 1024 dimensions prove this map stays metal=0.
-const dryOrmGolden={sha256:'fa1284094b372b556c7756743d02575e2c4e0509b454069b83be28af99e2676a',width:1024,height:1024,rgb:[255,242,0]};
-const atlasRegions={cloth:{id:'Blanket',uv:[.02,.52,.48,.98]},straw:{id:'Straw',uv:[.52,.52,.98,.98]},binding:{id:'Binding',uv:[.02,.02,.48,.48]},jacket:{id:'Jacket',uv:[.52,.02,.98,.48]}};
-const materialRegions={Material_SichuanCloth:'cloth',Material_SichuanClothPatch:'cloth',Material_SichuanStraw:'straw',Material_SichuanBinding:'binding',Material_SichuanJacket:'jacket'};
+const atlasRegions={surface:{id:'surface',uv:[0,0,1,1]}};
+const materialRegions={Material_SichuanPackBaked:'surface'};
+let runtimeTexCoord=1;
+const uvTriangles=[];
+const uvOwners=[];
 function Check(ok,label,detail=null){report.checks.push({ok:!!ok,label,...(detail===null?{}:{detail})});if(!ok)console.error(`FAIL ${label}${detail===null?'':`  ${typeof detail==='string'?detail:JSON.stringify(detail)}`}`);}
 const identity=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];
 const Near=(a,b,epsilon=1e-6)=>a.length===b.length&&a.every((value,index)=>Math.abs(value-b[index])<=epsilon);
@@ -59,10 +58,9 @@ try{
   const externalMaps=new Map();
   Check(textureManifest.normalConvention==='gl','Manifest declares OpenGL tangent-space normals');
   Check(textureManifest.atlas?.uvOrigin==='bottom-left','Manifest atlas coordinates are Blender bottom-left UVs');
-  for(const [key,region] of Object.entries(atlasRegions)){
-    const declared=textureManifest.atlas?.quadrants?.find(value=>value.id===region.id);
-    Check(!!declared&&Near(declared.uvBounds,region.uv),`${key} atlas region matches the material contract`,declared?.uvBounds);
-  }
+  Check(textureManifest.atlas?.layout==='unique-surface-uv','Actual surface reprojection is documented, rather than the old material-study quadrants');
+  runtimeTexCoord=textureManifest.atlas?.texCoord;
+  Check(runtimeTexCoord===1&&textureManifest.atlas?.uvSet==='GameUV','The production atlas uses the explicit GameUV / TEXCOORD_1 contract');
   for(const channel of ['Base','Normal','Orm']){
     const entries=textureManifest.files.filter(entry=>entry.channel===channel);
     Check(entries.length===1,`Exactly one external ${channel} map is registered`,entries.length);
@@ -78,8 +76,13 @@ try{
     Check(entry.colorSpace===(channel==='Base'?'sRGB':'linear'),`External ${channel} has the correct documented color-space semantic`,entry.colorSpace);
   }
   const orm=externalMaps.get('Orm');
-  report.ormProof={method:'Entire payload equals an independently pixel-decoded constant-map golden SHA-256',...dryOrmGolden};
-  Check(!!orm&&orm.sha256===dryOrmGolden.sha256&&orm.width===dryOrmGolden.width&&orm.height===dryOrmGolden.height,'Actual ORM is the independently verified all-pixel [255,242,0] dielectric map',report.ormProof);
+  const ormPixels=await sharp(orm.data).removeAlpha().raw().toBuffer({resolveWithObject:true});
+  const extrema={min:[255,255,255],max:[0,0,0]};
+  for(let pixel=0;pixel<ormPixels.data.length;pixel+=3)for(let channel=0;channel<3;channel++){const value=ormPixels.data[pixel+channel];extrema.min[channel]=Math.min(extrema.min[channel],value);extrema.max[channel]=Math.max(extrema.max[channel],value);}
+  report.ormProof={method:'Independent full-pixel decode of the delivered lossless WebP',pixels:ormPixels.info.width*ormPixels.info.height,...extrema};
+  Check(ormPixels.info.channels===3&&report.ormProof.pixels===1048576&&extrema.min[2]===0&&extrema.max[2]===0,'Every one of the 1,048,576 metallic pixels is zero',report.ormProof);
+  Check(extrema.min[1]===242&&extrema.max[1]===242,'Every roughness pixel stays at the dry-fibre value 242/255',extrema);
+  Check(extrema.max[0]-extrema.min[0]>=20&&extrema.max[0]>=240,'AO contains a real varying surface-occlusion bake, rather than the old constant placeholder',extrema);
   Check(glb.buffer.readUInt32LE(4)===2&&glb.buffer.readUInt32LE(8)===glb.buffer.length,'GLB 2 header and byte length are valid');
   Check(g.asset?.version==='2.0','glTF 2.0 asset');
   Check(!(g.skins?.length),'Rigid parts have no skin dependency');
@@ -102,13 +105,15 @@ try{
       const part=report.parts[owner];if(part)part.meshNodes.push(index);
       for(const primitive of g.meshes[node.mesh].primitives){
         const mode=primitive.mode??4;Check(mode===4,`${node.name} uses triangle primitives`,mode);if(mode!==4)continue;
-        for(const attr of ['POSITION','NORMAL','TEXCOORD_0'])Check(primitive.attributes[attr]!==undefined,`${node.name} has ${attr}`);
+        const uvAttribute='TEXCOORD_'+runtimeTexCoord;
+        for(const attr of ['POSITION','NORMAL',uvAttribute])Check(primitive.attributes[attr]!==undefined,`${node.name} has ${attr}`);
         if(primitive.attributes.POSITION===undefined)continue;
         const accessor=g.accessors[primitive.attributes.POSITION];Check(!accessor.sparse,`${node.name} POSITION is directly readable`);
         const positions=ReadAccessor(glb,primitive.attributes.POSITION),points=[];
         for(let index=0;index<positions.count;index++){const point=Array.from(positions.data.subarray(index*3,index*3+3));if(!point.every(Number.isFinite))throw Error('Nonfinite geometry');points.push(Transform(next,point));}
-        if(primitive.attributes.TEXCOORD_0!==undefined){
-          const uvId=primitive.attributes.TEXCOORD_0,uvAccessor=g.accessors[uvId],uv=ReadAccessor(glb,uvId);
+        let primitiveUv=null;
+        if(primitive.attributes[uvAttribute]!==undefined){
+          const uvId=primitive.attributes[uvAttribute],uvAccessor=g.accessors[uvId],uv=ReadAccessor(glb,uvId);primitiveUv=uv;
           const material=g.materials[primitive.material],regionKey=materialRegions[material?.name],region=atlasRegions[regionKey];
           Check(uvAccessor.type==='VEC2'&&!uvAccessor.sparse&&uv.count===positions.count,`${node.name} has one directly readable UV pair per actual vertex`);
           Check(!!region&&material?.extras?.AtlasRegion===regionKey,`${material?.name??primitive.material} declares its expected atlas region`,regionKey);
@@ -125,11 +130,12 @@ try{
             }
             const measured={node:node.name,material:material.name,region:regionKey,origin:'glTF top-left image coordinates',expected,bounds:[...min,...max],vertices:uv.count,outside};
             report.uvPrimitives.push(measured);
-            Check(outside===0,`${node.name} actual UVs remain inside the ${regionKey} quadrant with a 20-pixel border`,measured);
+            Check(outside===0,`${node.name} actual GameUV values stay within the delivered atlas`,measured);
           }
         }
         const indices=primitive.indices!==undefined?Array.from(ReadAccessorInt(glb,primitive.indices).data):Array.from({length:positions.count},(_,index)=>index);
         Check(indices.length%3===0&&indices.every(value=>Number.isInteger(value)&&value>=0&&value<positions.count),`${node.name} triangle indices are in range`);
+        if(primitiveUv)for(let corner=0;corner<indices.length;corner+=3){uvTriangles.push(indices.slice(corner,corner+3).map(index=>[primitiveUv.data[index*2],primitiveUv.data[index*2+1]]));uvOwners.push(node.name);}
         report.totalTriangles+=indices.length/3;
         const triangles=[];for(let corner=0;corner<indices.length;corner+=3)triangles.push(indices.slice(corner,corner+3).map(index=>points[index]));
         allTriangles.push(...triangles);
@@ -141,6 +147,33 @@ try{
     for(const child of node.children??[]){parent.set(child,index);Walk(child,next,owner);}
   }
   for(const root of roots)Walk(root,identity);
+  const resolution=256,coverage=new Uint8Array(resolution*resolution),coverageOwner=new Int32Array(resolution*resolution);coverageOwner.fill(-1);const overlapExamples=[];
+  let overlappingSamples=0,degenerateUvs=0,uvArea=0;
+  for(const [triangleId,[a,b,c]] of uvTriangles.entries()){
+    const determinant=(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+    if(Math.abs(determinant)<1e-14){degenerateUvs++;continue;}uvArea+=Math.abs(determinant)/2;
+    const minX=Math.max(0,Math.floor(Math.min(a[0],b[0],c[0])*resolution)),maxX=Math.min(resolution-1,Math.ceil(Math.max(a[0],b[0],c[0])*resolution));
+    const minY=Math.max(0,Math.floor(Math.min(a[1],b[1],c[1])*resolution)),maxY=Math.min(resolution-1,Math.ceil(Math.max(a[1],b[1],c[1])*resolution));
+    for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++){
+      const px=(x+.5)/resolution-a[0],py=(y+.5)/resolution-a[1];
+      const u=(px*(c[1]-a[1])-py*(c[0]-a[0]))/determinant,v=((b[0]-a[0])*py-(b[1]-a[1])*px)/determinant;
+      if(u>1e-7&&v>1e-7&&u+v<1-1e-7){const index=y*resolution+x;if(coverage[index]){overlappingSamples++;if(overlapExamples.length<8)overlapExamples.push({uv:[(x+.5)/resolution,(y+.5)/resolution],owners:[uvOwners[coverageOwner[index]],uvOwners[triangleId]],first:uvTriangles[coverageOwner[index]],second:[a,b,c]});}coverage[index]=1;coverageOwner[index]=triangleId;}
+    }
+  }
+  report.surfaceUv={area:uvArea,rasterResolution:resolution,coveredSamples:coverage.reduce((sum,value)=>sum+value,0),overlappingSamples,degenerateUvs,overlapExamples};
+  Check(degenerateUvs===0,'Every production triangle has non-degenerate surface UV area',report.surfaceUv);
+  Check(overlappingSamples===0&&uvArea<=1.001,'All five components have genuinely non-overlapping production UV islands',report.surfaceUv);
+  Check(report.surfaceUv.coveredSamples>resolution*resolution*.25,'The 1024 atlas has meaningful surface coverage',report.surfaceUv);
+  const normalPixels=await sharp(externalMaps.get('Normal').data).removeAlpha().raw().toBuffer({resolveWithObject:true});
+  let invalidNormalSamples=0,blackAlbedoSamples=0;const blackAlbedoLocations=[];
+  const basePixels=await sharp(externalMaps.get('Base').data).removeAlpha().raw().toBuffer({resolveWithObject:true});
+  for(let y=0;y<resolution;y++)for(let x=0;x<resolution;x++)if(coverage[y*resolution+x]){
+    const offset=((y*4+2)*1024+x*4+2)*3;
+    if(normalPixels.data[offset+2]<120)invalidNormalSamples++;
+    if(basePixels.data[offset]+basePixels.data[offset+1]+basePixels.data[offset+2]<4){blackAlbedoSamples++;blackAlbedoLocations.push([x*4+2,y*4+2]);}
+  }
+  Check(invalidNormalSamples===0,'Sampled surface normal texels point into the outward hemisphere',{invalidNormalSamples});
+  Check(blackAlbedoSamples===0,'Production UVs do not sample unbaked black albedo holes',{blackAlbedoSamples,blackAlbedoLocations});
   for(const name of names.slice(1)){
     const id=nodeIds[name][0];let cursor=id;const ancestors=[];while(parent.has(cursor)){cursor=parent.get(cursor);ancestors.push(cursor);}
     Check(id!==undefined&&reachable.has(id)&&ancestors.includes(rootId),`${name} is below Pack_Root`);
@@ -173,7 +206,7 @@ try{
     report.materials.push({id,name:material.name,slots,metallicFactor:pbr.metallicFactor??1,roughnessFactor:pbr.roughnessFactor??1});
     for(const [slot,index] of Object.entries(slots)){Check(index!==undefined,`${material.name??id} has ${slot} texture`);if(index!==undefined){const source=SourceOfTexture(index);Check(source!==undefined,`${material.name??id} ${slot} source image exists`);if(source!==undefined)neededImages.add(source);}}
     for(const [slot,info] of Object.entries(slotInfo)){
-      Check(!!info&&(info.texCoord??0)===0&&!info.extensions?.KHR_texture_transform,`${material.name??id} ${slot} actually samples the audited TEXCOORD_0 without a transform`);
+      Check(!!info&&(info.texCoord??0)===runtimeTexCoord&&!info.extensions?.KHR_texture_transform,`${material.name??id} ${slot} actually samples the audited GameUV without a transform`);
       if(info){const source=SourceOfTexture(info.index),channel={base:'Base',normal:'Normal',orm:'Orm',ao:'Orm'}[slot];if(source!==undefined){if(!imageChannels.has(source))imageChannels.set(source,new Set());imageChannels.get(source).add(channel);}}
     }
     Check(slots.orm!==undefined&&SourceOfTexture(slots.orm)===SourceOfTexture(slots.ao),`${material.name??id} AO and metallic-roughness use one ORM image`);
@@ -189,7 +222,7 @@ try{
     Check(size.width===1024&&size.height===1024,`Material image ${image.name??id} is exactly 1024 square`,size);
     Check(channels.length===1,`Image ${image.name??id} is not reused across incompatible PBR channel semantics`,channels);
     for(const channel of channels){const external=externalMaps.get(channel);Check(!!external&&sha256===external.sha256&&bytes.equals(external.data),`Entire embedded ${channel} image equals its delivered external WebP byte for byte`,{embedded:sha256,external:external?.sha256});}
-    if(channels.includes('Orm'))Check(sha256===dryOrmGolden.sha256,'Embedded ORM also proves metallic=0 for every pixel',sha256);
+    if(channels.includes('Orm'))Check(sha256===orm.sha256,'Embedded ORM is the same independently decoded all-nonmetal map',sha256);
   }
   report.bounds=Bounds(allTriangles.flat());
   // Keep audit JSON compact and independent of source geometry duplication.
