@@ -15,7 +15,7 @@
 //   6. 体块：院墙（带门洞 / 窗洞 / 狗洞 / 墙缝）、房子（实心块）、老耿家三间屋（空心 + 平顶 + 女墙，没人站上去）、石磨、窖沿与盖板、
 //      柴草垛、水缸、翻倒的大车（加高到 1.15）、场院的麦秸垛、东街的土地庙等日常摆件、干沟南岸的枯树（0105 的表），以及随信号体块：
 //      CartDeparted（车上的弹药箱）/ SideGateOpen（侧门扇）/ CellarBlast（盖板飞开、窖口冒烟）/ MgSilenced（北窗上的机枪 → 石碾后）/
-//      NorthYardGatesBroken（北边院子链上的三道门扇倒下）/ BackDoorOpen（水缸、后门扇）。
+//      NorthYardGatesBroken（北边院子链上的三道门扇倒下）/ BackVatMoved（水缸推到门东边，10-20 拆出来的）/ BackDoorOpen（后门扇）。
 //
 // 纪律：不读时钟、不读 git（commit / generatedAt 由 CLI 传入）；没有随机数，生成两次逐字相同。
 // ===========================================================================
@@ -323,12 +323,12 @@ function GengBlocks(sample) {
   const leafZ0 = SG.z + SG.w / 2 - SG.leafW;
   gates.push(Block("SideGateLeaf", SW.x - 0.15, leafZ0 + SG.leafW / 2, SG.leafT, SG.leafW, 2.0, WOOD, { signal: SIG.sideGateOpen }));
   gates.push(Block("SideGateLeafOpen", SW.x + T / 2 + SG.leafW / 2, SG.z + SG.w / 2 + 0.05, SG.leafW, SG.leafT, 2.0, WOOD, { appearSignal: SIG.sideGateOpen }));
-  // 后门：门扇关着（向里开，被水缸顶着），水缸堵在门里头；10 末水缸挪开、门扇开到西墙边
+  // 后门：门扇关着（向里开，被水缸顶着），水缸堵在门里头；10 末老耿先把水缸往东推开（BackVatMoved，片段 2.8 s），再拔门闩把门扇拉开到西墙边（BackDoorOpen，6.1 s）
   gates.push(Block("BackDoorLeaf", G.backDoor.x, C.maxZ - 0.15, G.backDoor.w - 0.05, 0.08, 2.0, WOOD, { signal: SIG.backDoorOpen }));
   gates.push(Block("BackDoorLeafOpen", G.backDoor.x - G.backDoor.w / 2 + 0.05, C.maxZ - 0.25 - (G.backDoor.w - 0.05) / 2, 0.08, G.backDoor.w - 0.05, 2.0, WOOD, { appearSignal: SIG.backDoorOpen }));
   const vat = L0610_PROP_KINDS.WaterVat;
-  gates.push(Block("BackVat", G.backVat.x, G.backVat.z, vat.w, vat.d, vat.h, vat.semantic, { prop: "WaterVat", signal: SIG.backDoorOpen }));
-  gates.push(Block("BackVatMoved", G.backVatMoved.x, G.backVatMoved.z, vat.w, vat.d, vat.h, vat.semantic, { prop: "WaterVat", appearSignal: SIG.backDoorOpen }));
+  gates.push(Block("BackVat", G.backVat.x, G.backVat.z, vat.w, vat.d, vat.h, vat.semantic, { prop: "WaterVat", signal: SIG.backVatMoved }));
+  gates.push(Block("BackVatMoved", G.backVatMoved.x, G.backVatMoved.z, vat.w, vat.d, vat.h, vat.semantic, { prop: "WaterVat", appearSignal: SIG.backVatMoved }));
 
   // --- 灶屋（西北，门朝东）：空心 + 平顶；灶台、案板 -------------------------------------------
   Wall(blocks, "KitchenNorth", "x", K.box.minZ, K.box.minX, K.box.maxX, [], K.roofH);
@@ -352,7 +352,8 @@ function GengBlocks(sample) {
   const M = G.mill;
   blocks.push(Block("MillBase", M.x, M.z, M.baseW, M.baseW, M.baseH, BRICK));
   blocks.push(Block("MillStone", M.x, M.z, M.stoneW, M.stoneW, M.stoneH, BRICK, { y: R2(sample(M.x, M.z) + M.baseH + M.stoneH / 2) }));
-  const rimOff = CELLAR.floorW / 2 + CELLAR.wallM + 0.1, rimLen = (rimOff + 0.1) * 2;
+  // 窖沿矮块贴着网格里的坑口外沿：坑心外 1.0 m 那一圈格点是整高（Data_…Space 的 cellar 注），矮块放在 1.2…1.4 m（不随 wallM 走，爬出窖的根 1.1 m 不踩它）
+  const rimOff = CELLAR.floorW / 2 + L0610_CELL_M, rimLen = (rimOff + 0.1) * 2;
   blocks.push(Block("CellarRimNorth", CELLAR.x, CELLAR.z - rimOff, rimLen, 0.2, CELLAR.rimH, WOOD));
   blocks.push(Block("CellarRimSouth", CELLAR.x, CELLAR.z + rimOff, rimLen, 0.2, CELLAR.rimH, WOOD));
   blocks.push(Block("CellarRimWest", CELLAR.x - rimOff, CELLAR.z, 0.2, rimLen, CELLAR.rimH, WOOD));
@@ -718,7 +719,7 @@ export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", 
         + "z<205 逐点等于 FirstLevel0105 的地面（交通沟坡道 / 干沟 / 凹路头一段），往南：凹路南段（路底按弧长缓降缓升，直接接进村口路沟）、村口路沟（东西向、沟底 −0.9、街口南壁放缓成坡道）、"
         + "河汊子（沟底 −2.7 的南北向干沟 + 一线浅水）、耿家庄（整村压平 +0.3、街面压低 12 cm、地瓜窖平底开挖）；体块：院墙带门洞 / 窗洞 / 狗洞 / 墙缝、实心房子、老耿家三间空心屋 + 平顶（没人上房）、"
         + "石磨、窖沿与盖板、翻倒的大车（横在主街偏东）、场院的麦秸垛、东街的土地庙、日常摆件、0105 的南岸枯树；巷子北头的夹道开在路沟南沿上、主街那头封死；"
-        + "gates：CartDeparted / SideGateOpen / CellarBlast / MgSilenced / NorthYardGatesBroken / BackDoorOpen。",
+        + "gates：CartDeparted / SideGateOpen / CellarBlast / MgSilenced / NorthYardGatesBroken / BackVatMoved / BackDoorOpen（10-20 第四版：缸挪开与门开拆成两个信号，窖壁收直到 0.15）。",
     },
     bounds: { ...L0610_BOUNDS },
     spawn: { x: L0610_SPAWN.x, z: L0610_SPAWN.z, yawDeg: L0610_SPAWN.yawDeg },

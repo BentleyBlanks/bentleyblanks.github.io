@@ -184,7 +184,7 @@ export function StreetRoute(a, b) {
 // 单位与 POI
 
 const META = new WeakMap();
-const UNIT_KEY_ORDER = ["id", "side", "kind", "name", "castId", "role", "group", "weapon", "x", "z", "yawDeg", "stance", "aim", "state", "bearers", "arc", "speedMps", "path", "intent", "guess"];
+const UNIT_KEY_ORDER = ["id", "side", "kind", "name", "castId", "role", "group", "weapon", "x", "z", "yawDeg", "stance", "aim", "state", "bearers", "ride", "arc", "speedMps", "path", "intent", "guess"];
 
 /**
  * 一个单位。at = {x,z}；o：
@@ -208,6 +208,7 @@ function U(id, side, at, o = {}) {
   if (o.aim) u.aim = true;
   if (o.down) u.state = "down";
   if (o.bearers !== undefined) u.bearers = o.bearers;
+  if (o.ride) u.ride = { ...o.ride };   // §3 ride（10-20）：挂到车上，位姿跟车；x / z 只当车不在场时的备用
   if (o.arc) u.arc = o.arc;
   if (o.speed) u.speedMps = o.speed;
   if (o.path) u.path = o.path.map((p) => Pt(p.x, p.z));
@@ -319,6 +320,11 @@ const J = (id, at, o = {}) => U(id, "ija", at, { ...(IJA[id] || {}), ...o });
 
 const A = PL.assembly;
 const CART = Pt(PL.cartStop.x, PL.cartStop.z);
+/**
+ * 07 妮儿坐车尾（§3 ride，10-20）：挂在 GengCart 的车尾沿（车本地 z +1.2 = Script_EditorBlockoutPuppets BLOCKOUT_CART_SEATS.tail），背对车头，
+ * 根离车底下地面 = 车板顶 1.025 − VilSitEdge 坐高 0.90 × 小孩 0.62 = 0.467（SitRootY）。数字照 docs §5.6 的例子，不 import Puppets（它带 three）。
+ */
+export const NIER_RIDE = Object.freeze({ on: "GengCart", x: 0, z: 1.2, y: 0.467, yawDeg: 180 });
 const NIER_RIM = Pt(PL.nierRim.x, PL.nierRim.z);
 const MOUTH = Pt(PL.villageMouth.x, PL.villageMouth.z);
 const WINDOW = Pt(PL.northWindow.x, PL.northWindow.z);
@@ -569,14 +575,18 @@ function Keyframes() {
   // ======================= 07 沿着后送队往前走 =======================
   const s07 = { stage: 7, stageTitle: "沿着后送队往前走" };
   const CART_LAT = 1.0;
-  /** 老耿的车在玩家前头 ahead 米、靠路东边；妮儿站在车尾（坐不了，见 notes）；老耿在驴头边。 */
+  /**
+   * 老耿的车在玩家前头 ahead 米、靠路东边；妮儿坐在车尾跟车走（§3 ride，10-20）；老耿在驴头边。
+   * 车尾沿在车本地 z = +1.2（Script_EditorBlockoutPuppets BLOCKOUT_CART_SEATS.tail），车板顶 1.025；VilSitEdge 的根在屁股正下方、坐沿在根上 0.90，
+   * 小孩身体缩 0.62 → ride.y = 1.025 − 0.90 × 0.62 = 0.467（SitRootY）；背对车头 = yawDeg 180。她自己的 x / z 写成车尾那一点（车不在场时的备用）。
+   */
   const CartAhead = (playerZ, ahead = 6, { stance = null } = {}) => {
     const cz = playerZ + ahead;
     const cart = LZ(cz, CART_LAT);
     return [
       C("GengCart", cart, { yaw: 180, straight: true, speed: 1.6 }),
       C("Geng", LZ(cz + 1.9, 0.2), { yaw: 180, stance: stance || undefined }),
-      C("Nier", LZ(cz - 1.65, CART_LAT), { yaw: stance ? 0 : 180 }),
+      C("Nier", Pt(cart.x, cart.z - NIER_RIDE.z), { yaw: 0, ride: NIER_RIDE }),
     ];
   };
   /** 小队在凹路里往前挤：路中线偏东（担架和伤员在西边、车在东边）。 */
@@ -598,7 +608,7 @@ function Keyframes() {
     next: { text: "往前挤", x: LZ(244).x, z: LZ(244).z, radiusM: 3 },
     how: ["整条路都是人，一直望到南边", "担架一副挨一副搁在地上，抬担架的蹲在杠子边喘气", "车轮在车辙里颠，弹药箱哐哐响", "幺娃凑过来：顺儿哥，攒起娶婆娘？"],
     notes: `后送队 ${SLOTS.filter((s) => s.kind === "litter").length + 1} 副担架（含冬瓜那副）、${SLOTS.filter((s) => s.kind !== "litter" && s !== DONGGUA_SLOT).length} 个走着的伤员（${SLOTS.filter((s) => s.helper).length} 个有人架着），`
-      + "贴西坎从 z 190 停到 z 315；「被人背着的」编辑器没有这种姿态，用蹲着的伤员 + 旁边架着的人顶替。车在玩家前头 6 m 靠路东边；妮儿「坐车尾」没有坐姿，站在车尾。",
+      + "贴西坎从 z 190 停到 z 315；「被人背着的」预演用 VilNraCarryOnBack + VilRideOnBack 一对。车在玩家前头 6 m 靠路东边；妮儿坐在车尾（ride 挂在 GengCart 车尾沿、背对车头，预演播 VilSitEdge），车动她跟着走。",
     signals: [SIG.cartDeparted],
     units: [
       ...SquadInLane(205),
@@ -662,7 +672,7 @@ function Keyframes() {
     what: "日机贴着麦地飞过来，路上的人全往坎底下缩；妮儿最后一个趴下。飞机没开枪。路爬出洼地，耿家庄冒着烟。",
     next: { text: "到村口路沟", x: DITCH_08.Luo.x, z: DITCH_08.Luo.z, radiusM: 3 },
     how: ["预演机位：东坎上 (100,330) 往南看一长溜担架", "老耿拽着驴往坎边靠", "妮儿是看见别人都趴下才抬头，这时飞机已经在头顶", "全班弯腰顺凹路往前跑，凹路越走越浅，麦地那头几处房顶冒烟"],
-    notes: "不能操作的 20 s 短过场，关键帧只摆趴下那一拍：小队、后送队全体 prone（百姓是程序化身体，趴不下，老耿蹲、妮儿站着）。飞机没有单位，预演用说明字 / 音效。",
+    notes: "不能操作的 20 s 短过场，关键帧只摆趴下那一拍：小队、后送队全体 prone；老耿蹲在驴边；妮儿还坐在车尾（ride），她听不见，预演里看见别人都趴了才从车尾滑下来在车边扑倒（最后一个）。飞机是预演里的 aircraft 轨（Ki-30）。",
     signals: [SIG.cartDeparted],
     units: [
       N("Luo", LS(344.0, 0.3), { yaw: 180, stance: "prone" }),
@@ -1221,9 +1231,9 @@ function Keyframes() {
     player: { x: p106.x, z: p106.z, yawDeg: 180, pitchDeg: -2, stance: "stand" },
     what: "老耿挪开水缸、拔开朝南的后门，何有田端着枪守在门边，担架一副一副往外抬。班长：幺娃，接到！幺娃接过机枪。",
     next: { text: "（接 11）车先走" },
-    how: ["水缸挪到门边（BackDoorOpen：水缸换位置、门扇开了）", "后门外的小路一直通到村南口", "弹斗快空了，掷弹筒落到石碾跟前", "11 开头：车先走；文财跟着去；幺娃卸枪栓扔进水缸、何有田最后出门拴上绳子"],
-    notes: "11 这次不做。班长还在东街口顶着；北边、南边的鬼子位置照 10-4 / 10-5。",
-    signals: [SIG.cartDeparted, SIG.cellarBlast, SIG.sideGateOpen, SIG.mgSilenced, SIG.northYardGatesBroken, SIG.backDoorOpen],
+    how: ["老耿站在缸西边把缸往东推开 1.7 m（BackVatMoved），再拔门闩把门板拉开到西墙边（BackDoorOpen）", "后门外的小路一直通到村南口", "弹斗快空了，掷弹筒落到石碾跟前", "11 开头：车先走；文财跟着去；幺娃卸枪栓扔进水缸、何有田最后出门拴上绳子"],
+    notes: `11 这次不做。班长还在东街口顶着；北边、南边的鬼子位置照 10-4 / 10-5。缸挪开后在 (${G.backVatMoved.x},${G.backVatMoved.z})（门口东边，PrevizVillage VilPushVat 推 1.7 m 的落点）。`,
+    signals: [SIG.cartDeparted, SIG.cellarBlast, SIG.sideGateOpen, SIG.mgSilenced, SIG.northYardGatesBroken, SIG.backVatMoved, SIG.backDoorOpen],
     units: [
       C("Geng", geng106, { face: PL.backDoor }),
       N("HeYoutian", Pt(96.6, 504.6), { stance: "crouch", aim: true, yaw: 180 }),
@@ -1450,7 +1460,7 @@ export function FirstLevel0610Issues(doc, { scene = null, meta = new Map() } = {
       if (Dist(l, kf.player) < C.litterM - 0.2) out.push(`${kf.id} 玩家站在 ${l.id} 上`);
     }
     for (const v of kf.units.filter((u) => u.kind === "cart")) {
-      for (const u of people) if (OnCart(u, v, 0.2)) out.push(`${kf.id} ${u.id} 站在车身 ${v.id} 里`);
+      for (const u of people) if (u.ride?.on !== v.id && OnCart(u, v, 0.2)) out.push(`${kf.id} ${u.id} 站在车身 ${v.id} 里`);   // 挂在这辆车上的人（ride）本来就在车上
       if (OnCart(kf.player, v, 0)) out.push(`${kf.id} 玩家在车身 ${v.id} 里`);
     }
     if (Number.isFinite(kf.next?.x) && Dist(kf.next, kf.player) < C.nextM) out.push(`${kf.id} 下一步目标离玩家不到 ${C.nextM} m（只写文字）`);

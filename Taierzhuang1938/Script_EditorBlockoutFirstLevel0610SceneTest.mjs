@@ -6,7 +6,7 @@
 // 视线：侧门口看得见窖边的人（门关着看不见；门缝 / 墙缝里看得见窖口）、北窗顺主街看到村北口、石碾后顺东街看到东头、
 //   街口坡道上趴着的四个人都看得见北窗机枪手、北窗看不见巷子口与巷子任何一段、侧门里几步透过前屋南门看得见机枪组的后背、大车挡住北窗到车北侧的人；
 // 狗洞大人钻不过；主街 / 东街净空、东街又直又长；巷子不通主街；场院 / 麦秸垛 / 土地庙 / 北角 / 院子链三道门在；没有人能站的房顶要求（房顶块只是样子）；
-// 随信号体块与六个信号齐全。
+// 随信号体块与七个信号齐全（10-20 第四版：缸挪开 BackVatMoved 与门开 BackDoorOpen 分开；缸挪到 (99.7,504)；窖壁收直、窖沿矮块在坑心外 1.2 m）。
 
 import assert from "node:assert/strict";
 import { ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
@@ -93,7 +93,7 @@ const byId = new Map(all.map((x) => [x.id, x]));
 assert.equal(byId.size, all.length, "块 id 全关唯一");
 assert.ok(a.gates.every((g) => g.signal || g.appearSignal));
 const signals = new Set(a.gates.flatMap((g) => [g.signal, g.appearSignal]).filter(Boolean));
-assert.equal(Object.keys(SIG).length, 6, "六个信号");
+assert.equal(Object.keys(SIG).length, 7, "七个信号（10-20 第四版：缸挪开与门开拆成两个）");
 for (const s of Object.values(SIG)) assert.ok(signals.has(s), `随信号体块缺信号 ${s}`);
 assert.equal(byId.get("SideGateLeaf").signal, SIG.sideGateOpen);
 assert.equal(byId.get("SideGateLeafOpen").appearSignal, SIG.sideGateOpen);
@@ -101,8 +101,29 @@ assert.equal(byId.get("CellarLid").signal, SIG.cellarBlast);
 assert.equal(byId.get("CellarSmoke").appearSignal, SIG.cellarBlast);
 assert.equal(byId.get("GengWindowMg").signal, SIG.mgSilenced);
 assert.equal(byId.get("RollerMg").appearSignal, SIG.mgSilenced);
-assert.equal(byId.get("BackVat").signal, SIG.backDoorOpen);
+// 后门：缸随 BackVatMoved 换位置、门扇随 BackDoorOpen 换 —— 两个信号各管各的（缸 2.8 s 就推到位，门 6 s 多才拉开）
+assert.notEqual(SIG.backVatMoved, SIG.backDoorOpen, "缸挪开与门开是两个信号");
+assert.equal(byId.get("BackVat").signal, SIG.backVatMoved);
+assert.equal(byId.get("BackVatMoved").appearSignal, SIG.backVatMoved);
 assert.equal(byId.get("BackDoorLeaf").signal, SIG.backDoorOpen);
+assert.equal(byId.get("BackDoorLeafOpen").appearSignal, SIG.backDoorOpen);
+// 缸挪开的位置照 PrevizVillage V2 的 VilPushVat（清单 stage vatDoor）：老耿站在缸西边 1.05 m 面朝东，把缸顺 z 504 往东推 1.7 m → (99.7, 504)，让开 1.2 m 宽的门口
+{
+  const vat = byId.get("BackVat"), moved = byId.get("BackVatMoved");
+  Near(vat.x, G.backVat.x, 0.01, "缸原来在 x 98"); Near(vat.z, 504, 0.01, "缸原来在 z 504");
+  Near(moved.x - vat.x, 1.7, 0.01, "缸往东推 1.7 m"); Near(moved.z, vat.z, 0.01, "缸顺着 z 504 直推、不偏");
+  assert.ok(moved.x - moved.w / 2 >= G.backDoor.x + G.backDoor.w / 2, `挪开的缸（x ≥ ${(moved.x - moved.w / 2).toFixed(2)}）要让开门口东沿 ${G.backDoor.x + G.backDoor.w / 2}`);
+  const leafOpen = byId.get("BackDoorLeafOpen");
+  assert.ok(leafOpen.x + leafOpen.w / 2 <= G.backDoor.x - G.backDoor.w / 2 + 0.1, "拉开的门扇贴在门口西沿");
+}
+// 地瓜窖：网格里坑心 ±0.5 m 是坑底、1.0 m 外整高（壁过渡 0.15，第四版）；窖沿矮块在 1.2…1.4 m，爬出窖的根（1.1 m）不踩它
+{
+  const cx = G.cellar.x, cz = G.cellar.z;
+  for (const [dx, dz] of [[1.0, 0], [-1.0, 0], [0, 1.0], [0, -1.0], [1.1, 0.33]]) Near(sample(cx + dx, cz + dz), V.y, 0.08, `窖坑外 (${dx},${dz}) 是院子地面`);
+  for (const [dx, dz] of [[0.5, 0], [0, 0.5], [-0.5, 0]]) Near(sample(cx + dx, cz + dz), CELLAR_FLOOR_Y, 0.08, `窖坑里 (${dx},${dz}) 是坑底`);
+  const rim = byId.get("CellarRimEast");
+  assert.ok(rim.x - rim.w / 2 >= cx + 1.15 && rim.x - rim.w / 2 <= cx + 1.25, `窖沿矮块内沿在坑心外 1.2 m（${(rim.x - rim.w / 2 - cx).toFixed(2)}）`);
+}
 for (const id of ["PocketGateLeaf", "Yard1GateLeaf", "FarmyardGateLeaf"]) {
   assert.equal(byId.get(id)?.signal, SIG.northYardGatesBroken, `${id} 随 NorthYardGatesBroken 消失`);
   assert.equal(byId.get(`${id}Fallen`)?.appearSignal, SIG.northYardGatesBroken, `${id}Fallen 随 NorthYardGatesBroken 出现`);

@@ -3,7 +3,7 @@
 // 查：生成两次除 generatedAt 外逐字相同、过 ValidateBlockout 且无警告、摆位 / 走位问题为零（读 Blockout/FirstLevel0610.scene.json 连实心块与高差一起查）、
 // 第二版契约 §3 的 25 帧齐全、玩家点在场地内、next 不出现「掩护 / 清理 / 护送」、what 不超长、人物 id 稳定、castId 都是定妆表里的键；
 // 所有人脚下都在地面上（站在高度场或 ≤1 m 的块顶上，身子不进实心块）、**没有人站在房顶上**；
-// 六个信号按拍起；后送队够多（07 贴西坎、08 起缩在路沟东半截与凹路末段）；冬瓜一直躺在自己的担架上；
+// 七个信号按拍起（10-20：缸挪开 BackVatMoved 与门开 BackDoorOpen 都从 10-6 起）；07 妮儿挂在车尾沿上（ride）、别的帧不挂；后送队够多（07 贴西坎、08 起缩在路沟东半截与凹路末段）；冬瓜一直躺在自己的担架上；
 // 08 四个压窗口的人趴在街口坡道上都看得见北窗机枪手、08-4 喊人的鬼子从街口看得见 ≥ 1.5 s、08-5 妮儿顺路沟往西钻巷子口、09-2 从狗洞钻进后院、
 // 09-3 / 09-4 缝里看得见窖口、09-5 门开了看得见撒尿的看守、09-6 透过前屋南门看得见机枪组的后背、10-2 石碾后看得见东头与街上倒着的鬼子、
 // 10-2 剩下的缩在土地庙后、10-3 掷弹筒在麦秸垛北侧、10-4 抄北边的最前头到了主街东侧最南那院、10-5 南边翻墙、10-6 幺娃接过机枪、何有田守后门。
@@ -59,7 +59,9 @@ for (const id of IDS) { assert.ok(Unit(id, "Geng"), `${id} 老耿要在`); asser
 
 // --- 信号按拍起 ---
 const From = (sig, firstId) => IDS.forEach((id, i) => assert.equal(KF(id).signals.includes(sig), i >= IDS.indexOf(firstId), `${id} 的 ${sig}`));
-From(SIG.cartDeparted, "06-3"); From(SIG.cellarBlast, "09-4"); From(SIG.sideGateOpen, "09-5"); From(SIG.mgSilenced, "10-1"); From(SIG.northYardGatesBroken, "10-4"); From(SIG.backDoorOpen, "10-6");
+From(SIG.cartDeparted, "06-3"); From(SIG.cellarBlast, "09-4"); From(SIG.sideGateOpen, "09-5"); From(SIG.mgSilenced, "10-1"); From(SIG.northYardGatesBroken, "10-4");
+From(SIG.backVatMoved, "10-6"); From(SIG.backDoorOpen, "10-6");
+assert.equal(Object.keys(SIG).length, 7, "七个信号都查到了");
 
 // --- 06：车在南岸树底下，妮儿蹲在凹路口边上的沟沿上 ---
 assert.ok(DistXZ(Unit("06-1", "GengCart"), P.cartStop) < 0.1 && DistXZ(Unit("06-2", "Nier"), P.nierRim) < 0.1, "06 车在树底下、妮儿在沟沿上");
@@ -76,7 +78,11 @@ for (const id of ["07-1", "07-2", "07-3", "07-4"]) {
   const ahead = cart.z - pl.z;
   if (id !== "07-3") assert.ok(ahead >= 5 && ahead <= 7.5, `${id} 车在玩家前头 ${ahead.toFixed(1)} m（要 5–7）`);
   assert.ok(DistXZ(Unit(id, "Nier"), cart) < 2.2 && Unit(id, "Nier").z < cart.z, `${id} 妮儿在车尾`);
+  // 10-20：妮儿挂在车尾沿上跟车走（§3 ride）：车本地 z +1.2（车尾沿）、根离车底下地面 0.467（车板顶 1.025 − VilSitEdge 坐高 0.9 × 0.62）、背对车头
+  assert.deepEqual(Unit(id, "Nier").ride, { on: "GengCart", x: 0, z: 1.2, y: 0.467, yawDeg: 180 }, `${id} 妮儿要挂在车尾沿上（ride）`);
+  assert.ok(Math.abs(Unit(id, "Nier").x - cart.x) < 0.05 && Math.abs(cart.z - Unit(id, "Nier").z - 1.2) < 0.05 && Unit(id, "Nier").yawDeg === 0, `${id} 妮儿自己的 x / z 写成车尾那一点、朝北`);
 }
+for (const id of IDS) if (!/^07-/.test(id)) assert.equal(Unit(id, "Nier").ride, undefined, `${id} 妮儿不在车上（只有 07 坐车尾）`);
 for (const id of IDS.slice(3)) {
   const l = Unit(id, "LitterDonggua"), d = Unit(id, "Donggua");
   assert.ok(l && d && d.state === "down" && DistXZ(l, d) < 0.05, `${id} 冬瓜要躺在自己的担架上`);
@@ -180,6 +186,7 @@ assert.ok(in105.length >= 12 && in105.some((u) => u.x > G.carriageGate.minX && u
 assert.ok(KF("10-6").player.yawDeg === 180 && Math.abs(KF("10-6").player.x - G.backDoor.x) < 0.1 && KF("10-6").player.z > G.compound.maxZ, "10-6 玩家在后门外朝南");
 assert.ok(Unit("10-6", "LitterDonggua").z > G.compound.maxZ && Unit("10-6", "LitterDonggua").bearers === 2, "10-6 冬瓜的担架抬出了后门");
 assert.ok(DistXZ(Unit("10-6", "Geng"), G.backVatMoved) < 1.5, "10-6 老耿在挪开的水缸边");
+assert.ok(Math.abs(G.backVatMoved.x - 99.7) < 0.01 && Math.abs(G.backVatMoved.z - 504.0) < 0.01, "挪开的缸在 (99.7,504)：VilPushVat 从 (98,504) 往东直推 1.7 m 的落点");
 assert.ok(DistXZ(Unit("10-6", "HeYoutian"), P.backDoor) < 2.2 && Unit("10-6", "HeYoutian").aim, "10-6 何有田守在门边");
 assert.equal(Unit("10-6", "Yaowa").weapon, "Type11", "10-6 幺娃接过机枪");
 assert.ok(Unit("10-6", "Yaowa").stance === "prone" && DistXZ(Unit("10-6", "Yaowa"), P.roller) < 3, "10-6 幺娃趴在石碾后");

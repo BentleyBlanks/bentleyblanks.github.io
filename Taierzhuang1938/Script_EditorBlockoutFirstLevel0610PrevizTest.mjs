@@ -34,6 +34,12 @@ const SPEED = { walk: 1.4, run: 3.5, crawl: 0.5, drag: 0.9 };
 const PEOPLE = new Set(["soldier", "officer", "civilian", "child", undefined]);
 /** 小孩身体的缩放（Script_EditorBlockoutPuppets BLOCKOUT_PUPPETS.childScale）。 */
 const CHILD_SCALE = 0.62;
+/** 地瓜窖坑心（Data_EditorBlockoutFirstLevel0610Space L0610_GENG.cellar）；网格里坑口沿在坑心外 1.0 m。 */
+const CELLAR = { x: 90.5, z: 499.5 };
+/** 妮儿 07 坐车尾的 ride（关键帧生成器 NIER_RIDE：车尾沿 z +1.2、根离地 0.467 = 1.025 − 0.9 × 0.62、背对车头）。 */
+const NIER_RIDE = { on: "GengCart", x: 0, z: 1.2, y: 0.467, yawDeg: 180 };
+/** 四条新音效文件（Audio/BlockoutPreviz）的时长与响点，ffprobe 实测 10-20。 */
+const SFX_FILE = { babyCry: 3.53, cellarSob: 4.0, gateSmash: 2.33, gateSmashFirstHit: 0.07, jarShatter: 1.53 };
 
 function ClipTable() {
   const lib = Load("Animation/OpeningStoryboards/Data_OpeningStoryboardsAnimation.json");
@@ -195,6 +201,7 @@ export async function CheckPreviz(doc, { config, voice }) {
     const SolidsAt = t => { const sig = SignalsAt(t); return { solids: SolidsFor(layout, sig), stand: BlockStandSampler(layout.blocks, layout.gates || [], layout.terrainSampler, n => sig.includes(n)) }; };
     const PointCheck = (kat, p, { t = 0, body = true, slopeWarn = true, base = null } = {}) => {
       if (base && Math.hypot(p.x - base.x, p.z - base.z) < 0.02) slopeWarn = false;   // 关键帧自己摆的位置：坎上 / 窖里的人不再报斜坡
+      if (Math.abs(p.x - CELLAR.x) <= 1.3 && Math.abs(p.z - CELLAR.z) <= 1.3) slopeWarn = false;   // 窖沿：爬出窖的根按清单站在坑口沿外 0.1 m，0.35 m 内就是坑壁
       if (!InBounds(p)) { errors.push(`${kat} 出了场地：(${p.x}, ${p.z})`); return; }
       if (slopeWarn && Slope(p.x, p.z) > 0.45) warnings.push(`${kat} 落在斜坡 / 沟壁上（0.35 m 内高差 ${R(Slope(p.x, p.z))} m）：(${p.x}, ${p.z})`);
       if (body) {
@@ -286,7 +293,7 @@ export async function CheckPreviz(doc, { config, voice }) {
     rows.push(`${seq.keyframe} · ${seq.durationS} s · 镜头 ${seq.camera.length} · 台词 ${seq.lines.length} · 片段 ${[...clipsUsed].sort().join("、") || "（无）"}`);
   }
   if (doc.sequences.length !== config.keyframes.length) errors.push(`预演 ${doc.sequences.length} 段，关键帧 ${config.keyframes.length} 个`);
-  DesignChecks(doc, norm, config, layout, errors);
+  DesignChecks(doc, norm, config, layout, errors, table);
   if (table.village) StageChecks(doc, norm, config, layout, table.village, errors);
   else errors.push("PrevizVillage 清单不在盘上（Animation/PrevizVillage/Data_PrevizVillageAnimation.json）：成对动作查不了");
   return { errors, warnings, rows };
@@ -384,7 +391,7 @@ function StageChecks(doc, norm, config, layout, village, errors) {
 }
 
 /** 剧本要求的设计口径（只查 FirstLevel0610；第二版 2026-10-19 的 25 帧）。 */
-function DesignChecks(doc, norm, config, layout, errors) {
+function DesignChecks(doc, norm, config, layout, errors, table = { village: null }) {
   if (doc.level !== "FirstLevel0610") return;
   const Seq = id => doc.sequences.find(s => s.keyframe === id);
   const NSeq = id => norm.sequences.find(s => s.keyframe === id);
@@ -407,13 +414,32 @@ function DesignChecks(doc, norm, config, layout, errors) {
   const SignalT = (seq, name) => seq?.events.find(e => e.type === "signal" && e.name === name && e.on === true)?.t;
   const kf07 = config.keyframes.find(k => k.id === "07-4");
   let inView07 = false;
+  /** 07 妮儿坐车尾：关键帧 ride 挂在车尾沿、预演第一个键 VilSitEdge、挂着期间不写位置键（校验会报「位置键不管用」）。 */
+  const RideChecks = (id, s) => {
+    const u = Unit(id, "Nier");
+    if (JSON.stringify(u?.ride) !== JSON.stringify(NIER_RIDE)) errors.push(`${id}：关键帧里妮儿要挂在车尾沿上（ride ${JSON.stringify(NIER_RIDE)}），实际 ${JSON.stringify(u?.ride)}`);
+    if (Keys(s, "Nier")[0]?.clip !== "VilSitEdge") errors.push(`${id}：妮儿开场要坐在车尾（第一个键 VilSitEdge）`);
+    let riding = true;
+    for (const k of Keys(s, "Nier")) {
+      if (k.ride !== undefined) riding = k.ride !== null;
+      else if (riding && k.x !== undefined) errors.push(`${id}：妮儿 @${k.t} 挂在车上还写了位置键（不管用，要下车先写 ride: null）`);
+    }
+    return riding;
+  };
   // 六个信号按拍开
   if (!SignalOn("06-3", "CartDeparted")) errors.push("06-3：老耿赶车走要打开 CartDeparted");
   if (!SignalOn("09-4", "CellarBlast")) errors.push("09-4：窖里闷响要打开 CellarBlast");
   if (!SignalOn("09-5", "SideGateOpen")) errors.push("09-5：门闩拉开要打开 SideGateOpen");
   if (!SignalOn("10-1", "MgSilenced")) errors.push("10-1：打掉机枪组要打开 MgSilenced");
   if (!SignalOn("10-4", "NorthYardGatesBroken")) errors.push("10-4：北边三道门砸倒要打开 NorthYardGatesBroken");
-  if (!SignalOn("10-6", "BackDoorOpen")) errors.push("10-6：挪开水缸、拔门要打开 BackDoorOpen");
+  if (!SignalOn("10-6", "BackVatMoved")) errors.push("10-6：缸推到位要打开 BackVatMoved");
+  if (!SignalOn("10-6", "BackDoorOpen")) errors.push("10-6：门板拉开要打开 BackDoorOpen");
+  // 四条新音效（10-20）：别名在 §14.3；位置、时刻在各拍里再核
+  const Sfx = (seq, name) => (seq?.events || []).filter(e => e.type === "sfx" && e.name === name).sort((a, b) => a.t - b.t);
+  for (const [id, name] of [["09-1", "cellarSob"], ["09-3", "cellarSob"], ["09-4", "babyCry"], ["09-7", "jarShatter"], ["10-4", "gateSmash"]]) if (!Sfx(Seq(id), name).length) errors.push(`${id}：要用新音效 ${name}`);
+  for (const id of ["09-1", "09-3"]) for (const e of Sfx(Seq(id), "cellarSob")) if (!Near(e, CELLAR, 0.3)) errors.push(`${id}：窖里的哭声要从窖口放（(${e.x}, ${e.z})）`);
+  if (Sfx(Seq("09-1"), "cellarSob").length < 2 || Sfx(Seq("09-3"), "cellarSob").length < 2) errors.push("09-1 / 09-3：窖里的哭声各放两遍（文件 4 s，人在窖里的那一阵都得听见）");
+  for (const id of ["09-7", "10-4"]) if (Has(Seq(id), "sfx", e => e.name === "dirtFall" && id === "09-7" || e.name === "bodyFall" && id === "10-4")) errors.push(`${id}：有了新音效，别再拿 ${id === "09-7" ? "碎屑声顶罐子" : "重物落地顶砸门"}`);
   // 06：何有田喊、老耿走到妮儿身边拍肩膀、传令兵跑来报信、老耿的车第一个走、班长「都跟斗走」
   {
     const s1 = Seq("06-1");
@@ -438,16 +464,8 @@ function DesignChecks(doc, norm, config, layout, errors) {
     if (moves.length < 3) errors.push(`${id}：眼睛要分几段走（from/to 机位 ≥ 3 段），现在 ${moves.length}`);
     if (!s.camera.every(c => c.look?.actor === "Nier")) errors.push(`${id}：边走边说的镜头要一直看着车尾的妮儿（look 演员锚 Nier）`);
     for (const who of ["GengCart", "Yaowa", "Luo"]) if (!PosKeys(s, who).some(k => k.move === "walk")) errors.push(`${id}：${who} 要跟着往前走`);
-    // 妮儿坐在车尾（VilSitEdge，背对着车朝北），车动她倒退着跟（drag）；根在车尾板外：与车同时到达、在车中心北边 1.2–1.5 m
-    if (Keys(s, "Nier")[0]?.clip !== "VilSitEdge") errors.push(`${id}：妮儿开场要坐在车尾（第一个键 VilSitEdge）`);
-    const nierMoves = PosKeys(s, "Nier").filter(k => k.move === "drag" && k.t > 0);
-    if (!nierMoves.length) errors.push(`${id}：妮儿要跟着车走（drag 键）`);
-    for (const k of nierMoves) {
-      const cart = PosKeys(s, "GengCart").find(c => Math.abs(c.t - k.t) < 0.05);
-      if (!cart) { errors.push(`${id}：妮儿 @${k.t} 的到达时刻车没有位置键`); continue; }
-      const dz = cart.z - k.z, dx = Math.abs(cart.x - k.x);
-      if (dz < 1.2 || dz > 1.5 || dx > 0.3 || k.yawDeg !== 0) errors.push(`${id}：妮儿 @${k.t} 要坐在车尾板外（车中心北 1.2–1.5 m、朝北），实际 dz ${R(dz)} dx ${R(dx)} yaw ${k.yawDeg}`);
-    }
+    // 妮儿坐在车尾（VilSitEdge）：10-20 起挂在车尾沿上（关键帧 ride），车动她跟着走 —— 预演里只给片段，一个位置键都不许（挂着时位置键不管用）
+    RideChecks(id, s);
     // 背伤员的一对（stage carryOnBack）在队里
     if (!Keys(s, "Helper03").some(k => k.clip === "VilNraCarryOnBack") || !Keys(s, "Walker08").some(k => k.clip === "VilRideOnBack")) errors.push(`${id}：后送队里要有一对背着走的（Helper03 VilNraCarryOnBack + Walker08 VilRideOnBack）`);
     // 车在眼睛前头 5–7 m：每段走动结束时车的位置键与机位 to 的距离
@@ -473,6 +491,7 @@ function DesignChecks(doc, norm, config, layout, errors) {
     for (const l of ["StretcherDonggua.01", "StretcherDonggua.02", "StretcherDonggua.03", "BankLookoutOfficer.01", "BankLookoutLuo.01"]) if (!HasLine(s, l)) errors.push(`07-3：要有台词 ${l}`);
     if (!Order(s, ["StretcherDonggua.01", "StretcherDonggua.02", "StretcherDonggua.03", "BankLookoutOfficer.01", "BankLookoutLuo.01"])) errors.push("07-3：台词顺序要是 顺子 → 卫生兵 → 冬瓜 → 排长 → 班长");
     if (!PosKeys(s, "Luo").some(k => k.move === "walk" && k.z > 312.5)) errors.push("07-3：班长吼完要从坎上下来往前走");
+    if (RideChecks("07-3", s) !== true) errors.push("07-3：妮儿整段都坐在车尾（不下车）");
   }
   // 07-4：短过场——前 18 s 全是机位（非第一人称）、三段机位；一架 Ki-30 由北往南贴麦地飞过凹路、不开枪、引擎声跟着走、镜头 ① 看得见它；
   // 人往坎底缩（VilDuckProne 错峰）、妮儿最后一个；跑（run 键）；村子冒烟；最后切回眼睛趴在路沟沿
@@ -490,6 +509,18 @@ function DesignChecks(doc, norm, config, layout, errors) {
     if (nierDuck !== undefined && duckers.some(id => id !== "Nier" && duckT[id] !== undefined && duckT[id] >= nierDuck)) errors.push("07-4：妮儿要最后一个趴下（她听不见，看见别人趴了才趴）");
     const spread = Object.values(duckT).filter(t => t !== undefined);
     if (spread.length && Math.max(...spread) - Math.min(...spread) < 2.0) errors.push("07-4：扑倒要错峰（最早到最晚 ≥ 2 s）");
+    // 妮儿坐在车尾（ride）跟着车挪；扑倒前先下车：ride: null + 切到车尾外半步、朝北站着，再 VilDuckProne 在车边扑；下车在车停稳之后、扑倒之前
+    if (RideChecks("07-4", s) !== false) errors.push("07-4：妮儿扑倒前要下车（ride: null），之后不再上车");
+    const off = Keys(s, "Nier").find(k => k.ride === null);
+    const cartStop = Math.max(0, ...PosKeys(s, "GengCart").filter(k => k.move !== "cut" && k.t <= (nierDuck ?? Infinity)).map(k => k.t));   // 扑倒前车最后一次停稳
+    if (!off) errors.push("07-4：妮儿要有下车的键（ride: null）");
+    else {
+      if (off.x === undefined || off.move !== "cut" || off.stance !== "stand") errors.push("07-4：下车那个键要同时把她切到地上（x / z、move cut）、站着");
+      if (nierDuck === undefined || off.t >= nierDuck || off.t < nierDuck - 1.0) errors.push(`07-4：下车（${off.t} s）要在扑倒（${nierDuck} s）前 1 s 以内`);
+      if (off.t < cartStop) errors.push(`07-4：车停稳（${cartStop} s）了她才下车（${off.t} s）`);
+      const cart = PosKeys(s, "GengCart").at(-1) && PosAt("07-4", s, "GengCart", off.t);
+      if (cart && !(Math.abs(off.x - cart.x) < 0.3 && cart.z - off.z > 1.3 && cart.z - off.z < 2.2)) errors.push(`07-4：下车要落在车尾外半步（车中心北 1.3–2.2 m），实际 dz ${R(cart.z - off.z)} dx ${R(Math.abs(off.x - cart.x))}`);
+    }
     // 飞机
     const planes = s.aircraft || [];
     if (planes.length !== 1) errors.push(`07-4：要有一架飞机（aircraft[]），现在 ${planes.length}`);
@@ -648,9 +679,33 @@ function DesignChecks(doc, norm, config, layout, errors) {
     const climb = ClipKey(s, "CellarMan", "VilHandsUpClimbOut"), stabbed = ClipKey(s, "CellarMan", "VilStabbedFall"), thrust = ClipKey(s, "CellarIja2", "VilIjaBayonetThrust");
     if (!climb) errors.push("09-3：汉子要举着手从窖里爬出来（VilHandsUpClimbOut）");
     if (!stabbed || !thrust) errors.push("09-3：汉子刚爬出来就要被刺刀捅倒（VilIjaBayonetThrust + VilStabbedFall，成对站位由 StageChecks 核）");
-    if (climb && stabbed && stabbed.t < climb.t + 4.0) errors.push("09-3：要爬完站直了（4 s）才捅");
+    const climbS = table.village?.clips?.VilHandsUpClimbOut?.duration ?? 5.0;
+    if (climb && stabbed && stabbed.t < climb.t + climbS) errors.push(`09-3：要爬完站直举着手（片段 ${climbS} s）才捅`);
     if (stabbed && !stabbed.clipHold) errors.push("09-3：VilStabbedFall 末帧是尸体，要 clipHold 停住");
-    for (const id of ["CellarWife", "CellarGranny"]) if (!ClipKey(s, id, "VilHandsUpClimbOut")) errors.push(`09-3：${id} 也要举着手爬出来`);
+    // 爬出窖的根（V2 清单 stage cellarPit：坑口沿外 0.10 m、背对窖口；网格里坑口沿在坑心外 1.0 m → 根离坑心 1.1 m）：三个人起步时都在窖沿外、骨盆（根后 0.55）在坑里
+    const st = table.village?.stages?.cellarPit;
+    const climbers = [["CellarMan", climb], ["CellarWife", ClipKey(s, "CellarWife", "VilHandsUpClimbOut")], ["CellarGranny", ClipKey(s, "CellarGranny", "VilHandsUpClimbOut")]];
+    for (const [id, k] of climbers) {
+      if (!k) { errors.push(`09-3：${id} 也要举着手爬出来`); continue; }
+      const p = PosAt("09-3", s, id, k.t), yaw = Keys(s, id).filter(x => Number.isFinite(x.yawDeg) && x.t <= k.t + 0.01).at(-1)?.yawDeg;
+      const d = p ? Math.max(Math.abs(p.x - CELLAR.x), Math.abs(p.z - CELLAR.z)) : NaN;   // 到坑心的「方格」距离：坑口沿是坑心外 1.0 m 的正方形
+      if (!(d >= 1.0 + (st?.wallBehindM ?? 0.1) - 0.02 && d <= 1.25)) errors.push(`09-3：${id} 爬出窖的根要在坑口沿外 0.1 m（离坑心 1.1 m 上下），实际 ${R(d)} m（(${p?.x}, ${p?.z})）`);
+      if (!Number.isFinite(yaw)) errors.push(`09-3：${id} 的根要写明朝向（yawDeg，背对窖口）`);
+      else {
+        const away = Math.atan2(-(p.x - CELLAR.x), -(p.z - CELLAR.z)) * 180 / Math.PI;   // 从坑心指向根的方向（0 北、+90 西）
+        if (Math.abs(WrapDeg(yaw - away)) > 25) errors.push(`09-3：${id} 要背对窖口（朝 ${R(away)}°），实际 ${yaw}°`);
+        const pelvis = Fwd(p, yaw, -(st?.startPelvis?.z ?? 0.55));
+        if (Math.max(Math.abs(pelvis.x - CELLAR.x), Math.abs(pelvis.z - CELLAR.z)) > 0.8) errors.push(`09-3：${id} 起步时骨盆（根后 0.55 m）要在坑里，实际离坑心 ${R(Math.max(Math.abs(pelvis.x - CELLAR.x), Math.abs(pelvis.z - CELLAR.z)))} m`);
+      }
+    }
+    // 三个人一个爬完另一个才上（同一个口子）；汉子爬完切到 root.end（根前 0.38）再被捅
+    const order = climbers.map(([, k]) => k?.t).filter(t => t !== undefined).sort((a, b) => a - b);
+    for (let i = 1; i < order.length; i++) if (order[i] - order[i - 1] < climbS - 1.5) errors.push(`09-3：两个人爬出窖至少隔 ${R(climbS - 1.5)} s（${order[i - 1]} → ${order[i]}）`);
+    if (climb && stabbed) {
+      const p0 = PosAt("09-3", s, "CellarMan", climb.t), p1 = PosAt("09-3", s, "CellarMan", stabbed.t);
+      const moved = Math.hypot(p1.x - p0.x, p1.z - p0.z), want = Math.abs(st?.end?.z ?? 0.38);
+      if (Math.abs(moved - want) > 0.08) errors.push(`09-3：汉子爬完要切到清单 root.end（根前 ${want} m）再被捅，实际挪了 ${R(moved)} m`);
+    }
     if (!HasLine(s, "LeaderCallsMen.01")) errors.push("09-3：前屋的分队长要吼着调人");
     if (!ClipKey(s, "Leader", "VilIjaShoutPoint")) errors.push("09-3：分队长调人要指着吼（VilIjaShoutPoint）");
     const s4 = Seq("09-4");
@@ -658,6 +713,16 @@ function DesignChecks(doc, norm, config, layout, errors) {
     if (!bundleOn) errors.push("09-4：襁褓占位要在挑起来甩到窖沿时露面");
     if (!fling) errors.push("09-4：挑襁褓要用 VilIjaBayonetLiftFling");
     else if (bundleOn && (bundleOn.t < fling.t + 1.4 || bundleOn.t > fling.t + 1.8)) errors.push("09-4：襁褓要在甩出去那一下（片段 1.5 s）露面");
+    // 婴儿哭（babyCry 3.53 s）：扯襁褓前就在哭，一刺刀下去（片段 0.5 s）就断 —— 文件尾对齐扎下去那一刻（±0.15 s），从老太太怀里放
+    const cry = s4.events.find(e => e.type === "sfx" && e.name === "babyCry");
+    if (!cry) errors.push("09-4：孩子要在哭（babyCry）");
+    else if (fling) {
+      const stabAt = fling.t + 0.5, end = cry.t + SFX_FILE.babyCry;
+      if (Math.abs(end - stabAt) > 0.15) errors.push(`09-4：婴儿哭要在刺刀扎下去那一刻（${R(stabAt)} s）断，文件放完是 ${R(end)} s`);
+      if (cry.t > fling.t - 1.0) errors.push("09-4：扯襁褓前孩子就得在哭（哭声至少比挑起来早 1 s 起）");
+      const granny = PosAt("09-4", s4, "CellarGranny", cry.t);
+      if (!Near(cry, granny, 1.0)) errors.push("09-4：婴儿哭要从老太太怀里（她身边 1 m 内）放");
+    }
     if (!Keys(s4, "CellarGranny").some(k => k.state === "down")) errors.push("09-4：老太太要炸在窖里");
     if (!ClipKey(s4, "CellarGranny", "VilKneelCrawlToPit")) errors.push("09-4：老太太要跪着往窖里爬（VilKneelCrawlToPit）");
     const lob = ClipKey(s4, "CellarIja1", "VilIjaHelmetGrenadeLob"), blast = s4.events.find(e => e.type === "explosion" && Near(e, { x: 90.5, z: 499.5 }, 1.0));
@@ -723,6 +788,14 @@ function DesignChecks(doc, norm, config, layout, errors) {
     if (!Has(s6, "caption", e => /罐/.test(e.text))) errors.push("09-7：罐子掉地要有说明字");
     const lunge = s6.lines.find(l => l.line === "KitchenLunge.01"), bite = s6.lines.find(l => l.line === "KitchenBitten.01");
     if (!lunge || !bite || bite.t < lunge.t + 4) errors.push("09-7：先扑出来吼，压一会儿刺刀，再被咬惨叫");
+    // 罐子掉地：jarShatter 在「罐子掉地」的说明字那一刻、从妮儿脚下放；鬼子听见才扑出来
+    const jar = s6.events.find(e => e.type === "sfx" && e.name === "jarShatter"), jarCap = s6.events.find(e => e.type === "caption" && /罐/.test(e.text));
+    if (!jar) errors.push("09-7：罐子掉地要用 jarShatter");
+    else {
+      if (!jarCap || Math.abs(jar.t - jarCap.t) > 0.3) errors.push("09-7：罐子摔碎的声音要和「罐子掉地」的说明字同时");
+      if (!Near(jar, PosAt("09-7", s6, "Nier", jar.t), 0.6)) errors.push("09-7：罐子摔碎要在妮儿脚下");
+      if (lunge && lunge.t < jar.t) errors.push("09-7：鬼子要听见罐子响才扑出来");
+    }
     if (!s6.camera.some(c => c.eye?.stance === "prone" && c.eye.pitchDeg > 20)) errors.push("09-7：要有倒地仰视的镜头");
     if (!Has(s6, "caption", e => /大刀/.test(e.text))) errors.push("09-7：拔大刀砍的玩家操作时刻要有说明字");
     if (!Keys(s6, "KitchenIja").some(k => k.state === "down")) errors.push("09-7：鬼子要倒");
@@ -793,14 +866,16 @@ function DesignChecks(doc, norm, config, layout, errors) {
   {
     const s = Seq("10-4");
     for (const l of ["EastEndOfficer.03", "HoldEastStreet.01"]) if (!HasLine(s, l)) errors.push(`10-4：要有台词 ${l}`);
-    const bash = s.events.filter(e => e.type === "sfx" && e.name === "bodyFall").sort((a, b) => a.t - b.t);
-    if (bash.length < 3) errors.push("10-4：砸门声至少三处（用重物落地声顶）");
+    const bash = s.events.filter(e => e.type === "sfx" && e.name === "gateSmash").sort((a, b) => a.t - b.t);
+    if (bash.length < 3) errors.push("10-4：砸门声至少三处（gateSmash：枪托两下 + 一脚踹）");
     for (let i = 1; i < bash.length; i++) if (bash[i].x > bash[i - 1].x + 0.01) errors.push("10-4：砸门声要一个院子一个院子往西挪");
-    // 砸门的片段（VilIjaGateSmash：砸 0.45 / 0.95 s、踹 1.6 s）：三道门各一个人，从东往西；最后北角院门那一踹门就倒（信号）
+    // 砸门的片段（VilIjaGateSmash：砸 0.45 / 0.95 s、踹 1.6 s）：三道门各一个人，从东往西；最后北角院门那一踹门就倒（信号）；
+    // 砸门声文件（2.33 s）里第一下在 0.07 s，要对齐片段第一下砸（0.45 s）→ 文件从片段起播 + 0.38 s 放，一道门一遍
     const smashes = ["NorthIja1", "NorthIja2", "NorthIja3", "NorthIja4"].flatMap(id => ClipKeys(s, id, "VilIjaGateSmash").map(k => ({ id, k, p: PosAt("10-4", s, id, k.t) }))).sort((a, b) => a.k.t - b.k.t);
     if (smashes.length < 3) errors.push(`10-4：三道门都要有人枪托砸门（VilIjaGateSmash），现在 ${smashes.length}`);
     for (let i = 1; i < smashes.length; i++) if (smashes[i].p.x > smashes[i - 1].p.x) errors.push("10-4：砸门要一个院子一个院子往西");
-    for (const sm of smashes) { const h = sm.k.t + 0.45; if (!bash.some(b => Math.abs(b.t - h) < 0.06 && Near(b, sm.p, 1.2))) errors.push(`10-4：${sm.id} 砸门那一下（${R(h)} s）要有砸门声落在门上`); }
+    for (const sm of smashes) { const h = sm.k.t + 0.45 - SFX_FILE.gateSmashFirstHit; if (!bash.some(b => Math.abs(b.t - h) < 0.06 && Near(b, sm.p, 1.2))) errors.push(`10-4：${sm.id} 砸门那一下（片段 0.45 s = 文件 ${R(h)} s 起）要有 gateSmash 落在门上`); }
+    if (bash.length !== smashes.length) errors.push(`10-4：一道门一遍砸门声（${bash.length} 声 / ${smashes.length} 道门）`);
     const on = SignalT(s, "NorthYardGatesBroken");
     const pocket = smashes.find(sm => sm.id === "NorthIja1");
     if (!pocket || Math.abs(pocket.p.x - POCKET_GATE.x) > 0.3 || pocket.p.z > POCKET_GATE.z - 0.5 || pocket.p.z < POCKET_GATE.z - 0.95 || pocket.p.yawDeg !== 180) errors.push("10-4：砸北角院门的要站在门板北边 0.55 m（院里）、面朝南");
@@ -840,13 +915,28 @@ function DesignChecks(doc, norm, config, layout, errors) {
     if (!PosKeys(s4, "LitterDonggua").some(k => k.z > 506)) errors.push("10-6：担架要抬出后门");
     if (!Has(s4, "caption", e => /接 11/.test(e.text))) errors.push("10-6：末尾要有「接 11」的说明字");
     if (s4.then !== "stay") errors.push("10-6：最后一段 then 要是 stay");
-    // 挪缸开门（VilPushVat：缸挪开 1.4 s、门闩 2.6 s、门 3.0 s）：老耿站在缸北边 0.55 m 面朝南，信号在 1.3–3.2 s 之间切
-    const push = ClipKey(s4, "Geng", "VilPushVat"), opened = SignalT(s4, "BackDoorOpen");
+    // 挪缸开门（VilPushVat V2，清单 stage vatDoor）：老耿站在缸西边 1.05 m（根 (96.95, 504)）面朝东，缸推到位 2.8 s（信号 BackVatMoved），
+    // 拔门闩 5.55 s、扒住门板 5.75 s、松手 6.3 s、门板到 90° 6.6 s：门开的信号 BackDoorOpen 落在 5.75–6.6 s（拉门的过程里）；播完切到 root.end
+    const push = ClipKey(s4, "Geng", "VilPushVat"), vatMoved = SignalT(s4, "BackVatMoved"), opened = SignalT(s4, "BackDoorOpen");
+    const vd = table.village?.stages?.vatDoor, ev = Object.fromEntries((table.village?.clips?.VilPushVat?.events || []).map(e => [e.kind, e.t]));
     if (!push) errors.push("10-6：挪缸开门要用 VilPushVat");
     else {
       const p = PosAt("10-6", s4, "Geng", push.t);
-      if (!p || Math.abs(p.x - 98) > 0.15 || Math.abs(p.z - 503.45) > 0.1 || p.yawDeg !== 180) errors.push(`10-6：挪缸的根要在缸北边 0.55 m（(98, 503.45)）、面朝南，实际 (${p?.x}, ${p?.z}, ${p?.yawDeg})`);
-      if (opened === undefined || opened < push.t + 1.3 || opened > push.t + 3.2) errors.push("10-6：缸挪开 / 门开的信号要落在片段的 1.3–3.2 s");
+      const want = { x: 98 + (vd?.vatStart?.z ?? -1.05), z: 504 };
+      if (!p || Math.abs(p.x - want.x) > 0.05 || Math.abs(p.z - want.z) > 0.05 || p.yawDeg !== -90) errors.push(`10-6：挪缸的根要在缸西边 1.05 m（(${R(want.x)}, ${want.z})）、面朝东（−90），实际 (${p?.x}, ${p?.z}, ${p?.yawDeg})`);
+      if (vatMoved === undefined || Math.abs(vatMoved - (push.t + (ev.vatMoved ?? 2.8))) > 0.1) errors.push(`10-6：缸挪开的信号要在片段 vatMoved（${ev.vatMoved ?? 2.8} s）那一刻切，实际 ${vatMoved === undefined ? "没有" : R(vatMoved - push.t)}`);
+      if (opened === undefined || opened < push.t + (ev.doorGrab ?? 5.75) - 0.01 || opened > push.t + (ev.doorOpen ?? 6.6) + 0.01) errors.push(`10-6：门开的信号要落在拉门那一段（片段 ${ev.doorGrab ?? 5.75}–${ev.doorOpen ?? 6.6} s），实际 ${opened === undefined ? "没有" : R(opened - push.t)}`);
+      if (vatMoved !== undefined && opened !== undefined && opened - vatMoved < 2.5) errors.push("10-6：缸先挪开、门后开，中间隔着走到门前拔门闩那几秒");
+      const dur = table.village?.clips?.VilPushVat?.duration ?? 6.8;
+      const cut = PosKeys(s4, "Geng").find(k => k.move === "cut" && Math.abs(k.t - (push.t + dur)) < 0.05);
+      if (!cut) errors.push(`10-6：VilPushVat 播完（${dur} s）要把老耿切到清单 root.end`);
+      else {
+        const want2 = Fwd(p, p.yawDeg, -(vd?.end?.z ?? -0.9), vd?.end?.x ?? 0.55);
+        if (Math.hypot(cut.x - want2.x, cut.z - want2.z) > 0.08 || Math.abs(WrapDeg((cut.yawDeg ?? 0) - WrapDeg(p.yawDeg + (vd?.end?.yawDeg ?? -90)))) > 4) errors.push(`10-6：root.end 该在 (${R(want2.x)}, ${R(want2.z)}) 朝 ${R(WrapDeg(p.yawDeg + (vd?.end?.yawDeg ?? -90)))}°，实际 (${cut.x}, ${cut.z}) 朝 ${cut.yawDeg}°`);
+      }
+      // 妮儿、顺子的眼睛都不在缸的推道上（z 503.6…504.4、x 97.6…100.1）
+      const nier = PosAt("10-6", s4, "Nier", push.t);
+      if (nier && nier.x > 97.4 && nier.x < 100.3 && Math.abs(nier.z - 504) < 0.7) errors.push("10-6：妮儿别蹲在缸的推道上");
     }
   }
   // 大段的镜头轨：每一刻都能采样（没有空档让 SamplePrevizCamera 报错；飞机锚按那一秒的机身位置）

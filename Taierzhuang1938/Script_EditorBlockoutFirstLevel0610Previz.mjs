@@ -337,6 +337,11 @@ export function SlitEye(slit, target, { hw = 0.1, back = SLIT_BACK_M, margin = 0
  * 眼睛离墙面 0.35 m、z 499.56：往东能看的扇面约 −4°…+11°（窖口 −0.4°、挑襁褓的地方 +5°、窖沿 +7°、门里贴墙的妮儿 +8°）。
  */
 const GATE_EYE = Pt(WALL_X - WALL_T / 2 - SLIT_BACK_M, 499.56);
+/**
+ * 爬出窖的根离坑心多远（VilHandsUpClimbOut，清单 stage cellarPit：根在坑口沿外 wallBehindM 0.10 m）：
+ * 白盒的坑在 0.5 m 网格里坑口沿在坑心外 1.0 m（Data_…Space cellar 注），所以是 1.0 + 0.10。
+ */
+export const CELLAR_RIM_M = R(G.cellar.floorW / 2 + 0.2 + (VILLAGE_STAGES.cellarPit?.wallBehindM ?? 0.1));
 /** 眼睛 → 目标这条线上、过了目标再往前 m 米的点（把要看的东西排在视线上）。 */
 function Along(eye, target, m) {
   const d = Dist(eye, target);
@@ -409,8 +414,19 @@ const VIL = Object.freeze({
 const TALK_SLUNG = "PvStandTalkSlung", TALK_LOW = "PvStandTalkLowRifle", TALK_CROUCH = "PvCrouchTalkRifle";
 const POINT_STAND = "PvStandPointL", POINT_CROUCH = "PvCrouchPointL", WAVE_ON = "PvStandWaveOnL", BECKON = "PvStandBeckonL";
 const MEDIC_BANDAGE = "CareMedicBandage", SIT_STUFF_PACK = "PvSitStuffPack";
-/** 妮儿坐车尾：车尾板在车中心后 1.2 m（Puppets cart.d 2.4），她的根放在车尾板外 0.1 m、背对着车（清单 stage sitEdge：车在她身后 +z）。 */
-const CART_TAIL_M = 1.3;
+/**
+ * 妮儿坐车尾（第四版 10-20）：关键帧单位 Nier 在 07 四帧里都带 §3 ride（Script_EditorBlockoutFirstLevel0610Keyframes NIER_RIDE：挂在 GengCart 车尾沿、
+ * 根离车底下地面 0.467、背对车头），预演只给她 VilSitEdge 这个片段，**不写位置键**（挂着时位置键不管用，校验会报警告）；车动她跟着走。
+ * 要下车先写 { ride: null } 再写位置键（07-4 扑倒那一下）。车尾沿在车本地 z +1.2（Puppets BLOCKOUT_CART_SEATS.tail）。
+ */
+const CART_TAIL_Z = 1.2;
+/** 四条新音效文件的时长与里头响点（ffprobe 实测 Audio/BlockoutPreviz/*.mp3，10-20）：排时刻用。 */
+const SFX_FILE = Object.freeze({
+  babyCry: { seconds: 3.53 },                                  // 0–1.0 s 一阵、2.4–3.5 s 又一阵
+  cellarSob: { seconds: 4.0 },
+  gateSmash: { seconds: 2.33, hits: [0.07, 0.84, 1.66] },      // 枪托两下 + 一脚踹
+  jarShatter: { seconds: 1.53 },
+});
 /** 背伤员的一对（stage carryOnBack：同根同向同相位）。 */
 function CarryPair(s, carrier, rider, p, yaw, t = 0) {
   s.Place(carrier, t, p.x, p.z, { yawDeg: yaw, stance: "stand", clip: VIL.carry });
@@ -575,21 +591,13 @@ function CrowdWalk(s, ctx, fromKf, toKf, { t0 = 1.0, legM = 5.5, pauseS = 2.6, s
   }
   const tEnd = legs[legs.length - 1].t1;
   // 每个人：按自己的 lat 走到对应 z（最后一段落到 toKf 里的位置）。
-  // 妮儿坐在车尾（VilSitEdge）：根钉在车尾板外 CART_TAIL_M、背对着车（朝北），车动她就「倒退着」跟（move drag：朝向反过来，
-  // 一直朝北）—— 运行时没有「坐在车上跟车走」的挂法，车动的那几秒她的腿会走，停下又坐回去（缺口清单）。
+  // 妮儿坐在车尾（VilSitEdge）：关键帧单位带 ride（挂在车尾沿上），车动她跟着走 —— 这里只给片段，不写位置键（10-20 起）。
   for (const id of ids) {
     const a = KU(ctx, fromKf, id), b = KU(ctx, toKf, id);
     const lat = LaneLat(a), dz = a.z - P0.z;
     if (id === "Nier") {
-      const cart0 = KU(ctx, fromKf, "GengCart"), cart1 = KU(ctx, toKf, "GengCart");
-      const seat0 = Pt(cart0.x, cart0.z - CART_TAIL_M);
-      s.Place("Nier", 0, seat0.x, seat0.z, { yawDeg: 0, stance: "stand", clip: VIL.sit });
-      const cartLat = LaneLat(cart0), cartDz = cart0.z - P0.z;
-      for (let i = 0; i < legs.length; i++) {
-        const L = legs[i];
-        const to = i === legs.length - 1 ? Pt(cart1.x, cart1.z - CART_TAIL_M) : LZ(L.z1 + cartDz - CART_TAIL_M, cartLat);
-        s.Go("Nier", L.t0, L.t1, to.x, to.z, { move: "drag", yawDeg: 0 });
-      }
+      if (a.ride?.on !== "GengCart") throw new Error(`${fromKf}：妮儿要挂在 GengCart 上（关键帧 ride）`);
+      s.Key("Nier", 0, { clip: VIL.sit });
       continue;
     }
     for (let i = 0; i < legs.length; i++) {
@@ -683,8 +691,8 @@ function S0703(ctx) {
   const s = new Seq(ctx, "07-3", "冬瓜：就塞个毛巾；坎上的班长和排长");
   const K = id => KU(ctx, "07-3", id);
   const DG = UP(K("Donggua")), medic = UP(K("Medic")), luo = UP(K("Luo")), officer = UP(K("Officer"));
-  // 妮儿还坐在车尾（车停在队头前几步）
-  { const cart = UP(K("GengCart")); s.Place("Nier", 0, cart.x, cart.z - CART_TAIL_M, { yawDeg: 0, stance: "stand", clip: VIL.sit }); }
+  // 妮儿还坐在车尾（车停在队头前几步；她挂在车尾沿上，只给坐姿片段）
+  s.Key("Nier", 0, { clip: VIL.sit });
   // 蹲到担架边：裹着那床单被的冬瓜一直在抖
   s.Eye(0, 2.6, { stance: "stand", look: DG, pitch: -24, toPitch: -30 });
   s.Caption(0.5, 2.8, "（担架里找到冬瓜：身上裹着那床单被，人一直在抖。卫生兵蹲在旁边给别人缠绷带，满手是血）");
@@ -767,13 +775,17 @@ function S0704(ctx) {
   s.Key("Geng", 4.5, DUCK);
   s.Place("GengCart", 0, cartAt.x - 0.5, cartAt.z, { yawDeg: 180 });
   s.Go("GengCart", 2.6, 4.2, cartAt.x, cartAt.z, { move: "walk" });
-  // 妮儿坐在车尾（VilSitEdge），听不见飞机；看见别人都趴下了才抬头，这时飞机已经在头顶；她最后一个扑倒
-  s.Place("Nier", 0, cartAt.x - 0.5, cartAt.z - CART_TAIL_M, { yawDeg: 0, stance: "stand", clip: VIL.sit });
-  s.Go("Nier", 2.6, 4.2, cartAt.x, cartAt.z - CART_TAIL_M, { move: "drag", yawDeg: 0 });
+  // 妮儿坐在车尾（VilSitEdge，挂在车尾沿上跟着车挪），听不见飞机；看见别人都趴下了才抬头，这时飞机已经在头顶；她最后一个扑倒。
+  // 扑倒前先下车（ride: null）：从车尾沿滑下来站在车尾外头半步、朝北（看着一路趴下的人），再 VilDuckProne 在车边扑倒 ——
+  // VilDuckProne 的根在脚下的地上（跪、趴都带贴地修正），挂在车尾沿（根离地 0.467）上播它人会悬在半空；爬上车板缩成一团没有现成片段，
+  // 而且她是「看见别人都趴了才学着趴」，跳下来跟大家一样趴在地上更像。
+  s.Key("Nier", 0, { clip: VIL.sit });
   s.Caption(5.0, 2.4, "（妮儿是看见别人都趴下了才抬头，这时飞机已经在头顶）");
-  const NIER_DUCK = 6.0;
+  const NIER_OFF = 5.6, NIER_DUCK = 6.0;
+  const nierOff = Pt(cartAt.x, cartAt.z - CART_TAIL_Z - 0.5);
+  s.Key("Nier", NIER_OFF, { ride: null, x: nierOff.x, z: nierOff.z, move: "cut", yawDeg: 0, stance: "stand", clip: null });
   s.Key("Nier", NIER_DUCK, DUCK);
-  s.Caption(7.4, 2.4, "（她最后一个趴下。飞机没开枪，往南飞过庄子去了）");
+  s.Caption(7.4, 2.4, "（她从车尾滑下来，最后一个趴下。飞机没开枪，往南飞过庄子去了）");
   // —— 镜头 ②（约 7 s）：班长、排长带着全班弯腰顺凹路往前跑，老耿赶着车跟在后头；机位在前头的路中线上往回看，跟着退
   const RUN0 = 9.0, RUN1 = 16.0;
   s.Cam(RUN0, RUN1 - RUN0, { from: { ...LZ(352, 0.2), h: 1.4 }, to: { ...LZ(366, 0.2), h: 1.4 }, look: { actor: "Luo", offset: [0, 1.1, 0] }, ease: "linear", fov: 55 });
@@ -1117,6 +1129,9 @@ function S0901(ctx) {
         s.Caption(s.End("CellarShout.02") + 0.2, 2.8, "（老耿家后院那头。地底下有人在哭。只听得见，看不见：这是三下里的第一下）");
         s.Key("CellarIja1", mv1, { faceTo: CELLAR, clip: VIL.shout });
         s.Key("CellarIja1", s.End("CellarShout.02") + 0.8, { clip: null });
+        // 地底下有人在哭：cellarSob（Sfx_CellarSob.mp3，4 s）从窖口放（窖底 −1.7，声源在地面下 0.7 m），吼完接着哭一遍
+        s.Sfx(mv1 + 0.3, "cellarSob", { x: CELLAR.x, z: CELLAR.z, volume: 0.7 });
+        s.Sfx(s.End("CellarShout.02") + 0.3, "cellarSob", { x: CELLAR.x, z: CELLAR.z, volume: 0.6 });
         return s.End("CellarShout.02") + 3.2;
       }
       if (i === 3) s.Caption(mv1 + 0.4, 2.6, "（妮儿拐进了邻院敞着的小门：邻院的人跑的时候没顾上关）");
@@ -1166,39 +1181,50 @@ function S0903(ctx) {
   const K = id => KU(ctx, "09-3", id);
   // 眼贴着墙缝：缝只有一指宽，斜着看窖口只剩两度宽的一条——能看见的东西全排在「眼睛 → 窖口」这条线上
   const eyeA = SlitEye(CRACK, CELLAR);
-  const RIM_E = Along(eyeA, CELLAR, 1.6);     // 窖口东沿外（视线上）：汉子举着手从窖里爬上来站在这儿（VilHandsUpClimbOut 的根；
-  //                                             清单 stage cellarPit：起步时骨盆在根后 1.75 m、下 0.68 m —— 正在窖坑里）
+  // 爬出窖（PrevizVillage V2 的 VilHandsUpClimbOut，清单 stage cellarPit）：根放在坑口沿外 0.10 m 的地上、背对窖口，起步时骨盆在根后 0.55 m、
+  // 下 1.18 m（站在 2 m 深的坑底），蹬壁上的脚窝、扒窖沿撑上来，站在根前 0.38 m 举手。白盒的坑在 0.5 m 网格里是：坑心 ±0.5 m 坑底、
+  // 0.5…1.0 m 斜壁、1.0 m 外整高（Data_…Space cellar 注），所以「坑口沿」按网格算在坑心外 1.0 m，根放 1.0 + 0.10 = 1.1 m（CELLAR_RIM_M）：
+  // 根踩在院子地面上、起步的骨盆在坑心外 0.55 m 的坑底上。汉子的根在视线上（缝里只看得见这一条）。
+  // 坑是正方形：沿视线（偏离 x 轴约 17°）走到 x 方向离坑心正好 CELLAR_RIM_M 的那一点（他爬的是东壁），不是径向 1.1 m
+  const RIM_E = (() => { const d = Dist(eyeA, CELLAR), ux = (CELLAR.x - eyeA.x) / d, uz = (CELLAR.z - eyeA.z) / d; return Along(eyeA, CELLAR, CELLAR_RIM_M / Math.max(Math.abs(ux), Math.abs(uz))); })();
   const manYaw = Yaw(CELLAR, RIM_E);          // 背对窖口、面朝东边拿刺刀的
-  // 拿刺刀的按清单 stage bayonetVictim 站：汉子在他前方 1.92 m、右 0.12 m、面对他
-  const ija2 = StageAnchorFrom("bayonetVictim", "victim", RIM_E, manYaw);
-  // 窖里的人先在窖底（看不见：藏着，爬上来那一刻才露面）；三个鬼子围着窖口；妮儿缩在柴垛后头
-  const wife0 = Pt(89.6, 501.8), granny0 = Pt(91.9, 500.9);
+  // 拿刺刀的按清单 stage bayonetVictim 站：汉子在他前方 1.92 m、右 0.12 m、面对他 —— 汉子站直后在根前 0.38 m（root.end），刺刀对着那儿
+  const manUp = RootEndAt(VIL.climbOut, RIM_E, manYaw);
+  const ija2 = StageAnchorFrom("bayonetVictim", "victim", manUp, manYaw);
+  // 窖里的人先在窖底（看不见：藏着，爬上来那一刻才露面）；媳妇、老太太从南沿爬（并排、隔 1 m，背对窖口朝南）；三个鬼子围着窖口；妮儿缩在柴垛后头
+  const wife0 = Pt(CELLAR.x - 0.5, CELLAR.z + CELLAR_RIM_M), granny0 = Pt(CELLAR.x + 0.5, CELLAR.z + CELLAR_RIM_M);
   s.Place("CellarMan", 0, RIM_E.x, RIM_E.z, { state: "alive", stance: "stand", yawDeg: manYaw, visible: false });
-  s.Place("CellarWife", 0, wife0.x, wife0.z, { state: "alive", stance: "stand", yawDeg: Yaw(CELLAR, wife0), visible: false });
-  s.Place("CellarGranny", 0, granny0.x, granny0.z, { state: "alive", stance: "stand", yawDeg: Yaw(CELLAR, granny0), visible: false });
+  s.Place("CellarWife", 0, wife0.x, wife0.z, { state: "alive", stance: "stand", yawDeg: 180, visible: false });
+  s.Place("CellarGranny", 0, granny0.x, granny0.z, { state: "alive", stance: "stand", yawDeg: 180, visible: false });
   s.Place("CellarIja1", 0, 89.5, 497.1, { faceTo: CELLAR, clip: VIL.shout });   // 拎着手榴弹在窖口上晃、指着窖里吼
   s.Place("CellarIja2", 0, ija2.x, ija2.z, { yawDeg: ija2.yawDeg, aim: true });
   s.Place("CellarIja3", 0, 88.4, 501.6, { faceTo: CELLAR });
   s.Key("Nier", 0, { stance: "crouch", faceTo: CELLAR, clip: VIL.crouch });
-  s.Eye(0, 18.0, { stance: "stand", x: eyeA.x, z: eyeA.z, look: CELLAR, pitch: -4, fov: SLIT_FOV });
+  s.Eye(0, 22.0, { stance: "stand", x: eyeA.x, z: eyeA.z, look: CELLAR, pitch: -4, fov: SLIT_FOV });
   s.Caption(0.3, 3.0, "（隔墙的缝：缝只有一指宽，眼要贴上去，只看得见窖口那一小片）");
   s.Caption(3.6, 3.2, "（一个鬼子拎着手榴弹在窖口上晃，窖里的人举着手一个个往外爬）");
-  // 汉子举着双手从窖里一步步爬上来，站直举手（VilHandsUpClimbOut 4 s，末帧停住）
+  // 地底下压着嗓子的哭（cellarSob，4 s）：人还在窖里的时候从窖口放两遍（汉子爬的时候女人还在底下）
+  s.Sfx(0.5, "cellarSob", { x: CELLAR.x, z: CELLAR.z, volume: 0.7 });
+  s.Sfx(4.6, "cellarSob", { x: CELLAR.x, z: CELLAR.z, volume: 0.55 });
+  // 汉子举着双手从 2 m 的直壁爬上来，站直举手（VilHandsUpClimbOut 5.0 s：4.0 s 站起、4.2 s 举手、4.2–5.0 举着手喘气的停住段；末帧停住）
   const climb = 4.2;
   s.Key("CellarMan", climb, { visible: true, clip: VIL.climbOut, clipHold: true });
-  // 拿刺刀的端枪往前一捅（VilIjaBayonetThrust），汉子弯腰、跪倒、侧倒（VilStabbedFall，末帧是尸体）：清单两段同时起播，0.50 s 捅中
-  const stab = climb + VilClipS(VIL.climbOut) + 0.4;
+  // 拿刺刀的端枪往前一捅（VilIjaBayonetThrust），汉子弯腰、跪倒、侧倒（VilStabbedFall，末帧是尸体）：清单两段同时起播，0.50 s 捅中。
+  // 爬完（5.0 s）先切到 root.end（清单：根前 0.38 m），再接被捅：VilStabbedFall 没有根位移，从那儿倒
+  const climbed = climb + VilClipS(VIL.climbOut);
+  const stab = climbed + 0.4;
+  s.Key("CellarMan", stab, { x: manUp.x, z: manUp.z, move: "cut", yawDeg: manYaw, clip: VIL.stabbed, clipHold: true });
   s.Key("CellarIja2", stab, { clip: VIL.thrust });
-  s.Key("CellarMan", stab, { clip: VIL.stabbed, clipHold: true });
-  s.Sfx(stab + 0.5, "stab", RIM_E);
+  s.Sfx(stab + 0.5, "stab", manUp);
   s.Caption(stab + 0.6, 3.0, "（汉子刚爬出来就被刺刀捅倒）");
   s.Key("CellarIja2", stab + VilClipS(VIL.thrust), { clip: null, faceTo: CELLAR });
-  // 年轻媳妇、抱襁褓的老太太跟着举着手往外爬（也是 VilHandsUpClimbOut，爬上来站在窖沿外）
-  s.Key("CellarWife", stab + 0.4, { visible: true, clip: VIL.climbOut, clipHold: true });
-  s.Key("CellarGranny", stab + 2.2, { visible: true, clip: VIL.climbOut, clipHold: true });
-  s.Key("CellarIja3", stab + 3.6, { faceTo: "CellarWife" });
+  // 年轻媳妇、抱襁褓的老太太跟着从南沿举着手往外爬（也是 VilHandsUpClimbOut 5 s，一个爬到顶另一个才上）
+  const wifeClimb = stab + 0.4, grannyClimb = R(wifeClimb + VilClipS(VIL.climbOut) - 1.0);
+  s.Key("CellarWife", wifeClimb, { visible: true, clip: VIL.climbOut, clipHold: true });
+  s.Key("CellarGranny", grannyClimb, { visible: true, clip: VIL.climbOut, clipHold: true });
+  s.Key("CellarIja3", wifeClimb + 3.2, { faceTo: "CellarWife" });
   // 前屋那头有人在吼（分队长指着后院调人：VilIjaShoutPoint），这伙鬼子手上加快了
-  const call = s.Say("LeaderCallsMen.01", "Leader", stab + 4.0);
+  const call = s.Say("LeaderCallsMen.01", "Leader", grannyClimb + 1.0);
   s.Key("Leader", call - 0.3, { faceTo: CELLAR, clip: VIL.shout });
   s.Key("Leader", s.End("LeaderCallsMen.01") + 0.3, { faceTo: WINDOW, clip: null });
   s.Key("CellarIja1", s.End("LeaderCallsMen.01") + 0.3, { clip: null });
@@ -1206,8 +1232,8 @@ function S0903(ctx) {
   // 街口那边还在打
   Exchange(s, 1.6, { volume: 0.5 });
   Exchange(s, 12.0, { volume: 0.5 });
-  // 顺子还得往侧门挪，视线断了：眼睛离开缝，贴着墙往南挪到侧门外
-  const leave = Math.max(stab + 5.4, s.End("LeaderCallsMen.01") + 1.0);
+  // 顺子还得往侧门挪，视线断了：眼睛离开缝，贴着墙往南挪到侧门外（老太太爬到顶了才走）
+  const leave = Math.max(grannyClimb + VilClipS(VIL.climbOut) + 0.4, s.End("LeaderCallsMen.01") + 1.0);
   s.Caption(leave, 3.0, "（顺子还得往侧门挪，视线断了。妮儿缩在柴垛后头发抖）");
   const gateOut = Pt(80.7, 499.4);
   s.Creep(leave, 3.4, Pt(eyeA.x - 0.2, eyeA.z), gateOut, Pt(WALL_X, 499.0), { h: 1.3, lookH: 1.4 });
@@ -1250,12 +1276,15 @@ function S0904(ctx) {
   s.Caption(3.8, 3.0, "（媳妇被拖进偏屋，只听得见声音）");
   s.Place("CellarIja3", dragT1 + 0.4, 112.0, 486.6, { clip: null, faceTo: SIDE_ROOM_DOOR });
   { const w5 = UP(KU(ctx, "09-5", "CellarWife")); s.Place("CellarWife", dragT1 + 0.4, w5.x, w5.z, { clip: null, state: "down", yawDeg: 90 }); }
-  // 孩子在哭；一个鬼子从老太太怀里扯过襁褓，往下一扎、挑起来、往旁边一甩（VilIjaBayonetLiftFling：扎 0.5 s、挑 1.1 s、甩 1.5 s），哭声断了
-  s.Caption(7.4, 2.6, "（孩子在哭）");
+  // 孩子在哭；一个鬼子从老太太怀里扯过襁褓，往下一扎、挑起来、往旁边一甩（VilIjaBayonetLiftFling：扎 0.5 s、挑 1.1 s、甩 1.5 s），哭声断了。
+  // 婴儿哭 babyCry（Sfx_BabyCry.mp3 3.53 s，0–1 s 一阵、2.4–3.5 s 又一阵）：倒着排，文件放完正好是刺刀扎下去那一刻（预演音效没有「掐断」，靶在文件尾）
+  const FLING = 9.6, BABY_STAB = FLING + 0.5;
+  const cry = R(BABY_STAB - SFX_FILE.babyCry.seconds);
+  s.Sfx(cry, "babyCry", { x: GRANNY0.x, z: GRANNY0.z, volume: 0.8 });
+  s.Caption(cry + 0.2, 2.6, "（孩子在哭）");
   s.Go("CellarIja2", 7.6, 9.2, STAB_AT.x, STAB_AT.z, { move: "walk", yawDeg: STAB_YAW, aim: true });
-  const FLING = 9.6;
   s.Key("CellarIja2", FLING, { clip: VIL.fling });
-  s.Sfx(FLING + 0.5, "stab", STAB_AT);
+  s.Sfx(BABY_STAB, "stab", STAB_AT);
   s.Key("Bundle", FLING + 1.5, { visible: true });
   s.Caption(10.2, 4.0, "（一个鬼子从老太太怀里扯过襁褓，一刺刀扎穿，挑起来甩在窖沿上，哭声断了）");
   s.Key("CellarIja2", FLING + VilClipS(VIL.fling), { clip: null, faceTo: CELLAR });
@@ -1417,9 +1446,9 @@ function S0907(ctx) {
   s.Place("KitchenIja", 0, kij.x, kij.z, { state: "alive", stance: "crouch", yawDeg: 120, aim: false });
   s.Place("Nier", 0, NIER0.x, NIER0.z, { stance: "crouch", faceTo: THRESH, clip: VIL.crouch });
   s.Eye(0, 2.2, { stance: "crouch", x: DOOR_OUT.x, z: DOOR_OUT.z, look: KITCHEN_DOOR, pitch: -4 });
-  // 罐子哗啦一声掉在地上（没有罐子的体块与声音：碎屑声顶）
+  // 罐子哗啦一声掉在地上：jarShatter（Sfx_JarShatter.mp3 1.5 s，陶罐摔碎 + 弹壳撒一地；罐子还是没有体块）
   const drop = 1.4;
-  s.Sfx(drop, "dirtFall", { x: NIER0.x, z: NIER0.z, volume: 0.6 });
+  s.Sfx(drop, "jarShatter", { x: NIER0.x, z: NIER0.z, volume: 0.8 });
   s.Caption(drop, 2.4, "（妮儿怀里那罐弹壳掉在地上，哗啦一声）");
   s.Eye(drop + 0.2, 0.6, { stance: "crouch", x: DOOR_OUT.x, z: DOOR_OUT.z, look: KITCHEN_DOOR, pitch: -4, toLook: NIER0, toPitch: -30 });
   // 灶屋里的鬼子嘴里塞着东西就扑出来：跑到门里，从门里冲出来肩膀往前撞（VilIjaShoulderCharge，根往前 1.2 m），撞翻顺子
@@ -1671,11 +1700,12 @@ function S1004(ctx) {
   s.Eye(0, 3.0, { stance: "prone", look: SHRINE, pitch: 1, fov: 50 });
   // 军官：砸开北边的院门，穿院子，从后头绕
   s.Say("EastEndOfficer.03", "EastIja5", 0.8);
-  // 北边院子里「咣、咣」砸门，一个院子一个院子往西挪（没有砸门的音效：枪托砸门用重物落地声顶、踹门用碎屑声）
+  // 北边院子里「咣、咣」砸门，一个院子一个院子往西挪：gateSmash（Sfx_GateSmash.mp3 2.33 s：枪托两下 0.07 / 0.84 s、一脚踹 1.66 s）
+  // 一道门放一遍，文件里第一下对齐片段第一下砸（0.45 s）→ 文件从 t + 0.38 起；后两下比片段的 0.95 / 1.6 晚 0.27 / 0.44 s（文件里的间隔比片段宽，认了）
+  const SMASH_SFX_LEAD = R(0.45 - SFX_FILE.gateSmash.hits[0]);
   const smash = (id, t, p, v) => {
     s.Key(id, t, { clip: VIL.smash });
-    s.Sfx(t + 0.45, "bodyFall", { x: p.x, z: p.z, volume: v }); s.Sfx(t + 0.95, "bodyFall", { x: p.x, z: p.z, volume: v });
-    s.Sfx(t + 1.6, "dirtFall", { x: p.x, z: p.z, volume: v * 0.8 });
+    s.Sfx(t + SMASH_SFX_LEAD, "gateSmash", { x: p.x, z: p.z, volume: v });
     s.Key(id, t + VilClipS(VIL.smash), { clip: null });
     return R(t + 1.6);
   };
@@ -1800,11 +1830,14 @@ function S1006(ctx) {
   const P = KP(ctx, "10-6");
   const BACK = Pt(PL.backDoor.x, PL.backDoor.z);
   const VAT = Pt(G.backVat.x, G.backVat.z);
-  // 开场：门还关着、水缸堵在门里头；老耿站在缸前（清单 stage vatDoor：缸在根前 0.55 m，面朝门 / 南），妮儿蹲在他身边；顺子站在院里看着
+  // 开场：门还关着、水缸堵在门里头；老耿站在缸西边（PrevizVillage V2 的 VilPushVat，清单 stage vatDoor：根在缸中心西 1.05 m、面朝东，
+  // 把缸顺着 z 504 往东推 1.7 m 到 (99.7,504)，转身往南走到门前拔门闩、把门板拉进院里），妮儿蹲在他西北边；顺子站在院里看着
+  s.Signal(0, SIG.backVatMoved, false);
   s.Signal(0, SIG.backDoorOpen, false);
-  const VAT_ROOT = Pt(VAT.x - 0.05, VAT.z - 0.55);
-  s.Place("Geng", 0, VAT_ROOT.x, VAT_ROOT.z, { yawDeg: 180 });
-  s.Place("Nier", 0, 98.9, 502.6, { stance: "crouch", faceTo: "Geng", clip: VIL.crouch });
+  const VD = VILLAGE_STAGES.vatDoor;
+  const VAT_ROOT = Pt(VAT.x + VD.vatStart.z, VAT.z - VD.vatStart.x), VAT_YAW = -90;     // 缸在根前方 1.05 m（清单 vatStart.z = −1.05）；朝东 = −90
+  s.Place("Geng", 0, VAT_ROOT.x, VAT_ROOT.z, { yawDeg: VAT_YAW });
+  s.Place("Nier", 0, 96.6, 502.9, { stance: "crouch", faceTo: "Geng", clip: VIL.crouch });
   // 冬瓜的担架这会儿已经抬进了院子，停在后门前几米等门开；下一副在大门过道里
   const DG0 = Pt(105.4, 492.0);
   s.Place("LitterDonggua", 0, DG0.x, DG0.z, { yawDeg: 180 });
@@ -1814,19 +1847,29 @@ function S1006(ctx) {
   const he = UP(K("HeYoutian"));
   s.Place("HeYoutian", 0, UP(K5("HeYoutian")).x, UP(K5("HeYoutian")).z, { stance: "crouch", aim: true, yawDeg: 180 });
   const inYard = Pt(98.6, 500.4);
-  s.Eye(0, 6.4, { stance: "stand", x: inYard.x, z: inYard.z, look: VAT, pitch: -10 });
-  s.Caption(0.4, 3.4, "（老耿弓步推开堵门的水缸，再拔开朝南的后门。缸挪过去、门扇开是随信号换的体块）");
-  // 挪缸开门（VilPushVat：两手上缸 0.4 s、缸挪开 1.4 s、门闩拉开 2.6 s、门推开 3.0 s）；信号在拔门闩那一刻切（缸挪过去、门扇开）
+  const VAT_MOVED = Pt(G.backVatMoved.x, G.backVatMoved.z);
+  // 挪缸开门（VilPushVat V2，6.8 s）：两手上缸 0.4 s → 弯着腰把缸往正前方（东）推 1.7 m，2.8 s 推到位（信号 BackVatMoved：缸换到 (99.7,504)）→
+  // 直起来右转朝南走到门前 → 5.15 s 手上门闩、5.55 s 拔开 → 5.75 s 两手扒住门板往院里拉，6.3 s 松手、6.6 s 门板摆到 90°；
+  // 门板摆开的信号 BackDoorOpen 切在拉门的半道 6.1 s（关着的门板消失、开到西墙边的门板出现）。播完人在门东边、面朝门口（root.end 右 0.55 / 前 0.90、右转 90°）
   const PUSH = 0.8;
+  const EV = Object.fromEntries((VILLAGE.clips[VIL.pushVat].events || []).map(e => [e.kind, e.t]));
+  const vatMoved = R(PUSH + EV.vatMoved), open = R(PUSH + (EV.doorGrab + EV.handsOff) / 2);
+  s.Eye(0, vatMoved + 0.6, { stance: "stand", x: inYard.x, z: inYard.z, look: VAT, pitch: -10, toLook: VAT_MOVED, toPitch: -10 });
+  s.Caption(0.4, 3.4, "（老耿站在缸西边，弓着腰把堵门的水缸往东推开，再绕到门前拔开朝南的后门，把门板拉进院里）");
   s.Key("Geng", PUSH, { clip: VIL.pushVat });
-  const open = R(PUSH + 2.6);
+  s.Sfx(PUSH + EV.handsOnVat + 0.6, "dirtFall", { x: (VAT.x + VAT_MOVED.x) / 2, z: VAT.z, volume: 0.5 });   // 缸底在地上蹭
+  s.Signal(vatMoved, SIG.backVatMoved, true);
+  s.Caption(vatMoved + 0.2, 2.6, "（缸推到门东边，门口让开了）");
+  s.Eye(vatMoved + 0.6, open - vatMoved - 0.6, { stance: "stand", x: inYard.x, z: inYard.z, look: VAT_MOVED, pitch: -10, toLook: BACK, toPitch: -6 });
   s.Signal(open, SIG.backDoorOpen, true);
-  s.Sfx(PUSH + 1.4, "dirtFall", { x: VAT.x, z: VAT.z, volume: 0.5 });
-  const pushed = PUSH + VilClipS(VIL.pushVat);
-  s.Go("Geng", pushed + 0.2, pushed + 1.2, K("Geng").x, K("Geng").z, { move: "walk", yawDeg: K("Geng").yawDeg, depart: { clip: null } });
-  s.Go("Nier", pushed + 0.4, pushed + 1.4, K("Nier").x, K("Nier").z, { move: "walk", depart: { clip: null }, stance: "crouch", faceTo: "Geng", clip: VIL.crouch });
+  const pushed = R(PUSH + VilClipS(VIL.pushVat));
+  // 播完切到清单 root.end（门东边、面朝门口），再往东挪到关键帧的位置让担架过
+  const gengEnd = RootEndAt(VIL.pushVat, VAT_ROOT, VAT_YAW), gengEndYaw = R(WrapDeg(VAT_YAW + VILLAGE.models[0].clips.find(c => c.clip === VIL.pushVat).root.end[2]));
+  s.Key("Geng", pushed, { x: gengEnd.x, z: gengEnd.z, move: "cut", yawDeg: gengEndYaw, clip: null });
+  s.Go("Geng", pushed + 0.6, pushed + 2.4, K("Geng").x, K("Geng").z, { move: "walk", path: [Pt(99.0, 503.0)], yawDeg: K("Geng").yawDeg });
+  s.Go("Nier", pushed + 0.8, pushed + 2.6, K("Nier").x, K("Nier").z, { move: "walk", path: [Pt(98.2, 501.6)], depart: { clip: null }, stance: "crouch", faceTo: "Geng", clip: VIL.crouch });
   s.Go("HeYoutian", open + 0.2, open + 1.4, he.x, he.z, { move: "walk", stance: "crouch", aim: true, yawDeg: 180 });
-  s.Caption(open + 0.4, 3.0, "（水缸挪到门边，门扇开了。何有田端着枪守在门边。后门外是一条往南出村的小路）");
+  s.Caption(open + 0.4, 3.0, "（门板拉开了，贴在西墙边。何有田端着枪守在门边。后门外是一条往南出村的小路）");
   // 担架一副接一副往外抬：冬瓜的担架先出门
   const litterOut = Pt(BACK.x, G.compound.maxZ + 9.0);
   const lRoute = Route(DG0, litterOut);
@@ -1836,8 +1879,8 @@ function S1006(ctx) {
   s.Go("Donggua", t0, t1, lRoute.end.x, lRoute.end.z, { move: "walk", path: lRoute.path, yawDeg: -90 });
   s.Go("Medic", t0 + 1.4, t1 + 1.0, BACK.x - 1.0, G.compound.maxZ + 7.6, { move: "walk", path: [Pt(BACK.x, G.compound.maxZ - 2.6), Pt(BACK.x, G.compound.maxZ + 1.2)], depart: { stance: "stand" }, stance: "crouch", faceTo: "Donggua" });
   { const r = Route(Pt(GATE_X, 484.0), Pt(BACK.x, G.compound.maxZ - 4.6)); s.Go("Litter01", t0 + 4.0, t0 + 4.0 + RouteLen(Pt(GATE_X, 484.0), [...r.path, r.end]) / 1.2, r.end.x, r.end.z, { move: "walk", path: r.path, yawDeg: 180 }); }
-  // 眼睛：先在院里看担架出门，再切到门外路上、回头看门、再顺着小路往南看
-  s.Eye(6.4, 1.4, { stance: "stand", x: inYard.x, z: inYard.z, look: VAT, pitch: -10, toLook: BACK, toPitch: -4 });
+  // 眼睛：先在院里看门开、担架出门，再切到门外路上、回头看门、再顺着小路往南看
+  s.Eye(open, t0 + 2.6 - open, { stance: "stand", x: inYard.x, z: inYard.z, look: BACK, pitch: -6, toPitch: -4 });
   const outside = t0 + 2.6;
   const outEye = Pt(P.x - 0.6, P.z + 0.6);
   s.Eye(outside, 3.0, { stance: "stand", x: outEye.x, z: outEye.z, look: BACK, pitch: -4 });

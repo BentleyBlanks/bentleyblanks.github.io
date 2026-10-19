@@ -37,7 +37,7 @@
 //     这里前屋收到 x 82…106.4，x 106.9…109.5 留一道 2.6 m 的大门（门洞到后院的过道夹在前屋东墙与偏屋西墙之间）；
 //     前门因此从 x≈108 挪到 x 104，偏屋从 x 109…118 挪到 x 110…118.25（给过道让 1 m）。北窗 x 97 不动。
 //   · 巷子南北那一截：契约 x≈56；邻院西墙在 x 60，巷子 2 m 宽贴着它走，中线在 x 58.75。
-//   · 地瓜窖：契约窖口 1.2×1.2；0.5 m 的高度网格挖 1.2 m 的坑只剩一个尖，窖坑挖 1.6×1.6（坑壁 0.4），窖口 1.2 的样子由窖沿矮块与盖板表现。
+//   · 地瓜窖：契约窖口 1.2×1.2；0.5 m 的高度网格挖 1.2 m 的坑只剩一个尖，窖坑挖 1.6×1.6（坑壁过渡 0.15，第四版前是 0.4），窖口 1.2 的样子由窖沿矮块与盖板表现。
 //   · 石碾：从 (113,466) 挪到 (113.2,465.7)，趴在它西边的人才能顺着东街看到东头（不被东街南侧院墙的墙头挡住）。
 //   · 妮儿捡弹壳的地方：第二版剧本改成「蹲在沟沿上」挡着何有田的路，放在凹路口边上干沟南岸的坎脚 (56.5,157.3)；老耿的车停在南岸树底下（沟底贴着南壁，(54.5,155)）。
 //   · 地瓜窖：契约 (110,499) 离侧门 28 m，但剧本「留下的那个鬼子站在八九米外」、契约也写「9 m 左右」，按剧本挪到 (90.5,499.5)（离侧门 9 m）；
@@ -53,7 +53,7 @@ export { PointAlong, PointBeside, LineLength };
 
 export const L0610_LEVEL_KEY = "FirstLevel0610";
 export const L0610_TITLE = "第一关 06–10 · 耿家庄（新剧本白盒）";
-export const L0610_VERSION = "2026-10-19 第二版";
+export const L0610_VERSION = "2026-10-20 第四版（第二版空间 + 缸挪开位置 / 两个后门信号 / 窖壁收直）";
 
 /** 场地范围与高度网格（0.5 m 一格，与 0105 一样）。只烘干沟以北到坡顶那一截当背景，前沿不烘。 */
 export const L0610_BOUNDS = Object.freeze({ minX: -20, maxX: 250, minZ: 120, maxZ: 560 });
@@ -160,14 +160,19 @@ export const L0610_GENG = Object.freeze({
   board: Object.freeze({ x: 84.4, z: 485.1, w: 1.4, d: 0.6, h: 0.85 }),    // 案板（南墙根）
   mill: Object.freeze({ x: 100, z: 487, baseW: 1.5, baseH: 0.4, stoneW: 1.1, stoneH: 0.35 }),   // 石磨（后院中间偏北）
   // 地瓜窖：契约 (110,499) 离侧门 28 m，剧本「留下的那个鬼子站在八九米外」、契约也写「9 m 左右」——按剧本的距离来，窖口离侧门 9 m
-  cellar: Object.freeze({ x: 90.5, z: 499.5, floorW: 1.6, wallM: 0.4, depth: L0610_HEIGHTS.cellarDepth, mouth: 1.2, rimH: 0.15 }),
+  // 坑壁：第四版（10-20）从 0.4 收到 0.15 —— 契约与 PrevizVillage V2 的 VilHandsUpClimbOut 都按「四壁直的 2 m 坑」写；0.5 m 的高度网格
+  // 做不出真正的直壁，但壁的过渡 ≤ 0.2 时离坑心 1.0 m 那一圈格点就是整高（原来 0.4 时是半深 −0.7，坑口在网格里宽到 3 m），
+  // 坑在网格里就是：坑心 ±0.5 m 平底、0.5…1.0 m 一段 45° 斜壁、1.0 m 外是院子地面。爬出窖的根按这个口径放在坑心外 1.1 m（预演生成器）。
+  cellar: Object.freeze({ x: 90.5, z: 499.5, floorW: 1.6, wallM: 0.15, depth: L0610_HEIGHTS.cellarDepth, mouth: 1.2, rimH: 0.15 }),
   cellarLid: Object.freeze({ x: 92.3, z: 501.0, w: 1.3, d: 1.3, t: 0.08, ry: 0.35 }),            // 掀开的木盖板，扔在窖口东南
   cellarLidBlown: Object.freeze({ x: 94.0, z: 497.4, ry: 1.1 }),                                    // 炸飞后的位置
   pisserOffset: P(1.4, -2.3),                                                                        // 09-5 撒尿的看守：窖口东北、汉子尸体边（离侧门口约 9 m）
   haystack: Object.freeze({ x: 85.5, z: 503.4, w: 2.4, d: 1.8, h: 1.6 }),   // 柴草垛（后院西南角）：09-4 妮儿缩在它后头
   backDoor: Object.freeze({ x: 98, w: 1.2, topH: 2.0 }),                   // 朝南的后门（南墙 z 506）
   backVat: Object.freeze({ x: 98, z: 504 }),                                // 堵在门里头的大水缸
-  backVatMoved: Object.freeze({ x: 99.7, z: 503.4 }),                      // 10 末挪开后
+  // 10 末挪开后：老耿站在缸西边 (96.95,504) 面朝东，把缸顺着 z 504 往东推 1.7 m（PrevizVillage V2 的 VilPushVat，清单 stage vatDoor：
+  // vatStart 1.05 m → vatEnd 2.75 m 在根前方）→ (99.7,504.0)，让开 x 97.4…98.6 的门口；第三版写的 (99.7,503.4) 与片段方向距离对不上
+  backVatMoved: Object.freeze({ x: 99.7, z: 504.0 }),
   sharedWall: Object.freeze({ x: 81.5, fromZ: 474, toZ: 506 }),            // 与邻院共用的那道墙
   dogHole: Object.freeze({ z: 488, w: 0.45, h: 0.4 }),                     // 狗洞（大人钻不过）
   // 墙缝：契约 z≈493；窖口挪到 (90.5,499.5) 以后从 z 493 看它要斜 36°，0.5 m 厚的墙上一道缝看不到那么斜，挪到 z 496.5（斜 18°）、缝 0.2 m
@@ -272,7 +277,9 @@ export const L0610_SIGNALS = Object.freeze({
   sideGateOpen: "SideGateOpen",   // 09-5 起：侧门从里头拔开门闩、推开
   mgSilenced: "MgSilenced",       // 10-1 起：北窗机枪组被从背后打掉；10-2 那挺枪出现在石碾后头
   northYardGatesBroken: "NorthYardGatesBroken",   // 10-4 起：北边院子链上的三道门被砸倒
-  backDoorOpen: "BackDoorOpen",   // 10-6 起：水缸挪开、后门打开
+  // 10-6 起（第四版 10-20 把原来一个 BackDoorOpen 拆成两个：缸推到位是片段 2.8 s、门板摆开是 6.1 s，一个信号缸就得等到拔门闩才跳过去）
+  backVatMoved: "BackVatMoved",   // 10-6 起：老耿把堵门的水缸推到门东边（BackVat → BackVatMoved）
+  backDoorOpen: "BackDoorOpen",   // 10-6 起：后门闩拔开、门板拉开到西墙边（BackDoorLeaf → BackDoorLeafOpen）
 });
 
 /** 有名字的地方。x/z 是中心或站点；yawDeg 是站在那里该朝的方向。 */
