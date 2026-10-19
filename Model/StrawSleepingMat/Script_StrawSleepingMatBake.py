@@ -88,12 +88,12 @@ def Tube(builder, points, radius, sides=4, closed=False, ropeRepeats=None):
 def SheetHeight(x, y):
     # Broad almost-flat body with a restrained roll-memory ripple; only the
     # last 8–10 cm turn upward, matching the approved thin silhouette.
-    body = 0.0030 + 0.0016*math.sin(x*6.2 + y*3.7) + 0.0011*math.cos(y*14-x*2.2)
+    body = 0.0025 + 0.0018*math.sin(x*6.2 + y*3.7) + 0.0010*math.cos(y*14-x*2.2)
     edgeX = max(0, (abs(x)-0.80)/0.10)**2
     edgeY = max(0, (abs(y)-0.37)/0.08)**2
-    curl = (0.003 + 0.010*(0.5+0.5*math.sin(y*3.1+x*2.8))) * edgeX
-    curl += (0.002+0.004*(0.5+0.5*math.cos(x*4.4))) * edgeY
-    return body + curl
+    curl = (0.009 + 0.009*(0.5+0.5*math.sin(y*3.1+x*2.8))) * edgeX
+    curl += (0.002+0.005*(0.5+0.5*math.cos(x*4.4))) * edgeY
+    return min(body + curl,.0275)
 
 
 def BodyUV(x, y):
@@ -110,7 +110,7 @@ def CenterAtBottom(obj):
 
 def BuildFlat(material, collection):
     builder = MeshBuilder()
-    nx, ny = 20, 12
+    nx, ny = 16, 10
     positions = []
     for j in range(ny+1):
         row = []
@@ -118,11 +118,11 @@ def BuildFlat(material, collection):
         for i in range(nx+1):
             x = -0.9 + 1.8*i/nx
             # Keep the exact nominal footprint but soften the handmade edge.
-            wiggle = 0.0008*math.sin(i*2.21+j*1.73)
+            wiggle = 0.0040*math.sin(i*2.21+j*1.73)
             yy = y + (wiggle if j in (0,ny) and i not in (0,nx) else 0)
             if i in (0,nx) and j in (0,ny):
-                x -= math.copysign(.004,x)
-                yy -= math.copysign(.004,yy)
+                x -= math.copysign(.009,x)
+                yy -= math.copysign(.009,yy)
             row.append((x, yy, SheetHeight(x, yy)))
         positions.append(row)
     layers = []
@@ -143,11 +143,19 @@ def BuildFlat(material, collection):
                      [(0.52,0.02),(0.52,0.48),(0.67,0.48),(0.67,0.02)])
         x,y,z = positions[j][i]
         border.append((x,y,z))
-    Tube(builder, border, 0.0040, sides=5, closed=True)
+    Tube(builder, border, 0.0060, sides=6, closed=True)
+    # Hand whipstitches run over the edge cord and underneath the 5mm sheet.
+    for stitch in range(40):
+        index=int(stitch*len(border)/40)
+        p=Vector(border[index])
+        tangent=(Vector(border[(index+1)%len(border)])-Vector(border[(index-1)%len(border)])).normalized()
+        outward=Vector((tangent.y,-tangent.x,0)).normalized()
+        points=[p-outward*.005+Vector((0,0,.004)),p+outward*.004+Vector((0,0,.002)),p-outward*.003+Vector((0,0,-.0035))]
+        Tube(builder,points,.0015,sides=3)
     # Four compact hand-finished corner wraps, not decorative metal fittings.
-    for x,y in [(-.896,-.447),(.896,-.447),(.896,.447),(-.896,.447)]:
-        points = [(x+.003*math.cos(tau*k/4), y+.003*math.sin(tau*k/4), SheetHeight(x,y)+.0015) for k in range(4)]
-        Tube(builder, points, .0012, sides=4, closed=True)
+    for x,y in [(-.891,-.441),(.891,-.441),(.891,.441),(-.891,.441)]:
+        points = [(x+.005*math.cos(tau*k/4), y+.005*math.sin(tau*k/4), SheetHeight(x,y)+.0035) for k in range(4)]
+        Tube(builder, points, .0022, sides=3, closed=True)
     # A few silhouette fibres carry damage; the dense weave is ONLY in maps.
     for k in range(16):
         edge = k % 4
@@ -155,10 +163,18 @@ def BuildFlat(material, collection):
         y = (-.449 if edge==0 else .449) if edge < 2 else rng.uniform(-.44,.44)
         direction = Vector((0, -1 if edge==0 else 1, .25)) if edge<2 else Vector((-1 if edge==2 else 1,0,.25))
         start = Vector((x,y,SheetHeight(x,y)+.001))
-        end = start + direction * rng.uniform(.003,.009)
+        end = start + direction * rng.uniform(.005,.012)
         cross = Vector((direction.y,-direction.x,0))*.0005
         ids = [builder.Vertex(p) for p in (start-cross,start+cross,end+cross*.3,end-cross*.3)]
         builder.Face(ids,[(.52,.02),(.53,.02),(.67,.48),(.66,.48)],False)
+    for corner,(x,y) in enumerate([(-.891,-.441),(.891,-.441),(.891,.441),(-.891,.441)]):
+        for strand in range(3):
+            direction=Vector((math.copysign(.7+strand*.15,x),math.copysign(1.0-strand*.17,y),.15)).normalized()
+            start=Vector((x,y,SheetHeight(x,y)+.004))
+            tip=start+direction*(.008+strand*.002)
+            cross=Vector((direction.y,-direction.x,0))*.0006
+            ids=[builder.Vertex(p) for p in (start-cross,start+cross,tip+cross*.2,tip-cross*.2)]
+            builder.Face(ids,[(.52,.02),(.53,.02),(.67,.48),(.66,.48)],False)
     obj = builder.Build('Model_StrawSleepingMatFlat', material, collection)
     CenterAtBottom(obj)
     obj['NominalDimensionsMeters'] = [1.8,0.9,0.005]
@@ -170,7 +186,7 @@ def BuildFlat(material, collection):
 def Radius(theta, x=0):
     # The slight ovalness and waist at the two ties avoid a perfect pipe.
     shape = .0675*(1+.018*math.sin(3*theta+.7)+.012*math.sin(5*theta-1))
-    cinch = sum(.0012*math.exp(-((x-tie)/.035)**2) for tie in (-.215,.215))
+    cinch = sum(.0012*math.exp(-((x-tie)/.035)**2) for tie in (-.225,.225))
     return shape-cinch
 
 
@@ -179,91 +195,125 @@ def RollPoint(x, theta, offset=0):
     return (x, radius*math.sin(theta), .070+radius*math.cos(theta))
 
 
+
+
 def BuildRolled(material, collection):
-    builder = MeshBuilder()
-    sides = 24
-    stations = [-.45,-.215,.215,.45]
-    rings = []
-    for x in stations:
-        ring = []
+    builder=MeshBuilder()
+    sides=18
+    stations=[-.45,-.418,-.225,.225,.418,.45]
+    rings=[]
+    for i,x in enumerate(stations):
+        ring=[]
         for j in range(sides):
-            ring.append(builder.Vertex(RollPoint(x,tau*j/sides+math.pi)))
+            theta=math.pi+tau*j/sides
+            radius=Radius(theta,x)
+            radius+=.0011*math.sin(theta*7+i*1.9)+.0006*math.cos(theta*3+i)
+            flare=.0018 if i in (0,len(stations)-1) else 0
+            radius+=flare
+            xx=x+(math.copysign(.0012*math.sin(j*2.6),x) if i in (0,len(stations)-1) else 0)
+            ring.append(builder.Vertex((xx,radius*math.sin(theta),.072+radius*math.cos(theta))))
         rings.append(ring)
     for i in range(len(stations)-1):
         for j in range(sides):
-            k = (j+1)%sides
-            # Dedicated rectified exterior atlas keeps the approved weave
-            # scale on this state; its UV seam is underneath the bundle.
+            k=(j+1)%sides
             u0,u1=(stations[i]+.45)/.9,(stations[i+1]+.45)/.9
             v0,v1=.5+.5*j/sides,.5+.5*(j+1)/sides
-            builder.Face([rings[i][j],rings[i+1][j],rings[i+1][k],rings[i][k]],
-                         [(u0,v0),(u1,v0),(u1,v1),(u0,v1)])
-    # At this triangle budget the packed paired layers are represented in
-    # the end-face albedo/normal atlas. The dished end, open-looking centre,
-    # uneven circumference and bound rim retain actual silhouette geometry.
+            builder.Face([rings[i][j],rings[i+1][j],rings[i+1][k],rings[i][k]],[(u0,v0),(u1,v0),(u1,v1),(u0,v1)])
+    # A recessed fibre end closes the interior; actual paired spiral strips
+    # stand proud of it and cast their own narrow layer shadows in oblique views.
     for end in (-1,1):
-        outer,inner = [],[]
+        centre=builder.Vertex((end*.430,0,.072))
+        back=[]
+        endRing=rings[0] if end<0 else rings[-1]
+        for vertex in endRing:
+            p=builder.vertices[vertex]
+            back.append(builder.Vertex((end*.448,p[1],p[2])))
+        def CutUV(vertex):
+            p=builder.vertices[vertex]
+            return (.25+.238*p[1]/.0715,.25+.238*(p[2]-.072)/.0715)
         for j in range(sides):
-            angle = tau*j/sides
-            r = Radius(angle,end*.45)-.0012
-            outer.append(builder.Vertex((end*.4501,r*math.sin(angle),.070+r*math.cos(angle))))
-            inner.append(builder.Vertex((end*.444,.0065*math.sin(angle),.070+.0065*math.cos(angle))))
-        centre = builder.Vertex((end*.433,0,.070))
-        def EndUV(vertex):
-            p = builder.vertices[vertex]
-            return (.25+.241*p[1]/.0675,.25+.241*(p[2]-.070)/.0675)
-        for j in range(sides):
-            k = (j+1)%sides
-            face = [outer[j],outer[k],inner[k],inner[j]]
-            if end>0: face.reverse()
-            builder.Face(face,[EndUV(v) for v in face],True)
-            face = [inner[j],inner[k],centre]
-            if end>0: face.reverse()
-            builder.Face(face,[EndUV(v) for v in face],True)
-        # A full bound outer lip, separately visible from the end layers.
-        lip = [RollPoint(end*.450,tau*j/20,.0013) for j in range(20)]
-        Tube(builder,lip,.0028,sides=4,closed=True)
-    # TWO rope ties, each one closed path. All of this geometry counts.
-    for tieX in (-.215,.215):
-        points = [RollPoint(tieX,tau*j/20,.0027) for j in range(20)]
-        Tube(builder, points, .0036, sides=4, closed=True)
-        # Low polygon interlocked knot: six stations on a small figure eight.
-        knotPoints = []
-        for j in range(7):
-            t = tau*j/6
-            knotPoints.append((tieX+.010*math.sin(t), -.010+.006*math.sin(2*t), .147+.005*math.cos(t)))
-        Tube(builder,knotPoints,.0033,sides=4)
-        # One naturally hanging free tail at each knot.
-        tail = [RollPoint(tieX+.008+.007*j/5,-.12-1.1*j/5,.0055) for j in range(6)]
-        Tube(builder,tail,.0018,sides=3)
-        for direction in (-1,1):
-            start=Vector(tail[-1])
-            tip=start+Vector((direction*.005,-.004,-.010))
-            span=Vector((.0006,0,0))
-            ids=[builder.Vertex(p) for p in (start-span,start+span,tip+span*.2,tip-span*.2)]
-            builder.Face(ids,[(.52,.02),(.53,.02),(.67,.48),(.66,.48)],False)
-    loop = []
+            ids=[back[j],back[(j+1)%sides],centre]
+            if end>0:ids.reverse()
+            builder.Face(ids,[CutUV(v) for v in ids],True)
+        innerPairs=[]
+        for layer in (0,1):
+            strips=[]
+            for j in range(49):
+                t=j/48;a=-1.16+3.6*tau*t
+                r=.009+(.067-.009)*t-layer*.0048
+                ring=[]
+                for across in (0,1):
+                    rr=max(.0015,r-across*.0044)
+                    xx=end*(.4540+.0016*math.sin(j*1.7+layer)+.0012*math.cos(j*.8)-across*.0025)
+                    ring.append(builder.Vertex((xx,rr*math.sin(a),.072+rr*math.cos(a))))
+                strips.append(ring)
+            innerPairs.append(strips[0])
+            for j in range(48):
+                ids=[strips[j][0],strips[j+1][0],strips[j+1][1],strips[j][1]]
+                if end>0:ids.reverse()
+                # The same source photo is projected onto the surface, so
+                # geometric layer relief does not replace the real cut fibres.
+                builder.Face(ids,[CutUV(v) for v in ids],True)
+        # Two small quads turn the paired sheet back into a visible inner fold.
+        a,b=innerPairs[0],innerPairs[1]
+        middle=[builder.Vertex((end*.453,(builder.vertices[a[k]][1]+builder.vertices[b[k]][1])*.5,
+                 (builder.vertices[a[k]][2]+builder.vertices[b[k]][2])*.5+.0015)) for k in (0,1)]
+        for ids in ([a[0],middle[0],middle[1],a[1]],[middle[0],b[0],b[1],middle[1]]):
+            if end>0:ids=list(reversed(ids))
+            builder.Face(ids,[CutUV(v) for v in ids],True)
+    # Each tie is a two-strand twisted grass cord, not a straight painted line.
+    for tieX in (-.225,.225):
+        for strand in (0,1):
+            points=[]
+            for j in range(12):
+                a=tau*j/12
+                twist=a*5+strand*math.pi
+                centre=Vector(RollPoint(tieX,a,.0038));centre.z+=.002
+                centre.x+=.0020*math.cos(twist)
+                centre.y+=.0020*math.sin(twist)*math.sin(a)
+                centre.z+=.0020*math.sin(twist)*math.cos(a)
+                points.append(centre)
+            Tube(builder,points,.0025,sides=3,closed=True)
+        knot=[(-.008,-.022,.147),(-.013,-.015,.157),(-.005,-.007,.161),(.008,-.011,.153),
+              (.006,-.025,.145),(-.004,-.029,.151),(-.005,-.018,.159),(.012,-.010,.150)]
+        Tube(builder,[(tieX+dx*.75,-.018+(y+.018)*.72,.153+(z-.153)*.75) for dx,y,z in knot],.0043,sides=3)
+        tail=[RollPoint(tieX+.008+.010*j/4,-.16-1.18*j/4,.0070) for j in range(5)]
+        tail=[(x,y,z+.002) for x,y,z in tail]
+        Tube(builder,tail,.0023,sides=3)
+    loop=[]
     for j in range(13):
-        t = j/12
-        loop.append((-.215+.430*t, .001+.018*math.sin(t*tau), .145+.073*math.sin(math.pi*t)**1.10))
-    Tube(builder,loop,.0033,sides=4)
-    # The outer edge lip sits in the very last turn; paired end layers above
-    # expose the fold. Twelve isolated frays keep the silhouette handmade.
-    for j in range(12):
-        end = -1 if j%2==0 else 1
-        theta = tau*j/12+.5
-        start = Vector(RollPoint(end*.449,theta,.0007))
-        tip = start+Vector((end*rng.uniform(.003,.007), .002*math.sin(theta), .002*math.cos(theta)))
-        width = Vector((0,.0006*math.cos(theta),-.0006*math.sin(theta)))
-        ids = [builder.Vertex(p) for p in (start-width,start+width,tip)]
-        builder.Face(ids,[(.52,.02),(.52,.48),(.67,.25)],False)
-    obj = builder.Build('Model_StrawSleepingMatRolled', material, collection)
+        t=j/12
+        loop.append((-.225+.450*t,-.009+.016*math.sin(t*tau),.155+.070*math.sin(math.pi*t)**1.06))
+    for strand in (0,1):
+        strandPoints=[]
+        for j,point in enumerate(loop):
+            t=j/12;twist=tau*3*t+strand*math.pi
+            point=Vector(point)
+            tangent=(Vector(loop[min(j+1,12)])-Vector(loop[max(0,j-1)])).normalized()
+            normal=tangent.cross(Vector((0,1,0))).normalized()
+            binormal=tangent.cross(normal).normalized()
+            strandPoints.append(point+.0018*(normal*math.cos(twist)+binormal*math.sin(twist)))
+        Tube(builder,strandPoints,.0027,sides=3)
+    # End and rope-tail frays make the rough hand-trimmed silhouette visible.
+    for j in range(14):
+        if j<8:
+            end=-1 if j%2==0 else 1;a=tau*j/8+.4
+            start=Vector((end*.450,.067*math.sin(a),.072+.067*math.cos(a)))
+            tip=start+Vector((end*rng.uniform(.006,.0115),.002*math.sin(a),.003*math.cos(a)))
+            side=Vector((0,.0007*math.cos(a),-.0007*math.sin(a)))
+        else:
+            tieX=-.225 if j%2==0 else .225
+            start=Vector(RollPoint(tieX+.018,-1.34,.007));start.z+=.002
+            tip=start+Vector(((j%3-1)*.009,-.005,-.012-(j%3)*.003))
+            side=Vector((.0006,0,0))
+        ids=[builder.Vertex(p) for p in (start-side,start+side,tip+side*.2,tip-side*.2)]
+        builder.Face(ids,[(.52,.02),(.53,.02),(.67,.48),(.66,.48)],False)
+    obj=builder.Build('Model_StrawSleepingMatRolled',material,collection)
     CenterAtBottom(obj)
-    obj['NominalBodyDimensionsMeters'] = [0.9,0.135,0.135]
-    obj['TriangleLimit'] = 1200
-    obj['Bindings'] = 2
-    obj['CarryingLoops'] = 1
-    obj['Fold'] = '1.8m length folded once into 0.9 x 0.9m double layer; axis along original width'
+    obj['NominalBodyDimensionsMeters']=[.9,.135,.135]
+    obj['TriangleLimit']=1200;obj['Bindings']=2;obj['CarryingLoops']=1
+    obj['Fold']='Paired raised spiral layers with a joined inner fold; 0.9m roll axis'
+    obj['Refinement']='Actual raised end layers, two-strand ties, volumetric overhand knots, hand-trimmed frays'
     return obj
 
 
@@ -352,6 +402,7 @@ def Main():
     for coll in list(bpy.data.collections):
         if coll.name.startswith('StrawMat'):
             bpy.data.collections.remove(coll)
+    bpy.data.orphans_purge(do_recursive=True)
     collection = bpy.data.collections.new('StrawMat_Production')
     bpy.context.scene.collection.children.link(collection)
     bpy.context.scene.unit_settings.system = 'METRIC'
@@ -359,14 +410,14 @@ def Main():
     flat = BuildFlat(CreateMaterial('Flat'),collection)
     rolled = BuildRolled(CreateMaterial('Rolled'),collection)
     report = {'coordinateSystem':'glTF +Y up, metres; local origin at bottom-centre',
-              'sourceBlend':str(sourceRoot/'Scene_StrawSleepingMat.blend'),
+              'sourceBlend':str(sourceRoot/bpy.context.scene.get('StrawMatBlendName','Scene_StrawSleepingMatRefined.blend')),
               'assets':[Export(flat),Export(rolled)]}
     (root/'Data_GeometryBake.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
     bpy.context.scene['StrawMatRoot'] = str(root)
     bpy.context.scene['ReferenceApproval'] = 'User approved references on 2026-10-18; strict visual matching required'
     bpy.context.scene['ReferenceFlat'] = str(sourceRoot/'References'/'Reference_StrawSleepingMatFlat.png')
     bpy.context.scene['ReferenceRolled'] = str(sourceRoot/'References'/'Reference_StrawSleepingMatRolled.png')
-    bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_StrawSleepingMat.blend'))
+    bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/bpy.context.scene.get('StrawMatBlendName','Scene_StrawSleepingMatRefined.blend')))
     print(json.dumps(report,indent=2))
 
 
