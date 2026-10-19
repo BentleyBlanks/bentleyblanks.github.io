@@ -5,7 +5,9 @@
 //     stride 7、每段 帧数 × 骨数 × 7 个有限数、循环片段首尾同一帧、holdLoop 在时长内；
 //   · 验收数字（清单 models[] 抄自烘焙报告，运行时米）：脚滑 ≤ 2 cm（跪 / 趴 / 爬坡 / 翻墙的几段另有上限）、声明过接触点的段接触误差 ≤ 4 cm、
 //     骨盆每帧 ≤ 0.2 m、膝滑 ≤ 2.5 cm（跪着的段 ≤ 7.5 cm：被拽倒那两段膝盖本来就要离地）；
-//   · 成对站位：stages 里每个演员的片段都在清单里，偏移时刻 = 接触时刻之差（妮儿咬手腕 = 日军出口起点），根位移的段 root.end 对得上契约的米数。
+//   · 成对站位：stages 里每个演员的片段都在清单里，偏移时刻 = 接触时刻之差（妮儿咬手腕 = 日军出口起点），根位移的段 root.end 对得上契约的米数；
+//   · V2（10-20）：爬出窖的段按白盒 2 m 直壁的窖（stage cellarPit：起点在坑底、终点在窖沿外）、推缸的段按后门几何（stage vatDoor：缸往正前方
+//     推 1.7 m、人转身到门前，root.end 在清单写的站位上）。
 // 用法：node Taierzhuang1938/Script_PrevizVillageClipsTest.mjs
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -58,7 +60,7 @@ for (const name of names) {
 }
 
 // 3. 验收数字（运行时米）
-const SLIDE_LIMIT = { VilHandsUpClimbOut: 0.05, VilIjaClimbWall: 0.06, VilStabbedFall: 0.05, VilIjaBayonetThrust: 0.025 };
+const SLIDE_LIMIT = { VilIjaClimbWall: 0.06, VilStabbedFall: 0.05, VilIjaBayonetThrust: 0.025 };
 const KNEE_LIMIT = { VilReachPinned: 0.075, VilNraYankBack: 0.075, VilIjaPinBayonet: 0.03 };
 // 占位档放宽的几段：翻墙骑在墙头那一下手离墙头 ≤ 13 cm（胳膊够不到墙头、身子已经压下去了）、班长起身挥手时右手离枪 ≤ 7 cm。
 // 磕手榴弹那一下的检查点写的是手腕，指根离它正好一拳（9 cm）。
@@ -111,8 +113,31 @@ Near(RootEnd("VilCrawlHole")[1], -S.dogHole.rootMotionM, 0.15, "钻狗洞往前�
 Near(RootEnd("VilIjaClimbWall")[1], -(S.villageWall.wallFaceM + S.villageWall.wallThickM + 0.4), 0.15, "翻墙落在墙那边");
 Near(RootEnd("VilIjaShoulderCharge")[1], -1.2, 0.2, "肩撞冲出 1.2 m");
 Near(RootEnd("VilNraWaveCharge")[1], -0.8, 0.2, "挥手冲出 0.8 m");
-Near(byClip.get("VilHandsUpClimbOut").root.start[3], byClip.get("VilHandsUpClimbOut").root.end[3] - S.cellarPit.pitDepthM, 0.2, "从 1.5 m 深的坑里爬上来（骨盆高度差）");
-assert.ok(byClip.get("VilHandsUpClimbOut").root.start[1] > 1.4, "起点在坑里（根后方）");
+// 爬出窖（V2）：白盒的窖 2 m 直壁；起点骨盆在坑底（根后方、窖壁与对面壁之间），终点站在窖沿外（根前方），骨盆高度差 = 窖深
+const climb = byClip.get("VilHandsUpClimbOut"), pit = S.cellarPit;
+assert.equal(pit.pitDepthM, 2.0, "窖深 2.0 m（Data_EditorBlockoutFirstLevel0610Space L0610_HEIGHTS.cellarDepth）");
+assert.ok(pit.wallBehindM > 0 && pit.floorM === 1.6 && pit.mouthM === 1.2, "窖的几何：壁在根后方、坑底 1.6 m 见方、窖口 1.2 m");
+Near(climb.root.start[3], climb.root.end[3] - pit.pitDepthM, 0.2, "从 2 m 深的窖里爬上来（骨盆高度差）");
+assert.ok(climb.root.start[1] > pit.wallBehindM && climb.root.start[1] < pit.wallBehindM + pit.floorM, "起点在窖坑里（根后方、两壁之间）");
+Near(climb.root.start[1], pit.startPelvis.z, 0.15, "起点骨盆 = 清单 startPelvis");
+Near(climb.root.end[1], pit.end.z, 0.15, "爬出来站在清单写的根前方");
+assert.ok(climb.root.end[3] > 0.75, "终点站直了（骨盆离地）");
+assert.equal(manifest.clips.VilHandsUpClimbOut.holdLoop[1], manifest.clips.VilHandsUpClimbOut.duration, "举手保持循环到片尾");
+// 推缸开门（V2）：缸往正前方推 1.7 m（x 不变），人转身面朝右（南）到门前，root.end 在清单写的站位上；门闩在开门前拔开
+const vat = S.vatDoor, pushEnd = RootEnd("VilPushVat");
+Near(vat.vatEnd.z - vat.vatStart.z, -vat.vatMoveM, 1e-6, "缸挪的距离 = vatMoveM");
+assert.equal(vat.vatStart.x, 0, "缸在根的正前方"); assert.equal(vat.vatEnd.x, 0, "推完还在正前方");
+Near(vat.vatMoveM, 1.7, 1e-6, "推 1.7 m（契约：(98,504) → (99.7,504)）");
+assert.equal(vat.bolt.y, 1.25, "门闩 1.25 m 高");
+// 门往院里开（白盒 BackDoorLeafOpen：西轴、往北摆 90°）：门板尖落在门轴正前方一块板长处，人最后站在门里侧、开着的门板东边
+assert.equal(vat.doorOpensInward, true); assert.equal(vat.doorSwingDeg, 90);
+Near(vat.doorOpenTip.x, vat.doorHinge.x - vat.doorLeafM, 1e-6, "开到 90° 门板尖的 x = 门轴 x − 板长"); Near(vat.doorOpenTip.z, vat.doorHinge.z, 1e-6, "门板尖与门轴同一条线");
+assert.ok(vat.end.x < vat.doorOpenTip.x && vat.end.z < vat.doorHinge.z - 0.3, "人最后在门板尖的北边、门板东边（没站在门板扫过的扇面里）");
+Near(pushEnd[0], vat.end.x, 0.15, "推缸开门 root.end x"); Near(pushEnd[1], vat.end.z, 0.15, "推缸开门 root.end z");
+Near(pushEnd[2], vat.end.yawDeg, 10, "推完转身面朝门（右转 90°）");
+const Ev = (clip, kind) => manifest.clips[clip].events.find((e) => e.kind === kind)?.t;
+assert.ok(Ev("VilPushVat", "handsOnVat") < Ev("VilPushVat", "vatMoved") && Ev("VilPushVat", "vatMoved") < Ev("VilPushVat", "boltGrab")
+  && Ev("VilPushVat", "boltGrab") < Ev("VilPushVat", "boltOpen") && Ev("VilPushVat", "boltOpen") < Ev("VilPushVat", "doorOpen"), "推缸 → 拔闩 → 开门按顺序");
 Near(RootEnd("VilReachPinned")[1], 0.65, 0.15, "老耿被拽回约 0.65 m（坐回脚跟上）");
 Near(RootEnd("VilNraYankBack")[1], 0.6, 0.15, "幺娃倒回约 0.6 m");
 for (const clip of names) if (!manifest.clips[clip].rootMotion) {

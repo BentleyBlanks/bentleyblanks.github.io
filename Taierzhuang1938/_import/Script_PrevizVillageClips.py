@@ -31,6 +31,7 @@ KneelFlat, Standing, IjaABase, IjaReadyBase = _base['KneelFlat'], _base['Standin
 Clamp, Smooth, Unit, Add3, Lerp3, Mix = _base['Clamp'], _base['Smooth'], _base['Unit'], _base['Add3'], _base['Lerp3'], _base['Mix']
 Bump, SlungRifle, BodyFrame, CrouchBase = _base['Bump'], _base['SlungRifle'], _base['BodyFrame'], _base['CrouchBase']
 RaHidden, _Rot = _base['RaHidden'], _base['_Rot']
+WrPath, Turned = _base['WrPath'], _base['Turned']        # feet under a travelling, turning pelvis; the whole pose turned (VilPushVat V2)
 GHOST_BONES, GHOST_LINKS = _base['GHOST_BONES'], _base['GHOST_LINKS']
 GaitFoot, SetGrip, KneelLean = _pv['GaitFoot'], _pv['SetGrip'], _pv['KneelLean']
 LieBase, Breathe = _care['LieBase'], _care['Breathe']
@@ -322,13 +323,39 @@ RIDER_PELVIS = (0.0, .22, .98)        # VilRideOnBack pelvis in the carrier fram
 SEAT_H = .90                          # VilSitEdge: the cart tail edge height; the edge runs left-right under the root
 HOLE_H = .40                          # VilCrawlHole: the dog hole's clear height; the hole 0.4-1.0 m ahead of the root
 CRAWL_M = 1.5                         # root motion of VilCrawlHole
-PIT_DEPTH = 1.5                       # VilHandsUpClimbOut: the pit floor; a 45 deg earth ramp from y 0 to 1.5 behind
+# VilHandsUpClimbOut (V2, 2026-10-20): the white-box cellar (Data_EditorBlockoutFirstLevel0610Space L0610_GENG.cellar) -- a 1.6 m
+# square shaft 2.0 m deep with STRAIGHT walls, the mouth 1.2 m. The root is on the rim ground; the wall he climbs (the
+# pit's near wall face) is PIT_WALL_BACK behind the root, the pit floor from there back to PIT_WALL_BACK + 1.6.
+PIT_DEPTH = 2.0
+PIT_WALL_BACK = .10
+PIT_FLOOR_W, PIT_MOUTH_W = 1.6, 1.2
+PIT_HOLES = (.50, 1.00)               # two foot holes dug in the wall face, this high above the pit floor (right foot, then left)
+PIT_RIM_GRIP = .15                    # both hands this far onto the rim ground (from the wall face)
+PIT_STAND_BACK = .45                  # he starts standing on the pit floor, his pelvis this far behind the wall face
 WALL_H, WALL_FACE, WALL_THICK = 2.2, .35, .30   # VilIjaClimbWall: the wall face .35 m ahead, top 2.2 m, .30 thick
 CHARGE_M = 1.2                        # VilIjaShoulderCharge root motion
 WAVE_M = .8                           # VilNraWaveCharge root motion
 GATE_M = .55                          # VilIjaGateSmash: the gate plane ahead
 DOOR_M, BOLT_H, BOLT_TRAVEL = .45, 1.25, .25    # VilUnboltDoor: the door plane, the bolt height, the bolt slides this far left
-VAT_C, VAT_R, VAT_H, VAT_MOVE = (-.05, -.55), .32, .90, .60   # VilPushVat: the vat centre ahead, radius, height, pushed to his right
+# VilPushVat (V2, 2026-10-20), laid out on the white box (L0610_GENG: backVat (98, 504), backDoor x 98 in the south wall z 506,
+# the leaf 0.15 inside it, w 1.2, bolt 1.25 up): Geng stands WEST of the vat facing EAST (the root; +X world = clip forward),
+# the vat centre VAT_AHEAD ahead; he shoves it VAT_MOVE straight ahead (east: (98, 504) -> (99.7, 504), clear of the doorway),
+# turns right (south) and walks to the door, slides the bolt toward the hinge, grabs the leaf and PULLS it open INTO the yard
+# (the white box's BackDoorLeafOpen: hinged on the west jamb, swung 90 deg north) while he backs out of its way.
+# Door numbers are in the root frame: right = south (+z world), ahead = east (+x world).
+VAT_AHEAD, VAT_R, VAT_H, VAT_MOVE = 1.05, .40, .90, 1.70
+VAT_HAND_H = .80                      # both palms on the vat's near face just under the rim
+VAT_PUSH_BACK = .60                   # his pelvis this far behind the vat's near face while he drives it
+DOOR_RIGHT = 1.85                     # the leaf plane (505.85) this far right of the root
+DOOR_HINGE_AHEAD, DOOR_LEAF_M = .45, 1.15      # the hinge (the west jamb, x 97.4) this far ahead; the leaf runs further ahead from it
+BOLT_AHEAD = .95                      # the bolt handle on the leaf (x 97.9), 1.25 up; it slides BOLT_TRAVEL toward the hinge (to his right at the door)
+DOOR_STAND = (1.40, 1.05)             # (right, ahead) where he stands to unbolt, facing right (yaw -90: south)
+DOOR_GRAB = (1.40, 1.35)              # (right, ahead) a side step toward the free edge: where he stands as both hands take the leaf
+DOOR_EDGE_GRIP, DOOR_EDGE_H = 1.08, 1.30       # the left hand hooks the leaf's free edge this far from the hinge, this high
+DOOR_FACE_GRIP, DOOR_FACE_H = .78, 1.25        # the right palm on the leaf's face this far from the hinge, this high (lets go as the leaf comes)
+DOOR_SWING_DEG = 90.0                 # the leaf swings this far into the yard (BackDoorLeafOpen: along z 504.6-505.75 at x 97.45)
+DOOR_HANDS_OFF_DEG = 60.0             # about where the left hand lets go; the leaf swings on to 90
+DOOR_END = (.55, .90)                 # (right, ahead) his pelvis at the end: inside, 0.4 m east of the open leaf's tip, facing the doorway
 
 
 def VictimInIja(T):
@@ -420,10 +447,19 @@ def DefineStages(T):
     STAGES['dogHole'] = {'anchor': 'crawler', 'holeHeightM': HOLE_H, 'rootMotionM': CRAWL_M,
                          'notes': 'VilCrawlHole: the hole (%.2f m clear) spans 0.4-1.0 m ahead of the start root; he crawls %.1f m '
                                   'forward and comes up into a squat (manifest root.end).' % (HOLE_H, CRAWL_M)}
-    STAGES['cellarPit'] = {'anchor': 'climber', 'pitDepthM': PIT_DEPTH,
-                           'notes': 'VilHandsUpClimbOut: the root is on the rim; the pit floor is %.1f m down, reached by a 45 deg earth '
-                                    'ramp from the rim (y 0) back to 1.5 m behind. He starts on the pit floor 1.75 m behind the root '
-                                    '(root.start) and ends standing on the rim, hands up.' % PIT_DEPTH}
+    STAGES['cellarPit'] = {'anchor': 'climber', 'pitDepthM': PIT_DEPTH, 'wallBehindM': PIT_WALL_BACK, 'floorM': PIT_FLOOR_W, 'mouthM': PIT_MOUTH_W,
+                           'footHolesM': list(PIT_HOLES), 'rimGripM': PIT_RIM_GRIP,
+                           'startPelvis': {'x': 0.0, 'z': round(PIT_WALL_BACK + PIT_STAND_BACK, 3), 'y': -1.18},
+                           'end': {'x': 0.0, 'z': -.38, 'yawDeg': 0},
+                           'notes': 'VilHandsUpClimbOut (V2): the root is on the rim ground; the wall he climbs (the pit\'s near wall, STRAIGHT) '
+                                    'is %.2f m behind the root, the pit floor %.1f m down from there back to %.2f m behind (the %.1f m shaft; '
+                                    'the %.1f m mouth is the lid opening). Place the root %.2f m outside the pit edge, facing away from the pit. '
+                                    'He starts standing on the floor, pelvis %.2f m behind the root (root.start), toes the right foot into a '
+                                    'hole %.2f m up the wall, both hands on the wall, pushes up, hands over the rim %.2f m onto the ground, '
+                                    'left foot into the hole %.2f m up, heaves his chest over, right knee onto the rim, left foot up, stands '
+                                    '%.2f m ahead of the root with both hands up (root.end) and holds.'
+                                    % (PIT_WALL_BACK, PIT_DEPTH, PIT_WALL_BACK + PIT_FLOOR_W, PIT_FLOOR_W, PIT_MOUTH_W, PIT_WALL_BACK,
+                                       PIT_WALL_BACK + PIT_STAND_BACK, PIT_HOLES[0], PIT_RIM_GRIP, PIT_HOLES[1], .38)}
     STAGES['villageWall'] = {'anchor': 'climber', 'wallHeightM': WALL_H, 'wallFaceM': WALL_FACE, 'wallThickM': WALL_THICK,
                              'notes': 'VilIjaClimbWall: the wall face %.2f m ahead of the root, %.2f m high, %.2f m thick; he lands '
                                       '%.2f m ahead of the root (root.end).' % (WALL_FACE, WALL_H, WALL_THICK, WALL_FACE + WALL_THICK + .40)}
@@ -431,9 +467,33 @@ def DefineStages(T):
     STAGES['door'] = {'anchor': 'opener', 'doorM': DOOR_M, 'boltHeightM': BOLT_H,
                       'notes': 'VilUnboltDoor: the door plane %.2f m ahead, the bolt handle %.2f m up near the centre; it slides %.2f m '
                                'to his left (1.3 s), the push (1.7 s) swings the door away.' % (DOOR_M, BOLT_H, BOLT_TRAVEL)}
-    STAGES['vatDoor'] = {'anchor': 'geng', 'notes': 'VilPushVat: the vat (radius %.2f, %.2f m high) stands %.2f m ahead, %.2f m right '
-                         'of the root in front of the door (%.2f m ahead); it is pushed %.2f m to his right (0.4-1.4 s), then the bolt '
-                         '(2.6 s) and the door (3.0 s).' % (VAT_R, VAT_H, -VAT_C[1], -VAT_C[0], DOOR_M + .25, VAT_MOVE)}
+    STAGES['vatDoor'] = {'anchor': 'geng', 'vatRadiusM': VAT_R, 'vatHeightM': VAT_H, 'vatMoveM': VAT_MOVE,
+                         'vatStart': {'x': 0.0, 'z': -VAT_AHEAD}, 'vatEnd': {'x': 0.0, 'z': -round(VAT_AHEAD + VAT_MOVE, 3)},
+                         'pushedEnd': {'x': 0.0, 'z': -round(VAT_AHEAD + VAT_MOVE - VAT_R - VAT_PUSH_BACK, 3), 'yawDeg': 0},
+                         'doorPlaneRightM': DOOR_RIGHT, 'doorHinge': {'x': DOOR_RIGHT, 'z': -DOOR_HINGE_AHEAD}, 'doorLeafM': DOOR_LEAF_M,
+                         'bolt': {'x': round(DOOR_RIGHT - .03, 3), 'z': -BOLT_AHEAD, 'y': BOLT_H, 'travelM': BOLT_TRAVEL,
+                                  'slidTo': {'x': round(DOOR_RIGHT - .03, 3), 'z': -round(BOLT_AHEAD - BOLT_TRAVEL, 3)}},
+                         'standAtDoor': {'x': DOOR_STAND[0], 'z': -DOOR_STAND[1], 'yawDeg': -90},
+                         'doorGrab': {'x': DOOR_GRAB[0], 'z': -DOOR_GRAB[1], 'yawDeg': -90},
+                         'doorOpensInward': True, 'doorSwingDeg': DOOR_SWING_DEG, 'handsOffDeg': DOOR_HANDS_OFF_DEG,
+                         'doorOpenTip': {'x': round(DOOR_RIGHT - DOOR_LEAF_M, 3), 'z': -DOOR_HINGE_AHEAD},
+                         'end': {'x': DOOR_END[0], 'z': -DOOR_END[1], 'yawDeg': -90},
+                         'notes': 'VilPushVat (V2): root frame = Geng\'s start (x right, -z ahead); put the root %.2f m WEST of the vat centre '
+                                  'facing EAST (world: root (%.2f, 504), yaw toward +x). The vat (radius %.2f, %.2f m high) starts %.2f m ahead '
+                                  'and is shoved straight ahead %.1f m (0.4-2.8 s) to %.2f m ahead (world (98, 504) -> (99.7, 504)); his pelvis '
+                                  'follows to %.2f m ahead (pushedEnd). He turns right (south) and walks to the door: the leaf plane is %.2f m right '
+                                  'of the root (z 505.85), the hinge %.2f m ahead (x 97.4), the leaf %.2f m long from it; he stands at '
+                                  '(right %.2f, ahead %.2f) facing right, the right hand on the bolt (right %.2f, ahead %.2f, %.2f up; grab 5.15 s), '
+                                  'slides it %.2f m toward the hinge (open 5.55 s), side-steps to (right %.2f, ahead %.2f), hooks the leaf\'s free '
+                                  'edge with the left hand and puts the right palm on it (5.75 s) and PULLS it INTO the yard: the leaf swings about '
+                                  'the hinge toward the root side (x decreasing) while he backs out of its sweep (3 steps); the hands let go at '
+                                  'about %.0f deg (6.3 s), the leaf swings on to %.0f deg (6.6 s) and lies at doorOpenTip (the BackDoorLeafOpen '
+                                  'block: x 97.45, z 504.6-505.75); root.end at (right %.2f, ahead %.2f), yaw -90: inside, east of the open leaf, '
+                                  'facing the doorway.'
+                                  % (VAT_AHEAD, 98 - VAT_AHEAD, VAT_R, VAT_H, VAT_AHEAD, VAT_MOVE, VAT_AHEAD + VAT_MOVE,
+                                     VAT_AHEAD + VAT_MOVE - VAT_R - VAT_PUSH_BACK, DOOR_RIGHT, DOOR_HINGE_AHEAD, DOOR_LEAF_M,
+                                     DOOR_STAND[0], DOOR_STAND[1], DOOR_RIGHT - .03, BOLT_AHEAD, BOLT_H, BOLT_TRAVEL, DOOR_GRAB[0], DOOR_GRAB[1],
+                                     DOOR_HANDS_OFF_DEG, DOOR_SWING_DEG, DOOR_END[0], DOOR_END[1])}
 
 
 PROPS['grenade'] = {'notes': 'VilIjaHelmetGrenadeLob: Type 91 grenade in the right fist (centre, axis = fuze cap direction, up); flies '
@@ -461,10 +521,15 @@ Meta('VilCrawlHole', 3.0, False, role='nier', stage='dogHole', rootMotion=True,
      events=[{'t': .3, 'kind': 'crawlStart'}, {'t': 2.3, 'kind': 'crawlEnd'}, {'t': 3.0, 'kind': 'squatUp'}],
      notes='09-2 the dog hole: from prone, a hands-and-knees belly crawl %.1f m forward (0.3-2.3 s; the back stays under %.2f m), '
            'then up onto the haunches into a squat (3.0 s). Root motion: the pelvis ends %.1f m ahead.' % (CRAWL_M, HOLE_H, CRAWL_M))
-Meta('VilHandsUpClimbOut', 4.0, False, role='villager', stage='cellarPit', rootMotion=True, holdLoop=[3.2, 4.0],
-     events=[{'t': 2.8, 'kind': 'onRim'}],
-     notes='09-3 the family out of the cellar: both hands up the whole time; from the pit floor %.1f m down he climbs the 45 deg ramp '
-           'in four steps (0.3-2.6 s), stands up straight on the rim at 2.8 s; 3.2-4.0 s is a breathing hold loop, hands up.' % PIT_DEPTH)
+Meta('VilHandsUpClimbOut', 5.0, False, role='villager', stage='cellarPit', rootMotion=True, holdLoop=[4.2, 5.0],
+     events=[{'t': .45, 'kind': 'handsOnWall'}, {'t': .85, 'kind': 'footHole'}, {'t': 1.3, 'kind': 'handsOnRim'}, {'t': 1.85, 'kind': 'footHole'},
+             {'t': 2.85, 'kind': 'kneeOnRim'}, {'t': 4.0, 'kind': 'onRim'}, {'t': 4.2, 'kind': 'handsUp'}],
+     notes='09-3 the family out of the cellar (V2: the %.1f m straight-walled shaft): he stands on the pit floor %.2f m from the wall, '
+           'hands half raised; both palms onto the wall (0.45 s), the right foot toed into the hole %.2f m up (0.85 s), pushes up, both '
+           'hands over the rim (1.3 s), the left foot into the hole %.2f m up (1.85 s), heaves his chest over the rim, the right knee onto '
+           'the rim (2.85 s), the left foot up (3.35 s), stands (4.0 s) and raises both hands (4.2 s); 4.2-5.0 s is a breathing hold loop, '
+           'hands up. Root motion: root.start on the pit floor %.2f m behind the root, root.end %.2f m ahead on the rim.'
+           % (PIT_DEPTH, PIT_STAND_BACK, PIT_HOLES[0], PIT_HOLES[1], PIT_WALL_BACK + PIT_STAND_BACK, .38))
 Meta('VilStabbedFall', 2.4, False, role='villager', stage='bayonetVictim', terminal=True,
      contacts=[{'t': THRUST_T, 'limb': 'belly', 'action': 'stabbed', 'partnerRole': 'ija', 'part': 'bayonet'}],
      events=[{'t': THRUST_T, 'kind': 'stabbed'}, {'t': 1.15, 'kind': 'knees'}, {'t': 1.9, 'kind': 'groundImpact'}],
@@ -496,10 +561,15 @@ Meta('VilHugLegs', 2.0, False, role='nier', stage='hugLegs', holdLoop=[1.2, 2.0]
      events=[{'t': 1.0, 'kind': 'hug'}],
      notes='10-5 Nier hugs Geng\'s legs: two quick steps forward, drops onto both knees and throws both arms round the legs %.2f m '
            'ahead at %.2f m up (1.0 s), the face pressed against them; 1.2-2.0 s is a sobbing hold loop.' % (HUG_AHEAD, HUG_HEIGHT))
-Meta('VilPushVat', 3.2, False, role='geng', stage='vatDoor',
-     events=[{'t': .4, 'kind': 'handsOnVat'}, {'t': 1.4, 'kind': 'vatMoved'}, {'t': 2.6, 'kind': 'boltOpen'}, {'t': 3.0, 'kind': 'doorOpen'}],
-     notes='10-6 Geng: both hands on the vat ahead-right, a lunge sideways shoving it %.2f m to his right (0.4-1.4 s, the right '
-           'foot stepping out with it), straightens, the right hand to the bolt (2.2 s), slides it (2.6 s), pushes the door (3.0 s).' % VAT_MOVE)
+Meta('VilPushVat', 6.8, False, role='geng', stage='vatDoor', rootMotion=True,
+     events=[{'t': .4, 'kind': 'handsOnVat'}, {'t': 2.8, 'kind': 'vatMoved'}, {'t': 5.15, 'kind': 'boltGrab'}, {'t': 5.55, 'kind': 'boltOpen'},
+             {'t': 5.75, 'kind': 'doorGrab'}, {'t': 6.3, 'kind': 'handsOff'}, {'t': 6.6, 'kind': 'doorOpen'}],
+     notes='10-6 Geng (V2, laid out on the white box): both palms on the vat %.2f m ahead (0.4 s), bent low he drives it STRAIGHT AHEAD '
+           '%.1f m with quick shuffling steps (0.4-2.8 s), straightens, turns right (south) and walks to the door (3.1-4.9 s), the right hand '
+           'to the bolt (5.15 s), slides it %.2f m toward the hinge (5.55 s), a side step to the leaf\'s free edge, both hands on it (5.75 s) '
+           'and he PULLS the door into the yard, backing out of its sweep in three steps; the hands let go at about %.0f deg (6.3 s), the leaf '
+           'swings on to %.0f deg (6.6 s); he stands inside beside the open leaf facing the doorway. Root motion: root.end at (right %.2f, '
+           'ahead %.2f), yaw -90 (stage vatDoor).' % (VAT_AHEAD, VAT_MOVE, BOLT_TRAVEL, DOOR_HANDS_OFF_DEG, DOOR_SWING_DEG, DOOR_END[0], DOOR_END[1]))
 Meta('VilReachPinned', 2.4, False, role='geng', stage='yankBack', rootMotion=True,
      events=[{'t': YANK_T, 'kind': 'yanked'}, {'t': 2.1, 'kind': 'down'}],
      notes='08-5 Geng: on hands and knees at the lip, the chest over it, the right arm thrust forward and up shouting (0.4-1.3 s); '
@@ -1052,56 +1122,103 @@ def BuildCrawlHole(T, name):
 
 
 # ===============================================================================================================
-# VilHandsUpClimbOut: up the 45 deg ramp out of the pit, hands up
+# VilHandsUpClimbOut (V2): out of the 2 m straight-walled cellar -- foot holes, hands over the rim, knee up, stand, hands up
 # ===============================================================================================================
 @Builder('VilHandsUpClimbOut')
 def BuildHandsUpClimbOut(T, name):
-    D = 4.0
-    H, A, P, SX = T.H, T.A, T.P, T.SX
-    depth = T.R(PIT_DEPTH)
-
-    def G(x, y):
-        return -min(depth, max(0.0, y))
-    onRamp = lambda p: -45.0 if 0.02 < p[1] < depth - .02 else 0.0
-    startL, startR = (H + .03, depth + .30), (-(H + .03), depth + .22)
-    step = depth / 4
-    stepsL = [(.30, .65, (H + .03, depth - step * 1)), (1.10, 1.45, (H + .03, depth - step * 3)), (1.95, 2.30, (H + .03, -.18))]
-    stepsR = [(.70, 1.05, (-(H + .03), depth - step * 2)), (1.50, 1.85, (-(H + .03), depth - step * 4)), (2.35, 2.65, (-(H + .03), -.12))]
-    G2 = lambda x, y: G(x, y) + (.035 if 0.02 < y < depth - .02 else 0.0)        # a flat sole on the 45 deg ramp: the heel would dig in
-    rowsL, plL, pitchL, _ = Steps(T, 'L', startL, stepsL, lift=.14, ground=G2, pitchOn=onRamp)
-    rowsR, plR, pitchR, _ = Steps(T, 'R', startR, stepsR, lift=.14, ground=G2, pitchOn=onRamp)
-    pelvY = Channel([(0.0, depth + .26), (.30, depth + .26), (2.65, -.15), (2.9, -.15), (D, -.15)])
-    crouch = Channel([(0.0, .02), (.30, .12), (2.65, .12), (2.9, .02), (D, .02)])
+    D = 5.0
+    H, A, P, SX, SZ = T.H, T.A, T.P, T.SX, T.SZ
+    r = T.R
+    depth, wallY = r(PIT_DEPTH), r(PIT_WALL_BACK)
+    floor = -depth
+    hole1, hole2 = floor + r(PIT_HOLES[0]), floor + r(PIT_HOLES[1])
+    holeY = wallY + r(.16)                                 # the ankle of a foot toed into a hole (the toes inside the wall)
+    rimY, rimZ = wallY - r(PIT_RIM_GRIP), r(.04)         # finger roots 4 cm up: the flat fingers lie on the ground, not in it
+    rimY2 = rimY - r(.15)                                  # the palms walk forward on the rim as he heaves over
+    wallZ = floor + r(1.30)                                # both palms flat on the wall at chest height
+    y0 = wallY + r(PIT_STAND_BACK)
+    standZ = P - .035
     stand = Standing(T)
+    pelv = Channel([(0.0, (0, y0, floor + standZ - .02)), (.45, (0, y0 - .02, floor + standZ - .06)), (.85, (0, y0 - .06, floor + standZ - .08)),
+                    (1.35, (0, .33, -.86)), (1.85, (0, .30, -.86)), (2.45, (0, .22, -.30)), (2.85, (0, .20, .18)),
+                    (3.30, (0, -.08, .42)), (3.60, (0, -.22, .62)), (4.00, (0, -.42, standZ - .02)), (D, (0, -.42, standZ - .02))])
+    bend = Channel([(0.0, .06), (.45, .25), (1.35, .45), (1.85, .45), (2.45, .70), (2.85, 1.0), (3.30, .45), (3.60, .30), (4.00, .06), (D, .06)])
+    tilt = Channel([(0.0, .03), (.45, .15), (1.35, .35), (2.45, .50), (2.85, .75), (3.30, .35), (4.00, .03), (D, .03)])
+    head = Channel([(0.0, -.10), (.45, -.35), (2.45, -.35), (2.85, .20), (3.30, -.10), (4.00, -.15), (D, -.15)])
+    ankL = Channel([(0.0, (H + .02, y0 - .03, floor + A)), (.95, (H + .02, y0 - .03, floor + A)), (1.15, (H + .03, .40, floor + r(.35))),
+                    (1.35, (H + .03, .33, -1.30)), (1.50, (H + .03, .42, -1.20)), (1.85, (H + .03, holeY, hole2)), (2.42, (H + .03, holeY, hole2)),
+                    (2.58, (.15, .36, -.80)), (2.85, (.15, .33, -.55)), (3.05, (.15, .30, .22)), (3.20, (.15, -.12, .30)),
+                    (3.35, (H + .05, -.50, A)), (D, (H + .05, -.50, A))])
+    ankR = Channel([(0.0, (-(H + .02), y0 + .01, floor + A)), (.50, (-(H + .02), y0 + .01, floor + A)), (.68, (-(H + .03), .50, floor + r(.62))),
+                    (.85, (-(H + .03), holeY, hole1)), (1.95, (-(H + .03), holeY, hole1)), (2.15, (-.15, .36, -1.20)), (2.45, (-.146, .33, -.75)),
+                    (2.65, (-.166, .30, -.15)), (2.85, (-.166, .16, .10)), (3.30, (-.166, -.02, .18)), (3.55, (-.166, -.02, .18)),
+                    (3.72, (-.17, -.21, .24)), (3.90, (-(H + .05), -.40, A)), (D, (-(H + .05), -.40, A))])
+    pitchL = Channel([(0.0, 0.0), (.95, 0.0), (1.35, 35.0), (1.70, 20.0), (1.85, 15.0), (2.55, 15.0), (2.85, 35.0), (3.05, 10.0), (3.35, 0.0), (D, 0.0)])
+    pitchR = Channel([(0.0, 0.0), (.50, 0.0), (.70, 25.0), (.85, 15.0), (1.95, 15.0), (2.45, 35.0), (2.70, 60.0), (2.85, 80.0), (3.10, 80.0), (3.30, 15.0), (3.55, 15.0), (3.90, 0.0), (D, 0.0)])
+    poleL = Channel([(0.0, (H + .22, y0 - .95, floor + .45)), (.95, (H + .22, y0 - .95, floor + .45)), (1.35, (.55, -.25, -1.0)), (1.85, (.60, -.10, -.55)),
+                     (2.55, (.60, -.10, -.55)), (2.85, (.45, -.20, -.10)), (3.35, (H + .22, -1.45, .45)), (D, (H + .22, -1.45, .45))])
+    poleR = Channel([(0.0, (-(H + .22), y0 - .95, floor + .45)), (.50, (-(H + .22), y0 - .95, floor + .45)), (.85, (-.55, -.20, -1.1)), (1.95, (-.55, -.20, -1.1)),
+                     (2.45, (-.45, -.25, -.30)), (2.85, (-.25, -.90, .25)), (3.55, (-.25, -1.0, .35)), (3.90, (-(H + .22), -1.35, .45)), (D, (-(H + .22), -1.35, .45))])
+    # grounded only while a sole is planted: on the floor (to 0.95), then once the left foot stands on the rim (3.35); in between
+    # (foot holes, the heave, the knee on the rim) the authored heights rule, as the wall climb's
+    ground = Channel([(0.0, 1.0), (.85, 1.0), (.95, 0.0), (3.35, 0.0), (3.45, 1.0), (D, 1.0)])
+    wallHand = lambda s: (Sig(s) * .22, wallY - .015, wallZ)
+    rimHand = lambda s, t: (Sig(s) * (SX + .06), Mix(rimY, rimY2, Smooth((t - 2.45) / .40)), rimZ)
+    gripWall = Channel([(0.0, 0.0), (.30, 0.0), (.45, 1.0), (1.05, 1.0), (D, 1.0)])         # 1.05-1.30: the same grips travel wall -> rim
+    gripOut = Channel([(0.0, 1.0), (2.85, 1.0), (3.0, 0.0), (D, 0.0)])
+    handsUp = Channel([(0.0, (.12, -.30, .02)), (3.15, (.12, -.30, .02)), (3.30, (.12, -.15, .10)), (4.20, (.18, -.12, .44)), (D, (.18, -.12, .44))])
+
+    def Hand(s, t):
+        if t <= 1.05:
+            return wallHand(s)
+        if t >= 1.30:
+            return rimHand(s, t)
+        return Lerp3(wallHand(s), rimHand(s, 1.30), Smooth((t - 1.05) / .25))
 
     def Pose(t):
         f = dict(stand)
-        y = pelvY(t)
-        f['pelvis'] = (0, y, G(0, y) + P - .035 - crouch(t))
-        climbing = Smooth((t - .2) / .3) * (1 - Smooth((t - 2.6) / .3))
-        f['pelvisTilt'] = (.03 + .25 * climbing, 0, 0)
-        f['bend'] = .06 + .18 * climbing
-        f['head'] = (-.25 + .10 * climbing, 0, 0)
+        f['pelvis'] = pelv(t)
+        f['pelvisTilt'] = (tilt(t), 0, 0)
+        f['bend'] = bend(t)
+        f['head'] = (head(t), 0, 0)
         f['neck'] = (-.10, 0, 0)
-        f['shrug'] = .12
-        for s, rows, pitch in (('L', rowsL, pitchL), ('R', rowsR, pitchR)):
-            a = Channel(rows)(t)
-            f['ankle.' + s] = a
-            f['foot.' + s] = (Channel(pitch)(t), Sig(s) * 5, 0)
-            f['legPole.' + s] = (a[0] + Sig(s) * .10, a[1] - .9, a[2] + .6)
-            Rel(f, s, (Sig(s) * .13, -.06, .45), (Sig(s) * .55, .35, .15), (Sig(s) * .1, -.9, .35), (-Sig(s), -.1, .1), .25)
-        if t > 3.2:
-            b = math.sin(Tau * (t - 3.2) / (D - 3.2))
+        f['shrug'] = .10
+        f['ankle.L'], f['ankle.R'] = ankL(t), ankR(t)
+        f['foot.L'], f['foot.R'] = (pitchL(t), 6, 0), (pitchR(t), -6, 0)
+        f['legPole.L'], f['legPole.R'] = poleL(t), poleR(t)
+        w = gripWall(t) * gripOut(t)
+        for s in LR:
+            up = handsUp(t)
+            Rel(f, s, (Sig(s) * up[0], up[1], up[2]), (Sig(s) * .5, .15, .10), (0, 0, 1), (0, -1, 0), .2)
+            if w > 1e-3:
+                h = Hand(s, t)
+                onWall = t < 1.15
+                Grip(f, s, h, (0, 0, 1) if onWall else (0, -1, 0), (0, -1, 0) if onWall else (0, 0, -1), .25 if onWall else .2,
+                     (Sig(s) * (SX + .5), .30, wallZ) if onWall else (Sig(s) * (SX + .6), .35, h[2] + .10), w)
+                f['handRel.' + s] = (Sig(s) * up[0], up[1], up[2])
+        if t > 4.2:
+            b = math.sin(Tau * (t - 4.2) / (D - 4.2))
             f['bend'] += .012 * b
             f['shrug'] += .02 * b
         return T.Nest(f)
 
     def Review(t):
-        return [('poly', [(-.8, 0, 0), (.8, 0, 0), (.8, depth, -depth), (-.8, depth, -depth)], None, 0),
-                ('poly', [(-.8, depth, -depth), (.8, depth, -depth), (.8, depth + 1.2, -depth), (-.8, depth + 1.2, -depth)], None, 0)]
-    return {'pose': Pose, 'plants': plL + plR, 'ground': lambda x, y, t: G(x, y), 'reach': {'fraction': 2.0}, 'reviewProps': Review,
-            'reviewViews': [('side', (-4.0, .8, .4), (0, .8, -.2)), ('q', (-2.8, -2.0, 1.6), (0, .6, -.2)), ('front', (-.2, -3.6, 1.0), (0, .6, -.1))],
-            'reviewScale': 4.0, 'reviewFrames': lambda n: [0, int(n * .15), int(n * .3), int(n * .45), int(n * .62), int(n * .72), n - 1]}
+        far = wallY + r(PIT_FLOOR_W)
+        return [('poly', [(-.9, wallY, 0), (.9, wallY, 0), (.9, wallY, floor), (-.9, wallY, floor)], None, 0),
+                ('poly', [(-.9, wallY, floor), (.9, wallY, floor), (.9, far, floor), (-.9, far, floor)], None, 0),
+                ('poly', [(-.9, wallY, 0), (.9, wallY, 0), (.9, wallY - 1.2, 0), (-.9, wallY - 1.2, 0)], None, 0),
+                Box((-(H + .03), wallY - .06, hole1), (.16, .12, .12), 0), Box((H + .03, wallY - .06, hole2), (.16, .12, .12), 0)]
+
+    def Check(t):
+        if .45 <= t <= 1.05 or 1.30 <= t <= 2.85:
+            return {'L': Hand('L', t), 'R': Hand('R', t)}
+        return {}
+    return {'pose': Pose, 'plants': [('L', 0, .95), ('L', 1.85, 2.42), ('L', 3.35, D), ('R', 0, .50), ('R', .85, 1.95), ('R', 3.90, D)],
+            'ground': lambda x, y, t: 0.0 if y < wallY - r(.18) else floor, 'groundWeight': lambda t: ground(t),
+            'walls': [((0, wallY, 0), (0, 1, 0), (0, wallY, 0), (0, 0, -1))], 'check': Check, 'reach': {'fraction': 2.0}, 'reviewProps': Review,
+            'reviewViews': [('side', (-4.6, .9, -.6), (0, .5, -.6)), ('q', (-3.2, -2.8, 1.6), (0, .4, -.5)), ('front', (-.2, -4.2, .8), (0, .4, -.5))],
+            'reviewScale': 4.6, 'reviewFrames': lambda n: sorted({0, int(round(n * .85 / D)), int(round(n * 1.35 / D)), int(round(n * 1.85 / D)), int(round(n * 2.45 / D)),
+                                                                  int(round(n * 2.85 / D)), int(round(n * 3.3 / D)), int(round(n * 4.0 / D)), n - 1})}
 
 
 # ===============================================================================================================
@@ -1246,74 +1363,135 @@ def BuildKneelCrawl(T, name):
 
 
 # ===============================================================================================================
-# VilPushVat: shove the vat aside, then the bolt and the door
+# VilPushVat (V2): drive the vat 1.7 m straight ahead, turn right to the door, unbolt, pull the leaf open into the yard
 # ===============================================================================================================
 @Builder('VilPushVat')
 def BuildPushVat(T, name):
-    D = 3.2
+    D = 6.8
     H, A, P, SX, SZ = T.H, T.A, T.P, T.SX, T.SZ
+    r = T.R
     stand = Standing(T, bend=.08)
-    vat = RT(T, (VAT_C[0], VAT_C[1], 0))
-    vr, vh, mv = T.R(VAT_R), T.R(VAT_H), T.R(VAT_MOVE)
-    door = T.R(DOOR_M + .10)
-    bolt0 = (.0, -door + .04, T.R(BOLT_H))
-    bolt1 = (bolt0[0] + T.R(BOLT_TRAVEL), bolt0[1], bolt0[2])
-    pushR, pushL = (-(SX - .04), -door - .04, T.R(1.05)), (SX - .04, -door - .04, T.R(1.05))
-    moved = Channel([(0.0, 0.0), (.40, 0.0), (1.4, 1.0), (D, 1.0)])
-    # hands on the vat's near-left face (his side of it), pushing it to his right (-X)
-    def VatHand(s, m):
-        return (vat[0] + vr * .55 + Sig(s) * .12 - mv * m, vat[1] + vr * .55 - .02 + Sig(s) * .08, vh * .72)
-    rowsR, plR, _, _ = Steps(T, 'R', stand['ankle.R'], [(.45, .75, (-(H + .34), -.12)), (1.55, 1.85, (-(H + .04), .02))])
-    rowsL, plL, _, _ = Steps(T, 'L', stand['ankle.L'], [(.20, .45, (H + .06, -.30)), (1.75, 2.05, (H + .03, -.08))])
-    body = Tracks(stand, {
-        'pelvis': [(0.0, stand['pelvis']), (.40, (-.05, -.12, P - .16)), (1.4, (-.05 - mv * .6, -.10, P - .18)), (2.0, Add3(stand['pelvis'], (0, -.02, 0))),
-                   (2.6, Add3(stand['pelvis'], (.03, -.06, 0))), (D, Add3(stand['pelvis'], (0, -.24, -.03)))],
-        'pelvisTilt': [(0.0, (.03, 0, 0)), (.40, (.55, 0, 0)), (1.4, (.55, 0, 0)), (2.0, (.03, 0, 0)), (2.72, (.05, 0, 0)), (D, (.15, 0, 0))],
-        'bend': [(0.0, .08), (.40, .50), (1.4, .52), (2.0, .08), (2.6, .02), (D, .20)],
-        'twist': [(0.0, 0.0), (.40, -.35), (1.4, -.45), (2.0, 0.0), (2.6, .06), (D, 0.0)],
-        'lean': [(0.0, 0.0), (.40, -.10), (1.4, -.18), (2.0, 0.0)],
-        'head': [(0.0, (0, 0, 0)), (.40, (.25, 0, -.20)), (1.4, (.20, 0, -.30)), (2.0, (0, 0, 0)), (2.3, (-.15, 0, 0)), (2.8, (.05, 0, 0))],
-        'ankle.R': rowsR, 'ankle.L': rowsL,
-        'legPole.R': [(0.0, stand['legPole.R']), (.75, (-(H + .50), -.8, .5)), (1.85, stand['legPole.R'])],
-        'legPole.L': [(0.0, stand['legPole.L']), (.45, (H + .25, -1.0, .5)), (2.05, stand['legPole.L'])],
-    }, lag={'head': .05})
-    handR = Channel([(1.4, VatHand('R', 1.0)), (1.8, (-(SX + .02), -.15, P + .05)), (2.2, bolt0), (2.35, bolt0), (2.6, bolt1), (2.72, Add3(bolt1, (0, .05, -.05))), (2.9, pushR), (D, Add3(pushR, (0, -.12, 0)))])
-    handL = Channel([(1.4, VatHand('L', 1.0)), (1.8, (SX + .02, -.10, P - .05)), (2.4, (SX + .02, .01, P - .09)), (2.9, pushL), (D, Add3(pushL, (0, -.12, 0)))])
-    gripVat = Channel([(0.0, 0.0), (.25, 0.0), (.40, 1.0), (1.4, 1.0), (1.55, 0.0), (D, 0.0)])
-    gripBolt = Channel([(0.0, 0.0), (2.05, 0.0), (2.2, 1.0), (2.6, 1.0), (2.72, 0.0), (D, 0.0)])
+    moved = Channel([(0.0, 0.0), (.40, 0.0), (2.80, 1.0), (D, 1.0)])
+    # beats: push 0.4-2.8 | straighten | turn + walk 3.1-4.9 | bolt grab 5.15, open 5.55 | side step, both hands on the leaf 5.75 |
+    # pull it into the yard backing out of its sweep, hands off ~6.3 | the leaf swings on to 90 deg at 6.6 | stands inside
+    tBolt, tBoltOpen, tDoor, tHandsOff, tDoorOpen = 5.15, 5.55, 5.75, 6.30, 6.60
+    VatY = lambda t: -r(VAT_AHEAD + VAT_MOVE * moved(t))                 # the vat centre (x 0) while he drives it
+    vr, vh = r(VAT_R), r(VAT_H)
+    faceOff = math.sqrt(vr * vr - r(.20) ** 2) + r(.01)                  # the near face under a palm .20 m off the centre line
+    VatHand = lambda s, t: (Sig(s) * r(.20), VatY(t) + faceOff, r(VAT_HAND_H))
+    doorX, hingeY = -r(DOOR_RIGHT), -r(DOOR_HINGE_AHEAD)
+    bolt0 = (doorX + r(.03), -r(BOLT_AHEAD), r(BOLT_H))
+    boltAt = lambda t: (bolt0[0], bolt0[1] + r(BOLT_TRAVEL) * Smooth((t - (tBoltOpen - .30)) / .30), bolt0[2])
+    swing = lambda t: math.radians(DOOR_SWING_DEG) * Smooth((t - tDoor) / (tDoorOpen - tDoor))       # + = into the yard (toward +x)
+
+    def LeafPoint(rr, th, off=0.0):
+        """A point on the leaf rr from the hinge, `off` toward its yard-side face (the side he starts on); the leaf
+        swings from along -y (closed, the right plane) toward +x (open, into the yard)."""
+        return (doorX + rr * math.sin(th) + off * math.cos(th), hingeY - rr * math.cos(th) + off * math.sin(th))
+
+    def LeafHand(s, t):
+        th = swing(t)
+        if s == 'L':
+            x, y = LeafPoint(r(DOOR_EDGE_GRIP), th, r(.03))              # the left hand hooks the free edge
+            return (x, y, r(DOOR_EDGE_H))
+        x, y = LeafPoint(r(DOOR_FACE_GRIP), th, r(.04))                  # the right palm flat on the face
+        return (x, y, r(DOOR_FACE_H))
+    pushBack = r(VAT_R + VAT_PUSH_BACK)
+    yEnd = VatY(D) + pushBack
+    grabXY, endXY = (-r(DOOR_GRAB[0]), -r(DOOR_GRAB[1])), (-r(DOOR_END[0]), -r(DOOR_END[1]))
+    path = Channel([(t / 48, (0.0, VatY(t / 48) + pushBack)) for t in range(0, int(2.8 * 48) + 1)]
+                   + [(3.10, (0.0, yEnd)), (3.70, (-r(.40), yEnd + r(.08))), (4.30, (-r(1.00), yEnd + r(.38))),
+                      (4.90, (-r(DOOR_STAND[0]), -r(DOOR_STAND[1]))), (5.50, (-r(DOOR_STAND[0]), -r(DOOR_STAND[1]))),
+                      (5.78, grabXY), (6.00, (-r(1.05), -r(1.28))), (6.22, (-r(.72), -r(1.12))), (6.45, (-r(.55), -r(.95))),
+                      (6.62, endXY), (D, endXY)])
+    PelvisXY = lambda t: path(t)
+    turnAt = Channel([(0.0, 0.0), (3.0, 0.0), (4.1, -math.pi / 2), (D, -math.pi / 2)])
+    steps = [('R', .40, .65), ('L', .65, .90), ('R', .90, 1.15), ('L', 1.15, 1.40), ('R', 1.40, 1.65), ('L', 1.65, 1.90), ('R', 1.90, 2.15),
+             ('L', 2.15, 2.40), ('R', 2.40, 2.65), ('L', 2.65, 2.90),
+             ('R', 3.10, 3.40), ('L', 3.40, 3.70), ('R', 3.70, 4.00), ('L', 4.00, 4.30), ('R', 4.30, 4.60), ('L', 4.60, 4.90),
+             ('L', 5.52, 5.76), ('R', 5.78, 6.00), ('L', 6.00, 6.22), ('R', 6.22, 6.45), ('L', 6.45, 6.62)]
+    pushSt = lambda s: (Sig(s) * (H + .05), -r(.02))
+    walkSt = lambda s: (Sig(s) * (H + .03), 0.0)
+    stance = {'L': [pushSt('L')] * 5 + [walkSt('L')] * 3 + [(H + .03, 0.0), (H + .03, r(.08)), (H + .03, 0.0)],
+              'R': [pushSt('R')] * 5 + [walkSt('R')] * 3 + [(-(H + .03), r(.10)), (-(H + .03), r(.05))]}
+    legs, plants = WrPath(T, stand, PelvisXY, turnAt, steps, stance, lambda s, t: (H + .22, .95 + .10 * moved(t) * (1 - Smooth((t - 2.8) / .3)), .45), D, lift=.06)
+    legsAnim = Tracks(stand, legs)
+    # the knees stay a little bent on the walk and the backing steps (a straight-legged pelvis leaves the trailing foot out of reach)
+    pelvZ = Channel([(0.0, P - .035), (.40, r(.78)), (2.80, r(.78)), (3.10, P - .05), (3.30, P - .075), (4.70, P - .075), (4.90, P - .045), (5.50, P - .045),
+                     (tDoor, P - .07), (6.45, P - .09), (6.62, P - .05), (D, P - .05)])
+    bend = Channel([(0.0, .08), (.40, .80), (2.80, .78), (3.10, .08), (4.90, .10), (tBolt, .12), (tBoltOpen, .12), (tDoor, .25), (6.22, .25), (6.45, .10), (D, .08)])
+    tilt = Channel([(0.0, .03), (.40, .35), (2.80, .33), (3.10, .03), (tDoor, .08), (6.45, .03), (D, .03)])
+    head = Channel([(0.0, (0, 0, 0)), (.40, (-.10, 0, 0)), (2.80, (-.10, 0, 0)), (3.10, (0, 0, -.25)), (3.90, (0, 0, -.15)), (4.90, (.10, 0, 0)),
+                    (tBoltOpen, (.05, 0, 0)), (tDoor, (.05, 0, .15)), (6.22, (0, 0, .30)), (6.45, (0, 0, .10)), (D, (-.05, 0, 0))])
+    gripVat = Channel([(0.0, 0.0), (.20, 0.0), (.40, 1.0), (2.75, 1.0), (2.90, 0.0), (D, 0.0)])
+    gripBolt = Channel([(0.0, 0.0), (tBolt - .25, 0.0), (tBolt, 1.0), (tBoltOpen, 1.0), (tBoltOpen + .12, 0.0), (D, 0.0)])
+    gripDoorL = Channel([(0.0, 0.0), (tDoor - .15, 0.0), (tDoor, 1.0), (tHandsOff - .05, 1.0), (tHandsOff + .10, 0.0), (D, 0.0)])
+    gripDoorR = Channel([(0.0, 0.0), (tDoor - .12, 0.0), (tDoor, 1.0), (5.92, 1.0), (6.05, 0.0), (D, 0.0)])     # lets go as the leaf comes at him
+
+    def Wp(t, lx, ly, z):
+        """A world point from a body-frame offset (left, back, up) at the pelvis under the current turn."""
+        px, py = PelvisXY(t)
+        dx, dy = _Rot(lx, ly, turnAt(t))
+        return (px + dx, py + dy, z)
 
     def Pose(t):
-        f = body(t)
-        m = moved(t)
-        wv, wb = gripVat(t), gripBolt(t)
-        push = Smooth((t - 2.72) / .2)
+        f = dict(stand)
+        f.update({k: v for k, v in legsAnim(t).items() if k.startswith(('ankle.', 'foot.', 'legPole.'))})
+        px, py = PelvisXY(t)
+        f['pelvis'] = (px, py, pelvZ(t))
+        f['pelvisTilt'] = (tilt(t), 0, 0)
+        f['bend'] = bend(t)
+        f['head'] = head(t)
+        f['twist'] = -.10 * Bump(t, 3.0, 4.2) - .12 * Bump(t, tDoor - .1, 6.5)
         for s in LR:
-            f['handRel.' + s] = (Sig(s) * .08, -.14, -.42)
             f['poleRel.' + s] = (Sig(s) * .5, .3, -.3)
-        if t < 1.5 and wv > 1e-3:
+        wv, wb = gripVat(t), gripBolt(t)
+        wd = {'L': gripDoorL(t), 'R': gripDoorR(t)}
+        if wv > 1e-3:
             for s in LR:
-                Grip(f, s, VatHand(s, m), (-1, .2, -.2), (.3, -.9, .2), .5, (Sig(s) * (SX + .45) - .2, -.25, vh + .3), wv)
-                f['handRel.' + s] = (Sig(s) * .08, -.14, -.42)
-        elif t >= 1.5:
-            hr, hl = handR(t), handL(t)
-            if wb > 1e-3 and t < 2.7:
-                Grip(f, 'R', hr, (0, -.3, -1), (.95, -.3, 0), .95, (-(SX + .40), .25, SZ + .10), wb)
-                f['handRel.R'] = (-.06, -.20, -.10)
-            else:
-                World(f, 'R', hr, (-(SX + .40), .25, SZ - .20), Lerp3((0, -.2, -1), (0, -.3, .95), push), Lerp3((1, 0, 0), (0, -1, -.3), push), .45 - .2 * push)
-            World(f, 'L', hl, (SX + .40, .30, SZ - .30), Lerp3((0, -.2, -1), (0, -.3, .95), push), Lerp3((-1, 0, 0), (0, -1, -.3), push), .45 - .2 * push)
-        return T.Nest(f)
+                h = VatHand(s, t)
+                Grip(f, s, h, (Sig(s) * .3, -.2, .93), (0, -1, 0), .35, (Sig(s) * (SX + .5), h[1] + r(.35), r(1.05)), wv)
+                f['handRel.' + s] = (Sig(s) * .08, -.16, -.40)
+        if wb > 1e-3:
+            Grip(f, 'R', boltAt(t), (0, -.3, -.95), (0, -1, .2), .9, Wp(t, -(SX + .45), .30, SZ - .10), wb)
+            f['handRel.R'] = (-.06, -.25, -.05)
+        for s in LR:
+            if wd[s] > 1e-3:
+                if s == 'L':
+                    Grip(f, s, LeafHand(s, t), (0, -.3, -.95), (-.6, -.8, 0), .8, Wp(t, SX + .5, .20, r(1.05)), wd[s])    # fingers hooked over the edge
+                else:
+                    Grip(f, s, LeafHand(s, t), (-.3, -.1, .95), (0, -1, 0), .3, Wp(t, -(SX + .5), .25, r(1.05)), wd[s])
+                f['handRel.' + s] = (Sig(s) * .10, -.25, -.12)
+        f['framedGrips'] = True
+        return T.Nest(Turned(f, turnAt(t)))
 
     def Review(t):
-        m = moved(t)
-        c = (vat[0] - mv * m, vat[1], vh / 2)
-        swing = Smooth((t - 3.0) / .3) * .6
-        return [('cyl', (c[0], c[1], .0), (c[0], c[1], vh), vr), Box((bolt0[0] + T.R(BOLT_TRAVEL) * Smooth((t - 2.35) / .25), bolt0[1] + .02, bolt0[2]), (.18, .03, .03), 0),
-                ('poly', [(-.45, -door, 0), (-.45 + .9 * math.cos(swing), -door - .9 * math.sin(swing), 0), (-.45 + .9 * math.cos(swing), -door - .9 * math.sin(swing), 1.9), (-.45, -door, 1.9)], None, 0)]
-    return {'pose': Pose, 'plants': plR + plL, 'reach': {'fraction': .95, 'travel': .08, 'bend': .15, 'sink': .02},
-            'check': lambda t: ({'L': VatHand('L', moved(t)), 'R': VatHand('R', moved(t))} if .45 <= t <= 1.4 else ({'R': bolt0} if 2.2 <= t <= 2.35 else {})),
-            'reviewProps': Review, 'reviewViews': Views(cx=-.2, cy=-.4, cz=.8, far=3.4), 'reviewScale': 3.0,
-            'reviewFrames': lambda n: [0, int(n * .14), int(n * .3), int(n * .44), int(n * .7), int(n * .82), n - 1]}
+        c = (0.0, VatY(t))
+        th = swing(t)
+        far = LeafPoint(r(DOOR_LEAF_M), th)
+        b = boltAt(t)
+        return [('cyl', (c[0], c[1], .0), (c[0], c[1], vh), vr),
+                ('poly', [(doorX, hingeY, 0), (far[0], far[1], 0), (far[0], far[1], r(2.0)), (doorX, hingeY, r(2.0))], None, 0),
+                Box((b[0] + r(.01), b[1], b[2]), (.03, .20, .03), 0)]
+
+    def Check(t):
+        if .45 <= t <= 2.70:
+            return {'L': VatHand('L', t), 'R': VatHand('R', t)}
+        if tBolt + .05 <= t <= tBoltOpen - .05:
+            return {'R': boltAt(t)}
+        out = {}
+        if tDoor + .05 <= t <= tHandsOff - .05:
+            out['L'] = LeafHand('L', t)
+        if tDoor + .05 <= t <= 5.92:
+            out['R'] = LeafHand('R', t)
+        return out
+    # (the side camera on his LEFT, +x: the door leaf stands on his right and would hide him)
+    return {'pose': Pose, 'plants': plants, 'reach': {'fraction': .95, 'travel': .08, 'bend': .15, 'sink': .02}, 'check': Check,
+            'reviewProps': Review, 'reviewViews': [('side', (4.2, -1.3, 1.0), (-.6, -1.3, .7)), ('q', (3.4, -4.6, 2.4), (-.6, -1.3, .7)), ('top', (-.6, -1.3, 6.0), (-.6, -1.31, .0))],
+            'reviewScale': 5.2,
+            'reviewFrames': lambda n: sorted({0, int(round(n * .4 / D)), int(round(n * 1.6 / D)), int(round(n * 2.8 / D)), int(round(n * 3.7 / D)), int(round(n * 4.9 / D)),
+                                              int(round(n * tBoltOpen / D)), int(round(n * tDoor / D)), int(round(n * 6.0 / D)), int(round(n * 6.22 / D)),
+                                              int(round(n * tHandsOff / D)), int(round(n * tDoorOpen / D)), n - 1})}
 
 
 # ===============================================================================================================

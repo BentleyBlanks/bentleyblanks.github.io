@@ -28,7 +28,8 @@ export const BLOCKOUT_PREVIZ_CLIP_LIBRARIES = Object.freeze([
   Previz("PrevizCombat"),
   Previz("PrevizIja", "V2"),    // V2（10-19 第二轮）：掷弹筒组按真实尺寸（0.61 m）重烘、装填手挪开
   // 0610 村子的占位库（百姓 / 妮儿 / 老耿 / 后送兵 / 村里的日军，片段名 Vil 开头；门禁 Script_PrevizVillageClipsTest）
-  Previz("PrevizVillage"),
+  // V2（10-20）：VilHandsUpClimbOut 改成爬 2 m 直壁的窖（脚窝 + 扒窖沿 + 跪上去）、VilPushVat 按后门几何重做（缸往正前方推 1.7 m，再转身开门）
+  Previz("PrevizVillage", "V2"),
   // 06 集结处的救护库（CareMedicPress / CareMedicBandage / CareLieTreated / CareLieWrithe …）
   Object.freeze({ name: "CollectionCare", ...COLLECTION_CARE_ANIMATION }),
 ]);

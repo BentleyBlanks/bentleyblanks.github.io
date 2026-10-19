@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20261019PrevizVillageV1",
+ "version": "20261019PrevizVillageV2",
  "fps": 24,
  "actorForward": [
   0,
@@ -150,7 +150,7 @@
    }
   },
   "VilHandsUpClimbOut": {
-   "duration": 4.0,
+   "duration": 5.0,
    "loop": false,
    "weaponHold": "free",
    "rig": "TengxianNra02",
@@ -159,24 +159,48 @@
    "role": "villager",
    "stage": "cellarPit",
    "holdLoop": [
-    3.2,
-    4.0
+    4.2,
+    5.0
    ],
    "events": [
     {
-     "t": 2.8,
+     "t": 0.45,
+     "kind": "handsOnWall"
+    },
+    {
+     "t": 0.85,
+     "kind": "footHole"
+    },
+    {
+     "t": 1.3,
+     "kind": "handsOnRim"
+    },
+    {
+     "t": 1.85,
+     "kind": "footHole"
+    },
+    {
+     "t": 2.85,
+     "kind": "kneeOnRim"
+    },
+    {
+     "t": 4.0,
      "kind": "onRim"
+    },
+    {
+     "t": 4.2,
+     "kind": "handsUp"
     }
    ],
-   "notes": "09-3 the family out of the cellar: both hands up the whole time; from the pit floor 1.5 m down he climbs the 45 deg ramp in four steps (0.3-2.6 s), stands up straight on the rim at 2.8 s; 3.2-4.0 s is a breathing hold loop, hands up.",
+   "notes": "09-3 the family out of the cellar (V2: the 2.0 m straight-walled shaft): he stands on the pit floor 0.45 m from the wall, hands half raised; both palms onto the wall (0.45 s), the right foot toed into the hole 0.50 m up (0.85 s), pushes up, both hands over the rim (1.3 s), the left foot into the hole 1.00 m up (1.85 s), heaves his chest over the rim, the right knee onto the rim (2.85 s), the left foot up (3.35 s), stands (4.0 s) and raises both hands (4.2 s); 4.2-5.0 s is a breathing hold loop, hands up. Root motion: root.start on the pit floor 0.55 m behind the root, root.end 0.38 m ahead on the rim.",
    "bake": {
     "TengxianNra02": {
      "solverVersion": "20260928LimbContinuity",
      "seed": null,
      "twistMax": 320.0,
      "seedAnyHand": "",
-     "commit": "after:6d7742ae",
-     "valuesSha256": "335ff011354004e471df2c5dc482405a74c11692dd35b58b2f7d29b45cd0da2e"
+     "commit": "after:2690fa57",
+     "valuesSha256": "abcd9fa4e2c559b4247a2b8e7a0e3def0e38a4d4b293b77478e03297005db0ae"
     }
    }
   },
@@ -428,11 +452,11 @@
    }
   },
   "VilPushVat": {
-   "duration": 3.2,
+   "duration": 6.8,
    "loop": false,
    "weaponHold": "free",
    "rig": "TengxianNra02",
-   "rootMotion": false,
+   "rootMotion": true,
    "placeholder": "20261019 FirstLevel0610 previz",
    "role": "geng",
    "stage": "vatDoor",
@@ -442,27 +466,39 @@
      "kind": "handsOnVat"
     },
     {
-     "t": 1.4,
+     "t": 2.8,
      "kind": "vatMoved"
     },
     {
-     "t": 2.6,
+     "t": 5.15,
+     "kind": "boltGrab"
+    },
+    {
+     "t": 5.55,
      "kind": "boltOpen"
     },
     {
-     "t": 3.0,
+     "t": 5.75,
+     "kind": "doorGrab"
+    },
+    {
+     "t": 6.3,
+     "kind": "handsOff"
+    },
+    {
+     "t": 6.6,
      "kind": "doorOpen"
     }
    ],
-   "notes": "10-6 Geng: both hands on the vat ahead-right, a lunge sideways shoving it 0.60 m to his right (0.4-1.4 s, the right foot stepping out with it), straightens, the right hand to the bolt (2.2 s), slides it (2.6 s), pushes the door (3.0 s).",
+   "notes": "10-6 Geng (V2, laid out on the white box): both palms on the vat 1.05 m ahead (0.4 s), bent low he drives it STRAIGHT AHEAD 1.7 m with quick shuffling steps (0.4-2.8 s), straightens, turns right (south) and walks to the door (3.1-4.9 s), the right hand to the bolt (5.15 s), slides it 0.25 m toward the hinge (5.55 s), a side step to the leaf's free edge, both hands on it (5.75 s) and he PULLS the door into the yard, backing out of its sweep in three steps; the hands let go at about 60 deg (6.3 s), the leaf swings on to 90 deg (6.6 s); he stands inside beside the open leaf facing the doorway. Root motion: root.end at (right 0.55, ahead 0.90), yaw -90 (stage vatDoor).",
    "bake": {
     "TengxianNra02": {
      "solverVersion": "20260928LimbContinuity",
      "seed": null,
      "twistMax": 320.0,
      "seedAnyHand": "",
-     "commit": "after:6d7742ae",
-     "valuesSha256": "b22d0124c1c324a585e7690b6bb4cce8fdb04b23ec521f027a71ece32a1c3abf"
+     "commit": "after:6917b8f4",
+     "valuesSha256": "9e6b37dbbf7a511b0baa391854d3bb13fe4208ba0231819af864419aac84ca22"
     }
    }
   },
@@ -1163,8 +1199,26 @@
   },
   "cellarPit": {
    "anchor": "climber",
-   "pitDepthM": 1.5,
-   "notes": "VilHandsUpClimbOut: the root is on the rim; the pit floor is 1.5 m down, reached by a 45 deg earth ramp from the rim (y 0) back to 1.5 m behind. He starts on the pit floor 1.75 m behind the root (root.start) and ends standing on the rim, hands up."
+   "pitDepthM": 2.0,
+   "wallBehindM": 0.1,
+   "floorM": 1.6,
+   "mouthM": 1.2,
+   "footHolesM": [
+    0.5,
+    1.0
+   ],
+   "rimGripM": 0.15,
+   "startPelvis": {
+    "x": 0.0,
+    "z": 0.55,
+    "y": -1.18
+   },
+   "end": {
+    "x": 0.0,
+    "z": -0.38,
+    "yawDeg": 0
+   },
+   "notes": "VilHandsUpClimbOut (V2): the root is on the rim ground; the wall he climbs (the pit's near wall, STRAIGHT) is 0.10 m behind the root, the pit floor 2.0 m down from there back to 1.70 m behind (the 1.6 m shaft; the 1.2 m mouth is the lid opening). Place the root 0.10 m outside the pit edge, facing away from the pit. He starts standing on the floor, pelvis 0.55 m behind the root (root.start), toes the right foot into a hole 0.50 m up the wall, both hands on the wall, pushes up, hands over the rim 0.15 m onto the ground, left foot into the hole 1.00 m up, heaves his chest over, right knee onto the rim, left foot up, stands 0.38 m ahead of the root with both hands up (root.end) and holds."
   },
   "villageWall": {
    "anchor": "climber",
@@ -1186,7 +1240,61 @@
   },
   "vatDoor": {
    "anchor": "geng",
-   "notes": "VilPushVat: the vat (radius 0.32, 0.90 m high) stands 0.55 m ahead, 0.05 m right of the root in front of the door (0.70 m ahead); it is pushed 0.60 m to his right (0.4-1.4 s), then the bolt (2.6 s) and the door (3.0 s)."
+   "vatRadiusM": 0.4,
+   "vatHeightM": 0.9,
+   "vatMoveM": 1.7,
+   "vatStart": {
+    "x": 0.0,
+    "z": -1.05
+   },
+   "vatEnd": {
+    "x": 0.0,
+    "z": -2.75
+   },
+   "pushedEnd": {
+    "x": 0.0,
+    "z": -1.75,
+    "yawDeg": 0
+   },
+   "doorPlaneRightM": 1.85,
+   "doorHinge": {
+    "x": 1.85,
+    "z": -0.45
+   },
+   "doorLeafM": 1.15,
+   "bolt": {
+    "x": 1.82,
+    "z": -0.95,
+    "y": 1.25,
+    "travelM": 0.25,
+    "slidTo": {
+     "x": 1.82,
+     "z": -0.7
+    }
+   },
+   "standAtDoor": {
+    "x": 1.4,
+    "z": -1.05,
+    "yawDeg": -90
+   },
+   "doorGrab": {
+    "x": 1.4,
+    "z": -1.35,
+    "yawDeg": -90
+   },
+   "doorOpensInward": true,
+   "doorSwingDeg": 90.0,
+   "handsOffDeg": 60.0,
+   "doorOpenTip": {
+    "x": 0.7,
+    "z": -0.45
+   },
+   "end": {
+    "x": 0.55,
+    "z": -0.9,
+    "yawDeg": -90
+   },
+   "notes": "VilPushVat (V2): root frame = Geng's start (x right, -z ahead); put the root 1.05 m WEST of the vat centre facing EAST (world: root (96.95, 504), yaw toward +x). The vat (radius 0.40, 0.90 m high) starts 1.05 m ahead and is shoved straight ahead 1.7 m (0.4-2.8 s) to 2.75 m ahead (world (98, 504) -> (99.7, 504)); his pelvis follows to 1.75 m ahead (pushedEnd). He turns right (south) and walks to the door: the leaf plane is 1.85 m right of the root (z 505.85), the hinge 0.45 m ahead (x 97.4), the leaf 1.15 m long from it; he stands at (right 1.40, ahead 1.05) facing right, the right hand on the bolt (right 1.82, ahead 0.95, 1.25 up; grab 5.15 s), slides it 0.25 m toward the hinge (open 5.55 s), side-steps to (right 1.40, ahead 1.35), hooks the leaf's free edge with the left hand and puts the right palm on it (5.75 s) and PULLS it INTO the yard: the leaf swings about the hinge toward the root side (x decreasing) while he backs out of its sweep (3 steps); the hands let go at about 60 deg (6.3 s), the leaf swings on to 90 deg (6.6 s) and lies at doorOpenTip (the BackDoorLeafOpen block: x 97.45, z 504.6-505.75); root.end at (right 0.55, ahead 0.90), yaw -90: inside, east of the open leaf, facing the doorway."
   }
  },
  "props": {
@@ -1201,7 +1309,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02PrevizVillage.json",
-   "sha256": "e3c6f9dc3ebe8ac7cf04a8f912f1de4f66ecdf624369d3ab029be88eb088c862",
+   "sha256": "0e0a2eadd5a0b224d8228ecc38891d20f8c5c0fcc9548ca0e6ad33b60e97832c",
    "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\PrevizVillage_20261019\\Scene_TengxianNra02PrevizVillage.blend",
    "contactPoints": {},
@@ -1386,23 +1494,24 @@
     },
     {
      "clip": "VilHandsUpClimbOut",
-     "frames": 97,
-     "footSlideM": 0.0124,
+     "frames": 121,
+     "footSlideM": 0.0,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.0709,
+     "wallPenetrationM": 0.418,
+     "pelvisMaxStepM": 0.0602,
      "floorCorrectionMin": -0.0,
-     "floorCorrectionMax": 0.0136,
+     "floorCorrectionMax": 0.0,
      "root": {
       "start": [
        -0.0,
-       1.7375,
+       0.55,
        0.0,
-       -0.6756
+       -1.181
       ],
       "end": [
-       0.0,
-       -0.137,
+       -0.0,
+       -0.3837,
        0.0,
        0.819
       ],
@@ -1412,33 +1521,33 @@
      "plants": [
       [
        "L",
-       0.0,
-       0.3
+       0,
+       0.95
       ],
       [
        "L",
-       0.65,
-       1.1
+       1.85,
+       2.42
       ],
       [
        "L",
-       1.45,
+       3.35,
+       5.0
+      ],
+      [
+       "R",
+       0,
+       0.5
+      ],
+      [
+       "R",
+       0.85,
        1.95
       ],
       [
        "R",
-       0.0,
-       0.7
-      ],
-      [
-       "R",
-       1.05,
-       1.5
-      ],
-      [
-       "R",
-       1.85,
-       2.35
+       3.9,
+       5.0
       ]
      ],
      "kneePlants": [],
@@ -1757,49 +1866,144 @@
     },
     {
      "clip": "VilPushVat",
-     "frames": 78,
-     "footSlideM": 0.0,
-     "contactErrorM": 0.04,
-     "gripSolveErrorM": 0.05506,
-     "pelvisMaxStepM": 0.0705,
-     "floorCorrectionMin": -0.01221,
+     "frames": 165,
+     "footSlideM": 0.011,
+     "contactErrorM": 0.0198,
+     "gripSolveErrorM": 0.01981,
+     "pelvisMaxStepM": 0.1064,
+     "floorCorrectionMin": -0.00236,
      "floorCorrectionMax": 0.0,
      "root": {
       "start": [
        -0.0,
-       0.0183,
+       -0.05,
        0.0,
        0.8373
       ],
       "end": [
-       -0.0,
-       -0.201,
-       0.0,
-       0.8099
+       0.55,
+       -0.9,
+       -90.0,
+       0.8236
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
      "plants": [
       [
-       "R",
+       "L",
        0.0,
-       0.45
-      ],
-      [
-       "R",
-       0.75,
-       1.55
+       0.65
       ],
       [
        "L",
-       0.0,
-       0.2
+       0.9,
+       1.15
       ],
       [
        "L",
-       0.45,
-       1.75
+       1.4,
+       1.65
+      ],
+      [
+       "L",
+       1.9,
+       2.15
+      ],
+      [
+       "L",
+       2.4,
+       2.65
+      ],
+      [
+       "L",
+       2.9,
+       3.4
+      ],
+      [
+       "L",
+       3.7,
+       4.0
+      ],
+      [
+       "L",
+       4.3,
+       4.6
+      ],
+      [
+       "L",
+       4.9,
+       5.52
+      ],
+      [
+       "L",
+       5.76,
+       6.0
+      ],
+      [
+       "L",
+       6.22,
+       6.45
+      ],
+      [
+       "L",
+       6.62,
+       6.8
+      ],
+      [
+       "R",
+       0.0,
+       0.4
+      ],
+      [
+       "R",
+       0.65,
+       0.9
+      ],
+      [
+       "R",
+       1.15,
+       1.4
+      ],
+      [
+       "R",
+       1.65,
+       1.9
+      ],
+      [
+       "R",
+       2.15,
+       2.4
+      ],
+      [
+       "R",
+       2.65,
+       3.1
+      ],
+      [
+       "R",
+       3.4,
+       3.7
+      ],
+      [
+       "R",
+       4.0,
+       4.3
+      ],
+      [
+       "R",
+       4.6,
+       5.78
+      ],
+      [
+       "R",
+       6.0,
+       6.22
+      ],
+      [
+       "R",
+       6.45,
+       6.8
       ]
      ],
      "kneePlants": [],
