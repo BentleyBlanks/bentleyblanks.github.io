@@ -169,6 +169,22 @@ Test("演员：阶跃字段、片段秒数 = t − 键 t + clipFrom，clipHold �
   assert.equal(e.visible, true); Near(e.x, 3); Near(e.z, 3);
 });
 
+Test("clipRelease：校验（非负、要和 clip 同键）；取样带出、没写是 null、出口放完停末帧", () => {
+  const bad = ValidateBlockoutPreviz({ schema: BLOCKOUT_PREVIZ_SCHEMA, level: "Test", sequences: [{ keyframe: "01-1",
+    actors: [{ id: "Luo", keys: [{ t: 0, clip: "X", clipRelease: -1 }, { t: 1, clipRelease: 2 }] }] }] }, { config });
+  assert.ok(bad.errors.some(e => e.includes("keys[0].clipRelease")), bad.errors.join("; "));
+  assert.ok(bad.errors.some(e => e.includes("keys[1].clipRelease")), bad.errors.join("; "));
+  const ok = ValidateBlockoutPreviz({ schema: BLOCKOUT_PREVIZ_SCHEMA, level: "Test", sequences: [{ keyframe: "01-1",
+    actors: [{ id: "Luo", keys: [{ t: 0, clip: "X", clipHold: true, clipRelease: 2 }] }] }] }, { config });
+  assert.ok(ok.ok, ok.errors.join("; "));
+  const entry = { id: "Luo", keys: [{ t: 0, clip: "Pin" }, { t: 4, clip: "Pin", clipHold: true, clipRelease: 2 }] };
+  const base = config.keyframes[0].units[0];
+  const S = (t) => SamplePrevizActor(entry, t, base, { clipDuration: () => 3 });
+  assert.equal(S(1).clipRelease, null, "没写 clipRelease 的键 = null（停住段照旧循环）");
+  assert.equal(S(5).clipRelease, 2); Near(S(5).clipSeconds, 1); assert.equal(S(5).clipHold, true);
+  Near(S(9).clipSeconds, 3, 1e-6, "clipHold：出口放完停在末帧");
+});
+
 Test("演员：同一 t 两次取样结果一样（确定性）", () => {
   for (const t of [0, 1.234, 5.5, 9.99]) assert.deepEqual(SamplePrevizActor(seq.actors[0], t, base("Luo"), { resolve }), SamplePrevizActor(seq.actors[0], t, base("Luo"), { resolve }));
 });

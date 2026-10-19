@@ -300,6 +300,8 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
         if (k.clip !== undefined && k.clip !== null && (typeof k.clip !== "string" || !k.clip)) errors.push(`${kat}.clip 要是片段名或 null`);
         if (k.clipFrom !== undefined && !(Finite(k.clipFrom) && k.clipFrom >= 0)) errors.push(`${kat}.clipFrom 要是非负数`);
         if (k.clipHold !== undefined && typeof k.clipHold !== "boolean") errors.push(`${kat}.clipHold 要是 true / false`);
+        if (k.clipRelease !== undefined && !(Finite(k.clipRelease) && k.clipRelease >= 0)) errors.push(`${kat}.clipRelease 要是非负数（片段秒数）`);
+        if (k.clipRelease !== undefined && !k.clip) errors.push(`${kat}.clipRelease 要和 clip 写在同一个键`);
         if (k.lie !== undefined && k.lie !== null && !PREVIZ_LIE_MODES.includes(k.lie)) errors.push(`${kat}.lie 要是 ${PREVIZ_LIE_MODES.join(" / ")} 或 null`);
         if (k.weapon !== undefined && k.weapon !== null && (typeof k.weapon !== "string" || !k.weapon)) errors.push(`${kat}.weapon 要是武器 id（如 Dadao / HanYang）或 null（空手）`);
         if (k.throw !== undefined) {
@@ -755,10 +757,13 @@ export function SamplePrevizActor(entry, t, baseUnit, opts = {}) {
   let stance = Value("stance", PREVIZ_STANCES.includes(base.stance) ? base.stance : "stand");
   if (move === "crawl") stance = "prone";
   const clipKey = StepField(track, "clip", time);
-  let clip = clipKey ? clipKey.clip : null, clipSeconds = 0, clipHold = false;
+  let clip = clipKey ? clipKey.clip : null, clipSeconds = 0, clipHold = false, clipRelease = null;
   if (clip) {
     clipSeconds = time - clipKey.t + (Finite(clipKey.clipFrom) ? clipKey.clipFrom : 0);
     clipHold = clipKey.clipHold === true;
+    // 2026-10-19：带停住段（清单 holdLoop）的片段，clipRelease = 片段播到这一秒就放开停住段、接着放出口（开场动作层的 pose.holdUntil）；
+    // 不写 = 照旧在停住段里一直循环（0105 的 PvStandPointL 等靠这个停住）。
+    clipRelease = Finite(clipKey.clipRelease) ? clipKey.clipRelease : null;
     const duration = opts.clipDuration?.(clip);
     if (Finite(duration) && duration > 0 && clipSeconds > duration) {
       if (clipHold) clipSeconds = duration;
@@ -769,7 +774,7 @@ export function SamplePrevizActor(entry, t, baseUnit, opts = {}) {
   let thrown = null;
   for (const k of track.throws) if (k.t <= time && time < k.t + PREVIZ_THROW.clipS) thrown = k;
   const throwState = thrown ? { seconds: time - thrown.t, x: thrown.throw.x, z: thrown.throw.z } : null;
-  if (throwState) { clip = null; clipSeconds = 0; clipHold = false; stance = "stand"; }
+  if (throwState) { clip = null; clipSeconds = 0; clipHold = false; clipRelease = null; stance = "stand"; }
   return {
     x: at.x, z: at.z, yawDeg,
     stance,
@@ -781,7 +786,7 @@ export function SamplePrevizActor(entry, t, baseUnit, opts = {}) {
     carryRole: Value("carryRole", null) || null,
     woundedWalk: !!Value("woundedWalk", false),
     talking: !!Value("talking", false),
-    clip, clipSeconds, clipHold,
+    clip, clipSeconds, clipHold, clipRelease,
     throw: throwState,
     moving, move,
     speedMps: at.seg ? at.seg.length / Math.max(1e-6, at.seg.t1 - at.seg.t0) : 0,

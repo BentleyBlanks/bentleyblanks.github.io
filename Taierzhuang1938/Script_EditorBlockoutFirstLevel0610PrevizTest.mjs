@@ -695,6 +695,7 @@ function DesignChecks(doc, norm, config, layout, errors) {
     if (piss.length < 4) errors.push(`09-5：撒尿的停住段要重起几遍（VilIjaPissStand 键 ≥ 4，现在 ${piss.length}）`);
     const lastPiss = piss.at(-1);
     if (!lastPiss?.clipHold || (go.length && go[0].t < lastPiss.t + 2.9)) errors.push("09-5：最后一遍撒尿要 clipHold 走出口，系好裤子（3 s）才往偏屋走");
+    if (lastPiss && lastPiss.clipRelease !== 2) errors.push("09-5：最后一遍撒尿要 clipRelease 2（停住段 2 s 处放开，接着放系裤子回头的出口）");
     for (let i = 1; i < piss.length; i++) if (piss[i].t - piss[i - 1].t > 2.05) errors.push(`09-5：撒尿片段 ${piss[i - 1].t} → ${piss[i].t} s 之间会露出出口（间隔 > 2 s）`);
     const cower = ClipKey(s, "Nier", "VilCowerWhimper");
     if (!cower || whimper === undefined || cower.t > whimper) errors.push("09-5：妮儿呜咽前要蹲着捂嘴发抖（VilCowerWhimper）");
@@ -732,6 +733,7 @@ function DesignChecks(doc, norm, config, layout, errors) {
     // 压刺刀（VilIjaPinBayonet 停住段重起 ≥ 2 遍，最后一遍 clipHold 走被咬的出口）与咬手腕（VilBiteWrist，晚 1.5 s 起、0.5 s 咬中）
     const pins = ClipKeys(s6, "KitchenIja", "VilIjaPinBayonet"), biteKey = ClipKey(s6, "Nier", "VilBiteWrist");
     if (pins.length < 2 || !pins.at(-1).clipHold) errors.push("09-7：压刺刀要重起几遍、最后一遍 clipHold（被咬甩手后仰）");
+    if (pins.length && pins.at(-1).clipRelease !== 2) errors.push("09-7：最后一遍压刺刀要 clipRelease 2（2 s 被咬时放开停住段，放甩手后仰的出口）");
     if (!biteKey) errors.push("09-7：妮儿要咬手腕（VilBiteWrist，成对站位由 StageChecks 核）");
     const biteAt = biteKey ? biteKey.t + 0.5 : undefined;
     if (biteKey && pins.length && Math.abs(biteKey.t - (pins.at(-1).t + 1.5)) > 0.1) errors.push("09-7：咬手腕要比最后一遍压刺刀晚 1.5 s 起播（她 0.5 s 咬中 = 他 2.0 s 停住段结束）");

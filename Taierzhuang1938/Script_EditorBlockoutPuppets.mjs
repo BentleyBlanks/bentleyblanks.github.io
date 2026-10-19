@@ -580,6 +580,8 @@ export class BlockoutPuppets {
     const seconds = Math.max(0, drive.clipSeconds || 0);
     const meta = this.opening.api.OpeningClipMeta(clip) || {};
     const pose = { clip, seconds };
+    // 预演键 clipRelease（片段秒数）：带停住段的片段到这一秒放开、接着放出口（撒尿系裤子、被咬甩手后仰）
+    if (Number.isFinite(drive.clipRelease)) pose.holdUntil = drive.clipRelease;
     // 走着放的片段（manifest referenceSpeedMps，如 IjaWalkStabProne）：开场动作层按「走了多远」推它的身体时钟，
     // 而枪道具按 pose.seconds 取 —— 原地放时身体停在第一帧、枪跑到后面的帧，枪就脱手悬空。
     // 照开场导演的握法：身体时钟按片段秒数的增量喂（openingStoryboardTravel），枪交给双手（weaponHold）。

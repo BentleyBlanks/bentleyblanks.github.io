@@ -59,6 +59,9 @@ const previzDoc = {
       { id: "OfficerJ", spawn: { side: "ija", kind: "officer", x: 48, z: 160, yawDeg: 180 }, keys: [{ t: 0, clip: "PvStandPointL" }, { t: 4, clip: "PvCrouchCountFingers" }, { t: 9, clip: null }] },
       { id: "ProcGeng", spawn: { side: "civ", kind: "civilian", body: "procedural", x: 46, z: 160, yawDeg: 180 }, keys: [{ t: 0, clip: "PvStandPointL" }] },
       { id: "Walker", spawn: { side: "nra", kind: "soldier", x: 44, z: 166, yawDeg: 0 }, keys: [{ t: 16, x: 44, z: 146, move: "walk" }] },
+      // clipRelease：带停住段的片段到这一秒放开、接着放出口；不写就一直在停住段里循环
+      { id: "PinRel", spawn: { side: "ija", kind: "soldier", x: 42, z: 160, yawDeg: 180 }, keys: [{ t: 12, clip: "VilIjaPinBayonet", clipHold: true, clipRelease: 2 }] },
+      { id: "PinHold", spawn: { side: "ija", kind: "soldier", x: 40, z: 160, yawDeg: 180 }, keys: [{ t: 12, clip: "VilIjaPinBayonet", clipHold: true }] },
     ],
     aircraft: [{
       id: "Ki30A", model: "MitsubishiKi30",
@@ -217,6 +220,13 @@ try {
   await Shot("Slowmo_t7.6.png");
 
   // 4) 中断：飞机还回去
+  console.log("--- clipRelease");
+  await Seek(14.6);
+  const rel = await Probe("PinRel"), hold = await Probe("PinHold");
+  Check("clipRelease 2：片段播到 2.6 s 时已经放开停住段、在放出口（显示秒数≈2.6），不写的那个还在停住段里循环（≈0.6）",
+    rel?.shownClip === "VilIjaPinBayonet" && Math.abs(rel.shownClipSeconds - 2.6) < 0.08 && hold?.shownClip === "VilIjaPinBayonet" && Math.abs(hold.shownClipSeconds - 0.6) < 0.08,
+    J({ rel: [rel?.shownClip, rel?.shownClipSeconds], hold: [hold?.shownClip, hold?.shownClipSeconds] }));
+
   console.log("--- stop");
   await B(() => window.Tengxian.Debug.Blockout.Previz.Stop());
   await page.waitForTimeout(200);

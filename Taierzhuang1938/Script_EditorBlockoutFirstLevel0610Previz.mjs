@@ -73,6 +73,8 @@ const VILLAGE = JSON.parse(readFileSync(VILLAGE_MANIFEST_FILE, "utf8"));
 export const VILLAGE_STAGES = VILLAGE.stages;
 /** 村子库片段的时长（秒）。 */
 export function VilClipS(name) { const c = VILLAGE.clips[name]; if (!c) throw new Error(`PrevizVillage 清单里没有片段 ${name}`); return c.duration; }
+/** 带停住段的片段（清单 holdLoop [a, b]）停住段在哪一秒结束；没有停住段 = null。 */
+export function VilHoldEnd(name) { const h = VILLAGE.clips[name]?.holdLoop; return Array.isArray(h) && h.length === 2 ? h[1] : null; }
 /** 小孩身体的缩放（Script_EditorBlockoutPuppets BLOCKOUT_PUPPETS.childScale）：带根位移的片段在小孩身上位移也按它缩。 */
 export const CHILD_SCALE = 0.62;
 /**
@@ -263,11 +265,13 @@ class Seq {
   Slowmo(t, dur, rate, fade = 0.25) { this.slowmo.push({ t: R(t), dur: R(dur), rate, fade }); return this; }
   /**
    * 只在清单里标了 holdLoop、运行时不循环的片段（VilIjaPissStand 撒尿、VilIjaPinBayonet 压刺刀：前 2 s 是停住段、之后是出口）：
-   * 从 t0 起每 period 秒重新起一遍（看起来就是一直在做），tLast 那一遍放完不清（clipHold）= 走出口。返回出口播完的时刻。
+   * 从 t0 起每 period 秒重新起一遍（看起来就是一直在做），tLast 那一遍到停住段末尾放开（clipRelease = 停住段结束那一秒，
+   * 开场动作层的 pose.holdUntil），接着放出口（系裤子回头 / 被咬甩手后仰），放完停在末帧（clipHold）。返回出口播完的时刻。
    */
   HoldLoop(id, clip, t0, tLast, period = 1.9, fields = {}) {
     for (let t = t0; t < tLast - 0.3; t = R(t + period)) this.Key(id, t, { clip, ...fields });
-    this.Key(id, tLast, { clip, clipHold: true, ...fields });
+    const release = VilHoldEnd(clip);
+    this.Key(id, tLast, { clip, clipHold: true, ...(release !== null ? { clipRelease: release } : {}), ...fields });
     return R(tLast + VilClipS(clip));
   }
   Done({ durationS, then = "next" }) {
