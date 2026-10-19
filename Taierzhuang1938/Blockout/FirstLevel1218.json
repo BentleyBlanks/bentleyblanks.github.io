@@ -5,8 +5,8 @@
   "source": {
     "generator": "Script_EditorBlockoutCli.mjs export FirstLevel1218",
     "gameVersion": "12–18 扩写稿（2026-10-19，集成负责人）+ 同日分拍空间图",
-    "commit": "4c5601ff100aefe39c5f7aef9bbe0bfbfae30fe1",
-    "generatedAt": "2026-10-18T18:25:04.286Z"
+    "commit": "22f3cc12eacb7df91472ffb36f463393642f2ebc",
+    "generatedAt": "2026-10-19T04:17:05.746Z"
   },
   "zones": [
     {
@@ -9308,7 +9308,7 @@
         "pitchDeg": 0,
         "stance": "stand"
       },
-      "what": "撤下来的人一个个过桥；最后一拨被机枪压在土坎后。",
+      "what": "撤下来的人一个个过桥；接收院的担架也抬出来上桥；最后一拨被机枪压在土坎后。",
       "next": {
         "text": "打掉那挺机枪",
         "x": -40,
@@ -9317,6 +9317,7 @@
       },
       "how": [
         "天快黑透了，东边路上还有人往这边来，一到桥头就挤上浮桥；老耿牵着妮儿也在桥上，踩着一沉一沉的桥板往南",
+        "接收院里的担架也一副一副抬出来，插进队里上桥；军医跟着最后一副出了院门，没回头。院门敞着，马灯还在里头亮着；屋里只剩盖着脸的那几个，冬瓜也在里头",
         "路两边麦地里枪口火一闪一闪，先零星后连成一片，鬼子散开往前跃进；玩家打冲在前头朝撤下来的人开枪的鬼子",
         "越来越糟：路边架起一挺机枪往桥头扫，桥板上有人中枪掉进河里；掷弹筒「嘭」一声落在坑前头；军官冲工兵喊「准备点火！」",
         "最后一拨三四个兵拖着一个伤的被机枪压在土坎后头过不来；「炸！不等了！」「还有人！」「再等一哈！……顺儿！那挺机枪！」机枪一哑幺娃站起来挥手：「快过来！」领头的跑过时：「后头没得人了！」"
@@ -10063,24 +10064,63 @@
           "yawDeg": -90
         },
         {
-          "id": "GLitter1",
+          "id": "YardLitter1",
           "side": "nra",
           "kind": "litter",
-          "group": "gateQueue",
-          "x": -159.4,
-          "z": 618.8,
-          "yawDeg": 0,
-          "bearers": 0
+          "name": "院里抬出来的",
+          "group": "yardEvac",
+          "x": -150,
+          "z": 652.5,
+          "yawDeg": 180,
+          "speedMps": 1.2,
+          "intent": [
+            {
+              "x": -150,
+              "z": 740
+            }
+          ]
         },
         {
-          "id": "GLitter2",
+          "id": "YardLitter2",
           "side": "nra",
           "kind": "litter",
-          "group": "gateQueue",
-          "x": -159.4,
-          "z": 621.4,
-          "yawDeg": 0,
-          "bearers": 0
+          "name": "院里抬出来的",
+          "group": "yardEvac",
+          "x": -152,
+          "z": 628,
+          "yawDeg": -173.7,
+          "speedMps": 1.2,
+          "intent": [
+            {
+              "x": -150,
+              "z": 628
+            },
+            {
+              "x": -150,
+              "z": 740
+            }
+          ]
+        },
+        {
+          "id": "YardLitter3",
+          "side": "nra",
+          "kind": "litter",
+          "name": "院里抬出来的",
+          "group": "yardEvac",
+          "x": -157.8,
+          "z": 616.4,
+          "yawDeg": -106.5,
+          "speedMps": 1.2,
+          "intent": [
+            {
+              "x": -150,
+              "z": 624
+            },
+            {
+              "x": -150,
+              "z": 740
+            }
+          ]
         },
         {
           "id": "Doctor",
@@ -10088,54 +10128,41 @@
           "name": "军医",
           "role": "doctor",
           "weapon": null,
-          "x": -176.4,
+          "x": -161.2,
           "z": 616.6,
-          "yawDeg": -39,
-          "stance": "crouch"
+          "yawDeg": -101.1,
+          "speedMps": 1.2,
+          "path": [
+            {
+              "x": -163.3,
+              "z": 616
+            },
+            {
+              "x": -160.7,
+              "z": 616
+            },
+            {
+              "x": -161.2,
+              "z": 616.6
+            }
+          ],
+          "intent": [
+            {
+              "x": -150,
+              "z": 624
+            },
+            {
+              "x": -150,
+              "z": 740
+            }
+          ]
         },
         {
-          "id": "Civ1",
-          "side": "civ",
-          "kind": "civilian",
-          "name": "烧水的",
-          "x": -191.8,
-          "z": 616.2,
-          "yawDeg": 90
-        },
-        {
-          "id": "Civ2",
-          "side": "civ",
-          "kind": "civilian",
-          "name": "抱门板的",
-          "x": -170.6,
-          "z": 616.4,
-          "yawDeg": -90
-        },
-        {
-          "id": "Civ3",
-          "side": "civ",
-          "kind": "civilian",
-          "x": -188.4,
-          "z": 624.6,
-          "yawDeg": 0,
-          "stance": "crouch"
-        },
-        {
-          "id": "YardWounded01",
+          "id": "YardDead1",
           "side": "nra",
-          "role": "wounded",
+          "name": "盖着脸的",
           "group": "yard",
-          "x": -189.6,
-          "z": 608.4,
-          "yawDeg": 0,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded02",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
+          "weapon": null,
           "x": -186.2,
           "z": 609,
           "yawDeg": 45,
@@ -10143,43 +10170,11 @@
           "guess": true
         },
         {
-          "id": "YardWounded03",
+          "id": "YardDead2",
           "side": "nra",
-          "role": "wounded",
+          "name": "盖着脸的",
           "group": "yard",
-          "x": -182.6,
-          "z": 608.3,
-          "yawDeg": 90,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded04",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
-          "x": -170.4,
-          "z": 609.2,
-          "yawDeg": 135,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded05",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
-          "x": -167.2,
-          "z": 611.6,
-          "yawDeg": 0,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded06",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
+          "weapon": null,
           "x": -189.8,
           "z": 613.2,
           "yawDeg": 45,
@@ -10187,46 +10182,14 @@
           "guess": true
         },
         {
-          "id": "YardWounded07",
+          "id": "YardDead3",
           "side": "nra",
-          "role": "wounded",
+          "name": "盖着脸的",
           "group": "yard",
-          "x": -186.6,
-          "z": 614,
-          "yawDeg": 90,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded08",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
-          "x": -189.4,
-          "z": 618.2,
-          "yawDeg": 135,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded09",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
+          "weapon": null,
           "x": -186,
           "z": 621.6,
           "yawDeg": 0,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded10",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
-          "x": -167,
-          "z": 620.4,
-          "yawDeg": 45,
           "state": "down",
           "guess": true
         }
@@ -10946,27 +10909,41 @@
           "name": "军医",
           "role": "doctor",
           "weapon": null,
-          "x": -176.4,
-          "z": 616.6,
-          "yawDeg": -39,
-          "stance": "crouch"
+          "x": -149,
+          "z": 731.5,
+          "yawDeg": 180,
+          "speedMps": 1.2,
+          "path": [
+            {
+              "x": -150,
+              "z": 624
+            },
+            {
+              "x": -150,
+              "z": 731.5
+            },
+            {
+              "x": -149,
+              "z": 731.5
+            }
+          ],
+          "intent": [
+            {
+              "x": -150,
+              "z": 731.5
+            },
+            {
+              "x": -150,
+              "z": 760
+            }
+          ]
         },
         {
-          "id": "YardWounded01",
+          "id": "YardDead1",
           "side": "nra",
-          "role": "wounded",
+          "name": "盖着脸的",
           "group": "yard",
-          "x": -189.6,
-          "z": 608.4,
-          "yawDeg": 0,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded02",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
+          "weapon": null,
           "x": -186.2,
           "z": 609,
           "yawDeg": 45,
@@ -10974,43 +10951,11 @@
           "guess": true
         },
         {
-          "id": "YardWounded03",
+          "id": "YardDead2",
           "side": "nra",
-          "role": "wounded",
+          "name": "盖着脸的",
           "group": "yard",
-          "x": -182.6,
-          "z": 608.3,
-          "yawDeg": 90,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded04",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
-          "x": -170.4,
-          "z": 609.2,
-          "yawDeg": 135,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded05",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
-          "x": -167.2,
-          "z": 611.6,
-          "yawDeg": 0,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded06",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
+          "weapon": null,
           "x": -189.8,
           "z": 613.2,
           "yawDeg": 45,
@@ -11018,46 +10963,14 @@
           "guess": true
         },
         {
-          "id": "YardWounded07",
+          "id": "YardDead3",
           "side": "nra",
-          "role": "wounded",
+          "name": "盖着脸的",
           "group": "yard",
-          "x": -186.6,
-          "z": 614,
-          "yawDeg": 90,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded08",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
-          "x": -189.4,
-          "z": 618.2,
-          "yawDeg": 135,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded09",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
+          "weapon": null,
           "x": -186,
           "z": 621.6,
           "yawDeg": 0,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded10",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
-          "x": -167,
-          "z": 620.4,
-          "yawDeg": 45,
           "state": "down",
           "guess": true
         }
@@ -11673,27 +11586,41 @@
           "name": "军医",
           "role": "doctor",
           "weapon": null,
-          "x": -176.4,
-          "z": 616.6,
-          "yawDeg": -39,
-          "stance": "crouch"
+          "x": -149,
+          "z": 749.6,
+          "yawDeg": 180,
+          "speedMps": 1.2,
+          "path": [
+            {
+              "x": -150,
+              "z": 731.5
+            },
+            {
+              "x": -150,
+              "z": 749.6
+            },
+            {
+              "x": -149,
+              "z": 749.6
+            }
+          ],
+          "intent": [
+            {
+              "x": -150,
+              "z": 749.6
+            },
+            {
+              "x": -150,
+              "z": 800
+            }
+          ]
         },
         {
-          "id": "YardWounded01",
+          "id": "YardDead1",
           "side": "nra",
-          "role": "wounded",
+          "name": "盖着脸的",
           "group": "yard",
-          "x": -189.6,
-          "z": 608.4,
-          "yawDeg": 0,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded02",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
+          "weapon": null,
           "x": -186.2,
           "z": 609,
           "yawDeg": 45,
@@ -11701,43 +11628,11 @@
           "guess": true
         },
         {
-          "id": "YardWounded03",
+          "id": "YardDead2",
           "side": "nra",
-          "role": "wounded",
+          "name": "盖着脸的",
           "group": "yard",
-          "x": -182.6,
-          "z": 608.3,
-          "yawDeg": 90,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded04",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
-          "x": -170.4,
-          "z": 609.2,
-          "yawDeg": 135,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded05",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
-          "x": -167.2,
-          "z": 611.6,
-          "yawDeg": 0,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded06",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
+          "weapon": null,
           "x": -189.8,
           "z": 613.2,
           "yawDeg": 45,
@@ -11745,46 +11640,14 @@
           "guess": true
         },
         {
-          "id": "YardWounded07",
+          "id": "YardDead3",
           "side": "nra",
-          "role": "wounded",
+          "name": "盖着脸的",
           "group": "yard",
-          "x": -186.6,
-          "z": 614,
-          "yawDeg": 90,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded08",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
-          "x": -189.4,
-          "z": 618.2,
-          "yawDeg": 135,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded09",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
+          "weapon": null,
           "x": -186,
           "z": 621.6,
           "yawDeg": 0,
-          "state": "down",
-          "guess": true
-        },
-        {
-          "id": "YardWounded10",
-          "side": "nra",
-          "role": "wounded",
-          "group": "yard",
-          "x": -167,
-          "z": 620.4,
-          "yawDeg": 45,
           "state": "down",
           "guess": true
         }

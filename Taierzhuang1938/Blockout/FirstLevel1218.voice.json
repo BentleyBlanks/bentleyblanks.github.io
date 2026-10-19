@@ -1,7 +1,7 @@
 {
  "schema": "tengxian-blockout-voice/1",
  "level": "FirstLevel1218",
- "generatedAt": "2026-10-18T19:13:59.892Z",
+ "generatedAt": "2026-10-19T04:14:48.919Z",
  "requests": 35,
  "note": "占位配音（SeedAudio seed-audio-1.0，整段一次生成后按逐字时间戳切句）。file 相对 Taierzhuang1938/index.html；gapBeforeS 是录音里与上一句的原始间隔；keyframe 是契约 §4 的关键帧 id。",
  "scenes": [
@@ -9,7 +9,7 @@
    "id": "RoadWest",
    "beat": "12",
    "keyframe": "12-1",
-   "label": "12 出村：推门了、还有好远",
+   "label": "12 出村：还有好远",
    "attempt": 1,
    "attempts": 1,
    "references": [
@@ -35,22 +35,6 @@
     "RoadWest.02 是单句补录（刘文财，RoadWest02Pickup#1），不在整段录音里"
    ],
    "lines": [
-    {
-     "id": "RoadWest.01",
-     "keyframe": "12-1",
-     "who": "liuwencai",
-     "speaker": "刘文财",
-     "lang": "zh",
-     "subtitle": "推门了……班长他们出来了。",
-     "text": "推门了……班长他们出来了。",
-     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218RoadWest_01.mp3",
-     "durationS": 2.62,
-     "gapBeforeS": 0,
-     "sha256": "c1c6a486fc9403ff5ffc090b39c5093e8f7e371dec3319354c2138cdababe4b2",
-     "speakerCos": 0.852,
-     "cer": 0.2,
-     "transcript": "推门了,白帐他们出来了。"
-    },
     {
      "id": "RoadWest.02",
      "keyframe": "12-1",

@@ -321,8 +321,7 @@ function S1201(ctx) {
   for (const id of KG(ctx, "12-1", "convoy").filter(id => id !== "LitterDonggua")) s.Shift(id, T2, T3 - 0.4, 0, 12.0);
   s.WalkEye(T2, 2.0, Pt(eye0.x, zAt(T2)), Pt(99.4, 611.6), { ...GENG_SMOKE, h: 4 }, { lookTo: { actor: "Geng", offset: [0, 1.3, 0] }, ease: "inOut" });
   s.WalkEye(T2 + 2.0, T3 - T2 - 2.0, Pt(99.4, 611.6), Pt(93.6, 613.8), { actor: "Geng", offset: [0, 1.3, 0] }, { lookTo: { x: 40, z: 612, h: 1.2 }, ease: "inOut" });
-  // 刘文财两句、老耿一句（边走边说）
-  s.Say("RoadWest.01", "LiuWencai", 12.6);
+  // 刘文财问一句、老耿答一句（边走边说）；「推门了」那句 10-19 删了（RoadWest.01 留在台词表里只为切句对齐）
   s.Say("RoadWest.02", "LiuWencai", 17.0);
   s.Say("RoadWest.03", "Geng");
   s.Eye(T3, 3.0, { stance: "stand", x: 93.6, z: 613.8, look: Pt(40, 612), pitch: -1 });

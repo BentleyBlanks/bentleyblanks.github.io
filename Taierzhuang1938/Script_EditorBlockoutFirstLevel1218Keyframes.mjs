@@ -395,6 +395,18 @@ const QUEUE_Z = [618.8, 621.4, 624.2, 627.2, 630.0, 632.8];
 const DONGGUA_QUEUE_I = 2;
 const GateQueue = () => QUEUE_Z.flatMap((z, i) => (i === DONGGUA_QUEUE_I ? [] : [N(`GLitter${i + 1}`, Pt(Y.queueAlongX, z), { kind: "litter", bearers: 0, yaw: 0, group: "gateQueue" })]));
 const DONGGUA_QUEUE = Pt(Y.queueAlongX, QUEUE_Z[DONGGUA_QUEUE_I]);
+// 18-2 起接收院往南岸撤（10-19 用户定：炸桥前要交代院里的伤兵抬走了，不然「马灯还亮着」会读成把伤兵丢给鬼子）：
+// 活着的一副一副抬出院门上桥，军医跟着最后一副走；屋里只剩盖着脸的几个（冬瓜在厢房里，不摆）。
+const YARD_DEAD_I = Object.freeze([1, 5, 8]);   // WOUNDED_SPOTS 里留下的那几个
+const YardDead = () => YARD_DEAD_I.map((i, k) => N(`YardDead${k + 1}`, WOUNDED_SPOTS[i], { name: "盖着脸的", group: "yard", weapon: null, down: true, yaw: (i % 4) * 45, guess: true }));
+const GATE_OUT = Pt(PL.yardGate.x + 4.2, PL.yardGate.z + 0.4);   // 院门外一步，最后一副担架
+const YardEvac = () => [
+  N("YardLitter1", BP(652.5), { kind: "litter", name: "院里抬出来的", group: "yardEvac", yaw: 180, to: BP(740), speed: 1.2 }),
+  N("YardLitter2", Pt(-152.0, 628.0), { kind: "litter", name: "院里抬出来的", group: "yardEvac", face: BP(646), to: BP(740), speed: 1.2 }),
+  N("YardLitter3", GATE_OUT, { kind: "litter", name: "院里抬出来的", group: "yardEvac", face: SQUARE_C, to: BP(740), speed: 1.2 }),
+  N("Doctor", Pt(PL.yardGate.x + 0.8, PL.yardGate.z + 0.6), { face: SQUARE_C, to: BP(740), speed: 1.2 }),
+  ...YardDead(),
+];
 
 // 浮桥上的人：桥面 x −151.2…−148.8
 const SAPPER1 = Pt(BH.sapperPosts[0].x, BH.sapperPosts[0].z), SAPPER2 = Pt(BH.sapperPosts[1].x, BH.sapperPosts[1].z);
@@ -821,9 +833,9 @@ function Keyframes() {
   Add({
     id: "18-2", ...s18, name: "等",
     player: { x: p182.x, z: p182.z, yawDeg: -90, pitchDeg: 0, stance: "stand" },
-    what: "撤下来的人一个个过桥；最后一拨被机枪压在土坎后。",
+    what: "撤下来的人一个个过桥；接收院的担架也抬出来上桥；最后一拨被机枪压在土坎后。",
     next: { text: "打掉那挺机枪", x: MG.x, z: MG.z, radiusM: 4 },
-    how: ["天快黑透了，东边路上还有人往这边来，一到桥头就挤上浮桥；老耿牵着妮儿也在桥上，踩着一沉一沉的桥板往南", "路两边麦地里枪口火一闪一闪，先零星后连成一片，鬼子散开往前跃进；玩家打冲在前头朝撤下来的人开枪的鬼子", "越来越糟：路边架起一挺机枪往桥头扫，桥板上有人中枪掉进河里；掷弹筒「嘭」一声落在坑前头；军官冲工兵喊「准备点火！」", "最后一拨三四个兵拖着一个伤的被机枪压在土坎后头过不来；「炸！不等了！」「还有人！」「再等一哈！……顺儿！那挺机枪！」机枪一哑幺娃站起来挥手：「快过来！」领头的跑过时：「后头没得人了！」"],
+    how: ["天快黑透了，东边路上还有人往这边来，一到桥头就挤上浮桥；老耿牵着妮儿也在桥上，踩着一沉一沉的桥板往南", "接收院里的担架也一副一副抬出来，插进队里上桥；军医跟着最后一副出了院门，没回头。院门敞着，马灯还在里头亮着；屋里只剩盖着脸的那几个，冬瓜也在里头", "路两边麦地里枪口火一闪一闪，先零星后连成一片，鬼子散开往前跃进；玩家打冲在前头朝撤下来的人开枪的鬼子", "越来越糟：路边架起一挺机枪往桥头扫，桥板上有人中枪掉进河里；掷弹筒「嘭」一声落在坑前头；军官冲工兵喊「准备点火！」", "最后一拨三四个兵拖着一个伤的被机枪压在土坎后头过不来；「炸！不等了！」「还有人！」「再等一哈！……顺儿！那挺机枪！」机枪一哑幺娃站起来挥手：「快过来！」领头的跑过时：「后头没得人了！」"],
     notes: `散兵坑里站着（坑底 + 1.62）越过东沿的土袋看得见大路东边的机枪（场景生成器核过）；机枪趴着（眼 0.5）看不见土坎西边蹲着的最后一拨人（土坎顶 ${BK.topY}）。`
       + `鬼子：机枪组 2 在 ijaMg、步兵 ${IJA_FIELD.length} 个散在大路两边麦地 x −30…+12（跃进 intent 向西）、掷弹筒 2 在 ijaMortar。`,
     signals: [SIG.cartOverturned, SIG.chargesSet],
@@ -845,8 +857,7 @@ function Keyframes() {
       ...IjaMgGroup(),
       ...IjaField(),
       N("GateGuard", GATE_GUARD, { yaw: -90 }),
-      ...GateQueue().slice(0, 2),
-      ...YardPeople({ doctorAt: Pt(-176.4, 616.6), doctorStance: "crouch", doctorFace: WOUNDED_SPOTS[3] }),
+      ...YardEvac(),
     ],
     pois: [POI.ijaMg("danger"), POI.lastGroup(), POI.mortar(), POI.bridge()],
   });
@@ -883,7 +894,8 @@ function Keyframes() {
       ...IJA_SQUARE_E.map((p, i) => J(`Ija${i + 1}`, p, { role: "rifleman", group: "east", aim: true, face: BP(690), speed: 2.8,
         path: [RP(IJA_FIELD[i][0].x, IJA_FIELD[i][0].z > ROAD_Z ? 1.0 : -1.0), RP(p.x, p.z > ROAD_Z ? 1.0 : -1.0), p] })),
       ...IjaMgGroup(),
-      ...YardPeople({ doctorAt: Pt(-176.4, 616.6), doctorStance: "crouch", doctorFace: WOUNDED_SPOTS[3] }).filter((u) => u.id === "Doctor" || /^YardWounded/.test(u.id)),
+      N("Doctor", BP(731.5, 1.0), { yaw: 180, to: BP(760), speed: 1.2 }),
+      ...YardDead(),
     ],
     pois: [POI.southFoot("objective"), Poi("SapperSouth", "工兵捏着引线", "poi", sapperS, 1.5), Poi("IjaRush", "鬼子追到桥头", "danger", Pt(-120, 612), 10)],
   });
@@ -918,7 +930,8 @@ function Keyframes() {
       N("LitterCross", BP(748), { kind: "litter", yaw: 180, group: "bridge", to: BP(800) }),
       ...IJA_LEVEE_X.map((x, i) => J(`LeveeIja${i + 1}`, Pt(x, 634.8), { role: "rifleman", group: "levee", yaw: 180, aim: i % 3 !== 0, stance: i % 4 === 1 ? "crouch" : "stand", straight: true, guess: true })),
       J("IjaTank", RP(-118), { yaw: 90, straight: true, guess: true }),
-      ...YardPeople({ doctorAt: Pt(-176.4, 616.6), doctorStance: "crouch", doctorFace: WOUNDED_SPOTS[3] }).filter((u) => u.id === "Doctor" || /^YardWounded/.test(u.id)),
+      N("Doctor", BP(749.6, 1.0), { yaw: 180, to: BP(800), speed: 1.2 }),
+      ...YardDead(),
     ],
     pois: [POI.lamp(), POI.wreck(), Poi("LeveeIja", "鬼子涌到对岸堤上", "danger", Pt(-150, 635), 20), POI.southRoad()],
   });

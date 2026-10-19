@@ -290,6 +290,8 @@ function Install(r, manifest, timings) {
     targetDb: r.master.targetDb, cutMethod: r.master.cutMethod, hard: r.hard, flags: r.flags, lines: [] };
   r.slices.forEach((s, i) => {
     const line = r.scene.lines[i], dest = LineFile(r.scene, i);
+    // 剧本删掉的句子（cut）：切句时照旧占位对时间戳，这里不装、不进清单，旧文件一并删掉
+    if (line.cut) { fs.rmSync(dest, { force: true }); return; }
     fs.copyFileSync(s.file, dest);
     const sha256 = Sha256(dest), durationS = +MeasureVoice(dest).seconds.toFixed(3);
     entry.lines.push({ id: line.id, keyframe: line.keyframe, who: line.who, speaker: line.speaker, lang: line.lang, subtitle: line.subtitle, text: line.text,

@@ -769,11 +769,6 @@
    ],
    "lines": [
     {
-     "t": 12.6,
-     "line": "RoadWest.01",
-     "actor": "LiuWencai"
-    },
-    {
      "t": 17,
      "line": "RoadWest.02",
      "actor": "LiuWencai"

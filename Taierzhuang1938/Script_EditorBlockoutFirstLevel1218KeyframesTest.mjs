@@ -131,6 +131,15 @@ assert.ok(KF("18-4").units.filter((u) => u.group === "levee" && u.kind !== "tank
 assert.ok(Unit("18-4", "IjaTank")?.kind === "tank", "18-4 后头路上一辆战车");
 assert.ok(["Luo", "Yaowa", "HeYoutian", "LiuWencai", "Squad1", "Squad2"].every((id) => Unit("18-4", id).z >= LV.south.z + 2), "18-4 全班在南堤后");
 assert.ok(KF("18-4").pois.some((p) => p.id === "YardLamp") && KF("18-4").pois.some((p) => p.id === "Wreck"), "18-4 POI：院里马灯、断桥往下游漂");
+// 炸桥前接收院撤空（10-19）：18-2 院里的担架抬出来上桥、军医跟着最后一副；18-3 起院里只剩盖着脸的，军医在南岸
+const evac = KF("18-2").units.filter((u) => u.group === "yardEvac");
+assert.ok(evac.length >= 3 && evac.every((u) => u.kind === "litter" && u.intent?.at(-1)?.z > BR.southFootZ), "18-2 院里的担架抬出来，往南岸去");
+assert.ok(Unit("18-2", "Doctor")?.intent?.at(-1)?.z > BR.southFootZ && !KF("18-2").units.some((u) => /^(YardWounded|GLitter)/.test(u.id)), "18-2 军医跟着最后一副出院门；院里、门口不再有等着的伤员");
+for (const id of ["18-2", "18-3", "18-4"]) {
+  const dead = KF(id).units.filter((u) => /^YardDead/.test(u.id));
+  assert.ok(dead.length >= 2 && dead.every((u) => u.state === "down" && u.x >= Y.box.minX && u.x <= Y.box.maxX && u.z >= Y.box.minZ && u.z <= Y.box.maxZ), `${id} 院里只留盖着脸的几个`);
+}
+for (const id of ["18-3", "18-4"]) assert.ok(Unit(id, "Doctor").z > BR.southFootZ && !KF(id).units.some((u) => /^YardWounded/.test(u.id)), `${id} 军医已经过了河，院里没有活着的伤员`);
 const luo185 = Unit("18-5", "Luo");
 assert.ok(KF("18-5").units.filter((u) => u.side === "nra" && u.kind !== "litter").every((u) => u.id === "Guide" || u.id === "WaterMan" || u.z <= luo185.z) && DistXZ(Unit("18-5", "Yaowa"), Unit("18-5", "Geng")) < 2.6, "18-5 班长在前，幺娃走在老耿旁边");
 assert.ok(Unit("18-5", "Guide") && Math.abs(Unit("18-5", "Guide").x - P.northGate.x) < 2 && Unit("18-5", "WaterMan") && Unit("18-5", "SandCart1") && Unit("18-5", "SandCart2"), "18-5 北门口：带路的兵、舀水的、推小车的");
