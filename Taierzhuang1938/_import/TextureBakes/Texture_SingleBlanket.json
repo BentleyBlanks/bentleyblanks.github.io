@@ -1,0 +1,122 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-10-19",
+  "name": "SingleBlanket",
+  "preset": "singleBlanketAtlas",
+  "source": {
+    "path": "_import/Source/SingleBlanket/Texture_SingleBlanketSource.png",
+    "sha256": "428c9f3c18893e3dcffaa504c0c56a4700cedcaa58eca02ee78ccec244c9cbf2",
+    "metrics": {
+      "meanSrgb": [
+        0.7543,
+        0.6948,
+        0.6428
+      ],
+      "luma": 0.6973,
+      "lumaStd": 0.0761,
+      "sat": 0.1477,
+      "clipLow": 0.0,
+      "clipHigh": 0.0001,
+      "lowFreq": 0.024
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.62,
+      0.6,
+      0.56
+    ],
+    "contrast": 0.085,
+    "lumaRange": [
+      0.4,
+      0.78
+    ],
+    "satRange": [
+      0.0,
+      0.24
+    ],
+    "stdRange": [
+      0.025,
+      0.2
+    ],
+    "reliefM": 0.00012,
+    "rough": 0.9,
+    "roughVar": 0.006,
+    "roughLumaK": 0.0,
+    "ao": 0.04,
+    "metal": 0.0,
+    "seamless": "none",
+    "rowFlatten": false,
+    "flattenSigma": 0.088,
+    "isotropic": false,
+    "heightFromLuma": "direct",
+    "tileM": 1.630950643,
+    "size": 1024,
+    "dataSize": 1024,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 0.8,
+    "toneStrength": 0.9,
+    "keepTone": false,
+    "noFlatten": true,
+    "invertHeight": false,
+    "keepAlpha": true,
+    "roughMin": 0.85,
+    "baseQuality": 90,
+    "dataQuality": 90,
+    "dataLossless": true,
+    "detailBalance": 0,
+    "heightFineWeight": 0.45,
+    "uvAtlasReason": "One non-repeating 1.4x1.9m worn sheet, five user-approved repair patches; square UV encoding compensates the physical cloth aspect ratio"
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_SingleBlanketBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 433664,
+      "sha256": "ddb79e254097d863b28627197c05189a032209eb36fc131cac8fd0f29e420c3e"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_SingleBlanketNormal.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 211624,
+      "sha256": "930ff5ea8900b817c4e36caa56f2437c3c0e9f16ad8fa862c2592a2b33738331"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_SingleBlanketOrm.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 229370,
+      "sha256": "8ccf4cce70b249fec793ea641fc959603fc0d24b3620b02edd382c4f2723604f"
+    }
+  ],
+  "totalBytes": 874658,
+  "metrics": {
+    "meanSrgb": [
+      0.6332,
+      0.6105,
+      0.5678
+    ],
+    "luma": 0.6039,
+    "lumaStd": 0.0844,
+    "sat": 0.1033,
+    "clipLow": 0.0001,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0307,
+    "seam": 0.0047,
+    "interior": 0.0474,
+    "seamRatio": 0.099,
+    "border": 0.138,
+    "swing": 0.0699,
+    "aoMean": 0.993,
+    "roughMean": 0.9,
+    "texelsPerMeter": 627.9
+  },
+  "gateProblems": []
+}

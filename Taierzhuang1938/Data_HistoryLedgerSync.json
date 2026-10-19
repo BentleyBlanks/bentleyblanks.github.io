@@ -8,13 +8,13 @@
       "id": "3fd60335331c818fa24deadb6d72ca70",
       "title": "史实与创作",
       "role": "ledgerParent",
-      "lastEdited": "2026-10-18T23:28:04.079Z"
+      "lastEdited": "2026-10-19T14:06:14.700Z"
     },
     {
       "id": "3fd60335331c8194aa82f0b238084d34",
       "title": "史实与创作对照表",
       "role": "ledgerTable",
-      "lastEdited": "2026-10-18T23:27:50.147Z"
+      "lastEdited": "2026-10-19T14:06:13.390Z"
     },
     {
       "id": "3c360335331c81be876fcf4cb0928e1b",
@@ -68,6 +68,18 @@
     {
       "url": "https://www.marxists.org/chinese/reference-books/shanghaidezaochen/1-03.htm",
       "reason": "周而复长篇小说《上海的早晨》，只能挂在「创作」条目下说明是文学作品"
+    }
+  ],
+  "assetReviews": [
+    {
+      "asset": "SingleBlanket",
+      "date": "2026-10-19",
+      "scope": "Only the new five-patch thin sheet appearance and historical boundary; other source-page markers and repoCommit preserved",
+      "notionPages": [
+        "3fd60335331c8194aa82f0b238084d34",
+        "3fd60335331c818fa24deadb6d72ca70"
+      ],
+      "assetContract": "Model/Data_SingleBlanket.json"
     }
   ]
 }

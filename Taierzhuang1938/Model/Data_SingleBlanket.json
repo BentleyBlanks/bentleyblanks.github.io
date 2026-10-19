@@ -1,0 +1,642 @@
+{
+  "asset": "SingleBlanket",
+  "blenderVersion": "5.1.2",
+  "seed": 19380317,
+  "vertices": 336,
+  "quads": 300,
+  "triangles": 600,
+  "bones": [
+    {
+      "name": "Blanket_Root",
+      "headBlender": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "tailBlender": [
+        0.0,
+        0.0,
+        0.10000000149011612
+      ],
+      "parent": null,
+      "deform": false,
+      "connected": false
+    },
+    {
+      "name": "Blanket_CornerHeadL",
+      "headBlender": [
+        0.699999988079071,
+        -0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        0.699999988079071,
+        -0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r0_c1",
+      "headBlender": [
+        0.23330000042915344,
+        -0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        0.23330000042915344,
+        -0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r0_c2",
+      "headBlender": [
+        -0.23330000042915344,
+        -0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        -0.23330000042915344,
+        -0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_CornerHeadR",
+      "headBlender": [
+        -0.699999988079071,
+        -0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        -0.699999988079071,
+        -0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r1_c0",
+      "headBlender": [
+        0.699999988079071,
+        -0.5699999928474426,
+        0.0
+      ],
+      "tailBlender": [
+        0.699999988079071,
+        -0.5699999928474426,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r1_c1",
+      "headBlender": [
+        0.23330000042915344,
+        -0.5699999928474426,
+        0.0
+      ],
+      "tailBlender": [
+        0.23330000042915344,
+        -0.5699999928474426,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r1_c2",
+      "headBlender": [
+        -0.23330000042915344,
+        -0.5699999928474426,
+        0.0
+      ],
+      "tailBlender": [
+        -0.23330000042915344,
+        -0.5699999928474426,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r1_c3",
+      "headBlender": [
+        -0.699999988079071,
+        -0.5699999928474426,
+        0.0
+      ],
+      "tailBlender": [
+        -0.699999988079071,
+        -0.5699999928474426,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r2_c0",
+      "headBlender": [
+        0.699999988079071,
+        -0.1899999976158142,
+        0.0
+      ],
+      "tailBlender": [
+        0.699999988079071,
+        -0.1899999976158142,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r2_c1",
+      "headBlender": [
+        0.23330000042915344,
+        -0.1899999976158142,
+        0.0
+      ],
+      "tailBlender": [
+        0.23330000042915344,
+        -0.1899999976158142,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r2_c2",
+      "headBlender": [
+        -0.23330000042915344,
+        -0.1899999976158142,
+        0.0
+      ],
+      "tailBlender": [
+        -0.23330000042915344,
+        -0.1899999976158142,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r2_c3",
+      "headBlender": [
+        -0.699999988079071,
+        -0.1899999976158142,
+        0.0
+      ],
+      "tailBlender": [
+        -0.699999988079071,
+        -0.1899999976158142,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r3_c0",
+      "headBlender": [
+        0.699999988079071,
+        0.1899999976158142,
+        0.0
+      ],
+      "tailBlender": [
+        0.699999988079071,
+        0.1899999976158142,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r3_c1",
+      "headBlender": [
+        0.23330000042915344,
+        0.1899999976158142,
+        0.0
+      ],
+      "tailBlender": [
+        0.23330000042915344,
+        0.1899999976158142,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r3_c2",
+      "headBlender": [
+        -0.23330000042915344,
+        0.1899999976158142,
+        0.0
+      ],
+      "tailBlender": [
+        -0.23330000042915344,
+        0.1899999976158142,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r3_c3",
+      "headBlender": [
+        -0.699999988079071,
+        0.1899999976158142,
+        0.0
+      ],
+      "tailBlender": [
+        -0.699999988079071,
+        0.1899999976158142,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r4_c0",
+      "headBlender": [
+        0.699999988079071,
+        0.5699999928474426,
+        0.0
+      ],
+      "tailBlender": [
+        0.699999988079071,
+        0.5699999928474426,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r4_c1",
+      "headBlender": [
+        0.23330000042915344,
+        0.5699999928474426,
+        0.0
+      ],
+      "tailBlender": [
+        0.23330000042915344,
+        0.5699999928474426,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r4_c2",
+      "headBlender": [
+        -0.23330000042915344,
+        0.5699999928474426,
+        0.0
+      ],
+      "tailBlender": [
+        -0.23330000042915344,
+        0.5699999928474426,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r4_c3",
+      "headBlender": [
+        -0.699999988079071,
+        0.5699999928474426,
+        0.0
+      ],
+      "tailBlender": [
+        -0.699999988079071,
+        0.5699999928474426,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_CornerTailL",
+      "headBlender": [
+        0.699999988079071,
+        0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        0.699999988079071,
+        0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r5_c1",
+      "headBlender": [
+        0.23330000042915344,
+        0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        0.23330000042915344,
+        0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r5_c2",
+      "headBlender": [
+        -0.23330000042915344,
+        0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        -0.23330000042915344,
+        0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_CornerTailR",
+      "headBlender": [
+        -0.699999988079071,
+        0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        -0.699999988079071,
+        0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    }
+  ],
+  "checks": {
+    "restMaxDeviationM": 0.0,
+    "weightSumMaxError": 4.0978193283081055e-08,
+    "nonzeroInfluences": {
+      "4": 272,
+      "3": 32,
+      "2": 32
+    },
+    "liftHeadLHeightM": 0.6,
+    "liftAffectedVertices": 24,
+    "liftOutsideSupportMaxDeviationM": 0.0,
+    "liftInterpolationMaxErrorM": 8.940696716308594e-08,
+    "gripLiftMaxErrorM": 0.0,
+    "crumpledSizeM": [
+      0.4500000476837158,
+      0.44999992847442627,
+      0.2499999888241291
+    ],
+    "sockets": [
+      {
+        "name": "Socket_GripHeadL",
+        "parentBone": "Blanket_CornerHeadL",
+        "positionBlender": [
+          0.699999988079071,
+          -0.949999988079071,
+          0.0
+        ],
+        "matrixBasis": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.699999988079071
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            -0.949999988079071
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "zAxisBlender": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "Socket_GripHeadR",
+        "parentBone": "Blanket_CornerHeadR",
+        "positionBlender": [
+          -0.699999988079071,
+          -0.949999988079071,
+          0.0
+        ],
+        "matrixBasis": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            -0.699999988079071
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            -0.949999988079071
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "zAxisBlender": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "Socket_BodyHead",
+        "parentBone": "Blanket_Root",
+        "positionBlender": [
+          0.0,
+          -0.699999988079071,
+          0.0
+        ],
+        "matrixBasis": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            -0.699999988079071
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "zAxisBlender": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "Socket_BodyPelvis",
+        "parentBone": "Blanket_Root",
+        "positionBlender": [
+          0.0,
+          0.05000000074505806,
+          0.0
+        ],
+        "matrixBasis": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.05000000074505806
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "zAxisBlender": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    ],
+    "roundTripMaxDeviationM": 7.450580596923828e-09,
+    "roundTripSkinMaxDeviationM": 7.450580596923828e-09,
+    "roundTripVertexCount": 336,
+    "roundTripBoneCount": 25
+  },
+  "animations": [
+    {
+      "name": "Blanket_Flat",
+      "authoredFrames": 1,
+      "fps": 30,
+      "durationS": 0
+    },
+    {
+      "name": "Blanket_DragPose",
+      "authoredFrames": 1,
+      "fps": 30,
+      "durationS": 0
+    },
+    {
+      "name": "Blanket_Released",
+      "authoredFrames": 1,
+      "fps": 30,
+      "durationS": 0
+    },
+    {
+      "name": "Blanket_Crumpled",
+      "authoredFrames": 1,
+      "fps": 30,
+      "durationS": 0
+    },
+    {
+      "name": "Blanket_Unfold",
+      "authoredFrames": 45,
+      "fps": 30,
+      "durationS": 1.4666666666666666
+    }
+  ],
+  "testActionsBlendOnly": [
+    "Test_LiftHeadCorners",
+    "Test_DrapeOverBody"
+  ],
+  "sha256": "fa9a9d90fab4ea1382a53094d781b5d35b69e9a1569d3aca7cac509121ef1117",
+  "bytes": 975772,
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SingleBlanket\\Scene_SingleBlanket.blend",
+  "coordinates": "Blender (x,y,z) -> glTF (x,z,-y); head -Y -> +Z; L=+X",
+  "reconstructionScope": "User-approved five crude patches, gray-white plain cotton, aging, dimensions and dragging poses are artistic reconstruction; not a documented standardized 1938 issue pattern",
+  "historicalReferences": [
+    {
+      "url": "https://www.chinanews.com/cul/2014/09-03/6558063.shtml",
+      "scope": "2014 museum interview lists one single blanket and one straw mat; does not establish this sheet's color, size, patches or dragging use"
+    }
+  ]
+}

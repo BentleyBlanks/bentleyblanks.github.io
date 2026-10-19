@@ -209,6 +209,7 @@ export const testDefs = {
     desc: "一张贴图挂死不许把开机吊在「加载 PBR 材质」上",
   },
   BootPayloadTest: { file: "Script_BootPayloadTest.mjs", desc: "开机贴图字节红线：PBR_SETS 的总量/单张上限与 URL 存在性（纯 Node，毫秒级）" },
+  SingleBlanketAssetTest: { file: "_blender/Script_SingleBlanketVerify.mjs", desc: "单被25骨、精确蒙皮、五动作、形态键、挂点与独立CPU绑定核验" },
   AssetStandardsTest: { file: "Script_AssetStandardsTest.mjs", desc: "源/实际面数、枪械 30k、战车 80k、三件翻倍特例与编辑器清单一致性（纯 Node）" },
   GeoTest: { file: "Script_GeoTest.mjs", desc: "几何快路等价性：MakeBox/PlaceGeometry 与 three 通用路逐浮点相同" },
   RoadPathTest: { file: "Script_RoadPathTest.mjs", desc: "样条道路中心线契约：过点/弧长/切向/缺口/采样（纯 Node，毫秒级）" },
@@ -652,6 +653,7 @@ export const tier0Fast = [
   "TerrainTrailRulesTest",
   "TextureStandardsTest",
   "AssetStandardsTest",
+  "SingleBlanketAssetTest",
   "ModelFacingTest",
   "AircraftGeometryTest",
   "TestRunnerTest",
@@ -720,6 +722,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "TextureStandardsTest", "AssetStandardsTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
   whiteboxQuality: { label: "白盒画质配置与实机", tests: ["WhiteboxQualityTest", "WhiteboxQualityBrowserTest", "WhiteboxShaderWarmTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
@@ -848,6 +851,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  { domain: "singleBlanket", pattern: /SingleBlanket/ },
   { domain: "combat", pattern: /FpsGripCorrective|FpsHandSkinWeights|FpsHandSelfContact|FpsHandPose|HanYangReloadClearance|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },
   {domain:"historyCodex",pattern:/HistoryCodex|HistoryBook|HistoryConscription|HistoryLedger|page-flip|Texture\/Menu\/History\//},
   { domain: "combat", pattern: /AircraftGeometry|OptimizeKi21|OptimizeKi30|Model_MitsubishiKi(21Ia|30)/ },

@@ -69,6 +69,8 @@ start 选项
                       C:\\Program Files\\Blender Foundation\\Blender *、PATH 依次找。
   --timeout <sec>     等端口就绪的上限，默认 ${DEFAULT_START_TIMEOUT_SEC}。
   --new               不复用现有实例，强制再起一个。
+  --batch <script.py>  在独立无界面进程运行重建脚本，记入本树实例账并等待退出；不启动 MCP 服务。
+  --batch-args <json>  给重建脚本的字符串参数数组文件（放在命令行 -- 后）。
   --json              以 JSON 输出结果。
 
 status 选项
@@ -116,7 +118,7 @@ function ParseArgs(argv) {
   const opts = { command: "", positional: [], flags: {} };
   const takesValue = new Set([
     "blend", "port", "task", "blender", "timeout", "code", "file",
-    "type", "params", "grace",
+    "type", "params", "grace", "batch", "batch-args",
   ]);
   let index = 0;
   if (argv[index] && !argv[index].startsWith("-")) opts.command = argv[index++];
@@ -511,7 +513,45 @@ async function LiveInstances() {
   return live;
 }
 
+async function CommandBatch(opts) {
+  const script = path.resolve(opts.flags.batch);
+  if (!fs.existsSync(script) || !fs.statSync(script).isFile() || path.extname(script) !== ".py") {
+    throw new Error(`无界面重建需要存在的 .py 脚本：${script}`);
+  }
+  const scriptArgs = opts.flags["batch-args"]
+    ? JSON.parse(fs.readFileSync(path.resolve(opts.flags["batch-args"]), "utf8")) : [];
+  if (!Array.isArray(scriptArgs) || !scriptArgs.every((arg) => typeof arg === "string")) {
+    throw new Error("--batch-args 文件必须是字符串数组");
+  }
+  const live = await LiveInstances();
+  const port = await PickPort(new Set(live.map((record) => record.port)));
+  const exe = FindBlenderExe(opts.flags.blender);
+  EnsureStateDir();
+  const logPath = path.join(STATE_DIR, `Log_Batch_${port}.txt`);
+  const logFd = fs.openSync(logPath, "w");
+  const child = spawn(exe, ["--background", "--factory-startup", "--python-exit-code", "1",
+    "--python", script, "--", ...scriptArgs], {
+    stdio: ["ignore", logFd, logFd], windowsHide: true, env: { ...process.env },
+  });
+  fs.closeSync(logFd);
+  const record = { mode: "batch", port, pid: child.pid, task: String(opts.flags.task || ""),
+    script, exe, blend: "", log: logPath, worktree: REPO_ROOT,
+    sessionId: process.env.CLAUDE_CODE_SESSION_ID || "", startedAt: new Date().toISOString() };
+  record.stateFile = WriteInstance(record);
+  const exitCode = await new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  }).finally(() => DropInstance(record));
+  const payload = { action: "batch-completed", ...record, exitCode,
+    elapsedMs: Date.now() - Date.parse(record.startedAt) };
+  if (opts.flags.json) console.log(JSON.stringify(payload, null, 2));
+  else console.log(`无界面重建结束  pid ${record.pid}  exit ${exitCode}  ${logPath}`);
+  if (exitCode !== 0) console.error(fs.readFileSync(logPath, "utf8").slice(-12000));
+  return exitCode;
+}
+
 async function CommandStart(opts) {
+  if (opts.flags.batch) return CommandBatch(opts);
   const blendArg = opts.flags.blend || opts.positional[0] || "";
   const blendPath = blendArg ? path.resolve(blendArg) : "";
   if (blendPath && !fs.existsSync(blendPath)) throw new Error(`.blend 不存在：${blendPath}`);
@@ -521,7 +561,7 @@ async function CommandStart(opts) {
     for (const record of live) {
       const sameBlend = !blendPath || path.resolve(record.blend || "") === blendPath;
       const samePort = opts.flags.port === undefined || Number(opts.flags.port) === record.port;
-      if (!sameBlend || !samePort) continue;
+      if (record.mode === "batch" || !sameBlend || !samePort) continue;
       if (!(await Ping(record.port))) continue;
       return Report(opts, { action: "reused", ...record });
     }
@@ -591,7 +631,7 @@ async function CommandStatus(opts) {
   const rows = [];
   for (const record of records) {
     const alive = IsLiveBlender(record.pid);
-    const responsive = alive ? await Ping(record.port) : false;
+    const responsive = alive && record.mode !== "batch" ? await Ping(record.port) : false;
     rows.push({ ...record, alive, responsive });
   }
   const payload = { worktree: REPO_ROOT, stateDir: STATE_DIR, instances: rows };
@@ -605,7 +645,7 @@ async function CommandStatus(opts) {
   console.log(`记录目录  ${STATE_DIR}`);
   if (!rows.length) console.log("实例      （无）本 worktree 当前没有起过 Blender");
   for (const row of rows) {
-    const state = row.alive ? (row.responsive ? "活着·端口就绪" : "活着·端口不应答") : "已退出（记录待清）";
+    const state = row.alive ? (row.mode === "batch" ? "无界面重建中" : row.responsive ? "活着·端口就绪" : "活着·端口不应答") : "已退出（记录待清）";
     console.log(`实例      端口 ${row.port}  pid ${row.pid}  ${state}`);
     console.log(`          任务 ${row.task || "(未标注)"}  起于 ${row.startedAt}`);
     console.log(`          blend ${row.blend || "(空场景)"}`);
@@ -621,7 +661,7 @@ async function CommandStatus(opts) {
 
 async function ResolveTargetPort(opts) {
   if (opts.flags.port !== undefined) return NumberFlag(opts.flags, "port", PORT_MIN);
-  const live = await LiveInstances();
+  const live = (await LiveInstances()).filter((record) => record.mode !== "batch");
   if (!live.length) throw new Error("本 worktree 没有活着的实例；先 start");
   if (live.length > 1) throw new Error(`本 worktree 有 ${live.length} 个实例（端口 ${live.map((r) => r.port).join(", ")}），用 --port 指定`);
   return live[0].port;
@@ -747,6 +787,18 @@ async function StopOne(record, opts) {
     DropInstance(record);
     outcome.steps.push("进程早就不在了，只清了记录");
     outcome.result = "already-gone";
+    return outcome;
+  }
+
+  if (record.mode === "batch") {
+    // A batch job has no MCP listener. Never send a command to its bookkeeping
+    // port: another worktree may legitimately be serving that TCP port.
+    KillTree(record.pid);
+    await Sleep(500);
+    const stillThere = IsLiveBlender(record.pid);
+    if (!stillThere) DropInstance(record);
+    outcome.steps.push("终止本任务的无界面重建进程树");
+    outcome.result = stillThere ? "stubborn" : "killed";
     return outcome;
   }
 

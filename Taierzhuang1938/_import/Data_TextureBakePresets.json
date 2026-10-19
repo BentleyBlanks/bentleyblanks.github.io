@@ -90,6 +90,13 @@
       "reliefM": 0.002, "rough": 0.95, "roughVar": 0.03, "roughLumaK": 0.0, "ao": 0.35, "metal": 0.0,
       "seamless": "blend", "rowFlatten": false, "flattenSigma": 0.088, "isotropic": true, "heightFromLuma": "direct"
     },
+    "singleBlanketAtlas": {
+      "label": "用户确认的五补丁灰白薄土布单被作者UV图集；补丁与磨损为复原设计，非平铺材质",
+      "mean": [0.64, 0.61, 0.56], "contrast": 0.10,
+      "lumaRange": [0.40, 0.78], "satRange": [0.0, 0.24], "stdRange": [0.025, 0.20],
+      "reliefM": 0.00035, "rough": 0.90, "roughVar": 0.04, "roughLumaK": 0.0, "ao": 0.20, "metal": 0.0,
+      "seamless": "none", "rowFlatten": false, "flattenSigma": 0.088, "isotropic": false, "heightFromLuma": "direct"
+    },
     "sichuanBlanketPackAtlas": {
       "label": "独立川军被包四材质作者UV图集：灰白旧土布、草编、灰布带、靛蓝短褂；分区色差不代表烘入光照",
       "mean": [0.49, 0.47, 0.42], "contrast": 0.19,

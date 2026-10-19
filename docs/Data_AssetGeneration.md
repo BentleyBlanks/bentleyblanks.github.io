@@ -20,6 +20,7 @@ node scripts/Script_BlenderMcp.mjs stop
 - Blender 5.2 改用 `bl_ext.user_default.mcp` 扩展；入口兼容它的新协议，仍使用本 worktree 专用端口。该扩展支持 `exec` 和 `call --type ping`；场景查询直接在 `exec` 中用 `bpy` 完成。
 - `stop` 先（可选 `--save`）存盘，再请 Blender 自己退出（正常退出会把 `quit.blend` 落到临时目录，File > Recover Last Session 还能捞回来），超时才 `taskkill /T /F`。
 - 完整参数见 `node scripts/Script_BlenderMcp.mjs --help`。
+- 无界面复建验收也走同一入口：`start --batch <重建脚本.py> --batch-args <字符串参数数组.json> --blender <指定版本>`。它只运行批处理、不起 MCP 服务，等待退出并清除本树进程记录；用户偏好与现有交互实例不受影响。`status --scan` 可查仍在运行的批处理，`stop` 只终止本树记录的进程。
 
 ### 状态与日志放在哪
 

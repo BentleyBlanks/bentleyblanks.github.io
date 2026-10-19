@@ -1,0 +1,115 @@
+{
+  "file": "Model/Model_SingleBlanket.glb",
+  "sha256": "fa9a9d90fab4ea1382a53094d781b5d35b69e9a1569d3aca7cac509121ef1117",
+  "vertices": 336,
+  "triangles": 600,
+  "joints": 25,
+  "nonzeroInfluences": {
+    "2": 32,
+    "3": 32,
+    "4": 272
+  },
+  "weightSumMaxError": 4.0978193283081055e-8,
+  "rootMaxWeight": 0,
+  "cpuRestMaxDeviationM": 4.296010995392949e-8,
+  "cpuLiftInterpolationMaxErrorM": 0,
+  "cpuLiftOutsideSupportMaxDeviationM": 0,
+  "cpuLiftAffectedVertices": 24,
+  "crumpledSizeGltfM": [
+    0.45000004680410943,
+    0.24999999345993856,
+    0.45000000966316483
+  ],
+  "unfoldStartMaxErrorM": 0,
+  "unfoldEndMaxErrorM": 0,
+  "dragGripMaxErrorM": 2.9200193091131658e-8,
+  "animations": [
+    "Blanket_Flat",
+    "Blanket_DragPose",
+    "Blanket_Released",
+    "Blanket_Crumpled",
+    "Blanket_Unfold"
+  ],
+  "deterministicHeadlessRebuilds": {
+    "blender": "5.1.2",
+    "runs": 2,
+    "identical": true,
+    "hashes": [
+      "fa9a9d90fab4ea1382a53094d781b5d35b69e9a1569d3aca7cac509121ef1117",
+      "fa9a9d90fab4ea1382a53094d781b5d35b69e9a1569d3aca7cac509121ef1117"
+    ]
+  },
+  "khronosValidator": {
+    "errors": 0,
+    "warnings": 1,
+    "infos": 10,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/0"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/4"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/26"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/27"
+      },
+      {
+        "code": "NODE_SKINNED_MESH_NON_ROOT",
+        "message": "Node with a skinned mesh is not root. Parent transforms will not affect a skinned mesh.",
+        "severity": 1,
+        "pointer": "/nodes/29"
+      },
+      {
+        "code": "UNUSED_OBJECT",
+        "message": "This object may be unused.",
+        "severity": 2,
+        "pointer": "/accessors/11"
+      },
+      {
+        "code": "UNUSED_OBJECT",
+        "message": "This object may be unused.",
+        "severity": 2,
+        "pointer": "/accessors/13"
+      },
+      {
+        "code": "UNUSED_OBJECT",
+        "message": "This object may be unused.",
+        "severity": 2,
+        "pointer": "/accessors/46"
+      },
+      {
+        "code": "UNUSED_OBJECT",
+        "message": "This object may be unused.",
+        "severity": 2,
+        "pointer": "/accessors/53"
+      },
+      {
+        "code": "UNUSED_OBJECT",
+        "message": "This object may be unused.",
+        "severity": 2,
+        "pointer": "/accessors/122"
+      },
+      {
+        "code": "UNUSED_OBJECT",
+        "message": "This object may be unused.",
+        "severity": 2,
+        "pointer": "/accessors/124"
+      }
+    ]
+  }
+}

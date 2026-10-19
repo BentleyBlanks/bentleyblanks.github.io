@@ -90,6 +90,10 @@ const HISTORY_SOURCE_ADDITIONS_BYTES = 192 * 1024;
 // shallow factory/contact detail. +128 KiB over the original ZB-26 allowance;
 // no new runtime maps, material draws, boot payload or per-file/set limits.
 const ZB26_AUTHOR_ATLAS_BYTES = 640 * 1024;
+// User-required four 1024 maps for the independent thin-sheet asset: 1,049,760
+// bytes including its lossless story mask. PBR maps are rebuild sources and
+// embedded in the GLB; this allowance adds no boot/level network requests.
+const SINGLE_BLANKET_ASSET_BYTES = 1024 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -110,10 +114,32 @@ export const TEXTURE_BUDGETS = Object.freeze({
     lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES, // Also includes lossless command-room irradiance.
     editor: 0.25 * 1024 * 1024,
   }),
-  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES,
+  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + SINGLE_BLANKET_ASSET_BYTES,
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
+  {
+    id: "SingleBlanket", kind: "material", tier: "offline",
+    toneClass: null, metersPerTile: null,
+    toneReason: "Non-repeating UV atlas of the user-approved five-patch thin cotton sheet; physical aspect restored by the mesh",
+    normalConvention: "gl", bake: "_import/Script_SingleBlanketTextureBake.py",
+    bakeRecord: "_import/TextureBakes/Texture_SingleBlanket.json",
+    source: { provider: "imagegen", date: "2026-10-19", prompt: "_import/Prompts/Texture_SingleBlanket.txt",
+      note: "Approved five-patch design; subsequent user-requested finer, softer washed cotton material" },
+    consumers: [{ file: "_blender/Script_SingleBlanketBake.py", token: "Texture_SingleBlanket" }],
+    files: [["Texture_SingleBlanketBase.webp", "Base", 1024, 1024],
+      ["Texture_SingleBlanketNormal.webp", "Normal", 1024, 1024], ["Texture_SingleBlanketOrm.webp", "Orm", 1024, 1024]],
+    note: "Rebuild sources; embedded in Model_SingleBlanket.glb, no separate boot or level requests",
+  },
+  {
+    id: "SingleBlanketStoryMask", kind: "decal", tier: "offline",
+    packing: "R=mud, stronger at edges/tail; G=blood from pelvis toward head; B=0; lossless linear data",
+    bake: "_import/Script_SingleBlanketTextureBake.py",
+    source: { provider: "procedural", date: "2026-10-19", ref: "_import/Script_SingleBlanketTextureBake.py" },
+    consumers: [{ file: "_import/Script_SingleBlanketTextureBake.py", token: "Texture_SingleBlanketMask.webp" }],
+    files: [["Texture_SingleBlanketMask.webp", "Mask", 1024, 1024]],
+    note: "Independent story mask, deliberately absent from the GLB material",
+  },
   {
     id: "CommandRoomLighting", kind: "lightmap", tier: "lazy",
     packing: "Lossless RGB = sRGB(linear diffuse irradiance / 32); UV1; direct + indirect, no albedo",
