@@ -51,6 +51,12 @@ export const BLOCKOUT_EDITOR = Object.freeze({
   freeSpotM: 3,
   freeSpotRadius: 0.2,
   freeSpotHeight: 1.2,
+  // 关键帧摆的蹲 / 趴是给那一帧机位看的：离开机位走出这么远就自动站起来，
+  // 否则自由走动时一直是蹲着的眼高（1.05 m）和蹲走速度，像半蹲着走（用户 2026-10-20）。
+  // 头顶这一截（脚底往上 standClearFromM 起、高 standClearHeightM）有东西就先不站（洞里、桌下）。
+  standUpAfterM: 0.35,
+  standClearFromM: 1.0,
+  standClearHeightM: 0.8,
   groundName: "FirstLevelWhitebox_Ground",
   // 第一次烘纸面地图要等加载画面收掉、再跑够这么久的游戏帧：开机那阵子一起烘会卡出一帧约 290 ms
   //（C 包实测；延后 1.5 s 就没有了）。之后切关建完就烘。
@@ -762,6 +768,20 @@ export class EditorBlockout {
       player.radius = STANCE[stance].radius;
       if (player.stanceBlend) { player.stanceBlend.crouch = stance === "crouch" ? 1 : 0; player.stanceBlend.prone = stance === "prone" ? 1 : 0; }
     }
+    this.posed = player.stance !== "stand" ? { stance: player.stance, x, z } : null;
+  }
+
+  /** 关键帧摆的蹲 / 趴，玩家一迈步就站起来；玩家自己按过 C / Z（姿态变了）就不再管。 */
+  UpdatePosedStance() {
+    const posed = this.posed, player = this.game.player;
+    if (!posed || !player) return;
+    if (player.stance !== posed.stance) { this.posed = null; return; }
+    if (this.previz?.playing) return;
+    const { standUpAfterM, standClearFromM, standClearHeightM, freeSpotRadius } = BLOCKOUT_EDITOR;
+    const p = player.position;
+    if (Math.hypot(p.x - posed.x, p.z - posed.z) < standUpAfterM) return;
+    if (player.physics?.Overlaps?.(p.x, p.y + standClearFromM, p.z, freeSpotRadius, standClearHeightM)) return;
+    if (player.SetStance?.("stand")) this.posed = null;
   }
 
   /** 机位埋进墙里时就近挪：0.1 m 一圈、每圈 16 个方向，最多 0.7 m。→ {x,y,z,moved} | null */
@@ -795,6 +815,7 @@ export class EditorBlockout {
     if (locked !== this.locked) { this.locked = locked; this.ui.SetInteractive(!locked); }
     // 预演先摆这一帧的演员状态，演员层再按它出姿势；慢动作里演员的动画 dt 跟预演时钟一起缩（TimeScale < 1）
     this.previz.Update(dt);
+    this.UpdatePosedStance();
     this.puppets.Update(dt * (this.previz.TimeScale?.() ?? 1), this._cam);
     if (!this.puppets.transitioning && this.toUnitData) { this.unitData = this.toUnitData; this.toUnitData = null; }
     if (this.pending && !this.puppets.transitioning) this.ResolvePending(true);

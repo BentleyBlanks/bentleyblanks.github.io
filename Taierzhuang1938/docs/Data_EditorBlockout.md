@@ -416,6 +416,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 - 端点（照 `Script_TextureImportServer` 的加固写法）：本机 socket + Host 只认 localhost / 127.0.0.1、`Content-Type: application/json`、同源 Origin、body ≤ 4 MB、`level ∈ BLOCKOUT_LEVEL_KEYS` 且路径过 `BLOCKOUT_CONFIG_FILE_RE`、解析后路径必须在根目录下、`ValidateBlockout` 不过返回 400 + `details`、`revision` 不符返回 409、`.tmp` + rename 原子写（`JSON.stringify(doc, null, 2) + "\n"`）。任何拒绝都不落一个字节。路由放在 405 闸之前。场景文件 v1 不开放写。
 - 不可写时（Pages、测试服、局域网、旧的预览进程）：存进 `localStorage`（键 `tengxian1938_blockout_<Level>`）+ 提供下载 JSON，界面写明原因。
 - 编辑器 v1 只有一个写操作：「记下当前机位」= 把玩家当前位置 / 朝向 / 姿态写进当前关键帧的 `player` 并保存。其余改动直接改 JSON（人或 AI），编辑器 2 s 内同步。
+- 关键帧机位的蹲 / 趴只管那一帧的画面（2026-10-20）：玩家离开机位走出 0.35 m 就自动站起来（头顶 1.0–1.8 m 有东西时先不站）；玩家自己按过 C / Z 之后就不再替他改。所以「记下当前机位」前要蹲着拍，就在机位上按 C。
 - 根 `CLAUDE.md`「本地预览」与 LocalPreview 头注、`--help` 补这条端点。
 
 ## 8. 第一关关键帧清单（生成器按这张表出 `Blockout/FirstLevel.json`）
