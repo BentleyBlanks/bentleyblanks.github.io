@@ -52,8 +52,33 @@ def Main():
     channels=[np.asarray(Image.fromarray(normal[...,c].astype(np.float32),'F').resize((1024,1024),Image.Resampling.LANCZOS)) for c in range(3)]
     normal=np.stack(channels,axis=-1);normal/=np.maximum(np.linalg.norm(normal,axis=-1,keepdims=True),1e-6)
     Image.fromarray(np.clip((normal*.5+.5)*255,0,255).astype(np.uint8)).save(args.out/'Texture_ReferenceCottonNormal.png')
-    reference.crop((583,589,644,651)).save(args.out/'Texture_ReferencePatchBase.png')
-    record={'source':str(args.reference),'sourceProvider':'approved built-in imagegen reference','frontPixels':box,'backPixels':backBox,'accessoriesMasked':True,'deLightSigmaPixels':48,'deLightStrength':.65,'physicalCottonExtentM':[.38,.30],'microReliefMeters':[.00008,.00045],'referenceUnmodified':True}
+    sideBox=(755,194,948,695)
+    sideLinear=SrgbToLinear(np.asarray(reference.crop(sideBox),dtype=np.float64)/255)
+    sh,sw=sideLinear.shape[:2]
+    # Reconstruct cotton underneath the two reference binding passes, while
+    # preserving the exposed vertical crease positions between them.
+    for top,bottom in ((329,391),(513,576)):
+        lo=max(0,top-sideBox[1]);hi=min(sh-1,bottom-sideBox[1])
+        for row in range(lo,hi+1):
+            amount=(row-lo)/max(1,hi-lo)
+            sideLinear[row]=sideLinear[max(0,lo-1)]*(1-amount)+sideLinear[min(sh-1,hi+1)]*amount
+    sideLuma=sideLinear.mean(axis=-1)
+    sideAlbedo=np.clip(sideLinear*(sideLuma.mean()/np.maximum(GaussianPeriodic(sideLuma,32),1e-4))[...,None]**.65*1.15,0,1)
+    Image.fromarray(np.rint(LinearToSrgb(sideAlbedo)*255).clip(0,255).astype(np.uint8)).resize((512,1024),Image.Resampling.LANCZOS).save(args.out/'Texture_ReferenceCottonSideBase.png')
+    sideFine=GaussianPeriodic(sideLuma,.6)-GaussianPeriodic(sideLuma,2)
+    sideFold=GaussianPeriodic(sideLuma,2)-GaussianPeriodic(sideLuma,10)
+    sideHeight=.00010*sideFine/max(float(sideFine.std()),1e-6)+.0012*sideFold/max(float(sideFold.std()),1e-6)
+    sx=np.gradient(sideHeight,axis=1)/(.13/sw);sy=np.gradient(sideHeight,axis=0)/(.30/sh)
+    sn=np.stack((-sx,sy,np.ones_like(sx)),axis=-1);sn/=np.maximum(np.linalg.norm(sn,axis=-1,keepdims=True),1e-6)
+    Image.fromarray(np.rint((sn*.5+.5)*255).clip(0,255).astype(np.uint8)).resize((512,1024),Image.Resampling.LANCZOS).save(args.out/'Texture_ReferenceCottonSideNormal.png')
+    patchImage=reference.crop((583,589,644,651));patchImage.save(args.out/'Texture_ReferencePatchBase.png')
+    patchLuma=SrgbToLinear(np.asarray(patchImage,dtype=np.float64)/255).mean(axis=-1)
+    patchHeight=GaussianPeriodic(patchLuma,.5)-GaussianPeriodic(patchLuma,2)
+    patchHeight*=.00006/max(float(patchHeight.std()),1e-6)
+    px=np.gradient(patchHeight,axis=1)/(.044/patchHeight.shape[1]);py=np.gradient(patchHeight,axis=0)/(.05/patchHeight.shape[0])
+    pn=np.stack((-px,py,np.ones_like(px)),axis=-1);pn/=np.linalg.norm(pn,axis=-1,keepdims=True)
+    Image.fromarray(np.rint((pn*.5+.5)*255).clip(0,255).astype(np.uint8)).save(args.out/'Texture_ReferencePatchNormal.png')
+    record={'source':str(args.reference),'sourceProvider':'approved built-in imagegen reference','frontPixels':box,'backPixels':backBox,'sidePixels':sideBox,'accessoriesMasked':True,'deLightSigmaPixels':48,'deLightStrength':.65,'physicalCottonExtentM':[.38,.30],'microReliefMeters':[.00008,.00045],'sideReliefMeters':[.00010,.0012],'referenceUnmodified':True}
     (args.out/'Data_ReferenceCottonStudy.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8')
 
 

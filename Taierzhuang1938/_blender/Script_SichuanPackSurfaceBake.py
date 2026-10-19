@@ -5,6 +5,8 @@ import subprocess
 import shutil
 import json
 from pathlib import Path
+from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 
 
 def BakeSurfaces(packRoot,projectPath,reviewPath):
@@ -22,14 +24,62 @@ def BakeSurfaces(packRoot,projectPath,reviewPath):
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.uv.smart_project(angle_limit=math.radians(62),island_margin=.008,area_weight=.4,correct_aspect=True,scale_to_bounds=False)
     bpy.ops.uv.seams_from_islands(mark_seams=True,mark_sharp=False)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    facePriorities={}
+    for obj in meshes:
+        priorities={polygon.index:.40 if 'ClothButton' in obj.name else 1.10 for polygon in obj.data.polygons}
+        if obj.name=='Pack_Bundle':
+            bvh=BVHTree.FromObject(obj,bpy.context.evaluated_depsgraph_get())
+            directions=[Vector(value) for value in ((0,-1,0),(0,1,0),(1,0,0),(-1,0,0),(0,0,1),(0,0,-1))]
+            for polygon in obj.data.polygons:
+                center=polygon.center
+                visible=[]
+                for index,direction in enumerate(directions):
+                    hit=bvh.ray_cast(center+direction*.6,-direction,1.2)
+                    if hit[0] is not None and (hit[0]-center).length<.00035:visible.append(index)
+                priorities[polygon.index]=1.90 if 0 in visible and polygon.normal.y<-.35 else 1.10 if 1 in visible and polygon.normal.y>.35 else 1.35 if visible else .20
+        elif 'ClothButton' in obj.name:
+            for polygon in obj.data.polygons:
+                priorities[polygon.index]=1.70 if polygon.center.y<-.105 else .40
+        facePriorities[obj.name]=priorities
+        edgeOwners={edge.index:[] for edge in obj.data.edges}
+        keys={tuple(sorted(edge.vertices)):edge.index for edge in obj.data.edges}
+        for polygon in obj.data.polygons:
+            for key in polygon.edge_keys:edgeOwners[keys[tuple(sorted(key))]].append(polygon.index)
+        for edge in obj.data.edges:
+            owners=edgeOwners[edge.index]
+            if len({priorities[index] for index in owners})>1:edge.use_seam=True
+    bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.uv.unwrap(method='MINIMUM_STRETCH',margin=.001)
     bpy.ops.uv.average_islands_scale()
     bpy.ops.object.mode_set(mode='OBJECT')
+    allocation=[]
     for obj in meshes:
-        priority=.40 if 'ClothButton' in obj.name else (1.35 if obj.name=='Pack_Bundle' else 1.10)
-        for loop in obj.data.uv_layers.active.data:loop.uv*=priority
+        priorities=facePriorities[obj.name]
+        keys={tuple(sorted(edge.vertices)):edge.index for edge in obj.data.edges}
+        owners={edge.index:[] for edge in obj.data.edges}
+        for polygon in obj.data.polygons:
+            for key in polygon.edge_keys:owners[keys[tuple(sorted(key))]].append(polygon.index)
+        neighbors={polygon.index:set() for polygon in obj.data.polygons}
+        for edge in obj.data.edges:
+            if edge.use_seam:continue
+            for a in owners[edge.index]:neighbors[a].update(b for b in owners[edge.index] if a!=b)
+        unseen=set(neighbors)
+        while unseen:
+            seed=unseen.pop();island={seed};stack=[seed]
+            while stack:
+                for index in neighbors[stack.pop()]:
+                    if index in unseen:unseen.remove(index);island.add(index);stack.append(index)
+            area=sum(obj.data.polygons[index].area for index in island)
+            hiddenArea=sum(obj.data.polygons[index].area for index in island if priorities[index]==.20)
+            internal=hiddenArea>area*.8
+            priority=sum(obj.data.polygons[index].area*priorities[index] for index in island)/max(area,1e-9)
+            loopIds={loop for index in island for loop in obj.data.polygons[index].loop_indices}
+            for index in loopIds:obj.data.uv_layers.active.data[index].uv*=priority
+            allocation.append({'object':obj.name,'faces':len(island),'areaM2':area,'hiddenAreaM2':hiddenArea,'priority':priority,'internal':internal})
+    (Path(reviewPath)/'Data_UvVisibilityAllocation.json').write_text(json.dumps(allocation,indent=2),encoding='utf-8')
     bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.uv.pack_islands(rotate=True,margin=.0045)
+    bpy.ops.uv.pack_islands(rotate=True,margin=.0030,margin_method='FRACTION',shape_method='CONCAVE')
     bpy.ops.object.mode_set(mode='OBJECT')
     uvRows=[]
     for obj in meshes:
@@ -92,7 +142,7 @@ def BakeSurfaces(packRoot,projectPath,reviewPath):
         baked[kind]=image.filepath_raw
         print('SURFACE_BAKED',kind,flush=True)
     python=shutil.which('python')
-    subprocess.run([python,str(Path(projectPath)/'_import/Script_SichuanPackSurfaceMaps.py'),'--project',str(projectPath),'--review',str(reviewPath)],check=True)
+    subprocess.run([python,str(Path(projectPath)/'_import/Script_SichuanPackSurfaceMaps.py'),'--project',str(projectPath),'--review',str(reviewPath)],check=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     return BindBakedMaterial(packRoot,projectPath)
 
 

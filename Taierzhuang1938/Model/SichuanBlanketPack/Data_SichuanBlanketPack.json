@@ -1,7 +1,7 @@
 {
   "schema": "tengxian-independent-prop-v1",
   "id": "SichuanBlanketPack",
-  "version": "20261019ReferenceMatchV2",
+  "version": "20261019ReferenceMatchV3",
   "title": "1938 Sichuan Army folded single-blanket pack",
   "asset": "Model_SichuanBlanketPack.glb",
   "textureManifest": "Data_SichuanBlanketPackTextures.json",
@@ -20,27 +20,27 @@
     "thickness": 0.13
   },
   "actualBundleDimensionsM": {
-    "width": 0.37979768216609955,
-    "height": 0.2999653071165085,
-    "thickness": 0.129534512758255,
-    "includes": "cloth gathers, folded edges, repair patch and its stitches"
+    "width": 0.3813689947128296,
+    "height": 0.2992594987154007,
+    "thickness": 0.12947143614292145,
+    "includes": "continuous folded sheet, conforming repair patch and cotton stitches"
   },
   "triangles": {
-    "total": 2998,
+    "total": 3000,
     "limit": 3000,
     "includesAllOptionalParts": true,
     "byPart": {
-      "Pack_Bundle": 1430,
-      "Pack_Binding": 488,
-      "Pack_Jacket": 140,
-      "Pack_StrawMat": 420,
-      "Pack_Sandals": 520
+      "Pack_Bundle": 1048,
+      "Pack_Binding": 582,
+      "Pack_Jacket": 186,
+      "Pack_StrawMat": 532,
+      "Pack_Sandals": 652
     }
   },
   "parts": [
     {
       "node": "Pack_Bundle",
-      "description": "One thin folded homespun cotton single blanket, with side-fold ridges and one stitched repair patch; planar back"
+      "description": "One continuous folded homespun cotton sheet with exposed nested cut edges, a conforming sewn repair patch and a planar contact leaf"
     },
     {
       "node": "Pack_Binding",
@@ -64,7 +64,8 @@
         0,
         0.36,
         0.3
-      ]
+      ],
+      "refinementStatus": "Hide and withdrawal controls verified; garment fold construction remains in progress"
     }
   ],
   "materials": {
@@ -80,7 +81,7 @@
     ],
     "dielectrics": true,
     "embeddedInGlb": true,
-    "sharedAtlas": "Unique non-overlapping GameUV surface atlas, reprojected from the imagegen material study and approved unshadowed cotton samples",
+    "sharedAtlas": "Unique non-overlapping GameUV atlas, reprojected from independent imagegen material studies and masked cotton from the approved reference; broad illumination is normalized",
     "sourceProvider": "Built-in image_gen__imagegen",
     "sharedExistingBlanketRequirement": "Withdrawn by user; this asset has its own independently generated texture set",
     "ormSemantics": "R=baked surface occlusion, G=242/255 roughness, B=0 metallic"
@@ -94,7 +95,10 @@
     "attachments": "../../_blender/Script_SichuanPackAttachments.py",
     "textureRebuild": "../../_import/Script_SichuanBlanketPackTextureBake.py",
     "surfaceBake": "../../_blender/Script_SichuanPackSurfaceBake.py",
-    "surfaceEncoder": "../../_import/Script_SichuanPackSurfaceMaps.py"
+    "surfaceEncoder": "../../_import/Script_SichuanPackSurfaceMaps.py",
+    "foldedCloth": "../../_blender/Script_SichuanFoldedCloth.py",
+    "binding": "../../_blender/Script_SichuanPackBinding.py",
+    "strawStudy": "../../_import/Script_SichuanStrawStudy.py"
   },
   "commandsFromRepositoryRoot": [
     "node scripts/Script_BlenderMcp.mjs start \"C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Scene_SichuanBlanketPack.blend\" --task SichuanBlanketPack",
@@ -119,6 +123,12 @@
       "Texture_ReferenceCompare_front.jpg",
       "Texture_ReferenceCompare_side.jpg",
       "Texture_ReferenceCompare_back.jpg"
+    ],
+    "status": "ReferenceFidelityInProgress",
+    "remainingRefinements": [
+      "Civilian jacket panel folds after withdrawal",
+      "Denser and more natural straw-sandal binding",
+      "Homespun fibre definition at the final 1024 atlas resolution"
     ]
   },
   "historicalReferences": [
@@ -140,7 +150,7 @@
     "text",
     "logos"
   ],
-  "assetUrl": "./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261019ReferenceMatchV2",
-  "assetBytes": 1312704,
-  "assetSha256": "b1e3f6c10240d043f34cf9ead8e8758759add58e747d88c0b23434e937fa55bd"
+  "assetUrl": "./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261019ReferenceMatchV3",
+  "assetBytes": 1964260,
+  "assetSha256": "53d16aa7fbb855e93204884928a955247095b587862d86dbf5cf7bdff07eac1a"
 }

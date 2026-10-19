@@ -36,7 +36,7 @@
     "uvOrigin": "bottom-left",
     "uvSet": "GameUV",
     "texCoord": 1,
-    "packing": "Minimum-stretch unwrap of all five components, non-overlapping islands, 0.0045 pack margin",
+    "packing": "Minimum-stretch unwrap; six-direction self-visibility allocates 1.90 density to the outer front and 0.20 to concealed cloth; non-overlapping concave islands, explicit 0.003 fractional margin",
     "bakeResolution": [
       2048,
       2048
@@ -53,8 +53,8 @@
       "width": 1024,
       "height": 1024,
       "colorSpace": "sRGB",
-      "bytes": 343002,
-      "sha256": "0e5882d1ca5dd15c4fb6ab94149a98a2feaa892b6a5d84dfb4069bef818dad48",
+      "bytes": 340770,
+      "sha256": "d639f627194619a9386691f055efc010bf69a1ac4a0f5f7cb01d1b6bc2e5f789",
       "encoding": "WebP q92"
     },
     {
@@ -63,9 +63,9 @@
       "width": 1024,
       "height": 1024,
       "colorSpace": "linear",
-      "bytes": 297704,
-      "sha256": "990758cd446da429a6d3153fce4447ae29483a23ee444be48ba9ccbfd8e3e5de",
-      "encoding": "WebP q98"
+      "bytes": 972808,
+      "sha256": "4213fca770c76577474ba6f3b39300f792adfe7b75b6a1b66f9e138073d75ad0",
+      "encoding": "lossless WebP"
     },
     {
       "path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackOrm.webp",
@@ -73,19 +73,19 @@
       "width": 1024,
       "height": 1024,
       "colorSpace": "linear",
-      "bytes": 438430,
-      "sha256": "f3f70aac74e07c63486a3dcbacaf73624f715c969bf8f995c488416ea059bef9",
+      "bytes": 412450,
+      "sha256": "bca1aa99b1c92e88aa7946e55edc44cf590170d826ddf530b585b2854fee30c8",
       "encoding": "lossless WebP"
     }
   ],
-  "totalBytes": 1079136,
-  "physicalMeaning": "Rough nonmetal natural fibres. ORM R is real surface occlusion; G is 242/255; B is zero. Base colour excludes the studio illumination.",
+  "totalBytes": 1726028,
+  "physicalMeaning": "Rough nonmetal natural fibres. ORM R is real surface occlusion; G is 242/255; B is zero. Broad reference illumination is normalized; fine crease shading remains an approximation.",
   "verification": {
     "allMaps1024": true,
     "allMetalZero": true,
     "surfaceUvReprojected": true,
     "aoRange": [
-      7,
+      5,
       255
     ]
   },
@@ -177,16 +177,74 @@
       232,
       315
     ],
-    "use": "Unshadowed interior material samples, blended with the generated albedo study; no whole concept projection",
+    "use": "Masked cotton front/back/side studies and grey-strip samples; the complete reference remains outside the game atlas",
     "cottonFacePixels": [
       77,
       194,
       680,
       695
     ],
+    "cottonSidePixels": [
+      755,
+      194,
+      948,
+      695
+    ],
     "cottonProcess": "Accessory/strap masks, replacement cotton, low-frequency scalar de-lighting and physical cotton micro-normal; documented by Data_ReferenceCottonStudy.json"
   },
   "surfaceBake": "_blender/Script_SichuanPackSurfaceBake.py",
   "surfaceEncoder": "_import/Script_SichuanPackSurfaceMaps.py",
-  "referenceClothBake": "_import/Script_SichuanPackReferenceCloth.py"
+  "referenceClothBake": "_import/Script_SichuanPackReferenceCloth.py",
+  "strawStudy": {
+    "provider": "Built-in image_gen__imagegen",
+    "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV04\\Image_SichuanStrawStudyV04.png",
+    "sourceSha256": "bc531de26b0630c90300b01e356571c4f35fabb0da23680c6e01c31130ef2f0b",
+    "regions": {
+      "Sole": [
+        0,
+        0,
+        627,
+        627
+      ],
+      "End": [
+        627,
+        0,
+        1254,
+        627
+      ],
+      "Weave": [
+        0,
+        627,
+        627,
+        1254
+      ],
+      "Cord": [
+        627,
+        627,
+        1254,
+        1254
+      ]
+    },
+    "physicalExtentsM": {
+      "Sole": [
+        0.056,
+        0.1
+      ],
+      "End": [
+        0.074,
+        0.074
+      ],
+      "Weave": [
+        0.0505,
+        0.11
+      ],
+      "Cord": [
+        0.012,
+        0.1
+      ]
+    },
+    "deLightStrength": 0.45,
+    "destination": "Reprojected into the shared 1024 GameUV atlas",
+    "prompt": "_import/SichuanBlanketPack/Data_ImagegenPromptV04.txt"
+  }
 }

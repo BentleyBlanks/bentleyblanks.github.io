@@ -3,7 +3,7 @@
 Run from the repository root with Script_BlenderMcp.mjs exec --file <this file>.
 Native Blender: X right, Z up, -Y outward. glTF: X right, Y up, +Z outward.
 The root is the centre of the planar body-contact surface, in metres.
-Texture_SichuanBlanketPack is an imagegen-authored, four-material 1024 atlas.
+The imagegen material studies are reprojected into one 1024 GameUV PBR set.
 """
 import bpy
 import bmesh
@@ -37,7 +37,7 @@ for mesh in list(bpy.data.meshes):
 for material in list(bpy.data.materials):
     if material.users == 0: bpy.data.materials.remove(material)
 for oldImage in list(bpy.data.images):
-    if oldImage.users==0 and 'SichuanBlanketPack' in oldImage.name:bpy.data.images.remove(oldImage)
+    if oldImage.users==0 and oldImage.source!='VIEWER':bpy.data.images.remove(oldImage)
 scene = bpy.context.scene
 scene['SichuanPackRepository'] = str(repoPath)
 scene.unit_settings.system = 'METRIC'
@@ -69,11 +69,21 @@ atlasRects = {'cloth':(.02,.52,.48,.98), 'straw':(.52,.52,.98,.98),
               'binding':(.02,.02,.48,.48), 'jacket':(.52,.02,.98,.48)}
 referenceImage=bpy.data.images.load(str(sourcePath/'Source/Image_SichuanBlanketPackThreeViewV02.png'),check_existing=False)
 referenceImage.colorspace_settings.name='sRGB'
-subprocess.run([shutil.which('python'),str(projectPath/'_import/Script_SichuanPackReferenceCloth.py'),'--reference',str(sourcePath/'Source/Image_SichuanBlanketPackThreeViewV02.png'),'--out',str(sourcePath/'Source/MaterialAtlasV03')],check=True)
+subprocess.run([shutil.which('python'),str(projectPath/'_import/Script_SichuanPackReferenceCloth.py'),'--reference',str(sourcePath/'Source/Image_SichuanBlanketPackThreeViewV02.png'),'--out',str(sourcePath/'Source/MaterialAtlasV03')],check=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
 cottonBase=bpy.data.images.load(str(sourcePath/'Source/MaterialAtlasV03/Texture_ReferenceCottonBase.png'),check_existing=False)
 cottonBackBase=bpy.data.images.load(str(sourcePath/'Source/MaterialAtlasV03/Texture_ReferenceCottonBackBase.png'),check_existing=False)
 cottonNormal=bpy.data.images.load(str(sourcePath/'Source/MaterialAtlasV03/Texture_ReferenceCottonNormal.png'),check_existing=False);cottonNormal.colorspace_settings.name='Non-Color'
+cottonSideBase=bpy.data.images.load(str(sourcePath/'Source/MaterialAtlasV03/Texture_ReferenceCottonSideBase.png'),check_existing=False)
+cottonSideNormal=bpy.data.images.load(str(sourcePath/'Source/MaterialAtlasV03/Texture_ReferenceCottonSideNormal.png'),check_existing=False);cottonSideNormal.colorspace_settings.name='Non-Color'
 patchBase=bpy.data.images.load(str(sourcePath/'Source/MaterialAtlasV03/Texture_ReferencePatchBase.png'),check_existing=False)
+patchNormal=bpy.data.images.load(str(sourcePath/'Source/MaterialAtlasV03/Texture_ReferencePatchNormal.png'),check_existing=False);patchNormal.colorspace_settings.name='Non-Color'
+strawImages={}
+subprocess.run([shutil.which('python'),str(projectPath/'_import/Script_SichuanStrawStudy.py'),'--source',str(sourcePath/'Source/MaterialAtlasV04/Image_SichuanStrawStudyV04.png'),'--out',str(sourcePath/'Source/MaterialAtlasV04')],check=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+for role in ('Sole','End','Weave','Cord'):
+    for channel in ('Base','Normal'):
+        image=bpy.data.images.load(str(sourcePath/'Source/MaterialAtlasV04'/f'Texture_Straw{role}{channel}.png'),check_existing=False)
+        image.colorspace_settings.name='sRGB' if channel=='Base' else 'Non-Color'
+        image.pack();strawImages[(role,channel)]=image
 
 def MakeMaterial(key, tint=(1,1,1,1), suffix='', normalStrength=.85):
     material = bpy.data.materials.new('Material_Sichuan' + key.title() + suffix)
@@ -103,15 +113,19 @@ def MakeMaterial(key, tint=(1,1,1,1), suffix='', normalStrength=.85):
         origin=nodes.new('ShaderNodeVectorMath');origin.operation='SUBTRACT';origin.inputs[1].default_value=(.02,.52,0)
         normalize=nodes.new('ShaderNodeVectorMath');normalize.operation='MULTIPLY';normalize.inputs[1].default_value=(1/.46,1/.46,1)
         links.new(plain.outputs['UV'],origin.inputs[0]);links.new(origin.outputs[0],normalize.inputs[0]);clothVector=normalize.outputs[0]
-        colour=nodes.new('ShaderNodeTexImage');colour.image=patchBase if suffix=='Patch' else cottonBackBase if suffix=='Back' else cottonBase;colour.extension='EXTEND';links.new(clothVector,colour.inputs['Vector']);baseColor=colour.outputs['Color']
+        colour=nodes.new('ShaderNodeTexImage');colour.image=patchBase if suffix=='Patch' else cottonBackBase if suffix=='Back' else cottonSideBase if suffix=='Fold' else cottonBase;colour.extension='EXTEND';links.new(clothVector,colour.inputs['Vector']);baseColor=colour.outputs['Color']
     if key=='straw':
+        strawRole='End' if suffix=='End' else 'Sole' if suffix=='Sandal' else 'Cord' if suffix=='Cord' else 'Weave'
         uv=nodes.new('ShaderNodeUVMap');uv.uv_map='UVMap'
         origin=nodes.new('ShaderNodeVectorMath');origin.operation='SUBTRACT';origin.inputs[1].default_value=(.52,.52,0)
-        repeat=nodes.new('ShaderNodeVectorMath');repeat.operation='MULTIPLY';repeatCount=3 if suffix=='Sandal' else 2;repeat.inputs[1].default_value=(repeatCount/.46,repeatCount/.46,1)
+        repeat=nodes.new('ShaderNodeVectorMath');repeat.operation='MULTIPLY'
+        repeatX,repeatY=(1,1) if strawRole=='End' else (1,2) if strawRole=='Sole' else (1,4) if strawRole=='Cord' else (8,2)
+        repeat.inputs[1].default_value=(repeatX/.46,repeatY/.46,1)
         fract=nodes.new('ShaderNodeVectorMath');fract.operation='FRACTION'
-        scale=nodes.new('ShaderNodeVectorMath');scale.operation='MULTIPLY';scale.inputs[1].default_value=(.46,.46,1)
-        offset=nodes.new('ShaderNodeVectorMath');offset.operation='ADD';offset.inputs[1].default_value=(.52,.52,0)
-        links.new(uv.outputs['UV'],origin.inputs[0]);links.new(origin.outputs[0],repeat.inputs[0]);links.new(repeat.outputs[0],fract.inputs[0]);links.new(fract.outputs[0],scale.inputs[0]);links.new(scale.outputs[0],offset.inputs[0]);strawVector=offset.outputs[0];links.new(strawVector,base.inputs['Vector'])
+        links.new(uv.outputs['UV'],origin.inputs[0]);links.new(origin.outputs[0],repeat.inputs[0]);links.new(repeat.outputs[0],fract.inputs[0])
+        strawVector=repeat.outputs[0] if strawRole=='End' else fract.outputs[0]
+        base.image=strawImages[(strawRole,'Base')];base.extension='EXTEND' if strawRole=='End' else 'REPEAT'
+        links.new(strawVector,base.inputs['Vector']);baseColor=base.outputs['Color']
     if key=='binding':
         uv=nodes.new('ShaderNodeUVMap');uv.uv_map='UVMap'
         subtract=nodes.new('ShaderNodeVectorMath');subtract.operation='SUBTRACT';subtract.inputs[1].default_value=(.2132,.02,0)
@@ -123,13 +137,13 @@ def MakeMaterial(key, tint=(1,1,1,1), suffix='', normalStrength=.85):
         links.new(uv.outputs['UV'],subtract.inputs[0]);links.new(subtract.outputs[0],repeat.inputs[0]);links.new(repeat.outputs[0],fract.inputs[0]);links.new(fract.outputs[0],scale.inputs[0]);links.new(scale.outputs[0],offset.inputs[0]);links.new(offset.outputs[0],sample.inputs['Vector'])
         mix=nodes.new('ShaderNodeMixRGB');mix.inputs[0].default_value=.25;links.new(sample.outputs['Color'],mix.inputs[1]);links.new(baseColor,mix.inputs[2]);baseColor=mix.outputs[0]
     if key=='binding':
-        neutral=nodes.new('ShaderNodeHueSaturation');neutral.inputs['Saturation'].default_value=.25;neutral.inputs['Value'].default_value=.95
+        neutral=nodes.new('ShaderNodeHueSaturation');neutral.inputs['Saturation'].default_value=.25;neutral.inputs['Value'].default_value=1.20
         links.new(baseColor,neutral.inputs['Color']);baseColor=neutral.outputs['Color']
     if key=='straw':
         aged=nodes.new('ShaderNodeHueSaturation');aged.inputs['Saturation'].default_value=.85;aged.inputs['Value'].default_value=1
         links.new(baseColor,aged.inputs['Color']);baseColor=aged.outputs['Color']
     if suffix=='Button':
-        faded=nodes.new('ShaderNodeMixRGB');faded.inputs[0].default_value=.35;faded.inputs[2].default_value=(.16,.18,.23,1)
+        faded=nodes.new('ShaderNodeMixRGB');faded.inputs[0].default_value=.60;faded.inputs[2].default_value=(.16,.18,.23,1)
         links.new(baseColor,faded.inputs[1]);baseColor=faded.outputs[0]
     if tint == (1,1,1,1):
         links.new(baseColor, shader.inputs['Base Color'])
@@ -140,8 +154,10 @@ def MakeMaterial(key, tint=(1,1,1,1), suffix='', normalStrength=.85):
         links.new(baseColor, multiply.inputs[6])
         links.new(multiply.outputs[2], shader.inputs['Base Color'])
     normal = nodes.new('ShaderNodeTexImage'); normal.image = images['Normal']
-    if key=='straw':links.new(strawVector,normal.inputs['Vector'])
-    if key=='cloth':normal.image=cottonNormal;normal.extension='EXTEND';links.new(clothVector,normal.inputs['Vector'])
+    if key=='straw':
+        normal.image=strawImages[(strawRole,'Normal')]
+        normal.extension='EXTEND' if strawRole=='End' else 'REPEAT';links.new(strawVector,normal.inputs['Vector'])
+    if key=='cloth':normal.image=patchNormal if suffix=='Patch' else cottonSideNormal if suffix=='Fold' else cottonNormal;normal.extension='EXTEND';links.new(clothVector,normal.inputs['Vector'])
     normalMap = nodes.new('ShaderNodeNormalMap'); normalMap.inputs['Strength'].default_value = normalStrength
     links.new(normal.outputs['Color'], normalMap.inputs['Color'])
     links.new(normalMap.outputs['Normal'], shader.inputs['Normal'])
@@ -175,8 +191,9 @@ def MakeMaterial(key, tint=(1,1,1,1), suffix='', normalStrength=.85):
     return material
 
 materials = {key: MakeMaterial(key) for key in atlasRects}
-materials['strawEnd']=MakeMaterial('straw',(.68,.66,.62,1),'End')
+materials['strawEnd']=MakeMaterial('straw',(.95,.94,.91,1),'End')
 materials['sandal']=MakeMaterial('straw',suffix='Sandal')
+materials['strawCord']=MakeMaterial('straw',suffix='Cord',normalStrength=.6)
 patchMaterial = MakeMaterial('cloth', (1,1,1,1), 'Patch', .16)
 backMaterial = MakeMaterial('cloth', suffix='Back', normalStrength=.06)
 foldMaterial = MakeMaterial('cloth', suffix='Fold', normalStrength=.48)
@@ -201,7 +218,7 @@ def CreateMesh(name, verts, faces, uvs, material, parent=None):
         sign=-1 if 'Left' in name else 1
         for face in bm.faces:
             if face.normal.x*sign<0:face.normal_flip()
-    if name.startswith('Pack_ClothGather'):
+    if name.startswith('Pack_ClothGather') or name=='Pack_RepairPatch':
         for face in bm.faces:
             if face.normal.y>0:face.normal_flip()
     if name == 'Pack_Bundle':
@@ -229,9 +246,13 @@ def CreateMesh(name, verts, faces, uvs, material, parent=None):
     return obj
 
 def AddRibbon(name, points, width, material, parent=None, axis='x'):
-    widthVector = Vector((1,0,0) if axis == 'x' else (0,0,1))
+    widthAxis = Vector((1,0,0) if axis == 'x' else (0,1,0) if axis=='y' else (0,0,1))
     verts, faces, uvs = [], [], []
     for index, point in enumerate(points):
+        tangent=(Vector(points[min(index+1,len(points)-1)])-Vector(points[max(0,index-1)])).normalized()
+        widthVector=widthAxis-tangent*widthAxis.dot(tangent)
+        if widthVector.length<.01:widthVector=tangent.cross(Vector((1,0,0) if abs(tangent.x)<.8 else (0,1,0)))
+        widthVector.normalize()
         for side in (-1,1):
             verts.append(tuple(Vector(point)+widthVector*width*.5*side))
             uvs.append(((side+1)/2, index/max(1,len(points)-1)))
@@ -269,92 +290,10 @@ def FrontDepth(xValue,zValue):
     cornerPocket=.012*max(0,min(1,(xValue-.08)/.07))*max(0,min(1,(zValue-.07)/.06))
     return max(-.130,-.1165-.013*puff+edgeRoll+wrinkle+cornerPocket)
 
-# Gridded cloth face, shallow bowed sides and a genuinely planar full back.
-xValues=[-.19,-.184,-.166,-.13,-.116,-.103,-.090,-.056,-.012,.04,.076,.089,.102,.13,.166,.184,.19]
-zValues=[-.15,-.138,-.10,-.073,-.060,-.047,-.015,.037,.05,.063,.11,.138,.15]
-verts=[]; uvs=[]; faces=[]
-for zValue in zValues:
-    for xValue in xValues:
-        xPos,zPos=xValue,zValue
-        cx,cz=.168,.128
-        if abs(xPos)>cx and abs(zPos)>cz:
-            delta=Vector((abs(xPos)-cx,abs(zPos)-cz)); delta=delta.normalized()*min(delta.length,.022)
-            xPos=math.copysign(cx+delta.x,xPos); zPos=math.copysign(cz+delta.y,zPos)
-        xPos-=math.copysign(.004*(.5+.5*math.sin(zPos*26+(.4 if xPos<0 else 2.3)))*(abs(xPos)/.19)**6,xPos)
-        zPos-=math.copysign(.0033*(.5+.5*math.sin(xPos*29+.8))*(abs(zPos)/.15)**8,zPos)
-        verts.append((xPos,FrontDepth(xPos,zPos),zPos));uvs.append(((xPos+.19)/.38,(zPos+.15)/.30))
-nx,nz=len(xValues),len(zValues)
-for row in range(nz-1):
-    for col in range(nx-1):
-        aValue=row*nx+col;faces.append((aValue,aValue+1,aValue+nx+1,aValue+nx))
-perimeter=list(range(nx))+[row*nx+nx-1 for row in range(1,nz)]+[(nz-1)*nx+col for col in range(nx-2,-1,-1)]+[row*nx for row in range(nz-2,0,-1)]
-previous=perimeter
-for depth,inset in ((-.105,.014),(-.030,.016),(0,0)):
-    current=[]
-    for index in perimeter:
-        xValue,_,zValue=verts[index]
-        sideWeight=abs(xValue)/.19
-        current.append(len(verts));verts.append((xValue-math.copysign(inset*sideWeight,xValue),depth,zValue))
-        uvs.append(((xValue+.19)/.38,(zValue+.15)/.30))
-    for index in range(len(perimeter)):
-        nextIndex=(index+1)%len(perimeter)
-        faces.append((previous[index],current[index],current[nextIndex],previous[nextIndex]))
-    previous=current
-backCenter=len(verts);verts.append((0,0,0));uvs.append((.5,.5))
-for index in range(len(previous)):faces.append((backCenter,previous[(index+1)%len(previous)],previous[index]))
-bundle=CreateMesh('Pack_Bundle',verts,faces,uvs,materials['cloth'],packRoot)
-bundle.data.materials.append(backMaterial)
-bundle.data.materials.append(foldMaterial)
-for polygon in bundle.data.polygons:
-    if all(abs(bundle.data.vertices[index].co.y)<1e-7 for index in polygon.vertices):polygon.material_index=1;polygon.use_smooth=False
-    elif abs(polygon.normal.x)>.40 or abs(polygon.normal.z)>.65:polygon.material_index=2
-bundle['NominalDimensionsM']=[.38,.30,.13]
-bundle['Construction']='One thin homespun cotton single blanket, folded; not a sewn bag'
-
-# The cut end of the folded blanket has nested U-shaped cloth edges. These
-# stand in front of the recessed end surface, rather than being buried lines.
-foldProfiles=[
-    [(-.024,.123),(-.056,.132),(-.093,.129),(-.112,.113),(-.117,.073),(-.119,.012),(-.116,-.070),(-.111,-.119),(-.093,-.137),(-.060,-.142),(-.028,-.132),(-.016,-.106),(-.014,-.04),(-.017,.075)],
-    [(-.041,.081),(-.043,.110),(-.057,.119),(-.078,.113),(-.087,.083),(-.088,.018),(-.086,-.063),(-.081,-.114),(-.065,-.129),(-.047,-.123),(-.037,-.103),(-.036,-.02),(-.038,.066)],
-    [(-.057,.078),(-.059,.095),(-.068,.097),(-.074,.078),(-.073,.022),(-.069,-.047),(-.068,-.103),(-.062,-.116),(-.055,-.106),(-.053,-.025),(-.054,.055)]
-]
-for sideSign in (-1,1):
-    for layer,profile in enumerate(foldProfiles[:1] if sideSign<0 else foldProfiles):
-        points=[]
-        for index in range(len(profile)-1):
-            p0=Vector(profile[max(0,index-1)]);p1=Vector(profile[index]);p2=Vector(profile[index+1]);p3=Vector(profile[min(len(profile)-1,index+2)])
-            samples=1 if sideSign<0 else 2
-            for step in range(samples):
-                t=step/samples
-                points.append(.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t*t+(-p0+3*p1-3*p2+p3)*t*t*t))
-        points.append(Vector(profile[-1]))
-        foldVerts=[];foldUvs=[];foldFaces=[]
-        width=.0105-layer*.0014
-        foldDistances=[0.0]
-        for index in range(1,len(points)):foldDistances.append(foldDistances[-1]+(points[index]-points[index-1]).length)
-        for index,point in enumerate(points):
-            tangent=(points[min(index+1,len(points)-1)]-points[max(0,index-1)]).normalized()
-            across=Vector((-tangent.y,tangent.x))
-            for s in (-1,-.45,.45,1):
-                pressure=sum(math.exp(-((point.y-z)/.020)**2) for z in (.05,-.060))
-                spread=width*(1+.16*math.sin(point.y*41+layer*1.3))*(1-pressure*.12)
-                cross=point+across*spread*s
-                cross.x+=.0026*math.sin(cross.y*47+layer*1.4)*(1-.5*pressure)
-                taper=.008*max(0,min(1,(abs(cross.y)-.12)/.03))**2
-                roundness=min(1,((1-abs(s))/.55)**.65)
-                xValue=sideSign*(min(.1898,.173+roundness*.0168+.0013*math.sin(index*.71+layer)-.0021*pressure)-taper)
-                foldVerts.append((xValue,cross.x,max(-.1485,min(.1485,cross.y))));foldUvs.append((.35+.12*(s+1)/2,(foldDistances[index]/.32)%1))
-        for index in range(len(points)-1):
-            for cell in range(3):
-                a=index*4+cell;foldFaces.append((a,a+1,a+5,a+4))
-        foldObject=CreateMesh('Pack_FoldEdge%s%d'%('Left' if sideSign<0 else 'Right',layer+1),foldVerts,foldFaces,foldUvs,foldMaterial,bundle)
-        for polygon in foldObject.data.polygons:
-            tile=math.floor((min(foldDistances[foldObject.data.loops[i].vertex_index//4] for i in polygon.loop_indices)+1e-7)/.32)
-            for loopIndex in polygon.loop_indices:
-                vertexIndex=foldObject.data.loops[loopIndex].vertex_index
-                u=.35+.12*(vertexIndex%4)/3
-                v=max(0,min(1,foldDistances[vertexIndex//4]/.32-tile))
-                foldObject.data.uv_layers.active.data[loopIndex].uv=(.02+.46*u,.52+.46*v)
+# A single continuous folded sheet supplies the front, contact leaf and
+# exposed nested cut edges. Accessories share the downstream projection.
+BuildFoldedCloth=runpy.run_path(str(projectPath/'_blender/Script_SichuanFoldedCloth.py'))['BuildFoldedCloth']
+bundle=BuildFoldedCloth(CreateMesh,FrontDepth,materials['cloth'],backMaterial,foldMaterial,packRoot)
 
 bpy.context.view_layer.update()
 surfaceBvh=BVHTree.FromObject(bundle,bpy.context.evaluated_depsgraph_get())
@@ -362,29 +301,35 @@ def SurfaceDepth(xValue,zValue,offset=.0016):
     hit=surfaceBvh.ray_cast(Vector((xValue,-.25,zValue)),Vector((0,1,0)),.30)
     return (hit[0].y if hit[0] is not None else FrontDepth(xValue,zValue))-offset
 
-gatherLines=[(-.180,.120,-.125,.086),(-.17,.011,-.115,.029),(-.18,-.126,-.12,-.087),(-.068,.133,-.021,.084),(-.067,.028,.016,.005),(-.028,-.057,.035,-.041),(.020,-.131,.071,-.094),(.179,.027,.119,.040),(.181,-.109,.119,-.084),(.15,-.015,.118,-.039)]
-gatherLines=[gatherLines[index] for index in (0,2,4,6,7,8)]
-for number,(ax,az,bx,bz) in enumerate(gatherLines):
-    start=Vector((ax,az));end=Vector((bx,bz));tangent=(end-start).normalized();across=Vector((-tangent.y,tangent.x))
-    gatherVerts=[];gatherUvs=[];gatherFaces=[]
-    for step in range(5):
-        t=step/4;point=start.lerp(end,t)+across*(.003*math.sin(t*math.pi)*(1 if number%2 else -1))
-        for s in (-1,0,1):
-            p=point+across*s*(.0015+.0035*math.sin(t*math.pi))
-            height=.0025*math.sin(t*math.pi)**1.2*(1-s*s)
-            depth=max(-.1315,SurfaceDepth(p.x,p.y,0)-height)
-            gatherVerts.append((p.x,depth,p.y));gatherUvs.append(((p.x+.19)/.38,(p.y+.15)/.30))
-    for step in range(4):
-        for cross in range(2):
-            a=step*3+cross;gatherFaces.append((a,a+1,a+4,a+3))
-    CreateMesh('Pack_ClothGather%02d'%number,gatherVerts,gatherFaces,gatherUvs,materials['cloth'],bundle)
-
 # One hand-stitched patch; stitches are plain cotton, no metal fasteners.
-patchVerts=[];patchUvs=[]
-for zValue in (-.134,-.105,-.078):
-    for xValue in (.126,.151,.176):
-        patchVerts.append((xValue,SurfaceDepth(xValue,zValue),zValue));patchUvs.append(((xValue-.126)/.05,(zValue+.134)/.056))
-patch=CreateMesh('Pack_RepairPatch',patchVerts,[(0,1,4,3),(1,2,5,4),(3,4,7,6),(4,5,8,7)],patchUvs,patchMaterial,bundle)
+patchVerts=[];patchUvs=[];patchFaces=[];patchLookup={}
+patchBounds=(.130,.174,-.132,-.082)
+def ClipPatch(points,axis,bound,greater):
+    result=[]
+    for a,b in zip(points,points[1:]+points[:1]):
+        insideA=a[axis]>=bound-1e-9 if greater else a[axis]<=bound+1e-9
+        insideB=b[axis]>=bound-1e-9 if greater else b[axis]<=bound+1e-9
+        if insideA:result.append(a)
+        if insideA!=insideB:result.append(a.lerp(b,(bound-a[axis])/(b[axis]-a[axis])))
+    return result
+bundle.data.calc_loop_triangles()
+for triangle in bundle.data.loop_triangles:
+    points=[bundle.data.vertices[index].co.copy() for index in triangle.vertices]
+    if triangle.normal.y>-.4 or any(point.y>-.103 for point in points):continue
+    for axis,bound,greater in ((0,patchBounds[0],True),(0,patchBounds[1],False),(2,patchBounds[2],True),(2,patchBounds[3],False)):
+        points=ClipPatch(points,axis,bound,greater)
+        if len(points)<3:break
+    face=[]
+    for point in points:
+        point.y-=.0018;key=tuple(round(value,8) for value in point)
+        if key not in patchLookup:
+            patchLookup[key]=len(patchVerts);patchVerts.append(tuple(point))
+            patchUvs.append(((point.x-patchBounds[0])/(patchBounds[1]-patchBounds[0]),(point.z-patchBounds[2])/(patchBounds[3]-patchBounds[2])))
+        index=patchLookup[key]
+        if not face or face[-1]!=index:face.append(index)
+    if len(face)>2 and face[0]==face[-1]:face.pop()
+    if len(set(face))>=3:patchFaces.append(tuple(face))
+patch=CreateMesh('Pack_RepairPatch',patchVerts,patchFaces,patchUvs,patchMaterial,bundle)
 # The upper blanket fold overlaps the jacket corner, showing an actual tuck
 # rather than presenting the blue corner as a sewn-on coloured patch.
 lipVerts=[];lipUvs=[];lipFaces=[]
@@ -399,10 +344,10 @@ for step in range(6):
 for step in range(5):
     for across in range(2):
         index=step*3+across;lipFaces.append((index,index+1,index+4,index+3))
-CreateMesh('Pack_TurnedFoldLip',lipVerts,lipFaces,lipUvs,foldMaterial,bundle)
+CreateMesh('Pack_TurnedFoldLip',lipVerts,lipFaces,lipUvs,materials['cloth'],bundle)
 for edge in range(4):
-    for stitch in range(4):
-        fraction=.15+stitch*.23
+    for stitch in range(6):
+        fraction=.12+stitch*.15
         if edge<2:
             xValue=.13+fraction*.041;zValue=-.131 if edge==0 else -.082
             points=[(xValue-.001,SurfaceDepth(xValue-.001,zValue-.0015,.0025),zValue-.0015),(xValue+.001,SurfaceDepth(xValue+.001,zValue+.0015,.0025),zValue+.0015)]
@@ -411,102 +356,9 @@ for edge in range(4):
             points=[(xValue-.0013,SurfaceDepth(xValue-.0013,zValue-.001,.0025),zValue-.001),(xValue+.0013,SurfaceDepth(xValue+.0013,zValue+.001,.0025),zValue+.001)]
         AddRibbon('Pack_PatchStitch%d_%d'%(edge,stitch),points,.00065,stitchMaterial,bundle)
 
-# ONE connected long cloth strip: horizontal pass, vertical pass, shoulder
-# loop, transfer on the rear, vertical pass, shoulder loop, second horizontal
-# pass. The ends meet in a small side knot. No separate sewn harness.
-bindingRoot=MakeRoot('Pack_Binding',packRoot)
-stripPoints=[];stripAxes=[]
-def StripPoint(point,axis): stripPoints.append(Vector(point));stripAxes.append(Vector((1,0,0) if axis=='x' else (0,0,1)))
-for p in [(-.184,.001,.05),(-.195,-.017,.05),(-.195,-.11,.05),(-.175,-.134,.05),(.175,-.134,.05),(.195,-.11,.05),(.195,-.017,.05),(.178,.001,.05),(-.103,.002,.05)]: StripPoint(p,'z')
-for p in [(-.103,.002,.11),(-.103,-.004,.151),(-.103,-.03,.155),(-.103,-.10,.155),(-.103,-.128,.137),(-.103,-.134,.11),(-.103,-.134,-.10),(-.103,-.126,-.142),(-.103,-.10,-.154),(-.103,-.025,-.154),(-.103,.002,-.137),(-.103,.004,-.115),(-.103,.06,-.113),(-.11,.10,-.06),(-.111,.112,.02),(-.108,.092,.10),(-.103,.04,.144),(-.103,.004,.146)]: StripPoint(p,'x')
-for p in [(-.075,-.006,.132),(.075,-.006,.132),(.103,.004,.146)]: StripPoint(p,'z')
-for p in [(.103,-.03,.155),(.103,-.10,.155),(.103,-.128,.137),(.103,-.134,.11),(.103,-.134,-.10),(.103,-.126,-.142),(.103,-.10,-.154),(.103,-.025,-.154),(.103,.002,-.137),(.103,.004,-.115),(.103,.06,-.113),(.11,.10,-.06),(.111,.112,.02),(.108,.092,.10),(.103,.04,.144),(.103,.004,.146),(.103,.002,.11),(.103,.002,-.060)]: StripPoint(p,'x')
-for p in [(.177,.003,-.060),(.195,-.017,-.060),(.195,-.11,-.060),(.175,-.134,-.060),(-.175,-.134,-.060),(-.195,-.11,-.060),(-.195,-.017,-.060),(-.18,.002,-.060),(-.184,.003,.025),(-.191,-.007,.049)]: StripPoint(p,'z')
-stripPoints=stripPoints[:-2]
-stripAxes=stripAxes[:-2]
-for p in [(-.17,-.0008,-.06),(.14,-.0008,-.06),(.184,-.0008,.05),(.194,-.064,.05)]:StripPoint(p,'z')
-prefix=[Vector(p) for p in [(.194,-.064,.05),(.18,-.0008,.05),(-.14,-.0008,.05)]]
-stripPoints=prefix+stripPoints;stripAxes=[Vector((0,0,1)) for _ in prefix]+stripAxes
-# Split at UV-repeat boundaries as well as geometric bends. That keeps the
-# weave at cotton scale without stretching a quarter-atlas over a long pass.
-for point in stripPoints:
-    if 0<point.x<.13:point.x*=.86408
-    if abs(point.x)>.194 and point.y<.001:point.x=math.copysign(.1932,point.x)
-    if point.y>.03:point.y=.03+(point.y-.03)*.57
-originalPoints,originalAxes=stripPoints,stripAxes
-stripPoints=[originalPoints[0]];stripAxes=[originalAxes[0]];pathDistances=[0.0]
-distance=0.0;repeatLength=.18
-for index in range(len(originalPoints)-1):
-    start,end=originalPoints[index],originalPoints[index+1]
-    length=(end-start).length
-    steps=max(3 if max(start.y,end.y)>.025 else 1,math.ceil(length/.048))
-    fractions={step/steps for step in range(1,steps+1)}
-    seam=(math.floor(distance/repeatLength)+1)*repeatLength
-    while seam<distance+length-1e-7:
-        fractions.add((seam-distance)/length);seam+=repeatLength
-    for fraction in sorted(fractions):
-        if max(start.y,end.y)>.025:
-            p0=originalPoints[max(0,index-1)];p3=originalPoints[min(len(originalPoints)-1,index+2)]
-            t=fraction
-            point=.5*((2*start)+(-p0+end)*t+(2*p0-5*start+4*end-p3)*t*t+(-p0+3*start-3*end+p3)*t*t*t)
-        else:point=start.lerp(end,fraction)
-        stripPoints.append(point)
-        stripAxes.append(originalAxes[index].lerp(originalAxes[index+1],fraction).normalized())
-        pathDistances.append(distance+fraction*length)
-    distance+=length
-bpy.context.view_layer.update()
-bundleBvh=BVHTree.FromObject(bundle,bpy.context.evaluated_depsgraph_get())
-for index,point in enumerate(stripPoints):
-    if point.y<-.122 and abs(point.x)<.18 and abs(point.z)<.145:
-        depths=[]
-        for dx,dz in ((0,0),(-.013,0),(.013,0),(0,-.013),(0,.013)):
-            hit=bundleBvh.ray_cast(Vector((point.x+dx,-.25,point.z+dz)),Vector((0,1,0)),.3)
-            if hit[0] is not None: depths.append(hit[0].y)
-        if depths:
-            crossing=.0015*sum(math.exp(-((point.z-z)/.022)**2) for z in (.05,-.060)) if stripAxes[index].x>.7 else 0
-            point.y=min(depths)-.0018-crossing
-stripVerts=[];stripFaces=[];stripUvs=[];stripRings=[];stripVertexDistances=[];stripVertexU=[]
-for index,point in enumerate(stripPoints):
-    tangent=stripPoints[min(index+1,len(stripPoints)-1)]-stripPoints[max(0,index-1)]
-    tangent.normalize();widthVector=stripAxes[index]-tangent*stripAxes[index].dot(tangent)
-    if widthVector.length<.01: widthVector=tangent.cross(Vector((0,1,0)))
-    widthVector.normalize();normal=tangent.cross(widthVector).normalized()
-    if point.y>.012:
-        twist=.72*max(0,min(1,(point.y-.012)/.055))
-        widthVector=(widthVector*math.cos(twist)+normal*math.sin(twist)).normalized()
-        normal=tangent.cross(widthVector).normalized()
-    front=point.y<-.09 and abs(point.x)<.18 and abs(point.z)<.145
-    ring=[]
-    for aValue in ((-1,0,1) if front else (-1,1)):
-        edgeWobble=1+.025*math.sin(index*1.71+.4*aValue)
-        crown=Vector((0,-.0013*(1-aValue*aValue),0)) if front else Vector((0,0,0))
-        ring.append(len(stripVerts));stripVerts.append(tuple(point+widthVector*.013*aValue*edgeWobble+crown))
-        stripUvs.append((.42+.16*(aValue+1)/2,(pathDistances[index]/repeatLength)%1))
-        stripVertexDistances.append(pathDistances[index]);stripVertexU.append(.42+.16*(aValue+1)/2)
-    stripRings.append(ring)
-for index in range(len(stripPoints)-1):
-    a,b=stripRings[index],stripRings[index+1]
-    if len(a)==len(b)==2:stripFaces.append((a[0],a[1],b[1],b[0]))
-    elif len(a)==len(b)==3:stripFaces.extend([(a[0],a[1],b[1],b[0]),(a[1],a[2],b[2],b[1])])
-    elif len(a)==2:stripFaces.extend([(a[0],a[1],b[1],b[0]),(a[1],b[2],b[1])])
-    else:stripFaces.extend([(a[0],a[1],b[0]),(a[1],a[2],b[1],b[0])])
-binding=CreateMesh('Pack_ContinuousClothStrap',stripVerts,stripFaces,stripUvs,materials['binding'],bindingRoot)
-rect=atlasRects['binding']
-for polygon in binding.data.polygons:
-    minDistance=min(stripVertexDistances[binding.data.loops[loopIndex].vertex_index] for loopIndex in polygon.loop_indices)
-    tile=math.floor((minDistance+1e-7)/repeatLength)
-    for loopIndex in polygon.loop_indices:
-        vertexIndex=binding.data.loops[loopIndex].vertex_index
-        uValue=stripVertexU[vertexIndex]
-        vValue=max(0,min(1,stripVertexDistances[vertexIndex]/repeatLength-tile))
-        binding.data.uv_layers.active.data[loopIndex].uv=(rect[0]+uValue*(rect[2]-rect[0]),rect[1]+vValue*(rect[3]-rect[1]))
-binding['ContinuousStrip']=True
-binding['OuterGridPasses']=[2,2]
-binding['ShoulderLoops']=2
-AddTube('Pack_SideClothKnot',[(.191,-.050,.05),(.199,-.065,.061),(.2,-.080,.054),(.192,-.065,.043),(.191,-.050,.05)],.005,materials['binding'],bindingRoot,sides=5)
-for sign in (-1,1):
-    AddRibbon('Pack_SideKnotLoop%d'%sign,[(.197,-.064,.05),(.199,-.064+sign*.013,.061),(.198,-.064+sign*.023,.047),(.196,-.064,.05)],.012,materials['binding'],bindingRoot,axis='z')
-AddRibbon('Pack_SideKnotTail',[(.197,-.067,.05),(.202,-.073,.019),(.207,-.079,-.003)],.019,materials['binding'],bindingRoot,axis='z')
+# One continuous cloth strip, including the two free shoulder loops.
+BuildBinding=runpy.run_path(str(projectPath/'_blender/Script_SichuanPackBinding.py'))['BuildBinding']
+bindingRoot=BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,packRoot)
 
 # Complete civilian short jacket, concealed inside the fold except one upper
 # corner. It remains a single independent assembly when pulled out.
@@ -526,13 +378,13 @@ for index in range(length):jacketFaces.append((index,(index+1)%length,(index+1)%
 # An attached folded upper corner reaches out of the blanket fold, while the
 # full jacket remains inside. These triangles share the shoulder edge.
 cornerStart=len(jacketVerts)
-jacketVerts.extend([(.120,-.1195,.144),(.178,-.1195,.141),(.174,-.1195,.074)])
+jacketVerts.extend([(.120,-.1195,.144),(.178,-.1195,.141),(.171,-.1195,.085)])
 jacketUvs.extend([(.62,.92),(.94,.92),(.94,.60)])
 jacketFaces.extend([(11,cornerStart,cornerStart+1),(11,cornerStart+1,cornerStart+2),(11,cornerStart+2,12),(cornerStart,cornerStart+1,cornerStart+2)])
 jacket=CreateMesh('Pack_IndigoShortJacket',jacketVerts,jacketFaces,jacketUvs,materials['jacket'],jacketRoot)
 # Front opening seam and a small folded hem are geometric, not printed labels.
 AddRibbon('Pack_JacketFrontPlacket',[(.016,-.052,-.10),(.016,-.052,.07),(.027,-.056,.10)],.009,materials['jacket'],jacketRoot)
-buttonCenter=Vector((.153,-.123,.119))
+buttonCenter=Vector((.156,-.124,.126))
 buttonVerts=[];buttonUvs=[];buttonFaces=[]
 for latitude in range(1,4):
     phi=math.pi*latitude/4
@@ -546,7 +398,11 @@ for latitude in range(2):
         a=latitude*8+segment;b=latitude*8+(segment+1)%8;buttonFaces.append((a,b,b+8,a+8))
 buttonFaces.extend([tuple(reversed(range(8))),tuple(16+i for i in range(8))])
 CreateMesh('Pack_ClothKnotButton',buttonVerts,buttonFaces,buttonUvs,buttonMaterial,jacketRoot)
-AddTube('Pack_ClothButtonLoop',[(.156,-.123,.119),(.165,-.123,.122),(.167,-.122,.118),(.158,-.122,.116)],.0012,buttonMaterial,jacketRoot,sides=4)
+buttonLoop=[]
+for index in range(13):
+    angle=index*math.tau/12
+    buttonLoop.append((.1642-.0072*math.cos(angle),-.125+.00035*math.cos(angle*2),.1265+.0030*math.sin(angle)+.0002*math.sin(angle*3)))
+AddTube('Pack_ClothButtonLoop',buttonLoop,.0012,buttonMaterial,jacketRoot,sides=3)
 
 BuildAttachments=runpy.run_path(str(projectPath/'_blender/Script_SichuanPackAttachments.py'))['BuildAttachments']
 attachments=BuildAttachments(CreateMesh,AddRibbon,AddTube,materials)
@@ -571,9 +427,12 @@ if preflight>3000:raise RuntimeError('All-parts pre-bake triangle budget exceede
 if scene.get('SichuanSurfaceBake',True):
     BakeSurfaces=runpy.run_path(str(projectPath/'_blender/Script_SichuanPackSurfaceBake.py'))['BakeSurfaces']
     BakeSurfaces(packRoot,projectPath,reviewPath)
-for filename in ('Script_SichuanBlanketPackBake.py','Script_SichuanPackAttachments.py','Script_SichuanPackSurfaceBake.py'):
+for filename in ('Script_SichuanBlanketPackBake.py','Script_SichuanFoldedCloth.py','Script_SichuanPackBinding.py','Script_SichuanPackAttachments.py','Script_SichuanPackSurfaceBake.py'):
     text=bpy.data.texts.get(filename) or bpy.data.texts.new(filename)
     text.clear();text.write((projectPath/'_blender'/filename).read_text(encoding='utf-8'))
+for filename in ('Script_SichuanPackReferenceCloth.py','Script_SichuanStrawStudy.py','Script_SichuanPackSurfaceMaps.py'):
+    text=bpy.data.texts.get(filename) or bpy.data.texts.new(filename)
+    text.clear();text.write((projectPath/'_import'/filename).read_text(encoding='utf-8'))
 triangles={}
 for root in (bundle,bindingRoot,jacketRoot,*attachments):
     count=0
@@ -602,18 +461,22 @@ bpy.ops.wm.save_as_mainfile(filepath=str(sourcePath/'Scene_SichuanBlanketPack.bl
 (reviewPath/'Data_BlenderBuild.json').write_text(json.dumps({'triangles':triangles,'totalTriangles':sum(triangles.values()),'blend':bpy.data.filepath,'glb':str(modelPath/'Model_SichuanBlanketPack.glb'),'nativeAxes':'Z up; -Y outward','exportAxes':'Y up; +Z outward; back Z=0','unitScale':1},indent=2),encoding='utf-8')
 contractPath=modelPath/'Data_SichuanBlanketPack.json'
 contract=json.loads(contractPath.read_text(encoding='utf-8'))
-contract['version']='20261019ReferenceMatchV2'
+contract['version']='20261019ReferenceMatchV3'
 contract['triangles']={'total':sum(triangles.values()),'limit':3000,'includesAllOptionalParts':True,'byPart':triangles}
 points=[bundle.matrix_world@vertex.co for vertex in bundle.data.vertices]
 sizes=[max(point[axis] for point in points)-min(point[axis] for point in points) for axis in range(3)]
-contract['actualBundleDimensionsM']={'width':sizes[0],'height':sizes[2],'thickness':sizes[1],'includes':'cloth gathers, folded edges, repair patch and its stitches'}
+contract['actualBundleDimensionsM']={'width':sizes[0],'height':sizes[2],'thickness':sizes[1],'includes':'continuous folded sheet, conforming repair patch and cotton stitches'}
 contract['materials'].pop('ormRgb',None)
 contract['materials']['ormSemantics']='R=baked surface occlusion, G=242/255 roughness, B=0 metallic'
-contract['materials']['sharedAtlas']='Unique non-overlapping GameUV surface atlas, reprojected from the imagegen material study and approved unshadowed cotton samples'
+contract['materials']['sharedAtlas']='Unique non-overlapping GameUV atlas, reprojected from independent imagegen material studies and masked cotton from the approved reference; broad illumination is normalized'
 contract['source']['surfaceBake']='../../_blender/Script_SichuanPackSurfaceBake.py'
 contract['source']['surfaceEncoder']='../../_import/Script_SichuanPackSurfaceMaps.py'
+contract['source']['foldedCloth']='../../_blender/Script_SichuanFoldedCloth.py'
+contract['source']['binding']='../../_blender/Script_SichuanPackBinding.py'
+contract['source']['strawStudy']='../../_import/Script_SichuanStrawStudy.py'
+contract['parts'][0]['description']='One continuous folded homespun cotton sheet with exposed nested cut edges, a conforming sewn repair patch and a planar contact leaf'
 contract['review']['sameHeightComparison']=['Texture_ReferenceCompare_front.jpg','Texture_ReferenceCompare_side.jpg','Texture_ReferenceCompare_back.jpg']
-contract['assetUrl']='./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261019ReferenceMatchV2'
+contract['assetUrl']='./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261019ReferenceMatchV3'
 payload=(modelPath/'Model_SichuanBlanketPack.glb').read_bytes();contract['assetBytes']=len(payload);contract['assetSha256']=hashlib.sha256(payload).hexdigest()
 contractPath.write_text(json.dumps(contract,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 print('SICHUAN_PACK_BUILD',json.dumps(triangles),'TOTAL',sum(triangles.values()),'BLEND',bpy.data.filepath)

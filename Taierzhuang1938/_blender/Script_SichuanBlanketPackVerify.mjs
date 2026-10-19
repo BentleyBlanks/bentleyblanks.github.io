@@ -165,6 +165,8 @@ try{
   Check(overlappingSamples===0&&uvArea<=1.001,'All five components have genuinely non-overlapping production UV islands',report.surfaceUv);
   Check(report.surfaceUv.coveredSamples>resolution*resolution*.25,'The 1024 atlas has meaningful surface coverage',report.surfaceUv);
   const normalPixels=await sharp(externalMaps.get('Normal').data).removeAlpha().raw().toBuffer({resolveWithObject:true});
+  let normalMinBlue=255;for(let pixel=2;pixel<normalPixels.data.length;pixel+=3)normalMinBlue=Math.min(normalMinBlue,normalPixels.data[pixel]);
+  Check(normalMinBlue>=128,'Every decoded normal-map pixel stays in the outward hemisphere, including edge padding',{pixels:normalPixels.info.width*normalPixels.info.height,minBlue:normalMinBlue});
   let invalidNormalSamples=0,blackAlbedoSamples=0;const blackAlbedoLocations=[];
   const basePixels=await sharp(externalMaps.get('Base').data).removeAlpha().raw().toBuffer({resolveWithObject:true});
   for(let y=0;y<resolution;y++)for(let x=0;x<resolution;x++)if(coverage[y*resolution+x]){
@@ -182,20 +184,43 @@ try{
     if(part){part.bounds=Bounds(part.points);part.triangleCount=part.triangles.length;part.materials=[...new Set(part.materials)];}
   }
   Check(report.totalTriangles>0&&report.totalTriangles<=3000,'All five parts combined are at most 3000 triangles (including hidden candidates)',report.totalTriangles);
+  const bindingBox=report.parts.Pack_Binding?.bounds;
+  Check(!!bindingBox&&bindingBox.max[1]<=.158,'The main cloth binding has no floating fin above the blanket top (the separate mat loops are excluded)',bindingBox);
   const bundle=report.parts.Pack_Bundle,box=bundle?.bounds;
   if(box){
     Check(Near(box.size,[.38,.30,.13],.002),'Bundle actual X/Y/Z bounds are 0.38 / 0.30 / 0.13 m (2 mm tolerance)',box);
     Check(Math.abs(box.center[0])<=.001&&Math.abs(box.center[1])<=.001&&Math.abs(box.min[2])<=.001,'Root is centered on the actual back plane (1 mm tolerance)',{center:box.center,backZ:box.min[2]});
-    let backArea=0,degenerate=0;
+    let backArea=0,degenerate=0;const flatContactPoints=[];
     for(const [a,b,c] of bundle.triangles){
       const ab=b.map((v,i)=>v-a[i]),ac=c.map((v,i)=>v-a[i]);
       const cross=[ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0]];
       if(Math.hypot(...cross)<1e-12)degenerate++;
       if([a,b,c].every(point=>Math.abs(point[2])<=.001)&&cross[2]<0)backArea+=-cross[2]/2;
+      if([a,b,c].every(point=>Math.abs(point[2])<=1e-6)&&cross[2]<0)flatContactPoints.push(a,b,c);
     }
     report.backPlane={areaM2:backArea,requiredM2:.38*.30*.55,degenerateBundleTriangles:degenerate};
     Check(backArea>=.38*.30*.55,'At least 55% of nominal back area is real flat z=0 surface facing -Z',report.backPlane);
     Check(degenerate===0,'Bundle has no zero-area triangles',degenerate);
+    const contactBounds=Bounds(flatContactPoints);report.backPlane.actualBounds=contactBounds;
+    Check(!!contactBounds&&Math.abs(contactBounds.center[0])<=.001&&Math.abs(contactBounds.center[1])<=.001,'The pivot is also centered on the actual flat contact leaf, within 1 mm',contactBounds);
+  }
+  const mat=report.parts.Pack_StrawMat;
+  if(bundle&&mat?.bounds){
+    const [sampleX,,sampleZ]=mat.bounds.center;
+    function HeightsAt(triangles){
+      const heights=[];
+      for(const [a,b,c] of triangles){
+        const bx=b[0]-a[0],bz=b[2]-a[2],cx=c[0]-a[0],cz=c[2]-a[2],det=bx*cz-bz*cx;
+        if(Math.abs(det)<1e-12)continue;
+        const px=sampleX-a[0],pz=sampleZ-a[2],u=(px*cz-pz*cx)/det,v=(bx*pz-bz*px)/det;
+        if(u>=-1e-7&&v>=-1e-7&&u+v<=1+1e-7)heights.push(a[1]+u*(b[1]-a[1])+v*(c[1]-a[1]));
+      }
+      return heights;
+    }
+    const clothHeights=HeightsAt(bundle.triangles),matHeights=HeightsAt(mat.triangles);
+    const clothTop=Math.max(...clothHeights),matBottom=Math.min(...matHeights),clearance=matBottom-clothTop;
+    report.matContact={sampleXZ:[sampleX,sampleZ],clothTopY:clothTop,matBottomY:matBottom,clearanceM:clearance};
+    Check(Number.isFinite(clearance)&&clearance>=-.0015&&clearance<=.0035,'The rolled mat is supported by the top fold, with at most 3.5 mm of textile clearance',report.matContact);
   }
   const neededImages=new Set(),imageChannels=new Map();
   function SourceOfTexture(index){const texture=g.textures?.[index];return texture?.extensions?.EXT_texture_webp?.source??texture?.source;}

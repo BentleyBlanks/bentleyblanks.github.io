@@ -1,0 +1,120 @@
+"""One routed cloth strip: two cross passes, two upright passes and shoulders."""
+import math
+import bpy
+from mathutils import Vector
+
+
+def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,parent):
+    root=MakeRoot('Pack_Binding',parent)
+    controls=[]
+
+    def Points(points,axis,shoulder=False):
+        for point in points:controls.append((Vector(point),Vector(axis),shoulder))
+
+    # The first complete turn is the upper cross pass. Transfers follow the
+    # undersides of existing cloth passes, outside the blanket itself.
+    Points([(.194,-.064,.050),(.194,-.111,.050),(.174,-.130,.050),
+            (-.174,-.130,.050),(-.194,-.111,.050),(-.194,-.018,.050),
+            (-.180,.003,.050),(.180,.003,.050),(.194,-.018,.050),
+            (.194,-.064,.050)],(0,0,1))
+    Points([(.194,-.018,.050),(.180,.0012,.050),(.089,.0012,.050)],(0,0,1))
+    Points([(.089,.0012,.132)],(1,0,0))
+
+    for side,x in ((1,.089),(-1,-.103)):
+        Points([(x,.002,.133),(x,-.017,.149),(x,-.099,.149),
+                (x,-.123,.132),(x,-.128,.105),(x,-.128,-.105),
+                (x,-.118,-.137),(x,-.092,-.151),(x,-.022,-.151),
+                (x,.003,-.135)],(1,0,0))
+        # The free loops sweep laterally toward the hips. Their ribbon width
+        # follows a transported frame through the rounded heel of each loop.
+        Points([(x+side*.009,.024,-.141),(x+side*.039,.060,-.133),
+                (x+side*.045,.088,-.091),(x+side*.035,.099,-.019),
+                (x+side*.020,.082,.062),(x+side*.004,.039,.121),
+                (x,.003,.135)],(1,0,0),True)
+        if side==1:
+            Points([(x,-.020,.150),(x,-.067,.150)],(1,0,0))
+            Points([(-.103,-.067,.150)],(0,1,0))
+            Points([(-.103,-.020,.150)],(1,0,0))
+
+    Points([(-.103,.0012,.124),(-.125,.0012,.050),(-.148,.0012,-.060)],(1,0,0))
+    Points([(-.180,.003,-.060)],(0,0,1))
+    Points([(.180,.003,-.060),(.194,-.018,-.060),(.194,-.111,-.060),
+            (.174,-.130,-.060),(-.174,-.130,-.060),(-.194,-.111,-.060),
+            (-.194,-.018,-.060),(-.180,.003,-.060)],(0,0,1))
+    Points([(-.174,.0012,-.060),(.130,.0012,-.060)],(0,0,1))
+    Points([(.110,.0012,.050)],(1,0,0))
+    Points([(.180,.0012,.050),(.194,-.018,.050),(.194,-.064,.050)],(0,0,1))
+
+    # Quadratic corner rounding gives bounded curvature without Catmull-Rom
+    # overshoot at the contact plane and shoulder attachments.
+    rounded=[]
+    for index,(point,axis,shoulder) in enumerate(controls):
+        if index in (0,len(controls)-1):
+            rounded.append((point,axis,shoulder));continue
+        previous,nextPoint=controls[index-1][0],controls[index+1][0]
+        a=(point-previous).length;b=(nextPoint-point).length
+        distance=min(.027,a*.40,b*.40) if shoulder else min(.012,a*.24,b*.24)
+        start=point+(previous-point).normalized()*distance
+        end=point+(nextPoint-point).normalized()*distance
+        rounded.append((start,axis,shoulder))
+        for step in (2,):
+            t=step/2
+            p=(1-t)**2*start+2*(1-t)*t*point+t*t*end
+            rounded.append((p,axis,shoulder))
+
+    samples=[rounded[0]];distances=[0.0];distance=0;repeat=.18
+    for (start,startAxis,s1),(end,endAxis,s2) in zip(rounded,rounded[1:]):
+        length=(end-start).length
+        if length<1e-8:continue
+        fractions={step/max(1,math.ceil(length/.050)) for step in range(1,max(1,math.ceil(length/.050))+1)}
+        seam=(math.floor(distance/repeat)+1)*repeat
+        while seam<distance+length-1e-7:
+            fractions.add((seam-distance)/length);seam+=repeat
+        for t in sorted(fractions):
+            samples.append((start.lerp(end,t),startAxis.lerp(endAxis,t).normalized(),s1 or s2));distances.append(distance+length*t)
+        distance+=length
+
+    verts=[];faces=[];uvs=[];rings=[];vertexDistances=[];vertexU=[]
+    previousWidth=None
+    for index,(point,axis,shoulder) in enumerate(samples):
+        tangent=(samples[min(index+1,len(samples)-1)][0]-samples[max(0,index-1)][0]).normalized()
+        width=axis-tangent*axis.dot(tangent)
+        transported=None if previousWidth is None else previousWidth-tangent*previousWidth.dot(tangent)
+        if width.length<.08:width=transported if transported is not None and transported.length>.08 else tangent.cross(Vector((0,1,0)))
+        width.normalize()
+        if transported is not None and width.dot(transported)<0:width.negate()
+        if shoulder:
+            normal=tangent.cross(width).normalized()
+            twist=.28*min(1,max(0,point.y/.055))
+            width=width*math.cos(twist)+normal*math.sin(twist)
+        previousWidth=width.copy()
+        isFront=point.y<-.105 and abs(point.x)<.179 and abs(point.z)<.140
+        if isFront:
+            depth=min(SurfaceDepth(point.x+width.x*a*.013,point.z+width.z*a*.013,.0017) for a in (-1,0,1))
+            # Upright passes lie over the cross passes at four intersections.
+            if abs(width.x)>.7:depth-=.0017*sum(math.exp(-((point.z-band)/.019)**2) for band in (.05,-.06))
+            point=Vector((point.x,depth,point.z))
+        ring=[]
+        for across in ((-1,0,1) if isFront else (-1,1)):
+            p=point+width*(.013*across)*(1+.012*math.sin(index*1.43+across))
+            if isFront:p.y-=.00065*(1-across*across)
+            ring.append(len(verts));verts.append(tuple(p));u=.42+.16*(across+1)/2
+            uvs.append((u,(distances[index]/repeat)%1));vertexDistances.append(distances[index]);vertexU.append(u)
+        rings.append(ring)
+    for a,b in zip(rings,rings[1:]):
+        if len(a)==len(b)==2:faces.append((a[0],a[1],b[1],b[0]))
+        elif len(a)==len(b)==3:faces.extend(((a[0],a[1],b[1],b[0]),(a[1],a[2],b[2],b[1])))
+        elif len(a)==2:faces.extend(((a[0],a[1],b[1],b[0]),(a[1],b[2],b[1])))
+        else:faces.extend(((a[0],a[1],b[0]),(a[1],a[2],b[1],b[0])))
+    strip=CreateMesh('Pack_ContinuousClothStrap',verts,faces,uvs,materials['binding'],root)
+    for polygon in strip.data.polygons:
+        tile=math.floor((min(vertexDistances[strip.data.loops[i].vertex_index] for i in polygon.loop_indices)+1e-7)/repeat)
+        for loopIndex in polygon.loop_indices:
+            index=strip.data.loops[loopIndex].vertex_index
+            strip.data.uv_layers.active.data[loopIndex].uv=(.02+.46*vertexU[index],.02+.46*max(0,min(1,vertexDistances[index]/repeat-tile)))
+    strip['ContinuousStrip']=True;strip['OuterGridPasses']=[2,2];strip['ShoulderLoops']=2
+    AddTube('Pack_SideClothKnot',[(.195,-.049,.05),(.199,-.061,.058),(.199,-.079,.052),(.197,-.065,.042),(.195,-.049,.05)],.0043,materials['binding'],root,sides=4)
+    for sign in (-1,1):
+        AddRibbon('Pack_SideKnotLoop%d'%sign,[(.199,-.064,.05),(.200,-.064+sign*.013,.060),(.200,-.064+sign*.021,.047),(.199,-.064,.05)],.010,materials['binding'],root,axis='z')
+    AddRibbon('Pack_SideKnotTail',[(.199,-.066,.05),(.201,-.071,.022),(.202,-.078,.004)],.017,materials['binding'],root,axis='y')
+    return root

@@ -71,7 +71,7 @@ def Main():
     outputs=[]
     for channel,image in [('Base',base),('Normal',normal),('Orm',Image.fromarray(orm))]:
         path=modelPath/('Texture_SichuanBlanketPack'+channel+'.webp')
-        image.save(path,format='WEBP',quality=92 if channel=='Base' else 98,lossless=channel=='Orm',method=6,use_sharp_yuv=True)
+        image.save(path,format='WEBP',quality=92 if channel=='Base' else 100,lossless=channel!='Base',method=6,use_sharp_yuv=True)
         payload=path.read_bytes();outputs.append({'channel':channel,'path':str(path),'width':1024,'height':1024,'bytes':len(payload),'sha256':hashlib.sha256(payload).hexdigest()})
     recordPath=args.project/'_import/SichuanBlanketPack/Data_SichuanBlanketPackTextureBake.json'
     record=json.loads(recordPath.read_text(encoding='utf-8'))
@@ -81,14 +81,18 @@ def Main():
         path=seedPath/('Texture_SichuanBlanketPack'+channel+'.webp');payload=path.read_bytes()
         study.append({'channel':channel,'path':str(path),'bytes':len(payload),'sha256':hashlib.sha256(payload).hexdigest()})
     record['materialStudyOutputs']=study;record['outputs']=outputs
-    record['surfaceBake']={'generator':'Script_SichuanPackSurfaceBake.py@2','resolution':[1024,1024],'intermediateResolution':[2048,2048],'padding':'16 source pixels of co-valid colour/normal/AO coverage dilation; outward-hemisphere unit-normal downsampling for thin two-sided cotton','uv':'Unique non-overlapping GameUV','ao':'Cycles AmbientOcclusion, 0.025 metre distance; garment uses self only','metallicPixels':[0,0],'roughnessPixels':[242,242],'aoRange':[int(ao.min()),int(ao.max())],'albedoContainsLighting':False}
+    strawPath=seedPath.parent/'MaterialAtlasV04'
+    record['strawStudy']=json.loads((strawPath/'Data_StrawStudy.json').read_text(encoding='utf-8'))
+    record['strawStudy']['prompt']='_import/SichuanBlanketPack/Data_ImagegenPromptV04.txt'
+    record['surfaceBake']={'generator':'Script_SichuanPackSurfaceBake.py@3','resolution':[1024,1024],'intermediateResolution':[2048,2048],'padding':'16 source pixels of co-valid colour/normal/AO coverage dilation; outward-hemisphere unit-normal downsampling for thin two-sided cotton','uv':'Unique non-overlapping GameUV','ao':'Cycles AmbientOcclusion, 0.025 metre distance; garment uses self only','metallicPixels':[0,0],'roughnessPixels':[242,242],'aoRange':[int(ao.min()),int(ao.max())],'albedoContainsLighting':False,'normalEncoding':'Lossless WebP; vector channels remain exact after decode'}
     record['surfaceBake']['subpixelCoverageRepair']={'texels':repaired,'method':'Fill only uncovered raster texels inside actual triangles or their 1.5px edge padding, using the already-baked median of the same source material'}
+    record['surfaceBake']['albedoContainsLighting']='Broad illumination normalized; fine reference crease shading is an approximation, not a measured intrinsic albedo'
     recordPath.write_text(json.dumps(record,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     manifestPath=modelPath/'Data_SichuanBlanketPackTextures.json'
     manifest=json.loads(manifestPath.read_text(encoding='utf-8'))
     manifest['schema']='tengxian-model-textures-v2';manifest['date']='2026-10-19'
     if 'quadrants' in manifest.get('atlas',{}):manifest['materialStudyAtlas']=manifest['atlas']
-    manifest['atlas']={'layout':'unique-surface-uv','uvOrigin':'bottom-left','uvSet':'GameUV','texCoord':1,'packing':'Minimum-stretch unwrap of all five components, non-overlapping islands, 0.0045 pack margin','bakeResolution':[2048,2048],'runtimeResolution':[1024,1024]}
+    manifest['atlas']={'layout':'unique-surface-uv','uvOrigin':'bottom-left','uvSet':'GameUV','texCoord':1,'packing':'Minimum-stretch unwrap; six-direction self-visibility allocates 1.90 density to the outer front and 0.20 to concealed cloth; non-overlapping concave islands, explicit 0.003 fractional margin','bakeResolution':[2048,2048],'runtimeResolution':[1024,1024]}
     manifest['source']['ref']='exec-dd140b53-c21e-4bf7-96e2-2eac2e0f8ab6.png'
     manifest['source']['path']=str(seedPath.parent/'Texture_SichuanBlanketPackSourceV03.png')
     manifest['source']['sha256']=hashlib.sha256((seedPath.parent/'Texture_SichuanBlanketPackSourceV03.png').read_bytes()).hexdigest()
@@ -97,11 +101,14 @@ def Main():
     manifest['referenceSamples']={'path':str(seedPath.parent/'Image_SichuanBlanketPackThreeViewV02.png'),'provider':'imagegen, approved reference','cottonPixels':[248,394,484,508],'greyClothPixels':[209,218,232,315],'use':'Unshadowed interior material samples, blended with the generated albedo study; no whole concept projection'}
     manifest['referenceClothBake']='_import/Script_SichuanPackReferenceCloth.py'
     manifest['referenceSamples']['cottonFacePixels']=[77,194,680,695]
+    manifest['referenceSamples']['cottonSidePixels']=[755,194,948,695]
+    manifest['referenceSamples']['use']='Masked cotton front/back/side studies and grey-strip samples; the complete reference remains outside the game atlas'
     manifest['referenceSamples']['cottonProcess']='Accessory/strap masks, replacement cotton, low-frequency scalar de-lighting and physical cotton micro-normal; documented by Data_ReferenceCottonStudy.json'
     manifest['surfaceBake']='_blender/Script_SichuanPackSurfaceBake.py';manifest['surfaceEncoder']='_import/Script_SichuanPackSurfaceMaps.py'
-    manifest['files']=[{'path':str(Path('Model/SichuanBlanketPack')/Path(row['path']).name).replace('\\','/'),'channel':row['channel'],'width':1024,'height':1024,'colorSpace':'sRGB' if row['channel']=='Base' else 'linear','bytes':row['bytes'],'sha256':row['sha256'],'encoding':'lossless WebP' if row['channel']=='Orm' else 'WebP q92' if row['channel']=='Base' else 'WebP q98'} for row in outputs]
+    manifest['files']=[{'path':str(Path('Model/SichuanBlanketPack')/Path(row['path']).name).replace('\\','/'),'channel':row['channel'],'width':1024,'height':1024,'colorSpace':'sRGB' if row['channel']=='Base' else 'linear','bytes':row['bytes'],'sha256':row['sha256'],'encoding':'WebP q92' if row['channel']=='Base' else 'lossless WebP'} for row in outputs]
     manifest['totalBytes']=sum(row['bytes'] for row in outputs)
-    manifest['physicalMeaning']='Rough nonmetal natural fibres. ORM R is real surface occlusion; G is 242/255; B is zero. Base colour excludes the studio illumination.'
+    manifest['strawStudy']=record['strawStudy']
+    manifest['physicalMeaning']='Rough nonmetal natural fibres. ORM R is real surface occlusion; G is 242/255; B is zero. Broad reference illumination is normalized; fine crease shading remains an approximation.'
     manifest['verification']={'allMaps1024':True,'allMetalZero':True,'surfaceUvReprojected':True,'aoRange':[int(ao.min()),int(ao.max())]}
     manifestPath.write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     print('SURFACE_MAPS_ENCODED',sum(row['bytes'] for row in outputs),flush=True)

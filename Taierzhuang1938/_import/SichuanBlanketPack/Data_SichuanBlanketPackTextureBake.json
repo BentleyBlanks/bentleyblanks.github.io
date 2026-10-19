@@ -80,24 +80,24 @@
       "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\SichuanBlanketPack\\Texture_SichuanBlanketPackBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 343002,
-      "sha256": "0e5882d1ca5dd15c4fb6ab94149a98a2feaa892b6a5d84dfb4069bef818dad48"
+      "bytes": 340770,
+      "sha256": "d639f627194619a9386691f055efc010bf69a1ac4a0f5f7cb01d1b6bc2e5f789"
     },
     {
       "channel": "Normal",
       "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\SichuanBlanketPack\\Texture_SichuanBlanketPackNormal.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 297704,
-      "sha256": "990758cd446da429a6d3153fce4447ae29483a23ee444be48ba9ccbfd8e3e5de"
+      "bytes": 972808,
+      "sha256": "4213fca770c76577474ba6f3b39300f792adfe7b75b6a1b66f9e138073d75ad0"
     },
     {
       "channel": "Orm",
       "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\SichuanBlanketPack\\Texture_SichuanBlanketPackOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 438430,
-      "sha256": "f3f70aac74e07c63486a3dcbacaf73624f715c969bf8f995c488416ea059bef9"
+      "bytes": 412450,
+      "sha256": "bca1aa99b1c92e88aa7946e55edc44cf590170d826ddf530b585b2854fee30c8"
     }
   ],
   "totalBytes": 972164,
@@ -162,7 +162,7 @@
     }
   ],
   "surfaceBake": {
-    "generator": "Script_SichuanPackSurfaceBake.py@2",
+    "generator": "Script_SichuanPackSurfaceBake.py@3",
     "resolution": [
       1024,
       1024
@@ -183,13 +183,66 @@
       242
     ],
     "aoRange": [
-      7,
+      5,
       255
     ],
-    "albedoContainsLighting": false,
+    "albedoContainsLighting": "Broad illumination normalized; fine reference crease shading is an approximation, not a measured intrinsic albedo",
+    "normalEncoding": "Lossless WebP; vector channels remain exact after decode",
     "subpixelCoverageRepair": {
-      "texels": 4,
+      "texels": 1,
       "method": "Fill only uncovered raster texels inside actual triangles or their 1.5px edge padding, using the already-baked median of the same source material"
     }
+  },
+  "strawStudy": {
+    "provider": "Built-in image_gen__imagegen",
+    "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV04\\Image_SichuanStrawStudyV04.png",
+    "sourceSha256": "bc531de26b0630c90300b01e356571c4f35fabb0da23680c6e01c31130ef2f0b",
+    "regions": {
+      "Sole": [
+        0,
+        0,
+        627,
+        627
+      ],
+      "End": [
+        627,
+        0,
+        1254,
+        627
+      ],
+      "Weave": [
+        0,
+        627,
+        627,
+        1254
+      ],
+      "Cord": [
+        627,
+        627,
+        1254,
+        1254
+      ]
+    },
+    "physicalExtentsM": {
+      "Sole": [
+        0.056,
+        0.1
+      ],
+      "End": [
+        0.074,
+        0.074
+      ],
+      "Weave": [
+        0.0505,
+        0.11
+      ],
+      "Cord": [
+        0.012,
+        0.1
+      ]
+    },
+    "deLightStrength": 0.45,
+    "destination": "Reprojected into the shared 1024 GameUV atlas",
+    "prompt": "_import/SichuanBlanketPack/Data_ImagegenPromptV04.txt"
   }
 }

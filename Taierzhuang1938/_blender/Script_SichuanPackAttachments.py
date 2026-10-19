@@ -22,20 +22,23 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
 
     matRoot = MakeRoot(
         'Pack_StrawMat',
-        'Separate removable horizontal rolled straw sleeping mat, 0.42 m long',
+        'Separate removable horizontal rolled straw sleeping mat, 0.408 m including rolled edges',
     )
     sandalRoot = MakeRoot(
         'Pack_Sandals',
         'One pair of traditional woven-straw sandals, suspended by a thin cord',
     )
     sandalMaterial=materials.get('sandal',materials['straw'])
+    ropeMaterial=materials.get('strawCord',sandalMaterial)
 
-    # A gently uneven, sixteen-sided cylinder rather than hundreds of stalks.
+    # A gently uneven low-poly cylinder; fibre detail is carried by the bake.
     # The atlas supplies the dense diagonal weave.  The end ribbons below
     # describe the actual roll spiral with only a few additional polygons.
     matCenter = (0.0, -0.067, 0.186)
-    matSides = 16
-    matRings = (-0.210,-0.198,-0.140,0.0,0.140,0.198,0.210)
+    matLength=.404
+    matHalf=matLength/2
+    matSides = 20
+    matRings = (-matHalf,0.0,matHalf)
     matVerts = []
     matUvs = []
     for ringIndex, xValue in enumerate(matRings):
@@ -50,7 +53,7 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
                 matCenter[1] + math.cos(angle) * radius,
                 matCenter[2] + math.sin(angle) * radius,
             ))
-            matUvs.append(((xValue + 0.210) / 0.420, sideIndex / matSides))
+            matUvs.append(((xValue+matHalf)/matLength, sideIndex/matSides))
     matFaces = []
     for ringIndex in range(len(matRings) - 1):
         for sideIndex in range(matSides):
@@ -66,13 +69,12 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
         xs=[matObject.data.vertices[i].co.x for i in polygon.vertices]
         isCap=max(xs)-min(xs)<1e-6
         if isCap:polygon.material_index=1
-        tile=math.floor(((min(xs)+.210)+1e-7)/.140)
         for loopIndex in polygon.loop_indices:
             point=matObject.data.vertices[matObject.data.loops[loopIndex].vertex_index].co
             if isCap:
                 u=.5+(point.y-matCenter[1])/.074;v=.5+(point.z-matCenter[2])/.074
             else:
-                u=max(0,min(1,(point.x+.210)/.140-tile))
+                u=(point.x+matHalf)/matLength
                 v=(math.atan2(point.z-matCenter[2],point.y-matCenter[1])/math.tau)%1
             matObject.data.uv_layers.active.data[loopIndex].uv=(.52+.46*u,.52+.46*v)
 
@@ -80,32 +82,33 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
         spiralVerts = []
         spiralUvs = []
         spiralFaces = []
-        segments = 34
+        segments = 44
         turns = 3.20
         for pointIndex in range(segments + 1):
-            fraction = pointIndex / segments
+            fraction = (pointIndex / segments)**.65
             angle = 0.45 + turns * 2.0 * math.pi * fraction
             radius = 0.004 + 0.028 * fraction
             # The narrow raised strip is a rolled sheet edge, not an emboss
             # of identical circular rings.  A slight end-face offset avoids
             # z-fighting while keeping the end cap a simple low-poly surface.
-            for edgeSign in (-1.0, 1.0):
+            for edgeSign in (-1.0, 0.0, 1.0):
                 edgeRadius = radius + edgeSign * 0.0017
                 spiralVerts.append((
-                    xValue,
+                    xValue+(-1 if reverse else 1)*.0015*(1-edgeSign*edgeSign),
                     matCenter[1] + math.cos(angle) * edgeRadius,
                     matCenter[2] + math.sin(angle) * edgeRadius,
                 ))
                 spiralUvs.append((fraction, (edgeSign + 1.0) * 0.5))
         for index in range(segments):
-            face = (index * 2, index * 2 + 1,
-                    index * 2 + 3, index * 2 + 2)
-            spiralFaces.append(tuple(reversed(face)) if reverse else face)
+            for across in range(2):
+                a=index*3+across
+                face=(a,a+1,a+4,a+3)
+                spiralFaces.append(tuple(reversed(face)) if reverse else face)
         CreateMesh(name, spiralVerts, spiralFaces, spiralUvs,
                    materials['straw'], parent=matRoot)
 
-    MakeRollSpiral('Pack_StrawMatLeftSpiral', -0.2105, True)
-    MakeRollSpiral('Pack_StrawMatRightSpiral', 0.2105, False)
+    MakeRollSpiral('Pack_StrawMatLeftSpiral', -matHalf-.0005, True)
+    MakeRollSpiral('Pack_StrawMatRightSpiral', matHalf+.0005, False)
 
     # Grey cloth loops align with the two principal vertical pack bindings.
     # They are part of the mat assembly so hiding the mat hides its loops.
@@ -155,7 +158,7 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
         for outward in (0.000, 0.008):
             for width, length in soleOutline:
                 verts.append(LocalPoint(width,length,outward))
-                uvs.append((.31+.25*(0.5+width/.052),(length+.079)/.158))
+                uvs.append((0.5+width/.056,(length+.079)/.158))
         sides = len(soleOutline)
         faces = [tuple(reversed(range(sides))),
                  tuple(sides + index for index in range(sides))]
@@ -164,21 +167,16 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
             faces.append((index, nextIndex, sides + nextIndex, sides + index))
         CreateMesh(name + 'WovenSole', verts, faces, uvs,
                    sandalMaterial, parent=sandalRoot)
-        rimVerts=[];rimUvs=[];rimFaces=[]
+        rimPoints=[]
         for index in range(sides+1):
             width,length=soleOutline[index%sides]
-            for inset in (0,.0028):
-                size=math.hypot(width,length)
-                factor=max(0,1-inset/max(size,.001))
-                rimVerts.append(LocalPoint(width*factor,length*factor,.009+.0005*math.sin(index*1.8)))
-                rimUvs.append((index/sides,.22+inset/.0028*.04))
-        for index in range(sides):rimFaces.append((index*2,index*2+1,index*2+3,index*2+2))
-        CreateMesh(name+'BraidedRim',rimVerts,rimFaces,rimUvs,sandalMaterial,parent=sandalRoot)
+            rimPoints.append(LocalPoint(width*.96,length*.99,.0095+.0007*math.sin(index*1.8)))
+        AddTube(name+'BraidedRim',rimPoints,.0036,ropeMaterial,parent=sandalRoot,sides=3)
 
-        def Lace(suffix, points, radius=0.0020):
+        def Lace(suffix, points, radius=0.0028):
             return AddTube(name + suffix,
                            [LocalPoint(*point) for point in points],
-                           radius,sandalMaterial,parent=sandalRoot,
+                           radius,ropeMaterial,parent=sandalRoot,
                            sides=4)
 
         # Two crossed forefoot cords and a broad multi-point toe binding.
@@ -193,7 +191,7 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
                                 (-0.020, 0.011, 0.021),
                                 (0.000, 0.008, 0.030),
                                 (0.019, 0.011, 0.021),
-                                (0.021, 0.017, 0.005)), 0.0026)
+                                (0.021, 0.017, 0.005)), 0.0036)
 
         # The heel yoke, attached at both sides, makes this a tied grass shoe
         # rather than a modern thong sandal.  Its loose cord crosses the
@@ -202,11 +200,11 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
                          (-0.017, -0.060, 0.025),
                          (0.000, -0.071, 0.031),
                          (0.016, -0.058, 0.025),
-                         (0.019, -0.022, 0.008)), 0.0024)
+                         (0.019, -0.022, 0.008)), 0.0032)
         Lace('InstepLace', ((-0.019, -0.024, 0.009),
                            (0.009, -0.007, 0.029),
                            (0.014, -0.028, 0.020),
-                           (0.017, -0.057, 0.011)), 0.0017)
+                           (0.017, -0.057, 0.011)), 0.0022)
         return LocalPoint(0.000,0.069,0.012)
 
     firstHang = MakeSandal(1,(-0.205,-0.144,-0.014))
@@ -218,8 +216,8 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
                  (-0.206, -0.086, 0.093),
                  (-0.220, end[1] + 0.003, 0.053),
                  end),
-                0.00135, materials['binding'], parent=sandalRoot, sides=4)
+                0.00135, ropeMaterial, parent=sandalRoot, sides=4)
 
-    matRoot['NominalDimensionsM'] = [0.420, 0.070, 0.070]
+    matRoot['NominalDimensionsM'] = [matLength+.004, 0.070, 0.070]
     sandalRoot['SandalCount'] = 2
     return [matRoot, sandalRoot]
