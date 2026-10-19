@@ -830,6 +830,36 @@ try {
   await page.click(".boLevelItem:not(.on)");
   ev = await page.evaluate(() => ({ events: window.__h.events.slice(), open: document.querySelector(".boLevel").classList.contains("open") }));
   Check("关卡下拉：打开、选第二关 → onLevel(\"SecondLevel\")、收起", menuOpen && ev.events.some((e) => e[0] === "level" && e[1] === "SecondLevel") && !ev.open, JSON.stringify(ev));
+  // 新旧标记（2026-10-19）：旧版关卡名前挂「旧版」、下面挂提示条可直跳新剧本；下拉按新剧本 / 旧版 / 草稿分组；新剧本关卡不挂提示条
+  const era = await page.evaluate(() => {
+    const h = window.__h; h.events.length = 0;
+    const levels = [
+      { key: "FirstLevel", label: "第一关 · 往南的路", era: "legacy", badge: "旧版", note: "旧剧本" },
+      { key: "SecondLevel", label: "第二关", era: "draft", badge: "草稿" },
+      { key: "FirstLevel0105", label: "第一关 01–05", era: "rewrite", badge: "新剧本", short: "01–05", note: "新剧本 01–05" },
+    ];
+    h.ui.SetLevels(levels, "FirstLevel");
+    const banner = document.querySelector(".boEraBanner");
+    const r = {
+      badge: document.querySelector(".boLevelBtn .boLevelBadge").textContent, era: document.querySelector(".boLevelBtn .boLevelBadge").dataset.era,
+      shown: banner.classList.contains("show"), jumps: [...banner.querySelectorAll("[data-level]")].map((b) => b.dataset.level),
+      groups: [...document.querySelectorAll(".boLevelGroup")].map((g) => g.textContent),
+      firstItem: document.querySelector(".boLevelItem .boLevelLabel")?.textContent,
+    };
+    banner.querySelector('[data-level="FirstLevel0105"]').click();
+    r.jumped = h.events.some((e) => e[0] === "level" && e[1] === "FirstLevel0105");
+    h.ui.SetLevels(levels, "FirstLevel0105");
+    r.rewriteShown = banner.classList.contains("show");
+    r.rewriteBadge = document.querySelector(".boLevelBtn .boLevelBadge").textContent;
+    h.ui.SetLevels([{ key: "FirstLevel", label: "第一关 · 往南的路" }, { key: "SecondLevel", label: "第二关 · 手榴弹雨（空间草稿）" }], "FirstLevel");
+    r.plainShown = banner.classList.contains("show"); r.plainBadgeHidden = document.querySelector(".boLevelBtn .boLevelBadge").hidden;
+    r.plainGroups = document.querySelectorAll(".boLevelGroup").length;
+    return r;
+  });
+  Check("新旧标记：旧版挂红标 + 提示条（跳 01–05 发 onLevel）；下拉分三组、新剧本在最上；新剧本关不挂提示条；不带 era 的老调用方照旧",
+    era.badge === "旧版" && era.era === "legacy" && era.shown && era.jumps.join() === "FirstLevel0105" && era.jumped
+    && era.groups.join("|") === "新剧本|旧版 · 游戏现行|草稿" && era.firstItem === "第一关 01–05"
+    && !era.rewriteShown && era.rewriteBadge === "新剧本" && !era.plainShown && era.plainBadgeHidden && era.plainGroups === 0, JSON.stringify(era));
   // 图层开关：射界三档循环
   await page.evaluate(() => { window.__h.events.length = 0; });
   await page.click('.boLayer[data-layer="arcs"]');

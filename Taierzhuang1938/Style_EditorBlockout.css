@@ -177,6 +177,45 @@
 .boLevelItem.on { color: var(--bo-gold-text); }
 .boLevelItem.on .boLevelMark { background: currentColor; }
 
+/* 新旧标记（2026-10-19）：关卡名前一枚小标——新剧本金框、旧版红底、草稿灰框；下拉按新剧本 / 旧版 / 草稿分组，每关下一行说明 */
+.boLevelBadge {
+  flex: 0 0 auto; padding: 1px 6px; border: 1px solid #cdb77b88; color: var(--bo-gold);
+  font: 600 11px/16px var(--bo-font); letter-spacing: 0.1em;
+}
+.boLevelBadge[data-era="legacy"] { border-color: #d6604acc; background: #d6604a2e; color: #f0a08f; }
+.boLevelBadge[data-era="draft"] { border-color: var(--bo-line-strong); color: var(--bo-muted); }
+.boLevelBadge[hidden] { display: none; }
+.boLevelBtn .boLevelName { flex: 1 1 auto; text-align: left; }
+.boLevelMenu { min-width: max(100%, 380px); }
+.boLevelGroup {
+  padding: 10px 18px 4px 16px; color: var(--bo-faint);
+  font: 11px/1.4 var(--bo-font); letter-spacing: 0.18em;
+}
+.boLevelGroup:not(:first-child) { margin-top: 6px; border-top: 1px solid var(--bo-line); }
+.boLevelText { display: flex; flex-direction: column; min-width: 0; padding: 6px 0; }
+.boLevelLabel { white-space: nowrap; }
+.boLevelNote { font-size: 11.5px; line-height: 1.45; letter-spacing: 0.04em; color: var(--bo-faint); white-space: normal; max-width: 360px; }
+.boLevelItem:hover .boLevelNote { color: var(--bo-muted); }
+
+/* 旧版提示条：挂在右上关卡下拉下面；红色左边线与旧版小标同色 */
+.boEraBanner {
+  position: absolute; top: 56px; right: 62px; width: min(460px, calc(100vw - 28px));
+  padding: 10px 10px 10px 14px; display: none; border-left: 3px solid #d6604acc;
+  pointer-events: auto;
+}
+.boEraBanner.show { display: block; }
+.boEraHead { display: flex; align-items: center; gap: 8px; color: var(--bo-bright); font-size: 13px; letter-spacing: 0.04em; }
+.boEraHead > span:nth-child(2) { flex: 1 1 auto; }
+.boEraClose { width: 24px; height: 24px; flex: 0 0 auto; }
+.boEraClose svg { width: 12px; height: 12px; }
+.boEraBody { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.boEraLead { color: var(--bo-muted); font-size: 12px; letter-spacing: 0.06em; margin-right: 2px; }
+.boEraGo {
+  height: 28px; padding: 0 12px; border: 1px solid #cdb77b88; color: var(--bo-gold);
+  font: 600 12.5px/26px var(--bo-num); letter-spacing: 0.06em;
+}
+.boEraGo:hover { border-color: var(--bo-gold); color: var(--bo-gold-hi); }
+
 .boLayers {
   display: flex; background: var(--bo-panel); border: 1px solid var(--bo-edge);
 }
@@ -410,6 +449,8 @@ body.blockoutMode #hud .hudFps { top: 56px; left: auto; right: 18px; }
 @media (max-width: 899px) {
   .boTopBar { top: 62px; right: 14px; }
   .boLevelBtn { min-width: 0; max-width: 150px; }
+  .boEraBanner { top: 104px; right: 14px; }
+  .boLevelMenu { min-width: min(380px, calc(100vw - 28px)); }
   body.blockoutMode #hud .hudFps { top: 104px; }
 }
 

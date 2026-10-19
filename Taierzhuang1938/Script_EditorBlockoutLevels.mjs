@@ -14,22 +14,30 @@ import { MISSION_LAYOUT, MISSION_ANCHORS } from "./Data_FirstLevelMissionLayout.
 import { MISSION_TERRAIN, SampleMissionNaturalHeight, TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
 import { BLOCKOUT_LEVEL_KEYS, ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
 
+// 新旧标记（2026-10-19，用户看着旧版第一关以为是新做的）：era 分 "rewrite"（按新剧本重做）/ "legacy"（游戏里现行的旧版）/
+// "draft"（空间草稿）；badge 是关卡名前的小标，note 是下拉里的一行说明，short 是旧版提示条上跳转按钮的短名。
+// 数组顺序别动：levelIndex 同时索引 BLOCKOUT_PHASES，下拉里的分组顺序由界面自己排。
 export const BLOCKOUT_LEVELS = Object.freeze([
   Object.freeze({ key: "FirstLevel", label: "第一关 · 往南的路", configUrl: "./Blockout/FirstLevel.json",
+    era: "legacy", badge: "旧版", note: "游戏里现行的第一关（旧剧本：老周、破墙机枪、拔刀军官）；新剧本已拆成 01–05 / 06–10 / 12–18 三段",
     scene: Object.freeze({ kind: "firstLevelMission" }) }),
   Object.freeze({ key: "SecondLevel", label: "第二关 · 手榴弹雨（空间草稿）", configUrl: "./Blockout/SecondLevel.json",
+    era: "draft", badge: "草稿", note: "第二关的空间草稿",
     scene: Object.freeze({ kind: "file", url: "./Blockout/SecondLevel.scene.json",
       placeholder: Object.freeze({ bounds: { minX: 400, maxX: 640, minZ: -250, maxZ: 60 }, spawn: { x: 470, z: -65, yawDeg: -90 } }) }) }),
   // 2026-10-18：按 Notion 定稿的 01–05（空间拓扑关系）新建的独立场地，坐标原点在沟口；不碰游戏里的第一关
   Object.freeze({ key: "FirstLevel0105", label: "第一关 01–05 · 撤退（新剧本）", configUrl: "./Blockout/FirstLevel0105.json",
+    era: "rewrite", badge: "新剧本", short: "01–05", note: "01–05：防炮洞 → 支沟拖冬瓜 → 集结处 → 机枪坑 → 路口板桥（10-18 剧本）",
     scene: Object.freeze({ kind: "file", url: "./Blockout/FirstLevel0105.scene.json",
       placeholder: Object.freeze({ bounds: { minX: -110, maxX: 190, minZ: -235, maxZ: 200 }, spawn: { x: 66.5, z: 64.2, yawDeg: 90 } }) }) }),
   // 2026-10-18：06–10 新剧本（干沟 → 凹路 → 耿家庄），与 0105 同一套坐标、另一片场地；锚点 Data_EditorBlockoutFirstLevel0610Space
   Object.freeze({ key: "FirstLevel0610", label: "第一关 06–10 · 耿家庄（新剧本）", configUrl: "./Blockout/FirstLevel0610.json",
+    era: "rewrite", badge: "新剧本", short: "06–10", note: "06–10：干沟 → 凹路 → 耿家庄（10-19 剧本）",
     scene: Object.freeze({ kind: "file", url: "./Blockout/FirstLevel0610.scene.json",
       placeholder: Object.freeze({ bounds: { minX: -20, maxX: 250, minZ: 120, maxZ: 560 }, spawn: { x: 35, z: 147, yawDeg: -90 } }) }) }),
   // 2026-10-19：12–18 新剧本（出村 → 北沙河北岸大路 → 空袭 → 排水沟 → 桥头接收院 → 守桥头、过浮桥 → 北门），与 0610 同一套坐标；锚点 Data_EditorBlockoutFirstLevel1218Space
   Object.freeze({ key: "FirstLevel1218", label: "第一关 12–18 · 北沙河（新剧本）", configUrl: "./Blockout/FirstLevel1218.json",
+    era: "rewrite", badge: "新剧本", short: "12–18", note: "12–18：出村 → 北沙河大路 → 空袭 → 桥头接收院 → 浮桥 → 北门（10-19 剧本）",
     scene: Object.freeze({ kind: "file", url: "./Blockout/FirstLevel1218.scene.json",
       placeholder: Object.freeze({ bounds: { minX: -250, maxX: 150, minZ: 480, maxZ: 895 }, spawn: { x: 98, z: 590, yawDeg: 180 } }) }) }),
 ]);

@@ -265,10 +265,11 @@ export class BlockoutUi {
     const level = El("div", "boLevel");
     this.btnLevel = Button("boLevelBtn", { tip: "切换关卡", label: "切换关卡" });
     this.btnLevel.dataset.tipSide = "below";
+    this.elLevelBadge = El("span", "boLevelBadge");
     this.elLevelName = El("span", "boLevelName", "—");
     const chev = El("i", "boChevron");
     chev.innerHTML = ICONS.chevron;
-    this.btnLevel.append(this.elLevelName, chev);
+    this.btnLevel.append(this.elLevelBadge, this.elLevelName, chev);
     this.btnLevel.setAttribute("aria-haspopup", "listbox");
     this.btnLevel.setAttribute("aria-expanded", "false");
     this.levelMenu = El("div", "boLevelMenu boPanel");
@@ -300,6 +301,41 @@ export class BlockoutUi {
 
     bar.append(level, layers, status);
     this.root.appendChild(bar);
+
+    // 旧版提示条（2026-10-19）：打开的是游戏现行的旧版关卡时，在关卡下拉下面挂一条，直接跳新剧本各段
+    this.eraBanner = El("div", "boEraBanner boPanel");
+    this.eraBanner.setAttribute("role", "note");
+    this.Listen(this.eraBanner, "click", (e) => {
+      const go = e.target.closest?.("[data-level]");
+      if (go) { this.Call("onLevel", go.dataset.level); return; }
+      if (e.target.closest?.(".boEraClose")) { this.eraDismissed = this.levelKey; this.eraBanner.classList.remove("show"); }
+    });
+    this.root.appendChild(this.eraBanner);
+  }
+
+  /** 旧版提示条：当前关是 legacy 时显示，列出新剧本各段的跳转按钮；关掉后只在这一关内不再出现。 */
+  UpdateEraBanner() {
+    const current = this.levels.find(l => l.key === this.levelKey);
+    const rewrites = this.levels.filter(l => l.era === "rewrite");
+    const show = current?.era === "legacy" && this.eraDismissed !== this.levelKey;
+    this.eraBanner.replaceChildren();
+    if (current?.era === "legacy") {
+      const head = El("div", "boEraHead");
+      head.append(El("span", "boLevelBadge", current.badge || "旧版"), El("span", "", "这关是游戏里现行的旧版，不是新剧本"));
+      const close = Button("boIconBtn boEraClose", { icon: "close", tip: "关掉提示" });
+      close.dataset.tipSide = "below";
+      head.append(close);
+      const body = El("div", "boEraBody");
+      body.append(El("span", "boEraLead", rewrites.length ? "新剧本在这里：" : "还没有新剧本的关卡"));
+      for (const l of rewrites) {
+        const b = Button("boEraGo", { text: l.short || l.label, label: l.label });
+        b.dataset.level = l.key;
+        b.title = l.note || l.label;
+        body.append(b);
+      }
+      this.eraBanner.append(head, body);
+    }
+    this.eraBanner.classList.toggle("show", show);
   }
 
   BuildMini() {
@@ -394,29 +430,50 @@ export class BlockoutUi {
   get miniCanvas() { return this.miniCanvasEl; }
   get fullCanvas() { return this.fullCanvasEl; }
 
-  /** @param {Array<{key,label}>} levels */
+  /** @param {Array<{key,label,era?,badge?,note?,short?}>} levels  era: "rewrite" 新剧本 / "legacy" 游戏现行旧版 / "draft" 草稿 */
   SetLevels(levels, currentKey) {
-    this.levels = (Array.isArray(levels) ? levels : []).map(l => ({ key: String(l.key), label: String(l.label ?? l.key) }));
+    const Opt = (v) => (typeof v === "string" && v ? v : "");
+    this.levels = (Array.isArray(levels) ? levels : []).map(l => ({
+      key: String(l.key), label: String(l.label ?? l.key),
+      era: Opt(l.era), badge: Opt(l.badge), note: Opt(l.note), short: Opt(l.short),
+    }));
     this.levelKey = currentKey ?? this.levels[0]?.key ?? "";
     const current = this.levels.find(l => l.key === this.levelKey);
     this.elLevelName.textContent = current ? current.label : "—";
-    this.elMapLevel.textContent = current ? current.label : "";
+    this.elLevelBadge.textContent = current?.badge || "";
+    this.elLevelBadge.dataset.era = current?.era || "";
+    this.elLevelBadge.hidden = !current?.badge;
+    this.btnLevel.title = current?.note ? `切换关卡 · ${current.note}` : "切换关卡";   // 这颗按钮的自绘提示被样式关掉了，用原生 title
+    this.elMapLevel.textContent = current ? (current.badge ? `${current.badge}｜${current.label}` : current.label) : "";
     this.levelMenu.replaceChildren();
-    for (const level of this.levels) {
-      const item = El("button", "boLevelItem");
-      item.type = "button";
-      item.setAttribute("role", "option");
-      const on = level.key === this.levelKey;
-      item.classList.toggle("on", on);
-      item.setAttribute("aria-selected", on ? "true" : "false");
-      item.append(El("i", "boLevelMark"), El("span", "", level.label));
-      item.addEventListener("click", () => {
-        this.CloseLevelMenu();
-        if (level.key !== this.levelKey) this.Call("onLevel", level.key);
-      });
-      this.levelMenu.append(item);
+    // 分组：新剧本在上，旧版 / 草稿在下；没写 era 的（老调用方）归到最后一组，不加组头
+    const GROUPS = [["rewrite", "新剧本"], ["legacy", "旧版 · 游戏现行"], ["draft", "草稿"], ["", ""]];
+    const tagged = this.levels.some(l => l.era);
+    for (const [era, title] of GROUPS) {
+      const members = this.levels.filter(l => (GROUPS.some(([e]) => e && e === l.era) ? l.era : "") === era);
+      if (!members.length) continue;
+      if (tagged && title) this.levelMenu.append(El("div", "boLevelGroup", title));
+      for (const level of members) {
+        const item = El("button", "boLevelItem");
+        item.type = "button";
+        item.setAttribute("role", "option");
+        item.dataset.era = level.era;
+        const on = level.key === this.levelKey;
+        item.classList.toggle("on", on);
+        item.setAttribute("aria-selected", on ? "true" : "false");
+        const text = El("span", "boLevelText");
+        text.append(El("span", "boLevelLabel", level.label));
+        if (level.note) text.append(El("span", "boLevelNote", level.note));
+        item.append(El("i", "boLevelMark"), text);
+        item.addEventListener("click", () => {
+          this.CloseLevelMenu();
+          if (level.key !== this.levelKey) this.Call("onLevel", level.key);
+        });
+        this.levelMenu.append(item);
+      }
     }
     this.btnLevel.disabled = this.levels.length < 2;
+    this.UpdateEraBanner();
   }
 
   OpenLevelMenu() {

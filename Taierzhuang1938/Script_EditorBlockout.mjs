@@ -269,7 +269,7 @@ export class EditorBlockout {
   // 启动 / 切关
 
   async Start() {
-    this.ui.SetLevels(BLOCKOUT_LEVELS.map(({ key, label }) => ({ key, label })), this.levelKey);
+    this.ui.SetLevels(BLOCKOUT_LEVELS.map(({ key: k, label, era, badge, note, short }) => ({ key: k, label, era, badge, note, short })), this.levelKey);
     this.ui.SetLayers(this.layers);
     this.ui.SetStatus({ state: "loading", message: "正在读配置", writable: false, saveReason: "" });
     this.started = true;
@@ -499,7 +499,7 @@ export class EditorBlockout {
       this.ReplaceUrl();
       this.SetupLevel();
       await this.previz.Load({ force: true });
-      this.ui.SetLevels(BLOCKOUT_LEVELS.map(({ key: k, label }) => ({ key: k, label })), this.levelKey);
+      this.ui.SetLevels(BLOCKOUT_LEVELS.map(({ key: k, label, era, badge, note, short }) => ({ key: k, label, era, badge, note, short })), this.levelKey);
       await this.GoTo(0, { animate: false });
       this.ui.Toast(`已切到${this.level.label}`, "info");
       return true;
