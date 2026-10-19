@@ -5,8 +5,8 @@
   "source": {
     "generator": "Script_EditorBlockoutCli.mjs export FirstLevel0105",
     "gameVersion": "Notion 01–05 剧本 + 空间拓扑关系（2026-10-18）",
-    "commit": "c9d677d7eec4fe967201e51e48483ed61012cfec",
-    "generatedAt": "2026-10-19T18:26:39.813Z"
+    "commit": "f861fce12d975109012391c9eef3f18d6a604ba3",
+    "generatedAt": "2026-10-19T18:34:00.601Z"
   },
   "zones": [
     {
@@ -5260,24 +5260,24 @@
           "role": "machineGun",
           "group": "lmg",
           "weapon": "Type11",
-          "x": -30,
-          "z": -118,
+          "x": -26.85,
+          "z": -116.84,
           "yawDeg": 0,
           "stance": "prone",
           "aim": true,
           "arc": {
             "halfDeg": 6,
-            "rangeM": 117.5,
-            "yawDeg": -164.4
+            "rangeM": 115.6,
+            "yawDeg": -165.8
           }
         },
         {
           "id": "IjaLmgWestLoader",
           "side": "ija",
           "group": "lmg",
-          "x": -31.4,
-          "z": -117.7,
-          "yawDeg": -164.2,
+          "x": -28.34,
+          "z": -117.58,
+          "yawDeg": -165.6,
           "stance": "prone"
         },
         {
@@ -5287,24 +5287,24 @@
           "role": "machineGun",
           "group": "lmg",
           "weapon": "Type11",
-          "x": 40,
-          "z": -140,
+          "x": 37.2,
+          "z": -137.4,
           "yawDeg": 0,
           "stance": "prone",
           "aim": true,
           "arc": {
             "halfDeg": 6,
-            "rangeM": 141.4,
-            "yawDeg": 162.8
+            "rangeM": 138.1,
+            "yawDeg": 163.6
           }
         },
         {
           "id": "IjaLmgEastLoader",
           "side": "ija",
           "group": "lmg",
-          "x": 41.4,
-          "z": -139.7,
-          "yawDeg": 162.7,
+          "x": 36,
+          "z": -139.4,
+          "yawDeg": 164.8,
           "stance": "prone"
         },
         {
@@ -5333,9 +5333,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -27.5,
-          "z": -100,
-          "yawDeg": -163.5,
+          "x": -48,
+          "z": -113.7,
+          "yawDeg": -155.8,
           "stance": "prone",
           "aim": true
         },
@@ -5344,9 +5344,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -23.1,
-          "z": -102.5,
-          "yawDeg": -166.4,
+          "x": -43,
+          "z": -113.41,
+          "yawDeg": -158,
           "stance": "prone",
           "aim": true
         },
@@ -5355,27 +5355,31 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush2",
-          "x": -5.5,
-          "z": -116,
-          "yawDeg": -177.1
+          "x": -14,
+          "z": -148.33,
+          "yawDeg": -174.3,
+          "stance": "prone",
+          "aim": true
         },
         {
           "id": "IjaRush4",
           "side": "ija",
           "role": "rifleman",
           "group": "rush2",
-          "x": -1.1,
-          "z": -113,
-          "yawDeg": -179.4
+          "x": -6,
+          "z": -148.3,
+          "yawDeg": -177.6,
+          "stance": "prone",
+          "aim": true
         },
         {
           "id": "IjaRush5",
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 16.5,
-          "z": -94,
-          "yawDeg": 169.3,
+          "x": 26,
+          "z": -148.86,
+          "yawDeg": 169.6,
           "stance": "prone",
           "aim": true
         },
@@ -5384,9 +5388,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 20.9,
-          "z": -97,
-          "yawDeg": 166.9,
+          "x": 30,
+          "z": -149,
+          "yawDeg": 168.1,
           "stance": "prone",
           "aim": true
         },
@@ -5395,18 +5399,22 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 36.3,
-          "z": -122,
-          "yawDeg": 162.5
+          "x": 48.34,
+          "z": -154.16,
+          "yawDeg": 161.8,
+          "stance": "prone",
+          "aim": true
         },
         {
           "id": "IjaRush8",
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 31.9,
-          "z": -119.5,
-          "yawDeg": 164.2
+          "x": 52.34,
+          "z": -156.83,
+          "yawDeg": 160.7,
+          "stance": "prone",
+          "aim": true
         }
       ],
       "pois": [
@@ -5478,7 +5486,7 @@
         "轻机枪不用打，只压人",
         "身后撤的人越来越稀"
       ],
-      "notes": "掷弹筒编制待核（资料多说每小队配 2–3 具，与「分队一级的配备」不一致）。从坑里只看得见发射冒的烟；听到「嘭」后约 5–6 s 落地（物理估算）。轻机枪在坑北约 100–150 m、掷弹筒约 200 m 的土坎后。",
+      "notes": "掷弹筒编制待核（资料多说每小队配 2–3 具，与「分队一级的配备」不一致）。从坑里只看得见发射冒的烟；听到「嘭」后约 5–6 s 落地（物理估算）。轻机枪一挺架在坑北约 110 m 坟地的坟后、一挺靠在约 135 m 的麦秸垛边，掷弹筒组在约 205 m 那道地坎下（北边低 2 m，从坑里看不见人）。跃进的步兵每次扑倒都落在田埂、坟包、干水沟沿后面；「左边沟里头有人」是顺坑西北那条干水沟弯着腰摸过来的三个（预演里加的人）。坑北的地物是创作（鲁南农田三月的常见样子）。",
       "units": [
         {
           "id": "Luo",
@@ -5615,24 +5623,24 @@
           "role": "machineGun",
           "group": "lmg",
           "weapon": "Type11",
-          "x": -30,
-          "z": -118,
+          "x": -26.85,
+          "z": -116.84,
           "yawDeg": 0,
           "stance": "prone",
           "aim": true,
           "arc": {
             "halfDeg": 6,
-            "rangeM": 117.5,
-            "yawDeg": -164.4
+            "rangeM": 115.6,
+            "yawDeg": -165.8
           }
         },
         {
           "id": "IjaLmgWestLoader",
           "side": "ija",
           "group": "lmg",
-          "x": -31.4,
-          "z": -117.7,
-          "yawDeg": -164.2,
+          "x": -28.34,
+          "z": -117.58,
+          "yawDeg": -165.6,
           "stance": "prone"
         },
         {
@@ -5642,24 +5650,24 @@
           "role": "machineGun",
           "group": "lmg",
           "weapon": "Type11",
-          "x": 40,
-          "z": -140,
+          "x": 37.2,
+          "z": -137.4,
           "yawDeg": 0,
           "stance": "prone",
           "aim": true,
           "arc": {
             "halfDeg": 6,
-            "rangeM": 141.4,
-            "yawDeg": 162.8
+            "rangeM": 138.1,
+            "yawDeg": 163.6
           }
         },
         {
           "id": "IjaLmgEastLoader",
           "side": "ija",
           "group": "lmg",
-          "x": 41.4,
-          "z": -139.7,
-          "yawDeg": 162.7,
+          "x": 36,
+          "z": -139.4,
+          "yawDeg": 164.8,
           "stance": "prone"
         },
         {
@@ -5688,9 +5696,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -25,
-          "z": -70,
-          "yawDeg": -158.4,
+          "x": -49.66,
+          "z": -89.16,
+          "yawDeg": -148.8,
           "stance": "prone",
           "aim": true
         },
@@ -5699,9 +5707,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -21,
-          "z": -72.5,
-          "yawDeg": -162.2,
+          "x": -44.66,
+          "z": -92.5,
+          "yawDeg": -152.4,
           "stance": "prone",
           "aim": true
         },
@@ -5710,27 +5718,31 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush2",
-          "x": -5,
-          "z": -86,
-          "yawDeg": -176.4
+          "x": -21.65,
+          "z": -107.7,
+          "yawDeg": -167.9,
+          "stance": "prone",
+          "aim": true
         },
         {
           "id": "IjaRush4",
           "side": "ija",
           "role": "rifleman",
           "group": "rush2",
-          "x": -1,
-          "z": -83,
-          "yawDeg": -179.2
+          "x": -11.65,
+          "z": -114.3,
+          "yawDeg": -173.8,
+          "stance": "prone",
+          "aim": true
         },
         {
           "id": "IjaRush5",
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 15,
-          "z": -64,
-          "yawDeg": 165.3,
+          "x": 20.34,
+          "z": -135.5,
+          "yawDeg": 171,
           "stance": "prone",
           "aim": true
         },
@@ -5739,9 +5751,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 19,
-          "z": -67,
-          "yawDeg": 162.4,
+          "x": 24.34,
+          "z": -138.16,
+          "yawDeg": 169.5,
           "stance": "prone",
           "aim": true
         },
@@ -5750,18 +5762,22 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 33,
-          "z": -92,
-          "yawDeg": 158.8
+          "x": 34,
+          "z": -108.27,
+          "yawDeg": 161.4,
+          "stance": "prone",
+          "aim": true
         },
         {
           "id": "IjaRush8",
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 29,
-          "z": -89.5,
-          "yawDeg": 160.6
+          "x": 38,
+          "z": -108.13,
+          "yawDeg": 159.4,
+          "stance": "prone",
+          "aim": true
         },
         {
           "id": "IjaTrench1",
@@ -6021,24 +6037,24 @@
           "role": "machineGun",
           "group": "lmg",
           "weapon": "Type11",
-          "x": -30,
-          "z": -118,
+          "x": -26.85,
+          "z": -116.84,
           "yawDeg": 0,
           "stance": "prone",
           "aim": true,
           "arc": {
             "halfDeg": 6,
-            "rangeM": 117.5,
-            "yawDeg": -164.4
+            "rangeM": 115.6,
+            "yawDeg": -165.8
           }
         },
         {
           "id": "IjaLmgWestLoader",
           "side": "ija",
           "group": "lmg",
-          "x": -31.4,
-          "z": -117.7,
-          "yawDeg": -164.2,
+          "x": -28.34,
+          "z": -117.58,
+          "yawDeg": -165.6,
           "stance": "prone"
         },
         {
@@ -6048,24 +6064,24 @@
           "role": "machineGun",
           "group": "lmg",
           "weapon": "Type11",
-          "x": 40,
-          "z": -140,
+          "x": 37.2,
+          "z": -137.4,
           "yawDeg": 0,
           "stance": "prone",
           "aim": true,
           "arc": {
             "halfDeg": 6,
-            "rangeM": 141.4,
-            "yawDeg": 162.8
+            "rangeM": 138.1,
+            "yawDeg": 163.6
           }
         },
         {
           "id": "IjaLmgEastLoader",
           "side": "ija",
           "group": "lmg",
-          "x": 41.4,
-          "z": -139.7,
-          "yawDeg": 162.7,
+          "x": 36,
+          "z": -139.4,
+          "yawDeg": 164.8,
           "stance": "prone"
         },
         {
@@ -6094,27 +6110,31 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -25,
-          "z": -52,
-          "yawDeg": -150.9
+          "x": -21.43,
+          "z": -56.45,
+          "yawDeg": -156.6,
+          "stance": "prone",
+          "aim": true
         },
         {
           "id": "IjaRush2",
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -21,
-          "z": -54.5,
-          "yawDeg": -156.1
+          "x": -20.05,
+          "z": -57.04,
+          "yawDeg": -158.2,
+          "stance": "prone",
+          "aim": true
         },
         {
           "id": "IjaRush3",
           "side": "ija",
           "role": "rifleman",
           "group": "rush2",
-          "x": -5,
-          "z": -68,
-          "yawDeg": -175.3,
+          "x": -6,
+          "z": -42.35,
+          "yawDeg": -170.4,
           "stance": "prone",
           "aim": true
         },
@@ -6123,9 +6143,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush2",
-          "x": -1,
-          "z": -65,
-          "yawDeg": -179,
+          "x": -9,
+          "z": -66.35,
+          "yawDeg": -171.4,
           "stance": "prone",
           "aim": true
         },
@@ -6134,27 +6154,31 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 15,
-          "z": -46,
-          "yawDeg": 159
+          "x": 16,
+          "z": -67.38,
+          "yawDeg": 165.2,
+          "stance": "prone",
+          "aim": true
         },
         {
           "id": "IjaRush6",
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 19,
-          "z": -49,
-          "yawDeg": 155.7
+          "x": 20,
+          "z": -67.65,
+          "yawDeg": 161.7,
+          "stance": "prone",
+          "aim": true
         },
         {
           "id": "IjaRush7",
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 33,
-          "z": -74,
-          "yawDeg": 153.8,
+          "x": 30,
+          "z": -40.81,
+          "yawDeg": 138.4,
           "stance": "prone",
           "aim": true
         },
@@ -6163,9 +6187,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 29,
-          "z": -71.5,
-          "yawDeg": 155.8,
+          "x": 34,
+          "z": -40.86,
+          "yawDeg": 134.9,
           "stance": "prone",
           "aim": true
         },
@@ -6647,24 +6671,24 @@
           "role": "machineGun",
           "group": "lmg",
           "weapon": "Type11",
-          "x": -30,
-          "z": -118,
+          "x": -26.85,
+          "z": -116.84,
           "yawDeg": 0,
           "stance": "prone",
           "aim": true,
           "arc": {
             "halfDeg": 6,
-            "rangeM": 117.5,
-            "yawDeg": -164.4
+            "rangeM": 115.6,
+            "yawDeg": -165.8
           }
         },
         {
           "id": "IjaLmgWestLoader",
           "side": "ija",
           "group": "lmg",
-          "x": -31.4,
-          "z": -117.7,
-          "yawDeg": -164.2,
+          "x": -28.34,
+          "z": -117.58,
+          "yawDeg": -165.6,
           "stance": "prone"
         },
         {
@@ -6674,24 +6698,24 @@
           "role": "machineGun",
           "group": "lmg",
           "weapon": "Type11",
-          "x": 40,
-          "z": -140,
+          "x": 37.2,
+          "z": -137.4,
           "yawDeg": 0,
           "stance": "prone",
           "aim": true,
           "arc": {
             "halfDeg": 6,
-            "rangeM": 141.4,
-            "yawDeg": 162.8
+            "rangeM": 138.1,
+            "yawDeg": 163.6
           }
         },
         {
           "id": "IjaLmgEastLoader",
           "side": "ija",
           "group": "lmg",
-          "x": 41.4,
-          "z": -139.7,
-          "yawDeg": 162.7,
+          "x": 36,
+          "z": -139.4,
+          "yawDeg": 164.8,
           "stance": "prone"
         },
         {
@@ -6720,9 +6744,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -18,
-          "z": -36,
-          "yawDeg": -148.2,
+          "x": -20,
+          "z": -43.55,
+          "yawDeg": -151.3,
           "stance": "prone",
           "aim": true
         },
@@ -6731,9 +6755,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -14,
-          "z": -38.5,
-          "yawDeg": -156,
+          "x": -15,
+          "z": -43.11,
+          "yawDeg": -157.4,
           "stance": "prone",
           "aim": true
         },
@@ -6742,9 +6766,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush2",
-          "x": -5,
-          "z": -44,
-          "yawDeg": -172.3
+          "x": -6,
+          "z": -30,
+          "yawDeg": -165.4
         },
         {
           "id": "IjaRush4",
@@ -6752,8 +6776,8 @@
           "role": "rifleman",
           "group": "rush2",
           "x": -1,
-          "z": -41,
-          "yawDeg": -178.3
+          "z": -33,
+          "yawDeg": -177.8
         },
         {
           "id": "IjaRush5",
@@ -6761,8 +6785,8 @@
           "role": "rifleman",
           "group": "rush3",
           "x": 10,
-          "z": -30,
-          "yawDeg": 156.5,
+          "z": -41.27,
+          "yawDeg": 163.7,
           "stance": "prone",
           "aim": true
         },
@@ -6772,8 +6796,8 @@
           "role": "rifleman",
           "group": "rush3",
           "x": 14,
-          "z": -33,
-          "yawDeg": 151.7,
+          "z": -41.08,
+          "yawDeg": 157.7,
           "stance": "prone",
           "aim": true
         },
@@ -6782,18 +6806,18 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 24,
-          "z": -47,
-          "yawDeg": 149
+          "x": 26,
+          "z": -28,
+          "yawDeg": 128.9
         },
         {
           "id": "IjaRush8",
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 20,
-          "z": -44.5,
-          "yawDeg": 151.9
+          "x": 30,
+          "z": -30,
+          "yawDeg": 127.5
         },
         {
           "id": "IjaTrench1",

@@ -6,10 +6,12 @@
 // 跑法：node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene FirstLevel0105 --force
 //
 // 坐标与尺寸只读 Data_EditorBlockoutFirstLevel0105Space（唯一口径）；本文件不另造锚点，只定「怎么烘」：
-//   1. 自然地面 NaturalHeight：前沿 0、坑北开阔地略低、z −206 东西向土坎、z 60→131 缓升到坡顶、
+//   1. 自然地面 NaturalHeight：前沿 0、坑北开阔地略低、z 60→131 缓升到坡顶、
 //      坡顶往南落到 +1.5 的台地，台地里一道弯弯曲曲的干沟（集结处，沟底 −1.0、两岸 2.5 m 陡坎，按 Space 的 GullyU 挖），
 //      中弯往南接支沟，支沟南头接一条往南的凹路；南岸再往南十来米落到平地 0；南岸坎顶堆两段矮土埂（0.6–0.8 m，L0105_GULLY_SOUTH_BERM，支沟处切开）；
 //      叠一层确定性的低频起伏（几条固定频率的正弦，不用随机数）。
+//      2026-10-20 坑北前景（只碰 z < −8，PitNorthHeight）：80 m 外 ±1 m 的大起伏、z ≈ −206 横贯全场的地坎（北低南高 2 m）、
+//      五道田埂、七座坟包、一条斜到坑西北的干水沟（深 1.2 m，两沿翻土，穿地坎处是豁口）；原来的土坎与东轻机枪弹坑去掉。
 //   2. 路面：路宽内压低一点，两侧路肩略起。
 //   3. 壕沟：复用 Script_TrenchPlan.CompileTrenchNetwork（与游戏第一关同一套断面、弃土垄与位置噪声）。
 //      交通沟在板桥底下加深 0.3 m、过坡顶那段变浅、末端顺着干沟北岸的坎切成坡道下到沟底：不拆段，而是给 Apply 的
@@ -17,7 +19,7 @@
 //      支沟的弃土只堆南沿（一道 0.75 m 的土垄，02 迂回组贴着它外侧爬，北沿的机枪看不见）。
 //   4. 支沟口：支沟比交通沟深 0.4 m；交通沟里不许被支沟的端头挖深（夹到交通沟底），落差在支沟口用台阶块补。
 //   5. 机枪坑、散兵坑、防炮洞：矩形 / 圆形平底开挖（底面取中心自然地面减深度，一整块平的）。
-//   6. 体块：沟里的日常摆件（L0105_PROPS）、路口板桥（横木 + 门板，显式 y）、干沟南岸的枯树，以及随信号体块。
+//   6. 体块：沟里的日常摆件（L0105_PROPS）、路口板桥（横木 + 门板，显式 y）、干沟南岸的枯树，坑北的树桩 / 柏树 / 麦秸垛 / 杨树 / 土坯房，以及随信号体块。
 //
 // 纪律：不读时钟、不读 git（commit / generatedAt 由 CLI 传入）；所有随机来自 TrenchPlan 的种子噪声，生成两次逐字相同。
 // ===========================================================================
@@ -31,6 +33,7 @@ import {
   L0105_ROAD, L0105_ROAD_WIDTH_M, L0105_PLACES, L0105_SIGNALS, L0105_SPAWN,
   L0105_GULLY, L0105_GULLY_TREES, L0105_GULLY_SOUTH_BERM, L0105_SUNKEN_LANE, L0105_BRIDGE, L0105_BRANCH_SOUTH_BERM,
   L0105_PROPS, L0105_PROP_KINDS, PointBeside, LineLength, GullyU, L0105_GULLY_POCKETS,
+  L0105_PIT_NORTH, BundZ, ScarpZ,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 export const L0105_SCENE_GENERATOR = "Script_EditorBlockoutCli.mjs scene FirstLevel0105";
@@ -56,11 +59,7 @@ const G = L0105_GULLY;
 const CREST_RISE_FROM_Z = 60;    // 从这里往南缓缓升到坡顶
 const FIELD_DIP_FROM_Z = -25;    // 坑北这条线以北开始变低
 const FIELD_DIP_RAMP_M = 25;
-// 土坎（mortarBank）：长 w、厚 d；坎顶留 1.5 m 平台，两侧 2.5 m 起坡，东西两头 8 m 收尖
-const BANK = P.mortarBank;
-const BANK_HALF_TOP_M = 0.75, BANK_SLOPE_M = BANK.d / 2 - 0.75, BANK_END_TAPER_M = 8;
-// 东边轻机枪的弹坑（敌人趴在坑里，往南打）
-const LMG_CRATER = Object.freeze({ x: P.enemyLmgEast.x, z: P.enemyLmgEast.z - 0.4, r: 2.6, depth: 0.6, rimH: 0.3, rimW: 1.6 });
+// （2026-10-20：原来 z −206 那道 90 m 宽、高 2.2 m 的土坎与东轻机枪的弹坑去掉，换成坑北前景 PitNorthHeight，见本文件「坑北前景」一节）
 
 /** 干沟「挖进去多少」（0…1）：沟底里 1，两岸 wallM 内陡起、东西两头 endWallM 内缓起（形状在 Space 的 GullyU）。 */
 function GullyWeight(x, z) {
@@ -159,12 +158,6 @@ export function NaturalHeight(x, z) {
   let h = H.front;
   // 坑北开阔地略低（守方居高一点）
   h += H.fieldNorthDip * Smooth((FIELD_DIP_FROM_Z - z) / FIELD_DIP_RAMP_M);
-  // 土坎：相对两侧地面高 mortarBankTop
-  {
-    const across = Smooth((BANK_HALF_TOP_M + BANK_SLOPE_M - Math.abs(z - BANK.z)) / BANK_SLOPE_M);
-    const along = Smooth((BANK.w / 2 - Math.abs(x - BANK.x)) / BANK_END_TAPER_M);
-    h += H.mortarBankTop * across * along;
-  }
   h += SouthProfile(x, z);
   h += Undulation(x, z);
   // 南岸坎顶土埂（在干沟 / 凹路开挖之前堆：坎里那一侧被干沟削掉一点，凹路处整个切开）
@@ -179,17 +172,111 @@ export function NaturalHeight(x, z) {
     const cap = LaneCap(x, z);
     if (cap < h) h = cap;
   }
-  // 东轻机枪的弹坑：碗 + 一圈翻出来的土
-  {
-    const d = Math.hypot(x - LMG_CRATER.x, z - LMG_CRATER.z);
-    if (d < LMG_CRATER.r + LMG_CRATER.rimW) {
-      const bowl = -LMG_CRATER.depth * (1 - Smooth(d / LMG_CRATER.r));
-      const u = (d - LMG_CRATER.r * 0.7) / (LMG_CRATER.rimW + LMG_CRATER.r * 0.3);
-      const rim = u > 0 && u < 1 ? LMG_CRATER.rimH * Math.sin(u * Math.PI) : 0;
-      h += bowl + rim;
-    }
-  }
+  // 坑北前景（大起伏、地坎、田埂、坟包、干水沟；只动 z < PIT_NORTH_FROM_Z）
+  if (z < PIT_NORTH_FROM_Z) h = PitNorthHeight(x, z, h);
   return h;
+}
+
+// ---------------------------------------------------------------------------
+// 1b. 坑北前景（2026-10-20，L0105_PIT_NORTH；创作，无史料出处）
+//   大起伏 + 地坎（北低南高）先改「地形」，记作 base；再在上面堆田埂、坟包；最后按 base 往下挖干水沟（沟底不被田埂垫高），
+//   两沿各翻一条矮土。地坎在干水沟穿过处把坎面放宽成豁口。只碰 z < PIT_NORTH_FROM_Z（前沿沟北沿弃土以北），南面一点不动。
+
+const PN = L0105_PIT_NORTH;
+const PIT_NORTH_FROM_Z = -8;
+const DITCH = PN.ditch;
+const DITCH_LEN = LineLength(DITCH.line);
+const DITCH_BOX = (() => {
+  const xs = DITCH.line.map((p) => p.x), zs = DITCH.line.map((p) => p.z), m = DITCH.topW / 2 + DITCH.lipW + PN.scarp.notchR + 2;
+  return { minX: Math.min(...xs) - m, maxX: Math.max(...xs) + m, minZ: Math.min(...zs) - m, maxZ: Math.max(...zs) + m };
+})();
+const GRAVES = Object.freeze([...PN.loneGraves, ...PN.graveyard]);
+
+/** 点到干水沟中心线：→ { d 横向距离, along 弧长 }（离沟很远时 d = Infinity）。 */
+export function DitchStation(x, z) {
+  if (x < DITCH_BOX.minX || x > DITCH_BOX.maxX || z < DITCH_BOX.minZ || z > DITCH_BOX.maxZ) return { d: Infinity, along: 0 };
+  let best = Infinity, at = 0, walked = 0;
+  for (let i = 1; i < DITCH.line.length; i++) {
+    const a = DITCH.line[i - 1], b = DITCH.line[i];
+    const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
+    const t = Clamp01(((x - a.x) * dx + (z - a.z) * dz) / (len * len));
+    const d = Math.hypot(x - a.x - dx * t, z - a.z - dz * t);
+    if (d < best) { best = d; at = walked + len * t; }
+    walked += len;
+  }
+  return { d: best, along: at };
+}
+/** 干水沟在这一处的深度系数（西南头最后 endTaperM 渐浅到 0）。 */
+export function DitchDepthAt(along) { return DITCH.depth * Smooth((DITCH_LEN - along) / DITCH.endTaperM); }
+
+/** 大起伏（米）：z < clearedToZ 起 rampM 内渐强。 */
+export function PitNorthRoll(x, z) {
+  const w = Smooth((PN.clearedToZ - z) / PN.roll.rampM);
+  if (w <= 0) return 0;
+  const r = PN.roll;
+  return w * (r.a1 * Math.sin(x * r.k1x + z * r.k1z + r.p1) + r.a2 * Math.sin(x * r.k2x + z * r.k2z + r.p2));
+}
+/** 整片地往北缓缓抬（米，≥ 0）：扫清带外到地坎 riseM，坎下往北到村子再 farRiseM。 */
+export function PitNorthTilt(z) {
+  const t = PN.tilt;
+  return t.riseM * Smooth((t.fromZ - z) / (t.fromZ - t.toZ)) + t.farRiseM * Smooth((t.farFromZ - z) / (t.farFromZ - t.farToZ));
+}
+/** 地坎（≤ 0，北边低 drop）：坎面宽 faceM，干水沟穿过处放宽成豁口。 */
+export function ScarpDelta(x, z, ditchD = DitchStation(x, z).d) {
+  const s = PN.scarp;
+  const u = ScarpZ(x) - z;   // 坎线以北为正
+  const W = s.faceM + s.notchM * (1 - Smooth(ditchD / s.notchR));
+  if (u < -W / 2 - 0.01) return 0;
+  return -s.drop * Smooth((u + W / 2) / W);
+}
+/** 田埂加高（米）：最高那一道。 */
+export function BundHeight(x, z) {
+  let best = 0;
+  for (const b of PN.bunds) {
+    if (x < b.minX - 1 || x > b.maxX + 1) continue;
+    const zc = BundZ(b, x);
+    const slope = b.amp * b.k * Math.cos(b.k * x + b.phase);
+    const d = Math.abs(z - zc) / Math.hypot(1, slope);
+    const half = PN.bundTopW / 2;
+    if (d >= half + PN.bundSlopeM) continue;
+    const k = d <= half ? 1 : 1 - Smooth((d - half) / PN.bundSlopeM);
+    const ends = Smooth((x - b.minX) / 3) * Smooth((b.maxX - x) / 3);
+    best = Math.max(best, PN.bundH * k * ends);
+  }
+  return best;
+}
+/** 坟包加高（米）：圆顶，底半径 graveBaseR。 */
+export function GraveHeight(x, z) {
+  let best = 0;
+  const R = PN.graveBaseR;
+  for (const g of GRAVES) {
+    const r = Math.hypot(x - g.x, z - g.z);
+    if (r >= R) continue;
+    best = Math.max(best, g.h * Math.pow(1 - (r / R) * (r / R), 1.2));
+  }
+  return best;
+}
+/** 干水沟：返回 { cap 开挖后的高度上限（Infinity = 不挖）, lip 沟沿翻土加高 }；base = 起伏 + 地坎后的地面。 */
+function DitchCut(base, st) {
+  if (!(st.d < DITCH.topW / 2 + DITCH.lipW)) return { cap: Infinity, lip: 0 };
+  const depth = DitchDepthAt(st.along);
+  const fh = DITCH.floorW / 2, th = DITCH.topW / 2;
+  if (st.d >= th) {
+    const u = (st.d - th) / DITCH.lipW;
+    return { cap: Infinity, lip: DITCH.lipH * Math.sin(u * Math.PI) * (depth / DITCH.depth) };
+  }
+  const k = st.d <= fh ? 1 : 1 - Smooth((st.d - fh) / (th - fh));
+  return { cap: base - depth * k, lip: 0 };
+}
+/** 坑北前景合到地面上。h = 原来的自然地面（含前沿一带的小起伏、坑北略低）。 */
+export function PitNorthHeight(x, z, h) {
+  const st = DitchStation(x, z);
+  const base = h + PitNorthRoll(x, z) + PitNorthTilt(z) + ScarpDelta(x, z, st.d);
+  let out = base + Math.max(BundHeight(x, z), GraveHeight(x, z));
+  const cut = DitchCut(base, st);
+  if (cut.cap < out) out = cut.cap;
+  else out += cut.lip;
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -486,11 +573,33 @@ export function L0105Blocks(sample, floors) {
     blocks.push(Block(`CrestPost${i + 1}`, p.x, p.z - 0.6, 2.6, 0.8, 0.45, i % 2 ? "earthDark" : "cover", { cover: { ...FACE_NORTH } }));
   });
 
-  // --- 远处日军：西轻机枪趴在小土包后，东轻机枪在弹坑里（坑沿是地形） ----------
-  blocks.push(Block("EnemyLmgWestMound", P.enemyLmgWest.x, P.enemyLmgWest.z + 1.3, 2.4, 1.1, 0.6, "earthDark", { cover: { ...FACE_SOUTH } }));
-  blocks.push(Block("EnemyLmgEastLip", P.enemyLmgEast.x, LMG_CRATER.z + LMG_CRATER.r + 0.5, 2.0, 0.8, 0.35, "earthDark", { cover: { ...FACE_SOUTH } }));
+  // --- 坑北前景（2026-10-20）：树桩、坟地柏树、麦秸垛、村前杨树、土坯房（田埂 / 坟包 / 干水沟 / 地坎在高度场里） ----------
+  blocks.push(...PitNorthBlocks(sample));
 
   return { blocks, gates, facts };
+}
+
+/**
+ * 坑北前景的体块（2026-10-20）：树桩（矮块，不挡人）、坟地柏树（细高块）、麦秸垛（两层块，圆顶感）、村前杨树、土坯房（墙块 + 草顶）。
+ * 显式 y 的块（麦秸垛上层、房顶）按 sample 在脚印中心与四角取最低的地面算（同不写 y 时加载器的落地法）。
+ */
+export function PitNorthBlocks(sample) {
+  const out = [];
+  const Low = (x, z, w, d) => Math.min(sample(x, z), sample(x - w / 2, z - d / 2), sample(x + w / 2, z - d / 2), sample(x - w / 2, z + d / 2), sample(x + w / 2, z + d / 2));
+  const N2 = (i) => String(i + 1).padStart(2, "0");
+  PN.stumps.forEach((s, i) => out.push(Block(`FieldStump_${N2(i)}`, s.x, s.z, 0.45, 0.45, s.h, "timber", { prop: "Stump" })));
+  PN.cypresses.forEach((t, i) => out.push(Block(`GraveCypress_${N2(i)}`, t.x, t.z, 1.1, 1.1, t.h, "foliage", { prop: "Cypress" })));
+  const hs = PN.haystack;
+  const hsY = Low(hs.x, hs.z, hs.w, hs.d);
+  out.push(Block("Haystack", hs.x, hs.z, hs.w, hs.d, hs.baseH, "canvas", { prop: "Haystack", y: R2(hsY + hs.baseH / 2), cover: { ...FACE_SOUTH } }));
+  out.push(Block("HaystackTop", hs.x, hs.z, hs.topW, hs.topD, hs.h - hs.baseH, "canvas", { prop: "Haystack", y: R2(hsY + hs.baseH + (hs.h - hs.baseH) / 2) }));
+  PN.poplars.forEach((t, i) => out.push(Block(`VillagePoplar_${N2(i)}`, t.x, t.z, 1.4, 1.4, t.h, "foliage", { prop: "Poplar" })));
+  PN.houses.forEach((hu, i) => {
+    const y0 = Low(hu.x, hu.z, hu.w, hu.d);
+    out.push(Block(`VillageHouse_${N2(i)}`, hu.x, hu.z, hu.w, hu.d, PN.houseWallH, "plaster", { y: R2(y0 + PN.houseWallH / 2) }));
+    out.push(Block(`VillageRoof_${N2(i)}`, hu.x, hu.z, hu.w + 0.5, hu.d + 0.5, PN.houseRoofT, "roof", { y: R2(y0 + PN.houseWallH + PN.houseRoofT / 2) }));
+  });
+  return out;
 }
 
 /** 折线（米）上的弧长 → 点 + 走向；摆件、板桥用。 */
@@ -723,6 +832,80 @@ export function GullyBankHeights(sample) {
   });
 }
 
+/**
+ * 坑北前景的核对（notes 与 SceneTest 共用）。观察者 = 坑里北壁射击台上站着的人（坑底 + 踏台 0.7 + 眼高 1.62，世界高 pitEyeY），
+ * 沿胸墙 x −3…3 与甲位五个点。sample = 烘好的网格。
+ */
+export const PIT_NORTH_DITCH_HEAD_M = 1.2;   // 干水沟里弯着腰走 / 蹲着的人，头顶离沟底
+export const PIT_NORTH_MORTAR_HEAD_M = 1.25; // 掷弹筒组蹲着，头顶离地
+export function PitNorthObservers(sample) {
+  const pitEyeY = sample(PIT.x, PIT.z) + 0.7 + 1.62;
+  return { pitEyeY: R2(pitEyeY), points: [[-3, -9.4], [-1.5, -9.4], [0, -9.4], [P.fireA.x, P.fireA.z], [1.5, -9.4], [3, -9.4]].map(([x, z]) => ({ x, z, eyeY: pitEyeY })) };
+}
+/** 世界高 aY 的眼睛 → 目标点离地 b.eye：最大遮挡（地面高出视线多少米；≤ 0 = 看得见）。 */
+export function SightBlockFromY(sample, a, b, stepM = 0.5) {
+  return SightBlock(sample, { x: a.x, z: a.z, eye: a.eyeY - sample(a.x, a.z) }, b, stepM);
+}
+export function PitNorthChecks(sample) {
+  const R = PN.graveBaseR;
+  const graves = [...PN.loneGraves.map((g, i) => ({ id: `孤坟${i + 1}`, ...g })), ...PN.graveyard].map((g) => {
+    let ring = 0; for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; ring += sample(g.x + Math.cos(a) * (R + 1), g.z + Math.sin(a) * (R + 1)); }
+    return { id: g.id, want: g.h, h: R2(sample(g.x, g.z) - ring / 12) };
+  });
+  // 田埂：每道每 10 m 量一次（埂顶 − 埂前后 2 m 的地面平均），避开干水沟和坟
+  const bunds = [];
+  for (const b of PN.bunds) for (let x = b.minX + 6; x <= b.maxX - 6; x += 10) {
+    const z = BundZ(b, x);
+    if (DitchStation(x, z).d < 4 || GraveHeight(x, z + 2) > 0 || GraveHeight(x, z - 2) > 0) continue;
+    bunds.push({ id: b.id, x, h: R2(sample(x, z) - (sample(x, z - 2) + sample(x, z + 2)) / 2) });
+  }
+  // 干水沟：沿沟每 3 m（尽头渐浅段不算）量深 = 两沿外 2.6 m 的地面平均 − 沟底
+  const ditchRows = [];
+  const tops = [];
+  for (let d = 2; d <= DITCH_LEN - PN.ditch.endTaperM - 1; d += 3) {
+    const c = PointBeside(PN.ditch.line, d, 0), l = PointBeside(PN.ditch.line, d, 2.6), r = PointBeside(PN.ditch.line, d, -2.6);
+    if (Math.abs(ScarpZ(c.x) - c.z) < PN.scarp.notchR + 8) continue;   // 豁口那一截是斜的
+    const floor = sample(c.x, c.z);
+    tops.push(R2((sample(l.x, l.z) + sample(r.x, r.z)) / 2 - floor));
+    ditchRows.push({ x: c.x, z: c.z, eye: PIT_NORTH_DITCH_HEAD_M });
+  }
+  // 地坎：坎线南 6 m 与北 6 m 的地面差（离豁口 10 m 以外，每 10 m）
+  const drops = [];
+  for (let x = L0105_BOUNDS.minX + 5; x <= L0105_BOUNDS.maxX - 5; x += 10) {
+    const z = ScarpZ(x);
+    if (DitchStation(x, z).d < 10) continue;
+    drops.push(R2(sample(x, z + 6) - sample(x, z - 6) - (PitNorthRoll(x, z + 6) - PitNorthRoll(x, z - 6)) - (PitNorthTilt(z + 6) - PitNorthTilt(z - 6))));
+  }
+  // 豁口：顺着沟走，1 m 内最大高差
+  let notchStep = 0;
+  for (let d = 0; d < DITCH_LEN - 1; d += 0.25) {
+    const a = PointBeside(PN.ditch.line, d, 0), b = PointBeside(PN.ditch.line, d + 1, 0);
+    if (Math.abs(ScarpZ(a.x) - a.z) > 12) continue;
+    notchStep = Math.max(notchStep, Math.abs(sample(a.x, a.z) - sample(b.x, b.z)));
+  }
+  const obs = PitNorthObservers(sample);
+  const Run = (targets) => {
+    let worst = Infinity, worstRow = null; const rows = [];
+    for (const a of obs.points) for (const b of targets) { const r = SightBlockFromY(sample, a, b); rows.push({ a, b, ...r }); if (r.block < worst) { worst = r.block; worstRow = rows[rows.length - 1]; } }
+    return { worst: R2(worst), worstRow, rows };
+  };
+  const m = P.mortar;
+  const mortar = Run([[m.x - 1, m.z], [m.x + 1.2, m.z - 0.6], [m.x, m.z], [m.x + 0.8, m.z + 0.9]].map(([x, z]) => ({ x, z, eye: PIT_NORTH_MORTAR_HEAD_M })));
+  // 烟：要「看得见」，取最容易被挡的那一对（block 最大）
+  const smokeRows = Run([{ x: m.x, z: m.z + 2, eye: 3.0 }]);
+  const smoke = { worst: R2(Math.max(...smokeRows.rows.map((r) => r.block))) };
+  const ditch = Run(ditchRows);
+  const fireA = { x: P.fireA.x, z: P.fireA.z, eyeY: obs.pitEyeY };
+  const lmgW = SightBlockFromY(sample, fireA, { x: P.enemyLmgWest.x, z: P.enemyLmgWest.z, eye: 0.4 });
+  const lmgE = SightBlockFromY(sample, fireA, { x: P.enemyLmgEast.x, z: P.enemyLmgEast.z, eye: 0.4 });
+  const hs = PN.haystack;
+  return {
+    pitEyeY: obs.pitEyeY, graves, bunds, bundMin: Math.min(...bunds.map((b) => b.h)), bundMax: Math.max(...bunds.map((b) => b.h)),
+    ditchDepthMin: Math.min(...tops), ditchDepthMax: Math.max(...tops), scarpMin: Math.min(...drops), scarpMax: Math.max(...drops), notchStep: R2(notchStep),
+    haystackTop: R2(hs.h), mortar, smoke, ditch, lmgW, lmgE,
+  };
+}
+
 /** 点到凹路中心线的水平距离。 */
 export function DistanceToLane(x, z) { return DistanceToPolyline(x, z, L0105_SUNKEN_LANE.line); }
 
@@ -794,7 +977,15 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
     notes.push(`南岸土埂：两段共 ${R2(SB_LEN)} m（南岸一长段绕过支沟压在凹路南边 + 凹路北边一小段：${SB_LENS.map(R2).join(" + ")}，每段两头 ${SB.taperM} m 收尖），`
       + `顶高 ${Math.min(...tops)}…${Math.max(...tops)} m、底宽 ${SB.w} m、顶宽 ${SB.topW} m；低于 0.6 m 的地方 ${low} 处`);
   }
-  notes.push(`坑北开阔地 (0,−80) ${R2(sample(0, -80))} · 土坎顶 (28,−206) ${R2(sample(BANK.x, BANK.z))}、坎北掷弹筒 ${at(P.mortar)} · 东轻机枪弹坑底 ${at(P.enemyLmgEast)}`);
+  {
+    const pn = PitNorthChecks(sample);
+    notes.push(`坑北前景：坑北 (0,−80) ${R2(sample(0, -80))}；坟高 ${pn.graves.map((g) => `${g.id} ${g.h}`).join(" / ")} m；田埂高 ${pn.bundMin}…${pn.bundMax} m；`
+      + `干水沟深 ${pn.ditchDepthMin}…${pn.ditchDepthMax} m（沿沟每 3 m，尽头渐浅段不算）；地坎落差 ${pn.scarpMin}…${pn.scarpMax} m（离豁口 10 m 外）、豁口处 1 m 内最大高差 ${pn.notchStep} m；`
+      + `麦秸垛顶 ${pn.haystackTop} m`);
+    notes.push(`坑北视线（坑里射击台上站着，眼高 ${pn.pitEyeY} m）：掷弹筒组蹲着的头 ${pn.mortar.worst > 0 ? "全被地坎挡住" : "看得见！"}（最少挡 ${pn.mortar.worst} m），`
+      + `发射烟（离地 3 m）${pn.smoke.worst <= 0 ? "看得见" : "被挡住！"}（最少露 ${R2(-pn.smoke.worst)} m）；干水沟里弯腰的人头（沟底 + ${PIT_NORTH_DITCH_HEAD_M}）${pn.ditch.worst > 0 ? "全看不见" : "有看得见的！"}（最少挡 ${pn.ditch.worst} m，${pn.ditch.rows.length} 对）；`
+      + `两挺轻机枪趴着的头（0.4）挡 ${pn.lmgW.block} / ${pn.lmgE.block} m`);
+  }
   const widths = [
     ["前沿沟 x−30", -30.5, 0, 0, 1], ["前沿沟 x60", 56, 0, 0.5, 1], ["前沿沟西折", -62, -12, 1, 0],
     ["交通沟南直段", 12.5, 32, 23, 1], ["交通沟斜段", 26, 76.6, 42, -18], ["交通沟坡顶", 35, 128, 1, 0], ["交通沟板桥下", 35, 116.5, 1, 0], ["支沟中段", 42, 65.8, 2.6, 41.1],

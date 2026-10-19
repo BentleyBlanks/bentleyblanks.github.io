@@ -25,21 +25,26 @@
 //   南岸坎顶堆矮土埂（10-18 加）                     → 顶高 0.6–0.8 m、底宽约 2.2 m，顺弯曲的南岸、绕过支沟、压在凹路南边，凹路拐弯处切开
 //   凹路（后送路）                                    → 凹路口在台地里往东到 (83,161) 拐往南，路底宽 4 m，比两侧低 1.2–2.5 m
 //   03 轻机枪在坑北约 100–150 m；掷弹筒约 200 m    → 轻机枪 (−30,−118) 与 (40,−140)；掷弹筒 (28,−214) 躲在土坎 z −206 后
+//   （2026-10-20 坑北前景改稿：轻机枪 1 在坟地 G2 东肩后 (−26.85,−116.84)、轻机枪 2 在麦秸垛 (40,−138) 西南角；土坎换成横贯全场的地坎，
+//    北低南高 2 m，掷弹筒 (28,−213) 在坎下；田埂、坟、干水沟、远处村子见 L0105_PIT_NORTH，边界北扩到 −480）
 //   02 拖单被（洞口 0 → 弹药箱垛 22 → 支沟口 41 → 拐角 2 62 → 路口 92 → 坡顶 107 → 干沟 125 m）与上面的折线一致
 // ===========================================================================
 
 export const L0105_LEVEL_KEY = "FirstLevel0105";
 export const L0105_TITLE = "第一关 01–05 · 撤退（新剧本白盒）";
 
-/** 场地范围与高度网格。0.5 m 一格：3.4 m 沟底 + 2 m 深的沟壁在 1 m 格上会被磨成斜坡。 */
-export const L0105_BOUNDS = Object.freeze({ minX: -110, maxX: 190, minZ: -235, maxZ: 200 });
+/**
+ * 场地范围与高度网格。0.5 m 一格：3.4 m 沟底 + 2 m 深的沟壁在 1 m 格上会被磨成斜坡。
+ * 2026-10-20：北边界 −235 → −480（坑北前景要放下 z −400…−470 的村子与杨树带，L0105_PIT_NORTH）。
+ */
+export const L0105_BOUNDS = Object.freeze({ minX: -110, maxX: 190, minZ: -480, maxZ: 200 });
 export const L0105_CELL_M = 0.5;
 
 /** 自然地面（开挖前）的几个控制高度，米。前沿一带是 0。 */
 export const L0105_HEIGHTS = Object.freeze({
   front: 0,            // 前沿沟、机枪坑一带
   fieldNorthDip: -0.8, // 坑北 40–180 m 的开阔地略低（守方居高一点，看得见跃进的人）
-  mortarBankTop: 2.2,  // 土坎顶（相对两侧地面）
+  // （2026-10-20 起 z −206 的土坎改成东西向长地坎，落差见 L0105_PIT_NORTH.scarp；原来的 mortarBankTop 2.2 不再用）
   crest: 3.0,          // 坡顶
   gullyRim: 1.5,       // 坡顶南边那片台地 = 干沟两岸的坎顶
   assemblyFloor: -1.0, // 集结处干沟沟底：比坡顶低 4 m、比两岸坎顶低 2.5 m，看不见前沿
@@ -220,15 +225,137 @@ export const L0105_PLACES = Object.freeze({
   roadsideNearDugout: Object.freeze({ name: "洞旁路边", x: 84, z: 70 }),
   // 坡顶别的班守着的坡沿（交通沟东边，趴着朝北）
   crestPosts: Object.freeze([P(42, 129.5), P(50, 129), P(58, 129.5), P(66, 130)]),
-  // 03：远处的日军
-  enemyLmgWest: Object.freeze({ name: "轻机枪（西）", x: -30, z: -118, yawDeg: 180 }),
-  enemyLmgEast: Object.freeze({ name: "轻机枪（东）", x: 40, z: -140, yawDeg: 180 }),
-  mortarBank: Object.freeze({ name: "土坎", x: 28, z: -206, w: 90, d: 8 }),
+  // 03：远处的日军（2026-10-20 坑北前景：轻机枪 1 架在坟地一座坟的东肩后、轻机枪 2 趴在麦秸垛西南角、掷弹筒组在地坎下；见 L0105_PIT_NORTH）
+  enemyLmgWest: Object.freeze({ name: "轻机枪（坟地）", x: -26.85, z: -116.84, yawDeg: 180, cover: "坟包 G2 (−28,−115.5) 的东肩" }),
+  enemyLmgEast: Object.freeze({ name: "轻机枪（麦秸垛）", x: 37.2, z: -137.4, yawDeg: 180, cover: "麦秸垛 (40,−138) 西南角" }),
+  mortarBank: Object.freeze({ name: "地坎", x: 28, z: -206, w: 300, d: 2 }),   // 东西横贯全场的梯田地坎（北低南高 2 m），见 L0105_PIT_NORTH.scarp
   mortar: Object.freeze({ name: "掷弹筒", x: 28, z: -213, yawDeg: 180 }),
   tankFirstSeen: Object.freeze({ name: "战车露头", x: 159, z: -20, yawDeg: 142 }),
   // 05：车刚过桥、车尾挨了那捆手榴弹，瘫在桥头（西南头），车身斜着把路堵死
   tankStop: Object.freeze({ name: "战车瘫在桥头", x: 28.7, z: 120.1, yawDeg: 148 }),
 });
+
+/**
+ * 坑北前景（2026-10-20，用户在 03 坑沿朝北看：「日军这么一马平川合理吗」→ 拍板的「坑北前景」改稿）。
+ * 没有史料出处，是创作：鲁南农田三月的常见样子（麦苗才返青、田埂、孤坟、坟地柏树、麦秸垛、干水沟、梯田地坎、远处村子和杨树带）。
+ * 场景生成器把田埂、坟包、干水沟、地坎、大起伏烘进高度场，树桩 / 柏树 / 麦秸垛 / 杨树 / 土坯房出体块；
+ * 关键帧与预演按这里摆 03 的日军（跃进的人每次扑倒都落在 rushCover 的掩体后）。
+ * 田埂中心线 z = z0 + amp·sin(k·x + phase)，x 在 [minX, maxX]；坟 [x, z, 高]；树 [x, z, 高]；房 [x, z, 东西宽, 南北深]。
+ */
+export const L0105_PIT_NORTH = Object.freeze({
+  clearedToZ: -80,   // 0–80 m 扫清射界（近处基本平，只有树桩、两道田埂、两座孤坟）
+  // 1. 扫清带里的树桩：矮块 0.3–0.5 m
+  stumps: Object.freeze([
+    [-48, -30, 0.4], [-31, -19, 0.35], [-12, -27, 0.45], [8, -22, 0.3], [24, -33, 0.5], [41, -24, 0.35], [58, -35, 0.4],
+    [76, -28, 0.45], [-38, -53, 0.3], [-4, -61, 0.4], [18, -51, 0.35], [33, -76, 0.5], [62, -57, 0.3], [85, -73, 0.4], [-56, -60, 0.45],
+  ].map(([x, z, h]) => Object.freeze({ x, z, h }))),
+  // 田埂：高 0.3、顶宽 0.6（两侧各 0.45 m 落到地面），两头 3 m 收尖
+  bundH: 0.3, bundTopW: 0.6, bundSlopeM: 0.45,
+  bunds: Object.freeze([
+    Object.freeze({ id: "N1", z0: -42, amp: 2.5, k: 0.035, phase: 0.6, minX: -95, maxX: 150 }),   // 扫清带里两道
+    Object.freeze({ id: "N2", z0: -68, amp: 3.0, k: 0.028, phase: 2.0, minX: -100, maxX: 160 }),  // 干水沟就到这道埂为止
+    Object.freeze({ id: "F1", z0: -110, amp: 3.5, k: 0.022, phase: 0.3, minX: -110, maxX: 190 }), // 80–200 m 三道横贯
+    Object.freeze({ id: "F2", z0: -150, amp: 3.0, k: 0.019, phase: 1.7, minX: -110, maxX: 190 }),
+    Object.freeze({ id: "F3", z0: -190, amp: 3.5, k: 0.017, phase: 2.9, minX: -110, maxX: 190 }),
+  ]),
+  // 2. 两座孤坟（平不掉的）+ 4. 坟地五座坟：圆坟包，直径约 2.5 m（底 3 m 收到地面）
+  graveBaseR: 1.5,
+  loneGraves: Object.freeze([[-20, -55, 1.1], [45, -65, 1.15]].map(([x, z, h]) => Object.freeze({ x, z, h }))),
+  graveyard: Object.freeze([
+    ["G1", -35, -117, 1.2], ["G2", -28, -115.5, 1.1], ["G3", -31, -122, 1.3], ["G4", -24, -120.5, 1.0], ["G5", -37, -123.5, 1.15],
+  ].map(([id, x, z, h]) => Object.freeze({ id, x, z, h }))),
+  cypresses: Object.freeze([[-33.5, -127.5, 8.0], [-25.5, -126, 6.5], [-40, -120, 7.0]].map(([x, z, h]) => Object.freeze({ x, z, h }))),
+  // 5. 麦秸垛：4×3 m、高 2.5（下层 1.9 + 上层收一圈 0.6，圆顶感）
+  haystack: Object.freeze({ x: 40, z: -138, w: 4, d: 3, h: 2.5, baseH: 1.9, topW: 3.2, topD: 2.2 }),
+  // 6. 干水沟：东北斜到坑西北，从坟地（北）和麦秸垛（南）之间穿过；沟底宽 1.5、口宽 3、深 1.2（自然地面往下），两沿各翻一条 0.3 m 高、1.2 m 宽的土（挖沟清淤堆的）；
+  //    西南头最后 8 m 渐浅到地面（尽头在 N2 田埂北边，离坑心约 95 m），东北头一直通到场地边上；穿过地坎处地坎放缓成豁口
+  ditch: Object.freeze({
+    line: Line([190, -245], [130, -200], [70, -165], [10, -125], [-40, -92], [-70, -72]),
+    floorW: 1.5, topW: 3.0, depth: 1.2, lipH: 0.3, lipW: 1.2, endTaperM: 8,
+  }),
+  // 7. 地坎：东西横贯，中心线 z = z0 + amp·sin(k·(x − x0))（x0 处正好 z0），北低南高 drop、坎面 faceM 宽（陡）；干水沟穿过处坎面放宽到 faceM + notchM（豁口）
+  scarp: Object.freeze({ z0: -206, amp: 4.5, k: 0.016, x0: 28, drop: 2.0, faceM: 2.0, notchM: 14, notchR: 6 }),
+  // 9. 大起伏：z < clearedToZ 起 rampM 内渐强，两条几百米波长的正弦，±1 m
+  roll: Object.freeze({ rampM: 60, a1: 0.6, k1x: 0.0105, k1z: 0.0062, p1: 0.4, a2: 0.4, k2x: -0.0068, k2z: 0.0121, p2: 2.1 }),
+  // 整片地往北缓缓抬：扫清带外到地坎抬 riseM（1 % 上下的坡，看不出来，坎顶就比坑北略高），坎下再往北到村子抬 farRiseM（村子在一片略高的地上）。
+  // 不抬的话坎下那一大片比沟底还低，编辑器的高度色带会把它染成一片冷色，远看像水；坎下只留 20 m 上下一条低地（掷弹筒组在里面）。
+  tilt: Object.freeze({ riseM: 1.5, fromZ: -80, toZ: -206, farRiseM: 2.0, farFromZ: -225, farToZ: -340 }),
+  // 8. 远处村子：村前一排杨树（12–15 m），后面十间土坯房（墙高 3 m + 草顶 0.35）
+  poplars: Object.freeze([
+    [-38, -401, 13.5], [-25, -399, 12.5], [-12, -402, 14.5], [1, -400, 13], [14, -398.5, 15], [27, -401.5, 12.5], [40, -400, 14],
+    [53, -402, 13], [66, -399, 14.5], [79, -401, 12], [92, -400.5, 13.5], [105, -398.5, 15], [118, -401, 13], [131, -400, 14],
+    [144, -402, 12.5], [157, -399.5, 13.5], [169, -401, 14],
+  ].map(([x, z, h]) => Object.freeze({ x, z, h }))),
+  houseWallH: 3.0, houseRoofT: 0.35,
+  houses: Object.freeze([
+    [-10, -420, 9, 6], [15, -418, 8, 6], [40, -425, 10, 6], [70, -419, 8, 5], [98, -423, 9, 6], [128, -418, 8, 6],
+    [25, -447, 9, 6], [60, -452, 10, 6], [110, -450, 8, 6], [145, -455, 9, 5],
+  ].map(([x, z, w, d]) => Object.freeze({ x, z, w, d }))),
+});
+
+/**
+ * 03 正面跃进的步兵（IjaRush1–8，两人一组）每一拍落在哪：[03-2, 03-3 开场, 03-3 第一次跃进后, 03-3 第二次跃进后 = 03-4, 03-5]。
+ * 每一项是掩体描述（扑倒 / 趴着都落在掩体后，掩体在他和坑之间）或 { open: [x, z] }（03-5 还在往前跑、站着）：
+ *   { bund: "N2", x }        田埂北边 backBundM 处（田埂在他和坑之间）
+ *   { grave: [x, z], lat }   坟包往远离坑的方向 backGraveM、横向 lat（面朝坑的右手为正）
+ *   { ditch: x }             干水沟北沿外 ditchSideM 处（沟沿那条翻土 + 沟在他和坑之间）
+ * IjaRush4 在 03-3 第一次跃进时中弹倒下，第二格写的是顶上来的 IjaRushR1 扑倒的地方（03-4 起 IjaRush4 就是他）。
+ */
+export const L0105_RUSH_COVER = Object.freeze({ backBundM: 1.3, backGraveM: 1.9, ditchSideM: 3.0, target: P(0, -8) });
+export const L0105_RUSH_STATIONS = Object.freeze({
+  IjaRush1: [{ bund: "F1", x: -48 }, { ditch: -48 }, { bund: "N2", x: -36 }, { grave: [-20, -55], lat: 0.75 }, { bund: "N1", x: -20 }],
+  IjaRush2: [{ bund: "F1", x: -43 }, { ditch: -43 }, { bund: "N2", x: -31 }, { grave: [-20, -55], lat: -0.75 }, { bund: "N1", x: -15 }],
+  IjaRush3: [{ bund: "F2", x: -14 }, { ditch: -20 }, { bund: "N2", x: -14 }, { bund: "N1", x: -6 }, { open: [-6, -30] }],
+  IjaRush4: [{ bund: "F2", x: -6 }, { ditch: -10 }, { bund: "N2", x: -9 }, { bund: "N2", x: -9 }, { open: [-1, -33] }],
+  IjaRush5: [{ bund: "F2", x: 26 }, { ditch: 22 }, { bund: "F1", x: 18 }, { bund: "N2", x: 16 }, { bund: "N1", x: 10 }],
+  IjaRush6: [{ bund: "F2", x: 30 }, { ditch: 26 }, { bund: "F1", x: 22 }, { bund: "N2", x: 20 }, { bund: "N1", x: 14 }],
+  IjaRush7: [{ ditch: 50 }, { bund: "F1", x: 34 }, { grave: [45, -65], lat: 0.75 }, { bund: "N1", x: 30 }, { open: [26, -28] }],
+  IjaRush8: [{ ditch: 54 }, { bund: "F1", x: 38 }, { grave: [45, -65], lat: -0.75 }, { bund: "N1", x: 34 }, { open: [30, -30] }],
+});
+/** 顶替 IjaRush4 的那个人：从 F1 田埂后起身，扑到 N2 田埂后（= IjaRush4 的第四格）。 */
+export const L0105_RUSH_REPLACEMENT = Object.freeze({ from: Object.freeze({ bund: "F1", x: -2 }), to: Object.freeze({ bund: "N2", x: -9 }) });
+/** 03-3 从干水沟里摸过来的三个人（左边沟里头有人！）：沟里弯着腰走到尽头，露头后扑到 N1 田埂后。 */
+export const L0105_DITCH_FLANK = Object.freeze({ ids: Object.freeze(["IjaFlank1", "IjaFlank2", "IjaFlank3"]), proneAt: Object.freeze([-40, -44, -36]) });
+
+/** 干水沟中心线在 x 处的 z（这条沟自东北往西南，x 单调）。 */
+export function DitchZAt(x) {
+  const line = L0105_PIT_NORTH.ditch.line;
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i - 1], b = line[i];
+    if ((x <= a.x && x >= b.x) || (x >= a.x && x <= b.x)) return a.z + (b.z - a.z) * (x - a.x) / (b.x - a.x);
+  }
+  return x > line[0].x ? line[0].z : line[line.length - 1].z;
+}
+
+/** 跃进站位描述 → { x, z, cover }（cover：掩体名；open 为 null）。 */
+export function RushStation(desc) {
+  const C = L0105_RUSH_COVER;
+  if (desc.open) return { x: desc.open[0], z: desc.open[1], cover: null };
+  if (desc.bund) {
+    const b = L0105_PIT_NORTH.bunds.find((q) => q.id === desc.bund);
+    return { x: desc.x, z: Math.round((BundZ(b, desc.x) - C.backBundM) * 100) / 100, cover: `田埂 ${desc.bund}` };
+  }
+  if (desc.grave) {
+    const [gx, gz] = desc.grave;
+    const dx = C.target.x - gx, dz = C.target.z - gz, len = Math.hypot(dx, dz), fx = dx / len, fz = dz / len;
+    // 面朝坑：前方 (fx, fz)，右手 (−fz, fx)
+    const x = gx - fx * C.backGraveM - fz * (desc.lat || 0), z = gz - fz * C.backGraveM + fx * (desc.lat || 0);
+    return { x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100, cover: `坟 (${gx},${gz})` };
+  }
+  if (desc.ditch !== undefined) {
+    // 沟的走向在这一段的法向：取北边（−z）那一侧
+    const x0 = desc.ditch, z0 = DitchZAt(x0), z1 = DitchZAt(x0 + 0.5);
+    let nx = -(z1 - z0), nz = 0.5; const len = Math.hypot(nx, nz); nx /= len; nz /= len;
+    if (nz > 0) { nx = -nx; nz = -nz; }
+    return { x: Math.round((x0 + nx * C.ditchSideM) * 100) / 100, z: Math.round((z0 + nz * C.ditchSideM) * 100) / 100, cover: "干水沟北沿" };
+  }
+  throw new Error(`跃进站位写错了：${JSON.stringify(desc)}`);
+}
+
+/** 田埂中心线在 x 处的 z。 */
+export function BundZ(bund, x) { return bund.z0 + bund.amp * Math.sin(bund.k * x + bund.phase); }
+/** 地坎中心线在 x 处的 z。 */
+export function ScarpZ(x) { const s = L0105_PIT_NORTH.scarp; return s.z0 + s.amp * Math.sin(s.k * (x - s.x0)); }
 
 /**
  * 沟里的日常摆件（不是专门摆的掩体）：on = 哪条沟，d = 沿中心线的弧长（米，从折线起点量），lat = 往行进方向左手边偏多少米。

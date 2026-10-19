@@ -6,6 +6,8 @@
 // 10-18 第二轮：南岸坎顶一道 0.6–0.8 m 的连续矮土埂（烘进高度场），南边平地看沟底的余量 ≥ 0.6 m。
 // 10-20 干沟改弯沟：沟底宽窄不一（坑窝 ≥ 9 m、最窄 ≥ 3.5 m、不能处处一样宽）、中心线连续沟底 ≥ 50 m、北岸坑窝陡坎、
 // 沟底离大路 ≥ 20 m（原来方坑西北角 8 m）、人待的地方离路口（板桥）≥ 28 m、支沟（伤员）在沟底高度、凹路口接上沟底。
+// 10-20 坑北前景：坟高、田埂高、干水沟深与断面、地坎落差与豁口、坑里看不见坎下的掷弹筒组（看得见烟）、沟里弯腰的人从坑里看不见头、
+// 跃进的人每一格都在掩体后、树桩 / 柏树 / 麦秸垛 / 杨树 / 土坯房的尺寸、扫清带基本平、坑北的改动不碰 z ≥ −8。
 
 import assert from "node:assert/strict";
 import { ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
@@ -13,11 +15,13 @@ import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
 import {
   BuildFirstLevel0105Scene, FloorWidthAt, NaturalHeight, L0105SightChecks, GullyFloorExtent, GullyBankHeights, PropPassage, PropsPerStraight,
   GullySouthBerm, GullySouthBermTop, L0105_GULLY_SOUTH_BERM_LENGTH,
+  PitNorthChecks, PitNorthHeight, PitNorthTilt, DitchStation, BundHeight, GraveHeight, SightBlockFromY, PitNorthObservers, PIT_NORTH_DITCH_HEAD_M,
 } from "./Script_EditorBlockoutFirstLevel0105Scene.mjs";
 import {
   L0105_PLACES as P, L0105_HEIGHTS as H, L0105_TRENCH_SECTION as S, L0105_GULLY as G, L0105_BRIDGE as BR,
   L0105_PROPS, L0105_PROP_KINDS, L0105_SUNKEN_LANE, L0105_GULLY_SOUTH_BERM as SB, PointBeside, GullyU, InGullyFloor,
   L0105_ROAD, L0105_GULLY_POCKETS, L0105_GULLY_TREES,
+  L0105_PIT_NORTH as PN, L0105_BOUNDS, L0105_RUSH_STATIONS, L0105_RUSH_REPLACEMENT, L0105_DITCH_FLANK, RushStation, ScarpZ, LineLength,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 const opts = { commit: "test", generatedAt: "2026-10-18T00:00:00.000Z" };
@@ -186,6 +190,105 @@ assert.ok(!all.some((x) => /foxhole|FoxHole|猫耳/i.test(x.id)), "不要猫耳�
   assert.ok(trees.every((t) => GullyU(t.x, t.z) >= 1), "枯树都长在坎顶上，不在沟底 / 坎上");
   assert.ok(trees.filter((t) => t.z > 150).length >= 8 && trees.filter((t) => t.z < 141).length >= 3, "南岸疏疏落落一排、北岸坑窝顶上几棵");
 }
+
+// --- 坑北前景（2026-10-20）---
+const pn = PitNorthChecks(sample);
+for (const g of pn.graves) assert.ok(g.h >= 0.95 && g.h <= 1.35 && Math.abs(g.h - g.want) <= 0.1, `坟 ${g.id} 高 ${g.h}（要 ${g.want}，1.0–1.3）`);
+assert.equal(pn.graves.length, 7, "两座孤坟 + 坟地五座");
+assert.ok(pn.bunds.length >= 60 && pn.bundMin >= 0.25 && pn.bundMax <= 0.36, `田埂高 ${pn.bundMin}…${pn.bundMax}（要约 0.3）`);
+assert.ok(pn.ditchDepthMin >= 1.15 && pn.ditchDepthMax <= 1.6, `干水沟深 ${pn.ditchDepthMin}…${pn.ditchDepthMax}（自然地面往下 1.2 + 沟沿翻土）`);
+{
+  // 断面：沟底宽约 1.5（离最深处 10 cm 内）；沟沿（翻土顶）到沟底 ≥ 1.2
+  for (const d of [20, 60, 120, 170, 200]) {
+    const c = PointBeside(PN.ditch.line, d, 0), l = PointBeside(PN.ditch.line, d, 1);
+    const nx = l.x - c.x, nz = l.z - c.z;
+    const prof = []; for (let u = -3; u <= 3.001; u += 0.05) prof.push([u, sample(c.x + nx * u, c.z + nz * u)]);
+    const floor = Math.min(...prof.map((p) => p[1]));
+    const flat = prof.filter((p) => p[1] <= floor + 0.1).map((p) => p[0]);
+    const floorW = Math.max(...flat) - Math.min(...flat);
+    assert.ok(floorW >= 0.9 && floorW <= 2.2, `干水沟 d${d} 沟底宽 ${floorW.toFixed(2)}（要约 1.5）`);
+    const rimY = (sample(c.x + nx * 2.2, c.z + nz * 2.2) + sample(c.x - nx * 2.2, c.z - nz * 2.2)) / 2;
+    assert.ok(rimY - floor >= 1.2, `干水沟 d${d} 沟沿到沟底 ${(rimY - floor).toFixed(2)}（蹲着头不露要 ≥ 1.2）`);
+  }
+  assert.ok(LineLength(PN.ditch.line) > 290, "干水沟全长");
+  // 尽头在坑西北约 100 m、渐浅到地面；不和坑、前沿沟、交通沟相交
+  const end = PN.ditch.line[PN.ditch.line.length - 1];
+  const dEnd = Math.hypot(end.x - P.pit.x, end.z - P.pit.z);
+  assert.ok(dEnd >= 85 && dEnd <= 110, `干水沟尽头离坑心 ${dEnd.toFixed(0)} m（要约 100）`);
+  assert.ok(Math.abs(Cut(end)) < 0.2, `干水沟尽头要渐浅到地面：${Cut(end).toFixed(2)}`);
+  for (const p of [P.pit, { x: -62, z: -22 }, { x: 0, z: 0 }, { x: 0.5, z: 11 }]) assert.ok(DitchStation(p.x, p.z).d > 40, "干水沟离坑 / 前沿沟 / 交通沟太近");
+}
+assert.ok(pn.scarpMin >= 1.7 && pn.scarpMax <= 2.3, `地坎落差 ${pn.scarpMin}…${pn.scarpMax}（北低南高约 2 m）`);
+{
+  // 坎面陡：坎线两侧各 1 m 落差 ≥ 1.2 m；豁口处顺沟走 1 m 内高差 ≤ 0.6 m
+  for (const x of [-80, -20, 28, 80, 170]) {
+    const z = ScarpZ(x);
+    assert.ok(sample(x, z + 1) - sample(x, z - 1) >= 1.2, `地坎 x${x} 坎面不够陡：${(sample(x, z + 1) - sample(x, z - 1)).toFixed(2)}`);
+  }
+  assert.ok(pn.notchStep <= 0.6, `豁口处顺沟 1 m 内高差 ${pn.notchStep}`);
+  // 掷弹筒组在坎下（北边低的那层）
+  assert.ok(P.mortar.z < ScarpZ(P.mortar.x) - 3, "掷弹筒组要在地坎北边（坎下）");
+  assert.ok(sample(P.mortar.x, P.mortar.z) < sample(P.mortar.x, ScarpZ(P.mortar.x) + 4) - 1.6, "掷弹筒组脚下比坎上低 ≥ 1.6 m");
+}
+assert.ok(pn.mortar.worst >= 0.3, `坑里看得见坎下的掷弹筒组：最少只挡 ${pn.mortar.worst} m（${JSON.stringify(pn.mortar.worstRow?.b)}）`);
+assert.ok(pn.smoke.worst <= -0.3, `坑里看不见掷弹筒的发射烟（离地 3 m）：${pn.smoke.worst}`);
+assert.ok(pn.ditch.worst >= 0.1, `干水沟里弯腰的人（沟底 + ${PIT_NORTH_DITCH_HEAD_M}）从坑里看得见头：最少只挡 ${pn.ditch.worst} m（${JSON.stringify(pn.ditch.worstRow?.b)}）`);
+assert.ok(pn.lmgW.block <= 0 && pn.lmgE.block <= 0, `坑里要看得见两挺轻机枪（压坑沿的人露着头）：${pn.lmgW.block} / ${pn.lmgE.block}`);
+{
+  // 跃进的人：有掩体的每一格，掩体在他和坑之间 —— 坑沿射击台上的眼睛看他趴着的身子（骨盆处离地 0.2；田埂只有 0.3 m，头顶齐埂），被田埂 / 坟 / 沟沿挡住
+  const obs = PitNorthObservers(sample);
+  const pitTop = { x: 0, z: -9.4, eyeY: obs.pitEyeY };
+  let n = 0;
+  const Check = (id, desc) => {
+    const st = RushStation(desc);
+    if (!st.cover) return;
+    const r = SightBlockFromY(sample, pitTop, { x: st.x, z: st.z, eye: 0.2 }, 0.1);
+    n += 1;
+    assert.ok(r.block >= 0.02, `${id} ${JSON.stringify(desc)} → (${st.x},${st.z}) 从坑里看过去没被 ${st.cover} 挡住（${r.block}）`);
+    assert.ok(Math.abs(sample(st.x, st.z + 0.35) - sample(st.x, st.z - 0.35)) < 0.3, `${id} 趴在斜坡上 (${st.x},${st.z})`);
+  };
+  for (const [id, list] of Object.entries(L0105_RUSH_STATIONS)) list.forEach((d) => Check(id, d));
+  Check("IjaRushR1", L0105_RUSH_REPLACEMENT.from); Check("IjaRushR1", L0105_RUSH_REPLACEMENT.to);
+  L0105_DITCH_FLANK.proneAt.forEach((x, i) => Check(L0105_DITCH_FLANK.ids[i], { bund: "N1", x }));
+  assert.ok(n >= 35, "跃进站位太少");
+}
+{
+  // 扫清带基本平：z −8…−80 内坑北前景只加了田埂、孤坟（和干水沟尽头），没有起伏、没有地坎（原来坑北略低的那 0.8 m 缓坡照旧）
+  for (let z = -8.5; z >= -80; z -= 1.5) for (let x = -100; x <= 185; x += 1.5) {
+    if (DitchStation(x, z).d < 6) continue;
+    const add = PitNorthHeight(x, z, 0);
+    assert.ok(Math.abs(add - Math.max(BundHeight(x, z), GraveHeight(x, z))) < 1e-9, "扫清带里除了田埂 / 孤坟还加了别的起伏：(" + x + "," + z + ") " + add);
+  }
+  // 坑北的函数只碰 z < −8：z ≥ −8 的点原样返回（南面、前沿一带一点不动）
+  for (const [x, z] of [[0, -7.9], [50, 0], [35, 120], [-100, 150]]) assert.equal(PitNorthHeight(x, z, 0.37), 0.37, `坑北的改动碰到了 (${x},${z})`);
+  // 大起伏：地坎以北那一大片（扣掉地坎落差）起伏 1–3 m（几百米一个波）
+  let rlo = Infinity, rhi = -Infinity;
+  for (let z = -230; z >= -470; z -= 10) for (let x = -100; x <= 180; x += 10) {
+    if (DitchStation(x, z).d < 4) continue;
+    const y = sample(x, z) + PN.scarp.drop - PitNorthTilt(z); rlo = Math.min(rlo, y); rhi = Math.max(rhi, y);
+  }
+  assert.ok(rhi - rlo >= 1.0 && rhi - rlo <= 3.0, `远处大起伏 ${(rhi - rlo).toFixed(2)} m（要 1–2 m 上下）`);
+}
+{
+  // 体块：树桩矮、柏树细高、麦秸垛 4×3×2.5、杨树 12–15 m、土坯房墙 3 m；边界放得下村子
+  const stumps = all.filter((x) => /^FieldStump_/.test(x.id));
+  assert.ok(stumps.length >= 10 && stumps.every((x) => x.h >= 0.3 && x.h <= 0.5 && x.z <= -8 && x.z >= -80), "扫清带树桩十几个、0.3–0.5 m");
+  const cyp = all.filter((x) => /^GraveCypress_/.test(x.id));
+  assert.ok(cyp.length >= 2 && cyp.length <= 3 && cyp.every((x) => x.h >= 6 && x.h <= 8 && x.w <= 1.5), "坟地 2–3 棵柏树，6–8 m");
+  const hs = byId.get("Haystack"), hsTop = byId.get("HaystackTop");
+  assert.ok(hs && hsTop && hs.w === 4 && hs.d === 3, "麦秸垛 4×3 m");
+  Near(hsTop.y + hsTop.h / 2 - (hs.y - hs.h / 2), 2.5, 0.02, "麦秸垛高");
+  const pop = all.filter((x) => /^VillagePoplar_/.test(x.id));
+  assert.ok(pop.length >= 12 && pop.every((x) => x.h >= 12 && x.h <= 15 && x.z <= -395 && x.z >= -405), "村前一排杨树 12–15 m");
+  const houses = all.filter((x) => /^VillageHouse_/.test(x.id));
+  assert.ok(houses.length >= 6 && houses.length <= 10 && houses.every((x) => x.h === 3 && x.z <= -410 && x.z - x.d / 2 >= L0105_BOUNDS.minZ), "后面 6–10 间土坯房，墙高 3 m，在场地里");
+  assert.ok(!all.some((x) => /^EnemyLmg(WestMound|EastLip)$/.test(x.id)), "原来轻机枪的小土包 / 弹坑沿去掉了");
+  // 轻机枪不站进麦秸垛，也不趴在坟顶上
+  for (const p of [P.enemyLmgEast, { x: 36.0, z: -139.4 }]) assert.ok(Math.abs(p.x - PN.haystack.x) > PN.haystack.w / 2 + 0.5 || Math.abs(p.z - PN.haystack.z) > PN.haystack.d / 2 + 0.5, "轻机枪 2 站进了麦秸垛");
+  assert.ok(GraveHeight(P.enemyLmgWest.x, P.enemyLmgWest.z) < 0.2, "轻机枪 1 趴在坟顶上了（要在坟后）");
+}
+console.log(`坑北前景：坟 ${pn.graves.map((g) => g.h).join("/")} m；田埂 ${pn.bundMin}…${pn.bundMax}；干水沟深 ${pn.ditchDepthMin}…${pn.ditchDepthMax}；地坎 ${pn.scarpMin}…${pn.scarpMax}；`
+  + `掷弹筒组最少挡 ${pn.mortar.worst} m、烟露 ${-pn.smoke.worst} m；沟里弯腰的人最少挡 ${pn.ditch.worst} m`);
 
 console.log(`ok：${a.blocks.length} 块 + ${a.gates.length} 随信号块，${a.terrain.cols}×${a.terrain.rows} 网格；干沟沟底宽 ${ext.min}…${ext.max} m、连续 ${ext.floorLen} m；`
   + `视线 ① 最少挡 ${sights.assembly.worst} m、② 最少挡 ${sights.south.worst} m；桥下净空 ${clear.toFixed(2)} m；门板缝 ${(gapMin * 100).toFixed(0)}–${(gapMax * 100).toFixed(0)} cm；摆件 ${L0105_PROPS.length}`);
