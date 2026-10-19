@@ -66,9 +66,10 @@ function OpenSettings(id) {
   if (SETTINGS_PAGE_IDS.includes(id)) settings.Open(id);
 }
 // 高级工具要游戏宿主：标题菜单不装编辑器，点了才带 editor=tools 换到游戏入口。剔除开发工具后不响应。
+// 不带关卡参数 = 工具首页：不建任何关卡，等人自己选工具（Data_ToolsHome）。
 function OpenTools() {
   if (!DEV_TOOLS_ENABLED) return;
-  const url = new URL(SandboxUrl(location.href, null)); url.searchParams.set('phase', '2'); url.searchParams.set('editor', 'tools');
+  const url = new URL(SandboxUrl(location.href, null)); url.searchParams.set('editor', 'tools');
   location.assign(url.href);
 }
 // 标题菜单没有战局可观察：Debug工具那一页只列出来、全部不可用（菜单上写明进关后去暂停菜单开）。

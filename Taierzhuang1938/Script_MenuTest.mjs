@@ -539,7 +539,10 @@ async function CheckInterface() {
     Check(name+'工具窗边界与内容可达',fits.left>=0&&fits.right<=width&&fits.top>=0&&fits.bottom<=height&&!fits.bodyOverflow,JSON.stringify(fits));
     await Shot('Weapon'+name);
   }
-  await page.evaluate(()=>window.Taierzhuang.Debug.CloseEditor());
+  // 标题菜单进来的是工具首页：退出 = 整页回独立标题菜单
+  Check('标题菜单进高级工具不建关卡',await page.evaluate(()=>window.Taierzhuang.editor.host.game.PHASES.map(p=>p.id).join()==='ToolsHome'));
+  await Promise.all([page.waitForURL(url=>!url.searchParams.has('editor'),{timeout:60000}),page.evaluate(()=>window.Taierzhuang.Debug.CloseEditor())]);
+  await page.waitForFunction(()=>window.Taierzhuang?.menu?.open,null,{timeout:120000});
   await page.setViewportSize({width:1600,height:900});
   await page.evaluate(()=>window.Taierzhuang.menu.ToTitle());
   for(const mode of ['codex','credits','debug']) {

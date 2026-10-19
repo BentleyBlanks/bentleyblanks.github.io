@@ -57,6 +57,7 @@ import { OrchestrationEditor } from "./Script_EditorOrchestration.mjs";
 import { SquadMarchEditor } from "./Script_EditorSquadMarch.mjs";
 import { TextureEditor } from "./Script_EditorTextures.mjs";
 import { BlockoutEntry } from "./Script_EditorBlockoutEntry.mjs";
+import { ToolsHome } from "./Script_EditorHome.mjs";
 
 /** 互斥编辑器：接管画面（多数还接管相机），任何时候只有一个活着。 */
 const EDITORS = [
@@ -310,6 +311,12 @@ export class EditorSuite {
     root.appendChild(empty.root);
     this.emptyInspector = empty.root;
 
+    // --- 工具首页（?editor=tools 不带关卡）：整页代替空 Inspector ----------------
+    this.home = this.host.home ? new ToolsHome({
+      menus: TOOL_MENUS, windowTools: WINDOW_TOOLS, onOpen: (id) => this.Open(id),
+    }) : null;
+    if (this.home) root.appendChild(this.home.root);
+
     this.workHost = El("div");
     root.appendChild(this.workHost);
 
@@ -390,8 +397,11 @@ export class EditorSuite {
     }
     if (this.closeToolItem) this.closeToolItem.disabled = !this.active;
     if (this.gear) this.gear.classList.toggle("on", this.Capturing);
-    if (this.emptyInspector) this.emptyInspector.hidden = !this.panelOpen || !!this.active;
-    this.inspectorToggle.hidden = !this.panelOpen || this.activeId === AssetStandardsEditor.id;
+    const homeShown = !!this.home && this.panelOpen && !this.active;
+    this.home?.Show(homeShown);
+    this.root.classList.toggle("homeShown", homeShown);
+    if (this.emptyInspector) this.emptyInspector.hidden = !this.panelOpen || !!this.active || !!this.home;
+    this.inspectorToggle.hidden = !this.panelOpen || homeShown || this.activeId === AssetStandardsEditor.id;
     const inspector = this.workHost.querySelector(".edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards)") || this.emptyInspector;
     this.inspectorElement = inspector;
     if (!inspector.id) inspector.id = inspector === this.emptyInspector ? "edInspectorEmpty" : "edInspectorPanel";
@@ -442,6 +452,12 @@ export class EditorSuite {
   /** 菜单栏里点一项。当前开着的那项再点一次 = 关掉它。 */
   Toggle(id) {
     if (id === TextureEditor.id || id === BlockoutEntry.id) return this.Open(id);
+    // 工具首页没有关卡：场景类工具先回首页问「载入哪一关」
+    if (this.home?.NeedsLevel(id)) {
+      if (this.active) this.CloseTool();
+      this.home.PickById(id);
+      return null;
+    }
     if (OVERLAYS.some((editor) => editor.id === id)) return this.ToggleOverlay(id);
     if (this.activeId === id) { this.CloseTool(); return null; }
     return this.Open(id);
@@ -630,6 +646,13 @@ export class EditorSuite {
         if (this.host.SettingsOpen?.()) return;
         this.TogglePanel(); event.preventDefault(); return;
       }
+      // 工具首页的「载入哪一关」单子开着时 Esc 只收单子
+      if (event.code === "Escape" && this.home?.SheetOpen) {
+        this.home.CloseSheet();
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
       // 下拉菜单开着时 Esc 只收菜单，不退出高级工具
       if (event.code === "Escape" && this.openMenuId) {
         this.OpenMenu(null);
@@ -641,7 +664,9 @@ export class EditorSuite {
         // 过场正在播的时候 Esc 归过场（跳过），别顺手把编辑器也关了
         const playing = this.host.cutscene && this.host.cutscene.Playing;
         if (!playing) {
-          this.TogglePanel(false);
+          // 工具首页上开着某个工具：Esc 先回首页，首页上再按才回主菜单
+          if (this.home && this.active) this.CloseTool();
+          else this.TogglePanel(false);
           event.preventDefault();
           // 暂停菜单也监听 Esc；设置关掉后不能让同一次按键继续穿透成「恢复战斗」。
           event.stopImmediatePropagation();

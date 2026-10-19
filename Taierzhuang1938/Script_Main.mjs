@@ -59,6 +59,10 @@ import { MovementRange } from "./Script_MovementRange.mjs";
 import { GORE_RANGE_PHASE, GORE_RANGE_ID } from "./Data_GoreRange.mjs";
 import { GoreRangeField } from "./Script_GoreRangeField.mjs";
 import { GoreRange } from "./Script_GoreRange.mjs";
+import { TOOLS_HOME_PHASE, TOOLS_HOME_ID } from "./Data_ToolsHome.mjs";
+import { ToolsHomeField } from "./Script_ToolsHomeField.mjs";
+import { DEV_TOOLS_ENABLED } from "./Data_DevTools.mjs";
+import { SandboxUrl } from "./Data_StartupRouting.mjs";
 import { HitReactionOf, HitReactionEnabled, SetHitReactionEnabled, PreloadDeathLibrary, DeathLibrary } from "./Script_HitReactionLayer.mjs";
 import { TerrainTrailSystem } from "./Script_TerrainTrails.mjs";
 import {
@@ -335,8 +339,15 @@ const FULL_SCENE = PHASE_PARAM === "fullscene" || LEGACY_FULL_SCENE_CARRIAGE;
 const FULL_SCENE_VIEW = FULL_SCENE
   && (LEGACY_FULL_SCENE_CARRIAGE || params.get("fullSceneView") === "carriage")
   ? "carriage" : "county";
-const SANDBOX = MOVEMENT_RANGE || EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || GORE_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE || BLOCKOUT;
-const PHASE_TABLE = BLOCKOUT ? BLOCKOUT_PHASES : MOVEMENT_RANGE ? [MOVEMENT_RANGE_PHASE] : EXPLOSION_TEST ? [EXPLOSION_RANGE_PHASE] : WEAPON_RANGE ? [WEAPON_RANGE_PHASE] : RANGE ? [RANGE_PHASE]
+/**
+ * 高级工具首页（?editor=tools 且没给关卡）：从主菜单打开高级工具走这里。
+ * 不建任何关卡，只铺一块空地让引擎跑起来，画面由工具首页盖住，等人自己选工具
+ * （Data_ToolsHome 文件头）。给了 phase / whitebox 等关卡参数时仍是老规矩：先建那一关再开工具。
+ */
+const TOOLS_HOME = DEV_TOOLS_ENABLED && EDITOR_PARAM === "tools" && !SHOT && !PREVIEW && PHASE_PARAM === null
+  && !(MOVEMENT_RANGE || EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || GORE_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE || BLOCKOUT);
+const SANDBOX = MOVEMENT_RANGE || EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || GORE_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE || BLOCKOUT || TOOLS_HOME;
+const PHASE_TABLE = TOOLS_HOME ? [TOOLS_HOME_PHASE] : BLOCKOUT ? BLOCKOUT_PHASES : MOVEMENT_RANGE ? [MOVEMENT_RANGE_PHASE] : EXPLOSION_TEST ? [EXPLOSION_RANGE_PHASE] : WEAPON_RANGE ? [WEAPON_RANGE_PHASE] : RANGE ? [RANGE_PHASE]
   : GORE_TEST ? [GORE_RANGE_PHASE]
   : MELEE_TEST ? [MELEE_QTE_PHASE]
     : FIRST_LEVEL_P012_WHITEBOX ? [ARCHIVED_P012_FIXTURE ? ARCHIVED_P012_PHASE : FIRST_LEVEL_P012_WHITEBOX_PHASE]
@@ -1065,7 +1076,7 @@ function ApplyDebugOptions() {
   // 只会把换人的着色器预热和一张阵亡卡塞进取证里。
   if (GORE_TEST) options.invincible = true;
   // 白盒关卡编辑器同理（只看布设），且只改这一份拷贝，不调会落盘的 SetDebugOption。
-  if (BLOCKOUT) options.invincible = true;
+  if (BLOCKOUT || TOOLS_HOME) options.invincible = true;
   player?.SetDebugOptions(options);
   EnsureDebugInventory();
   return options;
@@ -3123,8 +3134,10 @@ async function Boot() {
     actorFactory, viewmodel, audio, cutscene, destruction, profiler,
     shot: !!SHOT,
     ReleasePointerLock,
-    ReturnToMainMenu: MENU_AT_BOOT ? () => OpenMenu() : null,
+    ReturnToMainMenu: TOOLS_HOME ? ReturnToTitlePage : MENU_AT_BOOT ? () => OpenMenu() : null,
     SettingsOpen: () => !!settings?.IsOpen,
+    // 高级工具首页：没有关卡，空 Inspector 换成整页的工具首页（Script_Editor.BuildHome）
+    home: TOOLS_HOME,
     game: {
       // gi 走取值器：惰性构造后 Debug Rendering 面板才能看见新建的探针体
       state, FrameDebugger: frameDebugger, PHASES: PHASE_TABLE, JumpToLevel, graphics, ApplyGraphics, autoQuality, GraphicsProfile: graphicsProfileApi,
@@ -3379,9 +3392,13 @@ async function Boot() {
   else if (PREVIEW_AUTOPLAY) StartPreview({ unlockAudio: false });
   if (EDITOR_PARAM === "tools" && !SHOT && editor) {
     menu?.Close(); state.menu = false; ShowBoot(false);
-    editorReturnMenuMode = "title";
+    // 工具首页背后没有主菜单的活场景：退出时整页回标题菜单（FinishEditorSession）。
+    editorReturnMenuMode = TOOLS_HOME ? null : "title";
     SetDevToolsHidden(false);
     editor.TogglePanel(true);
+    // 首页选了要关卡的工具后整页换过来，带着 ?tool= 直接打开它
+    const tool = params.get("tool");
+    if (tool) editor.Open(tool);
   }
   if (EDITOR_PARAM === "fullScene" && !SHOT) {
     // 完整县城与车厢静态场景都直接进工具，不再让用户隔着已经打开的编辑器
@@ -3450,6 +3467,7 @@ const WORLD_CLASSES = {
   [WEAPON_RANGE_LEVEL_ID]: WeaponRangeField,
   [MOVEMENT_RANGE_ID]: MovementRangeField,
   [GORE_RANGE_ID]: GoreRangeField,
+  [TOOLS_HOME_ID]: ToolsHomeField,
   [MELEE_QTE_LEVEL_ID]: RangeField,
   [FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID]: FirstLevelWhiteboxField,
   // 白盒关卡编辑器的每一关都是同一个白盒场地类，布局各自不同（phase.whitebox.layout）。
@@ -3555,7 +3573,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   // 上一轮 PCG 自己的碰撞盒挡自己，所有候选都被判成重叠。
   battlefield.propPcgBlockers = battlefield.colliders.slice();
   // TownDressing is bounds-based, not phase-based: independent IDs alone do not isolate it.
-  const external = phase.whitebox?.p012 || phase.blockout || phase.id === EXPLOSION_RANGE_ID || phase.id === MOVEMENT_RANGE_ID || phase.id === GORE_RANGE_ID ? {count:0,generatedCount:0,pcgCount:0,pcgStats:null,pcgErrors:[],failed:[],colliders:[],streamer:null} : await AddExternalProps({
+  const external = phase.whitebox?.p012 || phase.blockout || phase.id === EXPLOSION_RANGE_ID || phase.id === MOVEMENT_RANGE_ID || phase.id === GORE_RANGE_ID || phase.id === TOOLS_HOME_ID ? {count:0,generatedCount:0,pcgCount:0,pcgStats:null,pcgErrors:[],failed:[],colliders:[],streamer:null} : await AddExternalProps({
     scene, library, phaseId: FieldIdFor(phase), bounds: phase.bounds,
     groundAt: (x, z) => battlefield.GroundHeight(x, z),
     blockers: battlefield.propPcgBlockers,
@@ -3583,7 +3601,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   }
   // tzm 饰件层（信号机/站灯/窗花/门五金…）：与外部 GLB 布景同一个异步槽位，
   // 但物理契约不同（多数无碰撞、可悬空安装），所以是平行的一层，见 Script_TrimProps 文件头。
-  const trim = phase.whitebox?.p012 || phase.blockout || phase.id === EXPLOSION_RANGE_ID || phase.id === MOVEMENT_RANGE_ID || phase.id === GORE_RANGE_ID ? {count:0,failed:[],colliders:[]} : await AddTrimProps({ scene, library, phaseId: FieldIdFor(phase) });
+  const trim = phase.whitebox?.p012 || phase.blockout || phase.id === EXPLOSION_RANGE_ID || phase.id === MOVEMENT_RANGE_ID || phase.id === GORE_RANGE_ID || phase.id === TOOLS_HOME_ID ? {count:0,failed:[],colliders:[]} : await AddTrimProps({ scene, library, phaseId: FieldIdFor(phase) });
   battlefield.trimProps = trim;
   if (trim.colliders?.length) {
     battlefield.colliders.push(...trim.colliders);
@@ -4005,7 +4023,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   // CountSide("nra") 都会把他们数进去，于是撒兵自动少撒同样多 ——
   // 场上活人总数一个没多，开机红线（drawCalls / triangles）不受影响。
   // 名册默认从本章 beats 的 who 推导（该章说过话的战斗员自动在场），INT2 按章精修。
-  if (!MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !GORE_TEST && !BLOCKOUT && !PREVIEW && !cutsceneOnly && !deprecated && companion) {
+  if (!MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !GORE_TEST && !BLOCKOUT && !TOOLS_HOME && !PREVIEW && !cutsceneOnly && !deprecated && companion) {
     companion.BeginLevel(contentId, {
       // 名册**优先走章节数据点名**（INT2 起七章都写了 roster）；没写才由 beats 推。
       // 推导只收「该章说过话的战斗员」—— 军医、参谋、师长这些 combatant:false 的人
@@ -4029,7 +4047,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   // 章节摆点：**排在具名同伴之后**（罗班长要先站出来，摆点层才拿得到他的句柄），
   // 也排在 SeedSoldiers 之前（后送队要从 nra 名额里出人，撒兵才会自动少撒同样多）。
   // 靶场／白刃训练场／预览／过场承载章都不摆；第一关白盒有正式第一章内容。
-  if (!phase.whitebox?.fullMission && !MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !GORE_TEST && !BLOCKOUT && !PREVIEW && !cutsceneOnly && !deprecated && setpieces) {
+  if (!phase.whitebox?.fullMission && !MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !GORE_TEST && !BLOCKOUT && !TOOLS_HOME && !PREVIEW && !cutsceneOnly && !deprecated && setpieces) {
     setpieces.BeginLevel(contentId, phase);
   }
   interact.Clear("P012");
@@ -4475,6 +4493,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   else if (FIRST_LEVEL_P012_WHITEBOX) { state.pinned = true; SeedSoldiers(phase); }
   // 白盒关卡编辑器：敌我单位是编辑器自己摆的独立演员，不撒兵、不换关。
   else if (BLOCKOUT) { state.pinned = true; }
+  // 高级工具首页：空地，不撒兵（Data_ToolsHome）。
+  else if (TOOLS_HOME) { state.pinned = true; }
   else if (!PREVIEW && !cutsceneOnly) SeedSoldiers(phase);
   SeedSmokeColumns(phase);
   // 进关先打一个检查点：第一拍就被击倒时也有地方可退。
@@ -5396,7 +5416,7 @@ const PIN_RELEASE_GRACE_S = PACING.pinReleaseGraceS;
 /** 换下一关。关末过场 -> 下一关关前过场 -> 建切片。 */
 async function AdvanceLevel(opts = {}) {
   // The gun laboratory has no campaign completion, including explicit debug calls.
-  if (MOVEMENT_RANGE || WEAPON_RANGE || EXPLOSION_TEST || GORE_TEST || BLOCKOUT) return state.phaseIndex;
+  if (MOVEMENT_RANGE || WEAPON_RANGE || EXPLOSION_TEST || GORE_TEST || BLOCKOUT || TOOLS_HOME) return state.phaseIndex;
   if (state.advancing) return state.phaseIndex;
   // 走到这里就算这一关过了：菜单的「继续」与选章里的「已通过」都读这条
   Progress.MarkCleared(PHASE_TABLE[state.phaseIndex].id, state.phaseIndex);
@@ -6639,8 +6659,14 @@ function FinishSettings() {
   menu.Show("settings");
 }
 
+/** 高级工具首页退出 = 回独立的标题菜单（去掉 editor 与各关卡参数后重载）。 */
+function ReturnToTitlePage() {
+  window.location.assign(SandboxUrl(window.location.href, null));
+}
+
 /** 编辑器从菜单进来时，完整关闭后回到原来的菜单层。 */
 function FinishEditorSession() {
+  if (TOOLS_HOME) { ReturnToTitlePage(); return; }
   const mode = editorReturnMenuMode;
   editorReturnMenuMode = null;
   if (!mode || !menu) return;
@@ -9424,6 +9450,7 @@ function Frame(dt, render = true) {
     // 断肢场的木桩兵**不自动复位**：断了的肢体要留在场上看，复位走面板的「重置木桩」。
     else if (GORE_TEST) { /* GoreRange reseeds only on demand. */ }
     else if (BLOCKOUT) { /* Blockout units are editor-owned puppets; nothing to reseed. */ }
+    else if (TOOLS_HOME) { /* The tools home is an empty lot. */ }
     else if (!EXPLOSION_TEST) SeedSoldiers(phase);
     profiler.E("spawn");
   }
