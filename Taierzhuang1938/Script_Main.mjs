@@ -6374,6 +6374,12 @@ window.addEventListener("keyup", (event) => {
  * 「root document ... not valid for pointer lock」，再点多少次都一样。这时退回「按住右键拖动转视角」：
  * 左键照常开火，右键按住期间的 mousemove 进转头（不开镜）。只认这一种拒绝 —— 手势过期、Esc 冷却
  * 那几种是一时的，照旧提示玩家再点一下。
+ *
+ * 事故（2026-10-21，用户在 Edge 里开白盒编辑器）：**普通 Edge 窗口不在系统前台时**抢锁，报的是
+ * 一字不差的同一句 WrongDocumentError（有头 Edge 实测）。Alt 松开、Esc 松开、1.3 s 重抢这些不是点击
+ * 发起的抢锁，正好可能落在窗口没在前台的那一刻 —— 以前一次就永久退成右键拖动，之后点画面也不再抢锁，
+ * 表现是「Esc 之后回不去」。所以：只有**在画面上点击**发起的抢锁被这样拒才退化；退化之后每次点击
+ * 仍顺手再要一次锁，要到了就退出右键拖动（OnPointerLockChange）。
  */
 let lockUnavailable = false;
 let dragLooking = false;
@@ -6407,15 +6413,20 @@ let rawInputActive = false;
  * 抓不到锁本身不是事故 —— 键位路由里那条「没拿到锁的第一次点击只用来抢锁」会接住；
  * 但不吞的话控制台会留一条 unhandled rejection，而开机冒烟把 console.error 当事故。
  * 抓不到就提示玩家点一下，别让人对着不转的镜头猜。
+ * fromClick：这次是玩家在画面上点击发起的（只有这种被「root document」拒才退成右键拖动，见上）。
  */
-function RequestPointerLock() {
+function RequestPointerLock({ fromClick = false } = {}) {
   if (SHOT || altMouseFree || UiCapturing() || BlockoutMouseCaptured()) return;
   if (escapeHeld) { lockAfterEscape = true; return; }
   if (FAKE_POINTER_LOCK) {
     if (!fakeLocked) { fakeLocked = true; OnPointerLockChange(); }
     return;
   }
-  const nudge = (error) => { if (LockRefusedForGood(error)) EnterDragLook(); else hud?.Hint(T("hud.hint.pointerLock"), 3.0); };
+  const nudge = (error) => {
+    if (fromClick && LockRefusedForGood(error)) EnterDragLook();
+    // 已经在右键拖动里：点击顺手要的锁被拒是常态，别每下都弹「点一下画面」
+    else if (!lockUnavailable) hud?.Hint(T("hud.hint.pointerLock"), 3.0);
+  };
   // **先要 raw input**（unadjustedMovement）。事故：镜头在鼠标往一个方向推到一定
   // 距离之后会突然跳切到另一个角度。页内链路（mousemove -> lookX -> yaw -> 相机）
   // 逐帧量过是连续的，跳的是浏览器送来的 movementX/Y 本身：Chromium on Windows
@@ -6522,6 +6533,8 @@ function OnPointerLockChange() {
     // 下一次 Esc 被浏览器拿去解锁、页面收不到按键，玩家要按两次才能继续。
     if (menu && menu.open) { ReleasePointerLock(); return; }
     intentionalPointerUnlock = false;
+    // 要到锁了：这个窗口锁得住，之前的右键拖动是误判（见 lockUnavailable 的注释）
+    lockUnavailable = false; dragLooking = false;
     lockGrantedAt = performance.now();
     ResetLookSpikeHistory();
     return;
@@ -7115,9 +7128,10 @@ const router = new InputRouter({
     // 白盒总图开着：点到图外（导航栏两边的画面）也不开枪、不抢锁、不起右键转头
     if (BlockoutMouseCaptured()) return false;
     if (!PointerLocked() && !SHOT) {
-      // 整页拿不到锁：不再「第一下只抢锁」，点击照常进游戏（右键拖动转视角见 Capture）
-      if (lockUnavailable) return true;
-      RequestPointerLock(); return false;
+      // 整页拿不到锁：不再「第一下只抢锁」，点击照常进游戏（右键拖动转视角见 Capture）；
+      // 但顺手再要一次锁 —— 万一是误判（窗口当时不在前台），这一下就回到正常锁定
+      if (lockUnavailable) { RequestPointerLock({ fromClick: true }); return true; }
+      RequestPointerLock({ fromClick: true }); return false;
     }
     return true;
   },
