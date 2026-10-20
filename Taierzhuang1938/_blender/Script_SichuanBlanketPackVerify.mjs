@@ -1,5 +1,5 @@
 // Pure Node audit of the delivered GLB, independent of baker self-reports.
-// Usage: node Taierzhuang1938/_blender/Script_SichuanBlanketPackVerify.mjs [model.glb]
+// Usage: node Taierzhuang1938/_blender/Script_SichuanBlanketPackVerify.mjs [model.glb] [--project=<project-directory>] [--max-triangles=3000]
 // Reports stay in ignored tmp/. Uses the repository's sharp dependency to
 // independently decode real pixel data, without a browser or Blender.
 import fs from 'node:fs';
@@ -14,10 +14,10 @@ const Option=name=>args.find(value=>value.startsWith(`--${name}=`))?.slice(name.
 const defaultProjectDir=fileURLToPath(new URL('../',import.meta.url));
 const projectDir=path.resolve(Option('project')??defaultProjectDir);
 const triangleLimit=Number(Option('max-triangles')??3000);
-if(!Number.isInteger(triangleLimit)||triangleLimit<1||triangleLimit>10000)throw Error('Triangle limit must be an integer within the user-authorized 10000-triangle ceiling');
+if(!Number.isInteger(triangleLimit)||triangleLimit<1||triangleLimit>3000)throw Error('Triangle limit must be an integer within the requested 3000-triangle ceiling');
 const defaultFile=path.join(projectDir,'Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb');
 const modelFile=path.resolve(args.find(value=>!value.startsWith('--'))??defaultFile);
-const outDir=path.resolve(defaultProjectDir,'../tmp/SichuanBlanketPack/Review',Option('project')?'V6Audit':'');
+const outDir=path.resolve(defaultProjectDir,'../tmp/SichuanBlanketPack/Review',Option('project')?'CandidateAudit':'');
 const textureManifestFile=path.join(projectDir,'Model/SichuanBlanketPack/Data_SichuanBlanketPackTextures.json');
 const report={file:modelFile,triangleLimit,checks:[],parts:{},materials:[],images:[],externalMaps:[],uvPrimitives:[],totalTriangles:0};
 const Hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -27,6 +27,7 @@ let runtimeTexCoord=1;
 const uvTriangles=[];
 const uvOwners=[];
 const backNormalDots=[];
+let roughnessProjection=[];
 function Check(ok,label,detail=null){report.checks.push({ok:!!ok,label,...(detail===null?{}:{detail})});if(!ok)console.error(`FAIL ${label}${detail===null?'':`  ${typeof detail==='string'?detail:JSON.stringify(detail)}`}`);}
 const identity=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];
 const Near=(a,b,epsilon=1e-6)=>a.length===b.length&&a.every((value,index)=>Math.abs(value-b[index])<=epsilon);
@@ -38,6 +39,23 @@ function NodeMatrix(node){
 }
 function Transform(m,p){return [m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12],m[1]*p[0]+m[5]*p[1]+m[9]*p[2]+m[13],m[2]*p[0]+m[6]*p[1]+m[10]*p[2]+m[14]];}
 function Bounds(points){if(!points.length)return null;const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];for(const point of points)for(let axis=0;axis<3;axis++){min[axis]=Math.min(min[axis],point[axis]);max[axis]=Math.max(max[axis],point[axis]);}return {min,max,size:max.map((value,index)=>value-min[index]),center:max.map((value,index)=>(value+min[index])/2)};}
+function UvIntersectionArea(subject,clip){
+  const cross=(a,b,p)=>(b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]);
+  const direction=cross(clip[0],clip[1],clip[2])>=0?1:-1;
+  let polygon=subject;
+  for(let edge=0;edge<3&&polygon.length;edge++){
+    const a=clip[edge],b=clip[(edge+1)%3],next=[];
+    for(let index=0;index<polygon.length;index++){
+      const start=polygon[index],end=polygon[(index+1)%polygon.length],d0=cross(a,b,start)*direction,d1=cross(a,b,end)*direction;
+      const inside0=d0>=0,inside1=d1>=0;
+      if(inside0)next.push(start);
+      if(inside0!==inside1){const t=d0/(d0-d1);next.push([start[0]+t*(end[0]-start[0]),start[1]+t*(end[1]-start[1])]);}
+    }
+    polygon=next;
+  }
+  let twiceArea=0;for(let index=0;index<polygon.length;index++){const a=polygon[index],b=polygon[(index+1)%polygon.length];twiceArea+=a[0]*b[1]-a[1]*b[0];}
+  return Math.abs(twiceArea)/2;
+}
 function ImageSize(bytes){
   if(bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))return {format:'png',width:bytes.readUInt32BE(16),height:bytes.readUInt32BE(20)};
   if(bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WEBP'){
@@ -52,6 +70,26 @@ function ImageSize(bytes){
     let offset=2;while(offset+4<bytes.length){if(bytes[offset]!==0xff){offset++;continue;}const marker=bytes[offset+1];offset+=2;if(marker===0xd8||marker===0xd9)continue;const length=bytes.readUInt16BE(offset);if([0xc0,0xc1,0xc2,0xc3,0xc5,0xc6,0xc7,0xc9,0xca,0xcb,0xcd,0xce,0xcf].includes(marker))return {format:'jpeg',height:bytes.readUInt16BE(offset+3),width:bytes.readUInt16BE(offset+5)};offset+=length;}
   }
   throw Error('Unsupported or invalid source image encoding');
+}
+
+function ReadEvidenceFile(entry,label){
+  Check(!!entry&&typeof entry.path==='string'&&entry.path.length>0,`${label} has a readable evidence path`);
+  if(!entry?.path)return null;
+  const file=path.resolve(projectDir,entry.path);
+  Check(fs.existsSync(file),`${label} evidence exists`,file);
+  if(!fs.existsSync(file))return null;
+  const data=fs.readFileSync(file),sha256=Hash(data);
+  Check(entry.bytes===data.length&&entry.sha256===sha256,`${label} complete file matches its recorded size and SHA-256`,{file,bytes:data.length,sha256});
+  return {file,data,sha256};
+}
+
+async function ReadEvidenceImage(entry,label){
+  const evidence=ReadEvidenceFile(entry,label);
+  if(!evidence)return null;
+  const size=ImageSize(evidence.data);
+  Check(entry.width===size.width&&entry.height===size.height,`${label} real image dimensions match the record`,size);
+  const pixels=await sharp(evidence.data).removeAlpha().toColourspace('srgb').raw().toBuffer({resolveWithObject:true});
+  return {...evidence,...size,pixels};
 }
 
 try{
@@ -87,7 +125,41 @@ try{
   for(let pixel=0;pixel<ormPixels.data.length;pixel+=3)for(let channel=0;channel<3;channel++){const value=ormPixels.data[pixel+channel];extrema.min[channel]=Math.min(extrema.min[channel],value);extrema.max[channel]=Math.max(extrema.max[channel],value);}
   report.ormProof={method:'Independent full-pixel decode of the delivered lossless WebP',pixels:ormPixels.info.width*ormPixels.info.height,...extrema};
   Check(ormPixels.info.channels===3&&report.ormProof.pixels===1048576&&extrema.min[2]===0&&extrema.max[2]===0,'Every one of the 1,048,576 metallic pixels is zero',report.ormProof);
-  Check(extrema.min[1]===242&&extrema.max[1]===242,'Every roughness pixel stays at the dry-fibre value 242/255',extrema);
+  Check(extrema.min[1]>=200&&extrema.max[1]<=255,'Every roughness texel is within the dry natural-fibre range 200..255',extrema);
+  Check(extrema.max[1]-extrema.min[1]>=8,'Delivered roughness contains measured variation rather than a constant placeholder',extrema);
+  const roughnessBake=bakeRecord.roughnessBake;
+  Check(roughnessBake?.method==='selected-to-active-emission'&&roughnessBake?.sourceProperty==='Principled BSDF.Roughness','Bake evidence identifies the high-source roughness socket and actual selected-to-active emission projection',roughnessBake?{method:roughnessBake.method,sourceProperty:roughnessBake.sourceProperty}:null);
+  if(roughnessBake){
+    const sourceBlend=ReadEvidenceFile(roughnessBake.sourceBlend,'Roughness high-source Blender file');
+    if(sourceBlend)Check(/\.blend$/i.test(sourceBlend.file),'Roughness source is the retained Blender project',sourceBlend.file);
+    const sources=roughnessBake.sources??[];
+    Check(Array.isArray(sources)&&sources.length>0,'Roughness projection records the actual source objects and materials');
+    const sourceNames=new Set();
+    for(const source of sources){
+      Check(typeof source.name==='string'&&source.name.length>0&&!sourceNames.has(source.name),`Roughness source ${source.name} has a unique object name`);sourceNames.add(source.name);
+      Check(Array.isArray(source.materials)&&source.materials.length>0,`Roughness source ${source.name} records material socket evidence`);
+      for(const material of source.materials??[])Check(typeof material.name==='string'&&material.name.length>0&&typeof material.roughnessLinked==='boolean'&&Number.isFinite(material.roughnessDefault)&&material.roughnessDefault>=0&&material.roughnessDefault<=1,`Source material ${material.name} records its real roughness input`,material);
+    }
+    roughnessProjection=roughnessBake.projection??[];
+    Check(Array.isArray(roughnessProjection)&&roughnessProjection.length>0,'Roughness bake records individual source-to-target projection operations');
+    for(const projection of roughnessProjection)Check(typeof projection.target==='string'&&projection.target.length>0&&projection.selectedToActive===true&&projection.bakeType==='EMIT'&&Array.isArray(projection.sources)&&projection.sources.length>0&&projection.sources.every(name=>sourceNames.has(name)),`Roughness target ${projection.target} used real recorded high sources`,projection);
+    for(const part of ['Pack_Bundle','Pack_Binding','Pack_Sandals','Pack_StrawMat','Pack_Jacket'])Check(roughnessProjection.some(projection=>projection.part===part),`${part} participates in the source roughness projection`);
+    const raw=await ReadEvidenceImage(roughnessBake.raw,'Raw selected-to-active roughness bake');
+    const runtime=await ReadEvidenceImage(roughnessBake.runtime,'Runtime projected roughness scalar');
+    if(raw){
+      let nonGray=0,minimum=255,maximum=0;
+      for(let offset=0;offset<raw.pixels.data.length;offset+=3){const channels=raw.pixels.data.subarray(offset,offset+3);if(Math.max(...channels)-Math.min(...channels)>1)nonGray++;minimum=Math.min(minimum,channels[0]);maximum=Math.max(maximum,channels[0]);}
+      report.roughnessRawProof={width:raw.width,height:raw.height,nonGray,minimum,maximum,sha256:raw.sha256};
+      Check(raw.width>=1024&&raw.height>=1024&&raw.pixels.info.channels===3&&nonGray===0&&maximum-minimum>=8,'The recorded raw emission result is a real varying scalar image at bake resolution',report.roughnessRawProof);
+    }
+    if(runtime){
+      let nonGray=0,mismatched=0;
+      const validSize=runtime.width===1024&&runtime.height===1024&&runtime.pixels.info.channels===3;
+      if(validSize)for(let offset=0;offset<runtime.pixels.data.length;offset+=3){const value=runtime.pixels.data[offset];if(runtime.pixels.data[offset+1]!==value||runtime.pixels.data[offset+2]!==value)nonGray++;if(ormPixels.data[offset+1]!==value)mismatched++;}
+      report.roughnessPackingProof={width:runtime.width,height:runtime.height,pixels:validSize?1048576:0,nonGray,mismatched,sha256:runtime.sha256};
+      Check(validSize&&nonGray===0&&mismatched===0,'All 1,048,576 ORM.G values equal the recorded projected runtime roughness image exactly',report.roughnessPackingProof);
+    }
+  }
   Check(extrema.max[0]-extrema.min[0]>=20&&extrema.max[0]>=240,'AO contains a real varying surface-occlusion bake, rather than the old constant placeholder',extrema);
   Check(glb.buffer.readUInt32LE(4)===2&&glb.buffer.readUInt32LE(8)===glb.buffer.length,'GLB 2 header and byte length are valid');
   Check(g.asset?.version==='2.0','glTF 2.0 asset');
@@ -167,6 +239,12 @@ try{
     for(const child of node.children??[]){parent.set(child,index);Walk(child,next,owner);}
   }
   for(const root of roots)Walk(root,identity);
+  Check((g.scenes??[]).length===1,'The GLB has one complete delivery scene, including every optional component');
+  const unreachableMeshNodes=(g.nodes??[]).flatMap((node,index)=>node.mesh!==undefined&&!reachable.has(index)?[{index,name:node.name,mesh:node.mesh}]:[]);
+  Check(unreachableMeshNodes.length===0,'No mesh nodes are hidden outside the audited delivery hierarchy',unreachableMeshNodes);
+  const referencedMeshes=new Set([...reachable].flatMap(index=>g.nodes[index].mesh===undefined?[]:[g.nodes[index].mesh]));
+  Check(referencedMeshes.size===(g.meshes??[]).length,'All delivered mesh resources are included in the triangle count',{referenced:referencedMeshes.size,delivered:g.meshes?.length??0});
+  for(const index of reachable){const node=g.nodes[index];if(node.mesh!==undefined)Check(roughnessProjection.some(projection=>projection.target===node.name),`${node.name} has its own recorded source roughness projection`);}
   const resolution=256,coverage=new Uint8Array(resolution*resolution),coverageOwner=new Int32Array(resolution*resolution);coverageOwner.fill(-1);const overlapExamples=[];
   let overlappingSamples=0,degenerateUvs=0,uvArea=0;
   for(const [triangleId,[a,b,c]] of uvTriangles.entries()){
@@ -183,19 +261,38 @@ try{
   report.surfaceUv={area:uvArea,rasterResolution:resolution,coveredSamples:coverage.reduce((sum,value)=>sum+value,0),overlappingSamples,degenerateUvs,overlapExamples};
   Check(degenerateUvs===0,'Every production triangle has non-degenerate surface UV area',report.surfaceUv);
   Check(overlappingSamples===0&&uvArea<=1.001,'All five components have genuinely non-overlapping production UV islands',report.surfaceUv);
+  const bucketResolution=32,buckets=new Map(),testedPairs=new Set(),exactOverlapExamples=[];
+  let exactOverlapPairs=0,maxIntersectionArea=0;
+  for(const [id,triangle] of uvTriangles.entries()){
+    const min=triangle.reduce((out,uv)=>out.map((value,axis)=>Math.min(value,uv[axis])),[Infinity,Infinity]),max=triangle.reduce((out,uv)=>out.map((value,axis)=>Math.max(value,uv[axis])),[-Infinity,-Infinity]);
+    const low=min.map(value=>Math.max(0,Math.min(bucketResolution-1,Math.floor(value*bucketResolution)))),high=max.map(value=>Math.max(0,Math.min(bucketResolution-1,Math.floor(value*bucketResolution))));
+    for(let y=low[1];y<=high[1];y++)for(let x=low[0];x<=high[0];x++){
+      const key=y*bucketResolution+x,existing=buckets.get(key)??[];
+      for(const other of existing){
+        const pair=other*uvTriangles.length+id;if(testedPairs.has(pair))continue;testedPairs.add(pair);
+        const intersectionArea=UvIntersectionArea(triangle,uvTriangles[other]);maxIntersectionArea=Math.max(maxIntersectionArea,intersectionArea);
+        if(intersectionArea>1e-10){exactOverlapPairs++;if(exactOverlapExamples.length<8)exactOverlapExamples.push({triangles:[other,id],owners:[uvOwners[other],uvOwners[id]],intersectionArea});}
+      }
+      existing.push(id);buckets.set(key,existing);
+    }
+  }
+  report.surfaceUv.exactIntersection={method:'Triangle clipping after 32x32 spatial candidate bucketing; shared edges have zero area',testedPairs:testedPairs.size,toleranceUvArea:1e-10,exactOverlapPairs,maxIntersectionArea,examples:exactOverlapExamples};
+  Check(exactOverlapPairs===0,'Actual UV triangles have no positive-area intersections, including islands below raster sample size',report.surfaceUv.exactIntersection);
   Check(report.surfaceUv.coveredSamples>resolution*resolution*.25,'The 1024 atlas has meaningful surface coverage',report.surfaceUv);
   const normalPixels=await sharp(externalMaps.get('Normal').data).removeAlpha().raw().toBuffer({resolveWithObject:true});
   let normalMinBlue=255;for(let pixel=2;pixel<normalPixels.data.length;pixel+=3)normalMinBlue=Math.min(normalMinBlue,normalPixels.data[pixel]);
   Check(normalMinBlue>=128,'Every decoded normal-map pixel stays in the outward hemisphere, including edge padding',{pixels:normalPixels.info.width*normalPixels.info.height,minBlue:normalMinBlue});
-  let invalidNormalSamples=0,blackAlbedoSamples=0;const blackAlbedoLocations=[];
+  let invalidNormalSamples=0,blackAlbedoSamples=0,surfaceRoughnessMin=255,surfaceRoughnessMax=0;const blackAlbedoLocations=[];
   const basePixels=await sharp(externalMaps.get('Base').data).removeAlpha().raw().toBuffer({resolveWithObject:true});
   for(let y=0;y<resolution;y++)for(let x=0;x<resolution;x++)if(coverage[y*resolution+x]){
     const offset=((y*4+2)*1024+x*4+2)*3;
     if(normalPixels.data[offset+2]<120)invalidNormalSamples++;
     if(basePixels.data[offset]+basePixels.data[offset+1]+basePixels.data[offset+2]<4){blackAlbedoSamples++;blackAlbedoLocations.push([x*4+2,y*4+2]);}
+    surfaceRoughnessMin=Math.min(surfaceRoughnessMin,ormPixels.data[offset+1]);surfaceRoughnessMax=Math.max(surfaceRoughnessMax,ormPixels.data[offset+1]);
   }
   Check(invalidNormalSamples===0,'Sampled surface normal texels point into the outward hemisphere',{invalidNormalSamples});
   Check(blackAlbedoSamples===0,'Production UVs do not sample unbaked black albedo holes',{blackAlbedoSamples,blackAlbedoLocations});
+  Check(surfaceRoughnessMin>=200&&surfaceRoughnessMax-surfaceRoughnessMin>=8,'Actual covered surfaces contain dry and nonconstant projected roughness',{min:surfaceRoughnessMin,max:surfaceRoughnessMax});
   for(const name of names.slice(1)){
     const id=nodeIds[name][0];let cursor=id;const ancestors=[];while(parent.has(cursor)){cursor=parent.get(cursor);ancestors.push(cursor);}
     Check(id!==undefined&&reachable.has(id)&&ancestors.includes(rootId),`${name} is below Pack_Root`);
@@ -213,6 +310,9 @@ try{
     }
     jacketPart.surfaceAreaM2=jacketArea;
     Check(jacketArea>=.65&&jacketArea<=1.25,'The folded civilian jacket retains full-size cloth area rather than a miniature flat silhouette',jacketArea);
+    const extraction=[0,.36,.30],extractedBounds=Bounds(jacketPart.points.map(point=>point.map((value,axis)=>value+extraction[axis])));
+    report.jacketExtraction={method:'Apply the documented withdrawal translation to all original geometry owned by Pack_Jacket; independent part ancestry is verified above',translationM:extraction,meshNodes:jacketPart.meshNodes.map(index=>g.nodes[index].name),triangleCount:jacketPart.triangles.length,originalBounds:jacketPart.bounds,extractedBounds};
+    Check(jacketPart.meshNodes.length>0&&Near(extractedBounds.center,jacketPart.bounds.center.map((value,axis)=>value+extraction[axis]))&&Near(extractedBounds.size,jacketPart.bounds.size),'The complete original jacket geometry can be withdrawn through its independent node without shrinking or separating its descendants',report.jacketExtraction);
   }
   const bindingBox=report.parts.Pack_Binding?.bounds;
   Check(!!bindingBox&&bindingBox.max[1]<=.158,'The main cloth binding has no floating fin above the blanket top (the separate mat loops are excluded)',bindingBox);
@@ -261,6 +361,8 @@ try{
     const slots={base:pbr.baseColorTexture?.index,normal:material.normalTexture?.index,orm:pbr.metallicRoughnessTexture?.index,ao:material.occlusionTexture?.index};
     const slotInfo={base:pbr.baseColorTexture,normal:material.normalTexture,orm:pbr.metallicRoughnessTexture,ao:material.occlusionTexture};
     report.materials.push({id,name:material.name,slots,metallicFactor:pbr.metallicFactor??1,roughnessFactor:pbr.roughnessFactor??1});
+    Check((pbr.roughnessFactor??1)===1,`${material.name??id} uses the projected roughness map without reducing dry-fibre roughness`,pbr.roughnessFactor??1);
+    Check(Number.isFinite(pbr.metallicFactor??1)&&(pbr.metallicFactor??1)>=0&&(pbr.metallicFactor??1)<=1,`${material.name??id} has a valid metallic factor`,pbr.metallicFactor??1);
     for(const [slot,index] of Object.entries(slots)){Check(index!==undefined,`${material.name??id} has ${slot} texture`);if(index!==undefined){const source=SourceOfTexture(index);Check(source!==undefined,`${material.name??id} ${slot} source image exists`);if(source!==undefined)neededImages.add(source);}}
     for(const [slot,info] of Object.entries(slotInfo)){
       Check(!!info&&(info.texCoord??0)===runtimeTexCoord&&!info.extensions?.KHR_texture_transform,`${material.name??id} ${slot} actually samples the audited GameUV without a transform`);

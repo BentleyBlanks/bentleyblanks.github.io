@@ -2,7 +2,13 @@
 
 当前稳定烘焙基准为 `HighV10/Scene_SichuanPackSoftWearV10.blend`，保留该源与原图。最终必须 ≤3000 三角（含所有可隐藏部件），见[需求核对](Data_RequirementsAudit.md)。当前 V6 的 9870 三角不是最终输出。
 
-下一步在独立 `GameV10/Scene_SichuanPackGameV10.blend` 中从 V10 evaluated 形体取低模；不得为了预算重建旧箱体、旧圆柱席卷或旧鞋。高模和棉布/草纤维材质不再推倒重做。最终形体仍需把鞋边稍收薄、卷口大起伏收平，以接近参考的压实感。
+已在独立 `GameV10/Scene_SichuanPackGameV10.blend` 中从 V10 evaluated 形体取低模；不重建旧箱体、旧圆柱席卷或旧鞋。高模和棉布/草纤维材质保留。鞋沿取实际高模的 72% 位置并稍收薄，卷口保留窄缝。
+
+2026-10-21 实测几何为 **2937 三角**：Bundle 974、Binding 620、Jacket 319、StrawMat 376、Sandals 648，全部可隐藏部件均计入。短褂仍保留完整衣身、衣角与布扣；衣身表面误差 0.90 mm，露出衣角 1.71 mm。游戏背面按真实朝向和位置投平，最大调整 2.38 mm，接触面积 0.09759 m²；高模源不改。
+
+`Script_SichuanGameUvV10.py` 实际检查 2937 个三角：精确重叠为零、越界为零、退化为零，且各三角均含 1024 像素中心。低模首层 SurfaceUV 保留，运行时使用第二层 GameUV。
+
+五部件真实 Base/Normal/Roughness/AO 首轮投射已执行，但 encoder 正确拒绝了主带的 1726 个内部漏烘像素，法线也发现反向投射。当前在独立临时场景中测试折层与窄带的法线/射线对应，**尚未通过游戏资产验收，也未替换旧 V6 GLB**。不能引用几何与 UV 通过证明贴图或最终视觉完成。
 
 初始总额以 2950 留 50 余量：Bundle 1020、Binding 630、Jacket 320、StrawMat 520、Sandals 460。实际可在五者间重新分配，尤其不要因鞋边、鞋口带和悬绳而削掉双鞋结构；总额必须按导出的全部索引验证，不能只看 Blender 的一部分。
 
