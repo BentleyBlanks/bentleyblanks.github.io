@@ -371,6 +371,12 @@ export class BlockoutMarkers {
   - `animal` = 单独一匹马；`state: "down"` 侧躺、不迈腿。
   - 模型异步下载，下完前照旧是体块，载不进来就一直是体块；组上标 `whiteboxCharacter`，白盒画质里保留贴图。Probe 多给 `model`（`"Type89Tank"` / `"ox"` / `"horse"` / null）、`draftAnimalVisible`、`draftTravelM`。
   - 预演的飞机本来就是游戏机队的三菱 Ki-30 克隆（§14.2，`Script_EditorBlockoutPrevizAircraft`），不变。
+- 2026-10-20 不打仗时不端枪（用户：下蹲、跑步、聊天这类大部分动作不会把枪拿在手上，换成看着正常的占位动作）。判断只看 `aim`：
+  - 拿步枪（`BLOCKOUT_PUPPETS.slungWeapons`：汉阳造 / 三八式 / 中正式）、`aim` 为假的兵（国军日军一样）：站着 / 走 / 跑用游戏里的背枪步态（`Script_RelaxedGait` 的 `"slung"`：`RelaxedStand` / `RelaxedWalk` / `BackRifleRun`，枪挂背上）；蹲着不动、没在播片段时播 `PvCrouchRestRifle`（单膝跪、枪竖在身前歇着）。日军不戒备原来是端枪警戒步态（`"alert"`），现在也背枪；拿机枪的日军不戒备照旧 `"alert"`。
+  - `aim` 为真：照旧端枪（国军友军步态、日军原生）。蹲着走、趴着、爬照旧端枪（没有空手的现成片段）；倒地的人手里的枪不动。
+  - 预演片段：`PvStandTalkLowRifle`（右手提枪说话）运行时换成背枪版 `PvStandTalkSlung`（`PREVIZ_CLIP_REMAP`，数据不改）；`VilDuckProne`（卧倒抱头）进背枪表 `PREVIZ_WEAPON_SLUNG`。指路 / 招手 / 拦人（右手低提枪）、蹲着说话 / 歇着（枪竖着）不动。
+  - 开场动作库与预演额外动作库改成编辑器一开就在后台下（`BlockoutPreviz.EnsureOpening`），不等第一次播预演（蹲着歇的片段要它）。
+  - Probe 多给 `gait`、`rifleInHand`、`rifleOnBack`。
 
 ### 5.7 树（`Script_EditorBlockoutTrees.mjs`，2026-10-20）
 
@@ -596,6 +602,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 - 2026-10-13（地图开着鼠标漏到游戏）：遮罩改成盖满整屏（导航栏两边那条原来露着，点一下会重新锁鼠标 / 在面板里直接开枪）；`Script_Main` 加 `BlockoutMouseCaptured()` 闸住抢锁、开枪、转头与滚轮换枪。
 - 2026-10-20（01–05 集结处改弯沟）：§13 干沟由 15×50 m 方坑改成一条弯沟（坑窝 A / 中弯 / 坑窝 B，沟底宽 5–15 m，中弯往南接支沟放伤员，支沟南头接凹路、凹路在台地里往东到 x 83 才拐往南）；02 末的人分三小堆贴北岸、伤员放支沟里；锚点加 `GullyU` / `InGullyFloor`；0610 跟着挪妮儿、06-1–06-3 的站位，干沟进 0610 路网（中心线，不再是矩形区域）。
 - 2026-10-19（12–18 新剧本白盒）：新关卡 `FirstLevel1218`（§16）；§14.3 预演音效别名加 `planeDrone` / `planeDive` / `strafeNear` / `strafeFar` / `strafeDirt`（飞机与扫射，映射到游戏音频库现成的键）。
+- 2026-10-20（不端枪）：§5.6 不戒备的步枪兵站 / 走 / 跑背枪、蹲着歇枪竖着；预演里提枪说话换背枪版、卧倒抱头背枪；动作库开编辑器就下。
 - 2026-10-20（默认关卡）：§1 白盒工具默认开新剧本 01–05（菜单入口、没写 / 写错 `level` 都进它），不再默认开旧版第一关。
 - 2026-10-20（正式模型）：§5.6 战车 / 车 / 牲口换游戏里的八九式、撤运车 + 牛 / 马（带 Walk 动画），单位可选 `draft`；§5.7 树换枯树模型（树干块只留碰撞）；关键帧机位的蹲 / 趴走开就站起来（§7）。
 - 2026-10-18（01–05 第三轮，「小毛病全都修掉」）：§14.2 白盒画质下预演的爆炸看得见了（`Script_EditorBlockoutPrevizFx` 在调试叠加层另画简易爆炸，只在编辑器、只在白盒特效关时画）；§14.1 演员键 `throw`（播投弹片段 + 弹的抛物线）、爆炸事件 `h`；§5.6 `lie:"along"` 按身体包围框居中、固定用 `DeathCollapseC`，Probe 再多给几项；§13 板桥门板缝 5 → 9 cm、旧门板厚薄高低不一，冬瓜在被子上一直躺着，桥下的人一律蹲 / 趴，05-3 顺子替身播投弹片段；补：白盒下的烟与枪口火、05-4 鬼子绕桥东头、04-3 刘文财猫腰过桥底。

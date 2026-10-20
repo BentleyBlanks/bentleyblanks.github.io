@@ -50,6 +50,8 @@ export const PREVIZ_WEAPON_SLUNG = Object.freeze([
   "PvCrawlCarryBundle", "PvClimbOutTrench", "PvSupportWalkL", "PvSupportWalkR", "PvSupportedHop",
   // CollectionCare：医护包扎 / 按伤口（2026-10-19 起 02末卫生兵用 CareMedicPress）
   "CareMedicPress", "CareMedicBandage",
+  // 2026-10-20：卧倒抱头（空袭里的兵）两只手抱着后脑，枪背着；百姓播它时手里本来就没枪
+  "VilDuckProne",
 ]);
 
 /**

@@ -163,6 +163,7 @@ export class BlockoutPreviz {
    * force：不管原文变没变都重新归一化（配置换了，核对要重做）。→ 是否有预演。
    */
   async Load({ force = false } = {}) {
+    if (!this.openingLoading && !this.opening) this.EnsureOpening();
     const levelKey = this.editor.levelKey;
     if (levelKey !== this.levelKey) { this.levelKey = levelKey; this.text = null; this.doc = null; this.present = false; force = true; }
     this.lastCheckMs = performance.now();
@@ -358,16 +359,24 @@ export class BlockoutPreviz {
       this.faceTracksLoaded.add(faceUrl);
       jobs.push(LoadFaceTracks(new URL(faceUrl, location.href).href).catch(() => 0));
     }
-    if (seq.actors.some(a => a.keys.some(k => typeof k.clip === "string")) && !this.opening) {
-      jobs.push((async () => {
-        const api = await import("./Script_OpeningStoryboardAnimation.mjs");
-        const library = await api.LoadOpeningStoryboardAnimation();
-        await this.LoadExtraClipLibraries(api);
-        this.opening = { api, library };
-        this.editor.puppets.SetOpeningLibrary(this.opening);
-      })().catch(error => console.warn("[BlockoutPreviz] 开场动作库读不到，片段退回原生动画", error)));
-    }
+    if (seq.actors.some(a => a.keys.some(k => typeof k.clip === "string"))) jobs.push(this.EnsureOpening());
     await Promise.all(jobs);
+  }
+
+  /**
+   * 开场动作库 + 预演额外动作库（只下一次，交给演员层）。2026-10-20 起编辑器一开就在后台下：关键帧里拿步枪、
+   * 不戒备、蹲着不动的兵要播歇着的片段（Script_EditorBlockoutPuppets._RestDrive），不等第一次播预演。读不到只警告。
+   */
+  EnsureOpening() {
+    if (this.opening) return Promise.resolve(this.opening);
+    return this.openingLoading ||= (async () => {
+      const api = await import("./Script_OpeningStoryboardAnimation.mjs");
+      const library = await api.LoadOpeningStoryboardAnimation();
+      await this.LoadExtraClipLibraries(api);
+      this.opening = { api, library };
+      this.editor.puppets.SetOpeningLibrary(this.opening);
+      return this.opening;
+    })().catch(error => { this.openingLoading = null; console.warn("[BlockoutPreviz] 开场动作库读不到，片段退回原生动画", error); return null; });
   }
 
   /** 中断 / 播完。restore：按 then 跳关键帧（直接到位）。 */

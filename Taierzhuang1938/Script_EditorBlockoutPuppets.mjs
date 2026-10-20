@@ -61,11 +61,20 @@
 //     单位（老耿的黑子）时车自己的牲口藏起来，不叠两匹。单独的 animal 单位 = 只有那匹马；倒地（state down）侧躺、不迈腿。
 //   · 模型异步下载：下完之前照旧是体块，下完那一帧换掉（体块藏起，不删）；模型载不进来就一直是体块。
 //     组上标 whiteboxCharacter：白盒画质里也保留贴图（同预演的飞机）。
+//
+// 2026-10-20（不打仗时不端枪，用户：下蹲、跑步、聊天这类大部分动作不会把枪拿在手上）：
+//   · 拿步枪（BLOCKOUT_PUPPETS.slungWeapons）、此刻不戒备（aim 为假）的兵，国军日军一样：站着 / 走 / 跑换游戏里的
+//     背枪步态（Script_RelaxedGait "slung"：RelaxedStand / RelaxedWalk / BackRifleRun，枪挂在背上）；蹲着不动、没在播片段时
+//     播 PvCrouchRestRifle（单膝跪、枪竖在身前歇着，动作库下完才有，之前照原生蹲姿）。aim 为真照旧端枪（国军友军步态、
+//     日军原生）；拿机枪 / 掷弹筒 / 大刀的、不戒备的日军步枪兵以外的人照旧。蹲着走、趴着、爬照旧端枪（没有空手的现成片段）。
+//   · 预演片段：PvStandTalkLowRifle（右手提枪说话）换成同一套的背枪版 PvStandTalkSlung（PREVIZ_CLIP_REMAP）；
+//     卧倒抱头 VilDuckProne 加进背枪表（Data_BlockoutPrevizClips.PREVIZ_WEAPON_SLUNG）。
+//   · Probe 多给 gait（背枪步态的模式）、rifleInHand / rifleOnBack。
 
 import * as THREE from "three";
 import { SampleTransition } from "./Script_EditorBlockoutConfig.mjs";
 import { InstallAllyGait } from "./Script_AllyGait.mjs";
-import { SetRelaxedGait, EnsureRelaxedGait } from "./Script_RelaxedGait.mjs";
+import { SetRelaxedGait, EnsureRelaxedGait, UpdateRelaxedGaitWeapon, RelaxedGaitShown } from "./Script_RelaxedGait.mjs";
 import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { LoadLugouCastModels } from "./Script_CharacterModel.mjs";
 import { PREVIZ_WEAPON_HIDDEN } from "./Data_BlockoutPrevizClips.mjs";
@@ -110,7 +119,14 @@ export const BLOCKOUT_PUPPETS = Object.freeze({
   animalDown: { rollRad: 1.45, liftM: 0.32 },
   /** 两帧之间挪超过这么远算瞬移（跳关键帧），不算走路，不推步子。 */
   teleportM: 3,
+  /** 不戒备时背在背上的枪（步枪）；机枪 / 掷弹筒 / 手枪 / 大刀照旧。 */
+  slungWeapons: ["HanYang", "Type38", "ZhongZheng"],
+  /** 拿步枪、不戒备、蹲着不动、没在播片段的兵：播这段歇着的片段（单膝跪、枪竖在身前）。 */
+  crouchRestClip: "PvCrouchRestRifle",
 });
+
+/** 预演片段换成同一套里不端枪的版本（2026-10-20）：右手提枪说话 → 背枪说话。 */
+export const PREVIZ_CLIP_REMAP = Object.freeze({ PvStandTalkLowRifle: "PvStandTalkSlung" });
 
 const DEG = Math.PI / 180;
 
@@ -295,6 +311,7 @@ export class BlockoutPuppets {
     try {
       // 步态库是异步下载的：下不来就用缺省动作，不能留一条未处理的 rejection。
       if (!weapon && bodyKind !== "civilian") SetRelaxedGait(soldier, "unarmed");
+      else if (!unit.aim && BLOCKOUT_PUPPETS.slungWeapons.includes(weapon)) SetRelaxedGait(soldier, "slung");
       else if (bodyKind === "nra" || bodyKind === "nraOfficer") InstallAllyGait(soldier)?.catch?.(() => {});
       else if (bodyKind === "ija") SetRelaxedGait(soldier, unit.aim ? null : "alert");
     } catch (error) { /* 同上 */ }
@@ -446,7 +463,6 @@ export class BlockoutPuppets {
       for (const human of puppet.humans) {
         if (human.slot === "main" && newWeapon && !UNARMED_CASTS.has(unit.castId)) human.baseWeapon = newWeapon;
         human.soldier.missionCombatAlert = !!unit.aim;
-        if (human.kind === "ija") SetRelaxedGait(human.soldier, unit.aim ? null : "alert");
       }
     }
     for (const [id, puppet] of this.puppets) if (!keep.has(id) && !puppet.temp) { this._Destroy(puppet); this.puppets.delete(id); }
@@ -565,7 +581,8 @@ export class BlockoutPuppets {
       if (lieClip && human.lieClip?.clip === drive.clip && human.lieClip.L) this._PlaceLying(human, x, z, ry, human.lieClip.L);
       if (!seat) this._ApplyRootPath(human, drive, ry);
       this._SyncWeapon(human, drive);
-      if (human.kind === "ija" || human.soldier.relaxedGait) EnsureRelaxedGait(human.soldier);
+      const relaxed = this._SyncGait(human, drive ? !!drive.aim : !!unit.aim);
+      if (human.soldier.relaxedGait) EnsureRelaxedGait(human.soldier);
       human.animDt += dt;
       const far = distance > BLOCKOUT_PUPPETS.farAnimM;
       if (!force && far && (this.frame + puppet.stagger) % BLOCKOUT_PUPPETS.farAnimEvery !== 0) continue;
@@ -583,7 +600,7 @@ export class BlockoutPuppets {
         if (rig?.deathClipById?.has?.(LIE_DEATH_VARIANT)) rig.deathVariantId = LIE_DEATH_VARIANT;
       }
       const throwing = this._ApplyThrow(human, drive, step);
-      const clipState = throwing ? null : this._ApplyClip(human, drive, mps, step);
+      const clipState = throwing ? null : this._ApplyClip(human, this._RestDrive(puppet, human, drive, { relaxed, mps, carryRole, seat }), mps, step);
       // 友军步态（AllyGait）把「不戒备」的蹲着待着换成 AllyCrouchCarryStand（扛枪半蹲，骨盆离地 0.66 m，
       // 看着是站着的）：蹲 / 卧的人也当戒备，落到原生 KneelHold / CrouchIdle（骨盆 0.36–0.45 m）。
       human.soldier.missionCombatAlert = aim || (!carryRole && puppet.stance !== "stand");
@@ -606,6 +623,7 @@ export class BlockoutPuppets {
         state.meleeCombat = { weapon: actor.weaponId, state: "idle", action: "Guard", clip: "DadaoGuard", normalized: this.elapsed % 1, t: this.elapsed, weight: 1 };
       }
       actor.Update(step, state);
+      this._UpdateSlungRifle(human, relaxed);
       // 2026-10-19：趴着 / 躺着播的空手片段（抱捆爬、躺着攥袖子）手里、背上都不挂枪（背枪那把是竖着挂的，趴下会戳上天）
       if (drive?.clip && PREVIZ_WEAPON_HIDDEN.includes(drive.clip) && human.openingInstalled === true) {
         if (actor.weaponGroup) actor.weaponGroup.visible = false;
@@ -762,10 +780,45 @@ export class BlockoutPuppets {
   // -------------------------------------------------------------------------
   // 预演的外部驱动（§14.2）
 
+  /**
+   * 背枪步态（2026-10-20，文件头）：拿步枪、不戒备的人 "slung"；其余照旧（空手 "unarmed"、日军不戒备 "alert"、
+   * 戒备的 null 交给原生 / 友军步态）。→ 这个人此刻是不是背枪的。
+   */
+  _SyncGait(human, aim) {
+    const soldier = human.soldier, weapon = human.actor.weaponId ?? null;
+    const relaxed = !aim && BLOCKOUT_PUPPETS.slungWeapons.includes(weapon);
+    const mode = !weapon && human.bodyKind !== "civilian" ? "unarmed" : relaxed ? "slung"
+      : human.bodyKind === "ija" && !aim ? "alert" : null;
+    if ((soldier.relaxedGait || null) !== mode) SetRelaxedGait(soldier, mode);
+    return relaxed;
+  }
+
+  /** 拿步枪、不戒备、蹲着不动、没在播片段：换成歇着的片段（BLOCKOUT_PUPPETS.crouchRestClip）；其余原样返回 drive。 */
+  _RestDrive(puppet, human, drive, { relaxed, mps, carryRole, seat }) {
+    if (!relaxed || drive?.clip || drive?.throw || human.slot !== "main" || puppet.stance !== "crouch" || mps > 0.05
+      || puppet.down || carryRole || seat || !this.opening?.library) return drive;
+    const clip = BLOCKOUT_PUPPETS.crouchRestClip;
+    const duration = this.opening.api.OpeningClipMeta?.(clip)?.duration || 4;
+    return { ...(drive || {}), clip, clipSeconds: (this.elapsed + puppet.stagger * 0.013) % duration };
+  }
+
+  /**
+   * 背枪步态在用时把手里的枪挂到背上（RelaxedGait 的背枪挂点）；没在用（蹲、趴、播片段、投弹、戒备）时手里的枪拿回来。
+   * 正在播开场动作库片段的人由动作层自己管（它每帧也调 UpdateRelaxedGaitWeapon）。
+   */
+  _UpdateSlungRifle(human, relaxed) {
+    const soldier = human.soldier, actor = human.actor, rig = actor.characterRig;
+    if (!rig || !actor.weaponGroup || soldier.openingStoryboardPose) return;
+    if (!relaxed && !rig.relaxedGaitRifle?.visible) return;
+    const onBack = relaxed && RelaxedGaitShown(soldier);
+    UpdateRelaxedGaitWeapon(soldier, onBack);
+    if (!onBack) actor.weaponGroup.visible = true;
+  }
+
   /** 开场动作库的片段（clip / clipSeconds）：第一次要片段时才给这个人装那一层（库没下完前照原生动画）。 */
   _ApplyClip(human, drive, mps, dt = 0) {
     const soldier = human.soldier;
-    const clip = drive?.clip || null;
+    const clip = PREVIZ_CLIP_REMAP[drive?.clip] ?? drive?.clip ?? null;
     if (clip && !human.openingInstalled && this.opening?.library) {
       try { this.opening.api.InstallOpeningStoryboardAnimation(soldier); human.openingInstalled = true; }
       catch (error) { console.warn("[BlockoutPuppets] opening layer install failed", error); human.openingInstalled = "failed"; }
@@ -1035,6 +1088,10 @@ export class BlockoutPuppets {
       throwClipS: rig?.clipById?.get?.("GrenadeThrow")?.duration ?? null,
       // 2026-10-19：身体种类、两手、动画时钟（慢动作取证）、开场动作层正在播的片段与进度
       body: human?.body ?? null, bodyKind: human?.bodyKind ?? null, rigged: !!rig, handR, handL,
+      // 2026-10-20：背枪步态的模式、手里 / 背上有没有枪
+      gait: human?.soldier.relaxedGait ?? null,
+      rifleInHand: !!(human?.actor.weaponGroup?.visible && human.actor.weaponId),
+      rifleOnBack: !!(rig?.relaxedGaitRifle?.visible || rig?.openingSlungRifle?.visible),
       mixerTime: rig?.mixer?.time ?? null,
       shownClip: rig?.openingStoryboardState?.clipId ?? null, shownClipSeconds: rig?.openingStoryboardState?.seconds ?? null,
       hiddenParts: rig ? (() => { let n = 0; rig.root.traverse(o => { if (o.userData?.blockoutCivilianHidden) n++; }); return n; })() : 0,
