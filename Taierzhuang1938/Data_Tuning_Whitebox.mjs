@@ -71,7 +71,8 @@ export const WHITEBOX_LIGHTING = Object.freeze({ ambient: 1.8, sun: 1.4, directi
 //（SH 0.42、底色 0.18 对 4.6 的太阳），编辑器里背光的墙、沟壁、木梁一片死黑，摆位置看不清。只管编辑器，正片不吃。
 // 上面那组白盒中性光（默认画质）不走 LightRig，不受它影响。
 // 量过（10-20，high 画质、第一关旧版 01-2）：1/1 → 4/6 时最暗四分之一像素从 48 抬到 67，近黑（<20）占比 10.7% → 4.3%。
-export const BLOCKOUT_EDITOR_FILL = Object.freeze({ probe: 4, ambient: 6 });
+// 10-20 晚：用户嫌 4/6 太亮（「间接光是现在的 30–40% 左右差不多」），两项一起乘 0.35 → 1.4 / 2.1。
+export const BLOCKOUT_EDITOR_FILL = Object.freeze({ probe: 1.4, ambient: 2.1 });
 
 export function NormalizeWhiteboxConfig(value = {}) {
   const config = { ...WHITEBOX_DEFAULTS };
