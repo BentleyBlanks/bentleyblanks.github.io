@@ -6,7 +6,7 @@ import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {LaunchBrowser} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import {ServeRoot} from "./Script_DevServer.mjs";
-import {FPS_ARM_LIMITS,FpsArmPose} from "./Data_FpsArmPoses.mjs";
+import {FPS_ARM_LIMITS} from "./Data_FpsArmPoses.mjs";
 import {SHELVED_WEAPONS} from "./Data_Weapons.mjs";
 import {ZbContactGeometryFailures} from "./Script_FpsZbContactGeometry.mjs";
 
@@ -518,12 +518,7 @@ try {
     Check(pose.facing>.45,`${pose.id} ${pose.pose}: index pad does not face the trigger (${pose.facing.toFixed(2)})`);
     Check(pose.holdingDrift<.001,`${pose.id}: ADS changes the finger contact`);
     if(pose.pose==="fire")Check(pose.triggerTravel>.0001,`${pose.id}: firing does not flex the trigger finger`);
-    // The aiming-only cradle (Data_FpsArmPoses adsSupport) holds a 30-40 mm fore-end in the palm from
-    // below with the hand hidden behind the receiver; the little finger then lies outside the wood and
-    // stays tucked. Thumb to ring keep the 4 mm gate, the little finger must stay within 25 mm, and the
-    // HanYang whole-arm crossing gate below still applies to the cradle.
-    const cradle=pose.pose==='ads'&&FpsArmPose(pose.id)?.ads?.contacts?.left!==FpsArmPose(pose.id)?.hip?.contacts?.left;
-    for(const [digit,distance] of pose.support.entries())Check(distance<(cradle&&digit===4?.025:.004),`${pose.id} ${pose.pose}: support digit ${digit} is ${(distance*1000).toFixed(1)} mm from the fore-end surface`);
+    for(const [digit,distance] of pose.support.entries())Check(distance<.004,`${pose.id} ${pose.pose}: support digit ${digit} is ${(distance*1000).toFixed(1)} mm from the fore-end surface`);
     if(pose.id==='HanYang'){
       // A new procedural palm frame can look correct while the native Idle
       // silently restores the previous, over-bent support wrist.

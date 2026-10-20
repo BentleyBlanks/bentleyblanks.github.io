@@ -10,13 +10,17 @@ Palm (7 DOF about the hip contact, incl. a turn about the palm normal) is search
 jointly with the fingers: palm skin against the real fore-end, no penetration
 (nearest normal + three-ray parity), the production two-bone IK's minimum wrist
 bend, and the highest hand point seen from the ADS eye (ray-cast against the
-rifle). Fingers: per digit deltas from the authored hip rotations within normal
-abduction, distal pads on the fore-end, skin >= 0.6 mm off the wood, also kept
-behind the receiver. On a 30-40 mm fore-end the cradled little finger lies outside
-the wood and stays tucked (see docs/Data_FpsRifleView20261016.md v12).
+rifle) kept in the COD band 0.18-0.31 screen heights under the sight line (neither
+raised to it nor hidden). Fingers: per digit deltas from the authored hip rotations
+within normal abduction, distal pads on the fore-end, skin >= 0.6 mm off the wood,
+not above that band. The shipped grips use FPS_ADS_ROLL_ANCHOR=0.2 with
+FPS_ADS_SHOULDER (see docs/Data_FpsRifleView20261016.md v12).
 
 FPS_ADS_PALM (json {weapon: palm params}) reruns the fingers on fixed palms;
-FPS_ADS_PALM_SEED refines from given palms; FPS_ADS_SWEEP_ONLY prints palm costs.
+FPS_ADS_PALM_SEED refines from given palms; FPS_ADS_ROLL_ANCHOR / FPS_ADS_ROLL_SEEDS
+start from the hip palm turned about the fore-end axis; FPS_ADS_SHOULDER sets the ADS
+shoulder used by the wrist estimate; FPS_ADS_CUFF targets the wrist on screen;
+FPS_ADS_SWEEP_ONLY prints palm costs.
 Inputs (globals or environment):
   FPS_GRIP_PROJECT_ROOT  Taierzhuang1938 folder
   FPS_GRIP_INPUT         Script_FpsWeaponGripExport output (Data_<id>.json, --clean)
@@ -97,7 +101,9 @@ for wid in ids:
     contactGun = M4(frame['contactGun'])
     handFromContact = contactGun.inverted() @ handGun
     anchorToGun = M4(frame['anchorToGun'])
-    shoulder = anchorToGun @ Vector(frame['shoulderAnchor'])
+    shoulderOverride = Setting('FPS_ADS_SHOULDER')
+    shoulderOverride = json.loads(Path(shoulderOverride).read_text()).get(wid) if shoulderOverride else None
+    shoulder = anchorToGun @ Vector(shoulderOverride or frame['shoulderAnchor'])
     upper, lower = frame['armLength']['upper'], frame['armLength']['lower']
     eye = Vector(frame['eye'])
     tanHalf = math.tan(frame['fov'] * DEG / 2)
@@ -117,6 +123,8 @@ for wid in ids:
     underside = min(v.y for v in cut if abs(v.x) < .03)
     sectionX = [v.x for v in cut if abs(v.x) < .03]
     centerX = (min(sectionX) + max(sectionX)) / 2
+    sectionY = [v.y for v in cut if abs(v.x) < .03]
+    foreEndCenter = Vector((centerX, (min(sectionY) + max(sectionY)) / 2, z0))
     support = [i for i in range(0, len(vertices), 3) if max(v.y for v in vertices[i:i + 3]) >= underside - .002]
     supportVertices = [vertices[i + k] for i in support for k in range(3)]
     bvh = BVHTree.FromPolygons(supportVertices, [(i, i + 1, i + 2) for i in range(0, len(supportVertices), 3)])
@@ -203,9 +211,10 @@ for wid in ids:
         baseCos = axial * (d - upper * math.cos(angle)) / lower
         return math.degrees(math.acos(max(-1, min(1, baseCos + amplitude)))), offset.length / (upper + lower)
 
-    def TopNdc(points, tree=None):
+    def Visible(points, tree=None):
+        """Highest NDC y and the NDC x of every hand point the ADS eye sees past the rifle."""
         tree = tree or bvh
-        top = -9
+        top, xs = -9, []
         for v in points:
             ray = v - eye
             distance = ray.length
@@ -216,7 +225,11 @@ for wid in ids:
             if depth <= 0:
                 continue
             top = max(top, ray.y / depth / tanHalf)
-        return top
+            xs.append(ray.x / depth / tanHalf / frame['aspect'])
+        return top, xs
+
+    def TopNdc(points, tree=None):
+        return Visible(points, tree)[0]
 
     def PalmDelta(p):
         rotation = Euler((p[0], p[1], p[2]), 'XYZ').to_matrix().to_4x4()
@@ -228,7 +241,11 @@ for wid in ids:
             D = D @ C0 @ Matrix.Rotation(p[6], 4, 'Y') @ C0inv
         return D
 
-    targetNdc = -0.45
+    targetNdc = -0.36   # hand and fingers stay below 0.18 screen heights under the sight line
+    # COD Type 38 ADS: the sleeve cuff sits ~0.30 screen heights left of and under the sight
+    # line and the forearm runs from there to the lower-left corner.
+    cuffTarget = json.loads(Setting('FPS_ADS_CUFF')) if Setting('FPS_ADS_CUFF') else None
+    handLow = -0.62     # ...but the hand still shows above 0.31 screen heights under it
     # Finger roots (MCP joints) of the four fingers: they must stay near the wood
     # or the finger stage cannot close the digits onto it.
     roots = [chains[n]['W'].to_translation() for n in chains if chains[n]['segment'] == 0 and chains[n]['digit'] > 0]
@@ -246,15 +263,24 @@ for wid in ids:
         share = allGaps[:max(40, int(len(allGaps) * .35))]
         meanShare = sum(share) / len(share)
         bend, reach = MinimumWristBend(D @ C0)
-        top = TopNdc([D @ v for v, infl in handCloud])
+        # Where the wrist (sleeve cuff) lands on screen, in screen heights (x left -, y down +).
+        wrist = (D @ C0 @ handFromContact).to_translation() - eye
+        cuff = (wrist.x / -wrist.z / (2 * tanHalf), -wrist.y / -wrist.z / (2 * tanHalf))
+        cuffMiss = math.hypot(cuff[0] - cuffTarget[0], cuff[1] - cuffTarget[1]) if cuffTarget else 0
+        top, xs = Visible([D @ v for v, infl in handCloud])
+        rightShare = sum(1 for x in xs if x > 0) / max(1, len(xs))
         cost = 400 * pen + 40 * max(0, mean40 - .003) + 60 * max(0, nearest - .002) + 40 * max(0, meanShare - .006)
         cost += .03 * max(0, bend - 22) + .2 * max(0, reach - .95)
         cost += 10 * max(0, contactX - centerX - .006) + 10 * max(0, centerX - .014 - contactX)
-        cost += 6.0 * max(0, top - targetNdc)
+        # COD Type 38 ADS: the support hand shows left of the receiver, its top about
+        # 0.19 screen heights under the sight line, the sleeve below it. Neither
+        # hidden (v12 first cut) nor raised to the sight line (the original blob).
+        cost += 6.0 * max(0, top - targetNdc) + 6.0 * max(0, handLow - top) + 2.0 * rightShare + 8.0 * cuffMiss
         cost += .4 * Vector(p[3:6]).length + .02 * Vector(p[:3]).length
         if detail:
             return {'cost': cost, 'rootGapMm': rootGap * 1000, 'contactXMm': (contactX - centerX) * 1000, 'penMm': pen * 1000, 'nearestMm': nearest * 1000, 'mean40Mm': mean40 * 1000, 'meanShare35Mm': meanShare * 1000,
-                    'minWristBend': bend, 'reachRatio': reach, 'topNdc': top}
+                    'minWristBend': bend, 'reachRatio': reach, 'topNdc': top, 'visible': len(xs), 'rightShare': rightShare,
+                    'cuff': [round(cuff[0], 3), round(cuff[1], 3)]}
         return cost
 
     hip = PalmCost([0] * 6, True)
@@ -356,11 +382,17 @@ for wid in ids:
     base = seedsByWeapon.get(wid, [0] * 6)
     fingerSeeds = {}
 
+    anchor = {'params': None}
+
     def Joint(p, detail=False):
         D = PalmDelta(p)
         authored, reports, fingers = FitFingers(D, quick=True, seeds=fingerSeeds)
         palmCost = PalmCost(p)
         cost = palmCost + fingers
+        if anchor['params']:
+            # Stay near the anchored roll: the in-game sleeve/hand composition was chosen there.
+            a = anchor['params']
+            cost += 4 * math.sqrt(sum((p[i] - a[i]) ** 2 for i in (0, 1, 2, 6))) + 60 * math.sqrt(sum((p[i] - a[i]) ** 2 for i in (3, 4, 5)))
         if detail:
             return cost, palmCost, fingers, reports
         return cost
@@ -376,7 +408,30 @@ for wid in ids:
             print(json.dumps({'weapon': wid, 'stage': 'sweep-detail', 'phi': phi, **{k: round(v, 3) for k, v in detail.items()}}), flush=True)
         continue
     best, p = math.inf, None
-    for phi in (() if fixedPalm or seedPalm else (-1.4, -1.0, -.6, -.3, 0, .3, .6, 1.0, 1.4)):
+    rollSeeds = Setting('FPS_ADS_ROLL_SEEDS')
+    rollAnchor = Setting('FPS_ADS_ROLL_ANCHOR')
+    if rollAnchor and not (fixedPalm or seedPalm):
+        pivot = Vector(hipContact['position'])
+        theta = float(rollAnchor)
+        R = Matrix.Rotation(theta, 3, 'Z')
+        t = foreEndCenter + R @ (pivot - foreEndCenter) - pivot
+        anchor['params'] = [0, 0, theta, t.x, t.y, t.z, 0]
+        seedPalm = anchor['params'][:]
+    if rollSeeds and not (fixedPalm or seedPalm):
+        # Hip grip turned about the fore-end axis: the thumb leaves the top edge for the left side.
+        pivot = Vector(hipContact['position'])
+        for theta in [float(x) for x in str(rollSeeds).split(',')]:
+            R = Matrix.Rotation(theta, 3, 'Z')
+            t = foreEndCenter + R @ (pivot - foreEndCenter) - pivot
+            trial = [0, 0, theta, t.x, t.y, t.z, 0]
+            cost, palmCost, fingers, reports = Joint(trial, True)
+            detail = PalmCost(trial, True)
+            print(json.dumps({'weapon': wid, 'stage': 'roll-seed', 'theta': theta, 'cost': round(cost, 4), 'palm': round(palmCost, 4),
+                              'top': round(detail['topNdc'], 3), 'visible': detail['visible'], 'right': round(detail['rightShare'], 2),
+                              'wrist': round(detail['minWristBend'], 1), 'cuff': detail['cuff'], 'gaps': [r['gapMm'] for r in reports]}), flush=True)
+            if cost < best:
+                best, p = cost, trial
+    for phi in (() if fixedPalm or seedPalm or rollSeeds else (-1.4, -1.0, -.6, -.3, 0, .3, .6, 1.0, 1.4)):
         trial = base[:] + [phi]
         cost, palmCost, fingers, reports = Joint(trial, True)
         print(json.dumps({'weapon': wid, 'stage': 'sweep', 'phi': phi, 'cost': round(cost, 4), 'palm': round(palmCost, 4),
@@ -389,7 +444,7 @@ for wid in ids:
         p = list(seedPalm)
         best = Joint(p)
     print(json.dumps({'weapon': wid, 'stage': 'joint-start', 'cost': best, 'phi': p[6]}), flush=True)
-    for step in ([] if fixedPalm else [.12, .06, .03]):
+    for step in ([] if fixedPalm else [.04, .02] if anchor['params'] else [.08, .04] if rollSeeds else [.12, .06, .03]):
         for iteration in range(3):
             changed = False
             for index in range(7):
