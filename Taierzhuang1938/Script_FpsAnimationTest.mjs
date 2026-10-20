@@ -55,6 +55,9 @@ console.log(`PASS ${count} Blender bone clips: finite transforms, normalized rot
   assert(before.angleTo(bone.quaternion)>1e-5||position.distanceTo(bone.position)>1e-5,'the body retains its breathing motion');
   assert.equal(bolt.position.z,.078,'breathing must retain the open bolt travel');
   assert(Math.abs(bolt.rotation.z-Math.PI/2)<1e-8,'breathing must retain the unlocked handle angle');
+  vm.wallLower=.5;
+  assert.equal(animation.Update(1/60,{elapsed:.8}),false,'a gun lowered against a wall hands the arms to IK, which follows the lowered gun');
+  vm.wallLower=0;
   animation.SetPreview('Idle',{time:.3});
   assert(Math.abs(bolt.position.z)<1e-8&&Math.abs(bolt.rotation.z)<1e-8,'explicit clip preview still applies its authored mechanism');
   console.log('PASS holding motion retains live mechanism state and explicit previews retain full controls');

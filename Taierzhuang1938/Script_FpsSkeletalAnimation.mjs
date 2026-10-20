@@ -113,7 +113,9 @@ export class FpsSkeletalAnimation {
       this.Apply(preview.name,preview.time,{visible:true});
       for(const side of ['r','l'])arms.operationPose[side]=arms.contactWeight[side]<.999?{source:'BlenderMCP'}:null;
     }else{
-      if(input.meleeCombat||(input.moveSpeed||0)>.05||vm.sprintSpring.value>.001||vm.adsSpring.value>.001||vm.action||vm.flashTime<.6)return false;
+      // The bake knows nothing of the wall carry pivot: lowered against a wall
+      // the hands must follow the gun through IK, not hold the empty air.
+      if(input.meleeCombat||(input.moveSpeed||0)>.05||vm.sprintSpring.value>.001||vm.adsSpring.value>.001||(vm.wallLower||0)>.001||vm.action||vm.flashTime<.6)return false;
       this.clock=input.elapsed??this.clock+dt;
       // Holding motion owns the body pose, while the firearm state owns its
       // mechanism. An Idle bake from a closed rifle must not close a held bolt.
