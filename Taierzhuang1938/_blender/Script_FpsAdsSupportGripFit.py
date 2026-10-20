@@ -28,8 +28,15 @@ belongs. FPS_ADS_GRID {weapon: {theta, phi, dy}} sweeps the palm rolled about th
 fore-end axis, turned about its normal and lowered; FPS_ADS_EXTRA_SEEDS adds palms to
 compare. FPS_ADS_PEN weights skin inside the 0.6 mm clearance (3000 for the shipped
 grips), FPS_ADS_LITTLE_REACH the little finger's pad pull, FPS_ADS_WRAP an experimental
-pull of index/middle round to the stock's right side (not shipped). The per-rifle
-settings are in docs/Data_FpsRifleView20261016.md v14.
+pull of index/middle round to the stock's right side (not shipped).
+
+Straight wrist (v16): FPS_ADS_WRIST_TARGET / FPS_ADS_WRIST_WEIGHT set the minimum IK
+wrist bend the palm is pushed toward (the cuff skin creases with it); FPS_ADS_CUFF may be
+{weapon: [x, y]} screen heights (keep the shipped wrist where it is on screen), weighted by
+FPS_ADS_CUFF_WEIGHT. Tried and not shipped: FPS_ADS_THUMB_HUG / FPS_ADS_THUMB_YAW /
+FPS_ADS_THUMB_YAW_WEIGHT / FPS_ADS_THUMB_BASE (whole thumb flat along the stock, with an
+aimed thumb start and palm yaw in FPS_ADS_GRID): it needs the palm under the stock and hides
+the hand at ADS. The per-rifle settings are in docs/Data_FpsRifleView20261016.md v16.
 
 FPS_ADS_PALM (json {weapon: palm params}) reruns the fingers on fixed palms;
 FPS_ADS_PALM_SEED refines from given palms; FPS_ADS_ROLL_ANCHOR / FPS_ADS_ROLL_SEEDS
@@ -282,6 +289,12 @@ for wid in ids:
     thumbSide = Setting('FPS_ADS_THUMB_SIDE')
     thumbSide = json.loads(Path(thumbSide).read_text()).get(wid) if thumbSide else None
     thumbTop = float(Setting('FPS_ADS_THUMB_TOP', fingerTop))
+    # The whole thumb lies against the stock and parallel to it (user top-view sketch): its
+    # proximal and distal phalanges both within 3 mm of the wood, yaw off the bore axis capped.
+    thumbHug = float(Setting('FPS_ADS_THUMB_HUG', 0))
+    thumbYaw = float(Setting('FPS_ADS_THUMB_YAW', 90))
+    thumbYawWeight = float(Setting('FPS_ADS_THUMB_YAW_WEIGHT', .1))   # per degree past the cap
+    thumbBase = float(Setting('FPS_ADS_THUMB_BASE', 45))   # thumb base (CMC) delta per axis, degrees
     wrapWeight = float(Setting('FPS_ADS_WRAP', 0))   # index/middle curl under the wood instead of pointing forward
     penWeight = float(Setting('FPS_ADS_PEN', 300))   # skin closer than 0.6 mm to the rifle, per metre
     # {weapon: mm}: the whole index finger stays under this gun-local height, below the thumb band;
@@ -297,6 +310,12 @@ for wid in ids:
     # COD Type 38 ADS: the sleeve cuff sits ~0.30 screen heights left of and under the sight
     # line and the forearm runs from there to the lower-left corner.
     cuffTarget = json.loads(Setting('FPS_ADS_CUFF')) if Setting('FPS_ADS_CUFF') else None
+    if isinstance(cuffTarget, dict):   # per rifle, e.g. the shipped wrist so the sleeve keeps its place
+        cuffTarget = cuffTarget.get(wid)
+    cuffWeight = float(Setting('FPS_ADS_CUFF_WEIGHT', 8))
+    # Minimum wrist bend the production IK can reach; a bent wrist shows a crease at the cuff.
+    wristTarget = float(Setting('FPS_ADS_WRIST_TARGET', 22))
+    wristWeight = float(Setting('FPS_ADS_WRIST_WEIGHT', .03))
     handLow = -0.62     # ...but the hand still shows above 0.31 screen heights under it
     # Finger roots (MCP joints) of the four fingers: they must stay near the wood
     # or the finger stage cannot close the digits onto it.
@@ -322,12 +341,12 @@ for wid in ids:
         top, xs = Visible([D @ v for v, infl in handCloud])
         rightShare = sum(1 for x in xs if x > 0) / max(1, len(xs))
         cost = 400 * pen + 40 * max(0, mean40 - .003) + 60 * max(0, nearest - .002) + 40 * max(0, meanShare - .006)
-        cost += .03 * max(0, bend - 22) + .2 * max(0, reach - .95)
+        cost += wristWeight * max(0, bend - wristTarget) + .2 * max(0, reach - .95)
         cost += 10 * max(0, contactX - centerX - .006) + 10 * max(0, centerX - .014 - contactX)
         # COD Type 38 ADS: the support hand shows left of the receiver, its top about
         # 0.19 screen heights under the sight line, the sleeve below it. Neither
         # hidden (v12 first cut) nor raised to the sight line (the original blob).
-        cost += topWeight * max(0, top - targetNdc) + 6.0 * max(0, handLow - top) + 2.0 * rightShare + 8.0 * cuffMiss
+        cost += topWeight * max(0, top - targetNdc) + 6.0 * max(0, handLow - top) + 2.0 * rightShare + cuffWeight * cuffMiss
         cost += .4 * Vector(p[3:6]).length + .02 * Vector(p[:3]).length
         if detail:
             return {'cost': cost, 'rootGapMm': rootGap * 1000, 'contactXMm': (contactX - centerX) * 1000, 'penMm': pen * 1000, 'nearestMm': nearest * 1000, 'mean40Mm': mean40 * 1000, 'meanShare35Mm': meanShare * 1000,
@@ -424,6 +443,25 @@ for wid in ids:
             return [0] + [max(HINGE[(digit, k)][0], min(HINGE[(digit, k)][1], flexes[k])) if names[k] in rebuilt else 0 for k in (1, 2)] + [0]
         return [max(HINGE[(digit, k)][0], min(HINGE[(digit, k)][1], flexes[k])) for k in range(3)] + [0]
 
+    def AimThumb(D):
+        """Thumb start for a palm: turn the thumb base so a near-straight thumb runs from its
+        CMC joint to the left face of the stock inside the thumb band, pointing at the muzzle.
+        Small local steps from the authored base never reach that pose."""
+        names = Bones(0)
+        T, rotations, quats = FK(D, 0, [0, 0, 0, 5, 5])
+        cmc = T[names[0]] @ chains[names[0]]['W'].to_translation()
+        padBone, padPoint = pads[0]
+        pad = T[padBone] @ (chains[padBone]['W'] @ padPoint)
+        v = pad - cmc
+        lo, hi, ceiling = (x / 1000 for x in thumbSide)
+        dx, dy = (sideX - .004) - cmc.x, (lo + hi) / 2 - cmc.y
+        dz = -math.sqrt(max(1e-6, v.length_squared - dx * dx - dy * dy))
+        R = v.normalized().rotation_difference(Vector((dx, dy, dz)).normalized())
+        Wp = (D @ chains[names[0]]['P']).to_quaternion()
+        q = quats[names[0]]
+        delta = q.inverted() @ Wp.inverted() @ R @ Wp @ q
+        return [max(-thumbBase, min(thumbBase, math.degrees(a))) for a in delta.to_euler('XYZ')] + [5, 5]
+
     def FitFingers(D, quick=False, seeds=None):
         """Per digit deltas from the authored hip rotations under palm delta D.
         Gate (FpsHandContactTest): distal pad <= 4 mm (fit to 3.2), skin >= 0.6 mm off the wood."""
@@ -439,7 +477,7 @@ for wid in ids:
             def Evaluate(params, detail=False):
                 T, rotations, quats = FK(D, digit, params)
                 anatomy, hinges = AnatomyCost(quats)
-                pen, squared, distalGap, seen, drift = 0., 0., 1., [], 0.
+                pen, squared, distalGap, seen, drift, segGap = 0., 0., 1., [], 0., {}
                 for index, (v, infl) in enumerate(pts):
                     moved = sum((((T[b] @ v) if b in T else (D @ v) if (b == handName or b in chains) else v) * w for b, w in infl), Vector()) * (1 / sum(w for b, w in infl))
                     if index % 3 == 0:
@@ -450,8 +488,11 @@ for wid in ids:
                     depth = max(0., .0006 - signed)
                     pen = max(pen, depth)
                     squared += depth * depth
-                    if max(infl, key=lambda pair: pair[1])[0] == padBone:
+                    owner = max(infl, key=lambda pair: pair[1])[0]
+                    if owner == padBone:
                         distalGap = min(distalGap, signed)
+                    if digit == 0:
+                        segGap[owner] = min(segGap.get(owner, 1.), signed)
                 gap = max(abs(Signed(T[padBone] @ padHip)), distalGap)
                 thumbShape, shape = 0., None
                 if digit == 0 and thumbSide and not hipMode:
@@ -471,7 +512,14 @@ for wid in ids:
                     thumbShape += 200 * (max(0, lo - pad.y) + max(0, pad.y - hi))
                     thumbShape += 200 * max(0, pad.x - (sideX + .004))
                     thumbShape += 200 * max(0, max(v.y for v in seen) - ceiling) if seen else 0
+                    # Yaw on the proximal phalanx axis (MCP to IP joint centres): the pad sits on the
+                    # volar side, so MCP-to-pad reads ~15 deg inward even for a thumb parallel to the stock.
+                    axis = (ip - mcp).normalized()
+                    yaw = math.degrees(math.atan2(axis.x, max(1e-6, -axis.z)))
+                    hug = [segGap.get(n, 1.) for n in Bones(0)[1:]]
+                    thumbShape += thumbYawWeight * max(0, abs(yaw) - thumbYaw) + thumbHug * sum(max(0, g - .003) for g in hug)
                     shape = {'padMm': [round(v * 1000, 1) for v in pad], 'direction': [round(v, 2) for v in direction], 'pitch': round(pitch, 1),
+                             'yaw': round(yaw, 1), 'hugMm': [round(g * 1000, 1) for g in hug],
                              'ipMm': round(ip.y * 1000, 1), 'topMm': round(max(v.y for v in seen) * 1000, 1) if seen else None}
                 if digit and digit <= fingerCeilDigits and indexCeil is not None and seen and not hipMode:
                     indexTop = max(v.y for v in seen)
@@ -509,7 +557,7 @@ for wid in ids:
             spread = {1: 20, 2: 12, 3: 15, 4: 20}.get(digit, 0)
             # A kept (authored) joint takes a flex delta, a rebuilt one an absolute hinge angle.
             JointBounds = lambda k: HINGE[(digit, k)] if Bones(digit)[k] in rebuilt else (-25, 25)
-            bounds = ([(-45, 45)] * 3 + [JointBounds(1), JointBounds(2)] if digit == 0
+            bounds = ([(-thumbBase, thumbBase)] * 3 + [JointBounds(1), JointBounds(2)] if digit == 0
                       else [(-12, 12), JointBounds(1), JointBounds(2), (-10, 10)] if hipMode
                       else [HINGE[(digit, 0)], HINGE[(digit, 1)], HINGE[(digit, 2)], (-spread, spread)])
             hipStart = HipParams(digit)
@@ -525,6 +573,8 @@ for wid in ids:
                 print(json.dumps({'weapon': wid, 'stage': 'hip-refit-contact', 'digit': digit, 'penMm': round(after[1] * 1000, 3), 'gapMm': round(after[2] * 1000, 3)}), flush=True)
             if digit == 0:
                 starts = [hipStart, [0, 0, 0, 20, 15]]
+                if thumbSide and not hipMode:
+                    starts.insert(0, AimThumb(D))
                 if hipMode:
                     starts += [[0, 0, 0, a, b] for a, b in ((0, 0), (10, 10), (30, 20))]
                 if not quick:
@@ -638,12 +688,15 @@ for wid in ids:
             t = foreEndCenter + R @ (pivot - foreEndCenter) - pivot
             for phi in grid['phi']:
                 for dy in grid['dy']:
-                    trial = [0, 0, theta, t.x, t.y + dy, t.z, phi]
-                    cost, palmCost, fingers, reports = Joint(trial, True)
-                    print(json.dumps({'weapon': wid, 'stage': 'grid', 'theta': theta, 'phi': phi, 'dy': dy, 'cost': round(cost, 3), 'palm': round(palmCost, 3),
-                                      'digits': [round(r['cost'], 2) for r in reports], 'gaps': [r['gapMm'] for r in reports], 'pens': [r['penMm'] for r in reports]}), flush=True)
-                    if cost < best:
-                        best, p = cost, trial
+                    # yaw: palm turned about the vertical so its thumb side (CMC) comes to the stock.
+                    for yaw in grid.get('yaw', [0]):
+                        trial = [0, yaw, theta, t.x, t.y + dy, t.z, phi]
+                        cost, palmCost, fingers, reports = Joint(trial, True)
+                        print(json.dumps({'weapon': wid, 'stage': 'grid', 'theta': theta, 'phi': phi, 'dy': dy, 'yaw': yaw, 'cost': round(cost, 3), 'palm': round(palmCost, 3),
+                                          'digits': [round(r['cost'], 2) for r in reports], 'gaps': [r['gapMm'] for r in reports], 'pens': [r['penMm'] for r in reports],
+                                          'thumb': reports[0].get('shape')}), flush=True)
+                        if cost < best:
+                            best, p = cost, trial
     for phi in (() if fixedPalm or seedPalm or rollSeeds or grid else (-1.4, -1.0, -.6, -.3, 0, .3, .6, 1.0, 1.4)):
         trial = base[:] + [phi]
         cost, palmCost, fingers, reports = Joint(trial, True)
