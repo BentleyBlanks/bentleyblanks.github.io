@@ -1,0 +1,70 @@
+{
+  "generator": "Built-in image_gen__imagegen",
+  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV09\\Image_SichuanOldCottonV09.png",
+  "sourceSha256": "0655b54f8c4d7b34fbbf0756ed65f527af8d4b6fbb7c7446fdffd046fe758aae",
+  "sourceResolution": [
+    1254,
+    1254
+  ],
+  "preparationScript": "Script_SichuanOldCottonV9.py",
+  "preparationScriptSha256": "9ec00d3a7446a3f5c7b79eb69bb57c80ead0e9954971457d830b167a76a79bdc",
+  "resolution": [
+    1024,
+    1024
+  ],
+  "layout": "Unique non-tiling entire blanket front; 0.38 m wide by 0.30 m tall",
+  "albedoPreparation": "RGB conversion and Lanczos resize only; all broad dirt and faded marks preserved",
+  "normalPreparation": {
+    "convention": "OpenGL tangent-space +Y",
+    "heightSignal": "Luminance minus Gaussian blur; fibre detail only",
+    "gaussianRadiusPx": 3.5,
+    "gradientScale": 1.5,
+    "normalLengthMin": 0.9999998807907104
+  },
+  "roughnessPreparation": {
+    "base": 0.955,
+    "fibreVariationScale": 0.09,
+    "clamp": [
+      0.925,
+      0.98
+    ],
+    "observedRange": [
+      0.925000011920929,
+      0.9800000190734863
+    ]
+  },
+  "metallic": 0,
+  "maps": {
+    "baseColor": {
+      "file": "Texture_SichuanOldCottonV09Base.png",
+      "sha256": "c59328eea0c7eac4be6795eb1d3020318298b613f691a6843ded3be524d08655",
+      "resolution": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "colorSpace": "sRGB"
+    },
+    "normal": {
+      "file": "Texture_SichuanOldCottonV09Normal.png",
+      "sha256": "9bab727a0887eac9077a6c4b8399bb341c2c7994ce019672344c45f85fc710aa",
+      "resolution": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "colorSpace": "Non-Color"
+    },
+    "roughness": {
+      "file": "Texture_SichuanOldCottonV09Roughness.png",
+      "sha256": "7e4673403c514c22db7e7977a053a635ba79ddbfa37dcd3cd7d2f844e9c4a1b3",
+      "resolution": [
+        1024,
+        1024
+      ],
+      "mode": "L",
+      "colorSpace": "Non-Color"
+    }
+  },
+  "gameBakeComplete": false
+}

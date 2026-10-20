@@ -1,5 +1,7 @@
 # Sichuan Blanket Pack — V8 Straw and Wear
 
+本页为已被用户否决的 V8 历史记录。当前续修见 [V9 Reference Wear](Data_ReferenceWearV9.md)。
+
 用户反馈“材质的新旧差异过大；草席卷和草鞋外形差异也还是太大”。本轮保留 V7 被包、布带及短褂的几何，重做草编件并统一旧化；没有进行游戏减面或替换 V6 游戏 GLB。
 
 ## 当前源工程

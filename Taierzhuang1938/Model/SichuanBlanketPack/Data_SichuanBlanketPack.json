@@ -138,7 +138,7 @@
     ],
     "reviewedDate": "2026-10-20",
     "technicalChecks": 147,
-    "technicalChecksScope": "Historical V6 game asset only; not evidence for V7/V8 high-model appearance",
+    "technicalChecksScope": "Historical V6 game asset only; not evidence for V7/V8/V9 high-model appearance",
     "sourceReopenVerified": true,
     "referenceCorrespondence": [
       "Folded blanket construction, two horizontal and two vertical grey cloth passes",
@@ -161,21 +161,25 @@
     "authorizedBudgetTriangles": 10000,
     "nextPhaseTriangleBudget": null,
     "currentHighStudy": {
-      "sourceBlend": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/HighV8/Scene_SichuanPackStrawWearV8.blend",
+      "sourceBlend": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/HighV9/Scene_SichuanPackReferenceWearV9.blend",
       "bodyBaseline": "HighV7/Scene_SichuanHighClothV7.blend",
-      "rebuildScript": "../../_blender/Script_SichuanPackRefineV8.py",
-      "documentation": "Data_StrawWearV8.md",
+      "rebuildScript": "../../_blender/Script_SichuanPackReferenceWearV9.py",
+      "documentation": "Data_ReferenceWearV9.md",
       "userFeedback": "材质的新旧差异过大；草席卷和草鞋外形差异也还是太大，继续优化",
       "completedWork": [
-        "Preserve V7 cotton bundle, binding and jacket geometry, verified by vertex hashes",
-        "Shared-age imagegen fibre atlas with physical cloth scale and non-repeating dust/mud",
-        "Five tight irregular grass-sheet roll layers with braided cut edges and real interlacing",
-        "Heel-up braided sandals with chevron footbeds, thick edges and actual cord attachment",
-        "Wear stays attached when the pack or independent garment moves"
+        "Preserve visible V7 blanket surface while freezing its current state and replacing legacy patch faces; retained coordinate and UV hashes verified",
+        "Unique imagegen old-cotton panel preserves broad asymmetric stains, with 1024 normal and roughness maps",
+        "Restore separate conforming hand-sewn repair and sparse attached worn fibres",
+        "Continuous flattened grass strips interlace over a compressed, eccentric sheet roll with narrow irregular layer gaps",
+        "Narrower cupped sandals use dense uneven transverse straw bundles instead of rigid longitudinal grille bars",
+        "Washed grey binding, interrupted lower-edge mud and part-local wear reduce material-age contrast",
+        "Short compressed straw bundles replace smooth end bands; narrower layer gaps interrupt the paper-roll appearance",
+        "The original cloth knot and eyelet are exposed outside the garment and enlarged locally for readability"
       ],
       "bodyGeometryPreserved": true,
       "visualApproval": false,
       "sourceReopenVerified": true,
+      "sourceReviewDate": "2026-10-21",
       "gameAssetReplaced": false
     }
   },
