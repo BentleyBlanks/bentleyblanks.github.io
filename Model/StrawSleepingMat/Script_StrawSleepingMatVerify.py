@@ -74,6 +74,10 @@ def VerifyAsset(file,limit,isFlat):
                 points=Accessor(document,binary,attributes['POSITION'])
                 normals=Accessor(document,binary,attributes['NORMAL'])
                 assert np.allclose(np.linalg.norm(normals,axis=1),1,atol=.015), 'Invalid normals'
+                tangents=Accessor(document,binary,attributes['TANGENT'])
+                assert np.allclose(np.linalg.norm(tangents[:,:3],axis=1),1,atol=.015),'Invalid tangent length'
+                assert np.allclose(np.abs(tangents[:,3]),1,atol=1e-5),'Invalid tangent handedness'
+                assert np.allclose(np.sum(normals*tangents[:,:3],axis=1),0,atol=.015),'Tangent not orthogonal to normal'
                 indices=Accessor(document,binary,primitive['indices']).reshape(-1,3)
                 assert indices.max() < len(points)
                 triangleCount += len(indices)

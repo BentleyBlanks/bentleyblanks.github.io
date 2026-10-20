@@ -1,4 +1,4 @@
-"""Bake aligned 1K PBR data from the two approved imagegen material sources.
+"""Bake aligned 1K PBR data from references and focused imagegen sources.
 
 This is technical texture packing/channel derivation, not a new generative
 redesign. Broad colour stains are excluded from height by a high-pass filter.
@@ -9,7 +9,7 @@ import argparse
 import hashlib
 import json
 import numpy as np
-from PIL import Image, ImageFilter, ImageOps
+from PIL import Image, ImageFilter, ImageOps, ImageDraw
 
 
 def Blur(values, radius):
@@ -83,6 +83,28 @@ def FrayStrip(file):
     return strip
 
 
+def KnotPatch(source,cord):
+    source=source.convert('RGBA')
+    alpha=np.asarray(source.getchannel('A'))
+    ys,xs=np.where(alpha>180)
+    source=source.crop((int(xs.min()),int(ys.min()),int(xs.max()+1),int(ys.max()+1)))
+    rgba=np.asarray(source,dtype=np.float32)/255
+    median=np.median(rgba[:,:,:3][rgba[:,:,3]>.8],axis=0)
+    cordRgb=np.asarray(cord,dtype=np.float32)/255
+    target=.7*median+.3*np.median(cordRgb[236:304,15:175].reshape(-1,3),axis=0)
+    rgb=np.clip(rgba[:,:,:3]*np.clip(target/np.maximum(median,.03),.85,1.15),0,1)
+    binary=Image.fromarray(np.uint8(rgba[:,:,3]>.5)*255)
+    flood=binary.copy();ImageDraw.floodfill(flood,(0,0),127)
+    exterior=np.asarray(flood)==127
+    fill=np.where(exterior[:,:,None],target,target*.22)
+    opacity=np.clip((rgba[:,:,3]-.5)/.4,0,1)[:,:,None]
+    rgb=rgb*opacity+fill*(1-opacity)
+    core=Image.fromarray(np.uint8(rgb*255+.5)).resize((212,212),Image.Resampling.LANCZOS)
+    patch=Image.new('RGB',(220,220),tuple(np.uint8(target*255)))
+    patch.paste(core,(4,4))
+    return patch,BakeChannels(patch,10.0,10.0)
+
+
 def ResolveRollHorizon(projected,detail):
     """Keep approved wear; replace undersampled weave at cylinder horizons."""
     detail=detail.resize(projected.size,Image.Resampling.LANCZOS)
@@ -111,6 +133,7 @@ def Bake(root, scratch):
     rope = rope.resize((512, 384), Image.Resampling.LANCZOS)
     end = end.resize((512, 512), Image.Resampling.LANCZOS)
     rope,ropeData=BakeCord(rope)
+    knot,knotData=KnotPatch(Image.open(source/'Texture_StrawKnotSource.png'),rope)
     fray=FrayStrip(source/'Texture_StrawFraySource.png')
     frayNormal=np.zeros((128,512,3),dtype=np.uint8);frayNormal[:]=[128,128,255]
     frayRoughness=np.full((128,512),230,dtype=np.uint8)
@@ -120,10 +143,11 @@ def Bake(root, scratch):
     textureDir = root / 'Texture'
     textureDir.mkdir(exist_ok=True)
     report = {'resolution': [1024, 1024], 'normalConvention': 'OpenGL +Y',
-              'atlas': {'sheetV': [0.5, 1.0], 'cordUV': [[0.5,1.0],[0.125,0.5]], 'frayUV':[[0.5,1.0],[0.0,0.125]],'endUV': [[0.0,0.5],[0.0,0.5]]},
+              'atlas': {'sheetV': [0.5, 1.0], 'cordUV': [[0.5,1.0],[0.125,0.5]], 'frayUV':[[0.5,1.0],[0.0,0.125]],'endUV': [[0.0,0.5],[0.0,0.5]], 'rolledKnotUV':[[524/1024,736/1024],[1-736/1024,1-524/1024]]},
               'cordNormalPitchMeters':.015,'alphaMode':'MASK','alphaCutoff':.33,
               'sourceProvider': 'built-in image_gen__imagegen',
               'rollHorizonDetail':'Approved reference projection keeps broad wear. At undersampled cylinder horizons, fine imagegen weave replaces stretched photographic grain, with a smooth facing-angle blend.',
+              'knotDetail':'Dedicated imagegen compact straw-knot material projected onto a rounded low-poly knot proxy; region 520..740 pixels in both atlas axes.',
               'sets': {}}
     for state,sourceName in [('Flat','Texture_StrawFlatReferenceProjection.png'),('Rolled','Texture_StrawRolledReferenceProjection.png')]:
         body = Image.open(source/sourceName).convert('RGB').resize((1024,512),Image.Resampling.LANCZOS)
@@ -134,10 +158,15 @@ def Bake(root, scratch):
         atlas.paste(end,(0,512))
         atlas.paste(rope,(512,512))
         atlas.paste(fray,(512,896))
+        if state=='Rolled':atlas.paste(knot,(520,520))
         bodyData = BakeChannels(body,9.0)
         normal = np.concatenate([bodyData[0],np.concatenate([endData[0],cordData[0]],axis=1)])
         roughness = np.concatenate([bodyData[1],np.concatenate([endData[1],cordData[1]],axis=1)])
         ao = np.concatenate([bodyData[2],np.concatenate([endData[2],cordData[2]],axis=1)])
+        if state=='Rolled':
+            normal[520:740,520:740]=knotData[0]
+            roughness[520:740,520:740]=knotData[1]
+            ao[520:740,520:740]=knotData[2]
         maps = {'BaseColor':atlas,'Normal':Image.fromarray(normal),
                 'Roughness':Image.fromarray(roughness),'AO':Image.fromarray(ao)}
         report['sets'][state] = {}

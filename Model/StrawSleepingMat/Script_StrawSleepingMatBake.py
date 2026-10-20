@@ -118,60 +118,6 @@ def FrayCard(builder,start,tip,side,index):
     builder.Face(ids,[(u0,.003),(u1,.003),(u1,.123),(u0,.123)],False)
 
 
-def KnotPath(centre,scale,steps,angle=0):
-    points=[]
-    for index in range(steps):
-        t=tau*index/steps+.17
-        a=(2+math.cos(3*t))*math.cos(2*t)
-        b=(2+math.cos(3*t))*math.sin(2*t)
-        x=scale[0]*a;y=scale[1]*b
-        points.append(Vector(centre)+Vector((x*math.cos(angle)-y*math.sin(angle),x*math.sin(angle)+y*math.cos(angle),-scale[2]*math.sin(3*t))))
-    return points
-
-
-def CompactKnot(builder,centre,scale,radius,collection,targetTriangles=144):
-    # Collapse a smooth sweep by geometric error rather than assigning just
-    # three vertices to every section. This spends the same game budget on
-    # the outside of tight bends, where a regular coarse tube looks angular.
-    path=KnotPath(centre,scale,96,.12)
-    high=MeshBuilder()
-    Tube(high,path,radius,sides=10,closed=True,roughness=0)
-    mesh=bpy.data.meshes.new('Bake_KnotHigh')
-    mesh.from_pydata(high.vertices,[],high.faces);mesh.update()
-    uvLayer=mesh.uv_layers.new(name='UVMap')
-    for polygon,uvs in zip(mesh.polygons,high.uvs):
-        polygon.use_smooth=True
-        for loopIndex,uv in zip(polygon.loop_indices,uvs):
-            uvLayer.data[loopIndex].uv=uv
-    mesh.update()
-    sourceNormals=[(Vector(vertex)-path[index//10]).normalized() for index,vertex in enumerate(high.vertices)]
-    mesh.normals_split_custom_set([sourceNormals[loop.vertex_index] for loop in mesh.loops])
-    temp=bpy.data.objects.new('Bake_KnotHigh',mesh);collection.objects.link(temp)
-    modifier=temp.modifiers.new('KnotCurvatureBudget','DECIMATE')
-    modifier.decimate_type='COLLAPSE';modifier.use_collapse_triangulate=True
-    modifier.delimit=set()
-    ratio=targetTriangles/(len(high.faces)*2)
-    reduced=None
-    for attempt in range(4):
-        modifier.ratio=ratio
-        bpy.context.view_layer.update()
-        reduced=bpy.data.meshes.new_from_object(temp.evaluated_get(bpy.context.evaluated_depsgraph_get()))
-        reduced.calc_loop_triangles()
-        if len(reduced.loop_triangles)<=targetTriangles:break
-        bpy.data.meshes.remove(reduced);ratio*=.97
-    assert len(reduced.loop_triangles)<=targetTriangles,'Knot exceeds reserved budget'
-    offset=len(builder.vertices)
-    builder.vertices.extend(tuple(vertex.co) for vertex in reduced.vertices)
-    for triangle in reduced.loop_triangles:
-        # Transfer both the arc-length UVs and sweep normals with the collapse;
-        # a nearest-curve lookup may jump to a different interwoven strand.
-        uvs=[tuple(reduced.uv_layers.active.data[i].uv) for i in triangle.loops]
-        builder.Face([offset+i for i in triangle.vertices],uvs,
-                     normals=[reduced.corner_normals[i].vector.copy() for i in triangle.loops])
-    bpy.data.objects.remove(temp,do_unlink=True)
-    bpy.data.meshes.remove(mesh);bpy.data.meshes.remove(reduced)
-
-
 def CordLobe(builder,centre,axis,length,radius,phase=0):
     centre=Vector(centre);axis=Vector(axis).normalized()
     helper=Vector((0,0,1)) if abs(axis.z)<.8 else Vector((0,1,0))
@@ -194,6 +140,42 @@ def CordLobe(builder,centre,axis,length,radius,phase=0):
         builder.Face([rings[0][j],rings[0][k],rings[1][k],rings[1][j]],[(ua,v0),(ua,v1),(ub,v1),(ub,v0)])
         builder.Face([start,rings[0][k],rings[0][j]],[(u0,(v0+v1)*.5),(ua,v1),(ua,v0)])
         builder.Face([end,rings[1][j],rings[1][k]],[(u0+length*uvScale,(v0+v1)*.5),(ub,v0),(ub,v1)])
+
+
+def ProjectedKnot(builder,centre):
+    centre=Vector(centre);radii=Vector((.0155,.0100,.0120))
+    segments,latitudes=10,8
+    directions={}
+    projection={}
+    def Vertex(point):
+        angle=math.atan2(point.z/radii.z,point.x/radii.x)
+        edge=math.sqrt((point.x/radii.x)**2+(point.z/radii.z)**2)
+        scale=1+(.045*math.sin(3*angle+.4)+.025*math.cos(5*angle-.7))*edge
+        index=builder.Vertex(centre+point*scale)
+        projection[index]=(point.x/radii.x,point.z/radii.z)
+        directions[index]=Vector((point.x/radii.x**2,point.y/radii.y**2,point.z/radii.z**2)).normalized()
+        return index
+    top=Vertex(Vector((0,0,radii.z)));bottom=Vertex(Vector((0,0,-radii.z)))
+    rings=[]
+    for j in range(1,latitudes):
+        theta=math.pi*j/latitudes
+        rings.append([Vertex(Vector((radii.x*math.sin(theta)*math.cos(tau*i/segments),
+            radii.y*math.sin(theta)*math.sin(tau*i/segments),radii.z*math.cos(theta)))) for i in range(segments)])
+    def Face(ids):
+        uvs=[]
+        for index in ids:
+            x,z=projection[index]
+            uvs.append(((524+212*(.5+.5*x))/1024,
+                        1-(524+212*(.5-.5*z))/1024))
+        builder.Face(ids,uvs,normals=[directions[index] for index in ids])
+    for i in range(segments):
+        nxt=(i+1)%segments
+        Face([top,rings[0][i],rings[0][nxt]])
+        Face([bottom,rings[-1][nxt],rings[-1][i]])
+    for j in range(len(rings)-1):
+        for i in range(segments):
+            nxt=(i+1)%segments
+            Face([rings[j][i],rings[j+1][i],rings[j+1][nxt],rings[j][nxt]])
 
 
 def SheetHeight(x, y):
@@ -383,7 +365,7 @@ def BuildRolled(material, collection):
             point=Vector(RollPoint(tieX+.0008*math.sin(a*3),a,.0043));point.z+=.002
             points.append(point)
         Tube(builder,points,.0040,sides=4,closed=True)
-        CompactKnot(builder,(tieX,-.012,.1470),(.0038,.0032,.0065),.0044,collection)
+        ProjectedKnot(builder,(tieX,-.012,.1480))
         tail=[RollPoint(tieX+.008+.012*j/6,-.16-1.18*j/6,.0070) for j in range(7)]
         tail=[(x,y,z+.002) for x,y,z in tail]
         Tube(builder,tail,.0023,sides=3)
@@ -419,7 +401,7 @@ def BuildRolled(material, collection):
     obj['NominalBodyDimensionsMeters']=[.9,.135,.135]
     obj['TriangleLimit']=1200;obj['Bindings']=2;obj['CarryingLoops']=1
     obj['Fold']='Raised outer paired spiral layers, normal-mapped inner coils and a joined inner fold; 0.9m roll axis'
-    obj['Refinement']='Curvature-optimised interwoven cord knots; arc-length two-lobe braid normals at 15mm pitch; alpha-cut split fibres'
+    obj['Refinement']='Rounded compact knot proxies with dedicated imagegen PBR detail; arc-length binding braid normals at 15mm pitch; alpha-cut split fibres'
     return obj
 
 
@@ -518,14 +500,14 @@ def Main():
     flat = BuildFlat(CreateMaterial('Flat'),collection)
     rolled = BuildRolled(CreateMaterial('Rolled'),collection)
     report = {'coordinateSystem':'glTF +Y up, metres; local origin at bottom-centre',
-              'sourceBlend':str(sourceRoot/bpy.context.scene.get('StrawMatBlendName','Scene_StrawSleepingMatDetail.blend')),
+              'sourceBlend':str(sourceRoot/bpy.context.scene.get('StrawMatBlendName','Scene_StrawSleepingMatKnotDetail.blend')),
               'assets':[Export(flat),Export(rolled)]}
     (root/'Data_GeometryBake.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
     bpy.context.scene['StrawMatRoot'] = str(root)
     bpy.context.scene['ReferenceApproval'] = 'User approved references on 2026-10-18; strict visual matching required'
     bpy.context.scene['ReferenceFlat'] = str(sourceRoot/'References'/'Reference_StrawSleepingMatFlat.png')
     bpy.context.scene['ReferenceRolled'] = str(sourceRoot/'References'/'Reference_StrawSleepingMatRolled.png')
-    bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/bpy.context.scene.get('StrawMatBlendName','Scene_StrawSleepingMatDetail.blend')))
+    bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/bpy.context.scene.get('StrawMatBlendName','Scene_StrawSleepingMatKnotDetail.blend')))
     print(json.dumps(report,indent=2))
 
 

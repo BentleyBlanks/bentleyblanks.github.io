@@ -38,6 +38,16 @@
         0.0,
         0.5
       ]
+    ],
+    "rolledKnotUV": [
+      [
+        0.51171875,
+        0.71875
+      ],
+      [
+        0.28125,
+        0.48828125
+      ]
     ]
   },
   "cordNormalPitchMeters": 0.015,
@@ -45,6 +55,7 @@
   "alphaCutoff": 0.33,
   "sourceProvider": "built-in image_gen__imagegen",
   "rollHorizonDetail": "Approved reference projection keeps broad wear. At undersampled cylinder horizons, fine imagegen weave replaces stretched photographic grain, with a smooth facing-angle blend.",
+  "knotDetail": "Dedicated imagegen compact straw-knot material projected onto a rounded low-poly knot proxy; region 520..740 pixels in both atlas axes.",
   "sets": {
     "Flat": {
       "BaseColor": {
@@ -91,7 +102,7 @@
           1024,
           1024
         ],
-        "sha256": "d0d6c69da9d1372fa97a715910d738b136ad2ad5874a7020b9845d335dbd0ef6",
+        "sha256": "51850a186c34f100f2325b84b7c409c1a403a833ea083532b1f3d5f2bd5e3418",
         "colorSpace": "sRGB"
       },
       "Normal": {
@@ -100,7 +111,7 @@
           1024,
           1024
         ],
-        "sha256": "7bbced5c536abd528c7f5540bdc59b19acf953a3e1444737c46b69377c339461",
+        "sha256": "e7e5c1f5583169e90b811f515b7c2636ed76537f2bbbec2b15abd20ea1d5158a",
         "colorSpace": "linear data"
       },
       "Roughness": {
@@ -109,7 +120,7 @@
           1024,
           1024
         ],
-        "sha256": "60904befa1c2bafa44aeb415ed868a4f2b269f56dec832dc10f6e57b70555364",
+        "sha256": "907964fbbb4bb73950271c8a48ea638d9dd248e549f948603734c561bf521688",
         "colorSpace": "linear data"
       },
       "AO": {
@@ -118,7 +129,7 @@
           1024,
           1024
         ],
-        "sha256": "745b0d03a1148bc57f5abcb997afb3c6468dd6295ad1c3f64284bbe49bf5d000",
+        "sha256": "d6df25a69f1349f9f3f94ed808b7033321e1869abdb6b8300b5e4ce348c4c091",
         "colorSpace": "linear data"
       }
     }

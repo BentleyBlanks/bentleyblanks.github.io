@@ -1,6 +1,6 @@
 {
   "asset": "StrawSleepingMat",
-  "revision": "Detail3",
+  "revision": "KnotDetail4",
   "revisionDate": "2026-10-20",
   "descriptionZh": "1930年代中国南方士兵随身单人草席；蒲草/稻草平纹，草绳锁边，晒褪黄褐色，磨损断草、泥渍与雨水晕痕",
   "referenceApproval": "参考图可以 极致的对标以后才能算完成",
@@ -30,7 +30,7 @@
       "nominalAxisLength": 0.9,
       "nominalBodyDiameter": 0.135,
       "diameterIncludingCords": 0.1492,
-      "triangles": 1200,
+      "triangles": 1192,
       "triangleLimit": 1200,
       "bindings": 2,
       "carryingLoops": 1,
@@ -40,25 +40,36 @@
     }
   ],
   "pbr": {
-    "resolution": [1024,1024],
-    "sets": ["Flat","Rolled"],
-    "channels": ["BaseColor","Normal","Roughness","AO"],
+    "resolution": [
+      1024,
+      1024
+    ],
+    "sets": [
+      "Flat",
+      "Rolled"
+    ],
+    "channels": [
+      "BaseColor",
+      "Normal",
+      "Roughness",
+      "AO"
+    ],
     "naming": "Texture/Texture_StrawSleepingMat<Flat|Rolled><Channel>.png",
     "baseColorSpace": "sRGB",
     "dataColorSpace": "linear, non-color",
     "normalConvention": "OpenGL +Y tangent space",
     "metallic": 0,
     "glbPacking": "Self-contained GLB embeds albedo, normal, and ORM (R AO / G roughness / B zero metallic). Four separate requested channels are retained externally.",
-    "atlas": "Upper half is sheet/exterior; lower left is rolled cut end; lower right upper 384 rows are cord grain; bottom 128 rows are eight alpha-cut fibre clumps.",
+    "atlas": "Upper half: sheet/exterior. Lower left: cut end. Lower right: cord and eight alpha fibre cells; the rolled knot uses a private 220x220 patch at pixels (520,520)..(740,740), outside the binding UV range.",
     "alphaMode": "MASK",
     "alphaCutoff": 0.33,
     "cordBraidPitchMeters": 0.015,
-    "geometryDetail": "Thickness, irregular curls, bound edge, whipstitches and interwoven cord knots are geometry. Rolled knots use curvature-based simplification of smooth closed sweeps, preserving their arc-length UVs and surface normals. The rolled mat keeps raised outer paired spiral strips and a joined inner fold; inner fine coils use the cut-end normal/AO bake. Smooth binding and carrying-loop sweeps carry arc-length UVs and two-lobe helical normals. Split fibres use 28 flat-state and 26 rolled-state fixed alpha-cut cards, including two knot tufts. Dense woven fibres remain in normal maps.",
+    "geometryDetail": "Thickness, curls, bound edge, whipstitches and compact rounded knot forms are geometry. Intricate knot plies and fibres use a dedicated imagegen material projected onto the knot forms. The rolled mat keeps raised outer paired spiral strips and a joined inner fold; inner fine coils use the cut-end normal/AO bake. Binding and carrying-loop sweeps use arc-length UVs with two-lobe helical normals. Split fibres use 28 flat-state and 26 rolled-state alpha-cut cards. Dense sheet weave remains in normal maps.",
     "referenceMatching": "Production sheet and exterior colour are UV-projected from the approved imagegen reference sheets. Cylindrical foreshortening and broad photographic lighting are removed in Blender before the aligned PBR data bake. At undersampled cylinder horizons, supplementary imagegen fine weave replaces stretched grain while preserving the reference's broad colour and wear, with a smooth facing-angle blend."
   },
   "provenance": {
     "imageGeneration": "built-in image_gen__imagegen",
-    "textureSources": "Source/Texture_StrawFlatReferenceProjection.png, Texture_StrawRolledReferenceProjection.png, Texture_StrawRollWeaveFineSource.png, Texture_StrawCordFibreSource.png, Texture_StrawFraySource.png and Texture_StrawRollEndSource.png",
+    "textureSources": "Source/Texture_StrawFlatReferenceProjection.png, Texture_StrawRolledReferenceProjection.png, Texture_StrawRollWeaveFineSource.png, Texture_StrawCordFibreSource.png, Texture_StrawFraySource.png and Texture_StrawRollEndSource.png, Texture_StrawKnotSource.png",
     "texturePrompts": "Source/Data_*ImagegenPrompt*.json and Source/Data_ImagegenPrompts.json",
     "historicalSources": [
       "https://m.krzzjn.com/show-1104-31418.html",
@@ -69,12 +80,15 @@
     "historicalLimit": "Sources support soldiers carrying small straw mats and traditional southern grass weaving. Exact dimensions, two ties and carrying loop follow the user's approved reconstruction."
   },
   "rebuild": {
-    "pythonDependencies": ["numpy","Pillow"],
+    "pythonDependencies": [
+      "numpy",
+      "Pillow"
+    ],
     "textureCommand": "python Model/StrawSleepingMat/Script_StrawSleepingMatTextures.py --scratch tmp/StrawSleepingMat",
     "blenderWorkflow": "Start this task's isolated .blend with scripts/Script_BlenderMcp.mjs, set scene['StrawMatRoot'] to this directory, then execute Script_StrawSleepingMatBake.py through BlenderMCP.",
     "verificationCommand": "python Model/StrawSleepingMat/Script_StrawSleepingMatVerify.py --report tmp/StrawSleepingMat/Data_ExportVerification.json",
     "projectionCommand": "Run Script_StrawReferenceProjection.py through the isolated BlenderMCP scene to reproject the approved reference files kept in the Blender project References directory.",
-    "blenderSource": "C:/Users/Bentl/OneDrive/AI/Models/Blender/HistoricalProps/StrawSleepingMat/Scene_StrawSleepingMatDetail.blend",
+    "blenderSource": "C:/Users/Bentl/OneDrive/AI/Models/Blender/HistoricalProps/StrawSleepingMat/Scene_StrawSleepingMatKnotDetail.blend",
     "localReview": "tmp/StrawSleepingMat/index.html; screenshots and reference sheets remain local"
   }
 }
