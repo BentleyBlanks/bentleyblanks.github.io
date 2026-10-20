@@ -100,6 +100,8 @@ export class BlockoutPreviz {
   /** @param {import("./Script_EditorBlockout.mjs").EditorBlockout} editor */
   constructor(editor) {
     this.editor = editor;
+    // 镜头：缺省切镜（运镜直接切到落幅，§14.2）；?previzCamera=move 看照写的运镜
+    this.cameraMode = editor.params?.get?.("previzCamera") === "move" ? "move" : "cut";
     this.doc = null;          // 归一化后的预演
     this.text = null;         // 原文（轮询比对）
     this.levelKey = null;
@@ -769,13 +771,16 @@ export class BlockoutPreviz {
   CameraPose(t = this.run?.t ?? 0) {
     const run = this.run;
     if (!run) return null;
-    const shot = SamplePrevizCamera(run.seq.camera, t, (a) => this.ResolveAnchor(a));
+    const shot = SamplePrevizCamera(run.seq.camera, t, (a) => this.ResolveAnchor(a), { cuts: this.cameraMode === "cut" });
     if (!shot) return null;
     const shake = Math.max(shot.shake || 0, PrevizOverlays(run.seq, t).shake);
     const o = PrevizShakeOffset(shake, t);
     return { position: { x: shot.position.x + o.x, y: shot.position.y + o.y, z: shot.position.z + o.z },
       yawDeg: shot.yawDeg + o.yawDeg, pitchDeg: shot.pitchDeg + o.pitchDeg, fov: shot.fov, index: shot.index, eye: shot.eye };
   }
+
+  /** "cut"（缺省，切镜）/ "move"（照写的运镜）。 */
+  SetCameraMode(mode) { this.cameraMode = mode === "move" ? "move" : "cut"; return this.cameraMode; }
 
   ApplyCamera(camera) {
     if (!this.run || !camera) return false;
@@ -839,6 +844,7 @@ export class BlockoutPreviz {
     return {
       present: this.present, playing: !!run, paused: !!run?.paused, keyframe: run?.seq.keyframe ?? null, title: run?.seq.title ?? null,
       t: run ? +run.t.toFixed(3) : 0, durationS: run ? +run.durationS.toFixed(3) : 0, then: run?.seq.then ?? null,
+      cameraMode: this.cameraMode,
       sequences: this.doc ? this.doc.sequences.map(s => s.keyframe) : [], lines, subtitles: this.elSubs.hidden ? [] : [...this.elSubs.querySelectorAll(".boPrevizText")].map(e => e.textContent),
       camera: this.lastCamera && run ? { ...this.lastCamera, position: { ...this.lastCamera.position } } : null,
       missingClips: [...this.missingClips], missingLines: [...this.missingLines], missingSfx: [...this.missingSfx],

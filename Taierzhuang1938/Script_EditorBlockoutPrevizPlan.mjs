@@ -5,7 +5,7 @@
 //   ValidateBlockoutPreviz(doc, {config?, voice?})  → { ok, errors, warnings }（中文、带路径）
 //   NormalizeBlockoutPreviz(doc)     深拷贝 + 排序 + 缺省值
 //   SamplePrevizActor(entry, t, baseUnit, opts?)    演员在 t 秒的位置 / 朝向 / 姿态 / 片段
-//   SamplePrevizCamera(camera, t, resolve)          镜头在 t 秒的机位 / 朝向 / 视场
+//   SamplePrevizCamera(camera, t, resolve, {cuts})  镜头在 t 秒的机位 / 朝向 / 视场（cuts = 切镜，见 PREVIZ_CUTS）
 //   PrevizSequenceDuration(seq, {lineDuration?})    序列时长
 //   PrevizOverlays(seq, t)           白光 / 黑场 / 说明字 / 震屏在 t 秒的确定性取值
 //   PrevizThrows(seq, base, standAt) 演员键 throw（2026-10-18 第三轮）：投弹动作的出手点 → 落点抛物线；SampleThrowFlight 取 t 秒位置
@@ -185,6 +185,7 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
       if (c.ease !== undefined && !["linear", "inOut"].includes(c.ease)) errors.push(`${cat}.ease 要是 linear / inOut`);
       if (c.fov !== undefined && !(Finite(c.fov) && c.fov > 1 && c.fov < 170)) errors.push(`${cat}.fov 要是 1–170 的度数`);
       if (c.shake !== undefined && !(Finite(c.shake) && c.shake >= 0 && c.shake <= 1)) errors.push(`${cat}.shake 要在 0–1`);
+      if (c.keepMove !== undefined && typeof c.keepMove !== "boolean") errors.push(`${cat}.keepMove 要是 true / false`);
       if (c.eye !== undefined) {
         const e = c.eye;
         if (!IsObject(e)) { errors.push(`${cat}.eye 要是对象`); return; }
@@ -897,18 +898,41 @@ function SampleShot(c, u, resolve) {
 }
 
 /**
+ * 切镜（2026-10-21，用户：「直接切镜我大概就能 get 意思」「实际游戏我也不会做镜头动画，除了非常少的几个」）：
+ * 运镜不插值，一条镜头一开始就切到它的落幅（转头 = 直接看过去，推拉 = 直接到终点）；
+ * 长于 splitS 秒、且起幅落幅差得多（转角 > splitDeg 或机位挪 > splitM）的，切成两个定镜：前半段起幅、后半段落幅
+ * （从天上的飞机摇到地面、走一段路这种，起幅本身也有意思）。挂在演员 / 飞机上的锚照样跟着动（不然人跑出画）。
+ * 单条写 `keepMove: true` 的照原样运镜（游戏里真做镜头动画的那几条）。
+ */
+export const PREVIZ_CUTS = Object.freeze({ splitS: 1.2, splitDeg: 20, splitM: 1.5 });
+
+function ShotsDiffer(a, b) {
+  return Math.abs(WrapDeg(b.yawDeg - a.yawDeg)) > PREVIZ_CUTS.splitDeg || Math.abs(b.pitchDeg - a.pitchDeg) > PREVIZ_CUTS.splitDeg
+    || Math.hypot(b.position.x - a.position.x, b.position.y - a.position.y, b.position.z - a.position.z) > PREVIZ_CUTS.splitM;
+}
+
+/**
  * 镜头轨在 t 秒的机位。camera = 归一化后的 seq.camera；resolve(anchor) → {x,y,z}（点 {x,z,h?} 按地面 + h，
  * 演员锚按演员脚下 + offset；"player" 的眼睛锚还可以带 yawDeg / pitchDeg）。空轨返回 null。
  * 每条管 [t, t+dur)；空档沿用上一条的最后一帧；第一条之前用第一条的起点。
- * @returns {{position:{x,y,z}, yawDeg, pitchDeg, fov, shake, index, eye, target?}|null}
+ * cuts：切镜（见 PREVIZ_CUTS；缺省 false = 照写的运镜，各关的数据测试按这个口径采样）。
+ * @returns {{position:{x,y,z}, yawDeg, pitchDeg, fov, shake, index, eye, target?, cut?}|null}
  */
-export function SamplePrevizCamera(camera, t, resolve) {
+export function SamplePrevizCamera(camera, t, resolve, { cuts = false } = {}) {
   if (!Array.isArray(camera) || !camera.length || typeof resolve !== "function") return null;
   let index = 0;
   for (let i = 0; i < camera.length; i++) if (camera[i].t <= t) index = i;
   const c = camera[index];
   const dur = Math.max(0, c.dur || 0);
   const local = t < c.t ? 0 : dur > 0 ? Math.min(1, (t - c.t) / dur) : 1;
+  if (cuts && c.keepMove !== true) {
+    const end = SampleShot(c, 1, resolve);
+    if (dur > PREVIZ_CUTS.splitS && local < 0.5) {
+      const start = SampleShot(c, 0, resolve);
+      if (ShotsDiffer(start, end)) return { ...start, index, cut: true };
+    }
+    return { ...end, index, cut: true };
+  }
   const shot = SampleShot(c, PrevizEase(local, c.ease || PREVIZ_DEFAULTS.ease), resolve);
   return { ...shot, index };
 }

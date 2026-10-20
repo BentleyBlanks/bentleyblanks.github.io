@@ -288,6 +288,8 @@ export class EditorBlockout {
       State: () => this.previz.State(),
       Reload: () => this.previz.Load({ force: true }),
       CameraPose: (t) => this.previz.CameraPose(t),
+      // 2026-10-21：镜头切镜 / 运镜（"cut" 缺省 / "move"）
+      SetCameraMode: (mode) => this.previz.SetCameraMode(mode),
     };
   }
 

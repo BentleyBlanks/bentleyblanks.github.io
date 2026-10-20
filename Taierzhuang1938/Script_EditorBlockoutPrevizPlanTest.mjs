@@ -217,6 +217,26 @@ Test("镜头：空档沿用上一条最后一帧；from/to + look，linear；fov
   assert.equal(SamplePrevizCamera([], 1, camResolve), null);
 });
 
+Test("镜头切镜：运镜直接切到落幅；长且差得多的切成起幅 / 落幅两个定镜；keepMove 照原样", () => {
+  const cam = NormalizeBlockoutPreviz({ schema: BLOCKOUT_PREVIZ_SCHEMA, level: "X", sequences: [{ keyframe: "01-1", camera: [
+    { t: 0, dur: 1, eye: { x: 0, z: 0, stance: "crouch", yawDeg: 0, pitchDeg: 0, toYawDeg: 90 } },          // 短转头
+    { t: 2, dur: 4, eye: { x: 0, z: 0, stance: "crouch", yawDeg: 90, pitchDeg: 0, toYawDeg: 100 } },       // 长但只转 10°
+    { t: 6, dur: 4, from: { x: 0, z: 0 }, look: { x: 0, z: -10 }, to: { x: 0, z: -14 } },                  // 走 14 m
+    { t: 10, dur: 2, eye: { x: 0, z: 0, yawDeg: 0, pitchDeg: 0, toYawDeg: 90 }, keepMove: true },
+  ] }] }).sequences[0].camera;
+  const C = (t) => SamplePrevizCamera(cam, t, camResolve, { cuts: true });
+  Near(C(0).yawDeg, 90, 1e-6, "短转头：一开始就看过去"); assert.equal(C(0).cut, true);
+  Near(C(0.5).yawDeg, 90); Near(C(1.5).yawDeg, 90, 1e-6, "空档沿用落幅");
+  Near(C(2.1).yawDeg, 100, 1e-6, "长但差得少：只落幅一个定镜");
+  Near(C(6.5).position.z, 0, 1e-6, "长且差得多：前半段起幅"); Near(C(7.9).position.z, 0);
+  Near(C(8.1).position.z, -14, 1e-6, "后半段落幅"); Near(C(9.9).position.z, -14);
+  Near(C(11).yawDeg, 45, 1e-6, "keepMove：照写的运镜（inOut 中点）"); assert.equal(C(11).cut, undefined);
+  Near(SamplePrevizCamera(cam, 0.5, camResolve).yawDeg, 90 * 0.5, 1e-6, "缺省（不切镜）照旧插值");
+  for (const t of [0.3, 4, 7, 8.5]) assert.deepEqual(C(t), C(t), "确定性");
+  assert.ok(ValidateBlockoutPreviz({ schema: BLOCKOUT_PREVIZ_SCHEMA, level: "X", sequences: [{ keyframe: "01-1", camera: [{ t: 0, dur: 1, eye: {}, keepMove: "yes" }] }] })
+    .errors.some(e => e.includes("keepMove")), "keepMove 要是布尔");
+});
+
 Test("时长：durationS 优先；否则取各轨最晚结束（台词按清单时长）", () => {
   assert.equal(PrevizSequenceDuration({ ...seq, durationS: 41.5 }), 41.5);
   Near(PrevizSequenceDuration(seq, { lineDuration: () => 1.5 }), 10.2, 1e-9, "black 6.2 + 4");
