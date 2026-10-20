@@ -134,6 +134,28 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
             index=strip.data.loops[loopIndex].vertex_index
             strip.data.uv_layers.active.data[loopIndex].uv=(.02+.46*vertexU[index],.02+.46*max(0,min(1,vertexDistances[index]/repeat-tile)))
     strip['ContinuousStrip']=True;strip['OuterGridPasses']=[2,2];strip['ShoulderLoops']=2
+    if softCloth:
+        def KnotRibbon(name,points,widths):
+            positions=[];coordinates=[];polygons=[]
+            for index,point in enumerate(points):
+                tangent=(Vector(points[min(index+1,len(points)-1)])-Vector(points[max(0,index-1)])).normalized()
+                across=Vector((0,-tangent.z,tangent.y)).normalized()
+                for side in (-1,0,1):
+                    p=Vector(point)+across*(widths[index]*.5*side);p.x+=.0012*(1-side*side)
+                    positions.append(tuple(p));coordinates.append(((side+1)/2,index/(len(points)-1)))
+            for index in range(len(points)-1):
+                for cross in range(2):
+                    a=index*3+cross;polygons.append((a,a+1,a+4,a+3))
+            cloth=CreateMesh(name,positions,polygons,coordinates,materials['binding'],root)
+            for polygon in cloth.data.polygons:
+                if polygon.normal.x<0:polygon.flip()
+            cloth.data.update()
+        KnotRibbon('Pack_SoftKnotOver',[(.197,-.044,.057),(.201,-.054,.054),(.204,-.065,.049),(.201,-.076,.047),(.197,-.084,.051)],[.019,.015,.010,.014,.018])
+        KnotRibbon('Pack_SoftKnotUnder',[(.197,-.048,.042),(.199,-.055,.048),(.200,-.064,.055),(.198,-.073,.058),(.196,-.079,.055)],[.014,.012,.009,.012,.016])
+        KnotRibbon('Pack_SoftKnotLoopLeft',[(.199,-.064,.051),(.200,-.047,.061),(.197,-.040,.053),(.197,-.047,.044),(.199,-.062,.049)],[.008,.010,.011,.010,.008])
+        KnotRibbon('Pack_SoftKnotLoopRight',[(.200,-.066,.051),(.201,-.080,.059),(.198,-.086,.052),(.198,-.081,.046),(.200,-.067,.049)],[.008,.009,.010,.009,.008])
+        KnotRibbon('Pack_SoftKnotTail',[(.198,-.062,.047),(.200,-.066,.026),(.198,-.073,.007),(.195,-.071,-.009)],[.014,.017,.019,.020])
+        return root
     AddTube('Pack_SideClothKnot',[(.195,-.049,.05),(.199,-.061,.058),(.199,-.079,.052),(.197,-.065,.042),(.195,-.049,.05)],.0043,materials['binding'],root,sides=4)
     for sign in (-1,1):
         AddRibbon('Pack_SideKnotLoop%d'%sign,[(.199,-.064,.05),(.200,-.064+sign*.013,.060),(.200,-.064+sign*.021,.047),(.199,-.064,.05)],.010,materials['binding'],root,axis='z')

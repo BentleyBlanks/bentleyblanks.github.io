@@ -72,9 +72,10 @@ def BuildSoftBundle(CreateMesh,unusedDepth,clothMaterial,backMaterial,foldMateri
             # Front/back edges turn in; the side cut is recessed for the
             # folded cloth lips, which carry the final width silhouette.
             side=abs(x)/.1898
-            inset=.014*math.sin(math.pi*fraction)**.7*side**5
+            cutEnd=max(0,min(1,(depth+.100)/.045))
+            inset=.014*math.sin(math.pi*fraction)**.7*side**5*cutEnd
             x-=math.copysign(inset,x)
-            z-=math.copysign(.0035*math.sin(math.pi*fraction)*(abs(z)/.15)**5,z)
+            z-=math.copysign(.0010*math.sin(math.pi*fraction)*(abs(z)/.15)**5,z)
             current.append(len(verts));verts.append((x,depth,z));uvs.append(((x+.19)/.38,(z+.15)/.30))
         for index in range(len(perimeter)):
             following=(index+1)%len(perimeter)
@@ -85,9 +86,8 @@ def BuildSoftBundle(CreateMesh,unusedDepth,clothMaterial,backMaterial,foldMateri
         faces.append((backCenter,previous[(index+1)%len(previous)],previous[index]));roles.append('back')
 
     profiles=[
-        [(-.014,.121),(-.027,.139),(-.057,.143),(-.087,.136),(-.108,.116),(-.114,.076),(-.115,.013),(-.112,-.061),(-.106,-.116),(-.092,-.136),(-.066,-.142),(-.037,-.137),(-.021,-.119),(-.016,-.076),(-.016,.026)],
-        [(-.036,.084),(-.041,.111),(-.057,.126),(-.077,.119),(-.086,.088),(-.084,.027),(-.087,-.052),(-.079,-.113),(-.062,-.130),(-.044,-.122),(-.034,-.098),(-.032,-.027),(-.035,.044)],
-        [(-.055,.079),(-.060,.102),(-.072,.096),(-.076,.065),(-.071,.012),(-.074,-.055),(-.068,-.105),(-.057,-.117),(-.049,-.098),(-.051,-.032),(-.052,.041)]
+        [(-.073,.082),(-.072,.112),(-.065,.132),(-.049,.139),(-.030,.134),(-.019,.113),(-.016,.074),(-.019,.016),(-.015,-.055),(-.020,-.108),(-.029,-.137),(-.041,-.143),(-.051,-.135),(-.063,-.141),(-.073,-.121),(-.076,-.090),(-.070,-.018),(-.074,.038),(-.073,.082)],
+        [(-.055,.075),(-.055,.103),(-.046,.121),(-.034,.116),(-.029,.090),(-.032,.024),(-.029,-.039),(-.035,-.102),(-.043,-.126),(-.052,-.132),(-.059,-.119),(-.062,-.092),(-.057,-.030),(-.061,.031),(-.055,.075)]
     ]
     for sign in (-1,1):
         for layer,profile in enumerate(profiles if sign>0 else profiles[:1]):
@@ -104,12 +104,13 @@ def BuildSoftBundle(CreateMesh,unusedDepth,clothMaterial,backMaterial,foldMateri
             for index,point in enumerate(points):
                 tangent=(points[min(index+1,len(points)-1)]-points[max(0,index-1)]).normalized();across=Vector((-tangent.y,tangent.x))
                 compression=sum(math.exp(-((point.y-band)/.023)**2) for band in (.05,-.06))
-                half=(.0115-layer*.0015)*(1+.13*math.sin(point.y*37+layer*1.7))*(1-.16*compression)
+                loosen=max(0,min(1,(-point.y-.075)/.06))
+                half=(.0105-layer*.0017)*(1+.17*math.sin(point.y*37+layer*1.7)+loosen*.17*math.sin(point.y*113+layer))*(1-.20*compression)
                 ring=[]
                 for s in crossValues:
                     yz=point+across*half*s
-                    yz.x+=.0018*math.sin(yz.y*39+layer*1.2)
-                    x=sign*(.174+.0155*math.cos(s*math.pi/2)-.0023*compression+.0008*math.sin(point.y*48+layer))
+                    yz.x+=.0018*math.sin(yz.y*39+layer*1.2)+loosen*.0015*math.sin(yz.y*125+layer)
+                    x=sign*(.175+.0142*math.cos(s*math.pi/2)-.0030*compression+.0010*math.sin(point.y*48+layer)-loosen*.0014*math.cos(point.y*103+layer))
                     ring.append(len(verts));verts.append((x,yz.x,max(-.1498,min(.1498,yz.y))));uvs.append(((yz.x+.13)/.13,(yz.y+.15)/.30))
                 rows.append(ring)
             for a,b in zip(rows,rows[1:]):
