@@ -1,0 +1,4 @@
+# Rebuild evidence is local; the packed source regenerates both reports.
+Data_Build.json
+Data_CornerProvenance.json
+__pycache__/

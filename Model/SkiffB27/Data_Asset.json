@@ -1,0 +1,388 @@
+{
+  "asset": "SkiffB27",
+  "version": "SkiffB27Fix1",
+  "status": "validated",
+  "descriptionZh": "B27 独立战损木船：108件金属件重新落座、中央船底长缝收合、肋骨细纹和断面端纹修复；保留原船型、主要侧舷破口与49,944三角面。",
+  "integration": {
+    "mode": "standaloneReusableAsset",
+    "levelPlacementRequested": false,
+    "levelPlacement": null,
+    "runtimeLoader": "Taierzhuang1938/Script_ModelImports.mjs:ManagedGLTFLoader"
+  },
+  "runtime": {
+    "file": "Model_SkiffB27.glb",
+    "triangles": 49944,
+    "meshes": 2,
+    "primitives": 4,
+    "materials": 4,
+    "embeddedPbrImages": 9,
+    "vertexRecords": 82666,
+    "vertexRecordLimitExclusive": 90000,
+    "bytes": 7333052,
+    "sha256": "282ed4ede609a157302c4a472dbecec1240f6d4612f9c9b4d89540046cdd6b81",
+    "geometrySha256": "d5d574944b0ccbe4147f6ef4f8dc6048681c9355788252b1ddfd9a4f21907783",
+    "actualBoundsMin": [
+      -0.7641668915748596,
+      7.456490857293829e-05,
+      -2.299999952316284
+    ],
+    "actualBoundsMax": [
+      0.7641668915748596,
+      1.1007041931152344,
+      2.299999952316284
+    ],
+    "actualDimensionsXyzMeters": [
+      1.5283337831497192,
+      1.1006296282066614,
+      4.599999904632568
+    ]
+  },
+  "coordinates": {
+    "unit": "metre",
+    "up": "+Y",
+    "longAxis": "Z",
+    "front": "-Z",
+    "targetDimensionsXyzMeters": [
+      1.5283337831497192,
+      1.1006296873092651,
+      4.599999904632568
+    ],
+    "targetLengthWidthHeightMeters": [
+      4.599999904632568,
+      1.5283337831497192,
+      1.1006296873092651
+    ],
+    "facingMeasurement": {
+      "method": "Measured original source object vertices after the source-to-runtime transform; BowStem is at the negative-Z end and Transom components at the positive-Z end.",
+      "bowStemZRangeMeters": [
+        -2.299999952316284,
+        -1.7355462312698364
+      ],
+      "transomCapZRangeMeters": [
+        2.0774528980255127,
+        2.299999952316284
+      ],
+      "transomPlank0ZRangeMeters": [
+        2.0871798992156982,
+        2.2859690189361572
+      ]
+    },
+    "sourceToRuntime": {
+      "center": [
+        0.00020641088485717773,
+        -0.06716883182525635,
+        -0.14005334675312042
+      ],
+      "scale": 0.8948437418327958,
+      "axisMatrix": [
+        [
+          -1,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          0
+        ]
+      ],
+      "formula": "runtime = (sourceWorld - center) @ transpose(axisMatrix) * scale"
+    }
+  },
+  "source": {
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/SkiffB27Repair20261020/Scene_SkiffB27.blend",
+    "status": "validated",
+    "collection": "StrandedSkiffA",
+    "assetMeshObjects": 302,
+    "displayObjectsExcluded": true,
+    "sha256": "16533064d2e6a450bebf62303d71dbbb4ea90c2a787d4ff91d33b00437739315",
+    "bytes": 23132258,
+    "packedTemplateText": "Data_SkiffB27Template",
+    "packedCorrespondenceText": "Data_SkiffB27Correspondence",
+    "packedRuntimeTextures": 9,
+    "embeddedScriptsPattern": "Script_SkiffB27*.py",
+    "defaultExportNeedsOriginalArchive": false,
+    "defaultExportNeedsExternalTextureFiles": false,
+    "defaultExportPlatform": "Windows; run the saved packed source through Script_BlenderMcp.mjs start --batch",
+    "coldOpenValidation": "PASS: 60 checks",
+    "keelNormalStorage": "Native Blender 5.2 FLOAT_VECTOR corner custom_normal; no modifier or quantized INT16_2D conversion"
+  },
+  "original": {
+    "authoringAsset": "Dots Skiff B27",
+    "archiveRoot": "C:/Users/Bentl/OneDrive/AI/Models/Blender/DotsAcceptance20261020/SkiffB27/Restored/Skiff_B18-B27_49944tri",
+    "sourceRelativePath": "B27/Source_Skiff_B27.blend",
+    "runtimeRelativePath": "B27/Model_B27.glb",
+    "deliveryReadme": "README_B27_交付.txt",
+    "deliveryRecord": "Data_FinalDelivery.json",
+    "archiveManifest": "SHA256_MANIFEST.json",
+    "preservation": "Read-only complete restored B18-B27 archive, source/PBR/recipes/intermediate candidates and original evidence retained externally; do not overwrite.",
+    "triangles": 49944,
+    "vertexRecords": 82095,
+    "sourceMeshObjects": 302,
+    "bytes": 6992072,
+    "sha256": "621bea33c2ee27c3b051d9f968bc6257c7626eee9f9343370ce304a40d4a3c33",
+    "geometrySha256": "bcbdf29373c1c9861920138f671eceb8376a02b72bc1fb262538e11c0ca17c2a"
+  },
+  "repair": {
+    "status": "validated",
+    "nails": {
+      "recipe": "Data_NailRepairRecipe.json",
+      "translatedObjects": 108,
+      "scope": "Only translation of existing metal pieces; retain all 201 original metal components and verify actual solid-wood support independently.",
+      "actualSupportedComponents": 201
+    },
+    "keel": {
+      "object": "KeelSole",
+      "widthStations": 81,
+      "targetOverlapMeters": 0.005,
+      "policy": "Widen existing sole vertices toward the measured inner garboard edges; retain source topology, outer silhouette and main side damage.",
+      "targetIsNotValidation": true,
+      "actualMaximumVertexMoveMeters": 0.06450738715897568,
+      "actualSeamValidation": "PASS: underside normal/fill and magenta-background original/repaired comparison; two central longitudinal openings removed and main side breaches retained",
+      "watertightnessClaim": false
+    },
+    "endGrain": {
+      "selectedObjects": [
+        "BentRib*",
+        "BrokenThwart*"
+      ],
+      "selection": "Short end polygons selected by object identity and geometric orientation/position; visually check all visible broken ends.",
+      "endMaterialIndex": 3,
+      "retainedMaterialName": "Material_StrandedSkiffBareInnerWood",
+      "formerMaterial3LongFacesRemappedTo": 2,
+      "sideMaterialName": "Material_StrandedSkiffWeatheredWood",
+      "actualTriangles": 759
+    }
+  },
+  "geometryContract": {
+    "triangulation": "Original template triangles and winding retained exactly once; no ordinary vessel glTF re-export or Blender retriangulation.",
+    "provenance": "Data_CornerProvenance.json",
+    "sourceTopologyAndObjectMatrices": "Preserve the 302 asset objects, polygon connectivity and object matrices; original unused vertices remain source-only.",
+    "uv": "Retain authored runtime/source UV offsets, apply current source-loop deltas, scale rib long-face UVs uniformly by 1.85, and use current planar source UVs on selected end polygons.",
+    "endPlanarUvScalePerMeter": 3.5,
+    "normals": "Retain authored runtime normals outside KeelSole. Capture source keel corner normals before deformation; transform source and runtime keel normals by the inverse transpose of the exact piecewise-linear width Jacobian. Source keel normals use native FLOAT_VECTOR custom_normal corner storage to avoid measured legacy INT16_2D quantization.",
+    "tangents": "Retain authored tangents outside selected ends and KeelSole. Keel tangents follow the width Jacobian and retain handedness; end tangents/handedness come from final triangle positions and UVs, with record splits as needed.",
+    "vertexColors": "Original per-record COLOR_0 preserved.",
+    "normalAuditScope": "Cold-source audit checks keel source/runtime inverse-J behavior; authored source/runtime baseline normal differences remain and complete source/runtime normal equality is not claimed.",
+    "laterEdits": "Topology/face selection or changes beyond the declared normal/tangent policy require updating the recipe, provenance and independent checks.",
+    "sourceMaterialSynchronization": "Source polygon material slots synchronized to the original runtime triangle provenance before the declared 3-to-2 side and end-to-3 remapping; six original texture bindings unchanged."
+  },
+  "pbr": {
+    "sets": 3,
+    "images": 9,
+    "baseDimensions": [
+      1024,
+      1024
+    ],
+    "normalDimensions": [
+      512,
+      512
+    ],
+    "ormDimensions": [
+      512,
+      512
+    ],
+    "baseColorSpace": "sRGB",
+    "normalAndOrmColorSpace": "Non-Color",
+    "ormChannels": {
+      "R": "occlusion",
+      "G": "roughness",
+      "B": "metallic"
+    },
+    "ironUsesTextures": false,
+    "unchangedSets": [
+      "Material_StrandedSkiffOuterSkin",
+      "Material_StrandedSkiffWeatheredWood"
+    ],
+    "replacementSet": "Material_StrandedSkiffBareInnerWood: dedicated end-grain Base/Normal/Orm",
+    "encoding": "WebP; replacement Normal/ORM encoded losslessly from native PNG bakes; Base uses the bounded quality policy in Script_SkiffB27Encode.py.",
+    "imageByteLimit": 600000,
+    "replacementSetByteLimit": 1000000,
+    "actualImageBytes": [
+      {
+        "index": 0,
+        "name": "Texture_B19_OuterNormal",
+        "size": [
+          512,
+          512
+        ],
+        "bytes": 132276,
+        "sha256": "bfe837c19e0bb248d1ea36194a3e0d3a1c87ec026d33c46f4d0e1b6aaec4ba84"
+      },
+      {
+        "index": 1,
+        "name": "Texture_B19_OuterOrm",
+        "size": [
+          512,
+          512
+        ],
+        "bytes": 56090,
+        "sha256": "e10690d13584fde3b9e705842138de16ab5690f08e53e9f9d1e88a0f2bb7604d"
+      },
+      {
+        "index": 2,
+        "name": "Texture_B19_OuterBase",
+        "size": [
+          1024,
+          1024
+        ],
+        "bytes": 188716,
+        "sha256": "aafafdc576a381a26224140e86a48c951b2b84874a3ff33704a908f5458d430d"
+      },
+      {
+        "index": 3,
+        "name": "Texture_B21_WoodNormal",
+        "size": [
+          512,
+          512
+        ],
+        "bytes": 120998,
+        "sha256": "564af227b79a8217bec8b618f681171b94ad1c213f643a5fa1eeb92d245fa7c4"
+      },
+      {
+        "index": 4,
+        "name": "Texture_B21_WoodOrm",
+        "size": [
+          512,
+          512
+        ],
+        "bytes": 47962,
+        "sha256": "ad2df9f06ffc7f80c50aa63575e44519d5fd5c3b6d85cafd90574654d8aad51c"
+      },
+      {
+        "index": 5,
+        "name": "Texture_B21_WoodBase",
+        "size": [
+          1024,
+          1024
+        ],
+        "bytes": 225194,
+        "sha256": "600028c1e7beb088ff8e0568b26a69bd1d17b76e0d7087accdce4d152781e72a"
+      },
+      {
+        "index": 6,
+        "name": "Texture_SkiffB27EndGrainNormalRuntime",
+        "size": [
+          512,
+          512
+        ],
+        "bytes": 96850,
+        "sha256": "421e61445f0f789c68125c13205c136047901de48f62c32d593ed1d662024009"
+      },
+      {
+        "index": 7,
+        "name": "Texture_SkiffB27EndGrainOrmRuntime",
+        "size": [
+          512,
+          512
+        ],
+        "bytes": 119404,
+        "sha256": "fc98e10fca6ee5e4f0f3deda957650dca406664d9d97afa630ca0c60fa1ea743"
+      },
+      {
+        "index": 8,
+        "name": "Texture_SkiffB27EndGrainBaseRuntime",
+        "size": [
+          1024,
+          1024
+        ],
+        "bytes": 496234,
+        "sha256": "59e3587fdd469bac960b355cb41da3dddbe6a95157629a1f4871567b4657f453"
+      }
+    ],
+    "actualTotalImageBytes": 1483724
+  },
+  "artSource": {
+    "classification": "creativeReconstruction",
+    "descriptionZh": "船型与损伤沿用用户提供的 B27；端纹为创作修复，不作船种、年代工艺或史料真实性宣称。",
+    "endGrainMother": "C:/Users/Bentl/OneDrive/AI/Models/Blender/SkiffB27Repair20261020/Texture_SkiffEndGrainMaster.png",
+    "provider": "built-in imagegen",
+    "promptSummary": "Weathered boat timber end-grain material reference, varied growth rings and fibre cracks, neutral lighting and no text; used as the mother for short broken timber ends.",
+    "derivation": "Native Blender Base/Normal/ORM bake; micro-normal height inferred from mother-image luminance, not scanned or measured wood relief.",
+    "rightsAndHistoryBoundary": "Original archive retained as supplied provenance; no new third-party license, public-domain status or historical-evidence claim is asserted. Generated end-grain is an authored material treatment.",
+    "prompt": "Flat orthographic macro albedo texture covering the full square with a weathered old boat timber cross section/end grain; muted grey-brown/taupe, fine irregular eccentric growth ring arcs, cut pores and small radial checks; center outside lower left; natural uneven fibres, low contrast neutral diffuse lighting; no bark, objects, text, baked shadows, specular, perfect circles or long parallel side grain.",
+    "motherSha256": "32bd61b7bf7c7306dd0084e489f6329a564478c13fa077e8699d0ba5bfd941e7"
+  },
+  "rebuild": {
+    "defaultScript": "Script_SkiffB27Bake.py",
+    "runner": "node scripts/Script_BlenderMcp.mjs start --batch Model/SkiffB27/Script_SkiffB27Bake.py --batch-args tmp/SkiffB27/Data_ExportArgs.json --task SkiffB27Export --json",
+    "defaultArguments": [
+      "--source",
+      "C:/Users/Bentl/OneDrive/AI/Models/Blender/SkiffB27Repair20261020/Scene_SkiffB27.blend",
+      "--output",
+      "<absolute checkout>/Model/SkiffB27"
+    ],
+    "initializeOnlyArguments": [
+      "--initialize",
+      "--template",
+      "<read-only archive>/B27/Model_B27.glb",
+      "--recipe",
+      "Data_NailRepairRecipe.json",
+      "--endgrain-master",
+      "<OneDrive>/Texture_SkiffEndGrainMaster.png",
+      "--save-source",
+      "<OneDrive>/Scene_SkiffB27.blend"
+    ],
+    "externalPythonForInitialize": "NumPy/Pillow environment configured through the end-grain baker; default export does not rebake or require that external encoder.",
+    "linuxDependencies": [],
+    "deterministicRebuild": "PASS: fresh Blender process rebuilt the packed final source to a byte-identical 7,333,052-byte GLB"
+  },
+  "validation": {
+    "independentRuntime": {
+      "status": "PASS",
+      "report": "Data_IndependentVerify.json",
+      "checks": 103,
+      "reversedFaces": 0,
+      "newNearZeroAreaFaces": 0
+    },
+    "coldSource": {
+      "status": "PASS",
+      "report": "Data_FinalSourceAudit.json",
+      "checks": 60
+    },
+    "byteIdenticalDefaultRebuild": {
+      "status": "PASS",
+      "report": "Data_RebuildComparison.json",
+      "sha256": "282ed4ede609a157302c4a472dbecec1240f6d4612f9c9b4d89540046cdd6b81"
+    },
+    "managedGltfWebgl": {
+      "status": "PASS",
+      "report": "ReviewFinal2/Data_BrowserReview.json",
+      "views": 16,
+      "mouseOrbitPanZoom": true,
+      "originalSwitchPreservesCamera": true,
+      "nonBlockingTelemetry": "Known Three FileLoader stream ERR_ABORTED events retained with complete byte-length/SHA and actual loader/render evidence; no page, console, HTTP or blocking failures"
+    },
+    "allNailSolidSupport": {
+      "status": "PASS",
+      "report": "Data_IndependentVerify.json",
+      "metalComponents": 201,
+      "supported": 201,
+      "closedWoodComponents": 96,
+      "woodComponents": 99,
+      "method": "Coordinate-welded connected components (1e-6 m quantization); exact finite edge/triangle intersections in both directions plus coplanar convex overlap; 3-direction parity containment only in closed components, in either containment direction. No distance-based support classification.",
+      "penetrationVolume": "Deterministic estimate reported only for closed solids; no watertightness claim"
+    },
+    "bottomAndBrokenEndVisualReview": {
+      "status": "PASS",
+      "report": "ReviewFinal2/Data_VisualReview.json"
+    },
+    "blenderNoTaskResiduals": {
+      "status": "PASS",
+      "report": "Data_BlenderFinalStatus.json",
+      "taskInstances": []
+    },
+    "localEvidenceOnly": true,
+    "evidenceRoot": "C:/Users/Bentl/OneDrive/AI/Models/Blender/SkiffB27Repair20261020/Acceptance"
+  },
+  "delivery": {
+    "channel": "master",
+    "assetUrl": "https://bentleyblanks.github.io/Model/SkiffB27/Model_SkiffB27.glb?v=SkiffB27Fix1",
+    "publicationEvidence": "Commit and actual Pages content hash recorded in the external Acceptance/Data_Publish.json after push"
+  }
+}
