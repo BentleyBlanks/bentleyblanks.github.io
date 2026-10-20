@@ -39,6 +39,7 @@ export const MAP_COLORS = Object.freeze({
   friend: RGB(38, 106, 180),     // 友：蓝
   civ: RGB(70, 136, 56),         // 百姓：绿
   gold: RGB(226, 166, 26),       // 要点 / 下一步 / 玩家 / 当前关键帧
+  fly: RGB(44, 168, 190),        // 飞行观察相机（§4.3，2026-10-21）：青，别的标记都不用这个色
 });
 
 /** 全关总图在这个比例（像素 / 米）及以上改用矢量块。 */
@@ -167,7 +168,7 @@ export class BlockoutMap {
     this.bakeStats = null;
     this.keyframes = [];
     this.kfIndex = -1;
-    this.dynamic = { player: null, units: [], pois: [], next: null };
+    this.dynamic = { player: null, fly: null, units: [], pois: [], next: null };
     this.layers = { arcs: "default", intents: true, labels: true, landmarks: true, stations: true };
     this.landmarks = [];        // 场景文件的地标（2026-10-20，SetLandmarks）
     this.view = null;           // 全关总图视图 {cx, cz, pxPerM}
@@ -273,11 +274,13 @@ export class BlockoutMap {
    * 换动态层（玩家、单位、要点、下一步）。全关总图开着时自己约一次重画（同一帧合并成一次；
    * 调用方紧接着自己 PaintFull 的话那次约好的就不再画；图关着时什么也不画）——
    * 地图上点关键帧跳过去、过渡中单位在走，图保持打开也得跟着动。
-   * @param {{player?:{x,z,yawDeg}, units?:Array, pois?:Array, next?:{x,z,text,radiusM}|null}} d
+   * fly（2026-10-21，飞行观察）：相机的位置与朝向，画成青色的相机标记 + 视锥；有它时小地图以它为中心（玩家标记照画，视野里有就看得到）。
+   * @param {{player?:{x,z,yawDeg}, fly?:{x,z,yawDeg}|null, units?:Array, pois?:Array, next?:{x,z,text,radiusM}|null}} d
    */
   SetDynamic(d = {}) {
     this.dynamic = {
       player: d.player && Finite(d.player.x) && Finite(d.player.z) ? { x: d.player.x, z: d.player.z, yawDeg: d.player.yawDeg || 0 } : null,
+      fly: d.fly && Finite(d.fly.x) && Finite(d.fly.z) ? { x: d.fly.x, z: d.fly.z, yawDeg: d.fly.yawDeg || 0 } : null,
       units: Array.isArray(d.units) ? d.units : [],
       pois: Array.isArray(d.pois) ? d.pois : [],
       next: d.next && Finite(d.next.x) && Finite(d.next.z) ? d.next : null,
@@ -622,9 +625,9 @@ export class BlockoutMap {
     const b = this.scene.bounds;
     const s = Math.max(Finite(pxPerM) && pxPerM > 0 ? pxPerM : MINI_PX_PER_M, Math.min(w / (b.maxX - b.minX), h / (b.maxZ - b.minZ)));
     const viewW = w / s, viewH = h / s;
-    const player = this.dynamic.player;
-    let cx = player ? player.x : (b.minX + b.maxX) / 2;
-    let cz = player ? player.z : (b.minZ + b.maxZ) / 2;
+    const focus = this.dynamic.fly || this.dynamic.player;
+    let cx = focus ? focus.x : (b.minX + b.maxX) / 2;
+    let cz = focus ? focus.z : (b.minZ + b.maxZ) / 2;
     cx = viewW >= b.maxX - b.minX ? (b.minX + b.maxX) / 2 : Clamp(cx, b.minX + viewW / 2, b.maxX - viewW / 2);
     cz = viewH >= b.maxZ - b.minZ ? (b.minZ + b.maxZ) / 2 : Clamp(cz, b.minZ + viewH / 2, b.maxZ - viewH / 2);
     const view = { cx, cz, s, w, h };
@@ -983,7 +986,7 @@ export class BlockoutMap {
   }
 
   PaintDynamic(ctx, view, { mini }) {
-    const { units, pois, next, player } = this.dynamic;
+    const { units, pois, next, player, fly } = this.dynamic;
     const s = view.s;
     const glyph = mini ? 1 : Clamp(0.85 + (s - 1.5) * 0.06, 1, 1.45);
     const arcMode = this.layers.arcs;
@@ -1066,6 +1069,20 @@ export class BlockoutMap {
       ctx.fillStyle = grad;
       ctx.fill();
       PlayerArrow(ctx, p.x, p.y, (mini ? 1 : 1.15) * glyph, player.yawDeg);
+    }
+    // 飞行观察相机（压在玩家上面；到玩家本人拉一条淡虚线，看得出人留在哪儿）
+    if (fly) {
+      const c = Project(view, fly.x, fly.z);
+      if (player) {
+        const p = Project(view, player.x, player.z);
+        ctx.save();
+        ctx.setLineDash([2, 4]);
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = Css(MAP_COLORS.ink, 0.45);
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(c.x, c.y); ctx.stroke();
+        ctx.restore();
+      }
+      FlyMarker(ctx, c.x, c.y, (mini ? 1 : 1.15) * glyph, fly.yawDeg, mini ? 52 : Clamp(46 * s, 52, 150));
     }
     // 标签（只在全关总图上）
     if (!mini && this.layers.labels) this.PaintLabels(ctx, view, live);
@@ -1439,6 +1456,40 @@ function PlayerArrow(ctx, x, y, scale, yawDeg) {
   ctx.stroke();
   ctx.fillStyle = Css(MAP_COLORS.gold);
   ctx.fill();
+  ctx.restore();
+}
+
+/** 飞行观察相机：青色视锥 + 描边的青色圆（相机身子）+ 朝向小三角。 */
+function FlyMarker(ctx, x, y, scale, yawDeg, coneR) {
+  const a = CanvasAngle(yawDeg);
+  const grad = ctx.createRadialGradient(x, y, 2, x, y, coneR);
+  grad.addColorStop(0, Css(MAP_COLORS.fly, 0.5));
+  grad.addColorStop(1, Css(MAP_COLORS.fly, 0));
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, coneR, a - 0.5, a + 0.5);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = Css(MAP_COLORS.fly, 0.75);
+  ctx.stroke();
+  ctx.translate(x, y);
+  ctx.rotate(-YawRad(yawDeg));
+  ctx.scale(scale, scale);
+  // 朝向小三角（尖指前方）
+  ctx.beginPath();
+  ctx.moveTo(0, -13); ctx.lineTo(4.6, -6.4); ctx.lineTo(-4.6, -6.4); ctx.closePath();
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 3; ctx.strokeStyle = Css(MAP_COLORS.ink); ctx.stroke();
+  ctx.fillStyle = Css(MAP_COLORS.fly); ctx.fill();
+  // 相机身子
+  ctx.beginPath(); ctx.arc(0, 0, 5.4, 0, Math.PI * 2);
+  ctx.lineWidth = 3; ctx.strokeStyle = Css(MAP_COLORS.ink); ctx.stroke();
+  ctx.fillStyle = Css(MAP_COLORS.fly); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, 1.8, 0, Math.PI * 2);
+  ctx.fillStyle = Css(MAP_COLORS.paper); ctx.fill();
   ctx.restore();
 }
 

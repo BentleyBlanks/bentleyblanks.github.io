@@ -495,6 +495,30 @@ body.blockoutMode #hud .hudFps { top: 56px; left: auto; right: 18px; }
 /* 导航栏不响应 */
 .boNav.locked { pointer-events: none !important; opacity: 0.45; }
 .boKeysPreviz { display: inline-flex; align-items: center; gap: 3px; }
+
+/* --- 飞行观察（§4.3，2026-10-21） ----------------------------------------- */
+/* 卡片右上的「飞行观察」按钮：同复制 / 记机位，进了飞行就亮金边 */
+.boFlyBtn { flex: 0 0 auto; margin: -3px 0 0 0; color: var(--bo-text); border-color: var(--bo-edge); background: #13140b55; }
+.boFlyBtn:hover { border-color: #cdb77b88; }
+.boFlyBtn.on { color: var(--bo-gold); border-color: var(--bo-gold); background: var(--bo-sel-strong); }
+/* 飞行中：卡片底多一条（预演播放时整张卡片只剩预演条，这一条跟着藏） */
+.boFlyBar { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--bo-line-strong); }
+.boFlyTop { display: flex; align-items: center; gap: 10px; }
+.boFlyTag {
+  flex: 0 0 auto; padding: 0 7px; font-size: 11.5px; line-height: 18px; letter-spacing: 0.16em;
+  color: #15130c; background: var(--bo-gold-fill);
+}
+.boFlyName { flex: 1 1 auto; min-width: 0; font: 700 14px/1.3 var(--bo-serif); color: var(--bo-bright); letter-spacing: 0.08em; white-space: nowrap; }
+.boFlySpeed { flex: 0 0 auto; font: 12px/18px var(--bo-num); color: var(--bo-gold-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.boFlyStop { flex: 0 0 auto; width: 26px; height: 26px; margin-right: -4px; color: var(--bo-text); border-color: var(--bo-edge); background: #13140b55; }
+.boFlyPos { margin-top: 7px; font: 12px/17px var(--bo-num); color: var(--bo-muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.boFlyHint { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 4px; margin-top: 6px; font-size: 11px; line-height: 15px; color: var(--bo-faint); letter-spacing: 0.06em; }
+.boFlyHint > span { margin-right: 5px; }
+.boFlyHint > span:last-child { margin-right: 0; }
+.boKeysFly .boKbd { color: var(--bo-muted); }
+/* 飞行中导航栏的「飞行」提示变金，提醒现在是相机在动 */
+.flyOn .boKeysFly { color: var(--bo-gold-text); }
+.flyOn .boKeysFly .boKbd { color: var(--bo-gold); border-color: #cdb77b88; }
 /* 遮罩：白光 / 黑场盖 3D 画面，卡片、字幕、导航栏在它上面 */
 .boPrevizOverlay { position: absolute; inset: 0; pointer-events: none; }
 .boPrevizBlack, .boPrevizFlash { position: absolute; inset: 0; opacity: 0; }

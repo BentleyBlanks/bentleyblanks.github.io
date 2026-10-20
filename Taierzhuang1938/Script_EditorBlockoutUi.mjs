@@ -12,6 +12,8 @@
 //   中上  提示条（2.5 s 淡出）
 //   预演（§14.2，2026-10-18）：当前关键帧挂了预演时卡片右上多一个「预演」按钮（N）；播放中卡片换成
 //         「预演 · 标题 · 进度条 · 秒数」，导航栏不响应（.locked），按键只认 N / Esc（中断）。
+//   飞行观察（§4.3，2026-10-21）：卡片右上多一个「飞行观察」按钮（O，进飞行后亮金边）；飞行中卡片底多一条
+//         「飞行 · 速度 · 位置 / 朝向 · 按键提示 · 退出」；导航栏的按键提示里多一个 O；预演播放时整张卡片只剩预演条，飞行条跟着藏。
 //
 // 输入约定：
 // - 本界面 DOM 上的 mousedown / wheel / keydown 一律 stopPropagation —— 游戏的按键路由挂在
@@ -48,6 +50,8 @@ const ICONS = Object.freeze({
   guess: SVG('<circle cx="8" cy="8" r="5.2" stroke-dasharray="2.2 2"/>'),
   play: SVG('<path d="M5.2 3.6v8.8L12.4 8z" fill="currentColor" fill-opacity=".85"/>'),
   stop: SVG('<rect x="4.4" y="4.4" width="7.2" height="7.2" fill="currentColor" fill-opacity=".85"/>'),
+  // 飞行观察（2026-10-21）：一架纸飞机
+  fly: SVG('<path d="M2.2 7.4 13.8 2.4 9.6 13.6 7.7 8.5z" fill="currentColor" fill-opacity=".18"/><path d="M7.7 8.5 13.8 2.4"/>'),
   // 地标：杆上一面小旗（2026-10-20）
   landmarks: SVG('<path d="M4.2 13.5V2.6"/><path d="M4.2 3.2h7.6l-2.1 2.7 2.1 2.7H4.2z" fill="currentColor" fill-opacity=".25"/>'),
   // 站位：一条虚线路，尽头一个朝前的小三角（2026-10-20）
@@ -82,7 +86,7 @@ const LAYER_TIPS = Object.freeze({
 });
 const STATUS_TEXT = Object.freeze({ ok: "配置已载入", synced: "配置在外部改过，已同步", error: "配置有错", loading: "正在读配置" });
 
-const KEY_ACTIONS = Object.freeze({ Period: "next", NumpadDecimal: "next", Comma: "prev", KeyM: "map", KeyY: "replay", KeyP: "copy", KeyN: "previz", Escape: "escape" });
+const KEY_ACTIONS = Object.freeze({ Period: "next", NumpadDecimal: "next", Comma: "prev", KeyM: "map", KeyY: "replay", KeyP: "copy", KeyN: "previz", KeyO: "fly", Escape: "escape" });
 
 function El(tag, className = "", text = "") {
   const el = document.createElement(tag);
@@ -196,6 +200,7 @@ export class BlockoutUi {
     // 预演播放中只认 N / Esc（中断）
     if (this.previzActive) { if (action === "previz" || action === "escape") this.Call("onPreviz"); return; }
     if (action === "previz") { if (this.previzAvailable) this.Call("onPreviz"); return; }
+    if (action === "fly") { this.Call("onFly"); return; }
     if (action === "next") this.Call("onNext");
     else if (action === "prev") this.Call("onPrev");
     else if (action === "replay") this.Call("onReplay");
@@ -227,7 +232,27 @@ export class BlockoutUi {
     this.btnPreviz.dataset.tipSide = "left";
     this.btnPreviz.hidden = true;
     this.Listen(this.btnPreviz, "click", () => this.Call("onPreviz"));
-    head.append(titleWrap, this.btnPreviz, this.btnCopy, this.btnSave);
+    this.btnFly = Button("boIconBtn boFlyBtn", { icon: "fly", tip: "飞行观察：穿墙的自由相机，玩家留在原地（O）" });
+    this.btnFly.dataset.tipSide = "left";
+    this.btnFly.setAttribute("aria-pressed", "false");
+    this.Listen(this.btnFly, "click", () => this.Call("onFly"));
+    head.append(titleWrap, this.btnPreviz, this.btnFly, this.btnCopy, this.btnSave);
+
+    // 飞行观察中的那一条：「飞行」标签 + 速度 + 退出；位置 / 朝向；按键提示
+    const flyBar = El("div", "boFlyBar");
+    const flyTop = El("div", "boFlyTop");
+    this.elFlySpeed = El("span", "boFlySpeed");
+    this.btnFlyStop = Button("boIconBtn boFlyStop", { icon: "close", tip: "退出飞行观察（O）" });
+    this.btnFlyStop.dataset.tipSide = "left";
+    this.Listen(this.btnFlyStop, "click", () => this.Call("onFly"));
+    flyTop.append(El("span", "boFlyTag", "飞行"), El("span", "boFlyName", "观察相机"), this.elFlySpeed, this.btnFlyStop);
+    this.elFlyPos = El("div", "boFlyPos");
+    const flyHint = El("div", "boFlyHint");
+    flyHint.append(Kbd("WASD"), El("span", "", "移动"), Kbd("Q"), Kbd("E"), El("span", "", "降 / 升"),
+      Kbd("Shift"), El("span", "", "加速"), El("span", "", "滚轮 调速"), Kbd("O"), El("span", "", "退出"));
+    flyBar.append(flyTop, this.elFlyPos, flyHint);
+    flyBar.hidden = true;
+    this.flyBar = flyBar;
 
     // 预演播放中的那一行：「预演 · 标题」+ 进度条 + 秒数 + 中断按钮
     const bar = El("div", "boPrevizBar");
@@ -272,7 +297,7 @@ export class BlockoutUi {
     this.elGuess.append(gi, this.elGuessText);
     this.elEmpty = El("div", "boEmpty", "没有关键帧");
 
-    card.append(head, what, next, this.elHow, this.elNotes, this.elGuess, this.elEmpty, this.previzBar);
+    card.append(head, what, next, this.elHow, this.elNotes, this.elGuess, this.elEmpty, this.flyBar, this.previzBar);
     this.cardEl = card;
     this.root.appendChild(card);
   }
@@ -409,6 +434,10 @@ export class BlockoutUi {
     this.elKeysPreviz.append(Kbd("N"), El("span", "", "预演"));
     this.elKeysPreviz.hidden = true;
     keys.prepend(this.elKeysPreviz);
+    // 飞行观察的键：永远在（不依赖这一关有没有预演）
+    const keysFly = El("span", "boKeysPreviz boKeysFly");
+    keysFly.append(Kbd("O"), El("span", "", "飞行"));
+    keys.prepend(keysFly);
     side.append(counter, keys);
 
     nav.append(this.btnPrev, wrap, this.btnNext, this.btnReplay, side);
@@ -813,6 +842,25 @@ export class BlockoutUi {
     const k = durationS > 0 ? Math.max(0, Math.min(1, t / durationS)) : 0;
     this.elPrevizFill.style.width = (k * 100).toFixed(2) + "%";
     if (!was) { this.CloseLevelMenu(); this.HideNavTip(); }
+  }
+
+  /**
+   * 飞行观察（§4.3）：active 时按钮亮起、卡片底多一条「飞行 · 速度 · 位置 / 朝向」。
+   * { active, x, y, z, yawDeg, pitchDeg, speedMps, boost }；active:false 收回。
+   */
+  SetFly({ active = false, x = 0, y = 0, z = 0, yawDeg = 0, pitchDeg = 0, speedMps = 0, boost = false } = {}) {
+    this.flyActive = !!active;
+    this.cardEl.classList.toggle("fly", this.flyActive);
+    this.btnFly.classList.toggle("on", this.flyActive);
+    this.btnFly.setAttribute("aria-pressed", this.flyActive ? "true" : "false");
+    this.root.classList.toggle("flyOn", this.flyActive);
+    this.flyBar.hidden = !this.flyActive;
+    if (!this.flyActive) return;
+    const speed = (speedMps < 10 ? speedMps.toFixed(1) : String(Math.round(speedMps))) + " m/s" + (boost ? " ×加速" : "");
+    if (this.elFlySpeed.textContent !== speed) this.elFlySpeed.textContent = speed;
+    const sign = (v) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(0);
+    const pos = "x " + x.toFixed(1) + "  z " + z.toFixed(1) + "  高 " + y.toFixed(1) + "　朝向 " + sign(yawDeg) + "°  俯仰 " + sign(pitchDeg) + "°";
+    if (this.elFlyPos.textContent !== pos) this.elFlyPos.textContent = pos;
   }
 
   /** 过渡中：rate > 1 时显示「快进 ×n」（§5.2）。本方法是对 §4 接口的补充。 */

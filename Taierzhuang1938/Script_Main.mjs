@@ -1027,7 +1027,10 @@ function BlockoutMouseCaptured() {
   return BLOCKOUT && !!blockout?.CapturesMouse?.();
 }
 
-/** 白盒编辑器的预演播放中：玩家站在原地，走动 / 姿态 / 开火 / 键位动作都不吃（预演自己的 N / Esc 在编辑器模块里）。 */
+/**
+ * 白盒编辑器的预演播放中、或飞行观察（O，docs/Data_EditorBlockout.md §4.3）中：玩家站在原地，走动 / 探身 / 姿态 / 开火 / 键位动作都不吃
+ * （预演自己的 N / Esc、飞行的移动键都在编辑器模块里）。
+ */
 function BlockoutInputCaptured() {
   return BLOCKOUT && !!blockout?.CapturesInput?.();
 }
@@ -7159,7 +7162,8 @@ const router = new InputRouter({
     // 滚滚轮会真的切枪 —— 而这两件事在暂停的世界里做，退出编辑器时状态已经错了。
     if (UiCapturing()) return;
     if (action === "cycleSlot" && BlockoutMouseCaptured()) return;
-    if (BlockoutInputCaptured()) return;
+    // 飞行观察中 M 还要能开全关总图（看相机在图上哪儿）；预演中不放行
+    if (BlockoutInputCaptured() && !(action === "map" && blockout?.AllowsMapKey?.())) return;
     if (["crouch", "prone", "traverse"].includes(action) || action.startsWith("stance:")) {
       if (!state.running || state.menu || !player.Alive || meleeCombat?.Active || emplacement?.Mounted) return;
     }
@@ -9041,6 +9045,13 @@ function Frame(dt, render = true) {
     input.forward = 0; input.strafe = 0; input.sprint = false; input.fire = false; input.ads = false;
     input.crouchPressed = false; input.pronePressed = false; input.stanceRequested = null;
   }
+  // 白盒编辑器的飞行观察：鼠标位移转的是飞行相机（走的还是游戏自己的那条输入链：指针锁 / 假后端 / 锁不住时按住右键拖动），
+  // 玩家本人不转头、不探身（Q / E 在飞行里是升降）。灵敏度与玩家转头同一口径。
+  if (BLOCKOUT && blockout?.flying) {
+    const flySens = (input.sensitivity ?? 1) * FREE_AIM.sensitivityScale;
+    blockout.FlyLook(-input.lookX * flySens, -input.lookY * flySens);
+    input.lookX = 0; input.lookY = 0; input.lean = 0;
+  }
   emplacedAds = !!emplacement?.Mounted && !!input.ads && player.Alive;
   if (emplacement?.Mounted) {
     input.forward = 0; input.strafe = 0; input.sprint = false; input.ads = false;
@@ -9376,7 +9387,8 @@ function Frame(dt, render = true) {
   missionRuntime?.Update(dt);
   missionRuntime?.opening.ApplyCamera();
   // 白盒编辑器的预演：玩家相机写完之后接管（docs/Data_EditorBlockout.md §14.2）
-  blockout?.ApplyCamera?.(camera);
+  // 飞行观察时相机可能离玩家很远：阴影框跟着相机走（同炮击扬尘测试场的自由相机）
+  if (blockout?.ApplyCamera?.(camera) && blockout.flying) { camera.getWorldDirection(_forward); lights.UpdateShadowFrustum(camera.position, _forward); }
   // 炮击扬尘测试场的自由观察相机：玩家相机写完之后接管，阴影框跟着相机走（玩家留在原地）。
   if (impactRange?.ApplyCamera(camera)) { camera.getWorldDirection(_forward); lights.UpdateShadowFrustum(camera.position, _forward); }
   profiler.E("story/mission");

@@ -29,11 +29,16 @@ export function BearingText(relDeg) {
   return abs <= 90 ? `${side}前 ${Math.round(abs)}°` : `${side}后 ${Math.round(abs)}°`;
 }
 
-/** URL 里的 pose 参数：x,z,yawDeg,pitchDeg,stance（米 / 度，两位、一位小数）。 */
+/**
+ * URL 里的 pose 参数：x,z,yawDeg,pitchDeg,stance（米 / 度，两位、一位小数）。
+ * 飞行观察（§4.3）复制出来的多一个第 6 项：相机离地的绝对高度 flyY（米，两位小数）——打开后玩家落在 x,z，再从这个高度起飞。
+ */
 export function PoseParam(pose) {
   if (!pose || !Num(pose.x) || !Num(pose.z)) return "";
   const stance = STANCES.includes(pose.stance) ? pose.stance : "stand";
-  return [RoundTo(pose.x, 2), RoundTo(pose.z, 2), RoundTo(WrapDeg(pose.yawDeg || 0), 1), RoundTo(pose.pitchDeg || 0, 1), stance].join(",");
+  const parts = [RoundTo(pose.x, 2), RoundTo(pose.z, 2), RoundTo(WrapDeg(pose.yawDeg || 0), 1), RoundTo(pose.pitchDeg || 0, 1), stance];
+  if (Num(pose.flyY)) parts.push(RoundTo(pose.flyY, 2));
+  return parts.join(",");
 }
 
 /** PoseParam 的反向；不合法 → null（不认的就当没给，照常落在关键帧机位）。 */
@@ -45,6 +50,7 @@ export function ParsePoseParam(text) {
   if (!Num(x) || !Num(z)) return null;
   const pose = { x, z, yawDeg: Num(yaw) ? WrapDeg(yaw) : 0, pitchDeg: Num(pitch) ? Math.max(-89, Math.min(89, pitch)) : 0, stance: "stand" };
   if (STANCES.includes(parts[4])) pose.stance = parts[4];
+  if (parts.length >= 6 && parts[5] !== "" && Num(Number(parts[5]))) pose.flyY = Number(parts[5]);
   return pose;
 }
 
@@ -99,7 +105,7 @@ export function BuildBlockoutSnapshot(input) {
       const url = new URL(input.url);
       url.searchParams.delete("pose");
       url.hash = "";
-      reproduce = `${url.toString()}${url.search ? "&" : "?"}pose=${PoseParam(player)}`;
+      reproduce = `${url.toString()}${url.search ? "&" : "?"}pose=${PoseParam(input.fly ? { ...player, flyY: player.eyeY } : player)}`;
     } catch { reproduce = ""; }
   }
   return {
@@ -111,6 +117,12 @@ export function BuildBlockoutSnapshot(input) {
       offsetM: kfPlayer ? Dist(kfPlayer.x, kfPlayer.z) : null,
     } : null,
     next, player, aim,
+    // 飞行观察（§4.3）：player 是飞行相机的位姿，玩家本人的位置另记在这里；没飞行时没有这个字段
+    ...(input.fly ? { fly: { body: input.fly.body ? {
+      x: RoundTo(input.fly.body.x, 2), y: RoundTo(input.fly.body.y, 2), z: RoundTo(input.fly.body.z, 2),
+      yawDeg: RoundTo(WrapDeg(input.fly.body.yawDeg || 0), 1), pitchDeg: RoundTo(input.fly.body.pitchDeg || 0, 1),
+      stance: STANCES.includes(input.fly.body.stance) ? input.fly.body.stance : "stand",
+    } : null } } : {}),
     near: near.slice(0, nearMax),
     nearMore: Math.max(0, near.length - nearMax),
     map: input.map?.open ? { open: true, cx: RoundTo(input.map.cx, 1), cz: RoundTo(input.map.cz, 1), spanM: RoundTo(input.map.spanM, 0) } : null,
@@ -146,7 +158,14 @@ export function FormatBlockoutSnapshot(snap) {
     lines.push("关键帧：（没有）");
   }
   const p = snap.player;
-  lines.push(`我现在：x ${Fixed(p.x, 2)}  y ${Fixed(p.y, 2)}  z ${Fixed(p.z, 2)}${kf?.offsetM != null ? `（离关键帧机位 ${Fixed(kf.offsetM, 1)} m）` : ""}　朝向 ${Signed(p.yawDeg, 1)}°　俯仰 ${Signed(p.pitchDeg, 1)}°　${STANCE_TEXT[p.stance] || p.stance}　眼睛 y ${Fixed(p.eyeY, 2)}`);
+  if (snap.fly) {
+    // 飞行观察：「我现在」写的是飞行相机（没有脚，y 就是相机高度），玩家本人没动
+    lines.push(`我现在（飞行观察相机）：x ${Fixed(p.x, 2)}  y ${Fixed(p.y, 2)}  z ${Fixed(p.z, 2)}${kf?.offsetM != null ? `（离关键帧机位 ${Fixed(kf.offsetM, 1)} m）` : ""}　朝向 ${Signed(p.yawDeg, 1)}°　俯仰 ${Signed(p.pitchDeg, 1)}°`);
+    const b = snap.fly.body;
+    if (b) lines.push(`　玩家本人没动：x ${Fixed(b.x, 2)}  z ${Fixed(b.z, 2)}　朝向 ${Signed(b.yawDeg, 1)}°　${STANCE_TEXT[b.stance] || b.stance}`);
+  } else {
+    lines.push(`我现在：x ${Fixed(p.x, 2)}  y ${Fixed(p.y, 2)}  z ${Fixed(p.z, 2)}${kf?.offsetM != null ? `（离关键帧机位 ${Fixed(kf.offsetM, 1)} m）` : ""}　朝向 ${Signed(p.yawDeg, 1)}°　俯仰 ${Signed(p.pitchDeg, 1)}°　${STANCE_TEXT[p.stance] || p.stance}　眼睛 y ${Fixed(p.eyeY, 2)}`);
+  }
   const aim = snap.aim;
   if (aim.kind === "block") {
     const name = [aim.id, aim.semantic && aim.semantic !== aim.id ? aim.semantic : "", aim.tag && !aim.id ? aim.tag : ""].filter(Boolean).join(" / ") || "一块白盒";
@@ -160,7 +179,7 @@ export function FormatBlockoutSnapshot(snap) {
     lines.push(`附近 30 m：${snap.near.map(NearText).join("；")}${snap.nearMore ? `；另有 ${snap.nearMore} 个没列` : ""}`);
   }
   if (snap.map) lines.push(`全关总图开着：中心 x ${Fixed(snap.map.cx, 1)}  z ${Fixed(snap.map.cz, 1)}，横向约 ${Fixed(snap.map.spanM, 0)} m`);
-  if (snap.reproduce) lines.push(`重现这个机位：${snap.reproduce}`);
+  if (snap.reproduce) lines.push(`重现这个机位${snap.fly ? "（打开后进飞行观察，相机在这个高度）" : ""}：${snap.reproduce}`);
   lines.push("口径：x 向东为正、z 向南为正（米）；朝向 0°=北、+90°=西；俯仰正=抬头；「左 23°」= 要往左转 23° 才正对。格式见 Taierzhuang1938/docs/Data_EditorBlockout.md §4.2");
   lines.push(`${SNAPSHOT_DATA_PREFIX}${JSON.stringify(snap)}`);
   return lines.join("\n");

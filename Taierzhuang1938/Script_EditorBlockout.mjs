@@ -13,6 +13,10 @@
 //   预演（§14，Script_EditorBlockoutPreviz）：读 Blockout/<Level>.previz.json（404 = 没有），卡片上的「预演」按钮或 N 播，
 //   播放中相机经 ApplyCamera 归预演、鼠标与 WASD 归预演（CapturesMouse / CapturesInput）、3D 标记与头顶标签藏起来、
 //   导航栏与翻关键帧的键不响应；N / Esc 中断，播完 / 中断按 then 跳关键帧。
+//   飞行观察（testFly，§4.3，2026-10-21）：O（或卡片上的按钮）进 / 出一台不受碰撞的自由相机；
+//   WASD 沿视线前后左右、E 升 Q 降、Shift 加速、滚轮调速；玩家本人原地不动（走动 / 开火 / 跳 / 换枪一律不吃）；
+//   进入时从当前视角起飞，退出时相机自然回到玩家的位置与朝向；预演开始时自动退出，预演中不让进。
+//   小地图 / 全关总图画出相机的位置与朝向；「复制当前位置」（P）复制的是飞行相机的位姿。
 //
 // 界面（Script_EditorBlockoutUi）与纸面俯视图（Script_EditorBlockoutMap）只走 §4 / §4.1 的接口；
 // 全关总图上的鼠标（滚轮缩放、拖动平移、双击看全图、点关键帧）归地图模块，点选经 onMapPick 回到这里。
@@ -69,6 +73,30 @@ export const BLOCKOUT_EDITOR = Object.freeze({
   firstBakeDelayMs: 1500,
   firstBakeMinFrames: 30,
 });
+
+/**
+ * 飞行观察（§4.3）。键码集中在这里：O 进 / 出（游戏与编辑器没人绑 O）；飞行中玩家的键位动作整张表闸掉，
+ * 所以 Q / E（平时是左右探身）、Shift（平时是冲刺）可以借来当升降与加速。
+ */
+export const BLOCKOUT_FLY = Object.freeze({
+  toggleKey: "KeyO",
+  toggleKeyLabel: "O",
+  forwardKey: "KeyW", backKey: "KeyS", leftKey: "KeyA", rightKey: "KeyD",
+  upKey: "KeyE", downKey: "KeyQ",
+  boostKeys: Object.freeze(["ShiftLeft", "ShiftRight"]),
+  speedMps: 8,
+  minMps: 0.5,
+  maxMps: 400,
+  boostScale: 4,
+  // 滚轮一格（deltaY 100）速度 ×1.25（向上滚变快、向下滚变慢）；一次事件最多算三格
+  wheelStep: 1.25,
+  wheelMaxNotches: 3,
+  maxPitchDeg: 89.5,
+  // 唯一一道限制：不低于地面（高度场）这么多，免得钻到地底下什么也看不见；墙、体块一概穿过去
+  minAboveGroundM: 0.15,
+});
+const FLY_HELD_KEYS = new Set([BLOCKOUT_FLY.forwardKey, BLOCKOUT_FLY.backKey, BLOCKOUT_FLY.leftKey, BLOCKOUT_FLY.rightKey,
+  BLOCKOUT_FLY.upKey, BLOCKOUT_FLY.downKey, ...BLOCKOUT_FLY.boostKeys]);
 
 function WrapDeg(deg) { let d = ((deg + 180) % 360 + 360) % 360 - 180; if (d === -180) d = 180; return d; }
 function Round(value, digits) { const k = 10 ** digits; return Math.round(value * k) / k; }
@@ -187,6 +215,11 @@ export class EditorBlockout {
     this.bakeWait = null;
     this.bake = { startedAt: null, doneAt: null, levelKey: null };
     this._cam = new THREE.Vector3();
+    // 飞行观察（§4.3）：相机位姿自己存（yaw / pitch 弧度，约定同玩家：yaw 正 = 往左转），玩家本人不碰
+    this.fly = {
+      active: false, pos: new THREE.Vector3(), yaw: 0, pitch: 0, speed: BLOCKOUT_FLY.speedMps,
+      keys: new Set(), origin: null, hudKey: "", entered: 0,
+    };
     this.groundAt = (x, z) => {
       const field = this.game.battlefield;
       if (!field) return 0;
@@ -232,6 +265,7 @@ export class EditorBlockout {
       onCloseMap: () => { this.ToggleMap(false); },
       onMapPick: (index) => { if (!this.previz?.playing) this.GoTo(index, { animate: false }); },
       onPreviz: () => { this.previz.Toggle(); },
+      onFly: () => { this.ToggleFly(); },
     });
     // 高级工具的独立音量（Script_EditorVolume，2026-10-20）：白盒编辑器也是高级工具里的工具，用同一份，右上角一条
     if (host.audio?.SetToolsVolume) {
@@ -277,6 +311,11 @@ export class EditorBlockout {
       // 取证用（2026-10-20）：这一关的地标（已归一化）与此刻挂在屏幕上的标签文字（按层）
       Landmarks: () => this.landmarks.map(lm => ({ ...lm })),
       Labels: () => this.markers.LabelInfo(),
+      // 飞行观察（§4.3，2026-10-21）：Fly(on?) 进 / 出（不给 = 切换；on 为真时可带机位 {x,y,z,yawDeg,pitchDeg}）→ FlyState；
+      // FlyState() 读现状；FlyPose(pose) 把飞行相机摆到任意机位（要在飞行中）。
+      Fly: (on, pose) => this.ToggleFly(on, pose),
+      FlyState: () => this.FlyState(),
+      FlyPose: (pose) => this.SetFlyPose(pose),
     };
     // 预演（§14.2）：Has / Play / Stop / Seek / Resume / State；Reload 重读预演文件，CameraPose 取某一秒的机位。
     this.api.Previz = {
@@ -315,7 +354,12 @@ export class EditorBlockout {
     let index = kf != null ? KeyframeIndex(this.doc, kf) : 0;
     if (index < 0) index = 0;
     await this.GoTo(index, { animate: false });
-    if (pose) { this.PlacePlayer(pose); this.UpdateCard(true); }
+    if (pose) {
+      this.PlacePlayer(pose);
+      // 飞行观察复制出来的链接多一个相机高度（§4.3）：玩家落在相机正下方，再从那个高度起飞
+      if (Number.isFinite(pose.flyY)) this.EnterFly({ x: pose.x, y: pose.flyY, z: pose.z, yawDeg: pose.yawDeg, pitchDeg: pose.pitchDeg }, { quiet: true });
+      this.UpdateCard(true);
+    }
     this.ready = true;
     this.pollTimer = setInterval(() => { this.Poll(); }, BLOCKOUT_EDITOR.pollS * 1000);
     // 存档口只问一次：界面要写明「这里能不能直接存」。
@@ -579,6 +623,7 @@ export class EditorBlockout {
     const run = (async () => {
       this.ResolvePending(false);
       this.previz.Stop({ restore: false });
+      this.ExitFly({ quiet: true });
       this.ui.SetStatus({ state: "loading", message: "正在切换关卡", writable: !!this.writable, saveReason: this.saveReason || "" });
       this.puppets.Apply([]);
       this.markers.SetUnits([]);
@@ -916,6 +961,7 @@ export class EditorBlockout {
     if (locked !== this.locked) { this.locked = locked; this.ui.SetInteractive(!locked); }
     // 预演先摆这一帧的演员状态，演员层再按它出姿势；慢动作里演员的动画 dt 跟预演时钟一起缩（TimeScale < 1）
     this.previz.Update(dt);
+    this.UpdateFly(dt);
     this.UpdatePosedStance();
     this.trees.Sync(game.battlefield.layout);
     if (this.backdrop.Sync(game.battlefield.layout)) this.host.post?.whiteboxScene?.Invalidate?.();
@@ -992,6 +1038,8 @@ export class EditorBlockout {
     if (!kf || !player) return;
     this.map.SetDynamic({
       player: { x: player.position.x, z: player.position.z, yawDeg: player.yaw / DEG },
+      // 飞行观察：相机的位置与朝向（小地图改以它为中心，§4.3）
+      fly: this.fly.active ? { x: this.fly.pos.x, z: this.fly.pos.z, yawDeg: this.fly.yaw / DEG } : null,
       units: this.liveUnits,
       pois: kf.pois,
       next: kf.next && Number.isFinite(kf.next.x) ? kf.next : null,
@@ -1037,13 +1085,176 @@ export class EditorBlockout {
   CapturesMouse() { return this.mapOpen || !!this.previz?.playing; }
 
   /** Script_Main 问：走动 / 姿态 / 开火的键是不是归编辑器（预演播放中玩家站在原地）。 */
-  CapturesInput() { return !!this.previz?.playing; }
+  CapturesInput() { return !!this.previz?.playing || this.fly.active; }
 
-  /** Script_Main 在玩家相机写完之后调：预演播放中相机归预演。→ true = 这一帧接管了。 */
-  ApplyCamera(camera) { return this.previz?.ApplyCamera(camera) || false; }
+  /** Script_Main 问：现在是不是飞行观察（鼠标位移转的是飞行相机，不是玩家；阴影框跟着相机走）。 */
+  get flying() { return this.fly.active; }
+
+  /** Script_Main 问：键位动作 `map`（M）在输入被编辑器接管时还放不放行 —— 飞行中放行（要看相机在图上哪儿），预演中不放。 */
+  AllowsMapKey() { return this.fly.active && !this.previz?.playing; }
+
+  /** Script_Main 在玩家相机写完之后调：预演播放中相机归预演，飞行观察中归飞行相机。→ true = 这一帧接管了。 */
+  ApplyCamera(camera) {
+    if (this.previz?.ApplyCamera(camera)) return true;
+    return this.fly.active ? this.ApplyFlyCamera(camera) : false;
+  }
+
+  // -------------------------------------------------------------------------
+  // 飞行观察（testFly，§4.3，2026-10-21）
+
+  /**
+   * 进 / 出飞行观察；on 不给 = 切换。进的时候可带机位 {x, y, z, yawDeg, pitchDeg}（不给 = 从当前视角起飞）。→ FlyState()
+   * 规则：预演播放中不让进（相机归预演）；预演开始 / 切关时自动退出。
+   */
+  ToggleFly(on, pose) {
+    const want = on === undefined ? !this.fly.active : !!on;
+    if (want && !this.fly.active) this.EnterFly(pose);
+    else if (!want && this.fly.active) this.ExitFly();
+    else if (want && pose) this.SetFlyPose(pose);
+    return this.FlyState();
+  }
+
+  /** → true = 现在在飞行中。 */
+  EnterFly(pose = null, { quiet = false } = {}) {
+    const f = this.fly;
+    if (f.active) return true;
+    if (!this.started || !this.doc || this.rebuilding || this.switching) return false;
+    if (this.previz?.playing) {
+      if (!quiet) this.ui.Toast("预演播放中不能飞行观察：先按 N 或 Esc 中断", "warn");
+      return false;
+    }
+    const camera = this.host.camera, player = this.game.player;
+    const eye = camera.getWorldPosition(new THREE.Vector3());
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    const yaw0 = Math.atan2(-dir.x, -dir.z), pitch0 = Math.asin(Math.max(-1, Math.min(1, dir.y)));
+    f.origin = {
+      camera: { x: eye.x, y: eye.y, z: eye.z, yawDeg: yaw0 / DEG, pitchDeg: pitch0 / DEG },
+      player: player ? { x: player.position.x, y: player.position.y, z: player.position.z, yawDeg: player.yaw / DEG, pitchDeg: player.pitch / DEG, stance: player.stance } : null,
+    };
+    f.active = true;
+    f.keys.clear();
+    f.entered += 1;
+    f.hudKey = "";
+    f.pos.copy(eye); f.yaw = yaw0; f.pitch = pitch0;
+    if (pose) this.SetFlyPose(pose);
+    // 相机离开玩家：第一人称枪模藏起来（退出时还回去）
+    this.host.SetViewmodelVisible?.(false);
+    this.mapTimer = 0;
+    this.UpdateFlyHud(true);
+    if (!quiet) this.ui.Toast(`飞行观察：${BLOCKOUT_FLY.toggleKeyLabel} 退出，玩家留在原地`, "info");
+    return true;
+  }
+
+  /** 退出：玩家这几帧一直没动，下一帧 Script_Main 就把相机写回玩家的位置与朝向，这里不用还原什么。 */
+  ExitFly({ quiet = false } = {}) {
+    const f = this.fly;
+    if (!f.active) return false;
+    f.active = false;
+    f.keys.clear();
+    if (!this.previz?.playing) this.host.SetViewmodelVisible?.(true);
+    this.ui.SetFly({ active: false });
+    f.hudKey = "";
+    this.mapTimer = 0;
+    if (!quiet) this.ui.Toast("已回到玩家视角", "info");
+    return true;
+  }
+
+  /** 把飞行相机摆到 {x, y, z, yawDeg, pitchDeg}（缺 y 用当前高度）。要在飞行中。 */
+  SetFlyPose(pose) {
+    const f = this.fly;
+    if (!f.active || !pose) return this.FlyState();
+    if (Number.isFinite(pose.x)) f.pos.x = pose.x;
+    if (Number.isFinite(pose.y)) f.pos.y = pose.y;
+    if (Number.isFinite(pose.z)) f.pos.z = pose.z;
+    if (Number.isFinite(pose.yawDeg)) f.yaw = pose.yawDeg * DEG;
+    if (Number.isFinite(pose.pitchDeg)) f.pitch = Math.max(-BLOCKOUT_FLY.maxPitchDeg, Math.min(BLOCKOUT_FLY.maxPitchDeg, pose.pitchDeg)) * DEG;
+    this.mapTimer = 0;
+    return this.FlyState();
+  }
+
+  /** Script_Main 把这一帧的鼠标位移（已乘灵敏度，弧度；右 / 下为负）交过来：转的是飞行相机，不是玩家。 */
+  FlyLook(dyaw, dpitch) {
+    const f = this.fly;
+    if (!f.active) return;
+    f.yaw += dyaw;
+    const limit = BLOCKOUT_FLY.maxPitchDeg * DEG;
+    f.pitch = Math.max(-limit, Math.min(limit, f.pitch + dpitch));
+  }
+
+  /** 滚轮调速：deltaY 100 = 一格，向上滚（负）变快、向下滚变慢，一次事件最多三格。→ 新速度（m/s）。 */
+  FlyWheel(deltaY) {
+    const f = this.fly;
+    if (!f.active || !Number.isFinite(deltaY) || deltaY === 0) return f.speed;
+    const notches = Math.max(-BLOCKOUT_FLY.wheelMaxNotches, Math.min(BLOCKOUT_FLY.wheelMaxNotches, -deltaY / 100));
+    f.speed = Math.max(BLOCKOUT_FLY.minMps, Math.min(BLOCKOUT_FLY.maxMps, f.speed * BLOCKOUT_FLY.wheelStep ** notches));
+    this.UpdateFlyHud(true);
+    return f.speed;
+  }
+
+  /** 每帧：按住的键推相机（沿视线前后、横向左右、世界竖直升降），不查碰撞，只留一道地面下限。 */
+  UpdateFly(dt) {
+    const f = this.fly;
+    if (!f.active) return;
+    const h = f.keys;
+    const forward = (h.has(BLOCKOUT_FLY.forwardKey) ? 1 : 0) - (h.has(BLOCKOUT_FLY.backKey) ? 1 : 0);
+    const strafe = (h.has(BLOCKOUT_FLY.rightKey) ? 1 : 0) - (h.has(BLOCKOUT_FLY.leftKey) ? 1 : 0);
+    const rise = (h.has(BLOCKOUT_FLY.upKey) ? 1 : 0) - (h.has(BLOCKOUT_FLY.downKey) ? 1 : 0);
+    if (forward || strafe || rise) {
+      const boost = BLOCKOUT_FLY.boostKeys.some(code => h.has(code));
+      const step = f.speed * (boost ? BLOCKOUT_FLY.boostScale : 1) * Math.max(0, dt);
+      const cp = Math.cos(f.pitch), sp = Math.sin(f.pitch), sy = Math.sin(f.yaw), cy = Math.cos(f.yaw);
+      f.pos.x += (-sy * cp * forward + cy * strafe) * step;
+      f.pos.y += (sp * forward + rise) * step;
+      f.pos.z += (-cy * cp * forward - sy * strafe) * step;
+    }
+    const floor = this.groundAt(f.pos.x, f.pos.z) + BLOCKOUT_FLY.minAboveGroundM;
+    if (f.pos.y < floor) f.pos.y = floor;
+    this.UpdateFlyHud(false);
+  }
+
+  /** 写相机（Script_Main 在玩家相机写完之后调）。 */
+  ApplyFlyCamera(camera) {
+    const f = this.fly;
+    camera.position.copy(f.pos);
+    camera.rotation.order = "YXZ";
+    camera.rotation.set(f.pitch, f.yaw, 0);
+    camera.updateMatrixWorld(true);
+    return true;
+  }
+
+  /** 卡片里的飞行条：位置 / 朝向 / 速度，变了才碰 DOM（0.1 m、1°）。 */
+  UpdateFlyHud(force) {
+    const f = this.fly;
+    if (!f.active) return;
+    const boost = BLOCKOUT_FLY.boostKeys.some(code => f.keys.has(code));
+    const key = [f.pos.x.toFixed(1), f.pos.y.toFixed(1), f.pos.z.toFixed(1), Math.round(f.yaw / DEG), Math.round(f.pitch / DEG), f.speed.toFixed(2), boost ? 1 : 0].join("|");
+    if (!force && key === f.hudKey) return;
+    f.hudKey = key;
+    this.ui.SetFly({ active: true, x: f.pos.x, y: f.pos.y, z: f.pos.z, yawDeg: WrapDeg(f.yaw / DEG), pitchDeg: f.pitch / DEG, speedMps: f.speed, boost });
+  }
+
+  /** 取证 / 测试用：飞行现状。camera 是 Three 相机此刻真正的位姿（和 x / y / z 对照能看出有没有被别的东西抢走）。 */
+  FlyState() {
+    const f = this.fly;
+    const player = this.game.player;
+    const camera = this.host.camera;
+    const eye = camera.getWorldPosition(new THREE.Vector3());
+    const dir = camera.getWorldDirection(new THREE.Vector3());
+    return {
+      active: f.active, key: BLOCKOUT_FLY.toggleKey,
+      x: f.pos.x, y: f.pos.y, z: f.pos.z, yawDeg: WrapDeg(f.yaw / DEG), pitchDeg: f.pitch / DEG,
+      speedMps: f.speed, boost: BLOCKOUT_FLY.boostKeys.some(code => f.keys.has(code)), keys: [...f.keys], entered: f.entered,
+      origin: f.origin ? JSON.parse(JSON.stringify(f.origin)) : null,
+      player: player ? { x: player.position.x, y: player.position.y, z: player.position.z, yawDeg: player.yaw / DEG, pitchDeg: player.pitch / DEG, stance: player.stance } : null,
+      camera: { x: eye.x, y: eye.y, z: eye.z, yawDeg: Math.atan2(-dir.x, -dir.z) / DEG, pitchDeg: Math.asin(Math.max(-1, Math.min(1, dir.y))) / DEG },
+      canEnter: !this.previz?.playing && !this.rebuilding && !this.switching, previz: !!this.previz?.playing,
+    };
+  }
 
   // ---- 预演的界面钩子（Script_EditorBlockoutPreviz 调） ----
   OnPrevizStart(run) {
+    // 预演要相机：飞行观察先收（§4.3）
+    this.ExitFly({ quiet: true });
     this.ToggleMap(false);
     this.markers.SetHidden?.(true);
     this.labelRoot.style.display = "none";
@@ -1068,7 +1279,7 @@ export class EditorBlockout {
 
   /** 全关总图对准玩家当前位置：比例用上次留下的，没有就让短边看到约 MAP_FOCUS_SPAN_M 米。 */
   FocusMapOnPlayer() {
-    const p = this.game.player?.position;
+    const p = this.fly.active ? this.fly.pos : this.game.player?.position;
     if (!p) { this.map.FitBounds(); return; }
     const canvas = this.ui.fullCanvas;
     const short = Math.min(canvas?.clientWidth || 1000, canvas?.clientHeight || 700);
@@ -1079,10 +1290,19 @@ export class EditorBlockout {
 
   BindKeys() {
     this.onKeyDown = (event) => {
-      if (!this.ready || event.repeat) return;
+      if (!this.ready) return;
       const target = event.target;
       if (target && /^(INPUT|SELECT|TEXTAREA)$/.test(target.tagName || "")) return;
       if (this.host.launcherOpen) return;
+      // 飞行观察：移动 / 升降 / 加速的键只记按住状态（长按的自动重复无所谓）
+      if (this.fly.active && FLY_HELD_KEYS.has(event.code) && !event.ctrlKey && !event.metaKey && !event.altKey) this.fly.keys.add(event.code);
+      if (event.repeat) return;
+      // 飞行观察：O 进 / 出；预演中不让进（要先 N / Esc 中断）
+      if (event.code === BLOCKOUT_FLY.toggleKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        this.ToggleFly();
+        return;
+      }
       // 预演：N 播 / 中断，Esc 中断；播放中翻关键帧、重播、复制位置、地图的键都不理
       if (event.code === PREVIZ_KEY && !event.ctrlKey && !event.metaKey && !event.altKey) {
         if (this.previz.playing || this.previz.Has()) { event.preventDefault(); this.previz.Toggle(); }
@@ -1099,6 +1319,14 @@ export class EditorBlockout {
       else if (event.code === "Escape" && this.mapOpen) { event.preventDefault(); this.ToggleMap(false); }
     };
     document.addEventListener("keydown", this.onKeyDown);
+    // 飞行观察的按住状态：松键 / 窗口失焦（收不到 keyup）都要清，免得相机自己一直飞
+    this.onKeyUp = (event) => { this.fly.keys.delete(event.code); };
+    this.onBlur = () => { this.fly.keys.clear(); };
+    // 滚轮调速：挂 document（编辑器界面上的滚轮已被界面自己拦下，不会到这里）；全关总图开着时滚轮归地图
+    this.onWheel = (event) => { if (this.fly.active && !this.mapOpen && !this.previz?.playing) this.FlyWheel(event.deltaY); };
+    document.addEventListener("keyup", this.onKeyUp);
+    window.addEventListener("blur", this.onBlur);
+    document.addEventListener("wheel", this.onWheel, { passive: true });
   }
 
   // 全关总图的鼠标（滚轮缩放、拖动平移、双击看全图、点关键帧）归地图模块（§4.1）：
@@ -1240,19 +1468,24 @@ export class EditorBlockout {
     const player = this.game.player, kf = this.keyframe;
     if (!player || !this.doc) return null;
     const camera = this.host.camera;
-    const eye = camera.getWorldPosition(new THREE.Vector3());
-    const dir = camera.getWorldDirection(new THREE.Vector3());
+    // 飞行观察（§4.3）：复制的是飞行相机的位姿（直接读飞行状态，不等相机下一帧才转过去）；玩家本人另记在 fly.body
+    const fly = this.fly.active ? this.fly : null;
+    const eye = fly ? fly.pos.clone() : camera.getWorldPosition(new THREE.Vector3());
+    const dir = fly
+      ? new THREE.Vector3(-Math.sin(fly.yaw) * Math.cos(fly.pitch), Math.sin(fly.pitch), -Math.cos(fly.yaw) * Math.cos(fly.pitch))
+      : camera.getWorldDirection(new THREE.Vector3());
     const canvas = this.ui.fullCanvas, view = this.map.view;
+    const body = { x: player.position.x, y: player.position.y, z: player.position.z, yawDeg: player.yaw / DEG, pitchDeg: player.pitch / DEG, stance: player.stance };
     return BuildBlockoutSnapshot({
       level: { key: this.levelKey, label: this.level?.label || this.doc.title || "", configPath: BlockoutConfigPath(this.levelKey) },
       keyframe: kf ? {
         id: kf.id, index: this.index, count: this.doc.keyframes.length, stage: kf.stage, stageTitle: kf.stageTitle,
         name: kf.name, what: kf.what, next: kf.next || null, player: kf.player,
       } : null,
-      player: {
-        x: player.position.x, y: player.position.y, z: player.position.z, eyeY: eye.y,
-        yawDeg: player.yaw / DEG, pitchDeg: player.pitch / DEG, stance: player.stance,
-      },
+      player: fly
+        ? { x: eye.x, y: eye.y, z: eye.z, eyeY: eye.y, yawDeg: WrapDeg(fly.yaw / DEG), pitchDeg: fly.pitch / DEG, stance: "stand" }
+        : { x: body.x, y: body.y, z: body.z, eyeY: eye.y, yawDeg: body.yawDeg, pitchDeg: body.pitchDeg, stance: body.stance },
+      fly: fly ? { body } : null,
       aim: this.AimHit(eye, dir),
       units: this.liveUnits.filter(u => u.visible !== false),
       pois: kf?.pois || [],
@@ -1270,7 +1503,7 @@ export class EditorBlockout {
     const method = await WriteClipboard(text);
     const where = (snap.keyframe?.id ? snap.keyframe.id + "，" : "") + "x " + snap.player.x.toFixed(1) + "  z " + snap.player.z.toFixed(1);
     if (method) {
-      this.ui.Toast("已复制当前位置（" + where + "），直接粘贴给 agent", "ok");
+      this.ui.Toast((snap.fly ? "已复制飞行相机的位置（" : "已复制当前位置（") + where + "），直接粘贴给 agent", "ok");
     } else {
       this.ReleasePointerLock();
       this.ui.ShowCopyText(text);
@@ -1292,7 +1525,7 @@ export class EditorBlockout {
       layers: { ...this.layers }, signals: [...(this.signals || [])], syncCount: this.syncCount,
       syncRejected: this.syncRejected, lastSyncMs: this.lastSyncMs, staleConfig: this.staleConfig,
       revision: this.revision ?? null, saving: this.saving,
-      lastPlan: this.lastPlan || null, writable: this.writable, previz: !!this.previz?.playing,
+      lastPlan: this.lastPlan || null, writable: this.writable, previz: !!this.previz?.playing, fly: this.fly.active,
     };
   }
 
@@ -1316,6 +1549,10 @@ export class EditorBlockout {
     clearInterval(this.pollTimer);
     clearTimeout(this.syncedTimer);
     document.removeEventListener("keydown", this.onKeyDown);
+    document.removeEventListener("keyup", this.onKeyUp);
+    window.removeEventListener("blur", this.onBlur);
+    document.removeEventListener("wheel", this.onWheel);
+    this.ExitFly({ quiet: true });
     this.previz.Dispose();
     this.ResolvePending(false);
     this.puppets.Dispose();

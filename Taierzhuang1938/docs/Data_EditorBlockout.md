@@ -268,7 +268,7 @@ export function NormalizeRide(ride);                // → { on, x, z, y, yawDeg
 
 - 游戏 HUD：编辑器模式给 `body` 加 `blockoutMode` 类，隐藏任务字、简报卡、字幕、旧小地图、人数池等；保留准星、弹药、受伤反馈。
 - 指针锁：锁定时编辑器界面可见但不可点（`pointer-events:none`）；Esc 解锁后可点；点 3D 画面重新锁定（现有逻辑）。窗口不给锁（Claude 桌面应用的内置浏览器面板会报 `SecurityError` / `WrongDocumentError`「root document … not valid for pointer lock」）时，`Script_Main` 改成**按住右键拖动转视角**、左键照常开枪，提示一次 `hud.hint.dragLook`；正常浏览器不受影响。**只有在画面上点击发起的抢锁被这样拒才退化**：普通 Edge 窗口不在系统前台时抢锁也报一字不差的同一句（2026-10-21 有头 Edge 实测；编辑器开机那一下、Alt / Esc 松开、1.3 s 重抢都可能撞上），以前一次就永久退成右键拖动、之后点画面也不再抢锁。退化之后每次点击仍顺手再要一次锁，要到了就回到正常锁定。编辑器 DOM 上的 `mousedown`/`wheel`/`keydown` 必须 `stopPropagation`，否则会触发抢锁、滚轮换枪。
-- 按键（锁定 / 未锁定都有效）：`.` 下一个（带过渡动画）、`,` 上一个（直接到位）、`M` 全关总图（替代原 M 小地图）、`Y` 重播进入当前关键帧的过渡、`P` 复制当前位置（§4.2）、`N` 播 / 中断当前关键帧的预演（§14，2026-10-18；`V` 是近战键）。不得占用 `KEYMAP` 已绑的键。
+- 按键（锁定 / 未锁定都有效）：`.` 下一个（带过渡动画）、`,` 上一个（直接到位）、`M` 全关总图（替代原 M 小地图）、`Y` 重播进入当前关键帧的过渡、`P` 复制当前位置（§4.2）、`N` 播 / 中断当前关键帧的预演（§14，2026-10-18；`V` 是近战键）、`O` 进 / 出飞行观察（§4.3，2026-10-21）。不得占用 `KEYMAP` 已绑的键。
 
 ```js
 export class BlockoutUi {
@@ -293,7 +293,7 @@ export class BlockoutUi {
 
 - 底：米黄纸色（`#e6dfcd` 一带）+ 轻微山体阴影 + 1 m 细等高线、5 m 粗等高线；有 `naturalHeight` 时，开挖处（地面低于自然地面 0.25 m 以上：沟、下沉路）用淡褐色水洗。
 - 块：按 `ry` 旋转画脚印；房屋 / 墙用深墨色，矮掩体（cover、高 ≤ 1.4 m）用中灰，`airWall` / `void` / `coping` 与 0.35 m 以下的碎块不画；水用淡蓝。
-- 标记：敌 = 红三角（尖指朝向）、友 = 蓝圆点 + 朝向短线、百姓 = 绿点、战车 = 红色旋转矩形、担架 / 车 = 蓝色小矩形；射界 = 半透明扇形（同阵营色）；去向 = 虚线箭头；POI = 金色菱形；下一步目标 = 金色圆环；玩家 = 金色箭头 + 视锥；推测位置 = 虚线圈。
+- 标记：敌 = 红三角（尖指朝向）、友 = 蓝圆点 + 朝向短线、百姓 = 绿点、战车 = 红色旋转矩形、担架 / 车 = 蓝色小矩形；射界 = 半透明扇形（同阵营色）；去向 = 虚线箭头；POI = 金色菱形；下一步目标 = 金色圆环；玩家 = 金色箭头 + 视锥；飞行观察相机（§4.3）= 青色圆 + 朝向小三角 + 青色视锥，到玩家本人拉一条淡虚线；推测位置 = 虚线圈。
 - 静态层（地面 + 块）每关只烘一次，分块在空闲帧里做，切关缓存；小地图每次刷新 = 一次 `drawImage` + 动态标记，5–10 Hz。
 - 全关总图在放大到 ≥ 4 px/m 时块改用矢量重画，不糊。
 - 只在全关总图的 canvas 元素上挂鼠标监听，**不得往 window 挂监听**。
@@ -304,7 +304,7 @@ export class BlockoutMap {
   SetScene({ levelKey, bounds, blocks /*[{x,z,w,d,h,ry,semantic,solid}]*/, sampleHeight /*(x,z)=>y*/, naturalHeight /*可选*/, ways /*可选 {roads, trenches}*/ })
   Bake()                                   // → Promise，空闲分块烘静态层
   SetKeyframes(list /*[{id,stage,player:{x,z}}]*/, index)
-  SetDynamic({ player: {x,z,yawDeg}, units, pois, next })
+  SetDynamic({ player: {x,z,yawDeg}, fly /* 可选 {x,z,yawDeg}，飞行观察时有，小地图改以它为中心 */, units, pois, next })
   SetLandmarks(list)                       // 场景文件的地标（2026-10-20）：小地图与全关总图都画 kind 色小方块 + 墨边，有尺寸的画脚印（片区虚线），放大到 ≥ 1.5 px/m 排名字
   SetLayers({ arcs, intents, labels, landmarks, stations })   // stations 只管小地图上的站位点与虚线（全关总图的关键帧点一直在）
   PaintMini(canvas, { pxPerM })            // 北朝上，以玩家为中心并夹在边界内
@@ -329,6 +329,38 @@ export class BlockoutMap {
 
 **agent 收到这段文字时**：「关键帧」那一行的 id 就是 `Blockout/<Level>.json` 里 `keyframes[].id`；「我现在」的 x / z / 朝向 / 俯仰可以原样写进那个关键帧的 `player`；
 「准星对着：体块 X」的 X 是本关布局里的块 id；要看画面就无头打开「重现这个机位」链接截图。相对方位「左前 23°」= 要往左转 23° 才正对。
+
+### 4.3 飞行观察（testFly，2026-10-21）
+
+用户要一台不受碰撞的自由相机，在白盒场地里绕着看（空间关系、视线、高处俯瞰），看的时候玩家本人不动。
+
+**键位**（写进契约；游戏与编辑器已绑的键一个没占）：
+
+| 键 | 作用 |
+| --- | --- |
+| `O` | 进 / 出飞行观察（卡片右上的飞行按钮同效；`BLOCKOUT_FLY.toggleKey`）。游戏 `KEYMAP` 与编辑器（`, . Y P M N Esc`、反引号）都没人绑 O |
+| `W` `S` `A` `D` | 沿视线前后（含俯仰，抬头 W 就往上飞）、横向左右 |
+| `E` / `Q` | 世界竖直升 / 降 |
+| `Shift`（按住） | 加速 ×4 |
+| 滚轮 | 调飞行速度：一格 ×1.25（向上滚变快、向下滚变慢），夹在 0.5–400 m/s，缺省 8 m/s |
+| 鼠标 | 转头（指针锁；锁不住的窗口照旧按住右键拖动，走的是 `Script_Main` 原来那条输入链，没有另写） |
+
+飞行中 `E Q Shift W A S D` 是借用的：游戏里它们是探身 / 冲刺 / 走路，但飞行中整张键位表对玩家闸掉了（`CapturesInput()`），不冲突。`P` 复制、`M` 地图、`Esc` 解鼠标照常；`Esc` 只释放鼠标，**不**退出飞行（退出只用 `O`）。
+
+**行为**：
+- 进入：从当前相机的位置与朝向起飞（`FlyState().origin` 记着进入时相机与玩家的位姿）。退出：不用还原什么——玩家这期间一直没动，下一帧 `Script_Main` 把相机写回玩家的位置与朝向（实测误差 < 2 cm）。
+- 不查碰撞：墙、体块、沟沿都穿过去，没有重力。唯一的限制是不低于地面（`groundAt` + 0.15 m），免得钻到地底下什么都看不见。
+- 玩家原地不动：飞行中 `CapturesInput()` 为真，`Script_Main` 把走动 / 冲刺 / 探身 / 姿态 / 开火 / 开镜清零、键位动作（跳 / 换枪 / 装填 / 近战 / 投弹…）整张表闸掉（只放行 `map`），枪模与第一人称身体藏起（退出时还回）；玩家本来就无敌无限弹药。鼠标位移不给玩家转头，由 `Script_Main` 乘上与玩家同口径的灵敏度后交给 `FlyLook(dyaw, dpitch)`；鼠标键仍能抢指针锁（点画面就锁住）。
+- 阴影框跟着相机走（`Script_Main` 在 `ApplyCamera` 之后更新，同炮击扬尘测试场的自由相机）。
+- 关键帧：飞行中翻关键帧（`, .`、导航栏、地图点选）允许——玩家照旧被传到新站位、演员照旧走过渡，相机留在原处，正好站在高处看；退出时回到的是新站位的玩家视角。
+- **预演规则**（最简单的一条）：相机归预演，预演不能和飞行共存。预演播放中**不让进**飞行（`O` 与 `Debug.Fly(true)` 都被拒，弹提示「预演播放中不能飞行观察：先按 N 或 Esc 中断」）；飞行中**开播预演**（`N` / 预演按钮 / `Previz.Play`）则自动退出飞行（`OnPrevizStart`），预演播完或中断后相机交还玩家，可再按 `O` 进。切关（`SwitchLevel`）同样自动退出。
+- 地图：小地图改以飞行相机为中心（玩家标记照画，在视野里就看得到），全关总图打开时也对准相机；相机画成青色（`MAP_COLORS.fly`）的圆 + 朝向小三角 + 视锥，到玩家本人一条淡虚线。飞行中 `M` 照样开全关总图（地图开着时鼠标归地图，滚轮缩放地图而不是调速）。
+
+**界面**（沿用 §4 的视觉：金边选中、细线、衬线标题、直角）：卡片右上多一个纸飞机图标按钮「飞行观察」（飞行中亮金边，`aria-pressed`）；飞行中卡片底多一条：金底「飞行」标签 + 「观察相机」+ 速度（`8.0 m/s`、按住 Shift 时写「×加速」）+ 退出钮，下一行相机的 x / z / 高 / 朝向 / 俯仰（等宽数字），再下一行按键提示；导航栏的按键提示多一个 `O 飞行`（飞行中变金）。预演播放时整张卡片只剩预演条，飞行条跟着藏。
+
+**复制当前位置**（§4.2）：飞行中 `P` / 复制按钮 / `Snapshot()` 复制的是**飞行相机**的位姿，格式不变：`player` 块 = 相机的 `x / z`、`y` 与 `eyeY` 都是相机的绝对高度、`yawDeg / pitchDeg` 是相机朝向、`stance` 写 `stand`；多一个 `fly: { body }`（玩家本人没动的位置 / 朝向 / 姿态）。文字里「我现在（飞行观察相机）」「玩家本人没动」两行，准星射线从相机发出。「重现」链接的 `pose=` 多第 6 项相机绝对高度：`pose=x,z,yawDeg,pitchDeg,stand,flyY`（`PoseParam` / `ParsePoseParam`；5 项的旧格式不变）；打开后玩家落在 `x,z`，再从 `flyY` 这个高度、该朝向起飞。
+
+`Script_Main` 的薄钩子（只加判断）：`BlockoutInputCaptured()` 对飞行也为真；`OnAction` 里放行 `map`（`blockout.AllowsMapKey()`）；`Frame` 里清零输入之后，飞行中把 `input.lookX/Y` 乘灵敏度交给 `blockout.FlyLook` 并清零（`lean` 也清）；`ApplyCamera` 之后飞行中更新阴影框。
 
 ## 5. 关键帧、过渡与标记
 
@@ -473,6 +505,9 @@ Snapshot(); SnapshotText()   // §4.2 快照对象 / 贴给 agent 的文字（�
 CopySnapshot()               // 真去写剪贴板 → Promise<{ ok, method: "clipboard"|"execCommand"|null, text }>
 Probe(id)                    // 某个演员此刻的样子（§5.6）
 StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证用）
+Fly(on?, pose?)              // 飞行观察（§4.3）：进 / 出（不给 on = 切换；进时可带机位 {x,y,z,yawDeg,pitchDeg}）→ FlyState
+FlyState()                   // → { active, x, y, z, yawDeg, pitchDeg, speedMps, boost, keys, entered, origin:{camera,player}, player, camera, canEnter, previz }；camera 是 Three 相机此刻的真实位姿
+FlyPose(pose)                // 飞行中把相机摆到任意机位
 ```
 
 ### 6.2 总控（`Script_EditorBlockout.mjs`）
@@ -589,6 +624,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 | `Script_EditorBlockoutMapTest.mjs` | 浏览器（临时 harness 页） | 纸面底色、块脚印、旋转块、等高线、各阵营标记颜色按像素数计（不看 `.visible`）；小地图以玩家为中心；全关总图缩放 / 平移 / 关键帧拾取 |
 | `Script_EditorBlockoutBrowserTest.mjs` | 浏览器（游戏） | `?editor=blockout&level=FirstLevel&quality=whitebox&scale=small&audio=0` 启动；没有任务运行时、没有过场；关键帧数与配置一致；`GoTo` 后玩家位置误差 < 0.5 m；`Next` 过渡中单位位置连续变化（不瞬移）、结束后到位；切到 `SecondLevel` 后场景边界与地形变化、再切回；小地图与卡片像素非空；配置文件被外部改写后 3 s 内同步；全程无未捕获错误；截图存 `_shots/EditorBlockout/` |
 | `Script_EditorBlockoutFirstLevel0105KeepInBrowserTest.mjs`（2026-10-21） | 浏览器（游戏） | 01–05 玩家出不了沟：剧本通路逐 0.25 m 在「沟里」且离隐形墙 ≥ 0.4 m；19 处低处 × 8 个方向跳 + 翻三秒每帧都在沟里；射击台翻不过胸墙；顺交通沟 / 支沟走得到；手榴弹飞出沟；预演里翻出沟的 NPC 照常出沟；无错（§13 末） |
+| `Script_EditorBlockoutFlyBrowserTest.mjs`（2026-10-21） | 浏览器（游戏） | `FirstLevel0105` 上钉飞行观察（§4.3）：O 不与 `KEYMAP` / 编辑器键冲突；按钮 / O 键进，起飞位姿 = 进入时相机；W S A D E Q 位移 = 速度 × 时间、Shift ×4、抬头沿视线斜飞、穿墙不查碰撞、唯一的地面下限；滚轮 ×1.25 / 夹上下限且不换枪；鼠标位移（`Debug.Look` 与真 mousemove）转飞行相机、玩家不转；狂按游戏键与左右键后玩家位置 / 朝向 / 姿态 / 血量 / 弹药 / 槽位不变；小地图与全关总图（M）里有青色相机标记；P 复制的是相机位姿、重现链接带第 6 项并真能从该高度起飞；O 退出后相机回到进入时玩家视角（< 2 cm）、枪模还回来；预演中进不去、飞行中开播预演自动退出、切关自动退出；无未捕获错误 |
 | `Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs`（2026-10-19） | 浏览器（游戏） | `FirstLevel0610` 的 06-2 上注入一段预演（page.route）：百姓 / 小孩 / 国军军官 / 日军军官都能播预演动作库的片段且姿态真的变了（蹲下片段骨盆比站着低 ≥ 0.25 m、举手片段手比没片段时高 ≥ 0.25 m、趴下片段骨盆 < 0.3 m）、`body:"procedural"` 的百姓还是程序化身体；飞机模型载进来、Seek 到航线中段位置等于 `SamplePrevizAircraft`、在视锥里且正对 `look` 飞机锚、扫射段画出土点、过了末航点不可见；慢动作窗口里 `timeScale` = rate、墙上跑 0.9 s 预演只走 0.3 倍、人物动画时钟与走路同倍率；中断后克隆还回机队；**2026-10-20**：一辆 spawn 的驴车走起来，坐车尾的小孩（`VilSitEdge`，`ride.y` 0.467）与车板上的担架（`y` 1.075）两个时刻都跟着车（位置 = 车位姿 ∘ 本地偏移，误差 < 0.05 m）、小孩骨盆落在车板顶 ±0.1 m、不走路；url 音效 `babyCry`（`page.route` 喂生成的 WAV）装进声库并真放出一条 voice、`cellarSob` 404 只警告一次并进 `missingSfx`（这一趟因此**不带 `audio=0`**）；全程无未捕获错误；截图存 `_shots/EditorBlockoutPrevizRuntime/` |
 
 - 新模块登记 `index.html` import map（带 `?v=`）；`Style_EditorBlockout.css` 加 `<link>`；`Script_TestRunner` 登记上面四个测试与 `changedDomainRules`（`Blockout/` 目录归 editor 域）。
@@ -610,6 +646,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 ## 12. 变更记录
 
 - 2026-10-21（01–05 防止玩家跳出壕沟）：场景块可选 `tag`（`airWall` 只挡玩家）与 `noClimb`（§2.2）；`Script_Player.ProbeVault` 认 `noClimb`、不隔着隐形墙翻；01–05 胸墙与板桥标不能攀、沟沿一圈 892 段隐形墙（`L0105KeepInWalls`），新闸门 `Script_EditorBlockoutFirstLevel0105KeepInBrowserTest`（§13 末、§10）。
+- 2026-10-21（飞行观察 testFly）：新增 §4.3——`O` 键 / 卡片按钮进出一台不受碰撞的自由相机（WASD 沿视线、E 升 Q 降、Shift ×4、滚轮调速 0.5–400 m/s），玩家原地不动且不吃游戏输入，进时从当前视角起飞、退出相机自然回到玩家视角；预演中不让进、飞行中开播预演或切关自动退出；小地图 / 全关总图画青色相机标记（`MAP_COLORS.fly`，小地图以相机为中心）；`P` 复制的是相机位姿，`pose=` 多第 6 项相机高度；`Debug.Blockout.Fly / FlyState / FlyPose`；`Script_Main` 薄钩子（`BlockoutInputCaptured` 含飞行、放行 `map`、`FlyLook`、阴影框）；门禁 `Script_EditorBlockoutFlyBrowserTest.mjs`。
 - 2026-10-21（01–05 03-2 掷弹筒看得见）：顺子站上射击台看见坎后冒烟、嘭，跳下台后弹落坑东沿、台上东头的弟兄顺着台子掀翻落在台面上，再喊「丢弹筒！挪起走！」；`SHELL_032`、`PIT.pitNra1` 挪到机枪西边，见 §13 末「2026-10-21 03-2」。
 - 2026-10-21（01–05 树不沿路种）：坑北大路两边、田间小路边成排的树去掉，换成田里零星 18 棵 + 远景层零星 14 棵（`L0105_BACKDROP_LONE_TREES`），见 §13 末「2026-10-21」。
 - 2026-10-20（人名 / 站位 / 地标三层标记，都能开关）：§2.2 场景文件加可选 `landmarks`（七种 kind，`ValidateBlockoutScene` → `LandmarkIssues`，`NormalizeLandmarks`）；§5.5「标签」改三档（全部档无名的人按身份兜底、带 id 尾号）、新开关「地标」「站位」（右上同一排，缺省开，六个开关的选择记在 localStorage）；新模块 `Script_EditorBlockoutMarkerRules`（纯规则）+ `…MarkerRulesTest`；§4.1 俯视图画地标、小地图画站位；§15 0610 的场景文件填了 47 个地标（`L0610Landmarks`，坐标全取锚点表），SceneTest 钉地标齐、都在场地里、狗洞 / 墙缝 / 侧门 / 窖 / 北窗的框对得上；总控 `LoadLandmarks()` 进关后再读一次场景文件只取地标（`Script_EditorBlockoutLevels` 没动）。BrowserTest 加 0610 的地标 / 站位 / 三档 / 记忆用例。
