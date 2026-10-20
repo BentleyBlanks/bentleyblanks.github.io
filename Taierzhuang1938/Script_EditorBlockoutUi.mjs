@@ -8,7 +8,8 @@
 //   左下  小地图画布（地图模块往里画）+ 「M 展开」
 //   底部  导航栏：按阶段分段、每个关键帧一个刻度、金色滑块、悬停提示、点击 / 拖动松手跳转、
 //         左右箭头、计数、过渡中的「快进 ×n」、极小的按键提示
-//   全屏  全关总图外框（地图模块往 fullCanvas 里画；关闭按钮、M / Esc 关闭）
+//   全屏  全关总图外框（地图模块往 fullCanvas 里画；关闭按钮、M / Esc 关闭）；图头与画布容器经 mapHead / mapBody
+//         交给「编辑布设」层（Script_EditorBlockoutMapEdit，§4.4）往里放开关、工具栏和检查器
 //   中上  提示条（2.5 s 淡出）
 //   预演（§14.2，2026-10-18）：当前关键帧挂了预演时卡片右上多一个「预演」按钮（N）；播放中卡片换成
 //         「预演 · 标题 · 进度条 · 秒数」，导航栏不响应（.locked），按键只认 N / Esc（中断）。
@@ -194,6 +195,8 @@ export class BlockoutUi {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     // 「复制当前位置」的备用文字框里：除了 Esc 关框，键都留给文字框（不翻关键帧）
     if (e.target?.closest?.(".boCopyBox") && e.code !== "Escape") return;
+    // 编辑布设检查器里敲字 / 敲数（§4.4）：键都归输入框（M 不关图、. 不翻关键帧、P 不复制）
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName || "") && !e.target.closest?.(".boCopyBox")) return;
     const action = KEY_ACTIONS[e.code];
     if (!action) return;
     e.preventDefault();
@@ -464,9 +467,13 @@ export class BlockoutUi {
     this.btnCloseMap.dataset.tipSide = "left";
     this.Listen(this.btnCloseMap, "click", () => this.Call("onCloseMap"));
     head.append(title, legend, hint, this.btnCloseMap);
+    this.elMapHint = hint;
+    this.mapHintDefault = hint.textContent;
+    this.mapHeadEl = head;
     const body = El("div", "boMapBody");
     this.fullCanvasEl = El("canvas", "boMapCanvas");
     body.append(this.fullCanvasEl);
+    this.mapBodyEl = body;
     frame.append(head, body);
     overlay.append(frame);
     this.Listen(overlay, "pointerdown", (e) => { if (e.target === overlay) this.Call("onCloseMap"); });
@@ -479,6 +486,15 @@ export class BlockoutUi {
 
   get miniCanvas() { return this.miniCanvasEl; }
   get fullCanvas() { return this.fullCanvasEl; }
+  /** 全关总图的图头 / 画布容器 / 关闭按钮（编辑布设层往里放东西，§4.4）。 */
+  get mapHead() { return this.mapHeadEl; }
+  get mapBody() { return this.mapBodyEl; }
+  get mapCloseButton() { return this.btnCloseMap; }
+
+  /** 全关总图右上的操作提示；不给 = 回到默认那句。 */
+  SetMapHint(text) {
+    if (this.elMapHint) this.elMapHint.textContent = text || this.mapHintDefault || "";
+  }
 
   /** @param {Array<{key,label,era?,badge?,note?,short?}>} levels  era: "rewrite" 新剧本 / "legacy" 游戏现行旧版 / "draft" 草稿 */
   SetLevels(levels, currentKey) {
@@ -896,15 +912,18 @@ export class BlockoutUi {
     }
   }
 
-  /** 「复制当前位置」写不进剪贴板时的备用框：文字已全选，用户按 Ctrl+C；Esc / 关闭按钮收起。 */
-  ShowCopyText(text) {
+  /**
+   * 「复制当前位置」写不进剪贴板时的备用框：文字已全选，用户按 Ctrl+C；Esc / 关闭按钮收起。
+   * title：框头的字（编辑布设导出时是「布设调整」，§4.4）。
+   */
+  ShowCopyText(text, title = "复制当前位置") {
     if (this.disposed) return;
     if (!this.copyBox) {
       const box = El("div", "boCopyBox boPanel");
       box.setAttribute("role", "dialog");
-      box.setAttribute("aria-label", "复制当前位置");
       const head = El("div", "boCopyHead");
-      head.append(El("span", "boCopyTitle", "复制当前位置"), El("span", "boCopyHint", "按 Ctrl+C 复制，整段贴给 agent"));
+      this.copyTitle = El("span", "boCopyTitle", "");
+      head.append(this.copyTitle, El("span", "boCopyHint", "按 Ctrl+C 复制，整段贴给 agent"));
       const close = Button("boIconBtn boClose", { icon: "close", tip: "关闭（Esc）" });
       close.dataset.tipSide = "left";
       this.Listen(close, "click", () => this.HideCopyText());
@@ -916,6 +935,8 @@ export class BlockoutUi {
       this.copyBox = box;
       this.root.appendChild(box);
     }
+    this.copyTitle.textContent = title;
+    this.copyBox.setAttribute("aria-label", title);
     this.copyArea.value = String(text || "");
     this.copyBox.hidden = false;
     this.copyArea.focus({ preventScroll: true });

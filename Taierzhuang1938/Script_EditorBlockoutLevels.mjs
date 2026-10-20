@@ -676,7 +676,7 @@ export function BlockoutMapScene(layout, groundAt) {
   const firstLevel = layout?.id === "BlockoutFirstLevel";
   return {
     bounds: { ...(layout?.bounds || { minX: 0, maxX: 1, minZ: 0, maxZ: 1 }) },
-    blocks: (layout?.blocks || []).map(b => ({ x: b.x, z: b.z, w: b.w, d: b.d, h: b.h, ry: b.ry || 0,
+    blocks: (layout?.blocks || []).map(b => ({ id: b.id, x: b.x, z: b.z, w: b.w, d: b.d, h: b.h, ry: b.ry || 0,
       semantic: b.blockoutWater ? "water" : b.semantic, solid: b.solid !== false, tag: b.tag })),
     sampleHeight: groundAt || layout?.terrainSampler || (() => 0),
     naturalHeight: firstLevel ? SampleMissionNaturalHeight : null,

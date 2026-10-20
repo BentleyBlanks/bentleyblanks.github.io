@@ -362,6 +362,40 @@ export class BlockoutMap {
 
 `Script_Main` 的薄钩子（只加判断）：`BlockoutInputCaptured()` 对飞行也为真；`OnAction` 里放行 `map`（`blockout.AllowsMapKey()`）；`Frame` 里清零输入之后，飞行中把 `input.lookX/Y` 乘灵敏度交给 `blockout.FlyLook` 并清零（`lean` 也清）；`ApplyCamera` 之后飞行中更新阴影框。
 
+### 4.4 编辑布设（全关总图里拖着微调、加说明标记，导出给 agent；2026-10-21）
+
+用户原话（10-21）：在全关总图里做一个布设编辑——像总图上那些布设一样能自己拖着调位置，也能在 2D 图上加标记写说明；调好的布设 + 标记一键导出给 agent 读了去改。**不做保存**（编辑器里的编辑器），入口放在全关总图里；目的是人手微调细节位置。
+
+- **入口**：全关总图图头「编辑布设」开关（关闭按钮左边，金边 = 开着，右上角数字 = 挪了几处 + 几个标记）。开着时图上左上一条工具栏、右上一块检查器，图头提示换成编辑的。关图、切关键帧都不丢；切关各关各一份（回来还在）；**关掉 / 刷新页面就没了**。
+- **能拖的**：地标（场景文件 `landmarks`）、体块（布局里有 `id` 的、全关总图上画得出来的）、当前关键帧的人（`units`）/ 要点（`pois`）/ 下一步目标（`next`）、所有关键帧的玩家站位（`player`，关键帧点）、自己加的说明标记。
+- **操作**：左键拖东西 = 挪（挪动量吸附到 0.1 m，坐标本身不吸附：没往 x 挪的东西 x 一位不变）；左键拖空地 = 平移、点空地 = 取消选择；Shift + 点 = 加选 / 减选，Shift + 拖空地 = 框选（中心落在框里的都选上，一座房子框住一起挪）；右键 / 中键拖 = 平移；滚轮缩放；编辑开着时双击不回全图。画布有焦点时：方向键微调 0.1 m（Shift 1 m）、Q / E 转 15°（Shift 5°，人和站位改 `yawDeg`，体块和地标改 `ry`）、Delete 还原选中的 / 删选中的标记、Ctrl+Z 撤销、Ctrl+Y / Ctrl+Shift+Z 重做、Esc 先取消拖动 / 放标记 / 选择，什么都没有才关图。画布有焦点时 WASD 不走（界面根拦着），点回 3D 画面照常。
+- **画法**（只在全关总图、只在开着时；小地图和 3D 不变）：挪过的东西画在新位置（关键帧点、人、要点、下一步、地标都替换；人的去向箭头从新位置画起）；挪过的体块在原位置盖一层纸色 + 虚线框、新位置按原样式填色 + 金边；其余挪过的在原位置一个空心小圈、细虚线连到新位置；选中 = 金框 / 金圈，悬停 = 虚线圈 + 名字与坐标小牌，拖动中 = 挪动量小牌。说明标记 = 紫色圆钉 + 号 + 一行字（≤ 26 字，超出省略），带半径的再画一个虚线圆。
+- **加标记**：工具栏第二个按钮（或检查器提示）→ 在图上点一下放一个点，按住拖开 = 圈一片（半径取整到 0.5 m）；放好后检查器里的文字框自动有焦点，直接敲字（敲字时 M / . / P 不触发编辑器按键）；检查器里还能改 x / z / 半径、删掉。
+- **检查器**：没选中 = 操作说明；选中一个 = 是谁（`id`、语义、文件里的路径）、x / z / 朝向可以直接敲数、「原来 x z」、还原；站位多一个「跳到这个关键帧」；选中多个 = 各类几个、还原这几个、取消选择。
+- **导出给 Agent**（工具栏金色按钮）：同 §4.2 的写剪贴板三级退路（`navigator.clipboard` → `execCommand` → 弹出文字已全选的框，框头「布设调整」）。文字格式（`Script_EditorBlockoutLayoutEdit.FormatLayoutEdit`）：
+  ```
+  【滕县白盒编辑器 · 布设调整】
+  关卡：第一关 06–10（FirstLevel0610）
+  文件：配置 Taierzhuang1938/Blockout/FirstLevel0610.json；场景 Taierzhuang1938/Blockout/FirstLevel0610.scene.json
+  导出时停在关键帧：08-2
+  在全关总图上挪了 3 处、加了 1 个说明标记（都只在编辑器里看，没存盘；按下面改到文件里）。
+
+  挪动：
+  1. 体块 KitchenNorth、KitchenSouth、… 等 10 块一起往东 3 m、往北 1 m（场景 blocks / gates 里按 id 找；各自的新坐标见数据行）
+  2. 地标「狗洞」 LmDogHole（场景 landmarks[3]）：(81.50, 488.00) → (82.30, 487.10)，往东 0.8 m、往北 0.9 m
+  3. 友方人「罗班长」 Luo（配置 keyframes[9].units[0]）：(100.00, 430.00) → (101.00, 430.00)，往东 1 m；朝向 10.0° → 25.0°
+
+  说明标记：
+  ① x 83.0  z 486.0，半径 4 m 这一片：「狗洞再往东一点」　附近：狗洞（LmDogHole） 在西南 1.3 m
+  怎么改：……
+  数据：{"schema":"tengxian-blockout-layout-edit/1", …}
+  ```
+  最后一行 `数据：` 是整份导出对象（`schema: "tengxian-blockout-layout-edit/1"`；`moves[]`：`kind`（landmark / block / unit / poi / next / station）、`id`、`name`、`file`（scene / config）、`keyframe`（只对人 / 要点 / 下一步 / 站位）、`path`、`from`、`to`（`x, z`，人和站位带 `yawDeg`，体块和地标带 `ry` 弧度）、`dx`、`dz`、可选 `dYawDeg` / `dRyDeg`；`markers[]`：`n`、`x`、`z`、可选 `radiusM`、`text`、`near[]`（15 m 内最近 4 个有名字的东西：kind / id / name / distM / dir 八方位））；`ParseLayoutEdit(text)` 找这一行解析回来。
+- **agent 收到这段文字时**：数字以 `数据：` 行为准。`file: "config"` 的直接改 `Blockout/<Level>.json` 里 `path` 指的那一项（关键帧 id 用 `keyframe`，编辑器 2 s 内同步）；但 0105 / 0610 / 1218 的配置是关键帧生成器导出的，**用户手改过的 JSON 为准**，要不要同步回生成器（`Script_EditorBlockout<Level>Keyframes.mjs` / `Data_…Space.mjs`）看那一关的口径。`file: "scene"` 的地标 / 体块在场景文件里，场景文件是生成器烘的：改 `Script_EditorBlockout<Level>Scene.mjs` / `Data_EditorBlockout<Level>Space.mjs` 里对应的常量再 `node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene <Level> --force`（只改 JSON 会被下次重烘冲掉）；第一关旧版（`FirstLevel`）没有场景文件，体块是游戏布局表。一座房子整组挪的体块合成一行，各自新坐标看数据行。说明标记是用户的话：按 `text` 去改，`near` 帮着认是哪儿。
+- **已采纳**：配置重读（外部修改同步）、地标读回来、切关键帧时，总控拿数据里现在的位置对一遍（`LayoutEditSession.Reconcile`）：已经等于改到的位置（6 cm 内、朝向 0.6° 内）的条目拿掉并提示「有 n 处已经改到文件里了」；挪过但还没到位的把「原来」更新成新的数据位置。体块要重进这一关（场景文件重读）才对得上。
+- **模块**：`Script_EditorBlockoutLayoutEdit.mjs`（纯，零 three / DOM：`LayoutEditSession` 改动记录 + 撤销栈 200 步、`BuildLayoutEditExport` / `FormatLayoutEdit` / `ParseLayoutEdit`）；`Script_EditorBlockoutMapEdit.mjs`（DOM + canvas 2D，零 three：`BlockoutMapEdit` 开关、工具栏、检查器、拾取、拖动、画）；`BlockoutMap` 加 `SetEditLayer(layer)` / `editing`，`BuildItems` 的每项带 `src`（块原来的 id / 位置 / 尺寸），导出 `BlockCorners` / `BlockStyleFill`；`BlockoutMapScene` 的块带 `id`；`BlockoutUi` 加 `mapHead` / `mapBody` / `mapCloseButton` / `SetMapHint`，`ShowCopyText(text, title)`，焦点在输入框里时编辑器按键不触发；总控 `PushEditContext` / `ExportLayoutEdit`，`Debug.Blockout.LayoutEdit`（`SetActive` / `State` / `Session` / `Export` / `Text` / `Copy` / `Context` / `Focus` / `ScreenPoint`）。
+- **门禁**：`Script_EditorBlockoutLayoutEditTest`（纯 node）、`Script_EditorBlockoutMapEditBrowserTest`（浏览器，0610 08-1 真鼠标：拖狗洞、拖幺娃、框选整座灶屋拖、加标记敲字不串键、Ctrl+Z / Y、方向键、导出进剪贴板能解析、关掉后点关键帧照常跳、配置与场景文件逐字节不变）。
+
 ## 5. 关键帧、过渡与标记
 
 ### 5.1 切换
@@ -621,6 +655,8 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 | --- | --- | --- |
 | `Script_EditorBlockoutConfigTest.mjs` | 纯 node | 校验器正反例；`NormalizeBlockout` 缺省值与 yaw 换算（三种来源各一例钉死）；`PlanTransition` 四种 mode、时长夹取、路径采样；两份提交的配置与场景文件通过校验；生成器两次输出除 `generatedAt` 外逐字相同；每个关键帧玩家点在关卡边界内、不在实心块里；单位不在实心块里（超出只报警告并列出） |
 | `Script_EditorBlockoutSaveTest.mjs` | 纯 node | 起真 LocalPreview（`--root=<临时目录>`）：status 可写、save 写对文件、各种拒绝（坏 level、`..`、超大、坏文档、GET、错误 Content-Type、外来 Origin / Host、revision 不符）零字节落盘、无 `.tmp` 残留、仓库里的 `Blockout/` 前后逐字节相同；`/__notes/status`、`/__tuning/status` 仍正常 |
+| `Script_EditorBlockoutLayoutEditTest.mjs`（2026-10-21） | 纯 node | 编辑布设的改动记录与导出（§4.4）：from / to、挪回原处就删、整组平移吸附挪动量、撤销 / 重做 / 取消、标记、`Reconcile`、导出排序与文字、`数据：` 行往返 |
+| `Script_EditorBlockoutMapEditBrowserTest.mjs`（2026-10-21） | 浏览器（游戏） | 0610 08-1 上真鼠标走一遍编辑布设（§4.4 门禁那条）；截图与导出文字存 `_shots/EditorBlockoutMapEdit/` |
 | `Script_EditorBlockoutMapTest.mjs` | 浏览器（临时 harness 页） | 纸面底色、块脚印、旋转块、等高线、各阵营标记颜色按像素数计（不看 `.visible`）；小地图以玩家为中心；全关总图缩放 / 平移 / 关键帧拾取 |
 | `Script_EditorBlockoutBrowserTest.mjs` | 浏览器（游戏） | `?editor=blockout&level=FirstLevel&quality=whitebox&scale=small&audio=0` 启动；没有任务运行时、没有过场；关键帧数与配置一致；`GoTo` 后玩家位置误差 < 0.5 m；`Next` 过渡中单位位置连续变化（不瞬移）、结束后到位；切到 `SecondLevel` 后场景边界与地形变化、再切回；小地图与卡片像素非空；配置文件被外部改写后 3 s 内同步；全程无未捕获错误；截图存 `_shots/EditorBlockout/` |
 | `Script_EditorBlockoutFirstLevel0105KeepInBrowserTest.mjs`（2026-10-21） | 浏览器（游戏） | 01–05 玩家出不了沟：剧本通路逐 0.25 m 在「沟里」且离隐形墙 ≥ 0.4 m；19 处低处 × 8 个方向跳 + 翻三秒每帧都在沟里；射击台翻不过胸墙；顺交通沟 / 支沟走得到；手榴弹飞出沟；预演里翻出沟的 NPC 照常出沟；无错（§13 末） |
@@ -647,6 +683,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 
 - 2026-10-21（01–05 防止玩家跳出壕沟）：场景块可选 `tag`（`airWall` 只挡玩家）与 `noClimb`（§2.2）；`Script_Player.ProbeVault` 认 `noClimb`、不隔着隐形墙翻；01–05 胸墙与板桥标不能攀、沟沿一圈 892 段隐形墙（`L0105KeepInWalls`），新闸门 `Script_EditorBlockoutFirstLevel0105KeepInBrowserTest`（§13 末、§10）。
 - 2026-10-21（飞行观察 testFly）：新增 §4.3——`O` 键 / 卡片按钮进出一台不受碰撞的自由相机（WASD 沿视线、E 升 Q 降、Shift ×4、滚轮调速 0.5–400 m/s），玩家原地不动且不吃游戏输入，进时从当前视角起飞、退出相机自然回到玩家视角；预演中不让进、飞行中开播预演或切关自动退出；小地图 / 全关总图画青色相机标记（`MAP_COLORS.fly`，小地图以相机为中心）；`P` 复制的是相机位姿，`pose=` 多第 6 项相机高度；`Debug.Blockout.Fly / FlyState / FlyPose`；`Script_Main` 薄钩子（`BlockoutInputCaptured` 含飞行、放行 `map`、`FlyLook`、阴影框）；门禁 `Script_EditorBlockoutFlyBrowserTest.mjs`。
+- 2026-10-21（编辑布设）：§4.4 全关总图图头加「编辑布设」开关：拖地标 / 体块 / 当前关键帧的人、要点、下一步 / 各关键帧站位，加说明标记，「导出给 Agent」进剪贴板（末行 `数据：` JSON）；不存盘、不动 3D；agent 改到位的条目自动拿掉。新模块 `Script_EditorBlockoutLayoutEdit`（纯）、`Script_EditorBlockoutMapEdit`（DOM + canvas），门禁 `…LayoutEditTest`、`…MapEditBrowserTest`。
 - 2026-10-21（01–05 03-2 掷弹筒看得见）：顺子站上射击台看见坎后冒烟、嘭，跳下台后弹落坑东沿、台上东头的弟兄顺着台子掀翻落在台面上，再喊「丢弹筒！挪起走！」；`SHELL_032`、`PIT.pitNra1` 挪到机枪西边，见 §13 末「2026-10-21 03-2」。
 - 2026-10-21（01–05 树不沿路种）：坑北大路两边、田间小路边成排的树去掉，换成田里零星 18 棵 + 远景层零星 14 棵（`L0105_BACKDROP_LONE_TREES`），见 §13 末「2026-10-21」。
 - 2026-10-20（人名 / 站位 / 地标三层标记，都能开关）：§2.2 场景文件加可选 `landmarks`（七种 kind，`ValidateBlockoutScene` → `LandmarkIssues`，`NormalizeLandmarks`）；§5.5「标签」改三档（全部档无名的人按身份兜底、带 id 尾号）、新开关「地标」「站位」（右上同一排，缺省开，六个开关的选择记在 localStorage）；新模块 `Script_EditorBlockoutMarkerRules`（纯规则）+ `…MarkerRulesTest`；§4.1 俯视图画地标、小地图画站位；§15 0610 的场景文件填了 47 个地标（`L0610Landmarks`，坐标全取锚点表），SceneTest 钉地标齐、都在场地里、狗洞 / 墙缝 / 侧门 / 窖 / 北窗的框对得上；总控 `LoadLandmarks()` 进关后再读一次场景文件只取地标（`Script_EditorBlockoutLevels` 没动）。BrowserTest 加 0610 的地标 / 站位 / 三档 / 记忆用例。

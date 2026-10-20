@@ -379,6 +379,48 @@
 .boMapBody { position: relative; flex: 1 1 auto; min-height: 0; }
 .boMapCanvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
 .boMapCanvas.dragging { cursor: grabbing; }
+.boMapCanvas:focus { outline: none; }
+
+/* --- 全关总图 · 编辑布设（§4.4，Script_EditorBlockoutMapEdit） ------------------- */
+/* 图头里的开关：开着时金边 + 选中条；右上角的数字 = 挪了几处 + 几个标记 */
+.boEditToggle { flex: 0 0 auto; height: 30px; padding: 0 10px 0 8px; color: var(--bo-text); border-color: var(--bo-edge); letter-spacing: 0.08em; font-size: 12.5px; }
+.boEditToggle.on { color: var(--bo-gold-hi); border-color: var(--bo-gold); background: var(--bo-sel-strong); box-shadow: inset 2px 0 0 var(--bo-gold); }
+.boEditBadge { min-width: 16px; height: 16px; padding: 0 4px; font: 600 10px/16px var(--bo-num); text-align: center; color: #1b1a14; background: var(--bo-gold-fill); }
+.boEditBadge:empty { display: none; }
+.boMapHead > .boEditToggle + .boClose { margin-left: -14px; }
+
+.boEditBar, .boEditInspector { position: absolute; z-index: 2; box-shadow: 0 12px 32px #0009; }
+.boEditBar { top: 10px; left: 10px; display: flex; align-items: center; gap: 2px; padding: 3px; }
+.boEditTool.on { color: var(--bo-gold-hi); background: var(--bo-sel-strong); box-shadow: inset 0 -2px 0 var(--bo-gold); }
+.boEditSep { width: 1px; height: 18px; margin: 0 5px; background: var(--bo-line-strong); }
+.boEditCount { padding: 0 8px 0 4px; font: 12px/30px var(--bo-num); color: var(--bo-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.boEditExport {
+  height: 30px; margin-left: 6px; padding: 0 12px 0 10px; font-size: 12.5px; font-weight: 700; letter-spacing: 0.08em;
+  color: #1b1a14; background: var(--bo-gold-fill); border-color: var(--bo-gold);
+}
+.boEditExport:hover { color: #1b1a14; background: var(--bo-gold-hi); }
+.boEditExport:disabled { color: #1b1a14; background: var(--bo-gold-fill); }
+
+.boEditInspector { top: 10px; right: 10px; width: 272px; max-height: calc(100% - 20px); overflow: auto; padding: 10px 12px 12px; }
+.boEditHead { font: 700 14px/1.35 var(--bo-serif); color: var(--bo-bright); letter-spacing: 0.06em; overflow-wrap: anywhere; }
+.boEditSub { margin-top: 2px; font: 11px/1.45 var(--bo-num); color: var(--bo-faint); overflow-wrap: anywhere; }
+.boEditHelp { margin-top: 6px; font-size: 12px; line-height: 1.5; color: var(--bo-muted); padding-left: 8px; border-left: 1px solid var(--bo-line-strong); }
+.boEditGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.boEditField { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.boEditLabel { font-size: 10.5px; letter-spacing: 0.1em; color: var(--bo-faint); }
+.boEditInput, .boEditText {
+  width: 100%; min-width: 0; margin: 0; padding: 4px 6px; border-radius: 0;
+  font: 12px/1.4 var(--bo-num); color: var(--bo-bright); background: #0b0c0acc;
+  border: 1px solid var(--bo-line-strong); outline: none; user-select: text;
+}
+.boEditInput:focus, .boEditText:focus { border-color: var(--bo-gold); }
+.boEditText { display: block; margin-top: 10px; resize: vertical; min-height: 64px; font-family: var(--bo-font); font-size: 12.5px; line-height: 1.5; }
+.boEditText::placeholder { color: #8a8c80; }
+.boEditFrom { margin-top: 6px; font: 11px/1.4 var(--bo-num); color: var(--bo-faint); }
+.boEditActions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.boEditAct { height: 26px; padding: 0 9px 0 7px; font-size: 12px; color: var(--bo-text); border-color: var(--bo-edge); }
+.boEditAct svg { width: 14px; height: 14px; }
+.boEditAct.danger:hover { color: #ffb4a4; }
 
 /* --- 复制当前位置的备用框（剪贴板写不进去时才出现，§4.2） ------------------------- */
 .boCopyBox {

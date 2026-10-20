@@ -10,6 +10,8 @@
 //   「记下当前机位」把玩家现在的位置 / 朝向 / 姿态写回当前关键帧并保存（带上读配置时的版本号，§7）；
 //   「复制当前位置」（P）把关卡 / 关键帧 / 机位 / 准星落点 / 附近的人整理成一段文字放进剪贴板，贴给 agent 用（§4.2）；
 //   地址栏带 pose=x,z,朝向,俯仰,姿态 时，落到关键帧后再把玩家摆到这个机位（那段文字里的「重现」链接就是它）。
+//   「编辑布设」（§4.4，Script_EditorBlockoutMapEdit）：全关总图里拖地标 / 体块 / 人 / 要点 / 站位、加说明标记，
+//   「导出给 Agent」把改动排成一段文字进剪贴板；改动按关卡各记一份（LayoutEditSession），只在这一页里，不存盘、不动 3D。
 //   预演（§14，Script_EditorBlockoutPreviz）：读 Blockout/<Level>.previz.json（404 = 没有），卡片上的「预演」按钮或 N 播，
 //   播放中相机经 ApplyCamera 归预演、鼠标与 WASD 归预演（CapturesMouse / CapturesInput）、3D 标记与头顶标签藏起来、
 //   导航栏与翻关键帧的键不响应；N / Esc 中断，播完 / 中断按 then 跳关键帧。
@@ -41,6 +43,8 @@ import { BlockoutMarkers } from "./Script_EditorBlockoutMarkers.mjs";
 import { BlockoutStore } from "./Script_EditorBlockoutStore.mjs";
 import { BlockoutUi } from "./Script_EditorBlockoutUi.mjs";
 import { BlockoutMap } from "./Script_EditorBlockoutMap.mjs";
+import { BlockoutMapEdit } from "./Script_EditorBlockoutMapEdit.mjs";
+import { LayoutEditSession, BuildLayoutEditExport, FormatLayoutEdit } from "./Script_EditorBlockoutLayoutEdit.mjs";
 import { BlockoutPreviz, PREVIZ_KEY } from "./Script_EditorBlockoutPreviz.mjs";
 import { BlockStandSampler } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { BuildWhiteboxWater } from "./Script_FirstLevelWhiteboxLooks.mjs";
@@ -178,6 +182,10 @@ export class EditorBlockout {
     try { this.layers = ParseStoredLayers(globalThis.localStorage?.getItem(BLOCKOUT_LAYERS_STORAGE_KEY) ?? null); } catch (error) { /* 无痕窗口 / 不让读 */ }
     this.landmarks = [];
     this.landmarksLevel = "";
+    // 场景文件原文里地标 / 体块的下标（编辑布设导出时写「landmarks[12]」「gates[3]」给 agent 定位）
+    this.scenePaths = { landmarks: new Map(), blocks: new Map() };
+    // 编辑布设（§4.4）：关卡键 → LayoutEditSession；切关回来还在，关页面就没了
+    this.layoutEdits = new Map();
     this.doc = null;
     this.rawDoc = null;
     this.configText = null;
@@ -267,6 +275,12 @@ export class EditorBlockout {
       onPreviz: () => { this.previz.Toggle(); },
       onFly: () => { this.ToggleFly(); },
     });
+    this.mapEdit = new BlockoutMapEdit({
+      map: this.map, head: this.ui.mapHead, before: this.ui.mapCloseButton, body: this.ui.mapBody,
+      onExport: () => { this.ExportLayoutEdit(); },
+      onJump: (index) => { if (!this.previz?.playing) this.GoTo(index, { animate: false }); },
+      onActive: (on) => { this.ui.SetMapHint(on ? "编辑布设：拖动挪位置 · Shift 多选 / 框选 · 拖空地平移 · 不存盘，弄好导出" : ""); },
+    });
     // 高级工具的独立音量（Script_EditorVolume，2026-10-20）：白盒编辑器也是高级工具里的工具，用同一份，右上角一条
     if (host.audio?.SetToolsVolume) {
       this.toolsVolume = LoadToolsVolume(host.audio.masterVolume ?? 1);
@@ -316,6 +330,25 @@ export class EditorBlockout {
       Fly: (on, pose) => this.ToggleFly(on, pose),
       FlyState: () => this.FlyState(),
       FlyPose: (pose) => this.SetFlyPose(pose),
+      // 编辑布设（§4.4）：开关、此刻的改动记录（会话对象本身，测试直接调它的方法）、导出的文字、写剪贴板
+      LayoutEdit: {
+        SetActive: (on) => { if (on && !this.mapOpen) this.ToggleMap(true); this.mapEdit.SetActive(on); return this.mapEdit.active; },
+        State: () => ({ ...this.mapEdit.State(), moves: this.LayoutEdits().moveCount, markers: this.LayoutEdits().markerCount }),
+        Session: () => this.LayoutEdits(),
+        Export: () => this.LayoutEditExport(),
+        Text: () => FormatLayoutEdit(this.LayoutEditExport()),
+        Copy: () => this.ExportLayoutEdit(),
+        Refresh: () => this.mapEdit.Refresh(),
+        // 测试用：能挪的东西（当前上下文）、把全关总图对到某点、世界点 → 客户区像素
+        Context: () => JSON.parse(JSON.stringify(this.mapEdit.ctx)),
+        Focus: (x, z, pxPerM) => { this.map.FocusOn(x, z, pxPerM); this.map.PaintFull(this.ui.fullCanvas); return this.MapView(); },
+        ScreenPoint: (x, z) => {
+          const canvas = this.ui.fullCanvas;
+          if (!this.mapOpen || !canvas) return null;
+          const r = canvas.getBoundingClientRect(), p = this.map.WorldToScreen(x, z);
+          return { x: r.left + p.x, y: r.top + p.y };
+        },
+      },
     };
     // 预演（§14.2）：Has / Play / Stop / Seek / Resume / State；Reload 重读预演文件，CameraPose 取某一秒的机位。
     this.api.Previz = {
@@ -452,6 +485,7 @@ export class EditorBlockout {
     this.map.SetKeyframes(this.doc.keyframes.map(kf => ({ id: kf.id, stage: kf.stage, stageLabel: kf.stageLabel, player: { x: kf.player.x, z: kf.player.z } })), Math.max(0, this.index));
     // 站位（2026-10-20）：所有关键帧的玩家站位画进 3D；地标另从场景文件读
     this.markers.SetStations(this.StationList(), Math.max(0, this.index));
+    this.mapEdit.SetSession(this.LayoutEdits());
     this.LoadLandmarks();
   }
 
@@ -469,24 +503,30 @@ export class EditorBlockout {
     const url = this.level?.scene?.kind === "file" ? this.level.scene.url : null;
     this.landmarks = [];
     this.landmarksLevel = levelKey;
+    this.scenePaths = { landmarks: new Map(), blocks: new Map() };
     this.markers.SetLandmarks([]);
     this.map.SetLandmarks([]);
-    if (!url) return [];
+    if (!url) { this.PushEditContext(); return []; }
     let list = [];
+    const paths = { landmarks: new Map(), blocks: new Map() };
     try {
       const response = await globalThis.fetch(`${url}?t=${Date.now()}`, { cache: "no-store" });
       if (response.ok) {
         const doc = await response.json();
         list = NormalizeLandmarks(doc?.landmarks);
+        (doc?.landmarks || []).forEach((lm, i) => { if (lm?.id) paths.landmarks.set(String(lm.id), `landmarks[${i}]`); });
+        for (const key of ["blocks", "gates"]) (doc?.[key] || []).forEach((b, i) => { if (b?.id) paths.blocks.set(String(b.id), `${key}[${i}]`); });
       }
     } catch (error) {
       console.warn("[Blockout] landmarks load failed", error);
     }
     if (this.levelKey !== levelKey || this.landmarksLevel !== levelKey) return [];
     this.landmarks = list;
+    this.scenePaths = paths;
     this.markers.SetLandmarks(list);
     this.map.SetLandmarks(list);
     this.mapTimer = 0;
+    this.PushEditContext();
     return list;
   }
 
@@ -796,8 +836,9 @@ export class EditorBlockout {
     this.ui.SetKeyframes(this.KeyframeList(), index);
     this.map.SetKeyframes(this.doc.keyframes.map(k => ({ id: k.id, stage: k.stage, stageLabel: k.stageLabel, player: { x: k.player.x, z: k.player.z } })), index);
     this.markers.SetStations(this.StationList(), index);
-    // 地图开着时跳关键帧：图跟着挪到新站位（比例不变）
-    if (this.mapOpen) this.FocusMapOnPlayer();
+    this.PushEditContext();
+    // 地图开着时跳关键帧：图跟着挪到新站位（比例不变）；编辑布设开着时不挪（正在对着某处改）
+    if (this.mapOpen && !this.mapEdit.active) this.FocusMapOnPlayer();
     this.cardKey = "";
     this.UpdateCard(true);
     this.mapTimer = 0;
@@ -1433,6 +1474,91 @@ export class EditorBlockout {
   }
 
   // -------------------------------------------------------------------------
+  // 编辑布设（§4.4）
+
+  /** 这一关的改动记录（没有就开一份）。 */
+  LayoutEdits(levelKey = this.levelKey) {
+    let session = this.layoutEdits.get(levelKey);
+    if (!session) { session = new LayoutEditSession(levelKey); this.layoutEdits.set(levelKey, session); }
+    return session;
+  }
+
+  /**
+   * 把此刻能挪的东西交给编辑层（切关键帧、重读配置、地标读回来之后）；顺手把 agent 已经改到位的条目从记录里拿掉
+   *（数据位置 = 改到的位置），数据挪过但没到位的把「原来」更新成新的数据位置。
+   */
+  PushEditContext() {
+    if (!this.mapEdit || !this.doc) return;
+    const kf = this.keyframe, i = this.index;
+    const units = (kf?.units || []).map((u, j) => ({ kind: "unit", id: u.id, keyframeId: kf.id, name: u.name || "", path: `keyframes[${i}].units[${j}]`,
+      meta: { side: u.side, kind: u.kind }, x: u.x, z: u.z, yawDeg: u.yawDeg }));
+    const pois = (kf?.pois || []).filter(p => Number.isFinite(p.x)).map((p) => ({ kind: "poi", id: p.id, keyframeId: kf.id, name: p.name || "",
+      path: `keyframes[${i}].pois[${kf.pois.indexOf(p)}]`, meta: { kind: p.kind }, x: p.x, z: p.z }));
+    const next = kf?.next && Number.isFinite(kf.next.x) ? { kind: "next", id: "next", keyframeId: kf.id, name: kf.next.text || "", path: `keyframes[${i}].next`, x: kf.next.x, z: kf.next.z } : null;
+    const stations = this.doc.keyframes.map((k, n) => ({ kind: "station", id: k.id, keyframeId: k.id, index: n, name: k.name || "", path: `keyframes[${n}].player`,
+      x: k.player.x, z: k.player.z, yawDeg: k.player.yawDeg }));
+    const landmarks = this.landmarks.map(lm => ({ kind: "landmark", id: lm.id, name: lm.name || "", path: this.scenePaths.landmarks.get(lm.id) || "",
+      meta: { kind: lm.kind }, x: lm.x, z: lm.z, ry: Number.isFinite(lm.ry) ? lm.ry : 0 }));
+    const session = this.LayoutEdits();
+    if (this.mapEdit.session !== session) this.mapEdit.SetSession(session);
+    // 体块的 path 在导出时补（编辑层只认 id）；这里先把已有记录的 path 补齐
+    for (const m of session.moves.values()) if (m.kind === "block" && !m.path) m.path = this.scenePaths.blocks.get(m.id) || "";
+    const applied = this.ReconcileLayoutEdits(session);
+    this.mapEdit.SetContext({ keyframeId: kf?.id ?? "", keyframeIndex: i, units, pois, next, stations, landmarks });
+    if (applied) this.ui.Toast(`布设调整里有 ${applied} 处已经改到文件里了，从记录里拿掉`, "ok");
+  }
+
+  /** 数据里现在的位置（找不到 → null），给 LayoutEditSession.Reconcile。 */
+  ReconcileLayoutEdits(session) {
+    if (!session.moveCount) return 0;
+    const kfOf = (id) => this.doc.keyframes.find(k => k.id === id);
+    const blocks = this.game.battlefield?.layout?.blocks || this.phase?.whitebox?.layout?.blocks || [];
+    const blockById = new Map(blocks.filter(b => b?.id).map(b => [String(b.id), b]));
+    // 地标还没读回来（文件场景）时不判地标，免得把记录误当成「找不到」
+    const landmarksReady = this.landmarksLevel === this.levelKey;
+    return session.Reconcile((m) => {
+      if (m.kind === "station") { const k = kfOf(m.keyframeId); return k ? { x: k.player.x, z: k.player.z, yawDeg: k.player.yawDeg } : null; }
+      if (m.kind === "unit") { const u = kfOf(m.keyframeId)?.units.find(q => q.id === m.id); return u ? { x: u.x, z: u.z, yawDeg: u.yawDeg } : null; }
+      if (m.kind === "poi") { const p = kfOf(m.keyframeId)?.pois.find(q => q.id === m.id); return p && Number.isFinite(p.x) ? { x: p.x, z: p.z } : null; }
+      if (m.kind === "next") { const n = kfOf(m.keyframeId)?.next; return n && Number.isFinite(n.x) ? { x: n.x, z: n.z } : null; }
+      if (m.kind === "landmark") { if (!landmarksReady) return null; const lm = this.landmarks.find(q => q.id === m.id); return lm ? { x: lm.x, z: lm.z, ry: lm.ry || 0 } : null; }
+      if (m.kind === "block") { const b = blockById.get(m.id); return b ? { x: b.x, z: b.z, ry: b.ry || 0 } : null; }
+      return null;
+    });
+  }
+
+  /** 改动记录 → 导出对象（Script_EditorBlockoutLayoutEdit.BuildLayoutEditExport）。 */
+  LayoutEditExport() {
+    const session = this.LayoutEdits();
+    for (const m of session.moves.values()) if (m.kind === "block" && !m.path) m.path = this.scenePaths.blocks.get(m.id) || "";
+    const canvas = this.ui.fullCanvas, view = this.map.view, kf = this.keyframe;
+    const scenePath = this.level?.scene?.kind === "file" ? `Taierzhuang1938/${String(this.level.scene.url).replace(/^\.\//, "")}` : "";
+    return BuildLayoutEditExport(session, {
+      level: { key: this.levelKey, label: this.level?.label || this.doc?.title || "", configPath: BlockoutConfigPath(this.levelKey), scenePath },
+      keyframe: kf ? { id: kf.id, index: this.index } : null,
+      near: () => this.mapEdit.NearCandidates(),
+      view: view ? { cx: view.cx, cz: view.cz, spanM: (canvas?.clientWidth || 0) / view.pxPerM } : null,
+      url: location.href,
+    });
+  }
+
+  /** 「导出给 Agent」：文字写进剪贴板；写不进去就弹出选好文字的框。 */
+  async ExportLayoutEdit() {
+    const session = this.LayoutEdits();
+    if (session.empty) { this.ui.Toast("还没挪东西、也没加标记", "warn"); return { ok: false, method: null, text: "" }; }
+    const text = FormatLayoutEdit(this.LayoutEditExport());
+    this.lastLayoutEditText = text;
+    const method = await WriteClipboard(text);
+    if (method) {
+      this.ui.Toast(`已复制布设调整（挪了 ${session.moveCount} 处、标记 ${session.markerCount} 个），直接粘贴给 agent`, "ok");
+    } else {
+      this.ui.ShowCopyText(text, "布设调整");
+      this.ui.Toast("这个窗口不让写剪贴板：文字已经选好，按 Ctrl+C 复制", "warn");
+    }
+    return { ok: !!method, method, text };
+  }
+
+  // -------------------------------------------------------------------------
   // 复制当前位置（§4.2）
 
   /** 准星正前方打一条射线（连地表）：打到体块 → 体块 id（从本关布局里按中心与尺寸认回来）。 */
@@ -1559,6 +1685,7 @@ export class EditorBlockout {
     this.trees.Dispose();
     this.backdrop.Dispose();
     this.markers.Dispose();
+    this.mapEdit.Dispose();
     this.map.Dispose();
     this.ui.Dispose();
     this.root.remove();

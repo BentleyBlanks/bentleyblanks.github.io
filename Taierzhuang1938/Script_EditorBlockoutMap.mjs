@@ -14,6 +14,10 @@
 // 朝向 yawDeg：0 = 朝北（−Z），+90 = 朝西；前方 = (−sin, −cos)。块的 ry（弧度）在画布上是 rotate(−ry)。
 //
 // 输入监听只挂在全关总图那张 canvas 元素上（pointer 事件 + setPointerCapture），**不往 window 挂**。
+//
+// 编辑布设（§4.4，2026-10-21）：SetEditLayer(layer) 挂一个 Script_EditorBlockoutMapEdit；它开着时全关总图的
+// 左键、键盘先问它（它不要的才走平移 / 点关键帧），画动态层前用它的 Override* 换成挪过的位置，画完动态层再调它的 Paint。
+// 小地图不受影响。
 // ===========================================================================
 
 import { DefaultArc } from "./Script_EditorBlockoutConfig.mjs";
@@ -130,7 +134,8 @@ export function ClassifyBlock(block, groundAt = null) {
   return block.h > LOW_MAX_H ? "wall" : "low";
 }
 
-function Corners(b) {
+/** 块脚印的四个角（世界 [x, z]，按 ry 转）。编辑层画挪过的块也用它。 */
+export function BlockCorners(b) {
   const ry = Finite(b.ry) ? b.ry : 0;
   const c = Math.cos(ry), s = Math.sin(ry);
   const hw = b.w / 2, hd = b.d / 2;
@@ -181,6 +186,7 @@ export class BlockoutMap {
     this.repaintQueued = false;
     this.fullDirty = false;     // 约过重画、之后还没真画过
     this.disposed = false;
+    this.editLayer = null;      // 编辑布设（§4.4）：Script_EditorBlockoutMapEdit，SetEditLayer 挂上
     this.miniView = null;       // 最近一次小地图的视图（测试与调试用）
     this.lastMiniMs = 0;
     this.lastFullMs = 0;
@@ -233,15 +239,17 @@ export class BlockoutMap {
       const style = ClassifyBlock(block, groundAt);
       counts[style]++;
       if (style === "skip") continue;
+      // src：块原来的数（编辑布设按 id 认块、按原尺寸画挪过的位置）
+      const src = { id: block.id ? String(block.id) : "", x: block.x, z: block.z, w: block.w, d: block.d, h: block.h, ry: Finite(block.ry) ? block.ry : 0, semantic: block.semantic || "" };
       if (style === "foliage") {
         const r = Math.max(1.1, Math.max(block.w, block.d) / 2);
-        items.push({ style, x: block.x, z: block.z, r, minX: block.x - r, maxX: block.x + r, minZ: block.z - r, maxZ: block.z + r });
+        items.push({ style, x: block.x, z: block.z, r, minX: block.x - r, maxX: block.x + r, minZ: block.z - r, maxZ: block.z + r, src });
         continue;
       }
-      const corners = Corners(block);
+      const corners = BlockCorners(block);
       let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
       for (const [x, z] of corners) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z); }
-      items.push({ style, corners, minX, maxX, minZ, maxZ });
+      items.push({ style, corners, minX, maxX, minZ, maxZ, src });
     }
     items.sort((a, b) => STYLE_ORDER.indexOf(a.style) - STYLE_ORDER.indexOf(b.style));
     this.items = items;
@@ -307,6 +315,15 @@ export class BlockoutMap {
     this.landmarks = (Array.isArray(list) ? list : []).filter(lm => lm && Finite(lm.x) && Finite(lm.z));
     this.RequestFullRepaint();
   }
+
+  /** 挂上 / 摘掉编辑布设层（§4.4）。layer.active 为假时全关总图照旧。 */
+  SetEditLayer(layer) {
+    this.editLayer = layer || null;
+    this.RequestFullRepaint();
+  }
+
+  /** 编辑布设开着吗（全关总图的输入与画法据此分流）。 */
+  get editing() { return !!this.editLayer?.active; }
 
   /**
    * 地标（2026-10-20）：有尺寸的按脚印画描边矩形（片区虚线、其余实线），片区 / 地名的半径画虚线圆；
@@ -666,10 +683,23 @@ export class BlockoutMap {
     ctx.fillRect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y);
     ctx.restore();
     this.PaintBase(ctx, view, dpr, { vector: view.s >= VECTOR_PX_PER_M });
-    this.PaintRoute(ctx, view);
-    this.PaintKeyframeDots(ctx, view);
-    this.PaintDynamic(ctx, view, { mini: false });
-    this.PaintHoverTip(ctx, view);
+    // 编辑布设开着：关键帧点、单位、要点、下一步、地标先换成挪过的位置，画完换回来（只影响这一次全关总图）
+    const layer = this.editing ? this.editLayer : null;
+    const saved = layer ? { keyframes: this.keyframes, landmarks: this.landmarks, dynamic: this.dynamic } : null;
+    if (layer) {
+      this.keyframes = layer.OverrideKeyframes(this.keyframes);
+      this.landmarks = layer.OverrideLandmarks(this.landmarks);
+      const d = this.dynamic;
+      this.dynamic = { ...d, units: layer.OverrideUnits(d.units), pois: layer.OverridePois(d.pois), next: layer.OverrideNext(d.next) };
+    }
+    try {
+      this.PaintRoute(ctx, view);
+      this.PaintKeyframeDots(ctx, view);
+      this.PaintDynamic(ctx, view, { mini: false });
+      if (layer) layer.Paint(ctx, view); else this.PaintHoverTip(ctx, view);
+    } finally {
+      if (saved) Object.assign(this, saved);
+    }
     this.PaintChrome(ctx, view);
     this.fullDirty = false;     // 画的就是最新的：之前约好的那次重画到点不用再画
     this.lastFullMs = Now() - t0;
@@ -793,8 +823,11 @@ export class BlockoutMap {
       if (e.button !== 0 && e.button !== 1 && e.button !== 2) return;
       e.preventDefault();
       try { canvas.setPointerCapture(e.pointerId); } catch { /* 合成事件没有真指针 */ }
-      this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, button: e.button };
-      canvas.classList.add("dragging");
+      const r = canvas.getBoundingClientRect();
+      // 编辑布设开着时左键归编辑层（挪东西 / 框选 / 放标记；拖空地它自己平移）
+      const edit = this.editing && this.editLayer.OnPointerDown(e, e.clientX - r.left, e.clientY - r.top);
+      this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, button: e.button, edit };
+      if (!edit) canvas.classList.add("dragging");
     });
     on("pointermove", (e) => {
       const r = canvas.getBoundingClientRect();
@@ -803,11 +836,17 @@ export class BlockoutMap {
         const dx = e.clientX - this.drag.x, dy = e.clientY - this.drag.y;
         this.drag.x = e.clientX; this.drag.y = e.clientY;
         this.drag.moved += Math.abs(dx) + Math.abs(dy);
-        if (this.drag.moved > 3) this.PanBy(dx, dy);
+        if (this.drag.edit) this.editLayer?.OnPointerMove(e, px, py);
+        else if (this.drag.moved > 3) this.PanBy(dx, dy);
       }
       this.cursor = this.ScreenToWorld(px, py);
-      const hover = this.drag ? -1 : this.PickKeyframe(px, py);
-      if (hover !== this.hover) { this.hover = hover; canvas.style.cursor = hover >= 0 ? "pointer" : ""; }
+      if (this.editing) {
+        this.hover = -1;
+        if (!this.drag) canvas.style.cursor = this.editLayer.Cursor(px, py);
+      } else {
+        const hover = this.drag ? -1 : this.PickKeyframe(px, py);
+        if (hover !== this.hover || canvas.style.cursor === "move" || canvas.style.cursor === "crosshair") { this.hover = hover; canvas.style.cursor = hover >= 0 ? "pointer" : ""; }
+      }
       this.RequestFullRepaint();
     });
     const End = (e) => {
@@ -816,6 +855,11 @@ export class BlockoutMap {
       this.drag = null;
       canvas.classList.remove("dragging");
       try { canvas.releasePointerCapture(e.pointerId); } catch { /* 已释放 */ }
+      if (drag.edit) {
+        const r = canvas.getBoundingClientRect();
+        this.editLayer?.OnPointerUp(e, e.clientX - r.left, e.clientY - r.top);
+        return;
+      }
       if (e.type === "pointerup" && drag.moved <= 3 && drag.button === 0) {
         const r = canvas.getBoundingClientRect();
         const index = this.PickKeyframe(e.clientX - r.left, e.clientY - r.top);
@@ -825,7 +869,9 @@ export class BlockoutMap {
     on("pointerup", End);
     on("pointercancel", End);
     on("pointerleave", () => { if (!this.drag) { this.hover = -1; this.cursor = null; this.RequestFullRepaint(); } });
-    on("dblclick", (e) => { e.preventDefault(); this.FitBounds(); });
+    on("dblclick", (e) => { e.preventDefault(); if (this.editing && this.editLayer.OnDblClick(e)) return; this.FitBounds(); });
+    // 编辑布设：画布有焦点时的键（方向键微调、Q / E 转、Delete、Ctrl+Z / Y、Esc）
+    on("keydown", (e) => { if (this.editing) this.editLayer.OnKey(e); });
     on("contextmenu", (e) => e.preventDefault());
   }
 
@@ -1266,16 +1312,21 @@ function BlitBaked(ctx, img, bs, b, view) {
   ctx.drawImage(img, sx, sy, sw, sh, d0.x, d0.y, (sw / bs) * view.s, (sh / bs) * view.s);
 }
 
+const STYLE_FILLS = Object.freeze({
+  water: Css(MAP_COLORS.water),
+  deck: Css(MAP_COLORS.road),
+  roof: Css(MAP_COLORS.roof),
+  foliage: Css(MAP_COLORS.foliage, 0.72),
+  low: Css(MAP_COLORS.low),
+  wall: Css(MAP_COLORS.wall),
+});
+
+/** 块样式（ClassifyBlock 的结果）的填充色，编辑层画挪过的块用。 */
+export function BlockStyleFill(style) { return STYLE_FILLS[style] || STYLE_FILLS.wall; }
+
 /** 在当前变换（世界米）下画块；items 已按 STYLE_ORDER 排好。 */
 function DrawItems(ctx, items, pxPerM) {
-  const fills = {
-    water: Css(MAP_COLORS.water),
-    deck: Css(MAP_COLORS.road),
-    roof: Css(MAP_COLORS.roof),
-    foliage: Css(MAP_COLORS.foliage, 0.72),
-    low: Css(MAP_COLORS.low),
-    wall: Css(MAP_COLORS.wall),
-  };
+  const fills = STYLE_FILLS;
   let style = null;
   const Flush = () => { if (style) ctx.fill(); };
   for (const item of items) {
