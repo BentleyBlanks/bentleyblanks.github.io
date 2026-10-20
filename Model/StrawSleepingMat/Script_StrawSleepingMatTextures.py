@@ -94,9 +94,13 @@ def KnotPatch(source,cord):
     target=.7*median+.3*np.median(cordRgb[236:304,15:175].reshape(-1,3),axis=0)
     rgb=np.clip(rgba[:,:,:3]*np.clip(target/np.maximum(median,.03),.85,1.15),0,1)
     binary=Image.fromarray(np.uint8(rgba[:,:,3]>.5)*255)
-    flood=binary.copy();ImageDraw.floodfill(flood,(0,0),127)
-    exterior=np.asarray(flood)==127
-    fill=np.where(exterior[:,:,None],target,target*.22)
+    # Padding connects all exterior corners even when the knot touches the
+    # cropped image boundary. Interior gaps remain separate dark cavities.
+    flood=ImageOps.expand(binary,border=1,fill=0);ImageDraw.floodfill(flood,(0,0),127)
+    exterior=np.asarray(flood)[1:-1,1:-1]==127
+    filler=np.asarray(cord.resize(source.size,Image.Resampling.LANCZOS),dtype=np.float32)/255
+    filler*=target/np.maximum(np.median(filler.reshape(-1,3),axis=0),.03)
+    fill=np.where(exterior[:,:,None],np.clip(filler,0,1),target*.22)
     opacity=np.clip((rgba[:,:,3]-.5)/.4,0,1)[:,:,None]
     rgb=rgb*opacity+fill*(1-opacity)
     core=Image.fromarray(np.uint8(rgb*255+.5)).resize((212,212),Image.Resampling.LANCZOS)

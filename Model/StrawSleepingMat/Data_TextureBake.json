@@ -102,7 +102,7 @@
           1024,
           1024
         ],
-        "sha256": "51850a186c34f100f2325b84b7c409c1a403a833ea083532b1f3d5f2bd5e3418",
+        "sha256": "9c7d885a0200ef20ee9917c3460ed2de7af1651b8db0e2052b2ff7b3e0911b90",
         "colorSpace": "sRGB"
       },
       "Normal": {
@@ -111,7 +111,7 @@
           1024,
           1024
         ],
-        "sha256": "e7e5c1f5583169e90b811f515b7c2636ed76537f2bbbec2b15abd20ea1d5158a",
+        "sha256": "45fc15cfd3ea1b39167c4ee817ac03a6a827600ef7446b53c62981ac4b4b2789",
         "colorSpace": "linear data"
       },
       "Roughness": {
@@ -120,7 +120,7 @@
           1024,
           1024
         ],
-        "sha256": "907964fbbb4bb73950271c8a48ea638d9dd248e549f948603734c561bf521688",
+        "sha256": "8d5d7d77197c14c95f40d5b8b311e4b10e36b7d68f27191497baef4cc2d4090e",
         "colorSpace": "linear data"
       },
       "AO": {
@@ -129,7 +129,7 @@
           1024,
           1024
         ],
-        "sha256": "d6df25a69f1349f9f3f94ed808b7033321e1869abdb6b8300b5e4ce348c4c091",
+        "sha256": "96f970c5d30b099583abf005e8dbcd525b9f0128fc084423c69991e1a97d87c0",
         "colorSpace": "linear data"
       }
     }
