@@ -66,6 +66,16 @@ function CanAction(weapon, action) {
   return false;
 }
 
+// 程序动作（白刃等）没有 Blender 骨骼片段，姿势由 Viewmodel 的动作时钟逐帧算出来。
+// 时间轴把同一个正片动作钉在某个进度上（action.hold），不另抄一份动画。
+// 只收纯按进度求值的动作：投掷会真的扔出手榴弹，装填会提交弹药与发声，不能来回拖。
+const ACTION_CLIP_PREFIX = "action:";
+const ACTION_TIMELINE_FPS = 60;
+function ActionClipLabel(weaponId, action) {
+  if (action === "melee") return weaponId === "Dadao" ? "大刀劈砍（程序动作）" : "白刃（程序动作）";
+  return action;
+}
+
 function SetDepth(material, depthTest) {
   const materials = Array.isArray(material) ? material : [material];
   for (const entry of materials) {
@@ -143,6 +153,7 @@ export class FirstPersonEditor {
     this.cleanTimer = null;
     this.refreshTimer = 0;
     this.saved = null;
+    this.actionPreview = null;
   }
 
   Enter(root) {
@@ -175,6 +186,8 @@ export class FirstPersonEditor {
     const viewmodel = this.host.viewmodel;
     this.ClearCleanMode();
     this.DisposeDiagnostics();
+    if (viewmodel?.action?.hold != null) viewmodel.action = null;
+    this.actionPreview = null;
     if (viewmodel && this.saved) {
       viewmodel.root.removeFromParent();
       if (this.saved.parent) this.saved.parent.add(viewmodel.root);
@@ -258,10 +271,10 @@ export class FirstPersonEditor {
       {label:"实时输入",onClick:()=>this.ClearAnimation()},
     ]);
     this.animationLoop = Toggle(timeline,"循环",true,on=>{
-      const preview=this.host.viewmodel.skeletalAnimation?.preview;if(preview)preview.loop=on;
+      const preview=this.ActivePreview();if(preview)preview.loop=on;
     });
     this.animationSpeed = Slider(timeline,{label:"播放速度",min:.1,max:2,step:.1,value:1,format:value=>`${value.toFixed(1)}×`,onInput:value=>{
-      const preview=this.host.viewmodel.skeletalAnimation?.preview;if(preview)preview.speed=value;
+      const preview=this.ActivePreview();if(preview)preview.speed=value;
     }});
     this.animationTime = Note(timeline,"");
 
@@ -397,6 +410,8 @@ export class FirstPersonEditor {
 
   SetWeapon(id, variant = 0) {
     if (!FIRST_PERSON_IDS.includes(id)) return false;
+    // 时间轴是按装备列的（骨骼片段 / 程序动作），换装备先把上一件的预览收掉。
+    if (this.actionPreview || this.host.viewmodel.skeletalAnimation?.preview) this.ClearAnimation();
     this.weaponId = id;
     const variants = WEAPON_MESH_VARIANTS[id] || [];
     this.weaponVariant = variants.length && variant > 0 && variant < variants.length ? variant | 0 : 0;
@@ -513,30 +528,97 @@ export class FirstPersonEditor {
   RefreshAnimationList() {
     if(!this.animationSelect)return;
     this.animationSelect.replaceChildren();
-    const names=this.host.viewmodel.skeletalAnimation?.Clips()||[];
+    const names=this.AnimationNames();
     for(const name of names){
-      const option=document.createElement('option');option.value=name;option.textContent=FPS_ANIMATION_LABELS[name]||name;
+      const action=this.ActionClip(name);
+      const option=document.createElement('option');option.value=name;
+      option.textContent=action?ActionClipLabel(this.weaponId,action):FPS_ANIMATION_LABELS[name]||name;
       this.animationSelect.appendChild(option);
     }
     this.animationSelect.disabled=!names.length;
     this.RefreshAnimationTimeline();
   }
 
+  AnimationNames() {
+    const weapon=WEAPONS[this.weaponId];
+    return [...(this.host.viewmodel.skeletalAnimation?.Clips()||[]),
+      ...(CanAction(weapon,"melee")?[ACTION_CLIP_PREFIX+"melee"]:[])];
+  }
+
+  /** "action:melee" → "melee"；不是本装备能做的程序动作就返回 null。 */
+  ActionClip(name) {
+    if(typeof name!=='string'||!name.startsWith(ACTION_CLIP_PREFIX))return null;
+    const action=name.slice(ACTION_CLIP_PREFIX.length);
+    return action==="melee"&&CanAction(WEAPONS[this.weaponId],action)?action:null;
+  }
+
+  /** 当前时间轴背后的那份播放状态（骨骼片段或程序动作），没有就是 null。 */
+  ActivePreview() {
+    return this.actionPreview||this.host.viewmodel.skeletalAnimation?.preview||null;
+  }
+
+  DefaultAnimation() {
+    return this.animationSelect?.value||this.AnimationNames()[0]||'Idle';
+  }
+
   SetAnimation(name,options={}) {
     const vm=this.host.viewmodel;
-    if(!vm.skeletalAnimation?.Clip(name))return false;
+    const action=this.ActionClip(name);
+    if(!action&&!vm.skeletalAnimation?.Clip(name))return false;
+    this.ClearAnimation();
     vm.action=null;vm.pendingBoltAt=-1;vm._ResetAnimatedParts();
     vm.adsSpring.Set(0);vm.sprintSpring.Set(0);
     this.ads=0;this.sprint=0;
     this.animationSelect.value=name;
-    const result=vm.skeletalAnimation.SetPreview(name,options);
+    const result=action?this.StartActionPreview(action,options):vm.skeletalAnimation.SetPreview(name,options);
     this.SetStudioFov(this.PlayerFov());
     this.RefreshAnimationTimeline();this.UpdateDiagnostics();return result;
   }
 
+  StartActionPreview(action,{time=0,playing=false,loop=true,speed=1}={}) {
+    const vm=this.host.viewmodel;
+    if(!Number.isFinite(time)||!Number.isFinite(speed))return false;
+    if(action!=="melee"||!vm.TriggerMelee()||!vm.action)return false;
+    const duration=vm.action.duration;
+    this.actionPreview={name:ACTION_CLIP_PREFIX+action,action,kind:vm.action.kind,mode:vm.action.melee,duration,
+      time:THREE.MathUtils.clamp(time,0,duration),playing:!!playing,loop:!!loop,speed:THREE.MathUtils.clamp(speed,.1,2)};
+    this.SettleActionPreview();
+    return this.AnimationSnapshot();
+  }
+
+  /** 把正片动作钉在预览进度上；动作被别的入口清掉了就按同一模式重新起一次。 */
+  HoldActionPreview() {
+    const preview=this.actionPreview,vm=this.host.viewmodel;
+    if(!preview)return false;
+    if(vm.action?.kind!==preview.kind||vm.action.hold==null){
+      vm.action=null;
+      if(!vm.TriggerMelee(preview.mode)||!vm.action){this.actionPreview=null;return false;}
+    }
+    vm.action.hold=preview.duration?preview.time/preview.duration:0;
+    return true;
+  }
+
+  /**
+   * 拖动/逐帧之后让双臂落到这一帧。大刀的肘轨是采样好的，一帧就到位；其余动作的肘平面
+   * 带历史限速，多走几步同一进度，避免拖动结果取决于上一次停在哪。
+   */
+  SettleActionPreview() {
+    if(!this.HoldActionPreview())return false;
+    for(let i=0;i<8;i++)this.StepViewmodel(1/60);
+    return true;
+  }
+
   SeekAnimation({seconds,normalized,frame}={}) {
+    if(!this.ActivePreview()&&!this.SetAnimation(this.DefaultAnimation()))return false;
+    if(this.actionPreview){
+      const preview=this.actionPreview;
+      const time=seconds??(normalized!=null?normalized*preview.duration:frame!=null?frame/ACTION_TIMELINE_FPS:NaN);
+      if(!Number.isFinite(time))return false;
+      preview.time=THREE.MathUtils.clamp(time,0,preview.duration);preview.playing=false;
+      this.SettleActionPreview();
+      this.RefreshAnimationTimeline();this.UpdateDiagnostics();return this.AnimationSnapshot();
+    }
     const player=this.host.viewmodel.skeletalAnimation;
-    if(!player?.preview&&!this.SetAnimation(this.animationSelect?.value||'Idle'))return false;
     const clip=player.Clip(player.preview.name);
     const time=seconds??(normalized!=null?normalized*clip.duration:frame!=null?frame*clip.duration/(clip.count-1):NaN);
     const result=player.Seek(time);
@@ -549,18 +631,22 @@ export class FirstPersonEditor {
   }
 
   SetAnimationPlayback(options={}) {
-    const player=this.host.viewmodel.skeletalAnimation;
-    if(!player?.preview&&!this.SetAnimation(this.animationSelect?.value||'Idle'))return false;
+    if(!this.ActivePreview()&&!this.SetAnimation(this.DefaultAnimation()))return false;
     if(options.speed!=null&&!Number.isFinite(options.speed))return false;
-    if(options.playing!=null)player.preview.playing=!!options.playing;
-    if(options.loop!=null)player.preview.loop=!!options.loop;
-    if(options.speed!=null)player.preview.speed=Math.max(.1,Math.min(2,options.speed));
-    this.RefreshAnimationTimeline();return player.Snapshot();
+    const preview=this.ActivePreview();
+    // 播完停在末帧的程序动作，再按播放从头来，和骨骼片段的循环口径一致。
+    if(options.playing&&this.actionPreview&&!preview.loop&&preview.time>=preview.duration)preview.time=0;
+    if(options.playing!=null)preview.playing=!!options.playing;
+    if(options.loop!=null)preview.loop=!!options.loop;
+    if(options.speed!=null)preview.speed=Math.max(.1,Math.min(2,options.speed));
+    this.RefreshAnimationTimeline();return this.AnimationSnapshot();
   }
 
   StepAnimation(delta=1) {
+    if(!this.ActivePreview()&&!this.SetAnimation(this.DefaultAnimation()))return false;
+    if(this.actionPreview)
+      return this.SeekAnimation({frame:Math.round(this.actionPreview.time*ACTION_TIMELINE_FPS)+Math.trunc(delta)});
     const player=this.host.viewmodel.skeletalAnimation;
-    if(!player?.preview&&!this.SetAnimation(this.animationSelect?.value||'Idle'))return false;
     const clip=player.Clip(player.preview.name);
     const frame=Math.round(player.preview.time/clip.duration*(clip.count-1))+Math.trunc(delta);
     return this.SeekAnimation({frame});
@@ -569,12 +655,23 @@ export class FirstPersonEditor {
   ClearAnimation() {
     const vm=this.host.viewmodel;
     if(vm?.skeletalAnimation)vm.skeletalAnimation.preview=null;
+    if(this.actionPreview&&vm?.action?.hold!=null)vm.action=null;
+    this.actionPreview=null;
     vm?.armAnchor.position.set(0,0,0);vm?.armAnchor.quaternion.identity();vm?.armAnchor.scale.set(1,1,1);
     this.RefreshAnimationTimeline();return true;
   }
 
+  AnimationSnapshot() {
+    const preview=this.actionPreview;
+    if(!preview)return this.host.viewmodel.skeletalAnimation?.Snapshot()||null;
+    const frames=Math.round(preview.duration*ACTION_TIMELINE_FPS)+1;
+    return {available:this.AnimationNames(),name:preview.name,time:preview.time,duration:preview.duration,
+      frame:Math.min(frames-1,Math.round(preview.time*ACTION_TIMELINE_FPS)),frames,source:'ProceduralAction',
+      action:preview.action,mode:preview.mode,playing:preview.playing,loop:preview.loop,speed:preview.speed};
+  }
+
   RefreshAnimationTimeline() {
-    const snapshot=this.host.viewmodel.skeletalAnimation?.Snapshot();
+    const snapshot=this.AnimationSnapshot();
     if(this.animationLoop)this.animationLoop.Set(snapshot?.loop??true);
     if(this.animationSpeed)this.animationSpeed.Set(snapshot?.speed??1);
     if(this.animationPosition)this.animationPosition.Set(snapshot?.duration?snapshot.time/snapshot.duration:0);
@@ -742,7 +839,7 @@ export class FirstPersonEditor {
       view: this.view,
       inspectPreset: this.inspectPreset || null,
       pose: this.pose,
-      animation: viewmodel.skeletalAnimation?.Snapshot()||null,
+      animation: this.AnimationSnapshot(),
       ads: +this.ads.toFixed(3),
       sprint: +this.sprint.toFixed(3),
       rigSource: viewmodel.rigSource,
@@ -840,15 +937,27 @@ export class FirstPersonEditor {
     if (this.view === "inspect") this.studio.Zoom(delta);
   }
 
-  Update(dt) {
-    const viewmodel = this.host.viewmodel;
-    this.time += dt;
-    this.refreshTimer -= dt;
-    viewmodel.Update(dt, {
+  StepViewmodel(dt) {
+    this.host.viewmodel.Update(dt, {
       dt, moveSpeed: this.sprint ? 4 : 0, strafe: 0, grounded: true, sprint: this.sprint,
       ads: this.ads, lookDeltaYaw: 0, lookDeltaPitch: 0,
       crouch: 0, elapsed: this.time, lowAmmo: false,
     });
+  }
+
+  Update(dt) {
+    this.time += dt;
+    this.refreshTimer -= dt;
+    const preview = this.actionPreview;
+    if (preview?.playing) {
+      preview.time += dt * preview.speed;
+      if (preview.time > preview.duration) {
+        if (preview.loop) preview.time %= preview.duration;
+        else { preview.time = preview.duration; preview.playing = false; }
+      }
+    }
+    if (preview) this.HoldActionPreview();
+    this.StepViewmodel(dt);
     this.RefreshAnimationTimeline();
     this.UpdateDiagnostics();
     this.RefreshFacts();

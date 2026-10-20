@@ -3126,11 +3126,14 @@ export class Viewmodel {
 
     if (!this.action || !this.rig) return;
     const a = this.action;
-    a.t += dt / a.duration;
+    // 第一人称检查器的时间轴把动作钉在 hold（0..1）上：不推进、不收招，
+    // 每帧照样从 _ResetAnimatedParts 起把整套姿势按这个进度重算一遍。
+    if (a.hold != null) a.t = Clamp01(a.hold);
+    else a.t += dt / a.duration;
     a.reloadTimeline?.Advance(a.t, event => this.onReloadEvent?.(event, a));
     if (a.kind === "meleeWind") {
       a.t = Math.min(a.t, 1);      // 蓄力顶满就停住，出招由松手驱动，不自动结束
-    } else if (a.t >= 1) {
+    } else if (a.t >= 1 && a.hold == null) {
       this._EndAction(a);
       return;
     }
@@ -4111,12 +4114,18 @@ export class Viewmodel {
     this.weaponMount.position.sub(grip).applyQuaternion(rotation).add(grip).add(displacement);
     this.weaponMount.quaternion.premultiply(rotation);
     const body = rig._CurrentBody();
-    rig.videoBody = {shoulders:{},elbowPoles:{},authoredElbows:frame.source === 'BlenderDadaoPowerSwing'};
+    const authoredElbows = frame.source === 'BlenderDadaoPowerSwing';
+    rig.videoBody = {shoulders:{},elbowPoles:{},authoredElbows};
     for (const [key,offset,pole] of [["right",7,13],["left",10,16]]) {
       rig.videoBody.shoulders[key] = new THREE.Vector3().fromArray(body.shoulders[key])
         .add(new THREE.Vector3().fromArray(values,offset).multiplyScalar(scale*weight)).toArray();
-      rig.videoBody.elbowPoles[key] = new THREE.Vector3().fromArray(body.elbowPoles[key]).normalize()
-        .lerp(new THREE.Vector3().fromArray(values,pole).normalize(),weight*(rig.videoBody.authoredElbows ? 1 : .65)).normalize().toArray();
+      // 大刀的肘轨是逐帧拟合好的肘位，首尾帧就是静止架势那一个肘位。起刀/收招 0.07 s
+      // 交接（weight<1）若拿架势默认肘向去混，混出来的方向被腕弯上限一夹会先掉到手下面、
+      // 交接一结束又弹回去 —— 收招那一下的「抖」。所以 authored 肘向不跟 weight 混。
+      const authored = new THREE.Vector3().fromArray(values,pole).normalize();
+      rig.videoBody.elbowPoles[key] = authoredElbows ? authored.toArray()
+        : new THREE.Vector3().fromArray(body.elbowPoles[key]).normalize()
+          .lerp(authored,weight*.65).normalize().toArray();
     }
   }
 

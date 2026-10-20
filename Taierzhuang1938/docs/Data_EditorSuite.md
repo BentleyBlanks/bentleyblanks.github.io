@@ -278,6 +278,13 @@ TAA 开放当前帧权重、抖动幅度和锐化；GI 开放采样偏移、反�
 `SetWeapon / SetView / SetInspectPreset / SetPose / Snapshot`；固定出图入口是
 `Script_FpsGripEditorShot.mjs`，加 `--all` 可把全部 15 项的玩家/右后外部视角一次拍完。
 
+「骨骼动画时间轴」列两类片段：Blender 导出的骨骼片段（如汉阳造「持枪呼吸」），以及可检查的
+程序动作（当前是白刃，大刀显示为「大刀劈砍（程序动作）」，值为 `action:melee`）。程序动作不另写
+动画：时间轴给正片动作设 `action.hold`（0..1），`Viewmodel._StepAction` 就不推进、不收招，每帧照常
+从 `_ResetAnimatedParts` 起按这个进度重算，按 60 fps 计帧。拖动 / 逐帧后会按同一进度多走几步，
+让带历史限速的肘平面落定。投掷（会真扔出手榴弹）和装填（提交弹药、发声）不进时间轴。
+`Debug.FirstPersonAnimation({ weapon:"Dadao", clip:"action:melee", normalized:0.46 })` 与面板同一条路。
+
 ### 音效音乐 `Script_EditorAudio.mjs`
 
 每个音有**两层**：底层是 WebAudio 现场合成的 32 个配方，上面盖着一层实录采样

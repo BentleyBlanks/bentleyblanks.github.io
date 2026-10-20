@@ -305,6 +305,30 @@ try{
   await page.evaluate(phase=>{Taierzhuang.Debug.MeleeCombat.Preview('Light',phase);Taierzhuang.StepFrames(2,0,true);},phase);
   await page.screenshot({path:path.join(out,`Scene_Dadao_${Math.round(phase*100)}.png`)});
  }
+ // Combat enters and leaves the stroke through 0.07 s blends with the guard,
+ // which has no video clip. Mixing the fitted elbows with the default guard pole
+ // used to clamp the support elbow below the hands and snap it back afterwards.
+ const handoff=await page.evaluate(async()=>{
+  const THREE=await import('./vendor/three/build/three.module.js');
+  const T=Taierzhuang,L=T.Debug.MeleeCombat;L.Preview(null);L.Select('DadaoOne');L.Pause(true);T.StepFrames(90,1/60,false);
+  const v=T.viewmodel,r=v.riggedArms,P=side=>r._InAnchor(r.bones[side].forearm,new THREE.Vector3());
+  const start={r:P('r'),l:P('l')};
+  if(!T.meleeCombat.Attack(T.player,false))throw Error('Player attack did not start');
+  const result={blendStep:0,blendFrames:0,guardReturn:0};let previous={r:start.r.clone(),l:start.l.clone()};
+  for(let i=0;i<150;i++){
+   T.StepFrames(1,1/120,false);const pose=T.meleeCombat.ViewPose();
+   for(const side of ['r','l']){
+    const elbow=P(side);
+    if(pose?.transition){result.blendStep=Math.max(result.blendStep,elbow.distanceTo(previous[side]));result.blendFrames++;}
+    previous[side]=elbow;
+   }
+  }
+  for(const side of ['r','l'])result.guardReturn=Math.max(result.guardReturn,previous[side].distanceTo(start[side]));
+  return result;
+ });
+ assert(handoff.blendFrames>8,`Combat did not blend into and out of the stroke (${handoff.blendFrames} samples)`);
+ assert(handoff.blendStep<.015,`Elbow jumps during the guard/stroke hand-off: ${handoff.blendStep} m per 1/120 s`);
+ assert(handoff.guardReturn<.002,`Elbow does not settle back on the guard pose: ${handoff.guardReturn} m`);
  const inspector=await page.evaluate(async()=>{
   const THREE=await import('./vendor/three/build/three.module.js');
   const {MELEE_WEAPONS}=await import('./Data_MeleeCombat.mjs');

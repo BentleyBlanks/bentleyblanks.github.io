@@ -287,8 +287,11 @@ export const FPS_ARM_POSES = Freeze({
     ...FPS_WEAPON_GRIPS.GrenadeBundle,
     actions: { throw: { family: "bundleGrenade", release: 0.50 } },
   }),
+  // 冲刺 = 腰射架势绕相机 X 轴前倾 12°（刀尖往前倒一点），位置不动。旧值 (-0.13,-0.52,1.89)
+  // 是 09-16 刃口翻面之前的架势，和现在的腰射差 163°，冲刺时整把刀连双手拧半圈。
+  // 欧拉角线性混合只在两端相近时成立，所以这里的旋转必须由腰射架势推出来，不能另调。
   Dadao: WeaponPose({
-    family: "melee", hip: FixedPose(V(...FPS_DADAO_SWING.guardWeaponPosition), V(...FPS_DADAO_SWING.guardWeaponRotation)), ads: FixedPose(V(0.175, -0.170, -0.470), V(0.900, -0.540, -1.500)), sprint: FixedPose(V(0.255, -0.225, -0.500), V(-0.130, -0.520, 1.890)),
+    family: "melee", hip: FixedPose(V(...FPS_DADAO_SWING.guardWeaponPosition), V(...FPS_DADAO_SWING.guardWeaponRotation)), ads: FixedPose(V(0.175, -0.170, -0.470), V(0.900, -0.540, -1.500)), sprint: FixedPose(V(...FPS_DADAO_SWING.guardWeaponPosition), V(0.5471, -0.7016, -0.8397)),
     ...FPS_WEAPON_GRIPS.Dadao,
     actions: { melee: { family: "dadao", release: 0.18 } },
   }),

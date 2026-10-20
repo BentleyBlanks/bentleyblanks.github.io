@@ -131,6 +131,52 @@ try {
     views.player.parentIsCamera && views.player.state.view === "player",
     `parent=${views.player.state.rootParent}`);
 
+  // 大刀没有 Blender 骨骼片段：时间轴列的是程序动作，面板的滑杆 / 按钮要真的驱动正片挥刀。
+  const timeline = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    const editor = T.editor.active;
+    const vm = T.viewmodel;
+    editor.SetWeapon("Dadao");
+    editor.SetView("player");
+    editor.SetPose("hip");
+    for (let i = 0; i < 30; i += 1) editor.Update(1 / 60);
+    const options = [...editor.animationSelect.options].map((option) => [option.value, option.textContent]);
+    const guard = vm.weaponMount.quaternion.clone();
+    const Button = (label) => [...editor.panel.root.querySelectorAll("button")].find((button) => button.textContent === label);
+    const slider = editor.animationPosition.root.querySelector("input");
+    slider.value = "0.46";
+    slider.dispatchEvent(new Event("input"));
+    const dragged = editor.Snapshot().animation;
+    const turned = 2 * Math.acos(Math.min(1, Math.abs(vm.weaponMount.quaternion.dot(guard)))) * 180 / Math.PI;
+    const wrist = Math.max(vm.riggedArms.wristBend.r, vm.riggedArms.wristBend.l);
+    Button("后一帧").click();
+    const stepped = editor.Snapshot().animation;
+    Button("播放").click();
+    for (let i = 0; i < 12; i += 1) editor.Update(1 / 60);
+    const played = editor.Snapshot().animation;
+    Button("暂停").click();
+    const paused = editor.Snapshot().animation;
+    Button("实时输入").click();
+    for (let i = 0; i < 4; i += 1) editor.Update(1 / 60);
+    return { options, dragged, turned, wrist, stepped, played, paused,
+      cleared: editor.Snapshot().animation?.source === "ProceduralAction", action: vm.action?.kind || null };
+  });
+  Check("大刀时间轴列出劈砍程序动作",
+    timeline.options.some(([value, label]) => value === "action:melee" && label.includes("大刀劈砍")),
+    timeline.options.map((option) => option.join("=")).join(", "));
+  Check("拖动播放位置把正片挥刀钉在该进度",
+    timeline.dragged?.source === "ProceduralAction" && !timeline.dragged.playing
+      && Math.abs(timeline.dragged.time / timeline.dragged.duration - 0.46) < 0.002 && timeline.turned > 30,
+    `${timeline.dragged?.time?.toFixed(3)}/${timeline.dragged?.duration} s · 刀转 ${timeline.turned.toFixed(1)}°`);
+  Check("拖动后的姿势守住腕弯上限", timeline.wrist <= 65.01, `${timeline.wrist.toFixed(1)}°`);
+  Check("后一帧前进一帧", timeline.stepped?.frame === timeline.dragged.frame + 1,
+    `${timeline.dragged.frame} → ${timeline.stepped?.frame}`);
+  Check("播放 / 暂停驱动程序动作时钟",
+    timeline.played?.playing && timeline.played.time > timeline.stepped.time && !timeline.paused?.playing,
+    `${timeline.stepped?.time?.toFixed(3)} → ${timeline.played?.time?.toFixed(3)} s`);
+  Check("实时输入收掉钉住的动作", !timeline.cleared && timeline.action === null,
+    `仍在程序动作=${timeline.cleared} action=${timeline.action}`);
+
   const restored = await page.evaluate(() => {
     const T = window.Taierzhuang;
     T.editor.Close();
