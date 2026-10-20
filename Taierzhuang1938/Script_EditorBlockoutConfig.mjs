@@ -10,6 +10,15 @@ export const BLOCKOUT_SCHEMA = "tengxian-blockout/1";
 export const BLOCKOUT_SCENE_SCHEMA = "tengxian-blockout-scene/1";
 /** 场景文件 paint（地面涂色，§2.2）最多几项。 */
 export const BLOCKOUT_PAINT_MAX_ITEMS = 5000;
+/**
+ * 场景文件 backdrop（远景层，§2.2，2026-10-20）的上限与种类：只看不走的远处地面、田块、路、村子、山包。
+ * shapes 的 kind：box（房墙 / 屋顶 / 院墙）、blob（一团树冠）、hill（低山包）、tree（编辑器的枯树模型，同场地里的树）。
+ */
+export const BLOCKOUT_BACKDROP = Object.freeze({
+  shapeKinds: Object.freeze(["box", "blob", "hill", "tree"]),
+  maxShapes: 8000, maxPaint: 2000, maxRects: 40000, maxPalette: 64,
+  farMin: 100, farMax: 20000, radiusMax: 20000, blendMax: 2000,
+});
 export const BLOCKOUT_LEVEL_KEYS = Object.freeze(["FirstLevel", "SecondLevel", "FirstLevel0105", "FirstLevel0610", "FirstLevel1218"]);
 export const BLOCKOUT_LEVEL_RE = /^[A-Za-z0-9]+$/;
 export const BLOCKOUT_CONFIG_FILE_RE = /^Taierzhuang1938\/Blockout\/[A-Za-z0-9]+\.json$/;
@@ -373,27 +382,109 @@ export function ValidateBlockoutScene(doc) {
     else {
       if (doc.paint.length > BLOCKOUT_PAINT_MAX_ITEMS) errors.push(`paint 最多 ${BLOCKOUT_PAINT_MAX_ITEMS} 项，现在 ${doc.paint.length}`);
       const paintIds = new Set();
-      const PointsOk = (list, min) => Array.isArray(list) && list.length >= min && list.every(p => IsObject(p) && Finite(p.x) && Finite(p.z));
       doc.paint.forEach((item, i) => {
         const at = `paint[${i}]`;
         if (!IsObject(item)) { errors.push(`${at} 要是对象`); return; }
         if (typeof item.id !== "string" || !item.id) errors.push(`${at}.id 要是非空字符串`);
         else if (paintIds.has(item.id)) errors.push(`${at}.id 重复：${item.id}`);
         else paintIds.add(item.id);
-        if (typeof item.color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(item.color)) errors.push(`${at}.color 要是 "#rrggbb"`);
-        if (item.strength !== undefined && !(Finite(item.strength) && item.strength >= 0 && item.strength <= 1)) errors.push(`${at}.strength 要在 0…1`);
-        if (item.feather !== undefined && !(Finite(item.feather) && item.feather > 0 && item.feather <= 20)) errors.push(`${at}.feather 要在 (0, 20] 米`);
-        const hasPoly = item.poly !== undefined, hasLine = item.line !== undefined;
-        if (hasPoly === hasLine) errors.push(`${at} 要有 poly 或 line 其中一个`);
-        else if (hasPoly && !PointsOk(item.poly, 3)) errors.push(`${at}.poly 要是至少 3 个 {x, z} 点`);
-        else if (hasLine) {
-          if (!PointsOk(item.line, 2)) errors.push(`${at}.line 要是至少 2 个 {x, z} 点`);
-          if (!(Finite(item.halfW) && item.halfW > 0)) errors.push(`${at}.halfW 要是正数（米）`);
-        }
+        PaintItemIssues(item, at, errors);
       });
     }
   }
+  // 可选 backdrop（§2.2，2026-10-20）：远景层，只看不走（不进碰撞、寻路、玩家能走的范围）
+  if (doc.backdrop !== undefined) BackdropIssues(doc.backdrop, errors);
   return { ok: errors.length === 0, errors, warnings };
+}
+
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+/** paint 一项（poly / line）的问题（场景 paint 与远景层 paint 共用）。 */
+function PaintItemIssues(item, at, errors) {
+  const PointsOk = (list, min) => Array.isArray(list) && list.length >= min && list.every(p => IsObject(p) && Finite(p.x) && Finite(p.z));
+  if (typeof item.color !== "string" || !HEX_RE.test(item.color)) errors.push(`${at}.color 要是 "#rrggbb"`);
+  if (item.strength !== undefined && !(Finite(item.strength) && item.strength >= 0 && item.strength <= 1)) errors.push(`${at}.strength 要在 0…1`);
+  if (item.feather !== undefined && !(Finite(item.feather) && item.feather > 0 && item.feather <= 20)) errors.push(`${at}.feather 要在 (0, 20] 米`);
+  const hasPoly = item.poly !== undefined, hasLine = item.line !== undefined;
+  if (hasPoly === hasLine) errors.push(`${at} 要有 poly 或 line 其中一个`);
+  else if (hasPoly && !PointsOk(item.poly, 3)) errors.push(`${at}.poly 要是至少 3 个 {x, z} 点`);
+  else if (hasLine) {
+    if (!PointsOk(item.line, 2)) errors.push(`${at}.line 要是至少 2 个 {x, z} 点`);
+    if (!(Finite(item.halfW) && item.halfW > 0)) errors.push(`${at}.halfW 要是正数（米）`);
+  }
+}
+
+/**
+ * 远景层（§2.2 backdrop）校验：
+ *   far（远裁剪，米）、ground { color, y, radiusM, blendM }、haze { color, fromM, toM, max }（可选）、
+ *   paint（按顺序画进远景地面：poly / line 同场景 paint，或 { id, rects: [[x0, z0, x1, z1, 色号], …], palette: ["#rrggbb", …] }）、
+ *   shapes（box / blob / hill / tree，见 BLOCKOUT_BACKDROP）。
+ */
+function BackdropIssues(bd, errors) {
+  const L = BLOCKOUT_BACKDROP;
+  if (!IsObject(bd)) { errors.push("backdrop 要是对象"); return; }
+  if (!(Finite(bd.far) && bd.far >= L.farMin && bd.far <= L.farMax)) errors.push(`backdrop.far 要在 ${L.farMin}…${L.farMax} 米`);
+  const g = bd.ground;
+  if (!IsObject(g)) errors.push("backdrop.ground 要是对象 { color, y, radiusM, blendM }");
+  else {
+    if (typeof g.color !== "string" || !HEX_RE.test(g.color)) errors.push('backdrop.ground.color 要是 "#rrggbb"');
+    if (!Finite(g.y)) errors.push("backdrop.ground.y 要是有限数字（米）");
+    if (!(Finite(g.radiusM) && g.radiusM > 0 && g.radiusM <= L.radiusMax)) errors.push(`backdrop.ground.radiusM 要在 (0, ${L.radiusMax}] 米`);
+    if (g.blendM !== undefined && !(Finite(g.blendM) && g.blendM >= 0 && g.blendM <= L.blendMax)) errors.push(`backdrop.ground.blendM 要在 0…${L.blendMax} 米`);
+  }
+  if (bd.haze !== undefined) {
+    const h = bd.haze;
+    if (!IsObject(h) || typeof h.color !== "string" || !HEX_RE.test(h.color) || !Finite(h.fromM) || !Finite(h.toM) || h.fromM < 0 || h.toM <= h.fromM
+      || !(Finite(h.max) && h.max >= 0 && h.max <= 1)) errors.push('backdrop.haze 要是 { color: "#rrggbb", fromM ≥ 0, toM > fromM, max 0…1 }');
+  }
+  const ids = new Set();
+  const Id = (item, at) => {
+    if (typeof item.id !== "string" || !item.id) errors.push(`${at}.id 要是非空字符串`);
+    else if (ids.has(item.id)) errors.push(`${at}.id 重复：${item.id}`);
+    else ids.add(item.id);
+  };
+  if (bd.paint !== undefined) {
+    if (!Array.isArray(bd.paint)) errors.push("backdrop.paint 要是数组");
+    else {
+      if (bd.paint.length > L.maxPaint) errors.push(`backdrop.paint 最多 ${L.maxPaint} 项，现在 ${bd.paint.length}`);
+      bd.paint.forEach((item, i) => {
+        const at = `backdrop.paint[${i}]`;
+        if (!IsObject(item)) { errors.push(`${at} 要是对象`); return; }
+        Id(item, at);
+        if (item.rects === undefined) { PaintItemIssues(item, at, errors); return; }
+        const pal = item.palette;
+        if (!Array.isArray(pal) || !pal.length || pal.length > L.maxPalette || !pal.every(c => typeof c === "string" && HEX_RE.test(c))) {
+          errors.push(`${at}.palette 要是 1…${L.maxPalette} 个 "#rrggbb"`); return;
+        }
+        if (!Array.isArray(item.rects) || item.rects.length > L.maxRects) { errors.push(`${at}.rects 要是至多 ${L.maxRects} 个 [x0, z0, x1, z1, 色号]`); return; }
+        let bad = 0, first = -1;
+        item.rects.forEach((r, k) => {
+          const ok = Array.isArray(r) && r.length === 5 && r.slice(0, 4).every(Finite) && r[2] > r[0] && r[3] > r[1] && Number.isInteger(r[4]) && r[4] >= 0 && r[4] < pal.length;
+          if (!ok) { bad += 1; if (first < 0) first = k; }
+        });
+        if (bad) errors.push(`${at}.rects 有 ${bad} 个不对（第一个是 [${first}]）：要是 [x0, z0, x1, z1, 色号]，x1 > x0、z1 > z0、色号是 palette 的下标`);
+      });
+    }
+  }
+  if (bd.shapes !== undefined) {
+    if (!Array.isArray(bd.shapes)) errors.push("backdrop.shapes 要是数组");
+    else {
+      if (bd.shapes.length > L.maxShapes) errors.push(`backdrop.shapes 最多 ${L.maxShapes} 个，现在 ${bd.shapes.length}`);
+      bd.shapes.forEach((sh, i) => {
+        const at = `backdrop.shapes[${i}]`;
+        if (!IsObject(sh)) { errors.push(`${at} 要是对象`); return; }
+        Id(sh, at);
+        if (!L.shapeKinds.includes(sh.kind)) { errors.push(`${at}.kind 要是 ${L.shapeKinds.join(" / ")}`); return; }
+        if (!Finite(sh.x) || !Finite(sh.z)) errors.push(`${at} 要带有限的 x / z`);
+        if (!(Finite(sh.h) && sh.h > 0)) errors.push(`${at}.h 要是正数（米）`);
+        if (sh.lift !== undefined && !Finite(sh.lift)) errors.push(`${at}.lift 要是有限数字（离地，米）`);
+        if (sh.ry !== undefined && !Finite(sh.ry)) errors.push(`${at}.ry 要是有限数字（弧度）`);
+        if (sh.kind !== "tree" && (typeof sh.color !== "string" || !HEX_RE.test(sh.color))) errors.push(`${at}.color 要是 "#rrggbb"`);
+        if (sh.topColor !== undefined && (typeof sh.topColor !== "string" || !HEX_RE.test(sh.topColor))) errors.push(`${at}.topColor 要是 "#rrggbb"`);
+        if (sh.kind === "box" && !(Finite(sh.w) && sh.w > 0 && Finite(sh.d) && sh.d > 0)) errors.push(`${at}（box）要带正的 w / d`);
+        if ((sh.kind === "blob" || sh.kind === "hill") && !(Finite(sh.rx) && sh.rx > 0 && (sh.rz === undefined || (Finite(sh.rz) && sh.rz > 0)))) errors.push(`${at}（${sh.kind}）要带正的 rx（rz 可选）`);
+      });
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

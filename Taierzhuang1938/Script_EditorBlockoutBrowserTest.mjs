@@ -882,6 +882,9 @@ try {
     return { state: Bl.State(), bounds: { ...bf.bounds }, layoutId: bf.layout.id, groundAtCenter: bf.GroundHeight(555, -65),
       url: location.search, player: { x: T.player.position.x, z: T.player.position.z } };
   });
+  const secondBackdrop = await B(() => window.Tengxian.Debug.Blockout.Stats().backdrop);
+  Check("没写 backdrop 的关卡（第二关）不建远景层、远平面照旧 650（2026-10-20）", secondBackdrop.built === false && secondBackdrop.cameraFar === 650,
+    JSON.stringify(secondBackdrop));
   Check("切到第二关：场景边界与地形都换了、地址栏改了", second.state.level === "SecondLevel" && second.layoutId === "BlockoutSecondLevel"
     && second.bounds.minX !== firstBounds.minX && /level=SecondLevel/.test(second.url) && second.groundAtCenter < -1,
   JSON.stringify({ bounds: second.bounds, layout: second.layoutId, gully: second.groundAtCenter.toFixed(2), url: second.url, ms: metrics.switchMs }));
@@ -993,6 +996,28 @@ try {
     reopened.state.id === "06-1" && Math.hypot(reopened.x - snap.player.x, reopened.z - snap.player.z) < 0.3
       && Math.abs(reopened.yawDeg - snap.player.yawDeg) < 0.2 && !/pose=/.test(reopened.search),
     JSON.stringify({ id: reopened.state.id, x: reopened.x.toFixed(2), z: reopened.z.toFixed(2), yaw: reopened.yawDeg.toFixed(1), want: snap.player, search: reopened.search }));
+
+  // 远景层（§2.2 backdrop，2026-10-20）：01–05 写了 backdrop —— 建出远景地面与体块、远平面拉到 backdrop.far、
+  // 远景网格不进 battlefield（不碰撞、不进寻路）、玩家范围不变；远景里的树一起种进树的实例里
+  console.log("--- backdrop (FirstLevel0105)");
+  await B(() => window.Tengxian.Debug.Blockout.SwitchLevel("FirstLevel0105"));
+  await WaitSync(() => window.Tengxian.Debug.Blockout.Stats().backdrop.built === true, null, 20000);
+  const bd = await B(() => {
+    const T = window.Tengxian, st = T.Debug.Blockout.Stats().backdrop, bf = T.battlefield;
+    const fieldMeshes = new Set(bf.meshes || []);
+    let inField = 0, meshes = 0;
+    T.scene?.traverse?.((o) => { if (o.userData?.blockoutBackdrop) { meshes += 1; if (fieldMeshes.has(o)) inField += 1; } });
+    return { st, inField, meshes, bounds: { ...bf.bounds }, layoutFar: bf.layout.cameraFar, trees: T.Debug.Blockout.Stats().trees,
+      shapes: bf.layout.backdrop?.shapes?.filter((s) => s.kind === "tree").length ?? 0, blocks: bf.layout.blocks.length,
+      treeBlocks: bf.layout.blocks.filter((b) => b.blockoutTree).length };
+  });
+  Check("01–05 远景层：地面 + 体块建出来、远平面 = backdrop.far、不进场地网格、玩家范围是场地边界",
+    bd.st.built && bd.st.meshes >= 3 && bd.st.triangles > 10000 && bd.st.cameraFar === bd.st.far && bd.st.far >= 5000 && bd.inField === 0 && bd.meshes === bd.st.meshes
+      && bd.bounds.minZ === -480 && bd.st.texture && bd.st.texture.width >= 1024,
+    JSON.stringify({ meshes: bd.st.meshes, tris: bd.st.triangles, far: bd.st.cameraFar, inField: bd.inField, tex: bd.st.texture, bounds: bd.bounds, ms: bd.st.buildMs }));
+  Check("01–05 远景层的树（村 A、出了北边界的杨树）和场地里的树一起种", bd.trees.count === bd.treeBlocks + bd.shapes && bd.shapes > 30,
+    JSON.stringify({ trees: bd.trees, treeBlocks: bd.treeBlocks, backdropTrees: bd.shapes }));
+  await page.screenshot({ path: path.join(shotDir, "FirstLevel0105_Backdrop.png") });
 
   Check("全程没有未捕获错误", errors.length === 0, errors.slice(0, 5).join(" | "));
 } finally {

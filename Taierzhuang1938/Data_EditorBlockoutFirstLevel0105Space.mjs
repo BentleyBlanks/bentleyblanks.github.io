@@ -26,7 +26,8 @@
 //   凹路（后送路）                                    → 凹路口在台地里往东到 (83,161) 拐往南，路底宽 4 m，比两侧低 1.2–2.5 m
 //   03 轻机枪在坑北约 100–150 m；掷弹筒约 200 m    → 轻机枪 (−30,−118) 与 (40,−140)；掷弹筒 (28,−214) 躲在土坎 z −206 后
 //   （2026-10-20 坑北前景改稿：轻机枪 1 在坟地 G2 东肩后 (−26.85,−116.84)、轻机枪 2 在麦秸垛 (40,−138) 西南角；土坎换成横贯全场的地坎，
-//    北低南高 2 m，掷弹筒 (28,−213) 在坎下；田埂、坟、干水沟、远处村子见 L0105_PIT_NORTH，边界北扩到 −480）
+//    北低南高 2 m，掷弹筒 (28,−213) 在坎下；田埂、坟、干水沟见 L0105_PIT_NORTH，边界北扩到 −480；
+//    10-20 第三版：压平、南北向窄条田 L0105_FARM、散坟 L0105_FIELD_GRAVES，村子与东边低山挪到场景文件的远景层 L0105_BACKDROP_*）
 //   02 拖单被（洞口 0 → 弹药箱垛 22 → 支沟口 41 → 拐角 2 62 → 路口 92 → 坡顶 107 → 干沟 125 m）与上面的折线一致
 // ===========================================================================
 
@@ -277,125 +278,135 @@ export const L0105_PIT_NORTH = Object.freeze({
   scarp: Object.freeze({ z0: -206, amp: 4.5, k: 0.016, x0: 28, drop: 2.0, faceM: 2.0, notchM: 14, notchR: 6 }),
   // 9. 大起伏：z < clearedToZ 起 rampM 内渐强，两条几百米波长的正弦，±1 m
   roll: Object.freeze({ rampM: 60, a1: 0.6, k1x: 0.0105, k1z: 0.0062, p1: 0.4, a2: 0.4, k2x: -0.0068, k2z: 0.0121, p2: 2.1 }),
-  // 整片地往北缓缓抬：扫清带外到地坎抬 riseM（1 % 上下的坡，看不出来，坎顶就比坑北略高），坎下再往北到村子抬 farRiseM（村子在一片缓坡顶上）。
-  // 不抬的话坎下那一大片比沟底还低，编辑器的高度色带会把它染成一片冷色，远看像水；坎下只留 20 m 上下一条低地（掷弹筒组在里面）。
-  // 2026-10-20 第二轮：坎下 z −225 → −300 抬 2 → 5.5 m（正对着坑的缓坡，最陡约 11 %；村子在坡顶的平地上）：坑里眼高只比地面高 1 m，平地上 100 m 外的田在画面里挤成几个像素，
-  // 抬起来的这面坡和坡顶的村子才露得出来。
-  // 村子坐在往北再缓缓抬的坡上（villageRiseM，z −296 → −366，约 6 %）：后排比前排高一截，从坑里看屋顶一排压一排露出来。
-  tilt: Object.freeze({ riseM: 1.5, fromZ: -80, toZ: -206, farRiseM: 5.5, farFromZ: -225, farToZ: -300, villageRiseM: 4.5, villageFromZ: -296, villageToZ: -366 }),
+  // （2026-10-20 第二轮曾让整片地往北抬 10 m 上下（tilt：坎下缓坡 + 村子坐在坡顶）；第三版照史料压平（华北平原、村外是开阔地）：
+  //  抬高整个去掉，坑北只留上面 ±1 m 的大起伏和地坎 2 m 的落差。坎下比坑北低 2 m 那一大片由涂色盖着，高度色带不会把它染成「水」。）
 });
 
 /**
- * 坑北第二轮（2026-10-20，用户从坑里朝北看：「还是大平原，房子也没有，路也没有，田也看不到」）：田、路、村子要一眼认得出。
- * 创作，不是史料复原（鲁南农田三月：返青的冬小麦、翻过的地、撂荒地；村子是一户一院的土坯房，深色屋顶）。
+ * 坑北第三版（2026-10-20，用户查过史料后拍板第三版草图）：照史料压平、窄条田、四个村子、东边低山。
+ * 史料要点（用户查证）：1938 年战报写北沙河到界河一路「途中五里一村庄」（约 2.5 km 一个）；房子都聚在村里，村外是开阔地，远看村子是一团团树；
+ * 田里散着坟丘和河沟；界河一线东边有低山包（龙山、普阳山一类）；田是分家分碎的南北向窄长条，宽窄不一。
+ * 村子、山包的具体位置与大小、田怎么分、坟摆在哪是创作（照上面的样子摆）。第二轮 300 m 处那个带炮楼的村子拿掉（炮楼没查到出处）。
  *
- * 田：扫清带（z −12…−80）是一整块被踩过的麦地；往北按「横带」分（每条带的南北界是田埂 F1 / F2 / F3、地坎、再往北几道只涂色的地界），
- *     每条带里再按东西 20–60 m 切成一条一条的长条地（场景生成器按带号定宽度和种的东西，相邻两块不同）。颜色见 L0105_FIELD_PAINT。
- * 路：大路（L0105_ROAD）北头 (175,−40) 往北接一条土路 L0105_NORTH_ROAD 到村子东口，顺村里的前街一直穿到西头；战车就是从村里顺这条路出来的。
- *     L0105_ROAD 本身一个点不动（03-4 战车露头、04 / 05 战车走的都是它）。另一条田间小路 L0105_FIELD_PATH 从村子前街往西南穿田到坟地北边，
- *     单独一条线，不接进 L0105_ROAD。大路北段两边成排的杨树（细高 foliage 块 → 编辑器种成树）。
+ * 场地（L0105_BOUNDS，北到 −480）里的地面、田、坟、路、树是场景文件的高度场 / 涂色 / 体块；场地外（村 A 起往北）是场景文件的远景层 backdrop
+ * （§2.2：只看不走，不进碰撞、不进寻路）。场地里的田块与远景里的田块由同一套分组网格（L0105_FARM）切出来，接缝两边一条条对得上。
+ *
+ * 路：大路 L0105_ROAD 一个点不动（03-4 战车露头、04 / 05 战车走的都是它）；它北头 (175,−40) 往北接一条土路 L0105_NORTH_ROAD，
+ *     场地里那段一直通到北边界 (138,−480)，远景层里 L0105_BACKDROP_ROAD 接着往北穿过村 A（日军集结的村子），再往东北通到村 D。
+ *     田间小路 L0105_FIELD_PATH 从坟地北边往北出场地，远景层里 L0105_BACKDROP_PATHS 把四个村子连起来（虚的土路）。
  *     路穿过地坎处地坎放缓成坡道，大路穿过干水沟处沟填平（涵洞土）。
- * 村子：坑北 290–365 m 的缓坡顶上，三排院子、两条东西街、中间一条南北胡同；院墙 2 m（plaster）、正房 / 厢房墙 3 m（plaster）+ 屋顶块（roof，比墙宽 0.8、厚 1.0–1.5）。
  */
-export const L0105_NORTH_ROAD = Line([175, -40], [173, -90], [166, -150], [156, -205], [140, -262], [124, -296], [112, -318], [-52, -318]);
+export const L0105_NORTH_ROAD = Line([175, -40], [173, -90], [166, -150], [156, -205], [148, -262], [143, -330], [140, -400], [138, -480]);
 export const L0105_NORTH_ROAD_HALF_W = 2.6;
-export const L0105_FIELD_PATH = Line([-5, -318], [-5, -298], [-22, -262], [-40, -222], [-44, -200], [-40, -165], [-33, -134]);
+export const L0105_FIELD_PATH = Line([-62, -480], [-56, -400], [-50, -320], [-46, -262], [-40, -222], [-44, -200], [-40, -165], [-33, -134]);
 export const L0105_FIELD_PATH_HALF_W = 1.3;
-/** 田间小路坎下到村口那一截，西边一侧稀稀拉拉一排树（从坑里看是一条往村子去的线）：从小路起点量 fromM…toM，每 spacing 米一棵。 */
-export const L0105_PATH_TREES = Object.freeze({ lat: 3.2, spacing: 14, fromM: 24, toM: 112, hMin: 10, hMax: 13 });
+/** 田间小路坎下那一截西边一侧稀稀拉拉一排树（从坑里看是一条往北去的线）：从小路起点（北边界）量 fromM…toM，每 spacing 米一棵。 */
+export const L0105_PATH_TREES = Object.freeze({ lat: 3.2, spacing: 16, fromM: 20, toM: 250, hMin: 10, hMax: 13 });
 
-/** 涂色（sRGB）。白盒灰调里拉得开，但别花：麦苗偏灰的暗绿、翻过的地深褐、撂荒地浅土黄。 */
+/** 涂色（sRGB）。白盒灰调里拉得开，但别花：麦苗偏灰的暗绿、翻过的地深褐、撂荒地浅土黄；每种两档深浅，一条条才分得开。 */
 export const L0105_FIELD_PAINT = Object.freeze({
   cleared: "#7d8360",   // 扫清带：被踩过的麦地（浅一点的绿褐）
   wheat: Object.freeze(["#566540", "#61704a"]),
-  plowed: "#5a4532",
-  fallow: "#b09a66",
-  bund: "#6a5842",      // 田埂、地界
-  graveSoil: "#594634", // 坟包
+  plowed: Object.freeze(["#5a4532", "#654c37"]),
+  fallow: Object.freeze(["#b09a66", "#a38d5c"]),
+  fieldPath: "#c4b792", // 组与组之间的田间小路（窄、浅土色）
+  bund: "#6a5842",      // 田埂
+  graveSoil: "#594634", // 坟地、两座孤坟（老坟）
+  newSoil: "#7b6246",   // 田里散的单个坟（新土）
   ditchSoil: "#7a6143", // 干水沟两边翻出来的新土
   scarpFace: "#5b4a38", // 地坎坎面
   road: "#d8cfb6",      // 车辙压实的路（比撂荒地更白更灰，远看是一条亮线）
   path: "#d0c5a6",
-  yard: "#a08f72",      // 院子里的夯土
+  yard: "#a08f72",      // 村里的夯土地
   threshing: "#c3b38c", // 场院
 });
 
 /**
- * 田块分带：带与带之间的界线（自南往北），{ bund } = 那道田埂、{ scarp: true } = 地坎、{ z0, amp, k, phase } = 只涂色的地界（同 BundZ 的写法）。
- * strips：这一带东西切成长条地时每条的宽度范围（米）。
+ * 田的分组网格（场地与远景共用；场景生成器 FarmLayout 按它切）：
+ *   组排（南北一排排）：南北界 rowsZ（自南往北，"scarp" = 地坎中心线），再往北按 rowLen 一排排往北排到 region.minZ；
+ *   每排东西切成组（groupW 宽），组与组之间、排与排之间留一条 2·pathHalfW 宽的田间小路（涂 fieldPath 色）；
+ *   每组再东西切成南北向的长条地（stripW 宽，宽窄不一），种什么按 crops 的比例抽（左右相邻两条不种同一样）。
+ *   组心离坑超过 stripRadiusM 的不再切条，一组一块（远处拼块）。扫清带（cleared，z −80…−12）在远景里也接着往东西延伸。
+ * x 方向分组从 originX 起算，场地和远景是同一条序列。确定性（按序号散列，不读随机数）。
  */
-const FB = (z0, amp, k, phase) => Object.freeze({ z0, amp, k, phase });
-export const L0105_FIELD_BANDS = Object.freeze([
-  Object.freeze({ south: FB(-80, 0, 0, 0), north: Object.freeze({ bund: "F1" }), strips: Object.freeze([20, 45]) }),
-  Object.freeze({ south: Object.freeze({ bund: "F1" }), north: Object.freeze({ bund: "F2" }), strips: Object.freeze([22, 50]) }),
-  Object.freeze({ south: Object.freeze({ bund: "F2" }), north: Object.freeze({ bund: "F3" }), strips: Object.freeze([25, 55]) }),
-  Object.freeze({ south: Object.freeze({ bund: "F3" }), north: Object.freeze({ scarp: true }), strips: Object.freeze([25, 60]) }),
-  Object.freeze({ south: Object.freeze({ scarp: true }), north: FB(-248, 3, 0.021, 0.8), strips: Object.freeze([25, 60]) }),
-  Object.freeze({ south: FB(-248, 3, 0.021, 0.8), north: FB(-286, 2.5, 0.018, 2.2), strips: Object.freeze([20, 50]) }),
-  Object.freeze({ south: FB(-286, 2.5, 0.018, 2.2), north: FB(-330, 3, 0.02, 1.1), strips: Object.freeze([25, 55]) }),
-  Object.freeze({ south: FB(-330, 3, 0.02, 1.1), north: FB(-378, 3, 0.017, 0.2), strips: Object.freeze([25, 60]) }),
-  Object.freeze({ south: FB(-378, 3, 0.017, 0.2), north: FB(-428, 3.5, 0.015, 2.6), strips: Object.freeze([30, 60]) }),
-  Object.freeze({ south: FB(-428, 3.5, 0.015, 2.6), north: FB(-482, 0, 0, 0), strips: Object.freeze([30, 60]) }),
-]);
-
-/** 村子：三排院子（每排南沿 zS → 北沿 zN），两条街夹在中间，x 在 [minX, maxX]，胡同 [laneX0, laneX1] 南北穿过。 */
-export const L0105_VILLAGE = Object.freeze({
-  minX: -48, maxX: 116, laneX0: -8, laneX1: -2,
-  rows: Object.freeze([Object.freeze({ zS: -298, zN: -314 }), Object.freeze({ zS: -322, zN: -338 }), Object.freeze({ zS: -346, zN: -362 })]),
-  streets: Object.freeze([-318, -342]), streetHalfW: 3.5,
-  yardWidths: Object.freeze([18, 16, 21, 17, 19, 15, 20, 22, 16, 18, 20, 17]),
-  yardGapM: 1.5,
-  yardWallH: 2.0, yardWallT: 0.5, gateW: 3.0,
-  houseWallH: 3.0, roofOverhangM: 0.8,
-  // 屋顶块上再压一条窄一点的屋脊块（顺东西，深 0.45 倍、高 ridgeH），远看一排排房子的轮廓才有起伏
-  ridgeH: 0.6, ridgeDepthK: 0.45, roofColor: "#3e3a35",
-  big: Object.freeze({ row: 1, index: 3, yardWallH: 2.6, houseWallH: 4.0 }),   // 大户：院墙高一点、正房 4 m
-  // 大户院子东南角一座炮楼（鲁南村子常见的看家楼，创作）：4×4 m、墙高 8.5 m + 顶 1.2 m，全村最高的那一块
-  tower: Object.freeze({ x: 30.5, z: -325.5, w: 4, d: 4, wallH: 8.5, roofT: 1.2 }),
-  // 场院：村南西头一片、东头一片（麦秸垛堆在这里）
-  threshing: Object.freeze([Object.freeze({ minX: -46, maxX: -18, minZ: -294, maxZ: -280 }), Object.freeze({ minX: 84, maxX: 108, minZ: -294, maxZ: -282 })]),
-  haystacks: Object.freeze([[-38, -287], [-27, -289.5], [95, -288]].map(([x, z]) => Object.freeze({ x, z }))),
-  // 村边与院外的大树（槐、榆，13–17 m），[x, z, 高]
-  trees: Object.freeze([[-54, -300, 15], [-56, -330, 16.5], [-52, -358, 14], [122, -305, 15.5], [124, -340, 14], [121, -366, 16],
-    [20, -370, 15], [70, -371, 16.5], [-25, -369, 14.5], [-12, -293, 13], [52, -294.5, 14.5]].map(([x, z, h]) => Object.freeze({ x, z, h }))),
+export const L0105_FARM = Object.freeze({
+  originX: -3800,
+  region: Object.freeze({ minX: -3300, maxX: 3800, minZ: -4200, maxZ: -80 }),
+  rowsZ: Object.freeze([-80, "scarp", -318, -432]),
+  rowLen: Object.freeze([120, 210]),
+  groupW: Object.freeze([110, 240]),
+  stripW: Object.freeze([5, 20]),
+  pathHalfW: 1.1,
+  stripRadiusM: 1900,
+  crops: Object.freeze([["wheat", 0.36], ["plowed", 0.34], ["fallow", 0.30]]),
+  cleared: Object.freeze({ minZ: -80, maxZ: -12 }),
 });
+
+/**
+ * 田里散的单个坟（圆土包，烘进高度场，涂新土色）[x, z, 高]：避开 03 跃进的那一片（x −75…75、z > −215）、干水沟、路、掷弹筒组，
+ * 也不在坑看轻机枪 / 掷弹筒烟的视线上。底半径同坟地（graveBaseR）。
+ */
+export const L0105_FIELD_GRAVES = Object.freeze([
+  [-92, -96, 0.9], [-80, -142, 1.0], [-100, -180, 0.85], [92, -92, 1.1], [118, -158, 0.95], [140, -110, 1.05], [104, -172, 0.9],
+  [-62, -238, 1.0], [62, -262, 1.2], [-18, -300, 0.8], [100, -318, 1.1], [-88, -352, 0.95], [12, -372, 1.0], [168, -392, 0.9],
+  [-40, -428, 1.15], [80, -452, 0.85],
+].map(([x, z, h]) => Object.freeze({ x, z, h })));
 
 /** 田边、沟边零星几棵树 [x, z, 高]（避开扫清带和 03 日军跃进的地方）。 */
 export const L0105_FIELD_TREES = Object.freeze([[-88, -152, 11], [-96, -238, 12.5], [96, -176, 10.5], [122, -128, 12], [64, -258, 11.5], [-76, -276, 12],
   [176, -332, 13], [-100, -402, 12], [150, -410, 13.5]].map(([x, z, h]) => Object.freeze({ x, z, h })));
 
-/** 大路北段两边的杨树：离路中心 lat 米、spacing 米一棵（± jitterM），树高 hMin…hMax；从北段起点往北 fromM 米起（扫清带以外，守军清过射界）种到 toM 米（村口）。 */
-export const L0105_ROAD_TREES = Object.freeze({ lat: 4.4, spacing: 10, jitterM: 1.6, hMin: 11, hMax: 15, fromM: 48, toM: 268 });
+/**
+ * 大路北段两边的杨树：离路中心 lat 米、spacing 米一棵（± jitterM），树高 hMin…hMax；从北段起点往北 fromM 米起（扫清带以外，守军清过射界）
+ * 一直种到村 A 南口（toM，量的是场地里那段 + 远景里那段连起来的弧长）。场地里的是体块（编辑器种成树），出了北边界的写进远景层（kind "tree"）。
+ */
+export const L0105_ROAD_TREES = Object.freeze({ lat: 4.4, spacing: 13, jitterM: 1.6, hMin: 11, hMax: 15, fromM: 48, toM: 518 });
 
-/** 村子的户：每户 { id, row, x0, x1, zS, zN, gateX, big, yardWallH, houses: [{ x, z, w, d, wallH, roofT }] }。确定性（不读随机数）。 */
-export const L0105_VILLAGE_HOMES = (() => {
-  const V = L0105_VILLAGE, out = [];
-  let n = 0;
-  V.rows.forEach((row, r) => {
-    let x = V.minX + (r % 2 ? 3 : 0);
-    let k = r * 5;
-    for (;;) {
-      const w = V.yardWidths[k % V.yardWidths.length]; k += 1;
-      if (x < V.laneX1 && x + w > V.laneX0) { x = V.laneX1; continue; }   // 让出胡同
-      if (x + w > V.maxX) break;
-      const big = r === V.big.row && out.filter((h) => h.row === r).length === V.big.index;
-      const x0 = x, x1 = x + w, zS = row.zS, zN = row.zN;
-      const houses = [];
-      // 正房：坐北朝南，贴着北墙
-      houses.push({ x: (x0 + x1) / 2, z: zN + 0.5 + 3, w: w - 2, d: 6, wallH: big ? V.big.houseWallH : V.houseWallH + ((n * 5) % 4) * 0.2, roofT: big ? 1.5 : 1.2 + ((n * 7) % 3) * 0.1 });
-      // 厢房：东或西（按户号交替），有的两边都有
-      const side = n % 2 ? 1 : -1;
-      houses.push({ x: side < 0 ? x0 + 0.5 + 2.4 : x1 - 0.5 - 2.4, z: zN + 7.5 + 3, w: 4.8, d: 6, wallH: V.houseWallH, roofT: 1.1 });
-      if (n % 3 === 0 && w >= 18) houses.push({ x: side < 0 ? x1 - 0.5 - 2.2 : x0 + 0.5 + 2.2, z: zN + 7.5 + 2.75, w: 4.4, d: 5.5, wallH: V.houseWallH, roofT: 1.0 });
-      const gateX = side < 0 ? x1 - 3.5 : x0 + 3.5;   // 门开在南墙，厢房对面那头
-      out.push(Object.freeze({ id: "Home" + String(n + 1).padStart(2, "0"), row: r, x0, x1, zS, zN, gateX, big,
-        yardWallH: big ? V.big.yardWallH : V.yardWallH, houses: Object.freeze(houses.map((h) => Object.freeze(h))) }));
-      n += 1;
-      x = x1 + V.yardGapM;
-    }
-  });
-  return Object.freeze(out);
-})();
+/** 远景层里的路：大路接着场地里那段往北穿过村 A（南北一条街），出北口往东北到村 D、再往远处去。 */
+export const L0105_BACKDROP_ROAD = Line([138, -480], [136, -566], [135, -617], [133, -672], [300, -860], [620, -1200], [980, -1560], [1300, -1840],
+  [1500, -2010], [1700, -2190], [2050, -2560]);
+/** 远景层里的田间小路（虚的土路）：场地里的小路接着往北到村 C，半路岔去村 B；村 A 西口接过来；村 B → 村 C；村 C → 村 D。 */
+export const L0105_BACKDROP_PATHS = Object.freeze([
+  Line([-62, -480], [-74, -640], [-80, -900], [-70, -1300], [-62, -1890]),
+  Line([-76, -760], [-400, -820], [-720, -858]),
+  Line([66, -640], [-10, -700], [-76, -760]),
+  Line([-850, -950], [-700, -1400], [-190, -1960]),
+  Line([86, -2020], [600, -2045], [1000, -2030], [1360, -2012]),
+]);
+
+/**
+ * 四个村子（远景层）：x, z 是村心，rx / rz 是房子那一片的半宽（东西 / 南北）；外面一圈树（ringM 宽）围着。
+ * 村 A 离坑约 620 m，日军集结的村子，大路从南口进、北口出（村里一条南北街），树用编辑器的枯树模型（kind "tree"，同场地里的树）；
+ * 村 B / C / D 在 1.2 / 2 / 2.5 km 外，树是一团团树冠块（kind "blob"），从坑里看是天边几团树里露出几排房顶。
+ * 「五里一村庄」：A–D 之间 1.2–2.5 km。位置是创作。
+ */
+const BV = (id, name, x, z, rx, rz, extra = {}) => Object.freeze({ id, name, x, z, rx, rz, ringM: 14, treeKind: "blob", ...extra });
+export const L0105_BACKDROP_VILLAGES = Object.freeze([
+  BV("A", "村 A（日军集结的村子）", 136, -617, 62, 44, { treeKind: "tree", streetX: 135, yardW: 18, ringM: 12 }),
+  BV("B", "村 B（西北）", -850, -860, 110, 80),
+  BV("C", "村 C（正北）", -60, -2010, 130, 95),
+  BV("D", "村 D（东北，大路往远处）", 1500, -2010, 120, 90, { streetX: 1500 }),
+]);
+
+/**
+ * 东边一串低山包（远景层，kind "hill"）：东北到东约 3.1 km，20–60 m 高（像龙山、普阳山那样的低山，具体哪座不对号），
+ * 长轴顺着这一串（ry ≈ −1.13 rad，西北—东南走向）。[id, x, z, 长半轴, 短半轴, 高, ry]。
+ */
+export const L0105_BACKDROP_HILLS = Object.freeze([
+  ["Hill1", 1960, -2400, 340, 240, 32, -1.05], ["Hill2", 2250, -2080, 300, 220, 46, -1.1], ["Hill3", 2420, -1880, 400, 280, 58, -1.12],
+  ["Hill4", 2700, -1470, 360, 250, 44, -1.18], ["Hill5", 2930, -980, 300, 220, 26, -1.2], ["Hill6", 3060, -480, 380, 260, 40, -1.25],
+  ["Hill7", 3150, 80, 320, 230, 24, -1.3],
+].map(([id, x, z, rx, rz, h, ry]) => Object.freeze({ id, x, z, rx, rz, h, ry })));
+
+/** 远景层的颜色（sRGB）与参数。haze 照白盒画质的底色（Data_Tuning_Whitebox backgroundColor）。 */
+export const L0105_BACKDROP = Object.freeze({
+  far: 7000, radiusM: 6000, blendM: 160,
+  ground: "#7a7150",   // 远处没切田块的地：几种田混起来的平均色
+  haze: Object.freeze({ color: "#adb8c2", fromM: 650, toM: 6500, max: 0.88 }),
+  wall: "#a89c86", roof: "#3e3a35",
+  crowns: Object.freeze(["#5a5446", "#4f4b40", "#625a4a", "#565041"]),
+  hill: "#5f5a47", hillTop: "#6d6656",
+});
 
 /**
  * 03 正面跃进的步兵（IjaRush1–8，两人一组）每一拍落在哪：[03-2, 03-3 开场, 03-3 第一次跃进后, 03-3 第二次跃进后 = 03-4, 03-5]。

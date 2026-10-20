@@ -327,6 +327,151 @@ export function BuildGroundPaint(items, bounds = null) {
   return { cellM, minX, minZ, cols, rows, C, A, Blend };
 }
 
+/** 远景地面贴图（§6.3 backdrop，2026-10-20）：最长边至多 maxPx 像素、一个像素至少 minTexelM 米。 */
+export const BLOCKOUT_BACKDROP_TEXTURE = Object.freeze({ maxPx: 4096, minTexelM: 1, padM: 6 });
+
+/**
+ * 把 backdrop.paint（按顺序：poly / line 同场景 paint，rects = 轴对齐田块，实边）画成一张 RGBA 图（sRGB 字节），纯 JS、零 three。
+ * 每个像素存「预乘」累积色 C 与覆盖度 A（同 BuildGroundPaint），最后写出 rgb = C / A、a = A；没涂到的像素 rgb = ground.color、a = 0
+ * （mipmap 平均时不会混进黑边）。图外框一圈像素一定是 a = 0（钳边采样出去就是没涂）。
+ * → null（没有可画的项）或 { minX, minZ, texelM, width, height, data: Uint8Array, painted 被涂到的像素数 }。
+ */
+export function RasterizeBackdropPaint(backdrop, options = {}) {
+  const items = backdrop?.paint || [];
+  if (!items.length) return null;
+  const T = { ...BLOCKOUT_BACKDROP_TEXTURE, ...options };
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  const Grow = (x0, z0, x1, z1) => { minX = Math.min(minX, x0); minZ = Math.min(minZ, z0); maxX = Math.max(maxX, x1); maxZ = Math.max(maxZ, z1); };
+  for (const item of items) {
+    if (item.rects) { for (const r of item.rects) Grow(r[0], r[1], r[2], r[3]); continue; }
+    const pad = (item.line ? item.halfW : 0) + (Number.isFinite(item.feather) ? item.feather : BLOCKOUT_PAINT.feather);
+    for (const p of item.poly || item.line) Grow(p.x - pad, p.z - pad, p.x + pad, p.z + pad);
+  }
+  if (!(maxX > minX && maxZ > minZ)) return null;
+  minX -= T.padM; minZ -= T.padM; maxX += T.padM; maxZ += T.padM;
+  const texelM = Math.max(T.minTexelM, Math.max(maxX - minX, maxZ - minZ) / (T.maxPx - 2));
+  const width = Math.min(T.maxPx, Math.ceil((maxX - minX) / texelM) + 2), height = Math.min(T.maxPx, Math.ceil((maxZ - minZ) / texelM) + 2);
+  // 像素 (i, j) 的中心 = (minX + (i − 0.5)·texelM, minZ + (j − 0.5)·texelM)：第 0 行 / 列与最后一行 / 列是空的外框
+  minX -= texelM; minZ -= texelM;
+  const C = new Float32Array(width * height * 3), A = new Float32Array(width * height);
+  const PX = (x) => (x - minX) / texelM - 0.5, PZ = (z) => (z - minZ) / texelM - 0.5;
+  const Lo = (v, n) => Math.max(1, Math.min(n - 2, Math.floor(v))), Hi = (v, n) => Math.max(1, Math.min(n - 2, Math.ceil(v)));
+  const Blend = (at, rgb, a) => {
+    A[at] = A[at] * (1 - a) + a;
+    C[at * 3] = C[at * 3] * (1 - a) + rgb[0] * a; C[at * 3 + 1] = C[at * 3 + 1] * (1 - a) + rgb[1] * a; C[at * 3 + 2] = C[at * 3 + 2] * (1 - a) + rgb[2] * a;
+  };
+  const cov = new Float32Array(width * height);
+  for (const item of items) {
+    if (item.rects) {
+      const pal = item.palette.map(HexRgb);
+      for (const [x0, z0, x1, z1, c] of item.rects) {
+        // 像素中心落在矩形里的那些像素：实边，整块盖上
+        const i0 = Math.max(1, Math.ceil(PX(x0))), i1 = Math.min(width - 2, Math.floor(PX(x1)));
+        const j0 = Math.max(1, Math.ceil(PZ(z0))), j1 = Math.min(height - 2, Math.floor(PZ(z1)));
+        const rgb = pal[c];
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          const at = j * width + i;
+          A[at] = 1; C[at * 3] = rgb[0]; C[at * 3 + 1] = rgb[1]; C[at * 3 + 2] = rgb[2];
+        }
+      }
+      continue;
+    }
+    const rgb = HexRgb(item.color);
+    const feather = Number.isFinite(item.feather) ? item.feather : BLOCKOUT_PAINT.feather;
+    const strength = Number.isFinite(item.strength) ? item.strength : 1;
+    const Cover = (sd) => { const u = 0.5 - sd / feather; return u <= 0 ? 0 : (u >= 1 ? 1 : u * u * (3 - 2 * u)) * strength; };
+    if (item.poly) {
+      const pts = item.poly;
+      let bx0 = Infinity, bx1 = -Infinity, bz0 = Infinity, bz1 = -Infinity;
+      for (const p of pts) { bx0 = Math.min(bx0, p.x); bx1 = Math.max(bx1, p.x); bz0 = Math.min(bz0, p.z); bz1 = Math.max(bz1, p.z); }
+      const i0 = Lo(PX(bx0 - feather), width), i1 = Hi(PX(bx1 + feather), width), j0 = Lo(PZ(bz0 - feather), height), j1 = Hi(PZ(bz1 + feather), height);
+      // 轴对齐的矩形（四个点、边都顺着 x / z）直接算有符号距离：大片底色（扫清带、田间小路底色）不必逐边求
+      const rect = pts.length === 4 && pts.every((p, k) => { const q = pts[(k + 1) % 4]; return p.x === q.x || p.z === q.z; })
+        && new Set(pts.map((p) => p.x)).size === 2 && new Set(pts.map((p) => p.z)).size === 2;
+      const cx = (bx0 + bx1) / 2, cz = (bz0 + bz1) / 2, hx = (bx1 - bx0) / 2, hz = (bz1 - bz0) / 2;
+      const Sd = rect ? (x, z) => { const qx = Math.abs(x - cx) - hx, qz = Math.abs(z - cz) - hz; return Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0); }
+        : (x, z) => PolySignedDistance(x, z, pts);
+      for (let j = j0; j <= j1; j++) {
+        const z = minZ + (j + 0.5) * texelM;
+        for (let i = i0; i <= i1; i++) {
+          const a = Cover(Sd(minX + (i + 0.5) * texelM, z));
+          if (a > 0) Blend(j * width + i, rgb, a);
+        }
+      }
+      continue;
+    }
+    // 折线：逐段在自己的外包框里算覆盖、取最大（段与段接头处不叠两遍），最后一起混
+    const pts = item.line, reach = item.halfW + feather, touched = [];
+    for (let k = 1; k < pts.length; k++) {
+      const a0 = pts[k - 1], b0 = pts[k];
+      const i0 = Lo(PX(Math.min(a0.x, b0.x) - reach), width), i1 = Hi(PX(Math.max(a0.x, b0.x) + reach), width);
+      const j0 = Lo(PZ(Math.min(a0.z, b0.z) - reach), height), j1 = Hi(PZ(Math.max(a0.z, b0.z) + reach), height);
+      for (let j = j0; j <= j1; j++) {
+        const z = minZ + (j + 0.5) * texelM;
+        for (let i = i0; i <= i1; i++) {
+          const a = Cover(Math.sqrt(SegDist2(minX + (i + 0.5) * texelM, z, a0.x, a0.z, b0.x, b0.z)) - item.halfW);
+          if (a <= 0) continue;
+          const at = j * width + i;
+          if (cov[at] === 0) touched.push(at);
+          if (a > cov[at]) cov[at] = a;
+        }
+      }
+    }
+    for (const at of touched) { Blend(at, rgb, cov[at]); cov[at] = 0; }
+  }
+  const base = HexRgb(backdrop.ground?.color || "#808080");
+  const data = new Uint8Array(width * height * 4);
+  let painted = 0;
+  for (let at = 0; at < width * height; at++) {
+    const a = A[at];
+    if (a > 1e-4) {
+      painted += 1;
+      for (let c = 0; c < 3; c++) data[at * 4 + c] = Math.max(0, Math.min(255, Math.round(C[at * 3 + c] / a * 255)));
+      data[at * 4 + 3] = Math.max(1, Math.min(255, Math.round(a * 255)));
+    } else {
+      data[at * 4] = Math.round(base[0] * 255); data[at * 4 + 1] = Math.round(base[1] * 255); data[at * 4 + 2] = Math.round(base[2] * 255); data[at * 4 + 3] = 0;
+    }
+  }
+  return { minX, minZ, texelM, width, height, data, painted };
+}
+
+/** 白盒关卡的相机远平面（米）；场景文件写了 backdrop 时取 max(这个, backdrop.far)（§2.2，2026-10-20）。 */
+export const BLOCKOUT_CAMERA_FAR = 650;
+
+/**
+ * 远景层地面高（§2.2 backdrop，2026-10-20）：场地里就是场地网格；场地外离场地边 o 米处 =
+ * 「边上最近那一点的场地高」往 ground.y 过渡，smoothstep(o / blendM)。接缝上两边一样高，往外慢慢落到 ground.y。
+ * → (x, z) => y。纯函数（编辑器的远景地面、远景里的树、测试共用）。
+ */
+export function BackdropGroundSampler(backdrop, terrainSampler, bounds) {
+  const g = backdrop.ground, blend = Number.isFinite(g.blendM) ? g.blendM : 0;
+  const { minX, maxX, minZ, maxZ } = bounds;
+  return (x, z) => {
+    const cx = x < minX ? minX : x > maxX ? maxX : x, cz = z < minZ ? minZ : z > maxZ ? maxZ : z;
+    const edge = terrainSampler(cx, cz);
+    const o = Math.hypot(x - cx, z - cz);
+    if (o <= 0) return edge;
+    return edge + (g.y - edge) * BackdropBlend(o, blend);
+  };
+}
+/** 离场地边 o 米处往远景基准（高度 / 颜色）过渡了多少：0 = 接缝上（同场地），1 = 完全是远景。 */
+export function BackdropBlend(o, blendM) {
+  if (!(blendM > 0)) return o > 0 ? 1 : 0;
+  const t = Math.max(0, Math.min(1, o / blendM));
+  return t * t * (3 - 2 * t);
+}
+/** 场景文件的 backdrop → 布局里用的那份（深拷贝、补缺省：blendM 0、haze null、paint / shapes []）。 */
+function NormalizeBackdrop(bd) {
+  if (!bd) return null;
+  return {
+    far: bd.far,
+    ground: { color: bd.ground.color, y: bd.ground.y, radiusM: bd.ground.radiusM, blendM: Number.isFinite(bd.ground.blendM) ? bd.ground.blendM : 0 },
+    haze: bd.haze ? { ...bd.haze } : null,
+    paint: (bd.paint || []).map((p) => (p.rects ? { id: p.id, palette: [...p.palette], rects: p.rects } : { ...p })),
+    shapes: (bd.shapes || []).map((sh) => ({ ...sh })),
+  };
+}
+
 export function LayoutFromSceneDoc(doc) {
   const check = ValidateBlockoutScene(doc);
   if (!check.ok) throw new Error(`场景文件有 ${check.errors.length} 处错误：${check.errors.slice(0, 3).join("；")}`);
@@ -338,6 +483,7 @@ export function LayoutFromSceneDoc(doc) {
   const tint = doc.heightTint ? { lo: doc.heightTint.lo, hi: doc.heightTint.hi } : { lo: sampler.minY, hi: Math.max(sampler.minY + 0.5, sampler.maxY) };
   // 可选 paint（2026-10-20）：地面涂色栅格，没写就是 null
   const groundPaint = BuildGroundPaint(doc.paint, doc.bounds);
+  const backdrop = NormalizeBackdrop(doc.backdrop);
   // 水块同第一关（BlockoutBlock）：盒子不画（灰盒子读不出是水，还会和水面打架），总控在顶面另铺水面
   // 可选 y（2026-10-18）：显式给了就用块中心的这个高度（架在坑上的洞顶、横木），没给就按 GroundedBlock 落地。
   const Placed = (block) => {
@@ -375,6 +521,11 @@ export function LayoutFromSceneDoc(doc) {
     groundPaint,
     colorSemantics: Array.isArray(doc.colorSemantics) ? [...doc.colorSemantics] : [],
     paint: groundPaint ? doc.paint.map((p) => ({ ...p })) : [],
+    // 可选 backdrop（2026-10-20）：远景层，只看不走——不进 blocks / gates（不碰撞、不进寻路），bounds 不变（玩家走不出去）；
+    // 编辑器按它画远景（Script_EditorBlockoutBackdrop），相机远平面拉到 cameraFar。没写 = null，cameraFar 照旧。
+    backdrop,
+    backdropGroundAt: backdrop ? BackdropGroundSampler(backdrop, sampler, doc.bounds) : null,
+    cameraFar: backdrop ? Math.max(BLOCKOUT_CAMERA_FAR, backdrop.far) : BLOCKOUT_CAMERA_FAR,
     bounds: { ...doc.bounds },
     ground,
     // 可选 semanticColors（2026-10-20）：场景文件改的几种块色盖在第一关那张表上
@@ -416,6 +567,8 @@ function ZonesFor(label, spawn) {
 /** 把场景布局装进 phase（文件场景在 Prepare 里调）。 */
 function ApplyLayout(phase, layout) {
   phase.whitebox.layout = layout;
+  // 远景层要的远平面（Script_Main 在 BuildField 之后按 phase.cameraFar 设相机）；没有远景层的关卡照旧 650
+  phase.cameraFar = Number.isFinite(layout.cameraFar) ? layout.cameraFar : BLOCKOUT_CAMERA_FAR;
   phase.bounds = { ...layout.bounds };
   if (layout.spawn) phase.spawn = SpawnFrom(layout.spawn);
   phase.zones = ZonesFor(phase.label, phase.spawn);
@@ -451,7 +604,7 @@ export function MakeBlockoutPhase(level) {
     ijaSupport: [],
     hud: { objectiveMarkers: false },
     loadoutOverride: { ...LOADOUT, throwables: { ...LOADOUT.throwables } },
-    cameraFar: 650,
+    cameraFar: BLOCKOUT_CAMERA_FAR,
     whitebox: { layout: null, blockout: true, actorCapacity: 160 },
   };
   phase.blockout = {

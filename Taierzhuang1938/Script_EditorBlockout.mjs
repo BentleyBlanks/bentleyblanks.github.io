@@ -28,6 +28,7 @@ import {
 import { BuildBlockoutSnapshot, FormatBlockoutSnapshot, ParsePoseParam } from "./Script_EditorBlockoutSnapshot.mjs";
 import { BlockoutPuppets } from "./Script_EditorBlockoutPuppets.mjs";
 import { BlockoutTrees } from "./Script_EditorBlockoutTrees.mjs";
+import { BlockoutBackdrop } from "./Script_EditorBlockoutBackdrop.mjs";
 import { BlockoutMarkers } from "./Script_EditorBlockoutMarkers.mjs";
 import { BlockoutStore } from "./Script_EditorBlockoutStore.mjs";
 import { BlockoutUi } from "./Script_EditorBlockoutUi.mjs";
@@ -206,6 +207,8 @@ export class EditorBlockout {
     this.puppets = new BlockoutPuppets({ scene: host.scene, actorFactory: host.actorFactory, library: host.library, groundAt: this.standAt });
     // 树：布局里标 blockoutTree 的块种游戏里的枯树模型（2026-10-20，§5.7）
     this.trees = new BlockoutTrees({ scene: host.scene, groundAt: this.groundAt });
+    // 远景层（场景文件 backdrop，§2.2 / §6.3，2026-10-20）：只看不走；地面叠同一套米格线，接缝两边对得上
+    this.backdrop = new BlockoutBackdrop({ scene: host.scene, renderer: host.renderer, patches: [GRID_PATCH] });
     this.markers = new BlockoutMarkers({ post: host.post, camera: host.camera, groundAt: this.standAt, labelRoot: this.labelRoot });
     this.map = new BlockoutMap();
     this.ui = new BlockoutUi(this.root, {
@@ -852,6 +855,7 @@ export class EditorBlockout {
     this.previz.Update(dt);
     this.UpdatePosedStance();
     this.trees.Sync(game.battlefield.layout);
+    if (this.backdrop.Sync(game.battlefield.layout)) this.host.post?.whiteboxScene?.Invalidate?.();
     this.puppets.Update(dt * (this.previz.TimeScale?.() ?? 1), this._cam);
     if (!this.puppets.transitioning && this.toUnitData) { this.unitData = this.toUnitData; this.toUnitData = null; }
     if (this.pending && !this.puppets.transitioning) this.ResolvePending(true);
@@ -1234,6 +1238,7 @@ export class EditorBlockout {
     return {
       puppets: this.puppets.puppets.size, actors: this.puppets.actorCount, warning: this.puppets.warning,
       trees: this.trees.Stats(),
+      backdrop: { ...this.backdrop.Stats(), cameraFar: this.host.camera?.far ?? null },
       markers: { ...this.markers.stats },
       fans: this.markers.FanInfo(),
       map: {
@@ -1252,6 +1257,7 @@ export class EditorBlockout {
     this.ResolvePending(false);
     this.puppets.Dispose();
     this.trees.Dispose();
+    this.backdrop.Dispose();
     this.markers.Dispose();
     this.map.Dispose();
     this.ui.Dispose();

@@ -20,11 +20,21 @@ export const BLOCKOUT_TREES = Object.freeze({
   sinkM: 0.09,
 });
 
-/** 布局里要种树的块 → [{ id, x, z, heightM }]。 */
+/**
+ * 布局里要种树的块 → [{ id, x, z, heightM, y? }]。
+ * 2026-10-20：远景层（layout.backdrop，§2.2）里 kind "tree" 的也种（村 A 那一圈树、出了北边界的路边杨树），
+ * 根的高度按远景地面（layout.backdropGroundAt）给 y；场地里的树不给 y，照旧按场地地面。远景里的树只是模型，没有碰撞。
+ */
 export function BlockoutTreeSpots(layout) {
-  return (layout?.blocks || []).filter(b => b?.blockoutTree).map(b => ({
+  const spots = (layout?.blocks || []).filter(b => b?.blockoutTree).map(b => ({
     id: String(b.id || ""), x: b.x, z: b.z, heightM: Number.isFinite(b.treeHeightM) && b.treeHeightM > 0 ? b.treeHeightM : b.h,
   }));
+  const groundAt = layout?.backdropGroundAt;
+  for (const sh of layout?.backdrop?.shapes || []) {
+    if (sh?.kind !== "tree") continue;
+    spots.push({ id: String(sh.id), x: sh.x, z: sh.z, heightM: sh.h, y: groundAt ? groundAt(sh.x, sh.z) + (Number.isFinite(sh.lift) ? sh.lift : 0) : undefined });
+  }
+  return spots;
 }
 
 function HashAngle(text) {
@@ -88,7 +98,7 @@ export class BlockoutTrees {
     AttachShadowDepth(mesh);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     spots.forEach((spot, i) => {
-      p.set(spot.x, this.groundAt(spot.x, spot.z) - BLOCKOUT_TREES.sinkM, spot.z);
+      p.set(spot.x, (Number.isFinite(spot.y) ? spot.y : this.groundAt(spot.x, spot.z)) - BLOCKOUT_TREES.sinkM, spot.z);
       q.setFromAxisAngle(up, HashAngle(spot.id));
       s.setScalar(spot.heightM / BREAKABLE_TREES.heightM);
       mesh.setMatrixAt(i, m.compose(p, q, s));

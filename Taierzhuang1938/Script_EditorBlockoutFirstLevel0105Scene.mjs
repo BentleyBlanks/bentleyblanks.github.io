@@ -19,7 +19,9 @@
 //      支沟的弃土只堆南沿（一道 0.75 m 的土垄，02 迂回组贴着它外侧爬，北沿的机枪看不见）。
 //   4. 支沟口：支沟比交通沟深 0.4 m；交通沟里不许被支沟的端头挖深（夹到交通沟底），落差在支沟口用台阶块补。
 //   5. 机枪坑、散兵坑、防炮洞：矩形 / 圆形平底开挖（底面取中心自然地面减深度，一整块平的）。
-//   6. 体块：沟里的日常摆件（L0105_PROPS）、路口板桥（横木 + 门板，显式 y）、干沟南岸的枯树，坑北的树桩 / 柏树 / 麦秸垛 / 杨树 / 土坯房，以及随信号体块。
+//   6. 体块：沟里的日常摆件（L0105_PROPS）、路口板桥（横木 + 门板，显式 y）、干沟南岸的枯树，坑北的树桩 / 柏树 / 麦秸垛 / 杨树，以及随信号体块。
+//   7. 2026-10-20 第三版：坑北压平（tilt 去掉）、南北向窄条田（FarmLayout → paint）、散坟（烘进高度场）；
+//      场地外的田、路、四个村子、东边低山写进远景层 backdrop（L0105Backdrop，契约 §2.2，只看不走）。
 //
 // 纪律：不读时钟、不读 git（commit / generatedAt 由 CLI 传入）；所有随机来自 TrenchPlan 的种子噪声，生成两次逐字相同。
 // ===========================================================================
@@ -34,8 +36,9 @@ import {
   L0105_GULLY, L0105_GULLY_TREES, L0105_GULLY_SOUTH_BERM, L0105_SUNKEN_LANE, L0105_BRIDGE, L0105_BRANCH_SOUTH_BERM,
   L0105_PROPS, L0105_PROP_KINDS, PointBeside, LineLength, GullyU, L0105_GULLY_POCKETS,
   L0105_PIT_NORTH, BundZ, ScarpZ,
-  L0105_NORTH_ROAD, L0105_NORTH_ROAD_HALF_W, L0105_FIELD_PATH, L0105_FIELD_PATH_HALF_W, L0105_FIELD_PAINT, L0105_FIELD_BANDS,
-  L0105_VILLAGE, L0105_VILLAGE_HOMES, L0105_FIELD_TREES, L0105_ROAD_TREES, L0105_PATH_TREES,
+  L0105_NORTH_ROAD, L0105_NORTH_ROAD_HALF_W, L0105_FIELD_PATH, L0105_FIELD_PATH_HALF_W, L0105_FIELD_PAINT,
+  L0105_FIELD_TREES, L0105_ROAD_TREES, L0105_PATH_TREES, L0105_FIELD_GRAVES, L0105_FARM,
+  L0105_BACKDROP, L0105_BACKDROP_ROAD, L0105_BACKDROP_PATHS, L0105_BACKDROP_VILLAGES, L0105_BACKDROP_HILLS,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 export const L0105_SCENE_GENERATOR = "Script_EditorBlockoutCli.mjs scene FirstLevel0105";
@@ -192,7 +195,8 @@ const DITCH_BOX = (() => {
   const xs = DITCH.line.map((p) => p.x), zs = DITCH.line.map((p) => p.z), m = DITCH.topW / 2 + DITCH.lipW + PN.scarp.notchR + 2;
   return { minX: Math.min(...xs) - m, maxX: Math.max(...xs) + m, minZ: Math.min(...zs) - m, maxZ: Math.max(...zs) + m };
 })();
-const GRAVES = Object.freeze([...PN.loneGraves, ...PN.graveyard]);
+// 坟：两座孤坟 + 坟地五座 + 第三版田里散的单个坟（L0105_FIELD_GRAVES）
+const GRAVES = Object.freeze([...PN.loneGraves, ...PN.graveyard, ...L0105_FIELD_GRAVES]);
 
 /** 点到干水沟中心线：→ { d 横向距离, along 弧长 }（离沟很远时 d = Infinity）。 */
 export function DitchStation(x, z) {
@@ -217,12 +221,6 @@ export function PitNorthRoll(x, z) {
   if (w <= 0) return 0;
   const r = PN.roll;
   return w * (r.a1 * Math.sin(x * r.k1x + z * r.k1z + r.p1) + r.a2 * Math.sin(x * r.k2x + z * r.k2z + r.p2));
-}
-/** 整片地往北缓缓抬（米，≥ 0）：扫清带外到地坎 riseM，坎下往北到村子再 farRiseM。 */
-export function PitNorthTilt(z) {
-  const t = PN.tilt;
-  return t.riseM * Smooth((t.fromZ - z) / (t.fromZ - t.toZ)) + t.farRiseM * Smooth((t.farFromZ - z) / (t.farFromZ - t.farToZ))
-    + t.villageRiseM * Clamp01((t.villageFromZ - z) / (t.villageFromZ - t.villageToZ));
 }
 /** 路穿过地坎处的坡道（2026-10-20 第二轮）：大路放宽 roadM、田间小路放宽 pathM，离路中心 R 米内渐变。 */
 const SCARP_ROAD_NOTCH = Object.freeze({ roadM: 14, roadR: 7, pathM: 9, pathR: 4 });
@@ -284,7 +282,7 @@ function DitchCut(base, st, x, z) {
 /** 坑北前景合到地面上。h = 原来的自然地面（含前沿一带的小起伏、坑北略低）。 */
 export function PitNorthHeight(x, z, h) {
   const st = DitchStation(x, z);
-  const base = h + PitNorthRoll(x, z) + PitNorthTilt(z) + ScarpDelta(x, z, st.d);
+  const base = h + PitNorthRoll(x, z) + ScarpDelta(x, z, st.d);   // 2026-10-20 第三版：往北抬的那层（tilt）去掉，压平
   let out = base + Math.max(BundHeight(x, z), GraveHeight(x, z));
   const cut = DitchCut(base, st, x, z);
   if (cut.cap < out) out = cut.cap;
@@ -461,7 +459,7 @@ export function BakeL0105Grid(ground, bounds = L0105_BOUNDS, cellM = L0105_CELL_
   const cols = Math.round((bounds.maxX - bounds.minX) / cellM);
   const rows = Math.round((bounds.maxZ - bounds.minZ) / cellM);
   const buffer = Buffer.alloc((cols + 1) * (rows + 1) * 2);
-  let min = Infinity, max = -Infinity, southMax = -Infinity;
+  let min = Infinity, max = -Infinity, southMax = -Infinity, southMin = Infinity;
   for (let iz = 0; iz <= rows; iz++) {
     const south = bounds.minZ + iz * cellM >= PIT_NORTH_FROM_Z;
     for (let ix = 0; ix <= cols; ix++) {
@@ -470,12 +468,13 @@ export function BakeL0105Grid(ground, bounds = L0105_BOUNDS, cellM = L0105_CELL_
       if (cm < min) min = cm;
       if (cm > max) max = cm;
       if (south && cm > southMax) southMax = cm;
+      if (south && cm < southMin) southMin = cm;
       buffer.writeInt16LE(cm, (iz * (cols + 1) + ix) * 2);
     }
   }
   return {
     terrain: { kind: "heightmap", minX: bounds.minX, minZ: bounds.minZ, cellM, cols, rows, encoding: "int16-cm-base64", data: buffer.toString("base64") },
-    minM: min / 100, maxM: max / 100, southMaxM: southMax / 100,
+    minM: min / 100, maxM: max / 100, southMaxM: southMax / 100, southMinM: southMin / 100,
   };
 }
 
@@ -596,9 +595,10 @@ export function L0105Blocks(sample, floors) {
 
 /**
  * 坑北前景的体块（2026-10-20）：树桩（矮块，不挡人）、坟地柏树（细高块）、麦秸垛（两层块，圆顶感）；
- * 第二轮：大路北段两边的杨树、田边零星的树、村子（院墙 + 正房 / 厢房 + 屋顶）、村边大树、场院麦秸垛。
+ * 第二轮起：大路北段两边的杨树、田边零星的树、田间小路边一排树。第三版：村子拿掉（挪到远景层），杨树顺新的大路北段种到北边界，
+ * 出了边界的那几棵进远景层（L0105Backdrop）。
  * 树都是细高 foliage 块（脚印 0.6 m ≤ 1 m），编辑器种成树模型（IsSceneTreeBlock）。
- * 显式 y 的块（麦秸垛上层、房墙、房顶）按 sample 在脚印中心与四角取最低的地面算（同不写 y 时加载器的落地法）。
+ * 显式 y 的块（麦秸垛上层）按 sample 在脚印中心与四角取最低的地面算（同不写 y 时加载器的落地法）。
  */
 export function PitNorthBlocks(sample) {
   const out = [];
@@ -615,63 +615,40 @@ export function PitNorthBlocks(sample) {
   const hs = PN.haystack;
   Haystack("Haystack", hs.x, hs.z, hs.w, hs.d, hs.h, hs.baseH, hs.topW, hs.topD, { cover: { ...FACE_SOUTH } });
 
-  // 大路北段两边的杨树：spacing 米一棵，位置 / 树高按序号做确定性抖动；不种在干水沟、地坎坎面上，也不压着田间小路
-  const RT = L0105_ROAD_TREES;
-  let ti = 0;
-  for (let d = RT.fromM; d <= RT.toM; d += RT.spacing) {
-    for (const side of [1, -1]) {
-      const j = Hash01(ti * 2 + (side > 0 ? 0 : 1), 7);
-      const p = PointBeside(L0105_NORTH_ROAD, d + (j - 0.5) * 2 * RT.jitterM, side * (RT.lat + (Hash01(ti, 11) - 0.5) * 0.8));
-      ti += 1;
-      if (DitchStation(p.x, p.z).d < 4 || Math.abs(ScarpZ(p.x) - p.z) < 6 || DistanceToPolyline(p.x, p.z, L0105_FIELD_PATH) < 4) continue;
-      Tree(`RoadPoplar_${String(ti).padStart(3, "0")}`, p.x, p.z, RT.hMin + (RT.hMax - RT.hMin) * Hash01(ti, 13));
-    }
-  }
+  // 大路北段两边的杨树（场地里那几棵；出了北边界的进远景层）
+  for (const t of RoadPoplarSpots()) if (t.inField) Tree(t.id, t.x, t.z, t.h);
   L0105_FIELD_TREES.forEach((t, i) => Tree(`FieldTree_${N2(i)}`, t.x, t.z, t.h));
   {
     const PT = L0105_PATH_TREES;
     let k = 0;
     for (let d = PT.fromM; d <= PT.toM; d += PT.spacing, k += 1) {
-      const p = PointBeside(L0105_FIELD_PATH, d, -PT.lat);   // 行进方向（往西南）的右手 = 西北侧
-      if (Math.abs(ScarpZ(p.x) - p.z) < 6) continue;
+      const p = PointBeside(L0105_FIELD_PATH, d, -PT.lat);   // 小路从北边界往南走，右手 = 西侧
+      if (Math.abs(ScarpZ(p.x) - p.z) < 6 || GraveHeight(p.x, p.z) > 0) continue;
       Tree(`PathTree_${N2(k)}`, p.x, p.z, PT.hMin + (PT.hMax - PT.hMin) * Hash01(k, 19));
     }
   }
+  return out;
+}
 
-  // 村子：每户四面院墙（南墙在门口断开）、正房 + 厢房（墙块 + 屋顶块）
-  const V = L0105_VILLAGE;
-  const Wall = (id, x0, z0, x1, z1, h) => out.push(Block(id, (x0 + x1) / 2, (z0 + z1) / 2, Math.max(V.yardWallT, x1 - x0), Math.max(V.yardWallT, z1 - z0), h, "plaster", { prop: "YardWall" }));
-  for (const home of L0105_VILLAGE_HOMES) {
-    const { id, x0, x1, zS, zN, gateX, yardWallH: wh } = home;
-    const t = V.yardWallT / 2;
-    Wall(`${id}_WallN`, x0, zN - t, x1, zN + t, wh);
-    // 东西两面墙顺坡，分两截落地（一整截 16 m 在坡上，高的那头只露出一半）
-    const zM = (zN + zS) / 2;
-    Wall(`${id}_WallW1`, x0 - t, zN, x0 + t, zM, wh); Wall(`${id}_WallW2`, x0 - t, zM, x0 + t, zS, wh);
-    Wall(`${id}_WallE1`, x1 - t, zN, x1 + t, zM, wh); Wall(`${id}_WallE2`, x1 - t, zM, x1 + t, zS, wh);
-    const g0 = gateX - V.gateW / 2, g1 = gateX + V.gateW / 2;
-    if (g0 - x0 > 0.6) Wall(`${id}_WallS1`, x0, zS - t, g0, zS + t, wh);
-    if (x1 - g1 > 0.6) Wall(`${id}_WallS2`, g1, zS - t, x1, zS + t, wh);
-    home.houses.forEach((hu, k) => {
-      const y0 = Low(hu.x, hu.z, hu.w, hu.d);
-      out.push(Block(`${id}_House${k + 1}`, hu.x, hu.z, hu.w, hu.d, hu.wallH, "plaster", { prop: "House", y: R2(y0 + hu.wallH / 2) }));
-      out.push(Block(`${id}_Roof${k + 1}`, hu.x, hu.z, hu.w + V.roofOverhangM, hu.d + V.roofOverhangM, hu.roofT, "roof", { prop: "Roof", y: R2(y0 + hu.wallH + hu.roofT / 2) }));
-      // 屋脊：顺长边，厢房（南北长）顺南北
-      const along = hu.w >= hu.d;
-      out.push(Block(`${id}_Ridge${k + 1}`, hu.x, hu.z, along ? hu.w : hu.w * V.ridgeDepthK, along ? hu.d * V.ridgeDepthK : hu.d, V.ridgeH, "roof",
-        { prop: "Roof", y: R2(y0 + hu.wallH + hu.roofT + V.ridgeH / 2) }));
-    });
-    // 隔几户院里一棵树（院子南半边）
-    const n = Number(id.slice(4));
-    if (n % 4 === 1) Tree(`${id}_Tree`, home.x0 + (home.x1 - home.x0) * (n % 8 === 1 ? 0.3 : 0.7), zS - 3, 12 + (n % 5) * 0.8);
+/** 大路北段 + 远景里那段连起来（村 A 南口以南）的弧长线。 */
+const ROAD_TO_A = Object.freeze([...L0105_NORTH_ROAD, ...L0105_BACKDROP_ROAD.slice(1)]);
+/**
+ * 大路两边的杨树：spacing 米一棵，位置 / 树高按序号做确定性抖动；不种在干水沟、地坎坎面上，不压着田间小路和坟。
+ * inField = 在场地里（z ≥ minZ + 1）→ 体块；否则进远景层（kind "tree"）。
+ */
+export function RoadPoplarSpots() {
+  const RT = L0105_ROAD_TREES, out = [];
+  let ti = 0;
+  for (let d = RT.fromM; d <= RT.toM; d += RT.spacing) {
+    for (const side of [1, -1]) {
+      const j = Hash01(ti * 2 + (side > 0 ? 0 : 1), 7);
+      const p = PointBeside(ROAD_TO_A, d + (j - 0.5) * 2 * RT.jitterM, side * (RT.lat + (Hash01(ti, 11) - 0.5) * 0.8));
+      ti += 1;
+      if (DitchStation(p.x, p.z).d < 4 || Math.abs(ScarpZ(p.x) - p.z) < 6 || DistanceToPolyline(p.x, p.z, L0105_FIELD_PATH) < 4 || GraveHeight(p.x, p.z) > 0) continue;
+      out.push({ id: `RoadPoplar_${String(ti).padStart(3, "0")}`, x: R2(p.x), z: R2(p.z), h: R2(RT.hMin + (RT.hMax - RT.hMin) * Hash01(ti, 13)),
+        inField: p.z >= L0105_BOUNDS.minZ + 1 });
+    }
   }
-  {
-    const tw = V.tower, y0 = Low(tw.x, tw.z, tw.w, tw.d);
-    out.push(Block("VillageTower", tw.x, tw.z, tw.w, tw.d, tw.wallH, "plaster", { prop: "House", y: R2(y0 + tw.wallH / 2) }));
-    out.push(Block("VillageTowerRoof", tw.x, tw.z, tw.w + V.roofOverhangM, tw.d + V.roofOverhangM, tw.roofT, "roof", { prop: "Roof", y: R2(y0 + tw.wallH + tw.roofT / 2) }));
-  }
-  V.trees.forEach((t, i) => Tree(`VillageTree_${N2(i)}`, t.x, t.z, t.h));
-  V.haystacks.forEach((h, i) => Haystack(`VillageHaystack_${N2(i)}`, h.x, h.z, 4, 4, 2.8, 2.1, 3.1, 3.1));
   return out;
 }
 
@@ -682,16 +659,82 @@ function Hash01(i, salt = 0) {
 }
 
 // ---------------------------------------------------------------------------
-// 坑北地面涂色（场景文件 paint，§2.2 / §6.3，2026-10-20 第二轮）
+// 田的分组网格（2026-10-20 第三版，L0105_FARM）：场地的涂色与远景层的田块都从这里切，接缝两边对得上
+
+const FARM = L0105_FARM;
+const Pick = (range, u) => range[0] + (range[1] - range[0]) * u;
+/** 组排的一条南北界在 x 处的 z（"scarp" = 地坎中心线；出了场地按边界上的值延长，远景里的田接得上）。 */
+export function FarmEdgeZ(edge, x) {
+  if (edge === "scarp") return ScarpZ(Math.max(L0105_BOUNDS.minX, Math.min(L0105_BOUNDS.maxX, x)));
+  return edge;
+}
+/** 种什么：按 crops 的比例抽；kind + 两档深浅里的哪一档。 */
+function PickCrop(u, shadeU) {
+  let acc = 0;
+  for (const [kind, w] of FARM.crops) { acc += w; if (u < acc) return { kind, shade: shadeU < 0.5 ? 0 : 1 }; }
+  return { kind: FARM.crops[FARM.crops.length - 1][0], shade: shadeU < 0.5 ? 0 : 1 };
+}
+export function CropColor(c) { return L0105_FIELD_PAINT[c.kind][c.shade]; }
+
+/**
+ * 切田：→ { rows: [{ index, south, north }], groups: [{ row, index, x0, x1, strips: bool }], parcels: [{ row, group, x0, x1, crop }] }。
+ * 组排：rowsZ 定的几排之后按 rowLen 往北排到 region.minZ；每排从 originX 起按 groupW 切组（每排起点错开）；
+ * 组里按 stripW 切条（最后一条把剩下的分匀，不留细边），左右相邻两条不种同一样；组心离坑 > stripRadiusM 的一组一块。
+ */
+export function FarmLayout() {
+  const edges = [...FARM.rowsZ];
+  for (let k = 0; ; k++) {
+    const last = edges[edges.length - 1];
+    if (last <= FARM.region.minZ) break;
+    edges.push(Math.max(FARM.region.minZ, Math.round(last - Pick(FARM.rowLen, Hash01(k, 31)))));
+  }
+  const rows = [], groups = [], parcels = [];
+  const pit = { x: P.pit.x, z: P.pit.z };
+  for (let r = 0; r + 1 < edges.length; r++) {
+    const row = { index: r, south: edges[r], north: edges[r + 1] };
+    rows.push(row);
+    let x = FARM.originX - Hash01(r, 41) * FARM.groupW[1];
+    for (let g = 0; x < FARM.region.maxX; g++) {
+      const w = Math.round(Pick(FARM.groupW, Hash01(r * 1000 + g, 43)));
+      const x0 = x, x1 = x + w;
+      x = x1;
+      if (x1 < FARM.region.minX) continue;
+      const midZ = (FarmEdgeZ(row.south, (x0 + x1) / 2) + FarmEdgeZ(row.north, (x0 + x1) / 2)) / 2;
+      const strips = Math.hypot((x0 + x1) / 2 - pit.x, midZ - pit.z) <= FARM.stripRadiusM;
+      const group = { row: r, index: g, x0, x1, strips };
+      groups.push(group);
+      const key = r * 1000 + g;
+      const gx0 = x0 + FARM.pathHalfW, gx1 = x1 - FARM.pathHalfW;
+      if (!strips) {
+        parcels.push({ row: r, group: g, x0: gx0, x1: gx1, crop: PickCrop(Hash01(key, 53), Hash01(key, 59)) });
+        continue;
+      }
+      let sx = gx0, prev = null;
+      for (let s = 0; sx < gx1 - 0.01; s++) {
+        const u = Hash01(key * 100 + s, 47);
+        let sw = FARM.stripW[0] + (FARM.stripW[1] - FARM.stripW[0]) * Math.pow(u, 1.4);
+        const rem = gx1 - sx;
+        if (rem <= FARM.stripW[1] && rem - sw < FARM.stripW[0]) sw = rem;
+        else if (rem - sw < FARM.stripW[0]) sw = rem / 2;
+        let crop = PickCrop(Hash01(key * 100 + s, 53), Hash01(key * 100 + s, 59));
+        if (prev && crop.kind === prev.kind) {
+          const kinds = FARM.crops.map((c) => c[0]).filter((k) => k !== prev.kind);
+          crop = { kind: kinds[Hash01(key * 100 + s, 61) < 0.5 ? 0 : 1], shade: crop.shade };
+        }
+        parcels.push({ row: r, group: g, x0: sx, x1: sx + sw, crop });
+        prev = crop;
+        sx += sw;
+      }
+    }
+  }
+  return { rows, groups, parcels };
+}
+
+// ---------------------------------------------------------------------------
+// 坑北地面涂色（场景文件 paint，§2.2 / §6.3；2026-10-20 第二轮起，第三版换成窄条田）
 
 const PR1 = (v) => Math.round(v * 10) / 10;
 const PPt = (x, z) => ({ x: PR1(x), z: PR1(z) });
-/** 田块分带的一条界线在 x 处的 z。 */
-function BandLineZ(edge, x) {
-  if (edge.scarp) return ScarpZ(x);
-  if (edge.bund) return BundZ(PN.bunds.find((b) => b.id === edge.bund), x);
-  return edge.z0 + edge.amp * Math.sin(edge.k * x + edge.phase);
-}
 /** 折线 / 曲线按步长取点。 */
 function SampleCurve(fn, x0, x1, stepM) {
   const pts = [];
@@ -699,67 +742,53 @@ function SampleCurve(fn, x0, x1, stepM) {
   for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n; pts.push(PPt(x, fn(x))); }
   return pts;
 }
-const CROPS = Object.freeze(["wheat", "plowed", "fallow"]);
+/** 八边形（坟包涂色）。 */
+function Octagon(x, z, r) {
+  const poly = []; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; poly.push(PPt(x + Math.cos(a) * r, z + Math.sin(a) * r)); }
+  return poly;
+}
 
 /**
- * 坑北的涂色项（按顺序叠，后面的盖前面的）：扫清带 → 田块 → 田埂 / 地界 → 干水沟翻土 → 地坎坎面 → 坟包 → 村子 → 场院 → 村里的街 → 路 → 田间小路。
- * 田块：每条横带东西切成长条地，宽度在带的 strips 范围里按序号抖，种什么按序号抽（麦 5 成、翻地 3 成不到、撂荒 2 成多），跟左边那块一样就换下一种。
+ * 坑北的涂色项（按顺序叠，后面的盖前面的）：扫清带 → 田间小路底色 → 窄条田（FarmLayout，场地里那几组）→ 田埂 → 干水沟翻土 → 地坎坎面 → 坟 → 路 → 田间小路。
+ * 田块的多边形往场地外多伸 2 m（栅格按场地边界裁，边上是满涂，跟远景层接得上）；地坎两边那两排的南 / 北沿顺着地坎曲线走。
  */
-export function L0105Paint() {
+export function L0105Paint(farm = FarmLayout()) {
   const C = L0105_FIELD_PAINT, B = L0105_BOUNDS;
   const out = [];
+  const X0 = B.minX - 2, X1 = B.maxX + 2, Z1 = B.minZ - 2;
   // 扫清带：z −12…−80（避开坑、散兵坑、爬沟和前沿沟西头北折那一截）
   out.push({ id: "Cleared", color: C.cleared, feather: 1.5, poly: [
     PPt(B.minX, -80), PPt(B.maxX, -80), PPt(B.maxX, -12), PPt(-1.5, -12), PPt(-1.5, -17.5), PPt(-11.5, -17.5), PPt(-11.5, -12),
     PPt(-56, -12), PPt(-56, -27), PPt(-68, -27), PPt(-68, -12), PPt(B.minX, -12)] });
   // 爬沟、丙位散兵坑一圈是挖出来的土（扫清带上留的那个缺口）
   out.push({ id: "SapSpoil", color: C.ditchSoil, strength: 0.75, feather: 1.2, poly: [PPt(-1.5, -12), PPt(-1.5, -17.5), PPt(-11.5, -17.5), PPt(-11.5, -12)] });
-  // 田块
-  L0105_FIELD_BANDS.forEach((band, bi) => {
-    let x = B.minX - 2, i = 0, prev = -1;
-    while (x < B.maxX + 2) {
-      const [wMin, wMax] = band.strips;
-      let w = wMin + (wMax - wMin) * Hash01(bi * 101 + i, 3);
-      if (B.maxX + 2 - (x + w) < wMin * 0.6) w = B.maxX + 2 - x;   // 最后一块别剩一条细边
-      const x0 = x, x1 = x + w;
-      const r = Hash01(bi * 101 + i, 5);
-      let crop = r < 0.5 ? 0 : r < 0.78 ? 1 : 2;
-      if (crop === prev) crop = (crop + 1 + (Hash01(bi * 101 + i, 9) < 0.5 ? 0 : 1)) % 3;
-      prev = crop;
-      const kind = CROPS[crop];
-      const color = kind === "wheat" ? C.wheat[Hash01(bi * 101 + i, 17) < 0.5 ? 0 : 1] : C[kind];
-      const south = SampleCurve((q) => BandLineZ(band.south, q), x0, x1, 8);
-      const north = SampleCurve((q) => BandLineZ(band.north, q), x0, x1, 8).reverse();
-      out.push({ id: `Field_${bi + 1}_${String(i + 1).padStart(2, "0")}`, color, feather: 1.2, poly: [...south, ...north] });
-      x = x1; i += 1;
-    }
-  });
-  // 田埂（烘进高度场的那几道）与只涂色的地界
+  // 田间小路底色：整片坑北先涂成小路色，田块之间留下的缝就是组与组、排与排之间的小路
+  out.push({ id: "FarmPaths", color: C.fieldPath, feather: 0.6, poly: [PPt(X0, -80), PPt(X1, -80), PPt(X1, Z1), PPt(X0, Z1)] });
+  // 窄条田（场地里那几组）
+  const ph = FARM.pathHalfW;
+  for (const p of farm.parcels) {
+    const row = farm.rows[p.row];
+    const x0 = Math.max(X0, p.x0), x1 = Math.min(X1, p.x1);
+    if (!(x1 - x0 > 0.2)) continue;
+    const s0 = row.south, n0 = row.north;
+    const SouthZ = (x) => FarmEdgeZ(s0, x) - ph, NorthZ = (x) => Math.max(Z1, FarmEdgeZ(n0, x) + ph);
+    if (SouthZ((x0 + x1) / 2) < Z1) continue;
+    const south = s0 === "scarp" ? SampleCurve(SouthZ, x0, x1, 6) : [PPt(x0, SouthZ(x0)), PPt(x1, SouthZ(x1))];
+    const north = (n0 === "scarp" ? SampleCurve(NorthZ, x0, x1, 6) : [PPt(x0, NorthZ(x0)), PPt(x1, NorthZ(x1))]).reverse();
+    out.push({ id: `Field_${p.row + 1}_${String(p.group).padStart(2, "0")}_${String(Math.round(p.x0 * 10))}`, color: CropColor(p.crop), feather: 0.8, poly: [...south, ...north] });
+  }
+  // 田埂（烘进高度场的那几道）
   for (const b of PN.bunds) out.push({ id: `Bund_${b.id}`, color: C.bund, strength: 0.75, feather: 0.8, halfW: 0.45, line: SampleCurve((q) => BundZ(b, q), b.minX, b.maxX, 5) });
-  L0105_FIELD_BANDS.forEach((band, bi) => {
-    const e = band.north;
-    if (e.bund || e.scarp || bi === L0105_FIELD_BANDS.length - 1) return;
-    out.push({ id: `FieldEdge_${bi + 1}`, color: C.bund, strength: 0.7, feather: 0.8, halfW: 0.45, line: SampleCurve((q) => BandLineZ(e, q), B.minX, B.maxX, 6) });
-  });
   // 干水沟两边翻出来的新土（连沟一起涂）
   out.push({ id: "DitchSoil", color: C.ditchSoil, strength: 0.9, feather: 0.8, halfW: PR1(DITCH.topW / 2 + DITCH.lipW), line: DITCH.line.map((p) => PPt(p.x, p.z)) });
   // 地坎坎面
   out.push({ id: "ScarpFace", color: C.scarpFace, strength: 0.9, feather: 0.8, halfW: 1.3, line: SampleCurve(ScarpZ, B.minX, B.maxX, 5) });
-  // 坟包
+  // 坟包：坟地与两座孤坟是老坟，田里散的单个坟是新土
   [...PN.loneGraves.map((g, i) => ({ id: `LoneGrave${i + 1}`, ...g })), ...PN.graveyard].forEach((g) => {
-    const poly = []; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; poly.push(PPt(g.x + Math.cos(a) * 1.9, g.z + Math.sin(a) * 1.9)); }
-    out.push({ id: `Grave_${g.id}`, color: C.graveSoil, feather: 0.6, poly });
+    out.push({ id: `Grave_${g.id}`, color: C.graveSoil, feather: 0.6, poly: Octagon(g.x, g.z, 1.9) });
   });
-  // 村子：整片夯土地 + 场院
-  const V = L0105_VILLAGE;
-  const zS = V.rows[0].zS + 2, zN = V.rows[V.rows.length - 1].zN - 2;
-  out.push({ id: "VillageGround", color: C.yard, feather: 1.5, poly: [PPt(V.minX - 3, zS), PPt(V.maxX + 3, zS), PPt(V.maxX + 3, zN), PPt(V.minX - 3, zN)] });
-  V.threshing.forEach((t, i) => out.push({ id: `Threshing_${i + 1}`, color: C.threshing, feather: 1.2,
-    poly: [PPt(t.minX, t.maxZ), PPt(t.maxX, t.maxZ), PPt(t.maxX, t.minZ), PPt(t.minX, t.minZ)] }));
-  // 后街与胡同（前街就是大路北段的末段）
-  out.push({ id: "VillageBackStreet", color: C.path, feather: 0.8, halfW: V.streetHalfW, line: [PPt(V.minX - 3, V.streets[1]), PPt(V.maxX + 3, V.streets[1])] });
-  out.push({ id: "VillageLane", color: C.path, feather: 0.8, halfW: PR1((V.laneX1 - V.laneX0) / 2), line: [PPt((V.laneX0 + V.laneX1) / 2, zS), PPt((V.laneX0 + V.laneX1) / 2, zN)] });
-  // 路：大路在坑北这一截（到 z −11.5，南面不涂）+ 大路北段 + 田间小路
+  L0105_FIELD_GRAVES.forEach((g, i) => out.push({ id: `FieldGrave_${String(i + 1).padStart(2, "0")}`, color: C.newSoil, feather: 0.6, poly: Octagon(g.x, g.z, 1.9) }));
+  // 路：大路在坑北这一截（到 z −11.5，南面不涂）+ 大路北段（到北边界）+ 田间小路
   {
     const endZ = -11.5;   // 圆头 + 柔边不过 z −8
     const a = L0105_ROAD[0], b = L0105_ROAD[1], t = (endZ - a.z) / (b.z - a.z);
@@ -768,6 +797,142 @@ export function L0105Paint() {
   out.push({ id: "NorthRoad", color: C.road, feather: 0.8, halfW: L0105_NORTH_ROAD_HALF_W, line: L0105_NORTH_ROAD.map((p) => PPt(p.x, p.z)) });
   out.push({ id: "FieldPath", color: C.path, feather: 0.6, halfW: L0105_FIELD_PATH_HALF_W, line: L0105_FIELD_PATH.map((p) => PPt(p.x, p.z)) });
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// 远景层（场景文件 backdrop，§2.2 / §6.3；2026-10-20 第三版）：场地外的田、路、四个村子、东边低山。只看不走。
+
+const R1 = (v) => Math.round(v * 10) / 10;
+/** 椭圆（村里的地）。 */
+function Ellipse(x, z, rx, rz, n = 20) {
+  const poly = []; for (let k = 0; k < n; k++) { const a = k * 2 * Math.PI / n; poly.push(PPt(x + Math.cos(a) * rx, z + Math.sin(a) * rz)); }
+  return poly;
+}
+
+/**
+ * 一个村子的远景体块：一排排院子（正房 + 一侧厢房，墙 + 深色屋顶；村 A 加院墙），外面一圈树、院里零星几棵。
+ * 村 A 的树用编辑器的枯树模型（kind "tree"），别的村用树冠块（kind "blob"）。有 streetX 的村子中间留一条南北街（大路从这里穿过去），树圈在街口断开。
+ * → shapes 数组（id 前缀 Village<id>_）。
+ */
+export function VillageShapes(v) {
+  const BD = L0105_BACKDROP, out = [];
+  const pre = `Village${v.id}_`;
+  const yardD = 16, laneM = 4, yardW = v.yardW || 19;
+  const nRows = Math.max(1, Math.floor((2 * v.rz + laneM) / (yardD + laneM)));
+  const z0 = v.z - (nRows * (yardD + laneM) - laneM) / 2;
+  let n = 0;
+  const near = v.treeKind === "tree";
+  for (let r = 0; r < nRows; r++) {
+    const zN = z0 + r * (yardD + laneM), zS = zN + yardD;
+    // 椭圆里能放下的那一段
+    const zc = (zN + zS) / 2, k = 1 - Math.pow((zc - v.z) / (v.rz + 4), 2);
+    if (k <= 0.05) continue;
+    const half = v.rx * Math.sqrt(k);
+    let x = v.x - half + (r % 2 ? 4 : 0);
+    for (let g = 0; x < v.x + half - 8; g++) {
+      const w = yardW - 3 + 6 * Hash01(n, 71);
+      const x0 = x, x1 = Math.min(x + w, v.x + half);
+      x = x1 + 1.5;
+      if (Number.isFinite(v.streetX) && x0 < v.streetX + 5 && x1 > v.streetX - 5) { x = v.streetX + 5; continue; }
+      if (x1 - x0 < 10) continue;
+      const id = `${pre}Y${String(n + 1).padStart(2, "0")}`;
+      const wallH = R1(3.0 + 0.6 * Hash01(n, 73)), cx = (x0 + x1) / 2;
+      // 正房：坐北，贴北墙
+      out.push({ id: `${id}_House`, kind: "box", x: R1(cx), z: R1(zN + 3.5), w: R1(x1 - x0 - 2), d: 6, h: wallH, color: BD.wall });
+      out.push({ id: `${id}_Roof`, kind: "box", x: R1(cx), z: R1(zN + 3.5), w: R1(x1 - x0 - 1.2), d: 6.8, h: 1.2, lift: wallH, color: BD.roof });
+      // 厢房：东或西（按户号交替）；远处的村子隔一户才有
+      if (near || n % 2 === 0) {
+        const side = n % 2 ? 1 : -1, hx = side < 0 ? x0 + 3 : x1 - 3;
+        out.push({ id: `${id}_Side`, kind: "box", x: R1(hx), z: R1(zN + 10.5), w: 4.8, d: 6, h: 3, color: BD.wall });
+        out.push({ id: `${id}_SideRoof`, kind: "box", x: R1(hx), z: R1(zN + 10.5), w: 5.6, d: 6.8, h: 1.1, lift: 3, color: BD.roof });
+      }
+      if (near) {
+        // 院墙（2 m）：北、东、西、南（南墙门口断开 3 m）
+        const t = 0.5, gate = n % 2 ? x0 + 4 : x1 - 4;
+        out.push({ id: `${id}_WallN`, kind: "box", x: R1(cx), z: R1(zN), w: R1(x1 - x0), d: t, h: 2, color: BD.wall });
+        out.push({ id: `${id}_WallW`, kind: "box", x: R1(x0), z: R1(zc), w: t, d: yardD, h: 2, color: BD.wall });
+        out.push({ id: `${id}_WallE`, kind: "box", x: R1(x1), z: R1(zc), w: t, d: yardD, h: 2, color: BD.wall });
+        if (gate - 1.5 - x0 > 0.6) out.push({ id: `${id}_WallS1`, kind: "box", x: R1((x0 + gate - 1.5) / 2), z: R1(zS), w: R1(gate - 1.5 - x0), d: t, h: 2, color: BD.wall });
+        if (x1 - gate - 1.5 > 0.6) out.push({ id: `${id}_WallS2`, kind: "box", x: R1((gate + 1.5 + x1) / 2), z: R1(zS), w: R1(x1 - gate - 1.5), d: t, h: 2, color: BD.wall });
+      }
+      // 院里的树（远处的村子隔一户一棵、村 A 隔两户一棵，院子南半边）：从外面看是村里冒出来的一团团树梢
+      if (n % (near ? 3 : 2) === 1) Crown(`${id}_Tree`, x0 + (x1 - x0) * (0.3 + 0.4 * Hash01(n, 79)), zS - 4, n);
+      n += 1;
+    }
+  }
+  // 外面一圈树：椭圆（半轴 = 房子那一片 + ringM/2 + 4），每 spacing 米一棵，径向抖 ±ringM/2；街口断开
+  const ax = v.rx + v.ringM / 2 + 4, az = v.rz + v.ringM / 2 + 4;
+  const perim = 2 * Math.PI * Math.sqrt((ax * ax + az * az) / 2);
+  const spacing = near ? 6.5 : 8.5;
+  const count = Math.round(perim / spacing);
+  for (let i = 0; i < count; i++) {
+    const a = (i + 0.5 * Hash01(i, 83)) / count * 2 * Math.PI;
+    const jr = (Hash01(i, 89) - 0.5) * v.ringM;
+    const x = v.x + Math.cos(a) * (ax + jr), z = v.z + Math.sin(a) * (az + jr);
+    if (Number.isFinite(v.streetX) && Math.abs(x - v.streetX) < 7) continue;
+    // 树圈不是一道齐整的篱笆：一段段疏密不一（按角度的慢变化决定这一段稀不稀），远看是一团团
+    if (!near && Hash01(i, 113) < 0.35 * (0.5 + 0.5 * Math.sin(a * 3 + v.x * 0.01))) continue;
+    Crown(`${pre}Ring${String(i + 1).padStart(3, "0")}`, x, z, i + 500);
+    // 外圈再错开半棵补一层（远看是厚厚一团）
+    if (!near && Hash01(i, 97) < 0.6) Crown(`${pre}RingB${String(i + 1).padStart(3, "0")}`, v.x + Math.cos(a + 0.5 / count * 2 * Math.PI) * (ax + v.ringM * 0.6), v.z + Math.sin(a + 0.5 / count * 2 * Math.PI) * (az + v.ringM * 0.6), i + 900);
+  }
+  return out;
+  function Crown(id, x, z, i) {
+    if (near) { out.push({ id, kind: "tree", x: R1(x), z: R1(z), h: R1(11 + 5 * Hash01(i, 101)) }); return; }
+    const color = BD.crowns[Math.floor(Hash01(i, 109) * BD.crowns.length) % BD.crowns.length];
+    // 一成多是细高的杨树（树冠窄、19–24 m），其余是槐、榆一类的圆树冠（9–18 m，高矮差得开），树梢一高一低
+    if (Hash01(i, 127) < 0.14) {
+      const r = 2.2 + 1.2 * Hash01(i, 103);
+      out.push({ id, kind: "blob", x: R1(x), z: R1(z), rx: R1(r), rz: R1(r), h: R1(17 + 5 * Hash01(i, 101)), lift: 2, color });
+      return;
+    }
+    const h = 9 + 9 * Math.pow(Hash01(i, 101), 1.3), r = 4 + 4 * Hash01(i, 103);
+    out.push({ id, kind: "blob", x: R1(x), z: R1(z), rx: R1(r), rz: R1(r * (0.8 + 0.4 * Hash01(i, 107))), h: R1(h - 1.5), lift: 1.5, color });
+  }
+}
+
+/**
+ * 远景层文档（§2.2 backdrop）。groundY：远处地面的高（取场地北边界的平均地面，坑北压平以后就是坎下那一片的高）。
+ * paint 顺序：扫清带往东西接着延伸 → 田间小路底色 → 田块（rects，同 FarmLayout）→ 村里的地 → 大路 → 田间小路。
+ */
+export function L0105Backdrop(sample, farm = FarmLayout()) {
+  const BD = L0105_BACKDROP, C = L0105_FIELD_PAINT, FR = FARM.region, B = L0105_BOUNDS;
+  let sum = 0, n = 0;
+  for (let x = B.minX; x <= B.maxX; x += 2) { sum += sample(x, B.minZ); n += 1; }
+  const groundY = R2(sum / n);
+  const palette = [], ci = new Map();
+  const Ci = (color) => { if (!ci.has(color)) { ci.set(color, palette.length); palette.push(color); } return ci.get(color); };
+  const rects = [];
+  const ph = FARM.pathHalfW;
+  for (const p of farm.parcels) {
+    const row = farm.rows[p.row], cx = (p.x0 + p.x1) / 2;
+    const z0 = FarmEdgeZ(row.south, cx) - ph, z1 = FarmEdgeZ(row.north, cx) + ph;   // z0 南（大）、z1 北（小）
+    if (!(z0 - z1 > 0.5)) continue;
+    rects.push([R1(p.x0), R1(z1), R1(p.x1), R1(z0), Ci(CropColor(p.crop))]);
+  }
+  const paint = [
+    { id: "BdCleared", color: C.cleared, feather: 1.5, poly: [PPt(FR.minX, FARM.cleared.minZ), PPt(FR.maxX, FARM.cleared.minZ), PPt(FR.maxX, FARM.cleared.maxZ), PPt(FR.minX, FARM.cleared.maxZ)] },
+    { id: "BdFarmPaths", color: C.fieldPath, feather: 1, poly: [PPt(FR.minX, FR.minZ), PPt(FR.maxX, FR.minZ), PPt(FR.maxX, FR.maxZ), PPt(FR.minX, FR.maxZ)] },
+    { id: "BdFields", rects, palette },
+  ];
+  for (const v of L0105_BACKDROP_VILLAGES) {
+    paint.push({ id: `BdVillage${v.id}Ground`, color: C.yard, feather: 4, poly: Ellipse(v.x, v.z, v.rx + 6, v.rz + 6) });
+    paint.push({ id: `BdVillage${v.id}Threshing`, color: C.threshing, feather: 2, poly: [PPt(v.x - v.rx * 0.6, v.z + v.rz + 10), PPt(v.x - v.rx * 0.2, v.z + v.rz + 10), PPt(v.x - v.rx * 0.2, v.z + v.rz + 26), PPt(v.x - v.rx * 0.6, v.z + v.rz + 26)] });
+  }
+  paint.push({ id: "BdRoad", color: C.road, feather: 0.8, halfW: L0105_NORTH_ROAD_HALF_W, line: L0105_BACKDROP_ROAD.map((p) => PPt(p.x, p.z)) });
+  L0105_BACKDROP_PATHS.forEach((line, i) => paint.push({ id: `BdPath${i + 1}`, color: C.path, feather: 0.8, halfW: L0105_FIELD_PATH_HALF_W, line: line.map((p) => PPt(p.x, p.z)) }));
+
+  const shapes = [];
+  for (const t of RoadPoplarSpots()) if (!t.inField) shapes.push({ id: `Bd${t.id}`, kind: "tree", x: R1(t.x), z: R1(t.z), h: R1(t.h) });
+  for (const v of L0105_BACKDROP_VILLAGES) shapes.push(...VillageShapes(v));
+  for (const h of L0105_BACKDROP_HILLS) shapes.push({ id: h.id, kind: "hill", x: h.x, z: h.z, rx: h.rx, rz: h.rz, h: h.h, ry: h.ry, color: BD.hill, topColor: BD.hillTop });
+  return {
+    far: BD.far,
+    ground: { color: BD.ground, y: groundY, radiusM: BD.radiusM, blendM: BD.blendM },
+    haze: { ...BD.haze },
+    paint,
+    shapes,
+  };
 }
 
 /** 折线（米）上的弧长 → 点 + 走向；摆件、板桥用。 */
@@ -1044,7 +1209,7 @@ export function PitNorthChecks(sample) {
     const z = ScarpZ(x);
     if (DitchStation(x, z).d < 10) continue;
     if (DistanceToPolyline(x, z, L0105_NORTH_ROAD) < 12 || DistanceToPolyline(x, z, L0105_FIELD_PATH) < 8) continue;   // 路穿过处是坡道
-    drops.push(R2(sample(x, z + 6) - sample(x, z - 6) - (PitNorthRoll(x, z + 6) - PitNorthRoll(x, z - 6)) - (PitNorthTilt(z + 6) - PitNorthTilt(z - 6))));
+    drops.push(R2(sample(x, z + 6) - sample(x, z - 6) - (PitNorthRoll(x, z + 6) - PitNorthRoll(x, z - 6))));
   }
   // 豁口：顺着沟走，1 m 内最大高差
   let notchStep = 0;
@@ -1112,7 +1277,7 @@ export function L0105SightChecks(sample) {
 /** 生成场景文档。commit / generatedAt 由 CLI 传进来；notes 收抽样核对行（CLI 打到控制台）。 */
 export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", notes = [] } = {}) {
   const { Ground } = L0105Ground();
-  const { terrain, minM, maxM, southMaxM } = BakeL0105Grid(Ground);
+  const { terrain, minM, maxM, southMaxM, southMinM } = BakeL0105Grid(Ground);
   const sample = HeightGridSampler(terrain);
 
   const branchFloorAtSteps = Math.min(...[0, 0.5, 1.0].map((dx) => sample(STEP_TOP_X + 0.6 + dx, BranchZAt(STEP_TOP_X + 0.6 + dx))));
@@ -1122,7 +1287,9 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
     pitFloorY: sample(PIT.x, PIT.z), frontFloorAtMouth, branchFloorAtSteps, trafficFloorAtJunction, dugoutFloorY: sample(DUG.x, DUG.z),
   });
 
-  const paint = L0105Paint();
+  const farm = FarmLayout();
+  const paint = L0105Paint(farm);
+  const backdrop = L0105Backdrop(sample, farm);
 
   // --- 抽样核对 ---
   const at = (p) => R2(sample(p.x, p.z));
@@ -1160,12 +1327,17 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
   }
   {
     const count = (re) => blocks.filter((b) => re.test(b.id)).length;
-    const fields = paint.filter((p) => /^Field_/.test(p.id));
-    const kinds = {}; for (const f of fields) kinds[f.color] = (kinds[f.color] || 0) + 1;
-    notes.push(`坑北第二轮：涂色 ${paint.length} 项（田块 ${fields.length}，按颜色 ${Object.entries(kinds).map(([c, n]) => `${c}×${n}`).join(" ")}）；`
-      + `村子 ${L0105_VILLAGE_HOMES.length} 户、房 ${count(/_House\d$/)} 间、院墙 ${count(/_Wall/)} 段；路边杨树 ${count(/^RoadPoplar_/)}、田边树 ${count(/^FieldTree_/)}、村里村边树 ${count(/^VillageTree_|_Tree$/)}；`
-      + `地面：坑沿 (0,−11) ${R2(sample(0, -11))} · 坎下 (28,−213) ${R2(sample(28, -213))} · 坡上 (30,−260) ${R2(sample(30, -260))} · 村前 (30,−296) ${R2(sample(30, -296))} · 村里 (30,−340) ${R2(sample(30, -340))}；`
-      + `色带 ${minM}…${southMaxM}（全场最高 ${maxM}）`);
+    const fieldStrips = paint.filter((p) => /^Field_/.test(p.id));
+    const kinds = {}; for (const f of fieldStrips) kinds[f.color] = (kinds[f.color] || 0) + 1;
+    const widths = fieldStrips.map((f) => { const xs = f.poly.map((q) => q.x); return Math.max(...xs) - Math.min(...xs); });
+    const bdShapes = {}; for (const sh of backdrop.shapes) bdShapes[sh.kind] = (bdShapes[sh.kind] || 0) + 1;
+    const rects = backdrop.paint.find((p) => p.rects)?.rects || [];
+    notes.push(`坑北第三版：涂色 ${paint.length} 项（场地里窄条田 ${fieldStrips.length} 条，宽 ${R2(Math.min(...widths))}…${R2(Math.max(...widths))} m，按颜色 ${Object.entries(kinds).map(([c, n]) => `${c}×${n}`).join(" ")}）；`
+      + `散坟 ${L0105_FIELD_GRAVES.length} 座；路边杨树 ${count(/^RoadPoplar_/)}（场地里）、田边树 ${count(/^FieldTree_/)}、小路边树 ${count(/^PathTree_/)}；`
+      + `地面：坑沿 (0,−11) ${R2(sample(0, -11))} · 坎上 (28,−190) ${R2(sample(28, -190))} · 坎下 (28,−213) ${R2(sample(28, -213))} · (30,−260) ${R2(sample(30, -260))} · (30,−340) ${R2(sample(30, -340))} · 北边界 (30,−480) ${R2(sample(30, -480))}；`
+      + `色带 ${southMinM}…${southMaxM}（钉在南面；全场 ${minM}…${maxM}）`);
+    notes.push(`远景层：地面高 ${backdrop.ground.y} m、铺出去 ${backdrop.ground.radiusM} m、远裁剪 ${backdrop.far} m；田块 ${rects.length} 块；体块 ${Object.entries(bdShapes).map(([k, n]) => `${k}×${n}`).join(" ")}；`
+      + `村子 ${L0105_BACKDROP_VILLAGES.map((v) => `${v.id} (${v.x},${v.z}) 离坑 ${Math.round(Math.hypot(v.x - P.pit.x, v.z - P.pit.z))} m`).join("、")}`);
   }
   const widths = [
     ["前沿沟 x−30", -30.5, 0, 0, 1], ["前沿沟 x60", 56, 0, 0.5, 1], ["前沿沟西折", -62, -12, 1, 0],
@@ -1199,14 +1371,15 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
     bounds: { ...L0105_BOUNDS },
     spawn: { x: L0105_SPAWN.x, z: L0105_SPAWN.z, yawDeg: L0105_SPAWN.yawDeg },
     terrain,
-    // 2026-10-20 第二轮：坑北抬高了（坎下缓坡顶 +5 m 上下），色带上限钉在南面（z ≥ −8）的最高点，南面颜色跟原来一样；坑北有涂色盖着
-    heightTint: { lo: minM, hi: southMaxM },
-    // 白盒画质里屋顶、树冠块保留语义色（深灰屋顶、暗绿柏树），远处的村子才认得出是一片房顶
-    colorSemantics: ["roof", "foliage"],
-    semanticColors: { roof: L0105_VILLAGE.roofColor },
+    // 色带钉在南面（z ≥ −8）的最低 / 最高点：坑北压平后坎下比南面的沟底还低，色带不跟着挪，南面颜色跟原来一样；坑北有涂色盖着
+    heightTint: { lo: southMinM, hi: southMaxM },
+    // 白盒画质里树冠块（坟地柏树）保留暗绿（第三版村子挪进远景层，场地里没有屋顶块了）
+    colorSemantics: ["foliage"],
     blocks,
     gates,
     paint,
+    // 2026-10-20 第三版：远景层（场地外的田、路、四个村子、东边低山；只看不走），§2.2 backdrop
+    backdrop,
     ways: {
       roads: [Pts(L0105_ROAD), Pts(L0105_SUNKEN_LANE.line), Pts(L0105_NORTH_ROAD), Pts(L0105_FIELD_PATH)],
       trenches: [Pts(L0105_TRENCHES.front), Pts(L0105_TRENCHES.traffic), Pts(L0105_TRENCHES.branch), Pts(L0105_TRENCHES.crawlSap)],

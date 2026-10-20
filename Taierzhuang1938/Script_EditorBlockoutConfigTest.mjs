@@ -50,7 +50,8 @@ import { MISSION_PLACEMENT as P, MISSION_ANCHORS as A, MISSION_LAYOUT } from "./
 import { WHITEBOX_0518_CAMERA_BY_ID } from "./Data_FirstLevelWhitebox0518Cameras.mjs";
 import { END_TUNING } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { MISSION_SCENARIO_SIGNALS } from "./Data_FirstLevelMissionGates.mjs";
-import { LayoutFromSceneDoc, BuildGroundPaint, BlockoutTintColor } from "./Script_EditorBlockoutLevels.mjs";
+import { LayoutFromSceneDoc, BuildGroundPaint, BlockoutTintColor, BackdropBlend, RasterizeBackdropPaint, BLOCKOUT_CAMERA_FAR } from "./Script_EditorBlockoutLevels.mjs";
+import { BlockoutTreeSpots } from "./Script_EditorBlockoutTrees.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BLOCKOUT_DIR = path.join(HERE, "Blockout");
@@ -187,6 +188,98 @@ Check("ValidateBlockoutScene：可选 paint / heightTint / colorSemantics / sema
   assert.deepEqual(p2.paint, []);
   assert.deepEqual(p2.SampleGroundColor(2, 1), BlockoutTintColor(0, p2.heightTint), "不写 paint：按高度上色，一点不变");
   assert.equal(BuildGroundPaint([], null), null);
+});
+
+Check("ValidateBlockoutScene：可选 backdrop 远景层（2026-10-20）：校验、交出、远平面、接缝高度、地面图；不写的关卡不变", () => {
+  const cols = 4, rows = 4;
+  const heights = Buffer.alloc((cols + 1) * (rows + 1) * 2);
+  for (let i = 0; i <= cols; i++) heights.writeInt16LE(150, i * 2);   // 北边界（iz = 0）那一排 1.5 m
+  const scene = { schema: BLOCKOUT_SCENE_SCHEMA, level: "SecondLevel", bounds: { minX: 0, maxX: 4, minZ: 0, maxZ: 4 }, spawn: { x: 1, z: 1 },
+    terrain: { kind: "heightmap", minX: 0, minZ: 0, cellM: 1, cols, rows, encoding: "int16-cm-base64", data: heights.toString("base64") }, blocks: [],
+    backdrop: {
+      far: 5000,
+      ground: { color: "#7a7150", y: -2, radiusM: 3000, blendM: 100 },
+      haze: { color: "#adb8c2", fromM: 600, toM: 5000, max: 0.8 },
+      paint: [
+        { id: "fields", palette: ["#566540", "#5a4532"], rects: [[-50, -60, -10, -10, 0], [10, -60, 40, -10, 1]] },
+        { id: "road", color: "#d8cfb6", halfW: 2, line: [{ x: 2, z: 0 }, { x: 2, z: -80 }] },
+        { id: "yard", color: "#a08f72", poly: [{ x: 100, z: -100 }, { x: 140, z: -100 }, { x: 140, z: -140 }] },
+      ],
+      shapes: [
+        { id: "House", kind: "box", x: 120, z: -120, w: 8, d: 6, h: 3, color: "#a89c86" },
+        { id: "Roof", kind: "box", x: 120, z: -120, w: 8.8, d: 6.8, h: 1.2, lift: 3, color: "#3e3a35" },
+        { id: "Crown", kind: "blob", x: 130, z: -110, rx: 6, rz: 5, h: 12, lift: 1.5, color: "#5a5446" },
+        { id: "Hill", kind: "hill", x: 2000, z: -2000, rx: 400, rz: 250, h: 40, ry: -1.1, color: "#5f5a47", topColor: "#6d6656" },
+        { id: "Poplar", kind: "tree", x: 2, z: -30, h: 13 },
+      ],
+    } };
+  const ok = ValidateBlockoutScene(scene);
+  assert.equal(ok.ok, true, ok.errors.join("; "));
+  const bad = [
+    (s) => { s.backdrop = []; },
+    (s) => { s.backdrop.far = 50; },
+    (s) => { s.backdrop.far = 1e6; },
+    (s) => { delete s.backdrop.ground; },
+    (s) => { s.backdrop.ground.color = "brown"; },
+    (s) => { s.backdrop.ground.y = "low"; },
+    (s) => { s.backdrop.ground.radiusM = 0; },
+    (s) => { s.backdrop.ground.blendM = -1; },
+    (s) => { s.backdrop.haze.toM = 100; },
+    (s) => { s.backdrop.haze.max = 2; },
+    (s) => { s.backdrop.paint = {}; },
+    (s) => { s.backdrop.paint[0].palette = []; },
+    (s) => { s.backdrop.paint[0].palette = ["green"]; },
+    (s) => { s.backdrop.paint[0].rects = [[0, 0, -1, 1, 0]]; },
+    (s) => { s.backdrop.paint[0].rects = [[0, 0, 1, 1, 2]]; },
+    (s) => { s.backdrop.paint[0].rects = [[0, 0, 1, 1]]; },
+    (s) => { delete s.backdrop.paint[1].halfW; },
+    (s) => { s.backdrop.paint[2].id = "fields"; },
+    (s) => { s.backdrop.shapes = {}; },
+    (s) => { s.backdrop.shapes[0].kind = "castle"; },
+    (s) => { delete s.backdrop.shapes[0].w; },
+    (s) => { s.backdrop.shapes[1].id = "House"; },
+    (s) => { s.backdrop.shapes[2].rx = 0; },
+    (s) => { s.backdrop.shapes[3].h = 0; },
+    (s) => { s.backdrop.shapes[3].topColor = "#fff"; },
+    (s) => { s.backdrop.shapes[0].color = undefined; },
+    (s) => { s.backdrop.shapes[1].lift = "top"; },
+    (s) => { s.backdrop.shapes[4].x = NaN; },
+  ];
+  bad.forEach((mutate, i) => {
+    const s = structuredClone(scene);
+    mutate(s);
+    assert.equal(ValidateBlockoutScene(s).ok, false, `backdrop 反例 ${i} 该报错`);
+  });
+  // 布局：交出远景层（深拷贝）、远平面、地面高度函数；不进 blocks / gates，bounds 不变
+  const layout = LayoutFromSceneDoc(scene);
+  assert.equal(layout.cameraFar, 5000);
+  assert.equal(layout.backdrop.shapes.length, 5);
+  assert.deepEqual(layout.blocks, []);
+  assert.deepEqual(layout.bounds, scene.bounds);
+  layout.backdrop.shapes[0].x = 999;
+  assert.equal(scene.backdrop.shapes[0].x, 120, "布局里的远景层是拷贝");
+  // 接缝上 = 场地边上的高；往外 blendM 内落到 ground.y；场地里就是场地网格
+  assert.ok(Math.abs(layout.backdropGroundAt(2, 0) - 1.5) < 1e-6 && Math.abs(layout.backdropGroundAt(2, -0.001) - 1.5) < 1e-3, "北接缝高度");
+  assert.ok(Math.abs(layout.backdropGroundAt(2, -50) - (1.5 + (-2 - 1.5) * BackdropBlend(50, 100))) < 1e-6, "过渡段");
+  assert.equal(layout.backdropGroundAt(2, -500), -2);
+  assert.equal(layout.backdropGroundAt(2, 2), layout.terrainSampler(2, 2));
+  // 编辑器的树也种远景层里的 tree，根按远景地面
+  const spots = BlockoutTreeSpots(layout);
+  assert.ok(spots.some((t) => t.id === "Poplar" && Math.abs(t.y - layout.backdropGroundAt(2, -30)) < 1e-9 && t.heightM === 13));
+  // 地面图：田块 rects 实色、路柔边、没涂到的地方透明（a = 0、rgb = ground.color）
+  const ras = RasterizeBackdropPaint(layout.backdrop, { maxPx: 512 });
+  const At = (x, z) => { const i = Math.round((x - ras.minX) / ras.texelM - 0.5), j = Math.round((z - ras.minZ) / ras.texelM - 0.5); const k = (j * ras.width + i) * 4; return [...ras.data.slice(k, k + 4)]; };
+  assert.deepEqual(At(-30, -35), [0x56, 0x65, 0x40, 255], "田块 0");
+  assert.deepEqual(At(25, -35), [0x5a, 0x45, 0x32, 255], "田块 1");
+  assert.equal(At(2, -40)[3], 255, "路中间满涂");
+  assert.deepEqual(At(80, -40), [0x7a, 0x71, 0x50, 0], "没涂的地方透明、rgb 是 ground.color");
+  for (let i = 0; i < ras.width; i++) assert.equal(ras.data[i * 4 + 3], 0, "图外框一圈透明（钳边采样出去是没涂）");
+  // 不写 backdrop：没有远景层、远平面照旧
+  const plain = structuredClone(scene); delete plain.backdrop;
+  const p2 = LayoutFromSceneDoc(plain);
+  assert.equal(p2.backdrop, null); assert.equal(p2.backdropGroundAt, null); assert.equal(p2.cameraFar, BLOCKOUT_CAMERA_FAR);
+  assert.equal(RasterizeBackdropPaint(null), null);
+  assert.deepEqual(BlockoutTreeSpots(p2), []);
 });
 
 // ---------------------------------------------------------------------------
