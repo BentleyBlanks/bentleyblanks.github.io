@@ -381,13 +381,22 @@ export const OUTFLANK_FIRE_021 = Object.freeze({ Luo: 35.4, LiuWencai: 33.2, Squ
 const PIT = Object.freeze({
   gunner: Pt(PL.zb26.x, PL.zb26.z + 0.2),
   yaowa: Pt(PL.zb26.x - 1.2, PL.zb26.z + 1.0),
-  pitNra1: Pt(PL.pit.x + 2.7, PL.pit.z - 1.7),
+  // 2026-10-21：原来 (2.7, −8.7) 在射击台东头，跟 03-2 挨炸的那个弟兄挤在一起、挡着爆点；挪到机枪西边（同 03-3 预演让开顺子视线的位置，离幺娃 ≥ 0.6 m）
+  pitNra1: Pt(PL.pit.x - 3.0, PL.pit.z - 2.05),
   // 2026-10-19：原来 (2.8, 1.4) 跟蹲在 (2.0, 1.7) 的刘文财叠在一起，往南挪开、身子顺着南北躺（lie:"along"，倒地动作不再把人甩回刘文财身上；离刘文财 ≥ 0.6 m）
   pitNra2: Pt(PL.pit.x + 3.0, PL.pit.z + 2.2),
   pitNra3: Pt(PL.pit.x - 3.0, PL.pit.z + 1.0),
   pitNra4: Pt(PL.pit.x - 0.6, PL.pit.z + 0.6),
   entry: Pt(PL.pit.x + 0.9, PL.pit.z + 2.0),
 });
+/**
+ * 03-2 那一发掷弹筒（2026-10-21）：挨炸的弟兄（PitNra2）进坑前站在射击台东头、朝东偏北（护着丢掉的东段前沿沟），
+ * 弹落在他正前方 distM 米的坑东沿；预演 S0302 与 03-2 的「弹落点」POI 用同一个点。他往西顺着台子掀翻，落下来还在台面上。
+ */
+export const SHELL_032 = (() => {
+  const man = Pt(PL.pit.x + 2.5, PL.pit.z - 2.15), yawDeg = -75, distM = 1.9, a = yawDeg * Math.PI / 180;
+  return Object.freeze({ man, yawDeg, distM, hit: Pt(man.x - Math.sin(a) * distM, man.z - Math.cos(a) * distM) });
+})();
 // 抱手榴弹的弟兄死在坑沿外，那捆手榴弹落在沟沿上（胸墙北边）
 const BUNDLE = Pt(PL.parapet.x + 1.6, PL.parapet.z - 1.3);
 const BUNDLE_MAN = Pt(PL.parapet.x + 0.6, PL.parapet.z - 3.0);
@@ -918,20 +927,21 @@ function Keyframes() {
     what: "刚挤进坑，一发掷弹筒落在坑沿，一个弟兄被掀翻。幺娃在给机枪手压弹匣。",
     next: { text: "上坑沿（甲位）", x: PL.fireA.x, z: PL.fireA.z, radiusM: 1.2 },
     how: ["「丢弹筒！挪起走！」", "幺娃看见顺子，愣了一下", "坑里能打的只有三个位置"],
-    notes: "坑在交通沟口，一挺捷克式，四五个人（坑里另几个弟兄的站位推测）。三个射位：甲 坑沿朝北、乙 沟口朝东、丙 散兵坑朝西北。坑北（2026-10-20 第四轮）：正面两组趴在最远那道田埂 F3（约 185 m）后，另两组还在地坎后的低地里（坎北低 2 m，坑里看不见）；西边干水沟里弯着腰摸着一个班（8 人、一挺轻机枪），坑里也看不见。",
+    notes: "坑在交通沟口，一挺捷克式，四五个人（坑里另几个弟兄的站位推测）。三个射位：甲 坑沿朝北、乙 沟口朝东、丙 散兵坑朝西北。坑北（2026-10-20 第四轮）：正面两组趴在最远那道田埂 F3（约 185 m）后，另两组还在地坎后的低地里（坎北低 2 m，坑里看不见）；西边干水沟里弯着腰摸着一个班（8 人、一挺轻机枪），坑里也看不见。掷弹筒（2026-10-21）：顺子站上射击台往北看，坎后冒一股烟、嘭；跳下台约 5.5 s 后落在坑东沿，台上东头那个弟兄顺着台子往西掀翻（落在台面上）。",
     units: [
       N("Luo", Pt(PL.pit.x - 1.6, PL.pit.z + 2.3), { face: PL.fireA, stance: "crouch" }),
       N("LiuWencai", Pt(PL.pit.x - 2.8, PL.pit.z + 2.4), { face: PL.fireA, stance: "crouch" }),
       N("Gunner", PIT.gunner, { yaw: 0, stance: "crouch", aim: true, from: TR.crawlSap[0] }),
       N("Yaowa", PIT.yaowa, { face: p32, stance: "crouch", from: TR.crawlSap[0] }),
       N("PitNra1", PIT.pitNra1, { yaw: 0, aim: true, guess: true }),
-      N("PitNra2", PIT.pitNra2, { yaw: 180, down: true, lie: "along", guess: true }),
+      // 2026-10-21：进坑这一刻他还站在射击台东头朝东端着枪（预演 S0302 里挨炸掀翻）；03-3 起躺在坑底东南角（拖开了）
+      N("PitNra2", SHELL_032.man, { yaw: SHELL_032.yawDeg, aim: true, guess: true }),
       N("PitNra3", PIT.pitNra3, { face: PL.fireC, stance: "crouch", guess: true }),
       N("PitNra4", PIT.pitNra4, { face: PL.parapet, stance: "crouch", role: "grenadeBundle", guess: true }),
       ...[-30, -18].map((x, i) => N(`RetreatNraW${i + 1}`, FrontAtX(x, i ? 0.5 : -0.5), { yaw: -80, group: "westFront", to: [PL.mouth, T(T_CORNER1 + 6)], guess: true })),
       ...lmgUnits(), ...mortarUnits(), ...RushUnits("03-2"), ...DitchSquadUnits("03-2"),
     ],
-    pois: [...pitPois(), Poi("ShellHit", "掷弹筒弹落点（坑沿）", "danger", Pt(PIT.pitNra2.x + 0.4, PL.pit.z - PL.pit.d / 2 - 0.4), 1.5), scarpPoi()],
+    pois: [...pitPois(), Poi("ShellHit", "掷弹筒弹落点（坑东沿）", "danger", SHELL_032.hit, 1.5), scarpPoi()],
   });
 
   const pA = Pt(PL.fireA.x, PL.fireA.z);

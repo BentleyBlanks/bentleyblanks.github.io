@@ -9523,66 +9523,159 @@
   {
    "keyframe": "03-2",
    "title": "进坑就挨一发掷弹筒",
-   "durationS": 15.38,
+   "durationS": 19.78,
    "then": "next",
    "camera": [
     {
      "t": 0,
-     "dur": 4.4,
+     "dur": 4.2,
      "from": {
       "x": 0.6,
       "z": 6.5,
       "h": 1.6
      },
      "look": {
-      "x": 0.6,
-      "z": -12,
-      "h": 1.2
+      "x": 0.3,
+      "z": -14,
+      "h": 1.6
      },
      "to": {
-      "x": 0.9,
-      "z": -5,
-      "h": 1.05
+      "x": 0.2,
+      "z": -7.7,
+      "h": 1.6
      },
      "ease": "linear"
     },
     {
-     "t": 4.4,
-     "dur": 2.7,
-     "eye": {
-      "x": 0.9,
-      "z": -5,
-      "stance": "crouch",
-      "yawDeg": 2.45,
-      "pitchDeg": 2,
-      "toYawDeg": -24.54,
-      "toPitchDeg": 2
+     "t": 4.2,
+     "dur": 0.5,
+     "from": {
+      "x": 0.2,
+      "z": -7.7,
+      "h": 1.6
+     },
+     "look": {
+      "x": 0.3,
+      "z": -14,
+      "h": 1.6
+     },
+     "to": {
+      "x": 0.1,
+      "z": -8.3,
+      "h": 2.32
+     },
+     "lookTo": {
+      "x": 22,
+      "z": -207,
+      "h": 2.6
      }
     },
     {
-     "t": 7.5,
-     "dur": 1,
-     "eye": {
-      "x": 0.9,
-      "z": -5,
-      "stance": "crouch",
-      "yawDeg": -24.54,
-      "pitchDeg": 2,
-      "toYawDeg": 26.57,
-      "toPitchDeg": 4
+     "t": 4.7,
+     "dur": 2.9,
+     "from": {
+      "x": 0.1,
+      "z": -8.3,
+      "h": 2.32
+     },
+     "look": {
+      "x": 22,
+      "z": -207,
+      "h": 2.6
+     },
+     "lookTo": {
+      "x": 28,
+      "z": -211,
+      "h": 3.6
+     },
+     "fov": 18
+    },
+    {
+     "t": 7.6,
+     "dur": 0.45,
+     "from": {
+      "x": 0.1,
+      "z": -8.3,
+      "h": 2.32
+     },
+     "look": {
+      "x": 28,
+      "z": -211,
+      "h": 3.6
+     },
+     "to": {
+      "x": 0.6,
+      "z": -6.9,
+      "h": 1.05
+     },
+     "lookTo": {
+      "x": 2.5,
+      "z": -9.15,
+      "h": 1
      }
     },
     {
-     "t": 10.58,
+     "t": 8.05,
+     "dur": 3.65,
+     "from": {
+      "x": 0.6,
+      "z": -6.9,
+      "h": 1.05
+     },
+     "look": {
+      "x": 2.5,
+      "z": -9.15,
+      "h": 1
+     },
+     "lookTo": {
+      "x": 3.42,
+      "z": -9.39,
+      "h": 0.9
+     }
+    },
+    {
+     "t": 11.7,
+     "dur": 1,
+     "from": {
+      "x": 0.6,
+      "z": -6.9,
+      "h": 1.05
+     },
+     "look": {
+      "x": 3.42,
+      "z": -9.39,
+      "h": 0.9
+     },
+     "lookTo": {
+      "x": 1.3,
+      "z": -8.95,
+      "h": 0.55
+     }
+    },
+    {
+     "t": 12.7,
      "dur": 1,
      "eye": {
-      "x": 0.9,
-      "z": -5,
+      "x": 0.6,
+      "z": -6.9,
       "stance": "crouch",
-      "yawDeg": 26.57,
-      "pitchDeg": 4,
-      "toYawDeg": 44.14,
-      "toPitchDeg": -6
+      "yawDeg": -18.85,
+      "pitchDeg": -4,
+      "toYawDeg": 38.05,
+      "toPitchDeg": 6
+     }
+    },
+    {
+     "t": 14.98,
+     "dur": 1,
+     "eye": {
+      "x": 0.6,
+      "z": -6.9,
+      "stance": "crouch",
+      "yawDeg": 38.05,
+      "pitchDeg": 6,
+      "toYawDeg": 63.43,
+      "toPitchDeg": -4
      }
     }
    ],
@@ -9606,7 +9699,7 @@
        "yawDeg": -28.1
       },
       {
-       "t": 7,
+       "t": 11.2,
        "clip": "DuckBlast"
       }
      ]
@@ -9616,19 +9709,19 @@
      "keys": [
       {
        "t": 0,
-       "x": 0.4,
-       "z": 6.2,
+       "x": 0.3,
+       "z": 8.4,
        "move": "cut",
        "stance": "stand"
       },
       {
        "t": 0.4,
-       "x": 0.4,
-       "z": 6.2,
+       "x": 0.3,
+       "z": 8.4,
        "move": "cut"
       },
       {
-       "t": 5.2,
+       "t": 6.4,
        "x": -2.8,
        "z": -4.6,
        "move": "walk",
@@ -9642,19 +9735,39 @@
      "keys": [
       {
        "t": 0,
-       "x": 3,
-       "z": -9.2,
+       "x": 2.5,
+       "z": -9.15,
        "move": "cut",
        "state": "alive",
        "stance": "stand",
        "aim": true,
-       "yawDeg": 0
+       "yawDeg": -75
       },
       {
-       "t": 6.92,
+       "t": 11.12,
        "clip": "PvBlastThrownBack",
        "clipHold": true,
        "aim": false
+      }
+     ]
+    },
+    {
+     "id": "Yaowa",
+     "keys": [
+      {
+       "t": 0,
+       "clip": "YaowaSitLoad",
+       "faceTo": "Gunner"
+      },
+      {
+       "t": 15.38,
+       "clip": null,
+       "faceTo": "player"
+      },
+      {
+       "t": 18.38,
+       "clip": "YaowaSitLoad",
+       "faceTo": "Gunner"
       }
      ]
     },
@@ -9670,7 +9783,7 @@
        "stance": "crouch",
        "aim": false,
        "clip": "PvIjaLauncherFire",
-       "clipFrom": 0.2
+       "clipFrom": 0
       }
      ]
     },
@@ -9686,34 +9799,14 @@
        "stance": "crouch",
        "aim": false,
        "clip": "PvIjaLauncherLoad",
-       "clipFrom": 0.2
-      }
-     ]
-    },
-    {
-     "id": "Yaowa",
-     "keys": [
-      {
-       "t": 0,
-       "clip": "YaowaSitLoad",
-       "faceTo": "Gunner"
-      },
-      {
-       "t": 10.98,
-       "clip": null,
-       "faceTo": "player"
-      },
-      {
-       "t": 13.98,
-       "clip": "YaowaSitLoad",
-       "faceTo": "Gunner"
+       "clipFrom": 0
       }
      ]
     }
    ],
    "lines": [
     {
-     "t": 7.7,
+     "t": 12.1,
      "line": "PitHold.02",
      "actor": "Gunner"
     }
@@ -9741,14 +9834,28 @@
      "z": -118
     },
     {
-     "t": 1.4,
+     "t": 3.6,
+     "type": "muzzle",
+     "actor": "Gunner",
+     "count": 5,
+     "interval": 0.11
+    },
+    {
+     "t": 3.6,
+     "type": "sfx",
+     "name": "mgBurstNear",
+     "x": -1.2,
+     "z": -9.2
+    },
+    {
+     "t": 5.6,
      "type": "sfx",
      "name": "mortarPop",
      "x": 28,
      "z": -213
     },
     {
-     "t": 1.4,
+     "t": 5.6,
      "type": "smoke",
      "x": 28,
      "z": -211,
@@ -9756,83 +9863,95 @@
      "dur": 4
     },
     {
-     "t": 4.2,
+     "t": 5.9,
+     "type": "caption",
+     "text": "（坎后头冒起一股烟——嘭）",
+     "dur": 2.4
+    },
+    {
+     "t": 6.6,
      "type": "muzzle",
      "actor": "Gunner",
      "count": 5,
      "interval": 0.11
     },
     {
-     "t": 4.2,
+     "t": 6.6,
      "type": "sfx",
      "name": "mgBurstNear",
      "x": -1.2,
      "z": -9.2
     },
     {
-     "t": 6.9,
-     "type": "sfx",
-     "name": "mortarImpact",
-     "x": 3.2,
-     "z": -10.4
+     "t": 8,
+     "type": "shake",
+     "dur": 0.3,
+     "strength": 0.15
     },
     {
-     "t": 6.9,
+     "t": 11.1,
+     "type": "sfx",
+     "name": "mortarImpact",
+     "x": 4.34,
+     "z": -9.64
+    },
+    {
+     "t": 11.1,
      "type": "explosion",
-     "x": 3.2,
-     "z": -10.4,
+     "x": 4.34,
+     "z": -9.64,
      "kind": "launcher",
      "radius": 4
     },
     {
-     "t": 6.9,
+     "t": 11.1,
      "type": "shake",
      "dur": 0.5,
      "strength": 0.6
     },
     {
-     "t": 8.1,
+     "t": 12.5,
      "type": "muzzle",
      "actor": "Gunner",
      "count": 5,
      "interval": 0.11
     },
     {
-     "t": 8.1,
+     "t": 12.5,
      "type": "sfx",
      "name": "mgBurstNear",
      "x": -1.2,
      "z": -9.2
     },
     {
-     "t": 10.5,
+     "t": 14.9,
      "type": "muzzle",
      "actor": "Gunner",
      "count": 6,
      "interval": 0.11
     },
     {
-     "t": 10.5,
+     "t": 14.9,
      "type": "sfx",
      "name": "mgBurstNear",
      "x": -1.2,
      "z": -9.2
     },
     {
-     "t": 11.38,
+     "t": 15.78,
      "type": "caption",
      "text": "（幺娃看见顺子，愣了一下）",
      "dur": 2.4
     },
     {
-     "t": 12.18,
+     "t": 16.58,
      "type": "sfx",
      "name": "mgBurstFar",
      "x": 40,
      "z": -140
     },
     {
-     "t": 12.38,
+     "t": 16.78,
      "type": "explosion",
      "x": -2.2,
      "z": -11.2,
@@ -9840,7 +9959,7 @@
      "radius": 0.8
     },
     {
-     "t": 12.68,
+     "t": 17.08,
      "type": "explosion",
      "x": 2,
      "z": -11.4,

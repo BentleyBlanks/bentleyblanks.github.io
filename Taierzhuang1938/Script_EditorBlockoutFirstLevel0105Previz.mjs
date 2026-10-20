@@ -29,7 +29,7 @@ import {
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 import { PREVIZ_THROW, SamplePrevizActor, NormalizeBlockoutPreviz } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES } from "./Data_BlockoutPrevizClips.mjs";
-import { BRIDGE_EAST_DETOUR, DRAG, OUTFLANK_FIRE_021, OUTFLANK_FIRE_LAT, OUTFLANK_RIM_LAT, FrontAtX } from "./Script_EditorBlockoutFirstLevel0105Keyframes.mjs";
+import { BRIDGE_EAST_DETOUR, DRAG, OUTFLANK_FIRE_021, OUTFLANK_FIRE_LAT, OUTFLANK_RIM_LAT, FrontAtX, SHELL_032 } from "./Script_EditorBlockoutFirstLevel0105Keyframes.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const PREVIZ_FILE = join(HERE, "Blockout", "FirstLevel0105.previz.json");
@@ -1307,33 +1307,58 @@ function S0301(ctx) {
   return s.Done({ durationS: 25.0 });
 }
 
+/**
+ * 03-2 的掷弹筒（2026-10-21 用户：「进坑就挨一发掷弹筒」预演里看不到这一下）：顺子站上射击台往北看 → 坎后冒烟、嘭 →
+ * 跳下台蹲在坑底 → 约 5.5 s 后落在坑东沿 → 台上东头那个弟兄被掀翻 →「丢弹筒！挪起走！」→ 幺娃愣一下。
+ * 被掀的人站在射击台东头朝东（护着丢掉的东段前沿沟），弹落在他正前方的坑东沿：PvBlastThrownBack 顺着台子往西掀 0.95 m，
+ * 落下来还在台面上（台面南沿 z −8.45，人躺在 z −8.9 上下），不会掀出台子悬在坑底上空。
+ * 镜头不跨台子边（预演机位高度 = 那一点的地面 + h，跨过台边会跳 0.7 m）：「站上台」是在台子南边 0.15 m 的坑底上把眼抬到台上站着的高度。
+ */
+const PIT_STEP_TOP = 0.7;                      // 射击台比坑底高（Script_EditorBlockoutFirstLevel0105Scene PitFireStep）
+
 function S0302(ctx) {
   const s = new Seq(ctx, "03-2", "进坑就挨一发掷弹筒");
-  // 刚挤进去
+  // 刚挤进去（刘文财跟在顺子后头，不让镜头穿过他）
   s.Place("Luo", 0, 0.6, 3.0, { stance: "stand" });
-  s.Place("LiuWencai", 0, 0.4, 6.2, { stance: "stand" });
+  s.Place("LiuWencai", 0, 0.3, 8.4, { stance: "stand" });
   s.Go("Luo", 0, 4.4, -1.6, -4.7, { move: "walk", stance: "crouch", yawDeg: -28.1 });
-  s.Go("LiuWencai", 0.4, 5.2, -2.8, -4.6, { move: "walk", stance: "crouch", yawDeg: -38 });
-  s.Place("PitNra2", 0, 3.0, -9.2, { state: "alive", stance: "stand", aim: true, yawDeg: 0 });
-  MortarCrew(s, 1.4);
+  s.Go("LiuWencai", 0.4, 6.4, -2.8, -4.6, { move: "walk", stance: "crouch", yawDeg: -38 });
+  // 台上东头这个弟兄护着丢掉的东段前沿沟（朝东偏北）；另一个（PitNra1）在机枪西边，不挡爆点
+  const man = SHELL_032.man, SHELL_HIT_032 = SHELL_032.hit;
+  s.Place("PitNra2", 0, man.x, man.z, { state: "alive", stance: "stand", aim: true, yawDeg: SHELL_032.yawDeg });
   s.Key("Yaowa", 0, { clip: "YaowaSitLoad", faceTo: "Gunner" });
-  s.Cam(0, 4.4, { from: { x: 0.6, z: 6.5, h: 1.6 }, to: { x: 0.9, z: -5, h: 1.05 }, look: { x: 0.6, z: -12, h: 1.2 }, ease: "linear" });
-  for (const t of [0.6, 4.2]) { Shot(s, t, "Gunner", { count: 5, sfx: "mgBurstNear" }); }
+  const pop = 5.6;
+  MortarCrew(s, pop);
+  for (const t of [0.6, 3.6, 6.6]) { Shot(s, t, "Gunner", { count: 5, sfx: "mgBurstNear" }); }
   s.Sfx(1.0, "mgBurstFar", { x: -30, z: -118 });
-  // 掷弹筒：远处冒烟、嘭——约 5.5 s 后落在坑沿，把一个弟兄掀翻
-  const hit = Mortar(s, 1.4, { x: 3.2, z: -10.4 }, { radius: 4, shake: 0.6 });
-  // 被掀翻（PvBlastThrownBack：面朝爆点，片段自己往后掀 0.95 m、枪脱手按 weapon 轨落地；片段一直留着，不再 cut 挪人）
+  // ① 进坑（0–4.2 s），站上射击台往北看（4.2–7.6 s）：坎后冒一股烟、嘭（掷弹筒组在坎下，看不见人，只看得见烟）
+  const floor = { x: 0.2, z: -7.7 }, up = { x: 0.1, z: -8.3 }, D = { x: 0.6, z: -6.9 };
+  const scarp0 = { x: 22, z: -207, h: 2.6 }, scarp1 = { x: 28, z: -211, h: 3.6 };
+  s.Cam(0, 4.2, { from: { x: 0.6, z: 6.5, h: 1.6 }, to: { ...floor, h: 1.6 }, look: { x: 0.3, z: -14, h: 1.6 }, ease: "linear" });
+  s.Cam(4.2, 0.5, { from: { ...floor, h: 1.6 }, to: { ...up, h: PIT_STEP_TOP + 1.62 }, look: { x: 0.3, z: -14, h: 1.6 }, lookTo: scarp0 });
+  // 盯着坎看（视野收到 18°：200 m 外的一股烟在 60° 里只有十来个像素）
+  s.Cam(4.7, 2.9, { from: { ...up, h: PIT_STEP_TOP + 1.62 }, look: scarp0, lookTo: scarp1, fov: 18 });
+  const hit = Mortar(s, pop, SHELL_HIT_032, { radius: 4, shake: 0.6 });
+  s.Caption(pop + 0.3, 2.4, "（坎后头冒起一股烟——嘭）");
+  // ② 跳下台蹲在坑底（7.6 s），等它落下来：台上东头那个弟兄还端着枪朝东
+  const manChest = { x: man.x, z: man.z, h: 1.0 };
+  s.Cam(7.6, 0.45, { from: { ...up, h: PIT_STEP_TOP + 1.62 }, to: { ...D, h: 1.05 }, look: scarp1, lookTo: manChest });
+  s.Shake(8.0, 0.3, 0.15);
+  s.Cam(8.05, R(hit - 8.05 + 0.6), { from: { ...D, h: 1.05 }, look: manChest, lookTo: { x: R((man.x + SHELL_HIT_032.x) / 2), z: R((man.z + SHELL_HIT_032.z) / 2), h: 0.9 } });
+  // ③ 落在坑东沿：他被掀翻（PvBlastThrownBack：面朝爆点，片段自己往后掀 0.95 m、枪脱手按 weapon 轨落地；片段一直留着，不再 cut 挪人）
   s.Key("PitNra2", hit + 0.02, { clip: "PvBlastThrownBack", clipHold: true, aim: false });
   s.Key("Luo", hit + 0.1, { clip: "DuckBlast" });
-  s.Eye(4.4, hit - 4.4 + 0.2, { stance: "crouch", look: { x: 0.6, z: -12 }, pitch: 2, toLook: { x: 3.0, z: -9.6 }, toPitch: 2 });
-  // 有人喊：丢弹筒！挪起走！
-  Shot(s, hit + 1.2, "Gunner", { count: 5, sfx: "mgBurstNear" });   // 机枪手边打边喊
-  s.Say("PitHold.02", "Gunner", hit + 0.8);
-  s.Eye(hit + 0.6, 1.0, { stance: "crouch", look: { x: 3.0, z: -9.6 }, pitch: 2, toLook: { x: -1.2, z: -9.2 }, toPitch: 4 });
-  Shot(s, hit + 3.6, "Gunner", { count: 6, sfx: "mgBurstNear" });
-  // 幺娃在给机枪手压弹匣，看见顺子，愣了一下
+  // 看着他摔在台上（1.0 s）
+  const landed = { x: R(man.x - 1.2), z: R(man.z + 0.2), h: 0.55 };
+  s.Cam(R(hit + 0.6), 1.0, { from: { ...D, h: 1.05 }, look: { x: R((man.x + SHELL_HIT_032.x) / 2), z: R((man.z + SHELL_HIT_032.z) / 2), h: 0.9 }, lookTo: landed });
+  // ④ 有人喊：丢弹筒！挪起走！（机枪手边打边喊）
+  Shot(s, hit + 1.4, "Gunner", { count: 5, sfx: "mgBurstNear" });
+  s.Say("PitHold.02", "Gunner", hit + 1.0);
+  s.Eye(hit + 1.6, 1.0, { stance: "crouch", x: D.x, z: D.z, look: landed, pitch: -4, toLook: { x: -1.2, z: -9.2 }, toPitch: 6 });
+  Shot(s, hit + 3.8, "Gunner", { count: 6, sfx: "mgBurstNear" });
+  // ⑤ 幺娃在给机枪手压弹匣，看见顺子，愣了一下
   const see = s.End("PitHold.02") + 0.6;
-  s.Eye(see - 0.4, 1.0, { stance: "crouch", look: { x: -1.2, z: -9.2 }, pitch: 4, toLook: { x: -2.4, z: -8.4 }, toPitch: -6 });
+  s.Eye(see - 0.4, 1.0, { stance: "crouch", x: D.x, z: D.z, look: { x: -1.2, z: -9.2 }, pitch: 6, toLook: { x: -2.4, z: -8.4 }, toPitch: -4 });
   s.Key("Yaowa", see, { clip: null, faceTo: "player" });
   s.Caption(see + 0.4, 2.4, "（幺娃看见顺子，愣了一下）");
   s.Key("Yaowa", see + 3.0, { clip: "YaowaSitLoad", faceTo: "Gunner" });
