@@ -8,6 +8,8 @@
 
 export const BLOCKOUT_SCHEMA = "tengxian-blockout/1";
 export const BLOCKOUT_SCENE_SCHEMA = "tengxian-blockout-scene/1";
+/** 场景文件 paint（地面涂色，§2.2）最多几项。 */
+export const BLOCKOUT_PAINT_MAX_ITEMS = 5000;
 export const BLOCKOUT_LEVEL_KEYS = Object.freeze(["FirstLevel", "SecondLevel", "FirstLevel0105", "FirstLevel0610", "FirstLevel1218"]);
 export const BLOCKOUT_LEVEL_RE = /^[A-Za-z0-9]+$/;
 export const BLOCKOUT_CONFIG_FILE_RE = /^Taierzhuang1938\/Blockout\/[A-Za-z0-9]+\.json$/;
@@ -350,6 +352,46 @@ export function ValidateBlockoutScene(doc) {
       if (gate.appearSignal !== undefined && !hasAppear) errors.push(`${at}.appearSignal 要是非空字符串`);
       if (!hasSignal && !hasAppear) errors.push(`${at} 要带 signal（到了就消失）或 appearSignal（到了才出现）`);
     });
+  }
+  // 可选 heightTint（§2.2，2026-10-20）：高度色带的上下限（米），不写 = 按网格最低 / 最高。
+  if (doc.heightTint !== undefined) {
+    const ht = doc.heightTint;
+    if (!IsObject(ht) || !Finite(ht.lo) || !Finite(ht.hi) || ht.hi <= ht.lo) errors.push("heightTint 要是 { lo, hi }，有限数字且 hi > lo");
+  }
+  // 可选 colorSemantics（§2.2 / §6.3，2026-10-20）：这几种 semantic 的块在白盒画质里保留语义色（屋顶深灰、树冠暗绿），不刷成灰网格。
+  if (doc.colorSemantics !== undefined) {
+    if (!Array.isArray(doc.colorSemantics) || doc.colorSemantics.length > 16 || !doc.colorSemantics.every(v => typeof v === "string" && v)) errors.push("colorSemantics 要是至多 16 个非空字符串的数组");
+  }
+  // 可选 semanticColors（§2.2，2026-10-20）：这一关改几种 semantic 的块色，{ roof: "#3f3b36" }；不写 = 照第一关那张表。
+  if (doc.semanticColors !== undefined) {
+    const sc = doc.semanticColors;
+    if (!IsObject(sc) || Object.keys(sc).length > 32 || !Object.entries(sc).every(([k, v]) => k && typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v))) errors.push('semanticColors 要是 { semantic: "#rrggbb" }（至多 32 项）');
+  }
+  // 可选 paint（§2.2，2026-10-20）：地面涂色。每项是多边形 poly 或折线 line + halfW，按顺序叠（后面的盖前面的）。
+  if (doc.paint !== undefined) {
+    if (!Array.isArray(doc.paint)) errors.push("paint 要是数组");
+    else {
+      if (doc.paint.length > BLOCKOUT_PAINT_MAX_ITEMS) errors.push(`paint 最多 ${BLOCKOUT_PAINT_MAX_ITEMS} 项，现在 ${doc.paint.length}`);
+      const paintIds = new Set();
+      const PointsOk = (list, min) => Array.isArray(list) && list.length >= min && list.every(p => IsObject(p) && Finite(p.x) && Finite(p.z));
+      doc.paint.forEach((item, i) => {
+        const at = `paint[${i}]`;
+        if (!IsObject(item)) { errors.push(`${at} 要是对象`); return; }
+        if (typeof item.id !== "string" || !item.id) errors.push(`${at}.id 要是非空字符串`);
+        else if (paintIds.has(item.id)) errors.push(`${at}.id 重复：${item.id}`);
+        else paintIds.add(item.id);
+        if (typeof item.color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(item.color)) errors.push(`${at}.color 要是 "#rrggbb"`);
+        if (item.strength !== undefined && !(Finite(item.strength) && item.strength >= 0 && item.strength <= 1)) errors.push(`${at}.strength 要在 0…1`);
+        if (item.feather !== undefined && !(Finite(item.feather) && item.feather > 0 && item.feather <= 20)) errors.push(`${at}.feather 要在 (0, 20] 米`);
+        const hasPoly = item.poly !== undefined, hasLine = item.line !== undefined;
+        if (hasPoly === hasLine) errors.push(`${at} 要有 poly 或 line 其中一个`);
+        else if (hasPoly && !PointsOk(item.poly, 3)) errors.push(`${at}.poly 要是至少 3 个 {x, z} 点`);
+        else if (hasLine) {
+          if (!PointsOk(item.line, 2)) errors.push(`${at}.line 要是至少 2 个 {x, z} 点`);
+          if (!(Finite(item.halfW) && item.halfW > 0)) errors.push(`${at}.halfW 要是正数（米）`);
+        }
+      });
+    }
   }
   return { ok: errors.length === 0, errors, warnings };
 }

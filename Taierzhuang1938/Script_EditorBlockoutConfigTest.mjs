@@ -50,6 +50,7 @@ import { MISSION_PLACEMENT as P, MISSION_ANCHORS as A, MISSION_LAYOUT } from "./
 import { WHITEBOX_0518_CAMERA_BY_ID } from "./Data_FirstLevelWhitebox0518Cameras.mjs";
 import { END_TUNING } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { MISSION_SCENARIO_SIGNALS } from "./Data_FirstLevelMissionGates.mjs";
+import { LayoutFromSceneDoc, BuildGroundPaint, BlockoutTintColor } from "./Script_EditorBlockoutLevels.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const BLOCKOUT_DIR = path.join(HERE, "Blockout");
@@ -130,6 +131,62 @@ Check("ValidateBlockoutScene 正例与反例", () => {
     mutate(s);
     assert.equal(ValidateBlockoutScene(s).ok, false);
   }
+});
+
+Check("ValidateBlockoutScene：可选 paint / heightTint / colorSemantics / semanticColors（2026-10-20）", () => {
+  const cols = 4, rows = 4;
+  const data = Buffer.alloc((cols + 1) * (rows + 1) * 2).toString("base64");
+  const scene = { schema: BLOCKOUT_SCENE_SCHEMA, level: "SecondLevel", bounds: { minX: 0, maxX: 4, minZ: 0, maxZ: 4 }, spawn: { x: 1, z: 1 },
+    terrain: { kind: "heightmap", minX: 0, minZ: 0, cellM: 1, cols, rows, encoding: "int16-cm-base64", data }, blocks: [],
+    heightTint: { lo: -1, hi: 2 }, colorSemantics: ["roof"], semanticColors: { roof: "#3e3a35" },
+    paint: [
+      { id: "field", color: "#566540", poly: [{ x: 0, z: 0 }, { x: 4, z: 0 }, { x: 4, z: 2 }, { x: 0, z: 2 }] },
+      { id: "road", color: "#d8cfb6", strength: 0.8, feather: 0.5, halfW: 0.5, line: [{ x: 0, z: 3 }, { x: 4, z: 3 }] },
+    ] };
+  assert.equal(ValidateBlockoutScene(scene).ok, true, ValidateBlockoutScene(scene).errors.join("; "));
+  const bad = [
+    (s) => { s.paint = {}; },
+    (s) => { s.paint[0].color = "green"; },
+    (s) => { s.paint[0].id = ""; },
+    (s) => { s.paint[1].id = "field"; },
+    (s) => { s.paint[0].strength = 1.5; },
+    (s) => { s.paint[0].feather = 0; },
+    (s) => { s.paint[0].poly = [{ x: 0, z: 0 }, { x: 1, z: 1 }]; },
+    (s) => { s.paint[0].line = s.paint[1].line; },
+    (s) => { delete s.paint[0].poly; },
+    (s) => { delete s.paint[1].halfW; },
+    (s) => { s.paint[1].line = [{ x: 0, z: 3 }]; },
+    (s) => { s.heightTint = { lo: 2, hi: 1 }; },
+    (s) => { s.colorSemantics = "roof"; },
+    (s) => { s.colorSemantics = [""]; },
+    (s) => { s.semanticColors = { roof: 0x333333 }; },
+  ];
+  bad.forEach((mutate, i) => {
+    const s = structuredClone(scene);
+    mutate(s);
+    assert.equal(ValidateBlockoutScene(s).ok, false, `反例 ${i} 该报错`);
+  });
+  // 布局：涂色栅格按顺序叠、柔边、南面不涂；不写 paint 的关卡没有栅格、颜色不变
+  const layout = LayoutFromSceneDoc(scene);
+  assert.ok(layout.groundPaint && layout.colorSemantics.includes("roof") && layout.semanticColors.roof === 0x3e3a35);
+  assert.deepEqual(layout.heightTint, { lo: -1, hi: 2 });
+  const rgb = [0, 0, 0];
+  assert.ok(layout.groundPaint.Blend(2, 1, rgb) > 0.99);
+  assert.ok(Math.abs(rgb[0] - 0x56 / 255) < 1e-3 && Math.abs(rgb[1] - 0x65 / 255) < 1e-3, `田块里取到的颜色 ${rgb}`);
+  const onRoad = [0, 0, 0];
+  const aRoad = layout.groundPaint.Blend(2, 3, onRoad);
+  assert.ok(aRoad > 0.75 && aRoad < 0.85, `路 strength 0.8：覆盖度 ${aRoad}`);
+  assert.ok(layout.groundPaint.Blend(2, 2, [0, 0, 0]) > 0.3 && layout.groundPaint.Blend(2, 2, [0, 0, 0]) < 0.7, "田块边上是柔边（覆盖一半上下）");
+  const tinted = layout.SampleGroundColor(2, 1);
+  assert.ok(Math.abs(tinted[0] - 0x56 / 255) < 1e-3, "SampleGroundColor 也混了涂色");
+  const plain = structuredClone(scene);
+  delete plain.paint; delete plain.heightTint; delete plain.colorSemantics; delete plain.semanticColors;
+  const p2 = LayoutFromSceneDoc(plain);
+  assert.equal(p2.groundPaint, null);
+  assert.deepEqual(p2.colorSemantics, []);
+  assert.deepEqual(p2.paint, []);
+  assert.deepEqual(p2.SampleGroundColor(2, 1), BlockoutTintColor(0, p2.heightTint), "不写 paint：按高度上色，一点不变");
+  assert.equal(BuildGroundPaint([], null), null);
 });
 
 // ---------------------------------------------------------------------------

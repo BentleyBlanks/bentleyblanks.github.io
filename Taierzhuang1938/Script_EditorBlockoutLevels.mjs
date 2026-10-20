@@ -214,6 +214,119 @@ export function IsSceneTreeBlock(block) {
   return block?.semantic === "foliage" && Math.max(block.w, block.d) <= BLOCKOUT_TREE_MAX_FOOT_M && block.h >= 2;
 }
 
+// ---------------------------------------------------------------------------
+// 地面涂色（场景文件可选 paint，§2.2 / §6.3，2026-10-20）
+//
+// 按顺序把每一项（多边形 poly，或折线 line + 半宽 halfW）「盖」到一张米级栅格上（预乘颜色 + 覆盖度，后面的盖前面的），
+// 边缘按 feather（米，缺省 1）做柔边，strength（0…1，缺省 1）是不透明度。取色时双线性插值：
+//   结果 = 高度色 × (1 − A) + C（C 是预乘的涂色，sRGB 0–1）。
+// 不写 paint 的关卡没有这张栅格（groundPaint = null），画面逐位不变。
+
+export const BLOCKOUT_PAINT = Object.freeze({
+  /** 栅格格距：从 0.5 m 起，格数超过 maxCells 就翻倍。 */
+  cellM: 0.5, maxCells: 400000, feather: 1,
+});
+
+function HexRgb(hex) {
+  const v = parseInt(hex.slice(1), 16);
+  return [((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255];
+}
+
+/** 点到线段的距离平方。 */
+function SegDist2(px, pz, ax, az, bx, bz) {
+  const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz;
+  const t = l2 > 0 ? Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l2)) : 0;
+  const ex = px - ax - dx * t, ez = pz - az - dz * t;
+  return ex * ex + ez * ez;
+}
+
+/** 有符号距离：多边形内为负。 */
+function PolySignedDistance(px, pz, pts) {
+  let inside = false, best = Infinity;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i], b = pts[j];
+    if ((a.z > pz) !== (b.z > pz) && px < (b.x - a.x) * (pz - a.z) / (b.z - a.z) + a.x) inside = !inside;
+    const d2 = SegDist2(px, pz, a.x, a.z, b.x, b.z);
+    if (d2 < best) best = d2;
+  }
+  const d = Math.sqrt(best);
+  return inside ? -d : d;
+}
+
+function LineDistance(px, pz, pts) {
+  let best = Infinity;
+  for (let i = 1; i < pts.length; i++) {
+    const d2 = SegDist2(px, pz, pts[i - 1].x, pts[i - 1].z, pts[i].x, pts[i].z);
+    if (d2 < best) best = d2;
+  }
+  return Math.sqrt(best);
+}
+
+/**
+ * 把 paint 烘成栅格。→ null（没有可画的项）或 { cellM, minX, minZ, cols, rows, C: Float32Array(rgb 预乘), A: Float32Array, Blend(x, z, rgb) }。
+ * Blend 把 (x,z) 处的涂色按覆盖度混进 rgb（sRGB 0–1，就地改），返回覆盖度 A（0 = 没涂）。
+ */
+export function BuildGroundPaint(items, bounds = null) {
+  if (!Array.isArray(items) || !items.length) return null;
+  const list = items.map((item) => {
+    const pts = item.poly || item.line;
+    const halfW = item.line ? item.halfW : 0;
+    const feather = Number.isFinite(item.feather) ? item.feather : BLOCKOUT_PAINT.feather;
+    const pad = halfW + feather;
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const p of pts) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); }
+    return { pts, line: !!item.line, halfW, feather, strength: Number.isFinite(item.strength) ? item.strength : 1, rgb: HexRgb(item.color),
+      minX: minX - pad, maxX: maxX + pad, minZ: minZ - pad, maxZ: maxZ + pad };
+  });
+  let minX = Math.min(...list.map((p) => p.minX)), maxX = Math.max(...list.map((p) => p.maxX));
+  let minZ = Math.min(...list.map((p) => p.minZ)), maxZ = Math.max(...list.map((p) => p.maxZ));
+  if (bounds) { minX = Math.max(minX, bounds.minX); maxX = Math.min(maxX, bounds.maxX); minZ = Math.max(minZ, bounds.minZ); maxZ = Math.min(maxZ, bounds.maxZ); }
+  if (!(maxX > minX && maxZ > minZ)) return null;
+  let cellM = BLOCKOUT_PAINT.cellM;
+  while (((maxX - minX) / cellM + 1) * ((maxZ - minZ) / cellM + 1) > BLOCKOUT_PAINT.maxCells) cellM *= 2;
+  const cols = Math.ceil((maxX - minX) / cellM) + 1, rows = Math.ceil((maxZ - minZ) / cellM) + 1;
+  const C = new Float32Array(cols * rows * 3), A = new Float32Array(cols * rows);
+  for (const p of list) {
+    const i0 = Math.max(0, Math.floor((p.minX - minX) / cellM)), i1 = Math.min(cols - 1, Math.ceil((p.maxX - minX) / cellM));
+    const j0 = Math.max(0, Math.floor((p.minZ - minZ) / cellM)), j1 = Math.min(rows - 1, Math.ceil((p.maxZ - minZ) / cellM));
+    for (let j = j0; j <= j1; j++) {
+      const z = minZ + j * cellM;
+      for (let i = i0; i <= i1; i++) {
+        const x = minX + i * cellM;
+        const sd = p.line ? LineDistance(x, z, p.pts) - p.halfW : PolySignedDistance(x, z, p.pts);
+        // 边界（sd = 0）处覆盖一半，往外 feather/2 落到 0、往里 feather/2 到满
+        const u = 0.5 - sd / p.feather;
+        if (u <= 0) continue;
+        const k = u >= 1 ? 1 : u * u * (3 - 2 * u);
+        const a = k * p.strength;
+        if (a <= 0) continue;
+        const at = j * cols + i;
+        A[at] = A[at] * (1 - a) + a;
+        C[at * 3] = C[at * 3] * (1 - a) + p.rgb[0] * a;
+        C[at * 3 + 1] = C[at * 3 + 1] * (1 - a) + p.rgb[1] * a;
+        C[at * 3 + 2] = C[at * 3 + 2] * (1 - a) + p.rgb[2] * a;
+      }
+    }
+  }
+  const Blend = (x, z, rgb) => {
+    const gx = (x - minX) / cellM, gz = (z - minZ) / cellM;
+    if (!(gx >= 0 && gz >= 0 && gx <= cols - 1 && gz <= rows - 1)) return 0;
+    const i = Math.min(cols - 2, Math.floor(gx)), j = Math.min(rows - 2, Math.floor(gz));
+    if (i < 0 || j < 0) return 0;
+    const u = gx - i, v = gz - j;
+    const a00 = j * cols + i, a10 = a00 + 1, a01 = a00 + cols, a11 = a01 + 1;
+    const w00 = (1 - u) * (1 - v), w10 = u * (1 - v), w01 = (1 - u) * v, w11 = u * v;
+    const a = A[a00] * w00 + A[a10] * w10 + A[a01] * w01 + A[a11] * w11;
+    if (a <= 1e-4) return 0;
+    for (let c = 0; c < 3; c++) {
+      const pc = C[a00 * 3 + c] * w00 + C[a10 * 3 + c] * w10 + C[a01 * 3 + c] * w01 + C[a11 * 3 + c] * w11;
+      rgb[c] = rgb[c] * (1 - a) + pc;
+    }
+    return a;
+  };
+  return { cellM, minX, minZ, cols, rows, C, A, Blend };
+}
+
 export function LayoutFromSceneDoc(doc) {
   const check = ValidateBlockoutScene(doc);
   if (!check.ok) throw new Error(`场景文件有 ${check.errors.length} 处错误：${check.errors.slice(0, 3).join("；")}`);
@@ -221,7 +334,10 @@ export function LayoutFromSceneDoc(doc) {
   const sampler = HeightGridSampler(t);
   const w = t.cols * t.cellM, d = t.rows * t.cellM;
   const ground = { x: t.minX + w / 2, z: t.minZ + d / 2, w, d, h: 1, y: -0.5, semantic: "ground" };
-  const tint = { lo: sampler.minY, hi: Math.max(sampler.minY + 0.5, sampler.maxY) };
+  // 可选 heightTint（2026-10-20）：场景文件写了就用它（坑北抬高了，色带别跟着把南面的颜色挪掉）
+  const tint = doc.heightTint ? { lo: doc.heightTint.lo, hi: doc.heightTint.hi } : { lo: sampler.minY, hi: Math.max(sampler.minY + 0.5, sampler.maxY) };
+  // 可选 paint（2026-10-20）：地面涂色栅格，没写就是 null
+  const groundPaint = BuildGroundPaint(doc.paint, doc.bounds);
   // 水块同第一关（BlockoutBlock）：盒子不画（灰盒子读不出是水，还会和水面打架），总控在顶面另铺水面
   // 可选 y（2026-10-18）：显式给了就用块中心的这个高度（架在坑上的洞顶、横木），没给就按 GroundedBlock 落地。
   const Placed = (block) => {
@@ -251,12 +367,19 @@ export function LayoutFromSceneDoc(doc) {
     terrain: "P012Heightfield",
     terrainSpec: null,
     terrainSampler: sampler,
-    SampleGroundColor: (x, z) => BlockoutTintColor(sampler(x, z), tint),
+    SampleGroundColor: groundPaint
+      ? (x, z) => { const rgb = BlockoutTintColor(sampler(x, z), tint); groundPaint.Blend(x, z, rgb); return rgb; }
+      : (x, z) => BlockoutTintColor(sampler(x, z), tint),
     SampleGroundSurface: null,
     heightTint: tint,
+    groundPaint,
+    colorSemantics: Array.isArray(doc.colorSemantics) ? [...doc.colorSemantics] : [],
+    paint: groundPaint ? doc.paint.map((p) => ({ ...p })) : [],
     bounds: { ...doc.bounds },
     ground,
-    semanticColors: { ...MISSION_LAYOUT.semanticColors },
+    // 可选 semanticColors（2026-10-20）：场景文件改的几种块色盖在第一关那张表上
+    semanticColors: { ...MISSION_LAYOUT.semanticColors,
+      ...Object.fromEntries(Object.entries(doc.semanticColors || {}).map(([k, v]) => [k, parseInt(v.slice(1), 16)])) },
     semanticSurfaces: { ...(MISSION_LAYOUT.semanticSurfaces || {}) },
     blocks,
     gates,
@@ -400,5 +523,6 @@ export function BlockoutMapScene(layout, groundAt) {
     sampleHeight: groundAt || layout?.terrainSampler || (() => 0),
     naturalHeight: firstLevel ? SampleMissionNaturalHeight : null,
     ways: firstLevel ? FirstLevelBlockoutWays() : (layout?.ways || { roads: [], trenches: [] }),
+    paint: layout?.paint || [],
   };
 }

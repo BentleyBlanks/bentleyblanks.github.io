@@ -98,6 +98,21 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
 - 高度：`(cols+1)×(rows+1)` 个 int16 小端，单位厘米，`heights[iz*(cols+1)+ix]`。`LayoutFromSceneDoc` 给出 `terrain: "P012Heightfield"`、`terrainSampler: HeightGridSampler(terrain)`、`terrainSpec: null`、`gates: []`、`walkableSurfaces: []`、`legend: false`、`fortifications: false`、`materialLooks: false`。
 - 块的 `y` 在加载时算：脚落在中心与四角中最低的地面上，`y = 最低地面 + h/2`（同 Layout 的 `GroundedBlock`）。**2026-10-18**：块可以显式写 `y`（块中心高度，米），给架在坑上的洞顶、悬着的横木用；写了就不落地。
 - **2026-10-18 可选 `gates`**：与 `blocks` 同字段，再带 `signal`（信号到了就消失）或 `appearSignal`（信号到了才出现），id 与 `blocks` 一起全关唯一。`LayoutFromSceneDoc` 把它们原样交给 `FirstLevelWhiteboxField` 的 gate（与第一关的门同一套 `SyncScenario` / `RestoreScenario`），并给布局 `hideOpenGates: true`：文件场景里「打开」的 gate 是塌掉 / 炸掉的东西，直接隐藏，不走第一关「白门升起 1.2 m」的老画法。关键帧的 `signals` 决定此刻哪些信号为真（§5.4）。
+- **2026-10-20 可选 `paint` / `heightTint` / `colorSemantics` / `semanticColors`**（坑北「田、路、村子看得见」那一轮加的，都只做加法，不写的关卡逐位不变）：
+  ```json
+  "heightTint": { "lo": -2.68, "hi": 3.72 },
+  "colorSemantics": ["roof", "foliage"],
+  "semanticColors": { "roof": "#3e3a35" },
+  "paint": [
+    { "id": "Field_1_01", "color": "#566540", "feather": 1.2, "poly": [ {"x": -112, "z": -80}, {"x": -90, "z": -80}, {"x": -90, "z": -110.6}, {"x": -112, "z": -110.2} ] },
+    { "id": "NorthRoad", "color": "#d8cfb6", "strength": 1, "feather": 0.8, "halfW": 2.6, "line": [ {"x": 175, "z": -40}, {"x": 173, "z": -90} ] }
+  ]
+  ```
+  - `paint`：地面涂色，按数组顺序叠（后面的盖前面的）。每项 `id`（全关唯一）、`color`（`"#rrggbb"`，sRGB）、多边形 `poly`（≥ 3 点）**或**折线 `line`（≥ 2 点）+ 半宽 `halfW`（米，> 0）；可选 `strength`（0–1，缺省 1，不透明度）、`feather`（米，(0, 20]，缺省 1：边界处覆盖一半，往外 feather/2 落到 0、往里 feather/2 到满，smoothstep）。至多 `BLOCKOUT_PAINT_MAX_ITEMS`（5000）项。
+  - `LayoutFromSceneDoc` 用 `BuildGroundPaint(paint, bounds)` 把它烘成一张栅格（格距从 0.5 m 起，格数超过 40 万就翻倍；0105 是 1 m，约 300×470 格）：每格存预乘颜色 C 与覆盖度 A，逐项 `A ← A(1−a) + a`、`C ← C(1−a) + color·a`。布局给出 `groundPaint`（`{ Blend(x, z, rgb) }`：双线性取 C、A，`rgb ← rgb(1−A) + C`，返回 A；没写 paint 是 `null`）、`paint`（原样，给全关总图）、`SampleGroundColor` 也混进涂色。
+  - `heightTint`：高度色带上下限（米，`hi > lo`）；不写 = 网格最低 / 最高。0105 坑北抬高了 5 m 上下，钉在南面（z ≥ −8）的最高点，南面颜色一点不变。
+  - `colorSemantics`：这几种 semantic 的块在白盒画质里保留语义色（总控给它们的网格标 `whiteboxCharacter`，白盒渲染器原样画，照样加米格线）；默认白盒画质所有块都刷成同一种灰网格，远处的村子屋顶和墙分不开。至多 16 个。
+  - `semanticColors`：`{ semantic: "#rrggbb" }`，盖在第一关那张语义色表上（只影响这一关）。至多 32 项。
 - `Data_FirstLevelP012Terrain.CreateP012Terrain` 加一个钩子：`layout.terrainSampler` 存在时，节点高度与 `RefineCells` 的细分高度都用它；**不存在时逐位不变**（`Script_FirstLevelWhiteboxTerrainTest --digest` 前后一致）。
 
 ## 3. 配置文件（`Blockout/<Level>.json`）
@@ -419,6 +434,9 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 - 地形：高度色带（低处偏冷偏暗、高处偏暖偏亮，幅度克制）+ 白盒网格线；没有贴图、草、碎石、壕沟表面网格。
 - 水：北沙河等水块要读得出是水（淡蓝半透明），不能是灰盒子。
 - 方块：沿用默认白盒画质的灰网格材质。
+- **地面涂色（2026-10-20）**：场景文件写了 `paint`（§2.2）时，`DressWorld` 先按高度查表上色，再逐顶点把顶点的**世界** (x, z)（`mesh.matrixWorld` 换算；地面网格本来就在原点）丢给 `layout.groundPaint.Blend` 混进涂色（sRGB 里混，再换线性写进顶点色）；覆盖度 0 的顶点照旧写查表色。地面网格 0.5 m 一个顶点（`terrain.cellM`），20–60 m 宽的田块边界清楚。没有 `paint` 的关卡不进这条路，顶点色逐位不变。
+- **块保留语义色（2026-10-20）**：场景文件 `colorSemantics` 列出的 semantic，`DressWorld` 把用这些语义材质的静态块网格标 `whiteboxCharacter`、补米格线，并让白盒渲染器重判一次（`post.whiteboxScene.Invalidate()`）；其它块照旧灰网格。
+- 全关总图（Map 模块）在「blocks」那一步、路和块之前，把 `paint` 以 0.32 × strength 的不透明度铺一层（多边形填、折线按 2×halfW 描）。
 
 ## 7. 存档（`Script_EditorBlockoutStore.mjs` + 本机端点）
 
@@ -528,6 +546,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 
 ## 12. 变更记录
 
+- 2026-10-20（坑北第二轮：田、路、村子看得见）：§2.2 场景文件加可选 `paint`（地面涂色，多边形 / 折线 + 半宽，按顺序叠）、`heightTint`、`colorSemantics`、`semanticColors`，`ValidateBlockoutScene` 校验、`LayoutFromSceneDoc` 给 `groundPaint`；§6.3 `DressWorld` 按高度上色后混涂色、列出的语义块在白盒画质里保留语义色，全关总图淡铺涂色；不写这些字段的关卡逐位不变。§13 01–05 坑北铺田块、大路北段与田间小路、村子挪到 290–365 m 做成 24 户。
 - 2026-10-20（通用动作换成 Kimodo）：§14.5 本机 Kimodo 文生动作换掉 7 条手 K 的预演通用片段（说话 ×2、指、挥手前进、停止手势、逃跑、卧倒），新库 `Animation/PrevizKimodo` 排在预演动作库表第一；运行时改成并行下载、按表顺序并库（原来谁先下完谁先并，同名片段归属不确定）。另 11 条生成了但不如手 K，保留旧的。
 - 2026-10-20（12–18 预演第二版）：§16 用上 `ride`（三副担架横搁车板、妮儿坐车尾、13-2 伤员挂到担架上被抬走；关键帧生成器 `CartWorld` / `NIER_TAIL_RIDE` / `PressPose` / `DOCTOR_PRESS`，摆位检查跳过挂着的人、`tending` 不报与伤员重叠）、`aircraft`（13-1 / 14-2 两架 Ki-30 顺着大路扫、13-2 / 14-1 兜圈子，弹着由 strafe 画）、`slowmo`（14-2 松手那 1.7 s）、百姓 / 小孩 / 军官 / 兵的占位片段、`clipRelease`（冬瓜攥袖子）、18-2 院里担架出院门上桥；PrevizTest 加飞机 / 慢动作 / 挂车 / 片段 / 院里担架 / `TalkPostureChecks`，KeyframesTest 加挂车与军医站位断言。
 - 2026-10-20（挂到车上 + 预演音效直接放文件，运行时包 M）：§3 单位加可选 `ride`（挂到 `cart` / `tank` / `litter` 上，`Script_EditorBlockoutConfig` 校验 / 归一化，`RideIssues` / `NormalizeRide` / `BLOCKOUT_RIDE_CARRIER_KINDS`）；§5.6 `BlockoutPuppets` 按车位姿摆挂着的人与担架、驴车尺寸实测 `BLOCKOUT_CART_SEATS`（车板顶 1.025 m）、`SitRootY` / `RideWorldPose`、Probe 多给 `ride` / `seat` / `rootAboveCarrierGround`；§14.1 预演键 `ride`（阶跃，挂着写位置键报警告）；§14.3 `PREVIZ_SFX` 可写 `{ url }` 直接放 `Audio/BlockoutPreviz/` 的文件（解码进声库、按位置放、读不到只警告一次），别名加 `babyCry` / `cellarSob` / `gateSmash` / `jarShatter`；门禁 ConfigTest / PrevizPlanTest 加用例、`PrevizRuntimeBrowserTest` 加车 + 挂人 + url 音效（不再带 `audio=0`）。0610 的数据（07 妮儿坐车尾改成 `ride`）由之后的集成一路改。
@@ -615,6 +634,17 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
   - 「左边沟里头有人！」（03-3，`DitchFlank`）：IjaFlank1–3 一开场就在干水沟里（尽头渐浅段往东北 26–32 m），蹲着顺沟往西南走，12.0 / 12.6 / 13.2 s 走到渐浅段起点，起身露头、跑出沟尽头，21.6–23.4 s 扑到 N1 田埂后 x −40 / −44 / −36（坑西北约 50 m，从丙位散兵坑看是同一个方向）。刘文财 16.4 s 那句照旧；IjaFlank1 的那一枪从 17.6 s 挪到 23.2 s（趴稳了才打，原来在开阔地上边跑边打），IjaFlank2 36–45 s 蹲着退回沟尽头。
   - 掷弹筒组位置不变（坎下）；`Mortar()` 的白烟仍在 (28, −211)。
 - 截图：`_shots/EditorBlockout0105/PitNorth/`（不提交）。
+
+**2026-10-20 第二轮：田、路、村子看得见（用户从坑里朝北看：「这里看起来还是大平原，房子也没有，路也没有，田也看不到，我不知道你做了什么」）**：
+原因：白盒地面只按高度上一种色，田块分不出来；0.3 m 田埂远了就没了；10 间 3 m 的房子在 400 多米外只是天边几粒，还被杨树挡；没有通村子的路。坑沿射击台上眼高只比地面高 1 m，80–200 m 的地在 1280×720 画面里挤在地平线下 10–20 个像素里，所以只能靠「颜色拉开 + 往北的坡抬起来 + 成排的树和深色屋顶」让人一眼认出来。都是创作（鲁南农田三月），不是史料复原；锚点在 `Data_EditorBlockoutFirstLevel0105Space`（`L0105_NORTH_ROAD` / `L0105_FIELD_PATH` / `L0105_FIELD_PAINT` / `L0105_FIELD_BANDS` / `L0105_VILLAGE` / `L0105_VILLAGE_HOMES` / `L0105_FIELD_TREES` / `L0105_ROAD_TREES` / `L0105_PATH_TREES`），场景生成器 `PitNorthBlocks` / `L0105Paint`。
+- **涂色**（场景文件 `paint`，§2.2 / §6.3）：105 项，全在 z ≤ −8.5（SceneTest 查 z −7.9 一线覆盖度为 0）。扫清带 `Cleared` `#7d8360`（被踩过的麦地），z −12…−80 横贯全场，坑前爬沟 / 丙位散兵坑一圈 x −11.5…−1.5、z −12…−17.5 留出来涂新土；前沿沟西头北折那截 x −68…−56、z −12…−27 也留出。田块 76 块：十条横带（南北界依次 z −80 直线、F1、F2、F3 田埂、地坎、三道只涂色的地界 z ≈ −248 / −286 / −330 / −378 / −428、场地北边），每条带东西切成长条地（宽度按带在 20–45 … 30–60 m 里按序号抖），麦地 `#566540` / `#61704a`（28 块）、翻过的地 `#5a4532`（23）、撂荒地 `#b09a66`（25），左右相邻两块不同。田埂和地界线 `#6a5842`（半宽 0.45 m，0.7–0.75）；干水沟连两沿翻土 `#7a6143`（半宽 2.7 m）；地坎坎面 `#5b4a38`（半宽 1.3 m）；七座坟 `#594634`（半径 1.9 m 八边形）；村里整片夯土 `#a08f72`、两片场院 `#c3b38c`、后街和胡同 `#d0c5a6`；路 `#d8cfb6`（比撂荒地更白更灰）。
+- **路**：大路 `L0105_ROAD` 一个点不动（SceneTest 逐点核对；03-4 战车露头 (159,−20)、04 / 05 战车走的都是它，关键帧与预演重导后逐字不变）。大路在坑北那一截 (175,−40)→(151.7,−11.5) 涂成路色。大路北段 `L0105_NORTH_ROAD` (175,−40) → (173,−90) → (166,−150) → (156,−205) → (140,−262) → (124,−296) → 村子东口 (112,−318) → 顺前街 → 村西头 (−52,−318)，涂色半宽 2.6 m；两边杨树 `RoadPoplar_*` 43 棵（离路 4.4 m ± 0.4、10 m ± 1.6 一棵、高 11–15 m、脚印 0.6 m → 编辑器种成树），从北段 48 m 处（扫清带外，z ≈ −88）种到村口，干水沟、地坎坎面、小路边上不种。田间小路 `L0105_FIELD_PATH` 从前街胡同口 (−5,−318) → 胡同 → (−22,−262) → (−40,−222) → (−44,−200) → (−40,−165) → 坟地北边 (−33,−134)，半宽 1.3 m，单独一条（不接进 `L0105_ROAD`）；坎下到村口那一截西北侧 7 棵树（14 m 一棵、10–13 m）。路穿地坎：坎面在大路两侧 7 m 内放宽 14 m、小路两侧 4 m 内放宽 9 m（坡道，顺路 1 m 内高差 ≤ 0.35）；大路过干水沟（约 (153,−216)）路面下填平，离路边 3 m 渐回原深。`ways.roads` 多了大路北段和小路两条（全关总图画路）。
+- **地形**：坎下 z −225 → −300 抬 2 → 5.5 m（正对坑的缓坡，最陡约 11 %），村里 z −296 → −366 再抬 4.5 m（后排比前排高一截）。地面：坎下 (28,−213) −2.03、坡上 (30,−260) 0.25、村前 (30,−296) 3.3、村里 (30,−340) 6.28；全场最高 9.28。场景文件 `heightTint` 钉在 −2.68…3.72（=南面的最低 / 最高），南面颜色不变。
+- **村子**（`L0105_VILLAGE` / `L0105_VILLAGE_HOMES`，确定性生成）：x −48…116，三排院子（z −298…−314、−322…−338、−346…−362，离坑 290–355 m），中间两条东西街（z −318 前街 = 大路北段、−342 后街），胡同 x −8…−2。24 户，院子 15–22 m 宽 × 16 m 深、院间 1.5 m；每户四面院墙（2 m、0.5 m 厚、`plaster`，南墙在门口断开 3 m，东西墙顺坡分两截），正房坐北（宽 = 院宽 − 2、深 6、墙 3.0–3.6 m）、一侧厢房（4.8×6、3 m），每三户有一户两边都有厢房，共 54 间；屋顶块（`roof`，比墙宽 0.8 m、厚 1.0–1.5 m）上再压一条屋脊块（0.6 m，顺长边、宽 0.45 倍）。大户（第二排第四户）院墙 2.6 m、正房 4 m，院子东南角一座炮楼 (30.5,−325.5) 4×4 m、墙 8.5 m + 顶 1.2 m（全村最高）。屋顶在白盒画质里用深色（`semanticColors.roof` `#3e3a35`、`colorSemantics` 含 roof），柏树块也保留暗绿（`foliage`）。村边、院里大树 17 棵（13–17 m）；村南两片场院（x −46…−18、84…108）三垛麦秸（4×4×2.8 m）。原来 400 多米外 17 棵杨树、10 间房去掉。
+- **田边树**（`L0105_FIELD_TREES`）9 棵：(−88,−152)、(−96,−238)、(96,−176)、(122,−128)、(64,−258)、(−76,−276)、(176,−332)、(−100,−402)、(150,−410)，10–13.5 m；都不在扫清带、不在 03 跃进的地方。坟地柏树、麦秸垛、树桩不动。
+- **03 的人**：日军站位、掷弹筒、沟里摸过来的三个人都没动；关键帧（`export --force`）与预演（`--force`）重导后内容不变（关键帧只有文件头的 commit / 时间变，没留），新块里没有站人（KeyframesTest / PrevizTest 过）。视线核对全照旧（掷弹筒组最少挡 0.98 m、烟露 0.56 m、沟里弯腰的人最少挡 0.15 m）；`PitNorthChecks` 的地坎落差跳过路两侧的坡道、沟深跳过大路填平那一截。
+- **文件**：`FirstLevel0105.scene.json` 2 218 984 → 2 422 717 字节（+9 %），体块 131 → 512。
+- **验收截图**（`_shots/EditorBlockout0105/PitNorth2/`，不提交）：03-3 坑沿射击台站着朝北（1280×720 / 2000×834）、03-2 坑里蹲着朝北、坑上方 20 m 朝北、60 m 鸟瞰、路边朝村子、全关总图。坑沿那一张里：近处一整片绿褐的扫清带，往北一条条绿 / 褐 / 黄的田，右边一排树顺大路一直排到村子，正前方天边一片浅墙深顶、前后错落的房子和一座炮楼。
 
 ## 14. 预演（previz，2026-10-18）
 

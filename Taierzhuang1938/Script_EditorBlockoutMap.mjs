@@ -212,6 +212,8 @@ export class BlockoutMap {
       trenches: Polylines(scene.ways?.trenches),
       rails: Polylines(scene.ways?.rails),
     };
+    // 地面涂色（场景文件 paint，2026-10-20）：纸面上淡淡铺一层（田块、路），没有就空
+    this.paint = PaintItems(scene.paint);
     this.BuildItems(blocks);
     const cached = this.cache.get(levelKey);
     this.baked = cached && cached.signature === signature ? cached : null;
@@ -318,7 +320,7 @@ export class BlockoutMap {
     gctx.fillStyle = Css(MAP_COLORS.paper);
     gctx.fillRect(0, 0, width, height);
     const job = {
-      signature: scene.signature, levelKey: scene.levelKey, scene, items: this.items, ways: this.ways,
+      signature: scene.signature, levelKey: scene.levelKey, scene, items: this.items, ways: this.ways, paint: this.paint || [],
       cellM, cols, rows, pxPerM, width, height, ground, gctx,
       H: new Float32Array((cols + 1) * (rows + 1)),
       N: scene.naturalHeight ? new Float32Array((cols + 1) * (rows + 1)) : null,
@@ -434,6 +436,7 @@ export class BlockoutMap {
       const ctx = composite.getContext("2d");
       ctx.drawImage(job.ground, 0, 0);
       ctx.setTransform(job.pxPerM, 0, 0, job.pxPerM, -minX * job.pxPerM, -minZ * job.pxPerM);
+      DrawPaint(ctx, job.paint);
       DrawWays(ctx, job.ways, job.pxPerM);
       DrawItems(ctx, job.items, job.pxPerM);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1203,6 +1206,35 @@ function StrokeLines(ctx, lines) {
   ctx.beginPath();
   for (const line of lines) line.forEach((p, i) => (i ? ctx.lineTo(p.x, p.z) : ctx.moveTo(p.x, p.z)));
   ctx.stroke();
+}
+
+/** 场景文件 paint → 纸面上画的形状（只认写对了的项）。 */
+function PaintItems(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const item of list) {
+    if (!item || typeof item.color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(item.color)) continue;
+    const pts = Polylines([item.poly || item.line])[0];
+    if (!pts || pts.length < 2) continue;
+    out.push({ color: item.color, line: !item.poly, halfW: Number(item.halfW) || 0, strength: Number.isFinite(item.strength) ? item.strength : 1, pts });
+  }
+  return out;
+}
+
+/** 地面涂色淡淡一层（世界坐标变换已设好）：多边形填、折线按宽描。 */
+function DrawPaint(ctx, paint) {
+  if (!paint || !paint.length) return;
+  ctx.save();
+  ctx.lineJoin = "round"; ctx.lineCap = "round";
+  for (const p of paint) {
+    ctx.globalAlpha = 0.32 * p.strength;
+    ctx.beginPath();
+    ctx.moveTo(p.pts[0].x, p.pts[0].z);
+    for (let i = 1; i < p.pts.length; i++) ctx.lineTo(p.pts[i].x, p.pts[i].z);
+    if (p.line) { ctx.strokeStyle = p.color; ctx.lineWidth = Math.max(0.5, p.halfW * 2); ctx.stroke(); }
+    else { ctx.closePath(); ctx.fillStyle = p.color; ctx.fill(); }
+  }
+  ctx.restore();
 }
 
 function DrawWays(ctx, ways, pxPerM) {

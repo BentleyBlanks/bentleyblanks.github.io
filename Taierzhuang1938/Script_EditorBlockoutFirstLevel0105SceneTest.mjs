@@ -7,11 +7,14 @@
 // 10-20 干沟改弯沟：沟底宽窄不一（坑窝 ≥ 9 m、最窄 ≥ 3.5 m、不能处处一样宽）、中心线连续沟底 ≥ 50 m、北岸坑窝陡坎、
 // 沟底离大路 ≥ 20 m（原来方坑西北角 8 m）、人待的地方离路口（板桥）≥ 28 m、支沟（伤员）在沟底高度、凹路口接上沟底。
 // 10-20 坑北前景：坟高、田埂高、干水沟深与断面、地坎落差与豁口、坑里看不见坎下的掷弹筒组（看得见烟）、沟里弯腰的人从坑里看不见头、
-// 跃进的人每一格都在掩体后、树桩 / 柏树 / 麦秸垛 / 杨树 / 土坯房的尺寸、扫清带基本平、坑北的改动不碰 z ≥ −8。
+// 跃进的人每一格都在掩体后、树桩 / 柏树 / 麦秸垛的尺寸、扫清带基本平、坑北的改动不碰 z ≥ −8。
+// 10-20 坑北第二轮（田、路、村子看得见）：涂色只在坑北（z < −8）、田块够多三种颜色都有、相邻两块不同色；大路 L0105_ROAD 一个点不动，
+// 大路北段接在它北头穿村、田间小路单独一条；路边杨树两侧成排、离路 3.5–5.5 m、能种成树；路穿地坎 / 干水沟处是坡道 / 填平；
+// 村子在坑北 285–365 m、20–30 户、院墙 2–2.6 m、房墙 ≥ 3 m、屋顶比墙宽且 1–1.5 m 压在墙顶；色带钉在南面。
 
 import assert from "node:assert/strict";
 import { ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
-import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
+import { HeightGridSampler, IsSceneTreeBlock, BuildGroundPaint } from "./Script_EditorBlockoutLevels.mjs";
 import {
   BuildFirstLevel0105Scene, FloorWidthAt, NaturalHeight, L0105SightChecks, GullyFloorExtent, GullyBankHeights, PropPassage, PropsPerStraight,
   GullySouthBerm, GullySouthBermTop, L0105_GULLY_SOUTH_BERM_LENGTH,
@@ -22,6 +25,7 @@ import {
   L0105_PROPS, L0105_PROP_KINDS, L0105_SUNKEN_LANE, L0105_GULLY_SOUTH_BERM as SB, PointBeside, GullyU, InGullyFloor,
   L0105_ROAD, L0105_GULLY_POCKETS, L0105_GULLY_TREES,
   L0105_PIT_NORTH as PN, L0105_BOUNDS, L0105_RUSH_STATIONS, L0105_RUSH_REPLACEMENT, L0105_DITCH_FLANK, RushStation, ScarpZ, LineLength,
+  L0105_NORTH_ROAD, L0105_FIELD_PATH, L0105_VILLAGE, L0105_VILLAGE_HOMES, L0105_ROAD_TREES, L0105_FIELD_PAINT,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 const opts = { commit: "test", generatedAt: "2026-10-18T00:00:00.000Z" };
@@ -278,15 +282,96 @@ assert.ok(pn.lmgW.block <= 0 && pn.lmgE.block <= 0, `坑里要看得见两挺轻
   const hs = byId.get("Haystack"), hsTop = byId.get("HaystackTop");
   assert.ok(hs && hsTop && hs.w === 4 && hs.d === 3, "麦秸垛 4×3 m");
   Near(hsTop.y + hsTop.h / 2 - (hs.y - hs.h / 2), 2.5, 0.02, "麦秸垛高");
-  const pop = all.filter((x) => /^VillagePoplar_/.test(x.id));
-  assert.ok(pop.length >= 12 && pop.every((x) => x.h >= 12 && x.h <= 15 && x.z <= -395 && x.z >= -405), "村前一排杨树 12–15 m");
-  const houses = all.filter((x) => /^VillageHouse_/.test(x.id));
-  assert.ok(houses.length >= 6 && houses.length <= 10 && houses.every((x) => x.h === 3 && x.z <= -410 && x.z - x.d / 2 >= L0105_BOUNDS.minZ), "后面 6–10 间土坯房，墙高 3 m，在场地里");
+  assert.ok(!all.some((x) => /^Village(Poplar|House|Roof)_/.test(x.id)), "原来 400 多米外那排杨树和 10 间房去掉了（第二轮重排）");
   assert.ok(!all.some((x) => /^EnemyLmg(WestMound|EastLip)$/.test(x.id)), "原来轻机枪的小土包 / 弹坑沿去掉了");
   // 轻机枪不站进麦秸垛，也不趴在坟顶上
   for (const p of [P.enemyLmgEast, { x: 36.0, z: -139.4 }]) assert.ok(Math.abs(p.x - PN.haystack.x) > PN.haystack.w / 2 + 0.5 || Math.abs(p.z - PN.haystack.z) > PN.haystack.d / 2 + 0.5, "轻机枪 2 站进了麦秸垛");
   assert.ok(GraveHeight(P.enemyLmgWest.x, P.enemyLmgWest.z) < 0.2, "轻机枪 1 趴在坟顶上了（要在坟后）");
 }
+// --- 坑北第二轮（2026-10-20）：田、路、村子 ---
+{
+  const paint = a.paint;
+  assert.ok(Array.isArray(paint) && paint.length >= 60, "坑北要有涂色");
+  for (const item of paint) for (const p of item.poly || item.line) assert.ok(p.z + (item.halfW || 0) + (item.feather || 1) / 2 < -8, `涂色 ${item.id} 伸到了 z ≥ −8：(${p.x},${p.z})`);
+  // 栅格烘出来南面一点没涂（z ≥ −8 处覆盖度 0）
+  const gp = BuildGroundPaint(paint, a.bounds), rgb = [0.5, 0.5, 0.5];
+  for (let x = -110; x <= 190; x += 2) assert.equal(gp.Blend(x, -7.9, rgb), 0, `z −7.9 x ${x} 被涂了色`);
+  assert.ok(gp.Blend(30, -50, [0, 0, 0]) > 0.99 && gp.Blend(30, -260, [0, 0, 0]) > 0.99 && gp.Blend(30, -330, [0, 0, 0]) > 0.99, "扫清带、坎下、村子都要涂满");
+  const fields = paint.filter((p) => /^Field_/.test(p.id));
+  const C = L0105_FIELD_PAINT;
+  assert.ok(fields.length >= 50, `田块 ${fields.length}`);
+  for (const c of [C.plowed, C.fallow]) assert.ok(fields.some((f) => f.color === c), `田块缺颜色 ${c}`);
+  assert.ok(fields.some((f) => C.wheat.includes(f.color)), "田块缺麦地");
+  const kind = (c) => (C.wheat.includes(c) ? "wheat" : c);
+  for (let i = 1; i < fields.length; i++) {
+    const b0 = fields[i - 1].id.split("_")[1], b1 = fields[i].id.split("_")[1];
+    if (b0 === b1) assert.notEqual(kind(fields[i - 1].color), kind(fields[i].color), `相邻两块田一个颜色：${fields[i - 1].id} / ${fields[i].id}`);
+  }
+  for (const f of fields) {
+    const xs = f.poly.map((p) => p.x), w = Math.max(...xs) - Math.min(...xs);
+    if (Math.min(...xs) > L0105_BOUNDS.minX && Math.max(...xs) < L0105_BOUNDS.maxX) assert.ok(w >= 19.9 && w <= 61, `田块 ${f.id} 宽 ${w.toFixed(1)}（要 20–60）`);
+  }
+  // 路：大路一个点不动；北段接在大路北头，末端在村里；小路单独一条，不接进大路
+  assert.deepEqual(L0105_ROAD.map((p) => [p.x, p.z]), [[175, -40], [105, 50], [35, 116], [-20, 152], [-100, 185]], "大路 L0105_ROAD 不许动（战车路线）");
+  assert.deepEqual([L0105_NORTH_ROAD[0].x, L0105_NORTH_ROAD[0].z], [175, -40], "大路北段从大路北头接出去");
+  const roads = a.ways.roads.map((l) => JSON.stringify(l.map((p) => [p.x, p.z])));
+  assert.ok(roads.includes(JSON.stringify(L0105_ROAD.map((p) => [p.x, p.z]))), "ways.roads 里大路原样");
+  assert.equal(roads.length, 4, "ways.roads：大路、凹路、大路北段、田间小路");
+  const V = L0105_VILLAGE;
+  const end = L0105_NORTH_ROAD[L0105_NORTH_ROAD.length - 1];
+  assert.ok(end.z <= V.rows[0].zS && end.z >= V.rows[V.rows.length - 1].zN && end.x <= V.minX, "大路北段穿村到西头");
+  const pathEnd = L0105_FIELD_PATH[L0105_FIELD_PATH.length - 1];
+  assert.ok(Math.hypot(pathEnd.x + 31, pathEnd.z + 122) < 15, "田间小路通到坟地一带");
+  // 路穿地坎是坡道、大路过干水沟填平：顺路 1 m 内高差 ≤ 0.35
+  for (const line of [L0105_NORTH_ROAD, L0105_FIELD_PATH]) {
+    let worst = 0;
+    for (let d = 0; d < LineLength(line) - 1; d += 0.5) {
+      const p = PointBeside(line, d, 0), q = PointBeside(line, d + 1, 0);
+      if (q.z > -150 || q.z < -260) continue;
+      worst = Math.max(worst, Math.abs(sample(p.x, p.z) - sample(q.x, q.z)));
+    }
+    assert.ok(worst <= 0.35, `路穿过地坎 / 干水沟处 1 m 内高差 ${worst.toFixed(2)}`);
+  }
+  // 路边杨树：两侧成排、离路 3.5–5.5 m、能种成树
+  const rt = all.filter((x) => /^RoadPoplar_/.test(x.id));
+  assert.ok(rt.length >= 36 && rt.every((t) => IsSceneTreeBlock(t) && t.h >= L0105_ROAD_TREES.hMin && t.h <= L0105_ROAD_TREES.hMax), `路边杨树 ${rt.length}，要能种成树`);
+  const sides = { 1: 0, "-1": 0 };
+  for (const t of rt) {
+    let best = Infinity, sgn = 0;
+    for (let i = 1; i < L0105_NORTH_ROAD.length; i++) {
+      const p0 = L0105_NORTH_ROAD[i - 1], p1 = L0105_NORTH_ROAD[i], dx = p1.x - p0.x, dz = p1.z - p0.z, l2 = dx * dx + dz * dz;
+      const k = Math.max(0, Math.min(1, ((t.x - p0.x) * dx + (t.z - p0.z) * dz) / l2)), ex = t.x - p0.x - dx * k, ez = t.z - p0.z - dz * k, dd = Math.hypot(ex, ez);
+      if (dd < best) { best = dd; sgn = Math.sign(dx * ez - dz * ex); }
+    }
+    assert.ok(best >= 3.5 && best <= 5.5, `杨树 ${t.id} 离路 ${best.toFixed(1)} m`);
+    sides[sgn] += 1;
+  }
+  assert.ok(sides[1] >= 18 && sides[-1] >= 18, `路两侧的杨树 ${sides[1]} / ${sides[-1]}`);
+  // 村子
+  const homes = L0105_VILLAGE_HOMES;
+  assert.ok(homes.length >= 20 && homes.length <= 30, `村子 ${homes.length} 户`);
+  const HouseRe = /^Home\d\d_House\d$/;
+  for (const h of homes) {
+    const dz = -(h.zS + h.zN) / 2 - 7;
+    assert.ok(dz >= 285 && dz <= 365, `${h.id} 离坑 ${dz.toFixed(0)} m`);
+    const walls = all.filter((x) => x.id.startsWith(h.id + "_Wall"));
+    assert.ok(walls.length >= 6 && walls.every((w) => w.h >= 2 && w.h <= 2.6 && w.semantic === "plaster"), `${h.id} 院墙`);
+    const hs = all.filter((x) => x.id.startsWith(h.id + "_House") && HouseRe.test(x.id));
+    assert.ok(hs.length >= 2 && hs.length <= 3, `${h.id} 两三间房`);
+    for (const house of hs) {
+      assert.ok(house.h >= 3 && house.semantic === "plaster", `${house.id} 墙高 ${house.h}`);
+      const roof = byId.get(house.id.replace("_House", "_Roof"));
+      assert.ok(roof && roof.semantic === "roof" && roof.w > house.w && roof.d > house.d && roof.h >= 1 && roof.h <= 1.5, `${house.id} 屋顶`);
+      Near(roof.y - roof.h / 2, house.y + house.h / 2, 0.02, `${house.id} 屋顶压在墙顶上`);
+    }
+  }
+  assert.ok(a.colorSemantics?.includes("roof") && /^#[0-9a-f]{6}$/i.test(a.semanticColors?.roof || ""), "屋顶在白盒画质里保留深色");
+  // 树、房都不在扫清带里
+  for (const x of all) if (/^(RoadPoplar|FieldTree|PathTree|VillageTree|Home)/.test(x.id) && x.z > -80) assert.fail(`${x.id} 种进了扫清带 (${x.x},${x.z})`);
+  // 色带钉在南面（z ≥ −8）的最高点：坑北抬高了也不改南面的颜色
+  assert.ok(a.heightTint && a.heightTint.hi < 4 && a.heightTint.lo < -2, `heightTint ${JSON.stringify(a.heightTint)}`);
+}
+
 console.log(`坑北前景：坟 ${pn.graves.map((g) => g.h).join("/")} m；田埂 ${pn.bundMin}…${pn.bundMax}；干水沟深 ${pn.ditchDepthMin}…${pn.ditchDepthMax}；地坎 ${pn.scarpMin}…${pn.scarpMax}；`
   + `掷弹筒组最少挡 ${pn.mortar.worst} m、烟露 ${-pn.smoke.worst} m；沟里弯腰的人最少挡 ${pn.ditch.worst} m`);
 

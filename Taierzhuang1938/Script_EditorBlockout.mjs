@@ -421,6 +421,13 @@ export class EditorBlockout {
       lut[i * 3] = color.r; lut[i * 3 + 1] = color.g; lut[i * 3 + 2] = color.b;
     }
     const span = Math.max(0.5, tint.hi - tint.lo);
+    // 地面涂色（场景文件 paint，§6.3，2026-10-20）：按高度上完色再按 (x,z) 混涂色；没有 paint 的关卡走原路，逐位不变
+    const paint = layout.groundPaint || null;
+    const srgb = paint ? new Float32Array(256 * 3) : null;
+    if (paint) for (let i = 0; i < 256; i++) {
+      BlockoutTintColor(tint.lo + (tint.hi - tint.lo) * i / 255, tint, rgb);
+      srgb[i * 3] = rgb[0]; srgb[i * 3 + 1] = rgb[1]; srgb[i * 3 + 2] = rgb[2];
+    }
     for (const mesh of field.meshes || []) {
       if (mesh.name !== BLOCKOUT_EDITOR.groundName || !mesh.geometry) continue;
       const position = mesh.geometry.getAttribute("position");
@@ -429,8 +436,22 @@ export class EditorBlockout {
         colors = new THREE.BufferAttribute(new Float32Array(position.count * 3), 3);
         mesh.geometry.setAttribute("color", colors);
       }
+      // 顶点是网格本地坐标：涂色按世界 (x,z) 取（地面网格一般就在原点，这里照样换算）
+      mesh.updateMatrixWorld?.(true);
+      const e = mesh.matrixWorld?.elements;
       for (let i = 0; i < position.count; i++) {
         const k = Math.max(0, Math.min(255, Math.round((position.getY(i) - tint.lo) / span * 255))) * 3;
+        if (paint) {
+          const px = position.getX(i), py = position.getY(i), pz = position.getZ(i);
+          const wx = e ? e[0] * px + e[4] * py + e[8] * pz + e[12] : px;
+          const wz = e ? e[2] * px + e[6] * py + e[10] * pz + e[14] : pz;
+          rgb[0] = srgb[k]; rgb[1] = srgb[k + 1]; rgb[2] = srgb[k + 2];
+          if (paint.Blend(wx, wz, rgb) > 0) {
+            color.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace);
+            colors.setXYZ(i, color.r, color.g, color.b);
+            continue;
+          }
+        }
         colors.setXYZ(i, lut[k], lut[k + 1], lut[k + 2]);
       }
       colors.needsUpdate = true;
@@ -441,6 +462,17 @@ export class EditorBlockout {
         const patches = PatchesOf(material) || [];
         if (!patches.some(patch => patch.key === GRID_PATCH.key)) { ApplyPatches(material, [...patches, GRID_PATCH]); material.needsUpdate = true; }
       }
+    }
+    // 场景文件 colorSemantics（§6.3，2026-10-20）：这几种块在白盒画质里保留语义色（标 whiteboxCharacter，白盒渲染器原样画），照样加米格线
+    const keep = new Set((layout.colorSemantics || []).map(sem => field.materials?.get?.(sem)).filter(Boolean));
+    if (keep.size) {
+      for (const mesh of field.meshes || []) {
+        if (!mesh?.isMesh || !keep.has(mesh.material) || mesh.userData.whiteboxCharacter) continue;
+        mesh.userData.whiteboxCharacter = true;
+        const patches = PatchesOf(mesh.material) || [];
+        if (!patches.some(patch => patch.key === GRID_PATCH.key)) { ApplyPatches(mesh.material, [...patches, GRID_PATCH]); mesh.material.needsUpdate = true; }
+      }
+      this.host.post?.whiteboxScene?.Invalidate?.();
     }
     if (!field.waterMesh) {
       const blocks = BlockoutWaterBlocks(layout);

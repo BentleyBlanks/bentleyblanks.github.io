@@ -34,6 +34,8 @@ import {
   L0105_GULLY, L0105_GULLY_TREES, L0105_GULLY_SOUTH_BERM, L0105_SUNKEN_LANE, L0105_BRIDGE, L0105_BRANCH_SOUTH_BERM,
   L0105_PROPS, L0105_PROP_KINDS, PointBeside, LineLength, GullyU, L0105_GULLY_POCKETS,
   L0105_PIT_NORTH, BundZ, ScarpZ,
+  L0105_NORTH_ROAD, L0105_NORTH_ROAD_HALF_W, L0105_FIELD_PATH, L0105_FIELD_PATH_HALF_W, L0105_FIELD_PAINT, L0105_FIELD_BANDS,
+  L0105_VILLAGE, L0105_VILLAGE_HOMES, L0105_FIELD_TREES, L0105_ROAD_TREES, L0105_PATH_TREES,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 export const L0105_SCENE_GENERATOR = "Script_EditorBlockoutCli.mjs scene FirstLevel0105";
@@ -219,13 +221,21 @@ export function PitNorthRoll(x, z) {
 /** 整片地往北缓缓抬（米，≥ 0）：扫清带外到地坎 riseM，坎下往北到村子再 farRiseM。 */
 export function PitNorthTilt(z) {
   const t = PN.tilt;
-  return t.riseM * Smooth((t.fromZ - z) / (t.fromZ - t.toZ)) + t.farRiseM * Smooth((t.farFromZ - z) / (t.farFromZ - t.farToZ));
+  return t.riseM * Smooth((t.fromZ - z) / (t.fromZ - t.toZ)) + t.farRiseM * Smooth((t.farFromZ - z) / (t.farFromZ - t.farToZ))
+    + t.villageRiseM * Clamp01((t.villageFromZ - z) / (t.villageFromZ - t.villageToZ));
 }
-/** 地坎（≤ 0，北边低 drop）：坎面宽 faceM，干水沟穿过处放宽成豁口。 */
+/** 路穿过地坎处的坡道（2026-10-20 第二轮）：大路放宽 roadM、田间小路放宽 pathM，离路中心 R 米内渐变。 */
+const SCARP_ROAD_NOTCH = Object.freeze({ roadM: 14, roadR: 7, pathM: 9, pathR: 4 });
+/** 地坎（≤ 0，北边低 drop）：坎面宽 faceM，干水沟穿过处放宽成豁口，大路 / 小路穿过处放宽成坡道。 */
 export function ScarpDelta(x, z, ditchD = DitchStation(x, z).d) {
   const s = PN.scarp;
   const u = ScarpZ(x) - z;   // 坎线以北为正
-  const W = s.faceM + s.notchM * (1 - Smooth(ditchD / s.notchR));
+  let notch = s.notchM * (1 - Smooth(ditchD / s.notchR));
+  if (Math.abs(u) < (s.faceM + SCARP_ROAD_NOTCH.roadM) / 2 + 0.5) {
+    notch = Math.max(notch, SCARP_ROAD_NOTCH.roadM * (1 - Smooth(DistanceToPolyline(x, z, L0105_NORTH_ROAD) / SCARP_ROAD_NOTCH.roadR)),
+      SCARP_ROAD_NOTCH.pathM * (1 - Smooth(DistanceToPolyline(x, z, L0105_FIELD_PATH) / SCARP_ROAD_NOTCH.pathR)));
+  }
+  const W = s.faceM + notch;
   if (u < -W / 2 - 0.01) return 0;
   return -s.drop * Smooth((u + W / 2) / W);
 }
@@ -257,9 +267,12 @@ export function GraveHeight(x, z) {
   return best;
 }
 /** 干水沟：返回 { cap 开挖后的高度上限（Infinity = 不挖）, lip 沟沿翻土加高 }；base = 起伏 + 地坎后的地面。 */
-function DitchCut(base, st) {
+function DitchCut(base, st, x, z) {
   if (!(st.d < DITCH.topW / 2 + DITCH.lipW)) return { cap: Infinity, lip: 0 };
-  const depth = DitchDepthAt(st.along);
+  // 大路北段从沟上过：路面下填平（涵洞土），离路边 3 m 渐回原深
+  const fill = Smooth((DistanceToPolyline(x, z, L0105_NORTH_ROAD) - L0105_NORTH_ROAD_HALF_W - 1) / 3);
+  if (fill <= 0) return { cap: Infinity, lip: 0 };
+  const depth = DitchDepthAt(st.along) * fill;
   const fh = DITCH.floorW / 2, th = DITCH.topW / 2;
   if (st.d >= th) {
     const u = (st.d - th) / DITCH.lipW;
@@ -273,7 +286,7 @@ export function PitNorthHeight(x, z, h) {
   const st = DitchStation(x, z);
   const base = h + PitNorthRoll(x, z) + PitNorthTilt(z) + ScarpDelta(x, z, st.d);
   let out = base + Math.max(BundHeight(x, z), GraveHeight(x, z));
-  const cut = DitchCut(base, st);
+  const cut = DitchCut(base, st, x, z);
   if (cut.cap < out) out = cut.cap;
   else out += cut.lip;
   return out;
@@ -448,19 +461,21 @@ export function BakeL0105Grid(ground, bounds = L0105_BOUNDS, cellM = L0105_CELL_
   const cols = Math.round((bounds.maxX - bounds.minX) / cellM);
   const rows = Math.round((bounds.maxZ - bounds.minZ) / cellM);
   const buffer = Buffer.alloc((cols + 1) * (rows + 1) * 2);
-  let min = Infinity, max = -Infinity;
+  let min = Infinity, max = -Infinity, southMax = -Infinity;
   for (let iz = 0; iz <= rows; iz++) {
+    const south = bounds.minZ + iz * cellM >= PIT_NORTH_FROM_Z;
     for (let ix = 0; ix <= cols; ix++) {
       const y = ground(bounds.minX + ix * cellM, bounds.minZ + iz * cellM);
       const cm = Math.max(-32768, Math.min(32767, Math.round(y * 100)));
       if (cm < min) min = cm;
       if (cm > max) max = cm;
+      if (south && cm > southMax) southMax = cm;
       buffer.writeInt16LE(cm, (iz * (cols + 1) + ix) * 2);
     }
   }
   return {
     terrain: { kind: "heightmap", minX: bounds.minX, minZ: bounds.minZ, cellM, cols, rows, encoding: "int16-cm-base64", data: buffer.toString("base64") },
-    minM: min / 100, maxM: max / 100,
+    minM: min / 100, maxM: max / 100, southMaxM: southMax / 100,
   };
 }
 
@@ -580,25 +595,178 @@ export function L0105Blocks(sample, floors) {
 }
 
 /**
- * 坑北前景的体块（2026-10-20）：树桩（矮块，不挡人）、坟地柏树（细高块）、麦秸垛（两层块，圆顶感）、村前杨树、土坯房（墙块 + 草顶）。
- * 显式 y 的块（麦秸垛上层、房顶）按 sample 在脚印中心与四角取最低的地面算（同不写 y 时加载器的落地法）。
+ * 坑北前景的体块（2026-10-20）：树桩（矮块，不挡人）、坟地柏树（细高块）、麦秸垛（两层块，圆顶感）；
+ * 第二轮：大路北段两边的杨树、田边零星的树、村子（院墙 + 正房 / 厢房 + 屋顶）、村边大树、场院麦秸垛。
+ * 树都是细高 foliage 块（脚印 0.6 m ≤ 1 m），编辑器种成树模型（IsSceneTreeBlock）。
+ * 显式 y 的块（麦秸垛上层、房墙、房顶）按 sample 在脚印中心与四角取最低的地面算（同不写 y 时加载器的落地法）。
  */
 export function PitNorthBlocks(sample) {
   const out = [];
   const Low = (x, z, w, d) => Math.min(sample(x, z), sample(x - w / 2, z - d / 2), sample(x + w / 2, z - d / 2), sample(x - w / 2, z + d / 2), sample(x + w / 2, z + d / 2));
   const N2 = (i) => String(i + 1).padStart(2, "0");
+  const Tree = (id, x, z, h) => out.push(Block(id, x, z, 0.6, 0.6, h, "foliage", { prop: "Tree" }));
   PN.stumps.forEach((s, i) => out.push(Block(`FieldStump_${N2(i)}`, s.x, s.z, 0.45, 0.45, s.h, "timber", { prop: "Stump" })));
   PN.cypresses.forEach((t, i) => out.push(Block(`GraveCypress_${N2(i)}`, t.x, t.z, 1.1, 1.1, t.h, "foliage", { prop: "Cypress" })));
+  const Haystack = (id, x, z, w, d, h, baseH, topW, topD, extra = {}) => {
+    const y0 = Low(x, z, w, d);
+    out.push(Block(id, x, z, w, d, baseH, "canvas", { prop: "Haystack", y: R2(y0 + baseH / 2), ...extra }));
+    out.push(Block(`${id}Top`, x, z, topW, topD, h - baseH, "canvas", { prop: "Haystack", y: R2(y0 + baseH + (h - baseH) / 2) }));
+  };
   const hs = PN.haystack;
-  const hsY = Low(hs.x, hs.z, hs.w, hs.d);
-  out.push(Block("Haystack", hs.x, hs.z, hs.w, hs.d, hs.baseH, "canvas", { prop: "Haystack", y: R2(hsY + hs.baseH / 2), cover: { ...FACE_SOUTH } }));
-  out.push(Block("HaystackTop", hs.x, hs.z, hs.topW, hs.topD, hs.h - hs.baseH, "canvas", { prop: "Haystack", y: R2(hsY + hs.baseH + (hs.h - hs.baseH) / 2) }));
-  PN.poplars.forEach((t, i) => out.push(Block(`VillagePoplar_${N2(i)}`, t.x, t.z, 1.4, 1.4, t.h, "foliage", { prop: "Poplar" })));
-  PN.houses.forEach((hu, i) => {
-    const y0 = Low(hu.x, hu.z, hu.w, hu.d);
-    out.push(Block(`VillageHouse_${N2(i)}`, hu.x, hu.z, hu.w, hu.d, PN.houseWallH, "plaster", { y: R2(y0 + PN.houseWallH / 2) }));
-    out.push(Block(`VillageRoof_${N2(i)}`, hu.x, hu.z, hu.w + 0.5, hu.d + 0.5, PN.houseRoofT, "roof", { y: R2(y0 + PN.houseWallH + PN.houseRoofT / 2) }));
+  Haystack("Haystack", hs.x, hs.z, hs.w, hs.d, hs.h, hs.baseH, hs.topW, hs.topD, { cover: { ...FACE_SOUTH } });
+
+  // 大路北段两边的杨树：spacing 米一棵，位置 / 树高按序号做确定性抖动；不种在干水沟、地坎坎面上，也不压着田间小路
+  const RT = L0105_ROAD_TREES;
+  let ti = 0;
+  for (let d = RT.fromM; d <= RT.toM; d += RT.spacing) {
+    for (const side of [1, -1]) {
+      const j = Hash01(ti * 2 + (side > 0 ? 0 : 1), 7);
+      const p = PointBeside(L0105_NORTH_ROAD, d + (j - 0.5) * 2 * RT.jitterM, side * (RT.lat + (Hash01(ti, 11) - 0.5) * 0.8));
+      ti += 1;
+      if (DitchStation(p.x, p.z).d < 4 || Math.abs(ScarpZ(p.x) - p.z) < 6 || DistanceToPolyline(p.x, p.z, L0105_FIELD_PATH) < 4) continue;
+      Tree(`RoadPoplar_${String(ti).padStart(3, "0")}`, p.x, p.z, RT.hMin + (RT.hMax - RT.hMin) * Hash01(ti, 13));
+    }
+  }
+  L0105_FIELD_TREES.forEach((t, i) => Tree(`FieldTree_${N2(i)}`, t.x, t.z, t.h));
+  {
+    const PT = L0105_PATH_TREES;
+    let k = 0;
+    for (let d = PT.fromM; d <= PT.toM; d += PT.spacing, k += 1) {
+      const p = PointBeside(L0105_FIELD_PATH, d, -PT.lat);   // 行进方向（往西南）的右手 = 西北侧
+      if (Math.abs(ScarpZ(p.x) - p.z) < 6) continue;
+      Tree(`PathTree_${N2(k)}`, p.x, p.z, PT.hMin + (PT.hMax - PT.hMin) * Hash01(k, 19));
+    }
+  }
+
+  // 村子：每户四面院墙（南墙在门口断开）、正房 + 厢房（墙块 + 屋顶块）
+  const V = L0105_VILLAGE;
+  const Wall = (id, x0, z0, x1, z1, h) => out.push(Block(id, (x0 + x1) / 2, (z0 + z1) / 2, Math.max(V.yardWallT, x1 - x0), Math.max(V.yardWallT, z1 - z0), h, "plaster", { prop: "YardWall" }));
+  for (const home of L0105_VILLAGE_HOMES) {
+    const { id, x0, x1, zS, zN, gateX, yardWallH: wh } = home;
+    const t = V.yardWallT / 2;
+    Wall(`${id}_WallN`, x0, zN - t, x1, zN + t, wh);
+    // 东西两面墙顺坡，分两截落地（一整截 16 m 在坡上，高的那头只露出一半）
+    const zM = (zN + zS) / 2;
+    Wall(`${id}_WallW1`, x0 - t, zN, x0 + t, zM, wh); Wall(`${id}_WallW2`, x0 - t, zM, x0 + t, zS, wh);
+    Wall(`${id}_WallE1`, x1 - t, zN, x1 + t, zM, wh); Wall(`${id}_WallE2`, x1 - t, zM, x1 + t, zS, wh);
+    const g0 = gateX - V.gateW / 2, g1 = gateX + V.gateW / 2;
+    if (g0 - x0 > 0.6) Wall(`${id}_WallS1`, x0, zS - t, g0, zS + t, wh);
+    if (x1 - g1 > 0.6) Wall(`${id}_WallS2`, g1, zS - t, x1, zS + t, wh);
+    home.houses.forEach((hu, k) => {
+      const y0 = Low(hu.x, hu.z, hu.w, hu.d);
+      out.push(Block(`${id}_House${k + 1}`, hu.x, hu.z, hu.w, hu.d, hu.wallH, "plaster", { prop: "House", y: R2(y0 + hu.wallH / 2) }));
+      out.push(Block(`${id}_Roof${k + 1}`, hu.x, hu.z, hu.w + V.roofOverhangM, hu.d + V.roofOverhangM, hu.roofT, "roof", { prop: "Roof", y: R2(y0 + hu.wallH + hu.roofT / 2) }));
+      // 屋脊：顺长边，厢房（南北长）顺南北
+      const along = hu.w >= hu.d;
+      out.push(Block(`${id}_Ridge${k + 1}`, hu.x, hu.z, along ? hu.w : hu.w * V.ridgeDepthK, along ? hu.d * V.ridgeDepthK : hu.d, V.ridgeH, "roof",
+        { prop: "Roof", y: R2(y0 + hu.wallH + hu.roofT + V.ridgeH / 2) }));
+    });
+    // 隔几户院里一棵树（院子南半边）
+    const n = Number(id.slice(4));
+    if (n % 4 === 1) Tree(`${id}_Tree`, home.x0 + (home.x1 - home.x0) * (n % 8 === 1 ? 0.3 : 0.7), zS - 3, 12 + (n % 5) * 0.8);
+  }
+  {
+    const tw = V.tower, y0 = Low(tw.x, tw.z, tw.w, tw.d);
+    out.push(Block("VillageTower", tw.x, tw.z, tw.w, tw.d, tw.wallH, "plaster", { prop: "House", y: R2(y0 + tw.wallH / 2) }));
+    out.push(Block("VillageTowerRoof", tw.x, tw.z, tw.w + V.roofOverhangM, tw.d + V.roofOverhangM, tw.roofT, "roof", { prop: "Roof", y: R2(y0 + tw.wallH + tw.roofT / 2) }));
+  }
+  V.trees.forEach((t, i) => Tree(`VillageTree_${N2(i)}`, t.x, t.z, t.h));
+  V.haystacks.forEach((h, i) => Haystack(`VillageHaystack_${N2(i)}`, h.x, h.z, 4, 4, 2.8, 2.1, 3.1, 3.1));
+  return out;
+}
+
+/** 确定性 0…1（不读随机数）。 */
+function Hash01(i, salt = 0) {
+  const v = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453;
+  return v - Math.floor(v);
+}
+
+// ---------------------------------------------------------------------------
+// 坑北地面涂色（场景文件 paint，§2.2 / §6.3，2026-10-20 第二轮）
+
+const PR1 = (v) => Math.round(v * 10) / 10;
+const PPt = (x, z) => ({ x: PR1(x), z: PR1(z) });
+/** 田块分带的一条界线在 x 处的 z。 */
+function BandLineZ(edge, x) {
+  if (edge.scarp) return ScarpZ(x);
+  if (edge.bund) return BundZ(PN.bunds.find((b) => b.id === edge.bund), x);
+  return edge.z0 + edge.amp * Math.sin(edge.k * x + edge.phase);
+}
+/** 折线 / 曲线按步长取点。 */
+function SampleCurve(fn, x0, x1, stepM) {
+  const pts = [];
+  const n = Math.max(1, Math.ceil((x1 - x0) / stepM));
+  for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n; pts.push(PPt(x, fn(x))); }
+  return pts;
+}
+const CROPS = Object.freeze(["wheat", "plowed", "fallow"]);
+
+/**
+ * 坑北的涂色项（按顺序叠，后面的盖前面的）：扫清带 → 田块 → 田埂 / 地界 → 干水沟翻土 → 地坎坎面 → 坟包 → 村子 → 场院 → 村里的街 → 路 → 田间小路。
+ * 田块：每条横带东西切成长条地，宽度在带的 strips 范围里按序号抖，种什么按序号抽（麦 5 成、翻地 3 成不到、撂荒 2 成多），跟左边那块一样就换下一种。
+ */
+export function L0105Paint() {
+  const C = L0105_FIELD_PAINT, B = L0105_BOUNDS;
+  const out = [];
+  // 扫清带：z −12…−80（避开坑、散兵坑、爬沟和前沿沟西头北折那一截）
+  out.push({ id: "Cleared", color: C.cleared, feather: 1.5, poly: [
+    PPt(B.minX, -80), PPt(B.maxX, -80), PPt(B.maxX, -12), PPt(-1.5, -12), PPt(-1.5, -17.5), PPt(-11.5, -17.5), PPt(-11.5, -12),
+    PPt(-56, -12), PPt(-56, -27), PPt(-68, -27), PPt(-68, -12), PPt(B.minX, -12)] });
+  // 爬沟、丙位散兵坑一圈是挖出来的土（扫清带上留的那个缺口）
+  out.push({ id: "SapSpoil", color: C.ditchSoil, strength: 0.75, feather: 1.2, poly: [PPt(-1.5, -12), PPt(-1.5, -17.5), PPt(-11.5, -17.5), PPt(-11.5, -12)] });
+  // 田块
+  L0105_FIELD_BANDS.forEach((band, bi) => {
+    let x = B.minX - 2, i = 0, prev = -1;
+    while (x < B.maxX + 2) {
+      const [wMin, wMax] = band.strips;
+      let w = wMin + (wMax - wMin) * Hash01(bi * 101 + i, 3);
+      if (B.maxX + 2 - (x + w) < wMin * 0.6) w = B.maxX + 2 - x;   // 最后一块别剩一条细边
+      const x0 = x, x1 = x + w;
+      const r = Hash01(bi * 101 + i, 5);
+      let crop = r < 0.5 ? 0 : r < 0.78 ? 1 : 2;
+      if (crop === prev) crop = (crop + 1 + (Hash01(bi * 101 + i, 9) < 0.5 ? 0 : 1)) % 3;
+      prev = crop;
+      const kind = CROPS[crop];
+      const color = kind === "wheat" ? C.wheat[Hash01(bi * 101 + i, 17) < 0.5 ? 0 : 1] : C[kind];
+      const south = SampleCurve((q) => BandLineZ(band.south, q), x0, x1, 8);
+      const north = SampleCurve((q) => BandLineZ(band.north, q), x0, x1, 8).reverse();
+      out.push({ id: `Field_${bi + 1}_${String(i + 1).padStart(2, "0")}`, color, feather: 1.2, poly: [...south, ...north] });
+      x = x1; i += 1;
+    }
   });
+  // 田埂（烘进高度场的那几道）与只涂色的地界
+  for (const b of PN.bunds) out.push({ id: `Bund_${b.id}`, color: C.bund, strength: 0.75, feather: 0.8, halfW: 0.45, line: SampleCurve((q) => BundZ(b, q), b.minX, b.maxX, 5) });
+  L0105_FIELD_BANDS.forEach((band, bi) => {
+    const e = band.north;
+    if (e.bund || e.scarp || bi === L0105_FIELD_BANDS.length - 1) return;
+    out.push({ id: `FieldEdge_${bi + 1}`, color: C.bund, strength: 0.7, feather: 0.8, halfW: 0.45, line: SampleCurve((q) => BandLineZ(e, q), B.minX, B.maxX, 6) });
+  });
+  // 干水沟两边翻出来的新土（连沟一起涂）
+  out.push({ id: "DitchSoil", color: C.ditchSoil, strength: 0.9, feather: 0.8, halfW: PR1(DITCH.topW / 2 + DITCH.lipW), line: DITCH.line.map((p) => PPt(p.x, p.z)) });
+  // 地坎坎面
+  out.push({ id: "ScarpFace", color: C.scarpFace, strength: 0.9, feather: 0.8, halfW: 1.3, line: SampleCurve(ScarpZ, B.minX, B.maxX, 5) });
+  // 坟包
+  [...PN.loneGraves.map((g, i) => ({ id: `LoneGrave${i + 1}`, ...g })), ...PN.graveyard].forEach((g) => {
+    const poly = []; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; poly.push(PPt(g.x + Math.cos(a) * 1.9, g.z + Math.sin(a) * 1.9)); }
+    out.push({ id: `Grave_${g.id}`, color: C.graveSoil, feather: 0.6, poly });
+  });
+  // 村子：整片夯土地 + 场院
+  const V = L0105_VILLAGE;
+  const zS = V.rows[0].zS + 2, zN = V.rows[V.rows.length - 1].zN - 2;
+  out.push({ id: "VillageGround", color: C.yard, feather: 1.5, poly: [PPt(V.minX - 3, zS), PPt(V.maxX + 3, zS), PPt(V.maxX + 3, zN), PPt(V.minX - 3, zN)] });
+  V.threshing.forEach((t, i) => out.push({ id: `Threshing_${i + 1}`, color: C.threshing, feather: 1.2,
+    poly: [PPt(t.minX, t.maxZ), PPt(t.maxX, t.maxZ), PPt(t.maxX, t.minZ), PPt(t.minX, t.minZ)] }));
+  // 后街与胡同（前街就是大路北段的末段）
+  out.push({ id: "VillageBackStreet", color: C.path, feather: 0.8, halfW: V.streetHalfW, line: [PPt(V.minX - 3, V.streets[1]), PPt(V.maxX + 3, V.streets[1])] });
+  out.push({ id: "VillageLane", color: C.path, feather: 0.8, halfW: PR1((V.laneX1 - V.laneX0) / 2), line: [PPt((V.laneX0 + V.laneX1) / 2, zS), PPt((V.laneX0 + V.laneX1) / 2, zN)] });
+  // 路：大路在坑北这一截（到 z −11.5，南面不涂）+ 大路北段 + 田间小路
+  {
+    const endZ = -11.5;   // 圆头 + 柔边不过 z −8
+    const a = L0105_ROAD[0], b = L0105_ROAD[1], t = (endZ - a.z) / (b.z - a.z);
+    out.push({ id: "RoadNorthEnd", color: C.road, feather: 0.8, halfW: PR1(L0105_ROAD_WIDTH_M / 2), line: [PPt(a.x, a.z), PPt(a.x + (b.x - a.x) * t, endZ)] });
+  }
+  out.push({ id: "NorthRoad", color: C.road, feather: 0.8, halfW: L0105_NORTH_ROAD_HALF_W, line: L0105_NORTH_ROAD.map((p) => PPt(p.x, p.z)) });
+  out.push({ id: "FieldPath", color: C.path, feather: 0.6, halfW: L0105_FIELD_PATH_HALF_W, line: L0105_FIELD_PATH.map((p) => PPt(p.x, p.z)) });
   return out;
 }
 
@@ -865,6 +1033,7 @@ export function PitNorthChecks(sample) {
   for (let d = 2; d <= DITCH_LEN - PN.ditch.endTaperM - 1; d += 3) {
     const c = PointBeside(PN.ditch.line, d, 0), l = PointBeside(PN.ditch.line, d, 2.6), r = PointBeside(PN.ditch.line, d, -2.6);
     if (Math.abs(ScarpZ(c.x) - c.z) < PN.scarp.notchR + 8) continue;   // 豁口那一截是斜的
+    if (DistanceToPolyline(c.x, c.z, L0105_NORTH_ROAD) < L0105_NORTH_ROAD_HALF_W + 6) continue;   // 大路从沟上过，那一截填平了
     const floor = sample(c.x, c.z);
     tops.push(R2((sample(l.x, l.z) + sample(r.x, r.z)) / 2 - floor));
     ditchRows.push({ x: c.x, z: c.z, eye: PIT_NORTH_DITCH_HEAD_M });
@@ -874,6 +1043,7 @@ export function PitNorthChecks(sample) {
   for (let x = L0105_BOUNDS.minX + 5; x <= L0105_BOUNDS.maxX - 5; x += 10) {
     const z = ScarpZ(x);
     if (DitchStation(x, z).d < 10) continue;
+    if (DistanceToPolyline(x, z, L0105_NORTH_ROAD) < 12 || DistanceToPolyline(x, z, L0105_FIELD_PATH) < 8) continue;   // 路穿过处是坡道
     drops.push(R2(sample(x, z + 6) - sample(x, z - 6) - (PitNorthRoll(x, z + 6) - PitNorthRoll(x, z - 6)) - (PitNorthTilt(z + 6) - PitNorthTilt(z - 6))));
   }
   // 豁口：顺着沟走，1 m 内最大高差
@@ -942,7 +1112,7 @@ export function L0105SightChecks(sample) {
 /** 生成场景文档。commit / generatedAt 由 CLI 传进来；notes 收抽样核对行（CLI 打到控制台）。 */
 export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", notes = [] } = {}) {
   const { Ground } = L0105Ground();
-  const { terrain, minM, maxM } = BakeL0105Grid(Ground);
+  const { terrain, minM, maxM, southMaxM } = BakeL0105Grid(Ground);
   const sample = HeightGridSampler(terrain);
 
   const branchFloorAtSteps = Math.min(...[0, 0.5, 1.0].map((dx) => sample(STEP_TOP_X + 0.6 + dx, BranchZAt(STEP_TOP_X + 0.6 + dx))));
@@ -951,6 +1121,8 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
   const { blocks, gates, facts } = L0105Blocks(sample, {
     pitFloorY: sample(PIT.x, PIT.z), frontFloorAtMouth, branchFloorAtSteps, trafficFloorAtJunction, dugoutFloorY: sample(DUG.x, DUG.z),
   });
+
+  const paint = L0105Paint();
 
   // --- 抽样核对 ---
   const at = (p) => R2(sample(p.x, p.z));
@@ -986,6 +1158,15 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
       + `发射烟（离地 3 m）${pn.smoke.worst <= 0 ? "看得见" : "被挡住！"}（最少露 ${R2(-pn.smoke.worst)} m）；干水沟里弯腰的人头（沟底 + ${PIT_NORTH_DITCH_HEAD_M}）${pn.ditch.worst > 0 ? "全看不见" : "有看得见的！"}（最少挡 ${pn.ditch.worst} m，${pn.ditch.rows.length} 对）；`
       + `两挺轻机枪趴着的头（0.4）挡 ${pn.lmgW.block} / ${pn.lmgE.block} m`);
   }
+  {
+    const count = (re) => blocks.filter((b) => re.test(b.id)).length;
+    const fields = paint.filter((p) => /^Field_/.test(p.id));
+    const kinds = {}; for (const f of fields) kinds[f.color] = (kinds[f.color] || 0) + 1;
+    notes.push(`坑北第二轮：涂色 ${paint.length} 项（田块 ${fields.length}，按颜色 ${Object.entries(kinds).map(([c, n]) => `${c}×${n}`).join(" ")}）；`
+      + `村子 ${L0105_VILLAGE_HOMES.length} 户、房 ${count(/_House\d$/)} 间、院墙 ${count(/_Wall/)} 段；路边杨树 ${count(/^RoadPoplar_/)}、田边树 ${count(/^FieldTree_/)}、村里村边树 ${count(/^VillageTree_|_Tree$/)}；`
+      + `地面：坑沿 (0,−11) ${R2(sample(0, -11))} · 坎下 (28,−213) ${R2(sample(28, -213))} · 坡上 (30,−260) ${R2(sample(30, -260))} · 村前 (30,−296) ${R2(sample(30, -296))} · 村里 (30,−340) ${R2(sample(30, -340))}；`
+      + `色带 ${minM}…${southMaxM}（全场最高 ${maxM}）`);
+  }
   const widths = [
     ["前沿沟 x−30", -30.5, 0, 0, 1], ["前沿沟 x60", 56, 0, 0.5, 1], ["前沿沟西折", -62, -12, 1, 0],
     ["交通沟南直段", 12.5, 32, 23, 1], ["交通沟斜段", 26, 76.6, 42, -18], ["交通沟坡顶", 35, 128, 1, 0], ["交通沟板桥下", 35, 116.5, 1, 0], ["支沟中段", 42, 65.8, 2.6, 41.1],
@@ -1018,10 +1199,16 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
     bounds: { ...L0105_BOUNDS },
     spawn: { x: L0105_SPAWN.x, z: L0105_SPAWN.z, yawDeg: L0105_SPAWN.yawDeg },
     terrain,
+    // 2026-10-20 第二轮：坑北抬高了（坎下缓坡顶 +5 m 上下），色带上限钉在南面（z ≥ −8）的最高点，南面颜色跟原来一样；坑北有涂色盖着
+    heightTint: { lo: minM, hi: southMaxM },
+    // 白盒画质里屋顶、树冠块保留语义色（深灰屋顶、暗绿柏树），远处的村子才认得出是一片房顶
+    colorSemantics: ["roof", "foliage"],
+    semanticColors: { roof: L0105_VILLAGE.roofColor },
     blocks,
     gates,
+    paint,
     ways: {
-      roads: [Pts(L0105_ROAD), Pts(L0105_SUNKEN_LANE.line)],
+      roads: [Pts(L0105_ROAD), Pts(L0105_SUNKEN_LANE.line), Pts(L0105_NORTH_ROAD), Pts(L0105_FIELD_PATH)],
       trenches: [Pts(L0105_TRENCHES.front), Pts(L0105_TRENCHES.traffic), Pts(L0105_TRENCHES.branch), Pts(L0105_TRENCHES.crawlSap)],
     },
   };
