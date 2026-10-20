@@ -4356,6 +4356,8 @@ export class AudioEngine {
     this.playCounter = 0;
     this.space = "street";
     this.masterVolume = 1;
+    // 高级工具自己的总音量（2026-10-20）：不是 null 时盖过玩家的总音量，退出高级工具清回 null（SetToolsVolume）
+    this.toolsVolume = null;
     // 玩家的音量设置。ctx 还没建的时候也能设，BuildGraph 会照着这份摆节点。
     this.mix = { ...AUDIO_MIX_DEFAULTS };
     this.voiceMute = false;
@@ -4601,7 +4603,7 @@ export class AudioEngine {
       .connect(this.hitFilter).connect(this.hitGain).connect(this.deafFilter);
 
     this.masterGain = ctx.createGain();
-    this.masterGain.gain.value = this.masterVolume;
+    this.masterGain.gain.value = this.outputVolume;
     this.masterGain.connect(this.busComp);
 
     // 三条声部总线。duck 只压音乐与环境，音效不压 —— 台词/爆炸时把枪声也压掉
@@ -6401,10 +6403,26 @@ export class AudioEngine {
 
   SetMasterVolume(value) {
     this.masterVolume = Clamp01(value);
+    this._ApplyOutputVolume();
+  }
+
+  /**
+   * 高级工具的独立音量（2026-10-20，用户：高级工具页面要有独立的音量调节）：0–1 时总线按它出声、不动玩家的
+   * masterVolume（存档里那份也不动）；null = 回到玩家的总音量。Script_Editor 开 / 关高级工具时调。
+   */
+  SetToolsVolume(value) {
+    this.toolsVolume = value == null ? null : Clamp01(value);
+    this._ApplyOutputVolume();
+  }
+
+  /** 此刻真正推到总线上的总音量。 */
+  get outputVolume() { return this.toolsVolume ?? this.masterVolume; }
+
+  _ApplyOutputVolume() {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
     // 20 ms 斜坡：直接赋值会在正在响的声音上留一道「咔」。
-    this.masterGain.gain.setTargetAtTime(this.masterVolume, t, 0.02);
+    this.masterGain.gain.setTargetAtTime(this.outputVolume, t, 0.02);
     this.SyncDeafenVolume();
   }
 
@@ -6786,7 +6804,7 @@ export class AudioEngine {
   }
 
   SyncDeafenVolume() {
-    this.deafenVoice?.user.gain.setTargetAtTime(this.masterVolume * this.mix.sfx, this.ctx.currentTime, 0.02);
+    this.deafenVoice?.user.gain.setTargetAtTime(this.outputVolume * this.mix.sfx, this.ctx.currentTime, 0.02);
   }
 
   /**

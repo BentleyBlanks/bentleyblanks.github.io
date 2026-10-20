@@ -21,6 +21,12 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 - **高级工具**（菜单 设置 → 高级工具、齿轮或 `` ` ``）：十七个互斥编辑器 + 关卡编排、贴图管理两个独立窗口
   + 白盒关卡编辑器跳转入口，共 20 项，分在顶部菜单栏的「场景 / 关卡 / 角色 / 武器 / 特效与声音 / 资产」六个菜单里（表在
   `Script_Editor.TOOL_MENUS`），「游戏」菜单放关闭当前工具、返回主菜单、退出。选中的工具显示在右侧 Inspector。
+- **高级工具音量**（2026-10-20，用户：高级工具页面要有独立的音量调节）：菜单栏右侧（状态字与 × 之间）一条
+  喇叭 + 滑条 + 百分比（`Script_EditorVolume`），点喇叭静音 / 取消，滑条上滚轮一格 5%。存在自己的 localStorage 键
+  `tengxian1938_tools_volume_v1`（`{ volume, muted }`），**不碰**游戏「声音」设置那份 `tengxian1938_audio_v1`；第一次用时从
+  玩家当前的总音量起步。高级工具开着（或有工具在跑）、或者在白盒关卡编辑器页面里时，`EditorSuite.SyncToolsVolume` 调
+  `Script_Audio.SetToolsVolume(音量)` 盖过玩家的总音量（`outputVolume = toolsVolume ?? masterVolume`）；退出高级工具调
+  `SetToolsVolume(null)` 还回去。白盒关卡编辑器右上角工具条里也有同一条（同一份存档）。
 - **Debug工具**（菜单 设置 → Debug工具）：六个可叠加的观察层 Debug Rendering / Profiler / Frame Debugger /
   WorldInfo / 玩家状态 / 敌军 AI，外加 FPS 显示。代码仍在编辑器套件里（`EditorSuite.DebugToolStates` /
   `ToggleDebugTool`，页内顺序 `Data_DevTools.DEBUG_TOOL_IDS`），高级工具的菜单栏不再列它们。

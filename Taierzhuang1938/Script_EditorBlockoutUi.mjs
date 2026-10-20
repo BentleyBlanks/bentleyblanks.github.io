@@ -331,6 +331,9 @@ export class BlockoutUi {
     this.root.appendChild(this.eraBanner);
   }
 
+  /** 右上角工具条里、状态点左边再挂一个控件（高级工具音量，2026-10-20）。 */
+  AddTopBarControl(el) { this.statusEl.parentNode.insertBefore(el, this.statusEl); }
+
   /** 旧版提示条：当前关是 legacy 时显示，列出新剧本各段的跳转按钮；关掉后只在这一关内不再出现。 */
   UpdateEraBanner() {
     const current = this.levels.find(l => l.key === this.levelKey);

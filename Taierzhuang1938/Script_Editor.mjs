@@ -58,6 +58,7 @@ import { SquadMarchEditor } from "./Script_EditorSquadMarch.mjs";
 import { TextureEditor } from "./Script_EditorTextures.mjs";
 import { BlockoutEntry } from "./Script_EditorBlockoutEntry.mjs";
 import { ToolsHome } from "./Script_EditorHome.mjs";
+import { LoadToolsVolume, ToolsVolumeControl, ToolsVolumeLevel } from "./Script_EditorVolume.mjs";
 
 /** 互斥编辑器：接管画面（多数还接管相机），任何时候只有一个活着。 */
 const EDITORS = [
@@ -115,6 +116,8 @@ export class EditorSuite {
     // 场景关卡与地形是两个入口，但编辑的是同一份叠加文档。只放在本 EditorSuite
     // 会话内：切换工具不丢未保存改动，真正退出工具后运行时场景仍会清干净。
     this.worldEditDocument = null;
+    // 高级工具自己的音量（Script_EditorVolume）：开着高级工具时盖过玩家的总音量，退出就还回去
+    this.toolsVolume = LoadToolsVolume(host.audio?.masterVolume ?? 1);
 
     // actorFactory 传给摄影棚不是为了造人（造人的是各编辑器自己），
     // 是为了在藏世界的同时把人物合批关掉 —— 见 Studio.SetActorBatch 那段事故账。
@@ -218,6 +221,10 @@ export class EditorSuite {
     bar.appendChild(menus);
     this.status = El("div", "edMenuStatus");
     bar.appendChild(this.status);
+    if (this.host.audio?.SetToolsVolume) {
+      this.volumeControl = ToolsVolumeControl(this.toolsVolume, () => this.SyncToolsVolume());
+      bar.appendChild(this.volumeControl.root);
+    }
     const exit = El("button", "edMenuExit", "×");
     exit.type = "button";
     exit.title = "退出高级工具（Esc / `）";
@@ -426,6 +433,19 @@ export class EditorSuite {
     }
     // 高级工具是一整张工作台：开着就收 HUD（空 Inspector 时也收）。
     document.body.classList.toggle("edHideHud", this.panelOpen || !!this.active);
+    this.SyncToolsVolume();
+  }
+
+  /**
+   * 高级工具开着（或有工具在跑）、或者就在白盒编辑器页面里：总线用工具自己的音量；否则还给玩家的总音量。
+   * 白盒编辑器右上角也有一条（同一份存档），这里先读回存档再推，两条显示一致。
+   */
+  SyncToolsVolume() {
+    const audio = this.host.audio;
+    if (!audio?.SetToolsVolume) return;
+    const toolsPage = this.Capturing || BlockoutEntry.Active();
+    if (toolsPage) { Object.assign(this.toolsVolume, LoadToolsVolume(this.toolsVolume.volume)); this.volumeControl?.Refresh(); }
+    audio.SetToolsVolume(toolsPage ? ToolsVolumeLevel(this.toolsVolume) : null);
   }
 
   // -------------------------------------------------------------------------

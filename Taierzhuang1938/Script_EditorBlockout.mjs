@@ -31,6 +31,7 @@ import {
 import { BuildBlockoutSnapshot, FormatBlockoutSnapshot, ParsePoseParam } from "./Script_EditorBlockoutSnapshot.mjs";
 import { BlockoutPuppets } from "./Script_EditorBlockoutPuppets.mjs";
 import { BlockoutTrees } from "./Script_EditorBlockoutTrees.mjs";
+import { LoadToolsVolume, ToolsVolumeControl, ToolsVolumeLevel } from "./Script_EditorVolume.mjs";
 import { BlockoutBackdrop } from "./Script_EditorBlockoutBackdrop.mjs";
 import { BlockoutMarkers } from "./Script_EditorBlockoutMarkers.mjs";
 import { BlockoutStore } from "./Script_EditorBlockoutStore.mjs";
@@ -232,6 +233,13 @@ export class EditorBlockout {
       onMapPick: (index) => { if (!this.previz?.playing) this.GoTo(index, { animate: false }); },
       onPreviz: () => { this.previz.Toggle(); },
     });
+    // 高级工具的独立音量（Script_EditorVolume，2026-10-20）：白盒编辑器也是高级工具里的工具，用同一份，右上角一条
+    if (host.audio?.SetToolsVolume) {
+      this.toolsVolume = LoadToolsVolume(host.audio.masterVolume ?? 1);
+      this.volumeControl = ToolsVolumeControl(this.toolsVolume, (state) => host.audio.SetToolsVolume(ToolsVolumeLevel(state)));
+      this.ui.AddTopBarControl(this.volumeControl.root);
+      host.audio.SetToolsVolume(ToolsVolumeLevel(this.toolsVolume));
+    }
     this.previz = new BlockoutPreviz(this);
     this.previzSignals = null;
     this.BindKeys();

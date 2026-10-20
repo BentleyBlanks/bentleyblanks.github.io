@@ -227,6 +227,17 @@
   content: ""; position: absolute; right: 4px; top: 4px; width: 4px; height: 4px; background: var(--bo-gold);
 }
 
+/* 高级工具音量（Script_EditorVolume，2026-10-20）：同菜单栏那条，这里套白盒工具条的面板底 */
+.boTopBar .edVolume {
+  align-self: stretch; margin: 0; padding: 0 10px 0 4px; gap: 6px;
+  background: var(--bo-panel); border: 1px solid var(--bo-edge); pointer-events: auto;
+  /* Style_Editor.css 的 --ed-* 只在 #edRoot 里有：这里换成白盒工具条的同色 */
+  --ed-text-2: #c2c3b6; --ed-text-3: var(--bo-muted); --ed-text-4: var(--bo-faint); --ed-edge: var(--bo-edge);
+  --ed-gold: var(--bo-gold); --ed-gold-hi: var(--bo-gold-hi); --ed-gold-fill: var(--bo-gold); --ed-thumb: #e4d9bb; --ed-rule-2: var(--bo-line);
+}
+.boTopBar .edVolumeRange { width: 72px; }
+.boTopBar .edVolumeValue { min-width: 2.9em; }
+
 .boStatus {
   position: relative; width: 34px; display: flex; align-items: center; justify-content: center;
   background: var(--bo-panel); border: 1px solid var(--bo-edge); cursor: default; outline: none;
@@ -450,6 +461,7 @@ body.blockoutMode #hud .hudFps { top: 56px; left: auto; right: 18px; }
 /* 很窄时右上那条挪到齿轮下面，不压左上的卡片 */
 @media (max-width: 899px) {
   .boTopBar { top: 62px; right: 14px; }
+  .boTopBar :is(.edVolumeRange, .edVolumeValue) { display: none; }
   .boLevelBtn { min-width: 0; max-width: 150px; }
   .boEraBanner { top: 104px; right: 14px; }
   .boLevelMenu { min-width: min(380px, calc(100vw - 28px)); }

@@ -440,6 +440,35 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
 }
 .edMenuExit:hover { color: var(--ed-gold-hi); }
 
+/* 高级工具独立音量（Script_EditorVolume，2026-10-20）：喇叭 + 细线滑条 + 百分比，放在状态字与 × 之间 */
+.edVolume {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 0 14px 0 12px; margin-right: 4px;
+  border-left: 1px solid var(--ed-rule-2); align-self: stretch;
+}
+.edVolumeMute {
+  width: 26px; height: 26px; padding: 3px; border: 0; border-radius: 0; background: transparent; cursor: pointer;
+  color: var(--ed-text-2); transition: color 0.12s linear;
+}
+.edVolumeMute svg { width: 100%; height: 100%; display: block; }
+.edVolumeMute:hover, .edVolumeMute:focus-visible { color: var(--ed-gold-hi); }
+.edVolume.muted .edVolumeMute { color: var(--ed-text-4); }
+.edVolumeRange {
+  -webkit-appearance: none; appearance: none; width: 96px; height: 18px; margin: 0; background: transparent; cursor: pointer;
+}
+.edVolumeRange::-webkit-slider-runnable-track {
+  height: 2px; background: linear-gradient(90deg, var(--ed-gold-fill) var(--fill, 100%), var(--ed-edge) var(--fill, 100%));
+}
+.edVolumeRange::-moz-range-track { height: 2px; background: var(--ed-edge); }
+.edVolumeRange::-moz-range-progress { height: 2px; background: var(--ed-gold-fill); }
+.edVolumeRange::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 10px; height: 10px; margin-top: -4px; border-radius: 50%; background: var(--ed-thumb); border: 0;
+}
+.edVolumeRange::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; background: var(--ed-thumb); border: 0; }
+.edVolumeRange:focus-visible { outline: 1px solid var(--ed-gold); outline-offset: 2px; }
+.edVolume.muted .edVolumeRange::-webkit-slider-runnable-track { background: var(--ed-edge); }
+.edVolume.muted .edVolumeRange::-moz-range-progress { background: transparent; }
+.edVolumeValue { min-width: 3.2em; color: var(--ed-text-3); font-size: 12px; letter-spacing: 0.08em; font-variant-numeric: tabular-nums; text-align: right; }
+
 /* --- 高级工具：右侧 Inspector -------------------------------------------- */
 /* 每个编辑器仍是自己的 Panel({variant:"work"})，在这里统一停靠到菜单栏下面的右侧；
    Debug Rendering / 敌军 AI 是叠加浮窗、资产规范是整张表，不进 Inspector。 */
@@ -704,6 +733,7 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
   #edRoot.toolsOpen .edHint { top: calc(var(--ed-bar-h) + 6px); }
   .edFacialTimeline { left: 8px; right: 8px; }
   .edMenuStatus { display: none; }
+  .edVolumeRange { width: 64px; }
   .edMenuBrand { font-size: 15px; padding-right: 14px; }
 }
 
