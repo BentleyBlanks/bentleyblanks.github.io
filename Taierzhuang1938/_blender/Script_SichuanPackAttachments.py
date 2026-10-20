@@ -36,7 +36,7 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
     # A gently uneven low-poly cylinder; fibre detail is carried by the bake.
     # The atlas supplies the dense diagonal weave.  The end ribbons below
     # describe the actual roll spiral with only a few additional polygons.
-    matCenter = (0.0, -0.067, 0.186)
+    matCenter = (0.0, -0.067, 0.183)
     matLength=.404
     matHalf=matLength/2
     matSides = 20
@@ -84,7 +84,7 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
         spiralVerts = []
         spiralUvs = []
         spiralFaces = []
-        segments = 37
+        segments = 32
         turns = 3.20
         for pointIndex in range(segments + 1):
             fraction = (pointIndex / segments)**.65

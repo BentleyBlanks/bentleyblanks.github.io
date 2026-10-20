@@ -21,6 +21,7 @@ const materialRegions={Material_SichuanPackBaked:'surface'};
 let runtimeTexCoord=1;
 const uvTriangles=[];
 const uvOwners=[];
+const backNormalDots=[];
 function Check(ok,label,detail=null){report.checks.push({ok:!!ok,label,...(detail===null?{}:{detail})});if(!ok)console.error(`FAIL ${label}${detail===null?'':`  ${typeof detail==='string'?detail:JSON.stringify(detail)}`}`);}
 const identity=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];
 const Near=(a,b,epsilon=1e-6)=>a.length===b.length&&a.every((value,index)=>Math.abs(value-b[index])<=epsilon);
@@ -112,6 +113,7 @@ try{
         const positions=ReadAccessor(glb,primitive.attributes.POSITION),points=[];
         for(let index=0;index<positions.count;index++){const point=Array.from(positions.data.subarray(index*3,index*3+3));if(!point.every(Number.isFinite))throw Error('Nonfinite geometry');points.push(Transform(next,point));}
         let primitiveUv=null;
+        const vertexNormals=primitive.attributes.NORMAL===undefined?null:ReadAccessor(glb,primitive.attributes.NORMAL);
         if(primitive.attributes[uvAttribute]!==undefined){
           const uvId=primitive.attributes[uvAttribute],uvAccessor=g.accessors[uvId],uv=ReadAccessor(glb,uvId);primitiveUv=uv;
           const material=g.materials[primitive.material],regionKey=materialRegions[material?.name],region=atlasRegions[regionKey];
@@ -138,6 +140,19 @@ try{
         if(primitiveUv)for(let corner=0;corner<indices.length;corner+=3){uvTriangles.push(indices.slice(corner,corner+3).map(index=>[primitiveUv.data[index*2],primitiveUv.data[index*2+1]]));uvOwners.push(node.name);}
         report.totalTriangles+=indices.length/3;
         const triangles=[];for(let corner=0;corner<indices.length;corner+=3)triangles.push(indices.slice(corner,corner+3).map(index=>points[index]));
+        if(owner==='Pack_Bundle'&&vertexNormals){
+          for(let corner=0;corner<indices.length;corner+=3){
+            const ids=indices.slice(corner,corner+3),face=ids.map(id=>points[id]);
+            if(!face.every(point=>Math.abs(point[2])<=1e-6))continue;
+            const [a,b,c]=face,crossZ=(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+            if(crossZ>=0)continue;
+            for(const id of ids){
+              const n=vertexNormals.data.subarray(id*3,id*3+3);
+              const direction=[next[0]*n[0]+next[4]*n[1]+next[8]*n[2],next[1]*n[0]+next[5]*n[1]+next[9]*n[2],next[2]*n[0]+next[6]*n[1]+next[10]*n[2]];
+              backNormalDots.push(-direction[2]/Math.hypot(...direction));
+            }
+          }
+        }
         allTriangles.push(...triangles);
         if(part){part.points.push(...points);part.triangles.push(...triangles);if(primitive.material!==undefined)part.materials.push(primitive.material);}
         Check(primitive.material!==undefined,`${node.name} has an assigned material`);
@@ -213,6 +228,8 @@ try{
     Check(degenerate===0,'Bundle has no zero-area triangles',degenerate);
     const contactBounds=Bounds(flatContactPoints);report.backPlane.actualBounds=contactBounds;
     Check(!!contactBounds&&Math.abs(contactBounds.center[0])<=.001&&Math.abs(contactBounds.center[1])<=.001,'The pivot is also centered on the actual flat contact leaf, within 1 mm',contactBounds);
+    report.backPlane.exportedNormalProof={corners:backNormalDots.length,minFacingDot:backNormalDots.length?Math.min(...backNormalDots):null};
+    Check(backNormalDots.length>0&&backNormalDots.every(dot=>Number.isFinite(dot)&&dot>.95),'Actual flat-contact vertex normals face -Z without folded-edge shading leaking across the plane',report.backPlane.exportedNormalProof);
   }
   const mat=report.parts.Pack_StrawMat;
   if(bundle&&mat?.bounds){

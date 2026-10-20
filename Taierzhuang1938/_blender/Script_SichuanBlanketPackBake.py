@@ -30,6 +30,8 @@ for directory in (modelPath, sourcePath, reviewPath):
     directory.mkdir(parents=True, exist_ok=True)
 if bpy.context.scene.get('BlenderMcpTask') != 'SichuanBlanketPack':
     raise RuntimeError('Refusing to replace a scene not owned by this task')
+for oldSource in list(bpy.context.scene.objects):
+    if oldSource.get('SichuanHighSource'):bpy.data.objects.remove(oldSource,do_unlink=True)
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.object.delete(use_global=False)
 for mesh in list(bpy.data.meshes):
@@ -175,7 +177,7 @@ def MakeMaterial(key, tint=(1,1,1,1), suffix='', normalStrength=.85):
     links.new(normalMap.outputs['Normal'], shader.inputs['Normal'])
     if suffix=='End' and key=='straw':
         geometry=nodes.new('ShaderNodeNewGeometry')
-        subtract=nodes.new('ShaderNodeVectorMath');subtract.operation='SUBTRACT';subtract.inputs[1].default_value=(0,-.067,.186)
+        subtract=nodes.new('ShaderNodeVectorMath');subtract.operation='SUBTRACT';subtract.inputs[1].default_value=(0,-.067,.183)
         split=nodes.new('ShaderNodeSeparateXYZ');links.new(geometry.outputs['Position'],subtract.inputs[0]);links.new(subtract.outputs[0],split.inputs[0])
         y2=nodes.new('ShaderNodeMath');y2.operation='MULTIPLY';links.new(split.outputs['Y'],y2.inputs[0]);links.new(split.outputs['Y'],y2.inputs[1])
         z2=nodes.new('ShaderNodeMath');z2.operation='MULTIPLY';links.new(split.outputs['Z'],z2.inputs[0]);links.new(split.outputs['Z'],z2.inputs[1])
@@ -302,10 +304,22 @@ def FrontDepth(xValue,zValue):
     cornerPocket=.012*max(0,min(1,(xValue-.08)/.07))*max(0,min(1,(zValue-.07)/.06))
     return max(-.130,-.1165-.013*puff+edgeRoll+wrinkle+cornerPocket)
 
-# A single continuous folded sheet supplies the front, contact leaf and
-# exposed nested cut edges. Accessories share the downstream projection.
-BuildFoldedCloth=runpy.run_path(str(projectPath/'_blender/Script_SichuanFoldedCloth.py'))['BuildFoldedCloth']
-bundle=BuildFoldedCloth(CreateMesh,FrontDepth,materials['cloth'],backMaterial,foldMaterial,packRoot)
+# A sculpted soft volume supplies the folded bundle, then is reduced to the
+# game mesh. Keep its high-resolution cloth outside the exported root.
+soft=runpy.run_path(str(projectPath/'_blender/Script_SichuanSoftBundle.py'))
+FrontDepth=soft['SoftFrontDepth']
+fabric=runpy.run_path(str(projectPath/'_blender/Script_SichuanFabricMaterial.py'))['ApplyFabric']
+fabricFolder=sourcePath/'Source/MaterialAtlasV05'
+subprocess.run([shutil.which('python'),str(projectPath/'_import/Script_SichuanFabricStudy.py'),'--source',str(fabricFolder/'Image_SichuanFabricStudyV05.png'),'--out',str(fabricFolder)],check=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+fabric(materials['cloth'],'Cotton',fabricFolder,(.38,.30),wear='Front')
+fabric(backMaterial,'Cotton',fabricFolder,(.38,.30),wear='Back',normalStrength=.15)
+fabric(foldMaterial,'Cotton',fabricFolder,(.13,.30))
+fabric(patchMaterial,'Patch',fabricFolder,(.044,.050))
+fabric(materials['binding'],'Binding',fabricFolder,(.026,.18))
+fabric(materials['jacket'],'Indigo',fabricFolder,(1.24,.56))
+fabric(buttonMaterial,'Indigo',fabricFolder,(.008,.006),normalStrength=.30)
+bundle=soft['BuildSoftBundle'](CreateMesh,FrontDepth,materials['cloth'],backMaterial,foldMaterial,packRoot)
+highSource=bpy.data.objects[bundle['HighSource']]
 
 bpy.context.view_layer.update()
 surfaceBvh=BVHTree.FromObject(bundle,bpy.context.evaluated_depsgraph_get())
@@ -351,7 +365,7 @@ for step in range(6):
         s=across/2
         xValue=.111+.066*t+.012*s
         zValue=.140-.067*t+.009*s
-        depth=max(-.129,min(-.122,FrontDepth(xValue,zValue)-.006))-.0016*math.sin(s*math.pi)
+        depth=SurfaceDepth(xValue,zValue,.0032)-.0008*math.sin(s*math.pi)
         lipVerts.append((xValue,depth,zValue));lipUvs.append(((xValue+.19)/.38,(zValue+.15)/.30))
 for step in range(5):
     for across in range(2):
@@ -370,7 +384,12 @@ for edge in range(4):
 
 # One continuous cloth strip, including the two free shoulder loops.
 BuildBinding=runpy.run_path(str(projectPath/'_blender/Script_SichuanPackBinding.py'))['BuildBinding']
-bindingRoot=BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,packRoot)
+bindingRoot=BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,packRoot,softCloth=True)
+for child in bindingRoot.children_recursive:
+    if child.type=='MESH' and child.name=='Pack_ContinuousClothStrap':
+        narrow=materials['binding'].copy();narrow.name='Material_NarrowCottonTape'
+        fabric(narrow,'Binding',fabricFolder,(.026,.18),narrowTape=True)
+        child.data.materials[0]=narrow
 
 # Complete civilian short jacket, concealed inside the fold except one upper
 # corner. It remains a single independent assembly when pulled out.
@@ -378,8 +397,8 @@ jacketRoot=MakeRoot('Pack_Jacket',packRoot)
 jacketRoot['Control']='Hide this node or translate it upward/outward to withdraw the original garment'
 jacketRoot['Garment']='Civilian indigo homespun short jacket; cloth knot button'
 BuildCivilianJacket=runpy.run_path(str(projectPath/'_blender/Script_SichuanCivilianJacket.py'))['BuildCivilianJacket']
-jacket=BuildCivilianJacket(CreateMesh,materials['jacket'],jacketRoot)
-buttonCenter=Vector((.156,-.124,.126))
+jacket=BuildCivilianJacket(CreateMesh,materials['jacket'],jacketRoot,SurfaceDepth)
+buttonCenter=Vector((.156,SurfaceDepth(.156,.126,.0038),.126))
 buttonVerts=[];buttonUvs=[];buttonFaces=[]
 for latitude in range(1,4):
     phi=math.pi*latitude/4
@@ -396,12 +415,32 @@ CreateMesh('Pack_ClothKnotButton',buttonVerts,buttonFaces,buttonUvs,buttonMateri
 buttonLoop=[]
 for index in range(13):
     angle=index*math.tau/12
-    buttonLoop.append((.1642-.0072*math.cos(angle),-.125+.00035*math.cos(angle*2),.1265+.0030*math.sin(angle)+.0002*math.sin(angle*3)))
+    buttonX=.1642-.0072*math.cos(angle);buttonZ=.1265+.0030*math.sin(angle)+.0002*math.sin(angle*3)
+    buttonLoop.append((buttonX,SurfaceDepth(buttonX,buttonZ,.0045)+.00035*math.cos(angle*2),buttonZ))
 AddTube('Pack_ClothButtonLoop',buttonLoop,.0012,buttonMaterial,jacketRoot,sides=3)
 
 BuildAttachments=runpy.run_path(str(projectPath/'_blender/Script_SichuanPackAttachments.py'))['BuildAttachments']
 attachments=BuildAttachments(CreateMesh,AddRibbon,AddTube,materials)
 for obj in attachments: obj.parent=packRoot
+
+# The sculpt source also carries the repair and turned-over lip, so their
+# raised edge normals survive the high-to-low normal projection.
+highSource.hide_set(False);highSource.hide_render=False
+sourceBvh=BVHTree.FromObject(highSource,bpy.context.evaluated_depsgraph_get())
+copies=[]
+for child in bundle.children_recursive:
+    if child.type!='MESH':continue
+    clone=child.copy();clone.data=child.data.copy();scene.collection.objects.link(clone);clone.parent=None
+    clone['SichuanHighSource']=True
+    if 'Patch' in child.name:
+        for vertex in clone.data.vertices:
+            hit=sourceBvh.ray_cast(Vector((vertex.co.x,-.25,vertex.co.z)),Vector((0,1,0)),.30)
+            if hit[0] is not None:vertex.co.y=hit[0].y-(.0025 if 'Stitch' in child.name else .0018)
+    copies.append(clone)
+bpy.ops.object.select_all(action='DESELECT');highSource.select_set(True)
+for clone in copies:clone.select_set(True)
+bpy.context.view_layer.objects.active=highSource;bpy.ops.object.join()
+highSource.hide_render=True;highSource.hide_set(True)
 
 # Keep only five independently controlled assemblies and a small material
 # palette. Joining geometry does not change visibility/extraction contracts.
@@ -421,11 +460,11 @@ for obj in packRoot.children_recursive:
 if preflight>3000:raise RuntimeError('All-parts pre-bake triangle budget exceeded: '+str(preflight))
 if scene.get('SichuanSurfaceBake',True):
     BakeSurfaces=runpy.run_path(str(projectPath/'_blender/Script_SichuanPackSurfaceBake.py'))['BakeSurfaces']
-    BakeSurfaces(packRoot,projectPath,reviewPath)
-for filename in ('Script_SichuanBlanketPackBake.py','Script_SichuanFoldedCloth.py','Script_SichuanPackBinding.py','Script_SichuanCivilianJacket.py','Script_SichuanPackAttachments.py','Script_SichuanPackSurfaceBake.py'):
+    BakeSurfaces(packRoot,projectPath,reviewPath,highSource=highSource)
+for filename in ('Script_SichuanBlanketPackBake.py','Script_SichuanSoftBundle.py','Script_SichuanFabricMaterial.py','Script_SichuanPackBinding.py','Script_SichuanCivilianJacket.py','Script_SichuanPackAttachments.py','Script_SichuanPackSurfaceBake.py'):
     text=bpy.data.texts.get(filename) or bpy.data.texts.new(filename)
     text.clear();text.write((projectPath/'_blender'/filename).read_text(encoding='utf-8'))
-for filename in ('Script_SichuanPackReferenceCloth.py','Script_SichuanStrawStudy.py','Script_SichuanPackSurfaceMaps.py'):
+for filename in ('Script_SichuanPackReferenceCloth.py','Script_SichuanFabricStudy.py','Script_SichuanStrawStudy.py','Script_SichuanPackSurfaceMaps.py'):
     text=bpy.data.texts.get(filename) or bpy.data.texts.new(filename)
     text.clear();text.write((projectPath/'_import'/filename).read_text(encoding='utf-8'))
 triangles={}
@@ -452,21 +491,26 @@ for screen in bpy.data.screens:
             space.region_3d.view_location=Vector((-.015,-.04,.025))
             space.region_3d.view_distance=.82
             space.region_3d.view_rotation=Vector((.55,-1,.35)).to_track_quat('Z','Y')
+for image in bpy.data.images:
+    if image.users and image.source=='FILE' and not image.packed_file:image.pack()
 bpy.ops.wm.save_as_mainfile(filepath=str(sourcePath/'Scene_SichuanBlanketPack.blend'))
 (reviewPath/'Data_BlenderBuild.json').write_text(json.dumps({'triangles':triangles,'totalTriangles':sum(triangles.values()),'blend':bpy.data.filepath,'glb':str(modelPath/'Model_SichuanBlanketPack.glb'),'nativeAxes':'Z up; -Y outward','exportAxes':'Y up; +Z outward; back Z=0','unitScale':1},indent=2),encoding='utf-8')
 contractPath=modelPath/'Data_SichuanBlanketPack.json'
 contract=json.loads(contractPath.read_text(encoding='utf-8'))
-contract['version']='20261020ReferenceMatchV4'
+contract['version']='20261020SoftClothV5'
 contract['triangles']={'total':sum(triangles.values()),'limit':3000,'includesAllOptionalParts':True,'byPart':triangles}
 points=[bundle.matrix_world@vertex.co for vertex in bundle.data.vertices]
 sizes=[max(point[axis] for point in points)-min(point[axis] for point in points) for axis in range(3)]
-contract['actualBundleDimensionsM']={'width':sizes[0],'height':sizes[2],'thickness':sizes[1],'includes':'continuous folded sheet, conforming repair patch and cotton stitches'}
+contract['actualBundleDimensionsM']={'width':sizes[0],'height':sizes[2],'thickness':sizes[1],'includes':'soft folded bundle, conforming repair patch and cotton stitches'}
 contract['materials'].pop('ormRgb',None)
 contract['materials']['ormSemantics']='R=baked surface occlusion, G=242/255 roughness, B=0 metallic'
-contract['materials']['sharedAtlas']='Unique non-overlapping GameUV atlas, reprojected from independent imagegen material studies and masked cotton from the approved reference; broad illumination is normalized'
+contract['materials']['sharedAtlas']='Unique non-overlapping GameUV atlas from independent imagegen V05 fabric and V04 straw studies; normalized low-frequency cotton wear and high-to-low sculpted fold normals'
 contract['source']['surfaceBake']='../../_blender/Script_SichuanPackSurfaceBake.py'
 contract['source']['surfaceEncoder']='../../_import/Script_SichuanPackSurfaceMaps.py'
-contract['source']['foldedCloth']='../../_blender/Script_SichuanFoldedCloth.py'
+contract['source']['foldedCloth']='../../_blender/Script_SichuanSoftBundle.py'
+contract['source']['fabricMaterials']='../../_blender/Script_SichuanFabricMaterial.py'
+contract['source']['fabricStudy']='../../_import/Script_SichuanFabricStudy.py'
+contract['source']['textureRebuild']='../../_blender/Script_SichuanBlanketPackBake.py'
 contract['source']['binding']='../../_blender/Script_SichuanPackBinding.py'
 contract['source']['strawStudy']='../../_import/Script_SichuanStrawStudy.py'
 contract['source']['civilianJacket']='../../_blender/Script_SichuanCivilianJacket.py'
@@ -475,10 +519,12 @@ for part in contract['parts']:
         part['description']='Full-size long-sleeved civilian indigo jacket, with sleeves and side panels folded inward and the hem folded underneath; the approved corner and cloth knot remain exposed'
         part['patternDimensionsM']=[1.24,.56]
         part.pop('refinementStatus',None)
-contract['parts'][0]['description']='One continuous folded homespun cotton sheet with exposed nested cut edges, a conforming sewn repair patch and a planar contact leaf'
+contract['parts'][0]['description']='Soft folded homespun cotton volume with exposed turned cloth ends, pressure creases, a sewn repair patch and a planar contact leaf; sculpt source retained outside the game root'
 contract['review']['sameHeightComparison']=['Texture_ReferenceCompare_front.jpg','Texture_ReferenceCompare_side.jpg','Texture_ReferenceCompare_back.jpg']
 contract['review']['status']='RebuiltAwaitingVisualReview'
-contract['assetUrl']='./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261020ReferenceMatchV4'
+contract['review']['technicalChecks']=None
+contract['review']['sourceReopenVerified']=False
+contract['assetUrl']='./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261020SoftClothV5'
 payload=(modelPath/'Model_SichuanBlanketPack.glb').read_bytes();contract['assetBytes']=len(payload);contract['assetSha256']=hashlib.sha256(payload).hexdigest()
 contractPath.write_text(json.dumps(contract,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 print('SICHUAN_PACK_BUILD',json.dumps(triangles),'TOTAL',sum(triangles.values()),'BLEND',bpy.data.filepath)

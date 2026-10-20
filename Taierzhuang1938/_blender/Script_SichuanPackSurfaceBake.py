@@ -9,8 +9,10 @@ from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
 
-def BakeSurfaces(packRoot,projectPath,reviewPath):
+def BakeSurfaces(packRoot,projectPath,reviewPath,highSource=None):
     scene=bpy.context.scene
+    if highSource is not None:
+        highSource.data.uv_layers.active.name='SurfaceUV'
     meshes=[obj for obj in packRoot.children_recursive if obj.type=='MESH']
     bpy.ops.object.select_all(action='DESELECT')
     for obj in meshes:
@@ -126,21 +128,26 @@ def BakeSurfaces(packRoot,projectPath,reviewPath):
             if kind=='Base':
                 emission=nodes.new('ShaderNodeEmission')
                 source=shader.inputs['Base Color'].links[0].from_socket
-                if material.get('AtlasRegion')=='cloth':
-                    soften=nodes.new('ShaderNodeMixRGB');soften.inputs[0].default_value=.18
-                    soften.inputs[2].default_value=(.45,.42,.37,1)
-                    links.new(source,soften.inputs[1]);source=soften.outputs[0]
                 links.new(source,emission.inputs['Color']);links.new(emission.outputs[0],output.inputs['Surface'])
             elif kind=='Ao':
-                ao=nodes.new('ShaderNodeAmbientOcclusion');ao.only_local=material.get('AtlasRegion')!='cloth'
+                ao=nodes.new('ShaderNodeAmbientOcclusion');ao.only_local=True
                 ao.inputs['Distance'].default_value=.025
-                weight=.25 if material.get('AtlasRegion')=='jacket' else .75
+                weight=.25 if material.get('AtlasRegion')=='jacket' else .45 if material.get('AtlasRegion')=='cloth' else .65
                 multiply=nodes.new('ShaderNodeMath');multiply.operation='MULTIPLY';multiply.inputs[1].default_value=weight
                 add=nodes.new('ShaderNodeMath');add.operation='ADD';add.inputs[1].default_value=1-weight
                 emission=nodes.new('ShaderNodeEmission')
                 links.new(ao.outputs['AO'],multiply.inputs[0]);links.new(multiply.outputs[0],add.inputs[0]);links.new(add.outputs[0],emission.inputs['Color']);links.new(emission.outputs[0],output.inputs['Surface'])
             else:links.new(shader.outputs['BSDF'],output.inputs['Surface'])
-        bpy.ops.object.bake(type='NORMAL' if kind=='Normal' else 'EMIT',use_clear=True,margin=4)
+        for index,obj in enumerate(meshes):
+            bpy.ops.object.select_all(action='DESELECT')
+            if highSource is not None:highSource.hide_set(True);highSource.hide_render=True
+            obj.select_set(True);bpy.context.view_layer.objects.active=obj
+            selectedToActive=highSource is not None and obj.name=='Pack_Bundle' and kind=='Normal'
+            if selectedToActive:
+                highSource.hide_set(False);highSource.hide_render=False;highSource.select_set(True)
+            scene.render.bake.use_selected_to_active=selectedToActive
+            bpy.ops.object.bake(type='NORMAL' if kind=='Normal' else 'EMIT',use_clear=index==0,margin=4,use_selected_to_active=selectedToActive,cage_extrusion=.007,max_ray_distance=.018)
+        if highSource is not None:highSource.hide_render=True;highSource.hide_set(True)
         image.filepath_raw=str(Path(reviewPath)/('SurfaceBake_'+kind+'.png'));image.file_format='PNG';image.save()
         baked[kind]=image.filepath_raw
         print('SURFACE_BAKED',kind,flush=True)

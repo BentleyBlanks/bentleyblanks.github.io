@@ -6,14 +6,14 @@
   "scope": "Independent GLB authoring textures, embedded in Model_SichuanBlanketPack.glb; no existing game or level requests these images.",
   "source": {
     "provider": "imagegen",
-    "ref": "exec-dd140b53-c21e-4bf7-96e2-2eac2e0f8ab6.png",
-    "date": "2026-10-19",
+    "ref": "Image_SichuanFabricStudyV05.png",
+    "date": "2026-10-20",
     "width": 1254,
     "height": 1254,
-    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\Texture_SichuanBlanketPackSourceV03.png",
-    "sha256": "1f54cc97c245a83fbc03e163a8c3c485e50c19b25882da8eafeb663e18ea55db",
-    "prompt": "_import/SichuanBlanketPack/Prompt_SichuanBlanketPackAtlasV03.txt",
-    "persistentPrompt": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Source/Prompt_SichuanBlanketPackAtlas.txt"
+    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV05\\Image_SichuanFabricStudyV05.png",
+    "sha256": "9c55fd39d79bd0d6d83340692f0604d340b19d11f6e71e1cd2f2a75b4df1d42c",
+    "prompt": "_import/SichuanBlanketPack/Data_ImagegenPromptV05.txt",
+    "persistentPrompt": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\Data_ImagegenPromptV05.txt"
   },
   "bake": "_import/Script_SichuanBlanketPackTextureBake.py",
   "bakeRecord": "_import/SichuanBlanketPack/Data_SichuanBlanketPackTextureBake.json",
@@ -30,7 +30,7 @@
   "metersPerTile": null,
   "normalConvention": "gl",
   "normalMeaning": "OpenGL tangent-space normal, RGB = n * 0.5 + 0.5; green points toward the image top. Fine cloth/straw relief is derived from a high-frequency albedo band-pass rather than full-colour quadrant differences.",
-  "atlasReason": "Four distinct authored UV material quadrants deliberately differ in albedo and do not tile into one another. The source is flat and unlit; no seamless blending, low-frequency flattening or palette matching is applied.",
+  "atlasReason": "Independent imagegen fibre studies are reprojected onto unique non-overlapping GameUV islands; sculpted cloth supplies the broad fold relief.",
   "atlas": {
     "layout": "unique-surface-uv",
     "uvOrigin": "bottom-left",
@@ -53,8 +53,8 @@
       "width": 1024,
       "height": 1024,
       "colorSpace": "sRGB",
-      "bytes": 319944,
-      "sha256": "cad16cc6bbf6d3c51ab3d092736959b0043da045c311bde3b15f2a99aa0ffde7",
+      "bytes": 411310,
+      "sha256": "40aa529df5b532ff80ca3bdaa3501c828d0cd8f2e9e94a61cc7a5c435139facc",
       "encoding": "WebP q92"
     },
     {
@@ -63,8 +63,8 @@
       "width": 1024,
       "height": 1024,
       "colorSpace": "linear",
-      "bytes": 885084,
-      "sha256": "34cd9b44a96b52fb59174056a0f04d890eb6426a7a617c8955143963b073137f",
+      "bytes": 1209434,
+      "sha256": "f0b0ab7e172ae1dcca68b562fe88ff48d879acc60f2169f95a33e02bb92164dd",
       "encoding": "lossless WebP"
     },
     {
@@ -73,19 +73,19 @@
       "width": 1024,
       "height": 1024,
       "colorSpace": "linear",
-      "bytes": 409400,
-      "sha256": "c264c07200784bc2a61d16d8d968cb6a4550627f1626f4ebb8479a3885e91aff",
+      "bytes": 379064,
+      "sha256": "c39f80b8739a6ef8c3c1c264b129e0ae2ad038989724a1df31d8ef9757c88862",
       "encoding": "lossless WebP"
     }
   ],
-  "totalBytes": 1614428,
-  "physicalMeaning": "Rough nonmetal natural fibres. ORM R is real surface occlusion; G is 242/255; B is zero. Broad reference illumination is normalized; fine crease shading remains an approximation.",
+  "totalBytes": 1999808,
+  "physicalMeaning": "Rough nonmetal natural fibres. ORM R is baked self-occlusion; G is 242/255; B is zero. Sculpted fold normals are projected from the high source; V05 cotton carries normalized reference wear without painted side-fold shadows.",
   "verification": {
     "allMaps1024": true,
     "allMetalZero": true,
     "surfaceUvReprojected": true,
     "aoRange": [
-      4,
+      6,
       255
     ]
   },
@@ -177,20 +177,14 @@
       232,
       315
     ],
-    "use": "Masked cotton front/back/side studies and grey-strip samples; the complete reference remains outside the game atlas",
+    "use": "Blurred normalized front/back wear ratio only; fabric yarn and indigo/grey cloth come from the independent V05 study",
     "cottonFacePixels": [
       77,
       194,
       680,
       695
     ],
-    "cottonSidePixels": [
-      755,
-      194,
-      948,
-      695
-    ],
-    "cottonProcess": "Accessory/strap masks, replacement cotton, low-frequency scalar de-lighting and physical cotton micro-normal; documented by Data_ReferenceCottonStudy.json"
+    "cottonProcess": "_import/Script_SichuanFabricStudy.py: calibrated sRGB colour, 8cm effective tile and fine 55/65 micrometre normal relief"
   },
   "surfaceBake": "_blender/Script_SichuanPackSurfaceBake.py",
   "surfaceEncoder": "_import/Script_SichuanPackSurfaceMaps.py",
@@ -246,5 +240,72 @@
     "deLightStrength": 0.45,
     "destination": "Reprojected into the shared 1024 GameUV atlas",
     "prompt": "_import/SichuanBlanketPack/Data_ImagegenPromptV04.txt"
+  },
+  "fabricStudy": {
+    "provider": "Built-in imagegen",
+    "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV05\\Image_SichuanFabricStudyV05.png",
+    "sourceSha256": "9c55fd39d79bd0d6d83340692f0604d340b19d11f6e71e1cd2f2a75b4df1d42c",
+    "sourceNominalSwatchM": [
+      0.12,
+      0.12
+    ],
+    "effectiveTileM": [
+      0.08,
+      0.08
+    ],
+    "regions": {
+      "Cotton": [
+        0,
+        0,
+        627,
+        627
+      ],
+      "Binding": [
+        627,
+        0,
+        1254,
+        627
+      ],
+      "Patch": [
+        0,
+        627,
+        627,
+        1254
+      ],
+      "Indigo": [
+        627,
+        627,
+        1254,
+        1254
+      ]
+    },
+    "targetSrgb": {
+      "Cotton": [
+        183,
+        176,
+        161
+      ],
+      "Binding": [
+        116,
+        116,
+        113
+      ],
+      "Patch": [
+        157,
+        145,
+        128
+      ],
+      "Indigo": [
+        81,
+        83,
+        99
+      ]
+    },
+    "normalReliefM": [
+      5.5e-05,
+      6.5e-05
+    ],
+    "wear": "Separate low-frequency reference wear ratio; no side-fold photograph is projected into albedo",
+    "prompt": "_import/SichuanBlanketPack/Data_ImagegenPromptV05.txt"
   }
 }

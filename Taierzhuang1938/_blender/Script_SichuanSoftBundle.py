@@ -7,10 +7,10 @@ from mathutils import Vector
 
 def SoftFrontDepth(x,z,detail=0):
     edge=max(abs(x)/.19,abs(z)/.15)
-    roll=.014*max(0,(edge-.73)/.27)**1.7
+    roll=.019*max(0,(edge-.70)/.30)**1.65
     pressure=sum(math.exp(-((x-band)/.017)**2) for band in (-.103,.089))
     pressure+=sum(math.exp(-((z-band)/.017)**2) for band in (.05,-.06))
-    depth=-.128+roll+.008*min(1.65,pressure)
+    depth=-.129+roll+.0085*min(1.65,pressure)
     depth+=.0015*math.sin(x*33+z*14)*math.cos(z*29-.4)
     if detail:
         wrinkles=0
@@ -37,9 +37,28 @@ def BuildSoftBundle(CreateMesh,unusedDepth,clothMaterial,backMaterial,foldMateri
         bpy.ops.object.select_all(action='DESELECT');low.select_set(True);bpy.context.view_layer.objects.active=low
         decimate=low.modifiers.new('VisibleClothRetopology','DECIMATE');decimate.ratio=840/initial;decimate.use_collapse_triangulate=True
         bpy.ops.object.modifier_apply(modifier=decimate.name)
+        # Quadric reduction can move the originally planar contact leaf a few
+        # micrometres and overshoot a soft silhouette. Preserve the authored
+        # attachment plane and physical envelope explicitly before normals.
+        for vertex in low.data.vertices:
+            vertex.co.x=max(-.1898,min(.1898,vertex.co.x))
+            vertex.co.z=max(-.1498,min(.1498,vertex.co.z))
+            vertex.co.y=0 if vertex.co.y>-.0015 else max(-.1290,vertex.co.y)
+        low.data.update()
         transfer=low.modifiers.new('SculptedClothNormals','DATA_TRANSFER');transfer.object=source
         transfer.use_loop_data=True;transfer.data_types_loops={'CUSTOM_NORMAL'};transfer.loop_mapping='POLYINTERP_NEAREST'
         bpy.ops.object.modifier_apply(modifier=transfer.name)
+        # Large contact-plane triangles must not interpolate a corner normal
+        # from an adjacent turned fold. Their entire surface is exactly flat.
+        normals=[tuple(corner.vector) for corner in low.data.corner_normals]
+        for polygon in low.data.polygons:
+            if all(abs(low.data.vertices[index].co.y)<1e-9 for index in polygon.vertices):
+                polygon.use_smooth=False;polygon.material_index=1
+                for index in polygon.loop_indices:
+                    normals[index]=(0,1,0)
+                    point=low.data.vertices[low.data.loops[index].vertex_index].co
+                    low.data.uv_layers.active.data[index].uv=(.02+.46*(point.x+.19)/.38,.52+.46*(point.z+.15)/.30)
+        low.data.normals_split_custom_set(normals)
         source.hide_render=True;source.hide_set(True)
         low['HighSource']=source.name
         return low
@@ -47,10 +66,12 @@ def BuildSoftBundle(CreateMesh,unusedDepth,clothMaterial,backMaterial,foldMateri
     verts=[];uvs=[];faces=[];roles=[]
     def FrontPoint(s,t):
         z=.1498*t
-        radius=.023
+        radius=.028
         q=max(0,(abs(z)-(.1498-radius))/radius)
         halfWidth=.1898-radius*(1-math.sqrt(max(0,1-q*q)))
         x=s*halfWidth
+        edgePressure=sum(math.exp(-((x-band)/.020)**2) for band in (-.103,.089))
+        z-=math.copysign(.0033*edgePressure*abs(t)**12,z)
         return (x,SoftFrontDepth(x,z,1 if high else 0),z)
     for row in range(nz+1):
         for column in range(nx+1):
@@ -75,6 +96,9 @@ def BuildSoftBundle(CreateMesh,unusedDepth,clothMaterial,backMaterial,foldMateri
             cutEnd=max(0,min(1,(depth+.100)/.045))
             inset=.014*math.sin(math.pi*fraction)**.7*side**5*cutEnd
             x-=math.copysign(inset,x)
+            sideWrinkle=(.0017*math.sin(z*81+depth*97)+.0009*math.sin(z*173-depth*113))
+            sideWrinkle*=math.sin(math.pi*fraction)*side**8
+            x=math.copysign(min(.1898,abs(x)+sideWrinkle),x)
             z-=math.copysign(.0010*math.sin(math.pi*fraction)*(abs(z)/.15)**5,z)
             current.append(len(verts));verts.append((x,depth,z));uvs.append(((x+.19)/.38,(z+.15)/.30))
         for index in range(len(perimeter)):
@@ -99,18 +123,24 @@ def BuildSoftBundle(CreateMesh,unusedDepth,clothMaterial,backMaterial,foldMateri
                     t=sample/samples
                     points.append(.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t*t+(-p0+3*p1-3*p2+p3)*t*t*t))
             points.append(Vector(profile[-1]))
+            arc=[0.0]
+            for previousPoint,nextPoint in zip(points,points[1:]):arc.append(arc[-1]+(nextPoint-previousPoint).length)
             rows=[]
             crossValues=(-1,-.7,-.35,0,.35,.7,1) if high else (-1,0,1)
             for index,point in enumerate(points):
                 tangent=(points[min(index+1,len(points)-1)]-points[max(0,index-1)]).normalized();across=Vector((-tangent.y,tangent.x))
                 compression=sum(math.exp(-((point.y-band)/.023)**2) for band in (.05,-.06))
-                loosen=max(0,min(1,(-point.y-.075)/.06))
-                half=(.0105-layer*.0017)*(1+.17*math.sin(point.y*37+layer*1.7)+loosen*.17*math.sin(point.y*113+layer))*(1-.20*compression)
+                loosen=max(0,min(1,(-point.y-.070)/.055))
+                phase=arc[index]*137+layer*2.3
+                half=(.0113-layer*.0014)*(1+.20*math.sin(point.y*37+layer*1.7)-loosen*.20+loosen*.23*math.sin(phase))*(1-.22*compression)
                 ring=[]
                 for s in crossValues:
                     yz=point+across*half*s
-                    yz.x+=.0018*math.sin(yz.y*39+layer*1.2)+loosen*.0015*math.sin(yz.y*125+layer)
-                    x=sign*(.175+.0142*math.cos(s*math.pi/2)-.0030*compression+.0010*math.sin(point.y*48+layer)-loosen*.0014*math.cos(point.y*103+layer))
+                    yz.x+=.0025*math.sin(yz.y*39+layer*1.2)+loosen*.0048*math.sin(phase+.7*s)
+                    yz.y+=loosen*.0037*math.sin(phase*.73+1.5*s)
+                    pleat=loosen*.0038*math.sin(phase+2.5*s)*math.cos(s*math.pi/2)**2
+                    ridge=.0204*(1+.10*math.sin(point.y*87+layer*2))
+                    x=sign*min(.1898,.169+(ridge-loosen*.0020)*math.cos(s*math.pi/2)-.0040*compression+.0010*math.sin(point.y*48+layer)+pleat)
                     ring.append(len(verts));verts.append((x,yz.x,max(-.1498,min(.1498,yz.y))));uvs.append(((yz.x+.13)/.13,(yz.y+.15)/.30))
                 rows.append(ring)
             for a,b in zip(rows,rows[1:]):

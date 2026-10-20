@@ -3,7 +3,7 @@ import math
 from mathutils import Vector
 
 
-def BuildCivilianJacket(CreateMesh,material,parent):
+def BuildCivilianJacket(CreateMesh,material,parent,surfaceDepth=None):
     verts=[];uvs=[];faces=[];lookup={}
 
     def Fold(u,v,back=False,sleeve=False):
@@ -115,8 +115,25 @@ def BuildCivilianJacket(CreateMesh,material,parent):
 
     # Preserve the already-approved exposed corner and knot-button placement.
     anchorA=Vertex(Fold(.20,.56),(.66,1));anchorB=Vertex(Fold(.26,.50),(.71,.89))
-    corner=[Vertex(Vector(point),(.65+(point[0]-.120)/1.24,.90+(point[2]-.144)/.56)) for point in ((.120,-.1195,.144),(.178,-.1195,.141),(.171,-.1195,.085))]
-    cornerFaces=((anchorA,corner[0],corner[1]),(anchorA,corner[1],corner[2]),(anchorA,corner[2],anchorB),tuple(corner))
+    corners=[Vector(point) for point in ((.112,-.120,.146),(.180,-.121,.142),(.174,-.119,.083))]
+    corner=[];rows=[];steps=4
+    for row in range(steps+1):
+        indices=[]
+        for column in range(steps-row+1):
+            u=row/steps;v=column/steps
+            point=corners[0]*(1-u-v)+corners[1]*u+corners[2]*v
+            point.y-=.0035*math.sin((u*2.8+v*1.7)*math.pi)*math.sin((u+v)*math.pi)
+            if surfaceDepth is not None:
+                point.y=surfaceDepth(point.x,point.z,.0015)-.0013*math.sin((u*2.8+v*1.7)*math.pi)*math.sin((u+v)*math.pi)
+            index=Vertex(point,((point.x+.62)/1.24,.90+(point.z-.144)/.56))
+            indices.append(index)
+        rows.append(indices)
+    corner=[rows[0][0],rows[-1][0],rows[0][-1]]
+    for row in range(steps):
+        for column in range(steps-row):
+            faces.append((rows[row][column],rows[row+1][column],rows[row][column+1]))
+            if column<steps-row-1:faces.append((rows[row][column+1],rows[row+1][column],rows[row+1][column+1]))
+    cornerFaces=((anchorA,corner[0],corner[1]),(anchorA,corner[1],corner[2]),(anchorA,corner[2],anchorB))
     faces.extend(tuple(reversed(face)) for face in cornerFaces)
     obj=CreateMesh('Pack_IndigoShortJacket',verts,faces,uvs,material,parent)
     obj.data.set_sharp_from_angle(angle=math.radians(55));obj.data.update()
