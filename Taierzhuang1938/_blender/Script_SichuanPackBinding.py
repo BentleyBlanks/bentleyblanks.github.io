@@ -4,7 +4,7 @@ import bpy
 from mathutils import Vector
 
 
-def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,parent,softCloth=False,refined=False,sideSurfaceDepth=None):
+def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,parent,softCloth=False,refined=False,sideSurfaceDepth=None,pointMapper=None,highDensity=False):
     root=MakeRoot('Pack_Binding',parent)
     controls=[]
 
@@ -12,7 +12,11 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
         for point in points:
             point=Vector(point)
             if refined and point.x>.193 and abs(point.y+.064)<1e-7:point.y+=.039
-            controls.append((point,Vector(axis),shoulder))
+            direction=Vector(axis)
+            if pointMapper is not None:
+                direction=(pointMapper(point+direction*.001)-pointMapper(point-direction*.001)).normalized()
+                point=pointMapper(point)
+            controls.append((point,direction,shoulder))
 
     # The first complete turn is the upper cross pass. Transfers follow the
     # undersides of existing cloth passes, outside the blanket itself.
@@ -70,7 +74,7 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
     for (start,startAxis,s1),(end,endAxis,s2) in zip(rounded,rounded[1:]):
         length=(end-start).length
         if length<1e-8:continue
-        spacing=.040 if refined else .050
+        spacing=.008 if highDensity else .040 if refined else .050
         fractions={step/max(1,math.ceil(length/spacing)) for step in range(1,max(1,math.ceil(length/spacing))+1)}
         seam=(math.floor(distance/repeat)+1)*repeat
         while seam<distance+length-1e-7:
@@ -102,20 +106,23 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
             if abs(width.x)>.7:depth-=.0017*sum(math.exp(-((point.z-band)/.019)**2) for band in (.05,-.06))
             point=Vector((point.x,depth,point.z))
         ring=[]
-        for across in ((-1,0,1) if isFront else (-1,1)):
+        crossValues=(-1,-2/3,-1/3,0,1/3,2/3,1) if highDensity else (-1,0,1) if isFront else (-1,1)
+        for across in crossValues:
             variation=1+.055*math.sin(distances[index]*43+.4)+.020*math.sin(distances[index]*127+across) if softCloth else 1+.012*math.sin(index*1.43+across)
             p=point+width*(.013*across)*variation
             if isFront:p.y-=.00065*(1-across*across)
             if isFront and softCloth:
                 crossing=.0017*sum(math.exp(-((point.z-band)/.019)**2) for band in (.05,-.06)) if abs(width.x)>.7 else 0
                 p.y=SurfaceDepth(p.x,p.z,.0015)-crossing-.00025*(1-across*across)
-            if refined and sideSurfaceDepth is not None and abs(p.x)>.180 and -.122<p.y<-.001 and abs(p.z)<.143:
+            if refined and sideSurfaceDepth is not None and abs(p.x)>(.150 if pointMapper is not None else .180) and -.122<p.y<-.001 and abs(p.z)<(.153 if pointMapper is not None else .143):
                 p.x=sideSurfaceDepth(1 if p.x>0 else -1,p.y,p.z)
             ring.append(len(verts));verts.append(tuple(p));u=.42+.16*(across+1)/2
             uvs.append((u,(distances[index]/repeat)%1));vertexDistances.append(distances[index]);vertexU.append(u)
         rings.append(ring)
     for a,b in zip(rings,rings[1:]):
-        if len(a)==len(b)==2:faces.append((a[0],a[1],b[1],b[0]))
+        if highDensity:
+            for column in range(len(a)-1):faces.append((a[column],a[column+1],b[column+1],b[column]))
+        elif len(a)==len(b)==2:faces.append((a[0],a[1],b[1],b[0]))
         elif len(a)==len(b)==3:faces.extend(((a[0],a[1],b[1],b[0]),(a[1],a[2],b[2],b[1])))
         elif len(a)==2:faces.extend(((a[0],a[1],b[1],b[0]),(a[1],b[2],b[1])))
         else:faces.extend(((a[0],a[1],b[0]),(a[1],a[2],b[1],b[0])))
@@ -172,6 +179,7 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
                         p.y=-.025+(p.y+.064)*.55
                         if 'Tail' not in name:p.z=.050+(p.z-.050)*.70
                         else:p.z=.050+(p.z-.050)*.78
+                    if pointMapper is not None:p=pointMapper(p)
                     positions.append(tuple(p));coordinates.append(((side+1)/2,index/(len(points)-1)))
             for index in range(len(points)-1):
                 for cross in range(2):

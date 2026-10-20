@@ -130,8 +130,11 @@
       "Texture_ReferenceCompare_side.jpg",
       "Texture_ReferenceCompare_back.jpg"
     ],
-    "status": "V6LocallyValidatedForReview",
-    "remainingRefinements": [],
+    "status": "V6RejectedByUser_V7NaturalHighClothPendingReview",
+    "remainingRefinements": [
+      "Visual review of the V7 natural cloth folds; user finds the silhouette closer",
+      "Retopology and 1024 PBR transfer only after high-model appearance succeeds"
+    ],
     "reviewedDate": "2026-10-20",
     "technicalChecks": 147,
     "sourceReopenVerified": true,
@@ -153,7 +156,22 @@
       "Independent finer V06 cotton, earth/sweat masks, darker indigo and restrained crease normals",
       "Automatic isolation of folded-over UV faces; actual GameUV overlap audit remains strict"
     ],
-    "authorizedBudgetTriangles": 10000
+    "authorizedBudgetTriangles": 10000,
+    "nextPhaseTriangleBudget": null,
+    "currentHighStudy": {
+      "sourceBlend": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/HighV7/Scene_SichuanHighClothV7.blend",
+      "rebuildScript": "../../_blender/Script_SichuanHighClothBuildV7.py",
+      "userFeedback": "轮廓更接近，继续自然布褶",
+      "completedWork": [
+        "Preserve V7 silhouette and flat body-contact back",
+        "Frame-51 tie-constrained cloth relaxation with irregular broad gathering",
+        "Clean indigo corner, turned cotton overlap and rounded knot button"
+      ],
+      "visualApproval": false,
+      "rebuildIdenticalCoarseSource": true,
+      "sourceReopenVerified": true,
+      "gameAssetReplaced": false
+    }
   },
   "historicalReferences": [
     {
