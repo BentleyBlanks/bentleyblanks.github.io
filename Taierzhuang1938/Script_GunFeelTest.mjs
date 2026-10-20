@@ -135,8 +135,9 @@ const report = await page.evaluate(({ flashKinds, firearms }) => {
       hasBoltAction: !["ZhongZheng", "HanYang", "Type38"].includes(id) || !!vm.rig?.parts?.bolt,
     };
     if (id === "Type38") {
-      // Keep the complete rear receiver/stock outside the camera near plane.
-      // Hiding these uncapped submeshes exposes the inside of the rifle.
+      // 开镜贴脸（照门离眼 0.22 m）时枪托后半截本来就在眼睛后面，会穿过近裁面。
+      // 这些子网格没有封口：切口一旦落进画面就看得见枪身内部，所以不许藏、
+      // 也不许切口出现在近裁面的可见窗口里（按 21:9 超宽屏算横向，再各留 25% 余量）。
       for (let frame = 0; frame < 48; frame += 1) {
         vm.Update(1 / 60, { ads: 1, moveSpeed: 0, grounded: true });
       }
@@ -144,14 +145,29 @@ const report = await page.evaluate(({ flashKinds, firearms }) => {
       vm.rig.group.traverse(part=>{if(part.isMesh&&/adsNear/.test(part.name))parts.push(part);});
       vm.root.updateWorldMatrix(true,true);T.camera.updateMatrixWorld(true);
       const inverse=T.camera.matrixWorld.clone().invert(),point=T.camera.position.clone();
-      let minDepth=Infinity,vertices=0;
+      const near=T.camera.near,halfH=near*Math.tan(T.camera.fov*Math.PI/360)*1.25,halfW=halfH*2.4;
+      let vertices=0,cutEdges=0,visibleCuts=0,closestCut=Infinity;
       for(const part of parts){
         const transform=inverse.clone().multiply(part.matrixWorld),position=part.geometry.attributes.position;
+        const camera=new Float32Array(position.count*3);
         for(let i=0;i<position.count;i++){
-          point.fromBufferAttribute(position,i).applyMatrix4(transform);minDepth=Math.min(minDepth,-point.z);vertices++;
+          point.fromBufferAttribute(position,i).applyMatrix4(transform);camera.set([point.x,point.y,-point.z],i*3);vertices++;
+        }
+        const index=part.geometry.index,count=index?index.count:position.count;
+        const At=(k)=>index?index.getX(k):k;
+        for(let k=0;k+2<count;k+=3){
+          const tri=[At(k),At(k+1),At(k+2)];
+          for(let e=0;e<3;e++){
+            const a=tri[e]*3,b=tri[(e+1)%3]*3,da=camera[a+2],db=camera[b+2];
+            if((da-near)*(db-near)>=0)continue;
+            const t=(near-da)/(db-da),x=camera[a]+(camera[b]-camera[a])*t,y=camera[a+1]+(camera[b+1]-camera[a+1])*t;
+            cutEdges++;
+            closestCut=Math.min(closestCut,Math.max(Math.abs(x)/halfW,Math.abs(y)/halfH));
+            if(Math.abs(x)<halfW&&Math.abs(y)<halfH)visibleCuts++;
+          }
         }
       }
-      type38AdsNear = { count:parts.length,hidden:parts.filter(part=>!part.visible).length,minDepth,vertices,near:T.camera.near };
+      type38AdsNear = { count:parts.length,hidden:parts.filter(part=>!part.visible).length,vertices,cutEdges,visibleCuts,closestCut,near };
     }
   }
 
@@ -235,12 +251,12 @@ Check(`${FIREARMS.length} 支火器走模型、铁瞄零偏心并保留栓动动
   Object.entries(report.sights)
     .map(([id, entry]) => `${id}: model=${entry.isModel} sight=${entry.hasSight} offset=${entry.offsetMm.toFixed(2)}mm bolt=${entry.hasBoltAction}`)
     .join(" · "));
-Check("三八式开镜保留完整机匣与枪托，近端顶点不穿相机裁切面",
+Check("三八式开镜保留完整机匣与枪托，近裁面切口不落进画面",
   report.type38AdsNear && report.type38AdsNear.count >= 2
     && report.type38AdsNear.hidden === 0 && report.type38AdsNear.vertices > 0
-    && report.type38AdsNear.minDepth > report.type38AdsNear.near + 0.003,
+    && report.type38AdsNear.visibleCuts === 0,
   report.type38AdsNear
-    ? `ADS 近端 ${report.type38AdsNear.vertices} 顶点，最近 ${(report.type38AdsNear.minDepth*1000).toFixed(1)} mm，裁切面 ${(report.type38AdsNear.near*1000).toFixed(1)} mm`
+    ? `ADS 近端 ${report.type38AdsNear.vertices} 顶点，穿近裁面 ${report.type38AdsNear.cutEdges} 条边、落进画面 ${report.type38AdsNear.visibleCuts} 条，最近切口在窗口 ${report.type38AdsNear.closestCut.toFixed(2)} 倍外（裁切面 ${(report.type38AdsNear.near*1000).toFixed(1)} mm）`
     : "缺少三八式 ADS 近眼网格");
 Check("第一人称手臂只画外表面，冲刺时袖筒背面不会铺满屏幕",
   report.sprintAmount > 0.8 && report.armSides.length > 0 && report.armSides.every((side) => side === 0),
