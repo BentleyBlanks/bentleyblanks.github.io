@@ -1,7 +1,7 @@
 {
  "schema": 1,
- "revision": "20261021RifleHoldRunV1",
- "clipSha256": "e963a28c7562215d0f8352663e450d58424ac4f55608b87359e92e533902b912",
+ "revision": "20261021RifleHoldRunV2",
+ "clipSha256": "13e14c9f5fa790cddc11f2264c12785dbdf8cc6bc912bdada84c05e51e86e15a",
  "units": "runtime metres (1.66 m NRA actor), seconds, degrees",
  "samplesPerKey": 4,
  "gait": {
@@ -510,6 +510,25 @@
   "rifleVerticalAmplitudeCm": 4.96,
   "chestVerticalAmplitudeCm": 5.28,
   "rifleLagBehindChestDeg": 9
+ },
+ "runtimeProfile": {
+  "referenceMpsModelUnits": 3.49224,
+  "referenceMpsRuntime": 3.19,
+  "contacts": {
+   "L": [
+    [
+     0,
+     0.367816
+    ]
+   ],
+   "R": [
+    [
+     0.494253,
+     0.862069
+    ]
+   ]
+  },
+  "rule": "toe joint within 3.5 cm of its floor and travelling back > 0.12 m/s for > 75 ms, 120 Hz (Script_LocomotionProfileBake)"
  },
  "binds": {
   "models": 7,

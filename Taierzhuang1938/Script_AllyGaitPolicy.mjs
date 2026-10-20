@@ -13,7 +13,17 @@ export function CrouchWalkBySpeed(speedMps, walking = false) {
   return speedMps > (walking ? C.crouchSlowBelowMps : C.crouchFastAboveMps);
 }
 
-export function SelectAllyGait(soldier, state, id, readySeconds = 0) {
+// The fast calm run by speed with hysteresis and a hold (the same shape as RelaxedGait's walk/run switch).
+// `memory` is { running, frames } kept by the caller per man; it is updated here.
+export function HoldRunBySpeed(speedMps, memory) {
+  const wants = speedMps > (memory.running ? C.holdRunBelowMps : C.holdRunAboveMps);
+  memory.frames = wants !== !!memory.running ? (memory.frames || 0) + 1 : 0;
+  if (memory.frames >= C.holdRunSwitchFrames) { memory.running = wants; memory.frames = 0; }
+  return !!memory.running;
+}
+
+// `holdRun` (optional) is the caller's { running, frames } memory for the fast calm run; without it RifleHoldRun is off.
+export function SelectAllyGait(soldier, state, id, readySeconds = 0, holdRun = null) {
   if (soldier.p012AwaitingWeapon || soldier.relaxedGait || soldier.openingActorPerformance
       || soldier.openingStoryboardPose || soldier.openingStoryboardTravel != null
       || soldier.missionRescueTarget || state.dead || state.carryRole || state.meleeCombat
@@ -28,5 +38,6 @@ export function SelectAllyGait(soldier, state, id, readySeconds = 0) {
   if (low && !moving && ['StandToKneel','KneelHold','RifleCrouchAdvance','KneelToStand'].includes(id)) return 'AllyCrouchCarryStand';
   if (!low && moving && speed <= C.walkMaximumMps && ['RifleRun','BackRifleRun'].includes(id)) return 'AllyCarryWalk';
   if (!low && !moving && id === 'AdvanceFire') return 'AllyCarryStand';
+  if (!low && holdRun && id === 'RifleRun' && HoldRunBySpeed(speed, holdRun)) return 'RifleHoldRun';
   return id;
 }

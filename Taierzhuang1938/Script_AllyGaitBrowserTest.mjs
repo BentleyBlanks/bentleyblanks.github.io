@@ -27,20 +27,24 @@ try {
       {name:'AllyCarryWalk',state:{moveSpeedMps:1.2,aim:1}},
       {name:'AllyCarryStand',state:{moveSpeedMps:0,aim:1}},
       {name:'AllyCrouchCarryStand',state:{crouch:1,moveSpeedMps:0,aim:1}},
+      // The fast calm run (Animation/RifleHoldRun): two rifles; the same pace under threat keeps the ready run.
+      {name:'RifleHoldRun',state:{moveSpeedMps:3.2,aim:1},weapon:'ZhongZheng',variant:1},
+      {name:'RifleHoldRun',state:{moveSpeedMps:3.2,aim:1},weapon:'HanYang',variant:4},
+      {name:'RifleRun',state:{moveSpeedMps:3.2,aim:1},threat:true,weapon:'ZhongZheng',variant:1},
     ];
     const actors=[],rows=[];
     for(const [i,spec] of specs.entries()){
-      const actor=T.actorFactory.Create('nra',{seed:8120+i,modelVariant:i%2?4:1,weapon:['ZhongZheng','HanYang','Type38'][i%3]});
+      const actor=T.actorFactory.Create('nra',{seed:8120+i,modelVariant:spec.variant??(i%2?4:1),weapon:spec.weapon??['ZhongZheng','HanYang','Type38'][i%3]});
       const soldier={actor,targetVisible:spec.threat,targetFromMemory:false,suppression:0};
       await InstallAllyGait(soldier);
-      actor.root.position.set((i-2)*1.1,0,0);actor.root.rotation.y=.65;scene.add(actor.root);
+      const slot=(i-(specs.length-1)/2)*1.1;actor.root.position.set(slot,0,0);actor.root.rotation.y=.65;scene.add(actor.root);
       const state={...spec.state,moveSpeed:(spec.state.moveSpeedMps||0)/3.6};
       for(let f=0;f<120;f++)actor.Update(1/60,{...state,elapsed:f/60});
       const rig=actor.characterRig;
       const row={wanted:spec.name,clip:rig.currentId,model:rig.modelId,carryWeight:rig.allyCarryWeight,aimApplied:!!actor.rigAimApplied};
       const travel=new THREE.Vector3(0,0,-1).applyQuaternion(actor.root.quaternion);
       const leans=[],floors=[],grips=[];let contactError=0,contactFrames=0;
-      const muzzleUp=[],weaponFloors=[],muzzleRise=[];
+      const muzzleUp=[],weaponFloors=[],muzzleRise=[],leftOffAxis=[],leftSpan=[],sagittalPitch=[];
       const CheckCarry=()=>{
         if(!spec.name.includes('Carry'))return;
         const weapon=actor.weaponGroup;weapon.updateWorldMatrix(true,true);
@@ -60,6 +64,14 @@ try {
         rig.root.traverse(mesh=>{if(!mesh.isSkinnedMesh)return;mesh.skeleton.update();
           const p=new THREE.Vector3();for(let v=0;v<mesh.geometry.attributes.position.count;v++){mesh.getVertexPosition(v,p).applyMatrix4(mesh.matrixWorld);floor=Math.min(floor,p.y);}});
         floors.push(floor);
+        if(spec.name==='RifleHoldRun'){
+          // Both hands on the rifle: the left grip lies on the weapon's own axis, the actor's two-hand rule at work.
+          const weapon=actor.weaponGroup,right=rig.Grip('weaponR').getWorldPosition(new THREE.Vector3()),left=rig.Grip('weaponL').getWorldPosition(new THREE.Vector3());
+          const axis=weapon.localToWorld(actor.weaponGripFront.clone()).sub(weapon.getWorldPosition(new THREE.Vector3())).normalize();
+          const arm=left.clone().sub(right);leftOffAxis.push(arm.clone().cross(axis).length());leftSpan.push(arm.length());
+          const muzzle=weapon.localToWorld(actor.weaponMuzzle.clone()).sub(weapon.getWorldPosition(new THREE.Vector3())).normalize().applyQuaternion(actor.root.quaternion.clone().invert());
+          sagittalPitch.push(Math.atan2(muzzle.y,-muzzle.z)*180/Math.PI);
+        }
         const grip=rig.Grip('weaponR').getWorldPosition(new THREE.Vector3());
         grips.push(grip.distanceTo(actor.weaponGroup.getWorldPosition(new THREE.Vector3())));
         CheckCarry();
@@ -81,12 +93,13 @@ try {
         actor.Update(0,state);CheckCarry();
       }
       actor.root.rotation.y=.65;
+      if(leftOffAxis.length){row.leftOffAxisMax=Math.max(...leftOffAxis);row.leftSpan=[Math.min(...leftSpan),Math.max(...leftSpan)];row.sagittalPitch=[Math.min(...sagittalPitch),Math.max(...sagittalPitch)];}
       if(muzzleUp.length){row.muzzleUpMin=Math.min(...muzzleUp);row.weaponFloor=Math.min(...weaponFloors);row.muzzleRiseMin=Math.min(...muzzleRise);}
       // Actual fire must recover a ready action and the aim layer.
       actor.Update(.1,{...state,firing:true,aim:1});
       row.fireClip=rig.currentId;row.fireAim=actor.rigAimApplied;
       for(let f=0;f<120;f++)actor.Update(1/60,{...state,elapsed:5+f/60});
-      actor.root.position.set((i-2)*1.1,0,0);rig.locomotion.ResetContacts();
+      actor.root.position.set(slot,0,0);rig.locomotion.ResetContacts();
       rows.push(row);actors.push({actor,soldier,state,name:spec.name});
     }
     const camera=new THREE.PerspectiveCamera(34,1600/960,.1,100);
@@ -114,10 +127,17 @@ try {
     assert.deepEqual(errors,[]);
     for(const row of report){
       assert.equal(row.clip,row.wanted);
-      assert.ok(row.floor[0]>-.015&&row.floor[1]<.03,row.clip+' ground '+row.floor);
+      if(row.clip==='RifleHoldRun')assert.ok(row.floor[0]>-.015&&row.floor[1]>.03&&row.floor[1]<.3,row.clip+' a run keeps its ground contact and its flight '+row.floor);
+      else assert.ok(row.floor[0]>-.015&&row.floor[1]<.03,row.clip+' ground '+row.floor);
       assert.ok(row.gripMax<.04,row.clip+' right hand contact '+row.gripMax);
       assert.ok(row.contactError<.015,row.clip+' planted-foot drift '+row.contactError);
       if(!row.clip.includes('Stand'))assert.ok(row.contactFrames>20,'full contact exercised');
+      if(row.clip==='RifleHoldRun'){
+        assert.ok(row.lean[0]>15&&row.lean[1]<24&&row.lean[1]-row.lean[0]<4,row.clip+' forward lean '+row.lean);
+        assert.ok(row.leftOffAxisMax<.02&&row.leftSpan[0]>.3&&row.leftSpan[1]<.38,row.clip+' left hand on the rifle '+row.leftOffAxisMax+' '+row.leftSpan);
+        assert.ok(row.sagittalPitch[0]>38&&row.sagittalPitch[1]<58,row.clip+' muzzle pitch '+row.sagittalPitch);
+        assert.equal(row.carryWeight,0,row.clip+' is not a carry (no placed rifle track)');
+      }
       if(row.clip.includes('Crouch'))assert.ok(row.lean[0]>12&&row.lean[1]-row.lean[0]<3,row.clip+' stable forward lean');
       if(row.clip.includes('Carry')){
         assert.ok(row.carryWeight>.99);assert.equal(row.aimApplied,false);assert.ok(!row.fireClip.includes('Carry'));assert.equal(row.fireAim,true);

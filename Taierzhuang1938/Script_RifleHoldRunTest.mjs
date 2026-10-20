@@ -10,6 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { LoadGlb, PoseScene, BuildSkin, ReadAccessor } from './_import/Script_LugouGlbPose.mjs';
+import { MeasureProfile } from './_import/Script_RifleHoldRunProfile.mjs';
+import { ALLY_GAIT } from './Data_Tuning_AllyGait.mjs';
 
 const here = import.meta.dirname;
 const dir = path.join(here, 'Animation/RifleHoldRun');
@@ -291,7 +293,7 @@ let anchors;
   scene.Apply(animation, 0);
 }
 {
-  const V = profile.referenceMps;
+  const V = profile.designReferenceMps;
   const results = [];
   const ground = (side, which, i) => {   // ground-frame (lateral, forward) of an anchor at record i (i may exceed M: next cycle)
     const r = records[i % M], p = r.sole[side].pos[anchors[side][which]], t = (i % M) * dt + Math.floor(i / M) * T;
@@ -315,7 +317,7 @@ let anchors;
 
 // -- 3 ground, flight, foot roll -----------------------------------------------------------------------------------
 {
-  const windows = { L: [[0, profile.contacts.L[0][1]]], R: [[profile.contacts.R[0][0], profile.contacts.R[0][1]]] };
+  const windows = { L: [[0, profile.designContacts.L[0][1]]], R: [[profile.designContacts.R[0][0], profile.designContacts.R[0][1]]] };
   const inStance = (side, phase) => windows[side].some(([a, b]) => phase >= a - 1e-9 && phase <= b + 1e-9);
   const stanceMin = [], swingMin = [];
   records.forEach((r, i) => {
@@ -352,7 +354,7 @@ const flex = (rec, side, kind) => {
   const kneeSeries = { L: records.map(r => deg(flex(r, 'L', 'knee'))), R: records.map(r => deg(flex(r, 'R', 'knee'))) };
   const elbowSeries = { L: records.map(r => deg(flex(r, 'L', 'elbow'))), R: records.map(r => deg(flex(r, 'R', 'elbow'))) };
   // touchdown and stance extremes (left foot touchdown is at phase 0; the right at 0.5)
-  const tdIndex = { L: 0, R: M / 2 }, stanceEnd = { L: Math.round(profile.contacts.L[0][1] * M), R: Math.round(profile.contacts.R[0][1] * M) };
+  const tdIndex = { L: 0, R: M / 2 }, stanceEnd = { L: Math.round(profile.designContacts.L[0][1] * M), R: Math.round(profile.designContacts.R[0][1] * M) };
   const tdFlex = ['L', 'R'].map(s => kneeSeries[s][tdIndex[s]]);
   const stancePeak = ['L', 'R'].map(s => { let m = -1e9; for (let i = tdIndex[s]; i <= stanceEnd[s]; i++) m = Math.max(m, kneeSeries[s][i]); return m; });
   const swingPeak = ['L', 'R'].map(s => { let m = -1e9; for (let i = stanceEnd[s]; i < tdIndex[s] + M; i++) m = Math.max(m, kneeSeries[s][i % M]); return m; });
@@ -390,7 +392,7 @@ const flex = (rec, side, kind) => {
 
 // -- 5 centre-of-mass dynamics ------------------------------------------------------------------------------------
 {
-  const V = profile.referenceMps;
+  const V = profile.designReferenceMps;
   const zs = records.map(r => r.com[1]);
   const flightFits = flights.map(([a, b]) => {
     const idx = []; for (let i = a; i < b; i++) idx.push(i);
@@ -402,7 +404,7 @@ const flex = (rec, side, kind) => {
   const h = T / N, key = keyIdx.map(i => records[i].com);
   const accel = key.map((c, k) => [0, 1, 2].map(ax => (key[(k + 1) % N][ax] - 2 * c[ax] + key[(k + N - 1) % N][ax]) / (h * h)));
   const keyPhase = k => k / N;
-  const stanceKeys = side => { const [a, b] = side === 'L' ? [0, profile.contacts.L[0][1]] : [0.5, profile.contacts.R[0][1]]; return key.map((_, k) => k).filter(k => keyPhase(k) >= a - 1e-9 && keyPhase(k) <= b + 1e-9); };
+  const stanceKeys = side => { const [a, b] = side === 'L' ? [0, profile.designContacts.L[0][1]] : [0.5, profile.designContacts.R[0][1]]; return key.map((_, k) => k).filter(k => keyPhase(k) >= a - 1e-9 && keyPhase(k) <= b + 1e-9); };
   const stanceReport = ['L', 'R'].map(side => {
     const ks = stanceKeys(side), az = ks.map(k => accel[k][1]), as = ks.map(k => accel[k][2]);
     const third = Math.max(1, Math.floor(ks.length / 3));
@@ -419,7 +421,7 @@ const flex = (rec, side, kind) => {
   const rifleFits = flights.map(([a, b]) => { const idx = []; for (let i = a; i < b; i++) idx.push(i); const fit = Quadratic(idx.map(i => times[i % M] + Math.floor(i / M) * T), idx.map(i => withRifle[i % M])); return R(2 * fit.a, 3); });
   out.com = { flightParabola: flightFits, flightAccelWithRifleMps2: rifleFits, comDefinition: 'de Leva 1996 male segment masses, joint-centre segments, trunk = neck base to pelvis joint (COM 51.38 % from the neck end)', stance: stanceReport, verticalPeakToPeakCm: R((pelvisBob[1] - pelvisBob[0]) * 100, 2), lateralPeakToPeakCm: R((swayLat[1] - swayLat[0]) * 100, 2), surgePeakToPeakCm: R((surge[1] - surge[0]) * 100, 2),
     stepsPerMin: R(stepsPerMin, 1), speedMps: V, stepLengthM: R(stepM, 3), strideM: R(stepM * 2, 3), stepLengthPerHeight: R(stepM / TARGET_HEIGHT, 3), stanceS: stanceMean, flightS: flightMean,
-    dutyFactorDesign: R((profile.contacts.L[0][1] - profile.contacts.L[0][0]) * 2, 3), dutyFactorUnder3p5cm: R(stanceMean / (stanceMean + flightMean), 3), froude: R(V * V / (G * 0.87), 2) };
+    dutyFactorDesign: R((profile.designContacts.L[0][1] - profile.designContacts.L[0][0]) * 2, 3), dutyFactorUnder3p5cm: R(stanceMean / (stanceMean + flightMean), 3), froude: R(V * V / (G * 0.87), 2) };
   const accelOk = flightFits.every(f => Math.abs(f.accelMps2 + G) / G <= 0.15);
   const signsOk = stanceReport.every(s => s.firstThirdHorizontalMps2 < -0.3 && s.lastThirdHorizontalMps2 > 0.3 && s.peakVerticalAccelMps2 > 0.8 * G && s.peakVerticalAccelMps2 < 2.6 * G);
   Gate(5, 'center of mass', `flight a ${flightFits.map(f => f.accelMps2)} (-9.81 +-15%), bob ${out.com.verticalPeakToPeakCm} cm, GRF peak ${stanceReport.map(s => s.grfPeakBw)} BW, brake/push ${stanceReport.map(s => s.firstThirdHorizontalMps2 + '/' + s.lastThirdHorizontalMps2)}, ${R(stepsPerMin, 0)} steps/min, ${V} m/s`,
@@ -521,6 +523,17 @@ const flex = (rec, side, kind) => {
   out.secondary = { pack: 'rigid on Spine2 (the model has no pack bones; none added)', rifleVerticalAmplitudeCm: R(amp(rifle) * 100, 2), chestVerticalAmplitudeCm: R(amp(chest) * 100, 2), rifleLagBehindChestDeg: R(lag > 180 ? lag - 360 : lag, 1) };
   Gate(7, 'secondary', `rifle bob ${R(amp(rifle) * 100, 1)} cm vs chest ${R(amp(chest) * 100, 1)} cm, lag ${R(lag > 180 ? lag - 360 : lag, 0)} deg (pack rigid, none added)`,
     amp(rifle) <= amp(chest) && amp(rifle) >= 0.5 * amp(chest) && (lag > 180 ? lag - 360 : lag) >= 5 && (lag > 180 ? lag - 360 : lag) <= 90);
+}
+
+// -- the runtime profile (production rule, model units) is fresh, and the runtime loads this revision -----------------
+{
+  const measured = MeasureProfile(data);
+  for (const key of ['duration', 'referenceMps', 'contacts']) assert.deepEqual(profile[key], measured[key], `profile.${key} is stale: run _import/Script_RifleHoldRunProfile.mjs`);
+  assert.equal(data.revision, ALLY_GAIT.holdRunVersion, 'Data_Tuning_AllyGait.holdRunVersion matches the shipped clip revision');
+  const runtimeScale = S, runtimeMps = measured.referenceMps * runtimeScale;
+  assert.ok(Math.abs(runtimeMps - profile.designReferenceMps) / profile.designReferenceMps < 0.03, `measured toe speed ${R(runtimeMps, 3)} m/s vs design ${profile.designReferenceMps}`);
+  assert.ok(ALLY_GAIT.holdRunBelowMps < runtimeMps && runtimeMps < ALLY_GAIT.holdRunAboveMps + 1.2, 'the run speed band brackets the clip speed');
+  out.runtimeProfile = { referenceMpsModelUnits: measured.referenceMps, referenceMpsRuntime: R(runtimeMps, 3), contacts: measured.contacts, rule: 'toe joint within 3.5 cm of its floor and travelling back > 0.12 m/s for > 75 ms, 120 Hz (Script_LocomotionProfileBake)' };
 }
 
 // -- every Tengxian model binds every track ------------------------------------------------------------------------

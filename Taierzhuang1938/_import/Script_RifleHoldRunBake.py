@@ -47,7 +47,7 @@ sheets = project.parent / 'tmp/RifleHoldRun/Sheets' / ROUND
 private.mkdir(parents=True, exist_ok=True)
 output.mkdir(parents=True, exist_ok=True)
 
-REVISION = '20261021RifleHoldRunV1'
+REVISION = '20261021RifleHoldRunV2'
 G = 9.81
 # ---------------------------------------------------------------------------------------------------- parameters
 GAIT = dict(
@@ -626,8 +626,11 @@ def Bake(ctx):
         tracks.append({'name': 'HoldRifle.' + prop_, 'type': kind, 'times': times, 'values': [round(v, 6) for s in props for v in s[off:off + width]]})
     clip = {'name': 'RifleHoldRun', 'uuid': 'RifleHoldRun', 'duration': round(T, 6), 'tracks': tracks, 'blendMode': 2500}
     stance_share = GAIT['stanceShare']
-    profile = {'duration': round(T, 6), 'cycles': 1, 'source': 'procedural', 'referenceMps': V,
-               'contacts': {'L': [[0.0, round(stance_share, 6)]], 'R': [[0.5, round(0.5 + stance_share, 6)]]},
+    design = {'L': [[0.0, round(stance_share, 6)]], 'R': [[0.5, round(0.5 + stance_share, 6)]]}
+    # designReferenceMps is in runtime metres; referenceMps / contacts are what the runtime locomotion reads (model units,
+    # measured with the production rule) and are overwritten by _import/Script_RifleHoldRunProfile.mjs after this bake.
+    profile = {'duration': round(T, 6), 'cycles': 1, 'source': 'procedural', 'referenceMps': round(V / factor, 6),
+               'designReferenceMps': V, 'designContacts': design, 'contacts': design,
                'floorM': [round(min(min(p) for p in report['floor']), 4), round(max(max(p) for p in report['floor']), 4)],
                'leanDeg': [round(min(report['lean']), 2), round(max(report['lean']), 2)],
                'gripSpanM': [round(min(report['span']), 4), round(max(report['span']), 4)],

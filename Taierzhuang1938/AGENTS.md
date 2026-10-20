@@ -113,7 +113,7 @@
 - **01 洞口过场 2026-09-26 现场修订**（CaptiveDragged 起的独立机位已由上一条取消）：[渐显、翻译避让、踹国军旗与独立摄影机](docs/Data_OpeningCinematic20260926.md)。CaptiveDragged→Wipe 使用独立机位，Reach 回到第一人称；这段覆盖旧 SB03 倒地旁观镜头与人物旧站位。同文第二轮：日军走动背枪、翻译空手走/小跑（`Script_RelaxedGait` + `Animation/RelaxedGait`，门禁 `Script_RelaxedGaitTest`），日兵乙发现伤兵后喊翻译（`InterpreterCall`）。
 
 - **01 日军先头兵警戒持枪小跑（2026-09-27）**：日兵甲、乙入场从背枪放松走改为双手持枪、站直小跑、头左右扫视（`SetRelaxedGait(...,"alert")`，BlenderMCP 烘的 `Animation/IjaAlertGait` 三条），到位甩枪上背再拖人。口径与重烘见 [IjaAlertGait](Animation/IjaAlertGait/Data_IjaAlertGait.md)，门禁 `Script_IjaAlertGaitTest`。
-- **双手持枪跑动 `RifleHoldRun`（2026-10-21，未接运行时）**：共用骨架上用 Blender 从质心抛物线反解出的一条原地跑循环（3.2 m/s、167 步/分、前倾 19°、双手握中正式枪，武器轨 `HoldRifle`）。口径、实测、出处与接入点见 [RifleHoldRun](Animation/RifleHoldRun/Data_RifleHoldRun.md)，门禁 `Script_RifleHoldRunTest`（animation 域）。
+- **双手持枪跑动 `RifleHoldRun`（2026-10-21，已接 AllyGait）**：共用骨架上用 Blender 从质心抛物线反解出的一条原地跑循环（3.2 m/s、167 步/分、前倾 19°、双手握中正式枪）。国军步枪兵不戒备、速度 > 2.6 m/s 时由 `Script_AllyGaitPolicy.SelectAllyGait` 换上（威胁/开火/蹲/各优先姿态、P012 背枪行军照旧）。口径、实测、出处与接入细节见 [RifleHoldRun](Animation/RifleHoldRun/Data_RifleHoldRun.md)，门禁 `Script_RifleHoldRunTest`（animation 域）、`Script_AllyGaitTest` / `Script_AllyGaitBrowserTest`（allyGait 域）。
 
 - **01 日兵甲翻越塌顶木、从木头底下拖出顺子（2026-09-27，已被 2026-09-27 改稿取代：不再拖出）**：[翻越与倒拖](docs/Data_OpeningVaultHaul20260927.md)。Found 不再穿木头走进坑，DragOut 不再背对顺子往前走；三条新动作只烘 IJA02，烘焙 spec 新增 `groundWeight`。
 

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {Object3D, Quaternion, Vector3} from 'three';
 import { ALLY_GAIT } from './Data_Tuning_AllyGait.mjs';
-import { SelectAllyGait, AllyGaitThreat, CrouchWalkBySpeed } from './Script_AllyGaitPolicy.mjs';
+import { SelectAllyGait, AllyGaitThreat, CrouchWalkBySpeed, HoldRunBySpeed } from './Script_AllyGaitPolicy.mjs';
 import { LoadGlb, PoseScene, BuildSkin, MinSkinnedY } from './_import/Script_LugouGlbPose.mjs';
 const file=path.join(import.meta.dirname,'Animation/AllyGait/Animation_TengxianAllyGait.json');
 const data=JSON.parse(fs.readFileSync(file));
@@ -28,6 +28,30 @@ assert.ok(AllyGaitThreat(calm,{firing:true}));
 assert.equal(SelectAllyGait({...calm,missionCombatAlert:true},{crouch:1,moveSpeedMps:0},'KneelHold'),'KneelHold');
 assert.equal(SelectAllyGait({...calm,missionCombatAlert:true},{crouch:1,moveSpeedMps:.8},'RifleCrouchAdvance'),'AllyCrouchReady');
 assert.equal(SelectAllyGait({...calm,missionCombatAlert:true},{},'AdvanceFire'),'AdvanceFire');
+// RifleHoldRun: the calm fast run of an NRA rifleman (RifleRun above holdRunAboveMps, with hysteresis and a hold).
+{
+  const memory={running:false,frames:0},run=speed=>SelectAllyGait(calm,{moveSpeedMps:speed},'RifleRun',0,memory);
+  const hold=ALLY_GAIT.holdRunSwitchFrames;
+  assert.equal(SelectAllyGait(calm,{moveSpeedMps:3.2},'RifleRun'),'RifleRun','no memory from the caller: the feature is off');
+  for(let f=0;f<hold-1;f++)assert.equal(run(3.2),'RifleRun','a pace has to hold before the switch');
+  assert.equal(run(3.2),'RifleHoldRun','held fast pace becomes the hold run');
+  assert.equal(run(2.45),'RifleHoldRun','no switch down inside the hysteresis band');
+  for(let f=0;f<hold-1;f++)assert.equal(run(2.0+f*.02),'RifleHoldRun','one slow update does not flicker');
+  assert.equal(run(2.0),'RifleRun','held slow pace returns to the production run');
+  assert.equal(run(2.45),'RifleRun','no switch up inside the hysteresis band');
+  assert.ok(ALLY_GAIT.holdRunBelowMps<ALLY_GAIT.holdRunAboveMps&&ALLY_GAIT.holdRunBelowMps>ALLY_GAIT.walkMaximumMps);
+  const fast=()=>({running:true,frames:0});
+  assert.equal(SelectAllyGait({...calm,targetVisible:true},{moveSpeedMps:3.2},'RifleRun',0,fast()),'RifleRun','threat keeps the ready run');
+  assert.equal(SelectAllyGait(calm,{moveSpeedMps:3.2},'RifleRun',.4,fast()),'RifleRun','the ready hold after a threat keeps the ready run');
+  assert.equal(SelectAllyGait(calm,{moveSpeedMps:3.2,crouch:1},'RifleRun',0,fast()),'RifleRun','crouching is never the hold run');
+  assert.equal(SelectAllyGait(calm,{moveSpeedMps:3.2},'BackRifleRun',0,fast()),'BackRifleRun','the slung P012 march keeps its own run');
+  for(const field of ['dead','carryRole','meleeCombat','prone','kneel','woundedWalk','throwing','reach','melee','binoculars'])
+    assert.equal(SelectAllyGait(calm,{moveSpeedMps:3.2,[field]:1},'RifleRun',0,fast()),'RifleRun',field+' retains priority');
+  for(const field of ['p012AwaitingWeapon','relaxedGait','openingActorPerformance','openingStoryboardPose','missionRescueTarget'])
+    assert.equal(SelectAllyGait({...calm,[field]:true},{moveSpeedMps:3.2},'RifleRun',0,fast()),'RifleRun',field+' retains priority');
+  assert.equal(SelectAllyGait({...calm,missionCombatAlert:true},{moveSpeedMps:3.2},'RifleRun',0,fast()),'RifleRun','a live mission alert keeps the ready run');
+  assert.ok(HoldRunBySpeed(3.2,{running:true,frames:0}));
+}
 // IJA crouch gait selection by speed, with hysteresis between the creep and the crouch walk.
 assert.equal(CrouchWalkBySpeed(.2,false),false);assert.equal(CrouchWalkBySpeed(1.4,false),true);
 assert.equal(CrouchWalkBySpeed(.4,false),false,'no switch up inside the hysteresis band');
@@ -81,15 +105,38 @@ const {InstallAllyGait}=await import('./Script_AllyGait.mjs');
 const savedFetch=globalThis.fetch;
 let aimCalls=0,gestureCalls=0;
 try{
-  globalThis.fetch=async()=>({ok:true,json:async()=>data});
+  const holdRunData=JSON.parse(fs.readFileSync(path.join(import.meta.dirname,'Animation/RifleHoldRun/Animation_TengxianRifleHoldRun.json')));
+  assert.equal(holdRunData.revision,ALLY_GAIT.holdRunVersion,'RifleHoldRun asset cache version matches the shipped clip');
+  globalThis.fetch=async url=>({ok:true,json:async()=>String(url).includes('RifleHoldRun')?holdRunData:data});
+  let baseId='AdvanceFire';
   const rig={modelId:'TengxianNra02',root:new Object3D(),clipById:new Map(),locomotion:{profiles:{}},
-    _ActionForState:()=> 'AdvanceFire',Update(){},CanPlayInfantry:()=>true,
+    _ActionForState:()=>baseId,Update(){},CanPlayInfantry:()=>true,
     speakerGesture:{AfterActorAim(){gestureCalls++;}}};
   const actor={characterRig:rig,_UpdateInfantryProps(){},_ApplyRiggedAim(){aimCalls++;}};
   await InstallAllyGait({actor});
+  // The fast calm run: clip, its measured profile (model units), no weapon track left to bind, selection by speed.
+  const holdClip=rig.clipById.get('RifleHoldRun');
+  assert.ok(holdClip&&holdClip.tracks.length>50&&!holdClip.tracks.some(t=>t.name.startsWith('HoldRifle.')),'RifleHoldRun installed without its weapon track');
+  assert.equal(rig.locomotion.profiles.RifleHoldRun.referenceMps,holdRunData.profiles.RifleHoldRun.referenceMps);
+  assert.ok(rig.locomotion.profiles.RifleHoldRun.contacts.L.length&&rig.locomotion.profiles.RifleHoldRun.contacts.R.length);
+  baseId='RifleRun';
+  const ids=[];
+  for(let f=0;f<ALLY_GAIT.holdRunSwitchFrames+2;f++)ids.push(rig._ActionForState({moveSpeedMps:3.2}));
+  assert.ok(ids.includes('RifleHoldRun'));
+  assert.equal(rig._ActionForState({moveSpeedMps:3.2,crouch:1}),'RifleRun');
+  baseId='AdvanceFire';
   rig.currentId='AllyCarryStand';actor._ApplyRiggedAim({aim:1});
   assert.equal(gestureCalls,1,'dialogue still clears the placed rifle');
   assert.equal(aimCalls,0,'remembered aim does not raise the carrying arm');
   actor._ApplyRiggedAim({aim:1,firing:true});
   assert.equal(aimCalls,1,'real fire retains the original aim solver');
+  // The fast calm run holds the rifle the same way: remembered aim leaves the arms alone, fire hands them to the aim layer.
+  rig.currentId='RifleHoldRun';gestureCalls=0;
+  actor._ApplyRiggedAim({aim:1});
+  assert.equal(aimCalls,1,'remembered aim does not lift the rifle out of the hold run');
+  assert.equal(gestureCalls,1,'dialogue still clears the held rifle');
+  actor._ApplyRiggedAim({aim:1,firing:true});
+  assert.equal(aimCalls,2,'real fire in a hold run retains the original aim solver');
+  rig.currentId='RifleRun';actor._ApplyRiggedAim({aim:1});
+  assert.equal(aimCalls,3,'the production run keeps its aim layer');
 }finally{globalThis.fetch=savedFetch;}

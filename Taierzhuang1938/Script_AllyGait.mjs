@@ -2,10 +2,25 @@
 import { AnimationClip, Object3D, Vector3, Quaternion } from 'three';
 import { ALLY_GAIT as C } from './Data_Tuning_AllyGait.mjs';
 import { AllyGaitThreat, SelectAllyGait, CrouchWalkBySpeed } from './Script_AllyGaitPolicy.mjs';
-let promise;
+let promise, holdRunPromise;
 export function LoadAllyGait() {
   return promise ||= fetch(`./Animation/AllyGait/Animation_TengxianAllyGait.json?v=${C.version}`)
     .then(r => { if (!r.ok) throw new Error('AllyGait HTTP '+r.status); return r.json(); });
+}
+// RifleHoldRun (Animation/RifleHoldRun, Blender, _import/Script_RifleHoldRunBake.py): the calm fast run, rifle in both hands
+// across the chest. Optional: a failed load leaves the production RifleRun in charge. The rifle itself is mounted by the actor's
+// own two-hand rule (right grip -> left grip, up from the torso), which is the rule the clip was authored against, so the
+// clip's HoldRifle weapon track is not used here.
+export function LoadRifleHoldRun() {
+  return holdRunPromise ||= fetch(`./Animation/RifleHoldRun/Animation_TengxianRifleHoldRun.json?v=${C.holdRunVersion}`)
+    .then(r => { if (!r.ok) throw new Error('RifleHoldRun HTTP '+r.status); return r.json(); })
+    .then(data => {
+      const clip=AnimationClip.parse(data.clips.find(json=>json.name==='RifleHoldRun'));
+      clip.tracks=clip.tracks.filter(t=>!t.name.startsWith(data.weaponTrack+'.'));
+      const p=data.profiles.RifleHoldRun;
+      return {clip,profile:{duration:p.duration,referenceMps:p.referenceMps,contacts:p.contacts}};
+    })
+    .catch(error=>{console.warn('[RifleHoldRun]',error);return null;});
 }
 let crouchWalk=null;
 // IJA riflemen share TengxianHumanoidV1 (identical rest bones), so the ready crouch walk plays
@@ -33,9 +48,14 @@ export async function InstallAllyGait(soldier) {
   const actor=soldier?.actor, rig=actor?.characterRig;
   if (rig?.modelId?.startsWith('TengxianIja')) return InstallCrouchWalk(soldier);
   if (!rig?.modelId?.startsWith('TengxianNra') || rig.allyGaitInstalled) return;
-  const data=await LoadAllyGait();
+  const [data,holdRun]=await Promise.all([LoadAllyGait(),LoadRifleHoldRun()]);
   if (rig.disposed || rig.allyGaitInstalled) return;
   rig.allyGaitInstalled=true;
+  if (holdRun) {
+    rig.clipById.set('RifleHoldRun',holdRun.clip);
+    rig.locomotion.profiles={...rig.locomotion.profiles,RifleHoldRun:holdRun.profile};
+  }
+  const holdRunMemory={running:false,frames:0};
   const helper=new Object3D();helper.name='AllyRifle';rig.root.add(helper);
   const propTracks=new Map();
   for (const json of data.clips) {
@@ -51,7 +71,7 @@ export async function InstallAllyGait(soldier) {
   rig._ActionForState=function SelectAllyLocomotion(state={}) {
     const id=select.call(this,state);
     if (this.forcedClip || actor.ragdollState || !this.CanPlayInfantry()) return id;
-    const chosen=SelectAllyGait(soldier,state,id,readySeconds);
+    const chosen=SelectAllyGait(soldier,state,id,readySeconds,holdRun?holdRunMemory:null);
     if (chosen.startsWith('Ally')) this.p012BackRifleActive=false;
     return chosen;
   };
@@ -84,8 +104,9 @@ export async function InstallAllyGait(soldier) {
     if (total>0 && !this.goreWeaponHold) this._ApplyInfantryProp(this.weaponGroup,helper,rig.allyCarryWeight);
   };
   actor._ApplyRiggedAim=function AimAllyRifle(state) {
-    // Carry clips release the left arm; the inherited AI aim value must not raise it again.
-    if (rig.currentId.includes('Carry') && rig.currentId.startsWith('Ally') && !state.firing) {
+    // Carry clips release the left arm; the inherited AI aim value must not raise it again. The fast calm run holds the rifle
+    // with both hands across the chest the same way: only real fire hands the arms to the aim layer.
+    if ((rig.currentId==='RifleHoldRun' || rig.currentId.includes('Carry') && rig.currentId.startsWith('Ally')) && !state.firing) {
       rig.speakerGesture?.AfterActorAim();
       return;
     }

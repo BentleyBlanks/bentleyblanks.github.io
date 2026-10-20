@@ -1,15 +1,16 @@
 # RifleHoldRun：双手持枪跑动（原地循环）
 
 2026-10-21 按用户给的三视图（正 / 侧 / 背，国军步兵双手持栓动步枪快跑）在共用骨架 `TengxianHumanoidV1`（参考外观 `Model_TengxianNra02.glb`）上用 Blender 做的一条循环动作。
-**这一版只交资产、重建脚本、门禁和说明，没有接进游戏运行时**（接入点见文末）。不改模型、贴图、蒙皮权重，也不动其他步态。
+**2026-10-21 已接进运行时**：国军步枪兵不戒备的快跑（> 2.6 m/s）播这条（见文末「运行时接入」）。不改模型、贴图、蒙皮权重，也不动其他步态。
 
 ## 文件
 
 | 文件 | 内容 |
 | --- | --- |
-| `Animation_TengxianRifleHoldRun.json` | 一条 three.js `AnimationClip` JSON：`RifleHoldRun`（时长 0.72 s，30 键/周期，从 0 s 起，末键 = 首键）+ 武器轨 `HoldRifle.position/quaternion` + `profiles.RifleHoldRun`（参考速度、接触区间、实测摘要）。骨名按 GLTFLoader 净化后的写法；不动的轨道只存一键 |
+| `Animation_TengxianRifleHoldRun.json` | 一条 three.js `AnimationClip` JSON：`RifleHoldRun`（时长 0.72 s，30 键/周期，从 0 s 起，末键 = 首键）+ 武器轨 `HoldRifle.position/quaternion` + `profiles.RifleHoldRun`（运行时读的 `referenceMps`（模型单位）/ `contacts`，以及设计值 `designReferenceMps`（运行时米）/ `designContacts`）。骨名按 GLTFLoader 净化后的写法；不动的轨道只存一键 |
 | `Data_RifleHoldRun.json` | 独立测量（`Script_RifleHoldRunTest.mjs --write` 写出）：逐项实测数、各门禁的通过结论、clip 文件哈希（过期会被门禁发现） |
 | `../../_import/Script_RifleHoldRunPrepare.mjs` | 只导出两份姿态给 Blender：绑定（T）姿态；IjaGuardPort 第 0 帧（仅取「双手握枪」的手型） |
+| `../../_import/Script_RifleHoldRunProfile.mjs` | 烘完之后跑：用生产步态剖面的同一条规则（`Script_LocomotionProfileBake`：趾关节离地 < 3.5 cm 且后退 > 0.12 m/s 持续 > 75 ms，120 Hz）量出运行时要读的参考速度和接触区间，写回 clip 文件的 `profiles.RifleHoldRun` |
 | `../../_import/Script_RifleHoldRunBake.py` | Blender 烘焙脚本：生成动作、逐帧解算、写 JSON、存 .blend；`RIFLE_HOLD_RUN_RENDER=1` 另出联系图 |
 | `../../Script_RifleHoldRunTest.mjs` | 纯 Node 门禁（quick 层、animation 域） |
 
@@ -84,10 +85,18 @@ Data 里记的「支撑脚不滑」口径：鞋底有两个材质锚点（静止
 - 支撑中段膝屈 73°、骨盆偏低：来自「腿 0.772 m + 质心起伏 8 cm + 触地 0.24 s」，不是漏做。
 - 腾空占比在 3.5 cm 阈值下量出 20%，设计值 33%（两脚都离地的真实时间）；两者差在落地前 / 离地后鞋底仍在 3.5 cm 内的那几十毫秒。
 - 次级运动只有枪的软挂载（晚 9°）；背包 / 弹药盒 / 水壶随脊柱骨刚性运动，没有单独骨，按任务要求没有硬加。
-- 武器轨 `HoldRifle` 尚无运行时消费方。
+- 武器轨 `HoldRifle` 运行时不用（见下），留在文件里是烘焙与测量的参照。
 
-## 建议的接入点（本次不做）
+## 运行时接入（2026-10-21）
 
-- 以 `Script_AllyGait.mjs` 为样板：加载 JSON、`AnimationClip.parse`、把 `HoldRifle.*` 轨摘出来驱动一个 helper，沿用 `_UpdateInfantryProps` / `_ApplyInfantryProp` 把枪挂到 helper 上（运行时会把 helper 位置收回真右掌，枪轴向左握点）。
-- 选片点：国军步枪兵在 `RifleRun` / `BackRifleRun` 的跑步档里，速度落在约 2.6–3.8 m/s 且持枪、无蹲卧搬运等优先姿态时换成 `RifleHoldRun`；播放倍率 = 实际速度 / `profiles.RifleHoldRun.referenceMps`（3.2，运行时米）。
-- `profiles.RifleHoldRun.contacts` 给了左右脚接触区间（设计值 0–0.333、0.5–0.833 周期），可进 `ACTOR_LOCOMOTION_PROFILES` 做速度同步。
+改动都在 AllyGait 这一层（国军步枪兵共用，第一关班里的人和白盒工具的国军木偶都装它）：
+
+- `Script_AllyGaitPolicy.mjs` `SelectAllyGait(…, holdRun)`：站立、不戒备（无威胁、不在 `readyHoldS` 内、无 `missionCombatAlert`）、基础选片为 `RifleRun`、速度 > `holdRunAboveMps`（2.6 m/s）时换成 `RifleHoldRun`；低于 `holdRunBelowMps`（2.3）才换回，换档要连续 `holdRunSwitchFrames`（6）次更新（滞回 + 保持，和 RelaxedGait 的走/跑切换同形）。优先姿态（死亡、搬运、白刃、卧、跪、蹲、受伤跛行、投弹、伸手、望远镜、离地、开场/任务接管、P012 等武器、`relaxedGait`）一律照旧，威胁、开火时仍是生产的 `RifleRun`，P012 背枪行军（`BackRifleRun`）也不动。`Data_Tuning_AllyGait` 里这些数可调。
+- `Script_AllyGait.mjs`：`LoadRifleHoldRun()` 取 JSON（`?v=holdRunVersion`，缓存版本 = clip 的 `revision`，门禁对账），解析 clip、剥掉 `HoldRifle.*` 轨，装进每个国军 rig 的 `clipById`，并把 `profiles.RifleHoldRun`（模型单位）放进该 rig 的 `locomotion.profiles`——速度分摊（播放倍率 × 步幅缩放）、支撑脚锁定都吃这张表。装不上（取不到文件）就静默退回生产 `RifleRun`。
+- 枪不走武器轨：运行时本来就按「右握点定位、朝左握点定向、上取躯干上向」摆双手枪，正是烘焙时对照的那条规则，所以 `HoldRifle` 轨没用上，中正式、汉阳造都按自己的枪模挂在同一对握点上（浏览器门禁量过：左握点离枪轴 0.01 mm，握距 0.34 m）。
+- `_ApplyRiggedAim`：保持姿势时（`RifleHoldRun` 且没在开火）不把「残留的 aim 值」交给瞄准层——否则双臂被拽成平端，枪口回到水平；真开火才交（和扛枪走的做法一样）。
+- `index.html` 里这三个模块的缓存戳已 +1。
+
+**门禁**：`Script_AllyGaitTest`（策略：滞回/保持/威胁/蹲/各优先姿态/BackRifleRun；装 clip、剖面、剥轨；瞄准钩子）、`Script_RifleHoldRunTest`（clip 的剖面没过期、`holdRunVersion` 对账、测出的趾速换成运行时米与设计值差 < 3%）、`Script_AllyGaitBrowserTest`（真引擎里的真国军 rig：中正式 / 汉阳造都播 `RifleHoldRun`，前倾 19°，支撑脚锁定误差 0，落脚与腾空，左握点在枪轴上，枪口侧视俯仰，威胁同速度仍是 `RifleRun`）。
+
+**没做的**：IJA 不用（它们有自己的警戒小跑，且这条是国军参考）；玩家第一人称不用；`BackRifleRun`（P012 背枪行军）不动；扛枪行军属于另一条动作，不在这里。
