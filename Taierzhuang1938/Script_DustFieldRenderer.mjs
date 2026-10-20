@@ -150,6 +150,11 @@ uniform vec4 uSkinRect;
 uniform vec4 uSkinShape;      // h, lift, shockR, frontV
 uniform vec2 uImpact;
 uniform float uSkinPatch;
+uniform float uPuffFreq;
+uniform float uPuffPop;
+uniform float uPuffRef;
+uniform float uPuffEdge;
+uniform float uPuffHaze;
 uniform vec3 uSkinColor;
 uniform float uSkinPhaseG;
 uniform vec4 uSurgeRect;      // minX, minZ, 1/size, 1/size
@@ -211,6 +216,22 @@ vec2 Smoothed(vec2 uv, vec2 size){
   return (i + f - 0.5) / size;
 }
 
+// 三次 B 样条（四次硬件双线性取样，C2 连续）：大炸弹的网格一格一米多，smoothstep 插值在格心是平的，
+// 尘浪顶面会变成一格格枕头似的鼓包（画面上是一圈圈波纹）。
+vec4 BSpline(sampler2D tex, vec2 uv){
+  vec2 size = vec2(textureSize(tex, 0));
+  vec2 st = uv * size - 0.5, i = floor(st), f = st - i;
+  vec2 f2 = f * f, f3 = f2 * f;
+  vec2 w0 = (1.0 - 3.0 * f + 3.0 * f2 - f3) / 6.0;
+  vec2 w1 = (4.0 - 6.0 * f2 + 3.0 * f3) / 6.0;
+  vec2 w2 = (1.0 + 3.0 * f + 3.0 * f2 - 3.0 * f3) / 6.0;
+  vec2 w3 = f3 / 6.0;
+  vec2 g0 = w0 + w1, g1 = w2 + w3;
+  vec2 h0 = (i - 0.5 + w1 / g0) / size, h1 = (i + 1.5 + w3 / g1) / size;
+  return g0.y * (g0.x * texture(tex, h0) + g1.x * texture(tex, vec2(h1.x, h0.y)))
+       + g1.y * (g0.x * texture(tex, vec2(h0.x, h1.y)) + g1.x * texture(tex, h1));
+}
+
 // 两层尘的「平均」消光系数（不含噪声）。fresh 输出按消光加权的新鲜度。
 float gNearSurge = 0.0;   // Field 顺手报：采样点在贴地尘浪那一层里（主循环据此加密步长）
 float Field(vec3 p, out float fresh){
@@ -219,7 +240,7 @@ float Field(vec3 p, out float fresh){
   vec2 su = (p.xz - uSurgeRect.xy) * uSurgeRect.zw;
   float groundHere = uBaseY;
   if (su.x > 0.0 && su.y > 0.0 && su.x < 1.0 && su.y < 1.0) {
-    vec4 s = texture(uSurge, Smoothed(su, vec2(textureSize(uSurge, 0))));
+    vec4 s = BSpline(uSurge, su);
     // 地面高用普通双线性：smoothstep 插值在格心处是平的，坡上会变成一级级台阶（沟壁上一道道横纹）
     s.x = texture(uSurge, su).x;
     groundHere = uBaseY + s.x;
@@ -238,7 +259,7 @@ float Field(vec3 p, out float fresh){
   }
   vec2 lu = (p.xz - uLoftRect.xy) * uLoftRect.zw;
   if (lu.x > 0.0 && lu.y > 0.0 && lu.x < 1.0 && lu.y < 1.0) {
-    vec4 l = texture(uLoft, Smoothed(lu, vec2(textureSize(uLoft, 0))));
+    vec4 l = BSpline(uLoft, lu);
     if (l.x > 1e-4) {
       float zb = uBaseY + l.y / l.x, zt = uBaseY + l.z / l.x, th = max(0.4, zt - zb);
       float u = (p.y - zb) / th;
@@ -265,26 +286,28 @@ float Skin(vec3 p, out float near){
   float h = uSkinShape.x, y = p.y - ground - uSkinShape.y;
   if (y < -0.5 || y > 1.15 * h + 0.6) return 0.0;
   near = 1.0;
-  float front = smoothstep(-1.5, 0.0, uAge * uSkinShape.w - length(p.xz - uImpact));
-  // 很细的浮土（用户：「很细的尘土，不是来自炮弹本身，是震动把地面上的尘土震起来」）：
-  // 斑驳用固定的米制尺度（不随当量放大）—— 一缕一缕、一小撮一小撮，几十厘米到一米多；
-  // 三层噪声都随时间往上、往外慢慢飘，像一层薄纱在动。
-  vec3 fp = vec3(p.x - uSkinRect.x, y, p.z - uSkinRect.y);
-  float n1 = texture(uNoise, fp * vec3(0.17, 0.3, 0.17) + vec3(uSeed * 3.1, -uAge * 0.06, uSeed * 1.7)).b;
-  float n2 = texture(uNoise, fp * vec3(0.26, 0.45, 0.26) + vec3(uSeed * 1.3, -uAge * 0.11, 0.37)).g;
-  float n3 = texture(uNoise, fp * vec3(0.62, 0.9, 0.62) + vec3(0.71, -uAge * 0.2, uSeed * 2.9)).g;
-  // 放射状条纹：用方向向量（连续，不在 ±π 处起接缝）取噪声，沿半径变化慢、绕圈变化快
   vec2 rel = p.xz - uImpact;
   float rad = length(rel);
-  vec2 dir = rel / max(rad, 1e-3);
-  float streak = texture(uNoise, vec3(dir * 2.4 + uSeed, rad * 0.05 - uAge * 0.05)).r;
-  float n = n1 * 0.42 + n2 * 0.33 + n3 * 0.25;
-  float wisp = smoothstep(0.2, 0.8, n + 0.22 * (streak - 0.5));
-  k *= mix(1.0, 0.25 + wisp * 1.5, uSkinPatch);
-  // 顶面跟着大缕起伏：一缕高一缕低，不是一刀切平的面
-  float top = h * (0.5 + 1.0 * n1);
-  float prof = smoothstep(-0.45, -0.05, y) * (1.0 - smoothstep(0.2 * top, top + 0.05, y));
-  return k / h * prof * front;
+  float front = smoothstep(-1.5, 0.0, uAge * uSkinShape.w - rad);
+  // 震起的细浮土（用户 2026-10-21；对照参考：155 mm 实弹靶场、工兵爆破）：火球与黑烟周围贴地铺开的一条浅色低尘带，
+  // 一团一团像爆米花 —— 冲击波扫过之后各处在半秒内先后冒起，再连成参差的一片，团顶受光发亮，团与团之间是薄尘。
+  vec3 fp = vec3(p.x - uSkinRect.x, y, p.z - uSkinRect.y);
+  float n1 = texture(uNoise, fp * vec3(0.12, 0.2, 0.12) + vec3(uSeed * 3.1, -uAge * 0.05, uSeed * 1.7)).b;
+  // 爆米花团：Perlin-Worley 卷团噪声，竖直方向压扁（团是矮胖的），随时间往上翻
+  vec3 pq = vec3(fp.x, fp.y * 1.5, fp.z) * uPuffFreq + vec3(uSeed * 5.3, -uAge * 0.12, uSeed * 2.1);
+  // 再叠一层转过一个无理角度、尺度 0.43 倍的噪声：一张 48³ 的平铺贴图在几十米范围里会露出规则的点阵
+  vec3 pr = vec3(pq.x * 0.8 - pq.z * 0.6, pq.y, pq.x * 0.6 + pq.z * 0.8) * 0.43 + vec3(0.17, 0.0, 0.41);
+  float puff = texture(uNoise, pq).r * 0.62 + texture(uNoise, pr).r * 0.38;
+  float puffD = texture(uNoise, pq * 2.7 + vec3(0.31, -uAge * 0.2, 0.57)).g * 0.6 + texture(uNoise, pr * 3.1).g * 0.4;
+  // 一团一团先后冒：每处的起尘时刻 = 冲击波到达 + 0–popS 秒（低频噪声决定谁先谁后）
+  float pop = smoothstep(0.0, 0.15, uAge - rad / uSkinShape.w - n1 * uPuffPop);
+  float kRel = clamp(k / uPuffRef, 0.0, 1.5);
+  float v = puff + 0.35 * (puffD - 0.5) + 0.12 * (kRel - 0.5) - (1.0 - pop) * 0.4;
+  float s = smoothstep(uPuffEdge - 0.08, uPuffEdge + 0.08, v);
+  // 团顶参差：鼓包的地方高，团之间低
+  float top = h * (0.35 + 1.25 * puff);
+  float prof = smoothstep(-0.45, -0.05, y) * (1.0 - smoothstep(0.25 * top, top + 0.05, y));
+  return k / h * prof * front * (uPuffHaze * pop + (1.0 - uPuffHaze) * 2.4 * s);
 }
 
 // 采样坐标的三维扭曲：同一张光滑的场，被扭成一坨一坨的轮廓（菜花边的大形）。
@@ -301,11 +324,15 @@ float Shape(vec3 p, float d){
   if (d < 1e-4) return 0.0;
   vec3 q = p - uDrift + vec3(uSeed * 17.0, -uAge * 0.32, uSeed * 31.0);
   float n = texture(uNoise, q * uBillow).r;
-  float det = texture(uNoise, q * uDetail + vec3(0.0, -uAge * 0.18, 0.0)).g;
+  // 细节一半 Worley、一半平滑值噪声：纯 Worley 在大片薄尘上会把格子边界描成一张多边形网
+  vec4 dn = texture(uNoise, q * uDetail + vec3(0.0, -uAge * 0.18, 0.0));
+  float det = dn.g * 0.5 + dn.b * 0.5;
   float c = 1.0 - exp(-d * uCoverageK);
   float v = c + (n - 0.5) * uErosion + (det - 0.5) * uErosion * 0.45;
+  // 薄的地方阈值过渡放软：大片薄尘整面都落在阈值边上时，硬过渡会把噪声等高线描出来
+  float soft = uEdgeSoft + 0.22 * (1.0 - c);
   // 团块之外留一层柔和的残尘（haze）：稀薄的尘不该被阈值整片吃掉 —— 久留的那层「灰蒙蒙」就是它
-  return smoothstep(uEdge - uEdgeSoft, uEdge + uEdgeSoft, v) * (d + uSolid * c) + d * uHaze * (0.5 + n);
+  return smoothstep(uEdge - soft, uEdge + soft, v) * (d + uSolid * c) + d * uHaze * (0.5 + n);
 }
 
 float ShadowShape(vec3 p, float d){
@@ -391,6 +418,7 @@ function MakeMaterial(shared, noise, quality) {
     uSurge: { value: null }, uLoft: { value: null }, uSkin: { value: null }, uNoise: { value: noise },
     uSkinRect: { value: new THREE.Vector4() }, uSkinShape: { value: new THREE.Vector4(0.3, 0, 0, 160) },
     uImpact: { value: new THREE.Vector2() }, uSkinPatch: { value: 0.75 },
+    uPuffFreq: { value: 0.2 }, uPuffPop: { value: 0.45 }, uPuffRef: { value: 1 }, uPuffEdge: { value: 0.5 }, uPuffHaze: { value: 0.25 },
     uSkinColor: { value: new THREE.Vector3() }, uSkinPhaseG: { value: RENDER.skinPhaseG },
     uSurgeRect: { value: new THREE.Vector4() }, uLoftRect: { value: new THREE.Vector4() },
     uBaseY: { value: 0 }, uBoxMin: { value: new THREE.Vector3() }, uBoxMax: { value: new THREE.Vector3(1, 1, 1) },
@@ -469,6 +497,15 @@ export class DustFieldSystem {
     const surgeTex = MakeTexture(N), loftTex = MakeTexture(N), skinTex = MakeTexture(N);
     material.uniforms.uSurge.value = surgeTex; material.uniforms.uLoft.value = loftTex; material.uniforms.uSkin.value = skinTex;
     material.uniforms.uSkinPatch.value = field.T.shock.patch;
+    {
+      const S = field.T.shock;
+      // 噪声 R 通道最粗一层是一张平铺 4 个 Worley 格：一团 ≈ 平铺 / 4，按 √∛W 放大（大炸弹的团更大）
+      material.uniforms.uPuffFreq.value = 1 / (4 * S.puffM * Math.sqrt(field.scale.cube));
+      material.uniforms.uPuffPop.value = S.popS;
+      material.uniforms.uPuffRef.value = S.center;
+      material.uniforms.uPuffEdge.value = S.puffEdge;
+      material.uniforms.uPuffHaze.value = S.puffHaze;
+    }
     const surface = GROUND_IMPACT_SURFACES[field.surfaceId];
     material.uniforms.uSkinColor.value.fromArray(surface.skin ?? surface.dust);
     material.uniforms.uFreshColor.value.fromArray(surface.fresh);
@@ -520,8 +557,10 @@ export class DustFieldSystem {
       u.uSkinRect.value.set(info.skinRect[0], info.skinRect[1], 1 / info.skinRect[2], 1 / info.skinRect[3]);
       u.uSkinShape.value.set(info.skinH, info.skinLift, info.shockR, info.shockV);
       u.uImpact.value.set(info.impact[0], info.impact[1]);
-      u.uBoxMin.value.set(info.minX, info.minY, info.minZ);
-      u.uBoxMax.value.set(info.maxX, info.maxY, info.maxZ);
+      // 采样坐标的三维扭曲会把尘往外推出数据的范围（大炸弹七八米）：盒子按扭曲幅度留余量，不然尘团顶被盒顶切成一块平盖
+      const pad = u.uWarp.value * 1.6;
+      u.uBoxMin.value.set(info.minX - pad, info.minY, info.minZ - pad);
+      u.uBoxMax.value.set(info.maxX + pad, info.maxY + pad, info.maxZ + pad);
       u.uAge.value = field.time;
       u.uFade.value = info.fade;
       u.uDrift.value.set(field.loftX - e.origin.x, 0, field.loftZ - e.origin.z);

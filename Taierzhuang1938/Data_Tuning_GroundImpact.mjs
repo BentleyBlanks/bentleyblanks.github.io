@@ -57,7 +57,7 @@ export const GROUND_IMPACT_DUST = Object.freeze({
     settleHeavyS: 2.6, settleFineS: 30,
     life: 12,
     // 数值扩散（m²/s，×∛W）：抹掉粗网格上的振荡波纹
-    smoothK: 1.5,
+    smoothK: 3,
   }),
 
   /**
@@ -114,13 +114,16 @@ export const GROUND_IMPACT_DUST = Object.freeze({
    *   （2026-10-21 用户再补：要的是「很细的尘土」—— 薄、透、颗粒细，透过它还看得见地面；所以光学深度比炮弹本身的尘小一个量级）
    */
   shock: Object.freeze({
-    radiusK: 15, frontV: 160, center: 1.2, edge: 0.16, falloff: 1.1,
+    radiusK: 15, frontV: 160, center: 1.3, edge: 0.4, falloff: 0.8,
     // 外沿按方向起伏（花瓣形），不是一个规整的圆：lobes 个大瓣、幅度 lobeAmp（占半径）
     lobes: 7, lobeAmp: 0.28,
     slopeK: 1.1, convexK: 2.4,
-    h0: 0.3, grow: 0.9, growLate: 0.12, lift: 0.14, liftDelayS: 0.6,
+    h0: 0.6, grow: 1.4, growLate: 0.12, lift: 0.14, liftDelayS: 0.8,
     decayS: 10, diffuse: 0.9, windFactor: 0.9, windDelayS: 0.8,
     patch: 0.9,
+    // 爆米花团（参考：155 mm 实弹靶场的白色低尘带、工兵爆破的浅色贴地尘）：团的尺寸（米，×√∛W）、
+    // 冲击波过后各处先后冒起的时间差（s）、团的阈值（越大团越少越碎）、团之间留多少薄尘
+    puffM: 1.3, popS: 0.22, puffEdge: 0.36, puffHaze: 0.3,
   }),
 
   /** 新土的「黑」退成扬尘的「灰黄」的时间常数（s）。新鲜度只影响颜色，不影响多少。 */
@@ -137,7 +140,7 @@ export const GROUND_IMPACT_DUST = Object.freeze({
  */
 export const GROUND_IMPACT_SURFACES = Object.freeze({
   // skin：震起来的地表浮土，和地面同一种土色（偏浅、偏灰一点），不是炸出来的黑土
-  loess: Object.freeze({ fresh: Object.freeze([0.15, 0.125, 0.10]), dust: Object.freeze([0.33, 0.29, 0.24]), skin: Object.freeze([0.27, 0.235, 0.185]), massScale: 1 }),
+  loess: Object.freeze({ fresh: Object.freeze([0.15, 0.125, 0.10]), dust: Object.freeze([0.33, 0.29, 0.24]), skin: Object.freeze([0.31, 0.275, 0.215]), massScale: 1 }),
 });
 
 /**

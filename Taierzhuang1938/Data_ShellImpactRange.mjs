@@ -121,7 +121,7 @@ export const SHELL_IMPACT_MG = Object.freeze({ weaponId: "Type92Hmg", ...L(-44, 
 /** 枯树（Model_BreakableDeadTree，炮击能打断）：局部坐标，scale 是相对原模型的倍率。 */
 export const SHELL_IMPACT_TREES = Object.freeze([
   [-62, -50, 1.0], [-48, -70, 1.15], [-30, -86, 0.95], [22, -80, 1.1], [44, -48, 0.9],
-  [74, -26, 1.05], [-78, 12, 1.0], [-66, 30, 0.9], [68, 30, 1.1],
+  [82, -48, 1.05], [-78, 12, 1.0], [-66, 30, 0.9], [68, 30, 1.1],
 ].map(([x, z, scale], i) => Object.freeze({ id: `ImpactTree${i}`, ...L(x, z), ry: i * 2.1, scale })));
 
 // ---------------------------------------------------------------------------

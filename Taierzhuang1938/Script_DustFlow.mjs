@@ -281,21 +281,26 @@ export class DustFlowField {
     const N = this.N, N1 = N + 1, c = this.cell, sc = this.scale, r0 = sc.craterR;
     const p = this.T.scale.blastFalloff * (1 - this.T.confinement.channelFalloff * this.confined);
     const D = this.channelD, detour = this.T.confinement.detourLoss, reach = this.extent / 2 - 1.5 * c;
-    const Weight = (a, b, px, pz, sign) => {
+    // 炸点直线看得到的地方（在该方向的通畅长度以内）用直线距离与径向方向；看不到的（拐角后面）才用沿沟路程。
+    // 八邻域 Dijkstra 的路程等高线是八角形，平地上全用它会让尘浪沿 22.5° 的几条线起放射状条纹。
+    const Weight = (a, b, px, pz, nx, nz) => {
       const da = D[a], db = D[b];
       if (!Number.isFinite(da) || !Number.isFinite(db)) return 0;
-      const grad = Math.max(-1, Math.min(1, (db - da) / c)) * sign;
-      const d = 0.5 * (da + db), dx = px - this.cx, dz = pz - this.cz, r = Math.hypot(dx, dz);
-      const eff = d + detour * Math.max(0, d - r);
+      const dx = px - this.cx, dz = pz - this.cz, r = Math.hypot(dx, dz);
+      if (r < 1e-4) return 0;
+      const ux = dx / r, uz = dz / r;
+      const sight = 1 - Smooth(this.JetLength(Math.atan2(dz, dx)) - c, this.JetLength(Math.atan2(dz, dx)) + 2 * c, r);
+      const gradD = Math.max(-1, Math.min(1, (db - da) / c));
+      const grad = sight * (ux * nx + uz * nz) + (1 - sight) * gradD;
+      const d = 0.5 * (da + db), eff = sight * r + (1 - sight) * (d + detour * Math.max(0, d - r));
       if (eff > reach) return 0;
-      const bias = r > 1e-4 ? this.Bias(dx / r, dz / r) : 1;
-      return Math.pow(r0 / (eff + r0), p) * (1 - Smooth(reach * 0.8, reach, eff)) * bias * grad;
+      return Math.pow(r0 / (eff + r0), p) * (1 - Smooth(reach * 0.8, reach, eff)) * this.Bias(ux, uz) * grad;
     };
     for (let j = 0; j < N; j++) for (let i = 1; i < N; i++) {
-      this.blastX[j * N1 + i] = Weight(j * N + i - 1, j * N + i, this.minX + i * c, this.minZ + (j + 0.5) * c, 1);
+      this.blastX[j * N1 + i] = Weight(j * N + i - 1, j * N + i, this.minX + i * c, this.minZ + (j + 0.5) * c, 1, 0);
     }
     for (let j = 1; j < N; j++) for (let i = 0; i < N; i++) {
-      this.blastZ[j * N + i] = Weight((j - 1) * N + i, j * N + i, this.minX + (i + 0.5) * c, this.minZ + j * c, 1);
+      this.blastZ[j * N + i] = Weight((j - 1) * N + i, j * N + i, this.minX + (i + 0.5) * c, this.minZ + j * c, 0, 1);
     }
   }
 
@@ -693,10 +698,11 @@ export class DustFlowField {
 
   /** 震起的地面尘此刻的厚度与离地高度（米）：全场一个数，底面贴着各处的地面。 */
   SkinShape() {
-    const S = this.T.shock, t = this.time;
+    const S = this.T.shock, t = this.time, root = Math.sqrt(this.scale.cube);
+    // 大炸弹震起的尘带更高（×√∛W）：75 mm 一两米，250 kg 四五米
     return {
-      h: S.h0 + S.grow * (1 - Math.exp(-t / 0.9)) + S.growLate * t,
-      lift: S.lift * Math.max(0, t - S.liftDelayS),
+      h: (S.h0 + S.grow * (1 - Math.exp(-t / 0.9)) + S.growLate * t) * root,
+      lift: S.lift * Math.max(0, t - S.liftDelayS) * root,
     };
   }
 
