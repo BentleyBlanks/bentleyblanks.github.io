@@ -9,7 +9,7 @@ import math
 import json
 import random
 from pathlib import Path
-from mathutils import Vector
+from mathutils import Vector, Quaternion
 
 root = Path(bpy.context.scene['StrawMatRoot']) if 'StrawMatRoot' in bpy.context.scene else Path(__file__).resolve().parent
 repoRoot = root.parents[1]
@@ -25,15 +25,17 @@ class MeshBuilder:
         self.faces = []
         self.uvs = []
         self.smooth = []
+        self.customNormals = []
 
     def Vertex(self, position):
         self.vertices.append(tuple(position))
         return len(self.vertices) - 1
 
-    def Face(self, indices, uvs, smooth=True):
+    def Face(self, indices, uvs, smooth=True, normals=None):
         self.faces.append(tuple(indices))
         self.uvs.append(uvs)
         self.smooth.append(smooth)
+        self.customNormals.append(normals)
 
     def Build(self, name, material, collection):
         mesh = bpy.data.meshes.new(name)
@@ -44,29 +46,49 @@ class MeshBuilder:
             polygon.use_smooth = smooth
             for loopIndex, uv in zip(polygon.loop_indices, uvs):
                 uvLayer.data[loopIndex].uv = uv
+        mesh.update()
+        if any(normals is not None for normals in self.customNormals):
+            loopNormals=[normal.vector.copy() for normal in mesh.corner_normals]
+            for polygon,normals in zip(mesh.polygons,self.customNormals):
+                if normals is not None:
+                    for loopIndex,normal in zip(polygon.loop_indices,normals):
+                        loopNormals[loopIndex]=normal
+            mesh.normals_split_custom_set(loopNormals)
         obj = bpy.data.objects.new(name, mesh)
         collection.objects.link(obj)
         obj.data.materials.append(material)
         return obj
 
 
-def Tube(builder, points, radius, sides=4, closed=False, ropeRepeats=None):
+def Tube(builder, points, radius, sides=4, closed=False, ropeRepeats=None, roughness=.035):
     points = [Vector(p) for p in points]
     rings = []
     lengths = [0.0]
     for i in range(1, len(points)):
         lengths.append(lengths[-1] + (points[i] - points[i-1]).length)
+    tangents=[]
+    for i,point in enumerate(points):
+        previous=points[(i-1)%len(points)] if closed or i>0 else point
+        following=points[(i+1)%len(points)] if closed or i<len(points)-1 else point
+        tangents.append((following-previous).normalized())
+    helper=Vector((1,0,0)) if abs(tangents[0].x)<.8 else Vector((0,0,1))
+    frames=[tangents[0].cross(helper).normalized()]
+    for i in range(1,len(points)):
+        normal=tangents[i-1].rotation_difference(tangents[i])@frames[-1]
+        normal=(normal-tangents[i]*normal.dot(tangents[i])).normalized()
+        frames.append(normal)
+    if closed:
+        closing=tangents[-1].rotation_difference(tangents[0])@frames[-1]
+        angle=math.atan2(tangents[0].dot(closing.cross(frames[0])),closing.dot(frames[0]))
+        frames=[Quaternion(tangent,angle*i/len(points))@normal for i,(tangent,normal) in enumerate(zip(tangents,frames))]
     for i, point in enumerate(points):
-        previous = points[(i-1) % len(points)] if closed or i > 0 else point
-        following = points[(i+1) % len(points)] if closed or i < len(points)-1 else point
-        tangent = (following - previous).normalized()
-        helper = Vector((1, 0, 0)) if abs(tangent.x) < 0.8 else Vector((0, 0, 1))
-        normal = tangent.cross(helper).normalized()
+        tangent=tangents[i]
+        normal=frames[i]
         binormal = tangent.cross(normal).normalized()
         ring = []
         for j in range(sides):
             angle = tau * j / sides + 0.16
-            variation = 1 + 0.035 * math.sin(i*2.1 + j*1.7)
+            variation = 1 + roughness * math.sin(i*2.1 + j*1.7)
             position = point + (normal * math.cos(angle) + binormal * math.sin(angle)) * radius * variation
             ring.append(builder.Vertex(position))
         rings.append(ring)
@@ -76,13 +98,102 @@ def Tube(builder, points, radius, sides=4, closed=False, ropeRepeats=None):
         nxt = (i+1) % len(points)
         # Repeat a modest run of the generated diagonal rope fibres along the
         # actual cord length; each cross section samples its width separately.
-        u0 = 0.515 + (i % 3)*0.155
-        u1 = u0+0.155
+        uvPeriod=.155/3
+        uvScale=uvPeriod/.015
+        u0=.515+(lengths[i]*uvScale)%uvPeriod
+        span=(lengths[nxt] if nxt else total)-lengths[i]
+        u1=u0+span*uvScale
         for j in range(sides):
             k = (j+1) % sides
-            v0, v1 = 0.015 + 0.47*j/sides, 0.015 + 0.47*(j+1)/sides
+            uvCircumference=uvScale*.019
+            v0,v1=.205+uvCircumference*j/sides,.205+uvCircumference*(j+1)/sides
             builder.Face((rings[i][j], rings[i][k], rings[nxt][k], rings[nxt][j]),
                          [(u0,v0), (u0,v1), (u1,v1), (u1,v0)])
+
+
+def FrayCard(builder,start,tip,side,index):
+    ids=[builder.Vertex(p) for p in (start-side,start+side,tip+side,tip-side)]
+    u0=.5+(index%8)*.0625+.002
+    u1=u0+.0585
+    builder.Face(ids,[(u0,.003),(u1,.003),(u1,.123),(u0,.123)],False)
+
+
+def KnotPath(centre,scale,steps,angle=0):
+    points=[]
+    for index in range(steps):
+        t=tau*index/steps+.17
+        a=(2+math.cos(3*t))*math.cos(2*t)
+        b=(2+math.cos(3*t))*math.sin(2*t)
+        x=scale[0]*a;y=scale[1]*b
+        points.append(Vector(centre)+Vector((x*math.cos(angle)-y*math.sin(angle),x*math.sin(angle)+y*math.cos(angle),-scale[2]*math.sin(3*t))))
+    return points
+
+
+def CompactKnot(builder,centre,scale,radius,collection,targetTriangles=144):
+    # Collapse a smooth sweep by geometric error rather than assigning just
+    # three vertices to every section. This spends the same game budget on
+    # the outside of tight bends, where a regular coarse tube looks angular.
+    path=KnotPath(centre,scale,96,.12)
+    high=MeshBuilder()
+    Tube(high,path,radius,sides=10,closed=True,roughness=0)
+    mesh=bpy.data.meshes.new('Bake_KnotHigh')
+    mesh.from_pydata(high.vertices,[],high.faces);mesh.update()
+    uvLayer=mesh.uv_layers.new(name='UVMap')
+    for polygon,uvs in zip(mesh.polygons,high.uvs):
+        polygon.use_smooth=True
+        for loopIndex,uv in zip(polygon.loop_indices,uvs):
+            uvLayer.data[loopIndex].uv=uv
+    mesh.update()
+    sourceNormals=[(Vector(vertex)-path[index//10]).normalized() for index,vertex in enumerate(high.vertices)]
+    mesh.normals_split_custom_set([sourceNormals[loop.vertex_index] for loop in mesh.loops])
+    temp=bpy.data.objects.new('Bake_KnotHigh',mesh);collection.objects.link(temp)
+    modifier=temp.modifiers.new('KnotCurvatureBudget','DECIMATE')
+    modifier.decimate_type='COLLAPSE';modifier.use_collapse_triangulate=True
+    modifier.delimit=set()
+    ratio=targetTriangles/(len(high.faces)*2)
+    reduced=None
+    for attempt in range(4):
+        modifier.ratio=ratio
+        bpy.context.view_layer.update()
+        reduced=bpy.data.meshes.new_from_object(temp.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+        reduced.calc_loop_triangles()
+        if len(reduced.loop_triangles)<=targetTriangles:break
+        bpy.data.meshes.remove(reduced);ratio*=.97
+    assert len(reduced.loop_triangles)<=targetTriangles,'Knot exceeds reserved budget'
+    offset=len(builder.vertices)
+    builder.vertices.extend(tuple(vertex.co) for vertex in reduced.vertices)
+    for triangle in reduced.loop_triangles:
+        # Transfer both the arc-length UVs and sweep normals with the collapse;
+        # a nearest-curve lookup may jump to a different interwoven strand.
+        uvs=[tuple(reduced.uv_layers.active.data[i].uv) for i in triangle.loops]
+        builder.Face([offset+i for i in triangle.vertices],uvs,
+                     normals=[reduced.corner_normals[i].vector.copy() for i in triangle.loops])
+    bpy.data.objects.remove(temp,do_unlink=True)
+    bpy.data.meshes.remove(mesh);bpy.data.meshes.remove(reduced)
+
+
+def CordLobe(builder,centre,axis,length,radius,phase=0):
+    centre=Vector(centre);axis=Vector(axis).normalized()
+    helper=Vector((0,0,1)) if abs(axis.z)<.8 else Vector((0,1,0))
+    normal=axis.cross(helper).normalized();binormal=axis.cross(normal).normalized()
+    half=length*.5
+    stations=[-half+radius*.55,half-radius*.55]
+    rings=[]
+    for station in stations:
+        ring=[]
+        for j in range(8):
+            a=tau*j/8+.11
+            ring.append(builder.Vertex(centre+axis*station+radius*.89*(normal*math.cos(a)+binormal*math.sin(a))))
+        rings.append(ring)
+    start=builder.Vertex(centre-axis*half);end=builder.Vertex(centre+axis*half)
+    uvScale=(.155/3)/.015;uvCircumference=uvScale*.019
+    u0=.515+(phase%1)*(.155/3)
+    for j in range(8):
+        k=(j+1)%8;v0=.205+uvCircumference*j/8;v1=.205+uvCircumference*(j+1)/8
+        ua=u0+(stations[0]+half)*uvScale;ub=u0+(stations[1]+half)*uvScale
+        builder.Face([rings[0][j],rings[0][k],rings[1][k],rings[1][j]],[(ua,v0),(ua,v1),(ub,v1),(ub,v0)])
+        builder.Face([start,rings[0][k],rings[0][j]],[(u0,(v0+v1)*.5),(ua,v1),(ua,v0)])
+        builder.Face([end,rings[1][j],rings[1][k]],[(u0+length*uvScale,(v0+v1)*.5),(ub,v0),(ub,v1)])
 
 
 def SheetHeight(x, y):
@@ -140,41 +251,40 @@ def BuildFlat(material, collection):
     for index, (i,j) in enumerate(perimeter):
         ni,nj = perimeter[(index+1)%len(perimeter)]
         builder.Face([layers[0][j][i],layers[1][j][i],layers[1][nj][ni],layers[0][nj][ni]],
-                     [(0.52,0.02),(0.52,0.48),(0.67,0.48),(0.67,0.02)])
+                     [(0.52,0.14),(0.52,0.48),(0.67,0.48),(0.67,0.14)])
         x,y,z = positions[j][i]
         border.append((x,y,z))
     Tube(builder, border, 0.0060, sides=6, closed=True)
     # Hand whipstitches run over the edge cord and underneath the 5mm sheet.
-    for stitch in range(40):
-        index=int(stitch*len(border)/40)
+    for stitch in range(26):
+        index=int(stitch*len(border)/26)
         p=Vector(border[index])
         tangent=(Vector(border[(index+1)%len(border)])-Vector(border[(index-1)%len(border)])).normalized()
         outward=Vector((tangent.y,-tangent.x,0)).normalized()
         points=[p-outward*.005+Vector((0,0,.004)),p+outward*.004+Vector((0,0,.002)),p-outward*.003+Vector((0,0,-.0035))]
         Tube(builder,points,.0015,sides=3)
     # Four compact hand-finished corner wraps, not decorative metal fittings.
-    for x,y in [(-.891,-.441),(.891,-.441),(.891,.441),(-.891,.441)]:
-        points = [(x+.005*math.cos(tau*k/4), y+.005*math.sin(tau*k/4), SheetHeight(x,y)+.0035) for k in range(4)]
-        Tube(builder, points, .0022, sides=3, closed=True)
+    for corner,(x,y) in enumerate([(-.891,-.441),(.891,-.441),(.891,.441),(-.891,.441)]):
+        sx=math.copysign(1,x);sy=math.copysign(1,y);z=SheetHeight(x,y)+.0058
+        CordLobe(builder,(x,y,z),(sx*.75,sy*.45,.40),.014,.0028,corner*.17)
+        CordLobe(builder,(x-sx*.001,y+sy*.001,z+.002),(sx*.60,-sy*.75,.24),.0135,.0028,corner*.17+.4)
     # A few silhouette fibres carry damage; the dense weave is ONLY in maps.
     for k in range(16):
         edge = k % 4
         x = rng.uniform(-.88,.88) if edge < 2 else (-.9 if edge==2 else .9)
         y = (-.449 if edge==0 else .449) if edge < 2 else rng.uniform(-.44,.44)
         direction = Vector((0, -1 if edge==0 else 1, .25)) if edge<2 else Vector((-1 if edge==2 else 1,0,.25))
-        start = Vector((x,y,SheetHeight(x,y)+.001))
-        end = start + direction * rng.uniform(.005,.012)
-        cross = Vector((direction.y,-direction.x,0))*.0005
-        ids = [builder.Vertex(p) for p in (start-cross,start+cross,end+cross*.3,end-cross*.3)]
-        builder.Face(ids,[(.52,.02),(.53,.02),(.67,.48),(.66,.48)],False)
+        start = Vector((x,y,SheetHeight(x,y)+.002))-Vector((direction.x,direction.y,0))*.008
+        end = start + direction * rng.uniform(.014,.022)
+        cross = Vector((direction.y,-direction.x,0))*.005
+        FrayCard(builder,start,end,cross,k)
     for corner,(x,y) in enumerate([(-.891,-.441),(.891,-.441),(.891,.441),(-.891,.441)]):
         for strand in range(3):
             direction=Vector((math.copysign(.7+strand*.15,x),math.copysign(1.0-strand*.17,y),.15)).normalized()
             start=Vector((x,y,SheetHeight(x,y)+.004))
-            tip=start+direction*(.008+strand*.002)
-            cross=Vector((direction.y,-direction.x,0))*.0006
-            ids=[builder.Vertex(p) for p in (start-cross,start+cross,tip+cross*.2,tip-cross*.2)]
-            builder.Face(ids,[(.52,.02),(.53,.02),(.67,.48),(.66,.48)],False)
+            tip=start+direction*(.010+strand*.002)
+            cross=Vector((direction.y,-direction.x,0))*.0045
+            FrayCard(builder,start,tip,cross,corner*3+strand)
     obj = builder.Build('Model_StrawSleepingMatFlat', material, collection)
     CenterAtBottom(obj)
     obj['NominalDimensionsMeters'] = [1.8,0.9,0.005]
@@ -200,7 +310,7 @@ def RollPoint(x, theta, offset=0):
 def BuildRolled(material, collection):
     builder=MeshBuilder()
     sides=18
-    stations=[-.45,-.418,-.225,.225,.418,.45]
+    stations=[-.45,-.225,0,.225,.45]
     rings=[]
     for i,x in enumerate(stations):
         ring=[]
@@ -238,8 +348,10 @@ def BuildRolled(material, collection):
         innerPairs=[]
         for layer in (0,1):
             strips=[]
-            for j in range(49):
-                t=j/48;a=-1.16+3.6*tau*t
+            # Keep geometric relief on the visible outer turns. The fine
+            # inner turns use the aligned cut-end normal/AO bake.
+            for j in range(25):
+                t=.58+.42*j/24;a=-1.16+3.6*tau*t
                 r=.009+(.067-.009)*t-layer*.0048
                 ring=[]
                 for across in (0,1):
@@ -247,8 +359,10 @@ def BuildRolled(material, collection):
                     xx=end*(.4540+.0016*math.sin(j*1.7+layer)+.0012*math.cos(j*.8)-across*.0025)
                     ring.append(builder.Vertex((xx,rr*math.sin(a),.072+rr*math.cos(a))))
                 strips.append(ring)
-            innerPairs.append(strips[0])
-            for j in range(48):
+            a=-1.16;r=.009-layer*.0048
+            innerPairs.append([builder.Vertex((end*.454,max(.0015,r-across*.0044)*math.sin(a),
+                .072+max(.0015,r-across*.0044)*math.cos(a))) for across in (0,1)])
+            for j in range(24):
                 ids=[strips[j][0],strips[j+1][0],strips[j+1][1],strips[j][1]]
                 if end>0:ids.reverse()
                 # The same source photo is projected onto the surface, so
@@ -261,59 +375,51 @@ def BuildRolled(material, collection):
         for ids in ([a[0],middle[0],middle[1],a[1]],[middle[0],b[0],b[1],middle[1]]):
             if end>0:ids=list(reversed(ids))
             builder.Face(ids,[CutUV(v) for v in ids],True)
-    # Each tie is a two-strand twisted grass cord, not a straight painted line.
+    # Smooth cord sweeps carry the physically scaled two-lobe braid normal.
     for tieX in (-.225,.225):
-        for strand in (0,1):
-            points=[]
-            for j in range(12):
-                a=tau*j/12
-                twist=a*5+strand*math.pi
-                centre=Vector(RollPoint(tieX,a,.0038));centre.z+=.002
-                centre.x+=.0020*math.cos(twist)
-                centre.y+=.0020*math.sin(twist)*math.sin(a)
-                centre.z+=.0020*math.sin(twist)*math.cos(a)
-                points.append(centre)
-            Tube(builder,points,.0025,sides=3,closed=True)
-        knot=[(-.008,-.022,.147),(-.013,-.015,.157),(-.005,-.007,.161),(.008,-.011,.153),
-              (.006,-.025,.145),(-.004,-.029,.151),(-.005,-.018,.159),(.012,-.010,.150)]
-        Tube(builder,[(tieX+dx*.75,-.018+(y+.018)*.72,.153+(z-.153)*.75) for dx,y,z in knot],.0043,sides=3)
-        tail=[RollPoint(tieX+.008+.010*j/4,-.16-1.18*j/4,.0070) for j in range(5)]
+        points=[]
+        for j in range(18):
+            a=tau*j/18
+            point=Vector(RollPoint(tieX+.0008*math.sin(a*3),a,.0043));point.z+=.002
+            points.append(point)
+        Tube(builder,points,.0040,sides=4,closed=True)
+        CompactKnot(builder,(tieX,-.012,.1470),(.0038,.0032,.0065),.0044,collection)
+        tail=[RollPoint(tieX+.008+.012*j/6,-.16-1.18*j/6,.0070) for j in range(7)]
         tail=[(x,y,z+.002) for x,y,z in tail]
         Tube(builder,tail,.0023,sides=3)
     loop=[]
-    for j in range(13):
-        t=j/12
-        loop.append((-.225+.450*t,-.009+.016*math.sin(t*tau),.155+.070*math.sin(math.pi*t)**1.06))
-    for strand in (0,1):
-        strandPoints=[]
-        for j,point in enumerate(loop):
-            t=j/12;twist=tau*3*t+strand*math.pi
-            point=Vector(point)
-            tangent=(Vector(loop[min(j+1,12)])-Vector(loop[max(0,j-1)])).normalized()
-            normal=tangent.cross(Vector((0,1,0))).normalized()
-            binormal=tangent.cross(normal).normalized()
-            strandPoints.append(point+.0018*(normal*math.cos(twist)+binormal*math.sin(twist)))
-        Tube(builder,strandPoints,.0027,sides=3)
+    for j in range(21):
+        t=j/20
+        loop.append((-.225+.450*t,-.012+.016*math.sin(t*tau),.147+.078*math.sin(math.pi*t)**1.06))
+    Tube(builder,loop,.0038,sides=3)
     # End and rope-tail frays make the rough hand-trimmed silhouette visible.
-    for j in range(14):
-        if j<8:
-            end=-1 if j%2==0 else 1;a=tau*j/8+.4
-            start=Vector((end*.450,.067*math.sin(a),.072+.067*math.cos(a)))
-            tip=start+Vector((end*rng.uniform(.006,.0115),.002*math.sin(a),.003*math.cos(a)))
-            side=Vector((0,.0007*math.cos(a),-.0007*math.sin(a)))
+    for j in range(26):
+        if j<22:
+            end=-1 if j%2==0 else 1;a=tau*(j//2)/12+.23
+            if (j//2)%2==0:
+                start=Vector((end*.451,.067*math.sin(a),.072+.067*math.cos(a)))
+                tip=start+Vector((end*.006,.007*math.sin(a),.007*math.cos(a)))
+            else:
+                start=Vector((end*.445,.066*math.sin(a),.072+.066*math.cos(a)))
+                tip=start+Vector((end*.014,.003*math.sin(a),.003*math.cos(a)))
+            side=Vector((0,.005*math.cos(a),-.005*math.sin(a)))
+        elif j<24:
+            tieX=-.225 if j%2==0 else .225
+            start=Vector(RollPoint(tieX+.020,-1.30,.008));start.z+=.002
+            tip=start+Vector((.002,-.004,-.015))
+            side=Vector((.0045,0,0))
         else:
             tieX=-.225 if j%2==0 else .225
-            start=Vector(RollPoint(tieX+.018,-1.34,.007));start.z+=.002
-            tip=start+Vector(((j%3-1)*.009,-.005,-.012-(j%3)*.003))
-            side=Vector((.0006,0,0))
-        ids=[builder.Vertex(p) for p in (start-side,start+side,tip+side*.2,tip-side*.2)]
-        builder.Face(ids,[(.52,.02),(.53,.02),(.67,.48),(.66,.48)],False)
+            start=Vector((tieX-.009,-.012,.149))
+            tip=start+Vector((-.006,-.002,.010))
+            side=Vector((.004,0,0))
+        FrayCard(builder,start,tip,side,j)
     obj=builder.Build('Model_StrawSleepingMatRolled',material,collection)
     CenterAtBottom(obj)
     obj['NominalBodyDimensionsMeters']=[.9,.135,.135]
     obj['TriangleLimit']=1200;obj['Bindings']=2;obj['CarryingLoops']=1
-    obj['Fold']='Paired raised spiral layers with a joined inner fold; 0.9m roll axis'
-    obj['Refinement']='Actual raised end layers, two-strand ties, volumetric overhand knots, hand-trimmed frays'
+    obj['Fold']='Raised outer paired spiral layers, normal-mapped inner coils and a joined inner fold; 0.9m roll axis'
+    obj['Refinement']='Curvature-optimised interwoven cord knots; arc-length two-lobe braid normals at 15mm pitch; alpha-cut split fibres'
     return obj
 
 
@@ -342,6 +448,8 @@ def CreateMaterial(state):
     shader.inputs['IOR'].default_value = 1.46
     shader.inputs['Specular IOR Level'].default_value = .22
     base = ImageNode(nodes,root/'Texture'/f'Texture_StrawSleepingMat{state}BaseColor.png','BaseColor sRGB')
+    clip=nodes.new('ShaderNodeMath');clip.operation='GREATER_THAN';clip.inputs[1].default_value=.33
+    links.new(base.outputs['Alpha'],clip.inputs[0]);links.new(clip.outputs[0],shader.inputs['Alpha'])
     normal = ImageNode(nodes,root/'Texture'/f'Texture_StrawSleepingMat{state}Normal.png','Normal OpenGL',True)
     orm = ImageNode(nodes,scratch/f'Texture_StrawSleepingMat{state}Orm.png','ORM AO Roughness ZeroMetal',True)
     separate = nodes.new('ShaderNodeSeparateColor')
@@ -410,14 +518,14 @@ def Main():
     flat = BuildFlat(CreateMaterial('Flat'),collection)
     rolled = BuildRolled(CreateMaterial('Rolled'),collection)
     report = {'coordinateSystem':'glTF +Y up, metres; local origin at bottom-centre',
-              'sourceBlend':str(sourceRoot/bpy.context.scene.get('StrawMatBlendName','Scene_StrawSleepingMatRefined.blend')),
+              'sourceBlend':str(sourceRoot/bpy.context.scene.get('StrawMatBlendName','Scene_StrawSleepingMatDetail.blend')),
               'assets':[Export(flat),Export(rolled)]}
     (root/'Data_GeometryBake.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
     bpy.context.scene['StrawMatRoot'] = str(root)
     bpy.context.scene['ReferenceApproval'] = 'User approved references on 2026-10-18; strict visual matching required'
     bpy.context.scene['ReferenceFlat'] = str(sourceRoot/'References'/'Reference_StrawSleepingMatFlat.png')
     bpy.context.scene['ReferenceRolled'] = str(sourceRoot/'References'/'Reference_StrawSleepingMatRolled.png')
-    bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/bpy.context.scene.get('StrawMatBlendName','Scene_StrawSleepingMatRefined.blend')))
+    bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/bpy.context.scene.get('StrawMatBlendName','Scene_StrawSleepingMatDetail.blend')))
     print(json.dumps(report,indent=2))
 
 

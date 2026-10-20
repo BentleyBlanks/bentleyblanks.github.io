@@ -15,8 +15,18 @@
         1.0
       ],
       [
-        0.0,
+        0.125,
         0.5
+      ]
+    ],
+    "frayUV": [
+      [
+        0.5,
+        1.0
+      ],
+      [
+        0.0,
+        0.125
       ]
     ],
     "endUV": [
@@ -30,7 +40,11 @@
       ]
     ]
   },
+  "cordNormalPitchMeters": 0.015,
+  "alphaMode": "MASK",
+  "alphaCutoff": 0.33,
   "sourceProvider": "built-in image_gen__imagegen",
+  "rollHorizonDetail": "Approved reference projection keeps broad wear. At undersampled cylinder horizons, fine imagegen weave replaces stretched photographic grain, with a smooth facing-angle blend.",
   "sets": {
     "Flat": {
       "BaseColor": {
@@ -39,7 +53,7 @@
           1024,
           1024
         ],
-        "sha256": "6469a6a2513be6a0258f2064e9c7c8c6fc720271179a329eb7bb6b8db5991730",
+        "sha256": "b7cf4377a70f83d13f50b2a02bf9fdd550a5a6352b5bd2dfbd8638a865662af0",
         "colorSpace": "sRGB"
       },
       "Normal": {
@@ -48,7 +62,7 @@
           1024,
           1024
         ],
-        "sha256": "d662440ceae0ed7a01801240a4eee20d61becd844f74848abf46b7dc299e3c2f",
+        "sha256": "0ce5830fa6cc104cda4964b3a8995476fdfd2b3e53982a951782f4a14f4563b7",
         "colorSpace": "linear data"
       },
       "Roughness": {
@@ -57,7 +71,7 @@
           1024,
           1024
         ],
-        "sha256": "1210b6b2c230a344257877cd23d001d9fcd0ddcdb9d577edc38dffd5a3d2f245",
+        "sha256": "b171bb44b51385b843e8fb0123d08ce5add3dfb6dd270f2bd754a9a508f8f650",
         "colorSpace": "linear data"
       },
       "AO": {
@@ -66,7 +80,7 @@
           1024,
           1024
         ],
-        "sha256": "cb08096edb2af602361814df7b2cf799712fc8cb056e1c53813febae13687379",
+        "sha256": "5aabe7940552fdd378afea129c9bd475aaad148bfaef362f68eef6daf4c65dec",
         "colorSpace": "linear data"
       }
     },
@@ -77,7 +91,7 @@
           1024,
           1024
         ],
-        "sha256": "c9d802b1e81cc1930644c57c7d8bc8cc2313fc240a286cbe3c191f8ed637e128",
+        "sha256": "d0d6c69da9d1372fa97a715910d738b136ad2ad5874a7020b9845d335dbd0ef6",
         "colorSpace": "sRGB"
       },
       "Normal": {
@@ -86,7 +100,7 @@
           1024,
           1024
         ],
-        "sha256": "3d93982a0617acbcc7b2bb4aa38218a2f8a2f2636264d07042b93ba0d60c1b18",
+        "sha256": "7bbced5c536abd528c7f5540bdc59b19acf953a3e1444737c46b69377c339461",
         "colorSpace": "linear data"
       },
       "Roughness": {
@@ -95,7 +109,7 @@
           1024,
           1024
         ],
-        "sha256": "be0a2c9a548ca2179fe4411f4b0f47f3b6ae52dd12932080f3ff2098d5c261c9",
+        "sha256": "60904befa1c2bafa44aeb415ed868a4f2b269f56dec832dc10f6e57b70555364",
         "colorSpace": "linear data"
       },
       "AO": {
@@ -104,7 +118,7 @@
           1024,
           1024
         ],
-        "sha256": "f17fc3ca0e9d888f950fc24c3651769644105e48351dd1aa2ff2d67dc98d827d",
+        "sha256": "745b0d03a1148bc57f5abcb997afb3c6468dd6295ad1c3f64284bbe49bf5d000",
         "colorSpace": "linear data"
       }
     }

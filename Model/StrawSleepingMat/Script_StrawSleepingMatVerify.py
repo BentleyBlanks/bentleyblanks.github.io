@@ -105,9 +105,19 @@ def VerifyAsset(file,limit,isFlat):
         assert .17 <= dimensions[1] <= .32,'Carrying loop missing or excessively large'
     materials=document['materials']
     for material in materials:
+        assert material.get('alphaMode')=='MASK','Frayed grass must use alpha clipping, not blending'
+        assert .20<=material.get('alphaCutoff',0)<=.5,'Unexpected fibre cutoff'
         assert all(key in material for key in ['normalTexture','occlusionTexture','pbrMetallicRoughness'])
         pbr=material['pbrMetallicRoughness']
         assert 'baseColorTexture' in pbr and 'metallicRoughnessTexture' in pbr
+        baseImage=document['images'][document['textures'][pbr['baseColorTexture']['index']]['source']]
+        baseView=document['bufferViews'][baseImage['bufferView']]
+        baseStart=baseView.get('byteOffset',0)
+        base=Image.open(io.BytesIO(binary[baseStart:baseStart+baseView['byteLength']])).convert('RGBA')
+        alpha=np.asarray(base.getchannel('A'))
+        assert (alpha[:896]==255).all() and (alpha[896:,:512]==255).all(),'Opaque surface accidentally cut out'
+        coverage=float((alpha[896:,512:]>=material['alphaCutoff']*255).mean())
+        assert .03<coverage<.65,'Fibre cutout is empty or a solid rectangle'
         ormTexture=document['textures'][pbr['metallicRoughnessTexture']['index']]
         ormImage=document['images'][ormTexture['source']]
         view=document['bufferViews'][ormImage['bufferView']]
@@ -144,6 +154,9 @@ def Main():
             file=root/'Texture'/f'Texture_StrawSleepingMat{state}{channel}.png'
             image=Image.open(file)
             assert image.size==(1024,1024)
+            if channel=='Normal':
+                normal=np.asarray(image.convert('RGB'),dtype=float)/127.5-1
+                assert np.allclose(np.linalg.norm(normal,axis=2),1,atol=.02),'Invalid tangent normal map'
             maps[state][channel]={'size':list(image.size),'bytes':file.stat().st_size,'sha256':hashlib.sha256(file.read_bytes()).hexdigest()}
     report={'result':'PASS','independentGlbDecode':True,'assets':[
         VerifyAsset(root/'Model_StrawSleepingMatFlat.glb',2000,True),

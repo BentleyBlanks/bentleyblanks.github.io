@@ -1,5 +1,7 @@
 {
   "asset": "StrawSleepingMat",
+  "revision": "Detail3",
+  "revisionDate": "2026-10-20",
   "descriptionZh": "1930年代中国南方士兵随身单人草席；蒲草/稻草平纹，草绳锁边，晒褪黄褐色，磨损断草、泥渍与雨水晕痕",
   "referenceApproval": "参考图可以 极致的对标以后才能算完成",
   "deliveryType": "Two independent reusable game assets",
@@ -17,7 +19,7 @@
       "nominalLength": 1.8,
       "nominalWidth": 0.9,
       "sheetThickness": 0.005,
-      "triangles": 2000,
+      "triangles": 1992,
       "triangleLimit": 2000,
       "textureSet": "Flat",
       "boundsNote": "Loose broken fibre tips extend slightly beyond the nominal sheet. Curl makes full height larger than the 5mm sheet thickness."
@@ -27,7 +29,7 @@
       "state": "folded once and tightly rolled, two straw-cord ties and one carrying loop",
       "nominalAxisLength": 0.9,
       "nominalBodyDiameter": 0.135,
-      "diameterIncludingCords": 0.1493,
+      "diameterIncludingCords": 0.1492,
       "triangles": 1200,
       "triangleLimit": 1200,
       "bindings": 2,
@@ -47,13 +49,16 @@
     "normalConvention": "OpenGL +Y tangent space",
     "metallic": 0,
     "glbPacking": "Self-contained GLB embeds albedo, normal, and ORM (R AO / G roughness / B zero metallic). Four separate requested channels are retained externally.",
-    "atlas": "Upper half is sheet/exterior; lower left is rolled cut end; lower right is straw cord.",
-    "geometryDetail": "Thickness, irregular curls, thick bound edge and whipstitches are geometry. The rolled mat has actual raised paired spiral strips and a joined inner fold over a recessed fibre backing, two-strand ties, overhand knots, frayed tails and a two-strand carrying loop. Dense woven fibres remain in normal maps.",
-    "referenceMatching": "Production sheet and exterior colour are UV-projected from the approved imagegen reference sheets. Cylindrical foreshortening and broad photographic lighting are removed in Blender before the aligned PBR data bake."
+    "atlas": "Upper half is sheet/exterior; lower left is rolled cut end; lower right upper 384 rows are cord grain; bottom 128 rows are eight alpha-cut fibre clumps.",
+    "alphaMode": "MASK",
+    "alphaCutoff": 0.33,
+    "cordBraidPitchMeters": 0.015,
+    "geometryDetail": "Thickness, irregular curls, bound edge, whipstitches and interwoven cord knots are geometry. Rolled knots use curvature-based simplification of smooth closed sweeps, preserving their arc-length UVs and surface normals. The rolled mat keeps raised outer paired spiral strips and a joined inner fold; inner fine coils use the cut-end normal/AO bake. Smooth binding and carrying-loop sweeps carry arc-length UVs and two-lobe helical normals. Split fibres use 28 flat-state and 26 rolled-state fixed alpha-cut cards, including two knot tufts. Dense woven fibres remain in normal maps.",
+    "referenceMatching": "Production sheet and exterior colour are UV-projected from the approved imagegen reference sheets. Cylindrical foreshortening and broad photographic lighting are removed in Blender before the aligned PBR data bake. At undersampled cylinder horizons, supplementary imagegen fine weave replaces stretched grain while preserving the reference's broad colour and wear, with a smooth facing-angle blend."
   },
   "provenance": {
     "imageGeneration": "built-in image_gen__imagegen",
-    "textureSources": "Source/Texture_StrawFlatReferenceProjection.png, Texture_StrawRolledReferenceProjection.png, Texture_StrawRopeSource.png and Texture_StrawRollEndSource.png",
+    "textureSources": "Source/Texture_StrawFlatReferenceProjection.png, Texture_StrawRolledReferenceProjection.png, Texture_StrawRollWeaveFineSource.png, Texture_StrawCordFibreSource.png, Texture_StrawFraySource.png and Texture_StrawRollEndSource.png",
     "texturePrompts": "Source/Data_*ImagegenPrompt*.json and Source/Data_ImagegenPrompts.json",
     "historicalSources": [
       "https://m.krzzjn.com/show-1104-31418.html",
@@ -69,7 +74,7 @@
     "blenderWorkflow": "Start this task's isolated .blend with scripts/Script_BlenderMcp.mjs, set scene['StrawMatRoot'] to this directory, then execute Script_StrawSleepingMatBake.py through BlenderMCP.",
     "verificationCommand": "python Model/StrawSleepingMat/Script_StrawSleepingMatVerify.py --report tmp/StrawSleepingMat/Data_ExportVerification.json",
     "projectionCommand": "Run Script_StrawReferenceProjection.py through the isolated BlenderMCP scene to reproject the approved reference files kept in the Blender project References directory.",
-    "blenderSource": "C:/Users/Bentl/OneDrive/AI/Models/Blender/HistoricalProps/StrawSleepingMat/Scene_StrawSleepingMatRefined.blend",
+    "blenderSource": "C:/Users/Bentl/OneDrive/AI/Models/Blender/HistoricalProps/StrawSleepingMat/Scene_StrawSleepingMatDetail.blend",
     "localReview": "tmp/StrawSleepingMat/index.html; screenshots and reference sheets remain local"
   }
 }
