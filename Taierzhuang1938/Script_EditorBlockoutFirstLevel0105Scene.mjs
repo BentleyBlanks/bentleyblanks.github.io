@@ -19,7 +19,7 @@
 //      支沟的弃土只堆南沿（一道 0.75 m 的土垄，02 迂回组贴着它外侧爬，北沿的机枪看不见）。
 //   4. 支沟口：支沟比交通沟深 0.4 m；交通沟里不许被支沟的端头挖深（夹到交通沟底），落差在支沟口用台阶块补。
 //   5. 机枪坑、散兵坑、防炮洞：矩形 / 圆形平底开挖（底面取中心自然地面减深度，一整块平的）。
-//   6. 体块：沟里的日常摆件（L0105_PROPS）、路口板桥（横木 + 门板，显式 y）、干沟南岸的枯树，坑北的树桩 / 柏树 / 麦秸垛 / 杨树，以及随信号体块。
+//   6. 体块：沟里的日常摆件（L0105_PROPS）、路口板桥（横木 + 门板，显式 y）、干沟南岸的枯树，坑北的树桩 / 柏树 / 麦秸垛 / 田里零星的树，以及随信号体块。
 //   7. 2026-10-20 第三版：坑北压平（tilt 去掉）、南北向窄条田（FarmLayout → paint）、散坟（烘进高度场）；
 //      场地外的田、路、四个村子、东边低山写进远景层 backdrop（L0105Backdrop，契约 §2.2，只看不走）。
 //
@@ -37,7 +37,7 @@ import {
   L0105_PROPS, L0105_PROP_KINDS, PointBeside, LineLength, GullyU, L0105_GULLY_POCKETS,
   L0105_PIT_NORTH, BundZ, ScarpZ, PointAlong, DitchEmerge,
   L0105_NORTH_ROAD, L0105_NORTH_ROAD_HALF_W, L0105_FIELD_PATH, L0105_FIELD_PATH_HALF_W, L0105_FIELD_PAINT,
-  L0105_FIELD_TREES, L0105_ROAD_TREES, L0105_PATH_TREES, L0105_FIELD_GRAVES, L0105_FARM,
+  L0105_FIELD_TREES, L0105_BACKDROP_LONE_TREES, L0105_FIELD_GRAVES, L0105_FARM,
   L0105_BACKDROP, L0105_BACKDROP_ROAD, L0105_BACKDROP_PATHS, L0105_BACKDROP_VILLAGES, L0105_BACKDROP_HILLS,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
@@ -587,7 +587,7 @@ export function L0105Blocks(sample, floors) {
     blocks.push(Block(`CrestPost${i + 1}`, p.x, p.z - 0.6, 2.6, 0.8, 0.45, i % 2 ? "earthDark" : "cover", { cover: { ...FACE_NORTH } }));
   });
 
-  // --- 坑北前景（2026-10-20）：树桩、坟地柏树、麦秸垛、村前杨树、土坯房（田埂 / 坟包 / 干水沟 / 地坎在高度场里） ----------
+  // --- 坑北前景（2026-10-20）：树桩、坟地柏树、麦秸垛、田里零星的树（田埂 / 坟包 / 干水沟 / 地坎在高度场里） ----------
   blocks.push(...PitNorthBlocks(sample));
 
   return { blocks, gates, facts };
@@ -595,8 +595,8 @@ export function L0105Blocks(sample, floors) {
 
 /**
  * 坑北前景的体块（2026-10-20）：树桩（矮块，不挡人）、坟地柏树（细高块）、麦秸垛（两层块，圆顶感）；
- * 第二轮起：大路北段两边的杨树、田边零星的树、田间小路边一排树。第三版：村子拿掉（挪到远景层），杨树顺新的大路北段种到北边界，
- * 出了边界的那几棵进远景层（L0105Backdrop）。
+ * 第二轮起：大路北段两边的杨树、田边零星的树、田间小路边一排树。第三版：村子拿掉（挪到远景层）。
+ * 2026-10-21：不再沿大路、沿小路成排种树，只剩田里零星的（L0105_FIELD_TREES）；场地外的零星树在远景层（L0105_BACKDROP_LONE_TREES）。
  * 树都是细高 foliage 块（脚印 0.6 m ≤ 1 m），编辑器种成树模型（IsSceneTreeBlock）。
  * 显式 y 的块（麦秸垛上层）按 sample 在脚印中心与四角取最低的地面算（同不写 y 时加载器的落地法）。
  */
@@ -615,40 +615,8 @@ export function PitNorthBlocks(sample) {
   const hs = PN.haystack;
   Haystack("Haystack", hs.x, hs.z, hs.w, hs.d, hs.h, hs.baseH, hs.topW, hs.topD, { cover: { ...FACE_SOUTH } });
 
-  // 大路北段两边的杨树（场地里那几棵；出了北边界的进远景层）
-  for (const t of RoadPoplarSpots()) if (t.inField) Tree(t.id, t.x, t.z, t.h);
+  // 田里零星的树（2026-10-21：不再沿大路、沿小路成排种，一棵一棵散在田里；见 L0105_FIELD_TREES）
   L0105_FIELD_TREES.forEach((t, i) => Tree(`FieldTree_${N2(i)}`, t.x, t.z, t.h));
-  {
-    const PT = L0105_PATH_TREES;
-    let k = 0;
-    for (let d = PT.fromM; d <= PT.toM; d += PT.spacing, k += 1) {
-      const p = PointBeside(L0105_FIELD_PATH, d, -PT.lat);   // 小路从北边界往南走，右手 = 西侧
-      if (Math.abs(ScarpZ(p.x) - p.z) < 6 || GraveHeight(p.x, p.z) > 0) continue;
-      Tree(`PathTree_${N2(k)}`, p.x, p.z, PT.hMin + (PT.hMax - PT.hMin) * Hash01(k, 19));
-    }
-  }
-  return out;
-}
-
-/** 大路北段 + 远景里那段连起来（村 A 南口以南）的弧长线。 */
-const ROAD_TO_A = Object.freeze([...L0105_NORTH_ROAD, ...L0105_BACKDROP_ROAD.slice(1)]);
-/**
- * 大路两边的杨树：spacing 米一棵，位置 / 树高按序号做确定性抖动；不种在干水沟、地坎坎面上，不压着田间小路和坟。
- * inField = 在场地里（z ≥ minZ + 1）→ 体块；否则进远景层（kind "tree"）。
- */
-export function RoadPoplarSpots() {
-  const RT = L0105_ROAD_TREES, out = [];
-  let ti = 0;
-  for (let d = RT.fromM; d <= RT.toM; d += RT.spacing) {
-    for (const side of [1, -1]) {
-      const j = Hash01(ti * 2 + (side > 0 ? 0 : 1), 7);
-      const p = PointBeside(ROAD_TO_A, d + (j - 0.5) * 2 * RT.jitterM, side * (RT.lat + (Hash01(ti, 11) - 0.5) * 0.8));
-      ti += 1;
-      if (DitchStation(p.x, p.z).d < 4 || Math.abs(ScarpZ(p.x) - p.z) < 6 || DistanceToPolyline(p.x, p.z, L0105_FIELD_PATH) < 4 || GraveHeight(p.x, p.z) > 0) continue;
-      out.push({ id: `RoadPoplar_${String(ti).padStart(3, "0")}`, x: R2(p.x), z: R2(p.z), h: R2(RT.hMin + (RT.hMax - RT.hMin) * Hash01(ti, 13)),
-        inField: p.z >= L0105_BOUNDS.minZ + 1 });
-    }
-  }
   return out;
 }
 
@@ -923,7 +891,8 @@ export function L0105Backdrop(sample, farm = FarmLayout()) {
   L0105_BACKDROP_PATHS.forEach((line, i) => paint.push({ id: `BdPath${i + 1}`, color: C.path, feather: 0.8, halfW: L0105_FIELD_PATH_HALF_W, line: line.map((p) => PPt(p.x, p.z)) }));
 
   const shapes = [];
-  for (const t of RoadPoplarSpots()) if (!t.inField) shapes.push({ id: `Bd${t.id}`, kind: "tree", x: R1(t.x), z: R1(t.z), h: R1(t.h) });
+  // 田野上零星的树（2026-10-21 起不再沿大路种；村子外圈的树照旧在 VillageShapes 里）
+  L0105_BACKDROP_LONE_TREES.forEach((t, i) => shapes.push({ id: `BdLoneTree${String(i + 1).padStart(2, "0")}`, kind: "tree", x: t.x, z: t.z, h: t.h }));
   for (const v of L0105_BACKDROP_VILLAGES) shapes.push(...VillageShapes(v));
   for (const h of L0105_BACKDROP_HILLS) shapes.push({ id: h.id, kind: "hill", x: h.x, z: h.z, rx: h.rx, rz: h.rz, h: h.h, ry: h.ry, color: BD.hill, topColor: BD.hillTop });
   return {
@@ -1411,7 +1380,7 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
     const bdShapes = {}; for (const sh of backdrop.shapes) bdShapes[sh.kind] = (bdShapes[sh.kind] || 0) + 1;
     const rects = backdrop.paint.find((p) => p.rects)?.rects || [];
     notes.push(`坑北第三版：涂色 ${paint.length} 项（场地里窄条田 ${fieldStrips.length} 条，宽 ${R2(Math.min(...widths))}…${R2(Math.max(...widths))} m，按颜色 ${Object.entries(kinds).map(([c, n]) => `${c}×${n}`).join(" ")}）；`
-      + `散坟 ${L0105_FIELD_GRAVES.length} 座；路边杨树 ${count(/^RoadPoplar_/)}（场地里）、田边树 ${count(/^FieldTree_/)}、小路边树 ${count(/^PathTree_/)}；`
+      + `散坟 ${L0105_FIELD_GRAVES.length} 座；田里零星的树 ${count(/^FieldTree_/)}（不沿路种）；`
       + `地面：坑沿 (0,−11) ${R2(sample(0, -11))} · 坎上 (28,−190) ${R2(sample(28, -190))} · 坎下 (28,−213) ${R2(sample(28, -213))} · (30,−260) ${R2(sample(30, -260))} · (30,−340) ${R2(sample(30, -340))} · 北边界 (30,−480) ${R2(sample(30, -480))}；`
       + `色带 ${southMinM}…${southMaxM}（钉在南面；全场 ${minM}…${maxM}）`);
     notes.push(`远景层：地面高 ${backdrop.ground.y} m、铺出去 ${backdrop.ground.radiusM} m、远裁剪 ${backdrop.far} m；田块 ${rects.length} 块；体块 ${Object.entries(bdShapes).map(([k, n]) => `${k}×${n}`).join(" ")}；`

@@ -22,7 +22,7 @@ export const BLOCKOUT_TREES = Object.freeze({
 
 /**
  * 布局里要种树的块 → [{ id, x, z, heightM, y? }]。
- * 2026-10-20：远景层（layout.backdrop，§2.2）里 kind "tree" 的也种（村 A 那一圈树、出了北边界的路边杨树），
+ * 2026-10-20：远景层（layout.backdrop，§2.2）里 kind "tree" 的也种（村 A 那一圈树、田野上零星的树），
  * 根的高度按远景地面（layout.backdropGroundAt）给 y；场地里的树不给 y，照旧按场地地面。远景里的树只是模型，没有碰撞。
  */
 export function BlockoutTreeSpots(layout) {

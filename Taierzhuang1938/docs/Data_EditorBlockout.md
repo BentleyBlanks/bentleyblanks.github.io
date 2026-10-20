@@ -606,6 +606,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 
 ## 12. 变更记录
 
+- 2026-10-21（01–05 树不沿路种）：坑北大路两边、田间小路边成排的树去掉，换成田里零星 18 棵 + 远景层零星 14 棵（`L0105_BACKDROP_LONE_TREES`），见 §13 末「2026-10-21」。
 - 2026-10-20（人名 / 站位 / 地标三层标记，都能开关）：§2.2 场景文件加可选 `landmarks`（七种 kind，`ValidateBlockoutScene` → `LandmarkIssues`，`NormalizeLandmarks`）；§5.5「标签」改三档（全部档无名的人按身份兜底、带 id 尾号）、新开关「地标」「站位」（右上同一排，缺省开，六个开关的选择记在 localStorage）；新模块 `Script_EditorBlockoutMarkerRules`（纯规则）+ `…MarkerRulesTest`；§4.1 俯视图画地标、小地图画站位；§15 0610 的场景文件填了 47 个地标（`L0610Landmarks`，坐标全取锚点表），SceneTest 钉地标齐、都在场地里、狗洞 / 墙缝 / 侧门 / 窖 / 北窗的框对得上；总控 `LoadLandmarks()` 进关后再读一次场景文件只取地标（`Script_EditorBlockoutLevels` 没动）。BrowserTest 加 0610 的地标 / 站位 / 三档 / 记忆用例。
 - 2026-10-20（标记不压前景）：§5.5 3D 标记两遍都做深度测试、片元深度最近算到离眼 1.25 m，第一人称的手和枪不再被穿墙那一遍盖住（`Script_EditorBlockoutMarkers.BehindForeground`）。
 - 2026-10-20（坑北第三版：照史料压平、窄条田、四个村子、东边低山）：§2.2 场景文件加可选 `backdrop`（远景层：远平面、远景地面、变淡、paint（poly / line / rects）、shapes（box / blob / hill / tree）），`ValidateBlockoutScene` 校验（`BLOCKOUT_BACKDROP`）、`LayoutFromSceneDoc` 交出 `backdrop` / `backdropGroundAt` / `cameraFar`、`ApplyLayout` 设 `phase.cameraFar`；§6.3 新模块 `Script_EditorBlockoutBackdrop` 画远景层，§5.7 的树多种远景层里的 `tree`；不写 `backdrop` 的关卡逐位不变、远平面照旧 650。§13 01–05 坑北压平、窄条田、散坟、村子挪进远景层（四个村子）、东边一串低山。
@@ -739,6 +740,13 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 - **侧面主攻**：`L0105_DITCH_SQUAD` 一个班 8 人（班长 IjaFlank1、轻机枪 IjaFlankLmg + 装填手、步兵 IjaFlank2–6），03-2 / 03-3 开场在干水沟里弯着腰排成一串（沟上弧长 270 m 起、隔 3.2 m）；03-3 12.3 s 停下、14.6 s 班长站起来探头（刘文财 16.4 s「左边沟里头有人！」）、15.8 s 起猫腰快走（1.8 m/s）到出沟点；轻机枪组趴进渐浅段（弧长 309.5 / 307.8）打丙位；步兵一个个出沟扑到 N2 后（离坑约 60 m），IjaFlank2 / IjaFlank4 出沟跑到六成处被丙位打倒；03-4 IjaFlank1 / IjaFlank3 先扑进麦地、再跳到 N1 后（离坑约 45 m）。
 - **东沟**：清沟的 IjaTrench1–3 03-3 开场在前沿沟 x 40 / 46 / 52，乙位那段（44–56 s）顺沟一个弯一个弯清到 x 15 / 20 / 26（= 03-4 关键帧）。04-1 占了坑的改成这三个（原来是正面跃进上来的 IjaRush1/2）。
 - SceneTest：有掩体的站位都被挡住（≥ 0.02 m）；相邻两格 9.5–18 m（翻坎那一跃 ≤ 26 m）；麦地里趴的地方平；坎下蹲着的（眼高 1.0）坑里看不见；那个班开场都在沟中心线 0.8 m 内。验收图（`_shots/EditorBlockout0105/Rush4*`，不提交）：四拍的旁观机位、玩家视角缩头、编辑器总图 03-4。
+
+**2026-10-21 树不沿路种（用户看了俯视图：「整个场景其实都应该稀疏的有几颗，而不会是沿着路种树（应该历史上没有这样的设定）」）**：
+- 第二轮为了从坑里认出路，大路北段两边种了成排的杨树（场地里 59 棵 `RoadPoplar_*`、出了北边界到村 A 南口 12 棵 `BdRoadPoplar_*`），田间小路西侧一排 15 棵 `PathTree_*`；从 02 坡顶、03 坑里往北看连成一道树墙。路边行道树没查到出处，全部去掉（`L0105_ROAD_TREES` / `L0105_PATH_TREES` / `RoadPoplarSpots` 删掉）。
+- 换成**零星的树**，一棵一棵散在田边地头：场地里 `L0105_FIELD_TREES` 9 → 18 棵（10.5–13.5 m），远景层新加 `L0105_BACKDROP_LONE_TREES` 14 棵（`BdLoneTree01–14`，kind `tree`，场地外到村子之间、村与村之间）。都是创作。
+- SceneTest 钉：没有 `RoadPoplar_` / `PathTree_` / `BdRoadPoplar`；田里的树两两隔 25 m 以上、离大路 / 大路北段 / 田间小路中心 ≥ 10 m、每条路 15 m 内最多一棵（不成排）、离干水沟中心线 ≥ 3 m、离地坎坎面 ≥ 6 m、离坟 ≥ 3 m、不在扫清带和 03 跃进那一片（x −75…75、z > −215）；远景的零星树离远景的路和小路 ≥ 20 m、不在村子树圈边上、都在场地外。
+- 不动的：干沟南岸的枯树（06 老耿的驴车停在树底下，0610 接缝要对上）、坟地柏树、扫清带的树桩、四个村子外圈那一团团树（远看村子是一团团树，第三版的史料依据）。03 的人、关键帧、预演不受影响（KeyframesTest / PrevizTest 过）。
+- 场地体块 181 → 116；`FirstLevel0105.scene.json` 3.10 → 3.09 MB；远景层的树 76 → 78。验收图 `_shots/EditorBlockout0105/SparseTrees/`（不提交）：03-3 坑沿朝北改前改后对比、02-7、全关总图。
 
 ## 14. 预演（previz，2026-10-18）
 

@@ -9,7 +9,7 @@
 // 10-20 坑北前景：坟高、田埂高、干水沟深与断面、地坎落差与豁口、坑里看不见坎下的掷弹筒组（看得见烟）、沟里弯腰的人从坑里看不见头、
 // 跃进的人每一格都在掩体后、树桩 / 柏树 / 麦秸垛的尺寸、扫清带基本平、坑北的改动不碰 z ≥ −8。
 // 10-20 坑北第二轮（田、路、村子看得见）：涂色只在坑北（z < −8）、田块够多三种颜色都有、相邻两块不同色；大路 L0105_ROAD 一个点不动，
-// 大路北段接在它北头穿村、田间小路单独一条；路边杨树两侧成排、离路 3.5–5.5 m、能种成树；路穿地坎 / 干水沟处是坡道 / 填平；
+// 大路北段接在它北头穿村、田间小路单独一条；路穿地坎 / 干水沟处是坡道 / 填平；（10-21 起树不沿路种：田里零星十几棵，彼此隔 25 m 以上，见下）；
 // 村子在坑北 285–365 m、20–30 户、院墙 2–2.6 m、房墙 ≥ 3 m、屋顶比墙宽且 1–1.5 m 压在墙顶；色带钉在南面。
 // 10-20 第三版（照史料压平、窄条田、四个村子、东边低山）：坑北只剩 ±1 m 大起伏 + 2 m 地坎；场地里的田是南北向 5–20 m 的窄条、几十条一组、组间小路，
 // 翻地 + 撂荒过半；田里散 10–20 座单个的坟（0.8–1.2 m，不挡跃进站位、不压路）；场地里没有村子；远景层 backdrop 过校验、
@@ -31,7 +31,7 @@ import {
   L0105_PROPS, L0105_PROP_KINDS, L0105_SUNKEN_LANE, L0105_GULLY_SOUTH_BERM as SB, PointBeside, GullyU, InGullyFloor,
   L0105_ROAD, L0105_GULLY_POCKETS, L0105_GULLY_TREES,
   L0105_PIT_NORTH as PN, L0105_BOUNDS, L0105_RUSH_STATIONS, L0105_RUSH_FALLEN, L0105_DITCH_SQUAD, DitchSquadStart, RushStation, ScarpZ, LineLength,
-  L0105_NORTH_ROAD, L0105_FIELD_PATH, L0105_ROAD_TREES, L0105_FIELD_PAINT, L0105_FIELD_GRAVES, L0105_FARM,
+  L0105_NORTH_ROAD, L0105_FIELD_PATH, L0105_FIELD_TREES, L0105_BACKDROP_LONE_TREES, L0105_BACKDROP_PATHS, L0105_FIELD_PAINT, L0105_FIELD_GRAVES, L0105_FARM,
   L0105_BACKDROP_ROAD, L0105_BACKDROP_VILLAGES, L0105_BACKDROP_HILLS, L0105_HEIGHTS,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
@@ -307,7 +307,7 @@ assert.ok(pn.lmgW.block <= 0 && pn.lmgE.block <= 0, `坑里要看得见两挺轻
   for (let x = -100; x <= 180; x += 20) { const r = PitNorthRoll(x, -400); assert.ok(Math.abs(r) <= 1.0001, `大起伏超过 ±1 m：${r}`); }
 }
 {
-  // 体块：树桩矮、柏树细高、麦秸垛 4×3×2.5、杨树 12–15 m、土坯房墙 3 m；边界放得下村子
+  // 体块：树桩矮、柏树细高、麦秸垛 4×3×2.5；边界放得下村子
   const stumps = all.filter((x) => /^FieldStump_/.test(x.id));
   assert.ok(stumps.length >= 10 && stumps.every((x) => x.h >= 0.3 && x.h <= 0.5 && x.z <= -8 && x.z >= -80), "扫清带树桩十几个、0.3–0.5 m");
   const cyp = all.filter((x) => /^GraveCypress_/.test(x.id));
@@ -377,21 +377,34 @@ assert.ok(pn.lmgW.block <= 0 && pn.lmgE.block <= 0, `坑里要看得见两挺轻
     }
     assert.ok(worstStep <= 0.35, `路穿过地坎 / 干水沟处 1 m 内高差 ${worstStep.toFixed(2)}`);
   }
-  // 路边杨树：两侧成排、离路 3.5–5.5 m、能种成树
-  const rt = all.filter((x) => /^RoadPoplar_/.test(x.id));
-  assert.ok(rt.length >= 36 && rt.every((t) => IsSceneTreeBlock(t) && t.h >= L0105_ROAD_TREES.hMin && t.h <= L0105_ROAD_TREES.hMax), `路边杨树 ${rt.length}，要能种成树`);
-  const sides = { 1: 0, "-1": 0 };
-  for (const t of rt) {
-    let best = Infinity, sgn = 0;
-    for (let i = 1; i < L0105_NORTH_ROAD.length; i++) {
-      const p0 = L0105_NORTH_ROAD[i - 1], p1 = L0105_NORTH_ROAD[i], dx = p1.x - p0.x, dz = p1.z - p0.z, l2 = dx * dx + dz * dz;
-      const k = Math.max(0, Math.min(1, ((t.x - p0.x) * dx + (t.z - p0.z) * dz) / l2)), ex = t.x - p0.x - dx * k, ez = t.z - p0.z - dz * k, dd = Math.hypot(ex, ez);
-      if (dd < best) { best = dd; sgn = Math.sign(dx * ez - dz * ex); }
-    }
-    assert.ok(best >= 3.5 && best <= 5.5, `杨树 ${t.id} 离路 ${best.toFixed(1)} m`);
-    sides[sgn] += 1;
+  // 树（2026-10-21 用户：整个场景稀疏地有几棵，不沿路种）：没有路边 / 小路边成排的树；田里零星的树彼此隔 25 m 以上、离路远、不在沟上坎上坟上
+  assert.ok(!all.some((x) => /^(RoadPoplar|PathTree)_/.test(x.id)), "沿大路、沿小路成排的树去掉了");
+  const ft = all.filter((x) => /^FieldTree_/.test(x.id));
+  assert.equal(ft.length, L0105_FIELD_TREES.length, "田里零星的树照锚点表");
+  const DistLine = (x, z, line) => { let best = Infinity; for (let i = 1; i < line.length; i++) { const a0 = line[i - 1], a1 = line[i], dx = a1.x - a0.x, dz = a1.z - a0.z, l2 = dx * dx + dz * dz; const k = Math.max(0, Math.min(1, ((x - a0.x) * dx + (z - a0.z) * dz) / l2)); best = Math.min(best, Math.hypot(x - a0.x - dx * k, z - a0.z - dz * k)); } return best; };
+  const graveSpots = [...L0105_FIELD_GRAVES, ...PN.loneGraves, ...PN.graveyard];
+  for (const t of ft) {
+    assert.ok(IsSceneTreeBlock(t) && t.h >= 10 && t.h <= 14, `${t.id} 要能种成树（${t.h} m）`);
+    for (const line of [L0105_NORTH_ROAD, L0105_FIELD_PATH, L0105_ROAD]) assert.ok(DistLine(t.x, t.z, line) >= 10, `${t.id} (${t.x},${t.z}) 挨着路`);
+    assert.ok(DitchStation(t.x, t.z).d >= 3 && Math.abs(ScarpZ(t.x) - t.z) >= 6, `${t.id} (${t.x},${t.z}) 在沟里 / 坎上`);
+    assert.ok(graveSpots.every((g) => Math.hypot(g.x - t.x, g.z - t.z) >= 3), `${t.id} (${t.x},${t.z}) 长在坟包上`);
+    assert.ok(!(t.x > -75 && t.x < 75 && t.z > -215) && t.z < -90, `${t.id} (${t.x},${t.z}) 在扫清带或 03 跃进的那一片里`);
+    for (const u of ft) if (u !== t) assert.ok(Math.hypot(u.x - t.x, u.z - t.z) >= 25, `${t.id} 和 ${u.id} 挨得太近（要稀疏）`);
   }
-  assert.ok(sides[1] >= 18 && sides[-1] >= 18, `路两侧的杨树 ${sides[1]} / ${sides[-1]}`);
+  for (const line of [L0105_NORTH_ROAD, L0105_FIELD_PATH]) assert.ok(ft.filter((t) => DistLine(t.x, t.z, line) < 15).length <= 1, "路边 15 m 内最多一棵（不成排）");
+  // 远景田野上零星的树：照锚点表，不在村子树圈里，离远景的路和小路 ≥ 20 m；没有沿大路的成排树
+  {
+    const bdt = a.backdrop.shapes.filter((x) => /^BdLoneTree/.test(x.id));
+    assert.equal(bdt.length, L0105_BACKDROP_LONE_TREES.length, "远景零星的树照锚点表");
+    assert.ok(!a.backdrop.shapes.some((x) => /^BdRoadPoplar/.test(x.id)), "远景里沿大路的树去掉了");
+    const DL = (x, z, line) => { let best = Infinity; for (let i = 1; i < line.length; i++) { const a0 = line[i - 1], a1 = line[i], dx = a1.x - a0.x, dz = a1.z - a0.z, l2 = dx * dx + dz * dz; const k = Math.max(0, Math.min(1, ((x - a0.x) * dx + (z - a0.z) * dz) / l2)); best = Math.min(best, Math.hypot(x - a0.x - dx * k, z - a0.z - dz * k)); } return best; };
+    for (const t of bdt) {
+      assert.equal(t.kind, "tree");
+      for (const line of [L0105_BACKDROP_ROAD, ...L0105_BACKDROP_PATHS]) assert.ok(DL(t.x, t.z, line) >= 20, `${t.id} (${t.x},${t.z}) 挨着远景的路`);
+      for (const v of L0105_BACKDROP_VILLAGES) assert.ok(Math.abs(t.x - v.x) > v.rx + v.ringM + 20 || Math.abs(t.z - v.z) > v.rz + v.ringM + 20, `${t.id} 在村 ${v.id} 边上`);
+      assert.ok(t.z < L0105_BOUNDS.minZ, `${t.id} 应在场地外`);
+    }
+  }
   // 场地里没有村子（第三版挪进远景层）、没有炮楼
   assert.ok(!all.some((x) => /^(Home\d|Village)/.test(x.id)), "场地里不该再有村子的块");
   // 散坟：10–20 座，0.8–1.2 m 高（烘进高度场、涂新土色），不挨着跃进站位 / 路 / 干水沟 / 掷弹筒组

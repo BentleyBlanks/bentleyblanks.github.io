@@ -1015,7 +1015,7 @@ try {
     bd.st.built && bd.st.meshes >= 3 && bd.st.triangles > 10000 && bd.st.cameraFar === bd.st.far && bd.st.far >= 5000 && bd.inField === 0 && bd.meshes === bd.st.meshes
       && bd.bounds.minZ === -480 && bd.st.texture && bd.st.texture.width >= 1024,
     JSON.stringify({ meshes: bd.st.meshes, tris: bd.st.triangles, far: bd.st.cameraFar, inField: bd.inField, tex: bd.st.texture, bounds: bd.bounds, ms: bd.st.buildMs }));
-  Check("01–05 远景层的树（村 A、出了北边界的杨树）和场地里的树一起种", bd.trees.count === bd.treeBlocks + bd.shapes && bd.shapes > 30,
+  Check("01–05 远景层的树（村 A、田野上零星的树）和场地里的树一起种", bd.trees.count === bd.treeBlocks + bd.shapes && bd.shapes > 30,
     JSON.stringify({ trees: bd.trees, treeBlocks: bd.treeBlocks, backdropTrees: bd.shapes }));
   await page.screenshot({ path: path.join(shotDir, "FirstLevel0105_Backdrop.png") });
 
