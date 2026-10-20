@@ -8,13 +8,13 @@
       "id": "3fd60335331c818fa24deadb6d72ca70",
       "title": "史实与创作",
       "role": "ledgerParent",
-      "lastEdited": "2026-10-20T11:37:58.711Z"
+      "lastEdited": "2026-10-20T17:45:29.275Z"
     },
     {
       "id": "3fd60335331c8194aa82f0b238084d34",
       "title": "史实与创作对照表",
       "role": "ledgerTable",
-      "lastEdited": "2026-10-20T16:32:36.694Z"
+      "lastEdited": "2026-10-20T17:45:28.187Z"
     },
     {
       "id": "3c360335331c81be876fcf4cb0928e1b",
@@ -94,6 +94,21 @@
         "3fd60335331c818fa24deadb6d72ca70"
       ],
       "assetContract": "Model/Data_SingleBlanket.json"
+    },
+    {
+      "asset": "DonkeyCart",
+      "date": "2026-10-21",
+      "scope": "DonkeyCart exterior and harness only; reference-led creative reconstruction",
+      "notionPages": [
+        "3fd60335331c8194aa82f0b238084d34",
+        "3fd60335331c818fa24deadb6d72ca70"
+      ],
+      "notionLastEdited": {
+        "3fd60335331c8194aa82f0b238084d34": "2026-10-20T17:45:28.187Z",
+        "3fd60335331c818fa24deadb6d72ca70": "2026-10-20T17:45:29.275Z"
+      },
+      "assetContract": "Model/DonkeyCart/Data_DonkeyCart.json",
+      "note": "Unrelated source pages and the global repository review cursor were not marked reviewed by this asset task."
     }
   ]
 }

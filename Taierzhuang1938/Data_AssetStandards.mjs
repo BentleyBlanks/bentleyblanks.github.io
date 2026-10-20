@@ -120,6 +120,10 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 }
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
+  Object.freeze({ id: "DonkeyCart", name: "灰驴与两轮木车", pack: "DonkeyCart/Model_DonkeyCart.glb",
+    sourceTriangles: 97230, actualTriangles: 79500, targetTriangles: 79500, policy: "target",
+    sourceTexture: "用户原画、内置 Imagegen 短毛与旧榆木、CC0 雕刻法线", runtimeTexture: "两套作者 UV 图集；2K Base / 1K Normal / 512 ORM，无损 WebP 内嵌",
+    note: "独立绑定资产；动物28骨、车4骨，原地行走/静止与独立轮动按路程同步。全部部件低于80K；编辑源保留，运行时仅简化木车并量测表面误差。外观与套具为按图创作复原。" }),
   ...[["Flat", "铺开", 1992, 2000], ["Rolled", "卷起", 1192, 1200]].map(([state, label, triangles, limit]) => Object.freeze({
     id: `StrawSleepingMat${state}`, name: `随身草席 · ${label}`, pack: `../Model/StrawSleepingMat/Model_StrawSleepingMat${state}.glb`,
     sourceTriangles: triangles, actualTriangles: triangles, targetTriangles: limit, policy: "source",

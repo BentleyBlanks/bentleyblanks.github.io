@@ -1,0 +1,133 @@
+{
+  "schema": "tengxian-independent-rigged-prop-v1",
+  "id": "DonkeyCart",
+  "version": "20261021ReferenceMatchV1",
+  "asset": "Model_DonkeyCart.glb",
+  "textureManifest": "Data_DonkeyCartTextures.json",
+  "sha256": "1080b9096105e38fc54b5a705925bf23671d9693011c19ffabe62b196a81ce2d",
+  "bytes": 9326892,
+  "units": "metres",
+  "upAxis": "+Y",
+  "facingAxis": "-Z",
+  "sourceCoordinates": "Blender +Y forward / +Z up; exported once to glTF -Z forward / +Y up",
+  "pivotM": [
+    0,
+    0,
+    0
+  ],
+  "nominalWithersHeightM": 1.1,
+  "boundsM": {
+    "min": [
+      -0.8260000944137573,
+      0.0,
+      -1.0664021968841553
+    ],
+    "max": [
+      0.8260000944137573,
+      1.5614452362060547,
+      2.2799999713897705
+    ],
+    "dimensions": [
+      1.6520001888275146,
+      1.5614452362060547,
+      3.346402168273926
+    ]
+  },
+  "cart": {
+    "bedLengthM": 1.52,
+    "bedWidthM": 1.075,
+    "wheelRadiusM": 0.4,
+    "wheelSpokes": 14,
+    "wheelTimberSegments": 6
+  },
+  "triangles": {
+    "total": 79500,
+    "limit": 80000,
+    "byBatch": {
+      "Animal": 54538,
+      "Cart": 24962
+    },
+    "runtimeCartMaxSurfaceDeviationM": 0.0008306061499752104
+  },
+  "runtime": {
+    "meshes": [
+      "DonkeyRuntime",
+      "CartRuntime"
+    ],
+    "skins": [
+      {
+        "name": "CartSkeleton",
+        "jointCount": 4
+      },
+      {
+        "name": "DonkeySkeleton",
+        "jointCount": 28
+      }
+    ],
+    "materials": 2,
+    "maxInfluences": 4,
+    "morphTargets": 0
+  },
+  "animations": {
+    "DonkeyWalk": {
+      "durationS": 1.2,
+      "strideM": 0.68,
+      "speedMps": 0.5666666666666668,
+      "inPlace": true
+    },
+    "DonkeyIdle": {
+      "durationS": 3.0
+    },
+    "CartRoll": {
+      "durationS": 2.0,
+      "distancePerCycleM": 2.5132741228718345
+    },
+    "coupling": "Advance the assembly along local -Z by distance; Walk time = distance / strideM * walkDuration; CartRoll time = distance / wheelCircumference * 2 seconds. Idle freezes wheel distance."
+  },
+  "verification": {
+    "nativeStanceSoleRangeM": [
+      0.0003998324100393802,
+      0.00040013849502429366
+    ],
+    "nativeStanceDriftPerFrameM": 2.211335683906246e-07,
+    "reimportedStanceSoleRangeM": [
+      0.0003998044121544808,
+      0.0004002087807748467
+    ],
+    "reimportedStanceDriftPerFrameM": 4.7637143018100514e-07,
+    "continuousLegRoots": {
+      "DonkeyFrontLeft": true,
+      "DonkeyFrontRight": true,
+      "DonkeyRearLeft": true,
+      "DonkeyRearRight": true
+    },
+    "traceAnchorDriftM": 5.960464477539063e-08,
+    "traceBindingGapM": 0,
+    "dropTugGapM": 0.0006678439094685018,
+    "skinWeightSumError": 9.685754776000977e-08,
+    "webpPixelsUnchanged": true,
+    "geometrySkinActionsUnchangedDuringPacking": true
+  },
+  "editableSource": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\Scene_DonkeyCart.blend",
+  "preservedSourceTemplate": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\ReuseAudit\\Scene_Round14Candidate.blend",
+  "rigReuse": {
+    "retained": "four-pivot quadruped hierarchy, analytic folding-cannon solver and distance clock conventions",
+    "rebuilt": "donkey proportions, head/ear/tail geometry, physical joint origins, voxel heat skin, walk/idle, cart, all attached harness and wheel surfaces",
+    "notReused": "old Walk/Trot actions, candidate facial rings, horse hair cards, candidate harness detachment dynamics; the candidate was not treated as accepted"
+  },
+  "credits": [
+    {
+      "name": "Lyndon Daniels / ChadM Rigged Horse",
+      "license": "CC0",
+      "url": "https://opengameart.org/content/rigged-horse",
+      "use": "retained editable skin topology and sculpt normal, extensively reshaped to the supplied donkey reference"
+    },
+    {
+      "name": "User supplied donkey and cart reference plus built-in Imagegen",
+      "use": "subject identity, reference turnaround and short fur material"
+    }
+  ],
+  "reconstructionScope": "驴的比例、毛色、旧损与木车、套具的具体做法按用户参考图创作；不是1938年鲁南统一样式或某一件实物的复刻。尺寸为建模定标，不作为史料规格。",
+  "historicalReferences": [],
+  "rebuild": "node Taierzhuang1938/_blender/Script_DonkeyCartRebuild.mjs"
+}

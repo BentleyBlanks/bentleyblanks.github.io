@@ -60,6 +60,36 @@ function GlbPoints(file, meshName = null) {
   return points;
 }
 
+// Skinned bind coordinates must include jointWorld * inverseBind. Applying
+// meshNodeWorld alone counts an armature placement twice for Blender exports.
+function RiggedGlbPoints(file,meshName,boneName=null){
+  const glb=LoadGlb(file),g=glb.json,world=new Map(),points=[];
+  const identity=Float64Array.from([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]);
+  const Visit=(index,parent)=>{const matrix=Mat4Mul(parent,NodeMatrix(g.nodes[index]));world.set(index,matrix);for(const child of g.nodes[index].children||[])Visit(child,matrix)};
+  for(const root of g.scenes[g.scene||0].nodes)Visit(root,identity);
+  for(const [index,node] of g.nodes.entries()){
+    if(node.mesh===undefined||node.name!==meshName)continue;
+    const skin=g.skins[node.skin],inverse=ReadAccessor(glb,skin.inverseBindMatrices);
+    const matrices=skin.joints.map((joint,i)=>Mat4Mul(world.get(joint),inverse.data.slice(i*16,i*16+16)));
+    for(const primitive of g.meshes[node.mesh].primitives){
+      const positions=ReadAccessor(glb,primitive.attributes.POSITION),joints=ReadAccessor(glb,primitive.attributes.JOINTS_0),weights=ReadAccessor(glb,primitive.attributes.WEIGHTS_0);
+      const accessor=g.accessors[primitive.attributes.WEIGHTS_0],divisor=accessor.normalized?(accessor.componentType===5121?255:65535):1;
+      for(let i=0;i<positions.count;i++){
+        const p=[0,0,0];let selected=0;
+        for(let c=0;c<4;c++){
+          const joint=joints.data[i*4+c],weight=weights.data[i*4+c]/divisor,m=matrices[joint];
+          if(!weight)continue;
+          if(g.nodes[skin.joints[joint]].name===boneName)selected+=weight;
+          const x=positions.data[i*3],y=positions.data[i*3+1],z=positions.data[i*3+2];
+          for(let axis=0;axis<3;axis++)p[axis]+=weight*(m[axis]*x+m[4+axis]*y+m[8+axis]*z+m[12+axis]);
+        }
+        if(!boneName||selected>.75)points.push(p);
+      }
+    }
+  }
+  return points;
+}
+
 /**
  * 量一架飞机的机首方向（局部 XZ 单位向量）。返回 null 表示两条判据打架，
  * 那就不是这套启发式能判的模型，得人工登记别的证据。
@@ -230,5 +260,24 @@ for (const [id, spec] of Object.entries(STRAW_SLEEPING_MAT_ASSETS)) {
   Check(Math.abs(min[1]) < 0.000001 && Math.abs(min[0] + max[0]) < 0.000001 && Math.abs(min[2] + max[2]) < 0.000001,
     `${id} 完整模型底面中心在原点`);
 }
+const donkeyFile=path.join(projectDir,"Model/DonkeyCart/Model_DonkeyCart.glb");
+const donkey=LoadGlb(donkeyFile),animalCloud=RiggedGlbPoints(donkeyFile,"DonkeyRuntime"),cartCloud=RiggedGlbPoints(donkeyFile,"CartRuntime");
+const donkeySpec=JSON.parse(fs.readFileSync(path.join(projectDir,"Model/DonkeyCart/Data_DonkeyCart.json"),"utf8"));
+const headCloud=RiggedGlbPoints(donkeyFile,"DonkeyRuntime","DonkeyHeadPivot");
+const headMeanZ=headCloud.reduce((sum,p)=>sum+p[2],0)/headCloud.length;
+const animalMinZ=Math.min(...animalCloud.map(p=>p[2])),cartMinZ=Math.min(...cartCloud.map(p=>p[2]));
+Check(headCloud.length>500 && headMeanZ<-.65 && animalMinZ<cartMinZ-.25,
+  "驴车实际头部顶点云朝 -Z，鼻端位于双辕前方",`head z=${headMeanZ.toFixed(4)} nose=${animalMinZ.toFixed(4)} shaft=${cartMinZ.toFixed(4)}`);
+const donkeyY=[...animalCloud,...cartCloud].map(p=>p[1]);
+Check(Math.abs(Math.min(...donkeyY))<.001 && Math.max(...donkeyY)>1.48 && Math.max(...donkeyY)<1.68,
+  "驴车米制 Y-up、轮底零高与长耳完整高度",`${Math.min(...donkeyY).toFixed(5)} / ${Math.max(...donkeyY).toFixed(5)}`);
+const donkeyTriangles=donkey.json.meshes.flatMap(m=>m.primitives).reduce((sum,p)=>sum+donkey.json.accessors[p.indices].count/3,0);
+Check(donkey.json.meshes.length===2 && donkey.json.skins.length===2 && donkeyTriangles===donkeySpec.triangles.total && donkeyTriangles<=80000,
+  "驴车两网格两骨架、实际完整面数与资产契约一致",String(donkeyTriangles));
+const actualMin=[0,1,2].map(axis=>Math.min(...[...animalCloud,...cartCloud].map(p=>p[axis]))),actualMax=[0,1,2].map(axis=>Math.max(...[...animalCloud,...cartCloud].map(p=>p[axis])));
+Check(actualMin.every((v,i)=>Math.abs(v-donkeySpec.boundsM.min[i])<.00003)&&actualMax.every((v,i)=>Math.abs(v-donkeySpec.boundsM.max[i])<.00003),
+  "驴车实际蒙皮绑定顶点云与外部 Blender 量测包围盒一致");
+Check(donkeySpec.facingAxis==="-Z" && donkeySpec.upAxis==="+Y" && ["DonkeyWalk","DonkeyIdle","CartRoll"].every(name=>donkey.json.animations.some(a=>a.name===name)),
+  "驴车朝向契约与三条必要动画齐备");
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机机首与战车车头全部按几何复量落在 -Z");
