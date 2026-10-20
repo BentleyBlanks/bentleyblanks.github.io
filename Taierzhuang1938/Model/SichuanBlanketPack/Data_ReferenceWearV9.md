@@ -1,5 +1,7 @@
 # Sichuan Blanket Pack — V9 Reference Wear
 
+本页为 V9 阶段记录，后续修正见 [V10 Soft Wear](Data_SoftWearV10.md)。
+
 V8 的实际视觉被用户否决：布料与附件旧化不协调，草席卷与草鞋仍偏离第二版参考。本轮继续高模细化，当前未进行游戏减面，也未覆盖历史 V6 GLB。
 
 ## Source

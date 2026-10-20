@@ -35,7 +35,9 @@
       "Pack_Jacket": 332,
       "Pack_StrawMat": 808,
       "Pack_Sandals": 708
-    }
+    },
+    "limitScope": "Historical V6 build threshold only; verified final requested limit is requiredFinalTriangleLimit=3000",
+    "meetsRequiredFinalLimit": false
   },
   "parts": [
     {
@@ -138,7 +140,7 @@
     ],
     "reviewedDate": "2026-10-20",
     "technicalChecks": 147,
-    "technicalChecksScope": "Historical V6 game asset only; not evidence for V7/V8/V9 high-model appearance",
+    "technicalChecksScope": "Historical V6 game asset only; not evidence for V7/V8/V9/V10 high-model appearance",
     "sourceReopenVerified": true,
     "referenceCorrespondence": [
       "Folded blanket construction, two horizontal and two vertical grey cloth passes",
@@ -151,36 +153,42 @@
     "finalModelApprovedByUser": false,
     "visualInspection": "Actual exported V6 GLB inspected in front, right end, back and three-quarter views, plus native physical rendering; round folded edges and adjacent bottom returns compared with approved V02",
     "refinementChanges": [
-      "User raised the game budget to 10000; all optional parts total 9870 triangles",
+      "Historical V6 used a 10000 build threshold and totals 9870; this is not evidence of final compliance with the verified 3000 requirement",
       "Rebuilt folded ends as round cloth volumes with nested upper and paired lower returns",
       "Softer unquilted front surface, true thin tape edges and curved shoulder loops",
       "Connected mat fastening to the blanket passes and fitted side binding to the outer cloth envelope",
       "Independent finer V06 cotton, earth/sweat masks, darker indigo and restrained crease normals",
       "Automatic isolation of folded-over UV faces; actual GameUV overlap audit remains strict"
     ],
-    "authorizedBudgetTriangles": 10000,
-    "nextPhaseTriangleBudget": null,
+    "authorizedBudgetTriangles": 3000,
+    "nextPhaseTriangleBudget": 3000,
     "currentHighStudy": {
-      "sourceBlend": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/HighV9/Scene_SichuanPackReferenceWearV9.blend",
+      "sourceBlend": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/HighV10/Scene_SichuanPackSoftWearV10.blend",
       "bodyBaseline": "HighV7/Scene_SichuanHighClothV7.blend",
-      "rebuildScript": "../../_blender/Script_SichuanPackReferenceWearV9.py",
-      "documentation": "Data_ReferenceWearV9.md",
+      "rebuildScript": "../../_blender/Script_SichuanReferenceRefinementV10.py",
+      "documentation": "Data_SoftWearV10.md",
       "userFeedback": "材质的新旧差异过大；草席卷和草鞋外形差异也还是太大，继续优化",
       "completedWork": [
-        "Preserve visible V7 blanket surface while freezing its current state and replacing legacy patch faces; retained coordinate and UV hashes verified",
-        "Unique imagegen old-cotton panel preserves broad asymmetric stains, with 1024 normal and roughness maps",
-        "Restore separate conforming hand-sewn repair and sparse attached worn fibres",
-        "Continuous flattened grass strips interlace over a compressed, eccentric sheet roll with narrow irregular layer gaps",
-        "Narrower cupped sandals use dense uneven transverse straw bundles instead of rigid longitudinal grille bars",
-        "Washed grey binding, interrupted lower-edge mud and part-local wear reduce material-age contrast",
-        "Short compressed straw bundles replace smooth end bands; narrower layer gaps interrupt the paper-roll appearance",
-        "The original cloth knot and eyelet are exposed outside the garment and enlarged locally for readability"
+        "Imagegen corrected the old-cotton source toward washed nap and curled broken yarn, reducing the heavy dark hem",
+        "Eight sparse soft cloth creases and local tape folds use editable shape keys; Basis, UVs, contact plane and parent transforms remain unchanged",
+        "Compressed the real inner straw windings while retaining the outer woven lap and retaining tapes",
+        "Removed broad cut-end faces and replaced them with continuous, global-arc flattened grass interlacing",
+        "Folded the real sheet starting edge into the small core opening instead of using an end cap",
+        "Locally crushed transverse sandal bundles without changing their cup centreline, perimeter or laces",
+        "Part-local grey dust and sparse attached worn fibres keep the removable parts in the same age range",
+        "A separate imagegen longitudinal old-grass PBR surface adds vegetable grain, split fibres and worn colour variation"
       ],
-      "bodyGeometryPreserved": true,
+      "bodyGeometryPreserved": false,
       "visualApproval": false,
       "sourceReopenVerified": true,
       "sourceReviewDate": "2026-10-21",
-      "gameAssetReplaced": false
+      "gameAssetReplaced": false,
+      "bodyContourAndContactPlanePreserved": true,
+      "clothBasisAndUvsPreserved": true,
+      "requirementsAudit": "Data_RequirementsAudit.md",
+      "nextStep": "Preserve HighV10; build a separate <=3000-triangle game mesh and transfer all five parts into a 1024 PBR atlas",
+      "agentVisualReview": "Soft old cloth and coordinated material ages established; retain as bake source. Shoe rim thickness and mat end waviness still require controlled refinement in final geometry.",
+      "gameBuildPlan": "Data_GameBuildV10Plan.md"
     }
   },
   "historicalReferences": [
@@ -204,5 +212,6 @@
   ],
   "assetUrl": "./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261020ReferenceMatchV6",
   "assetBytes": 2355828,
-  "assetSha256": "8b739a1340d4802ba0b8c11d80ae9990c41f22a3b161275d3616c463b7e22ef5"
+  "assetSha256": "8b739a1340d4802ba0b8c11d80ae9990c41f22a3b161275d3616c463b7e22ef5",
+  "requiredFinalTriangleLimit": 3000
 }

@@ -1,0 +1,21 @@
+{
+  "source": "Image_SichuanSoftOldCottonV10.png",
+  "sourceSha256": "cd74ba1d92f6f2a651faf93be2ac20b2d6e006b15ff7dcd7a0853be2eae7c61f",
+  "normal": "Texture_SichuanCottonReliefV10Normal.png",
+  "normalSha256": "c0100c3168ef57373527cbf2d50b6a96fbf877eace10caf341794d13555b758d",
+  "normalConvention": "OpenGL +Y",
+  "resolution": [
+    1024,
+    1024
+  ],
+  "gaussianBandPx": [
+    1.0,
+    8.0
+  ],
+  "gradientScale": 8.0,
+  "albedoPreparation": "RGB/Lanczos 1024 only; retain generated cotton exactly",
+  "base": "Texture_SichuanSoftOldCottonV10Base.png",
+  "baseSha256": "f7d2fd21106dfc6b6256c0703b103a3efe3a7ba11a8a5da75379ec4480463d49",
+  "generationSource": "Built-in imagegen edit of V09 cotton using approved V02 reference",
+  "gameBakeComplete": false
+}

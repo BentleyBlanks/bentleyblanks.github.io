@@ -1,0 +1,35 @@
+{
+  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV10\\Image_SichuanWornStrawV10.png",
+  "sourceSha256": "188d96eba964ba9cb79cdb9c9be510e3422ae01920a1fd21d9beb8c9ad5d2208",
+  "sourceResolution": [
+    1254,
+    1254
+  ],
+  "generator": "Built-in imagegen, approved V02 straw material reference",
+  "layout": "Lengthwise unbraided grass surface; weave supplied by geometry",
+  "albedoPreparation": "RGB/Lanczos only",
+  "resolution": [
+    1024,
+    1024
+  ],
+  "normalConvention": "OpenGL +Y",
+  "roughnessRange": [
+    0.925000011920929,
+    0.9850000143051147
+  ],
+  "maps": {
+    "Base": {
+      "file": "Texture_SichuanWornStrawV10Base.png",
+      "sha256": "e5b68f696f408406fd8793076ac2fccdb771d75f2b7fa513953ce66b9cbdd9cf"
+    },
+    "Normal": {
+      "file": "Texture_SichuanWornStrawV10Normal.png",
+      "sha256": "08c8643ec5a34f5a75bc4548027b40fb2287cdb4996a44141826d8bfc6578088"
+    },
+    "Roughness": {
+      "file": "Texture_SichuanWornStrawV10Roughness.png",
+      "sha256": "c6d46173e822a823db3697dadd65ec10cd9e0db71e858630c4265d6aa8564ae0"
+    }
+  },
+  "gameBakeComplete": false
+}
