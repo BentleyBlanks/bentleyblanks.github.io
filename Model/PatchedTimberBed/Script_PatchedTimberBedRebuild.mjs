@@ -8,7 +8,7 @@ const repoRoot=path.resolve(scriptRoot,'../..');
 const argumentsList=process.argv.slice(2);
 function Option(name,fallback){return argumentsList.find(value=>value.startsWith(`--${name}=`))?.slice(name.length+3)??fallback;}
 const sourceRoot=Option('source-root','C:/Users/Bentl/OneDrive/AI/Models/Blender/PatchedTimberBed20261020');
-const reviewRoot=path.resolve(repoRoot,Option('review-root','tmp/BedBnBsAcceptance'));
+const reviewRoot=path.resolve(repoRoot,Option('review-root','tmp/BedBnBs50kAcceptance'));
 const outputFile=path.resolve(repoRoot,Option('output','Model/PatchedTimberBed/Model_PatchedTimberBed.glb'));
 fs.mkdirSync(reviewRoot,{recursive:true});
 for(const input of ['Inputs/BN/Restored/Bed_BN_Complete_Editable_Checkpoint.blend','Inputs/BS/BedBS/BS_material_only.blend','Inputs/BS/BedBS/BR_lowfrequency_corner_colors.npz','Inputs/BS/BedBS/BS_BaseColor.webp','Inputs/BS/BedBS/BS_Normal.webp','Inputs/BS/BedBS/BS_fiber_bundle_Base_1024.png']){

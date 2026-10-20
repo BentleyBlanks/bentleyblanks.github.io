@@ -12,12 +12,12 @@ from mathutils import Vector
 repoRoot=pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(pathlib.Path(__file__).resolve().parent))
 sys.dont_write_bytecode=True
-from Script_PatchedTimberBedFit import FitQuiltUnderside
-from Script_PatchedTimberBedLining import AddGameQuiltLining
 from Script_PatchedTimberBedCotton import ApplyCottonWeave
+from Script_PatchedTimberBedWood import WeatherTimberFrame
+from Script_PatchedTimberBedQuilt import BakeQuiltSurface
 if '--' in sys.argv:
- parser=argparse.ArgumentParser();parser.add_argument('--source-root',required=True);parser.add_argument('--review-root',required=True);parser.add_argument('--stage',default='all',choices=['prepare','build','finish','all'])
- args=parser.parse_args(sys.argv[sys.argv.index('--')+1:]);config={'sourceRoot':args.source_root,'reviewRoot':args.review_root,'stage':args.stage}
+ parser=argparse.ArgumentParser();parser.add_argument('--source-root',required=True);parser.add_argument('--review-root',required=True);parser.add_argument('--stage',default='all',choices=['prepare','build','finish','refresh','all']);parser.add_argument('--skip-renders',action='store_true');parser.add_argument('--group',choices=['Quilt','Straw'],default='Straw')
+ args=parser.parse_args(sys.argv[sys.argv.index('--')+1:]);config={'sourceRoot':args.source_root,'reviewRoot':args.review_root,'stage':args.stage,'skipRenders':args.skip_renders,'refreshGroup':args.group}
 else:config=json.loads(pathlib.Path(os.environ.get('BED_BAKE_CONFIG',str(repoRoot/'tmp/BedBnBsAcceptance/Data_BakeConfig.json'))).read_text())
 sourceRoot=pathlib.Path(config['sourceRoot'])
 reviewRoot=pathlib.Path(config['reviewRoot'])
@@ -82,20 +82,17 @@ def Export(objects,path):
  bpy.ops.export_scene.gltf(filepath=str(path),export_format='GLB',use_selection=True,export_animations=False,export_cameras=False,export_lights=False,export_vertex_color='NAME',export_vertex_color_name='BR_original_low_frequency_color',export_all_vertex_colors=False,export_tangents=True)
 
 def Deform(points):
- # A continuous field across the original eleven material partitions and sewing.
- # Positive gathers keep the lower quilt shell clear of the supporting mattress.
+ # Preserve the authored large cloth folds. Only broad, shallow gathers and
+ # foot-end gravity are added continuously across panels and stitching.
  x,y,z=points.T
  top=np.clip((z-.59)/.065,0,1)
- edge=np.exp(-((np.abs(y)-.365)/.13)**2)
- envelope=np.exp(-((x-.05)/.86)**4)
- ripple=(.011*np.sin(34*x+7*y+1.1)+.006*np.sin(19*x-16*y+.4))
- gathers=top*envelope*(edge*(.014+ripple))
- for cx,cy,amp,sx,sy in [(-.35,-.20,.022,.20,.14),(.10,.24,.026,.22,.16),(.48,-.14,.024,.17,.13),(-.65,.14,.017,.16,.17)]:
+ gathers=np.zeros(len(points))
+ for cx,cy,amp,sx,sy in [(-.35,-.20,.007,.30,.22),(.18,.24,.008,.34,.23),(.50,-.14,.006,.28,.21)]:
   gathers+=top*amp*np.exp(-((x-cx)/sx)**2-((y-cy)/sy)**2)
  foot=np.clip((x-.80)/.48,0,1);foot=foot*foot*(3-2*foot)
- points[:,2]+=gathers-foot*(.025+.010*np.sin(11*y+.5))
- points[:,0]+=foot*(.009*np.sin(19*y+1.4)+.005*np.sin(31*y))
- points[:,1]+=foot*.007*np.sin(12*y+6*x)
+ points[:,2]+=gathers-foot*(.016+.004*np.sin(7*y+.5))
+ points[:,0]+=foot*.005*np.sin(9*y+1.4)
+ points[:,1]+=foot*.003*np.sin(7*y+3*x)
  return points
 
 def Prepare():
@@ -130,12 +127,17 @@ def Prepare():
    if n.type=='TEX_IMAGE' and n.image:
     role='Base' if n.image.colorspace_settings.name=='sRGB' else 'Normal'
     path=textureRoot/('Texture_BSFoot'+role+'.png');n.image.filepath_raw=str(path);n.image.file_format='PNG';n.image.save();n.image.pack()
- fitStats=FitQuiltUnderside([o for o in objects if GroupName(o) in ('Quilt','BS_FootCloth')],[o for o in objects if GroupName(o)=='Straw'],affectedObjects=[o for o in objects if GroupName(o) in ('Quilt','BS_FootCloth','Sewing')],mode='high')
- (reviewRoot/'Data_UndersideFitHigh.json').write_text(json.dumps(fitStats,indent=2))
+ # The previous height-band fit also pulled visible fold flanks down by up to
+ # 149 mm. Keep the complete authored outer shell; game contact now uses a
+ # separately classified hidden underside and the real compacted straw mat.
+ (reviewRoot/'Data_UndersideFitHigh.json').write_text(json.dumps({'method':'Authored visible shell preserved; no height-band displacement of fold flanks','fitDisplacementM':0},indent=2))
+ woodStats=WeatherTimberFrame([o for o in objects if GroupName(o)=='Frame'])
+ (reviewRoot/'Data_WoodWeathering.json').write_text(json.dumps(woodStats,indent=2))
  ArchiveRecipes()
  bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedHigh.blend'))
  scene=bpy.context.scene;scene.render.resolution_x=1080;scene.render.resolution_y=720;scene.render.resolution_percentage=100;scene.render.use_border=False;scene.render.use_crop_to_border=False;scene.cycles.samples=32;scene.render.threads_mode='FIXED';scene.render.threads=6
- scene.render.filepath=str(reviewRoot/'Render_FinalHigh.png');bpy.ops.render.render(write_still=True)
+ scene.render.filepath=str(reviewRoot/'Render_FinalHigh.png')
+ if not config.get('skipRenders',False):bpy.ops.render.render(write_still=True)
  print('PREPARED_HIGH',flush=True)
 
 def GroupName(o):
@@ -185,7 +187,7 @@ def BakeVertexGroup(groupName,sourceObjects,targetCount):
  col=material.node_tree.nodes.new('ShaderNodeVertexColor');col.layer_name=attr.name;material.node_tree.links.new(col.outputs['Color'],bsdf.inputs['Base Color'])
  im=bpy.data.images['0.jpg' if groupName=='Quilt' else 'Texture_HaystackStrawNormal']
  im.filepath_raw=str(textureRoot/('Texture_Bed'+groupName+'TiledNormal.png'));im.file_format='PNG';im.save();im.pack()
- nodes=material.node_tree.nodes;links=material.node_tree.links;uv=nodes.new('ShaderNodeUVMap');uv.uv_map='UVMap';tex=nodes.new('ShaderNodeTexImage');tex.image=im;normal=nodes.new('ShaderNodeNormalMap');normal.uv_map='UVMap';normal.inputs['Strength'].default_value=.5 if groupName=='Quilt' else .12
+ nodes=material.node_tree.nodes;links=material.node_tree.links;uv=nodes.new('ShaderNodeUVMap');uv.uv_map='UVMap';tex=nodes.new('ShaderNodeTexImage');tex.image=im;normal=nodes.new('ShaderNodeNormalMap');normal.uv_map='UVMap';normal.inputs['Strength'].default_value=.25 if groupName=='Quilt' else .12
  links.new(uv.outputs['UV'],tex.inputs['Vector']);links.new(tex.outputs['Color'],normal.inputs['Color']);links.new(normal.outputs['Normal'],bsdf.inputs['Normal'])
  low.data.materials.clear();low.data.materials.append(material)
  for p in low.data.polygons:p.material_index=0
@@ -216,7 +218,7 @@ def BakeGroup(groupName,sourceObjects,targetCount,size):
     uv=m.node_tree.nodes.new('ShaderNodeUVMap');uv.uv_map='UVMap';m.node_tree.links.new(uv.outputs['UV'],n.inputs['Vector'])
  uv=low.data.uv_layers.new(name='GameUV');low.data.uv_layers.active=uv;uv.active_render=True
  Select([low]);bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(angle_limit=1.15,island_margin=.007,area_weight=.35);bpy.ops.object.mode_set(mode='OBJECT')
- scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.device='CPU';scene.cycles.samples=8;scene.render.threads_mode='FIXED';scene.render.threads=8
+ scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.device='CPU';scene.cycles.samples=16 if groupName=='Frame' else 8;scene.render.threads_mode='FIXED';scene.render.threads=6
  scene.render.bake.use_selected_to_active=False;scene.render.bake.margin=12;scene.render.bake.use_clear=True;scene.render.bake.target='IMAGE_TEXTURES'
  scene.render.bake.use_pass_direct=False;scene.render.bake.use_pass_indirect=False;scene.render.bake.use_pass_color=True
  images={}
@@ -243,6 +245,30 @@ def BakeGroup(groupName,sourceObjects,targetCount,size):
  print('BAKED',groupName,before,TriangleCount(low),size,flush=True)
  return low,{'group':groupName,'sourceObjects':len(sourceObjects),'sourceTriangles':before,'gameTriangles':TriangleCount(low),'removedDegenerates':len(bad),'bakeSize':size}
 
+def CompactFrameTextures(frame):
+ # Keep the visible grain colour at 2K; tangent relief and broad roughness need
+ # fewer texels. The original 2K source bakes remain in Bakes for editing.
+ rows=[]
+ for node in frame.data.materials[0].node_tree.nodes:
+  if node.type!='TEX_IMAGE' or not node.image:continue
+  image=node.image
+  role=next((name for name in ('Normal','Roughness') if name in image.name),None)
+  if role is None:continue
+  size=1024 if role=='Normal' else 512
+  before=list(image.size)
+  if before==[size,size]:continue
+  if image.packed_file:image.unpack(method='REMOVE')
+  image.scale(size,size)
+  if role=='Normal':
+   pixels=np.empty(size*size*4,dtype=np.float32);image.pixels.foreach_get(pixels)
+   pixels=pixels.reshape(-1,4);vectors=pixels[:,:3]*2-1
+   vectors/=np.maximum(np.linalg.norm(vectors,axis=1,keepdims=True),1e-12)
+   pixels[:,:3]=(vectors+1)*.5;image.pixels.foreach_set(pixels.ravel())
+  image.name='Texture_BedFrame'+role+'Game'
+  image.filepath_raw=str(textureRoot/(image.name+'.png'));image.file_format='PNG';image.save();image.pack()
+  rows.append({'role':role,'bakedDimensions':before,'gameDimensions':list(image.size),'normalVectorsRenormalized':role=='Normal'})
+ return {'frameBaseDimensions':[2048,2048],'maps':rows,'policy':'2K colour / 1K tangent normal / 512 roughness; original source bakes retained'}
+
 def Build():
  if not config.get('useOpenScene',False):bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedHigh.blend'))
  originals=[o for o in bpy.context.scene.objects if o.type=='MESH' and not o.hide_render and o.name!='Plane']
@@ -250,26 +276,41 @@ def Build():
  for o in originals:groups.setdefault(GroupName(o),[]).append(o)
  foot=groups['BS_FootCloth'][0];duplicate=foot.copy();duplicate.data=foot.data.copy();bpy.context.collection.objects.link(duplicate);duplicate.name='BS_FootCloth_Game'
  duplicate.data.materials[0].name='BS_FootCloth';CleanGameMesh(duplicate,soft=True)
- Select([duplicate]);mod=duplicate.modifiers.new('FootBudget','DECIMATE');mod.ratio=.24;mod.use_collapse_triangulate=True;bpy.ops.object.modifier_apply(modifier=mod.name);CleanGameMesh(duplicate,soft=True)
+ Select([duplicate]);mod=duplicate.modifiers.new('FootBudget','DECIMATE');mod.ratio=min(1,5000/TriangleCount(duplicate));mod.use_collapse_triangulate=True;bpy.ops.object.modifier_apply(modifier=mod.name);CleanGameMesh(duplicate,soft=True)
  duplicate.name='BS_FootCloth'
  rows=[];game=[duplicate]
- for name,target,size in [('Quilt',55000,2048),('Pillow',6000,1024),('Sewing',9000,512),('Frame',12000,1024),('Straw',65000,2048)]:
-  low,row=BakeVertexGroup(name,groups[name],target) if name in ('Quilt','Straw') else BakeGroup(name,groups[name],target,512 if name in ('Pillow','Sewing') else size)
+ for name,target,size in [('Quilt',18000,2048),('Pillow',2200,512),('Sewing',1800,512),('Frame',6000,2048),('Straw',6500,1024)]:
+  if name=='Quilt':low,row=BakeQuiltSurface(groups[name],target)
+  elif name=='Straw':
+   from Script_PatchedTimberBedStraw import BakeStrawSurface
+   low,row=BakeStrawSurface(groups[name],12500)
+  else:low,row=BakeGroup(name,groups[name],target,512 if name in ('Pillow','Sewing') else size)
   game.append(low);rows.append(row)
   bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_BedBakeProgress.blend'))
+  (reviewRoot/'Data_BakeBaseReport.json').write_text(json.dumps({'groups':rows,'footTriangles':TriangleCount(duplicate)},indent=2))
  FinishGame(game,originals,rows,duplicate)
 
 def FinishGame(game,originals,rows,duplicate):
+ from Script_PatchedTimberBedContact import AddCompactMatContact
  quilt=next(o for o in game if o.name=='Quilt');straw=next(o for o in game if o.name=='Straw');sewing=next(o for o in game if o.name=='Sewing')
- fitStats=FitQuiltUnderside([quilt,duplicate],[straw],affectedObjects=[quilt,duplicate,sewing],mode='game')
- (reviewRoot/'Data_UndersideFitGame.json').write_text(json.dumps(fitStats,indent=2))
- liningStats=AddGameQuiltLining(quilt,duplicate,straw)
+ liningStats=AddCompactMatContact(quilt,duplicate,straw)
  (reviewRoot/'Data_QuiltLining.json').write_text(json.dumps(liningStats,indent=2))
  OrientQuiltShell(quilt)
  weaveStats=ApplyCottonWeave(quilt,bsRoot,textureRoot)
  (reviewRoot/'Data_CottonWeave.json').write_text(json.dumps(weaveStats,indent=2))
+ textureStats=CompactFrameTextures(next(o for o in game if o.name=='Frame'))
+ (reviewRoot/'Data_TextureBudget.json').write_text(json.dumps(textureStats,indent=2))
+ cleanup=[]
+ for o in game:
+  before=TriangleCount(o)
+  repaired=o.data.validate(verbose=True,clean_customdata=False);o.data.update()
+  if o.data.validate(verbose=False,clean_customdata=False):raise ValueError(f'{o.name} remains invalid after mesh cleanup')
+  cleanup.append({'group':o.name,'trianglesBefore':before,'trianglesAfter':TriangleCount(o),'meshValidationRepaired':repaired,'uvLayers':[v.name for v in o.data.uv_layers],'colourLayers':[v.name for v in o.data.color_attributes]})
+ (reviewRoot/'Data_GameMeshCleanup.json').write_text(json.dumps(cleanup,indent=2))
  for row in rows:
   o=next(o for o in game if o.name==row['group']);row['trianglesBeforeContactRefinement']=row['gameTriangles'];row['gameTriangles']=TriangleCount(o)
+ totalTriangles=sum(TriangleCount(o) for o in game)
+ if totalTriangles>50000:raise ValueError(f'Complete bed exceeds the user 50000-triangle cap: {totalTriangles}')
  # Preserve construction axes; glTF conversion produces Y-up, long X, foot +X.
  allPoints=[o.matrix_world@Vector(v) for o in game for v in o.bound_box]
  offset=Vector(((min(p.x for p in allPoints)+max(p.x for p in allPoints))/2,(min(p.y for p in allPoints)+max(p.y for p in allPoints))/2,min(p.z for p in allPoints)))
@@ -279,9 +320,11 @@ def FinishGame(game,originals,rows,duplicate):
  for o in originals:o.hide_render=True;o.hide_set(True)
  for o in game:o.hide_render=False;o.hide_set(False)
  Export(game,reviewRoot/'Model_PatchedTimberBedStandard.glb')
+ for row in rows:row['gameTriangles']=TriangleCount(next(o for o in game if o.name==row['group']))
  ArchiveRecipes()
  bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'))
- scene=bpy.context.scene;scene.render.resolution_x=1080;scene.render.resolution_y=720;scene.render.resolution_percentage=100;scene.render.use_border=False;scene.cycles.samples=32;scene.render.filepath=str(reviewRoot/'Render_FinalGame.png');bpy.ops.render.render(write_still=True)
+ scene=bpy.context.scene;scene.render.resolution_x=1080;scene.render.resolution_y=720;scene.render.resolution_percentage=100;scene.render.use_border=False;scene.cycles.samples=32;scene.render.filepath=str(reviewRoot/'Render_FinalGame.png')
+ if not config.get('skipRenders',False):bpy.ops.render.render(write_still=True)
  (reviewRoot/'Data_BakeReport.json').write_text(json.dumps({'groups':rows,'footTriangles':TriangleCount(duplicate),'originOffsetBlender':list(offset)},indent=2))
  print('GAME_EXPORTED',flush=True)
 
@@ -295,11 +338,37 @@ def ResumeFinish():
  duplicate=feet[0];game.insert(0,duplicate)
  assert not game[1].get('GameQuiltLiningAdded',False)
  originals=[o for o in bpy.context.scene.objects if o.type=='MESH' and o.name!='Plane' and o not in game]
- rows=json.loads((reviewRoot/'Data_BakeReport.json').read_text())['groups']
+ baseReport=reviewRoot/'Data_BakeBaseReport.json'
+ rows=json.loads((baseReport if baseReport.is_file() else reviewRoot/'Data_BakeReport.json').read_text())['groups']
  for row in rows:row['gameTriangles']=TriangleCount(next(o for o in game if o.name==row['group']))
  FinishGame(game,originals,rows,duplicate)
+
+def RefreshSoftGroup():
+ # Iterate one source-based soft group while reusing the checked PBR atlases.
+ # Full Build calls the same surface helpers, so this is a checkpoint shortcut.
+ bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_BedBakeProgress.blend'))
+ game=[bpy.data.objects[name] for name in ('Quilt','Pillow','Sewing','Frame','Straw')]
+ feet=[o for o in bpy.context.scene.objects if o.type=='MESH' and o.name.startswith('BS_FootCloth') and len(o.data.vertices)<30000]
+ assert len(feet)==1
+ duplicate=feet[0];game.insert(0,duplicate)
+ originals=[o for o in bpy.context.scene.objects if o.type=='MESH' and o.name!='Plane' and o not in game]
+ name=config.get('refreshGroup','Straw');old=next(o for o in game if o.name==name);oldMesh=old.data
+ game.remove(old);bpy.data.objects.remove(old,do_unlink=True)
+ if oldMesh.users==0:bpy.data.meshes.remove(oldMesh)
+ sources=[o for o in originals if GroupName(o)==name]
+ if name=='Quilt':low,row=BakeQuiltSurface(sources,18000)
+ else:
+  from Script_PatchedTimberBedStraw import BakeStrawSurface
+  low,row=BakeStrawSurface(sources,12500)
+ game.append(low)
+ basePath=reviewRoot/'Data_BakeBaseReport.json';base=json.loads(basePath.read_text())
+ base['groups']=[row if item['group']==name else item for item in base['groups']];basePath.write_text(json.dumps(base,indent=2))
+ (reviewRoot/('Data_'+name+'SourceBake.json')).write_text(json.dumps(row,indent=2))
+ bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_BedBakeProgress.blend'))
+ FinishGame(game,originals,base['groups'],duplicate)
 
 stage=config.get('stage','all')
 if stage in ('prepare','all'):Prepare()
 if stage in ('build','all'):Build()
 if stage=='finish':ResumeFinish()
+if stage=='refresh':RefreshSoftGroup()

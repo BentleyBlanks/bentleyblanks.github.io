@@ -12,9 +12,9 @@ import { ServeRoot } from '../../Taierzhuang1938/Script_DevServer.mjs';
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const argumentsList = process.argv.slice(2);
 function Option(name, fallback) { return argumentsList.find(item => item.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback; }
-const outputRoot = path.resolve(repositoryRoot, Option('out', 'tmp/BedBnBsAcceptance'));
+const outputRoot = path.resolve(repositoryRoot, Option('out', 'tmp/BedBnBs50kAcceptance'));
 const finalFile = path.resolve(repositoryRoot, Option('model', 'Model/PatchedTimberBed/Model_PatchedTimberBed.glb'));
-const originalFile = path.resolve(repositoryRoot, Option('original', 'tmp/BedBnBsAcceptance/Model_OriginalBed.glb'));
+const originalFile = path.resolve(repositoryRoot, Option('original', 'tmp/BedBnBs50kAcceptance/Model_OriginalBed.glb'));
 const contractFile = path.resolve(repositoryRoot, Option('contract', 'Model/PatchedTimberBed/Data_Asset.json'));
 const compare = argumentsList.includes('--comparison');
 const originalLabel = Option('original-label', '原版形体·颜色烘焙');
@@ -389,7 +389,7 @@ async function Main() {
   const originalReport = compare ? await Inspect(originalFile, false) : null;
   let contract = null; try { contract = JSON.parse(await fs.readFile(contractFile, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   const record = contract?.models?.find(item => item.file === path.basename(finalFile)) ?? contract?.model ?? contract;
-  const triangleLimit = Number(Option('max-triangles', record?.triangleLimit ?? record?.triangleBudget ?? contract?.performance?.triangleLimit ?? 0));
+  const triangleLimit = Math.min(50000, Number(Option('max-triangles', record?.triangleLimit ?? record?.triangleBudget ?? contract?.performance?.triangleLimit ?? 50000)));
   const drawLimit = Number(Option('max-draws', record?.drawPrimitiveLimit ?? record?.drawCallBudget ?? contract?.performance?.drawPrimitiveLimit ?? 0));
   if (triangleLimit) assert.ok(finalReport.triangles <= triangleLimit, `triangle budget ${triangleLimit}`);
   if (drawLimit) assert.ok(finalReport.drawPrimitives <= drawLimit, `draw primitive budget ${drawLimit}`);

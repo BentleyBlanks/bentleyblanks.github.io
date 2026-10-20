@@ -14,9 +14,9 @@ const sampleXs = [-.9, -.6, -.3, 0, .3, .6];
 const sampleZs = [-.43, -.38, -.25, 0, .25, .38, .43];
 const gapLimit = .002;
 const penetrationLimit = .002;
-const intendedMicroOverlap = .0005;
+const targetCottonGap = .00025;
 const upperSurfaceClearance = .001;
-const reportFile = path.resolve(repositoryRoot, Option('report', 'tmp/BedBnBsAcceptance/Data_ContactReview.json'));
+const reportFile = path.resolve(repositoryRoot, Option('report', 'tmp/BedBnBs50kAcceptance/Data_ContactReview.json'));
 
 function Identity() { return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]; }
 function Multiply(a, b) {
@@ -105,7 +105,7 @@ function EvaluateSample(sample) {
   if (strawTop && upper && strawTop.y > upper.y - upperSurfaceClearance) violations.push('SupportReachesVisibleUpperShell');
   return { x: sample.x, z: sample.z, result: violations.length ? 'FAIL' : 'PASS', violations, lowerCertified,
     gapM: gap, gapMm: gap === null ? null : gap * 1000, rawLowestGapM: rawLowestGap,
-    deviationFromIntendedOverlapM: gap === null ? null : gap + intendedMicroOverlap,
+    deviationFromTargetGapM: gap === null ? null : gap - targetCottonGap,
     quiltLowerY: lowerCertified ? lower.y : null, quiltUpperY: upper?.y ?? null,
     rawQuiltLowestY: lower?.y ?? null, supportTopY: strawTop?.y ?? null,
     shellThicknessM: lowerCertified && upper ? upper.y - lower.y : null,
@@ -202,10 +202,10 @@ function SelfTest() {
 async function Main() {
   if (argumentsList.includes('--self-test')) return SelfTest();
   const final = await Inspect(path.resolve(repositoryRoot, Option('model', 'Model/PatchedTimberBed/Model_PatchedTimberBed.glb')), false);
-  const original = argumentsList.includes('--comparison') ? await Inspect(path.resolve(repositoryRoot, Option('original', 'tmp/BedBnBsAcceptance/Model_OriginalBed.glb')), true) : null;
+  const original = argumentsList.includes('--comparison') ? await Inspect(path.resolve(repositoryRoot, Option('original', 'tmp/BedBnBs50kAcceptance/Model_OriginalBed.glb')), true) : null;
   const report = { result: final.result, method: 'Independent dense-GLB decode, float64 node transforms, exact projected-triangle vertical intersections; geometric winding certifies lower shell',
-    limits: { maximumFloatingGapM: gapLimit, maximumPenetrationM: penetrationLimit, intendedMicroOverlapM: intendedMicroOverlap,
-      interpretation: 'The 2 mm absolute contact limit is unchanged. Intended 0.5 mm overlap is inside that limit; interpolation error receives no additional slack.', upperSurfaceClearanceM: upperSurfaceClearance },
+    limits: { maximumFloatingGapM: gapLimit, maximumPenetrationM: penetrationLimit, targetCottonGapM: targetCottonGap,
+      interpretation: 'The 2 mm absolute contact limit is unchanged. Target 0.25 mm cotton clearance is inside that limit; interpolation error receives no additional slack.', upperSurfaceClearanceM: upperSurfaceClearance },
     final, ...(original ? { original, baselineFailureDoesNotRelaxFinalGate: true, comparison: final.points.map((point, index) => ({ x: point.x, z: point.z, finalGapMm: point.gapMm, originalGapMm: original.points[index].gapMm, finalStatus: point.result, originalStatus: original.points[index].result })) } : {}),
     limitation: 'Forty-two exact contact probes establish sampled support, not a global proof against every intersection; inspect full views and conservative lower-shell hole diagnostics too.' };
   await fs.mkdir(path.dirname(reportFile), { recursive: true }); await fs.writeFile(reportFile, `${JSON.stringify(report, null, 2)}\n`);
