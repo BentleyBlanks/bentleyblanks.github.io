@@ -628,8 +628,8 @@
     "Test_LiftHeadCorners",
     "Test_DrapeOverBody"
   ],
-  "sha256": "fa9a9d90fab4ea1382a53094d781b5d35b69e9a1569d3aca7cac509121ef1117",
-  "bytes": 975772,
+  "sha256": "0eb4e5c5a6b8dda216bf3f6f958282dbf2d1459c1e8675429d19522d59a0c89e",
+  "bytes": 968748,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SingleBlanket\\Scene_SingleBlanket.blend",
   "coordinates": "Blender (x,y,z) -> glTF (x,z,-y); head -Y -> +Z; L=+X",
   "reconstructionScope": "User-approved five crude patches, gray-white plain cotton, aging, dimensions and dragging poses are artistic reconstruction; not a documented standardized 1938 issue pattern",

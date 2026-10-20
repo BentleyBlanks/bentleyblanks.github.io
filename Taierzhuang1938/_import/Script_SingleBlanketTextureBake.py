@@ -73,7 +73,10 @@ def Main():
         "--source", str(sourcePath), "--name", "SingleBlanket", "--preset", "singleBlanketAtlas",
         "--tile-m", "1.630950643", "--size", "1024", "--data-size", "1024",
         "--pack", "orm", "--seamless", "none", "--no-flatten", "--keep-alpha",
-        "--mean", "0.62,0.60,0.56", "--contrast", "0.085", "--tone-strength", "0.9",
+        # Approved V3 cloth crop's display palette: warm gray-brown, without
+        # the previous cool/green bias. These are image sRGB statistics, not
+        # a measured historical albedo. Full strength avoids source mean leak.
+        "--mean", "0.655,0.601,0.548", "--contrast", "0.0804", "--tone-strength", "1.0",
         "--normal-convention", "gl", "--relief-m", "0.00012", "--normal-strength", "0.8",
         "--rough", "0.90", "--rough-var", "0.006", "--rough-min", "0.85", "--ao", "0.04", "--metal", "0",
         "--base-quality", "90", "--data-quality", "90", "--data-lossless",

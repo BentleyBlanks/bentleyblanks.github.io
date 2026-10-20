@@ -2,9 +2,11 @@
 
 2026-10-19，Blender 5.1.2。按用户确认的五补丁三视图制作；随后按“看起来不柔软”的反馈改细棉布织纹、减轻浮雕、重做圆缓软褶和垂覆。单层薄布，无填充、厚度、绗缝、约束、IK、驱动器或布料模拟。
 
+2026-10-20：按对标反馈，把偏冷绿的基色校正到已确认参考图的灰褐色显示配色。图集平均sRGB约从(0.633, 0.611, 0.568)调整到(0.655, 0.601, 0.548)，目标对比度0.0804；这是参考图的显示色统计，不是实物测色。原imagegen源图、五补丁布局、alpha、网格、骨骼、权重、挂点、形态键及五条动作保留；实际GLB逐访问器复核几何、蒙皮和动作数据一致，重烘PBR并更新内嵌贴图。出图显式固定曝光0、gamma 1，无光照对标使用Standard/None。
+
 ## 交付与重建
 
-- 游戏资产：[Model_SingleBlanket.glb](../Model/Model_SingleBlanket.glb)，975,772字节；[机器契约](../Model/Data_SingleBlanket.json)。
+- 游戏资产：[Model_SingleBlanket.glb](../Model/Model_SingleBlanket.glb)，968,748字节；[机器契约](../Model/Data_SingleBlanket.json)。
 - [独立泥血遮罩](../Texture/Texture_SingleBlanketMask.webp)，1024×1024，无损WebP，未接进材质。
 - [Blender重建脚本](../_blender/Script_SingleBlanketBake.py)、[贴图烘焙](../_import/Script_SingleBlanketTextureBake.py)、[独立GLB/CPU校验](../_blender/Script_SingleBlanketVerify.mjs)、[浏览器GLTFLoader校验](../_blender/Script_SingleBlanketBrowserVerify.mjs)、[出图脚本](../_blender/Script_SingleBlanketShots.py)。
 - 源工程：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SingleBlanket/Scene_SingleBlanket.blend`。参考、截图、对标图在同目录的`Reference/`与`Review/`，均不入仓库。
@@ -41,7 +43,7 @@ Khronos检查使用官方`gltf-validator@2.0.0-dev.3.10`；可安装到忽略目
 
 ## 骨骼命名与Rest坐标
 
-单位米；所有Roll=0。根骨不变形、无权重。其余24根全部直接父于Blanket_Root，不连接；没有网格骨之间的父子链。
+单位米；所有Roll=0。根骨不变形、无权重。其余24根全部直接父于Blanket_Root，不连接；没有网格骨之间的父子链。横向4列覆盖1.4米，间隔约46.67厘米；纵向6行覆盖1.9米，间隔38厘米。骨格是运行时的独立控制点，最终布面曲率取决于这些控制点的姿势和网格密度；当前没有布料求解器自动生成褶皱。
 
 | 名称 | Head (X,Y,Z) | Tail (X,Y,Z) | Deform |
 | --- | --- | --- | --- |
@@ -118,7 +120,7 @@ Base RGBA、Normal、ORM均1024×1024，全部内嵌GLB。平纹洗旧棉布、�
 | 两次独立无界面复建 | SHA-256完全相同，且与交付GLB一致 |
 | 浏览器GLTFLoader | 五动作正常读入、25骨、600三角；展开首尾偏差≤2.1×10⁻⁸米，无页面错误 |
 
-GLB SHA-256：`fa9a9d90fab4ea1382a53094d781b5d35b69e9a1569d3aca7cac509121ef1117`。
+GLB SHA-256：`0eb4e5c5a6b8dda216bf3f6f958282dbf2d1459c1e8675429d19522d59a0c89e`。
 
 ## 本地视觉验收
 

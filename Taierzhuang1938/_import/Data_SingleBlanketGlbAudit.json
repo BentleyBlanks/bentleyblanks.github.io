@@ -1,6 +1,6 @@
 {
   "file": "Model/Model_SingleBlanket.glb",
-  "sha256": "fa9a9d90fab4ea1382a53094d781b5d35b69e9a1569d3aca7cac509121ef1117",
+  "sha256": "0eb4e5c5a6b8dda216bf3f6f958282dbf2d1459c1e8675429d19522d59a0c89e",
   "vertices": 336,
   "triangles": 600,
   "joints": 25,
@@ -35,8 +35,8 @@
     "runs": 2,
     "identical": true,
     "hashes": [
-      "fa9a9d90fab4ea1382a53094d781b5d35b69e9a1569d3aca7cac509121ef1117",
-      "fa9a9d90fab4ea1382a53094d781b5d35b69e9a1569d3aca7cac509121ef1117"
+      "0eb4e5c5a6b8dda216bf3f6f958282dbf2d1459c1e8675429d19522d59a0c89e",
+      "0eb4e5c5a6b8dda216bf3f6f958282dbf2d1459c1e8675429d19522d59a0c89e"
     ]
   },
   "khronosValidator": {

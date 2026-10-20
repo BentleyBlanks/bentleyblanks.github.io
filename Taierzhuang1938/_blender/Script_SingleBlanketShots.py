@@ -67,6 +67,8 @@ def Main():
     scene.world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.45
     scene.view_settings.view_transform = "AgX"
     scene.view_settings.look = "AgX - Medium High Contrast"
+    scene.view_settings.exposure = 0.0
+    scene.view_settings.gamma = 1.0
     bpy.ops.mesh.primitive_plane_add(size=200, location=(0, 0, -0.006))
     ground = bpy.context.object
     ground.name = "Review_Ground"
@@ -155,6 +157,7 @@ def Main():
     tree.links.new(mix.outputs[0], tree.nodes["Material Output"].inputs["Surface"])
     mesh.data.materials[0] = unlit
     scene.view_settings.view_transform = "Standard"
+    scene.view_settings.look = "None"
     Render("ReferenceAlignment", (0, 0, 3), (0, 0, 0), 2.9)
     scene.view_settings.view_transform = "AgX"
     mesh.data.materials[0] = mainMaterial
