@@ -130,14 +130,15 @@
       "Texture_ReferenceCompare_side.jpg",
       "Texture_ReferenceCompare_back.jpg"
     ],
-    "status": "V6RejectedByUser_V7HighClothDeliveredForReview",
+    "status": "V8StrawAndWearRefinedForReview",
+    "localPageScope": "Historical V6 game preview; use the current high-study source and native renders for V8",
     "remainingRefinements": [
       "Game topology and UV for the later game-output phase",
       "Final 1024 PBR transfer for the later game-output phase"
     ],
     "reviewedDate": "2026-10-20",
     "technicalChecks": 147,
-    "technicalChecksScope": "Historical V6 game asset only; not evidence for V7 high-model appearance",
+    "technicalChecksScope": "Historical V6 game asset only; not evidence for V7/V8 high-model appearance",
     "sourceReopenVerified": true,
     "referenceCorrespondence": [
       "Folded blanket construction, two horizontal and two vertical grey cloth passes",
@@ -160,20 +161,20 @@
     "authorizedBudgetTriangles": 10000,
     "nextPhaseTriangleBudget": null,
     "currentHighStudy": {
-      "sourceBlend": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/HighV7/Scene_SichuanHighClothV7.blend",
-      "rebuildScript": "../../_blender/Script_SichuanHighClothBuildV7.py",
-      "documentation": "Data_HighClothV7.md",
-      "userFeedback": "轮廓更接近，继续自然布褶",
+      "sourceBlend": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/HighV8/Scene_SichuanPackStrawWearV8.blend",
+      "bodyBaseline": "HighV7/Scene_SichuanHighClothV7.blend",
+      "rebuildScript": "../../_blender/Script_SichuanPackRefineV8.py",
+      "documentation": "Data_StrawWearV8.md",
+      "userFeedback": "材质的新旧差异过大；草席卷和草鞋外形差异也还是太大，继续优化",
       "completedWork": [
-        "Preserve V7 silhouette and flat body-contact back",
-        "Frame-51 tie-constrained cloth relaxation with irregular broad gathering",
-        "Clean indigo corner, turned cotton overlap and rounded knot button",
-        "Ordered side-layer connections remove projecting fins near the tucked coat",
-        "High-resolution jacket corner and rounded cotton tape, bow and shoulder loops"
+        "Preserve V7 cotton bundle, binding and jacket geometry, verified by vertex hashes",
+        "Shared-age imagegen fibre atlas with physical cloth scale and non-repeating dust/mud",
+        "Five tight irregular grass-sheet roll layers with braided cut edges and real interlacing",
+        "Heel-up braided sandals with chevron footbeds, thick edges and actual cord attachment",
+        "Wear stays attached when the pack or independent garment moves"
       ],
-      "highRefinementComplete": true,
+      "bodyGeometryPreserved": true,
       "visualApproval": false,
-      "rebuildIdenticalCoarseSource": true,
       "sourceReopenVerified": true,
       "gameAssetReplaced": false
     }

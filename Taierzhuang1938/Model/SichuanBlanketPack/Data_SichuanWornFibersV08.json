@@ -1,0 +1,38 @@
+{
+  "generator": "Built-in image_gen__imagegen",
+  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV08\\Image_SichuanWornFibersV08.png",
+  "sourceSha256": "63026c25659bb288db8ec60b8f537e0b17c09609723819f9f832469d4161fa5b",
+  "resolution": [
+    1024,
+    1024
+  ],
+  "regionsImagePixels": {
+    "Cotton": [
+      0,
+      0,
+      512,
+      512
+    ],
+    "Binding": [
+      512,
+      0,
+      1024,
+      512
+    ],
+    "Indigo": [
+      0,
+      512,
+      512,
+      1024
+    ],
+    "Straw": [
+      512,
+      512,
+      1024,
+      1024
+    ]
+  },
+  "purpose": "Shared-age homespun cotton, tape, indigo and grass fibres; geometry supplies the actual straw weave",
+  "technicalMaps": "Normal from high-frequency fibre luminance; matte roughness, no metallic component",
+  "gameBakeComplete": false
+}
