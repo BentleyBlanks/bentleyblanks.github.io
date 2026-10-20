@@ -36,7 +36,15 @@ wrist bend the palm is pushed toward (the cuff skin creases with it); FPS_ADS_CU
 FPS_ADS_CUFF_WEIGHT. Tried and not shipped: FPS_ADS_THUMB_HUG / FPS_ADS_THUMB_YAW /
 FPS_ADS_THUMB_YAW_WEIGHT / FPS_ADS_THUMB_BASE (whole thumb flat along the stock, with an
 aimed thumb start and palm yaw in FPS_ADS_GRID): it needs the palm under the stock and hides
-the hand at ADS. The per-rifle settings are in docs/Data_FpsRifleView20261016.md v16.
+the hand at ADS.
+
+Thumb in line with the hand (v17): FPS_ADS_THUMB_LINE / FPS_ADS_THUMB_LINE_CAP penalise the
+top-view angle at the thumb base between wrist -> CMC and CMC -> thumb pad, so the hand's radial
+edge does not bulge out to the thumb base and turn back in (the user's '<'); a palm-yaw grid
+(FPS_ADS_GRID yaw) lets the whole hand follow the forearm instead. FPS_ADS_PALM_CLEAR widens
+the palm skin clearance, since in game the wrist ring's forearm weights carry the palm heel
+~0.5-1 mm deeper than this hand-bone-only skin. The per-rifle settings are in
+docs/Data_FpsRifleView20261016.md v17.
 
 FPS_ADS_PALM (json {weapon: palm params}) reruns the fingers on fixed palms;
 FPS_ADS_PALM_SEED refines from given palms; FPS_ADS_ROLL_ANCHOR / FPS_ADS_ROLL_SEEDS
@@ -295,6 +303,10 @@ for wid in ids:
     thumbYaw = float(Setting('FPS_ADS_THUMB_YAW', 90))
     thumbYawWeight = float(Setting('FPS_ADS_THUMB_YAW_WEIGHT', .1))   # per degree past the cap
     thumbBase = float(Setting('FPS_ADS_THUMB_BASE', 45))   # thumb base (CMC) delta per axis, degrees
+    # Seen from above, wrist -> thumb base -> thumb tip should be one line (user sketch): the hand's
+    # radial edge must not bulge out to the thumb base and then turn back in to the stock.
+    thumbLine = float(Setting('FPS_ADS_THUMB_LINE', 0))         # weight per degree past the cap
+    thumbLineCap = float(Setting('FPS_ADS_THUMB_LINE_CAP', 15))
     wrapWeight = float(Setting('FPS_ADS_WRAP', 0))   # index/middle curl under the wood instead of pointing forward
     penWeight = float(Setting('FPS_ADS_PEN', 300))   # skin closer than 0.6 mm to the rifle, per metre
     # {weapon: mm}: the whole index finger stays under this gun-local height, below the thumb band;
@@ -315,6 +327,9 @@ for wid in ids:
     cuffWeight = float(Setting('FPS_ADS_CUFF_WEIGHT', 8))
     # Minimum wrist bend the production IK can reach; a bent wrist shows a crease at the cuff.
     wristTarget = float(Setting('FPS_ADS_WRIST_TARGET', 22))
+    # Palm skin clearance from the rifle (m). In game the wrist ring also carries 20-30 % forearm
+    # weight and lands the palm heel ~0.5-1 mm deeper than this hand-bone-only skin.
+    palmClear = float(Setting('FPS_ADS_PALM_CLEAR', .0005))
     wristWeight = float(Setting('FPS_ADS_WRIST_WEIGHT', .03))
     handLow = -0.62     # ...but the hand still shows above 0.31 screen heights under it
     # Finger roots (MCP joints) of the four fingers: they must stay near the wood
@@ -324,7 +339,7 @@ for wid in ids:
     def PalmCost(p, detail=False):
         D = PalmDelta(p)
         moved = [D @ v for v in palmOnly]
-        pen = max([max(0., .0005 - Signed(v, bvhAll)) for v in moved], default=0)
+        pen = max([max(0., palmClear - Signed(v, bvhAll)) for v in moved], default=0)
         volarGaps = sorted(((abs(Signed(D @ v)), D @ v) for v in volar), key=lambda pair: pair[0])
         allGaps = [g for g, v in volarGaps]
         contactX = sum(v.x for g, v in volarGaps[:40]) / 40
@@ -517,9 +532,14 @@ for wid in ids:
                     axis = (ip - mcp).normalized()
                     yaw = math.degrees(math.atan2(axis.x, max(1e-6, -axis.z)))
                     hug = [segGap.get(n, 1.) for n in Bones(0)[1:]]
+                    wristPoint = (D @ C0 @ handFromContact).to_translation()
+                    cmc = T[Bones(0)[0]] @ chains[Bones(0)[0]]['W'].to_translation()
+                    a2, b2 = Vector((cmc.x - wristPoint.x, cmc.z - wristPoint.z)), Vector((pad.x - cmc.x, pad.z - cmc.z))
+                    lineKink = math.degrees(a2.angle(b2)) if a2.length > 1e-6 and b2.length > 1e-6 else 0.
+                    thumbShape += thumbLine * max(0, lineKink - thumbLineCap)
                     thumbShape += thumbYawWeight * max(0, abs(yaw) - thumbYaw) + thumbHug * sum(max(0, g - .003) for g in hug)
                     shape = {'padMm': [round(v * 1000, 1) for v in pad], 'direction': [round(v, 2) for v in direction], 'pitch': round(pitch, 1),
-                             'yaw': round(yaw, 1), 'hugMm': [round(g * 1000, 1) for g in hug],
+                             'yaw': round(yaw, 1), 'hugMm': [round(g * 1000, 1) for g in hug], 'lineKink': round(lineKink, 1),
                              'ipMm': round(ip.y * 1000, 1), 'topMm': round(max(v.y for v in seen) * 1000, 1) if seen else None}
                 if digit and digit <= fingerCeilDigits and indexCeil is not None and seen and not hipMode:
                     indexTop = max(v.y for v in seen)
