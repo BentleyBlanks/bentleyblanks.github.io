@@ -16,9 +16,20 @@ axis, measured like Script_FpsHandPoseTest: finger MCP -10..95 deg plus abductio
 (index/middle/ring/little +-20/12/15/20), PIP 0..105, DIP 0..80, thumb MCP/IP -5..60/80
 (the thumb base keeps three free axes), so no joint bends backwards. Distal pads on the
 fore-end (FPS_ADS_REACH), skin >= 0.6 mm off the wood, finger top under
-FPS_ADS_FINGER_TOP (weight FPS_ADS_FINGER_TOP_WEIGHT). The shipped grips use
-FPS_ADS_ROLL_ANCHOR=0.2 with FPS_ADS_SHOULDER; the per-rifle settings are in
-docs/Data_FpsRifleView20261016.md v12.
+FPS_ADS_FINGER_TOP (weight FPS_ADS_FINGER_TOP_WEIGHT).
+
+Thumb along the stock (user sketch, 2026-10-20): FPS_ADS_THUMB_SIDE {weapon: [pad y low,
+pad y high, thumb ceiling] mm} puts the thumb pad on the left face in that band, its IP
+joint no lower than 4 mm under it, pointing at the muzzle 0-20 deg up, and no thumb skin
+above the ceiling (the stock's upper edge); FPS_ADS_THUMB_TOP is its own NDC limit.
+FPS_ADS_INDEX_CEIL {weapon: mm} keeps the index (FPS_ADS_CEIL_DIGITS=4: all four fingers)
+below the thumb, so a straight index no longer rises along the stock where the thumb
+belongs. FPS_ADS_GRID {weapon: {theta, phi, dy}} sweeps the palm rolled about the
+fore-end axis, turned about its normal and lowered; FPS_ADS_EXTRA_SEEDS adds palms to
+compare. FPS_ADS_PEN weights skin inside the 0.6 mm clearance (3000 for the shipped
+grips), FPS_ADS_LITTLE_REACH the little finger's pad pull, FPS_ADS_WRAP an experimental
+pull of index/middle round to the stock's right side (not shipped). The per-rifle
+settings are in docs/Data_FpsRifleView20261016.md v14.
 
 FPS_ADS_PALM (json {weapon: palm params}) reruns the fingers on fixed palms;
 FPS_ADS_PALM_SEED refines from given palms; FPS_ADS_ROLL_ANCHOR / FPS_ADS_ROLL_SEEDS
@@ -142,6 +153,7 @@ for wid in ids:
     centerX = (min(sectionX) + max(sectionX)) / 2
     sectionY = [v.y for v in cut if abs(v.x) < .03]
     foreEndCenter = Vector((centerX, (min(sectionY) + max(sectionY)) / 2, z0))
+    sideX = min(sectionX)   # left face of the stock at the contact
     support = [i for i in range(0, len(vertices), 3) if max(v.y for v in vertices[i:i + 3]) >= underside - .002]
     supportVertices = [vertices[i + k] for i in support for k in range(3)]
     bvh = BVHTree.FromPolygons(supportVertices, [(i, i + 1, i + 2) for i in range(0, len(supportVertices), 3)])
@@ -264,6 +276,24 @@ for wid in ids:
     fingerTop = float(Setting('FPS_ADS_FINGER_TOP', targetNdc))
     reachWeight = float(Setting('FPS_ADS_REACH', 60))       # distal pad onto the wood
     anchorShift = float(Setting('FPS_ADS_ANCHOR_SHIFT', 60))  # palm translation cost near the roll anchor
+    # Thumb along the upper left side of the stock, pointing at the muzzle (user sketch 2026-10-20):
+    # {weapon: [pad y low, pad y high, thumb ceiling]} in gun-local mm. Unset: the older rule that
+    # tucks the thumb under the index knuckle (it then hid in the web between thumb and index).
+    thumbSide = Setting('FPS_ADS_THUMB_SIDE')
+    thumbSide = json.loads(Path(thumbSide).read_text()).get(wid) if thumbSide else None
+    thumbTop = float(Setting('FPS_ADS_THUMB_TOP', fingerTop))
+    wrapWeight = float(Setting('FPS_ADS_WRAP', 0))   # index/middle curl under the wood instead of pointing forward
+    penWeight = float(Setting('FPS_ADS_PEN', 300))   # skin closer than 0.6 mm to the rifle, per metre
+    # {weapon: mm}: the whole index finger stays under this gun-local height, below the thumb band;
+    # a straight index rising along the stock took the place the thumb belongs in.
+    indexCeil = Setting('FPS_ADS_INDEX_CEIL')
+    indexCeil = json.loads(Path(indexCeil).read_text()).get(wid) if indexCeil else None
+    fingerCeilDigits = int(Setting('FPS_ADS_CEIL_DIGITS', 1))   # 4: no finger climbs the side past the thumb
+    littleReach = float(Setting('FPS_ADS_LITTLE_REACH', .25))
+    grid = Setting('FPS_ADS_GRID')   # {weapon: {theta, phi, dy}}: palm rolled about the fore-end axis, turned, lowered
+    grid = json.loads(Path(grid).read_text()).get(wid) if grid else None
+    extraSeeds = Setting('FPS_ADS_EXTRA_SEEDS')
+    extraSeeds = json.loads(Path(extraSeeds).read_text()).get(wid, []) if extraSeeds else []
     # COD Type 38 ADS: the sleeve cuff sits ~0.30 screen heights left of and under the sight
     # line and the forearm runs from there to the lower-left corner.
     cuffTarget = json.loads(Setting('FPS_ADS_CUFF')) if Setting('FPS_ADS_CUFF') else None
@@ -423,8 +453,40 @@ for wid in ids:
                     if max(infl, key=lambda pair: pair[1])[0] == padBone:
                         distalGap = min(distalGap, signed)
                 gap = max(abs(Signed(T[padBone] @ padHip)), distalGap)
-                thumbShape = 0.
-                if digit == 0 and not hipMode:
+                thumbShape, shape = 0., None
+                if digit == 0 and thumbSide and not hipMode:
+                    # The thumb lies on the left face of the stock, in its upper band, and points
+                    # at the muzzle (at most ~15 deg up); no part of it rises over the stock edge.
+                    pad = T[padBone] @ padHip
+                    mcpName = Bones(0)[1]
+                    mcp = T[mcpName] @ chains[mcpName]['W'].to_translation()
+                    direction = (pad - mcp).normalized()
+                    lo, hi, ceiling = (v / 1000 for v in thumbSide)
+                    # Pitch in the side plane: 0-20 deg up toward the muzzle; turning in toward the wood is fine.
+                    pitch = math.degrees(math.atan2(direction.y, max(1e-6, -direction.z)))
+                    thumbShape = .1 * (max(0, -pitch) + max(0, pitch - 20)) + 4 * max(0, .5 - (-direction.z))
+                    ipName = Bones(0)[2]
+                    ip = T[ipName] @ chains[ipName]['W'].to_translation()
+                    thumbShape += 200 * max(0, lo - .004 - ip.y)
+                    thumbShape += 200 * (max(0, lo - pad.y) + max(0, pad.y - hi))
+                    thumbShape += 200 * max(0, pad.x - (sideX + .004))
+                    thumbShape += 200 * max(0, max(v.y for v in seen) - ceiling) if seen else 0
+                    shape = {'padMm': [round(v * 1000, 1) for v in pad], 'direction': [round(v, 2) for v in direction], 'pitch': round(pitch, 1),
+                             'ipMm': round(ip.y * 1000, 1), 'topMm': round(max(v.y for v in seen) * 1000, 1) if seen else None}
+                if digit and digit <= fingerCeilDigits and indexCeil is not None and seen and not hipMode:
+                    indexTop = max(v.y for v in seen)
+                    thumbShape += 200 * max(0, indexTop - indexCeil / 1000)
+                    shape = {**(shape or {}), 'indexTopMm': round(indexTop * 1000, 1)}
+                elif digit and digit < 3 and wrapWeight and not hipMode:
+                    # Index and middle wrap under the stock to its right side instead of lying
+                    # straight forward along the left face.
+                    pad = T[padBone] @ padHip
+                    rootName = Bones(digit)[0]
+                    mcp = T[rootName] @ chains[rootName]['W'].to_translation()
+                    forward = (pad - mcp).normalized().dot(Vector((0, 0, -1)))
+                    thumbShape = wrapWeight * (max(0, forward - .5) + 100 * max(0, (centerX - .004) - pad.x))
+                    shape = {'padMm': [round(v * 1000, 1) for v in pad], 'forward': round(forward, 2)}
+                elif digit == 0 and not thumbSide and not hipMode:
                     # Seen from the ADS eye a raised thumb tip stands beside the receiver as a
                     # lone stub. Keep it pointing forward along the wood and below the index
                     # knuckle, so the silhouette is the knuckle row of a holding hand.
@@ -434,13 +496,14 @@ for wid in ids:
                     thumbShape = 40 * max(0, pad.y - (indexKnuckle.y - .004)) + 2 * max(0, .8 - direction.dot(Vector((0, 0, -1))))
                 # The little finger falls outside a 30-40 mm fore-end once the palm
                 # cradles it; it only has to come close, not be wrenched onto the wood.
-                reach = reachWeight * (.25 if digit == 4 else 1)
+                reach = reachWeight * (littleReach if digit == 4 else 1)
                 # Keep the digit behind the receiver from the ADS eye, as the palm is.
                 top = TopNdc(seen, bvhAll) if fingerTopWeight or detail else -9
                 driftRms = math.sqrt(drift / max(1, len(pts)))
-                cost = 300 * pen + 30 * math.sqrt(squared / max(1, len(pts))) + reach * max(0, gap - .0032) + fingerTopWeight * max(0, top - fingerTop) + thumbShape + anatomy
+                limit = thumbTop if digit == 0 else fingerTop
+                cost = penWeight * pen + 30 * math.sqrt(squared / max(1, len(pts))) + reach * max(0, gap - .0032) + fingerTopWeight * max(0, top - limit) + thumbShape + anatomy
                 cost += stayWeight * driftRms + .00004 * sum(abs(a) for a in params)
-                return (cost, pen, gap, rotations, top, hinges, driftRms) if detail else cost
+                return (cost, pen, gap, rotations, top, hinges, driftRms, shape) if detail else cost
 
             n = 5 if digit == 0 else 4
             spread = {1: 20, 2: 12, 3: 15, 4: 20}.get(digit, 0)
@@ -499,7 +562,7 @@ for wid in ids:
             total += after[0]
             authored.update(after[3])
             reports.append({'digit': digit, 'penMm': round(after[1] * 1000, 3), 'gapMm': round(after[2] * 1000, 3), 'topNdc': round(after[4], 3), 'hinges': after[5], 'deltaDeg': winner,
-                            'driftRmsMm': round(after[6] * 1000, 3)})
+                            'driftRmsMm': round(after[6] * 1000, 3), 'cost': round(after[0], 3), **({'shape': after[7]} if after[7] else {})})
         return authored, reports, total
 
     # Palm: start from the hidden cradles the palm-only fit found (palm under the
@@ -561,7 +624,27 @@ for wid in ids:
                               'wrist': round(detail['minWristBend'], 1), 'cuff': detail['cuff'], 'gaps': [r['gapMm'] for r in reports]}), flush=True)
             if cost < best:
                 best, p = cost, trial
-    for phi in (() if fixedPalm or seedPalm or rollSeeds else (-1.4, -1.0, -.6, -.3, 0, .3, .6, 1.0, 1.4)):
+    for trial in ([] if fixedPalm else extraSeeds):
+        cost, palmCost, fingers, reports = Joint(list(trial), True)
+        detail = PalmCost(list(trial), True)
+        print(json.dumps({'weapon': wid, 'stage': 'extra-seed', 'seed': trial, 'cost': round(cost, 4), 'palm': round(palmCost, 4), 'fingers': round(fingers, 4),
+                          'top': round(detail['topNdc'], 3), 'wrist': round(detail['minWristBend'], 1), 'gaps': [r['gapMm'] for r in reports]}), flush=True)
+        if cost < best:
+            best, p = cost, list(trial)
+    if grid and not fixedPalm:
+        pivot = Vector(hipContact['position'])
+        for theta in grid['theta']:
+            R = Matrix.Rotation(theta, 3, 'Z')
+            t = foreEndCenter + R @ (pivot - foreEndCenter) - pivot
+            for phi in grid['phi']:
+                for dy in grid['dy']:
+                    trial = [0, 0, theta, t.x, t.y + dy, t.z, phi]
+                    cost, palmCost, fingers, reports = Joint(trial, True)
+                    print(json.dumps({'weapon': wid, 'stage': 'grid', 'theta': theta, 'phi': phi, 'dy': dy, 'cost': round(cost, 3), 'palm': round(palmCost, 3),
+                                      'digits': [round(r['cost'], 2) for r in reports], 'gaps': [r['gapMm'] for r in reports], 'pens': [r['penMm'] for r in reports]}), flush=True)
+                    if cost < best:
+                        best, p = cost, trial
+    for phi in (() if fixedPalm or seedPalm or rollSeeds or grid else (-1.4, -1.0, -.6, -.3, 0, .3, .6, 1.0, 1.4)):
         trial = base[:] + [phi]
         cost, palmCost, fingers, reports = Joint(trial, True)
         print(json.dumps({'weapon': wid, 'stage': 'sweep', 'phi': phi, 'cost': round(cost, 4), 'palm': round(palmCost, 4),
@@ -570,11 +653,11 @@ for wid in ids:
             best, p = cost, trial
     if fixedPalm:
         p = list(fixedPalm)
-    elif seedPalm:
+    elif seedPalm and not extraSeeds:
         p = list(seedPalm)
         best = Joint(p)
     print(json.dumps({'weapon': wid, 'stage': 'joint-start', 'cost': best, 'phi': p[6]}), flush=True)
-    for step in ([] if fixedPalm else [.04, .02] if anchor['params'] else [.08, .04] if rollSeeds else [.12, .06, .03]):
+    for step in ([] if fixedPalm else [.04, .02] if anchor['params'] else [.08, .04] if rollSeeds or grid else [.12, .06, .03]):
         for iteration in range(3):
             changed = False
             for index in range(7):

@@ -4,7 +4,17 @@
 参考为 Hectorlo 的全武器展示，Type 38 从 01:07:07 开始，主要构图标尺为用户的 01:07:54 帧：
 <https://mag.moe/306872/>。
 
-## 当前 v13：腰射托枪手去反关节（2026-10-20）
+## 当前 v14：开镜拇指顺护木（2026-10-20）
+
+v12 推上去后（53b1b435），用户在开镜托枪手的侧面图上圈出拇指「位置太奇怪」，并画出它该在哪：顺着木托左侧上半部朝枪口、略往上翘，指尖停在木托上沿。给指节标号后查实：侧面最上面那根长长前伸的其实是**食指**；拇指被旧规则「拇指尖低于食指根」（当初防拇指在机匣旁翘成一截）压进拇指与食指之间的指缝，看不出来。只改开镜那一份（`adsSupport`），腰射握姿与 v13 字节不变。
+
+- 拇指：指肚贴在木托左侧上半部（枪体坐标高度：三八式／汉阳造 14–24 mm、中正式 22–34 mm），指间关节不低于这条带 4 mm，朝枪口上斜 8–12°（规则 0–20°），整根不超过木托上沿（30／30／40 mm）。
+- 四指整根压在拇指下面（三八式 16 mm、汉阳造 18 mm、中正式 24 mm 以下），在木托底下托住、指尖往上勾住木头。汉阳造只限食指时，中指从拇指外侧卷上来叠成一个鼓包，所以汉阳造四指都限高。
+- 试过没用的：让食指、中指绕到木托右侧（`FPS_ADS_WRAP`）。手掌得转到木托底下，汉阳造／中正式的食指反而从木托底下戳出去；早期权重下手指还会为了绕过去插进木头 5 mm。
+- 指腹离木（`FpsHandContactTest`，门限 4 mm）三支都过；`FpsHandPoseTest` 指间关节不反折也过。开镜画面里（游戏内量）：左腕三八式／汉阳造／中正式 27°／33°／27°（v12 为 19°／14°／20°，手掌下移、四指放平的代价）；袖子和前臂取样 57／130／93 点（v12 为 103／107／107），最左到画面左 0.45–0.52 屏高；手顶端在瞄准线下 0.12–0.14 屏高（v12 为 0.08–0.11）。
+- 拟合：`_blender/Script_FpsAdsSupportGripFit.py` 新增 `FPS_ADS_THUMB_SIDE`（拇指高度带与上沿，源工程 `Thumb1/Data_ThumbSide.json`）、`FPS_ADS_INDEX_CEIL`／`FPS_ADS_CEIL_DIGITS`（手指高度上限）、`FPS_ADS_THUMB_TOP`、`FPS_ADS_PEN`（皮肤进入 0.6 mm 余量的罚重）、`FPS_ADS_LITTLE_REACH`、`FPS_ADS_GRID`／`FPS_ADS_EXTRA_SEEDS`（掌框网格与种子）、`FPS_ADS_WRAP`（未采用）。现行设置：`FPS_ADS_THUMB_TOP=-0.05`、`FPS_ADS_PEN=3000`、`FPS_ADS_REACH=400`、`FPS_ADS_FINGER_TOP=-0.13`（权重 25）；掌框按网格（绕护木轴 0–0.3 rad × 绕掌心法线 -0.5–0.3 rad × 下移 4–22 mm）加 v12 掌框作种子再细调。三八式、中正式 `Thumb3C/`（只限食指高度）；汉阳造先 `Thumb4C/`（四指都限高、`FPS_ADS_LITTLE_REACH=1`），再固定掌框、手指上限放到 18 mm 重拟（`Thumb5C/`）。三支合并在源工程 `FinalThumb/Data_AdsSupportGrips.json`。
+
+## v13：腰射托枪手去反关节（2026-10-20）
 
 v12 查出三八式／中正式的**腰射**托枪手本身就有反关节，而测试只看汉阳造的腰射握姿，这两支没人管；玩家不按瞄准时一直看得到。两支枪的指间关节旋转是同一份，按 `Script_FpsHandPoseTest` 的量法：小指末节 -27.3°、拇指掌指 -25.2° 且偏离铰链 16.5°，食指／无名指／小指中节偏离铰链 12.1／13.7／12.8°（门限：弯曲 ≥ -5°、偏离 ≤ 8°）。另用整臂探针（与汉阳造 `wholeArms` 同一个）量到三八式腰射中指、食指、小指皮肤穿过护木木面（71／28／36 个三角面）。
 
@@ -28,7 +38,7 @@ v12 查出三八式／中正式的**腰射**托枪手本身就有反关节，而
 - 开镜画面里（游戏内量）：左腕三八式／汉阳造／中正式 19°／14°／20°；袖子和前臂取样 103／107／107 点（上一版 44／85／64），最左到画面左 0.40–0.51 屏高；手顶端在瞄准线下 0.08–0.11 屏高。拉栓全程不换握法：
 
 - 运行时：`RiggedModel.SetPoseState` 按 `adsGrip` 插值掌框位置／朝向，`FpsAnatomy` 同步 slerp 15 个指关节；`adsGrip` 跟玩家是否按住瞄准走（90 ms 平滑），不跟拉栓／装填时枪暂离瞄准线走，拉栓全程左手不换握法。没有 `adsSupport` 的装备行为不变（`AdsContactMix` 返回 0）。
-- 拟合：`_blender/Script_FpsAdsSupportGripFit.py`，输入 `Script_FpsWeaponGripExport.mjs --clean` 的生产蒙皮／枪体包与开镜眼位／肩位／臂长。掌框 7 自由度（含绕掌心法线的转角）与五指联合搜索：掌面网格最近 35% 贴护木、不穿模（法线 + 三射线奇偶判内）、生产双骨 IK 的最小腕弯（`FPS_ADS_SHOULDER` 给开镜肩位）、开镜视线中露出的手最高点落在瞄准线下 0.15–0.31 屏高（对枪体射线遮挡，太高或完全藏住都罚）；皮肤离木面 ≥0.6 mm。手指为单轴铰链（见上），指腹贴木权重 `FPS_ADS_REACH`、指尖高度上限 `FPS_ADS_FINGER_TOP`／`FPS_ADS_FINGER_TOP_WEIGHT`。现行结果都以 `FPS_ADS_ROLL_ANCHOR=0.2`（以腰射掌框沿护木转 0.2 rad 为锚、只许小幅偏离）起算：三八式 `CodLook10/`；汉阳造 `CodLook16/`（`FPS_ADS_REACH=400`、`FPS_ADS_FINGER_TOP=-0.13`、权重 25、`FPS_ADS_ANCHOR_SHIFT=20`）；中正式先按同样设置但 `FPS_ADS_REACH=150` 联合搜掌框（`CodLook13/`），再用 `FPS_ADS_PALM` 固定掌框、`FPS_ADS_REACH=400` 重拟手指（`CodLook14/`）。三支合并在 `Final/Data_AdsSupportGrips.json`。拟合输入（导出包、开镜眼位／肩位 `Data_AdsFrames.json` 及其导出脚本、游戏内量手腕／可见度／逐帧的探针）在源工程 `Input/`。
+- 拟合：`_blender/Script_FpsAdsSupportGripFit.py`，输入 `Script_FpsWeaponGripExport.mjs --clean` 的生产蒙皮／枪体包与开镜眼位／肩位／臂长。掌框 7 自由度（含绕掌心法线的转角）与五指联合搜索：掌面网格最近 35% 贴护木、不穿模（法线 + 三射线奇偶判内）、生产双骨 IK 的最小腕弯（`FPS_ADS_SHOULDER` 给开镜肩位）、开镜视线中露出的手最高点落在瞄准线下 0.15–0.31 屏高（对枪体射线遮挡，太高或完全藏住都罚）；皮肤离木面 ≥0.6 mm。手指为单轴铰链（见上），指腹贴木权重 `FPS_ADS_REACH`、指尖高度上限 `FPS_ADS_FINGER_TOP`／`FPS_ADS_FINGER_TOP_WEIGHT`。v12 结果都以 `FPS_ADS_ROLL_ANCHOR=0.2`（以腰射掌框沿护木转 0.2 rad 为锚、只许小幅偏离）起算：三八式 `CodLook10/`；汉阳造 `CodLook16/`（`FPS_ADS_REACH=400`、`FPS_ADS_FINGER_TOP=-0.13`、权重 25、`FPS_ADS_ANCHOR_SHIFT=20`）；中正式先按同样设置但 `FPS_ADS_REACH=150` 联合搜掌框（`CodLook13/`），再用 `FPS_ADS_PALM` 固定掌框、`FPS_ADS_REACH=400` 重拟手指（`CodLook14/`）。三支合并在 `Final/Data_AdsSupportGrips.json`（v14 已替换）。拟合输入（导出包、开镜眼位／肩位 `Data_AdsFrames.json` 及其导出脚本、游戏内量手腕／可见度／逐帧的探针）在源工程 `Input/`。
 - 袖口横向位置受限：手掌要贴住 30–40 mm 宽的护木，手腕只能落在机匣左下约 0.11–0.16 屏高处，到不了 COD 的 0.30；把袖口硬拉过去会让手掌离开木面。源工程 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/FpsAdsSupportGrip_20261020/`，审阅渲染 `_blender/Script_FpsAdsSupportGripReview.py`。
 - 汉阳造开镜右肘极向量 x 0.30→0.45：眼距 0.22 时右前臂内侧擦进木托（`FpsHandContactTest` 整臂交叉 230 对、0.46 mm），外抬后为零。
 
