@@ -101,11 +101,12 @@ function ConvexPieces(positions, count) {
 // Fracture caps are hidden inside a standing tree, so only broken stumps draw them.
 const CAP_MATERIAL = "Material_FracturedWood";
 export class BreakableTrees {
-  static async Load(field) {
+  // placements（可选）：独立场地自带的种树表 [{ id, x, z, ry, scale }]；不给就是第一关那一份 MakeTreePlacements()，行为不变。
+  static async Load(field, placements = null) {
     const gltf = await new GLTFLoader().loadAsync("./Model/Model_BreakableDeadTree.glb?v=20261009LosslessWebp");
-    return new BreakableTrees(field, gltf.scene);
+    return new BreakableTrees(field, gltf.scene, placements);
   }
-  constructor(field, source) {
+  constructor(field, source, placements = null) {
     this.field = field;
     this.root = new THREE.Group(); this.root.name = "BreakableTrees";
     this.parts = []; this.materials = new Set(); this.textures = new Set();
@@ -156,7 +157,7 @@ export class BreakableTrees {
       return geometry;
     }) };
     // Until the first UpdateView every tree sits at the cheapest level.
-    this.trees = MakeTreePlacements().map(p => ({ ...p, y: field.GroundHeight(p.x,p.z)-0.09,
+    this.trees = (placements || MakeTreePlacements()).map(p => ({ ...p, y: field.GroundHeight(p.x,p.z)-0.09,
       health: T.health, broken: false, lod: T.lod.length-1, body: null, fallen: null, fallenBark: [], age: 0, rest: 0 }));
     this.standingTrees = new Set(this.trees);
     const sectors = new Map();

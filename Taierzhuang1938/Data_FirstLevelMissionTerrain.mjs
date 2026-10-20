@@ -159,7 +159,8 @@ export function TrenchPlanFor(spec = MISSION_TERRAIN) {
   const revision = TrenchRevision();
   const cached = trenchPlans.get(network);
   if (cached && cached.revision === revision) return cached.plan;
-  const plan = CompileTrenchNetwork(network, { natural: SampleMissionNaturalHeight });
+  // spec.naturalHeight（可选）：独立场地（炮击扬尘测试场）自带的自然地面；不给就是第一关那一份，行为逐位不变。
+  const plan = CompileTrenchNetwork(network, { natural: spec.naturalHeight || SampleMissionNaturalHeight });
   trenchPlans.set(network, { revision, plan });
   return plan;
 }
@@ -177,7 +178,7 @@ export function SampleMissionNaturalHeight(x, z) {
   return field + east + west + north + bank;
 }
 export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
-  const natural = SampleMissionNaturalHeight(x, z);
+  const natural = spec.naturalHeight ? spec.naturalHeight(x, z) : SampleMissionNaturalHeight(x, z);
   let height = natural;
   // 道路与场坪的压平因子同时是抛土堆的掩码：挖出来的土堆在沟沿上是对的，堆到
   // 碾平的路面或场坪上就成了一道谁也解释不了的坎（担架队和大车正从那儿过）。

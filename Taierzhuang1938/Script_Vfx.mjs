@@ -45,6 +45,8 @@ import {PARTICLE_VOLUME_ASSETS} from './Data_ParticleVolumeAssets.mjs';
 import { BURNING_LIGHT, EXPLOSION_PARTICLE_ART, EXPLOSION_VOLUME_ART, PARTICLE_VOLUME, PARTICLE_MESH } from "./Data_Tuning_Particles.mjs";
 import { BOMB_BLAST_VFX } from "./Data_AerialBombs.mjs";
 import { BlastScale, LinearDragAt } from "./Script_BombBallistics.mjs";
+import { DustFieldSystem } from "./Script_DustFieldRenderer.mjs";
+import { EXPLOSIVES } from "./Data_Explosives.mjs";
 
 // ---------------------------------------------------------------------------
 // 色板：全部来自 docs/Data_HistoryMaterial.md 的考据表。
@@ -395,6 +397,15 @@ const MUZZLE_KINDS = {
   cannon: { size: 1.05, life: 0.095, smoke: 9, wisps: 6, spikes: 4 },
 };
 
+// 落地扬尘的弹道土柱外观（覆盖 BOMB_BLAST_VFX 的同名项）：仰角低一些、速度七成、团至少按 0.45 的相对尺寸、尾巴用土色。
+const GROUND_IMPACT_EJECTA = Object.freeze({
+  elevationDeg: Object.freeze([38, 68]), speedScale: 0.7, minRel: 0.45, trailOpacity: 0.28,
+  streamerBase: 3, streamerPerCube: 1.2,
+});
+
+// 落地扬尘：调用方没给 explosiveId / chargeKg 时按种类取的缺省装药（kg TNT，取 Data_Explosives 同类代表）。
+const GROUND_IMPACT_DEFAULT_CHARGE = Object.freeze({ grenade: 0.165, launcher: 0.153, shell: 0.81, tank: 1.155, bomb: 22 });
+
 const EXPLOSION_KINDS = {
   grenade: { flash: 1.0, fire: 6, smoke: 9, chunks: 12, sparks: 4, sooty: 0.15, column: 1.0 },
   launcher: { flash: 0.85, fire: 4, smoke: 7, chunks: 10, sparks: 3, sooty: 0.1, column: 0.8 },
@@ -478,6 +489,11 @@ export class VfxSystem {
     this.wind = new THREE.Vector3(0.35, 0, -0.15);     // 鲁南春季多西南风，考据里写死的
     this.groundLevel = 0;                              // 碎块/弹壳落到哪一层，见 SetGroundLevel
     this.smokeSources = new Map();
+    // 落地扬尘（Script_DustFlow + Script_DustFieldRenderer）：按关卡开（phase.groundImpactDust），
+    // 开了之后落地的爆炸不再播固定形状的土尘体积，改成贴地形流动的尘。需要地面采样器。
+    this.groundImpactDust = false;
+    this.groundSampler = null;
+    this.dustFields = null;
     this.battleSmoke = null;
     this.nextSourceId = 1;
     // 运行时取证：冒烟测试确认调用方传了真实枪种、快烟与余烟两层都生成。
@@ -863,6 +879,25 @@ export class VfxSystem {
   SetWind(vector) { this.wind.copy(vector); this.particles?.SetWind(vector); }
 
   /**
+   * 落地扬尘开关（docs/Data_ShellImpactDust.md）。开着时落在地上的爆炸走 GroundImpact：
+   * 尘土按地形流（沟里炸顺沟走），不再播固定形状的 DustImpact 体积与贴地尘环。
+   * 打开的那一刻把三维噪声算好，免得第一发落地那一帧卡一下。
+   */
+  SetGroundImpactDust(enabled) {
+    this.groundImpactDust = !!enabled;
+    if (this.groundImpactDust) {
+      this.dustFields ??= new DustFieldSystem(this.root, this.shared, this.quality);
+      this.dustFields.Warm();
+    }
+  }
+
+  /** 地面高度采样（含弹坑形变）：(x, z) => y。落地扬尘靠它知道沟在哪。 */
+  SetGroundSampler(fn) { this.groundSampler = typeof fn === "function" ? fn : null; }
+
+  /** 清掉所有还在飘的落地扬尘（测试场「清空」、换关）。 */
+  ClearGroundImpacts() { this.dustFields?.Clear(); }
+
+  /**
    * 当前脚下的地面高度（米）。碎砖、木屑、弹壳落到这一层就停。
    * 关卡里上了屋顶/城墙就把它改掉，否则碎块会穿过屋顶掉到街上。
    */
@@ -885,6 +920,7 @@ export class VfxSystem {
     if (step > 0) this.particles.Resume();
     this.particles.Update(step);
     this._UpdateSmokeSources(step);
+    this.dustFields?.Update(step, this.wind);
     this.battleSmoke?.Update();
     this.bloodEffects.Update(step,this.time,camera);
 
@@ -1337,12 +1373,17 @@ export class VfxSystem {
    */
   Explosion(position, {
     radius = 6, kind = "grenade", groundY = null, spriteVariant = null,
+    explosiveId = null, incoming = null, chargeKg = null,
   } = {}) {
     const profile = EXPLOSION_KINDS[kind] || EXPLOSION_KINDS.grenade;
     const art = EXPLOSION_PARTICLE_ART[kind] || EXPLOSION_PARTICLE_ART.grenade;
     const scale = Math.max(0.35, radius / 6);
+    // 落地扬尘开着、而且确实炸在地上（离地不超过这种弹能挖到地的距离）：尘土交给 GroundImpact。
+    const impact = this._GroundBurst(position, kind, explosiveId, chargeKg);
     // 空炸（打在墙上、屋顶上）时爆点比地面高，碎块得继续往下掉
-    const ground = groundY ?? Math.min(position.y - 0.05, this.groundLevel);
+    const sampled = this.groundSampler ? this.groundSampler(position.x, position.z) : NaN;
+    const ground = groundY ?? impact?.ground
+      ?? Math.min(position.y - 0.05, Number.isFinite(sampled) ? sampled : this.groundLevel);
     const effectivePower = radius * profile.flash;
     const spriteKey = EXPLOSION_SPRITE_VARIANTS[spriteVariant]
       ? spriteVariant : this.SelectExplosionSpriteVariant(effectivePower);
@@ -1384,13 +1425,14 @@ export class VfxSystem {
 
     // A single evolving 3D field carries blast expansion and the cooling cloud.
     // Fragmentation keeps only the brief flash above; sustained emission belongs to fuel.
+    // 落地扬尘开着时，土尘那一份由 GroundImpact 的贴地尘流承担（形状跟着地形走），这里不再叠固定体积。
     const volumeArt=EXPLOSION_VOLUME_ART[kind]||EXPLOSION_VOLUME_ART.grenade;
-    this.lastExplosionSprite.volume=this.particles.VolumeBurst([position.x,position.y,position.z],{
+    if (!impact) this.lastExplosionSprite.volume=this.particles.VolumeBurst([position.x,position.y,position.z],{
       ...volumeArt,size:scale*volumeArt.scale,seed:Math.floor(this.random()*4294967295),
     });
 
-    // 3) 贴地尘环（两圈错开，前一圈快、后一圈慢）
-    for (let i = 0; i < (profile.rings ?? 2); i += 1) {
+    // 3) 贴地尘环（两圈错开，前一圈快、后一圈慢）。落地扬尘的尘浪本身就是这一圈，开着时不画。
+    for (let i = 0; i < (impact ? 0 : (profile.rings ?? 2)); i += 1) {
       const s = ResetSpawn();
       s.x = position.x; s.y = ground + 0.08 + i * 0.05; s.z = position.z;
       s.nx = 0; s.ny = 1; s.nz = 0;
@@ -1405,18 +1447,21 @@ export class VfxSystem {
       this.pools.ring.Spawn(s, this.time);
     }
 
-    // 4) 抛射碎块
-    const chunkCount = Math.round(profile.chunks * this.spawnScale);
+    // 4) 抛射碎块。落在地上的炸点甩的是土块（湿黄土 + 熏黑），大小按装药立方根：
+    //    75 mm 一发甩出拳头到脸盆大的土块，旧的砖色小碎块在土地上读不出来。
+    const chunkCount = Math.round((impact ? 10 + 12 * Math.cbrt(impact.charge) : profile.chunks) * this.spawnScale);
+    const clodScale = impact ? Math.cbrt(impact.charge) : scale;
     for (let i = 0; i < chunkCount; i += 1) {
       const a = this.random() * 6.2831853;
       const up = this._Range(0.35, 1.5);
-      const speed = this._Range(3.5, 11) * scale;
-      const size = this._Range(0.02, 0.075) * scale;
+      const speed = this._Range(3.5, 11) * (impact ? 1.2 * Math.sqrt(clodScale) : scale);
+      const size = this._Range(0.02, impact ? 0.11 : 0.075) * clodScale;
       this._SpawnDebris(
         position.x, position.y + 0.1, position.z,
         Math.cos(a) * speed, up * speed * 0.8, Math.sin(a) * speed,
         size, size * this._Range(0.5, 1.0), size * this._Range(0.8, 2.2),
-        this.random() < profile.sooty ? VFX_PALETTE.woodBurnt : VFX_PALETTE.brick,
+        impact ? (this.random() < 0.45 ? VFX_PALETTE.blackCore : VFX_PALETTE.soil)
+          : this.random() < profile.sooty ? VFX_PALETTE.woodBurnt : VFX_PALETTE.brick,
         this._Range(0.9, 1.8), ground, 0.3, this._Range(1.6, 3.2));
     }
 
@@ -1443,6 +1488,46 @@ export class VfxSystem {
     // after excavation its depth tolerance cuts concentric bands into the pit
     // walls, and repeated blasts stack those slices at successive heights.
     // Impact() still uses small surface decals for ordinary bullet holes.
+    if (impact) this.lastExplosionSprite.groundImpact = this.GroundImpact(position, {
+      chargeKg: impact.charge, incoming, groundY: impact.ground, massScale: impact.coupling });
+  }
+
+  /**
+   * 这次爆炸算不算「落在地上」、装药多少。落地扬尘没开、没有地面采样器、或离地太高（空炸）返回 null。
+   * 装药优先用调用方给的，再按 explosiveId 查 Data_Explosives，最后按种类给一个缺省。
+   */
+  _GroundBurst(position, kind, explosiveId, chargeKg) {
+    if (!this.groundImpactDust || !this.groundSampler) return null;
+    const spec = explosiveId && EXPLOSIVES[explosiveId] ? EXPLOSIVES[explosiveId] : null;
+    const charge = Number.isFinite(chargeKg) && chargeKg > 0 ? chargeKg
+      : spec ? spec.fillingKg : (GROUND_IMPACT_DEFAULT_CHARGE[kind] ?? GROUND_IMPACT_DEFAULT_CHARGE.shell);
+    const ground = this.groundSampler(position.x, position.z);
+    if (!Number.isFinite(ground)) return null;
+    const reach = spec ? spec.groundReachM : 1.2 + 1.1 * Math.cbrt(charge);
+    const gap = Math.max(0, position.y - ground);
+    if (gap > reach) return null;
+    return { charge, ground, coupling: Math.max(0.25, 1 - gap / reach) };
+  }
+
+  /**
+   * 落地扬尘（docs/Data_ShellImpactDust.md）：一张贴地形的尘流 + 弹道土柱。Explosion 在落地时自动调；
+   * 剧情 / 编辑器也可以直接调。需要先 SetGroundSampler。返回这一团的取证（DustFlowField.Inspect）。
+   * @param {object} o chargeKg（kg TNT）、incoming（弹的速度，可选）、groundY、surface、massScale
+   */
+  GroundImpact(position, { chargeKg = 0.81, incoming = null, groundY = null, surface = "loess", massScale = 1 } = {}) {
+    if (!this.groundSampler) return null;
+    this.dustFields ??= new DustFieldSystem(this.root, this.shared, this.quality);
+    const ground = Number.isFinite(groundY) ? groundY : this.groundSampler(position.x, position.z);
+    const entry = this.dustFields.Add({ x: position.x, y: position.y, z: position.z, chargeKg,
+      groundAt: this.groundSampler, incoming, wind: this.wind, surface, massScale });
+    const h = incoming ? Math.hypot(incoming.x || 0, incoming.z || 0) : 0;
+    const fx = h > 1e-3 ? incoming.x / h : 0, fz = h > 1e-3 ? incoming.z / h : 0;
+    // 炮弹的抛射土比航弹那套矮、团大、不发黑：沿用航弹参数时 75 mm 的拖尾是一根根很细很高的黑线
+    const ejecta = this._EjectaStreamers(position.x, position.z, ground, BlastScale(chargeKg), fx, fz,
+      this.spawnScale * Math.max(0.3, Math.min(1, massScale)), this.time, { ...GROUND_IMPACT_EJECTA, trailCore: VFX_PALETTE.soil });
+    this.groundImpacts = (this.groundImpacts || 0) + 1;
+    this.lastGroundImpact = { chargeKg, ground, streamers: ejecta.streamers, field: entry.field.Inspect() };
+    return this.lastGroundImpact;
   }
 
   /**
@@ -1469,6 +1554,15 @@ export class VfxSystem {
     const h = Math.hypot(dirX, dirZ), fx = h > 1e-3 ? dirX / h : 0, fz = h > 1e-3 ? dirZ / h : 0;
     const wind = this.wind;
 
+    // 落地扬尘开着：整颗炸弹交给 Explosion → GroundImpact（贴地尘流 + 弹道土柱），不再叠下面那几层。
+    if (this.groundImpactDust && this.groundSampler) {
+      this.Explosion({ x: cx, y: ground + 0.3 * rel, z: cz }, { radius: S.visualRadius, kind: "bomb", groundY: ground,
+        chargeKg: S.chargeKg, incoming: h > 1e-3 ? { x: fx, y: -3, z: fz } : null });
+      this.bombBlasts = (this.bombBlasts || 0) + 1;
+      this.lastBombBlast = { chargeKg: S.chargeKg, budget, radius: S.visualRadius, groundImpact: true };
+      return this.lastBombBlast;
+    }
+
     // 0) 闪光、火球、尘环。
     this.Explosion({ x: cx, y: ground + 0.3 * rel, z: cz }, { radius: S.visualRadius, kind: "bomb", groundY: ground });
 
@@ -1487,6 +1581,36 @@ export class VfxSystem {
     }
 
     // 2) 抛射土柱。
+    const { streamers, trail } = this._EjectaStreamers(cx, cz, ground, S, fx, fz, scale, now);
+
+    // Bulk soil expansion and the ground surge are the DustImpact volume
+    // emitted above. Keep ballistic streamers, without stacking giant puff balls.
+    const columnN=0,surgeN=0;
+
+    // 5) The cooling explosion field replaces a stack of oversized spherical caps.
+    const capN=1,top=S.columnV[1]/.85,capLife=(V.capLifeS[0]+V.capLifeS[1])*.5,cap=V.capVolume;
+    this.particles.VolumeBurst([cx,ground+top*V.capHeightU[0],cz],{
+      asset:'GroundExplosion',size:rel,life:capLife,speed:PARTICLE_VOLUME_ASSETS.GroundExplosion.duration/capLife,
+      bounds:cap.boundsScale.map(n=>n*V.capSizeM[1]),density:cap.density/Math.max(.5,rel),
+      emission:0,flameExtinction:0,delay:cap.delay,fadeIn:cap.fadeIn,velocity:[wind.x*cap.wind,cap.rise,wind.z*cap.wind],
+      seed:Math.floor(this.random()*4294967295),
+    });
+
+    this.bombBlasts = (this.bombBlasts || 0) + 1;
+    this.lastBombBlast = { chargeKg: S.chargeKg, budget, radius: S.visualRadius, shockR: S.shockR, surgeR: S.surgeR,
+      ejectaV: S.ejectaV, streamers, trail, column: columnN, surge: surgeN, cap: capN };
+    return this.lastBombBlast;
+  }
+
+  /**
+   * 弹道土柱（倒锥形抛射幕）：每条的头是一团沿弹道飞的暗土，沿途按它那一刻的位置预排几团土（延时出生）。
+   * 斜着砸进去的弹（fx, fz 是来向的水平单位向量）下游一侧抛得多。BombBlast 与 GroundImpact 共用。
+   */
+  _EjectaStreamers(cx, cz, ground, S, fx, fz, scale, now = this.time, look = null) {
+    const V = look ? { ...BOMB_BLAST_VFX, ...look } : BOMB_BLAST_VFX;
+    const pool = this.pools.bombSmoke, rel = Math.max(look?.minRel ?? 0, S.cube / 2.8), wind = this.wind;
+    const speedScale = look?.speedScale ?? 1, trailCore = look?.trailCore ?? VFX_PALETTE.blackCore;
+    const count = (base) => Math.max(1, Math.round(base * scale));
     const streamers = count(V.streamerBase + V.streamerPerCube * S.cube);
     const trail = Math.max(1, Math.round(V.trailPuffs * Math.min(1, scale + 0.3)));
     const gravity = BOMB_GRAVITY, head = BOMB_HEAD;
@@ -1496,7 +1620,7 @@ export class VfxSystem {
       let hx = Math.cos(az) + fx * V.downrangeBias, hz = Math.sin(az) + fz * V.downrangeBias;
       const hl = Math.hypot(hx, hz) || 1; hx /= hl; hz /= hl;
       const el = this._Range(V.elevationDeg[0], V.elevationDeg[1]) * Math.PI / 180;
-      const v = this._Range(S.ejectaV[0], S.ejectaV[1]);
+      const v = this._Range(S.ejectaV[0], S.ejectaV[1]) * speedScale;
       const p0 = { x: cx + hx * S.craterR * 0.4, y: ground + 0.4, z: cz + hz * S.craterR * 0.4 };
       const v0 = { x: hx * Math.cos(el) * v, y: Math.sin(el) * v, z: hz * Math.cos(el) * v };
       const k = V.clodDrag;
@@ -1536,29 +1660,12 @@ export class VfxSystem {
         s.sizeEnd = V.trailSizeM[1] * this._Range(0.75, 1.15) * rel * (1 + m * 0.12);
         s.opacity = V.trailOpacity - m * 0.07; s.fadeIn = 0.05;
         s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.4);
-        s.colorA = m === 0 ? VFX_PALETTE.blackCore : VFX_PALETTE.dustDense; s.colorB = VFX_PALETTE.soil;
+        s.colorA = m === 0 ? trailCore : VFX_PALETTE.dustDense; s.colorB = VFX_PALETTE.soil;
         s.seed = this.random();
         pool.Spawn(s, now + tau);
       }
     }
-
-    // Bulk soil expansion and the ground surge are the DustImpact volume
-    // emitted above. Keep ballistic streamers, without stacking giant puff balls.
-    const columnN=0,surgeN=0;
-
-    // 5) The cooling explosion field replaces a stack of oversized spherical caps.
-    const capN=1,top=S.columnV[1]/.85,capLife=(V.capLifeS[0]+V.capLifeS[1])*.5,cap=V.capVolume;
-    this.particles.VolumeBurst([cx,ground+top*V.capHeightU[0],cz],{
-      asset:'GroundExplosion',size:rel,life:capLife,speed:PARTICLE_VOLUME_ASSETS.GroundExplosion.duration/capLife,
-      bounds:cap.boundsScale.map(n=>n*V.capSizeM[1]),density:cap.density/Math.max(.5,rel),
-      emission:0,flameExtinction:0,delay:cap.delay,fadeIn:cap.fadeIn,velocity:[wind.x*cap.wind,cap.rise,wind.z*cap.wind],
-      seed:Math.floor(this.random()*4294967295),
-    });
-
-    this.bombBlasts = (this.bombBlasts || 0) + 1;
-    this.lastBombBlast = { chargeKg: S.chargeKg, budget, radius: S.visualRadius, shockR: S.shockR, surgeR: S.surgeR,
-      ejectaV: S.ejectaV, streamers, trail, column: columnN, surge: surgeN, cap: capN };
-    return this.lastBombBlast;
+    return { streamers, trail };
   }
 
   /**
@@ -1858,9 +1965,11 @@ export class VfxSystem {
     // 血源与 smokeSources 不同：它挂在一根**已经不在场上**的骨头上，清粒子那一刻
     // 那个断口八成也随着换关拆掉了，留着只会在下一关的原点冒血。
     this.bloodEffects.Clear();
+    this.dustFields?.Clear();
   }
 
   Dispose() {
+    this.dustFields?.Dispose(); this.dustFields = null;
     this.battleSmoke?.Dispose();
     this.particles.Dispose();
     if (this.scene.onBeforeRender === this.sceneHook) {

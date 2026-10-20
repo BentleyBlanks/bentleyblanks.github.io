@@ -846,6 +846,9 @@ export function ClearExternalProps() {
 export async function AddExternalProps({
   scene, library, phaseId, groundAt, bounds, generatedPlacements = [],
   blockers = [], cells = [], pcgDocument = PROP_PCG_DOCUMENT,
+  // 独立场地（炮击扬尘测试场）自带的摆位表 [{ asset, x, z, ry, scale }]：给了就只摆这些，
+  // 不带 PLACEMENTS[phaseId]、城里每户的 TownDressing 与视觉 PCG。不给 = 原行为逐字不变。
+  placementsOnly = null,
 }) {
   ClearExternalProps();
   // 三层摆位：按关写死的 PLACEMENTS + 按世界坐标登记、按本关 bounds 过滤的
@@ -853,8 +856,8 @@ export async function AddExternalProps({
   // 都跨关共位 —— 城是同一座城；PCG 还用 cell-local seed 保证同一院落不换摆法。
   // generatedPlacements 是 Script_World 构建器产出的沙袋组合；它只负责画面，
   // 碰撞仍由 AddBarricade/AddSandbagPlug/AddSandbagEmplacement 的整段盒负责。
-  const handPlacements = [...PlacementsFor(phaseId), ...TownDressingFor(bounds)];
-  const pcg = GeneratePropPcg(pcgDocument, {
+  const handPlacements = placementsOnly ? [...placementsOnly] : [...PlacementsFor(phaseId), ...TownDressingFor(bounds)];
+  const pcg = placementsOnly ? { placements: [], stats: null, errors: [] } : GeneratePropPcg(pcgDocument, {
     bounds, cells, blockers, groundAt,
     fixedPlacements: [...handPlacements, ...generatedPlacements],
     assetIds: Object.keys(ASSETS),

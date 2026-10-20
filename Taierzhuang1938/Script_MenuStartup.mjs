@@ -18,6 +18,7 @@ import {MOVEMENT_RANGE_PHASE} from './Data_MovementRange.mjs';
 import {WEAPON_RANGE_PHASE} from './Data_WeaponRange.mjs';
 import {RANGE_PHASE} from './Data_Range.mjs';
 import {EXPLOSION_RANGE_PHASE} from './Data_ExplosionRange.mjs';
+import {SHELL_IMPACT_RANGE_PHASE} from './Data_ShellImpactRange.mjs';
 import {MELEE_QTE_PHASE} from './Data_MeleeQte.mjs';
 import {GORE_RANGE_PHASE} from './Data_GoreRange.mjs';
 import {FIRST_LEVEL_STAGES} from './Data_FirstLevelMissionStages.mjs';
@@ -103,7 +104,7 @@ function StepFrames(count = 1, dt = 1 / 60, render = true) {
 }
 await preview.Load();
 menu = new MainMenu({root: document.getElementById('menu'), camera, staticBackdrop: true,
-  campaign: CAMPAIGN_ENTRIES, sandboxes: [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE, GORE_RANGE_PHASE],
+  campaign: CAMPAIGN_ENTRIES, sandboxes: [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE, GORE_RANGE_PHASE, SHELL_IMPACT_RANGE_PHASE],
   CommandRoomPreview: () => preview.State(), PreviewCommandRoom, PrepareBackdrop: () => preview.Load(),
   SliceIndex: () => null, Unlock: () => audio.Unlock(), Settings: OpenSettings,
   DevToolsAvailable: DEV_TOOLS_ENABLED, DebugTools: DebugToolStates, ToggleDebugTool: DebugToolStates,

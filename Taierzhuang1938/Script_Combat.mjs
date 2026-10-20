@@ -353,7 +353,8 @@ export class CombatSystem {
         this.host.vfx?.Explosion(impact,{radius:shell.radius,kind:"shell"});
         this.BlastFeedback(impact,shell.radius);
       }else this.Blast(impact, shell.radius, shell.damage, "shell", null, shell.byPlayer, null, shell.kind, null,
-        shell.occludedSuppression ? { occludedSuppression: true } : null);
+        // 来向给落地扬尘：斜着砸进去的弹，下游一侧抛得多（Vfx.GroundImpact）。
+        { incoming: shell.velocity.clone(), ...(shell.occludedSuppression ? { occludedSuppression: true } : {}) });
       shell.OnImpact?.(impact); this.shellVisuals.Retire(shell); this.shells.splice(i, 1);
     }
   }
@@ -745,7 +746,7 @@ export class CombatSystem {
    */
   Blast(position, radius, damage, kind, hurtSide = null, byPlayer = false, onHit = null, explosiveId = kind, ownerId = null, options = null) {
     this.host.onBlast?.({position:position.clone(),radius,damage,kind,hurtSide,byPlayer,explosiveId,ownerId});
-    if (this.host.vfx) this.host.vfx.Explosion(position, { radius, kind });
+    if (this.host.vfx) this.host.vfx.Explosion(position, { radius, kind, explosiveId, incoming: options?.incoming ?? null });
     // 先改场景拓扑、再算人物遮挡：爆压把墙打穿的同一瞬间，洞口后面的人应该吃到
     // 剩余冲击，而不是等下一颗弹。Destruction.Blast 内部会把同一次爆炸批量提交，
     // 空间散列与导航只重建一次。

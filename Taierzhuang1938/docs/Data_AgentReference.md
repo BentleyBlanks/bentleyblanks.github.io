@@ -450,6 +450,12 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 - `Script_GoreRange.mjs` 撒木桩兵（`dummy:true`）、重置、按手榴弹原数引爆炸坑、慢动作与读数，取证口 `Debug.GoreRange`（State / Reset / Detonate / Target / SeverLimb / SeverRandom / SetForce / SetSlowMotion / LimbPoint / Posts）；`Script_GoreLab.mjs` 是左上角面板（必断开关、每肢体一颗按钮、live parts / 断面 / 血源 / draw call 增量 / 上一帧 ms）。断肢本身一行都不在这三个模块里，它们只调 `Debug.Gore`。
 - 回归口 `Script_GoreRangeTest.mjs`（combat 域）：`--field` 只验场地（不依赖断肢核心），不带参数连断肢链一起验。先读 `docs/Data_Dismemberment.md`（§9 场地、§10.2 验收）。
 
+### 炮击扬尘测试场（?impacts=1，第七片测试沙盒）
+- `Data_ShellImpactRange.mjs`（场地 / 壕沟段 / 落点 / 布景 / 弹种 / 机位 / 相位，纯数据）+ `Data_ShellImpactRangeTerrain.mjs`（terrain spec 与布局）+ `Script_ShellImpactRangeField.mjs`（继承 `FirstLevelWhiteboxField`：第一关同款分层土壤 PBR + 样条壕沟网络，补枯树 / 桶 / 机枪 / 战车阵地）+ `Script_ShellImpactRange.mjs`（弹种投送 / 时间 / 观察相机 / 选点）+ `Script_ShellImpactLab.mjs`（左侧面板）；世界 (3800,3800) 为场心。
+- 爆炸一律走生产链 `combat.FireShell` / `combat.Blast`（explosiveId 传弹种自己的）；phase 的 `groundImpactDust` 是通用开关，`Script_Main` 据此调 `vfx.SetGroundImpactDust?.` / `SetGroundSampler?.`；取证口 `Debug.ShellImpact`（Fire / Barrage / Clear / SetTimeScale / Camera / Targets / Munitions …）。
+- 回归口 `Script_ShellImpactRangeTest.mjs`（纯 Node）/ `Script_ShellImpactRangeBrowserTest.mjs`（explosives 域）；入口、坐标、弹种与投送、面板、接口见 `docs/Data_ShellImpactRange.md`。
+- 落地扬尘本身（贴地形的尘流 + 土柱 + 震起的细尘）：`Script_DustFlow.mjs`（规则层，零 three）、`Script_DustFieldRenderer.mjs`（体积积分）、`Data_Tuning_GroundImpact.mjs`，`Vfx.GroundImpact` / `SetGroundImpactDust` / `SetGroundSampler`；回归 `Script_DustFlowTest.mjs`；口径 `docs/Data_ShellImpactDust.md`。
+
 ### 已移除的旧策划白盒
 
 - 旧 `?whitebox=1` 关卡与选关入口已移除。`FirstLevelWhitebox` 数据、场景和规则模块仍供 P0/P1/P2 版本及纯逻辑回归复用。
@@ -793,6 +799,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 - `Data_TengxianIntegration.md`（模块契约索引）、`Data_TengxianDesign.md`、`Data_CutsceneRedo.md`、
   `Data_CityWallPbr.md`、`Data_ExternalPropSources.md`、`Data_TaierzhuangHeightmap.md`、
   `Data_TestRange.md`（?range=1）、`Data_ExplosionRange.md`（爆炸测试场、通用炮坑与返掷现状）、
+  `Data_ShellImpactRange.md`（?impacts=1，炮击扬尘测试场：壕沟地形、弹种投送、面板与 Debug 接口）、
   `Data_MeleeQte.md`（?melee=1）、`Data_RoadSpline.md`、
   `Data_WallSpline.md`（样条道路/围墙 + 未迁移例外清单）。
 
