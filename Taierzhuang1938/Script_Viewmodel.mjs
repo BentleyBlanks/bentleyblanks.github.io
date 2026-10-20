@@ -2728,6 +2728,10 @@ export class Viewmodel {
 
     // --- 弹簧 ---------------------------------------------------------------
     const ads = Clamp(this.adsSpring.Step(step, adsInput), -0.2, 1.2);
+    // 托枪手的开镜握法跟玩家按没按住瞄准走，不跟拉栓/装填时枪临时离开瞄准线走：
+    // 否则每开一枪左手都要在护木上转一圈再转回来。时间常数取开镜 FOV 那条 150 ms 的一半多。
+    const adsGripTarget = Clamp01(input.ads ?? 0) * (1 - this.wallLower) * (1 - sprint * 0.9);
+    this.adsGrip = (this.adsGrip || 0) + (adsGripTarget - (this.adsGrip || 0)) * (1 - Math.exp(-step / 0.09));
     // 两个阈值分开 = 迟滞。用同一个值的话，弹簧那点过冲会让右手在阈值上每帧闪一下。
     if (this.adsHideParts.length) {
       if (!this.adsHidden && ads > 0.55) {
@@ -2907,7 +2911,7 @@ export class Viewmodel {
     if (this.riggedArms) {
       this.armAnchor.quaternion.identity();
       if (!this.weapon) this._UpdateUnarmedHands(gait, sprint, grounded ? 1 : 0);
-      else this.riggedArms.SetPoseState({ ads: Clamp01(ads), sprint: Clamp01(sprintValue),
+      else this.riggedArms.SetPoseState({ ads: Clamp01(ads), adsGrip: Clamp01(this.adsGrip), sprint: Clamp01(sprintValue),
         reload: this.action?.kind === "reload", reloadBlend: this.reloadBlend, melee: !!input.meleeCombat,
         fire: 1-Ease.InOut(Ease.Seg(this.flashTime,0.055,0.18)) });
       if (this.meleeVideoFrame) this._ApplyMeleeVideo();
@@ -2987,6 +2991,7 @@ export class Viewmodel {
     if (this.riggedArms) {
       this.riggedArms.poseState.sprint = sprint;
       this.riggedArms.poseState.ads = 0;
+      this.riggedArms.poseState.adsGrip = 0;
     }
     for (const [side, sign, hand, contact] of [["r", 1, this.handRight.group, this.gripContactRight], ["l", -1, this.handLeft.group, this.gripContactLeft]]) {
       const swing = Math.sin(this.bobPhase + (side === "l" ? Math.PI : 0)) * amplitude;

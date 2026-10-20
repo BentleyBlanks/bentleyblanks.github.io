@@ -15,7 +15,7 @@ import { ApplyNraUniform } from "./Script_UniformColors.mjs";
 import { TagCharacterSurface } from "./Script_CharacterSurface.mjs";
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
-import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS, FPS_BAYONET_SUPPORT } from "./Data_FpsArmPoses.mjs";
+import { FpsArmPose, FpsArmStateRotation, AdsContactMix, FPS_ARM_LIMITS, FPS_BAYONET_SUPPORT } from "./Data_FpsArmPoses.mjs";
 import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Script_FpsAnatomy.mjs";
 import { StepElbowArc } from "./Script_FpsElbowArc.mjs";
 import { LoadFpsSkeletalAnimations } from "./Script_FpsSkeletalAnimation.mjs";
@@ -505,28 +505,33 @@ export class FpsArmRig {
     return this;
   }
 
-  SetPoseState({ ads = 0, sprint = 0, reload = false, reloadBlend = 0, melee = false, fire = 0 } = {}) {
+  SetPoseState({ ads = 0, adsGrip = ads, sprint = 0, reload = false, reloadBlend = 0, melee = false, fire = 0 } = {}) {
     this.poseState.fire = THREE.MathUtils.clamp(fire,0,1);
     this.poseState.melee = melee;
     this.poseState.reload = reload;
     this.poseState.reloadBlend = THREE.MathUtils.clamp(reloadBlend, 0, 1);
     this.poseState.ads = THREE.MathUtils.clamp(ads, 0, 1);
+    this.poseState.adsGrip = THREE.MathUtils.clamp(adsGrip, 0, 1);
     this.poseState.sprint = THREE.MathUtils.clamp(sprint, 0, 1);
     if (this.poseSpec && this.contactTargets) {
       for (const side of ["r", "l"]) {
         const key = side === "r" ? "right" : "left";
         const Hip = this.poseSpec.hip.contacts[key].rotation;
-        const Ads = FpsArmStateRotation(this.weaponId, "ads", key);
+        // 开镜专用握点（目前是三支栓动步枪的左手）：掌朝向与位置都随开镜量滑过去，
+        // 手指在 FpsAnatomy 里同步混合。
+        const adsMix = AdsContactMix(this.poseSpec, key, this.poseState.adsGrip);
+        const Ads = adsMix > 0 ? this.poseSpec.ads.contacts[key].rotation : FpsArmStateRotation(this.weaponId, "ads", key);
         const Sprint = FpsArmStateRotation(this.weaponId, "sprint", key);
         this._e0.set(Hip[0], Hip[1], Hip[2], "YXZ");
         this._q0.setFromEuler(this._e0);
         this._e0.set(Ads[0], Ads[1], Ads[2], "YXZ");
         this._q1.setFromEuler(this._e0);
-        this._q0.slerp(this._q1, this.poseState.ads);
+        this._q0.slerp(this._q1, adsMix > 0 ? adsMix : this.poseState.ads);
         this._e0.set(Sprint[0], Sprint[1], Sprint[2], "YXZ");
         this._q1.setFromEuler(this._e0);
         this.contactTargets[side].quaternion.copy(this._q0.slerp(this._q1, this.poseState.sprint));
         this.contactTargets[side].position.fromArray(this.poseSpec.contacts[key].position);
+        if (adsMix > 0) this.contactTargets[side].position.lerp(this._v0.fromArray(this.poseSpec.ads.contacts[key].position), adsMix);
         if (melee && side === "l" && this.poseSpec.actions.bayonet && !this.poseSpec.contacts.left.fingerRotations) {
           this.contactTargets[side].position.y = FPS_BAYONET_SUPPORT.heightM;
           const r = FPS_BAYONET_SUPPORT.rotation;

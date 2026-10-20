@@ -1,7 +1,7 @@
 // Anatomical frames captured from the NRA01-derived FPS bind skeleton.
 // All IK lives in the arm anchor, before viewmodel FOV/depth compression.
 import * as THREE from "three";
-import { FPS_HAND_SHAPES } from "./Data_FpsArmPoses.mjs";
+import { FPS_HAND_SHAPES, AdsContactMix } from "./Data_FpsArmPoses.mjs";
 
 export function FrameQuaternion(direction, normal) {
   const z = direction.clone().normalize();
@@ -61,7 +61,11 @@ export function CaptureAnatomy(rig) {
 
 export function ApplyAnatomicalFingers(rig) {
   for (const side of ["r", "l"]) {
-    const contact = rig.poseSpec?.contacts?.[side === "r" ? "right" : "left"];
+    const contactKey = side === "r" ? "right" : "left";
+    const contact = rig.poseSpec?.contacts?.[contactKey];
+    // Weapons with a separate aiming grip slerp each authored joint toward it.
+    const adsMix = AdsContactMix(rig.poseSpec, contactKey, rig.poseState?.adsGrip ?? rig.poseState?.ads);
+    const adsRotations = adsMix > 0 ? rig.poseSpec.ads.contacts[contactKey].fingerRotations : null;
     const firearm = !rig.unarmed && ["boltRifle","lmg","pistol"].includes(rig.poseSpec?.family);
     const operation = rig.operationPose?.[side];
     const Shape = (name) => {
@@ -105,6 +109,8 @@ export function ApplyAnatomicalFingers(rig) {
       };
       const AuthoredRotation = () => {
         const rotation = new THREE.Quaternion().fromArray(authored).normalize();
+        const aiming = adsRotations?.[workingKey];
+        if (aiming) rotation.slerp(new THREE.Quaternion().fromArray(aiming).normalize(), adsMix);
         return authoredTrigger && fire ? rotation.slerp(new THREE.Quaternion().fromArray(authoredTrigger).normalize(),fire) : rotation;
       };
       const BlendAuthored = () => {
