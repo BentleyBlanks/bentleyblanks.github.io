@@ -25,6 +25,17 @@ FPS_ADS_PALM_SEED refines from given palms; FPS_ADS_ROLL_ANCHOR / FPS_ADS_ROLL_S
 start from the hip palm turned about the fore-end axis; FPS_ADS_SHOULDER sets the ADS
 shoulder used by the wrist estimate; FPS_ADS_CUFF targets the wrist on screen;
 FPS_ADS_SWEEP_ONLY prints palm costs.
+
+FPS_SUPPORT_STATE=hip refits the hip support fingers instead: the hip palm frame is
+kept exactly. Only the PIP/DIP and thumb MCP/IP joints that fail the FpsHandPoseTest
+gate are rebuilt as pure hinges (thumb floor -4 deg for rounding margin); passing
+joints keep their authored rotation plus a flex delta (+-25), each MCP its authored
+rotation plus a flex/spread delta (+-12/10), the thumb CMC its authored rotation plus
+the usual deltas. A digit whose joints all pass and that neither enters the wood nor
+misses it stays exactly as authored. Besides pad contact and clearance, FPS_HIP_STAY
+weights the RMS skin displacement from the authored grip, so the fit only removes the
+backward/sideways bends. Shipped: FPS_ADS_REACH=150 FPS_HIP_STAY=100 (docs v13).
+Output Data_HipSupportGrips.json.
 Inputs (globals or environment):
   FPS_GRIP_PROJECT_ROOT  Taierzhuang1938 folder
   FPS_GRIP_INPUT         Script_FpsWeaponGripExport output (Data_<id>.json, --clean)
@@ -55,6 +66,8 @@ ids = Setting('FPS_GRIP_IDS', 'Type38,HanYang,ZhongZheng')
 ids = ids.split(',') if isinstance(ids, str) else list(ids)
 source.mkdir(parents=True, exist_ok=True)
 DEG = math.pi / 180
+hipMode = str(Setting('FPS_SUPPORT_STATE', 'ads')).lower() == 'hip'
+stayWeight = float(Setting('FPS_HIP_STAY', 15)) if hipMode else 0.
 
 
 def M4(v):
@@ -247,7 +260,7 @@ for wid in ids:
 
     targetNdc = float(Setting('FPS_ADS_TOP', -0.36))   # hand and fingers stay below this NDC (−0.36 = 0.18 screen heights)
     topWeight = float(Setting('FPS_ADS_TOP_WEIGHT', 6.0))
-    fingerTopWeight = float(Setting('FPS_ADS_FINGER_TOP_WEIGHT', 4.0))   # 0: visible fingers are fine if anatomical
+    fingerTopWeight = float(Setting('FPS_ADS_FINGER_TOP_WEIGHT', 0 if hipMode else 4.0))   # 0: visible fingers are fine if anatomical
     fingerTop = float(Setting('FPS_ADS_FINGER_TOP', targetNdc))
     reachWeight = float(Setting('FPS_ADS_REACH', 60))       # distal pad onto the wood
     anchorShift = float(Setting('FPS_ADS_ANCHOR_SHIFT', 60))  # palm translation cost near the roll anchor
@@ -298,11 +311,15 @@ for wid in ids:
 
     # Anatomical hinge limits (degrees), measured exactly like Script_FpsHandPoseTest:
     # twist of rest^-1 * q about the captured curl axis. PIP/DIP never bend backwards.
-    HINGE = {(0, 1): (-5, 60), (0, 2): (-5, 80)}
+    # Hip keeps 1 deg of margin under the test's -5 so rounding the quaternions cannot cross it.
+    HINGE = {(0, 1): (-4, 60), (0, 2): (-4, 80)} if hipMode else {(0, 1): (-5, 60), (0, 2): (-5, 80)}
     for d in range(1, 5):
         # PIP/DIP stay at or above straight. The MCP can extend passively 20-30 degrees, but a
         # raised knuckle over a curled PIP reads as a claw (HanYang middle -22 deg), so 10 at most.
         HINGE[(d, 0)], HINGE[(d, 1)], HINGE[(d, 2)] = (-10, 95), (0, 105), (0, 80)
+        if hipMode:
+            # Hip: the authored MCP (incl. its abduction/roll) stays; only a small delta is fitted.
+            del HINGE[(d, 0)]
 
     def Hinge(name, q):
         c = chains[name]
@@ -333,6 +350,13 @@ for wid in ids:
 
     hipHinges = [(n[-8:], *[round(v, 1) for v in Hinge(n, chains[n]['localQ'])]) for n in sorted(chains)]
     print(json.dumps({'weapon': wid, 'stage': 'hip-hinges', 'hinges': hipHinges}), flush=True)
+    # Hip mode rebuilds only the PIP/DIP (thumb MCP/IP) joints that fail the FpsHandPoseTest
+    # gate (flex < -5 or off-hinge > 8 deg). Passing joints keep their authored rotation and
+    # get a flex delta about the curl axis, which leaves their off-hinge part unchanged.
+    rebuilt = {n for n in chains if chains[n]['segment'] > 0
+               and (Hinge(n, chains[n]['localQ'])[0] < -5 or Hinge(n, chains[n]['localQ'])[1] > 8)} if hipMode else set(chains)
+    if hipMode:
+        print(json.dumps({'weapon': wid, 'stage': 'hip-rebuilt', 'joints': sorted(n[-8:] for n in rebuilt)}), flush=True)
 
     def FK(D, digit, params):
         """Digits 1-4: [MCP flex, PIP flex, DIP flex, MCP spread]; thumb: [CMC x, y, z deltas
@@ -345,9 +369,12 @@ for wid in ids:
             seg = c['segment']
             if digit == 0 and seg == 0:
                 q = c['localQ'] @ Euler((params[0] * DEG, params[1] * DEG, params[2] * DEG), 'XYZ').to_quaternion()
+            elif hipMode and seg == 0:
+                # Hip MCP: authored rotation, then flex delta about the curl axis and spread delta.
+                q = Quaternion(c['spreadV'], params[3] * DEG) @ c['localQ'] @ Quaternion(c['axisV'], params[0] * DEG)
             else:
                 flex = params[3 + seg - 1] if digit == 0 else params[seg]
-                q = c['restQ'] @ Quaternion(c['axisV'], flex * DEG)
+                q = (c['restQ'] if name in rebuilt else c['localQ']) @ Quaternion(c['axisV'], flex * DEG)
                 if digit and seg == 0:
                     q = Quaternion(c['spreadV'], params[3] * DEG) @ q
             W = (D @ c['P'] if parent is None else parent) @ Matrix.LocRotScale(Vector(c['position']), q, Vector(c['scale']))
@@ -360,9 +387,11 @@ for wid in ids:
     def HipParams(digit):
         """Start from the authored hip grip's hinge angles, clamped into anatomy."""
         names = Bones(digit)
-        flexes = [Hinge(n, chains[n]['localQ'])[0] for n in names]
+        flexes = [Hinge(n, chains[n]['localQ'])[0] if n in rebuilt else 0 for n in names]
         if digit == 0:
-            return [0, 0, 0] + [max(HINGE[(0, k)][0], min(HINGE[(0, k)][1], flexes[k])) for k in (1, 2)]
+            return [0, 0, 0] + [max(HINGE[(0, k)][0], min(HINGE[(0, k)][1], flexes[k])) if names[k] in rebuilt else 0 for k in (1, 2)]
+        if hipMode:
+            return [0] + [max(HINGE[(digit, k)][0], min(HINGE[(digit, k)][1], flexes[k])) if names[k] in rebuilt else 0 for k in (1, 2)] + [0]
         return [max(HINGE[(digit, k)][0], min(HINGE[(digit, k)][1], flexes[k])) for k in range(3)] + [0]
 
     def FitFingers(D, quick=False, seeds=None):
@@ -380,11 +409,13 @@ for wid in ids:
             def Evaluate(params, detail=False):
                 T, rotations, quats = FK(D, digit, params)
                 anatomy, hinges = AnatomyCost(quats)
-                pen, squared, distalGap, seen = 0., 0., 1., []
+                pen, squared, distalGap, seen, drift = 0., 0., 1., [], 0.
                 for index, (v, infl) in enumerate(pts):
                     moved = sum((((T[b] @ v) if b in T else (D @ v) if (b == handName or b in chains) else v) * w for b, w in infl), Vector()) * (1 / sum(w for b, w in infl))
                     if index % 3 == 0:
                         seen.append(moved)
+                    # The package skin is posed in the authored hip grip.
+                    drift += (moved - v).length_squared
                     signed = Signed(moved, bvhAll)
                     depth = max(0., .0006 - signed)
                     pen = max(pen, depth)
@@ -393,7 +424,7 @@ for wid in ids:
                         distalGap = min(distalGap, signed)
                 gap = max(abs(Signed(T[padBone] @ padHip)), distalGap)
                 thumbShape = 0.
-                if digit == 0:
+                if digit == 0 and not hipMode:
                     # Seen from the ADS eye a raised thumb tip stands beside the receiver as a
                     # lone stub. Keep it pointing forward along the wood and below the index
                     # knuckle, so the silhouette is the knuckle row of a holding hand.
@@ -405,22 +436,43 @@ for wid in ids:
                 # cradles it; it only has to come close, not be wrenched onto the wood.
                 reach = reachWeight * (.25 if digit == 4 else 1)
                 # Keep the digit behind the receiver from the ADS eye, as the palm is.
-                top = TopNdc(seen, bvhAll)
+                top = TopNdc(seen, bvhAll) if fingerTopWeight or detail else -9
+                driftRms = math.sqrt(drift / max(1, len(pts)))
                 cost = 300 * pen + 30 * math.sqrt(squared / max(1, len(pts))) + reach * max(0, gap - .0032) + fingerTopWeight * max(0, top - fingerTop) + thumbShape + anatomy
-                cost += .00004 * sum(abs(a) for a in params)
-                return (cost, pen, gap, rotations, top, hinges) if detail else cost
+                cost += stayWeight * driftRms + .00004 * sum(abs(a) for a in params)
+                return (cost, pen, gap, rotations, top, hinges, driftRms) if detail else cost
 
             n = 5 if digit == 0 else 4
             spread = {1: 20, 2: 12, 3: 15, 4: 20}.get(digit, 0)
-            bounds = ([(-45, 45)] * 3 + [HINGE[(0, 1)], HINGE[(0, 2)]] if digit == 0
+            # A kept (authored) joint takes a flex delta, a rebuilt one an absolute hinge angle.
+            JointBounds = lambda k: HINGE[(digit, k)] if Bones(digit)[k] in rebuilt else (-25, 25)
+            bounds = ([(-45, 45)] * 3 + [JointBounds(1), JointBounds(2)] if digit == 0
+                      else [(-12, 12), JointBounds(1), JointBounds(2), (-10, 10)] if hipMode
                       else [HINGE[(digit, 0)], HINGE[(digit, 1)], HINGE[(digit, 2)], (-spread, spread)])
             hipStart = HipParams(digit)
+            if hipMode and not rebuilt.intersection(Bones(digit)):
+                after = Evaluate(hipStart, True)
+                if after[1] <= 0 and after[2] <= .0032:
+                    # Every joint passes and the digit neither enters the wood nor misses it: keep it exactly.
+                    total += after[0]
+                    authored.update(after[3])
+                    reports.append({'digit': digit, 'kept': True, 'penMm': round(after[1] * 1000, 3), 'gapMm': round(after[2] * 1000, 3),
+                                    'hinges': after[5], 'deltaDeg': hipStart, 'driftRmsMm': round(after[6] * 1000, 3)})
+                    continue
+                print(json.dumps({'weapon': wid, 'stage': 'hip-refit-contact', 'digit': digit, 'penMm': round(after[1] * 1000, 3), 'gapMm': round(after[2] * 1000, 3)}), flush=True)
             if digit == 0:
                 starts = [hipStart, [0, 0, 0, 20, 15]]
+                if hipMode:
+                    starts += [[0, 0, 0, a, b] for a, b in ((0, 0), (10, 10), (30, 20))]
                 if not quick:
                     starts += [[a, b, c, 20, 15] for a, b, c in ((20, 0, 0), (-20, 0, 0), (0, 20, 0), (0, -20, 0), (0, 0, 20), (0, 0, -20))]
+            elif hipMode:
+                starts = [hipStart] + [[m, hipStart[1] + p, hipStart[2] + d, 0] for m, p, d in
+                                       ((0, 10, 10), (0, -10, 0), (0, 0, 20), (6, 15, 10), (-6, -5, 15))]
             else:
                 starts = [hipStart, [25, 20, 10, 0], [45, 35, 20, 0], [70, 40, 20, 10], [70, 40, 20, -10]]
+            if hipMode:
+                starts = [[max(bounds[i][0], min(bounds[i][1], s[i])) for i in range(n)] for s in starts]
             if seeds and digit in seeds:
                 starts = [seeds[digit]] + (starts[:2] if quick else starts)
             elif quick:
@@ -446,7 +498,8 @@ for wid in ids:
             after = Evaluate(winner, True)
             total += after[0]
             authored.update(after[3])
-            reports.append({'digit': digit, 'penMm': round(after[1] * 1000, 3), 'gapMm': round(after[2] * 1000, 3), 'topNdc': round(after[4], 3), 'hinges': after[5], 'deltaDeg': winner})
+            reports.append({'digit': digit, 'penMm': round(after[1] * 1000, 3), 'gapMm': round(after[2] * 1000, 3), 'topNdc': round(after[4], 3), 'hinges': after[5], 'deltaDeg': winner,
+                            'driftRmsMm': round(after[6] * 1000, 3)})
         return authored, reports, total
 
     # Palm: start from the hidden cradles the palm-only fit found (palm under the
@@ -474,6 +527,8 @@ for wid in ids:
 
     fixedPalm = Setting('FPS_ADS_PALM')
     fixedPalm = json.loads(Path(fixedPalm).read_text()).get(wid) if fixedPalm else None
+    if hipMode:
+        fixedPalm = [0] * 7
     seedPalm = Setting('FPS_ADS_PALM_SEED')
     seedPalm = json.loads(Path(seedPalm).read_text()).get(wid) if seedPalm else None
     sweepOnly = Setting('FPS_ADS_SWEEP_ONLY')
@@ -543,7 +598,8 @@ for wid in ids:
         print(json.dumps({'weapon': wid, 'stage': 'finger', **report}), flush=True)
 
     results[wid] = {
-        'contact': {'position': [round(v, 7) for v in C1.to_translation()], 'rotation': ToEulerYXZ(C1.to_3x3()),
+        'contact': {'position': hipContact['position'] if hipMode else [round(v, 7) for v in C1.to_translation()],
+                    'rotation': hipContact['rotation'] if hipMode else ToEulerYXZ(C1.to_3x3()),
                     'fingerRotations': authored},
         'palmParameters': [round(v, 6) for v in palmWinner],
         'palm': palm, 'hip': hip, 'digits': digitReports,
@@ -578,7 +634,7 @@ for wid in ids:
             if report['digit'] == digit:
                 params = report['deltaDeg']
         fingerT.update(FK(D, digit, params)[0])
-    for label, transform in (('Hip', None), ('Ads', True)):
+    for label, transform in (('Hip', None), ('HipFit' if hipMode else 'Ads', True)):
         verts, faces, base = [], [], 0
         for mesh in pkg['skin']:
             count = len(mesh['pos']) // 3
@@ -602,8 +658,9 @@ for wid in ids:
         Mesh(f'{wid}_LeftHand{label}', verts, faces, (.86, .62, .5, 1) if transform else (.5, .6, .86, 1))
     print(json.dumps({'weapon': wid, 'elapsedS': round(time.time() - started, 1)}), flush=True)
 
-(source / 'Data_AdsSupportGrips.json').write_text(json.dumps(results, indent=1), encoding='utf-8')
-print(json.dumps({'written': str(source / 'Data_AdsSupportGrips.json'), 'weapons': list(results)}), flush=True)
+outputName = 'Data_HipSupportGrips.json' if hipMode else 'Data_AdsSupportGrips.json'
+(source / outputName).write_text(json.dumps(results, indent=1), encoding='utf-8')
+print(json.dumps({'written': str(source / outputName), 'weapons': list(results)}), flush=True)
 
 blend = Setting('FPS_GRIP_BLEND')
 if blend:

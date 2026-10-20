@@ -98,14 +98,17 @@ Inspect("l", { kind: "leftHolding" });
 Inspect("r", { kind: "rightHolding" });
 sampledPoses++;
 
-// Aiming-only support grips (Data_FpsArmPoses adsSupport) are blended in by adsGrip.
-// The aiming pose itself must be anatomical. (Intermediate weights also carry the hip
-// grip, whose Type38/ZhongZheng authoring predates this gate; it is not swept here.)
+// Every weapon's hip support grip (HanYang above is only the rig default), then the
+// aiming-only support grips (Data_FpsArmPoses adsSupport), which adsGrip blends in
+// joint by joint from the hip grip: the whole 0-1 blend must stay anatomical.
 const holdingSpec = rig.poseSpec;
 for (const [weapon, spec] of Object.entries(FPS_ARM_POSES)) {
+  rig.poseSpec = spec; rig.poseState.adsGrip = 0;
+  ApplyAnatomicalFingers(rig);
+  Inspect("l", { kind: "hipSupport", weapon });
+  sampledPoses++;
   if (spec.ads?.contacts?.left === spec.hip?.contacts?.left) continue;
-  rig.poseSpec = spec;
-  for (const adsGrip of [1]) {
+  for (const adsGrip of [.25, .5, .75, 1]) {
     rig.poseState.adsGrip = adsGrip;
     ApplyAnatomicalFingers(rig);
     Inspect("l", { kind: "adsSupport", weapon, adsGrip });
