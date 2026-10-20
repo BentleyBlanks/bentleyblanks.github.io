@@ -20,7 +20,7 @@
 
 import * as THREE from "three";
 import {
-  BLOCKOUT_LEVELS, BLOCKOUT_PHASES, BlockoutTintColor, BlockoutWaterBlocks, BlockoutMapScene,
+  BLOCKOUT_LEVELS, BLOCKOUT_PHASES, BlockoutLevelIndex, BlockoutTintColor, BlockoutWaterBlocks, BlockoutMapScene,
 } from "./Script_EditorBlockoutLevels.mjs";
 import {
   ValidateBlockout, NormalizeBlockout, KeyframeIndex, PlanTransition, DefaultArc, YawDegFromTo, BlockoutConfigPath,
@@ -139,7 +139,7 @@ export class EditorBlockout {
     this.RequestPointerLock = RequestPointerLock || (() => {});
     this.ReleasePointerLock = ReleasePointerLock || (() => {});
     this.levelIndex = this.game.state?.phaseIndex ?? 0;
-    this.levelKey = BLOCKOUT_LEVELS[this.levelIndex]?.key || BLOCKOUT_LEVELS[0].key;
+    this.levelKey = BLOCKOUT_LEVELS[this.levelIndex]?.key || BLOCKOUT_LEVELS[BlockoutLevelIndex(null)].key;
     this.store = new BlockoutStore();
     this.layers = { arcs: "default", intents: true, labels: true, xray: true };
     this.doc = null;

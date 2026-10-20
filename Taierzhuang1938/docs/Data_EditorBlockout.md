@@ -24,7 +24,7 @@ index.html?editor=blockout&level=FirstLevel[&kf=03-2][&pose=x,z,朝向,俯仰,�
 - `editor=blockout` 已经能把启动路由到 `Script_Main`（`Data_StartupRouting.IsMenuStartup` 认 `editor`），**不改路由表**。
 - `level` 缺省 `FirstLevel`；`kf` 缺省第一个关键帧。
 - `pose`（2026-10-13 追加）：落到关键帧之后再把玩家摆到这个机位（米 / 度，如 `-35.12,-97.3,-140.2,-5,stand`），就是 §4.2「复制当前位置」里那条「重现」链接；进来后地址栏去掉它（之后翻关键帧不再套用）。不合法就当没给。
-- **菜单入口（用户 2026-10-13 追加）**：高级工具（同日另一轮已改成顶部菜单栏 + Inspector）的「关卡」菜单第一项「白盒关卡编辑器」（照 `TextureEditor` 的写法：一个只带静态 `id = "blockout"` / `label` / `hint` / `Open()` 的小类，放在 `Script_EditorBlockoutEntry.mjs`，`Script_Editor.mjs` 把它放进 `TOOL_MENUS` 的「关卡」并在 `Toggle` / `Open` 里按 id 特判）。`Open()` 跳到 `?editor=blockout&level=FirstLevel`（保留当前 `quality` / `scale` / `audio` 参数，去掉 `whitebox` / `missionStage` / `phase` 等关卡参数）。已经在编辑器模式里时，这个按钮显示为当前项，点了不重载。菜单栏条目数因此 +1：`Script_EditorTest` 的 19 → 20。轻量菜单（`Script_MenuStartup`）里的「高级工具」本来就跳到带编辑器面板的完整页面，不另加入口。
+- **菜单入口（用户 2026-10-13 追加）**：高级工具（同日另一轮已改成顶部菜单栏 + Inspector）的「关卡」菜单第一项「白盒关卡编辑器」（照 `TextureEditor` 的写法：一个只带静态 `id = "blockout"` / `label` / `hint` / `Open()` 的小类，放在 `Script_EditorBlockoutEntry.mjs`，`Script_Editor.mjs` 把它放进 `TOOL_MENUS` 的「关卡」并在 `Toggle` / `Open` 里按 id 特判）。`Open()` 跳到 `?editor=blockout&level=FirstLevel0105`（2026-10-20 起默认新剧本 01–05，`BLOCKOUT_DEFAULT_LEVEL`；没写 `level` 或写错时也进它；旧版第一关在关卡下拉里；保留当前 `quality` / `scale` / `audio` 参数，去掉 `whitebox` / `missionStage` / `phase` 等关卡参数）。已经在编辑器模式里时，这个按钮显示为当前项，点了不重载。菜单栏条目数因此 +1：`Script_EditorTest` 的 19 → 20。轻量菜单（`Script_MenuStartup`）里的「高级工具」本来就跳到带编辑器面板的完整页面，不另加入口。
 - 该模式下：
   - `PHASE_TABLE` 换成 `BLOCKOUT_PHASES`（每个关卡一个 phase），关卡间切换走现成的 `JumpToLevel(i)`（整片拆除重建）。
   - **不建** `FirstLevelMissionRuntime`、过场、故事拍、`companion` / `setpieces`、`SeedSoldiers`（含每 3 s 的补兵）、主菜单。
@@ -595,6 +595,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 - 2026-10-13（地图开着鼠标漏到游戏）：遮罩改成盖满整屏（导航栏两边那条原来露着，点一下会重新锁鼠标 / 在面板里直接开枪）；`Script_Main` 加 `BlockoutMouseCaptured()` 闸住抢锁、开枪、转头与滚轮换枪。
 - 2026-10-20（01–05 集结处改弯沟）：§13 干沟由 15×50 m 方坑改成一条弯沟（坑窝 A / 中弯 / 坑窝 B，沟底宽 5–15 m，中弯往南接支沟放伤员，支沟南头接凹路、凹路在台地里往东到 x 83 才拐往南）；02 末的人分三小堆贴北岸、伤员放支沟里；锚点加 `GullyU` / `InGullyFloor`；0610 跟着挪妮儿、06-1–06-3 的站位，干沟进 0610 路网（中心线，不再是矩形区域）。
 - 2026-10-19（12–18 新剧本白盒）：新关卡 `FirstLevel1218`（§16）；§14.3 预演音效别名加 `planeDrone` / `planeDive` / `strafeNear` / `strafeFar` / `strafeDirt`（飞机与扫射，映射到游戏音频库现成的键）。
+- 2026-10-20（默认关卡）：§1 白盒工具默认开新剧本 01–05（菜单入口、没写 / 写错 `level` 都进它），不再默认开旧版第一关。
 - 2026-10-20（正式模型）：§5.6 战车 / 车 / 牲口换游戏里的八九式、撤运车 + 牛 / 马（带 Walk 动画），单位可选 `draft`；§5.7 树换枯树模型（树干块只留碰撞）；关键帧机位的蹲 / 趴走开就站起来（§7）。
 - 2026-10-18（01–05 第三轮，「小毛病全都修掉」）：§14.2 白盒画质下预演的爆炸看得见了（`Script_EditorBlockoutPrevizFx` 在调试叠加层另画简易爆炸，只在编辑器、只在白盒特效关时画）；§14.1 演员键 `throw`（播投弹片段 + 弹的抛物线）、爆炸事件 `h`；§5.6 `lie:"along"` 按身体包围框居中、固定用 `DeathCollapseC`，Probe 再多给几项；§13 板桥门板缝 5 → 9 cm、旧门板厚薄高低不一，冬瓜在被子上一直躺着，桥下的人一律蹲 / 趴，05-3 顺子替身播投弹片段；补：白盒下的烟与枪口火、05-4 鬼子绕桥东头、04-3 刘文财猫腰过桥底。
 - 2026-10-18（01–05 第二轮修补）：§3 单位加可选 `lie`、`weapon` 写 `Dadao` 摆白刃戒备；§5.6 倒地的人移动只平移、`lie:"along"` 顺着躺、预演 / 关键帧换武器就地 `SetWeapon`、Probe 多给几项；§14.1 演员键加 `lie`、`weapon`（阶跃）；§13 干沟南岸坎顶加矮土埂（南边平地看沟底余量 0.16 → 0.78 m）、板桥门板之间 5 cm 缝、05-2 桥下仰看与 05-3 甩手榴弹换机位、冬瓜顺着被子躺平滑跟着走、班长 02-2 抡大刀跳沟。

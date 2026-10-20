@@ -3,7 +3,9 @@
 // 不进互斥编辑器表 —— 白盒编辑器是一整套独立入口（?editor=blockout），打开就是换页面。
 //
 // 跳转时保留当前的画质 / 规模 / 音频参数，去掉关卡类参数（whitebox / missionStage / phase …），
-// 默认进第一关。已经在白盒编辑器里时这个按钮显示为当前项，点了不重载。
+// 默认进新剧本 01–05（BLOCKOUT_DEFAULT_LEVEL，2026-10-20；旧版第一关在关卡下拉里）。已经在白盒编辑器里时这个按钮显示为当前项，点了不重载。
+
+import { BLOCKOUT_DEFAULT_LEVEL } from "./Script_EditorBlockoutLevels.mjs";
 
 const KEEP_PARAMS = ["quality", "scale", "audio"];
 
@@ -17,12 +19,12 @@ export class BlockoutEntry {
     return new URLSearchParams(search).get("editor") === "blockout";
   }
 
-  /** 目标地址：?editor=blockout&level=FirstLevel，只带上画质 / 规模 / 音频。 */
+  /** 目标地址：?editor=blockout&level=FirstLevel0105，只带上画质 / 规模 / 音频。 */
   static Url(href = globalThis.location?.href || "") {
     const current = new URL(href);
     const url = new URL(current.pathname, current.origin);
     url.searchParams.set("editor", "blockout");
-    url.searchParams.set("level", "FirstLevel");
+    url.searchParams.set("level", BLOCKOUT_DEFAULT_LEVEL);
     for (const key of KEEP_PARAMS) {
       const value = current.searchParams.get(key);
       if (value !== null) url.searchParams.set(key, value);

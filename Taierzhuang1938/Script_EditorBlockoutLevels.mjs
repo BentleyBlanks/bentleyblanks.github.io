@@ -656,9 +656,12 @@ function EmptySceneLayout(phase) {
 /** 模块求值时建好；phase 对象本身可改（文件场景在 Prepare 里填布局）。 */
 export const BLOCKOUT_PHASES = Object.freeze(BLOCKOUT_LEVELS.map(MakeBlockoutPhase));
 
+/** 没写 ?level=（或写错）时进哪一关：新剧本 01–05（2026-10-20 用户：白盒工具默认开新剧本，不开旧版）。 */
+export const BLOCKOUT_DEFAULT_LEVEL = "FirstLevel0105";
+
 export function BlockoutLevelIndex(key) {
   const index = BLOCKOUT_LEVELS.findIndex(level => level.key === key);
-  return index >= 0 ? index : 0;
+  return index >= 0 ? index : Math.max(0, BLOCKOUT_LEVELS.findIndex(level => level.key === BLOCKOUT_DEFAULT_LEVEL));
 }
 
 /** 关卡的水块（第一关北沙河等）；总控用它铺水面。 */

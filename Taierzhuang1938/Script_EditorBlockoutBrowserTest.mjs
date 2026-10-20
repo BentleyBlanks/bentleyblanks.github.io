@@ -64,7 +64,7 @@ const Near = (a, b, eps) => Math.abs(a - b) <= eps;
 // 0) node 里的纯规则
 console.log("--- node checks");
 Check("关卡注册表 key 都在 BLOCKOUT_LEVEL_KEYS 里", BLOCKOUT_LEVELS.every(l => BLOCKOUT_LEVEL_KEYS.includes(l.key)));
-Check("BlockoutLevelIndex 找不到返回 0", BlockoutLevelIndex("Nope") === 0 && BlockoutLevelIndex("SecondLevel") === 1);
+Check("BlockoutLevelIndex 找不到 / 没写时回到新剧本 01–05", BLOCKOUT_LEVELS[BlockoutLevelIndex("Nope")].key === "FirstLevel0105" && BLOCKOUT_LEVELS[BlockoutLevelIndex(null)].key === "FirstLevel0105" && BlockoutLevelIndex("SecondLevel") === 1);
 for (const phase of BLOCKOUT_PHASES) {
   const banned = ["contentId", "p012", "fullMission", "smokeColumns", "roster", "chapter"].filter(k => k in phase || k in (phase.whitebox || {}));
   Check(`${phase.id}：不带任务 / 故事 / 同伴字段`, banned.length === 0, banned.join(","));
@@ -109,8 +109,8 @@ const sceneText = await fs.readFile(path.join(projectDir, "Blockout", "SecondLev
 }
 {
   const url = new URL(BlockoutEntry.Url("http://127.0.0.1:9/Taierzhuang1938/?whitebox=p012&missionStage=3&phase=2&quality=high&scale=small&audio=0"));
-  Check("启动面板入口：跳到 ?editor=blockout&level=FirstLevel，只保留画质 / 规模 / 音频", url.pathname === "/Taierzhuang1938/"
-    && url.searchParams.get("editor") === "blockout" && url.searchParams.get("level") === "FirstLevel"
+  Check("启动面板入口：跳到 ?editor=blockout&level=FirstLevel0105（新剧本），只保留画质 / 规模 / 音频", url.pathname === "/Taierzhuang1938/"
+    && url.searchParams.get("editor") === "blockout" && url.searchParams.get("level") === "FirstLevel0105"
     && url.searchParams.get("quality") === "high" && url.searchParams.get("scale") === "small" && url.searchParams.get("audio") === "0"
     && !url.searchParams.has("whitebox") && !url.searchParams.has("missionStage") && !url.searchParams.has("phase"), url.search);
   Check("启动面板入口：已经在编辑器里时认得出", BlockoutEntry.Active("?editor=blockout&level=SecondLevel") && !BlockoutEntry.Active("?editor=tools"));
