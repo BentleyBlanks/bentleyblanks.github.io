@@ -3,7 +3,7 @@ import math
 from mathutils import Vector
 
 
-def BuildCivilianJacket(CreateMesh,material,parent,surfaceDepth=None):
+def BuildCivilianJacket(CreateMesh,material,parent,surfaceDepth=None,refined=False):
     verts=[];uvs=[];faces=[];lookup={}
 
     def Fold(u,v,back=False,sleeve=False):
@@ -116,7 +116,7 @@ def BuildCivilianJacket(CreateMesh,material,parent,surfaceDepth=None):
     # Preserve the already-approved exposed corner and knot-button placement.
     anchorA=Vertex(Fold(.20,.56),(.66,1));anchorB=Vertex(Fold(.26,.50),(.71,.89))
     corners=[Vector(point) for point in ((.112,-.120,.146),(.180,-.121,.142),(.174,-.119,.083))]
-    corner=[];rows=[];steps=4
+    corner=[];rows=[];steps=8 if refined else 4
     for row in range(steps+1):
         indices=[]
         for column in range(steps-row+1):
@@ -124,7 +124,8 @@ def BuildCivilianJacket(CreateMesh,material,parent,surfaceDepth=None):
             point=corners[0]*(1-u-v)+corners[1]*u+corners[2]*v
             point.y-=.0035*math.sin((u*2.8+v*1.7)*math.pi)*math.sin((u+v)*math.pi)
             if surfaceDepth is not None:
-                point.y=surfaceDepth(point.x,point.z,.0015)-.0013*math.sin((u*2.8+v*1.7)*math.pi)*math.sin((u+v)*math.pi)
+                wave=math.sin((u*2.8+v*1.7)*math.pi)*math.sin((u+v)*math.pi)
+                point.y=surfaceDepth(point.x,point.z,.0015)-(.0045*abs(wave) if refined else .0013*wave)
             index=Vertex(point,((point.x+.62)/1.24,.90+(point.z-.144)/.56))
             indices.append(index)
         rows.append(indices)

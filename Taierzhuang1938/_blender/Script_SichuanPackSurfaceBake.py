@@ -9,7 +9,7 @@ from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
 
-def BakeSurfaces(packRoot,projectPath,reviewPath,highSource=None):
+def BakeSurfaces(packRoot,projectPath,reviewPath,highSource=None,fabricVersion='V05'):
     scene=bpy.context.scene
     if highSource is not None:
         highSource.data.uv_layers.active.name='SurfaceUV'
@@ -86,6 +86,11 @@ def BakeSurfaces(packRoot,projectPath,reviewPath,highSource=None):
     bpy.ops.object.mode_set(mode='EDIT')
     bpy.ops.uv.pack_islands(rotate=True,margin=.0030,margin_method='FRACTION',shape_method='CONCAVE')
     bpy.ops.object.mode_set(mode='OBJECT')
+    if fabricVersion=='V06':
+        import runpy
+        repair=runpy.run_path(str(Path(__file__).with_name('Script_SichuanUvRepair.py')))['RepairOverlaps']
+        repairs=repair(meshes)
+        (Path(reviewPath)/'Data_FoldUvRepairs.json').write_text(json.dumps(repairs,indent=2),encoding='utf-8')
     uvRows=[]
     for obj in meshes:
         obj.data.calc_loop_triangles();layer=obj.data.uv_layers['GameUV']
@@ -132,7 +137,7 @@ def BakeSurfaces(packRoot,projectPath,reviewPath,highSource=None):
             elif kind=='Ao':
                 ao=nodes.new('ShaderNodeAmbientOcclusion');ao.only_local=True
                 ao.inputs['Distance'].default_value=.025
-                weight=.25 if material.get('AtlasRegion')=='jacket' else .45 if material.get('AtlasRegion')=='cloth' else .65
+                weight=.25 if material.get('AtlasRegion')=='jacket' else (.65 if fabricVersion=='V06' else .45) if material.get('AtlasRegion')=='cloth' else .65
                 multiply=nodes.new('ShaderNodeMath');multiply.operation='MULTIPLY';multiply.inputs[1].default_value=weight
                 add=nodes.new('ShaderNodeMath');add.operation='ADD';add.inputs[1].default_value=1-weight
                 emission=nodes.new('ShaderNodeEmission')
@@ -151,8 +156,10 @@ def BakeSurfaces(packRoot,projectPath,reviewPath,highSource=None):
         image.filepath_raw=str(Path(reviewPath)/('SurfaceBake_'+kind+'.png'));image.file_format='PNG';image.save()
         baked[kind]=image.filepath_raw
         print('SURFACE_BAKED',kind,flush=True)
+    for material,(shader,output) in saved.items():
+        material.node_tree.links.new(shader.outputs['BSDF'],output.inputs['Surface'])
     python=shutil.which('python')
-    subprocess.run([python,str(Path(projectPath)/'_import/Script_SichuanPackSurfaceMaps.py'),'--project',str(projectPath),'--review',str(reviewPath)],check=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    subprocess.run([python,str(Path(projectPath)/'_import/Script_SichuanPackSurfaceMaps.py'),'--project',str(projectPath),'--review',str(reviewPath),'--fabric-version',fabricVersion],check=True,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     return BindBakedMaterial(packRoot,projectPath)
 
 

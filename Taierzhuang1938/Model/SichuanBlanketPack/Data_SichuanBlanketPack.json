@@ -1,7 +1,7 @@
 {
   "schema": "tengxian-independent-prop-v1",
   "id": "SichuanBlanketPack",
-  "version": "20261020SoftClothV5",
+  "version": "20261020ReferenceMatchV6",
   "title": "1938 Sichuan Army folded single-blanket pack",
   "asset": "Model_SichuanBlanketPack.glb",
   "textureManifest": "Data_SichuanBlanketPackTextures.json",
@@ -22,18 +22,18 @@
   "actualBundleDimensionsM": {
     "width": 0.37959998846054077,
     "height": 0.2996000051498413,
-    "thickness": 0.1314721703529358,
+    "thickness": 0.12959015369415283,
     "includes": "soft folded bundle, conforming repair patch and cotton stitches"
   },
   "triangles": {
-    "total": 2991,
-    "limit": 3000,
+    "total": 9870,
+    "limit": 10000,
     "includesAllOptionalParts": true,
     "byPart": {
-      "Pack_Bundle": 925,
-      "Pack_Binding": 638,
-      "Pack_Jacket": 284,
-      "Pack_StrawMat": 436,
+      "Pack_Bundle": 4634,
+      "Pack_Binding": 3388,
+      "Pack_Jacket": 332,
+      "Pack_StrawMat": 808,
       "Pack_Sandals": 708
     }
   },
@@ -84,7 +84,7 @@
     ],
     "dielectrics": true,
     "embeddedInGlb": true,
-    "sharedAtlas": "Unique non-overlapping GameUV atlas from independent imagegen V05 fabric and V04 straw studies; normalized low-frequency cotton wear and high-to-low sculpted fold normals",
+    "sharedAtlas": "Unique non-overlapping GameUV atlas from imagegen V06 fine cotton and V04 straw; independent dirt and sweat, sculpted folds and restrained geometric end relief",
     "sourceProvider": "Built-in image_gen__imagegen",
     "sharedExistingBlanketRequirement": "Withdrawn by user; this asset has its own independently generated texture set",
     "ormSemantics": "R=baked surface occlusion, G=242/255 roughness, B=0 metallic"
@@ -99,7 +99,7 @@
     "textureRebuild": "../../_blender/Script_SichuanBlanketPackBake.py",
     "surfaceBake": "../../_blender/Script_SichuanPackSurfaceBake.py",
     "surfaceEncoder": "../../_import/Script_SichuanPackSurfaceMaps.py",
-    "foldedCloth": "../../_blender/Script_SichuanSoftBundle.py",
+    "foldedCloth": "../../_blender/Script_SichuanSoftBundleV6.py",
     "binding": "../../_blender/Script_SichuanPackBinding.py",
     "strawStudy": "../../_import/Script_SichuanStrawStudy.py",
     "civilianJacket": "../../_blender/Script_SichuanCivilianJacket.py",
@@ -110,7 +110,7 @@
     "node scripts/Script_BlenderMcp.mjs start \"C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/Scene_SichuanBlanketPack.blend\" --task SichuanBlanketPack",
     "node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_SichuanBlanketPackBake.py",
     "node scripts/Script_BlenderMcp.mjs stop --save",
-    "node Taierzhuang1938/_blender/Script_SichuanBlanketPackVerify.mjs"
+    "node Taierzhuang1938/_blender/Script_SichuanBlanketPackVerify.mjs --max-triangles=10000"
   ],
   "review": {
     "scope": "Independent asset",
@@ -130,7 +130,7 @@
       "Texture_ReferenceCompare_side.jpg",
       "Texture_ReferenceCompare_back.jpg"
     ],
-    "status": "V5LocallyValidated",
+    "status": "V6LocallyValidatedForReview",
     "remainingRefinements": [],
     "reviewedDate": "2026-10-20",
     "technicalChecks": 147,
@@ -144,14 +144,16 @@
       "Independent full-size folded civilian indigo jacket; exposed corner and cloth knot button preserved"
     ],
     "finalModelApprovedByUser": false,
-    "visualInspection": "Codex inspected front, flat back, side, three-quarter and the withdrawn original jacket; mat/jacket visibility and unchanged extraction geometry verified in the browser",
+    "visualInspection": "Actual exported V6 GLB inspected in front, right end, back and three-quarter views, plus native physical rendering; round folded edges and adjacent bottom returns compared with approved V02",
     "refinementChanges": [
-      "Soft body sculpt projected to a low-poly folded blanket volume",
-      "Asymmetric compressed lower cloth ends and irregular edge thickness",
-      "Fine imagegen V05 cotton, grey tape and indigo fabric; no painted side-fold shadows",
-      "Conforming tucked coat corner, raised cloth knot and supported straw mat",
-      "Exact flat contact plane and independent flat-back normals after reduction"
-    ]
+      "User raised the game budget to 10000; all optional parts total 9870 triangles",
+      "Rebuilt folded ends as round cloth volumes with nested upper and paired lower returns",
+      "Softer unquilted front surface, true thin tape edges and curved shoulder loops",
+      "Connected mat fastening to the blanket passes and fitted side binding to the outer cloth envelope",
+      "Independent finer V06 cotton, earth/sweat masks, darker indigo and restrained crease normals",
+      "Automatic isolation of folded-over UV faces; actual GameUV overlap audit remains strict"
+    ],
+    "authorizedBudgetTriangles": 10000
   },
   "historicalReferences": [
     {
@@ -172,7 +174,7 @@
     "text",
     "logos"
   ],
-  "assetUrl": "./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261020SoftClothV5",
-  "assetBytes": 2257356,
-  "assetSha256": "a792e151a291a57aeba9ebd91f014f71e65f4fe8e5f5858ecdd739236f067e47"
+  "assetUrl": "./Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb?v=20261020ReferenceMatchV6",
+  "assetBytes": 2355828,
+  "assetSha256": "8b739a1340d4802ba0b8c11d80ae9990c41f22a3b161275d3616c463b7e22ef5"
 }

@@ -6,14 +6,14 @@
   "scope": "Independent GLB authoring textures, embedded in Model_SichuanBlanketPack.glb; no existing game or level requests these images.",
   "source": {
     "provider": "imagegen",
-    "ref": "Image_SichuanFabricStudyV05.png",
+    "ref": "Image_SichuanFabricStudyV06.png",
     "date": "2026-10-20",
     "width": 1254,
     "height": 1254,
-    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV05\\Image_SichuanFabricStudyV05.png",
-    "sha256": "9c55fd39d79bd0d6d83340692f0604d340b19d11f6e71e1cd2f2a75b4df1d42c",
-    "prompt": "_import/SichuanBlanketPack/Data_ImagegenPromptV05.txt",
-    "persistentPrompt": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\Data_ImagegenPromptV05.txt"
+    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV06\\Image_SichuanFabricStudyV06.png",
+    "sha256": "befe1c9c4d91686c6920808657375ed78ec403204bbfab85f0f59472aa022a10",
+    "prompt": "_import/SichuanBlanketPack/Data_ImagegenPromptV06.txt",
+    "persistentPrompt": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\Data_ImagegenPromptV06.txt"
   },
   "bake": "_import/Script_SichuanBlanketPackTextureBake.py",
   "bakeRecord": "_import/SichuanBlanketPack/Data_SichuanBlanketPackTextureBake.json",
@@ -29,7 +29,7 @@
   "toneClass": null,
   "metersPerTile": null,
   "normalConvention": "gl",
-  "normalMeaning": "OpenGL tangent-space normal, RGB = n * 0.5 + 0.5; green points toward the image top. Fine cloth/straw relief is derived from a high-frequency albedo band-pass rather than full-colour quadrant differences.",
+  "normalMeaning": "OpenGL tangent-space normals: sculpted cloth folds projected from high to low plus fine cotton/straw micro-relief",
   "atlasReason": "Independent imagegen fibre studies are reprojected onto unique non-overlapping GameUV islands; sculpted cloth supplies the broad fold relief.",
   "atlas": {
     "layout": "unique-surface-uv",
@@ -53,8 +53,8 @@
       "width": 1024,
       "height": 1024,
       "colorSpace": "sRGB",
-      "bytes": 411310,
-      "sha256": "40aa529df5b532ff80ca3bdaa3501c828d0cd8f2e9e94a61cc7a5c435139facc",
+      "bytes": 357866,
+      "sha256": "851f63dadc9c7db91a6ea6bff5a90dfb478e52f6248dd7df30df3569ae480868",
       "encoding": "WebP q92"
     },
     {
@@ -63,8 +63,8 @@
       "width": 1024,
       "height": 1024,
       "colorSpace": "linear",
-      "bytes": 1209434,
-      "sha256": "f0b0ab7e172ae1dcca68b562fe88ff48d879acc60f2169f95a33e02bb92164dd",
+      "bytes": 945324,
+      "sha256": "d35236ff903579a1576c5d1989c7fd320a15c21f847d3959f69bc3747753ca02",
       "encoding": "lossless WebP"
     },
     {
@@ -73,13 +73,13 @@
       "width": 1024,
       "height": 1024,
       "colorSpace": "linear",
-      "bytes": 379064,
-      "sha256": "c39f80b8739a6ef8c3c1c264b129e0ae2ad038989724a1df31d8ef9757c88862",
+      "bytes": 413540,
+      "sha256": "d7fe3735d8ad292f42d624dfd1b72b6649294ea95ec774b8eacc7a48100634e3",
       "encoding": "lossless WebP"
     }
   ],
-  "totalBytes": 1999808,
-  "physicalMeaning": "Rough nonmetal natural fibres. ORM R is baked self-occlusion; G is 242/255; B is zero. Sculpted fold normals are projected from the high source; V05 cotton carries normalized reference wear without painted side-fold shadows.",
+  "totalBytes": 1716730,
+  "physicalMeaning": "Rough nonmetal natural fibres. ORM R is baked self-occlusion, G=242/255, B=0. V06 independent cotton albedo, earth and sweat; rounded folded geometry and restrained reference crease relief supply normals.",
   "verification": {
     "allMaps1024": true,
     "allMetalZero": true,
@@ -164,27 +164,7 @@
   },
   "referenceSamples": {
     "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\Image_SichuanBlanketPackThreeViewV02.png",
-    "provider": "imagegen, approved reference",
-    "cottonPixels": [
-      248,
-      394,
-      484,
-      508
-    ],
-    "greyClothPixels": [
-      209,
-      218,
-      232,
-      315
-    ],
-    "use": "Blurred normalized front/back wear ratio only; fabric yarn and indigo/grey cloth come from the independent V05 study",
-    "cottonFacePixels": [
-      77,
-      194,
-      680,
-      695
-    ],
-    "cottonProcess": "_import/Script_SichuanFabricStudy.py: calibrated sRGB colour, 8cm effective tile and fine 55/65 micrometre normal relief"
+    "use": "Approved modelling reference and tiny neutral grey cotton-stitch sample only; cotton albedo and dirt are independent V06 materials"
   },
   "surfaceBake": "_blender/Script_SichuanPackSurfaceBake.py",
   "surfaceEncoder": "_import/Script_SichuanPackSurfaceMaps.py",
@@ -243,8 +223,8 @@
   },
   "fabricStudy": {
     "provider": "Built-in imagegen",
-    "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV05\\Image_SichuanFabricStudyV05.png",
-    "sourceSha256": "9c55fd39d79bd0d6d83340692f0604d340b19d11f6e71e1cd2f2a75b4df1d42c",
+    "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV06\\Image_SichuanFabricStudyV06.png",
+    "sourceSha256": "befe1c9c4d91686c6920808657375ed78ec403204bbfab85f0f59472aa022a10",
     "sourceNominalSwatchM": [
       0.12,
       0.12
@@ -281,9 +261,9 @@
     },
     "targetSrgb": {
       "Cotton": [
-        183,
-        176,
-        161
+        180,
+        170,
+        151
       ],
       "Binding": [
         116,
@@ -296,16 +276,29 @@
         128
       ],
       "Indigo": [
-        81,
-        83,
-        99
+        61,
+        72,
+        94
       ]
     },
     "normalReliefM": [
       5.5e-05,
       6.5e-05
     ],
-    "wear": "Separate low-frequency reference wear ratio; no side-fold photograph is projected into albedo",
-    "prompt": "_import/SichuanBlanketPack/Data_ImagegenPromptV05.txt"
+    "wear": "Independent deterministic earth pigment, bottom-edge grime and sweat; no reference crease lighting enters any albedo",
+    "endRelief": {
+      "referenceCrop": [
+        755,
+        194,
+        948,
+        695
+      ],
+      "method": "Approximate geometric micro-relief from 2px minus 9px grayscale bands; geometry only, never albedo",
+      "heightRangeM": [
+        -0.0008,
+        0.0008
+      ]
+    },
+    "prompt": "_import/SichuanBlanketPack/Data_ImagegenPromptV06.txt"
   }
 }

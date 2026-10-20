@@ -9,12 +9,17 @@ import {fileURLToPath} from 'node:url';
 import sharp from 'sharp';
 import {LoadGlb,ReadAccessor,ReadAccessorInt} from '../_import/Script_LugouGlbPose.mjs';
 
-const projectDir=fileURLToPath(new URL('../',import.meta.url));
+const args=process.argv.slice(2);
+const Option=name=>args.find(value=>value.startsWith(`--${name}=`))?.slice(name.length+3);
+const defaultProjectDir=fileURLToPath(new URL('../',import.meta.url));
+const projectDir=path.resolve(Option('project')??defaultProjectDir);
+const triangleLimit=Number(Option('max-triangles')??3000);
+if(!Number.isInteger(triangleLimit)||triangleLimit<1||triangleLimit>10000)throw Error('Triangle limit must be an integer within the user-authorized 10000-triangle ceiling');
 const defaultFile=path.join(projectDir,'Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb');
-const modelFile=path.resolve(process.argv[2]??defaultFile);
-const outDir=path.resolve(projectDir,'../tmp/SichuanBlanketPack/Review');
+const modelFile=path.resolve(args.find(value=>!value.startsWith('--'))??defaultFile);
+const outDir=path.resolve(defaultProjectDir,'../tmp/SichuanBlanketPack/Review',Option('project')?'V6Audit':'');
 const textureManifestFile=path.join(projectDir,'Model/SichuanBlanketPack/Data_SichuanBlanketPackTextures.json');
-const report={file:modelFile,checks:[],parts:{},materials:[],images:[],externalMaps:[],uvPrimitives:[],totalTriangles:0};
+const report={file:modelFile,triangleLimit,checks:[],parts:{},materials:[],images:[],externalMaps:[],uvPrimitives:[],totalTriangles:0};
 const Hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const atlasRegions={surface:{id:'surface',uv:[0,0,1,1]}};
 const materialRegions={Material_SichuanPackBaked:'surface'};
@@ -198,7 +203,7 @@ try{
     const part=report.parts[name];Check((part?.triangles.length??0)>0,`${name} contains real triangle geometry`);
     if(part){part.bounds=Bounds(part.points);part.triangleCount=part.triangles.length;part.materials=[...new Set(part.materials)];}
   }
-  Check(report.totalTriangles>0&&report.totalTriangles<=3000,'All five parts combined are at most 3000 triangles (including hidden candidates)',report.totalTriangles);
+  Check(report.totalTriangles>0&&report.totalTriangles<=triangleLimit,`All five parts combined are at most ${triangleLimit} triangles (including hidden candidates)`,report.totalTriangles);
   const jacketPart=report.parts.Pack_Jacket;
   if(jacketPart){
     let jacketArea=0;

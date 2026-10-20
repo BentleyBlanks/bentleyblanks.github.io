@@ -4,12 +4,15 @@ import bpy
 from mathutils import Vector
 
 
-def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,parent,softCloth=False):
+def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,parent,softCloth=False,refined=False,sideSurfaceDepth=None):
     root=MakeRoot('Pack_Binding',parent)
     controls=[]
 
     def Points(points,axis,shoulder=False):
-        for point in points:controls.append((Vector(point),Vector(axis),shoulder))
+        for point in points:
+            point=Vector(point)
+            if refined and point.x>.193 and abs(point.y+.064)<1e-7:point.y+=.039
+            controls.append((point,Vector(axis),shoulder))
 
     # The first complete turn is the upper cross pass. Transfers follow the
     # undersides of existing cloth passes, outside the blanket itself.
@@ -57,8 +60,9 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
         start=point+(previous-point).normalized()*distance
         end=point+(nextPoint-point).normalized()*distance
         rounded.append((start,axis,shoulder))
-        for step in (2,):
-            t=step/2
+        steps=(1,2,3) if refined and shoulder else (1,2) if refined else (2,)
+        for step in steps:
+            t=step/(3 if refined and shoulder else 2)
             p=(1-t)**2*start+2*(1-t)*t*point+t*t*end
             rounded.append((p,axis,shoulder))
 
@@ -66,7 +70,8 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
     for (start,startAxis,s1),(end,endAxis,s2) in zip(rounded,rounded[1:]):
         length=(end-start).length
         if length<1e-8:continue
-        fractions={step/max(1,math.ceil(length/.050)) for step in range(1,max(1,math.ceil(length/.050))+1)}
+        spacing=.040 if refined else .050
+        fractions={step/max(1,math.ceil(length/spacing)) for step in range(1,max(1,math.ceil(length/spacing))+1)}
         seam=(math.floor(distance/repeat)+1)*repeat
         while seam<distance+length-1e-7:
             fractions.add((seam-distance)/length);seam+=repeat
@@ -88,7 +93,9 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
             twist=(.40 if softCloth else .28)*min(1,max(0,point.y/.055))
             width=width*math.cos(twist)+normal*math.sin(twist)
         previousWidth=width.copy()
-        isFront=point.y<-.105 and abs(point.x)<.179 and abs(point.z)<.140
+        frontDepthLimit=-.095 if refined else -.105
+        frontHeightLimit=.1505 if refined else .140
+        isFront=point.y<frontDepthLimit and abs(point.x)<.179 and abs(point.z)<frontHeightLimit
         if isFront:
             depth=min(SurfaceDepth(point.x+width.x*a*.013,point.z+width.z*a*.013,.0017) for a in (-1,0,1))
             # Upright passes lie over the cross passes at four intersections.
@@ -102,6 +109,8 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
             if isFront and softCloth:
                 crossing=.0017*sum(math.exp(-((point.z-band)/.019)**2) for band in (.05,-.06)) if abs(width.x)>.7 else 0
                 p.y=SurfaceDepth(p.x,p.z,.0015)-crossing-.00025*(1-across*across)
+            if refined and sideSurfaceDepth is not None and abs(p.x)>.180 and -.122<p.y<-.001 and abs(p.z)<.143:
+                p.x=sideSurfaceDepth(1 if p.x>0 else -1,p.y,p.z)
             ring.append(len(verts));verts.append(tuple(p));u=.42+.16*(across+1)/2
             uvs.append((u,(distances[index]/repeat)%1));vertexDistances.append(distances[index]);vertexU.append(u)
         rings.append(ring)
@@ -117,7 +126,7 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
         weights=((1/3,1/3,1/3),(.5,.5,0),(.5,0,.5),(0,.5,.5))
         for iteration in range(3):
             for face in faces:
-                if not all(positions[index].y<-.105 and abs(positions[index].x)<.179 and abs(positions[index].z)<.140 for index in face):continue
+                if not all(positions[index].y<(-.095 if refined else -.105) and abs(positions[index].x)<.179 and abs(positions[index].z)<(.1505 if refined else .140) for index in face):continue
                 triangles=((face[0],face[1],face[2]),) if len(face)==3 else ((face[0],face[1],face[2]),(face[0],face[2],face[3]),(face[0],face[1],face[3]),(face[1],face[2],face[3]))
                 push=0
                 for triangle in triangles:
@@ -134,13 +143,18 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
             index=strip.data.loops[loopIndex].vertex_index
             strip.data.uv_layers.active.data[loopIndex].uv=(.02+.46*vertexU[index],.02+.46*max(0,min(1,vertexDistances[index]/repeat-tile)))
     strip['ContinuousStrip']=True;strip['OuterGridPasses']=[2,2];strip['ShoulderLoops']=2
+    if refined:
+        bpy.ops.object.select_all(action='DESELECT');strip.select_set(True);bpy.context.view_layer.objects.active=strip
+        solid=strip.modifiers.new('RealCottonTapeThickness','SOLIDIFY');solid.thickness=.0009;solid.offset=-.35;solid.use_even_offset=False
+        bpy.ops.object.modifier_apply(modifier=solid.name)
+        strip.data.set_sharp_from_angle(angle=math.radians(45))
     if softCloth:
         def KnotRibbon(name,points,widths):
             if 'Loop' in name:
                 smooth=[];smoothWidths=[]
                 for index in range(len(points)-1):
                     p0=Vector(points[max(0,index-1)]);p1=Vector(points[index]);p2=Vector(points[index+1]);p3=Vector(points[min(len(points)-1,index+2)])
-                    for t in (0,.5):
+                    for t in ((0,.25,.5,.75) if refined else (0,.5)):
                         smooth.append(tuple(.5*((2*p1)+(-p0+p2)*t+(2*p0-5*p1+4*p2-p3)*t*t+(-p0+3*p1-3*p2+p3)*t*t*t)))
                         smoothWidths.append(widths[index]*(1-t)+widths[index+1]*t)
                 points=smooth+[points[-1]];widths=smoothWidths+[widths[-1]]
@@ -148,8 +162,16 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
             for index,point in enumerate(points):
                 tangent=(Vector(points[min(index+1,len(points)-1)])-Vector(points[max(0,index-1)])).normalized()
                 across=Vector((0,-tangent.z,tangent.y)).normalized()
+                if refined:
+                    twist=.65*math.sin(index/max(1,len(points)-1)*math.tau+.6)
+                    across=across*math.cos(twist)+Vector((1,0,0))*math.sin(twist)
                 for side in (-1,0,1):
                     p=Vector(point)+across*(widths[index]*.5*side);p.x+=.0012*(1-side*side)
+                    if refined:
+                        p.x-=.008
+                        p.y=-.025+(p.y+.064)*.55
+                        if 'Tail' not in name:p.z=.050+(p.z-.050)*.70
+                        else:p.z=.050+(p.z-.050)*.78
                     positions.append(tuple(p));coordinates.append(((side+1)/2,index/(len(points)-1)))
             for index in range(len(points)-1):
                 for cross in range(2):
@@ -158,6 +180,11 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
             for polygon in cloth.data.polygons:
                 if polygon.normal.x<0:polygon.flip()
             cloth.data.update()
+            if refined:
+                bpy.ops.object.select_all(action='DESELECT');cloth.select_set(True);bpy.context.view_layer.objects.active=cloth
+                solid=cloth.modifiers.new('CottonKnotThickness','SOLIDIFY');solid.thickness=.0012;solid.offset=0;solid.use_even_offset=False
+                bpy.ops.object.modifier_apply(modifier=solid.name)
+                cloth.data.set_sharp_from_angle(angle=math.radians(45))
         KnotRibbon('Pack_SoftKnotOver',[(.198,-.044,.058),(.204,-.054,.054),(.209,-.065,.049),(.204,-.076,.046),(.198,-.084,.051)],[.019,.015,.010,.014,.018])
         KnotRibbon('Pack_SoftKnotUnder',[(.198,-.048,.041),(.201,-.055,.048),(.204,-.064,.056),(.201,-.073,.059),(.198,-.079,.055)],[.014,.012,.009,.012,.016])
         KnotRibbon('Pack_SoftKnotLoopLeft',[(.203,-.064,.052),(.207,-.048,.073),(.204,-.035,.066),(.199,-.043,.040),(.203,-.062,.049)],[.008,.010,.012,.010,.008])

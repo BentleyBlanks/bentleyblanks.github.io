@@ -10,7 +10,7 @@ import bmesh
 from mathutils import Vector
 
 
-def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
+def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials, refined=False,surfaceDepth=None):
     """Return independently hideable straw-mat and paired-sandal roots."""
     import bpy
 
@@ -36,8 +36,8 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
     # A gently uneven low-poly cylinder; fibre detail is carried by the bake.
     # The atlas supplies the dense diagonal weave.  The end ribbons below
     # describe the actual roll spiral with only a few additional polygons.
-    matCenter = (0.0, -0.067, 0.183)
-    matLength=.404
+    matCenter = (0.0, -0.067, 0.1805 if refined else 0.183)
+    matLength=.395 if refined else .404
     matHalf=matLength/2
     matSides = 20
     matRings = (-matHalf,0.0,matHalf)
@@ -47,7 +47,7 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
         taper = 0.96 if ringIndex in (0,len(matRings)-1) else 1.0
         for sideIndex in range(matSides):
             angle = 2.0 * math.pi * sideIndex / matSides
-            radius = 0.035 * taper * (
+            radius = (0.031 if refined else 0.035) * taper * (
                 1.0 + 0.017 * math.sin(3.0 * angle + 0.7)
             )
             matVerts.append((
@@ -74,7 +74,8 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
         for loopIndex in polygon.loop_indices:
             point=matObject.data.vertices[matObject.data.loops[loopIndex].vertex_index].co
             if isCap:
-                u=.5+(point.y-matCenter[1])/.074;v=.5+(point.z-matCenter[2])/.074
+                diameter=.066 if refined else .074
+                u=.5+(point.y-matCenter[1])/diameter;v=.5+(point.z-matCenter[2])/diameter
             else:
                 u=(point.x+matHalf)/matLength
                 v=(math.atan2(point.z-matCenter[2],point.y-matCenter[1])/math.tau)%1
@@ -84,12 +85,12 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
         spiralVerts = []
         spiralUvs = []
         spiralFaces = []
-        segments = 32
-        turns = 3.20
+        segments = 72 if refined else 32
+        turns = 4.60 if refined else 3.20
         for pointIndex in range(segments + 1):
             fraction = (pointIndex / segments)**.65
             angle = 0.45 + turns * 2.0 * math.pi * fraction
-            radius = 0.004 + 0.028 * fraction
+            radius = 0.004 + (.025 if refined else .028) * fraction
             # The narrow raised strip is a rolled sheet edge, not an emboss
             # of identical circular rings.  A slight end-face offset avoids
             # z-fighting while keeping the end cap a simple low-poly surface.
@@ -116,15 +117,20 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
     # They are part of the mat assembly so hiding the mat hides its loops.
     for strapIndex, xValue in enumerate((-0.103,0.089)):
         points = []
-        for pointIndex in range(17):
-            angle = 2.0 * math.pi * pointIndex / 16.0
+        strapSegments=24 if refined else 16
+        for pointIndex in range(strapSegments+1):
+            angle = 2.0 * math.pi * pointIndex / strapSegments
             points.append((
                 xValue,
-                matCenter[1] + math.cos(angle) * 0.0375,
-                matCenter[2] + math.sin(angle) * 0.0375,
+                matCenter[1] + math.cos(angle) * (.0335 if refined else .0375),
+                matCenter[2] + math.sin(angle) * (.0335 if refined else .0375),
             ))
         AddRibbon('Pack_StrawMatBinding%02d' % (strapIndex + 1), points,
                   0.025, materials['binding'], parent=matRoot, axis='x')
+        if refined:
+            joinY=surfaceDepth(xValue,.137,.001) if surfaceDepth else -.116
+            AddRibbon('Pack_MatFrontConnector%02d'%strapIndex,[(xValue,-.1005,.1805),(xValue,-.107,.166),(xValue,-.116,.1485),(xValue,joinY,.137)],.025,materials['binding'],parent=matRoot,axis='x')
+            AddRibbon('Pack_MatRearConnector%02d'%strapIndex,[(xValue,-.0335,.1805),(xValue,-.017,.157),(xValue,.001,.139)],.025,materials['binding'],parent=matRoot,axis='x')
 
     # A shoe is modelled in its own basis.  Width runs diagonally across the
     # pack's side; the sole points partly toward the observer so both members
@@ -234,6 +240,6 @@ def BuildAttachments(CreateMesh, AddRibbon, AddTube, materials):
                  end),
                 0.00135, ropeMaterial, parent=sandalRoot, sides=4)
 
-    matRoot['NominalDimensionsM'] = [matLength+.004, 0.070, 0.070]
+    matRoot['NominalDimensionsM'] = [matLength+.004, .062 if refined else .070, .062 if refined else .070]
     sandalRoot['SandalCount'] = 2
     return [matRoot, sandalRoot]

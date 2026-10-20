@@ -2,7 +2,7 @@
 import bpy
 
 
-def ApplyFabric(material,role,folder,extent,narrowTape=False,wear=None,normalStrength=.75):
+def ApplyFabric(material,role,folder,extent,narrowTape=False,wear=None,normalStrength=.75,foldRelief=False):
     region=material['AtlasRegion'];rect={'cloth':(.02,.52),'binding':(.02,.02),'jacket':(.52,.02)}[region]
     material.use_nodes=True;nodes=material.node_tree.nodes;links=material.node_tree.links;nodes.clear()
     out=nodes.new('ShaderNodeOutputMaterial');shader=nodes.new('ShaderNodeBsdfPrincipled');shader.inputs['Roughness'].default_value=.95;shader.inputs['Metallic'].default_value=0;links.new(shader.outputs['BSDF'],out.inputs['Surface'])
@@ -22,4 +22,10 @@ def ApplyFabric(material,role,folder,extent,narrowTape=False,wear=None,normalStr
     links.new(colour,shader.inputs['Base Color'])
     normal=nodes.new('ShaderNodeTexImage');normal.image=bpy.data.images.load(str(folder/f'Texture_Fabric{role}Normal.png'),check_existing=True);normal.image.colorspace_settings.name='Non-Color';links.new(scale.outputs[0],normal.inputs['Vector'])
     bump=nodes.new('ShaderNodeNormalMap');bump.uv_map='UVMap';bump.inputs['Strength'].default_value=normalStrength;links.new(normal.outputs['Color'],bump.inputs['Color']);links.new(bump.outputs['Normal'],shader.inputs['Normal'])
-    material['FabricStudyV05']=role
+    if foldRelief:
+        height=nodes.new('ShaderNodeTexImage');height.image=bpy.data.images.load(str(folder/'Texture_EndWrinkleHeight.png'),check_existing=True);height.image.colorspace_settings.name='Non-Color';height.extension='EXTEND';links.new(plain,height.inputs['Vector'])
+        crease=nodes.new('ShaderNodeBump');crease.inputs['Distance'].default_value=.001;crease.inputs['Strength'].default_value=.25
+        links.new(height.outputs['Color'],crease.inputs['Height']);links.new(bump.outputs['Normal'],crease.inputs['Normal']);links.new(crease.outputs['Normal'],shader.inputs['Normal'])
+    if 'FabricStudyV05' in material:del material['FabricStudyV05']
+    material['FabricStudyRole']=role
+    material['FabricStudyVersion']=folder.name.replace('MaterialAtlas','')
