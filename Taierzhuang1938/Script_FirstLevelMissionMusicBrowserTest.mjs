@@ -18,18 +18,19 @@ try {
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&menu=0&manual=1&quality=low&scale=small`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
   await page.locator("#bootStart").click();
-  // 【2026-09-26】01 开场过场改为放「前线压来」（原来不放乐）：开机后只拉这一段，别的不预载。
+  // 【2026-09-26】01 开场过场有配乐（原来不放乐）：开机后只拉这一段，别的不预载。2026-10-21 起是用户选的「炮后余震」。
   await page.waitForFunction(() => window.Tengxian.audio.ctx?.state === "running" && !!window.Tengxian.audio.musicLayer, null, { timeout: 60000 });
-  assert.ok(requests.length > 0 && requests.every(url => /AudioBgm_TheFrontClosesIn\.mp3/.test(url)),
+  assert.ok(requests.length > 0 && requests.every(url => /AudioBgm_ShellShock\.mp3/.test(url)),
     "the opening loads only its own score: " + JSON.stringify(requests));
   await page.screenshot({ path: path.join(output, "Scene_CarriageMusic.png") });
   // 2026.09.20 第二波（End 包）：夹具按新 27 步重写。旧的 Shelter / FinalCarry / Exit
   // 三个内部步骤随采用稿下线，换成现役的 BunkerRescue / WallPath / NightMarch；
   // 15A 与 17 是静的，18 的桥头回到紧张、爆破那一步是「南路断了」。
-  const starts = [[1,"TheFrontClosesIn"],[2,"TheFrontClosesIn","BunkerRescue"],[3,"IronSiege","RearTrench"],
-    [3,"CloseQuartersPressure","Support"],[4,"CloseQuartersPressure"],[5,"CloseQuartersPressure"],
+  // 2026-10-21 用户选曲：01 炮后余震、03 壕沟脉冲（到前沿前）、05 支沟、13 / 14 空袭。
+  const starts = [[1,"ShellShock"],[2,"TheFrontClosesIn","BunkerRescue"],[3,"IronSiege","RearTrench"],
+    [3,"TrenchPulse","Support"],[4,"CloseQuartersPressure"],[5,"SapTrench"],
     [6,"TheFrontClosesIn"],[7,"TheRoadSouth"],[8,"IronSiege"],[9,"IronSiege"],[10,"IronSiege"],
-    [11,"TheRoadSouth"],[12,"CloseQuartersPressure"],[13,"CloseQuartersPressure"],[14,"TheSouthRoadBreaks"],
+    [11,"TheRoadSouth"],[12,"CloseQuartersPressure"],[13,"AirRaid"],[14,"AirRaid"],
     [15,null],[15,"TheLivingStillNeedUs","WallPath"],[15,"TheLivingStillNeedUs","ReceptionGate"],
     [16,"KeepYourEyesOpen"],[17,null],
     [18,"TheFrontClosesIn"],[18,"CloseQuartersPressure","BridgeCover"],
@@ -58,12 +59,11 @@ try {
         bufferSeconds:a.musicBuffers.get(cue)?.duration||0,
         cached:[...a.musicBuffers.keys()].filter(key=>key.startsWith("firstLevel")), errors:[...a.musicErrors] };
       if (cue) {
-        const current = r.voice.current;
-        r.voice.current = {phase:"playing"}; r.UpdateMusic();
-        sample.dialogueScale = a.musicLayer.levelScale;
-        r.voice.current = null; r.UpdateMusic();
-        sample.normalScale = a.musicLayer.levelScale;
-        r.voice.current = current;
+        // 量让位时把「是否在说话」钉住：进 04 等步骤时前沿对白（frontScenes）可能正好在播，只改 voice.current 盖不住它。
+        const Speaking = on => { Object.defineProperty(r, "StorySpeaking", { configurable: true, get: () => on }); r.UpdateMusic(); };
+        Speaking(true); sample.dialogueScale = a.musicLayer.levelScale;
+        Speaking(false); sample.normalScale = a.musicLayer.levelScale;
+        delete r.StorySpeaking; r.UpdateMusic();
         a.SetPaused(true); sample.paused = !a.musicLayer;
         a.SetPaused(false); sample.resumed = a.musicCue === cue && !!a.musicLayer;
         // Observe actual WebAudio output from this music group, before the user/master controls.
@@ -82,9 +82,9 @@ try {
     assert.ok(row.held); assert.equal(row.errors.length,0);
     assert.ok(row.cached.length<=3);
     if(cue) {
-      const isBattleCue = ["CloseQuartersPressure", "IronSiege"].includes(id);
+      const isBattleCue = ["CloseQuartersPressure", "IronSiege", "ShellShock", "TrenchPulse", "FrontLine", "SapTrench", "AirRaid"].includes(id);   // 90 s 一首的那几条
       assert.ok(row.heads>0 && (isBattleCue ? Math.abs(row.bufferSeconds-90)<0.1 : row.bufferSeconds>90) && row.signalPeak>0.00001, JSON.stringify(row));
-      assert.ok(row.dialogueScale<row.normalScale && row.paused && row.resumed);
+      assert.ok(row.dialogueScale<row.normalScale && row.paused && row.resumed, JSON.stringify(row));
     }
     rows.push(row); console.log("MUSIC_STAGE",JSON.stringify(row));
   }

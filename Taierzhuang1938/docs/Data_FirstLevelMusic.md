@@ -6,6 +6,19 @@
 
 2026-09-12：按用户最新决定，Train 与 Unloading 不再播放背景音乐，仅保留现场声音和剧情对白。《车厢闲话》作为历史资产保留，当前流程不请求它。车厢轮轨床改用一条独立 SeedAudio 机械环境录音（轮轨、木板、铁扣与少量风声），由 `Data_FirstLevelCarriageSound.trainBed` 选择；生成提示词、原始与成品哈希、电平和 0.4 秒接缝处理记录在 `Audio/Amb/Data_AmbManifest.json`。已有对白、人群反应与炮击事件保持各自独立声源。
 
+
+2026-10-21：按用户在配乐控制台（独立仓库 `Taierzhuang1938Score`，`C:\Users\Bentl\OneDrive\Sync\饮河\FPS\音乐`）照新剧本做的选曲迁入五首 10-13 候选：炮后余震 ShellShock、壕沟脉冲 TrenchPulse、前沿绞肉 FrontLine、支沟 SapTrench、空袭 AirRaid。都从当时生成的原始 take 用 `Script_FirstLevelMusicBake.mjs --only=…` 按本表口径重新打包（112 kbps、RMS −27 dBFS），来源哈希与控制台试听的是同一次生成。音频版本 `20261021-score-pick`。
+
+| 阶段（旧步骤） | 之前 | 现在 |
+| --- | --- | --- |
+| 01 Trapped | 前线压来 | 炮后余震（近爆后静默照旧） |
+| 03 Support | 交火前沿 | 壕沟脉冲 → 到前沿（`frontReached`）换前沿绞肉 |
+| 05 Tank | 交火前沿 | 支沟 → 撤回己方交通壕（`frontDisengaged`）后不放乐 |
+| 13 AirFirst | 交火前沿 | 空袭 |
+| 14 Carry、Dive、Rescue | 南路断了 / 钢铁围攻 | 空袭 |
+
+10 Courtyard、11 TransferApproach 用户选「保持当前」；其余阶段用户还没定，没动。一步之内按事实换曲的规则在 `FIRST_LEVEL_MUSIC_SPLITS`（`FirstLevelStageCue`）：事实成立就改放 `then`（`null` = 不放），走常规 1.6 s 过渡；进这一步时事实已经成立（跳关 / 读档）直接放 `then`。下表是 2026-09 的历史口径，以上表为准。
+
 | 曲目 | 运行阶段 |
 | --- | --- |
 | 车厢闲话 | 历史曲库资产，Train 与 Unloading 均不播放配乐 |

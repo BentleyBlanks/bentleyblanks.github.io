@@ -3,17 +3,23 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 import { MISSION_STAGES } from "./Data_FirstLevelMission.mjs";
 import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_STAGE_MUSIC, FIRST_LEVEL_MUSIC_MIX, FIRST_LEVEL_MUSIC_OPENING,
-  FirstLevelMusicState } from "./Data_FirstLevelMissionMusic.mjs";
+  FIRST_LEVEL_MUSIC_SPLITS, FirstLevelMusicState, FirstLevelStageCue } from "./Data_FirstLevelMissionMusic.mjs";
 import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
 
 assert.deepEqual(Object.keys(FIRST_LEVEL_STAGE_MUSIC), MISSION_STAGES.map(stage => stage.id));
 const cues = Object.keys(FIRST_LEVEL_MUSIC_CUES);
-assert.equal(cues.length, 9);
+assert.equal(cues.length, 14);
 const manifest = JSON.parse(fs.readFileSync(new URL("./Audio/Music/FirstLevel/Data_FirstLevelMusicManifest.json", import.meta.url)));
 const approvedBattleTakes = {
   firstLevelCloseQuartersPressure: "2fc553c982dc6893f22e414b9a18cdb40963e07955f501433dc292176590d297",
   firstLevelIronSiege: "3b8aa2065be06d4b464e26bac421824210ef0c8696d11508f7a11f9143fa3538",
+  // 2026-10-21 用户在配乐控制台选中的 10-13 候选：从这几条原始 take 打包（与控制台里试听的是同一次生成）。
+  firstLevelShellShock: "a42bc64c9eea1319d87e00bd716d5e249ba71878bb7835b974ce715d4ce1a89d",
+  firstLevelTrenchPulse: "72af30d300c090f98af98dd05e3314593bdc5eea34253ce426b65c9a31dca88a",
+  firstLevelFrontLine: "0b3c6dbff6b537d03aa120b22221f60dc41d5a7d90606533ba07f9deba24f425",
+  firstLevelSapTrench: "dbcf685f0838384b092378fe5629527fba7be207c0353c6b130dea75a617f0cd",
+  firstLevelAirRaid: "64c830c8e6b2df56bb0fc991b1089e984c7b08635bac5fde6b3994371178eceb",
 };
 for (const [cue, sha256] of Object.entries(approvedBattleTakes)) {
   assert.equal(manifest.cues[cue].sourceSha256, sha256, "package the exact user-approved preview");
@@ -27,11 +33,12 @@ for (const cue of cues) {
   assert.ok(entry.seconds > 90 && entry.seconds < 130 && entry.bytes < 2_000_000);
   assert.ok(Math.abs(entry.rmsDbfs + 27) <= 0.6 && entry.peakDbfs <= -3);
 }
-// 【2026-09-26】01/02 开场过场原来不放乐；用户要「背景音乐 + 战场嘈杂」，改成「前线压来」压在底下。
+// 【2026-09-26】01/02 开场过场原来不放乐；用户要「背景音乐 + 战场嘈杂」，压在底下。
+// 【2026-10-21】01 换成用户选的「炮后余震」，02 仍是「前线压来」。
 // 近爆那一下仍是静的（黑屏、醒来、剧情档耳鸣），silenceS 之后 returnS 内一档一档爬回。
 {
   const O = FIRST_LEVEL_MUSIC_OPENING;
-  assert.equal(FirstLevelMusicState("Trapped").cue, "firstLevelTheFrontClosesIn");
+  assert.equal(FirstLevelMusicState("Trapped").cue, "firstLevelShellShock");
   assert.equal(FirstLevelMusicState("BunkerRescue").cue, "firstLevelTheFrontClosesIn");
   assert.ok(FirstLevelMusicState("Trapped").scale < 1 && FirstLevelMusicState("BunkerRescue").scale < 1, "开场配乐压在底下");
   const talk = FirstLevelMusicState("Trapped", { speaking: true }).scale / FirstLevelMusicState("Trapped").scale;
@@ -41,7 +48,7 @@ for (const cue of cues) {
   assert.ok(quiet.cue === null && quiet.fadeOut < 0.2, "近爆后 silenceS 内静（快淡出）");
   const ages = [O.silenceS + 0.5, O.silenceS + O.returnS * 0.5, O.silenceS + O.returnS + 1];
   const back = ages.map((a) => FirstLevelMusicState("Trapped", { shellImpact: true, shellImpactAgeS: a }));
-  assert.ok(back.every((s) => s.cue === "firstLevelTheFrontClosesIn") && back[0].scale < back[1].scale && back[1].scale < back[2].scale
+  assert.ok(back.every((s) => s.cue === "firstLevelShellShock") && back[0].scale < back[1].scale && back[1].scale < back[2].scale
     && Math.abs(back[2].scale - FirstLevelMusicState("Trapped").scale) < 1e-9, `近爆后爬回：${back.map((s) => s.scale.toFixed(2)).join("→")}`);
   assert.ok(FirstLevelMusicState("BunkerRescue", { shellImpact: true, shellImpactAgeS: 0 }).cue !== null, "近爆静默只在 01");
   // 运行时对象：事实由假变真起算；第一次看时已经为真（跳关/读档）算很久以前。
@@ -53,20 +60,37 @@ for (const cue of cues) {
   now = 50; live.Update("Trapped", { shellImpact: true });
   now = 50 + O.silenceS - 1; live.Update("Trapped", { shellImpact: true });
   now = 50 + O.silenceS + O.returnS + 1; live.Update("Trapped", { shellImpact: true });
-  assert.deepEqual(seen.map((r) => r[1]), ["firstLevelTheFrontClosesIn", null, "firstLevelTheFrontClosesIn"], JSON.stringify(seen));
+  assert.deepEqual(seen.map((r) => r[1]), ["firstLevelShellShock", null, "firstLevelShellShock"], JSON.stringify(seen));
   const cold = new FirstLevelMissionMusic({ ctx: { currentTime: 999 }, Music: (cue) => seen.push([999, cue]), SetMusicLevel() {} });
   cold.Update("Trapped", { shellImpact: true });
-  assert.equal(seen.at(-1)[1], "firstLevelTheFrontClosesIn", "从醒来之后进 01：直接有配乐");
+  assert.equal(seen.at(-1)[1], "firstLevelShellShock", "从醒来之后进 01：直接有配乐");
 }
 assert.equal(FirstLevelMusicState("South").cue, "firstLevelTheRoadSouth");
 assert.equal(FirstLevelMusicState("TransferApproach").cue, "firstLevelTheRoadSouth");
 assert.equal(FirstLevelMusicState("Death").cue, null);
-for (const stage of ["Support", "MachineGun", "Tank", "Transfer", "AirFirst", "BridgeCover"]) {
+for (const stage of ["MachineGun", "Transfer", "BridgeCover"]) {
   assert.equal(FirstLevelMusicState(stage).cue, "firstLevelCloseQuartersPressure", stage);
   assert.equal(FirstLevelMusicState(stage, { failed: true }).cue, null, stage);
 }
-for (const stage of ["RearTrench", "Village", "Melee", "Courtyard", "Rescue"]) {
+for (const stage of ["RearTrench", "Village", "Melee", "Courtyard"]) {
   assert.equal(FirstLevelMusicState(stage).cue, "firstLevelIronSiege", stage);
+}
+// 【2026-10-21】用户选曲：13 / 14 是「空袭」；03 到前沿前后两首；05 撤回之后不放乐。
+for (const stage of ["AirFirst", "Carry", "Dive", "Rescue"]) assert.equal(FirstLevelMusicState(stage).cue, "firstLevelAirRaid", stage);
+{
+  const has = (...ids) => (id) => ids.includes(id);
+  for (const [stage, split] of Object.entries(FIRST_LEVEL_MUSIC_SPLITS)) {
+    assert.ok(MISSION_STAGES.find((s) => s.id === stage)?.requirements.includes(split.fact), `${stage} 的换曲事实 ${split.fact} 是这一步的过关条件之一`);
+    assert.ok(split.then === null || FIRST_LEVEL_MUSIC_CUES[`firstLevel${split.then}`], `${stage} 换成的 ${split.then} 已登记`);
+  }
+  assert.equal(FirstLevelMusicState("Support").cue, "firstLevelTrenchPulse", "逆着人流往前沿走");
+  assert.equal(FirstLevelMusicState("Support", { has: has("frontReached") }).cue, "firstLevelFrontLine", "到前沿开始守坑");
+  assert.equal(FirstLevelMusicState("Support", { has: has("frontReached"), failed: true }).cue, null);
+  assert.equal(FirstLevelMusicState("Tank").cue, "firstLevelSapTrench", "沿支沟摸战车：潜行张力");
+  assert.equal(FirstLevelMusicState("Tank", { has: has("tankImmobilized", "lastGuardsWithdrawn") }).cue, "firstLevelSapTrench", "炸停战车不换曲、不起胜利音乐");
+  const back = FirstLevelMusicState("Tank", { has: has("frontDisengaged") });
+  assert.ok(back.cue === null && back.fadeOut > 1, "撤回己方交通壕之后不放乐，常规过渡淡出");
+  assert.equal(FirstLevelStageCue("MachineGun", has("frontReached")), "CloseQuartersPressure", "换曲只对登记的步骤生效");
 }
 assert.equal(FirstLevelMusicState("NightMarch").cue, "firstLevelTheLivingStillNeedUs");
 assert.equal(FirstLevelMusicState("Orders").cue, "firstLevelTheFrontClosesIn");
@@ -94,13 +118,22 @@ assert.ok(Math.abs(trainSource.rmsDbfs + 27) < .6 && trainSource.peakDbfs < -1);
 const calls = [], levels = [];
 const audio = { Music: (...args) => calls.push(args), SetMusicLevel: (...args) => levels.push(args) };
 const director = new FirstLevelMissionMusic(audio);
-director.Update("Support"); director.Update("MachineGun"); director.Update("Tank");
-assert.equal(calls.length, 1, "continuous front battle must not restart its recording");
+const front = (id) => id === "frontReached";
+director.Update("Support"); director.Update("Support");
+assert.equal(calls.length, 1, "same cue must not restart its recording");
+director.Update("Support", { has: front }); director.Update("Support", { has: front });
+assert.equal(calls.length, 2); assert.equal(calls.at(-1)[0], "firstLevelFrontLine", "reaching the front switches once");
+director.Update("MachineGun"); director.Update("MachineGun");
+assert.equal(calls.length, 3, "continuous machine-gun phase must not restart its recording");
+director.Update("Tank");
+assert.equal(calls.at(-1)[0], "firstLevelSapTrench");
 director.Update("Tank", { speaking: true });
-assert.equal(calls.length, 1);
+assert.equal(calls.length, 4);
 assert.ok(levels.at(-1)[0] < 0.5, "battle dialogue ducks the music group without restarting");
+director.Update("Tank", { has: (id) => id === "frontDisengaged" });
+assert.equal(calls.length, 5); assert.equal(calls.at(-1)[0], null, "back in our trench: no music");
 director.Update("Orders", { speaking: true });
-assert.equal(calls.length, 2);
+assert.equal(calls.length, 6);
 assert.equal(calls.at(-1)[0], "firstLevelTheFrontClosesIn", "orders leave battle music");
 assert.ok(calls.at(-1)[1].levelScale < 0.3, "orders and dialogue combine");
 director.Update("Orders", { speaking: false });
@@ -116,8 +149,8 @@ assert.equal(calls.at(-1)[0], "firstLevelIronSiege");
 director.Update("TransferApproach");
 assert.equal(calls.at(-1)[0], "firstLevelTheRoadSouth", "travel leaves battle music");
 director.Update("Rescue");
-assert.equal(calls.at(-1)[0], "firstLevelIronSiege");
+assert.equal(calls.at(-1)[0], "firstLevelAirRaid");
 director.Update("Handover");
 assert.equal(calls.at(-1)[0], "firstLevelKeepYourEyesOpen", "carrying returns to the story cue");
 director.Dispose(); assert.equal(calls.at(-1)[0], null);
-console.log("PASS nine verified assets; battle assignments, story transitions, silence, dialogue and uninterrupted combat");
+console.log("PASS fourteen verified assets; stage assignments, fact splits, story transitions, silence, dialogue and uninterrupted combat");

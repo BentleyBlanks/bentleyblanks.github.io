@@ -1,5 +1,5 @@
 // Train and unloading use diegetic sound only. Retained score labels are editor metadata.
-export const FIRST_LEVEL_MUSIC_VERSION = "20260910-combat-duo";
+export const FIRST_LEVEL_MUSIC_VERSION = "20261021-score-pick";
 export const FIRST_LEVEL_MUSIC_CUES = Object.freeze(Object.fromEntries([
   ["LeavingHome", "车厢闲话", 0.72],
   ["TheFrontClosesIn", "前线压来", 0.50],
@@ -10,6 +10,12 @@ export const FIRST_LEVEL_MUSIC_CUES = Object.freeze(Object.fromEntries([
   ["TheLivingStillNeedUs", "后头还有活人", 0.60],
   ["CloseQuartersPressure", "交火前沿", 0.54],
   ["IronSiege", "钢铁围攻", 0.54],
+  // 2026-10-21 用户在配乐控制台（Taierzhuang1938Score 仓库）里选中的 10-13 候选，从原始 take 按本表口径重新打包。
+  ["ShellShock", "炮后余震", 0.50],
+  ["TrenchPulse", "壕沟脉冲", 0.55],
+  ["FrontLine", "前沿绞肉", 0.55],
+  ["SapTrench", "支沟", 0.55],
+  ["AirRaid", "空袭", 0.55],
 ].map(([id, label, level]) => [`firstLevel${id}`, Object.freeze({
   label, level, file: `FirstLevel/AudioBgm_${id}.mp3`,
   version: FIRST_LEVEL_MUSIC_VERSION, onDemand: true, loopFadeS: 6,
@@ -29,13 +35,19 @@ export const FIRST_LEVEL_MUSIC_MIX = Object.freeze({
 // 没有什么战场嘈杂的氛围」—— 改成「前线压来」（D 小调 96 BPM，低弦短弓固定音型 + 深沉模拟贝斯，
 // 提示词里就要求「给现场音效和四川话对白留出空间」），压在台词与远处枪炮下面；
 // 电平、对白让位与近爆那一下的静默见下面 FIRST_LEVEL_MUSIC_OPENING。用已有成稿，不另生成。
+// 【2026-10-21】用户在配乐控制台按新剧本选曲（导出 Data_Export_FirstLevel，10-21）：
+//  · 01 Trapped：「炮后余震」——洞里只要一层低频、没有节拍；近爆后的静默照旧（FIRST_LEVEL_MUSIC_OPENING）。
+//  · 03 Support：「壕沟脉冲」逆着人流往前沿走，到前沿（frontReached）换「前沿绞肉」守坑，见 FIRST_LEVEL_MUSIC_SPLITS。
+//  · 05 Tank：「支沟」——鼓全撤的潜行张力；撤回己方交通壕（frontDisengaged）之后不放乐，不起胜利音乐。
+//  · 13 AirFirst、14 Carry / Dive / Rescue：「空袭」，不再借步兵交火的曲子。
+//  · 10 Courtyard、11 TransferApproach 用户选「保持当前」，没改；其余阶段用户还没定，保持原样。
 export const FIRST_LEVEL_STAGE_MUSIC = Object.freeze({
-  Trapped: "TheFrontClosesIn", BunkerRescue: "TheFrontClosesIn", RearTrench: "IronSiege",
-  Support: "CloseQuartersPressure", MachineGun: "CloseQuartersPressure", Tank: "CloseQuartersPressure", Orders: "TheFrontClosesIn",
+  Trapped: "ShellShock", BunkerRescue: "TheFrontClosesIn", RearTrench: "IronSiege",
+  Support: "TrenchPulse", MachineGun: "CloseQuartersPressure", Tank: "SapTrench", Orders: "TheFrontClosesIn",
   South: "TheRoadSouth", Village: "IronSiege", Melee: "IronSiege", Courtyard: "IronSiege",
   TransferApproach: "TheRoadSouth", Transfer: "CloseQuartersPressure", CartRide: "TheRoadSouth",
-  AirFirst: "CloseQuartersPressure", Carry: "TheSouthRoadBreaks", Dive: "TheSouthRoadBreaks",
-  Rescue: "IronSiege",
+  AirFirst: "AirRaid", Carry: "AirRaid", Dive: "AirRaid",
+  Rescue: "AirRaid",
   // 2026.09.20 第二波（End 包）按新 15–18 的情绪核重排：
   //  · 15A 收拢是**整关第一次真正的安静**——飞机声远去、只剩喘息与远炮，这里不放乐；
   //    原来的「别闭眼」既压过了降压感，也把老周提前写成死亡倒计时（Notion 15A 明确
@@ -50,6 +62,22 @@ export const FIRST_LEVEL_STAGE_MUSIC = Object.freeze({
   Death: null, BridgeOrders: "TheFrontClosesIn", BridgeCover: "CloseQuartersPressure",
   BridgeWithdraw: "TheSouthRoadBreaks", NightMarch: "TheLivingStillNeedUs", Complete: null,
 });
+/**
+ * 【2026-10-21】一个步骤里按事实换曲：fact 一成立，这一步就改放 then（null = 不放乐），走常规 1.6 s 过渡。
+ * 进这一步时 fact 已经成立（跳关、读档）就直接放 then。事实只看 FirstLevelMissionMusic.Update 传进来的 facts.has。
+ *   · Support：新剧本 03「逆着人流上去，守坑」—— 到前沿（frontReached，与 rightNestCaptured 同一刻记）之前是「壕沟脉冲」，之后「前沿绞肉」。
+ *   · Tank：新剧本 05-4「翻回干沟以后」不放乐 —— 撤回己方交通壕（frontDisengaged）起静。
+ */
+export const FIRST_LEVEL_MUSIC_SPLITS = Object.freeze({
+  Support: Object.freeze({ fact: "frontReached", then: "FrontLine" }),
+  Tank: Object.freeze({ fact: "frontDisengaged", then: null }),
+});
+/** 这一步此刻该放的 cue id（不带 firstLevel 前缀；null = 不放）。 */
+export function FirstLevelStageCue(stage, has) {
+  const split = FIRST_LEVEL_MUSIC_SPLITS[stage];
+  if (split && typeof has === "function" && has(split.fact)) return split.then;
+  return FIRST_LEVEL_STAGE_MUSIC[stage] ?? null;
+}
 
 /**
  * 【2026-09-23】01–05 的战斗配乐让位与标点（用户：「01-05 应该在整体的战斗音效上有一个
@@ -95,7 +123,7 @@ export const FIRST_LEVEL_MUSIC_OPENING = Object.freeze({
 });
 
 export function FirstLevelMusicState(stage, { shellImpact = false, shellImpactAgeS = shellImpact ? 0 : Infinity,
-  speaking = false, failed = false, intensity = 0, stingerAgeS = Infinity } = {}) {
+  speaking = false, failed = false, intensity = 0, stingerAgeS = Infinity, has = null } = {}) {
   const mix = FIRST_LEVEL_MUSIC_MIX;
   const O = FIRST_LEVEL_MUSIC_OPENING;
   // 01 近爆之后：silenceS 内静，之后 returnS 内爬回（见 FIRST_LEVEL_MUSIC_OPENING）。
@@ -104,7 +132,7 @@ export function FirstLevelMusicState(stage, { shellImpact = false, shellImpactAg
     ? Math.round(Math.min(1, Math.max(0, (blastAge - O.silenceS) / O.returnS)) / O.stepScale) * O.stepScale : 1;
   // 15A 与 17 是「静」：与失败、受困近爆同一条淡出（silenceS），不走 1.6 s 的常规过渡。
   const silent = failed || blastBack <= 0;
-  const id = silent ? null : FIRST_LEVEL_STAGE_MUSIC[stage];
+  const id = silent ? null : FirstLevelStageCue(stage, has);
   let scale = ({ RearTrench: mix.rearTrenchScale, Orders: mix.ordersScale,
     Transfer: mix.transferScale, Handover: mix.handoverScale,
     WallPath: mix.wallPathScale, ReceptionGate: mix.wallPathScale, ...O.stages })[stage] ?? 1;
