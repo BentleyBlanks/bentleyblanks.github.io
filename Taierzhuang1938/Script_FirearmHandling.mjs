@@ -43,6 +43,14 @@ export class FirearmHandling {
   }
 }
 
+// Walls keep the approach margin; ground only counts where the held gun really
+// reaches it, so a glance at the floor does not lower the gun.
+function FloorGraceM(hit) {
+  const normal = hit.normal, up = Array.isArray(normal) ? normal[1] : normal?.y;
+  if (!Number.isFinite(up)) return 0;
+  return WALL_CARRY.floorGraceM * Clamp01((up - WALL_CARRY.floorNormalY) / (1 - WALL_CARRY.floorNormalY));
+}
+
 // Probe the intended raised barrel, never the already-lowered visual muzzle:
 // using the latter makes the gun raise/lower repeatedly against the same wall.
 export function GunClearance(weapon, eye, forward, right, raycast) {
@@ -55,7 +63,7 @@ export function GunClearance(weapon, eye, forward, right, raycast) {
     const origin = { x: eye.x + right.x * side, y: eye.y + right.y * side + down,
       z: eye.z + right.z * side };
     const hit = raycast(origin, forward, probeLength);
-    if (Number.isFinite(hit?.t) && hit.t >= 0) distance = Math.min(distance, hit.t);
+    if (Number.isFinite(hit?.t) && hit.t >= 0) distance = Math.min(distance, hit.t + FloorGraceM(hit));
   }
   const full = reach * WALL_CARRY.fullLowerRatio;
   const lower = Clamp01((probeLength - distance) / (probeLength - full));

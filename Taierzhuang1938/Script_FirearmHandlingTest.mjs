@@ -39,5 +39,12 @@ assert.ok(Probe(0.5).lower > 0.8 && Probe(0.5).blocked);
 assert.ok(!Probe(0.5, WEAPONS.ServicePistol).blocked, "short weapons can be used closer to cover");
 assert.equal(Probe(0.2, WEAPONS.Dadao).lower, 0, "melee and thrown items retain their own actions");
 assert.deepEqual(Probe(0.5), Probe(0.5), "visual lowering cannot change the intended-barrel probe");
+const Surface = (distance, normal) => GunClearance(rifle, eye, forward, right,
+  (_p, _d, length) => distance <= length ? {t:distance, normal} : null);
+assert.equal(Surface(1.0, [0, 1, 0]).lower, 0, "looking down at flat ground a metre off keeps the gun up");
+assert.ok(Surface(1.0, [0, 0, 1]).blocked && Surface(1.0, [0, 0, 1]).lower > 0.6, "a wall at the same distance still lowers it");
+const bank = Surface(1.0, [0, Math.SQRT1_2, Math.SQRT1_2]).lower;
+assert.ok(bank > 0 && bank < Surface(1.0, [0, 0, 1]).lower, "a 45 degree bank sits between floor and wall");
+assert.ok(Surface(0.4, {x:0, y:1, z:0}).blocked, "ground right at the barrel (prone) still lowers it");
 console.log(JSON.stringify({centerHalfFraction:inner/count, mean:[sumX/count,sumY/count], quadrants}));
 console.log("FirearmHandlingTest OK");

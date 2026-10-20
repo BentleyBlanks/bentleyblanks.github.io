@@ -20,6 +20,10 @@ export const WALL_CARRY = Object.freeze({
   approachM: 0.30, fullLowerRatio: 0.56, blockRatio: 0.88,
   lowerS: 0.065, raiseS: 0.16, fireReadyLower: 0.30,
   pitchRad: -1.26, backM: 0.08, downM: -0.14,
+  // Ground facing up (normal y above floorNormalY, full at flat) counts this much
+  // farther away: looking down at the floor stand/crouch never carries the gun
+  // low; prone starts near 22 deg down, where the barrel really meets the dirt.
+  floorGraceM: 0.70, floorNormalY: 0.50,
 });
 
 // Shared first-person rifle flash: a hot, masked flame and a brief PBR light pulse.
