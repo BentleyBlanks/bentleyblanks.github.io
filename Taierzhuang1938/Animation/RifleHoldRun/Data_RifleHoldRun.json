@@ -1,0 +1,562 @@
+{
+ "schema": 1,
+ "revision": "20261021RifleHoldRunV1",
+ "clipSha256": "e963a28c7562215d0f8352663e450d58424ac4f55608b87359e92e533902b912",
+ "units": "runtime metres (1.66 m NRA actor), seconds, degrees",
+ "samplesPerKey": 4,
+ "gait": {
+  "cycleS": 0.72,
+  "keys": 30,
+  "speedMps": 3.2,
+  "stanceShare": 0.3333,
+  "comTdHeight": 0.885,
+  "brakeAccel": 2.6,
+  "swayM": 0.014,
+  "footHalfWidth": 0.07,
+  "tdAhead": 0.17,
+  "heelTdPitch": -0.1,
+  "toePitch": 0.95,
+  "heelRockShare": 0.12,
+  "flatEndShare": 0.55,
+  "pitchHandOff": 0.2,
+  "ankleRelaxed": 0.32,
+  "landingDropMps": -1.2,
+  "swingClear": 0.12,
+  "liftRise": 0.14,
+  "liftHold": 0.7,
+  "liftDrop": 0.82,
+  "pelvisYawDeg": 6,
+  "chestYawDeg": 5,
+  "pelvisRollDeg": 3,
+  "pelvisTiltDeg": 2,
+  "leanDeg": [
+   11,
+   19,
+   25,
+   29,
+   24,
+   8
+  ],
+  "headYawShare": 0.15,
+  "clearance": 0.003,
+  "rifleGrip": [
+   -0.12,
+   0.33,
+   0.26
+  ],
+  "rifleAxis": [
+   0.78,
+   0.42,
+   0.46
+  ],
+  "gripSpan": 0.34,
+  "rifleMountHz": 1.7,
+  "rifleMountDamping": 0.7,
+  "rifleMountShare": 0.4,
+  "rifleChestYawShare": 0.3,
+  "poleR": [
+   -0.35,
+   -0.1,
+   -0.4
+  ],
+  "poleL": [
+   0.35,
+   -0.3,
+   -0.4
+  ]
+ },
+ "loop": {
+  "firstTimeS": 0,
+  "lastTimeS": 0.72,
+  "durationS": 0.72,
+  "positionSeamM": 0,
+  "rotationSeamDeg": 0.0014,
+  "worstSeamTrack": "Bip001_L_Forearm.quaternion",
+  "seamSecondDifferenceM": 0.03336,
+  "restMaxSecondDifferenceM": 0.05728,
+  "pelvisMaxKeyStepM": 0.0246,
+  "pelvisMedianKeyStepM": 0.0157,
+  "keysPerCycle": 30
+ },
+ "contact": {
+  "thresholdM": 0.035,
+  "flightFraction": 0.2,
+  "stanceS": 0.288,
+  "flightS": 0.072,
+  "contacts": {
+   "L": [
+    [
+     0.975,
+     0.375
+    ]
+   ],
+   "R": [
+    [
+     0.475,
+     0.875
+    ]
+   ]
+  }
+ },
+ "slip": {
+  "referenceMps": 3.2,
+  "contactThresholdM": 0.035,
+  "plantedThresholdM": 0.012,
+  "anchors": "rear-most (heel) and front-most (toe tip) sole vertex at rest",
+  "stances": [
+   {
+    "side": "L",
+    "anchor": "heel",
+    "from": 0.975,
+    "to": 0.375,
+    "travel35cm": 0.0034,
+    "travelPlantedCm": 0.0009,
+    "samples35": 31
+   },
+   {
+    "side": "L",
+    "anchor": "ball",
+    "from": 0.975,
+    "to": 0.375,
+    "travel35cm": 0.0024,
+    "travelPlantedCm": 0,
+    "samples35": 43
+   },
+   {
+    "side": "R",
+    "anchor": "heel",
+    "from": 0.475,
+    "to": 0.875,
+    "travel35cm": 0.0033,
+    "travelPlantedCm": 0.0009,
+    "samples35": 31
+   },
+   {
+    "side": "R",
+    "anchor": "ball",
+    "from": 0.475,
+    "to": 0.875,
+    "travel35cm": 0.0024,
+    "travelPlantedCm": 0,
+    "samples35": 43
+   }
+  ],
+  "maxTravel35M": 0.0034,
+  "maxTravelPlantedM": 0.0009
+ },
+ "ground": {
+  "stanceSoleM": [
+   0.0006,
+   0.003
+  ],
+  "swingSoleMinM": 0.003,
+  "flightFraction": 0.2,
+  "flightMaxClearanceM": 0.1123,
+  "footLocalAngleDeg": {
+   "mean": 10.2,
+   "max": 22
+  }
+ },
+ "joints": {
+  "kneeFlexDeg": {
+   "L": [
+    29.6,
+    123.1
+   ],
+   "R": [
+    29.4,
+    123.1
+   ]
+  },
+  "kneeTouchdownDeg": [
+   30.7,
+   30.5
+  ],
+  "kneeStancePeakDeg": [
+   72.5,
+   72.4
+  ],
+  "kneeSwingPeakDeg": [
+   123.1,
+   123.1
+  ],
+  "elbowFlexDeg": {
+   "L": [
+    105.8,
+    112.8
+   ],
+   "R": [
+    68.3,
+    80.6
+   ]
+  },
+  "boneLengthWorstErrorMm": 0.0055,
+  "worstBone": "Bip001 R Clavicle",
+  "smoothness": {
+   "kneeL": {
+    "maxSecondDifferenceDeg": 14.66,
+    "spikeDeg": 0,
+    "atKey": -1,
+    "series": [
+     30.7,
+     45.4,
+     57.8,
+     66.4,
+     71.6,
+     72.5,
+     69.7,
+     67,
+     63.1,
+     57.7,
+     50.3,
+     51.5,
+     67.3,
+     71.1,
+     74.9,
+     84,
+     96.6,
+     109,
+     118.7,
+     123.1,
+     120.5,
+     111.8,
+     99.3,
+     85.2,
+     71.5,
+     60.1,
+     52.9,
+     50.1,
+     42.4,
+     29.6
+    ]
+   },
+   "kneeR": {
+    "maxSecondDifferenceDeg": 14.69,
+    "spikeDeg": 0,
+    "atKey": -1,
+    "series": [
+     83.9,
+     96.6,
+     108.9,
+     118.7,
+     123.1,
+     120.5,
+     111.8,
+     99.3,
+     85.2,
+     71.5,
+     60,
+     52.8,
+     50,
+     42.3,
+     29.4,
+     30.5,
+     45.2,
+     57.7,
+     66.3,
+     71.5,
+     72.4,
+     69.6,
+     67,
+     63,
+     57.6,
+     50.2,
+     51.4,
+     67.2,
+     71,
+     74.8
+    ]
+   },
+   "elbowL": {
+    "maxSecondDifferenceDeg": 0.2,
+    "spikeDeg": 0,
+    "atKey": -1,
+    "series": [
+     105.8,
+     106,
+     106.3,
+     106.9,
+     107.5,
+     108.2,
+     108.9,
+     109.6,
+     110.1,
+     110.6,
+     111,
+     111.5,
+     111.9,
+     112.3,
+     112.5,
+     112.7,
+     112.8,
+     112.7,
+     112.5,
+     112.2,
+     111.8,
+     111.2,
+     110.4,
+     109.5,
+     108.6,
+     107.7,
+     107,
+     106.5,
+     106.1,
+     105.9
+    ]
+   },
+   "elbowR": {
+    "maxSecondDifferenceDeg": 0.91,
+    "spikeDeg": 0,
+    "atKey": -1,
+    "series": [
+     78.7,
+     79.9,
+     80.6,
+     80.6,
+     79.8,
+     78.4,
+     76.5,
+     74.2,
+     71.9,
+     69.9,
+     68.7,
+     68.3,
+     68.7,
+     69.7,
+     71,
+     72.5,
+     74.1,
+     75.4,
+     76.3,
+     76.6,
+     76.4,
+     75.7,
+     74.8,
+     73.8,
+     73.1,
+     73,
+     73.6,
+     74.6,
+     76,
+     77.4
+    ]
+   }
+  }
+ },
+ "com": {
+  "flightParabola": [
+   {
+    "from": 0.375,
+    "to": 0.475,
+    "samples": 12,
+    "accelMps2": -9.665,
+    "residualRmsMm": 0.313
+   },
+   {
+    "from": 0.875,
+    "to": 0.975,
+    "samples": 12,
+    "accelMps2": -9.652,
+    "residualRmsMm": 0.313
+   }
+  ],
+  "flightAccelWithRifleMps2": [
+   -9.258,
+   -9.246
+  ],
+  "comDefinition": "de Leva 1996 male segment masses, joint-centre segments, trunk = neck base to pelvis joint (COM 51.38 % from the neck end)",
+  "stance": [
+   {
+    "side": "L",
+    "peakVerticalAccelMps2": 13.03,
+    "grfPeakBw": 2.33,
+    "meanVerticalAccelMps2": 4.76,
+    "firstThirdHorizontalMps2": -1.43,
+    "lastThirdHorizontalMps2": 2.09,
+    "firstPositiveKeyOfStance": 2
+   },
+   {
+    "side": "R",
+    "peakVerticalAccelMps2": 13.03,
+    "grfPeakBw": 2.33,
+    "meanVerticalAccelMps2": 4.76,
+    "firstThirdHorizontalMps2": -1.44,
+    "lastThirdHorizontalMps2": 2.09,
+    "firstPositiveKeyOfStance": 2
+   }
+  ],
+  "verticalPeakToPeakCm": 8.09,
+  "lateralPeakToPeakCm": 2.79,
+  "surgePeakToPeakCm": 1.21,
+  "stepsPerMin": 166.7,
+  "speedMps": 3.2,
+  "stepLengthM": 1.152,
+  "strideM": 2.304,
+  "stepLengthPerHeight": 0.694,
+  "stanceS": 0.288,
+  "flightS": 0.072,
+  "dutyFactorDesign": 0.667,
+  "dutyFactorUnder3p5cm": 0.8,
+  "froude": 1.2
+ },
+ "upperBody": {
+  "leanDeg": {
+   "range": [
+    19.09,
+    19.49
+   ],
+   "mean": 19.28,
+   "peakToPeak": 0.4
+  },
+  "hipYawDeg": [
+   -6,
+   6
+  ],
+  "shoulderYawDeg": [
+   -5,
+   5
+  ],
+  "hipShoulderCorrelation": -1,
+  "headPeakToPeakDeg": {
+   "pitch": 0,
+   "yaw": 1.5,
+   "roll": 0.21
+  },
+  "rifle": {
+   "sagittalPitchDeg": [
+    46.26,
+    49.03
+   ],
+   "sagittalPitchMean": 47.63,
+   "elevationDeg": [
+    27.44,
+    27.44
+   ],
+   "yawLeftDeg": [
+    60.2,
+    63.2
+   ],
+   "muzzleHeightM": [
+    1.401,
+    1.501
+   ],
+   "muzzleDriftVsChest": {
+    "pitchDeg": [
+     14.295535389921037,
+     21.404660973444628
+    ],
+    "yawDeg": [
+     34.59694628788482,
+     37.85462434116207
+    ]
+   }
+  },
+  "grips": {
+   "rightGripInRifleFrameMm": {
+    "x": [
+     -0.02,
+     0.01
+    ],
+    "y": [
+     -0.02,
+     0.02
+    ],
+    "z": [
+     -0.03,
+     0
+    ]
+   },
+   "leftGripInRifleFrameMm": {
+    "x": [
+     -0.02,
+     0.03
+    ],
+    "y": [
+     -0.01,
+     0.03
+    ],
+    "z": [
+     -340.02,
+     -339.98
+    ]
+   },
+   "spanM": [
+    0.34,
+    0.34
+   ]
+  },
+  "handMotionInChestFrameCm": {
+   "R": [
+    3.42,
+    2.01,
+    3.01
+   ],
+   "L": [
+    3.47,
+    2.51,
+    2.83
+   ]
+  },
+  "rifleClearance": {
+   "worstPenetrationMm": 0,
+   "atKey": -1,
+   "bodyPart": "",
+   "rifleLocalPoint": null,
+   "nearestSignedMm": 32.32
+  }
+ },
+ "secondary": {
+  "pack": "rigid on Spine2 (the model has no pack bones; none added)",
+  "rifleVerticalAmplitudeCm": 4.96,
+  "chestVerticalAmplitudeCm": 5.28,
+  "rifleLagBehindChestDeg": 9
+ },
+ "binds": {
+  "models": 7,
+  "tracksChecked": 742
+ },
+ "gates": [
+  {
+   "id": 1,
+   "name": "loop",
+   "pass": true,
+   "value": "starts 0s, ends 0.72s, seam 0 mm / 0.001 deg (Bip001_L_Forearm.quaternion), pelvis step max/median 24.6/15.7 mm, seam d2 33.4 vs rest 57.3 mm"
+  },
+  {
+   "id": 2,
+   "name": "no slip",
+   "pass": true,
+   "value": "anchor travel in the ground frame: 0.34 cm while under 3.5 cm, 0.09 cm while under 1.2 cm"
+  },
+  {
+   "id": 3,
+   "name": "ground/flight",
+   "pass": true,
+   "value": "stance sole 0.6,3 mm, swing min 3 mm, flight 20 %, clearance 11.2 cm, foot angle mean 10 max 22"
+  },
+  {
+   "id": 4,
+   "name": "joints",
+   "pass": true,
+   "value": "knee min 29.4 td 31,31 stance peak 73,72 swing peak 123,123; elbow 68..113; bone err 0.005 mm (Bip001 R Clavicle); spike 0"
+  },
+  {
+   "id": 5,
+   "name": "center of mass",
+   "pass": true,
+   "value": "flight a -9.665,-9.652 (-9.81 +-15%), bob 8.09 cm, GRF peak 2.33,2.33 BW, brake/push -1.43/2.09,-1.44/2.09, 167 steps/min, 3.2 m/s"
+  },
+  {
+   "id": 6,
+   "name": "trunk & rifle",
+   "pass": true,
+   "value": "lean 19.1,19.5 (p-p 0.4), hip/shoulder yaw 12/10 deg r=-1, head p-p 0/1.5/0.21, grips move 0 mm, muzzle 47.6 deg (46.3,49), penetration 0 mm"
+  },
+  {
+   "id": 7,
+   "name": "secondary",
+   "pass": true,
+   "value": "rifle bob 5 cm vs chest 5.3 cm, lag 9 deg (pack rigid, none added)"
+  }
+ ]
+}

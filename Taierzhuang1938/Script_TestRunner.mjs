@@ -278,6 +278,7 @@ export const testDefs = {
   ProneCrawlTest: { file: "Script_ProneCrawlTest.mjs", timeoutMs: 300000, desc: "Shared Blender crawl: visible limbs, distance clock, terrain contact, fixed bone lengths and loop seam" },
   ActorLocomotionTest: { file: "Script_ActorLocomotionTest.mjs", timeoutMs: 240000, desc: "实测步幅、世界支撑脚、转弯与位移时钟" },
   IjaAlertGaitTest: { file: "Script_IjaAlertGaitTest.mjs", desc: "01 日军先头兵警戒持枪小跑/走/站（BlenderMCP 烘焙）：循环接缝、双手够到枪且每步不拧袖、枪口朝前下、头扫视、小跑有腾空、七套模型骨名能绑、导演入场用 alert+trot 并到位甩枪上背" },
+  RifleHoldRunTest: { file: "Script_RifleHoldRunTest.mjs", desc: "双手持枪跑动（Blender 烘焙，质心抛物线）：无缝循环、支撑脚不滑、鞋底贴地与腾空、膝肘与骨长、质心腾空加速度≈−g、前倾/肩胯反扭/握点/枪口/枪穿插、七套模型骨名都能绑" },
   RelaxedGaitTest: { file: "Script_RelaxedGaitTest.mjs", desc: "背枪走 / 空手走与放松站姿：烘焙未过期、循环接缝、鞋底贴地、腿不超伸、七套模型骨名都能绑上、导演步速落在走/跑两侧" },
   InfantryAnimationTest: { file: "Script_InfantryAnimationTest.mjs", timeoutMs: 360000, desc: "八套步兵动作、道具与状态衔接" },
   CharacterSpeechTest: { file: "Script_CharacterSpeechTest.mjs", desc: "说话人口型驱动、说话人隔离与面部资产契约" },
@@ -704,6 +705,7 @@ export const tier0Fast = [
   "OpeningSetTest",
   "RelaxedGaitTest",
   "IjaAlertGaitTest",
+  "RifleHoldRunTest",
   "AllyGaitTest",
 ];
 
@@ -750,7 +752,7 @@ export const domains = {
   firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
   firstLevel: {label:'新版第一关完整任务',tests:['SandbagStandardTest','FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTerrainTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','FirstLevelFarBankTest','PontoonBridgeTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','MissionAreaGuardTest','MissionAreaGuardBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','LitterGaitTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionPeopleCadenceTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','CartCorpseBumpTest','FirstLevelFrontTest','FirstLevelCollectionCareTest','FirstLevelFrontPressureTest','FirstLevelFrontCounterattackTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest','FirstLevelFrontCheckpoint04Test','FirstLevelFrontCheckpoint05Test','FirstLevelFrontCheckpoint05BombFirstTest','FirstLevelRearDoorWalkTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
-  animation: { label: '独立动画资产验收', tests: ['ProneCrawlTest','ActorLocomotionTest','BackRifleRunTest','RelaxedGaitTest','IjaAlertGaitTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest','HitReactionTest','HitReactionBrowserTest'] },
+  animation: { label: '独立动画资产验收', tests: ['ProneCrawlTest','ActorLocomotionTest','BackRifleRunTest','RelaxedGaitTest','IjaAlertGaitTest','RifleHoldRunTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest','HitReactionTest','HitReactionBrowserTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷/炮击扬尘测试场", tests: ["ExplosionRulesTest", "DustFlowTest", "ExplosionRangeTest", "CraterSurfaceTest", "ShellImpactRangeTest", "ShellImpactRangeBrowserTest"] },
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
@@ -1039,7 +1041,7 @@ const changedDomainRules = [
   { domain: "editor", pattern: /Trench(es|Plan|Spline|Editor)/i },
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
   // LayeredGait（2026-09-28 NPC 脚步与位移同步的分层步态）由 ActorLocomotionTest 看着，归动画域。
-  { domain: 'animation', pattern: /ProneCrawl|BackRifleRun|RelaxedGait|IjaAlertGait|LayeredGait|Melee.*Animation|MeleeAnimation|Infantry/i },
+  { domain: 'animation', pattern: /ProneCrawl|BackRifleRun|RelaxedGait|IjaAlertGait|RifleHoldRun|LayeredGait|Melee.*Animation|MeleeAnimation|Infantry/i },
   // 背枪走 / 空手走目前只在 01–02 开场导演里用（日兵甲乙、纵深日兵、翻译）：改它要连开场一起验。
   { domain: 'openingStoryboards', pattern: /RelaxedGait|IjaAlertGait|Data_Tuning_ActorLocomotion/i },
   // 站立待机叠加层与它的旋钮表：装在第一关每个兵身上，验收在 FirstLevelP012AnimationTest（ai 域）。
