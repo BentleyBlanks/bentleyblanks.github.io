@@ -75,7 +75,9 @@
 //   开机就读进来了；没读到时先画体块、读到了再换）。挂在担架组（bed）下面，所以抬着 / 一头着地 / 放地上 / 挂车上的高度与倾角
 //   照旧由 LitterPose / ride 摆。资产自己的坐标：+Z 朝前头抬的人、竿心 y = 0.12、竿长 2.15 m；白盒的前头在本地 −Z，
 //   所以转 180°，并往下挪 0.09 m 让竿心落在体块竿子原来的高度（担架组原点 + 0.03）。几何与材质全场共用一份，拆的时候不拆。
-//   名字带「被」不带「担架」的 litter（01–05 两人拖的单被）不是担架，照旧是体块。
+//   名字带「被」不带「担架」的 litter（01–05 两人拖的单被）不是担架：换成上传的五补丁单被（Script_EditorBlockoutBlanket，
+//   Model_SingleBlanket.glb，宽 1.4 m、长 1.9 m），头端朝前（单位朝向，拽的人在这头），平铺贴地；被拖着走（moving）时
+//   渐变到资产自带的拖拽姿势（头端两角抬到 0.7 m、两侧兜起、尾端贴地），停下渐变回平铺。
 
 import * as THREE from "three";
 import { SampleTransition } from "./Script_EditorBlockoutConfig.mjs";
@@ -86,6 +88,7 @@ import { LoadLugouCastModels } from "./Script_CharacterModel.mjs";
 import { PREVIZ_WEAPON_HIDDEN } from "./Data_BlockoutPrevizClips.mjs";
 import { LoadDraftCartAssets, CreateDraftCartInstance } from "./Script_DraftCartModel.mjs";
 import { LoadStretcherAsset, StretcherAssetGeometry, CreateStretcherMaterial } from "./Script_StretcherAsset.mjs";
+import { LoadBlockoutBlanket, CreateBlockoutBlanket } from "./Script_EditorBlockoutBlanket.mjs";
 
 /** 不拿枪的定妆角色（开场导演 Spawn 时给 unarmed:true 的那几个）。 */
 const UNARMED_CASTS = new Set(["interpreter"]);
@@ -128,6 +131,8 @@ export const BLOCKOUT_PUPPETS = Object.freeze({
   animalDown: { rollRad: 1.45, liftM: 0.32 },
   /** 两帧之间挪超过这么远算瞬移（跳关键帧），不算走路，不推步子。 */
   teleportM: 3,
+  /** 单被离地（防 z-fighting）。 */
+  blanketLiftM: 0.005,
   /** 不戒备时背在背上的枪（步枪）；机枪 / 掷弹筒 / 手枪 / 大刀照旧。 */
   slungWeapons: ["HanYang", "Type38", "ZhongZheng"],
   /** 拿步枪、不戒备、蹲着不动、没在播片段的兵：播这段歇着的片段（单膝跪、枪竖在身前）。 */
@@ -214,6 +219,12 @@ export function LitterSlots(unit) {
  * 担架怎么摆：抬着 → 杆在手的高度、放平；只剩前头一人 → 前头在手上、后头着地（斜着）；
  * 没人抬或抬的人倒了（state:"down"）→ 平放在地上。→ { y, tilt }（y 是担架面中心离地高度，tilt 绕 X 的弧度，前高为正）
  */
+/** 这个 litter 单位其实是被子（01–05 两人拖的单被）：名字带「被」不带「担架」。 */
+export function IsBlanketLitter(unit) {
+  const name = unit?.name || "";
+  return /被/.test(name) && !/担架/.test(name);
+}
+
 export function LitterPose(unit, down = unit?.state === "down") {
   const l = BLOCKOUT_PUPPETS.litter;
   const slots = LitterSlots(unit);
@@ -270,6 +281,7 @@ export class BlockoutPuppets {
     this.library = library;
     this.draftAssets = null;
     this.draftLoading = null;
+    this.blanketAsset = null;   // null 没读、Promise 在读、false 读失败、对象 = 读到了
     this.groundAt = groundAt;
     this.root = new THREE.Group();
     this.root.name = "BlockoutPuppets";
@@ -425,6 +437,7 @@ export class BlockoutPuppets {
       const model = puppet.body.userData.model;
       if (model?.draft) model.draft.Dispose();
       else if (model?.stretcher) model.stretcher.removeFromParent();   // 几何与材质全场共用，不拆
+      else if (model?.blanket) model.blanket.Dispose();               // 同上（骨架是克隆的，几何贴图共用）
       else if (model?.tank) model.tank.root.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
       (puppet.body.userData.boxes || puppet.body).traverse(o => { if (o.isMesh) o.geometry.dispose(); });
       puppet.body.removeFromParent();
@@ -562,7 +575,6 @@ export class BlockoutPuppets {
       puppet.body.visible = puppet.visible;
       puppet.body.position.set(puppet.x, y, puppet.z);
       puppet.body.rotation.y = ry;
-      if (BLOCKOUT_PUPPETS.models) this._PoseModel(puppet);
       const bed = puppet.body.userData.stretcher;
       if (bed) {
         // 挂在车上的担架平放（担架组原点 = 布中心）；地上 / 手上的照 LitterPose
@@ -570,6 +582,7 @@ export class BlockoutPuppets {
         bed.position.y = pose.y;
         bed.rotation.x = pose.tilt;
       }
+      if (BLOCKOUT_PUPPETS.models) this._PoseModel(puppet, dt);
     }
     const unit = puppet.unit;
     const fx = -Math.sin(ry), fz = -Math.cos(ry);
@@ -708,8 +721,20 @@ export class BlockoutPuppets {
         body.add(tank.root);
         model = { tank, turret: tank.nodes?.get?.("turret") || null };
       }
-    } else if (unit.kind === "litter" && !(/被/.test(unit.name || "") && !/担架/.test(unit.name || ""))) {
-      // 01–05 的「单被」（拖着走的被子）也是 litter 单位：名字带「被」不带「担架」的照旧是体块，不换成担架
+    } else if (unit.kind === "litter" && IsBlanketLitter(unit)) {
+      // 01–05 的「单被」（拖着走的被子）：上传的五补丁单被，头端朝前（资产头端 +Z，这里前方是 −Z，转 180°）
+      if (this.blanketAsset === null) {
+        this.blanketAsset = LoadBlockoutBlanket().then((asset) => { this.blanketAsset = asset; })
+          .catch((error) => { console.warn("[BlockoutPuppets] blanket model failed; blankets stay blocks", error); this.blanketAsset = false; });
+      }
+      if (this.blanketAsset instanceof Promise) return;
+      if (this.blanketAsset) {
+        const blanket = CreateBlockoutBlanket(this.blanketAsset);
+        blanket.root.rotation.y = Math.PI;
+        body.userData.stretcher.add(blanket.root);
+        model = { blanket };
+      }
+    } else if (unit.kind === "litter") {
       const geometry = StretcherAssetGeometry();
       if (!geometry) {
         // 开机本来就读了；万一还没到（或读失败）就再要一次，到了的那一帧换，失败就一直是体块
@@ -742,11 +767,18 @@ export class BlockoutPuppets {
     if (model) { body.userData.boxes.visible = false; body.userData.whiteboxCharacter = true; }
   }
 
-  /** 每帧：炮塔对着射界扇；车轮、牲口按走过的路程迈步；倒地的牲口侧躺；车前另有牲口单位时藏自己的。 */
-  _PoseModel(puppet) {
+  /** 每帧：炮塔对着射界扇；车轮、牲口按走过的路程迈步；倒地的牲口侧躺；车前另有牲口单位时藏自己的；被子拖着走时兜起来。 */
+  _PoseModel(puppet, dt = 0) {
     this._DressModel(puppet);
     const model = puppet.body.userData.model;
     if (!model) return;
+    if (model.blanket) {
+      // 被子贴着担架组底下的地面（担架组被 LitterPose 抬到 groundY，这里抵回去，留 5 mm 防闪）
+      const bed = puppet.body.userData.stretcher;
+      model.blanket.root.position.y = -(bed?.position.y || 0) + BLOCKOUT_PUPPETS.blanketLiftM;
+      model.blanket.SetDrag(puppet.moving ? 1 : 0, dt);
+      return;
+    }
     const unit = puppet.unit;
     if (model.turret) {
       const arcYaw = Number.isFinite(unit.arc?.yawDeg) ? unit.arc.yawDeg : puppet.yawDeg;
@@ -1131,7 +1163,8 @@ export class BlockoutPuppets {
       seat: puppet.seat ? { ...puppet.seat } : null,
       rootY: human ? human.actor.root.position.y : (puppet.body ? puppet.body.position.y : null),
       // 2026-10-20：正式模型（"Type89Tank" / "ox" / "horse"；null = 还是体块）与车自己的牲口显不显示
-      model: (() => { const m = puppet.body?.userData.model; return m?.tank ? BLOCKOUT_PUPPETS.tankModel : m?.stretcher ? "BambooStretcher" : m?.kind ?? null; })(),
+      model: (() => { const m = puppet.body?.userData.model; return m?.tank ? BLOCKOUT_PUPPETS.tankModel : m?.stretcher ? "BambooStretcher" : m?.blanket ? "SingleBlanket" : m?.kind ?? null; })(),
+      blanketDrag: puppet.body?.userData.model?.blanket ? +puppet.body.userData.model.blanket.drag.toFixed(3) : null,
       draftAnimalVisible: puppet.body?.userData.model?.draft ? puppet.body.userData.model.draft.animalRoot.visible : null,
       draftTravelM: puppet.body?.userData.model?.draft ? puppet.body.userData.model.travelM : null,
       rootAboveCarrierGround: puppet.seat && (human || puppet.body) ? (human ? human.actor.root.position.y : puppet.body.position.y) - puppet.seat.carrierY : null,
