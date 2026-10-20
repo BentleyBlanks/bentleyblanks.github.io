@@ -1626,7 +1626,9 @@ export class Viewmodel {
     // 白刃期间把冲刺姿态"静音"的权重（0 = 冲刺姿态照常，1 = 完全按腰射姿态挥）。
     // 它不是弹簧：这条曲线不许过冲，过冲会让刀在收招时越过腰射姿态弹一下。见 Update。
     this.meleeSprintMute = 0;
-    this.landSpring = new Spring(150, 0.38);
+    // 落地下沉（2026-10-21）：原先 0.38 阻尼比，落地砸下去还要弹回来一下，连跳时枪一直在甩。
+    // 0.62 只留一点点回弹，读起来是"膝盖接住了"，不是枪在弹簧上。
+    this.landSpring = new Spring(170, 0.62);
     this.crouchSpring = new Spring(110, 0.9);
     this.equipSpring = new Spring(90, 0.85, 1);
     this.recoilKick = SpringFromRecover(0.4);
@@ -2810,11 +2812,11 @@ export class Viewmodel {
     // 落地检测：滞空越久，落地那一下越沉
     if (!grounded) this.airTime += step;
     if (grounded && !this.prevGrounded) {
-      this.landSpring.Impulse(-Clamp(this.airTime, 0.05, 0.7) * 3.2);
+      this.landSpring.Impulse(-Clamp(this.airTime, 0.05, 0.7) * 0.9);
       this.airTime = 0;
     }
     this.prevGrounded = grounded;
-    const land = this.landSpring.Step(step, grounded ? 0 : 0.35);
+    const land = this.landSpring.Step(step, grounded ? 0 : 0.15);
 
     // 自定义自由瞄准值仍可驱动枪体，但默认三档均为 0：标准 FPS 下鼠标直接转相机，
     // HUD、弹道与机械瞄具共用屏幕中心，不再让枪口先在画面里游动。
@@ -2861,10 +2863,13 @@ export class Viewmodel {
     // 蹲低只是腰射的持枪姿态，开镜时必须淡掉：它叠在解出来的开镜姿势外面，
     // 原来蹲着开镜照门会比屏幕中心低 1.2 cm（720p 下约 20 px），弹孔全落在准星上方。
     const crouchCarry = crouchValue * (1 - adsVisual);
-    let stateY = land * 0.055 - jumpRise * 0.026 + jumpFall * 0.014
+    // 跳跃这几项（2026-10-21 收小）：原先一次原地跳枪身上下走 7 cm、枪口俯仰甩 15°，
+    // 连跳时整把枪在画面里上下翻，玩家原话"过于夸张不写实"。现在一跳约 2 cm、俯仰约 5°，
+    // 跟 COD 的落地一沉同一个量级。Script_JumpTest 卡着上下限。
+    let stateY = land * 0.030 - jumpRise * 0.012 + jumpFall * 0.006
       + crouchCarry * -0.012 + (1 - equip) * -0.26;
-    let stateZ = jumpRise * 0.030 - jumpFall * 0.012 + crouchCarry * 0.010;
-    let stateRx = land * 0.16 - jumpRise * 0.13 + jumpFall * 0.09 + (1 - equip) * -0.55;
+    let stateZ = jumpRise * 0.012 - jumpFall * 0.005 + crouchCarry * 0.010;
+    let stateRx = land * 0.07 - jumpRise * 0.05 + jumpFall * 0.035 + (1 - equip) * -0.55;
 
     this.statePivot.position.set(0, stateY, stateZ);
     this.statePivot.rotation.set(stateRx, (1 - equip) * 0.35, (1 - equip) * -0.25, "YXZ");

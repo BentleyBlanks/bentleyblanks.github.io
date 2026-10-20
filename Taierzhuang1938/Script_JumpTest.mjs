@@ -68,7 +68,8 @@ try {
       && jump.rise > 0.42 && jump.rise < 0.68,
     `跳跃 +${jump.count} / 翻越 +${jump.vaults} / 抬高 ${jump.rise.toFixed(3)} m / 落地 ${jump.landed}`);
   Check("跳跃有体力、动作与落地反馈",
-    jump.staminaCost > 0.06 && jump.viewTravel > 0.08 && jump.landImpact > 0.1,
+    // 枪身俯仰要看得出来，但不许回到「一跳甩 15°」那种夸张幅度（2026-10-21）
+    jump.staminaCost > 0.06 && jump.viewTravel > 0.04 && jump.viewTravel < 0.12 && jump.landImpact > 0.1,
     `体力 ${jump.staminaCost.toFixed(3)} / 枪身俯仰 ${jump.viewTravel.toFixed(3)} rad / 落地 ${jump.landImpact.toFixed(3)}`);
 
   const prone = await page.evaluate(() => {
