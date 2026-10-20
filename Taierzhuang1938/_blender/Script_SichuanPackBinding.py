@@ -4,7 +4,7 @@ import bpy
 from mathutils import Vector
 
 
-def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,parent):
+def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,parent,softCloth=False):
     root=MakeRoot('Pack_Binding',parent)
     controls=[]
 
@@ -85,7 +85,7 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
         if transported is not None and width.dot(transported)<0:width.negate()
         if shoulder:
             normal=tangent.cross(width).normalized()
-            twist=.28*min(1,max(0,point.y/.055))
+            twist=(.40 if softCloth else .28)*min(1,max(0,point.y/.055))
             width=width*math.cos(twist)+normal*math.sin(twist)
         previousWidth=width.copy()
         isFront=point.y<-.105 and abs(point.x)<.179 and abs(point.z)<.140
@@ -96,8 +96,12 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
             point=Vector((point.x,depth,point.z))
         ring=[]
         for across in ((-1,0,1) if isFront else (-1,1)):
-            p=point+width*(.013*across)*(1+.012*math.sin(index*1.43+across))
+            variation=1+.055*math.sin(distances[index]*43+.4)+.020*math.sin(distances[index]*127+across) if softCloth else 1+.012*math.sin(index*1.43+across)
+            p=point+width*(.013*across)*variation
             if isFront:p.y-=.00065*(1-across*across)
+            if isFront and softCloth:
+                crossing=.0017*sum(math.exp(-((point.z-band)/.019)**2) for band in (.05,-.06)) if abs(width.x)>.7 else 0
+                p.y=SurfaceDepth(p.x,p.z,.0015)-crossing-.00025*(1-across*across)
             ring.append(len(verts));verts.append(tuple(p));u=.42+.16*(across+1)/2
             uvs.append((u,(distances[index]/repeat)%1));vertexDistances.append(distances[index]);vertexU.append(u)
         rings.append(ring)
@@ -106,6 +110,23 @@ def BuildBinding(CreateMesh,MakeRoot,AddTube,AddRibbon,SurfaceDepth,materials,pa
         elif len(a)==len(b)==3:faces.extend(((a[0],a[1],b[1],b[0]),(a[1],a[2],b[2],b[1])))
         elif len(a)==2:faces.extend(((a[0],a[1],b[1],b[0]),(a[1],b[2],b[1])))
         else:faces.extend(((a[0],a[1],b[0]),(a[1],a[2],b[1],b[0])))
+    if softCloth:
+        # Keep the entire ribbon face outside the low-poly cloth, including
+        # its interior: fitting vertices alone lets long triangles cut in.
+        positions=[Vector(point) for point in verts]
+        weights=((1/3,1/3,1/3),(.5,.5,0),(.5,0,.5),(0,.5,.5))
+        for iteration in range(3):
+            for face in faces:
+                if not all(positions[index].y<-.105 and abs(positions[index].x)<.179 and abs(positions[index].z)<.140 for index in face):continue
+                triangles=((face[0],face[1],face[2]),) if len(face)==3 else ((face[0],face[1],face[2]),(face[0],face[2],face[3]),(face[0],face[1],face[3]),(face[1],face[2],face[3]))
+                push=0
+                for triangle in triangles:
+                    for barycentric in weights:
+                        point=sum((positions[index]*weight for index,weight in zip(triangle,barycentric)),Vector())
+                        push=max(push,point.y-SurfaceDepth(point.x,point.z,.0013))
+                if push>0:
+                    for index in face:positions[index].y-=push+.0001
+        verts=[tuple(point) for point in positions]
     strip=CreateMesh('Pack_ContinuousClothStrap',verts,faces,uvs,materials['binding'],root)
     for polygon in strip.data.polygons:
         tile=math.floor((min(vertexDistances[strip.data.loops[i].vertex_index] for i in polygon.loop_indices)+1e-7)/repeat)

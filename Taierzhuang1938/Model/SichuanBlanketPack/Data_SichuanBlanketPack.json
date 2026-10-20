@@ -128,8 +128,12 @@
       "Texture_ReferenceCompare_side.jpg",
       "Texture_ReferenceCompare_back.jpg"
     ],
-    "status": "ReferenceMatchReviewed",
-    "remainingRefinements": [],
+    "status": "ReopenedAfterUserRejection",
+    "remainingRefinements": [
+      "Soft textile body and folded-end silhouette",
+      "Natural grey tape conformity and textile fibre scale",
+      "Remove painted fold shadows from the material source"
+    ],
     "reviewedDate": "2026-10-20",
     "technicalChecks": 146,
     "sourceReopenVerified": true,
