@@ -66,6 +66,12 @@ export const WHITEBOX_CARDS = Object.freeze({ desaturate: 0.4, brightness: 0.5, 
 // 读不出来；换成这组后受光地面亮度基本不变（太阳高度约 52° 时 3.07 对 2.96），影子处约为受光面的 41%。
 export const WHITEBOX_LIGHTING = Object.freeze({ ambient: 1.8, sun: 1.4, direction: [40, 70, 25],
   shadowAmbient: 1.25, shadowSun: 2.3 });
+// 白盒关卡编辑器（?editor=blockout）在正片光照下的补光倍率（2026-10-20）：乘在本关天光的 Global SH（probe）与
+// 环境底色（ambient）上（Script_Light.SetFillBoost），换天光后照样生效。第一关白昼档的阴影侧是照概念图压暗的
+//（SH 0.42、底色 0.18 对 4.6 的太阳），编辑器里背光的墙、沟壁、木梁一片死黑，摆位置看不清。只管编辑器，正片不吃。
+// 上面那组白盒中性光（默认画质）不走 LightRig，不受它影响。
+// 量过（10-20，high 画质、第一关旧版 01-2）：1/1 → 4/6 时最暗四分之一像素从 48 抬到 67，近黑（<20）占比 10.7% → 4.3%。
+export const BLOCKOUT_EDITOR_FILL = Object.freeze({ probe: 4, ambient: 6 });
 
 export function NormalizeWhiteboxConfig(value = {}) {
   const config = { ...WHITEBOX_DEFAULTS };

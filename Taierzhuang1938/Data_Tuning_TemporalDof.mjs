@@ -99,7 +99,8 @@ export const MOTION_BLUR = {
  *
  *   sensorWidthMm / focalLengthMm / fNumber  物理镜头参数（35 mm 全画幅 + 35/2.8）
  *   apertureDriven   true = CoC 幅度直接来自 f/N；false（出厂）= 归一到美术上限
- *   ringCount / ringSamples  gather 的同心环：8 + 16 + 24 = 48 抽样（COD:AW 同量级）
+ *   gather 是 48 抽样的固定黄金角螺旋盘（COD:AW 同量级），不按像素/帧旋转：
+ *   景深排在 TAA 之后，旋转出来的噪声没人平均，会在前景轮廓外留一圈芝麻点。
  *   nearFillRadius   近场填洞的半径（半分辨率像素）
  *   nearCoverageGain 近场覆盖度（alpha）的增益：>1 让前景边缘更肯往外渗
  *   maxCocPx         CoC 的绝对上限（输出像素）。tile 之外没有别的保护，别调太大
@@ -118,8 +119,6 @@ export const DOF = {
   focalLengthMm: 35,
   fNumber: 2.8,
   apertureDriven: false,
-  ringCount: 3,
-  ringSamples: [8, 16, 24],
   nearFillRadius: 1,
   nearCoverageGain: 1.35,
   maxCocPx: 28,

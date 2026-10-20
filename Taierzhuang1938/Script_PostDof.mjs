@@ -4,11 +4,11 @@
 // Warfare"（SIGGRAPH 2014 Course）的 DOF 一节。四趟：
 //   1. **降采样 + 预滤波**（半分辨率）：rgb = Karis 加权平均的颜色（压掉会在
 //      散景里放大成一坨的 firefly），a = **带符号 CoC**（远景为正、近景为负，像素）。
-//   2. **主 gather**（半分辨率，MRT 两路）：48 抽样同心环，近场与远场**分开算**。
+//   2. **主 gather**（半分辨率，MRT 两路）：48 抽样固定黄金角螺旋盘，近场与远场**分开算**。
 //      远场按「样本自己的 CoC 够不够覆盖到中心」加权（scatter-as-gather）；
 //      近场按**固定的最大近景半径**采集，因为近景要往画面外/往清楚的背景上渗。
 //   3. **填洞**（半分辨率，只做近场）：近场在半分辨率上采集必然留空洞（前景轮廓
-//      内侧一圈），3×3 取覆盖度最大的补上。
+//      内侧一圈），覆盖度取 max(自己, 3×3 帐篷平均)，颜色按覆盖度预乘平均。
 //   4. **上采样合成**（输出分辨率）：远场按本像素 CoC 混、近场按覆盖度 alpha 盖上去。
 //
 // ## CoC 是物理的（薄透镜），幅度归一到既有的美术上限
@@ -71,7 +71,7 @@ float CocPx(float viewDepth, vec2 uv) {
 const FRAG_DOF_DOWN = /* glsl */`
 uniform sampler2D uColor;
 uniform sampler2D uNormalDepth;
-uniform vec2 uColorTexel;
+uniform vec2 uTargetTexel;
 varying vec2 vUv;
 ${GLSL_COMMON}
 ${GLSL_COC}
@@ -81,7 +81,11 @@ void main() {
   float coc = 0.0;
   for (int y = 0; y < 2; y++) {
     for (int x = 0; x < 2; x++) {
-      vec2 offset = (vec2(float(x), float(y)) - 0.5) * uColorTexel;
+      // 四个抽样摊满**本靶一个像素**的足迹（±¼ 靶像素，双线性各再均 2×2）。
+      // 旧版按输入像素 ±½ 取，四分之一分辨率档（dofScale 0.5）下只看到 4×4 足迹
+      // 正中那 2×2，其余 12 个像素直接跳过 —— 细边（枪栓、准星）在低分辨率源上
+      // 一帧在一帧不在，gather 再一放大就是轮廓外那圈芝麻点。
+      vec2 offset = (vec2(float(x), float(y)) - 0.5) * 0.5 * uTargetTexel;
       vec3 c = texture2D(uColor, vUv + offset).rgb;
       // Karis 平均：亮度越高权重越低。不做的话一个高光点会在 48 抽样的
       // 散景盘里被复制成 48 个亮斑（"firefly 变成一串珠子"）。
@@ -106,7 +110,6 @@ uniform sampler2D uSource;      // 半分辨率：rgb = 颜色，a = 带符号 C
 uniform vec2 uTexel;            // 1 / 半分辨率
 uniform float uNearRadius;      // 近场固定采集半径（本靶像素）
 uniform float uCocScale;        // 输出像素 → 本靶像素（= 本靶宽 / 输出宽）
-uniform float uFrame;
 varying vec2 vUv;
 ${GLSL_COMMON}
 layout(location = 0) out vec4 oNear;
@@ -120,17 +123,17 @@ void main() {
   float farWeight = 1.0;
   vec3 nearSum = vec3(0.0);
   float nearWeight = 0.0;
-  // 每像素旋转整个采样盘：固定角度会让所有散景对齐成同一朵花。
-  float rot = Ign(gl_FragCoord.xy + uFrame * 1.37) * 6.2831853;
-
+  // 采样盘**固定**、不随像素也不随帧转：黄金角螺旋（Vogel 盘），r = √((i+½)/N)
+  // 按面积均匀铺满单位圆。
+  // 旧版按 IGN 每像素、每帧旋转三环盘，指望下游把噪声平均掉 —— 可本 pass 排在
+  // TAA **之后**，没人平均。低分辨率靶上每个像素采到的「枪栓 / 墙」比例各不相同，
+  // 双线性放大回输出后就是前景轮廓外一圈芝麻点，还逐帧闪。
+  // 本靶上的采集半径最多 maxCocPx × ¼ ≈ 7 像素，48 个点间距 < 2 像素、源又是
+  // 双线性取样，固定盘看不出条纹或「同一朵花」。
   for (int i = 0; i < ${samples}; i++) {
     float fi = float(i);
-    // 三个同心环 8 / 16 / 24（外环样本多，面积权重才均匀）
-    float ring = i < 8 ? 1.0 : (i < 24 ? 2.0 : 3.0);
-    float idx = i < 8 ? fi : (i < 24 ? fi - 8.0 : fi - 24.0);
-    float cnt = i < 8 ? 8.0 : (i < 24 ? 16.0 : 24.0);
-    float rf = ring / 3.0;
-    float angle = (idx + 0.5) / cnt * 6.2831853 + rot + ring * 0.7;
+    float rf = sqrt((fi + 0.5) / float(${samples}));
+    float angle = fi * 2.39996323;
     vec2 dir = vec2(cos(angle), sin(angle)) * rf;
 
     // 远场：只有 CoC 够大、能覆盖到中心的**远景**样本才算数（scatter-as-gather）
@@ -163,9 +166,13 @@ void main() {
     }
   }
 
-  // 近场覆盖度：本像素自己是近景就直接满，否则看采到多少近景样本。
+  // 近场覆盖度：本像素自己是近景就直接满，否则看盘里有多大比例是近景。
+  // 分母取半个盘：正好压在前景轮廓上（直边）时一半样本落在前景里 → 1，
+  // 往外走到一个半径远 → 0，前景在背景上渗出一道连续的坡。
+  // 旧版分母是 ¼ 个盘（再乘 nearCoverageGain 1.35），12/48 个样本就满 —— 轮廓外
+  // 一两格低分辨率像素全是 1、再往外全是 0，硬台阶只靠每像素随机转盘抖成噪点。
   float selfNear = clamp(max(-cocCenter, 0.0) * uCocScale, 0.0, 1.0);
-  float gathered = clamp(nearWeight / (float(${samples}) * 0.25), 0.0, 1.0);
+  float gathered = clamp(nearWeight / (float(${samples}) * 0.5), 0.0, 1.0);
   float coverage = max(selfNear, gathered);
   oNear = vec4(nearSum / max(nearWeight, 1e-4), coverage);
   oFar = vec4(farSum / max(farWeight, 1e-4), farRadius > 0.5 ? 1.0 : 0.0);
@@ -180,16 +187,25 @@ uniform vec2 uTexel;
 uniform float uRadius;
 varying vec2 vUv;
 void main() {
-  vec4 best = texture2D(uNear, vUv);
+  vec4 center = texture2D(uNear, vUv);
+  float coverageSum = 0.0;
+  vec3 colorSum = vec3(0.0);
+  float colorWeight = 0.0;
   for (int y = -1; y <= 1; y++) {
     for (int x = -1; x <= 1; x++) {
       vec4 s = texture2D(uNear, vUv + vec2(float(x), float(y)) * uRadius * uTexel);
-      // 取覆盖度最高的那个：半分辨率采集在前景轮廓内侧必然留空洞，
-      // 不补的话合成之后能看见一圈锯齿状的锐利残留。
-      if (s.a > best.a) best = s;
+      float k = x == 0 && y == 0 ? 4.0 : (x == 0 || y == 0 ? 2.0 : 1.0);   // 3×3 帐篷核，和 16
+      coverageSum += s.a * k;
+      // 颜色按覆盖度预乘再平均。
+      colorSum += s.rgb * s.a * k;
+      colorWeight += s.a * k;
     }
   }
-  gl_FragColor = best;
+  // 覆盖度 = max(自己, 帐篷平均)：前景轮廓内侧的空洞被邻居补上，轮廓外侧是平滑的坡。
+  // 旧版取 3×3 最大值连颜色一起照搬那一个邻居 —— 轮廓整体往外胀一格、边上是硬台阶，
+  // 双线性放大回输出后是一格一格的块。
+  float coverage = max(center.a, coverageSum / 16.0);
+  gl_FragColor = vec4(colorSum / max(colorWeight, 1e-4), coverage);
 }
 `;
 
@@ -268,14 +284,14 @@ export class DofPass {
 
     this.uniformsDown = {
       uColor: { value: null }, uNormalDepth: { value: null },
-      uColorTexel: { value: new THREE.Vector2() },
+      uTargetTexel: { value: new THREE.Vector2() },
       ...MakeCocUniforms(),
     };
     this.matDown = MakeFullscreenMaterial(FRAG_DOF_DOWN, this.uniformsDown);
 
     this.uniformsGather = {
       uSource: { value: null }, uTexel: { value: new THREE.Vector2() },
-      uNearRadius: { value: 0 }, uCocScale: { value: 0.5 }, uFrame: { value: 0 },
+      uNearRadius: { value: 0 }, uCocScale: { value: 0.5 },
     };
     this.matGather = MakeFullscreenMaterial(MakeGatherFrag(this.samples), this.uniformsGather,
       { glslVersion: THREE.GLSL3 });
@@ -381,7 +397,7 @@ export class DofPass {
     const UD = this.uniformsDown;
     UD.uColor.value = ctx.sceneColor.texture;
     UD.uNormalDepth.value = ctx.normalDepthTexture;
-    UD.uColorTexel.value.set(1 / ctx.sceneColor.width, 1 / ctx.sceneColor.height);
+    UD.uTargetTexel.value.set(1 / this.half.width, 1 / this.half.height);
     ctx.blitter.Blit(this.matDown, this.half);
 
     // 2) 主 gather（近 + 远，一趟出两张）
@@ -393,7 +409,6 @@ export class DofPass {
     // 近场半径按最大近景 CoC 定（换算到这张靶的像素）：近场必须往外渗，
     // 按本像素 CoC 采的话前景根本盖不住背景。
     UG.uNearRadius.value = Math.max(this.coc.nearMaxPx, this.coc.viewmodelMaxPx) * cocScale;
-    UG.uFrame.value = ctx.frame;
     ctx.blitter.Blit(this.matGather, this.gather);
 
     // 3) 近场填洞

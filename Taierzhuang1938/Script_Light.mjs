@@ -106,6 +106,8 @@ export class LightRig {
     this.probeBase = this.globalProbe.intensity;
     this.ambientBase = this.ambient.intensity;
     this.giFill = 1;
+    // 关卡编辑器（?editor=blockout）的补光倍率，见 SetFillBoost。正片恒 1。
+    this.fillBoost = { probe: 1, ambient: 1 };
 
     // ---------------------------------------------------------------------
     // 特效点光池
@@ -269,8 +271,23 @@ export class LightRig {
    */
   SetGiActive(active) {
     this.giFill = active ? 0.42 : 1;
-    this.globalProbe.intensity = this.probeBase * this.giFill;
-    this.ambient.intensity = this.ambientBase * (active ? 0.72 : 1);
+    this._ApplyFill();
+  }
+
+  /**
+   * 编辑器补光：在每一档天光的 SH / 环境底色上再乘一个倍率，换天光（过场、
+   * 预演切天）之后照样生效。只给白盒关卡编辑器用 —— 正片的阴影侧是按概念图
+   * 量出来压暗的（Script_Sky firstLevelBattleDay 那段账），编辑器里摆位置、
+   * 看动线时背光面一片死黑就什么都看不清了。
+   */
+  SetFillBoost({ probe = 1, ambient = 1 } = {}) {
+    this.fillBoost = { probe, ambient };
+    this._ApplyFill();
+  }
+
+  _ApplyFill() {
+    this.globalProbe.intensity = this.probeBase * this.giFill * this.fillBoost.probe;
+    this.ambient.intensity = this.ambientBase * (this.giFill < 1 ? 0.72 : 1) * this.fillBoost.ambient;
   }
 
   /** 套用 SKY_PRESETS 里那一份光照参数。 */
@@ -281,8 +298,7 @@ export class LightRig {
     this.probeBase = preset.shProbeIntensity ?? (preset.lightIntensity <= 0.5 ? 0.11 : 0.34);
     this.ambient.color.setHex(preset.ambientColor ?? 0x607085);
     this.ambientBase = preset.ambientIntensity ?? (preset.lightIntensity <= 0.5 ? 0.045 : 0.16);
-    this.globalProbe.intensity = this.probeBase * this.giFill;
-    this.ambient.intensity = this.ambientBase * (this.giFill < 1 ? 0.72 : 1);
+    this._ApplyFill();
     this.sunDirection.copy(sunDirection).normalize();
     // 夜战（lightIntensity ≤ 0.35）关掉阴影：那一档太阳本来就几乎不照，
     // 烘四张图纯属白花。low 档不再一刀切关掉（见构造器里的账）。

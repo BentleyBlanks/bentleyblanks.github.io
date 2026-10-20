@@ -150,7 +150,7 @@ import { BREATH_HOLD, FREE_AIM } from "./Data_Tuning_Player.mjs";
 import { EMPLACEMENT_VIEW } from "./Data_Tuning_Interact.mjs";
 import { FpsMountedPoseKey } from "./Data_FpsArmPoses.mjs";
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
-import { WhiteboxGraphicsOverrides, WhiteboxPostOptions } from "./Data_Tuning_Whitebox.mjs";
+import { WhiteboxGraphicsOverrides, WhiteboxPostOptions, BLOCKOUT_EDITOR_FILL } from "./Data_Tuning_Whitebox.mjs";
 import { LoadGraphicsProfile, LoadWhiteboxConfig, CreateGraphicsProfileApi } from "./Script_GraphicsProfile.mjs";
 import { WhiteboxSceneRenderer } from "./Script_WhiteboxRendering.mjs";
 import { BootPaper } from "./Script_BootPaper.mjs";
@@ -730,6 +730,8 @@ SetWaterSkyUniforms(sky.uniforms);
 // BasicShadowMap（PCSS 的 blocker search 必须读到裸深度；采样器类型必须与
 // Script_Csm.SHADOW_MAP_TYPE 一致，不一致是未定义行为）。
 const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66, renderer });
+// 白盒关卡编辑器在正片光照下（非白盒画质，或白盒开了「场景光照」）背光面近乎死黑：补光抬上来。
+if (BLOCKOUT) lights.SetFillBoost(BLOCKOUT_EDITOR_FILL);
 if (WHITEBOX_CONFIG) {
   renderer.shadowMap.enabled = graphics.shadows;
   lights.SetShadowsEnabled(graphics.shadows);
