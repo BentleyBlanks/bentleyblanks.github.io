@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 1,
+  "id": "PatchedTimberBed",
+  "version": "20261020BnBsV1",
+  "description": "Complete reusable old timber bed with straw mattress, patched cotton quilt and pillow; BN whole bed plus BS cloth material and continuous soft gathers/drape.",
+  "historicalStatus": "Creative reconstruction preserving the user-selected M17 C design; no claim of unique documented historical specimen.",
+  "models": [
+    {
+      "file": "Model_PatchedTimberBed.glb",
+      "url": "/Model/PatchedTimberBed/Model_PatchedTimberBed.glb?v=20261020BnBsV1",
+      "sha256": "07050b88cf0037ccff50e5e3caf0e7c32b5cfdb3f5149fb609b09bfe01a85bcc",
+      "bytes": 24821764,
+      "triangles": 288799,
+      "triangleLimit": 300000,
+      "drawPrimitiveLimit": 6,
+      "drawPrimitives": 6,
+      "materials": 6,
+      "boundsMin": [
+        -1.2340132594108582,
+        0,
+        -0.5493350923061371
+      ],
+      "boundsMax": [
+        1.2340132594108582,
+        0.8928824518261536,
+        0.5493350923061371
+      ],
+      "dimensionsMeters": [
+        2.4680265188217163,
+        0.8928824518261536,
+        1.0986701846122742
+      ]
+    }
+  ],
+  "coordinates": {
+    "units": "meter",
+    "up": "+Y",
+    "lengthAxis": "X",
+    "widthAxis": "Z",
+    "footEnd": "+X",
+    "origin": "Ground plane and complete bed XZ bounds centre",
+    "sourceToGameTranslationBlender": [
+      0.09402185678482056,
+      -0.0014869272708892822,
+      3.65521373169031e-05
+    ]
+  },
+  "components": [
+    {
+      "node": "BS_FootCloth.001",
+      "triangles": 22794,
+      "vertices": 11943
+    },
+    {
+      "node": "Frame",
+      "triangles": 12000,
+      "vertices": 12443
+    },
+    {
+      "node": "Pillow",
+      "triangles": 6000,
+      "vertices": 5677
+    },
+    {
+      "node": "Quilt",
+      "triangles": 174941,
+      "vertices": 120142
+    },
+    {
+      "node": "Sewing",
+      "triangles": 8990,
+      "vertices": 11488
+    },
+    {
+      "node": "Straw",
+      "triangles": 64074,
+      "vertices": 121761
+    }
+  ],
+  "source": {
+    "root": "C:/Users/Bentl/OneDrive/AI/Models/Blender/PatchedTimberBed20261020",
+    "originalArchiveReadOnly": "C:/Users/Bentl/OneDrive/AI/Models/Blender/DotsAcceptance20261020",
+    "originalHigh": "Scene_OriginalBed.blend",
+    "editedHigh": "Scene_PatchedTimberBedHigh.blend",
+    "gameProject": "Scene_PatchedTimberBedGame.blend",
+    "inputSha256": {
+      "Inputs/BN/Restored/Bed_BN_Complete_Editable_Checkpoint.blend": "69132d0209e202ee99422adbb2de74bf5ccfed2a930bec08faae16a009514f0d",
+      "Inputs/BS/BedBS/BS_material_only.blend": "b2bd5c2e5063613949c537c7019107494caeeddd25c6ce8b05841b1ff56e8201",
+      "Inputs/BS/BedBS/BR_lowfrequency_corner_colors.npz": "cbbf5fcfc757e946777eb6607f3dafa8010b12932a7bf04d88df348c1e739abf",
+      "Inputs/BS/BedBS/BS_BaseColor.webp": "b6876cc7112df44f9b40abef39ccb6cba6202a84857139b39659b91a4a5505dd",
+      "Inputs/BS/BedBS/BS_Normal.webp": "07c293b66c08c01dfe96d148f9fa3c073542b0d2de34459f88cf932bffe26316",
+      "Inputs/BS/BedBS/BS_fiber_bundle_Base_1024.png": "79725fd48109369792d1fc46a6fe80238fe36f1e97a00856f7480ff87a3078ed"
+    },
+    "baselineIncludingStudioGround": {
+      "meshObjects": 965,
+      "triangles": 2443302,
+      "usedMaterials": 116
+    },
+    "baselineExcludingStudioGround": {
+      "meshObjects": 964,
+      "triangles": 2443300,
+      "usedMaterials": 115
+    },
+    "highDetailKept": true,
+    "sourceZeroAreaFacesRemoved": 14
+  },
+  "materials": {
+    "QuiltAndStraw": "Original diffuse-only surface colour baked to explicit CORNER COLOR_0, averaged inside each vertex/material island; authored tiled normals and Normal UV0 retained. Quilt additionally multiplies existing BS yarn detail at physical 19.627cm UV1 scale with mean-compensated colours.",
+    "FramePillowSewing": "Dedicated base/normal/roughness PBR atlases, 1024/512/512 pixels.",
+    "BSFootCloth": {
+      "colorAttribute": "COLOR_0",
+      "uvAttribute": "TEXCOORD_1 (three uv1)",
+      "baseTransform": {
+        "scale": [
+          0.5240554213523865,
+          0.5240554213523865
+        ],
+        "offset": [
+          0,
+          0.4759445786476135
+        ]
+      },
+      "normalTransform": {
+        "scale": [
+          1,
+          1
+        ],
+        "offset": [
+          0,
+          0
+        ]
+      },
+      "normalScale": 0.5,
+      "roughness": 0.94,
+      "originalWebpBytesRetained": true,
+      "imageSha256": {
+        "BS_BaseColor.webp": "b6876cc7112df44f9b40abef39ccb6cba6202a84857139b39659b91a4a5505dd",
+        "BS_Normal.webp": "07c293b66c08c01dfe96d148f9fa3c073542b0d2de34459f88cf932bffe26316"
+      }
+    }
+  },
+  "performance": {
+    "intendedUse": "Detailed close-view reusable prop; stream on demand, avoid dense repetition. No level placement added.",
+    "triangleLimit": 300000,
+    "drawPrimitiveLimit": 6,
+    "embeddedImages": 14,
+    "embeddedImageBytes": 4949866,
+    "textureRgba8BytesWithoutMips": 30408704,
+    "triangleReductionFraction": 0.881799615274424,
+    "tradeoffs": [
+      "Submillimeter straw fibres and sewing cross-sections simplified; main outline, crossings and torn edges retained.",
+      "Quilt and straw fine colour is vertex-sampled and interpolated, not pixel-identical to the high source.",
+      "Geometry detail removed by decimation is not claimed to be fully encoded in normal maps.",
+      "The close-view game budget includes a real cotton lining; adaptive surface matching is capped and does not certify every surface point."
+    ]
+  },
+  "runtime": {
+    "loader": "Taierzhuang1938/Script_ModelImports.mjs ManagedGLTFLoader",
+    "extensionsRequired": [
+      "EXT_texture_webp"
+    ],
+    "extensionsUsed": [
+      "KHR_texture_transform",
+      "EXT_texture_webp"
+    ],
+    "keepNativePbr": true,
+    "keepColor0AndUv1": true,
+    "doNotOverrideWithWoodBeam": true,
+    "doNotUsePositionNormalUvOnlyBatchingOrTzm": true,
+    "levelIntegrated": false
+  },
+  "verification": {
+    "dateLocal": "2026-10-21",
+    "geometryAreaGateWorldCrossLength": 1e-12,
+    "degenerateTriangles": 0,
+    "sourceRebuild": "node Model/PatchedTimberBed/Script_PatchedTimberBedRebuild.mjs",
+    "test": "node Model/PatchedTimberBed/Script_PatchedTimberBedTest.mjs --comparison",
+    "evidenceLocalOnly": "tmp/BedBnBsAcceptance",
+    "sourceMaterialComparison": "Same Cycles camera and lighting: Render_OriginalSource.png / Render_FinalHigh.png / Render_FinalGame.png",
+    "webglOriginalTransport": "Original high geometry with original colour sampled to CORNER colours; approximate material transport, original Cycles render is authoritative.",
+    "contactSamples": {
+      "points": 42,
+      "passing": 42,
+      "failures": 0,
+      "certifiedLowerShells": 42,
+      "floating": 0,
+      "overPenetrating": 0,
+      "missingLowerShells": 0,
+      "minGapMm": -1.4336924920953509,
+      "medianGapMm": 0.2509492835305327,
+      "maxGapMm": 1.7844216998195161
+    },
+    "realManagedLoaderWebglAndInteraction": "PASS; seven matching camera views for original and final, actual image decoding and binary SHA verified, orbit and zoom exercised",
+    "coldEditableSource": "PASS; 6 game meshes and all 14 used images decoded from packed Blender source",
+    "surfaceLimit": "42 fixed probes meet +/-2mm. Adaptive lining has a 120k triangle cap and residuals elsewhere; this is not a mathematical proof of zero intersections over the entire surface."
+  },
+  "gameLining": {
+    "addedTriangles": 119943,
+    "targetGapM": 0.00025,
+    "sameQuiltDraw": true,
+    "method": "Continuous cotton lining conforming to actual straw, adaptive shared-edge subdivision, outward return hem; original outer shell retained",
+    "triangleCap": 120000,
+    "budgetLimited": true,
+    "oldPositionsUv0ColourPreservedExactly": true
+  }
+}
