@@ -44,6 +44,10 @@
 - 直接调用脚本能明确选中检出；若使用 npm，先确认解析到本任务的 package.json。服务支持 `--help`、指定端口、worktree 挂载与 `--shortcut`；保持路径、缓存和 COOP/COEP 行为与 Pages 兼容。
 - 运行与改动相关的现有检查；跨模块、共享基础设施和高风险变化扩大验证。纯指令或文档整理检查链接、命令和 diff，不因此启动所有游戏或浏览器回归；嵌入代码或运行时配置的变化按实际影响选测。
 - **后台无头浏览器测试一律静音。** 新写或临时起的 Playwright／Chromium 都带 `--mute-audio`（共用入口 `PrairieFire1937/Script_BrowserTestKit.mjs` 等已内置）；只有专门验收音频、需要真听时才设环境变量 `TEST_AUDIBLE=1` 放开。Playwright 无头默认已静音，但显式写上，避免改成有头后外放。
+- **内置浏览器（Claude 的 Browser pane 等用户看得见的 agent 浏览器）打开 Demo 一律把音量设成 0。** 用户同时开着很多会话，几个 pane 一起出声会互相盖。打开页面后第一件事就静音，再做别的；只有任务本身是听声音（配乐、音效、配音、混音验收）或用户明确要听时才不静音，并在回复里说一声开着声音。
+  - 滕县（Taierzhuang1938）：在页面里执行下面这段，再 reload 一次（开机读存档；高级工具 / 白盒编辑器读自己那份）。只改本次预览端口这个源的 localStorage，不碰线上和用户自己的浏览器：
+    `localStorage.setItem("tengxian1938_audio_v1", JSON.stringify({ ...JSON.parse(localStorage.getItem("tengxian1938_audio_v1") || "{}"), master: 0 })); localStorage.setItem("tengxian1938_tools_volume_v1", JSON.stringify({ volume: 0, muted: true })); location.reload();`
+  - 其他 Demo：先找项目自己的音量设置（存档键或设置面板）设 0；找不到就在页面里执行 `document.querySelectorAll("audio,video").forEach(m => m.muted = true); window.Howler?.mute?.(true);`，并在报告里说明这个 Demo 只能靠临时静音（刷新后失效，刷新后重做）。
 - 全仓选测入口：`node scripts/Script_TestChangedProjects.mjs --changed=origin/master --dry-run` 查看计划，再按影响范围执行。该脚本按路径选项目，文档路径也可能命中；没有命中不代表无需验证。
 - 脚本、样式或资产变化按项目要求更新 cache-bust，**在提交与推送前完成**。测试通过后，只有新变化、失败或未解疑点才扩大或重复测试。
 - 页面上线要核对对应部署提交及线上内容或版本戳；HTTP 200 只证明可访问。部署仍在排队时区分“已推送”和“已上线”。纯仓库说明变化核对远端提交即可。
