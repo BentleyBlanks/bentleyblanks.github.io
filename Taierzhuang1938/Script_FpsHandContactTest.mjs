@@ -397,6 +397,12 @@ try {
           const measured=hanYangHoldingProbes[side].Measure({weaponGroup:vm.rig.group,arms,roots:[vm.rig.group],magazine:null,contactClass:'hanYangHoldingNoExemptions'});
           return {side,maxDepthMm:measured.maxDepthMm,crossings:measured.crossingTriangleObstaclePairs,witnesses:measured.rows.filter(row=>row.crossingSkinTriangles||row.maxDepthMm)};
         })}:null;
+        // The ADS support arm of the Type38/ZhongZheng: the same complete-arm probe as HanYang's wholeArms.
+        // A palm-frame fit alone cannot see the elbow plane pushing the forearm and sleeve through the receiver.
+        const adsSupportArm=pose==='ads'&&['Type38','ZhongZheng'].includes(id)?(()=>{
+          const measured=hanYangHoldingProbes.l.Measure({weaponGroup:vm.rig.group,arms,roots:[vm.rig.group],magazine:null,contactClass:'hanYangHoldingNoExemptions'});
+          return {side:'l',maxDepthMm:measured.maxDepthMm,crossings:measured.crossingTriangleObstaclePairs,coverage:measured.coverage,witnesses:measured.rows.filter(row=>row.crossingSkinTriangles||row.maxDepthMm)};
+        })():null;
         result.poses.push({id,pose,support,supportSamples,supportPoints:gunSurface?[0,1,2,3,4].map(digit=>Pad("l",digit).toArray()):[],point:point.toArray(),trigger:actualTrigger?.target.toArray()??target?.toArray(),distance:actualTrigger?.distance??(target?point.distanceTo(target):Infinity),
           facing:actualTrigger?.facing??normal.z,holdingDrift:pose==="ads"?point.distanceTo(actualTrigger?hipTriggerSkin.point:hip):0,
           triggerTravel:pose==="fire"?point.distanceTo(actualTrigger?hipTriggerSkin.point:hip):0,
@@ -405,7 +411,7 @@ try {
             normal:actualTrigger.normal,normalDotToTarget:actualTrigger.toTarget,signedSeparation:actualTrigger.signedSeparation,
             sameHipWitness:actualTrigger.witness.mesh===hipTriggerSkin.witness.mesh&&actualTrigger.witness.index===hipTriggerSkin.witness.index,
             jointRotationChangeRad:Math.max(...indexJoints.map((b,i)=>b.quaternion.angleTo(hipTriggerJoints[i])))}:null,
-          wrist:{...arms.wristBend},supportSkin:zbContact?.support??null,triggerSkin:zbContact?.trigger??null,hanYangContact,thumbFrames:id==='HanYang'?HanYangThumbFrames():null});
+          wrist:{...arms.wristBend},supportSkin:zbContact?.support??null,triggerSkin:zbContact?.trigger??null,hanYangContact,adsSupportArm,thumbFrames:id==='HanYang'?HanYangThumbFrames():null});
       }
       if(holdingOnly)continue;
       editor.SetPose("hip");for(let i=0;i<90;i++)editor.Update(1/60);
@@ -533,8 +539,15 @@ try {
       for(const thumb of pose.thumbFrames)Check(thumb.nailDorsalDot>.9,`HanYang ${pose.pose} ${thumb.side}: thumb nail lies on the side of the finger (${thumb.nailDorsalDot})`);
       for(const arm of pose.hanYangContact.wholeArms)Check(arm.crossings===0&&arm.maxDepthMm===0,`HanYang ${pose.pose} ${arm.side}: actual complete arm/wrist/sleeve crosses the gun (${JSON.stringify(arm)})`);
     }
+    if(pose.adsSupportArm){
+      const arm=pose.adsSupportArm;
+      Check(['Forearm','Wrist','UpperArm','Hand'].every(region=>arm.coverage?.[region]>0),`${pose.id} ads l: complete support arm skin was not measured (${JSON.stringify(arm.coverage)})`);
+      Check(arm.crossings===0&&arm.maxDepthMm===0,`${pose.id} ads l: actual complete support arm/wrist/sleeve crosses the gun (${JSON.stringify(arm)})`);
+    }
     if(pose.id==='Zb26')failures.push(...ZbContactGeometryFailures({support:pose.supportSkin,trigger:pose.triggerSkin},`Zb26 ${pose.pose}`));
   }
+  for(const id of ['Type38','ZhongZheng'].filter(id=>!only||only.includes(id)))
+    Check(report.poses.some(pose=>pose.id===id&&pose.pose==='ads'&&pose.adsSupportArm),`${id}: ADS support arm was not measured`);
   for(const action of report.actions){
     if(action.id==='HanYang')Check(action.maxThumbBoundaryStepDeg<30,`HanYang ${action.action}: thumb holding/action handoff jumps ${action.maxThumbBoundaryStepDeg.toFixed(2)}deg in one 60fps frame`);
     Check(action.maxGrip<FPS_ARM_LIMITS.positionResidualM,`${action.id} ${action.action}: hand leaves target ${JSON.stringify(action.worstGrip)}`);
