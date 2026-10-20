@@ -20,12 +20,14 @@ from mathutils.kdtree import KDTree
 
 projectDir = Path(globals()["SingleBlanketProject"]) if "SingleBlanketProject" in globals() else Path(__file__).resolve().parents[1]
 sourceDir = Path("C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SingleBlanket")
-xColumns = (0.70, 0.2333, -0.2333, -0.70)
-yRows = (-0.95, -0.57, -0.19, 0.19, 0.57, 0.95)
+boneRowCount, boneColumnCount = 9, 8
+xColumns = tuple(0.70-1.40*c/(boneColumnCount-1) for c in range(boneColumnCount))
+yRows = tuple(-0.95+1.90*r/(boneRowCount-1) for r in range(boneRowCount))
+ySpacing = 1.90/(boneRowCount-1)
 clipNames = ("Blanket_Flat", "Blanket_DragPose", "Blanket_Released", "Blanket_Crumpled", "Blanket_Unfold")
-cornerNames = {(0, 0): "Blanket_CornerHeadL", (0, 3): "Blanket_CornerHeadR",
-               (5, 0): "Blanket_CornerTailL", (5, 3): "Blanket_CornerTailR"}
-widthSegments, lengthSegments = 36, 48
+cornerNames = {(0, 0): "Blanket_CornerHeadL", (0, boneColumnCount-1): "Blanket_CornerHeadR",
+               (boneRowCount-1, 0): "Blanket_CornerTailL", (boneRowCount-1, boneColumnCount-1): "Blanket_CornerTailR"}
+widthSegments, lengthSegments = 50, 60
 
 
 def BoneName(row, column):
@@ -40,10 +42,10 @@ def Dump(path, data):
 def BilinearWeights(point):
     x = min(0.70, max(-0.70, point.x))
     y = min(0.95, max(-0.95, point.y))
-    column = next((c for c in range(3) if x >= xColumns[c+1]), 2)
-    row = min(4, max(0, int(math.floor((y+0.95)/0.38 + 1e-10))))
+    column = next((c for c in range(boneColumnCount-1) if x >= xColumns[c+1]), boneColumnCount-2)
+    row = min(boneRowCount-2, max(0, int(math.floor((y+0.95)/ySpacing + 1e-10))))
     u = min(1.0, max(0.0, (xColumns[column]-x)/(xColumns[column]-xColumns[column+1])))
-    v = min(1.0, max(0.0, (y-yRows[row])/0.38))
+    v = min(1.0, max(0.0, (y-yRows[row])/ySpacing))
     return [(BoneName(row, column), (1-u)*(1-v)),
             (BoneName(row, column+1), u*(1-v)),
             (BoneName(row+1, column), (1-u)*v),
@@ -116,7 +118,8 @@ def CreateRig(mesh):
     mesh.parent = rig
     modifier = mesh.modifiers.new("Armature", "ARMATURE")
     modifier.object = rig
-    groups = {BoneName(r, c): mesh.vertex_groups.new(name=BoneName(r, c)) for r in range(6) for c in range(4)}
+    groups = {BoneName(r, c): mesh.vertex_groups.new(name=BoneName(r, c))
+              for r in range(boneRowCount) for c in range(boneColumnCount)}
     for vertex in mesh.data.vertices:
         for name, weight in BilinearWeights(vertex.co):
             if weight > 1e-12:
@@ -201,6 +204,19 @@ def RestTargets():
     return {BoneName(r, c): Vector((x, y, 0)) for r, y in enumerate(yRows) for c, x in enumerate(xColumns)}
 
 
+def SmoothProfile(amount, values):
+    phase = min(1.0, max(0.0, amount))*(len(values)-1)
+    lower = min(len(values)-2, int(phase))
+    fraction = phase-lower
+    fraction = fraction*fraction*(3-2*fraction)
+    return values[lower]*(1-fraction)+values[lower+1]*fraction
+
+
+def DrapeAngle(x):
+    side = min(1.0, max(0.0, (abs(x)-0.25)/0.45))
+    return math.copysign(min(math.radians(70), math.atan(0.226/0.29*math.tan(side*math.pi/2))), x)
+
+
 def CreatePoses(mesh):
     rest = RestTargets()
     poses = {name: {n: v.copy() for n, v in rest.items()} for name in clipNames[:4]}
@@ -240,30 +256,26 @@ def CreatePoses(mesh):
                        x*math.sin(twist)+y*math.cos(twist)+0.012*math.sin(4*u-v),
                        2.5*widthRise+0.45*lengthRise+0.035*math.sin(5*u+1.4*v)+
                        0.026*math.sin(4*v-u)-0.055*math.exp(-((u-0.92)/0.22)**2-((v+0.55)/0.45)**2)))
-    for r in range(6):
-        for c in range(4):
+    for r in range(boneRowCount):
+        for c in range(boneColumnCount):
             name = BoneName(r, c)
+            longitudinal, lateral = r/(boneRowCount-1), xColumns[c]/0.70
+            side = abs(lateral)**2
             flat = poses["Blanket_Flat"][name]
-            flat.z = 0.010 + 0.009*math.sin(r*1.7+c*2.0)
+            flat.z = 0.010+0.006*math.sin(longitudinal*8.5+lateral*3)*math.cos(longitudinal*2.7-lateral)
             drag = poses["Blanket_DragPose"][name]
-            if r == 0:
-                drag.z = 0.70 if c in (0, 3) else 0.36
-                drag.y -= 0.20 if c in (0, 3) else 0.12
-                if c in (0, 3):
-                    drag.x -= math.copysign(0.15, drag.x)
-            elif r == 1:
-                drag.z = 0.15 + (0.08 if c in (0, 3) else 0)
-            elif r in (2, 3) and c in (0, 3):
-                drag.z = 0.08
-            elif r in (2, 3):
-                drag.z = 0.070 if r == 2 else 0.025
-            if r == 5 and c in (0, 3):
-                drag.y += 0.03
+            centreHeight = SmoothProfile(longitudinal, (0.36, 0.15, 0.070, 0.025, 0, 0))
+            edgeHeight = SmoothProfile(longitudinal, (0.70, 0.23, 0.080, 0.080, 0, 0))
+            drag.z = centreHeight*(1-side)+edgeHeight*side
+            headGather = max(0.0, 1-longitudinal/0.30)**2
+            drag.x -= 0.15*lateral*headGather
+            drag.y -= (0.12+0.08*side)*headGather
+            drag.y += 0.03*side*max(0.0, (longitudinal-0.85)/0.15)**2
             released = poses["Blanket_Released"][name]
-            released.x += 0.018*math.sin(r*2.1+c*1.8)
-            released.y += 0.025*math.cos(r*1.4+c*2.3)
-            released.z = 0.030*abs(math.sin(r*2.2+c*1.6))
-            if r == 0 and c in (0, 3):
+            released.x += 0.018*math.sin(longitudinal*9.5+lateral*2.2)
+            released.y += 0.025*math.cos(longitudinal*8+lateral*2.5)
+            released.z = 0.030*abs(math.sin(longitudinal*10+lateral*2.5))
+            if r == 0 and c in (0, boneColumnCount-1):
                 released.z = 0
             poses["Blanket_Crumpled"][name] = FoldedSurface(rest[name].x/0.7, rest[name].y/0.95)
     deltas = []
@@ -293,16 +305,23 @@ def CreatePoses(mesh):
     lift = {n: v.copy() for n, v in rest.items()}
     lift["Blanket_CornerHeadL"].z = lift["Blanket_CornerHeadR"].z = 0.8
     drape = {n: v.copy() for n, v in rest.items()}
-    for r in range(6):
-        for c in range(4):
+    for r in range(boneRowCount):
+        for c in range(boneColumnCount):
             value = drape[BoneName(r, c)]
-            if c in (0, 3):
-                value.x = math.copysign(0.51+0.025*math.sin(r*1.7+c*0.6), value.x)
-                value.y += 0.012*math.sin(r*1.9+c)
-                value.z = 0.012+0.014*(0.5+0.5*math.sin(r*2.2+c*1.3))
+            longitudinal, lateral = r/(boneRowCount-1), xColumns[c]/0.70
+            distance = abs(xColumns[c])
+            if distance <= 0.25:
+                value.x = math.copysign(distance*0.90, value.x)
+                value.z = 0.245+0.012*math.cos(distance/0.25*math.pi/2)
             else:
-                value.x = math.copysign(0.215, value.x)
-                value.z = 0.160 if r in (0, 5) else 0.240+0.006*math.sin(r*1.4+c*0.8)
+                side = (distance-0.25)/0.45
+                value.x = math.copysign(0.225+0.29*math.sin(side*math.pi/2), value.x)
+                value.z = 0.014+0.226*math.cos(side*math.pi/2)
+                value.x += lateral*0.012*side*math.sin(longitudinal*8+2*lateral)
+                value.y += 0.012*side*math.sin(longitudinal*9.5+lateral)
+                value.z += 0.008*side*(0.5+0.5*math.sin(longitudinal*11+lateral))
+            if r in (0, boneRowCount-1):
+                value.z -= 0.075*max(0.0, 1-distance/0.5)
     poses["Test_LiftHeadCorners"], poses["Test_DrapeOverBody"] = lift, drape
     return poses
 
@@ -339,30 +358,32 @@ def CreateActions(rig, mesh, poses):
             if name == "Blanket_Unfold":
                 amount = (frame-1)/44
                 targets = {}
-                for r in range(6):
-                    for c in range(4):
+                for r in range(boneRowCount):
+                    for c in range(boneColumnCount):
                         boneName = BoneName(r, c)
                         value = poses["Blanket_Crumpled"][boneName].lerp(poses["Blanket_Flat"][boneName], amount)
                         wave = math.sin(math.pi*amount)**1.7
-                        value.z += wave*(0.64 if r == 0 and c in (0, 3) else 0.38)*(1-r/5)**1.7
-                        value.y -= wave*0.08*(1-r/5)
+                        longitudinal, lateral = r/(boneRowCount-1), xColumns[c]/0.70
+                        value.z += wave*(0.38+0.26*abs(lateral)**6)*(1-longitudinal)**1.7
+                        value.y -= wave*0.08*(1-longitudinal)
                         targets[boneName] = value
                 morph = (1-amount)**1.6
             else:
                 targets, morph = poses[name], 1.0 if name == "Blanket_Crumpled" else 0.0
             ApplyTargets(rig, targets)
-            for r in range(6):
-                for c in range(4):
+            for r in range(boneRowCount):
+                for c in range(boneColumnCount):
                     boneName = BoneName(r, c)
                     angleX, angleY = 0.0, 0.0
                     if name == "Test_DrapeOverBody":
-                        angleY = math.copysign(math.radians(55 if c in (0, 3) else 5), xColumns[c])
-                        if c in (1, 2) and r in (0, 5):
-                            angleX = math.radians(50 if r == 0 else -50)
+                        angleY = DrapeAngle(xColumns[c])
+                        if r in (0, boneRowCount-1):
+                            core = max(0.0, 1-abs(xColumns[c])/0.5)
+                            angleX = math.radians(55 if r == 0 else -55)*core
                     elif name == "Blanket_DragPose":
-                        angleX = math.radians((-12, -12, -6, -2, 0, 0)[r])
-                        if r in (1, 2, 3):
-                            angleY = math.copysign(math.radians(8), xColumns[c])
+                        longitudinal = r/(boneRowCount-1)
+                        angleX = math.radians(SmoothProfile(longitudinal, (-12, -12, -6, -2, 0, 0)))
+                        angleY = math.radians(8)*xColumns[c]/0.70*math.sin(math.pi*longitudinal)
                     restRotation = rig.data.bones[boneName].matrix_local.to_quaternion()
                     worldRotation = Euler((angleX, angleY, 0)).to_quaternion()
                     poseBone = rig.pose.bones[boneName]
@@ -508,8 +529,12 @@ def CanonicalizeGlb(path):
     for index in range(positionAccessor["count"]):
         px, py, pz = struct.unpack_from("<3f", binary, positionOffset+index*positionStride)
         values = BilinearWeights(Vector((px, -pz, py)))
-        struct.pack_into(jointFormat, binary, jointOffset+index*jointStride, *(jointNames[name] for name, _ in values))
-        struct.pack_into("<4f", binary, weightOffset+index*weightStride, *(weight for _, weight in values))
+        storedWeights = struct.unpack("<4f", struct.pack("<4f", *(weight for _, weight in values)))
+        # A zero-weight slot is padding: glTF expects joint index zero there.
+        # This leaves the bilinear weights and every effective influence intact.
+        storedJoints = [jointNames[name] if weight != 0.0 else 0 for (name, _), weight in zip(values, storedWeights)]
+        struct.pack_into(jointFormat, binary, jointOffset+index*jointStride, *storedJoints)
+        struct.pack_into("<4f", binary, weightOffset+index*weightStride, *storedWeights)
     nodeNames = {i: node.get("name", "") for i, node in enumerate(document["nodes"])}
     for animation in document["animations"]:
         channels = [ch for ch in animation["channels"] if
@@ -671,7 +696,7 @@ def Main():
     originalPoints = [v.co.copy() for v in mesh.data.vertices]
     path = args.output_dir / "Model_SingleBlanket.glb"
     document = Export(rig, mesh, sockets, path)
-    assert len(document["skins"]) == 1 and len(document["skins"][0]["joints"]) == 25
+    assert len(document["skins"]) == 1 and len(document["skins"][0]["joints"]) == 1+boneRowCount*boneColumnCount
     assert "inverseBindMatrices" in document["skins"][0]
     assert [a["name"] for a in document["animations"]] == list(clipNames)
     assert len(document["meshes"][0]["primitives"][0]["targets"]) == 1
@@ -687,6 +712,9 @@ def Main():
     report = {"asset": "SingleBlanket", "blenderVersion": bpy.app.version_string,
         "seed": 19380317, "vertices": len(mesh.data.vertices), "quads": len(mesh.data.polygons),
         "simulationMesh": SimulationMetadata(path, document),
+        "rigTopology": {"rows": boneRowCount, "columns": boneColumnCount,
+                        "controlBones": boneRowCount*boneColumnCount, "rootBones": 1,
+                        "spacingM": [1.40/(boneColumnCount-1), ySpacing], "parent": "Blanket_Root"},
         "triangles": sum(len(p.vertices)-2 for p in mesh.data.polygons), "bones": [
             {"name": b.name, "headBlender": list(b.head_local), "tailBlender": list(b.tail_local),
              "parent": b.parent.name if b.parent else None, "deform": b.use_deform, "connected": b.use_connect}

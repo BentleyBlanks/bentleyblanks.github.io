@@ -128,7 +128,7 @@ else CheckServicePistolGrip();
 Check(MESHES.Type95HaGo.triangles === 82142,
   "九五式到 80k 仅降 2.6%，保留 82,142 原始三角", String(MESHES.Type95HaGo.triangles));
 Check(EXTERNAL_GLB_STANDARDS.length === 57
-  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "SingleBlanket" && record.actualTriangles === 3456 && record.targetTriangles === 4000)
+  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "SingleBlanket" && record.actualTriangles === 6000 && record.targetTriangles === 6000)
   && EXTERNAL_GLB_STANDARDS.every((record) => record.actualTriangles > 0 && record.targetTriangles > 0),
   "外部 GLB 分类登记既有资产、指挥室、接收院陈设与单被，共 57 项");
 

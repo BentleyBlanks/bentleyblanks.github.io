@@ -85,9 +85,9 @@ function SkinPoints(state,override=null) {
 }
 const MaxError=(a,b)=>Math.max(...a.map((p,i)=>Distance(p,b[i])));
 const Size=points=>[0,1,2].map(k=>Math.max(...points.map(p=>p[k]))-Math.min(...points.map(p=>p[k])));
-assert.equal(doc.skins.length,1);assert.equal(skin.joints.length,25);assert.equal(ibm.length,25);
+assert.equal(doc.skins.length,1);assert.equal(skin.joints.length,73);assert.equal(ibm.length,73);
 assert.equal(doc.meshes.length,1);assert.equal(doc.meshes[0].primitives.length,1);
-assert.equal(positions.length,1813);assert.equal(Accessor(primitive.indices).length/3,3456);
+assert.equal(positions.length,3111);assert.equal(Accessor(primitive.indices).length/3,6000);
 // A single welded, connected sheet is needed by the future per-vertex solver.
 const triangles=Accessor(primitive.indices).flat();
 const edges=new Map(),connected=Array.from({length:positions.length},(_,i)=>i);
@@ -106,9 +106,9 @@ for(let i=0;i<triangles.length;i+=3){
 assert.equal(new Set(positions.map(p=>p.map(v=>v.toFixed(7)).join(','))).size,positions.length);
 assert.equal(new Set(positions.map((_,i)=>Find(i))).size,1);
 assert.ok([...edges.values()].every(n=>n===1||n===2));
-assert.equal([...edges.values()].filter(n=>n===1).length,168);
+assert.equal([...edges.values()].filter(n=>n===1).length,220);
 assert.equal(positions.length-edges.size+triangles.length/3,1);
-assert.ok(minEdgeLength>0.015&&maxEdgeLength<0.07);
+assert.ok(minEdgeLength>1.4/50-0.015-1e-6&&maxEdgeLength<0.05);
 assert.equal(primitive.targets.length,1);assert.ok(primitive.targets[0].NORMAL!==undefined);
 assert.deepEqual(doc.meshes[0].extras.targetNames,['Crumpled']);
 assert.ok(primitive.attributes.JOINTS_1===undefined && primitive.attributes.WEIGHTS_1===undefined);
@@ -123,15 +123,15 @@ assert.equal(doc.images.length,3);assert.ok(doc.images.every(i=>i.bufferView!==u
 assert.ok(!JSON.stringify(doc.extensionsUsed||[]).includes('draco'));
 assert.ok(!doc.nodes.some(n=>n.name?.startsWith('Ref_')||n.camera!==undefined));
 const root=byName.get('Blanket_Root'), rootJoint=skin.joints.indexOf(root);
-assert.ok(rootJoint>=0);assert.equal(doc.nodes.length,31);
+assert.ok(rootJoint>=0);assert.equal(doc.nodes.length,79);
 for(const node of skin.joints)if(node!==root)assert.equal(parent[node],root);
-const x=[0.7,0.2333,-0.2333,-0.7],y=[-0.95,-0.57,-0.19,0.19,0.57,0.95];
-const BoneName=(r,c)=>({r0c0:'Blanket_CornerHeadL',r0c3:'Blanket_CornerHeadR',r5c0:'Blanket_CornerTailL',r5c3:'Blanket_CornerTailR'}[`r${r}c${c}`]||`Blanket_Grid_r${r}_c${c}`);
+const x=[0.7,0.5,0.3,0.1,-0.1,-0.3,-0.5,-0.7],y=[-0.95,-0.7125,-0.475,-0.2375,0,0.2375,0.475,0.7125,0.95];
+const BoneName=(r,c)=>({r0c0:'Blanket_CornerHeadL',r0c7:'Blanket_CornerHeadR',r8c0:'Blanket_CornerTailL',r8c7:'Blanket_CornerTailR'}[`r${r}c${c}`]||`Blanket_Grid_r${r}_c${c}`);
 function ExpectedWeights(point){
   const px=Math.max(-0.7,Math.min(0.7,point[0])),py=Math.max(-0.95,Math.min(0.95,-point[2]));
-  let column=x.slice(1).findIndex(v=>px>=v);if(column<0)column=2;
-  const row=Math.max(0,Math.min(4,Math.floor((py+0.95)/0.38+1e-10)));
-  const u=Math.max(0,Math.min(1,(x[column]-px)/(x[column]-x[column+1]))),v=Math.max(0,Math.min(1,(py-y[row])/0.38));
+  let column=x.slice(1).findIndex(v=>px>=v);if(column<0)column=6;
+  const row=Math.max(0,Math.min(7,Math.floor((py+0.95)/0.2375+1e-10)));
+  const u=Math.max(0,Math.min(1,(x[column]-px)/(x[column]-x[column+1]))),v=Math.max(0,Math.min(1,(py-y[row])/0.2375));
   return new Map([[BoneName(row,column),(1-u)*(1-v)],[BoneName(row,column+1),u*(1-v)],
     [BoneName(row+1,column),(1-u)*v],[BoneName(row+1,column+1),u*v]]);
 }
@@ -150,7 +150,7 @@ assert.ok(sumError<0.001&&rootWeight===0&&bilinearWeightMaxError<1e-7);
 const rest=State(), restPoints=SkinPoints(rest), unskinned=positions.map(p=>Point(rest.world[meshNode],p));
 const restError=MaxError(restPoints,unskinned);assert.ok(restError<0.0001);
 assert.ok(Math.max(...unskinned.map(p=>Math.abs(p[1])))<0.0001);
-for(let r=0;r<6;r++)for(let c=0;c<4;c++)assert.ok(Distance(Point(rest.world[byName.get(BoneName(r,c))],[0,0,0]),[x[c],0,-y[r]])<0.0001);
+for(let r=0;r<9;r++)for(let c=0;c<8;c++)assert.ok(Distance(Point(rest.world[byName.get(BoneName(r,c))],[0,0,0]),[x[c],0,-y[r]])<0.0001);
 const headL=byName.get('Blanket_CornerHeadL'), liftMatrix=[...rest.world[headL]];liftMatrix[13]+=0.6;
 const lifted=SkinPoints(rest,new Map([[headL,liftMatrix]]));
 let liftError=0,outsideError=0,affected=0;
@@ -164,7 +164,7 @@ assert.ok(liftError<1e-6&&outsideError===0);
 const expectedNames=['Blanket_Flat','Blanket_DragPose','Blanket_Released','Blanket_Crumpled','Blanket_Unfold'];
 assert.deepEqual(doc.animations.map(a=>a.name),expectedNames);
 doc.animations.forEach((a,i)=>{
-  assert.equal(a.channels.length,49);
+  assert.equal(a.channels.length,145);
   for(const ch of a.channels)assert.ok(ch.target.path==='weights'||(['translation','rotation'].includes(ch.target.path)&&skin.joints.includes(ch.target.node)&&ch.target.node!==root));
   for(const sampler of a.samplers) {
     const times=Accessor(sampler.input).flat();assert.equal(times.length,i===4?45:1);
@@ -182,7 +182,9 @@ assert.ok(Distance(Point(drag.world[headL],[0,0,0]),[0.55,0.70,1.15])<0.0001);
 const gripError=Distance(Point(drag.world[byName.get('Socket_GripHeadL')],[0,0,0]),[0.55,0.70,1.15]);
 assert.ok(gripError<0.0001);
 const source=JSON.parse(fs.readFileSync(path.join(projectDir,'Model/Data_SingleBlanket.json')));
-assert.deepEqual(source.simulationMesh.gridSegments,[36,48]);assert.equal(source.simulationMesh.welded,true);
+assert.deepEqual(source.simulationMesh.gridSegments,[50,60]);assert.equal(source.simulationMesh.welded,true);
+assert.equal(source.rigTopology.rows,9);assert.equal(source.rigTopology.columns,8);
+assert.equal(source.rigTopology.controlBones,72);assert.equal(source.rigTopology.rootBones,1);
 assert.equal(source.simulationMesh.cornerPins.length,2);
 for(const pin of source.simulationMesh.cornerPins){
   assert.ok(Number.isInteger(pin.vertexGlb)&&pin.vertexGlb>=0&&pin.vertexGlb<positions.length);
@@ -192,8 +194,8 @@ for(const pin of source.simulationMesh.cornerPins){
   assert.ok(Distance(positions[pin.vertexGlb],socket)<0.022);
 }
 const sha256=crypto.createHash('sha256').update(raw).digest('hex');assert.equal(source.sha256,sha256);
-const report={file:'Model/Model_SingleBlanket.glb',sha256,vertices:positions.length,triangles:3456,joints:25,
-  topology:{welded:true,connectedComponents:1,boundaryEdges:168,minTriangleAreaM2:minTriangleArea,minEdgeLengthM:minEdgeLength,maxEdgeLengthM:maxEdgeLength},
+const report={file:'Model/Model_SingleBlanket.glb',sha256,vertices:positions.length,triangles:6000,joints:73,
+  topology:{welded:true,connectedComponents:1,boundaryEdges:220,minTriangleAreaM2:minTriangleArea,minEdgeLengthM:minEdgeLength,maxEdgeLengthM:maxEdgeLength},
   bilinearWeightMaxError,
   nonzeroInfluences:influenceCounts,weightSumMaxError:sumError,rootMaxWeight:rootWeight,
   cpuRestMaxDeviationM:restError,cpuLiftInterpolationMaxErrorM:liftError,
@@ -213,6 +215,7 @@ if(fs.existsSync(validatorPath)) {
   const result=await validator.validateBytes(new Uint8Array(raw),{uri:'Model_SingleBlanket.glb',maxIssues:100});
   report.khronosValidator={errors:result.issues.numErrors,warnings:result.issues.numWarnings,
     infos:result.issues.numInfos,messages:result.issues.messages};assert.equal(result.issues.numErrors,0);
+  assert.ok(!result.issues.messages.some(m=>m.code==='ACCESSOR_JOINTS_USED_ZERO_WEIGHT'));
 } else {
   console.warn('Khronos validator unavailable; pass --validator=<module directory> to repeat the formal check');
 }

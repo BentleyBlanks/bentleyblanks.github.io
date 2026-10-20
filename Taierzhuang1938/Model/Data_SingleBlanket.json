@@ -2,23 +2,23 @@
   "asset": "SingleBlanket",
   "blenderVersion": "5.1.2",
   "seed": 19380317,
-  "vertices": 1813,
-  "quads": 1728,
+  "vertices": 3111,
+  "quads": 3000,
   "simulationMesh": {
     "gridSegments": [
-      36,
-      48
+      50,
+      60
     ],
     "nominalCellSizeM": [
-      0.03888888888888889,
-      0.03958333333333333
+      0.027999999999999997,
+      0.03166666666666666
     ],
     "welded": true,
     "initialPose": "Rest",
     "cornerPins": [
       {
         "socket": "Socket_GripHeadL",
-        "vertexGlb": 36,
+        "vertexGlb": 50,
         "restOffsetGltfM": [
           -0.004637777805328369,
           0.0,
@@ -37,7 +37,18 @@
     ],
     "note": "Read structural/bending connectivity from the GLB index buffer; runtime solver is not included. Reset morph and animation before simulation, then apply pins in the same world space."
   },
-  "triangles": 3456,
+  "rigTopology": {
+    "rows": 9,
+    "columns": 8,
+    "controlBones": 72,
+    "rootBones": 1,
+    "spacingM": [
+      0.19999999999999998,
+      0.2375
+    ],
+    "parent": "Blanket_Root"
+  },
+  "triangles": 6000,
   "bones": [
     {
       "name": "Blanket_Root",
@@ -74,12 +85,12 @@
     {
       "name": "Blanket_Grid_r0_c1",
       "headBlender": [
-        0.23330000042915344,
+        0.5,
         -0.949999988079071,
         0.0
       ],
       "tailBlender": [
-        0.23330000042915344,
+        0.5,
         -0.949999988079071,
         0.05000000074505806
       ],
@@ -90,12 +101,76 @@
     {
       "name": "Blanket_Grid_r0_c2",
       "headBlender": [
-        -0.23330000042915344,
+        0.30000001192092896,
         -0.949999988079071,
         0.0
       ],
       "tailBlender": [
-        -0.23330000042915344,
+        0.30000001192092896,
+        -0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r0_c3",
+      "headBlender": [
+        0.10000000149011612,
+        -0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        0.10000000149011612,
+        -0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r0_c4",
+      "headBlender": [
+        -0.10000000149011612,
+        -0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        -0.10000000149011612,
+        -0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r0_c5",
+      "headBlender": [
+        -0.30000001192092896,
+        -0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        -0.30000001192092896,
+        -0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r0_c6",
+      "headBlender": [
+        -0.5,
+        -0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        -0.5,
         -0.949999988079071,
         0.05000000074505806
       ],
@@ -123,12 +198,12 @@
       "name": "Blanket_Grid_r1_c0",
       "headBlender": [
         0.699999988079071,
-        -0.5699999928474426,
+        -0.7124999761581421,
         0.0
       ],
       "tailBlender": [
         0.699999988079071,
-        -0.5699999928474426,
+        -0.7124999761581421,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -138,13 +213,13 @@
     {
       "name": "Blanket_Grid_r1_c1",
       "headBlender": [
-        0.23330000042915344,
-        -0.5699999928474426,
+        0.5,
+        -0.7124999761581421,
         0.0
       ],
       "tailBlender": [
-        0.23330000042915344,
-        -0.5699999928474426,
+        0.5,
+        -0.7124999761581421,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -154,13 +229,13 @@
     {
       "name": "Blanket_Grid_r1_c2",
       "headBlender": [
-        -0.23330000042915344,
-        -0.5699999928474426,
+        0.30000001192092896,
+        -0.7124999761581421,
         0.0
       ],
       "tailBlender": [
-        -0.23330000042915344,
-        -0.5699999928474426,
+        0.30000001192092896,
+        -0.7124999761581421,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -170,13 +245,77 @@
     {
       "name": "Blanket_Grid_r1_c3",
       "headBlender": [
+        0.10000000149011612,
+        -0.7124999761581421,
+        0.0
+      ],
+      "tailBlender": [
+        0.10000000149011612,
+        -0.7124999761581421,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r1_c4",
+      "headBlender": [
+        -0.10000000149011612,
+        -0.7124999761581421,
+        0.0
+      ],
+      "tailBlender": [
+        -0.10000000149011612,
+        -0.7124999761581421,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r1_c5",
+      "headBlender": [
+        -0.30000001192092896,
+        -0.7124999761581421,
+        0.0
+      ],
+      "tailBlender": [
+        -0.30000001192092896,
+        -0.7124999761581421,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r1_c6",
+      "headBlender": [
+        -0.5,
+        -0.7124999761581421,
+        0.0
+      ],
+      "tailBlender": [
+        -0.5,
+        -0.7124999761581421,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r1_c7",
+      "headBlender": [
         -0.699999988079071,
-        -0.5699999928474426,
+        -0.7124999761581421,
         0.0
       ],
       "tailBlender": [
         -0.699999988079071,
-        -0.5699999928474426,
+        -0.7124999761581421,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -187,12 +326,12 @@
       "name": "Blanket_Grid_r2_c0",
       "headBlender": [
         0.699999988079071,
-        -0.1899999976158142,
+        -0.4749999940395355,
         0.0
       ],
       "tailBlender": [
         0.699999988079071,
-        -0.1899999976158142,
+        -0.4749999940395355,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -202,13 +341,13 @@
     {
       "name": "Blanket_Grid_r2_c1",
       "headBlender": [
-        0.23330000042915344,
-        -0.1899999976158142,
+        0.5,
+        -0.4749999940395355,
         0.0
       ],
       "tailBlender": [
-        0.23330000042915344,
-        -0.1899999976158142,
+        0.5,
+        -0.4749999940395355,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -218,13 +357,13 @@
     {
       "name": "Blanket_Grid_r2_c2",
       "headBlender": [
-        -0.23330000042915344,
-        -0.1899999976158142,
+        0.30000001192092896,
+        -0.4749999940395355,
         0.0
       ],
       "tailBlender": [
-        -0.23330000042915344,
-        -0.1899999976158142,
+        0.30000001192092896,
+        -0.4749999940395355,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -234,13 +373,77 @@
     {
       "name": "Blanket_Grid_r2_c3",
       "headBlender": [
+        0.10000000149011612,
+        -0.4749999940395355,
+        0.0
+      ],
+      "tailBlender": [
+        0.10000000149011612,
+        -0.4749999940395355,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r2_c4",
+      "headBlender": [
+        -0.10000000149011612,
+        -0.4749999940395355,
+        0.0
+      ],
+      "tailBlender": [
+        -0.10000000149011612,
+        -0.4749999940395355,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r2_c5",
+      "headBlender": [
+        -0.30000001192092896,
+        -0.4749999940395355,
+        0.0
+      ],
+      "tailBlender": [
+        -0.30000001192092896,
+        -0.4749999940395355,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r2_c6",
+      "headBlender": [
+        -0.5,
+        -0.4749999940395355,
+        0.0
+      ],
+      "tailBlender": [
+        -0.5,
+        -0.4749999940395355,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r2_c7",
+      "headBlender": [
         -0.699999988079071,
-        -0.1899999976158142,
+        -0.4749999940395355,
         0.0
       ],
       "tailBlender": [
         -0.699999988079071,
-        -0.1899999976158142,
+        -0.4749999940395355,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -251,12 +454,12 @@
       "name": "Blanket_Grid_r3_c0",
       "headBlender": [
         0.699999988079071,
-        0.1899999976158142,
+        -0.23749999701976776,
         0.0
       ],
       "tailBlender": [
         0.699999988079071,
-        0.1899999976158142,
+        -0.23749999701976776,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -266,13 +469,13 @@
     {
       "name": "Blanket_Grid_r3_c1",
       "headBlender": [
-        0.23330000042915344,
-        0.1899999976158142,
+        0.5,
+        -0.23749999701976776,
         0.0
       ],
       "tailBlender": [
-        0.23330000042915344,
-        0.1899999976158142,
+        0.5,
+        -0.23749999701976776,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -282,13 +485,13 @@
     {
       "name": "Blanket_Grid_r3_c2",
       "headBlender": [
-        -0.23330000042915344,
-        0.1899999976158142,
+        0.30000001192092896,
+        -0.23749999701976776,
         0.0
       ],
       "tailBlender": [
-        -0.23330000042915344,
-        0.1899999976158142,
+        0.30000001192092896,
+        -0.23749999701976776,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -298,13 +501,77 @@
     {
       "name": "Blanket_Grid_r3_c3",
       "headBlender": [
+        0.10000000149011612,
+        -0.23749999701976776,
+        0.0
+      ],
+      "tailBlender": [
+        0.10000000149011612,
+        -0.23749999701976776,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r3_c4",
+      "headBlender": [
+        -0.10000000149011612,
+        -0.23749999701976776,
+        0.0
+      ],
+      "tailBlender": [
+        -0.10000000149011612,
+        -0.23749999701976776,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r3_c5",
+      "headBlender": [
+        -0.30000001192092896,
+        -0.23749999701976776,
+        0.0
+      ],
+      "tailBlender": [
+        -0.30000001192092896,
+        -0.23749999701976776,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r3_c6",
+      "headBlender": [
+        -0.5,
+        -0.23749999701976776,
+        0.0
+      ],
+      "tailBlender": [
+        -0.5,
+        -0.23749999701976776,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r3_c7",
+      "headBlender": [
         -0.699999988079071,
-        0.1899999976158142,
+        -0.23749999701976776,
         0.0
       ],
       "tailBlender": [
         -0.699999988079071,
-        0.1899999976158142,
+        -0.23749999701976776,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -315,12 +582,12 @@
       "name": "Blanket_Grid_r4_c0",
       "headBlender": [
         0.699999988079071,
-        0.5699999928474426,
+        0.0,
         0.0
       ],
       "tailBlender": [
         0.699999988079071,
-        0.5699999928474426,
+        0.0,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -330,13 +597,13 @@
     {
       "name": "Blanket_Grid_r4_c1",
       "headBlender": [
-        0.23330000042915344,
-        0.5699999928474426,
+        0.5,
+        0.0,
         0.0
       ],
       "tailBlender": [
-        0.23330000042915344,
-        0.5699999928474426,
+        0.5,
+        0.0,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -346,13 +613,13 @@
     {
       "name": "Blanket_Grid_r4_c2",
       "headBlender": [
-        -0.23330000042915344,
-        0.5699999928474426,
+        0.30000001192092896,
+        0.0,
         0.0
       ],
       "tailBlender": [
-        -0.23330000042915344,
-        0.5699999928474426,
+        0.30000001192092896,
+        0.0,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -362,13 +629,461 @@
     {
       "name": "Blanket_Grid_r4_c3",
       "headBlender": [
+        0.10000000149011612,
+        0.0,
+        0.0
+      ],
+      "tailBlender": [
+        0.10000000149011612,
+        0.0,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r4_c4",
+      "headBlender": [
+        -0.10000000149011612,
+        0.0,
+        0.0
+      ],
+      "tailBlender": [
+        -0.10000000149011612,
+        0.0,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r4_c5",
+      "headBlender": [
+        -0.30000001192092896,
+        0.0,
+        0.0
+      ],
+      "tailBlender": [
+        -0.30000001192092896,
+        0.0,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r4_c6",
+      "headBlender": [
+        -0.5,
+        0.0,
+        0.0
+      ],
+      "tailBlender": [
+        -0.5,
+        0.0,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r4_c7",
+      "headBlender": [
         -0.699999988079071,
-        0.5699999928474426,
+        0.0,
         0.0
       ],
       "tailBlender": [
         -0.699999988079071,
-        0.5699999928474426,
+        0.0,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r5_c0",
+      "headBlender": [
+        0.699999988079071,
+        0.23749999701976776,
+        0.0
+      ],
+      "tailBlender": [
+        0.699999988079071,
+        0.23749999701976776,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r5_c1",
+      "headBlender": [
+        0.5,
+        0.23749999701976776,
+        0.0
+      ],
+      "tailBlender": [
+        0.5,
+        0.23749999701976776,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r5_c2",
+      "headBlender": [
+        0.30000001192092896,
+        0.23749999701976776,
+        0.0
+      ],
+      "tailBlender": [
+        0.30000001192092896,
+        0.23749999701976776,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r5_c3",
+      "headBlender": [
+        0.10000000149011612,
+        0.23749999701976776,
+        0.0
+      ],
+      "tailBlender": [
+        0.10000000149011612,
+        0.23749999701976776,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r5_c4",
+      "headBlender": [
+        -0.10000000149011612,
+        0.23749999701976776,
+        0.0
+      ],
+      "tailBlender": [
+        -0.10000000149011612,
+        0.23749999701976776,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r5_c5",
+      "headBlender": [
+        -0.30000001192092896,
+        0.23749999701976776,
+        0.0
+      ],
+      "tailBlender": [
+        -0.30000001192092896,
+        0.23749999701976776,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r5_c6",
+      "headBlender": [
+        -0.5,
+        0.23749999701976776,
+        0.0
+      ],
+      "tailBlender": [
+        -0.5,
+        0.23749999701976776,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r5_c7",
+      "headBlender": [
+        -0.699999988079071,
+        0.23749999701976776,
+        0.0
+      ],
+      "tailBlender": [
+        -0.699999988079071,
+        0.23749999701976776,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r6_c0",
+      "headBlender": [
+        0.699999988079071,
+        0.4749999940395355,
+        0.0
+      ],
+      "tailBlender": [
+        0.699999988079071,
+        0.4749999940395355,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r6_c1",
+      "headBlender": [
+        0.5,
+        0.4749999940395355,
+        0.0
+      ],
+      "tailBlender": [
+        0.5,
+        0.4749999940395355,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r6_c2",
+      "headBlender": [
+        0.30000001192092896,
+        0.4749999940395355,
+        0.0
+      ],
+      "tailBlender": [
+        0.30000001192092896,
+        0.4749999940395355,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r6_c3",
+      "headBlender": [
+        0.10000000149011612,
+        0.4749999940395355,
+        0.0
+      ],
+      "tailBlender": [
+        0.10000000149011612,
+        0.4749999940395355,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r6_c4",
+      "headBlender": [
+        -0.10000000149011612,
+        0.4749999940395355,
+        0.0
+      ],
+      "tailBlender": [
+        -0.10000000149011612,
+        0.4749999940395355,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r6_c5",
+      "headBlender": [
+        -0.30000001192092896,
+        0.4749999940395355,
+        0.0
+      ],
+      "tailBlender": [
+        -0.30000001192092896,
+        0.4749999940395355,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r6_c6",
+      "headBlender": [
+        -0.5,
+        0.4749999940395355,
+        0.0
+      ],
+      "tailBlender": [
+        -0.5,
+        0.4749999940395355,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r6_c7",
+      "headBlender": [
+        -0.699999988079071,
+        0.4749999940395355,
+        0.0
+      ],
+      "tailBlender": [
+        -0.699999988079071,
+        0.4749999940395355,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r7_c0",
+      "headBlender": [
+        0.699999988079071,
+        0.7124999761581421,
+        0.0
+      ],
+      "tailBlender": [
+        0.699999988079071,
+        0.7124999761581421,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r7_c1",
+      "headBlender": [
+        0.5,
+        0.7124999761581421,
+        0.0
+      ],
+      "tailBlender": [
+        0.5,
+        0.7124999761581421,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r7_c2",
+      "headBlender": [
+        0.30000001192092896,
+        0.7124999761581421,
+        0.0
+      ],
+      "tailBlender": [
+        0.30000001192092896,
+        0.7124999761581421,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r7_c3",
+      "headBlender": [
+        0.10000000149011612,
+        0.7124999761581421,
+        0.0
+      ],
+      "tailBlender": [
+        0.10000000149011612,
+        0.7124999761581421,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r7_c4",
+      "headBlender": [
+        -0.10000000149011612,
+        0.7124999761581421,
+        0.0
+      ],
+      "tailBlender": [
+        -0.10000000149011612,
+        0.7124999761581421,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r7_c5",
+      "headBlender": [
+        -0.30000001192092896,
+        0.7124999761581421,
+        0.0
+      ],
+      "tailBlender": [
+        -0.30000001192092896,
+        0.7124999761581421,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r7_c6",
+      "headBlender": [
+        -0.5,
+        0.7124999761581421,
+        0.0
+      ],
+      "tailBlender": [
+        -0.5,
+        0.7124999761581421,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r7_c7",
+      "headBlender": [
+        -0.699999988079071,
+        0.7124999761581421,
+        0.0
+      ],
+      "tailBlender": [
+        -0.699999988079071,
+        0.7124999761581421,
         0.05000000074505806
       ],
       "parent": "Blanket_Root",
@@ -392,14 +1107,14 @@
       "connected": false
     },
     {
-      "name": "Blanket_Grid_r5_c1",
+      "name": "Blanket_Grid_r8_c1",
       "headBlender": [
-        0.23330000042915344,
+        0.5,
         0.949999988079071,
         0.0
       ],
       "tailBlender": [
-        0.23330000042915344,
+        0.5,
         0.949999988079071,
         0.05000000074505806
       ],
@@ -408,14 +1123,78 @@
       "connected": false
     },
     {
-      "name": "Blanket_Grid_r5_c2",
+      "name": "Blanket_Grid_r8_c2",
       "headBlender": [
-        -0.23330000042915344,
+        0.30000001192092896,
         0.949999988079071,
         0.0
       ],
       "tailBlender": [
-        -0.23330000042915344,
+        0.30000001192092896,
+        0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r8_c3",
+      "headBlender": [
+        0.10000000149011612,
+        0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        0.10000000149011612,
+        0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r8_c4",
+      "headBlender": [
+        -0.10000000149011612,
+        0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        -0.10000000149011612,
+        0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r8_c5",
+      "headBlender": [
+        -0.30000001192092896,
+        0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        -0.30000001192092896,
+        0.949999988079071,
+        0.05000000074505806
+      ],
+      "parent": "Blanket_Root",
+      "deform": true,
+      "connected": false
+    },
+    {
+      "name": "Blanket_Grid_r8_c6",
+      "headBlender": [
+        -0.5,
+        0.949999988079071,
+        0.0
+      ],
+      "tailBlender": [
+        -0.5,
         0.949999988079071,
         0.05000000074505806
       ],
@@ -442,19 +1221,21 @@
   ],
   "checks": {
     "restMaxDeviationM": 0.0,
-    "weightSumMaxError": 4.0978193283081055e-08,
+    "weightSumMaxError": 4.470348358154297e-08,
     "nonzeroInfluences": {
-      "4": 1813
+      "4": 2980,
+      "3": 80,
+      "2": 51
     },
     "liftHeadLHeightM": 0.6,
-    "liftAffectedVertices": 130,
+    "liftAffectedVertices": 64,
     "liftOutsideSupportMaxDeviationM": 0.0,
     "liftInterpolationMaxErrorM": 5.960464477539063e-08,
     "gripLiftMaxErrorM": 0.0,
     "crumpledSizeM": [
-      0.44999992847442627,
       0.45000001788139343,
-      0.2499999995343387
+      0.4500000476837158,
+      0.2499999850988388
     ],
     "sockets": [
       {
@@ -620,18 +1401,18 @@
     ],
     "topology": {
       "gridSegments": [
-        36,
-        48
+        50,
+        60
       ],
-      "boundaryEdges": 168,
-      "minQuadAreaM2": 0.0009772740304470062,
-      "minEdgeLengthM": 0.02486950214036043,
-      "maxEdgeLengthM": 0.03998206469482293
+      "boundaryEdges": 220,
+      "minQuadAreaM2": 0.0004766453057527542,
+      "minEdgeLengthM": 0.01533079134732367,
+      "maxEdgeLengthM": 0.03204858208156871
     },
-    "roundTripMaxDeviationM": 7.450580596923828e-09,
-    "roundTripSkinMaxDeviationM": 7.450580596923828e-09,
-    "roundTripVertexCount": 1813,
-    "roundTripBoneCount": 25
+    "roundTripMaxDeviationM": 0.0,
+    "roundTripSkinMaxDeviationM": 0.0,
+    "roundTripVertexCount": 3111,
+    "roundTripBoneCount": 73
   },
   "animations": [
     {
@@ -669,8 +1450,8 @@
     "Test_LiftHeadCorners",
     "Test_DrapeOverBody"
   ],
-  "sha256": "b5b62b28ede1d08695bdfc73d5da282fd70c38b4466678cce058f5fa7d57d6b7",
-  "bytes": 1122144,
+  "sha256": "e9af2877b388ad484a30779477debe824766fafe711feb6818f26d490d6646d1",
+  "bytes": 1381384,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SingleBlanket\\Scene_SingleBlanket.blend",
   "coordinates": "Blender (x,y,z) -> glTF (x,z,-y); head -Y -> +Z; L=+X",
   "reconstructionScope": "User-approved five crude patches, gray-white plain cotton, aging, dimensions and dragging poses are artistic reconstruction; not a documented standardized 1938 issue pattern",
