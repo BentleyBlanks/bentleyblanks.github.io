@@ -1,9 +1,9 @@
 {
   "file": "Model/Model_SingleBlanket.glb",
-  "sha256": "e9af2877b388ad484a30779477debe824766fafe711feb6818f26d490d6646d1",
+  "sha256": "15a16e38cbd97076d1fee5d400d3d4f36fd5c20072877547c8e9cc510e6b8b08",
   "vertices": 3111,
   "triangles": 6000,
-  "joints": 73,
+  "joints": 217,
   "topology": {
     "welded": true,
     "connectedComponents": 1,
@@ -12,25 +12,23 @@
     "minEdgeLengthM": 0.015330791473388672,
     "maxEdgeLengthM": 0.0422703341459013
   },
-  "bilinearWeightMaxError": 2.9802322387695312e-8,
+  "bilinearWeightMaxError": 2.9785730437659197e-8,
   "nonzeroInfluences": {
-    "2": 51,
-    "3": 80,
-    "4": 2980
+    "4": 3111
   },
-  "weightSumMaxError": 4.470348358154297e-8,
+  "weightSumMaxError": 4.0978193283081055e-8,
   "rootMaxWeight": 0,
-  "cpuRestMaxDeviationM": 4.006958242877087e-8,
+  "cpuRestMaxDeviationM": 4.1265041413235495e-8,
   "cpuLiftInterpolationMaxErrorM": 0,
   "cpuLiftOutsideSupportMaxDeviationM": 0,
-  "cpuLiftAffectedVertices": 64,
+  "cpuLiftAffectedVertices": 20,
   "crumpledSizeGltfM": [
-    0.4500000180796978,
-    0.24999999069285145,
-    0.45000003116108334
+    0.45000003816425815,
+    0.2500000112853278,
+    0.4499999820575223
   ],
   "unfoldStartMaxErrorM": 0,
-  "unfoldEndMaxErrorM": 3.561873325053287e-29,
+  "unfoldEndMaxErrorM": 0,
   "dragGripMaxErrorM": 2.9200193091131658e-8,
   "animations": [
     "Blanket_Flat",
@@ -44,14 +42,14 @@
     "runs": 2,
     "identical": true,
     "hashes": [
-      "e9af2877b388ad484a30779477debe824766fafe711feb6818f26d490d6646d1",
-      "e9af2877b388ad484a30779477debe824766fafe711feb6818f26d490d6646d1"
+      "15a16e38cbd97076d1fee5d400d3d4f36fd5c20072877547c8e9cc510e6b8b08",
+      "15a16e38cbd97076d1fee5d400d3d4f36fd5c20072877547c8e9cc510e6b8b08"
     ]
   },
   "khronosValidator": {
     "errors": 0,
     "warnings": 1,
-    "infos": 13,
+    "infos": 15,
     "messages": [
       {
         "code": "NODE_EMPTY",
@@ -63,25 +61,25 @@
         "code": "NODE_EMPTY",
         "message": "Empty node encountered.",
         "severity": 2,
-        "pointer": "/nodes/8"
+        "pointer": "/nodes/12"
       },
       {
         "code": "NODE_EMPTY",
         "message": "Empty node encountered.",
         "severity": 2,
-        "pointer": "/nodes/74"
+        "pointer": "/nodes/218"
       },
       {
         "code": "NODE_EMPTY",
         "message": "Empty node encountered.",
         "severity": 2,
-        "pointer": "/nodes/75"
+        "pointer": "/nodes/219"
       },
       {
         "code": "NODE_SKINNED_MESH_NON_ROOT",
         "message": "Node with a skinned mesh is not root. Parent transforms will not affect a skinned mesh.",
         "severity": 1,
-        "pointer": "/nodes/77"
+        "pointer": "/nodes/221"
       },
       {
         "code": "UNUSED_OBJECT",
@@ -99,43 +97,55 @@
         "code": "UNUSED_OBJECT",
         "message": "This object may be unused.",
         "severity": 2,
-        "pointer": "/accessors/102"
+        "pointer": "/accessors/246"
       },
       {
         "code": "UNUSED_OBJECT",
         "message": "This object may be unused.",
         "severity": 2,
-        "pointer": "/accessors/105"
+        "pointer": "/accessors/253"
       },
       {
         "code": "UNUSED_OBJECT",
         "message": "This object may be unused.",
         "severity": 2,
-        "pointer": "/accessors/116"
+        "pointer": "/accessors/256"
       },
       {
         "code": "UNUSED_OBJECT",
         "message": "This object may be unused.",
         "severity": 2,
-        "pointer": "/accessors/185"
+        "pointer": "/accessors/323"
       },
       {
         "code": "UNUSED_OBJECT",
         "message": "This object may be unused.",
         "severity": 2,
-        "pointer": "/accessors/202"
-      },
-      {
-        "code": "UNUSED_OBJECT",
-        "message": "This object may be unused.",
-        "severity": 2,
-        "pointer": "/accessors/375"
+        "pointer": "/accessors/372"
       },
       {
         "code": "UNUSED_OBJECT",
         "message": "This object may be unused.",
         "severity": 2,
         "pointer": "/accessors/377"
+      },
+      {
+        "code": "UNUSED_OBJECT",
+        "message": "This object may be unused.",
+        "severity": 2,
+        "pointer": "/accessors/450"
+      },
+      {
+        "code": "UNUSED_OBJECT",
+        "message": "This object may be unused.",
+        "severity": 2,
+        "pointer": "/accessors/1093"
+      },
+      {
+        "code": "UNUSED_OBJECT",
+        "message": "This object may be unused.",
+        "severity": 2,
+        "pointer": "/accessors/1095"
       }
     ]
   }

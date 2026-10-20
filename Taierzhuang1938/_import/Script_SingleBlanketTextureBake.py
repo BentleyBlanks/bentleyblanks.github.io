@@ -5,6 +5,7 @@ The source PNG is a physical 1.4 x 1.9 m rectangle encoded into square UV space;
 that affine encoding restores the original yarn aspect ratio on the model.
 """
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
@@ -15,6 +16,19 @@ from PIL import Image
 
 projectDir = Path(__file__).resolve().parents[1]
 sourcePath = projectDir / "_import/Source/SingleBlanket/Texture_SingleBlanketSource.png"
+referencePath = sourcePath.with_name("Texture_SingleBlanketApprovedReference.png")
+alphaPath = sourcePath.with_name("Texture_SingleBlanketReferenceAlpha.png")
+
+
+def ProjectApprovedReference():
+    """UV material projection of the approved imagegen pixels; no repainting."""
+    with Image.open(referencePath) as reference:
+        color = reference.convert("RGB").resize((1024, 1024), Image.Resampling.LANCZOS)
+    with Image.open(alphaPath) as originalAlpha:
+        alpha = originalAlpha.convert("L").resize((1024, 1024), Image.Resampling.LANCZOS)
+    color.putalpha(alpha)
+    color.save(sourcePath, optimize=True)
+    print(json.dumps({"referenceProjection": str(referencePath), "alpha": str(alphaPath), "atlas": str(sourcePath)}))
 
 
 def PrepareSource(inputPath):
@@ -62,11 +76,13 @@ def BakeMask():
 
 def Main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", type=Path, help="Optional original imagegen RGBA; default reuses the committed canonical PNG")
+    parser.add_argument("--source", type=Path, help="Optional alternate imagegen RGBA; default projects the committed approved reference and alpha")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.source:
         PrepareSource(args.source)
+    elif not args.dry_run:
+        ProjectApprovedReference()
     if not sourcePath.exists():
         raise FileNotFoundError(sourcePath)
     command = [sys.executable, str(projectDir / "_import/Script_BakePbrTexture.py"),
@@ -76,9 +92,9 @@ def Main():
         # Approved V3 cloth crop's display palette: warm gray-brown, without
         # the previous cool/green bias. These are image sRGB statistics, not
         # a measured historical albedo. Full strength avoids source mean leak.
-        "--mean", "0.655,0.601,0.548", "--contrast", "0.0804", "--tone-strength", "1.0",
-        "--normal-convention", "gl", "--relief-m", "0.00012", "--normal-strength", "0.8",
-        "--rough", "0.90", "--rough-var", "0.006", "--rough-min", "0.85", "--ao", "0.04", "--metal", "0",
+        "--mean", "0.655,0.601,0.548", "--contrast", "0.075", "--tone-strength", "1.0",
+        "--normal-convention", "gl", "--relief-m", "0.00006", "--normal-strength", "0.8",
+        "--rough", "0.92", "--rough-var", "0.006", "--rough-min", "0.85", "--ao", "0.04", "--metal", "0",
         "--base-quality", "90", "--data-quality", "90", "--data-lossless",
         "--uv-atlas-reason", "One non-repeating 1.4x1.9m worn sheet, five user-approved repair patches; square UV encoding compensates the physical cloth aspect ratio",
         "--strict"]
@@ -86,6 +102,16 @@ def Main():
         command.append("--dry-run")
     subprocess.run(command, check=True)
     if not args.dry_run:
+        if not args.source:
+            recordPath = projectDir / "_import/TextureBakes/Texture_SingleBlanket.json"
+            record = json.loads(recordPath.read_text(encoding="utf-8"))
+            record["referenceProjection"] = {
+                "colorSource": referencePath.relative_to(projectDir).as_posix(),
+                "colorSha256": hashlib.sha256(referencePath.read_bytes()).hexdigest(),
+                "alphaSource": alphaPath.relative_to(projectDir).as_posix(),
+                "alphaSha256": hashlib.sha256(alphaPath.read_bytes()).hexdigest(),
+                "method": "Approved imagegen RGB projected into square UV; prior edge alpha retained; no repainting"}
+            recordPath.write_text(json.dumps(record, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
         BakeMask()
 
 

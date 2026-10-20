@@ -124,7 +124,7 @@ export const EXTERNAL_GLB_STANDARDS = Object.freeze([
     sourceTriangles: 6000, actualTriangles: 6000, targetTriangles: 6000,
     sourceTexture: "用户确认参考图、内置 imagegen 的柔软旧棉布图集",
     runtimeTexture: "1024 Base alpha / Normal / ORM 内嵌，独立剧情泥血遮罩",
-    policy: "source", note: "50x60 四边形；纵9行x横8列共72变形骨加Root，73骨、精确双线性、一个形态键、五个NLA动作。_blender/Script_SingleBlanketBake.py 重建；头端+Z，四个角骨与挂点名称保留。" }),
+    policy: "source", note: "50x60 四边形；纵18行x横12列共216变形骨加Root，217骨、精确双线性、一个形态键、五个NLA动作；参考布面直接UV投影。_blender/Script_SingleBlanketBake.py 重建；头端+Z，四个角骨与挂点名称保留。" }),
   Object.freeze({ id: "WardProps", name: "接收院药柜与医疗陈设", pack: "Model_WardProps.glb",
     sourceTriangles: 44524, actualTriangles: 44524, targetTriangles: 50000,
     sourceTexture: "项目 VillageTimber PBR / Blender 材质", runtimeTexture: "作者 UV、内嵌旧木 PBR、陶／搪瓷／药瓶独立材质",

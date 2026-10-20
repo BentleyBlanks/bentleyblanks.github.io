@@ -5,19 +5,19 @@
   "preset": "singleBlanketAtlas",
   "source": {
     "path": "_import/Source/SingleBlanket/Texture_SingleBlanketSource.png",
-    "sha256": "428c9f3c18893e3dcffaa504c0c56a4700cedcaa58eca02ee78ccec244c9cbf2",
+    "sha256": "5b4ad71cec62695f8b4fbba7f87f5d7dbd2bfef6800f21353a28621af2432b1e",
     "metrics": {
       "meanSrgb": [
-        0.7543,
-        0.6948,
-        0.6428
+        0.6551,
+        0.6007,
+        0.5482
       ],
-      "luma": 0.6973,
-      "lumaStd": 0.0761,
-      "sat": 0.1477,
+      "luma": 0.6013,
+      "lumaStd": 0.0801,
+      "sat": 0.1631,
       "clipLow": 0.0,
-      "clipHigh": 0.0001,
-      "lowFreq": 0.024
+      "clipHigh": 0.0,
+      "lowFreq": 0.0352
     }
   },
   "heightSource": null,
@@ -27,7 +27,7 @@
       0.601,
       0.548
     ],
-    "contrast": 0.0804,
+    "contrast": 0.075,
     "lumaRange": [
       0.4,
       0.78
@@ -40,8 +40,8 @@
       0.025,
       0.2
     ],
-    "reliefM": 0.00012,
-    "rough": 0.9,
+    "reliefM": 6e-05,
+    "rough": 0.92,
     "roughVar": 0.006,
     "roughLumaK": 0.0,
     "ao": 0.04,
@@ -76,47 +76,54 @@
       "file": "Texture_SingleBlanketBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 427150,
-      "sha256": "23fa5c7d16b752d9f72d5c770ad6d33d90f060ccc8f60b055e616669d3213a43"
+      "bytes": 287576,
+      "sha256": "d91a69cf2ab33d43ea4d8125111b427355f54354b4075c3c6083fe2b3281d733"
     },
     {
       "channel": "Normal",
       "file": "Texture_SingleBlanketNormal.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 211494,
-      "sha256": "b460f8d89a8695baf8a88aa92254ac3eea6a7a2c00819a3f62aebeee78e5e959"
+      "bytes": 187098,
+      "sha256": "d7dc5a692165ce7b5538da45603dd496c5611602d63496044cf9814649971953"
     },
     {
       "channel": "Orm",
       "file": "Texture_SingleBlanketOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 228988,
-      "sha256": "a9a8fbefca5e77a4f1c71ca2ccc3ab68c57e0dcc6fb945ce7269015facd5b1fb"
+      "bytes": 219680,
+      "sha256": "bd7cac9c90e2684d2f5f4d09599357c18d1fe733462a9bf30790e8ac495e55c3"
     }
   ],
-  "totalBytes": 867632,
+  "totalBytes": 694354,
   "metrics": {
     "meanSrgb": [
-      0.6551,
-      0.6013,
-      0.5477
+      0.6531,
+      0.5995,
+      0.5453
     ],
-    "luma": 0.6014,
-    "lumaStd": 0.0807,
-    "sat": 0.164,
+    "luma": 0.5993,
+    "lumaStd": 0.0736,
+    "sat": 0.165,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0295,
-    "seam": 0.0044,
-    "interior": 0.0451,
-    "seamRatio": 0.098,
-    "border": 0.136,
-    "swing": 0.0673,
-    "aoMean": 0.993,
-    "roughMean": 0.9,
+    "lowFreq": 0.0341,
+    "seam": 0.2394,
+    "interior": 0.03,
+    "seamRatio": 7.974,
+    "border": 0.986,
+    "swing": 0.0791,
+    "aoMean": 0.994,
+    "roughMean": 0.919,
     "texelsPerMeter": 627.9
   },
-  "gateProblems": []
+  "gateProblems": [],
+  "referenceProjection": {
+    "colorSource": "_import/Source/SingleBlanket/Texture_SingleBlanketApprovedReference.png",
+    "colorSha256": "f460c47520d9805f086ce515330bf25053fa08d11f7106877201059d5da2b351",
+    "alphaSource": "_import/Source/SingleBlanket/Texture_SingleBlanketReferenceAlpha.png",
+    "alphaSha256": "430389dff04d84524fecc8d7da5fa52598fa1f1812254f24b5a99ea14e28950a",
+    "method": "Approved imagegen RGB projected into square UV; prior edge alpha retained; no repainting"
+  }
 }

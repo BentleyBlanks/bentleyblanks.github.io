@@ -85,7 +85,7 @@ function SkinPoints(state,override=null) {
 }
 const MaxError=(a,b)=>Math.max(...a.map((p,i)=>Distance(p,b[i])));
 const Size=points=>[0,1,2].map(k=>Math.max(...points.map(p=>p[k]))-Math.min(...points.map(p=>p[k])));
-assert.equal(doc.skins.length,1);assert.equal(skin.joints.length,73);assert.equal(ibm.length,73);
+assert.equal(doc.skins.length,1);assert.equal(skin.joints.length,217);assert.equal(ibm.length,217);
 assert.equal(doc.meshes.length,1);assert.equal(doc.meshes[0].primitives.length,1);
 assert.equal(positions.length,3111);assert.equal(Accessor(primitive.indices).length/3,6000);
 // A single welded, connected sheet is needed by the future per-vertex solver.
@@ -115,23 +115,23 @@ assert.ok(primitive.attributes.JOINTS_1===undefined && primitive.attributes.WEIG
 const material=doc.materials[0];
 assert.equal(material.name,'Mat_SingleBlanket');assert.equal(material.alphaMode,'MASK');
 assert.equal(material.alphaCutoff??0.5,0.5);assert.equal(material.doubleSided,true);
-assert.ok(Math.abs(material.normalTexture.scale-0.45)<1e-6);
+assert.ok(Math.abs(material.normalTexture.scale-0.35)<1e-6);
 assert.ok(material.extensions?.KHR_materials_sheen);
-assert.ok(material.extensions.KHR_materials_sheen.sheenColorFactor.every(v=>Math.abs(v-0.18)<1e-6));
-assert.ok(Math.abs(material.extensions.KHR_materials_sheen.sheenRoughnessFactor-0.85)<1e-6);
+assert.ok(material.extensions.KHR_materials_sheen.sheenColorFactor.every(v=>Math.abs(v-0.10)<1e-6));
+assert.ok(Math.abs(material.extensions.KHR_materials_sheen.sheenRoughnessFactor-0.90)<1e-6);
 assert.equal(doc.images.length,3);assert.ok(doc.images.every(i=>i.bufferView!==undefined&&!i.uri));
 assert.ok(!JSON.stringify(doc.extensionsUsed||[]).includes('draco'));
 assert.ok(!doc.nodes.some(n=>n.name?.startsWith('Ref_')||n.camera!==undefined));
 const root=byName.get('Blanket_Root'), rootJoint=skin.joints.indexOf(root);
-assert.ok(rootJoint>=0);assert.equal(doc.nodes.length,79);
+assert.ok(rootJoint>=0);assert.equal(doc.nodes.length,223);
 for(const node of skin.joints)if(node!==root)assert.equal(parent[node],root);
-const x=[0.7,0.5,0.3,0.1,-0.1,-0.3,-0.5,-0.7],y=[-0.95,-0.7125,-0.475,-0.2375,0,0.2375,0.475,0.7125,0.95];
-const BoneName=(r,c)=>({r0c0:'Blanket_CornerHeadL',r0c7:'Blanket_CornerHeadR',r8c0:'Blanket_CornerTailL',r8c7:'Blanket_CornerTailR'}[`r${r}c${c}`]||`Blanket_Grid_r${r}_c${c}`);
+const x=Array.from({length:12},(_,c)=>0.7-1.4*c/11),y=Array.from({length:18},(_,r)=>-0.95+1.9*r/17);
+const BoneName=(r,c)=>({r0c0:'Blanket_CornerHeadL',r0c11:'Blanket_CornerHeadR',r17c0:'Blanket_CornerTailL',r17c11:'Blanket_CornerTailR'}[`r${r}c${c}`]||`Blanket_Grid_r${r}_c${c}`);
 function ExpectedWeights(point){
   const px=Math.max(-0.7,Math.min(0.7,point[0])),py=Math.max(-0.95,Math.min(0.95,-point[2]));
-  let column=x.slice(1).findIndex(v=>px>=v);if(column<0)column=6;
-  const row=Math.max(0,Math.min(7,Math.floor((py+0.95)/0.2375+1e-10)));
-  const u=Math.max(0,Math.min(1,(x[column]-px)/(x[column]-x[column+1]))),v=Math.max(0,Math.min(1,(py-y[row])/0.2375));
+  let column=x.slice(1).findIndex(v=>px>=v);if(column<0)column=10;
+  const row=Math.max(0,Math.min(16,Math.floor((py+0.95)/(1.9/17)+1e-10)));
+  const u=Math.max(0,Math.min(1,(x[column]-px)/(x[column]-x[column+1]))),v=Math.max(0,Math.min(1,(py-y[row])/(1.9/17)));
   return new Map([[BoneName(row,column),(1-u)*(1-v)],[BoneName(row,column+1),u*(1-v)],
     [BoneName(row+1,column),(1-u)*v],[BoneName(row+1,column+1),u*v]]);
 }
@@ -150,7 +150,7 @@ assert.ok(sumError<0.001&&rootWeight===0&&bilinearWeightMaxError<1e-7);
 const rest=State(), restPoints=SkinPoints(rest), unskinned=positions.map(p=>Point(rest.world[meshNode],p));
 const restError=MaxError(restPoints,unskinned);assert.ok(restError<0.0001);
 assert.ok(Math.max(...unskinned.map(p=>Math.abs(p[1])))<0.0001);
-for(let r=0;r<9;r++)for(let c=0;c<8;c++)assert.ok(Distance(Point(rest.world[byName.get(BoneName(r,c))],[0,0,0]),[x[c],0,-y[r]])<0.0001);
+for(let r=0;r<18;r++)for(let c=0;c<12;c++)assert.ok(Distance(Point(rest.world[byName.get(BoneName(r,c))],[0,0,0]),[x[c],0,-y[r]])<0.0001);
 const headL=byName.get('Blanket_CornerHeadL'), liftMatrix=[...rest.world[headL]];liftMatrix[13]+=0.6;
 const lifted=SkinPoints(rest,new Map([[headL,liftMatrix]]));
 let liftError=0,outsideError=0,affected=0;
@@ -164,7 +164,7 @@ assert.ok(liftError<1e-6&&outsideError===0);
 const expectedNames=['Blanket_Flat','Blanket_DragPose','Blanket_Released','Blanket_Crumpled','Blanket_Unfold'];
 assert.deepEqual(doc.animations.map(a=>a.name),expectedNames);
 doc.animations.forEach((a,i)=>{
-  assert.equal(a.channels.length,145);
+  assert.equal(a.channels.length,433);
   for(const ch of a.channels)assert.ok(ch.target.path==='weights'||(['translation','rotation'].includes(ch.target.path)&&skin.joints.includes(ch.target.node)&&ch.target.node!==root));
   for(const sampler of a.samplers) {
     const times=Accessor(sampler.input).flat();assert.equal(times.length,i===4?45:1);
@@ -183,8 +183,8 @@ const gripError=Distance(Point(drag.world[byName.get('Socket_GripHeadL')],[0,0,0
 assert.ok(gripError<0.0001);
 const source=JSON.parse(fs.readFileSync(path.join(projectDir,'Model/Data_SingleBlanket.json')));
 assert.deepEqual(source.simulationMesh.gridSegments,[50,60]);assert.equal(source.simulationMesh.welded,true);
-assert.equal(source.rigTopology.rows,9);assert.equal(source.rigTopology.columns,8);
-assert.equal(source.rigTopology.controlBones,72);assert.equal(source.rigTopology.rootBones,1);
+assert.equal(source.rigTopology.rows,18);assert.equal(source.rigTopology.columns,12);
+assert.equal(source.rigTopology.controlBones,216);assert.equal(source.rigTopology.rootBones,1);
 assert.equal(source.simulationMesh.cornerPins.length,2);
 for(const pin of source.simulationMesh.cornerPins){
   assert.ok(Number.isInteger(pin.vertexGlb)&&pin.vertexGlb>=0&&pin.vertexGlb<positions.length);
@@ -194,7 +194,7 @@ for(const pin of source.simulationMesh.cornerPins){
   assert.ok(Distance(positions[pin.vertexGlb],socket)<0.022);
 }
 const sha256=crypto.createHash('sha256').update(raw).digest('hex');assert.equal(source.sha256,sha256);
-const report={file:'Model/Model_SingleBlanket.glb',sha256,vertices:positions.length,triangles:6000,joints:73,
+const report={file:'Model/Model_SingleBlanket.glb',sha256,vertices:positions.length,triangles:6000,joints:217,
   topology:{welded:true,connectedComponents:1,boundaryEdges:220,minTriangleAreaM2:minTriangleArea,minEdgeLengthM:minEdgeLength,maxEdgeLengthM:maxEdgeLength},
   bilinearWeightMaxError,
   nonzeroInfluences:influenceCounts,weightSumMaxError:sumError,rootMaxWeight:rootWeight,

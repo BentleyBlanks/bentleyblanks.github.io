@@ -20,7 +20,7 @@ from mathutils.kdtree import KDTree
 
 projectDir = Path(globals()["SingleBlanketProject"]) if "SingleBlanketProject" in globals() else Path(__file__).resolve().parents[1]
 sourceDir = Path("C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SingleBlanket")
-boneRowCount, boneColumnCount = 9, 8
+boneRowCount, boneColumnCount = 18, 12
 xColumns = tuple(0.70-1.40*c/(boneColumnCount-1) for c in range(boneColumnCount))
 yRows = tuple(-0.95+1.90*r/(boneRowCount-1) for r in range(boneRowCount))
 ySpacing = 1.90/(boneRowCount-1)
@@ -158,12 +158,12 @@ def CreateMaterial():
     tree = material.node_tree
     bsdf = tree.nodes.get("Principled BSDF")
     bsdf.inputs["Metallic"].default_value = 0
-    bsdf.inputs["Roughness"].default_value = 0.90
+    bsdf.inputs["Roughness"].default_value = 0.92
     # glTF encodes sheen strength in its colour factor, rather than a separate
     # weight. Keep Blender and the exported MeshPhysicalMaterial consistent.
     bsdf.inputs["Sheen Weight"].default_value = 1.0
-    bsdf.inputs["Sheen Tint"].default_value = (0.18, 0.18, 0.18, 1.0)
-    bsdf.inputs["Sheen Roughness"].default_value = 0.85
+    bsdf.inputs["Sheen Tint"].default_value = (0.10, 0.10, 0.10, 1.0)
+    bsdf.inputs["Sheen Roughness"].default_value = 0.90
     for channel in ("Base", "Normal", "Orm"):
         imagePath = projectDir / f"Texture/Texture_SingleBlanket{channel}.webp"
         if not imagePath.exists():
@@ -182,7 +182,7 @@ def CreateMaterial():
             tree.links.new(clip.outputs[0], bsdf.inputs["Alpha"])
         elif channel == "Normal":
             normal = tree.nodes.new("ShaderNodeNormalMap")
-            normal.inputs["Strength"].default_value = 0.45
+            normal.inputs["Strength"].default_value = 0.35
             tree.links.new(node.outputs["Color"], normal.inputs["Color"])
             tree.links.new(normal.outputs["Normal"], bsdf.inputs["Normal"])
         else:
@@ -214,7 +214,7 @@ def SmoothProfile(amount, values):
 
 def DrapeAngle(x):
     side = min(1.0, max(0.0, (abs(x)-0.25)/0.45))
-    return math.copysign(min(math.radians(70), math.atan(0.226/0.29*math.tan(side*math.pi/2))), x)
+    return math.copysign(min(math.radians(70), math.atan(0.217/0.29*math.tan(side*math.pi/2))), x)
 
 
 def CreatePoses(mesh):
@@ -312,11 +312,11 @@ def CreatePoses(mesh):
             distance = abs(xColumns[c])
             if distance <= 0.25:
                 value.x = math.copysign(distance*0.90, value.x)
-                value.z = 0.245+0.012*math.cos(distance/0.25*math.pi/2)
+                value.z = 0.227+0.007*math.cos(distance/0.25*math.pi/2)
             else:
                 side = (distance-0.25)/0.45
                 value.x = math.copysign(0.225+0.29*math.sin(side*math.pi/2), value.x)
-                value.z = 0.014+0.226*math.cos(side*math.pi/2)
+                value.z = 0.010+0.217*math.cos(side*math.pi/2)
                 value.x += lateral*0.012*side*math.sin(longitudinal*8+2*lateral)
                 value.y += 0.012*side*math.sin(longitudinal*9.5+lateral)
                 value.z += 0.008*side*(0.5+0.5*math.sin(longitudinal*11+lateral))
