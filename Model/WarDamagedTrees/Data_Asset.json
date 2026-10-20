@@ -1,0 +1,180 @@
+{
+  "asset": "WarDamagedTrees",
+  "descriptionZh": "Dots 制作的两类战损无叶树，独立可复用资产；细直树 Tree10 与弯斜树 Tree13，具体树种未确认。",
+  "version": "20261020",
+  "coordinateSystem": {
+    "unit": "metre",
+    "up": "+Y",
+    "front": "Not defined for natural props",
+    "pivot": "Original trunk-base datum; small root portions extend below Y=0. Preserve this datum when planting."
+  },
+  "models": [
+    {
+      "file": "Model_WarDamagedTree10Lod0.glb",
+      "authoringAsset": "Tree10",
+      "triangles": 38900,
+      "boundsMin": [
+        -0.4775271415710449,
+        -0.005522231105715036,
+        -0.5470069646835327
+      ],
+      "boundsMax": [
+        0.38752481341362,
+        4.3050384521484375,
+        0.6407469511032104
+      ],
+      "dimensionsMeters": [
+        0.8650519549846649,
+        4.3105606832541525,
+        1.1877539157867432
+      ],
+      "textureDimensionCounts": {
+        "1254x1254": 9,
+        "2048x2048": 3
+      },
+      "rgbaImageSha256": [
+        "4fd84d4f61fef2d07668e01162b2b0a2f70f6f47f3d0a4b031a39fe89ec6cf67",
+        "ac2f33911df6a113744f281eb0c37aef7923592231b222565269e75a5722e71c",
+        "5c3e25db8da3ade347966060ef01666a783292fa4aadf466db6efaa8e3bff9e3",
+        "f1ac7e284f38281b2ec96fdd55b421e1247ff84761313f2a2384b23b2c52f852",
+        "1cf169b84b43b5fefe130fbee73281e1ea0cba7dd72b789919ade87e4175a600",
+        "5613eeb3d67c89d71a83c13390efc94f9b282028c516b1044d5c7287379b2902",
+        "b5c613e7397245b4022879f3e884859f5e35da292df51379f7067d547e5dfd36",
+        "e210f6b28f9fc74800a5a2e2e3fd0e821da4cedc03d3e160d814a1791648fb50",
+        "607b8e83b4cfdcf7c86fb1e3f3f3b0842dca8a54a73f522f195fa30d63d2cad2",
+        "73a2445e72f6cc0d57df68db4afefbdf74a77811ac981a1cb35fa55593cb3202",
+        "2be7ba95b4238e1d0f2caa50c0f1416e71eb364dad80b9f3be5d4a19d1fda55b",
+        "0589116cfa04977fe69400da4fb52d81f83bcaf4f7b59341b20b045ae174b497"
+      ],
+      "sha256": "38673a0b2b87aa4d3fc82853395ebc6b8375a8d4339d0f2277aa0d52cf50c0cb"
+    },
+    {
+      "file": "Model_WarDamagedTree13Lod0.glb",
+      "authoringAsset": "Tree13",
+      "triangles": 48456,
+      "boundsMin": [
+        -0.8736051321029663,
+        -0.021507086232304573,
+        -2.712085008621216
+      ],
+      "boundsMax": [
+        5.733939170837402,
+        7.744580268859863,
+        0.444916307926178
+      ],
+      "dimensionsMeters": [
+        6.607544302940369,
+        7.766087355092168,
+        3.157001316547394
+      ],
+      "textureDimensionCounts": {
+        "1254x1254": 12
+      },
+      "rgbaImageSha256": [
+        "4fd84d4f61fef2d07668e01162b2b0a2f70f6f47f3d0a4b031a39fe89ec6cf67",
+        "f2eae5482515c7d08654c504da145f722e482598a6ace11446cd68ed860ffcb6",
+        "bb0face1a6ce4519dae41515bb01aebb303b60cdc3344ae2d787da137463830c",
+        "1dad2eba2ceaf23bf70c8c0483922c2b01ecf62d6acff58e813be67d8c3c51e2",
+        "52649f38a67055fb8fb467012d3606862cf6145d10e2f880b1775d9e6a74d91b",
+        "ca9bfa584c59f083837bff3d6ce8078d14e4b1a4159fafab8747260c1e5fe592",
+        "f1ac7e284f38281b2ec96fdd55b421e1247ff84761313f2a2384b23b2c52f852",
+        "1cf169b84b43b5fefe130fbee73281e1ea0cba7dd72b789919ade87e4175a600",
+        "9d0a80024b59022c32937d83da9a17205acc1d79ca94ea56f206d4fdc8bcf983",
+        "9d5c58a05d45feeb9ceb4b6511d81a8e2187ff93c5bcbcae699d30236be89e70",
+        "159ef0633e20c3457dfb1d2b168946b8162a6881cbd16ac3f0bde651a7ae6ddd",
+        "fa0064582c322c8ff25f14a561f4c681f27dd72f678f65793170c277c53514d8"
+      ],
+      "sha256": "fbd6b0e20776d99453b6730909692ba5cb1d2cc47f60b0d64dbfe6963b31fdd4"
+    },
+    {
+      "file": "Model_WarDamagedTree13Lod1.glb",
+      "authoringAsset": "Tree13",
+      "triangles": 22094,
+      "boundsMin": [
+        -0.8739121556282043,
+        -0.02095063216984272,
+        -2.7127108573913574
+      ],
+      "boundsMax": [
+        5.733241558074951,
+        7.729721546173096,
+        0.4474979341030121
+      ],
+      "dimensionsMeters": [
+        6.6071537137031555,
+        7.750672178342938,
+        3.1602087914943695
+      ],
+      "textureDimensionCounts": {
+        "1254x1254": 12
+      },
+      "rgbaImageSha256": [
+        "4fd84d4f61fef2d07668e01162b2b0a2f70f6f47f3d0a4b031a39fe89ec6cf67",
+        "f2eae5482515c7d08654c504da145f722e482598a6ace11446cd68ed860ffcb6",
+        "bb0face1a6ce4519dae41515bb01aebb303b60cdc3344ae2d787da137463830c",
+        "1dad2eba2ceaf23bf70c8c0483922c2b01ecf62d6acff58e813be67d8c3c51e2",
+        "52649f38a67055fb8fb467012d3606862cf6145d10e2f880b1775d9e6a74d91b",
+        "ca9bfa584c59f083837bff3d6ce8078d14e4b1a4159fafab8747260c1e5fe592",
+        "f1ac7e284f38281b2ec96fdd55b421e1247ff84761313f2a2384b23b2c52f852",
+        "1cf169b84b43b5fefe130fbee73281e1ea0cba7dd72b789919ade87e4175a600",
+        "9d0a80024b59022c32937d83da9a17205acc1d79ca94ea56f206d4fdc8bcf983",
+        "9d5c58a05d45feeb9ceb4b6511d81a8e2187ff93c5bcbcae699d30236be89e70",
+        "159ef0633e20c3457dfb1d2b168946b8162a6881cbd16ac3f0bde651a7ae6ddd",
+        "fa0064582c322c8ff25f14a561f4c681f27dd72f678f65793170c277c53514d8"
+      ],
+      "sha256": "1d5202df43ec3e4b03fbcf438c0e26c33c8b2a0a23d2ab1f713a99a479b698c7"
+    }
+  ],
+  "pbr": {
+    "packing": "Self-contained GLB; 12 embedded images per model; authored resolution retained",
+    "baseColorSpace": "sRGB",
+    "normalAndMetallicRoughnessColorSpace": "linear/non-color",
+    "normalConvention": "OpenGL +Y",
+    "vertexColor": "COLOR_0 supplies authored scorch and surface variation; keep vertex colors enabled",
+    "compression": "Lossless WebP where smaller, otherwise original encoding; no resampling; exact decoded RGBA verified against delivered source textures"
+  },
+  "provenance": {
+    "authoring": "User-supplied Dots / 外包负责人 Blender deliverables",
+    "sourceVersions": [
+      "Tree10 Budget40K LOD0, 2026-10",
+      "Tree13 Battle 50k LOD0/LOD1, 2026-10"
+    ],
+    "historicalLimit": "Stylized natural props; species and individual historical trees are not identified.",
+    "rightsNote": "Delivered by the user for this repository; no CC0 or other third-party license claim is added. Original authoring notes remain with the preserved source archives."
+  },
+  "sources": [
+    {
+      "asset": "Tree10",
+      "file": "C:/Users/Bentl/OneDrive/AI/Models/Blender/DotsAcceptance20261020/Tree10/Scene_WarDamagedTree10.blend",
+      "sha256": "6dbde6c3882a15c641d6318a8744134c5d910e44a5fd1bd29f4e0155a57f4f33",
+      "packedTextures": 12
+    },
+    {
+      "asset": "Tree13",
+      "file": "C:/Users/Bentl/OneDrive/AI/Models/Blender/DotsAcceptance20261020/Tree13/Scene_WarDamagedTree13.blend",
+      "sha256": "eb6bfe90b621dac0dc35cb743e2e19ff0b29673f8ffa5272a66e6a92800b5fee",
+      "packedTextures": 12
+    }
+  ],
+  "rebuild": {
+    "blender": "5.2.1 LTS",
+    "pythonDependencies": [
+      "numpy",
+      "Pillow"
+    ],
+    "sourceRoot": "C:/Users/Bentl/OneDrive/AI/Models/Blender/DotsAcceptance20261020",
+    "exportScript": "Script_WarDamagedTreesBake.py",
+    "packingCommand": "python -B Model/WarDamagedTrees/Script_WarDamagedTreesPack.py --root Model/WarDamagedTrees",
+    "verificationCommand": "python -B Model/WarDamagedTrees/Script_WarDamagedTreesVerify.py --root Model/WarDamagedTrees",
+    "workflow": "Write an argument JSON array containing --source-root and --output absolute directories. Run node scripts/Script_BlenderMcp.mjs start --batch Model/WarDamagedTrees/Script_WarDamagedTreesBake.py --batch-args <args.json>, then run packing and verification commands. Source .blend files and backups remain in OneDrive."
+  },
+  "acceptance": {
+    "structure": "Exact triangle counts, finite attributes, valid indices, unit normals, no near-zero-area faces, original bounds and exact source texture pixels checked",
+    "browser": "Project ManagedGLTFLoader, actual WebGL rendering and original/exported comparison passed in local acceptance viewer",
+    "localEvidence": "tmp/DotsAcceptance/; viewer and screenshots remain local",
+    "scope": "Independent assets; no level placement or runtime LOD switching policy is introduced",
+    "sourcePreservation": "Cold-opened packed sources; geometry, transforms, material assignments and UVs unchanged",
+    "vertexColorPreservation": "All triangle-corner position/COLOR_0 pairs match the delivered runtime assets at 10-micrometre position precision",
+    "rebuild": "Independent clean rebuild produced byte-identical GLBs for all three variants"
+  }
+}

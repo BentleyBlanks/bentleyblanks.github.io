@@ -1,0 +1,395 @@
+{
+  "method": "Lossless same-resolution WebP; decoded RGBA and all non-image buffers verified byte-for-byte",
+  "models": [
+    {
+      "file": "Model_WarDamagedTree10Lod0.glb",
+      "beforeBytes": 37356848,
+      "afterBytes": 28265768,
+      "beforeSha256": "ed6e97ceffce069bad0ba7ec6727d508d809413da36ceb8cc8ea0bcb4d3656c5",
+      "afterSha256": "38673a0b2b87aa4d3fc82853395ebc6b8375a8d4339d0f2277aa0d52cf50c0cb",
+      "geometrySha256": "c18020c716a443ccb90ff391280d7efac9c4b5c828009a84ed75b366fcc6a0c4",
+      "images": [
+        {
+          "index": 0,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "4fd84d4f61fef2d07668e01162b2b0a2f70f6f47f3d0a4b031a39fe89ec6cf67",
+          "beforeBytes": 2668205,
+          "afterBytes": 2668205
+        },
+        {
+          "index": 1,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "ac2f33911df6a113744f281eb0c37aef7923592231b222565269e75a5722e71c",
+          "beforeBytes": 1145941,
+          "afterBytes": 722594
+        },
+        {
+          "index": 2,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "5c3e25db8da3ade347966060ef01666a783292fa4aadf466db6efaa8e3bff9e3",
+          "beforeBytes": 2985381,
+          "afterBytes": 2124930
+        },
+        {
+          "index": 3,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "f1ac7e284f38281b2ec96fdd55b421e1247ff84761313f2a2384b23b2c52f852",
+          "beforeBytes": 3775660,
+          "afterBytes": 3612376
+        },
+        {
+          "index": 4,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "1cf169b84b43b5fefe130fbee73281e1ea0cba7dd72b789919ade87e4175a600",
+          "beforeBytes": 1921587,
+          "afterBytes": 1921587
+        },
+        {
+          "index": 5,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "5613eeb3d67c89d71a83c13390efc94f9b282028c516b1044d5c7287379b2902",
+          "beforeBytes": 656494,
+          "afterBytes": 595746
+        },
+        {
+          "index": 6,
+          "dimensions": [
+            2048,
+            2048
+          ],
+          "rgbaSha256": "b5c613e7397245b4022879f3e884859f5e35da292df51379f7067d547e5dfd36",
+          "beforeBytes": 4604181,
+          "afterBytes": 2752062
+        },
+        {
+          "index": 7,
+          "dimensions": [
+            2048,
+            2048
+          ],
+          "rgbaSha256": "e210f6b28f9fc74800a5a2e2e3fd0e821da4cedc03d3e160d814a1791648fb50",
+          "beforeBytes": 3713157,
+          "afterBytes": 2029812
+        },
+        {
+          "index": 8,
+          "dimensions": [
+            2048,
+            2048
+          ],
+          "rgbaSha256": "607b8e83b4cfdcf7c86fb1e3f3f3b0842dca8a54a73f522f195fa30d63d2cad2",
+          "beforeBytes": 6823158,
+          "afterBytes": 4451384
+        },
+        {
+          "index": 9,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "73a2445e72f6cc0d57df68db4afefbdf74a77811ac981a1cb35fa55593cb3202",
+          "beforeBytes": 3365833,
+          "afterBytes": 3263252
+        },
+        {
+          "index": 10,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "2be7ba95b4238e1d0f2caa50c0f1416e71eb364dad80b9f3be5d4a19d1fda55b",
+          "beforeBytes": 1609365,
+          "afterBytes": 953594
+        },
+        {
+          "index": 11,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "0589116cfa04977fe69400da4fb52d81f83bcaf4f7b59341b20b045ae174b497",
+          "beforeBytes": 2896938,
+          "afterBytes": 1978770
+        }
+      ]
+    },
+    {
+      "file": "Model_WarDamagedTree13Lod0.glb",
+      "beforeBytes": 26512152,
+      "afterBytes": 23577176,
+      "beforeSha256": "369535a79e0d1098af9dceacad990c0cc2ffe8351e1aa5f47d400ccc25c53a3b",
+      "afterSha256": "fbd6b0e20776d99453b6730909692ba5cb1d2cc47f60b0d64dbfe6963b31fdd4",
+      "geometrySha256": "c6c69c2f2ba221297685418ed63d11a9c90fc503461bedff0e73190e5cebf0c3",
+      "images": [
+        {
+          "index": 0,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "4fd84d4f61fef2d07668e01162b2b0a2f70f6f47f3d0a4b031a39fe89ec6cf67",
+          "beforeBytes": 2668205,
+          "afterBytes": 2668205
+        },
+        {
+          "index": 1,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "f2eae5482515c7d08654c504da145f722e482598a6ace11446cd68ed860ffcb6",
+          "beforeBytes": 2977863,
+          "afterBytes": 2108426
+        },
+        {
+          "index": 2,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "bb0face1a6ce4519dae41515bb01aebb303b60cdc3344ae2d787da137463830c",
+          "beforeBytes": 832924,
+          "afterBytes": 541538
+        },
+        {
+          "index": 3,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "1dad2eba2ceaf23bf70c8c0483922c2b01ecf62d6acff58e813be67d8c3c51e2",
+          "beforeBytes": 3491618,
+          "afterBytes": 3348138
+        },
+        {
+          "index": 4,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "52649f38a67055fb8fb467012d3606862cf6145d10e2f880b1775d9e6a74d91b",
+          "beforeBytes": 1691774,
+          "afterBytes": 1691774
+        },
+        {
+          "index": 5,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "ca9bfa584c59f083837bff3d6ce8078d14e4b1a4159fafab8747260c1e5fe592",
+          "beforeBytes": 1109857,
+          "afterBytes": 545810
+        },
+        {
+          "index": 6,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "9d5c58a05d45feeb9ceb4b6511d81a8e2187ff93c5bcbcae699d30236be89e70",
+          "beforeBytes": 2822513,
+          "afterBytes": 2822513
+        },
+        {
+          "index": 7,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "159ef0633e20c3457dfb1d2b168946b8162a6881cbd16ac3f0bde651a7ae6ddd",
+          "beforeBytes": 1394242,
+          "afterBytes": 1394242
+        },
+        {
+          "index": 8,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "fa0064582c322c8ff25f14a561f4c681f27dd72f678f65793170c277c53514d8",
+          "beforeBytes": 854535,
+          "afterBytes": 545552
+        },
+        {
+          "index": 9,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "f1ac7e284f38281b2ec96fdd55b421e1247ff84761313f2a2384b23b2c52f852",
+          "beforeBytes": 3775660,
+          "afterBytes": 3612376
+        },
+        {
+          "index": 10,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "1cf169b84b43b5fefe130fbee73281e1ea0cba7dd72b789919ade87e4175a600",
+          "beforeBytes": 1921587,
+          "afterBytes": 1921587
+        },
+        {
+          "index": 11,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "9d0a80024b59022c32937d83da9a17205acc1d79ca94ea56f206d4fdc8bcf983",
+          "beforeBytes": 1190999,
+          "afterBytes": 596302
+        }
+      ]
+    },
+    {
+      "file": "Model_WarDamagedTree13Lod1.glb",
+      "beforeBytes": 25653764,
+      "afterBytes": 22718788,
+      "beforeSha256": "bff83745249efc38a16a0d6c7dc760cf2d9db7ab7e81dc36c99d090ca9a51de4",
+      "afterSha256": "1d5202df43ec3e4b03fbcf438c0e26c33c8b2a0a23d2ab1f713a99a479b698c7",
+      "geometrySha256": "e1a7053a232723d24b836c801302f322740573d3e4c42cac3166009cc8a538d0",
+      "images": [
+        {
+          "index": 0,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "4fd84d4f61fef2d07668e01162b2b0a2f70f6f47f3d0a4b031a39fe89ec6cf67",
+          "beforeBytes": 2668205,
+          "afterBytes": 2668205
+        },
+        {
+          "index": 1,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "f2eae5482515c7d08654c504da145f722e482598a6ace11446cd68ed860ffcb6",
+          "beforeBytes": 2977863,
+          "afterBytes": 2108426
+        },
+        {
+          "index": 2,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "bb0face1a6ce4519dae41515bb01aebb303b60cdc3344ae2d787da137463830c",
+          "beforeBytes": 832924,
+          "afterBytes": 541538
+        },
+        {
+          "index": 3,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "1dad2eba2ceaf23bf70c8c0483922c2b01ecf62d6acff58e813be67d8c3c51e2",
+          "beforeBytes": 3491618,
+          "afterBytes": 3348138
+        },
+        {
+          "index": 4,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "52649f38a67055fb8fb467012d3606862cf6145d10e2f880b1775d9e6a74d91b",
+          "beforeBytes": 1691774,
+          "afterBytes": 1691774
+        },
+        {
+          "index": 5,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "ca9bfa584c59f083837bff3d6ce8078d14e4b1a4159fafab8747260c1e5fe592",
+          "beforeBytes": 1109857,
+          "afterBytes": 545810
+        },
+        {
+          "index": 6,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "9d5c58a05d45feeb9ceb4b6511d81a8e2187ff93c5bcbcae699d30236be89e70",
+          "beforeBytes": 2822513,
+          "afterBytes": 2822513
+        },
+        {
+          "index": 7,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "159ef0633e20c3457dfb1d2b168946b8162a6881cbd16ac3f0bde651a7ae6ddd",
+          "beforeBytes": 1394242,
+          "afterBytes": 1394242
+        },
+        {
+          "index": 8,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "fa0064582c322c8ff25f14a561f4c681f27dd72f678f65793170c277c53514d8",
+          "beforeBytes": 854535,
+          "afterBytes": 545552
+        },
+        {
+          "index": 9,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "f1ac7e284f38281b2ec96fdd55b421e1247ff84761313f2a2384b23b2c52f852",
+          "beforeBytes": 3775660,
+          "afterBytes": 3612376
+        },
+        {
+          "index": 10,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "1cf169b84b43b5fefe130fbee73281e1ea0cba7dd72b789919ade87e4175a600",
+          "beforeBytes": 1921587,
+          "afterBytes": 1921587
+        },
+        {
+          "index": 11,
+          "dimensions": [
+            1254,
+            1254
+          ],
+          "rgbaSha256": "9d0a80024b59022c32937d83da9a17205acc1d79ca94ea56f206d4fdc8bcf983",
+          "beforeBytes": 1190999,
+          "afterBytes": 596302
+        }
+      ]
+    }
+  ]
+}
