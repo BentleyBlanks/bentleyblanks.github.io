@@ -23,10 +23,24 @@
 
 截图与 JSON 报告放在忽略目录 `_shots/FirearmHandling`，不作为游戏资产提交。
 
-## 枪口焰与瞬时照明（2026-09-14）
+## 转视角摇摆（2026-10-21，照 COD）
 
-三八式、汉阳造及共用 Viewmodel 的火器复用已交付 Vefects 火焰遮罩，三片向前火舌与端面亮核合批。持续时间、颜色、强度和尺寸统一取 `Data_Tuning_FirearmHandling.MUZZLE_FLASH`；世界烟尘继续走 Vfx 枪种配方。没有新增生成位图。
+用户反馈：稍快地转镜头枪就大幅晃动，停下时还有一个大回弹。原因是旧的欠阻尼弹簧（阻尼比 0.42）：一次约 125°/s 的转身枪偏 5.2°、停下后反向回弹 1.2°、来回晃约 1 秒，最大能偏 12.6°。
+
+现在照 COD 引擎（COD2 / WaW / COD4 同一套 `BG_CalculateWeaponPosition_Sway` + `DiffTrack`，读的是 KisakCOD 反编译源码）实现在 `Script_FirearmHandling.LookSway`：这一帧视角转了多少，先折成「度 / (1/60 s)」再限幅，乘比例得到枪该落后多少（转向与位移都落在转向后面），再用一阶跟随追过去 —— 一阶跟随数学上不会过冲，停手就是平顺回位。数值取 WaW 栓动步枪 Kar98k 的武器文件（`swayMaxAngle 5`、`swayLerpSpeed 5`、俯仰/偏航比例 0.1、横 0.08 in、纵 0.12 in），唯一来源 `Data_Tuning_FirearmHandling.LOOK_SWAY`；各枪 `Data_Weapons.swayScale` 照乘，开镜仍没有转视角摇摆（2026-08-21 的中心瞄准口径）。实测同一次转身：偏转 0.19°、回弹 0、0.25 s 回稳，20/30/60 fps 一致。
+
+验收：`Script_FirearmHandlingTest.mjs`（限幅、不过冲且单调回位、鼠标分帧抖动被滤掉、各帧率一致、开镜为零）。
+
+## 枪口焰与瞬时照明（2026-09-14 起，2026-10-21 重做）
+
+**看不到枪焰的根因**：开枪发生在一帧里面，视图模型和灯紧接着先把这一整帧的时长记到枪焰年龄上再画。旧枪焰只活 36 ms：60 fps 画出来只剩 39% 亮、30 fps 2%、低于 28 fps 一帧都画不出来；枪口灯同理（20 fps 为 0）。现在枪焰的年龄从**画出来的第一帧**算起（`flashTime` 仍是离开枪口多久，手臂开火姿态照读），`LightRig` 先按当前年龄给亮度再长一岁，开火后第一帧在任何帧率下都是满亮度。
+
+**做法照 COD 的 view flash**（WaW `raw/fx/weapon/muzzleflashes/*_view.efx`：每发随机挑图集格、随机滚转与大小、一到两片，寿命 30–100 ms）：一张 4×4 图集 `Texture_MuzzleFlash_01`，每发随机组合——一到两片正面气团（平行画面）、一到两片沿枪管的火舌（绕枪管转到最对镜头）、一片柔光。步枪多挑步枪气团格，机枪多挑大火团格。网格挂在 `Viewmodel.root`（相机空间、FOV 深度压缩之外），每帧按枪口的**可见**位置重写五片四边形。混合是预乘：rgb 是火自己的光，alpha（图集覆盖度 × 每片遮挡）把背后压暗一点——纯加色在白天亮天空上会洗成一团白。目标 alpha 原样保留。
+
+**图集是照片级的**：第一版程序化星芒被用户评为「有点卡通」，要求接近 COD / 战地的写实。现在三张 2×2 源图由内置 imagegen 生成（步枪口正面气团、侧面火舌、机枪火团；提示词 `_import/Prompts/Texture_MuzzleFlash.txt`，源图无损存 `_import/Source/MuzzleFlash/`），`_import/Script_BakeMuzzleFlashAtlas.py` 只负责切格、去黑底、对齐枪口、缩放、导出覆盖度并打包；柔光格程序生成。写实的要点：软的湍流气团而不是尖星芒，小白黄核、暖橙身、边缘渐隐成薄烟，半透明，只亮 1–3 帧。
+
+尺寸、寿命、遮挡、亮度、选格概率与灯光取 `Data_Tuning_FirearmHandling.MUZZLE_FLASH`，各枪种覆盖在 `Data_Tuning_FirearmEffects`；世界烟尘继续走 Vfx 枪种配方。
 
 玩家开火经 `VfxSystem.MuzzleFlash({player:true})` 获得灯槽短时优先权，NPC 不得在包络结束前把这盏灯移走。灯仍由 LightRig 驱动，low 走固定点光、其余档位走簇光，不增加灯数或开火时重编译。现有枪身 Standard/PBR 材质响应真实直接光，木托为漫反射、金属为粗糙镜面反射；没有用枪身自发光冒充照明。
 
-`Script_MuzzleFlashTest.mjs` 验证两支枪的腰射和 ADS、high/low 两条光照路径、NPC 抢灯保护及熄灭。GPU 对照隐藏火光、世界和手臂，在同一真实枪身姿态只开关枪口灯，按枪身遮罩计量受光像素；正式后期截图另留 `_shots/MuzzleFlash` 本地复核。
+`Script_MuzzleFlashTest.mjs` 验证四支枪的腰射和 ADS、high/low 两条光照路径、NPC 抢灯保护及熄灭，并用真实按键在 20/30/60 fps 下确认开火后画出的第一帧枪焰与枪口灯都是满亮度、连续几发形状各不相同。GPU 对照隐藏火光、世界和手臂，在同一真实枪身姿态只开关枪口灯，按枪身遮罩计量受光像素；正式后期截图另留 `_shots/MuzzleFlash` 本地复核。

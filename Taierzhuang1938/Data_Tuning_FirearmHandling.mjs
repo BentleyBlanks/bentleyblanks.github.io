@@ -26,13 +26,46 @@ export const WALL_CARRY = Object.freeze({
   floorGraceM: 0.70, floorNormalY: 0.50,
 });
 
-// Shared first-person rifle flash: a hot, masked flame and a brief PBR light pulse.
-// Reuse the shipped Vefects mask; no new generated bitmap is needed.
+// First-person look sway (2026-10-20 user: a quick mouse turn swung the gun hard
+// and it sprang back when the turn stopped; match COD). Same model as the IW
+// engine of COD2 / WaW / COD4 (BG_CalculateWeaponPosition_Sway + DiffTrack): the
+// look change this frame, in degrees per 1/60 s and clamped to maxDegPerFrame,
+// sets how far the gun trails; the gun follows that target with a first-order
+// tracker at lerpSpeed per second, so it settles without overshoot. Values are
+// WaW's Kar98k hip weapon file (swayMaxAngle 5, swayLerpSpeed 5, swayPitchScale /
+// swayYawScale 0.1, swayHorizScale 0.08 in, swayVertScale 0.12 in), inches in
+// metres. Data_Weapons.swayScale multiplies; ADS keeps no look sway (2026-08-21).
+export const LOOK_SWAY = Object.freeze({
+  maxDegPerFrame: 5, lerpSpeed: 5,
+  yawScale: 0.1, pitchScale: 0.1,                 // degrees of lag per degree/frame
+  horizM: 0.08 * 0.0254, vertM: 0.12 * 0.0254,    // metres of lag per degree/frame
+  rollScale: 0.06,                                // slight bank into the turn
+  strafeRollRad: 0.045, strafeLerpSpeed: 6,       // existing strafe lean, now without rebound
+});
+
+// Shared first-person muzzle flash, COD view-flash recipe (WaW raw/fx/weapon/
+// muzzleflashes/*_view.efx): every shot picks random atlas cells, roll, size and
+// count, so no two flashes match. Sprites: one or two camera-facing gas flashes,
+// one or two flame tongues along the bore, a soft glow; plus the PBR light pulse.
+// Age 0 is the first frame that is drawn (fired inside the frame, so the frame
+// time is not charged against the flash), and lives are COD's 30-100 ms.
+// Kinds override in Data_Tuning_FirearmEffects.
 export const MUZZLE_FLASH = Object.freeze({
-  mask: "./Texture/Texture_VefectsFireMask_01.webp",
-  lifeS: 0.060, lightLifeS: 0.075, lightRadiusM: 5,
-  lightIntensity: 26, lightColor: 0xffc781,
-  widthM: 0.13, lengthM: 0.27, coreM: 0.16,
-  color: 0xffc781, radiance: 7.5,
-  minScale: 0.85, maxScale: 1.25, endScale: 0.55,
+  // Photographic cells (imagegen sheets, see _import/Script_BakeMuzzleFlashAtlas.py).
+  atlas: "./Texture/Texture_MuzzleFlash_01.webp?v=20261021000000",
+  atlasGrid: 4, rifleCells: Object.freeze([0, 1, 2, 3]), fireballCells: Object.freeze([4, 5, 6, 7]),
+  tongueCells: Object.freeze([8, 9, 10, 11, 12, 13, 14]), glowCell: 15,
+  fireballChance: 0.3,             // machine guns lean to the billowing fireball cells
+  lifeS: 0.050, tongueLifeS: 0.060, glowLifeS: 0.070,
+  lightLifeS: 0.060, lightRadiusM: 5, lightIntensity: 26, lightColor: 0xffc781,
+  frontM: 0.20, frontScale: Object.freeze([0.80, 1.20]), frontAspect: Object.freeze([0.85, 1.18]),
+  frontAheadM: 0.035, secondFrontChance: 0.35, secondFrontScale: Object.freeze([0.50, 0.75]),
+  tongueM: 0.24, tongueScale: Object.freeze([0.70, 1.30]), tongueWidth: 0.60,
+  secondTongueChance: 0.6, secondTongueTurn: Object.freeze([0.5, 1.2]), secondTongueScale: Object.freeze([0.6, 0.9]),
+  glowM: 0.30, glowGain: 0.30,
+  frontCover: 0.6, tongueCover: 0.5, // premultiplied coverage: fire stays orange over a bright sky, gas stays see-through
+  grow: 0.35,                      // gas keeps expanding while it fades
+  adsScale: 1.0,                   // aimed: same size; the sights hide the core and the cloud spills around them
+  radiance: 3.4, radianceJitter: Object.freeze([0.85, 1.20]),
+  tints: Object.freeze([0xfff0de, 0xffd2a6]),
 });

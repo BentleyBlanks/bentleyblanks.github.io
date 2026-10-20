@@ -3,32 +3,32 @@
 // remains bounded during automatic fire instead of building an opaque aim screen.
 import { MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
 
+// Flash sizes are sprite edge lengths in metres at the viewmodel muzzle. Rifles
+// lean to star cells; machine guns to the ragged fireballs of COD's MG flashes;
+// automatic lives stay shorter than the fire interval so bursts read as pulses.
 export const FIREARM_EFFECTS = Object.freeze({
   boltRifle: Object.freeze({
-    ...MUZZLE_FLASH, id:"boltRifle", lifeS:.036, lightLifeS:.047,
-    widthM:.090, lengthM:.230, coreM:.100, radiance:6.8,
-    minScale:.88, maxScale:1.10, lightIntensity:24,
+    ...MUZZLE_FLASH, id:"boltRifle", lifeS:.050, tongueLifeS:.060, glowLifeS:.070, lightLifeS:.060,
+    frontM:.20, tongueM:.24, glowM:.30, radiance:3.4, fireballChance:.3, lightIntensity:24,
     quickSmoke:{count:2,life:[.14,.22],speed:2.8,size:[.026,.135],opacity:.10},
     lingering:{intervalS:.20,life:[.55,.85],size:[.020,.15],opacity:.075},
   }),
   lmg: Object.freeze({
-    ...MUZZLE_FLASH, id:"lmg", lifeS:.026, lightLifeS:.036,
-    widthM:.082, lengthM:.190, coreM:.104, radiance:6.4,
-    minScale:.86, maxScale:1.08, lightIntensity:19,
+    ...MUZZLE_FLASH, id:"lmg", lifeS:.040, tongueLifeS:.048, glowLifeS:.055, lightLifeS:.045,
+    frontM:.24, tongueM:.26, glowM:.32, radiance:3.3, fireballChance:.5, lightIntensity:19, adsScale:1.1,
     quickSmoke:{count:1,life:[.12,.18],speed:3.0,size:[.022,.110],opacity:.075},
     lingering:{intervalS:.24,life:[.48,.68],size:[.018,.13],opacity:.055},
   }),
   hmg: Object.freeze({
-    ...MUZZLE_FLASH, id:"hmg", lifeS:.043, lightLifeS:.054,
-    widthM:.105, lengthM:.265, coreM:.115, radiance:7.2,
-    minScale:.90, maxScale:1.12, lightIntensity:31,
+    ...MUZZLE_FLASH, id:"hmg", lifeS:.050, tongueLifeS:.058, glowLifeS:.070, lightLifeS:.060,
+    frontM:.38, tongueM:.34, glowM:.46, radiance:3.6, fireballChance:.75, lightIntensity:31,
+    secondFrontChance:.5, adsScale:1.1,
     quickSmoke:{count:2,life:[.15,.23],speed:3.4,size:[.030,.165],opacity:.095},
     lingering:{intervalS:.22,life:[.60,.90],size:[.022,.18],opacity:.075},
   }),
   pistol: Object.freeze({
-    ...MUZZLE_FLASH,id:"pistol",lifeS:.023,lightLifeS:.032,
-    widthM:.065,lengthM:.115,coreM:.070,radiance:5.8,
-    minScale:.85,maxScale:1.1,lightIntensity:16,
+    ...MUZZLE_FLASH,id:"pistol",lifeS:.035,tongueLifeS:.040,glowLifeS:.050,lightLifeS:.040,
+    frontM:.11,tongueM:.12,glowM:.18,radiance:3.0,fireballChance:.3,lightIntensity:16,
     quickSmoke:{count:1,life:[.10,.16],speed:2.1,size:[.018,.095],opacity:.075},
     lingering:{intervalS:.20,life:[.40,.65],size:[.015,.11],opacity:.05},
   }),

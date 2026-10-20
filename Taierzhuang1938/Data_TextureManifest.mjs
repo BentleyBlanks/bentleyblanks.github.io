@@ -1120,6 +1120,15 @@ export const TEXTURE_MANIFEST = Object.freeze([
     ],
   },
   {
+    id: "MuzzleFlash", kind: "vfx", tier: "fx",
+    packing: "4x4 cells of 256 px; RGB = the flame's own light (sRGB, black = none), A = coverage from luminance for premultiplied blending: 0-3 rifle blast down the bore, 4-7 machine-gun fireball down the bore, 8-11 side plumes with the muzzle at the cell's bottom edge, 12-14 mirrored plumes, 15 procedural glow",
+    bake: "_import/Script_BakeMuzzleFlashAtlas.py",
+    source: { provider: "imagegen", date: "2026-10-21", prompt: "_import/Prompts/Texture_MuzzleFlash.txt",
+      ref: "_import/Source/MuzzleFlash/", note: "Three photographic 2x2 sheets (front, fireball, side) cut, aligned and packed by the bake script; replaces the 2026-10-20 procedural star pass the user found cartoonish. Cell roles follow COD WaW view muzzle-flash effects (random atlas cell, roll and size per shot)" },
+    consumers: [{ file: "Data_Tuning_FirearmHandling.mjs", token: "Texture_MuzzleFlash_01" }],
+    files: [["Texture_MuzzleFlash_01.webp", "Atlas", 1024, 1024]],
+  },
+  {
     id: "IncomingMarker", kind: "vfx", tier: "fx",
     packing: "R 线稿、G 颗粒、B 尘团",
     bake: "_import/BuildIncomingMarkerTexture.py",

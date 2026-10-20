@@ -1,0 +1,25 @@
+# Texture_MuzzleFlash_01 — imagegen source sheets (2026-10-21)
+# Tool: Codex CLI built-in image_gen__imagegen (level 1 of the repo's image chain), one call per sheet, 1254x1254 RGB.
+# Sources: _import/Source/MuzzleFlash/Texture_MuzzleFlash{Front,Side,Fireball}Source.webp (lossless). Packed by _import/Script_BakeMuzzleFlashAtlas.py.
+# Why: the 2026-10-20 procedural star atlas read as a cartoon; user asked for COD / Battlefield realism.
+
+## Front (Texture_MuzzleFlashFrontSource) — atlas cells 0-3
+Photorealistic high-speed photography reference sheet for a game visual-effects texture.
+A 2x2 grid of FOUR DIFFERENT muzzle blasts of a 1930s military bolt-action rifle (7.92 mm), each seen from DIRECTLY IN FRONT of the muzzle, looking straight down the bore axis, so the gas cloud spreads radially around a centre point.
+Each blast: hot propellant gas bursting out as a soft, turbulent, asymmetric cloud; a small bright pale-yellow core at the centre, warm yellow-orange body, dull orange-red ragged wispy edges that fade into thin translucent grey smoke; 3 to 5 soft irregular lobes, never a clean star; a few tiny glowing unburnt powder sparks flying outward. Real photographic detail, like a frame from a 1000 fps camera.
+Strictly NOT cartoon, no sharp geometric spikes, no lens flare, no glow rings, no gun, no barrel, no hands, no text, no grid lines, no borders.
+Background is pure black (#000000) everywhere outside the flames. Each blast is centred in its own quarter with a generous black margin so no flame touches the edges of its quarter. Square image, 1024x1024.
+
+## Side (Texture_MuzzleFlashSideSource) — atlas cells 8-11, mirrored 12-14
+Photorealistic high-speed photography reference sheet for a game visual-effects texture.
+A 2x2 grid of FOUR DIFFERENT rifle muzzle blasts seen FROM THE SIDE. In every quarter the muzzle point is at the bottom centre of that quarter and the plume shoots STRAIGHT UP (vertical axis).
+Each plume: a narrow white-hot jet right at the base, a brighter rounded bulb of burning gas a little above the muzzle, then a longer expanding turbulent yellow-orange flame with ragged tongues and filaments that fades into faint translucent grey smoke near the top; slightly different length, width and shape in each quarter; a few tiny glowing powder sparks.
+Real photographic detail like a frame from a 1000 fps camera. Strictly NOT cartoon, no geometric spikes, no lens flare, no gun, no barrel, no hands, no text, no grid lines, no borders.
+Pure black background (#000000) everywhere outside the flames, generous black margin so no flame touches the edges of its quarter. Square image, 1024x1024.
+
+## Fireball (Texture_MuzzleFlashFireballSource) — atlas cells 4-7
+Photorealistic high-speed photography reference sheet for a game visual-effects texture.
+A 2x2 grid of FOUR DIFFERENT machine-gun muzzle blasts (1930s water-cooled heavy machine gun), each seen from DIRECTLY IN FRONT of the muzzle, looking down the bore axis.
+Each blast: a large billowing fireball of burning propellant gas, dense turbulent orange and yellow flame with a small white-yellow hot core, darker orange-red cooler patches and ragged wispy edges that fade into translucent grey-brown smoke, a few tiny glowing sparks. Irregular and asymmetric, each one a different shape.
+Real photographic detail like a frame from a 1000 fps camera. Strictly NOT cartoon, no geometric star spikes, no lens flare, no glow rings, no gun, no hands, no text, no grid lines, no borders.
+Pure black background (#000000) everywhere outside the flames, generous black margin so no flame touches the edges of its quarter. Square image, 1024x1024.

@@ -2825,7 +2825,7 @@ async function Boot() {
         sprintBlocked: player.sprint > 0.35
           || (state.elapsed - sprintReleaseAt) < SPRINT_FIRE_DELAY_S,
         sinceSprint: state.elapsed - sprintReleaseAt,
-        swayYaw: viewmodel.swayYaw ? viewmodel.swayYaw.value : null,
+        swayYaw: viewmodel.lookSway ? viewmodel.lookSway.yaw : null,
         lastLookDeltaYaw: lastLookDeltaYaw,
         lowAmmo: state.ammo <= 1,
         boltOpen: viewmodel.boltOpen,
@@ -7869,12 +7869,11 @@ let firePunch = 0;
 const SPRINT_FIRE_DELAY_S = FIRE_CONTROL.sprintFireDelayS;
 let sprintReleaseAt = -99;
 let sprintWasOn = false;
-// 方子 3「接上 sway 输入」：Script_Viewmodel 的三个弹簧全写好了，
-// 而这里一直传的是写死的 0 —— 实测相机转 398°，弹簧恒等于 0。
-// 弹簧常数一个都不用动，只要把每帧的视角增量算出来传进去。
+// 方子 3「接上 sway 输入」：每帧的视角增量传给 Viewmodel 的转视角摇摆
+//（2026-10-20 起是 COD 式一阶跟随 LookSway，不再是欠阻尼弹簧）。
 let lastViewYaw = 0;
 let lastViewPitch = 0;
-let lastLookDeltaYaw = 0;      // 上一帧真的传给 sway 弹簧的那个数（取证用）
+let lastLookDeltaYaw = 0;      // 上一帧真的传给 sway 的那个数（取证用）
 
 /**
  * 弹道步进积分。
@@ -9166,9 +9165,8 @@ function Frame(dt, render = true) {
   }
   p012Binoculars?.Update({owned:!!p012Runtime?.binocularOwned,raised:p012BinocularRaised},dt);
 
-  // 枪感方子 3：**把视线增量接进 sway 弹簧。**
-  // 三个弹簧、限幅、增量换算 Script_Viewmodel 全写好了，而这里一直传的是 0 ——
-  // 实测相机转了 398° 而三个弹簧恒等于 0，等于整套"枪滞后于视线"没接线。
+  // 枪感方子 3：**把视线增量接进 sway。**
+  // 限幅、增量换算在 Script_FirearmHandling.LookSway；这里只负责算出每帧转了多少。
   // 算增量要用**枪口方向**（yaw + aimYaw），不是视线：自由瞄准那一段偏移
   // 本来就是"枪还没跟上"的一部分，漏掉它枪会在自由瞄准范围内诡异地不动。
   const viewYaw = player.yaw + player.aimYaw;

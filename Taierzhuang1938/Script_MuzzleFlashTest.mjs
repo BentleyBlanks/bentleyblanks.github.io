@@ -156,6 +156,38 @@ try {
         }
       }
     }
+    if (quality !== "high") continue;
+    // 2026-10-20: the trigger shot lands inside Frame(), before the viewmodel and the
+    // lights step. The frame drawn right after it must carry the full flash and light
+    // at any frame rate (it was 39% at 60 fps and nothing at all below 28 fps), and
+    // every shot rolls its own flash (COD view flash: random cells, roll, size, count).
+    const pulse = await page.evaluate(() => {
+      const T = window.Taierzhuang, vm = T.viewmodel, range = T.Debug.WeaponRange;
+      const Step = (n, dt = 1 / 60) => T.StepFrames(n, dt, false);
+      T.Debug.Mouse(0, false); T.Debug.Mouse(2, false);
+      range.GoTo("table", "HanYang"); Step(120); T.StepFrames(2);
+      if (T.Debug.Slots().weapon !== "HanYang" && !range.Pickup("HanYang")) throw new Error("Pickup rejected: HanYang");
+      Step(150); range.GoTo("firing"); range.SetAmmoMode("infinite"); Step(120);
+      const rows = [], shapes = new Set();
+      for (const fps of [20, 30, 60, 20, 30, 60]) {
+        Step(Math.round(fps * 2.2), 1 / fps);
+        const before = T.state.playerShots;
+        T.Debug.Mouse(0, true); Step(1, 1 / fps); T.Debug.Mouse(0, false);
+        const color = vm.flashGeometry.attributes.color.array, shot = vm.flashShot;
+        rows.push({ fps, fired: T.state.playerShots - before, visible: vm.flash.visible,
+          front: color[3] / vm.flashProfile.frontCover, light: T.lights.muzzle.intensity / Math.max(1e-6, T.lights.muzzleBase) });
+        shapes.add(JSON.stringify([shot.front.map((s) => [s.cell, s.roll.toFixed(3), s.size.toFixed(4)]), shot.tongue.map((s) => s.cell)]));
+      }
+      return { rows, shapes: shapes.size };
+    });
+    for (const row of pulse.rows) {
+      assert.equal(row.fired, 1, `${row.fps} fps: real trigger shot`);
+      assert(row.visible && row.front > 0.99, `${row.fps} fps: first drawn frame carries the full flash: ${JSON.stringify(row)}`);
+      assert(row.light > 0.99, `${row.fps} fps: first drawn frame carries the full muzzle light: ${JSON.stringify(row)}`);
+    }
+    assert.equal(pulse.shapes, pulse.rows.length, `every shot rolls its own flash: ${JSON.stringify(pulse)}`);
+    results.push({ key: "FirstDrawnFrame", ...pulse });
+    console.log(`PASS first drawn frame: full flash and light at 20/30/60 fps, ${pulse.shapes} distinct flashes`);
   }
   assert.deepEqual(errors, [], "Browser errors");
   fs.writeFileSync(path.join(out, "Data_MuzzleFlashReport.json"), JSON.stringify(results, null, 2));

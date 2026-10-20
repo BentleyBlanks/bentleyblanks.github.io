@@ -583,10 +583,12 @@ export class LightRig {
       light.intensity = state.currentIntensity;
     }
 
+    // 先按当前年龄给亮度、再长一岁：开枪就发生在这一帧里，紧跟着画出来的那一帧
+    // 必须是满亮度。原来先长一岁再算，60 fps 只剩 42%、20 fps 直接是 0。
     if (this.muzzleAge < this.muzzleDuration) {
-      this.muzzleAge += step;
       const t = Clamp01(this.muzzleAge / this.muzzleDuration);
       this.muzzle.intensity = this.muzzleBase * (1 - t) * (1 - t);
+      this.muzzleAge += step;
     } else {
       this.muzzle.intensity = 0;
     }

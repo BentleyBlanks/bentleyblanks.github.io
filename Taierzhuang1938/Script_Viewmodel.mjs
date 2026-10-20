@@ -55,6 +55,7 @@ import { FpsSkeletalAnimation } from "./Script_FpsSkeletalAnimation.mjs";
 import { BeginDeathHands, UpdateDeathHands, ResetDeathHands } from "./Script_PlayerDeath.mjs";
 
 import { AUTOMATIC_RECOIL, WALL_CARRY, MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
+import { LookSway } from "./Script_FirearmHandling.mjs";
 import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS, FPS_BOLT_HAND, FPS_TOP_MAG_RELOAD, FPS_HOPPER_RELOAD } from "./Data_Tuning_FpsReload.mjs";
 import { FirearmEffects, CASE_EJECTION, VIEWMODEL_FIREARM_SURFACES } from "./Data_Tuning_FirearmEffects.mjs";
 
@@ -282,6 +283,15 @@ function SafeMaterial(library, name, options, fallback) {
   }
 }
 
+// Texture_MuzzleFlash_01 is colour (manifest channel Atlas): decode as sRGB.
+// Cells are padded to black, so clamped mips never bleed a neighbour in.
+function LoadFlashAtlas() {
+  const texture = new ManagedTextureLoader().load(MUZZLE_FLASH.atlas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+  return texture;
+}
+
 function BuildMaterials(library) {
   const { reflectanceScale: zb26Reflectance, ...zb26Finish } = VIEWMODEL_FIREARM_SURFACES.zb26Steel;
   return {
@@ -396,13 +406,19 @@ function BuildMaterials(library) {
     lqWeaponPlain: SafeMaterial(library, "Steel", {}, 0x555960),
     // 刀柄缠的红布：全场唯二的高饱和点之一（另一个是青天白日帽徽）
     redCloth: library.Plain("VmRedCloth", { color: 0x8e2b22, roughness: 0.92, metalness: 0 }),
+    // Pre-coloured atlas; per-sprite HDR radiance, tint and fade ride on vertex colours.
+    // 预乘混合：rgb 是火自己的光，alpha（图集覆盖度 × 每片遮挡）把背后压暗一点 ——
+    // 纯加色在白天亮天空上会洗成一团白，带一点遮挡火才保持橙色、星芒读得出来。
+    // 目标 alpha 原样保留（ZeroFactor / OneFactor），不改场景色缓冲的 alpha 语义。
     flash: new THREE.MeshBasicMaterial({
       name: "VmMuzzleFlash",
-      map: new ManagedTextureLoader().load(MUZZLE_FLASH.mask),
-      color: new THREE.Color(MUZZLE_FLASH.color).multiplyScalar(MUZZLE_FLASH.radiance),
-      blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-      transparent: true, opacity: 1, depthWrite: false, toneMapped: false,
-      // 加色混合与先后无关：单趟画，免得 three 把「透明+双面」拆两趟、每趟标脏重算参数。
+      map: LoadFlashAtlas(),
+      color: 0xffffff, vertexColors: true,
+      blending: THREE.CustomBlending, blendEquation: THREE.AddEquation,
+      blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+      blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor,
+      side: THREE.DoubleSide, transparent: true, opacity: 1, depthWrite: false, toneMapped: false,
+      // 单趟画，免得 three 把「透明+双面」拆两趟、每趟标脏重算参数。
       forceSinglePass: true,
     }),
   };
@@ -1601,10 +1617,9 @@ export class Viewmodel {
     this.reloadPivot.add(this.swingPivot);
 
     // --- 弹簧 ---------------------------------------------------------------
-    // 阻尼比 0.42：明显欠阻尼，鼠标停下后枪还会甩过去一点再回来 —— 这就是"重量"
-    this.swayYaw = new Spring(115, 0.42);
-    this.swayPitch = new Spring(115, 0.42);
-    this.swayRoll = new Spring(80, 0.55);
+    // 转视角的摇摆不用弹簧（2026-10-20）：原先 0.42 阻尼比的欠阻尼弹簧在鼠标停下时
+    // 甩过头 23%、来回晃一秒，且最大能偏 12.6°。改成 COD 的一阶跟随，见 LookSway。
+    this.lookSway = new LookSway();
     // 开镜带一点点过冲（0.72 阻尼比），到位那一下有"顿"感；再低就晃得看不清准星
     this.adsSpring = new Spring(240, 0.72);
     this.sprintSpring = new Spring(90, 0.95);
@@ -1719,6 +1734,7 @@ export class Viewmodel {
 
     // --- 枪口焰 -------------------------------------------------------------
     this.flash = this._BuildFlash();
+    this.root.add(this.flash);
     this.flashTime = 999;
 
     // --- 抛壳 / 抛桥夹的小道具池 ---------------------------------------------
@@ -1772,37 +1788,70 @@ export class Viewmodel {
   // -------------------------------------------------------------------------
 
   /**
-   * 枪口焰：三片遮罩火舌 + 端面亮核。自发光，不放实光源 —— 实光源交给
-   * 调用方的 LightRig.AddFire 之类去做，视图模型自己点灯会把整条阴影链子拖垮。
-   * 三片遮罩火焰和端面亮核合并为一个网格，共用短促衰减。
+   * 枪口焰（2026-10-21 照 COD 的 view flash 重做）：一张照片级 4×4 图集（imagegen 源图切格），
+   * 每一发随机挑格、随机滚转与大小、随机一到两片 —— 正面气团（对着镜头）、
+   * 沿枪管的火舌（绕枪管转到最对镜头）、底下一片柔光。自发光，不放实光源 ——
+   * 实光源走 Vfx.MuzzleFlash → LightRig.FlashMuzzle，视图模型自己点灯会拖垮阴影链。
+   *
+   * 网格挂在 root（相机空间、在 fovRig 的非等比缩放**之外**），每帧按枪口的可见位置
+   * 重写五片四边形：挂在枪口锚点下的话，正面贴片会被 FOV 深度压缩拧斜。
+   * 片序：0/1 正面气团，2/3 火舌，4 柔光；没用到的片收成零面积。
    */
   _BuildFlash() {
     const group = new THREE.Group();
-    this.flashGeometries = new Map();
+    group.name = "VmMuzzleFlash";
     this.flashProfile = FirearmEffects("boltRifle");
-    const mesh = new THREE.Mesh(this._FlashGeometry(this.flashProfile), this.materials.flash);
-    mesh.frustumCulled = false; mesh.castShadow = false;
+    this.flashShot = null;
+    const quads = 5, geometry = new THREE.BufferGeometry();
+    const position = new THREE.BufferAttribute(new Float32Array(quads * 12), 3);
+    const uv = new THREE.BufferAttribute(new Float32Array(quads * 8), 2);
+    const color = new THREE.BufferAttribute(new Float32Array(quads * 16), 4);
+    for (const attribute of [position, uv, color]) attribute.setUsage(THREE.DynamicDrawUsage);
+    const index = [];
+    for (let q = 0; q < quads; q += 1) index.push(q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3);
+    geometry.setIndex(index);
+    geometry.setAttribute("position", position);
+    geometry.setAttribute("uv", uv);
+    geometry.setAttribute("color", color);
+    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 10);
+    this.flashGeometry = geometry;
+    const mesh = new THREE.Mesh(geometry, this.materials.flash);
+    mesh.name = "VmMuzzleFlashSprites";
+    mesh.frustumCulled = false; mesh.castShadow = false; mesh.receiveShadow = false;
+    mesh.renderOrder = 10;
     group.add(mesh); group.visible = false;
+    this._flashTmp = { o: new THREE.Vector3(), f: new THREE.Vector3(), axis: new THREE.Vector3(),
+      side: new THREE.Vector3(), up: new THREE.Vector3(), c: new THREE.Vector3(), a: new THREE.Vector3(),
+      b: new THREE.Vector3(), color: new THREE.Color() };
     return group;
   }
 
-  _FlashGeometry(profile) {
-    if (this.flashGeometries.has(profile.id)) return this.flashGeometries.get(profile.id);
-    const petals = [];
-    for (let i = 0; i < 3; i += 1) {
-      const petal = new THREE.PlaneGeometry(profile.widthM, profile.lengthM);
-      petal.rotateX(-Math.PI / 2);
-      petal.translate(0, 0, -profile.lengthM / 2);
-      petal.rotateZ((i / 3) * Math.PI);
-      petals.push(petal);
-    }
-    // End-on core remains visible through iron sights when the long cards are edge-on.
-    const core = new THREE.PlaneGeometry(profile.coreM, profile.coreM);
-    core.translate(0, 0, -0.025);
-    petals.push(core);
-    const geometry=MergeGeometries(petals);
-    this.flashGeometries.set(profile.id,geometry);
-    return geometry;
+  /** 这一发的枪焰：COD 式随机 —— 格子、滚转、大小、长宽比、片数、亮度、色温。 */
+  _RollFlash(roll, sizeRoll) {
+    const P = this.flashProfile;
+    const rnd = Mulberry32(HashString(`${this.seed}:flash:${this.shotIndex}`));
+    const Range = (pair) => Mix(pair[0], pair[1], rnd());
+    const Pick = (cells) => cells[Math.floor(rnd() * cells.length) % cells.length];
+    // 步枪口喷出的气团 / 机枪的大火团两组格子；机枪偏火团（COD 的机枪焰是一大团碎火）。
+    const PickFront = () => Pick(rnd() < P.fireballChance ? P.fireballCells : P.rifleCells);
+    const ads = Mix(1, P.adsScale, Clamp01(this.adsSpring.value));
+    const tint = this._flashTmp.color.set(P.tints[0]).lerp(new THREE.Color(P.tints[1]), rnd());
+    const radiance = P.radiance * Range(P.radianceJitter);
+    const front = [{
+      cell: PickFront(), roll, size: P.frontM * Mix(P.frontScale[0], P.frontScale[1], sizeRoll) * ads,
+      aspect: Range(P.frontAspect), ahead: P.frontAheadM, gain: 1,
+    }];
+    if (rnd() < P.secondFrontChance) front.push({
+      cell: PickFront(), roll: rnd() * Math.PI * 2, size: front[0].size * Range(P.secondFrontScale),
+      aspect: Range(P.frontAspect), ahead: P.frontAheadM * Mix(1.2, 2.2, rnd()), gain: Mix(0.55, 0.85, rnd()),
+    });
+    const tongue = [{ cell: Pick(P.tongueCells), length: P.tongueM * Range(P.tongueScale) * ads, turn: 0, gain: 0.9 }];
+    if (rnd() < P.secondTongueChance) tongue.push({
+      cell: Pick(P.tongueCells), length: tongue[0].length * Range(P.secondTongueScale),
+      turn: (rnd() < 0.5 ? -1 : 1) * Range(P.secondTongueTurn), gain: Mix(0.5, 0.8, rnd()),
+    });
+    return { front, tongue, glow: { size: P.glowM * ads * Mix(0.85, 1.15, rnd()), gain: P.glowGain },
+      r: tint.r * radiance, g: tint.g * radiance, b: tint.b * radiance };
   }
 
   /** 抛壳/抛桥夹的小道具：共用一个池子，最多同时 6 个飞在画面里。 */
@@ -2044,8 +2093,7 @@ export class Viewmodel {
     this.visualAmmo = this.weapon.magazine ?? null;
     this.hopperLastAmmo = this.visualAmmo;
     this.flashProfile=FirearmEffects(this.weapon);
-    this.flash.children[0].geometry=this._FlashGeometry(this.flashProfile);
-    this.materials.flash.color.set(this.flashProfile.color).multiplyScalar(this.flashProfile.radiance);
+    this.flashShot=null;
     if (["enBloc","stripper"].includes(this.weapon.reloadKind))
       for (let count = 1; count < 5; count += 1) this._ReloadRoundGeometry(reloadProfile, count);
 
@@ -2113,7 +2161,6 @@ export class Viewmodel {
     this.muzzleAnchor = new THREE.Object3D();
     this.muzzleAnchor.position.copy(this.rig.muzzle);
     this.rig.group.add(this.muzzleAnchor);
-    this.muzzleAnchor.add(this.flash);
 
     // 后坐弹簧按这支枪的 recoverS 重建（栓动枪回位慢而重，捷克式快而碎）
     const recover = (this.weapon.recoil && this.weapon.recoil.recoverS) || 0.4;
@@ -2369,10 +2416,7 @@ export class Viewmodel {
 
   _ClearRig() {
     if (this.riggedArms) this.riggedArms.Detach();
-    if (this.muzzleAnchor) {
-      this.muzzleAnchor.remove(this.flash);
-      this.muzzleAnchor = null;
-    }
+    this.muzzleAnchor = null;
     if (this.rig) {
       this.rig.group.remove(this.handRight.group);
       this.rig.group.remove(this.handLeft.group);
@@ -2432,13 +2476,12 @@ export class Viewmodel {
       this.cameraKick.y += yawAmount * 0.5 * adsAim;
     }
 
-    // 枪焰：旋转按发数派生，连发时每一发的形状不同
+    // 枪焰：格子、滚转、大小、片数按发数派生，连发时每一发的形状不同。
+    // 这一发在帧内打出，画出来的第一帧算 0 岁（见 _StepFlash），帧率再低也看得见。
     this.flashTime = 0;
-    this.flash.rotation.z = rnd() * Math.PI * 2;
-    const size = Mix(this.flashProfile.minScale, this.flashProfile.maxScale, rnd());
-    this.flashBaseScale = size;
+    this.flashFresh = true;
+    this.flashShot = this._RollFlash(rnd() * Math.PI * 2, rnd());
     this.materials.flash.opacity = 1;
-    this.flash.scale.setScalar(size);
     this.flash.visible = true;
 
     // 半自动/全自动当场抛壳；栓动枪的壳是拉栓时才出来的
@@ -2779,23 +2822,14 @@ export class Viewmodel {
     const freeAimPitch = Clamp(input.freeAimPitch ?? 0, -0.25, 0.25);
     this.root.rotation.set(freeAimPitch, freeAimYaw, 0, "YXZ");
 
-    // --- 摇摆：枪滞后于视线，停下后过冲一点再回来 ---------------------------
-    // 传进来的是"这一帧转了多少弧度"，先换算成角速度，否则帧率一变手感就变
-    const rate = step > 1e-5 ? 1 / step : 0;
-    const yawRate = (input.lookDeltaYaw || 0) * rate;
-    const pitchRate = (input.lookDeltaPitch || 0) * rate;
+    // --- 摇摆：枪滞后于视线，停下后平顺回位（COD，不过冲）---------------------
+    // 传进来的是"这一帧转了多少弧度"；LookSway 先折成「度 / (1/60 s)」再限幅，
+    // 帧率怎么变手感都不变。枪口朝向与位置都落在转向的后面。
     const adsVisual = Clamp01(ads);
     const swayGain = (this.weapon ? this.weapon.swayScale ?? 1 : 1) * (1 - adsVisual);
-    const yawTarget = Clamp(-yawRate * 0.030, -0.22, 0.22) * swayGain;
-    const pitchTarget = Clamp(pitchRate * 0.026, -0.18, 0.18) * swayGain;
-    const rollTarget = (Clamp(-yawRate * 0.012, -0.10, 0.10) - strafe * 0.045) * swayGain;
-    const swayYaw = this.swayYaw.Step(step, yawTarget);
-    const swayPitch = this.swayPitch.Step(step, pitchTarget);
-    const swayRoll = this.swayRoll.Step(step, rollTarget);
-
-    this.swayPivot.rotation.set(swayPitch, swayYaw, swayRoll, "YXZ");
-    // 转身时枪不只是转，还会被甩开一点，横向位移比纯旋转更能读出"沉"
-    this.swayPivot.position.set(swayYaw * -0.075, swayPitch * -0.055, 0);
+    const sway = this.lookSway.Step(step, input.lookDeltaYaw || 0, input.lookDeltaPitch || 0, swayGain, strafe);
+    this.swayPivot.rotation.set(sway.pitch, sway.yaw, sway.roll + sway.strafeRoll, "YXZ");
+    this.swayPivot.position.set(sway.x, sway.y, 0);
 
     // --- 步伐晃动：走 / 跑 / 蹲三档 -----------------------------------------
     const gait = Math.max(moveSpeed, sprint);
@@ -2924,6 +2958,7 @@ export class Viewmodel {
       crouch: Math.max(input.crouch || 0, input.carryBodyCrouch || 0) } : input,
       parent, (this.root.visible || !!input.carryBodyVisible) && !(input.meleeCameraDrop > 0.05));
     this._UpdateSleeves();
+    this._PlaceFlash();
   }
 
   /**
@@ -4179,15 +4214,91 @@ export class Viewmodel {
 
   _StepFlash(dt) {
     if (!this.flash.visible) return;
+    // flashTime 仍是「离开枪多久」（手臂开火姿态读它）；枪焰自己的年龄从画出来的
+    // 第一帧起算。原来开火那一帧先扣掉整帧时长：60 fps 只剩 39% 亮、30 fps 2%、
+    // 低于 28 fps 一帧都画不出来 —— 「开火没有枪口焰」就是这么来的。
     this.flashTime += dt;
-    // Shared bounded pulse; preserve each shot's seeded size throughout its decay.
-    const profile=this.flashProfile;
-    const life = Clamp01(this.flashTime / profile.lifeS);
-    if (life >= 1) { this.flash.visible = false; return; }
-    const shrink = Math.pow(1-life,1.5);
-    this.flash.scale.setScalar(this.flashBaseScale * Mix(profile.endScale, 1, Math.sqrt(1-life)));
-    this.materials.flash.opacity = shrink;
-    this.flash.rotation.z += dt * 6;
+    if (this.flashFresh) { this.flashBorn = this.flashTime; this.flashFresh = false; }
+    const P = this.flashProfile;
+    if (!this.flashShot || this.flashTime - this.flashBorn >= Math.max(P.lifeS, P.tongueLifeS, P.glowLifeS)) {
+      this.flash.visible = false;
+    }
+  }
+
+  /** 每帧把枪焰几片贴到枪口的**可见**位置（root 空间 = 相机空间，镜头在原点）。 */
+  _PlaceFlash() {
+    if (!this.flash.visible || !this.flashShot || !this.muzzleAnchor) return;
+    const P = this.flashProfile, shot = this.flashShot, T = this._flashTmp;
+    const age = Math.max(0, this.flashTime - (this.flashBorn ?? this.flashTime));
+    this.muzzleAnchor.updateWorldMatrix(true, false);
+    const o = this.root.worldToLocal(T.o.set(0, 0, 0).applyMatrix4(this.muzzleAnchor.matrixWorld));
+    const f = this.root.worldToLocal(T.f.set(0, 0, -0.1).applyMatrix4(this.muzzleAnchor.matrixWorld));
+    // 枪管在画面里的方向：两点都过 FOV 压缩，取的是看上去的枪管，不是物理枪管。
+    const axis = T.axis.subVectors(f, o).normalize();
+    const geometry = this.flashGeometry;
+    const pos = geometry.attributes.position.array, uv = geometry.attributes.uv.array;
+    const col = geometry.attributes.color.array;
+    const grid = P.atlasGrid;
+    const Fade = (life, power) => { const t = age / life; return t >= 1 ? 0 : Math.pow(1 - t, power); };
+    const Write = (q, center, a, b, cell, k, cover) => {
+      // a：贴图 U 方向半宽；b：V 方向半高（火舌的 V 从枪口指向焰尖）。
+      const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+      const u0 = (cell % grid) / grid, v0 = 1 - (Math.floor(cell / grid) + 1) / grid;
+      for (let i = 0; i < 4; i += 1) {
+        const [su, sv] = corners[i], p = (q * 4 + i) * 3, t = (q * 4 + i) * 2;
+        pos[p] = center.x + a.x * su + b.x * sv;
+        pos[p + 1] = center.y + a.y * su + b.y * sv;
+        pos[p + 2] = center.z + a.z * su + b.z * sv;
+        uv[t] = u0 + (su + 1) / 2 / grid; uv[t + 1] = v0 + (sv + 1) / 2 / grid;
+        const c = (q * 4 + i) * 4;
+        col[c] = shot.r * k; col[c + 1] = shot.g * k; col[c + 2] = shot.b * k; col[c + 3] = cover * k;
+      }
+    };
+    const Clear = (q) => {
+      for (let i = 0; i < 4; i += 1) {
+        const p = (q * 4 + i) * 3, c = (q * 4 + i) * 4;
+        pos[p] = o.x; pos[p + 1] = o.y; pos[p + 2] = o.z; col[c] = col[c + 1] = col[c + 2] = col[c + 3] = 0;
+      }
+    };
+
+    // 0/1 正面气团：平行于画面，随机滚转；边褪边胀开。
+    for (let q = 0; q < 2; q += 1) {
+      const sprite = shot.front[q];
+      const k = sprite ? Fade(P.lifeS * (q ? 0.8 : 1), 1.4) * sprite.gain : 0;
+      if (!k) { Clear(q); continue; }
+      const grow = 1 + P.grow * Math.min(1, age / P.lifeS);
+      const half = sprite.size * 0.5 * grow;
+      const cr = Math.cos(sprite.roll), sr = Math.sin(sprite.roll);
+      T.c.copy(o).addScaledVector(axis, sprite.ahead * grow);
+      Write(q, T.c, T.a.set(cr * half * sprite.aspect, sr * half * sprite.aspect, 0), T.b.set(-sr * half, cr * half, 0), sprite.cell, k, P.frontCover);
+    }
+    // 2/3 火舌：从枪口沿枪管伸出去；第一片绕枪管转到最对镜头，第二片再偏一个角。
+    const toCamera = T.f.copy(o).negate().normalize();
+    T.side.crossVectors(axis, toCamera);
+    if (T.side.lengthSq() < 1e-6) T.side.crossVectors(axis, T.up.set(0, 1, 0));
+    T.side.normalize();
+    T.up.crossVectors(axis, T.side);   // 与 side、axis 都垂直，用来绕枪管转
+    for (let q = 0; q < 2; q += 1) {
+      const sprite = shot.tongue[q];
+      const k = sprite ? Fade(P.tongueLifeS, 1.2) * sprite.gain : 0;
+      if (!k) { Clear(2 + q); continue; }
+      const length = sprite.length * (1 + 0.3 * Math.min(1, age / P.tongueLifeS));
+      const width = length * P.tongueWidth * 0.5;
+      T.a.copy(T.side).multiplyScalar(Math.cos(sprite.turn)).addScaledVector(T.up, Math.sin(sprite.turn)).multiplyScalar(width);
+      T.b.copy(axis).multiplyScalar(length * 0.5);
+      T.c.copy(o).addScaledVector(axis, length * 0.5 - 0.01);
+      Write(2 + q, T.c, T.a, T.b, sprite.cell, k, P.tongueCover);
+    }
+    // 4 柔光：贴着枪口，平行于画面。
+    {
+      const k = Fade(P.glowLifeS, 2) * shot.glow.gain;
+      const half = shot.glow.size * 0.5;
+      if (k) Write(4, T.c.copy(o).addScaledVector(axis, 0.01), T.a.set(half, 0, 0), T.b.set(0, half, 0), P.glowCell, k, 0);
+      else Clear(4);
+    }
+    geometry.attributes.position.needsUpdate = true;
+    geometry.attributes.uv.needsUpdate = true;
+    geometry.attributes.color.needsUpdate = true;
   }
 
   _SpawnShell(rnd) {
@@ -4351,7 +4462,7 @@ export class Viewmodel {
     for (const {geometry} of this.reloadMagazineGeometry.values()) if (!seen.has(geometry)) {
       seen.add(geometry); geometry.dispose();
     }
-    for(const geometry of this.flashGeometries.values())if(!seen.has(geometry)){seen.add(geometry);geometry.dispose();}
+    if (this.flashGeometry && !seen.has(this.flashGeometry)) { seen.add(this.flashGeometry); this.flashGeometry.dispose(); }
     for (const hand of [this.handRight, this.handLeft, this.sleeveRight, this.sleeveLeft]) {
       for (const mesh of hand.meshes) if (mesh.geometry) mesh.geometry.dispose();
     }

@@ -1,4 +1,4 @@
-import { SHOT_DISTRIBUTION, FIRING_BLOOM, AUTOMATIC_RECOIL, WALL_CARRY } from "./Data_Tuning_FirearmHandling.mjs";
+import { SHOT_DISTRIBUTION, FIRING_BLOOM, AUTOMATIC_RECOIL, WALL_CARRY, LOOK_SWAY } from "./Data_Tuning_FirearmHandling.mjs";
 
 const Clamp01 = (value) => Math.max(0, Math.min(1, value));
 export const IsAutomaticGun = (weapon) => weapon?.kind === "lmg" || weapon?.kind === "hmg";
@@ -69,4 +69,34 @@ export function GunClearance(weapon, eye, forward, right, raycast) {
   const lower = Clamp01((probeLength - distance) / (probeLength - full));
   return { lower,
     blocked: distance < reach * WALL_CARRY.blockRatio || lower > WALL_CARRY.fireReadyLower, distance };
+}
+
+// COD look sway (IW engine BG_CalculateWeaponPosition_Sway): the gun trails the
+// turn by an amount set from this frame's look change, and DiffTrack follows it
+// with a first-order step, so stopping the mouse eases back with no rebound.
+// The look change is normalised to degrees per 1/60 s before the clamp, which
+// keeps the response the same at 20, 30 or 144 fps; the exponential step is the
+// frame-rate independent form of DiffTrack's `cur += rate * err * dt`.
+const DEG = Math.PI / 180;
+const Clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+export class LookSway {
+  constructor(tuning = LOOK_SWAY) { this.tuning = tuning; this.Reset(); }
+  Reset() { this.yaw = 0; this.pitch = 0; this.roll = 0; this.x = 0; this.y = 0; this.strafeRoll = 0; return this; }
+  // dYaw / dPitch: radians the view turned this frame (yaw + = left, pitch + = up).
+  // gain: weapon swayScale x (1 - ADS). Outputs are radians and metres for the
+  // camera-origin sway layer: the muzzle points and sits behind the turn.
+  Step(dt, dYaw = 0, dPitch = 0, gain = 1, strafe = 0) {
+    if (!(dt > 1e-5)) return this;
+    const S = this.tuning, perFrame = 1 / (dt * 60 * DEG);
+    const yawDeg = Clamp((dYaw || 0) * perFrame, -S.maxDegPerFrame, S.maxDegPerFrame) * gain;
+    const pitchDeg = Clamp((dPitch || 0) * perFrame, -S.maxDegPerFrame, S.maxDegPerFrame) * gain;
+    const follow = 1 - Math.exp(-S.lerpSpeed * dt);
+    this.yaw += (-yawDeg * S.yawScale * DEG - this.yaw) * follow;
+    this.pitch += (-pitchDeg * S.pitchScale * DEG - this.pitch) * follow;
+    this.roll += (-yawDeg * S.rollScale * DEG - this.roll) * follow;
+    this.x += (yawDeg * S.horizM - this.x) * follow;
+    this.y += (-pitchDeg * S.vertM - this.y) * follow;
+    this.strafeRoll += (-(strafe || 0) * S.strafeRollRad * gain - this.strafeRoll) * (1 - Math.exp(-S.strafeLerpSpeed * dt));
+    return this;
+  }
 }

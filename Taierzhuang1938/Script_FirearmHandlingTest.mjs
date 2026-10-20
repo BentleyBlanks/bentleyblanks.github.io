@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { SampleShotDisk, FirearmHandling, GunClearance } from "./Script_FirearmHandling.mjs";
+import { SampleShotDisk, FirearmHandling, GunClearance, LookSway } from "./Script_FirearmHandling.mjs";
+import { LOOK_SWAY } from "./Data_Tuning_FirearmHandling.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";
 
@@ -46,5 +47,40 @@ assert.ok(Surface(1.0, [0, 0, 1]).blocked && Surface(1.0, [0, 0, 1]).lower > 0.6
 const bank = Surface(1.0, [0, Math.SQRT1_2, Math.SQRT1_2]).lower;
 assert.ok(bank > 0 && bank < Surface(1.0, [0, 0, 1]).lower, "a 45 degree bank sits between floor and wall");
 assert.ok(Surface(0.4, {x:0, y:1, z:0}).blocked, "ground right at the barrel (prone) still lowers it");
-console.log(JSON.stringify({centerHalfFraction:inner/count, mean:[sumX/count,sumY/count], quadrants}));
+// COD look sway: a fast mouse turn, uneven per-frame mouse chunks, then a dead stop.
+const DEG = Math.PI / 180;
+function Flick(fps, turnDegPerS, flickS = 0.35, settleS = 1.2) {
+  const sway = new LookSway(), dt = 1 / fps, trace = [];
+  const flickFrames = Math.round(flickS * fps);
+  for (let i = 0; i < flickFrames + Math.round(settleS * fps); i += 1) {
+    const chunk = i < flickFrames ? turnDegPerS * DEG * dt * (i % 2 ? 1.45 : 0.55) : 0;
+    sway.Step(dt, -chunk, chunk * 0.3, 1, 0);   // turning right and a little up
+    trace.push({ flick: i < flickFrames, yaw: sway.yaw, pitch: sway.pitch, x: sway.x, roll: sway.roll });
+  }
+  return trace;
+}
+const capYaw = LOOK_SWAY.maxDegPerFrame * LOOK_SWAY.yawScale * DEG;
+for (const fps of [144, 60, 30, 20]) {
+  const fast = Flick(fps, 900), during = fast.filter((s) => s.flick), after = fast.filter((s) => !s.flick);
+  const peak = Math.max(...fast.map((s) => Math.abs(s.yaw)));
+  assert.ok(peak <= capYaw * 1.0001 && peak > capYaw * 0.6, `${fps} fps: a 900 deg/s flick trails by at most the COD cap (${peak / DEG} deg)`);
+  assert.ok(Math.max(...fast.map((s) => Math.abs(s.x))) <= LOOK_SWAY.maxDegPerFrame * LOOK_SWAY.horizM * 1.0001, `${fps} fps: lateral lag is capped`);
+  assert.ok(during.at(-1).yaw > 0 && during.at(-1).x < 0 && during.at(-1).pitch < 0, `${fps} fps: turning right/up the muzzle trails left/down`);
+  // No rebound: after the stop the lag only shrinks and never crosses to the other side.
+  for (let i = 1; i < after.length; i += 1) {
+    assert.ok(after[i].yaw >= 0 && after[i].yaw <= after[i - 1].yaw + 1e-12, `${fps} fps: settles without overshoot`);
+    assert.ok(after[i].pitch <= 0 && after[i].x <= 0, `${fps} fps: offset never springs past centre`);
+  }
+  assert.ok(Math.abs(after.at(-1).yaw) < capYaw * 0.01, `${fps} fps: settled within 1.2 s`);
+  // Uneven mouse chunks (0.55x / 1.45x per frame) must not shake the gun back and forth.
+  let reversals = 0;
+  for (let i = 2; i < during.length; i += 1) if ((during[i].yaw - during[i - 1].yaw) * (during[i - 1].yaw - during[i - 2].yaw) < 0) reversals += Math.abs(during[i].yaw - during[i - 1].yaw);
+  assert.ok(reversals < capYaw * 0.35, `${fps} fps: frame-to-frame mouse jitter stays filtered (${reversals / DEG} deg)`);
+}
+const moderate = (fps) => Math.max(...Flick(fps, 150).map((s) => Math.abs(s.yaw)));
+assert.ok(Math.abs(moderate(20) - moderate(60)) < moderate(60) * 0.15, "same response at 20 and 60 fps");
+const aimed = new LookSway().Step(1 / 60, -0.2, 0, 0, 0);
+assert.equal(aimed.yaw, 0, "no look sway when the weapon's gain is zero (ADS)");
+console.log(JSON.stringify({centerHalfFraction:inner/count, mean:[sumX/count,sumY/count], quadrants,
+  lookSwayPeakDeg: { at60: moderate(60) / DEG, at20: moderate(20) / DEG, cap: capYaw / DEG }}));
 console.log("FirearmHandlingTest OK");

@@ -58,7 +58,6 @@ const UNSTAMPED_PENDING = new Set([
   ...["Rifleman", "MachineGunner", "Bayonet", "Tank", "Reserve", "Dormant", "Cleared", "Hold", "FriendlySquad",
     "GuardPost", "Defender", "ForwardNest", "Player", "Stretcher", "Cart", "Aircraft", "Supply", "Gate", "Anchor",
     "Zone", "Route", "Wave", "Note"].map((id) => `Data_OrchestrationIcons.mjs|Texture/Editor/Icon_Orch_${id}.png`),
-  "Data_Tuning_FirearmHandling.mjs|Texture/Texture_VefectsFireMask_01.webp",
   "Script_TzmShot.mjs|Texture/Texture_Type89Orm.webp",
   ...["VefectsFireMask_01", "VefectsGroundFireMask_01", "VefectsSmokeMask_01", "VefectsNoise_03", "VefectsNoise_08",
     "IncomingMarker_01", "BulletImpactPbrAtlasBase", "BulletImpactPbrAtlasNormal", "BulletImpactPbrAtlasOrm",
