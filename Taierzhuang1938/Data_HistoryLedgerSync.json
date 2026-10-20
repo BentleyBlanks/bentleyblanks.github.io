@@ -72,6 +72,20 @@
   ],
   "assetReviews": [
     {
+      "asset": "StrawSleepingMat",
+      "date": "2026-10-20",
+      "scope": "Only user-approved KnotDetail4 appearance and collection-point placement; source equipment article reopened, two ledger pages updated, other source-page markers and repoCommit preserved",
+      "notionPages": [
+        "3fd60335331c8194aa82f0b238084d34",
+        "3fd60335331c818fa24deadb6d72ca70"
+      ],
+      "notionLastEdited": {
+        "3fd60335331c8194aa82f0b238084d34": "2026-10-20T05:51:53.617Z",
+        "3fd60335331c818fa24deadb6d72ca70": "2026-10-20T05:51:54.617Z"
+      },
+      "assetContract": "../Model/StrawSleepingMat/Data_Asset.json"
+    },
+    {
       "asset": "SingleBlanket",
       "date": "2026-10-19",
       "scope": "Only the new five-patch thin sheet appearance and historical boundary; other source-page markers and repoCommit preserved",

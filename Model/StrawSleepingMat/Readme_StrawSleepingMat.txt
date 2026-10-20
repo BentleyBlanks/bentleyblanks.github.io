@@ -33,3 +33,6 @@ Source/ 保存内置 imagegen 的材质来源和提示词；Data_Asset.json 列�
 Blender 原工程位于 C:/Users/Bentl/OneDrive/AI/Models/Blender/HistoricalProps/StrawSleepingMat/。
 预览、参考图对比与验收报告只在本地 DeliveryKnotDetail/ 包内；不属于游戏运行资源。
 旧版、Refined 版、Detail 版与本次 KnotDetail 版工程和交付包分别保留。
+
+2026-10-20 游戏接入：Taierzhuang1938 第一关集结处以五张铺开款替换伤员草垫，西侧行装旁放两卷；两款登记进外部道具目录。
+运行时直接加载本目录的已确认 GLB，保持原尺寸、作者切线、透明断草与PBR，按区域和材质合批。接入契约见 Taierzhuang1938/docs/Data_StrawSleepingMat.md。

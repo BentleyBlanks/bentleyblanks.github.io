@@ -240,34 +240,6 @@ export function WrapLimb(rig, boneRole, childRole, { kind = "bandage", at = 0.5,
   return mesh;
 }
 
-let strawMaterial = null;
-/**
- * 伤员身下的稻草垫：黄褐底上几百道细长的明暗草秆（沿贴图 v 方向），一张画布、一只材质。
- * 白盒场的「VillageStraw」是纯色语义材质，铺成一张平板看起来就是一块木板。
- */
-export function StrawMaterial() {
-  if (strawMaterial || typeof document === "undefined") return strawMaterial;
-  const canvas = document.createElement("canvas");
-  canvas.width = 128; canvas.height = 256;
-  const g = canvas.getContext("2d");
-  g.fillStyle = "#8f7443"; g.fillRect(0, 0, 128, 256);
-  let seed = 7;
-  const Random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  for (let i = 0; i < 520; i++) {
-    const x = Random() * 128, y = Random() * 256, len = 40 + Random() * 140, tilt = (Random() - 0.5) * 10;
-    const light = Random();
-    g.strokeStyle = light > 0.55 ? `rgba(${196 + light * 40},${166 + light * 34},${104 + light * 20},0.75)` : `rgba(${88 + light * 50},${68 + light * 40},${38 + light * 20},0.7)`;
-    g.lineWidth = 0.8 + Random() * 1.6;
-    g.beginPath(); g.moveTo(x, y); g.lineTo(x + tilt, y + len); g.stroke();
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-  strawMaterial = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.97, metalness: 0 });
-  strawMaterial.name = "CollectionCareStraw";
-  return strawMaterial;
-}
-
 /** 医护：左上臂的红十字袖标。 */
 export function DressMedic(rig) {
   return WrapLimb(rig, "upperArmL", "forearmL", { kind: "armband", at: 0.5, radiusM: 0.062, lengthM: 0.06 });

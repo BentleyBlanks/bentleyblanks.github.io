@@ -877,7 +877,7 @@ const changedDomainRules = [
   {domain:"firstLevel",pattern:/CollectionCare/},
   {domain:"breakableTrees",pattern:/BreakableTree|Script_Combat|Script_FirstLevelWhiteboxField/},
   // 第一关道具换模型 / 碎砖瓦 / 植被（docs/Data_FirstLevelVegetationProps.md）：图集烘焙脚本与白盒场地接线点也算。
-  {domain:"firstLevelDressing",pattern:/WardProps|FirstLevel(PropDressing|Vegetation)|BakeVegetationAtlas|Script_FirstLevelWhiteboxField/},
+  {domain:"firstLevelDressing",pattern:/StrawSleepingMat|WardProps|FirstLevel(PropDressing|Vegetation)|BakeVegetationAtlas|Script_FirstLevelWhiteboxField/},
   {domain:"distantSmoke",pattern:/FirstLevelDistantSmoke|FirstLevelSmokeOrigins|BattleSmoke|Script_Vfx/},
   // 烟柱下的焦木堆几何（Blender 导出的内联网格，只有 Script_FirstLevelSmokeOrigins 在用；三角预算在 SmokeOriginsTest）。
   {domain:"distantSmoke",pattern:/BurntTimberPile/},

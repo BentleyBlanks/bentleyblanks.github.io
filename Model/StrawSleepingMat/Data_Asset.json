@@ -5,6 +5,14 @@
   "descriptionZh": "1930年代中国南方士兵随身单人草席；蒲草/稻草平纹，草绳锁边，晒褪黄褐色，磨损断草、泥渍与雨水晕痕",
   "referenceApproval": "参考图可以 极致的对标以后才能算完成",
   "deliveryType": "Two independent reusable game assets",
+  "gameIntegration": {
+    "project": "Taierzhuang1938",
+    "module": "Data_StrawSleepingMat.mjs",
+    "consumer": "Script_FirstLevelPropDressing.mjs",
+    "placement": "Five flat patient mats and two rolls beside the collection-point kit; native scale, sector/material batching",
+    "catalogIds": ["strawSleepingMatFlat", "strawSleepingMatRolled"],
+    "version": "2026102095"
+  },
   "coordinateSystem": {
     "unit": "metre",
     "up": "+Y",

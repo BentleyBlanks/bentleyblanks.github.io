@@ -120,6 +120,12 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 }
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
+  ...[["Flat", "铺开", 1992, 2000], ["Rolled", "卷起", 1192, 1200]].map(([state, label, triangles, limit]) => Object.freeze({
+    id: `StrawSleepingMat${state}`, name: `随身草席 · ${label}`, pack: `../Model/StrawSleepingMat/Model_StrawSleepingMat${state}.glb`,
+    sourceTriangles: triangles, actualTriangles: triangles, targetTriangles: limit, policy: "source",
+    sourceTexture: "用户确认三视图，内置 imagegen PBR", runtimeTexture: "1024 Base alpha / Normal / ORM 内嵌",
+    note: "KnotDetail4；米制 Y-up、长轴 X、底面中心，MASK 0.33；第一关集结处静态合批，完整生成源在共享 Model/StrawSleepingMat。",
+  })),
   Object.freeze({ id: "SingleBlanket", name: "五补丁薄土布单被", pack: "Model_SingleBlanket.glb",
     sourceTriangles: 6000, actualTriangles: 6000, targetTriangles: 6000,
     sourceTexture: "用户确认参考图、内置 imagegen 的柔软旧棉布图集",

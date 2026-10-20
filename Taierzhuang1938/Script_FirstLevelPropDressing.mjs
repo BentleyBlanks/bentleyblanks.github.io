@@ -15,6 +15,9 @@ import { InstantiateExternalProp, ExternalPropCatalog } from "./Script_ExternalP
 import { LoadDraftCartAssets } from "./Script_DraftCartModel.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { BuildSink } from "./Script_World.mjs";
+import { MergeGeometries } from "./Script_Geo.mjs";
+import { STRAW_SLEEPING_MAT_ASSETS, PlanCollectionStrawSleepingMats } from "./Data_StrawSleepingMat.mjs";
+import { MISSION_PLACEMENT } from "./Data_FirstLevelMissionLayout.mjs";
 import {
   PROP_DRESSING_ASSETS, PROP_DRESSING_SECTOR_M, PROP_MATERIAL_TINT, PROP_MATERIAL_OVERRIDE, PROP_SPECIAL_ASSETS,
   PlanPropDressing, PlanRubbleScatter, Rng,
@@ -27,9 +30,13 @@ export async function LoadFirstLevelPropDressing(library) {
   const catalog = new Map(ExternalPropCatalog().map((spec) => [spec.id, spec]));
   // 调色克隆按源材质缓存：同一只库材质在本关只克隆一次（一种材质仍是一只合批桶）。
   const tinted = new Map();
-  await Promise.all(PROP_DRESSING_ASSETS.map(async (id) => {
+  await Promise.all([...PROP_DRESSING_ASSETS, ...Object.keys(STRAW_SLEEPING_MAT_ASSETS)].map(async (id) => {
     const root = await InstantiateExternalProp(id, library);
+    if (!root && STRAW_SLEEPING_MAT_ASSETS[id]) throw new Error(`Required straw mat failed to load: ${id}`);
     if (!root) { console.warn(`[FirstLevelPropDressing] ${id} 没有加载到，这几件保留平色盒`); return; }
+    if (STRAW_SLEEPING_MAT_ASSETS[id]) root.traverse((mesh) => {
+      if (mesh.isMesh) library.ConfigureExternalPbr(mesh.material, { metalness: 0 });
+    });
     const override = PROP_MATERIAL_OVERRIDE[id];
     if (override) {
       const key = `override:${override.recipe}:${JSON.stringify(override.options)}`;
@@ -277,6 +284,8 @@ export function AddFirstLevelPropDressing(sink, layout, dressing, groundAt, mate
       sink.Add(key, geometry);
     });
   }
+  const strawMats = AddCollectionStrawSleepingMats(sink, layout, dressing, groundAt, materials);
+  triangles += strawMats.triangles;
   // 碎砖瓦：一区一份预并好的几何。
   const rubble = PlanRubbleScatter(MissionDressingContext(layout, groundAt));
   let rubbleTriangles = 0;
@@ -311,10 +320,52 @@ export function AddFirstLevelPropDressing(sink, layout, dressing, groundAt, mate
   sink.SetSector("FirstLevelWhitebox");
   return {
     replaced: new Set([...plan.replaced, ...(library ? rubble.hidden : [])]),
-    placements: plan.placements, missing: plan.missing,
+    placements: plan.placements, missing: plan.missing, strawMats,
     rubble: library ? rubble.pieces.length : 0,
     stats: { props: plan.placements.length, propTriangles: Math.round(triangles), rubble: rubble.pieces.length,
       rubbleTriangles: Math.round(rubbleTriangles), hiddenLoose: rubble.hidden.size,
       buildMs: started ? Math.round(performance.now() - started) : 0 },
   };
+}
+
+/** Premerge each sector/material once so BuildSink preserves the authored tangent frame. */
+function AddCollectionStrawSleepingMats(sink, layout, dressing, groundAt, materials) {
+  const placements = PlanCollectionStrawSleepingMats(layout, MISSION_PLACEMENT.collection, groundAt);
+  const buckets = new Map();
+  const matrix = new THREE.Matrix4(), local = new THREE.Matrix4();
+  const position = new THREE.Vector3(), rotation = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+  let triangles = 0;
+  for (const placement of placements) {
+    const model = dressing.models.get(placement.asset);
+    if (!model) throw new Error(`Missing collection mat: ${placement.asset}`);
+    matrix.compose(position.set(placement.x, placement.y, placement.z),
+      rotation.setFromAxisAngle(up, placement.yaw), new THREE.Vector3(1, 1, 1));
+    model.root.traverse((mesh) => {
+      if (!mesh.isMesh) return;
+      const key = `MissionDefenseMaterial_${mesh.material.uuid}`, sector = SectorKey(placement.x, placement.z);
+      materials.set(key, mesh.material);
+      const bucketKey = `${sector}|${key}`;
+      if (!buckets.has(bucketKey)) buckets.set(bucketKey, { key, sector, geometries: [] });
+      const geometry = mesh.geometry.clone().applyMatrix4(local.multiplyMatrices(matrix, mesh.matrixWorld));
+      triangles += (geometry.index?.count ?? geometry.attributes.position.count) / 3;
+      buckets.get(bucketKey).geometries.push(geometry);
+    });
+  }
+  for (const { key, sector, geometries } of buckets.values()) {
+    // MergeGeometries intentionally keeps only position/normal/uv for general scenery.
+    // These atlas bakes also need their rotated glTF tangents (and any secondary UVs).
+    const extras = Object.keys(geometries[0].attributes).filter(name => !["position", "normal", "uv"].includes(name));
+    const attributes = new Map(extras.map(name => {
+      const source = geometries[0].attributes[name];
+      const array = new source.array.constructor(geometries.reduce((n, g) => n + g.attributes[name].array.length, 0));
+      let offset = 0;
+      for (const geometry of geometries) { array.set(geometry.attributes[name].array, offset); offset += geometry.attributes[name].array.length; }
+      return [name, new THREE.BufferAttribute(array, source.itemSize, source.normalized)];
+    }));
+    const geometry = MergeGeometries(geometries);
+    for (const [name, attribute] of attributes) geometry.setAttribute(name, attribute);
+    sink.SetSector(sector);
+    sink.Add(key, geometry);
+  }
+  return { placements, triangles, batches: buckets.size };
 }

@@ -7,7 +7,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_LAYOUT, MISSION_PLACEMENT } from "./Data_FirstLevelMissionLayout.mjs";
+import { STRAW_SLEEPING_MAT_ASSETS, PlanCollectionStrawSleepingMats, STRAW_SLEEPING_MAT_SHEET_M } from "./Data_StrawSleepingMat.mjs";
+import { FRONT_TUNING } from "./Data_Tuning_FirstLevelFront.mjs";
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import {
   PROP_DRESSING, PROP_DRESSING_ASSETS, PROP_FIT_TOLERANCE, PROP_RUBBLE, PROP_SPECIAL_ASSETS, PROP_MATERIAL_OVERRIDE,
@@ -177,6 +179,26 @@ const hiddenSolid = [...hiddenIds].filter((id) => byId.get(id).solid !== false |
 Check(hiddenSolid.length === 0 && hiddenIds.size > 100, `只换不实心、非掩体的散块（${hiddenIds.size} 块，违规 ${hiddenSolid.length}）`);
 const overlap = [...hiddenIds].filter((id) => plan.replaced.has(id));
 Check(overlap.length === 0, "散块与道具替换表不重叠");
+
+// User-approved mat geometry is consumed at native scale, outside placeholder-box fitting.
+const strawMats = PlanCollectionStrawSleepingMats(MISSION_LAYOUT, MISSION_PLACEMENT.collection, SampleMissionTerrain);
+Check(strawMats.length === MISSION_PLACEMENT.collection.wounded.length + 2, "每位伤员一张席，另有两卷随身草席");
+Check(PlanCollectionStrawSleepingMats({ id: "OtherLevel" }, {}, () => 0).length === 0, "不向其他白盒场景注入集结处草席");
+Check(strawMats.every(p => p.y === SampleMissionTerrain(p.x, p.z)), "草席使用共享地面采样器，无绝对 Y");
+Check(FRONT_TUNING.careStrawThicknessM === STRAW_SLEEPING_MAT_SHEET_M, "伤员离地高度对应5毫米席厚");
+for (const [id, spec] of Object.entries(STRAW_SLEEPING_MAT_ASSETS)) {
+  Check(catalog.has(id) && !catalog.get(id).solid && !catalog.get(id).materialMap, `${id} 目录登记、无碰撞、保留作者PBR`);
+  const glb = ReadGlb(path.resolve(root, spec.url.split("?")[0]));
+  const triangles = glb.json.meshes.flatMap(mesh => mesh.primitives).reduce((n, p) => n + glb.json.accessors[p.indices].count / 3, 0);
+  Check(triangles === spec.triangles, `${id} 原始面数未变 (${triangles})`);
+  Check(glb.json.materials.every(m => m.alphaMode === "MASK" && Math.abs(m.alphaCutoff - 0.33) < 1e-6 && m.doubleSided
+    && m.pbrMetallicRoughness.metallicRoughnessTexture && m.normalTexture && m.occlusionTexture), `${id} 保留透明断草、法线与AO`);
+}
+Check(strawMats.filter(p => p.asset === "strawSleepingMatFlat").every((p, i) => {
+  const person = MISSION_PLACEMENT.collection.wounded[i];
+  return Math.abs(Math.cos(p.yaw) - Math.sin(person.yaw)) < 1e-8
+    && Math.abs(-Math.sin(p.yaw) - Math.cos(person.yaw)) < 1e-8;
+}), "草席X长轴顺着伤员头脚方向，未把宽边当长边");
 
 if (failures) { console.log(`\n${failures} 项失败`); process.exit(1); }
 console.log("\nFirstLevelPropDressingTest 全部通过");

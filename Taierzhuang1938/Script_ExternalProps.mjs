@@ -37,6 +37,7 @@
 
 import * as THREE from "three";
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
+import { STRAW_SLEEPING_MAT_ASSETS } from "./Data_StrawSleepingMat.mjs";
 import {
   BuildSink, EXTERNAL_SANDBAG_ASSET_IDS, EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
 } from "./Script_World.mjs";
@@ -231,6 +232,7 @@ function PackAssets(pack, table) {
 }
 
 const ASSETS = Object.freeze({
+  ...STRAW_SLEEPING_MAT_ASSETS,
   // Library-only until explicitly placed. Keep native PBR and the complete
   // hierarchy: wheel pivots and rods are consumed by Script_TrainRig.mjs.
   trainReferenceLocomotive: {

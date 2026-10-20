@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { LoadGlb, ReadAccessor } from "./_import/Script_LugouGlbPose.mjs";
 import { AIRCRAFT_ASSETS, NoseYaw } from "./Data_AircraftAssets.mjs";
 import { MESHES } from "./Data_Meshes.mjs";
+import { STRAW_SLEEPING_MAT_ASSETS } from "./Data_StrawSleepingMat.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const TOLERANCE_DEG = 12;
@@ -220,5 +221,14 @@ Check(Math.abs(Math.min(...cigaretteZ) + .085) < .001 && Math.abs(Math.max(...ci
 const EndRadius = predicate => Math.max(...cigarettePoints.filter(p => predicate(p[2])).map(p => Math.hypot(p[0], p[1])));
 Check(EndRadius(z => z < -.08) > EndRadius(z => z > .002) * 1.2, "卷烟真实烟灰端在 -Z，拧口在 +Z");
 Check(cigarette.json.textures?.length >= 3, "卷烟保留底色、法线与粗糙度贴图");
+for (const [id, spec] of Object.entries(STRAW_SLEEPING_MAT_ASSETS)) {
+  const points = GlbPoints(path.resolve(projectDir, spec.url.split("?")[0]));
+  const min = [0, 1, 2].map(axis => Math.min(...points.map(p => p[axis])));
+  const max = [0, 1, 2].map(axis => Math.max(...points.map(p => p[axis])));
+  Check(min.every((v, axis) => Math.abs(max[axis] - v - spec.bounds[axis]) < 0.00001),
+    `${id} 顶点云量得米制 X 长边 / Y 向上 / Z 宽度`, max.map((v, axis) => (v - min[axis]).toFixed(5)).join(" / "));
+  Check(Math.abs(min[1]) < 0.000001 && Math.abs(min[0] + max[0]) < 0.000001 && Math.abs(min[2] + max[2]) < 0.000001,
+    `${id} 完整模型底面中心在原点`);
+}
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机机首与战车车头全部按几何复量落在 -Z");

@@ -31,7 +31,7 @@ import { STRETCHER_PATIENT_LIFT_M } from "./Data_Carry.mjs";
 import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 import { COLLECTION_CARE_CLIPS as CARE, CareMedicSpot, CarePatientClip } from "./Data_FirstLevelCollectionCare.mjs";
 import { LoadCollectionCareAnimation, CollectionCareLibrary, CareClipDuration, InstallCareClips, RemoveCareClips,
-  DressMedic, DressWound, StrawMaterial } from "./Script_CollectionCareAnimation.mjs";
+  DressMedic, DressWound } from "./Script_CollectionCareAnimation.mjs";
 import { T } from "./Script_Text.mjs";
 import { INTERACT } from "./Data_Tuning_Interact.mjs";
 
@@ -137,7 +137,6 @@ export class FirstLevelCollection {
     this.dressed = true;
     // 伤员与医护的动作库（1.6 MB）在这里才取；到之前那几个人不画（不画成站着的伤员）。
     LoadCollectionCareAnimation().catch((error) => console.warn(`[CollectionCare] ${String(error).slice(0, 160)}`));
-    this.DressStraw();
     const material = CreateStretcherMaterial();
     const geometry = CreateStretcherGeometry();
     for (const [i, spot] of Place.collection.litters.entries()) {
@@ -155,38 +154,6 @@ export class FirstLevelCollection {
     }
     this.propGeometry = geometry;
     this.propMaterial = material;
-  }
-  /**
-   * 伤员身下的草垫：每张三束压扁的稻草顺着人铺开、略微错开，全场一只 InstancedMesh（StrawMaterial 的草秆贴图）。
-   */
-  DressStraw() {
-    const r = this.r, [w, l] = F.careStrawM, h = F.careStrawThicknessM;
-    const mats = this.people.filter((person) => person.kind === "wounded");
-    // [横移（垫宽的比例）, 沿人（垫长的比例）, 宽, 长, 转角]
-    const layout = [[0.0, -0.28, 1.0, 0.52, 0.03], [0.05, 0.1, 0.94, 0.46, -0.05], [-0.04, 0.38, 0.86, 0.34, 0.07]];
-    const material = StrawMaterial() || new THREE.MeshStandardMaterial({ color: 0x8f7443, roughness: 0.97, metalness: 0 });
-    const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), material, mats.length * layout.length);
-    mesh.name = "MissionCollectionStraw";
-    mesh.receiveShadow = true;
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-    let n = 0;
-    for (const person of mats) {
-      // 草垫中心在骨盆往头那边挪 0.15 m（人从骨盆到头顶比到脚跟短一点点，但头下垫得多）。
-      const cx = person.x + Math.sin(person.yaw) * 0.15, cz = person.z + Math.cos(person.yaw) * 0.15;
-      const ground = r.battlefield.GroundHeight(cx, cz);
-      for (const [dx, dz, width, length, turn] of layout) {
-        const yaw = person.yaw + turn, c = Math.cos(person.yaw), s = Math.sin(person.yaw);
-        p.set(cx + dx * w * c + dz * l * s, ground + h * 0.5, cz - dx * w * s + dz * l * c);
-        q.setFromAxisAngle(up, yaw);
-        sc.set(w * width, h * (0.8 + 0.2 * width), l * length);
-        mesh.setMatrixAt(n++, m.compose(p, q, sc));
-      }
-    }
-    mesh.count = n;
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-    r.scene.add(mesh);
-    this.straw = mesh;
   }
   /** 立即模式的人群：每帧在 view.Update 之后补一次，不然 people.End() 会把他们藏起来。 */
   Draw(time) {
@@ -609,14 +576,13 @@ export class FirstLevelCollection {
     this.propGeometry = this.propMaterial = null;
     this.props = [];
     DisposeCigaretteAsset(this.smoke);
-    for (const mesh of [this.match, this.straw]) {
+    for (const mesh of [this.match]) {
       if (!mesh) continue;
       mesh.parent?.remove(mesh);
       mesh.geometry.dispose();
-      // 草垫的材质是 StrawMaterial 全场共用的一只，不归这里释放。
-      if (mesh !== this.straw) mesh.material.dispose();
+      mesh.material.dispose();
     }
-    this.smoke = this.match = this.straw = null;
+    this.smoke = this.match = null;
   }
 }
 
