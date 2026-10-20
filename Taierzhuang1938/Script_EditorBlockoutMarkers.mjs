@@ -4,7 +4,8 @@
 // 把普通 Mesh 涂灰，调试叠加层不受影响。颜色按曝光预补（同 Script_EditorAi 的叠加层：
 // 峰值压到 0.75，否则 ACES 会把阵营色冲成白）。
 //
-// 看得见 / 被挡住两种画法：同一份几何画两遍 —— 一遍做深度测试（亮），一遍不做（暗、半透明）。
+// 看得见 / 被挡住两种画法：同一份几何画两遍 —— 一遍做深度测试（亮），一遍穿墙（暗、半透明；深度钉在离眼 1.25 m，
+// 只有第一人称的手 / 枪和贴脸 1.25 m 内的东西挡得住它，见 BehindForeground）。
 // 被墙挡住的人也找得到，但一眼分得出现在看不看得见他。「穿墙显示」关掉第二遍。
 // 射界扇例外（§5.5）：只画深度测试那一遍（不穿墙），填充很淡（约 0.1）、描边细；
 // 扇子起点离相机 6 m 以内整片淡出 —— 第一人称低机位时，近处的扇子会像一大张半透明的布糊满屏幕；
@@ -232,9 +233,35 @@ class DynamicLayer {
   Dispose() { this.geometry.dispose(); for (const material of this.materials) material.dispose(); }
 }
 
+/**
+ * 标记不压前景（2026-10-20，用户「标记的渲染队列会覆盖掉前景」）：叠加层与主场景共用一份深度，第一人称的手和枪
+ * 也在里面（视图模型整支压到眼前 depthBudget 以内，游戏里 Script_Main 给的是 1.22 m）。原来穿墙那一遍不做深度测试，
+ * 半透明地盖在枪和手上。现在两遍都做深度测试、片元深度最近只算到离眼 BLOCKOUT_FOREGROUND_M：
+ *   看得见那一遍 —— 深度 = max(自己, 1.25 m 处)：比这还近的标记也排在手和枪后面；
+ *   穿墙那一遍   —— 深度钉在 1.25 m 处：1.25 m 外的墙挡不住它（照旧穿墙），这以内的手 / 枪挡得住；
+ *                   代价是贴脸 1.25 m 内的墙也不再被穿透（人都贴着墙了，越过去看就是）。
+ * 不读预通道（白盒画质不跑预通道），只改 gl_FragDepth；depthWrite 本来就关着，不污染深度。
+ */
+export const BLOCKOUT_FOREGROUND_M = 1.25;
+function BehindForeground(material, pin) {
+  const prior = material.onBeforeCompile;
+  const priorKey = material.customProgramCacheKey?.bind(material);
+  material.onBeforeCompile = (shader, renderer) => {
+    prior?.call(material, shader, renderer);
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nuniform mat4 projectionMatrix;")
+      .replace("#include <opaque_fragment>", `#include <opaque_fragment>
+  vec4 blockoutFgClip = projectionMatrix * vec4(0.0, 0.0, -${BLOCKOUT_FOREGROUND_M.toFixed(3)}, 1.0);
+  float blockoutFgDepth = clamp(blockoutFgClip.z / blockoutFgClip.w * 0.5 + 0.5, 0.0, 1.0);
+  gl_FragDepth = ${pin ? "blockoutFgDepth" : "max(gl_FragCoord.z, blockoutFgDepth)"};`);
+  };
+  material.customProgramCacheKey = () => `${priorKey ? priorKey() : ""}|blockoutFg${pin ? "Pin" : "Max"}1`;
+  material.depthTest = true;
+  return material;
+}
 function MeshMaterial(depthTest) {
-  return new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: depthTest ? 1 : 0.3,
-    depthTest, depthWrite: false, toneMapped: false, fog: false, side: THREE.DoubleSide });
+  return BehindForeground(new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: depthTest ? 1 : 0.3,
+    depthTest: true, depthWrite: false, toneMapped: false, fog: false, side: THREE.DoubleSide }), !depthTest);
 }
 /** 射界扇：离相机 surfaceNearM 以内的那部分扇面逐像素淡掉（顶点里算到相机的距离）。 */
 function WithNearFade(material) {
@@ -253,16 +280,19 @@ function WithNearFade(material) {
 }
 /** 射界扇的填充：只做深度测试那一遍；贴地薄片往相机挪一点，免得和地面打架。 */
 function FanMeshMaterial() {
-  return WithNearFade(new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 1,
+  return BehindForeground(WithNearFade(new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 1,
     depthTest: true, depthWrite: false, toneMapped: false, fog: false, side: THREE.DoubleSide,
-    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }));
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 })), false);
 }
 function FanLineMaterial() {
-  return WithNearFade(LineMaterial(true));
+  return BehindForeground(WithNearFade(RawLineMaterial(1)), false);
+}
+function RawLineMaterial(opacity) {
+  return new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity,
+    depthTest: true, depthWrite: false, toneMapped: false, fog: false });
 }
 function LineMaterial(depthTest) {
-  return new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: depthTest ? 1 : 0.3,
-    depthTest, depthWrite: false, toneMapped: false, fog: false });
+  return BehindForeground(RawLineMaterial(depthTest ? 1 : 0.3), !depthTest);
 }
 
 function IsMachineGun(unit) { return BLOCKOUT_MG_WEAPONS.includes(unit.weapon); }
