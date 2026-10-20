@@ -2,7 +2,7 @@
   "schema": 1,
   "authoringTask": "FpsGripConformity_20261015",
   "sourceTraceSignature": "76af827cf340978292bf4f4d22435aa46448fde497b60c1b64cee6262fb64bd3",
-  "kinematicSignature": "14b1a9476159edc2cf602d6d20e740ca1009ccfc601bdaa4c69fc385581ac5c3",
+  "kinematicSignature": "4136e1f81fb9fffe59f431237750dda538d5648f0cae711e77c6cca85b87a746",
   "sourceArmLength": 0.57233826,
   "sourceToRuntimeScale": 0.9756173748889421,
   "rotationVectorDeg": [
@@ -49,5 +49,12 @@
     }
   },
   "weaponSurfaceSha256": "e9b02d16a67609bd7cd9b815fa02d504ba798d6619c3d3f2033ff2ff05c836b0",
-  "notes": "Rigid shoulder-pair rotation about its midpoint plus small common translation. Prop trajectory, hand local contact frames and arm lengths are unchanged. First/last offsets are exactly zero; gameplay actions share source phase mapping."
+  "notes": "Rigid shoulder-pair rotation about its midpoint plus small common translation. Prop trajectory, hand local contact frames and arm lengths are unchanged. First/last offsets are exactly zero; gameplay actions share source phase mapping.",
+  "retainedFor": [
+    {
+      "task": "DadaoDiagonalGrip_20261021",
+      "note": "2026-10-21 30-degree diagonal grasp: the 10-15 torso turn (rotation, translation, timing) is kept unchanged; the extra follow-through twist lives in the stroke shoulder keys. Elbow fit and DadaoSwingTest re-verify it.",
+      "previousKinematicSignature": "14b1a9476159edc2cf602d6d20e740ca1009ccfc601bdaa4c69fc385581ac5c3"
+    }
+  ]
 }

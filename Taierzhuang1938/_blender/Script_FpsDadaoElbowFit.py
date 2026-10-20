@@ -262,7 +262,9 @@ for side, key in [('r', 'right'), ('l', 'left')]:
         preference.append(.00002 * np.sum((normals - reference) ** 2, axis=1))
     points, valid = np.array(candidates), np.array(valid)
     FitPhase('continuous_path_begin', side=side)
-    for collisionPass in range(8):
+    # A sleeve that meets the blade at one elbow angle usually meets it at the
+    # neighbouring angles too; drop a +/-12 degree band so the search converges.
+    for collisionPass in range(24):
         parents = []
         cost = np.where(valid[0], preference[0], np.inf)
         for i in range(1, len(frames)):
@@ -288,7 +290,7 @@ for side, key in [('r', 'right'), ('l', 'left')]:
             measured = sleeveGeometry.Check(i, side, selected[i], np.array(f[key]), rotation @ contactNormal, weaponMatrix)
             actualSleeveRows.append(measured)
             if measured['clearanceM'] < sleeveGeometry.margin - 1e-9:
-                valid[i, indices[i]] = False
+                valid[i, (indices[i] + np.arange(-12, 13)) % len(theta)] = False
                 invalid.append(i)
         FitPhase('actual_sleeve_path', side=side, passIndex=collisionPass, invalidFrames=invalid)
         if not invalid:

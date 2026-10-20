@@ -1,4 +1,5 @@
-// Actual first-person blade projection: lower-left cut and readable silhouette.
+// Actual first-person blade projection: lower-left cut, readable silhouette and a
+// follow-through that exits through the lower-left edge.
 // Default collects fresh production matrices; --trace=path evaluates a stamped
 // replay already captured by this test or DadaoSwingTest --trace --export-source.
 import assert from 'node:assert/strict';
@@ -36,7 +37,10 @@ export function EvaluateDadaoProjection(replay,stroke=FPS_DADAO_SWING) {
  });
  const active=samples.filter(s=>s.t>=start&&s.t<=end),central=active.filter(s=>s.tip.visible&&Math.abs(s.tip.ndc[0])<.9&&Math.abs(s.tip.ndc[1])<.75);
  const failures=[],Check=(condition,message)=>{if(!condition)failures.push(message);};
- Check(central.length>=5,`Only ${central.length} central tip samples`);
+ // Central readability in time, not sample count: the same 121-sample curve is
+ // stretched over 0.65 s (light) and 1.36 s (heavy) clocks.
+ const centralMs=central.length*duration/120*1000;
+ Check(centralMs>=40,`Tip is central for only ${centralMs.toFixed(1)} ms (${central.length} samples)`);
  let diagonalAngleDeg=null,monotonicRatio=0,maximumCollapseRun=0,currentRun=0,monotonic=0,steps=0;
  if(central.length>=2){
   const first=central[0],last=central.at(-1);
@@ -48,14 +52,18 @@ export function EvaluateDadaoProjection(replay,stroke=FPS_DADAO_SWING) {
   Check(monotonicRatio>=.9,`Only ${(monotonicRatio*100).toFixed(1)}% central steps go left and down`);
   Check(maximumCollapseRun<=2,`Blade collapses below .12 viewport heights for ${maximumCollapseRun} central samples`);
  }
- const follow=samples.filter(s=>s.sourceTime>=.40&&s.sourceTime<=.56);
- const lowerLeft=follow.filter(s=>{const [x,y]=s.tip.pixel;return x/s.width>=.15&&x/s.width<=.35&&y/s.height>=.70&&y/s.height<=1.05;});
- Check(lowerLeft.length>=2,`Only ${lowerLeft.length} follow-through samples reach viewport x15–35% / y70–105%`);
+ // 2026-10-21 diagonal grasp: the follow-through drops with the arms, so the
+ // tip leaves through the lower-left edge instead of resting inside the frame.
+ const follow=samples.filter(s=>s.sourceTime>=.36&&s.sourceTime<=.56);
+ const lowerLeft=follow.filter(s=>{const [x,y]=s.tip.pixel;return x/s.width>=.15&&x/s.width<=.45&&y/s.height>=.75&&y/s.height<=1.10;});
+ Check(lowerLeft.length>=2,`Only ${lowerLeft.length} follow-through samples cross the lower-left exit x15–45% / y75–110%`);
+ const followLeft=Math.min(...follow.map(s=>s.tip.pixel[0]/s.width)),followLow=Math.max(...follow.map(s=>s.tip.pixel[1]/s.height));
+ Check(followLeft<=.35&&followLow>=1,`Follow-through must exit low-left (left ${followLeft.toFixed(2)}, low ${followLow.toFixed(2)})`);
  return {pass:failures.length===0,action:replay.action||'Light',camera,strokeControlSignature:stroke.strokeControlSignature,
   activeRange:[active[0].i,active.at(-1).i],centralRange:central.length?[central[0].i,central.at(-1).i]:null,
   diagonalAngleDeg,monotonicRatio,maximumCollapseRun,
   minimumCentralBladeHeightRatio:central.length?Math.min(...central.map(s=>s.projectedBladeHeightRatio)):null,
-  lowerLeftSamples:lowerLeft.map(s=>({i:s.i,pixel:s.tip.pixel})),failures,samples};
+  centralMs,followLeft,followLow,lowerLeftSamples:lowerLeft.map(s=>({i:s.i,pixel:s.tip.pixel})),failures,samples};
 }
 
 async function CollectRuntimeProjections() {

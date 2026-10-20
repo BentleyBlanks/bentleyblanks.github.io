@@ -37,7 +37,11 @@ folder = Path(FPS_GRIP_SOURCE).resolve()
 task = globals().get('FPS_GRIP_TASK', 'FpsGripConformity_20261015')
 exportOnly = bool(globals().get('FPS_DADAO_EXPORT_ONLY', False))
 folder.mkdir(parents=True, exist_ok=True)
-assert task == 'FpsGripConformity_20261015', 'Use this task-owned stroke source'
+# Each authoring round owns its source copy; the saved .blend name follows the task.
+SOURCE_BLENDS = {'FpsGripConformity_20261015': 'Animation_FpsGripConformity.blend',
+                 'DadaoDiagonalGrip_20261021': 'Animation_DadaoDiagonalGrip.blend'}
+assert task in SOURCE_BLENDS, 'Use a task-owned stroke source'
+blendName = SOURCE_BLENDS[task]
 assert not bpy.data.filepath or Path(bpy.data.filepath).resolve().parent == folder, 'Open a source copy in this task directory first'
 sceneName = 'Scene_FpsDadaoConformityStroke'
 scene = bpy.data.scenes.get(sceneName)
@@ -66,6 +70,16 @@ kinematicInput = {'contacts': {key: {field: config[key][field] for field in ['po
                                for key in ['right', 'left']},
                   'shoulders': config['bodyHip']['shoulders'], 'sourceArmLength': .57233826}
 kinematicSignature = hashlib.sha256(json.dumps(kinematicInput, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+# A new grasp invalidates the torso plan unless the author explicitly keeps
+# its motion: FPS_DADAO_RETAIN_SHOULDER_PLAN re-signs the unchanged rotation,
+# translation and timing for the current contacts and records why. The elbow fit
+# and DadaoSwingTest still have to pass on the new contacts afterwards.
+retainNote = globals().get('FPS_DADAO_RETAIN_SHOULDER_PLAN')
+if retainNote and shoulderPlan['kinematicSignature'] != kinematicSignature:
+    shoulderPlan.setdefault('retainedFor', []).append({'task': task, 'note': str(retainNote),
+                                                       'previousKinematicSignature': shoulderPlan['kinematicSignature']})
+    shoulderPlan['kinematicSignature'] = kinematicSignature
+    shoulderPlanPath.write_text(json.dumps(shoulderPlan, indent=2), encoding='utf-8')
 assert shoulderPlan['kinematicSignature'] == kinematicSignature, 'Refit the torso motion for the current wrist contacts/body anchors'
 Phase('grip_table_read_end')
 planeUp = Vector((.65, .7599342076785331, 0)).normalized()
@@ -91,11 +105,16 @@ keys = [
     (.14, (.190, -.110, -.465), 84, (.015, .040, .015), (.035, .040, .010)),
     (.26, (.190, -.005, -.440), 105, (.020, .070, .015), (.050, .075, .005)),
     (.30, (.095, -.055, -.460), 82, (.005, .050, -.030), (.055, .060, -.025)),
-    (.36, (-.080, -.270, -.480), 15, (-.015, .010, -.055), (.040, .020, -.055)),
-    (.43, (-.180, -.370, -.470), -32, (-.035, .010, -.040), (.015, .025, -.035)),
-    (.52, (-.200, -.390, -.450), -40, (-.030, .010, -.025), (.010, .030, -.025)),
-    (.65, (-.160, -.340, -.470), -8, (-.025, .010, -.020), (.010, .030, -.020)),
-    (.80, (-.040, -.220, -.515), 32, (-.010, 0, -.010), (.010, .010, -.010)),
+    # 2026-10-21 diagonal grasp: the follow-through finishes 23 cm lower, 10 cm
+    # further left and 7 cm nearer the body, and the torso turns into the cut
+    # (left shoulder back 8 cm and down 4 cm, right shoulder forward 4 cm). With
+    # the hands at shoulder height the blade's down-facing edge forced both
+    # elbows over the hilt; the blade direction (pitch) is unchanged.
+    (.36, (-.117, -.355, -.454), 15, (-.015, .010, -.070), (.040, .005, -.026)),
+    (.43, (-.280, -.599, -.400), -32, (-.035, .010, -.080), (.015, -.015, .045)),
+    (.52, (-.300, -.620, -.380), -40, (-.030, .010, -.065), (.010, -.010, .055)),
+    (.65, (-.258, -.566, -.401), -8, (-.025, .010, -.059), (.010, -.009, .059)),
+    (.80, (-.050, -.244, -.508), 32, (-.010, 0, -.014), (.010, .006, -.002)),
     (1, tuple(baseGrip), 58, (0, 0, 0), (0, 0, 0)),
 ]
 
@@ -286,8 +305,8 @@ text.write((root / '_blender' / scriptName).read_text(encoding='utf-8'))
 Phase('guard_seek_begin')
 scene.frame_set(1)
 Phase('guard_seek_end')
-Phase('source_blend_save_begin', path=str(folder / 'Animation_FpsGripConformity.blend'), compress=True)
-bpy.ops.wm.save_as_mainfile(filepath=str(folder / 'Animation_FpsGripConformity.blend'), compress=True)
+Phase('source_blend_save_begin', path=str(folder / blendName), compress=True)
+bpy.ops.wm.save_as_mainfile(filepath=str(folder / blendName), compress=True)
 Phase('source_blend_save_end')
 print(json.dumps({'source': bpy.data.filepath, 'strokeFrames': len(frames), 'signature': signature,
                   'elbowFitStatus': data['elbowFitStatus'], 'guardWeaponPosition': list(guardPosition),

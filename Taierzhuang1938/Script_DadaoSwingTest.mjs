@@ -314,20 +314,24 @@ try{
   const v=T.viewmodel,r=v.riggedArms,P=side=>r._InAnchor(r.bones[side].forearm,new THREE.Vector3());
   const start={r:P('r'),l:P('l')};
   if(!T.meleeCombat.Attack(T.player,false))throw Error('Player attack did not start');
-  const result={blendStep:0,blendFrames:0,guardReturn:0};let previous={r:start.r.clone(),l:start.l.clone()};
+  const result={entryStep:0,entryFrames:0,exitDeviation:0,exitFrames:0,guardReturn:0};let previous={r:start.r.clone(),l:start.l.clone()};
   for(let i=0;i<150;i++){
    T.StepFrames(1,1/120,false);const pose=T.meleeCombat.ViewPose();
    for(const side of ['r','l']){
     const elbow=P(side);
-    if(pose?.transition){result.blendStep=Math.max(result.blendStep,elbow.distanceTo(previous[side]));result.blendFrames++;}
+    // Entering: the stroke already moves; only a snap shows up as a large step.
+    if(pose?.transition&&pose.clip==='DadaoLight'){result.entryStep=Math.max(result.entryStep,elbow.distanceTo(previous[side]));result.entryFrames++;}
+    // Leaving: the stroke ends on the guard elbow, so the blend must stay on it.
+    if(pose?.transition&&pose.clip==='DadaoGuard'){result.exitDeviation=Math.max(result.exitDeviation,elbow.distanceTo(start[side]));result.exitFrames++;}
     previous[side]=elbow;
    }
   }
   for(const side of ['r','l'])result.guardReturn=Math.max(result.guardReturn,previous[side].distanceTo(start[side]));
   return result;
  });
- assert(handoff.blendFrames>8,`Combat did not blend into and out of the stroke (${handoff.blendFrames} samples)`);
- assert(handoff.blendStep<.015,`Elbow jumps during the guard/stroke hand-off: ${handoff.blendStep} m per 1/120 s`);
+ assert(handoff.entryFrames>4&&handoff.exitFrames>4,`Combat did not blend into and out of the stroke (${handoff.entryFrames}/${handoff.exitFrames} samples)`);
+ assert(handoff.entryStep<.02,`Elbow snaps while entering the stroke: ${handoff.entryStep} m per 1/120 s`);
+ assert(handoff.exitDeviation<.01,`Elbow leaves the guard pose during the hand-off back to guard: ${handoff.exitDeviation} m`);
  assert(handoff.guardReturn<.002,`Elbow does not settle back on the guard pose: ${handoff.guardReturn} m`);
  const inspector=await page.evaluate(async()=>{
   const THREE=await import('./vendor/three/build/three.module.js');

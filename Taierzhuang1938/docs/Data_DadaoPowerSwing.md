@@ -17,12 +17,64 @@
 - **检查器时间轴**：原先只认 Blender 导出的骨骼片段（只有汉阳造的「持枪呼吸」），大刀列表为空，
   拖动、播放、逐帧都无效。现在可检查的白刃动作以「大刀劈砍（程序动作）」列进时间轴，
   由 `Viewmodel` 的 `action.hold` 把正片动作钉在指定进度上逐帧重算，按 60 fps 计帧。
-- **未解决：劈到底时左肘翻到上方**（用户 10-21 截图里的「反关节」）。扫描整刀左臂肘圆：
-  进度 0.44–0.52 时满足腕弯 ≤ 64° 的肘向只剩约 20° 宽，对应肘高与眼睛平齐、在镜头正前方 27 cm；
-  这时肘自然下垂需要腕弯约 159°。IK 判定用的掌轴与真实手骨（腕 → 指根）只差 10°，不是算法假象。
-  原因是刀轨随势段双手停在左肩正前方、与肩同高，而刀尖朝前下，掌轴随刃口朝下后方；
-  要让左肘落到下面，必须改随势段刀轨（双手落低 / 收势刀身回正），这会改动已验收的「左下随势」
-  与「主手全程在屏内」口径，待用户选定方向后重做 Blender 刀轨与肘轨拟合。
+- **劈到底时左肘翻到上方 → 30° 斜握 + 随势段下放**（用户 10-21 截图里的「反关节」，见下一节）。
+
+## 2026-10-21：30° 斜握与随势段下放
+
+**原因。** 扫描整刀左臂肘圆：进度 0.44–0.52 时满足腕弯 ≤ 64° 的肘向只剩约 20° 宽，对应肘高与眼睛平齐、
+在镜头正前方 27 cm（玩家视角正中那团袖子）；这时肘自然下垂需要腕弯约 159°。IK 判定用的掌轴与真实手骨
+（腕 → 指根）只差 10°，不是算法假象。根子是两件事叠在一起：刀柄横在掌心、几乎垂直于掌轴（倾 5–6°），
+掌轴跟着刃口转；随势段双手又停在左肩正前方、与肩同高，刀尖朝前下，掌轴朝下后方，前臂只能从上方进手腕。
+静止架势的左肘在胸前正中、比肩高 2.8 cm 也是同一个原因。
+
+**用户选定的改法（10-21）。** 斜握 30° + 随势段双手下放，刀尖仍劈向左下。离线几何验证：只斜握救不了随势段
+（θ 从 −45° 到 60° 都找不到自然左肘）；只下放要挪 41–50 cm；斜握 30° 时下放约 23 cm 即可。45° 斜握在这把刀上
+放不下两只手：可握部分约 20 cm，一只手沿柄占 7.2 cm ÷ cos θ + 1.8 cm，45° 时两手共 24 cm。
+
+- **握法**：`Script_FpsDadaoDiagonalGrip.mjs` 把两只手的掌框绕「掌轴 × 刀柄轴」转到掌轴朝刀身倾 30°（可重复执行）；
+  `Script_FpsWeaponGripExport.mjs --only=Dadao --clean` 导出实机蒙皮；`_blender/Script_FpsDadaoDiagonalGripFit.py`
+  先让整只手在刀柄上刚性平移找位（在刀柄截面内沿武器局部 −Y 约 16–17 mm，掌框位置随之写回），再重拟四指（穿柄 ≤ 1.31 mm、
+  指腹离柄 ≤ 1 mm）和拇指（力量握：拇指压在食指近节或中节上，右拇指贴食指中节 1.08 mm、左拇指贴食指近节 0.99 mm）。
+  两手皮肤最近 0.3 mm，不叠。**已知余量**：右拇指根部有一处皮肤陷进刀柄靠护手一端约 8 mm
+  （刀柄截面正中，被手掌自己挡住，五个方向近景都看不出）；左拇指进柄 1.28 mm。
+- **刀轨**：`Script_FpsDadaoPhysicalStroke.py` 的 t=.36/.43/.52/.65/.80 关键帧，握点下放 23 cm、左移 10 cm、
+  往身体收 7 cm（权重按平滑窗 0.30→0.44 起、0.62→0.86 落折算），刀身在劈砍平面里的角度不变；
+  同几帧加躯干左拧：左肩后撤 8 cm、下沉 4 cm，右肩前送 4 cm（否则劈到底时左上臂从画面左下角扫进来）。
+  肩带计划 `_blender/Data_FpsDadaoShoulderBelt.json` 的躯干转动按原值沿用，只因握点变化重签名，原因写在 `retainedFor`。
+- **肘轨**：`Script_FpsDadaoElbowFit.py` 按新轨迹重拟。真实袖子 × 刀身净空检查里，一次只剔掉被选中的那一个肘向
+  收敛不了（右臂回架段 92–105 帧反复碰刀，8 轮后失败），改为连同左右 ±12° 一起剔、上限 24 轮：右臂 3 轮、左臂 1 轮收敛。
+  右臂相邻帧肘位最大 5.3 cm、腕弯最大 63.8°，左臂 2.1 cm、63.5°，袖子离刀最近 1.02 mm（门限 1 mm）。
+
+**结果（实机）。** 整刀双肘始终低于各自的肩：左 7–17 cm、右 7–23 cm；架势左肘比肩低 9.6 cm（改前高 2.8 cm）。
+轻斩刀尖有效行程 2.26 m（改前约 2.0 m），向下 1.36 m、向左 1.12 m，刃向一致度 0.977，峰值 28.9 m/s，最大腕弯 63.8°。
+玩家视角：劈到底时镜头里不再有大团袖子，刀经画面左下边扫出画面，约 0.1 s 后回到画面。
+
+**测试口径变化。** `FpsDadaoProjectionTest`：随势段由「刀尖停在左下 x15–35%/y70–105%」改为「刀尖经左下出口带
+x15–45%/y75–110% 出画，且最左 ≤ 35%、越过画面下沿」；劈砍中段的中央可见由「≥ 5 个采样」改为「≥ 40 ms」
+（同一条曲线摊在 0.65 s 轻斩与 1.36 s 重劈上，按采样数等于给两者 27 ms 与 56 ms 两套标准；新标准对轻斩更严、
+对重劈放宽，重劈实测 45 ms）。`DadaoSwingTest` 的交接防抖改为：起刀交接单步 < 20 mm，收招交接全程离架势肘位 < 10 mm
+（旧 bug 分别是 23–56 mm 与 15 cm）。`DadaoSwingTest` 原有「31 帧中至少 16 帧看得到主手」不变（现为 19/18 帧）。
+`SprintMeleeTest` 站姿基准「刀身中段在画面内的采样 ≥ 60%」改为 ≥ 50%（现 53%，改前约 82%）；
+它守的「冲刺不比站姿少」不变（冲刺同为 53%）。
+
+**源工程**：`C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\DadaoDiagonalGrip_20261021\Animation_DadaoDiagonalGrip.blend`
+（由 10-15 刀轨源工程复制，`Scene_FpsDadaoConformityStroke` 改认本任务，`AdoptedFrom` 记来源；10-15 源工程不动）。
+目录内 `Data_DadaoGripFitInput.json`（手指拟合输入）、`Data_DadaoDiagonalGripFit.json`（拟合报告）、
+`Data_FpsDadaoStroke.json`、`Data_FpsDadaoElbowFit.json`、`Data_DadaoReplaySkin.json`／`Frames.json`（精确回放输入）。
+
+**重建顺序**（`node scripts/Script_BlenderMcp.mjs start <上述 .blend> --task DadaoDiagonalGrip_20261021`，各脚本经 `exec`
+设 `FPS_GRIP_PROJECT_ROOT`／`FPS_GRIP_SOURCE`／`FPS_GRIP_TASK='DadaoDiagonalGrip_20261021'`）：
+1. `node Taierzhuang1938/Script_FpsDadaoDiagonalGrip.mjs`；
+2. `node Taierzhuang1938/Script_FpsWeaponGripExport.mjs <目录> --only=Dadao --clean`，再执行 `Script_FpsDadaoDiagonalGripFit.py`
+   （`FPS_GRIP_INPUT` 指向该目录）；
+3. `Script_FpsDadaoPhysicalStroke.py`（握点变了时设 `FPS_DADAO_RETAIN_SHOULDER_PLAN` 写明沿用理由）；
+4. `node Taierzhuang1938/Script_DadaoSwingTest.mjs --trace --export-source` 导出实机轨迹，执行 `Script_FpsDadaoElbowFit.py`，再重跑第 3 步；
+5. 验收 `DadaoSwingTest`／`FpsDadaoProjectionTest` 等，`Script_FpsDadaoConformityReplay.py` 刷新源工程回放；`stop`。
+
+**未完成：源工程精确回放。** 本轮执行第 5 步的回放脚本在第一步静态比对就失败（蒙皮差 26.27 mm）。
+该步只用导出骨骼矩阵 + 当前手部 GLB 做线性蒙皮，与本轮刀轨／握法无关；手部 GLB 在 10-16 改过指根权重和手指关节
+（哈希由 10-15 回放时的 `419f2df5…` 变为 `dffb45e2…`），回放脚本尚未跟上，留待单独排查。
+因此源工程里只有新刀轨的控制轨与烘焙数据，没有新的 121 帧实机蒙皮回放；运行时验收以上面的测试为准。
 
 ## 2026-09-16：刃口朝向纠正
 

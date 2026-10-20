@@ -6,7 +6,7 @@
 
 ## 当前入口与任务范围
 
-- **大刀收招抖动、冲刺拧刀、检查器时间轴（2026-10-21）**：刀轨肘向（`BlenderDadaoPowerSwing`）在起刀 / 收招交接里不再按权重混架势默认肘向（混出的方向被腕弯上限夹到下方再弹回，就是那一下抖）；大刀冲刺姿势由腰射架势前倾 12° 推出（旧值和腰射差 163°）；第一人称检查器时间轴可选「大刀劈砍（程序动作）」，经 `action.hold` 钉住正片动作逐帧检查。劈到底时左肘翻到上方是刀轨随势段双手太高所致，改法待用户定。见 [大刀劈砍修订](docs/Data_DadaoPowerSwing.md) 与 [编辑器套件](docs/Data_EditorSuite.md)。
+- **大刀收招抖动、冲刺拧刀、检查器时间轴、斜握重做（2026-10-21）**：刀轨肘向（`BlenderDadaoPowerSwing`）在起刀 / 收招交接里不再按权重混架势默认肘向（混出的方向被腕弯上限夹到下方再弹回，就是那一下抖）；大刀冲刺姿势由腰射架势前倾 12° 推出（旧值和腰射差 163°）；第一人称检查器时间轴可选「大刀劈砍（程序动作）」，经 `action.hold` 钉住正片动作逐帧检查。劈到底时左肘翻到上方（随势段双手停在左肩高度、刀柄横在掌心）按用户选定改为 30° 斜握（`Script_FpsDadaoDiagonalGrip.mjs` + `_blender/Script_FpsDadaoDiagonalGripFit.py`）+ 随势段双手下放 23 cm 与躯干左拧，肘轨重拟，整刀双肘始终低于肩，刀经画面左下边扫出；`FpsDadaoProjectionTest` 随势段与中央可见判据随之改写。源工程 `DadaoDiagonalGrip_20261021`，源工程实机回放因 10-16 手部 GLB 变更未刷新。见 [大刀劈砍修订](docs/Data_DadaoPowerSwing.md) 与 [编辑器套件](docs/Data_EditorSuite.md)。
 
 - **转视角摇摆与枪口焰对标 COD（2026-10-21）**：转视角摇摆改为 COD 引擎的限幅 + 一阶跟随（WaW Kar98k 数值，`LOOK_SWAY`），不再甩过头回弹；枪口焰年龄从画出来的第一帧算起、枪口灯先给亮度再计时，低帧率也看得见；枪焰换成照片级 4×4 图集，每发随机格子、滚转、大小、片数，预乘混合。口径与验收见 [枪械手感](docs/Data_FirearmHandling.md)。
 - **炮弹落地扬尘与炮击扬尘测试场（2026-10-21）**：用户要尘的起始形态贴着壕沟、之后升起飘散，并补充炸点半径内地面被震起的一层很细的浮土。落地爆炸在开了 `phase.groundImpactDust` 的关卡改走 `Vfx.GroundImpact`：局部网格上的贴地尘流（爆风按沿沟路程走、拐过折角）+ 土柱 / 悬浮尘云 + 震起的细尘，体积积分出团块与薄纱；目前只有独立测试场 `?impacts=1` 开（锯齿壕沟、碉堡、11 个弹种按真实落角投送、慢放 / 观察相机 / 新旧 A/B）。口径 [落地扬尘](docs/Data_ShellImpactDust.md)、[测试场](docs/Data_ShellImpactRange.md)；回归 `Script_DustFlowTest`、`Script_ShellImpactRangeTest`、`Script_ShellImpactRangeBrowserTest`。正片默认不开，开之前要过性能与能见度两本账。
