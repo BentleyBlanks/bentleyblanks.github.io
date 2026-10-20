@@ -106,8 +106,10 @@ try {
     a.Dispose(); return {staleIgnored,pauseHeld,resumesLatest,silenceHeld};
   });
   assert.ok(Object.values(races).every(Boolean),JSON.stringify(races));
-  assert.equal(new Set(requests.map(url=>url.split("?")[0])).size,7);
+  // 每首用到的曲子只下载一次：张数 = 上面阶段表里出现过的不同 cue（2026-10-21 起 11 首）。
+  const activeCues = new Set(starts.map(([, id]) => id).filter(Boolean));
+  assert.equal(new Set(requests.map(url=>url.split("?")[0])).size, activeCues.size, JSON.stringify([...activeCues]));
   assert.deepEqual(errors,[]);
   await fs.writeFile(path.join(output,"Data_MusicVerification.json"),JSON.stringify({rows,races,requests,errors},null,2));
-  console.log("PASS silent carriage and seven active audible cues, both battle recordings, story transitions, dialogue, pause/resume, cache and late-load races");
+  console.log(`PASS silent carriage and ${activeCues.size} active audible cues, both battle recordings, story transitions, dialogue, pause/resume, cache and late-load races`);
 } finally { await browser.close(); await new Promise(resolve=>server.close(resolve)); }
