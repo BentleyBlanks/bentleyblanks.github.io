@@ -14,6 +14,8 @@
 // 10-20 第三版（照史料压平、窄条田、四个村子、东边低山）：坑北只剩 ±1 m 大起伏 + 2 m 地坎；场地里的田是南北向 5–20 m 的窄条、几十条一组、组间小路，
 // 翻地 + 撂荒过半；田里散 10–20 座单个的坟（0.8–1.2 m，不挡跃进站位、不压路）；场地里没有村子；远景层 backdrop 过校验、
 // 四个村子 / 山包的方位与距离、大路从场地北边界接进远景层穿过村 A 通到村 D、远景地面在接缝上与场地一样高、北边界两边的田块颜色接得上。
+// 10-20 第四轮（短跃进、来路、沟里一个班）：跃进一跃 9.5–18 m（翻坎那一跃 ≤ 26 m）；麦地里趴的站位平；坎下的站位蹲着从坑里看不见；
+// 沟里那个班开场都在干水沟里、弯着腰坑里看不见；出沟后扑到 N2 / N1 后的每一格都被田埂挡住。
 
 import assert from "node:assert/strict";
 import { ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
@@ -28,7 +30,7 @@ import {
   L0105_PLACES as P, L0105_HEIGHTS as H, L0105_TRENCH_SECTION as S, L0105_GULLY as G, L0105_BRIDGE as BR,
   L0105_PROPS, L0105_PROP_KINDS, L0105_SUNKEN_LANE, L0105_GULLY_SOUTH_BERM as SB, PointBeside, GullyU, InGullyFloor,
   L0105_ROAD, L0105_GULLY_POCKETS, L0105_GULLY_TREES,
-  L0105_PIT_NORTH as PN, L0105_BOUNDS, L0105_RUSH_STATIONS, L0105_RUSH_REPLACEMENT, L0105_DITCH_FLANK, RushStation, ScarpZ, LineLength,
+  L0105_PIT_NORTH as PN, L0105_BOUNDS, L0105_RUSH_STATIONS, L0105_RUSH_FALLEN, L0105_DITCH_SQUAD, DitchSquadStart, RushStation, ScarpZ, LineLength,
   L0105_NORTH_ROAD, L0105_FIELD_PATH, L0105_ROAD_TREES, L0105_FIELD_PAINT, L0105_FIELD_GRAVES, L0105_FARM,
   L0105_BACKDROP_ROAD, L0105_BACKDROP_VILLAGES, L0105_BACKDROP_HILLS, L0105_HEIGHTS,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
@@ -257,9 +259,29 @@ assert.ok(pn.lmgW.block <= 0 && pn.lmgE.block <= 0, `坑里要看得见两挺轻
     assert.ok(Math.abs(sample(st.x, st.z + 0.35) - sample(st.x, st.z - 0.35)) < 0.3, `${id} 趴在斜坡上 (${st.x},${st.z})`);
   };
   for (const [id, list] of Object.entries(L0105_RUSH_STATIONS)) list.forEach((d) => Check(id, d));
-  Check("IjaRushR1", L0105_RUSH_REPLACEMENT.from); Check("IjaRushR1", L0105_RUSH_REPLACEMENT.to);
-  L0105_DITCH_FLANK.proneAt.forEach((x, i) => Check(L0105_DITCH_FLANK.ids[i], { bund: "N1", x }));
-  assert.ok(n >= 35, "跃进站位太少");
+  const SQ = L0105_DITCH_SQUAD;
+  for (const [id, x] of Object.entries(SQ.n2X)) if (!SQ.fallen.includes(id)) Check(id, { bund: "N2", x });
+  for (const [id, n1] of Object.entries(SQ.toN1)) Check(id, { bund: "N1", x: n1.x });
+  assert.ok(n >= 20, `有掩体的站位太少（${n}）`);
+  // 10-20 第四轮：短跃进 —— 相邻两格 9.5–18 m（从坎下翻上来那一跃算上翻坎 ≤ 26 m）；麦地里趴的地方平；坎下的蹲着（眼高 1.0）坑里看不见
+  for (const [id, list] of Object.entries(L0105_RUSH_STATIONS)) {
+    const st = list.map(RushStation);
+    for (let i = 1; i < st.length; i++) {
+      const hop = Math.hypot(st[i].x - st[i - 1].x, st[i].z - st[i - 1].z);
+      assert.ok(hop >= 9.5 && hop <= (st[i - 1].hidden ? 26 : 18), `${id} 第 ${i} 跃 ${hop.toFixed(1)} m`);
+    }
+    for (const q of st) {
+      if (q.prone) assert.ok(Math.abs(sample(q.x, q.z + 0.35) - sample(q.x, q.z - 0.35)) < 0.3, `${id} 趴在斜坡上 (${q.x},${q.z})`);
+      if (q.hidden) {
+        assert.ok(q.z < ScarpZ(q.x) - 3, `${id} (${q.x},${q.z}) 要在地坎北边的低地里`);
+        const r = SightBlockFromY(sample, pitTop, { x: q.x, z: q.z, eye: 1.0 }, 0.1);
+        assert.ok(r.block >= 0.05, `${id} 蹲在坎下 (${q.x},${q.z}) 从坑里看得见（${r.block}）`);
+      }
+    }
+  }
+  for (const [id, f] of Object.entries(L0105_RUSH_FALLEN)) assert.ok(f.bound < 5 && Math.abs(f.at.z) > 150, `${id} 倒在正面开阔地里`);
+  // 沟里那个班开场在干水沟里（离沟中心线 ≤ 0.8 m，弯着腰从坑里看不见：断面另见 pn.ditch）
+  SQ.ids.forEach((id, i) => { const q = DitchSquadStart(i); assert.ok(DitchStation(q.x, q.z).d <= 0.8, `${id} 开场不在沟里 (${q.x},${q.z})`); });
 }
 {
   // 扫清带基本平：z −8…−80 内坑北前景只加了田埂、孤坟（和干水沟尽头），没有起伏、没有地坎（原来坑北略低的那 0.8 m 缓坡照旧）
@@ -376,7 +398,6 @@ assert.ok(pn.lmgW.block <= 0 && pn.lmgE.block <= 0, `坑里要看得见两挺轻
   assert.ok(L0105_FIELD_GRAVES.length >= 10 && L0105_FIELD_GRAVES.length <= 20, `散坟 ${L0105_FIELD_GRAVES.length}`);
   const stations = [];
   for (const list of Object.values(L0105_RUSH_STATIONS)) for (const d of list) stations.push(RushStation(d));
-  stations.push(RushStation(L0105_RUSH_REPLACEMENT.from), RushStation(L0105_RUSH_REPLACEMENT.to));
   for (const g of L0105_FIELD_GRAVES) {
     let ring = 0; for (let i = 0; i < 12; i++) { const ang = i * Math.PI / 6; ring += sample(g.x + Math.cos(ang) * (PN.graveBaseR + 1), g.z + Math.sin(ang) * (PN.graveBaseR + 1)); }
     const h = sample(g.x, g.z) - ring / 12;

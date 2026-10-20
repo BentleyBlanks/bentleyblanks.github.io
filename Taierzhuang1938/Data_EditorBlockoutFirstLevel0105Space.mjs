@@ -240,7 +240,7 @@ export const L0105_PLACES = Object.freeze({
  * 坑北前景（2026-10-20，用户在 03 坑沿朝北看：「日军这么一马平川合理吗」→ 拍板的「坑北前景」改稿）。
  * 没有史料出处，是创作：鲁南农田三月的常见样子（麦苗才返青、田埂、孤坟、坟地柏树、麦秸垛、干水沟、梯田地坎、远处村子和杨树带）。
  * 场景生成器把田埂、坟包、干水沟、地坎、大起伏烘进高度场，树桩 / 柏树 / 麦秸垛 / 杨树 / 土坯房出体块；
- * 关键帧与预演按这里摆 03 的日军（跃进的人每次扑倒都落在 rushCover 的掩体后）。
+ * 关键帧与预演按这里摆 03 的日军（跃进的人扑在田埂 / 坟 / 沟沿后，或趴在两道田埂之间的麦地里；见 L0105_RUSH_STATIONS）。
  * 田埂中心线 z = z0 + amp·sin(k·x + phase)，x 在 [minX, maxX]；坟 [x, z, 高]；树 [x, z, 高]；房 [x, z, 东西宽, 南北深]。
  */
 export const L0105_PIT_NORTH = Object.freeze({
@@ -409,28 +409,68 @@ export const L0105_BACKDROP = Object.freeze({
 });
 
 /**
- * 03 正面跃进的步兵（IjaRush1–8，两人一组）每一拍落在哪：[03-2, 03-3 开场, 03-3 第一次跃进后, 03-3 第二次跃进后 = 03-4, 03-5]。
- * 每一项是掩体描述（扑倒 / 趴着都落在掩体后，掩体在他和坑之间）或 { open: [x, z] }（03-5 还在往前跑、站着）：
- *   { bund: "N2", x }        田埂北边 backBundM 处（田埂在他和坑之间）
+ * 03 正面跃进的步兵（IjaRush1–8，两人一组：组 1 = 1/2、组 2 = 3/4、组 3 = 5/6、组 4 = 7/8）。
+ * 2026-10-20 第四轮（用户问「日军真是在大平面上直直冲过来的？没遮挡不就是活靶子？」→ 照史料拍板四拍）：
+ *   正面是拖住守军的，不是主攻 —— 先用轻机枪把坑里的人压下去、趁缩头那几秒一组跳一段（一跃 12–18 m、三四秒就扑倒），
+ *   两道田埂之间约 40 m 跳三次，中间两次扑在麦地里；整个 03-3 正面只从 F3（约 185 m）推到 F2（约 140 m）。
+ *   组 2、组 4 开场还在地坎后面的低地里（坎北低 2 m，坑里看不见人），03-3 一开场翻坎上来（交代「人从哪来」）。
+ * 每人一串站位，下标见 L0105_RUSH_KEY：[0] 03-2 / 03-3 开场、[1] 03-3 第一跃后、[2] 第二跃后、[3] 第三跃后 = 03-4、[4] 03-4 那一跃后 = 03-5。
+ *   { bund: "F2", x }        田埂北边 backBundM 处（田埂在他和坑之间）
+ *   { field: [x, z] }        趴在麦地里（没有掩体，只靠趴得低；150 m 外看就是一道土色）
+ *   { scarp: x }             地坎北边 behindScarpM 处的低地里（蹲着，坑里看不见）
  *   { grave: [x, z], lat }   坟包往远离坑的方向 backGraveM、横向 lat（面朝坑的右手为正）
  *   { ditch: x }             干水沟北沿外 ditchSideM 处（沟沿那条翻土 + 沟在他和坑之间）
- * IjaRush4 在 03-3 第一次跃进时中弹倒下，第二格写的是顶上来的 IjaRushR1 扑倒的地方（03-4 起 IjaRush4 就是他）。
+ *   { open: [x, z] }         站着
+ * IjaRush4 在 03-3 第二跃里中弹（L0105_RUSH_FALLEN），之后的拍子躺在那里。
+ * 依据：日军进攻先用火力压住守军、散开一段段往前、出发线放在挡得住枪弹的地方、偏爱包抄（美军 TM-E 30-480，1944，第七章进攻）；
+ * 具体距离、人数、路线、时刻是创作。
  */
-export const L0105_RUSH_COVER = Object.freeze({ backBundM: 1.3, backGraveM: 1.9, ditchSideM: 3.0, target: P(0, -8) });
+export const L0105_RUSH_COVER = Object.freeze({ backBundM: 1.3, backGraveM: 1.9, ditchSideM: 3.0, behindScarpM: 6.0, target: P(0, -8) });
+export const L0105_RUSH_KEY = Object.freeze({ "03-2": 0, "03-3": 0, "03-4": 3, "03-5": 4 });
 export const L0105_RUSH_STATIONS = Object.freeze({
-  IjaRush1: [{ bund: "F1", x: -48 }, { ditch: -48 }, { bund: "N2", x: -36 }, { grave: [-20, -55], lat: 0.75 }, { bund: "N1", x: -20 }],
-  IjaRush2: [{ bund: "F1", x: -43 }, { ditch: -43 }, { bund: "N2", x: -31 }, { grave: [-20, -55], lat: -0.75 }, { bund: "N1", x: -15 }],
-  IjaRush3: [{ bund: "F2", x: -14 }, { ditch: -20 }, { bund: "N2", x: -14 }, { bund: "N1", x: -6 }, { open: [-6, -30] }],
-  IjaRush4: [{ bund: "F2", x: -6 }, { ditch: -10 }, { bund: "N2", x: -9 }, { bund: "N2", x: -9 }, { open: [-1, -33] }],
-  IjaRush5: [{ bund: "F2", x: 26 }, { ditch: 22 }, { bund: "F1", x: 18 }, { bund: "N2", x: 16 }, { bund: "N1", x: 10 }],
-  IjaRush6: [{ bund: "F2", x: 30 }, { ditch: 26 }, { bund: "F1", x: 22 }, { bund: "N2", x: 20 }, { bund: "N1", x: 14 }],
-  IjaRush7: [{ ditch: 50 }, { bund: "F1", x: 34 }, { grave: [45, -65], lat: 0.75 }, { bund: "N1", x: 30 }, { open: [26, -28] }],
-  IjaRush8: [{ ditch: 54 }, { bund: "F1", x: 38 }, { grave: [45, -65], lat: -0.75 }, { bund: "N1", x: 34 }, { open: [30, -30] }],
+  IjaRush1: [{ bund: "F3", x: -46 }, { field: [-46, -176] }, { field: [-46, -162] }, { bund: "F2", x: -46 }, { field: [-46, -135] }],
+  IjaRush2: [{ bund: "F3", x: -40 }, { field: [-40, -176] }, { field: [-40, -162] }, { bund: "F2", x: -40 }, { field: [-40, -135] }],
+  IjaRush3: [{ scarp: -14 }, { bund: "F3", x: -14 }, { field: [-14, -176] }, { field: [-14, -162] }, { bund: "F2", x: -14 }],
+  IjaRush4: [{ scarp: -7 }, { bund: "F3", x: -7 }],
+  IjaRush5: [{ bund: "F3", x: 18 }, { field: [18, -177] }, { field: [18, -163] }, { bund: "F2", x: 18 }, { ditch: 18 }],
+  IjaRush6: [{ bund: "F3", x: 24 }, { field: [24, -177] }, { field: [24, -163] }, { bund: "F2", x: 24 }, { ditch: 24 }],
+  IjaRush7: [{ scarp: 44 }, { bund: "F3", x: 44 }, { field: [44, -178] }, { field: [44, -164] }, { ditch: 44 }],
+  IjaRush8: [{ scarp: 50 }, { bund: "F3", x: 50 }, { field: [50, -178] }, { field: [50, -164] }, { ditch: 50 }],
 });
-/** 顶替 IjaRush4 的那个人：从 F1 田埂后起身，扑到 N2 田埂后（= IjaRush4 的第四格）。 */
-export const L0105_RUSH_REPLACEMENT = Object.freeze({ from: Object.freeze({ bund: "F1", x: -2 }), to: Object.freeze({ bund: "N2", x: -9 }) });
-/** 03-3 从干水沟里摸过来的三个人（左边沟里头有人！）：沟里弯着腰走到尽头，露头后扑到 N1 田埂后。 */
-export const L0105_DITCH_FLANK = Object.freeze({ ids: Object.freeze(["IjaFlank1", "IjaFlank2", "IjaFlank3"]), proneAt: Object.freeze([-40, -44, -36]) });
+/** 中弹倒下的：第几跃（站位下标）里、倒在哪。 */
+export const L0105_RUSH_FALLEN = Object.freeze({ IjaRush4: Object.freeze({ bound: 2, at: P(-7.4, -181) }) });
+
+/**
+ * 03 西边干水沟里摸过来的一个班（2026-10-20 第四轮：侧面才是主攻）：8 人，班长 IjaFlank1 打头，轻机枪组（射手 + 装填手）走第三、四。
+ * 03-2 / 03-3 开场在沟里弯着腰（沟深 1.2 m，坑里看不见），打头的在沟上弧长 startD（从东北头量）、一个跟一个隔 spacingM。
+ * 03-3：走到 peekD 停下，班长站起来探一眼（「左边沟里头有人！」）；然后猫腰快走到渐浅段起点（出沟点），
+ *   轻机枪组趴进渐浅段（lmgD / loaderD，沟还有半米深，枪口出沟沿）打坑的丙位；步枪兵一个个出沟扑到 N2 田埂后（n2X），
+ *   fallen 那两个出沟跑到 fallenFrac 处被丙位打倒。
+ * 03-4：toN1 那两个先扑进麦地（mid）、再跳到 N1 田埂后（离坑约 45 m）。具体人数、路线是创作（日军一个分队的编制约十来人带一挺轻机枪）。
+ */
+export const L0105_DITCH_SQUAD = Object.freeze({
+  ids: Object.freeze(["IjaFlank1", "IjaFlank2", "IjaFlankLmg", "IjaFlankLmgLoader", "IjaFlank3", "IjaFlank4", "IjaFlank5", "IjaFlank6"]),
+  lmg: "IjaFlankLmg", loader: "IjaFlankLmgLoader", leader: "IjaFlank1",
+  startD: 270, spacingM: 3.2, peekD: 285, lmgD: 309.5, loaderD: 307.8,
+  n2X: Object.freeze({ IjaFlank1: -52, IjaFlank2: -57, IjaFlank3: -62, IjaFlank4: -67, IjaFlank5: -72, IjaFlank6: -77 }),
+  fallen: Object.freeze(["IjaFlank2", "IjaFlank4"]), fallenFrac: 0.6,
+  toN1: Object.freeze({ IjaFlank1: Object.freeze({ mid: P(-51, -56), x: -50 }), IjaFlank3: Object.freeze({ mid: P(-61, -57), x: -60 }) }),
+});
+/** 干水沟出沟点（渐浅段起点：从这里起人就露头了）。 */
+export function DitchEmerge() {
+  const line = L0105_PIT_NORTH.ditch.line;
+  return PointAlong(line, LineLength(line) - L0105_PIT_NORTH.ditch.endTaperM);
+}
+/** 沟里那个班第 i 个人在 03-3 开场的位置（沟中心线上，弧长 startD − i·spacingM）。 */
+export function DitchSquadStart(i) {
+  const S = L0105_DITCH_SQUAD;
+  return PointAlong(L0105_PIT_NORTH.ditch.line, S.startD - i * S.spacingM);
+}
+/** 出沟被打倒的人倒在哪：出沟点 → N2 站位的 fallenFrac 处。 */
+export function DitchSquadFallenAt(id) {
+  const S = L0105_DITCH_SQUAD, e = DitchEmerge(), st = RushStation({ bund: "N2", x: S.n2X[id] });
+  return P(Math.round((e.x + (st.x - e.x) * S.fallenFrac) * 100) / 100, Math.round((e.z + (st.z - e.z) * S.fallenFrac) * 100) / 100);
+}
 
 /** 干水沟中心线在 x 处的 z（这条沟自东北往西南，x 单调）。 */
 export function DitchZAt(x) {
@@ -442,10 +482,12 @@ export function DitchZAt(x) {
   return x > line[0].x ? line[0].z : line[line.length - 1].z;
 }
 
-/** 跃进站位描述 → { x, z, cover }（cover：掩体名；open 为 null）。 */
+/** 跃进站位描述 → { x, z, cover, prone?, hidden? }（cover：掩体名；open / field 为 null；field 趴着，scarp 蹲在坎下看不见）。 */
 export function RushStation(desc) {
   const C = L0105_RUSH_COVER;
   if (desc.open) return { x: desc.open[0], z: desc.open[1], cover: null };
+  if (desc.field) return { x: desc.field[0], z: desc.field[1], cover: null, prone: true };
+  if (desc.scarp !== undefined) return { x: desc.scarp, z: Math.round((ScarpZ(desc.scarp) - C.behindScarpM) * 100) / 100, cover: null, hidden: true };
   if (desc.bund) {
     const b = L0105_PIT_NORTH.bunds.find((q) => q.id === desc.bund);
     return { x: desc.x, z: Math.round((BundZ(b, desc.x) - C.backBundM) * 100) / 100, cover: `田埂 ${desc.bund}` };

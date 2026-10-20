@@ -25,11 +25,11 @@ import { fileURLToPath } from "node:url";
 import {
   L0105_PLACES as PL, L0105_TRENCHES, L0105_ROAD, L0105_BRIDGE, L0105_PROPS, PointBeside, LineLength,
   L0105_GULLY, L0105_GULLY_POCKETS, L0105_SUNKEN_LANE,
-  L0105_PIT_NORTH, L0105_RUSH_STATIONS, L0105_RUSH_REPLACEMENT, L0105_DITCH_FLANK, RushStation,
+  L0105_PIT_NORTH, L0105_RUSH_STATIONS, L0105_RUSH_FALLEN, L0105_DITCH_SQUAD, DitchSquadFallenAt, RushStation, ScarpZ,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 import { PREVIZ_THROW, SamplePrevizActor, NormalizeBlockoutPreviz } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES } from "./Data_BlockoutPrevizClips.mjs";
-import { BRIDGE_EAST_DETOUR, DRAG, OUTFLANK_FIRE_021, OUTFLANK_FIRE_LAT, OUTFLANK_RIM_LAT } from "./Script_EditorBlockoutFirstLevel0105Keyframes.mjs";
+import { BRIDGE_EAST_DETOUR, DRAG, OUTFLANK_FIRE_021, OUTFLANK_FIRE_LAT, OUTFLANK_RIM_LAT, FrontAtX } from "./Script_EditorBlockoutFirstLevel0105Keyframes.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const PREVIZ_FILE = join(HERE, "Blockout", "FirstLevel0105.previz.json");
@@ -1344,133 +1344,205 @@ function S0302(ctx) {
 }
 
 // ---------------------------------------------------------------------------
-// 03 坑北前景（2026-10-20）：跃进扑在掩体后、干水沟里摸过来的人
+// 03 坑北（2026-10-20 第四轮，用户问「日军真是在大平面上直直冲过来的？没遮挡不就是活靶子？」→ 拍板四拍）：
+//   来路：人从地坎后那片看不见的低地翻上来 → 压制：两挺轻机枪一扫坑沿、坑里缩头，正面趁这几秒一组跳一段（短跃进）→
+//   侧面才是主攻：西边干水沟里一个班，班长探头被看见、出沟、轻机枪架在沟尽头打丙位 → 东头沟里的一个弯一个弯清过来。
+// 依据：日军进攻先用火力压住守军、散开一段段往前、偏爱包抄（美军 TM-E 30-480，1944）；具体人数、路线、时刻是创作。
 
 const RUSH_TARGET = { x: 0, z: -8 };
-/** 03-3 的两轮跃进：[t, 落到第几格, 谁, 谁不扑（中弹）]。 */
-const RUSH_BOUNDS_033 = Object.freeze([
-  [2.0, 2, ["IjaRush1", "IjaRush2", "IjaRush5", "IjaRush6"], []],
-  [10.0, 2, ["IjaRush3", "IjaRush4", "IjaRush7", "IjaRush8"], ["IjaRush4"]],
-  [30.0, 3, ["IjaRush1", "IjaRush2", "IjaRush5", "IjaRush6"], []],
-  [44.0, 3, ["IjaRush3", "IjaRush7", "IjaRush8"], []],
-]);
-const RUSH_RUN_MPS = 4.2;
+/** 短跑速度（带枪带装具冲一段，m/s）：一跃 12–18 m ≈ 2.5–3.8 s。 */
+const RUSH_RUN_MPS = 4.8;
 /**
- * 一跃：t 起身跑到掩体前 0.8 m（跑步速度 RUSH_RUN_MPS，最少 2.4 s），朝坑扑倒（PvStandToProneDive 往前带 0.8 m）落在 to 上；
- * noDive = 跑出去 RUSH_SHOT_AFTER_S 秒就中弹（只跑到那一点站住，倒地另写）。
+ * 03-3 的跃进：[t, 跳到第几格（L0105_RUSH_STATIONS 下标）, 谁]。组 2、组 4 开场翻坎（第 1 格 = F3 后）；
+ * 之后四组轮着，一组跳、其余趴着打。第一、二轮跟着轻机枪扫坑沿起跳（坑里缩头那两秒）。IjaRush4 第二跃里中弹（L0105_RUSH_FALLEN）。
  */
-const RUSH_SHOT_AFTER_S = 3.4;
-function RushBound(s, id, t, to, noDive = false) {
+const RUSH_BOUNDS_033 = Object.freeze([
+  [0.6, 1, ["IjaRush3", "IjaRush4"]], [1.0, 1, ["IjaRush7", "IjaRush8"]],
+  [6.6, 1, ["IjaRush1", "IjaRush2"]], [9.8, 1, ["IjaRush5", "IjaRush6"]],
+  [12.2, 2, ["IjaRush3", "IjaRush4"]], [15.8, 2, ["IjaRush7", "IjaRush8"]],
+  [25.0, 2, ["IjaRush1", "IjaRush2"]], [28.4, 2, ["IjaRush5", "IjaRush6"]],
+  [33.0, 3, ["IjaRush3"]], [36.4, 3, ["IjaRush7", "IjaRush8"]],
+  [44.0, 3, ["IjaRush1", "IjaRush2"]], [48.0, 3, ["IjaRush5", "IjaRush6"]],
+]);
+/** 03-4 的那一跃（第 3 格 → 第 4 格 = 03-5 的站位）。 */
+const RUSH_BOUNDS_034 = Object.freeze([
+  [3.0, 4, ["IjaRush1", "IjaRush2"]], [7.0, 4, ["IjaRush5", "IjaRush6"]], [11.0, 4, ["IjaRush3"]], [15.0, 4, ["IjaRush7", "IjaRush8"]],
+]);
+/**
+ * 一跃：t 起身跑到站位前 0.8 m，朝 faceTo 扑倒（PvStandToProneDive 往前带 0.8 m）落在站位上；从坎下翻上来的路过坎顶。
+ * fall：跑到 fall 那一点就中弹倒下（ShotCollapse），不扑。minS：最短跑多久。返回落地 / 倒下的时刻。
+ */
+function Bound(s, id, t, to, { faceTo = RUSH_TARGET, fall = null, minS = 2.4 } = {}) {
   const p = s.pos.get(id);
-  const yaw = Yaw(to, RUSH_TARGET);
-  const stop = Off(to, yaw, -0.8);
-  const runS = Math.max(2.4, Dist(p, stop) / RUSH_RUN_MPS);
-  if (noDive) {
-    const f = Math.min(1, RUSH_SHOT_AFTER_S / runS);
-    s.Go(id, t, R(t + RUSH_SHOT_AFTER_S), R(p.x + (stop.x - p.x) * f), R(p.z + (stop.z - p.z) * f), { move: "run", depart: { stance: "stand", aim: false } });
-    return;
-  }
-  s.Go(id, t, R(t + runS), stop.x, stop.z, { move: "run", depart: { stance: "stand", aim: false } });
-  Dive(s, id, R(t + runS), yaw, { aim: true });
+  const end = fall || to;
+  const yaw = Yaw(end, faceTo);
+  const overScarp = p.z < ScarpZ(p.x) - 1;
+  const path = overScarp ? [{ x: R(p.x + (end.x - p.x) * 0.3), z: R(ScarpZ(p.x) + 1.2) }] : undefined;
+  const stop = fall ? fall : Off(to, yaw, -0.8);
+  const runS = Math.max(minS, (Dist(p, stop) + (overScarp ? 1.5 : 0)) / RUSH_RUN_MPS);
+  const tEnd = R(t + runS);
+  s.Go(id, t, tEnd, stop.x, stop.z, { move: "run", ...(path ? { path } : {}), depart: { stance: "stand", aim: false } });
+  if (fall) {
+    s.Key(id, tEnd, { clip: "ShotCollapse", clipHold: true });
+    s.Key(id, R(tEnd + 1.6), { state: "down", clip: null });
+  } else Dive(s, id, tEnd, yaw, { aim: true });
+  return tEnd;
 }
+/** 按表跳：中弹的那个（L0105_RUSH_FALLEN）跑到倒下的地方。 */
+function RushBounds(s, schedule) {
+  for (const [t, k, ids] of schedule) for (const id of ids) {
+    const fell = L0105_RUSH_FALLEN[id];
+    if (fell && k >= fell.bound) Bound(s, id, t, null, { fall: fell.at, minS: 1.2 });
+    else Bound(s, id, t, RushStation(L0105_RUSH_STATIONS[id][k]));
+  }
+}
+/** 轻机枪一梭子扫过坑沿：土点从 x0 一路溅到 x1（胸墙北边），枪声 + 一串打土声。 */
+function SweepParapet(s, t, gun, x0, x1, n = 6) {
+  Shot(s, t, gun, { count: 8, sfx: "mgBurstFar" });
+  for (let i = 0; i < n; i++) Puff(s, t + 0.3 + i * 0.12, { x: R(x0 + (x1 - x0) * i / (n - 1)), z: i % 2 ? -11.4 : -11.0 });
+  s.Sfx(t + 0.3, "strafeDirt", { x: R((x0 + x1) / 2), z: -11.2, volume: 0.5 });
+}
+/** 缩头：0.3 s 从站姿眼高降到蹲（盯着眼前胸墙的土）、停着，t1 前 0.3 s 抬回来看 lookUp。 */
+function Duck(s, t0, t1, at, lookUp) {
+  const low = { x: at.x, z: R(at.z + 0.35), h: 1.0 }, wall = { x: R(at.x - 0.4), z: R(at.z - 1.6), h: 0.9 };
+  s.Cam(t0, 0.3, { from: { x: at.x, z: at.z, h: 1.62 }, to: low, look: { x: at.x, z: R(at.z - 8), h: 1.4 }, lookTo: wall });
+  s.Cam(R(t1 - 0.3), 0.3, { from: low, to: { x: at.x, z: at.z, h: 1.62 }, look: wall, lookTo: lookUp });
+  s.Shake(t0 + 0.05, 0.5, 0.2);
+}
+
 /** 干水沟上按弧长取点（d 从东北头量）。 */
 const DITCH_LINE = L0105_PIT_NORTH.ditch.line, DITCH_LEN = LineLength(DITCH_LINE);
 const DitchAt = (d, lat = 0) => { const p = PointBeside(DITCH_LINE, d, lat); return { x: R(p.x), z: R(p.z) }; };
-/** 沟里的一段途经点（从 d0 到 d1，每 stepM 一个，不含 d0）。 */
+/** 沟里的一段途经点（从 d0 到 d1，每 stepM 一个，不含两端）。 */
 function DitchPath(d0, d1, stepM = 6) {
   const out = [], n = Math.max(1, Math.round(Math.abs(d1 - d0) / stepM));
   for (let k = 1; k < n; k++) out.push(DitchAt(d0 + (d1 - d0) * k / n));
   return out;
 }
-/** 沟尽头（渐浅段开始处，从这里起人就露头了）。 */
+/** 出沟点（渐浅段起点，从这里起人就露头了）。 */
 const DITCH_EMERGE_D = DITCH_LEN - L0105_PIT_NORTH.ditch.endTaperM;
-function DitchFlankBack() { return DitchAt(DITCH_EMERGE_D - 4); }
+const SQUAD = L0105_DITCH_SQUAD;
+/** 那个班（03-3）：12.3 s 前一个跟一个猫腰走到 peekD 停下；14.6–15.6 s 班长站起来探头；15.8 s 起猫腰快走（SQUAD_FAST_MPS）到出沟点。 */
+const SQUAD_STOP_T = 12.3, SQUAD_PEEK_T = 14.6, SQUAD_GO_T = 15.8, SQUAD_FAST_MPS = 1.8;
+const SquadStopD = i => SQUAD.peekD - i * SQUAD.spacingM;
 /**
- * 03-3「左边沟里头有人！」：三个人一开场就在沟里，弯着腰（crouch）顺沟往西南摸，12 s 前后走到渐浅段起点，
- * 一个接一个露头、跑出沟尽头，扑到 N1 田埂后（L0105_DITCH_FLANK.proneAt），枪口朝丙位散兵坑。
+ * 03-3「左边沟里头有人！」：那个班顺干水沟弯着腰摸到坑西北（沟深 1.2 m + 沟沿翻土，坑里看不见头），班长探头被刘文财看见；
+ * 出沟：轻机枪组趴进渐浅段（枪口出沟沿）打丙位；步兵一个个出沟扑到 N2 后，fallen 那两个半路被丙位打倒。
+ * 返回 { peek 探头那一点, out: {id → 到出沟点 / 机枪位的时刻}, fallT: {id → 倒下的时刻} }。
  */
-function DitchFlank(s, C) {
-  L0105_DITCH_FLANK.ids.forEach((id, i) => {
-    const d0 = DITCH_EMERGE_D - 26 - i * 3, dEnd = DITCH_EMERGE_D - 0.5 - i * 1.6;
-    const p0 = DitchAt(d0), pEnd = DitchAt(dEnd);
-    s.Spawn(id, { side: "ija", x: p0.x, z: p0.z, yawDeg: Yaw(p0, pEnd), stance: "crouch" });
-    const tOut = 12.0 + i * 0.6;
-    s.Go(id, 0, tOut, pEnd.x, pEnd.z, { move: "walk", path: DitchPath(d0, dEnd), stance: "crouch" });
-    const to = RushStation({ bund: "N1", x: L0105_DITCH_FLANK.proneAt[i] });
-    const yaw = Yaw(to, C);
-    const stop = Off(to, yaw, -0.8);
-    const runS = Math.max(2.4, Dist(pEnd, stop) / RUSH_RUN_MPS);
-    s.Go(id, tOut + 0.5, R(tOut + 0.5 + runS), stop.x, stop.z, { move: "run", depart: { stance: "stand", aim: false } });
-    Dive(s, id, R(tOut + 0.5 + runS), yaw, { aim: true, faceTo: C });
+function DitchSquad033(s, C) {
+  const out = {}, fallT = {};
+  SQUAD.ids.forEach((id, i) => {
+    const d0 = SQUAD.startD - i * SQUAD.spacingM, dStop = SquadStopD(i);
+    const stop = DitchAt(dStop);
+    s.Go(id, 0, SQUAD_STOP_T, stop.x, stop.z, { move: "walk", path: DitchPath(d0, dStop), stance: "crouch" });
+    const crew = id === SQUAD.lmg || id === SQUAD.loader;
+    const dTo = crew ? (id === SQUAD.lmg ? SQUAD.lmgD : SQUAD.loaderD) : DITCH_EMERGE_D;
+    const tTo = R(SQUAD_GO_T + (dTo - dStop) / SQUAD_FAST_MPS);
+    const to = DitchAt(dTo);
+    // 猫腰快走：walk 的默认速度比 SQUAD_FAST_MPS 慢，出发键钉住出发时刻，运行时按窗口算出 1.8 m/s
+    s.Go(id, SQUAD_GO_T, tTo, to.x, to.z, { move: "walk", path: DitchPath(dStop, dTo), depart: { stance: "crouch", aim: false }, stance: "crouch" });
+    out[id] = tTo;
+    if (crew) {
+      s.Key(id, R(tTo + 0.2), { stance: "prone", aim: id === SQUAD.lmg, faceTo: C });
+      return;
+    }
+    const fall = SQUAD.fallen.includes(id) ? DitchSquadFallenAt(id) : null;
+    const tEnd = Bound(s, id, R(tTo + 0.2), RushStation({ bund: "N2", x: SQUAD.n2X[id] }), { faceTo: C, fall, minS: 1.2 });
+    if (fall) fallT[id] = tEnd;
   });
+  // 班长探头：在沟里站起来看一眼坑那边
+  s.Key(SQUAD.leader, SQUAD_PEEK_T, { stance: "stand", faceTo: C });
+  s.Key(SQUAD.leader, R(SQUAD_PEEK_T + 1.0), { stance: "crouch" });
+  return { peek: DitchAt(SquadStopD(0)), out, fallT };
+}
+
+/** 东头沿前沿沟往西清过来的：跑到前沿沟上 x 那一点（经过中间的折点）。 */
+function TrenchClear(s, id, t, x, lat, mps = 3.6) {
+  const p = s.pos.get(id), to = FrontAtX(x, lat);
+  const path = L0105_TRENCHES.front.filter(v => (v.x - p.x) * (v.x - to.x) < 0).sort((a, b) => b.x - a.x).map(v => ({ x: v.x, z: v.z }));
+  const len = [p, ...path, to].reduce((acc, q, i, arr) => acc + (i ? Dist(arr[i - 1], q) : 0), 0);
+  s.Go(id, t, R(t + len / mps), to.x, to.z, { move: "run", ...(path.length ? { path } : {}), aim: true });
+  return R(t + len / mps);
 }
 
 function S0303(ctx) {
   const s = new Seq(ctx, "03-3", "三个射位轮换");
   const A = { x: 0.8, z: -9.2 }, B = { x: 3.6, z: 1.0 }, C = { x: -9, z: -15 };
-  // 甲位（坑沿，朝北）
-  s.Eye(0, 4, { stance: "stand", x: A.x, z: A.z, yaw: 0, pitch: 1, toYaw: 8 });
-  s.Eye(4, 11, { stance: "stand", x: A.x, z: A.z, yaw: 8, pitch: 1, toYaw: -14 });
-  for (const t of [2.6, 5.8, 9.2, 12.8]) Shot(s, t, "player");
-  Shot(s, 1.4, "Gunner", { count: 6, sfx: "mgBurstNear" }); Shot(s, 7.6, "Gunner", { count: 6, sfx: "mgBurstNear" });
-  // 正面的步兵一段一段往前冲（跃进 → 扑倒）：2026-10-20 坑北前景，每一跃都扑在田埂 / 坟包 / 干水沟沿后面
-  // （L0105_RUSH_STATIONS 的第 2、3 格；关键帧 03-3 是第 1 格、03-4 是第 3 格）。
-  for (const [t, stage, ids, noDive] of RUSH_BOUNDS_033) for (const id of ids) RushBound(s, id, t, RushStation(L0105_RUSH_STATIONS[id][stage]), noDive.includes(id));
-  // 倒下一个马上有人补上：F1 田埂后起身，扑到 N2 田埂后（03-4 起他就是 IjaRush4）
-  s.Key("IjaRush4", 13.4, { clip: "ShotCollapse", clipHold: true });
-  s.Key("IjaRush4", 15.0, { state: "down", clip: null });
-  {
-    const from = RushStation(L0105_RUSH_REPLACEMENT.from);
-    s.Spawn("IjaRushR1", { side: "ija", x: from.x, z: from.z, yawDeg: Yaw(from, RUSH_TARGET), stance: "prone", aim: true }, { visible: false });
-    s.Key("IjaRushR1", 15.0, { visible: true });
-    RushBound(s, "IjaRushR1", 16.0, RushStation(L0105_RUSH_REPLACEMENT.to));
+  // 甲位这一段按举枪瞄着看的视野（ADS_FOV）：190 m 外的人在 60° 里只有几个像素；缩头那两秒放下枪（默认 60°）
+  const ADS_FOV = 32;
+  // ① 来路（0–5.9 s）：站上坑沿往北看 —— 地坎上冒出钢盔，两组人翻坎上来、扑到最远那道田埂后；坎后冒掷弹筒的烟（盯着坎看，镜头再收窄）
+  s.Eye(0, 5.9, { stance: "stand", x: A.x, z: A.z, look: { x: 8, z: -205 }, toLook: { x: 24, z: -203 }, pitch: 0.3, fov: 26 });
+  s.Eye(5.9, 0.6, { stance: "stand", x: A.x, z: A.z, look: { x: 24, z: -203 }, pitch: 0.3, toLook: { x: -43, z: -186 }, toPitch: 0.3, fov: ADS_FOV });
+  RushBounds(s, RUSH_BOUNDS_033);
+  Shot(s, 2.2, "IjaRush1"); Puff(s, 2.3, { x: -1.4, z: -11.3 });
+  Shot(s, 3.6, "IjaRush6"); Puff(s, 3.7, { x: 2.4, z: -11.1 });
+  Shot(s, 3.0, "Gunner", { count: 5, sfx: "mgBurstNear" });
+  for (const t of [2.6, 4.8]) Shot(s, t, "player");
+  // ② 压制（6–15 s）：轻机枪一扫坑沿 → 缩头 → 正面趁这两秒跳一段 → 抬头只来得及打一两枪 → 又一梭子
+  SweepParapet(s, 6.2, "IjaLmgWest", -3.4, 3.0);
+  Duck(s, 6.5, 8.4, A, { x: -43, z: -176, h: 1.0 });
+  s.Eye(8.4, 3.4, { stance: "stand", x: A.x, z: A.z, look: { x: -43, z: -176 }, pitch: 0.3, toLook: { x: 21, z: -183 }, toPitch: 0.3, fov: ADS_FOV });
+  for (const t of [8.9, 10.5]) Shot(s, t, "player");
+  Shot(s, 9.4, "Gunner", { count: 5, sfx: "mgBurstNear" });
+  Shot(s, 10.9, "IjaRush2"); Puff(s, 10.95, { x: 0.2, z: -11.2 });
+  SweepParapet(s, 11.6, "IjaLmgEast", 3.4, -3.0);
+  Duck(s, 11.9, 13.8, A, { x: -10, z: -182, h: 1.0 });
+  s.Eye(13.8, 1.2, { stance: "stand", x: A.x, z: A.z, look: { x: -10, z: -182 }, pitch: 0.3, fov: ADS_FOV });
+  Shot(s, 12.8, "IjaRush1"); Puff(s, 12.85, { x: -0.8, z: -11.0 });
+  for (const [id, t0, t1] of [["PitNra1", 6.5, 8.4], ["PitNra1", 11.9, 13.8]]) {
+    s.Key(id, t0, { stance: "crouch", aim: false });
+    s.Key(id, t1, { stance: "stand", aim: true });
   }
-  // 两挺轻机枪压着坑沿（只负责压人），土点跟着玩家在的射位
-  for (const t of [3.4, 10.6, 16.6, 27.0, 36.0, 46.0, 54.0]) {
-    const id = Math.round(t) % 2 ? "IjaLmgWest" : "IjaLmgEast";
-    Shot(s, t, id, { count: 6, sfx: "mgBurstFar" });
-    Puff(s, t + 0.35, t < 19 ? { x: 0.2 + (t % 3) - 1, z: -11.0 } : t < 41 ? { x: -10.4, z: -16.4 } : { x: 5.6, z: -1.8 });
-  }
+  // 跑得最久的那个（IjaRush4）抬头那一下被打倒
+  const rush4Fall = s.actorMap.get("IjaRush4").keys.find(k => k.clip === "ShotCollapse").t;
+  Shot(s, R(rush4Fall - 0.15), "player");
   // 掷弹筒：一发比一发近（远处的掷弹筒组 2 s 一循环，「嘭」都落在 4 + 2k 上）
   MortarCrew(s, 4.0);
   Mortar(s, 4.0, { x: 7, z: -17.5 }, { shake: 0.25 });
   Mortar(s, 10.0, { x: 2.6, z: -12.9 }, { shake: 0.55 });
-  // 坑西北：三个日军顺干水沟弯着腰摸过来（沟深 1.2 m + 沟沿翻土，从坑里看不见头），到沟尽头露头，扑到 N1 田埂后（丙位散兵坑外）
-  DitchFlank(s, C);
-  // 他们一露头：左边沟里头有人！
+  // ③ 侧面（14.6 s 起）：西边干水沟里那个班 —— 班长探头，「左边沟里头有人！」
+  const squad = DitchSquad033(s, C);
+  s.Eye(15.0, 1.2, { stance: "stand", x: A.x, z: A.z, look: { x: -10, z: -182 }, pitch: 0.3, toLook: squad.peek, toPitch: 0, fov: ADS_FOV });
   const shout = s.Say("PitHold.03", "LiuWencai", 16.4);
-  s.Key("LiuWencai", shout - 0.3, { faceTo: { x: -20, z: -25 }, clip: "PvCrouchPointL", clipHold: true });
+  s.Key("LiuWencai", shout - 0.3, { faceTo: squad.peek, clip: "PvCrouchPointL", clipHold: true });
   s.Key("LiuWencai", shout + 2.6, { clip: null });
-  s.Eye(15.0, 1.2, { stance: "stand", x: A.x, z: A.z, yaw: -14, pitch: 1, toLook: { x: -20, z: -25 }, toPitch: 0 });
-  Shot(s, 23.2, "IjaFlank1"); Puff(s, 23.3, { x: -8.4, z: -16.6 });   // 扑倒趴稳了才开枪（原来 17.6 s 在开阔地上边跑边打）
   // 换到丙位（散兵坑，朝西北）：沿爬沟过去，原来守丙位的兵让到坑里
   s.Cam(18.4, 2.6, { from: { x: A.x, z: A.z, h: 1.62 }, to: { x: -2.0, z: -8.0, h: 1.05 }, look: { x: -4.0, z: -9.6, h: 0.9 }, lookTo: { x: -6.0, z: -12.0, h: 0.9 } });
-  s.Cam(21.0, 3.2, { from: { x: -2.0, z: -8.0, h: 1.05 }, to: { x: -8.6, z: -14.6, h: 0.95 }, look: { x: -6.0, z: -12.0, h: 0.9 }, lookTo: { x: -20, z: -25, h: 0.6 }, ease: "linear" });
+  s.Cam(21.0, 3.2, { from: { x: -2.0, z: -8.0, h: 1.05 }, to: { x: -8.6, z: -14.6, h: 0.95 }, look: { x: -6.0, z: -12.0, h: 0.9 }, lookTo: { x: -40, z: -60, h: 0.6 }, ease: "linear" });
   s.Go("PitNra3", 18.6, 23.6, -3.0, -6.6, { move: "walk", path: [{ x: -8, z: -14 }, { x: -3.5, z: -9 }], stance: "crouch", depart: { aim: false } });
-  s.Eye(24.2, 15.6, { stance: "stand", x: C.x, z: C.z, look: { x: -20, z: -25 }, pitch: 0, toYaw: 30 });
-  for (const t of [25.2, 27.8, 30.6, 33.8, 37.0]) Shot(s, t, "player");
-  Shot(s, 26.4, "IjaFlank2"); Puff(s, 26.5, { x: -9.8, z: -16.2 });
-  s.Key("IjaFlank1", 28.0, { clip: "ShotCollapse", clipHold: true });
-  s.Key("IjaFlank1", 29.6, { state: "down", clip: null });
-  s.Key("IjaFlank3", 34.0, { clip: "ShotCollapse", clipHold: true });
-  s.Key("IjaFlank3", 35.6, { state: "down", clip: null });
-  { const back = DitchFlankBack(); s.Go("IjaFlank2", 36.0, 45.0, back.x, back.z, { move: "run", depart: { stance: "crouch", aim: false }, stance: "crouch" }); } // 剩下的退回沟里
+  // 丙位：那个班一个个出沟；轻机枪趴进沟尽头打丙位；丙位打倒出沟的两个
+  s.Eye(24.2, 15.6, { stance: "stand", x: C.x, z: C.z, look: { x: -63, z: -75 }, pitch: 0, toLook: { x: -58, z: -69 }, fov: 45 });
+  const [fallA, fallB] = SQUAD.fallen.map(id => squad.fallT[id]);
+  for (const t of [27.4, R(fallA - 0.15), 32.6, R(fallB - 0.15), 39.0]) Shot(s, t, "player");
+  const lmgOn = R(squad.out[SQUAD.lmg] + 1.2);
+  for (const [t, pts] of [[lmgOn, [{ x: -10.6, z: -16.6 }, { x: -8.4, z: -16.9 }]], [R(lmgOn + 4.2), [{ x: -9.8, z: -16.0 }, { x: -10.9, z: -14.8 }]]]) {
+    Shot(s, t, SQUAD.lmg, { count: 6, sfx: "mgBurstFar" });
+    pts.forEach((p, i) => Puff(s, R(t + 0.3 + i * 0.25), p));
+  }
+  Shot(s, 31.4, SQUAD.leader); Puff(s, 31.5, { x: -8.4, z: -16.6 });
   Mortar(s, 24.0, { x: -15, z: -24 }, { shake: 0.25 });
   Mortar(s, 32.0, { x: -11.4, z: -18.6 }, { shake: 0.6 });
-  // 换到乙位（沟口，朝东）：东头的鬼子沿丢掉的那段沟一段一段清过来（另一件事）
+  // ④ 换到乙位（沟口，朝东）：东头的鬼子沿丢掉的那段沟一个弯一个弯清过来（约 40 m → 约 15 m）
   s.Cam(39.8, 3.4, { from: { x: -8.6, z: -14.6, h: 0.95 }, to: { x: -2.0, z: -8.0, h: 1.05 }, look: { x: -6.0, z: -12.0, h: 0.9 }, lookTo: { x: 0.4, z: -4.0, h: 1.0 }, ease: "linear" });
   s.Cam(43.2, 2.8, { from: { x: -2.0, z: -8.0, h: 1.05 }, to: { x: B.x, z: B.z, h: 1.62 }, look: { x: 0.4, z: -4.0, h: 1.0 }, lookTo: { x: 14, z: -2.4, h: 1.4 } });
   s.Go("PitNra3", 40.0, 45.0, -9, -15, { move: "walk", path: [{ x: -3.5, z: -9 }, { x: -8, z: -14 }], depart: { stance: "crouch" }, stance: "stand", aim: true, yawDeg: 45 });
   s.Go("Luo", 43.0, 44.6, 4.6, -0.8, { move: "walk", yawDeg: -90 });
   s.Eye(46.0, 14, { stance: "stand", x: B.x, z: B.z, yaw: -90, pitch: 1, toYaw: -80 });
-  s.Go("IjaTrench1", 45.0, 48.0, 13.8, -2.6, { move: "run", stance: "crouch", aim: true });
-  s.Go("IjaTrench2", 46.0, 50.0, 18.6, -1.2, { move: "run" });
-  s.Go("IjaTrench3", 47.0, 51.5, 24.0, 1.6, { move: "run" });
+  TrenchClear(s, "IjaTrench1", 44.6, 28.5, -0.6); TrenchClear(s, "IjaTrench2", 45.4, 34, 0.6); TrenchClear(s, "IjaTrench3", 46.2, 40, -0.6);
+  Shot(s, 49.6, "IjaTrench1"); Puff(s, 49.65, { x: 5.4, z: 0.9 });
+  TrenchClear(s, "IjaTrench1", 51.0, 15, -0.6); TrenchClear(s, "IjaTrench2", 52.2, 20, 0.6); TrenchClear(s, "IjaTrench3", 53.4, 26, -0.6);
+  Shot(s, 56.6, "IjaTrench1"); Puff(s, 56.65, { x: 5.0, z: 0.2 });
+  Shot(s, 57.8, "IjaTrench2");
   for (const t of [48.6, 51.4, 54.2, 57.6]) Shot(s, t, "player");
-  Shot(s, 49.2, "Luo"); Shot(s, 53.0, "Luo"); Shot(s, 50.0, "IjaTrench1"); Puff(s, 50.05, { x: 5.4, z: 0.9 });
-  s.Go("IjaTrench1", 54.0, 55.0, 14.7, -2.4, { move: "walk", stance: "crouch" });
+  Shot(s, 49.2, "Luo"); Shot(s, 53.0, "Luo");
   Mortar(s, 46.0, { x: 9.0, z: -6.5 }, { shake: 0.3 });
   Mortar(s, 54.0, { x: 5.4, z: -2.6 }, { shake: 0.7 });
+  // 正面的两挺轻机枪一直压着（土点跟着玩家在的射位）
+  for (const [t, gun, p] of [[20.2, "IjaLmgEast", { x: -4.6, z: -11.6 }], [27.0, "IjaLmgWest", { x: -10.4, z: -16.4 }], [46.0, "IjaLmgEast", { x: 5.6, z: -1.8 }], [54.6, "IjaLmgWest", { x: 5.2, z: -2.2 }]]) {
+    Shot(s, t, gun, { count: 6, sfx: "mgBurstFar" });
+    Puff(s, t + 0.35, p);
+  }
   // 身后：撤下来的人一个个从沟口过去，越来越稀
   for (const [id, t] of [["RetreatPass1", 6.0], ["RetreatPass2", 30.0]]) {
     s.Spawn(id, { x: -20, z: -1.4, yawDeg: -80 }, { visible: false });
@@ -1533,6 +1605,20 @@ function S0304(ctx) {
   Puff(s, crawl + 5.9, { x: 0.9, z: -14.2 });
   s.Key("PitNra4", crawl + 6.0, { state: "down", clip: null });
   s.Caption(crawl + 6.6, 3.0, "（那捆手榴弹落在坑沿外）");
+  // 坑外（2026-10-20 第四轮）：正面再跳一段（还在 130 m 开外）；西边那个班打头的两个先扑进麦地、再跳到 N1 后（离坑约 45 m），
+  // 沟尽头的轻机枪接着打丙位
+  const C = { x: PL.fireC.x, z: PL.fireC.z };
+  RushBounds(s, RUSH_BOUNDS_034);
+  for (const [id, t] of [["IjaFlank1", 4.0], ["IjaFlank3", 5.2]]) {
+    const n1 = L0105_DITCH_SQUAD.toN1[id];
+    Bound(s, id, t, n1.mid, { faceTo: C });
+    Bound(s, id, t + 8.0, RushStation({ bund: "N1", x: n1.x }), { faceTo: C });
+  }
+  for (const [t, p] of [[6.4, { x: -9.6, z: -16.4 }], [16.6, { x: -10.2, z: -15.2 }]]) {
+    Shot(s, t, L0105_DITCH_SQUAD.lmg, { count: 6, sfx: "mgBurstFar" });
+    Puff(s, t + 0.35, p);
+  }
+  Shot(s, 9.4, "IjaFlank5"); Shot(s, 18.2, "IjaFlank6");
   return s.Done({ durationS: crawl + 10.0 });
 }
 
@@ -1578,7 +1664,7 @@ function S0401(ctx) {
   s.Place("Yaowa", 0, 0.8, 3.2);
   s.Place("LiuWencai", 0, 0.4, 6.4);
   s.Place("Luo", 0, 0.9, 9.0);
-  for (const id of ["IjaRush1", "IjaRush2", "IjaTrench1"]) s.Key(id, 0, { visible: false });
+  for (const id of ["IjaTrench1", "IjaTrench2", "IjaTrench3"]) s.Key(id, 0, { visible: false });
   // 坑丢了，往拐角 1 跑
   s.Cam(0, 3.6, { from: { x: 2.2, z: -5.2, h: 1.3 }, to: { x: 1.62, z: 12.16, h: 1.4 }, look: { actor: "Yaowa", offset: [0, 1.2, 0] }, ease: "linear" });
   SupportGo(s, 0, 9.0, { x: 5.29, z: 15.41 }, { path: [{ x: 0.5, z: 11 }] });
@@ -1586,12 +1672,13 @@ function S0401(ctx) {
   s.Go("Luo", 0, 4.0, 13.57, 21.63, { move: "run", path: [{ x: 1.0, z: 11.4 }], faceTo: "player" });
   // 回身顶：鬼子在坑里顺第一段沟往下打
   s.Eye(3.6, 1.0, { stance: "crouch", yaw: -160, pitch: 0, toYaw: 4.8, toPitch: 2 });
-  s.Key("IjaTrench1", 4.0, { visible: true }); s.Key("IjaRush1", 4.6, { visible: true }); s.Key("IjaRush2", 5.0, { visible: true });
+  // 2026-10-20 第四轮：坑里的是东头沿前沿沟清过来的那几个（离坑最近，先进的坑）
+  s.Key("IjaTrench3", 4.0, { visible: true }); s.Key("IjaTrench1", 4.6, { visible: true }); s.Key("IjaTrench2", 5.0, { visible: true });
   s.Eye(4.6, 14, { stance: "crouch", yaw: 4.8, pitch: 2, toYaw: 0 });
   for (const t of [6.0, 8.6, 11.2, 14.4]) Shot(s, t, "player");
-  Shot(s, 5.4, "IjaTrench1"); Puff(s, 5.45, { x: 2.4, z: 10.6 });
-  Shot(s, 7.4, "IjaRush1"); Shot(s, 10.0, "IjaRush2"); Puff(s, 10.05, { x: 0.6, z: 9.8 });
-  Shot(s, 13.0, "IjaTrench1"); Puff(s, 13.05, { x: 2.8, z: 11.4 });
+  Shot(s, 5.4, "IjaTrench3"); Puff(s, 5.45, { x: 2.4, z: 10.6 });
+  Shot(s, 7.4, "IjaTrench1"); Shot(s, 10.0, "IjaTrench2"); Puff(s, 10.05, { x: 0.6, z: 9.8 });
+  Shot(s, 13.0, "IjaTrench3"); Puff(s, 13.05, { x: 2.8, z: 11.4 });
   // 前头两个人走得慢，一直在顺子眼前；班长先到下一个拐角回身喊人
   s.Key("Luo", 6.0, { clip: "PvStandBeckonL" });
   s.Caption(12.0, 3.0, "（班长在下个拐角回身招呼：走！）");

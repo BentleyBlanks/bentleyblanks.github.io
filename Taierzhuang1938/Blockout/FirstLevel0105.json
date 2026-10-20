@@ -5,8 +5,8 @@
   "source": {
     "generator": "Script_EditorBlockoutCli.mjs export FirstLevel0105",
     "gameVersion": "Notion 01–05 剧本 + 空间拓扑关系（2026-10-18）",
-    "commit": "f861fce12d975109012391c9eef3f18d6a604ba3",
-    "generatedAt": "2026-10-19T18:34:00.601Z"
+    "commit": "891aadd474b02d40e3888a3167d36f3849546540",
+    "generatedAt": "2026-10-20T11:17:08.584Z"
   },
   "zones": [
     {
@@ -4996,7 +4996,7 @@
         "幺娃看见顺子，愣了一下",
         "坑里能打的只有三个位置"
       ],
-      "notes": "坑在交通沟口，一挺捷克式，四五个人（坑里另几个弟兄的站位推测）。三个射位：甲 坑沿朝北、乙 沟口朝东、丙 散兵坑朝西北。",
+      "notes": "坑在交通沟口，一挺捷克式，四五个人（坑里另几个弟兄的站位推测）。三个射位：甲 坑沿朝北、乙 沟口朝东、丙 散兵坑朝西北。坑北（2026-10-20 第四轮）：正面两组趴在最远那道田埂 F3（约 185 m）后，另两组还在地坎后的低地里（坎北低 2 m，坑里看不见）；西边干水沟里弯着腰摸着一个班（8 人、一挺轻机枪），坑里也看不见。",
       "units": [
         {
           "id": "Luo",
@@ -5333,9 +5333,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -48,
-          "z": -113.7,
-          "yawDeg": -155.8,
+          "x": -46,
+          "z": -188.31,
+          "yawDeg": -165.8,
           "stance": "prone",
           "aim": true
         },
@@ -5344,9 +5344,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -43,
-          "z": -113.41,
-          "yawDeg": -158,
+          "x": -40,
+          "z": -188.51,
+          "yawDeg": -167.6,
           "stance": "prone",
           "aim": true
         },
@@ -5356,30 +5356,28 @@
           "role": "rifleman",
           "group": "rush2",
           "x": -14,
-          "z": -148.33,
-          "yawDeg": -174.3,
-          "stance": "prone",
-          "aim": true
+          "z": -214.8,
+          "yawDeg": -176.1,
+          "stance": "crouch"
         },
         {
           "id": "IjaRush4",
           "side": "ija",
           "role": "rifleman",
           "group": "rush2",
-          "x": -6,
-          "z": -148.3,
-          "yawDeg": -177.6,
-          "stance": "prone",
-          "aim": true
+          "x": -7,
+          "z": -214.39,
+          "yawDeg": -178.1,
+          "stance": "crouch"
         },
         {
           "id": "IjaRush5",
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 26,
-          "z": -148.86,
-          "yawDeg": 169.6,
+          "x": 18,
+          "z": -191.53,
+          "yawDeg": 174.4,
           "stance": "prone",
           "aim": true
         },
@@ -5388,9 +5386,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 30,
-          "z": -149,
-          "yawDeg": 168.1,
+          "x": 24,
+          "z": -191.88,
+          "yawDeg": 172.6,
           "stance": "prone",
           "aim": true
         },
@@ -5399,22 +5397,103 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 48.34,
-          "z": -154.16,
-          "yawDeg": 161.8,
-          "stance": "prone",
-          "aim": true
+          "x": 44,
+          "z": -210.86,
+          "yawDeg": 167.8,
+          "stance": "crouch"
         },
         {
           "id": "IjaRush8",
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 52.34,
-          "z": -156.83,
-          "yawDeg": 160.7,
-          "stance": "prone",
-          "aim": true
+          "x": 50,
+          "z": -210.45,
+          "yawDeg": 166.2,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlank1",
+          "side": "ija",
+          "name": "沟里那个班的班长",
+          "role": "leader",
+          "group": "ditchSquad",
+          "x": -34.59,
+          "z": -95.57,
+          "yawDeg": 123.4,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlank2",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -31.92,
+          "z": -97.33,
+          "yawDeg": 123.4,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlankLmg",
+          "side": "ija",
+          "name": "轻机枪（沟里那个班）",
+          "role": "machineGun",
+          "group": "ditchSquad",
+          "weapon": "Type11",
+          "x": -29.25,
+          "z": -99.1,
+          "yawDeg": 123.4,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlankLmgLoader",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -26.58,
+          "z": -100.86,
+          "yawDeg": 123.4,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlank3",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -23.91,
+          "z": -102.62,
+          "yawDeg": 123.4,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlank4",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -21.24,
+          "z": -104.38,
+          "yawDeg": 123.4,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlank5",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -18.57,
+          "z": -106.15,
+          "yawDeg": 123.4,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlank6",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -15.9,
+          "z": -107.91,
+          "yawDeg": 123.4,
+          "stance": "crouch"
         }
       ],
       "pois": [
@@ -5457,6 +5536,14 @@
           "x": 3.4,
           "z": -10.4,
           "radiusM": 1.5
+        },
+        {
+          "id": "ScarpEdge",
+          "name": "地坎（坎后低 2 m，人从这里冒出来）",
+          "kind": "landmark",
+          "x": 16,
+          "z": -206.86,
+          "radiusM": 10
         }
       ],
       "signals": []
@@ -5473,7 +5560,7 @@
         "pitchDeg": 1,
         "stance": "stand"
       },
-      "what": "正面步兵一段一段跃进，两挺轻机枪压着坑沿；东头的鬼子沿沟往西清过来。",
+      "what": "地坎上冒出人来，翻过来扑在最远那道田埂后；两挺轻机枪一扫坑沿就得缩头，正面趁这几秒跳一段。西边干水沟里一个班摸到坑西北，东头的鬼子沿沟往西清过来。",
       "next": {
         "text": "掷弹筒冒烟就换射位",
         "x": -9,
@@ -5481,12 +5568,13 @@
         "radiusM": 1.5
       },
       "how": [
-        "掷弹筒冒烟——几秒后落地，一发比一发近",
-        "「左边沟里头有人！」",
-        "轻机枪不用打，只压人",
-        "身后撤的人越来越稀"
+        "地坎上冒出钢盔——人是从坎后那片看不见的低地上来的",
+        "机枪一扫坑沿就缩头；再抬头，正面又近了十几米",
+        "「左边沟里头有人！」——沟里那个班才是要命的",
+        "东头沟里的一个弯一个弯清过来",
+        "掷弹筒冒烟——几秒后落地，一发比一发近"
       ],
-      "notes": "掷弹筒编制待核（资料多说每小队配 2–3 具，与「分队一级的配备」不一致）。从坑里只看得见发射冒的烟；听到「嘭」后约 5–6 s 落地（物理估算）。轻机枪一挺架在坑北约 110 m 坟地的坟后、一挺靠在约 135 m 的麦秸垛边，掷弹筒组在约 205 m 那道地坎下（北边低 2 m，从坑里看不见人）。跃进的步兵每次扑倒都落在田埂、坟包、干水沟沿后面；「左边沟里头有人」是顺坑西北那条干水沟弯着腰摸过来的三个（预演里加的人）。坑北的地物是创作（鲁南农田三月的常见样子）。",
+      "notes": "2026-10-20 第四轮（用户问「日军真是在大平面上直直冲过来的？」）：正面是拖住守军的——先用轻机枪压住坑沿、趁坑里的人缩头一组跳一段，一跃 12–18 m、三四秒就扑倒，两道田埂之间扑在麦地里；整个 03-3 正面只从 F3（约 185 m）推到 F2（约 140 m）。主攻在侧面：西边干水沟里一个班（8 人、一挺轻机枪），班长在沟里探头被刘文财看见，出沟后轻机枪架在沟尽头打丙位、步兵扑在 N2 后（离坑约 60 m），丙位打倒两个。东头清沟的从约 40 m 推到约 15 m。依据：日军进攻先用火力压住守军、散开一段段往前、出发线放在挡得住枪弹的地方、偏爱包抄（美军 TM-E 30-480，1944）；滕县攻城的日军步兵第 10 联队带轻机枪 72 挺、炮 54 门（中文维基转引战斗详报）。具体人数、路线、时刻是创作。掷弹筒编制待核（资料多说每小队配 2–3 具，与「分队一级的配备」不一致）。从坑里只看得见发射冒的烟；听到「嘭」后约 5–6 s 落地（物理估算）。轻机枪一挺架在坑北约 110 m 坟地的坟后、一挺靠在约 135 m 的麦秸垛边，掷弹筒组在约 205 m 那道地坎下（北边低 2 m，从坑里看不见人）。坑北的地物是创作（鲁南农田三月的常见样子）。",
       "units": [
         {
           "id": "Luo",
@@ -5696,9 +5784,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -49.66,
-          "z": -89.16,
-          "yawDeg": -148.8,
+          "x": -46,
+          "z": -188.31,
+          "yawDeg": -165.8,
           "stance": "prone",
           "aim": true
         },
@@ -5707,9 +5795,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -44.66,
-          "z": -92.5,
-          "yawDeg": -152.4,
+          "x": -40,
+          "z": -188.51,
+          "yawDeg": -167.6,
           "stance": "prone",
           "aim": true
         },
@@ -5718,31 +5806,29 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush2",
-          "x": -21.65,
-          "z": -107.7,
-          "yawDeg": -167.9,
-          "stance": "prone",
-          "aim": true
+          "x": -14,
+          "z": -214.8,
+          "yawDeg": -176.1,
+          "stance": "crouch"
         },
         {
           "id": "IjaRush4",
           "side": "ija",
           "role": "rifleman",
           "group": "rush2",
-          "x": -11.65,
-          "z": -114.3,
-          "yawDeg": -173.8,
-          "stance": "prone",
-          "aim": true
+          "x": -7,
+          "z": -214.39,
+          "yawDeg": -178.1,
+          "stance": "crouch"
         },
         {
           "id": "IjaRush5",
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 20.34,
-          "z": -135.5,
-          "yawDeg": 171,
+          "x": 18,
+          "z": -191.53,
+          "yawDeg": 174.4,
           "stance": "prone",
           "aim": true
         },
@@ -5751,9 +5837,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 24.34,
-          "z": -138.16,
-          "yawDeg": 169.5,
+          "x": 24,
+          "z": -191.88,
+          "yawDeg": 172.6,
           "stance": "prone",
           "aim": true
         },
@@ -5762,36 +5848,125 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 34,
-          "z": -108.27,
-          "yawDeg": 161.4,
-          "stance": "prone",
-          "aim": true
+          "x": 44,
+          "z": -210.86,
+          "yawDeg": 167.8,
+          "stance": "crouch"
         },
         {
           "id": "IjaRush8",
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 38,
-          "z": -108.13,
-          "yawDeg": 159.4,
-          "stance": "prone",
-          "aim": true
+          "x": 50,
+          "z": -210.45,
+          "yawDeg": 166.2,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlank1",
+          "side": "ija",
+          "name": "沟里那个班的班长",
+          "role": "leader",
+          "group": "ditchSquad",
+          "x": -34.59,
+          "z": -95.57,
+          "yawDeg": 123.4,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlank2",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -31.92,
+          "z": -97.33,
+          "yawDeg": 123.4,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlankLmg",
+          "side": "ija",
+          "name": "轻机枪（沟里那个班）",
+          "role": "machineGun",
+          "group": "ditchSquad",
+          "weapon": "Type11",
+          "x": -29.25,
+          "z": -99.1,
+          "yawDeg": 123.4,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlankLmgLoader",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -26.58,
+          "z": -100.86,
+          "yawDeg": 123.4,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlank3",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -23.91,
+          "z": -102.62,
+          "yawDeg": 123.4,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlank4",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -21.24,
+          "z": -104.38,
+          "yawDeg": 123.4,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlank5",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -18.57,
+          "z": -106.15,
+          "yawDeg": 123.4,
+          "stance": "crouch"
+        },
+        {
+          "id": "IjaFlank6",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -15.9,
+          "z": -107.91,
+          "yawDeg": 123.4,
+          "stance": "crouch"
         },
         {
           "id": "IjaTrench1",
           "side": "ija",
           "role": "rifleman",
           "group": "trenchClear",
-          "x": 17.7,
-          "z": -0.65,
+          "x": 39.7,
+          "z": -1.82,
           "yawDeg": 90,
           "aim": true,
           "intent": [
             {
-              "x": 18,
-              "z": -1.17
+              "x": 40,
+              "z": -2.33
+            },
+            {
+              "x": 38,
+              "z": -3.5
+            },
+            {
+              "x": 26,
+              "z": 3.5
             },
             {
               "x": 14,
@@ -5808,8 +5983,8 @@
           "side": "ija",
           "role": "rifleman",
           "group": "trenchClear",
-          "x": 24.3,
-          "z": 1.82,
+          "x": 46.3,
+          "z": 0.65,
           "yawDeg": 90
         },
         {
@@ -5817,8 +5992,8 @@
           "side": "ija",
           "role": "rifleman",
           "group": "trenchClear",
-          "x": 31.3,
-          "z": 1.1,
+          "x": 52.3,
+          "z": 2.85,
           "yawDeg": 90
         }
       ],
@@ -5862,6 +6037,22 @@
           "x": 25,
           "z": 2.92,
           "radiusM": 6
+        },
+        {
+          "id": "ScarpEdge",
+          "name": "地坎（坎后低 2 m，人从这里冒出来）",
+          "kind": "landmark",
+          "x": 16,
+          "z": -206.86,
+          "radiusM": 10
+        },
+        {
+          "id": "DitchEnd",
+          "name": "干水沟尽头（沟里那个班从这里出沟）",
+          "kind": "danger",
+          "x": -63.34,
+          "z": -76.44,
+          "radiusM": 6
         }
       ],
       "signals": []
@@ -5891,7 +6082,7 @@
         "抱手榴弹的弟兄爬出去，死在坑沿外",
         "那捆手榴弹落在沟沿上"
       ],
-      "notes": "机枪手 03-4 先算倒地（刚中弹），03-5 起由幺娃架着走。战车炮口射界画到坑沿。",
+      "notes": "机枪手 03-4 先算倒地（刚中弹），03-5 起由幺娃架着走。战车炮口射界画到坑沿。坑外（第四轮）：正面这时才趴到 F2（约 140 m）；沟里那个班的轻机枪架在沟尽头打丙位，步兵趴在 N2 后（离坑约 60 m）、出沟时倒了两个；东头清沟的到了约 15 m。",
       "signals": [
         "PitShelled"
       ],
@@ -6110,9 +6301,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -21.43,
-          "z": -56.45,
-          "yawDeg": -156.6,
+          "x": -46,
+          "z": -149.09,
+          "yawDeg": -162.1,
           "stance": "prone",
           "aim": true
         },
@@ -6121,9 +6312,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -20.05,
-          "z": -57.04,
-          "yawDeg": -158.2,
+          "x": -40,
+          "z": -148.88,
+          "yawDeg": -164.3,
           "stance": "prone",
           "aim": true
         },
@@ -6132,9 +6323,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush2",
-          "x": -6,
-          "z": -42.35,
-          "yawDeg": -170.4,
+          "x": -14,
+          "z": -162,
+          "yawDeg": -174.8,
           "stance": "prone",
           "aim": true
         },
@@ -6143,20 +6334,19 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush2",
-          "x": -9,
-          "z": -66.35,
-          "yawDeg": -171.4,
-          "stance": "prone",
-          "aim": true
+          "x": -7.4,
+          "z": -181,
+          "yawDeg": -177.6,
+          "state": "down"
         },
         {
           "id": "IjaRush5",
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 16,
-          "z": -67.38,
-          "yawDeg": 165.2,
+          "x": 18,
+          "z": -148.63,
+          "yawDeg": 172.8,
           "stance": "prone",
           "aim": true
         },
@@ -6165,9 +6355,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 20,
-          "z": -67.65,
-          "yawDeg": 161.7,
+          "x": 24,
+          "z": -148.8,
+          "yawDeg": 170.4,
           "stance": "prone",
           "aim": true
         },
@@ -6176,9 +6366,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 30,
-          "z": -40.81,
-          "yawDeg": 138.4,
+          "x": 44,
+          "z": -164,
+          "yawDeg": 164.3,
           "stance": "prone",
           "aim": true
         },
@@ -6187,9 +6377,102 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 34,
-          "z": -40.86,
-          "yawDeg": 134.9,
+          "x": 50,
+          "z": -164,
+          "yawDeg": 162.3,
+          "stance": "prone",
+          "aim": true
+        },
+        {
+          "id": "IjaFlank1",
+          "side": "ija",
+          "name": "沟里那个班的班长",
+          "role": "leader",
+          "group": "ditchSquad",
+          "x": -52,
+          "z": -67.75,
+          "yawDeg": -140.8,
+          "stance": "prone",
+          "aim": true
+        },
+        {
+          "id": "IjaFlank2",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -59.54,
+          "z": -71.45,
+          "yawDeg": -138.2,
+          "state": "down"
+        },
+        {
+          "id": "IjaFlankLmg",
+          "side": "ija",
+          "name": "轻机枪（沟里那个班）",
+          "role": "machineGun",
+          "group": "ditchSquad",
+          "weapon": "Type11",
+          "x": -67.47,
+          "z": -73.68,
+          "yawDeg": -135.1,
+          "stance": "prone",
+          "aim": true,
+          "arc": {
+            "halfDeg": 5,
+            "rangeM": 88.8,
+            "yawDeg": -135.1
+          }
+        },
+        {
+          "id": "IjaFlankLmgLoader",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -66.06,
+          "z": -74.63,
+          "yawDeg": -136.3,
+          "stance": "prone"
+        },
+        {
+          "id": "IjaFlank3",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -62,
+          "z": -68.52,
+          "yawDeg": -135.3,
+          "stance": "prone",
+          "aim": true
+        },
+        {
+          "id": "IjaFlank4",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -65.54,
+          "z": -71.93,
+          "yawDeg": -135.2,
+          "state": "down"
+        },
+        {
+          "id": "IjaFlank5",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -72,
+          "z": -69.35,
+          "yawDeg": -130.8,
+          "stance": "prone",
+          "aim": true
+        },
+        {
+          "id": "IjaFlank6",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -77,
+          "z": -69.77,
+          "yawDeg": -128.8,
           "stance": "prone",
           "aim": true
         },
@@ -6204,8 +6487,16 @@
           "aim": true,
           "path": [
             {
-              "x": 18,
-              "z": -1.17
+              "x": 40,
+              "z": -2.33
+            },
+            {
+              "x": 38,
+              "z": -3.5
+            },
+            {
+              "x": 26,
+              "z": 3.5
             },
             {
               "x": 15,
@@ -6227,8 +6518,16 @@
           "yawDeg": 90,
           "path": [
             {
-              "x": 24,
-              "z": 2.33
+              "x": 46,
+              "z": 1.17
+            },
+            {
+              "x": 38,
+              "z": -3.5
+            },
+            {
+              "x": 26,
+              "z": 3.5
             },
             {
               "x": 20,
@@ -6250,8 +6549,16 @@
           "yawDeg": 90,
           "path": [
             {
-              "x": 31,
-              "z": 0.58
+              "x": 52,
+              "z": 2.33
+            },
+            {
+              "x": 50,
+              "z": 3.5
+            },
+            {
+              "x": 38,
+              "z": -3.5
             },
             {
               "x": 26,
@@ -6340,7 +6647,7 @@
         "幺娃架着机枪手先往下走",
         "捡完退到拐角 1"
       ],
-      "notes": "捡起后的下一步是拐角 1（下一帧）。坑里另两个能动的弟兄跟着往南撤（推测），倒下的两个留在坑里。",
+      "notes": "捡起后的下一步是拐角 1（下一帧）。坑里另两个能动的弟兄跟着往南撤（推测），倒下的两个留在坑里。为什么撤（第四轮）：三面挤——正面还拖在 130 m 外，西边沟里那个班有两个跳到了 N1（离坑约 45 m），东头沟里的到了 10 m 上下。",
       "signals": [
         "PitShelled"
       ],
@@ -6744,9 +7051,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -20,
-          "z": -43.55,
-          "yawDeg": -151.3,
+          "x": -46,
+          "z": -135,
+          "yawDeg": -160.2,
           "stance": "prone",
           "aim": true
         },
@@ -6755,9 +7062,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush1",
-          "x": -15,
-          "z": -43.11,
-          "yawDeg": -157.4,
+          "x": -40,
+          "z": -135,
+          "yawDeg": -162.6,
           "stance": "prone",
           "aim": true
         },
@@ -6766,27 +7073,30 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush2",
-          "x": -6,
-          "z": -30,
-          "yawDeg": -165.4
+          "x": -14,
+          "z": -148.33,
+          "yawDeg": -174.3,
+          "stance": "prone",
+          "aim": true
         },
         {
           "id": "IjaRush4",
           "side": "ija",
           "role": "rifleman",
           "group": "rush2",
-          "x": -1,
-          "z": -33,
-          "yawDeg": -177.8
+          "x": -7.4,
+          "z": -181,
+          "yawDeg": -177.6,
+          "state": "down"
         },
         {
           "id": "IjaRush5",
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 10,
-          "z": -41.27,
-          "yawDeg": 163.7,
+          "x": 16.34,
+          "z": -132.83,
+          "yawDeg": 172.6,
           "stance": "prone",
           "aim": true
         },
@@ -6795,9 +7105,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 14,
-          "z": -41.08,
-          "yawDeg": 157.7,
+          "x": 22.34,
+          "z": -136.83,
+          "yawDeg": 170.2,
           "stance": "prone",
           "aim": true
         },
@@ -6806,18 +7116,115 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 26,
-          "z": -28,
-          "yawDeg": 128.9
+          "x": 42.34,
+          "z": -150.16,
+          "yawDeg": 163.5,
+          "stance": "prone",
+          "aim": true
         },
         {
           "id": "IjaRush8",
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 30,
-          "z": -30,
-          "yawDeg": 127.5
+          "x": 48.34,
+          "z": -154.16,
+          "yawDeg": 161.8,
+          "stance": "prone",
+          "aim": true
+        },
+        {
+          "id": "IjaFlank1",
+          "side": "ija",
+          "name": "沟里那个班的班长",
+          "role": "leader",
+          "group": "ditchSquad",
+          "x": -50,
+          "z": -45.58,
+          "yawDeg": -126.7,
+          "stance": "prone",
+          "aim": true
+        },
+        {
+          "id": "IjaFlank2",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -59.54,
+          "z": -71.45,
+          "yawDeg": -138.2,
+          "state": "down"
+        },
+        {
+          "id": "IjaFlankLmg",
+          "side": "ija",
+          "name": "轻机枪（沟里那个班）",
+          "role": "machineGun",
+          "group": "ditchSquad",
+          "weapon": "Type11",
+          "x": -67.47,
+          "z": -73.68,
+          "yawDeg": -135.1,
+          "stance": "prone",
+          "aim": true,
+          "arc": {
+            "halfDeg": 5,
+            "rangeM": 88.8,
+            "yawDeg": -135.1
+          }
+        },
+        {
+          "id": "IjaFlankLmgLoader",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -66.06,
+          "z": -74.63,
+          "yawDeg": -136.3,
+          "stance": "prone"
+        },
+        {
+          "id": "IjaFlank3",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -60,
+          "z": -45.79,
+          "yawDeg": -121.1,
+          "stance": "prone",
+          "aim": true
+        },
+        {
+          "id": "IjaFlank4",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -65.54,
+          "z": -71.93,
+          "yawDeg": -135.2,
+          "state": "down"
+        },
+        {
+          "id": "IjaFlank5",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -72,
+          "z": -69.35,
+          "yawDeg": -130.8,
+          "stance": "prone",
+          "aim": true
+        },
+        {
+          "id": "IjaFlank6",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "ditchSquad",
+          "x": -77,
+          "z": -69.77,
+          "yawDeg": -128.8,
+          "stance": "prone",
+          "aim": true
         },
         {
           "id": "IjaTrench1",
@@ -6946,7 +7353,7 @@
         "班长在下个拐角回身喊人",
         "交通沟只有一条路"
       ],
-      "notes": "回身顶住，就是为了给前头这两个人争时间。坑里的日军是 03 跃进上来的那两个（IjaRush1/2）。",
+      "notes": "回身顶住，就是为了给前头这两个人争时间。坑里的日军是 03 东头沿前沿沟清过来的那几个（IjaTrench1–3，离坑最近，先进的坑；2026-10-20 第四轮起正面跃进的还在 130 m 外）。",
       "signals": [
         "PitShelled"
       ],
@@ -7066,8 +7473,10 @@
           ]
         },
         {
-          "id": "IjaRush1",
+          "id": "IjaTrench1",
           "side": "ija",
+          "role": "rifleman",
+          "group": "trenchClear",
           "x": -0.4,
           "z": -5.4,
           "yawDeg": -176.9,
@@ -7076,27 +7485,87 @@
             "halfDeg": 4,
             "rangeM": 19.4,
             "yawDeg": -176.9
-          }
+          },
+          "path": [
+            {
+              "x": 10,
+              "z": -1.95
+            },
+            {
+              "x": 5,
+              "z": 0
+            },
+            {
+              "x": 0,
+              "z": 0
+            },
+            {
+              "x": 0,
+              "z": -5.4
+            },
+            {
+              "x": -0.4,
+              "z": -5.4
+            }
+          ]
         },
         {
-          "id": "IjaRush2",
+          "id": "IjaTrench2",
           "side": "ija",
+          "role": "rifleman",
+          "group": "trenchClear",
           "x": 1.8,
           "z": -7.6,
           "yawDeg": 166.7,
-          "aim": true
+          "aim": true,
+          "path": [
+            {
+              "x": 15,
+              "z": -2.92
+            },
+            {
+              "x": 14,
+              "z": -3.5
+            },
+            {
+              "x": 5,
+              "z": 0
+            },
+            {
+              "x": 0,
+              "z": 0
+            },
+            {
+              "x": 0,
+              "z": -7
+            },
+            {
+              "x": 0.4,
+              "z": -8.11
+            },
+            {
+              "x": 1.8,
+              "z": -7.6
+            }
+          ]
         },
         {
-          "id": "IjaTrench1",
+          "id": "IjaTrench3",
           "side": "ija",
+          "role": "rifleman",
+          "group": "trenchClear",
           "x": 4.5,
           "z": -0.3,
           "yawDeg": 180,
           "aim": true,
           "path": [
             {
-              "x": 10,
-              "z": -1.95
+              "x": 21,
+              "z": 0.58
+            },
+            {
+              "x": 14,
+              "z": -3.5
             },
             {
               "x": 5,
@@ -7109,52 +7578,6 @@
             {
               "x": 4.5,
               "z": -0.3
-            }
-          ]
-        },
-        {
-          "id": "IjaTrench2",
-          "side": "ija",
-          "x": 9.18,
-          "z": -1.09,
-          "yawDeg": 90,
-          "path": [
-            {
-              "x": 15,
-              "z": -2.92
-            },
-            {
-              "x": 14,
-              "z": -3.5
-            },
-            {
-              "x": 9,
-              "z": -1.56
-            },
-            {
-              "x": 9.18,
-              "z": -1.09
-            }
-          ]
-        },
-        {
-          "id": "IjaTrench3",
-          "side": "ija",
-          "x": 14.25,
-          "z": -3.93,
-          "yawDeg": 90,
-          "path": [
-            {
-              "x": 21,
-              "z": 0.58
-            },
-            {
-              "x": 14,
-              "z": -3.5
-            },
-            {
-              "x": 14.25,
-              "z": -3.93
             }
           ]
         }
@@ -7347,8 +7770,8 @@
           "aim": true,
           "path": [
             {
-              "x": 4.5,
-              "z": 0
+              "x": 0,
+              "z": -5.4
             },
             {
               "x": 0,
@@ -7381,12 +7804,12 @@
           "yawDeg": 177.5,
           "path": [
             {
-              "x": 9,
-              "z": -1.56
+              "x": 0.4,
+              "z": -8.11
             },
             {
-              "x": 5,
-              "z": 0
+              "x": 0,
+              "z": -7
             },
             {
               "x": 0,
@@ -7419,11 +7842,7 @@
           "yawDeg": 177.5,
           "path": [
             {
-              "x": 14,
-              "z": -3.5
-            },
-            {
-              "x": 5,
+              "x": 4.5,
               "z": 0
             },
             {

@@ -26,7 +26,8 @@ import {
   L0105_LEVEL_KEY, L0105_TITLE, L0105_BOUNDS, L0105_PLACES as PL, L0105_TRENCHES as TR, L0105_TRENCH_SECTION,
   L0105_ROAD, L0105_FRONT_LOST_FROM_X, L0105_SIGNALS as SIG, PointAlong, LineLength,
   L0105_GULLY, L0105_GULLY_POCKETS, L0105_SUNKEN_LANE, L0105_PROPS, L0105_BRIDGE, InGullyFloor, PointBeside,
-  L0105_RUSH_STATIONS, RushStation,
+  L0105_RUSH_STATIONS, L0105_RUSH_KEY, L0105_RUSH_FALLEN, RushStation,
+  L0105_DITCH_SQUAD, DitchSquadStart, DitchSquadFallenAt, DitchEmerge, L0105_PIT_NORTH, ScarpZ,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 export const FIRST_LEVEL_0105_GENERATOR = "Script_EditorBlockoutCli.mjs export FirstLevel0105";
@@ -79,7 +80,7 @@ function Slice(line, d0, d1) {
 }
 
 /** 前沿沟上 x = 给定值的那一点（沟口以东 / 以西的折线段 x 单调）。 */
-function FrontAtX(x, lat = 0) {
+export function FrontAtX(x, lat = 0) {
   const line = TR.front;
   let walked = 0;
   for (let i = 1; i < line.length; i++) {
@@ -415,15 +416,41 @@ const RIM_NORTH = Pt(BRANCH_EXIT.x + 1, PL.enemyBranchGun.z - 0.6);
 const AROUND_ROOF = Pt(PL.dugout.x + 5, PL.dugout.z - PL.dugout.d / 2 - 4);
 const ROADSIDE_IN = [ROADSIDE, AROUND_ROOF, RIM_NORTH];   // 从路边跳进支沟（倒过来就是翻出去）
 
-// 03 正面跃进的步兵：四组，每组两人（03-2 → 03-5 往前推）。2026-10-20 坑北前景：每一格都落在田埂 / 坟包 / 干水沟沿的后面
-// （Data_EditorBlockoutFirstLevel0105Space.L0105_RUSH_STATIONS；stage 0 = 03-2、1 = 03-3 开场、3 = 03-4、4 = 03-5），
-// 趴在掩体后的端枪趴着；03-5 还没扑倒的站着往前跑。野地里跨沟、翻埂（climb，不报高差）。
-const RushUnits = (stage) => Object.entries(L0105_RUSH_STATIONS).map(([id, list], i) => {
-  const st = RushStation(list[stage]);
-  return J(id, Pt(st.x, st.z), {
-    group: `rush${Math.floor(i / 2) + 1}`, role: "rifleman", face: PL.pit, aim: !!st.cover, stance: st.cover ? "prone" : "stand", straight: true, climb: true,
-  });
+// 03 正面跃进的步兵：四组，每组两人（2026-10-20 第四轮：短跃进、正面只是拖住；Data_EditorBlockoutFirstLevel0105Space.L0105_RUSH_STATIONS，
+// 哪一拍用第几格见 L0105_RUSH_KEY）。扑在掩体后 / 麦地里的趴着端枪；地坎后低地里的蹲着、不端枪（坑里看不见）；中弹的躺在倒下的地方。
+// 野地里跨沟、翻埂、翻坎（climb，不报高差）。
+const RushUnits = (kfId) => Object.entries(L0105_RUSH_STATIONS).map(([id, list], i) => {
+  const k = L0105_RUSH_KEY[kfId], fell = L0105_RUSH_FALLEN[id];
+  const base = { group: `rush${Math.floor(i / 2) + 1}`, role: "rifleman", straight: true, climb: true };
+  if (fell && k >= fell.bound) return J(id, Pt(fell.at.x, fell.at.z), { ...base, yaw: Yaw(fell.at, PL.pit), down: true });
+  const st = RushStation(list[k]);
+  const down = !!(st.cover || st.prone);
+  return J(id, Pt(st.x, st.z), { ...base, face: PL.pit, aim: down, stance: down ? "prone" : st.hidden ? "crouch" : "stand" });
 });
+
+// 03 西边干水沟里摸过来的一个班（L0105_DITCH_SQUAD）：03-2 / 03-3 在沟里弯着腰排成一串；03-4 出了沟（轻机枪趴在渐浅段、
+// 步兵扑在 N2 后、两个倒在出沟的路上）；03-5 打头的两个跳到了 N1 后。
+const DITCH_LINE = L0105_PIT_NORTH.ditch.line, DITCH_LEN = LineLength(DITCH_LINE);
+const FIRE_C = Pt(PL.fireC.x, PL.fireC.z);
+function DitchSquadUnits(kfId) {
+  const S = L0105_DITCH_SQUAD;
+  return S.ids.map((id, i) => {
+    const base = { group: "ditchSquad", role: id === S.lmg ? "machineGun" : id === S.leader ? "leader" : "rifleman", straight: true, climb: true,
+      ...(id === S.lmg ? { name: "轻机枪（沟里那个班）", weapon: "Type11" } : id === S.leader ? { name: "沟里那个班的班长" } : {}) };
+    if (kfId === "03-2" || kfId === "03-3") {
+      const p = DitchSquadStart(i);
+      return J(id, Pt(p.x, p.z), { ...base, yaw: R1(p.headingYawDeg), stance: "crouch" });
+    }
+    if (id === S.lmg || id === S.loader) {
+      const p = PointAlong(DITCH_LINE, id === S.lmg ? S.lmgD : S.loaderD);
+      return J(id, Pt(p.x, p.z), { ...base, face: FIRE_C, stance: "prone", aim: id === S.lmg, ...(id === S.lmg ? { arc: ArcTo(p, FIRE_C, 5) } : {}) });
+    }
+    if (S.fallen.includes(id)) { const p = DitchSquadFallenAt(id); return J(id, Pt(p.x, p.z), { ...base, yaw: Yaw(p, FIRE_C), down: true }); }
+    const n1 = kfId === "03-5" && S.toN1[id];
+    const st = RushStation({ bund: n1 ? "N1" : "N2", x: n1 ? n1.x : S.n2X[id] });
+    return J(id, Pt(st.x, st.z), { ...base, face: FIRE_C, stance: "prone", aim: true });
+  });
+}
 
 // 03–04 沿丢掉的前沿沟从东往西清过来的那股（x 往西推）
 const TrenchClearers = (xs, o = {}) => xs.map((x, i) => J(`IjaTrench${i + 1}`, FrontAtX(x, i % 2 ? 0.6 : -0.6), {
@@ -882,13 +909,16 @@ function Keyframes() {
     J("IjaMortar2", MORTAR_2, { role: "mortarLoader", group: "mortar", stance: "crouch", face: PL.pit, straight: true }),
   ];
   const pitPois = (fire = "poi") => [POI.fireA(fire), POI.fireB(fire), POI.fireC(fire), POI.mortar()];
+  // 2026-10-20 第四轮：人从地坎后上来（坎北低 2 m，坑里看不见人）；西边干水沟尽头是那个班出沟的地方
+  const scarpPoi = () => Poi("ScarpEdge", "地坎（坎后低 2 m，人从这里冒出来）", "landmark", Pt(16, ScarpZ(16)), 10);
+  const ditchEndPoi = () => Poi("DitchEnd", "干水沟尽头（沟里那个班从这里出沟）", "danger", DitchEmerge(), 6);
   Add({
     id: "03-2", ...s03, name: "进坑就挨一发掷弹筒",
     player: { x: p32.x, z: p32.z, yawDeg: Yaw(p32, PIT.yaowa), pitchDeg: -6, stance: "crouch" },
     what: "刚挤进坑，一发掷弹筒落在坑沿，一个弟兄被掀翻。幺娃在给机枪手压弹匣。",
     next: { text: "上坑沿（甲位）", x: PL.fireA.x, z: PL.fireA.z, radiusM: 1.2 },
     how: ["「丢弹筒！挪起走！」", "幺娃看见顺子，愣了一下", "坑里能打的只有三个位置"],
-    notes: "坑在交通沟口，一挺捷克式，四五个人（坑里另几个弟兄的站位推测）。三个射位：甲 坑沿朝北、乙 沟口朝东、丙 散兵坑朝西北。",
+    notes: "坑在交通沟口，一挺捷克式，四五个人（坑里另几个弟兄的站位推测）。三个射位：甲 坑沿朝北、乙 沟口朝东、丙 散兵坑朝西北。坑北（2026-10-20 第四轮）：正面两组趴在最远那道田埂 F3（约 185 m）后，另两组还在地坎后的低地里（坎北低 2 m，坑里看不见）；西边干水沟里弯着腰摸着一个班（8 人、一挺轻机枪），坑里也看不见。",
     units: [
       N("Luo", Pt(PL.pit.x - 1.6, PL.pit.z + 2.3), { face: PL.fireA, stance: "crouch" }),
       N("LiuWencai", Pt(PL.pit.x - 2.8, PL.pit.z + 2.4), { face: PL.fireA, stance: "crouch" }),
@@ -899,9 +929,9 @@ function Keyframes() {
       N("PitNra3", PIT.pitNra3, { face: PL.fireC, stance: "crouch", guess: true }),
       N("PitNra4", PIT.pitNra4, { face: PL.parapet, stance: "crouch", role: "grenadeBundle", guess: true }),
       ...[-30, -18].map((x, i) => N(`RetreatNraW${i + 1}`, FrontAtX(x, i ? 0.5 : -0.5), { yaw: -80, group: "westFront", to: [PL.mouth, T(T_CORNER1 + 6)], guess: true })),
-      ...lmgUnits(), ...mortarUnits(), ...RushUnits(0),
+      ...lmgUnits(), ...mortarUnits(), ...RushUnits("03-2"), ...DitchSquadUnits("03-2"),
     ],
-    pois: [...pitPois(), Poi("ShellHit", "掷弹筒弹落点（坑沿）", "danger", Pt(PIT.pitNra2.x + 0.4, PL.pit.z - PL.pit.d / 2 - 0.4), 1.5)],
+    pois: [...pitPois(), Poi("ShellHit", "掷弹筒弹落点（坑沿）", "danger", Pt(PIT.pitNra2.x + 0.4, PL.pit.z - PL.pit.d / 2 - 0.4), 1.5), scarpPoi()],
   });
 
   const pA = Pt(PL.fireA.x, PL.fireA.z);
@@ -909,10 +939,10 @@ function Keyframes() {
   Add({
     id: "03-3", ...s03, name: "三个射位轮换",
     player: { x: pA.x, z: pA.z, yawDeg: PL.fireA.yawDeg, pitchDeg: 1, stance: "stand" },
-    what: "正面步兵一段一段跃进，两挺轻机枪压着坑沿；东头的鬼子沿沟往西清过来。",
+    what: "地坎上冒出人来，翻过来扑在最远那道田埂后；两挺轻机枪一扫坑沿就得缩头，正面趁这几秒跳一段。西边干水沟里一个班摸到坑西北，东头的鬼子沿沟往西清过来。",
     next: { text: "掷弹筒冒烟就换射位", x: PL.fireC.x, z: PL.fireC.z, radiusM: 1.5 },
-    how: ["掷弹筒冒烟——几秒后落地，一发比一发近", "「左边沟里头有人！」", "轻机枪不用打，只压人", "身后撤的人越来越稀"],
-    notes: "掷弹筒编制待核（资料多说每小队配 2–3 具，与「分队一级的配备」不一致）。从坑里只看得见发射冒的烟；听到「嘭」后约 5–6 s 落地（物理估算）。轻机枪一挺架在坑北约 110 m 坟地的坟后、一挺靠在约 135 m 的麦秸垛边，掷弹筒组在约 205 m 那道地坎下（北边低 2 m，从坑里看不见人）。跃进的步兵每次扑倒都落在田埂、坟包、干水沟沿后面；「左边沟里头有人」是顺坑西北那条干水沟弯着腰摸过来的三个（预演里加的人）。坑北的地物是创作（鲁南农田三月的常见样子）。",
+    how: ["地坎上冒出钢盔——人是从坎后那片看不见的低地上来的", "机枪一扫坑沿就缩头；再抬头，正面又近了十几米", "「左边沟里头有人！」——沟里那个班才是要命的", "东头沟里的一个弯一个弯清过来", "掷弹筒冒烟——几秒后落地，一发比一发近"],
+    notes: "2026-10-20 第四轮（用户问「日军真是在大平面上直直冲过来的？」）：正面是拖住守军的——先用轻机枪压住坑沿、趁坑里的人缩头一组跳一段，一跃 12–18 m、三四秒就扑倒，两道田埂之间扑在麦地里；整个 03-3 正面只从 F3（约 185 m）推到 F2（约 140 m）。主攻在侧面：西边干水沟里一个班（8 人、一挺轻机枪），班长在沟里探头被刘文财看见，出沟后轻机枪架在沟尽头打丙位、步兵扑在 N2 后（离坑约 60 m），丙位打倒两个。东头清沟的从约 40 m 推到约 15 m。依据：日军进攻先用火力压住守军、散开一段段往前、出发线放在挡得住枪弹的地方、偏爱包抄（美军 TM-E 30-480，1944）；滕县攻城的日军步兵第 10 联队带轻机枪 72 挺、炮 54 门（中文维基转引战斗详报）。具体人数、路线、时刻是创作。掷弹筒编制待核（资料多说每小队配 2–3 具，与「分队一级的配备」不一致）。从坑里只看得见发射冒的烟；听到「嘭」后约 5–6 s 落地（物理估算）。轻机枪一挺架在坑北约 110 m 坟地的坟后、一挺靠在约 135 m 的麦秸垛边，掷弹筒组在约 205 m 那道地坎下（北边低 2 m，从坑里看不见人）。坑北的地物是创作（鲁南农田三月的常见样子）。",
     units: [
       N("Luo", Pt(PL.fireB.x - 0.2, PL.fireB.z - 0.2), { yaw: PL.fireB.yawDeg, aim: true }),
       N("LiuWencai", Pt(PL.pit.x + 2.0, PL.pit.z + 1.7), { face: PL.fireA, stance: "crouch", guess: true }),
@@ -922,10 +952,10 @@ function Keyframes() {
       N("PitNra2", PIT.pitNra2, { yaw: 180, down: true, lie: "along", guess: true }),
       N("PitNra3", Pt(PL.fireC.x, PL.fireC.z), { yaw: PL.fireC.yawDeg, aim: true, guess: true }),
       N("PitNra4", PIT.pitNra4, { face: PL.parapet, stance: "crouch", role: "grenadeBundle", guess: true }),
-      ...lmgUnits(), ...mortarUnits(), ...RushUnits(1),
-      ...TrenchClearers([lost03 + 5, lost03 + 11, lost03 + 18], { to: FrontAtX(lost03) }),
+      ...lmgUnits(), ...mortarUnits(), ...RushUnits("03-3"), ...DitchSquadUnits("03-3"),
+      ...TrenchClearers([lost03 + 27, lost03 + 33, lost03 + 39], { to: FrontAtX(lost03) }),
     ],
-    pois: [...pitPois(), POI.frontLost("03")],
+    pois: [...pitPois(), POI.frontLost("03"), scarpPoi(), ditchEndPoi()],
   });
 
   const tankArc = ArcTo(TANK_SEEN, PL.parapet, 4, 4);
@@ -936,7 +966,7 @@ function Keyframes() {
     what: "机枪手腿上中弹，幺娃把他往后拖；路那头战车露头，一炮打在坑沿。",
     next: { text: "看坑沿外那捆手榴弹", x: BUNDLE.x, z: BUNDLE.z, radiusM: 1 },
     how: ["掷弹筒弹落在捷克式旁边", "战车一炮打塌一截胸墙", "抱手榴弹的弟兄爬出去，死在坑沿外", "那捆手榴弹落在沟沿上"],
-    notes: "机枪手 03-4 先算倒地（刚中弹），03-5 起由幺娃架着走。战车炮口射界画到坑沿。",
+    notes: "机枪手 03-4 先算倒地（刚中弹），03-5 起由幺娃架着走。战车炮口射界画到坑沿。坑外（第四轮）：正面这时才趴到 F2（约 140 m）；沟里那个班的轻机枪架在沟尽头打丙位，步兵趴在 N2 后（离坑约 60 m）、出沟时倒了两个；东头清沟的到了约 15 m。",
     signals: [SIG.pitShelled],
     units: [
       N("Luo", Pt(PL.fireB.x - 0.2, PL.fireB.z - 0.2), { yaw: PL.fireB.yawDeg, aim: true }),
@@ -948,7 +978,7 @@ function Keyframes() {
       N("PitNra3", Pt(PL.fireC.x, PL.fireC.z), { yaw: PL.fireC.yawDeg, aim: true, guess: true }),
       N("PitNra4", BUNDLE_MAN, { yaw: 0, down: true, climb: true, path: [Pt(PL.parapet.x + 0.5, PL.parapet.z), BUNDLE_MAN] }),
       J("Tank", TANK_SEEN, { yaw: PL.tankFirstSeen.yawDeg, arc: tankArc, straight: true, path: Slice(L0105_ROAD, Station(L0105_ROAD, TANK_SEEN) - 14, Station(L0105_ROAD, TANK_SEEN)) }),
-      ...lmgUnits(), ...mortarUnits(), ...RushUnits(3),
+      ...lmgUnits(), ...mortarUnits(), ...RushUnits("03-4"), ...DitchSquadUnits("03-4"),
       ...TrenchClearers([lost03 + 2, lost03 + 7, lost03 + 13]),
     ],
     pois: [Poi("Bundle", "那捆手榴弹", "objective", BUNDLE, 0.8), Poi("TankSeen", "战车露头", "danger", TANK_SEEN, 5), ...pitPois()],
@@ -961,7 +991,7 @@ function Keyframes() {
     what: "殿后的兵跑过沟口：「后头没得人了！」班长：「走了！把那捆捡起！」",
     next: { text: "捡起那捆手榴弹", x: BUNDLE.x, z: BUNDLE.z, radiusM: 1 },
     how: ["殿后的兵从西边沟里跑过沟口", "班长下到沟口回身喊", "幺娃架着机枪手先往下走", "捡完退到拐角 1"],
-    notes: "捡起后的下一步是拐角 1（下一帧）。坑里另两个能动的弟兄跟着往南撤（推测），倒下的两个留在坑里。",
+    notes: "捡起后的下一步是拐角 1（下一帧）。坑里另两个能动的弟兄跟着往南撤（推测），倒下的两个留在坑里。为什么撤（第四轮）：三面挤——正面还拖在 130 m 外，西边沟里那个班有两个跳到了 N1（离坑约 45 m），东头沟里的到了 10 m 上下。",
     signals: [SIG.pitShelled],
     units: [
       N("Luo", T(1.5, 0.6), { face: PL.pit, aim: true }),
@@ -974,7 +1004,7 @@ function Keyframes() {
       N("PitNra4", BUNDLE_MAN, { yaw: 0, down: true }),
       N("RearguardNra", FrontAtX(-4, 0.4), { name: "殿后的兵", yaw: -85, to: [PL.mouth, T(T_BEND + 3)], from: FrontAtX(-26, 0.4) }),
       J("Tank", TANK_SEEN, { yaw: PL.tankFirstSeen.yawDeg, arc: tankArc, straight: true, intent: RoadRoute(TANK_SEEN, RoadBack(70)) }),
-      ...lmgUnits(), ...mortarUnits(), ...RushUnits(4),
+      ...lmgUnits(), ...mortarUnits(), ...RushUnits("03-5"), ...DitchSquadUnits("03-5"),
       ...TrenchClearers([lost03 - 3, lost03 + 2, lost03 + 8]),
     ],
     pois: [Poi("Bundle", "那捆手榴弹", "objective", BUNDLE, 0.8), POI.corner1("poi"), POI.mouth("landmark")],
@@ -990,18 +1020,16 @@ function Keyframes() {
     what: "坑丢了，鬼子在坑里顺第一段沟往下打。拐角 1 挡住射线，回身顶一阵。",
     next: { text: "顶一阵再退到下个拐角", x: PL.bend.x, z: PL.bend.z, radiusM: 2.5 },
     how: ["子弹顺着第一段沟打下来", "幺娃架着机枪手就在前头几步", "班长在下个拐角回身喊人", "交通沟只有一条路"],
-    notes: "回身顶住，就是为了给前头这两个人争时间。坑里的日军是 03 跃进上来的那两个（IjaRush1/2）。",
+    notes: "回身顶住，就是为了给前头这两个人争时间。坑里的日军是 03 东头沿前沿沟清过来的那几个（IjaTrench1–3，离坑最近，先进的坑；2026-10-20 第四轮起正面跃进的还在 130 m 外）。",
     signals: [SIG.pitShelled],
     units: [
       N("Luo", T(T_BEND + 0.6, 0.6), { yaw: BackYaw(TRAFFIC, T_BEND - 2) }),
       N("LiuWencai", T(T_BEND - 5, -0.4), { yaw: T(T_BEND - 5).heading }),
       N("Gunner", T(T_CORNER1 + 6.5, -0.45), { yaw: T(T_CORNER1 + 6.5).heading }),
       N("Yaowa", T(T_CORNER1 + 6.5, 0.45), { yaw: T(T_CORNER1 + 6.5).heading }),
-      J("IjaRush1", pitArcFrom, { face: PL.corner1, aim: true, arc: ArcTo(pitArcFrom, PL.corner1, 4, 3), straight: true, climb: true }),
-      J("IjaRush2", Pt(PL.pit.x + 1.8, PL.pit.z - 0.6), { face: PL.mouth, aim: true, straight: true, climb: true }),
-      J("IjaTrench1", FrontAtX(4.5, 0.3), { yaw: 180, aim: true }),
-      J("IjaTrench2", FrontAtX(9, -0.5), { yaw: 90 }),
-      J("IjaTrench3", FrontAtX(14, 0.5), { yaw: 90 }),
+      J("IjaTrench1", pitArcFrom, { group: "trenchClear", role: "rifleman", face: PL.corner1, aim: true, arc: ArcTo(pitArcFrom, PL.corner1, 4, 3) }),
+      J("IjaTrench2", Pt(PL.pit.x + 1.8, PL.pit.z - 0.6), { group: "trenchClear", role: "rifleman", face: PL.mouth, aim: true }),
+      J("IjaTrench3", FrontAtX(4.5, 0.3), { group: "trenchClear", role: "rifleman", yaw: 180, aim: true }),
     ],
     pois: [POI.corner1("landmark"), POI.pit("danger", "机枪坑（已丢）"), Poi("Bend", "下个拐角", "poi", PL.bend, 2)],
   });
