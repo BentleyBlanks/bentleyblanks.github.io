@@ -17,6 +17,7 @@
 // ===========================================================================
 
 import { DefaultArc } from "./Script_EditorBlockoutConfig.mjs";
+import { BLOCKOUT_LANDMARK_COLORS, LandmarkGeometry } from "./Script_EditorBlockoutMarkerRules.mjs";
 
 const RGB = (r, g, b) => Object.freeze([r, g, b]);
 
@@ -167,7 +168,8 @@ export class BlockoutMap {
     this.keyframes = [];
     this.kfIndex = -1;
     this.dynamic = { player: null, units: [], pois: [], next: null };
-    this.layers = { arcs: "default", intents: true, labels: true };
+    this.layers = { arcs: "default", intents: true, labels: true, landmarks: true, stations: true };
+    this.landmarks = [];        // 场景文件的地标（2026-10-20，SetLandmarks）
     this.view = null;           // 全关总图视图 {cx, cz, pxPerM}
     this.viewTouched = false;   // 用户缩放 / 平移过就不再自动看全图
     this.fitFor = { w: 0, h: 0 };
@@ -290,8 +292,83 @@ export class BlockoutMap {
       this.layers.arcs = a === true ? "default" : a === false ? "off" : ["default", "all", "off"].includes(a) ? a : this.layers.arcs;
     }
     if ("intents" in layers) this.layers.intents = !!layers.intents;
-    if ("labels" in layers) this.layers.labels = !!layers.labels;
+    // 标签三档（2026-10-20）："off" / false 关，其余开（纸面图上无名的人本来就没有字）
+    if ("labels" in layers) this.layers.labels = layers.labels !== false && layers.labels !== "off";
+    if ("landmarks" in layers) this.layers.landmarks = !!layers.landmarks;
+    if ("stations" in layers) this.layers.stations = !!layers.stations;
     this.RequestFullRepaint();
+  }
+
+  /** 场景文件的地标（已过 NormalizeLandmarks；2026-10-20）：小地图与全关总图都画。 */
+  SetLandmarks(list) {
+    this.landmarks = (Array.isArray(list) ? list : []).filter(lm => lm && Finite(lm.x) && Finite(lm.z));
+    this.RequestFullRepaint();
+  }
+
+  /**
+   * 地标（2026-10-20）：有尺寸的按脚印画描边矩形（片区虚线、其余实线），片区 / 地名的半径画虚线圆；
+   * 每个地标一个 kind 色的小方块 + 深墨边；全关总图上标签在 PaintLabels 里一起排。
+   */
+  PaintLandmarks(ctx, view, { mini }) {
+    if (!this.layers.landmarks || !this.landmarks.length) return;
+    const s = view.s;
+    ctx.save();
+    for (const lm of this.landmarks) {
+      const p = Project(view, lm.x, lm.z);
+      if (p.x < -60 || p.y < -60 || p.x > view.w + 60 || p.y > view.h + 60) continue;
+      const g = LandmarkGeometry(lm, 0);
+      const color = BLOCKOUT_LANDMARK_COLORS[lm.kind] || BLOCKOUT_LANDMARK_COLORS.place;
+      const ink = Css(MAP_COLORS.ink, 0.9);
+      if (g.box && (g.box.w * s >= 6 || g.box.d * s >= 6)) {
+        ctx.beginPath();
+        g.box.corners.forEach(([x, z], i) => { const q = Project(view, x, z); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
+        ctx.closePath();
+        ctx.setLineDash(g.dashed ? [5, 4] : []);
+        ctx.lineWidth = g.dashed ? 1.4 : 2.4;
+        ctx.strokeStyle = ink; ctx.stroke();
+        ctx.lineWidth = g.dashed ? 1 : 1.4;
+        ctx.strokeStyle = color; ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      if (g.ring && g.ring.r * s >= 5) {
+        ctx.beginPath(); ctx.arc(p.x, p.y, g.ring.r * s, 0, Math.PI * 2);
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1.2; ctx.strokeStyle = Css(MAP_COLORS.ink, 0.75); ctx.stroke();
+        ctx.lineWidth = 0.8; ctx.strokeStyle = color; ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      const half = mini ? 3.2 : 3.8;
+      ctx.fillStyle = ink;
+      ctx.fillRect(p.x - half - 1.2, p.y - half - 1.2, half * 2 + 2.4, half * 2 + 2.4);
+      ctx.fillStyle = color;
+      ctx.fillRect(p.x - half, p.y - half, half * 2, half * 2);
+    }
+    ctx.restore();
+  }
+
+  /** 小地图上的关键帧站位（2026-10-20）：小墨点 + 当前帧金环，点之间细虚线；全关总图本来就有 PaintRoute / PaintKeyframeDots。 */
+  PaintMiniStations(ctx, view) {
+    if (!this.layers.stations || !this.keyframes.length) return;
+    ctx.save();
+    if (this.keyframes.length >= 2) {
+      ctx.setLineDash([3, 3]);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = Css(MAP_COLORS.ink, 0.5);
+      ctx.beginPath();
+      this.keyframes.forEach((kf, i) => { const p = Project(view, kf.x, kf.z); if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); });
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    for (const kf of this.keyframes) {
+      const p = Project(view, kf.x, kf.z);
+      if (p.x < -10 || p.y < -10 || p.x > view.w + 10 || p.y > view.h + 10) continue;
+      const current = kf.i === this.kfIndex;
+      ctx.beginPath(); ctx.arc(p.x, p.y, current ? 4.5 : 3, 0, Math.PI * 2);
+      ctx.fillStyle = Css(MAP_COLORS.paper); ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, current ? 3.2 : 2, 0, Math.PI * 2);
+      ctx.fillStyle = current ? Css(MAP_COLORS.gold) : Css(MAP_COLORS.ink, 0.8); ctx.fill();
+    }
+    ctx.restore();
   }
 
   // -------------------------------------------------------------------------
@@ -961,6 +1038,9 @@ export class BlockoutMap {
       ctx.beginPath(); ctx.arc(t.x, t.y, 2, 0, Math.PI * 2); ctx.fillStyle = Css(MAP_COLORS.gold); ctx.fill();
       if (mini) EdgePointer(ctx, view, t, player ? Project(view, player.x, player.z) : null);
     }
+    // 地标（压在要点下面）与小地图上的站位（2026-10-20）
+    this.PaintLandmarks(ctx, view, { mini });
+    if (mini) this.PaintMiniStations(ctx, view);
     // 要点
     for (const poi of pois) {
       if (!Finite(poi.x) || !Finite(poi.z)) continue;
@@ -1075,6 +1155,14 @@ export class BlockoutMap {
       if (!poi.name || !Finite(poi.x)) continue;
       const p = Project(view, poi.x, poi.z);
       Label(poi.name, p.x, p.y, Css(MAP_COLORS.ink));
+    }
+    // 地标名（2026-10-20）：墨色小字，放大到 1.5 px/m 以上才排（否则满图都是字）
+    if (this.layers.landmarks && view.s >= 1.5) {
+      for (const lm of this.landmarks) {
+        const p = Project(view, lm.x, lm.z);
+        if (p.x < -40 || p.y < -40 || p.x > view.w + 40 || p.y > view.h + 40) continue;
+        Label(lm.name, p.x, p.y, Css(MAP_COLORS.ink, 0.88), 500);
+      }
     }
     for (const u of units) {
       if (!u.name || !Finite(u.x)) continue;

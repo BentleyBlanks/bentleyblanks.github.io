@@ -140,6 +140,19 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
   - `shapes`（≤ 8000）：`box`（`w` × `d` × `h`，可带 `ry` 弧度、`lift` 离地米；房墙、屋顶、院墙）、`blob`（椭球树冠：`rx`、可选 `rz`、`h` 竖向全高、`lift`）、`hill`（低山包：长短半轴 `rx` / `rz`、`h`、`ry`，高度剖面 (1 − r²)² 加一点按角度的起伏，`color` → `topColor` 按高度过渡）、`tree`（编辑器的枯树模型，同场地里的树，只要 `x, z, h`）。除 `tree` 外都要 `color`。脚下的地面高都按 `ground` 那条规则算。
   - **只看不走**：`LayoutFromSceneDoc` 把它原样（深拷贝）交成 `layout.backdrop`，另给 `layout.backdropGroundAt`（上面那条地面高规则）与 `layout.cameraFar`；**不进 `blocks` / `gates`**（不碰撞、不进寻路、不进 colliders），`bounds` 不变（玩家走不出场地）。全关总图不画远景层。
   - 校验在 `ValidateBlockoutScene`（`BLOCKOUT_BACKDROP` 上限表）；地面图在 `RasterizeBackdropPaint`（纯 JS，零 three，node 测试也能跑）。
+- **2026-10-20 可选 `landmarks`（地标）**（用户「每个关键位置、每个特殊 POI 区域加标记，例如狗洞，白盒下看不太清」；所有关卡共用的格式，只做加法，不写的关卡逐位不变）：白盒灰里看不清的特殊地方，编辑器画成亮色线框 + 光柱 + 头顶标签（§5.5，开关「地标」）。
+  ```json
+  "landmarks": [
+    { "id": "LmDogHole", "name": "狗洞", "kind": "hole", "x": 81.5, "z": 488, "w": 0.7, "d": 0.45, "h": 0.4, "note": "0.45 m 宽、0.4 m 高，大人钻不过" },
+    { "id": "LmCellar", "name": "地瓜窖", "kind": "pit", "x": 90.5, "z": 499.5, "y": -0.7, "w": 1.6, "d": 1.6, "h": 2, "note": "深 2 m" },
+    { "id": "LmMainStreet", "name": "主街", "kind": "area", "x": 100, "z": 427.5, "w": 6, "d": 85 },
+    { "id": "LmGully", "name": "干沟（集结处）", "kind": "area", "x": 56, "z": 152, "radiusM": 9 },
+    { "id": "LmVillageSouth", "name": "村南口", "kind": "place", "x": 98, "z": 545, "radiusM": 2.5 }
+  ]
+  ```
+  - 每项 `{ id, name, kind, x, z, y?, w?, d?, h?, ry?, radiusM?, note? }`：`id` 全关唯一（和 blocks 的 id 不是一张表）；`name` ≤ 24 字；`kind` 七种：`hole`（洞口 / 缝）、`door`（门）、`window`（窗）、`pit`（坑 / 窖）、`area`（片区：给 `w` / `d` 或 `radiusM`）、`prop`（物件：石碾、麦秸垛、水缸、土地庙）、`place`（地名：村北口、东街东头）；`x, z` 中心（米）；`y` 可选的中心高度（不写就落地；窖这种从坑底立到地面的写 `y`）；`w / d` 要一起给、`h` 可选（给了就画贴着它的线框）；`ry` 弧度；`radiusM` 画地环；`note` ≤ 60 字，标签上的一行小字。至多 `BLOCKOUT_LANDMARK_LIMITS.maxItems`（400）项。
+  - 校验在 `ValidateBlockoutScene` → `LandmarkIssues`（单独导出给生成器与测试用），归一化 `NormalizeLandmarks`（坏项跳过）。`LayoutFromSceneDoc` **不碰**它（布局里没有地标）：总控 `LoadLandmarks()` 在每次进关后自己再读一次场景文件只取 `landmarks`（第一关没有场景文件 = 没有地标），交给标记层与俯视图。
+  - 0610 的地标由生成器 `L0610Landmarks(sample)` 从锚点表填（§15）；**0105 / 1218 要加地标**：在各自的场景生成器里照 0610 的写法加一个 `L0105Landmarks` / `L1218Landmarks`（坐标取各自 `Data_…Space` 的常量）写进 `scene.landmarks`，重跑 `scene <Level> --force`，SceneTest 加「地标齐、都在场地里、关键的框对得上」。
 - `Data_FirstLevelP012Terrain.CreateP012Terrain` 加一个钩子：`layout.terrainSampler` 存在时，节点高度与 `RefineCells` 的细分高度都用它；**不存在时逐位不变**（`Script_FirstLevelWhiteboxTerrainTest --digest` 前后一致）。
 
 ## 3. 配置文件（`Blockout/<Level>.json`）
@@ -246,7 +259,7 @@ export function NormalizeRide(ride);                // → { on, x, z, y, yawDeg
 | 位置 | 内容 |
 | --- | --- |
 | 左上 · 关键帧卡片（宽约 380 px） | 第 1 行：金色阶段号「03」+ 阶段标题 + 灰色「· 站位名」；右上两个小按钮「复制当前位置」（§4.2）与「记下当前机位」（§7）。第 2 行「此时」+ `what`。第 3 行「下一步」+ 指向目标的小箭头（随视角转，正前方朝上）+ `next.text` + 距离「52 m」。可选第 4 行：`how` 小标签；`notes` 一行弱显示；有 `guess` 单位时一行「n 个位置是推测的」。右上角一个小按钮「记下当前机位」（§7）。 |
-| 右上 · 关卡与图层（齿轮按钮左侧） | 关卡下拉（显示当前关卡名 + 下拉箭头）；4 个图标开关：射界 / 去向 / 标签 / 穿墙显示；配置状态小点（绿 = 已载入，蓝闪 = 检测到外部修改已同步，红 = 配置有错，悬停看原因）。 |
+| 右上 · 关卡与图层（齿轮按钮左侧） | 关卡下拉（显示当前关卡名 + 下拉箭头）；6 个图标开关：射界（三档）/ 去向 / 标签（三档，2026-10-20：有名字的 → 全部 → 关）/ 穿墙显示 / 地标 / 站位（后两个 2026-10-20 加，缺省开；图标是自画的 SVG：杆上一面小旗、虚线路尽头一个小三角；三档的开关在「全部」档右上角有个金点）；配置状态小点（绿 = 已载入，蓝闪 = 检测到外部修改已同步，红 = 配置有错，悬停看原因）。**开关的选择记在 localStorage**（键 `tengxian1938_blockout_layers`，`Script_EditorBlockoutMarkerRules.SerializeLayers / ParseStoredLayers`，读写都包 try/catch；下次打开编辑器照上次的）。 |
 | 左下 · 小地图（220×220 CSS px，按 DPR 出图） | 北朝上、跟随玩家；纸面风格；角落小字「M 展开」。 |
 | 底部居中 · 导航栏（宽 min(1140 px, 64vw)，全关总图打开时仍在最上层可点） | 左右两个箭头按钮 + 一个重播按钮（当前是第一个关键帧时置灰）；中间轨道按阶段分段（段宽按该阶段关键帧数），段下方小字阶段号 01…18；每个关键帧一个刻度，当前关键帧金色滑块；悬停刻度弹出「03 · 观察射台」；点击跳转、拖动松手跳转；右侧计数「03 · 2/3」；最右一行极小的按键提示「, . 切换　M 地图　Esc 鼠标」。 |
 | 全关总图（M 打开，图框铺满导航栏以上；半透明遮罩盖满整屏，导航栏浮在遮罩上） | 纸面大图，**开着时鼠标只归地图**（游戏不转头、不开枪、不抢锁、滚轮不换枪；点遮罩空处关图），**打开时以玩家为中心**（默认约 220 m 见方；用户缩放过就记住那个比例），跳关键帧时跟到新位置；滚轮以光标为中心缩放、拖动平移、双击回到全图；每个关键帧是带阶段号的小点，点之间连一条虚线路线；点击关键帧点直接跳转（图保持打开）；当前关键帧的单位、射界、去向、POI 全画；右上一个关闭按钮，M / Esc 关闭。 |
@@ -262,7 +275,7 @@ export class BlockoutUi {
   SetLevels(levels /*[{key,label}]*/, currentKey)
   SetKeyframes(list /*[{id,stage,stageTitle,name}]*/, index)
   SetCard({ stage, stageTitle, name, what, next: { text, distanceM, relYawDeg } | null, how, notes, guessCount })
-  SetLayers({ arcs, intents, labels, xray })
+  SetLayers({ arcs, intents, labels, xray, landmarks, stations })   // labels: true|false|"named"|"all"|"off"（2026-10-20）
   SetStatus({ state: "ok"|"synced"|"error"|"loading", message, writable, saveReason })
   SetTransition({ active, rate })   // 过渡中导航栏显示「快进 ×n」（rate > 1 时）
   Toast(text, kind /* "info"|"ok"|"warn"|"error" */)
@@ -291,7 +304,8 @@ export class BlockoutMap {
   Bake()                                   // → Promise，空闲分块烘静态层
   SetKeyframes(list /*[{id,stage,player:{x,z}}]*/, index)
   SetDynamic({ player: {x,z,yawDeg}, units, pois, next })
-  SetLayers({ arcs, intents, labels })
+  SetLandmarks(list)                       // 场景文件的地标（2026-10-20）：小地图与全关总图都画 kind 色小方块 + 墨边，有尺寸的画脚印（片区虚线），放大到 ≥ 1.5 px/m 排名字
+  SetLayers({ arcs, intents, labels, landmarks, stations })   // stations 只管小地图上的站位点与虚线（全关总图的关键帧点一直在）
   PaintMini(canvas, { pxPerM })            // 北朝上，以玩家为中心并夹在边界内
   PaintFull(canvas)                        // 用内部视图 {cx,cz,pxPerM}
   FitBounds(); ZoomAt(px, py, factor); PanBy(dxPx, dyPx); ClearCache(levelKey?) /* 场景文件重读后丢掉烘好的静态层 */;
@@ -349,12 +363,18 @@ export class BlockoutMap {
 - POI：细光柱 0→8 m + 地环；下一步目标：金色光柱 0→14 m + 呼吸地环。
 - **看得见 / 被挡住两种画法**：同一组几何画两遍，一遍做深度测试（亮），一遍不做（暗、半透明）。被墙挡住的人也能找到，但一眼分得出「现在看不看得见他」。图层开关「穿墙显示」关掉第二遍。2026-10-20（用户「标记盖住前景」）：叠加层和第一人称的手 / 枪共用一份深度，原来穿墙那一遍不做深度测试、半透明地盖在枪和手上。现在两遍都做深度测试，片元深度最近只算到离眼 1.25 m（`BLOCKOUT_FOREGROUND_M`；游戏的视图模型整支压在 `depthBudget` 1.22 m 内）：看得见那一遍取 max(自己, 1.25 m)，穿墙那一遍钉在 1.25 m——手和枪挡得住标记，1.25 m 外的墙照旧穿透；代价是贴脸 1.25 m 内的墙也不再穿透。只改 `gl_FragDepth`，不读预通道（白盒画质不跑预通道）。
 - 头顶 DOM 标签池：有名字的显示「色点 + 名字」，无名普通兵只显示色点三角；120 m 外只保留有名字的与机枪；按近到远避让；下一步目标在屏幕外时贴边显示箭头 + 「下一步 · 文字 · 距离」。标签挂在单位的世界位置上（不挂 `actor.root` 子节点）。
+- **三层新标记（2026-10-20，用户「每个人、每个关键位置、每个特殊 POI 区域加标记，都要能开关」）**。纯规则在 `Script_EditorBlockoutMarkerRules.mjs`（零 three / DOM，node 测试 `Script_EditorBlockoutMarkerRulesTest`），画法在 `Script_EditorBlockoutMarkers`，俯视图在 `Script_EditorBlockoutMap`：
+  - **每个人都有标签**：「标签」开关改三档 `labels: "named" | "all" | "off"`（`true` / `false` 仍认 = named / off）。`named` = 原样（有名字的「色点 + 名字」，无名的只有色点，无名机枪写「机枪」）；`all` = 无名的人按身份兜底（`UnitFallbackText`：国军 / 日军 / 百姓 / 小孩 / 军官 / 日军军官 / 伤员（倒地的国军、百姓）/ 日军（倒地）/ 担架 / 驴车 / 战车 / 牲口 / 机枪），同一帧里同一种兜底不止一个时带 id 的尾号（`Walker04` → 「国军 04」，`UnitLabelTexts`）；距离、避让照旧，120 m 外仍只留有名字的与机枪（远处不会满屏）；`off` = 一个都不挂。
+  - **地标**（场景文件 `landmarks`，§2.2；`SetLandmarks(list)`，开关「地标」缺省开）：按 kind 分色（`BLOCKOUT_LANDMARK_COLORS`：洞 / 缝粉 `#ff6fd8`、门青 `#3fe0e0`、窗紫 `#a98bff`、坑 / 窖薄荷绿 `#5ef0a8`、片区白 `#f2f2ee`、物件黄绿 `#c9f05a`、地名米白 `#e8e8e0`——和敌 / 友 / 百姓 / 要点 / 下一步 / 危险的颜色都不撞，测试钉着）。有 `w / d` 的画贴着它的亮线框（每边外扩 0.08 m、薄的撑到 0.3 m 厚、高至少 0.3 m；四个侧面与顶面淡淡填一层 0.16，远看是一块发光的盒子，线框边离相机 2.5 m 内填充整片淡掉、6.5 m 外不淡（石碾贴脸时那块填充会糊半个屏幕；按 0.1 一档量化、跨档才重建）；给了 `y` 就从 `y − h/2` 立起，窖是从坑底立到地面）；片区不立盒子、画贴地的虚线描边，`radiusM` 画虚线地环，地名脚下一个 0.8 m 的小地环；每个都竖一根细光柱（3.4 m，片区 / 地名 2.6 m，至少高过线框顶 0.6 m）、顶上两片交叉的小旗；DOM 标签挂在柱顶（方点 + 名字，有 `note` 跟一行小字），10 m 内有线框的改挂在线框顶上（第一人称里柱顶早出画面了），160 m 外不挂标签（线框照画）。被挡住的照「穿墙显示」画第二遍。几何只算到角点 / 高度这一步（`LandmarkGeometry`），画在 `_RebuildLandmarks`。
+  - **站位**（`SetStations(list, index)`，开关「站位」缺省开）：这一关所有关键帧的 `player` 点：地上一个小三角朝着那一帧的 `yawDeg`（0.5 m；当前帧 0.7 m、亮色 `#ffd56a` 并带 0.9 m 地环，其余 `#f7e9c3` 淡一半），按顺序连一条 0.09 m 宽的细虚线（玩家这一关怎么走）；标签「拍号 + 名字」（`StationLabel`：「08-3 压窗口」），220 m 外不挂、离相机 2 m 内（就站在它上面）不挂。全关总图上的关键帧点与路线本来就有；小地图上加了同样的点与虚线（`PaintMiniStations`）。
+  - 取证：`Debug.Blockout.Landmarks()`（这一关归一化后的地标）、`Labels()`（此刻挂着的标签文字，按 `units / pois / landmarks / stations` 分）、`Stats().markers` 多给 `landmarks / stations / unitLabels / landmarkLabels / stationLabels`。截图验收 `_shots/EditorBlockoutMarkers/`（不提交）。
 
 ```js
 export class BlockoutMarkers {
   constructor({ post, camera, groundAt, labelRoot })
   SetUnits(units /*现场位置 + 数据：id,side,kind,name,x,z,yawDeg,arc,intent,guess,visible*/)
-  SetPois(pois); SetNext(next /*{x,z,text}|null*/); SetLayers({ arcs, intents, labels, xray });
+  SetPois(pois); SetNext(next /*{x,z,text}|null*/); SetLayers({ arcs, intents, labels, xray, landmarks, stations });
+  SetLandmarks(list /*NormalizeLandmarks 的结果*/); SetStations(list /*[{id,name,x,z,yawDeg}]*/, index); LabelInfo();   // 2026-10-20
   Update(dt)   // 投影 DOM 标签；移动中的单位每帧重建它那几段几何，静止的不动
   Dispose()
 }
@@ -586,6 +606,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 
 ## 12. 变更记录
 
+- 2026-10-20（人名 / 站位 / 地标三层标记，都能开关）：§2.2 场景文件加可选 `landmarks`（七种 kind，`ValidateBlockoutScene` → `LandmarkIssues`，`NormalizeLandmarks`）；§5.5「标签」改三档（全部档无名的人按身份兜底、带 id 尾号）、新开关「地标」「站位」（右上同一排，缺省开，六个开关的选择记在 localStorage）；新模块 `Script_EditorBlockoutMarkerRules`（纯规则）+ `…MarkerRulesTest`；§4.1 俯视图画地标、小地图画站位；§15 0610 的场景文件填了 47 个地标（`L0610Landmarks`，坐标全取锚点表），SceneTest 钉地标齐、都在场地里、狗洞 / 墙缝 / 侧门 / 窖 / 北窗的框对得上；总控 `LoadLandmarks()` 进关后再读一次场景文件只取地标（`Script_EditorBlockoutLevels` 没动）。BrowserTest 加 0610 的地标 / 站位 / 三档 / 记忆用例。
 - 2026-10-20（标记不压前景）：§5.5 3D 标记两遍都做深度测试、片元深度最近算到离眼 1.25 m，第一人称的手和枪不再被穿墙那一遍盖住（`Script_EditorBlockoutMarkers.BehindForeground`）。
 - 2026-10-20（坑北第三版：照史料压平、窄条田、四个村子、东边低山）：§2.2 场景文件加可选 `backdrop`（远景层：远平面、远景地面、变淡、paint（poly / line / rects）、shapes（box / blob / hill / tree）），`ValidateBlockoutScene` 校验（`BLOCKOUT_BACKDROP`）、`LayoutFromSceneDoc` 交出 `backdrop` / `backdropGroundAt` / `cameraFar`、`ApplyLayout` 设 `phase.cameraFar`；§6.3 新模块 `Script_EditorBlockoutBackdrop` 画远景层，§5.7 的树多种远景层里的 `tree`；不写 `backdrop` 的关卡逐位不变、远平面照旧 650。§13 01–05 坑北压平、窄条田、散坟、村子挪进远景层（四个村子）、东边一串低山。
 - 2026-10-20（坑北第二轮：田、路、村子看得见）：§2.2 场景文件加可选 `paint`（地面涂色，多边形 / 折线 + 半宽，按顺序叠）、`heightTint`、`colorSemantics`、`semanticColors`，`ValidateBlockoutScene` 校验、`LayoutFromSceneDoc` 给 `groundPaint`；§6.3 `DressWorld` 按高度上色后混涂色、列出的语义块在白盒画质里保留语义色，全关总图淡铺涂色；不写这些字段的关卡逐位不变。§13 01–05 坑北铺田块、大路北段与田间小路、村子挪到 290–365 m 做成 24 户。
@@ -884,7 +905,9 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 | 文件 | 是什么 | 怎么来 |
 | --- | --- | --- |
 | `Data_EditorBlockoutFirstLevel0610Space.mjs` | 空间锚点（唯一口径）：场地范围、平地大形、凹路南段（路底按弧长的控制点）、河汊子、整村压平高度、街、老耿家（前屋 / 大门过道 / 后院 / 灶屋 / 偏屋 / 石磨 / 地瓜窖 / 柴草垛 / 后门与水缸 / 共用墙上的狗洞 / 墙缝 / 侧门）、邻院、东街与主街两侧的院子、日常摆件表、五个场景信号、地名、出生点。头注列着与契约草稿不一致的地方 | 集成负责人的契约 §3 换算；摆不下 / 接不上的才挪 |
-| `Script_EditorBlockoutFirstLevel0610Scene.mjs` → `Blockout/FirstLevel0610.scene.json` | 0.5 m 高度网格（540×880）+ 186 个体块 + 15 个随信号体块 + 路 / 沟中心线 | `node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene FirstLevel0610 --force` |
+| `Script_EditorBlockoutFirstLevel0610Scene.mjs` → `Blockout/FirstLevel0610.scene.json` | 0.5 m 高度网格（540×880）+ 体块 + 随信号体块 + 路 / 沟中心线 + 47 个地标（`L0610Landmarks`，2026-10-20，见下） | `node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene FirstLevel0610 --force` |
+
+**地标（§2.2 `landmarks`，2026-10-20）**：`L0610Landmarks(sample)` 从锚点表填，坐标一律取 `Data_EditorBlockoutFirstLevel0610Space` 的常量。47 个：06 的干沟（集结处，半径 9）、老耿的驴车停处（南岸树底下）、妮儿捡弹壳的沟沿、凹路口、凹路尽头；村口路沟（片区）、路沟东半截（后送队）、街口坡道射击位（四人趴的那一溜）、村北口、巷子口；夹道 / 巷子东西那截 / 南北那截、主街、小空地、小空地北角、东街、后门外的小路（都是片区虚线）；翻倒的大车；老耿家的北窗（机枪，框从窗台到窗洞顶）、前门、大门（车道）、大门过道、前屋南门、灶屋门、偏屋门、石磨、柴垛、地瓜窖（框从坑底立到院子地面）、后门、水缸（堵后门，挪前的位置，note 写 10-6 推到门东边）；邻院西墙的小门、**狗洞**（框 0.7×0.45×0.4，就是共用墙上那个口子）、**墙缝**、**侧门**；石碾、场院、麦秸垛、土地庙、北边砸开的三道院门（①场院西隔墙 ②北侧第一个院西墙 ③北角北墙）、南边翻墙处、掷弹筒藏处、东街东头；河汊子（片区）、村南口。SceneTest 钉：≥ 40 个、七种 kind 都用到、过校验、都在场地里、狗洞 / 墙缝 / 侧门的框对准共用墙上的口子（宽 = 口子宽、狗洞高 = 过梁下沿）、窖的框从坑底到地面、北窗从窗台到窗洞顶、大车 / 麦秸垛的框和体块同心同尺寸、三道院门离门板 ≤ 0.3 m。12–18 的场景 `BlocksFrom0610` 只带体块，不带地标（12–18 要不要地标由它自己的会话加）。
 | `Script_EditorBlockoutFirstLevel0610Keyframes.mjs` → `Blockout/FirstLevel0610.json` | 20 个关键帧（06-1…10-4），坐标全从锚点算；人物走位按村里的路网（凹路、主街、小空地、东街、巷子、各道门）自动排 | `... export FirstLevel0610 --force`（**会覆盖手改**） |
 | `Script_EditorBlockoutFirstLevel0610SceneTest.mjs` / `...KeyframesTest.mjs` | 纯 node 门禁（见下） | `node Taierzhuang1938/Script_EditorBlockoutFirstLevel0610SceneTest.mjs` 等 |
 

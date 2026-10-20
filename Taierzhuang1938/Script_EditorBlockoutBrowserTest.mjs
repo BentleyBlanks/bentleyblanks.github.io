@@ -1019,6 +1019,69 @@ try {
     JSON.stringify({ trees: bd.trees, treeBlocks: bd.treeBlocks, backdropTrees: bd.shapes }));
   await page.screenshot({ path: path.join(shotDir, "FirstLevel0105_Backdrop.png") });
 
+  // 三层新标记（§5.5，2026-10-20）：0610 的地标从场景文件读进来、狗洞地标在 09-2 的画面里有线框和标签；
+  // 「地标」「站位」开关关掉后几何与标签真的没了；「标签」三档：全部 > 有名字的 > 关；选择记进 localStorage；右上六个开关
+  console.log("--- landmarks / stations / label modes (FirstLevel0610)");
+  await B(() => window.Tengxian.Debug.Blockout.SwitchLevel("FirstLevel0610"));
+  await WaitSync(() => window.Tengxian.Debug.Blockout.State().ready && window.Tengxian.Debug.Blockout.State().level === "FirstLevel0610" && window.Tengxian.Debug.Blockout.Stats().landmarks > 0, null, 30000);
+  await GoTo("09-2");
+  // 09-2 的机位俯角 30°，狗洞的标签在画面上方外头：抬一点头看洞
+  await B(() => { const Bl = window.Tengxian.Debug.Blockout; const kf = Bl.Config().keyframes.find(k => k.id === "09-2"); Bl.PlacePlayer({ ...kf.player, pitchDeg: -8 }); });
+  await page.waitForTimeout(900);
+  const lm = await B(() => {
+    const Bl = window.Tengxian.Debug.Blockout;
+    const list = Bl.Landmarks();
+    const dog = list.find(l => l.name === "狗洞");
+    return { count: list.length, kinds: [...new Set(list.map(l => l.kind))].sort(), dog, stats: Bl.Stats().markers, labels: Bl.Labels(), layers: Bl.State().layers,
+      buttons: [...document.querySelectorAll(".boLayer")].map(b => b.dataset.layer) };
+  });
+  Check("0610 的地标从场景文件读进来（≥ 40 个、七种 kind 都有）、标记层画了它们", lm.count >= 40 && lm.kinds.length === 7 && lm.stats.landmarks === lm.count,
+    JSON.stringify({ count: lm.count, kinds: lm.kinds, drawn: lm.stats.landmarks }));
+  Check("09-2 画面里有狗洞地标：线框几何在、头顶挂着「狗洞」标签", !!lm.dog && lm.dog.kind === "hole" && lm.dog.w > 0 && lm.stats.lines > 100 && lm.labels.landmarks.includes("狗洞"),
+    JSON.stringify({ dog: lm.dog, lines: lm.stats.lines, labels: lm.labels.landmarks }));
+  Check("站位层：25 个关键帧的站位都画了，近处挂着「拍号 + 名字」的标签", lm.stats.stations === 25 && lm.labels.stations.length > 0 && lm.labels.stations.every(t => /^\d\d-\d /.test(t)),
+    JSON.stringify({ stations: lm.stats.stations, labels: lm.labels.stations.slice(0, 4) }));
+  Check("右上六个图层开关（射界 / 去向 / 标签 / 穿墙显示 / 地标 / 站位），缺省地标、站位开、标签 = 有名字的",
+    lm.buttons.join() === "arcs,intents,labels,xray,landmarks,stations" && lm.layers.landmarks === true && lm.layers.stations === true && lm.layers.labels === "named", JSON.stringify({ buttons: lm.buttons, layers: lm.layers }));
+  const toggles = await page.evaluate(async () => {
+    const Bl = window.Tengxian.Debug.Blockout;
+    const Frame = () => new Promise(r => setTimeout(r, 700));
+    const out = {};
+    document.querySelector('.boLayer[data-layer="landmarks"]').click(); await Frame();
+    out.lmOff = { layer: Bl.State().layers.landmarks, drawn: Bl.Stats().markers.landmarks, labels: Bl.Labels().landmarks.length, dom: [...document.querySelectorAll(".blockoutLabel")].some(e => e.style.display !== "none" && e.dataset.layer === "landmarks") };
+    document.querySelector('.boLayer[data-layer="landmarks"]').click(); await Frame();
+    out.lmOn = { layer: Bl.State().layers.landmarks, drawn: Bl.Stats().markers.landmarks, labels: Bl.Labels().landmarks.length };
+    document.querySelector('.boLayer[data-layer="stations"]').click(); await Frame();
+    out.stOff = { layer: Bl.State().layers.stations, drawn: Bl.Stats().markers.stations, labels: Bl.Labels().stations.length };
+    document.querySelector('.boLayer[data-layer="stations"]').click(); await Frame();
+    out.stOn = { drawn: Bl.Stats().markers.stations };
+    // 标签三档：点一下 → 全部（无名的人也有字），再点 → 关，再点 → 有名字的。09-2 画面里的人都有名字，换到 08-3 站着看主街（沟里 / 街上有无名的走着的伤员）
+    await Bl.GoTo("08-3", { animate: false });
+    const kf83 = Bl.Config().keyframes.find(k => k.id === "08-3");
+    Bl.PlacePlayer({ ...kf83.player, stance: "stand", pitchDeg: -4 });
+    await Frame(); await Frame();
+    const named = Bl.Stats().markers.unitLabels;
+    document.querySelector('.boLayer[data-layer="labels"]').click(); await Frame();
+    out.all = { layer: Bl.State().layers.labels, unitLabels: Bl.Stats().markers.unitLabels, texts: Bl.Labels().units.filter(t => /^(国军|日军|百姓|伤员|担架)/.test(t)).slice(0, 5), cls: document.querySelector('.boLayer[data-layer="labels"]').className };
+    document.querySelector('.boLayer[data-layer="labels"]').click(); await Frame();
+    out.off = { layer: Bl.State().layers.labels, unitLabels: Bl.Stats().markers.unitLabels, cls: document.querySelector('.boLayer[data-layer="labels"]').className };
+    document.querySelector('.boLayer[data-layer="labels"]').click(); await Frame();
+    out.named = { layer: Bl.State().layers.labels, unitLabels: Bl.Stats().markers.unitLabels, before: named, texts: Bl.Labels().units.filter(t => /^(国军|日军|百姓|伤员|担架)/.test(t)) };
+    out.stored = JSON.parse(localStorage.getItem("tengxian1938_blockout_layers") || "null");
+    return out;
+  });
+  Check("「地标」关：线框与标签都没了；再开回来", toggles.lmOff.layer === false && toggles.lmOff.drawn === 0 && toggles.lmOff.labels === 0 && !toggles.lmOff.dom
+    && toggles.lmOn.layer === true && toggles.lmOn.drawn === lm.count && toggles.lmOn.labels > 0, JSON.stringify({ off: toggles.lmOff, on: toggles.lmOn }));
+  Check("「站位」关：站位几何与标签都没了；再开回来", toggles.stOff.layer === false && toggles.stOff.drawn === 0 && toggles.stOff.labels === 0 && toggles.stOn.drawn === 25, JSON.stringify(toggles.stOff));
+  // 数标签个数不可靠：「全部」档的字更宽，避让时会挤掉几个；看的是有没有兜底文字
+  Check("「标签」三档：全部时无名的人按身份写字（国军 / 伤员 …）、关时一个都没有、再点回有名字的（没有兜底文字）",
+    toggles.all.layer === "all" && toggles.all.texts.length > 0 && /\ball\b/.test(toggles.all.cls)
+      && toggles.off.layer === "off" && toggles.off.unitLabels === 0 && !/\bon\b/.test(toggles.off.cls) && toggles.named.layer === "named" && toggles.named.texts.length === 0 && toggles.named.unitLabels > 0,
+    JSON.stringify({ all: toggles.all, off: { layer: toggles.off.layer, n: toggles.off.unitLabels }, named: toggles.named }));
+  Check("开关的选择记进 localStorage（六个键）", toggles.stored && Object.keys(toggles.stored).sort().join() === "arcs,intents,labels,landmarks,stations,xray" && toggles.stored.labels === "named",
+    JSON.stringify(toggles.stored));
+  await page.screenshot({ path: path.join(shotDir, "FirstLevel0610_09-2_Landmarks.png") });
+
   Check("全程没有未捕获错误", errors.length === 0, errors.slice(0, 5).join(" | "));
 } finally {
   const after = await fs.readFile(configPath);

@@ -15,9 +15,19 @@
 // 头顶标签是 DOM（挂在单位的世界位置上，不挂 actor 子节点）：有名字的「色点 + 名字」，
 // 无名普通兵只有色点；120 m 外只留有名字的与机枪；近的先排、互相避让；
 // 下一步目标在屏幕外时贴边显示箭头 + 「下一步 · 文字 · 距离」。
+//
+// 2026-10-20 三层新标记（§5.5，规则在 Script_EditorBlockoutMarkerRules）：
+//   · 「标签」改三档：有名字的（原样）/ 全部（无名的人按身份兜底「国军 04」「日军」「担架」…；120 m 外照旧只留有名字的与机枪）/ 关；
+//   · 地标（场景文件 landmarks，SetLandmarks）：按 kind 分色的亮线框（比实物略大、薄的也撑到 0.3 m）+ 淡填充 + 细光柱 + 顶上两片小旗 +
+//     DOM 标签（名字 · 小字 note）；片区画虚线描边 / 虚线地环；被挡住的照「穿墙显示」画第二遍；开关「地标」；
+//   · 站位（这一关所有关键帧的玩家站位，SetStations）：地上小三角朝着那一帧的朝向、当前帧亮且带地环、其余淡，按顺序连一条细虚线，
+//     标签「拍号 + 名字」；站在它上面（2 m 内）时不挂标签；开关「站位」。
 
 import * as THREE from "three";
 import { BLOCKOUT_MG_WEAPONS } from "./Script_EditorBlockoutConfig.mjs";
+import {
+  BLOCKOUT_LAYER_DEFAULTS, BLOCKOUT_LANDMARK_DRAW, BLOCKOUT_STATION_DRAW, LandmarkGeometry, StationLabel, UnitLabelTexts, LabelMode,
+} from "./Script_EditorBlockoutMarkerRules.mjs";
 
 export const BLOCKOUT_MARKER_COLORS = Object.freeze({
   ija: "#d6604a", nra: "#9dc0e4", civ: "#9fc47f",
@@ -319,9 +329,12 @@ export class BlockoutMarkers {
     };
     if (post?.AddDebugOverlay) { post.AddDebugOverlay(this.root); this.host = "post"; }
     else { camera.parent?.add?.(this.root); this.host = "scene"; }
-    this.layers = { arcs: "default", intents: true, labels: true, xray: true };
+    this.layers = { ...BLOCKOUT_LAYER_DEFAULTS };
     this.units = [];
     this.pois = [];
+    this.landmarks = [];
+    this.stations = [];
+    this.stationIndex = -1;
     this.next = null;
     this.chunks = new Map();     // key -> { sig, chunk }
     this.dirty = true;
@@ -331,7 +344,104 @@ export class BlockoutMarkers {
     this._v = new THREE.Vector3();
     this._w = new THREE.Vector3();
     this._camera = new THREE.Vector3();
-    this.stats = { units: 0, tris: 0, lines: 0, fanTris: 0, fanLines: 0, fans: 0, labels: 0 };
+    this.stats = { units: 0, tris: 0, lines: 0, fanTris: 0, fanLines: 0, fans: 0, labels: 0, landmarks: 0, stations: 0, landmarkLabels: 0, stationLabels: 0, unitLabels: 0 };
+  }
+
+  // -------------------------------------------------------------------------
+  // 地标与站位（2026-10-20，§5.5）
+
+  /** 场景文件的 landmarks（已过 NormalizeLandmarks）。开关「地标」关着时只记下来、不画。 */
+  SetLandmarks(list) {
+    this.landmarks = Array.isArray(list) ? list : [];
+    this._RebuildLandmarks();
+  }
+
+  /**
+   * 线框的淡填充离相机近了整片淡掉（石碾 2 m 外时那块填充会糊半个屏幕）：按地标到相机的距离算 0…1、量化到 0.1 一档，
+   * 档位串变了才重建（相机走动时不是每帧重建）。线框本身不淡。
+   */
+  _LandmarkFades() {
+    this.camera.getWorldPosition(this._camera);
+    const cam = this._camera, D = BLOCKOUT_LANDMARK_DRAW;
+    const fades = [];
+    let sig = "";
+    for (const lm of this.landmarks) {
+      const d = Math.hypot(lm.x - cam.x, lm.z - cam.z) - Math.max(lm.w, lm.d) / 2;
+      const f = Math.round(Math.min(1, Math.max(0, (d - D.fillFadeNearM) / (D.fillFadeFarM - D.fillFadeNearM))) * 10) / 10;
+      fades.push(f);
+      sig += f;
+    }
+    return { fades, sig };
+  }
+
+  _RebuildLandmarks() {
+    if (!this.layers.landmarks || !this.landmarks.length) { if (this.chunks.delete("landmarks")) this.dirty = true; return; }
+    const chunk = new Chunk(this.groundAt);
+    const D = BLOCKOUT_LANDMARK_DRAW;
+    const fades = this._LandmarkFades();
+    this.landmarkSig = fades.sig;
+    this.landmarks.forEach((lm, i) => {
+      const ground = this.groundAt(lm.x, lm.z);
+      const g = LandmarkGeometry(lm, ground);
+      const line = Rgba(g.color, 0.95), fill = Rgba(g.color, D.fillAlpha * fades.fades[i]);
+      if (g.box && g.dashed) {
+        // 片区：贴地的虚线描边（不立 3D 盒子，主街 85 m 长的盒子会糊满街）
+        const pts = [...g.box.corners, g.box.corners[0]].map(([x, z]) => ({ x, z }));
+        chunk.Ribbon(pts, 0.14, Rgba(g.color, 0.75), { dash: [1.2, 0.8], lift: 0.07 });
+      } else if (g.box) {
+        const c = g.box.corners, y0 = g.box.y0, y1 = g.box.y1;
+        for (let i = 0; i < 4; i++) {
+          const a = c[i], b = c[(i + 1) % 4];
+          chunk.Seg([a[0], y0, a[1]], [b[0], y0, b[1]], line);
+          chunk.Seg([a[0], y1, a[1]], [b[0], y1, b[1]], line);
+          chunk.Seg([a[0], y0, a[1]], [a[0], y1, a[1]], line);
+          // 四个侧面淡淡填一层：远看是一块发光的盒子，近看线框还在
+          chunk.Tri([a[0], y0, a[1]], [b[0], y0, b[1]], [b[0], y1, b[1]], fill);
+          chunk.Tri([a[0], y0, a[1]], [b[0], y1, b[1]], [a[0], y1, a[1]], fill);
+        }
+        chunk.Tri([c[0][0], y1, c[0][1]], [c[1][0], y1, c[1][1]], [c[2][0], y1, c[2][1]], fill);
+        chunk.Tri([c[0][0], y1, c[0][1]], [c[2][0], y1, c[2][1]], [c[3][0], y1, c[3][1]], fill);
+      }
+      if (g.ring) {
+        const segments = Math.max(24, Math.min(96, Math.round(g.ring.r * 4)));
+        chunk.Ring(lm.x, lm.z, g.ring.r, 0.14, Rgba(g.color, 0.8), { dash: g.dashed, segments });
+      }
+      // 细光柱 + 顶上两片交叉的小旗（哪个方向看都有一片是正面）
+      chunk.Pillar(lm.x, lm.z, g.pillarM, 0, line, 1);
+      const top = ground + g.pillarM, flag = D.flagM;
+      chunk.Tri([lm.x, top, lm.z], [lm.x + flag, top - 0.13, lm.z], [lm.x, top - 0.3, lm.z], line);
+      chunk.Tri([lm.x, top, lm.z], [lm.x, top - 0.13, lm.z + flag], [lm.x, top - 0.3, lm.z], line);
+    });
+    this.chunks.set("landmarks", { sig: "", chunk });
+    this.dirty = true;
+  }
+
+  /** 这一关所有关键帧的玩家站位：[{ id, name, x, z, yawDeg }]，index = 当前关键帧。 */
+  SetStations(list, index = -1) {
+    this.stations = (Array.isArray(list) ? list : []).filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.z));
+    this.stationIndex = Number.isInteger(index) ? index : -1;
+    this._RebuildStations();
+  }
+
+  _RebuildStations() {
+    if (!this.layers.stations || !this.stations.length) { if (this.chunks.delete("stations")) this.dirty = true; return; }
+    const chunk = new Chunk(this.groundAt);
+    const S = BLOCKOUT_STATION_DRAW;
+    const route = this.stations.map(s => ({ x: s.x, z: s.z }));
+    if (route.length >= 2) chunk.Ribbon(route, S.lineWidthM, Rgba(S.color, 0.55), { dash: S.dash, lift: 0.06 });
+    this.stations.forEach((s, i) => {
+      const current = i === this.stationIndex;
+      const rgba = Rgba(current ? S.currentColor : S.color, current ? 0.98 : S.dimAlpha);
+      const size = current ? S.currentTriM : S.triM;
+      const yaw = Number.isFinite(s.yawDeg) ? s.yawDeg : 0;
+      const fx = -Math.sin(yaw * DEG), fz = -Math.cos(yaw * DEG);
+      chunk.ClampAround(s.x, s.z, UNIT_GROUND_CLAMP);
+      chunk.Head({ x: s.x + fx * size * 0.55, z: s.z + fz * size * 0.55 }, { x: fx, z: fz }, size, rgba, 0.09);
+      if (current) chunk.Ring(s.x, s.z, S.ringM, 0.1, Rgba(S.currentColor, 0.9), { segments: 28 });
+      chunk.ClampAround(0, 0, null);
+    });
+    this.chunks.set("stations", { sig: "", chunk });
+    this.dirty = true;
   }
 
   // -------------------------------------------------------------------------
@@ -380,11 +490,15 @@ export class BlockoutMarkers {
     const before = JSON.stringify(this.layers);
     Object.assign(this.layers, layers || {});
     if (this.layers.arcs === true) this.layers.arcs = "default";
+    // 「标签」三档（2026-10-20）：true / false 也认
+    this.layers.labels = LabelMode(this.layers.labels);
     if (JSON.stringify(this.layers) === before) return;
     for (const key of [...this.chunks.keys()]) if (key.startsWith("u:")) this.chunks.delete(key);
     // 射界扇没有穿墙那一遍，「穿墙显示」只管地环、箭头、光柱
     this.tris.occluded.visible = this.lines.occluded.visible = this.layers.xray !== false;
     this.SetUnits(this.units);
+    this._RebuildLandmarks();
+    this._RebuildStations();
     this.dirty = true;
   }
 
@@ -459,6 +573,19 @@ export class BlockoutMarkers {
     this.stats.fanLines = this.fanLines.count / 2;
     this.stats.fans = chunks.filter(chunk => chunk.fanTri.length).length;
     this.stats.units = this.units.length;
+    this.stats.landmarks = this.chunks.has("landmarks") ? this.landmarks.length : 0;
+    this.stats.stations = this.chunks.has("stations") ? this.stations.length : 0;
+  }
+
+  /** 取证：此刻挂在屏幕上的 DOM 标签文字（按层分），测试用。 */
+  LabelInfo() {
+    const out = { units: [], pois: [], landmarks: [], stations: [], next: [] };
+    for (const el of this.labels) {
+      if (!el || el.style.display === "none") continue;
+      const layer = el.dataset.layer || "units";
+      (out[layer] || out.units).push(el._text.textContent);
+    }
+    return out;
   }
 
   /** 取证：现在场上画了哪些扇子、各自的淡出系数（测试用）。 */
@@ -484,6 +611,8 @@ export class BlockoutMarkers {
     this.time += dt;
     if (this.hidden) return;
     if (this.next) { this.chunks.set("next", { sig: "", chunk: this._NextChunk() }); this.dirty = true; }
+    // 地标的淡填充按离相机的距离淡出（跨档才重建，2026-10-20）
+    if (this.layers.landmarks && this.landmarks.length && this.chunks.has("landmarks") && this._LandmarkFades().sig !== this.landmarkSig) this._RebuildLandmarks();
     if (this.flashes?.length) {
       this.flashes = this.flashes.filter(f => this.time - f.t0 < FLASH_S);
       this.chunks.set("flash", { sig: "", chunk: this._FlashChunk() });
@@ -514,12 +643,43 @@ export class BlockoutMarkers {
       const dot = document.createElement("i");
       dot.style.cssText = "display:inline-block;width:8px;height:8px;flex:none;";
       const text = document.createElement("span");
-      el.append(dot, text);
-      el._dot = dot; el._text = text;
+      // 地标的一行小字（note），2026-10-20
+      const note = document.createElement("span");
+      note.style.cssText = "display:none;font-size:10px;line-height:14px;color:#b4b7aa;margin-left:2px;";
+      el.append(dot, text, note);
+      el._dot = dot; el._text = text; el._note = note;
       this.labelRoot.appendChild(el);
       this.labels[index] = el;
     }
     return el;
+  }
+
+  /** 地标与站位的标签候选（2026-10-20）；推进 candidates。 */
+  _ExtraLabelCandidates(candidates, cx, cz) {
+    if (this.layers.landmarks && this.landmarks.length) {
+      const D = BLOCKOUT_LANDMARK_DRAW;
+      for (const lm of this.landmarks) {
+        const distance = Math.hypot(lm.x - cx, lm.z - cz);
+        if (distance > D.labelFarM) continue;
+        const g = LandmarkGeometry(lm, this.groundAt(lm.x, lm.z));
+        // 走近了（10 m 内）有线框的标签挂在线框顶上，不然 3.4 m 高的柱顶在第一人称里早出了画面
+        const labelY = distance < D.nearLabelM && g.box ? g.box.y1 + D.labelLiftM : g.labelY;
+        const p = this._Project(lm.x, labelY, lm.z);
+        if (!p.onScreen) continue;
+        candidates.push({ p, distance, color: g.color, text: lm.name, note: lm.note || "", shape: "square", priority: 1, layer: "landmarks" });
+      }
+    }
+    if (this.layers.stations && this.stations.length) {
+      const S = BLOCKOUT_STATION_DRAW;
+      this.stations.forEach((s, i) => {
+        const distance = Math.hypot(s.x - cx, s.z - cz);
+        if (distance > S.labelFarM || distance < S.skipNearM) return;
+        const current = i === this.stationIndex;
+        const p = this._Project(s.x, this.groundAt(s.x, s.z) + S.labelLiftM, s.z);
+        if (!p.onScreen) return;
+        candidates.push({ p, distance, color: current ? S.currentColor : S.color, text: StationLabel(s), shape: "dot", priority: current ? 1 : 0, layer: "stations", dim: !current });
+      });
+    }
   }
 
   _UpdateLabels() {
@@ -528,7 +688,10 @@ export class BlockoutMarkers {
     camera.getWorldPosition(this._camera);
     const cx = this._camera.x, cz = this._camera.z;
     const candidates = [];
-    if (this.layers.labels !== false) {
+    const labelMode = LabelMode(this.layers.labels);
+    if (labelMode !== "off") {
+      // 三档（2026-10-20）：named = 有名字的才有字（无名机枪写「机枪」），all = 无名的按身份兜底、同类带 id 尾号
+      const texts = UnitLabelTexts(this.units, labelMode);
       for (const unit of this.units) {
         if (unit.visible === false) continue;
         const distance = Math.hypot(unit.x - cx, unit.z - cz);
@@ -537,14 +700,14 @@ export class BlockoutMarkers {
         const y = this.groundAt(unit.x, unit.z) + (HEAD_Y[unit.kind] || 2) + (unit.stance === "prone" ? -1.2 : unit.stance === "crouch" ? -0.5 : 0);
         const p = this._Project(unit.x, y, unit.z);
         if (!p.onScreen) continue;
-        candidates.push({ p, distance, color: BLOCKOUT_MARKER_COLORS[unit.side] || "#fff", text: unit.name || (IsMachineGun(unit) ? "机枪" : ""),
-          shape: unit.side === "ija" ? "tri" : "dot", guess: !!unit.guess, priority: named ? 1 : 0 });
+        candidates.push({ p, distance, color: BLOCKOUT_MARKER_COLORS[unit.side] || "#fff", text: texts.get(unit.id) || "",
+          shape: unit.side === "ija" ? "tri" : "dot", guess: !!unit.guess, priority: named ? 1 : 0, layer: "units" });
       }
       for (const poi of this.pois) {
         const distance = Math.hypot(poi.x - cx, poi.z - cz);
         const p = this._Project(poi.x, this.groundAt(poi.x, poi.z) + 8.4, poi.z);
         if (!p.onScreen || !poi.name) continue;
-        candidates.push({ p, distance, color: BLOCKOUT_MARKER_COLORS[poi.kind] || BLOCKOUT_MARKER_COLORS.poi, text: poi.name, shape: "diamond", priority: 1 });
+        candidates.push({ p, distance, color: BLOCKOUT_MARKER_COLORS[poi.kind] || BLOCKOUT_MARKER_COLORS.poi, text: poi.name, shape: "diamond", priority: 1, layer: "pois" });
       }
     }
     let nextLabel = null;
@@ -556,12 +719,15 @@ export class BlockoutMarkers {
       if (p.onScreen) candidates.push({ p, distance: -1, color: BLOCKOUT_MARKER_COLORS.next, text, shape: "diamond", priority: 2, next: true });
       else nextLabel = { p, text };
     }
+    // 地标与站位的标签（2026-10-20）；开关关着时不进候选
+    this._ExtraLabelCandidates(candidates, cx, cz);
     // 近的先排；同距离时有名字的、下一步优先
     candidates.sort((a, b) => (b.priority === 2) - (a.priority === 2) || a.distance - b.distance);
     const placed = [];
     let used = 0;
+    const counts = { units: 0, landmarks: 0, stations: 0 };
     for (const c of candidates) {
-      const width = 22 + (c.text ? c.text.length * 12 : 0), height = 18;
+      const width = 22 + (c.text ? c.text.length * 12 : 0) + (c.note ? c.note.length * 10 + 4 : 0), height = 18;
       let x = c.p.sx - width / 2, y = c.p.sy - height;
       let ok = false;
       for (let attempt = 0; attempt < 3 && !ok; attempt++) {
@@ -586,9 +752,20 @@ export class BlockoutMarkers {
       el._text.textContent = c.text;
       el._text.style.display = c.text ? "" : "none";
       el.style.padding = c.text ? "1px 6px 1px 4px" : "3px";
+      // 地标 / 站位（2026-10-20）：方点、小字 note、淡的站位、层名给取证用
+      if (c.shape === "square") { el._dot.style.borderRadius = "0"; el._dot.style.transform = "none"; el._dot.style.width = "8px"; el._dot.style.height = "8px"; }
+      el._note.textContent = c.note || "";
+      el._note.style.display = c.note ? "" : "none";
+      el.style.opacity = c.dim ? "0.72" : "";
+      el._text.style.color = c.layer === "landmarks" ? c.color : c.layer === "stations" ? c.color : "";
+      el.dataset.layer = c.layer || "units";
+      counts[c.layer || "units"] = (counts[c.layer || "units"] || 0) + 1;
     }
     for (let i = used; i < this.labels.length; i++) if (this.labels[i].style.display !== "none") this.labels[i].style.display = "none";
     this.stats.labels = used;
+    this.stats.unitLabels = counts.units;
+    this.stats.landmarkLabels = counts.landmarks;
+    this.stats.stationLabels = counts.stations;
     this._UpdateEdge(nextLabel);
   }
 

@@ -9,7 +9,7 @@
 // 随信号体块与七个信号齐全（10-20 第四版：缸挪开 BackVatMoved 与门开 BackDoorOpen 分开；缸挪到 (99.7,504)；窖壁收直、窖沿矮块在坑心外 1.2 m）。
 
 import assert from "node:assert/strict";
-import { ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
+import { ValidateBlockoutScene, LandmarkIssues, BLOCKOUT_LANDMARK_KINDS } from "./Script_EditorBlockoutConfig.mjs";
 import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
 import {
   BuildFirstLevel0610Scene, CompareWith0105, LaneDepthAt, RiverSectionAt, DitchSectionAt, L0610SightChecks, BlockSight, BlockCenterY, SolidBlocks,
@@ -233,6 +233,58 @@ assert.deepEqual(solids.filter((blk) => Intersects(blk, passage)).map((x) => x.i
 // 村口（蹲着 1.2）→ 北窗里的机枪手（1.0）这条线上不能有摆件
 assert.equal(BlockSight(solids, sample, { x: 100, z: 385, eye: 1.2 }, { x: G.mgPost.x, z: G.mgPost.z, eye: 1.0 }), null, "村口到北窗的视线被摆件挡了");
 
-console.log(`ok：${a.blocks.length} 块 + ${a.gates.length} 随信号块，${a.terrain.cols}×${a.terrain.rows} 网格；与 0105 接缝最大差 ${cmp ? cmp.worst : "—"} m；`
+// --- 地标（§2.2 landmarks，2026-10-20）：齐、都在场地里、过校验、狗洞 / 墙缝 / 侧门的框和共用墙上的口子对得上 ---
+{
+  const lms = a.landmarks;
+  assert.ok(Array.isArray(lms) && lms.length >= 40, `地标要有 40 个以上，现在 ${lms?.length}`);
+  const errors = [];
+  LandmarkIssues(lms, errors);
+  assert.deepEqual(errors, [], "地标过校验");
+  const byName = new Map(lms.map((lm) => [lm.name, lm]));
+  const NEED = ["干沟（集结处）", P.cartStop.name, "凹路口", DT.name, P.ditchEast.name, "街口坡道射击位", "巷子口", ST.alleyNorth.name, ST.main.name, P.cart.name,
+    "北窗（机枪）", P.frontDoor.name, P.carriageGate.name, P.gatePassage.name, P.roomYardDoor.name, P.kitchenDoor.name, P.sideRoomDoor.name, P.mill.name, "柴垛", P.cellar.name,
+    P.backDoor.name, "水缸（堵后门）", P.neighborDoor.name, P.dogHole.name, P.crack.name, P.sideGate.name, P.roller.name, EY.farmyard.name, EY.strawStack.name, EY.shrine.name,
+    "院门①（场院西隔墙）", "院门②（北侧第一个院西墙）", "院门③（北角北墙）", P.southClimb.name, P.eastEnd.name, "河汊子", P.villageSouth.name];
+  for (const name of NEED) assert.ok(byName.has(name), `缺地标「${name}」`);
+  const B = a.bounds;
+  for (const lm of lms) {
+    assert.ok(lm.x >= B.minX && lm.x <= B.maxX && lm.z >= B.minZ && lm.z <= B.maxZ, `地标「${lm.name}」出了场地 (${lm.x},${lm.z})`);
+    assert.ok(BLOCKOUT_LANDMARK_KINDS.includes(lm.kind), `地标「${lm.name}」kind ${lm.kind}`);
+  }
+  for (const kind of ["hole", "door", "window", "pit", "area", "prop", "place"]) assert.ok(lms.some((lm) => lm.kind === kind), `七种 kind 都要用到：缺 ${kind}`);
+  // 狗洞：框的中心就是共用墙上那个口子的中心、宽 = 口子宽、高 = 过梁下沿；在墙上（x = 共用墙）
+  const dogLm = byName.get(P.dogHole.name);
+  Near(dogLm.x, G.sharedWall.x, 0.01, "狗洞地标在共用墙上");
+  Near(dogLm.z, (hole.from + hole.to) / 2, 0.05, "狗洞地标对准口子中心");
+  Near(dogLm.d, hole.w, 0.05, "狗洞地标的宽 = 口子宽");
+  assert.ok(dogLm.w >= V.wallT, "狗洞地标至少盖住墙厚");
+  Near(dogLm.h, BlockCenterY(lintel, sample) - lintel.h / 2 - sample(G.sharedWall.x, G.dogHole.z), 0.05, "狗洞地标的高 = 过梁下沿");
+  const crackLm = byName.get(P.crack.name);
+  Near(crackLm.z, (crack.from + crack.to) / 2, 0.05, "墙缝地标对准缝中心");
+  Near(crackLm.d, crack.w, 0.05, "墙缝地标的宽 = 缝宽");
+  const gateLm = byName.get(P.sideGate.name);
+  Near(gateLm.z, (gate.from + gate.to) / 2, 0.05, "侧门地标对准门洞中心");
+  // 窖：线框从坑底立到院子地面（显式 y = 坑底 + 深 / 2）
+  const cellarLm = byName.get(P.cellar.name);
+  Near(cellarLm.y - cellarLm.h / 2, CELLAR_FLOOR_Y, 0.08, "窖地标的底 = 坑底");
+  Near(cellarLm.y + cellarLm.h / 2, V.y, 0.1, "窖地标的顶 = 院子地面");
+  // 北窗：框从窗台到窗洞顶
+  const win = byName.get("北窗（机枪）");
+  Near(win.y - win.h / 2, sample(win.x, win.z) + G.window.sillH, 0.05, "北窗地标的底 = 窗台");
+  Near(win.y + win.h / 2, sample(win.x, win.z) + G.window.topH, 0.05, "北窗地标的顶 = 窗洞顶");
+  // 翻倒的大车 / 石碾 / 麦秸垛的框和体块同心同尺寸
+  for (const [name, id] of [[P.cart.name, "OverturnedCart_S1"], [EY.strawStack.name, "StrawStack_F1"]]) {
+    const lm = byName.get(name), blk = byId.get(id);
+    Near(lm.x, blk.x, 0.01, `${name} 地标同心`); Near(lm.z, blk.z, 0.01, `${name} 地标同心`);
+    Near(lm.w, blk.w, 0.01, `${name} 地标同宽`); Near(lm.d, blk.d, 0.01, `${name} 地标同深`);
+  }
+  // 三道砸开的院门：和场景里那三扇门板同一个口子
+  for (const [name, id] of [["院门①（场院西隔墙）", "FarmyardGateLeaf"], ["院门②（北侧第一个院西墙）", "Yard1GateLeaf"], ["院门③（北角北墙）", "PocketGateLeaf"]]) {
+    const lm = byName.get(name), leaf = byId.get(id);
+    assert.ok(Math.hypot(lm.x - leaf.x, lm.z - leaf.z) <= 0.3, `${name} 地标离门板 ${Math.hypot(lm.x - leaf.x, lm.z - leaf.z).toFixed(2)} m`);
+  }
+}
+
+console.log(`ok：${a.blocks.length} 块 + ${a.gates.length} 随信号块 + ${a.landmarks.length} 地标，${a.terrain.cols}×${a.terrain.rows} 网格；与 0105 接缝最大差 ${cmp ? cmp.worst : "—"} m；`
   + `凹路 z260 深 ${LaneDepthAt(sample, 260).depth} m、z370 深 ${LaneDepthAt(sample, 370).depth} m；路沟 x80 底 ${DitchSectionAt(sample, 80).floor} 宽 ${DitchSectionAt(sample, 80).floorW} m；`
   + `河汊子 z400 底 ${RiverSectionAt(sample, 400).floor} 宽 ${RiverSectionAt(sample, 400).floorW} m；狗洞 ${hole.w.toFixed(2)} m`);

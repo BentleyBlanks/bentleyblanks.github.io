@@ -4,7 +4,7 @@
 // 只有 DOM，不碰 three，也不认识游戏：所有动作经 handlers 回调交给总控。
 //   左上  关键帧卡片：阶段号 + 阶段标题 + 站位名；此时；下一步（随视角转的小箭头 + 距离）；
 //         靠什么让玩家知道（小标签）；备注一行；推测位置计数；「记下当前机位」按钮
-//   右上  关卡下拉 + 4 个图层开关（射界三档 / 去向 / 标签 / 穿墙显示）+ 配置状态点（悬停看原因）
+//   右上  关卡下拉 + 6 个图层开关（射界三档 / 去向 / 标签三档 / 穿墙显示 / 地标 / 站位，后两个 2026-10-20 加）+ 配置状态点（悬停看原因）
 //   左下  小地图画布（地图模块往里画）+ 「M 展开」
 //   底部  导航栏：按阶段分段、每个关键帧一个刻度、金色滑块、悬停提示、点击 / 拖动松手跳转、
 //         左右箭头、计数、过渡中的「快进 ×n」、极小的按键提示
@@ -48,6 +48,10 @@ const ICONS = Object.freeze({
   guess: SVG('<circle cx="8" cy="8" r="5.2" stroke-dasharray="2.2 2"/>'),
   play: SVG('<path d="M5.2 3.6v8.8L12.4 8z" fill="currentColor" fill-opacity=".85"/>'),
   stop: SVG('<rect x="4.4" y="4.4" width="7.2" height="7.2" fill="currentColor" fill-opacity=".85"/>'),
+  // 地标：杆上一面小旗（2026-10-20）
+  landmarks: SVG('<path d="M4.2 13.5V2.6"/><path d="M4.2 3.2h7.6l-2.1 2.7 2.1 2.7H4.2z" fill="currentColor" fill-opacity=".25"/>'),
+  // 站位：一条虚线路，尽头一个朝前的小三角（2026-10-20）
+  stations: SVG('<path d="M2.6 12.8c3.2-.6 4.6-3.4 6.6-5.2" stroke-dasharray="2 1.7"/><path d="M9.6 2.9 13.6 6.6 8.3 7.4z" fill="currentColor" fill-opacity=".85"/>'),
 });
 
 const LAYER_DEFS = Object.freeze([
@@ -55,12 +59,26 @@ const LAYER_DEFS = Object.freeze([
   { name: "intents", icon: "intents", label: "去向" },
   { name: "labels", icon: "labels", label: "标签" },
   { name: "xray", icon: "xray", label: "穿墙显示" },
+  // 2026-10-20：地标（场景文件 landmarks）与站位（所有关键帧的玩家站位）
+  { name: "landmarks", icon: "landmarks", label: "地标" },
+  { name: "stations", icon: "stations", label: "站位" },
 ]);
 const ARC_CYCLE = Object.freeze({ default: "all", all: "off", off: "default" });
 const ARC_TIPS = Object.freeze({
   default: "射界：数据给的与机枪、战车（再点：全部）",
   all: "射界：全部，含举枪的步枪（再点：关）",
   off: "射界：关（再点：打开）",
+});
+// 「标签」三档（2026-10-20）：有名字的 → 全部（无名的人按身份写「国军」「日军」「担架」…）→ 关
+const LABEL_CYCLE = Object.freeze({ named: "all", all: "off", off: "named" });
+const LABEL_TIPS = Object.freeze({
+  named: "标签：有名字的人（再点：所有人）",
+  all: "标签：所有人，无名的按身份写（再点：关）",
+  off: "标签：关（再点：有名字的）",
+});
+const LAYER_TIPS = Object.freeze({
+  landmarks: { on: "地标：狗洞、门、窖、片区这些特殊地方（再点：关）", off: "地标：关（再点：打开）" },
+  stations: { on: "站位：这一关所有关键帧的玩家站位与路线（再点：关）", off: "站位：关（再点：打开）" },
 });
 const STATUS_TEXT = Object.freeze({ ok: "配置已载入", synced: "配置在外部改过，已同步", error: "配置有错", loading: "正在读配置" });
 
@@ -100,7 +118,7 @@ export class BlockoutUi {
     this.keyframes = [];
     this.index = -1;
     this.segments = [];
-    this.layers = { arcs: "default", intents: true, labels: true, xray: true };
+    this.layers = { arcs: "default", intents: true, labels: "named", xray: true, landmarks: true, stations: true };
     this.status = { state: "loading", message: "", writable: false, saveReason: "" };
     this.interactive = true;
     this.mapOpen = false;
@@ -408,7 +426,7 @@ export class BlockoutUi {
     title.append(this.elMapLevel);
     const legend = El("div", "boLegend");
     const Item = (cls, text) => { const it = El("span", "boLegendItem"); it.append(El("i", `boGlyph ${cls}`), El("span", "", text)); return it; };
-    legend.append(Item("enemy", "敌"), Item("friend", "友"), Item("civ", "百姓"), Item("poi", "要点"), Item("next", "下一步"), Item("player", "你"), Item("kf", "关键帧"));
+    legend.append(Item("enemy", "敌"), Item("friend", "友"), Item("civ", "百姓"), Item("poi", "要点"), Item("next", "下一步"), Item("player", "你"), Item("kf", "关键帧"), Item("landmark", "地标"));
     const hint = El("div", "boMapHint", "滚轮缩放 · 拖动平移 · 双击看全图 · 点关键帧跳转");
     this.btnCloseMap = Button("boIconBtn boClose", { icon: "close", tip: "关闭（M / Esc）" });
     this.btnCloseMap.dataset.tipSide = "left";
@@ -698,23 +716,34 @@ export class BlockoutUi {
     };
   }
 
-  /** arcs: true | false | "default" | "all" | "off"；其余布尔 */
+  /** arcs: true | false | "default" | "all" | "off"；labels: true | false | "named" | "all" | "off"（2026-10-20 三档）；其余布尔 */
   SetLayers(layers = {}) {
     if ("arcs" in layers) {
       const a = layers.arcs;
       this.layers.arcs = a === true ? "default" : a === false ? "off" : ARC_CYCLE[a] ? a : this.layers.arcs;
     }
-    for (const k of ["intents", "labels", "xray"]) if (k in layers) this.layers[k] = !!layers[k];
+    if ("labels" in layers) {
+      const l = layers.labels;
+      this.layers.labels = l === true ? "named" : l === false ? "off" : LABEL_CYCLE[l] ? l : this.layers.labels;
+    }
+    for (const k of ["intents", "xray", "landmarks", "stations"]) if (k in layers) this.layers[k] = !!layers[k];
     for (const def of LAYER_DEFS) {
       const b = this.layerBtns[def.name];
       const v = this.layers[def.name];
-      const on = def.name === "arcs" ? v !== "off" : !!v;
+      const on = def.name === "arcs" || def.name === "labels" ? v !== "off" : !!v;
       b.classList.toggle("on", on);
       b.setAttribute("aria-pressed", on ? "true" : "false");
       if (def.name === "arcs") {
         b.classList.toggle("all", v === "all");
         b.dataset.tip = ARC_TIPS[v];
         b.setAttribute("aria-label", ARC_TIPS[v]);
+      } else if (def.name === "labels") {
+        b.classList.toggle("all", v === "all");
+        b.dataset.tip = LABEL_TIPS[v];
+        b.setAttribute("aria-label", LABEL_TIPS[v]);
+      } else if (LAYER_TIPS[def.name]) {
+        b.dataset.tip = LAYER_TIPS[def.name][on ? "on" : "off"];
+        b.setAttribute("aria-label", b.dataset.tip);
       } else {
         b.dataset.tip = `${def.label}：${on ? "开" : "关"}`;
       }
@@ -724,6 +753,7 @@ export class BlockoutUi {
   ToggleLayer(name) {
     let value;
     if (name === "arcs") value = ARC_CYCLE[this.layers.arcs] || "default";
+    else if (name === "labels") value = LABEL_CYCLE[this.layers.labels] || "named";
     else value = !this.layers[name];
     this.SetLayers({ [name]: value });
     this.Call("onLayer", name, value);

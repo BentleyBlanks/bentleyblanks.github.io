@@ -3,9 +3,9 @@
   "level": "FirstLevel0610",
   "source": {
     "generator": "Script_EditorBlockoutCli.mjs scene FirstLevel0610",
-    "generatedAt": "2026-10-19T18:26:40.944Z",
-    "commit": "c9d677d7eec4fe967201e51e48483ed61012cfec",
-    "notes": "06–10 新剧本白盒（2026-10-19 第二版）：锚点 Data_EditorBlockoutFirstLevel0610Space；高度 0.5 m 网格（-2.7…3.72 m）；z<205 逐点等于 FirstLevel0105 的地面（交通沟坡道 / 干沟 / 凹路头一段），往南：凹路南段（路底按弧长缓降缓升，直接接进村口路沟）、村口路沟（东西向、沟底 −0.9、街口南壁放缓成坡道）、河汊子（沟底 −2.7 的南北向干沟 + 一线浅水）、耿家庄（整村压平 +0.3、街面压低 12 cm、地瓜窖平底开挖）；体块：院墙带门洞 / 窗洞 / 狗洞 / 墙缝、实心房子、老耿家三间空心屋 + 平顶（没人上房）、石磨、窖沿与盖板、翻倒的大车（横在主街偏东）、场院的麦秸垛、东街的土地庙、日常摆件、0105 的南岸枯树；巷子北头的夹道开在路沟南沿上、主街那头封死；gates：CartDeparted / SideGateOpen / CellarBlast / MgSilenced / NorthYardGatesBroken / BackVatMoved / BackDoorOpen（10-20 第四版：缸挪开与门开拆成两个信号，窖壁收直到 0.15）。"
+    "generatedAt": "2026-10-20T14:53:06.701Z",
+    "commit": "179069a46e085016522e7eb37490a5356d3e8d85",
+    "notes": "06–10 新剧本白盒（2026-10-19 第二版）：锚点 Data_EditorBlockoutFirstLevel0610Space；高度 0.5 m 网格（-2.7…3.72 m）；z<205 逐点等于 FirstLevel0105 的地面（交通沟坡道 / 干沟 / 凹路头一段），往南：凹路南段（路底按弧长缓降缓升，直接接进村口路沟）、村口路沟（东西向、沟底 −0.9、街口南壁放缓成坡道）、河汊子（沟底 −2.7 的南北向干沟 + 一线浅水）、耿家庄（整村压平 +0.3、街面压低 12 cm、地瓜窖平底开挖）；体块：院墙带门洞 / 窗洞 / 狗洞 / 墙缝、实心房子、老耿家三间空心屋 + 平顶（没人上房）、石磨、窖沿与盖板、翻倒的大车（横在主街偏东）、场院的麦秸垛、东街的土地庙、日常摆件、0105 的南岸枯树；巷子北头的夹道开在路沟南沿上、主街那头封死；gates：CartDeparted / SideGateOpen / CellarBlast / MgSilenced / NorthYardGatesBroken / BackVatMoved / BackDoorOpen（10-20 第四版：缸挪开与门开拆成两个信号，窖壁收直到 0.15）；landmarks（10-20）：47 个地标（干沟、路沟、街巷、老耿家的门窗 / 窖 / 磨 / 缸、狗洞 / 墙缝 / 侧门、石碾 / 场院 / 麦秸垛 / 土地庙 / 三道院门、河汊子、村南口），编辑器画亮色标记。"
   },
   "bounds": {
     "minX": -20,
@@ -2594,6 +2594,465 @@
       "y": 0.18,
       "prop": "AmmoBox",
       "signal": "CartDeparted"
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "LmGully",
+      "name": "干沟（集结处）",
+      "kind": "area",
+      "x": 56,
+      "z": 152,
+      "radiusM": 9,
+      "note": "06 回到这里"
+    },
+    {
+      "id": "LmCartStop",
+      "name": "老耿的驴车（南岸树底下）",
+      "kind": "place",
+      "x": 54.5,
+      "z": 155,
+      "radiusM": 2.2
+    },
+    {
+      "id": "LmNierRim",
+      "name": "妮儿捡弹壳的沟沿",
+      "kind": "place",
+      "x": 58.5,
+      "z": 160.6
+    },
+    {
+      "id": "LmLaneHead",
+      "name": "凹路口",
+      "kind": "place",
+      "x": 60.5,
+      "z": 157.3,
+      "radiusM": 2.5
+    },
+    {
+      "id": "LmLaneEnd",
+      "name": "凹路尽头（接进路沟）",
+      "kind": "place",
+      "x": 100,
+      "z": 376
+    },
+    {
+      "id": "LmDitch",
+      "name": "村口路沟",
+      "kind": "area",
+      "x": 90.5,
+      "z": 380,
+      "w": 69,
+      "d": 5.6,
+      "note": "沟底 −0.9"
+    },
+    {
+      "id": "LmDitchEast",
+      "name": "路沟东半截（后送队）",
+      "kind": "place",
+      "x": 114,
+      "z": 380,
+      "radiusM": 6
+    },
+    {
+      "id": "LmMouthShooters",
+      "name": "街口坡道射击位",
+      "kind": "place",
+      "x": 100,
+      "z": 384.35,
+      "w": 6.599999999999989,
+      "d": 1.2,
+      "h": 0.5,
+      "note": "08 四人趴这里压北窗"
+    },
+    {
+      "id": "LmVillageMouth",
+      "name": "村北口（街口坡道顶）",
+      "kind": "place",
+      "x": 100,
+      "z": 385
+    },
+    {
+      "id": "LmAlleyMouth",
+      "name": "巷子口",
+      "kind": "place",
+      "x": 80,
+      "z": 384,
+      "radiusM": 1.5
+    },
+    {
+      "id": "LmAlleyPassage",
+      "name": "巷子（北头的夹道）",
+      "kind": "area",
+      "x": 80,
+      "z": 390.5,
+      "w": 2,
+      "d": 15
+    },
+    {
+      "id": "LmAlleyWest",
+      "name": "巷子（东西那截）",
+      "kind": "area",
+      "x": 69.88,
+      "z": 398,
+      "w": 22.25,
+      "d": 2
+    },
+    {
+      "id": "LmAlleySouth",
+      "name": "巷子（南北那截）",
+      "kind": "area",
+      "x": 58.75,
+      "z": 444.5,
+      "w": 2,
+      "d": 95
+    },
+    {
+      "id": "LmMainStreet",
+      "name": "主街",
+      "kind": "area",
+      "x": 100,
+      "z": 427.5,
+      "w": 6,
+      "d": 85
+    },
+    {
+      "id": "LmSquare",
+      "name": "老耿家门前的小空地",
+      "kind": "area",
+      "x": 100,
+      "z": 465,
+      "w": 36,
+      "d": 10
+    },
+    {
+      "id": "LmPocket",
+      "name": "小空地北角",
+      "kind": "area",
+      "x": 107.63,
+      "z": 456,
+      "w": 8.75,
+      "d": 8,
+      "note": "10-4 鬼子从这院门钻出来"
+    },
+    {
+      "id": "LmEastStreet",
+      "name": "东街（窄巷）",
+      "kind": "area",
+      "x": 175,
+      "z": 465,
+      "w": 114,
+      "d": 3.5
+    },
+    {
+      "id": "LmBackLane",
+      "name": "后门外的小路",
+      "kind": "area",
+      "x": 98,
+      "z": 525.5,
+      "w": 2.5,
+      "d": 39
+    },
+    {
+      "id": "LmCart",
+      "name": "翻倒的大车",
+      "kind": "prop",
+      "x": 100.8,
+      "z": 446,
+      "w": 2.6,
+      "d": 1.6,
+      "h": 1.15,
+      "note": "08-3 班长四人躲北侧"
+    },
+    {
+      "id": "LmNorthWindow",
+      "name": "北窗（机枪）",
+      "kind": "window",
+      "x": 97,
+      "z": 470,
+      "w": 1.4,
+      "d": 0.5,
+      "h": 1.1,
+      "y": 1.69
+    },
+    {
+      "id": "LmFrontDoor",
+      "name": "前门",
+      "kind": "door",
+      "x": 104,
+      "z": 470,
+      "w": 1.2,
+      "d": 0.5,
+      "h": 2
+    },
+    {
+      "id": "LmCarriageGate",
+      "name": "大门（车道）",
+      "kind": "door",
+      "x": 108.2,
+      "z": 470,
+      "w": 2.6,
+      "d": 0.5,
+      "h": 2.6
+    },
+    {
+      "id": "LmGatePassage",
+      "name": "大门过道",
+      "kind": "area",
+      "x": 108.08,
+      "z": 475,
+      "w": 3.3499999999999943,
+      "d": 10,
+      "note": "08 甩手榴弹的鬼子在这里"
+    },
+    {
+      "id": "LmRoomYardDoor",
+      "name": "前屋南门",
+      "kind": "door",
+      "x": 94,
+      "z": 478,
+      "w": 1.2,
+      "d": 0.5,
+      "h": 2,
+      "note": "09-6 从这门看副射手的后背"
+    },
+    {
+      "id": "LmKitchenDoor",
+      "name": "灶屋门",
+      "kind": "door",
+      "x": 90,
+      "z": 483.5,
+      "w": 0.5,
+      "d": 1.2,
+      "h": 2
+    },
+    {
+      "id": "LmSideRoomDoor",
+      "name": "偏屋门",
+      "kind": "door",
+      "x": 110,
+      "z": 486,
+      "w": 0.5,
+      "d": 1.2,
+      "h": 2
+    },
+    {
+      "id": "LmMill",
+      "name": "石磨",
+      "kind": "prop",
+      "x": 100,
+      "z": 487,
+      "w": 1.5,
+      "d": 1.5,
+      "h": 0.75
+    },
+    {
+      "id": "LmHaystack",
+      "name": "柴垛",
+      "kind": "prop",
+      "x": 85.5,
+      "z": 503.4,
+      "w": 2.4,
+      "d": 1.8,
+      "h": 1.6,
+      "note": "09-2 妮儿缩在它南边"
+    },
+    {
+      "id": "LmCellar",
+      "name": "地瓜窖",
+      "kind": "pit",
+      "x": 90.5,
+      "z": 499.5,
+      "w": 1.6,
+      "d": 1.6,
+      "h": 2,
+      "y": -0.7,
+      "note": "深 2 m，一家人藏在里头"
+    },
+    {
+      "id": "LmBackDoor",
+      "name": "后门",
+      "kind": "door",
+      "x": 98,
+      "z": 506,
+      "w": 1.2,
+      "d": 0.5,
+      "h": 2
+    },
+    {
+      "id": "LmBackVat",
+      "name": "水缸（堵后门）",
+      "kind": "prop",
+      "x": 98,
+      "z": 504,
+      "w": 0.8,
+      "d": 0.8,
+      "h": 0.9,
+      "note": "10-6 老耿推到门东边"
+    },
+    {
+      "id": "LmNeighborDoor",
+      "name": "邻院西墙的小门（敞着）",
+      "kind": "door",
+      "x": 60,
+      "z": 490,
+      "w": 0.5,
+      "d": 1,
+      "h": 2
+    },
+    {
+      "id": "LmDogHole",
+      "name": "狗洞",
+      "kind": "hole",
+      "x": 81.5,
+      "z": 488,
+      "w": 0.7,
+      "d": 0.45,
+      "h": 0.4,
+      "note": "0.45 m 宽、0.4 m 高，大人钻不过"
+    },
+    {
+      "id": "LmCrack",
+      "name": "墙缝",
+      "kind": "hole",
+      "x": 81.5,
+      "z": 496.5,
+      "w": 0.7,
+      "d": 0.2,
+      "h": 2.2,
+      "note": "09-3 从这缝看窖口"
+    },
+    {
+      "id": "LmSideGate",
+      "name": "侧门",
+      "kind": "door",
+      "x": 81.5,
+      "z": 500,
+      "w": 0.5,
+      "d": 1,
+      "h": 2,
+      "note": "09-5 妮儿从里头拔门闩"
+    },
+    {
+      "id": "LmRoller",
+      "name": "石碾",
+      "kind": "prop",
+      "x": 113.2,
+      "z": 465.7,
+      "w": 2,
+      "d": 2,
+      "h": 1.02,
+      "note": "10-2 趴它后头顺东街打"
+    },
+    {
+      "id": "LmFarmyard",
+      "name": "场院（打谷场）",
+      "kind": "area",
+      "x": 166,
+      "z": 451.63,
+      "w": 32,
+      "d": 23.25
+    },
+    {
+      "id": "LmStrawStack",
+      "name": "麦秸垛",
+      "kind": "prop",
+      "x": 164,
+      "z": 452,
+      "w": 4.2,
+      "d": 4,
+      "h": 3,
+      "note": "10-3 掷弹筒组躲北侧"
+    },
+    {
+      "id": "LmShrine",
+      "name": "土地庙",
+      "kind": "prop",
+      "x": 192,
+      "z": 466.4,
+      "w": 1.6,
+      "d": 1.2,
+      "h": 1.8,
+      "note": "10-2 鬼子缩在它东边"
+    },
+    {
+      "id": "LmNorthGate1",
+      "name": "院门①（场院西隔墙）",
+      "kind": "door",
+      "x": 150,
+      "z": 450,
+      "w": 0.5,
+      "d": 1.5,
+      "h": 2,
+      "note": "10-4 砸开"
+    },
+    {
+      "id": "LmNorthGate2",
+      "name": "院门②（北侧第一个院西墙）",
+      "kind": "door",
+      "x": 118.25,
+      "z": 455,
+      "w": 0.5,
+      "d": 1.5,
+      "h": 2,
+      "note": "10-4 砸开"
+    },
+    {
+      "id": "LmNorthGate3",
+      "name": "院门③（北角北墙）",
+      "kind": "door",
+      "x": 108,
+      "z": 452,
+      "w": 1.5,
+      "d": 0.5,
+      "h": 2,
+      "note": "10-4 砸开，就在石碾背后"
+    },
+    {
+      "id": "LmSouthClimb",
+      "name": "南边翻墙处",
+      "kind": "place",
+      "x": 126,
+      "z": 490,
+      "w": 3,
+      "d": 0.5,
+      "h": 2.2,
+      "note": "10-5 南边两个鬼子翻这段墙"
+    },
+    {
+      "id": "LmMortarHide",
+      "name": "掷弹筒藏处",
+      "kind": "place",
+      "x": 164.2,
+      "z": 455.4,
+      "radiusM": 1.8
+    },
+    {
+      "id": "LmEastEnd",
+      "name": "东街东头",
+      "kind": "place",
+      "x": 232,
+      "z": 465,
+      "radiusM": 2
+    },
+    {
+      "id": "LmRiver",
+      "name": "河汊子",
+      "kind": "area",
+      "x": 19,
+      "z": 380,
+      "w": 11,
+      "d": 360,
+      "note": "车下不去"
+    },
+    {
+      "id": "LmVillageSouth",
+      "name": "村南口",
+      "kind": "place",
+      "x": 98,
+      "z": 545,
+      "radiusM": 2.5,
+      "note": "11 驴车从这里出村"
     }
   ],
   "ways": {

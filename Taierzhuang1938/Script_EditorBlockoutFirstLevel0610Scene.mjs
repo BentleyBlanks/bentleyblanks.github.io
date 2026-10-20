@@ -21,7 +21,7 @@
 // ===========================================================================
 
 import fs from "node:fs";
-import { BLOCKOUT_SCENE_SCHEMA } from "./Script_EditorBlockoutConfig.mjs";
+import { BLOCKOUT_SCENE_SCHEMA, LandmarkIssues } from "./Script_EditorBlockoutConfig.mjs";
 import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
 import { L0105Ground, NaturalHeight as NaturalHeight0105, SightBlock } from "./Script_EditorBlockoutFirstLevel0105Scene.mjs";
 import {
@@ -543,6 +543,88 @@ export function L0610Blocks(sample) {
 }
 
 // ---------------------------------------------------------------------------
+// 地标（§2.2 landmarks，2026-10-20）：白盒灰里看不清的特殊地方，编辑器画亮色线框 + 光柱 + 标签。
+// 坐标一律取锚点表的常量（不抄数字）；有尺寸的给 w / d / h（洞 / 门 / 窗 / 窖 / 物件），片区给宽深或半径，地名只给点。
+
+/** 全部地标。sample 给窖这种要显式 y 的。 */
+export function L0610Landmarks(sample) {
+  const PL = L0610_PLACES, FR = G.frontRoom, K = G.kitchen, SR = G.sideRoom, C = G.compound, E = L0610_EAST_YARDS, NB = L0610_NEIGHBOR;
+  const NC = E.northChain, CG = G.carriageGate, PK = L0610_PROP_KINDS;
+  const T = V.wallT;
+  const L = (id, name, kind, x, z, extra = {}) => ({ id, name, kind, x: R2(x), z: R2(z), ...extra });
+  const Size = (w, d, h) => ({ w: R2(w), d: R2(d), h: R2(h) });
+  const DoorX = (x, z, w) => Size(w, T, V.doorTopH);              // 开在东西向墙上的门（门洞沿 x）
+  const DoorZ = (x, z, w) => Size(T, w, V.doorTopH);              // 开在南北向墙上的门（门洞沿 z）
+  const Area = (box) => ({ x: R2((box.minX + box.maxX) / 2), z: R2((box.minZ + box.maxZ) / 2), w: R2(box.maxX - box.minX), d: R2(box.maxZ - box.minZ) });
+  const Run = (r) => (r.axis === "z"
+    ? { x: r.c, z: (r.from + r.to) / 2, w: r.half * 2, d: r.to - r.from }
+    : { x: (r.from + r.to) / 2, z: r.c, w: r.to - r.from, d: r.half * 2 });
+  const sq = Area(ST.square.box), pk = Area(ST.pocket.box), fy = Area({ minX: E.farmyard.minX, maxX: E.farmyard.maxX, minZ: E.north.box.minZ, maxZ: ST.east.z - ST.east.halfW });
+  const main = Run(STREET_RUNS[0]), east = Run(STREET_RUNS[1]), passage = Run(STREET_RUNS[2]), alleyW = Run(STREET_RUNS[3]), alleyS = Run(STREET_RUNS[4]), backLane = Run(STREET_RUNS[5]);
+  const shooters = L0610_MOUTH_SHOOTERS;
+  const shX = (shooters[0].x + shooters[shooters.length - 1].x) / 2, shZ = shooters.reduce((s, p) => s + p.z, 0) / shooters.length;
+  const dog = G.dogHole, crack = G.crack, gate = G.sideGate, SW = G.sharedWall;
+  const cart = PK.OverturnedCart, hay = G.haystack, straw = E.strawStack, shrine = E.shrine, vat = PK.WaterVat, M = G.mill, RL = PL.roller;
+  const cellarY = R2(sample(G.cellar.x, G.cellar.z) + G.cellar.depth / 2);   // 窖：线框从坑底立到院子地面
+  return [
+    // 06：干沟与凹路
+    L("LmGully", "干沟（集结处）", "area", PL.assembly.x, PL.assembly.z, { radiusM: 9, note: "06 回到这里" }),
+    L("LmCartStop", PL.cartStop.name, "place", PL.cartStop.x, PL.cartStop.z, { radiusM: 2.2 }),
+    L("LmNierRim", PL.nierRim.name, "place", PL.nierRim.x, PL.nierRim.z),
+    L("LmLaneHead", "凹路口", "place", PL.laneHead.x, PL.laneHead.z, { radiusM: 2.5 }),
+    L("LmLaneEnd", PL.laneEnd.name, "place", PL.laneEnd.x, PL.laneEnd.z),
+    // 村口：路沟、东半截、街口坡道射击位、村北口、巷子口
+    L("LmDitch", DT.name, "area", (DT.fromX + DT.toX) / 2, DT.z, { w: DT.toX - DT.fromX, d: DT.floorW + 2 * DT.wallM, note: "沟底 −0.9" }),
+    L("LmDitchEast", PL.ditchEast.name, "place", PL.ditchEast.x, PL.ditchEast.z, { radiusM: 6 }),
+    L("LmMouthShooters", "街口坡道射击位", "place", shX, shZ, { w: shooters[shooters.length - 1].x - shooters[0].x + 1.4, d: 1.2, h: 0.5, note: "08 四人趴这里压北窗" }),
+    L("LmVillageMouth", PL.villageMouth.name, "place", PL.villageMouth.x, PL.villageMouth.z),
+    L("LmAlleyMouth", PL.alleyMouth.name, "place", PL.alleyMouth.x, PL.alleyMouth.z, { radiusM: 1.5 }),
+    // 街与巷
+    L("LmAlleyPassage", ST.alleyNorth.name, "area", passage.x, passage.z, { w: passage.w, d: passage.d }),
+    L("LmAlleyWest", ST.alleyWest.name, "area", alleyW.x, alleyW.z, { w: alleyW.w, d: alleyW.d }),
+    L("LmAlleySouth", ST.alleySouth.name, "area", alleyS.x, alleyS.z, { w: alleyS.w, d: alleyS.d }),
+    L("LmMainStreet", ST.main.name, "area", main.x, main.z, { w: main.w, d: main.d }),
+    L("LmSquare", ST.square.name, "area", sq.x, sq.z, { w: sq.w, d: sq.d }),
+    L("LmPocket", "小空地北角", "area", pk.x, pk.z, { w: pk.w, d: pk.d, note: "10-4 鬼子从这院门钻出来" }),
+    L("LmEastStreet", ST.east.name, "area", east.x, east.z, { w: east.w, d: east.d }),
+    L("LmBackLane", ST.backLane.name, "area", backLane.x, backLane.z, { w: backLane.w, d: backLane.d }),
+    L("LmCart", PL.cart.name, "prop", PL.cart.x, PL.cart.z, { ...Size(cart.w, cart.d, cart.h), note: "08-3 班长四人躲北侧" }),
+    // 老耿家：北窗、前门、大门与过道、前屋南门、灶屋门、偏屋门、石磨、柴垛、地瓜窖、后门、水缸
+    L("LmNorthWindow", "北窗（机枪）", "window", G.window.x, FR.box.minZ, { ...Size(G.window.w, T, G.window.topH - G.window.sillH), y: R2(sample(G.window.x, FR.box.minZ) + (G.window.sillH + G.window.topH) / 2) }),
+    L("LmFrontDoor", PL.frontDoor.name, "door", G.frontDoor.x, FR.box.minZ, DoorX(G.frontDoor.x, FR.box.minZ, G.frontDoor.w)),
+    L("LmCarriageGate", PL.carriageGate.name, "door", (CG.minX + CG.maxX) / 2, C.minZ, Size(CG.maxX - CG.minX, T, CG.topH)),
+    L("LmGatePassage", PL.gatePassage.name, "area", (FR.box.maxX + G.passageEastX) / 2, (C.minZ + SR.box.minZ) / 2, { w: G.passageEastX - FR.box.maxX, d: SR.box.minZ - C.minZ, note: "08 甩手榴弹的鬼子在这里" }),
+    L("LmRoomYardDoor", PL.roomYardDoor.name, "door", G.roomYardDoor.x, FR.box.maxZ, { ...DoorX(G.roomYardDoor.x, FR.box.maxZ, G.roomYardDoor.w), note: "09-6 从这门看副射手的后背" }),
+    L("LmKitchenDoor", PL.kitchenDoor.name, "door", K.box.maxX, K.door.z, DoorZ(K.box.maxX, K.door.z, K.door.w)),
+    L("LmSideRoomDoor", PL.sideRoomDoor.name, "door", SR.box.minX, SR.door.z, DoorZ(SR.box.minX, SR.door.z, SR.door.w)),
+    L("LmMill", PL.mill.name, "prop", M.x, M.z, Size(M.baseW, M.baseW, M.baseH + M.stoneH)),
+    L("LmHaystack", "柴垛", "prop", hay.x, hay.z, { ...Size(hay.w, hay.d, hay.h), note: "09-2 妮儿缩在它南边" }),
+    L("LmCellar", PL.cellar.name, "pit", G.cellar.x, G.cellar.z, { ...Size(G.cellar.floorW, G.cellar.floorW, G.cellar.depth), y: cellarY, note: "深 2 m，一家人藏在里头" }),
+    L("LmBackDoor", PL.backDoor.name, "door", G.backDoor.x, C.maxZ, DoorX(G.backDoor.x, C.maxZ, G.backDoor.w)),
+    L("LmBackVat", "水缸（堵后门）", "prop", G.backVat.x, G.backVat.z, { ...Size(vat.w, vat.d, vat.h), note: "10-6 老耿推到门东边" }),
+    // 邻院与共用墙上的三个口子
+    L("LmNeighborDoor", PL.neighborDoor.name, "door", NB.box.minX, NB.westDoor.z, DoorZ(NB.box.minX, NB.westDoor.z, NB.westDoor.w)),
+    L("LmDogHole", PL.dogHole.name, "hole", SW.x, dog.z, { ...Size(T + 0.2, dog.w, dog.h), note: `${dog.w} m 宽、${dog.h} m 高，大人钻不过` }),
+    L("LmCrack", PL.crack.name, "hole", SW.x, crack.z, { ...Size(T + 0.2, crack.w, V.wallH), note: "09-3 从这缝看窖口" }),
+    L("LmSideGate", PL.sideGate.name, "door", SW.x, gate.z, { ...Size(T, gate.w, 2.0), note: "09-5 妮儿从里头拔门闩" }),
+    // 东街：石碾、场院、麦秸垛、土地庙、北边三道院门、南边翻墙处、东头、外面的麦地
+    L("LmRoller", PL.roller.name, "prop", RL.x, RL.z, { ...Size(RL.baseW, RL.baseW, RL.baseH + RL.h), note: "10-2 趴它后头顺东街打" }),
+    L("LmFarmyard", E.farmyard.name, "area", fy.x, fy.z, { w: fy.w, d: fy.d }),
+    L("LmStrawStack", straw.name, "prop", straw.x, straw.z, { ...Size(straw.w, straw.d, straw.h), note: "10-3 掷弹筒组躲北侧" }),
+    L("LmShrine", shrine.name, "prop", shrine.x, shrine.z, { ...Size(shrine.w, shrine.d, shrine.h), note: "10-2 鬼子缩在它东边" }),
+    L("LmNorthGate1", "院门①（场院西隔墙）", "door", NC.farmyardDoor.x, NC.farmyardDoor.z, { ...DoorZ(NC.farmyardDoor.x, NC.farmyardDoor.z, NC.farmyardDoor.w), note: "10-4 砸开" }),
+    L("LmNorthGate2", "院门②（北侧第一个院西墙）", "door", NC.yard1Door.x, NC.yard1Door.z, { ...DoorZ(NC.yard1Door.x, NC.yard1Door.z, NC.yard1Door.w), note: "10-4 砸开" }),
+    L("LmNorthGate3", "院门③（北角北墙）", "door", NC.pocketGate.x, NC.pocketGate.z, { ...DoorX(NC.pocketGate.x, NC.pocketGate.z, NC.pocketGate.w), note: "10-4 砸开，就在石碾背后" }),
+    L("LmSouthClimb", PL.southClimb.name, "place", E.southClimb.x, E.southClimb.z, { ...Size(3, T, V.wallH), note: "10-5 南边两个鬼子翻这段墙" }),
+    L("LmMortarHide", "掷弹筒藏处", "place", E.mortarHide.x, E.mortarHide.z, { radiusM: 1.8 }),
+    L("LmEastEnd", PL.eastEnd.name, "place", PL.eastEnd.x, PL.eastEnd.z, { radiusM: 2 }),
+    // 村西的河汊子、村南口
+    L("LmRiver", RV.name, "area", RV.centerX, (RV.fromZ + L0610_BOUNDS.maxZ) / 2, { w: RV.floorW + 2 * RV.wallM, d: L0610_BOUNDS.maxZ - RV.fromZ, note: "车下不去" }),
+    L("LmVillageSouth", PL.villageSouth.name, "place", PL.villageSouth.x, PL.villageSouth.z, { radiusM: 2.5, note: "11 驴车从这里出村" }),
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // 核对
 
 /** 当前信号下在场的实心块（gates 按 signal / appearSignal 取舍）。 */
@@ -707,6 +789,12 @@ export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", 
   const { terrain, minM, maxM } = BakeL0610Grid(Ground);
   const sample = HeightGridSampler(terrain);
   const { blocks, gates } = L0610Blocks(sample);
+  const landmarks = L0610Landmarks(sample);
+  {
+    const errors = [];
+    LandmarkIssues(landmarks, errors);
+    if (errors.length) throw new Error(`地标表有错：${errors.join("；")}`);
+  }
 
   const scene = {
     schema: BLOCKOUT_SCENE_SCHEMA,
@@ -719,13 +807,15 @@ export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", 
         + "z<205 逐点等于 FirstLevel0105 的地面（交通沟坡道 / 干沟 / 凹路头一段），往南：凹路南段（路底按弧长缓降缓升，直接接进村口路沟）、村口路沟（东西向、沟底 −0.9、街口南壁放缓成坡道）、"
         + "河汊子（沟底 −2.7 的南北向干沟 + 一线浅水）、耿家庄（整村压平 +0.3、街面压低 12 cm、地瓜窖平底开挖）；体块：院墙带门洞 / 窗洞 / 狗洞 / 墙缝、实心房子、老耿家三间空心屋 + 平顶（没人上房）、"
         + "石磨、窖沿与盖板、翻倒的大车（横在主街偏东）、场院的麦秸垛、东街的土地庙、日常摆件、0105 的南岸枯树；巷子北头的夹道开在路沟南沿上、主街那头封死；"
-        + "gates：CartDeparted / SideGateOpen / CellarBlast / MgSilenced / NorthYardGatesBroken / BackVatMoved / BackDoorOpen（10-20 第四版：缸挪开与门开拆成两个信号，窖壁收直到 0.15）。",
+        + "gates：CartDeparted / SideGateOpen / CellarBlast / MgSilenced / NorthYardGatesBroken / BackVatMoved / BackDoorOpen（10-20 第四版：缸挪开与门开拆成两个信号，窖壁收直到 0.15）；"
+        + `landmarks（10-20）：${landmarks.length} 个地标（干沟、路沟、街巷、老耿家的门窗 / 窖 / 磨 / 缸、狗洞 / 墙缝 / 侧门、石碾 / 场院 / 麦秸垛 / 土地庙 / 三道院门、河汊子、村南口），编辑器画亮色标记。`,
     },
     bounds: { ...L0610_BOUNDS },
     spawn: { x: L0610_SPAWN.x, z: L0610_SPAWN.z, yawDeg: L0610_SPAWN.yawDeg },
     terrain,
     blocks,
     gates,
+    landmarks,
     ways: {
       roads: [
         Pts(LANE.line),

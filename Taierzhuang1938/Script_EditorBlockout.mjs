@@ -23,8 +23,11 @@ import {
   BLOCKOUT_LEVELS, BLOCKOUT_PHASES, BlockoutLevelIndex, BlockoutTintColor, BlockoutWaterBlocks, BlockoutMapScene,
 } from "./Script_EditorBlockoutLevels.mjs";
 import {
-  ValidateBlockout, NormalizeBlockout, KeyframeIndex, PlanTransition, DefaultArc, YawDegFromTo, BlockoutConfigPath,
+  ValidateBlockout, NormalizeBlockout, KeyframeIndex, PlanTransition, DefaultArc, YawDegFromTo, BlockoutConfigPath, NormalizeLandmarks,
 } from "./Script_EditorBlockoutConfig.mjs";
+import {
+  BLOCKOUT_LAYER_DEFAULTS, BLOCKOUT_LAYERS_STORAGE_KEY, NormalizeLayers, ParseStoredLayers, SerializeLayers,
+} from "./Script_EditorBlockoutMarkerRules.mjs";
 import { BuildBlockoutSnapshot, FormatBlockoutSnapshot, ParsePoseParam } from "./Script_EditorBlockoutSnapshot.mjs";
 import { BlockoutPuppets } from "./Script_EditorBlockoutPuppets.mjs";
 import { BlockoutTrees } from "./Script_EditorBlockoutTrees.mjs";
@@ -141,7 +144,11 @@ export class EditorBlockout {
     this.levelIndex = this.game.state?.phaseIndex ?? 0;
     this.levelKey = BLOCKOUT_LEVELS[this.levelIndex]?.key || BLOCKOUT_LEVELS[BlockoutLevelIndex(null)].key;
     this.store = new BlockoutStore();
-    this.layers = { arcs: "default", intents: true, labels: true, xray: true };
+    // 图层开关（2026-10-20 起六个：射界 / 去向 / 标签三档 / 穿墙显示 / 地标 / 站位）；上次的选择记在 localStorage，读不到就缺省
+    this.layers = { ...BLOCKOUT_LAYER_DEFAULTS };
+    try { this.layers = ParseStoredLayers(globalThis.localStorage?.getItem(BLOCKOUT_LAYERS_STORAGE_KEY) ?? null); } catch (error) { /* 无痕窗口 / 不让读 */ }
+    this.landmarks = [];
+    this.landmarksLevel = "";
     this.doc = null;
     this.rawDoc = null;
     this.configText = null;
@@ -259,6 +266,9 @@ export class EditorBlockout {
       Probe: (id) => this.puppets.Probe(id),
       // 取证用（2026-10-18 第三轮）：站人的地面（高度场 + 一步能踩上的块顶，§5.6）
       StandAt: (x, z) => this.standAt(x, z),
+      // 取证用（2026-10-20）：这一关的地标（已归一化）与此刻挂在屏幕上的标签文字（按层）
+      Landmarks: () => this.landmarks.map(lm => ({ ...lm })),
+      Labels: () => this.markers.LabelInfo(),
     };
     // 预演（§14.2）：Has / Play / Stop / Seek / Resume / State；Reload 重读预演文件，CameraPose 取某一秒的机位。
     this.api.Previz = {
@@ -282,7 +292,8 @@ export class EditorBlockout {
 
   async Start() {
     this.ui.SetLevels(BLOCKOUT_LEVELS.map(({ key: k, label, era, badge, note, short }) => ({ key: k, label, era, badge, note, short })), this.levelKey);
-    this.ui.SetLayers(this.layers);
+    // 记住的开关选择要同时推给界面、标记层、俯视图（2026-10-20）
+    this.SetLayers({});
     this.ui.SetStatus({ state: "loading", message: "正在读配置", writable: false, saveReason: "" });
     this.started = true;
     await this.LoadConfig();
@@ -385,6 +396,44 @@ export class EditorBlockout {
     this.map.FitBounds();
     this.ui.SetKeyframes(this.KeyframeList(), Math.max(0, this.index));
     this.map.SetKeyframes(this.doc.keyframes.map(kf => ({ id: kf.id, stage: kf.stage, stageLabel: kf.stageLabel, player: { x: kf.player.x, z: kf.player.z } })), Math.max(0, this.index));
+    // 站位（2026-10-20）：所有关键帧的玩家站位画进 3D；地标另从场景文件读
+    this.markers.SetStations(this.StationList(), Math.max(0, this.index));
+    this.LoadLandmarks();
+  }
+
+  /** 这一关所有关键帧的玩家站位（标记层「站位」用）。 */
+  StationList() {
+    return (this.doc?.keyframes || []).map(kf => ({ id: kf.id, name: kf.name, x: kf.player.x, z: kf.player.z, yawDeg: kf.player.yawDeg }));
+  }
+
+  /**
+   * 地标（场景文件 landmarks，§2.2，2026-10-20）：Levels 的 Prepare 只把场景烘成布局，没留原文，这里再读一次场景文件只取 landmarks
+   *（第一关没有场景文件 = 没有地标）。读到以后交给标记层与俯视图；切关途中读回来的旧关的丢掉。
+   */
+  async LoadLandmarks() {
+    const levelKey = this.levelKey;
+    const url = this.level?.scene?.kind === "file" ? this.level.scene.url : null;
+    this.landmarks = [];
+    this.landmarksLevel = levelKey;
+    this.markers.SetLandmarks([]);
+    this.map.SetLandmarks([]);
+    if (!url) return [];
+    let list = [];
+    try {
+      const response = await globalThis.fetch(`${url}?t=${Date.now()}`, { cache: "no-store" });
+      if (response.ok) {
+        const doc = await response.json();
+        list = NormalizeLandmarks(doc?.landmarks);
+      }
+    } catch (error) {
+      console.warn("[Blockout] landmarks load failed", error);
+    }
+    if (this.levelKey !== levelKey || this.landmarksLevel !== levelKey) return [];
+    this.landmarks = list;
+    this.markers.SetLandmarks(list);
+    this.map.SetLandmarks(list);
+    this.mapTimer = 0;
+    return list;
   }
 
   /** 烘这一关的纸面静态层（空闲分块；同一关已经烘过直接回来）。 */
@@ -525,6 +574,8 @@ export class EditorBlockout {
       this.markers.SetUnits([]);
       this.markers.SetPois([]);
       this.markers.SetNext(null);
+      this.markers.SetLandmarks([]);
+      this.markers.SetStations([], -1);
       this.unitData = new Map();
       this.toUnitData = null;
       this.liveUnits = [];
@@ -613,6 +664,7 @@ export class EditorBlockout {
   SetupLevelLists() {
     this.ui.SetKeyframes(this.KeyframeList(), Math.max(0, this.index));
     this.map.SetKeyframes(this.doc.keyframes.map(kf => ({ id: kf.id, stage: kf.stage, stageLabel: kf.stageLabel, player: { x: kf.player.x, z: kf.player.z } })), Math.max(0, this.index));
+    this.markers.SetStations(this.StationList(), Math.max(0, this.index));
   }
 
   /**
@@ -688,6 +740,7 @@ export class EditorBlockout {
     this.markers.SetNext(kf.next && Number.isFinite(kf.next.x) ? kf.next : null);
     this.ui.SetKeyframes(this.KeyframeList(), index);
     this.map.SetKeyframes(this.doc.keyframes.map(k => ({ id: k.id, stage: k.stage, stageLabel: k.stageLabel, player: { x: k.player.x, z: k.player.z } })), index);
+    this.markers.SetStations(this.StationList(), index);
     // 地图开着时跳关键帧：图跟着挪到新站位（比例不变）
     if (this.mapOpen) this.FocusMapOnPlayer();
     this.cardKey = "";
@@ -942,15 +995,14 @@ export class EditorBlockout {
   // 图层 / 地图 / 输入
 
   SetLayers(partial = {}) {
-    for (const [name, value] of Object.entries(partial)) {
-      if (!(name in this.layers)) continue;
-      if (name === "arcs") this.layers.arcs = value === true ? "default" : value === false ? "off" : ["all", "default", "off"].includes(value) ? value : this.layers.arcs;
-      else this.layers[name] = !!value;
-    }
+    // 取值归一化（射界 / 标签三档、其余布尔；不认识的键丢掉）在 Script_EditorBlockoutMarkerRules.NormalizeLayers（2026-10-20）
+    this.layers = NormalizeLayers(partial, this.layers);
     this.markers.SetLayers(this.layers);
-    this.map.SetLayers({ arcs: this.layers.arcs, intents: this.layers.intents, labels: this.layers.labels });
+    this.map.SetLayers({ arcs: this.layers.arcs, intents: this.layers.intents, labels: this.layers.labels, landmarks: this.layers.landmarks, stations: this.layers.stations });
     this.ui.SetLayers(this.layers);
     this.mapTimer = 0;
+    // 记住这次的选择（读不到 / 不让写就算了）
+    try { globalThis.localStorage?.setItem(BLOCKOUT_LAYERS_STORAGE_KEY, SerializeLayers(this.layers)); } catch (error) { /* 无痕窗口 */ }
     return { ...this.layers };
   }
 
@@ -1241,6 +1293,7 @@ export class EditorBlockout {
       backdrop: { ...this.backdrop.Stats(), cameraFar: this.host.camera?.far ?? null },
       markers: { ...this.markers.stats },
       fans: this.markers.FanInfo(),
+      landmarks: this.landmarks.length,
       map: {
         baking: !!this.map.baking, baked: !!this.map.baked, waiting: !!this.bakeWait,
         startedAt: this.bake.startedAt, doneAt: this.bake.doneAt, levelKey: this.bake.levelKey,

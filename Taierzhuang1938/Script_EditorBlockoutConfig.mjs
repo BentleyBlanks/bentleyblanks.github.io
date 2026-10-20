@@ -19,6 +19,14 @@ export const BLOCKOUT_BACKDROP = Object.freeze({
   maxShapes: 8000, maxPaint: 2000, maxRects: 40000, maxPalette: 64,
   farMin: 100, farMax: 20000, radiusMax: 20000, blendMax: 2000,
 });
+/**
+ * 场景文件 landmarks（地标，§2.2，2026-10-20）：白盒灰里看不清的「特殊地方」——洞口 / 缝（hole）、门（door）、窗（window）、
+ * 坑 / 窖（pit）、片区（area，给半径或宽深）、物件（prop）、地名（place）。编辑器把它们画成亮色线框 + 光柱 + 头顶标签（§5.5）。
+ * 每项 { id, name, kind, x, z, y?, w?, d?, h?, ry?, radiusM?, note? }：y 是中心高度（米，不写就落地）；w / d / h 给了就画贴着它的线框；
+ * radiusM 画地环（片区）；note 是标签上的一行小字。
+ */
+export const BLOCKOUT_LANDMARK_KINDS = Object.freeze(["hole", "door", "window", "pit", "area", "prop", "place"]);
+export const BLOCKOUT_LANDMARK_LIMITS = Object.freeze({ maxItems: 400, nameMax: 24, noteMax: 60, sizeMax: 2000 });
 export const BLOCKOUT_LEVEL_KEYS = Object.freeze(["FirstLevel", "SecondLevel", "FirstLevel0105", "FirstLevel0610", "FirstLevel1218"]);
 export const BLOCKOUT_LEVEL_RE = /^[A-Za-z0-9]+$/;
 export const BLOCKOUT_CONFIG_FILE_RE = /^Taierzhuang1938\/Blockout\/[A-Za-z0-9]+\.json$/;
@@ -394,7 +402,59 @@ export function ValidateBlockoutScene(doc) {
   }
   // 可选 backdrop（§2.2，2026-10-20）：远景层，只看不走（不进碰撞、寻路、玩家能走的范围）
   if (doc.backdrop !== undefined) BackdropIssues(doc.backdrop, errors);
+  // 可选 landmarks（§2.2，2026-10-20）：地标（狗洞、门、窖、片区、物件、地名），编辑器画亮色标记
+  if (doc.landmarks !== undefined) LandmarkIssues(doc.landmarks, errors, "landmarks");
   return { ok: errors.length === 0, errors, warnings };
+}
+
+/**
+ * 地标清单（§2.2 landmarks）的毛病：不是数组、超过上限、id 重复、name / kind / x / z 不合法、尺寸不是正数、note 太长。
+ * 往 errors 里推中文信息（带路径）。单独导出给生成器与测试用。
+ */
+export function LandmarkIssues(list, errors, at = "landmarks") {
+  if (!Array.isArray(list)) { errors.push(`${at} 要是数组`); return; }
+  const L = BLOCKOUT_LANDMARK_LIMITS;
+  if (list.length > L.maxItems) errors.push(`${at} 最多 ${L.maxItems} 项，现在 ${list.length}`);
+  const ids = new Set();
+  list.forEach((lm, i) => {
+    const p = `${at}[${i}]`;
+    if (!IsObject(lm)) { errors.push(`${p} 要是对象`); return; }
+    if (typeof lm.id !== "string" || !lm.id) errors.push(`${p}.id 要是非空字符串`);
+    else if (ids.has(lm.id)) errors.push(`${p}.id 重复：${lm.id}`);
+    else ids.add(lm.id);
+    if (typeof lm.name !== "string" || !lm.name) errors.push(`${p}.name 要是非空字符串`);
+    else if (lm.name.length > L.nameMax) errors.push(`${p}.name 最多 ${L.nameMax} 字`);
+    if (!BLOCKOUT_LANDMARK_KINDS.includes(lm.kind)) errors.push(`${p}.kind 要是 ${BLOCKOUT_LANDMARK_KINDS.join(" / ")} 之一`);
+    for (const k of ["x", "z"]) if (!Finite(lm[k])) errors.push(`${p}.${k} 要是有限数字`);
+    for (const k of ["y", "ry"]) if (lm[k] !== undefined && !Finite(lm[k])) errors.push(`${p}.${k} 要是有限数字`);
+    for (const k of ["w", "d", "h", "radiusM"]) if (lm[k] !== undefined && !(Finite(lm[k]) && lm[k] > 0 && lm[k] <= L.sizeMax)) errors.push(`${p}.${k} 要是 (0, ${L.sizeMax}] 的数`);
+    if ((lm.w === undefined) !== (lm.d === undefined)) errors.push(`${p} 的 w / d 要一起给`);
+    if (lm.note !== undefined && (typeof lm.note !== "string" || lm.note.length > L.noteMax)) errors.push(`${p}.note 要是不超过 ${L.noteMax} 字的字符串`);
+  });
+}
+
+/**
+ * 地标归一化（深拷贝、补缺省）：坏项跳过。→ [{ id, name, kind, x, z, y: number|null, w, d, h, ry, radiusM: number|null, note }]
+ * 没给 w / d 的 w = d = 0（不画线框）；h 缺省 0；ry 缺省 0。
+ */
+export function NormalizeLandmarks(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const lm of list) {
+    if (!IsObject(lm) || typeof lm.id !== "string" || !lm.id || seen.has(lm.id) || typeof lm.name !== "string" || !lm.name) continue;
+    if (!BLOCKOUT_LANDMARK_KINDS.includes(lm.kind) || !Finite(lm.x) || !Finite(lm.z)) continue;
+    seen.add(lm.id);
+    const size = Finite(lm.w) && lm.w > 0 && Finite(lm.d) && lm.d > 0;
+    out.push({
+      id: lm.id, name: lm.name, kind: lm.kind, x: lm.x, z: lm.z,
+      y: Finite(lm.y) ? lm.y : null,
+      w: size ? lm.w : 0, d: size ? lm.d : 0, h: Finite(lm.h) && lm.h > 0 ? lm.h : 0, ry: Finite(lm.ry) ? lm.ry : 0,
+      radiusM: Finite(lm.radiusM) && lm.radiusM > 0 ? lm.radiusM : null,
+      note: typeof lm.note === "string" ? lm.note : "",
+    });
+  }
+  return out;
 }
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;

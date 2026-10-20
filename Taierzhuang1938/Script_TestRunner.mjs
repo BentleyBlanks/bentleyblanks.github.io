@@ -341,7 +341,8 @@ export const testDefs = {
   EditorBlockoutFirstLevel0105SceneTest: { file: "Script_EditorBlockoutFirstLevel0105SceneTest.mjs", desc: "01–05 新剧本白盒场地：生成两次逐字相同、锚点处沟 / 坑 / 洞深度、沟底宽 ≥3.4 m、坡顶挡住集结处看前沿的视线（纯 Node）" },
   EditorBlockoutFirstLevel0105KeyframesTest: { file: "Script_EditorBlockoutFirstLevel0105KeyframesTest.mjs", desc: "01–05 新剧本白盒关键帧：生成可复现、校验通过、人不进实心块 / 不重叠、走位沿沟不翻沟壁（纯 Node）" },
   EditorBlockoutFirstLevel0105PrevizTest: { file: "Script_EditorBlockoutFirstLevel0105PrevizTest.mjs", desc: "01–05 预演数据：过校验、片段在该骨架上存在、台词不互压、走位点在地面上与场地内、说话人在画面里（纯 Node）" },
-  EditorBlockoutFirstLevel0610SceneTest: { file: "Script_EditorBlockoutFirstLevel0610SceneTest.mjs", desc: "06–10 新剧本白盒场地：生成两次逐字相同、与 0105 北半截逐点接上、凹路 / 河汊子 / 窖的深度、狗洞大人钻不过、侧门 / 门缝 / 墙缝 / 北窗 / 石碾五条视线、东街净空（纯 Node）" },
+  EditorBlockoutFirstLevel0610SceneTest: { file: "Script_EditorBlockoutFirstLevel0610SceneTest.mjs", desc: "06–10 新剧本白盒场地：生成两次逐字相同、与 0105 北半截逐点接上、凹路 / 河汊子 / 窖的深度、狗洞大人钻不过、侧门 / 门缝 / 墙缝 / 北窗 / 石碾五条视线、东街净空、地标齐且狗洞 / 墙缝 / 窖 / 北窗的框对得上（纯 Node）" },
+  EditorBlockoutMarkerRulesTest: { file: "Script_EditorBlockoutMarkerRulesTest.mjs", desc: "白盒编辑器三层新标记（2026-10-20）：无名单位的兜底文字与尾号、地标校验 / 归一化 / 几何、站位标签、开关状态与 localStorage 读写、0610 场景文件的地标过校验（纯 Node，秒级）" },
   EditorBlockoutFirstLevel0610KeyframesTest: { file: "Script_EditorBlockoutFirstLevel0610KeyframesTest.mjs", desc: "06–10 新剧本白盒关键帧：生成可复现、校验通过、摆位 / 走位 0 问题、信号按拍起、所有人脚下在地面上、关键视线（纯 Node）" },
   EditorBlockoutFirstLevel0610PrevizTest: { file: "Script_EditorBlockoutFirstLevel0610PrevizTest.mjs", desc: "06–10 预演数据：过校验、片段在该骨架上存在（百姓 / 军官 10-19 起也能播通用片段）、台词不互压、走位 / 机位不进实心块、说话人在画面里、门缝 / 墙缝的眼睛真能看到演的东西、信号按拍开（纯 Node）" },
   EditorBlockoutFirstLevel1218SceneTest: { file: "Script_EditorBlockoutFirstLevel1218SceneTest.mjs", desc: "12–18 新剧本白盒场地：生成两次逐字相同、与 0610 村南逐点接上、河汊子拐弯在大路北边、排水沟比人深、两道河堤留口子、浮桥 14 段连续且引道接得上、接收院大门 / 厢房门槛、北门门洞、三个信号的随信号体块、五条视线（纯 Node）" },
@@ -641,6 +642,7 @@ export const tier0Fast = [
   "EditorBlockoutFirstLevel0610SceneTest",
   "EditorBlockoutFirstLevel0610KeyframesTest",
   "EditorBlockoutFirstLevel0610PrevizTest",
+  "EditorBlockoutMarkerRulesTest",
   "EditorBlockoutFirstLevel1218SceneTest",
   "EditorBlockoutFirstLevel1218KeyframesTest",
   "EditorBlockoutFirstLevel1218PrevizTest",
@@ -811,7 +813,7 @@ export const domains = {
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
   menu: { label: "主菜单/加载画面", tests: ["MenuStartupTest", "ToolsHomeTest", "AboutBrowserTest", "FirstLevelP012DebugTest", "MenuTest", "CommandRoomBrowserTest", "CommandRoomPublicationTest", "CommandRoomPreviewTest", "MenuPresentationTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootPaperPbrTest", "BootInteractionTest"] },
-  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["DevToolsIsolationTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutConfigTest", "EditorBlockoutSaveTest", "EditorBlockoutPrevizPlanTest", "EditorBlockoutFirstLevel0105SceneTest", "EditorBlockoutFirstLevel0105KeyframesTest", "EditorBlockoutFirstLevel0105PrevizTest", "EditorBlockoutFirstLevel0610SceneTest", "EditorBlockoutFirstLevel0610KeyframesTest", "EditorBlockoutFirstLevel0610PrevizTest", "EditorBlockoutFirstLevel1218SceneTest", "EditorBlockoutFirstLevel1218KeyframesTest", "EditorBlockoutFirstLevel1218PrevizTest", "PrevizVillageClipsTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
+  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["DevToolsIsolationTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutConfigTest", "EditorBlockoutSaveTest", "EditorBlockoutPrevizPlanTest", "EditorBlockoutFirstLevel0105SceneTest", "EditorBlockoutFirstLevel0105KeyframesTest", "EditorBlockoutFirstLevel0105PrevizTest", "EditorBlockoutFirstLevel0610SceneTest", "EditorBlockoutFirstLevel0610KeyframesTest", "EditorBlockoutFirstLevel0610PrevizTest", "EditorBlockoutMarkerRulesTest", "EditorBlockoutFirstLevel1218SceneTest", "EditorBlockoutFirstLevel1218KeyframesTest", "EditorBlockoutFirstLevel1218PrevizTest", "PrevizVillageClipsTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
