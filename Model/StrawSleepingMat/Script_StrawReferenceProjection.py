@@ -104,4 +104,4 @@ def Bake(state):
 
 records=[Bake('Flat'),Bake('Rolled')]
 (source/'Data_ReferenceProjection.json').write_text(json.dumps(records,indent=2),encoding='utf-8')
-scene['StrawMatBlendName']='Scene_StrawSleepingMatRefined.blend'
+scene['StrawMatBlendName']='Scene_StrawSleepingMatDetail.blend'
