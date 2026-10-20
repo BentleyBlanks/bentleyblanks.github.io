@@ -474,6 +474,7 @@ export class PlayerController {
     //    的话直接判死 —— 通行阶梯的硬顶是关卡设计的承诺，不许用别处的矮台阶绕开。
     let top = -Infinity;
     let wall = false;
+    let noClimb = false;
     const obstacles = new Set();
     const near = this.world.NearbyColliders
       ? this.world.NearbyColliders(probeX, probeZ, r + 1.2)
@@ -495,12 +496,14 @@ export class PlayerController {
         continue;
       }
       if (rel < TRAVERSAL.vaultMin) continue;
+      // 2026-10-21：标了「不能攀」的块（白盒的胸墙、板桥）挡在前面就整个不翻 —— 射击台上照样露头开枪，只是翻不过去
+      if (box.noClimb) { noClimb = true; continue; }
       // 记下"正在翻的是哪几只盒"。落点检查要把它们摘出去 —— 人正是从它们上面
       // 过来的，厚墙的盒子伸进落点那一格是应当的，不能反过来判自己落不下去。
       obstacles.add(box);
       if (box.max[1] > top) top = box.max[1];
     }
-    if (wall || !Number.isFinite(top)) return null;
+    if (wall || noClimb || !Number.isFinite(top)) return null;
     const plan = TraversalPlan(top - feet);
     if (!plan) return null;
     if (this.stamina < plan.stamina) return null;            // 喘不上气就扒不动墙头
@@ -517,7 +520,40 @@ export class PlayerController {
     const landY = TraversalLanding(landNear, this.position, { x: landX, z: landZ },
       this.world.GroundHeight(landX, landZ), top + 0.05, r, obstacles);
     if (landY === null) return null;                         // 墙那边还是墙：翻过去没地方站
+    // 3) 落点和人之间隔着只挡人的隐形墙（tag airWall）就不翻：翻越是照曲线挪过去的，不走角色控制器，墙拦不住它。
+    if (this._CrossesAirWall(landX, landZ)) return null;
     return { plan, top, landX, landY, landZ };
+  }
+
+  /**
+   * 2026-10-21：从脚下到 (toX, toZ) 这一段水平线穿不穿过隐形墙（碰撞 tag airWall，可带 ry 斜放）。
+   * 按墙自己的朝向算（斜墙的轴对齐包围盒会盖住半条沟，不能拿它判）。
+   */
+  _CrossesAirWall(toX, toZ) {
+    const x0 = this.position.x, z0 = this.position.z;
+    const mx = (x0 + toX) / 2, mz = (z0 + toZ) / 2;
+    const reach = Math.hypot(toX - x0, toZ - z0) / 2 + 1;
+    const list = this.world.NearbyColliders ? this.world.NearbyColliders(mx, mz, reach) : this.world.colliders;
+    for (const box of list) {
+      if (box.tag !== "airWall" || !box.c || !box.h) continue;
+      const c = Math.cos(box.ry || 0), s = Math.sin(box.ry || 0);
+      // 世界 → 墙本地：lx = dx·cos − dz·sin，lz = dx·sin + dz·cos（同 three 的 rotation.y）
+      const L = (x, z) => { const dx = x - box.c[0], dz = z - box.c[2]; return [dx * c - dz * s, dx * s + dz * c]; };
+      const [ax, az] = L(x0, z0), [bx, bz] = L(toX, toZ);
+      const hx = box.h[0] + 0.05, hz = box.h[2] + 0.05;
+      // Liang–Barsky：线段与 [−hx,hx]×[−hz,hz] 有没有交
+      let t0 = 0, t1 = 1;
+      const dx = bx - ax, dz = bz - az;
+      let hit = true;
+      for (const [p, q] of [[-dx, ax + hx], [dx, hx - ax], [-dz, az + hz], [dz, hz - az]]) {
+        if (Math.abs(p) < 1e-9) { if (q < 0) { hit = false; break; } continue; }
+        const r = q / p;
+        if (p < 0) { if (r > t1) { hit = false; break; } if (r > t0) t0 = r; }
+        else { if (r < t0) { hit = false; break; } if (r < t1) t1 = r; }
+      }
+      if (hit && t0 <= t1) return true;
+    }
+    return false;
   }
 
   /**

@@ -97,6 +97,7 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
 
 - 高度：`(cols+1)×(rows+1)` 个 int16 小端，单位厘米，`heights[iz*(cols+1)+ix]`。`LayoutFromSceneDoc` 给出 `terrain: "P012Heightfield"`、`terrainSampler: HeightGridSampler(terrain)`、`terrainSpec: null`、`gates: []`、`walkableSurfaces: []`、`legend: false`、`fortifications: false`、`materialLooks: false`。
 - 块的 `y` 在加载时算：脚落在中心与四角中最低的地面上，`y = 最低地面 + h/2`（同 Layout 的 `GroundedBlock`）。**2026-10-18**：块可以显式写 `y`（块中心高度，米），给架在坑上的洞顶、悬着的横木用；写了就不落地。
+- **2026-10-21 可选 `tag` 与 `noClimb`**：`tag: "airWall"` = 只挡玩家的隐形墙（`Script_Physics` 只让角色控制器撞它；子弹、视线、手榴弹、布娃娃穿过去；通常配 `visual: false`、`semantic: "airWall"`，地图不画、站人地面与摆位核对不算它；`?airWalls=1` 画成半透明板）；`noClimb: true` = 不能攀：`Script_Player.ProbeVault` 见到它挡在前面就不翻越 / 攀爬（碰撞记录带着这个标，`FirstLevelWhiteboxField` 的静态块与 gate 都传）。翻越落点和人之间隔着 `airWall` 也不翻。校验：`tag` 是非空字符串、`noClimb` 是布尔。01–05 用法见 §13「2026-10-21 防止玩家跳出壕沟」。
 - **2026-10-18 可选 `gates`**：与 `blocks` 同字段，再带 `signal`（信号到了就消失）或 `appearSignal`（信号到了才出现），id 与 `blocks` 一起全关唯一。`LayoutFromSceneDoc` 把它们原样交给 `FirstLevelWhiteboxField` 的 gate（与第一关的门同一套 `SyncScenario` / `RestoreScenario`），并给布局 `hideOpenGates: true`：文件场景里「打开」的 gate 是塌掉 / 炸掉的东西，直接隐藏，不走第一关「白门升起 1.2 m」的老画法。关键帧的 `signals` 决定此刻哪些信号为真（§5.4）。
 - **2026-10-20 可选 `paint` / `heightTint` / `colorSemantics` / `semanticColors`**（坑北「田、路、村子看得见」那一轮加的，都只做加法，不写的关卡逐位不变）：
   ```json
@@ -587,6 +588,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 | `Script_EditorBlockoutSaveTest.mjs` | 纯 node | 起真 LocalPreview（`--root=<临时目录>`）：status 可写、save 写对文件、各种拒绝（坏 level、`..`、超大、坏文档、GET、错误 Content-Type、外来 Origin / Host、revision 不符）零字节落盘、无 `.tmp` 残留、仓库里的 `Blockout/` 前后逐字节相同；`/__notes/status`、`/__tuning/status` 仍正常 |
 | `Script_EditorBlockoutMapTest.mjs` | 浏览器（临时 harness 页） | 纸面底色、块脚印、旋转块、等高线、各阵营标记颜色按像素数计（不看 `.visible`）；小地图以玩家为中心；全关总图缩放 / 平移 / 关键帧拾取 |
 | `Script_EditorBlockoutBrowserTest.mjs` | 浏览器（游戏） | `?editor=blockout&level=FirstLevel&quality=whitebox&scale=small&audio=0` 启动；没有任务运行时、没有过场；关键帧数与配置一致；`GoTo` 后玩家位置误差 < 0.5 m；`Next` 过渡中单位位置连续变化（不瞬移）、结束后到位；切到 `SecondLevel` 后场景边界与地形变化、再切回；小地图与卡片像素非空；配置文件被外部改写后 3 s 内同步；全程无未捕获错误；截图存 `_shots/EditorBlockout/` |
+| `Script_EditorBlockoutFirstLevel0105KeepInBrowserTest.mjs`（2026-10-21） | 浏览器（游戏） | 01–05 玩家出不了沟：剧本通路逐 0.25 m 在「沟里」且离隐形墙 ≥ 0.4 m；19 处低处 × 8 个方向跳 + 翻三秒每帧都在沟里；射击台翻不过胸墙；顺交通沟 / 支沟走得到；手榴弹飞出沟；预演里翻出沟的 NPC 照常出沟；无错（§13 末） |
 | `Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs`（2026-10-19） | 浏览器（游戏） | `FirstLevel0610` 的 06-2 上注入一段预演（page.route）：百姓 / 小孩 / 国军军官 / 日军军官都能播预演动作库的片段且姿态真的变了（蹲下片段骨盆比站着低 ≥ 0.25 m、举手片段手比没片段时高 ≥ 0.25 m、趴下片段骨盆 < 0.3 m）、`body:"procedural"` 的百姓还是程序化身体；飞机模型载进来、Seek 到航线中段位置等于 `SamplePrevizAircraft`、在视锥里且正对 `look` 飞机锚、扫射段画出土点、过了末航点不可见；慢动作窗口里 `timeScale` = rate、墙上跑 0.9 s 预演只走 0.3 倍、人物动画时钟与走路同倍率；中断后克隆还回机队；**2026-10-20**：一辆 spawn 的驴车走起来，坐车尾的小孩（`VilSitEdge`，`ride.y` 0.467）与车板上的担架（`y` 1.075）两个时刻都跟着车（位置 = 车位姿 ∘ 本地偏移，误差 < 0.05 m）、小孩骨盆落在车板顶 ±0.1 m、不走路；url 音效 `babyCry`（`page.route` 喂生成的 WAV）装进声库并真放出一条 voice、`cellarSob` 404 只警告一次并进 `missingSfx`（这一趟因此**不带 `audio=0`**）；全程无未捕获错误；截图存 `_shots/EditorBlockoutPrevizRuntime/` |
 
 - 新模块登记 `index.html` import map（带 `?v=`）；`Style_EditorBlockout.css` 加 `<link>`；`Script_TestRunner` 登记上面四个测试与 `changedDomainRules`（`Blockout/` 目录归 editor 域）。
@@ -607,6 +609,7 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 
 ## 12. 变更记录
 
+- 2026-10-21（01–05 防止玩家跳出壕沟）：场景块可选 `tag`（`airWall` 只挡玩家）与 `noClimb`（§2.2）；`Script_Player.ProbeVault` 认 `noClimb`、不隔着隐形墙翻；01–05 胸墙与板桥标不能攀、沟沿一圈 892 段隐形墙（`L0105KeepInWalls`），新闸门 `Script_EditorBlockoutFirstLevel0105KeepInBrowserTest`（§13 末、§10）。
 - 2026-10-21（01–05 03-2 掷弹筒看得见）：顺子站上射击台看见坎后冒烟、嘭，跳下台后弹落坑东沿、台上东头的弟兄顺着台子掀翻落在台面上，再喊「丢弹筒！挪起走！」；`SHELL_032`、`PIT.pitNra1` 挪到机枪西边，见 §13 末「2026-10-21 03-2」。
 - 2026-10-21（01–05 树不沿路种）：坑北大路两边、田间小路边成排的树去掉，换成田里零星 18 棵 + 远景层零星 14 棵（`L0105_BACKDROP_LONE_TREES`），见 §13 末「2026-10-21」。
 - 2026-10-20（人名 / 站位 / 地标三层标记，都能开关）：§2.2 场景文件加可选 `landmarks`（七种 kind，`ValidateBlockoutScene` → `LandmarkIssues`，`NormalizeLandmarks`）；§5.5「标签」改三档（全部档无名的人按身份兜底、带 id 尾号）、新开关「地标」「站位」（右上同一排，缺省开，六个开关的选择记在 localStorage）；新模块 `Script_EditorBlockoutMarkerRules`（纯规则）+ `…MarkerRulesTest`；§4.1 俯视图画地标、小地图画站位；§15 0610 的场景文件填了 47 个地标（`L0610Landmarks`，坐标全取锚点表），SceneTest 钉地标齐、都在场地里、狗洞 / 墙缝 / 侧门 / 窖 / 北窗的框对得上；总控 `LoadLandmarks()` 进关后再读一次场景文件只取地标（`Script_EditorBlockoutLevels` 没动）。BrowserTest 加 0610 的地标 / 站位 / 三档 / 记忆用例。
@@ -759,6 +762,13 @@ StandAt(x, z)                // 站人的地面（2026-10-18 第三轮，取证�
 - 站位：`SHELL_032`（Keyframes 导出，预演与 03-2 的「弹落点（坑东沿）」POI 同一个点）—— PitNra2 站在射击台东头 (2.5, −9.15) 朝东偏北 −75°（护着丢掉的东段前沿沟），弹落在他正前方 1.9 m；03-2 关键帧里他改成站着端枪，03-3 起照旧躺在坑底东南角。`PIT.pitNra1` 挪到机枪西边 (−3.0, −9.05)（03-2 / 03-3 / 03-4 关键帧；离幺娃 0.89 m）。
 - 镜头不跨射击台边：预演机位高度 = 那一点的地面 + h，跨过台边会跳 0.7 m，所以「站上台」是在台子南边 0.15 m 的坑底上把眼抬到台上站着的高度（h = 0.7 + 1.62）。
 - 验收图（`_shots/EditorBlockout0105/Mortar032/`，不提交）：`before/` 改前第一人称；`after/` 同一组时刻的第一人称（FP_*）和旁观机位（Side_*，改 previz JSON 的 camera 注入，盘上文件不动）；拼图 `Mortar032_Sheet_20261021.jpg`。旁观机位从坑东沿顺着台子看：人平躺在台面上，没悬空。
+
+**2026-10-21 防止玩家跳出壕沟（用户：只做两层——沟壁胸墙不能攀 + 沟沿一圈只挡玩家的隐形墙；不做「出去就被打死」）**：
+- 实测原因（改前，`?editor=blockout&level=FirstLevel0105`，按住 W 连按 Space 三秒）：前沿沟、交通沟、坡顶段的人全走了出去——**多数不是翻越**，是顺着沟壁走上去：沟壁是高度场（解析地面），角色控制器只把脚提到地面高，没有坡度上限；坑沿射击台上朝北是翻越 + 攀爬过胸墙。
+- **① 不能攀（`noClimb`，§2.2）**：胸墙三截 + 塌下来那摊土、板桥的横木与门板（共 19 块，此刻在场上的 16 块）。`Script_Player.ProbeVault`：前面要翻的东西里有 `noClimb` 就整个不翻（射击台不标，照样站上去露头开枪）；另加一条——落点和人之间隔着隐形墙（`tag airWall`，按墙自己的朝向算线段相交）也不翻：翻越是照曲线挪过去的，不走角色控制器，墙拦不住它。
+- **② 沟沿隐形墙（`L0105KeepInWalls`，体块 `KeepIn_0001…`）**：「沟里」= 比没挖之前的地面（`UncutHeight`：`NaturalHeight` 去掉干沟、凹路两刀）低 ≥ 0.6 m、和机枪坑连得上的那一片格点（`KeepInMask`，z ≥ −30；坑北的干水沟不圈）——前沿沟两段、坑、爬沟、散兵坑、交通沟（板桥底下、坡顶段、坡道）、支沟与台阶、防炮洞、干沟（坑窝、支沟）、凹路（往南变浅到 0.6 m 处封口）。它的边（沟里格点与沟外格点之间那条格线）顺着「沟里在左手」串成一个环、按 0.3 m 容差拉直，每段一块斜墙：厚 0.2 m、两头各多伸出 0.1 m（拐角不漏缝），墙脚 = 沟里一侧 0.4 m 处最低地面 − 0.6、墙顶 = 两侧最高地面 + 3.0（站在 0.9 m 的摆件上也跳不过去）。892 段，`tag/semantic airWall`、`visual: false`。物理上只挡角色控制器（`Script_Physics` `IG_AIR_WALL`）：子弹、视线射线、手榴弹、碎块、布娃娃都穿过去；预演 / 关键帧里的人不是物理角色，站人的地面（`BlockStandSampler`）与关键帧摆位核对（`SolidsFor`）都不算它。墙线在 0.6 m 深那条线上，所以人能顺沟壁上到离沟沿约 0.6 m 处（同站在射击台上露头），再往外就挡住。
+- 通路不堵（静态核对）：前沿沟、交通沟（含坡道到干沟）、支沟到防炮洞口、爬沟到散兵坑、沟口—坑底—甲位、沟口—乙位、干沟中心线、干沟—支沟—凹路口、凹路头 40 m 逐 0.25 m 都在沟里、离墙 ≥ 0.4 m；每个关键帧顺子站的点都在沟里。
+- 验收（`Script_EditorBlockoutFirstLevel0105KeepInBrowserTest.mjs`，24 项）：19 处低处 / 空子（坡顶段与坡道上沿、两处塌方摆件旁、支沟台阶顶与支沟口、坑沿射击台甲位 / 东头 / 西头爬沟口、板桥两头、沟口和坑的东西接缝、散兵坑、前沿沟西头北折、干沟南北岸下、凹路、防炮洞口）× 8 个方向，按住 W（后半加 Shift）每 0.5 s 一下 Space 三秒，152 趟、起跳 742 次、翻越 9 次，每一帧都还在沟里；射击台朝北 `ProbeVault` 为空；从乙位顺交通沟过板桥底下、坡顶、坡道走到集结处，从防炮洞口顺支沟上台阶到交通沟，从坑底到前沿沟西段，都走得到（没卡住）；手榴弹从前沿沟里往北扔，飞到沟北 35 m；01-4 班长翻出沟（`PvClimbOutTrench`）以后照常在沟外爬；站人的地面在墙线上是地面不是墙顶；全程无错。截图 `_shots/EditorBlockout0105/KeepIn/`（`?airWalls=1` 把墙画成半透明板，不提交）。
 
 ## 14. 预演（previz，2026-10-18）
 

@@ -204,6 +204,8 @@ function GroundedBlock(block, groundAt) {
     solid: block.solid !== false,
     ...(block.cover ? { cover: { ...block.cover } } : {}),
     ...(block.visual === false ? { visual: false } : {}),
+    // 2026-10-21：不能攀（翻越 / 攀爬在它上面不触发，Script_Player.ProbeVault）
+    ...(block.noClimb === true ? { noClimb: true } : {}),
   };
 }
 

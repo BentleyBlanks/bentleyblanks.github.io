@@ -111,6 +111,8 @@ function ColliderRecord(spec) {
     h: [hx, hy, hz],
     ry,
     tag: spec.tag || "whiteboxWall",
+    // 2026-10-21：不能攀的块（白盒 01–05 的胸墙、板桥）：Script_Player.ProbeVault 见到它挡在正前方就不翻
+    ...(spec.noClimb === true ? { noClimb: true } : {}),
   };
 }
 
@@ -405,6 +407,8 @@ export class FirstLevelWhiteboxField {
       if (block.solid !== false) {
         targetSink.Solid(block.x, block.y, block.z, block.w * 0.5, block.h * 0.5,
           block.d * 0.5, block.tag, block.ry || 0, WhiteboxSurface(block, this.layout));
+        // 2026-10-21：不能攀（白盒 01–05 的胸墙、板桥）跟着碰撞记录走，Script_Player.ProbeVault 认它
+        if (block.noClimb === true) targetSink.colliders[targetSink.colliders.length - 1].noClimb = true;
       }
       if (block.cover) {
         for(const point of block.cover.points||[block])

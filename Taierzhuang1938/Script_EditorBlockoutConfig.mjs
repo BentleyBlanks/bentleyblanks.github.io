@@ -353,6 +353,9 @@ export function ValidateBlockoutScene(doc) {
     if ((Finite(block.w) && block.w <= 0) || (Finite(block.d) && block.d <= 0) || (Finite(block.h) && block.h <= 0)) errors.push(`${at} 的 w / d / h 要大于 0`);
     if (block.ry !== undefined && !Finite(block.ry)) errors.push(`${at}.ry 要是有限数字（弧度）`);
     if (typeof block.semantic !== "string" || !block.semantic) errors.push(`${at}.semantic 要是非空字符串`);
+    // 2026-10-21：可选 tag（"airWall" = 只挡玩家的隐形墙）、noClimb（不能攀）
+    if (block.tag !== undefined && (typeof block.tag !== "string" || !block.tag)) errors.push(`${at}.tag 要是非空字符串`);
+    if (block.noClimb !== undefined && typeof block.noClimb !== "boolean") errors.push(`${at}.noClimb 要是 true / false`);
     return true;
   };
   if (!Array.isArray(doc.blocks)) errors.push("blocks 要是数组");

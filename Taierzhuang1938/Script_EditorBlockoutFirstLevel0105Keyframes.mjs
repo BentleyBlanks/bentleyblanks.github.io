@@ -1299,7 +1299,8 @@ export const L0105_CHECK = Object.freeze({
 
 function SolidsFor(scene, signals) {
   const on = new Set(signals);
-  const out = scene.blocks.filter((b) => b.solid !== false && !b.blockoutWater);
+  // 隐形墙（tag airWall，2026-10-21 沟沿一圈只挡玩家）不挡人物的站位与走位
+  const out = scene.blocks.filter((b) => b.solid !== false && !b.blockoutWater && b.tag !== "airWall");
   for (const g of scene.gates || []) {
     const absent = (g.signal && on.has(g.signal)) || (g.appearSignal && !on.has(g.appearSignal));
     if (!absent && g.solid !== false) out.push(g);

@@ -29,7 +29,7 @@
 import { BLOCKOUT_SCENE_SCHEMA, LandmarkIssues } from "./Script_EditorBlockoutConfig.mjs";
 import { CompileTrenchNetwork } from "./Script_TrenchPlan.mjs";
 import { TRENCH_EARTH_PROFILE } from "./Data_TrenchAppearance.mjs";
-import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
+import { HeightGridSampler, DecodeHeightGrid } from "./Script_EditorBlockoutLevels.mjs";
 import {
   L0105_LEVEL_KEY, L0105_BOUNDS, L0105_CELL_M, L0105_HEIGHTS, L0105_TRENCH_SECTION, L0105_TRENCHES,
   L0105_ROAD, L0105_ROAD_WIDTH_M, L0105_PLACES, L0105_SIGNALS, L0105_SPAWN,
@@ -452,6 +452,178 @@ export function L0105Ground() {
     return h;
   };
   return { Ground, plan, pitFloorY, fireCFloorY, dugoutFloorY };
+}
+
+// ---------------------------------------------------------------------------
+// 5b. 圈住玩家（2026-10-21 用户：防止玩家跳出壕沟）：沟沿上方一圈只挡玩家的隐形墙
+//   「沟里」= 开挖比没挖之前的地面低 KEEP_IN.depthM 以上、而且和机枪坑连得上的那一片（壕沟、坑、爬沟、散兵坑、防炮洞、
+//   交通沟坡道、干沟、凹路）。在它的边上立墙：tag "airWall"（Script_Physics 只挡角色控制器；子弹、手榴弹、视线、布娃娃都穿过去），
+//   预演 / 关键帧里的人不是物理角色，不受影响。墙线在边上那条格线（离沟底一侧的格点 0.25 m），按 0.2 m 容差拉直成一段段斜墙。
+
+export const KEEP_IN = Object.freeze({
+  depthM: 0.6,        // 比没挖之前低这么多才算沟里（爬沟 1.0、坡顶段 1.5 都在里头）
+  fromZ: -30,         // 只在坑北这条线以南圈（壕沟网最北到散兵坑 −16.6；坑北的干水沟、弹坑不圈）
+  thickM: 0.2,        // 墙厚
+  simplifyM: 0.3,     // 拉直容差
+  belowM: 0.6,        // 墙脚：比沟里一侧最低的地面再低
+  aboveM: 3.0,        // 墙顶：比两侧最高的地面再高（站在摆件上也跳不过去）
+  seed: Object.freeze({ x: 0, z: -7 }),   // 机枪坑
+});
+
+/** 没挖干沟、凹路之前的地面（台地 / 坡顶 / 田）：圈「沟里」用。同 NaturalHeight 去掉干沟和凹路两刀。 */
+export function UncutHeight(x, z) {
+  let h = H.front;
+  h += H.fieldNorthDip * Smooth((FIELD_DIP_FROM_Z - z) / FIELD_DIP_RAMP_M);
+  h += SouthProfile(x, z);
+  h += Undulation(x, z);
+  h += GullySouthBerm(x, z);
+  if (z < PIT_NORTH_FROM_Z) h = PitNorthHeight(x, z, h);
+  return h;
+}
+
+/** 格点上的「沟里」掩码（Uint8：1 = 沟里、和机枪坑连得上；小的封闭洞填上）。terrain = 烘好的网格。 */
+export function KeepInMask(terrain, heights = DecodeHeightGrid(terrain)) {
+  const { minX, minZ, cellM, cols, rows } = terrain;
+  const W = cols + 1;
+  const iz0 = Math.max(0, Math.ceil((KEEP_IN.fromZ - minZ) / cellM));
+  const deep = new Uint8Array((cols + 1) * (rows + 1));
+  for (let iz = iz0; iz <= rows; iz++) {
+    const z = minZ + iz * cellM;
+    for (let ix = 0; ix <= cols; ix++) {
+      const x = minX + ix * cellM, i = iz * W + ix;
+      if (UncutHeight(x, z) + RoadDelta(x, z) - heights[i] >= KEEP_IN.depthM) deep[i] = 1;
+    }
+  }
+  // 和机枪坑连得上的那一片（四邻接）
+  const mask = new Uint8Array(deep.length);
+  const seed = Math.round((KEEP_IN.seed.z - minZ) / cellM) * W + Math.round((KEEP_IN.seed.x - minX) / cellM);
+  if (!deep[seed]) throw new Error("KeepInMask：机枪坑那一点不算沟里");
+  const stack = [seed];
+  mask[seed] = 1;
+  while (stack.length) {
+    const i = stack.pop(), ix = i % W, iz = (i - ix) / W;
+    for (const [jx, jz] of [[ix + 1, iz], [ix - 1, iz], [ix, iz + 1], [ix, iz - 1]]) {
+      if (jx < 0 || jx > cols || jz < iz0 || jz > rows) continue;
+      const j = jz * W + jx;
+      if (deep[j] && !mask[j]) { mask[j] = 1; stack.push(j); }
+    }
+  }
+  // 封闭在沟里的小块（从网格边上走不到的「沟外」）填成沟里，免得沟底中间立墙
+  const outside = new Uint8Array(deep.length);
+  const q = [];
+  for (let iz = iz0; iz <= rows; iz++) for (let ix = 0; ix <= cols; ix++) {
+    if (ix !== 0 && ix !== cols && iz !== iz0 && iz !== rows) continue;
+    const i = iz * W + ix;
+    if (!mask[i] && !outside[i]) { outside[i] = 1; q.push(i); }
+  }
+  while (q.length) {
+    const i = q.pop(), ix = i % W, iz = (i - ix) / W;
+    for (const [jx, jz] of [[ix + 1, iz], [ix - 1, iz], [ix, iz + 1], [ix, iz - 1]]) {
+      if (jx < 0 || jx > cols || jz < iz0 || jz > rows) continue;
+      const j = jz * W + jx;
+      if (!mask[j] && !outside[j]) { outside[j] = 1; q.push(j); }
+    }
+  }
+  let filled = 0;
+  for (let iz = iz0; iz <= rows; iz++) for (let ix = 0; ix <= cols; ix++) {
+    const i = iz * W + ix;
+    if (!mask[i] && !outside[i]) { mask[i] = 1; filled += 1; }
+  }
+  return { mask, iz0, filled, W };
+}
+
+/** 道格拉斯—普克（闭合环先在最远两点处拆开）。pts = [{x,z}]。 */
+function SimplifyLoop(pts, tol) {
+  const DP = (a) => {
+    if (a.length <= 2) return a;
+    const p = a[0], q = a[a.length - 1], dx = q.x - p.x, dz = q.z - p.z, L = Math.hypot(dx, dz) || 1e-9;
+    let worst = -1, at = 0;
+    for (let k = 1; k < a.length - 1; k++) {
+      const d = Math.abs((a[k].x - p.x) * dz - (a[k].z - p.z) * dx) / L;
+      if (d > worst) { worst = d; at = k; }
+    }
+    if (worst <= tol) return [p, q];
+    return [...DP(a.slice(0, at + 1)).slice(0, -1), ...DP(a.slice(at))];
+  };
+  let far = 0, best = -1;
+  for (let k = 1; k < pts.length; k++) { const d = Math.hypot(pts[k].x - pts[0].x, pts[k].z - pts[0].z); if (d > best) { best = d; far = k; } }
+  const a = DP(pts.slice(0, far + 1)), b = DP([...pts.slice(far), pts[0]]);
+  return [...a.slice(0, -1), ...b.slice(0, -1)];
+}
+
+/**
+ * 沟沿隐形墙（体块，tag "airWall"、visual false、semantic "airWall"）：掩码的边（沟里格点 | 沟外格点之间那条格线）
+ * 顺着「沟里在左手」串成环、拉直，每段一块斜墙（两头各多伸出半个墙厚，拐角不漏缝）。
+ * 墙脚 = 沟里一侧 0.4 m 处地面的最低 − belowM，墙顶 = 两侧最高 + aboveM。sample = 烘好的网格采样。
+ */
+export function L0105KeepInWalls(terrain, sample) {
+  const heights = DecodeHeightGrid(terrain);
+  const { mask, iz0, filled, W } = KeepInMask(terrain, heights);
+  const { minX, minZ, cellM, cols, rows } = terrain;
+  const In = (ix, iz) => ix >= 0 && ix <= cols && iz >= iz0 && iz <= rows && mask[iz * W + ix] === 1;
+  // 有向边（角点用两倍格坐标，免得出现半格小数）：沟里在左手
+  const out = new Map();   // 起点角 → [终点角]
+  const Add = (ax, az, bx, bz) => { const k = `${ax},${az}`; if (!out.has(k)) out.set(k, []); out.get(k).push(`${bx},${bz}`); };
+  for (let iz = iz0; iz <= rows; iz++) for (let ix = 0; ix <= cols; ix++) {
+    if (!In(ix, iz)) continue;
+    const X = 2 * ix, Z = 2 * iz;
+    if (!In(ix + 1, iz)) Add(X + 1, Z - 1, X + 1, Z + 1);
+    if (!In(ix - 1, iz)) Add(X - 1, Z + 1, X - 1, Z - 1);
+    if (!In(ix, iz + 1)) Add(X + 1, Z + 1, X - 1, Z + 1);
+    if (!In(ix, iz - 1)) Add(X - 1, Z - 1, X + 1, Z - 1);
+  }
+  const P2 = (k) => { const [a, b] = k.split(",").map(Number); return { x: minX + a * cellM / 2, z: minZ + b * cellM / 2 }; };
+  const loops = [];
+  for (const start of [...out.keys()]) {
+    while (out.get(start)?.length) {
+      const loop = [start];
+      let cur = start, prev = null;
+      for (let guard = 0; guard < 200000; guard++) {
+        const list = out.get(cur);
+        if (!list?.length) break;
+        // 鞍点（两条出边）：先拐左（沟里两块在角上碰头时各自成环）
+        let pick = 0;
+        if (list.length > 1 && prev) {
+          const [px, pz] = prev.split(",").map(Number), [cx, cz] = cur.split(",").map(Number);
+          const dx = cx - px, dz = cz - pz;
+          pick = list.findIndex((n) => { const [nx, nz] = n.split(",").map(Number); return dx * (nz - cz) - dz * (nx - cx) > 0; });
+          if (pick < 0) pick = 0;
+        }
+        const next = list.splice(pick, 1)[0];
+        prev = cur; cur = next;
+        if (cur === start) break;
+        loop.push(cur);
+      }
+      if (loop.length >= 4) loops.push(loop.map(P2));
+    }
+  }
+  const walls = [];
+  const t = KEEP_IN.thickM;
+  let n = 0;
+  for (const loop of loops) {
+    const pts = SimplifyLoop(loop, KEEP_IN.simplifyM);
+    for (let k = 0; k < pts.length; k++) {
+      const a = pts[k], b = pts[(k + 1) % pts.length];
+      const dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz);
+      if (L < 1e-3) continue;
+      const fx = dx / L, fz = dz / L, lx = -fz, lz = fx;   // lx/lz：左手（沟里）
+      let low = Infinity, high = -Infinity;
+      for (let s = 0; s <= L + 1e-6; s += Math.min(0.5, L)) {
+        const x = a.x + fx * s, z = a.z + fz * s;
+        const gin = sample(x + lx * 0.4, z + lz * 0.4), gout = sample(x - lx * 0.4, z - lz * 0.4), g0 = sample(x, z);
+        low = Math.min(low, gin);
+        high = Math.max(high, gin, gout, g0);
+      }
+      const bottom = low - KEEP_IN.belowM, top = high + KEEP_IN.aboveM;
+      n += 1;
+      walls.push({
+        id: `KeepIn_${String(n).padStart(4, "0")}`, x: R2((a.x + b.x) / 2), z: R2((a.z + b.z) / 2),
+        w: R2(L + t), d: t, h: R2(top - bottom), ry: Math.round(Math.atan2(-fz, fx) * 1e4) / 1e4,
+        y: R2((top + bottom) / 2), semantic: "airWall", tag: "airWall", visual: false, solid: true,
+      });
+    }
+  }
+  return { walls, loops: loops.length, filled };
 }
 
 /** 按 §2.2 烘高度：(cols+1)×(rows+1) 个 int16 小端厘米，heights[iz*(cols+1)+ix]。 */
@@ -1337,6 +1509,14 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
     LandmarkIssues(landmarks, errors);
     if (errors.length) throw new Error(`地标表有错：${errors.join("；")}`);
   }
+  // 防止玩家跳出壕沟（2026-10-21）：① 胸墙、板桥（横木 / 门板）标「不能攀」（noClimb：翻越 / 攀爬在它们上面不触发，射击台上照样露头开枪）；
+  // ② 沟沿一圈只挡玩家的隐形墙（L0105KeepInWalls，tag airWall）
+  const NO_CLIMB = /^(Parapet(West|East|Middle|Rubble)|Bridge(DoorBoard|Stringer|BrokenBoard)_\d+)$/;
+  for (const b of [...blocks, ...gates]) if (NO_CLIMB.test(b.id)) b.noClimb = true;
+  const keepIn = L0105KeepInWalls(terrain, sample);
+  blocks.push(...keepIn.walls);
+  notes.push(`圈住玩家：沟里（比没挖之前低 ≥ ${KEEP_IN.depthM} m、和机枪坑连得上）${keepIn.loops} 个环、封闭小洞填了 ${keepIn.filled} 格；沟沿隐形墙 ${keepIn.walls.length} 段（只挡玩家）；`
+    + `不能攀的块 ${[...blocks, ...gates].filter((b) => b.noClimb).length} 个（胸墙、板桥）`);
 
   // --- 抽样核对 ---
   const at = (p) => R2(sample(p.x, p.z));
