@@ -121,10 +121,10 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
   Object.freeze({ id: "SingleBlanket", name: "五补丁薄土布单被", pack: "Model_SingleBlanket.glb",
-    sourceTriangles: 600, actualTriangles: 600, targetTriangles: 4000,
+    sourceTriangles: 3456, actualTriangles: 3456, targetTriangles: 4000,
     sourceTexture: "用户确认参考图、内置 imagegen 的柔软旧棉布图集",
     runtimeTexture: "1024 Base alpha / Normal / ORM 内嵌，独立剧情泥血遮罩",
-    policy: "source", note: "15x20 四边形；25骨、精确双线性、一个形态键、五个NLA动作。_blender/Script_SingleBlanketBake.py 重建；头端+Z，供运行时逐骨驱动。" }),
+    policy: "source", note: "36x48 四边形、约4cm网格，供后续游戏内逐顶点模拟；25骨、精确双线性、一个形态键、五个NLA动作。_blender/Script_SingleBlanketBake.py 重建；头端+Z，挂点与骨名保留。" }),
   Object.freeze({ id: "WardProps", name: "接收院药柜与医疗陈设", pack: "Model_WardProps.glb",
     sourceTriangles: 44524, actualTriangles: 44524, targetTriangles: 50000,
     sourceTexture: "项目 VillageTimber PBR / Blender 材质", runtimeTexture: "作者 UV、内嵌旧木 PBR、陶／搪瓷／药瓶独立材质",

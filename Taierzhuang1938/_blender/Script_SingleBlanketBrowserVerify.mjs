@@ -16,7 +16,7 @@ const html=`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>单�
 <style>*{box-sizing:border-box}body{margin:0;background:#202427;color:#eee;font:15px system-ui}header{padding:14px 20px;background:#303639;display:flex;gap:16px;align-items:center}button,select,input{font:inherit}main{display:grid;grid-template-columns:68% 32%;height:calc(100vh - 58px)}canvas{display:block;width:100%;height:100%;touch-action:none}aside{padding:16px;overflow:auto;background:#e8e5df;color:#272727}img{width:100%;height:auto}p{line-height:1.6}small{color:#bbb}</style>
 <script type="importmap">{"imports":{"three":"/Taierzhuang1938/vendor/three/build/three.module.js"}}</script>
 <header><strong>五补丁薄土布单被</strong><select id="pose"></select><button id="play">播放展开</button><label>时间 <input id="time" type="range" min="0" max="1.466666667" step="0.001" value="0"></label><small>拖动旋转 · 滚轮缩放</small></header>
-<main><canvas></canvas><aside><strong>已确认的参考图</strong><img src="Reference.png"><p>对照五块补丁、粗陋手缝、破旧程度和薄布质感。材质与褶皱已按后续要求修正柔软度。</p><p>600三角形 · 25骨 · 1024贴图</p></aside></main>
+<main><canvas></canvas><aside><strong>已确认的参考图</strong><img src="Reference.png"><p>对照五块补丁、粗陋手缝、破旧程度和薄布质感。基色已校正为灰褐色；36×48规则网格供后续游戏内布料模拟。</p><p>${meta.triangles}三角形 · 25骨 · 1024贴图</p></aside></main>
 <script type="module">
 import * as T from 'three';import {GLTFLoader} from '/Taierzhuang1938/vendor/three/examples/jsm/loaders/GLTFLoader.js';
 const canvas=document.querySelector('canvas'),renderer=new T.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(1);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=0.82;
@@ -45,14 +45,14 @@ try {
   const snapshots={};for(const name of names)snapshots[name]=await page.evaluate(n=>window.SingleBlanket.SetPose(n),name);
   const end=await page.evaluate(()=>window.SingleBlanket.SetPose('Blanket_Unfold',44/30));
   const maxError=(a,b)=>Math.max(...a.points.map((p,i)=>Math.hypot(...p.map((v,k)=>v-b.points[i][k]))));
-  assert.equal(snapshots.Blanket_Flat.bones,25);assert.equal(snapshots.Blanket_Flat.triangles,600);
+  assert.equal(snapshots.Blanket_Flat.bones,25);assert.equal(snapshots.Blanket_Flat.triangles,3456);
   assert.ok(snapshots.Blanket_DragPose.size[1]>0.6);
   assert.ok(maxError(snapshots.Blanket_Crumpled,snapshots.Blanket_Unfold)<1e-5);
   assert.ok(maxError(snapshots.Blanket_Flat,end)<1e-5);
   assert.ok(Math.max(...snapshots.Blanket_Crumpled.size.map((v,k)=>Math.abs(v-[0.45,0.25,0.45][k])))<0.001);
   await page.evaluate(()=>window.SingleBlanket.SetPose('Blanket_DragPose'));
   await page.locator('canvas').screenshot({path:path.join(reviewDir,'Scene_BrowserDragPose.png')});
-  const report={sha256:meta.sha256,errors,clips:names,bones:25,triangles:600,crumpledSizeM:snapshots.Blanket_Crumpled.size,
+  const report={sha256:meta.sha256,errors,clips:names,bones:25,triangles:3456,crumpledSizeM:snapshots.Blanket_Crumpled.size,
     unfoldStartMaxErrorM:maxError(snapshots.Blanket_Crumpled,snapshots.Blanket_Unfold),unfoldEndMaxErrorM:maxError(snapshots.Blanket_Flat,end)};
   assert.deepEqual(errors,[]);fs.writeFileSync(path.join(reviewDir,'Data_BrowserCheck.json'),JSON.stringify(report,null,2));
   fs.copyFileSync(path.join(reviewDir,'Data_BrowserCheck.json'),path.join(sourceDir,'Review/Data_BrowserCheck.json'));

@@ -2,9 +2,42 @@
   "asset": "SingleBlanket",
   "blenderVersion": "5.1.2",
   "seed": 19380317,
-  "vertices": 336,
-  "quads": 300,
-  "triangles": 600,
+  "vertices": 1813,
+  "quads": 1728,
+  "simulationMesh": {
+    "gridSegments": [
+      36,
+      48
+    ],
+    "nominalCellSizeM": [
+      0.03888888888888889,
+      0.03958333333333333
+    ],
+    "welded": true,
+    "initialPose": "Rest",
+    "cornerPins": [
+      {
+        "socket": "Socket_GripHeadL",
+        "vertexGlb": 36,
+        "restOffsetGltfM": [
+          -0.004637777805328369,
+          0.0,
+          -0.004372358322143555
+        ]
+      },
+      {
+        "socket": "Socket_GripHeadR",
+        "vertexGlb": 0,
+        "restOffsetGltfM": [
+          0.004637777805328369,
+          0.0,
+          -0.004372358322143555
+        ]
+      }
+    ],
+    "note": "Read structural/bending connectivity from the GLB index buffer; runtime solver is not included. Reset morph and animation before simulation, then apply pins in the same world space."
+  },
+  "triangles": 3456,
   "bones": [
     {
       "name": "Blanket_Root",
@@ -411,19 +444,17 @@
     "restMaxDeviationM": 0.0,
     "weightSumMaxError": 4.0978193283081055e-08,
     "nonzeroInfluences": {
-      "4": 272,
-      "3": 32,
-      "2": 32
+      "4": 1813
     },
     "liftHeadLHeightM": 0.6,
-    "liftAffectedVertices": 24,
+    "liftAffectedVertices": 130,
     "liftOutsideSupportMaxDeviationM": 0.0,
-    "liftInterpolationMaxErrorM": 8.940696716308594e-08,
+    "liftInterpolationMaxErrorM": 5.960464477539063e-08,
     "gripLiftMaxErrorM": 0.0,
     "crumpledSizeM": [
-      0.4500000476837158,
       0.44999992847442627,
-      0.2499999888241291
+      0.45000001788139343,
+      0.2499999995343387
     ],
     "sockets": [
       {
@@ -587,9 +618,19 @@
         ]
       }
     ],
+    "topology": {
+      "gridSegments": [
+        36,
+        48
+      ],
+      "boundaryEdges": 168,
+      "minQuadAreaM2": 0.0009772740304470062,
+      "minEdgeLengthM": 0.02486950214036043,
+      "maxEdgeLengthM": 0.03998206469482293
+    },
     "roundTripMaxDeviationM": 7.450580596923828e-09,
     "roundTripSkinMaxDeviationM": 7.450580596923828e-09,
-    "roundTripVertexCount": 336,
+    "roundTripVertexCount": 1813,
     "roundTripBoneCount": 25
   },
   "animations": [
@@ -628,8 +669,8 @@
     "Test_LiftHeadCorners",
     "Test_DrapeOverBody"
   ],
-  "sha256": "0eb4e5c5a6b8dda216bf3f6f958282dbf2d1459c1e8675429d19522d59a0c89e",
-  "bytes": 968748,
+  "sha256": "b5b62b28ede1d08695bdfc73d5da282fd70c38b4466678cce058f5fa7d57d6b7",
+  "bytes": 1122144,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SingleBlanket\\Scene_SingleBlanket.blend",
   "coordinates": "Blender (x,y,z) -> glTF (x,z,-y); head -Y -> +Z; L=+X",
   "reconstructionScope": "User-approved five crude patches, gray-white plain cotton, aging, dimensions and dragging poses are artistic reconstruction; not a documented standardized 1938 issue pattern",

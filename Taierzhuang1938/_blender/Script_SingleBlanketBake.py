@@ -25,6 +25,7 @@ yRows = (-0.95, -0.57, -0.19, 0.19, 0.57, 0.95)
 clipNames = ("Blanket_Flat", "Blanket_DragPose", "Blanket_Released", "Blanket_Crumpled", "Blanket_Unfold")
 cornerNames = {(0, 0): "Blanket_CornerHeadL", (0, 3): "Blanket_CornerHeadR",
                (5, 0): "Blanket_CornerTailL", (5, 3): "Blanket_CornerTailR"}
+widthSegments, lengthSegments = 36, 48
 
 
 def BoneName(row, column):
@@ -54,19 +55,27 @@ def CreateMesh():
     # Paired inward offsets keep the geometric centre exactly at the origin.
     edgeX = [rng.uniform(0, 0.015) for _ in range(11)]
     edgeY = [rng.uniform(0, 0.015) for _ in range(8)]
+    def EdgeOffset(index, segments, controls):
+        phase = min(index, segments-index)*2/segments*(len(controls)-1)
+        lower = min(len(controls)-2, int(phase))
+        amount = phase-lower
+        amount = amount*amount*(3-2*amount)
+        return controls[lower]*(1-amount)+controls[lower+1]*amount
+
     vertices, faces = [], []
-    for j in range(21):
-        for i in range(16):
-            x, y = -0.70 + 1.40*i/15, -0.95 + 1.90*j/20
-            if i in (0, 15):
-                x += (1 if i == 0 else -1)*edgeX[min(j, 20-j)]
-            if j in (0, 20):
-                y += (1 if j == 0 else -1)*edgeY[min(i, 15-i)]
+    stride = widthSegments+1
+    for j in range(lengthSegments+1):
+        for i in range(widthSegments+1):
+            x, y = -0.70 + 1.40*i/widthSegments, -0.95 + 1.90*j/lengthSegments
+            if i in (0, widthSegments):
+                x += (1 if i == 0 else -1)*EdgeOffset(j, lengthSegments, edgeX)
+            if j in (0, lengthSegments):
+                y += (1 if j == 0 else -1)*EdgeOffset(i, widthSegments, edgeY)
             vertices.append((x, y, 0.0))
-    for j in range(20):
-        for i in range(15):
-            k = j*16+i
-            faces.append((k, k+1, k+17, k+16))
+    for j in range(lengthSegments):
+        for i in range(widthSegments):
+            k = j*stride+i
+            faces.append((k, k+1, k+stride+1, k+stride))
     meshData = bpy.data.meshes.new("Blanket_Geometry")
     meshData.from_pydata(vertices, [], faces)
     meshData.update()
@@ -77,9 +86,9 @@ def CreateMesh():
         polygon.use_smooth = True
         for loopIndex in polygon.loop_indices:
             vertexIndex = meshData.loops[loopIndex].vertex_index
-            i, j = vertexIndex % 16, vertexIndex // 16
+            i, j = vertexIndex % stride, vertexIndex // stride
             # Head-up top views show +X (L) on image left.
-            uv.data[loopIndex].uv = (1-i/15, 1-j/20)
+            uv.data[loopIndex].uv = (1-i/widthSegments, 1-j/lengthSegments)
     mesh.shape_key_add(name="Basis")
     mesh.shape_key_add(name="Crumpled")
     return mesh
@@ -147,6 +156,11 @@ def CreateMaterial():
     bsdf = tree.nodes.get("Principled BSDF")
     bsdf.inputs["Metallic"].default_value = 0
     bsdf.inputs["Roughness"].default_value = 0.90
+    # glTF encodes sheen strength in its colour factor, rather than a separate
+    # weight. Keep Blender and the exported MeshPhysicalMaterial consistent.
+    bsdf.inputs["Sheen Weight"].default_value = 1.0
+    bsdf.inputs["Sheen Tint"].default_value = (0.18, 0.18, 0.18, 1.0)
+    bsdf.inputs["Sheen Roughness"].default_value = 0.85
     for channel in ("Base", "Normal", "Orm"):
         imagePath = projectDir / f"Texture/Texture_SingleBlanket{channel}.webp"
         if not imagePath.exists():
@@ -165,7 +179,7 @@ def CreateMaterial():
             tree.links.new(clip.outputs[0], bsdf.inputs["Alpha"])
         elif channel == "Normal":
             normal = tree.nodes.new("ShaderNodeNormalMap")
-            normal.inputs["Strength"].default_value = 1.0
+            normal.inputs["Strength"].default_value = 0.45
             tree.links.new(node.outputs["Color"], normal.inputs["Color"])
             tree.links.new(normal.outputs["Normal"], bsdf.inputs["Normal"])
         else:
@@ -190,13 +204,42 @@ def RestTargets():
 def CreatePoses(mesh):
     rest = RestTargets()
     poses = {name: {n: v.copy() for n, v in rest.items()} for name in clipNames[:4]}
+    def FoldProfile(centers, halfWidth, length):
+        # Integrate a fabric tangent through loose rounded hairpin folds. The
+        # positive rises keep successive panels in separate overlapping layers.
+        samples, x, z = [], 0.0, 0.0
+        count = 2049
+        for index in range(count):
+            coordinate = -1+2*index/(count-1)
+            angle = 0.0
+            for fold, center in enumerate(centers):
+                t = min(1.0, max(0.0, (coordinate-center+halfWidth)/(2*halfWidth)))
+                angle += (1 if fold % 2 == 0 else -1)*math.pi*t*t*(3-2*t)
+            if index:
+                x += math.cos(angle)*length/(count-1)
+                z += math.sin(angle)*length/(count-1)
+            samples.append((x, z))
+        middle = (min(p[0] for p in samples)+max(p[0] for p in samples))/2
+        def At(coordinate):
+            phase = min(count-1, max(0.0, (coordinate+1)*(count-1)/2))
+            lower = min(count-2, int(phase))
+            amount = phase-lower
+            a, b = samples[lower], samples[lower+1]
+            return (a[0]*(1-amount)+b[0]*amount-middle, a[1]*(1-amount)+b[1]*amount)
+        return At
+
+    widthProfile = FoldProfile((-0.30, 0.38), 0.14, 1.40)
+    lengthProfile = FoldProfile((-0.52, -0.01, 0.55), 0.085, 1.90)
     def FoldedSurface(u, v):
-        phase = 2.15*math.pi*u+0.9*math.sin(1.4*math.pi*v)+0.45*v
-        return Vector((0.17*u+0.060*math.sin(phase),
-                       0.18*v+0.035*math.sin(1.7*math.pi*v+0.8*u)*math.cos(math.pi*u/2),
-                       0.065+0.040*(0.8+0.2*math.cos(2.1*v))*math.cos(phase)+
-                       0.075*math.exp(-3*(u*u+v*v))+
-                       0.022*math.sin(2*math.pi*v+1.7*u)*math.cos(math.pi*u/2)))
+        du = u+0.09*math.sin(2.1*v+0.5*u)*(1-u*u)
+        dv = v+0.08*math.sin(2.7*u-0.7*v)*(1-v*v)
+        x, widthRise = widthProfile(du)
+        y, lengthRise = lengthProfile(dv)
+        twist = 0.65*math.sin(2.2*u)+0.65*v+0.22*math.sin(1.7*math.pi*v)
+        return Vector((x*math.cos(twist)-y*math.sin(twist)+0.016*math.sin(3*v+u),
+                       x*math.sin(twist)+y*math.cos(twist)+0.012*math.sin(4*u-v),
+                       2.5*widthRise+0.45*lengthRise+0.035*math.sin(5*u+1.4*v)+
+                       0.026*math.sin(4*v-u)-0.055*math.exp(-((u-0.92)/0.22)**2-((v+0.55)/0.45)**2)))
     for r in range(6):
         for c in range(4):
             name = BoneName(r, c)
@@ -225,12 +268,12 @@ def CreatePoses(mesh):
             poses["Blanket_Crumpled"][name] = FoldedSurface(rest[name].x/0.7, rest[name].y/0.95)
     deltas = []
     for vertex in mesh.data.vertices:
-        i, j = vertex.index % 16, vertex.index // 16
         cage = Vector((0, 0, 0))
         for name, weight in BilinearWeights(vertex.co):
             cage += weight*poses["Blanket_Crumpled"][name]
         desired = FoldedSurface(vertex.co.x/0.7, vertex.co.y/0.95)
-        desired.z += 0.002*math.sin(i*1.1+j*1.4)
+        u, v = vertex.co.x/0.7, vertex.co.y/0.95
+        desired.z += 0.0025*math.sin(9*u+2*v)*math.sin(11*v-1.3*u)
         deltas.append(desired-cage)
     finalPoints = []
     for vertex, delta in zip(mesh.data.vertices, deltas):
@@ -253,8 +296,13 @@ def CreatePoses(mesh):
     for r in range(6):
         for c in range(4):
             value = drape[BoneName(r, c)]
-            value.x = math.copysign(0.52 if c in (0, 3) else 0.215, value.x)
-            value.z = 0.012 if c in (0, 3) else 0.235
+            if c in (0, 3):
+                value.x = math.copysign(0.51+0.025*math.sin(r*1.7+c*0.6), value.x)
+                value.y += 0.012*math.sin(r*1.9+c)
+                value.z = 0.012+0.014*(0.5+0.5*math.sin(r*2.2+c*1.3))
+            else:
+                value.x = math.copysign(0.215, value.x)
+                value.z = 0.160 if r in (0, 5) else 0.240+0.006*math.sin(r*1.4+c*0.8)
     poses["Test_LiftHeadCorners"], poses["Test_DrapeOverBody"] = lift, drape
     return poses
 
@@ -308,7 +356,9 @@ def CreateActions(rig, mesh, poses):
                     boneName = BoneName(r, c)
                     angleX, angleY = 0.0, 0.0
                     if name == "Test_DrapeOverBody":
-                        angleY = math.copysign(math.radians(22 if c in (0, 3) else 8), xColumns[c])
+                        angleY = math.copysign(math.radians(55 if c in (0, 3) else 5), xColumns[c])
+                        if c in (1, 2) and r in (0, 5):
+                            angleX = math.radians(50 if r == 0 else -50)
                     elif name == "Blanket_DragPose":
                         angleX = math.radians((-12, -12, -6, -2, 0, 0)[r])
                         if r in (1, 2, 3):
@@ -366,6 +416,21 @@ def EvaluatedPoints(mesh):
 
 def CheckSource(rig, mesh, sockets, poses):
     ClearPose(rig, mesh)
+    assert len(mesh.data.vertices) == (widthSegments+1)*(lengthSegments+1)
+    assert len(mesh.data.polygons) == widthSegments*lengthSegments
+    assert all(len(p.vertices) == 4 and p.area > 1e-8 and p.normal.z > 0.99 for p in mesh.data.polygons)
+    edgeUses = {}
+    for polygon in mesh.data.polygons:
+        for edge in polygon.edge_keys:
+            edgeUses[edge] = edgeUses.get(edge, 0)+1
+    assert all(count in (1, 2) for count in edgeUses.values())
+    assert sum(count == 1 for count in edgeUses.values()) == 2*(widthSegments+lengthSegments)
+    assert len(mesh.data.vertices)-len(mesh.data.edges)+len(mesh.data.polygons) == 1
+    edgeLengths = [(mesh.data.vertices[e.vertices[0]].co-mesh.data.vertices[e.vertices[1]].co).length for e in mesh.data.edges]
+    topology = {"gridSegments": [widthSegments, lengthSegments],
+                "boundaryEdges": sum(count == 1 for count in edgeUses.values()),
+                "minQuadAreaM2": min(p.area for p in mesh.data.polygons),
+                "minEdgeLengthM": min(edgeLengths), "maxEdgeLengthM": max(edgeLengths)}
     original = [v.co.copy() for v in mesh.data.vertices]
     evaluated = EvaluatedPoints(mesh)
     restError = max((a-b).length for a, b in zip(original, evaluated))
@@ -412,7 +477,8 @@ def CheckSource(rig, mesh, sockets, poses):
     return {"restMaxDeviationM": restError, "weightSumMaxError": sumError,
             "nonzeroInfluences": counts, "liftHeadLHeightM": 0.60, "liftAffectedVertices": affected,
             "liftOutsideSupportMaxDeviationM": outsideError, "liftInterpolationMaxErrorM": interpolationError,
-            "gripLiftMaxErrorM": gripError, "crumpledSizeM": size, "sockets": socketReport}
+            "gripLiftMaxErrorM": gripError, "crumpledSizeM": size, "sockets": socketReport,
+            "topology": topology}
 
 
 def CanonicalizeGlb(path):
@@ -499,6 +565,30 @@ def Export(rig, mesh, sockets, path):
         export_morph_animation=True, export_draco_mesh_compression_enable=False, export_extras=False)
     ClearPose(rig, mesh)
     return CanonicalizeGlb(path)
+
+
+def SimulationMetadata(path, document):
+    """Exported vertex indices and rest offsets for future runtime corner pins."""
+    raw = path.read_bytes()
+    jsonLength = struct.unpack_from("<I", raw, 12)[0]
+    binary = raw[28+jsonLength:]
+    primitive = document["meshes"][0]["primitives"][0]
+    accessor = document["accessors"][primitive["attributes"]["POSITION"]]
+    view = document["bufferViews"][accessor["bufferView"]]
+    offset = view.get("byteOffset", 0)+accessor.get("byteOffset", 0)
+    stride = view.get("byteStride", 12)
+    points = [Vector(struct.unpack_from("<3f", binary, offset+i*stride)) for i in range(accessor["count"])]
+    assert len(set(tuple(p) for p in points)) == len(points), "Simulation surface must share vertices"
+    pins = []
+    for socket, position in [("Socket_GripHeadL", (0.70, 0, 0.95)),
+                             ("Socket_GripHeadR", (-0.70, 0, 0.95))]:
+        target = Vector(position)
+        index = min(range(len(points)), key=lambda i: (points[i]-target).length_squared)
+        pins.append({"socket": socket, "vertexGlb": index, "restOffsetGltfM": list(points[index]-target)})
+    return {"gridSegments": [widthSegments, lengthSegments],
+            "nominalCellSizeM": [1.40/widthSegments, 1.90/lengthSegments],
+            "welded": True, "initialPose": "Rest", "cornerPins": pins,
+            "note": "Read structural/bending connectivity from the GLB index buffer; runtime solver is not included. Reset morph and animation before simulation, then apply pins in the same world space."}
 
 
 def CheckRoundTrip(path, originalPoints):
@@ -596,6 +686,7 @@ def Main():
         bpy.ops.wm.save_as_mainfile(filepath=str(sourceDir / "Scene_SingleBlanket.blend"), compress=True)
     report = {"asset": "SingleBlanket", "blenderVersion": bpy.app.version_string,
         "seed": 19380317, "vertices": len(mesh.data.vertices), "quads": len(mesh.data.polygons),
+        "simulationMesh": SimulationMetadata(path, document),
         "triangles": sum(len(p.vertices)-2 for p in mesh.data.polygons), "bones": [
             {"name": b.name, "headBlender": list(b.head_local), "tailBlender": list(b.tail_local),
              "parent": b.parent.name if b.parent else None, "deform": b.use_deform, "connected": b.use_connect}

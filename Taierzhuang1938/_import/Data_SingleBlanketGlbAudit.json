@@ -1,24 +1,31 @@
 {
   "file": "Model/Model_SingleBlanket.glb",
-  "sha256": "0eb4e5c5a6b8dda216bf3f6f958282dbf2d1459c1e8675429d19522d59a0c89e",
-  "vertices": 336,
-  "triangles": 600,
+  "sha256": "b5b62b28ede1d08695bdfc73d5da282fd70c38b4466678cce058f5fa7d57d6b7",
+  "vertices": 1813,
+  "triangles": 3456,
   "joints": 25,
+  "topology": {
+    "welded": true,
+    "connectedComponents": 1,
+    "boundaryEdges": 168,
+    "minTriangleAreaM2": 0.00048357361321871295,
+    "minEdgeLengthM": 0.02486950159072876,
+    "maxEdgeLengthM": 0.05549047975092171
+  },
+  "bilinearWeightMaxError": 2.958288181087454e-8,
   "nonzeroInfluences": {
-    "2": 32,
-    "3": 32,
-    "4": 272
+    "4": 1813
   },
   "weightSumMaxError": 4.0978193283081055e-8,
   "rootMaxWeight": 0,
-  "cpuRestMaxDeviationM": 4.296010995392949e-8,
+  "cpuRestMaxDeviationM": 4.1220321236963913e-8,
   "cpuLiftInterpolationMaxErrorM": 0,
   "cpuLiftOutsideSupportMaxDeviationM": 0,
-  "cpuLiftAffectedVertices": 24,
+  "cpuLiftAffectedVertices": 130,
   "crumpledSizeGltfM": [
-    0.45000004680410943,
-    0.24999999345993856,
-    0.45000000966316483
+    0.4499999776644056,
+    0.24999999795041797,
+    0.44999998427855376
   ],
   "unfoldStartMaxErrorM": 0,
   "unfoldEndMaxErrorM": 0,
@@ -35,8 +42,8 @@
     "runs": 2,
     "identical": true,
     "hashes": [
-      "0eb4e5c5a6b8dda216bf3f6f958282dbf2d1459c1e8675429d19522d59a0c89e",
-      "0eb4e5c5a6b8dda216bf3f6f958282dbf2d1459c1e8675429d19522d59a0c89e"
+      "b5b62b28ede1d08695bdfc73d5da282fd70c38b4466678cce058f5fa7d57d6b7",
+      "b5b62b28ede1d08695bdfc73d5da282fd70c38b4466678cce058f5fa7d57d6b7"
     ]
   },
   "khronosValidator": {
