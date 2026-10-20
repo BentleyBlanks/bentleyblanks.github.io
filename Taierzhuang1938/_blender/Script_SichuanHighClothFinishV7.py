@@ -130,13 +130,48 @@ for obj in jacket.children_recursive:
     loose=[v for v in bm.verts if not v.link_faces]
     if loose:bmesh.ops.delete(bm,geom=loose,context='VERTS')
     bm.to_mesh(obj.data);bm.free()
-    for vertex in obj.data.vertices:
+    if not obj.get('HighCornerRefined'):
+        bm=bmesh.new();bm.from_mesh(obj.data);bm.verts.ensure_lookup_table()
+        uvLayer=bm.loops.layers.uv.active;corner=set()
+        for face in bm.faces:
+            for loop in face.loops:
+                p=loop.vert.co;uv=loop[uvLayer].uv;predictedV=.02+.46*(.90+(p.z-.144)/.56)
+                if .785<uv.x<.820 and abs(uv.y-predictedV)<.009 and p.x>.105 and p.z>.073:corner.add(loop.vert)
+        bridges=[face for face in bm.faces if any(v in corner for v in face.verts)
+                 and any(loop[uvLayer].uv.y>.475 for loop in face.loops)]
+        if bridges:bmesh.ops.delete(bm,geom=bridges,context='FACES')
+        edges=[edge for edge in bm.edges if all(v in corner for v in edge.verts)]
+        bmesh.ops.subdivide_edges(bm,edges=edges,cuts=3,use_grid_fill=True)
+        bm.to_mesh(obj.data);bm.free();obj['HighCornerRefined']=True
+    cornerVertices=set()
+    for loop in obj.data.loops:
+        p=obj.data.vertices[loop.vertex_index].co
+        uv=obj.data.uv_layers.active.data[loop.index].uv
+        predictedV=.02+.46*(.90+(p.z-.144)/.56)
+        if .785<uv.x<.820 and abs(uv.y-predictedV)<.009 and p.x>.105 and p.z>.073:
+            cornerVertices.add(loop.vertex_index)
+    for index in cornerVertices:
+        vertex=obj.data.vertices[index]
         p=vertex.co
-        if p.x>.105 and p.z>.073 and p.y<-.103:
-            y=Front(p.x,p.z)
-            if y is not None:
-                p.y=y-.0038
+        p.z=min(p.z,.1415)
+        y=Front(p.x,p.z)
+        if y is None:
+            # At the rounded crown the sheet grid ends before the folded
+            # side. Extend its front height, never use a rear fold ray hit.
+            nearby=rest[np.abs(rest[:,2]-p.z)<.004]
+            limit=max(nearby[:,0])-.001 if len(nearby) else .165
+            y=Front(min(p.x,limit),p.z)
+        if y is not None:p.y=y-.0038
     obj.data.update()
+    # The three old long bridge triangles were visible through the open side.
+    # Both the complete folded jacket and its exposed corner stay in this
+    # independent assembly; the concealed bridge has no exterior surface.
+    bm=bmesh.new();bm.from_mesh(obj.data);bm.verts.ensure_lookup_table()
+    uvLayer=bm.loops.layers.uv.active
+    bridges=[face for face in bm.faces if any(v.index in cornerVertices for v in face.verts)
+             and any(loop[uvLayer].uv.y>.475 for loop in face.loops)]
+    if bridges:bmesh.ops.delete(bm,geom=bridges,context='FACES')
+    bm.to_mesh(obj.data);bm.free();obj.data.update()
 
 old=bpy.data.objects.get('StudyV7_ClothKnotButton')
 if old:bpy.data.objects.remove(old,do_unlink=True)
@@ -181,12 +216,14 @@ for row in range(steps+1):
     t=row/steps
     cx=.112+.063*t+.0009*math.sin(t*math.pi*2)
     cz=.139-.061*t
+    taper=.15+.85*min(1,t/.12,(1-t)/.12)
+    seating=min(1,t/.06,(1-t)/.10)
     for column in range(across+1):
         s=column/across
-        px=cx+.0070*(s-.5);pz=cz+.0073*(s-.5)
+        px=cx+.0070*taper*(s-.5);pz=cz+.0073*taper*(s-.5)
         y=Front(px,pz)
         if y is None:y=-.111
-        py=y-.0037-.0022*math.sin(math.pi*s)
+        py=y-.0012-seating*(.0025+.0022*math.sin(math.pi*s))
         verts.append((px,py,pz))
 for row in range(steps):
     for col in range(across):

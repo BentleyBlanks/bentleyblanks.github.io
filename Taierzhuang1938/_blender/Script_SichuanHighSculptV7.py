@@ -74,7 +74,7 @@ def SculptGathering(body):
 
 def BuildSoftBundle(CreateMesh,unusedDepth,material,backMaterial,foldMaterial,parent,high=False):
     # Use the full source, never the decimated game copy.
-    body=cloth['BuildSoftBundle'](CreateMesh,unusedDepth,material,backMaterial,foldMaterial,parent,high=True)
+    body=cloth['BuildSoftBundle'](CreateMesh,unusedDepth,material,backMaterial,foldMaterial,parent,high=True,orderedSideLayers=True)
     body.name='Pack_Bundle'
     for vertex in body.data.vertices:vertex.co=RawShape(vertex.co)
     xs=[v.co.x for v in body.data.vertices];ys=[v.co.y for v in body.data.vertices];zs=[v.co.z for v in body.data.vertices]

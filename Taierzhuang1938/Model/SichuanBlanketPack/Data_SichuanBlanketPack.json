@@ -130,13 +130,14 @@
       "Texture_ReferenceCompare_side.jpg",
       "Texture_ReferenceCompare_back.jpg"
     ],
-    "status": "V6RejectedByUser_V7NaturalHighClothPendingReview",
+    "status": "V6RejectedByUser_V7HighClothDeliveredForReview",
     "remainingRefinements": [
-      "Visual review of the V7 natural cloth folds; user finds the silhouette closer",
-      "Retopology and 1024 PBR transfer only after high-model appearance succeeds"
+      "Game topology and UV for the later game-output phase",
+      "Final 1024 PBR transfer for the later game-output phase"
     ],
     "reviewedDate": "2026-10-20",
     "technicalChecks": 147,
+    "technicalChecksScope": "Historical V6 game asset only; not evidence for V7 high-model appearance",
     "sourceReopenVerified": true,
     "referenceCorrespondence": [
       "Folded blanket construction, two horizontal and two vertical grey cloth passes",
@@ -161,12 +162,16 @@
     "currentHighStudy": {
       "sourceBlend": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SichuanBlanketPack/HighV7/Scene_SichuanHighClothV7.blend",
       "rebuildScript": "../../_blender/Script_SichuanHighClothBuildV7.py",
+      "documentation": "Data_HighClothV7.md",
       "userFeedback": "轮廓更接近，继续自然布褶",
       "completedWork": [
         "Preserve V7 silhouette and flat body-contact back",
         "Frame-51 tie-constrained cloth relaxation with irregular broad gathering",
-        "Clean indigo corner, turned cotton overlap and rounded knot button"
+        "Clean indigo corner, turned cotton overlap and rounded knot button",
+        "Ordered side-layer connections remove projecting fins near the tucked coat",
+        "High-resolution jacket corner and rounded cotton tape, bow and shoulder loops"
       ],
+      "highRefinementComplete": true,
       "visualApproval": false,
       "rebuildIdenticalCoarseSource": true,
       "sourceReopenVerified": true,

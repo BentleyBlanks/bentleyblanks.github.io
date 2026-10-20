@@ -49,9 +49,9 @@ def SoftFrontDepth(x,z,detail=0):
     return max(-.130,depth)
 
 
-def BuildSoftBundle(CreateMesh,unusedDepth,clothMaterial,backMaterial,foldMaterial,parent,high=False):
+def BuildSoftBundle(CreateMesh,unusedDepth,clothMaterial,backMaterial,foldMaterial,parent,high=False,orderedSideLayers=False):
     if not high:
-        source=BuildSoftBundle(CreateMesh,unusedDepth,clothMaterial,backMaterial,foldMaterial,parent,True)
+        source=BuildSoftBundle(CreateMesh,unusedDepth,clothMaterial,backMaterial,foldMaterial,parent,True,orderedSideLayers)
         source.name='Study_SoftBundleHigh';source.parent=None
         source['SichuanHighSource']=True
         low=source.copy();low.data=source.data.copy();low.name='Pack_Bundle';low.parent=parent
@@ -108,10 +108,14 @@ def BuildSoftBundle(CreateMesh,unusedDepth,clothMaterial,backMaterial,foldMateri
     perimeter+=[row*(nx+1) for row in range(nz-1,0,-1)]
     previous=perimeter
     depths=(-.103,-.065,-.020,0) if not high else tuple(-.108+index*.108/32 for index in range(33))
-    for depth in depths:
+    for layerIndex,layerDepth in enumerate(depths):
         current=[]
         for vertex in perimeter:
             x,frontY,z=verts[vertex]
+            # The high V7 crown is recessed around the tucked coat. Fixed
+            # depth rings can turn back through that front edge and make
+            # projecting fins. Relative rings always advance toward the back.
+            depth=frontY*.96*(1-layerIndex/(len(depths)-1)) if orderedSideLayers else layerDepth
             fraction=max(0,min(1,-depth/.13))
             # Front/back edges turn in; the side cut is recessed for the
             # folded cloth lips, which carry the final width silhouette.
