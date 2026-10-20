@@ -3,8 +3,8 @@
   "level": "FirstLevel0105",
   "source": {
     "generator": "Script_EditorBlockoutCli.mjs scene FirstLevel0105",
-    "generatedAt": "2026-10-20T06:27:23.542Z",
-    "commit": "7ad886460d6e308fbb98c23c45fb6684e2b68e15",
+    "generatedAt": "2026-10-20T15:31:40.141Z",
+    "commit": "998fe73de64bb78efeee14c0f0f4412cbf23c8b6",
     "notes": "01–05 新剧本白盒：锚点 Data_EditorBlockoutFirstLevel0105Space；高度 0.5 m 网格（-4.09…3.72 m）；壕沟 = Script_TrenchPlan.CompileTrenchNetwork（前沿两段 + 交通 + 支沟 + 爬沟；交通沟板桥下加深、坡顶变浅、坡道下到干沟靠改基准面；支沟弃土只堆南沿成土垄）；集结处 = 坡后干沟（沟底 −1.0、两岸 2.5 m 陡坎、南岸坎顶一道 0.6–0.8 m 矮土埂、南岸枯树、东南头接凹路）；坑 / 散兵坑 / 洞为平底开挖；沟里日常摆件；路口板桥（白盒先做，剧本这一拍待拍板）；gates：DugoutCollapsed / PitShelled / TankDisabled（桥面两块门板压断）。"
   },
   "bounds": {
@@ -51200,6 +51200,421 @@
       }
     ]
   },
+  "landmarks": [
+    {
+      "id": "LmDugout",
+      "name": "防炮洞",
+      "kind": "pit",
+      "x": 66.5,
+      "z": 64.5,
+      "w": 7,
+      "d": 5,
+      "h": 2.6,
+      "y": -1.22,
+      "note": "01 开场；洞口朝西对着支沟"
+    },
+    {
+      "id": "LmDugoutMouth",
+      "name": "防炮洞口",
+      "kind": "place",
+      "x": 63,
+      "z": 64.5,
+      "radiusM": 1.4,
+      "note": "01 塌洞，顺子被压在这"
+    },
+    {
+      "id": "LmBranch",
+      "name": "支沟",
+      "kind": "area",
+      "x": 42.45,
+      "z": 65.8,
+      "w": 41.18,
+      "d": 3.4,
+      "ry": 0.06,
+      "note": "02 拖着冬瓜从洞口往西拖"
+    },
+    {
+      "id": "LmBranchGun",
+      "name": "日军机枪（支沟沿）",
+      "kind": "place",
+      "x": 56,
+      "z": 61.6,
+      "radiusM": 1.2,
+      "note": "01–02 架在北沿上顺沟压支沟口"
+    },
+    {
+      "id": "LmInterrogation",
+      "name": "审问处",
+      "kind": "place",
+      "x": 57.5,
+      "z": 65.3,
+      "radiusM": 1.5,
+      "note": "02 冬瓜在这挨刺刀"
+    },
+    {
+      "id": "LmSteps",
+      "name": "支沟口（台阶）",
+      "kind": "place",
+      "x": 24.4,
+      "z": 66.9,
+      "radiusM": 1.5,
+      "note": "02 何有田几个在台阶上压机枪"
+    },
+    {
+      "id": "LmOutflankExit",
+      "name": "迂回组爬出交通沟",
+      "kind": "place",
+      "x": 31,
+      "z": 74.2,
+      "radiusM": 1.2,
+      "note": "02 班长一组从这爬出去绕南沿"
+    },
+    {
+      "id": "LmCover1",
+      "name": "弹药箱垛",
+      "kind": "prop",
+      "x": 40.94,
+      "z": 67.2,
+      "w": 1.6,
+      "d": 1,
+      "h": 1,
+      "ry": 0.06,
+      "note": "02 拖被子第一次回身打"
+    },
+    {
+      "id": "LmCover2",
+      "name": "土袋垛（台阶拐角）",
+      "kind": "prop",
+      "x": 25.29,
+      "z": 71.44,
+      "w": 1.8,
+      "d": 0.9,
+      "h": 0.9,
+      "ry": -1.17,
+      "note": "02 第二次回身打"
+    },
+    {
+      "id": "LmCover3",
+      "name": "土袋垛（拐角 2）",
+      "kind": "prop",
+      "x": 31.72,
+      "z": 87.81,
+      "w": 1.8,
+      "d": 0.9,
+      "h": 0.9,
+      "ry": -1.41,
+      "note": "02 第三次回身打"
+    },
+    {
+      "id": "LmCorner2",
+      "name": "拐角 2",
+      "kind": "place",
+      "x": 30,
+      "z": 86,
+      "radiusM": 1.5
+    },
+    {
+      "id": "LmBridge",
+      "name": "路口板桥",
+      "kind": "prop",
+      "x": 35,
+      "z": 116,
+      "w": 3.8,
+      "d": 9.5,
+      "h": 0.4,
+      "ry": -0.9,
+      "y": 2.42,
+      "note": "05 战车只能走桥，班长带顺子趴桥下"
+    },
+    {
+      "id": "LmCrest",
+      "name": "坡顶",
+      "kind": "place",
+      "x": 35,
+      "z": 131,
+      "radiusM": 2
+    },
+    {
+      "id": "LmCrestPosts",
+      "name": "坡沿（别的班守着）",
+      "kind": "area",
+      "x": 54,
+      "z": 129.5,
+      "w": 28,
+      "d": 3,
+      "note": "02 末接应，05 守坡沿"
+    },
+    {
+      "id": "LmAssemblyEntry",
+      "name": "干沟口（交通沟下到干沟）",
+      "kind": "place",
+      "x": 35,
+      "z": 141.5,
+      "radiusM": 1.5
+    },
+    {
+      "id": "LmGully",
+      "name": "干沟（集结处）",
+      "kind": "area",
+      "x": 56,
+      "z": 152,
+      "radiusM": 9,
+      "note": "02 末撤到这里"
+    },
+    {
+      "id": "LmPocketA",
+      "name": "坑窝 A",
+      "kind": "place",
+      "x": 43,
+      "z": 144.8,
+      "radiusM": 2
+    },
+    {
+      "id": "LmPocketB",
+      "name": "坑窝 B",
+      "kind": "place",
+      "x": 71,
+      "z": 145.5,
+      "radiusM": 2
+    },
+    {
+      "id": "LmWoundedBay",
+      "name": "支沟（伤员放这里）",
+      "kind": "place",
+      "x": 57.3,
+      "z": 154.8,
+      "radiusM": 1.5
+    },
+    {
+      "id": "LmLaneHead",
+      "name": "凹路口",
+      "kind": "place",
+      "x": 60.5,
+      "z": 157.3,
+      "radiusM": 2.5
+    },
+    {
+      "id": "LmMouth",
+      "name": "沟口",
+      "kind": "place",
+      "x": 0,
+      "z": 0,
+      "radiusM": 1.5
+    },
+    {
+      "id": "LmPit",
+      "name": "机枪坑",
+      "kind": "pit",
+      "x": 0,
+      "z": -7,
+      "w": 8,
+      "d": 6,
+      "h": 1.3,
+      "y": -0.59,
+      "note": "03 守坑，一挺捷克式"
+    },
+    {
+      "id": "LmFireA",
+      "name": "甲 · 坑沿",
+      "kind": "place",
+      "x": 0.8,
+      "z": -9.2,
+      "radiusM": 0.8,
+      "note": "朝北压正面"
+    },
+    {
+      "id": "LmFireB",
+      "name": "乙 · 沟口",
+      "kind": "place",
+      "x": 4.5,
+      "z": 0.3,
+      "radiusM": 0.8,
+      "note": "朝东挡沟里清过来的"
+    },
+    {
+      "id": "LmFireC",
+      "name": "丙 · 散兵坑",
+      "kind": "pit",
+      "x": -9,
+      "z": -15,
+      "w": 3.2,
+      "d": 3.2,
+      "h": 1.2,
+      "y": -0.58,
+      "note": "朝西北护侧翼"
+    },
+    {
+      "id": "LmParapet",
+      "name": "胸墙",
+      "kind": "prop",
+      "x": 0,
+      "z": -10.6,
+      "w": 9,
+      "d": 1.4,
+      "h": 0.8,
+      "note": "03-4 战车一炮打塌中间一截"
+    },
+    {
+      "id": "LmFrontWestFold",
+      "name": "前沿沟西头北折",
+      "kind": "area",
+      "x": -62,
+      "z": -11,
+      "w": 3.4,
+      "d": 22,
+      "note": "西段守军顺沟撤到沟口"
+    },
+    {
+      "id": "LmCorner1",
+      "name": "拐角 1",
+      "kind": "place",
+      "x": 0.5,
+      "z": 11,
+      "radiusM": 1.5,
+      "note": "04 第一次回身顶"
+    },
+    {
+      "id": "LmBend",
+      "name": "斜折",
+      "kind": "place",
+      "x": 13,
+      "z": 21,
+      "radiusM": 1.5,
+      "note": "04 第二次回身"
+    },
+    {
+      "id": "LmLoneGrave1",
+      "name": "孤坟",
+      "kind": "prop",
+      "x": -20,
+      "z": -55,
+      "w": 3,
+      "d": 3,
+      "h": 1.1,
+      "note": "扫清带里平不掉的坟"
+    },
+    {
+      "id": "LmLoneGrave2",
+      "name": "孤坟",
+      "kind": "prop",
+      "x": 45,
+      "z": -65,
+      "w": 3,
+      "d": 3,
+      "h": 1.15,
+      "note": "扫清带里平不掉的坟"
+    },
+    {
+      "id": "LmGraveyard",
+      "name": "坟地",
+      "kind": "area",
+      "x": -31,
+      "z": -119.7,
+      "radiusM": 8,
+      "note": "轻机枪（西）架在坟头后"
+    },
+    {
+      "id": "LmHaystack",
+      "name": "麦秸垛",
+      "kind": "prop",
+      "x": 40,
+      "z": -138,
+      "w": 4,
+      "d": 3,
+      "h": 2.5,
+      "note": "轻机枪（东）靠在它西南角"
+    },
+    {
+      "id": "LmDitchMid",
+      "name": "干水沟（深 1.2 m）",
+      "kind": "place",
+      "x": 23.79,
+      "z": -134.19,
+      "radiusM": 2,
+      "note": "弯着腰走，坑里看不见头"
+    },
+    {
+      "id": "LmDitchEnd",
+      "name": "干水沟尽头",
+      "kind": "place",
+      "x": -63.34,
+      "z": -76.44,
+      "radiusM": 3,
+      "note": "03 沟里那个班从这出沟"
+    },
+    {
+      "id": "LmScarp",
+      "name": "地坎（北低 2 m）",
+      "kind": "place",
+      "x": 16,
+      "z": -206.86,
+      "radiusM": 4,
+      "note": "03 人从坎后那片低地翻上来"
+    },
+    {
+      "id": "LmMortar",
+      "name": "掷弹筒",
+      "kind": "place",
+      "x": 28,
+      "z": -213,
+      "radiusM": 2,
+      "note": "坑里只看得见发射的烟"
+    },
+    {
+      "id": "LmBundN1",
+      "name": "田埂 N1（离坑约 35 m）",
+      "kind": "place",
+      "x": -88,
+      "z": -43.54,
+      "radiusM": 1,
+      "note": "03 跃进扑在埂后"
+    },
+    {
+      "id": "LmBundN2",
+      "name": "田埂 N2（离坑约 60 m）",
+      "kind": "place",
+      "x": -88,
+      "z": -69.34,
+      "radiusM": 1,
+      "note": "03 跃进扑在埂后"
+    },
+    {
+      "id": "LmBundF1",
+      "name": "田埂 F1（离坑约 105 m）",
+      "kind": "place",
+      "x": -88,
+      "z": -113.49,
+      "radiusM": 1,
+      "note": "03 跃进扑在埂后"
+    },
+    {
+      "id": "LmBundF2",
+      "name": "田埂 F2（离坑约 145 m）",
+      "kind": "place",
+      "x": -88,
+      "z": -149.92,
+      "radiusM": 1,
+      "note": "03 跃进扑在埂后"
+    },
+    {
+      "id": "LmBundF3",
+      "name": "田埂 F3（离坑约 180 m）",
+      "kind": "place",
+      "x": -88,
+      "z": -186.55,
+      "radiusM": 1,
+      "note": "03 跃进扑在埂后"
+    },
+    {
+      "id": "LmTankSeen",
+      "name": "战车露头",
+      "kind": "place",
+      "x": 159,
+      "z": -20,
+      "radiusM": 4,
+      "note": "03-4 战车从这条路露头"
+    }
+  ],
   "ways": {
     "roads": [
       [

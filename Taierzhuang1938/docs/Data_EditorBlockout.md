@@ -152,7 +152,7 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
   ```
   - 每项 `{ id, name, kind, x, z, y?, w?, d?, h?, ry?, radiusM?, note? }`：`id` 全关唯一（和 blocks 的 id 不是一张表）；`name` ≤ 24 字；`kind` 七种：`hole`（洞口 / 缝）、`door`（门）、`window`（窗）、`pit`（坑 / 窖）、`area`（片区：给 `w` / `d` 或 `radiusM`）、`prop`（物件：石碾、麦秸垛、水缸、土地庙）、`place`（地名：村北口、东街东头）；`x, z` 中心（米）；`y` 可选的中心高度（不写就落地；窖这种从坑底立到地面的写 `y`）；`w / d` 要一起给、`h` 可选（给了就画贴着它的线框）；`ry` 弧度；`radiusM` 画地环；`note` ≤ 60 字，标签上的一行小字。至多 `BLOCKOUT_LANDMARK_LIMITS.maxItems`（400）项。
   - 校验在 `ValidateBlockoutScene` → `LandmarkIssues`（单独导出给生成器与测试用），归一化 `NormalizeLandmarks`（坏项跳过）。`LayoutFromSceneDoc` **不碰**它（布局里没有地标）：总控 `LoadLandmarks()` 在每次进关后自己再读一次场景文件只取 `landmarks`（第一关没有场景文件 = 没有地标），交给标记层与俯视图。
-  - 0610 的地标由生成器 `L0610Landmarks(sample)` 从锚点表填（§15）；**0105 / 1218 要加地标**：在各自的场景生成器里照 0610 的写法加一个 `L0105Landmarks` / `L1218Landmarks`（坐标取各自 `Data_…Space` 的常量）写进 `scene.landmarks`，重跑 `scene <Level> --force`，SceneTest 加「地标齐、都在场地里、关键的框对得上」。
+  - 0610 的地标由生成器 `L0610Landmarks(sample)` 从锚点表填（§15）；0105 由 `L0105Landmarks(sample, blocks, bridgeDeckTop)` 填（2026-10-20，43 个：防炮洞与洞口、支沟、支沟机枪、审问处、台阶、迂回组爬出处、02 三处回身打的掩体（框就是那三个摆件）、板桥、坡顶与坡沿、干沟与坑窝、凹路口、沟口、机枪坑与甲乙丙三个射位、胸墙、前沿沟西头北折、拐角 1、斜折、坑北的孤坟 / 坟地 / 麦秸垛 / 干水沟与出沟点 / 地坎 / 掷弹筒 / 五道田埂（标签放在 x −88，写离坑多远）/ 战车露头；SceneTest 查齐、过校验、坑和洞的框从坑底立到地面、掩体框对得上摆件、板桥框朝向对得上门板）；**1218 要加地标**：在各自的场景生成器里照 0610 的写法加一个 `L0105Landmarks` / `L1218Landmarks`（坐标取各自 `Data_…Space` 的常量）写进 `scene.landmarks`，重跑 `scene <Level> --force`，SceneTest 加「地标齐、都在场地里、关键的框对得上」。
 - `Data_FirstLevelP012Terrain.CreateP012Terrain` 加一个钩子：`layout.terrainSampler` 存在时，节点高度与 `RefineCells` 的细分高度都用它；**不存在时逐位不变**（`Script_FirstLevelWhiteboxTerrainTest --digest` 前后一致）。
 
 ## 3. 配置文件（`Blockout/<Level>.json`）

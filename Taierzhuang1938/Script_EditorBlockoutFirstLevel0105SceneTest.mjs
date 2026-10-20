@@ -18,7 +18,7 @@
 // 沟里那个班开场都在干水沟里、弯着腰坑里看不见；出沟后扑到 N2 / N1 后的每一格都被田埂挡住。
 
 import assert from "node:assert/strict";
-import { ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
+import { ValidateBlockoutScene, LandmarkIssues, BLOCKOUT_LANDMARK_KINDS } from "./Script_EditorBlockoutConfig.mjs";
 import { HeightGridSampler, IsSceneTreeBlock, BuildGroundPaint, LayoutFromSceneDoc, RasterizeBackdropPaint } from "./Script_EditorBlockoutLevels.mjs";
 import {
   BuildFirstLevel0105Scene, FloorWidthAt, NaturalHeight, L0105SightChecks, GullyFloorExtent, GullyBankHeights, PropPassage, PropsPerStraight,
@@ -474,7 +474,47 @@ assert.ok(pn.lmgW.block <= 0 && pn.lmgE.block <= 0, `坑里要看得见两挺轻
 console.log(`坑北前景：坟 ${pn.graves.map((g) => g.h).join("/")} m；田埂 ${pn.bundMin}…${pn.bundMax}；干水沟深 ${pn.ditchDepthMin}…${pn.ditchDepthMax}；地坎 ${pn.scarpMin}…${pn.scarpMax}；`
   + `掷弹筒组最少挡 ${pn.mortar.worst} m、烟露 ${-pn.smoke.worst} m；沟里弯腰的人最少挡 ${pn.ditch.worst} m`);
 
-console.log(`ok：${a.blocks.length} 块 + ${a.gates.length} 随信号块，${a.terrain.cols}×${a.terrain.rows} 网格；干沟沟底宽 ${ext.min}…${ext.max} m、连续 ${ext.floorLen} m；`
+// --- 地标（§2.2 landmarks，2026-10-20）：齐、都在场地里、过校验；坑 / 洞 / 板桥 / 麦秸垛的框对得上实物；三处回身打的掩体框就是那三个摆件 ---
+{
+  const lms = a.landmarks;
+  assert.ok(Array.isArray(lms) && lms.length >= 35, `地标要有 35 个以上，现在 ${lms?.length}`);
+  const errors = [];
+  LandmarkIssues(lms, errors);
+  assert.deepEqual(errors, [], "地标过校验");
+  const byName = new Map(lms.map((lm) => [lm.name, lm]));
+  const NEED = [P.dugout.name, P.dugoutMouth.name, "支沟", P.enemyBranchGun.name, P.interrogation.name, P.branchMouth.name, P.outflankExit.name,
+    "弹药箱垛", "土袋垛（台阶拐角）", "土袋垛（拐角 2）", BR.name, P.crest.name, "干沟（集结处）", "凹路口", P.pit.name, P.fireA.name, P.fireB.name, P.fireC.name,
+    P.parapet.name, P.corner1.name, "坟地", "麦秸垛", "干水沟尽头", "地坎（北低 2 m）", P.mortar.name, P.tankFirstSeen.name];
+  for (const name of NEED) assert.ok(byName.has(name), `缺地标「${name}」`);
+  assert.equal(lms.filter((lm) => /^田埂 /.test(lm.name)).length, PN.bunds.length, "每道田埂一个地标");
+  const B = a.bounds;
+  for (const lm of lms) {
+    assert.ok(lm.x >= B.minX && lm.x <= B.maxX && lm.z >= B.minZ && lm.z <= B.maxZ, `地标「${lm.name}」出了场地 (${lm.x},${lm.z})`);
+    assert.ok(BLOCKOUT_LANDMARK_KINDS.includes(lm.kind), `地标「${lm.name}」kind ${lm.kind}`);
+  }
+  // 坑 / 洞：框从坑底立到地面（y − h/2 ≈ 坑底，y + h/2 ≈ 坑边自然地面上下 0.25 m）
+  for (const [name, c, depth] of [[P.pit.name, P.pit, P.pit.floorDepth], [P.dugout.name, P.dugout, P.dugout.floorDepth]]) {
+    const lm = byName.get(name);
+    assert.ok(Math.abs(lm.y - lm.h / 2 - sample(c.x, c.z)) < 0.05, `${name} 地标的底 = 坑底`);
+    assert.ok(Math.abs(lm.w - c.w) < 0.01 && Math.abs(lm.d - c.d) < 0.01 && Math.abs(lm.h - depth) < 0.01, `${name} 地标的尺寸 = 坑的尺寸`);
+  }
+  // 三处回身打的掩体：框就是那三个摆件（位置、尺寸、朝向）
+  for (const [name, id] of [["弹药箱垛", "CrateStack_B1"], ["土袋垛（台阶拐角）", "SandbagStack_J1"], ["土袋垛（拐角 2）", "SandbagStack_C2"]]) {
+    const lm = byName.get(name), b = a.blocks.find((q) => q.id === id);
+    assert.ok(b && Math.hypot(lm.x - b.x, lm.z - b.z) < 0.02 && Math.abs(lm.w - b.w) < 0.02 && Math.abs((lm.ry || 0) - (b.ry || 0)) < 0.01, `${name} 地标对不上摆件 ${id}`);
+  }
+  // 板桥：框的朝向 = 门板的朝向（本地 Z 顺路），顶在桥面附近
+  {
+    const lm = byName.get(BR.name), board = [...a.blocks, ...a.gates].find((q) => q.id === "BridgeDoorBoard_01");
+    assert.ok(Math.abs(lm.ry - Math.atan2(fx, fz)) < 0.01, `板桥地标朝向 ${lm.ry}`);
+    assert.ok(Math.abs(lm.y + lm.h / 2 - (board.y + board.h / 2)) < 0.15, "板桥地标顶在桥面上");
+  }
+  const hsLm = byName.get("麦秸垛");
+  assert.ok(Math.hypot(hsLm.x - PN.haystack.x, hsLm.z - PN.haystack.z) < 0.01 && Math.abs(hsLm.h - PN.haystack.h) < 0.01, "麦秸垛地标对上麦秸垛");
+  for (const kind of ["pit", "area", "prop", "place"]) assert.ok(lms.some((lm) => lm.kind === kind), `缺 ${kind} 类地标`);
+}
+
+console.log(`ok：${a.blocks.length} 块 + ${a.gates.length} 随信号块 + ${a.landmarks.length} 地标，${a.terrain.cols}×${a.terrain.rows} 网格；干沟沟底宽 ${ext.min}…${ext.max} m、连续 ${ext.floorLen} m；`
   + `视线 ① 最少挡 ${sights.assembly.worst} m、② 最少挡 ${sights.south.worst} m；桥下净空 ${clear.toFixed(2)} m；门板缝 ${(gapMin * 100).toFixed(0)}–${(gapMax * 100).toFixed(0)} cm；摆件 ${L0105_PROPS.length}`);
 
 function BranchZ(x) { return 67.1 + (64.5 - 67.1) * (x - 21.9) / (63 - 21.9); }

@@ -26,7 +26,7 @@
 // 纪律：不读时钟、不读 git（commit / generatedAt 由 CLI 传入）；所有随机来自 TrenchPlan 的种子噪声，生成两次逐字相同。
 // ===========================================================================
 
-import { BLOCKOUT_SCENE_SCHEMA } from "./Script_EditorBlockoutConfig.mjs";
+import { BLOCKOUT_SCENE_SCHEMA, LandmarkIssues } from "./Script_EditorBlockoutConfig.mjs";
 import { CompileTrenchNetwork } from "./Script_TrenchPlan.mjs";
 import { TRENCH_EARTH_PROFILE } from "./Data_TrenchAppearance.mjs";
 import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
@@ -35,7 +35,7 @@ import {
   L0105_ROAD, L0105_ROAD_WIDTH_M, L0105_PLACES, L0105_SIGNALS, L0105_SPAWN,
   L0105_GULLY, L0105_GULLY_TREES, L0105_GULLY_SOUTH_BERM, L0105_SUNKEN_LANE, L0105_BRIDGE, L0105_BRANCH_SOUTH_BERM,
   L0105_PROPS, L0105_PROP_KINDS, PointBeside, LineLength, GullyU, L0105_GULLY_POCKETS,
-  L0105_PIT_NORTH, BundZ, ScarpZ,
+  L0105_PIT_NORTH, BundZ, ScarpZ, PointAlong, DitchEmerge,
   L0105_NORTH_ROAD, L0105_NORTH_ROAD_HALF_W, L0105_FIELD_PATH, L0105_FIELD_PATH_HALF_W, L0105_FIELD_PAINT,
   L0105_FIELD_TREES, L0105_ROAD_TREES, L0105_PATH_TREES, L0105_FIELD_GRAVES, L0105_FARM,
   L0105_BACKDROP, L0105_BACKDROP_ROAD, L0105_BACKDROP_PATHS, L0105_BACKDROP_VILLAGES, L0105_BACKDROP_HILLS,
@@ -1274,6 +1274,78 @@ export function L0105SightChecks(sample) {
 // ---------------------------------------------------------------------------
 // 场景
 
+
+// ---------------------------------------------------------------------------
+// 地标（§2.2 landmarks，2026-10-20，格式与写法照 0610 的 L0610Landmarks）：白盒灰里看不清的关键地方，编辑器画亮色线框 + 光柱 + 标签。
+// 坐标一律取锚点表（L0105_PLACES / L0105_PIT_NORTH / L0105_BRIDGE …）或已经生成的体块，不抄数字；有尺寸的给 w / d / h，片区给宽深或半径，地名只给点。
+
+/** 全部地标。sample 给坑 / 洞这种要显式 y 的；blocks 取摆件的实际尺寸与朝向；bridgeDeckTop 是板桥桥面顶。 */
+export function L0105Landmarks(sample, blocks, bridgeDeckTop) {
+  const L = (id, name, kind, x, z, extra = {}) => ({ id, name, kind, x: R2(x), z: R2(z), ...extra });
+  const Size = (w, d, h) => ({ w: R2(w), d: R2(d), h: R2(h) });
+  const FromBlock = (id) => { const b = blocks.find((q) => q.id === id); if (!b) throw new Error(`地标找不到体块 ${id}`); return b; };
+  const BlockBox = (b) => ({ ...Size(b.w, b.d, b.h), ...(b.ry ? { ry: R2(b.ry) } : {}) });
+  const PitY = (c, depth) => R2(sample(c.x, c.z) + depth / 2);   // 坑 / 洞：线框从坑底立到地面
+  const PN = L0105_PIT_NORTH;
+  // 支沟：支沟口 → 洞口一条直线，本地 X 顺着沟（同 PropBlocks 的 ry 口径）
+  const BR = L0105_TRENCHES.branch, b0 = BR[0], b1 = BR[BR.length - 1];
+  const brLen = Math.hypot(b1.x - b0.x, b1.z - b0.z), brRy = Math.atan2(-(b1.z - b0.z) / brLen, (b1.x - b0.x) / brLen);
+  // 板桥：本地 Z 顺路（同 BridgeBlocks 的 ry 口径）
+  const BRG = L0105_BRIDGE, br = BRG.yawDeg * Math.PI / 180, bfx = -Math.sin(br), bfz = -Math.cos(br);
+  const bridgeRy = Math.atan2(bfx, bfz);
+  const par = P.parapet, crest = P.crestPosts;
+  const crestX = (crest[0].x + crest[crest.length - 1].x) / 2, crestZ = crest.reduce((a, q) => a + q.z, 0) / crest.length;
+  const yard = { x: PN.graveyard.reduce((a, g) => a + g.x, 0) / PN.graveyard.length, z: PN.graveyard.reduce((a, g) => a + g.z, 0) / PN.graveyard.length };
+  const hs = PN.haystack, emerge = DitchEmerge(), ditchMid = PointAlong(PN.ditch.line, 200);
+  const bundLabelX = -88;
+  const crate = FromBlock("CrateStack_B1"), sbJ = FromBlock("SandbagStack_J1"), sbC = FromBlock("SandbagStack_C2");
+  const front = L0105_TRENCHES.front;
+  return [
+    // 01–02：防炮洞、支沟、审问处、台阶、迂回、三处回身打的掩体
+    L("LmDugout", P.dugout.name, "pit", P.dugout.x, P.dugout.z, { ...Size(P.dugout.w, P.dugout.d, P.dugout.floorDepth), y: PitY(P.dugout, P.dugout.floorDepth), note: "01 开场；洞口朝西对着支沟" }),
+    L("LmDugoutMouth", P.dugoutMouth.name, "place", P.dugoutMouth.x, P.dugoutMouth.z, { radiusM: 1.4, note: "01 塌洞，顺子被压在这" }),
+    L("LmBranch", "支沟", "area", (b0.x + b1.x) / 2, (b0.z + b1.z) / 2, { w: R2(brLen), d: L0105_TRENCH_SECTION.branch.floorW, ry: R2(brRy), note: "02 拖着冬瓜从洞口往西拖" }),
+    L("LmBranchGun", P.enemyBranchGun.name, "place", P.enemyBranchGun.x, P.enemyBranchGun.z, { radiusM: 1.2, note: "01–02 架在北沿上顺沟压支沟口" }),
+    L("LmInterrogation", P.interrogation.name, "place", P.interrogation.x, P.interrogation.z, { radiusM: 1.5, note: "02 冬瓜在这挨刺刀" }),
+    L("LmSteps", P.branchMouth.name, "place", P.steps.x, P.steps.z, { radiusM: 1.5, note: "02 何有田几个在台阶上压机枪" }),
+    L("LmOutflankExit", P.outflankExit.name, "place", P.outflankExit.x, P.outflankExit.z, { radiusM: 1.2, note: "02 班长一组从这爬出去绕南沿" }),
+    L("LmCover1", "弹药箱垛", "prop", crate.x, crate.z, { ...BlockBox(crate), note: "02 拖被子第一次回身打" }),
+    L("LmCover2", "土袋垛（台阶拐角）", "prop", sbJ.x, sbJ.z, { ...BlockBox(sbJ), note: "02 第二次回身打" }),
+    L("LmCover3", "土袋垛（拐角 2）", "prop", sbC.x, sbC.z, { ...BlockBox(sbC), note: "02 第三次回身打" }),
+    L("LmCorner2", P.corner2.name, "place", P.corner2.x, P.corner2.z, { radiusM: 1.5 }),
+    // 05：板桥、坡顶；02 末 / 06：干沟
+    L("LmBridge", BRG.name, "prop", BRG.x, BRG.z, { ...Size(BRG.deckW, BRG.spanM, 0.4), ry: R2(bridgeRy), y: R2(bridgeDeckTop - 0.2), note: "05 战车只能走桥，班长带顺子趴桥下" }),
+    L("LmCrest", P.crest.name, "place", P.crest.x, P.crest.z, { radiusM: 2 }),
+    L("LmCrestPosts", "坡沿（别的班守着）", "area", crestX, crestZ, { w: R2(crest[crest.length - 1].x - crest[0].x + 4), d: 3, note: "02 末接应，05 守坡沿" }),
+    L("LmAssemblyEntry", P.assemblyEntry.name, "place", P.assemblyEntry.x, P.assemblyEntry.z, { radiusM: 1.5 }),
+    L("LmGully", "干沟（集结处）", "area", P.assembly.x, P.assembly.z, { radiusM: 9, note: "02 末撤到这里" }),
+    L("LmPocketA", "坑窝 A", "place", L0105_GULLY_POCKETS.a.x, L0105_GULLY_POCKETS.a.z, { radiusM: 2 }),
+    L("LmPocketB", "坑窝 B", "place", L0105_GULLY_POCKETS.b.x, L0105_GULLY_POCKETS.b.z, { radiusM: 2 }),
+    L("LmWoundedBay", P.woundedBay.name, "place", P.woundedBay.x, P.woundedBay.z, { radiusM: 1.5 }),
+    L("LmLaneHead", "凹路口", "place", P.laneHead.x, P.laneHead.z, { radiusM: 2.5 }),
+    // 03–04：沟口、机枪坑与三个射位、胸墙、西头北折、拐角 1、斜折
+    L("LmMouth", P.mouth.name, "place", P.mouth.x, P.mouth.z, { radiusM: 1.5 }),
+    L("LmPit", P.pit.name, "pit", P.pit.x, P.pit.z, { ...Size(P.pit.w, P.pit.d, P.pit.floorDepth), y: PitY(P.pit, P.pit.floorDepth), note: "03 守坑，一挺捷克式" }),
+    L("LmFireA", P.fireA.name, "place", P.fireA.x, P.fireA.z, { radiusM: 0.8, note: "朝北压正面" }),
+    L("LmFireB", P.fireB.name, "place", P.fireB.x, P.fireB.z, { radiusM: 0.8, note: "朝东挡沟里清过来的" }),
+    L("LmFireC", P.fireC.name, "pit", P.fireC.x, P.fireC.z, { ...Size(P.fireC.radiusM * 2, P.fireC.radiusM * 2, P.fireC.depth), y: PitY(P.fireC, P.fireC.depth), note: "朝西北护侧翼" }),
+    L("LmParapet", P.parapet.name, "prop", par.x, par.z, { ...Size(par.w, par.d, par.h), note: "03-4 战车一炮打塌中间一截" }),
+    L("LmFrontWestFold", "前沿沟西头北折", "area", front[0].x, (front[0].z + front[1].z) / 2, { w: L0105_TRENCH_SECTION.front.floorW, d: R2(front[1].z - front[0].z), note: "西段守军顺沟撤到沟口" }),
+    L("LmCorner1", P.corner1.name, "place", P.corner1.x, P.corner1.z, { radiusM: 1.5, note: "04 第一次回身顶" }),
+    L("LmBend", P.bend.name, "place", P.bend.x, P.bend.z, { radiusM: 1.5, note: "04 第二次回身" }),
+    // 03 坑北：孤坟、坟地、麦秸垛、干水沟、地坎、掷弹筒、五道田埂、战车露头
+    ...PN.loneGraves.map((g, i) => L(`LmLoneGrave${i + 1}`, "孤坟", "prop", g.x, g.z, { ...Size(PN.graveBaseR * 2, PN.graveBaseR * 2, g.h), note: "扫清带里平不掉的坟" })),
+    L("LmGraveyard", "坟地", "area", yard.x, yard.z, { radiusM: 8, note: "轻机枪（西）架在坟头后" }),
+    L("LmHaystack", "麦秸垛", "prop", hs.x, hs.z, { ...Size(hs.w, hs.d, hs.h), note: "轻机枪（东）靠在它西南角" }),
+    L("LmDitchMid", "干水沟（深 1.2 m）", "place", ditchMid.x, ditchMid.z, { radiusM: 2, note: "弯着腰走，坑里看不见头" }),
+    L("LmDitchEnd", "干水沟尽头", "place", emerge.x, emerge.z, { radiusM: 3, note: "03 沟里那个班从这出沟" }),
+    L("LmScarp", "地坎（北低 2 m）", "place", 16, ScarpZ(16), { radiusM: 4, note: "03 人从坎后那片低地翻上来" }),
+    L("LmMortar", P.mortar.name, "place", P.mortar.x, P.mortar.z, { radiusM: 2, note: "坑里只看得见发射的烟" }),
+    ...PN.bunds.map((b) => L(`LmBund${b.id}`, `田埂 ${b.id}（离坑约 ${Math.round(Math.abs(BundZ(b, bundLabelX) - P.pit.z) / 5) * 5} m）`, "place", bundLabelX, BundZ(b, bundLabelX), { radiusM: 1, note: "03 跃进扑在埂后" })),
+    L("LmTankSeen", P.tankFirstSeen.name, "place", P.tankFirstSeen.x, P.tankFirstSeen.z, { radiusM: 4, note: "03-4 战车从这条路露头" }),
+  ];
+}
+
 /** 生成场景文档。commit / generatedAt 由 CLI 传进来；notes 收抽样核对行（CLI 打到控制台）。 */
 export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", notes = [] } = {}) {
   const { Ground } = L0105Ground();
@@ -1290,6 +1362,12 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
   const farm = FarmLayout();
   const paint = L0105Paint(farm);
   const backdrop = L0105Backdrop(sample, farm);
+  const landmarks = L0105Landmarks(sample, [...blocks, ...gates], facts.bridgeDeckTop);
+  {
+    const errors = [];
+    LandmarkIssues(landmarks, errors);
+    if (errors.length) throw new Error(`地标表有错：${errors.join("；")}`);
+  }
 
   // --- 抽样核对 ---
   const at = (p) => R2(sample(p.x, p.z));
@@ -1380,6 +1458,8 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
     paint,
     // 2026-10-20 第三版：远景层（场地外的田、路、四个村子、东边低山；只看不走），§2.2 backdrop
     backdrop,
+    // 2026-10-20：地标（§2.2 landmarks，编辑器「地标」开关）：洞、支沟、三处回身打的掩体、板桥、坑与三个射位、坑北的坟 / 垛 / 沟 / 坎 / 田埂
+    landmarks,
     ways: {
       roads: [Pts(L0105_ROAD), Pts(L0105_SUNKEN_LANE.line), Pts(L0105_NORTH_ROAD), Pts(L0105_FIELD_PATH)],
       trenches: [Pts(L0105_TRENCHES.front), Pts(L0105_TRENCHES.traffic), Pts(L0105_TRENCHES.branch), Pts(L0105_TRENCHES.crawlSap)],
