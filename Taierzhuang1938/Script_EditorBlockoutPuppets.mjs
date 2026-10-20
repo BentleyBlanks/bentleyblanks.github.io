@@ -70,6 +70,12 @@
 //   · 预演片段：PvStandTalkLowRifle（右手提枪说话）换成同一套的背枪版 PvStandTalkSlung（PREVIZ_CLIP_REMAP）；
 //     卧倒抱头 VilDuckProne 加进背枪表（Data_BlockoutPrevizClips.PREVIZ_WEAPON_SLUNG）。
 //   · Probe 多给 gait（背枪步态的模式）、rifleInHand / rifleOnBack。
+//
+// 2026-10-21（担架也用正式资产，用户）：担架 = 全游戏同一副竹竿布兜担架（Script_StretcherAsset，Model_BambooStretcher.glb，
+//   开机就读进来了；没读到时先画体块、读到了再换）。挂在担架组（bed）下面，所以抬着 / 一头着地 / 放地上 / 挂车上的高度与倾角
+//   照旧由 LitterPose / ride 摆。资产自己的坐标：+Z 朝前头抬的人、竿心 y = 0.12、竿长 2.15 m；白盒的前头在本地 −Z，
+//   所以转 180°，并往下挪 0.09 m 让竿心落在体块竿子原来的高度（担架组原点 + 0.03）。几何与材质全场共用一份，拆的时候不拆。
+//   名字带「被」不带「担架」的 litter（01–05 两人拖的单被）不是担架，照旧是体块。
 
 import * as THREE from "three";
 import { SampleTransition } from "./Script_EditorBlockoutConfig.mjs";
@@ -79,6 +85,7 @@ import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions } from "./Data_FirstLeve
 import { LoadLugouCastModels } from "./Script_CharacterModel.mjs";
 import { PREVIZ_WEAPON_HIDDEN } from "./Data_BlockoutPrevizClips.mjs";
 import { LoadDraftCartAssets, CreateDraftCartInstance } from "./Script_DraftCartModel.mjs";
+import { LoadStretcherAsset, StretcherAssetGeometry, CreateStretcherMaterial } from "./Script_StretcherAsset.mjs";
 
 /** 不拿枪的定妆角色（开场导演 Spawn 时给 unarmed:true 的那几个）。 */
 const UNARMED_CASTS = new Set(["interpreter"]);
@@ -107,7 +114,9 @@ export const BLOCKOUT_PUPPETS = Object.freeze({
   /** 百姓 / 小孩的身体缺省："rig" = NRA 骨架占位身体（能放片段）；"procedural" = 旧的程序化 tzm 身体。单位字段 body 可覆盖。 */
   civilianBody: "rig",
   tank: { w: 2.18, d: 5.75, h: 1.2, turretW: 1.5, turretD: 1.7, turretH: 0.75, barrel: 1.6 },
-  litter: { w: 0.7, d: 2.1, y: 0.78, groundY: 0.12, bearerGapM: 0.55 },
+  litter: { w: 0.7, d: 2.1, y: 0.78, groundY: 0.12, bearerGapM: 0.55,
+    /** 正式担架模型在担架组里的摆法（文件头 2026-10-21）：转 180°（前头朝 −Z）、竿心落到组原点 + 0.03。 */
+    modelYaw: Math.PI, modelY: 0.03 - 0.12 },
   cart: { w: 1.5, d: 2.4, h: 0.55, y: 0.75, wheel: 0.62 },
   animal: { w: 0.6, d: 1.7, h: 0.75, y: 0.95, head: 0.55 },
   /** 战车 / 车 / 牲口用正式模型（false = 全用体块）。 */
@@ -336,9 +345,11 @@ export class BlockoutPuppets {
     const group = new THREE.Group();
     group.name = `BlockoutPuppet_${unit.id}`;
     const side = unit.side === "ija" ? m.ija : unit.side === "civ" ? m.civ : m.nra;
-    // 战车 / 车 / 牲口的体块放进子组：正式模型到了就整组藏起来（_DressModel）
-    const boxes = unit.kind === "litter" ? group : new THREE.Group();
-    if (boxes !== group) { boxes.name = "BlockoutBoxes"; group.add(boxes); group.userData.boxes = boxes; }
+    // 战车 / 车 / 牲口 / 担架的体块放进子组：正式模型到了就整组藏起来（_DressModel）。担架的子组在担架组（bed）里
+    const boxes = new THREE.Group();
+    boxes.name = "BlockoutBoxes";
+    group.userData.boxes = boxes;
+    if (unit.kind !== "litter") group.add(boxes);
     if (unit.kind === "tank") {
       const t = P.tank;
       Box(boxes, side, t.w, t.h, t.d, 0, 0.35 + t.h / 2, 0);
@@ -350,9 +361,10 @@ export class BlockoutPuppets {
       const l = P.litter;
       const bed = new THREE.Group();
       bed.name = "BlockoutStretcher";
-      Box(bed, m.cloth, l.w, 0.1, l.d, 0, 0, 0);
-      Box(bed, m.wood, 0.05, 0.05, l.d + 0.9, -l.w / 2, 0.03, 0);
-      Box(bed, m.wood, 0.05, 0.05, l.d + 0.9, l.w / 2, 0.03, 0);
+      Box(boxes, m.cloth, l.w, 0.1, l.d, 0, 0, 0);
+      Box(boxes, m.wood, 0.05, 0.05, l.d + 0.9, -l.w / 2, 0.03, 0);
+      Box(boxes, m.wood, 0.05, 0.05, l.d + 0.9, l.w / 2, 0.03, 0);
+      bed.add(boxes);
       group.add(bed);
       group.userData.stretcher = bed;
     } else if (unit.kind === "cart" || unit.kind === "animal") {
@@ -412,6 +424,7 @@ export class BlockoutPuppets {
       // 正式模型：车 / 牲口的几何与骨架是共用的（CloneSkinnedRig），只停动画摘下来；战车是每辆现造的几何，照拆。材质都是共用的，不拆。
       const model = puppet.body.userData.model;
       if (model?.draft) model.draft.Dispose();
+      else if (model?.stretcher) model.stretcher.removeFromParent();   // 几何与材质全场共用，不拆
       else if (model?.tank) model.tank.root.traverse(o => { if (o.isMesh) o.geometry.dispose(); });
       (puppet.body.userData.boxes || puppet.body).traverse(o => { if (o.isMesh) o.geometry.dispose(); });
       puppet.body.removeFromParent();
@@ -694,6 +707,24 @@ export class BlockoutPuppets {
         tank.root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
         body.add(tank.root);
         model = { tank, turret: tank.nodes?.get?.("turret") || null };
+      }
+    } else if (unit.kind === "litter" && !(/被/.test(unit.name || "") && !/担架/.test(unit.name || ""))) {
+      // 01–05 的「单被」（拖着走的被子）也是 litter 单位：名字带「被」不带「担架」的照旧是体块，不换成担架
+      const geometry = StretcherAssetGeometry();
+      if (!geometry) {
+        // 开机本来就读了；万一还没到（或读失败）就再要一次，到了的那一帧换，失败就一直是体块
+        if (!this.stretcherLoading) this.stretcherLoading = LoadStretcherAsset().catch((error) => { console.warn("[BlockoutPuppets] stretcher model failed; litters stay blocks", error); this.stretcherFailed = true; });
+        if (!this.stretcherFailed) return;
+      } else {
+        const L = BLOCKOUT_PUPPETS.litter;
+        this.stretcherMaterial ||= CreateStretcherMaterial();
+        const mesh = new THREE.Mesh(geometry, this.stretcherMaterial);
+        mesh.name = "BlockoutBambooStretcher";
+        mesh.rotation.y = L.modelYaw;
+        mesh.position.y = L.modelY;
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        body.userData.stretcher.add(mesh);
+        model = { stretcher: mesh };
       }
     } else if (unit.kind === "cart" || unit.kind === "animal") {
       if (this.draftAssets === null) { this._LoadDraft(); return; }
@@ -1100,7 +1131,7 @@ export class BlockoutPuppets {
       seat: puppet.seat ? { ...puppet.seat } : null,
       rootY: human ? human.actor.root.position.y : (puppet.body ? puppet.body.position.y : null),
       // 2026-10-20：正式模型（"Type89Tank" / "ox" / "horse"；null = 还是体块）与车自己的牲口显不显示
-      model: (() => { const m = puppet.body?.userData.model; return m?.tank ? BLOCKOUT_PUPPETS.tankModel : m?.kind ?? null; })(),
+      model: (() => { const m = puppet.body?.userData.model; return m?.tank ? BLOCKOUT_PUPPETS.tankModel : m?.stretcher ? "BambooStretcher" : m?.kind ?? null; })(),
       draftAnimalVisible: puppet.body?.userData.model?.draft ? puppet.body.userData.model.draft.animalRoot.visible : null,
       draftTravelM: puppet.body?.userData.model?.draft ? puppet.body.userData.model.travelM : null,
       rootAboveCarrierGround: puppet.seat && (human || puppet.body) ? (human ? human.actor.root.position.y : puppet.body.position.y) - puppet.seat.carrierY : null,
@@ -1123,5 +1154,6 @@ export class BlockoutPuppets {
     this.plan = null;
     this.root.removeFromParent();
     for (const material of Object.values(this.materials)) material.dispose();
+    this.stretcherMaterial?.dispose();
   }
 }
