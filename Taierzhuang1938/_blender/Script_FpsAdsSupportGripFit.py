@@ -11,10 +11,14 @@ jointly with the fingers: palm skin against the real fore-end, no penetration
 (nearest normal + three-ray parity), the production two-bone IK's minimum wrist
 bend, and the highest hand point seen from the ADS eye (ray-cast against the
 rifle) kept in the COD band 0.18-0.31 screen heights under the sight line (neither
-raised to it nor hidden). Fingers: per digit deltas from the authored hip rotations
-within normal abduction, distal pads on the fore-end, skin >= 0.6 mm off the wood,
-not above that band. The shipped grips use FPS_ADS_ROLL_ANCHOR=0.2 with
-FPS_ADS_SHOULDER (see docs/Data_FpsRifleView20261016.md v12).
+raised to it nor hidden). Fingers are pure hinges about each joint's captured curl
+axis, measured like Script_FpsHandPoseTest: finger MCP -10..95 deg plus abduction
+(index/middle/ring/little +-20/12/15/20), PIP 0..105, DIP 0..80, thumb MCP/IP -5..60/80
+(the thumb base keeps three free axes), so no joint bends backwards. Distal pads on the
+fore-end (FPS_ADS_REACH), skin >= 0.6 mm off the wood, finger top under
+FPS_ADS_FINGER_TOP (weight FPS_ADS_FINGER_TOP_WEIGHT). The shipped grips use
+FPS_ADS_ROLL_ANCHOR=0.2 with FPS_ADS_SHOULDER; the per-rifle settings are in
+docs/Data_FpsRifleView20261016.md v12.
 
 FPS_ADS_PALM (json {weapon: palm params}) reruns the fingers on fixed palms;
 FPS_ADS_PALM_SEED refines from given palms; FPS_ADS_ROLL_ANCHOR / FPS_ADS_ROLL_SEEDS
@@ -161,7 +165,7 @@ for wid in ids:
         match = re.search(r'finger(\d)(\d)?$', name, re.I)
         chains[name] = {**c, 'digit': int(match[1]), 'segment': int(match[2] or 0), 'W': M4(c['world']),
                         'P': M4(c['parentWorld']), 'axisV': Vector(c['axis']), 'spreadV': Vector(c['spreadAxis']),
-                        'localQ': Q(c['local'])}
+                        'localQ': Q(c['local']), 'restQ': Q(c['rest'])}
     handName = [n for n in pkg['boneNames'] if re.search(r'l[_ ]?hand$', n, re.I)][0]
 
     # Skin samples owned by the left hand or its fingers.
@@ -241,7 +245,12 @@ for wid in ids:
             D = D @ C0 @ Matrix.Rotation(p[6], 4, 'Y') @ C0inv
         return D
 
-    targetNdc = -0.36   # hand and fingers stay below 0.18 screen heights under the sight line
+    targetNdc = float(Setting('FPS_ADS_TOP', -0.36))   # hand and fingers stay below this NDC (−0.36 = 0.18 screen heights)
+    topWeight = float(Setting('FPS_ADS_TOP_WEIGHT', 6.0))
+    fingerTopWeight = float(Setting('FPS_ADS_FINGER_TOP_WEIGHT', 4.0))   # 0: visible fingers are fine if anatomical
+    fingerTop = float(Setting('FPS_ADS_FINGER_TOP', targetNdc))
+    reachWeight = float(Setting('FPS_ADS_REACH', 60))       # distal pad onto the wood
+    anchorShift = float(Setting('FPS_ADS_ANCHOR_SHIFT', 60))  # palm translation cost near the roll anchor
     # COD Type 38 ADS: the sleeve cuff sits ~0.30 screen heights left of and under the sight
     # line and the forearm runs from there to the lower-left corner.
     cuffTarget = json.loads(Setting('FPS_ADS_CUFF')) if Setting('FPS_ADS_CUFF') else None
@@ -275,7 +284,7 @@ for wid in ids:
         # COD Type 38 ADS: the support hand shows left of the receiver, its top about
         # 0.19 screen heights under the sight line, the sleeve below it. Neither
         # hidden (v12 first cut) nor raised to the sight line (the original blob).
-        cost += 6.0 * max(0, top - targetNdc) + 6.0 * max(0, handLow - top) + 2.0 * rightShare + 8.0 * cuffMiss
+        cost += topWeight * max(0, top - targetNdc) + 6.0 * max(0, handLow - top) + 2.0 * rightShare + 8.0 * cuffMiss
         cost += .4 * Vector(p[3:6]).length + .02 * Vector(p[:3]).length
         if detail:
             return {'cost': cost, 'rootGapMm': rootGap * 1000, 'contactXMm': (contactX - centerX) * 1000, 'penMm': pen * 1000, 'nearestMm': nearest * 1000, 'mean40Mm': mean40 * 1000, 'meanShare35Mm': meanShare * 1000,
@@ -287,29 +296,80 @@ for wid in ids:
     print(json.dumps({'weapon': wid, 'stage': 'hip', **hip}), flush=True)
     pads = {d: (pkg['pads'][f'l{d}2']['bone'], Vector(pkg['pads'][f'l{d}2']['point'])) for d in range(5)}
 
+    # Anatomical hinge limits (degrees), measured exactly like Script_FpsHandPoseTest:
+    # twist of rest^-1 * q about the captured curl axis. PIP/DIP never bend backwards.
+    HINGE = {(0, 1): (-5, 60), (0, 2): (-5, 80)}
+    for d in range(1, 5):
+        # PIP/DIP stay at or above straight. The MCP can extend passively 20-30 degrees, but a
+        # raised knuckle over a curled PIP reads as a claw (HanYang middle -22 deg), so 10 at most.
+        HINGE[(d, 0)], HINGE[(d, 1)], HINGE[(d, 2)] = (-10, 95), (0, 105), (0, 80)
+
+    def Hinge(name, q):
+        c = chains[name]
+        relative = c['restQ'].inverted() @ q
+        if relative.w < 0:
+            relative = Quaternion((-relative.w, -relative.x, -relative.y, -relative.z))
+        axis = c['axisV'].normalized()
+        projection = Vector((relative.x, relative.y, relative.z)).dot(axis)
+        twist = Quaternion((relative.w, *(axis * projection)))
+        twist = Quaternion() if twist.magnitude < 1e-10 else twist.normalized()
+        flex = math.degrees(2 * math.atan2(Vector((twist.x, twist.y, twist.z)).dot(axis), twist.w))
+        off = math.degrees((relative @ twist.inverted()).angle)
+        return flex, off
+
+    def AnatomyCost(quats):
+        cost, worst = 0., []
+        for name, q in quats.items():
+            c = chains[name]
+            limits = HINGE.get((c['digit'], c['segment']))
+            if not limits:
+                continue
+            flex, off = Hinge(name, q)
+            cost += .5 * (max(0, limits[0] - flex) + max(0, flex - limits[1]))
+            if c['segment'] > 0:
+                cost += .2 * max(0, off - 8)
+            worst.append((name[-8:], round(flex, 1), round(off, 1)))
+        return cost, worst
+
+    hipHinges = [(n[-8:], *[round(v, 1) for v in Hinge(n, chains[n]['localQ'])]) for n in sorted(chains)]
+    print(json.dumps({'weapon': wid, 'stage': 'hip-hinges', 'hinges': hipHinges}), flush=True)
+
     def FK(D, digit, params):
-        transforms, rotations, parent = {}, {}, None
+        """Digits 1-4: [MCP flex, PIP flex, DIP flex, MCP spread]; thumb: [CMC x, y, z deltas
+        on the authored CMC, MCP flex, IP flex]. PIP/DIP/thumb MCP/IP are rebuilt as pure
+        hinges from the bind rest (rest @ hinge), like Script_FpsWeaponGripFit, so they can
+        neither twist sideways nor bend backwards past the bounds."""
+        transforms, rotations, quats, parent = {}, {}, {}, None
         for name in Bones(digit):
             c = chains[name]
             seg = c['segment']
-            q = c['localQ'].copy()
             if digit == 0 and seg == 0:
-                q = q @ Euler((params[0] * DEG, params[1] * DEG, params[2] * DEG), 'XYZ').to_quaternion()
+                q = c['localQ'] @ Euler((params[0] * DEG, params[1] * DEG, params[2] * DEG), 'XYZ').to_quaternion()
             else:
-                curl = params[3 + seg - 1] if digit == 0 else params[seg]
-                q = q @ Quaternion(c['axisV'], curl * DEG)
-                if seg == 0:
+                flex = params[3 + seg - 1] if digit == 0 else params[seg]
+                q = c['restQ'] @ Quaternion(c['axisV'], flex * DEG)
+                if digit and seg == 0:
                     q = Quaternion(c['spreadV'], params[3] * DEG) @ q
             W = (D @ c['P'] if parent is None else parent) @ Matrix.LocRotScale(Vector(c['position']), q, Vector(c['scale']))
             transforms[name] = W @ c['W'].inverted()
             rotations[str(digit) + (str(seg) if seg else '')] = QA(q)
+            quats[name] = q
             parent = W
-        return transforms, rotations
+        return transforms, rotations, quats
+
+    def HipParams(digit):
+        """Start from the authored hip grip's hinge angles, clamped into anatomy."""
+        names = Bones(digit)
+        flexes = [Hinge(n, chains[n]['localQ'])[0] for n in names]
+        if digit == 0:
+            return [0, 0, 0] + [max(HINGE[(0, k)][0], min(HINGE[(0, k)][1], flexes[k])) for k in (1, 2)]
+        return [max(HINGE[(digit, k)][0], min(HINGE[(digit, k)][1], flexes[k])) for k in range(3)] + [0]
 
     def FitFingers(D, quick=False, seeds=None):
         """Per digit deltas from the authored hip rotations under palm delta D.
         Gate (FpsHandContactTest): distal pad <= 4 mm (fit to 3.2), skin >= 0.6 mm off the wood."""
         authored, reports, total = {}, [], 0.
+        indexKnuckle = (D @ chains[Bones(1)[0]]['W']).to_translation()
         for digit in range(5):
             pts = digitSamples.get(digit, [])
             if quick:
@@ -318,7 +378,8 @@ for wid in ids:
             padHip = chains[padBone]['W'] @ padPoint
 
             def Evaluate(params, detail=False):
-                T, rotations = FK(D, digit, params)
+                T, rotations, quats = FK(D, digit, params)
+                anatomy, hinges = AnatomyCost(quats)
                 pen, squared, distalGap, seen = 0., 0., 1., []
                 for index, (v, infl) in enumerate(pts):
                     moved = sum((((T[b] @ v) if b in T else (D @ v) if (b == handName or b in chains) else v) * w for b, w in infl), Vector()) * (1 / sum(w for b, w in infl))
@@ -331,21 +392,35 @@ for wid in ids:
                     if max(infl, key=lambda pair: pair[1])[0] == padBone:
                         distalGap = min(distalGap, signed)
                 gap = max(abs(Signed(T[padBone] @ padHip)), distalGap)
+                thumbShape = 0.
+                if digit == 0:
+                    # Seen from the ADS eye a raised thumb tip stands beside the receiver as a
+                    # lone stub. Keep it pointing forward along the wood and below the index
+                    # knuckle, so the silhouette is the knuckle row of a holding hand.
+                    pad = T[padBone] @ padHip
+                    distal = T[padBone] @ chains[padBone]['W'].to_translation()
+                    direction = (pad - distal).normalized()
+                    thumbShape = 40 * max(0, pad.y - (indexKnuckle.y - .004)) + 2 * max(0, .8 - direction.dot(Vector((0, 0, -1))))
                 # The little finger falls outside a 30-40 mm fore-end once the palm
                 # cradles it; it only has to come close, not be wrenched onto the wood.
-                reach = 15 if digit == 4 else 60
+                reach = reachWeight * (.25 if digit == 4 else 1)
                 # Keep the digit behind the receiver from the ADS eye, as the palm is.
                 top = TopNdc(seen, bvhAll)
-                cost = 300 * pen + 30 * math.sqrt(squared / max(1, len(pts))) + reach * max(0, gap - .0032) + 4 * max(0, top - targetNdc)
+                cost = 300 * pen + 30 * math.sqrt(squared / max(1, len(pts))) + reach * max(0, gap - .0032) + fingerTopWeight * max(0, top - fingerTop) + thumbShape + anatomy
                 cost += .00004 * sum(abs(a) for a in params)
-                return (cost, pen, gap, rotations, top) if detail else cost
+                return (cost, pen, gap, rotations, top, hinges) if detail else cost
 
             n = 5 if digit == 0 else 4
-            spread = {1: 15, 2: 12, 3: 15, 4: 18}.get(digit, 0)
-            bounds = [(-45, 45)] * 3 + [(-40, 40)] * 2 if digit == 0 else [(-40, 90), (-40, 70), (-40, 60), (-spread, spread)]
-            starts = [[0] * n] if digit == 0 else [[0] * n, [25, 20, 10, 0], [45, 35, 20, 0], [70, 40, 20, 10], [70, 40, 20, -10]]
-            if digit == 0 and not quick:
-                starts += [[20, 0, 0, 0, 0], [-20, 0, 0, 0, 0], [0, 20, 0, 0, 0], [0, -20, 0, 0, 0], [0, 0, 20, 0, 0], [0, 0, -20, 0, 0]]
+            spread = {1: 20, 2: 12, 3: 15, 4: 20}.get(digit, 0)
+            bounds = ([(-45, 45)] * 3 + [HINGE[(0, 1)], HINGE[(0, 2)]] if digit == 0
+                      else [HINGE[(digit, 0)], HINGE[(digit, 1)], HINGE[(digit, 2)], (-spread, spread)])
+            hipStart = HipParams(digit)
+            if digit == 0:
+                starts = [hipStart, [0, 0, 0, 20, 15]]
+                if not quick:
+                    starts += [[a, b, c, 20, 15] for a, b, c in ((20, 0, 0), (-20, 0, 0), (0, 20, 0), (0, -20, 0), (0, 0, 20), (0, 0, -20))]
+            else:
+                starts = [hipStart, [25, 20, 10, 0], [45, 35, 20, 0], [70, 40, 20, 10], [70, 40, 20, -10]]
             if seeds and digit in seeds:
                 starts = [seeds[digit]] + (starts[:2] if quick else starts)
             elif quick:
@@ -371,7 +446,7 @@ for wid in ids:
             after = Evaluate(winner, True)
             total += after[0]
             authored.update(after[3])
-            reports.append({'digit': digit, 'penMm': round(after[1] * 1000, 3), 'gapMm': round(after[2] * 1000, 3), 'topNdc': round(after[4], 3), 'deltaDeg': winner})
+            reports.append({'digit': digit, 'penMm': round(after[1] * 1000, 3), 'gapMm': round(after[2] * 1000, 3), 'topNdc': round(after[4], 3), 'hinges': after[5], 'deltaDeg': winner})
         return authored, reports, total
 
     # Palm: start from the hidden cradles the palm-only fit found (palm under the
@@ -392,7 +467,7 @@ for wid in ids:
         if anchor['params']:
             # Stay near the anchored roll: the in-game sleeve/hand composition was chosen there.
             a = anchor['params']
-            cost += 4 * math.sqrt(sum((p[i] - a[i]) ** 2 for i in (0, 1, 2, 6))) + 60 * math.sqrt(sum((p[i] - a[i]) ** 2 for i in (3, 4, 5)))
+            cost += 4 * math.sqrt(sum((p[i] - a[i]) ** 2 for i in (0, 1, 2, 6))) + anchorShift * math.sqrt(sum((p[i] - a[i]) ** 2 for i in (3, 4, 5)))
         if detail:
             return cost, palmCost, fingers, reports
         return cost
@@ -405,7 +480,7 @@ for wid in ids:
     if sweepOnly:
         for phi in [float(x) for x in str(sweepOnly).split(',')]:
             detail = PalmCost(base[:] + [phi], True)
-            print(json.dumps({'weapon': wid, 'stage': 'sweep-detail', 'phi': phi, **{k: round(v, 3) for k, v in detail.items()}}), flush=True)
+            print(json.dumps({'weapon': wid, 'stage': 'sweep-detail', 'phi': phi, **{k: (round(v, 3) if isinstance(v, float) else v) for k, v in detail.items()}}), flush=True)
         continue
     best, p = math.inf, None
     rollSeeds = Setting('FPS_ADS_ROLL_SEEDS')

@@ -98,6 +98,22 @@ Inspect("l", { kind: "leftHolding" });
 Inspect("r", { kind: "rightHolding" });
 sampledPoses++;
 
+// Aiming-only support grips (Data_FpsArmPoses adsSupport) are blended in by adsGrip.
+// The aiming pose itself must be anatomical. (Intermediate weights also carry the hip
+// grip, whose Type38/ZhongZheng authoring predates this gate; it is not swept here.)
+const holdingSpec = rig.poseSpec;
+for (const [weapon, spec] of Object.entries(FPS_ARM_POSES)) {
+  if (spec.ads?.contacts?.left === spec.hip?.contacts?.left) continue;
+  rig.poseSpec = spec;
+  for (const adsGrip of [1]) {
+    rig.poseState.adsGrip = adsGrip;
+    ApplyAnatomicalFingers(rig);
+    Inspect("l", { kind: "adsSupport", weapon, adsGrip });
+    sampledPoses++;
+  }
+}
+rig.poseSpec = holdingSpec; rig.poseState.adsGrip = 0;
+
 // Contact weight is a pose weight. Authored digits must make the same progress
 // as their palm when entering a working pose; blending an already mixed target
 // again makes a 50% release advance only 25% and rush at the end.
