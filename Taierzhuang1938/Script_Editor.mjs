@@ -233,8 +233,19 @@ export class EditorSuite {
       this.volumeControl = ToolsVolumeControl(this.toolsVolume, () => this.SyncToolsVolume());
       bar.appendChild(this.volumeControl.root);
     }
-    const exit = El("button", "edMenuExit", "×");
+    // 最右两颗分开管（2026-10-22，用户：一个 × 既像关工具又是退出，看不懂）：
+    // × 只关当前工具、留在高级工具里，没开工具时藏起来；⏻ 才是退出高级工具。
+    const closeTool = El("button", "edMenuCloseTool", "×");
+    closeTool.type = "button";
+    closeTool.title = "关闭当前工具（留在高级工具里）";
+    closeTool.setAttribute("aria-label", "关闭当前工具");
+    closeTool.addEventListener("click", () => this.CloseTool());
+    bar.appendChild(closeTool);
+    this.closeToolButton = closeTool;
+    const exit = El("button", "edMenuExit");
     exit.type = "button";
+    exit.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.3 5.6a6.2 6.2 0 1 0 7.4 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'
+      + '<path d="M10 2.6v7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
     exit.title = "退出高级工具（Esc / `）";
     exit.setAttribute("aria-label", "退出高级工具");
     exit.addEventListener("click", () => this.TogglePanel(false));
@@ -363,7 +374,7 @@ export class EditorSuite {
     const target = this.inspectorCollapsed ? this.menuBar
       : this.active ? this.inspectorElement?.querySelector(".edHead") : this.root;
     if (target && this.inspectorToggle.parentElement !== target) {
-      target.insertBefore(this.inspectorToggle, target === this.menuBar ? this.menuBar.querySelector(".edMenuExit") : null);
+      target.insertBefore(this.inspectorToggle, target === this.menuBar ? this.menuBar.querySelector(".edMenuCloseTool") : null);
     }
     this.root.classList.toggle("inspectorCollapsed", this.inspectorCollapsed);
     const label = this.inspectorCollapsed ? "展开 Inspector" : "收起 Inspector";
@@ -436,6 +447,7 @@ export class EditorSuite {
     }
     this.RefreshDebugMenu();
     if (this.closeToolItem) this.closeToolItem.disabled = !this.active;
+    if (this.closeToolButton) this.closeToolButton.hidden = !this.active;
     if (this.gear) this.gear.classList.toggle("on", this.Capturing);
     const homeShown = !!this.home && this.panelOpen && !this.active;
     this.home?.Show(homeShown);

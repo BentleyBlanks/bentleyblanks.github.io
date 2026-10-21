@@ -226,6 +226,24 @@ if(process.argv.includes('--launcher-only')){
   process.exit(failed.length||errors.length?1:0);
 }
 
+// 菜单栏右端：× 只关当前工具（没开工具时藏起来），⏻（.edMenuExit）才退出高级工具（2026-10-22）
+const closeIdle = await page.isVisible("#edRoot .edMenuCloseTool");
+await ClickTool("assetStandards");
+await Step(1);
+const closeWithTool = await page.isVisible("#edRoot .edMenuCloseTool");
+await page.click("#edRoot .edMenuCloseTool");
+const afterCloseTool = await page.evaluate(() => ({
+  panelOpen: window.Taierzhuang.Debug.Editor().panelOpen, active: window.Taierzhuang.Debug.Editor().active,
+}));
+Check("菜单栏 × 只关当前工具、留在高级工具里，没开工具时不显示",
+  !closeIdle && closeWithTool && afterCloseTool.panelOpen && !afterCloseTool.active && !(await page.isVisible("#edRoot .edMenuCloseTool")),
+  JSON.stringify({ closeIdle, closeWithTool, ...afterCloseTool }));
+Check("退出按钮是图标、标着「退出高级工具」",
+  await page.evaluate(() => {
+    const exit = document.querySelector("#edRoot .edMenuExit");
+    return !!exit?.querySelector("svg") && exit.getAttribute("aria-label") === "退出高级工具" && exit.textContent.trim() === "";
+  }));
+
 // 资产规范是构件库之外的独立只读分类。它不摆模型，但必须把原始/实际/限制/贴图
 // 与七类入口真实摆出来；只注册一个空按钮不算完成。
 await ClickTool("assetStandards");

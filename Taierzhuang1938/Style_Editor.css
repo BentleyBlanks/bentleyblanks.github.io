@@ -436,11 +436,19 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
   flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: flex-end;
   padding: 0 16px; color: var(--ed-text-3); font-size: 12px; letter-spacing: 0.16em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.edMenuExit {
+/* 右端两颗（2026-10-22）：× 关当前工具（没开工具时 hidden），⏻ 退出高级工具，中间一道细竖线隔开 */
+.edMenuCloseTool {
   flex: 0 0 auto; cursor: pointer; width: 40px; border: 0; border-radius: 0; background: transparent;
   color: #bbbbae; font-size: 24px; line-height: 1; transition: color 0.12s linear;
 }
-.edMenuExit:hover { color: var(--ed-gold-hi); }
+.edMenuCloseTool[hidden] { display: none; }
+.edMenuCloseTool:hover, .edMenuCloseTool:focus-visible { color: var(--ed-gold-hi); }
+.edMenuExit {
+  flex: 0 0 auto; cursor: pointer; width: 44px; padding: 0 12px; border: 0; border-left: 1px solid var(--ed-rule-2); border-radius: 0;
+  background: transparent; color: #bbbbae; transition: color 0.12s linear;
+}
+.edMenuExit svg { width: 19px; height: 19px; display: block; }
+.edMenuExit:hover, .edMenuExit:focus-visible { color: var(--ed-bad); }
 
 /* 高级工具独立音量（Script_EditorVolume，2026-10-20）：喇叭 + 细线滑条 + 百分比，放在状态字与 × 之间 */
 .edVolume {
