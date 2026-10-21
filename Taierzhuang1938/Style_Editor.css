@@ -394,6 +394,8 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
 }
 .edMenuBrand::after { content: ""; position: absolute; right: 0; top: 50%; height: 18px; margin-top: -9px; border-right: 1px solid var(--ed-rule); }
 .edMenus { flex: 0 0 auto; display: flex; align-items: stretch; }
+/* 右侧那组（Debug工具下拉，2026-10-22）：紧挨音量条，左边一道细竖线跟状态字隔开 */
+.edMenusRight { border-left: 1px solid var(--ed-rule-2); }
 .edMenu { position: static; display: flex; }
 .edMenuTitle {
   cursor: pointer; padding: 0 15px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent;

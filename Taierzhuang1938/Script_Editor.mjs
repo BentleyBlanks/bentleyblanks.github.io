@@ -30,6 +30,7 @@
 
 import { El, Panel, Note } from "./Script_EditorUi.mjs";
 import { DEBUG_TOOL_IDS } from "./Data_DevTools.mjs";
+import { T } from "./Script_Text.mjs";
 import { Studio, FlyCam, ViewportInput } from "./Script_EditorStage.mjs";
 import { ActorEditor } from "./Script_EditorActor.mjs";
 import { FacialEditor } from "./Script_EditorFacial.mjs";
@@ -71,9 +72,12 @@ const EDITORS = [
 // 关卡编排工作台也是叠加层：独立窗口里的 2D 俯视图 + 流程/时间轴，
 // 既不碰 three 场景也不接管相机，「边打边看走到哪一步」正是它的主用例。
 const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, FrameDebuggerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor, OrchestrationEditor];
-// 「Debug工具」= 除关卡编排外的叠加层。入口在菜单 设置 → Debug工具（Data_DevTools.DEBUG_TOOL_IDS 定顺序），
-// 高级工具的菜单栏里不再列 —— 关卡编排语义上仍是叠加层，但人找它时想的是「我要编关卡」。
+// 「Debug工具」= 除关卡编排外的叠加层，外加 FPS 显示（Data_DevTools.DEBUG_TOOL_IDS 定顺序）。两处入口开关同一份状态：
+// 菜单 设置 → Debug工具，和高级工具菜单栏右侧、音量条旁边的「Debug工具」下拉（2026-10-22，用户：高级工具里也要能开
+// Profiler / Debug Rendering / Frame Debugger）。关卡编排语义上仍是叠加层，但人找它时想的是「我要编关卡」，放在「关卡」菜单。
 const DEBUG_OVERLAYS = OVERLAYS.filter((editor) => editor !== OrchestrationEditor);
+// Debug工具里弹独立浏览器窗口的几项，下拉条目后缀 ↗（同 WINDOW_TOOLS）
+const DEBUG_WINDOW_TOOLS = new Set([ProfilerEditor.id, FrameDebuggerEditor.id, WorldInfoEditor.id, PlayerStateEditor.id]);
 
 /**
  * 菜单栏。顺序就是栏上的顺序；每个工具只登记一次（同一项画两遍就有两处开关）。
@@ -110,6 +114,7 @@ export class EditorSuite {
     this.panelOpen = false;
     this.inspectorCollapsed = false;
     this.entries = new Map();
+    this.debugEntries = new Map();
     this.menus = new Map();
     this.openMenuId = null;
     this.hidden = false;
@@ -221,6 +226,9 @@ export class EditorSuite {
     bar.appendChild(menus);
     this.status = El("div", "edMenuStatus");
     bar.appendChild(this.status);
+    // Debug工具下拉跟音量条挨着放在右边：这两样不属于哪个工具，开着哪个工具都可能要用
+    const debugSlot = El("div", "edMenus edMenusRight");
+    bar.appendChild(debugSlot);
     if (this.host.audio?.SetToolsVolume) {
       this.volumeControl = ToolsVolumeControl(this.toolsVolume, () => this.SyncToolsVolume());
       bar.appendChild(this.volumeControl.root);
@@ -234,7 +242,7 @@ export class EditorSuite {
     root.appendChild(bar);
     this.menuBar = bar;
 
-    const Menu = (id, label) => {
+    const Menu = (id, label, parent = menus) => {
       const wrap = El("div", "edMenu");
       wrap.dataset.menu = id;
       const title = El("button", "edMenuTitle", label);
@@ -247,7 +255,7 @@ export class EditorSuite {
       const drop = El("div", "edMenuDrop");
       drop.setAttribute("role", "menu");
       wrap.append(title, drop);
-      menus.appendChild(wrap);
+      parent.appendChild(wrap);
       this.menus.set(id, { wrap, title, drop });
       return drop;
     };
@@ -291,6 +299,17 @@ export class EditorSuite {
       }
     }
 
+    // Debug工具：与 设置 → Debug工具 同一套条目、同一份文案（Data_Text_Menu 的 menu.debugTools.*）
+    if (DEBUG_TOOL_IDS.length) {
+      const debugDrop = Menu("debug", "Debug工具", debugSlot);
+      for (const id of DEBUG_TOOL_IDS) {
+        const button = Item(debugDrop, T(`menu.debugTools.${id}.label`), () => this.ToggleDebugToolFromMenu(id),
+          { hint: T(`menu.debugTools.${id}.note`), window: DEBUG_WINDOW_TOOLS.has(id), role: "menuitemcheckbox" });
+        button.dataset.debugTool = id;
+        this.debugEntries.set(id, button);
+      }
+    }
+
     // 点菜单栏以外的地方收起下拉（捕获阶段：画布上的拖拽 / 笔刷也要先收菜单）
     this._onPointerDown = (event) => {
       if (this.openMenuId && !this.menuBar.contains(event.target)) this.OpenMenu(null);
@@ -307,7 +326,7 @@ export class EditorSuite {
     empty.body.appendChild(art);
     empty.body.appendChild(El("div", "edEmptyTitle", "未选择工具"));
     Note(empty.body, "从顶部菜单栏选一个工具，它的参数会显示在这里。再点一次菜单里打勾的那项、或点右上的 × 就关掉它。");
-    Note(empty.body, "Debug Rendering、Profiler、Frame Debugger、WorldInfo、玩家状态、敌军 AI 与 FPS 显示在菜单 设置 → Debug工具。");
+    Note(empty.body, "Debug Rendering、Profiler、Frame Debugger、WorldInfo、玩家状态、敌军 AI 与 FPS 显示在菜单栏右边的「Debug工具」里（设置 → Debug工具 是同一套开关）。");
     const keys = El("div", "edEmptyKeys");
     for (const [key, text] of [["`", "打开 / 退出"], ["Esc", "退出"]]) {
       const item = El("span");
@@ -354,9 +373,22 @@ export class EditorSuite {
     if (keepFocus) this.inspectorToggle.focus({ preventScroll: !this.inspectorCollapsed });
   }
 
+  /** Debug工具下拉的勾选与置灰。FPS 显示也能从设置页改，所以每次展开下拉再对一遍。 */
+  RefreshDebugMenu() {
+    if (!this.debugEntries.size) return;
+    for (const tool of this.DebugToolStates()) {
+      const button = this.debugEntries.get(tool.id);
+      if (!button) continue;
+      button.classList.toggle("on", !!tool.on);
+      button.setAttribute("aria-checked", String(!!tool.on));
+      button.disabled = !tool.available;
+    }
+  }
+
   /** 展开一个下拉菜单；null = 全部收起。 */
   OpenMenu(id) {
     this.openMenuId = id && this.menus.has(id) ? id : null;
+    if (this.openMenuId === "debug") this.RefreshDebugMenu();
     for (const [menuId, menu] of this.menus) {
       const open = menuId === this.openMenuId;
       menu.wrap.classList.toggle("open", open);
@@ -402,6 +434,7 @@ export class EditorSuite {
       button.classList.toggle("on", on);
       button.setAttribute("aria-checked", String(on));
     }
+    this.RefreshDebugMenu();
     if (this.closeToolItem) this.closeToolItem.disabled = !this.active;
     if (this.gear) this.gear.classList.toggle("on", this.Capturing);
     const homeShown = !!this.home && this.panelOpen && !this.active;
@@ -498,6 +531,7 @@ export class EditorSuite {
       overlay.Enter(this.workHost);
     } catch (error) {
       console.error(`[Editor] ${id} 打不开：`, error);
+      this.overlayError = error?.message || String(error);
       this.overlays.delete(id);
       return null;
     }
@@ -536,6 +570,22 @@ export class EditorSuite {
       this.ToggleOverlay(id);
     }
     return this.DebugToolStates();
+  }
+
+  /**
+   * 菜单栏「Debug工具」下拉里点一项。独立窗口被浏览器拦下时 ToggleOverlay 只在控制台报错，
+   * 人在菜单里点了却什么都没出来 —— 这里把原因写到画面顶上的提示行，几秒后自己收掉。
+   */
+  ToggleDebugToolFromMenu(id) {
+    const wasOn = this.overlays.has(id);
+    this.overlayError = "";
+    this.ToggleDebugTool(id);
+    this.RefreshStatus();
+    if (wasOn || this.overlays.has(id) || !this.overlayError) return;
+    const text = this.overlayError; // 各工具自己的报错已经带名字（「Profiler 独立窗口被浏览器弹窗拦截……」）
+    this.SetHint(text);
+    clearTimeout(this.overlayErrorTimer);
+    this.overlayErrorTimer = setTimeout(() => { if (this.hint?.textContent === text) this.SetHint(""); }, 5000);
   }
 
   // -------------------------------------------------------------------------

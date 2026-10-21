@@ -27,9 +27,12 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
   玩家当前的总音量起步。高级工具开着（或有工具在跑）、或者在白盒关卡编辑器页面里时，`EditorSuite.SyncToolsVolume` 调
   `Script_Audio.SetToolsVolume(音量)` 盖过玩家的总音量（`outputVolume = toolsVolume ?? masterVolume`）；退出高级工具调
   `SetToolsVolume(null)` 还回去。白盒关卡编辑器右上角工具条里也有同一条（同一份存档）。
-- **Debug工具**（菜单 设置 → Debug工具）：六个可叠加的观察层 Debug Rendering / Profiler / Frame Debugger /
-  WorldInfo / 玩家状态 / 敌军 AI，外加 FPS 显示。代码仍在编辑器套件里（`EditorSuite.DebugToolStates` /
-  `ToggleDebugTool`，页内顺序 `Data_DevTools.DEBUG_TOOL_IDS`），高级工具的菜单栏不再列它们。
+- **Debug工具**（菜单 设置 → Debug工具；高级工具菜单栏右侧、音量条左边的「Debug工具」下拉）：六个可叠加的观察层
+  Debug Rendering / Profiler / Frame Debugger / WorldInfo / 玩家状态 / 敌军 AI，外加 FPS 显示。两处入口开关同一份状态
+  （`EditorSuite.DebugToolStates` / `ToggleDebugTool`，顺序与文案都取 `Data_DevTools.DEBUG_TOOL_IDS` 与
+  `Data_Text_Menu` 的 `menu.debugTools.*`）；下拉条目带 `data-debug-tool`，不算编辑器条目（不带 `data-editor`），
+  开着的打金方块，弹独立窗口的几项后缀 ↗。独立窗口被浏览器拦下时下拉不会静悄悄地没反应：拦截原因写到画面顶上的提示行，5 秒后收掉
+  （2026-10-22 起；之前高级工具菜单栏不列它们，只能回设置页开）。
   标题菜单（独立启动，没有战局）里这一页只读，提示进关后从暂停菜单开。
 
 玩家设置（画面 / 声音 / 操作）不属于开发工具，见下文「设置不在高级工具里」。
@@ -71,6 +74,7 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 | --- | --- |
 | 菜单 设置 → 高级工具 | 主菜单或暂停菜单。暂停菜单进来的退出后回设置目录；标题菜单（独立启动）换到 `?editor=tools`，即下面的「工具首页」 |
 | 菜单 设置 → Debug工具 | 暂停菜单（Esc）。勾上后「继续」即可边打边看；暂停菜单开着时开发工具层整层收起 |
+| 高级工具菜单栏 → Debug工具 | 高级工具开着时（含工具首页）。同一套开关，开完退出高级工具照样留着（keepOnClose） |
 | 点右上角齿轮 | **没拿指针锁**的时候（开局那张「进城」页、或玩家按过 Esc）；打开的是高级工具 |
 | 按 `` ` ``（Backquote） | 任何时候（玩家设置页开着时除外）。打游戏当中这是唯一的入口 |
 | `window.Tengxian.Debug.OpenEditor("actor")` / `Debug.ToggleDebugTool("debugRendering")` | 测试与自动化 |
