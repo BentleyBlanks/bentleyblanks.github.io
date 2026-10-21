@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { LoadGlb, ReadAccessor, ReadAccessorInt } from "./_import/Script_LugouGlbPose.mjs";
 import { UndoFpsHandSkinWeightRepair } from "./Script_FpsHandSkinWeightsTest.mjs";
 import { UndoFpsForearmTaper } from "./Script_FpsForearmTaperTest.mjs";
+import { UndoFpsWristNormalSeam } from "./Script_FpsWristNormalSeamTest.mjs";
 
 const project = path.dirname(fileURLToPath(import.meta.url));
 const Hash = value => createHash("sha256").update(value).digest("hex");
@@ -54,9 +55,11 @@ function ArchivedBasis(manifest) {
 }
 
 export function AuditAsset(bytes, manifest, archivedBytes = null) {
-  // The forearm taper and the weight repair are separate reviewed layers. Each
-  // must reverse to its exact previous asset before the retained-prefix/morph
-  // audit is allowed to run.
+  // The wrist normal-map seam, the forearm taper and the weight repair are
+  // separate reviewed layers. Each must reverse to its exact previous asset
+  // before the retained-prefix/morph audit is allowed to run.
+  if(manifest.wristNormalSeam)bytes=UndoFpsWristNormalSeam(bytes,
+    JSON.parse(fs.readFileSync(path.join(project,manifest.wristNormalSeam))),manifest.asset);
   if(manifest.forearmTaper)bytes=UndoFpsForearmTaper(bytes,
     JSON.parse(fs.readFileSync(path.join(project,manifest.forearmTaper))),manifest.asset);
   if(manifest.skinWeightRepair)bytes=UndoFpsHandSkinWeightRepair(bytes,
@@ -161,5 +164,5 @@ export function AuditAsset(bytes, manifest, archivedBytes = null) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const manifest = JSON.parse(fs.readFileSync(path.join(project, "Model/Data_FpsGripCorrectives.json")));
   const results = AuditAsset(fs.readFileSync(path.join(project, manifest.asset)), manifest, ArchivedBasis(manifest));
-  console.log(`PASS FpsGripCorrectiveAsset: ${manifest.basis.binaryBytes} original bytes ${manifest.skinWeightRepair?`verified after exact ${manifest.forearmTaper?'forearm-taper and ':''}weight-repair restoration`:'retained'}; ${results.map(r => `${r.name}: ${r.changed} localized vertices, bind max ${r.maximumBindDelta.toFixed(6)}`).join("; ")}`);
+  console.log(`PASS FpsGripCorrectiveAsset: ${manifest.basis.binaryBytes} original bytes ${manifest.skinWeightRepair?`verified after exact ${manifest.wristNormalSeam?'wrist-seam, ':''}${manifest.forearmTaper?'forearm-taper and ':''}weight-repair restoration`:'retained'}; ${results.map(r => `${r.name}: ${r.changed} localized vertices, bind max ${r.maximumBindDelta.toFixed(6)}`).join("; ")}`);
 }

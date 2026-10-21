@@ -1,0 +1,204 @@
+{
+ "version": 1,
+ "baker": "_blender/Script_FpsWristNormalSeamBake.py",
+ "test": "Script_FpsWristNormalSeamTest.mjs",
+ "previousLayer": "Model/Data_FpsForearmTaper.json",
+ "method": "Bridge triangles = skin triangles within bridgeWindowMm of the forearm taper end plane (sides.*.frame/endPlane of the previous layer) with vertices on both sides of it. Per vertex h = tilted-axis distance past the first hand ring (max end-plane coordinate of the bridge ring vertices, per side); per pixel h is interpolated with pixel-centre barycentrics (minimum over covering triangles). Weight w = smoothstep((h - holdMm) / fadeMm) on bridge and hand triangles with h < holdMm + fadeMm; uncovered texels in the edited box are filled by gutterPx synchronous 8-neighbour growth steps from every covered skin texel (weight 1 outside the zone), each taking the minimum of neighbours assigned in earlier steps. Edited texel = floor((1 - w) * flatRgb + w * original + 0.5) per channel; all other texels are the libwebp decode of the original image, byte for byte.",
+ "mesh": {
+  "material": "Material_HanYangScanSkin",
+  "meshIndex": 0,
+  "primitiveIndex": 0,
+  "fieldAsset": "Model/Model_FpsHanYangHands.glb"
+ },
+ "unchanged": "Every previous byte stays in place: the old image remains in the BIN unreferenced; geometry, UVs, weights, morphs, materials and every other texture are untouched. Only texture 2 (the skin normal map) points at the new image.",
+ "parameters": {
+  "flatRgb": [
+   128,
+   127,
+   255
+  ],
+  "holdMm": 0.5,
+  "fadeMm": 4.0,
+  "gutterPx": 32,
+  "radiusMm": 90.0,
+  "bridgeWindowMm": 12.0,
+  "textureSize": 4096
+ },
+ "texture": {
+  "index": 2,
+  "before": {
+   "image": 2,
+   "name": "Texture_UnifiedSkinNormal",
+   "sha256": "5068fcb07dfc960ac74112b3183b8b3a194b2c3650d12990bb96234c89be1cb6",
+   "bytes": 285988,
+   "chunk": "VP8 ",
+   "decodedRgbSha256": "9eba9b1a3e03fb8817dd0376a304a20bd1cb96b725f0b32621cb2b68f1d87039"
+  },
+  "after": {
+   "name": "Texture_UnifiedSkinNormal_WristSeamFade",
+   "sha256": "a4f1572fd6a19258e57d149b4584a22b0f812a25df8666b02802c94436b32afc",
+   "bytes": 1879430,
+   "chunk": "VP8L",
+   "decodedRgbSha256": "f5dca295ee97a156a04683f3f3e4d0c6b784f887253e1d43d2435bb828cff036"
+  },
+  "size": [
+   4096,
+   4096
+  ]
+ },
+ "sides": {
+  "l": {
+   "bridgeTriangles": 342,
+   "ringVertices": 262,
+   "forearmEdgeVertices": 108,
+   "ringTMm": [
+    2.5628,
+    2.7024
+   ],
+   "forearmEdgeTMm": [
+    -3.0228,
+    -2.5628
+   ]
+  },
+  "r": {
+   "bridgeTriangles": 342,
+   "ringVertices": 277,
+   "forearmEdgeVertices": 117,
+   "ringTMm": [
+    2.5636,
+    2.7016
+   ],
+   "forearmEdgeTMm": [
+    -3.0275,
+    -2.5636
+   ]
+  }
+ },
+ "editBox": [
+  0,
+  361,
+  4089,
+  3399
+ ],
+ "counts": {
+  "zoneTriangles": 2116,
+  "bridgeTriangles": 684,
+  "handFadeTriangles": 1432,
+  "editedTexels": 252372,
+  "changedTexels": 165543,
+  "bridgeTexels": 44145,
+  "gutterTexels": 171291,
+  "sharedEdgeTexels": 0
+ },
+ "stats": {
+  "before": {
+   "bridgeTiltP90Deg": 16.044,
+   "bridgeTiltMaxDeg": 33.228,
+   "zoneNeighbourJumpP999Deg": 10.499,
+   "zoneNeighbourJumpMaxDeg": 26.51
+  },
+  "after": {
+   "bridgeTiltP90Deg": 0.318,
+   "bridgeTiltMaxDeg": 0.318,
+   "zoneNeighbourJumpP999Deg": 3.265,
+   "zoneNeighbourJumpMaxDeg": 7.237
+  }
+ },
+ "flatTiltDeg": 0.3178,
+ "assets": [
+  {
+   "asset": "Model/Model_FpsHanYangHands.glb",
+   "before": {
+    "sha256": "ec950c2430a1da77054da32fd6b813aff3a89d43be5db15090d7933887e69e30",
+    "bytes": 8916368,
+    "jsonChunkLength": 25552,
+    "binChunkLength": 8890788
+   },
+   "after": {
+    "sha256": "7eb32d47260b6a6a70cd54c5c7c2ff0242e2a9a35e145d65e4d6240c63a4ca97",
+    "bytes": 10795948,
+    "jsonChunkLength": 25700,
+    "binChunkLength": 10770220
+   },
+   "placement": {
+    "bufferView": 33,
+    "image": 4,
+    "byteOffset": 8890788,
+    "byteLength": 1879430,
+    "binPadding": 2
+   },
+   "jsonEdits": [
+    {
+     "at": 18168,
+     "before": "\"EXT_texture_webp\":{\"source\":2}",
+     "after": "\"EXT_texture_webp\":{\"source\":4}"
+    },
+    {
+     "at": 18569,
+     "before": "",
+     "after": ",{\"bufferView\":33,\"mimeType\":\"image/webp\",\"name\":\"Texture_UnifiedSkinNormal_WristSeamFade\"}"
+    },
+    {
+     "at": 25428,
+     "before": "",
+     "after": ",{\"buffer\":0,\"byteLength\":1879430,\"byteOffset\":8890788}"
+    },
+    {
+     "at": 25515,
+     "before": "\"buffers\":[{\"byteLength\":8890788}]",
+     "after": "\"buffers\":[{\"byteLength\":10770220}]"
+    }
+   ]
+  },
+  {
+   "asset": "Model/Model_FpsHanYangHandsRepaired.glb",
+   "before": {
+    "sha256": "49cf82dcc38a9f4f15cd06930093ceaa5a1d7e6680d32ea994966f543d2c3f84",
+    "bytes": 9074672,
+    "jsonChunkLength": 36656,
+    "binChunkLength": 9037988
+   },
+   "after": {
+    "sha256": "79737035776f8a9574480f184b706c8fd87c0c60545e892440c324881ae790af",
+    "bytes": 10954248,
+    "jsonChunkLength": 36800,
+    "binChunkLength": 10917420
+   },
+   "placement": {
+    "bufferView": 39,
+    "image": 4,
+    "byteOffset": 9037988,
+    "byteLength": 1879430,
+    "binPadding": 2
+   },
+   "jsonEdits": [
+    {
+     "at": 28331,
+     "before": "\"EXT_texture_webp\":{\"source\":2}",
+     "after": "\"EXT_texture_webp\":{\"source\":4}"
+    },
+    {
+     "at": 28732,
+     "before": "",
+     "after": ",{\"bufferView\":39,\"mimeType\":\"image/webp\",\"name\":\"Texture_UnifiedSkinNormal_WristSeamFade\"}"
+    },
+    {
+     "at": 36531,
+     "before": "",
+     "after": ",{\"buffer\":0,\"byteLength\":1879430,\"byteOffset\":9037988}"
+    },
+    {
+     "at": 36618,
+     "before": "\"buffers\":[{\"byteLength\":9037988}]",
+     "after": "\"buffers\":[{\"byteLength\":10917420}]"
+    }
+   ]
+  }
+ ],
+ "runtime": {
+  "python": "3.13.13",
+  "numpy": "2.5.1",
+  "pillow": "12.2.0",
+  "libwebp": "1.6.0"
+ }
+}

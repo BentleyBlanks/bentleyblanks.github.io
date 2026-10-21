@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
+import {LoadFpsWristNormalSeam,UndoFpsWristNormalSeam} from './Script_FpsWristNormalSeamTest.mjs';
 
 const project=path.dirname(fileURLToPath(import.meta.url));
 export const FPS_FOREARM_TAPER_RECIPE='Model/Data_FpsForearmTaper.json';
@@ -195,12 +196,13 @@ export function ValidateFpsForearmTaper(before,after,recipe,asset){
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
-  const recipe=LoadFpsForearmTaper(),lines=[];
+  const recipe=LoadFpsForearmTaper(),seam=LoadFpsWristNormalSeam(),lines=[];
   const previous={'Model/Model_FpsHanYangHands.glb':JSON.parse(fs.readFileSync(path.join(project,'Model/Data_FpsHandSkinWeights.json'))).output.sha256,
     'Model/Model_FpsHanYangHandsRepaired.glb':JSON.parse(fs.readFileSync(path.join(project,'Model/Data_FpsHanYangHandRepair.json'))).outputSha256};
   assert.deepEqual(recipe.assets.map(r=>r.asset),Object.keys(previous),'both hand GLBs carry the taper');
   for(const row of recipe.assets){
-    const bytes=fs.readFileSync(path.join(project,row.asset)),restored=UndoFpsForearmTaper(bytes,recipe,row.asset);
+    // The shipped asset carries the later wrist normal-map seam; peel it off byte-exactly first.
+    const bytes=UndoFpsWristNormalSeam(fs.readFileSync(path.join(project,row.asset)),seam,row.asset),restored=UndoFpsForearmTaper(bytes,recipe,row.asset);
     assert.equal(Hash(restored),previous[row.asset],`${row.asset}: undo lands on the previously reviewed layer`);
     const report=ValidateFpsForearmTaper(restored,bytes,recipe,row.asset);
     const corrupt=Buffer.from(bytes);corrupt[corrupt.length-1]^=1;
