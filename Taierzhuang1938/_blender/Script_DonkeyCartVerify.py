@@ -47,6 +47,11 @@ for front in ('Front','Rear'):
             if p.z<.035 and any(group.group==index and group.weight>.98 for group in vertex.groups):indices.append(vertex.index)
         if not indices:raise RuntimeError('Packed GLB has no rigid actual sole: '+stem)
         soleIndices[stem]=indices
+foreY=sum((animal.matrix_world@animal.data.vertices[i].co).y for i in soleIndices['DonkeyFrontLeft'])/len(soleIndices['DonkeyFrontLeft'])
+hindY=sum((animal.matrix_world@animal.data.vertices[i].co).y for i in soleIndices['DonkeyRearLeft'])/len(soleIndices['DonkeyRearLeft'])
+Render('FeetSide',(-4,(foreY+hindY)/2,.37),(0,(foreY+hindY)/2,.34),1.25,640,400)
+Render('FeetFront',(0,3,.27),(0,foreY,.27),.56,640,640)
+Render('FeetRear',(0,-3,.27),(0,hindY,.27),.56,640,640)
 for obj in rigs:obj.data.pose_position='POSE'
 walkStrip=next(track.strips[0] for track in donkeyRig.animation_data.nla_tracks if 'DonkeyWalk' in track.name)
 for track in donkeyRig.animation_data.nla_tracks:track.mute=True
@@ -78,6 +83,7 @@ report['stanceSoleRangeM']=[min(row['minZ'] for row in planted),max(row['minZ'] 
 report['worstStanceDriftPerFrameM']=max(drift)
 report['samples']=samples
 scene.frame_set(18);Render('Walk',(-4,5,2.8),(0,-.45,.81),3.85,640,400)
+scene.frame_set(26);Render('WalkFeet',(-4,(foreY+hindY)/2,.38),(0,(foreY+hindY)/2,.32),1.40,640,400)
 (base/'Review/Data_ImportedGlbVerification.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
 for obj in imported:bpy.data.objects.remove(obj,do_unlink=True)
 for obj,(render,hidden) in visibility.items():obj.hide_render=render;obj.hide_set(hidden)

@@ -1,7 +1,7 @@
 {
   "schema": "tengxian-independent-prop-textures-v1",
   "asset": "DonkeyCart",
-  "version": "20261021ReferenceMatchV1",
+  "version": "20261021FeetReferenceV2",
   "uv": "two unique non-overlapping authored GameUV atlases, exported as UV0",
   "colorSpace": {
     "Base": "sRGB",
@@ -29,8 +29,8 @@
         1024,
         1024
       ],
-      "bytes": 743856,
-      "sha256": "87442ab3a41bdda5e4f91b532053e443ef89dbb6b3e27d2dacbbdcbb62556ded",
+      "bytes": 730912,
+      "sha256": "04e98b74f7b6e22ce4a78faa28b0c6478dbb8151336fe4aeeaa2de438c336ebf",
       "lossless": true
     },
     {
@@ -40,8 +40,8 @@
         2048,
         2048
       ],
-      "bytes": 1883068,
-      "sha256": "7b77efdafb67a375d9b33283401b405f0cc188a9f6b2ef467e8513337b5f0c2b",
+      "bytes": 1877096,
+      "sha256": "2a02781aaa6894a5966a70e767c7b06085cd3787dbb3953802e1d4d5d363b972",
       "lossless": true
     },
     {
@@ -51,8 +51,8 @@
         512,
         512
       ],
-      "bytes": 56332,
-      "sha256": "c9bad475018d03188589b45d620a7de5c0b936146205052ed678220aecf664c6",
+      "bytes": 55444,
+      "sha256": "180a74c3332b9e793653928c5dff29cc433a5ece078339dbff1829e6987cbdb4",
       "lossless": true
     },
     {
@@ -62,8 +62,8 @@
         1024,
         1024
       ],
-      "bytes": 634686,
-      "sha256": "5241adefc1721acb06756c3bc9c01fc5ec50d0dba6862f01129c332b806de117",
+      "bytes": 616920,
+      "sha256": "e638a28ec5a817f88a1aad51e60a0888fc867fc943e92d815a7ad812e45a5f57",
       "lossless": true
     },
     {
@@ -73,8 +73,8 @@
         2048,
         2048
       ],
-      "bytes": 1120866,
-      "sha256": "bcf9263fd0bc5562eb6052a28aa24383a7ea050f9ee81eb752f8b24852884355",
+      "bytes": 1055484,
+      "sha256": "963fa3451f2f9a8833559e9d65dd8c4cf41de829a3aead3e8e02d866ca8728ef",
       "lossless": true
     },
     {
@@ -84,8 +84,8 @@
         512,
         512
       ],
-      "bytes": 41764,
-      "sha256": "6300739df78b2b24701ec349f8cab67e3cc2801eda9e9ca580f0e4fe27122856",
+      "bytes": 45224,
+      "sha256": "f04a44040e1afb7a4607891febf6639053a54e6d4e6f84121e9a3f7afa3f252f",
       "lossless": true
     }
   ]

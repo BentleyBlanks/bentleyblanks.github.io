@@ -1,11 +1,11 @@
 {
   "schema": "tengxian-independent-rigged-prop-v1",
   "id": "DonkeyCart",
-  "version": "20261021ReferenceMatchV1",
+  "version": "20261021FeetReferenceV2",
   "asset": "Model_DonkeyCart.glb",
   "textureManifest": "Data_DonkeyCartTextures.json",
-  "sha256": "1080b9096105e38fc54b5a705925bf23671d9693011c19ffabe62b196a81ce2d",
-  "bytes": 9326892,
+  "sha256": "4030742830d896453dba3ec23decfc20d16ce42efa05e3bc0d432bc6fe9c4dc9",
+  "bytes": 9295668,
   "units": "metres",
   "upAxis": "+Y",
   "facingAxis": "-Z",
@@ -33,6 +33,36 @@
       3.346402168273926
     ]
   },
+  "feet": {
+    "construction": "continuous cannon/carpus/hock/fetlock/pastern; single horn wall and recessed sole, short rear feathering",
+    "hoofWallDimensionsM": {
+      "DonkeyFrontLeft": [
+        0.0737999975681305,
+        0.09191912412643433,
+        0.0725347094994504
+      ],
+      "DonkeyFrontRight": [
+        0.0737999975681305,
+        0.09191912412643433,
+        0.0725347094994504
+      ],
+      "DonkeyRearLeft": [
+        0.06863399595022202,
+        0.09191912040114403,
+        0.0725347094994504
+      ],
+      "DonkeyRearRight": [
+        0.06863399595022202,
+        0.09191911667585373,
+        0.0725347094994504
+      ]
+    },
+    "frontCarpusHeightM": 0.48,
+    "rearHockHeightM": 0.47,
+    "fetlockPivotHeightM": 0.155,
+    "source": "_blender/Script_DonkeyCartFeet.py",
+    "appearance": "reference-led creative anatomy; dimensions are authoring choices"
+  },
   "cart": {
     "bedLengthM": 1.52,
     "bedWidthM": 1.075,
@@ -44,8 +74,8 @@
     "total": 79500,
     "limit": 80000,
     "byBatch": {
-      "Animal": 54538,
-      "Cart": 24962
+      "Animal": 55900,
+      "Cart": 23600
     },
     "runtimeCartMaxSurfaceDeviationM": 0.0008306061499752104
   },
@@ -86,15 +116,15 @@
   },
   "verification": {
     "nativeStanceSoleRangeM": [
-      0.0003998324100393802,
-      0.00040013849502429366
+      0.0003997584281023592,
+      0.0004002078203484416
     ],
-    "nativeStanceDriftPerFrameM": 2.211335683906246e-07,
+    "nativeStanceDriftPerFrameM": 2.961688571508081e-07,
     "reimportedStanceSoleRangeM": [
-      0.0003998044121544808,
-      0.0004002087807748467
+      0.0003999032196588814,
+      0.00040036009158939123
     ],
-    "reimportedStanceDriftPerFrameM": 4.7637143018100514e-07,
+    "reimportedStanceDriftPerFrameM": 3.594822353784888e-07,
     "continuousLegRoots": {
       "DonkeyFrontLeft": true,
       "DonkeyFrontRight": true,
@@ -103,8 +133,16 @@
     },
     "traceAnchorDriftM": 5.960464477539063e-08,
     "traceBindingGapM": 0,
-    "dropTugGapM": 0.0006678439094685018,
-    "skinWeightSumError": 9.685754776000977e-08,
+    "continuousHornToTorsoPaths": {
+      "DonkeyFrontLeft": true,
+      "DonkeyFrontRight": true,
+      "DonkeyRearLeft": true,
+      "DonkeyRearRight": true
+    },
+    "maxHornNonHoofWeight": 0.0,
+    "maxRebuiltLowerForeignWeight": 0,
+    "dropTugGapM": 0.0006701386300846934,
+    "skinWeightSumError": 8.940696716308594e-08,
     "webpPixelsUnchanged": true,
     "geometrySkinActionsUnchangedDuringPacking": true
   },

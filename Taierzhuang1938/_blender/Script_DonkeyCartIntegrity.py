@@ -18,6 +18,17 @@ rows=[{skin.vertex_groups[g.group].name:g.weight for g in v.groups if g.weight>1
 torso=max((v.index for v in skin.data.vertices if v.co.z>.75),key=lambda i:sum(w for n,w in rows[i].items() if n in ('DonkeyBodyPivot','DonkeyThoraxPivot','DonkeyChestPivot','DonkeyPelvisPivot')))
 torsoComponent=Find(torso)
 legPaths={}
+solePaths={};hoofDimensions={};hornWeightErrors=[];lowerForeignWeights=[]
+owners=skin.data.attributes.get('FootOwner')
+if owners is None:raise RuntimeError('Rebuilt lower legs have no ownership attribute')
+hornIndices={v for p in skin.data.polygons if skin.data.materials[p.material_index].name.startswith('DonkeyHoofHorn') for v in p.vertices}
+for owner,stem in enumerate(('DonkeyFrontLeft','DonkeyFrontRight','DonkeyRearLeft','DonkeyRearRight'),1):
+    lowerForeignWeights.extend(sum(weight for name,weight in rows[v.index].items() if not name.startswith(stem)) for v in skin.data.vertices if owners.data[v.index].value==owner)
+    points=[v for v in skin.data.vertices if owners.data[v.index].value==owner and v.index in hornIndices]
+    if not points:raise RuntimeError('A hoof has no separate horn wall: '+stem)
+    solePaths[stem]=all(Find(v.index)==torsoComponent for v in points)
+    hoofDimensions[stem]=[max(v.co[i] for v in points)-min(v.co[i] for v in points) for i in range(3)]
+    hornWeightErrors.extend(abs(1-rows[v.index].get(stem+'HoofPivot',0)) for v in points)
 for front in ('Front','Rear'):
     for side in ('Left','Right'):
         stem='Donkey'+front+side
@@ -61,6 +72,7 @@ for frame in range(1,38):
         contacts.append({'frame':frame,'side':side,'traceToBindingGapM':traceGap,'dropToTugGapM':tugGap})
 
 report={'continuousLegRootPaths':legPaths,'rootEdgeCount':len(rootEdges),
+ 'continuousHornToTorsoPaths':solePaths,'hoofWallDimensionsM':hoofDimensions,'maxHornNonHoofWeight':max(hornWeightErrors),'maxRebuiltLowerForeignWeight':max(lowerForeignWeights),
  'rootEdgeStretchRange':[min(row[0] for row in ratios),max(row[0] for row in ratios)],
  'worstRootEdge':list(max(ratios)),
  'maxTraceAnchorDriftM':max(anchorErrors),
@@ -77,6 +89,9 @@ report['paddedCollarSignedVolumesM3']=padVolumes
 scene.frame_set(0)
 print(json.dumps({k:v for k,v in report.items() if k!='contacts'}))
 if not all(legPaths.values()):raise RuntimeError('A donkey leg root is not topologically continuous with its torso')
+if not all(solePaths.values()):raise RuntimeError('A horn wall is detached from the continuous lower leg')
+if max(hornWeightErrors)>1e-6:raise RuntimeError('Hard hoof horn must move rigidly with its hoof bone')
+if max(lowerForeignWeights)>1e-6:raise RuntimeError('Chest/body weights must not pull the rebuilt lower-leg seam')
 if report['skinWeightSumError']>1e-5 or report['maxSkinInfluences']>4:raise RuntimeError('Invalid runtime skin weights')
 if report['maxTraceAnchorDriftM']>.0001:raise RuntimeError('Trace endpoint detaches from the cart')
 if report['maxTraceToBindingGapM']>.003 or report['maxDropToTugGapM']>.005:raise RuntimeError('Harness connections leave their contact tolerance')

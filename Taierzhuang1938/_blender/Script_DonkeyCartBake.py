@@ -271,8 +271,8 @@ oldRig=next(obj for obj in new.objects if obj.type=='ARMATURE')
 oldOrigins={b.name:b.head_local.copy() for b in oldRig.data.bones}
 oldRows=[{original.vertex_groups[g.group].name:g.weight for g in v.groups} for v in original.data.vertices]
 
-frontP=[Vector((0,.68,.91)),Vector((0,.59,.72)),Vector((0,.68,.36)),Vector((0,.68,.105))]
-rearP=[Vector((0,-.25,.94)),Vector((0,-.06,.73)),Vector((0,-.33,.36)),Vector((0,-.26,.105))]
+frontP=[Vector((0,.68,.91)),Vector((0,.555,.72)),Vector((0,.68,.48)),Vector((0,.645,.155))]
+rearP=[Vector((0,-.25,.94)),Vector((0,-.06,.73)),Vector((0,-.33,.47)),Vector((0,-.295,.155))]
 for point in rearP:point.y+=hindForwardShift
 targetOrigins={'DonkeyRoot':Vector((0,0,0)),'DonkeyBodyPivot':Vector((0,.3,.79)),
  'DonkeyThoraxPivot':Vector((0,.64,.93)),'DonkeyNeckPivot':Vector((0,.67,.98)),
@@ -343,7 +343,7 @@ def AdaptPoint(point,row):
         oldCentre=anchors[-1][1]
         for (za,ya),(zb,yb) in zip(anchors,anchors[1:]):
             if za<=result.z<=zb:oldCentre=ya+(yb-ya)*(result.z-za)/(zb-za);break
-        targetY=.68 if result.z<=.36 else .68+(.59-.68)*(result.z-.36)/(.72-.36)
+        targetY=frontP[2].y if result.z<=frontP[2].z else frontP[2].y+(frontP[1].y-frontP[2].y)*(result.z-frontP[2].z)/(frontP[1].z-frontP[2].z)
         factor=Smooth(.22,.35,result.z)*(1-Smooth(.60,.78,result.z))*Smooth(.025,.065,abs(result.x))*Smooth(.35,.55,result.y)
         narrow=1-.45*Smooth(.30,.55,result.z)
         result.y=result.y*(1-factor)+(targetY+(result.y-oldCentre)*narrow)*factor
@@ -472,7 +472,11 @@ if earEdges:bmesh.ops.holes_fill(bm,edges=earEdges,sides=128)
 bm.to_mesh(skin.data);bm.free();skin.data.update()
 skinNamespace={}
 exec(compile((project/'_blender/Script_DonkeyCartSkin.py').read_text(encoding='utf-8'),'Script_DonkeyCartSkin.py','exec'),skinNamespace)
+feetNamespace={}
+exec(compile((project/'_blender/Script_DonkeyCartFeet.py').read_text(encoding='utf-8'),'Script_DonkeyCartFeet.py','exec'),feetNamespace)
+feetNamespace['RebuildLowerLegs'](skin,rig,skinMaterial)
 skinNamespace['RebindDonkeySkin'](rig,skin)
+feetNamespace['BindLowerLegs'](skin,rig)
 
 # Rebuild facial features on the newly measured surface; the candidate's buried
 # eyes, lid rings and hanging lip pieces were explicitly excluded above.

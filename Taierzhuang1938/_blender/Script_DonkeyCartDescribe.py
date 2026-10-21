@@ -17,7 +17,7 @@ for name in ('DonkeyRuntime','CartRuntime'):
 blenderMin=[min(p[i] for p in points) for i in range(3)];blenderMax=[max(p[i] for p in points) for i in range(3)]
 gltfPoints=[Vector((p.x,p.z,-p.y)) for p in points]
 gltfMin=[min(p[i] for p in gltfPoints) for i in range(3)];gltfMax=[max(p[i] for p in gltfPoints) for i in range(3)]
-textures={'schema':'tengxian-independent-prop-textures-v1','asset':'DonkeyCart','version':'20261021ReferenceMatchV1',
+textures={'schema':'tengxian-independent-prop-textures-v1','asset':'DonkeyCart','version':'20261021FeetReferenceV2',
  'uv':'two unique non-overlapping authored GameUV atlases, exported as UV0','colorSpace':{'Base':'sRGB','Normal':'linear OpenGL +Y','Orm':'linear; R=1, G=roughness, B=metallic'},
  'sizeReason':'2048 base atlases preserve the close donkey face, short fur, hemp lay and worn elm; normals 1024, ORM 512',
  'source':{'provider':'imagegen + procedural + sourcePack','furInput':str(base/'SourceTextures/Texture_DonkeyShortFurSource.png'),
@@ -25,10 +25,13 @@ textures={'schema':'tengxian-independent-prop-textures-v1','asset':'DonkeyCart',
  'sculptNormal':'CC0 Lyndon Daniels / ChadM equine surface normal from preserved source'},
  'bake':{'method':'Cycles diffuse colour only, tangent normal and explicit ORM emission; no direct/indirect lighting in base colour','script':'_blender/Script_DonkeyCartExport.py','losslessWebp':True},'textures':packing['images']}
 (output/'Data_DonkeyCartTextures.json').write_text(json.dumps(textures,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-contract={'schema':'tengxian-independent-rigged-prop-v1','id':'DonkeyCart','version':'20261021ReferenceMatchV1','asset':asset.name,
+contract={'schema':'tengxian-independent-rigged-prop-v1','id':'DonkeyCart','version':'20261021FeetReferenceV2','asset':asset.name,
  'textureManifest':'Data_DonkeyCartTextures.json','sha256':sha,'bytes':asset.stat().st_size,'units':'metres','upAxis':'+Y','facingAxis':'-Z',
  'sourceCoordinates':'Blender +Y forward / +Z up; exported once to glTF -Z forward / +Y up','pivotM':[0,0,0],
  'nominalWithersHeightM':1.10,'boundsM':{'min':gltfMin,'max':gltfMax,'dimensions':[gltfMax[i]-gltfMin[i] for i in range(3)]},
+ 'feet':{'construction':'continuous cannon/carpus/hock/fetlock/pastern; single horn wall and recessed sole, short rear feathering',
+ 'hoofWallDimensionsM':integrity['hoofWallDimensionsM'],'frontCarpusHeightM':.48,'rearHockHeightM':.47,'fetlockPivotHeightM':.155,
+ 'source':'_blender/Script_DonkeyCartFeet.py','appearance':'reference-led creative anatomy; dimensions are authoring choices'},
  'cart':{'bedLengthM':1.52,'bedWidthM':1.075,'wheelRadiusM':float(bpy.data.objects['DonkeyCartRig']['wheelRadiusM']),'wheelSpokes':14,'wheelTimberSegments':6},
  'triangles':{'total':bake['totalTriangles'],'limit':80000,'byBatch':{r['label']:r['triangles'] for r in bake['batches']},
  'runtimeCartMaxSurfaceDeviationM':max(r['budgetSurfaceMaxErrorM'] for r in bake['batches'])},
@@ -39,6 +42,7 @@ contract={'schema':'tengxian-independent-rigged-prop-v1','id':'DonkeyCart','vers
  'verification':{'nativeStanceSoleRangeM':native['stanceSoleRangeM'],'nativeStanceDriftPerFrameM':native['worstStanceDriftPerFrameM'],
  'reimportedStanceSoleRangeM':imported['stanceSoleRangeM'],'reimportedStanceDriftPerFrameM':imported['worstStanceDriftPerFrameM'],
  'continuousLegRoots':integrity['continuousLegRootPaths'],'traceAnchorDriftM':integrity['maxTraceAnchorDriftM'],'traceBindingGapM':integrity['maxTraceToBindingGapM'],
+ 'continuousHornToTorsoPaths':integrity['continuousHornToTorsoPaths'],'maxHornNonHoofWeight':integrity['maxHornNonHoofWeight'],'maxRebuiltLowerForeignWeight':integrity['maxRebuiltLowerForeignWeight'],
  'dropTugGapM':integrity['maxDropToTugGapM'],'skinWeightSumError':integrity['skinWeightSumError'],'webpPixelsUnchanged':True,'geometrySkinActionsUnchangedDuringPacking':True},
  'editableSource':str(base/'Scene_DonkeyCart.blend'),'preservedSourceTemplate':str(base/'ReuseAudit/Scene_Round14Candidate.blend'),
  'rigReuse':{'retained':'four-pivot quadruped hierarchy, analytic folding-cannon solver and distance clock conventions',
