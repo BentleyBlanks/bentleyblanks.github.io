@@ -16,7 +16,7 @@ from Script_PatchedTimberBedCotton import ApplyCottonWeave
 from Script_PatchedTimberBedWood import WeatherTimberFrame
 from Script_PatchedTimberBedQuilt import BakeQuiltSurface
 if '--' in sys.argv:
- parser=argparse.ArgumentParser();parser.add_argument('--source-root',required=True);parser.add_argument('--review-root',required=True);parser.add_argument('--stage',default='all',choices=['prepare','build','finish','refresh','all']);parser.add_argument('--skip-renders',action='store_true');parser.add_argument('--group',choices=['Quilt','Straw'],default='Straw')
+ parser=argparse.ArgumentParser();parser.add_argument('--source-root',required=True);parser.add_argument('--review-root',required=True);parser.add_argument('--stage',default='all',choices=['prepare','build','finish','refresh','material-frame','export','all']);parser.add_argument('--skip-renders',action='store_true');parser.add_argument('--group',choices=['Quilt','Straw'],default='Straw')
  args=parser.parse_args(sys.argv[sys.argv.index('--')+1:]);config={'sourceRoot':args.source_root,'reviewRoot':args.review_root,'stage':args.stage,'skipRenders':args.skip_renders,'refreshGroup':args.group}
 else:config=json.loads(pathlib.Path(os.environ.get('BED_BAKE_CONFIG',str(repoRoot/'tmp/BedBnBsAcceptance/Data_BakeConfig.json'))).read_text())
 sourceRoot=pathlib.Path(config['sourceRoot'])
@@ -25,6 +25,9 @@ bnRoot=sourceRoot/'Inputs/BN/Restored'
 bsRoot=sourceRoot/'Inputs/BS/BedBS'
 reviewRoot.mkdir(parents=True,exist_ok=True)
 textureRoot=sourceRoot/'Bakes';textureRoot.mkdir(exist_ok=True)
+# Task-owned projects are reproducible; do not accumulate automatic .blend1
+# copies on every checkpoint save. This process does not save user preferences.
+bpy.context.preferences.filepaths.save_version=0
 
 def Select(objects):
  bpy.context.view_layer.update()
@@ -78,8 +81,14 @@ def OrientQuiltShell(o):
  (reviewRoot/'Data_QuiltShellOrientation.json').write_text(json.dumps({'existingFacesFlipped':len(changed),'method':'existing lowest/uppermost actual surface triangles oriented outward by bidirectional vertical envelope rays','addedFaces':0},indent=2))
 
 def Export(objects,path):
+ for obj in objects:
+  layers=obj.data.color_attributes
+  name=obj.get('GameExportColorLayer','BR_original_low_frequency_color')
+  if layers.get(name):
+   layers.active_color=layers[name];layers.render_color_index=layers.find(name)
+  elif obj.get('GameExportColorLayer'):raise ValueError('Explicit game export colour layer is missing: '+obj.name+'/'+name)
  Select(objects)
- bpy.ops.export_scene.gltf(filepath=str(path),export_format='GLB',use_selection=True,export_animations=False,export_cameras=False,export_lights=False,export_vertex_color='NAME',export_vertex_color_name='BR_original_low_frequency_color',export_all_vertex_colors=False,export_tangents=True)
+ bpy.ops.export_scene.gltf(filepath=str(path),export_format='GLB',use_selection=True,export_animations=False,export_cameras=False,export_lights=False,export_vertex_color='ACTIVE',export_all_vertex_colors=False,export_tangents=True)
 
 def Deform(points):
  # Preserve the authored large cloth folds. Only broad, shallow gathers and
@@ -131,7 +140,7 @@ def Prepare():
  # 149 mm. Keep the complete authored outer shell; game contact now uses a
  # separately classified hidden underside and the real compacted straw mat.
  (reviewRoot/'Data_UndersideFitHigh.json').write_text(json.dumps({'method':'Authored visible shell preserved; no height-band displacement of fold flanks','fitDisplacementM':0},indent=2))
- woodStats=WeatherTimberFrame([o for o in objects if GroupName(o)=='Frame'])
+ woodStats=WeatherTimberFrame([o for o in objects if GroupName(o)=='Frame'],chipGeometry=True)
  (reviewRoot/'Data_WoodWeathering.json').write_text(json.dumps(woodStats,indent=2))
  ArchiveRecipes()
  bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedHigh.blend'))
@@ -218,6 +227,7 @@ def BakeGroup(groupName,sourceObjects,targetCount,size):
     uv=m.node_tree.nodes.new('ShaderNodeUVMap');uv.uv_map='UVMap';m.node_tree.links.new(uv.outputs['UV'],n.inputs['Vector'])
  uv=low.data.uv_layers.new(name='GameUV');low.data.uv_layers.active=uv;uv.active_render=True
  Select([low]);bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.uv.smart_project(angle_limit=1.15,island_margin=.007,area_weight=.35);bpy.ops.object.mode_set(mode='OBJECT')
+ if groupName=='Frame':return BakeFrameOnExistingMesh(low,sourceObjects)
  scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.device='CPU';scene.cycles.samples=16 if groupName=='Frame' else 8;scene.render.threads_mode='FIXED';scene.render.threads=6
  scene.render.bake.use_selected_to_active=False;scene.render.bake.margin=12;scene.render.bake.use_clear=True;scene.render.bake.target='IMAGE_TEXTURES'
  scene.render.bake.use_pass_direct=False;scene.render.bake.use_pass_indirect=False;scene.render.bake.use_pass_color=True
@@ -244,6 +254,60 @@ def BakeGroup(groupName,sourceObjects,targetCount,size):
  for layer in list(low.data.color_attributes):low.data.color_attributes.remove(layer)
  print('BAKED',groupName,before,TriangleCount(low),size,flush=True)
  return low,{'group':groupName,'sourceObjects':len(sourceObjects),'sourceTriangles':before,'gameTriangles':TriangleCount(low),'removedDegenerates':len(bad),'bakeSize':size}
+
+def BakeFrameOnExistingMesh(frame,sourceObjects):
+ # Bake source shaders onto approved geometry and GameUV, without re-decimation.
+ sourceObjects=list(sourceObjects);scene=bpy.context.scene
+ before=np.empty(len(frame.data.vertices)*3,dtype=np.float32);frame.data.vertices.foreach_get('co',before)
+ visibility={obj:(obj.hide_render,obj.hide_get()) for obj in scene.objects if obj.type=='MESH'}
+ target=bpy.data.materials.new('Material_FrameProjectionTarget');target.use_nodes=True
+ frame.data.materials.clear();frame.data.materials.append(target)
+ for poly in frame.data.polygons:poly.material_index=0
+ uv=frame.data.uv_layers.get('GameUV')
+ if uv is None:raise ValueError('Approved Frame has no GameUV')
+ frame.data.uv_layers.active=uv;uv.active_render=True
+ images={}
+ try:
+  for obj in visibility:obj.hide_render=True
+  for obj in sourceObjects+[frame]:obj.hide_render=False;obj.hide_set(False)
+  scene.render.engine='CYCLES';scene.cycles.device='CPU';scene.cycles.samples=16
+  scene.render.threads_mode='FIXED';scene.render.threads=6
+  bake=scene.render.bake;bake.target='IMAGE_TEXTURES';bake.use_selected_to_active=True
+  bake.use_cage=False;bake.cage_extrusion=.006;bake.max_ray_distance=.025
+  bake.margin=12;bake.use_clear=True;bake.use_pass_direct=False;bake.use_pass_indirect=False;bake.use_pass_color=True
+  for role,kind,size in [('Base','DIFFUSE',2048),('Normal','NORMAL',1024),('Roughness','ROUGHNESS',512)]:
+   name='Texture_BedFrame'+role+'Aged'
+   previous=bpy.data.images.get(name)
+   if previous:previous.name=name+'_Previous'
+   image=bpy.data.images.new(name,width=size,height=size,alpha=False)
+   image.colorspace_settings.name='sRGB' if role=='Base' else 'Non-Color'
+   node=target.node_tree.nodes.new('ShaderNodeTexImage');node.image=image;target.node_tree.nodes.active=node
+   Select([frame]+sourceObjects);bpy.context.view_layer.objects.active=frame
+   print('FRAME_MATERIAL_BAKE_BEGIN',role,size,flush=True)
+   bpy.ops.object.bake(type=kind)
+   image.filepath_raw=str(textureRoot/(name+'.png'));image.file_format='PNG';image.save();image.pack();images[role]=image
+   print('FRAME_MATERIAL_BAKE_FINISHED',role,flush=True)
+ finally:
+  scene.render.bake.use_selected_to_active=False
+  for obj,(hideRender,hidden) in visibility.items():obj.hide_render=hideRender;obj.hide_set(hidden)
+ material=bpy.data.materials.new('Material_BedFrame');material.use_nodes=True
+ nodes=material.node_tree.nodes;links=material.node_tree.links;shader=nodes.get('Principled BSDF')
+ shader.inputs['Metallic'].default_value=0
+ uvNode=nodes.new('ShaderNodeUVMap');uvNode.uv_map='GameUV'
+ for role,image in images.items():
+  texture=nodes.new('ShaderNodeTexImage');texture.image=image;links.new(uvNode.outputs['UV'],texture.inputs['Vector'])
+  if role=='Normal':
+   normal=nodes.new('ShaderNodeNormalMap');normal.uv_map='GameUV'
+   links.new(texture.outputs['Color'],normal.inputs['Color']);links.new(normal.outputs['Normal'],shader.inputs['Normal'])
+  else:links.new(texture.outputs['Color'],shader.inputs['Base Color' if role=='Base' else 'Roughness'])
+ frame.data.materials[0]=material
+ for layer in list(frame.data.uv_layers):
+  if layer.name!='GameUV':frame.data.uv_layers.remove(layer)
+ for layer in list(frame.data.color_attributes):frame.data.color_attributes.remove(layer)
+ after=np.empty_like(before);frame.data.vertices.foreach_get('co',after)
+ if not np.array_equal(before,after):raise ValueError('Frame material bake moved approved geometry')
+ return frame,{'group':'Frame','sourceObjects':len(sourceObjects),'sourceTriangles':sum(TriangleCount(obj) for obj in sourceObjects),'gameTriangles':TriangleCount(frame),'bakeSize':2048,'normalSize':1024,'roughnessSize':512,'representation':'Aged source shaders projected to approved geometry and GameUV; selected-to-active PBR bake','maximumVertexDisplacementM':0.,'projectionCageExtrusionM':.006,'projectionRayDistanceM':.025}
+
 
 def CompactFrameTextures(frame):
  # Keep the visible grain colour at 2K; tangent relief and broad roughness need
@@ -295,6 +359,10 @@ def FinishGame(game,originals,rows,duplicate):
  quilt=next(o for o in game if o.name=='Quilt');straw=next(o for o in game if o.name=='Straw');sewing=next(o for o in game if o.name=='Sewing')
  liningStats=AddCompactMatContact(quilt,duplicate,straw)
  (reviewRoot/'Data_QuiltLining.json').write_text(json.dumps(liningStats,indent=2))
+ from Script_PatchedTimberBedStrawAge import ApplyAgedStrawMaterial
+ strawAgeStats=ApplyAgedStrawMaterial(straw,textureRoot)
+ straw['GameExportColorLayer']=strawAgeStats['exportColorLayer']
+ (reviewRoot/'Data_StrawAge.json').write_text(json.dumps(strawAgeStats,indent=2))
  OrientQuiltShell(quilt)
  weaveStats=ApplyCottonWeave(quilt,bsRoot,textureRoot)
  (reviewRoot/'Data_CottonWeave.json').write_text(json.dumps(weaveStats,indent=2))
@@ -321,8 +389,19 @@ def FinishGame(game,originals,rows,duplicate):
  for o in game:o.hide_render=False;o.hide_set(False)
  Export(game,reviewRoot/'Model_PatchedTimberBedStandard.glb')
  for row in rows:row['gameTriangles']=TriangleCount(next(o for o in game if o.name==row['group']))
+ # The complete editable high source lives in its own project. A game project
+ # needs the six approved meshes and studio, not another hidden high bed copy.
+ removedSourceObjects=0
+ for obj in originals:
+  if bpy.data.objects.get(obj.name)==obj:bpy.data.objects.remove(obj,do_unlink=True);removedSourceObjects+=1
+ removedUnused={}
+ for name in ('meshes','materials','images'):
+  collection=getattr(bpy.data,name);unused=[item for item in collection if item.users==0]
+  for item in unused:collection.remove(item)
+  removedUnused[name]=len(unused)
+ (reviewRoot/'Data_GameProjectCompaction.json').write_text(json.dumps({'removedHiddenHighObjects':removedSourceObjects,'removedUnusedDatablocks':removedUnused,'editableGameMeshes':len(game),'highSourceRetainedSeparately':True},indent=2))
  ArchiveRecipes()
- bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'))
+ bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'),compress=True)
  scene=bpy.context.scene;scene.render.resolution_x=1080;scene.render.resolution_y=720;scene.render.resolution_percentage=100;scene.render.use_border=False;scene.cycles.samples=32;scene.render.filepath=str(reviewRoot/'Render_FinalGame.png')
  if not config.get('skipRenders',False):bpy.ops.render.render(write_still=True)
  (reviewRoot/'Data_BakeReport.json').write_text(json.dumps({'groups':rows,'footTriangles':TriangleCount(duplicate),'originOffsetBlender':list(offset)},indent=2))
@@ -367,8 +446,39 @@ def RefreshSoftGroup():
  bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_BedBakeProgress.blend'))
  FinishGame(game,originals,base['groups'],duplicate)
 
+def ExportSavedGame():
+ bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'))
+ game=[obj for obj in bpy.context.scene.objects if obj.type=='MESH' and not obj.hide_render and obj.name!='Plane']
+ if len(game)!=6 or sum(TriangleCount(obj) for obj in game)>50000:raise ValueError('Saved game violates complete-bed contract')
+ Export(game,reviewRoot/'Model_PatchedTimberBedStandard.glb')
+ ArchiveRecipes();bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'),compress=True)
+ print('SAVED_GAME_EXPORTED',flush=True)
+
+
+def RefreshFrameMaterial():
+ # External source and pre-contact checkpoint retain exact approved geometry.
+ bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedHigh.blend'))
+ sources=[obj for obj in bpy.context.scene.objects if obj.type=='MESH' and obj.name.startswith('FRAME_')]
+ stats=WeatherTimberFrame(sources)
+ (reviewRoot/'Data_WoodWeathering.json').write_text(json.dumps(stats,indent=2))
+ ArchiveRecipes();bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedHigh.blend'))
+ bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_BedBakeProgress.blend'))
+ sources=[obj for obj in bpy.context.scene.objects if obj.type=='MESH' and obj.name.startswith('FRAME_')]
+ stats=WeatherTimberFrame(sources)
+ (reviewRoot/'Data_WoodWeathering.json').write_text(json.dumps(stats,indent=2))
+ frame=bpy.data.objects['Frame'];frame,row=BakeFrameOnExistingMesh(frame,sources)
+ basePath=reviewRoot/'Data_BakeBaseReport.json';base=json.loads(basePath.read_text())
+ base['groups']=[row if item['group']=='Frame' else item for item in base['groups']]
+ basePath.write_text(json.dumps(base,indent=2))
+ (reviewRoot/'Data_FrameMaterialRefresh.json').write_text(json.dumps(row,indent=2))
+ ArchiveRecipes();bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_BedBakeProgress.blend'))
+ print('FRAME_MATERIAL_CHECKPOINT_SAVED',flush=True)
+
+
 stage=config.get('stage','all')
 if stage in ('prepare','all'):Prepare()
 if stage in ('build','all'):Build()
 if stage=='finish':ResumeFinish()
 if stage=='refresh':RefreshSoftGroup()
+if stage=='material-frame':RefreshFrameMaterial()
+if stage=='export':ExportSavedGame()
