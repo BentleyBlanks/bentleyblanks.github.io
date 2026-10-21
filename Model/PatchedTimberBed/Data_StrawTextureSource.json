@@ -1,0 +1,10 @@
+{
+  "mode": "built-in image_gen",
+  "purpose": "Continuous aged woven mat BaseColor source",
+  "file": "Texture_BedAgedStrawSource.png",
+  "prompt": "Use case: photorealistic-natural. Asset type: square seamless physically based game material albedo source. An orthographic straight-down macro photograph scan of an old Chinese handwoven rice-straw sleeping mat, covering the entire image edge to edge. Continuous tight basket weave: natural flattened golden-tan straw ribbons around 4-6mm broad crossing alternating under and over transverse bundles, organic slight irregularity, tiny frayed longitudinal fibres, compressed worn crests, old muted ochre and grey-brown dirt in the weave intersections, softly faded dry straw rather than green hay. The imaged square represents about 24 by 24 cm, about 36-45 interlaced cells each direction. Believable subtle ageing, visible woven structure in base color. Flat diffuse cross-polarized illumination, no directional shadows or highlights, no perspective, no vignette, no decorative border, no loose perimeter blades, no objects or text, no watermark. Tileable left-right top-bottom. Opaque full image. Photographic texture detail, no stylized painted strokes.",
+  "generatedOn": "2026-10-22",
+  "opaque": true,
+  "sha256": "55974c626bf2a6216a5f49cceea09d251907f8f000372c2ec04321af22d575ab",
+  "sourceBytes": 2767511
+}

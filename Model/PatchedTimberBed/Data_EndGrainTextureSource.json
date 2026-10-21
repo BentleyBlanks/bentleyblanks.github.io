@@ -1,0 +1,10 @@
+{
+  "mode": "built-in image_gen",
+  "purpose": "Weathered timber cap cross-grain BaseColor source",
+  "file": "Texture_BedAgedEndGrainSource.png",
+  "prompt": "Use case: photorealistic-natural. Asset type: square physically based game material albedo source. Straight-on orthographic macro texture scan of a dry sawn old elm timber end grain covering all pixels, muted weathered warm grey-brown wood matching aged unvarnished rustic furniture. Square field represents 18 by 18cm. Uneven close growth ring arcs with pith just outside lower-left of frame, porous end-grain capillaries, abrasive saw marks mostly worn off, several irregular fine branching shrinkage checks following radial directions, subtly lighter abraded perimeter areas. Clearly readable realistic end-grain structure and aged mottling across entire square. Natural low to medium contrast with brown fibrous fissures, avoid black star symbols or perfect concentric target rings. Flat diffuse cross-polarized lighting, no directional shadows or specular highlights. No object silhouette, no frame, no bark, no side grain, no perspective, no vignette, no text, no watermark. Opaque full image.",
+  "generatedOn": "2026-10-22",
+  "opaque": true,
+  "sha256": "ca6d720ccfe389c8a6a202913b2038e6a32238ef754291d7eb2dc3cac50df78b",
+  "sourceBytes": 3830705
+}

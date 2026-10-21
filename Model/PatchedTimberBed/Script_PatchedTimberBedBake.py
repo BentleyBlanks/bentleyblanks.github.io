@@ -16,7 +16,7 @@ from Script_PatchedTimberBedCotton import ApplyCottonWeave
 from Script_PatchedTimberBedWood import WeatherTimberFrame
 from Script_PatchedTimberBedQuilt import BakeQuiltSurface
 if '--' in sys.argv:
- parser=argparse.ArgumentParser();parser.add_argument('--source-root',required=True);parser.add_argument('--review-root',required=True);parser.add_argument('--stage',default='all',choices=['prepare','build','finish','refresh','material-frame','wood-reference','uv-cloth','wood-texture','export','all']);parser.add_argument('--skip-renders',action='store_true');parser.add_argument('--group',choices=['Quilt','Straw'],default='Straw')
+ parser=argparse.ArgumentParser();parser.add_argument('--source-root',required=True);parser.add_argument('--review-root',required=True);parser.add_argument('--stage',default='all',choices=['prepare','build','finish','refresh','material-frame','wood-reference','uv-cloth','wood-texture','craft','export','all']);parser.add_argument('--skip-renders',action='store_true');parser.add_argument('--group',choices=['Quilt','Straw'],default='Straw')
  args=parser.parse_args(sys.argv[sys.argv.index('--')+1:]);config={'sourceRoot':args.source_root,'reviewRoot':args.review_root,'stage':args.stage,'skipRenders':args.skip_renders,'refreshGroup':args.group}
 else:config=json.loads(pathlib.Path(os.environ.get('BED_BAKE_CONFIG',str(repoRoot/'tmp/BedBnBsAcceptance/Data_BakeConfig.json'))).read_text())
 sourceRoot=pathlib.Path(config['sourceRoot'])
@@ -40,10 +40,8 @@ def TriangleCount(o):return sum(len(p.vertices)-2 for p in o.data.polygons)
 
 def ArchiveRecipes():
  destination=sourceRoot/'Scripts';destination.mkdir(exist_ok=True)
- bitmap=pathlib.Path(__file__).resolve().parent/'Texture_BedAgedCottonSource.png'
- if bitmap.exists():shutil.copy2(bitmap,destination/bitmap.name)
- timber=pathlib.Path(__file__).resolve().parent/'Texture_BedAgedTimberSource.png'
- if timber.exists():shutil.copy2(timber,destination/timber.name)
+ for bitmap in pathlib.Path(__file__).resolve().parent.glob('Texture_BedAged*Source.png'):shutil.copy2(bitmap,destination/bitmap.name)
+ for receipt in pathlib.Path(__file__).resolve().parent.glob('Data_*TextureSource.json'):shutil.copy2(receipt,destination/receipt.name)
  for path in pathlib.Path(__file__).resolve().parent.glob('Script_PatchedTimberBed*'):
   if path.suffix not in ('.py','.mjs'):continue
   shutil.copy2(path,destination/path.name)
@@ -507,6 +505,10 @@ def BuildReferenceFrame(objects,targetCount=7200,metricUv=False):
  copies=[]
  for source in objects:
   obj=source.copy();obj.data=source.data.copy();bpy.context.scene.collection.objects.link(obj);copies.append(obj)
+  if config.get('stage')=='craft' and 'load slat' in source.name.lower():
+   # Spend the reduction on hidden support slats. Vertex-group weighting is
+   # insufficient for exact round-rim and crack-mouth surface preservation.
+   Select([obj]);modifier=obj.modifiers.new('HiddenSlatBudget','DECIMATE');modifier.ratio=min(1.,140/TriangleCount(obj));modifier.use_collapse_triangulate=True;bpy.ops.object.modifier_apply(modifier=modifier.name)
  low=Join(copies,'Frame');Select([low]);bpy.ops.object.transform_apply(location=False,rotation=True,scale=True)
  if metricUv:
   points=np.asarray([low.matrix_world@v.co for v in low.data.vertices]);minimum=points.min(axis=0);maximum=points.max(axis=0)
@@ -515,6 +517,7 @@ def BuildReferenceFrame(objects,targetCount=7200,metricUv=False):
  before=TriangleCount(low);history=[]
  for attempt in range(6):
   count=TriangleCount(low)
+  if config.get('stage')=='craft':break
   if count<=targetCount:break
   modifier=low.modifiers.new('ReferenceFrameBudget','DECIMATE');modifier.ratio=max(.005,min(.98,targetCount/count))
   modifier.use_collapse_triangulate=True
@@ -523,7 +526,7 @@ def BuildReferenceFrame(objects,targetCount=7200,metricUv=False):
   bpy.ops.object.modifier_apply(modifier=modifier.name)
   after=TriangleCount(low);history.append([count,after])
   if after>=count:break
- hardLimit=10500 if metricUv else 7500
+ hardLimit=16000 if config.get('stage')=='craft' else 10500 if metricUv else 7500
  if TriangleCount(low)>hardLimit:raise ValueError('Protected reference Frame exceeds its component ceiling: '+str(TriangleCount(low)))
  if metricUv:
   from Script_PatchedTimberBedSurfaceRevision import MetricWood
@@ -664,6 +667,67 @@ def RefreshUvCloth():
  print('METRIC_UV_COTTON_EXPORTED',flush=True)
 
 
+def RefreshCraft():
+ from Script_PatchedTimberBedCraft import RoundTimberSources,WearTimberSources,RebuildStraw,Version
+ bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedHigh.blend'))
+ # Always regenerate Frame from the immutable source; this is deterministic,
+ # handles interrupted runs and avoids applying damage repeatedly.
+ for obj in [o for o in bpy.context.scene.objects if o.type=='MESH' and o.name.startswith('FRAME_')]:bpy.data.objects.remove(obj,do_unlink=True)
+ with bpy.data.libraries.load(str(bnRoot/'Bed_BN_Complete_Editable_Checkpoint.blend'),link=False) as (available,loaded):loaded.objects=[n for n in available.objects if n.startswith('FRAME_')]
+ for obj in loaded.objects:bpy.context.scene.collection.objects.link(obj)
+ bpy.context.view_layer.update()
+ sources=[o for o in bpy.context.scene.objects if o.type=='MESH' and o.name.startswith('FRAME_')]
+ # Old flat black crack triangles are superseded by real subtraction and the
+ # end-grain source bitmap; they must not float over the new cap material.
+ fake=[o for o in sources if 'Open timber grain checks' in o.name]
+ for obj in fake:sources.remove(obj);bpy.data.objects.remove(obj,do_unlink=True)
+ rounded=RoundTimberSources(sources);PrepareReferenceFrameSources(sources)
+ wear=WearTimberSources(sources);wear['roundedSections']=rounded;TagFrameSources(sources);ArchiveRecipes()
+ (reviewRoot/'Data_TimberCraft.json').write_text(json.dumps(wear,indent=2))
+ (sourceRoot/'Scripts/Data_TimberCraft.json').write_text(json.dumps(wear,indent=2))
+ bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedHigh.blend'),compress=True)
+ frame,frameRow=BuildReferenceFrame(sources,11500,metricUv=True)
+ matrix=frame.matrix_world.copy();frame.parent=None;frame.matrix_world=matrix
+ transfer=sourceRoot/'Scene_WoodFrameTransfer.blend';bpy.data.libraries.write(str(transfer),{frame},path_remap='RELATIVE',compress=True)
+ bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'))
+ old=bpy.data.objects['Frame'];bpy.data.objects.remove(old,do_unlink=True)
+ try:
+  with bpy.data.libraries.load(str(transfer),link=False) as (available,loaded):loaded.objects=['Frame']
+ finally:transfer.unlink(missing_ok=True)
+ frame=loaded.objects[0];bpy.context.scene.collection.objects.link(frame);frame.name='Frame'
+ previousFile=reviewRoot/'Data_PreviousAsset.json'
+ previous=json.loads((previousFile if previousFile.exists() else pathlib.Path(__file__).with_name('Data_Asset.json')).read_text(encoding='utf-8'))
+ offset=Vector(bpy.context.scene.get('PatchedTimberBedSourceOffset',previous['coordinates']['sourceToGameTranslationBlender']));frame.location-=offset;frame.hide_render=False;frame.hide_set(False);bpy.context.view_layer.update()
+ world=np.asarray([frame.matrix_world@v.co for v in frame.data.vertices]);floor=float(world[:,2].min())
+ if abs(floor)>.0005:raise ValueError('Craft floor alignment exceeds original 0.5mm allowance')
+ inverse=frame.matrix_world.inverted()
+ for vertex,point in zip(frame.data.vertices,world):
+  weight=np.clip(1-(point[2]-floor)/.004,0,1);point=point.copy();point[2]-=floor*weight;vertex.co=inverse@Vector(point)
+ # Preserve the pre-existing bounds-centre pivot exactly: the rounded source
+ # ring fit changes extreme tips by only tens of microns. Restore those two
+ # narrow endpoint bands rather than translate any frozen bed component.
+ world=np.asarray([frame.matrix_world@v.co for v in frame.data.vertices]);bounds=previous['models'][0]
+ endpointDeltaX=float(bounds['boundsMin'][0]-world[:,0].min());endpointDeltaZ=float(bounds['boundsMax'][1]-world[:,2].max())
+ if max(abs(endpointDeltaX),abs(endpointDeltaZ))>.0005:raise ValueError('Rounded timber endpoint fit changed original bounds excessively')
+ minX=float(world[:,0].min());maxZ=float(world[:,2].max())
+ for vertex,point in zip(frame.data.vertices,world):
+  point=point.copy();point[0]+=endpointDeltaX*np.clip(1-(point[0]-minX)/.004,0,1);point[2]+=endpointDeltaZ*np.clip(1-(maxZ-point[2])/.004,0,1);vertex.co=inverse@Vector(point)
+ straw=RebuildStraw(bpy.data.objects['Straw'],textureRoot)
+ game=[o for o in bpy.context.scene.objects if o.type=='MESH' and not o.hide_render and o.name!='Plane']
+ total=sum(TriangleCount(o) for o in game)
+ if len(game)!=6 or total>60000:raise ValueError('Craft full-bed budget exceeded: '+str(total))
+ for obj in game:
+  obj.data.validate(verbose=True,clean_customdata=False);obj.data.update()
+  if obj.data.validate(verbose=False,clean_customdata=False):raise ValueError('Invalid craft mesh: '+obj.name)
+ Export(game,reviewRoot/'Model_PatchedTimberBedStandard.glb')
+ for name in ('meshes','materials','images'):
+  collection=getattr(bpy.data,name)
+  for item in [item for item in collection if item.users==0]:collection.remove(item)
+ ArchiveRecipes();bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'),compress=True)
+ (reviewRoot/'Data_CraftBuild.json').write_text(json.dumps({'result':'PASS','version':Version,'frame':frameRow,'timberWear':wear,'straw':straw,'components':[{'name':o.name,'triangles':TriangleCount(o)} for o in game],'completeTriangles':total,'triangleLimit':60000,'frozenComponents':['Quilt','BS_FootCloth','Pillow','Sewing'],'maximumFootAlignmentM':abs(floor),'endpointBandAlignmentM':[endpointDeltaX,endpointDeltaZ]},indent=2))
+ print('WOVEN_MAT_WORN_EDGES_EXPORTED',flush=True)
+
+
 def RefreshWoodBitmap():
  from Script_PatchedTimberBedSurfaceRevision import WoodMaps,WriteMaps
  bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'))
@@ -724,4 +788,5 @@ if stage=='material-frame':RefreshReferenceWood()
 if stage=='wood-reference':RefreshReferenceWood()
 if stage=='uv-cloth':RefreshUvCloth()
 if stage=='wood-texture':RefreshWoodBitmap()
+if stage=='craft':RefreshCraft()
 if stage=='export':ExportSavedGame()

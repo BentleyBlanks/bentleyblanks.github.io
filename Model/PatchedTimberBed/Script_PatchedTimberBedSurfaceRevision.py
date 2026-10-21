@@ -90,10 +90,16 @@ def WoodMaps():
   split=np.exp(-((y-cy-.001*np.sin(x*4*np.pi/SideMeters))/.00030)**2)*np.exp(-(dx/length)**4)
   rgb*=1-.18*split[:,:,None];field-=.00025*split
  Put(SideRect,rgb,field,(SideMeters,SideMeters),roughness)
+ from Script_PatchedTimberBedCotton import ReadRgbPng,ToLinear
+ endSource=Path(__file__).with_name('Texture_BedAgedEndGrainSource.png')
+ if not endSource.exists():raise FileNotFoundError('Required photographic timber end grain source is missing')
+ endLinear=ToLinear(ReadRgbPng(endSource).astype(np.float64)/255)
  for i,rect in enumerate(EndRects):
-  xx,yy=np.meshgrid(np.linspace(-.09,.09,448),np.linspace(.09,-.09,448));radius=np.sqrt((xx+.16+.015*i)**2+((yy-.02*i)*.92)**2)
-  phase=radius/.0043+.12*np.sin(radius*77);ring=(.5+.5*np.cos(phase*2*np.pi))**12
-  endRgb=np.asarray([.17,.123,.078])[None,None,:]*(1-.055*ring[:,:,None]);Put(rect,endRgb,-.000025*ring,(.18,.18),.88)
+  endRgb=ResizePixels(np.rot90(endLinear,i),448)
+  # Match the side's warm brown value while retaining the porous cross grain.
+  endRgb*=np.asarray([.94,.87,.78])[None,None,:]
+  lum=endRgb@np.asarray([.2126,.7152,.0722]);height=(lum-lum.mean())/max(float(lum.std()),1e-9)*.000055
+  Put(rect,endRgb,height,(.18,.18),.9)
  base[8:64,1568:2016]=1;rough[8:64,1568:2016]=.84;metal[8:64,1792:2016]=.70
  source=Path(__file__).with_name('Texture_BedAgedTimberSource.png')
  if source.exists():

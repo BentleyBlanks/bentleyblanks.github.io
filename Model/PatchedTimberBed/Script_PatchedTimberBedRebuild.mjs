@@ -11,7 +11,7 @@ const sourceRoot=Option('source-root','C:/Users/Bentl/OneDrive/AI/Models/Blender
 const reviewRoot=path.resolve(repoRoot,Option('review-root','tmp/BedBnBs50kAcceptance'));
 const outputFile=path.resolve(repoRoot,Option('output','Model/PatchedTimberBed/Model_PatchedTimberBed.glb'));
 const stage=Option('stage','all');
-if(!['all','wood-reference','uv-cloth','wood-texture'].includes(stage))throw new Error('Supported rebuild stages: all, wood-reference, uv-cloth, wood-texture');
+if(!['all','wood-reference','uv-cloth','wood-texture','craft'].includes(stage))throw new Error('Supported rebuild stages: all, wood-reference, uv-cloth, wood-texture, craft');
 fs.mkdirSync(reviewRoot,{recursive:true});
 for(const input of ['Inputs/BN/Restored/Bed_BN_Complete_Editable_Checkpoint.blend','Inputs/BS/BedBS/BS_material_only.blend','Inputs/BS/BedBS/BR_lowfrequency_corner_colors.npz','Inputs/BS/BedBS/BS_BaseColor.webp','Inputs/BS/BedBS/BS_Normal.webp','Inputs/BS/BedBS/BS_fiber_bundle_Base_1024.png']){
  if(!fs.existsSync(path.join(sourceRoot,input)))throw new Error(`Missing read-only input: ${path.join(sourceRoot,input)}`);
@@ -33,6 +33,8 @@ Run(process.execPath,['scripts/Script_BlenderMcp.mjs','start','--batch',path.joi
 if(stage==='all'){
  fs.writeFileSync(argumentFile,JSON.stringify(['--source-root',sourceRoot,'--review-root',reviewRoot,'--stage','uv-cloth']));
  Run(process.execPath,['scripts/Script_BlenderMcp.mjs','start','--batch',path.join(scriptRoot,'Script_PatchedTimberBedBake.py'),'--batch-args',argumentFile,'--task','PatchedTimberBedMetricSurfaces']);
+ fs.writeFileSync(argumentFile,JSON.stringify(['--source-root',sourceRoot,'--review-root',reviewRoot,'--stage','craft']));
+ Run(process.execPath,['scripts/Script_BlenderMcp.mjs','start','--batch',path.join(scriptRoot,'Script_PatchedTimberBedBake.py'),'--batch-args',argumentFile,'--task','PatchedTimberBedCraft']);
 }
 Run(Option('python','python'),['-B',path.join(scriptRoot,'Script_PatchedTimberBedPack.py'),path.join(reviewRoot,'Model_PatchedTimberBedStandard.glb'),outputFile,'--bs-dir',path.join(sourceRoot,'Inputs/BS/BedBS'),'--receipt',path.join(reviewRoot,'Data_PackReport.json')]);
 if(argumentsList.includes('--comparison')){
