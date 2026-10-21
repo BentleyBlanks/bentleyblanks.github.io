@@ -22,7 +22,8 @@
 // 门开了 → 屁股对到老子 → 灶屋门口）；10 背后打掉机枪组，石碾后守东街四步的前三步 + 穿院子 + 后门。
 //
 // 第三版（2026-10-19，白盒预演补齐 v3 契约 §3）：
-//   · 07-4 一架 Ki-30（段里的 aircraft[]，§14.1）由北往南贴麦地低空飞过凹路、不开枪，引擎声跟着飞机走，镜头 ① 中段看着它；
+//   · 07-4 三架九七式轻爆（Ki-30，段里的 aircraft[]，§14.1）排成人字，高高地（离地约 400 m）由北往南飞过凹路去炸县城，不下来、不开枪；
+//     路过时看见了凹路里的人（右后那架在头顶上斜了斜翅膀），13 那两架低空扫射的是它们炸完回去、再一次出动来的（2026-10-21 用户改）；
 //     人群 VilDuckProne 错峰扑倒，妮儿最后一个（她听不见，看见别人趴了才趴）。
 //   · 百姓、军官全用骨骼身体放片段：按 PrevizVillage 清单把 Vil 片段放到对应的拍（妮儿坐车尾 VilSitEdge、慌跑 VilPanicRun、
 //     钻狗洞 VilCrawlHole、窖里一家举手爬出 / 被捅 / 被拖 / 跪着爬、磕钢盔扔手榴弹、挑襁褓、撒尿的看守、呜咽 / 拔门闩 / 攥衣角 /
@@ -741,25 +742,43 @@ function S0703(ctx) {
 }
 
 function S0704(ctx) {
-  const s = new Seq(ctx, "07-4", "短过场：飞机贴麦地飞过，出洼地望见耿家庄");
+  const s = new Seq(ctx, "07-4", "短过场：三架轰炸机高高地往南飞过，出洼地望见耿家庄");
   const K = id => KU(ctx, "07-4", id), K8 = id => KU(ctx, "08-1", id);
   const laneFolk = Object.keys(Object.fromEntries((ctx.config.keyframes.find(k => k.id === "07-4").units).filter(u => /^(Walker|Helper)\d+$/.test(u.id)).map(u => [u.id, 1])));
-  // —— 飞机：一架九七式轻爆（Ki-30）由北往南贴着麦地低空飞过凹路，不开枪，往南飞过庄子去了。航点按时间升序，
-  //    约 70 m/s；凹路上空 20 多米。引擎声（planeDrone）从出现起跟着机身走，4.2 s 放一次通场声（planeDive）。
-  const PLANE = "Ki30";
+  // —— 飞机（2026-10-21 用户改）：三架九七式轻爆（Ki-30，和 13 扫射的是同一种）排成人字，离地约 400 m 由北往南飞过凹路，看方向是去炸县城；
+  //    不俯冲、不开枪（没有 diveT / strafe），约 85 m/s，领机 4.6 s 过凹路上空。路过时看见了凹路里的人：右后那架在头顶上
+  //    往外偏一下再回来（航线拐个小弯，运行时按转弯给坡度 = 斜了斜翅膀）。13 那两架低空扫射的是它们炸完回去、再一次出动来的。
+  //    引擎声（planeDrone）跟着各自的机身走，高处听着是一片沉闷的嗡嗡。
+  const PLANE = "Ki30Lead", WING_L = "Ki30Left", WING_R = "Ki30Right";
+  const HIGH = 400, OVER = 4.6, Z_OVER = 336, V = 85;
+  const Zt = (t, dz = 0) => R(Z_OVER + dz + V * (t - OVER));
   s.Aircraft(PLANE, {
     model: "MitsubishiKi30",
-    path: [{ t: 0.4, x: 92, y: 85, z: 20 }, { t: 3.6, x: 94.5, y: 30, z: 250 }, { t: 4.9, x: 96, y: 22, z: 335 }, { t: 6.6, x: 98, y: 34, z: 455 }, { t: 9.6, x: 104, y: 105, z: 670 }],
-    sound: { drone: true, diveT: 4.2 },
+    path: [{ t: 0, x: 98, h: HIGH, z: Zt(0) }, { t: OVER, x: 98, h: HIGH, z: Zt(OVER) }, { t: 11, x: 100, h: HIGH + 5, z: Zt(11) }],
+    sound: { drone: true },
+  });
+  s.Aircraft(WING_L, {
+    model: "MitsubishiKi30",
+    path: [{ t: 0, x: 53, h: HIGH + 10, z: Zt(0, -35) }, { t: OVER, x: 53, h: HIGH + 10, z: Zt(OVER, -35) }, { t: 11, x: 55, h: HIGH + 15, z: Zt(11, -35) }],
+    sound: { drone: true },
+  });
+  s.Aircraft(WING_R, {
+    model: "MitsubishiKi30",
+    path: [
+      { t: 0, x: 143, h: HIGH - 5, z: Zt(0, -35) }, { t: 3.8, x: 143, h: HIGH - 5, z: Zt(3.8, -35) },
+      { t: 5.4, x: 156, h: HIGH - 5, z: Zt(5.4, -35) }, { t: 7.0, x: 143, h: HIGH - 5, z: Zt(7.0, -35) }, { t: 11, x: 145, h: HIGH, z: Zt(11, -35) },
+    ],
+    sound: { drone: true },
   });
   // —— 镜头 ①（约 9 s）：机位在凹路东坎上往南俯看一长溜担架；北边飞机声来了，镜头抬起来看着它掠过头顶，再落回坎底缩着的人
   const BANK = Pt(101.6, 330);
-  s.Cam(0, 3.2, { from: { ...BANK, h: 1.7 }, to: { x: 101.8, z: 331.5, h: 1.65 }, look: { x: 96.5, z: 345, h: 0.4 }, lookTo: { x: 96.0, z: 338, h: 0.5 }, ease: "linear", fov: 58 });
-  s.Cam(3.2, 3.2, { from: { x: 101.8, z: 331.5, h: 1.65 }, look: { aircraft: PLANE }, ease: "linear", fov: 62 });
+  // 高处的飞机过头顶时机位几乎朝天：镜头只在它们从北边过来、仰角 60°–75° 那一段看着领机，过顶前落回坎底
+  s.Cam(0, 1.6, { from: { ...BANK, h: 1.7 }, to: { x: 101.8, z: 331.5, h: 1.65 }, look: { x: 96.5, z: 345, h: 0.4 }, lookTo: { x: 96.0, z: 338, h: 0.5 }, ease: "linear", fov: 58 });
+  s.Cam(1.6, 2.0, { from: { x: 101.8, z: 331.5, h: 1.65 }, look: { aircraft: PLANE }, ease: "linear", fov: 70 });
+  s.Cam(3.6, 2.8, { from: { x: 101.8, z: 331.5, h: 1.65 }, look: { x: 97.5, z: 338, h: 0.4 }, ease: "inOut", fov: 58 });
   s.Cam(6.4, 2.6, { from: { x: 101.8, z: 331.5, h: 1.65 }, to: { x: 101.9, z: 333, h: 1.6 }, look: { x: 97.5, z: 338, h: 0.4 }, lookTo: { actor: "Nier", offset: [0, 0.5, 0] }, ease: "inOut", fov: 58 });
-  s.Caption(0.3, 3.0, "（从坎上往下看：凹路里一长溜担架。北边传来飞机声）");
-  s.Shake(4.4, 1.4, 0.08);
-  s.Caption(3.4, 3.0, "（一架日机贴着麦地飞过来。路上的人全往土坎底下缩，老耿拽着驴往坎边靠）");
+  s.Caption(0.3, 1.6, "（从坎上往下看：凹路里一长溜担架。北边传来一阵沉闷的飞机声）");
+  s.Caption(1.9, 3.0, "（三架日军飞机排成个人字，高高地从北边过来，往南去，看方向是县城。路上的人全往土坎底下缩，老耿拽着驴往坎边靠）");
   // 开场大家还站着 / 蹲着（07-3 的样子），听见飞机就扑倒（VilDuckProne：跪、趴、抱头，末帧停住）：小队与后送队错峰
   const DUCK = { clip: VIL.duck, clipHold: true, stance: "prone" };
   for (const id of SQUAD) s.Key(id, 0, { stance: "crouch" });
@@ -785,7 +804,7 @@ function S0704(ctx) {
   const nierOff = Pt(cartAt.x, cartAt.z - CART_TAIL_Z - 0.5);
   s.Key("Nier", NIER_OFF, { ride: null, x: nierOff.x, z: nierOff.z, move: "cut", yawDeg: 0, stance: "stand", clip: null });
   s.Key("Nier", NIER_DUCK, DUCK);
-  s.Caption(7.4, 2.4, "（她从车尾滑下来，最后一个趴下。飞机没开枪，往南飞过庄子去了）");
+  s.Caption(7.4, 2.4, "（她从车尾滑下来，最后一个趴下。飞机没下来，最后那架在头顶上斜了斜翅膀，往南飞远了）");
   // —— 镜头 ②（约 7 s）：班长、排长带着全班弯腰顺凹路往前跑，老耿赶着车跟在后头；机位在前头的路中线上往回看，跟着退
   const RUN0 = 9.0, RUN1 = 16.0;
   s.Cam(RUN0, RUN1 - RUN0, { from: { ...LZ(352, 0.2), h: 1.4 }, to: { ...LZ(366, 0.2), h: 1.4 }, look: { actor: "Luo", offset: [0, 1.1, 0] }, ease: "linear", fov: 55 });

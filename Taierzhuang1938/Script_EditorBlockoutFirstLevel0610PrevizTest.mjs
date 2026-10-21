@@ -10,7 +10,7 @@
 // 身子不进实心块（按那一刻的信号算随信号体块，路线按 0.5 m 取样）；走位要求的速度不离谱；说话的人在那一刻是可见的；
 // 机位点不在实心块里；门缝 / 墙缝那几段的眼睛真能从缝里看到演的东西（2D 视线不被 ≥1 m 高的块挡）；
 // 剧本要求的事件（六个信号按拍开、掷弹筒越落越近、09 的「响了才走」节奏、07 边走边说、07-4 非第一人称短过场、08 手榴弹与喊人的可见段、10 东街 25–70 m）都在。第二版 2026-10-19 按 25 帧重写。
-// 第三版（2026-10-19，白盒预演补齐）再查：07-4 有一架 Ki-30 由北往南飞过凹路、不开枪、引擎声跟着走、镜头 ① 里看得见它，人群 VilDuckProne 错峰扑倒、
+// 第三版（2026-10-19，白盒预演补齐）再查：07-4 有飞机由北往南飞过凹路（10-21 起：三架 Ki-30 高飞去炸县城、不俯冲不开枪、一架斜翅膀）、引擎声跟着走、镜头 ① 里看得见它，人群 VilDuckProne 错峰扑倒、
 // 妮儿最后一个；用到的 Vil 片段都在 PrevizVillage 清单里；成对动作（清单 stages）两人的相对站位、朝向、起播时差与清单一致
 //（StageChecks：拿刺刀捅 / 被捅、倒退拖 / 被拖、压刺刀 / 咬手腕、伸手 / 拽回、背 / 被背、抱腿、攥衣角）；09-7 有慢动作窗口（约 1.5 s、0.3 倍、带渐变），
 // 咬中那一刻在窗口里、窗口里没台词；钻狗洞 / 翻墙 / 砸门 / 挪缸 / 拔门闩 / 磕钢盔扔手榴弹 / 挑襁褓的片段与它们带出的信号 / 事件对得上时刻。
@@ -521,25 +521,36 @@ function DesignChecks(doc, norm, config, layout, errors, table = { village: null
       const cart = PosKeys(s, "GengCart").at(-1) && PosAt("07-4", s, "GengCart", off.t);
       if (cart && !(Math.abs(off.x - cart.x) < 0.3 && cart.z - off.z > 1.3 && cart.z - off.z < 2.2)) errors.push(`07-4：下车要落在车尾外半步（车中心北 1.3–2.2 m），实际 dz ${R(cart.z - off.z)} dx ${R(Math.abs(off.x - cart.x))}`);
     }
-    // 飞机
+    // 飞机（2026-10-21 用户改）：几架轰炸机高高地往南去炸县城，路过看见了这里的人；不俯冲、不开枪。
+    // 13 那两架低空扫射的是它们炸完回去、再一次出动来的（12–18 的 13-1）。
     const planes = s.aircraft || [];
-    if (planes.length !== 1) errors.push(`07-4：要有一架飞机（aircraft[]），现在 ${planes.length}`);
+    if (planes.length < 3) errors.push(`07-4：要有不止一架飞机（排成队往南去，≥ 3 架），现在 ${planes.length}`);
+    if (planes.some(p => p.model !== "MitsubishiKi30")) errors.push("07-4：飞机要是九七式轻爆 MitsubishiKi30（和 13 扫射的同一种，炸完回去再出动的就是它们）");
     const plane = planes[0];
     if (plane) {
-      if (plane.model !== "MitsubishiKi30") errors.push("07-4：飞机要是九七式轻爆 MitsubishiKi30");
-      const path = plane.path || [];
-      if (path.length < 3 || path[0].z > 200 || path.at(-1).z < 550) errors.push("07-4：飞机要由北（z < 200）往南（z > 550）飞过");
-      if ((plane.strafe || []).length) errors.push("07-4：飞机不开枪（不许写 strafe）");
-      if (plane.sound?.drone === false) errors.push("07-4：引擎声要跟着飞机走（sound.drone 不许关）");
-      // 贴麦地低飞过凹路：航线上有一刻在凹路（x 95…101、z 300…370）上空、离地 15–40 m
       const ground = layout.terrainSampler;
-      let low = false, seen = false;
+      let seen = false;
+      for (const p of planes) {
+        const path = p.path || [];
+        if (path.length < 2 || path[0].z > 200 || path.at(-1).z < 550) errors.push(`07-4：${p.id} 要由北（z < 200）往南（z > 550）飞过`);
+        if ((p.strafe || []).length) errors.push(`07-4：${p.id} 不开枪（不许写 strafe）`);
+        if (p.sound?.diveT !== undefined) errors.push(`07-4：${p.id} 不俯冲（不许写 sound.diveT）`);
+        if (p.sound?.drone === false) errors.push(`07-4：${p.id} 的引擎声要跟着飞机走（sound.drone 不许关）`);
+        // 高飞：整条航线离地 ≥ 250 m（不是冲着这里来的）
+        let minH = Infinity;
+        for (let t = path[0]?.t ?? 0; path.length && t <= path.at(-1).t; t += 0.1) {
+          const q = SamplePrevizAircraft(p, t, { groundAt: ground });
+          if (q.visible) minH = Math.min(minH, q.y - ground(q.x, q.z));
+        }
+        if (!(minH >= 250)) errors.push(`07-4：${p.id} 要高飞（离地 ≥ 250 m），最低 ${R(minH)} m`);
+      }
+      // 至少有一架转弯时斜了斜翅膀（看见了凹路里的人）
+      if (!planes.some(p => { for (let t = p.path[0].t; t <= p.path.at(-1).t; t += 0.1) if (Math.abs(SamplePrevizAircraft(p, t).bank) > 0.25) return true; return false; })) errors.push("07-4：要有一架在头顶上斜一斜翅膀（航线拐个小弯，坡度 > 0.25 rad）");
+      const path = plane.path || [];
       for (let t = path[0].t; t <= path.at(-1).t; t += 0.1) {
         const p = SamplePrevizAircraft(plane, t, { groundAt: ground });
         if (!p.visible) continue;
-        const h = p.y - ground(p.x, p.z);
-        if (p.x > 94 && p.x < 102 && p.z > 300 && p.z < 370 && h > 15 && h < 40) low = true;
-        if (nierDuck !== undefined && t < nierDuck && p.z > 330 && p.z < 345) seen = seen || true;   // 过顶在妮儿趴下之前
+        if (nierDuck !== undefined && t < nierDuck && p.z > 330 && p.z < 345) seen = seen || true;   // 领机过顶在妮儿趴下之前
         // 镜头里看得见它：镜头朝向与「机位 → 机身」的夹角在视场的 0.75 倍以内
         const shot = SamplePrevizCamera(n.camera, t, CameraResolver(kf07, n, ground, t));
         if (shot && !shot.eye) {
@@ -550,7 +561,6 @@ function DesignChecks(doc, norm, config, layout, errors, table = { village: null
           if (ang <= (shot.fov || 60) * 0.75) inView07 = true;
         }
       }
-      if (!low) errors.push("07-4：飞机要贴着麦地低飞过凹路（凹路上空、离地 15–40 m）");
       if (!seen) errors.push("07-4：飞机要在妮儿趴下之前就过了头顶");
       if (!inView07) errors.push("07-4：镜头里要看得见飞机（某一刻机身在机位的视场里）");
       if (!s.camera.some(c => c.look?.aircraft === plane.id || c.lookTo?.aircraft === plane.id)) errors.push("07-4：要有一条镜头看着飞机（look / lookTo 用飞机锚）");
