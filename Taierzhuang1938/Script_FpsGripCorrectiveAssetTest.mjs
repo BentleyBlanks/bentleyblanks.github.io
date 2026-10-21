@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { LoadGlb, ReadAccessor, ReadAccessorInt } from "./_import/Script_LugouGlbPose.mjs";
 import { UndoFpsHandSkinWeightRepair } from "./Script_FpsHandSkinWeightsTest.mjs";
+import { UndoFpsForearmTaper } from "./Script_FpsForearmTaperTest.mjs";
 
 const project = path.dirname(fileURLToPath(import.meta.url));
 const Hash = value => createHash("sha256").update(value).digest("hex");
@@ -53,8 +54,11 @@ function ArchivedBasis(manifest) {
 }
 
 export function AuditAsset(bytes, manifest, archivedBytes = null) {
-  // Weight repair is a separate reviewed layer. It must reverse to the exact
-  // original asset before the retained-prefix/morph audit is allowed to run.
+  // The forearm taper and the weight repair are separate reviewed layers. Each
+  // must reverse to its exact previous asset before the retained-prefix/morph
+  // audit is allowed to run.
+  if(manifest.forearmTaper)bytes=UndoFpsForearmTaper(bytes,
+    JSON.parse(fs.readFileSync(path.join(project,manifest.forearmTaper))),manifest.asset);
   if(manifest.skinWeightRepair)bytes=UndoFpsHandSkinWeightRepair(bytes,
     JSON.parse(fs.readFileSync(path.join(project,manifest.skinWeightRepair))));
   assert.equal(bytes.readUInt32LE(0), 0x46546c67, "FPS asset is GLB");
@@ -157,5 +161,5 @@ export function AuditAsset(bytes, manifest, archivedBytes = null) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const manifest = JSON.parse(fs.readFileSync(path.join(project, "Model/Data_FpsGripCorrectives.json")));
   const results = AuditAsset(fs.readFileSync(path.join(project, manifest.asset)), manifest, ArchivedBasis(manifest));
-  console.log(`PASS FpsGripCorrectiveAsset: ${manifest.basis.binaryBytes} original bytes ${manifest.skinWeightRepair?'verified after exact weight-repair restoration':'retained'}; ${results.map(r => `${r.name}: ${r.changed} localized vertices, bind max ${r.maximumBindDelta.toFixed(6)}`).join("; ")}`);
+  console.log(`PASS FpsGripCorrectiveAsset: ${manifest.basis.binaryBytes} original bytes ${manifest.skinWeightRepair?`verified after exact ${manifest.forearmTaper?'forearm-taper and ':''}weight-repair restoration`:'retained'}; ${results.map(r => `${r.name}: ${r.changed} localized vertices, bind max ${r.maximumBindDelta.toFixed(6)}`).join("; ")}`);
 }

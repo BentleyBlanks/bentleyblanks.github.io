@@ -271,6 +271,7 @@ export const testDefs = {
   RiggedModelTest: { file: "Script_RiggedModelTest.mjs", desc: "第一人称手臂 GLB 的二进制契约（纯 Node，秒级）" },
   FpsGripCorrectiveAssetTest: { file: "Script_FpsGripCorrectiveAssetTest.mjs", desc: "握持 ShapeKey：原 GLB 前缀与描述不变、默认关闭、三通道与手部权重隔离（纯 Node）" },
   FpsHandSkinWeightsTest: { file: "Script_FpsHandSkinWeightsTest.mjs", desc: "扫描手局部权重：逐字节反还原、正确手侧、归一化及仅批准顶点变化" },
+  FpsForearmTaperTest: { file: "Script_FpsForearmTaperTest.mjs", desc: "前臂到手腕削薄：两份手部 GLB 逐字节反还原、只往里径向收、法线/切线独立重算、背侧轮廓无折棱（纯 Node）" },
   FpsHandSelfContactTest: { file: "Script_FpsHandSelfContactTest.mjs", desc: "汉阳造真实蒙皮：工作手型及过渡中十对纯指皮肤横穿（纯 Node）" },
   FpsHandLeftSelfContactTest: { file: "Script_FpsHandSelfContactTest.mjs", args:["--side=l"], desc: "汉阳造左手承托：十对真实纯指皮肤零横穿（纯 Node）" },
   FpsHandPoseTest: { file: "Script_FpsHandPoseTest.mjs", desc: "汉阳造真实绑定逐指关节：混合姿态屈伸及铰链外扭转（纯 Node）" },
@@ -772,7 +773,7 @@ export const domains = {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tier2Tests:["FpsReloadClearanceTest","HanYangReloadClearanceTest"],
     tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmActionsTest", "FirearmHandlingBrowserTest", "FirearmResponseBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsRifleViewTest", "FpsGripCorrectiveAssetTest", "FpsHandSkinWeightsTest", "FpsHandSelfContactTest", "FpsHandLeftSelfContactTest", "FpsHandPoseTest", "FpsSleeveTest", "FpsHandAnatomyTest", "FpsHandContactTest", "FpsElbowArcTest", "FpsReloadMechanicsTest", "FpsGripEditorTest", "FpsAnimationTest", "FpsDadaoProjectionTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
+      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsRifleViewTest", "FpsGripCorrectiveAssetTest", "FpsHandSkinWeightsTest", "FpsForearmTaperTest", "FpsHandSelfContactTest", "FpsHandLeftSelfContactTest", "FpsHandPoseTest", "FpsSleeveTest", "FpsHandAnatomyTest", "FpsHandContactTest", "FpsElbowArcTest", "FpsReloadMechanicsTest", "FpsGripEditorTest", "FpsAnimationTest", "FpsDadaoProjectionTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "ModelFacingTest",
       // 受击物理反应挂在 TakeHit/Kill/Actor.Update 上：碰伤害口径、人物动画、死亡的改动连着它们一起跑。
       "HitReactionTest", "HitReactionBrowserTest",
@@ -868,7 +869,7 @@ export const domains = {
 
 const changedDomainRules = [
   { domain: "singleBlanket", pattern: /SingleBlanket/ },
-  { domain: "combat", pattern: /FpsGripCorrective|FpsHandSkinWeights|FpsHandSelfContact|FpsHandPose|HanYangReloadClearance|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },
+  { domain: "combat", pattern: /FpsGripCorrective|FpsHandSkinWeights|FpsForearmTaper|FpsHandSelfContact|FpsHandPose|HanYangReloadClearance|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },
   {domain:"historyCodex",pattern:/HistoryCodex|HistoryBook|HistoryConscription|HistoryLedger|page-flip|Texture\/Menu\/History\//},
   { domain: "combat", pattern: /AircraftGeometry|OptimizeKi21|OptimizeKi30|Model_MitsubishiKi(21Ia|30)/ },
   {domain:"textureAssets",pattern:/(?:AssetPublish|BuildPublishAssets|ValidatePublishAssets|PublishCache|PublishAssets|ModelImports)/},

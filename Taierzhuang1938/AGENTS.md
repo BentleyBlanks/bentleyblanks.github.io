@@ -8,6 +8,8 @@
 
 - **大刀收招抖动、冲刺拧刀、检查器时间轴、斜握重做（2026-10-21）**：刀轨肘向（`BlenderDadaoPowerSwing`）在起刀 / 收招交接里不再按权重混架势默认肘向（混出的方向被腕弯上限夹到下方再弹回，就是那一下抖）；大刀冲刺姿势由腰射架势前倾 12° 推出（旧值和腰射差 163°）；第一人称检查器时间轴可选「大刀劈砍（程序动作）」，经 `action.hold` 钉住正片动作逐帧检查。劈到底时左肘翻到上方（随势段双手停在左肩高度、刀柄横在掌心）按用户选定改为 30° 斜握（`Script_FpsDadaoDiagonalGrip.mjs` + `_blender/Script_FpsDadaoDiagonalGripFit.py`）+ 随势段双手下放 23 cm 与躯干左拧，肘轨重拟，整刀双肘始终低于肩，刀经画面左下边扫出；`FpsDadaoProjectionTest` 随势段与中央可见判据随之改写。源工程 `DadaoDiagonalGrip_20261021`，含 121 帧实机蒙皮回放（回放脚本已修好 10-16 手部 GLB 重复骨槽的权重累加）。见 [大刀劈砍修订](docs/Data_DadaoPowerSwing.md) 与 [编辑器套件](docs/Data_EditorSuite.md)。
 
+- **第一人称手腕硬棱：前臂削薄（2026-10-21）**：扫描手接在军装前臂上，手背一侧前臂比手背高出约 2 cm、在手腕前 2 cm 内陡降，侧面看是一道竖棱。两份手臂 GLB（`Model_FpsHanYangHands.glb`、`Model_FpsHanYangHandsRepaired.glb`）加一层可撤回的「前臂削薄」：只把手背一侧前臂到手腕的皮肤点沿径向往里收（袖口里起、第一圈手掌皮肤前止），其余字节不变；配方 `Model/Data_FpsForearmTaper.json`，重建 `_blender/Script_FpsForearmTaperBake.py`，门禁 `Script_FpsForearmTaperTest`（逐字节撤回到上一层、独立重算法线／切线、背侧轮廓无折棱）。`AuditAsset` 与 `FpsHandSkinWeightsTest` 先撤这一层。手腕 UV 岛边上法线贴图自带的一条斜坡带仍会显出细线，未处理。见 [近镜握持续修 v18](docs/Data_FpsRifleView20261016.md)。
+
 - **转视角摇摆与枪口焰对标 COD（2026-10-21）**：转视角摇摆改为 COD 引擎的限幅 + 一阶跟随（WaW Kar98k 数值，`LOOK_SWAY`），不再甩过头回弹；枪口焰年龄从画出来的第一帧算起、枪口灯先给亮度再计时，低帧率也看得见；枪焰换成照片级 4×4 图集，每发随机格子、滚转、大小、片数，预乘混合。口径与验收见 [枪械手感](docs/Data_FirearmHandling.md)。
 - **炮弹落地扬尘与炮击扬尘测试场（2026-10-21）**：用户要尘的起始形态贴着壕沟、之后升起飘散，并补充炸点半径内地面被震起的一层很细的浮土。落地爆炸在开了 `phase.groundImpactDust` 的关卡改走 `Vfx.GroundImpact`：局部网格上的贴地尘流（爆风按沿沟路程走、拐过折角）+ 土柱 / 悬浮尘云 + 震起的细尘，体积积分出团块与薄纱；目前只有独立测试场 `?impacts=1` 开（锯齿壕沟、碉堡、11 个弹种按真实落角投送、慢放 / 观察相机 / 新旧 A/B）。口径 [落地扬尘](docs/Data_ShellImpactDust.md)、[测试场](docs/Data_ShellImpactRange.md)；回归 `Script_DustFlowTest`、`Script_ShellImpactRangeTest`、`Script_ShellImpactRangeBrowserTest`。正片默认不开，开之前要过性能与能见度两本账。
 

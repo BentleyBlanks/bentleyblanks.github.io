@@ -6,6 +6,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {LoadFpsForearmTaper,UndoFpsForearmTaper} from './Script_FpsForearmTaperTest.mjs';
 
 const project=path.dirname(fileURLToPath(import.meta.url));
 const Hash=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -119,7 +120,8 @@ export function UndoFpsHandSkinWeightRepair(bytes,recipe) {
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
   const recipe=JSON.parse(fs.readFileSync(path.join(project,'Model/Data_FpsHandSkinWeights.json')));
-  const bytes=fs.readFileSync(path.join(project,recipe.asset));
+  // The shipped asset carries the later forearm taper; peel it off byte-exactly first.
+  const bytes=UndoFpsForearmTaper(fs.readFileSync(path.join(project,recipe.asset)),LoadFpsForearmTaper(),recipe.asset);
   const restored=UndoFpsHandSkinWeightRepair(bytes,recipe);
   const archived=spawnSync('git',['show',`${recipe.basis.git.commit}:${recipe.basis.git.path}`],
     {cwd:path.resolve(project,'..'),windowsHide:true,maxBuffer:32*1024*1024});
