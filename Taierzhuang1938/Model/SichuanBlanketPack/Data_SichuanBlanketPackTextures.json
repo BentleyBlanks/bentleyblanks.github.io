@@ -1,91 +1,461 @@
 {
-  "schema": "tengxian-model-textures-v2",
+  "schema": "sichuan-lod40k-pbr-textures-v13",
   "id": "SichuanBlanketPack",
-  "date": "2026-10-21",
-  "pathsRelativeTo": "Taierzhuang1938/",
-  "scope": "Independent high-to-low V10 game asset; all five components share one production atlas",
-  "source": {
-    "highBlend": {
-      "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\HighGameV10\\Scene_SichuanPackGameBakeSourceV10.blend",
-      "bytes": 90579860,
-      "sha256": "962adce5e1eaa6adf35241b0433eafc0c7aef8102b11d7b11792a72e26155c41"
-    },
-    "materialSources": [],
-    "projectionRecord": {
-      "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\GameV10\\Bake\\Data_BakeProjection.json",
-      "bytes": 5926194,
-      "sha256": "3b75b303bf5d4d102067137afc67da30a3c3a09f654c91c7d48f0e3b74e65982"
+  "version": "20261022Lod40kV13-03d3d4f2",
+  "pathsRelativeTo": "Taierzhuang1938",
+  "model": {
+    "path": "Model/SichuanBlanketPack/Model_SichuanBlanketPack.gltf",
+    "bytes": 16447,
+    "sha256": "03d3d4f2d1026b98d9e32ceb113cc4461e0be351c5192dcc1c152d679c88562f"
+  },
+  "atlas": {
+    "layout": "new-low-part-atlas-high-to-low-projection",
+    "parts": 5,
+    "uvSets": [
+      "ProjectionUV"
+    ],
+    "texCoord": 0,
+    "uvOrigin": "bottom-left",
+    "resolutionPerPart": [
+      4096,
+      4096
+    ],
+    "materialBakeMode": "projected-high-to-low-new-uv",
+    "projectionBake": {
+      "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\ProjectionFinal\\Data_ProjectionWithFallbackV13.json",
+      "bytes": 97951,
+      "sha256": "b324414a45309b6331587b2fcbe2ad15b60b40eb460320b9f90614adc1fbb139",
+      "generator": "SichuanLodProjectionBakeV13",
+      "nearestSurfaceFallback": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Data_NearestSurfaceFallbackV13.json",
+        "bytes": 172024,
+        "sha256": "5127d7b98db9a1f93f2e87567fc7a3637cb4434bde746ac8f20aff884bf2a71e",
+        "generator": "SichuanNearestSurfaceFallbackV13"
+      },
+      "surfaceTransferMethod": "Selected rays with recorded closest-high-surface barycentric texture sampling for actual covered texels missed by rays; sampled high normals converted from High TBN to Low TBN."
     }
   },
-  "bakeRecord": "_import/SichuanBlanketPack/Data_SichuanBlanketPackTextureBake.json",
-  "surfaceEncoder": "_import/Script_SichuanGameMapsV10.py",
-  "embeddedAsset": "Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb",
-  "normalConvention": "gl",
-  "normalMeaning": "Actual high-to-low tangent normal projection; BOX downsample and vector renormalization, no inward-normal flipping",
-  "atlas": {
-    "layout": "unique-surface-uv",
-    "uvOrigin": "bottom-left",
-    "uvSet": "GameUV",
-    "texCoord": 1,
-    "bakeResolution": [
-      2048,
-      2048
-    ],
-    "runtimeResolution": [
-      1024,
-      1024
-    ],
-    "packing": "Actual GameUV islands recorded by Data_SurfaceUv.json"
+  "normalConvention": "OpenGL tangent-space +Y",
+  "channels": {
+    "Base": {
+      "colorSpace": "sRGB"
+    },
+    "Normal": {
+      "colorSpace": "linear"
+    },
+    "Orm": {
+      "colorSpace": "linear",
+      "components": {
+        "r": "ambient-occlusion",
+        "g": "roughness",
+        "b": "metallic (all zero)"
+      }
+    }
   },
-  "atlasReason": "High-source materials and geometric relief are projected onto unique production UVs; source material tiles are not runtime atlas quadrants",
+  "encoding": {
+    "format": "lossless-webp",
+    "extension": "EXT_texture_webp",
+    "required": true,
+    "pngFallback": false,
+    "runtimeBitDepth": 8,
+    "alphaRemoved": true,
+    "materialsOpaque": true,
+    "precision": "Fifteen actual high-to-low projection images match raw GLB payloads byte-for-byte; RGB8 decoding is explicit; all lossless WebPs verified byte-exact to those decoded RGB8 buffers.",
+    "inheritedBaseOrmImages": 0,
+    "baseOrmExactToHighRuntime": false,
+    "newTransferredNormalImages": 5,
+    "projectedPbrImages": 15,
+    "highAtlasPixelsInherited": false
+  },
   "files": [
     {
+      "part": "Pack_Bundle",
       "channel": "Base",
-      "width": 1024,
-      "height": 1024,
-      "bytes": 904210,
-      "sha256": "883793f9f2df74532a62b9c901816b8b219660d6fa1826823587c3b247df1bc9",
-      "path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackBase.webp",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_Bundle_Base.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
       "colorSpace": "sRGB",
-      "encoding": "lossless WebP"
+      "encoding": "lossless-webp",
+      "bytes": 11924724,
+      "sha256": "1720dff6aa9e640f23a73186931368b0fd2492cefa62ab8f1fc5e337d8d99f14",
+      "sourceDecodedRgb8Sha256": "ceeeeb20b92b1bd7df0d0db7d8f36e70ebee40ccd83b917dcf7d1788cf0d0691",
+      "runtimeDecodedRgb8Sha256": "ceeeeb20b92b1bd7df0d0db7d8f36e70ebee40ccd83b917dcf7d1788cf0d0691",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_Bundle_Base.png",
+        "bytes": 25527568,
+        "sha256": "f501d1ca3710220174b9a32fe127850a8de475ebc4bd37f7a66086f5335f9d7f"
+      },
+      "highAtlasPixelsInherited": false
     },
     {
+      "part": "Pack_Bundle",
       "channel": "Normal",
-      "width": 1024,
-      "height": 1024,
-      "bytes": 689186,
-      "sha256": "7ce926d9f6d7999cc7739acd713f1b66b65f91e51bcaf42e159a9538e160a475",
-      "path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackNormal.webp",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_Bundle_Normal.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
       "colorSpace": "linear",
-      "encoding": "lossless WebP"
+      "encoding": "lossless-webp",
+      "bytes": 7238358,
+      "sha256": "f1539b776485fb396e728bd8aa7b4992d501c6448c6ae1dbd8c2dc377896e1f0",
+      "sourceDecodedRgb8Sha256": "620247e8aa55dca9c896e2e72f3d0ecf764b255e4a8b630fe65dbccda8ab4de1",
+      "runtimeDecodedRgb8Sha256": "620247e8aa55dca9c896e2e72f3d0ecf764b255e4a8b630fe65dbccda8ab4de1",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_Bundle_Normal.png",
+        "bytes": 19565181,
+        "sha256": "61ff8165873d26083119cd01c2da643509898bb211e64e0b959ec01e86fec913"
+      },
+      "highAtlasPixelsInherited": false
     },
     {
+      "part": "Pack_Bundle",
       "channel": "Orm",
-      "width": 1024,
-      "height": 1024,
-      "bytes": 418926,
-      "sha256": "d8d3a01973980abc15c63435ddb574df5ad5f56b899c11e0000066c91e0ecc45",
-      "path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackOrm.webp",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_Bundle_Orm.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
       "colorSpace": "linear",
-      "encoding": "lossless WebP"
+      "encoding": "lossless-webp",
+      "bytes": 3764054,
+      "sha256": "b4b8a61e72e2073976e1818dbb1fcc12dd44a3144cf98a473bae026a1e4bf36b",
+      "sourceDecodedRgb8Sha256": "a9975544015849438defe30a6aa350b888129fe895759f38fd98f28745d6ff77",
+      "runtimeDecodedRgb8Sha256": "a9975544015849438defe30a6aa350b888129fe895759f38fd98f28745d6ff77",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_Bundle_Orm.png",
+        "bytes": 8744523,
+        "sha256": "a1c77c5b781c00d3cb42561c65419b2d58c5cc30b41cb616754f023f3a1554c7"
+      },
+      "highAtlasPixelsInherited": false
+    },
+    {
+      "part": "Pack_Binding",
+      "channel": "Base",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_Binding_Base.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
+      "colorSpace": "sRGB",
+      "encoding": "lossless-webp",
+      "bytes": 7391340,
+      "sha256": "afe845600b27ac8889fab69b1ef4bd4f2a37c5b823959fd02f63ac9087c65bd6",
+      "sourceDecodedRgb8Sha256": "a3f7b7410404dd9f71865d8e48df82419ae3e7bc3983a1d83c03d5c8d1fc0a49",
+      "runtimeDecodedRgb8Sha256": "a3f7b7410404dd9f71865d8e48df82419ae3e7bc3983a1d83c03d5c8d1fc0a49",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_Binding_Base.png",
+        "bytes": 13559324,
+        "sha256": "d04043a2c79942a2cd7df68aa8bffc092f672d7b156c2071fba6d0a4fae75b53"
+      },
+      "highAtlasPixelsInherited": false
+    },
+    {
+      "part": "Pack_Binding",
+      "channel": "Normal",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_Binding_Normal.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
+      "colorSpace": "linear",
+      "encoding": "lossless-webp",
+      "bytes": 4266072,
+      "sha256": "a50d0c1c5ad7fad0cac3f1efc2a37587da7fcc9bb43523dcf110268508570cc1",
+      "sourceDecodedRgb8Sha256": "2369bc62788360c0567ea540eda3279db59d8681b49d49566e7834d2c3eab2eb",
+      "runtimeDecodedRgb8Sha256": "2369bc62788360c0567ea540eda3279db59d8681b49d49566e7834d2c3eab2eb",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_Binding_Normal.png",
+        "bytes": 8988035,
+        "sha256": "478a623accf10a9cba8ecffad7276a85a4d5453b381114eea67dc4209c8edc3d"
+      },
+      "highAtlasPixelsInherited": false
+    },
+    {
+      "part": "Pack_Binding",
+      "channel": "Orm",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_Binding_Orm.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
+      "colorSpace": "linear",
+      "encoding": "lossless-webp",
+      "bytes": 4252620,
+      "sha256": "9efbc05926fa38872008db441743948c333e98ae13a4814b8306d0ed0d6753a8",
+      "sourceDecodedRgb8Sha256": "8a397710211d232cab0a75c8142fac8fb1f40a43f8f174efdb45768e33d1cd41",
+      "runtimeDecodedRgb8Sha256": "8a397710211d232cab0a75c8142fac8fb1f40a43f8f174efdb45768e33d1cd41",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_Binding_Orm.png",
+        "bytes": 8576022,
+        "sha256": "ff9020f4d73e970d63389be95c84b6dcf585d6bae1bad94c91f275ad6a980e8f"
+      },
+      "highAtlasPixelsInherited": false
+    },
+    {
+      "part": "Pack_Jacket",
+      "channel": "Base",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_Jacket_Base.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
+      "colorSpace": "sRGB",
+      "encoding": "lossless-webp",
+      "bytes": 14452310,
+      "sha256": "01be2d2bf20f27aa5dab7603d7acc0929b75dcf7ff84875e180c4d1f7ffdec6e",
+      "sourceDecodedRgb8Sha256": "5d2a899a476fa4f27eb82344d49a828d14d47a5119860e9a3fc5a4047c405bf0",
+      "runtimeDecodedRgb8Sha256": "5d2a899a476fa4f27eb82344d49a828d14d47a5119860e9a3fc5a4047c405bf0",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_Jacket_Base.png",
+        "bytes": 23272322,
+        "sha256": "f7a127ae6b36872e53f9dd0e490e4f55b613fdb89b7e4353e0ab819307bd643e"
+      },
+      "highAtlasPixelsInherited": false
+    },
+    {
+      "part": "Pack_Jacket",
+      "channel": "Normal",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_Jacket_Normal.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
+      "colorSpace": "linear",
+      "encoding": "lossless-webp",
+      "bytes": 11097538,
+      "sha256": "c5421beb98bce8c8e6e36d4e7af3ca0f7f3265a9fdec4fb1a3a18f0b0f39fd1e",
+      "sourceDecodedRgb8Sha256": "3dbfe9674b5704bc5b6f1c7f98604f35b1e08156591d2645690a4bc34527170c",
+      "runtimeDecodedRgb8Sha256": "3dbfe9674b5704bc5b6f1c7f98604f35b1e08156591d2645690a4bc34527170c",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_Jacket_Normal.png",
+        "bytes": 27075811,
+        "sha256": "4a2d53d943942932202a89bd5852151449b9f1e9487df2ddb05cda08c585cd39"
+      },
+      "highAtlasPixelsInherited": false
+    },
+    {
+      "part": "Pack_Jacket",
+      "channel": "Orm",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_Jacket_Orm.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
+      "colorSpace": "linear",
+      "encoding": "lossless-webp",
+      "bytes": 8152168,
+      "sha256": "0d2c70d4fdd5419af2087608ed9a95ee7db52c94385f4b78f78b692d7844cdf3",
+      "sourceDecodedRgb8Sha256": "5f2921dfbe286b02510c9affb236cff9f0fca4af355bb13cb1129e8bd581c389",
+      "runtimeDecodedRgb8Sha256": "5f2921dfbe286b02510c9affb236cff9f0fca4af355bb13cb1129e8bd581c389",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_Jacket_Orm.png",
+        "bytes": 15080840,
+        "sha256": "d84056f369c7fa5ef75b6c2f469bd4ad67048923e822ec2b57fb46af3e723bbf"
+      },
+      "highAtlasPixelsInherited": false
+    },
+    {
+      "part": "Pack_StrawMat",
+      "channel": "Base",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_StrawMat_Base.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
+      "colorSpace": "sRGB",
+      "encoding": "lossless-webp",
+      "bytes": 7308538,
+      "sha256": "e8f9ee79c96a62f0d1e5ad5d14760e9a50b273f6142e669bd4e5ddd7878a67a6",
+      "sourceDecodedRgb8Sha256": "6746f16aaad81b292adaa8032a1fb081e36fa81d0107c3d50745d8d73cb5e4b1",
+      "runtimeDecodedRgb8Sha256": "6746f16aaad81b292adaa8032a1fb081e36fa81d0107c3d50745d8d73cb5e4b1",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_StrawMat_Base.png",
+        "bytes": 12267633,
+        "sha256": "f532a0e889171a226b6076bec1e84743146e29ba9c4d448558566d6e9c0fef7f"
+      },
+      "highAtlasPixelsInherited": false
+    },
+    {
+      "part": "Pack_StrawMat",
+      "channel": "Normal",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_StrawMat_Normal.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
+      "colorSpace": "linear",
+      "encoding": "lossless-webp",
+      "bytes": 8786072,
+      "sha256": "f3b5e4e35b9665c38bb70551e1032146c9fa3fb67bc5df48fab951241b142079",
+      "sourceDecodedRgb8Sha256": "20e9010c341feabbe3a5d94fa3d298c0a147e6e49606e23b53c10464e6e8cc69",
+      "runtimeDecodedRgb8Sha256": "20e9010c341feabbe3a5d94fa3d298c0a147e6e49606e23b53c10464e6e8cc69",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_StrawMat_Normal.png",
+        "bytes": 17191520,
+        "sha256": "51a22b258c240fc8432723a942f7849eadadefe6eb9572f93e0fb00b9862090a"
+      },
+      "highAtlasPixelsInherited": false
+    },
+    {
+      "part": "Pack_StrawMat",
+      "channel": "Orm",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_StrawMat_Orm.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
+      "colorSpace": "linear",
+      "encoding": "lossless-webp",
+      "bytes": 5878850,
+      "sha256": "4a74072e9cc99b114cee114a84d84f700690bc5d027ef8452c185c0687cb0104",
+      "sourceDecodedRgb8Sha256": "35a98dace7b4375063dbf32cb9f291e7be56a4416b0ea63b1292073e5e9fed39",
+      "runtimeDecodedRgb8Sha256": "35a98dace7b4375063dbf32cb9f291e7be56a4416b0ea63b1292073e5e9fed39",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_StrawMat_Orm.png",
+        "bytes": 9017592,
+        "sha256": "ccd2bd54f3a383beeded7f7715ee449b0e674cdf926399260ad01c17e9d50c1a"
+      },
+      "highAtlasPixelsInherited": false
+    },
+    {
+      "part": "Pack_Sandals",
+      "channel": "Base",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_Sandals_Base.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
+      "colorSpace": "sRGB",
+      "encoding": "lossless-webp",
+      "bytes": 9323904,
+      "sha256": "d909732370d6c3f31d0f508a6719cd02d161707fd1fa4da23dbd1dab7756dce0",
+      "sourceDecodedRgb8Sha256": "6880c0094286f23ab88b4438a61fda36d50b7ed6ad14be4f2621b291d60a873f",
+      "runtimeDecodedRgb8Sha256": "6880c0094286f23ab88b4438a61fda36d50b7ed6ad14be4f2621b291d60a873f",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_Sandals_Base.png",
+        "bytes": 15888829,
+        "sha256": "4e3319444f5e2bf4e92e060aae0fe4dcb12055b2fbfabbfeea45121712f3a082"
+      },
+      "highAtlasPixelsInherited": false
+    },
+    {
+      "part": "Pack_Sandals",
+      "channel": "Normal",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_Sandals_Normal.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
+      "colorSpace": "linear",
+      "encoding": "lossless-webp",
+      "bytes": 8164484,
+      "sha256": "964e9618d3bf2dceb83daf054544e376f9f0f46413cdd8fd53111b2640ebfafe",
+      "sourceDecodedRgb8Sha256": "356eed2cdbc4fcdd40b2798757087dce9308c32c474fde9dcb2d4b34ac7833ec",
+      "runtimeDecodedRgb8Sha256": "356eed2cdbc4fcdd40b2798757087dce9308c32c474fde9dcb2d4b34ac7833ec",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_Sandals_Normal.png",
+        "bytes": 16971755,
+        "sha256": "49f0d96be9b819a92b6e17f59ec875d21388af8943c77e5a14e1c1948fdb51c6"
+      },
+      "highAtlasPixelsInherited": false
+    },
+    {
+      "part": "Pack_Sandals",
+      "channel": "Orm",
+      "path": "Model/SichuanBlanketPack/Texture_ProjectedV13_Pack_Sandals_Orm.webp",
+      "mimeType": "image/webp",
+      "width": 4096,
+      "height": 4096,
+      "channels": 3,
+      "bitDepth": 8,
+      "colorSpace": "linear",
+      "encoding": "lossless-webp",
+      "bytes": 7115604,
+      "sha256": "ab2025930e1b9c6200eae077cf019e06ef728a23ad2308b8ed7771e376e59b6f",
+      "sourceDecodedRgb8Sha256": "61025dbab24978659436abb16bbcbc11d9e8d0b74dfa8e267fac5a8e3b579af2",
+      "runtimeDecodedRgb8Sha256": "61025dbab24978659436abb16bbcbc11d9e8d0b74dfa8e267fac5a8e3b579af2",
+      "projectedSource": {
+        "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\FallbackFinal\\Texture_ProjectedV13_Pack_Sandals_Orm.png",
+        "bytes": 11307321,
+        "sha256": "ba28b210f30fddb91d432020ecaa1412b9203f2bcbb78468ec25407c50fbbb81"
+      },
+      "highAtlasPixelsInherited": false
     }
   ],
-  "totalBytes": 2012322,
-  "physicalMeaning": "Dry nonmetal natural fibres. ORM.R is actual projected AO, ORM.G is actual projected high-source roughness, ORM.B is zero.",
-  "verification": {
-    "allMaps1024": true,
-    "allMetalZero": true,
-    "projectedRuntimeRoughnessMatchesOrmGreen": true,
-    "roughnessRange": [
-      234,
-      255
-    ],
-    "surfaceRoughnessRange": [
-      234,
-      252
-    ],
-    "rawCoreMisses": 0,
-    "syntheticSurfaceFillPixels": 0,
-    "completeLosslessImageRoundTrips": true
+  "totalImageBytes": 119116636,
+  "materialProvenance": [
+    {
+      "record": "Model/SichuanBlanketPack/Data_SichuanWornFibersV08.json",
+      "role": "Binding and indigo homespun fibre source",
+      "recordSha256": "e80b807435d38460a25101c47c67547f7d39d204f28ab87f19731e4b25d57130",
+      "generator": "Built-in image_gen__imagegen"
+    },
+    {
+      "record": "Model/SichuanBlanketPack/Data_SichuanOldCottonV09.json",
+      "role": "Cotton parent reference and roughness source",
+      "recordSha256": "9eacb5f854e02ef961eed7ff8ebad473f0e73255d462796eb84df519f9f36d0c",
+      "generator": "Built-in image_gen__imagegen"
+    },
+    {
+      "record": "Model/SichuanBlanketPack/Data_SichuanCottonReliefV10.json",
+      "role": "Soft washed cotton albedo and normal source",
+      "recordSha256": "3b3fb0162cab8dc6e721865d25abb4afb34962283c86f5f3cf0fa2ca6e9cdcfe",
+      "generator": "Built-in imagegen edit of V09 cotton using approved V02 reference"
+    },
+    {
+      "record": "Model/SichuanBlanketPack/Data_SichuanWornStrawV10.json",
+      "role": "Worn grass albedo and relief source",
+      "recordSha256": "dbe82783bc3e46350044901dada802e37d4393e2c288bd474d60166472bcf36b",
+      "generator": "Built-in imagegen, approved V02 straw material reference"
+    },
+    {
+      "record": "_import/SichuanBlanketPack/Source/MatEndV12/Data_SichuanMatEndSourceV12.json",
+      "role": "Imagegen rolled mat end winding source",
+      "recordSha256": "e0206ba019b09d646cd57cac6c4fb3b5f073cdc0301617a6bee68e20a32c09a1",
+      "generator": "Built-in image_gen__imagegen"
+    }
+  ],
+  "verifiedForReview": true,
+  "userApproved": false,
+  "review": {
+    "verifiedForReview": true,
+    "userApproved": false,
+    "evidence": {
+      "rawLodAudit": {
+        "passed": true,
+        "count": 16191,
+        "actualSha256": "8071c6e3c4a0c10b1e4341698a7c8984c8c892e13fde46ac89bcdb9dc0d1bee6",
+        "localEvidencePath": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\Data_FinalGlbAuditV13.json"
+      },
+      "runtimePackaging": {
+        "passed": true,
+        "count": 15,
+        "actualSha256": "146ecd32e483cec6a4fec434a5eaa658b86ec539577ef4bd1fbb108816b7b7fd",
+        "localEvidencePath": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\ProjectedRuntime\\Data_LodRuntimePackageV13.json"
+      },
+      "actualBrowser": {
+        "passed": true,
+        "count": 181,
+        "actualSha256": "03d3d4f2d1026b98d9e32ceb113cc4461e0be351c5192dcc1c152d679c88562f",
+        "localEvidencePath": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\BrowserFinal\\Data_BrowserQualityV12.json"
+      }
+    }
   }
 }

@@ -1,0 +1,2 @@
+# The manifest records the exported glTF byte hash; preserve LF on checkout.
+Model_SichuanBlanketPack.gltf text eol=lf
