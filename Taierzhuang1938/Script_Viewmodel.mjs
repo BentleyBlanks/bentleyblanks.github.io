@@ -2639,10 +2639,12 @@ export class Viewmodel {
     // 这一发就被静默吞掉了。
     if (this.IsBusy()) return false;
     let restoreWeapon = null;
-    if (kind === "Grenade" && this.weaponId !== "Grenade") {
+    // 端着别的（G / H 快扔）：右手临时换成这颗投掷物播它自己的轨迹，收招换回。
+    // 集束弹原来不换，左手掏一颗普通木柄弹做样子。
+    if (THROW_TRACKS[kind] && this.weaponId !== kind) {
       restoreWeapon = { id:this.weaponId, variant:this.weaponVariant, armPose:this.armPoseKey,
         boltOpen:this.boltOpen, pendingBoltAt:this.pendingBoltAt, pendingHoldOpen:this.pendingHoldOpen };
-      this.Equip("Grenade", 0, { instant:true });
+      this.Equip(kind, 0, { instant:true });
     }
     if (!this.rig) return false;
     this._StartAction("throw", (THROW_TRACKS[this.weaponId] || FPS_GRENADE_THROW).durationS);

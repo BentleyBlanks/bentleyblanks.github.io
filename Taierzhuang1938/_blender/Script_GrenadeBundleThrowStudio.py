@@ -102,9 +102,10 @@ for frame in range(1,122):
         *controls[2].location,*controls[3].location,*controls[4].location,*controls[5].location]])
 # release .50 is Data_FpsArmPoses GrenadeBundle.actions.throw.release (unchanged); the left
 # hand leaves .10-.26 and returns .82-.97, the right opens .47-.55 and closes .82-.94.
+# quickDraw*: H from a rifle swaps to the bundle and lifts it in from 0.20 m below, as G does.
 data={'version':'20261021BundleOverarm','durationS':.82,'release':.50,
       'withdraw':[.10,.26,.82,.97],'opening':[.47,.55,.82,.94],
-      'reappear':.88,'powerMinAmplitude':.80,'frames':frames}
+      'reappear':.88,'powerMinAmplitude':.80,'quickDrawDropM':.20,'quickDrawEnd':.16,'frames':frames}
 (root/'Data_FpsGrenadeBundleThrow.mjs').write_text(
     '// Blender-authored bundle grenade (_blender/Script_GrenadeBundleThrowStudio.py): weaponMount xyz, quaternion xyzw,\n'
     '// left-hand target xyz once it lets go, shoulders R/L, elbow poles R/L (camera / armAnchor space).\n'

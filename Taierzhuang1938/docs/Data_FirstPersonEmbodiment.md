@@ -211,7 +211,7 @@ MotionVectorContract、ExplosionRules、ExplosionRange 通过。通用 BootTest 
 动作期间掌向由此片段统一控制，不混入冲刺或开镜的持握旋转。原普通手雷模型与双臂模型不变。
 
 G 快捷投普通手雷也调用同一动作，临时收起手中武器，结束后恢复原型号、变体和拉栓状态；
-空手亦可使用已有库存。重复投掷输入不能重启正在播放的动作。集束弹和返掷保留各自路径。
+空手亦可使用已有库存。重复投掷输入不能重启正在播放的动作。返掷保留自己的路径；集束弹 2026-10-21 起也走这一条（见下文「集束弹过肩投掷」）。
 
 `ReleaseCook` 将普通手雷交给当前动作的 `onRelease`，在本帧双臂解算之后从实际握点发射，
 不再于起手时从眼位提前生成。`Combat.Throw` 的 `handRelease` 选项只跳过旧眼位发射偏移，
@@ -236,21 +236,29 @@ ModuleGraph、Text、TestRunner 与 MotionVectorContract 通过。全仓 `prepus
 在 `SpeakerGestureTest` 的 `FrontObservation.02: luo gestured on his previous line too` 停止；
 未修改主检出 `2ec581c5` 上复测得到同一错误，该全仓门禁未通过。
 
-### 集束弹过肩投掷（2026-10-21，候选，未推送）
+### 集束弹过肩投掷（2026-10-21）
 
 集束弹 `GrenadeBundle` 原来没有作者轨迹，走 `_AnimThrow` 的程序化抡臂：转的是 `actionPivot`，肩膀跟着一起转，
 t≈0.1–0.4 整副手臂被转出镜头、画面里什么都没有，t≈0.5 两截上臂带着袖口断面横在画面上方，t≈0.6–0.9 一条胳膊占满半屏。
 现在和普通手雷一样走 Blender 作者轨迹 `Data_FpsGrenadeBundleThrow.mjs`：只动武器挂点、肩位与肘极点，肩膀留在眼睛下后方。
 `Script_Viewmodel` 的 `THROW_TRACKS` 按手里的武器选轨迹（普通弹 / 集束弹），`_ApplyGrenadeThrow(track)` 两者共用；
-步枪在手时左手掏弹（offhand）仍走程序化动作。
+只有不带 `kind` 的投掷（返掷 `OnPickup`）还在步枪在手时左手掏弹（offhand）、走程序化动作。
 
 - 节奏（归一化，整段仍 0.82 s）：0–0.12 双手把弹束往上托（左肩随之前送，左手托得住），0.10–0.26 左手从弹头下松开、落出画面左下；
   0.30 右手把弹束举在右上、弹头朝上（举起拍，弹束在画内）；0.40 后引，弹头往右后甩出画面右上角；0.45 越过头顶向前；
   0.47–0.55 右手张开，0.50 出手；0.58–0.68 手顺势往下、从画面下沿出去；0.88 新的一束在画外出现，0.82–0.97 左手回到弹头下。
 - 腕角：中段各拍的掌向按肘极点算出的前臂方向反推（举起 / 后引 / 越顶 / 出手 / 跟随腕弯约 10 / 25 / 5 / -10 / -20°），
   不靠 65° 腕弯上限硬夹；起止两帧就是腰射持握（`Data_FpsWeaponGrips.GrenadeBundle.hip` 与 `bodyHip` 肩位），起手不跳。
-- 不变的：出手仍是 `Data_FpsArmPoses.GrenadeBundle.actions.throw.release = 0.50`，0.50 那一帧藏起手里那一束；
-  游戏侧 `ReleaseCook` 仍在起手时从眼位抛出、扣一个库存（集束弹没有接普通弹的 `handRelease` 掌心出手，这次也没接），伤害、库存与引信逻辑一行未动。
+- 出手：`Data_FpsArmPoses.GrenadeBundle.actions.throw.release = 0.50`（0.41 s），0.50 那一帧藏起手里那一束，同一帧从掌心飞出。
+  原来 `ReleaseCook` 在起手那一帧就从眼位（`muzzleAheadM` / `muzzleRiseM` 偏移）抛出、扣库存，出手前 0.41 s 世界里已经有一束在飞；
+  现在和普通弹同一条路：`TriggerThrow(power, { kind:"GrenadeBundle", onRelease })`，`_ReleaseThrow` 取右手 `gripNodes.r` 的掌心，
+  `Combat.Throw` 传 `handRelease:true`（不再加眼位偏移），库存到出手才扣，引信照算起手时间（`cooked + t × duration`）；
+  出手前被换装 / 剧情 `CompleteAction` 收尾不扣库存，人死了不补发。初速、抛物线、伤害与碰撞不变。
+- 端着步枪（或拿着普通弹、空手）按 H：和 G 一样右手临时换成集束弹，播这条轨迹，收招换回原武器、变体和拉栓状态。
+  原来是左手掏一颗普通木柄弹做样子。换上来的头 0.16 从下方 0.20 m 抬进画面（`quickDrawDropM` / `quickDrawEnd`，与普通弹同值）。
+  实测掌心出手点在眼位右侧约 0.08 m、前方约 0.57–0.70 m（蓄力越足越靠前），高出 0.05–0.13 m。
+- 第一关 05 投送驱动 `Script_FirstLevelBundleThrowDriver` 仍按眼位前 `muzzleAheadM` 的出手点解出蓄力；松键后等出手那一帧，
+  在这一枪的 `onRelease` 前头按真掌心、按已定的初速再解一次朝向与仰角（同样取余量 ≥ 0.6 的最平一条），才蹲回掩体。返回里 `release` 记下重解结果、掌心离眼位多远和等了几帧。
 - 与投掷物构图候选（分支 `worktree-agent-aa31e23963ac7c1e4`，`174b91c3`）兼容：那边投掷时构图在 0–0.14 退出、0.84 起回来并整体后退 `[-.05,0,-.10]`；
   候选的持握本来就是弹头朝上，这条轨迹前 0.12 先把弹束托到弹头朝上，两边叠起来起手不翻面。两边都改了 `index.html` 里 `Script_Viewmodel.mjs` 的戳，合并时取较大的一个。
   那边 `docs/Data_FpsRifleView20261016.md` 里「集束弹没有作者轨迹」那一句合并后要改掉。
@@ -264,7 +272,9 @@ t≈0.1–0.4 整副手臂被转出镜头、画面里什么都没有，t≈0.5 �
 
 验收：`Script_GrenadeThrowTest` 新增集束弹整段 121 帧（腕弯 ≤65°、两手握持时握点残差 ≤6 mm、两肘相邻采样位移 <8.5 cm、骨段不拉伸、只释放一次、0.6 手指张开）、
 可读性（两肩关节投影始终在画外 ≥1.5 倍半屏，袖口断面进不了画面；右手只在右半屏；t=0.30 与 0.475 弹束中心在画内）、三档力度连续播放、
-游戏侧起手抛出 / 库存 / 0.50 藏弹 / 回到持握。`Script_FpsArmTest` 集束弹修形生命周期改为左右手各在自己的松手窗口里取样（原先要求两手同时处于中间权重，新动作左手先放）。
+游戏侧（两种弹 × 拿着本弹 / 步枪 / 空手 / 拿着另一种弹：出手前 0 发、出手帧从掌心出 1 发、库存这时才扣、引信、换回原武器；
+出手前换装 / `CompleteAction` / 死亡都不出弹不扣库存；真实按 H 从步枪起手，约 25 帧后出手；步枪按 H 四种姿态的肘、腕、握点）。
+`Script_FpsArmTest` 集束弹修形生命周期改为左右手各在自己的松手窗口里取样（原先要求两手同时处于中间权重，新动作左手先放）。
 本轮实测：握点残差 0、腕弯最大 64.0°、肘部每 1/120 最大位移右 2.7 cm / 左 6.7 cm、两肩投影最近 8.6 倍半屏、右手最左在 NDC x=0.24；
 GrenadeThrowTest、FpsArmTest 1013/1013、FpsGripEditorTest 42/42、MotionVectorContractTest、ModuleGraphTest、TextTest 通过；
 `TestRunnerTest` 报 `Data_ToolsHome.mjs` / `Icon_TabSeal*.png` / `Script_ToolsHomeField.mjs` 未登记领域，为主线已有问题，与本改动无关。

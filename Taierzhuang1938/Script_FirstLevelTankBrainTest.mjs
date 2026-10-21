@@ -446,7 +446,9 @@ function Run(brain, world, seconds, each = null) {
   ok(brain.holdIndex === I("Block") && brain.reached === I("Block"), "05: holds Block (never squeezes out of the deck throw's reach)");
   // Two-stage damage needs the second bundle on the engine deck (hull top 2.56 m, 1.2 m aft of centre). With the
   // throw model of Script_FirstLevelBundleThrowDriver (THROW.arcLift, muzzle advance, gravity 19.6) the slowest
-  // throw that lands there from the attack position must stay under the bundle's top speed.
+  // throw that lands there from the attack position must stay under the bundle's top speed. Since 2026-10-21 the
+  // bundle leaves the palm on its 0.50 release frame (about 0.1 m right of / ahead of this eye-plus-muzzle point);
+  // the driver keeps this model to pick the charge and re-aims from the real palm on release.
   {
     const f = Forward(brain.hullYaw), deck = { x: brain.x - f.x * 1.2, z: brain.z - f.z * 1.2 };
     const raw = Dist(deck, FRONT_SORTIE.throw), rise = 2.61, hg = JUMP.gravityMps2 / 2;

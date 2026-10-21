@@ -10,7 +10,6 @@ import {FPS_GRENADE_THROW} from './Data_FpsGrenadeThrow.mjs';
 import {FPS_GRENADE_BUNDLE_THROW} from './Data_FpsGrenadeBundleThrow.mjs';
 import {FPS_WEAPON_GRIPS} from './Data_FpsWeaponGrips.mjs';
 import {WEAPONS} from './Data_Weapons.mjs';
-import {THROW} from './Data_Tuning_Combat.mjs';
 const root=path.dirname(fileURLToPath(import.meta.url)),out=path.join(root,'_shots/GrenadeThrow');fs.mkdirSync(out,{recursive:true});
 const server=await ServeRoot(path.dirname(root),0),browser=await LaunchBrowser(),page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[];
 page.on('pageerror',e=>errors.push(String(e)));
@@ -59,60 +58,96 @@ try{
   return result;
  });
  for(const row of continuous){assert.equal(row.releases,1);assert(row.finished&&row.bodyCleared&&row.visible,'throw must reset after continuous playback');assert(row.wrist<=FPS_ARM_LIMITS.wristBendDeg+.1&&row.grip<=FPS_ARM_LIMITS.positionResidualM,'short throws keep the anatomical grip');}
- // Exercise the actual game release/inventory path, including quick throw
- // while carrying a rifle and when empty-handed. No projectile update here:
- // the first position must be exactly the evaluated release point.
- const gameplay=await page.evaluate(({durationS,release})=>{
-  const T=Taierzhuang,v=T.viewmodel,rows=[];
+ // Exercise the actual game release/inventory path for both throwables (G / H),
+ // held, as a quick throw while carrying a rifle, empty-handed and while holding
+ // the other throwable. No projectile update here: the first position must be
+ // exactly the evaluated release point. The bundle used to leave the eye on the
+ // first frame of the throw (2026-10-21); it now waits for its 0.50 release too.
+ const RELEASE={Grenade:FPS_GRENADE_THROW.release,GrenadeBundle:FPS_ARM_POSES.GrenadeBundle.actions.throw.release};
+ const gameplay=await page.evaluate(({durationS,RELEASE})=>{
+  const T=Taierzhuang,v=T.viewmodel,rows=[],field={Grenade:'grenades',GrenadeBundle:'bundles'};
   const input={ads:0,sprint:0,moveSpeed:0,grounded:true,crouch:0,strafe:0,lookDeltaYaw:0,lookDeltaPitch:0,elapsed:0,lowAmmo:false};
-  for(const id of ['Grenade','HanYang',null]){
+  for(const kind of ['Grenade','GrenadeBundle'])for(const id of [kind,'HanYang',null,kind==='Grenade'?'GrenadeBundle':'Grenade']){
+   const release=RELEASE[kind],stock=()=>T.state[field[kind]];
    v.action=null;v.Equip(id,0,{instant:true});v.Update(0,input);
-   T.state.grenades=3;T.player.health=100;
+   T.state.grenades=3;T.state.bundles=3;T.player.health=100;
    const old=new Set(T.combat.projectiles),ammo=T.state.ammo,clips=T.state.clips;
    let hand=null,count=0;
    v.onThrowRelease=point=>{hand=point.toArray();count++;};
-   T.Debug.Throw('Grenade',.75);
-   const initial={active:v.weaponId,count:T.combat.projectiles.filter(p=>!old.has(p)).length,stock:T.state.grenades};
-   const duplicate=v.TriggerThrow(.75,{kind:'Grenade'});
+   T.Debug.Throw(kind,.75);
+   const initial={active:v.weaponId,offhand:v.action?.offhand,count:T.combat.projectiles.filter(p=>!old.has(p)).length,stock:stock()};
+   const duplicate=v.TriggerThrow(.75,{kind});
    v.action.t=release-.01;v.Update(0,input);
-   const before={count:T.combat.projectiles.filter(p=>!old.has(p)).length,stock:T.state.grenades,held:v.rig.parts.grenade.visible};
+   const before={count:T.combat.projectiles.filter(p=>!old.has(p)).length,stock:stock(),held:v.rig.parts.grenade.visible};
    v.action.t=release;v.Update(0,input);
    const created=T.combat.projectiles.filter(p=>!old.has(p));
-   const after={count:created.length,stock:T.state.grenades,held:v.rig.parts.grenade.visible,origin:created[0]?.position.toArray(),fuse:created[0]?.fuse,hand};
+   const after={count:created.length,kind:created[0]?.kind,stock:stock(),held:v.rig.parts.grenade.visible,origin:created[0]?.position.toArray(),fuse:created[0]?.fuse,hand};
    for(let i=0;i<70;i++)v.Update(durationS/120,input);
-   rows.push({id,initial,before,after,duplicate,releases:count,restored:v.weaponId,finished:!v.action,
+   rows.push({kind,id,initial,before,after,duplicate,releases:count,restored:v.weaponId,finished:!v.action,
     ammunitionUnchanged:T.state.ammo===ammo&&T.state.clips===clips});
   }
   return rows;
- },FPS_GRENADE_THROW);
+ },{durationS:FPS_GRENADE_THROW.durationS,RELEASE});
  fs.writeFileSync(path.join(out,'Data_Gameplay.json'),JSON.stringify(gameplay,null,2));
  for(const row of gameplay){
-  assert.equal(row.initial.active,'Grenade','quick throw uses the authored ordinary grenade');
-  assert.equal(row.initial.count,0,'no projectile at windup');assert.equal(row.initial.stock,3);
-  assert.equal(row.before.count,0,'no projectile before the release frame');assert.equal(row.before.stock,3);assert(row.before.held);
-  assert.equal(row.after.count,1);assert.equal(row.after.stock,2);assert(!row.after.held);
-  assert(Dist(row.after.origin,row.after.hand)<1e-6,'projectile starts at the evaluated palm');
-  assert(Math.abs(row.after.fuse-(WEAPONS.Grenade.fuseS-(.75*1.1-.35)-FPS_GRENADE_THROW.durationS*FPS_GRENADE_THROW.release))<1e-5,'windup does not extend the burning fuse');
+  const tag=`${row.kind} from ${row.id}`;
+  assert.equal(row.initial.active,row.kind,`${tag}: quick throw swaps to the authored throwable`);assert.equal(row.initial.offhand,false,`${tag}: thrown by the right hand`);
+  assert.equal(row.initial.count,0,`${tag}: no projectile at windup`);assert.equal(row.initial.stock,3);
+  assert.equal(row.before.count,0,`${tag}: no projectile before the release frame`);assert.equal(row.before.stock,3);assert(row.before.held);
+  assert.equal(row.after.count,1);assert.equal(row.after.kind,row.kind);assert.equal(row.after.stock,2);assert(!row.after.held);
+  assert(Dist(row.after.origin,row.after.hand)<1e-6,`${tag}: projectile starts at the evaluated palm`);
+  assert(Math.abs(row.after.fuse-(WEAPONS[row.kind].fuseS-(.75*1.1-.35)-FPS_GRENADE_THROW.durationS*RELEASE[row.kind]))<1e-5,`${tag}: windup does not extend the burning fuse`);
   assert.equal(row.duplicate,false,'repeated input cannot restart a pending throw');assert.equal(row.releases,1);
-  assert.equal(row.restored,row.id);assert(row.finished&&row.ammunitionUnchanged,'original weapon/ammo restored');
+  assert.equal(row.restored,row.id);assert(row.finished&&row.ammunitionUnchanged,`${tag}: original weapon/ammo restored`);
+ }
+ // A throw stopped before its release frame spends nothing: a forced re-equip
+ // (handover, cutscene), the script's CompleteAction (09 door knock-down), or a
+ // thrower killed mid-windup (no projectile is emitted for the dead).
+ const cancelled=await page.evaluate(({RELEASE})=>{
+  const T=Taierzhuang,v=T.viewmodel,rows=[],field={Grenade:'grenades',GrenadeBundle:'bundles'};
+  const input={ads:0,sprint:0,moveSpeed:0,grounded:true,crouch:0,strafe:0,lookDeltaYaw:0,lookDeltaPitch:0,elapsed:0,lowAmmo:false};
+  for(const kind of ['Grenade','GrenadeBundle'])for(const how of ['equip','complete','death']){
+   v.action=null;v.onThrowRelease=null;v.Equip('HanYang',0,{instant:true});v.Update(0,input);
+   T.state.grenades=3;T.state.bundles=3;T.player.health=100;
+   const old=new Set(T.combat.projectiles);
+   T.Debug.Throw(kind,.75);v.action.t=RELEASE[kind]-.2;v.Update(0,input);
+   if(how==='equip')v.Equip('HanYang',0,{instant:true});
+   else if(how==='complete')v.CompleteAction();
+   else T.player.alive=false;
+   for(let i=0;i<100;i++)v.Update(.82/120,input);
+   rows.push({kind,how,count:T.combat.projectiles.filter(p=>!old.has(p)).length,stock:T.state[field[kind]],weapon:v.weaponId,finished:!v.action});
+   T.player.alive=true;
+  }
+  return rows;
+ },{RELEASE});
+ fs.writeFileSync(path.join(out,'Data_GameplayCancelled.json'),JSON.stringify(cancelled,null,2));
+ for(const row of cancelled){
+  assert(row.count===0&&row.stock===3,`${row.kind} ${row.how} before release: nothing thrown, nothing spent (${JSON.stringify(row)})`);
+  assert(row.finished&&row.weapon==='HanYang',`${row.kind} ${row.how}: the rifle is back in hand`);
  }
  const quickAnatomy=await page.evaluate(async()=>{
   const THREE=await import('./vendor/three/build/three.module.js'),v=Taierzhuang.viewmodel,rows=[];
-  for(const power of [0,1])for(const stance of ['stand','sprint','ads','crouch']){
+  // H from a rifle swaps to the two-handed bundle the same way: both elbows stay
+  // continuous and both hands stay on it while they hold it.
+  for(const kind of ['Grenade','GrenadeBundle'])for(const power of [0,1])for(const stance of ['stand','sprint','ads','crouch']){
    const input={ads:stance==='ads'?1:0,sprint:stance==='sprint'?1:0,moveSpeed:0,grounded:true,crouch:stance==='crouch'?1:0,elapsed:0};
    v.action=null;v.Equip('HanYang',0,{instant:true});
    for(let i=0;i<90;i++)v.Update(1/60,input);
    const active=stance==='ads'?v.adsSpring.value:stance==='sprint'?v.sprintSpring.value:stance==='crouch'?v.crouchSpring.value:1;
-   v.TriggerThrow(power,{kind:'Grenade'});
-   const rig=v.riggedArms;
-   let previous=null,elbowStep=0,wrist=0,grip=0;
+   v.TriggerThrow(power,{kind});
+   const rig=v.riggedArms,sides=kind==='Grenade'?['r']:['r','l'];
+   let previous={},elbowStep=0,wrist=0,grip=0;
    for(let i=0;i<120;i++){
     v.action.t=i/120;v.Update(0,input);
-    const elbow=rig._InAnchor(rig.bones.r.forearm,new THREE.Vector3());
-    if(previous)elbowStep=Math.max(elbowStep,elbow.distanceTo(previous));previous=elbow;
-    wrist=Math.max(wrist,...Object.values(rig.wristBend));grip=Math.max(grip,rig.gripError.r);
+    for(const side of sides){
+     const elbow=rig._InAnchor(rig.bones[side].forearm,new THREE.Vector3());
+     if(previous[side])elbowStep=Math.max(elbowStep,elbow.distanceTo(previous[side]));previous[side]=elbow;
+    }
+    wrist=Math.max(wrist,...Object.values(rig.wristBend));
+    if(kind==='Grenade')grip=Math.max(grip,rig.gripError.r);
+    else for(const side of sides)if(rig.contactWeight[side]>.999)grip=Math.max(grip,rig.gripError[side]);
    }
-   rows.push({power,stance,active,elbowStep,wrist,grip});
+   rows.push({kind,power,stance,active,elbowStep,wrist,grip});
   }
   return rows;
  });
@@ -191,27 +226,31 @@ try{
   return rows;
  });
  for(const row of bundleContinuous){assert.equal(row.releases,1);assert(row.finished&&row.bodyCleared&&row.visible,'bundle throw must reset after continuous playback');assert(row.wrist<=FPS_ARM_LIMITS.wristBendDeg+.1&&row.grip<=FPS_ARM_LIMITS.positionResidualM,'short bundle throws keep the anatomical grip');}
- // The bundle's game path is unchanged by the new arm track: ReleaseCook still launches it
- // from the eye when the throw starts and takes one from stock; the track only moves the arms.
+ // Real input, real frames: H with the rifle in hand. Nothing leaves on key-up;
+ // the right hand swaps to the bundle, and the one bundle leaves on the release
+ // frame (0.50 x 0.82 s = about 25 frames), when the stock is spent. Back to the rifle after.
  const bundleGameplay=await page.evaluate(()=>{
-  const T=Taierzhuang,v=T.viewmodel,input={ads:0,sprint:0,moveSpeed:0,grounded:true,crouch:0,strafe:0,lookDeltaYaw:0,lookDeltaPitch:0,elapsed:0,lowAmmo:false};
-  v.action=null;v.onThrowRelease=null;v.Equip('GrenadeBundle',0,{instant:true});v.Update(0,input);
+  const T=Taierzhuang,v=T.viewmodel;
+  v.action=null;v.Equip('HanYang',0,{instant:true});T.StepFrames(30);v.onThrowRelease=null;const rifle=v.weaponId;
   T.state.bundles=3;T.player.health=100;
-  const old=new Set(T.combat.projectiles),eye=T.player.EyePosition.clone();
-  T.Debug.Throw('GrenadeBundle',.75);
-  const created=()=>T.combat.projectiles.filter(p=>!old.has(p));
-  const start={count:created().length,kind:created()[0]?.kind,fromEye:created()[0]?created()[0].position.distanceTo(eye):null,stock:T.state.bundles,action:v.action?.kind,offhand:v.action?.offhand};
-  v.action.t=.49;v.Update(0,input);const before={count:created().length,held:v.rig.parts.grenade.visible};
-  v.action.t=.50;v.Update(0,input);const after={count:created().length,held:v.rig.parts.grenade.visible,stock:T.state.bundles};
-  for(let i=0;i<70;i++)v.Update(.82/120,input);
-  return {start,before,after,finished:!v.action,visible:v.rig.parts.grenade.visible,weapon:v.weaponId};
+  const old=new Set(T.combat.projectiles),created=()=>T.combat.projectiles.filter(p=>!old.has(p));
+  T.Debug.Key('KeyH',true);T.StepFrames(45);T.Debug.Key('KeyH',false);
+  const keyUp={count:created().length,stock:T.state.bundles,weapon:v.weaponId,offhand:v.action?.offhand,held:v.rig.parts.grenade.visible};
+  let frames=0;for(;frames<60&&!created().length;frames++)T.StepFrames(1);
+  const released={frames,count:created().length,kind:created()[0]?.kind,stock:T.state.bundles,held:v.rig.parts.grenade.visible};
+  T.StepFrames(40);
+  return {rifle,keyUp,released,count:created().length,finished:!v.action,weapon:v.weaponId};
  });
- assert.equal(bundleGameplay.start.count,1,'bundle still leaves when the throw starts');assert.equal(bundleGameplay.start.kind,'GrenadeBundle');
- assert(bundleGameplay.start.fromEye<=THROW.muzzleAheadM+THROW.muzzleRiseM+1e-4,'bundle still starts at the eye');assert.equal(bundleGameplay.start.stock,2);
- assert.equal(bundleGameplay.start.action,'throw');assert.equal(bundleGameplay.start.offhand,false);
- assert(bundleGameplay.before.count===1&&bundleGameplay.before.held,'bundle held until the release frame');
- assert(bundleGameplay.after.count===1&&!bundleGameplay.after.held&&bundleGameplay.after.stock===2,'release frame hides the held bundle without a second projectile');
- assert(bundleGameplay.finished&&bundleGameplay.visible&&bundleGameplay.weapon==='GrenadeBundle','bundle hold restored');
+ const releaseFrames=FPS_ARM_POSES.GrenadeBundle.actions.throw.release*FPS_GRENADE_BUNDLE_THROW.durationS*60;
+ assert(bundleGameplay.keyUp.count===0&&bundleGameplay.keyUp.stock===3,`H key-up throws nothing yet: ${JSON.stringify(bundleGameplay.keyUp)}`);
+ assert(bundleGameplay.keyUp.weapon==='GrenadeBundle'&&bundleGameplay.keyUp.offhand===false&&bundleGameplay.keyUp.held,'H from a rifle holds the bundle in the right hand');
+ assert(Math.abs(bundleGameplay.released.frames+1-releaseFrames)<=2,`bundle leaves on its release frame (${bundleGameplay.released.frames+1} vs ${releaseFrames.toFixed(1)})`);
+ assert(bundleGameplay.released.count===1&&bundleGameplay.released.kind==='GrenadeBundle'&&bundleGameplay.released.stock===2&&!bundleGameplay.released.held,`one bundle leaves the hand on release: ${JSON.stringify(bundleGameplay.released)}`);
+ assert(bundleGameplay.rifle==='HanYang'&&bundleGameplay.count===1&&bundleGameplay.finished&&bundleGameplay.weapon===bundleGameplay.rifle,`one bundle per throw, rifle restored: ${JSON.stringify(bundleGameplay)}`);
+ for(const phase of [.02,.08,.16,.30,.50]){
+  await page.evaluate(t=>{const T=Taierzhuang,v=T.viewmodel;v.action=null;v.Equip('HanYang',0,{instant:true});T.StepFrames(2,0,true);v.TriggerThrow(1,{kind:'GrenadeBundle'});v.action.t=t;T.StepFrames(6,0,true);},phase);
+  await page.screenshot({path:path.join(out,`Scene_BundleQuick_${Math.round(phase*100)}.png`)});
+ }
  for(const phase of [.10,.20,.30,.40,.45,.48,.50,.60,.70,.80,.90,.95]){
   await page.evaluate(t=>{const T=Taierzhuang,v=T.viewmodel;v.action=null;v.Equip('GrenadeBundle',0,{instant:true});v.rig.parts.grenade.visible=true;v.TriggerThrow(1);v.action.t=t;T.StepFrames(6,0,true);},phase);
   await page.screenshot({path:path.join(out,`Scene_Bundle_${Math.round(phase*100)}.png`)});

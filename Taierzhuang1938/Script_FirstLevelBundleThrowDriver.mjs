@@ -13,6 +13,7 @@
 //                        两段毁伤被跳过（战车探针「MobilityKill then Disabled」红）。
 // 弧线余量按「车体外廓内的地面 = 车顶」算，越过车顶的那条弧线不会擦着车身。
 // 返回里 selfBlast = 这一颗炸到玩家自己的掉血（按 TakeHit 前后血量差，来源在爆点 1 m 以内的爆炸）。
+// release = 出手那一帧（松键后约 0.41 s）按真掌心重解的朝向/仰角、掌心离眼位多远、松键后等了几帧。
 export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {}) {
   return page.evaluate(async (aimKind) => {
   const { THROW } = await import("./Data_Tuning_Combat.mjs");
@@ -72,6 +73,22 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
   // of Combat.Throw's 3-D advance, residual rifle free-aim, and a "landing"
   // sample taken after the bundle had already struck, bounced and rolled.
   const halfGravity=JUMP.gravityMps2*.5;
+  // 一条弧线（从出手点 origin 朝 target 水平走 distance）离地的最小余量。
+  // 60 个采样点（原 20 个 ≈ 25 cm 一点，会漏掉车顶边那一下）。
+  const Clearance=(origin,distance,pitch,speed)=>{
+    const cosine=Math.cos(pitch),vertical=Math.sin(pitch)+THROW.arcLift,
+      run=Math.hypot(target.x-origin.x,target.z-origin.z)||1;
+    let clearance=Infinity;
+    for (let step = 1; step <= 60; step++) {
+      const along=step/61,x=origin.x+(target.x-origin.x)*distance*along/run,z=origin.z+(target.z-origin.z)*distance*along/run;
+      const t = distance * along / (speed * cosine);
+      const y = origin.y + speed * vertical * t - halfGravity * t * t;
+      // 车体外廓里（越过车顶 / 落在车顶）按车顶算余量：车体本身不是地面，但也不能穿过去。
+      const floor = tank.brain && OverHull(x, z) ? Math.max(targetY, tankGround + HullTop) : g.battlefield.GroundHeight(x, z);
+      clearance = Math.min(clearance, y - floor-.055);
+    }
+    return clearance;
+  };
   let best = null;
   for (let pitch = 0.06; pitch <= 1.3; pitch += 0.02) {
     const cosine = Math.cos(pitch), vertical = Math.sin(pitch) + THROW.arcLift;
@@ -86,17 +103,8 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
     if (drop <= 0.05) continue;
     const speed = Math.sqrt(halfGravity * distance * distance / (cosine * cosine * drop));
     if (speed < kind.throwSpeedMin + 0.05 || speed > kind.throwSpeedMax - 0.05) continue;
-    let clearance = Infinity;
-    // 60 个采样点（原 20 个 ≈ 25 cm 一点，会漏掉车顶边那一下）。
-    for (let step = 1; step <= 60; step++) {
-      const along = step / 61,travel=THROW.muzzleAheadM*cosine+distance*along,
-        x=p.x+(target.x-p.x)*travel/rawDistance,z=p.z+(target.z-p.z)*travel/rawDistance;
-      const t = distance * along / (speed * cosine);
-      const y = originY + speed * vertical * t - halfGravity * t * t;
-      // 车体外廓里（越过车顶 / 落在车顶）按车顶算余量：车体本身不是地面，但也不能穿过去。
-      const floor = tank.brain && OverHull(x, z) ? Math.max(targetY, tankGround + HullTop) : g.battlefield.GroundHeight(x, z);
-      clearance = Math.min(clearance, y - floor-.055);
-    }
+    const ahead=THROW.muzzleAheadM*cosine/rawDistance;
+    const clearance=Clearance({x:p.x+(target.x-p.x)*ahead,y:originY,z:p.z+(target.z-p.z)*ahead},distance,pitch,speed);
     // 取**最平**的那条够用的弧线，不是余量最大的那条。仰到 1.2 rad 去吊射，
     // 水平分量只剩三分之一，初速差一点落点就差一半（实测解出 12.7 m、只飞了 6.5 m）。
     const candidate={pitch,speed,clearance,distance,rise,originY};
@@ -108,12 +116,23 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
   g.player.pitch = shot.pitch;
   const power = (shot.speed - kind.throwSpeedMin) / (kind.throwSpeedMax - kind.throwSpeedMin);
   const chargeFrames = Math.round(66 * Math.max(0.08, Math.min(1, power)));
-  const before = g.state.bundles;
-  g.Debug.Key("KeyH", true);g.StepFrames(chargeFrames,1/60,false);
-  g.player.aimYaw=0;g.player.aimPitch=0;
-  const requestedDirection=g.player.AimDirection().clone(),releaseAt=g.Debug.FirstLevelMissionRuntime().time;
-  g.Debug.Key("KeyH", false);
-  const launched=g.combat.projectiles.find(entry=>entry.kind==="GrenadeBundle");
+  // 出手那一帧的二次瞄准：初速已由蓄力定死、出手点是真掌心，扫仰角找正好落在 target 上的解，
+  // 取法同上（余量 ≥ 0.6 的最平一条，否则余量最大的）；一条都没有就不动准星。
+  const ReleaseAim=(hand,speed)=>{
+    const distance=Math.hypot(target.x-hand.x,target.z-hand.z),yaw=Math.atan2(hand.x-target.x,hand.z-target.z);
+    const Miss=pitch=>{const t=distance/(speed*Math.cos(pitch));
+      return hand.y+speed*(Math.sin(pitch)+THROW.arcLift)*t-halfGravity*t*t-targetY;};
+    let chosen=null;
+    for(let pitch=0.06;pitch<1.3;pitch+=0.01){
+      if(Math.sign(Miss(pitch))===Math.sign(Miss(pitch+0.01)))continue;
+      let lo=pitch,hi=pitch+0.01;
+      for(let i=0;i<30;i++){const mid=(lo+hi)/2;if(Math.sign(Miss(mid))===Math.sign(Miss(lo)))lo=mid;else hi=mid;}
+      const root={pitch:(lo+hi)/2};root.clearance=Clearance(hand,distance,root.pitch,speed);
+      if(root.clearance>=0.6){chosen=root;break;}
+      if(!chosen||root.clearance>chosen.clearance)chosen=root;
+    }
+    return {yaw,distance,pitch:chosen?.pitch??g.player.pitch,clearance:chosen?.clearance??null,solved:!!chosen};
+  };
   const Initial=entry=>{
     if(!entry)return null;
     const velocity=entry.body?.linvel?.()||entry.velocity;
@@ -123,16 +142,43 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
       horizontalSpeed:+Math.hypot(velocity.x,velocity.z).toFixed(3),
       velocityPitch:+Math.atan2(velocity.y,Math.hypot(velocity.x,velocity.z)).toFixed(3)};
   };
-  const launch=Initial(launched),requested={pitch:+g.player.pitch.toFixed(3),aimPitch:+g.player.aimPitch.toFixed(3),
-    yaw:+g.player.yaw.toFixed(3),aimYaw:+g.player.aimYaw.toFixed(3),
-    direction:[+requestedDirection.x.toFixed(3),+requestedDirection.y.toFixed(3),+requestedDirection.z.toFixed(3)],
-    power:+power.toFixed(3),chargeFrames,stance:g.player.stance};
+  const before = g.state.bundles;
+  g.Debug.Key("KeyH", true);g.StepFrames(chargeFrames,1/60,false);
+  g.player.aimYaw=0;g.player.aimPitch=0;
+  const releaseAt=g.Debug.FirstLevelMissionRuntime().time,old=new Set(g.combat.projectiles);
+  g.Debug.Key("KeyH", false);
+  // 2026-10-21 起集束弹和普通弹一样：松键只是起手（端着步枪也是右手换上集束弹），
+  // 0.50 那一帧才从算好的掌心飞出、才扣库存（Script_Main ReleaseCook）。上面那一遍按眼位前
+  // muzzleAheadM 估出手点定蓄力；出手那一帧拿到真掌心，在这一枪的 onRelease 前头按真掌心再解一次
+  // 朝向与仰角 —— 人抡臂时也在压准星。掌心在眼位右前方约 0.1 m，差得不多，但车顶甲板那一路余量只有几十厘米。
+  let launched=null,launch=null,requested=null,release=null,waitFrames=0;
+  const pending=g.viewmodel.action;
+  if(pending?.kind==="throw"&&pending.onRelease){
+    const Emit=pending.onRelease;
+    pending.onRelease=(hand,releasedPower)=>{
+      const eyeAt=g.player.EyePosition.clone();
+      release=ReleaseAim(hand,kind.throwSpeedMin+(kind.throwSpeedMax-kind.throwSpeedMin)*releasedPower);
+      g.player.yaw=release.yaw;g.player.pitch=release.pitch;g.player.aimYaw=0;g.player.aimPitch=0;
+      const direction=g.player.AimDirection().clone();
+      requested={pitch:+g.player.pitch.toFixed(3),aimPitch:+g.player.aimPitch.toFixed(3),
+        yaw:+g.player.yaw.toFixed(3),aimYaw:+g.player.aimYaw.toFixed(3),
+        direction:[+direction.x.toFixed(3),+direction.y.toFixed(3),+direction.z.toFixed(3)],
+        power:+releasedPower.toFixed(3),chargeFrames,stance:g.player.stance};
+      Object.assign(release,{hand:hand.toArray().map(n=>+n.toFixed(3)),fromEye:hand.clone().sub(eyeAt).toArray().map(n=>+n.toFixed(3))});
+      Emit(hand,releasedPower);
+      // 刚建出来、还没走过一帧：初速就是 Combat.Throw 给的那一个。
+      launched=g.combat.projectiles.find(entry=>!old.has(entry)&&entry.kind==="GrenadeBundle")||null;
+      launch=Initial(launched);
+    };
+  }
+  for(;waitFrames<90&&!release&&g.viewmodel.action===pending&&pending;waitFrames++)g.StepFrames(1,1/60,false);
+  if(release)release.waitFrames=waitFrames;
   g.StepFrames(1, 1 / 60, false);
   if (g.player.stance === "stand") g.Debug.Key("KeyC");
   // 跟着这一发看它落在哪儿：炸不停的时候，落点比任何推断都说明问题。
   let land=null,firstContact=null,firstVelocityBreak=null,previousVelocity=launch?.velocity||null;
   for (let frame = 0; frame < 300 && g.player.alive; frame++) {
-    const flying = g.combat.projectiles.find((entry) => entry.kind === "GrenadeBundle");
+    const flying = launched && g.combat.projectiles.includes(launched) ? launched : null;
     if (flying) {
       land={x:+flying.position.x.toFixed(2),y:+flying.position.y.toFixed(2),z:+flying.position.z.toFixed(2)};
       const velocity=flying.body?.linvel?.()||flying.velocity,current={x:velocity.x,y:velocity.y,z:velocity.z};
@@ -159,10 +205,12 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
   const selfBlast = blast ? hits.filter((h) => h.blast && h.from && Math.hypot(h.from.x - blast.x, h.from.y - blast.y, h.from.z - blast.z) < 1)
     .reduce((sum, h) => sum + Math.max(0, h.loss), 0) : 0;
   return { before, after: g.state.bundles, alive: g.player.alive, health: g.player.health, selfBlast: +selfBlast.toFixed(1),
-    mission: g.Debug.FirstLevelMission(), aimKind: resolved, requestedAim: aimKind, target, stanceBefore, stanceAtRelease: requested.stance,
+    mission: g.Debug.FirstLevelMission(), aimKind: resolved, requestedAim: aimKind, target, stanceBefore, stanceAtRelease: requested?.stance ?? null,
     aim: { pitch: +shot.pitch.toFixed(3), speed: +shot.speed.toFixed(2),
       clearance: shot.clearance == null ? null : +shot.clearance.toFixed(2),
       distance:+(shot.distance??rawDistance).toFixed(2),rise:+(shot.rise??(targetY-eye.y)).toFixed(2),solved:!!best },
+    release:release&&{...release,pitch:+release.pitch.toFixed(3),yaw:+release.yaw.toFixed(3),distance:+release.distance.toFixed(2),
+      clearance:release.clearance==null?null:+release.clearance.toFixed(2)},
     requested,launch,firstVelocityBreak,firstContact,land,
     blast:blast?{x:+blast.x.toFixed(2),y:+blast.y.toFixed(2),z:+blast.z.toFixed(2),
       trackDistance:+blast.trackDistance.toFixed(2)}:null,

@@ -7435,17 +7435,15 @@ function ReleaseCook() {
   const power = Clamp01(state.cook / 1.1);
   const cooked = Math.max(0, state.cook - 0.35);
   state.cook = 0;
-  if (kind === "Grenade") {
-    // The ordinary grenade (including G from a rifle) leaves the evaluated
-    // palm on the release frame. Cooking continues during the windup.
-    viewmodel.TriggerThrow(power, { kind, onRelease:(hand, releasedPower) => {
-      if (!player.Alive) return;
-      EmitPlayerGrenade(kind, releasedPower, hand, cooked + viewmodel.action.t * viewmodel.action.duration, true);
-    } });
-    return;
-  }
-  EmitPlayerGrenade(kind, power, player.EyePosition.clone(), cooked);
-  viewmodel.TriggerThrow?.(power);
+  // Both throwables (G / H, also from a rifle) leave the evaluated palm on the
+  // release frame (Grenade 0.48, bundle 0.50). Cooking continues during the
+  // windup; stock is spent only when the hand lets go, so a throw cancelled
+  // before release (re-equip, cutscene) or a thrower killed mid-windup spends nothing.
+  // 集束弹 2026-10-21 前是按下那一帧就从眼位飞出，手里那一束 0.41 s 后才藏起来。
+  viewmodel.TriggerThrow(power, { kind, onRelease:(hand, releasedPower) => {
+    if (!player.Alive) return;
+    EmitPlayerGrenade(kind, releasedPower, hand, cooked + viewmodel.action.t * viewmodel.action.duration, true);
+  } });
 }
 
 function EmitPlayerGrenade(kind, power, origin, cooked, handRelease = false) {
