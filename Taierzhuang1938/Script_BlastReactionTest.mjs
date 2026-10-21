@@ -55,12 +55,15 @@ Group("峰值超压：Kinney–Graham 量级、随距离降、随装药升、遮
   assert.equal(WindowStrength(100, [148, 166, 1]), 0); assert.equal(WindowStrength(200, [148, 166, 1]), 1);
 });
 
-Group("各反应的出闸距离（手榴弹：60 m 只眨眼；20 m 起耳鸣；3 m 全满）", () => {
+Group("各反应的出闸距离（手榴弹：远处只眨眼；20 m 起耳鸣；3 m 近满）", () => {
   const far = Exposure("Grenade", 60), mid = Exposure("Grenade", 25), near = Exposure("Grenade", 12), close = Exposure("Grenade", 3);
   assert.ok(far.blink > 0 && far.flinch === 0 && far.tinnitus === 0, "60 m：只眨一下眼");
-  assert.ok(mid.flinch > 0 && mid.tinnitus === 0, "25 m：缩一下，不耳鸣");
-  assert.ok(near.tinnitus > 0 && near.daze === 0, "12 m：开始耳鸣，不发懵");
-  assert.ok(close.flinch > 0.95 && close.squeeze > 0.85 && close.tinnitus > 0.9 && close.daze > 0.5, "3 m：几乎全满");
+  assert.ok(mid.flinch < 0.03 && mid.tinnitus === 0 && mid.squeeze === 0, "25 m：头基本不动，不耳鸣，不闭紧");
+  assert.ok(near.tinnitus > 0 && near.daze === 0 && near.squeeze === 0, "12 m：开始耳鸣，不发懵，不闭紧");
+  assert.ok(close.flinch > 0.9 && close.squeeze > 0.6 && close.tinnitus > 0.9 && close.daze > 0.3, "3 m：缩身扭头近满、闭紧、耳鸣满、发懵");
+  // 2026-10-22 用户实测：35 m 的 75 野炮反应太大 —— 现在只眨一下，头的反应 < 0.05。
+  const s35 = Exposure("Shell75", 35);
+  assert.ok(s35.blink > 0 && s35.flinch < 0.05 && s35.squeeze === 0, `75 野炮 35 m：只眨眼（缩身 ${s35.flinch.toFixed(3)}）`);
   // 大的炸得远：250 公斤炸弹 100 m 外仍要耳鸣，手榴弹 100 m 外什么都没有。
   assert.ok(Exposure("Bomb250kg", 100).tinnitus > 0 && Exposure("Grenade", 100).flinch === 0);
 });
@@ -115,7 +118,7 @@ Group("正前方炸也要转开（左右交替）；身后炸只缩不转", () =
   const e = Exposure("Shell75", 10, { lateral: 0 });
   const first = f.Blast(e, FRONT), second = f.Blast(e, FRONT);
   assert.ok(first.yaw !== 0 && Math.sign(first.yaw) === -Math.sign(second.yaw), "正前方：转开，下一发换另一边");
-  const back = Peak("Shell75", 10, BACK).peak, front = Peak("Shell75", 10, FRONT).peak;
+  const back = Peak("Shell75", 7, BACK).peak, front = Peak("Shell75", 7, FRONT).peak;
   assert.ok(Math.abs(back.yaw) < 0.02, `身后：基本不转（${(back.yaw * 57.3).toFixed(1)}°）`);
   assert.ok(back.pitch < -0.1 && back.drop > 0.08, "身后：照样低头缩身");
   assert.ok(Math.abs(front.yaw) > 0.15, "正前：转开");
@@ -126,15 +129,26 @@ Group("距离决定程度：近的转得多、闭得久；远的只眨眼", () =
   assert.ok(p5.yaw > p12.yaw && p12.yaw > p25.yaw, "转头角度随距离降");
   assert.ok(p5.drop > p12.drop && p12.drop > p25.drop, "缩身随距离降");
   assert.ok(p5.focus > p25.focus, "发糊随距离降");
-  // 闭眼时长：近的闭死、远的眨一下就睁开。
-  const closedFor = (d) => {
-    const f = new BlastFlinch(); f.SetEnabled(true); f.Blast(Exposure("Grenade", d, { lateral: 1 }), RIGHT);
-    let t = 0; Run(f, 3, 1 / 120, (fl) => { if (fl.eyeClosure > 0.8) t += 1 / 120; });
+  // 闭眼时长：近的闭得久一点、远的眨一下就睁开；单发再近也不会一直闭着（2026-10-22 用户：除非连续引爆）。
+  const closedFor = (id, d, repeats = []) => {
+    const f = new BlastFlinch(); f.SetEnabled(true);
+    const e = Exposure(id, d, { lateral: 1 }), shots = [...repeats];
+    f.Blast(e, RIGHT);
+    let t = 0;
+    Run(f, 6, 1 / 120, (fl, at) => {
+      while (shots.length && shots[0] <= at) { shots.shift(); fl.Blast(e, RIGHT); }
+      if (fl.eyeClosure > 0.8) t += 1 / 120;
+    });
     return t;
   };
-  const c3 = closedFor(3), c12 = closedFor(12), c60 = closedFor(60);
-  assert.ok(c3 > 0.45 && c3 > c12 && c12 > c60, `闭眼 3 m ${c3.toFixed(2)} s > 12 m ${c12.toFixed(2)} s > 60 m ${c60.toFixed(2)} s`);
+  const c3 = closedFor("Grenade", 3), c12 = closedFor("Grenade", 12), c60 = closedFor("Grenade", 60);
+  assert.ok(c3 > c12 && c12 >= c60, `闭眼 3 m ${c3.toFixed(2)} s > 12 m ${c12.toFixed(2)} s ≥ 60 m ${c60.toFixed(2)} s`);
+  assert.ok(c3 < 0.4, `单发 3 m 也只闭一下：${c3.toFixed(2)} s`);
+  assert.ok(c60 < 0.12, `远处只是一刹那的眨眼：${c60.toFixed(2)} s`);
+  const barrage = closedFor("Shell75", 8, [1.2, 2.4, 3.6]), single = closedFor("Shell75", 8);
+  assert.ok(barrage > single * 3.5, `连续四发越闭越久：${barrage.toFixed(2)} s vs 单发 ${single.toFixed(2)} s`);
   assert.ok(Peak("Grenade", 60, RIGHT).peak.yaw === 0, "60 m：头不动");
+  assert.ok(Math.abs(Peak("Shell75", 35, RIGHT).peak.yaw) < 0.03, "75 野炮 35 m：头基本不动（< 2°）");
 });
 
 Group("冲击到了才反应（按声速）、先眨眼后转头", () => {
@@ -175,7 +189,7 @@ Group("确定性：同样的输入同样的曲线（出图可复现）", () => {
 
 Group("喘与心跳：强的那一下之后有，远的没有", () => {
   const near = new BlastFlinch(); near.SetEnabled(true); near.Blast(Exposure("Grenade", 4, { lateral: 1 }), RIGHT); near.Update(0.5);
-  assert.ok(near.breathless > 3 && near.heart > 0.3 && near.heartBpm >= BLAST_FLINCH.body.heartBpmMin);
+  assert.ok(near.breathless > 3 && near.heart > 0.2 && near.heartBpm >= BLAST_FLINCH.body.heartBpmMin);
   const far = new BlastFlinch(); far.SetEnabled(true); far.Blast(Exposure("Grenade", 40, { lateral: 1 }), RIGHT); far.Update(0.5);
   assert.equal(far.breathless, 0); assert.equal(far.heart, 0);
 });

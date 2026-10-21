@@ -46,6 +46,8 @@ import { BURNING_LIGHT, EXPLOSION_PARTICLE_ART, EXPLOSION_VOLUME_ART, PARTICLE_V
 import { BOMB_BLAST_VFX } from "./Data_AerialBombs.mjs";
 import { BlastScale, LinearDragAt } from "./Script_BombBallistics.mjs";
 import { DustFieldSystem } from "./Script_DustFieldRenderer.mjs";
+import { DustTuningFor } from "./Script_DustFlow.mjs";
+import { GROUND_IMPACT_BURSTS } from "./Data_Tuning_GroundImpact.mjs";
 import { EXPLOSIVES } from "./Data_Explosives.mjs";
 
 // ---------------------------------------------------------------------------
@@ -1489,7 +1491,7 @@ export class VfxSystem {
     // walls, and repeated blasts stack those slices at successive heights.
     // Impact() still uses small surface decals for ordinary bullet holes.
     if (impact) this.lastExplosionSprite.groundImpact = this.GroundImpact(position, {
-      chargeKg: impact.charge, incoming, groundY: impact.ground, massScale: impact.coupling });
+      chargeKg: impact.charge, incoming, groundY: impact.ground, massScale: impact.coupling, burst: impact.burst });
   }
 
   /**
@@ -1506,27 +1508,30 @@ export class VfxSystem {
     const reach = spec ? spec.groundReachM : 1.2 + 1.1 * Math.cbrt(charge);
     const gap = Math.max(0, position.y - ground);
     if (gap > reach) return null;
-    return { charge, ground, coupling: Math.max(0.25, 1 - gap / reach) };
+    return { charge, ground, coupling: Math.max(0.25, 1 - gap / reach), burst: spec?.burst ?? null };
   }
 
   /**
    * 落地扬尘（docs/Data_ShellImpactDust.md）：一张贴地形的尘流 + 弹道土柱。Explosion 在落地时自动调；
    * 剧情 / 编辑器也可以直接调。需要先 SetGroundSampler。返回这一团的取证（DustFlowField.Inspect）。
-   * @param {object} o chargeKg（kg TNT）、incoming（弹的速度，可选）、groundY、surface、massScale
+   * @param {object} o chargeKg（kg TNT）、incoming（弹的速度，可选）、groundY、surface、massScale、
+   *   burst（起爆方式，Data_Explosives 的 burst：手榴弹 "surface" 掀土少得多，见 GROUND_IMPACT_BURSTS）
    */
-  GroundImpact(position, { chargeKg = 0.81, incoming = null, groundY = null, surface = "loess", massScale = 1 } = {}) {
+  GroundImpact(position, { chargeKg = 0.81, incoming = null, groundY = null, surface = "loess", massScale = 1, burst = null } = {}) {
     if (!this.groundSampler) return null;
     this.dustFields ??= new DustFieldSystem(this.root, this.shared, this.quality);
     const ground = Number.isFinite(groundY) ? groundY : this.groundSampler(position.x, position.z);
+    const tuning = DustTuningFor(burst);
+    const ejectaScale = GROUND_IMPACT_BURSTS[burst]?.ejecta ?? 1;
     const entry = this.dustFields.Add({ x: position.x, y: position.y, z: position.z, chargeKg,
-      groundAt: this.groundSampler, incoming, wind: this.wind, surface, massScale });
+      groundAt: this.groundSampler, incoming, wind: this.wind, surface, massScale, tuning });
     const h = incoming ? Math.hypot(incoming.x || 0, incoming.z || 0) : 0;
     const fx = h > 1e-3 ? incoming.x / h : 0, fz = h > 1e-3 ? incoming.z / h : 0;
     // 炮弹的抛射土比航弹那套矮、团大、不发黑：沿用航弹参数时 75 mm 的拖尾是一根根很细很高的黑线
     const ejecta = this._EjectaStreamers(position.x, position.z, ground, BlastScale(chargeKg), fx, fz,
-      this.spawnScale * Math.max(0.3, Math.min(1, massScale)), this.time, { ...GROUND_IMPACT_EJECTA, trailCore: VFX_PALETTE.soil });
+      this.spawnScale * Math.max(0.3, Math.min(1, massScale)) * ejectaScale, this.time, { ...GROUND_IMPACT_EJECTA, trailCore: VFX_PALETTE.soil });
     this.groundImpacts = (this.groundImpacts || 0) + 1;
-    this.lastGroundImpact = { chargeKg, ground, streamers: ejecta.streamers, field: entry.field.Inspect() };
+    this.lastGroundImpact = { chargeKg, ground, burst, streamers: ejecta.streamers, field: entry.field.Inspect() };
     return this.lastGroundImpact;
   }
 

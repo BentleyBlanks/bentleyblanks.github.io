@@ -135,6 +135,24 @@ export const GROUND_IMPACT_DUST = Object.freeze({
 });
 
 /**
+ * 起爆方式对扬尘的倍率（2026-10-22）。Data_Explosives 的 `burst` 选一档；没写的（炮弹、航弹）按原表。
+ *
+ * surface（手榴弹）：用户嫌手榴弹的扬尘过大。手榴弹躺在地面上炸，薄铁皮壳、几乎不钻土 —— 冲出去的大半是空气里的爆风，
+ * 掀起的只是表层浮土和炸药的黑烟：实拍里一颗木柄手榴弹在干土上是两三米高、三四米宽的一团灰黑，几秒到十来秒就散，
+ * 不像带引信的炮弹那样从地里掀起一根土柱、一大圈尘浪。这里在立方根律之外再乘：
+ *   column / surge   土柱高 / 尘浪半径（手榴弹 ≈ 2.3 m / 2.8 m）
+ *   mass             土柱与尘浪的尘量
+ *   surgeCap         尘浪源头初始堆高里那一截固定值（surge.capPad，不随装药缩放 —— 小装药因此铺得相对太宽）
+ *   shockRadius / shockDepth / shockDecay   震起的细尘：范围（≈ 3.3 m）、浓淡、多久淡掉
+ *   loftLife / surgeLife   悬浮尘云与贴地尘浪的寿命（尘云 ≈ 16 s，原来 55 s）
+ *   ejecta           弹道土块与拖尾的条数
+ */
+export const GROUND_IMPACT_BURSTS = Object.freeze({
+  surface: Object.freeze({ column: 0.5, surge: 0.7, mass: 0.35, surgeCap: 0.5, shockRadius: 0.4, shockDepth: 0.5, shockDecay: 0.4,
+    loftLife: 0.3, surgeLife: 0.5, ejecta: 0.5 }),
+});
+
+/**
  * 表面：颜色是线性 RGB 反照率。fresh = 刚掀起来的湿土 + 炸药烟（参考图里最黑的那团核心），
  * dust = 散开、晒干之后的扬尘（偏浅的灰黄）。先只有干黄土一种；湿泥 / 雪 / 砖石之后按同一格式加。
  */
@@ -197,4 +215,11 @@ export const GROUND_IMPACT_RENDER = Object.freeze({
    */
   ambientScale: 1.6, groundBounce: 0.16,
   maxFields: 10,
+  /**
+   * 网格数据上传节流（2026-10-22 帧取证）：原来每团每帧整张重传三张 RGBA32F（一团约 440 KB / 帧），显卡还在读上一帧的贴图时
+   * 又被改写，ANGLE / D3D11 只能停下来等 —— 剖析里 bindTexture / useProgram 占了一成多、炸完一两秒后每隔一帧就是 20–45 ms。
+   * 现在两套贴图轮换（写的那套不是正在画的那套），并按这团尘的年龄降频：fullS 秒内每帧传，halfS 秒内隔帧，之后每 slowEvery 帧
+   *（各团错开）。尘一两秒后变化很慢，降频看不出来；漂移、淡出、火光这些逐帧量照常每帧更新。
+   */
+  upload: Object.freeze({ fullS: 1.2, halfS: 5, slowEvery: 4 }),
 });

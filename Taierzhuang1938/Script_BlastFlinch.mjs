@@ -50,6 +50,8 @@ export class BlastFlinch {
     this.time = 0;
     this.frontSide = 1;       // 正前方爆炸：往哪边转，每次交替
     this.serial = 0;
+    this.load = 0;            // 连续炮击的累积（BLAST_FLINCH.load）：按时间漏，每发按缩身强度加
+    this.loadAt = 0;
     this.Zero();
     this.stats = { blasts: 0, ignored: 0 };
   }
@@ -91,6 +93,12 @@ export class BlastFlinch {
     else { sign = this.frontSide; this.frontSide = -this.frontSide; }
     const f = exposure.flinch;
     const yawWeight = Clamp01(Math.abs(lateral) + H.frontYawShare * Math.max(0, forward));
+    // 连续炮击：先按上一发到现在的时间漏掉，再记上这一发（用这一发之前的累积来拉长闭眼：第一发不受影响）。
+    const L = T.load;
+    this.load *= Math.exp(-Math.max(0, this.time - this.loadAt) / L.tauS);
+    this.loadAt = this.time;
+    const load = Math.min(L.max, this.load);
+    this.load = Math.min(L.max, this.load + Math.max(f, exposure.squeeze));
     const event = {
       id: ++this.serial, u: -Math.max(0, exposure.arrivalS || 0),
       sign, lateral, forward, up,
@@ -105,6 +113,7 @@ export class BlastFlinch {
       release: H.releaseMinS + H.releaseSpanS * f,
       overshoot: H.settleOvershoot * f,
       dazeDecay: T.daze.decayMinS + T.daze.decaySpanS * exposure.daze,
+      load,
       breathS: exposure.body > 0 ? T.body.breathMinS + T.body.breathSpanS * exposure.body : 0,
       heartS: exposure.body > 0 ? T.body.heartMinS + T.body.heartSpanS * exposure.body : 0,
     };
@@ -117,8 +126,9 @@ export class BlastFlinch {
   /** 这个事件已经完全结束（所有通道都回零）。 */
   Done(e) {
     const T = this.T;
-    const lidEnd = T.blinkLatencyS + T.squeeze.closeS + T.squeeze.holdMinS + T.squeeze.holdSpanS
-      + T.squeeze.openS * 2 + T.squeeze.squintS * 1.5 + 1;
+    const stretch = 1 + Math.max(T.load.holdGain, 1) * (e.load || 0);
+    const lidEnd = T.blinkLatencyS + T.squeeze.closeS + (T.squeeze.holdMinS + T.squeeze.holdSpanS) * stretch
+      + T.squeeze.openS * 2 + T.squeeze.squintS * 1.5 * stretch + T.blink.reboundAtS + 1;
     const headEnd = T.bodyLatencyS + T.head.attackS + e.hold + e.release + T.arms.lagS;
     const tremorEnd = T.tremor.holdS + T.tremor.decayS * 4;
     const dazeEnd = T.daze.attackS + T.daze.holdS + e.dazeDecay * 4;
@@ -155,21 +165,23 @@ export class BlastFlinch {
       if (e.blink > 0) {
         const amp = Clamp01(e.blink / B.fullAt);
         lid = Math.max(lid, amp * LidPulse(u, T.blinkLatencyS, B.closeS, B.holdMinS + B.holdSpanS * e.blink, B.openS));
-        if (e.blink >= B.rebound) {
-          lid = Math.max(lid, B.reboundClosure * e.blink
-            * LidPulse(u, B.reboundAtS, B.reboundCloseS, 0.02, B.reboundOpenS));
+        // 睁眼时的余颤只在近爆（闭紧过）时有。
+        if (e.squeeze >= B.rebound) {
+          lid = Math.max(lid, B.reboundClosure * LidPulse(u, B.reboundAtS, B.reboundCloseS, 0.02, B.reboundOpenS));
         }
       }
       if (e.squeeze > 0) {
-        const hold = S.holdMinS + S.holdSpanS * e.squeeze;
-        const open = S.openS * (1 + e.squeeze);
-        const amp = Math.min(1, 0.55 + 0.45 * e.squeeze / 0.6);
-        lid = Math.max(lid, amp * LidPulse(u, T.blinkLatencyS, S.closeS, hold, open));
+        // 单发最多停 ~0.25 s；连续炮击（e.load）才越闭越久。
+        const hold = (S.holdMinS + S.holdSpanS * e.squeeze) * (1 + T.load.holdGain * e.load);
+        const open = S.openS * (1 + 0.6 * e.squeeze);
+        lid = Math.max(lid, LidPulse(u, T.blinkLatencyS, S.closeS, hold, open));
+        const squintAmp = e.squeeze >= S.squintFrom || e.load > 0.5
+          ? S.squint * Math.max(e.squeeze, 0.5) * (1 + T.load.squintGain * e.load) : 0;
         const squintFrom = T.blinkLatencyS + S.closeS + hold + open * 0.6;
-        const squintLen = S.squintS * (0.5 + e.squeeze);
-        if (u > squintFrom) {
+        const squintLen = S.squintS * (0.5 + e.squeeze) * (1 + e.load);
+        if (squintAmp > 0 && u > squintFrom) {
           const k = Clamp01((u - squintFrom) / squintLen);
-          lid = Math.max(lid, S.squint * e.squeeze * (1 - Smooth(k)));
+          lid = Math.max(lid, Math.min(0.6, squintAmp) * (1 - Smooth(k)));
         }
       }
       // 恍惚：快起、停一下、慢退；近爆另有一下极短的发糊（冲击晃了一下眼）。
@@ -230,6 +242,7 @@ export class BlastFlinch {
 
   Reset() {
     this.events.length = 0;
+    this.load = 0;
     this.Zero();
   }
 
@@ -240,6 +253,7 @@ export class BlastFlinch {
       yaw: this.yaw, pitch: this.pitch, roll: this.roll, dropM: this.dropM, sideM: this.sideM,
       eyeClosure: this.eyeClosure, daze: { ...this.daze }, arms: { ...this.arms }, tremor: this.tremor,
       heart: this.heart, heartBpm: this.heartBpm, breathless: this.breathless, headLevel: this.headLevel,
+      load: this.load * Math.exp(-Math.max(0, this.time - this.loadAt) / this.T.load.tauS),
       stats: { ...this.stats },
       last: this.events.length ? { ...this.events[this.events.length - 1] } : null,
     };

@@ -18,14 +18,16 @@
  * 换成 dB SPL：20·log10(Ps / 20 µPa)。量级参照：手榴弹 5 m 约 177 dB、12 m 约 168 dB；150 毫米榴弹 35 m 约 168 dB。
  *
  * 各反应的 dB 窗 [从, 满]：x = (dB − 从) / (满 − 从)，夹到 0..1 再取 curve 次方。
- * 窗口照「什么距离该有什么反应」定（手榴弹为例）：
- *   blink   150–166：六七十米外的一声会轻轻眨一下眼（惊跳眨眼，最先、最轻的一层；越近合得越满）
- *   flinch  154–182：三十米内开始缩一下，八米（172 dB）已经很明显
- *   squeeze 166–186：十二米起眼睛要闭紧一会儿，三米内闭死
+ * 窗口照「什么距离该有什么反应」定（手榴弹为例）。2026-10-22 用户实测改过一轮：「离得比较远的时候眨眼应该就一刹那、
+ * 头也基本上不动，35 m 反应仍然很大」「除非是连续引爆，不然眼睛不可能一直闭着」—— 头的反应窗往近处挪、曲线更陡（远处几乎为 0），
+ * 闭紧眼的窗也往近处挪，单发闭紧的时长收短（连续炮击才越闭越久，见 BLAST_FLINCH.load）：
+ *   blink   150–170：远处的一声只是眨一下（一刹那，约 0.15 s；越近合得越满）
+ *   flinch  160–186（^1.6）：十来米内才看得出缩头转开，五米很明显，三米满；35 m 的 75 野炮约 1°（等于不动）
+ *   squeeze 170–190：八九米内眼睛才闭紧一下（单发最多约 0.25 s），三米内闭得最久
  *   tinnitus 163–185：二十米内开始耳鸣（与原来通用耳鸣十二三米出闸同一量级），三米满
- *   daze    172–192：五米内才会发懵、视线发糊
- *   tremor  164–185：手抖（肾上腺素）
- *   body    160–182：之后喘粗气、听得见自己心跳
+ *   daze    174–194：四米内才会发懵、视线发糊
+ *   tremor  168–188：手抖（肾上腺素）
+ *   body    166–186：之后喘粗气、听得见自己心跳
  */
 export const BLAST_EXPOSURE = Object.freeze({
   ambientKPa: 101.325,
@@ -42,13 +44,13 @@ export const BLAST_EXPOSURE = Object.freeze({
   /** 头影：背对爆点那只耳朵少挨多少（高频为主的冲击，人头挡掉的量级是 6–10 dB）。 */
   headShadowDb: -7,
   windows: Object.freeze({
-    blink: Object.freeze([150, 166, 1.0]),
-    flinch: Object.freeze([154, 182, 1.1]),
-    squeeze: Object.freeze([166, 186, 1.15]),
+    blink: Object.freeze([150, 170, 1.0]),
+    flinch: Object.freeze([160, 186, 1.6]),
+    squeeze: Object.freeze([170, 190, 1.3]),
     tinnitus: Object.freeze([163, 185, 1.05]),
-    daze: Object.freeze([172, 192, 1.2]),
-    tremor: Object.freeze([164, 185, 1.0]),
-    body: Object.freeze([160, 182, 1.0]),
+    daze: Object.freeze([174, 194, 1.2]),
+    tremor: Object.freeze([168, 188, 1.0]),
+    body: Object.freeze([166, 186, 1.0]),
   }),
   /** 声速（米 / 秒）：反应从冲击波到人那一刻算起（看见火光在先，挨那一下在后）。 */
   soundSpeedMps: 343,
@@ -74,16 +76,24 @@ export const BLAST_FLINCH = Object.freeze({
   /** 反射潜伏期：惊跳眨眼 30–50 ms、颈部肌肉 60–100 ms（取中值）。 */
   blinkLatencyS: 0.035,
   bodyLatencyS: 0.07,
-  blink: Object.freeze({ closeS: 0.05, holdMinS: 0.03, holdSpanS: 0.09, openS: 0.16,
+  // 惊跳眨眼本身就是一刹那：合 40 ms、几乎不停、110 ms 睁开（整个约 0.15 s）。
+  blink: Object.freeze({ closeS: 0.04, holdMinS: 0, holdSpanS: 0.04, openS: 0.11,
     /** 眼皮合多少 = 强度 / fullAt（弱的那一下只是眼皮跳一下）；强度到 fullAt 才合满。 */
-    fullAt: 0.55,
-    /** 睁眼时的余颤：强度过 rebound 才有，第二下合到 reboundClosure。 */
-    rebound: 0.5, reboundAtS: 0.42, reboundClosure: 0.55, reboundCloseS: 0.06, reboundOpenS: 0.2 }),
-  squeeze: Object.freeze({ closeS: 0.07, holdMinS: 0.12, holdSpanS: 0.5, openS: 0.45,
-    /** 睁开后还眯着：眯到多少、多久退完。 */
-    squint: 0.32, squintS: 3.2 }),
+    fullAt: 0.5,
+    /** 睁眼时的余颤：闭紧强度过 rebound 才有（近爆），第二下合到 reboundClosure。 */
+    rebound: 0.35, reboundAtS: 0.5, reboundClosure: 0.45, reboundCloseS: 0.05, reboundOpenS: 0.14 }),
+  // 单发闭紧：最多停 holdMinS + holdSpanS ≈ 0.25 s 再睁开；连续炮击按 load 拉长（见下）。
+  squeeze: Object.freeze({ closeS: 0.05, holdMinS: 0.03, holdSpanS: 0.22, openS: 0.18,
+    /** 睁开后还眯着（灰、光）：闭紧强度过 squintFrom 才有，眯到 squint × 强度，squintS 秒退完。 */
+    squint: 0.18, squintFrom: 0.3, squintS: 1.2 }),
+  /**
+   * 连续炮击的累积（2026-10-22 用户：「除非是连续引爆，不然眼睛不可能一直闭着」）：每发按自己的缩身强度往 load 里加，
+   * load 按 tauS 秒指数漏；闭紧的停留 ×(1 + holdGain·load)、眯眼 ×(1 + squintGain·load)，封顶 max。
+   * 单发时 load 只有这一发自己，基本不变；隔一两秒一发、发发都近，才越闭越久、眯着睁不开。
+   */
+  load: Object.freeze({ tauS: 2.5, max: 2, holdGain: 1.4, squintGain: 1.2 }),
   head: Object.freeze({
-    attackS: 0.16, holdMinS: 0.12, holdSpanS: 0.75, releaseMinS: 0.55, releaseSpanS: 1.0,
+    attackS: 0.14, holdMinS: 0.06, holdSpanS: 0.45, releaseMinS: 0.4, releaseSpanS: 0.7,
     yawRad: 0.62,           // 约 35°：脸转开
     pitchRad: -0.34,        // 约 −19°：下巴往胸口收
     rollRad: 0.2,           // 约 11°：头歪向背离爆点那边

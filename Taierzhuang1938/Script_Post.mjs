@@ -85,6 +85,7 @@ import { InteriorSkyPass } from "./Script_InteriorSkyOcclusion.mjs";
 import { SsrPass, SsrColorPass } from "./Script_PostSsr.mjs";
 import { VolumetricsPass } from "./Script_PostVolumetrics.mjs";
 import { ContactShadowsPass, MakeShadowDebugViews } from "./Script_ContactShadows.mjs";
+import { GroundDustPass } from "./Script_PostGroundDust.mjs";
 import { TaaPass } from "./Script_PostTaa.mjs";
 import { MotionBlurPass } from "./Script_PostMotionBlur.mjs";
 import { DofPass } from "./Script_PostDof.mjs";
@@ -232,6 +233,7 @@ export class PostPipeline {
     this.interiorSkyPass = new InteriorSkyPass(this);
     // 屏幕空间接触阴影（子系统 B1）。
     this.contactShadowsPass = new ContactShadowsPass(this, { quality: this.quality });
+    this.groundDustPass = new GroundDustPass(this);
     this.taaPass = new TaaPass(this);
     this.exposurePass = new ExposurePass(this);
     this.motionBlurPass = new MotionBlurPass(this);
@@ -280,6 +282,9 @@ export class PostPipeline {
       // 屏幕空间接触阴影：要预通道的法线+视深，产出的图要在主场景那一趟被材质
       // 采到，所以卡在 gtao 与 main 之间。关着时 Idle() 把材质那边还原成纯白。
       this.contactShadowsPass,
+      // 落地扬尘降分辨率体积（Script_PostGroundDust）：要预通道深度截断射线，产出的靶由主场景里那张全屏片按深度放大叠上，
+      // 所以卡在预通道之后、main 之前。没尘 / 关掉时 Idle 让尘团退回主场景全分辨率画。
+      this.groundDustPass,
       {
         name: "main",
         Enabled: () => true,
@@ -616,6 +621,9 @@ export class PostPipeline {
    * froxel 体积雾要它的阴影图（光柱被建筑切断）与局部光表
    * （`GetClusterLightData()` 优先，退化到火源池 / `GetEffectLightState()`）。
    */
+  /** 落地扬尘的尘团系统（Script_DustFieldRenderer.DustFieldSystem，Vfx 懒建）：Script_Main 每帧交一次。 */
+  SetGroundDustSource(system) { this.groundDustPass?.SetSource(system); }
+
   SetSunShadowSource(lightRig) {
     this.debugPass.SetSunShadowSource(lightRig);
     this.volumetricsPass.SetSunShadowSource(lightRig);

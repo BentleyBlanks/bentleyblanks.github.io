@@ -84,7 +84,10 @@ try {
     }
     const state = api.State();
     const peak = (k, sign = 1) => series.reduce((m, s) => Math.max(m, sign * (s[k] ?? 0)), 0);
+    const dustTarget = t.post.targets.groundDust;
     return {
+      groundDust: { ran: t.post.lastRenderedPasses.includes("groundDust"), half: dustTarget ? dustTarget.width / t.post.width : null,
+        halfFrames: t.vfx.dustFields?.Inspect().halfFrames ?? 0 },
       shot, last: state.last, peak: state.peak, ears: t.audio.EarState(),
       yawUnchanged: p.yaw === yaw0 && p.pitch === pitch0,
       maxCamYaw: peak("camYaw"), minCamYaw: -peak("camYaw", -1), maxDown: peak("camPitch", -1), maxRoll: peak("camRoll"),
@@ -101,14 +104,16 @@ try {
   assert.ok(r5.last.exposure.db > 170 && r5.last.exposure.tinnitusRight > r5.last.exposure.tinnitusLeft, JSON.stringify(r5.last.exposure));
   assert.ok(r5.yawUnchanged, "玩家的 yaw / pitch 本体不动（枪口不被带歪）");
   assert.ok(r5.maxCamYaw > 0.25, `右边炸：相机往左转开 ${(r5.maxCamYaw * 57.3).toFixed(0)}°`);
-  assert.ok(r5.maxDown > 0.12, "低头");
+  assert.ok(r5.maxDown > 0.1, "低头");
   assert.ok(r5.maxRoll > 0.06, "头往左歪");
-  assert.ok(r5.maxEye > 0.95 && r5.eyeFrames >= 8, `眼睛闭紧一会儿（${r5.eyeFrames} 帧 > 0.8）`);
-  assert.ok(r5.maxDrop > 0.1, "缩身");
+  assert.ok(r5.maxEye > 0.95 && r5.eyeFrames >= 6 && r5.eyeFrames <= 24, `眼睛闭紧一下，单发不久闭（${r5.eyeFrames} 帧 > 0.8）`);
+  assert.ok(r5.maxDrop > 0.08, "缩身");
   assert.ok(r5.minVmRy < -0.05, "手臂跟得少：枪反向转回一部分");
   assert.ok(r5.ears.right.lowHz < r5.ears.left.lowHz, `朝爆点那只（右）耳朵更闷：右 ${r5.ears.right.lowHz?.toFixed(0)} / 左 ${r5.ears.left.lowHz?.toFixed(0)} Hz`);
   assert.ok(r5.ears.right.gainDb < -6, "右耳外界小下去");
   assert.ok(r5.ears.ringing && r5.ears.ringNodes === 14, "一条鸣响，14 个节点");
+  // 落地扬尘按画质档降分辨率画（Script_PostGroundDust；high 档 0.5）。
+  assert.ok(r5.groundDust.ran && Math.abs(r5.groundDust.half - 0.5) < 0.01 && r5.groundDust.halfFrames > 0, JSON.stringify(r5.groundDust));
   console.log("PASS right 5 m grenade", JSON.stringify({ yaw: r5.maxCamYaw, eyeFrames: r5.eyeFrames, ears: r5.ears }));
 
   // 后期合成收到眼皮与恍惚（不只是规则层的数）。
@@ -135,6 +140,7 @@ try {
   assert.ok(r5.maxCamYaw > result.right12.maxCamYaw && result.right12.maxCamYaw > result.right35.maxCamYaw, "近的转得多");
   assert.ok(r5.eyeFrames > result.right12.eyeFrames, "近的闭得久");
   assert.ok(!(result.right35.ears.right.lowHz < 15000), "35 m 的手榴弹不该把耳朵震闷");
+  assert.ok(result.right35.maxCamYaw < 0.02 && result.right35.eyeFrames <= 6, `35 m：只眨一下、头基本不动（${(result.right35.maxCamYaw * 57.3).toFixed(1)}°，${result.right35.eyeFrames} 帧）`);
   // 左边炸：反过来往右转。
   result.left8 = await Blast({ munition: "Shell82", distanceM: 8, bearing: "left", frames: 330 });
   assert.ok(result.left8.minCamYaw < -0.15, "左边炸：往右转开");

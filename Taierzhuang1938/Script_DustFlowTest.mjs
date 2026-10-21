@@ -5,7 +5,9 @@
 //   3. 斜着砸进去：下游一侧多；
 //   4. 不凭空造尘、全是有限非负数、两次一模一样、最后会收工。
 import assert from "node:assert/strict";
-import { DustFlowField, ImpactScale } from "./Script_DustFlow.mjs";
+import { DustFlowField, ImpactScale, DustTuningFor } from "./Script_DustFlow.mjs";
+import { EXPLOSIVES } from "./Data_Explosives.mjs";
+import { GROUND_IMPACT_DUST } from "./Data_Tuning_GroundImpact.mjs";
 
 const Smooth = (t) => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
 // 一条沿 x 走的射击壕（深 2 m、沟底宽 2.6 m、坡宽 1.1 m），x = ±12 m 处折向（traverse），沟外两侧 0.35 m 弃土垄。
@@ -112,5 +114,24 @@ const g = ImpactScale(0.165), s = ImpactScale(0.81), bomb = ImpactScale(100);
 assert.ok(g.columnH < s.columnH && s.columnH < bomb.columnH && bomb.columnH / s.columnH < 6, "column height scales with cube root");
 assert.ok(new DustFlowField({ x: 0, z: 0, chargeKg: 100, groundAt: FlatGround }).N <= 96, "grid stays within budget for a 250 kg bomb");
 
+// --- 6) 手榴弹贴地爆（2026-10-22 用户：手榴弹扬尘过大）：躺在地面上炸、几乎不钻土，掀起的土远少于同装药的炮弹 -----
+assert.equal(EXPLOSIVES.Grenade.burst, "surface"); assert.equal(EXPLOSIVES.GrenadeBundle.burst, "surface");
+assert.ok(!EXPLOSIVES.Shell75.burst && !EXPLOSIVES.Shell50.burst, "炮弹仍按带引信钻土那一档");
+assert.equal(DustTuningFor(null), GROUND_IMPACT_DUST); assert.equal(DustTuningFor("surface"), DustTuningFor("surface"), "按档缓存");
+const surfaceT = DustTuningFor("surface");
+const gShell = ImpactScale(0.165), gHand = ImpactScale(0.165, surfaceT);
+assert.ok(gHand.columnH < 2.6 && gHand.columnH < gShell.columnH * 0.6, `手榴弹土柱 ≈ 2.3 m（${gHand.columnH.toFixed(2)} m）`);
+assert.ok(gHand.surgeR < 3 && gHand.columnQ < gShell.columnQ * 0.5, `手榴弹尘浪半径 ≈ 2.8 m（${gHand.surgeR.toFixed(2)} m）`);
+assert.ok(surfaceT.shock.radiusK * gHand.cube < 3.6 && surfaceT.loft.life < 20, "震起的细尘 ≈ 3.3 m、悬浮尘云 ≈ 16 s");
+const hand = Run({ x: 0, z: 0, chargeKg: 0.165, groundAt: FlatGround, tuning: surfaceT }, 1.5);
+const shellLike = Run({ x: 0, z: 0, chargeKg: 0.165, groundAt: FlatGround }, 1.5);
+const Q = (f) => f.TotalSurge() + f.TotalLoft() + f.TotalSkin();
+assert.ok(Q(hand) < Q(shellLike) * 0.6, `同装药贴地爆的尘量明显少（${Q(hand).toFixed(1)} vs ${Q(shellLike).toFixed(1)} m²）`);
+const handLife = new DustFlowField({ x: 0, z: 0, chargeKg: 0.165, groundAt: FlatGround, tuning: surfaceT });
+let handSteps = 0;
+while (handLife.Step(0.1) && handSteps < 2000) handSteps++;
+assert.ok(handLife.finished && handSteps * 0.1 < 20, `手榴弹的尘 ${(handSteps * 0.1).toFixed(1)} s 内散完`);
+
+console.log(`PASS DustFlowTest: surface-burst grenade column ${gHand.columnH.toFixed(2)} m / surge ${gHand.surgeR.toFixed(2)} m / gone in ${(handSteps * 0.1).toFixed(1)} s; `);
 console.log(`PASS DustFlowTest: trench confined ${ti.confined} boost ${ti.boost}, along/across ${(along / Math.max(1e-6, across)).toFixed(1)}x, spread ${elongEarly.toFixed(2)}@0.4s ${elong.toFixed(2)}@1s, `
   + `open ground isotropic, downrange ${(down / Math.max(1e-6, up)).toFixed(2)}x, deterministic, drift, retire`);

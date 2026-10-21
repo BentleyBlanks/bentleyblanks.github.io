@@ -22,13 +22,38 @@
 //
 // 网格只在建立后的第一次 Step 才采地面：那时弹坑已经挖好（Combat.Blast 先画特效再挖坑）。
 
-import { GROUND_IMPACT_DUST as DEFAULT_DUST, GROUND_IMPACT_SURFACES } from "./Data_Tuning_GroundImpact.mjs";
+import { GROUND_IMPACT_DUST as DEFAULT_DUST, GROUND_IMPACT_SURFACES, GROUND_IMPACT_BURSTS } from "./Data_Tuning_GroundImpact.mjs";
 
 const TAU = Math.PI * 2;
 const EPS_H = 0.004;
 function Smooth(a, b, x) {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
+}
+
+const BURST_TUNING = new Map();
+/**
+ * 起爆方式（Data_Explosives 的 burst，如手榴弹的 "surface"）对应的整张数值表：在 GROUND_IMPACT_DUST 上按
+ * GROUND_IMPACT_BURSTS 的倍率改几项（土柱 / 尘浪 / 尘量 / 震起的细尘 / 寿命）。没有这一档返回原表。结果缓存、冻结。
+ */
+export function DustTuningFor(burst, T = DEFAULT_DUST) {
+  const B = burst ? GROUND_IMPACT_BURSTS[burst] : null;
+  if (!B || T !== DEFAULT_DUST) return T;
+  if (BURST_TUNING.has(burst)) return BURST_TUNING.get(burst);
+  const tuned = Object.freeze({
+    ...T,
+    scale: Object.freeze({ ...T.scale, columnK: T.scale.columnK * B.column, surgeK: T.scale.surgeK * B.surge }),
+    mass: Object.freeze({ ...T.mass, columnQ: T.mass.columnQ * B.mass, surgeQ: T.mass.surgeQ * B.mass }),
+    shock: Object.freeze({ ...T.shock, radiusK: T.shock.radiusK * B.shockRadius, center: T.shock.center * B.shockDepth,
+      edge: T.shock.edge * B.shockDepth, decayS: T.shock.decayS * B.shockDecay }),
+    loft: Object.freeze({ ...T.loft, life: T.loft.life * B.loftLife, fadeS: T.loft.fadeS * B.loftLife,
+      fallFineS: T.loft.fallFineS * B.loftLife }),
+    surge: Object.freeze({ ...T.surge, life: T.surge.life * B.surgeLife, settleFineS: T.surge.settleFineS * B.loftLife,
+      capPad: T.surge.capPad * (B.surgeCap ?? 1) }),
+    burst,
+  });
+  BURST_TUNING.set(burst, tuned);
+  return tuned;
 }
 
 /** 尺度律：全部按装药立方根。返回米 / 秒 / 米每秒。 */

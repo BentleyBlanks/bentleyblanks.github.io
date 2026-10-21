@@ -141,6 +141,7 @@ function generateShadowMapTypeDefine( parameters ) {
  5  gtao                  地平线搜索（AO + 弯曲法线 + SSIL）→ 时域 → 双边 → rtAoBlur（§5）
  5a interiorSky           装了屋子表的关卡才跑：室内天光可见度乘进 AO 图的 R（§5.11）
  5b contactShadows        屏幕空间接触阴影（只压直射太阳）→ 合进 SSIL 靶的 alpha（§6）
+ 5c groundDust            落地扬尘降分辨率体积（Script_PostGroundDust，groundDustScale；只在有尘时跑，main 里那张全屏片按深度放大叠上，见 Data_ShellImpactDust「性能」）
  6  main                  HDR 主场景（AO / SSIL / SSR / 簇状局部光由材质补丁注入；ultra 才 4×MSAA）
  7  wireframe             着色模式非 shaded 时叠一层三角形边线
  8  debugOverlay          Rapier 碰撞体线框等（同一张 hdr 靶与深度）

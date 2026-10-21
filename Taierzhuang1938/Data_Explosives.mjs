@@ -6,6 +6,9 @@ import { AERIAL_BOMBS } from "./Data_AerialBombs.mjs";
 
 export const EXPLOSIVE_SOURCES = {
   M24: "https://ebadatelnavhm.vhu.sk/item/9/31",
+  M24Filling: "https://en.wikipedia.org/wiki/Stielhandgranate_24",
+  ChineseStickGrenade: "https://en.wikipedia.org/wiki/Type_67_hand_grenade",
+  Type98Copy: "https://en.wikipedia.org/wiki/Type_98_grenade",
   JapaneseArmy: "https://www.bulletpicker.com/pdf/Japanese-Ammunition-Part-4.pdf",
   JapaneseOrdnance: "https://www.bulletpicker.com/pdf/TM-9-1985-5.pdf",
   MortarAnalogue: "https://www.bulletpicker.com/pdf/Catalog-of-Standard-Ordnance-Items-Vol-3.pdf",
@@ -19,9 +22,13 @@ export const EXPLOSIVE_SOURCES = {
 // ratio (0.81 kg / 6.6 kg = 0.123); no identified filling figure was found.
 const TYPE94_FILL_RATIO = 0.123;
 
+// burst（落地扬尘怎么起，Data_Tuning_GroundImpact.GROUND_IMPACT_BURSTS）：缺省 = 带引信的炮弹 / 航弹，落地时略钻进土里才炸，掀土最多；
+// "surface" = 手榴弹：躺在地面上、薄铁皮壳炸开（M24 本是靠爆风的进攻型手榴弹，破片很少），几乎不钻土，掀起的土远少于同装药的炮弹。
+// 2026-10-22 用户嫌手榴弹扬尘过大、要按历史上的威力收：德国 M24 装 165–170 g TNT；中国仿制型装 TNT 掺硝酸钾、一般比原型弱；
+// 日军照中国木柄弹仿制的九八式只装 85 g 苦味酸（不到 M24 一半）。中国二十四年式的确切克数没查到可靠出处，装药仍按 M24 记。
 export const EXPLOSIVES = {
-  Grenade: { name: "木柄手榴弹", fillingKg: 0.165, evidence: "M24 analogue; Chinese filling varies", craterRadiusM: 0.85, craterDepthM: 0.13, groundReachM: 1.2 },
-  GrenadeBundle: { name: "集束手榴弹", fillingKg: 1.155, evidence: "seven M24 analogue heads", craterRadiusM: 1.6, craterDepthM: 0.42, groundReachM: 2.0 },
+  Grenade: { name: "木柄手榴弹", fillingKg: 0.165, evidence: "M24 analogue; Chinese filling varies", craterRadiusM: 0.85, craterDepthM: 0.13, groundReachM: 1.2, burst: "surface" },
+  GrenadeBundle: { name: "集束手榴弹", fillingKg: 1.155, evidence: "seven M24 analogue heads", craterRadiusM: 1.6, craterDepthM: 0.42, groundReachM: 2.0, burst: "surface" },
   Shell37: { name: "37毫米榴弹", fillingKg: 0.058, evidence: "Type 94 HE, 2.05 oz", craterRadiusM: 0.95, craterDepthM: 0.19, groundReachM: 1.3 },
   Shell57: { name: "57毫米榴弹", fillingKg: 0.25, evidence: "Type 90 HE", craterRadiusM: 1.35, craterDepthM: 0.32, groundReachM: 1.6 },
   Shell50: { name: "50毫米掷弹筒弹", fillingKg: 0.153, evidence: "Type 89 HE, 5.4 oz; TM 9-1985-5 p372", craterRadiusM: 1.15, craterDepthM: 0.25, groundReachM: 1.5 },

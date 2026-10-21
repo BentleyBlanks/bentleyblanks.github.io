@@ -9,7 +9,8 @@
 // 受光照抄 Script_ParticleVolumeMaterial：朝太阳几步算遮光、HG 前向散射、二阶散射近似、天光；
 // 颜色按「新鲜度」从刚掀起的黑土渐变到散开后的灰黄。输出预乘颜色 + 透过率，保留目标 alpha。
 //
-// 网格数据每帧整张上传（N ≤ 96，两张 RGBA32F，一团 ≤ 290 KB），不做增量。
+// 网格数据整张上传（N ≤ 96，三张 RGBA32F，一团 ≤ 440 KB）：两套贴图轮换、按年龄降频（GROUND_IMPACT_RENDER.upload）。
+// 材质用完不销毁、回收复用：销毁最后一只就会把着色器程序一起删掉，下一发再编一遍（第一发 / 清空之后卡约半秒）。
 
 import * as THREE from "three";
 import { MarkNoPrepass } from "./Script_Post.mjs";
@@ -488,18 +489,74 @@ function MakeTexture(N) {
 }
 
 // ---------------------------------------------------------------------------
+// 降分辨率（Script_PostGroundDust）：尘团挂在专用层上只由那一趟画进低分辨率靶，主场景里换成一张全屏片按深度放大叠上。
+
+/** 尘团在降分辨率模式下所在的层（主相机只看第 0 层；29 / 30 / 31 已被第一人称自阴影、人物合批、隐藏层占用）。 */
+export const GROUND_DUST_LAYER = 28;
+
+const UPSAMPLE_VERTEX = /* glsl */ `
+void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }
+`;
+
+// 按深度放大：取四个最近的低分辨率样本，双线性权重 × 深度相近度（低分辨率那条射线截在它像素中心的深度上，
+// 与这个全分辨率像素的深度差得多 = 那条射线看到的不是这里），把尘糊到近处物体边上的那圈晕压掉。
+const UPSAMPLE_FRAGMENT = /* glsl */ `
+uniform sampler2D uDustHalf;
+uniform sampler2D uNormalDepth;
+uniform vec2 uFullRes;
+uniform vec2 uHalfRes;
+uniform float uDepthValid;
+float SceneDepth(vec2 uv){ float d = texture2D(uNormalDepth, uv).w; return d > 0.0 ? d : 1.0e5; }
+void main(){
+  vec2 uv = gl_FragCoord.xy / uFullRes;
+  vec2 hp = uv * uHalfRes - 0.5;
+  vec2 base = floor(hp), f = hp - base;
+  float d0 = uDepthValid > 0.5 ? SceneDepth(uv) : 1.0;
+  vec4 acc = vec4(0.0);
+  float wsum = 0.0;
+  vec4 nearest = vec4(0.0, 0.0, 0.0, 1.0);
+  float nearestErr = 1.0e9;
+  for (int k = 0; k < 4; k++) {
+    vec2 o = vec2(float(k - (k / 2) * 2), float(k / 2));
+    vec2 tuv = clamp((base + o + 0.5) / uHalfRes, vec2(0.0), vec2(1.0));
+    vec4 s = texture2D(uDustHalf, tuv);
+    float bil = (o.x > 0.5 ? f.x : 1.0 - f.x) * (o.y > 0.5 ? f.y : 1.0 - f.y);
+    float err = uDepthValid > 0.5 ? abs(SceneDepth(tuv) - d0) / max(d0, 0.5) : 0.0;
+    float w = bil / (1.0 + 60.0 * err) + 1.0e-5;
+    acc += s * w; wsum += w;
+    if (err < nearestErr) { nearestErr = err; nearest = s; }
+  }
+  vec4 dust = acc / wsum;
+  // 四个都对不上（深度边上）：用最接近的那一个，不要平均出一圈晕
+  if (uDepthValid > 0.5 && nearestErr > 0.08) dust = nearest;
+  gl_FragColor = vec4(max(dust.rgb, vec3(0.0)), clamp(dust.a, 0.0, 1.0));
+}
+`;
+
+// ---------------------------------------------------------------------------
 // 管理：一团尘 = 一张 DustFlowField + 一只盒子网格。
 
 export class DustFieldSystem {
   constructor(root, shared, quality = "high") {
     this.root = root; this.shared = shared; this.quality = quality;
     this.fields = [];
+    // 所有尘团的盒子挂在这一组下（降分辨率那一趟只渲染这一组，不必遍历整个场景）。
+    this.group = new THREE.Group();
+    this.group.name = "GroundImpactDustFields";
+    this.root.add(this.group);
+    // 尘团着色器用 gl_FragCoord / uResolution 去取预通道深度：降分辨率时这是低分辨率靶的尺寸，平时跟着共享的那份。
+    this.resolution = { value: new THREE.Vector2(1, 1) };
+    this.halfMode = false;
+    this.upsample = null;     // 主场景里的全屏片（降分辨率模式才有、才显示）
+    this.halfFrames = 0;
     this.noise = null;
     this.geometry = new THREE.BoxGeometry(1, 1, 1);
     this.frame = 0;
     this.nextSeed = 1;
     this.created = 0;
     this.floatLinear = null;
+    this.materialPool = [];   // 用完的材质（不销毁：程序要一直留着，见文件头）
+    this.uploads = 0;         // 取证：一共传了几次网格
   }
 
   /** 第一次用之前把噪声算好（开扬尘的那一刻调，免得第一发炮弹那一帧卡 100 ms）。 */
@@ -521,9 +578,12 @@ export class DustFieldSystem {
       oldest.field.time = Math.max(oldest.field.time, L.life - L.fadeS);
     }
     const N = field.N;
-    const material = MakeMaterial(this.shared, this.noise.texture, this.quality);
-    const surgeTex = MakeTexture(N), loftTex = MakeTexture(N), skinTex = MakeTexture(N);
-    material.uniforms.uSurge.value = surgeTex; material.uniforms.uLoft.value = loftTex; material.uniforms.uSkin.value = skinTex;
+    // 每个随团写的统一变量下面与 Update 都会重写，回收来的材质直接用。
+    const material = this.materialPool.pop() || MakeMaterial(this.shared, this.noise.texture, this.quality);
+    material.uniforms.uResolution = this.resolution;
+    this._ApplyMode(material);
+    const sets = [0, 1].map(() => ({ surge: MakeTexture(N), loft: MakeTexture(N), skin: MakeTexture(N) }));
+    material.uniforms.uSurge.value = sets[0].surge; material.uniforms.uLoft.value = sets[0].loft; material.uniforms.uSkin.value = sets[0].skin;
     material.uniforms.uSkinPatch.value = field.T.shock.patch;
     {
       const S = field.T.shock;
@@ -551,8 +611,10 @@ export class DustFieldSystem {
     mesh.userData.skipNormalDepth = true;
     mesh.visible = false;
     mesh.onBeforeRender = (renderer) => this._CheckFloatLinear(renderer);
-    this.root.add(mesh);
-    const entry = { field, mesh, material, surgeTex, loftTex, skinTex, origin: { x: field.minX, z: field.minZ }, retiring: false };
+    mesh.layers.set(this.halfMode ? GROUND_DUST_LAYER : 0);
+    this.group.add(mesh);
+    const entry = { field, mesh, material, sets, back: 0, packed: false, slot: this.created % 4, info: null,
+      origin: { x: field.minX, z: field.minZ }, retiring: false };
     this.fields.push(entry);
     this.created++;
     return entry;
@@ -562,39 +624,135 @@ export class DustFieldSystem {
   _CheckFloatLinear(renderer) {
     if (this.floatLinear !== null) return;
     this.floatLinear = !!renderer.extensions?.has?.("OES_texture_float_linear");
-    if (!this.floatLinear) for (const e of this.fields) {
-      for (const t of [e.surgeTex, e.loftTex, e.skinTex]) { t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; }
+    if (!this.floatLinear) for (const e of this.fields) for (const set of e.sets) {
+      for (const t of [set.surge, set.loft, set.skin]) { t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; }
     }
+  }
+
+  /** 有没有要画的尘（降分辨率那一趟据此决定跑不跑）。 */
+  HasVisible() { return this.fields.some((e) => e.mesh.visible); }
+
+  /** 一只尘团材质按当前模式设混合：降分辨率靶里 alpha 要累积透过率，主场景里保留目标 alpha。 */
+  _ApplyMode(material) {
+    material.blendDstAlpha = this.halfMode ? THREE.OneMinusSrcAlphaFactor : THREE.OneFactor;
+  }
+
+  /**
+   * 降分辨率开 / 关（Script_PostGroundDust 每帧：跑了 = 开，被跳过 = 关）。开：尘团挪到专用层（主场景那一趟看不见），
+   * 全屏片显示；关：尘团回第 0 层按原样全分辨率画，全屏片收起，分辨率跟回共享的那份。
+   */
+  SetHalfMode(on) {
+    const half = !!on;
+    if (!half) this.resolution.value.copy(this.shared.uResolution.value);
+    if (half === this.halfMode) { if (this.upsample) this.upsample.visible = half && this.HasVisible(); return; }
+    this.halfMode = half;
+    for (const e of this.fields) { e.mesh.layers.set(half ? GROUND_DUST_LAYER : 0); this._ApplyMode(e.material); }
+    for (const material of this.materialPool) this._ApplyMode(material);
+    if (this.upsample) this.upsample.visible = half && this.HasVisible();
+  }
+
+  _EnsureUpsample() {
+    if (this.upsample) return this.upsample;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3));
+    const material = new THREE.ShaderMaterial({
+      vertexShader: UPSAMPLE_VERTEX, fragmentShader: UPSAMPLE_FRAGMENT,
+      uniforms: {
+        uDustHalf: { value: null }, uNormalDepth: this.shared.uNormalDepth, uDepthValid: this.shared.uDepthValid,
+        uFullRes: { value: new THREE.Vector2(1, 1) }, uHalfRes: { value: new THREE.Vector2(1, 1) },
+      },
+      transparent: true, depthTest: false, depthWrite: false,
+      // hdr = hdr·T + C（靶里存的是预乘散射 + 累积透过率）；目标 alpha 原样保留
+      blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.SrcAlphaFactor,
+      blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor,
+      blendEquation: THREE.AddEquation, blendEquationAlpha: THREE.AddEquation,
+    });
+    material.name = "GroundImpactDustUpsample";
+    material.userData.preserveTargetAlpha = true;
+    MarkNoPrepass(material);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.name = "GroundImpactDustUpsample";
+    // 与原来尘团盒子同一个位置（排在枪口焰、火星、烟这些透明物之前），前后关系不变。
+    mesh.frustumCulled = false; mesh.matrixAutoUpdate = false; mesh.renderOrder = 6;
+    mesh.userData.skipNormalDepth = true;
+    mesh.visible = false;
+    this.root.add(mesh);
+    this.upsample = mesh;
+    return mesh;
+  }
+
+  /**
+   * Script_PostGroundDust.Render：把所有尘团画进低分辨率靶（清成「没有散射、全透」），再让主场景里的全屏片去放大它。
+   * 渲染器的目标 / 清屏色 / autoClear 与相机的层都原样还回去。
+   */
+  RenderHalf(renderer, camera, target, fullWidth, fullHeight) {
+    this.SetHalfMode(true);
+    this.resolution.value.set(target.width, target.height);
+    const prevTarget = renderer.getRenderTarget(), prevAuto = renderer.autoClear, prevAlpha = renderer.getClearAlpha();
+    const prevColor = renderer.getClearColor(this._clearColor ??= new THREE.Color()), prevLayers = camera.layers.mask;
+    renderer.setRenderTarget(target);
+    renderer.setClearColor(0x000000, 1);
+    renderer.clear(true, false, false);
+    renderer.autoClear = false;
+    camera.layers.set(GROUND_DUST_LAYER);
+    try { renderer.render(this.group, camera); }
+    finally {
+      camera.layers.mask = prevLayers;
+      renderer.autoClear = prevAuto;
+      renderer.setClearColor(prevColor, prevAlpha);
+      renderer.setRenderTarget(prevTarget);
+    }
+    const quad = this._EnsureUpsample();
+    const u = quad.material.uniforms;
+    u.uDustHalf.value = target.texture;
+    u.uFullRes.value.set(fullWidth, fullHeight);
+    u.uHalfRes.value.set(target.width, target.height);
+    quad.visible = true;
+    this.halfFrames++;
   }
 
   Update(dt, wind = null) {
     this.frame = (this.frame + 1) % 4096;
+    // 不在降分辨率模式时，尘团取深度用的分辨率跟着共享的那份（主靶尺寸）。
+    if (!this.halfMode) this.resolution.value.copy(this.shared.uResolution.value);
     for (let k = this.fields.length - 1; k >= 0; k--) {
       const e = this.fields[k], field = e.field;
       if (wind) { field.wind.x = wind.x; field.wind.z = wind.z; }
       const alive = dt > 0 ? field.Step(dt) : !field.finished;
       if (!alive) { this._Remove(k); continue; }
       if (!field.ready) { e.mesh.visible = false; continue; }
-      const info = field.Pack(e.surgeTex.image.data, e.loftTex.image.data, e.skinTex.image.data);
-      if (this.floatLinear === false) for (const t of [e.surgeTex, e.loftTex, e.skinTex]) t.minFilter = t.magFilter = THREE.NearestFilter;
-      e.surgeTex.needsUpdate = true; e.loftTex.needsUpdate = true; e.skinTex.needsUpdate = true;
       const u = e.material.uniforms;
-      u.uSurgeRect.value.set(info.surgeRect[0], info.surgeRect[1], 1 / info.surgeRect[2], 1 / info.surgeRect[3]);
-      u.uLoftRect.value.set(info.loftRect[0], info.loftRect[1], 1 / info.loftRect[2], 1 / info.loftRect[3]);
-      u.uBaseY.value = info.baseY;
-      u.uSkinRect.value.set(info.skinRect[0], info.skinRect[1], 1 / info.skinRect[2], 1 / info.skinRect[3]);
-      u.uSkinShape.value.set(info.skinH, info.skinLift, info.shockR, info.shockV);
-      u.uImpact.value.set(info.impact[0], info.impact[1]);
+      // 上传节流（GROUND_IMPACT_RENDER.upload）：新的一团每帧传，之后隔帧、再之后每几帧传一次（各团错开）；
+      // 写进「不在画的那一套」贴图再换上去，显卡读上一帧那套时不用停下来等。网格范围这几项跟着这一次的数据走。
+      const U = RENDER.upload, age = field.time;
+      const every = age < U.fullS ? 1 : age < U.halfS ? 2 : U.slowEvery;
+      if (!e.packed || (this.frame + e.slot) % every === 0) {
+        const set = e.sets[e.back];
+        const info = field.Pack(set.surge.image.data, set.loft.image.data, set.skin.image.data);
+        for (const t of [set.surge, set.loft, set.skin]) {
+          if (this.floatLinear === false) t.minFilter = t.magFilter = THREE.NearestFilter;
+          t.needsUpdate = true;
+        }
+        u.uSurge.value = set.surge; u.uLoft.value = set.loft; u.uSkin.value = set.skin;
+        e.back ^= 1; e.packed = true; e.info = info; this.uploads++;
+        u.uSurgeRect.value.set(info.surgeRect[0], info.surgeRect[1], 1 / info.surgeRect[2], 1 / info.surgeRect[3]);
+        u.uLoftRect.value.set(info.loftRect[0], info.loftRect[1], 1 / info.loftRect[2], 1 / info.loftRect[3]);
+        u.uBaseY.value = info.baseY;
+        u.uSkinRect.value.set(info.skinRect[0], info.skinRect[1], 1 / info.skinRect[2], 1 / info.skinRect[3]);
+        u.uSkinShape.value.set(info.skinH, info.skinLift, info.shockR, info.shockV);
+        u.uImpact.value.set(info.impact[0], info.impact[1]);
+        // 采样坐标的三维扭曲会把尘往外推出数据的范围（大炸弹七八米）：盒子按扭曲幅度留余量，不然尘团顶被盒顶切成一块平盖
+        const pad = u.uWarp.value * 1.6;
+        u.uBoxMin.value.set(info.minX - pad, info.minY, info.minZ - pad);
+        u.uBoxMax.value.set(info.maxX + pad, info.maxY + pad, info.maxZ + pad);
+      }
+      const info = e.info, fade = field.Fade();
       this._FireUniforms(u, field, info);
-      // 采样坐标的三维扭曲会把尘往外推出数据的范围（大炸弹七八米）：盒子按扭曲幅度留余量，不然尘团顶被盒顶切成一块平盖
-      const pad = u.uWarp.value * 1.6;
-      u.uBoxMin.value.set(info.minX - pad, info.minY, info.minZ - pad);
-      u.uBoxMax.value.set(info.maxX + pad, info.maxY + pad, info.maxZ + pad);
       u.uAge.value = field.time;
-      u.uFade.value = info.fade;
+      u.uFade.value = fade;
       u.uDrift.value.set(field.loftX - e.origin.x, 0, field.loftZ - e.origin.z);
       u.uFrame.value = this.frame;
-      e.mesh.visible = info.fade > 0.001;
+      e.mesh.visible = fade > 0.001;
     }
   }
 
@@ -618,7 +776,10 @@ export class DustFieldSystem {
   _Remove(k) {
     const e = this.fields[k];
     e.mesh.removeFromParent();
-    e.material.dispose(); e.surgeTex.dispose(); e.loftTex.dispose(); e.skinTex.dispose();
+    for (const set of e.sets) { set.surge.dispose(); set.loft.dispose(); set.skin.dispose(); }
+    // 材质回收（不 dispose：最后一只一销毁，着色器程序跟着删，下一发重编）。池子封顶，多出来的才销毁。
+    e.material.uniforms.uSurge.value = e.material.uniforms.uLoft.value = e.material.uniforms.uSkin.value = null;
+    if (this.materialPool.length < RENDER.maxFields + 2) this.materialPool.push(e.material); else e.material.dispose();
     this.fields.splice(k, 1);
   }
 
@@ -626,13 +787,18 @@ export class DustFieldSystem {
 
   Inspect() {
     return {
-      live: this.fields.length, created: this.created, floatLinear: this.floatLinear,
+      live: this.fields.length, created: this.created, floatLinear: this.floatLinear, uploads: this.uploads, pooled: this.materialPool.length,
+      halfMode: this.halfMode, halfFrames: this.halfFrames,
       fields: this.fields.map((e) => e.field.Inspect()),
     };
   }
 
   Dispose() {
     this.Clear();
+    for (const material of this.materialPool) material.dispose();
+    this.materialPool.length = 0;
+    if (this.upsample) { this.upsample.removeFromParent(); this.upsample.geometry.dispose(); this.upsample.material.dispose(); this.upsample = null; }
+    this.group.removeFromParent();
     this.geometry.dispose();
     this.noise?.Release(); this.noise = null;
   }
