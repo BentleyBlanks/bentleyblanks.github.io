@@ -563,7 +563,12 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 ### 6.3 地形与水的样子
 
 - 地形：高度色带（低处偏冷偏暗、高处偏暖偏亮，幅度克制）+ 白盒网格线；没有贴图、草、碎石、壕沟表面网格。
-- 水：北沙河等水块要读得出是水（淡蓝半透明），不能是灰盒子。
+- 水：北沙河等水块要读得出是水，不能是灰盒子。第一关旧版仍走 `BuildWhiteboxWater`（正片河水着色）。
+- **河沟示意（2026-10-22，`Script_EditorBlockoutCreek.mjs`，数据 `Data_Tuning_Whitebox.BLOCKOUT_CREEK_LOOK`）**：用户「河汊子最好简单的表现一下他的材质，不然我想象不出来」。只改编辑器这一层，不碰 Space / Scene 生成器 / 场景 JSON：
+  - 文件场景的水块（`semantic "water"` / `blockoutWater`）顶面铺浑水贴图（`Texture/Editor/Texture_EditorCreekWaterBase.webp`，世界 xz 平铺 2 m、不透明度 0.88），网格 `BlockoutWater` 标 `whiteboxWater` + `whiteboxTerrain`（白盒画质「保留地形贴图」原样画，不换成蓝灰水色）。
+  - 地面上**挨着水块的那一圈**按水块自己认（不针对哪一关写坐标）：逐顶点算到水块脚印（含 `ry` 旋转）的水平距离 `near`（≤ 3.5 m 满、8 m 淡到 0）、比水面高多少 `low`（≤ 2.2 m 满、3.4 m 淡到 0）、坡度 `steep`（1 − 法线 y 从 0.3 起、0.55 满）；泥权重 = `near × max(low, steep)`，写进顶点属性 `blockoutMud`。河汊子（沟深 3、水深 1、壁 2.5 m）：沟底、两壁、岸沿全是泥，岸上再往外约 4.5 m 渐淡。没有水块的关卡全 0、逐位不变。
+  - 地面材质挂 `MUD_PATCH`（装在米格线补丁前面）：按权重把高度色带混成湿泥贴图（`Texture_EditorCreekMudBase.webp`，世界 xz 俯视投影 1.5 m 一张；三向投影在 45° 坡上出人字纹，弃用）、粗糙度压到 0.55，泥上的米格线再压一道（褐色上 15% 看不清）。
+  - 两张贴图 Lovart 快速模式 GPT Image 2 生成（提示词 `_import/Prompts/Texture_EditorCreek*.txt`，清单 `EditorCreekMud / EditorCreekWater`，tier=editor），本地边缘交叉淡化去接缝后缩到 1024 webp；源图在 `tmp/EditorCreekTex/`（不进仓库）。截图 `_shots/EditorBlockoutCreek/`。
 - 方块：沿用默认白盒画质的灰网格材质。
 - **地面涂色（2026-10-20）**：场景文件写了 `paint`（§2.2）时，`DressWorld` 先按高度查表上色，再逐顶点把顶点的**世界** (x, z)（`mesh.matrixWorld` 换算；地面网格本来就在原点）丢给 `layout.groundPaint.Blend` 混进涂色（sRGB 里混，再换线性写进顶点色）；覆盖度 0 的顶点照旧写查表色。地面网格 0.5 m 一个顶点（`terrain.cellM`），20–60 m 宽的田块边界清楚。没有 `paint` 的关卡不进这条路，顶点色逐位不变。
 - **块保留语义色（2026-10-20）**：场景文件 `colorSemantics` 列出的 semantic，`DressWorld` 把用这些语义材质的静态块网格标 `whiteboxCharacter`、补米格线，并让白盒渲染器重判一次（`post.whiteboxScene.Invalidate()`）；其它块照旧灰网格。

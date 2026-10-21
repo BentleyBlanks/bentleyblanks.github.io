@@ -94,6 +94,9 @@ const ZB26_AUTHOR_ATLAS_BYTES = 640 * 1024;
 // bytes including its lossless story mask. PBR maps are rebuild sources and
 // embedded in the GLB; this allowance adds no boot/level network requests.
 const SINGLE_BLANKET_ASSET_BYTES = 1024 * 1024;
+// 2026-10-22 白盒关卡编辑器的河沟示意两张反照率（泥 ~300 KB、水 ~60 KB，tier=editor）：只有 ?editor=blockout 下载，
+// 不进 boot / level 预算；全目录原本就顶着上限（63.79 / 63.81 MB），按它们的体积单列 384 KB。
+const EDITOR_CREEK_SKETCH_BYTES = 384 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -112,9 +115,10 @@ export const TEXTURE_BUDGETS = Object.freeze({
     // 2026-10-05: seven campaign maps + three historical papers add about 4 MB.
     // Only the selected pair is requested (< 1 MB), not the whole campaign set.
     lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES, // Also includes lossless command-room irradiance.
-    editor: 0.25 * 1024 * 1024,
+    // editor：2026-10-22 白盒编辑器河沟示意加两张 1024 反照率（泥 ~300 KB、水 ~60 KB），只在 ?editor=blockout 下载，玩家不碰；上限抬到 1 MB。
+    editor: 1 * 1024 * 1024,
   }),
-  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + SINGLE_BLANKET_ASSET_BYTES,
+  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES,
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -1465,6 +1469,29 @@ export const TEXTURE_MANIFEST = Object.freeze([
       ["Editor/Icon_Orch_Tank.png", "Image", 64, 64],
       ["Editor/Icon_Orch_Wave.png", "Image", 64, 64],
       ["Editor/Icon_Orch_Zone.png", "Image", 64, 64],
+    ],
+  },
+  // ——— 2026-10-22 白盒关卡编辑器的河沟示意（Script_EditorBlockoutCreek）：只有反照率的示意贴图，叠在白盒地面 / 水面上，正片不用 ———
+  {
+    id: "EditorCreekMud", kind: "decal", tier: "editor",
+    source: { provider: "lovart", date: "2026-10-22", ref: "thread 4b44ecda-1975-48ed-ae3d-6387df233e36（快速模式，GPT Image 2）",
+      prompt: "_import/Prompts/Texture_EditorCreekMud.txt",
+      note: "湿的黄褐色河泥 / 陡坎泥土（干裂、草根、水渍），俯视正交无光影；源图 2048 方在 tmp/EditorCreekTex/mud（不进仓库），本地按边缘交叉淡化 48 px 去接缝后缩到 1024 存 webp" },
+    consumers: [{ file: "Data_Tuning_Whitebox.mjs", token: "Texture_EditorCreekMudBase" },
+      { file: "Script_EditorBlockoutCreek.mjs", token: "BLOCKOUT_CREEK_LOOK.mud" }],
+    files: [
+      ["Editor/Texture_EditorCreekMudBase.webp", "Base", 1024, 1024],
+    ],
+  },
+  {
+    id: "EditorCreekWater", kind: "decal", tier: "editor",
+    source: { provider: "lovart", date: "2026-10-22", ref: "thread 0e3b0c51-61e2-4820-a02f-e2ded4dda9b9（快速模式，GPT Image 2）",
+      prompt: "_import/Prompts/Texture_EditorCreekWater.txt",
+      note: "浑浊的浅河水面（黄褐偏绿、细波纹、漂着草屑），俯视正交无反光；源图在 tmp/EditorCreekTex/water（不进仓库），边缘交叉淡化 96 px 去接缝后缩到 1024 存 webp" },
+    consumers: [{ file: "Data_Tuning_Whitebox.mjs", token: "Texture_EditorCreekWaterBase" },
+      { file: "Script_EditorBlockoutCreek.mjs", token: "BLOCKOUT_CREEK_LOOK.water" }],
+    files: [
+      ["Editor/Texture_EditorCreekWaterBase.webp", "Base", 1024, 1024],
     ],
   },
   {

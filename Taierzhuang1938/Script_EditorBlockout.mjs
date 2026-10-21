@@ -48,8 +48,8 @@ import { LayoutEditSession, BuildLayoutEditExport, FormatLayoutEdit } from "./Sc
 import { BlockoutPreviz, PREVIZ_KEY } from "./Script_EditorBlockoutPreviz.mjs";
 import { BlockStandSampler } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { BuildWhiteboxWater } from "./Script_FirstLevelWhiteboxLooks.mjs";
+import { BuildCreekWater, MUD_PATCH, PaintWaterEdgeMud, WaterPrints } from "./Script_EditorBlockoutCreek.mjs";
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
-import { MarkNoPrepass } from "./Script_Post.mjs";
 import { STANCE } from "./Data_Tuning_Player.mjs";
 
 const DEG = Math.PI / 180;
@@ -556,11 +556,18 @@ export class EditorBlockout {
     if (now - wait.since >= BLOCKOUT_EDITOR.firstBakeDelayMs && wait.frames >= BLOCKOUT_EDITOR.firstBakeMinFrames) this.StartBake();
   }
 
-  /** §6.3：地面按真实高度的色带上色 + 米格线；水块铺成水面（白盒画质认网格名里的 water）。 */
+  /**
+   * §6.3：地面按真实高度的色带上色 + 米格线；水块铺成水面（白盒画质认网格名里的 water）。
+   * 河沟示意（2026-10-22，Script_EditorBlockoutCreek）：文件场景的水块顶面铺浑水贴图，地面上挨着水块的那一圈
+   * 写泥权重（顶点属性 blockoutMud）、材质挂湿泥补丁；第一关旧版仍走 BuildWhiteboxWater（正片河水着色）。
+   */
   DressWorld(layout) {
     const field = this.game.battlefield;
     if (!field || !layout) return;
     const tint = layout.heightTint || { lo: -4, hi: 6 };
+    const waterBlocks = BlockoutWaterBlocks(layout);
+    const creek = layout.id !== "BlockoutFirstLevel" && waterBlocks.length > 0;
+    const prints = creek ? WaterPrints(waterBlocks, (x, z) => this.groundAt(x, z)) : [];
     // 色带查表：256 档，线性空间。
     const lut = new Float32Array(256 * 3), rgb = [0, 0, 0], color = new THREE.Color();
     for (let i = 0; i < 256; i++) {
@@ -603,12 +610,19 @@ export class EditorBlockout {
         colors.setXYZ(i, lut[k], lut[k + 1], lut[k + 2]);
       }
       colors.needsUpdate = true;
+      // 水边一圈的泥权重：没有水块的关卡也写一份全 0（材质可能跨关共用，补丁读属性不能缺）
+      PaintWaterEdgeMud(mesh, prints);
       const material = mesh.material;
       if (material && !Array.isArray(material)) {
         material.vertexColors = true;
         material.color?.setHex?.(0xffffff);
         const patches = PatchesOf(material) || [];
-        if (!patches.some(patch => patch.key === GRID_PATCH.key)) { ApplyPatches(material, [...patches, GRID_PATCH]); material.needsUpdate = true; }
+        // 泥补丁装在米格线前面：线照画在泥上
+        const wanted = [...patches];
+        let changed = false;
+        if (!wanted.some(patch => patch.key === MUD_PATCH.key)) { wanted.push(MUD_PATCH); changed = true; }
+        if (!wanted.some(patch => patch.key === GRID_PATCH.key)) { wanted.push(GRID_PATCH); changed = true; }
+        if (changed) { ApplyPatches(material, wanted); material.needsUpdate = true; }
       }
     }
     // 场景文件 colorSemantics（§6.3，2026-10-20）：这几种块在白盒画质里保留语义色（标 whiteboxCharacter，白盒渲染器原样画），照样加米格线
@@ -622,39 +636,12 @@ export class EditorBlockout {
       }
       this.host.post?.whiteboxScene?.Invalidate?.();
     }
-    if (!field.waterMesh) {
-      const blocks = BlockoutWaterBlocks(layout);
-      if (blocks.length) {
-        const mesh = layout.id === "BlockoutFirstLevel"
-          ? BuildWhiteboxWater(blocks, this.host.scene, { name: "BlockoutWater" })
-          : this.BuildWaterTops(blocks);
-        if (mesh) { field.waterMesh = mesh; field.meshes.push(mesh); }
-      }
+    if (!field.waterMesh && waterBlocks.length) {
+      const mesh = creek
+        ? BuildCreekWater(waterBlocks, (x, z) => this.groundAt(x, z), this.host.scene, { name: "BlockoutWater" })
+        : BuildWhiteboxWater(waterBlocks, this.host.scene, { name: "BlockoutWater" });
+      if (mesh) { field.waterMesh = mesh; field.meshes.push(mesh); }
     }
-  }
-
-  /** 文件场景的水块：顶面铺一层淡蓝半透明（名字带 water，白盒画质照水面画）。 */
-  BuildWaterTops(blocks) {
-    const positions = [], indices = [];
-    for (const b of blocks) {
-      const c = Math.cos(b.ry || 0), s = Math.sin(b.ry || 0), y = (b.y ?? this.groundAt(b.x, b.z)) + (b.h || 0) / 2;
-      const base = positions.length / 3;
-      for (const [lx, lz] of [[-b.w / 2, -b.d / 2], [b.w / 2, -b.d / 2], [b.w / 2, b.d / 2], [-b.w / 2, b.d / 2]]) {
-        positions.push(b.x + lx * c + lz * s, y, b.z - lx * s + lz * c);
-      }
-      indices.push(base, base + 2, base + 1, base, base + 3, base + 2);
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
-    const material = MarkNoPrepass(new THREE.MeshStandardMaterial({ color: 0x86b8d8, roughness: 0.15, metalness: 0,
-      transparent: true, opacity: 0.62, depthWrite: false, side: THREE.DoubleSide }));
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = "BlockoutWater";
-    mesh.userData.whiteboxWater = true;
-    this.host.scene.add(mesh);
-    return mesh;
   }
 
   /** 换关：回收演员与标记 → JumpToLevel（整片重建）→ 读新配置 → 地图重烘 → 改地址栏。 */
