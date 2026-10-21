@@ -81,6 +81,7 @@ import { FirstLevelSouthMouth } from "./Script_FirstLevelSouthMouth.mjs";
 import { MELEE_RULES } from "./Data_MeleeCombat.mjs";
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 import { SquadMarchAi } from "./Script_SquadMarchAi.mjs";
+import { RearGapM } from "./Script_AllyGaitPolicy.mjs";
 import { FirstLevelMissionView } from "./Script_FirstLevelMissionView.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
@@ -898,6 +899,9 @@ export class FirstLevelMissionRuntime {
     const bunkerRescueLocked = stage === "BunkerRescue" && !this.Has("luoRescueComplete");
     for (const actor of this.squad) {
       InstallMissionSentry(actor);
+      // Who stands in the lane behind him: AllyGait lets a man carry the rifle on his shoulder (muzzle behind it) only when the
+      // lane is clear, so escorting, queueing and a player at his heels keep the muzzle-up carry (Data_Tuning_AllyGait.march*).
+      actor.missionRearGapM=RearGapM(actor.position,actor.yaw,[this.player,...this.squad.filter(other=>other!==actor),...(this.column?.Marchers?.()||[])]);
       if (!actor.missionTrainReady) continue;
       // 16 的分派与 17 的何有田：接了吩咐的人真的走开／留下，接触反应不许盖过去
       //（口径同 02 罗班长掀木架那一处放行）。路线在 FirstLevelReception。

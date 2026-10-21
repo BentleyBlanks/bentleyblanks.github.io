@@ -14,6 +14,8 @@ import path from 'node:path';
 import { LoadGlb, PoseScene, ReadAccessor, ReadAccessorInt, Multiply } from './_import/Script_LugouGlbPose.mjs';
 import { LoadRifleMesh } from './_import/Script_RifleShoulderMarchPrepare.mjs';
 import * as THREE from './vendor/three/build/three.module.js';
+import { MeasureProfile } from './_import/Script_RifleShoulderMarchProfile.mjs';
+import { ALLY_GAIT } from './Data_Tuning_AllyGait.mjs';
 
 const project = import.meta.dirname;
 const clipFile = 'Animation/RifleShoulderMarch/Animation_TengxianRifleShoulderMarch.json';
@@ -766,6 +768,20 @@ export function Measure({ clipPath = path.join(project, clipFile), quiet = false
       for (const n of names) if (!have.has(n)) missing.push(id + ':' + n);
     }
     Check('P', 'every animated bone exists on all seven shared-skeleton bodies', missing.length, missing.length === 0, 0);
+  }
+
+  // ---- the runtime profile (production rule, model units) is fresh, and the runtime loads this revision
+  {
+    const measured = MeasureProfile(data);
+    const stale = ['duration', 'referenceMps', 'contacts'].filter((key) => JSON.stringify(profile[key]) !== JSON.stringify(measured[key]));
+    Check('P', 'profile duration/referenceMps/contacts are the production-rule measurement (run _import/Script_RifleShoulderMarchProfile.mjs)', stale, stale.length === 0, []);
+    Check('P', 'Data_Tuning_AllyGait.marchVersion matches the shipped clip revision', data.revision, data.revision === ALLY_GAIT.marchVersion, ALLY_GAIT.marchVersion);
+    const runtimeMps = measured.referenceMps * ACTOR_SCALE;
+    Check('P', 'the march speed band brackets the clip speed at actor scale (m/s)', runtimeMps, ALLY_GAIT.marchBelowMps < runtimeMps && runtimeMps < ALLY_GAIT.walkMaximumMps, [ALLY_GAIT.marchBelowMps, ALLY_GAIT.walkMaximumMps]);
+    const designRuntime = profile.designReferenceMps * ACTOR_SCALE;
+    Check('P', 'measured toe speed vs design speed (relative)', Math.abs(runtimeMps - designRuntime) / designRuntime, Math.abs(runtimeMps - designRuntime) / designRuntime < 0.03, 0.03);
+    metrics.runtimeProfile = { referenceMpsModelUnits: measured.referenceMps, referenceMpsRuntime: Round(runtimeMps, 3), contacts: measured.contacts,
+      rule: 'toe joint within 3.5 cm of its floor and travelling back > 0.12 m/s for > 75 ms, 120 Hz (Script_LocomotionProfileBake)' };
   }
 
   // ---- profile contacts (runtime footstep data) against the measured grounded runs

@@ -3,8 +3,8 @@
  "revision": "20261021RifleShoulderMarchV1",
  "clip": "RifleShoulderMarch",
  "clipFile": "Animation/RifleShoulderMarch/Animation_TengxianRifleShoulderMarch.json",
- "clipSha256": "7ff4c8dd1b9a5daff64a0c15f321b38cc6bf7931968adeab24e16bf2e99cecb6",
- "clipBytes": 66992,
+ "clipSha256": "cbcdb06019e44a59e8c17cdce75d993c812942c2647a407380316d65515b60ed",
+ "clipBytes": 65950,
  "measuredBy": "Script_RifleShoulderMarchTest.mjs (real skinned mesh of Model_TengxianNra02.glb, half-key-rate samples)",
  "actorScale": 0.91353450904124,
  "limits": {
@@ -102,7 +102,7 @@
    "fps": 60,
    "durationS": 1,
    "samplesPerCycle": 120,
-   "referenceMps": 1.33
+   "referenceMps": 1.329774
   },
   "loop": {
    "durationS": 1,
@@ -113,28 +113,28 @@
    "seamAccelRatio": 0.367
   },
   "slide": {
-   "worstM": 0.00509,
+   "worstM": 0.00504,
    "runs": [
     {
      "foot": "L",
      "pivot": "heel",
      "fromPhase": 0.5083,
      "samples": 53,
-     "slideM": 0.00509
+     "slideM": 0.00504
     },
     {
      "foot": "L",
      "pivot": "ball",
      "fromPhase": 0.5917,
      "samples": 65,
-     "slideM": 0.00219
+     "slideM": 0.00218
     },
     {
      "foot": "R",
      "pivot": "heel",
      "fromPhase": 0.0083,
      "samples": 53,
-     "slideM": 0.00509
+     "slideM": 0.00504
     },
     {
      "foot": "R",
@@ -223,12 +223,12 @@
   },
   "gait": {
    "cadenceStepsPerMin": 120,
-   "referenceSpeedModelMps": 1.33,
+   "referenceSpeedModelMps": 1.329774,
    "worldSpeedMps": 1.215,
    "measuredPivotSpeedModelMps": 1.3296,
-   "strideModelM": 1.33,
-   "stepModelM": 0.665,
-   "stepWorldM": 0.6075,
+   "strideModelM": 1.3298,
+   "stepModelM": 0.6649,
+   "stepWorldM": 0.6074,
    "legLengthWorldM": 0.8692,
    "froude": 0.173,
    "relativeStep": 0.699,
@@ -379,6 +379,29 @@
     -0.0157,
     -0.0102
    ]
+  },
+  "runtimeProfile": {
+   "referenceMpsModelUnits": 1.329774,
+   "referenceMpsRuntime": 1.215,
+   "contacts": {
+    "L": [
+     [
+      0,
+      0.15
+     ],
+     [
+      0.541667,
+      1
+     ]
+    ],
+    "R": [
+     [
+      0.041667,
+      0.65
+     ]
+    ]
+   },
+   "rule": "toe joint within 3.5 cm of its floor and travelling back > 0.12 m/s for > 75 ms, 120 Hz (Script_LocomotionProfileBake)"
   }
  },
  "allPass": true,
@@ -414,7 +437,7 @@
   {
    "id": "G2",
    "label": "support-pivot slide, worst (m)",
-   "value": 0.005089481497886474,
+   "value": 0.005042252671572655,
    "limit": 0.01,
    "pass": true
   },
@@ -517,7 +540,7 @@
   {
    "id": "G5",
    "label": "world speed (m/s)",
-   "value": 1.2150008970248494,
+   "value": 1.2147944382258058,
    "limit": [
     1.2,
     1.5
@@ -527,7 +550,7 @@
   {
    "id": "G5",
    "label": "Froude number",
-   "value": 0.17311744525023995,
+   "value": 0.17305861635022293,
    "limit": [
     0.12,
     0.3
@@ -537,7 +560,7 @@
   {
    "id": "G5",
    "label": "planted-pivot speed matches reference",
-   "value": -0.0003059551764198476,
+   "value": -0.00013605348325229638,
    "limit": 0.03,
    "pass": true
   },
@@ -760,6 +783,37 @@
    "label": "every animated bone exists on all seven shared-skeleton bodies",
    "value": 0,
    "limit": 0,
+   "pass": true
+  },
+  {
+   "id": "P",
+   "label": "profile duration/referenceMps/contacts are the production-rule measurement (run _import/Script_RifleShoulderMarchProfile.mjs)",
+   "value": [],
+   "limit": [],
+   "pass": true
+  },
+  {
+   "id": "P",
+   "label": "Data_Tuning_AllyGait.marchVersion matches the shipped clip revision",
+   "value": "20261021RifleShoulderMarchV1",
+   "limit": "20261021RifleShoulderMarchV1",
+   "pass": true
+  },
+  {
+   "id": "P",
+   "label": "the march speed band brackets the clip speed at actor scale (m/s)",
+   "value": 1.2147944382258058,
+   "limit": [
+    0.85,
+    1.9
+   ],
+   "pass": true
+  },
+  {
+   "id": "P",
+   "label": "measured toe speed vs design speed (relative)",
+   "value": 0.00016992481203028403,
+   "limit": 0.03,
    "pass": true
   },
   {

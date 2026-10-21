@@ -2,7 +2,7 @@
 
 2026-10-21 按用户的三视图参考做的一条原地循环：老式栓动步枪扛在右肩，枪托在右肩前方，枪身斜着越过颈后，
 枪口从左肩后方探出；左臂随步伐摆动，躯干微前倾，头稳。Blender 烘焙，共用 `TengxianHumanoidV1` 骨架（以
-`Model_TengxianNra02.glb` 为参考身体，七套 Tengxian 模型骨名都能绑）。**这轮只交资产、重建脚本、门禁和说明，没有接进游戏运行时**，接入点见末节。
+`Model_TengxianNra02.glb` 为参考身体，七套 Tengxian 模型骨名都能绑）。**已接进 `Script_AllyGait`（2026-10-21 第二轮）**：只在「共享行军层正在带一个人走路、身后没人、没在说话、没有威胁」时才换上，其余一律保持端枪（`AllyCarryWalk`）；规则与实测见末节「运行时接入」。
 
 ## 资产与口径
 
@@ -12,7 +12,8 @@
 | `Data_RifleShoulderMarch.json` | 门禁在发货 clip 上逐项实测的数、限值与是否通过（`--write` 重写；记着 clip 的 sha256） |
 | `../../_import/Script_RifleShoulderMarchBake.py` | 在 Blender 里生成这条 clip（不拷贝任何旧曲线） |
 | `../../_import/Script_RifleShoulderMarchPrepare.mjs` | 把游戏里的中正式步枪网格（tzm）解成明文，给 Blender 渲染联系图和门禁用 |
-| `../../Script_RifleShoulderMarchTest.mjs` | 纯 node 门禁：用发货 GLB 的真实蒙皮、半帧（120 Hz）采样，独立于烘焙脚本 |
+| `../../_import/Script_RifleShoulderMarchProfile.mjs` | **烘完 Blender 之后必跑的一步**：按生产口径（`Script_LocomotionProfileBake` 那条规则：趾关节离地面 <3.5 cm 且向后 >0.12 m/s 持续 >75 ms，120 Hz，模型米）在发货 GLB 上量出 `profiles.RifleShoulderMarch` 的 `duration / referenceMps / contacts` 写回 clip JSON；Blender 里的设计值留在 `designReferenceMps / designContacts`。`--verify` 只检查不写 |
+| `../../Script_RifleShoulderMarchTest.mjs` | 纯 node 门禁：用发货 GLB 的真实蒙皮、半帧（120 Hz）采样，独立于烘焙脚本；另核 profile 是否是现行规则量出来的、`Data_Tuning_AllyGait.marchVersion` 是否等于 clip 的 `revision` |
 
 - 单位：glTF 米（模型米）。NRA02 在运行时被缩放到 1.66 m（×0.9135），所以文中「世界」数 = 模型数 × 0.9135；**步枪保持真实尺寸**，在模型坐标里是网格的 1.0946 倍。
 - `AllyRifle` 道具轨沿用 `Animation/AllyGait` 的约定：rig 根局部、原点 = 枪的握点（`gripR`，运行时放在右手四指根的质心）、枪口 = −Z、+Y = 枪背（准星朝上）。运行时位置会被真实右掌覆盖，朝向取自这条轨。
@@ -28,10 +29,11 @@ node scripts/Script_BlenderMcp.mjs start --task RifleShoulderMarch
 node scripts/Script_BlenderMcp.mjs exec --code "import os; os.environ['RIFLE_MARCH_PROJECT']=r'<worktree>/Taierzhuang1938'; os.environ['RIFLE_MARCH_SAVE']='1'"
 node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_import/Script_RifleShoulderMarchBake.py --timeout 900
 node scripts/Script_BlenderMcp.mjs stop
+node Taierzhuang1938/_import/Script_RifleShoulderMarchProfile.mjs  # 量运行时用的 profile 写回 clip（重烘后必须重跑）
 node Taierzhuang1938/Script_RifleShoulderMarchTest.mjs --write     # 重写 Data_RifleShoulderMarch.json
 ```
 
-连烘两次 sha256 逐字节相同（`7ff4c8dd…`）。可编辑工程 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\RifleShoulderMarch_20261021\Scene_RifleShoulderMarch.blend`
+连烘两次 sha256 逐字节相同（Blender 直出 `7ff4c8dd…`；写入量出来的 profile 后发货文件是 `cbcdb060…`）。可编辑工程 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\RifleShoulderMarch_20261021\Scene_RifleShoulderMarch.blend`
 （不进仓库）。生成器里所有数值都在 `GAIT` 一张表里，`RIFLE_MARCH_PARAMS_FILE` 可临时覆盖做对比。
 
 ## 生成方法
@@ -117,9 +119,36 @@ node Taierzhuang1938/Script_RifleShoulderMarchTest.mjs --write     # 重写 Data
 6. Froude 数 Fr = v²/(g·L)：走→跑转换约 0.5（[Transition from walking to running](https://en.wikipedia.org/wiki/Transition_from_walking_to_running)、[Usherwood, Biology Letters](https://pmc.ncbi.nlm.nih.gov/articles/PMC1617162)）；动能势能交换最优约 0.25（[Tecnalia 综述](https://dsp.tecnalia.com/bitstreams/37fe722d-9756-4a02-8cff-1fa547b5d188/download)）。
 7. 骨盆–胸廓横转：步速增大时由同相趋向反相（Lamoth, Beek & Meijer 2002；[Lamoth 等腰背痛研究](https://research.rug.nl/en/publications/pelvis-thorax-coordination-in-the-transverse-plane-during-walking/)）。具体幅度（肩带 5–14°）是创作取值。
 
-## 建议的游戏接入点（本轮未接）
+## 运行时接入（2026-10-21，已接 `Script_AllyGait`）
 
-- 加载：仿 `Script_AllyGait.mjs` 的 `InstallAllyGait`——它已经会读带 `AllyRifle.*` 道具轨的 clip、把轨道摘出来驱动 `AllyRifle` 辅助物并按真实掌心位置贴枪；这条 clip 的枪轨沿用同名，只需把 `Animation/RifleShoulderMarch/Animation_TengxianRifleShoulderMarch.json` 与 `AllyGait` 那份并列读入，`rig.clipById.set` + `rig.locomotion.profiles['RifleShoulderMarch'] = data.profiles['RifleShoulderMarch']`（`duration / referenceMps / contacts` 就是运行时要的）。
-- 选用：在 `Script_AllyGaitPolicy.SelectAllyGait`（或 `Script_RelaxedGait` 的步态替换层）加一个「行军 / 转场、无威胁、不开火」状态——例如 06–08 的集结与转运、`Script_RelaxedGait` 的 `walkBelowMps = 1.75` 以下走路时，国军步枪兵选 `RifleShoulderMarch` 而不是 `AllyCarryWalk`；参考世界速度 1.215 m/s，运行时速率钳制 0.8–1.25 对应 0.97–1.52 m/s，覆盖常见的班组行进速度。数值放 `Data_Tuning_AllyGait.mjs`。
-- 优先级沿用现有层：导演动作、强制动作、蹲 / 卧 / 跪、白刃、投掷、开火、受击仍抢占；看见威胁立即退回 `AllyCarryWalk` / 端枪。
-- 日军同骨架可借用腿与躯干，但枪（三八式）握点与枪长不同，需另烘一份枪轨。
+接法照 `RifleHoldRun`（d1fbbd51）：`Script_AllyGait.LoadRifleShoulderMarch` 读 clip，`InstallAllyGait` 把它并进 `rig.clipById`、`rig.locomotion.profiles.RifleShoulderMarch`（`duration / referenceMps / contacts`，已按生产口径量过，见上），枪轨 `AllyRifle.*` 与 `AllyGait` 那份一样摘出来驱动 `AllyRifle` 辅助物，位置由真实右掌覆盖、朝向取自轨道；`_ApplyRiggedAim` 对它同 `AllyCarryWalk`（记着的瞄准不把枪从肩上抬下来，真开火才还给原瞄准层）。缓存版本 `Data_Tuning_AllyGait.marchVersion` 必须等于 clip 的 `revision`（门禁核对）。
+
+**什么时候才换上（`Script_AllyGaitPolicy.SelectAllyGait`，全部成立才换）**
+
+1. 国军步枪兵、基础动作是 `RifleRun`（`AdvanceFire` 站着、蹲、卧、背枪行军 `BackRifleRun`、日军都不碰），无威胁、不在戒备保持、没开火、没有任何优先姿态（担架、白刃、投掷、倒地、导演/任务接管…）。
+2. **共享行军层正在带他走路**：`soldier.squadMarchCommand` 是本帧新写的（`marchCommandFreshS` = 0.35 s 内更新过），而且 `status === 'running'`（等待、起步、刹车、停顿、让路、追赶、到达都不算）。这是区分「赶路 / 行军」与「护送、说话、等待」的依据：护送、说话、等人时他要么不在行军层里，要么在 `waiting` 之类的状态，一律不换。
+3. 没在说话：`speakerGesture.active / pending` 为空。
+4. **身后 4 m 车道内没人**：`missionRearGapM ≥ marchRearClearM`（4 m），车道宽 `marchRearLaneM` = 1.6 m。扛在肩上的枪口朝后，指着身后的人；09-27 的口径（`Animation/AllyGait/Data_AllyGait.md`）要求这类场合保持枪口朝上的端枪。`missionRearGapM` 由 `Script_FirstLevelMissionRuntime.UpdateSquad` 每帧写（玩家、其他班员、任务纵队里的人，取正后方最近一个；没写这个量就当作有人，宁可少用）。
+5. 速度在 `marchAboveMps` 1.05 ～ `walkMaximumMps` 1.9 m/s，带回差：已经在行军时低于 `marchBelowMps` 0.85 才退出；每次切换要连续 `marchSwitchFrames` 24 次更新（0.4 s 级）；超过 `marchHardMaxMps` 2.4 m/s（真在跑）立即退出，不等 24 帧。
+
+不满足就是原来的动作（`AllyCarryWalk` / `AllyCarryStand` / `RifleRun`…），门禁里把 11 种行军层状态（含没有）、说话、车道 3.9 m / 4 m、无车道信息、威胁、戒备保持、开火、蹲、背枪、站定、十五种优先姿态逐条断言过。
+
+**实机（`Script_AllyGaitBrowserTest`，真引擎 + 真蒙皮：NRA02 拿中正式、NRA05 拿汉阳造各一人）**
+
+| 项 | 实测 |
+| --- | --- |
+| 播放 | 动作 id `RifleShoulderMarch`，枪由 clip 放（`carryWeight` 1），`aimApplied` false |
+| 落脚锁 | 站立脚的世界位置误差 ≤ 2×10⁻⁷ m（0.0002 mm；56–71 个站立帧）；鞋底离地 NRA02 3.3–3.6 mm、NRA05 10.9–11.5 mm |
+| 枪在右手里 | 枪相对右手握点的转动 0.0°（整个周期不变，刚性）；握点到枪原点 ≈ 1×10⁻¹⁵ m |
+| 枪口 | 在人身后（后向分量 ≥ 0.76），世界俯仰 17.0–18.9° |
+| 头与颈 | 枪顶点进入头模型内部的个数 0；枪离颈段最近 ≥ 6.8 cm |
+| 躯干前倾 | 2.0–2.3° |
+| 同速有威胁 | 保持 `RifleRun`；身后 2 m 有人 / 没有行军指令：保持 `AllyCarryWalk`；行军中开火：回 `RifleRun` |
+
+枪口世界俯仰比设计值 9.5° 高（17–19°）：运行时枪口节点比枪轴向前再抬一点，加上躯干前倾 6.9° 把它也带上去；仍在「向后向上」的范围内，不指人。
+
+**影响面（要说清）**：当前第一关里班员平时以 `squadSpeedMps` 3.05 m/s 跑、纵队里除队尾外身后都有人，过场走、护送、接待、前沿走路多不经过行军层，所以这条在现在的节奏下**很少触发**（队尾、队形拉开、前面的人减速而身后无人时才会出现）。这是有意的保守：宁可少用，也不顶掉提枪。要多用，应先在任务侧给「赶路」一个明确的状态标记，再放宽第 2、4 条。
+
+**重烘后**：Blender 烘完要跑 `node Taierzhuang1938/_import/Script_RifleShoulderMarchProfile.mjs` 再 `Script_RifleShoulderMarchTest.mjs --write`；新 clip 的 `revision` 与 `marchVersion` 一起改，`index.html` 里 `Script_AllyGait` 等四个模块的缓存戳也要 bump（门禁 `Script_ModuleGraphTest`）。
+
+日军同骨架可借用腿与躯干，但枪（三八式）握点与枪长不同，需另烘一份枪轨；本轮不接。

@@ -114,6 +114,7 @@
 
 - **01 日军先头兵警戒持枪小跑（2026-09-27）**：日兵甲、乙入场从背枪放松走改为双手持枪、站直小跑、头左右扫视（`SetRelaxedGait(...,"alert")`，BlenderMCP 烘的 `Animation/IjaAlertGait` 三条），到位甩枪上背再拖人。口径与重烘见 [IjaAlertGait](Animation/IjaAlertGait/Data_IjaAlertGait.md)，门禁 `Script_IjaAlertGaitTest`。
 - **双手持枪跑动 `RifleHoldRun`（2026-10-21，已接 AllyGait）**：共用骨架上用 Blender 从质心抛物线反解出的一条原地跑循环（3.2 m/s、167 步/分、前倾 19°、双手握中正式枪）。国军步枪兵不戒备、速度 > 2.6 m/s 时由 `Script_AllyGaitPolicy.SelectAllyGait` 换上（威胁/开火/蹲/各优先姿态、P012 背枪行军照旧）。口径、实测、出处与接入细节见 [RifleHoldRun](Animation/RifleHoldRun/Data_RifleHoldRun.md)，门禁 `Script_RifleHoldRunTest`（animation 域）、`Script_AllyGaitTest` / `Script_AllyGaitBrowserTest`（allyGait 域）。
+- **扛枪行军走 `RifleShoulderMarch`（2026-10-21，已接 AllyGait）**：共用骨架上用 Blender 烘的一条原地循环（枪扛右肩、1.21 m/s、120 步/分）。**只在共享行军层正带他走路（`squadMarchCommand.status==="running"`）、身后 4 m 车道无人、没在说话、无威胁、速度 1.05–1.9 m/s 时**由 `SelectAllyGait` 换上；护送、谈话、等待、蹲、开火、背枪行军、日军、持枪跑动一律照旧（肩上的枪口朝后，指着身后的人，09-27 口径要求端枪）。当前任务节奏下很少触发（宁可少用）。口径、规则、实测见 [RifleShoulderMarch](Animation/RifleShoulderMarch/Data_RifleShoulderMarch.md)，门禁 `Script_RifleShoulderMarchTest`（animation 域，含「profile 是现行规则量出来的」）、`Script_AllyGaitTest` / `Script_AllyGaitBrowserTest`。重烘 Blender 后必须再跑 `_import/Script_RifleShoulderMarchProfile.mjs`。
 
 - **01 日兵甲翻越塌顶木、从木头底下拖出顺子（2026-09-27，已被 2026-09-27 改稿取代：不再拖出）**：[翻越与倒拖](docs/Data_OpeningVaultHaul20260927.md)。Found 不再穿木头走进坑，DragOut 不再背对顺子往前走；三条新动作只烘 IJA02，烘焙 spec 新增 `groundWeight`。
 

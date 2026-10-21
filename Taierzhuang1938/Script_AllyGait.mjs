@@ -2,7 +2,7 @@
 import { AnimationClip, Object3D, Vector3, Quaternion } from 'three';
 import { ALLY_GAIT as C } from './Data_Tuning_AllyGait.mjs';
 import { AllyGaitThreat, SelectAllyGait, CrouchWalkBySpeed } from './Script_AllyGaitPolicy.mjs';
-let promise, holdRunPromise;
+let promise, holdRunPromise, marchPromise;
 export function LoadAllyGait() {
   return promise ||= fetch(`./Animation/AllyGait/Animation_TengxianAllyGait.json?v=${C.version}`)
     .then(r => { if (!r.ok) throw new Error('AllyGait HTTP '+r.status); return r.json(); });
@@ -21,6 +21,18 @@ export function LoadRifleHoldRun() {
       return {clip,profile:{duration:p.duration,referenceMps:p.referenceMps,contacts:p.contacts}};
     })
     .catch(error=>{console.warn('[RifleHoldRun]',error);return null;});
+}
+// RifleShoulderMarch (Animation/RifleShoulderMarch, Blender, _import/Script_RifleShoulderMarchBake.py): the walk with the rifle on the
+// right shoulder. Optional like the hold run. Unlike it, the clip's AllyRifle weapon track IS used (placed like the carry clips'):
+// the rifle rides on the shoulder, which the actor's own two-hand rule cannot make.
+export function LoadRifleShoulderMarch() {
+  return marchPromise ||= fetch(`./Animation/RifleShoulderMarch/Animation_TengxianRifleShoulderMarch.json?v=${C.marchVersion}`)
+    .then(r => { if (!r.ok) throw new Error('RifleShoulderMarch HTTP '+r.status); return r.json(); })
+    .then(data => {
+      const json=data.clips.find(clip=>clip.name==='RifleShoulderMarch'),p=data.profiles.RifleShoulderMarch;
+      return {json,profile:{duration:p.duration,referenceMps:p.referenceMps,contacts:p.contacts}};
+    })
+    .catch(error=>{console.warn('[RifleShoulderMarch]',error);return null;});
 }
 let crouchWalk=null;
 // IJA riflemen share TengxianHumanoidV1 (identical rest bones), so the ready crouch walk plays
@@ -48,7 +60,7 @@ export async function InstallAllyGait(soldier) {
   const actor=soldier?.actor, rig=actor?.characterRig;
   if (rig?.modelId?.startsWith('TengxianIja')) return InstallCrouchWalk(soldier);
   if (!rig?.modelId?.startsWith('TengxianNra') || rig.allyGaitInstalled) return;
-  const [data,holdRun]=await Promise.all([LoadAllyGait(),LoadRifleHoldRun()]);
+  const [data,holdRun,march]=await Promise.all([LoadAllyGait(),LoadRifleHoldRun(),LoadRifleShoulderMarch()]);
   if (rig.disposed || rig.allyGaitInstalled) return;
   rig.allyGaitInstalled=true;
   if (holdRun) {
@@ -56,9 +68,11 @@ export async function InstallAllyGait(soldier) {
     rig.locomotion.profiles={...rig.locomotion.profiles,RifleHoldRun:holdRun.profile};
   }
   const holdRunMemory={running:false,frames:0};
+  const marchMemory={running:false,frames:0,status:null,talking:false};
+  if (march) rig.locomotion.profiles={...rig.locomotion.profiles,RifleShoulderMarch:march.profile};
   const helper=new Object3D();helper.name='AllyRifle';rig.root.add(helper);
   const propTracks=new Map();
-  for (const json of data.clips) {
+  for (const json of march?[...data.clips,march.json]:data.clips) {
     const clip=AnimationClip.parse(json);
     propTracks.set(clip.name,clip.tracks.filter(t=>t.name.startsWith('AllyRifle.')).map(t=>({property:t.name.split('.')[1],sample:t.createInterpolant()})));
     clip.tracks=clip.tracks.filter(t=>!t.name.startsWith('AllyRifle.'));
@@ -66,17 +80,25 @@ export async function InstallAllyGait(soldier) {
   }
   rig.locomotion.profiles={...rig.locomotion.profiles,
     ...Object.fromEntries(Object.entries(data.profiles).filter(([,p])=>p.referenceMps>0))};
-  let readySeconds=0;
+  let readySeconds=0,commandSeen=null,commandAge=Infinity;
   const select=rig._ActionForState,update=rig.Update;
   rig._ActionForState=function SelectAllyLocomotion(state={}) {
     const id=select.call(this,state);
     if (this.forcedClip || actor.ragdollState || !this.CanPlayInfantry()) return id;
-    const chosen=SelectAllyGait(soldier,state,id,readySeconds,holdRun?holdRunMemory:null);
-    if (chosen.startsWith('Ally')) this.p012BackRifleActive=false;
+    if (march) {
+      // The shared march layer replaces its command object on every update: one that stopped changing is a stale leftover.
+      marchMemory.status=commandSeen?.controlled&&commandAge<=C.marchCommandFreshS?commandSeen.status:null;
+      const gesture=this.speakerGesture;
+      marchMemory.talking=!!(gesture&&(gesture.active||gesture.pending));
+    }
+    const chosen=SelectAllyGait(soldier,state,id,readySeconds,holdRun?holdRunMemory:null,march?marchMemory:null);
+    if (chosen.startsWith('Ally') || chosen==='RifleShoulderMarch') this.p012BackRifleActive=false;
     return chosen;
   };
   rig.Update=function UpdateAllyLocomotion(dt,state={}) {
     readySeconds=AllyGaitThreat(soldier,state)?C.readyHoldS:Math.max(0,readySeconds-Math.max(0,dt));
+    const command=soldier.squadMarchCommand;
+    if (command!==commandSeen) { commandSeen=command; commandAge=0; } else commandAge+=Math.max(0,dt);
     return update.call(this,dt,state);
   };
   const point=new Vector3(),rotation=new Quaternion();
@@ -105,8 +127,8 @@ export async function InstallAllyGait(soldier) {
   };
   actor._ApplyRiggedAim=function AimAllyRifle(state) {
     // Carry clips release the left arm; the inherited AI aim value must not raise it again. The fast calm run holds the rifle
-    // with both hands across the chest the same way: only real fire hands the arms to the aim layer.
-    if ((rig.currentId==='RifleHoldRun' || rig.currentId.includes('Carry') && rig.currentId.startsWith('Ally')) && !state.firing) {
+    // with both hands across the chest, the march carries it on the shoulder, the same way: only real fire hands the arms to the aim layer.
+    if ((rig.currentId==='RifleHoldRun' || rig.currentId==='RifleShoulderMarch' || rig.currentId.includes('Carry') && rig.currentId.startsWith('Ally')) && !state.firing) {
       rig.speakerGesture?.AfterActorAim();
       return;
     }

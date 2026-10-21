@@ -7,6 +7,7 @@ Run through BlenderMCP (RIFLE_MARCH_PROJECT = the absolute Taierzhuang1938 direc
     node scripts/Script_BlenderMcp.mjs exec --code "import os; os.environ['RIFLE_MARCH_PROJECT']=r'<worktree>/Taierzhuang1938'; os.environ['RIFLE_MARCH_SAVE']='1'"
     node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_import/Script_RifleShoulderMarchBake.py --timeout 900
     node scripts/Script_BlenderMcp.mjs stop
+    node Taierzhuang1938/_import/Script_RifleShoulderMarchProfile.mjs   # measure the runtime profile into the clip JSON
     node Taierzhuang1938/Script_RifleShoulderMarchTest.mjs --write
 
 Environment: RIFLE_MARCH_PROJECT (required), RIFLE_MARCH_WRITE=0 (measure only, write nothing to the repository),
