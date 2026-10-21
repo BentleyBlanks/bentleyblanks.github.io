@@ -17,7 +17,18 @@
 | 13 AirFirst | 交火前沿 | 空袭 |
 | 14 Carry、Dive、Rescue | 南路断了 / 钢铁围攻 | 空袭 |
 
-10 Courtyard、11 TransferApproach 用户选「保持当前」；其余阶段用户还没定，没动。一步之内按事实换曲的规则在 `FIRST_LEVEL_MUSIC_SPLITS`（`FirstLevelStageCue`）：事实成立就改放 `then`（`null` = 不放），走常规 1.6 s 过渡；进这一步时事实已经成立（跳关 / 读档）直接放 `then`。下表是 2026-09 的历史口径，以上表为准。
+10 Courtyard、11 TransferApproach 用户选「保持当前」；其余阶段用户还没定，没动。
+
+2026-10-21 第二轮（导出 `Data_Export_FirstLevel_20261021-150600`）：再迁入 10-21 照新剧本生成的四首和旧关卡的「夜里入城」，音频版本 `20261021-score-pick2`。10-21 那四首从原始 take 打包；「夜里入城」没有存下原始 take，以旧关卡打包好的 `Audio/Music/AudioMusic_Night.mp3` 为源（52 s 一圈，`Data_Tracklist` 里 `minSeconds` 放开打包脚本的 90 s 下限）。
+
+| 阶段（旧步骤） | 之前 | 现在 |
+| --- | --- | --- |
+| 02 BunkerRescue、RearTrench | 前线压来 / 钢铁围攻 | 进城（原本写成收尾曲，循环接缝可能听得出） |
+| 04 MachineGun | 交火前沿 | 拐角 |
+| 06 Orders | 前线压来 | 夜里入城（二胡） |
+| 07 South | 往南的路 | 黄昏 |
+| 09 Melee | 钢铁围攻 | 门缝 |
+| 10 Courtyard | 钢铁围攻 | 把路打开（库里原有） |一步之内按事实换曲的规则在 `FIRST_LEVEL_MUSIC_SPLITS`（`FirstLevelStageCue`）：事实成立就改放 `then`（`null` = 不放），走常规 1.6 s 过渡；进这一步时事实已经成立（跳关 / 读档）直接放 `then`。下表是 2026-09 的历史口径，以上表为准。
 
 | 曲目 | 运行阶段 |
 | --- | --- |

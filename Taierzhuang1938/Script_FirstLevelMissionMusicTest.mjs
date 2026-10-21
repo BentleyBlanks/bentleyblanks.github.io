@@ -9,7 +9,7 @@ import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
 
 assert.deepEqual(Object.keys(FIRST_LEVEL_STAGE_MUSIC), MISSION_STAGES.map(stage => stage.id));
 const cues = Object.keys(FIRST_LEVEL_MUSIC_CUES);
-assert.equal(cues.length, 14);
+assert.equal(cues.length, 19);
 const manifest = JSON.parse(fs.readFileSync(new URL("./Audio/Music/FirstLevel/Data_FirstLevelMusicManifest.json", import.meta.url)));
 const approvedBattleTakes = {
   firstLevelCloseQuartersPressure: "2fc553c982dc6893f22e414b9a18cdb40963e07955f501433dc292176590d297",
@@ -20,17 +20,20 @@ const approvedBattleTakes = {
   firstLevelFrontLine: "0b3c6dbff6b537d03aa120b22221f60dc41d5a7d90606533ba07f9deba24f425",
   firstLevelSapTrench: "dbcf685f0838384b092378fe5629527fba7be207c0353c6b130dea75a617f0cd",
   firstLevelAirRaid: "64c830c8e6b2df56bb0fc991b1089e984c7b08635bac5fde6b3994371178eceb",
+  // 第二轮：10-21 候选的原始 take；「夜里入城」用旧关卡打包好的那份当源。
+  firstLevelNorthGate: "f0b2f6bb16f8fc4d907ba61133aa3d27d78414b464d730a8032350dd02b03928", firstLevelCornerByCorner: "6a67172cfeaa47390cc09b660d2870964363cb73c0f676746616c86195df2d18", firstLevelDusk: "dbf8cb196f90529e3cf114374db8f3108597aa3cbeeff10218e854b6f0bd103c", firstLevelWitness: "b05576473d973e5e01b79555b3751cc7d5c723a1361f149fc9355d6a0fb87161",
+  firstLevelNight: "6db31ffa1df6ac39cae4d45d33a050de51455adc362018455444584f23efe82b",
 };
 for (const [cue, sha256] of Object.entries(approvedBattleTakes)) {
   assert.equal(manifest.cues[cue].sourceSha256, sha256, "package the exact user-approved preview");
-  assert.ok(Math.abs(manifest.cues[cue].seconds - 90) < 0.1);
+  assert.ok(Math.abs(manifest.cues[cue].seconds - (cue === "firstLevelNight" ? 52 : 90)) < 0.2, cue);
 }
 assert.deepEqual(Object.keys(manifest.cues), cues);
 for (const cue of cues) {
   const spec = FIRST_LEVEL_MUSIC_CUES[cue], entry = manifest.cues[cue];
   const bytes = fs.readFileSync(new URL(`./Audio/Music/${spec.file}`, import.meta.url));
   assert.equal(crypto.createHash("sha256").update(bytes).digest("hex"), entry.sha256);
-  assert.ok(entry.seconds > 90 && entry.seconds < 130 && entry.bytes < 2_000_000);
+  assert.ok(entry.seconds > (cue === "firstLevelNight" ? 50 : 90) && entry.seconds < 130 && entry.bytes < 2_000_000, cue);
   assert.ok(Math.abs(entry.rmsDbfs + 27) <= 0.6 && entry.peakDbfs <= -3);
 }
 // 【2026-09-26】01/02 开场过场原来不放乐；用户要「背景音乐 + 战场嘈杂」，压在底下。
@@ -39,7 +42,7 @@ for (const cue of cues) {
 {
   const O = FIRST_LEVEL_MUSIC_OPENING;
   assert.equal(FirstLevelMusicState("Trapped").cue, "firstLevelShellShock");
-  assert.equal(FirstLevelMusicState("BunkerRescue").cue, "firstLevelTheFrontClosesIn");
+  assert.equal(FirstLevelMusicState("BunkerRescue").cue, "firstLevelNorthGate");
   assert.ok(FirstLevelMusicState("Trapped").scale < 1 && FirstLevelMusicState("BunkerRescue").scale < 1, "开场配乐压在底下");
   const talk = FirstLevelMusicState("Trapped", { speaking: true }).scale / FirstLevelMusicState("Trapped").scale;
   assert.ok(talk < 1 && talk > FIRST_LEVEL_MUSIC_MIX.dialogueScale, "开场说话时让位，但比常规的 0.42 让得少（另有对白侧链 −6 dB）");
@@ -65,16 +68,17 @@ for (const cue of cues) {
   cold.Update("Trapped", { shellImpact: true });
   assert.equal(seen.at(-1)[1], "firstLevelShellShock", "从醒来之后进 01：直接有配乐");
 }
-assert.equal(FirstLevelMusicState("South").cue, "firstLevelTheRoadSouth");
+assert.equal(FirstLevelMusicState("South").cue, "firstLevelDusk");
 assert.equal(FirstLevelMusicState("TransferApproach").cue, "firstLevelTheRoadSouth");
 assert.equal(FirstLevelMusicState("Death").cue, null);
-for (const stage of ["MachineGun", "Transfer", "BridgeCover"]) {
+for (const stage of ["Transfer", "BridgeCover"]) {
   assert.equal(FirstLevelMusicState(stage).cue, "firstLevelCloseQuartersPressure", stage);
   assert.equal(FirstLevelMusicState(stage, { failed: true }).cue, null, stage);
 }
-for (const stage of ["RearTrench", "Village", "Melee", "Courtyard"]) {
-  assert.equal(FirstLevelMusicState(stage).cue, "firstLevelIronSiege", stage);
-}
+assert.equal(FirstLevelMusicState("Village").cue, "firstLevelIronSiege");
+// 第二轮用户选曲
+for (const [stage, cue] of [["BunkerRescue", "NorthGate"], ["RearTrench", "NorthGate"], ["MachineGun", "CornerByCorner"], ["Orders", "Night"],
+  ["South", "Dusk"], ["Melee", "Witness"], ["Courtyard", "OpenTheWay"]]) assert.equal(FirstLevelMusicState(stage).cue, `firstLevel${cue}`, stage);
 // 【2026-10-21】用户选曲：13 / 14 是「空袭」；03 到前沿前后两首；05 撤回之后不放乐。
 for (const stage of ["AirFirst", "Carry", "Dive", "Rescue"]) assert.equal(FirstLevelMusicState(stage).cue, "firstLevelAirRaid", stage);
 {
@@ -90,10 +94,10 @@ for (const stage of ["AirFirst", "Carry", "Dive", "Rescue"]) assert.equal(FirstL
   assert.equal(FirstLevelMusicState("Tank", { has: has("tankImmobilized", "lastGuardsWithdrawn") }).cue, "firstLevelSapTrench", "炸停战车不换曲、不起胜利音乐");
   const back = FirstLevelMusicState("Tank", { has: has("frontDisengaged") });
   assert.ok(back.cue === null && back.fadeOut > 1, "撤回己方交通壕之后不放乐，常规过渡淡出");
-  assert.equal(FirstLevelStageCue("MachineGun", has("frontReached")), "CloseQuartersPressure", "换曲只对登记的步骤生效");
+  assert.equal(FirstLevelStageCue("MachineGun", has("frontReached")), "CornerByCorner", "换曲只对登记的步骤生效");
 }
 assert.equal(FirstLevelMusicState("NightMarch").cue, "firstLevelTheLivingStillNeedUs");
-assert.equal(FirstLevelMusicState("Orders").cue, "firstLevelTheFrontClosesIn");
+assert.equal(FirstLevelMusicState("Orders").cue, "firstLevelNight");
 assert.equal(FirstLevelMusicState("Handover").cue, "firstLevelKeepYourEyesOpen");
 assert.equal(FirstLevelMusicState("WallPath").cue, "firstLevelTheLivingStillNeedUs");
 // 15–18 的情绪核（End 包 2026.09.20）：15A 与 17 静，15B/15C 压到背景，
@@ -134,7 +138,7 @@ director.Update("Tank", { has: (id) => id === "frontDisengaged" });
 assert.equal(calls.length, 5); assert.equal(calls.at(-1)[0], null, "back in our trench: no music");
 director.Update("Orders", { speaking: true });
 assert.equal(calls.length, 6);
-assert.equal(calls.at(-1)[0], "firstLevelTheFrontClosesIn", "orders leave battle music");
+assert.equal(calls.at(-1)[0], "firstLevelNight", "orders leave battle music");
 assert.ok(calls.at(-1)[1].levelScale < 0.3, "orders and dialogue combine");
 director.Update("Orders", { speaking: false });
 assert.ok(levels.at(-1)[0] > levels[0][0]);
@@ -143,9 +147,11 @@ assert.equal(calls.at(-1)[0], null); assert.ok(calls.at(-1)[1].fadeOut < 0.2);
 director.Update("BridgeCover"); director.Update("WallPath");
 assert.equal(calls.at(-1)[0], "firstLevelTheLivingStillNeedUs");
 const beforeVillage = calls.length;
-director.Update("Village"); director.Update("Melee"); director.Update("Courtyard");
-assert.equal(calls.length, beforeVillage + 1, "continuous close combat holds its recording");
+director.Update("Village"); director.Update("Village");
+assert.equal(calls.length, beforeVillage + 1, "a step holds its recording");
 assert.equal(calls.at(-1)[0], "firstLevelIronSiege");
+director.Update("Melee"); director.Update("Courtyard");
+assert.equal(calls.at(-1)[0], "firstLevelOpenTheWay");
 director.Update("TransferApproach");
 assert.equal(calls.at(-1)[0], "firstLevelTheRoadSouth", "travel leaves battle music");
 director.Update("Rescue");
@@ -153,4 +159,4 @@ assert.equal(calls.at(-1)[0], "firstLevelAirRaid");
 director.Update("Handover");
 assert.equal(calls.at(-1)[0], "firstLevelKeepYourEyesOpen", "carrying returns to the story cue");
 director.Dispose(); assert.equal(calls.at(-1)[0], null);
-console.log("PASS fourteen verified assets; stage assignments, fact splits, story transitions, silence, dialogue and uninterrupted combat");
+console.log("PASS nineteen verified assets; stage assignments, fact splits, story transitions, silence, dialogue and uninterrupted combat");

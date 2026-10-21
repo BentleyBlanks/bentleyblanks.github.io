@@ -1,6 +1,7 @@
 // Package user-approved takes; never regenerates or edits the source recordings.
 // node Taierzhuang1938/Script_FirstLevelMusicBake.mjs --source-dir=<LevelOne_SevenCues>
 // Add approved takes without re-encoding existing cues: --only=CloseQuartersPressure,IronSiege
+// A short approved cue (e.g. a 52 s loop reused from another level) sets minSeconds in its Data_Tracklist entry.
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -43,7 +44,7 @@ for (const [cue, spec] of Object.entries(FIRST_LEVEL_MUSIC_CUES)) {
   Run("ffmpeg", ["-y", "-v", "error", "-i", sourceFile, "-map_metadata", "-1", "-af", `volume=${gainDb}dB`, "-ac", "2", "-ar", "44100", "-b:a", "112k", file]);
   const result = Measure(file);
   const duration = Number(Run("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file]).stdout);
-  if (Math.abs(result.rmsDbfs + 27) > 0.6 || result.peakDbfs > -2.5 || duration < 90) throw new Error(`Invalid packaged audio ${id}`);
+  if (Math.abs(result.rmsDbfs + 27) > 0.6 || result.peakDbfs > -2.5 || duration < (source.minSeconds ?? 90)) throw new Error(`Invalid packaged audio ${id}`);
   manifest.cues[cue] = { file: path.basename(file), title: source.title, scene: source.scene,
     seconds: duration, bytes: fs.statSync(file).size, sha256: Hash(file), sourceSha256: sourceHash,
     sourceGeneratedAt: source.generatedAt, prompt: source.prompt, gainDb, ...result };

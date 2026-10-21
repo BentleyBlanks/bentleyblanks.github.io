@@ -1,5 +1,5 @@
 // Train and unloading use diegetic sound only. Retained score labels are editor metadata.
-export const FIRST_LEVEL_MUSIC_VERSION = "20261021-score-pick";
+export const FIRST_LEVEL_MUSIC_VERSION = "20261021-score-pick2";
 export const FIRST_LEVEL_MUSIC_CUES = Object.freeze(Object.fromEntries([
   ["LeavingHome", "车厢闲话", 0.72],
   ["TheFrontClosesIn", "前线压来", 0.50],
@@ -16,6 +16,12 @@ export const FIRST_LEVEL_MUSIC_CUES = Object.freeze(Object.fromEntries([
   ["FrontLine", "前沿绞肉", 0.55],
   ["SapTrench", "支沟", 0.55],
   ["AirRaid", "空袭", 0.55],
+  // 2026-10-21 第二轮：10-21 照新剧本生成的候选，加上旧关卡的「夜里入城」（二胡，52 s 一圈）。
+  ["NorthGate", "进城", 0.60],
+  ["CornerByCorner", "拐角", 0.55],
+  ["Night", "夜里入城", 0.55],
+  ["Dusk", "黄昏", 0.60],
+  ["Witness", "门缝", 0.50],
 ].map(([id, label, level]) => [`firstLevel${id}`, Object.freeze({
   label, level, file: `FirstLevel/AudioBgm_${id}.mp3`,
   version: FIRST_LEVEL_MUSIC_VERSION, onDemand: true, loopFadeS: 6,
@@ -41,10 +47,14 @@ export const FIRST_LEVEL_MUSIC_MIX = Object.freeze({
 //  · 05 Tank：「支沟」——鼓全撤的潜行张力；撤回己方交通壕（frontDisengaged）之后不放乐，不起胜利音乐。
 //  · 13 AirFirst、14 Carry / Dive / Rescue：「空袭」，不再借步兵交火的曲子。
 //  · 10 Courtyard、11 TransferApproach 用户选「保持当前」，没改；其余阶段用户还没定，保持原样。
+// 【2026-10-21 第二轮】（导出 Data_Export_FirstLevel_20261021-150600）：
+//  · 02 BunkerRescue / RearTrench：「进城」（用户选的整段单曲；它原本写成收尾曲，循环接缝可能听得出）。
+//  · 04 MachineGun：「拐角」——拐角之间的狼狈后撤。06 Orders：「夜里入城」（二胡）。07 South：「黄昏」。
+//  · 09 Melee：「门缝」——潜行目击，一条不动的低音。10 Courtyard：「把路打开」（库里原有）。
 export const FIRST_LEVEL_STAGE_MUSIC = Object.freeze({
-  Trapped: "ShellShock", BunkerRescue: "TheFrontClosesIn", RearTrench: "IronSiege",
-  Support: "TrenchPulse", MachineGun: "CloseQuartersPressure", Tank: "SapTrench", Orders: "TheFrontClosesIn",
-  South: "TheRoadSouth", Village: "IronSiege", Melee: "IronSiege", Courtyard: "IronSiege",
+  Trapped: "ShellShock", BunkerRescue: "NorthGate", RearTrench: "NorthGate",
+  Support: "TrenchPulse", MachineGun: "CornerByCorner", Tank: "SapTrench", Orders: "Night",
+  South: "Dusk", Village: "IronSiege", Melee: "Witness", Courtyard: "OpenTheWay",
   TransferApproach: "TheRoadSouth", Transfer: "CloseQuartersPressure", CartRide: "TheRoadSouth",
   AirFirst: "AirRaid", Carry: "AirRaid", Dive: "AirRaid",
   Rescue: "AirRaid",

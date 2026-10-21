@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
+const manifest = JSON.parse(await fs.readFile(path.join(here, "Audio/Music/FirstLevel/Data_FirstLevelMusicManifest.json"), "utf8"));
 const output = path.join(here, "_shots/FirstLevelMusic");
 await fs.mkdir(output, { recursive: true });
 const server = await ServeRoot(path.resolve(here, ".."), 0), browser = await LaunchBrowser();
@@ -27,9 +28,9 @@ try {
   // 三个内部步骤随采用稿下线，换成现役的 BunkerRescue / WallPath / NightMarch；
   // 15A 与 17 是静的，18 的桥头回到紧张、爆破那一步是「南路断了」。
   // 2026-10-21 用户选曲：01 炮后余震、03 壕沟脉冲（到前沿前）、05 支沟、13 / 14 空袭。
-  const starts = [[1,"ShellShock"],[2,"TheFrontClosesIn","BunkerRescue"],[3,"IronSiege","RearTrench"],
-    [3,"TrenchPulse","Support"],[4,"CloseQuartersPressure"],[5,"SapTrench"],
-    [6,"TheFrontClosesIn"],[7,"TheRoadSouth"],[8,"IronSiege"],[9,"IronSiege"],[10,"IronSiege"],
+  const starts = [[1,"ShellShock"],[2,"NorthGate","BunkerRescue"],[3,"NorthGate","RearTrench"],
+    [3,"TrenchPulse","Support"],[4,"CornerByCorner"],[5,"SapTrench"],
+    [6,"Night"],[7,"Dusk"],[8,"IronSiege"],[9,"Witness"],[10,"OpenTheWay"],
     [11,"TheRoadSouth"],[12,"CloseQuartersPressure"],[13,"AirRaid"],[14,"AirRaid"],
     [15,null],[15,"TheLivingStillNeedUs","WallPath"],[15,"TheLivingStillNeedUs","ReceptionGate"],
     [16,"KeepYourEyesOpen"],[17,null],
@@ -82,8 +83,8 @@ try {
     assert.ok(row.held); assert.equal(row.errors.length,0);
     assert.ok(row.cached.length<=3);
     if(cue) {
-      const isBattleCue = ["CloseQuartersPressure", "IronSiege", "ShellShock", "TrenchPulse", "FrontLine", "SapTrench", "AirRaid"].includes(id);   // 90 s 一首的那几条
-      assert.ok(row.heads>0 && (isBattleCue ? Math.abs(row.bufferSeconds-90)<0.1 : row.bufferSeconds>90) && row.signalPeak>0.00001, JSON.stringify(row));
+      // 解码出来的时长对得上清单（90 s、120 s，夜里入城 52 s 都有）
+      assert.ok(row.heads>0 && Math.abs(row.bufferSeconds-manifest.cues[cue].seconds)<0.15 && row.signalPeak>0.00001, JSON.stringify(row));
       assert.ok(row.dialogueScale<row.normalScale && row.paused && row.resumed, JSON.stringify(row));
     }
     rows.push(row); console.log("MUSIC_STAGE",JSON.stringify(row));
