@@ -159,6 +159,141 @@ def BmTriangleCount(bm):
     return sum(len(face.verts) - 2 for face in bm.faces)
 
 
+def ContactGrassBudget(otherCounts, quiltTriangles, footTriangles, bodyTriangles,
+                       cottonTriangles, wholeBedLimit=50000):
+    """Budget actual validated geometry, without borrowing cleanup headroom."""
+    remaining = (int(wholeBedLimit) - sum(int(value) for value in otherCounts.values())
+                 - int(quiltTriangles) - int(footTriangles)
+                 - int(bodyTriangles) - int(cottonTriangles))
+    if remaining < 0:
+        raise ValueError('Cotton and new compact body alone exhaust the whole-bed triangle budget')
+    return remaining
+
+
+def ValidateContactMeshData(mesh, label, matrixWorld=None):
+    """Validate a private mesh and prove retained loop/face data are exact.
+
+    The caller must not supply a live game/source mesh. Temporary identity
+    layers survive native validation and geometric zero-area deletion, making
+    removal distinguishable from corruption or movement. No role-based budget
+    deletion happens here.
+    """
+    import bmesh
+    faceKey, loopKey = 'ContactValidationFaceId', 'ContactValidationLoopId'
+    if mesh.attributes.get(faceKey) or mesh.attributes.get(loopKey):
+        raise ValueError('Contact validation identity layer already exists')
+    beforeVertices = np.empty((len(mesh.vertices), 3), dtype=np.float32)
+    mesh.vertices.foreach_get('co', beforeVertices.ravel())
+    faceCount, loopCount = len(mesh.polygons), len(mesh.loops)
+    uvBefore = {}
+    for layer in mesh.uv_layers:
+        values = np.empty((loopCount, 2), dtype=np.float32)
+        layer.data.foreach_get('uv', values.ravel());uvBefore[layer.name] = values
+    colorsBefore = {}
+    for layer in mesh.color_attributes:
+        if layer.domain != 'CORNER':
+            continue
+        values = np.empty((loopCount, 4), dtype=np.float32)
+        layer.data.foreach_get('color', values.ravel());colorsBefore[layer.name] = values
+    intsBefore = {}
+    for layer in mesh.attributes:
+        if layer.domain == 'FACE' and layer.data_type == 'INT':
+            values = np.empty(faceCount, dtype=np.int32)
+            layer.data.foreach_get('value', values);intsBefore[layer.name] = values
+    mesh.attributes.new(name=faceKey, type='INT', domain='FACE').data.foreach_set('value', np.arange(1, faceCount + 1, dtype=np.int32))
+    mesh.attributes.new(name=loopKey, type='INT', domain='CORNER').data.foreach_set('value', np.arange(1, loopCount + 1, dtype=np.int32))
+    beforeTriangles = TriangleCount(mesh)
+    nativeRepaired = mesh.validate(verbose=False, clean_customdata=False)
+    mesh.update()
+    # Native mesh validation handles bad indices/duplicate topology. Collinear
+    # but distinct-index triangles additionally use the unchanged Pack world
+    # gate; no nonzero-area simplification threshold is introduced.
+    positions = np.empty((len(mesh.vertices), 3), dtype=np.float64)
+    mesh.vertices.foreach_get('co', positions.ravel())
+    matrix = np.eye(4) if matrixWorld is None else np.asarray(matrixWorld, dtype=np.float64)
+    world = positions @ matrix[:3, :3].T + matrix[:3, 3]
+    badFaces = []
+    for polygon in mesh.polygons:
+        if len(polygon.vertices) != 3:
+            raise ValueError('Prepared contact mesh must already be triangulated')
+        first, second, third = world[list(polygon.vertices)]
+        if np.linalg.norm(np.cross(second - first, third - first)) < 1e-12:
+            badFaces.append(polygon.index)
+    if badFaces:
+        bm = bmesh.new()
+        try:
+            bm.from_mesh(mesh);bm.faces.ensure_lookup_table()
+            bmesh.ops.delete(bm, geom=[bm.faces[index] for index in badFaces], context='FACES_ONLY')
+            bm.to_mesh(mesh)
+        finally:
+            bm.free()
+        mesh.update()
+    if mesh.validate(verbose=False, clean_customdata=False):
+        raise ValueError('Contact private mesh remains invalid after validation')
+    afterVertices = np.empty((len(mesh.vertices), 3), dtype=np.float32)
+    mesh.vertices.foreach_get('co', afterVertices.ravel())
+    if not np.array_equal(beforeVertices, afterVertices):
+        raise ValueError('Contact validation moved or reordered source vertices')
+    faceIds = np.empty(len(mesh.polygons), dtype=np.int32)
+    loopIds = np.empty(len(mesh.loops), dtype=np.int32)
+    mesh.attributes[faceKey].data.foreach_get('value', faceIds)
+    mesh.attributes[loopKey].data.foreach_get('value', loopIds)
+    if (np.any(faceIds < 1) or np.any(faceIds > faceCount) or len(np.unique(faceIds)) != len(faceIds)
+            or np.any(loopIds < 1) or np.any(loopIds > loopCount) or len(np.unique(loopIds)) != len(loopIds)):
+        raise ValueError('Contact validation lost unique face/corner identity')
+    for name, values in uvBefore.items():
+        layer = mesh.uv_layers.get(name)
+        if layer is None:
+            raise ValueError('Contact validation lost UV layer ' + name)
+        after = np.empty((len(mesh.loops), 2), dtype=np.float32)
+        layer.data.foreach_get('uv', after.ravel())
+        if not np.array_equal(values[loopIds - 1], after):
+            raise ValueError('Contact validation changed retained UV data: ' + name)
+    for name, values in colorsBefore.items():
+        layer = mesh.color_attributes.get(name)
+        if layer is None or layer.domain != 'CORNER':
+            raise ValueError('Contact validation lost corner colour layer ' + name)
+        after = np.empty((len(mesh.loops), 4), dtype=np.float32)
+        layer.data.foreach_get('color', after.ravel())
+        if not np.array_equal(values[loopIds - 1], after):
+            raise ValueError('Contact validation changed retained FLOAT/CORNER colour: ' + name)
+    for name, values in intsBefore.items():
+        layer = mesh.attributes.get(name)
+        if layer is None or layer.domain != 'FACE' or layer.data_type != 'INT':
+            raise ValueError('Contact validation lost source FACE INT layer ' + name)
+        after = np.empty(len(mesh.polygons), dtype=np.int32)
+        layer.data.foreach_get('value', after)
+        if not np.array_equal(values[faceIds - 1], after):
+            raise ValueError('Contact validation changed source lineage/role field: ' + name)
+    removed = np.ones(faceCount, dtype=bool);removed[faceIds - 1] = False
+    protected = intsBefore.get('StrawProtectedStructure', np.zeros(faceCount, dtype=np.int32))
+    report = {'group': label, 'trianglesBefore': beforeTriangles, 'trianglesAfter': TriangleCount(mesh),
+              'facesBefore': faceCount, 'facesAfter': len(mesh.polygons), 'nativeValidationRepaired': bool(nativeRepaired),
+              'geometricZeroAreaFacesRemoved': len(badFaces), 'worldCrossMagnitudeThreshold': 1e-12,
+              'protectedInvalidFacesRemovedByValidation': int(np.count_nonzero(removed & (protected > 0))),
+              'invalidFaceRemovalIsBudgetPruning': False, 'vertexOrderAndPositionsExactlyUnchanged': True,
+              'retainedUvsExactlyUnchanged': True, 'retainedFloatCornerColorsExactlyUnchanged': True,
+              'retainedFaceIntLineageAndRolesExactlyUnchanged': True}
+    mesh.attributes.remove(mesh.attributes[faceKey]);mesh.attributes.remove(mesh.attributes[loopKey])
+    return report
+
+
+def ValidatePreparedContactBMesh(bm, label, matrixWorld=None):
+    """Return a validated replacement BMesh, leaving its owner transactional."""
+    import bpy
+    import bmesh
+    mesh = bpy.data.meshes.new('Mesh_ContactBudgetValidationTemporary')
+    try:
+        bm.to_mesh(mesh)
+        report = ValidateContactMeshData(mesh, label, matrixWorld)
+        result = bmesh.new()
+        result.from_mesh(mesh)
+        result.verts.ensure_lookup_table();result.faces.ensure_lookup_table()
+        return result, report
+    finally:
+        bpy.data.meshes.remove(mesh)
+
+
 def ChooseGrassIslands(islands, preferredBudget=16000, maximumBudget=16000,
                        protectionAttributePresent=False):
     """Keep whole substantial islands; never move surviving grass vertices."""
@@ -466,7 +601,7 @@ def HiddenFaces(obj, envelope, xs, ys, heights):
     return selected
 
 
-def AddCompactMatContact(quilt, foot, straw):
+def AddCompactMatContact(quilt, foot, straw, validateBeforeBudget=False):
     """Return audits; edit only original Straw interior and hidden cotton faces."""
     import bpy
     import bmesh
@@ -645,16 +780,30 @@ def AddCompactMatContact(quilt, foot, straw):
                 if face[protectedLayer] != expected:
                     face[protectedLayer] = expected
                     restoredProtection += 1
+        preBudgetValidation = []
+        if validateBeforeBudget:
+            for obj in objects:
+                old = prepared[obj]
+                replacement, report = ValidatePreparedContactBMesh(old, obj.name, obj.matrix_world)
+                prepared[obj] = replacement
+                old.free()
+                preBudgetValidation.append(report)
+            sbm = prepared[straw]
+            lineage = sbm.faces.layers.int.get('ContactSourceFace')
+            protectedLayer = sbm.faces.layers.int.get('StrawProtectedStructure')
+            if lineage is None:
+                raise ValueError('Pre-budget validation lost original Straw face lineage')
+            for face in sbm.faces:
+                expected = sourceProtection.get(face[lineage])
+                if expected is None or (protectedLayer is not None and face[protectedLayer] != expected):
+                    raise ValueError('Pre-budget validation changed Straw source protection')
         otherBefore = {name: bpy.data.objects.get(name) for name in ('Frame', 'Pillow', 'Sewing')}
         otherBeforeCounts = {name: TriangleCount(obj.data) for name, obj in otherBefore.items()
                              if obj is not None and obj.type == 'MESH'}
         maximumOldGrass = 16000
         if len(otherBeforeCounts) == 3:
-            maximumOldGrass = (50000 - sum(otherBeforeCounts.values())
-                               - BmTriangleCount(prepared[quilt]) - len(cottonFaces)
-                               - BmTriangleCount(prepared[foot]) - len(bodyFaces))
-        if maximumOldGrass < 0:
-            raise ValueError('Cotton and new compact body alone exhaust the whole-bed triangle budget')
+            maximumOldGrass = ContactGrassBudget(otherBeforeCounts, BmTriangleCount(prepared[quilt]),
+                                                 BmTriangleCount(prepared[foot]), len(bodyFaces), len(cottonFaces))
         grassPruning = PruneGrassIslands(sbm, matrix, min(16000, maximumOldGrass), maximumOldGrass)
         surviving = Counter()
         for face in sbm.faces:
@@ -740,6 +889,8 @@ def AddCompactMatContact(quilt, foot, straw):
                  'removedOriginalStrawTriangles': removedOriginalStrawTriangles,
                  'retainedOriginalStrawTriangleFragments': sum(surviving.values()),
                  'grassIslandReduction': grassPruning,
+                 'preBudgetMeshValidationEnabled': bool(validateBeforeBudget),
+                 'preBudgetMeshValidation': preBudgetValidation,
                  'sameTrianglePairing': True, 'newMaterials': 0, 'newObjects': 0, 'newMeshDatablocks': 0,
                  'footBaseForNewCottonColour': footAudit,
                  'limitation': 'The paired cap gap is exact; retained old faces and outer fibres still require the independent unchanged contact and visual checks.'}

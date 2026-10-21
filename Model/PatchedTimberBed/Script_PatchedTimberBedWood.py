@@ -1,15 +1,20 @@
-"""Bakeable, member-aligned ageing for the BN/BS timber bed frame.
+"""Reference-led, member-aligned ageing for the BN/BS timber bed frame.
 
-WeatherTimberFrame(frameObjects) operates only on the supplied editable source
-meshes. Three explicit UV maps and a CORNER float colour layer carry metre-space
-grain, cross-section rings, edge distances and member data through Join and
-decimation; a POINT vector attribute anchors measured iron stains in world
-space. No Generated/Object coordinates, external images or extra polygons are
-used. Bake the result to the Frame Base/Normal/Roughness atlas as usual.
+WeatherTimberFrame(..., textureRoot=...) writes finite physical UV windows into
+shared Base/Normal/ORM PNG surfaces and packs those images into the source.
+ApplyReferenceWoodSurface maps the tagged game Frame to the same native PBR
+surface plus macro CORNER colour; real cut faces retain WoodDamageData.
+Three legacy metric UV maps/member data remain on editable sources. The None
+textureRoot path retains the earlier source recipe and optional versioned tiny
+corner chips. Material mapping adds no polygons or Blender process of its own.
 """
 import math
 import numbers
 import json
+import struct
+import zlib
+import hashlib
+from pathlib import Path
 import bpy
 import numpy as np
 
@@ -21,6 +26,177 @@ _EndUv = 'WoodEndUV'
 _EdgeUv = 'WoodEdgeUV'
 _MemberData = 'WoodMemberData'
 _WorldAttribute = 'WoodWeatherWorld'
+_SurfaceVersion = '20261021ReferenceElmSurfaceV6'
+_SurfaceLayout = {'side': [[32/2048,32/2048],[1504/2048,2016/2048]],
+ 'ends': [[[1568/2048,v],[2016/2048,v+448/2048]] for v in (64/2048,544/2048,1024/2048,1504/2048)],
+ 'metal': [.9296875,.982421875], 'neutral': [.8203125,.982421875], 'sideMetres': [2.6,.28], 'endMetres': [.18,.18]}
+
+
+def _EncodeSurfacePng(rgb):
+ def Chunk(kind,payload):return struct.pack('>I',len(payload))+kind+payload+struct.pack('>I',zlib.crc32(kind+payload)&0xffffffff)
+ height,width=rgb.shape[:2];scan=b''.join(b'\0'+row.tobytes() for row in rgb)
+ return b'\x89PNG\r\n\x1a\n'+Chunk(b'IHDR',struct.pack('>IIBBBBB',width,height,8,2,0,0,0))+Chunk(b'IDAT',zlib.compress(scan,6))+Chunk(b'IEND',b'')
+
+
+def _SurfaceSrgb(value):
+ value=np.clip(value,0,1)
+ return np.where(value<=.0031308,value*12.92,1.055*value**(1/2.4)-.055)
+
+
+def _SlowCurve(x,rng,count=9):
+ controls=rng.uniform(-1,1,count).astype(np.float32);coordinate=np.clip(x,0,1)*(count-1)
+ index=np.minimum(coordinate.astype(np.int32),count-2);fraction=coordinate-index;fraction=fraction*fraction*(3-2*fraction)
+ return controls[index]*(1-fraction)+controls[index+1]*fraction
+
+
+def BuildReferenceWoodSurface():
+ """Return aligned PNG-ready maps; finite atlas windows, no subrect repeats."""
+ size=2048;base=np.full((size,size,3),.82,dtype=np.float32)
+ normals=np.zeros((size,size,3),dtype=np.float32);normals[:,:,2]=1
+ roughness=np.full((size,size),.82,dtype=np.float32);metallic=np.zeros((size,size),dtype=np.float32)
+ rng=np.random.default_rng(640821)
+ def Put(rect,height,tone,physicalSize,end=False,wear=None,patina=None):
+  u0,v0=rect[0];u1,v1=rect[1];x0,x1=round(u0*size),round(u1*size);y0,y1=round((1-v1)*size),round((1-v0)*size)
+  du=physicalSize[0]/max(1,x1-x0-1);dv=physicalSize[1]/max(1,y1-y0-1)
+  dhv,dhu=np.gradient(height,-dv,du);vector=np.stack((-dhu,-dhv,np.ones_like(height)),axis=2);vector/=np.maximum(np.linalg.norm(vector,axis=2,keepdims=True),1e-8)
+  normals[y0:y1,x0:x1]=vector
+  if end:
+   color=tone[:,:,None]*np.asarray([.80,.78,.735],dtype=np.float32)
+   surfaceRough=.83+.05*np.maximum(0,1-tone)
+  else:
+   # The real old-elm reference reads as broken brown finish over irregular
+   # yellow-brown exposed fibres, not a flat brown vertex tint on a white tile.
+   dark=np.asarray([.29,.245,.185],dtype=np.float32);oldBrown=np.asarray([.75,.665,.515],dtype=np.float32)
+   finish=dark+(oldBrown-dark)*patina[:,:,None]
+   bare=np.asarray([.995,.935,.775],dtype=np.float32)
+   color=(finish*(1-wear[:,:,None])+bare*wear[:,:,None])*tone[:,:,None]
+   surfaceRough=.71+.05*np.maximum(0,1-tone)+.14*wear-.055*patina
+  base[y0:y1,x0:x1]=np.clip(color,.22,.995)
+  roughness[y0:y1,x0:x1]=np.clip(surfaceRough,.59,.94)
+ rect=_SurfaceLayout['side'];width=round((rect[1][0]-rect[0][0])*size);height=round((rect[1][1]-rect[0][1])*size)
+ x=np.linspace(0,2.6,width,dtype=np.float32)[None,:];y=np.linspace(.28,0,height,dtype=np.float32)[:,None]
+ bend=.0013*_SlowCurve(x/2.6,rng,8)+.00045*_SlowCurve(x/2.6,rng,19)
+ spread=1+.035*_SlowCurve(x/2.6,rng,6)
+ warped=y*spread+bend
+ # A single broad divergence is a growth-layer fork, not a dark oval repeated
+ # on every member. Each source takes a different physical finite window.
+ warped=warped+.0014*np.exp(-((x-1.47)/.33)**2)*np.tanh((y-.204)/.006)
+ boundaries=[-.025]
+ while boundaries[-1]<.315:boundaries.append(boundaries[-1]+float(rng.gamma(1.5,.0023)+.00070))
+ boundaries=np.asarray(boundaries,dtype=np.float32);index=np.clip(np.searchsorted(boundaries,warped)-1,0,len(boundaries)-2)
+ left=boundaries[index];right=boundaries[index+1];interval=right-left
+ distance=np.minimum(warped-left,right-warped)
+ groove=np.exp(-(distance/np.clip(interval*.12,.00016,.00062))**2)
+ bandValues=rng.uniform(-1,1,len(boundaries)).astype(np.float32)
+ tone=1+.044*bandValues[index]-.070*groove
+ field=.000025*bandValues[index]-.000070*groove
+ # Unequal, frayed longitudinal finish losses. Rectangular/tapered strokes have
+ # irregular fibre ends; Gaussian ellipses and uniformly bright edges are not
+ # used. Larger worn slivers survive an actual 640px close-up while the fine
+ # growth texture remains restrained beneath them.
+ wear=np.zeros_like(warped,dtype=np.float32)
+ for patch in range(28):
+  center=float(rng.uniform(.012,.268));start=float(rng.uniform(0,2.35));length=float(rng.uniform(.12,.43));halfWidth=float(rng.uniform(.003,.013))
+  if patch<3:length=.46;halfWidth=.022
+  curve=center+.0017*_SlowCurve(x/2.6,rng,9)
+  width=halfWidth*(.78+.28*_SlowCurve(x/2.6,rng,13))
+  across=np.abs(warped-curve)/np.maximum(width,.001)
+  crossMask=np.clip((1.12-across)/.32,0,1);crossMask=crossMask*crossMask*(3-2*crossMask)
+  # Layer-to-layer end offsets break the edge into splinter-like strokes.
+  phase=(x-start-.014*bandValues[index])/length
+  along=np.clip(phase/.12,0,1)*np.clip((1-phase)/.16,0,1)
+  broken=np.clip(.81+.24*bandValues[index]-.17*groove,.35,1)
+  wear=np.maximum(wear,(crossMask*along*broken*rng.uniform(.52,.90)).astype(np.float32))
+ # Art-directed worn fragments are placed inside the actual finite windows of
+ # Foot post.001 (seed 26476) and both long rails, not merely counted over the
+ # unused full atlas. Their 25-45mm broken widths remain visible at game scale.
+ # These are ordinary physical surface locations, not geometry/test patches.
+ wearAnchors=[(.69,.24,.104,.022,.94),(.94,.18,.157,.019,.91),(1.11,.11,.043,.017,.85),
+              (1.45,.32,.165,.021,.94),(.36,.26,.141,.017,.88),(1.97,.24,.187,.022,.88)]
+ for start,length,center,halfWidth,strength in wearAnchors:
+  curve=center+.0027*_SlowCurve(x/2.6,rng,11)
+  width=halfWidth*(.84+.24*_SlowCurve(x/2.6,rng,17))
+  across=np.abs(warped-curve)/np.maximum(width,.001)
+  crossMask=np.clip((1.14-across)/.34,0,1);crossMask=crossMask*crossMask*(3-2*crossMask)
+  phase=(x-start-.022*bandValues[index])/length
+  along=np.clip(phase/.14,0,1)*np.clip((1-phase)/.18,0,1)
+  broken=np.clip(.91+.18*bandValues[index]-.13*groove,.48,1)
+  wear=np.maximum(wear,(crossMask*along*broken*strength).astype(np.float32))
+ patina=np.clip(.57+.20*_SlowCurve(x/2.6,rng,11)+.09*bandValues[index]+.045*(warped/.28-.5),.12,.96)
+ field-=.000045*wear
+ # Sparse, unequal, tapering long dry checks. Most growth boundaries never
+ # become black cracks; widths and start/end locations vary independently.
+ for _ in range(7):
+  center=float(rng.uniform(.014,.266));start=float(rng.uniform(0,2.1));length=float(rng.uniform(.22,.68));halfWidth=float(rng.uniform(.00030,.00085))
+  path=center+.0007*_SlowCurve(x/2.6,rng,7)
+  along=np.clip((x-start)/max(length,.01),0,1);envelope=np.where((x>start)&(x<start+length),16*along*along*(1-along)*(1-along),0)
+  split=np.exp(-((y-path)/halfWidth)**2)*envelope
+  tone-=.26*split;field-=.00055*split
+ Put(rect,field.astype(np.float32),tone.astype(np.float32),(2.6,.28),wear=wear,patina=patina)
+ # Four eccentric sections: the pith lies outside the sampled face, so only
+ # partial irregular arcs appear. Nonuniform growth spacings avoid target rings.
+ for variant,rect in enumerate(_SurfaceLayout['ends']):
+  random=np.random.default_rng(913+variant*1201);width=round((rect[1][0]-rect[0][0])*size);height=round((rect[1][1]-rect[0][1])*size)
+  ex,ey=np.meshgrid(np.linspace(-.09,.09,width,dtype=np.float32),np.linspace(.09,-.09,height,dtype=np.float32))
+  pith=np.asarray([random.uniform(-.19,-.13),random.uniform(-.13,.13)],dtype=np.float32)
+  dx=ex-pith[0];dy=(ey-pith[1])*random.uniform(.77,1.24)
+  radius=np.sqrt(dx*dx+dy*dy)+.0017*(ex/.09)*(ey/.09)+.0008*(ey/.09)**3
+  rings=[0.]
+  while rings[-1]<.45:rings.append(rings[-1]+float(random.gamma(1.8,.0015)+.0007))
+  rings=np.asarray(rings,dtype=np.float32);ringId=np.clip(np.searchsorted(rings,radius)-1,0,len(rings)-2)
+  ringDistance=np.minimum(radius-rings[ringId],rings[ringId+1]-radius)
+  ringGroove=np.exp(-(ringDistance/.00032)**2)
+  ringTone=random.uniform(-1,1,len(rings)).astype(np.float32)[ringId]
+  etone=1+.023*ringTone-.036*ringGroove;eh=.000018*ringTone-.000045*ringGroove
+  # Only a couple of incomplete rays/checks. These are colour/relief cues;
+  # actual missing wedges and open end splits come from WoodDamage geometry.
+  for _ in range(2):
+   angle=float(random.uniform(-.75,.75));line=dy*np.cos(angle)-dx*np.sin(angle)
+   taper=np.clip((radius-.09)/.14,0,1)
+   check=np.exp(-(line/random.uniform(.00040,.00085))**2)*taper
+   etone-=.16*check;eh-=.00035*check
+  Put(rect,eh.astype(np.float32),etone.astype(np.float32),(.18,.18),True)
+ # Flat neutral patch reserved for iron and the already-authored dark checks.
+ base[8:64,1568:2016]=1;normals[8:64,1568:2016]=[0,0,1];roughness[8:64,1568:2016]=.82;metallic[8:64,1792:2016]=.70
+ rgb=np.floor(_SurfaceSrgb(base)*255+.5).astype(np.uint8)
+ normal=normals.reshape(1024,2,1024,2,3).mean(axis=(1,3));normal/=np.maximum(np.linalg.norm(normal,axis=2,keepdims=True),1e-8)
+ normal=np.floor(np.clip(normal*.5+.5,0,1)*255+.5).astype(np.uint8)
+ orm=np.zeros((512,512,3),dtype=np.uint8);orm[:,:,0]=255
+ orm[:,:,1]=np.floor(roughness.reshape(512,4,512,4).mean(axis=(1,3))*255+.5).astype(np.uint8)
+ orm[:,:,2]=np.floor(metallic.reshape(512,4,512,4).mean(axis=(1,3))*255+.5).astype(np.uint8)
+ return {'Base':rgb,'Normal':normal,'Orm':orm},{'version':_SurfaceVersion,'layout':_SurfaceLayout,'baseSize':2048,'normalSize':1024,'ormSize':512,'sideGrowthBoundaries':len(boundaries),'sideDryChecks':7,'irregularLongitudinalFinishLossPatches':34,'memberWindowWearAnchors':wearAnchors,'wearAreaAboveHalf':float(np.mean(wear>.5)),'sideColorLinearMinMax':[float(base[32:2016,32:1504].min()),float(base[32:2016,32:1504].max())],'endVariants':4,'sharedPhysicalHeightForPbr':True,'normalMethod':'physical finite-height derivatives, PNG-row V sign corrected, OpenGL +Y; area-averaged and renormalized to 1K','periodicEqualSpacing':False,'photographicPixelsCopied':False}
+
+
+def _ReferenceSurfaceMaterial(textureRoot):
+ textureRoot=Path(textureRoot);textureRoot.mkdir(parents=True,exist_ok=True)
+ recipeHash=hashlib.sha256(Path(__file__).read_bytes()).hexdigest();rootSignature=str(textureRoot.resolve())
+ material=bpy.data.materials.get('Material_BedFrameReference')
+ if material and material.get('ReferenceWoodSurfaceVersion')==_SurfaceVersion and material.get('ReferenceWoodRecipeHash')==recipeHash and material.get('ReferenceWoodTextureRoot')==rootSignature:
+  return material,json.loads(material['ReferenceWoodSurfaceReceipt'])
+ maps,stats=BuildReferenceWoodSurface();images={};textureRows=[]
+ for role,pixels in maps.items():
+  path=textureRoot/('Texture_BedFrameReference'+role+'.png');raw=_EncodeSurfacePng(pixels);path.write_bytes(raw)
+  image=bpy.data.images.load(str(path),check_existing=False);image.name=path.stem;image.colorspace_settings.name='sRGB' if role=='Base' else 'Non-Color';image.pack();images[role]=image
+  textureRows.append({'role':role,'file':str(path),'dimensions':[int(pixels.shape[1]),int(pixels.shape[0])],'sha256':hashlib.sha256(raw).hexdigest()})
+ if material is None:material=bpy.data.materials.new('Material_BedFrameReference')
+ oldImages=[node.image for node in material.node_tree.nodes if node.type=='TEX_IMAGE' and node.image] if material.use_nodes else []
+ material.use_nodes=True;nodes=material.node_tree.nodes;links=material.node_tree.links;nodes.clear()
+ for oldImage in oldImages:
+  if oldImage.users==0:bpy.data.images.remove(oldImage)
+ for role,image in images.items():image.name='Texture_BedFrameReference'+role
+ bsdf=nodes.new('ShaderNodeBsdfPrincipled');output=nodes.new('ShaderNodeOutputMaterial');links.new(bsdf.outputs['BSDF'],output.inputs['Surface'])
+ uv=nodes.new('ShaderNodeUVMap');uv.uv_map='UVMap';color=nodes.new('ShaderNodeVertexColor');color.layer_name='BR_original_low_frequency_color'
+ textureNodes={}
+ for role,image in images.items():
+  texture=nodes.new('ShaderNodeTexImage');texture.image=image;texture.interpolation='Linear';texture.extension='REPEAT';links.new(uv.outputs['UV'],texture.inputs['Vector']);textureNodes[role]=texture
+ multiply=nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1
+ links.new(textureNodes['Base'].outputs['Color'],multiply.inputs[1]);links.new(color.outputs['Color'],multiply.inputs[2]);links.new(multiply.outputs[0],bsdf.inputs['Base Color'])
+ normal=nodes.new('ShaderNodeNormalMap');normal.uv_map='UVMap';normal.inputs['Strength'].default_value=.48;links.new(textureNodes['Normal'].outputs['Color'],normal.inputs['Color']);links.new(normal.outputs['Normal'],bsdf.inputs['Normal'])
+ separate=nodes.new('ShaderNodeSeparateColor');links.new(textureNodes['Orm'].outputs['Color'],separate.inputs['Color']);links.new(separate.outputs['Green'],bsdf.inputs['Roughness']);links.new(separate.outputs['Blue'],bsdf.inputs['Metallic'])
+ stats['textures']=textureRows;stats['normalStrength']=.48;stats['nativePbrMaterial']=material.name;stats['recipeSha256']=recipeHash
+ material['ReferenceWoodSurfaceVersion']=_SurfaceVersion;material['ReferenceWoodSurfaceReceipt']=json.dumps(stats)
+ material['ReferenceWoodRecipeHash']=recipeHash;material['ReferenceWoodTextureRoot']=rootSignature
+ return material,stats
 
 
 def _MetalMaterial(material):
@@ -335,7 +511,7 @@ def _AuthorMember(obj,seed,material,chipGeometry=False):
  return {'object':obj.name,'sourceTriangles':sum(len(poly.vertices)-2 for poly in mesh.polygons),'lengthMetres':float(span[0]),'sectionMetres':[float(span[1]),float(span[2])],'sideFaces':sideFaces,'endFaces':endFaces,'existingVerticesChipped':chippedVertices,'maximumCornerChipMm':maxChip*1000,'geometryChangedThisPass':bool(chippedVertices),'preservedAuthoredMaterialSlots':len(originalMaterials)-len(woodySlots)}
 
 
-def WeatherTimberFrame(frameObjects,chipGeometry=False):
+def WeatherTimberFrame(frameObjects,chipGeometry=False,textureRoot=None):
  """Age supplied source frame members in place, returning JSON-safe statistics.
 
  Call once in Prepare, before saving Scene_PatchedTimberBedHigh.blend. Source
@@ -352,4 +528,141 @@ def WeatherTimberFrame(frameObjects,chipGeometry=False):
   if obj.type!='MESH':continue
   row=_AuthorMember(obj,2719+index*7919,material,chipGeometry=chipGeometry)
   if row:rows.append(row)
+ if textureRoot is not None:
+  records=[]
+  for index,obj in enumerate(sorted(objects,key=lambda value:value.name)):
+   if obj.type!='MESH':continue
+   record=_ReferenceMemberRecord(obj,2719+index*7919,index+1);records.append(record)
+   if record['surfaceRole']=='metal':record['ironContacts']=[contact for contact in ironContacts if contact['sourceObject']==obj.name]
+   _ApplyReferenceMapping(obj,textureRoot,[record],ironContacts,sourceMode=True)
+   obj['TimberWeatherVersion']=_SurfaceVersion
+  return {'version':_SurfaceVersion,'geometryVersion':_GeometryVersion,'geometryChippingEnabled':bool(chipGeometry),'geometryChangedThisPass':any(row.get('geometryChangedThisPass',False) for row in rows),'addedTriangles':0,'memberRecords':records,'members':rows,'ironContacts':ironContacts,'ironContactCount':len(ironContacts),'surface':_ReferenceSurfaceMaterial(textureRoot)[1],'sourceMetalMaterialsPreserved':True}
  return {'version':_Version,'geometryVersion':_GeometryVersion,'geometryChippingEnabled':bool(chipGeometry),'geometryChangedThisPass':any(row.get('geometryChangedThisPass',False) for row in rows),'objects':len(rows),'weatheredObjects':sum('skipped' not in row for row in rows),'addedTriangles':0,'maximumCornerChipMm':max((row.get('maximumCornerChipMm',0) for row in rows),default=0),'representation':'deep brown and grey patina with restrained broad mottling; clearly bounded metre-authored linear grain and long dry splits, tenon-shoulder grime, measured-iron staining, local dark semi-polish, sparse pale abrasions and foot damp tide marks; baked PBR','grainProfile':{'method':'metric transverse phase ridges with low-amplitude longitudinal bending; no Voronoi oval crack cells','grainPeriodM':.0105,'grainHalfWidthTransitionM':[.00050,.00160],'drySplitPeriodM':.041,'drySplitHalfWidthTransitionM':[.00040,.00175],'grainGrooveDepthM':.00048,'drySplitDepthM':.00145,'maximumCombinedGrainBendM':.00122,'recommendedBaseNormalSizes':[2048,1024]},'uvMaps':[_GrainUv,_EndUv,_EdgeUv],'cornerData':_MemberData,'worldPositionAttribute':_WorldAttribute,'ironContactCount':len(ironContacts),'ironContacts':ironContacts,'recommendedFrameTriangles':6000,'recommendedAtlasSize':2048,'members':rows}
+
+
+def _ReferenceMemberRecord(obj,seed,fallbackId):
+ points=np.empty(len(obj.data.vertices)*3,dtype=np.float64);obj.data.vertices.foreach_get('co',points);points=points.reshape(-1,3)
+ matrix=np.asarray(obj.matrix_world,dtype=np.float64);world=points@matrix[:3,:3].T+matrix[:3,3]
+ center,axes,coords=_MemberCoordinates(world);name=obj.name.lower()
+ basisPolicy='principal member axis'
+ if 'post' in name:
+  # Local subtractive cuts add many vertices to one post corner and can tilt
+  # vertex-weighted PCA. These named bed posts are upright members: retaining
+  # world Z for their fibre direction prevents that sampling bias becoming
+  # high-frequency cross-grain drift on a narrow visible side.
+  axes=np.column_stack(([0.,0.,1.],[-1.,0.,0.],[0.,-1.,0.]));coords=(world-center)@axes
+  basisPolicy='semantic upright post world-Z; independent of cut-vertex density'
+ role='recess' if 'open timber grain checks' in name else 'peg' if ('mortise' in name and 'peg' in name) else 'metal' if any(value for value in obj.data.materials) and all(_MetalMaterial(value) for value in obj.data.materials if value) else 'wood'
+ memberId=int(obj.get('FrameMemberId',fallbackId));obj['FrameMemberId']=memberId
+ return {'id':memberId,'name':obj.name,'center':center.tolist(),'axes':axes.T.tolist(),'minimum':coords.min(axis=0).tolist(),'maximum':coords.max(axis=0).tolist(),'seed':int(seed),'surfaceRole':role,'basisPolicy':basisPolicy}
+
+
+def _EnsureFrameTags(obj,record,sourceMode):
+ mesh=obj.data;member=mesh.attributes.get('FrameMemberId');metal=mesh.attributes.get('FrameMetalSlot')
+ if member is None:
+  if not sourceMode:raise ValueError('Joined Frame requires FACE FrameMemberId from source members')
+  member=mesh.attributes.new(name='FrameMemberId',type='INT',domain='FACE');member.data.foreach_set('value',np.full(len(mesh.polygons),record['id'],dtype=np.int32))
+ if member.domain!='FACE' or member.data_type!='INT':raise ValueError('FrameMemberId must be FACE INT')
+ if metal is None:
+  if not sourceMode:raise ValueError('Joined Frame requires FACE FrameMetalSlot from source material slots')
+  metal=mesh.attributes.new(name='FrameMetalSlot',type='INT',domain='FACE')
+  values=[]
+  for poly in mesh.polygons:
+   material=mesh.materials[poly.material_index] if poly.material_index<len(mesh.materials) else None
+   values.append(1 if _MetalMaterial(material) else 2 if _RetainedMaterial(material) else 0)
+  metal.data.foreach_set('value',np.asarray(values,dtype=np.int32))
+ if metal.domain!='FACE' or metal.data_type!='INT':raise ValueError('FrameMetalSlot must be FACE INT')
+ return member,metal
+
+
+def _ApplyReferenceMapping(frame,textureRoot,memberRecords,ironContacts=(),sourceMode=False):
+ mesh=frame.data
+ if not len(mesh.vertices):raise ValueError('Reference Frame surface needs nonempty geometry')
+ originalMaterials=list(mesh.materials);oldActive=mesh.color_attributes.active_color
+ oldActiveName=oldActive.name if oldActive else None
+ material,surfaceStats=_ReferenceSurfaceMaterial(textureRoot);records={int(record['id']):record for record in memberRecords}
+ default=memberRecords[0] if len(memberRecords)==1 else None
+ memberTag,metalTag=_EnsureFrameTags(frame,default,sourceMode)
+ memberIds=np.empty(len(mesh.polygons),dtype=np.int32);memberTag.data.foreach_get('value',memberIds)
+ metalIds=np.empty(len(mesh.polygons),dtype=np.int32);metalTag.data.foreach_get('value',metalIds)
+ missing=sorted(set(int(value) for value in memberIds)-set(records))
+ if missing:raise ValueError('Frame member records missing ids '+str(missing))
+ points=np.empty(len(mesh.vertices)*3,dtype=np.float64);mesh.vertices.foreach_get('co',points);points=points.reshape(-1,3)
+ beforeHash=hashlib.sha256(points.tobytes()).hexdigest();matrix=np.asarray(frame.matrix_world,dtype=np.float64);world=points@matrix[:3,:3].T+matrix[:3,3]
+ uvValues=np.zeros((len(mesh.loops),2),dtype=np.float32);colors=np.ones((len(mesh.loops),4),dtype=np.float32)
+ damage=mesh.color_attributes.get('WoodDamageData');damageValues=np.zeros((len(mesh.loops),4),dtype=np.float32)
+ if damage is not None:
+  if damage.domain!='CORNER':raise ValueError('WoodDamageData must use CORNER domain')
+  damage.data.foreach_get('color',damageValues.ravel())
+ sideCount=endCount=metalCount=recessCount=exposedCorners=0;windows={}
+ for memberId,record in records.items():
+  random=np.random.default_rng(record['seed']);minimum=np.asarray(record['minimum']);maximum=np.asarray(record['maximum']);span=np.maximum(maximum-minimum,1e-6)
+  windows[memberId]={'along':float(random.uniform(.014,max(.014,2.6-min(span[0],2.56)-.014))),'cross':[float(random.uniform(.006,max(.006,.28-min(span[axis],.265)-.006))) for axis in (1,2)],'end':int(record['seed']%4),'seedTone':float(random.uniform(.92,1.06))}
+ for poly in mesh.polygons:
+  record=records[int(memberIds[poly.index])];window=windows[int(memberIds[poly.index])];loops=np.asarray(poly.loop_indices,dtype=np.int32);ids=np.asarray(poly.vertices,dtype=np.int32)
+  face=world[ids];axes=np.asarray(record['axes'],dtype=np.float64);coords=(face-np.asarray(record['center']))@axes.T
+  minimum=np.asarray(record['minimum']);maximum=np.asarray(record['maximum']);span=np.maximum(maximum-minimum,1e-6)
+  normal=np.cross(face[1]-face[0],face[2]-face[0]);normal/=max(np.linalg.norm(normal),1e-15);alignment=np.abs(normal@axes.T)
+  role=record['surfaceRole'];isMetal=metalIds[poly.index]==1 or role=='metal';isRecess=metalIds[poly.index]==2 or role=='recess'
+  if isMetal or isRecess or role=='peg':
+   drop=int(np.argmax(np.abs(normal)));plane=face[:,[axis for axis in range(3) if axis!=drop]]
+   normalized=(plane-plane.min(axis=0))/np.maximum(np.ptp(plane,axis=0),1e-8)
+   uvValues[loops]=np.asarray(_SurfaceLayout['metal' if isMetal else 'neutral'])+(normalized-.5)*.006
+   colors[loops,:3]=(.032,.029,.023) if isMetal else (.018,.014,.009) if isRecess else (.125,.082,.043)
+   metalCount+=int(isMetal);recessCount+=int(isRecess)
+   continue
+  isEnd=alignment[0]>.72
+  if isEnd:
+   rect=np.asarray(_SurfaceLayout['ends'][window['end']]);relative=coords[:,1:]-minimum[1:]
+   virtual=.18;offset=np.maximum(0,virtual-span[1:])*.43
+   normalized=np.clip((relative+offset)/virtual,.015,.985);uvValues[loops]=rect[0]+normalized*(rect[1]-rect[0]);endCount+=1
+  else:
+   vAxis=2 if alignment[1]>=alignment[2] else 1
+   physical=np.stack((coords[:,0]-minimum[0]+window['along'],coords[:,vAxis]-minimum[vAxis]+window['cross'][vAxis-1]),axis=1)
+   normalized=np.clip(physical/np.asarray([2.6,.28]),.004,.996);rect=np.asarray(_SurfaceLayout['side']);uvValues[loops]=rect[0]+normalized*(rect[1]-rect[0]);sideCount+=1
+  # Broad physical use zones are intentionally restrained. No uniform bright
+  # edge mask: only the actual new WoodDamage cut faces expose paler wood.
+  color=np.tile(np.asarray([.245,.165,.090])*window['seedTone'],(len(loops),1))
+  greyWeight=.08+.06*((record['seed']%19)/18);color=color*(1-greyWeight)+np.asarray([.205,.180,.138])*greyWeight
+  damp=np.clip((.18-face[:,2])/.18,0,1)*.28;color=color*(1-damp[:,None])+np.asarray([.054,.046,.027])*damp[:,None]
+  shoulder=np.clip((.026-np.minimum(coords[:,0]-minimum[0],maximum[0]-coords[:,0]))/.026,0,1)*.09
+  color=color*(1-shoulder[:,None])+np.asarray([.055,.038,.021])*shoulder[:,None]
+  if isEnd:color=color*.93+np.asarray([.205,.175,.128])*.07
+  iron=np.zeros(len(loops),dtype=np.float64)
+  for contact in ironContacts:
+   delta=face-np.asarray(contact['position']);radius=contact['radiusM'];delta[:,2]+=.009
+   distance=np.linalg.norm(delta/np.asarray([radius*2,radius*2,radius*3]),axis=1)
+   iron=np.maximum(iron,np.clip((1.5-distance)/1.2,0,1)*.23)
+  color=color*(1-iron[:,None])+np.asarray([.040,.030,.018])*iron[:,None]
+  exposed=np.clip(damageValues[loops,0],0,1)*.42
+  color=color*(1-exposed[:,None])+np.asarray([.244,.211,.155])*exposed[:,None];exposedCorners+=int(np.count_nonzero(exposed))
+  colors[loops,:3]=color
+ uv=mesh.uv_layers.get('UVMap') or mesh.uv_layers.new(name='UVMap');uv.data.foreach_set('uv',uvValues.ravel());mesh.uv_layers.active=uv;uv.active_render=True
+ if not sourceMode:
+  for layer in list(mesh.uv_layers):
+   if layer.name!='UVMap':mesh.uv_layers.remove(layer)
+ color=mesh.color_attributes.get('BR_original_low_frequency_color')
+ if color and (color.domain!='CORNER' or color.data_type!='FLOAT_COLOR'):mesh.color_attributes.remove(color);color=None
+ if color is None:color=mesh.color_attributes.new(name='BR_original_low_frequency_color',type='FLOAT_COLOR',domain='CORNER')
+ color.data.foreach_set('color',colors.ravel());mesh.color_attributes.active_color=color
+ if sourceMode:
+  for index,value in enumerate(originalMaterials):
+   if value is not None and not _RetainedMaterial(value):mesh.materials[index]=material
+  if not originalMaterials:mesh.materials.append(material)
+  if oldActiveName and mesh.color_attributes.get(oldActiveName):mesh.color_attributes.active_color=mesh.color_attributes[oldActiveName]
+ else:
+  mesh.materials.clear();mesh.materials.append(material)
+  for poly in mesh.polygons:poly.material_index=0
+ mesh.update();after=np.empty(points.size,dtype=np.float64);mesh.vertices.foreach_get('co',after)
+ if not np.array_equal(points.ravel(),after):raise ValueError('Reference material mapping changed Frame positions')
+ frame['GameExportColorLayer']='BR_original_low_frequency_color'
+ return {'version':_SurfaceVersion,'group':'Frame','triangles':sum(len(poly.vertices)-2 for poly in mesh.polygons),'geometryUnchanged':True,'positionHash':beforeHash,'maximumVertexDisplacementM':0.,'materials':len(mesh.materials),'sourceMode':sourceMode,'uvLayer':'UVMap','colorLayer':'BR_original_low_frequency_color','finiteAtlasWindows':True,'sideFaces':sideCount,'endFaces':endCount,'metalFaces':metalCount,'recessFaces':recessCount,'actualExposedDamageCorners':exposedCorners,'memberCount':len(records),'surface':surfaceStats}
+
+
+def ApplyReferenceWoodSurface(frame,textureRoot,memberRecords):
+ """Map tagged final low Frame to one shared native PBR surface, in place."""
+ contacts=[]
+ for record in memberRecords:
+  for contact in record.get('ironContacts',[]):
+   if contact not in contacts:contacts.append(contact)
+ return _ApplyReferenceMapping(frame,textureRoot,memberRecords,contacts,sourceMode=False)

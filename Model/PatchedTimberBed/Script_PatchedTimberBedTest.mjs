@@ -187,8 +187,9 @@ async function BrowserMain() {
   const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, .005, 100);
   scene.add(new THREE.HemisphereLight(0xe2ecf4, 0x847b6a, 2.1));
   const sun = new THREE.DirectionalLight(0xffefda, 3); sun.position.set(4, 7, 3); sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4, near: .1, far: 20 });
-  sun.shadow.bias = -.00008; sun.shadow.normalBias = .0015; scene.add(sun);
+  sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -2, right: 2, top: 2, bottom: -2, near: .5, far: 14 });
+  sun.shadow.camera.updateProjectionMatrix();
+  sun.shadow.bias = .00012; sun.shadow.normalBias = .003; scene.add(sun);
   const fill = new THREE.DirectionalLight(0xd9e9ff, .65); fill.position.set(-3, 2, -4); scene.add(fill);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0xa9adb0, roughness: .94 }));
   floor.rotation.x = -Math.PI / 2; floor.position.y = BedConfig.boundsMin[1] - .003; floor.receiveShadow = true; scene.add(floor);
@@ -207,13 +208,19 @@ async function BrowserMain() {
     return distance * 1.17;
   }
   function SetView(view) {
-    const directions = { Front: [1.2, .9, 1.3], Back: [-1.2, .85, -1.3], Top: [.05, 2.5, .05], Quilt: [.3, 1.2, 1.1], FootCloth: [1.3, .55, .8], Frame: [1.1, .5, -1.3], Support: [.4, .1, 1.2] };
+    const directions = { Front: [1.2, .9, 1.3], Back: [-1.2, .85, -1.3], Top: [.05, 2.5, .05], Quilt: [.3, 1.2, 1.1], FootCloth: [1.3, .55, .8], Frame: [1.1, .5, -1.3], Support: [.4, .1, 1.2], FrameJoin: [1.15, .85, -1.3] };
     const direction = new THREE.Vector3(...directions[view]).normalize(); target.copy(center); let distance = Fit(direction);
-    if (['Quilt', 'FootCloth', 'Frame', 'Support'].includes(view)) {
+    if (['Quilt', 'FootCloth', 'Frame', 'Support', 'FrameJoin'].includes(view)) {
       if (view === 'Quilt') { target.y = sharedBox.min.y + size.y * .75; distance = size.length() * .47; }
       if (view === 'FootCloth') { target.x = sharedBox.max.x - size.x * .12; target.y = sharedBox.min.y + size.y * .54; distance = size.length() * .39; }
       if (view === 'Frame') { target.x = sharedBox.min.x + size.x * .17; target.y = sharedBox.min.y + size.y * .36; distance = size.length() * .44; }
       if (view === 'Support') { target.y = sharedBox.min.y + size.y * .36; distance = size.length() * .47; }
+      if (view === 'FrameJoin') {
+        // Shared bounds keep both assets at one camera: exposed foot-post cap,
+        // outside corner silhouette and the adjoining long/end rails.
+        target.set(sharedBox.max.x - size.x * .085, sharedBox.min.y + size.y * .685, sharedBox.min.z + size.z * .045);
+        distance = size.length() * .20;
+      }
     }
     camera.position.copy(target).addScaledVector(direction, distance); camera.updateProjectionMatrix(); currentView = view; Render();
   }
@@ -287,7 +294,7 @@ async function WriteReviewPage(finalReport, originalReport) {
   const config = { files: { Final: Url(finalFile), ...(originalReport ? { Original: Url(originalFile) } : {}) }, boundsMin, boundsMax, bsNodeExpression, originalLabel };
   const html = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Patched timber bed · local acceptance</title>
 <style>html,body{margin:0;overflow:hidden;background:#c5cbd0;font:14px system-ui}canvas{display:block;touch-action:none}header{position:absolute;inset:12px 12px auto;display:flex;gap:6px;align-items:center;z-index:2;padding:8px;background:#ffffffdf;border-radius:8px}select,button{font:inherit;padding:5px 9px}#status{margin-left:8px;font-size:12px}</style>
-<header><select id="asset"><option value="Final">最终完整游戏版</option>${originalReport ? `<option value="Original">${originalLabel.replaceAll('&','&amp;').replaceAll('<','&lt;')}</option>` : ''}</select>${[['Front','斜前'],['Back','背面'],['Top','俯视'],['Quilt','棉被'],['FootCloth','脚端布料'],['Frame','床架'],['Support','支撑草席']].map(([key,label]) => `<button data-view="${key}">${label}</button>`).join('')}<span id="status">加载中…</span></header>
+<header><select id="asset"><option value="Final">最终完整游戏版</option>${originalReport ? `<option value="Original">${originalLabel.replaceAll('&','&amp;').replaceAll('<','&lt;')}</option>` : ''}</select>${[['Front','斜前'],['Back','背面'],['Top','俯视'],['Quilt','棉被'],['FootCloth','脚端布料'],['Frame','床架'],['Support','支撑草席'],['FrameJoin','接头端纹']].map(([key,label]) => `<button data-view="${key}">${label}</button>`).join('')}<span id="status">加载中…</span></header>
 <script type="importmap">{"imports":{"three":"/Taierzhuang1938/vendor/three/build/three.module.js"}}</script><script type="module">import * as THREE from 'three';import {ManagedGLTFLoader} from '/Taierzhuang1938/Script_ModelImports.mjs';const BedConfig=${JSON.stringify(config)};(${BrowserMain.toString()})();</script></html>`;
   await fs.writeFile(path.join(outputRoot, 'index.html'), html);
 }
@@ -341,7 +348,7 @@ async function BrowserReview(finalReport, originalReport) {
           Near(normal.repeat, [1, 1], 'runtime BS normal scale'); Near(normal.offset, [0, 0], 'runtime BS normal offset');
         }
       }
-      for (const view of ['Front', 'Back', 'Top', 'Quilt', 'FootCloth', 'Frame', 'Support']) {
+      for (const view of ['Front', 'Back', 'Top', 'Quilt', 'FootCloth', 'Frame', 'Support', 'FrameJoin']) {
         await page.locator(`[data-view="${view}"]`).click();
         const frame = await page.evaluate(() => BedReview.Snapshot());
         assert.ok(frame.pixels.occupied > 300, `${name} ${view} draws visible model pixels`);

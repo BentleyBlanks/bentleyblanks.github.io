@@ -16,7 +16,7 @@ from Script_PatchedTimberBedCotton import ApplyCottonWeave
 from Script_PatchedTimberBedWood import WeatherTimberFrame
 from Script_PatchedTimberBedQuilt import BakeQuiltSurface
 if '--' in sys.argv:
- parser=argparse.ArgumentParser();parser.add_argument('--source-root',required=True);parser.add_argument('--review-root',required=True);parser.add_argument('--stage',default='all',choices=['prepare','build','finish','refresh','material-frame','export','all']);parser.add_argument('--skip-renders',action='store_true');parser.add_argument('--group',choices=['Quilt','Straw'],default='Straw')
+ parser=argparse.ArgumentParser();parser.add_argument('--source-root',required=True);parser.add_argument('--review-root',required=True);parser.add_argument('--stage',default='all',choices=['prepare','build','finish','refresh','material-frame','wood-reference','export','all']);parser.add_argument('--skip-renders',action='store_true');parser.add_argument('--group',choices=['Quilt','Straw'],default='Straw')
  args=parser.parse_args(sys.argv[sys.argv.index('--')+1:]);config={'sourceRoot':args.source_root,'reviewRoot':args.review_root,'stage':args.stage,'skipRenders':args.skip_renders,'refreshGroup':args.group}
 else:config=json.loads(pathlib.Path(os.environ.get('BED_BAKE_CONFIG',str(repoRoot/'tmp/BedBnBsAcceptance/Data_BakeConfig.json'))).read_text())
 sourceRoot=pathlib.Path(config['sourceRoot'])
@@ -140,8 +140,7 @@ def Prepare():
  # 149 mm. Keep the complete authored outer shell; game contact now uses a
  # separately classified hidden underside and the real compacted straw mat.
  (reviewRoot/'Data_UndersideFitHigh.json').write_text(json.dumps({'method':'Authored visible shell preserved; no height-band displacement of fold flanks','fitDisplacementM':0},indent=2))
- woodStats=WeatherTimberFrame([o for o in objects if GroupName(o)=='Frame'],chipGeometry=True)
- (reviewRoot/'Data_WoodWeathering.json').write_text(json.dumps(woodStats,indent=2))
+ PrepareReferenceFrameSources([o for o in objects if GroupName(o)=='Frame'])
  ArchiveRecipes()
  bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedHigh.blend'))
  scene=bpy.context.scene;scene.render.resolution_x=1080;scene.render.resolution_y=720;scene.render.resolution_percentage=100;scene.render.use_border=False;scene.render.use_crop_to_border=False;scene.cycles.samples=32;scene.render.threads_mode='FIXED';scene.render.threads=6
@@ -343,11 +342,12 @@ def Build():
  Select([duplicate]);mod=duplicate.modifiers.new('FootBudget','DECIMATE');mod.ratio=min(1,5000/TriangleCount(duplicate));mod.use_collapse_triangulate=True;bpy.ops.object.modifier_apply(modifier=mod.name);CleanGameMesh(duplicate,soft=True)
  duplicate.name='BS_FootCloth'
  rows=[];game=[duplicate]
- for name,target,size in [('Quilt',18000,2048),('Pillow',2200,512),('Sewing',1800,512),('Frame',6000,2048),('Straw',6500,1024)]:
+ for name,target,size in [('Quilt',18000,2048),('Pillow',2200,512),('Sewing',1800,512),('Frame',7200,2048),('Straw',12500,1024)]:
   if name=='Quilt':low,row=BakeQuiltSurface(groups[name],target)
   elif name=='Straw':
    from Script_PatchedTimberBedStraw import BakeStrawSurface
    low,row=BakeStrawSurface(groups[name],12500)
+  elif name=='Frame':low,row=BuildReferenceFrame(groups[name],target)
   else:low,row=BakeGroup(name,groups[name],target,512 if name in ('Pillow','Sewing') else size)
   game.append(low);rows.append(row)
   bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_BedBakeProgress.blend'))
@@ -357,7 +357,17 @@ def Build():
 def FinishGame(game,originals,rows,duplicate):
  from Script_PatchedTimberBedContact import AddCompactMatContact
  quilt=next(o for o in game if o.name=='Quilt');straw=next(o for o in game if o.name=='Straw');sewing=next(o for o in game if o.name=='Sewing')
- liningStats=AddCompactMatContact(quilt,duplicate,straw)
+ # Contact allocates the remaining whole-bed budget. Count actual valid meshes
+ # at that point, rather than reserving triangles that validation later removes.
+ validateBeforeBudget=config.get('stage','all') in ('all','build','finish')
+ if validateBeforeBudget:
+  beforeContact=[]
+  for obj in game:
+   count=TriangleCount(obj);repaired=obj.data.validate(verbose=True,clean_customdata=False);obj.data.update()
+   if obj.data.validate(verbose=False,clean_customdata=False):raise ValueError('Unstable pre-contact mesh validation: '+obj.name)
+   beforeContact.append({'group':obj.name,'trianglesBefore':count,'trianglesAfter':TriangleCount(obj),'meshValidationRepaired':repaired})
+  (reviewRoot/'Data_GameMeshPreContactValidation.json').write_text(json.dumps(beforeContact,indent=2))
+ liningStats=AddCompactMatContact(quilt,duplicate,straw,validateBeforeBudget=validateBeforeBudget)
  (reviewRoot/'Data_QuiltLining.json').write_text(json.dumps(liningStats,indent=2))
  from Script_PatchedTimberBedStrawAge import ApplyAgedStrawMaterial
  strawAgeStats=ApplyAgedStrawMaterial(straw,textureRoot)
@@ -446,6 +456,126 @@ def RefreshSoftGroup():
  bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_BedBakeProgress.blend'))
  FinishGame(game,originals,base['groups'],duplicate)
 
+def TagFrameSources(objects):
+ from Script_PatchedTimberBedWood import _MetalMaterial,_RetainedMaterial
+ for index,obj in enumerate(sorted(objects,key=lambda item:item.name)):
+  obj['FrameMemberId']=index
+  for name in ('FrameMemberId','FrameMetalSlot'):
+   layer=obj.data.attributes.get(name)
+   if layer is None:layer=obj.data.attributes.new(name=name,type='INT',domain='FACE')
+   if name=='FrameMemberId':values=np.full(len(obj.data.polygons),index,dtype=np.int32)
+   else:
+    classes=[1 if _MetalMaterial(material) else 2 if _RetainedMaterial(material) else 0 for material in obj.data.materials]
+    values=np.asarray([classes[poly.material_index] if poly.material_index<len(classes) else 0 for poly in obj.data.polygons],dtype=np.int32)
+   layer.data.foreach_set('value',values)
+
+
+def PrepareReferenceFrameSources(objects):
+ from Script_PatchedTimberBedWoodDamage import DamageTimberMembers
+ objects=list(objects)
+ # Reproduce the previous tiny V1 corner wear on pristine rebuild inputs only;
+ # its independent version prevents cumulative chipping on existing sources.
+ TagFrameSources(objects);WeatherTimberFrame(objects,chipGeometry=True)
+ damage=DamageTimberMembers(objects,gameTriangleTarget=7200)
+ damageFile=reviewRoot/'Data_WoodDamage.json'
+ archivedDamage=sourceRoot/'Scripts/Data_WoodDamage.json'
+ if damage.get('alreadyAppliedMembers',0) and not damage.get('geometryChangedThisPass'):
+  for receipt in (damageFile,archivedDamage):
+   if not receipt.exists():continue
+   previous=json.loads(receipt.read_text(encoding='utf-8'))
+   if previous.get('completedRegions',0)>0 and previous.get('version')==damage.get('version'):
+    (reviewRoot/'Data_WoodDamageIdempotence.json').write_text(json.dumps(damage,indent=2))
+    damage=previous;break
+ if damage.get('completedRegions',0)==0:raise ValueError('Reference wood requires actual visible subtractive damage, not an empty modifier pass')
+ damageFile.write_text(json.dumps(damage,indent=2))
+ archivedDamage.parent.mkdir(exist_ok=True);archivedDamage.write_text(json.dumps(damage,indent=2))
+ TagFrameSources(objects)
+ stats=WeatherTimberFrame(objects,chipGeometry=False,textureRoot=textureRoot)
+ (reviewRoot/'Data_WoodWeathering.json').write_text(json.dumps(stats,indent=2))
+ return stats
+
+
+def BuildReferenceFrame(objects,targetCount=7200):
+ from Script_PatchedTimberBedWood import ApplyReferenceWoodSurface
+ objects=list(objects);TagFrameSources(objects)
+ stats=WeatherTimberFrame(objects,chipGeometry=False,textureRoot=textureRoot)
+ copies=[]
+ for source in objects:
+  obj=source.copy();obj.data=source.data.copy();bpy.context.scene.collection.objects.link(obj);copies.append(obj)
+ low=Join(copies,'Frame');Select([low]);bpy.ops.object.transform_apply(location=False,rotation=True,scale=True)
+ before=TriangleCount(low);history=[]
+ for attempt in range(6):
+  count=TriangleCount(low)
+  if count<=targetCount:break
+  modifier=low.modifiers.new('ReferenceFrameBudget','DECIMATE');modifier.ratio=max(.005,min(.98,targetCount/count))
+  modifier.use_collapse_triangulate=True
+  if low.vertex_groups.get('TimberDamagePreserve'):
+   modifier.vertex_group='TimberDamagePreserve';modifier.invert_vertex_group=True;modifier.vertex_group_factor=1.
+  bpy.ops.object.modifier_apply(modifier=modifier.name)
+  after=TriangleCount(low);history.append([count,after])
+  if after>=count:break
+ if TriangleCount(low)>7500:raise ValueError('Protected reference Frame exceeds the 7500-triangle component ceiling: '+str(TriangleCount(low)))
+ surface=ApplyReferenceWoodSurface(low,textureRoot,stats['memberRecords'])
+ low['GameExportColorLayer']=surface.get('exportColorLayer','BR_original_low_frequency_color')
+ beforeValidate=TriangleCount(low);repaired=low.data.validate(verbose=True,clean_customdata=False);low.data.update()
+ if low.data.validate(verbose=True,clean_customdata=False):raise ValueError('Reference Frame remains invalid')
+ row={'group':'Frame','sourceObjects':len(objects),'sourceTriangles':before,'gameTriangles':TriangleCount(low),'targetTriangles':targetCount,'hardTriangleLimit':7500,'collapseHistory':history,'trianglesBeforeValidation':beforeValidate,'meshValidationRepaired':repaired,'representation':'Reference-informed damaged timber with shared metre-scale side/end surface and macro vertex colour'}
+ (reviewRoot/'Data_FrameReferenceSurface.json').write_text(json.dumps(surface,indent=2))
+ (reviewRoot/'Data_FrameReferenceBuild.json').write_text(json.dumps(row,indent=2))
+ return low,row
+
+
+def RefreshReferenceWood():
+ # Rebuild Frame alone; the compact saved game supplies the frozen other five
+ # components. The removed baking checkpoint is not required for this workflow.
+ bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedHigh.blend'))
+ sources=[obj for obj in bpy.context.scene.objects if obj.type=='MESH' and obj.name.startswith('FRAME_')]
+ PrepareReferenceFrameSources(sources)
+ ArchiveRecipes();bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedHigh.blend'),compress=True)
+ frame,row=BuildReferenceFrame(sources,7200)
+ matrix=frame.matrix_world.copy();frame.parent=None;frame.matrix_world=matrix
+ transfer=sourceRoot/'Scene_WoodFrameTransfer.blend'
+ bpy.data.libraries.write(str(transfer),{frame},path_remap='RELATIVE',compress=True)
+ bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'))
+ old=bpy.data.objects['Frame'];oldMesh=old.data
+ bpy.data.objects.remove(old,do_unlink=True)
+ if oldMesh.users==0:bpy.data.meshes.remove(oldMesh)
+ try:
+  with bpy.data.libraries.load(str(transfer),link=False) as (available,loaded):loaded.objects=['Frame']
+ finally:transfer.unlink(missing_ok=True)
+ frame=loaded.objects[0];bpy.context.scene.collection.objects.link(frame);frame.name='Frame'
+ previous=json.loads((reviewRoot/'Data_PreviousAsset.json').read_text(encoding='utf-8'))
+ offset=Vector(previous['coordinates']['sourceToGameTranslationBlender']);frame.location-=offset
+ bpy.context.view_layer.update()
+ # Reduction can lift the lowest sole by a fraction of a millimetre. Restore
+ # its existing floor contact locally; re-pivoting the bed would move the five
+ # frozen cloth/straw components. Refuse any correction larger than 0.5 mm.
+ world=np.asarray([frame.matrix_world@vertex.co for vertex in frame.data.vertices],dtype=np.float64)
+ minimum=float(world[:,2].min())
+ if abs(minimum)>.0005:raise ValueError('Reduced Frame sole needs more than 0.5 mm floor correction: '+str(minimum))
+ weights=np.clip(1-(world[:,2]-minimum)/.004,0,1)
+ inverse=frame.matrix_world.inverted();corrected=world.copy();corrected[:,2]-=minimum*weights
+ for vertex,point in zip(frame.data.vertices,corrected):vertex.co=inverse@Vector(point)
+ frame.data.update()
+ (reviewRoot/'Data_FrameFloorAlignment.json').write_text(json.dumps({'scope':'Frame sole bottom 4 mm only','soleBandM':.004,'floorBeforeM':minimum,'floorAfterM':float(corrected[:,2].min()),'maximumDisplacementM':float(np.abs(corrected-world).max()),'hardDisplacementLimitM':.0005,'otherComponentsMoved':False},indent=2))
+ frame.hide_render=False;frame.hide_set(False)
+ game=[obj for obj in bpy.context.scene.objects if obj.type=='MESH' and not obj.hide_render and obj.name!='Plane']
+ if len(game)!=6 or sum(TriangleCount(obj) for obj in game)>50000:raise ValueError('Reference wood violates the complete-bed budget')
+ Export(game,reviewRoot/'Model_PatchedTimberBedStandard.glb')
+ for name in ('meshes','materials','images'):
+  collection=getattr(bpy.data,name)
+  for item in [item for item in collection if item.users==0]:collection.remove(item)
+ ArchiveRecipes();bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'),compress=True)
+ reportFile=reviewRoot/'Data_BakeReport.json'
+ previousReport=json.loads(reportFile.read_text(encoding='utf-8')) if reportFile.exists() else {'groups':[],'originOffsetBlender':list(offset)}
+ previousReport['groups']=[item for item in previousReport['groups'] if item['group']!='Frame']+[row]
+ reportFile.write_text(json.dumps(previousReport,indent=2))
+ scene=bpy.context.scene;scene.render.resolution_x=1080;scene.render.resolution_y=720;scene.render.resolution_percentage=100;scene.render.use_border=False
+ scene.cycles.samples=32;scene.render.threads_mode='FIXED';scene.render.threads=6;scene.render.filepath=str(reviewRoot/'Render_FinalGame.png')
+ if not config.get('skipRenders',False):bpy.ops.render.render(write_still=True)
+ print('REFERENCE_WOOD_EXPORTED',flush=True)
+
+
 def ExportSavedGame():
  bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'))
  game=[obj for obj in bpy.context.scene.objects if obj.type=='MESH' and not obj.hide_render and obj.name!='Plane']
@@ -480,5 +610,6 @@ if stage in ('prepare','all'):Prepare()
 if stage in ('build','all'):Build()
 if stage=='finish':ResumeFinish()
 if stage=='refresh':RefreshSoftGroup()
-if stage=='material-frame':RefreshFrameMaterial()
+if stage=='material-frame':RefreshReferenceWood()
+if stage=='wood-reference':RefreshReferenceWood()
 if stage=='export':ExportSavedGame()
