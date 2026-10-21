@@ -1,42 +1,32 @@
 {
   "schema": "tengxian-model-textures-v2",
   "id": "SichuanBlanketPack",
-  "date": "2026-10-20",
+  "date": "2026-10-21",
   "pathsRelativeTo": "Taierzhuang1938/",
-  "scope": "Independent GLB authoring textures, embedded in Model_SichuanBlanketPack.glb; no existing game or level requests these images.",
+  "scope": "Independent high-to-low V10 game asset; all five components share one production atlas",
   "source": {
-    "provider": "imagegen",
-    "ref": "Image_SichuanFabricStudyV06.png",
-    "date": "2026-10-20",
-    "width": 1254,
-    "height": 1254,
-    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV06\\Image_SichuanFabricStudyV06.png",
-    "sha256": "befe1c9c4d91686c6920808657375ed78ec403204bbfab85f0f59472aa022a10",
-    "prompt": "_import/SichuanBlanketPack/Data_ImagegenPromptV06.txt",
-    "persistentPrompt": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\Data_ImagegenPromptV06.txt"
-  },
-  "bake": "_import/Script_SichuanBlanketPackTextureBake.py",
-  "bakeRecord": "_import/SichuanBlanketPack/Data_SichuanBlanketPackTextureBake.json",
-  "sharedBaker": "_import/Script_BakePbrTexture.py",
-  "preset": "sichuanBlanketPackAtlas",
-  "embeddedAsset": "Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb",
-  "consumers": [
-    {
-      "file": "_blender/Script_SichuanBlanketPackBake.py",
-      "token": "SichuanBlanketPack"
+    "highBlend": {
+      "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\HighGameV10\\Scene_SichuanPackGameBakeSourceV10.blend",
+      "bytes": 90579860,
+      "sha256": "962adce5e1eaa6adf35241b0433eafc0c7aef8102b11d7b11792a72e26155c41"
+    },
+    "materialSources": [],
+    "projectionRecord": {
+      "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\GameV10\\Bake\\Data_BakeProjection.json",
+      "bytes": 5926194,
+      "sha256": "3b75b303bf5d4d102067137afc67da30a3c3a09f654c91c7d48f0e3b74e65982"
     }
-  ],
-  "toneClass": null,
-  "metersPerTile": null,
+  },
+  "bakeRecord": "_import/SichuanBlanketPack/Data_SichuanBlanketPackTextureBake.json",
+  "surfaceEncoder": "_import/Script_SichuanGameMapsV10.py",
+  "embeddedAsset": "Model/SichuanBlanketPack/Model_SichuanBlanketPack.glb",
   "normalConvention": "gl",
-  "normalMeaning": "OpenGL tangent-space normals: sculpted cloth folds projected from high to low plus fine cotton/straw micro-relief",
-  "atlasReason": "Independent imagegen fibre studies are reprojected onto unique non-overlapping GameUV islands; sculpted cloth supplies the broad fold relief.",
+  "normalMeaning": "Actual high-to-low tangent normal projection; BOX downsample and vector renormalization, no inward-normal flipping",
   "atlas": {
     "layout": "unique-surface-uv",
     "uvOrigin": "bottom-left",
     "uvSet": "GameUV",
     "texCoord": 1,
-    "packing": "Minimum-stretch unwrap; six-direction self-visibility allocates 1.90 density to the outer front and 0.20 to concealed cloth; non-overlapping concave islands, explicit 0.003 fractional margin",
     "bakeResolution": [
       2048,
       2048
@@ -44,261 +34,58 @@
     "runtimeResolution": [
       1024,
       1024
-    ]
+    ],
+    "packing": "Actual GameUV islands recorded by Data_SurfaceUv.json"
   },
+  "atlasReason": "High-source materials and geometric relief are projected onto unique production UVs; source material tiles are not runtime atlas quadrants",
   "files": [
     {
-      "path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackBase.webp",
       "channel": "Base",
       "width": 1024,
       "height": 1024,
+      "bytes": 904210,
+      "sha256": "883793f9f2df74532a62b9c901816b8b219660d6fa1826823587c3b247df1bc9",
+      "path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackBase.webp",
       "colorSpace": "sRGB",
-      "bytes": 357866,
-      "sha256": "851f63dadc9c7db91a6ea6bff5a90dfb478e52f6248dd7df30df3569ae480868",
-      "encoding": "WebP q92"
+      "encoding": "lossless WebP"
     },
     {
-      "path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackNormal.webp",
       "channel": "Normal",
       "width": 1024,
       "height": 1024,
+      "bytes": 689186,
+      "sha256": "7ce926d9f6d7999cc7739acd713f1b66b65f91e51bcaf42e159a9538e160a475",
+      "path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackNormal.webp",
       "colorSpace": "linear",
-      "bytes": 945324,
-      "sha256": "d35236ff903579a1576c5d1989c7fd320a15c21f847d3959f69bc3747753ca02",
       "encoding": "lossless WebP"
     },
     {
-      "path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackOrm.webp",
       "channel": "Orm",
       "width": 1024,
       "height": 1024,
+      "bytes": 418926,
+      "sha256": "d8d3a01973980abc15c63435ddb574df5ad5f56b899c11e0000066c91e0ecc45",
+      "path": "Model/SichuanBlanketPack/Texture_SichuanBlanketPackOrm.webp",
       "colorSpace": "linear",
-      "bytes": 413540,
-      "sha256": "d7fe3735d8ad292f42d624dfd1b72b6649294ea95ec774b8eacc7a48100634e3",
       "encoding": "lossless WebP"
     }
   ],
-  "totalBytes": 1716730,
-  "physicalMeaning": "Rough nonmetal natural fibres. ORM R is baked self-occlusion, G=242/255, B=0. V06 independent cotton albedo, earth and sweat; rounded folded geometry and restrained reference crease relief supply normals.",
+  "totalBytes": 2012322,
+  "physicalMeaning": "Dry nonmetal natural fibres. ORM.R is actual projected AO, ORM.G is actual projected high-source roughness, ORM.B is zero.",
   "verification": {
     "allMaps1024": true,
     "allMetalZero": true,
-    "surfaceUvReprojected": true,
-    "aoRange": [
-      6,
+    "projectedRuntimeRoughnessMatchesOrmGreen": true,
+    "roughnessRange": [
+      234,
       255
-    ]
-  },
-  "materialStudyAtlas": {
-    "imageOrigin": "top-left",
-    "imageBoundsOrder": "left,top,right,bottom; normalized",
-    "uvOrigin": "bottom-left",
-    "uvBoundsOrder": "uMin,vMin,uMax,vMax; normalized",
-    "quadrants": [
-      {
-        "id": "Blanket",
-        "material": "worn light homespun cotton",
-        "imageBounds": [
-          0,
-          0,
-          0.5,
-          0.5
-        ],
-        "uvBounds": [
-          0.02,
-          0.52,
-          0.48,
-          0.98
-        ]
-      },
-      {
-        "id": "Straw",
-        "material": "dry woven straw mat and sandals",
-        "imageBounds": [
-          0.5,
-          0,
-          1,
-          0.5
-        ],
-        "uvBounds": [
-          0.52,
-          0.52,
-          0.98,
-          0.98
-        ]
-      },
-      {
-        "id": "Binding",
-        "material": "plain grey cloth binding and shoulder straps",
-        "imageBounds": [
-          0,
-          0.5,
-          0.5,
-          1
-        ],
-        "uvBounds": [
-          0.02,
-          0.02,
-          0.48,
-          0.48
-        ]
-      },
-      {
-        "id": "Jacket",
-        "material": "civilian indigo homespun cotton",
-        "imageBounds": [
-          0.5,
-          0.5,
-          1,
-          1
-        ],
-        "uvBounds": [
-          0.52,
-          0.02,
-          0.98,
-          0.48
-        ]
-      }
     ],
-    "blanketSharing": "Blanket face cloth, folded blanket body and its cloth patch reuse the same upper-left quadrant and PBR set."
-  },
-  "referenceSamples": {
-    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\Image_SichuanBlanketPackThreeViewV02.png",
-    "use": "Approved modelling reference and tiny neutral grey cotton-stitch sample only; cotton albedo and dirt are independent V06 materials"
-  },
-  "surfaceBake": "_blender/Script_SichuanPackSurfaceBake.py",
-  "surfaceEncoder": "_import/Script_SichuanPackSurfaceMaps.py",
-  "referenceClothBake": "_import/Script_SichuanPackReferenceCloth.py",
-  "strawStudy": {
-    "provider": "Built-in image_gen__imagegen",
-    "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV04\\Image_SichuanStrawStudyV04.png",
-    "sourceSha256": "bc531de26b0630c90300b01e356571c4f35fabb0da23680c6e01c31130ef2f0b",
-    "regions": {
-      "Sole": [
-        0,
-        0,
-        627,
-        627
-      ],
-      "End": [
-        627,
-        0,
-        1254,
-        627
-      ],
-      "Weave": [
-        0,
-        627,
-        627,
-        1254
-      ],
-      "Cord": [
-        627,
-        627,
-        1254,
-        1254
-      ]
-    },
-    "physicalExtentsM": {
-      "Sole": [
-        0.056,
-        0.1
-      ],
-      "End": [
-        0.074,
-        0.074
-      ],
-      "Weave": [
-        0.0505,
-        0.11
-      ],
-      "Cord": [
-        0.012,
-        0.1
-      ]
-    },
-    "deLightStrength": 0.45,
-    "destination": "Reprojected into the shared 1024 GameUV atlas",
-    "prompt": "_import/SichuanBlanketPack/Data_ImagegenPromptV04.txt"
-  },
-  "fabricStudy": {
-    "provider": "Built-in imagegen",
-    "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\SichuanBlanketPack\\Source\\MaterialAtlasV06\\Image_SichuanFabricStudyV06.png",
-    "sourceSha256": "befe1c9c4d91686c6920808657375ed78ec403204bbfab85f0f59472aa022a10",
-    "sourceNominalSwatchM": [
-      0.12,
-      0.12
+    "surfaceRoughnessRange": [
+      234,
+      252
     ],
-    "effectiveTileM": [
-      0.08,
-      0.08
-    ],
-    "regions": {
-      "Cotton": [
-        0,
-        0,
-        627,
-        627
-      ],
-      "Binding": [
-        627,
-        0,
-        1254,
-        627
-      ],
-      "Patch": [
-        0,
-        627,
-        627,
-        1254
-      ],
-      "Indigo": [
-        627,
-        627,
-        1254,
-        1254
-      ]
-    },
-    "targetSrgb": {
-      "Cotton": [
-        180,
-        170,
-        151
-      ],
-      "Binding": [
-        116,
-        116,
-        113
-      ],
-      "Patch": [
-        157,
-        145,
-        128
-      ],
-      "Indigo": [
-        61,
-        72,
-        94
-      ]
-    },
-    "normalReliefM": [
-      5.5e-05,
-      6.5e-05
-    ],
-    "wear": "Independent deterministic earth pigment, bottom-edge grime and sweat; no reference crease lighting enters any albedo",
-    "endRelief": {
-      "referenceCrop": [
-        755,
-        194,
-        948,
-        695
-      ],
-      "method": "Approximate geometric micro-relief from 2px minus 9px grayscale bands; geometry only, never albedo",
-      "heightRangeM": [
-        -0.0008,
-        0.0008
-      ]
-    },
-    "prompt": "_import/SichuanBlanketPack/Data_ImagegenPromptV06.txt"
+    "rawCoreMisses": 0,
+    "syntheticSurfaceFillPixels": 0,
+    "completeLosslessImageRoundTrips": true
   }
 }

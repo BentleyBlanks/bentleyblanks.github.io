@@ -157,17 +157,53 @@ def BodyOcclusion(shell,leaf,parent):
     return len(removed)
 
 
-def Patch(source,parent,leaf):
-    nx,nz=3,2;vertices=[];faces=[]
-    tree=BVHTree.FromObject(leaf,bpy.context.evaluated_depsgraph_get())
+def Patch(source,parent,leaf,clothSources):
+    nx,nz=6,3;vertices=[];faces=[]
+    deps=bpy.context.evaluated_depsgraph_get()
+    def SurfaceTree(obj):
+        evaluated=obj.evaluated_get(deps);mesh=evaluated.to_mesh()
+        try:
+            mesh.calc_loop_triangles();matrix=parent.matrix_world.inverted_safe()@obj.matrix_world
+            return BVHTree.FromPolygons([matrix@v.co for v in mesh.vertices],
+                                       [tuple(t.vertices)for t in mesh.loop_triangles],all_triangles=True)
+        finally:evaluated.to_mesh_clear()
+    highTrees=[SurfaceTree(obj)for obj in clothSources]
+    lowTree=SurfaceTree(leaf)
+    lowCore=next((obj for obj in parent.children_recursive if obj.name=='Game_BundleEnvelopeV10'),None)
+    coreTree=SurfaceTree(lowCore)if lowCore is not None else None
+    def Surface(trees,x,z):
+        def Query(px,pz):
+            hits=[tree.ray_cast(Vector((px,-.5,pz)),Vector((0,1,0)),1)[0]for tree in trees]
+            return min((hit.y for hit in hits if hit is not None),default=None)
+        hit=Query(x,z)
+        if hit is not None:return hit,0
+        for radius in (.0005,.001,.002,.003):
+            hits=[Query(x+dx,z+dz)for dx,dz in ((-radius,0),(0,radius),(-radius,radius),(radius,0),(0,-radius))]
+            values=[hit for hit in hits if hit is not None]
+            if values:return min(values),radius
+        return None,None
     into=parent.matrix_world.inverted()@source.matrix_world
+    lifts=[];highFallback=0;lowFallback=0;coreFallback=0;maximumNeighbor=0;records=[]
     for row in range(nz+1):
         for column in range(nx+1):
             r=row/nz*24;c=column/nx*24;ri=min(23,int(r));ci=min(23,int(c));rf=r-ri;cf=c-ci
             a=source.data.vertices[ri*25+ci].co.lerp(source.data.vertices[ri*25+ci+1].co,cf)
             b=source.data.vertices[(ri+1)*25+ci].co.lerp(source.data.vertices[(ri+1)*25+ci+1].co,cf)
-            p=into@(a.lerp(b,rf));hit=tree.ray_cast(Vector((p.x,-.4,p.z)),Vector((0,1,0)),.6)[0]
-            if hit is not None:p.y=min(p.y,hit.y-.00045)
+            p=into@(a.lerp(b,rf));highY,highRadius=Surface(highTrees,p.x,p.z)
+            if highY is None:raise RuntimeError('Actual high cloth reference missing beneath repair sample')
+            lift=highY-p.y
+            if not 0<lift<.004:raise RuntimeError('High repair is not a thin cloth lift; open original HighV10: '+str(lift))
+            lowY,lowRadius=Surface([lowTree],p.x,p.z)
+            usedCore=False
+            if lowY is None and coreTree is not None:
+                lowY,lowRadius=Surface([coreTree],p.x,p.z);usedCore=lowY is not None
+            if lowY is None:raise RuntimeError('Actual low cloth reference missing beneath repair sample')
+            originalY=p.y;p.y=lowY-lift
+            lifts.append(lift);highFallback+=bool(highRadius);lowFallback+=bool(lowRadius);coreFallback+=usedCore
+            maximumNeighbor=max(maximumNeighbor,highRadius or 0,lowRadius or 0)
+            records.append({'row':row,'column':column,'sourcePatchY':originalY,'highClothY':highY,
+                            'relativeHighLiftM':lift,'lowClothY':lowY,'gamePatchY':p.y,
+                            'lowReference':'Core'if usedCore else 'FrontLeaf'})
             vertices.append(tuple(p))
     for row in range(nz):
         for column in range(nx):
@@ -175,7 +211,12 @@ def Patch(source,parent,leaf):
     mesh=bpy.data.meshes.new('Geometry_GameRepairPatchV10');mesh.from_pydata(vertices,[],faces);mesh.update()
     obj=bpy.data.objects.new('Game_RepairPatchV10',mesh);bpy.context.scene.collection.objects.link(obj);obj.parent=parent
     obj['SourceHighObject']=source.name
-    return obj
+    obj['PatchFitMethod']='Actual low cloth surface minus measured original high relative patch lift'
+    return obj,{'method':obj['PatchFitMethod'],'referenceHighCloth':[obj.name for obj in clothSources],
+                'sourceLiftRangeM':[min(lifts),max(lifts)],'highNeighborFallbackSamples':highFallback,
+                'lowNeighborFallbackSamples':lowFallback,'lowCoreFallbackSamples':coreFallback,
+                'maximumActualNeighborRadiusM':maximumNeighbor,'samples':records,
+                'xzFootprintUnchanged':True,'triangles':Triangles(obj)}
 
 
 def BuildLowBundle(highPart,gamePart,budget=1000):
@@ -185,9 +226,11 @@ def BuildLowBundle(highPart,gamePart,budget=1000):
     hidden=BodyOcclusion(shell,front,gamePart)
     leaf=CloneSurface(front,gamePart,'Game_RelaxedFrontLeafV10')
     lip=CloneSurface(sources['StudyV7_JacketTuckLip'],gamePart,'Game_TurnedClothLipV10')
-    records=[Limit(shell,budget-352,True),Limit(leaf,308),Limit(lip,28)]
-    patch=Patch(sources['Pack_V9RepairPatch'],gamePart,leaf)
-    records.append({'object':patch.name,'triangles':Triangles(patch)})
+    # Preserve the core allowance; broad front relief transfers through PBR.
+    # Spend the released front triangles on rounder folded edges in Build.
+    records=[Limit(shell,budget-352,True),Limit(leaf,184),Limit(lip,28)]
+    patch,patchFit=Patch(sources['Pack_V9RepairPatch'],gamePart,leaf,(body,front))
+    records.append({'object':patch.name,'triangles':Triangles(patch),'relativeLiftConformance':patchFit})
     mat=bpy.data.materials.get('Material_GameClothClayV10') or bpy.data.materials.new('Material_GameClothClayV10')
     mat.use_nodes=True;mat.node_tree.nodes.get('Principled BSDF').inputs['Base Color'].default_value=(.40,.37,.31,1)
     mat.node_tree.nodes.get('Principled BSDF').inputs['Roughness'].default_value=.95

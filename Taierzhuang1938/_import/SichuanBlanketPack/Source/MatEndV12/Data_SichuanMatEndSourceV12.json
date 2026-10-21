@@ -1,0 +1,45 @@
+{
+  "schema": "sichuan-imagegen-mat-end-v12",
+  "generator": "Built-in image_gen__imagegen",
+  "recordedAt": "2026-10-21T03:13:16.019206+00:00",
+  "originalGenerated": {
+    "path": "C:\\Users\\Bentl\\.codex\\generated_images\\01a14e51-0640-7012-acab-f01542961cb6\\exec-761335b2-8466-4739-af30-38fdf2475a9c.png",
+    "bytes": 4168531,
+    "sha256": "7d1c49f51d7871156b298867a1f8221711a0fdaad062e09fde694482e3406841",
+    "width": 1254,
+    "height": 1254,
+    "mode": "RGB"
+  },
+  "stagedOriginal": {
+    "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\Taierzhuang1938\\_import\\SichuanBlanketPack\\Source\\MatEndV12\\Texture_SichuanMatEndGeneratedV12.png",
+    "bytes": 4168531,
+    "sha256": "7d1c49f51d7871156b298867a1f8221711a0fdaad062e09fde694482e3406841",
+    "width": 1254,
+    "height": 1254,
+    "mode": "RGB"
+  },
+  "prepared": {
+    "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\Taierzhuang1938\\_import\\SichuanBlanketPack\\Source\\MatEndV12\\Texture_SichuanMatEndBaseV12.png",
+    "bytes": 2441877,
+    "sha256": "ef766660acfab923c71095008d77adb5ee15b2aae169060a9d396a3c124524d2",
+    "width": 1024,
+    "height": 1024,
+    "mode": "RGB"
+  },
+  "promptFile": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\Taierzhuang1938\\_import\\SichuanBlanketPack\\Source\\MatEndV12\\Prompt_SichuanMatEndV12.txt",
+  "prompt": "Use case: photorealistic-natural. Asset type: one square PBR base-colour source texture for the FLAT circular end face of a small rolled 1938 Chinese woven straw sleeping mat, used on a low-poly game asset. Generate a 1024 by 1024 material image. View exactly straight along the roll axis, orthographic, no perspective, no side of cylinder. The entire picture is the cut END of one tightly rolled thin woven rush sheet. Clearly readable approximately FIVE turns of ONE continuous slightly irregular spiral from a small dark off-centre inner slit to the outer rim. Each wide spiral band shows densely compressed broken straw fibres and the rough cut thickness of the thin woven sheet; narrow dark-brown recessed seams separate adjacent wraps. It must immediately read as the end of a rolled STRAW MAT, not a rope coil, tree trunk, basket lid, bread, cinnamon pastry or random chopped-grass disk. Real irregular layer spacing, a few frayed fibre tips and compressed dents; old dry dusty use, muted warm wheat-gold/tan with earthy brown crevices and washed faded pale fibres, never white/grey, orange or glossy. Keep the 4\u20135 winding seams clear at a final diameter of only about 70 pixels; broad continuous winding bands dominate over fine noise. Flat diffuse albedo illumination, no directional highlight, cast shadow, vignette or background scene. The roll cross-section is centred and fills the square edge-to-edge in width and height; the unused corner areas should be plain matching straw-tan rather than black or white, since the actual circular mesh masks them. One continuous naturally imperfect spiral, not separate concentric rings. No labels, numbers, border, watermark, metal, cloth straps or other objects. Output only this single material texture.",
+  "promptCapturedVerbatim": true,
+  "preparation": {
+    "operations": [
+      "Convert RGB",
+      "Resize square source to 1024x1024 with Pillow LANCZOS"
+    ],
+    "generatedPixelsOtherwiseUnedited": true
+  },
+  "use": {
+    "runtimeGeometry": "Existing two24-point flat endpoint outlines,44tris; winding details from texture only",
+    "highSourceHelper": "_blender/Script_SichuanGameMatEndSourceV10.py",
+    "sharedRuntimeAtlas": 1024,
+    "generatorOutputIsReferenceMaterialNotFinalRuntimeAtlas": true
+  }
+}

@@ -17,6 +17,8 @@ from PIL import Image
 RAW_SIZE = 2048
 RUNTIME_SIZE = 1024
 PADDING_PIXELS = 16
+RUNTIME_FOOTPRINT_MAX_DISTANCE = 24
+RUNTIME_FOOTPRINT_HALO = 6
 PART_NAMES = (
     'Pack_Bundle', 'Pack_Binding', 'Pack_Sandals', 'Pack_StrawMat', 'Pack_Jacket'
 )
@@ -147,6 +149,157 @@ def DilateNeighbors(values, valid, iterations):
         if not added:
             break
     return values, valid, addedByIteration
+
+
+def RuntimeTriangleOwner(rows, x, y, runtimeSize):
+    """Find the actual triangle at the runtime pixel centre in top-left UVs."""
+    point = np.asarray(((x + .5) / runtimeSize, (y + .5) / runtimeSize))
+    candidates = []
+    for rowIndex, row in enumerate(rows):
+        a, b, c = np.asarray(row['uv'], dtype=np.float64)
+        ab, ac, delta = b - a, c - a, point - a
+        determinant = ab[0] * ac[1] - ab[1] * ac[0]
+        if abs(determinant) < 1e-16:
+            continue
+        u = (delta[0] * ac[1] - delta[1] * ac[0]) / determinant
+        v = (ab[0] * delta[1] - ab[1] * delta[0]) / determinant
+        margin = min(u, v, 1 - u - v)
+        if margin >= -1e-8:
+            candidates.append((margin, rowIndex))
+    Require(candidates, 'Runtime footprint has no actual top-left UV owner: ' +
+            json.dumps([x, y]))
+    # Shared triangle edges may have two owners. Prefer the more interior
+    # barycentric point and then the earlier source row deterministically.
+    return max(candidates, key=lambda item: (item[0], -item[1]))[1]
+
+
+def PadRuntimeFootprints(values, actualValid, padded, rows, runtimeMask,
+                         maxDistance=RUNTIME_FOOTPRINT_MAX_DISTANCE,
+                         halo=RUNTIME_FOOTPRINT_HALO):
+    """Extend a missed 2x2 filter footprint from its own raw triangle only.
+
+    The common 16px dilation stays intact. This narrowly handles runtime
+    centres inside a very thin UV tip whose four raw pixel centres are outside
+    the triangle. Actual raw surface samples are never overwritten. Every
+    additional eight-channel sample comes from an original valid pixel inside
+    the runtime owner's triangle, not a neighboring material or padded value.
+    """
+    height, width = actualValid.shape
+    runtimeHeight, runtimeWidth = runtimeMask.shape
+    Require(height == width == runtimeHeight * 2 == runtimeWidth * 2,
+            'Same-triangle footprint padding requires the actual 2:1 square downsample')
+    required = np.repeat(np.repeat(runtimeMask, 2, axis=0), 2, axis=1)
+    missing = required & ~padded
+    missingRuntime = np.unique(np.argwhere(missing) // 2, axis=0)
+    report = {
+        'method': 'Same-triangle original-valid nearest sample for missed runtime filter footprints',
+        'uvOrigin': 'Top-left; Data_SurfaceUv.json is used without V flipping',
+        'distanceLimitMetric': 'Chebyshev raw-pixel grid radius, matching the existing eight-neighbor dilation',
+        'nearestSourceSelectionMetric': 'Euclidean distance among same-triangle original-valid candidates inside the Chebyshev limit',
+        'maxChebyshevDistanceRawPixels': maxDistance, 'lanczosHaloRawPixels': halo,
+        'requiredRuntimePixels': int(runtimeMask.sum()),
+        'requiredRawFootprintPixels': int(required.sum()),
+        'initialUncoveredRequiredRawPixels': int(missing.sum()),
+        'criticalRuntimePixels': [], 'trace': [],
+        'centralPaddingCopies': 0, 'haloPaddingCopies': 0,
+        'newPaddingPixels': 0, 'reassignedExistingPaddingPixels': 0,
+        'rawSurfaceSamplesWritten': 0, 'syntheticSurfaceFillPixels': 0
+    }
+    if not len(missingRuntime):
+        report.update(uncoveredRequiredRawPixelsAfter=0,
+                      allRequiredFootprintsCovered=True,
+                      originalValidSamplesUnchanged=True,
+                      maximumCopyEuclideanDistanceRawPixels=0,
+                      maximumCopyChebyshevDistanceRawPixels=0)
+        return values, padded, report
+    actualHashBefore = hashlib.sha256(values[actualValid].tobytes()).hexdigest()
+    sourceCache = {}
+    critical = []
+    for y, x in missingRuntime:
+        x, y = int(x), int(y)
+        rowIndex = RuntimeTriangleOwner(rows, x, y, runtimeWidth)
+        row = rows[rowIndex]
+        if rowIndex not in sourceCache:
+            raster = TrianglePixels(row['uv'], width)
+            Require(raster is not None, 'Runtime owner has no raw raster bounds')
+            low, high, inside = raster
+            ownValid = inside & actualValid[low[1]:high[1] + 1, low[0]:high[0] + 1]
+            points = np.argwhere(ownValid)
+            Require(len(points) > 0, 'Runtime triangle has no measured raw source samples: ' +
+                    json.dumps({'object': row['object'], 'row': rowIndex,
+                                'polygon': row.get('polygon')}))
+            sourceCache[rowIndex] = points + np.asarray((low[1], low[0]))
+        owner = {'runtimeXY': [x, y], 'ownerRowIndex': rowIndex,
+                 'object': row['object'], 'part': row['part'],
+                 'polygon': row.get('polygon'), 'ownerUvTopLeft': row['uv'],
+                 'originalValidOwnerSamples': len(sourceCache[rowIndex])}
+        report['criticalRuntimePixels'].append(owner)
+        critical.append((x, y, owner, sourceCache[rowIndex]))
+
+    def CopyMeasured(x, y, owner, sourcePoints, purpose, mandatory):
+        if actualValid[y, x]:
+            return
+        delta = sourcePoints - np.asarray((y, x))
+        gridDistances = np.max(np.abs(delta), axis=1)
+        eligible = np.flatnonzero(gridDistances <= maxDistance)
+        distances2 = np.sum(delta.astype(np.float64) ** 2, axis=1)
+        if not len(eligible):
+            Require(not mandatory, 'Same-triangle raw footprint exceeds the measured-padding distance limit: ' +
+                    json.dumps({'runtimeXY': owner['runtimeXY'], 'object': owner['object'],
+                                'polygon': owner['polygon'], 'rawDestinationXY': [x, y],
+                                'nearestChebyshevRawPixels': int(gridDistances.min()),
+                                'metric': 'Chebyshev', 'limit': maxDistance}))
+            return
+        nearest = int(eligible[np.argmin(distances2[eligible])])
+        distance = float(np.sqrt(distances2[nearest]))
+        gridDistance = int(gridDistances[nearest])
+        sy, sx = (int(value) for value in sourcePoints[nearest])
+        Require(actualValid[sy, sx], 'Footprint source is not an original measured sample')
+        wasPadded = bool(padded[y, x])
+        sample = values[sy, sx].copy()
+        values[y, x] = sample
+        padded[y, x] = True
+        report['trace'].append({
+            'purpose': purpose, 'runtimeXY': owner['runtimeXY'],
+            'ownerRowIndex': owner['ownerRowIndex'], 'object': owner['object'],
+            'part': owner['part'], 'polygon': owner['polygon'],
+            'rawDestinationXY': [x, y], 'rawSourceXY': [sx, sy],
+            'euclideanDistanceRawPixels': distance,
+            'chebyshevDistanceRawPixels': gridDistance, 'previouslyPadded': wasPadded,
+            'sourceIsOriginalValid': True, 'sourceInsideOwnerTriangle': True,
+            'channels': ['BaseR', 'BaseG', 'BaseB', 'NormalR', 'NormalG', 'NormalB', 'AO', 'Roughness'],
+            'sourceValues': [int(round(value)) for value in sample]
+        })
+        report['centralPaddingCopies' if purpose == 'required2x2' else 'haloPaddingCopies'] += 1
+        report['reassignedExistingPaddingPixels' if wasPadded else 'newPaddingPixels'] += 1
+
+    # Resolve every critical central footprint before optional halos. Existing
+    # padding at those centres is rebound to the same triangle if necessary;
+    # measured raw-valid samples remain immutable even there.
+    for x, y, owner, points in critical:
+        for rawY in (2 * y, 2 * y + 1):
+            for rawX in (2 * x, 2 * x + 1):
+                CopyMeasured(rawX, rawY, owner, points, 'required2x2', True)
+    for x, y, owner, points in critical:
+        for rawY in range(max(0, 2 * y - halo), min(height, 2 * y + 2 + halo)):
+            for rawX in range(max(0, 2 * x - halo), min(width, 2 * x + 2 + halo)):
+                # Do not broaden or recolor the original global padding.
+                if padded[rawY, rawX] or actualValid[rawY, rawX]:
+                    continue
+                CopyMeasured(rawX, rawY, owner, points, 'lanczosHalo', False)
+    actualHashAfter = hashlib.sha256(values[actualValid].tobytes()).hexdigest()
+    Require(actualHashBefore == actualHashAfter,
+            'Same-triangle padding changed an actual raw surface sample')
+    report.update(originalValidSamplesSha256Before=actualHashBefore,
+                  originalValidSamplesSha256After=actualHashAfter,
+                  originalValidSamplesUnchanged=True,
+                  uncoveredRequiredRawPixelsAfter=int((required & ~padded).sum()),
+                  maximumCopyEuclideanDistanceRawPixels=max((item['euclideanDistanceRawPixels'] for item in report['trace']), default=0),
+                  maximumCopyChebyshevDistanceRawPixels=max((item['chebyshevDistanceRawPixels'] for item in report['trace']), default=0))
+    FailPixels(required & ~padded,
+               'Runtime production UV has an uncovered raw 2x2 filter footprint')
+    report['allRequiredFootprintsCovered'] = True
+    return values, padded, report
 
 
 def ResizeFloat(channel, resample=Image.Resampling.BOX):
@@ -285,6 +438,14 @@ def Main():
              invalidBoundaryPixels=int((mask & ~valid).sum()), paddingPixels=PADDING_PIXELS)
     values, padded, dilationCounts = DilateNeighbors(values, valid, PADDING_PIXELS)
     FailPixels(mask & ~padded, 'Measured-neighbor dilation did not cover the UV raster boundary')
+    runtimeMask = Rasterize(rows, RUNTIME_SIZE)
+    Progress('PaddingRuntimeFootprints', maximumChebyshevRawDistance=RUNTIME_FOOTPRINT_MAX_DISTANCE,
+             localLanczosHalo=RUNTIME_FOOTPRINT_HALO)
+    values, padded, footprintReport = PadRuntimeFootprints(values, valid, padded, rows, runtimeMask)
+    footprintReport['rawBakeEvidence'] = rawEvidence
+    footprintReport['surfaceUvRecord'] = FileEvidence(uvPath)
+    footprintReportPath = reviewPath / 'Data_RuntimeFootprintPaddingV10.json'
+    SaveJson(footprintReport, footprintReportPath)
     # Neutral values exist only beyond measured texture padding, never on UVs.
     values[~padded, 3:6] = [127.5, 127.5, 255]
     values[~padded, 6:8] = [255, 255]
@@ -297,7 +458,6 @@ def Main():
     # tiny negative Z to the tangent plane; never flip an inward projection.
     vectors[..., 2] = np.maximum(vectors[..., 2], 0)
     lengths = np.linalg.norm(vectors, axis=-1, keepdims=True)
-    runtimeMask = Rasterize(rows, RUNTIME_SIZE)
     FailPixels(runtimeMask & (lengths[..., 0] < .05),
                'Normal downsampling cancels a production surface vector')
     vectors[lengths[..., 0] < .05] = [0, 0, 1]
@@ -324,7 +484,8 @@ def Main():
                            ('Orm', Image.fromarray(ormPixels))):
         filePath = modelPath / ('Texture_SichuanBlanketPack' + channel + '.webp')
         SaveWebp(image.convert('RGB'), filePath)
-        outputs.append({'channel': channel, **ImageEvidence(filePath)})
+        outputs.append({'channel': channel, **ImageEvidence(filePath),
+                        'path': filePath.relative_to(projectPath).as_posix()})
     date = datetime.now().astimezone().date().isoformat()
     roughnessBake = {
         'method': 'selected-to-active-emission',
@@ -334,7 +495,7 @@ def Main():
         'raw': rawEvidence['Roughness'], 'runtime': ImageEvidence(runtimePath)
     }
     surfaceBake = {
-        'generator': 'Script_SichuanGameMapsV10.py@1',
+        'generator': 'Script_SichuanGameMapsV10.py@2',
         'date': date, 'resolution': [RUNTIME_SIZE, RUNTIME_SIZE],
         'intermediateResolution': [RAW_SIZE, RAW_SIZE],
         'uv': 'Unique non-overlapping GameUV / TEXCOORD_1',
@@ -351,6 +512,17 @@ def Main():
             'iterations': PADDING_PIXELS, 'addedPixelsPerIteration': dilationCounts,
             'rawActualCommonHitPixels': initialHits,
             'rawUvPixels': int(mask.sum()), 'rawCorePixels': int(core.sum()),
+            'runtimeFootprintPadding': {
+                'record': FileEvidence(footprintReportPath),
+                'criticalRuntimePixels': len(footprintReport['criticalRuntimePixels']),
+                'newPaddingPixels': footprintReport['newPaddingPixels'],
+                'reassignedExistingPaddingPixels': footprintReport['reassignedExistingPaddingPixels'],
+                'distanceLimitMetric': footprintReport['distanceLimitMetric'],
+                'maximumCopyChebyshevDistanceRawPixels': footprintReport['maximumCopyChebyshevDistanceRawPixels'],
+                'maximumCopyEuclideanDistanceRawPixels': footprintReport['maximumCopyEuclideanDistanceRawPixels'],
+                'originalValidSamplesUnchanged': footprintReport['originalValidSamplesUnchanged'],
+                'allRequiredFootprintsCovered': footprintReport['allRequiredFootprintsCovered']
+            },
             'syntheticSurfaceFillPixels': 0
         },
         'coreFailurePolicy': 'Alpha-zero, black albedo, inward or invalid normal and fully missed raster triangles abort encoding',
@@ -358,7 +530,7 @@ def Main():
         'dataEncoding': 'Lossless WebP; all ORM metallic bytes zero'
     }
     bakeRecord = {
-        'generator': 'Script_SichuanGameMapsV10.py@1', 'date': date,
+        'generator': 'Script_SichuanGameMapsV10.py@2', 'date': date,
         'name': 'SichuanBlanketPack', 'sourceBlend': record['sourceBlend'],
         'projectionRecord': FileEvidence(projectionPath),
         'surfaceUvRecord': FileEvidence(uvPath),

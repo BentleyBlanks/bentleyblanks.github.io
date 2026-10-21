@@ -1,0 +1,91 @@
+{
+  "schema": "sichuan-source-study-v1",
+  "id": "GrassWeaveV11",
+  "generator": "Built-in image_gen__imagegen",
+  "recordedAt": "2026-10-21T05:36:07.302969+08:00",
+  "source": "C:\\Users\\Bentl\\.codex\\generated_images\\01a14e51-0640-7012-acab-f01542961cb6\\exec-8b22b8ae-6ee4-4c32-8d99-b2fab1f3de80.png",
+  "sourceSha256": "5e5d54969197ee7d64b6a13d1d6112210928a65d955d570c183e32573e620a37",
+  "sourceBytes": 4741123,
+  "sourceResolution": [
+    1254,
+    1254
+  ],
+  "sourceEvidence": {
+    "path": "C:\\Users\\Bentl\\.codex\\generated_images\\01a14e51-0640-7012-acab-f01542961cb6\\exec-8b22b8ae-6ee4-4c32-8d99-b2fab1f3de80.png",
+    "bytes": 4741123,
+    "sha256": "5e5d54969197ee7d64b6a13d1d6112210928a65d955d570c183e32573e620a37",
+    "width": 1254,
+    "height": 1254,
+    "mode": "RGB"
+  },
+  "stagedGeneratedCopy": {
+    "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\Taierzhuang1938\\_import\\SichuanBlanketPack\\Source\\GrassWeaveV11\\Texture_SichuanWovenLodGeneratedV11.png",
+    "bytes": 4741123,
+    "sha256": "5e5d54969197ee7d64b6a13d1d6112210928a65d955d570c183e32573e620a37",
+    "width": 1254,
+    "height": 1254,
+    "mode": "RGB"
+  },
+  "preparedTile": {
+    "path": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\Taierzhuang1938\\_import\\SichuanBlanketPack\\Source\\GrassWeaveV11\\Texture_SichuanWovenLodBaseV11.png",
+    "bytes": 2706263,
+    "sha256": "dfab08b0c075ab26ef84f2a9207ba45327661571fb5030ba6cf4f655e34e3316",
+    "width": 1024,
+    "height": 1024,
+    "mode": "RGB"
+  },
+  "promptSummary": "Prepare an aged, coarse woven-grass image study for the rolled mat and straw sandals in the approved Sichuan blanket-pack design. Preserve visible woven fibre structure and a worn earthy colour range that remains legible on the low-polygon game asset.",
+  "promptSummaryLanguage": "English design-intent summary",
+  "promptCapturedVerbatim": false,
+  "promptSummaryBasis": "Design intent and retained source-use script. The exact original imagegen prompt text was not retained; this summary is not a quotation or a reconstruction claimed to be verbatim.",
+  "preparation": {
+    "preparedResolution": [
+      1024,
+      1024
+    ],
+    "colorSpace": "sRGB",
+    "pixelProcessingRecord": "The retained prepared image is authoritative. The exact intermediate pixel-processing recipe was not captured in this provenance record."
+  },
+  "use": {
+    "rebuildScript": "_blender/Script_SichuanGameWovenLodV10.py",
+    "tileWidthM": 0.055,
+    "imagegenTileWeight": 0.5,
+    "originalOldGrassColorWeight": 0.5,
+    "projection": "Part-local physical coordinates; measured circumferential arc on the actual mat roll, local X/Z on sandal sources",
+    "targetParts": [
+      "Pack_StrawMat",
+      "Pack_Sandals"
+    ],
+    "excludedSources": [
+      "cut grass end bundles",
+      "inner mat tuck",
+      "cotton retainers",
+      "hanging twine"
+    ],
+    "normalContribution": {
+      "source": "Prepared tile luminance bump applied to actual high geometry normals",
+      "strength": 0.08,
+      "distanceM": 0.0006,
+      "previousSourceShaderNormalSuppressed": true,
+      "runtimeProjection": "True high geometric normals only; source luminance bump is retained for native preview, and temporary BSDF.Normal links are disconnected during final normal projection"
+    },
+    "runtime": "Projected from the prepared high-source material into the shared 1024 GameUV PBR set; this source tile is not an additional runtime material",
+    "tileBranchTintLinear": [
+      0.98,
+      0.91,
+      0.78
+    ],
+    "materialAdjustment": "Fine-scale 55 mm weave, 50 percent retained old-grass colour; warm tint on tile branch only. Original image bytes unchanged."
+  },
+  "sourceRetention": {
+    "originalToolOutputRetained": true,
+    "stagedLargeCopyPresentAtRecording": true,
+    "largeStagedCopyRequiredInRepository": false,
+    "note": "Keep the original until final source archiving. A later removal of the staged large copy does not change its recorded hash; the tool output path and packed prepared source remain separate provenance."
+  },
+  "claims": {
+    "exactPromptKnown": false,
+    "finalReferenceFidelityProven": false,
+    "finalGameBakeValidationProvenByThisRecord": false
+  }
+}

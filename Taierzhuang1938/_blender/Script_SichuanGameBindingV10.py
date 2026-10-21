@@ -225,7 +225,7 @@ def MakeRibbon(source, gamePart, stations, order, material, sourceLabel):
     return obj
 
 
-def BuildLowBinding(highPart, gamePart, budget=650):
+def BuildLowBinding(highPart, gamePart, budget=354):
     """Read highPart; create only gamePart children; return a JSON-safe report."""
     assert isinstance(budget, int) and budget >= 100
     sources = {SourceName(obj): obj for obj in (highPart, *highPart.children_recursive)
@@ -257,11 +257,13 @@ def BuildLowBinding(highPart, gamePart, budget=650):
     # Reserve enough stations for every actual side-knot bend.  Knot pieces
     # remain separate surfaces of the same cloth tie, never metal hardware.
     knotLimit = min(48, max(20, budget // 12))
+    knotToleranceM = .0012
     knotTriangles = 0
     for name in names[1:]:
         stations, ranges, projectionError = recovered[name]
         order, error = SelectStations(stations, (0, len(stations) - 1),
-                                      knotLimit, .00045)
+                                      knotLimit, knotToleranceM)
+        assert error <= knotToleranceM, ('Side knot exceeded its measured curve tolerance', name, error)
         obj = MakeRibbon(joinedSource, gamePart, stations, order, material, name)
         triangles = TriangleCount(obj)
         knotTriangles += triangles
@@ -269,13 +271,18 @@ def BuildLowBinding(highPart, gamePart, budget=650):
         report.append({'source': name, 'object': obj.name,
                        'sourceStations': len(stations), 'gameStations': len(order),
                        'triangles': triangles, 'maxRouteErrorM': error,
+                       'allowedRouteErrorM': knotToleranceM,
                        'maxEvaluationProjectionM': projectionError})
     stations, ranges, projectionError = recovered[names[0]]
     mandatory = {0, len(stations) - 1}
     mandatory.update(index for index, span in enumerate(ranges) if span > .20)
     limit = (budget - knotTriangles) // 2 + 1
     order, error = SelectStations(stations, mandatory, limit, .0007)
-    assert error <= .0025, 'Insufficient binding budget for current route'
+    assert error <= .002, ('Insufficient binding budget for current route',
+                            {'budget': budget, 'mainStations': len(order),
+                             'sideKnotTriangles': knotTriangles, 'mainStationLimit': limit,
+                             'sideKnotStations': [row['gameStations'] for row in report],
+                             'maxRouteErrorM': error, 'allowedRouteErrorM': .002})
     obj = MakeRibbon(joinedSource, gamePart, stations, order, material, names[0])
     obj['ContinuousStrip'] = True
     obj['OuterGridPasses'] = [2, 2]
@@ -294,4 +301,9 @@ def BuildLowBinding(highPart, gamePart, budget=650):
     gamePart['ShoulderLoops'] = 2
     return {'generator': generator, 'budget': budget, 'triangles': triangles,
             'objects': report, 'sourceUntouched': True,
+            'routeErrorTargetM': .0007, 'allowedRouteErrorM': .002,
+            'allowedSideKnotErrorM': knotToleranceM,
+            'allocation': {'sideKnotTriangles': knotTriangles,
+                           'mainTriangleBudget': budget-knotTriangles,
+                           'mainStationLimit': limit, 'actualMainStations': len(order)},
             'currentEvaluatedRouteSampled': True, 'twoSidedThinCloth': True}

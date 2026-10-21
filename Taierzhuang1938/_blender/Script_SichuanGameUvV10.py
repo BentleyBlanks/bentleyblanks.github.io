@@ -77,8 +77,11 @@ def PixelCovered(points, resolution=1024):
         if len(cuts) >= 2:
             left, right = min(cuts), max(cuts)
             x = max(0, math.ceil(left-.5+1e-6))
-            if x < resolution and x+.5 < right-1e-6:
-                return True
+            last=min(resolution-1,math.floor(right-.5-1e-6))
+            for px in range(x,last+1):
+                crosses=[(b[0]-a[0])*(py-a[1])-(b[1]-a[1])*(px+.5-a[0]) for a,b in edges]
+                if all(value>1e-9 for value in crosses) or all(value < -1e-9 for value in crosses):
+                    return True
     return False
 
 
@@ -128,7 +131,8 @@ def Audit(rows):
         if IntersectionArea(rows[a]['uvBottom'], rows[b]['uvBottom']) > 1e-11:
             overlap.add((rows[a]['object'], rows[a]['polygon']))
             overlap.add((rows[b]['object'], rows[b]['polygon']))
-    return {'misses': misses, 'degenerate': degenerate, 'outside': outside,
+    rawMisses={(row['object'],row['polygon'])for row in rows if not PixelCovered(row['uvBottom'],2048)}
+    return {'misses': misses, 'rawMisses':rawMisses, 'degenerate': degenerate, 'outside': outside,
             'overlap': overlap, 'minimumTriangleAreaPixels': minimumArea}
 
 
@@ -206,6 +210,14 @@ def WeightIslands(meshes, root):
         for island in Islands(obj):
             area = sum(obj.data.polygons[index].area for index in island)
             priority = sum(obj.data.polygons[index].area*priorities[index] for index in island)/max(area, 1e-15)
+            if 'RepairPatch' in obj.name:
+                priority *= 1.45
+            if 'RepairStitch' in obj.name:
+                priority *= 3.0
+            if 'Spiral' in obj.name or 'RolledMatEndCaps' in obj.name:
+                priority *= 1.8
+            if 'BraidedRim' in obj.name:
+                priority *= 2.5
             loopIds = {loop for index in island for loop in obj.data.polygons[index].loop_indices}
             center = sum((uv[index].uv for index in loopIds), Vector((0, 0)))/len(loopIds)
             for index in loopIds:
@@ -241,6 +253,35 @@ def IsolateFace(obj, index, boost=1.8):
     offset = Vector((3+index*.021, 3+index*.013))
     for loop, point in zip(loops, coordinates):
         uv[loop].uv = offset+Vector(((point[0]-low[0])*scale[0], (point[1]-low[1])*scale[1]))
+
+
+def AlignIsolatedPixelCenters(meshes, misses, resolution=1024):
+    """Translate only singleton charts by <= half a texel on each axis.
+
+    A thin triangle can miss the pixel lattice despite adequate area. Its
+    centroid is interior, so aligning it to an actual texel centre resolves
+    that phase issue without stretching the chart or changing a surface.
+    The caller must rerun every overlap/outside/coverage gate afterwards.
+    """
+    changes=[]
+    for obj in meshes:
+        wanted={face for name,face in misses if name==obj.name}
+        if not wanted:continue
+        single={next(iter(island))for island in Islands(obj)if len(island)==1}
+        uv=obj.data.uv_layers['GameUV'].data
+        for index in sorted(wanted&single):
+            face=obj.data.polygons[index]
+            if len(face.vertices)!=3:raise RuntimeError('Pixel alignment requires explicit triangles')
+            center=sum((uv[loop].uv for loop in face.loop_indices),Vector((0,0)))/3
+            target=Vector(((math.floor(center.x*resolution)+.5)/resolution,
+                           (math.floor(center.y*resolution)+.5)/resolution))
+            shift=target-center
+            if max(abs(value)for value in shift)>.50001/resolution:
+                raise RuntimeError('Pixel-centre shift exceeds half a texel')
+            for loop in face.loop_indices:uv[loop].uv+=shift
+            changes.append({'object':obj.name,'polygon':index,'uvTranslation':list(shift),
+                            'texelTranslation':[value*resolution for value in shift]})
+    return changes
 
 
 def TriangulateGameMesh(obj):
@@ -291,7 +332,7 @@ def SelectGameUvs(meshes):
                 loop.select_edge = True
 
 
-def BuildGameUv(root, reviewPath):
+def BuildGameUv(root, reviewPath, resumeExisting=False):
     if root is None or root.name != 'Pack_Root' or root.get('PackSourceName'):
         raise RuntimeError('Pass the low game Pack_Root only')
     meshes = sorted([obj for obj in root.children_recursive if obj.type == 'MESH'], key=lambda obj: obj.name)
@@ -332,9 +373,11 @@ def BuildGameUv(root, reviewPath):
             for layer in list(layers)[1:]:
                 if layer.name != 'GameUV':
                     raise RuntimeError('Unexpected extra source UV layer: ' + obj.name)
-                layers.remove(layer)
+                if not resumeExisting:layers.remove(layer)
             sourceHashes[obj.name] = UvHash(first)
-            atlas = layers.new(name='GameUV', do_init=False)
+            if resumeExisting and (len(layers)!=2 or layers.get('GameUV')is None):
+                raise RuntimeError('Resume requires the actual existing second atlas')
+            atlas = layers.get('GameUV') if resumeExisting else layers.new(name='GameUV', do_init=False)
             layers.active_index = 1
             atlas.active_render = True
             obj.select_set(True)
@@ -345,17 +388,24 @@ def BuildGameUv(root, reviewPath):
                     'selected_objects': meshes, 'selected_editable_objects': meshes}
         if bpy.context.window is not None:
             override['window'] = bpy.context.window
+        if resumeExisting:
+            previous=json.loads((reviewPath/'Data_GameUvV10.json').read_text(encoding='utf-8'))
+            if previous['preservedSurfaceUvHashes']!=sourceHashes:raise RuntimeError('Resume source UVs differ from the actual previous atlas audit')
+            allocation=json.loads((reviewPath/'Data_UvVisibilityAllocation.json').read_text(encoding='utf-8'))
+            history=previous['history']
+        startIteration=len(history)
         with bpy.context.temp_override(**override):
-            SelectGameUvs(meshes)
-            bpy.ops.object.mode_set(mode='EDIT')
-            bpy.ops.mesh.select_all(action='SELECT')
-            bpy.ops.uv.smart_project(angle_limit=math.radians(62), island_margin=.001,
-                                     area_weight=.4, correct_aspect=True, scale_to_bounds=False)
-            bpy.ops.uv.average_islands_scale()
-            bpy.ops.object.mode_set(mode='OBJECT')
-            allocation = WeightIslands(meshes, root)
+            if not resumeExisting:
+                SelectGameUvs(meshes)
+                bpy.ops.object.mode_set(mode='EDIT')
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.uv.smart_project(angle_limit=math.radians(62), island_margin=.001,
+                                         area_weight=.4, correct_aspect=True, scale_to_bounds=False)
+                bpy.ops.uv.average_islands_scale()
+                bpy.ops.object.mode_set(mode='OBJECT')
+                allocation = WeightIslands(meshes, root)
             byName = {obj.name: obj for obj in meshes}
-            for iteration in range(9):
+            for iteration in range(16):
                 SelectGameUvs(meshes)
                 bpy.ops.object.mode_set(mode='EDIT')
                 bpy.ops.mesh.select_all(action='SELECT')
@@ -364,18 +414,24 @@ def BuildGameUv(root, reviewPath):
                 bpy.ops.object.mode_set(mode='OBJECT')
                 rows = Rows(meshes, root)
                 audit = Audit(rows)
-                history.append({'iteration': iteration, 'triangles': len(rows),
+                aligned=AlignIsolatedPixelCenters(meshes,audit['misses'])
+                if aligned:
+                    rows=Rows(meshes,root)
+                    audit=Audit(rows)
+                history.append({'iteration': startIteration+iteration, 'triangles': len(rows),
                                 'noPixelFaces': len(audit['misses']), 'overlappingFaces': len(audit['overlap']),
+                                'noRawPixelFaces':len(audit['rawMisses']),
                                 'degenerateFaces': len(audit['degenerate']), 'outsideFaces': len(audit['outside']),
-                                'minimumTriangleAreaPixels': audit['minimumTriangleAreaPixels']})
+                                'minimumTriangleAreaPixels': audit['minimumTriangleAreaPixels'],
+                                'singletonPixelPhaseAlignments':aligned})
                 print('GAME_UV_AUDIT', json.dumps(history[-1]), flush=True)
-                if not any(audit[key] for key in ('misses', 'overlap', 'degenerate', 'outside')):
+                if not any(audit[key] for key in ('misses','rawMisses', 'overlap', 'degenerate', 'outside')):
                     break
-                failures = set().union(*(audit[key] for key in ('misses', 'overlap', 'degenerate', 'outside')))
+                failures = set().union(*(audit[key] for key in ('misses','rawMisses', 'overlap', 'degenerate', 'outside')))
                 for name, face in failures:
                     IsolateFace(byName[name], face, boost=1.8+iteration*.4)
             else:
-                raise RuntimeError('Game UV audit still fails after nine actual packing attempts: ' + json.dumps(history[-1]))
+                raise RuntimeError('Game UV audit still fails after sixteen actual packing attempts: ' + json.dumps(history[-1]))
         for obj in meshes:
             if UvHash(obj.data.uv_layers['SurfaceUV']) != sourceHashes[obj.name]:
                 raise RuntimeError('Source SurfaceUV changed during atlas creation: ' + obj.name)
@@ -389,6 +445,7 @@ def BuildGameUv(root, reviewPath):
         report = {'generator': 'Script_SichuanGameUvV10.py', 'uvSet': 'GameUV', 'texCoord': 1,
                   'resolutionAudited': [1024, 1024], 'objects': len(meshes), 'triangles': len(rows),
                   'exactTriangleOverlapFree': True, 'everyTriangleContains1024PixelCenter': True,
+                  'everyTriangleContains2048PixelCenter':True,'resumedExistingAtlas':resumeExisting,
                   'preservedSurfaceUvHashes': sourceHashes, 'createdBlankSourceUv': createdSource,
                   'explicitGameTriangulation': triangulation,
                   'packing': 'Global smart projection; physical-area island scale; six-direction actual game visibility priorities; conservative convex island packing with 0.0035 fractional margin; exact overlap and 1024 pixel-centre audits',
