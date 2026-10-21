@@ -140,7 +140,8 @@ export const GROUND_IMPACT_DUST = Object.freeze({
  */
 export const GROUND_IMPACT_SURFACES = Object.freeze({
   // skin：震起来的地表浮土，和地面同一种土色（偏浅、偏灰一点），不是炸出来的黑土
-  loess: Object.freeze({ fresh: Object.freeze([0.15, 0.125, 0.10]), dust: Object.freeze([0.33, 0.29, 0.24]), skin: Object.freeze([0.31, 0.275, 0.215]), massScale: 1 }),
+  // 2026-10-21 用户：「两个尘土之间的颜色应该接近一些，现在看起来像两个组合起来的」—— 土柱的黑褐调亮、细尘调暗，往中间靠
+  loess: Object.freeze({ fresh: Object.freeze([0.2, 0.165, 0.13]), dust: Object.freeze([0.33, 0.29, 0.24]), skin: Object.freeze([0.275, 0.24, 0.19]), massScale: 1 }),
 });
 
 /**
@@ -169,9 +170,25 @@ export const GROUND_IMPACT_RENDER = Object.freeze({
   haze: 0.45,
   /** 采样坐标的三维扭曲幅度（米，×√∛W）：光滑的场被扭成一坨一坨的轮廓。softDepthM：贴地 / 贴墙处的软过渡。 */
   warpM: 2.6, softDepthM: 0.45,
-  phaseG: 0.38,
-  /** 震起的地面尘前向散射弱一些：一层薄尘逆光时按 0.38 算会亮成一片白泡沫。 */
-  skinPhaseG: 0.12,
+  phaseG: 0.3,
+  /** 震起的地面尘前向散射与土柱同一个值（两样尘受光一致才像一回事；早期用 0.12 / 0.38 两个值，看着像两层拼起来的）。 */
+  skinPhaseG: 0.3,
+  /** 细尘靠近土柱的那一圈带一点土柱的深色（新鲜度），往外渐浅：fresh × exp(−r / (nearK·R)) × exp(−t / nearS)。 */
+  skinNear: Object.freeze({ fresh: 0.55, nearK: 0.4, nearS: 3.5 }),
+  /**
+   * 起爆的一瞬火光（2026-10-21 用户：「应该有一瞬的火光」）：画在尘体积里的一团自发光 + 把周围的尘从里面照亮。
+   *   radiusK   火球半径（米，×∛W）：75 mm ≈ 1.8 m；center 离地高度占半径的比例
+   *   riseS     胀到全尺寸的时间；decayS 衰减时间常数（×√∛W）；lifeS 之后彻底关掉（×√∛W）
+   *   emission  自发光强度（HDR，每米）；glow 照亮周围尘的强度（×太阳色量级）
+   *   hot / cool 刚起爆的白黄与冷却后的橙红（线性 RGB，按衰减进度混）
+   */
+  fire: Object.freeze({
+    radiusK: 1.95, centerK: 0.55, riseS: 0.018, decayS: 0.075, lifeS: 0.45,
+    // 沟里炸时火球再抬高 ventM（米，×夹住比例 ×√∛W）：火光从沟里往上窜
+    ventM: 1.6,
+    emission: 26, glow: 7,
+    hot: Object.freeze([1.0, 0.7, 0.36]), cool: Object.freeze([1.0, 0.3, 0.06]),
+  }),
   multipleScattering: Object.freeze([0.55, 0.12]),
   ambientFloor: 0.42,
   /**

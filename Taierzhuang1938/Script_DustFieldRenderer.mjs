@@ -155,6 +155,9 @@ uniform float uPuffPop;
 uniform float uPuffRef;
 uniform float uPuffEdge;
 uniform float uPuffHaze;
+uniform vec4 uFire;          // 火球中心 xyz、半径
+uniform vec4 uFireColor;     // 线性颜色 × 强度（a = 照亮周围尘的强度）
+uniform vec3 uSkinNear;      // 细尘近土柱一圈的新鲜度：强度、半径比例 × R、时间衰减已乘进强度
 uniform vec3 uSkinColor;
 uniform float uSkinPhaseG;
 uniform vec4 uSurgeRect;      // minX, minZ, 1/size, 1/size
@@ -206,7 +209,8 @@ vec2 BoxHit(vec3 ro, vec3 rd){
   return vec2(max(max(n.x, n.y), n.z), min(min(f.x, f.y), f.z));
 }
 float Phase(float c, float g){ return (1.0 - g * g) / pow(max(0.05, 1.0 + g * g - 2.0 * g * c), 1.5); }
-float Ign(vec2 p){ return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+// 白噪声抖动：IGN 那种有规律的抖动在一帧里没被 TAA 平均掉时会成一道道斜纹，白噪声最多是细颗粒
+float Ign(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 
 // 平滑插值：双线性在格边上导数不连续，阈值一打（剖面、侵蚀）就描出一格一格的台阶。
 // 把格内坐标过一遍 smoothstep 再交给硬件双线性（一次取样，C1 连续）。
@@ -275,8 +279,10 @@ float Field(vec3 p, out float fresh){
 // 震起的地面尘：底面贴着这一处的真实地面（+ 上浮），厚度全场一个数；冲击波扫到之前没有。
 // 用不扭曲的坐标采（扭曲幅度好几米，一层几十厘米的薄尘会被扭成一团乱麻），斑驳也是柔的、不过团块阈值。
 // near：采样点在这层尘的高度附近（调用方据此加密步长 —— 薄层用粗步长会出一片网点）。
+float gSkinFresh = 0.0;
 float Skin(vec3 p, out float near){
   near = 0.0;
+  gSkinFresh = 0.0;
   vec2 ku = (p.xz - uSkinRect.xy) * uSkinRect.zw;
   if (ku.x <= 0.0 || ku.y <= 0.0 || ku.x >= 1.0 || ku.y >= 1.0) return 0.0;
   float k = texture(uSkin, Smoothed(ku, vec2(textureSize(uSkin, 0)))).r;
@@ -307,6 +313,8 @@ float Skin(vec3 p, out float near){
   // 团顶参差：鼓包的地方高，团之间低
   float top = h * (0.35 + 1.25 * puff);
   float prof = smoothstep(-0.45, -0.05, y) * (1.0 - smoothstep(0.25 * top, top + 0.05, y));
+  // 近土柱那一圈带一点土柱的深色，往外渐浅（两样尘接得上，不像两层拼起来的）
+  gSkinFresh = uSkinNear.x * exp(-rad / max(0.5, uSkinNear.y));
   return k / h * prof * front * (uPuffHaze * pop + (1.0 - uPuffHaze) * 2.4 * s);
 }
 
@@ -360,6 +368,7 @@ void main(){
   vec3 radiance = vec3(0.0);
   float transmission = 1.0;
   float tRay = start + jitter * ds;
+  float refine = 0.0, refineStep = ds;   // 撞上很浓的一层时退半步、细步长走几步（先粗后细），表面才不随抖动跳格
   float dsFine = clamp(uSkinShape.x * 0.3, 0.06, ds);
   float phaseSkin = Phase(dot(rd, light), uSkinPhaseG);
   for (int i = 0; i < 160; i++) {
@@ -370,14 +379,29 @@ void main(){
     float d = Field(w, fresh);
     float surgeH = gNearSurge;
     float skin = Skin(p, near);
+    float skinFresh = gSkinFresh;
+    // 一瞬的火光：火球那一团自己发光（被外面的尘挡住的自然看不见），空处也要走到
+    float fireD = uFireColor.a > 0.0 ? length(w - uFire.xyz) / max(uFire.w, 0.05) : 9.0;
+    float fireE = fireD < 1.0 ? (1.0 - smoothstep(0.25, 1.0, fireD)) : 0.0;
+    // 火球附近加密步长（一两米大的火球用 0.4 m 的步长会铺满网点）
+    float fireStep = fireD < 1.4 ? clamp(uFire.w * 0.08, 0.04, ds) : ds;
+    if (fireE > 0.0) { radiance += transmission * uFireColor.rgb * fireE * min(fireStep, 0.5); }
     float stepLen = near > 0.5 ? dsFine : ds;
     if (surgeH > 0.0) stepLen = min(stepLen, clamp(surgeH * 0.22, 0.12, ds));
-    if (d < 1e-4 && skin < 1e-4) { tRay += (near > 0.5 || surgeH > 0.0) ? stepLen : ds * 2.0; continue; }
+    stepLen = min(stepLen, fireStep);
+    if (refine > 0.0) { stepLen = min(stepLen, refineStep); refine -= 1.0; }
+    if (d < 1e-4 && skin < 1e-4) { tRay += (near > 0.5 || surgeH > 0.0 || fireD < 1.4) ? stepLen : ds * 2.0; continue; }
     float mainS = d > 1e-4 ? Shape(p, d) : 0.0;
     float sigma = mainS + skin;
     // 贴地 / 贴墙的软过渡：离预通道深度不到 softDepth 的那一截按距离淡掉（不然沟沿上一圈锯齿）
     if (sceneDepth > 0.0) sigma *= smoothstep(0.0, uSoftDepth, end - tRay);
     if (sigma < 1e-4) { tRay += stepLen; continue; }
+    if (sigma * stepLen > 1.5 && stepLen > 0.06 && refine <= 0.0) {
+      refineStep = clamp(0.8 / sigma, 0.03, stepLen * 0.5);
+      refine = 8.0;
+      tRay -= stepLen * (0.5 - 0.5 * jitter);
+      continue;
+    }
     float skinShare = skin / max(mainS + skin, 1e-5);
     // 朝太阳的遮光（步长逐步拉长）
     float tau = 0.0;
@@ -396,7 +420,10 @@ void main(){
     vec3 ambient = (uSkyColor * uAmbientScale + uSunColor * uGroundBounce * vec3(1.0, 0.84, 0.6)) * mix(uAmbientFloor, 1.0, exp(-above * 0.9));
     float ph = mix(phase, phaseSkin, skinShare);
     vec3 incident = ambient + uSunColor * (exp(-tau) * ph + uMultipleScattering.x * exp(-tau * uMultipleScattering.y));
-    vec3 albedo = mix(mix(uDustColor, uFreshColor, smoothstep(0.05, 0.95, fresh)), uSkinColor, skinShare);
+    // 火光把周围的尘从里面照亮（橙红，按离火球的距离衰减）
+    if (uFireColor.a > 0.0) incident += uFireColor.rgb / max(1.0, length(uFireColor.rgb)) * uFireColor.a * exp(-fireD * fireD * 0.35);
+    vec3 skinAlbedo = mix(uSkinColor, uFreshColor, clamp(skinFresh, 0.0, 1.0));
+    vec3 albedo = mix(mix(uDustColor, uFreshColor, smoothstep(0.05, 0.95, fresh)), skinAlbedo, skinShare);
     float next = exp(-sigma * stepLen);
     radiance += transmission * albedo * incident * (1.0 - next);
     transmission *= next;
@@ -419,6 +446,7 @@ function MakeMaterial(shared, noise, quality) {
     uSkinRect: { value: new THREE.Vector4() }, uSkinShape: { value: new THREE.Vector4(0.3, 0, 0, 160) },
     uImpact: { value: new THREE.Vector2() }, uSkinPatch: { value: 0.75 },
     uPuffFreq: { value: 0.2 }, uPuffPop: { value: 0.45 }, uPuffRef: { value: 1 }, uPuffEdge: { value: 0.5 }, uPuffHaze: { value: 0.25 },
+    uFire: { value: new THREE.Vector4() }, uFireColor: { value: new THREE.Vector4() }, uSkinNear: { value: new THREE.Vector3() },
     uSkinColor: { value: new THREE.Vector3() }, uSkinPhaseG: { value: RENDER.skinPhaseG },
     uSurgeRect: { value: new THREE.Vector4() }, uLoftRect: { value: new THREE.Vector4() },
     uBaseY: { value: 0 }, uBoxMin: { value: new THREE.Vector3() }, uBoxMax: { value: new THREE.Vector3(1, 1, 1) },
@@ -557,6 +585,7 @@ export class DustFieldSystem {
       u.uSkinRect.value.set(info.skinRect[0], info.skinRect[1], 1 / info.skinRect[2], 1 / info.skinRect[3]);
       u.uSkinShape.value.set(info.skinH, info.skinLift, info.shockR, info.shockV);
       u.uImpact.value.set(info.impact[0], info.impact[1]);
+      this._FireUniforms(u, field, info);
       // 采样坐标的三维扭曲会把尘往外推出数据的范围（大炸弹七八米）：盒子按扭曲幅度留余量，不然尘团顶被盒顶切成一块平盖
       const pad = u.uWarp.value * 1.6;
       u.uBoxMin.value.set(info.minX - pad, info.minY, info.minZ - pad);
@@ -567,6 +596,23 @@ export class DustFieldSystem {
       u.uFrame.value = this.frame;
       e.mesh.visible = info.fade > 0.001;
     }
+  }
+
+  /** 起爆火光与细尘近土柱新鲜度的每帧参数（GROUND_IMPACT_RENDER.fire / skinNear）。 */
+  _FireUniforms(u, field, info) {
+    const F = RENDER.fire, N = RENDER.skinNear, cube = field.scale.cube, root = Math.sqrt(cube), t = field.time;
+    // 沟里炸：火光从沟里往上窜（被沟壁收住、往上冲），火球抬高、放大一点，不然整团藏在沟沿下面
+    const confined = field.confined || 0;
+    const R = F.radiusK * cube * (1 + 0.3 * confined);
+    const grow = Math.min(1, t / F.riseS), decay = Math.exp(-t / (F.decayS * root));
+    const on = t < F.lifeS * root ? grow * decay : 0;
+    const r = R * (0.35 + 0.65 * grow) * (1 + 0.25 * (1 - decay));
+    const g = field.groundY ?? info.baseY;
+    u.uFire.value.set(field.cx, g + R * F.centerK + F.ventM * confined * Math.sqrt(cube), field.cz, r);
+    const k = 1 - decay;   // 0 = 刚起爆（白黄），1 = 冷了（橙红）
+    const c = [0, 1, 2].map((i) => F.hot[i] + (F.cool[i] - F.hot[i]) * k);
+    u.uFireColor.value.set(c[0] * F.emission * on, c[1] * F.emission * on, c[2] * F.emission * on, F.glow * on);
+    u.uSkinNear.value.set(N.fresh * Math.exp(-t / N.nearS), N.nearK * (info.shockR || 10), 0);
   }
 
   _Remove(k) {
