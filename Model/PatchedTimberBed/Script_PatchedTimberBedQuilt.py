@@ -214,7 +214,7 @@ def _GameMaterial():
  return material
 
 
-def BakeQuiltSurface(sourceObjects,targetCount=18000):
+def BakeQuiltSurface(sourceObjects,targetCount=18000,partitionBudgets=None,colorProcessor=None):
  """Return (single Quilt object, JSON-safe receipt) without low-mesh rebaking.
 
  Sources are the ten AB partitions, excluding the separately handled BS foot.
@@ -257,12 +257,15 @@ def BakeQuiltSurface(sourceObjects,targetCount=18000):
    colors=np.empty(len(attr.data)*4,dtype=np.float32);attr.data.foreach_get('color',colors)
    if not np.all(np.isfinite(colors)):raise ValueError('Nonfinite source-baked quilt colour: '+source.name)
    row={'sourceObject':source.name,'sourceTriangles':_Triangles(obj),'potentialGeometryDependentNodes':risks,'colourBakedBeforeReduction':True,'originalObjectBoundsMetres':[float(value) for value in source.dimensions],'bakedColorLinearRgbMinMax':[float(colors.reshape(-1,4)[:,:3].min()),float(colors.reshape(-1,4)[:,:3].max())]}
-   if _PartitionNumber(source.name)==7:row['sourceColorLowPass']=_ApplyGrayPatchLowPass(obj,attr,colors)
+   if colorProcessor is not None:row['sourceColorProcessing']=colorProcessor(obj,attr,colors)
+   elif _PartitionNumber(source.name)==7:row['sourceColorLowPass']=_ApplyGrayPatchLowPass(obj,attr,colors)
    rows.append(row)
    obj.hide_render=True
   for obj,row in zip(copies,rows):
    row['removedDegeneratesBeforeDecimation']=_CleanPartition(obj);row['trianglesAfterWithinPartitionWeld']=_Triangles(obj)
-  budgets=_Budgets(copies,int(targetCount))
+  budgets=([int(partitionBudgets[_PartitionNumber(obj.get('QuiltSourceName',obj.name))]) for obj in copies]
+           if partitionBudgets is not None else _Budgets(copies,int(targetCount)))
+  if sum(budgets)>targetCount:raise ValueError('Explicit Quilt partition budgets exceed target')
   for obj,row,budget in zip(copies,rows,budgets):
    _Select([obj]);count=_Triangles(obj)
    if count>budget:
@@ -294,4 +297,4 @@ def BakeQuiltSurface(sourceObjects,targetCount=18000):
   for obj in game:
    if obj.name.startswith('Quilt_PreSurfaceBake'):obj.hide_render=True;obj.hide_set(True)
  low.hide_render=False;low.hide_set(False)
- return low,{'group':'Quilt','sourceObjects':len(sources),'sourceTriangles':sum(row['sourceTriangles'] for row in rows),'gameTriangles':_Triangles(low),'requestedTriangles':int(targetCount),'representation':'DIFFUSE COLOR baked on each unchanged dense source partition before within-partition weld and collapse; partition 7 colour receives a normalized world-3D Gaussian low-pass; CORNER colour retained without low-mesh rebake','normalStrength':.15,'sourceBakeCyclesSamples':1,'crossPartitionWeld':False,'preservedOverlayPartitions':[6,7],'sourceColorLowPassPartitions':[7],'partitions':rows}
+ return low,{'group':'Quilt','sourceObjects':len(sources),'sourceTriangles':sum(row['sourceTriangles'] for row in rows),'gameTriangles':_Triangles(low),'requestedTriangles':int(targetCount),'representation':'Dense source colour baked before per-partition reduction; optional cotton colour preparation; original overlay separation retained','normalStrength':.15,'sourceBakeCyclesSamples':1,'crossPartitionWeld':False,'preservedOverlayPartitions':[6,7],'sourceColorLowPassPartitions':[] if colorProcessor else [7],'partitions':rows}

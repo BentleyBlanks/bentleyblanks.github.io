@@ -1,0 +1,11 @@
+{
+  "asset": "Texture_BedAgedCottonSource.png",
+  "provider": "built-in image_gen",
+  "skill": "imagegen",
+  "dimensions": [1254, 1254],
+  "sha256": "2317385d101e9a877f7f78338a2d233100f3327773b145e1cd0fb2daa7a2243c",
+  "physicalTileMeters": 0.35,
+  "prompt": "Use case: photorealistic-natural. Asset type: one square seamless PBR diffuse/albedo texture for old cotton bedding in a 3D historical game, NOT a photo of the bed. Fill the entire square edge to edge with a FLAT sheet of old handwoven plain-weave cotton, desaturated warm light gray / greige, tightly woven imperfect cotton yarns with irregular fine fibers, tiny pills and thread slubs, softened and abraded through years of washing, subtle uneven ingrained beige dust and very faint brown age speckling. Aged but still serviceable; fabric rather than leather/plastic/stone/paper. Approximately 35 x 35 centimeters of fabric viewed orthographically directly overhead at macro textile detail, enough tiny individual weave intersections to convey fine cloth, natural mild randomness, restrained color variations. Lighting is completely flat diffuse, no directional light, no cast shadows, no highlights, no creases, no large wrinkles, no folds, no draping, no edges, no visible seams, no patches, no objects, no border, no text, no watermark. The texture must be visually tileable on all four edges and uniformly lit with no vignette. A single square high-resolution full-bleed material swatch only.",
+  "processing": "Original generated RGB pixels are retained. Normal relief derives from the fine-fibre luminance residual after removing a 5px Gaussian; 45 micrometre RMS surrogate height, OpenGL +Y, resampled and renormalized to 1024. Roughness is 512. Macro patch colours remain separate vertex data.",
+  "limitation": "Generated albedo and derived micro-relief are artistic material inputs rather than a calibrated scanned PBR set. Model folds are geometry, not drawn into this tile."
+}

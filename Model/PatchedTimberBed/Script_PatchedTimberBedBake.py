@@ -16,7 +16,7 @@ from Script_PatchedTimberBedCotton import ApplyCottonWeave
 from Script_PatchedTimberBedWood import WeatherTimberFrame
 from Script_PatchedTimberBedQuilt import BakeQuiltSurface
 if '--' in sys.argv:
- parser=argparse.ArgumentParser();parser.add_argument('--source-root',required=True);parser.add_argument('--review-root',required=True);parser.add_argument('--stage',default='all',choices=['prepare','build','finish','refresh','material-frame','wood-reference','export','all']);parser.add_argument('--skip-renders',action='store_true');parser.add_argument('--group',choices=['Quilt','Straw'],default='Straw')
+ parser=argparse.ArgumentParser();parser.add_argument('--source-root',required=True);parser.add_argument('--review-root',required=True);parser.add_argument('--stage',default='all',choices=['prepare','build','finish','refresh','material-frame','wood-reference','uv-cloth','export','all']);parser.add_argument('--skip-renders',action='store_true');parser.add_argument('--group',choices=['Quilt','Straw'],default='Straw')
  args=parser.parse_args(sys.argv[sys.argv.index('--')+1:]);config={'sourceRoot':args.source_root,'reviewRoot':args.review_root,'stage':args.stage,'skipRenders':args.skip_renders,'refreshGroup':args.group}
 else:config=json.loads(pathlib.Path(os.environ.get('BED_BAKE_CONFIG',str(repoRoot/'tmp/BedBnBsAcceptance/Data_BakeConfig.json'))).read_text())
 sourceRoot=pathlib.Path(config['sourceRoot'])
@@ -40,6 +40,8 @@ def TriangleCount(o):return sum(len(p.vertices)-2 for p in o.data.polygons)
 
 def ArchiveRecipes():
  destination=sourceRoot/'Scripts';destination.mkdir(exist_ok=True)
+ bitmap=pathlib.Path(__file__).resolve().parent/'Texture_BedAgedCottonSource.png'
+ if bitmap.exists():shutil.copy2(bitmap,destination/bitmap.name)
  for path in pathlib.Path(__file__).resolve().parent.glob('Script_PatchedTimberBed*'):
   if path.suffix not in ('.py','.mjs'):continue
   shutil.copy2(path,destination/path.name)
@@ -393,6 +395,7 @@ def FinishGame(game,originals,rows,duplicate):
  allPoints=[o.matrix_world@Vector(v) for o in game for v in o.bound_box]
  offset=Vector(((min(p.x for p in allPoints)+max(p.x for p in allPoints))/2,(min(p.y for p in allPoints)+max(p.y for p in allPoints))/2,min(p.z for p in allPoints)))
  for o in game:o.location-=offset
+ bpy.context.scene['PatchedTimberBedSourceOffset']=list(offset)
  for o in bpy.context.scene.objects:
   if o.type in ('CAMERA','LIGHT'):o.location-=offset
  for o in originals:o.hide_render=True;o.hide_set(True)
@@ -495,7 +498,7 @@ def PrepareReferenceFrameSources(objects):
  return stats
 
 
-def BuildReferenceFrame(objects,targetCount=7200):
+def BuildReferenceFrame(objects,targetCount=7200,metricUv=False):
  from Script_PatchedTimberBedWood import ApplyReferenceWoodSurface
  objects=list(objects);TagFrameSources(objects)
  stats=WeatherTimberFrame(objects,chipGeometry=False,textureRoot=textureRoot)
@@ -503,6 +506,10 @@ def BuildReferenceFrame(objects,targetCount=7200):
  for source in objects:
   obj=source.copy();obj.data=source.data.copy();bpy.context.scene.collection.objects.link(obj);copies.append(obj)
  low=Join(copies,'Frame');Select([low]);bpy.ops.object.transform_apply(location=False,rotation=True,scale=True)
+ if metricUv:
+  points=np.asarray([low.matrix_world@v.co for v in low.data.vertices]);minimum=points.min(axis=0);maximum=points.max(axis=0)
+  anchors=np.where((points[:,2]<minimum[2]+.0005)|(points[:,0]<minimum[0]+.0005)|(points[:,1]<minimum[1]+.0005)|(points[:,1]>maximum[1]-.0005))[0]
+  group=low.vertex_groups.get('TimberDamagePreserve') or low.vertex_groups.new(name='TimberDamagePreserve');group.add(anchors.tolist(),1.,'REPLACE')
  before=TriangleCount(low);history=[]
  for attempt in range(6):
   count=TriangleCount(low)
@@ -514,12 +521,17 @@ def BuildReferenceFrame(objects,targetCount=7200):
   bpy.ops.object.modifier_apply(modifier=modifier.name)
   after=TriangleCount(low);history.append([count,after])
   if after>=count:break
- if TriangleCount(low)>7500:raise ValueError('Protected reference Frame exceeds the 7500-triangle component ceiling: '+str(TriangleCount(low)))
- surface=ApplyReferenceWoodSurface(low,textureRoot,stats['memberRecords'])
+ hardLimit=10500 if metricUv else 7500
+ if TriangleCount(low)>hardLimit:raise ValueError('Protected reference Frame exceeds its component ceiling: '+str(TriangleCount(low)))
+ if metricUv:
+  from Script_PatchedTimberBedSurfaceRevision import MetricWood
+  surface=MetricWood(low,stats['memberRecords'],textureRoot)
+ else:surface=ApplyReferenceWoodSurface(low,textureRoot,stats['memberRecords'])
  low['GameExportColorLayer']=surface.get('exportColorLayer','BR_original_low_frequency_color')
  beforeValidate=TriangleCount(low);repaired=low.data.validate(verbose=True,clean_customdata=False);low.data.update()
  if low.data.validate(verbose=True,clean_customdata=False):raise ValueError('Reference Frame remains invalid')
- row={'group':'Frame','sourceObjects':len(objects),'sourceTriangles':before,'gameTriangles':TriangleCount(low),'targetTriangles':targetCount,'hardTriangleLimit':7500,'collapseHistory':history,'trianglesBeforeValidation':beforeValidate,'meshValidationRepaired':repaired,'representation':'Reference-informed damaged timber with shared metre-scale side/end surface and macro vertex colour'}
+ if TriangleCount(low)>hardLimit:raise ValueError('UV chart cuts exceed Frame component budget: '+str(TriangleCount(low)))
+ row={'group':'Frame','sourceObjects':len(objects),'sourceTriangles':before,'gameTriangles':TriangleCount(low),'targetTriangles':targetCount,'hardTriangleLimit':hardLimit,'collapseHistory':history,'trianglesBeforeValidation':beforeValidate,'meshValidationRepaired':repaired,'representation':'Reference-informed damaged timber with metric side/end charts and macro vertex colour'}
  (reviewRoot/'Data_FrameReferenceSurface.json').write_text(json.dumps(surface,indent=2))
  (reviewRoot/'Data_FrameReferenceBuild.json').write_text(json.dumps(row,indent=2))
  return low,row
@@ -585,6 +597,71 @@ def ExportSavedGame():
  print('SAVED_GAME_EXPORTED',flush=True)
 
 
+def RefreshUvCloth():
+ from Script_PatchedTimberBedSurfaceRevision import DenseCottonColor,ApplyCleanCotton
+ bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedHigh.blend'))
+ frames=[o for o in bpy.context.scene.objects if o.type=='MESH' and o.name.startswith('FRAME_')]
+ PrepareReferenceFrameSources(frames);ArchiveRecipes()
+ bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedHigh.blend'),compress=True)
+ frame,frameRow=BuildReferenceFrame(frames,8100,metricUv=True)
+ budgets={6:11200,7:7600,9:1400}
+ sources=[o for o in bpy.context.scene.objects if o.type=='MESH' and o.name.startswith('AB exact material partition ') and int(o.name.rsplit(' ',1)[-1]) in budgets]
+ overlay,quiltRow=BakeQuiltSurface(sources,sum(budgets.values()),partitionBudgets=budgets,colorProcessor=DenseCottonColor)
+ (reviewRoot/'Data_VisibleCottonBuild.json').write_text(json.dumps(quiltRow,indent=2))
+ for obj in (frame,overlay):
+  matrix=obj.matrix_world.copy();obj.parent=None;obj.matrix_world=matrix
+ transfer=sourceRoot/'Scene_SurfaceRevisionTransfer.blend';bpy.data.libraries.write(str(transfer),{frame,overlay},path_remap='RELATIVE',compress=True)
+ bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'))
+ oldFrame=bpy.data.objects['Frame'];oldFrameMesh=oldFrame.data;bpy.data.objects.remove(oldFrame,do_unlink=True)
+ if oldFrameMesh.users==0:bpy.data.meshes.remove(oldFrameMesh)
+ try:
+  with bpy.data.libraries.load(str(transfer),link=False) as (available,loaded):loaded.objects=['Frame','Quilt']
+ finally:transfer.unlink(missing_ok=True)
+ frame,newQuilt=loaded.objects
+ for obj in (frame,newQuilt):bpy.context.scene.collection.objects.link(obj)
+ frame.name='Frame';newQuilt.name='Quilt_NewVisibleLayers'
+ pivotFile=reviewRoot/'Data_PreviousAsset.json'
+ previous=json.loads((pivotFile if pivotFile.exists() else pathlib.Path(__file__).with_name('Data_Asset.json')).read_text(encoding='utf-8'))
+ offset=Vector(bpy.context.scene.get('PatchedTimberBedSourceOffset',previous['coordinates']['sourceToGameTranslationBlender']))
+ bpy.context.scene['PatchedTimberBedSourceOffset']=list(offset)
+ for obj in (frame,newQuilt):obj.location-=offset;obj.hide_render=False;obj.hide_set(False)
+ bpy.context.view_layer.update()
+ world=np.asarray([frame.matrix_world@v.co for v in frame.data.vertices]);floor=float(world[:,2].min())
+ if abs(floor)>.0005:raise ValueError('Metric Frame floor changed by more than 0.5mm')
+ inverse=frame.matrix_world.inverted();weights=np.clip(1-(world[:,2]-floor)/.004,0,1)
+ for vertex,point,weight in zip(frame.data.vertices,world,weights):
+  point=point.copy();point[2]-=floor*weight;vertex.co=inverse@Vector(point)
+ (reviewRoot/'Data_FrameFloorAlignment.json').write_text(json.dumps({'floorBeforeM':floor,'maximumDisplacementM':abs(floor),'soleBandM':.004,'otherComponentsMoved':False},indent=2))
+ quilt=bpy.data.objects['Quilt'];mesh=quilt.data
+ backup=mesh.color_attributes.get('CottonSourceLowFrequencyColor')
+ if backup:
+  baseline=np.empty(len(mesh.loops)*4,np.float32);backup.data.foreach_get('color',baseline);mesh.color_attributes['BR_original_low_frequency_color'].data.foreach_set('color',baseline)
+ elif any(material and material.name.startswith('Material_BedQuiltCleanCotton') for material in mesh.materials):
+  from Script_PatchedTimberBedSurfaceRevision import CottonMaps
+  _,mean=CottonMaps();baseline=np.empty((len(mesh.loops),4),np.float32);mesh.color_attributes['BR_original_low_frequency_color'].data.foreach_get('color',baseline.ravel());baseline[:,:3]*=float(quilt.get('CleanCottonBaseMean',.9007));mesh.color_attributes['BR_original_low_frequency_color'].data.foreach_set('color',baseline.ravel())
+ before=TriangleCount(quilt);bm=bmesh.new();bm.from_mesh(mesh);tag=bm.faces.layers.int['QuiltSourcePartition']
+ remove=[face for face in bm.faces if face[tag] in budgets];bmesh.ops.delete(bm,geom=remove,context='FACES_ONLY')
+ bmesh.ops.delete(bm,geom=[v for v in bm.verts if not v.link_faces],context='VERTS');bm.to_mesh(mesh);bm.free();mesh.update()
+ retained=TriangleCount(quilt);quilt=Join([quilt,newQuilt],'Quilt')
+ for color in list(quilt.data.color_attributes):
+  if color.name!='BR_original_low_frequency_color':quilt.data.color_attributes.remove(color)
+ cotton=ApplyCleanCotton(quilt,textureRoot)
+ cotton.update({'previousQuiltTriangles':before,'retainedContactAndOtherPatchTriangles':retained,'replacedPartitions':list(budgets),'newVisibleLayers':quiltRow['gameTriangles'],'contactShellRebuilt':False})
+ (reviewRoot/'Data_CleanCotton.json').write_text(json.dumps(cotton,indent=2))
+ game=[o for o in bpy.context.scene.objects if o.type=='MESH' and not o.hide_render and o.name!='Plane']
+ if len(game)!=6 or sum(TriangleCount(o) for o in game)>60000:raise ValueError('UV/cotton revision exceeds complete-bed 60k budget')
+ for obj in game:
+  obj.data.validate(verbose=True,clean_customdata=False);obj.data.update()
+  if obj.data.validate(verbose=False,clean_customdata=False):raise ValueError('Invalid final mesh '+obj.name)
+ Export(game,reviewRoot/'Model_PatchedTimberBedStandard.glb')
+ for name in ('meshes','materials','images'):
+  collection=getattr(bpy.data,name)
+  for item in [item for item in collection if item.users==0]:collection.remove(item)
+ ArchiveRecipes();bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'),compress=True)
+ (reviewRoot/'Data_SurfaceRevisionBuild.json').write_text(json.dumps({'result':'PASS','frame':frameRow,'cotton':cotton,'components':[{'name':o.name,'triangles':TriangleCount(o)} for o in game],'triangleLimit':60000,'frozenComponents':['BS_FootCloth','Pillow','Sewing','Straw']},indent=2))
+ print('METRIC_UV_COTTON_EXPORTED',flush=True)
+
+
 def RefreshFrameMaterial():
  # External source and pre-contact checkpoint retain exact approved geometry.
  bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedHigh.blend'))
@@ -612,4 +689,5 @@ if stage=='finish':ResumeFinish()
 if stage=='refresh':RefreshSoftGroup()
 if stage=='material-frame':RefreshReferenceWood()
 if stage=='wood-reference':RefreshReferenceWood()
+if stage=='uv-cloth':RefreshUvCloth()
 if stage=='export':ExportSavedGame()

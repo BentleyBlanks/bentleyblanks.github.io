@@ -1,34 +1,34 @@
 {
   "schemaVersion": 1,
   "id": "PatchedTimberBed",
-  "version": "20261021ReferenceWoodV4",
-  "description": "Complete <=50k patched cotton-quilt bed with reference-informed old timber patina, irregular longitudinal grain and real local fibre loss; the five non-Frame components retain their approved geometry and materials.",
+  "version": "20261021MetricWoodCottonV5",
+  "description": "Complete <=60k patched cotton bed with metric timber perimeter charts, explicit UV repeat seams and restored woven-cotton appearance; original bearing shell and four other components preserved.",
   "historicalStatus": "Creative reconstruction preserving the user-selected M17 C design; no claim of unique documented historical specimen.",
   "models": [
     {
       "file": "Model_PatchedTimberBed.glb",
-      "url": "/Model/PatchedTimberBed/Model_PatchedTimberBed.glb?v=20261021ReferenceWoodV4",
-      "sha256": "44d64adfde72fea58494719ce753bc5cc17095786dae1baf9c4a3e80b807ce0b",
-      "bytes": 6957176,
-      "triangles": 49513,
-      "triangleLimit": 50000,
+      "url": "/Model/PatchedTimberBed/Model_PatchedTimberBed.glb?v=20261021MetricWoodCottonV5",
+      "sha256": "4afed547ea4a1051206950ba9fb64a9335608b09b0604ea02854adc0a2e61418",
+      "bytes": 10246908,
+      "triangles": 58951,
+      "triangleLimit": 60000,
       "drawPrimitiveLimit": 6,
       "drawPrimitives": 6,
       "materials": 6,
       "boundsMin": [
-        -1.230356514453888,
+        -1.2303438782691956,
         0,
-        -0.5490800440311432
+        -0.5492865145206451
       ],
       "boundsMax": [
         1.2305437922477722,
         0.8928422186909302,
-        0.5490739047527313
+        0.5492130219936371
       ],
       "dimensionsMeters": [
-        2.46090030670166,
+        2.4608876705169678,
         0.8928422186909302,
-        1.0981539487838745
+        1.0984995365142822
       ]
     }
   ],
@@ -53,8 +53,8 @@
     },
     {
       "node": "Frame",
-      "triangles": 7200,
-      "vertices": 8894
+      "triangles": 9534,
+      "vertices": 8368
     },
     {
       "node": "Pillow",
@@ -63,8 +63,8 @@
     },
     {
       "node": "Quilt",
-      "triangles": 17999,
-      "vertices": 16721
+      "triangles": 25103,
+      "vertices": 20328
     },
     {
       "node": "Sewing",
@@ -113,12 +113,12 @@
       "totalNetFreedBytes": 2151791439,
       "retainedProjects": [
         {
-          "file": "Scene_PatchedTimberBedGame.blend",
-          "bytes": 8877659
+          "file": "Scene_PatchedTimberBedHigh.blend",
+          "bytes": 147751036
         },
         {
-          "file": "Scene_PatchedTimberBedHigh.blend",
-          "bytes": 147734798
+          "file": "Scene_PatchedTimberBedGame.blend",
+          "bytes": 14367604
         }
       ],
       "inputHashesUnchanged": true,
@@ -130,9 +130,16 @@
         "localReceipt": "tmp/BedWoodReferenceAcceptance/Data_ReferenceSourceCleanup.json",
         "automaticBlendBackups": 0
       },
-      "currentSourceDirectoryBytes": 363993083
+      "currentSourceDirectoryBytes": 380027681,
+      "metricUvCottonCleanup": {
+        "removedFiles": 3,
+        "freedBytes": 14707462,
+        "receipt": "tmp/BedUvCloth60kAcceptance/Data_SourceCleanup.json"
+      }
     },
-    "damageReceipt": "Scripts/Data_WoodDamage.json"
+    "damageReceipt": "Scripts/Data_WoodDamage.json",
+    "editedHighRole": "Dense editable source geometry and source shaders retained for reconstruction; current metric UV and material presentation lives in the Game project and SurfaceRevision recipe.",
+    "rebuildSurfaceStage": "uv-cloth"
   },
   "materials": {
     "BSFootCloth": {
@@ -167,97 +174,57 @@
       }
     },
     "Quilt": {
-      "representation": "DIFFUSE COLOR baked on each unchanged dense source partition before within-partition weld and collapse; partition 7 colour receives a normalized world-3D Gaussian low-pass; CORNER colour retained without low-mesh rebake",
-      "preservedOverlayPartitions": [
+      "representation": "Dense visible source partitions 6,7,9 rebuilt independently with added geometry; low-frequency repair-patch chroma separated from clean woven PBR. Existing contact shell retained.",
+      "replacedPartitions": [
         6,
-        7
+        7,
+        9
       ],
-      "sourceColorLowPassPartitions": [
-        7
+      "newVisibleLayerTriangles": 20200,
+      "retainedContactAndOtherPatchTriangles": 4903,
+      "normalStrength": 0.48,
+      "allMapsUv": "UVMap.001 / runtime TEXCOORD_1",
+      "tileMeters": 0.35,
+      "uvMapping": "angle-based charts scaled by measured surface area",
+      "uvCharts": 932,
+      "physicalUv": {
+        "percentiles": [
+          10,
+          50,
+          90,
+          99
+        ],
+        "areaWeightedTilesPerMeter": [
+          2.8255587690464727,
+          2.857140982735393,
+          2.886259821424035,
+          3.101039174965697
+        ],
+        "areaWeightedAnisotropy": [
+          1.0000045504685486,
+          1.0003236031092029,
+          1.016102860057377,
+          1.0693711986168128
+        ]
+      },
+      "baseSource": "Texture_BedAgedCottonSource.png",
+      "baseSourceSha256": "2317385d101e9a877f7f78338a2d233100f3327773b145e1cd0fb2daa7a2243c",
+      "sourceReceipt": "Data_CottonTextureSource.json",
+      "baseDimensions": [
+        1254,
+        1254
       ],
-      "normalUv": "UV0",
-      "normalStrength": 0.15000000596046448,
-      "base": "Mean-compensated source CORNER COLOR_0 multiplied by existing BS yarn at physical UV1 scale",
-      "noHeightBandFitOfVisibleFolds": true,
-      "partition7": {
-        "sourceObject": "AB exact material partition 7",
-        "sourceColorLowPass": {
-          "method": "World-3D voxel colour mass / density; three separable Gaussian convolutions; trilinear corner resampling",
-          "cellM": 0.0125,
-          "sigmaM": 0.03,
-          "supportSigma": 3.0,
-          "nominalSupportRadiusM": 0.09,
-          "kernelRadiusCells": 7,
-          "actualSupportRadiusM": 0.08750000000000001,
-          "kernelTaps": 15,
-          "voxelOriginWorldM": [
-            -0.3875,
-            -0.5,
-            0.6000000000000001
-          ],
-          "voxelShape": [
-            41,
-            48,
-            13
-          ],
-          "occupiedVoxels": 2184,
-          "cornerSamples": 288297,
-          "smoothedContrastScale": 0.55,
-          "originalResidualScale": 0.015,
-          "partitionMixing": false,
-          "alpha": 1.0,
-          "allColorsFinite": true,
-          "before": {
-            "linearRgbMinMax": [
-              0.0044115460477769375,
-              0.36343398690223694
-            ],
-            "linearRgbMean": [
-              0.09832855926292038,
-              0.08613150936432645,
-              0.06620358075568183
-            ],
-            "linearRgbStandardDeviation": [
-              0.03347987846207924,
-              0.030972928604715944,
-              0.024204610921052343
-            ],
-            "luminanceStandardDeviation": 0.03096494968851446,
-            "luminanceP05P95": [
-              0.04452280769206583,
-              0.14369757181316614
-            ],
-            "luminanceP95MinusP05": 0.09917476412110031
-          },
-          "after": {
-            "linearRgbMinMax": [
-              0.06107379281376968,
-              0.11372983270298277
-            ],
-            "linearRgbMean": [
-              0.09817988280982545,
-              0.08600409262562778,
-              0.06611275611360898
-            ],
-            "linearRgbStandardDeviation": [
-              0.003261299232531553,
-              0.0028476674909610764,
-              0.002132791060824686
-            ],
-            "luminanceStandardDeviation": 0.002881923842963448,
-            "luminanceP05P95": [
-              0.08246754176154206,
-              0.092148564352224
-            ],
-            "luminanceP95MinusP05": 0.009681022590681945
-          },
-          "sourcePartition": 7,
-          "stage": "dense source copy, after colour bake and before reduction",
-          "geometryUnchanged": true,
-          "maximumVertexDisplacementM": 0.0,
-          "sourceInputObjectsChanged": false
-        }
-      }
+      "normalDimensions": [
+        1024,
+        1024
+      ],
+      "ormDimensions": [
+        512,
+        512
+      ],
+      "legacyNormalReplaced": true,
+      "normalMethod": "fine-fibre luminance residual only, 5px Gaussian removed; 45um RMS height, OpenGL +Y; stains excluded from broad displacement",
+      "noHeightBandFitOfVisibleFolds": true
     },
     "Straw": {
       "representation": "single joined high-source DIFFUSE COLOR bake with OriginalLoopId scatter, before within-source weld and isolated-scene collapse",
@@ -546,9 +513,9 @@
       }
     },
     "Frame": {
-      "representation": "Shared physical side/end wood surface multiplied by macro CORNER colour; irregular growth layers, local dark patina and sparse exposed fibre loss",
-      "weatheringVersion": "20261021ReferenceElmSurfaceV6",
-      "geometryVersion": "20261021VisibleWoodDamageV3",
+      "representation": "physical timber islands, continuous metric rectangular perimeter, explicit geometry cuts at tile resets; original source/damage tags retained separately",
+      "version": "20261021MetricWoodCottonV5",
+      "normalStrength": 0.36,
       "baseDimensions": [
         2048,
         2048
@@ -557,218 +524,60 @@
         1024,
         1024
       ],
-      "roughnessDimensions": [
+      "ormDimensions": [
         512,
         512
       ],
-      "texturePolicy": "Shared metre-authored surface, finite side/end windows; Base sRGB, OpenGL +Y Normal and packed ORM Non-Color",
-      "uvLayer": "UVMap",
-      "colorLayer": "BR_original_low_frequency_color",
-      "surface": {
-        "version": "20261021ReferenceElmSurfaceV6",
-        "layout": {
-          "side": [
-            [
-              0.015625,
-              0.015625
-            ],
-            [
-              0.734375,
-              0.984375
-            ]
-          ],
-          "ends": [
-            [
-              [
-                0.765625,
-                0.03125
-              ],
-              [
-                0.984375,
-                0.25
-              ]
-            ],
-            [
-              [
-                0.765625,
-                0.265625
-              ],
-              [
-                0.984375,
-                0.484375
-              ]
-            ],
-            [
-              [
-                0.765625,
-                0.5
-              ],
-              [
-                0.984375,
-                0.71875
-              ]
-            ],
-            [
-              [
-                0.765625,
-                0.734375
-              ],
-              [
-                0.984375,
-                0.953125
-              ]
-            ]
-          ],
-          "metal": [
-            0.9296875,
-            0.982421875
-          ],
-          "neutral": [
-            0.8203125,
-            0.982421875
-          ],
-          "sideMetres": [
-            2.6,
-            0.28
-          ],
-          "endMetres": [
-            0.18,
-            0.18
-          ]
-        },
-        "baseSize": 2048,
-        "normalSize": 1024,
-        "ormSize": 512,
-        "sideGrowthBoundaries": 86,
-        "sideDryChecks": 7,
-        "irregularLongitudinalFinishLossPatches": 34,
-        "memberWindowWearAnchors": [
-          [
-            0.69,
-            0.24,
-            0.104,
-            0.022,
-            0.94
-          ],
-          [
-            0.94,
-            0.18,
-            0.157,
-            0.019,
-            0.91
-          ],
-          [
-            1.11,
-            0.11,
-            0.043,
-            0.017,
-            0.85
-          ],
-          [
-            1.45,
-            0.32,
-            0.165,
-            0.021,
-            0.94
-          ],
-          [
-            0.36,
-            0.26,
-            0.141,
-            0.017,
-            0.88
-          ],
-          [
-            1.97,
-            0.24,
-            0.187,
-            0.022,
-            0.88
-          ]
-        ],
-        "wearAreaAboveHalf": 0.12920209502103785,
-        "sideColorLinearMinMax": [
-          0.2269313484430313,
-          0.9950000047683716
-        ],
-        "endVariants": 4,
-        "sharedPhysicalHeightForPbr": true,
-        "normalMethod": "physical finite-height derivatives, PNG-row V sign corrected, OpenGL +Y; area-averaged and renormalized to 1K",
-        "periodicEqualSpacing": false,
-        "photographicPixelsCopied": false,
-        "textures": [
-          {
-            "role": "Base",
-            "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\PatchedTimberBed20261020\\Bakes\\Texture_BedFrameReferenceBase.png",
-            "dimensions": [
-              2048,
-              2048
-            ],
-            "sha256": "372b4a8fed975d2cff23956cd739c75fff94fd1be59fceab9e68944f08a8e96c"
-          },
-          {
-            "role": "Normal",
-            "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\PatchedTimberBed20261020\\Bakes\\Texture_BedFrameReferenceNormal.png",
-            "dimensions": [
-              1024,
-              1024
-            ],
-            "sha256": "e71154539495709cb42810312dc40ab645d4e5b4654fe54e849d1f7e1c4cd848"
-          },
-          {
-            "role": "Orm",
-            "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\PatchedTimberBed20261020\\Bakes\\Texture_BedFrameReferenceOrm.png",
-            "dimensions": [
-              512,
-              512
-            ],
-            "sha256": "a108bbe934f62e5615cef481cdb222a588457d94a16727c81ccf8888b36b11fb"
-          }
-        ],
-        "normalStrength": 0.48,
-        "nativePbrMaterial": "Material_BedFrameReference",
-        "recipeSha256": "77e8fed6102fc59710d761e054c613a89321024b356e12fc17a4242020470885"
-      },
-      "actualExposedDamageCorners": 282,
-      "geometry": {
-        "damagedMembers": 7,
-        "completedRegions": 10,
-        "sourceTriangles": 19474,
-        "gameTriangles": 7200,
-        "targetTriangles": 7200,
-        "hardTriangleLimit": 7500,
-        "maximumVertexDisplacementM": 0.006477586459368467,
-        "protectedVertexGroup": "TimberDamagePreserve",
-        "protectionGroupInvertedForDecimate": true
-      },
-      "floorAlignment": {
-        "scope": "Frame sole bottom 4 mm only",
-        "soleBandM": 0.004,
-        "floorBeforeM": 0.0001348485384369269,
-        "floorAfterM": 0.0,
-        "maximumDisplacementM": 0.0001348485384369269,
-        "hardDisplacementLimitM": 0.0005,
-        "otherComponentsMoved": false
-      },
-      "detailedReceiptsLocalOnly": [
-        "Data_WoodWeathering.json",
-        "Data_WoodDamage.json",
-        "Data_FrameReferenceSurface.json",
-        "Data_FrameReferenceBuild.json",
-        "Data_FrameCutRetention.json"
+      "sidePhysicalMeters": [
+        0.64,
+        0.64
       ],
-      "visualReferences": [
-        {
-          "url": "https://www.chairish.com/product/6368349/antique-shanxi-province-elm-opium-daybed",
-          "observedScreenshot": "Reference_OldElmBed.jpg",
-          "observation": "Dark, quiet grain under brown patina; intermittent irregular exposed timber on worn corners, rounded old edges and local stains. Avoid uniformly bright edges and equally spaced black strips."
+      "sideTexelsPerMeter": [
+        2300,
+        2300
+      ],
+      "originalSourceMemberTagsRetained": true,
+      "sourceMemberCount": 38,
+      "physicalUvMemberCount": 38,
+      "repeatGeometryCuts": 1465,
+      "chartGuttersPixels": 16,
+      "periodicLongitudinalTexture": true,
+      "actualGameTriangles": 9534,
+      "uvDistortion": {
+        "result": "PASS",
+        "previousSha256": "44d64adfde72fea58494719ce753bc5cc17095786dae1baf9c4a3e80b807ce0b",
+        "finalSha256": "4afed547ea4a1051206950ba9fb64a9335608b09b0604ea02854adc0a2e61418",
+        "previousWood": {
+          "sideTriangles": 6032,
+          "sideAreaM2": 7.377555746337696,
+          "areaWeightedPixelAnisotropyP50P90P95P99": [
+            12.515538657155377,
+            12.52131367417191,
+            12.533399808552845,
+            12.664057840688073
+          ],
+          "areaFractionOver4": 1.0,
+          "pixelDensityP50": 2000.6530927623962
         },
-        {
-          "url": "https://unsplash.com/photos/a-piece-of-wood-that-has-been-cut-in-half-2fDOcq3vW5k",
-          "observedScreenshot": "Reference_SplitEnd.jpg",
-          "observation": "Eccentric partial growth arcs and uneven long-grain fracture; borrow fibre failure rather than outdoor rot, green staining or severe structural decay."
-        }
-      ]
+        "metricWood": {
+          "sideTriangles": 8287,
+          "sideAreaM2": 7.380509619475135,
+          "areaWeightedPixelAnisotropyP50P90P95P99": [
+            1.0393265881324245,
+            1.1036591783372298,
+            1.3078357872606508,
+            1.5947883282856843
+          ],
+          "areaFractionOver4": 0.00018698755367570202,
+          "pixelDensityP50": 2353.800888067142
+        },
+        "gates": {
+          "areaWeightedP95Maximum": 2.0,
+          "sideAreaOver4MaximumFraction": 0.02
+        },
+        "method": "Independently decode packed final glTF world triangles and UV0; calculate actual texel Jacobian singular values on finite side chart, weighted by world area. End grain, pegs and iron charts are excluded by UV region, not camera positions."
+      },
+      "detailedReceiptLocalOnly": "Data_FrameReferenceSurface.json"
     },
     "PillowSewing": {
       "representation": "Dedicated native PBR atlases",
@@ -780,12 +589,12 @@
   },
   "performance": {
     "intendedUse": "Detailed close-view reusable prop; stream on demand, avoid dense repetition. No level placement added.",
-    "triangleLimit": 50000,
+    "triangleLimit": 60000,
     "drawPrimitiveLimit": 6,
-    "embeddedImages": 16,
-    "embeddedImageBytes": 3215778,
-    "textureRgba8BytesWithoutMips": 41943040,
-    "triangleReductionFraction": 0.9797351942045595,
+    "embeddedImages": 17,
+    "embeddedImageBytes": 6247266,
+    "textureRgba8BytesWithoutMips": 48233104,
+    "triangleReductionFraction": 0.9758723857078542,
     "tradeoffs": [
       "Submillimetre fibres and sewing cross-sections are simplified while retaining the visible woven sides, main seams and silhouettes.",
       "Source CORNER colour and PBR transport are sampled approximations, not pixel-identical recovery of every original shader.",
@@ -813,11 +622,9 @@
     "dateLocal": "2026-10-21",
     "geometryAreaGateWorldCrossLength": 1e-12,
     "degenerateTriangles": 0,
-    "sourceRebuild": "node Model/PatchedTimberBed/Script_PatchedTimberBedRebuild.mjs",
-    "test": "node Model/PatchedTimberBed/Script_PatchedTimberBedTest.mjs --comparison --original=tmp/BedWoodReferenceAcceptance/Model_PreviousBed.glb --max-triangles=50000",
-    "contactTest": "node Model/PatchedTimberBed/Script_PatchedTimberBedContactTest.mjs",
-    "evidenceLocalOnly": "tmp/BedWoodReferenceAcceptance",
-    "sourceMaterialComparison": "Previous accepted 48,313-triangle and reference-wood model under one camera/light in actual ManagedGLTFLoader WebGL",
+    "sourceRebuild": "node Model/PatchedTimberBed/Script_PatchedTimberBedRebuild.mjs --stage=uv-cloth",
+    "test": "node Model/PatchedTimberBed/Script_PatchedTimberBedTest.mjs --comparison --original=tmp/BedUvCloth60kAcceptance/Model_PreviousBed.glb --out=tmp/BedUvCloth60kAcceptance --max-triangles=60000",
+    "evidenceLocalOnly": "tmp/BedUvCloth60kAcceptance",
     "contactSamples": {
       "points": 42,
       "passing": 42,
@@ -830,53 +637,72 @@
       "medianGapMm": 0.249997994835216,
       "maxGapMm": 0.2500414848328747
     },
-    "realManagedLoaderWebglAndInteraction": "PASS; exact runtime binary SHA, image decode, eight same-camera views, orbit and zoom",
-    "coldEditableSource": "PASS; 6 meshes, 16 used images packed and decoded, no repair",
-    "visualResult": "PASS for final model hash; see independent local review",
+    "untouchedComponents": {
+      "count": 4,
+      "names": [
+        "BS_FootCloth",
+        "Pillow",
+        "Sewing",
+        "Straw"
+      ],
+      "geometryNormalsUvColorMaterialExact": true
+    },
     "cutRetention": {
       "damagedMembers": 7,
       "cutRegions": 10,
       "protectedVertexCount": 163,
       "maximumNonFloorProtectedVertexDeltaM": 1.3328003944934608e-07,
-      "maximumCutSurfaceDistanceM": 4.45421646873001e-05,
-      "protectedVertexToleranceM": 1e-06,
-      "cutSurfaceToleranceM": 0.0001
+      "maximumCutSurfaceDistanceM": 4.45421646873001e-05
     },
-    "rebuildCoverage": {
-      "executedStage": "wood-reference",
-      "freshAllExecutedThisRevision": false,
-      "contactBudgetFixture": "Data_ContactValidationFixture.json",
-      "note": "A real native Mesh/BMesh fixture checks pre-budget invalid-face cleanup and exact retained UV/colour/lineage preservation; the complete from-Inputs bake was not rerun this revision."
+    "woodUvDistortion": {
+      "result": "PASS",
+      "previousSha256": "44d64adfde72fea58494719ce753bc5cc17095786dae1baf9c4a3e80b807ce0b",
+      "finalSha256": "4afed547ea4a1051206950ba9fb64a9335608b09b0604ea02854adc0a2e61418",
+      "previousWood": {
+        "sideTriangles": 6032,
+        "sideAreaM2": 7.377555746337696,
+        "areaWeightedPixelAnisotropyP50P90P95P99": [
+          12.515538657155377,
+          12.52131367417191,
+          12.533399808552845,
+          12.664057840688073
+        ],
+        "areaFractionOver4": 1.0,
+        "pixelDensityP50": 2000.6530927623962
+      },
+      "metricWood": {
+        "sideTriangles": 8287,
+        "sideAreaM2": 7.380509619475135,
+        "areaWeightedPixelAnisotropyP50P90P95P99": [
+          1.0393265881324245,
+          1.1036591783372298,
+          1.3078357872606508,
+          1.5947883282856843
+        ],
+        "areaFractionOver4": 0.00018698755367570202,
+        "pixelDensityP50": 2353.800888067142
+      },
+      "gates": {
+        "areaWeightedP95Maximum": 2.0,
+        "sideAreaOver4MaximumFraction": 0.02
+      },
+      "method": "Independently decode packed final glTF world triangles and UV0; calculate actual texel Jacobian singular values on finite side chart, weighted by world area. End grain, pegs and iron charts are excluded by UV region, not camera positions."
     },
-    "surfaceLimit": "42 fixed contact probes meet unchanged +/-2mm; inspected views and cut probes do not establish a mathematical global zero-intersection proof.",
+    "realManagedLoaderWebglAndInteraction": "PASS; final binary identity, 9 actual views, orbit and zoom",
+    "coldEditableSource": "PASS; six game meshes, packed images decode, six source inputs retain hashes",
+    "visualResult": "PASS; target wood and cloth near views and metric checker images inspected",
+    "rebuildCoverage": "uv-cloth stage executed; default all chain not rerun from Inputs this revision",
     "reportFiles": {
       "structural": "Data_StructuralReview.json",
       "browser": "Data_BrowserReview.json",
       "contact": "Data_ContactReview.json",
-      "visual": "Data_IndependentVisualReview.json",
-      "pack": "Data_PackReport.json",
+      "uv": "Data_UvDistortion.json",
+      "untouched": "Data_UntouchedComponents.json",
+      "cuts": "Data_FrameCutRetention.json",
       "cold": "Data_ColdSourceAudit.json",
-      "archive": "Data_ArchiveIntegrity.json",
-      "wood": "Data_WoodWeathering.json",
-      "damage": "Data_WoodDamage.json",
-      "frameSurface": "Data_FrameReferenceSurface.json",
-      "frameBuild": "Data_FrameReferenceBuild.json",
-      "frameCuts": "Data_FrameCutRetention.json",
-      "frozenComponents": "Data_FrameOnlyChangeAudit.json"
-    },
-    "frozenComponents": {
-      "previousSha256": "7a1394840595196c429ff19e260e6e79082b1bf5024a5c6806a5059f2e15fb9f",
-      "finalSha256": "44d64adfde72fea58494719ce753bc5cc17095786dae1baf9c4a3e80b807ce0b",
-      "nonFrameComponents": 5,
-      "nonFrameWorldGeometryUnchanged": true,
-      "nonFrameMaterialSemanticsUnchanged": true,
-      "nonFrameColorUvUnchanged": true,
-      "nonFrameNormalsUnchanged": true,
-      "nonFrameNodeTransformsUnchanged": true,
-      "totalTriangles": 49513,
-      "frameTriangles": 7200,
-      "completeBedWithin50000": true,
-      "frameWithin7500": true
+      "inputs": "Data_ArchiveIntegrity.json",
+      "visual": "Data_VisualReview.json",
+      "checker": "Data_CheckerReview.json"
     }
   },
   "gameContact": {
@@ -972,6 +798,7 @@
       "removedAreaFraction": 0.04870853325040539,
       "survivingVertexPositionsUnchanged": true,
       "detailedReceiptLocalOnly": "Data_QuiltLining.json"
-    }
+    },
+    "surfaceRevision": "Visible Quilt layers rebuilt; legacy contact-operation displacement fields describe that earlier operation. The retained bearing shell and 42 probes are unchanged this revision."
   }
 }

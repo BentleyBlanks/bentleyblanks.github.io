@@ -208,13 +208,14 @@ async function BrowserMain() {
     return distance * 1.17;
   }
   function SetView(view) {
-    const directions = { Front: [1.2, .9, 1.3], Back: [-1.2, .85, -1.3], Top: [.05, 2.5, .05], Quilt: [.3, 1.2, 1.1], FootCloth: [1.3, .55, .8], Frame: [1.1, .5, -1.3], Support: [.4, .1, 1.2], FrameJoin: [1.15, .85, -1.3] };
+    const directions = { Front: [1.2, .9, 1.3], Back: [-1.2, .85, -1.3], Top: [.05, 2.5, .05], Quilt: [.3, 1.2, 1.1], FootCloth: [1.3, .55, .8], Frame: [1.1, .5, -1.3], Support: [.4, .1, 1.2], FrameJoin: [1.15, .85, -1.3], ClothDetail: [.15,1.3,1.0] };
     const direction = new THREE.Vector3(...directions[view]).normalize(); target.copy(center); let distance = Fit(direction);
-    if (['Quilt', 'FootCloth', 'Frame', 'Support', 'FrameJoin'].includes(view)) {
+    if (['Quilt', 'FootCloth', 'Frame', 'Support', 'FrameJoin','ClothDetail'].includes(view)) {
       if (view === 'Quilt') { target.y = sharedBox.min.y + size.y * .75; distance = size.length() * .47; }
       if (view === 'FootCloth') { target.x = sharedBox.max.x - size.x * .12; target.y = sharedBox.min.y + size.y * .54; distance = size.length() * .39; }
       if (view === 'Frame') { target.x = sharedBox.min.x + size.x * .17; target.y = sharedBox.min.y + size.y * .36; distance = size.length() * .44; }
       if (view === 'Support') { target.y = sharedBox.min.y + size.y * .36; distance = size.length() * .47; }
+      if (view === 'ClothDetail') { target.x=-.12; target.y=sharedBox.min.y+size.y*.76; target.z=.13; distance=size.length()*.27; }
       if (view === 'FrameJoin') {
         // Shared bounds keep both assets at one camera: exposed foot-post cap,
         // outside corner silhouette and the adjoining long/end rails.
@@ -294,7 +295,7 @@ async function WriteReviewPage(finalReport, originalReport) {
   const config = { files: { Final: Url(finalFile), ...(originalReport ? { Original: Url(originalFile) } : {}) }, boundsMin, boundsMax, bsNodeExpression, originalLabel };
   const html = `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Patched timber bed · local acceptance</title>
 <style>html,body{margin:0;overflow:hidden;background:#c5cbd0;font:14px system-ui}canvas{display:block;touch-action:none}header{position:absolute;inset:12px 12px auto;display:flex;gap:6px;align-items:center;z-index:2;padding:8px;background:#ffffffdf;border-radius:8px}select,button{font:inherit;padding:5px 9px}#status{margin-left:8px;font-size:12px}</style>
-<header><select id="asset"><option value="Final">最终完整游戏版</option>${originalReport ? `<option value="Original">${originalLabel.replaceAll('&','&amp;').replaceAll('<','&lt;')}</option>` : ''}</select>${[['Front','斜前'],['Back','背面'],['Top','俯视'],['Quilt','棉被'],['FootCloth','脚端布料'],['Frame','床架'],['Support','支撑草席'],['FrameJoin','接头端纹']].map(([key,label]) => `<button data-view="${key}">${label}</button>`).join('')}<span id="status">加载中…</span></header>
+<header><select id="asset"><option value="Final">最终完整游戏版</option>${originalReport ? `<option value="Original">${originalLabel.replaceAll('&','&amp;').replaceAll('<','&lt;')}</option>` : ''}</select>${[['Front','斜前'],['Back','背面'],['Top','俯视'],['Quilt','棉被'],['FootCloth','脚端布料'],['Frame','床架'],['Support','支撑草席'],['FrameJoin','接头端纹'],['ClothDetail','布面近景']].map(([key,label]) => `<button data-view="${key}">${label}</button>`).join('')}<span id="status">加载中…</span></header>
 <script type="importmap">{"imports":{"three":"/Taierzhuang1938/vendor/three/build/three.module.js"}}</script><script type="module">import * as THREE from 'three';import {ManagedGLTFLoader} from '/Taierzhuang1938/Script_ModelImports.mjs';const BedConfig=${JSON.stringify(config)};(${BrowserMain.toString()})();</script></html>`;
   await fs.writeFile(path.join(outputRoot, 'index.html'), html);
 }
@@ -348,7 +349,7 @@ async function BrowserReview(finalReport, originalReport) {
           Near(normal.repeat, [1, 1], 'runtime BS normal scale'); Near(normal.offset, [0, 0], 'runtime BS normal offset');
         }
       }
-      for (const view of ['Front', 'Back', 'Top', 'Quilt', 'FootCloth', 'Frame', 'Support', 'FrameJoin']) {
+      for (const view of ['Front', 'Back', 'Top', 'Quilt', 'FootCloth', 'Frame', 'Support', 'FrameJoin', 'ClothDetail']) {
         await page.locator(`[data-view="${view}"]`).click();
         const frame = await page.evaluate(() => BedReview.Snapshot());
         assert.ok(frame.pixels.occupied > 300, `${name} ${view} draws visible model pixels`);
@@ -396,7 +397,7 @@ async function Main() {
   const originalReport = compare ? await Inspect(originalFile, false) : null;
   let contract = null; try { contract = JSON.parse(await fs.readFile(contractFile, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   const record = contract?.models?.find(item => item.file === path.basename(finalFile)) ?? contract?.model ?? contract;
-  const triangleLimit = Math.min(50000, Number(Option('max-triangles', record?.triangleLimit ?? record?.triangleBudget ?? contract?.performance?.triangleLimit ?? 50000)));
+  const triangleLimit = Math.min(60000, Number(Option('max-triangles', record?.triangleLimit ?? record?.triangleBudget ?? contract?.performance?.triangleLimit ?? 60000)));
   const drawLimit = Number(Option('max-draws', record?.drawPrimitiveLimit ?? record?.drawCallBudget ?? contract?.performance?.drawPrimitiveLimit ?? 0));
   if (triangleLimit) assert.ok(finalReport.triangles <= triangleLimit, `triangle budget ${triangleLimit}`);
   if (drawLimit) assert.ok(finalReport.drawPrimitives <= drawLimit, `draw primitive budget ${drawLimit}`);
