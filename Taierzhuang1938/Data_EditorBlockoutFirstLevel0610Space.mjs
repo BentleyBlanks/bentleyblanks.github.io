@@ -53,10 +53,20 @@ export { PointAlong, PointBeside, LineLength };
 
 export const L0610_LEVEL_KEY = "FirstLevel0610";
 export const L0610_TITLE = "第一关 06–10 · 耿家庄（新剧本白盒）";
-export const L0610_VERSION = "2026-10-20 第四版（第二版空间 + 缸挪开位置 / 两个后门信号 / 窖壁收直）";
+export const L0610_VERSION = "2026-10-21 第五版（河汊子贴西墙 / 补满三角院子 / 两道后门 / 东北进庄的道）";
+
+// 第五版（2026-10-21，用户「随便绕啊现在是」）：第四版里河汊子离庄子西墙还隔 17 m 空地、东北角东南角也空着，
+// 从村口路沟往西、往东都能绕到村南，08「绕不过去」不成立。改成：
+//   · 河汊子挪到贴着庄子西墙（中线 x 19 → 31.5，东岸土埂外沿正好到西墙 x 40），沟底积齐腰深的水（waterW 铺满沟底、waterH 1.0）；
+//     一个人下去蹚得过，抬着肚子开了口的伤号不行；
+//   · 村口路沟西头一直挖到河汊子、通进去（排水沟往河沟里排），西头不收口；
+//   · 庄子西南角、东北角、东南角补满院子（L0610_FILL_YARDS），庄子成一整块，往南只剩主街 → 老耿家 → 后门一条；
+//   · 东街东头出去接一条往东北的道（L0610_EAST_ROAD），鬼子是顺这条道进的庄：07 末爬出洼地、08 趴在街口都看得见这条道上的鬼子；
+//   · 08-1 逃出来的村民走两道后门：主街西边第一个院子西墙上朝巷子的后门（alleyBackGateZ）、主街东边第一个院子北墙朝路沟的后门（ditchBackGateX）。
+// 场地往东放宽到 x 320（东北进庄的道要在场地里）。
 
 /** 场地范围与高度网格（0.5 m 一格，与 0105 一样）。只烘干沟以北到坡顶那一截当背景，前沿不烘。 */
-export const L0610_BOUNDS = Object.freeze({ minX: -20, maxX: 250, minZ: 120, maxZ: 560 });
+export const L0610_BOUNDS = Object.freeze({ minX: -20, maxX: 320, minZ: 120, maxZ: 560 });
 export const L0610_CELL_M = L0105_CELL_M;
 
 const P = (x, z) => Object.freeze({ x, z });
@@ -114,15 +124,36 @@ export const L0610_LANE = Object.freeze({
  * 沟北沿是麦地（村子以北的平地 +0.3）。沟东半截放后送队和老耿的车，街口坡道上半截趴着小队，巷子口在 x 80 的南沿上。
  */
 export const L0610_DITCH = Object.freeze({
-  name: "村口路沟", z: 380, floorW: 3, fromX: 56, toX: 125, floorY: L0610_HEIGHTS.ditchFloorY,
+  name: "村口路沟", z: 380, floorW: 3, fromX: 36, toX: 125, floorY: L0610_HEIGHTS.ditchFloorY,
   wallM: 1.3, endM: 4, rampWallM: 3.6, rampHalfW: 3.0, rampBlendM: 1.5,
   eastHalfFromX: 104, westHalfToX: 98,
+  westOpensToRiver: true,   // 第五版：西头挖到河汊子东壁、通进去，不收口（endM 只收东头）
 });
 
-/** 河汊子（村西）：南北向的干沟，沟底一线浅水；凹路和村子都在它东边。 */
+/** 河汊子（村西）：南北向的河沟，两壁陡、沟底积着齐腰深的水（第五版）；贴着庄子西墙走，凹路和村子都在它东边。 */
 export const L0610_RIVER = Object.freeze({
-  name: "河汊子", centerX: 19, fromZ: 200, toZ: 560, floorW: 6, depth: L0610_HEIGHTS.riverDepth, wallM: 2.5,
-  bankH: 0.4, bankW: 3.0, endM: 10, waterW: 2.0, waterH: 0.12,
+  name: "河汊子", centerX: 31.5, fromZ: 200, toZ: 560, floorW: 6, depth: L0610_HEIGHTS.riverDepth, wallM: 2.5,
+  bankH: 0.4, bankW: 3.0, endM: 10, waterW: 6.0, waterH: 1.0,
+});
+
+/**
+ * 东北进庄的道（第五版）：东街东头出去，往东北穿过麦地。鬼子是顺这条道进的庄（08-1 逃出来的村民「东头……过来的」）；
+ * 07 末从凹路口、08 趴在街口顺着庄子北沿往东看，都看得见 x 255…290 那一段道上的鬼子。
+ */
+export const L0610_EAST_ROAD = Object.freeze({
+  name: "东北进庄的道", halfW: 2.0,
+  line: Line([232, 465], [246, 458], [258, 430], [270, 395], [285, 355], [300, 320]),
+});
+
+/**
+ * 第五版补满的院子（之前是空地，从村口路沟往西、往东都能绕到村南）。生成器按 L0610_STREET_YARDS 的做法盖院墙、隔墙、房子，
+ * 朝外（河汊子、麦地、东北进庄的道）一律不开门，庄子外沿是一整圈院墙。southWest 北墙把巷子南头封死（巷子只通邻院小门）。
+ * 10-4 抄北边的院子链（z 440…463）、10-5 南边翻墙摸后门、11 驴车出后门的路都不能被它们堵上 —— 生成器测试核。
+ */
+export const L0610_FILL_YARDS = Object.freeze({
+  southWest: Object.freeze({ box: Box(40, 60, 492.5, 545), splitsZ: Object.freeze([518]) }),
+  northEast: Object.freeze({ box: Box(118.25, 235, 385, 440), splitsX: Object.freeze([150, 182, 214]) }),
+  southEast: Object.freeze({ box: Box(137.5, 235, 492, 545), splitsX: Object.freeze([170, 202]) }),
 });
 
 /** 耿家庄的范围与通用尺寸。土坯 / 青砖平顶院落；院墙 2.2 m，房子 3.2–3.5 m。 */
@@ -216,9 +247,11 @@ export const L0610_EAST_YARDS = Object.freeze({
 
 /** 主街两侧与巷子西边的院子。 */
 export const L0610_STREET_YARDS = Object.freeze({
-  westOfMain: Object.freeze({ box: Box(60, 96.75, 400, 460), splitsZ: Object.freeze([430]), gatesZ: Object.freeze([418.5, 443.5]) }),
+  // 第五版：北边那个院（z 400…430）西墙上开一道朝巷子南北那截的后门（alleyBackGateZ），08-1 一个村民从这里钻巷子逃到沟西头
+  westOfMain: Object.freeze({ box: Box(60, 96.75, 400, 460), splitsZ: Object.freeze([430]), gatesZ: Object.freeze([418.5, 443.5]), alleyBackGateZ: 425 }),
   // 第二版：收到 x 118.25（第一版到 135，和东街北侧的院子叠在一起）；最南那院的西南角是小空地的北角（L0610_STREETS.pocket）
-  eastOfMain: Object.freeze({ box: Box(103.25, 118.25, 385, 460), splitsZ: Object.freeze([410, 435]), gatesZ: Object.freeze([408.5, 432.5]) }),
+  // 第五版：最北那院（z 385…410）北墙上开一道朝路沟东半截的后门（ditchBackGateX），08-1 两个村民从这里直接下到沟东半截
+  eastOfMain: Object.freeze({ box: Box(103.25, 118.25, 385, 460), splitsZ: Object.freeze([410, 435]), gatesZ: Object.freeze([408.5, 432.5]), ditchBackGateX: 110 }),
   northOfAlleyWest: Object.freeze({ box: Box(60, 78.5, 385, 397) }),       // 夹道西边
   northOfAlleyEast: Object.freeze({ box: Box(81.5, 96.75, 385, 399.25) }), // 夹道东边（南到巷子南墙）
   westOfAlley: Object.freeze({ box: Box(40, 57.5, 397, 492), splitsZ: Object.freeze([430, 462]) }),
@@ -301,7 +334,10 @@ export const L0610_PLACES = Object.freeze({
   roller: Object.freeze({ name: "石碾", x: 113.2, z: 465.7, w: 1.2, d: 0.9, h: 0.9, baseW: 2.0, baseH: 0.12 }),
   cart: Object.freeze({ name: "翻倒的大车", x: 100.8, z: 446 }),
   eastEnd: Object.freeze({ name: "东街东头", x: 232, z: 465 }),
-  river: Object.freeze({ name: "河汊子", x: 19, z: 400 }),
+  river: Object.freeze({ name: "河汊子", x: L0610_RIVER.centerX, z: 400 }),
+  alleyBackGate: Object.freeze({ name: "主街西边院子朝巷子的后门", x: 60, z: 425 }),          // 第五版：08-1 村民钻巷子
+  ditchBackGate: Object.freeze({ name: "主街东边院子朝路沟的后门", x: 110, z: 385 }),         // 第五版：08-1 村民下到沟东半截
+  eastRoadView: Object.freeze({ name: "东北进庄的道（看得见的那一段）", x: 272, z: 388 }),   // 第五版：07 末、08 看得见鬼子的地方
   neighborDoor: Object.freeze({ name: "邻院西墙的小门（敞着）", x: 60, z: 490 }),
   dogHole: Object.freeze({ name: "狗洞", x: 81.5, z: 488 }),
   crack: Object.freeze({ name: "墙缝", x: 81.5, z: 496.5 }),
