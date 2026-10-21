@@ -137,8 +137,16 @@ export const BLOCKOUT_PUPPETS = Object.freeze({
   animalDown: { rollRad: 1.45, liftM: 0.32 },
   /** 两帧之间挪超过这么远算瞬移（跳关键帧），不算走路，不推步子。 */
   teleportM: 3,
-  /** 单被离地（防 z-fighting）。 */
+  /** 单被离地（防 z-fighting；布料模拟时质点自己离地 BLANKET_CLOTH.groundOffsetM，这个只管根）。 */
   blanketLiftM: 0.005,
+  /**
+   * 单被的布料（2026-10-21，_BlanketEnv）：拽被角的人站在被头这么远内才算；躺着的人骨盆在被子（资产空间）这个范围里才算躺在上面；
+   * 两只手最多比被头（1.4 m）宽这么多倍（拖人片段的拳头在人外侧 0.26 m，两人各在中线旁 0.55 m → 拳头相距 1.62 m，
+   * _import/Script_PrevizCareClips.py STAGES.blanketDrag 是按 1.6 m 宽的被子摆的）；手离被角静止位置超过 maxGripReachM 不算拽着；
+   * 没人拽、被子却在走时两角贴地跟着走的位置（资产空间米 = 静止平铺的头角）。
+   */
+  blanketCloth: Object.freeze({ dragReachM: 3, riderHalfWidthM: 0.8, riderHalfLengthM: 1.2, headHalfWidthM: 0.7, headZ: 0.95,
+    maxGripSpan: 1.04, maxGripReachM: 2.5, groundGrip: Object.freeze({ x: 0.7, y: 0, z: 0.95 }) }),
   /** 不戒备时背在背上的枪（步枪）；机枪 / 掷弹筒 / 手枪 / 大刀照旧。 */
   slungWeapons: ["HanYang", "Type38", "ZhongZheng"],
   /** 拿步枪、不戒备、蹲着不动、没在播片段的兵：播这段歇着的片段（单膝跪、枪竖在身前）。 */
@@ -229,6 +237,25 @@ export function LitterSlots(unit) {
 export function IsBlanketLitter(unit) {
   const name = unit?.name || "";
   return /被/.test(name) && !/担架/.test(name);
+}
+
+/**
+ * 人身上的胶囊（世界坐标，给单被的布料用）：躯干两节、肩、头、两臂两节、胯、两腿两节；legsOnly 只要两腿。
+ * 半径按身体缩放 k（小孩 0.62）。调用前 actor.root.updateMatrixWorld(true)。→ [{ a, b, r, press, carry }]
+ */
+export function BodyCapsules(rig, k = 1, { legsOnly = false, press = false, carry = null } = {}) {
+  const b = rig.bones, out = [];
+  const P = (bone) => bone ? new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld) : null;
+  const Cap = (a, c, r) => { if (a && c) out.push({ a, b: c, r: r * k, press, carry }); };
+  const thighL = P(b.thighL), thighR = P(b.thighR), calfL = P(b.calfL), calfR = P(b.calfR), footL = P(b.footL), footR = P(b.footR);
+  Cap(thighL, calfL, 0.075); Cap(thighR, calfR, 0.075); Cap(calfL, footL, 0.055); Cap(calfR, footR, 0.055);
+  if (legsOnly) return out;
+  const pelvis = P(b.pelvis), chest = P(b.chest), neck = P(b.neck), head = P(b.head);
+  Cap(pelvis, chest, 0.12); Cap(chest, neck || head, 0.12); Cap(thighL, thighR, 0.1);
+  if (neck && head) Cap(neck, head.clone().add(head.clone().sub(neck).normalize().multiplyScalar(0.12 * k)), 0.1);
+  const armL = P(b.upperArmL), armR = P(b.upperArmR), foreL = P(b.forearmL), foreR = P(b.forearmR), handL = P(b.handL), handR = P(b.handR);
+  Cap(armL, armR, 0.07); Cap(armL, foreL, 0.055); Cap(armR, foreR, 0.055); Cap(foreL, handL, 0.045); Cap(foreR, handR, 0.045);
+  return out;
 }
 
 export function LitterPose(unit, down = unit?.state === "down") {
@@ -534,6 +561,7 @@ export class BlockoutPuppets {
         down: unit.state === "down" });
     }
     for (const unit of units) this._Pose(this.puppets.get(unit.id), 0, true);
+    this._StepBlankets(true);
   }
 
   /**
@@ -561,7 +589,10 @@ export class BlockoutPuppets {
       puppet.moving = s.moving; puppet.speedMps = s.speedMps; puppet.visible = s.visible;
     }
     // 状态全写完再摆（挂在车上的人读车的状态）
-    if (snap) for (const s of states) { const puppet = this.puppets.get(s.id); if (puppet) this._Pose(puppet, 0, true); }
+    if (snap) {
+      for (const s of states) { const puppet = this.puppets.get(s.id); if (puppet) this._Pose(puppet, 0, true); }
+      this._StepBlankets(true);
+    }
   }
 
   _Finish() {
@@ -610,7 +641,7 @@ export class BlockoutPuppets {
         bed.position.y = pose.y;
         bed.rotation.x = pose.tilt;
       }
-      if (BLOCKOUT_PUPPETS.models) this._PoseModel(puppet, dt);
+      if (BLOCKOUT_PUPPETS.models) this._PoseModel(puppet, dt, force);
     }
     const unit = puppet.unit;
     const fx = -Math.sin(ry), fz = -Math.cos(ry);
@@ -716,6 +747,7 @@ export class BlockoutPuppets {
     }
     this.elapsed += dt * rate;
     for (const puppet of this.puppets.values()) this._Pose(puppet, dt * rate, false, cameraPosition);
+    this._StepBlankets();
   }
 
   // -------------------------------------------------------------------------
@@ -796,7 +828,7 @@ export class BlockoutPuppets {
   }
 
   /** 每帧：炮塔对着射界扇；车轮、牲口按走过的路程迈步；倒地的牲口侧躺；车前另有牲口单位时藏自己的；被子拖着走时兜起来。 */
-  _PoseModel(puppet, dt = 0) {
+  _PoseModel(puppet, dt = 0, force = false) {
     this._DressModel(puppet);
     const model = puppet.body.userData.model;
     if (!model) return;
@@ -804,7 +836,10 @@ export class BlockoutPuppets {
       // 被子贴着担架组底下的地面（担架组被 LitterPose 抬到 groundY，这里抵回去，留 5 mm 防闪）
       const bed = puppet.body.userData.stretcher;
       model.blanket.root.position.y = -(bed?.position.y || 0) + BLOCKOUT_PUPPETS.blanketLiftM;
-      model.blanket.SetDrag(puppet.moving ? 1 : 0, dt);
+      if (!model.blanket.cloth) { model.blanket.SetDrag(puppet.moving ? 1 : 0, dt); return; }
+      // 布料：所有人摆完之后再推（_StepBlankets，要读这一帧的手和身体）；这里只攒时间
+      model.clothDt = (model.clothDt || 0) + dt;
+      if (force && dt <= 0) model.clothReset = true;
       return;
     }
     const unit = puppet.unit;
@@ -832,6 +867,90 @@ export class BlockoutPuppets {
       }
       draft.animalRoot.visible = !hitched;
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // 单被的布料（2026-10-21，Script_BlanketCloth；文件头）
+
+  /** 所有人摆完之后推被子的布料：reset = 重新铺平再空推（Apply / 关键帧跳转 / Seek 的第一步，确定性）。 */
+  _StepBlankets(reset = false) {
+    for (const puppet of this.puppets.values()) {
+      const model = puppet.body?.userData.model, blanket = model?.blanket;
+      if (!blanket?.cloth) continue;
+      const dt = model.clothDt || 0;
+      model.clothDt = 0;
+      if (!puppet.visible) { model.clothReset = true; continue; }
+      const env = this._BlanketEnv(puppet, blanket, dt);
+      env.reset = reset || !!model.clothReset;
+      model.clothReset = false;
+      try { blanket.Simulate(dt, env); }
+      catch (error) { console.warn("[BlockoutPuppets] blanket cloth failed; static poses", error); blanket.cloth = null; blanket.SetDrag(0); }
+    }
+  }
+
+  /**
+   * 这一帧被子的手、身体与地面。
+   * 手：别的单位里此刻 carryRole "front"、看得见、站在被头 dragReachM 内的人，按他在被子的哪一侧拽哪个角，用那一侧更靠外的
+   *   那只手（拖人片段 PvBlanketDragL/R 是外侧那只拳头攥着被角）的掌心（rig.grips）。只有一边有人拽（另一边是玩家 / 镜头）时，
+   *   另一角取这只手在被子中线另一侧的镜像位置；都没人拽、被子却在走（松手后往掩体后一拽、关键帧过渡）时两角贴地跟着被子走
+   *   （groundGrip：静止平铺时的头角，贴地），不悬空。两手比被头宽（片段按 1.6 m 宽的被子摆的拳头）时两边往里收到 maxGripSpan。
+   * 身体：倒着、骨盆落在被子范围里的人（冬瓜）整身胶囊（压在身下的布跟着他走）；拽被角的人的两条腿（布从拳头垂下去别穿过小腿）。
+   */
+  _BlanketEnv(puppet, blanket, dt) {
+    const B = BLOCKOUT_PUPPETS.blanketCloth;
+    const head = blanket.AssetPoint(0, 0, B.headZ, new THREE.Vector3());
+    const grips = { headL: null, headR: null }, gripAsset = { headL: null, headR: null };
+    const colliders = [];
+    for (const other of this.puppets.values()) {
+      if (other === puppet || !other.visible || !other.humans.length) continue;
+      const human = other.humans[0], actor = human.actor, rig = actor.characterRig;
+      if (!rig?.bones || !actor.root.visible) continue;
+      const role = other.drive ? other.drive.carryRole : other.unit.carryRole;
+      if (role === "front" && !other.down) {
+        if (Math.hypot(actor.root.position.x - head.x, actor.root.position.z - head.z) > B.dragReachM) continue;
+        actor.root.updateMatrixWorld(true);
+        const side = blanket.ToAsset(actor.root.position, new THREE.Vector3()).x >= 0 ? 1 : -1;
+        const key = side > 0 ? "headL" : "headR";
+        let best = null;
+        for (const hand of [rig.grips?.weaponL || rig.bones.handL, rig.grips?.weaponR || rig.bones.handR]) {
+          if (!hand) continue;
+          const a = blanket.ToAsset(new THREE.Vector3().setFromMatrixPosition(hand.matrixWorld), new THREE.Vector3());
+          if (!best || a.x * side > best.x * side) best = a;
+        }
+        // 手离这个被角的静止位置太远（人物模型还没跟上一次大跳、别处的人）不算
+        if (best && Math.hypot(best.x - side * B.headHalfWidthM, best.y, best.z - B.headZ) > B.maxGripReachM) best = null;
+        if (best && !gripAsset[key]) gripAsset[key] = best;
+        colliders.push(...BodyCapsules(rig, actor.root.scale.x || 1, { legsOnly: true }));
+      } else if (other.down) {
+        actor.root.updateMatrixWorld(true);
+        const pelvis = rig.bones.pelvis ? new THREE.Vector3().setFromMatrixPosition(rig.bones.pelvis.matrixWorld) : null;
+        if (!pelvis) continue;
+        const a = blanket.ToAsset(pelvis, new THREE.Vector3());
+        if (Math.abs(a.x) > B.riderHalfWidthM || Math.abs(a.z) > B.riderHalfLengthM) continue;
+        // 压在身下的布跟着他走：速度从骨盆这两帧的位移算
+        const last = human.clothPelvis;
+        const carry = last && dt > 0 && last.distanceTo(pelvis) < 1 ? [(pelvis.x - last.x) / dt, (pelvis.z - last.z) / dt] : [0, 0];
+        (human.clothPelvis ||= new THREE.Vector3()).copy(pelvis);
+        colliders.push(...BodyCapsules(rig, actor.root.scale.x || 1, { press: true, carry }));
+      }
+    }
+    // 只有一边有人：另一边镜像；都没人但被子在走：两角贴地跟着被子走
+    if (gripAsset.headL && !gripAsset.headR) gripAsset.headR = new THREE.Vector3(-gripAsset.headL.x, gripAsset.headL.y, gripAsset.headL.z);
+    else if (gripAsset.headR && !gripAsset.headL) gripAsset.headL = new THREE.Vector3(-gripAsset.headR.x, gripAsset.headR.y, gripAsset.headR.z);
+    else if (!gripAsset.headL && !gripAsset.headR && puppet.moving) {
+      gripAsset.headL = new THREE.Vector3(B.groundGrip.x, B.groundGrip.y, B.groundGrip.z);
+      gripAsset.headR = new THREE.Vector3(-B.groundGrip.x, B.groundGrip.y, B.groundGrip.z);
+    }
+    if (gripAsset.headL && gripAsset.headR) {
+      const span = gripAsset.headL.distanceTo(gripAsset.headR), max = 2 * B.headHalfWidthM * B.maxGripSpan;
+      if (span > max) {
+        const mid = gripAsset.headL.clone().add(gripAsset.headR).multiplyScalar(0.5), k = max / span;
+        gripAsset.headL.sub(mid).multiplyScalar(k).add(mid);
+        gripAsset.headR.sub(mid).multiplyScalar(k).add(mid);
+      }
+    }
+    for (const key of ["headL", "headR"]) if (gripAsset[key]) grips[key] = blanket.AssetPoint(gripAsset[key].x, gripAsset[key].y, gripAsset[key].z, new THREE.Vector3());
+    return { groundAt: this.groundAt, grips, colliders };
   }
 
   // -------------------------------------------------------------------------
@@ -1137,9 +1256,14 @@ export class BlockoutPuppets {
 
   /** 确定性取样（预演 Seek）：按当前驱动状态连推几步小 dt，让动作层 / 片段混合收敛到同一个姿态。 */
   Settle(steps = 10, dt = 0.05, cameraPosition = null) {
-    for (let i = 0; i < steps; i++) for (const puppet of this.puppets.values()) {
-      for (const human of puppet.humans) human.animDt = 0;
-      this._Pose(puppet, dt, true, cameraPosition);
+    for (let i = 0; i < steps; i++) {
+      for (const puppet of this.puppets.values()) {
+        for (const human of puppet.humans) human.animDt = 0;
+        this._Pose(puppet, dt, true, cameraPosition);
+      }
+      // 被子：等人物收敛了（最后一步）再重新铺平、按那时的手空推（大跳之后头一两步人物模型还没跟上，手在上一个时刻的地方）；
+      // 之前的步只攒时间不推
+      if (i === steps - 1) this._StepBlankets(true);
     }
   }
 
@@ -1195,6 +1319,8 @@ export class BlockoutPuppets {
       // 2026-10-20：正式模型（"Type89Tank" / "ox" / "horse"；null = 还是体块）与车自己的牲口显不显示
       model: (() => { const m = puppet.body?.userData.model; return m?.tank ? BLOCKOUT_PUPPETS.tankModel : m?.stretcher ? "BambooStretcher" : m?.blanket ? "SingleBlanket" : m?.kind ?? null; })(),
       blanketDrag: puppet.body?.userData.model?.blanket ? +puppet.body.userData.model.blanket.drag.toFixed(3) : null,
+      // 2026-10-21：单被的布料（两角离手多远、最高点、最大拉长、贴地 / 被压住的点数，见 Script_EditorBlockoutBlanket Probe）
+      blanketCloth: puppet.body?.userData.model?.blanket ? puppet.body.userData.model.blanket.Probe() : null,
       draftAnimalVisible: puppet.body?.userData.model?.draft ? puppet.body.userData.model.draft.animalRoot.visible : null,
       draftTravelM: puppet.body?.userData.model?.draft ? puppet.body.userData.model.travelM : null,
       rootAboveCarrierGround: puppet.seat && (human || puppet.body) ? (human ? human.actor.root.position.y : puppet.body.position.y) - puppet.seat.carrierY : null,

@@ -213,6 +213,7 @@ export const testDefs = {
   },
   BootPayloadTest: { file: "Script_BootPayloadTest.mjs", desc: "开机贴图字节红线：PBR_SETS 的总量/单张上限与 URL 存在性（纯 Node，毫秒级）" },
   SingleBlanketAssetTest: { file: "_blender/Script_SingleBlanketVerify.mjs", desc: "单被217骨、6000三角、精确蒙皮、五动作、形态键、挂点与独立CPU绑定核验" },
+  BlanketClothTest: { file: "Script_BlanketClothTest.mjs", desc: "单被布料模拟（2026-10-21，纯 Node）：真 GLB 的 18×12 骨格 / 角骨 / 静止朝向、挪转后重铺写回骨头蒙皮不变形、卷成圆筒时顶点离轴 = 半径且法线跟着转、平铺不动 / 落下落平、两角钉手拖人不对折不出 NaN、交叠不弹飞、实心块不当地面、台阶渐进抬、逐位确定、每帧耗时" },
   AssetStandardsTest: { file: "Script_AssetStandardsTest.mjs", desc: "源/实际面数、枪械 30k、战车 80k、三件翻倍特例与编辑器清单一致性（纯 Node）" },
   GeoTest: { file: "Script_GeoTest.mjs", desc: "几何快路等价性：MakeBox/PlaceGeometry 与 three 通用路逐浮点相同" },
   RoadPathTest: { file: "Script_RoadPathTest.mjs", desc: "样条道路中心线契约：过点/弧长/切向/缺口/采样（纯 Node，毫秒级）" },
@@ -360,6 +361,7 @@ export const testDefs = {
   EditorBlockoutMapTest: { file: "Script_EditorBlockoutMapTest.mjs", timeoutMs: 300000, desc: "白盒关卡编辑器纸面俯视图与界面：纸色 / 块 / 旋转块 / 等高线 / 各阵营标记数像素，小地图跟玩家，全关总图缩放平移拾取，导航栏刻度与输入隔离" },
   EditorBlockoutBrowserTest: { file: "Script_EditorBlockoutBrowserTest.mjs", timeoutMs: 600000, desc: "白盒关卡编辑器实机：?editor=blockout 不起任务与过场、关键帧传送、过渡连续不瞬移、切第二关再切回、外部改配置自动同步、高级工具入口、存档退化、无未捕获错误" },
   EditorBlockoutFirstLevel0105KeepInBrowserTest: { file: "Script_EditorBlockoutFirstLevel0105KeepInBrowserTest.mjs", timeoutMs: 900000, desc: "01–05 白盒玩家出不了沟（2026-10-21）：剧本通路在沟里且离隐形墙够远、19 处低处 × 8 个方向跳 + 翻每帧都在沟里、射击台翻不过胸墙、顺沟走得到、手榴弹飞出沟、NPC 照常翻出沟" },
+  EditorBlockoutBlanketClothBrowserTest: { file: "Script_EditorBlockoutBlanketClothBrowserTest.mjs", timeoutMs: 600000, desc: "白盒编辑器单被布料模拟（2026-10-21）实机：FirstLevel0105 关键帧平铺、02-3 揪起被角、02-4 拖到半路两角钉在两个拖的人手上 / 尾巴贴地 / 冬瓜身下压着布 / 拉长有上限、从不同时刻 Seek 结果一致、松手落平、连续播每帧耗时与不对折" },
   EditorBlockoutFlyBrowserTest: { file: "Script_EditorBlockoutFlyBrowserTest.mjs", timeoutMs: 600000, desc: "白盒编辑器飞行观察（2026-10-21）实机：O 键 / 按钮进出、WASD 沿视线 + E/Q 升降 + Shift 加速的位移、滚轮调速、鼠标转相机、玩家原地且不吃游戏输入、小地图 / 全关总图的相机标记、复制位置与重现链接带相机位姿、退出后相机回到玩家视角、预演与切关的互斥" },
   EditorBlockoutPrevizRuntimeBrowserTest: { file: "Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs", timeoutMs: 600000, desc: "白盒预演运行时补齐（2026-10-19）实机：百姓 / 小孩 / 军官的骨骼占位身体能播预演动作库片段且姿态真的变了、body:procedural 开关、飞机模型载入 / 在视锥里 / 位置等于纯函数、扫射土点、慢动作倍率与人物动画一起慢、中断后克隆还回机队、倒地的人被 state:alive 扶起当帧站起来且能再倒回去（2026-10-21）" },
   AiCombatBrowserTest: {
@@ -603,7 +605,7 @@ export const browserTests = new Set([
   'ProneCrawlTest', 'ActorLocomotionTest', 'BackRifleRunTest', 'RifleShoulderMarchTest', 'MeleeAnimationTest', 'DadaoSwingTest', 'FpsDadaoProjectionTest','GrenadeThrowTest', 'InfantryAnimationTest', 'DeathCollapseTest',
   "HitReactionBrowserTest", "NeckDeathBrowserTest",
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
-  "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest",
+  "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest", "EditorBlockoutBlanketClothBrowserTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPaperTest", "BootInteractionTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsSleeveTest", "FpsHandContactTest", "FpsReloadMechanicsTest", "FpsReloadClearanceTest", "HanYangReloadClearanceTest", "FpsGripEditorTest",
@@ -670,6 +672,7 @@ export const tier0Fast = [
   "TextureStandardsTest",
   "AssetStandardsTest",
   "SingleBlanketAssetTest",
+  "BlanketClothTest",
   "ModelFacingTest",
   "AircraftGeometryTest",
   "TestRunnerTest",
@@ -739,7 +742,7 @@ export const tier2 = [
 ];
 
 export const domains = {
-  singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "TextureStandardsTest", "AssetStandardsTest"] },
+  singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "TextureStandardsTest", "AssetStandardsTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
   whiteboxQuality: { label: "白盒画质配置与实机", tests: ["WhiteboxQualityTest", "WhiteboxQualityBrowserTest", "WhiteboxShaderWarmTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
@@ -828,7 +831,7 @@ export const domains = {
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
   menu: { label: "主菜单/加载画面", tests: ["MenuStartupTest", "ToolsHomeTest", "AboutBrowserTest", "FirstLevelP012DebugTest", "MenuTest", "CommandRoomBrowserTest", "CommandRoomPublicationTest", "CommandRoomPreviewTest", "MenuPresentationTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootPaperPbrTest", "BootInteractionTest"] },
-  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["DevToolsIsolationTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutConfigTest", "EditorBlockoutSaveTest", "EditorBlockoutPrevizPlanTest", "EditorBlockoutFirstLevel0105SceneTest", "EditorBlockoutFirstLevel0105KeyframesTest", "EditorBlockoutFirstLevel0105PrevizTest", "EditorBlockoutFirstLevel0610SceneTest", "EditorBlockoutFirstLevel0610KeyframesTest", "EditorBlockoutFirstLevel0610PrevizTest", "EditorBlockoutMarkerRulesTest", "EditorBlockoutLayoutEditTest", "EditorBlockoutFirstLevel1218SceneTest", "EditorBlockoutFirstLevel1218KeyframesTest", "EditorBlockoutFirstLevel1218PrevizTest", "PrevizVillageClipsTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
+  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["DevToolsIsolationTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutConfigTest", "EditorBlockoutSaveTest", "EditorBlockoutPrevizPlanTest", "EditorBlockoutFirstLevel0105SceneTest", "EditorBlockoutFirstLevel0105KeyframesTest", "EditorBlockoutFirstLevel0105PrevizTest", "EditorBlockoutFirstLevel0610SceneTest", "EditorBlockoutFirstLevel0610KeyframesTest", "EditorBlockoutFirstLevel0610PrevizTest", "EditorBlockoutMarkerRulesTest", "EditorBlockoutLayoutEditTest", "EditorBlockoutFirstLevel1218SceneTest", "EditorBlockoutFirstLevel1218KeyframesTest", "EditorBlockoutFirstLevel1218PrevizTest", "PrevizVillageClipsTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
@@ -868,7 +871,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
-  { domain: "singleBlanket", pattern: /SingleBlanket/ },
+  { domain: "singleBlanket", pattern: /SingleBlanket|BlanketCloth|EditorBlockoutBlanket/ },
   { domain: "combat", pattern: /FpsGripCorrective|FpsHandSkinWeights|FpsForearmTaper|FpsHandSelfContact|FpsHandPose|HanYangReloadClearance|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },
   {domain:"historyCodex",pattern:/HistoryCodex|HistoryBook|HistoryConscription|HistoryLedger|page-flip|Texture\/Menu\/History\//},
   { domain: "combat", pattern: /AircraftGeometry|OptimizeKi21|OptimizeKi30|Model_MitsubishiKi(21Ia|30)/ },

@@ -464,7 +464,13 @@ export class BlockoutMarkers {
   - 预演片段：`PvStandTalkLowRifle`（右手提枪说话）运行时换成背枪版 `PvStandTalkSlung`（`PREVIZ_CLIP_REMAP`，数据不改）；`VilDuckProne`（卧倒抱头）进背枪表 `PREVIZ_WEAPON_SLUNG`。指路 / 招手 / 拦人（右手低提枪）、蹲着说话 / 歇着（枪竖着）不动。
   - 开场动作库与预演额外动作库改成编辑器一开就在后台下（`BlockoutPreviz.EnsureOpening`），不等第一次播预演（蹲着歇的片段要它）。
   - Probe 多给 `gait`、`rifleInHand`、`rifleOnBack`。
-- 2026-10-21 担架用正式资产（用户）：`litter` 的担架换成全游戏同一副竹竿布兜担架（`Script_StretcherAsset`，`Model_BambooStretcher.glb`，开机就读了），挂在担架组下面，抬着 / 一头着地 / 放地上 / 挂车上的高度与倾角照旧（`LitterPose` / `ride`）；资产前头朝 +Z，这里转 180°、往下挪 0.09 m 让竿心落在原来体块竿子的高度。几何与材质全场共用。名字带「被」不带「担架」的 litter（01–05 两人拖的单被，`IsBlanketLitter`）不是担架：换成用户上传的五补丁单被（`Script_EditorBlockoutBlanket`，`Model_SingleBlanket.glb`，宽 1.4 m、长 1.9 m，见 `docs/Data_SingleBlanket.md`），头端朝前（单位朝向，拽的人那头），平铺贴地（离地 5 mm）；被拖着走（moving）时渐变到资产自带的 `Blanket_DragPose`（头端两角抬到 0.7 m、两侧兜起、尾端贴地），停下渐变回 `Blanket_Flat`。两条都是单帧静态姿势，读轨道第一帧按权重插值写骨头（不进 AnimationMixer）。Probe 的 `model` 给 `"BambooStretcher"` / `"SingleBlanket"`，被子多给 `blanketDrag`（0 平铺 … 1 拖拽）。
+- 2026-10-21 担架用正式资产（用户）：`litter` 的担架换成全游戏同一副竹竿布兜担架（`Script_StretcherAsset`，`Model_BambooStretcher.glb`，开机就读了），挂在担架组下面，抬着 / 一头着地 / 放地上 / 挂车上的高度与倾角照旧（`LitterPose` / `ride`）；资产前头朝 +Z，这里转 180°、往下挪 0.09 m 让竿心落在原来体块竿子的高度。几何与材质全场共用。名字带「被」不带「担架」的 litter（01–05 两人拖的单被，`IsBlanketLitter`）不是担架：换成用户上传的五补丁单被（`Script_EditorBlockoutBlanket`，`Model_SingleBlanket.glb`，宽 1.4 m、长 1.9 m，见 `docs/Data_SingleBlanket.md`），头端朝前（单位朝向，拽的人那头）。Probe 的 `model` 给 `"BambooStretcher"` / `"SingleBlanket"`，被子多给 `blanketDrag`（0 没人拽 / 1 有角被拽着）与 `blanketCloth`（见下）。
+- 2026-10-21 第二轮（用户：拖冬瓜的被子接一个比较基础的布料模拟）：单被走**布料模拟**（`Script_BlanketCloth.mjs`）。资产的 216 根变形骨是 18 行 × 12 列、全挂在 Root 下、静止朝向为单位阵、顶点按相邻四骨精确双线性蒙皮，所以一根骨 = 一个质点：世界空间里用 PBD 推这 216 个点（子步 1/90 s × 10 轮；相邻不许拉长、压短较软，对角抗剪，隔一根很弱的抗弯），每根骨摆到质点上、朝向取该点布面的切线标架（法线跟着转）。顶点照旧 GPU 蒙皮，不改几何。每帧约 0.4 ms。
+  - **谁拽**（`_BlanketEnv`）：别的单位此刻 `carryRole: "front"`、看得见、站在被头 3 m 内的人，按他在被子哪一侧拽哪个角，用那一侧更靠外的手的掌心（`rig.grips`，拖人片段 `PvBlanketDragL/R` 是外侧拳头攥被角）；手离那个被角的静止位置超过 2.5 m 不算。只有一边有人（另一边是玩家镜头）时另一角取镜像；都没人但被子在走（松手后往掩体后一拽、关键帧过渡）时两角贴地跟着被子走。两只拳头相距 1.62 m 比被头（1.4 m）宽，两边往里收到被头宽 × 1.04。被角以 3 m/s 挪到手上、到了就钉住。
+  - **身体**：倒着、骨盆落在被子范围里的人（冬瓜）整身胶囊（躯干、肩、头、胳膊、胯、腿，`BodyCapsules`）：身子正下方的点按在地上、水平跟着他走（静摩擦，`bodyHold` 0.8），其余推出胶囊；拽被角的人只算两条腿。地面用站人的地面（`standAt`），一下子比布高出 0.3 m 以上的实心块（路边弹药箱）不认，台阶按 1 m/s 渐进抬。被推开 / 被顶起的那一下限速，整体限 5 m/s（不然重铺时和身体交叠会把布弹上天）。
+  - **重铺**：被子一帧挪 1.2 m 以上、`Apply` / 关键帧跳转、预演 `Seek` 时，按此刻的位姿平铺下去再空推 0.9 s（被角挪到手上、布落定）；`Settle` 在最后一步才重铺（大跳之后头一步人物模型还没跟上，手在上一个时刻的地方）。所以同一秒从哪儿 Seek 过来布都差不多一样（实测差 4 mm）。暂停的预演里人物原地走、布跟着手动。
+  - **站位的物理限制**：拖人片段的拳头离地 0.77 m、在被子中心前 1.56 m（`STAGES.blanketDrag` 按 2.0 × 1.6 m 的被子摆的）；被子半边宽 0.7 m 比拳头高度还短，所以两手拽着时被头那条边中间落不到地上，被子会被手带着往前滑一截。冬瓜按关键帧平躺不动，于是他小腿伸出被尾约 0.3–0.5 m（真实拖人时人的头肩会被兜起来、整个人被往前带）。要改得在预演站位（`PULL`）或冬瓜的姿势上动，这里没动。
+  - Probe 的 `blanketCloth`：`headL/headR/tailL/tailR`（世界坐标、离地、`held`、离手 `gapM`、钉点 `target`）、`topM` / `lowM`、相邻质点最大拉长 / 最小压短、贴地 / 被压住的点数、胶囊数、`resets`、`lastMs`、`root`、`lastReset`。`BLOCKOUT_BLANKET.cloth = false` 退回原来两条静态姿势（`Blanket_Flat` / `Blanket_DragPose` 按 moving 插值）。闸门：`Script_BlanketClothTest`（纯 Node，真 GLB）与 `Script_EditorBlockoutBlanketClothBrowserTest`。
 
 ### 5.7 树（`Script_EditorBlockoutTrees.mjs`，2026-10-20）
 
@@ -708,6 +714,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 - 2026-10-20（01–05 集结处改弯沟）：§13 干沟由 15×50 m 方坑改成一条弯沟（坑窝 A / 中弯 / 坑窝 B，沟底宽 5–15 m，中弯往南接支沟放伤员，支沟南头接凹路、凹路在台地里往东到 x 83 才拐往南）；02 末的人分三小堆贴北岸、伤员放支沟里；锚点加 `GullyU` / `InGullyFloor`；0610 跟着挪妮儿、06-1–06-3 的站位，干沟进 0610 路网（中心线，不再是矩形区域）。
 - 2026-10-19（12–18 新剧本白盒）：新关卡 `FirstLevel1218`（§16）；§14.3 预演音效别名加 `planeDrone` / `planeDive` / `strafeNear` / `strafeFar` / `strafeDirt`（飞机与扫射，映射到游戏音频库现成的键）。
 - 2026-10-21（担架、单被）：§5.6 担架换竹竿布兜担架正式模型；单被换上传的五补丁单被，拖着走时兜起来。
+- 2026-10-21（单被布料）：§5.6 单被换成布料模拟（216 根骨当质点），被角钉在拖的人手上、冬瓜身下压着布、尾巴拖地；Seek 重铺；Probe 加 `blanketCloth`。
 - 2026-10-20（不端枪）：§5.6 不戒备的步枪兵站 / 走 / 跑背枪、蹲着歇枪竖着；预演里提枪说话换背枪版、卧倒抱头背枪；动作库开编辑器就下。
 - 2026-10-20（默认关卡）：§1 白盒工具默认开新剧本 01–05（菜单入口、没写 / 写错 `level` 都进它），不再默认开旧版第一关。
 - 2026-10-20（正式模型）：§5.6 战车 / 车 / 牲口换游戏里的八九式、撤运车 + 牛 / 马（带 Walk 动画），单位可选 `draft`；§5.7 树换枯树模型（树干块只留碰撞）；关键帧机位的蹲 / 趴走开就站起来（§7）。
