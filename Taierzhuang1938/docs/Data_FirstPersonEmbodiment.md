@@ -236,6 +236,39 @@ ModuleGraph、Text、TestRunner 与 MotionVectorContract 通过。全仓 `prepus
 在 `SpeakerGestureTest` 的 `FrontObservation.02: luo gestured on his previous line too` 停止；
 未修改主检出 `2ec581c5` 上复测得到同一错误，该全仓门禁未通过。
 
+### 集束弹过肩投掷（2026-10-21，候选，未推送）
+
+集束弹 `GrenadeBundle` 原来没有作者轨迹，走 `_AnimThrow` 的程序化抡臂：转的是 `actionPivot`，肩膀跟着一起转，
+t≈0.1–0.4 整副手臂被转出镜头、画面里什么都没有，t≈0.5 两截上臂带着袖口断面横在画面上方，t≈0.6–0.9 一条胳膊占满半屏。
+现在和普通手雷一样走 Blender 作者轨迹 `Data_FpsGrenadeBundleThrow.mjs`：只动武器挂点、肩位与肘极点，肩膀留在眼睛下后方。
+`Script_Viewmodel` 的 `THROW_TRACKS` 按手里的武器选轨迹（普通弹 / 集束弹），`_ApplyGrenadeThrow(track)` 两者共用；
+步枪在手时左手掏弹（offhand）仍走程序化动作。
+
+- 节奏（归一化，整段仍 0.82 s）：0–0.12 双手把弹束往上托（左肩随之前送，左手托得住），0.10–0.26 左手从弹头下松开、落出画面左下；
+  0.30 右手把弹束举在右上、弹头朝上（举起拍，弹束在画内）；0.40 后引，弹头往右后甩出画面右上角；0.45 越过头顶向前；
+  0.47–0.55 右手张开，0.50 出手；0.58–0.68 手顺势往下、从画面下沿出去；0.88 新的一束在画外出现，0.82–0.97 左手回到弹头下。
+- 腕角：中段各拍的掌向按肘极点算出的前臂方向反推（举起 / 后引 / 越顶 / 出手 / 跟随腕弯约 10 / 25 / 5 / -10 / -20°），
+  不靠 65° 腕弯上限硬夹；起止两帧就是腰射持握（`Data_FpsWeaponGrips.GrenadeBundle.hip` 与 `bodyHip` 肩位），起手不跳。
+- 不变的：出手仍是 `Data_FpsArmPoses.GrenadeBundle.actions.throw.release = 0.50`，0.50 那一帧藏起手里那一束；
+  游戏侧 `ReleaseCook` 仍在起手时从眼位抛出、扣一个库存（集束弹没有接普通弹的 `handRelease` 掌心出手，这次也没接），伤害、库存与引信逻辑一行未动。
+- 与投掷物构图候选（分支 `worktree-agent-aa31e23963ac7c1e4`，`174b91c3`）兼容：那边投掷时构图在 0–0.14 退出、0.84 起回来并整体后退 `[-.05,0,-.10]`；
+  候选的持握本来就是弹头朝上，这条轨迹前 0.12 先把弹束托到弹头朝上，两边叠起来起手不翻面。两边都改了 `index.html` 里 `Script_Viewmodel.mjs` 的戳，合并时取较大的一个。
+  那边 `docs/Data_FpsRifleView20261016.md` 里「集束弹没有作者轨迹」那一句合并后要改掉。
+
+可编辑源工程：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/GrenadeBundleThrow_20261021/Animation_GrenadeBundleThrow.blend`。
+`_blender/Script_GrenadeBundleThrowStudio.py` 建控制空物体（`Animation_BundleGrip` 是木柄上右手握点、带弹束朝向，导出时换成武器挂点）、
+关键帧与事件标记，并写运行时数据；在 Blender 里改完控制曲线后带 `GRENADE_BUNDLE_EXPORT_ONLY=True` 再跑一次，只从打开的源工程重新采样导出。
+`_blender/Script_GrenadeBundleThrowRigBake.py` 把 `Script_GrenadeThrowTest` 留下的 `_shots/GrenadeThrow/Data_BundleTrace.json`（121 帧、53 根骨骼）
+与按 `BuildGrenadeBundle` 尺寸搭的弹束代理件装进同一工程。顺序：`node scripts/Script_BlenderMcp.mjs start --task GrenadeBundleThrow_20261021`
+→ `exec` Studio（传 `GRENADE_PROJECT_ROOT`）→ 跑 `GrenadeThrowTest` → `exec` RigBake → `stop`。
+
+验收：`Script_GrenadeThrowTest` 新增集束弹整段 121 帧（腕弯 ≤65°、两手握持时握点残差 ≤6 mm、两肘相邻采样位移 <8.5 cm、骨段不拉伸、只释放一次、0.6 手指张开）、
+可读性（两肩关节投影始终在画外 ≥1.5 倍半屏，袖口断面进不了画面；右手只在右半屏；t=0.30 与 0.475 弹束中心在画内）、三档力度连续播放、
+游戏侧起手抛出 / 库存 / 0.50 藏弹 / 回到持握。`Script_FpsArmTest` 集束弹修形生命周期改为左右手各在自己的松手窗口里取样（原先要求两手同时处于中间权重，新动作左手先放）。
+本轮实测：握点残差 0、腕弯最大 64.0°、肘部每 1/120 最大位移右 2.7 cm / 左 6.7 cm、两肩投影最近 8.6 倍半屏、右手最左在 NDC x=0.24；
+GrenadeThrowTest、FpsArmTest 1013/1013、FpsGripEditorTest 42/42、MotionVectorContractTest、ModuleGraphTest、TextTest 通过；
+`TestRunnerTest` 报 `Data_ToolsHome.mjs` / `Icon_TabSeal*.png` / `Script_ToolsHomeField.mjs` 未登记领域，为主线已有问题，与本改动无关。
+
 ### 架设机枪（2026-09-27）
 
 接管机枪不再收枪只看世界模型。对标 COD WWII / BFV 的固定机枪与两脚架：**枪钉在工事上、人贴上去**。

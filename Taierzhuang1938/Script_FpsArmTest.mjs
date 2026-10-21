@@ -279,15 +279,17 @@ const report = await page.evaluate(async ({ onlyIds, shelved }) => {
   if (runBundleMorph) {
     Equip("GrenadeBundle"); Step(90); out.morphLifecycle.push(MorphState("bundleHeld"));
     vm.TriggerThrow(1);
-    const intermediate = []; let guard = 0;
+    // The authored bundle throw lets go with each hand on its own beat: the left drops from
+    // the heads as the bundle goes up, the right opens at release. Sample each key's window.
+    const intermediate = { r: [], l: [] }; let guard = 0;
     while (vm.action && vm.action.t < .60 && guard++ < 240) {
       Step(1);
-      const keys = CorrectiveWeights(arms).filter(c => c.weaponId === "GrenadeBundle");
-      if (keys.length === 2 && keys.every(c => c.weight > .02 && c.weight < .98))
-        intermediate.push(MorphState("bundleIntermediate"));
+      for (const key of CorrectiveWeights(arms).filter(c => c.weaponId === "GrenadeBundle"))
+        if (key.weight > .02 && key.weight < .98) intermediate[key.side].push(MorphState(`bundleIntermediate.${key.side}`));
     }
-    if (intermediate.length) out.morphLifecycle.push({ ...intermediate[0], label: "bundleMidEarly" },
-      { ...intermediate[intermediate.length - 1], label: "bundleMidLate" });
+    for (const side of ["l", "r"]) if (intermediate[side].length) out.morphLifecycle.push(
+      { ...intermediate[side][0], label: `bundleMidEarly.${side}` },
+      { ...intermediate[side][intermediate[side].length - 1], label: `bundleMidLate.${side}` });
     while (vm.action && vm.action.t < .65 && guard++ < 300) Step(1);
     out.morphLifecycle.push(MorphState("bundleReleased", { actionStillRunning: !!vm.action }));
     // Begin switching with nonzero keys, so Detach cannot pass vacuously after release.
@@ -347,13 +349,16 @@ if (report.morphExpected.bundle) {
     const entry = ExpectMorphState(label);
     if (entry) checks.push([`${label} 真实皮面完整重新握持`, entry.geometry.every(c => c.weight > .999 && c.actualToFullRatio > .98), JSON.stringify(entry.geometry)]);
   }
-  const early = ExpectMorphState("bundleMidEarly"), late = ExpectMorphState("bundleMidLate");
-  if (early && late) checks.push(["集束弹释放中皮面连续退形", late.t > early.t && early.geometry.every(a => {
-    const b = late.geometry.find(c => c.name === a.name);
-    return b && a.weight > .02 && a.weight < .98 && b.weight > .02 && b.weight < .98
-      && a.actualToFullRatio > .02 && a.actualToFullRatio < .98 && b.actualToFullRatio > .02
-      && b.actualToFullRatio < a.actualToFullRatio - .01;
-  }), JSON.stringify({ early, late })]);
+  for (const side of ["l", "r"]) {
+    const early = ExpectMorphState(`bundleMidEarly.${side}`), late = ExpectMorphState(`bundleMidLate.${side}`);
+    if (early && late) checks.push([`集束弹${side === "l" ? "左" : "右"}手释放中皮面连续退形`, late.t > early.t
+      && early.geometry.some(a => a.side === side) && early.geometry.filter(a => a.side === side).every(a => {
+      const b = late.geometry.find(c => c.name === a.name);
+      return b && a.weight > .02 && a.weight < .98 && b.weight > .02 && b.weight < .98
+        && a.actualToFullRatio > .02 && a.actualToFullRatio < .98 && b.actualToFullRatio > .02
+        && b.actualToFullRatio < a.actualToFullRatio - .01;
+    }), JSON.stringify({ early, late })]);
+  }
   const released = ExpectMorphState("bundleReleased");
   if (released) checks.push(["集束弹完全释放时同骨皮面回到Basis", released.actionStillRunning && released.t >= .6
     && released.geometry.every(c => released.contactWeight[c.side] < .001 && c.weight < 1e-6 && c.currentMaximumM < 1e-8), JSON.stringify(released)]);

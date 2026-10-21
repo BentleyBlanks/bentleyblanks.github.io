@@ -36,6 +36,7 @@ import { FPS_RIFLE_VIEW, RifleViewDepthScale, RifleActionFraming } from "./Data_
 import { CharacterWounds } from "./Script_CharacterWounds.mjs";
 import { SampleMeleeFirstPerson, SampleMeleeVideo } from "./Script_MeleeAnimation.mjs";
 import { FPS_GRENADE_THROW } from "./Data_FpsGrenadeThrow.mjs";
+import { FPS_GRENADE_BUNDLE_THROW } from "./Data_FpsGrenadeBundleThrow.mjs";
 import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { WEAPONS, GUN_MELEE } from "./Data_Weapons.mjs";
 import { FirearmReloadTimeline } from "./Script_FirearmActions.mjs";
@@ -60,6 +61,9 @@ import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS, FPS_BOLT_HAND, F
 import { FirearmEffects, CASE_EJECTION, VIEWMODEL_FIREARM_SURFACES } from "./Data_Tuning_FirearmEffects.mjs";
 
 const DEG = Math.PI / 180;
+// 手里拿着投掷物时走的 Blender 作者投掷轨迹（握点 / 掌向 / 左手去处 / 肩位 / 肘极点）。
+// 没登记的（步枪在手时左手掏弹的 offhand）仍走 _AnimThrow 的程序化动作。
+const THROW_TRACKS = Object.freeze({ Grenade: FPS_GRENADE_THROW, GrenadeBundle: FPS_GRENADE_BUNDLE_THROW });
 
 // 贴图密度。Script_Geo 的 TILE_METERS 是给建筑调的（砖墙一格 1.2 m），
 // 一支枪只有房子的十分之一大，直接套过来一整支枪只吃到贴图的三十分之一，
@@ -2641,7 +2645,7 @@ export class Viewmodel {
       this.Equip("Grenade", 0, { instant:true });
     }
     if (!this.rig) return false;
-    this._StartAction("throw", FPS_GRENADE_THROW.durationS);
+    this._StartAction("throw", (THROW_TRACKS[this.weaponId] || FPS_GRENADE_THROW).durationS);
     this.action.restoreWeapon = restoreWeapon;
     this.action.onRelease = onRelease;
     this.action.power = Clamp01(power);
@@ -2954,9 +2958,10 @@ export class Viewmodel {
         reload: this.action?.kind === "reload", reloadBlend: this.reloadBlend, melee: !!input.meleeCombat,
         fire: 1-Ease.InOut(Ease.Seg(this.flashTime,0.055,0.18)) });
       if (this.meleeVideoFrame) this._ApplyMeleeVideo();
-      if(this.weaponId === "Grenade" && this.action?.kind === "throw" && !this.action.offhand) this._ApplyGrenadeThrow();
+      const throwTrack = this._ThrowTrack();
+      if(throwTrack) this._ApplyGrenadeThrow(throwTrack);
       if (!this.skeletalAnimation?.Update(step,input)) this.riggedArms.Update(step);
-      if(["Grenade","GrenadeBundle"].includes(this.weaponId) && this.action?.kind === "throw" && !this.action.offhand) this._ReleaseThrow(this.action.t,this.action.power,false);
+      if(throwTrack) this._ReleaseThrow(this.action.t,this.action.power,false);
     }
     if (!this.weapon && !this.riggedArms) this._UpdateUnarmedHands(gait, sprint, grounded ? 1 : 0);
     this.body?.Update(step, input.carryBodyVisible ? { ...input, playerYaw: input.carryBodyYaw ?? input.playerYaw,
@@ -4155,7 +4160,7 @@ export class Viewmodel {
         this.handBaseRot.left.x + swing * 0.8,
         this.handBaseRot.left.y - swing * 0.4,
         this.handBaseRot.left.z, "YXZ");
-    } else if(this.weaponId !== "Grenade" || !this.riggedArms) {
+    } else if(!this._ThrowTrack()) {
       const swing = (cock * -1 + whip * 2.4 - follow * 1.2) * amp;
       this.actionPivot.position.set(
         -0.04 * cock + 0.06 * whip,
@@ -4163,39 +4168,42 @@ export class Viewmodel {
         0.26 * cock * amp - 0.46 * whip * amp + 0.14 * follow);
       this.actionPivot.rotation.set(swing * 0.9, -0.35 * cock + 0.30 * whip, 0.25 * cock, "YXZ");
     }
-
-    if(this.weaponId === "GrenadeBundle" && this.riggedArms && !offhand) {
-      const opening=Ease.InOut(Ease.Seg(t,.47,.55))*(1-Ease.InOut(Ease.Seg(t,.82,.94)));
-      for(const side of ["r","l"]) {
-        this.riggedArms.SetContactWeight(side,1-opening);
-        this.riggedArms.operationPose[side]={shape:"open",nextShape:"open",shapeMix:0};
-      }
-    }
-    if(offhand || !["Grenade","GrenadeBundle"].includes(this.weaponId) || !this.riggedArms) this._ReleaseThrow(t,power,offhand);
+    if(!this._ThrowTrack()) this._ReleaseThrow(t,power,offhand);
   }
 
-  _ApplyGrenadeThrow() {
-    const t=Clamp01(this.action.t),frames=FPS_GRENADE_THROW.frames,cursor=t*(frames.length-1);
+  /** 当前投掷用的作者轨迹（THROW_TRACKS），offhand / 没有骨骼手臂时为 null。 */
+  _ThrowTrack() {
+    if(this.action?.kind !== "throw" || this.action.offhand || !this.riggedArms) return null;
+    return THROW_TRACKS[this.weaponId] || null;
+  }
+
+  /**
+   * 播一条作者投掷轨迹。每帧 22 列：握点 xyz、掌向四元数 xyzw、左手离开后的去处 xyz、
+   * 左右肩、左右肘极点（相机 / armAnchor 空间）。withdraw 管左手离开再回来，
+   * opening 管右手松指再握回。普通弹与集束弹各一条，见 THROW_TRACKS。
+   */
+  _ApplyGrenadeThrow(track) {
+    const t=Clamp01(this.action.t),frames=track.frames,cursor=t*(frames.length-1);
     const a=frames[Math.floor(cursor)],b=frames[Math.min(frames.length-1,Math.floor(cursor)+1)],mix=cursor%1;
     const values=a.map((n,i)=>Mix(n,b[i],mix));
-    const amplitude=Mix(FPS_GRENADE_THROW.powerMinAmplitude,1,this.action.power);
+    const amplitude=Mix(track.powerMinAmplitude,1,this.action.power);
     this.weaponMount.position.fromArray(frames[0]).lerp(new THREE.Vector3().fromArray(values),amplitude);
     const rotation=new THREE.Quaternion().fromArray(a,3).slerp(new THREE.Quaternion().fromArray(b,3),mix);
     this.weaponMount.quaternion.fromArray(frames[0],3).slerp(rotation,amplitude);
-    if(this.action.restoreWeapon) this.weaponMount.position.y-=FPS_GRENADE_THROW.quickDrawDropM
-      *(1-Ease.InOut(Ease.Seg(t,0,FPS_GRENADE_THROW.quickDrawEnd)));
+    if(this.action.restoreWeapon && track.quickDrawDropM) this.weaponMount.position.y-=track.quickDrawDropM
+      *(1-Ease.InOut(Ease.Seg(t,0,track.quickDrawEnd)));
     const rig=this.riggedArms;
     // The authored palm orientation owns the throw, including during sprint/ADS.
     rig.SetPoseState({ads:0,sprint:0});
     rig.videoBody={shoulders:{right:values.slice(10,13),left:values.slice(13,16)},
       elbowPoles:{right:values.slice(16,19),left:values.slice(19,22)},authoredElbows:true};
-    const [leaveStart,leaveEnd,returnStart,returnEnd]=FPS_GRENADE_THROW.withdraw;
+    const [leaveStart,leaveEnd,returnStart,returnEnd]=track.withdraw;
     const withdraw=Ease.InOut(Ease.Seg(t,leaveStart,leaveEnd))*(1-Ease.InOut(Ease.Seg(t,returnStart,returnEnd)));
     rig.SetContactWeight("l",1-withdraw);
     const hand=this.handLeft.group;
     const target=this.armAnchor.localToWorld(new THREE.Vector3().fromArray(values,7));
     hand.position.lerp(hand.parent.worldToLocal(target),withdraw);
-    const [openStart,openEnd,closeStart,closeEnd]=FPS_GRENADE_THROW.opening;
+    const [openStart,openEnd,closeStart,closeEnd]=track.opening;
     const opening=Ease.InOut(Ease.Seg(t,openStart,openEnd))*(1-Ease.InOut(Ease.Seg(t,closeStart,closeEnd)));
     rig.SetContactWeight("r",1-opening);
     rig.operationPose.r={shape:"open",nextShape:"open",shapeMix:0};
@@ -4218,7 +4226,7 @@ export class Viewmodel {
         this.onThrowRelease?.(out, power);
       }
     }
-    if (t > FPS_GRENADE_THROW.reappear && this.rig.parts.grenade && !this.action?.restoreWeapon)
+    if (t > (THROW_TRACKS[this.weaponId] || FPS_GRENADE_THROW).reappear && this.rig.parts.grenade && !this.action?.restoreWeapon)
       this.rig.parts.grenade.visible = true;
   }
 

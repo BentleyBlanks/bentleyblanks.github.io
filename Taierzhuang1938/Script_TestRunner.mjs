@@ -388,7 +388,7 @@ export const testDefs = {
   WeaponRangeTest: { file: "Script_WeaponRangeTest.mjs", timeoutMs: 20 * 60 * 1000,
     desc: "全枪械白盒：桌面 F 拾取、无限弹药/换弹、10–200米静动靶与真实命中" },
   MeleeAnimationTest: { file: "Script_MeleeAnimationTest.mjs", timeoutMs: 15 * 60 * 1000, desc: "Blender 全骨骼与第一人称 54 动作、握持可见性及源工程样本" },
-  GrenadeThrowTest: { file: "Script_GrenadeThrowTest.mjs", timeoutMs: 600000, desc: "Grenade repaired hands, full throw anatomy and release" },
+  GrenadeThrowTest: { file: "Script_GrenadeThrowTest.mjs", timeoutMs: 600000, desc: "Grenade and bundle repaired hands, authored throw anatomy, framing and release" },
   DadaoSwingTest: { file: "Script_DadaoSwingTest.mjs", timeoutMs: 10 * 60 * 1000, desc: "Dadao cutting-edge travel, speed, recovery, grip and wrist limits" },
   FpsDadaoProjectionTest: { file: "Script_FpsDadaoProjectionTest.mjs", timeoutMs: 10 * 60 * 1000, desc: "大刀实际相机斜劈、刀身可读性与左下随势（五种攻击、两种画幅）" },
   MeleeCombatTest: { file: "Script_MeleeCombatTest.mjs", desc: "通用白刃规则、拨挡窗口、F 推架、两类僵持、伤害和多人隔离（纯 Node）" },
@@ -937,7 +937,7 @@ const changedDomainRules = [
   // Script_LayeredGait（分层步态，docs/Data_ActorLocomotion.md）由 ActorLocomotionTest 验收：2026-09-28 补上映射。
   // 担架员抬架走的 Blender 循环（Animation/LitterBearer，只由 Script_LayeredGait 读）同归这条。
   { domain: "animation", pattern: /ActorLocomotion|LocomotionProfileBake|LayeredGait|LitterBearer/ },
-  {domain:'animation',pattern:/DadaoSwing|DadaoPowerSwing|GrenadeThrow/},
+  {domain:'animation',pattern:/DadaoSwing|DadaoPowerSwing|GrenadeThrow|GrenadeBundleThrow/},
   {domain:"combat",pattern:/HitDisorientation/},
   {domain:'render',pattern:/TerrainBlend|TrenchSurfaceMaterial/},
   // 地面脚印与痕迹（docs/Data_TerrainTrails.md）：痕迹靶 pass、地形 / 壕沟 / 砸坑着色接入、人物骨架与战车登记。
