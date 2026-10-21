@@ -21,6 +21,7 @@ import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { FindReturnableGrenade } from "./Script_GrenadeReturn.mjs";
 import { GRENADE_RETURN, ExplosiveIdFor } from "./Data_Explosives.mjs";
+import { BlastExposure, BlastBearing, ChargeKgFor } from "./Script_BlastExposure.mjs";
 import { ShellVisuals } from "./Script_ShellVisual.mjs";
 import { T } from "./Script_Text.mjs";
 // 白刃劈中了哪一段：纯几何（实际高度与方向命中的肢段），断肢规则层要它当 shapeId。
@@ -351,7 +352,7 @@ export class CombatSystem {
         // or running zero-damage injury/destruction queries on the impact frame.
         this.host.onBlast?.({position:impact.clone(),radius:shell.radius,damage:0,kind:"shell",hurtSide:null,byPlayer:false,explosiveId:shell.kind,ownerId:null});
         this.host.vfx?.Explosion(impact,{radius:shell.radius,kind:"shell"});
-        this.BlastFeedback(impact,shell.radius);
+        this.BlastFeedback(impact,shell.radius,shell.kind);
       }else this.Blast(impact, shell.radius, shell.damage, "shell", null, shell.byPlayer, null, shell.kind, null,
         // 来向给落地扬尘：斜着砸进去的弹，下游一侧抛得多（Vfx.GroundImpact）。
         { incoming: shell.velocity.clone(), ...(shell.occludedSuppression ? { occludedSuppression: true } : {}) });
@@ -689,8 +690,11 @@ export class CombatSystem {
     }
   }
 
-  /** Shared sensory event, also usable by scripted demolition without changing damage. */
-  BlastFeedback(position, radius) {
+  /**
+   * Shared sensory event, also usable by scripted demolition without changing damage.
+   * explosiveId（可选）：弹种，按它查装药量算人头上的峰值超压（Script_BlastExposure）；不给就按半径反推。
+   */
+  BlastFeedback(position, radius, explosiveId = null) {
     const bf = this.host.battlefield;
     const from = position.clone();
     from.y += BLAST.originRiseM;
@@ -705,6 +709,7 @@ export class CombatSystem {
     // 不会出现「震得到听不到」这种自相矛盾），以及**先改场景拓扑再算遮挡** ——
     // 爆压把墙打穿的同一瞬间，洞口后面的人应该听到没被削过的那一声。
     let blastOccluded = false;
+    let earExposure = null;
     if (shaken && shaken.Alive) {
       const eye = this.tmp.set(shaken.position.x, shaken.position.y + BLAST.playerHitRiseM, shaken.position.z);
       const toEye = this.tmpB.subVectors(eye, from);
@@ -714,17 +719,30 @@ export class CombatSystem {
       blastOccluded = !!(wall && wall.t < eyeDist - BLAST.wallMarginM);
       const side = -(toEye.x * Math.cos(shaken.yaw || 0) - toEye.z * Math.sin(shaken.yaw || 0));
       if (shaken.shake) shaken.shake.Explosion(eyeDist, radius * BLAST.radiusScale, blastOccluded, side);
+      // 人头上有多响（2026-10-21）：按装药量 / 到眼睛的距离 / 遮挡 / 头影算两只耳朵与各种反应的强度，
+      // 交给第一人称反应（开着时）与耳朵模型（trauma 时）。遮挡沿用上面这一条，判据与震屏一致。
+      const head = { x: shaken.position.x, y: shaken.position.y + (shaken.eyeHeight ?? BLAST.playerHitRiseM), z: shaken.position.z };
+      const bearing = BlastBearing(head, position, shaken.yaw || 0);
+      const exposure = BlastExposure({ distanceM: bearing.distance, chargeKg: ChargeKgFor(explosiveId, radius),
+        occluded: blastOccluded, lateral: bearing.lateral });
+      this.lastExposure = { ...exposure, lateral: bearing.lateral, forward: bearing.forward, up: bearing.up,
+        explosiveId: explosiveId || null, radius, position: [position.x, position.y, position.z] };
+      // 最近十几发留底（测试场按落点把读数对回每一发）。
+      (this.exposureLog ||= []).push(this.lastExposure);
+      if (this.exposureLog.length > 16) this.exposureLog.shift();
+      shaken.BlastReaction?.(exposure, bearing);
+      earExposure = { left: exposure.tinnitusLeft, right: exposure.tinnitusRight };
     }
     // 距离分档、落屑与按威力/距离/遮挡分级的耳鸣，
     // 全在 Script_AudioWiring.Blast 里；这里只负责把「炸在哪、多大、挡没挡住」交出去。
     // 接线层缺席时（编辑器裸跑规则层）退回原来那条两档判断，一声不少。
-    if (this.host.audioWiring) this.host.audioWiring.Blast(position, radius, blastOccluded);
+    if (this.host.audioWiring) this.host.audioWiring.Blast(position, radius, blastOccluded, earExposure);
     else if (this.host.audio) {
       const audio = this.host.audio;
       const L = audio.listenerPos || { x: 0, y: 0, z: 0 };
       const d = Math.hypot(position.x - L.x, position.y - L.y, position.z - L.z);
       audio.Play(d > BLAST.nearAudioM ? "explosionFar" : "explosionNear",
-        { position: position.clone(), blastRadiusM: radius, blastOccluded,
+        { position: position.clone(), blastRadiusM: radius, blastOccluded, blastExposure: earExposure,
           volume: Clamp(radius / BLAST.audioVolumeRadiusDiv, BLAST.audioVolumeMin, BLAST.audioVolumeMax) });
     }
 
@@ -760,7 +778,7 @@ export class CombatSystem {
     const from = position.clone();
     from.y += BLAST.originRiseM;
 
-    this.BlastFeedback(position, radius);
+    this.BlastFeedback(position, radius, explosiveId);
 
     const affect = (targetPos, apply) => {
       const rel = this.tmp.subVectors(targetPos, from);

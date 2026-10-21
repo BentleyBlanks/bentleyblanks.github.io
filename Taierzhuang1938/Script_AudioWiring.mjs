@@ -23,6 +23,7 @@ import {
   GRENADE_FOLEY, BLAST_AUDIO, FIRE_SPOT, BATTLE_DENSITY, SUPPRESSION_DIRT,
   TRENCH_ZONE, SUPPRESSION_BODY,
 } from "./Data_Tuning_Audio.mjs";
+import { EAR_TRAUMA } from "./Data_Tuning_BlastReaction.mjs";
 
 /**
  * 脚下材质 → 脚步 cue。
@@ -176,6 +177,9 @@ export class AudioWiring {
     this.stressHeart = false;      // 压制心跳的滞回状态
     this.heartNextAt = 0;
     this.heartBeats = 0;           // 取证累计
+    // --- 近爆之后的心跳（Script_BlastFlinch：player.flinch.heart / heartBpm）-----
+    this.blastHeartNextAt = 0;
+    this.blastHeartBeats = 0;      // 取证累计
 
     // --- 火焰点声源 -------------------------------------------------------
     this.fireVoices = new Map();      // vfx 烟源 handle → { voice, at, until }
@@ -235,6 +239,7 @@ export class AudioWiring {
     this.stressBreath = false;
     this.stressHeart = false;
     this.heartNextAt = 0;
+    this.blastHeartNextAt = 0;
     this.lastFootstepAt = 0;
     this.lastStance = null;
     this.sprintHeldS = 0;
@@ -1156,6 +1161,7 @@ export class AudioWiring {
     this.Footsteps(surfaceByTag);
     this.Landing(surfaceByTag);
     this.SuppressionBody(dt);
+    this.BlastBody();
     this.BodyFoley(dt);
     this.FireSpots(dt);
   }
@@ -1194,6 +1200,28 @@ export class AudioWiring {
     // 而那正是这一声最该在的时候。
     audio?.Play("heartbeat", {
       volume: S.heartVolumeMin + (S.heartVolumeMax - S.heartVolumeMin) * k, priority: true,
+    });
+  }
+
+  /**
+   * 近爆之后听得见自己的心跳（2026-10-21，人物战场反应测试场）。只在近爆身体反应开着（player.flinch）时有：
+   * 心跳快慢与轻重读 flinch.heart / heartBpm（强的那一下之后几秒到十几秒，慢慢退）。
+   * 耳朵被震过（耳朵模型 trauma）时外界整体被压掉了，这一声是骨传导的自己的胸腔，不该跟着一起小 ——
+   * 按此刻耳朵被压掉的量补回一部分（EAR_TRAUMA.bodyCompensationMax 封顶）。压制心跳、濒死心跳在跳时让位（两条心跳叠在一起是乱拍）。
+   * 喘粗气交给 BodyFoley（同一条喘息槽，flinch.breathless > 0 时要 breathHeavy）。
+   */
+  BlastBody() {
+    const player = this.Player, audio = this.Audio, flinch = player?.flinch;
+    if (!audio || !flinch?.enabled || !player.Alive || !(flinch.heart > 0.02) || !(flinch.heartBpm > 0)
+      || this.stressHeart || (player.heartbeatTimer || 0) > 0) { this.blastHeartNextAt = 0; return; }
+    if (this.time < this.blastHeartNextAt) return;
+    this.blastHeartNextAt = this.time + 60 / flinch.heartBpm;
+    this.blastHeartBeats += 1;
+    const S = SUPPRESSION_BODY;
+    const press = audio.earModel === "trauma" ? audio.earTrauma?.Attenuation?.() || 0 : 0;
+    const lift = 1 + (EAR_TRAUMA.bodyCompensationMax - 1) * press;
+    audio.Play("heartbeat", {
+      volume: Math.min(1, (S.heartVolumeMin + (S.heartVolumeMax - S.heartVolumeMin) * flinch.heart) * lift), priority: true,
     });
   }
 
@@ -1277,7 +1305,9 @@ export class AudioWiring {
     if (!player.Alive) { this.StopBreath(0.4); return; }
     // 压制喘息排在最后：受伤喘息与冲刺喘息都在时让它们（见 SuppressionBody）。
     const stressed = this.stressBreath && !winded && !hurt;
-    const requestedCue = hurt ? "breathInjured" : (winded || this.stressBreath) ? "breathHeavy" : null;
+    // 近爆之后喘粗气（Script_BlastFlinch.breathless，近爆身体反应开着时才有）与压制喘息同一档。
+    const blastBreath = (player.flinch?.breathless || 0) > 0;
+    const requestedCue = hurt ? "breathInjured" : (winded || this.stressBreath || blastBreath) ? "breathHeavy" : null;
     if (requestedCue && requestedCue !== this.breathCue) {
       this.StopBreath(BODY_FOLEY.breathSwitchFadeS);
       this.breathCue = requestedCue;
@@ -1380,7 +1410,8 @@ export class AudioWiring {
    *   **只在引擎侧没注册遮挡探针时才用**：探针在场时遮挡由引擎独占一层，
    *   见下面那段注释。
    */
-  Blast(position, radius, occluded = false) {
+  /** earExposure（可选）：{ left, right } 两只耳朵的耳鸣强度（Combat.BlastFeedback 按 Script_BlastExposure 算），耳朵模型 trauma 用。 */
+  Blast(position, radius, occluded = false, earExposure = null) {
     const audio = this.Audio;
     if (!audio || !position) return null;
     const d = this.DistanceToListener(position);
@@ -1398,7 +1429,7 @@ export class AudioWiring {
     // refDistance 3.5 m 算出来的 −9.4 dB —— 那正是「炮弹没有声音」的最大一块。
     const opts = { position: { x: position.x, y: position.y, z: position.z }, volume, priority: true,
       sourceSizeM: Math.max(BLAST_AUDIO.sourceSizeFloorM, radius * BLAST_AUDIO.sourceSizeScale),
-      blastRadiusM: radius, blastOccluded: occluded };
+      blastRadiusM: radius, blastOccluded: occluded, blastExposure: earExposure };
     // 遮挡**只许算一层**。
     //
     // 【2026-09-09】这是用户报的「炮弹爆炸经常没声音」的直接成因：引擎侧

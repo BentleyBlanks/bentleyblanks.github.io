@@ -7,7 +7,7 @@ import {ServeRoot} from './Script_DevServer.mjs';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 
 for (const query of ['', 'quality=high', 'menuPreview=3&menuPreviewUi=0', 'audio=0']) assert.ok(IsMenuStartup(new URLSearchParams(query)), query);
-for (const query of ['whitebox=p012', 'range=1', 'impacts=1', 'shot=1', 'phase=0', 'poseTest=1', 'editor=fullScene', 'preview=CS_Chuchuan', 'menu=0']) assert.ok(!IsMenuStartup(new URLSearchParams(query)), query);
+for (const query of ['whitebox=p012', 'range=1', 'impacts=1', 'reactions=1', 'shot=1', 'phase=0', 'poseTest=1', 'editor=fullScene', 'preview=CS_Chuchuan', 'menu=0']) assert.ok(!IsMenuStartup(new URLSearchParams(query)), query);
 const target = new URL(SandboxUrl('https://example.test/?menuPreview=3&editor=fullScene&quality=high', 'firstLevelP012Whitebox'));
 assert.equal(target.search, '?quality=high&whitebox=p012');
 const bundle = await BuildBrowserBundle(), root = path.resolve(import.meta.dirname, '..');
@@ -92,7 +92,7 @@ async function CheckMenuResponse(page) {
   assert.ok(response.copyShift < 1, 'outgoing text retains its layout during the crossfade');
   await page.waitForFunction(() => !document.querySelector('.mnBriefLeaving'));
   await page.getByRole('button', {name: '测试场景', exact: true}).click();
-  assert.equal(await page.locator('.mnSandboxLevel:visible').count(), 7);
+  assert.equal(await page.locator('.mnSandboxLevel:visible').count(), 8);
   const routes = await page.evaluate(() => {
     const m = Tengxian.menu, play = m.host.PlaySandbox, keys = [];
     m.host.PlaySandbox = key => keys.push(key);
@@ -100,7 +100,7 @@ async function CheckMenuResponse(page) {
     finally { m.host.PlaySandbox = play; }
     return keys;
   });
-  assert.deepEqual(routes, ['movement', 'weapons', 'range', 'explosions', 'melee', 'gore', 'impacts']);
+  assert.deepEqual(routes, ['movement', 'weapons', 'range', 'explosions', 'melee', 'gore', 'impacts', 'reactions']);
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('.mnChapterLevel:visible').count(), 6);
   for (const viewport of [{width:390,height:844}, {width:844,height:390}]) {

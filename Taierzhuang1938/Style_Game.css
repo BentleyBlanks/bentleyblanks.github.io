@@ -1144,3 +1144,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   50% { transform:scale(1.12); color:#fff; background:rgba(224,176,98,.48); box-shadow:0 0 24px rgba(224,176,98,.65); }
 }
 @media(prefers-reduced-motion:reduce) { .hudMeleeQte.input .mqKeys kbd.expected { animation:none; background:rgba(224,176,98,.4); } }
+/* 人物战场反应测试场（?reactions=1）：沿用 .shellImpactLab 的整套样式，只补方位九宫格与距离一排。 */
+.battleReactionLab .brCompass{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:6px 0}
+.battleReactionLab .brCompass .siBtn{padding:6px 2px}
+.battleReactionLab .brDistances .siBtn{flex:1 1 22%;padding:5px 2px}

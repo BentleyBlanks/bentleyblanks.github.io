@@ -15,6 +15,8 @@
 - **集束弹过肩投掷（2026-10-21）**：集束弹不再走转 `actionPivot` 的程序化抡臂（肩膀跟着转，手臂横过镜头、看得见袖口断面），改走 Blender 作者轨迹 `Data_FpsGrenadeBundleThrow`（`THROW_TRACKS` 与普通弹共用 `_ApplyGrenadeThrow`）：双手托起 → 左手松开 → 右上举起 → 后引 → 越顶 → 0.50 出手 → 下收。游戏侧和普通弹同一条路：端着步枪按 H 也是右手临时换成集束弹（收招换回），0.50 那一帧才从掌心飞出、才扣库存，引信照算起手时间；出手前被换装 / 剧情收尾不扣，人死了不补发。第一关 05 的投送驱动 `Script_FirstLevelBundleThrowDriver` 出手那一帧按真掌心重解朝向和仰角。源工程 `GrenadeBundleThrow_20261021`，重建脚本 `_blender/Script_GrenadeBundleThrowStudio.py` / `…RigBake.py`；门禁 `GrenadeThrowTest`（含肩不入画、右手不过中线、举起与出手前弹束在画内、两种弹四种手持的掌心出手与库存、出手前取消）、`FpsArmTest`、`ExplosionRangeTest`。见 [第一人称化身](docs/Data_FirstPersonEmbodiment.md)「集束弹过肩投掷」。
 
 - **转视角摇摆与枪口焰对标 COD（2026-10-21）**：转视角摇摆改为 COD 引擎的限幅 + 一阶跟随（WaW Kar98k 数值，`LOOK_SWAY`），不再甩过头回弹；枪口焰年龄从画出来的第一帧算起、枪口灯先给亮度再计时，低帧率也看得见；枪焰换成照片级 4×4 图集，每发随机格子、滚转、大小、片数，预乘混合。口径与验收见 [枪械手感](docs/Data_FirearmHandling.md)。
+- **人物战场反应测试场与第一人称近爆反应、新耳鸣（2026-10-21）**：新沙盒 `?reactions=1`（选章第八项「人物战场反应测试场」）借炮击扬尘测试场的壕沟场地、扬尘与投送链，面板按弹种 × 离人多远 × 在人的哪一边在玩家身边引爆。两件新的共用机制接在 `Combat.BlastFeedback` 上、由 `phase.blastReaction` 打开（**目前只有这片测试场开，正片默认不开**）：按装药量与距离算人头上的峰值超压（`Script_BlastExposure`，Kinney–Graham），驱动第一人称身体反应（`Script_BlastFlinch`：眨眼 / 闭紧眼、背离爆点扭头、低头、歪头、缩身、收枪缩肩、手抖、恍惚、喘与心跳；不改玩家 yaw / pitch 本体）与耳朵模型 trauma（`Script_AudioEarTrauma`：左右耳分开的听阈抬高 / 变闷 / 听力坑 + 一条稳定的高音耳鸣，低频先回）；数在 `Data_Tuning_BlastReaction`。原来的耳鸣原样保留（legacy，面板可 A/B）。口径 [人物战场反应测试场](docs/Data_BattleReactionRange.md)、[通用近爆反馈](docs/Data_BlastFeedback.md)；回归 `Script_BlastReactionTest`、`Script_BattleReactionRangeBrowserTest`。往正片开之前要补台词在耳朵受损时的可懂度保底。
+
 - **炮弹落地扬尘与炮击扬尘测试场（2026-10-21）**：用户要尘的起始形态贴着壕沟、之后升起飘散，并补充炸点半径内地面被震起的一层很细的浮土。落地爆炸在开了 `phase.groundImpactDust` 的关卡改走 `Vfx.GroundImpact`：局部网格上的贴地尘流（爆风按沿沟路程走、拐过折角）+ 土柱 / 悬浮尘云 + 震起的细尘，体积积分出团块与薄纱；目前只有独立测试场 `?impacts=1` 开（锯齿壕沟、碉堡、11 个弹种按真实落角投送、慢放 / 观察相机 / 新旧 A/B）。口径 [落地扬尘](docs/Data_ShellImpactDust.md)、[测试场](docs/Data_ShellImpactRange.md)；回归 `Script_DustFlowTest`、`Script_ShellImpactRangeTest`、`Script_ShellImpactRangeBrowserTest`。正片默认不开，开之前要过性能与能见度两本账。
 
 - **驴车独立资产（2026-10-21）**：原图身份与完整车组三视图先经内置 Imagegen 核对，米制 `Model/DonkeyCart/` 保留驴、两轮木车和套具的完整绑定资产。行走按路程，轮动按实际轮周长分别取时；不沿用旧牛马车候选的动作、蒙皮或脱套具动态。外置编辑工程、重建入口、28+4 骨、两套 PBR 图集与实际 GLB 重导/锁蹄/连接验证见 [驴车资产](docs/Data_DonkeyCart.md) 和同目录资产契约；验收页、截图和原始工程只留本地。外观与捆法标创作复原。
@@ -167,7 +169,7 @@
 
 ## 跨系统契约
 
-- **近爆反馈为跨关卡共用机制**：手榴弹、炮弹等实弹通过 `Combat.Blast` 接入；无伤害剧情爆破用 `Combat.BlastFeedback`。距离与遮挡控制相机冲击、余震和耳鸣，不在关卡内复制一套震屏/耳鸣。接口、数值入口与验收见 [通用近爆反馈](docs/Data_BlastFeedback.md)。
+- **近爆反馈为跨关卡共用机制**：手榴弹、炮弹等实弹通过 `Combat.Blast` 接入；无伤害剧情爆破用 `Combat.BlastFeedback`。距离与遮挡控制相机冲击、余震和耳鸣，不在关卡内复制一套震屏/耳鸣；第一人称身体反应与耳朵模型 trauma 也只走这一个入口（`phase.blastReaction` 开关），不在关卡里另写扭头、闭眼或耳鸣。接口、数值入口与验收见 [通用近爆反馈](docs/Data_BlastFeedback.md)。
 
 1. 浏览器模块变更更新 `index.html` import map 对应的 `?v=`，新增模块登记 import map；源码 import 不自带 `?v=`，避免同一模块形成两个实例。验收：`Script_ModuleGraphTest.mjs`。
 2. `Data_*.mjs`、规则层及要求纯 Node 运行的 TexBake / FarLand / Identify / CutsceneCheck 保持无 three 依赖。

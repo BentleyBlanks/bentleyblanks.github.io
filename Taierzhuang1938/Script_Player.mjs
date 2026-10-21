@@ -29,6 +29,7 @@ import { AUTOMATIC_RECOIL } from "./Data_Tuning_FirearmHandling.mjs";
 import { FirearmHandling, GunClearance } from "./Script_FirearmHandling.mjs";
 import { RecoilAfterInput } from "./Script_FirearmActions.mjs";
 import { CameraShake } from "./Script_CameraShake.mjs";
+import { BlastFlinch } from "./Script_BlastFlinch.mjs";
 import { BlockPlayerStep, PLAYER_ACTOR_BLOCK } from "./Script_PlayerActorBlock.mjs";
 import { BlockPlayerByLitters } from "./Script_LitterBlock.mjs";
 import { CROWD } from "./Data_Tuning_Ai.mjs";
@@ -171,6 +172,10 @@ export class PlayerController {
     // 通用震屏（爆炸 / 近失弹 / 落地 / 中弹 / 日机弹着 / 扑沟）。数在 CAMERA_SHAKE，
     // 偏移在 SyncCamera 最后一步叠上去，不改 yaw/pitch 本体。
     this.shake = new CameraShake();
+    // 近爆的第一人称身体反应（Script_BlastFlinch：眨眼 / 闭眼、扭头避开、低头缩身、歪头、收枪、手抖、恍惚）。
+    // 默认关（enabled = false 时 Blast 什么都不做）；开了 phase.blastReaction 的关卡由装配层打开。
+    // 相机那几项叠在震屏之后，同样不改 yaw/pitch 本体。
+    this.flinch = new BlastFlinch();
     this.stamina = 1;
     this.sprintSpent = false;               // 冲刺跑空、还没回到 STAMINA.sprintResume
     // 只由 Script_DebugOptions 经装配层写入。默认全关，保持正式玩法完全不变。
@@ -292,6 +297,7 @@ export class PlayerController {
     this.jump.landImpact = 0;
     this.jump.runK = 0;
     this.shake.Reset();
+    this.flinch.Reset();
     this.waterDepth = 0;
   }
 
@@ -902,6 +908,7 @@ export class PlayerController {
 
     // --- 脚步 / 晃动 --------------------------------------------------------
     this.shake.Update(dt);
+    this.flinch.Update(dt);
     const planar = Math.hypot(this.velocity.x, this.velocity.z);
     this.stepDistance += planar * dt;
     this.headBob = Math.sin(this.stepDistance
@@ -1159,7 +1166,29 @@ export class PlayerController {
     cam.rotation.x += sh.pitch;
     cam.rotation.y += sh.yaw;
     cam.rotation.z += sh.roll;
+    // 近爆的身体反应（Script_BlastFlinch）：扭头避开、低头、歪头、缩身、往背离爆点那侧让一点。同样不改 yaw/pitch 本体。
+    const fl = this.flinch;
+    if (fl.Active) {
+      cam.position.y -= fl.dropM;
+      cam.position.x += rightVec.x * fl.sideM;
+      cam.position.z += rightVec.z * fl.sideM;
+      cam.rotation.x += fl.pitch;
+      cam.rotation.y += fl.yaw;
+      cam.rotation.z += fl.roll;
+    }
   }
+
+  /**
+   * 一发近爆的身体反应（Combat.BlastFeedback 调；exposure / bearing 见 Script_BlastExposure）。
+   * 反应关着、人死了时什么都不做。返回登记的事件（取证用），没反应返回 null。
+   */
+  BlastReaction(exposure, bearing) {
+    if (!this.alive) return null;
+    return this.flinch.Blast(exposure, bearing);
+  }
+
+  /** 开 / 关近爆身体反应（phase.blastReaction 或测试场面板）。 */
+  SetBlastReaction(on) { return this.flinch.SetEnabled(on); }
 
   /**
    * 第一人称倒地：视点留在刚才那个人身上，而不是切黑或升到尸体上方。

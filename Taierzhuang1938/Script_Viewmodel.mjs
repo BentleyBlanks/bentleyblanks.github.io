@@ -2876,9 +2876,14 @@ export class Viewmodel {
       + crouchCarry * -0.012 + (1 - equip) * -0.26;
     let stateZ = jumpRise * 0.012 - jumpFall * 0.005 + crouchCarry * 0.010;
     let stateRx = land * 0.07 - jumpRise * 0.05 + jumpFall * 0.035 + (1 - equip) * -0.55;
+    // 近爆的身体反应（Script_BlastFlinch.arms，2026-10-21）：枪往下压、往胸口收、枪口下垂；头转开时手臂跟得少
+    //（ry / rz 反向转回一部分），所以枪在画面里往爆点那一侧甩；之后几秒手在抖。开镜时一样要抖、一样要缩。
+    const flinch = input.blastFlinch || null;
+    if (flinch) { stateY += flinch.dy; stateZ += flinch.dz; stateRx += flinch.rx; }
 
-    this.statePivot.position.set(0, stateY, stateZ);
-    this.statePivot.rotation.set(stateRx, (1 - equip) * 0.35, (1 - equip) * -0.25, "YXZ");
+    this.statePivot.position.set(flinch ? flinch.dx : 0, stateY, stateZ);
+    this.statePivot.rotation.set(stateRx, (1 - equip) * 0.35 + (flinch ? flinch.ry : 0),
+      (1 - equip) * -0.25 + (flinch ? flinch.rz : 0), "YXZ");
 
     // --- 后坐 ---------------------------------------------------------------
     const kick = this.recoilKick.Step(step, 0);

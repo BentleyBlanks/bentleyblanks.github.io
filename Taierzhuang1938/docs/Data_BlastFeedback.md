@@ -13,6 +13,15 @@
 - 过场由导演曲线独占：01 近失弹、02 枪托由导演直接 `Deafen(1.1)` 走剧情档长尾；剧情档没恢复完之前，Reactions 请求的战斗档不顶掉它（01 那发近失弹本身是 `Combat.FireShell` 的真炮弹，落地时会再请求一次）。验收：`Script_AudioTest.mjs` 的耳鸣段。
 - 震屏不分关卡：01 近失弹落地照常走 `Combat.BlastFeedback` → `CameraShake.Explosion`（爆炸创伤约 0.39，半秒内衰减完）；但开场导演摄像机接管期间（`bunker.CameraActive`）画面只听导演的重影/失衡曲线，玩家震屏不叠上去（2026-09-24 合并时逐帧实测：震屏俯仰 −0.037 rad 时摄像机俯仰不动），随后 0.25 s 闭眼转黑。
 
+## 人头上有多响 · 第一人称身体反应 · 耳朵受损（2026-10-21，`phase.blastReaction`）
+
+同一个入口 `Combat.BlastFeedback(position, radius, explosiveId)` 在算完遮挡、喂完震屏之后，再按**装药量与到眼睛的距离**算峰值超压与 dB（`Script_BlastExposure`，Kinney–Graham），给两件共用机制：
+
+- 第一人称身体反应 `Player.flinch`（`Script_BlastFlinch`）：眨眼 / 闭紧眼（后期合成 `eyeClosure`，白天眼皮透暗红 `lidGlow`）、背离爆点扭头 / 低头 / 歪头 / 缩身（相机，叠在震屏之后，不改 yaw / pitch 本体）、收枪缩肩与手抖（Viewmodel `blastFlinch`）、恍惚（后期合成 `concussion` 取大）、喘与心跳（AudioWiring）。
+- 耳朵模型 trauma（`Script_AudioEarTrauma`，`Audio.SetEarModel`）：左右耳分开的听阈抬高 / 变闷 / 耳鸣音高处的听力坑 + 一条稳定的高音耳鸣；强度来自两只耳朵各自的 dB（头影），随 `AudioWiring.Blast` → `Play({ blastExposure })` 带进 `Reactions`。legacy（默认）时一个节点都不插，上面那套耳鸣原样。
+
+关卡 phase 写 `blastReaction: true` 两样一起开（`Script_Main.EnterLevel`；离开本关在 `BuildField` 里关）；两个开关也能分开调（`player.SetBlastReaction`、`audio.SetEarModel`）。目前只有人物战场反应测试场（`?reactions=1`）开着，正片默认不开。口径、数值与验收见 [人物战场反应测试场](Data_BattleReactionRange.md)。
+
 验收：`Script_CameraShakeTest.mjs` 检查衰减、距离、遮挡、方向和封顶；`Script_BlastFeedbackTest.mjs` 用实际 Combat 手榴弹/炮弹入口检查相机、恢复与音频节点，用 OfflineAudioContext 渲染实际耳鸣方法，检查起音、低通、4 kHz 耳鸣、恢复及静音。`Script_FirstLevelEndTest.mjs` 检查桥梁只调用一次共用感知。截图与报告保存在忽略目录 `_shots/BlastFeedback/`。
 
 本地预览验收可用 `BLAST_PREVIEW=http://127.0.0.1:<port>` 指向本任务 LocalPreview；不提供时测试自建临时服务。验收夹具为 `?explosions=1`，正式战役入口为 `?whitebox=p012`。

@@ -80,7 +80,10 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 - `Script_Combat.BlastFeedback`：实弹与剧情爆破共用的感知事件。
 - `Script_CameraShake` / `Data_Tuning_Player.CAMERA_SHAKE.explosion`：定向冲击与独立余震。
 - `Script_AudioWiring.Blast` / `Script_Audio.BlastHearing` / `Data_Tuning_Audio.BLAST_HEARING`：距离、威力、遮挡与有限耳鸣包络。
-- 说明与验收：[通用近爆反馈](Data_BlastFeedback.md)。
+- 人头上有多响 / 第一人称身体反应 / 耳朵受损（2026-10-21，`phase.blastReaction` 开关）：`Script_BlastExposure`（装药量 + 距离 → 峰值超压 / dB / 各反应强度，纯规则）、
+  `Script_BlastFlinch`（扭头 / 低头 / 歪头 / 缩身 / 眨眼闭眼 / 收枪 / 手抖 / 恍惚 / 喘与心跳，`Player.flinch`）、`Script_AudioEarTrauma`（左右耳分开的听力损失 + 稳定耳鸣，`Audio.SetEarModel("trauma")`），
+  数在 `Data_Tuning_BlastReaction`；回归 `Script_BlastReactionTest` / `Script_BattleReactionRangeBrowserTest`。
+- 说明与验收：[通用近爆反馈](Data_BlastFeedback.md)、[人物战场反应测试场](Data_BattleReactionRange.md)。
 
 ### 引导 / 主循环
 - `Script_Main.mjs` —— 装配层：启动顺序、关卡流程、每帧调度、输入接线。
@@ -455,6 +458,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 - `Data_ShellImpactRange.mjs`（场地 / 壕沟段 / 落点 / 布景 / 弹种 / 机位 / 相位，纯数据）+ `Data_ShellImpactRangeTerrain.mjs`（terrain spec 与布局）+ `Script_ShellImpactRangeField.mjs`（继承 `FirstLevelWhiteboxField`：第一关同款分层土壤 PBR + 样条壕沟网络，补枯树 / 桶 / 机枪 / 战车阵地）+ `Script_ShellImpactRange.mjs`（弹种投送 / 时间 / 观察相机 / 选点）+ `Script_ShellImpactLab.mjs`（左侧面板）；世界 (3800,3800) 为场心。
 - 爆炸一律走生产链 `combat.FireShell` / `combat.Blast`（explosiveId 传弹种自己的）；phase 的 `groundImpactDust` 是通用开关，`Script_Main` 据此调 `vfx.SetGroundImpactDust?.` / `SetGroundSampler?.`；取证口 `Debug.ShellImpact`（Fire / Barrage / Clear / SetTimeScale / Camera / Targets / Munitions …）。
 - 回归口 `Script_ShellImpactRangeTest.mjs`（纯 Node）/ `Script_ShellImpactRangeBrowserTest.mjs`（explosives 域）；入口、坐标、弹种与投送、面板、接口见 `docs/Data_ShellImpactRange.md`。
+- 人物战场反应测试场（?reactions=1，第八片测试沙盒）借同一片场地与投送（`ShellImpactRange` 以 embedded 方式嵌入）：`Data_BattleReactionRange.mjs` + `Script_BattleReactionRange.mjs` + `Script_BattleReactionLab.mjs`，取证口 `Debug.BattleReaction`；见 `docs/Data_BattleReactionRange.md`。
 - 落地扬尘本身（贴地形的尘流 + 土柱 + 震起的细尘）：`Script_DustFlow.mjs`（规则层，零 three）、`Script_DustFieldRenderer.mjs`（体积积分）、`Data_Tuning_GroundImpact.mjs`，`Vfx.GroundImpact` / `SetGroundImpactDust` / `SetGroundSampler`；回归 `Script_DustFlowTest.mjs`；口径 `docs/Data_ShellImpactDust.md`。
 
 ### 已移除的旧策划白盒
@@ -801,6 +805,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
   `Data_CityWallPbr.md`、`Data_ExternalPropSources.md`、`Data_TaierzhuangHeightmap.md`、
   `Data_TestRange.md`（?range=1）、`Data_ExplosionRange.md`（爆炸测试场、通用炮坑与返掷现状）、
   `Data_ShellImpactRange.md`（?impacts=1，炮击扬尘测试场：壕沟地形、弹种投送、面板与 Debug 接口）、
+  `Data_BattleReactionRange.md`（?reactions=1，人物战场反应测试场：第一人称近爆反应、耳朵受损、面板与 Debug 接口）、
   `Data_MeleeQte.md`（?melee=1）、`Data_RoadSpline.md`、
   `Data_WallSpline.md`（样条道路/围墙 + 未迁移例外清单）。
 

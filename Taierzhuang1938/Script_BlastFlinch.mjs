@@ -1,0 +1,249 @@
+// Script_BlastFlinch.mjs — 第一人称的近爆身体反应：眨眼 / 闭紧眼、扭头避开、低头缩身、歪头、收枪缩肩、手抖、恍惚、喘与心跳。
+//
+// **纯规则，不 import three。** 由 Script_Player 持有（this.flinch），Combat.BlastFeedback 喂爆炸（Blast），
+// Player.Update 推进（Update），SyncCamera 把相机那几项叠在震屏之后（不改 yaw/pitch 本体：枪口不被带歪，过后自己回来），
+// Script_Main 把眼皮与恍惚交给后期合成、把手臂那几项交给 Viewmodel，Script_AudioWiring 读喘与心跳。
+// 数全在 Data_Tuning_BlastReaction.BLAST_FLINCH；暴露量（强度 0..1）由 Script_BlastExposure 算。
+//
+// 每一发是一个事件（最多 maxEvents 个），各通道按事件自己的时间线出值，合成时方向性的几项（转头、歪头、侧让）
+// 按带符号求和再软限幅，其余取大 —— 连续炮击不会把头越拧越偏，也不会叠成糊。
+// 没有 Math.random：正前方爆炸往哪边转按一个交替序列挑，抖动用确定性的值噪声（出图可复现）。
+//
+// enabled = false 时 Blast 什么都不做（正片默认关；测试场与开了 phase.blastReaction 的关卡打开）。
+import { Clamp, Clamp01, ValueNoise2 } from "./Script_Noise.mjs";
+import { BLAST_FLINCH } from "./Data_Tuning_BlastReaction.mjs";
+
+const Smooth = (x) => { const t = Clamp01(x); return t * t * (3 - 2 * t); };
+const EaseOut = (x) => { const t = Clamp01(x); return 1 - (1 - t) * (1 - t) * (1 - t); };
+/** 软限幅：小量线性，接近上限时慢慢弯过去。 */
+const SoftCap = (v, cap) => cap * Math.tanh(v / cap);
+
+/** 头的包络：潜伏 → 快速转开（ease-out）→ 停 → 回位（带一点过冲再落定）。u 从冲击到人那一刻算。 */
+function HeadEnvelope(u, latency, attack, hold, release, overshoot) {
+  const a = u - latency;
+  if (a <= 0) return 0;
+  if (a < attack) return EaseOut(a / attack);
+  const r = a - attack - hold;
+  if (r <= 0) return 1;
+  if (r >= release) return 0;
+  const x = r / release;
+  return (1 - Smooth(x)) - overshoot * Math.sin(Math.PI * x) * Math.pow(x, 1.5);
+}
+
+/** 合上 → 停 → 睁开的一次眼皮。 */
+function LidPulse(u, start, close, hold, open) {
+  const a = u - start;
+  if (a <= 0) return 0;
+  if (a < close) return Smooth(a / close);
+  if (a < close + hold) return 1;
+  const o = a - close - hold;
+  return o >= open ? 0 : 1 - Smooth(o / open);
+}
+
+export class BlastFlinch {
+  /** @param {object} [tuning] 默认 BLAST_FLINCH；测试可注入。 */
+  constructor(tuning = BLAST_FLINCH, seed = 23) {
+    this.T = tuning;
+    this.seed = seed;
+    this.enabled = false;
+    this.events = [];
+    this.time = 0;
+    this.frontSide = 1;       // 正前方爆炸：往哪边转，每次交替
+    this.serial = 0;
+    this.Zero();
+    this.stats = { blasts: 0, ignored: 0 };
+  }
+
+  Zero() {
+    // 相机（弧度 / 米）
+    this.yaw = 0; this.pitch = 0; this.roll = 0; this.dropM = 0; this.sideM = 0;
+    // 眼皮 0..1、恍惚
+    this.eyeClosure = 0;
+    this.daze = { amount: 0, focus: 0 };
+    // 手臂（相机空间：米 / 弧度）
+    this.arms = { dx: 0, dy: 0, dz: 0, rx: 0, ry: 0, rz: 0 };
+    this.tremor = 0;
+    // 身体声音
+    this.heart = 0; this.heartBpm = 0; this.breathless = 0;
+    this.headLevel = 0;
+  }
+
+  /** 开 / 关（关的时候顺手清掉正在进行的反应）。 */
+  SetEnabled(on) {
+    this.enabled = !!on;
+    if (!this.enabled) this.Reset();
+    return this.enabled;
+  }
+
+  /**
+   * 一发爆炸。exposure 来自 Script_BlastExposure.BlastExposure；bearing 来自 BlastBearing（lateral / forward / up）。
+   * 返回登记的事件（取证用的平面对象），没反应返回 null。
+   */
+  Blast(exposure, bearing = {}) {
+    if (!this.enabled || !exposure || !exposure.any) { this.stats.ignored += 1; return null; }
+    const T = this.T, H = T.head;
+    const lateral = Clamp(Number(bearing.lateral) || 0, -1, 1);
+    const forward = Clamp(Number(bearing.forward) || 0, -1, 1);
+    const up = Clamp(Number(bearing.up) || 0, -1, 1);
+    // 转开的方向 = 背离爆点：爆点在右（lateral > 0）往左转（yaw +）、头往左歪（roll +）。
+    let sign;
+    if (Math.abs(lateral) >= H.minLateralForSide) sign = lateral > 0 ? 1 : -1;
+    else { sign = this.frontSide; this.frontSide = -this.frontSide; }
+    const f = exposure.flinch;
+    const yawWeight = Clamp01(Math.abs(lateral) + H.frontYawShare * Math.max(0, forward));
+    const event = {
+      id: ++this.serial, u: -Math.max(0, exposure.arrivalS || 0),
+      sign, lateral, forward, up,
+      blink: exposure.blink, flinch: f, squeeze: exposure.squeeze, daze: exposure.daze,
+      tremor: exposure.tremor, body: exposure.body, db: exposure.db,
+      yaw: sign * H.yawRad * f * yawWeight,
+      pitch: H.pitchRad * f * (0.75 + 0.25 * Math.max(0, forward) + H.overheadPitchShare * Math.max(0, up)),
+      roll: sign * H.rollRad * f * Math.max(Math.abs(lateral), 0.35 * yawWeight),
+      drop: H.dropM * f,
+      side: -sign * H.sideM * f * Math.abs(lateral),
+      hold: H.holdMinS + H.holdSpanS * f,
+      release: H.releaseMinS + H.releaseSpanS * f,
+      overshoot: H.settleOvershoot * f,
+      dazeDecay: T.daze.decayMinS + T.daze.decaySpanS * exposure.daze,
+      breathS: exposure.body > 0 ? T.body.breathMinS + T.body.breathSpanS * exposure.body : 0,
+      heartS: exposure.body > 0 ? T.body.heartMinS + T.body.heartSpanS * exposure.body : 0,
+    };
+    this.events.push(event);
+    if (this.events.length > T.maxEvents) this.events.shift();
+    this.stats.blasts += 1;
+    return { ...event };
+  }
+
+  /** 这个事件已经完全结束（所有通道都回零）。 */
+  Done(e) {
+    const T = this.T;
+    const lidEnd = T.blinkLatencyS + T.squeeze.closeS + T.squeeze.holdMinS + T.squeeze.holdSpanS
+      + T.squeeze.openS * 2 + T.squeeze.squintS * 1.5 + 1;
+    const headEnd = T.bodyLatencyS + T.head.attackS + e.hold + e.release + T.arms.lagS;
+    const tremorEnd = T.tremor.holdS + T.tremor.decayS * 4;
+    const dazeEnd = T.daze.attackS + T.daze.holdS + e.dazeDecay * 4;
+    return e.u > Math.max(lidEnd, headEnd, tremorEnd, dazeEnd, e.breathS, e.heartS);
+  }
+
+  /** 每帧推进，合成各通道。 */
+  Update(dt) {
+    const step = Clamp(Number(dt) || 0, 0, 0.25);
+    this.time += step;
+    for (const e of this.events) e.u += step;
+    this.events = this.events.filter((e) => !this.Done(e));
+    this.Zero();
+    if (!this.events.length) return;
+    const T = this.T, H = T.head, A = T.arms, B = T.blink, S = T.squeeze, D = T.daze, R = T.tremor;
+    let yaw = 0, pitch = 0, roll = 0, drop = 0, side = 0;
+    let armYaw = 0, armRoll = 0, armDrop = 0, armPull = 0, armPitch = 0;
+    let lid = 0, dazeAmount = 0, dazeFocus = 0, tremor = 0, heart = 0, bpmPeak = 0, breath = 0, level = 0;
+    for (const e of this.events) {
+      const u = e.u;
+      if (u < 0) continue;            // 冲击还在路上
+      // 头：扭开、低头、歪头、缩身、侧让。
+      const h = HeadEnvelope(u, T.bodyLatencyS, H.attackS, e.hold, e.release, e.overshoot);
+      yaw += e.yaw * h; pitch += e.pitch * h; roll += e.roll * h; drop += e.drop * h; side += e.side * h;
+      level = Math.max(level, Math.abs(h) * e.flinch);
+      // 手臂慢半拍：同一条包络往后挪 lagS。
+      const ha = HeadEnvelope(u, T.bodyLatencyS + A.lagS, H.attackS, e.hold, e.release, e.overshoot);
+      armYaw += -A.counterYaw * e.yaw * ha;
+      armRoll += -A.counterRoll * e.roll * ha;
+      armDrop += A.dropM * e.flinch * ha;
+      armPull += A.pullM * e.flinch * ha;
+      armPitch += A.pitchRad * e.flinch * ha;
+      // 眼皮：眨眼（+ 强的再眨一下）、闭紧、眯眼。
+      if (e.blink > 0) {
+        const amp = Clamp01(e.blink / B.fullAt);
+        lid = Math.max(lid, amp * LidPulse(u, T.blinkLatencyS, B.closeS, B.holdMinS + B.holdSpanS * e.blink, B.openS));
+        if (e.blink >= B.rebound) {
+          lid = Math.max(lid, B.reboundClosure * e.blink
+            * LidPulse(u, B.reboundAtS, B.reboundCloseS, 0.02, B.reboundOpenS));
+        }
+      }
+      if (e.squeeze > 0) {
+        const hold = S.holdMinS + S.holdSpanS * e.squeeze;
+        const open = S.openS * (1 + e.squeeze);
+        const amp = Math.min(1, 0.55 + 0.45 * e.squeeze / 0.6);
+        lid = Math.max(lid, amp * LidPulse(u, T.blinkLatencyS, S.closeS, hold, open));
+        const squintFrom = T.blinkLatencyS + S.closeS + hold + open * 0.6;
+        const squintLen = S.squintS * (0.5 + e.squeeze);
+        if (u > squintFrom) {
+          const k = Clamp01((u - squintFrom) / squintLen);
+          lid = Math.max(lid, S.squint * e.squeeze * (1 - Smooth(k)));
+        }
+      }
+      // 恍惚：快起、停一下、慢退；近爆另有一下极短的发糊（冲击晃了一下眼）。
+      if (e.daze > 0) {
+        const a = u < D.attackS ? Smooth(u / D.attackS)
+          : u < D.attackS + D.holdS ? 1 : Math.exp(-(u - D.attackS - D.holdS) / e.dazeDecay);
+        dazeAmount = Math.max(dazeAmount, D.amountScale * e.daze * a);
+        dazeFocus = Math.max(dazeFocus, D.focusScale * e.daze * a);
+      }
+      if (e.flinch > 0 && u < D.joltS) dazeFocus = Math.max(dazeFocus, D.jolt * e.flinch * Math.sin(Math.PI * u / D.joltS));
+      // 手抖：停一下，再按指数退。
+      if (e.tremor > 0) {
+        const k = u < R.holdS ? Smooth(u / 0.25) : Math.exp(-(u - R.holdS) / R.decayS);
+        tremor = Math.max(tremor, e.tremor * k);
+      }
+      // 喘与心跳：剩余时间的比例。
+      if (e.breathS > 0 && u < e.breathS) breath = Math.max(breath, e.breathS - u);
+      if (e.heartS > 0 && u < e.heartS) {
+        const k = 1 - u / e.heartS;
+        if (e.body * k > heart) heart = e.body * k;
+        bpmPeak = Math.max(bpmPeak, e.body);
+      }
+    }
+    const cap = T.stackCap;
+    this.yaw = SoftCap(yaw, H.yawRad * cap);
+    this.pitch = SoftCap(pitch, Math.abs(H.pitchRad) * cap);
+    this.roll = SoftCap(roll, H.rollRad * cap);
+    this.dropM = SoftCap(drop, H.dropM * cap);
+    this.sideM = SoftCap(side, H.sideM * cap);
+    this.headLevel = Math.min(1, level);
+    this.eyeClosure = Clamp01(lid);
+    this.daze = { amount: Clamp01(dazeAmount), focus: Clamp01(dazeFocus) };
+    // 手抖：生理震颤（9.5 Hz 上下）+ 慢晃，确定性值噪声。
+    this.tremor = Clamp01(tremor);
+    const n = (hz, lane) => (ValueNoise2(this.time * hz, lane, this.seed) - 0.5) * 2;
+    const tx = this.tremor * (R.m * n(R.hz, 1.3) + R.slowM * n(R.slowHz, 7.1));
+    const ty = this.tremor * (R.m * n(R.hz, 3.7) + R.slowM * n(R.slowHz, 9.9));
+    const trx = this.tremor * (R.rad * n(R.hz, 5.3) + R.slowRad * n(R.slowHz, 11.3));
+    const try_ = this.tremor * (R.rad * n(R.hz, 13.9) + R.slowRad * n(R.slowHz, 17.5));
+    this.arms = {
+      dx: tx,
+      dy: SoftCap(armDrop, Math.abs(A.dropM) * cap) + ty,
+      dz: SoftCap(armPull, A.pullM * cap),
+      rx: SoftCap(armPitch, Math.abs(A.pitchRad) * cap) + trx,
+      ry: SoftCap(armYaw, H.yawRad * A.counterYaw * cap) + try_,
+      rz: SoftCap(armRoll, H.rollRad * A.counterRoll * cap),
+    };
+    // 镜头也带一点抖（远小于枪）。
+    this.pitch += this.tremor * R.cameraRad * n(R.hz * 0.8, 21.1);
+    this.yaw += this.tremor * R.cameraRad * n(R.hz * 0.8, 23.7);
+    this.heart = Clamp01(heart);
+    this.heartBpm = heart > 0 ? T.body.heartBpmMin + (T.body.heartBpmMax - T.body.heartBpmMin) * bpmPeak : 0;
+    this.breathless = breath;
+  }
+
+  /** 还有没有在动的反应。 */
+  get Active() { return this.events.length > 0; }
+
+  Reset() {
+    this.events.length = 0;
+    this.Zero();
+  }
+
+  /** 取证快照（纯数据）。 */
+  State() {
+    return {
+      enabled: this.enabled, active: this.Active, events: this.events.length,
+      yaw: this.yaw, pitch: this.pitch, roll: this.roll, dropM: this.dropM, sideM: this.sideM,
+      eyeClosure: this.eyeClosure, daze: { ...this.daze }, arms: { ...this.arms }, tremor: this.tremor,
+      heart: this.heart, heartBpm: this.heartBpm, breathless: this.breathless, headLevel: this.headLevel,
+      stats: { ...this.stats },
+      last: this.events.length ? { ...this.events[this.events.length - 1] } : null,
+    };
+  }
+}
+
+export default BlastFlinch;

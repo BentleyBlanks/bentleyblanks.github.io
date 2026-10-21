@@ -31,6 +31,7 @@ export const TEXT = Object.freeze({
   "boot.start.weaponRange": "进入枪械靶场",
   "boot.start.explosionRange": "进入爆炸测试场",
   "boot.start.impactRange": "进入炮击扬尘测试场",
+  "boot.start.reactionRange": "进入人物战场反应测试场",
   "boot.start.goreRange": "进入断肢测试场",
   "boot.start.preview": "播放序章",
 

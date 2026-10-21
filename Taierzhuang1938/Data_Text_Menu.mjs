@@ -217,6 +217,8 @@ export const TEXT = Object.freeze({
   "menu.sandbox.gore.exit": "退出断肢测试场",
   "menu.sandbox.impacts.where": "炮击扬尘测试场",
   "menu.sandbox.impacts.exit": "退出炮击扬尘测试场",
+  "menu.sandbox.reactions.where": "人物战场反应测试场",
+  "menu.sandbox.reactions.exit": "退出人物战场反应测试场",
   // 第一关现在就是 P0/P1/P2 白盒（Data_Menu.CAMPAIGN_ENTRIES），玩家面前只叫「第一关」。
   "menu.sandbox.firstLevelP012Whitebox.where": "第一关",
   "menu.sandbox.firstLevelP012Whitebox.exit": "退出第一关",

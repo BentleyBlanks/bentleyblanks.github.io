@@ -48,6 +48,7 @@ import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 import { OPENING_AMBIENCE_PRESETS } from "./Data_FirstLevelMissionBattleSound.mjs";
 import { AUDIO_MIX_DEFAULTS, STORY_SPEECH, TINNITUS } from "./Data_Tuning_Audio.mjs";
 import { BuildSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
+import { EarTrauma } from "./Script_AudioEarTrauma.mjs";
 // 2026-09-29 战场远景床：选哪一档（?ambBed= / BATTLE_BED_VARIANT）与装载计划，纯函数在 Script_AmbBedVariant；
 // 「A 底床 + B/C 偶尔叠加（巷道里换 E）」的调度规则在 Script_BattleBedLayers，数在 BATTLE_BED_LAYERS。
 import { BATTLE_BED_VARIANT, BATTLE_BED_LAYERS } from "./Data_Tuning_Audio.mjs";
@@ -4450,6 +4451,13 @@ export class AudioEngine {
      * 需要在浏览器里排几十条真声音，那种测法是抛硬币）。
      */
     this.nodeBudget = NODE_BUDGET;
+    /**
+     * 耳朵模型（2026-10-21，人物战场反应测试场）："legacy" = 原来的耳鸣（DeafenShared / 01–06 两档），
+     * "trauma" = 左右耳分开的暂时性听力损失 + 稳定高音耳鸣（Script_AudioEarTrauma）。关卡用 phase.blastReaction 打开，
+     * 测试场面板能 A/B。legacy 下一个节点都不插，原来的总线一字不动。
+     */
+    this.earModel = "legacy";
+    this.earTrauma = null;
     // --- 外部人声采样（战场口令）。加载失败不影响任何其他功能 ---
     this.voiceBank = new Map();      // key -> {key, text, kind, file, duration}
     this.voicesReady = false;        // 声库里有没有能播的东西（Bark 读它）
@@ -4575,6 +4583,9 @@ export class AudioEngine {
     this.deafFilter.frequency.value = 20000;
     this.deafFilter.Q.value = 0.7;
     this.deafFilter.connect(this.outGain);
+    // 耳朵模型 trauma：耳朵那一段插在 deafFilter 与 outGain 之间（legacy 时不插，见 SetEarModel）。
+    this.earTrauma = new EarTrauma(this);
+    if (this.earModel === "trauma") this.earTrauma.Install(this.deafFilter, this.outGain);
 
     // 母线慢压缩：整体响度的地板。比值小、起控慢、释放慢 —— 听不出它在动，
     // 但一记爆炸不会再把整条母线摁下去 0.22 s（那就是「抽泵」）。
@@ -4895,6 +4906,7 @@ export class AudioEngine {
       this.duckGain.disconnect();
       this.storyDuck.disconnect();
       this.dialogueDuck?.disconnect();
+      this.earTrauma?.Dispose();
       this.masterGain.disconnect();
       this.busComp.disconnect();
       this.busMakeup.disconnect();
@@ -5895,7 +5907,8 @@ export class AudioEngine {
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, maxDuration = Infinity, pan = 0, burst = null, priority = false,
     bus = "sfx", airCut = 0, soundField = false, firstPerson = false, occlusion = null,
     weaponClass = null, sourceSizeM = 0, rolloff = null, storySpeech = false, selfCapped = false, yieldFirst = false, propagate = true,
-    blastRadiusM = BLAST_HEARING.referenceRadiusM, blastOccluded = false, occlusionExclude = null, ownVoice = false } = {}) {
+    blastRadiusM = BLAST_HEARING.referenceRadiusM, blastOccluded = false, occlusionExclude = null, ownVoice = false,
+    blastExposure = null } = {}) {
     // ownVoice：主角自己的嗓子（喊话 / 下令 / 打空骂人），走与剧情对白「own」同一套处理（见 RouteStorySpeech）。
     if (ownVoice) position = null;
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
@@ -6194,7 +6207,7 @@ export class AudioEngine {
     // Duck / 耳鸣 / 环境闪避统一在这儿触发（配方里不再各自触发，见 DUCK_ON 的抬头）。
     // 放在最后：这三样都会去动别的总线，而这条 voice 得先建成功才算「这一声真响了」。
     this.Reactions(name, distance, !!position, priority || firstPerson, weaponClass,
-      blastRadiusM, blastOccluded, startDelay);
+      blastRadiusM, blastOccluded, startDelay, blastExposure);
     return v;
   }
 
@@ -6208,7 +6221,7 @@ export class AudioEngine {
    * 触发条件属于「这一声是什么、离多远」，那是 Play 知道的事，不是配方知道的事。
    */
   Reactions(name, distance, spatial, selfShot, weaponClass = null,
-    blastRadiusM = BLAST_HEARING.referenceRadiusM, blastOccluded = false, startDelay = 0) {
+    blastRadiusM = BLAST_HEARING.referenceRadiusM, blastOccluded = false, startDelay = 0, blastExposure = null) {
     const duck = DUCK_ON[name];
     if (duck) {
       // 按听者距离缩放：两百米外的一颗手榴弹不该把配乐压下去。
@@ -6218,14 +6231,24 @@ export class AudioEngine {
       if (amount >= DUCK_MIN_AMOUNT) { this.Duck(duck.seconds, amount); this.stats.ducks += 1; }
     }
     const deaf = DEAFEN_ON[name];
-    // 耳鸣要过距离闸：几百米外的一记闷响不该震聋玩家（旧的 explosionFar 配方里正是这么写的）。
-    const strength = deaf ? BlastHearing(spatial ? distance : 0, blastRadiusM, blastOccluded) : 0;
-    if (strength > 0) {
-      // 01–06：战斗档，停留秒数取 DEAFEN_ON 的值（不按秒数判档 —— 通用那条的秒数会越过 storyFromS）。
-      if (this.firstLevelSoundscape) this.DeafenFirstLevel(deaf, DEAFEN_ATTACK_HOLD_S + startDelay, strength, "combat");
-      else this.Deafen(BLAST_HEARING.minHoldS + BLAST_HEARING.holdSpanS * strength,
-        DEAFEN_ATTACK_HOLD_S + startDelay, strength);
-      this.stats.deafens += 1;
+    // 耳朵模型 trauma：两只耳朵各自的强度由宿主按装药量 / 距离 / 遮挡 / 头影算好（Script_BlastExposure）随 Play 带进来；
+    // 没带的（场外近落弹之类）退回 BlastHearing 的对称强度。不再看是哪一档爆炸声（远爆也可能是 250 公斤炸弹）。
+    if (this.earModel === "trauma" && this.earTrauma?.Installed && (blastExposure || deaf)) {
+      const sym = blastExposure ? 0 : BlastHearing(spatial ? distance : 0, blastRadiusM, blastOccluded);
+      const fired = this.earTrauma.Trigger({
+        left: blastExposure ? blastExposure.left : sym, right: blastExposure ? blastExposure.right : sym,
+        holdS: DEAFEN_ATTACK_HOLD_S + startDelay });
+      if (fired) this.stats.deafens += 1;
+    } else {
+      // 耳鸣要过距离闸：几百米外的一记闷响不该震聋玩家（旧的 explosionFar 配方里正是这么写的）。
+      const strength = deaf ? BlastHearing(spatial ? distance : 0, blastRadiusM, blastOccluded) : 0;
+      if (strength > 0) {
+        // 01–06：战斗档，停留秒数取 DEAFEN_ON 的值（不按秒数判档 —— 通用那条的秒数会越过 storyFromS）。
+        if (this.firstLevelSoundscape) this.DeafenFirstLevel(deaf, DEAFEN_ATTACK_HOLD_S + startDelay, strength, "combat");
+        else this.Deafen(BLAST_HEARING.minHoldS + BLAST_HEARING.holdSpanS * strength,
+          DEAFEN_ATTACK_HOLD_S + startDelay, strength);
+        this.stats.deafens += 1;
+      }
     }
     // 玩家自己开的那一枪：环境床与远声组快压慢放（HDR-lite）。
     //
@@ -6641,6 +6664,12 @@ export class AudioEngine {
    */
   Deafen(seconds = 0.4, holdS = DEAFEN_ATTACK_HOLD_S, strength = 1) {
     if (!this.ctx || this.disposed) return;
+    // 耳朵模型 trauma：手动 / 剧情的 Deafen 也走同一副耳朵（两耳对称；剧情档拉长恢复）。
+    if (this.earModel === "trauma" && this.earTrauma?.Installed) {
+      this.earTrauma.Trigger({ left: strength, right: strength, holdS,
+        lengthScale: seconds >= TINNITUS.storyFromS ? 1.6 : 1 });
+      return;
+    }
     if (!this.firstLevelSoundscape) { this.DeafenShared(seconds, holdS, strength); return; }
     this.DeafenFirstLevel(seconds, holdS, strength, seconds >= TINNITUS.storyFromS ? "story" : "combat");
   }
@@ -6805,6 +6834,27 @@ export class AudioEngine {
 
   SyncDeafenVolume() {
     this.deafenVoice?.user.gain.setTargetAtTime(this.outputVolume * this.mix.sfx, this.ctx.currentTime, 0.02);
+    this.earTrauma?.SyncVolume();
+  }
+
+  /**
+   * 耳朵模型："legacy"（原来的耳鸣）或 "trauma"（Script_AudioEarTrauma）。换模型时两边正在响的都收掉、耳朵立刻恢复；
+   * trauma 把耳朵那一段插进总线，legacy 拔掉（直连回原样）。ctx 还没建时只记下来，BuildGraph 时照办。
+   */
+  SetEarModel(model) {
+    const next = model === "trauma" ? "trauma" : "legacy";
+    if (next === this.earModel && (next === "legacy" || this.earTrauma?.Installed || !this.ctx)) return this.earModel;
+    this.earModel = next;
+    if (!this.ctx || this.disposed) return this.earModel;
+    this.ResetDeafen();
+    if (next === "trauma") this.earTrauma?.Install(this.deafFilter, this.outGain);
+    else this.earTrauma?.Uninstall();
+    return this.earModel;
+  }
+
+  /** 耳朵受损的取证快照（trauma 模式；legacy 时 installed=false）。 */
+  EarState() {
+    return { model: this.earModel, ...(this.earTrauma?.State() || { installed: false }) };
   }
 
   /**
@@ -6822,7 +6872,7 @@ export class AudioEngine {
     this.deafenUntil = 0; this.deafenStrength = 0;
     if (sharedOnly && this.deafCurve) return;
     // 换场景 / Dispose：01–06 那两档的状态一起收，剩下的曲线与鸣响都不能带过去。
-    if (!sharedOnly) { this.StopTinnitus(0.01); this.deafCurve = null; this.tinnitusState = null; }
+    if (!sharedOnly) { this.StopTinnitus(0.01); this.deafCurve = null; this.tinnitusState = null; this.earTrauma?.Reset(); }
     if (this.ctx && this.deafFilter) {
       this.deafFilter.frequency.cancelScheduledValues(this.ctx.currentTime);
       this.deafFilter.frequency.setValueAtTime(BLAST_HEARING.clearHz, this.ctx.currentTime);

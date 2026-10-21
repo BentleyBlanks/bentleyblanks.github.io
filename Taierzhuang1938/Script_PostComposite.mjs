@@ -168,6 +168,7 @@ uniform vec3 uCheekCut;      // 02 cheek cut (2026-10-11): x = white sting on th
 uniform vec4 uBloodEdge;     // rgb multiplicative tint, a strength (SB03 blood-red corners)
 uniform vec4 uBloodCorners;  // weights top-left, top-right, bottom-left, bottom-right
 uniform vec4 uLidShape;      // feather, curvature, tilt, upper lid share
+uniform vec3 uLidGlow;       // light through closed lids (blast flinch in daylight); zero = black lids as before
 
 // --- SEGMENT encode ---------------------------------------------------------
 uniform float uDither;      // 输出抖动（1/255 的倍数）；0 = 关（出厂）
@@ -572,7 +573,7 @@ vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
       *(1.0-smoothstep(upper-uLidShape.x,upper+uLidShape.x,uv.y));
     aperture*=1.0-smoothstep(.90,1.0,closure);
   }
-  return max(color, vec3(0.0)) * (1.0 - uFade) * aperture;
+  return (max(color, vec3(0.0)) * aperture + uLidGlow * (1.0 - aperture)) * (1.0 - uFade);
 }
 
 // ===========================================================================
@@ -660,7 +661,7 @@ export class CompositePass {
       uHitDisorientation: { value: 0 },
       uHitOffset: { value: new THREE.Vector2() },
       uHitGhostMix: { value: HIT_DISORIENTATION.ghostMix },
-      uDamage: { value: 0 }, uFade: { value: 0 }, uEyeClosure:{value:0},
+      uDamage: { value: 0 }, uFade: { value: 0 }, uEyeClosure:{value:0}, uLidGlow:{value:new THREE.Vector3()},
       uConcussion:{value:new THREE.Vector4()},
       uRadialBlur:{value:0}, uSideDaze:{value:new THREE.Vector2()},uCheekCut:{value:new THREE.Vector3()}, uBloodEdge:{value:new THREE.Vector4()}, uBloodCorners:{value:new THREE.Vector4(1,1,1,1)},
       uConcussionGrade:{value:new THREE.Vector3(OPENING_PERCEPTION.ghostMix,OPENING_PERCEPTION.desaturation,OPENING_PERCEPTION.vignette)},
@@ -816,6 +817,8 @@ export class CompositePass {
       Math.cos(hitPhase) * HIT_DISORIENTATION.swayUv);
     U.uFade.value = options.fade ?? 0;
     U.uEyeClosure.value = options.eyeClosure ?? 0;
+    // 眼皮透光（近爆的闭眼，Script_Main.BlastLidGlow）：不给就是 0，闭眼仍是全黑（开场那套不变）。
+    if (options.lidGlow) U.uLidGlow.value.fromArray(options.lidGlow); else U.uLidGlow.value.set(0, 0, 0);
     const concussion=options.concussion,perception=OPENING_PERCEPTION;
     const pixelScale=ctx.height/perception.referenceHeight;
     U.uConcussion.value.set(Math.max(0,Math.min(1,concussion?.amount||0)),

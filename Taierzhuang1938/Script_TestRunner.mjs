@@ -200,6 +200,8 @@ export const testDefs = {
   ExplosionRangeTest: { file: "Script_ExplosionRangeTest.mjs", timeoutMs: 8 * 60 * 1000, desc: "爆炸白盒：真实F拾取/返掷/战车/炮击、地形网格/Rapier/人物穿坑与复位" },
   DustFlowTest: { file: "Script_DustFlowTest.mjs", desc: "落地扬尘规则层：合成锯齿壕沟上沟里炸被夹住、尘顺沟成带；平地圆、斜砸下游多、守恒、逐位可复现、随风漂、自己收工（纯 Node）" },
   ShellImpactRangeTest: { file: "Script_ShellImpactRangeTest.mjs", desc: "炮击扬尘测试场（?impacts=1）数据层：11 个弹种的装药 / 落角、壕沟网络与三岔口、落点、布景净空、第一关地形不变（纯 Node）" },
+  BlastReactionTest: { file: "Script_BlastReactionTest.mjs", desc: "近爆的人物反应规则层：Kinney–Graham 峰值超压 / dB、遮挡与头影、各反应出闸距离、背离爆点扭头 / 低头 / 歪头 / 缩身 / 收枪、眨眼先于转头、距离决定程度、回零、软限幅、确定性（纯 Node）" },
+  BattleReactionRangeBrowserTest: { file: "Script_BattleReactionRangeBrowserTest.mjs", timeoutMs: 15 * 60 * 1000, desc: "人物战场反应测试场（?reactions=1）：壕沟 + 扬尘场地与面板、真炸后相机背离爆点扭头低头歪头缩身、眼皮进后期合成、手臂收枪、两耳分开变闷、距离决定程度、反应 / 耳朵 A/B、清空、沟里遮挡；OfflineAudioContext 渲染正式 EarTrauma：起音放过、朝爆点那只耳朵更闷更鸣、音高稳定、低频先回、静音不鸣" },
   ShellImpactRangeBrowserTest: { file: "Script_ShellImpactRangeBrowserTest.mjs", timeoutMs: 15 * 60 * 1000, desc: "炮击扬尘测试场（?impacts=1）：土色 PBR 地形 + 壕沟 + 布景、面板、11 个弹种真实 FireShell / Blast 与挖坑、落角、齐射、暂停 / 单步 / 慢放、自由相机、鼠标选点、清空与 A/B 开关" },
   BootTest: {
     file: "Script_BootTest.mjs",
@@ -625,11 +627,13 @@ export const browserTests = new Set([
   "ExplosionRangeTest",
   "CraterSurfaceTest",
   "ShellImpactRangeBrowserTest",
+  "BattleReactionRangeBrowserTest",
 ]);
 
 export const tier0Fast = [
   "DustFlowTest",
   "ShellImpactRangeTest",
+  "BlastReactionTest",
   "FpsElbowArcTest",
   "TextureImportTest",
   "BreakableTreesTest",
@@ -764,7 +768,7 @@ export const domains = {
   firstLevel: {label:'新版第一关完整任务',tests:['SandbagStandardTest','FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTerrainTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','FirstLevelFarBankTest','PontoonBridgeTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','MissionAreaGuardTest','MissionAreaGuardBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','LitterGaitTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionPeopleCadenceTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','CartCorpseBumpTest','FirstLevelFrontTest','FirstLevelCollectionCareTest','FirstLevelFrontPressureTest','FirstLevelFrontCounterattackTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest','FirstLevelFrontCheckpoint04Test','FirstLevelFrontCheckpoint05Test','FirstLevelFrontCheckpoint05BombFirstTest','FirstLevelRearDoorWalkTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ProneCrawlTest','ActorLocomotionTest','BackRifleRunTest','RelaxedGaitTest','IjaAlertGaitTest','RifleHoldRunTest','RifleShoulderMarchTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest','HitReactionTest','HitReactionBrowserTest'] },
-  explosives: { label: "爆炸白盒与通用地形形变/返掷/炮击扬尘测试场", tests: ["ExplosionRulesTest", "DustFlowTest", "ExplosionRangeTest", "CraterSurfaceTest", "ShellImpactRangeTest", "ShellImpactRangeBrowserTest"] },
+  explosives: { label: "爆炸白盒与通用地形形变/返掷/炮击扬尘测试场/人物战场反应测试场", tests: ["ExplosionRulesTest", "DustFlowTest", "ExplosionRangeTest", "CraterSurfaceTest", "ShellImpactRangeTest", "ShellImpactRangeBrowserTest", "BlastReactionTest", "BattleReactionRangeBrowserTest"] },
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
     tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012TerrainTest", "TerrainLayersTest", "FirstLevelP012TerrainBrowserTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "TrenchPlanTest", "TrenchSurfaceTest", "PhysicsTest", "JumpTest", "DestructionTest", "TerrainTrailRulesTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest"],
@@ -1062,6 +1066,8 @@ const changedDomainRules = [
   // 关中过场的作者动作库、它的运行时表演层与烘焙脚本：都归 cutscene 域。
   { domain: "cutscene", pattern: /MachineGunCaptives|CutscenePerformance|Animation\/MachineGunCaptives/i },
   { domain: "ai", pattern: /FirstLevelP012(ShellShot|BackRifle|TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },
+  // 近爆的人物反应与耳朵模型（BlastExposure / BlastFlinch / AudioEarTrauma / BattleReaction*）：同挂 explosives。
+  { domain: "explosives", pattern: /(BlastExposure|BlastFlinch|BlastReaction|BattleReaction|EarTrauma)/i },
   { domain: "explosives", pattern: /(Explosion|Explosives|ShellImpact|DustFlow|DustField|GroundImpact|CraterSurface|CraterDebris|CraterScorched|BakeCraterSoil|GrenadeReturn|TerrainDeformation|ShellVisual|Script_Combat|Script_Physics|Script_Vfx)/i },
   // Trench：壕沟样条管线（Script_TrenchPlan / Script_TrenchSpline /
   // Data_FirstLevelMissionTrenches）改的是烘进共享高度场的那张开挖场，

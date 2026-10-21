@@ -40,9 +40,12 @@ export class ShellImpactRange {
    *   CanUse()            现在能不能动手（菜单 / 过场 / 编辑器捕获时为 false）
    *   Focus()             面板按钮点完把指针锁还给游戏
    *   SetViewmodelHidden  自由相机时藏起第一人称枪
+   * options.embedded：被别的测试场（人物战场反应测试场 ?reactions=1）嵌进去只借投送链 ——
+   *   不建面板、不挂键鼠监听、相机一直是玩家自己的；落点标记照样有（由宿主摆）。
    */
-  constructor(host) {
+  constructor(host, { embedded = false } = {}) {
     this.host = host;
+    this.embedded = !!embedded;
     this.random = Mulberry32(19381001);
     this.munitionId = SHELL_IMPACT_MUNITIONS[5].id;
     this.targetId = SHELL_IMPACT_DEFAULT_TARGET;
@@ -72,15 +75,17 @@ export class ShellImpactRange {
     this.bombMaterial = host.library.Plain("ImpactBomb", { color: 0x4a4d3f, roughness: 0.55, metalness: 0.5 });
     this.OnKey = (event) => this.HandleKey(event, event.type === "keydown");
     this.OnMouseDown = (event) => this.HandlePick(event);
-    window.addEventListener("keydown", this.OnKey, true);
-    window.addEventListener("keyup", this.OnKey, true);
-    window.addEventListener("mousedown", this.OnMouseDown, true);
     // 窗口失焦时松开的键收不到 keyup：清掉，免得相机自己一直飞。
     this.OnBlur = () => this.keys.clear();
-    window.addEventListener("blur", this.OnBlur);
+    if (!this.embedded) {
+      window.addEventListener("keydown", this.OnKey, true);
+      window.addEventListener("keyup", this.OnKey, true);
+      window.addEventListener("mousedown", this.OnMouseDown, true);
+      window.addEventListener("blur", this.OnBlur);
+    }
     this.SetTarget(this.targetId, { quiet: true });
-    this.Camera("reference");
-    this.lab = new ShellImpactLab(this);
+    this.Camera(this.embedded ? "player" : "reference");
+    this.lab = this.embedded ? null : new ShellImpactLab(this);
     this.api = {
       Fire: (munitionId, target, options) => this.Fire(munitionId, target, options),
       Barrage: (munitionId, target, options) => this.Barrage(munitionId, target, options),
