@@ -1,30 +1,30 @@
 {
   "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\Model_DonkeyCartUnpacked.glb",
   "output": "C:\\Users\\Bentl\\Documents\\bentleyblanks_Codex_DonkeyCart_20261020\\Taierzhuang1938\\Model\\DonkeyCart\\Model_DonkeyCart.glb",
-  "bytes": 9295668,
+  "bytes": 21411580,
   "geometrySkinActionsUnchanged": true,
-  "nonImageBufferSha256": "1b75ae0a433afb41df70188a1659500fc0af95ade5614aa2fa7c745e83eb3d9c",
+  "nonImageBufferSha256": "aafc5436ef33f875db1c0e2f03d425799bf31045c6d6dd1d983ec9e42d27817a",
   "images": [
     {
       "name": "Texture_DonkeyCartCartNormal",
       "file": "Texture_DonkeyCartCartNormal.webp",
       "size": [
-        1024,
-        1024
+        2048,
+        2048
       ],
-      "bytes": 730912,
-      "sha256": "04e98b74f7b6e22ce4a78faa28b0c6478dbb8151336fe4aeeaa2de438c336ebf",
+      "bytes": 4082632,
+      "sha256": "f2f2c85843c1e0a484e264a2956e88d2eaabc9569a2560981a85405f6cdb3283",
       "lossless": true
     },
     {
       "name": "Texture_DonkeyCartCartBase",
       "file": "Texture_DonkeyCartCartBase.webp",
       "size": [
-        2048,
-        2048
+        4096,
+        4096
       ],
-      "bytes": 1877096,
-      "sha256": "2a02781aaa6894a5966a70e767c7b06085cd3787dbb3953802e1d4d5d363b972",
+      "bytes": 8637260,
+      "sha256": "bffe7b2a83b030b0ed91f7d8d4ad7c7f6107f892147e2b6326896afc8257efb1",
       "lossless": true
     },
     {
@@ -34,8 +34,8 @@
         512,
         512
       ],
-      "bytes": 55444,
-      "sha256": "180a74c3332b9e793653928c5dff29cc433a5ece078339dbff1829e6987cbdb4",
+      "bytes": 98520,
+      "sha256": "6b10c1a2d7c6cb368a507fd59e01b7ac6c1d4d01e99a85c2c9223842a3831d7e",
       "lossless": true
     },
     {
@@ -45,8 +45,8 @@
         1024,
         1024
       ],
-      "bytes": 616920,
-      "sha256": "e638a28ec5a817f88a1aad51e60a0888fc867fc943e92d815a7ad812e45a5f57",
+      "bytes": 742592,
+      "sha256": "bd430ab70198e1965ebcebd7428c5c558001b5cf7412cf1d8bf6faaa76d9924e",
       "lossless": true
     },
     {
@@ -56,8 +56,8 @@
         2048,
         2048
       ],
-      "bytes": 1055484,
-      "sha256": "963fa3451f2f9a8833559e9d65dd8c4cf41de829a3aead3e8e02d866ca8728ef",
+      "bytes": 1790224,
+      "sha256": "301d9df91f3c8b53f2f222afe5adcaccb06e8704691c338b8ca38565ddee3187",
       "lossless": true
     },
     {
@@ -67,8 +67,8 @@
         512,
         512
       ],
-      "bytes": 45224,
-      "sha256": "f04a44040e1afb7a4607891febf6639053a54e6d4e6f84121e9a3f7afa3f252f",
+      "bytes": 80858,
+      "sha256": "f586926e1421f36e435789ff1f15c8cc45ff7426d89a9a897365cb8fbd50b109",
       "lossless": true
     }
   ],

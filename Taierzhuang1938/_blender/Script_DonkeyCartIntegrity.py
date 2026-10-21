@@ -85,6 +85,13 @@ for obj in bpy.data.objects:
     if obj.name.startswith('HarnessClothCollar') and obj.type=='MESH':
         bm=bmesh.new();bm.from_mesh(obj.data);padVolumes.append(bm.calc_volume(signed=True));bm.free()
 report['paddedCollarSignedVolumesM3']=padVolumes
+heads=[]
+for obj in bpy.data.objects:
+    if obj.type=='MESH' and obj.name.startswith('TyreRivet') and obj.parent==bpy.data.objects['DonkeyCartRig']:
+        points=[obj.matrix_world@v.co for v in obj.data.vertices]
+        heads.append(max(max(p[i] for p in points)-min(p[i] for p in points) for i in range(3)))
+report['maxTyreFastenerSpanM']=max(heads)
+report['maxHeadLimbWeight']=max((sum(weight for name,weight in rows[v.index].items() if name.startswith(('DonkeyFront','DonkeyRear'))) for v in skin.data.vertices if v.co.y>1.06 and v.co.z>.98),default=0)
 (base/'Review/Data_IntegrityVerification.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
 scene.frame_set(0)
 print(json.dumps({k:v for k,v in report.items() if k!='contacts'}))
@@ -96,3 +103,5 @@ if report['skinWeightSumError']>1e-5 or report['maxSkinInfluences']>4:raise Runt
 if report['maxTraceAnchorDriftM']>.0001:raise RuntimeError('Trace endpoint detaches from the cart')
 if report['maxTraceToBindingGapM']>.003 or report['maxDropToTugGapM']>.005:raise RuntimeError('Harness connections leave their contact tolerance')
 if len(padVolumes)!=2 or min(padVolumes)<=0:raise RuntimeError('Padded collar must have two closed outward-facing volumes')
+if report['maxTyreFastenerSpanM']>.020:raise RuntimeError('Wheel fastener reconstruction enlarged a small rivet')
+if report['maxHeadLimbWeight']>1e-6:raise RuntimeError('Limb motion must not pull the upper neck or muzzle surface')

@@ -52,6 +52,9 @@ hindY=sum((animal.matrix_world@animal.data.vertices[i].co).y for i in soleIndice
 Render('FeetSide',(-4,(foreY+hindY)/2,.37),(0,(foreY+hindY)/2,.34),1.25,640,400)
 Render('FeetFront',(0,3,.27),(0,foreY,.27),.56,640,640)
 Render('FeetRear',(0,-3,.27),(0,hindY,.27),.56,640,640)
+Render('UpperForelegs',(-4,.43,.68),(0,.43,.68),.80,640,640)
+Render('CartDetail',(-4,-1.43,1.05),(0,-1.43,.65),2.0,640,480)
+Render('CoatDetail',(-3,.08,1.0),(0,.08,.88),.85,640,480)
 for obj in rigs:obj.data.pose_position='POSE'
 walkStrip=next(track.strips[0] for track in donkeyRig.animation_data.nla_tracks if 'DonkeyWalk' in track.name)
 for track in donkeyRig.animation_data.nla_tracks:track.mute=True
@@ -84,6 +87,8 @@ report['worstStanceDriftPerFrameM']=max(drift)
 report['samples']=samples
 scene.frame_set(18);Render('Walk',(-4,5,2.8),(0,-.45,.81),3.85,640,400)
 scene.frame_set(26);Render('WalkFeet',(-4,(foreY+hindY)/2,.38),(0,(foreY+hindY)/2,.32),1.40,640,400)
+for frame in (6,27):
+    scene.frame_set(frame);Render('WalkUpperForelegs'+str(frame),(-4,.43,.65),(0,.43,.65),.95,640,640)
 (base/'Review/Data_ImportedGlbVerification.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
 for obj in imported:bpy.data.objects.remove(obj,do_unlink=True)
 for obj,(render,hidden) in visibility.items():obj.hide_render=render;obj.hide_set(hidden)

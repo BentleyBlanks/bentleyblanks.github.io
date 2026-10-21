@@ -9,6 +9,9 @@ for file in sorted((project/'_blender').glob('Script_DonkeyCart*')):
     text=bpy.data.texts.get(file.name) or bpy.data.texts.new(file.name);text.clear();text.write(file.read_text(encoding='utf-8'));text.use_fake_user=True
 record=base/'Data_ImageGeneration.json'
 text=bpy.data.texts.get(record.name) or bpy.data.texts.new(record.name);text.clear();text.write(record.read_text(encoding='utf-8'));text.use_fake_user=True
+for name in ('Data_SurfaceGenerationV3.json','Data_WeatheredCoatRefinement.json'):
+    record=base/'Refinement20261022'/name
+    text=bpy.data.texts.get(name) or bpy.data.texts.new(name);text.clear();text.write(record.read_text(encoding='utf-8'));text.use_fake_user=True
 scene.frame_set(0)
 for name in ('DonkeyRig','DonkeyCartRig'):
     rig=bpy.data.objects[name];rig.data.pose_position='POSE'

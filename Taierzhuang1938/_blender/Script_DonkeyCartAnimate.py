@@ -44,7 +44,9 @@ def FootTarget(point,phase,front):
     return point.y-sweep/2+sweep*eased,point.z+(.085 if front else .070)*arc,arc,False
 
 def WorldPose(phase,idle=False):
-    bob=(.0025*math.sin(2*math.pi*phase) if idle else .005*math.sin(4*math.pi*phase-.5))
+    # A standing limb is almost straight. During locomotion the torso settles
+    # into its support limbs instead of forcing the knee backward for reach.
+    bob=(-.004+.0025*math.sin(2*math.pi*phase) if idle else -.032+.005*math.sin(4*math.pi*phase-.5))
     worlds={'DonkeyRoot':rest['DonkeyRoot'].copy(),'DonkeyHitchPivot':rest['DonkeyHitchPivot'].copy()}
     movement=Matrix.Translation((.002*math.sin(2*math.pi*phase),0,bob))
     worlds['DonkeyBodyPivot']=movement@rest['DonkeyBodyPivot']
@@ -118,6 +120,7 @@ for i in range(61):
 track=cart.animation_data.nla_tracks.new();track.name='CartRoll';strip=track.strips.new('CartRoll',181,roll);strip.extrapolation='NOTHING'
 strip.action_frame_start=181;strip.action_frame_end=241;cart.animation_data.action=None
 rig['strideM']=stride;rig['walkPeriodS']=period;rig['gaitDutyFront']=.64;rig['gaitDutyRear']=.66
+rig['walkStanceCompressionM']=.032;rig['idleStanceCompressionM']=.004
 rig['walkCoordinateSystem']='Blender +Y forward; glTF -Z forward; stride clock follows distance'
 rig['sourceRigReuse']='Audited four-pivot limb hierarchy and two-link/folding-cannon solver; donkey rest origins, skin, gait and all harness rebuilt'
 cart['rollDistancePerCycleM']=2*math.pi*cart['wheelRadiusM'];cart['rollClipDurationS']=2

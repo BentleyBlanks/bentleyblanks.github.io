@@ -14,7 +14,7 @@ function Control(args,stdio='pipe'){
 }
 const state=JSON.parse(Control(['status','--json']));
 if(state.instances.some(instance=>instance.alive))throw Error('This worktree already has an active Blender; finish and stop it before rebuilding');
-for(const file of ['ReuseAudit/Scene_Round14Candidate.blend','SourceTextures/Texture_DonkeyShortFurSource.png','SourceTextures/Texture_DonkeyCartWeatheredElmSource.png']){
+for(const file of ['ReuseAudit/Scene_Round14Candidate.blend','SourceTextures/Texture_DonkeyShortFurSource.png','SourceTextures/Texture_DonkeyCartWeatheredElmSource.png','SourceTextures/Texture_DonkeyWeatheredCoatSourceV3.png','SourceTextures/Texture_DonkeyAgedElmSourceV3.png','Refinement20261022/Data_SurfaceGenerationV3.json','Refinement20261022/Data_WeatheredCoatRefinement.json']){
  if(!fs.existsSync(path.join(source,file)))throw Error('Missing preserved source: '+path.join(source,file));
 }
 const instance=JSON.parse(Control(['start','--new','--task','DonkeyCartRebuild','--json']));

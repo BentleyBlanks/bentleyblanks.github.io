@@ -1,11 +1,11 @@
 {
   "schema": "tengxian-independent-rigged-prop-v1",
   "id": "DonkeyCart",
-  "version": "20261021FeetReferenceV2",
+  "version": "20261022UpperLegsCoatCartV3",
   "asset": "Model_DonkeyCart.glb",
   "textureManifest": "Data_DonkeyCartTextures.json",
-  "sha256": "4030742830d896453dba3ec23decfc20d16ce42efa05e3bc0d432bc6fe9c4dc9",
-  "bytes": 9295668,
+  "sha256": "23b107b48da924ba0b29ca2fd63473f5db13a234ecb7991769336c88fd11636b",
+  "bytes": 21411580,
   "units": "metres",
   "upAxis": "+Y",
   "facingAxis": "-Z",
@@ -18,19 +18,19 @@
   "nominalWithersHeightM": 1.1,
   "boundsM": {
     "min": [
-      -0.8260000944137573,
+      -0.8257983922958374,
       0.0,
       -1.0664021968841553
     ],
     "max": [
-      0.8260000944137573,
+      0.8257983922958374,
       1.5614452362060547,
-      2.2799999713897705
+      2.1399998664855957
     ],
     "dimensions": [
-      1.6520001888275146,
+      1.6515967845916748,
       1.5614452362060547,
-      3.346402168273926
+      3.206402063369751
     ]
   },
   "feet": {
@@ -63,8 +63,20 @@
     "source": "_blender/Script_DonkeyCartFeet.py",
     "appearance": "reference-led creative anatomy; dimensions are authoring choices"
   },
+  "upperForelegs": {
+    "construction": "reference-aligned elbow/carpus with separately fitted continuous forearm surface",
+    "fitScript": "_blender/Script_DonkeyCartAnatomy.py",
+    "elbowToCarpusOffsetM": {
+      "Left": 0.011666655540466309,
+      "Right": 0.023333311080932617
+    }
+  },
+  "coat": {
+    "construction": "directional source fur, varied roughness, geometric short tufts along the body and limbs",
+    "sourceScript": "_blender/Script_DonkeyCartSurface.py"
+  },
   "cart": {
-    "bedLengthM": 1.52,
+    "bedLengthM": 1.2160000000000002,
     "bedWidthM": 1.075,
     "wheelRadiusM": 0.4,
     "wheelSpokes": 14,
@@ -74,10 +86,10 @@
     "total": 79500,
     "limit": 80000,
     "byBatch": {
-      "Animal": 55900,
-      "Cart": 23600
+      "Animal": 63484,
+      "Cart": 16016
     },
-    "runtimeCartMaxSurfaceDeviationM": 0.0008306061499752104
+    "runtimeCartMaxSurfaceDeviationM": 0.0013249027542769909
   },
   "runtime": {
     "meshes": [
@@ -96,14 +108,23 @@
     ],
     "materials": 2,
     "maxInfluences": 4,
-    "morphTargets": 0
+    "morphTargets": 0,
+    "uvAtlasCoverage": {
+      "Animal": 0.29926890646591037,
+      "Cart": 0.44994506918720895
+    },
+    "averageTexelsPerMetre": {
+      "Animal": 554.9922842614403,
+      "Cart": 645.6762364837998
+    }
   },
   "animations": {
     "DonkeyWalk": {
       "durationS": 1.2,
       "strideM": 0.68,
       "speedMps": 0.5666666666666668,
-      "inPlace": true
+      "inPlace": true,
+      "supportCompressionM": 0.032
     },
     "DonkeyIdle": {
       "durationS": 3.0
@@ -116,15 +137,15 @@
   },
   "verification": {
     "nativeStanceSoleRangeM": [
-      0.0003997584281023592,
-      0.0004002078203484416
+      0.00039979274151846766,
+      0.00040019629523158073
     ],
-    "nativeStanceDriftPerFrameM": 2.961688571508081e-07,
+    "nativeStanceDriftPerFrameM": 2.9987759060309815e-07,
     "reimportedStanceSoleRangeM": [
-      0.0003999032196588814,
-      0.00040036009158939123
+      0.0003997830208390951,
+      0.0004003627982456237
     ],
-    "reimportedStanceDriftPerFrameM": 3.594822353784888e-07,
+    "reimportedStanceDriftPerFrameM": 6.537967258031518e-07,
     "continuousLegRoots": {
       "DonkeyFrontLeft": true,
       "DonkeyFrontRight": true,
@@ -141,7 +162,9 @@
     },
     "maxHornNonHoofWeight": 0.0,
     "maxRebuiltLowerForeignWeight": 0,
-    "dropTugGapM": 0.0006701386300846934,
+    "maxTyreFastenerSpanM": 0.007662951946258545,
+    "maxHeadLimbWeight": 0,
+    "dropTugGapM": 0.0008086610469035804,
     "skinWeightSumError": 8.940696716308594e-08,
     "webpPixelsUnchanged": true,
     "geometrySkinActionsUnchangedDuringPacking": true

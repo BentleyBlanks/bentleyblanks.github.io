@@ -176,7 +176,7 @@ def RebuildLowerLegs(skin,rig,coat):
             crest=math.exp(-((vertex.co.x-centre.x)/.016)**2)*frontFacing
             bonePatch=math.exp(-((vertex.co.z-knee.z)/.043)**2)+.70*math.exp(-((vertex.co.z-.155)/.042)**2)
             patch=noise(vertex.co*38)+.45*noise(vertex.co*97)
-            shade=.039+.013*patch+.014*crest+.018*bonePatch*(.45+.55*crest)
+            shade=.029+.011*patch+.010*crest+.014*bonePatch*(.45+.55*crest)
             colors.data[vertex.index].color=(shade,shade*.96,shade*.89,1)
     skin['footConstruction']='continuous measured lower legs; separate single-toe horn wall, coronet and concave sole'
     skin['footProfileJson']=json.dumps(records)

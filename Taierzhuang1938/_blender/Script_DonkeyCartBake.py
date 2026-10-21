@@ -271,7 +271,7 @@ oldRig=next(obj for obj in new.objects if obj.type=='ARMATURE')
 oldOrigins={b.name:b.head_local.copy() for b in oldRig.data.bones}
 oldRows=[{original.vertex_groups[g.group].name:g.weight for g in v.groups} for v in original.data.vertices]
 
-frontP=[Vector((0,.68,.91)),Vector((0,.555,.72)),Vector((0,.68,.48)),Vector((0,.645,.155))]
+frontP=[Vector((0,.68,.91)),Vector((0,.665,.72)),Vector((0,.68,.48)),Vector((0,.645,.155))]
 rearP=[Vector((0,-.25,.94)),Vector((0,-.06,.73)),Vector((0,-.33,.47)),Vector((0,-.295,.155))]
 for point in rearP:point.y+=hindForwardShift
 targetOrigins={'DonkeyRoot':Vector((0,0,0)),'DonkeyBodyPivot':Vector((0,.3,.79)),
@@ -337,16 +337,6 @@ def AdaptPoint(point,row):
     sternum=(1-Smooth(.045,.11,abs(result.x)))*Smooth(.53,.70,result.z)*(1-Smooth(.78,.96,result.z))*Smooth(.60,.78,result.y)
     result.y-=.115*sternum
     result.z+=.016*sternum
-    # Fit the forearm's actual surface column to the donkey's elbow/carpus.
-    if .22<result.z<.78 and result.y>.35 and abs(result.x)>.025:
-        anchors=[(.105,.68),(.25,.6783),(.35,.6939),(.45,.7244),(.55,.7465),(.65,.775),(.78,.775)]
-        oldCentre=anchors[-1][1]
-        for (za,ya),(zb,yb) in zip(anchors,anchors[1:]):
-            if za<=result.z<=zb:oldCentre=ya+(yb-ya)*(result.z-za)/(zb-za);break
-        targetY=frontP[2].y if result.z<=frontP[2].z else frontP[2].y+(frontP[1].y-frontP[2].y)*(result.z-frontP[2].z)/(frontP[1].z-frontP[2].z)
-        factor=Smooth(.22,.35,result.z)*(1-Smooth(.60,.78,result.z))*Smooth(.025,.065,abs(result.x))*Smooth(.35,.55,result.y)
-        narrow=1-.45*Smooth(.30,.55,result.z)
-        result.y=result.y*(1-factor)+(targetY+(result.y-oldCentre)*narrow)*factor
     pouch=(1-Smooth(.035,.105,abs(result.x)))*Smooth(.57,.73,result.y)*Smooth(.42,.56,result.z)*(1-Smooth(.70,.82,result.z))
     result.z+=.115*pouch;result.y-=.035*pouch
     axial=sum(w for name,w in row.items() if any(n in name for n in ('Body','Pelvis','Thorax')))
@@ -399,7 +389,10 @@ def KeepFace(face):
 used=sorted({i for face in original.data.polygons if KeepFace(face) for i in face.vertices})
 indexMap={old:i for i,old in enumerate(used)}
 vertices=[AdaptPoint(original.data.vertices[i].co,oldRows[i]) for i in used]
+anatomyNamespace={}
+exec(compile((project/'_blender/Script_DonkeyCartAnatomy.py').read_text(encoding='utf-8'),'Script_DonkeyCartAnatomy.py','exec'),anatomyNamespace)
 faces=[tuple(indexMap[i] for i in p.vertices) for p in original.data.polygons if KeepFace(p)]
+anatomyNamespace['RefitUpperForelimbs'](vertices,[oldRows[i] for i in used],targetOrigins,faces)
 skin=Mesh('DonkeyContinuousSkin',vertices,faces,skinMaterial,donkeyCol)
 skin.data.materials.append(eyeMat);skin.data.materials.append(mouthMat)
 selectedFaces=[p for p in original.data.polygons if KeepFace(p)]
@@ -410,13 +403,15 @@ for face,sourceFace in zip(skin.data.polygons,selectedFaces):
     face.material_index=1 if sourceMat.startswith('HorseAssetEye') else 0
     for loop,sourceLoop in zip(face.loop_indices,sourceFace.loop_indices): uv.data[loop].uv=originalUv.data[sourceLoop].uv
 
-def CoatColor(point):
+def CoatColor(point,limbMass=0):
     x,y,z=point
-    base=Vector((.042,.042,.040));light=Vector((.265,.263,.245))
+    base=Vector((.028,.027,.025));light=Vector((.265,.263,.245))
     belly=(1-Smooth(.66,.80,z))*Smooth(-.48,-.29,y)*(1-Smooth(.56,.74,y))
     muzzle=Smooth(HeadY(1.035),HeadY(1.115),y)*(1-Smooth(HeadZ(1.08),HeadZ(1.18),z))
     ring=max(math.exp(-((y-HeadY(.985))**2/(.025**2)+(z-HeadZ(1.221))**2/(.027**2)+(abs(x)-.064)**2/(.06**2))),0)
     innerLeg=(1-Smooth(.075,.13,abs(x)))*(1-Smooth(.48,.75,z))*.43
+    belly*=1-Smooth(.15,.65,limbMass)
+    innerLeg*=1-Smooth(.15,.65,limbMass)
     mask=max(belly*.90,muzzle,ring*.84,innerLeg)
     color=base.lerp(light,mask)
     if z<.105:color=Vector((.135,.125,.105))
@@ -424,7 +419,9 @@ def CoatColor(point):
     return (*[v*variation for v in color],1)
 
 colors=skin.data.color_attributes.new(name='CoatColor',type='FLOAT_COLOR',domain='POINT')
-for v in skin.data.vertices:colors.data[v.index].color=CoatColor(v.co)
+for v in skin.data.vertices:
+    limbMass=sum(weight for name,weight in oldRows[used[v.index]].items() if name.startswith(('HorseFront','HorseRear')))
+    colors.data[v.index].color=CoatColor(v.co,limbMass)
 
 parents={'DonkeyRoot':None,'DonkeyBodyPivot':'DonkeyRoot','DonkeyThoraxPivot':'DonkeyBodyPivot',
  'DonkeyNeckPivot':'DonkeyThoraxPivot','DonkeyHeadPivot':'DonkeyNeckPivot','DonkeyPelvisPivot':'DonkeyBodyPivot',
@@ -477,6 +474,7 @@ exec(compile((project/'_blender/Script_DonkeyCartFeet.py').read_text(encoding='u
 feetNamespace['RebuildLowerLegs'](skin,rig,skinMaterial)
 skinNamespace['RebindDonkeySkin'](rig,skin)
 feetNamespace['BindLowerLegs'](skin,rig)
+anatomyNamespace['CleanAxialWeights'](skin)
 
 # Rebuild facial features on the newly measured surface; the candidate's buried
 # eyes, lid rings and hanging lip pieces were explicitly excluded above.
@@ -796,6 +794,10 @@ Bind(Tube('HalterUnderJaw',pts,.007,hemp,harnessCol,8),rig,bone='DonkeyHeadPivot
 leadPoints=[(x,HeadY(1.047)+.005+(y-1.075)*.26,z+headVerticalOffset*z/.954) for x,y,z in [(.012,1.075,.947),(.012,1.10,.87),(.014,1.12,.72),(.016,1.13,.52),(.020,1.14,.30),(.027,1.18,.075),(.035,1.24,.022),(.036,1.31,.0075)]]
 Bind(Tube('HalterHangingLead',leadPoints,.0065,hemp,harnessCol,8),rig,bone='DonkeyHeadPivot')
 
+surfaceNamespace={}
+exec(compile((project/'_blender/Script_DonkeyCartSurface.py').read_text(encoding='utf-8'),'Script_DonkeyCartSurface.py','exec'),surfaceNamespace)
+surfaceNamespace['RefineSurfaces'](scene,sourceDir,skin,rig,cartRig,donkeyCol,wood,woodDark,iron,cloth,leather,hemp)
+
 # Closed editable parts must have outward winding, including mirrored pinnae,
 # lofted boards and hollow wheel rings. Keep deliberately open face overlays.
 for col in (donkeyCol,cartCol,harnessCol):
@@ -807,17 +809,6 @@ for col in (donkeyCol,cartCol,harnessCol):
             if bm.calc_volume(signed=True)<0:bmesh.ops.reverse_faces(bm,faces=list(bm.faces))
             bm.to_mesh(obj.data);obj.data.update()
         bm.free()
-
-# Grain follows each individual timber's long axis, including curved felloe
-# sections, vertical stakes and wheel spokes. This attribute survives batching.
-for col in (cartCol,harnessCol):
-    for obj in col.objects:
-        if obj.type!='MESH' or not any(m in (wood,woodDark) for m in obj.data.materials):continue
-        points=[v.co for v in obj.data.vertices]
-        spans=[max(p[i] for p in points)-min(p[i] for p in points) for i in range(3)]
-        axis=max(range(3),key=lambda i:spans[i]);other=[i for i in range(3) if i!=axis]
-        attribute=obj.data.attributes.new('TimberCoordinates','FLOAT_VECTOR','POINT')
-        for vertex in obj.data.vertices:attribute.data[vertex.index].vector=((vertex.co[other[0]]+vertex.co[other[1]])/.40,vertex.co[axis]/.40,0)
 
 # Keep each editable component while leaving a neutral non-export studio.
 bpy.ops.mesh.primitive_plane_add(size=200,location=(0,-.45,0))

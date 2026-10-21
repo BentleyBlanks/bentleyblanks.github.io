@@ -2,7 +2,7 @@
 
 Source object material coordinates are preserved as a point attribute before
 joining, so grain/fur scale and direction survive batching and UV replacement.
-The original 457 editable components remain in the external Blender project.
+Editable components remain in the external Blender project.
 """
 import bpy,math,json,hashlib
 from pathlib import Path
@@ -13,6 +13,8 @@ scene=bpy.context.scene
 base=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020')
 bakeDir=base/'SourceTextures/Baked';bakeDir.mkdir(parents=True,exist_ok=True)
 project=Path(scene['DonkeyCartProject'])
+atlasNamespace={}
+exec(compile((project/'_blender/Script_DonkeyCartAtlas.py').read_text(encoding='utf-8'),'Script_DonkeyCartAtlas.py','exec'),atlasNamespace)
 runtimeCol=bpy.data.collections.get('RuntimeExport')
 if runtimeCol:
     for obj in list(runtimeCol.objects):bpy.data.objects.remove(obj,do_unlink=True)
@@ -62,6 +64,7 @@ def CloneBatch(sourceRig,label):
         for modifier in list(obj.modifiers):
             if modifier.type!='ARMATURE':bpy.ops.object.modifier_apply(modifier=modifier.name)
         if not obj.data.uv_layers.get('UVMap'):obj.data.uv_layers.new(name='UVMap')
+        atlasNamespace['AssignAtlasGroup'](obj,label,original.name)
         objects.append(obj)
     Select(objects);bpy.ops.object.join();obj=bpy.context.object
     obj.name='DonkeyRuntime' if label=='Animal' else 'CartRuntime'
@@ -85,11 +88,7 @@ def CloneBatch(sourceRig,label):
         distances=[targetTree.find_nearest(p)[3] for p in sourcePoints]+[sourceTree.find_nearest(v.co)[3] for v in obj.data.vertices]
         obj['budgetSurfaceMaxErrorM']=max(distances)
         if max(distances)>.005:raise RuntimeError('Runtime cart simplification changes its surface by more than 5 mm')
-    uv=obj.data.uv_layers.get('GameUV') or obj.data.uv_layers.new(name='GameUV')
-    obj.data.uv_layers.active=uv;uv.active_render=True
-    Select([obj]);bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.uv.smart_project(angle_limit=math.radians(66),island_margin=.0035,area_weight=.12,correct_aspect=True,scale_to_bounds=True)
-    bpy.ops.object.mode_set(mode='OBJECT')
+    Select([obj]);atlasNamespace['AuthorGameUv'](obj,label)
     return rig,obj
 
 animalRig,animal=CloneBatch(bpy.data.objects['DonkeyRig'],'Animal')
@@ -99,6 +98,8 @@ scene.render.bake.margin=5;scene.render.bake.use_selected_to_active=False;scene.
 scene.render.bake.use_pass_direct=False;scene.render.bake.use_pass_indirect=False;scene.render.bake.use_pass_color=True
 
 def TargetImage(obj,name,size,nonColor=False):
+    previous=bpy.data.images.get(name)
+    if previous:bpy.data.images.remove(previous,do_unlink=True)
     image=bpy.data.images.new(name,width=size,height=size,alpha=False)
     image.colorspace_settings.name='Non-Color' if nonColor else 'sRGB'
     image.file_format='PNG';image.filepath_raw=str(bakeDir/(name+'.png'))
@@ -114,10 +115,10 @@ def SaveImage(image):
 
 def Bake(obj,label):
     Select([obj])
-    baseImage=TargetImage(obj,'Texture_DonkeyCart'+label+'Base',2048)
+    baseImage=TargetImage(obj,'Texture_DonkeyCart'+label+'Base',2048 if label=='Animal' else 4096)
     bpy.ops.object.bake(type='DIFFUSE')
     info=[SaveImage(baseImage)]
-    normalImage=TargetImage(obj,'Texture_DonkeyCart'+label+'Normal',1024,True)
+    normalImage=TargetImage(obj,'Texture_DonkeyCart'+label+'Normal',1024 if label=='Animal' else 2048,True)
     bpy.ops.object.bake(type='NORMAL',normal_space='TANGENT',normal_r='POS_X',normal_g='POS_Y',normal_b='POS_Z')
     info.append(SaveImage(normalImage))
     ormImage=TargetImage(obj,'Texture_DonkeyCart'+label+'Orm',512,True)
@@ -141,7 +142,7 @@ def Bake(obj,label):
         mat.node_tree.links.new(original,output.inputs['Surface']);mat.node_tree.nodes.remove(emission);mat.node_tree.nodes.remove(combine)
     mat=bpy.data.materials.new('DonkeyCart'+label+'Pbr');mat.use_nodes=True;mat.use_backface_culling=True
     nodes,links=mat.node_tree.nodes,mat.node_tree.links;shader=nodes.get('Principled BSDF')
-    if label=='Animal':shader.inputs['Specular IOR Level'].default_value=.22
+    shader.inputs['Specular IOR Level'].default_value=.18 if label=='Animal' else .20
     uv=nodes.new('ShaderNodeUVMap');uv.uv_map='GameUV'
     def Texture(image):
         node=nodes.new('ShaderNodeTexImage');node.image=image;links.new(uv.outputs['UV'],node.inputs['Vector']);return node
@@ -159,8 +160,10 @@ def Bake(obj,label):
     for attribute in list(obj.data.color_attributes):obj.data.color_attributes.remove(attribute)
     coordinate=obj.data.attributes.get('MaterialCoordinates')
     if coordinate:obj.data.attributes.remove(coordinate)
+    grouping=obj.data.attributes.get('AtlasGroup')
+    if grouping:obj.data.attributes.remove(grouping)
     obj.data.calc_loop_triangles()
-    return {'label':label,'sourceTriangles':obj['sourceTriangles'],'triangles':len(obj.data.loop_triangles),'vertices':len(obj.data.vertices),'budgetSurfaceMaxErrorM':obj.get('budgetSurfaceMaxErrorM',0),'textures':info}
+    return {'label':label,'sourceTriangles':obj['sourceTriangles'],'triangles':len(obj.data.loop_triangles),'vertices':len(obj.data.vertices),'budgetSurfaceMaxErrorM':obj.get('budgetSurfaceMaxErrorM',0),'atlasCoverage':obj['atlasCoverage'],'atlasTexelsPerMetre':obj['atlasTexelsPerMetre'],'textures':info}
 
 reports=[Bake(animal,'Animal'),Bake(cart,'Cart')]
 for rig in (animalRig,cartRig):

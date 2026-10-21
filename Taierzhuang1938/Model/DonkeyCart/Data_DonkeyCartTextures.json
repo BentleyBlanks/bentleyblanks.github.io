@@ -1,19 +1,21 @@
 {
   "schema": "tengxian-independent-prop-textures-v1",
   "asset": "DonkeyCart",
-  "version": "20261021FeetReferenceV2",
-  "uv": "two unique non-overlapping authored GameUV atlases, exported as UV0",
+  "version": "20261022UpperLegsCoatCartV3",
+  "uv": "two non-overlapping GameUV atlases with reserved anatomy/timber groups, exported as UV0",
   "colorSpace": {
     "Base": "sRGB",
     "Normal": "linear OpenGL +Y",
     "Orm": "linear; R=1, G=roughness, B=metallic"
   },
-  "sizeReason": "2048 base atlases preserve the close donkey face, short fur, hemp lay and worn elm; normals 1024, ORM 512",
+  "sizeReason": "Animal 2048 Base / 1024 Normal; Cart 4096 Base / 2048 Normal preserves close grain over its much larger surface. ORM 512 for both. Body and wheels are protected from tiny hair/fastener chart padding.",
   "source": {
-    "provider": "imagegen + procedural + sourcePack",
-    "furInput": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\SourceTextures\\Texture_DonkeyShortFurSource.png",
-    "furPromptRecord": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\Data_ImageGeneration.json",
-    "elmInput": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\SourceTextures\\Texture_DonkeyCartWeatheredElmSource.png",
+    "provider": "built-in imagegen + procedural + sourcePack",
+    "furInput": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\SourceTextures\\Texture_DonkeyWeatheredCoatSourceV3.png",
+    "furPromptRecord": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\Refinement20261022\\Data_WeatheredCoatRefinement.json",
+    "elmInput": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\SourceTextures\\Texture_DonkeyAgedElmSourceV3.png",
+    "surfaceGenerationRecord": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\Refinement20261022\\Data_SurfaceGenerationV3.json",
+    "referenceGenerationRecord": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\Data_ImageGeneration.json",
     "sculptNormal": "CC0 Lyndon Daniels / ChadM equine surface normal from preserved source"
   },
   "bake": {
@@ -26,22 +28,22 @@
       "name": "Texture_DonkeyCartCartNormal",
       "file": "Texture_DonkeyCartCartNormal.webp",
       "size": [
-        1024,
-        1024
+        2048,
+        2048
       ],
-      "bytes": 730912,
-      "sha256": "04e98b74f7b6e22ce4a78faa28b0c6478dbb8151336fe4aeeaa2de438c336ebf",
+      "bytes": 4082632,
+      "sha256": "f2f2c85843c1e0a484e264a2956e88d2eaabc9569a2560981a85405f6cdb3283",
       "lossless": true
     },
     {
       "name": "Texture_DonkeyCartCartBase",
       "file": "Texture_DonkeyCartCartBase.webp",
       "size": [
-        2048,
-        2048
+        4096,
+        4096
       ],
-      "bytes": 1877096,
-      "sha256": "2a02781aaa6894a5966a70e767c7b06085cd3787dbb3953802e1d4d5d363b972",
+      "bytes": 8637260,
+      "sha256": "bffe7b2a83b030b0ed91f7d8d4ad7c7f6107f892147e2b6326896afc8257efb1",
       "lossless": true
     },
     {
@@ -51,8 +53,8 @@
         512,
         512
       ],
-      "bytes": 55444,
-      "sha256": "180a74c3332b9e793653928c5dff29cc433a5ece078339dbff1829e6987cbdb4",
+      "bytes": 98520,
+      "sha256": "6b10c1a2d7c6cb368a507fd59e01b7ac6c1d4d01e99a85c2c9223842a3831d7e",
       "lossless": true
     },
     {
@@ -62,8 +64,8 @@
         1024,
         1024
       ],
-      "bytes": 616920,
-      "sha256": "e638a28ec5a817f88a1aad51e60a0888fc867fc943e92d815a7ad812e45a5f57",
+      "bytes": 742592,
+      "sha256": "bd430ab70198e1965ebcebd7428c5c558001b5cf7412cf1d8bf6faaa76d9924e",
       "lossless": true
     },
     {
@@ -73,8 +75,8 @@
         2048,
         2048
       ],
-      "bytes": 1055484,
-      "sha256": "963fa3451f2f9a8833559e9d65dd8c4cf41de829a3aead3e8e02d866ca8728ef",
+      "bytes": 1790224,
+      "sha256": "301d9df91f3c8b53f2f222afe5adcaccb06e8704691c338b8ca38565ddee3187",
       "lossless": true
     },
     {
@@ -84,8 +86,8 @@
         512,
         512
       ],
-      "bytes": 45224,
-      "sha256": "f04a44040e1afb7a4607891febf6639053a54e6d4e6f84121e9a3f7afa3f252f",
+      "bytes": 80858,
+      "sha256": "f586926e1421f36e435789ff1f15c8cc45ff7426d89a9a897365cb8fbd50b109",
       "lossless": true
     }
   ]
