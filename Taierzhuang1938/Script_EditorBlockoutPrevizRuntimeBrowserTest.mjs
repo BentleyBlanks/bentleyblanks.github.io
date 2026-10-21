@@ -14,6 +14,9 @@
 //      小孩骨盆高度落在车尾板顶（车底下地面 + 1.025）±0.1 m、不播走路；
 //   6. 2026-10-20 url 音效：babyCry 的文件（测试用 page.route 喂一段生成的 WAV，不依赖代理 S 的产物）解码进声库并真的放出一条 voice；
 //      cellarSob 的文件 404 → 只警告一次、记进 missingSfx，预演照播。这一趟因此**不带 audio=0**（要音频上下文）。
+//   7. 2026-10-21 倒地的人扶得起来：spawn 时倒着（state down，一个不写 lie、一个 lie:"along"）的人，预演键 state:"alive"
+//      的那一帧就站起来（不再是倒地姿态、骨盆像站着的人）；再写 state:"down" 又倒回去（lie:"along" 头照旧朝朝向，背上不挂枪）；
+//      Seek 回到站着的那一秒又站起来（来回拖也对）。
 // 截图存 _shots/EditorBlockoutPrevizRuntime/（不提交）。
 // ===========================================================================
 
@@ -86,6 +89,11 @@ const previzDoc = {
       { id: "TestCart", spawn: { side: "civ", kind: "cart", x: 38, z: 172, yawDeg: 0 }, keys: [{ t: 19, x: 38, z: 160, move: "walk" }] },
       { id: "Kid", spawn: { side: "civ", kind: "child", x: 38, z: 173.5, yawDeg: 180, ride: { on: "TestCart", x: 0, z: 1.2, y: RIDE_KID_Y, yawDeg: 180 } }, keys: [{ t: 0, clip: "VilSitEdge" }] },
       { id: "TestLitter", spawn: { side: "nra", kind: "litter", bearers: 0, x: 38, z: 171, ride: { on: "TestCart", x: 0, z: -0.2, y: CART_LITTER_Y } }, keys: [] },
+      // 2026-10-21 倒着的人 2.5 s 扶起来、5 s 再倒下（一个不写 lie、一个顺着躺）
+      { id: "ReviveA", spawn: { side: "nra", kind: "soldier", x: 34, z: 166, yawDeg: 90, state: "down" },
+        keys: [{ t: 2.5, state: "alive", stance: "stand" }, { t: 5, state: "down" }] },
+      { id: "ReviveL", spawn: { side: "nra", kind: "soldier", x: 31, z: 166, yawDeg: 90, state: "down", lie: "along" },
+        keys: [{ t: 2.5, state: "alive", stance: "stand" }, { t: 5, state: "down", lie: "along" }] },
     ],
     aircraft: [{
       id: "Ki30A", model: "MitsubishiKi30",
@@ -196,6 +204,52 @@ try {
   Check("body:\"procedural\" 的百姓还是旧的程序化身体（开关有效）：没有骨架、不播片段", proc && proc.body === "procedural" && !proc.rigged && proc.shownClip == null, J(Brief(proc)));
   const missing = s55.missingClips.filter(c => /Pv(StandPointL|CrouchCountFingers|ProneBeckonL)/.test(c));
   Check("这几段片段没有一具骨架缺（missingClips 里没有它们）", missing.length === 0, J(missing));
+
+  // 7) 2026-10-21 倒地的人被预演键扶起来：那一帧就站起来；再倒下又躺回去；Seek 回去又站起来
+  console.log("--- revive a down unit");
+  const ReviveRun = (id) => B(async (id) => {
+    const Bl = window.Tengxian.Debug.Blockout, P = Bl.Previz;
+    const frame = () => new Promise(r => requestAnimationFrame(r));
+    const pick = (p) => p && { t: +P.State().t.toFixed(3), dead: p.dead, down: p.down, pelvis: +(p.pelvisAboveGround ?? NaN).toFixed(3),
+      yawDeg: p.yawDeg, headYawDeg: p.headYawDeg === null ? null : +p.headYawDeg.toFixed(1), deathVariant: p.deathVariant, actors: p.actors,
+      rifleOnBack: p.rifleOnBack, gait: p.gait };
+    await P.Seek(2.2); await frame(); await frame();
+    const down0 = pick(Bl.Probe(id));
+    // 一帧一帧放，取第一帧 t ≥ 2.5 的样子（预演先 Update、演员后摆：同一帧里就该站起来）
+    P.Resume();
+    let first = null, guard = 0;
+    while (!first && guard++ < 600) { await frame(); if (P.State().t >= 2.5) first = pick(Bl.Probe(id)); }
+    await P.Seek(4.0); await frame();
+    const alive = pick(Bl.Probe(id));
+    // 再倒下：从 4.9 s 放到 6.3 s（倒地动作 ≤ 0.8 s）
+    await P.Seek(4.9); await frame();
+    P.Resume();
+    guard = 0;
+    while (P.State().t < 6.3 && guard++ < 900) await frame();
+    await P.Seek(P.State().t); await frame();
+    const downAgain = pick(Bl.Probe(id));
+    await P.Seek(3.0); await frame();
+    const alive2 = pick(Bl.Probe(id));
+    return { down0, first, alive, downAgain, alive2 };
+  }, id);
+  const Wrap = (d) => ((d + 540) % 360) - 180;
+  const STAND_PELVIS = 0.8, LIE_PELVIS = 0.45;
+  for (const [id, along] of [["ReviveA", false], ["ReviveL", true]]) {
+    const r = await ReviveRun(id);
+    const label = along ? "顺着躺（lie:along）" : "不写 lie";
+    const headOk = (p) => !along || (p.headYawDeg !== null && Math.abs(Wrap(p.headYawDeg - p.yawDeg)) <= 12);
+    Check(`${label}的倒地的人：扶起来之前是倒地姿态（dead、骨盆 < ${LIE_PELVIS} m${along ? "、头朝朝向" : ""}）`,
+      r.down0?.dead && r.down0.down && r.down0.pelvis < LIE_PELVIS && headOk(r.down0), J(r.down0));
+    Check(`${label}：state:"alive" 的那一帧（第一帧 t ≥ 2.5）就站起来 —— 没有倒地姿态、骨盆 ≥ ${STAND_PELVIS} m（像站着的人）`,
+      r.first && r.first.t >= 2.5 && r.first.t < 2.8 && !r.first.dead && !r.first.down && r.first.pelvis >= STAND_PELVIS && r.first.actors === 1, J(r.first));
+    Check(`${label}：4 s 照样站着、骨盆跟第一帧差不到 0.15 m`,
+      r.alive && !r.alive.dead && r.alive.pelvis >= STAND_PELVIS && Math.abs(r.alive.pelvis - r.first?.pelvis) < 0.15, J({ first: r.first, alive: r.alive }));
+    // 站着时背着枪（背枪步态），倒下后枪不再挂背上（原来竖着戳在躺着的人背上）
+    Check(`${label}：5 s 写回 state:"down" 又倒下去（dead、骨盆 < ${LIE_PELVIS} m${along ? "、头朝朝向、倒地片段 DeathCollapseC" : ""}、背上没枪）`,
+      r.downAgain?.dead && r.downAgain.down && r.downAgain.pelvis < LIE_PELVIS && headOk(r.downAgain) && (!along || r.downAgain.deathVariant === "DeathCollapseC")
+        && r.downAgain.rifleOnBack === false, J({ alive: r.alive, downAgain: r.downAgain }));
+    Check(`${label}：倒回去之后 Seek 回 3 s 又站起来`, r.alive2 && !r.alive2.dead && !r.alive2.down && r.alive2.pelvis >= STAND_PELVIS, J(r.alive2));
+  }
 
   // 2) 飞机
   console.log("--- aircraft");

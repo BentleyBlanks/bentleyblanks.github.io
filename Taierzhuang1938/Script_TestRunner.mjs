@@ -360,7 +360,7 @@ export const testDefs = {
   EditorBlockoutBrowserTest: { file: "Script_EditorBlockoutBrowserTest.mjs", timeoutMs: 600000, desc: "白盒关卡编辑器实机：?editor=blockout 不起任务与过场、关键帧传送、过渡连续不瞬移、切第二关再切回、外部改配置自动同步、高级工具入口、存档退化、无未捕获错误" },
   EditorBlockoutFirstLevel0105KeepInBrowserTest: { file: "Script_EditorBlockoutFirstLevel0105KeepInBrowserTest.mjs", timeoutMs: 900000, desc: "01–05 白盒玩家出不了沟（2026-10-21）：剧本通路在沟里且离隐形墙够远、19 处低处 × 8 个方向跳 + 翻每帧都在沟里、射击台翻不过胸墙、顺沟走得到、手榴弹飞出沟、NPC 照常翻出沟" },
   EditorBlockoutFlyBrowserTest: { file: "Script_EditorBlockoutFlyBrowserTest.mjs", timeoutMs: 600000, desc: "白盒编辑器飞行观察（2026-10-21）实机：O 键 / 按钮进出、WASD 沿视线 + E/Q 升降 + Shift 加速的位移、滚轮调速、鼠标转相机、玩家原地且不吃游戏输入、小地图 / 全关总图的相机标记、复制位置与重现链接带相机位姿、退出后相机回到玩家视角、预演与切关的互斥" },
-  EditorBlockoutPrevizRuntimeBrowserTest: { file: "Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs", timeoutMs: 600000, desc: "白盒预演运行时补齐（2026-10-19）实机：百姓 / 小孩 / 军官的骨骼占位身体能播预演动作库片段且姿态真的变了、body:procedural 开关、飞机模型载入 / 在视锥里 / 位置等于纯函数、扫射土点、慢动作倍率与人物动画一起慢、中断后克隆还回机队" },
+  EditorBlockoutPrevizRuntimeBrowserTest: { file: "Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs", timeoutMs: 600000, desc: "白盒预演运行时补齐（2026-10-19）实机：百姓 / 小孩 / 军官的骨骼占位身体能播预演动作库片段且姿态真的变了、body:procedural 开关、飞机模型载入 / 在视锥里 / 位置等于纯函数、扫射土点、慢动作倍率与人物动画一起慢、中断后克隆还回机队、倒地的人被 state:alive 扶起当帧站起来且能再倒回去（2026-10-21）" },
   AiCombatBrowserTest: {
     file: "Script_AiCombatBrowserTest.mjs",
     timeoutMs: 25 * 60 * 1000,

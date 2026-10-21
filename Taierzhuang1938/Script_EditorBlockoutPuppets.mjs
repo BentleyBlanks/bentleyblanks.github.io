@@ -78,6 +78,12 @@
 //   名字带「被」不带「担架」的 litter（01–05 两人拖的单被）不是担架：换成上传的五补丁单被（Script_EditorBlockoutBlanket，
 //   Model_SingleBlanket.glb，宽 1.4 m、长 1.9 m），头端朝前（单位朝向，拽的人在这头），平铺贴地；被拖着走（moving）时
 //   渐变到资产自带的拖拽姿势（头端两角抬到 0.7 m、两侧兜起、尾端贴地），停下渐变回平铺。
+//
+// 2026-10-21（倒地的人扶得起来）：关键帧里倒着（state down）的人，预演键写 state:"alive" 原来不起身 —— 倒地在 Actor 里是
+//   一次性的（ragdollState 一置位就只摆倒地姿态，dead:false 撤不掉），只有播片段时被片段盖住才像站着。现在 _Pose 发现
+//   「不倒地了、人却还倒着」就把这个人重造一遍（_Revive，同关键帧之间「从倒地站起来就重造」），同一帧强推一步站起来；
+//   之后再写 state:"down" 就是新人从头倒（lie:"along" 照样用 LIE_DEATH_VARIANT 落定、重新量头的方向再摆）。
+//   站着背枪的人倒下后不再背枪（倒地后步态层不推了，背枪标志停在站着时的值，枪竖着戳在背上）：拿回手里，倒地动作摆在身边。
 
 import * as THREE from "three";
 import { SampleTransition } from "./Script_EditorBlockoutConfig.mjs";
@@ -405,8 +411,14 @@ export class BlockoutPuppets {
   _Create(unit, allowActors) {
     const puppet = { id: unit.id, unit, body: null, humans: [], x: unit.x, z: unit.z, yawDeg: unit.yawDeg, stance: unit.stance,
       moving: false, speedMps: 0, visible: true, down: unit.state === "down", noActor: false, stagger: HashSeed(unit.id) };
+    if (["tank", "litter", "cart", "animal"].includes(unit.kind)) puppet.body = this._MakeBody(unit);
+    this._MakeHumans(puppet, unit, allowActors);
+    return puppet;
+  }
+
+  /** 造这个单位的人：担架按 bearers 造抬杆的，战车 / 车 / 牲口没有人，其余一个；名额不够 → noActor。 */
+  _MakeHumans(puppet, unit, allowActors) {
     const bodyKinds = ["tank", "litter", "cart", "animal"];
-    if (bodyKinds.includes(unit.kind)) puppet.body = this._MakeBody(unit);
     if (unit.kind === "litter") {
       // §3 bearers：2 = 前后两人抬；1 = 只剩前头一人（后端着地）；0 = 担架放在地上，没人抬
       const slots = LitterSlots(unit);
@@ -423,15 +435,29 @@ export class BlockoutPuppets {
       } else puppet.noActor = true;
     }
     this.actorCount += puppet.humans.length;
-    return puppet;
   }
 
-  _Destroy(puppet) {
+  _DisposeHumans(puppet) {
     for (const human of puppet.humans) {
       try { human.actor.Dispose(); } catch (error) { /* already gone */ }
     }
     this.actorCount -= puppet.humans.length;
     puppet.humans.length = 0;
+  }
+
+  /**
+   * 2026-10-21：倒着的人被预演键扶起来（state "alive"）。倒地在 Actor 里是一次性的（ragdollState 一置位，Update 就只摆
+   * 倒地姿态，dead:false 撤不掉；lieLocal / 倒地片段的选择也跟着这个人走），照关键帧那头（_Sync：从倒地站起来就重造）
+   * 把人重造一遍；体块、位置、驱动都留着。之后再倒下就是一个新人从头倒（lie:"along" 照样重新量、重新摆）。
+   */
+  _Revive(puppet) {
+    const count = puppet.humans.length;
+    this._DisposeHumans(puppet);
+    this._MakeHumans(puppet, puppet.unit, count);
+  }
+
+  _Destroy(puppet) {
+    this._DisposeHumans(puppet);
     if (puppet.body) {
       // 正式模型：车 / 牲口的几何与骨架是共用的（CloneSkinnedRig），只停动画摘下来；战车是每辆现造的几何，照拆。材质都是共用的，不拆。
       const model = puppet.body.userData.model;
@@ -565,6 +591,8 @@ export class BlockoutPuppets {
       puppet.moving = !!drive.moving; puppet.speedMps = drive.speedMps || 0; puppet.visible = drive.visible !== false;
       puppet.down = drive.state === "down";
     }
+    // 2026-10-21 不倒地了，人却还是倒着的（预演键把倒地的人扶起来）：重造（_Revive），这一帧就站起来（照造人时那样强推一步）
+    if (!puppet.down && puppet.humans.some(h => h.actor.ragdollState)) { this._Revive(puppet); force = true; }
     // 2026-10-20 挂到车上（ride）：位姿 = 车当前位姿 ∘ 本地偏移，不贴地、不走路；位置键不管用
     const seat = this._Seat(puppet);
     puppet.seat = seat;
@@ -873,7 +901,9 @@ export class BlockoutPuppets {
     const soldier = human.soldier, actor = human.actor, rig = actor.characterRig;
     if (!rig || !actor.weaponGroup || soldier.openingStoryboardPose) return;
     if (!relaxed && !rig.relaxedGaitRifle?.visible) return;
-    const onBack = relaxed && RelaxedGaitShown(soldier);
+    // 倒下了不背枪（2026-10-21）：倒地后 Actor 不再推步态层，relaxedGaitActive 停在站着时的值，枪会竖着戳在躺着的人背上；
+    // 拿回手里，倒地动作照样把它摆在身边（同造出来就倒着的人）
+    const onBack = relaxed && !actor.ragdollState && RelaxedGaitShown(soldier);
     UpdateRelaxedGaitWeapon(soldier, onBack);
     if (!onBack) actor.weaponGroup.visible = true;
   }
