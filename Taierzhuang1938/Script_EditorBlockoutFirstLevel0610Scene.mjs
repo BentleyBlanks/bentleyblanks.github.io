@@ -9,10 +9,13 @@
 //   1. 自然地面：z < 205 直接用 0105 的 L0105Ground（交通沟坡道、干沟、南岸、凹路头一段逐点一致，两片白盒以后能接上）；
 //      z ≥ 205 用 0105 的 NaturalHeight（那里只剩低频起伏）再叠本关的大形：凹路中段两侧略高（路才有 2.5 m 深）、往南落回村子的 +0.3。
 //   2. 凹路：0105 的折线原样接上再往南到村口路沟的北沿，路底按弧长分段缓降 / 缓升到 −0.9 直接接进沟底；路底宽、两壁宽沿用 0105。
-//   3. 村口路沟（第二版）：东西向，沟底 3 m 宽、−0.9，两壁 1.3 m 陡起；街口那一段南壁放缓成 3.6 m 的坡道（驴车从这里上主街）；两头 4 m 内收掉。
-//   4. 河汊子：村西一条南北向干沟，沟底绝对高 −2.7（两岸 2.7…3.7 m）、两壁 2.5 m 陡起、岸上一道矮土埂；沟底一条水块（只做样子）。
-//   5. 耿家庄：整村压平到 +0.3（土坯墙才站得稳），街面压低 12 cm；地瓜窖是平底开挖。
+//   3. 村口路沟（第二版）：东西向，沟底 3 m 宽、−0.9，两壁 1.3 m 陡起；街口那一段南壁放缓成 3.6 m 的坡道（驴车从这里上主街）；
+//      东头 4 m 内收掉；西头（第五版）不收，沟底 −0.9 一直挖到河汊子东壁、落进河沟（排水口）。
+//   4. 河汊子：村西一条南北向河沟，沟底绝对高 −2.7（两岸 2.7…3.7 m）、两壁 2.5 m 陡起、岸上一道矮土埂；第五版贴着庄子西墙走：
+//      东壁坎沿顶到墙根 x 40，庄子那一段（z 383…548）东岸不堆土埂（埂顶会是一条顺墙根的路）；沟底铺满 1 m 深的水块（水面 −1.7）。
+//   5. 耿家庄：整村压平到 +0.3（土坯墙才站得稳），街面压低 12 cm；地瓜窖是平底开挖。东街东头出去一条往东北的土路（压低 0.15）、道边三个坟头烘进地里。
 //   6. 体块：院墙（带门洞 / 窗洞 / 狗洞 / 墙缝）、房子（实心块）、老耿家三间屋（空心 + 平顶 + 女墙，没人站上去）、石磨、窖沿与盖板、
+//      第五版补满的三块院子（西南 / 东北 / 东南，外沿一整圈墙、不开门）、两道没门扇的后门（主街西边北头那院西墙 z 425 → 巷子、主街东边最北那院北墙 x 110 → 路沟）、
 //      柴草垛、水缸、翻倒的大车（加高到 1.15）、场院的麦秸垛、东街的土地庙等日常摆件、干沟南岸的枯树（0105 的表），以及随信号体块：
 //      CartDeparted（车上的弹药箱）/ SideGateOpen（侧门扇）/ CellarBlast（盖板飞开、窖口冒烟）/ MgSilenced（北窗上的机枪 → 石碾后）/
 //      NorthYardGatesBroken（北边院子链上的三道门扇倒下）/ BackVatMoved（水缸推到门东边，10-20 拆出来的）/ BackDoorOpen（后门扇）。
@@ -26,8 +29,8 @@ import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
 import { L0105Ground, NaturalHeight as NaturalHeight0105, SightBlock } from "./Script_EditorBlockoutFirstLevel0105Scene.mjs";
 import {
   L0610_LEVEL_KEY, L0610_BOUNDS, L0610_CELL_M, L0610_HEIGHTS, L0610_PLAIN_PROFILE, L0610_LANE, L0610_DITCH, L0610_RIVER, L0610_VILLAGE,
-  L0610_STREETS, L0610_GENG, L0610_NEIGHBOR, L0610_EAST_YARDS, L0610_STREET_YARDS, L0610_PROP_KINDS, L0610_PROPS,
-  L0610_COLLAPSED_HOUSES, L0610_SIGNALS, L0610_PLACES, L0610_SPAWN, L0610_FROM_0105, L0610_MOUTH_SHOOTERS, LineLength, Station,
+  L0610_STREETS, L0610_GENG, L0610_NEIGHBOR, L0610_EAST_YARDS, L0610_STREET_YARDS, L0610_FILL_YARDS, L0610_EAST_ROAD, L0610_PROP_KINDS, L0610_PROPS,
+  L0610_COLLAPSED_HOUSES, L0610_SIGNALS, L0610_PLACES, L0610_SPAWN, L0610_FROM_0105, L0610_MOUTH_SHOOTERS, LineLength, Station, LanePointAtZ,
 } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 
 export { SightBlock, L0610_MOUTH_SHOOTERS };
@@ -116,7 +119,8 @@ function LaneCap(x, z) {
 }
 export function DistanceToLane(x, z) { return NearestOnLine(LANE.line, x, z).dist; }
 
-// 村口路沟：东西向，沟底 floorW 宽、floorY；南北两壁 wallM 陡起；街口那一段（|x − 主街中线| ≤ rampHalfW）南壁放缓成 rampWallM 的坡道；两头 endM 内收掉
+// 村口路沟：东西向，沟底 floorW 宽、floorY；南北两壁 wallM 陡起；街口那一段（|x − 主街中线| ≤ rampHalfW）南壁放缓成 rampWallM 的坡道；
+// 东头 endM 内收掉；西头（第五版 westOpensToRiver）不收：沟底 −0.9 一直挖到 fromX（在河汊子东壁里头），河汊子的开挖在后面把它接下去 —— 排水口
 const DT = L0610_DITCH;
 const DITCH_HALF = DT.floorW / 2;
 /** 路沟开挖后的高度上限（不在沟上 = Infinity）。h 是开挖前的地面（壁从沟底升到它）。 */
@@ -126,7 +130,8 @@ function DitchCap(h, x, z) {
   const nearStreet = 1 - Smooth((Math.abs(x - ST.main.x) - DT.rampHalfW) / DT.rampBlendM);
   const wallM = south ? Lerp(DT.wallM, DT.rampWallM, nearStreet) : DT.wallM;
   if (dz >= DITCH_HALF + wallM) return Infinity;
-  const over = Math.max(DT.fromX - x, 0, x - DT.toX);
+  if (x < DT.fromX) return Infinity;
+  const over = Math.max(DT.westOpensToRiver ? 0 : DT.fromX - x, 0, x - DT.toX);
   if (over >= DT.endM) return Infinity;
   const fade = 1 - Smooth(over / DT.endM);
   const floor = Lerp(h, DT.floorY, fade);
@@ -134,10 +139,18 @@ function DitchCap(h, x, z) {
   return Lerp(floor, h, Smooth((dz - DITCH_HALF) / wallM));
 }
 
-// 河汊子：沟底绝对高（两岸随平地起伏，沟底不随）
+// 河汊子：沟底绝对高（两岸随平地起伏，沟底不随）。第五版贴着庄子西墙：东壁坎沿 = centerX + floorW/2 + wallM = 40 = 西墙中线，
+// 庄子那一段（eastBankOff）东岸不堆土埂 —— 埂在 x 40…43 会垫在院墙底下，埂顶也是一条顺墙根的路
 const RV = L0610_RIVER;
 export const RIVER_FLOOR_Y = R2(H.plain - RV.depth + 0.3);   // −2.7
+export const RIVER_EAST_RIM_X = RV.centerX + RV.floorW / 2 + RV.wallM;   // 40：东壁坎沿（= 庄子西墙中线）
 const RIVER_BOX = Object.freeze({ minX: RV.centerX - RV.floorW / 2, maxX: RV.centerX + RV.floorW / 2, minZ: RV.fromZ, maxZ: RV.toZ + 50 });
+/** 东岸土埂的高度系数：庄子那一段为 0，两头 fadeM 内渐起到 1。 */
+function EastBankFactor(z) {
+  const off = RV.eastBankOff;
+  if (!off) return 1;
+  return 1 - Smooth((z - off.fromZ) / off.fadeM) * (1 - Smooth((z - off.toZ) / off.fadeM));
+}
 function RiverCarve(h, x, z) {
   const sdf = RectSdf(x, z, RIVER_BOX);
   if (sdf >= RV.wallM + RV.bankW) return h;
@@ -147,7 +160,24 @@ function RiverCarve(h, x, z) {
     return Math.min(h, Lerp(h, Lerp(h, RIVER_FLOOR_Y, fade), k));
   }
   const u = (sdf - RV.wallM) / RV.bankW;
-  return h + RV.bankH * Math.sin(u * Math.PI) * fade;
+  const bank = x > RV.centerX ? EastBankFactor(z) : 1;
+  return h + RV.bankH * Math.sin(u * Math.PI) * fade * bank;
+}
+
+// 东北进庄的道（第五版）：东街东头出去往东北的土路，压低 lowerM、两边 0.9 m 内渐出；道边几个坟头是圆土包（照 0105 散坟烘进地里）
+const ER = L0610_EAST_ROAD;
+function EastRoadDelta(x, z) {
+  const d = Math.max(NearestOnLine(ER.line, x, z).dist - ER.halfW, 0);
+  if (d >= 0.9) return 0;
+  return -ER.lowerM * (1 - Smooth((d + 0.3) / 0.6));
+}
+function GraveBumps(x, z) {
+  let dh = 0;
+  for (const g of ER.graves || []) {
+    const r = Math.hypot(x - g.x, z - g.z);
+    if (r < g.r) dh += g.h * (1 - Smooth(r / g.r));
+  }
+  return dh;
 }
 
 // 村子：整村压平
@@ -197,7 +227,8 @@ export function L0610Ground() {
     const ditch = DitchCap(h, x, z);
     if (ditch < h) h = ditch;
     h = RiverCarve(h, x, z);
-    h += StreetDelta(x, z);
+    h += Math.min(StreetDelta(x, z), EastRoadDelta(x, z));   // 东街东头接东北的道：两个压低取深的那个，不叠加
+    h += GraveBumps(x, z);
     h = CarveBox(h, x, z, CELLAR_BOX, CELLAR_FLOOR_Y, CELLAR.wallM);
     return h;
   };
@@ -425,7 +456,9 @@ function VillageBlocks(sample) {
   // 主街东边院子：东墙（到东街北侧院子的北墙为止，再往南是那片院子的西墙）、隔墙、村北边
   Wall(blocks, "EastYardsEast", "z", EM.box.maxX, EM.box.minZ, E.north.box.minZ, []);
   for (const z of EM.splitsZ) Wall(blocks, `EastYardsSplit${z}`, "x", z, EM.box.minX, EM.box.maxX, []);
-  Wall(blocks, "EastYardsNorthEdge", "x", EM.box.minZ, EM.box.minX, EM.box.maxX, []);
+  // 第五版：最北那院北墙上一道朝路沟的后门（x 110，没门扇：人跑了没关），08-1 两个村民从这里直接下到沟东半截
+  Wall(blocks, "EastYardsNorthEdge", "x", EM.box.minZ, EM.box.minX, EM.box.maxX, [Gap(EM.ditchBackGateX, gw)]);
+  Lintel(blocks, "DitchBackGateLintel", "x", EM.box.minZ, EM.ditchBackGateX - gw / 2, EM.ditchBackGateX + gw / 2, V.doorTopH, V.wallH, sample);
 
   // --- 巷子：北头的夹道（两道墙，北头开在路沟南沿上）、东西那截（主街那头封死）、南北那截的西墙、尽头；
   //     西边院子的西墙 = x 60 那道（从巷子到邻院南墙，开邻院小门，不放门扇） ---
@@ -437,7 +470,9 @@ function VillageBlocks(sample) {
   Wall(blocks, "AlleySouthWall", "x", alleySouthWallZ, W.box.minX, W.box.maxX, []);   // 一直到主街西墙：巷子不通主街
   Wall(blocks, "AlleyWestWall", "z", WA.box.maxX, ST.main.fromZ, AS.toZ + T / 2, []);
   Wall(blocks, "AlleyEndWall", "x", AS.toZ, WA.box.maxX - T / 2, W.box.minX + T / 2, []);
-  Wall(blocks, "WestYardsWest", "z", W.box.minX, alleySouthWallZ, NB.box.maxZ, [Gap(NB.westDoor.z, NB.westDoor.w)]);
+  // 第五版：主街西边北头那院（z 400…430）西墙上一道朝巷子南北那截的后门（z 425，没门扇），08-1 一个村民从这里钻巷子逃到沟西头
+  Wall(blocks, "WestYardsWest", "z", W.box.minX, alleySouthWallZ, NB.box.maxZ, [Gap(W.alleyBackGateZ, gw), Gap(NB.westDoor.z, NB.westDoor.w)]);
+  Lintel(blocks, "AlleyBackGateLintel", "z", W.box.minX, W.alleyBackGateZ - gw / 2, W.alleyBackGateZ + gw / 2, V.doorTopH, V.wallH, sample);
   Lintel(blocks, "NeighborDoorLintel", "z", W.box.minX, NB.westDoor.z - NB.westDoor.w / 2, NB.westDoor.z + NB.westDoor.w / 2, V.doorTopH, V.wallH, sample);
   // 巷子西边的院子：村西边、北边、隔墙
   Wall(blocks, "VillageWestEdge", "z", WA.box.minX, ST.main.fromZ, WA.box.maxZ, []);
@@ -481,7 +516,25 @@ function VillageBlocks(sample) {
   Wall(blocks, "SouthEastYardEast", "z", SEY.box.maxX, ES.box.maxZ, Y.villageSouthZ, []);
   Wall(blocks, "SouthEastYardSouth", "x", Y.villageSouthZ, SEY.box.minX, SEY.box.maxX, []);
 
-  // --- 房子（实心），两座塌了一角；场院（EN2）不盖房；夹道把原来的 NA1 拆成两座 ----------------------
+  // --- 第五版补满的三块院子：只画不和现成墙重合的那几面 + 隔墙；朝外（河汊子 / 麦地 / 东北进庄的道）不开门，朝里也不开（填实用的） ----
+  //     西南角 (40…60, 492…545)：北墙 = 巷子尽头 z 492（WestAlleyYardsSouth + AlleyEndWall）、东墙 = x 60（WestYardsWest / SouthWestYardWest）现成；画西墙、南墙、隔墙
+  //     东北角 (118.25…232, 388…440)：西墙 = EastYardsEast、南墙 = EastNorthYardsNorth 现成；画北墙（z 388）、东墙（x 232）、隔墙
+  //     东南角 (135…232, 490…545)：西墙 = SouthEastYardEast、北墙 = EastSouthYardsSouth 现成；画东墙（x 232）、南墙、隔墙
+  const FILL = L0610_FILL_YARDS;
+  Wall(blocks, "FillSWWest", "z", FILL.southWest.box.minX, FILL.southWest.box.minZ, Y.villageSouthZ, []);
+  Wall(blocks, "FillSWSouth", "x", Y.villageSouthZ, FILL.southWest.box.minX, FILL.southWest.box.maxX - T / 2, []);
+  for (const z of FILL.southWest.splitsZ) Wall(blocks, `FillSWSplit${z}`, "x", z, FILL.southWest.box.minX + T / 2, FILL.southWest.box.maxX - T / 2, []);
+  Wall(blocks, "FillNENorth", "x", FILL.northEast.box.minZ, FILL.northEast.box.minX + T / 2, FILL.northEast.box.maxX, []);
+  Wall(blocks, "FillNEEast", "z", FILL.northEast.box.maxX, FILL.northEast.box.minZ + T / 2, FILL.northEast.box.maxZ - T / 2, []);
+  for (const x of FILL.northEast.splitsX) Wall(blocks, `FillNESplit${x}`, "z", x, FILL.northEast.box.minZ + T / 2, FILL.northEast.box.maxZ - T / 2, []);
+  Wall(blocks, "FillSEEast", "z", FILL.southEast.box.maxX, FILL.southEast.box.minZ, Y.villageSouthZ, []);
+  Wall(blocks, "FillSESouth", "x", Y.villageSouthZ, FILL.southEast.box.minX + T / 2, FILL.southEast.box.maxX - T / 2, []);
+  for (const x of FILL.southEast.splitsX) Wall(blocks, `FillSESplit${x}`, "z", x, FILL.southEast.box.minZ + T / 2, Y.villageSouthZ - T / 2, []);
+
+  // --- 东北进庄的道边两棵树（foliage 细块：编辑器种树模型，同 0105 的枯树） -----------------------------------
+  (L0610_EAST_ROAD.trees || []).forEach((t, i) => blocks.push(Block(`RoadTree_${i + 1}`, t.x, t.z, 0.42, 0.42, t.h, "foliage")));
+
+  // --- 房子（实心），两座塌了一角；场院（EN2）不盖房；夹道把原来的 NA1 拆成两座；第五版补的院子每院一座（FSW / FNE / FSE） --------
   const HOUSES = {
     House_WM1: { minX: 66, maxX: 80, minZ: 402, maxZ: 408 }, House_WM2: { minX: 66, maxX: 80, minZ: 432, maxZ: 438 },
     House_EM1: { minX: 107, maxX: 117, minZ: 390, maxZ: 400 }, House_EM2: { minX: 107, maxX: 117, minZ: 414, maxZ: 424 }, House_EM3: { minX: 104, maxX: 112, minZ: 437, maxZ: 443 },
@@ -492,6 +545,11 @@ function VillageBlocks(sample) {
     House_ES1: { minX: 124, maxX: 142, minZ: 483, maxZ: 489 }, House_ES2: { minX: 152, maxX: 172, minZ: 483, maxZ: 489 },
     House_ES3: { minX: 184, maxX: 204, minZ: 483, maxZ: 489 }, House_ES4: { minX: 216, maxX: 230, minZ: 483, maxZ: 489 },
     House_SW1: { minX: 70, maxX: 90, minZ: 520, maxZ: 526 }, House_SE1: { minX: 104, maxX: 124, minZ: 520, maxZ: 526 },
+    // 第五版补的院子：西南角两院（房靠西墙）、东北角四院（房靠北墙，z 392…398：在街口 / 凹路口看东北道那一扇视线的南边）、东南角三院（房靠南）
+    House_FSW1: { minX: 42, maxX: 54, minZ: 500, maxZ: 507 }, House_FSW2: { minX: 42, maxX: 54, minZ: 524, maxZ: 531 },
+    House_FNE1: { minX: 124, maxX: 144, minZ: 392, maxZ: 398 }, House_FNE2: { minX: 156, maxX: 176, minZ: 392, maxZ: 398 },
+    House_FNE3: { minX: 188, maxX: 208, minZ: 392, maxZ: 398 }, House_FNE4: { minX: 218, maxX: 228, minZ: 392, maxZ: 398 },
+    House_FSE1: { minX: 141, maxX: 163, minZ: 520, maxZ: 526 }, House_FSE2: { minX: 176, maxX: 196, minZ: 520, maxZ: 526 }, House_FSE3: { minX: 208, maxX: 226, minZ: 520, maxZ: 526 },
   };
   for (const [id, box] of Object.entries(HOUSES)) {
     if (L0610_COLLAPSED_HOUSES.includes(id)) CollapsedHouse(blocks, id, box);
@@ -618,8 +676,12 @@ export function L0610Landmarks(sample) {
     L("LmSouthClimb", PL.southClimb.name, "place", E.southClimb.x, E.southClimb.z, { ...Size(3, T, V.wallH), note: "10-5 南边两个鬼子翻这段墙" }),
     L("LmMortarHide", "掷弹筒藏处", "place", E.mortarHide.x, E.mortarHide.z, { radiusM: 1.8 }),
     L("LmEastEnd", PL.eastEnd.name, "place", PL.eastEnd.x, PL.eastEnd.z, { radiusM: 2 }),
-    // 村西的河汊子、村南口
-    L("LmRiver", RV.name, "area", RV.centerX, (RV.fromZ + L0610_BOUNDS.maxZ) / 2, { w: RV.floorW + 2 * RV.wallM, d: L0610_BOUNDS.maxZ - RV.fromZ, note: "车下不去" }),
+    // 第五版：东北进庄的道（看得见鬼子的那一段）、两道没门扇的后门
+    L("LmEastRoadView", PL.eastRoadView.name, "place", PL.eastRoadView.x, PL.eastRoadView.z, { radiusM: 6, note: "鬼子顺这条道进庄；07 末 / 08 看得见" }),
+    L("LmAlleyBackGate", PL.alleyBackGate.name, "door", PL.alleyBackGate.x, PL.alleyBackGate.z, { ...DoorZ(PL.alleyBackGate.x, PL.alleyBackGate.z, V.gateW), note: "08-1 村民钻巷子逃到沟西头；没门扇" }),
+    L("LmDitchBackGate", PL.ditchBackGate.name, "door", PL.ditchBackGate.x, PL.ditchBackGate.z, { ...DoorX(PL.ditchBackGate.x, PL.ditchBackGate.z, V.gateW), note: "08-1 两个村民下到沟东半截；没门扇" }),
+    // 村西的河汊子（第五版贴着西墙、沟底齐腰深的水）、村南口
+    L("LmRiver", RV.name, "area", RV.centerX, (RV.fromZ + L0610_BOUNDS.maxZ) / 2, { w: RV.floorW + 2 * RV.wallM, d: L0610_BOUNDS.maxZ - RV.fromZ, note: "车下不去；沟底齐腰深的水，抬伤号过不去" }),
     L("LmVillageSouth", PL.villageSouth.name, "place", PL.villageSouth.x, PL.villageSouth.z, { radiusM: 2.5, note: "11 驴车从这里出村" }),
   ];
 }
@@ -726,11 +788,41 @@ export function L0610SightChecks(scene, sample) {
   const cart = L0610_PLACES.cart;
   const behindCart = { x: cart.x - 0.5, z: cart.z - 1.9, eye: 0.9 };
   const windowToCartHide = BlockSight(base, sample, mg, behindCart)?.id ?? null;
+  // ⑩（第五版）东北进庄的道：凹路尽头（LanePointAtZ(366)，蹲姿眼 1.05）与街口坡道上趴着的顺子（眼 0.32）→ 道上 x 272…290 那一段 1.5 m 高的人：
+  //    院墙 / 房子不许挡（地面另记：凹路口的眼在路底 −0.95 + 1.05 ≈ +0.1，比两侧麦地还低，地面本来就挡，所以 07 末看道的人要爬到坎上）
+  const laneMouth = { ...LanePointAtZ(366), eye: 1.05 };
+  const proneShooter = { ...L0610_MOUTH_SHOOTERS[0], eye: 0.32 };
+  const eastRoadTargets = EastRoadViewPoints().map((p) => ({ ...p, eye: 1.5 }));
+  const eastRoad = { laneMouth: [], ramp: [] };
+  for (const t of eastRoadTargets) {
+    eastRoad.laneMouth.push({ at: t, block: BlockSight(base, sample, laneMouth, t)?.id ?? null, ground: SightBlock(sample, laneMouth, t).block });
+    eastRoad.ramp.push({ at: t, block: BlockSight(base, sample, proneShooter, t)?.id ?? null, ground: SightBlock(sample, proneShooter, t).block });
+  }
   return {
     sideGateToCellar, gateClosedBlocks, throughGateCrack, throughCrack, windowToMouth, mouthToWindow, windowGround, rollerToEast, rollerGround,
-    shooterToWindow, windowToAlley, sideToMgBacks, windowToCartHide,
-    eyes: { crack: eye09_2, gateCrack: eye09_3, doorway, prone, side09_6: eye09_6, behindCart },
+    shooterToWindow, windowToAlley, sideToMgBacks, windowToCartHide, eastRoad,
+    eyes: { crack: eye09_2, gateCrack: eye09_3, doorway, prone, side09_6: eye09_6, behindCart, laneMouth, proneShooter },
   };
+}
+
+/** 东北进庄的道上「看得见鬼子」那一段（viewFromX…viewToX）：道中线上每 3 m 一个点（含 eastRoadView 本身）。 */
+export function EastRoadViewPoints() {
+  const line = ER.line, out = [{ x: L0610_PLACES.eastRoadView.x, z: L0610_PLACES.eastRoadView.z }];
+  for (let x = ER.viewFromX; x <= ER.viewToX + 1e-6; x += 3) {
+    for (let i = 1; i < line.length; i++) {
+      const a = line[i - 1], b = line[i];
+      if ((x - a.x) * (x - b.x) <= 0 && b.x !== a.x) { out.push({ x: R2(x), z: R2(a.z + (b.z - a.z) * (x - a.x) / (b.x - a.x)) }); break; }
+    }
+  }
+  return out;
+}
+
+/** 河汊子某 z 处东坎沿到庄子西墙之间能站人的平地有多宽：从中线往东找第一个高到庄子地面 −0.3 以上的点，到西墙内皮（x 40 − 墙厚/2）的距离。 */
+export function RiverEastLedgeAt(sample, z) {
+  const wallFace = L0610_STREET_YARDS.westOfAlley.box.minX - T / 2;   // 39.75
+  let rim = wallFace;
+  for (let x = RV.centerX; x <= wallFace; x += 0.05) { if (sample(x, z) >= V.y - 0.3) { rim = x; break; } }
+  return { rimX: R2(rim), ledgeW: R2(wallFace - rim) };
 }
 
 /** 村口路沟某 x 处：沟底、两沿、沟底宽（高度离沟底 15 cm 内的连续一段）。 */
@@ -803,10 +895,11 @@ export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", 
       generator: L0610_SCENE_GENERATOR,
       generatedAt,
       commit,
-      notes: `06–10 新剧本白盒（2026-10-19 第二版）：锚点 Data_EditorBlockoutFirstLevel0610Space；高度 ${L0610_CELL_M} m 网格（${minM}…${maxM} m）；`
-        + "z<205 逐点等于 FirstLevel0105 的地面（交通沟坡道 / 干沟 / 凹路头一段），往南：凹路南段（路底按弧长缓降缓升，直接接进村口路沟）、村口路沟（东西向、沟底 −0.9、街口南壁放缓成坡道）、"
-        + "河汊子（沟底 −2.7 的南北向干沟 + 一线浅水）、耿家庄（整村压平 +0.3、街面压低 12 cm、地瓜窖平底开挖）；体块：院墙带门洞 / 窗洞 / 狗洞 / 墙缝、实心房子、老耿家三间空心屋 + 平顶（没人上房）、"
-        + "石磨、窖沿与盖板、翻倒的大车（横在主街偏东）、场院的麦秸垛、东街的土地庙、日常摆件、0105 的南岸枯树；巷子北头的夹道开在路沟南沿上、主街那头封死；"
+      notes: `06–10 新剧本白盒（2026-10-21 第五版）：锚点 Data_EditorBlockoutFirstLevel0610Space；高度 ${L0610_CELL_M} m 网格（${minM}…${maxM} m）；`
+        + "z<205 逐点等于 FirstLevel0105 的地面（交通沟坡道 / 干沟 / 凹路头一段），往南：凹路南段（路底按弧长缓降缓升，直接接进村口路沟）、村口路沟（东西向、沟底 −0.9、街口南壁放缓成坡道、西头通进河汊子）、"
+        + "河汊子（沟底 −2.7、贴着庄子西墙 x 40 的南北向河沟，沟底 1 m 深的水）、耿家庄（整村压平 +0.3、街面压低 12 cm、地瓜窖平底开挖；西南 / 东北 / 东南三角补满院子、外沿一整圈墙）、东北进庄的道（压低 0.15、道边坟头）；"
+        + "体块：院墙带门洞 / 窗洞 / 狗洞 / 墙缝、实心房子、老耿家三间空心屋 + 平顶（没人上房）、两道没门扇的后门（西边院子→巷子 z 425、东边院子→路沟 x 110）、"
+        + "石磨、窖沿与盖板、翻倒的大车（横在主街偏东）、场院的麦秸垛、东街的土地庙、日常摆件、0105 的南岸枯树、道边两棵树；巷子北头的夹道开在路沟南沿上、主街那头封死；"
         + "gates：CartDeparted / SideGateOpen / CellarBlast / MgSilenced / NorthYardGatesBroken / BackVatMoved / BackDoorOpen（10-20 第四版：缸挪开与门开拆成两个信号，窖壁收直到 0.15）；"
         + `landmarks（10-20）：${landmarks.length} 个地标（干沟、路沟、街巷、老耿家的门窗 / 窖 / 磨 / 缸、狗洞 / 墙缝 / 侧门、石碾 / 场院 / 麦秸垛 / 土地庙 / 三道院门、河汊子、村南口），编辑器画亮色标记。`,
     },
@@ -823,10 +916,12 @@ export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", 
         [{ x: ST.east.fromX, z: ST.east.z }, { x: ST.east.toX, z: ST.east.z }],
         [{ x: ST.alleyNorth.x, z: ST.alleyNorth.fromZ }, { x: ST.alleyNorth.x, z: ST.alleyWest.z }, { x: ST.alleySouth.x, z: ST.alleyWest.z }, { x: ST.alleySouth.x, z: ST.alleySouth.toZ }],
         [{ x: ST.backLane.x, z: ST.backLane.fromZ }, { x: ST.backLane.x, z: ST.backLane.toZ }],
+        Pts(ER.line),   // 第五版：东街东头出去往东北的道
       ],
       trenches: [
         Pts(L0610_FROM_0105.trafficTrench.filter((p) => p.z >= L0610_BOUNDS.minZ)),
         [{ x: DT.fromX, z: DT.z }, { x: DT.toX, z: DT.z }],
+        [{ x: RV.centerX, z: RV.fromZ + RV.endM }, { x: RV.centerX, z: L0610_BOUNDS.maxZ }],   // 河汊子中线
       ],
     },
   };
@@ -843,7 +938,8 @@ export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", 
   const ditches = [60, 80, 100, 115, 124].map((x) => { const r = DitchSectionAt(sample, x); return `x${x} 底 ${r.floor} 沿 ${r.north}/${r.south} 宽 ${r.floorW}`; });
   notes.push(`村口路沟：${ditches.join(" · ")}；街口坡道 z381.5…385 ${[381.5, 382.5, 383.5, 384.3, 385].map((z) => R2(sample(100, z))).join(" → ")}；趴着的人脚下 ${L0610_MOUTH_SHOOTERS.map((p) => `${p.who} ${R2(sample(p.x, p.z))}`).join(" / ")}`);
   const rivers = [215, 260, 400, 500].map((z) => { const r = RiverSectionAt(sample, z); return `z${z} 底 ${r.floor} 岸 ${r.west}/${r.east} 宽 ${r.floorW}`; });
-  notes.push(`河汊子：${rivers.join(" · ")}`);
+  const ledges = [390, 420, 460, 500, 540].map((z) => { const r = RiverEastLedgeAt(sample, z); return `z${z} 坎沿 x${r.rimX} 到墙 ${r.ledgeW} m`; });
+  notes.push(`河汊子：${rivers.join(" · ")}；东坎沿到庄子西墙：${ledges.join(" · ")}；路沟西头 (38,380) ${R2(sample(38, 380))} / (36,380) ${R2(sample(36, 380))} / 西岸 (27,380) ${R2(sample(27, 380))}`);
   notes.push(`村里：小空地 ${at(PL.square)} · 后院 ${R2(sample(100, 494))} · 主街 (100,420) ${R2(sample(100, 420))} · 东街 (180,465) ${R2(sample(180, 465))} · 窖底 ${at(PL.cellar)}（深 ${R2(sample(100, 494) - sample(PL.cellar.x, PL.cellar.z))}）· 村南口 ${at(PL.villageSouth)}`);
   const s = L0610SightChecks(scene, sample);
   notes.push(`视线：侧门口→窖边的人 ${s.sideGateToCellar.block ? `被 ${s.sideGateToCellar.block} 挡` : "看得见"}（地面挡 ${s.sideGateToCellar.ground}）· 门关着时 ${s.gateClosedBlocks ? `被 ${s.gateClosedBlocks} 挡` : "居然看得见"}`
@@ -855,6 +951,9 @@ export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", 
     + ` · 北窗→巷子 ${s.windowToAlley.map((r) => `${r.name} ${r.block ? `被 ${r.block} 挡` : r.ground > 0 ? "被地面挡" : "看得见！"}`).join(" / ")}`
     + ` · 侧门里 (${s.eyes.side09_6.x},${s.eyes.side09_6.z}) 透过前屋南门看机枪组后背 ${s.sideToMgBacks.map((r) => `${r.who} ${r.block ? `被 ${r.block} 挡` : "看得见"}`).join(" / ")}`
     + ` · 北窗→大车北侧蹲着的人 ${s.windowToCartHide ? `被 ${s.windowToCartHide} 挡` : "看得见！"}`);
+  const SayRoad = (r) => `(${r.at.x},${r.at.z}) ${r.block ? `被 ${r.block} 挡` : "块不挡"}${r.ground > 0 ? `/地面挡 ${r.ground}` : ""}`;
+  notes.push(`视线（第五版）：凹路尽头 (${R2(s.eyes.laneMouth.x)},${R2(s.eyes.laneMouth.z)}) 蹲着→东北道 ${s.eastRoad.laneMouth.map(SayRoad).join(" / ")}`
+    + ` · 街口坡道趴着→东北道 ${s.eastRoad.ramp.map(SayRoad).join(" / ")}`);
   const dh = blocks.filter((b) => b.id.startsWith("SharedWall_")).map((b) => [b.z - b.d / 2, b.z + b.d / 2]).sort((a, b) => a[0] - b[0]);
   const holes = dh.slice(1).map((r, i) => R2(r[0] - dh[i][1])).filter((w) => w > 0.01);
   notes.push(`共用墙上的口子（从北到南）：${holes.join(" / ")} m（狗洞 / 墙缝 / 侧门）；狗洞过梁下沿 ${R2(blocks.find((b) => b.id === "DogHoleLintel").y - blocks.find((b) => b.id === "DogHoleLintel").h / 2 - sample(81.5, 488))} m`);

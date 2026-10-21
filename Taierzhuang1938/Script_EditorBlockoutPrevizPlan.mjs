@@ -6,6 +6,7 @@
 //   NormalizeBlockoutPreviz(doc)     深拷贝 + 排序 + 缺省值
 //   SamplePrevizActor(entry, t, baseUnit, opts?)    演员在 t 秒的位置 / 朝向 / 姿态 / 片段
 //   SamplePrevizCamera(camera, t, resolve, {cuts})  镜头在 t 秒的机位 / 朝向 / 视场（cuts = 切镜，见 PREVIZ_CUTS）
+//   PrevizFreeLookSegment(camera, index)            能转头不能走（2026-10-21，eye.free）：这一条属于哪一段 free 眼睛（PREVIZ_FREE_LOOK）
 //   PrevizSequenceDuration(seq, {lineDuration?})    序列时长
 //   PrevizOverlays(seq, t)           白光 / 黑场 / 说明字 / 震屏在 t 秒的确定性取值
 //   PrevizThrows(seq, base, standAt) 演员键 throw（2026-10-18 第三轮）：投弹动作的出手点 → 落点抛物线；SampleThrowFlight 取 t 秒位置
@@ -192,16 +193,22 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
         if (e.stance !== undefined && !PREVIZ_STANCES.includes(e.stance)) errors.push(`${cat}.eye.stance 要是 stand / crouch / prone`);
         for (const k of ["x", "z", "yawDeg", "pitchDeg", "toYawDeg", "toPitchDeg"]) if (e[k] !== undefined && !Finite(e[k])) errors.push(`${cat}.eye.${k} 要是有限数字`);
         if ((e.x === undefined) !== (e.z === undefined)) errors.push(`${cat}.eye 的 x / z 要同时给`);
+        // 2026-10-21：眼睛也能用锚点定默认视线（look 起幅 / toLook 落幅：点、演员锚、飞机锚），写了锚就不看 yawDeg / pitchDeg；
+        // free: true = 能转头不能走（§14.1）：眼睛位置要钉死（x / z 必填），玩家一动鼠标这一条剩下的时间视线归玩家
+        CheckAnchor(errors, `${cat}.eye.look`, e.look, false);
+        CheckAnchor(errors, `${cat}.eye.toLook`, e.toLook, false);
+        if (e.free !== undefined && typeof e.free !== "boolean") errors.push(`${cat}.eye.free 要是 true / false`);
+        if (e.free === true && (e.x === undefined || e.z === undefined)) errors.push(`${cat}.eye.free 的眼睛要钉死位置（x / z 必填）`);
       } else {
         CheckAnchor(errors, `${cat}.from`, c.from, true);
         CheckAnchor(errors, `${cat}.to`, c.to, false);
         CheckAnchor(errors, `${cat}.look`, c.look, true);
         CheckAnchor(errors, `${cat}.lookTo`, c.lookTo, false);
       }
-      for (const key of ["from", "to", "look", "lookTo"]) {
-        const actor = c[key]?.actor;
+      for (const [key, anchor] of [["from", c.from], ["to", c.to], ["look", c.look], ["lookTo", c.lookTo], ["eye.look", c.eye?.look], ["eye.toLook", c.eye?.toLook]]) {
+        const actor = anchor?.actor;
         if (units && typeof actor === "string" && actor !== "player" && !units.has(actor) && !SpawnIds(seq).has(actor)) errors.push(`${cat}.${key}.actor 在关键帧 ${seq.keyframe} 里找不到：${actor}`);
-        const plane = c[key]?.aircraft;
+        const plane = anchor?.aircraft;
         if (typeof plane === "string" && plane && !AircraftIds(seq).has(plane)) errors.push(`${cat}.${key}.aircraft 在这一段的 aircraft 里找不到：${plane}`);
       }
     });
@@ -885,11 +892,15 @@ function SampleShot(c, u, resolve) {
     const stance = PREVIZ_STANCES.includes(e.stance) ? e.stance : "stand";
     const anchor = Finite(e.x) && Finite(e.z) ? { x: e.x, z: e.z, h: PREVIZ_EYE_HEIGHT[stance] } : { actor: "player", offset: [0, PREVIZ_EYE_HEIGHT[stance], 0], eye: true, stance };
     const position = resolve(anchor);
-    const yaw0 = Finite(e.yawDeg) ? e.yawDeg : (position?.yawDeg ?? 0);
-    const pitch0 = Finite(e.pitchDeg) ? e.pitchDeg : (position?.pitchDeg ?? 0);
-    const yawDeg = Finite(e.toYawDeg) ? LerpYawDeg(yaw0, e.toYawDeg, u) : WrapDeg(yaw0);
-    const pitchDeg = Finite(e.toPitchDeg) ? Lerp(pitch0, e.toPitchDeg, u) : pitch0;
-    return { position: { x: position.x, y: position.y, z: position.z }, yawDeg, pitchDeg, fov: c.fov ?? PREVIZ_DEFAULTS.fov, shake: c.shake || 0, eye: true };
+    // 默认视线：起幅 look（锚点）或 yawDeg / pitchDeg，落幅 toLook（锚点）或 toYawDeg / toPitchDeg；锚点每次取样都重新算，
+    // 所以 look 写飞机锚就是「视线跟着飞机走」（2026-10-21）
+    const dir0 = IsObject(e.look) ? YawPitchOf(position, resolve(e.look))
+      : { yawDeg: Finite(e.yawDeg) ? e.yawDeg : (position?.yawDeg ?? 0), pitchDeg: Finite(e.pitchDeg) ? e.pitchDeg : (position?.pitchDeg ?? 0) };
+    const dir1 = IsObject(e.toLook) ? YawPitchOf(position, resolve(e.toLook))
+      : { yawDeg: Finite(e.toYawDeg) ? e.toYawDeg : dir0.yawDeg, pitchDeg: Finite(e.toPitchDeg) ? e.toPitchDeg : dir0.pitchDeg };
+    const yawDeg = LerpYawDeg(dir0.yawDeg, dir1.yawDeg, u);
+    const pitchDeg = Lerp(dir0.pitchDeg, dir1.pitchDeg, u);
+    return { position: { x: position.x, y: position.y, z: position.z }, yawDeg, pitchDeg, fov: c.fov ?? PREVIZ_DEFAULTS.fov, shake: c.shake || 0, eye: true, free: e.free === true };
   }
   const from = resolve(c.from), to = c.to ? resolve(c.to) : from;
   const look = resolve(c.look), lookTo = c.lookTo ? resolve(c.lookTo) : look;
@@ -935,6 +946,21 @@ export function SamplePrevizCamera(camera, t, resolve, { cuts = false } = {}) {
   }
   const shot = SampleShot(c, PrevizEase(local, c.ease || PREVIZ_DEFAULTS.ease), resolve);
   return { ...shot, index };
+}
+
+/**
+ * 能转头不能走（2026-10-21，§14.1 `eye.free`）：玩家一动鼠标 / 按方向键，视线就归玩家，到这一条镜头结束；
+ * **紧挨着的几条 free 眼睛，只要位置、姿态一样，算同一段**（默认视线分几条写，玩家转头不被夺回），下一条不一样的镜头开始时收回。
+ * → 这一条所属那一段的第一条镜头下标（不是 free 眼睛 → -1）。运行时按它判断「还是不是同一段」。
+ */
+export const PREVIZ_FREE_LOOK = Object.freeze({ samePosM: 0.05, degPerPx: 0.11, keyDegPerS: 90, pitchMaxDeg: 85 });
+export function PrevizFreeLookSegment(camera, index) {
+  if (!Array.isArray(camera) || !camera[index]?.eye || camera[index].eye.free !== true) return -1;
+  const Same = (a, b) => a?.eye?.free === true && b?.eye?.free === true && (a.eye.stance || "stand") === (b.eye.stance || "stand")
+    && Finite(a.eye.x) && Finite(b.eye.x) && Math.hypot(a.eye.x - b.eye.x, a.eye.z - b.eye.z) <= PREVIZ_FREE_LOOK.samePosM;
+  let first = index;
+  while (first > 0 && Same(camera[first - 1], camera[first])) first--;
+  return first;
 }
 
 // ---------------------------------------------------------------------------

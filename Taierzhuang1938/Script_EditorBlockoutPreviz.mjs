@@ -23,6 +23,11 @@
 //     放的时候走 audio.Play("voice.blockoutPrevizSfx.<别名>")，所以照样按事件的 x / z 定位、volume 起作用；
 //     文件读不到只警告一次、记进 State().missingSfx（别名→url），预演照常播。
 //
+//   · 2026-10-21：能转头不能走（镜头 eye.free，§14.1）：眼睛钉在写的位置、默认视线照写的放；玩家一动鼠标或按方向键
+//     （← → ↑ ↓），这一段 free 眼睛剩下的时间视线归玩家（WASD 本来就不起作用），下一条不一样的镜头开始时收回；
+//     Seek / 没人碰鼠标时就是默认视线（确定性，截图、测试都按它）。鼠标走这里自己挂的 mousemove（Script_Main 那条链在预演中
+//     把位移扔了，不抢指针锁）。Debug.Blockout.Previz.Look(dx, dy) 给测试喂位移；State().freeLook 报现在能不能转、转到哪了。
+//
 // Seek(t) 暂停在 t 秒并确定性求值（演员、镜头、遮罩、字幕、嘴、信号、持续的烟；一次性的爆炸 / 枪口火 / 音效不补放），
 // 同一 t 两次截图一样，供验收。Debug.Blockout.Previz：Has / Play / Stop / Seek / Resume / State（+ Reload）。
 //
@@ -33,6 +38,7 @@ import * as THREE from "three";
 import {
   ValidateBlockoutPreviz, NormalizeBlockoutPreviz, PrevizSequenceFor, PrevizSequenceDuration, SamplePrevizActor, SamplePrevizCamera,
   PrevizOverlays, PrevizShakeOffset, PrevizActiveLines, PrevizSignalsAt, PREVIZ_EYE_HEIGHT, PREVIZ_DEFAULTS, PrevizTimeScale, PrevizWallTime,
+  PREVIZ_FREE_LOOK, PrevizFreeLookSegment, WrapDeg,
 } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { BlockoutPrevizAircraft } from "./Script_EditorBlockoutPrevizAircraft.mjs";
 import { KeyframeIndex } from "./Script_EditorBlockoutConfig.mjs";
@@ -93,6 +99,8 @@ const SMOKE_DEFAULT_S = 6;
 const EXPLOSION_KINDS = new Set(["grenade", "launcher", "shell", "tank", "bomb"]);
 const DEG = Math.PI / 180;
 const VOICE_KEY_PREFIX = "blockoutPreviz.";
+/** 能转头不能走的看键（2026-10-21）：方向键，按住按 PREVIZ_FREE_LOOK.keyDegPerS 转。 */
+const FREE_LOOK_KEYS = Object.freeze({ ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] });
 
 function Fmt(t) { return `${Math.max(0, t).toFixed(1)} s`; }
 
@@ -139,7 +147,70 @@ export class BlockoutPreviz {
         },
       });
     } catch (error) { console.warn("[BlockoutPreviz] 飞机层建不起来", error); }
+    // 能转头不能走（2026-10-21，§14.1 eye.free）：segment = 现在这一段 free 眼睛的第一条镜头下标（-1 = 不在 free 眼睛里）；
+    // active = 玩家已经接手；yawDeg / pitchDeg = 玩家转到的视线；defaultYaw / defaultPitch = 这一帧的默认视线（接手那一刻从它起算）
+    this.freeLook = { segment: -1, active: false, yawDeg: 0, pitchDeg: 0, defaultYaw: 0, defaultPitch: 0, keys: new Set(), nudges: 0 };
+    this.BindFreeLook();
     this.BuildDom();
+  }
+
+  // -------------------------------------------------------------------------
+  // 能转头不能走（2026-10-21）
+
+  BindFreeLook() {
+    this.onFreeMouse = (event) => {
+      if (!this.FreeLookAvailable()) return;
+      const dx = event.movementX || 0, dy = event.movementY || 0;
+      if (Math.abs(dx) > 400 || Math.abs(dy) > 400) return;   // 浏览器偶发的上千像素假位移（同 Script_Main 的尖刺闸门）
+      this.Look(dx, dy);
+    };
+    this.onFreeKeyDown = (event) => {
+      if (!FREE_LOOK_KEYS[event.code] || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (!this.FreeLookAvailable()) return;
+      event.preventDefault();
+      this.freeLook.keys.add(event.code);
+    };
+    this.onFreeKeyUp = (event) => { this.freeLook.keys.delete(event.code); };
+    this.onFreeBlur = () => { this.freeLook.keys.clear(); };
+    document.addEventListener("mousemove", this.onFreeMouse);
+    document.addEventListener("keydown", this.onFreeKeyDown);
+    document.addEventListener("keyup", this.onFreeKeyUp);
+    window.addEventListener("blur", this.onFreeBlur);
+  }
+
+  UnbindFreeLook() {
+    document.removeEventListener("mousemove", this.onFreeMouse);
+    document.removeEventListener("keydown", this.onFreeKeyDown);
+    document.removeEventListener("keyup", this.onFreeKeyUp);
+    window.removeEventListener("blur", this.onFreeBlur);
+  }
+
+  /** 这一帧的镜头是不是能转头的眼睛（正在播、没暂停、当前镜头写了 eye.free）。 */
+  FreeLookAvailable() { return !!this.run && !this.run.paused && this.lastCamera?.free === true; }
+
+  /** 玩家转头（像素位移：右 +dx、下 +dy；方向键也换算成像素喂进来）。第一次接手从这一帧的默认视线起算。 */
+  Look(dx, dy) {
+    if (!this.FreeLookAvailable()) return false;
+    const fl = this.freeLook;
+    if (!fl.active) { fl.active = true; fl.yawDeg = fl.defaultYaw; fl.pitchDeg = fl.defaultPitch; }
+    fl.yawDeg = WrapDeg(fl.yawDeg - dx * PREVIZ_FREE_LOOK.degPerPx);
+    fl.pitchDeg = Math.max(-PREVIZ_FREE_LOOK.pitchMaxDeg, Math.min(PREVIZ_FREE_LOOK.pitchMaxDeg, fl.pitchDeg - dy * PREVIZ_FREE_LOOK.degPerPx));
+    fl.nudges += 1;
+    return true;
+  }
+
+  /** 收回（新一段开播、中断、Seek、离开 free 眼睛）。 */
+  ResetFreeLook() { const fl = this.freeLook; fl.segment = -1; fl.active = false; fl.nudges = 0; }
+
+  /** 每帧：按住的方向键按角速度转；镜头换了一段就收回（在 ApplyCamera 里按 PrevizFreeLookSegment 判断）。 */
+  UpdateFreeLook(dt) {
+    const fl = this.freeLook;
+    if (!fl.keys.size || !this.FreeLookAvailable()) return;
+    let kx = 0, ky = 0;
+    for (const code of fl.keys) { const [x, y] = FREE_LOOK_KEYS[code] || [0, 0]; kx += x; ky += y; }
+    if (!kx && !ky) return;
+    const px = PREVIZ_FREE_LOOK.keyDegPerS * dt / PREVIZ_FREE_LOOK.degPerPx;
+    this.Look(-kx * px, -ky * px);
   }
 
   /** 音效位置：{x,y,z} 直接用；{x,z,ground:true} = 地面 + 0.2（弹着点）；{x,z} = 地面 + 1。 */
@@ -286,6 +357,8 @@ export class BlockoutPreviz {
       if (run.units.has(entry.id)) run.actors.push(entry);
     }
     this.dialogue = new DialoguePlayer({ audio: this.host.audio, Clock: () => this.host.audio?.ctx?.currentTime ?? null });
+    this.ResetFreeLook();
+    this.lastCamera = null;
     editor.ReleasePointerLock();
     this.host.SetViewmodelVisible?.(false);
     document.body.classList.add("blockoutPreviz");
@@ -388,6 +461,7 @@ export class BlockoutPreviz {
     this.HideLoading();
     if (!run) return false;
     this.run = null;
+    this.ResetFreeLook();
     this.dialogue?.StopAll();
     this.dialogue = null;
     for (const handle of run.smoke.values()) { try { this.host.vfx?.RemoveSmokeSource(handle); } catch (error) { /* 已回收 */ } }
@@ -424,6 +498,7 @@ export class BlockoutPreviz {
     }
     const run = this.run;
     run.paused = true;
+    this.ResetFreeLook();   // Seek 按默认视线求值（确定性）
     this.dialogue?.StopAll();
     run.t = Math.max(0, Math.min(run.durationS, Number(t) || 0));
     run.prevT = run.t;
@@ -455,6 +530,7 @@ export class BlockoutPreviz {
       run.wallT += dt;
       run.prevT = prev;
       this.dialogue?.Update(dt);
+      this.UpdateFreeLook(dt);
       this.Evaluate(run.t, { fire: true, from: prev });
       if (run.t >= run.durationS) { this.Stop({ restore: true, finished: true }); return; }
     } else {
@@ -776,7 +852,8 @@ export class BlockoutPreviz {
     const shake = Math.max(shot.shake || 0, PrevizOverlays(run.seq, t).shake);
     const o = PrevizShakeOffset(shake, t);
     return { position: { x: shot.position.x + o.x, y: shot.position.y + o.y, z: shot.position.z + o.z },
-      yawDeg: shot.yawDeg + o.yawDeg, pitchDeg: shot.pitchDeg + o.pitchDeg, fov: shot.fov, index: shot.index, eye: shot.eye };
+      yawDeg: shot.yawDeg + o.yawDeg, pitchDeg: shot.pitchDeg + o.pitchDeg, fov: shot.fov, index: shot.index, eye: shot.eye, free: shot.free === true,
+      shake: o };
   }
 
   /** "cut"（缺省，切镜）/ "move"（照写的运镜）。 */
@@ -786,6 +863,15 @@ export class BlockoutPreviz {
     if (!this.run || !camera) return false;
     const pose = this.CameraPose();
     if (!pose) return false;
+    // 能转头不能走：这一帧是 free 眼睛就记下默认视线；玩家已经接手（同一段里）就用他转到的方向（震屏照加）。暂停 / Seek 时不接手
+    const fl = this.freeLook;
+    if (pose.free && !this.run.paused) {
+      const segment = PrevizFreeLookSegment(this.run.seq.camera, pose.index);
+      if (segment !== fl.segment) { fl.segment = segment; fl.active = false; }
+      fl.defaultYaw = pose.yawDeg - pose.shake.yawDeg;
+      fl.defaultPitch = pose.pitchDeg - pose.shake.pitchDeg;
+      if (fl.active) { pose.yawDeg = fl.yawDeg + pose.shake.yawDeg; pose.pitchDeg = fl.pitchDeg + pose.shake.pitchDeg; }
+    } else if (fl.segment !== -1) this.ResetFreeLook();
     camera.position.set(pose.position.x, pose.position.y, pose.position.z);
     camera.rotation.order = "YXZ";
     camera.rotation.set(pose.pitchDeg * DEG, pose.yawDeg * DEG, 0);
@@ -864,11 +950,18 @@ export class BlockoutPreviz {
         played: this.urlSfxPlayed,
       },
       audioState: this.host.audio?.ctx?.state ?? null,
+      // 2026-10-21：能转头不能走 —— available：这一帧的镜头是 free 眼睛；active：玩家已经接手；yaw / pitch：接手后的视线（没接手 = 默认视线）
+      freeLook: {
+        available: this.FreeLookAvailable(), active: this.freeLook.active, nudges: this.freeLook.nudges,
+        yawDeg: +(this.freeLook.active ? this.freeLook.yawDeg : this.freeLook.defaultYaw).toFixed(3),
+        pitchDeg: +(this.freeLook.active ? this.freeLook.pitchDeg : this.freeLook.defaultPitch).toFixed(3),
+      },
     };
   }
 
   Dispose() {
     this.Stop({ restore: false });
+    this.UnbindFreeLook();
     this.fx?.Dispose();
     this.air?.Dispose();
     this.elOverlay.remove(); this.elCaption.remove(); this.elSubs.remove();

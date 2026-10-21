@@ -1,8 +1,8 @@
 {
  "schema": "tengxian-blockout-voice/1",
  "level": "FirstLevel0610",
- "generatedAt": "2026-10-18T18:42:36.971Z",
- "requests": 62,
+ "generatedAt": "2026-10-21T08:53:55.356Z",
+ "requests": 76,
  "note": "占位配音（SeedAudio seed-audio-1.0，整段一次生成后按逐字时间戳切句）。file 相对 Taierzhuang1938/index.html；gapBeforeS 是录音里与上一句的原始间隔；keyframe 是第二版改稿契约 §3 的关键帧 id（06-1…10-6）。",
  "scenes": [
   {
@@ -283,8 +283,8 @@
    "beat": "07",
    "keyframe": "07-1",
    "label": "07 边走边数铜板：路费、我妹",
-   "attempt": 2,
-   "attempts": 1,
+   "attempt": 4,
+   "attempts": 2,
    "references": [
     {
      "who": [
@@ -301,11 +301,9 @@
      "castSha256": "149644dee09a7dd04db075dae47eebeb3b512509fa9e383ea15f5e6c42e1f9b1"
     }
    ],
-   "targetDb": -20.55,
+   "targetDb": -20.72,
    "cutMethod": "subtitle",
-   "hard": [
-    "CopperCoins.12 疑似念错（字错率 1）"
-   ],
+   "hard": [],
    "flags": [],
    "lines": [
     {
@@ -317,14 +315,14 @@
      "subtitle": "顺儿哥，一路数你那几个铜板，数个锤子哦？攒起娶婆娘？",
      "text": "顺儿哥，一路数你那几个铜板，数个锤子哦？攒起娶婆娘？",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610CopperCoins_01.mp3",
-     "durationS": 5.07,
+     "durationS": 5.95,
      "gapBeforeS": 0,
-     "sha256": "330c3cc10ab3c03e3285fb8fc07938ba46d2535d691e995b377b5bd4ad3812c4",
-     "speakerCos": 0.911,
-     "cer": 0.5,
-     "transcript": "孙儿哥,一路送你来几个同伴,送个锤子啊,站起去抱我娘。",
+     "sha256": "9c51daffab3c7eabbd66b55829a412f5b0a1d2a039e876c01f06e159018077af",
+     "speakerCos": 0.896,
+     "cer": 0.5455,
+     "transcript": "四个,一路数你俩几个同伴,数个锤子,暂且去破鸟。",
      "issues": [
-      "字错率 0.5 待人耳核对"
+      "字错率 0.5455 待人耳核对"
      ]
     },
     {
@@ -336,13 +334,14 @@
      "subtitle": "路费。",
      "text": "路费。",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610CopperCoins_02.mp3",
-     "durationS": 0.74,
-     "gapBeforeS": 1.18,
-     "sha256": "c20547650249912b6938686303a496e2d3c93b75e42c3cbbca71869266c6a1fd",
-     "speakerCos": 0.277,
+     "durationS": 0.64,
+     "gapBeforeS": 0.34,
+     "sha256": "8411cbcec6a6cd4496bd83c40e76fab0f6ab5958d7ed5cfa56a08c075dd620bc",
+     "speakerCos": 0.389,
      "cer": 1,
-     "transcript": "如肥。",
+     "transcript": "鲁斐",
      "issues": [
+      "有声 0.52 s，太短不判嗓子",
       "字错率 1 待人耳核对"
      ]
     },
@@ -355,14 +354,14 @@
      "subtitle": "路费？……你龟儿要跑？",
      "text": "路费？……你龟儿要跑？",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610CopperCoins_03.mp3",
-     "durationS": 2.18,
-     "gapBeforeS": 0.41,
-     "sha256": "eb46843aa4c418b89701c3a02ad018259294609d55f4291b949ea1f9eddc467f",
-     "speakerCos": 0.79,
-     "cer": 1,
-     "transcript": "鲁飞,一棍药泡。",
+     "durationS": 2.43,
+     "gapBeforeS": 5.47,
+     "sha256": "3ec47a3bd8c311beb7cf35aa489b6c71ad8f0bcaa1d176f41c9249af8df7d953",
+     "speakerCos": 0.76,
+     "cer": 0.5714,
+     "transcript": "鲁非,你乖儿要泡。",
      "issues": [
-      "字错率 1 待人耳核对"
+      "字错率 0.5714 待人耳核对"
      ]
     },
     {
@@ -374,12 +373,12 @@
      "subtitle": "跟冬瓜？他都那个鬼样子了。",
      "text": "跟冬瓜？他都那个鬼样子了。",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610CopperCoins_04.mp3",
-     "durationS": 2.96,
-     "gapBeforeS": 0.67,
-     "sha256": "45936b8b0626fd22c08de69052154b7b63045d844d391af7dd31d02000ad5c98",
-     "speakerCos": 0.858,
-     "cer": 0.0909,
-     "transcript": "跟冬瓜?他都哪个鬼样子了?"
+     "durationS": 2.45,
+     "gapBeforeS": 1.28,
+     "sha256": "ea26b7b0d69ecc357fd2eee4bd8d984b617592e240b480706bcc2f9e807f880a",
+     "speakerCos": 0.835,
+     "cer": 0.1818,
+     "transcript": "跟冬瓜,他都哪个龟样子了?"
     },
     {
      "id": "CopperCoins.05",
@@ -390,10 +389,10 @@
      "subtitle": "他舅在船上烧锅炉。没得他，他舅认得到老子是哪根葱？",
      "text": "他舅在船上烧锅炉。没得他，他舅认得到老子是哪根葱？",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610CopperCoins_05.mp3",
-     "durationS": 5.02,
-     "gapBeforeS": 0.39,
-     "sha256": "4443e189594333176fad3950a5444a21d554ec9dd8f470ef9f7c7fa9a3b7be2e",
-     "speakerCos": 0.695,
+     "durationS": 4.66,
+     "gapBeforeS": 3.87,
+     "sha256": "9e548c3dfcf2856db69215e85c9f03360de70b4a81c25955ae7dbe669785cbce",
+     "speakerCos": 0.694,
      "cer": 0.0909,
      "transcript": "他就在船上烧锅炉,没得他,他就认得到老子是哪根葱。"
     },
@@ -406,12 +405,12 @@
      "subtitle": "屋头有啥子嘛，你龟儿命都不要了往回跑。",
      "text": "屋头有啥子嘛，你龟儿命都不要了往回跑。",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610CopperCoins_06.mp3",
-     "durationS": 3.17,
-     "gapBeforeS": 0.35,
-     "sha256": "8c786a19909bc13b48ec9a8c2b90be07978fe7eab94b19102e843f1a78ee759b",
-     "speakerCos": 0.875,
+     "durationS": 3.25,
+     "gapBeforeS": 0.61,
+     "sha256": "c563a0b7fa488f8a395e28b019722fdbf7fd40887afffa62e75cfc4839aecc6b",
+     "speakerCos": 0.858,
      "cer": 0.2941,
-     "transcript": "不投有啥子嘛,你鬼儿明都不要了往回抛。"
+     "transcript": "五头有啥子嘛,一棍儿明都不要了往回炮。"
     },
     {
      "id": "CopperCoins.07",
@@ -422,12 +421,12 @@
      "subtitle": "我妹。屋头就剩她一个，秧都栽不下去，秋后拿啥子交租？交不上，东家就拿她抵。",
      "text": "我妹。屋头就剩她一个，秧都栽不下去，秋后拿啥子交租？交不上，东家就拿她抵。",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610CopperCoins_07.mp3",
-     "durationS": 8.65,
-     "gapBeforeS": 0.24,
-     "sha256": "ed178b4a7d03c32ca40e284f2420ce83a1603c9d3d72fc562476816576675bdf",
-     "speakerCos": 0.891,
-     "cer": 0.2258,
-     "transcript": "我妹,屋头就剩她一个,羊都宰不下去,秋后拿沙子教主,教不上,东家就拿她弟。"
+     "durationS": 7.31,
+     "gapBeforeS": 0.76,
+     "sha256": "43914d0ca7f5e69924467dea136236d58d9d67478a5013439604fcf3e992804e",
+     "speakerCos": 0.771,
+     "cer": 0.129,
+     "transcript": "我妹,屋头就剩她一个,羊都宰不下去,秋后拿啥子交猪,交不上,东家就拿她地。"
     },
     {
      "id": "CopperCoins.08",
@@ -438,14 +437,14 @@
      "subtitle": "抵？拿人抵？",
      "text": "抵？拿人抵？",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610CopperCoins_08.mp3",
-     "durationS": 1.66,
-     "gapBeforeS": 0.21,
-     "sha256": "92bc0eb779e412ef604a68abc1e87f68040c24300e92e28871e90832f532c743",
-     "speakerCos": 0.649,
-     "cer": 1,
-     "transcript": "的?那是人的?",
+     "durationS": 1.71,
+     "gapBeforeS": 0.57,
+     "sha256": "ad791677cc808d7c9c3d1215c8241d2b4931d5b4e5fbbff51b4a2c9ca2a56c37",
+     "speakerCos": 0.691,
+     "cer": 0.75,
+     "transcript": "地 拉人地",
      "issues": [
-      "字错率 1 待人耳核对"
+      "字错率 0.75 待人耳核对"
      ]
     },
     {
@@ -457,12 +456,12 @@
      "subtitle": "不拿人拿你妈啥子？屋头除了她，还剩个锤子！抵过去当丫头，租子一辈子还不清，人就一辈子是他屋头的！",
      "text": "不拿人拿你妈啥子？屋头除了她，还剩个锤子！抵过去当丫头，租子一辈子还不清，人就一辈子是他屋头的！",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610CopperCoins_09.mp3",
-     "durationS": 9.8,
-     "gapBeforeS": 0.13,
-     "sha256": "c949613413a0ed33d4aa484c8309109e70d596e7949f5737678b89b73b6c674c",
-     "speakerCos": 0.901,
-     "cer": 0.1429,
-     "transcript": "不拉人拉你妈啥子,屋头除了它,还剩个锤子,低过去当丫头。竹子一辈子还不清,人就一辈子是他屋头呢。"
+     "durationS": 8.021,
+     "gapBeforeS": 2.05,
+     "sha256": "24958bdcde6f32b7618e30868ea1c10ed9334b010651c679d11680743128f65c",
+     "speakerCos": 0.865,
+     "cer": 0.2381,
+     "transcript": "不拉人拉你妈啥子, 五头除了他,还剩个锤子,低过去当丫头,竹子一辈子还不清,仍旧一辈子是他五头呢。"
     },
     {
      "id": "CopperCoins.10",
@@ -473,12 +472,12 @@
      "subtitle": "那个老狗日的屋头现在那个丫头，前年抵过去的，十三岁，见到人头都不敢抬。今年开春，肚子大了。日他先人板板，十三岁！",
      "text": "那个老狗日的屋头现在那个丫头，前年抵过去的，十三岁，见到人头都不敢抬。今年开春，肚子大了。日他先人板板，十三岁！",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610CopperCoins_10.mp3",
-     "durationS": 11.43,
-     "gapBeforeS": 0.62,
-     "sha256": "bb68c296b2d5dffdf12cc4a8cb0d0d355ab215b1719d3333462a483b06232f22",
-     "speakerCos": 0.916,
-     "cer": 0.1875,
-     "transcript": "这个老狗子的五头现在那个丫头,千年低过去的,十三岁,见到人头都不敢抬。今年开春,肚子大了,日台仙人般般,十三岁。"
+     "durationS": 11.19,
+     "gapBeforeS": 0.28,
+     "sha256": "2cf3a091ed804e7387d2be2e5983fdb2e0f9b1d223a86d790e2bca66cce6e555",
+     "speakerCos": 0.743,
+     "cer": 0.1458,
+     "transcript": "那个老狗日的五头现在那个丫头,千年低过去了,十三岁,见到人头都不敢抬。今年开春,肚子大了,日他仙人斑斑,十三岁。"
     },
     {
      "id": "CopperCoins.11",
@@ -489,15 +488,12 @@
      "subtitle": "……我妹今年十二。",
      "text": "……我妹今年十二。",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610CopperCoins_11.mp3",
-     "durationS": 1.32,
-     "gapBeforeS": 1.16,
-     "sha256": "123014c3aaf2f73fb9121516cac5c3199d2b5d77e0dcaa873bfe7a3bdfaed749",
-     "speakerCos": 0.589,
-     "cer": 0.8333,
-     "transcript": "我没经验四尔。",
-     "issues": [
-      "字错率 0.8333 待人耳核对"
-     ]
+     "durationS": 2.95,
+     "gapBeforeS": 0.79,
+     "sha256": "58452d80d8467189282ce35b6ba4cfa60dd0bbd93f1b9fd095bb1819bff7b473",
+     "speakerCos": 0.442,
+     "cer": 0.3333,
+     "transcript": "我美,今年四二。"
     },
     {
      "id": "CopperCoins.12",
@@ -508,15 +504,12 @@
      "subtitle": "鬼子打到四川还早得很，那个老狗日的秋后就要上门。老子在这儿给哪个卖命？给保长？给东家？给上头那些当官的？卖你妈个锤子！",
      "text": "鬼子打到四川还早得很，那个老狗日的秋后就要上门。老子在这儿给哪个卖命？给保长？给东家？给上头那些当官的？卖你妈个锤子！",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610CopperCoins_12.mp3",
-     "durationS": 12.55,
+     "durationS": 11.8,
      "gapBeforeS": 1.08,
-     "sha256": "3545ce0270b5fe4eaab2d69e843073cc06b78307a096b7fd9a73e2035bcf63de",
+     "sha256": "f1b7ac49221b6e153b1884699fb14b992d96277b8daf436acd0646c6a7a447ce",
      "speakerCos": 0.695,
-     "cer": 1,
-     "transcript": "词词作曲",
-     "issues": [
-      "疑似念错（字错率 1）"
-     ]
+     "cer": 0.1731,
+     "transcript": "句子打到四川还糟得很,那个老狗子秋后就要上门。老子在这儿给哪个买面?给包长?给东家?给上头那些当官呢?买你妈个锤子。"
     },
     {
      "id": "CopperCoins.13",
@@ -524,15 +517,15 @@
      "who": "yaowa",
      "speaker": "幺娃",
      "lang": "zh",
-     "subtitle": "……我没听到。",
-     "text": "……我没听到。",
+     "subtitle": "……顺儿哥，你刚才说的，老子一个字都没听到。表跟第二个人讲。",
+     "text": "……顺儿哥，你刚才说的，老子一个字都没听到。表跟第二个人讲。",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610CopperCoins_13.mp3",
-     "durationS": 0.74,
-     "gapBeforeS": 2.44,
-     "sha256": "80717df4ab4e042d682971e973be785b4b8f879d8b85b65aa9245869cf1cd1c1",
-     "speakerCos": 0.717,
-     "cer": 0,
-     "transcript": "我没听到。"
+     "durationS": 5.74,
+     "gapBeforeS": 2.29,
+     "sha256": "789df07b62652edadb4083d7d0b63298448aa69b1dc436ce12c94e2fa6906e13",
+     "speakerCos": 0.682,
+     "cer": 0.125,
+     "transcript": "孙儿哥,你刚才说的,老子一个字都没听到,不要跟第二个人讲。"
     }
    ]
   },
@@ -541,8 +534,8 @@
    "beat": "07",
    "keyframe": "07-3",
    "label": "07 担架上的冬瓜：就他妈塞个毛巾",
-   "attempt": 5,
-   "attempts": 2,
+   "attempt": 8,
+   "attempts": 3,
    "references": [
     {
      "who": [
@@ -566,7 +559,7 @@
      "castSha256": "604aa0f6a2965420abaeb42c59179ba6b9ebdeeeb06fc73222f8ed677d63a3c6"
     }
    ],
-   "targetDb": -20.6,
+   "targetDb": -20.49,
    "cutMethod": "subtitle",
    "hard": [],
    "flags": [],
@@ -580,12 +573,12 @@
      "subtitle": "就他妈塞个毛巾？妈卖批！",
      "text": "就他妈塞个毛巾？妈卖批！",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610StretcherDonggua_01.mp3",
-     "durationS": 2.96,
+     "durationS": 2.53,
      "gapBeforeS": 0,
-     "sha256": "a43ac5e3f30e0d63be2ba986ec78e16929bfdb9dd5bb5a5fb0d202df5476b2df",
-     "speakerCos": 0.83,
+     "sha256": "6934fea38b55796a3271a208a538bc905036705f14be502bf537082b4b193a7c",
+     "speakerCos": 0.732,
      "cer": 0.6,
-     "transcript": "我塞个毛巾,妈妈的屁。",
+     "transcript": "塞个毛巾?买皮?",
      "issues": [
       "字错率 0.6 待人耳核对"
      ]
@@ -596,15 +589,15 @@
      "who": "bearer",
      "speaker": "卫生兵",
      "lang": "zh",
-     "subtitle": "有毛巾就烧高香了！天黑前送不到军医手里，就表想了。",
-     "text": "有毛巾就烧高香了！天黑前送不到军医手里，就表想了。",
+     "subtitle": "有毛巾就烧高香了！天黑前送不到军医手上，就等到挖坑埋人！",
+     "text": "有毛巾就烧高香了！天黑前送不到军医手上，就等到挖坑埋人！",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610StretcherDonggua_02.mp3",
-     "durationS": 4.62,
-     "gapBeforeS": 0.86,
-     "sha256": "50546fbc00aecda7170ff78ecd409ce68bb304d8150a6794fd361cbf4bea9e82",
-     "speakerCos": 0.873,
-     "cer": 0.1818,
-     "transcript": "有毛巾就烧高香喽,天黑前送不到军医手里,就飙香喽。"
+     "durationS": 5.77,
+     "gapBeforeS": 0.06,
+     "sha256": "0ad407be905026ca94ec48179cfb02d6be1208a883f7cf0880f16544aafac908",
+     "speakerCos": 0.903,
+     "cer": 0.16,
+     "transcript": "有毛巾就烧高香喽。填黑钱送不到军医手上,就等到挖坑买人。"
     },
     {
      "id": "StretcherDonggua.03",
@@ -615,12 +608,12 @@
      "subtitle": "表掀……日你妈……冷得很……",
      "text": "表掀……日你妈……冷得很……",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610StretcherDonggua_03.mp3",
-     "durationS": 4.422,
-     "gapBeforeS": 0.93,
-     "sha256": "3e9ce31fdd00e080f3ece0a35c8dae747536330ce4fdd3cc6c85a24cafdd9ed8",
-     "speakerCos": 0.74,
+     "durationS": 4.89,
+     "gapBeforeS": 0.48,
+     "sha256": "f3f8730752fb786a964628f8b9da594cf7ee9938c6e9d314ed692f2a07696288",
+     "speakerCos": 0.623,
      "cer": 0.25,
-     "transcript": "表现,死你妈,冷得很。"
+     "transcript": "表现,你妈,冷得很。"
     }
    ]
   },
@@ -709,6 +702,107 @@
    ]
   },
   {
+   "id": "PlaneDuck",
+   "beat": "07",
+   "keyframe": "07-4",
+   "label": "07 飞机来了：贴到坎",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "relief"
+     ],
+     "owner": "guard",
+     "castSha256": "18917d10a6f543eb30c418b592cffcbfee8248b142865edcf7613248d142aeb9"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "PlaneDuck.01",
+     "keyframe": "07-4",
+     "who": "relief",
+     "speaker": "排长",
+     "lang": "zh",
+     "subtitle": "飞机！贴到坎！",
+     "text": "飞机！贴到坎！",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610PlaneDuck_01.mp3",
+     "durationS": 2.07,
+     "gapBeforeS": 0,
+     "sha256": "7fcd8dfc859f96af5d0154ebb9ad9187df83209dea52b40e4e2415e5d6f5a806",
+     "speakerCos": 0.848,
+     "cer": 0.2,
+     "transcript": "飞机,贴到看!"
+    }
+   ]
+  },
+  {
+   "id": "LuoDriveOn",
+   "beat": "07",
+   "keyframe": "07-4",
+   "label": "07 飞机过去了：起来走、趴倒",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "luo"
+     ],
+     "owner": "luo",
+     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
+    }
+   ],
+   "targetDb": -17.2,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "LuoDriveOn.01",
+     "keyframe": "07-4",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "起来！走！",
+     "text": "起来！走！",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LuoDriveOn_01.mp3",
+     "durationS": 1.22,
+     "gapBeforeS": 0,
+     "sha256": "6416ea151cf852a0be2a170a8e2b042f30e892a9e481a59ede64654f53e11532",
+     "speakerCos": 0.625,
+     "cer": 0,
+     "transcript": "起来!走!",
+     "issues": [
+      "有声 0.48 s，太短不判嗓子"
+     ]
+    },
+    {
+     "id": "LuoDriveOn.02",
+     "keyframe": "07-4",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "趴倒！",
+     "text": "趴倒！",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LuoDriveOn_02.mp3",
+     "durationS": 0.768,
+     "gapBeforeS": 0.95,
+     "sha256": "7497faff22d33f7f3d00627e91cbaf40d1610ad55dd3f079755bf0140a8a98c8",
+     "speakerCos": 0.606,
+     "cer": 1,
+     "transcript": "爬刀!",
+     "issues": [
+      "有声 0.58 s，太短不判嗓子",
+      "字错率 1 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
    "id": "VillageMouth",
    "beat": "08",
    "keyframe": "08-1",
@@ -751,8 +845,8 @@
    "id": "GengHome",
    "beat": "08",
    "keyframe": "08-1",
-   "label": "08 村口：那是俺家",
-   "attempt": 1,
+   "label": "08 村口：那是俺家，窖里还藏着街坊",
+   "attempt": 2,
    "attempts": 1,
    "references": [
     {
@@ -774,24 +868,43 @@
      "who": "geng",
      "speaker": "老耿",
      "lang": "zhNorth",
-     "subtitle": "那是……俺家。",
-     "text": "那是……俺家。",
+     "subtitle": "那是俺家……狗日的占了俺家。",
+     "text": "那是俺家……狗日的占了俺家。",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610GengHome_01.mp3",
-     "durationS": 3.049,
+     "durationS": 6.06,
      "gapBeforeS": 0,
-     "sha256": "032be49b83ce9664cdd6e6a396aec56a71f6fa2efd3a453f0c3287367fde2185",
-     "speakerCos": 0.77,
-     "cer": 0.25,
-     "transcript": "那是暗家。"
+     "sha256": "2c15026f2c32bb0d98e09da1ae40faa7ed358162343e8f27e683e3eb648ddc9d",
+     "speakerCos": 0.871,
+     "cer": 0,
+     "transcript": "那是俺家。狗日的占了俺家。"
+    },
+    {
+     "id": "GengHome.02",
+     "keyframe": "08-1",
+     "who": "geng",
+     "speaker": "老耿",
+     "lang": "zhNorth",
+     "subtitle": "窖里还藏着街坊哩。",
+     "text": "窖里还藏着街坊哩。",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610GengHome_02.mp3",
+     "durationS": 2.113,
+     "gapBeforeS": 0.87,
+     "sha256": "7d0ea1424abad2573a078ee713cbd70b66de811194c7243640c24d94290a6036",
+     "speakerCos": 0.856,
+     "cer": 0.625,
+     "transcript": "叫你,还藏着介绍你。",
+     "issues": [
+      "字错率 0.625 待人耳核对"
+     ]
     }
    ]
   },
   {
-   "id": "NoWayAround",
+   "id": "NoWayAsk",
    "beat": "08",
    "keyframe": "08-2",
-   "label": "08 绕不过去：有没得路、闩死了、等天黑",
-   "attempt": 4,
+   "label": "08 绕不过去：有没得别的路",
+   "attempt": 1,
    "attempts": 1,
    "references": [
     {
@@ -800,14 +913,152 @@
      ],
      "owner": "luo",
      "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
-    },
+    }
+   ],
+   "targetDb": -19,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "NoWayAsk.01",
+     "keyframe": "08-2",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "老人家，这儿有没得别的路绕过去？",
+     "text": "老人家，这儿有没得别的路绕过去？",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610NoWayAsk_01.mp3",
+     "durationS": 2.64,
+     "gapBeforeS": 0,
+     "sha256": "f8cb8892dc24b0df6482821bce67a1b0d37356e852b463cdae573ab4acb3f75a",
+     "speakerCos": 0.878,
+     "cer": 0.0714,
+     "transcript": "老人家,这儿又没得别的路绕过去。"
+    }
+   ]
+  },
+  {
+   "id": "NoWayGeng",
+   "beat": "08",
+   "keyframe": "08-2",
+   "label": "08 绕不过去：河汊子、鬼子来的道、只有这一条街",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
     {
      "who": [
       "geng"
      ],
      "owner": "geng",
      "castSha256": "3ed097856b7a56b65285ef604e2eed302f564f880a74c3c5f66fdecd64a5acea"
+    }
+   ],
+   "targetDb": -19,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "NoWayGeng.01",
+     "keyframe": "08-2",
+     "who": "geng",
+     "speaker": "老耿",
+     "lang": "zhNorth",
+     "subtitle": "西边是河汊子，坎陡，水齐腰深，底下全是烂泥。",
+     "text": "西边是河汊子，坎陡，水齐腰深，底下全是烂泥。",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610NoWayGeng_01.mp3",
+     "durationS": 5.55,
+     "gapBeforeS": 0,
+     "sha256": "8595afbe0eee95f087fdbc347d1228a54a2e12e12a8945fff1ba4e331457045c",
+     "speakerCos": 0.93,
+     "cer": 0.2778,
+     "transcript": "西边是河岛子,潭斗,水漆腰身,底下全是烂泥。"
     },
+    {
+     "id": "NoWayGeng.02",
+     "keyframe": "08-2",
+     "who": "geng",
+     "speaker": "老耿",
+     "lang": "zhNorth",
+     "subtitle": "东边是鬼子来的道。",
+     "text": "东边是鬼子来的道。",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610NoWayGeng_02.mp3",
+     "durationS": 1.74,
+     "gapBeforeS": 0.98,
+     "sha256": "7620ed47ddefb258670c2fc7c418c8c559b8be9033077e32de25ad6bb0999057",
+     "speakerCos": 0.842,
+     "cer": 0.125,
+     "transcript": "东边,是鬼子来的到。"
+    },
+    {
+     "id": "NoWayGeng.03",
+     "keyframe": "08-2",
+     "who": "geng",
+     "speaker": "老耿",
+     "lang": "zhNorth",
+     "subtitle": "往南就这一条街，两边院子都闩死了，要过去，得从俺家后门出。",
+     "text": "往南就这一条街，两边院子都闩死了，要过去，得从俺家后门出。",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610NoWayGeng_03.mp3",
+     "durationS": 6.12,
+     "gapBeforeS": 0.61,
+     "sha256": "70a3113fbc10a990f1dca0d88c2229ebb2ed8926c5635b7ab948445da5467cff",
+     "speakerCos": 0.912,
+     "cer": 0.04,
+     "transcript": "往南,就这一条街,两边院子都栓死了,要过去得从俺家后门出。"
+    }
+   ]
+  },
+  {
+   "id": "NoWayMedic",
+   "beat": "08",
+   "keyframe": "08-2",
+   "label": "08 绕不过去：泡一哈冷水就没得了",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "bearer"
+     ],
+     "owner": "bearer",
+     "castSha256": "8dd0add9c18311c4cfc49317bad9918e548209095b9ee413d469f147eda9b035"
+    }
+   ],
+   "targetDb": -19,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "NoWayMedic.01",
+     "keyframe": "08-2",
+     "who": "bearer",
+     "speaker": "卫生兵",
+     "lang": "zh",
+     "subtitle": "抬起蹚水？肚皮上开了口子的，泡一哈冷水就没得了！",
+     "text": "抬起蹚水？肚皮上开了口子的，泡一哈冷水就没得了！",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610NoWayMedic_01.mp3",
+     "durationS": 5.17,
+     "gapBeforeS": 0,
+     "sha256": "7f61ba5eabc032b23d5828ad5dff2977a6391ff41a4f10b43b03a71b974344f6",
+     "speakerCos": 0.814,
+     "cer": 0.381,
+     "transcript": "胎气糖水,肚皮上开了钩子嘞,跑一下冷水就没得咯。",
+     "issues": [
+      "字错率 0.381 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "NoWayOfficer",
+   "beat": "08",
+   "keyframe": "08-2",
+   "label": "08 绕不过去：那就等天黑",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
     {
      "who": [
       "relief"
@@ -822,54 +1073,22 @@
    "flags": [],
    "lines": [
     {
-     "id": "NoWayAround.01",
-     "keyframe": "08-2",
-     "who": "luo",
-     "speaker": "罗班长",
-     "lang": "zh",
-     "subtitle": "老人家，有没得路绕到你屋后头？",
-     "text": "老人家，有没得路绕到你屋后头？",
-     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610NoWayAround_01.mp3",
-     "durationS": 2.18,
-     "gapBeforeS": 0,
-     "sha256": "e9cd7284f96ade746089da26ecba712250852ad0d78a5a603dd92b0334dc50ed",
-     "speakerCos": 0.82,
-     "cer": 0.1538,
-     "transcript": "老人家,有没得鲁造到你屋后头?"
-    },
-    {
-     "id": "NoWayAround.02",
-     "keyframe": "08-2",
-     "who": "geng",
-     "speaker": "老耿",
-     "lang": "zhNorth",
-     "subtitle": "西边是河汊子，车下不去。东边是鬼子来的道。两边院子都从里头闩死了，人都钻了窖，敲不开。",
-     "text": "西边是河汊子，车下不去。东边是鬼子来的道。两边院子都从里头闩死了，人都钻了窖，敲不开。",
-     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610NoWayAround_02.mp3",
-     "durationS": 10.26,
-     "gapBeforeS": 1.52,
-     "sha256": "366b0104c62fa5f000f6474a49a4e8ada4591e52d002dde7be79250af0994168",
-     "speakerCos": 0.949,
-     "cer": 0.0541,
-     "transcript": "西边是河道子,车下不去,东边是鬼子来的道,两边院子都从里头拴死了,人都钻了窖,敲不开。"
-    },
-    {
-     "id": "NoWayAround.03",
+     "id": "NoWayOfficer.01",
      "keyframe": "08-2",
      "who": "relief",
      "speaker": "排长",
      "lang": "zh",
      "subtitle": "那就等天黑。",
      "text": "那就等天黑。",
-     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610NoWayAround_03.mp3",
-     "durationS": 0.999,
-     "gapBeforeS": 2.93,
-     "sha256": "817fba8461926cf6b3dc461cee99aa1ba9d482fbaa7b29393d8f3bc06db3c75f",
-     "speakerCos": 0.579,
-     "cer": 0.6,
-     "transcript": "辣酒灯天黑。",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610NoWayOfficer_01.mp3",
+     "durationS": 0.95,
+     "gapBeforeS": 0,
+     "sha256": "4ab7a602aaa557622375e56423c845fee6d090887b7a3526c1285ff343fbdd37",
+     "speakerCos": 0.736,
+     "cer": 0.8,
+     "transcript": "垃圾灯填黑!",
      "issues": [
-      "字错率 0.6 待人耳核对"
+      "字错率 0.8 待人耳核对"
      ]
     }
    ]
@@ -996,7 +1215,7 @@
    "beat": "08",
    "keyframe": "08-3",
    "label": "08 压窗口：压到起、卡到了",
-   "attempt": 1,
+   "attempt": 2,
    "attempts": 1,
    "references": [
     {
@@ -1021,14 +1240,14 @@
      "subtitle": "压到起！日你妈压到起啊！",
      "text": "压到起！日你妈压到起啊！",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610PressWindow_01.mp3",
-     "durationS": 2.29,
+     "durationS": 2.17,
      "gapBeforeS": 0,
-     "sha256": "92688fdec0442930d052c826dc0bd30bb527ed8ecc2daac037891b5920d7059c",
-     "speakerCos": 0.756,
-     "cer": 0.7,
-     "transcript": "哑叨气,死你妈哑叨气啊!",
+     "sha256": "3cea3b3969125a9709d66d70b9f1a64e446dc6d654ebb62b6167d2bd4aa3e4de",
+     "speakerCos": 0.805,
+     "cer": 0.5,
+     "transcript": "哑到去,死你妈哑到去啊!",
      "issues": [
-      "字错率 0.7 待人耳核对"
+      "字错率 0.5 待人耳核对"
      ]
     },
     {
@@ -1037,15 +1256,15 @@
      "who": "luo",
      "speaker": "罗班长",
      "lang": "zh",
-     "subtitle": "卡到了！日他先人，抬不起头！",
-     "text": "卡到了！日他先人，抬不起头！",
+     "subtitle": "过不去了！日他先人，一冒头就是一梭子！",
+     "text": "过不去了！日他先人，一冒头就是一梭子！",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610PressWindow_02.mp3",
-     "durationS": 3.226,
-     "gapBeforeS": 0.67,
-     "sha256": "094536d7aeea953c11e44e6b91c91121d00da081f2c7c5ea9412302163f261b5",
-     "speakerCos": 0.853,
-     "cer": 0.0909,
-     "transcript": "卡到了,是他先人,抬不起头。"
+     "durationS": 3.679,
+     "gapBeforeS": 0.53,
+     "sha256": "d353e0e5be72b079820eef84a138329449ce9254bdd888ef0c9dccba491d40cc",
+     "speakerCos": 0.911,
+     "cer": 0.25,
+     "transcript": "过不去咯,日他显然,一毛头就是一梭子。"
     }
    ]
   },
@@ -1223,6 +1442,48 @@
      "transcript": "孙子,你狗子在往哪儿跑?",
      "issues": [
       "字错率 0.4444 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "LuoKeepFiring",
+   "beat": "08",
+   "keyframe": "08-5",
+   "label": "08 大车后头：压到起！哪个龟儿停了",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "luo"
+     ],
+     "owner": "luo",
+     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "LuoKeepFiring.01",
+     "keyframe": "08-5",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "压到起！哪个龟儿停了？！",
+     "text": "压到起！哪个龟儿停了？！",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LuoKeepFiring_01.mp3",
+     "durationS": 3.695,
+     "gapBeforeS": 0,
+     "sha256": "b2c02323a9c94d0c49547c481037f6d39d3069bfe0e8f8832f3c80478758eb2d",
+     "speakerCos": 0.609,
+     "cer": 0.6667,
+     "transcript": "压倒去,拉个鬼儿听闹!",
+     "issues": [
+      "字错率 0.6667 待人耳核对"
      ]
     }
    ]

@@ -362,6 +362,8 @@ export class EditorBlockout {
       CameraPose: (t) => this.previz.CameraPose(t),
       // 2026-10-21：镜头切镜 / 运镜（"cut" 缺省 / "move"）
       SetCameraMode: (mode) => this.previz.SetCameraMode(mode),
+      // 2026-10-21：能转头不能走的眼睛（eye.free）—— 给测试喂一次鼠标位移（像素，右 + / 下 +）；→ 这一帧能不能转
+      Look: (dx, dy) => this.previz.Look(dx, dy),
     };
   }
 

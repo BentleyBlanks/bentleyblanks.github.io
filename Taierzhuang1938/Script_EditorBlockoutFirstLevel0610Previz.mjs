@@ -32,6 +32,21 @@
 //     （RootEndAt，小孩身体按 0.62 缩）；只在清单里标 holdLoop、运行时不循环的片段（撒尿、压刺刀）用 HoldLoop 每 1.9 s 重起一遍。
 //   · 09-7 妮儿咬手腕那一下按慢动作放（段里的 slowmo[]：1.5 s、0.3 倍、进出 0.25 s 渐变），窗口里不排台词。
 //
+// 第五版（2026-10-21，用户当天改稿 + 空间第五版）：
+//   · 07-4 全程第一人称（不再切第三人称机位）：蹲着跟班长后背跑一段 → 排长「飞机！贴到坎！」→ 顺子半蹲贴东坎根，飞机过头顶那 10 s 是
+//     **能转头不能走**的眼睛（eye.free，§14.1，几条紧挨着、同位置的 free 眼睛算一段；默认视线先看人和车尾的妮儿、再抬头跟着领机、
+//     滑到斜翅膀的右后那架、落回坎底）→ 班长「起来！走！」蹲姿跑 → 末段班长先直起腰、顺子跟着直起来（眼高 1.62：凹路里蹲着看不见
+//     麦地那头，空间负责人实测）望见耿家庄冒烟、左前方东北道上几个鬼子往庄子东头钻 → 到村口路沟班长回头压手「趴倒！」→ 眼睛落到 08-1 的趴姿位置。
+//     飞机轨不动。
+//   · 08-1 村民走岔路：两个从主街东边 z 432.5 那道院门冲上街被打倒；一个从巷子后门出来顺巷子三截跑到巷子口滚进沟西头倒在顺子脚边；
+//     两个从路沟后门下到沟东半截缩进后送队。老耿两句（狗日的占了俺家 / 窖里还藏着街坊）。
+//   · 08-2 按新台词排（一人一场）：老耿朝东指「东边是鬼子来的道」时默认视线转向东边，顺着庄子北沿看得见东北道上远远走着的鬼子
+//     （道上 x ≥ 274 那一截才看得见，RoadWalk 不让他们走出去）；说「从俺家后门出」视线回到窗口。
+//   · 08-5 顺子直接跟进巷子：老耿「老总！俺妮儿」之后约 10 s 第一人称（下沟、猫腰顺沟南沿往西、拐进巷子口、再往里到夹道拐弯前 (80,394)），
+//     这一段里刘文财在身后吼、班长在大车后头喊「压到起！哪个龟儿停了？！」、北窗机枪掉过来几梭全打大车；末尾「（交还操作，接 09）」。
+//     09-1 的玩家起点随之改到 (80,394.5)，开头先一口气过东西那截到拐角再按「响了才挪」。
+//   · 07-1 / 07-2 边走边说里各回头瞅一眼后头两步的刘文财（他听见了「路费」那段）。
+//
 // 门缝 / 墙缝那几段（09-3 / 09-4）：镜头一直是顺子的眼睛贴在缝后头看出去（SlitEye：眼睛放在「缝 → 目标」连线上、
 // 缝后 0.35 m、视场收窄到 40°），不给特写；缝只有几度宽，看得见什么由缝的几何决定，演员的动作都排在那条缝的扇面里。
 //
@@ -45,7 +60,7 @@ import {
   L0610_PLACES as PL, L0610_GENG as G, L0610_NEIGHBOR as NB, L0610_STREETS as ST, L0610_SIGNALS as SIG, L0610_EAST_YARDS as EY,
   L0610_DITCH as DT, LanePointAtZ,
 } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
-import { StreetRoute } from "./Script_EditorBlockoutFirstLevel0610Keyframes.mjs";
+import { StreetRoute, RoadPointAtX } from "./Script_EditorBlockoutFirstLevel0610Keyframes.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const PREVIZ_FILE = join(HERE, "Blockout", "FirstLevel0610.previz.json");
@@ -218,15 +233,26 @@ class Seq {
   Caption(t, dur, text) { return this.Ev(t, "caption", { text, dur }); }
   Shake(t, dur, strength) { return this.Ev(t, "shake", { dur, strength }); }
   Signal(t, name, on) { return this.Ev(t, "signal", { name, on }); }
-  /** 第一人称镜头：顺子的眼睛。target 给了就换算朝向。 */
-  Eye(t, dur, { x, z, stance = "stand", yaw, pitch = 0, toYaw, toPitch, look, toLook, shake, fov }) {
+  /**
+   * 第一人称镜头：顺子的眼睛。look / toLook 是平面点就换算成 yawDeg / toYawDeg（俯仰照 pitch / toPitch 写）；
+   * 是演员锚 / 飞机锚、或带 h 的点，就原样写进 eye.look / eye.toLook（§14.1，2026-10-21：运行时每次取样重算，视线能跟着飞机走）。
+   * free: true = 能转头不能走（§14.1）：眼睛位置钉死，玩家一动鼠标这一段剩下的时间视线归玩家。
+   */
+  Eye(t, dur, { x, z, stance = "stand", yaw, pitch = 0, toYaw, toPitch, look, toLook, shake, fov, free }) {
     const at = { x: x ?? this.player.x, z: z ?? this.player.z };
     const eye = { x: R(at.x), z: R(at.z), stance };
-    eye.yawDeg = R(look ? Yaw(at, look) : yaw);
-    eye.pitchDeg = R(pitch);
-    if (toLook) eye.toYawDeg = Yaw(at, toLook);
-    else if (toYaw !== undefined) eye.toYawDeg = R(toYaw);
-    if (toPitch !== undefined) eye.toPitchDeg = R(toPitch);
+    const Anchor = p => (p && (p.actor || p.aircraft) ? { ...(p.actor ? { actor: p.actor } : { aircraft: p.aircraft }), offset: (p.offset || [0, 0, 0]).map(R) }
+      : p && p.h !== undefined ? { x: R(p.x), z: R(p.z), h: R(p.h) } : null);
+    const look0 = Anchor(look), look1 = Anchor(toLook);
+    if (look0) eye.look = look0;
+    else { eye.yawDeg = R(look ? Yaw(at, look) : yaw); eye.pitchDeg = R(pitch); }
+    if (look1) eye.toLook = look1;
+    else {
+      if (toLook) eye.toYawDeg = Yaw(at, toLook);
+      else if (toYaw !== undefined) eye.toYawDeg = R(toYaw);
+      if (toPitch !== undefined) eye.toPitchDeg = R(toPitch);
+    }
+    if (free) eye.free = true;
     const c = { t: R(t), dur: R(dur), eye };
     if (fov) c.fov = fov;
     if (shake) c.shake = shake;
@@ -428,6 +454,20 @@ const SFX_FILE = Object.freeze({
   gateSmash: { seconds: 2.33, hits: [0.07, 0.84, 1.66] },      // 枪托两下 + 一脚踹
   jarShatter: { seconds: 1.53 },
 });
+/**
+ * 东北进庄的道上弯着腰往庄子走的鬼子（第五版 10-21）：从关键帧位置顺着道慢慢往庄子挪（弯着腰、停停走走，alongM 米 / 整段）。
+ * 从街口趴着看，道中线 x ≥ 274 那一截才看得见（空间负责人实测），所以走得慢、不走出那一截。
+ */
+function RoadWalk(s, ids, t0, t1, { alongM = 14, lat = 0.5 } = {}) {
+  ids.forEach((id, k) => {
+    const cur = s.pos.get(id);
+    if (!cur) return;
+    const sign = k % 2 ? -1 : 1;
+    const dx = alongM * 0.36;   // 道的走向：每沿道 1 m，x 约少 0.36
+    const mid = RoadPointAtX(cur.x - dx * 0.5, sign * lat), end = RoadPointAtX(cur.x - dx, sign * lat);
+    s.Go(id, t0 + k * 0.4, t1 - k * 0.3, end.x, end.z, { move: "walk", path: [mid], stance: "crouch", faceTo: RoadPointAtX(cur.x - dx - 8, 0) });
+  });
+}
 /** 背伤员的一对（stage carryOnBack：同根同向同相位）。 */
 function CarryPair(s, carrier, rider, p, yaw, t = 0) {
   s.Place(carrier, t, p.x, p.z, { yawDeg: yaw, stance: "stand", clip: VIL.carry });
@@ -618,14 +658,30 @@ function CrowdWalk(s, ctx, fromKf, toKf, { t0 = 1.0, legM = 5.5, pauseS = 2.6, s
     const next = legs[i + 1];
     if (next) s.Cam(L.t1, next.t0 - L.t1, { from: { ...b, h: eyeH }, look: lookAt, fov: 58 });
   }
-  return { tEnd, legs, eyeAtZ };
+  return { tEnd, legs, eyeAtZ, end: Pt(P1.x, P1.z), eyeH, lookAt };
+}
+/**
+ * 边走边说里回头瞅一眼后头的刘文财（10-21：他走在顺子和幺娃后头两步、一声不吭 —— 他听见了「路费」那段，08-5 才会吼「往哪跑」）：
+ * 在第 i 段走完的停顿里插一条看他的镜头，再插一条回到车尾的妮儿（镜头轨空档沿用上一条，不插回去就一直看着他）。
+ */
+function GlanceBack(s, walk, i, offsetS, dur, caption) {
+  const L = walk.legs[i], next = walk.legs[i + 1];
+  const t0 = R(L.t1 + offsetS), t1 = R(Math.min(t0 + dur, (next ? next.t0 : t0 + dur + 0.5) - 0.1));
+  const at = i === walk.legs.length - 1 ? walk.end : walk.eyeAtZ(L.z1);
+  s.Cam(t0, t1 - t0, { from: { ...at, h: walk.eyeH }, look: { actor: "LiuWencai", offset: [0, 1.1, 0] }, fov: 58 });
+  s.Cam(t1, R((next ? next.t0 : t1 + 0.5) - t1), { from: { ...at, h: walk.eyeH }, look: walk.lookAt, fov: 58 });
+  if (caption) s.Caption(t0 + 0.1, dur + 0.6, caption);
+  return t0;
 }
 
 function S0701(ctx) {
   const s = new Seq(ctx, "07-1", "队尾：边走边数铜板");
   const ids = ["GengCart", "Geng", "Nier", ...SQUAD];
   // 停停走走地往前挤：对白约 56 s，45 m 路分 8 段走
-  const { tEnd } = CrowdWalk(s, ctx, "07-1", "07-2", { t0: 3.0, legM: 5.6, pauseS: 4.4 });
+  const walk = CrowdWalk(s, ctx, "07-1", "07-2", { t0: 3.0, legM: 5.6, pauseS: 4.4 });
+  const { tEnd } = walk;
+  // 「你龟儿要跑？」说过以后，顺子回头瞅了一眼：刘文财在后头两步，低着头走，一声不吭（他听见了）
+  GlanceBack(s, walk, 3, 0.6, 1.6, "（顺子回头瞅了一眼：刘文财在后头两步，低着头走，一声不吭）");
   s.Caption(0.4, 3.0, "（后送队贴着西边土坎停成一长溜：担架一副挨一副搁在地上，抬担架的蹲在杠子边喘气）");
   s.Caption(3.6, 2.6, "（路窄，只能侧着身子从担架和土坎中间往前挤，边挤边挨骂）");
   // 路上零零星星：被踩到的伤兵、讨水的、问前头的
@@ -671,6 +727,10 @@ function S0702(ctx) {
   s.Caption(sis + 0.2, 3.2, "（眼前就是车尾晃腿的妮儿。不给特写，也不点破）");
   s.Caption(s.End("CopperCoins.11") + 0.4, 1.8, "（幺娃不吭声）");
   const rant = s.Say("CopperCoins.12", null, s.End("CopperCoins.11") + 2.4);
+  // 幺娃不吭声那一下，顺子回头看了一眼后头两步的刘文财（他低着头，像没听见），再转回车尾
+  { const g0 = R(s.End("CopperCoins.11") + 0.5), g1 = R(g0 + 1.3);
+    s.Cam(g0, g1 - g0, { from: { x: P.x, z: P.z, h: 1.55 }, look: { actor: "LiuWencai", offset: [0, 1.1, 0] }, fov: 58 });
+    s.Cam(g1, R(rant + 4.0 - g1), { from: { x: P.x, z: P.z, h: 1.55 }, look: lookNier, fov: 58 }); }
   s.Key("Yaowa", 0, { faceTo: "player", clip: TALK_LOW });
   // 背着伤员的那一对（07-1 末挪到的地方）跟着往前挪几步
   { const h = UP(KU(ctx, "07-2", "Helper03")); const at = Pt(h.x, h.z + 2.5); CarryPair(s, "Helper03", "Walker08", at, 180); CarryGo(s, "Helper03", "Walker08", R(rant + 4.0), Pt(at.x, at.z + 3.0), { yawDeg: 180 }); }
@@ -742,7 +802,7 @@ function S0703(ctx) {
 }
 
 function S0704(ctx) {
-  const s = new Seq(ctx, "07-4", "短过场：三架轰炸机高高地往南飞过，出洼地望见耿家庄");
+  const s = new Seq(ctx, "07-4", "飞机过头顶（能转头不能走），出洼地望见耿家庄");
   const K = id => KU(ctx, "07-4", id), K8 = id => KU(ctx, "08-1", id);
   const laneFolk = Object.keys(Object.fromEntries((ctx.config.keyframes.find(k => k.id === "07-4").units).filter(u => /^(Walker|Helper)\d+$/.test(u.id)).map(u => [u.id, 1])));
   // —— 飞机（2026-10-21 用户改）：三架九七式轻爆（Ki-30，和 13 扫射的是同一种）排成人字，离地约 400 m 由北往南飞过凹路，看方向是去炸县城；
@@ -770,20 +830,37 @@ function S0704(ctx) {
     ],
     sound: { drone: true },
   });
-  // —— 镜头 ①（约 9 s）：机位在凹路东坎上往南俯看一长溜担架；北边飞机声来了，镜头抬起来看着它掠过头顶，再落回坎底缩着的人
-  const BANK = Pt(101.6, 330);
-  // 高处的飞机过头顶时机位几乎朝天：镜头只在它们从北边过来、仰角 60°–75° 那一段看着领机，过顶前落回坎底
-  s.Cam(0, 1.6, { from: { ...BANK, h: 1.7 }, to: { x: 101.8, z: 331.5, h: 1.65 }, look: { x: 96.5, z: 345, h: 0.4 }, lookTo: { x: 96.0, z: 338, h: 0.5 }, ease: "linear", fov: 58 });
-  s.Cam(1.6, 2.0, { from: { x: 101.8, z: 331.5, h: 1.65 }, look: { aircraft: PLANE }, ease: "linear", fov: 70 });
-  s.Cam(3.6, 2.8, { from: { x: 101.8, z: 331.5, h: 1.65 }, look: { x: 97.5, z: 338, h: 0.4 }, ease: "inOut", fov: 58 });
-  s.Cam(6.4, 2.6, { from: { x: 101.8, z: 331.5, h: 1.65 }, to: { x: 101.9, z: 333, h: 1.6 }, look: { x: 97.5, z: 338, h: 0.4 }, lookTo: { actor: "Nier", offset: [0, 0.5, 0] }, ease: "inOut", fov: 58 });
-  s.Caption(0.3, 1.6, "（从坎上往下看：凹路里一长溜担架。北边传来一阵沉闷的飞机声）");
-  s.Caption(1.9, 3.0, "（三架日军飞机排成个人字，高高地从北边过来，往南去，看方向是县城。路上的人全往土坎底下缩，老耿拽着驴往坎边靠）");
-  // 开场大家还站着 / 蹲着（07-3 的样子），听见飞机就扑倒（VilDuckProne：跪、趴、抱头，末帧停住）：小队与后送队错峰
+  // —— 全程第一人称（2026-10-21 用户：不要第三人称机位）。
+  //    ① 0–2.6 s 蹲着跟班长的后背顺凹路往前跑一段（开场全班先摆到比关键帧位置北边 7 m 处，跑到关键帧位置再贴坎）；
+  //    ② 排长「飞机！贴到坎！」，所有人贴坎缩下；顺子半蹲在东坎根（关键帧 07-4 的玩家位置）—— 2.6–12.6 s 这 10 s 是能转头不能走的眼睛
+  //      （eye.free，几条紧挨着、同位置的 free 眼睛算一段）：默认视线先看路上的人和车尾的妮儿，再抬头跟着领机，
+  //      三架排成人字过头顶，右后那架斜翅膀，再落回坎底的人；
+  //    ③ 班长「起来！走！」，接着蹲姿跑；凹路越走越浅，末段班长先直起腰、顺子跟着直起来（眼高 1.62：凹路里蹲着看不见麦地那头，
+  //      空间负责人实测），麦地那头是耿家庄（冒烟、响枪），左前方（东北）那条道上几个鬼子往庄子东头钻（默认视线扫过去）；
+  //    ④ 到村口路沟，班长回头压手「趴倒！」，眼睛落到 08-1 的趴姿位置。
+  const P74 = KP(ctx, "07-4");                                   // 顺子半蹲贴东坎根的位置（关键帧）
   const DUCK = { clip: VIL.duck, clipHold: true, stance: "prone" };
-  for (const id of SQUAD) s.Key(id, 0, { stance: "crouch" });
-  SQUAD.forEach((id, k) => s.Key(id, 2.2 + k * 0.25, DUCK));
-  s.Key("Officer", 0, { stance: "crouch" }); s.Key("Officer", 2.5, DUCK);
+  const LOOK_LUO = { actor: "Luo", offset: [0, 1.0, 0] };
+  // ① 开场：大家在比关键帧位置北边 7 m 处蹲着（07-3 的样子），跟着班长往前跑到关键帧位置
+  const AHEAD = 7.0;
+  const squadStart = new Map();
+  for (const id of ["LiuWencai", "Yaowa", "HeYoutian", "Squad1", "Squad2", "Squad3"]) {
+    const to = UP(K(id)), from = LZ(to.z - AHEAD, LaneLat(to));
+    squadStart.set(id, from);
+    s.Place(id, 0, from.x, from.z, { stance: "crouch", yawDeg: 180 });
+    s.Go(id, 0.2, 2.4, to.x, to.z, { move: "run", stance: "crouch", yawDeg: 180 });
+  }
+  { const luoTo = UP(K("Luo")), from = LZ(luoTo.z - AHEAD - 1.0, 0.3); s.Place("Luo", 0, from.x, from.z, { stance: "crouch", yawDeg: 180 }); s.Go("Luo", 0.1, 2.2, luoTo.x, luoTo.z, { move: "run", stance: "crouch", yawDeg: 180 }); }
+  { const to = UP(K("Officer")), from = LZ(to.z - AHEAD, -0.3); s.Place("Officer", 0, from.x, from.z, { stance: "crouch", yawDeg: 180 }); s.Go("Officer", 0.3, 2.3, to.x, to.z, { move: "run", stance: "crouch", faceTo: Pt(to.x, to.z - 40) }); }
+  const eye0 = LZ(P74.z - AHEAD, LaneLat(P74));
+  s.Creep(0, 2.5, eye0, Pt(P74.x, P74.z), LOOK_LUO, { h: 1.05, ease: "linear", fov: 58 });
+  s.Caption(0.3, 2.2, "（蹲着跟在班长后背后头顺凹路往前跑。北边传来一阵沉闷的飞机声）");
+  // ② 排长先听见，冲全路的人吼；全路的人错峰扑倒（VilDuckProne：跪、趴、抱头，末帧停住）
+  const warn = s.Say("PlaneDuck.01", "Officer", 1.5);
+  s.Key("Officer", warn - 0.2, { talking: true });
+  s.Key("Officer", 2.5, { talking: false, ...DUCK });
+  s.Key("Luo", 2.4, DUCK);
+  ["LiuWencai", "Yaowa", "HeYoutian", "Squad1", "Squad2", "Squad3"].forEach((id, k) => s.Key(id, 2.65 + k * 0.25, DUCK));
   // 卫生兵这会儿已经跟到队头（07-3 他在冬瓜那副担架边，离队头 25 m）
   { const m = LZ(324, -0.7); s.Place("Medic", 0, m.x, m.z, { stance: "crouch", yawDeg: 180 }); } s.Key("Medic", 3.0, DUCK);
   laneFolk.forEach((id, k) => { s.Key(id, 0, { stance: "crouch" }); s.Key(id, 2.7 + (k % 7) * 0.22, DUCK); });
@@ -799,100 +876,145 @@ function S0704(ctx) {
   // VilDuckProne 的根在脚下的地上（跪、趴都带贴地修正），挂在车尾沿（根离地 0.467）上播它人会悬在半空；爬上车板缩成一团没有现成片段，
   // 而且她是「看见别人都趴了才学着趴」，跳下来跟大家一样趴在地上更像。
   s.Key("Nier", 0, { clip: VIL.sit });
-  s.Caption(5.0, 2.4, "（妮儿是看见别人都趴下了才抬头，这时飞机已经在头顶）");
   const NIER_OFF = 5.6, NIER_DUCK = 6.0;
   const nierOff = Pt(cartAt.x, cartAt.z - CART_TAIL_Z - 0.5);
   s.Key("Nier", NIER_OFF, { ride: null, x: nierOff.x, z: nierOff.z, move: "cut", yawDeg: 0, stance: "stand", clip: null });
   s.Key("Nier", NIER_DUCK, DUCK);
-  s.Caption(7.4, 2.4, "（她从车尾滑下来，最后一个趴下。飞机没下来，最后那架在头顶上斜了斜翅膀，往南飞远了）");
-  // —— 镜头 ②（约 7 s）：班长、排长带着全班弯腰顺凹路往前跑，老耿赶着车跟在后头；机位在前头的路中线上往回看，跟着退
-  const RUN0 = 9.0, RUN1 = 16.0;
-  s.Cam(RUN0, RUN1 - RUN0, { from: { ...LZ(352, 0.2), h: 1.4 }, to: { ...LZ(366, 0.2), h: 1.4 }, look: { actor: "Luo", offset: [0, 1.1, 0] }, ease: "linear", fov: 55 });
-  s.Caption(RUN0 + 0.3, 3.2, "（班长、排长带着全班弯腰顺着凹路往前跑，老耿赶着车跟在后头。凹路越走越浅，土坎只剩齐腰高）");
+  // 能转头不能走的 10 s（2.6–12.6）：顺子半蹲在东坎根不动，默认视线分四条写（同位置同姿态 → 运行时算一段，玩家转头不被夺回）
+  const FREE0 = 2.6, FREE1 = 12.6;
+  const free = { stance: "crouch", x: P74.x, z: P74.z, free: true };
+  s.Eye(FREE0, 1.6, { ...free, look: { actor: "Nier", offset: [0, 0.5, 0] }, toLook: { aircraft: PLANE }, fov: 64 });          // 先看车尾的妮儿和缩下去的人，再抬头找飞机
+  s.Eye(FREE0 + 1.6, 3.4, { ...free, look: { aircraft: PLANE }, toLook: { aircraft: WING_R }, fov: 70 });                       // 跟着领机过头顶，视线滑到右后那架（它在斜翅膀）
+  s.Eye(FREE0 + 5.0, 2.6, { ...free, look: { aircraft: WING_R }, toLook: { x: nierOff.x, z: nierOff.z, h: 0.4 }, fov: 64 });     // 它飞远了，落回车边趴着的妮儿
+  s.Eye(FREE0 + 7.6, FREE1 - FREE0 - 7.6, { ...free, look: { x: nierOff.x, z: nierOff.z, h: 0.4 }, toLook: LOOK_LUO, fov: 58 });  // 再看坎底的班长（他要起来了）
+  s.Caption(FREE0 + 0.2, 2.4, "（贴在东坎根半蹲下来。能转头看四周，不能走）");
+  s.Caption(FREE0 + 2.6, 3.2, "（三架日军飞机排成个人字，高高地从北边过来，往南去，看方向是县城。路上的人全缩在坎底，老耿拽着驴往坎边靠）");
+  s.Caption(FREE0 + 5.8, 2.4, "（妮儿是看见别人都趴下了才抬头，这时飞机已经在头顶。她从车尾滑下来，最后一个趴下）");
+  s.Caption(FREE0 + 8.3, 2.6, "（飞机没下来，右后那架在头顶上斜了斜翅膀，往南飞远了）");
+  // ③ 班长「起来！走！」：第一个爬起来招手，全班跟着起身，蹲着顺凹路往前跑
+  const up = s.Say("LuoDriveOn.01", "Luo", FREE1 - 2.2);
+  s.Key("Luo", up - 0.2, { clip: null, stance: "stand", faceTo: "player" });
+  s.Key("Luo", up + 0.1, { clip: BECKON });
+  s.Key("Luo", FREE1 - 0.2, { clip: null, stance: "crouch", yawDeg: 180 });
+  ["LiuWencai", "Yaowa", "HeYoutian", "Squad1", "Squad2", "Squad3", "Officer"].forEach((id, k) => s.Key(id, up + 0.6 + k * 0.2, { clip: null, stance: "crouch" }));
+  laneFolk.forEach((id, k) => s.Key(id, up + 1.0 + (k % 5) * 0.3, { clip: null, stance: "crouch" }));
+  s.Key("Medic", up + 0.8, { clip: null, stance: "crouch" });
+  const RUN0 = FREE1, RUN1 = FREE1 + 7.2, STAND = RUN1, RUN2 = STAND + 4.8;
   const runTo = (id, to, t0, t1, extra = {}) => { const r = Route(s.pos.get(id), to); s.Go(id, t0, t1, r.end.x, r.end.z, { move: "run", path: r.path, depart: { stance: "crouch", clip: null }, stance: "crouch", ...extra }); };
-  runTo("Luo", LZ(360, 0.3), RUN0, RUN0 + 4.6); runTo("Officer", LZ(359, -0.6), RUN0 + 0.3, RUN0 + 4.9);
-  ["LiuWencai", "Yaowa", "HeYoutian", "Squad1", "Squad2", "Squad3"].forEach((id, k) => runTo(id, LZ(354 - k * 1.6, k % 2 ? 0.5 : -0.5), RUN0 + 0.6 + k * 0.2, RUN0 + 5.4 + k * 0.2));
-  // 后送队的人飞机过了才慢慢起来，还是缩在坎底（蹲着）
-  laneFolk.forEach((id, k) => s.Key(id, RUN0 + 1.0 + (k % 5) * 0.3, { clip: null, stance: "crouch" }));
-  s.Key("Medic", RUN0 + 0.8, { clip: null, stance: "crouch" });
-  s.Go("GengCart", RUN0 + 1.6, RUN1 + 0.6, LZ(348, 0.3).x, LZ(348, 0.3).z, { move: "walk", speed: 1.6 });
-  s.Go("Geng", RUN0 + 1.6, RUN1 + 0.6, LZ(350, -1.3).x, LZ(350, -1.3).z, { move: "walk", depart: { stance: "stand", clip: null } });
-  s.Go("Nier", RUN0 + 2.0, RUN1 + 0.8, LZ(346.5, 0.8).x, LZ(346.5, 0.8).z, { move: "walk", depart: { stance: "stand", clip: null } });
-  // —— 镜头 ③（约 6 s）：路爬出洼地，麦地那头就是耿家庄：土坯院墙和树，几处房顶冒烟，庄子里一阵一阵响枪
-  const V0 = RUN1, V1 = RUN1 + 6.0;
-  s.Cam(V0, V1 - V0, { from: { x: 103.6, z: 364.5, h: 1.6 }, to: { x: 103.0, z: 368.5, h: 1.6 }, look: { x: 100, z: 468, h: 2.6 }, ease: "linear", fov: 56 });
-  for (const [x, z] of [[100, 474], [160, 450], [70, 452]]) s.Ev(0, "smoke", { x, z, kind: "SmokeBlack", dur: V1 + 4 });
-  s.Caption(V0 + 0.3, 3.2, "（路爬出洼地，麦地那头就是耿家庄：一片土坯院墙和树，几处房顶冒着烟，庄子里一阵一阵响枪）");
-  WindowBurst(s, V0 + 0.8, { volume: 0.55, muzzle: false });
-  s.Sfx(V0 + 2.6, "rifleShot", { x: 100, z: 430, volume: 0.5 });
-  s.Sfx(V0 + 3.8, "rifleShot", { x: 150, z: 465, volume: 0.4 });
-  WindowBurst(s, V0 + 4.6, { volume: 0.6, muzzle: false });
-  // 全班继续顺凹路跑到村口路沟（08-1 的位置）；车跟到沟东半截
-  for (const id of [...SQUAD, "Officer", "Medic"]) { const to = K8(id); runTo(id, to, V0 + 0.4, V1 + 1.0, { yawDeg: to.yawDeg, ...(to.aim ? { aim: true } : {}), stance: to.stance || "crouch" }); }
-  void NIER_DUCK;
-  // 车、老耿、妮儿只跟到凹路尽头（then 跳到 08-1 时直接到沟东半截的位置）
-  { const to = LZ(368, 0.3); s.Go("GengCart", V0 + 1.0, V1 + 1.6, to.x, to.z, { move: "walk" }); }
-  { const to = LZ(370, -1.3); s.Go("Geng", V0 + 1.0, V1 + 1.6, to.x, to.z, { move: "walk" }); }
-  { const to = LZ(366, 0.8); s.Go("Nier", V0 + 1.4, V1 + 1.8, to.x, to.z, { move: "walk", stance: "crouch" }); }
-  // —— 切回第一人称：顺子趴在村口路沟的沟沿（街口坡道上半截）上，顺着主街看过去，接 08
+  runTo("Luo", LZ(357, 0.3), RUN0, RUN0 + 6.6); runTo("Officer", LZ(356, -0.6), RUN0 + 0.3, RUN0 + 6.9);
+  ["LiuWencai", "Yaowa", "HeYoutian", "Squad1", "Squad2", "Squad3"].forEach((id, k) => runTo(id, LZ(351 - k * 1.6, k % 2 ? 0.5 : -0.5), RUN0 + 0.6 + k * 0.2, RUN0 + 7.0 + k * 0.2));
+  s.Caption(RUN0 + 0.4, 3.0, "（全班弯腰顺着凹路往前跑，老耿赶着车跟在后头。凹路越走越浅，土坎只剩齐腰高）");
+  const eye1 = LZ(354, 0.6);
+  s.Creep(RUN0, RUN1 - RUN0, Pt(P74.x, P74.z), eye1, LOOK_LUO, { h: 1.05, ease: "linear", fov: 58 });
+  s.Go("GengCart", RUN0 + 1.6, RUN1 + 0.6, LZ(345, 0.3).x, LZ(345, 0.3).z, { move: "walk", speed: 1.6 });
+  s.Go("Geng", RUN0 + 1.6, RUN1 + 0.6, LZ(347, -1.3).x, LZ(347, -1.3).z, { move: "walk", depart: { stance: "stand", clip: null } });
+  s.Go("Nier", RUN0 + 2.0, RUN1 + 0.8, LZ(343.5, 0.8).x, LZ(343.5, 0.8).z, { move: "walk", depart: { stance: "stand", clip: null } });
+  // 末段：班长先直起腰往前看，顺子跟着直起来（眼高 1.62）：麦地那头就是耿家庄，几处房顶冒烟、响枪；左前方东北那条道上几个鬼子往庄子东头钻
+  s.Key("Luo", STAND - 0.6, { stance: "stand" });
+  s.Caption(STAND - 0.4, 2.6, "（凹路浅了。班长直起腰往前看，顺子跟着直起来）");
+  const eye2 = LZ(369, 0.6);
+  const ROAD_LOOK = RoadPointAtX(283, 0);
+  s.Cam(STAND, RUN2 - STAND, { from: { ...eye1, h: 1.62 }, to: { ...eye2, h: 1.62 }, look: { x: 100, z: 468, h: 2.6 }, lookTo: { x: ROAD_LOOK.x, z: ROAD_LOOK.z, h: 1.0 }, ease: "linear", fov: 60 });
+  for (const [x, z] of [[100, 474], [160, 450], [70, 452]]) s.Ev(0, "smoke", { x, z, kind: "SmokeBlack", dur: RUN2 + 6 });
+  s.Caption(STAND + 0.3, 3.0, "（麦地那头就是耿家庄：一片土坯院墙和树，几处房顶冒着烟，庄子里一阵一阵响枪）");
+  s.Caption(STAND + 3.3, 2.6, "（左前方东北那条道上，几个鬼子弯着腰往庄子东头钻：就是占了老耿家那伙的尾巴）");
+  WindowBurst(s, STAND + 0.8, { volume: 0.55, muzzle: false });
+  s.Sfx(STAND + 2.6, "rifleShot", { x: 100, z: 430, volume: 0.5 });
+  s.Sfx(STAND + 3.8, "rifleShot", { x: 150, z: 465, volume: 0.4 });
+  WindowBurst(s, STAND + 4.6, { volume: 0.6, muzzle: false });
+  // 东北道上的四个鬼子整段都在弯着腰往庄子走（从关键帧位置顺道挪 14 m，别走出从街口看得见的那一截 x ≥ 274）
+  RoadWalk(s, ["RoadIja1", "RoadIja2", "RoadIja3", "RoadIja4"], 0.5, RUN2 + 4.0, { alongM: 12 });
+  // ④ 全班继续顺凹路跑到村口路沟（08-1 的位置）；班长先到，回头朝后头压手「趴倒！」；车、老耿、妮儿只跟到凹路尽头
+  const luoTo = K8("Luo");
+  runTo("Luo", luoTo, STAND + 0.4, RUN2 - 0.6, { yawDeg: luoTo.yawDeg, depart: { stance: "stand", clip: null }, stance: "stand" });
+  for (const id of [...SQUAD.filter(id => id !== "Luo"), "Officer"]) { const to = K8(id); runTo(id, to, STAND + 1.0, RUN2 + 2.4, { yawDeg: to.yawDeg, ...(to.aim ? { aim: true } : {}), stance: to.stance || "crouch" }); }
+  // 卫生兵从队头（z 324）一路跑到沟东半截的担架边，路远，班长一喊就起跑
+  { const to = K8("Medic"); runTo("Medic", to, RUN0 + 0.8, RUN2 + 2.4, { yawDeg: to.yawDeg, stance: to.stance || "crouch" }); }
+  // 车、老耿、妮儿跟在后头走到凹路尽头（then 跳到 08-1 时直接到沟东半截的位置）
+  { const to = LZ(367, 0.3); s.Go("GengCart", RUN1 + 0.7, RUN2 + 3.6, to.x, to.z, { move: "walk" }); }
+  { const to = LZ(369.5, -1.3); s.Go("Geng", RUN1 + 0.7, RUN2 + 3.6, to.x, to.z, { move: "walk" }); }
+  { const to = LZ(365, 0.8); s.Go("Nier", RUN1 + 0.9, RUN2 + 3.8, to.x, to.z, { move: "walk", stance: "crouch" }); }
+  s.Key("Luo", RUN2 - 0.5, { faceTo: "player", clip: "PvStandHaltL" });
+  const down = s.Say("LuoDriveOn.02", "Luo", RUN2 - 0.2);
+  s.Caption(down + 0.2, 2.4, "（班长先到村口路沟，回头朝后头压手）");
+  s.Key("Luo", s.End("LuoDriveOn.02") + 0.6, { clip: null, stance: "crouch", faceTo: WINDOW });
+  s.Cam(RUN2, 1.6, { from: { ...eye2, h: 1.62 }, look: { actor: "Luo", offset: [0, 1.2, 0] }, fov: 58 });
+  // 顺子跑进路沟、爬上街口坡道趴下：眼睛从站姿一路压到趴姿，落到 08-1 的位置
   const P8 = KP(ctx, "08-1");
-  s.Eye(V1 + 0.2, 2.6, { stance: "prone", x: P8.x, z: P8.z, yaw: 180, pitch: -1 });
-  s.Caption(V1 + 0.5, 2.4, "（切回第一人称：顺子趴在村口外的路沟沿后头。接 08）");
-  return s.Done({ durationS: V1 + 2.8 });
+  const T8 = RUN2 + 1.6;
+  s.Cam(T8, 2.0, { from: { ...LZ(371, 0.6), h: 1.5 }, to: { x: P8.x, z: P8.z, h: 0.45 }, look: { actor: "Luo", offset: [0, 0.9, 0] }, lookTo: { x: WINDOW.x, z: WINDOW.z, h: 1.4 }, ease: "inOut", fov: 58 });
+  s.Eye(T8 + 2.0, 2.4, { stance: "prone", x: P8.x, z: P8.z, yaw: 180, pitch: -1 });
+  s.Caption(T8 + 2.2, 2.2, "（趴在村口外的路沟沿后头，顺着主街看过去。接 08）");
+  void NIER_DUCK; void squadStart;
+  return s.Done({ durationS: T8 + 4.6 });
 }
 
 // ---------------------------------------------------------------------------
 // 08 村口
 
 function S0801(ctx) {
-  const s = new Seq(ctx, "08-1", "村口：窗口的机枪顺着街扫");
+  const s = new Seq(ctx, "08-1", "村口：窗口的机枪顺着街扫，活下来的走岔路");
   const K = id => KU(ctx, "08-1", id);
-  // 五个村民从主街上往村外跑（都先摆在大车北边的街上）
-  const start = { Villager1: Pt(99.2, 434), Villager2: Pt(100.6, 438), Villager3: Pt(99.4, 442), Villager4: Pt(101.4, 436), Villager5: Pt(98.6, 440) };
-  // 都弓着身子慌跑（VilPanicRun：原地循环，身体时钟按实际速度推）
-  for (const [id, p] of Object.entries(start)) s.Place(id, 0, p.x, p.z, { state: "alive", stance: "stand", yawDeg: 0, clip: VIL.panic });
+  // 五个村民（第五版 10-21，用户：笔直的主街对着机枪不可能跑掉，活下来的走岔路）：
+  //   Villager2 / 3 从主街东边 z 432.5 那道院门冲上主街往北跑，被北窗机枪打倒；Villager1 从巷子后门出来，顺巷子南北那截 → 东西那截 →
+  //   夹道 → 巷子口，滚进沟西头倒在顺子脚边；Villager4 / 5 从路沟后门出来，直接下到沟东半截缩进后送队。起点都照关键帧的来路（path[0]）。
+  const Start = id => K(id).path[0];
+  const RUN = 2.9;   // VilPanicRun 的参考速度 2.89 m/s
+  const RunAlong = (id, t0, pts, extra = {}) => { const len = RouteLen(s.pos.get(id), pts); const end = pts[pts.length - 1]; return s.Go(id, t0, R(t0 + len / RUN), end.x, end.z, { move: "run", path: pts.slice(0, -1), ...extra }); };
+  for (const id of ["Villager1", "Villager2", "Villager3", "Villager4", "Villager5"]) { const p = Start(id); s.Place(id, 0, p.x, p.z, { state: "alive", stance: "stand", yawDeg: K(id).path.length > 1 ? Yaw(p, K(id).path[1]) : 0, clip: VIL.panic }); }
   s.Eye(0, 2.4, { stance: "prone", yaw: 180, pitch: -1 });
-  s.Caption(0.3, 2.6, "（趴在沟沿上顺着主街看到尽头：几个村民从主街上往村外跑）");
-  const RUN = 2.6;
-  const RunTo = (id, to, t0 = 0.4, extra = {}) => s.Go(id, t0, R(t0 + Dist(s.pos.get(id), to) / RUN), to.x, to.z, { move: "run", yawDeg: 0, ...extra });
-  // 街尽头前屋窗口里机枪打出来：先倒一个（远的那个），再倒一个（中枪倒下 ShotCollapse，倒定了再记 down）
+  s.Caption(0.3, 2.6, "（趴在沟沿上顺着主街看到尽头。街东边一道院门里冲出两个村民，往北跑）");
+  // 街尽头前屋窗口里机枪打出来：3 号出门两步就倒，2 号跑到半街倒下（中枪倒下 ShotCollapse，倒定了再记 down）
   const Shot2Down = (id, t, yaw) => { s.Key(id, t, { clip: "ShotCollapse", clipHold: true }); s.Key(id, t + 1.4, { state: "down", clip: null, yawDeg: yaw }); };
   const fall3 = UP(K("Villager3")), fall2 = UP(K("Villager2"));
-  RunTo("Villager3", fall3);
+  RunAlong("Villager3", 0.6, [...K("Villager3").path.slice(1), fall3], { yawDeg: 0 });
   const t3 = s.pos.get("Villager3").t;
   WindowBurst(s, t3 - 0.3, { volume: 0.8, puffAt: Off(fall3, -0.8, -1.2) });
   Shot2Down("Villager3", t3, K("Villager3").yawDeg);
-  s.Caption(t3 - 0.2, 2.6, "（街尽头那间前屋的窗口里，鬼子的机枪打出来，倒下一个）");
-  RunTo("Villager2", fall2);
+  s.Caption(t3 - 0.2, 2.6, "（街尽头那间前屋的窗口里，鬼子的机枪打出来，出门两步就倒下一个）");
+  RunAlong("Villager2", 1.6, [...K("Villager2").path.slice(1), fall2], { yawDeg: 0 });
   const t2 = s.pos.get("Villager2").t;
   WindowBurst(s, t2 - 0.3, { volume: 0.8, puffAt: Off(fall2, 0.9, -1.5) });
   Shot2Down("Villager2", t2, K("Villager2").yawDeg);
-  // 剩下的跑出街口：两个顺着坡道下沟、缩到后送队那边不见了；一个滚进小队这边的沟里
-  for (const id of ["Villager4", "Villager5"]) {
-    const out = id === "Villager4" ? Pt(105.6, 381.6) : Pt(104.2, 382.4);
-    RunTo(id, out, 0.4, { path: [Pt(101.6, 388), Pt(102.2, 384.6)] });
-    s.Key(id, s.pos.get(id).t + 0.2, { visible: false, clip: null });
+  s.Caption(t2 - 0.2, 2.6, "（另一个跑到半街，也倒了。笔直的街正对着机枪，跑不掉）");
+  // 北边院子的后门里跑出来两个，直接溜下沟东半截、缩进后送队（活着）
+  for (const [id, t0] of [["Villager4", 3.4], ["Villager5", 4.2]]) {
+    const to = UP(K(id));
+    RunAlong(id, t0, [...K(id).path.slice(1), to], { yawDeg: K(id).yawDeg });
+    s.Key(id, s.pos.get(id).t, { stance: "crouch", clip: VIL.crouch, yawDeg: K(id).yawDeg });
   }
+  // 巷子里的那个：从后门出来，顺巷子南北那截、东西那截、夹道跑到巷子口，滚进沟西头，趴在顺子脚边
   const v1 = UP(K("Villager1"));
-  RunTo("Villager1", v1, 0.4, { path: [Pt(97.6, 388), Pt(96.9, 382.2)] });
+  RunAlong("Villager1", 0.8, [...K("Villager1").path.slice(1), v1]);
   const t1 = s.pos.get("Villager1").t;
   s.Key("Villager1", t1, { stance: "crouch", faceTo: "player", clip: VIL.crouch });
-  s.Caption(t1, 2.4, "（剩下的一个滚进路沟，趴在顺子脚边）");
-  // 眼睛：顺着街看倒下的人，再回头看脚边滚进来的
+  s.Caption(t1 - 7.0, 3.0, "（左手边夹道里有脚步声：有人顺着巷子跑过来）");
+  s.Caption(t1, 2.4, "（从巷子口滚进路沟，趴在顺子脚边）");
+  // 眼睛：顺着街看倒下的两个，回头瞄一眼右手边下沟的两个，再回头看脚边滚进来的
   s.Eye(2.4, 1.0, { stance: "prone", yaw: 180, pitch: -1, toLook: fall3, toPitch: -1 });
   s.Eye(t2 - 0.6, 0.8, { stance: "prone", look: fall3, pitch: -1, toLook: fall2, toPitch: -1 });
-  s.Eye(t1 - 1.0, 1.0, { stance: "prone", look: fall2, pitch: -1, toLook: v1, toPitch: -14 });
+  const v4 = UP(K("Villager4"));
+  s.Eye(t2 + 1.4, 1.0, { stance: "prone", look: fall2, pitch: -1, toLook: v4, toPitch: -6 });
+  s.Caption(t2 + 1.6, 3.0, "（右手边：北边院子朝沟的后门里跑出来的两个，已经溜下沟、缩进后送队里）");
+  s.Eye(t2 + 4.4, 1.0, { stance: "prone", look: v4, pitch: -6, toLook: WINDOW, toPitch: -1 });
+  WindowBurst(s, t2 + 5.2, { volume: 0.8, puffAt: Pt(100.2, 389) });
+  s.Eye(t1 - 2.6, 1.0, { stance: "prone", look: WINDOW, pitch: -1, toLook: Pt(ALLEY_MOUTH.x, ALLEY_MOUTH.z + 1), toPitch: -3 });
+  s.Eye(t1 - 0.6, 0.8, { stance: "prone", look: Pt(ALLEY_MOUTH.x, ALLEY_MOUTH.z + 1), pitch: -3, toLook: v1, toPitch: -14 });
   s.Say("VillageMouth.01", "Villager1", t1 + 0.8);
   s.Caption(s.End("VillageMouth.01") + 0.2, 2.4, "（他之后跟着后送队一起走）");
-  // 老耿盯着那扇窗口，半天才说出来
+  // 老耿盯着那扇窗口，半天才说出来；停一停，再补一句
   const geng = UP(K("Geng"));
   s.Key("Geng", 0, { faceTo: WINDOW });
   s.Eye(s.End("VillageMouth.01") + 0.8, 1.2, { stance: "prone", look: v1, pitch: -14, toLook: geng, toPitch: -4 });
   const home = s.Say("GengHome.01", "Geng", s.End("VillageMouth.01") + 2.2);
   s.Caption(home + 0.2, 2.6, "（老耿盯着那扇窗口。那是他家）");
-  s.Eye(s.End("GengHome.01") + 0.4, 1.2, { stance: "prone", look: geng, pitch: -4, toLook: WINDOW, toPitch: -1 });
-  WindowBurst(s, s.End("GengHome.01") + 1.0, { volume: 0.8, puffAt: Pt(99.6, 388) });
-  return s.Done({ durationS: s.End("GengHome.01") + 3.6 });
+  const cellar = s.Say("GengHome.02", "Geng", s.End("GengHome.01") + 1.6);
+  s.Caption(cellar + 0.3, 2.6, "（老耿说完，还盯着那扇窗口）");
+  s.Eye(s.End("GengHome.02") + 0.4, 1.2, { stance: "prone", look: geng, pitch: -4, toLook: WINDOW, toPitch: -1 });
+  WindowBurst(s, s.End("GengHome.02") + 1.0, { volume: 0.8, puffAt: Pt(99.6, 388) });
+  // 东北道上远远还有两三个鬼子在往庄里走（从街口趴着看，道上 x ≥ 274 才看得见，所以走得慢、不走出那一截）
+  RoadWalk(s, ["RoadIja5", "RoadIja6", "RoadIja7"], 1.0, s.End("GengHome.02") + 3.0, { alongM: 12 });
+  return s.Done({ durationS: s.End("GengHome.02") + 3.6 });
 }
 
 function S0802(ctx) {
@@ -902,24 +1024,41 @@ function S0802(ctx) {
   // 回头看沟底：班长（蹲着，枪立在手边）扭头问趴在旁边的老耿
   s.Key("Luo", 0, { faceTo: "Geng", clip: TALK_CROUCH });
   s.Eye(0, 1.6, { stance: "prone", look: luo, pitch: 4 });
-  const ask = s.Say("NoWayAround.01", "Luo", 1.0);
+  const ask = s.Say("NoWayAsk.01", "Luo", 1.0);
   s.Key("Geng", ask + 0.6, { faceTo: "Luo" });
   s.Eye(ask + 1.4, 1.0, { stance: "prone", look: luo, pitch: 4, toLook: geng, toPitch: 4 });
-  // 老耿一边说一边用手朝西、朝东、朝两边院子比（站着指：PvStandPointL，每指一处重起一遍）
-  const west = s.Say("NoWayAround.02", "Geng");
+  // 老耿一边说一边用手指（站着指：PvStandPointL，每指一处重起一遍）：先朝西指河汊子（坎陡、水齐腰深）
+  const west = s.Say("NoWayGeng.01", "Geng");
   s.Key("Geng", west + 0.2, { faceTo: Pt(PL.river.x, 400), clip: POINT_STAND });
-  s.Key("Geng", west + 3.0, { faceTo: Pt(160, 465), clip: POINT_STAND });
-  s.Key("Geng", west + 5.4, { faceTo: Pt(104, 420), clip: POINT_STAND });
-  s.Key("Geng", s.End("NoWayAround.02"), { faceTo: "Luo", clip: null });
-  s.Caption(s.End("NoWayAround.02") + 0.2, 3.2, "（墙根有个狗洞，老耿没想起来：那是小孩走的路，大人眼里没有）");
-  // 排长在后头几步接一句；顺子一下子顶回去；卫生兵头也不抬补一句（一直在缠绷带）
-  s.Eye(s.End("NoWayAround.02") + 0.6, 1.0, { stance: "prone", look: geng, pitch: 4, toLook: officer, toPitch: 4 });
-  s.Key("Officer", 0, { faceTo: "Luo", clip: TALK_CROUCH });
-  s.Say("NoWayAround.03", "Officer", s.End("NoWayAround.02") + 1.6);
-  s.Say("DecideShunzi.01", null, s.End("NoWayAround.03") + 0.4);
-  s.Eye(s.End("NoWayAround.03") + 0.2, 0.8, { stance: "prone", look: officer, pitch: 4, toLook: medic, toPitch: 3 });
+  s.Key("Geng", s.End("NoWayGeng.01") + 0.2, { faceTo: "Luo", clip: null });
+  // 卫生兵蹲在担架边给人缠绷带，听见「水齐腰深」头也不抬地顶一句
   s.Key("Medic", 0, { stance: "crouch", faceTo: Pt(medic.x + 1.5, medic.z + 0.4), clip: MEDIC_BANDAGE });
+  s.Eye(s.End("NoWayGeng.01") + 0.1, 0.8, { stance: "prone", look: geng, pitch: 4, toLook: medic, toPitch: 3 });
+  const wade = s.Say("NoWayMedic.01", "Medic", s.End("NoWayGeng.01") + 0.6);
+  // 老耿朝东一指：东边是鬼子来的道 —— 眼睛跟着转向东边，顺着庄子北沿看得见那条道上远远走着的鬼子
+  const ROAD_SEEN = RoadPointAtX(286, 0);
+  const east = s.Say("NoWayGeng.02", "Geng", s.End("NoWayMedic.01") + 0.5);
+  s.Key("Geng", east - 0.2, { faceTo: ROAD_SEEN, clip: POINT_STAND });
+  s.Eye(east - 0.4, 0.9, { stance: "prone", look: medic, pitch: 3, toLook: geng, toPitch: 4 });
+  // 趴着往东看，眼前就是幺娃、文财几个趴着的身子，挡住了；顺子撑起半个身子（蹲姿眼高）越过他们看，看完再趴回去
+  s.Eye(east + 0.5, 1.4, { stance: "crouch", look: geng, pitch: 4, toLook: { x: ROAD_SEEN.x, z: ROAD_SEEN.z, h: 1.0 } });
+  s.Caption(east + 1.0, 3.0, "（顺子撑起半个身子，顺着庄子北沿往东看：东北进庄的那条道上，远远还有两三个鬼子在往庄里走）");
+  // 往南只有主街一条，两边院子都闩死了，得从俺家后门出 —— 指着主街尽头自家的方向，眼睛回到那扇窗口
+  const south = s.Say("NoWayGeng.03", "Geng", s.End("NoWayGeng.02") + 1.8);
+  s.Key("Geng", south - 0.2, { faceTo: WINDOW, clip: POINT_STAND });
+  s.Eye(south - 0.6, 1.2, { stance: "prone", look: { x: ROAD_SEEN.x, z: ROAD_SEEN.z, h: 1.0 }, toLook: { x: WINDOW.x, z: WINDOW.z, h: 1.4 } });
+  s.Key("Geng", s.End("NoWayGeng.03") + 0.2, { faceTo: "Luo", clip: null });
+  s.Caption(s.End("NoWayGeng.03") + 0.2, 3.2, "（墙根有个狗洞，老耿没想起来：那是小孩走的路，大人眼里没有）");
+  // 排长在后头几步接一句；顺子一下子顶回去；卫生兵头也不抬补一句（一直在缠绷带）
+  s.Eye(s.End("NoWayGeng.03") + 0.6, 1.0, { stance: "prone", look: WINDOW, pitch: -1, toLook: officer, toPitch: 4 });
+  s.Key("Officer", 0, { faceTo: "Luo", clip: TALK_CROUCH });
+  s.Say("NoWayOfficer.01", "Officer", s.End("NoWayGeng.03") + 1.6);
+  s.Say("DecideShunzi.01", null, s.End("NoWayOfficer.01") + 0.4);
+  s.Eye(s.End("NoWayOfficer.01") + 0.2, 0.8, { stance: "prone", look: officer, pitch: 4, toLook: medic, toPitch: 3 });
   s.Say("DecideMedic.01", "Medic", s.End("DecideShunzi.01") + 0.5);
+  void wade;
+  // 东北道上远远走着的那两三个鬼子整段都在挪（别走出从街口看得见的 x ≥ 274 那一截）
+  RoadWalk(s, ["RoadIja5", "RoadIja6", "RoadIja7"], 0.5, 40.0, { alongM: 12 });
   // 班长盯着窗口啐了一口：打！点名时一个一个指（蹲着指：PvCrouchPointL，每点一个重起一遍）
   s.Eye(s.End("DecideMedic.01") + 0.2, 1.0, { stance: "prone", look: medic, pitch: 3, toLook: luo, toPitch: 4 });
   s.Key("Luo", s.End("DecideMedic.01") + 0.3, { faceTo: WINDOW });
@@ -936,7 +1075,8 @@ function S0802(ctx) {
   for (const id of ["HeYoutian", "Escort1", "Escort2"]) s.Key(id, s.End("DecideLuo.01") + 0.6, { faceTo: "Luo" });
   s.Eye(s.End("DecideLuo.01") + 0.4, 1.4, { stance: "prone", look: luo, pitch: 4, toLook: WINDOW, toPitch: -1 });
   WindowBurst(s, 3.0, { volume: 0.8, puffAt: Pt(100.4, 388) });
-  WindowBurst(s, s.End("NoWayAround.03") + 1.0, { volume: 0.8, puffAt: Pt(99.2, 387) });
+  WindowBurst(s, s.End("NoWayGeng.01") + 0.2, { volume: 0.8, puffAt: Pt(100.8, 388.6) });
+  WindowBurst(s, s.End("NoWayOfficer.01") + 1.0, { volume: 0.8, puffAt: Pt(99.2, 387) });
   return s.Done({ durationS: s.End("DecideLuo.01") + 2.6 });
 }
 
@@ -1102,21 +1242,29 @@ function S0805(ctx) {
   const plead = s.Say("NierRuns.03", "Geng", T + 4.6);
   s.Key("Geng", plead - 0.2, { clip: POINT_CROUCH });
   s.Key("Geng", s.End("NierRuns.03") + 0.4, { clip: null });
-  s.Caption(s.End("NierRuns.03") + 0.2, 2.8, "（顺子趴的地方离巷子口最近。没人下令；玩家不动，老耿就再喊一遍）");
-  // 顺子爬起来往巷子里冲：眼睛从坡道下沟、顺沟底往西、到巷子口
-  const go = s.End("NierRuns.03") + 2.6;
-  const eyeA = Pt(P.x, P.z), eyeB = Pt(97.2, 381.2), eyeC = Pt(84, 380.6), eyeD = Pt(ALLEY_MOUTH.x, ALLEY_MOUTH.z + 1.5);
+  s.Caption(s.End("NierRuns.03") + 0.2, 2.4, "（顺子趴的地方离巷子口最近。没人下令——他自己爬起来追进去）");
+  // 顺子爬起来追进巷子（10-21 用户：过场里直接跟进去，走一点点路才交还操作）：眼睛从坡道下沟、猫腰顺沟南沿往西、拐进巷子口、
+  // 再往里十来米到夹道拐弯前 (80,394)；这一段里刘文财在身后吼、班长在大车后头喊、北窗机枪掉过来几梭全打大车
+  const go = s.End("NierRuns.03") + 1.6;
+  const eyeA = Pt(P.x, P.z), eyeB = Pt(97.2, 381.2), eyeC = Pt(84, 380.6), eyeD = Pt(ALLEY_MOUTH.x, ALLEY_MOUTH.z + 1.5), eyeE = Pt(ST.alleyNorth.x, 394.0);
   s.Eye(go - 0.8, 0.8, { stance: "prone", look: ALLEY_MOUTH, pitch: 0, toPitch: -2 });
   s.Creep(go, 1.4, eyeA, eyeB, Pt(90, 381), { h: 1.3, lookH: 1.0 });
-  s.Creep(go + 1.4, 4.2, eyeB, eyeC, Pt(ALLEY_MOUTH.x, ALLEY_MOUTH.z + 4), { h: 1.5, lookH: 1.0, ease: "linear" });
+  s.Creep(go + 1.4, 4.2, eyeB, eyeC, Pt(ALLEY_MOUTH.x, ALLEY_MOUTH.z + 4), { h: 1.4, lookH: 1.0, ease: "linear" });
   s.Creep(go + 5.6, 2.0, eyeC, eyeD, Pt(ST.alleyNorth.x, 398), { h: 1.55, lookH: 1.0 });
-  s.Caption(go + 0.2, 2.6, "（顺子爬起来往巷子里冲）");
+  s.Cam(go + 7.6, 3.2, { from: { ...eyeD, h: 1.55 }, to: { ...eyeE, h: 1.55 }, look: { x: ST.alleyNorth.x, z: ST.alleyWest.z, h: 1.0 }, lookTo: { x: ST.alleyNorth.x - 0.4, z: ST.alleyWest.z + 1.0, h: 1.1 }, ease: "linear" });   // 一直看着拐弯处（往西那截从这里看不进去，看过去就是墙）
+  s.Caption(go + 0.2, 2.6, "（顺子爬起来，猫着腰顺沟南沿往西冲）");
   const yell = s.Say("NierRuns.04", "LiuWencai", go + 1.6);
   s.Key("LiuWencai", yell - 0.3, { aim: false, faceTo: Pt(90, 381) });
-  s.Caption(s.End("NierRuns.04") + 0.2, 2.8, "（他以为顺子要开小差）");
-  WindowBurst(s, go + 3.0, { volume: 0.9, puffAt: Pt(99.0, 385.2) });
+  s.Caption(s.End("NierRuns.04") + 0.2, 3.2, "（刘文财趴在东边 5 m，没看见妮儿钻巷子，只看见顺子扔下射位往西钻——他以为顺子要开小差）");
+  // 班长缩在大车北边、背对路沟：觉出沟沿的火力稀了一半、机枪全掉过来打他，看不见是谁停了火
+  const keep = s.Say("LuoKeepFiring.01", "Luo", s.End("NierRuns.04") + 1.2);
+  s.Key("Luo", keep - 0.2, { talking: true });
+  s.Key("Luo", s.End("LuoKeepFiring.01") + 0.2, { talking: false });
+  s.Caption(s.End("LuoKeepFiring.01") + 0.2, 3.2, "（班长缩在大车北边、背对路沟，只觉出沟沿的枪声稀了、机枪全掉过来打车板，看不见是谁停了火）");
+  for (const [t, dx, dz] of [[go + 2.6, -1.2, -1.4], [go + 5.2, 0.6, -1.6], [go + 8.4, -0.4, -1.1]]) WindowBurst(s, t, { volume: 0.9, puffAt: Off(CART_WRECK, dx, dz) });
+  s.Caption(go + 9.6, 2.0, "（交还操作，接 09）");
   void plead;
-  return s.Done({ durationS: go + 8.6 });
+  return s.Done({ durationS: go + 11.2 });
 }
 
 // ---------------------------------------------------------------------------
@@ -1127,18 +1275,21 @@ function S0901(ctx) {
   const X = ST.alleySouth.x;
   const NIER_DOOR = UP(KU(ctx, "09-1", "Nier"));
   const LOOK = z => Pt(X, z);
-  // 开场：顺子刚拐进南北那截巷子；妮儿在前头十几米慌跑着（VilPanicRun），往邻院敞着的小门去
-  s.Place("Nier", 0, X + 0.3, 446, { stance: "stand", yawDeg: 180, clip: VIL.panic });
+  // 开场（10-21 起接 08-5 的末尾）：顺子在夹道里、东西那截拐弯前 (80,394.5)（08-5 预演交还操作的地方）；妮儿已经拐过弯，在南北那截里
+  // 慌跑着（VilPanicRun）往邻院敞着的小门去。先一口气跑过东西那截到拐角，再按「响了才挪」的节奏往南
+  const P0 = KP(ctx, "09-1");
+  s.Place("Nier", 0, X + 0.3, 404, { stance: "stand", yawDeg: 180, clip: VIL.panic });
   const doorOut = Pt(PL.neighborDoor.x - 0.9, NB.westDoor.z);
   const toDoor = s.Walk("Nier", 0.4, doorOut, { move: "run", speed: 2.9 });
   s.Walk("Nier", toDoor, NIER_DOOR, { move: "run", speed: 2.6, yawDeg: NIER_DOOR.yawDeg ?? -140, clip: null, stance: "crouch" });
-  const start = Pt(X, 432);
-  s.Eye(0, 2.2, { stance: "crouch", x: start.x, z: start.z, look: Pt(X, 470), pitch: 0 });
-  s.Caption(0.3, 3.2, "（巷子两边都是院墙，又窄又直。妮儿跑在前头，往南去了）");
-  s.Caption(3.8, 3.0, "（街口那边一直在打：机枪回一梭就挪一段，一停就贴墙不动。这个节奏 08 自己在沟沿上打出来过）");
+  const corner = Pt(X + 0.5, ST.alleyWest.z + 0.3);
+  s.Creep(0, 1.4, Pt(P0.x, P0.z), Pt(ST.alleyNorth.x - 0.4, ST.alleyWest.z), Pt(70, ST.alleyWest.z), { h: 1.05, lookH: 1.0, ease: "linear" });
+  s.Creep(1.4, 7.2, Pt(ST.alleyNorth.x - 0.4, ST.alleyWest.z), corner, Pt(X, 440), { h: 1.05, lookH: 1.0, ease: "linear" });
+  s.Caption(0.3, 3.2, "（跟进巷子：两边都是院墙，又窄又直。妮儿已经拐过弯，往南去了）");
+  s.Caption(8.8, 3.0, "（街口那边一直在打：机枪回一梭就挪一段，一停就贴墙不动。这个节奏 08 自己在沟沿上打出来过）");
   // 四段：每段「街口打 → 机枪回一梭」时挪一段，停下贴墙
-  const stops = [start, LOOK(446), LOOK(460), LOOK(474), LOOK(487)];
-  const t = CreepLegs(s, 2.2, stops, i => (i < 4 ? LOOK(stops[i].z + 24) : Pt(PL.neighborDoor.x + 1.5, NB.westDoor.z)), {
+  const stops = [corner, LOOK(432), LOOK(460), LOOK(474), LOOK(487)];
+  const t = CreepLegs(s, 8.6, stops, i => (i < 4 ? LOOK(stops[i].z + 24) : Pt(PL.neighborDoor.x + 1.5, NB.westDoor.z)), {
     volume: 0.55, pause: 2.6, speed: 2.4,
     onStop: (i, mv0, mv1) => {
       if (i === 2) {

@@ -14,7 +14,7 @@ import {
 } from "./Script_EditorBlockoutFirstLevel1218Scene.mjs";
 import {
   L1218_GROUND, L1218_HEIGHTS as H, L1218_ROAD as RD, L1218_DITCH as DT, L1218_LEVEES as LV, L1218_BRIDGE as BR, L1218_BRIDGEHEAD as BH, L1218_YARD as Y,
-  L1218_SOUTH as S, L1218_SIGNALS as SIG, L1218_PLACES as PL, L1218_BOUNDS as B,
+  L1218_SOUTH as S, L1218_SIGNALS as SIG, L1218_PLACES as PL, L1218_BOUNDS as B, L1218_HECHA as HC,
 } from "./Data_EditorBlockoutFirstLevel1218Space.mjs";
 
 const opts = { commit: "test", generatedAt: "2026-10-19T00:00:00.000Z" };
@@ -49,7 +49,14 @@ for (const x of [-40, -80, -120, -160, -200, -240]) {
   assert.ok(Math.min(r.minus, r.plus) - r.floor >= 2.5, `河汊子 x${x} 不够深：${(Math.min(r.minus, r.plus) - r.floor).toFixed(2)}`);
   assert.ok(r.floorW >= 5.5 && r.floorW <= 8.5, `河汊子 x${x} 沟底宽 ${r.floorW}（要约 6 m）`);
 }
-Near(sample(19, 556), HECHA_FLOOR_Y, 0.05, "河汊子直段在接缝处");
+Near(sample(HC.line[0].x, 556), HECHA_FLOOR_Y, 0.05, "河汊子直段在接缝处（中线跟 0610 的 L0610_RIVER.centerX 走）");
+assert.ok(HC.line[0].x === HC.line[1].x && HC.line[1].z >= L1218_GROUND.seamZ + 4, "河汊子头两点在直段上、直到接缝以南 4 m 才拐（接缝两边才接得上）");
+for (let i = 2; i < HC.line.length; i++) {   // 拐弯平顺：相邻两段转角 ≤ 50°
+  const a = HC.line[i - 2], b = HC.line[i - 1], c = HC.line[i];
+  const t1 = Math.atan2(b.x - a.x, b.z - a.z), t2 = Math.atan2(c.x - b.x, c.z - b.z);
+  const turn = Math.abs(((t2 - t1 + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI) * 180 / Math.PI;
+  assert.ok(turn <= 50, `河汊子在 (${b.x},${b.z}) 拐 ${turn.toFixed(0)}°，太急`);
+}
 assert.ok(a.blocks.filter((x) => /^HechaWater_/.test(x.id)).length >= 5 && a.blocks.filter((x) => x.semantic === "water").every((x) => x.solid === false), "河汊子沟底的水块：不实心、顺着折线");
 const river = byId.get("RiverWater");
 assert.ok(river && river.d >= 50 && river.w >= B.maxX - B.minX - 1 && Math.abs(river.y + river.h / 2 - H.waterY) < 0.01, "北沙河的水面块盖住整条河、顶在水面高");

@@ -66,7 +66,7 @@ assert.ok(kf.units.some(u => u.id === "Geng" && u.kind === "civilian") && kf.uni
 const previzDoc = {
   schema: "tengxian-blockout-previz/1", level: LEVEL,
   sequences: [{
-    keyframe: KF, title: "运行时补齐测试", then: "stay", durationS: 20,
+    keyframe: KF, title: "运行时补齐测试", then: "stay", durationS: 24,
     // 老耿、妮儿在干沟沟底（地面约 −0.8），岸上（+2.15）往下看被沟沿挡住：机位跟着演员锚放进沟里
     camera: [
       { t: 0, dur: 3, from: { actor: "Geng", offset: [2.6, 1.4, -2.2] }, look: { actor: "Geng", offset: [0, 0.9, 0] }, fov: 50 },
@@ -74,6 +74,9 @@ const previzDoc = {
       { t: 6, dur: 8, from: { x: 52, z: 162, h: 2.0 }, look: { aircraft: "Ki30A" }, fov: 60 },
       // 14 s 起看驴车：坐车尾的小孩与车板上的担架跟着车走
       { t: 14, dur: 6, from: { actor: "TestCart", offset: [3.4, 2.0, 3.2] }, look: { actor: "TestCart", offset: [0, 1.0, 0.6] }, fov: 50 },
+      // 2026-10-21 能转头不能走的眼睛（eye.free）：20–24 s 蹲在沟里，默认视线 0° → 40°；两条紧挨着、同位置 → 算一段
+      { t: 20, dur: 2, eye: { x: 50, z: 158, stance: "crouch", free: true, yawDeg: 0, pitchDeg: 0, toYawDeg: 40 } },
+      { t: 22, dur: 2, eye: { x: 50, z: 158, stance: "crouch", free: true, yawDeg: 40, pitchDeg: 0 } },
     ],
     actors: [
       { id: "Geng", keys: [{ t: 0, clip: "PvStandPointL" }, { t: 4, clip: "PvCrouchCountFingers" }, { t: 9, clip: null }] },
@@ -365,6 +368,33 @@ try {
   Check("clipRelease 2：片段播到 2.6 s 时已经放开停住段、在放出口（显示秒数≈2.6），不写的那个还在停住段里循环（≈0.6）",
     rel?.shownClip === "VilIjaPinBayonet" && Math.abs(rel.shownClipSeconds - 2.6) < 0.08 && hold?.shownClip === "VilIjaPinBayonet" && Math.abs(hold.shownClipSeconds - 0.6) < 0.08,
     J({ rel: [rel?.shownClip, rel?.shownClipSeconds], hold: [hold?.shownClip, hold?.shownClipSeconds] }));
+
+  // 8) 能转头不能走（2026-10-21 eye.free）：Seek 是默认视线、不能接手；播着时 Look(200, 0) 接手，相机 yaw 跟着转 22°（0.11°/px）；
+  //    跨到同一段的下一条 free 眼睛（22 s）视线不被夺回；再 Seek 回去又是默认视线
+  console.log("--- free look");
+  const fl0 = await Seek(20.5);
+  const fl = await B(async () => {
+    const T = window.Tengxian, P = T.Debug.Blockout.Previz;
+    const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const pausedLook = P.Look(200, 0);                       // 暂停时不接手
+    P.Resume(); await frame();
+    const before = P.State().freeLook, yawBefore = T.camera.rotation.y * 180 / Math.PI;
+    const took = P.Look(200, 0); await frame();
+    const after = P.State().freeLook, yawAfter = T.camera.rotation.y * 180 / Math.PI;
+    // 播到下一条 free 眼睛（22 s）：同一段，玩家的视线不被夺回
+    while (P.State().t < 22.4) await frame();
+    const later = P.State().freeLook, yawLater = T.camera.rotation.y * 180 / Math.PI;
+    await P.Seek(23.0); await frame();
+    const seeked = P.State().freeLook, yawSeeked = T.camera.rotation.y * 180 / Math.PI;
+    return { pausedLook, took, before, after, later, seeked, yawBefore, yawAfter, yawLater, yawSeeked };
+  });
+  // 缺省切镜（§14.2）：0 → 40° 的转头前半段定在 0°、后半段定在 40°，所以这会儿默认视线是 0 或 40，不是中间值
+  Check("Seek(20.5) 暂停时不能接手；Resume 后 State().freeLook.available、没接手、yaw = 默认视线（切镜：0° 或 40°）", fl0.freeLook?.available === false && fl0.paused && fl.before?.available === true && fl.before.active === false && fl.before.yawDeg >= 0 && fl.before.yawDeg <= 40, J({ fl0: fl0.freeLook, before: fl.before }));
+  Check("暂停时 Look 不接手；播着时 Look(200, 0) 接手：active、yaw 比接手前少 22°（±3°，默认视线还在走），相机 rotation.y 跟着",
+    fl.pausedLook === false && fl.took === true && fl.after?.active === true && Math.abs(Wrap(fl.yawBefore - fl.yawAfter) - 22) < 3 && Math.abs(Wrap(fl.after.yawDeg - fl.yawAfter)) < 0.5, J(fl));
+  Check("跨到同一段的下一条 free 眼睛（22 s）玩家的视线不被夺回；Seek 回去又是默认视线（active false、yaw 40°）",
+    fl.later?.active === true && Math.abs(Wrap(fl.yawLater - fl.yawAfter)) < 0.5 && fl.seeked?.active === false && Math.abs(Wrap(fl.yawSeeked - 40)) < 0.5, J({ later: fl.later, seeked: fl.seeked, yawLater: fl.yawLater, yawSeeked: fl.yawSeeked }));
+  await Shot("FreeLook_t23.png");
 
   console.log("--- stop");
   await B(() => window.Tengxian.Debug.Blockout.Previz.Stop());

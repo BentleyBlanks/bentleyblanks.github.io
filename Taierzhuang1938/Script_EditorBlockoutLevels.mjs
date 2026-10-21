@@ -34,7 +34,7 @@ export const BLOCKOUT_LEVELS = Object.freeze([
   Object.freeze({ key: "FirstLevel0610", label: "第一关 06–10 · 耿家庄（新剧本）", configUrl: "./Blockout/FirstLevel0610.json",
     era: "rewrite", badge: "新剧本", short: "06–10", note: "06–10：干沟 → 凹路 → 耿家庄（10-19 剧本）",
     scene: Object.freeze({ kind: "file", url: "./Blockout/FirstLevel0610.scene.json",
-      placeholder: Object.freeze({ bounds: { minX: -20, maxX: 250, minZ: 120, maxZ: 560 }, spawn: { x: 35, z: 147, yawDeg: -90 } }) }) }),
+      placeholder: Object.freeze({ bounds: { minX: -20, maxX: 320, minZ: 120, maxZ: 560 }, spawn: { x: 35, z: 147, yawDeg: -90 } }) }) }),
   // 2026-10-19：12–18 新剧本（出村 → 北沙河北岸大路 → 空袭 → 排水沟 → 桥头接收院 → 守桥头、过浮桥 → 北门），与 0610 同一套坐标；锚点 Data_EditorBlockoutFirstLevel1218Space
   Object.freeze({ key: "FirstLevel1218", label: "第一关 12–18 · 北沙河（新剧本）", configUrl: "./Blockout/FirstLevel1218.json",
     era: "rewrite", badge: "新剧本", short: "12–18", note: "12–18：出村 → 北沙河大路 → 空袭 → 桥头接收院 → 浮桥 → 北门（10-19 剧本）",

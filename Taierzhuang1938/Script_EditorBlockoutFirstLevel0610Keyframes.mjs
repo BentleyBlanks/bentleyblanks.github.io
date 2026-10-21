@@ -26,7 +26,7 @@ import { BlockStandSampler } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import {
   L0610_LEVEL_KEY, L0610_TITLE, L0610_VERSION, L0610_BOUNDS, L0610_PLACES as PL, L0610_LANE, L0610_DITCH as DT, L0610_STREETS as ST, L0610_GENG as G,
   L0610_NEIGHBOR as NB, L0610_EAST_YARDS as EY, L0610_STREET_YARDS as SY, L0610_SIGNALS as SIG, L0610_FROM_0105, L0610_MOUTH_SHOOTERS, LanePointAtZ,
-  PointAlong, LineLength, Station,
+  L0610_EAST_ROAD, PointAlong, PointBeside, LineLength, Station,
 } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 
 export const FIRST_LEVEL_0610_GENERATOR = "Script_EditorBlockoutCli.mjs export FirstLevel0610";
@@ -42,6 +42,21 @@ const Yaw = (from, to) => R1(YawDegFromTo(from, to));
 const Off = (p, dx, dz) => Pt(p.x + dx, p.z + dz);
 /** 凹路上按 z 取点（lat > 0 = 往南走的左手 = 东）。 */
 const LZ = (z, lat = 0) => { const p = LanePointAtZ(z, lat); return { x: R2(p.x), z: R2(p.z), heading: R1(p.headingYawDeg) }; };
+/**
+ * 东北进庄的道（第五版 L0610_EAST_ROAD：从东街东头 (232,465) 往东北到 (300,320)，x 单调增）上按 x 取中线上的点；
+ * lat 按折线的行进方向（往东北）左手偏。鬼子顺这条道往庄子走 = 往 x 小的方向走，面朝折线上 x 更小的那一点。
+ */
+export function RoadPointAtX(x, lat = 0) {
+  const line = L0610_EAST_ROAD.line;
+  let walked = 0;
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i - 1], b = line[i], len = Math.hypot(b.x - a.x, b.z - a.z);
+    if (b.x !== a.x && (x - a.x) * (x - b.x) <= 0) { const p = PointBeside(line, walked + len * (x - a.x) / (b.x - a.x), lat); return Pt(p.x, p.z); }
+    walked += len;
+  }
+  const p = PointBeside(line, x <= line[0].x ? 0 : LineLength(line), lat);
+  return Pt(p.x, p.z);
+}
 
 // ---------------------------------------------------------------------------
 // 路网：干沟中心线 + 凹路 + 路沟 + 街口坡道 + 街 + 巷子 + 各道门；院子 / 屋里 / 路沟是能自由走动的区域，门是区域的出入口。
@@ -258,6 +273,7 @@ const POI = {
   overturnedCart: (kind = "poi") => Poi("OverturnedCart", "翻倒的大车", kind, PL.cart, 2),
   river: () => Poi("River", "河汊子（车下不去）", "landmark", PL.river, 8),
   eastSide: () => Poi("EastSide", "东头（鬼子来的方向）", "danger", PL.fieldEast, 8),
+  eastRoad: () => Poi("EastRoad", "东北进庄的道（鬼子顺它进的庄）", "danger", PL.eastRoadView, 8),
   alleyMouth: (kind = "poi") => Poi("AlleyMouth", "巷子口", kind, PL.alleyMouth, 1.5),
   neighborDoor: (kind = "poi") => Poi("NeighborDoor", "邻院的小门（敞着）", kind, PL.neighborDoor, 1.5),
   dogHole: (kind = "poi") => Poi("DogHole", "狗洞（大人钻不进）", kind, PL.dogHole, 1),
@@ -321,6 +337,14 @@ const IJA = {
   Mortar1: { name: "掷弹筒", role: "mortar", group: "east" },
   Mortar2: { role: "mortarLoader", group: "east" },
   Mortar3: { role: "mortarLoader", group: "east" },
+  // 第五版（10-21）：东北进庄的道上往庄子走的鬼子（占了老耿家那伙的尾巴）：07-4 四个在 x 268…288，08-1 / 08-2 远远还有三个在 x 285…298
+  RoadIja1: { name: "东北道上往庄里走的", role: "rifleman", group: "road" },
+  RoadIja2: { role: "rifleman", group: "road" },
+  RoadIja3: { role: "rifleman", group: "road" },
+  RoadIja4: { role: "rifleman", group: "road" },
+  RoadIja5: { name: "东北道上远远走着的", role: "rifleman", group: "road" },
+  RoadIja6: { role: "rifleman", group: "road" },
+  RoadIja7: { role: "rifleman", group: "road" },
 };
 const J = (id, at, o = {}) => U(id, "ija", at, { ...(IJA[id] || {}), ...o });
 
@@ -480,6 +504,15 @@ const NorthChain = () => [
   J("NorthIja3", Pt(133.5, 456.6), { role: "rifleman", group: "north", face: Pt(NC.yard1Door.x, NC.yard1Door.z), straight: true, guess: true }),
   J("NorthIja4", Pt(148.8, 450.2), { role: "rifleman", group: "north", face: Pt(NC.yard1Door.x, NC.yard1Door.z), straight: true, guess: true }),
 ];
+// 东北进庄的道上弯着腰往庄子东头走的鬼子（第五版 10-21）：[id, x, lat]；都面朝道上 x 更小的那一点、去向是东街东头
+const RoadWalkers = (list) => list.map(([id, x, lat]) => J(id, RoadPointAtX(x, lat), {
+  stance: "crouch", face: RoadPointAtX(x - 8, lat), straight: true, guess: id !== "RoadIja1" && id !== "RoadIja5",
+  intent: [RoadPointAtX(x - 14, lat), RoadPointAtX(Math.max(236, x - 28), lat * 0.5), Pt(ST.east.toX, ST.east.z)],
+}));
+// 实测（空间负责人 10-21）：从街口坡道趴着（眼 0.32）看东北道，道中线 x ≥ 274 那一截才稳看得见（x 272 擦着主街东侧院子北墙东头）；
+// 凹路里蹲着看不见任何一段，07-4 末要直起腰（眼 1.62）。所以要被看见的鬼子都放在 L0610_EAST_ROAD.viewFromX…viewToX（274…290）往外一点那一截。
+const ROAD_IJA_074 = [["RoadIja1", 280, 0.6], ["RoadIja2", 285, -0.5], ["RoadIja3", 290, 0.5], ["RoadIja4", 295, -0.6]];
+const ROAD_IJA_08 = [["RoadIja5", 284, 0.5], ["RoadIja6", 289, -0.6], ["RoadIja7", 294, 0.4]];
 // 南边翻墙摸后门的（10-5 起）：翻南侧第一个院的南墙，往老耿家后门外的小路摸
 const SC = EY.southClimb;
 const SouthClimbers = () => [
@@ -598,12 +631,15 @@ function Keyframes() {
       C("Nier", Pt(cart.x, cart.z - NIER_RIDE.z), { yaw: 0, ride: NIER_RIDE }),
     ];
   };
-  /** 小队在凹路里往前挤：路中线偏东（担架和伤员在西边、车在东边）。 */
+  /**
+   * 小队在凹路里往前挤：路中线偏东（担架和伤员在西边、车在东边）。
+   * 10-21：幺娃凑在顺子左手边略后（并排说话），刘文财走在顺子和幺娃后头两步、一声不吭（他听见了「路费」那段，08 才会以为顺子要跑）。
+   */
   const SquadInLane = (z, { stance = null, withLuo = true } = {}) => [
     ...(withLuo ? [N("Luo", LS(z + 3.0, 0.3), { yaw: 180, stance: stance || undefined })] : []),
-    N("Yaowa", LS(z - 1.8, 0.25), { yaw: 180, stance: stance || undefined }),
-    N("HeYoutian", LS(z - 3.4, -0.3), { yaw: 180, stance: stance || undefined }),
-    N("LiuWencai", LS(z + 1.2, -0.3), { yaw: 180, stance: stance || undefined }),
+    N("Yaowa", LS(z - 0.7, 0.3), { yaw: 180, stance: stance || undefined }),
+    N("HeYoutian", LS(z - 3.6, -0.3), { yaw: 180, stance: stance || undefined }),
+    N("LiuWencai", LS(z - 2.2, -0.3), { yaw: 180, stance: stance || undefined }),
     N("Squad1", LS(z - 5.6, 0.2), { yaw: 180, guess: true, stance: stance || undefined }),
     N("Squad2", LS(z - 7.4, -0.25), { yaw: 180, guess: true, stance: stance || undefined }),
     N("Squad3", LS(z - 9.2, 0.1), { yaw: 180, guess: true, stance: stance || undefined }),
@@ -615,7 +651,7 @@ function Keyframes() {
     player: { x: p71.x, z: p71.z, yawDeg: 180, pitchDeg: -6, stance: "stand" },
     what: "后送队贴西坎停成一长溜。顺子边走边数铜板，幺娃问：数个锤子哦？车在前头几步，妮儿坐车尾晃腿。",
     next: { text: "往前挤", x: LZ(244).x, z: LZ(244).z, radiusM: 3 },
-    how: ["整条路都是人，一直望到南边", "担架一副挨一副搁在地上，抬担架的蹲在杠子边喘气", "车轮在车辙里颠，弹药箱哐哐响", "幺娃凑过来：顺儿哥，攒起娶婆娘？"],
+    how: ["整条路都是人，一直望到南边", "担架一副挨一副搁在地上，抬担架的蹲在杠子边喘气", "车轮在车辙里颠，弹药箱哐哐响", "幺娃凑过来：顺儿哥，攒起娶婆娘？", "刘文财走在两人后头两步，一声不吭（他听见了）"],
     notes: `后送队 ${SLOTS.filter((s) => s.kind === "litter").length + 1} 副担架（含冬瓜那副）、${SLOTS.filter((s) => s.kind !== "litter" && s !== DONGGUA_SLOT).length} 个走着的伤员（${SLOTS.filter((s) => s.helper).length} 个有人架着），`
       + "贴西坎从 z 190 停到 z 315；「被人背着的」预演用 VilNraCarryOnBack + VilRideOnBack 一对。车在玩家前头 6 m 靠路东边；妮儿坐在车尾（ride 挂在 GengCart 车尾沿、背对车头，预演播 VilSitEdge），车动她跟着走。",
     signals: [SIG.cartDeparted],
@@ -635,10 +671,10 @@ function Keyframes() {
   Add({
     id: "07-2", ...s07, name: "我妹今年十二",
     player: { x: p72.x, z: p72.z, yawDeg: 180, pitchDeg: -4, stance: "stand" },
-    what: "顺子说到「……我妹今年十二」，眼前就是车尾晃腿的妮儿。幺娃过了好一会儿：……我没听到。",
+    what: "顺子说到「……我妹今年十二」，眼前就是车尾晃腿的妮儿。幺娃过了好一会儿：老子一个字都没听到。表跟第二个人讲。",
     next: { text: "往队头挤", x: LZ(294).x, z: LZ(294).z, radiusM: 3 },
-    how: ["边走边说，幺娃在左手边略后", "车尾的妮儿就在正前方几步，不给特写、不点破", "台词在 Notion 07（路费 / 他舅在船上烧锅炉 / 东家拿人抵 / 卖你妈个锤子）", "前头村子的枪声时有时无"],
-    notes: "台词不逐句进关键帧。车仍在玩家前头 6 m，妮儿在车尾正对着玩家。",
+    how: ["边走边说，幺娃在左手边略后", "车尾的妮儿就在正前方几步，不给特写、不点破", "台词在 Notion 07（路费 / 他舅在船上烧锅炉 / 东家拿人抵 / 卖你妈个锤子）", "刘文财在后头两步，回头能看见他，他不吭声", "前头村子的枪声时有时无"],
+    notes: "台词不逐句进关键帧。车仍在玩家前头 6 m，妮儿在车尾正对着玩家。刘文财听见了「路费」那段，08-5 才会吼「往哪跑」。",
     signals: [SIG.cartDeparted],
     units: [
       ...SquadInLane(250),
@@ -656,7 +692,7 @@ function Keyframes() {
   Add({
     id: "07-3", ...s07, name: "冬瓜",
     player: { x: p73.x, z: p73.z, yawDeg: Yaw(p73, DONGGUA_LITTER), pitchDeg: -24, stance: "stand" },
-    what: "冬瓜裹着单被发抖。掀开被角：肚子上一条吸透血的毛巾。卫生兵：天黑前送不到军医手里，就表想了。",
+    what: "冬瓜裹着单被发抖。掀开被角：肚子上一条吸透血的毛巾。卫生兵：天黑前送不到军医手上，就等到挖坑埋人！",
     next: { text: "跟班长往前", x: LZ(336).x, z: LZ(336).z, radiusM: 3 },
     how: ["担架搁在西坎根，卫生兵满手是血蹲在旁边给别人缠绷带", "按键掀被角", "冬瓜：表掀……冷得很", "队头坎上班长和排长蹲着往南看：狗日的庄子里有鬼子"],
     notes: `契约 (95,300) 朝东南看担架；后送队贴西坎，冬瓜的担架在路西边 (${DONGGUA_LITTER.x},${DONGGUA_LITTER.z})，玩家站路中线偏东朝西南看它。班长 / 排长在东坎顶 (${BANK_LUO.x},${BANK_LUO.z})（契约 (97,312) 在坎的斜面上，挪到坎顶）。`,
@@ -673,15 +709,16 @@ function Keyframes() {
     pois: [Poi("DongguaLitter", "冬瓜的担架", "objective", DONGGUA_LITTER, 1.5), Poi("BankLuo", "班长和排长（坎上）", "poi", BANK_LUO, 2), POI.villageMouth("landmark")],
   });
 
-  // 07-4：短过场（预演机位在东坎上 (100,330) 往南看）；三架日机高高地往南飞过去炸县城（2026-10-21 用户改），全路的人往坎底下缩，妮儿最后一个趴下
-  const p74 = LZ(335, 0);
+  // 07-4：全程第一人称（10-21 用户：不要第三人称机位）。三架日机高高地往南飞过去炸县城，全路的人往坎底下缩，妮儿最后一个趴下；
+  // 顺子半蹲贴在凹路东坎根（不是趴），飞机过头顶那 10 s 能转头不能走（预演 eye.free）。东北进庄的道上三四个鬼子弯着腰往庄子东头走。
+  const p74 = LZ(333.5, 1.3);
   Add({
-    id: "07-4", ...s07, name: "短过场·飞机和村子",
-    player: { x: p74.x, z: p74.z, yawDeg: 180, pitchDeg: 4, stance: "prone" },
+    id: "07-4", ...s07, name: "飞机和村子",
+    player: { x: p74.x, z: p74.z, yawDeg: 150, pitchDeg: 2, stance: "crouch" },
     what: "三架日机高高地往南飞过（去炸县城），路上的人全往坎底下缩；妮儿最后一个趴下。路爬出洼地，耿家庄冒着烟。",
     next: { text: "到村口路沟", x: DITCH_08.Luo.x, z: DITCH_08.Luo.z, radiusM: 3 },
-    how: ["预演机位：东坎上 (100,330) 往南看一长溜担架", "老耿拽着驴往坎边靠", "妮儿是看见别人都趴下才抬头，这时飞机已经在头顶", "全班弯腰顺凹路往前跑，凹路越走越浅，麦地那头几处房顶冒烟"],
-    notes: "不能操作的 20 s 短过场，关键帧只摆趴下那一拍：小队、后送队全体 prone；老耿蹲在驴边；妮儿还坐在车尾（ride），她听不见，预演里看见别人都趴了才从车尾滑下来在车边扑倒（最后一个）。飞机是预演里的 aircraft 轨：三架 Ki-30 离地约 400 m 往南去炸县城，不下来、不开枪；它们看见了这里的人，13 低空扫射的就是它们炸完回去、再一次出动来的。",
+    how: ["全程第一人称：蹲着跟班长的后背顺凹路跑，排长喊「飞机！贴到坎！」", "顺子半蹲贴在东坎根，飞机过头顶那 10 s 能转头不能走；老耿拽着驴往坎边靠", "妮儿是看见别人都趴下才抬头，这时飞机已经在头顶", "班长「起来！走！」全班弯腰顺凹路往前跑，凹路越走越浅，麦地那头几处房顶冒烟", "左前方东北进庄的道上三四个鬼子弯着腰往庄子东头钻", "到村口路沟，班长回头压手「趴倒！」"],
+    notes: `不能走的约 30 s 第一人称段，关键帧只摆趴下那一拍：顺子半蹲在东坎根 (${p74.x},${p74.z})，小队、后送队全体 prone；老耿蹲在驴边；妮儿还坐在车尾（ride），她听不见，预演里看见别人都趴了才从车尾滑下来在车边扑倒（最后一个）。飞机是预演里的 aircraft 轨：三架 Ki-30 离地约 400 m 往南去炸县城，不下来、不开枪；它们看见了这里的人，13 低空扫射的就是它们炸完回去、再一次出动来的。东北道上的四个鬼子是占了老耿家那伙的尾巴（x 275…293：从街口趴着看，道上 x ≥ 274 才看得见；凹路里蹲着看不见，末段直起腰看）。`,
     signals: [SIG.cartDeparted],
     units: [
       N("Luo", LS(344.0, 0.3), { yaw: 180, stance: "prone" }),
@@ -690,20 +727,37 @@ function Keyframes() {
       ...Column({ stance: "prone" }),
       ...DongguaOnLitter(DONGGUA_LITTER),
       N("Medic", LZ(DONGGUA_SLOT.z + 1.6, COLUMN_LAT + 0.9), { yaw: 180, stance: "prone" }),
-      ...CartAhead(335, 6, { stance: "crouch" }),
+      ...CartAhead(p74.z, 6.5, { stance: "crouch" }),
+      ...RoadWalkers(ROAD_IJA_074),
     ],
-    pois: [POI.villageMouth("objective"), POI.ditch("landmark"), Poi("Camera07_4", "短过场机位（东坎上）", "poi", Pt(100, 330), 1.5)],
+    pois: [POI.villageMouth("objective"), POI.ditch("landmark"), POI.eastRoad()],
   });
 
   // ======================= 08 村口 =======================
   const s08 = { stage: 8, stageTitle: "村口" };
   const P08 = SHOOTER.player;
+  /**
+   * 08-1 逃出来的五个村民（第五版 10-21，用户：笔直的主街对着机枪不可能跑掉，活下来的走岔路）：
+   *   · Villager2 / 3 从主街东边 z 432.5 那道院门（MAIN_EAST_GATE2）冲上主街往北跑，被北窗机枪打倒（3 号出门两步就倒，2 号跑到 z 412）；
+   *   · Villager1 从主街西边北头那院西墙上朝巷子的后门（alleyBackGate）出来，顺巷子南北那截 → 东西那截 → 北头夹道 → 巷子口，滚进沟西头倒在顺子脚边；
+   *   · Villager4 / 5 从主街东边最北那院北墙上朝路沟的后门（ditchBackGate）出来，直接下到沟东半截缩进后送队（08-2 还在，之后跟后送队走了）。
+   * 两道后门的路都从门里头起算（第五版场景里两道门洞都开着，只有过梁块）。
+   */
+  const ALLEY_GATE = Pt(SY.westOfMain.box.minX + 0.9, SY.westOfMain.alleyBackGateZ);        // 后门里头（院里）
+  const ALLEY_GATE_OUT = Pt(ST.alleySouth.x, SY.westOfMain.alleyBackGateZ);                 // 门外、巷子中线上
+  const DITCH_GATE_OUT = Pt(SY.eastOfMain.ditchBackGateX, SY.eastOfMain.box.minZ - 0.75);   // 后门外、路沟北岸的麦地上
+  const DITCH_GATE_IN = Pt(SY.eastOfMain.ditchBackGateX, SY.eastOfMain.box.minZ + 0.9);     // 后门里头（院里）
+  const MAIN_EAST_GATE2 = Pt(SY.eastOfMain.box.minX, SY.eastOfMain.gatesZ[1]);           // 主街东边 z 432.5 那道院门
+  const V4_IN = Pt(110.35, 381.1), V5_IN = Pt(112.65, 381.1);                             // 沟东半截两副担架之间
   const Villagers08 = ({ arriving = false } = {}) => [
-    C("Villager1", Pt(94.6, 380.2), { name: "滚进沟里的村民", stance: "crouch", face: DITCH_08.Luo, climb: true, ...(arriving ? { path: [Pt(98.4, 396), Pt(98.6, 383.5), Pt(94.6, 380.2)] } : { straight: true }) }),
-    C("Villager2", Pt(101.2, 412), { down: true, yaw: 20, from: Pt(100.4, 428), fromStraight: true }),
-    C("Villager3", Pt(99.0, 431), { down: true, yaw: -30, from: Pt(99.4, 440), fromStraight: true }),
-    C("Villager4", Pt(102.0, 398), { yaw: 0, intent: [Pt(101.8, 386.5), Pt(103.4, 379.6)], speed: 2.4, from: Pt(101.6, 420), fromStraight: true, climb: true }),
-    C("Villager5", Pt(98.6, 406), { yaw: 0, intent: [Pt(98.2, 387.5), Pt(98.0, 383.4), Pt(94.0, 379.8)], speed: 2.4, from: Pt(98.8, 430), fromStraight: true, climb: true }),
+    C("Villager1", Pt(97.0, 382.4), { name: "巷子里滚进沟的村民", stance: "crouch", face: DITCH_08.Luo, climb: true,
+      ...(arriving ? { from: [ALLEY_GATE, ALLEY_GATE_OUT, Pt(ST.alleySouth.x, ST.alleyWest.z + 0.4), Pt(ST.alleyNorth.x - 0.2, ST.alleyWest.z), Pt(ST.alleyNorth.x, PL.alleyMouth.z + 0.2), Pt(ST.alleyNorth.x + 0.6, DT.z + 0.8)], fromStraight: true } : { straight: true }) }),
+    C("Villager2", Pt(101.2, 412), { down: true, yaw: 20, name: "院门冲出来的村民", ...(arriving ? { from: [Off(MAIN_EAST_GATE2, 1.45, 0.1), Off(MAIN_EAST_GATE2, -0.9, 0.0)], fromStraight: true } : { straight: true }) }),
+    C("Villager3", Pt(99.0, 431), { down: true, yaw: -30, ...(arriving ? { from: [Off(MAIN_EAST_GATE2, 1.5, -0.5), Off(MAIN_EAST_GATE2, -0.7, -0.4)], fromStraight: true } : { straight: true }) }),
+    C("Villager4", V4_IN, { stance: "crouch", face: Pt(V4_IN.x, V4_IN.z - 3), name: "后门下到沟里的村民", climb: true,
+      ...(arriving ? { from: [Off(DITCH_GATE_IN, -0.3, 0.3), Off(DITCH_GATE_OUT, -0.3, 0)], fromStraight: true } : { intent: [Pt(118.0, 381.2)] }) }),
+    C("Villager5", V5_IN, { stance: "crouch", face: Pt(V5_IN.x, V5_IN.z - 3), climb: true,
+      ...(arriving ? { from: [Off(DITCH_GATE_IN, 0.3, 1.0), Off(DITCH_GATE_OUT, 0.3, 0.1)], fromStraight: true } : { intent: [Pt(120.3, 381.2)] }) }),
   ];
   const WindowGroup = (o = {}) => [
     J("MgGunner", MG_AT, { yaw: 0, stance: "crouch", aim: true, arc: MG_ARC, ...o }),
@@ -761,36 +815,39 @@ function Keyframes() {
   Add({
     id: "08-1", ...s08, name: "村口·窗口",
     player: { x: P08.x, z: P08.z, yawDeg: 180, pitchDeg: -1, stance: "prone" },
-    what: "村民从主街往外跑，街尽头窗口里机枪打倒两个，一个滚进沟里。老耿盯着那扇窗：那是……俺家。",
+    what: "两个村民从院门冲上主街往北跑，窗口的机枪打倒；一个从巷子滚进沟里，两个从后门下到沟东半截。老耿：狗日的占了俺家。",
     next: { text: "看清怎么过" },
-    how: ["趴在路沟南沿上顺着主街看到尽头的北窗", "后送队和车缩在路沟东半截，小队在西半截", "滚进来的那个：东头……过来的……进庄了……", "窗口机枪顺着街扫"],
+    how: ["趴在路沟南沿上顺着主街看到尽头的北窗", "后送队和车缩在路沟东半截，小队在西半截", "活下来的走岔路：一个顺巷子滚进沟西头（东头……过来的……进庄了……），两个从北边后门下到沟东半截", "老耿：那是俺家……狗日的占了俺家。窖里还藏着街坊哩", "东北道上远远还有两三个鬼子在往庄里走"],
     notes: `趴在街口坡道上半截 (${P08.x},${P08.z})（眼刚高过街面）：主街只有 6 m 宽，趴在 x < 97 的沟沿上视线被主街西墙北头挡死，所以四个压窗口的人都在街口（契约写西半截 x 78…98）。`
-      + "鬼子 08 已在老耿家：北窗机枪组 2、前屋步枪 2 + 分队长、大门过道 2、后院窖口 3（一家人还在窖里）、灶屋 1。没有人在房顶上。",
+      + "鬼子 08 已在老耿家：北窗机枪组 2、前屋步枪 2 + 分队长、大门过道 2、后院窖口 3（一家人还在窖里）、灶屋 1。没有人在房顶上。"
+      + `村民走岔路（10-21 用户）：Villager2 / 3 从 (${MAIN_EAST_GATE2.x},${MAIN_EAST_GATE2.z}) 那道院门冲上街被打倒；Villager1 从巷子后门 (${ALLEY_GATE_OUT.x},${ALLEY_GATE_OUT.z}) 顺巷子、夹道、巷子口滚进沟西头；Villager4 / 5 从路沟后门 (${DITCH_GATE_OUT.x},${SY.eastOfMain.box.minZ}) 下到沟东半截。`,
     signals: [SIG.cartDeparted],
     units: [
       ...Shooters08(), ...DitchParty08(),
       ...Villagers08({ arriving: true }),
       ...WindowGroup(), ...HouseIja08(), ...CellarGroup08(), ...MillMan(),
       ...ConvoyInDitch(),
+      ...RoadWalkers(ROAD_IJA_08),
     ],
-    pois: [POI.window("danger"), POI.mainStreet("landmark"), POI.ditch("landmark"), POI.alleyMouth("landmark")],
+    pois: [POI.window("danger"), POI.mainStreet("landmark"), POI.ditch("landmark"), POI.alleyMouth("landmark"), POI.eastRoad()],
   });
 
   Add({
     id: "08-2", ...s08, name: "绕不过去",
     player: { x: P08.x, z: P08.z, yawDeg: Yaw(P08, DITCH_08.Luo), pitchDeg: 6, stance: "prone" },
-    what: "班长问路；老耿：两边院子都闩死了，人都钻了窖。排长：等天黑。顺子：冬瓜早凉透了！班长啐一口：打！",
+    what: "班长问路；老耿：河汊子水齐腰深，东边是鬼子来的道，往南只有这一条街，得从俺家后门出。排长：等天黑。班长啐一口：打！",
     next: { text: "压窗口" },
-    how: ["回头看沟底：老耿、班长、排长、卫生兵蹲在街口西边", "老耿：西边河汊子车下不去，东边是鬼子来的道", "卫生兵：这一沟伤号一半挨不到天黑", "班长：文财、幺娃、顺儿压窗口；有田，你两个跟到我"],
-    notes: "墙根有个狗洞，老耿没想起来（小孩走的路）。next 只写文字：下一步还是趴在原地。",
+    how: ["回头看沟底：老耿、班长、排长、卫生兵蹲在街口西边", "老耿朝西指河汊子（坎陡、水齐腰深）、朝东指鬼子来的道（道上远远还有鬼子在走）、指主街尽头自家后门", "卫生兵：抬起蹚水？泡一哈冷水就没得了！这一沟伤号一半挨不到天黑", "顺子：等天黑？冬瓜早他妈凉透了！", "班长：文财、幺娃、顺儿压窗口；有田，你两个跟到我"],
+    notes: "墙根有个狗洞，老耿没想起来（小孩走的路）。next 只写文字：下一步还是趴在原地。后门下来的两个村民还缩在沟东半截的担架之间。",
     signals: [SIG.cartDeparted],
     units: [
       ...Shooters08({ Yaowa: DITCH_08.Luo }), ...DitchParty08({ Luo: DITCH_08.Geng, Geng: DITCH_08.Luo, Officer: DITCH_08.Luo }),
-      ...Villagers08().filter((u) => !u.id.match(/Villager[45]/)),
+      ...Villagers08(),
       ...WindowGroup(), ...HouseIja08(), ...CellarGroup08(), ...MillMan(),
       ...ConvoyInDitch(),
+      ...RoadWalkers(ROAD_IJA_08),
     ],
-    pois: [POI.window("danger"), POI.river(), POI.eastSide(), POI.ditch("landmark")],
+    pois: [POI.window("danger"), POI.river(), POI.eastRoad(), POI.ditch("landmark")],
   });
 
   // 08-3：玩家压窗口；班长带何有田和两个后送队的兵顺主街东边的门洞摸到翻倒的大车后头被压住；大门里甩出手榴弹，一个兵倒了
@@ -812,7 +869,7 @@ function Keyframes() {
     player: { x: P08.x, z: P08.z, yawDeg: 180, pitchDeg: -1, stance: "prone" },
     what: "玩家压窗口；班长四人顺街东边一个门洞一个门洞摸到翻倒的大车后头。大门里甩出手榴弹，一个兵倒了。",
     next: { text: "一直压" },
-    how: ["机枪一梭打沟沿、一梭打班长：玩家一停火，机枪就掉头追着班长打", "班长：压到起！日你妈压到起啊！", "大门过道里又添了几杆枪，手榴弹从门楼后头甩出来炸在车边", "班长卡在车后头：抬不起头！"],
+    how: ["机枪一梭打沟沿、一梭打班长：玩家一停火，机枪就掉头追着班长打", "班长：压到起！日你妈压到起啊！", "大门过道里又添了几杆枪，手榴弹从门楼后头甩出来炸在车边", "班长卡在车后头：过不去了！一冒头就是一梭子！"],
     notes: `大车横在主街偏东 (${CART_HIDE.x},${CART_HIDE.z})、1.15 m 高，班长四人蹲在它北侧；契约写「西边门洞 / 偏西」，但车放西半边会挡住街口看北窗的视线扇（场景生成器核过）。扔手榴弹的在大门过道里（不上房）。`,
     signals: [SIG.cartDeparted],
     units: [
@@ -857,8 +914,8 @@ function Keyframes() {
     player: { x: P08.x, z: P08.z, yawDeg: Yaw(P08, nier85), pitchDeg: 2, stance: "prone" },
     what: "机枪扫到沟里，妮儿身边一个伤兵中枪，血溅了她一脸。她顺路沟往西跑，横穿街口钻进巷子。老耿：老总！俺妮儿——！",
     next: { text: "追进巷子", x: PL.alleyMouth.x, z: PL.alleyMouth.z, radiusM: 2 },
-    how: ["她听不见枪声，子弹追着她脚后跟打在土里", "老耿爬出沟去追，一梭子打在他跟前，幺娃一把把他拽回来", "顺子趴的地方离巷子口最近；玩家不动，老耿就再喊一遍", "刘文财在后头吼：顺子！你狗日的往哪跑！（他以为顺子要开小差）"],
-    notes: `妮儿从车尾 (${DITCH_08.Nier.x},${DITCH_08.Nier.z}) 顺沟底往西跑，到 x 80 爬上南沿进巷子口（标 climb）。老耿在南壁上被幺娃拽着。巷子口离顺子 ${R1(Dist(P08, PL.alleyMouth))} m。`,
+    how: ["她听不见枪声，子弹追着她脚后跟打在土里", "老耿爬出沟去追，一梭子打在他跟前，幺娃一把把他拽回来", "老耿：老总！俺妮儿——！过场里顺子自己爬起来追进巷子，拐弯前才交还操作", "刘文财趴在东边 5 m，没看见妮儿钻巷子，只看见顺子扔下射位往西钻：顺子！你狗日的往哪跑！", "班长缩在大车北边、背对路沟，觉出火力稀了：压到起！哪个龟儿停了？！"],
+    notes: `妮儿从车尾 (${DITCH_08.Nier.x},${DITCH_08.Nier.z}) 顺沟底往西跑，到 x 80 爬上南沿进巷子口（标 climb）。老耿在南壁上被幺娃拽着。巷子口离顺子 ${R1(Dist(P08, PL.alleyMouth))} m；预演末尾顺子跟进巷子到夹道拐弯前 (80,394) 再交还操作，09-1 从那儿起。`,
     signals: [SIG.cartDeparted],
     units: [
       ...Shooters08({ Yaowa: geng85, LiuWencai: P08 }).filter((u) => u.id !== "Yaowa"),
@@ -890,15 +947,16 @@ function Keyframes() {
     J("CellarIja3", Off(CELLAR, -1.9, 1.9), { face: CELLAR }),
     ...FamilyInCellar(),
   ];
-  const p91 = Pt(ST.alleySouth.x, 445);
+  // 09-1 起点接 08-5 的末尾（10-21）：顺子跟进巷子，在北头夹道里、东西那截拐弯前 (80,394.5) 交还操作
+  const p91 = Pt(ST.alleyNorth.x, 394.5);
   const nier91 = Pt(ST.alleySouth.x + 0.6, 487.6);
   Add({
     id: "09-1", ...s09, name: "巷子",
     player: { x: p91.x, z: p91.z, yawDeg: 180, pitchDeg: 0, stance: "crouch" },
     what: "妮儿在前头拐进邻院敞着的小门。后院有鬼子吼「出来！」，地底下有人哭。机枪响就挪一段，一停就贴墙。",
     next: { text: "跟进邻院", x: PL.neighborDoor.x + 1.5, z: NB.westDoor.z, radiusM: 2 },
-    how: ["巷子两边都是院墙，又窄又直", "邻院的人跑的时候没顾上关门", "街口那边一直在打：机枪回一梭就挪，一停就贴墙不动（08 自己打出来的节奏）", "只听得见，看不见：这是惨剧三下的第一下"],
-    notes: "巷子口在路沟西头的南沿上（x 80），夹道往南接东西那截再往南。",
+    how: ["从夹道拐弯前起（08-5 末尾交还操作的地方），先过东西那截再往南", "巷子两边都是院墙，又窄又直", "邻院的人跑的时候没顾上关门", "街口那边一直在打：机枪回一梭就挪，一停就贴墙不动（08 自己打出来的节奏）", "只听得见，看不见：这是惨剧三下的第一下"],
+    notes: `巷子口在路沟西头的南沿上（x 80），夹道往南接东西那截再往南。玩家起点 (${p91.x},${p91.z}) 在夹道里拐弯前，接 08-5 预演的末尾。`,
     signals: [SIG.cartDeparted],
     units: [
       C("Nier", nier91, { face: Pt(PL.neighborDoor.x + 1.3, NB.westDoor.z), speed: 2.4, path: [Pt(ST.alleyNorth.x + 0.4, DT.z), Pt(ST.alleyNorth.x, PL.alleyMouth.z), Pt(ST.alleyNorth.x, ST.alleyWest.z), Pt(ST.alleySouth.x, ST.alleyWest.z), nier91], intent: [Pt(PL.neighborDoor.x + 1.3, NB.westDoor.z), Pt(G.sharedWall.x - 1.0, G.dogHole.z)], climb: true }),
@@ -1310,6 +1368,7 @@ const ZONES = Object.freeze([
   { id: "E", name: "老耿家", stages: [9, 10], box: { minX: 81, maxX: 119, minZ: 469, maxZ: 508 } },
   { id: "F", name: "东街与两侧院子（场院 / 土地庙）", stages: [10, 10], box: { minX: 118, maxX: 235, minZ: 438, maxZ: 492 } },
   { id: "G", name: "河汊子（车下不去）", stages: [8, 8], box: { minX: 10, maxX: 28, minZ: 200, maxZ: 560 } },
+  { id: "H", name: "东北进庄的道（鬼子顺它进的庄）", stages: [7, 8], box: { minX: 230, maxX: 310, minZ: 310, maxZ: 470 } },
 ]);
 
 /**

@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  BLOCKOUT_PREVIZ_SCHEMA, ValidateBlockoutPreviz, NormalizeBlockoutPreviz, SamplePrevizActor, SamplePrevizCamera,
+  BLOCKOUT_PREVIZ_SCHEMA, ValidateBlockoutPreviz, NormalizeBlockoutPreviz, SamplePrevizActor, SamplePrevizCamera, PrevizFreeLookSegment,
   PrevizSequenceDuration, PrevizOverlays, PrevizActiveLines, PrevizSignalsAt, PREVIZ_MOVE_SPEED, PREVIZ_EYE_HEIGHT, PrevizShakeOffset,
   BlockStandSampler, PREVIZ_THROW, PrevizThrows, SampleThrowFlight,
   PREVIZ_AIRCRAFT, SamplePrevizAircraft, PrevizStrafeImpacts, PREVIZ_SLOWMO, PrevizTimeScale, PrevizWallTime, PrevizTimeFromWall,
@@ -235,6 +235,36 @@ Test("镜头切镜：运镜直接切到落幅；长且差得多的切成起幅 /
   for (const t of [0.3, 4, 7, 8.5]) assert.deepEqual(C(t), C(t), "确定性");
   assert.ok(ValidateBlockoutPreviz({ schema: BLOCKOUT_PREVIZ_SCHEMA, level: "X", sequences: [{ keyframe: "01-1", camera: [{ t: 0, dur: 1, eye: {}, keepMove: "yes" }] }] })
     .errors.some(e => e.includes("keepMove")), "keepMove 要是布尔");
+});
+
+Test("镜头：eye 用锚点定默认视线（look / toLook，飞机锚每次取样重算）；eye.free 能转头不能走、紧挨着同位置的几条算一段", () => {
+  const doc = { schema: BLOCKOUT_PREVIZ_SCHEMA, level: "X", sequences: [{ keyframe: "01-1",
+    aircraft: [{ id: "A", path: [{ t: 0, x: 0, h: 100, z: -100 }, { t: 10, x: 0, h: 100, z: 100 }] }],
+    camera: [
+      { t: 0, dur: 2, eye: { x: 0, z: 0, stance: "crouch", free: true, look: { x: 0, z: -10, h: 1.05 }, toLook: { aircraft: "A" } } },
+      { t: 2, dur: 2, eye: { x: 0, z: 0, stance: "crouch", free: true, look: { aircraft: "A" } } },
+      { t: 4, dur: 2, eye: { x: 0, z: 0, stance: "crouch", yawDeg: 0 } },                       // 不 free：另一段
+      { t: 6, dur: 2, eye: { x: 3, z: 0, stance: "crouch", free: true, yawDeg: 90 } },         // 位置不同：新的一段
+    ] }] };
+  const v = ValidateBlockoutPreviz(doc);
+  assert.deepEqual(v.errors, [], v.errors.join("；"));
+  const cam = NormalizeBlockoutPreviz(doc).sequences[0].camera;
+  const plane = (t) => ({ x: 0, y: 100, z: -100 + 20 * t });
+  const Res = (t) => (a) => (a.aircraft ? plane(t) : a.actor ? { x: 0, y: 1.05, z: 0 } : { x: a.x, y: a.h ?? 1.6, z: a.z });
+  const a0 = SamplePrevizCamera(cam, 0, Res(0));
+  Near(a0.yawDeg, 0, 1e-6, "起幅看正北的点"); Near(a0.pitchDeg, 0, 1e-6); assert.equal(a0.free, true); assert.equal(a0.eye, true);
+  const a2 = SamplePrevizCamera(cam, 2, Res(2));   // 落幅 = 飞机：t=2 飞机在 (0,100,-60)，仰角 atan(100/60)
+  Near(a2.pitchDeg, Math.atan2(100 - 1.05, 60) * 180 / Math.PI, 1e-6, "落幅跟着飞机（眼高 1.05）");
+  const a3 = SamplePrevizCamera(cam, 3, Res(3));   // 第二条只写 look 飞机锚：视线一直跟着它（t=3 飞机在 z −40）
+  Near(a3.pitchDeg, Math.atan2(100 - 1.05, 40) * 180 / Math.PI, 1e-6, "look 飞机锚每次取样重算");
+  assert.equal(SamplePrevizCamera(cam, 5, Res(5)).free, false, "没写 free 的眼睛不能转");
+  assert.equal(PrevizFreeLookSegment(cam, 0), 0); assert.equal(PrevizFreeLookSegment(cam, 1), 0, "紧挨着、同位置同姿态 → 同一段");
+  assert.equal(PrevizFreeLookSegment(cam, 2), -1, "不 free → -1"); assert.equal(PrevizFreeLookSegment(cam, 3), 3, "位置不同 → 新的一段");
+  const bad = ValidateBlockoutPreviz({ schema: BLOCKOUT_PREVIZ_SCHEMA, level: "X", sequences: [{ keyframe: "01-1", camera: [
+    { t: 0, dur: 1, eye: { free: "yes", stance: "crouch" } }, { t: 1, dur: 1, eye: { free: true, stance: "crouch" } }, { t: 2, dur: 1, eye: { x: 0, z: 0, look: { aircraft: "Nope" } } }] }] });
+  assert.ok(bad.errors.some(e => e.includes("eye.free 要是")), "free 要是布尔");
+  assert.ok(bad.errors.some(e => e.includes("钉死位置")), "free 的眼睛要写 x / z");
+  assert.ok(bad.errors.some(e => e.includes("eye.look.aircraft")), "eye.look 的飞机锚要在这一段的 aircraft 里");
 });
 
 Test("时长：durationS 优先；否则取各轨最晚结束（台词按清单时长）", () => {
