@@ -1,6 +1,6 @@
 # PatchedTimberBed
 
-完整床资产版本 `20261021MetricWoodCottonV5`：**58,951 三角面、6 网格／材质／绘制、10,246,908 字节**。用户本轮授权上限为整床 **60,000 三角面**，包含被里、草席承托、缝线和真实木损。GLB SHA256：`4afed547ea4a1051206950ba9fb64a9335608b09b0604ea02854adc0a2e61418`。完整身份及坐标见 [Data_Asset.json](Data_Asset.json)。
+完整床资产版本 `20261021NaturalTimberV6`：**58,951 三角面、6 网格／材质／绘制、13,118,916 字节**。用户本轮授权上限为整床 **60,000 三角面**，包含被里、草席承托、缝线和真实木损。GLB SHA256：`94ef1e53a6532b764d61cc3405c62dccd692af3b4fb8c1e3acafeb907266da10`。完整身份及坐标见 [Data_Asset.json](Data_Asset.json)。
 
 本轮修正木架 UV 拉伸及灰色被面的材质、三角面痕迹。真实 ManagedGLTFLoader/WebGL 的 9 个视角、拖动缩放、棋盘格检查、独立 UV Jacobian 审计、42 点接触、源工程冷开和输入哈希检查通过。验收网页、截图、对照模型与报告只在忽略目录 `tmp/BedUvCloth60kAcceptance/`，不随仓库发布。
 
@@ -13,6 +13,10 @@
 最终木架为 **9,534 三角面**：减面后 8,100，UV 接缝切分增加 1,434。Base 2048、OpenGL +Y Normal 1024、ORM 512，单材质。端面保留独立图区，铁件／木销使用专用中性区。
 
 独立读取最终 GLB，按世界三角面积加权计算实际纹理像素 Jacobian：侧面拉伸比 P95 从 **12.533 降至 1.308**，P99 为 **1.595**，比例大于 4 的侧面面积约 **0.019%**。这些小区域位于切口、倒角等复杂面，不宣称全局严格等距。棋盘格侧纹单格 20 mm，端面约 20 mm。
+
+本版进一步更换了木纹底图：旧程序纹理本身的长条柔化仍会产生拉丝观感，单纯修 UV 比例不能解决。新的 [Texture_BedAgedTimberSource.png](Texture_BedAgedTimberSource.png) 保留局部纹理转折、木眼及短孔隙细节；原图由内置 imagegen 生成，完整提示词与处理记录见 [Data_TimberTextureSource.json](Data_TimberTextureSource.json)。周期加平滑分解只处理拼接连续性，不对图像作方向性拉伸。微法线来自细节亮度残差约 70 µm RMS 的艺术高度近似。
+
+本次木纹替换未改变网格或 UV；与上版 58,951 面 GLB 比对，其余五组件（包含已修正被面）的几何、法线、UV、颜色及材质语义精确不变。
 
 ## 被面
 

@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
   "id": "PatchedTimberBed",
-  "version": "20261021MetricWoodCottonV5",
+  "version": "20261021NaturalTimberV6",
   "description": "Complete <=60k patched cotton bed with metric timber perimeter charts, explicit UV repeat seams and restored woven-cotton appearance; original bearing shell and four other components preserved.",
   "historicalStatus": "Creative reconstruction preserving the user-selected M17 C design; no claim of unique documented historical specimen.",
   "models": [
     {
       "file": "Model_PatchedTimberBed.glb",
-      "url": "/Model/PatchedTimberBed/Model_PatchedTimberBed.glb?v=20261021MetricWoodCottonV5",
-      "sha256": "4afed547ea4a1051206950ba9fb64a9335608b09b0604ea02854adc0a2e61418",
-      "bytes": 10246908,
+      "url": "/Model/PatchedTimberBed/Model_PatchedTimberBed.glb?v=20261021NaturalTimberV6",
+      "sha256": "94ef1e53a6532b764d61cc3405c62dccd692af3b4fb8c1e3acafeb907266da10",
+      "bytes": 13118916,
       "triangles": 58951,
       "triangleLimit": 60000,
       "drawPrimitiveLimit": 6,
@@ -114,11 +114,11 @@
       "retainedProjects": [
         {
           "file": "Scene_PatchedTimberBedHigh.blend",
-          "bytes": 147751036
+          "bytes": 147753838
         },
         {
           "file": "Scene_PatchedTimberBedGame.blend",
-          "bytes": 14367604
+          "bytes": 19713244
         }
       ],
       "inputHashesUnchanged": true,
@@ -130,7 +130,7 @@
         "localReceipt": "tmp/BedWoodReferenceAcceptance/Data_ReferenceSourceCleanup.json",
         "automaticBlendBackups": 0
       },
-      "currentSourceDirectoryBytes": 380027681,
+      "currentSourceDirectoryBytes": 394196114,
       "metricUvCottonCleanup": {
         "removedFiles": 3,
         "freedBytes": 14707462,
@@ -514,7 +514,7 @@
     },
     "Frame": {
       "representation": "physical timber islands, continuous metric rectangular perimeter, explicit geometry cuts at tile resets; original source/damage tags retained separately",
-      "version": "20261021MetricWoodCottonV5",
+      "version": "20261021NaturalTimberV6",
       "normalStrength": 0.36,
       "baseDimensions": [
         2048,
@@ -546,7 +546,7 @@
       "uvDistortion": {
         "result": "PASS",
         "previousSha256": "44d64adfde72fea58494719ce753bc5cc17095786dae1baf9c4a3e80b807ce0b",
-        "finalSha256": "4afed547ea4a1051206950ba9fb64a9335608b09b0604ea02854adc0a2e61418",
+        "finalSha256": "94ef1e53a6532b764d61cc3405c62dccd692af3b4fb8c1e3acafeb907266da10",
         "previousWood": {
           "sideTriangles": 6032,
           "sideAreaM2": 7.377555746337696,
@@ -577,7 +577,13 @@
         },
         "method": "Independently decode packed final glTF world triangles and UV0; calculate actual texel Jacobian singular values on finite side chart, weighted by world area. End grain, pegs and iron charts are excluded by UV region, not camera positions."
       },
-      "detailedReceiptLocalOnly": "Data_FrameReferenceSurface.json"
+      "detailedReceiptLocalOnly": "Data_FrameReferenceSurface.json",
+      "baseSource": "Texture_BedAgedTimberSource.png",
+      "baseSourceSha256": "8965f8a65e95a9f9e8adfa7fc97be6344e02bfe22c382a6ad31c2d8e55f92b4c",
+      "sourceReceipt": "Data_TimberTextureSource.json",
+      "surfaceDescription": "Natural local grain turns, knots and short pore detail replace the former blurred procedural long streaks; metric UV and geometry retained",
+      "bitmapUpdateGeometryAndUvUnchanged": true,
+      "microHeightRmsM": 7e-05
     },
     "PillowSewing": {
       "representation": "Dedicated native PBR atlases",
@@ -592,7 +598,7 @@
     "triangleLimit": 60000,
     "drawPrimitiveLimit": 6,
     "embeddedImages": 17,
-    "embeddedImageBytes": 6247266,
+    "embeddedImageBytes": 9119268,
     "textureRgba8BytesWithoutMips": 48233104,
     "triangleReductionFraction": 0.9758723857078542,
     "tradeoffs": [
@@ -657,7 +663,7 @@
     "woodUvDistortion": {
       "result": "PASS",
       "previousSha256": "44d64adfde72fea58494719ce753bc5cc17095786dae1baf9c4a3e80b807ce0b",
-      "finalSha256": "4afed547ea4a1051206950ba9fb64a9335608b09b0604ea02854adc0a2e61418",
+      "finalSha256": "94ef1e53a6532b764d61cc3405c62dccd692af3b4fb8c1e3acafeb907266da10",
       "previousWood": {
         "sideTriangles": 6032,
         "sideAreaM2": 7.377555746337696,
@@ -703,6 +709,12 @@
       "inputs": "Data_ArchiveIntegrity.json",
       "visual": "Data_VisualReview.json",
       "checker": "Data_CheckerReview.json"
+    },
+    "lastExecutedStage": "wood-texture",
+    "textureOnlyRefresh": {
+      "geometryAndUvUnchanged": true,
+      "otherFiveComponentsExact": true,
+      "report": "Data_WoodOnlyMaterialAudit.json"
     }
   },
   "gameContact": {

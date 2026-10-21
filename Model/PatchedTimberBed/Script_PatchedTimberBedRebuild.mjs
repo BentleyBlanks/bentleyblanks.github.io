@@ -11,7 +11,7 @@ const sourceRoot=Option('source-root','C:/Users/Bentl/OneDrive/AI/Models/Blender
 const reviewRoot=path.resolve(repoRoot,Option('review-root','tmp/BedBnBs50kAcceptance'));
 const outputFile=path.resolve(repoRoot,Option('output','Model/PatchedTimberBed/Model_PatchedTimberBed.glb'));
 const stage=Option('stage','all');
-if(!['all','wood-reference','uv-cloth'].includes(stage))throw new Error('Supported rebuild stages: all, wood-reference, uv-cloth');
+if(!['all','wood-reference','uv-cloth','wood-texture'].includes(stage))throw new Error('Supported rebuild stages: all, wood-reference, uv-cloth, wood-texture');
 fs.mkdirSync(reviewRoot,{recursive:true});
 for(const input of ['Inputs/BN/Restored/Bed_BN_Complete_Editable_Checkpoint.blend','Inputs/BS/BedBS/BS_material_only.blend','Inputs/BS/BedBS/BR_lowfrequency_corner_colors.npz','Inputs/BS/BedBS/BS_BaseColor.webp','Inputs/BS/BedBS/BS_Normal.webp','Inputs/BS/BedBS/BS_fiber_bundle_Base_1024.png']){
  if(!fs.existsSync(path.join(sourceRoot,input)))throw new Error(`Missing read-only input: ${path.join(sourceRoot,input)}`);

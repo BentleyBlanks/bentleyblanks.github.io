@@ -55,6 +55,7 @@ def NativeMaterial(name,images,uvName,colorName,normalStrength):
 
 
 def WoodMaps():
+ if not Path(__file__).with_name('Texture_BedAgedTimberSource.png').exists():raise FileNotFoundError('Required natural timber source texture is missing')
  size=2048;rng=np.random.default_rng(227109)
  base=np.ones((size,size,3),np.float32);normals=np.zeros((size,size,3),np.float32);normals[:,:,2]=1
  rough=np.full((size,size),.84,np.float32);metal=np.zeros((size,size),np.float32)
@@ -94,6 +95,27 @@ def WoodMaps():
   phase=radius/.0043+.12*np.sin(radius*77);ring=(.5+.5*np.cos(phase*2*np.pi))**12
   endRgb=np.asarray([.17,.123,.078])[None,None,:]*(1-.055*ring[:,:,None]);Put(rect,endRgb,-.000025*ring,(.18,.18),.88)
  base[8:64,1568:2016]=1;rough[8:64,1568:2016]=.84;metal[8:64,1792:2016]=.70
+ source=Path(__file__).with_name('Texture_BedAgedTimberSource.png')
+ if source.exists():
+  from Script_PatchedTimberBedCotton import ReadRgbPng,ToLinear
+  linear=ToLinear(ReadRgbPng(source).astype(np.float64)/255)
+  # Periodic-plus-smooth decomposition removes edge discontinuities without
+  # stretching, blurring or horizontally smearing the photographic grain.
+  h,w=linear.shape[:2];boundary=np.zeros_like(linear)
+  boundary[0]=linear[-1]-linear[0];boundary[-1]=linear[0]-linear[-1]
+  boundary[:,0]+=linear[:,-1]-linear[:,0];boundary[:,-1]+=linear[:,0]-linear[:,-1]
+  ky=np.fft.fftfreq(h)[:,None];kx=np.fft.fftfreq(w)[None,:]
+  denominator=2*np.cos(2*np.pi*kx)+2*np.cos(2*np.pi*ky)-4;denominator[0,0]=1
+  correction=np.fft.fft2(boundary,axes=(0,1))/denominator[:,:,None];correction[0,0]=0
+  periodic=np.clip(linear-np.fft.ifft2(correction,axes=(0,1)).real,.004,.8)
+  timber=ResizePixels(periodic,1472);lum=timber@np.asarray([.2126,.7152,.0722])
+  fy=np.fft.fftfreq(1472)[:,None];fx=np.fft.rfftfreq(1472)[None,:]
+  low=np.fft.irfft2(np.fft.rfft2(lum)*np.exp(-2*np.pi*np.pi*4.5**2*(fx*fx+fy*fy)),s=lum.shape)
+  residual=lum-low;micro=np.clip(residual/max(float(residual.std()),1e-9),-3,3)*.00007
+  du=(np.roll(micro,-1,axis=1)-np.roll(micro,1,axis=1))/(2*SideMeters/1472)
+  dv=(np.roll(micro,1,axis=0)-np.roll(micro,-1,axis=0))/(2*SideMeters/1472)
+  n=np.stack((-du,-dv,np.ones_like(micro)),axis=2);n/=np.linalg.norm(n,axis=2,keepdims=True)
+  base[544:2016,32:1504]=timber;normals[544:2016,32:1504]=n;rough[544:2016,32:1504]=np.clip(.84-.035*residual/max(float(residual.std()),1e-9),.75,.94)
  # Extrude all chart borders into their gutters. UVs at a repeat boundary
  # otherwise bilinearly blend into the unused white atlas background.
  for rect in [SideRect,*EndRects]:

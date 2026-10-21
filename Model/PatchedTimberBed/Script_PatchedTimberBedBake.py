@@ -16,7 +16,7 @@ from Script_PatchedTimberBedCotton import ApplyCottonWeave
 from Script_PatchedTimberBedWood import WeatherTimberFrame
 from Script_PatchedTimberBedQuilt import BakeQuiltSurface
 if '--' in sys.argv:
- parser=argparse.ArgumentParser();parser.add_argument('--source-root',required=True);parser.add_argument('--review-root',required=True);parser.add_argument('--stage',default='all',choices=['prepare','build','finish','refresh','material-frame','wood-reference','uv-cloth','export','all']);parser.add_argument('--skip-renders',action='store_true');parser.add_argument('--group',choices=['Quilt','Straw'],default='Straw')
+ parser=argparse.ArgumentParser();parser.add_argument('--source-root',required=True);parser.add_argument('--review-root',required=True);parser.add_argument('--stage',default='all',choices=['prepare','build','finish','refresh','material-frame','wood-reference','uv-cloth','wood-texture','export','all']);parser.add_argument('--skip-renders',action='store_true');parser.add_argument('--group',choices=['Quilt','Straw'],default='Straw')
  args=parser.parse_args(sys.argv[sys.argv.index('--')+1:]);config={'sourceRoot':args.source_root,'reviewRoot':args.review_root,'stage':args.stage,'skipRenders':args.skip_renders,'refreshGroup':args.group}
 else:config=json.loads(pathlib.Path(os.environ.get('BED_BAKE_CONFIG',str(repoRoot/'tmp/BedBnBsAcceptance/Data_BakeConfig.json'))).read_text())
 sourceRoot=pathlib.Path(config['sourceRoot'])
@@ -42,6 +42,8 @@ def ArchiveRecipes():
  destination=sourceRoot/'Scripts';destination.mkdir(exist_ok=True)
  bitmap=pathlib.Path(__file__).resolve().parent/'Texture_BedAgedCottonSource.png'
  if bitmap.exists():shutil.copy2(bitmap,destination/bitmap.name)
+ timber=pathlib.Path(__file__).resolve().parent/'Texture_BedAgedTimberSource.png'
+ if timber.exists():shutil.copy2(timber,destination/timber.name)
  for path in pathlib.Path(__file__).resolve().parent.glob('Script_PatchedTimberBed*'):
   if path.suffix not in ('.py','.mjs'):continue
   shutil.copy2(path,destination/path.name)
@@ -662,6 +664,37 @@ def RefreshUvCloth():
  print('METRIC_UV_COTTON_EXPORTED',flush=True)
 
 
+def RefreshWoodBitmap():
+ from Script_PatchedTimberBedSurfaceRevision import WoodMaps,WriteMaps
+ bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'))
+ frame=bpy.data.objects['Frame']
+ def GeometryHash():
+  digest=__import__('hashlib').sha256()
+  for obj in sorted([o for o in bpy.context.scene.objects if o.type=='MESH' and o.name!='Plane'],key=lambda o:o.name):
+   digest.update(np.asarray(obj.matrix_world,dtype=np.float64).tobytes())
+   for v in obj.data.vertices:digest.update(np.asarray(v.co,dtype=np.float32).tobytes())
+   for p in obj.data.polygons:digest.update(np.asarray(p.vertices,dtype=np.int32).tobytes())
+   for uv in obj.data.uv_layers:
+    values=np.empty(len(uv.data)*2,np.float32);uv.data.foreach_get('uv',values);digest.update(values.tobytes())
+  return digest.hexdigest()
+ before=GeometryHash();images,rows=WriteMaps(textureRoot,'Texture_BedFrameMetric',WoodMaps())
+ found=set();oldImages=[]
+ for node in frame.data.materials[0].node_tree.nodes:
+  if node.type!='TEX_IMAGE' or not node.image:continue
+  for role,image in images.items():
+   if 'BedFrameMetric'+role in node.image.name:oldImages.append(node.image);node.image=image;found.add(role);break
+ if found!=set(images):raise ValueError('Frame texture refresh failed to bind all three native maps')
+ for image in set(oldImages):
+  if image.users==0:bpy.data.images.remove(image)
+ if GeometryHash()!=before:raise ValueError('Texture-only refresh changed geometry or UV')
+ game=[o for o in bpy.context.scene.objects if o.type=='MESH' and not o.hide_render and o.name!='Plane']
+ if sum(TriangleCount(o) for o in game)>60000:raise ValueError('Complete bed exceeds 60k')
+ Export(game,reviewRoot/'Model_PatchedTimberBedStandard.glb');ArchiveRecipes()
+ bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedGame.blend'),compress=True)
+ (reviewRoot/'Data_WoodBitmapRefresh.json').write_text(json.dumps({'result':'PASS','version':'20261021NaturalTimberV6','geometryAndUvUnchanged':True,'geometryAndUvHash':before,'textures':rows,'sourceBitmap':'Texture_BedAgedTimberSource.png','sourceSha256':__import__('hashlib').sha256(pathlib.Path(__file__).with_name('Texture_BedAgedTimberSource.png').read_bytes()).hexdigest()},indent=2))
+ print('NATURAL_TIMBER_TEXTURE_EXPORTED',flush=True)
+
+
 def RefreshFrameMaterial():
  # External source and pre-contact checkpoint retain exact approved geometry.
  bpy.ops.wm.open_mainfile(filepath=str(sourceRoot/'Scene_PatchedTimberBedHigh.blend'))
@@ -690,4 +723,5 @@ if stage=='refresh':RefreshSoftGroup()
 if stage=='material-frame':RefreshReferenceWood()
 if stage=='wood-reference':RefreshReferenceWood()
 if stage=='uv-cloth':RefreshUvCloth()
+if stage=='wood-texture':RefreshWoodBitmap()
 if stage=='export':ExportSavedGame()
