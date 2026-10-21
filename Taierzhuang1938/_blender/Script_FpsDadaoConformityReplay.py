@@ -217,9 +217,17 @@ for skin in pkg['skin']:
             shader.inputs['Roughness'].default_value = max(.78, shader.inputs['Roughness'].default_value)
 for obj in imported:
     bpy.data.objects.remove(obj, do_unlink=True)
+# A copied source project records its origin in AdoptedFrom; that task's replay
+# shows the old stroke and is superseded here. Free the replaced data blocks too
+# so the rebuilt objects keep their names instead of picking up .001 suffixes.
+replacedOwners = {task, scene.get('AdoptedFrom')} - {None}
 for obj in list(scene.objects):
-    if obj.get('FpsDadaoReplayOwner') == task:
+    if obj.get('FpsDadaoReplayOwner') in replacedOwners:
+        blocks = [obj.data, obj.animation_data and obj.animation_data.action]
         bpy.data.objects.remove(obj, do_unlink=True)
+        for block in blocks:
+            if block is not None and block.users == 0:
+                getattr(bpy.data, {'MESH': 'meshes', 'ARMATURE': 'armatures', 'CAMERA': 'cameras', 'LIGHT': 'lights', 'ACTION': 'actions'}[block.id_type]).remove(block)
 
 
 def Own(obj):
@@ -287,10 +295,18 @@ for skin in pkg['skin']:
         mesh.normals_split_custom_set_from_vertices([(normalMatrix @ Vector(skin['normals'][i:i + 3])).normalized() for i in range(0, len(skin['normals']), 3)])
     groups = [obj.vertex_groups.new(name=name) for name in skin['bones']]
     for i in range(len(vertices)):
+        # Since the 10-16 MCP reweight, 82 hand vertices repeat a joint across
+        # their four glTF slots (e.g. 44 at .929 and again at .0001). LBS adds
+        # both terms; Blender keeps one weight per group, so a per-slot REPLACE
+        # kept only the last slot and the static check missed by 26 mm.
+        combined = {}
         for k in range(4):
             weight = skin['wts'][4 * i + k]
             if weight > 0:
-                groups[skin['infl'][4 * i + k]].add([i], weight, 'REPLACE')
+                index = skin['infl'][4 * i + k]
+                combined[index] = combined.get(index, 0.) + weight
+        for index, weight in combined.items():
+            groups[index].add([i], weight, 'REPLACE')
     modifier = obj.modifiers.new('Armature_FpsProduction', 'ARMATURE')
     modifier.object = arm
     rest = np.c_[np.asarray(skin['rest']).reshape(-1, 3), np.ones(len(vertices))]
@@ -449,9 +465,14 @@ text = bpy.data.texts.get('Script_FpsDadaoConformityReplay.py') or bpy.data.text
 text.clear()
 text.write(sourceScript.read_text(encoding='utf-8'))
 scene['ReplayStrokeControlSignature'] = stroke['strokeControlSignature']
+# An adopted 10-15 replay recorded a 1.03 s timing here; this replay is the
+# fixed 0.65 s Light clock above, so a leftover value would contradict it.
+scene.pop('ReplayActionTiming', None)
 scene['ReplayMaximumSkinErrorM'] = max(staticError, max(errors), max(keyframedErrors))
 scene.frame_set(44)
-bpy.ops.wm.save_as_mainfile(filepath=str(folder / 'Animation_FpsGripConformity.blend'), compress=True)
+# Save the opened source project in place (asserted above to live in folder);
+# a copied task project keeps its own name.
+bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath, compress=True)
 print(json.dumps({'source': bpy.data.filepath, 'replayFrames': 121, 'verticesPerFrame': validation['verticesPerFrame'],
                   'staticSkinErrorMm': staticError * 1000, 'maximumAnimatedSkinErrorMm': max(errors) * 1000,
                   'maximumKeyframedSkinErrorMm': max(keyframedErrors) * 1000,
