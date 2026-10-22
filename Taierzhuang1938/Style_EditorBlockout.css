@@ -37,6 +37,8 @@
   color-scheme: dark;
   user-select: none;
 }
+/* 加载画面（#boot，z-index 10）还在时整层编辑器（含地上标签）收起，不压在报纸上；收掉后照常显示。 */
+#boot:not(.gone) ~ #blockoutRoot { visibility: hidden; }
 .boRoot *, .boRoot *::before, .boRoot *::after { box-sizing: border-box; }
 .boRoot [hidden] { display: none !important; }
 .boRoot :is(.boCard, .boTopBar, .boMini, .boNav, .boMapOverlay.open, .boCopyBox) { pointer-events: auto; }
