@@ -11,7 +11,9 @@ const sourceRoot=Option('source-root','C:/Users/Bentl/OneDrive/AI/Models/Blender
 const reviewRoot=path.resolve(repoRoot,Option('review-root','tmp/BedBnBs50kAcceptance'));
 const outputFile=path.resolve(repoRoot,Option('output','Model/PatchedTimberBed/Model_PatchedTimberBed.glb'));
 const stage=Option('stage','all');
-if(!['all','wood-reference','uv-cloth','wood-texture','craft'].includes(stage))throw new Error('Supported rebuild stages: all, wood-reference, uv-cloth, wood-texture, craft');
+const mcpPort=Option('mcp-port',null);
+if(!['all','wood-reference','uv-cloth','wood-texture','craft','reference-fidelity'].includes(stage))throw new Error('Unsupported bed rebuild stage');
+if(mcpPort!==null&&(!/^\d+$/.test(mcpPort)||stage==='all'))throw new Error('Use an explicit managed MCP port for a single refresh stage');
 fs.mkdirSync(reviewRoot,{recursive:true});
 for(const input of ['Inputs/BN/Restored/Bed_BN_Complete_Editable_Checkpoint.blend','Inputs/BS/BedBS/BS_material_only.blend','Inputs/BS/BedBS/BR_lowfrequency_corner_colors.npz','Inputs/BS/BedBS/BS_BaseColor.webp','Inputs/BS/BedBS/BS_Normal.webp','Inputs/BS/BedBS/BS_fiber_bundle_Base_1024.png']){
  if(!fs.existsSync(path.join(sourceRoot,input)))throw new Error(`Missing read-only input: ${path.join(sourceRoot,input)}`);
@@ -29,11 +31,17 @@ function Run(command,args){
 }
 const argumentFile=path.join(reviewRoot,'Data_BlenderArguments.json');
 fs.writeFileSync(argumentFile,JSON.stringify(['--source-root',sourceRoot,'--review-root',reviewRoot,'--stage',stage]));
-Run(process.execPath,['scripts/Script_BlenderMcp.mjs','start','--batch',path.join(scriptRoot,'Script_PatchedTimberBedBake.py'),'--batch-args',argumentFile,'--task','PatchedTimberBedRebuild']);
+if(mcpPort!==null){
+ const mcpScript=path.join(reviewRoot,'Script_RunBedMcpRefresh.py');
+ const bakeFile=path.join(scriptRoot,'Script_PatchedTimberBedBake.py');
+ const argv=[bakeFile,'--','--source-root',sourceRoot,'--review-root',reviewRoot,'--stage',stage];
+ fs.writeFileSync(mcpScript,`import bpy,sys,runpy,importlib\nfrom pathlib import Path\nassert Path(bpy.data.filepath).resolve().parent==Path(${JSON.stringify(sourceRoot)}).resolve(), 'MCP scene is outside this bed task'\nimportlib.invalidate_caches()\nfor name in list(sys.modules):\n if name.startswith('Script_PatchedTimberBed'):sys.modules.pop(name)\npreviousArguments=list(sys.argv)\ntry:\n sys.argv=${JSON.stringify(argv)}\n runpy.run_path(${JSON.stringify(bakeFile)},run_name='__main__')\nfinally:\n sys.argv=previousArguments\n`);
+ Run(process.execPath,['scripts/Script_BlenderMcp.mjs','exec','--port',mcpPort,'--file',mcpScript,'--timeout','900']);
+}else Run(process.execPath,['scripts/Script_BlenderMcp.mjs','start','--batch',path.join(scriptRoot,'Script_PatchedTimberBedBake.py'),'--batch-args',argumentFile,'--task','PatchedTimberBedRebuild']);
 if(stage==='all'){
  fs.writeFileSync(argumentFile,JSON.stringify(['--source-root',sourceRoot,'--review-root',reviewRoot,'--stage','uv-cloth']));
  Run(process.execPath,['scripts/Script_BlenderMcp.mjs','start','--batch',path.join(scriptRoot,'Script_PatchedTimberBedBake.py'),'--batch-args',argumentFile,'--task','PatchedTimberBedMetricSurfaces']);
- fs.writeFileSync(argumentFile,JSON.stringify(['--source-root',sourceRoot,'--review-root',reviewRoot,'--stage','craft']));
+ fs.writeFileSync(argumentFile,JSON.stringify(['--source-root',sourceRoot,'--review-root',reviewRoot,'--stage','reference-fidelity']));
  Run(process.execPath,['scripts/Script_BlenderMcp.mjs','start','--batch',path.join(scriptRoot,'Script_PatchedTimberBedBake.py'),'--batch-args',argumentFile,'--task','PatchedTimberBedCraft']);
 }
 Run(Option('python','python'),['-B',path.join(scriptRoot,'Script_PatchedTimberBedPack.py'),path.join(reviewRoot,'Model_PatchedTimberBedStandard.glb'),outputFile,'--bs-dir',path.join(sourceRoot,'Inputs/BS/BedBS'),'--receipt',path.join(reviewRoot,'Data_PackReport.json')]);

@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
   "id": "PatchedTimberBed",
-  "version": "20261022WovenMatWornEdgesV7",
-  "description": "Complete <=60k patched timber bed with readable end grain, rounded worn timber edges and real dry checks; continuous woven straw BaseColor beneath round peripheral reed geometry. Paired bearing core and four cloth components preserved.",
+  "version": "20261022M17CottonBoundReedsV9",
+  "description": "M17 C reference refinement: dry grey-brown timber with irregular real losses, bound axial straw and curled foot-side stalks, softer unequal cotton gathers and continuous stitching; complete bed below 60k triangles.",
   "historicalStatus": "Creative reconstruction preserving the user-selected M17 C design; no claim of unique documented historical specimen.",
   "models": [
     {
       "file": "Model_PatchedTimberBed.glb",
-      "url": "/Model/PatchedTimberBed/Model_PatchedTimberBed.glb?v=20261022WovenMatWornEdgesV7",
-      "sha256": "f9a37ea4d022a78a1bf706479af45e70f48d20d62f3fafc8670b018918008b11",
-      "bytes": 18978584,
-      "triangles": 56706,
+      "url": "/Model/PatchedTimberBed/Model_PatchedTimberBed.glb?v=20261022M17CottonBoundReedsV9",
+      "sha256": "315ba907c26f9cb59f099cff26e49c47d438a21a03aaf828b77e0d3bca2844ed",
+      "bytes": 17115292,
+      "triangles": 59238,
       "triangleLimit": 60000,
       "drawPrimitiveLimit": 6,
       "drawPrimitives": 6,
@@ -49,12 +49,12 @@
     {
       "node": "BS_FootCloth.001",
       "triangles": 4999,
-      "vertices": 2802
+      "vertices": 2805
     },
     {
       "node": "Frame",
-      "triangles": 12671,
-      "vertices": 30872
+      "triangles": 12743,
+      "vertices": 9463
     },
     {
       "node": "Pillow",
@@ -69,12 +69,12 @@
     {
       "node": "Sewing",
       "triangles": 1744,
-      "vertices": 3703
+      "vertices": 3771
     },
     {
       "node": "Straw",
-      "triangles": 9989,
-      "vertices": 21415
+      "triangles": 12449,
+      "vertices": 18837
     }
   ],
   "source": {
@@ -114,11 +114,11 @@
       "retainedProjects": [
         {
           "file": "Scene_PatchedTimberBedGame.blend",
-          "bytes": 26374822
+          "bytes": 24054250
         },
         {
           "file": "Scene_PatchedTimberBedHigh.blend",
-          "bytes": 148001182
+          "bytes": 150222886
         }
       ],
       "inputHashesUnchanged": true,
@@ -130,7 +130,7 @@
         "localReceipt": "tmp/BedWoodReferenceAcceptance/Data_ReferenceSourceCleanup.json",
         "automaticBlendBackups": 0
       },
-      "currentSourceDirectoryBytes": 415368529,
+      "currentSourceDirectoryBytes": 416025838,
       "metricUvCottonCleanup": {
         "removedFiles": 3,
         "freedBytes": 14707462,
@@ -163,12 +163,64 @@
           }
         ],
         "inputsUnchanged": true
+      },
+      "referenceFidelityRevision": {
+        "inputsRetained": true,
+        "freedBytes": 18623289,
+        "retainedProjects": [
+          "Scene_PatchedTimberBedHigh.blend",
+          "Scene_PatchedTimberBedGame.blend"
+        ],
+        "removedFiles": [
+          {
+            "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\PatchedTimberBed20261020\\Bakes\\Texture_BedFrameIndoorPatinaBase.png",
+            "bytes": 3399364
+          },
+          {
+            "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\PatchedTimberBed20261020\\Bakes\\Texture_BedFrameIndoorPatinaNormal.png",
+            "bytes": 1001322
+          },
+          {
+            "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\PatchedTimberBed20261020\\Bakes\\Texture_BedFrameIndoorPatinaOrm.png",
+            "bytes": 106839
+          },
+          {
+            "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\PatchedTimberBed20261020\\Bakes\\Texture_BedFrameMetricBase.png",
+            "bytes": 7192096
+          },
+          {
+            "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\PatchedTimberBed20261020\\Bakes\\Texture_BedFrameMetricNormal.png",
+            "bytes": 1287485
+          },
+          {
+            "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\PatchedTimberBed20261020\\Bakes\\Texture_BedFrameMetricOrm.png",
+            "bytes": 110007
+          },
+          {
+            "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\PatchedTimberBed20261020\\Bakes\\Texture_BedStrawWovenBase.png",
+            "bytes": 2708083
+          },
+          {
+            "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\PatchedTimberBed20261020\\Bakes\\Texture_BedStrawWovenNormal.png",
+            "bytes": 2618230
+          },
+          {
+            "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\PatchedTimberBed20261020\\Bakes\\Texture_BedStrawWovenOrm.png",
+            "bytes": 199863
+          }
+        ],
+        "scope": "Unused images absent from both cold High and Game references"
       }
     },
     "damageReceipt": "Scripts/Data_WoodDamage.json",
-    "editedHighRole": "Dense original cloth sources retained; visible FRAME_ members regenerated from immutable checkpoint dimensions with rounded sections and actual losses. Current complete exported UV/PBR presentation is in Game.",
-    "rebuildSurfaceStage": "craft",
-    "craftDamageReceipt": "Scripts/Data_TimberCraft.json"
+    "editedHighRole": "Dense original cloth reconstruction source plus rounded/damaged timber. Game stores the final gathered cloth, source rest-position attributes and complete native PBR presentation.",
+    "rebuildSurfaceStage": "reference-fidelity",
+    "craftDamageReceipt": "Scripts/Data_TimberCraft.json",
+    "primaryReference": {
+      "file": "Inputs/BN/Restored/reference/M17_C_缂栧腑琛ョ紑鑽夊簥.png",
+      "sha256": "210f07e662e49f178275c069da0b6766deec360d48e9e1aaa6111e3b2864b67d",
+      "role": "Original user-selected M17 C design; material and shape acceptance reference. Antique elm/split-end photographs are supplemental only."
+    }
   },
   "materials": {
     "BSFootCloth": {
@@ -253,13 +305,69 @@
       ],
       "legacyNormalReplaced": true,
       "normalMethod": "fine-fibre luminance residual only, 5px Gaussian removed; 45um RMS height, OpenGL +Y; stains excluded from broad displacement",
-      "noHeightBandFitOfVisibleFolds": true
+      "noHeightBandFitOfVisibleFolds": true,
+      "m17GatherRevision": {
+        "version": "20261022M17CottonBoundReedsV9",
+        "geometry": {
+          "version": "20261022M17CottonBoundReedsV9",
+          "method": "shared continuous side gathers, unequal short pressure creases and foot drape; original rest positions retained for idempotent re-editing",
+          "objects": [
+            {
+              "object": "BS_FootCloth.001",
+              "triangles": 4999,
+              "movedVertices": 2560,
+              "maximumDisplacementM": 0.012059638302847705,
+              "lockedNearBearingVertices": 0,
+              "maximumLockedDisplacementM": 0.0,
+              "newTimberIntersectionsSuppressed": 1,
+              "upperSurfaceSupportLimits": 0,
+              "restPositionSha256": "2e998c7bce9b97545981bbcfdc10688a5ae963511398d68806d271861ef6b8b0"
+            },
+            {
+              "object": "Sewing",
+              "triangles": 1744,
+              "movedVertices": 1418,
+              "maximumDisplacementM": 0.011621977554669413,
+              "lockedNearBearingVertices": 0,
+              "maximumLockedDisplacementM": 0.0,
+              "newTimberIntersectionsSuppressed": 1,
+              "upperSurfaceSupportLimits": 0,
+              "restPositionSha256": "22fa9ee26293e7d570959061f22f293e0296f34e2d3e3d3005b6d2a9209361d4"
+            },
+            {
+              "object": "Quilt",
+              "triangles": 25103,
+              "movedVertices": 14491,
+              "maximumDisplacementM": 0.012882544812973048,
+              "lockedNearBearingVertices": 840,
+              "maximumLockedDisplacementM": 0.0,
+              "newTimberIntersectionsSuppressed": 6,
+              "upperSurfaceSupportLimits": 0,
+              "restPositionSha256": "cf8f0da40a4c8e225a4c94e908b98107661ff557ef00544a26e9919ce4797052"
+            }
+          ],
+          "maximumAllowedDisplacementM": 0.024,
+          "nearBearingLockDistanceM": 0.004,
+          "textureUvAndColorChanged": false,
+          "quiltTextureTransformScale": 1.45,
+          "effectiveCottonTileM": 0.24137931034482757,
+          "topologyChanged": false,
+          "pillowUnchanged": true
+        },
+        "nativeTextureTransformScale": [
+          1.45,
+          1.45
+        ],
+        "effectivePhysicalTileM": 0.24137931034482757,
+        "imagesAndUvColorDataUnchanged": true,
+        "normalsRecomputed": true
+      }
     },
     "Straw": {
-      "version": "20261022WovenMatWornEdgesV7",
-      "representation": "Retained paired bearing triangles plus continuous worn woven skin and five-sided round reed wraps, binding cords and sparse blunt broken fibres. Old decimated blade ribbons intentionally replaced.",
-      "baseSource": "Texture_BedAgedStrawSource.png",
-      "sourceReceipt": "Data_StrawTextureSource.json",
+      "version": "20261022M17CottonBoundReedsV9",
+      "representation": "M17 bound axial straw under close wraps, folded hem, compressed reeds and an open foot-side tuft",
+      "baseSource": "Texture_BedBoundReedSource.png",
+      "sourceReceipt": "Data_BoundReedTextureSource.json",
       "baseDimensions": [
         1024,
         1024
@@ -272,27 +380,32 @@
         512,
         512
       ],
-      "physicalWovenTileM": 0.24,
-      "normalStrength": 0.45,
+      "physicalWovenTileM": 0.16,
+      "normalStrength": 0.35,
       "mapsUv": "UVMap / TEXCOORD_0",
       "colorLayer": "StrawAgedLowFrequencyColor",
       "retainedBearingTriangles": 2229,
       "maximumBearingVertexChangeM": 0.0,
-      "gameTriangles": 9989,
+      "gameTriangles": 12449,
       "drawPrimitives": 1,
-      "roundReedCrossSectionSides": 5,
-      "roles0And1": "Original continuous bearing core kept; other roles explicitly regenerated for requested appearance."
+      "roundReedCrossSectionSides": [
+        3,
+        4
+      ],
+      "footTuftStalks": 60,
+      "primaryTuftSideBlender": "-Y",
+      "support": "visible lower skin follows actual Frame top ray intersections; original paired contact core unchanged"
     },
     "Frame": {
-      "version": "20261022WovenMatWornEdgesV7",
-      "representation": "physical timber islands, continuous metric rectangular perimeter, explicit geometry cuts at tile resets; original source/damage tags retained separately",
+      "version": "20261022M17CottonBoundReedsV9",
+      "representation": "M17 dry grey-brown weathered timber with metric perimeter/end charts, sparse unequal grain checks and fragmented corner losses",
       "baseSource": "Texture_BedAgedTimberSource.png",
       "endSource": "Texture_BedAgedEndGrainSource.png",
       "sourceReceipts": [
         "Data_TimberTextureSource.json",
         "Data_EndGrainTextureSource.json"
       ],
-      "normalStrength": 0.36,
+      "normalStrength": 0.42,
       "baseDimensions": [
         2048,
         2048
@@ -319,19 +432,31 @@
         0.0022,
         0.0038
       ],
-      "newRealLossRegions": 18,
+      "newRealLossRegions": 12,
       "visibleMemberReduction": "Visible rounded wood is copied exactly; only hidden load slats reduced to <=140 triangles per source. Explicit UV repeat cuts then applied.",
-      "actualGameTriangles": 12671,
-      "uvAreaWeightedP95Anisotropy": 1.22374860072939,
+      "actualGameTriangles": 12743,
+      "uvAreaWeightedP95Anisotropy": 1.2257495445731512,
       "retentionSurfaceToleranceM": 0.0002,
-      "primaryMemberTerminalRimsRounded": true
+      "primaryMemberTerminalRimsRounded": true,
+      "roughnessRange": [
+        0.76,
+        0.94
+      ],
+      "exteriorNormals": {
+        "smoothExteriorFaces": 10003,
+        "flatCapsAndFractures": 2740,
+        "sharpAngleDegrees": 52,
+        "method": "area-and-angle weighted exterior normals; real cut faces and end caps stay flat"
+      },
+      "surfaceRecipe": "Script_PatchedTimberBedReferenceFidelity.py"
     },
     "PillowSewing": {
       "representation": "Dedicated native PBR atlases",
       "dimensions": [
         512,
         512
-      ]
+      ],
+      "m17GeometryNote": "Pillow remains exact; Sewing follows the same continuous gather field as Quilt and foot cloth."
     }
   },
   "performance": {
@@ -339,14 +464,14 @@
     "triangleLimit": 60000,
     "drawPrimitiveLimit": 6,
     "embeddedImages": 17,
-    "embeddedImageBytes": 13909938,
+    "embeddedImageBytes": 13370886,
     "textureRgba8BytesWithoutMips": 54524560,
-    "triangleReductionFraction": 0.9767912249826055,
+    "triangleReductionFraction": 0.975754921622396,
     "tradeoffs": [
       "Submillimetre fibres and sewing cross-sections are simplified while retaining the visible woven sides, main seams and silhouettes.",
       "Source CORNER colour and PBR transport are sampled approximations, not pixel-identical recovery of every original shader.",
       "Removed geometric detail is not claimed to be fully reproduced by normal maps.",
-      "Contact uses a compacted original straw bearing surface and matching cotton underside; every added triangle counts toward the complete 50k cap."
+      "Contact uses a compacted original straw bearing surface and matching cotton underside; every added triangle counts toward the complete 60k cap."
     ]
   },
   "runtime": {
@@ -369,9 +494,10 @@
     "dateLocal": "2026-10-22",
     "geometryAreaGateWorldCrossLength": 1e-12,
     "degenerateTriangles": 0,
-    "sourceRebuild": "node Model/PatchedTimberBed/Script_PatchedTimberBedRebuild.mjs --stage=craft",
-    "rebuildCoverage": "craft stage executed from immutable Frame inputs and saved Game; default all chain not rerun from Inputs this revision",
-    "evidenceLocalOnly": "tmp/BedCraft60kAcceptance",
+    "sourceRebuild": "node Model/PatchedTimberBed/Script_PatchedTimberBedRebuild.mjs --stage=reference-fidelity --review-root=tmp/BedReferenceFidelityAcceptance --mcp-port=<managed port>",
+    "rebuildCoverage": "reference-fidelity executed through the live managed BlenderMCP instance; default all chain not rerun from Inputs this round",
+    "evidenceLocalOnly": "tmp/BedReferenceFidelityAcceptance",
+    "primaryReferenceSha256": "210f07e662e49f178275c069da0b6766deec360d48e9e1aaa6111e3b2864b67d",
     "contactSamples": {
       "points": 42,
       "passing": 42,
@@ -384,45 +510,69 @@
       "medianGapMm": 0.24998350476562736,
       "maxGapMm": 0.25002699476328605
     },
-    "untouchedComponents": [
-      "Quilt",
-      "BS_FootCloth",
-      "Pillow",
-      "Sewing"
-    ],
-    "untouchedGeometryNormalsUvColorMaterialExact": true,
+    "clothAudit": {
+      "maximumAllowedDisplacementM": 0.024001,
+      "pillowExact": true,
+      "cloth": [
+        {
+          "object": "Quilt",
+          "triangles": 25103,
+          "maximumCornerDisplacementM": 0.012882530689239502,
+          "uvAndColorTrianglesExact": true,
+          "materialUnchangedExceptExplicitQuiltTiling": true,
+          "quiltUniformTextureScale": 1.45,
+          "nodeTransformExact": true,
+          "ambiguousUvTriangleKeys": 0
+        },
+        {
+          "object": "BS_FootCloth.001",
+          "triangles": 4999,
+          "maximumCornerDisplacementM": 0.012059628963470459,
+          "uvAndColorTrianglesExact": true,
+          "materialUnchangedExceptExplicitQuiltTiling": true,
+          "quiltUniformTextureScale": null,
+          "nodeTransformExact": true,
+          "ambiguousUvTriangleKeys": 0
+        },
+        {
+          "object": "Sewing",
+          "triangles": 1744,
+          "maximumCornerDisplacementM": 0.011621952056884766,
+          "uvAndColorTrianglesExact": true,
+          "materialUnchangedExceptExplicitQuiltTiling": true,
+          "quiltUniformTextureScale": null,
+          "nodeTransformExact": true,
+          "ambiguousUvTriangleKeys": 0
+        }
+      ]
+    },
     "packedImagesColdDecode": 17,
     "unchangedInputs": 6,
     "woodUvDistortion": {
-      "sideTriangles": 10162,
-      "sideAreaM2": 7.442349482470547,
+      "sideTriangles": 10269,
+      "sideAreaM2": 7.4413899134443025,
       "areaWeightedPixelAnisotropyP50P90P95P99": [
-        1.0325133038794012,
-        1.0688073267342941,
-        1.22374860072939,
-        1.4740528671717752
+        1.0403603700469652,
+        1.1173865286564337,
+        1.2257495445731512,
+        1.4897174488941352
       ],
-      "areaFractionOver4": 0.001013996606481508,
-      "pixelDensityP50": 2502.6123394281067
+      "areaFractionOver4": 0.0006787945455553584,
+      "pixelDensityP50": 2493.75074758653
     },
     "roundedSurfaceRetention": {
       "roundedMembers": 24,
-      "newLossRegions": 18,
+      "newLossRegions": 12,
       "surfaceToleranceM": 0.0002
     },
-    "browser": "PASS; exact packed binary, actual ManagedGLTFLoader, 12 views, orbit and zoom",
-    "visualReview": [
-      "EndGrain",
-      "FrameJoin",
-      "Frame",
-      "StrawDetail",
-      "Pillow"
-    ],
+    "browser": "PASS; exact binary, ManagedGLTFLoader and native PBR, 14 views plus orbit/zoom",
+    "visualReference": "Original M17 C whole image and detail inset; grey timber, bound straw/foot tuft, quilt folds and foot drape inspected in Blender and actual loader",
     "reportFiles": [
+      "Data_ReferenceCriteria.json",
       "Data_StructuralReview.json",
       "Data_BrowserReview.json",
       "Data_ContactReview.json",
-      "Data_UntouchedComponents.json",
+      "Data_M17ClothAudit.json",
       "Data_UvDistortion.json",
       "Data_CraftRetention.json",
       "Data_ColdSourceAudit.json",
@@ -448,6 +598,9 @@
     },
     "gapLimitM": 0.002,
     "penetrationLimitM": 0.002,
-    "limitation": "42 exact probes establish sampled contact; they do not prove absence of all surface intersections."
+    "limitation": "42 exact probes establish sampled contact; they do not prove absence of all surface intersections.",
+    "cottonNearBearingLockDistanceM": 0.004,
+    "cottonMaximumLockedDisplacementM": 0.0,
+    "gatheredVisibleCloth": true
   }
 }

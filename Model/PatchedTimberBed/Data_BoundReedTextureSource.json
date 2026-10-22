@@ -1,0 +1,17 @@
+{
+  "mode": "built-in image_gen",
+  "file": "Texture_BedBoundReedSource.png",
+  "primaryReference": "Inputs/BN/Restored/reference/M17_C_编席补缀草床.png",
+  "purpose": "Bound rice-straw mat with axial fine stems and transverse hemp ties, replacing the earlier square wicker weave",
+  "prompt": "Asset type: a seamless square PBR BaseColor texture of the tightly bound rice-straw sleeping mat in the supplied M17 C reference close-up. The supplied image is material guidance only. Generate ONLY the flat orthographic material scan, no bed, no blanket, no object perspective, no silhouette or edges. Many very fine dry rice-straw stems running vertically from top to bottom, each about 1-2mm thick, pressed together in slightly uneven groups of 5-8 stems. Thin dark hemp binding twines run horizontally, spaced roughly 18-24mm apart, occasionally doubled. This is bound straw and reed matting, not square basket-weave wicker, not bamboo strips and not a burlap fabric. Show individual cylindrical straw fibres, papery peeled grooves, subtle crushed patches and broken little stalks, accumulated grey dust and old tan-brown discolouration. The square represents about 20 by 20cm. Palette muted dry wheat, dusty grey-tan and subdued brown, matching the reference. Flat diffuse cross-polarized light, no baked directional shadows, no gloss, no dramatic contrast. Edge-to-edge, tileable on both axes, opaque, no labels, no text, no watermark, no decorative border. Photographic detailed material scan.",
+  "generatedOn": "2026-10-22",
+  "opaque": true,
+  "sha256": "6920555d76fd57270f628289e07ee7a771b9866a7957893811d20e069057d196",
+  "dimensions": [
+    1254,
+    1254
+  ],
+  "sourceBytes": 3437846,
+  "physicalTileMeters": 0.16,
+  "processing": "Opaque generated source; periodic boundary correction, 1024 Base/Normal and 512 ORM, mapped to axial bundles on the M17 mat."
+}
