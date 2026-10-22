@@ -1,8 +1,8 @@
 {
  "schema": "tengxian-blockout-voice/1",
  "level": "FirstLevel1218",
- "generatedAt": "2026-10-19T04:14:48.919Z",
- "requests": 35,
+ "generatedAt": "2026-10-21T19:45:11.571Z",
+ "requests": 36,
  "note": "占位配音（SeedAudio seed-audio-1.0，整段一次生成后按逐字时间戳切句）。file 相对 Taierzhuang1938/index.html；gapBeforeS 是录音里与上一句的原始间隔；keyframe 是契约 §4 的关键帧 id。",
  "scenes": [
   {
@@ -10,8 +10,8 @@
    "beat": "12",
    "keyframe": "12-1",
    "label": "12 出村：还有好远",
-   "attempt": 1,
-   "attempts": 1,
+   "attempt": 2,
+   "attempts": 2,
    "references": [
     {
      "who": [
@@ -31,49 +31,42 @@
    "targetDb": -19,
    "cutMethod": "subtitle",
    "hard": [],
-   "flags": [
-    "RoadWest.02 是单句补录（刘文财，RoadWest02Pickup#1），不在整段录音里"
-   ],
+   "flags": [],
    "lines": [
     {
-     "id": "RoadWest.02",
+     "id": "RoadWest.01",
      "keyframe": "12-1",
      "who": "liuwencai",
      "speaker": "刘文财",
      "lang": "zh",
      "subtitle": "还有好远？脚杆都走断了。",
      "text": "还有好远？脚杆都走断了。",
-     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218RoadWest_02.mp3",
-     "durationS": 3.946,
-     "gapBeforeS": 1.59,
-     "sha256": "0885240eb794b4411c4bb30fdc132157390fd3f60618d8eceb7db55de009b5e8",
-     "speakerCos": 0.874,
-     "cer": 0.4,
-     "transcript": "还有好愿,酒干都走短了。",
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218RoadWest_01.mp3",
+     "durationS": 2.71,
+     "gapBeforeS": 0,
+     "sha256": "b36b6008045b7e5ccd85b6a212588bd824271e7dea400cf5f08d1839f99e130a",
+     "speakerCos": 0.846,
+     "cer": 0.5,
+     "transcript": "还有浩远,就该都走短咯。",
      "issues": [
-      "字错率 0.4 待人耳核对"
-     ],
-     "pickup": {
-      "scene": "RoadWest02Pickup",
-      "attempt": 1,
-      "attempts": 1
-     }
+      "字错率 0.5 待人耳核对"
+     ]
     },
     {
-     "id": "RoadWest.03",
+     "id": "RoadWest.02",
      "keyframe": "12-1",
      "who": "geng",
      "speaker": "老耿",
      "lang": "zhNorth",
      "subtitle": "瞅见桥头那几间屋没？伤兵都往那儿送，大夫在那儿。",
      "text": "瞅见桥头那几间屋没？伤兵都往那儿送，大夫在那儿。",
-     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218RoadWest_03.mp3",
-     "durationS": 4.351,
-     "gapBeforeS": 0.72,
-     "sha256": "7e5d763e6ceea30b5193c2c8921f7b817ec6428c1d3e065948636772e4f5ea81",
-     "speakerCos": 0.873,
-     "cer": 0.1429,
-     "transcript": "瞅见桥头那几间屋门,商兵都往那送,大夫在那儿。"
+     "file": "./Audio/Blockout1218/AudioVoice_Blockout1218RoadWest_02.mp3",
+     "durationS": 5.278,
+     "gapBeforeS": 0.68,
+     "sha256": "60cf7df3fa8e4105847a938b29e721ab986b7220681f7ac5ac5310b90103b5a7",
+     "speakerCos": 0.856,
+     "cer": 0.0952,
+     "transcript": "丑奸桥头那几间屋没,伤兵都往那儿送,大夫在那儿。"
     }
    ]
   },

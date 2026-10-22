@@ -5,8 +5,8 @@
   "source": {
     "generator": "Script_EditorBlockoutCli.mjs export FirstLevel1218",
     "gameVersion": "12–18 扩写稿（2026-10-19，集成负责人）+ 同日分拍空间图",
-    "commit": "df416c294395b7834598d03cb1ea09dbc9fb8beb",
-    "generatedAt": "2026-10-19T04:38:05.670Z"
+    "commit": "bbd7f445e133ea7fe8a8219e60b05a4058627e3e",
+    "generatedAt": "2026-10-22T02:19:10.575Z"
   },
   "zones": [
     {
@@ -107,7 +107,7 @@
         "pitchDeg": -2,
         "stance": "stand"
       },
-      "what": "驴车出后门往南；身后机枪停了、轰一声，老耿家方向冒烟。",
+      "what": "驴车出了村南口往南；身后村里的炮停了、轰一声，老耿家方向冒烟。",
       "next": {
         "text": "跟着驴车往西去桥头",
         "x": 40,
@@ -117,7 +117,7 @@
       "how": [
         "车板上横搁着三副担架，冬瓜那副靠车尾，妮儿坐车尾两条腿悬着",
         "刘文财跟在身后半步，顺子停他也停",
-        "身后村里机枪声停了、「轰」一声闷响",
+        "身后村里的炮停了、「轰」一声闷响（老耿家院门框上那颗手榴弹）",
         "老耿回头看一眼冒烟的方向，鞭杆搭一下接着走"
       ],
       "notes": "车板上三副担架横搁着（ride 挂在 GengCart 上，车板顶 1.025 m）：冬瓜那副靠车尾，另两副（CartLitter1 / 2）上各躺一个伤员；妮儿坐车尾沿（ride，两条腿悬在外头）。黑子用 kind animal 单独一个单位走在车前头。后送队 8 副担架 + 7 个走着的伤兵跟在车后头（从小路一直排到村南口）。",
@@ -371,8 +371,8 @@
           "side": "nra",
           "role": "walkingWounded",
           "group": "convoy",
-          "x": 97.2,
-          "z": 564.3,
+          "x": 98.89,
+          "z": 564.35,
           "yawDeg": 180,
           "speedMps": 1
         },
@@ -381,8 +381,8 @@
           "side": "nra",
           "kind": "litter",
           "group": "convoy",
-          "x": 98.8,
-          "z": 561.4,
+          "x": 102.18,
+          "z": 563.92,
           "yawDeg": 180,
           "bearers": 2,
           "speedMps": 1.2
@@ -392,8 +392,8 @@
           "side": "nra",
           "role": "walkingWounded",
           "group": "convoy",
-          "x": 97.2,
-          "z": 558.5,
+          "x": 103.56,
+          "z": 560.91,
           "yawDeg": 180,
           "speedMps": 1
         },
@@ -402,8 +402,8 @@
           "side": "nra",
           "kind": "litter",
           "group": "convoy",
-          "x": 98.8,
-          "z": 555.6,
+          "x": 106.85,
+          "z": 560.47,
           "yawDeg": 180,
           "bearers": 2,
           "speedMps": 1.2
@@ -413,8 +413,8 @@
           "side": "nra",
           "role": "walkingWounded",
           "group": "convoy",
-          "x": 97.2,
-          "z": 552.7,
+          "x": 108.23,
+          "z": 557.47,
           "yawDeg": 180,
           "speedMps": 1
         },
@@ -423,8 +423,8 @@
           "side": "nra",
           "kind": "litter",
           "group": "convoy",
-          "x": 98.8,
-          "z": 549.8,
+          "x": 111.52,
+          "z": 557.03,
           "yawDeg": 180,
           "bearers": 2,
           "speedMps": 1.2
@@ -434,8 +434,8 @@
           "side": "nra",
           "role": "walkingWounded",
           "group": "convoy",
-          "x": 97.2,
-          "z": 546.9,
+          "x": 112.9,
+          "z": 554.03,
           "yawDeg": 180,
           "speedMps": 1
         },
@@ -444,8 +444,8 @@
           "side": "nra",
           "kind": "litter",
           "group": "convoy",
-          "x": 98.8,
-          "z": 544,
+          "x": 116.19,
+          "z": 553.59,
           "yawDeg": 180,
           "bearers": 2,
           "speedMps": 1.2
@@ -456,8 +456,8 @@
           "id": "GengSmoke",
           "name": "老耿家那个方向冒烟",
           "kind": "landmark",
-          "x": 98,
-          "z": 500,
+          "x": 101,
+          "z": 479,
           "radiusM": 6
         },
         {

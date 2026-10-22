@@ -253,7 +253,7 @@ class Seq {
 // 常用点与小段落
 
 const GENG_SMOKE = Pt(PL.gengSmoke.x, PL.gengSmoke.z);
-const MG_POST_0610 = Pt(FROM0610.geng.mgPost.x, FROM0610.geng.mgPost.z);   // 12-1 身后村里还在打的那挺机枪（老耿家北窗）
+const MG_POST_0610 = Pt(FROM0610.geng.mgPost.x, FROM0610.geng.mgPost.z);   // 12-1 身后村里炮落的地方（老耿家北屋那一片；10-22 起不再是机枪）
 const MOUTH = Pt(PL.ditchMouth.x, PL.ditchMouth.z);
 const OUTLET = Pt(PL.ditchOutlet.x, PL.ditchOutlet.z);
 const YARD_GATE = Pt(PL.yardGate.x, PL.yardGate.z);
@@ -367,11 +367,11 @@ function S1201(ctx) {
   const gengStop = 10.4;
   const gengWalked = D1 * (gengStop - T1) / (T2 - T1);
   s.Shift("Geng", T1, gengStop, 0, gengWalked);
-  s.Caption(0.3, 3.6, "（出了老耿家后门，是一条顺着北沙河往西的土路；太阳压在西边桥头那几间房上）");
-  // 身后村里机枪一梭一梭，然后停了
-  for (const t of [1.2, 3.4, 5.9]) s.Sfx(t, "mgBurstFar", { x: MG_POST_0610.x, z: MG_POST_0610.z, volume: 0.45 });
-  s.Caption(7.6, 2.4, "（身后村子里的机枪声停了）");
-  // 又走一段，「轰」一声闷响：老耿家那个方向冒烟
+  s.Caption(0.3, 3.6, "（出了村南口，往南接上顺着北沙河往西的土路；太阳压在西边桥头那几间房上）");
+  // 身后村里的炮一排一排落（10 末炮轰耿家庄），然后停了
+  for (const t of [1.2, 3.4, 5.9]) s.Sfx(t, "mortarImpact", { x: MG_POST_0610.x, z: MG_POST_0610.z, volume: 0.5 });
+  s.Caption(7.6, 2.4, "（身后村里的炮停了）");
+  // 又走一段，「轰」一声闷响：老耿家那个方向冒烟（院门框上何有田卡的那颗手榴弹；字幕只写画面，不替玩家解释）
   const boom = 10.0;
   s.Sfx(boom, "grenadeBlast", { x: GENG_SMOKE.x, z: GENG_SMOKE.z, volume: 0.7 });
   s.Ev(boom, "explosion", { x: GENG_SMOKE.x, z: GENG_SMOKE.z, kind: "grenade", radius: 3, h: 1.0 });
@@ -395,9 +395,9 @@ function S1201(ctx) {
   for (const id of KG(ctx, "12-1", "convoy").filter(id => id !== "LitterDonggua")) s.Shift(id, T2, T3 - 0.4, 0, 12.0);
   s.WalkEye(T2, 2.0, Pt(eye0.x, zAt(T2)), Pt(99.4, 611.6), { ...GENG_SMOKE, h: 4 }, { lookTo: { actor: "Geng", offset: [0, 1.3, 0] }, ease: "inOut" });
   s.WalkEye(T2 + 2.0, T3 - T2 - 2.0, Pt(99.4, 611.6), Pt(93.6, 613.8), { actor: "Geng", offset: [0, 1.3, 0] }, { lookTo: { x: 40, z: 612, h: 1.2 }, ease: "inOut" });
-  // 刘文财问一句、老耿答一句（边走边说）；「推门了」那句 10-19 删了（RoadWest.01 留在台词表里只为切句对齐）
-  s.Say("RoadWest.02", "LiuWencai", 17.0);
-  s.Say("RoadWest.03", "Geng");
+  // 刘文财问一句、老耿答一句（边走边说）；「推门了」那句 10-19 删了（10-22 整场重配，台词表里也删了）
+  s.Say("RoadWest.01", "LiuWencai", 17.0);
+  s.Say("RoadWest.02", "Geng");
   s.Eye(T3, 3.0, { stance: "stand", x: 93.6, z: 613.8, look: Pt(40, 612), pitch: -1 });
   return s.Done({ durationS: T3 + 3.0 });
 }

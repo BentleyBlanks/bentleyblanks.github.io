@@ -2,23 +2,22 @@
 // Script_EditorBlockoutFirstLevel0610Scene.mjs —— 第一关 06–10 新剧本白盒（FirstLevel0610）的场景生成器（node 专用）
 //
 // 契约 docs/Data_EditorBlockout.md §2.2（场景文件格式，含 gates 与块的可选 y）、§15。产物：
-//   Blockout/FirstLevel0610.scene.json  高度网格 + 体块 + 随信号体块 + 路与沟的中心线
+//   Blockout/FirstLevel0610.scene.json  高度网格 + 体块 + 随信号体块 + 地标 + 路与沟的中心线
 // 跑法：node Taierzhuang1938/Script_EditorBlockoutCli.mjs scene FirstLevel0610 --force
 //
 // 坐标与尺寸只读 Data_EditorBlockoutFirstLevel0610Space（唯一口径）；本文件只定「怎么烘」：
-//   1. 自然地面：z < 205 直接用 0105 的 L0105Ground（交通沟坡道、干沟、南岸、凹路头一段逐点一致，两片白盒以后能接上）；
-//      z ≥ 205 用 0105 的 NaturalHeight（那里只剩低频起伏）再叠本关的大形：凹路中段两侧略高（路才有 2.5 m 深）、往南落回村子的 +0.3。
-//   2. 凹路：0105 的折线原样接上再往南到村口路沟的北沿，路底按弧长分段缓降 / 缓升到 −0.9 直接接进沟底；路底宽、两壁宽沿用 0105。
-//   3. 村口路沟（第二版）：东西向，沟底 3 m 宽、−0.9，两壁 1.3 m 陡起；街口那一段南壁放缓成 3.6 m 的坡道（驴车从这里上主街）；
-//      东头 4 m 内收掉；西头（第五版）不收，沟底 −0.9 一直挖到河汊子东壁、落进河沟（排水口）。
-//   4. 河汊子：村西一条南北向河沟，沟底绝对高 −2.7（两岸 2.7…3.7 m）、两壁 2.5 m 陡起、岸上一道矮土埂；第五版贴着庄子西墙走：
-//      东壁坎沿顶到墙根 x 40，庄子那一段（z 383…548）东岸不堆土埂（埂顶会是一条顺墙根的路）；沟底铺满 1 m 深的水块（水面 −1.7）。
-//   5. 耿家庄：整村压平到 +0.3（土坯墙才站得稳），街面压低 12 cm；地瓜窖是平底开挖。东街东头出去一条往东北的土路（压低 0.15）、道边三个坟头烘进地里。
-//   6. 体块：院墙（带门洞 / 窗洞 / 狗洞 / 墙缝）、房子（实心块）、老耿家三间屋（空心 + 平顶 + 女墙，没人站上去）、石磨、窖沿与盖板、
-//      第五版补满的三块院子（西南 / 东北 / 东南，外沿一整圈墙、不开门）、两道没门扇的后门（主街西边北头那院西墙 z 425 → 巷子、主街东边最北那院北墙 x 110 → 路沟）、
-//      柴草垛、水缸、翻倒的大车（加高到 1.15）、场院的麦秸垛、东街的土地庙等日常摆件、干沟南岸的枯树（0105 的表），以及随信号体块：
-//      CartDeparted（车上的弹药箱）/ SideGateOpen（侧门扇）/ CellarBlast（盖板飞开、窖口冒烟）/ MgSilenced（北窗上的机枪 → 石碾后）/
-//      NorthYardGatesBroken（北边院子链上的三道门扇倒下）/ BackVatMoved（水缸推到门东边，10-20 拆出来的）/ BackDoorOpen（后门扇）。
+//   1. 自然地面：z < 205 直接用 0105 的 L0105Ground（交通沟坡道、干沟、南岸、凹路头一段逐点一致）；z ≥ 205 用 0105 的 NaturalHeight 再叠本关的大形。
+//   2. 凹路：0105 的折线原样接上再往南到村口路沟的北沿，路底按弧长分段缓降 / 缓升到 −0.9 直接接进沟底。
+//   3. 村口路沟：东西向，沟底 3 m 宽、−0.9；街口那一段南壁放缓成坡道；东头收掉、西头挖进河汊子。
+//   4. 河汊子：贴着庄子西墙的南北向河沟，沟底 −2.7、两壁陡、庄子那一段东岸不堆土埂；沟底铺满 1 m 深的水。
+//   5. 耿家庄：整村压平到 +0.3，胡同 / 街 / 路口压低 12 cm；街坊家的地瓜窖、村西的取土坑（积水）平底开挖。东北进庄的道压低 0.15、道边坟头。
+//   6. 体块（第六版，2026-10-22）：全村院子按 L0610_YARDS 一院一院盖——院墙（共墙只画一道，按 WallPlan 合并；带门洞 / 枪眼 / 豁口 / 狗洞）、
+//      北屋 / 配房 / 南屋（大多实心；老耿家北屋与灶屋、街坊家北屋与西配房、东街南侧两座后墙对街的北屋是空心的，墙 + 平顶）、
+//      菜园的矮篱、取土坑的水、关着的 / 半掩的院门扇、瓦砾堆（炸塌的墙和房，把岔路堵死）、窄胡同里的柴垛、石碾、土地庙、麦秸垛、
+//      零散的树（房前屋后，不成排）、日常摆件、干沟南岸的枯树（0105 的表）；随信号体块：
+//      CartDeparted（车上的弹药箱）/ SideGateOpen（共用墙上的便门扇）/ CellarBlast（街坊家窖口的盖板飞开、冒烟）/ MgSilenced（堂屋枪眼后的机枪 → 石碾后）/
+//      NorthYardGatesBroken（北边院子链上的三道门扇倒下）/ BarrageHit（老耿家北屋东间的后墙与房顶塌下来、石碾旁一堆新瓦砾）/
+//      LaneWallCollapse（窄胡同中段西墙倒进胡同：墙板横着、瓦砾堆把胡同堵死）。
 //
 // 纪律：不读时钟、不读 git（commit / generatedAt 由 CLI 传入）；没有随机数，生成两次逐字相同。
 // ===========================================================================
@@ -29,8 +28,9 @@ import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
 import { L0105Ground, NaturalHeight as NaturalHeight0105, SightBlock } from "./Script_EditorBlockoutFirstLevel0105Scene.mjs";
 import {
   L0610_LEVEL_KEY, L0610_BOUNDS, L0610_CELL_M, L0610_HEIGHTS, L0610_PLAIN_PROFILE, L0610_LANE, L0610_DITCH, L0610_RIVER, L0610_VILLAGE,
-  L0610_STREETS, L0610_GENG, L0610_NEIGHBOR, L0610_EAST_YARDS, L0610_STREET_YARDS, L0610_FILL_YARDS, L0610_EAST_ROAD, L0610_PROP_KINDS, L0610_PROPS,
-  L0610_COLLAPSED_HOUSES, L0610_SIGNALS, L0610_PLACES, L0610_SPAWN, L0610_FROM_0105, L0610_MOUTH_SHOOTERS, LineLength, Station, LanePointAtZ,
+  L0610_STREETS, L0610_GENG, L0610_JIEFANG, L0610_BENJIA, L0610_YARDS, L0610_RUBBLE, L0610_SOUTH_LANE, L0610_EAST_STREET, L0610_ROUTE, L0610_TREES,
+  L0610_EAST_ROAD, L0610_PROP_KINDS, L0610_PROPS, L0610_COLLAPSED_HOUSES, L0610_SIGNALS, L0610_PLACES, L0610_SPAWN, L0610_FROM_0105, L0610_MOUTH_SHOOTERS,
+  L0610_FALLEN_WALLS, LineLength, Station, LanePointAtZ,
 } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 
 export { SightBlock, L0610_MOUTH_SHOOTERS };
@@ -39,6 +39,11 @@ export const L0610_SCENE_GENERATOR = "Script_EditorBlockoutCli.mjs scene FirstLe
 const H = L0610_HEIGHTS;
 const V = L0610_VILLAGE;
 const G = L0610_GENG;
+const J = L0610_JIEFANG;
+const B = L0610_BENJIA;
+const ST = L0610_STREETS;
+const ES = L0610_EAST_STREET;
+const SLN = L0610_SOUTH_LANE;
 const SIG = L0610_SIGNALS;
 const R2 = (v) => Math.round(v * 100) / 100;
 const Clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -48,18 +53,15 @@ const Lerp = (a, b, t) => a + (b - a) * t;
 // ---------------------------------------------------------------------------
 // 1. 自然地面
 
-/** 点到矩形（轴对齐）的外部距离；里面为 0。 */
 function RectOutside(x, z, box) {
   const dx = Math.max(box.minX - x, 0, x - box.maxX), dz = Math.max(box.minZ - z, 0, z - box.maxZ);
   return Math.hypot(dx, dz);
 }
-/** 点到矩形的有符号距离（外正内负）。 */
 function RectSdf(x, z, box) {
   const cx = (box.minX + box.maxX) / 2, cz = (box.minZ + box.maxZ) / 2, hx = (box.maxX - box.minX) / 2, hz = (box.maxZ - box.minZ) / 2;
   const qx = Math.abs(x - cx) - hx, qz = Math.abs(z - cz) - hz;
   return Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0);
 }
-/** 控制点 [[t, y], …]（t 递增）之间平滑过渡。 */
 function Knots(knots, t) {
   if (t <= knots[0][0]) return knots[0][1];
   for (let i = 1; i < knots.length; i++) {
@@ -69,13 +71,12 @@ function Knots(knots, t) {
   return knots[knots.length - 1][1];
 }
 
-const NORTH_SPLIT_Z = 205;   // 这条线以北照抄 0105 的地面（含交通沟坡道、干沟、凹路头一段）
+const NORTH_SPLIT_Z = 205;
 let north0105 = null;
 function NorthGround(x, z) {
   if (!north0105) north0105 = L0105Ground().Ground;
   return north0105(x, z);
 }
-/** 0105 的地面 + 本关平地大形（z ≤ 200 为 0，所以北半截逐点等于 0105）。 */
 export function BaseHeight(x, z) {
   const base = z < NORTH_SPLIT_Z ? NorthGround(x, z) : NaturalHeight0105(x, z);
   return base + Knots(L0610_PLAIN_PROFILE, z);
@@ -85,14 +86,13 @@ export function BaseHeight(x, z) {
 const LANE = L0610_LANE;
 const LANE_LEN = LineLength(LANE.line);
 const LANE_LEN_0105 = LineLength(L0610_FROM_0105.lane.line);
-const LANE_WALL_RISE_M = 3;   // 与 0105 同
+const LANE_WALL_RISE_M = 3;
 const LANE_KNOTS = (() => {
   const knots = [[LANE_LEN_0105, L0610_FROM_0105.lane.toY]];
   for (const k of LANE.floorKnots) knots.push([Station(LANE.line, k.at), k.y]);
-  knots.push([LANE_LEN, LANE.mouthY]);   // 末端 = 路沟沟底，直接接进沟里
+  knots.push([LANE_LEN, LANE.mouthY]);
   return knots;
 })();
-/** 路底高度随弧长：0105 那一截照 0105 的公式（接得上），之后按锚点的控制点。 */
 export function LaneFloorY(d) {
   if (d <= LANE_LEN_0105) return Lerp(L0610_FROM_0105.lane.fromY, L0610_FROM_0105.lane.toY, Smooth(d / LANE_LEN_0105));
   return Knots(LANE_KNOTS, d);
@@ -109,7 +109,6 @@ function NearestOnLine(line, x, z) {
   }
   return { dist: best, at };
 }
-/** 凹路开挖后的高度上限（不在路上 = Infinity）。 */
 function LaneCap(x, z) {
   const { dist, at } = NearestOnLine(LANE.line, x, z);
   const half = LANE.floorW / 2;
@@ -119,15 +118,13 @@ function LaneCap(x, z) {
 }
 export function DistanceToLane(x, z) { return NearestOnLine(LANE.line, x, z).dist; }
 
-// 村口路沟：东西向，沟底 floorW 宽、floorY；南北两壁 wallM 陡起；街口那一段（|x − 主街中线| ≤ rampHalfW）南壁放缓成 rampWallM 的坡道；
-// 东头 endM 内收掉；西头（第五版 westOpensToRiver）不收：沟底 −0.9 一直挖到 fromX（在河汊子东壁里头），河汊子的开挖在后面把它接下去 —— 排水口
+// 村口路沟
 const DT = L0610_DITCH;
 const DITCH_HALF = DT.floorW / 2;
-/** 路沟开挖后的高度上限（不在沟上 = Infinity）。h 是开挖前的地面（壁从沟底升到它）。 */
 function DitchCap(h, x, z) {
   const dz = Math.abs(z - DT.z);
   const south = z > DT.z;
-  const nearStreet = 1 - Smooth((Math.abs(x - ST.main.x) - DT.rampHalfW) / DT.rampBlendM);
+  const nearStreet = 1 - Smooth((Math.abs(x - ST.main.c) - DT.rampHalfW) / DT.rampBlendM);
   const wallM = south ? Lerp(DT.wallM, DT.rampWallM, nearStreet) : DT.wallM;
   if (dz >= DITCH_HALF + wallM) return Infinity;
   if (x < DT.fromX) return Infinity;
@@ -139,13 +136,11 @@ function DitchCap(h, x, z) {
   return Lerp(floor, h, Smooth((dz - DITCH_HALF) / wallM));
 }
 
-// 河汊子：沟底绝对高（两岸随平地起伏，沟底不随）。第五版贴着庄子西墙：东壁坎沿 = centerX + floorW/2 + wallM = 40 = 西墙中线，
-// 庄子那一段（eastBankOff）东岸不堆土埂 —— 埂在 x 40…43 会垫在院墙底下，埂顶也是一条顺墙根的路
+// 河汊子
 const RV = L0610_RIVER;
-export const RIVER_FLOOR_Y = R2(H.plain - RV.depth + 0.3);   // −2.7
-export const RIVER_EAST_RIM_X = RV.centerX + RV.floorW / 2 + RV.wallM;   // 40：东壁坎沿（= 庄子西墙中线）
+export const RIVER_FLOOR_Y = R2(H.plain - RV.depth + 0.3);
+export const RIVER_EAST_RIM_X = RV.centerX + RV.floorW / 2 + RV.wallM;
 const RIVER_BOX = Object.freeze({ minX: RV.centerX - RV.floorW / 2, maxX: RV.centerX + RV.floorW / 2, minZ: RV.fromZ, maxZ: RV.toZ + 50 });
-/** 东岸土埂的高度系数：庄子那一段为 0，两头 fadeM 内渐起到 1。 */
 function EastBankFactor(z) {
   const off = RV.eastBankOff;
   if (!off) return 1;
@@ -154,7 +149,7 @@ function EastBankFactor(z) {
 function RiverCarve(h, x, z) {
   const sdf = RectSdf(x, z, RIVER_BOX);
   if (sdf >= RV.wallM + RV.bankW) return h;
-  const fade = Smooth((z - RV.fromZ + RV.wallM) / RV.endM);   // 北头 endM 内从无到有
+  const fade = Smooth((z - RV.fromZ + RV.wallM) / RV.endM);
   if (sdf < RV.wallM) {
     const k = sdf <= 0 ? 1 : 1 - Smooth(sdf / RV.wallM);
     return Math.min(h, Lerp(h, Lerp(h, RIVER_FLOOR_Y, fade), k));
@@ -164,7 +159,7 @@ function RiverCarve(h, x, z) {
   return h + RV.bankH * Math.sin(u * Math.PI) * fade * bank;
 }
 
-// 东北进庄的道（第五版）：东街东头出去往东北的土路，压低 lowerM、两边 0.9 m 内渐出；道边几个坟头是圆土包（照 0105 散坟烘进地里）
+// 东北进庄的道
 const ER = L0610_EAST_ROAD;
 function EastRoadDelta(x, z) {
   const d = Math.max(NearestOnLine(ER.line, x, z).dist - ER.halfW, 0);
@@ -180,35 +175,29 @@ function GraveBumps(x, z) {
   return dh;
 }
 
-// 村子：整村压平
 function VillageWeight(x, z) { return 1 - Smooth(RectOutside(x, z, V.box) / V.fadeM); }
 
-// 街面压低（两边是墙，不要路肩）
-const ST = L0610_STREETS;
-const STREET_RUNS = Object.freeze([
-  { axis: "z", c: ST.main.x, from: ST.main.fromZ, to: ST.main.toZ, half: ST.main.halfW },
-  { axis: "x", c: ST.east.z, from: ST.east.fromX, to: ST.east.toX, half: ST.east.halfW },
-  { axis: "z", c: ST.alleyNorth.x, from: ST.alleyNorth.fromZ, to: ST.alleyNorth.toZ, half: ST.alleyNorth.halfW },
-  { axis: "x", c: ST.alleyWest.z, from: ST.alleyWest.fromX, to: ST.alleyWest.toX, half: ST.alleyWest.halfW },
-  { axis: "z", c: ST.alleySouth.x, from: ST.alleySouth.fromZ, to: ST.alleySouth.toZ, half: ST.alleySouth.halfW },
-  { axis: "z", c: ST.backLane.x, from: ST.backLane.fromZ, to: ST.backLane.toZ, half: ST.backLane.halfW },
-]);
+// 街巷压低：所有净空条 + 丁字路口
+export const STREET_RUNS = Object.freeze(Object.values(ST).filter((r) => r.axis));
 function StreetDelta(x, z) {
   let d = Infinity;
   for (const r of STREET_RUNS) {
     const along = r.axis === "z" ? z : x, across = r.axis === "z" ? x : z;
     const over = Math.max(r.from - along, 0, along - r.to);
-    d = Math.min(d, Math.hypot(Math.max(Math.abs(across - r.c) - r.half, 0), over));
+    d = Math.min(d, Math.hypot(Math.max(Math.abs(across - r.c) - r.halfW, 0), over));
   }
-  d = Math.min(d, RectSdf(x, z, ST.square.box), RectSdf(x, z, ST.pocket.box));
+  d = Math.min(d, RectSdf(x, z, ST.square.box));
   if (d >= 0.9) return 0;
   return -V.streetLowerM * (1 - Smooth((d + 0.3) / 0.6));
 }
 
-// 地瓜窖（平底开挖）
-const CELLAR = G.cellar;
+// 地瓜窖（街坊家）、取土坑：平底开挖
+const CELLAR = J.cellar;
 const CELLAR_BOX = Object.freeze({ minX: CELLAR.x - CELLAR.floorW / 2, maxX: CELLAR.x + CELLAR.floorW / 2, minZ: CELLAR.z - CELLAR.floorW / 2, maxZ: CELLAR.z + CELLAR.floorW / 2 });
 export const CELLAR_FLOOR_Y = R2(V.y - CELLAR.depth);
+const POND = L0610_YARDS.find((y) => y.kind === "pond").pond;
+const POND_BOX = Object.freeze({ minX: POND.x - POND.w / 2, maxX: POND.x + POND.w / 2, minZ: POND.z - POND.d / 2, maxZ: POND.z + POND.d / 2 });
+export const POND_FLOOR_Y = R2(V.y - POND.depth);
 function CarveBox(h, x, z, box, floorY, wallM) {
   const sdf = RectSdf(x, z, box);
   if (sdf >= wallM) return h;
@@ -216,7 +205,6 @@ function CarveBox(h, x, z, box, floorY, wallM) {
   return Math.min(h, Lerp(h, floorY, k));
 }
 
-/** 建好的地面函数。 */
 export function L0610Ground() {
   const Ground = (x, z) => {
     let h = BaseHeight(x, z);
@@ -227,15 +215,15 @@ export function L0610Ground() {
     const ditch = DitchCap(h, x, z);
     if (ditch < h) h = ditch;
     h = RiverCarve(h, x, z);
-    h += Math.min(StreetDelta(x, z), EastRoadDelta(x, z));   // 东街东头接东北的道：两个压低取深的那个，不叠加
+    h += Math.min(StreetDelta(x, z), EastRoadDelta(x, z));
     h += GraveBumps(x, z);
     h = CarveBox(h, x, z, CELLAR_BOX, CELLAR_FLOOR_Y, CELLAR.wallM);
+    h = CarveBox(h, x, z, POND_BOX, POND_FLOOR_Y, 1.6);
     return h;
   };
   return { Ground };
 }
 
-/** 按 §2.2 烘高度：(cols+1)×(rows+1) 个 int16 小端厘米，heights[iz*(cols+1)+ix]。 */
 export function BakeL0610Grid(ground, bounds = L0610_BOUNDS, cellM = L0610_CELL_M) {
   const cols = Math.round((bounds.maxX - bounds.minX) / cellM);
   const rows = Math.round((bounds.maxZ - bounds.minZ) / cellM);
@@ -257,43 +245,91 @@ export function BakeL0610Grid(ground, bounds = L0610_BOUNDS, cellM = L0610_CELL_
 }
 
 // ---------------------------------------------------------------------------
-// 体块
+// 2. 体块
 
 const Block = (id, x, z, w, d, h, semantic, extra = {}) => ({ id, x: R2(x), z: R2(z), w: R2(w), d: R2(d), h: R2(h), ry: 0, semantic, solid: true, ...extra });
-const WALL = "plaster", BRICK = "structure", ROOF = "roof", WOOD = "timber";
+const WALL = "plaster", BRICK = "structure", ROOF = "roof", WOOD = "timber", EARTH = "earthDark";
 const T = V.wallT;
+const Gap = (c, w) => ({ from: c - w / 2, to: c + w / 2 });
 
 /**
- * 一段轴对齐的墙拆成几块（避开 gaps）。axis "x"：墙沿 x 走、z 固定；"z"：沿 z 走、x 固定。
- * gaps：[{ from, to }]（沿墙方向的坐标）。h 可以是数或函数 (from, to) => h。
+ * 墙的总表：按（轴、固定坐标）那条线收集墙段（带高度）与洞口，最后合并成块——共墙只画一道，两院高度不同取高的。
+ * Add(axis, fixed, from, to, h, name)：name 给这段墙的块 id 前缀（没给用 Wall_x92 这样的名字）。Cut(axis, fixed, from, to)：洞口。
  */
-function Wall(out, id, axis, fixed, from, to, gaps = [], h = V.wallH, semantic = WALL, extra = {}) {
-  const cuts = gaps.filter((g) => g.to > from && g.from < to).sort((a, b) => a.from - b.from);
-  const runs = [];
-  let cur = from;
-  for (const g of cuts) { if (g.from > cur + 0.01) runs.push([cur, Math.min(g.from, to)]); cur = Math.max(cur, g.to); }
-  if (to > cur + 0.01) runs.push([cur, to]);
-  runs.forEach(([a, b], i) => {
-    const mid = (a + b) / 2, len = b - a, hh = typeof h === "function" ? h(a, b) : h;
-    const sid = runs.length > 1 ? `${id}_${i + 1}` : id;
-    out.push(axis === "x" ? Block(sid, mid, fixed, len, T, hh, semantic, extra) : Block(sid, fixed, mid, T, len, hh, semantic, extra));
-  });
+class WallPlan {
+  constructor() { this.lines = new Map(); this.fences = new Set(); }
+  Key(axis, fixed) { return `${axis}@${R2(fixed)}`; }
+  Line(axis, fixed) {
+    const k = this.Key(axis, fixed);
+    if (!this.lines.has(k)) this.lines.set(k, { axis, fixed: R2(fixed), segs: [], cuts: [], names: [] });
+    return this.lines.get(k);
+  }
+  Add(axis, fixed, from, to, h = V.wallH, name = null) {
+    if (to - from < 0.05) return;
+    const L = this.Line(axis, fixed);
+    L.segs.push({ from: R2(Math.min(from, to)), to: R2(Math.max(from, to)), h });
+    if (name) L.names.push({ from: R2(Math.min(from, to)), to: R2(Math.max(from, to)), name });
+  }
+  Cut(axis, fixed, from, to) { this.Line(axis, fixed).cuts.push({ from: R2(from), to: R2(to) }); }
+  /** 盖：按 0.05 m 的格子把每条线铺开（高度取最大），再减洞口、合并成连续段。 */
+  Emit(out, semantic = WALL) {
+    const STEP = 0.05;
+    const keys = [...this.lines.keys()].sort();
+    for (const k of keys) {
+      const L = this.lines.get(k);
+      if (!L.segs.length) continue;
+      const lo = Math.min(...L.segs.map((s) => s.from)), hi = Math.max(...L.segs.map((s) => s.to));
+      const n = Math.round((hi - lo) / STEP);
+      const cover = new Float64Array(n);
+      for (const s of L.segs) {
+        const a = Math.round((s.from - lo) / STEP), b = Math.round((s.to - lo) / STEP);
+        for (let i = a; i < b; i++) cover[i] = Math.max(cover[i], s.h);
+      }
+      for (const c of L.cuts) {
+        const a = Math.max(0, Math.round((c.from - lo) / STEP)), b = Math.min(n, Math.round((c.to - lo) / STEP));
+        for (let i = a; i < b; i++) cover[i] = 0;
+      }
+      const runs = [];
+      let i = 0;
+      while (i < n) {
+        if (cover[i] <= 0) { i++; continue; }
+        const h = cover[i];
+        let j = i;
+        while (j < n && Math.abs(cover[j] - h) < 1e-9) j++;
+        runs.push({ from: lo + i * STEP, to: lo + j * STEP, h });
+        i = j;
+      }
+      const base = `Wall_${L.axis}${String(L.fixed).replace(".", "p")}`;
+      runs.forEach((r, idx) => {
+        if (r.to - r.from < 0.049) return;
+        const mid = (r.from + r.to) / 2, len = r.to - r.from;
+        const named = L.names.find((nm) => mid >= nm.from - 0.01 && mid <= nm.to + 0.01);
+        const id = named ? `${named.name}_${idx + 1}` : `${base}_${idx + 1}`;
+        out.push(L.axis === "x" ? Block(id, mid, L.fixed, len, T, r.h, semantic) : Block(id, L.fixed, mid, T, len, r.h, semantic));
+      });
+    }
+  }
 }
+
 /** 门洞 / 窗洞上方的过梁（显式 y）：从 bottomH 到 topH。 */
-function Lintel(out, id, axis, fixed, from, to, bottomH, topH, sample, semantic = WALL) {
+function Lintel(out, id, axis, fixed, from, to, bottomH, topH, sample, semantic = WALL, extra = {}) {
   const mid = (from + to) / 2, len = to - from;
   const gy = axis === "x" ? sample(mid, fixed) : sample(fixed, mid);
   const y = R2(gy + (bottomH + topH) / 2);
-  out.push(axis === "x" ? Block(id, mid, fixed, len, T, topH - bottomH, semantic, { y }) : Block(id, fixed, mid, T, len, topH - bottomH, semantic, { y }));
+  out.push(axis === "x" ? Block(id, mid, fixed, len, T, topH - bottomH, semantic, { y, ...extra }) : Block(id, fixed, mid, T, len, topH - bottomH, semantic, { y, ...extra }));
+}
+/** 窗台 / 枪眼下的墙（落地）。 */
+function Sill(out, id, axis, fixed, from, to, h, extra = {}) {
+  const mid = (from + to) / 2, len = to - from;
+  out.push(axis === "x" ? Block(id, mid, fixed, len, T, h, WALL, extra) : Block(id, fixed, mid, T, len, h, WALL, extra));
 }
 /** 平顶（显式 y，顶在 topH）。 */
-function Slab(out, id, box, topH, sample, thick = 0.2, semantic = ROOF) {
+function Slab(out, id, box, topH, sample, thick = 0.2, extra = {}) {
   const cx = (box.minX + box.maxX) / 2, cz = (box.minZ + box.maxZ) / 2;
-  out.push(Block(id, cx, cz, box.maxX - box.minX, box.maxZ - box.minZ, thick, semantic, { y: R2(sample(cx, cz) + topH - thick / 2) }));
+  out.push(Block(id, cx, cz, box.maxX - box.minX, box.maxZ - box.minZ, thick, ROOF, { y: R2(sample(cx, cz) + topH - thick / 2), ...extra }));
 }
-/** 实心房子。 */
-function House(out, id, box, h = V.houseH, semantic = BRICK) {
-  out.push(Block(id, (box.minX + box.maxX) / 2, (box.minZ + box.maxZ) / 2, box.maxX - box.minX, box.maxZ - box.minZ, h, semantic, { house: true }));
+function House(out, id, box, h = V.houseH) {
+  out.push(Block(id, (box.minX + box.maxX) / 2, (box.minZ + box.maxZ) / 2, box.maxX - box.minX, box.maxZ - box.minZ, h, BRICK, { house: true }));
 }
 /** 塌了一角的房子：东南角缺一块，缺口里堆一摊土。 */
 function CollapsedHouse(out, id, box, h = V.houseH) {
@@ -303,113 +339,22 @@ function CollapsedHouse(out, id, box, h = V.houseH) {
   const k = L0610_PROP_KINDS.Rubble;
   out.push(Block(`${id}_Rubble`, box.maxX - cw / 2 + 0.3, box.maxZ - cd / 2 + 0.4, k.w, k.d, k.h, k.semantic, { ry: 0.3, prop: "Rubble" }));
 }
-const Gap = (c, w) => ({ from: c - w / 2, to: c + w / 2 });
 /** 关着的院门：门洞里一扇门板。 */
 function ClosedGate(out, id, axis, fixed, c, w) {
   out.push(axis === "x" ? Block(id, c, fixed, w - 0.1, 0.08, 2.0, WOOD, { gate: true }) : Block(id, fixed, c, 0.08, w - 0.1, 2.0, WOOD, { gate: true }));
 }
-
-/** 老耿家 + 邻院（含随信号体块）。 */
-function GengBlocks(sample) {
-  const blocks = [], gates = [];
-  const FR = G.frontRoom, K = G.kitchen, SR = G.sideRoom, C = G.compound;
-  const roomH = FR.roofH;
-  const gy = sample(100, 488);   // 后院地面（整村压平，一个数就够；显式 y 的块另按各自位置采）
-
-  // --- 前屋：北墙带北窗与前门，南墙带开向后院的门，东西墙，平顶 + 北女墙 ----------------
-  Wall(blocks, "GengFrontNorth", "x", FR.box.minZ, FR.box.minX, FR.box.maxX, [Gap(G.window.x, G.window.w), Gap(G.frontDoor.x, G.frontDoor.w)], roomH);
-  blocks.push(Block("GengWindowSill", G.window.x, FR.box.minZ, G.window.w, T, G.window.sillH, WALL));
-  Lintel(blocks, "GengWindowLintel", "x", FR.box.minZ, G.window.x - G.window.w / 2, G.window.x + G.window.w / 2, G.window.topH, roomH, sample);
-  Lintel(blocks, "GengFrontDoorLintel", "x", FR.box.minZ, G.frontDoor.x - G.frontDoor.w / 2, G.frontDoor.x + G.frontDoor.w / 2, G.frontDoor.topH, roomH, sample);
-  Wall(blocks, "GengFrontSouth", "x", FR.box.maxZ, FR.box.minX, FR.box.maxX, [Gap(G.roomYardDoor.x, G.roomYardDoor.w)], roomH);
-  Lintel(blocks, "GengRoomYardDoorLintel", "x", FR.box.maxZ, G.roomYardDoor.x - G.roomYardDoor.w / 2, G.roomYardDoor.x + G.roomYardDoor.w / 2, G.roomYardDoor.topH, roomH, sample);
-  Wall(blocks, "GengFrontWest", "z", FR.box.minX, FR.box.minZ, FR.box.maxZ, [], roomH);
-  Wall(blocks, "GengFrontEast", "z", FR.box.maxX, FR.box.minZ, FR.box.maxZ, [], roomH);
-  Slab(blocks, "GengFrontRoof", FR.box, roomH, sample);
-  const roofTop = sample((FR.box.minX + FR.box.maxX) / 2, (FR.box.minZ + FR.box.maxZ) / 2) + roomH;   // 与平顶同一个基准（街面压低 12 cm，不按墙脚采）
-  blocks.push(Block("GengRoofParapetNorth", (FR.box.minX + FR.box.maxX) / 2, FR.box.minZ, FR.box.maxX - FR.box.minX, T, FR.parapetH, WALL,
-    { y: R2(roofTop + FR.parapetH / 2) }));
-  // 北窗上的十一年式（机枪组被打掉前一直在窗台上；10-2 起出现在石碾后头）
-  gates.push(Block("GengWindowMg", G.window.x, FR.box.minZ, 0.12, 0.9, 0.14, "metal", { y: R2(sample(G.window.x, FR.box.minZ) + G.window.sillH + 0.07), signal: SIG.mgSilenced }));
-  const RL = L0610_PLACES.roller;
-  gates.push(Block("RollerMg", RL.x - 1.0, RL.z + 0.6, 0.9, 0.12, 0.14, "metal", { appearSignal: SIG.mgSilenced }));
-
-  // --- 大门（车道）与院墙北段：门楼过梁 2.6 m，两扇门板敞开贴着过道两壁 ------------------
-  const CG = G.carriageGate;
-  Wall(blocks, "GengNorthWallEast", "x", C.minZ, FR.box.maxX, C.maxX, [Gap((CG.minX + CG.maxX) / 2, CG.maxX - CG.minX)], (a) => (a < CG.maxX + 0.6 ? 3.0 : V.wallH));
-  Lintel(blocks, "GengGateLintel", "x", C.minZ, FR.box.maxX, CG.maxX + 0.5, CG.topH, 3.0, sample);
-  blocks.push(Block("GengGateLeafWest", CG.minX - 0.15, C.minZ + 0.95, 0.08, 1.3, 2.0, WOOD, { gate: true }));
-  blocks.push(Block("GengGateLeafEast", CG.maxX + 0.2, C.minZ + 0.95, 0.08, 1.3, 2.0, WOOD, { gate: true }));
-  Wall(blocks, "GengPassageEast", "z", G.passageEastX, C.minZ, SR.box.minZ, []);
-
-  // --- 院墙：东（偏屋那段高到 3.0）、南（后门）、与邻院共用的西墙（狗洞 / 墙缝 / 侧门） -------------
-  Wall(blocks, "GengEastWall", "z", C.maxX, L0610_EAST_YARDS.south.box.minZ, C.maxZ, [], (a, b) => (a >= SR.box.minZ - 0.01 && b <= SR.box.maxZ + 0.01 ? SR.roofH : V.wallH));
-  Wall(blocks, "GengSouthWall", "x", C.maxZ, C.minX, C.maxX, [Gap(G.backDoor.x, G.backDoor.w)]);
-  Lintel(blocks, "GengBackDoorLintel", "x", C.maxZ, G.backDoor.x - G.backDoor.w / 2, G.backDoor.x + G.backDoor.w / 2, G.backDoor.topH, V.wallH, sample);
-  const SW = G.sharedWall, DH = G.dogHole, CR = G.crack, SG = G.sideGate;
-  Wall(blocks, "SharedWall", "z", SW.x, SW.fromZ, SW.toZ, [Gap(DH.z, DH.w), Gap(CR.z, CR.w), Gap(SG.z, SG.w)]);
-  Lintel(blocks, "DogHoleLintel", "z", SW.x, DH.z - DH.w / 2, DH.z + DH.w / 2, DH.h, V.wallH, sample);
-  Lintel(blocks, "SideGateLintel", "z", SW.x, SG.z - SG.w / 2, SG.z + SG.w / 2, 2.0, V.wallH, sample);
-  // 侧门扇：关着时贴南侧铰链、北边留门缝；开了以后往老耿家这边摆成一字
-  const leafZ0 = SG.z + SG.w / 2 - SG.leafW;
-  gates.push(Block("SideGateLeaf", SW.x - 0.15, leafZ0 + SG.leafW / 2, SG.leafT, SG.leafW, 2.0, WOOD, { signal: SIG.sideGateOpen }));
-  gates.push(Block("SideGateLeafOpen", SW.x + T / 2 + SG.leafW / 2, SG.z + SG.w / 2 + 0.05, SG.leafW, SG.leafT, 2.0, WOOD, { appearSignal: SIG.sideGateOpen }));
-  // 后门：门扇关着（向里开，被水缸顶着），水缸堵在门里头；10 末老耿先把水缸往东推开（BackVatMoved，片段 2.8 s），再拔门闩把门扇拉开到西墙边（BackDoorOpen，6.1 s）
-  gates.push(Block("BackDoorLeaf", G.backDoor.x, C.maxZ - 0.15, G.backDoor.w - 0.05, 0.08, 2.0, WOOD, { signal: SIG.backDoorOpen }));
-  gates.push(Block("BackDoorLeafOpen", G.backDoor.x - G.backDoor.w / 2 + 0.05, C.maxZ - 0.25 - (G.backDoor.w - 0.05) / 2, 0.08, G.backDoor.w - 0.05, 2.0, WOOD, { appearSignal: SIG.backDoorOpen }));
-  const vat = L0610_PROP_KINDS.WaterVat;
-  gates.push(Block("BackVat", G.backVat.x, G.backVat.z, vat.w, vat.d, vat.h, vat.semantic, { prop: "WaterVat", signal: SIG.backVatMoved }));
-  gates.push(Block("BackVatMoved", G.backVatMoved.x, G.backVatMoved.z, vat.w, vat.d, vat.h, vat.semantic, { prop: "WaterVat", appearSignal: SIG.backVatMoved }));
-
-  // --- 灶屋（西北，门朝东）：空心 + 平顶；灶台、案板 -------------------------------------------
-  Wall(blocks, "KitchenNorth", "x", K.box.minZ, K.box.minX, K.box.maxX, [], K.roofH);
-  Wall(blocks, "KitchenSouth", "x", K.box.maxZ, K.box.minX, K.box.maxX, [], K.roofH);
-  Wall(blocks, "KitchenWest", "z", K.box.minX, K.box.minZ, K.box.maxZ, [], K.roofH);
-  Wall(blocks, "KitchenEast", "z", K.box.maxX, K.box.minZ, K.box.maxZ, [Gap(K.door.z, K.door.w)], K.roofH);
-  Lintel(blocks, "KitchenDoorLintel", "z", K.box.maxX, K.door.z - K.door.w / 2, K.door.z + K.door.w / 2, V.doorTopH, K.roofH, sample);
-  Slab(blocks, "KitchenRoof", K.box, K.roofH, sample);
-  blocks.push(Block("KitchenStove", G.stove.x, G.stove.z, G.stove.w, G.stove.d, G.stove.h, "earthDark"));
-  blocks.push(Block("KitchenBoard", G.board.x, G.board.z, G.board.w, G.board.d, G.board.h, WOOD));
-  blocks.push(Block("KitchenVat", K.box.maxX - 1.0, K.box.minZ + 0.9, vat.w, vat.d, vat.h, vat.semantic, { prop: "WaterVat" }));
-
-  // --- 偏屋（东，门朝西） ------------------------------------------------------------------
-  Wall(blocks, "SideRoomNorth", "x", SR.box.minZ, SR.box.minX, SR.box.maxX, [], SR.roofH);
-  Wall(blocks, "SideRoomSouth", "x", SR.box.maxZ, SR.box.minX, SR.box.maxX, [], SR.roofH);
-  Wall(blocks, "SideRoomWest", "z", SR.box.minX, SR.box.minZ, SR.box.maxZ, [Gap(SR.door.z, SR.door.w)], SR.roofH);
-  Lintel(blocks, "SideRoomDoorLintel", "z", SR.box.minX, SR.door.z - SR.door.w / 2, SR.door.z + SR.door.w / 2, V.doorTopH, SR.roofH, sample);
-  Slab(blocks, "SideRoomRoof", SR.box, SR.roofH, sample);
-
-  // --- 石磨、地瓜窖、柴草垛 ------------------------------------------------------------------
-  const M = G.mill;
-  blocks.push(Block("MillBase", M.x, M.z, M.baseW, M.baseW, M.baseH, BRICK));
-  blocks.push(Block("MillStone", M.x, M.z, M.stoneW, M.stoneW, M.stoneH, BRICK, { y: R2(sample(M.x, M.z) + M.baseH + M.stoneH / 2) }));
-  // 窖沿矮块贴着网格里的坑口外沿：坑心外 1.0 m 那一圈格点是整高（Data_…Space 的 cellar 注），矮块放在 1.2…1.4 m（不随 wallM 走，爬出窖的根 1.1 m 不踩它）
-  const rimOff = CELLAR.floorW / 2 + L0610_CELL_M, rimLen = (rimOff + 0.1) * 2;
-  blocks.push(Block("CellarRimNorth", CELLAR.x, CELLAR.z - rimOff, rimLen, 0.2, CELLAR.rimH, WOOD));
-  blocks.push(Block("CellarRimSouth", CELLAR.x, CELLAR.z + rimOff, rimLen, 0.2, CELLAR.rimH, WOOD));
-  blocks.push(Block("CellarRimWest", CELLAR.x - rimOff, CELLAR.z, 0.2, rimLen, CELLAR.rimH, WOOD));
-  blocks.push(Block("CellarRimEast", CELLAR.x + rimOff, CELLAR.z, 0.2, rimLen, CELLAR.rimH, WOOD));
-  const lid = G.cellarLid;
-  gates.push(Block("CellarLid", lid.x, lid.z, lid.w, lid.d, lid.t, WOOD, { ry: lid.ry, signal: SIG.cellarBlast }));
-  gates.push(Block("CellarLidBlown", G.cellarLidBlown.x, G.cellarLidBlown.z, lid.w, lid.d, lid.t, WOOD, { ry: G.cellarLidBlown.ry, appearSignal: SIG.cellarBlast }));
-  gates.push(Block("CellarSmoke", CELLAR.x, CELLAR.z, 0.8, 0.8, 3.2, ROOF, { y: R2(gy + 1.0), appearSignal: SIG.cellarBlast }));
-  gates.push(Block("CellarSmokeTop", CELLAR.x + 0.3, CELLAR.z - 0.2, 1.3, 1.3, 1.2, ROOF, { y: R2(gy + 3.0), appearSignal: SIG.cellarBlast }));
-  const hs = G.haystack;
-  blocks.push(Block("GengHaystack", hs.x, hs.z, hs.w, hs.d, hs.h, "canvas", { prop: "Haystack" }));
-
-  // --- 邻院（共用西墙在上面）：北、南、西墙（西墙开小门），一座房，水缸、鸡笼 ----------------------
-  const NB = L0610_NEIGHBOR;
-  Wall(blocks, "NeighborNorth", "x", NB.box.minZ, NB.box.minX, NB.box.maxX, []);
-  Wall(blocks, "NeighborSouth", "x", NB.box.maxZ, NB.box.minX, NB.box.maxX, []);
-  House(blocks, "NeighborHouse", NB.house.box, NB.house.h);
-  blocks.push(Block("NeighborVat", NB.vat.x, NB.vat.z, vat.w, vat.d, vat.h, vat.semantic, { prop: "WaterVat" }));
-  const coop = L0610_PROP_KINDS.ChickenCoop;
-  blocks.push(Block("NeighborCoop", NB.coop.x, NB.coop.z, coop.w, coop.d, coop.h, coop.semantic, { prop: "ChickenCoop" }));
-
-  return { blocks, gates };
+/** 半掩的院门：门扇往院里推开约 72°，铰链在洞口一侧；门缝和门洞都能往里瞥（人也挤得过）。inward +1 = 往 −z / −x 那边开。 */
+function AjarGate(out, id, axis, fixed, c, w, inward = 1) {
+  const leafW = w - 0.1, ang = 1.25;
+  if (axis === "x") {
+    const hx = c - w / 2 + 0.05, cx = hx + Math.cos(ang) * leafW / 2, cz = fixed - inward * Math.sin(ang) * leafW / 2;
+    out.push(Block(id, cx, cz, leafW, 0.08, 2.0, WOOD, { gate: true, ry: inward * ang }));
+  } else {
+    const hz = c - w / 2 + 0.05, cz = hz + Math.cos(ang) * leafW / 2, cx = fixed + inward * Math.sin(ang) * leafW / 2;
+    out.push(Block(id, cx, cz, 0.08, leafW, 2.0, WOOD, { gate: true, ry: inward * ang }));
+  }
 }
-
-/** 砸得倒的院门（北边抄后路那条院子链上的三道）：关着的门扇随 signal 消失，倒在地上的门扇随 appearSignal 出现。 */
+/** 砸得倒的院门：关着的门扇随 signal 消失，倒在地上的门扇随 appearSignal 出现。 */
 function BreakableGate(gates, id, axis, fixed, c, w, signal, fallenSide = 1) {
   const leafW = w - 0.1;
   if (axis === "x") {
@@ -421,9 +366,243 @@ function BreakableGate(gates, id, axis, fixed, c, w, signal, fallenSide = 1) {
   }
 }
 
-/** 东街南侧院墙外贴着街的土地庙：三面薄墙 + 顶，开口朝北（白盒占位；标 prop 让街的净空检查放过它）。 */
+/** 一面墙的「轴 / 固定坐标 / 起止」。 */
+function Side(box, wall) {
+  switch (wall) {
+    case "N": return { axis: "x", fixed: box.minZ, from: box.minX, to: box.maxX };
+    case "S": return { axis: "x", fixed: box.maxZ, from: box.minX, to: box.maxX };
+    case "W": return { axis: "z", fixed: box.minX, from: box.minZ, to: box.maxZ };
+    default: return { axis: "z", fixed: box.maxX, from: box.minZ, to: box.maxZ };
+  }
+}
+/** 空心房：四面墙进总表（门 / 窗 / 枪眼 / 豁口留洞），平顶、过梁、窗台另出。 */
+function HollowHouse(plan, out, id, box, h, sample, { door = null, loopholes = [], breach = null, window = null } = {}) {
+  for (const w of ["N", "S", "W", "E"]) { const s = Side(box, w); plan.Add(s.axis, s.fixed, s.from, s.to, h, `${id}_${w}`); }
+  if (door) {
+    const s = Side(box, door.wall);
+    const c = door.wall === "N" || door.wall === "S" ? door.x : door.z, w = door.w;
+    plan.Cut(s.axis, s.fixed, c - w / 2, c + w / 2);
+    Lintel(out, `${id}_DoorLintel`, s.axis, s.fixed, c - w / 2, c + w / 2, door.topH ?? V.doorTopH, h, sample);
+  }
+  const LH = V.loophole;
+  loopholes.forEach((lp, i) => {
+    const s = Side(box, lp.wall ?? "N"), c = lp.x ?? lp.z;
+    plan.Cut(s.axis, s.fixed, c - LH.w / 2, c + LH.w / 2);
+    Sill(out, `${id}_LoopholeSill${i + 1}`, s.axis, s.fixed, c - LH.w / 2, c + LH.w / 2, LH.sillH, { loophole: true });
+    Lintel(out, `${id}_LoopholeLintel${i + 1}`, s.axis, s.fixed, c - LH.w / 2, c + LH.w / 2, LH.topH, h, sample, WALL, { loophole: true });
+  });
+  if (breach) {
+    const s = Side(box, breach.wall ?? "N"), c = breach.x ?? breach.z;
+    plan.Cut(s.axis, s.fixed, c - breach.w / 2, c + breach.w / 2);
+    Sill(out, `${id}_BreachSill`, s.axis, s.fixed, c - breach.w / 2, c + breach.w / 2, breach.sillH, { breach: true });
+    Lintel(out, `${id}_BreachLintel`, s.axis, s.fixed, c - breach.w / 2, c + breach.w / 2, breach.topH ?? V.doorTopH, h, sample, WALL, { breach: true });
+  }
+  if (window) {
+    const s = Side(box, window.wall), c = window.wall === "N" || window.wall === "S" ? window.x : window.z;
+    plan.Cut(s.axis, s.fixed, c - window.w / 2, c + window.w / 2);
+    Sill(out, `${id}_WindowSill`, s.axis, s.fixed, c - window.w / 2, c + window.w / 2, window.sillH, { window: true });
+    Lintel(out, `${id}_WindowLintel`, s.axis, s.fixed, c - window.w / 2, c + window.w / 2, window.topH, h, sample, WALL, { window: true });
+  }
+  Slab(out, `${id}_Roof`, box, h, sample);
+}
+
+/** 一个院子：院墙（矮篱的那几面另出）、院门（洞 + 过梁 + 门扇）、房子。 */
+function YardBlocks(plan, out, gates, y, sample) {
+  const wallH = y.wallH ?? V.wallH;
+  const fences = new Set(y.fences || []);
+  const sides = y.notch ? NotchedSides(y.box, y.notch) : ["N", "S", "W", "E"].map((w) => ({ ...Side(y.box, w), wall: w }));
+  for (const s of sides) {
+    if (fences.has(s.wall)) {
+      const key = `${s.axis}@${R2(s.fixed)}:${R2(s.from)}-${R2(s.to)}`;
+      if (plan.fences.has(key)) continue;   // 两院共一道篱，只画一次
+      plan.fences.add(key);
+      const mid = (s.from + s.to) / 2, len = s.to - s.from;
+      out.push(s.axis === "x" ? Block(`Fence_${y.id}_${s.wall}`, mid, s.fixed, len, 0.3, V.fenceH, EARTH, { fence: true }) : Block(`Fence_${y.id}_${s.wall}`, s.fixed, mid, 0.3, len, V.fenceH, EARTH, { fence: true }));
+      continue;
+    }
+    plan.Add(s.axis, s.fixed, s.from, s.to, wallH, y.wallName ?? null);
+  }
+  const Door = (gate, tag) => {
+    if (!gate) return;
+    const s = Side(y.box, gate.wall), fixed = gate.at ?? s.fixed;   // at：门不在外框那面墙上（缺角的院子）
+    const c = gate.c;
+    plan.Cut(s.axis, fixed, c - gate.w / 2, c + gate.w / 2);
+    Lintel(out, `Gate_${y.id}${tag}_Lintel`, s.axis, fixed, c - gate.w / 2, c + gate.w / 2, V.doorTopH, wallH, sample);
+    if (gate.leaf === "closed") ClosedGate(out, `Gate_${y.id}${tag}_Leaf`, s.axis, fixed, c, gate.w);
+    else if (gate.leaf === "ajar") AjarGate(out, `Gate_${y.id}${tag}_Leaf`, s.axis, fixed, c, gate.w, gate.wall === "S" || gate.wall === "E" ? 1 : -1);
+    // "open" / "breakable" / null：不放门扇（砸得倒的那三道在院子链那里单独出）
+  };
+  if (y.gate) Door(y.gate, "");
+  if (y.backGate) Door(y.backGate, "Back");
+  if (y.open) {   // 场院：南墙中段不要
+    const s = Side(y.box, "S");
+    plan.Cut(s.axis, s.fixed, y.open.fromX, y.open.toX);
+  }
+  y.houses.forEach((h, i) => {
+    const id = h.id ? `House_${h.id}` : `House_${y.id}_${i + 1}`;
+    if (h.hollow) {
+      const lps = (h.loopholes || []).map((lp) => ({ wall: "N", x: lp.x }));
+      HollowHouse(plan, out, id, h.box, h.h, sample, { loopholes: lps, breach: h.breach ? { wall: "N", x: h.breach.x, w: h.breach.w, sillH: h.breach.sillH } : null, door: { wall: "S", x: (h.box.minX + h.box.maxX) / 2, w: V.doorW } });
+    } else if (L0610_COLLAPSED_HOUSES.includes(id)) CollapsedHouse(out, id, h.box, h.h);
+    else House(out, id, h.box, h.h);
+  });
+  if (y.kind === "pond") {
+    const p = y.pond;
+    out.push(Block(`PondWater_${y.id}`, p.x, p.z, p.w - 0.6, p.d - 0.6, p.waterH, "water", { y: R2(POND_FLOOR_Y + p.waterH / 2 - 0.02), solid: false }));
+  }
+}
+/** 被路口切掉一角的院子（WM3 / EM3）：墙沿着 L 形走。notch 在 box 的一个角上。 */
+function NotchedSides(box, notch) {
+  const sides = [];
+  const atEast = Math.abs(notch.maxX - box.maxX) < 0.01, atSouth = Math.abs(notch.maxZ - box.maxZ) < 0.01;
+  // 北、西两面完整（notch 在东南或西南角）
+  sides.push({ axis: "x", fixed: box.minZ, from: box.minX, to: box.maxX, wall: "N" });
+  if (atEast) {
+    sides.push({ axis: "z", fixed: box.minX, from: box.minZ, to: box.maxZ, wall: "W" });
+    sides.push({ axis: "z", fixed: box.maxX, from: box.minZ, to: atSouth ? notch.minZ : box.maxZ, wall: "E" });
+    sides.push({ axis: "x", fixed: notch.minZ, from: notch.minX, to: box.maxX, wall: "S" });     // 缺角的北边 = 路口的北墙
+    sides.push({ axis: "z", fixed: notch.minX, from: notch.minZ, to: box.maxZ, wall: "E" });     // 缺角的西边 = 路口的西墙
+    sides.push({ axis: "x", fixed: box.maxZ, from: box.minX, to: notch.minX, wall: "S" });
+  } else {
+    sides.push({ axis: "z", fixed: box.maxX, from: box.minZ, to: box.maxZ, wall: "E" });
+    sides.push({ axis: "z", fixed: box.minX, from: box.minZ, to: notch.minZ, wall: "W" });
+    sides.push({ axis: "x", fixed: notch.minZ, from: box.minX, to: notch.maxX, wall: "S" });
+    sides.push({ axis: "z", fixed: notch.maxX, from: notch.minZ, to: box.maxZ, wall: "W" });
+    sides.push({ axis: "x", fixed: box.maxZ, from: notch.maxX, to: box.maxX, wall: "S" });
+  }
+  return sides;
+}
+
+/** 老耿家（半面槽院）+ 共用墙 + 随信号体块。 */
+function GengBlocks(plan, blocks, gates, sample) {
+  const C = G.box, BW = G.beiwu, K = G.zaowu, LH = V.loophole;
+  const wallH = G.wallH;
+  // 院墙：北（= 丁字路口南边）、东（院门）、南；西墙 = 与本家院共用（狗洞 / 便门）
+  plan.Add("x", C.minZ, C.minX, C.maxX, wallH, "GengNorthWall");
+  plan.Add("z", C.maxX, C.minZ, C.maxZ, wallH, "GengEastWall");
+  plan.Add("x", C.maxZ, C.minX, C.maxX, wallH, "GengSouthWall");
+  plan.Add("z", C.minX, C.minZ, C.maxZ, wallH, "SharedWall");
+  // 院门（东墙靶南，敞着）
+  const GT = G.gate;
+  plan.Cut("z", C.maxX, GT.z - GT.w / 2, GT.z + GT.w / 2);
+  Lintel(blocks, "GengGateLintel", "z", C.maxX, GT.z - GT.w / 2, GT.z + GT.w / 2, GT.topH, wallH, sample);
+  blocks.push(Block("GengGateLeafOpen", C.maxX - T / 2 - 0.12, GT.z - GT.w / 2 - 0.55, 0.08, GT.w - 0.1, 2.0, WOOD, { gate: true, ry: 0.25 }));   // 门扇推开贴在院里东墙上（胡同里不占地）
+  // 狗洞与便门（共用墙）
+  const DH = G.dogHole, SG = G.sideGate;
+  plan.Cut("z", C.minX, DH.z - DH.w / 2, DH.z + DH.w / 2);
+  Lintel(blocks, "DogHoleLintel", "z", C.minX, DH.z - DH.w / 2, DH.z + DH.w / 2, DH.h, wallH, sample);
+  plan.Cut("z", C.minX, SG.z - SG.w / 2, SG.z + SG.w / 2);
+  Lintel(blocks, "SideGateLintel", "z", C.minX, SG.z - SG.w / 2, SG.z + SG.w / 2, 2.0, wallH, sample);
+  const leafZ0 = SG.z + SG.w / 2 - SG.leafW;
+  gates.push(Block("SideGateLeaf", C.minX + 0.15, leafZ0 + SG.leafW / 2, SG.leafT, SG.leafW, 2.0, WOOD, { signal: SIG.sideGateOpen }));
+  gates.push(Block("SideGateLeafOpen", C.minX + T / 2 + SG.leafW / 2, SG.z + SG.w / 2 + 0.05, SG.leafW, SG.leafT, 2.0, WOOD, { appearSignal: SIG.sideGateOpen }));
+
+  // --- 北屋三间：空心、平顶 + 北女墙；后墙三个枪眼；堂屋门朝南；东间（x ≥ collapseFromX）的后墙与房顶随 BarrageHit 塌下 ---
+  const roomH = BW.roofH, cx = BW.collapseFromX;
+  plan.Add("x", BW.box.minZ, BW.box.minX, cx, roomH, "GengBeiwuNorth");
+  plan.Cut("x", BW.box.minZ, cx, BW.box.maxX);   // 东间那段后墙单独做成随信号块
+  plan.Add("x", BW.box.maxZ, BW.box.minX, BW.box.maxX, roomH, "GengBeiwuSouth");
+  plan.Add("z", BW.box.minX, BW.box.minZ, BW.box.maxZ, roomH, "GengBeiwuWest");
+  plan.Add("z", BW.box.maxX, BW.box.minZ, BW.box.maxZ, roomH, "GengBeiwuEast");
+  const TD = BW.tangwuDoor;
+  plan.Cut("x", BW.box.maxZ, TD.x - TD.w / 2, TD.x + TD.w / 2);
+  Lintel(blocks, "GengTangwuDoorLintel", "x", BW.box.maxZ, TD.x - TD.w / 2, TD.x + TD.w / 2, TD.topH, roomH, sample);
+  for (const lp of BW.loopholes) {
+    const from = lp.x - LH.w / 2, to = lp.x + LH.w / 2;
+    const collapses = lp.x >= cx;
+    const extra = collapses ? { loophole: true, signal: SIG.barrageHit } : { loophole: true };
+    const list = collapses ? gates : blocks;
+    if (!collapses) plan.Cut("x", BW.box.minZ, from, to);
+    Sill(list, `GengLoopholeSill_${lp.who}`, "x", BW.box.minZ, from, to, LH.sillH, extra);
+    Lintel(list, `GengLoopholeLintel_${lp.who}`, "x", BW.box.minZ, from, to, LH.topH, roomH, sample, WALL, extra);
+  }
+  // 东间后墙（枪眼两边的两截）随 BarrageHit 消失
+  const eastLp = BW.loopholes.find((lp) => lp.x >= cx);
+  const eRuns = eastLp ? [[cx, eastLp.x - LH.w / 2], [eastLp.x + LH.w / 2, BW.box.maxX]] : [[cx, BW.box.maxX]];
+  eRuns.forEach(([a, b], i) => gates.push(Block(`GengBeiwuNorthEast_${i + 1}`, (a + b) / 2, BW.box.minZ, b - a, T, roomH, WALL, { signal: SIG.barrageHit })));
+  Slab(blocks, "GengBeiwuRoofWest", { minX: BW.box.minX, maxX: cx, minZ: BW.box.minZ, maxZ: BW.box.maxZ }, roomH, sample);
+  Slab(gates, "GengBeiwuRoofEast", { minX: cx, maxX: BW.box.maxX, minZ: BW.box.minZ, maxZ: BW.box.maxZ }, roomH, sample, 0.2, { signal: SIG.barrageHit });
+  const roofTop = sample((BW.box.minX + BW.box.maxX) / 2, (BW.box.minZ + BW.box.maxZ) / 2) + roomH;
+  blocks.push(Block("GengRoofParapetNorth", (BW.box.minX + cx) / 2, BW.box.minZ, cx - BW.box.minX, T, BW.parapetH, WALL, { y: R2(roofTop + BW.parapetH / 2) }));
+  gates.push(Block("GengRoofParapetNorthEast", (cx + BW.box.maxX) / 2, BW.box.minZ, BW.box.maxX - cx, T, BW.parapetH, WALL, { y: R2(roofTop + BW.parapetH / 2), signal: SIG.barrageHit }));
+  const CR = G.collapseRubble;
+  gates.push(Block("GengCollapseRubble", CR.x, CR.z, CR.w, CR.d, CR.h, EARTH, { ry: CR.ry, prop: "Rubble", appearSignal: SIG.barrageHit }));
+  // 堂屋枪眼上的十一年式（机枪组被打掉前一直在；10-2 起出现在石碾后头）；石碾旁随炮轰出现的一堆新瓦砾
+  const mgLp = BW.loopholes.find((lp) => lp.who === "mg");
+  gates.push(Block("GengLoopholeMg", mgLp.x, BW.box.minZ, 0.12, 0.9, 0.14, "metal", { y: R2(sample(mgLp.x, BW.box.minZ) + LH.sillH + 0.07), signal: SIG.mgSilenced }));
+  const RL = ES.roller;
+  gates.push(Block("RollerMg", RL.x - 1.0, RL.z + 0.6, 0.9, 0.12, 0.14, "metal", { appearSignal: SIG.mgSilenced }));
+  gates.push(Block("RollerRubble", 111.0, 461.6, 2.0, 1.6, 1.0, EARTH, { ry: -0.4, prop: "Rubble", appearSignal: SIG.barrageHit }));
+
+  // --- 灶屋两间（西屋，门朝东）：空心 + 平顶；灶台、案板；门口的水缸 ---
+  HollowHouse(plan, blocks, "GengZaowu", K.box, K.roofH, sample, { door: { wall: "E", z: K.door.z, w: K.door.w } });
+  blocks.push(Block("KitchenStove", G.stove.x, G.stove.z, G.stove.w, G.stove.d, G.stove.h, EARTH));
+  blocks.push(Block("KitchenBoard", G.board.x, G.board.z, G.board.w, G.board.d, G.board.h, WOOD));
+  const vat = L0610_PROP_KINDS.WaterVat;
+  blocks.push(Block("GengVat", G.vat.x, G.vat.z, vat.w, vat.d, vat.h, vat.semantic, { prop: "WaterVat" }));
+  const hs = G.haystack;
+  blocks.push(Block("GengHaystack", hs.x, hs.z, hs.w, hs.d, hs.h, "canvas", { prop: "Haystack" }));
+}
+
+/** 街坊家（四合院）：北屋空心、西配房空心（塌掉的西北角 / 窗洞 / 门 / 大缸）、东配房、南屋、半掩的院门、地瓜窖、石磨。 */
+function JiefangBlocks(plan, blocks, gates, sample) {
+  const C = J.box;
+  for (const w of ["N", "S", "W", "E"]) { const s = Side(C, w); plan.Add(s.axis, s.fixed, s.from, s.to, V.wallH, `Jiefang${w}`); }
+  const GT = J.gate;
+  plan.Cut("x", C.maxZ, GT.x - GT.w / 2, GT.x + GT.w / 2);
+  Lintel(blocks, "JiefangGateLintel", "x", C.maxZ, GT.x - GT.w / 2, GT.x + GT.w / 2, GT.topH, V.wallH, sample);
+  AjarGate(blocks, "JiefangGateLeaf", "x", C.maxZ, GT.x, GT.w, 1);
+  // 北屋（空心，堂屋门朝南）
+  HollowHouse(plan, blocks, "JiefangBeiwu", J.beiwu.box, J.beiwu.roofH, sample, { door: { wall: "S", x: J.beiwu.door.x, w: J.beiwu.door.w } });
+  // 西配房：西墙 = 院子西墙；西北角塌了（西墙 z 449.25…450.75、北墙 x 64.25…65.6 没了），地上一摊矮瓦砾；东墙窗洞 + 门
+  const WW = J.westWing, BR = WW.breach;
+  HollowHouse(plan, blocks, "JiefangWestWing", WW.box, WW.roofH, sample, {
+    door: { wall: "E", z: WW.door.z, w: WW.door.w },
+    window: { wall: "E", z: WW.window.z, w: WW.window.w, sillH: WW.window.sillH, topH: WW.window.topH },
+  });
+  plan.Cut("z", WW.box.minX, BR.z, BR.zTo);
+  plan.Cut("x", WW.box.minZ, WW.box.minX, BR.xTo);
+  blocks.push(Block("JiefangBreachRubble", WW.box.minX + 0.55, BR.z + 0.6, 1.5, 1.6, BR.rubbleH, EARTH, { ry: 0.5, prop: "Rubble", breach: true }));
+  blocks.push(Block("JiefangBreachRubble2", WW.box.minX - 0.5, BR.zTo + 0.2, 1.0, 0.9, 0.35, EARTH, { ry: -0.3, prop: "Rubble", breach: true }));
+  const vat = L0610_PROP_KINDS.WaterVat;
+  blocks.push(Block("JiefangWingVat", WW.vat.x, WW.vat.z, 0.9, 0.9, 1.0, vat.semantic, { prop: "WaterVat" }));
+  House(blocks, "JiefangEastWing", J.eastWing.box, J.eastWing.roofH);
+  House(blocks, "JiefangNanwu", J.nanwu.box, J.nanwu.roofH);
+  // 地瓜窖：窖沿矮块贴着坑口外沿（坑心外 1.2…1.4 m）、掀开的盖板；炸了以后盖板飞开、窖口冒烟
+  const rimOff = CELLAR.floorW / 2 + L0610_CELL_M, rimLen = (rimOff + 0.1) * 2;
+  blocks.push(Block("CellarRimNorth", CELLAR.x, CELLAR.z - rimOff, rimLen, 0.2, CELLAR.rimH, WOOD));
+  blocks.push(Block("CellarRimSouth", CELLAR.x, CELLAR.z + rimOff, rimLen, 0.2, CELLAR.rimH, WOOD));
+  blocks.push(Block("CellarRimWest", CELLAR.x - rimOff, CELLAR.z, 0.2, rimLen, CELLAR.rimH, WOOD));
+  blocks.push(Block("CellarRimEast", CELLAR.x + rimOff, CELLAR.z, 0.2, rimLen, CELLAR.rimH, WOOD));
+  const lid = J.cellarLid, gy = sample(CELLAR.x + 3, CELLAR.z);
+  gates.push(Block("CellarLid", lid.x, lid.z, lid.w, lid.d, lid.t, WOOD, { ry: lid.ry, signal: SIG.cellarBlast }));
+  gates.push(Block("CellarLidBlown", J.cellarLidBlown.x, J.cellarLidBlown.z, lid.w, lid.d, lid.t, WOOD, { ry: J.cellarLidBlown.ry, appearSignal: SIG.cellarBlast }));
+  gates.push(Block("CellarSmoke", CELLAR.x, CELLAR.z, 0.8, 0.8, 3.2, ROOF, { y: R2(gy + 1.0), appearSignal: SIG.cellarBlast }));
+  gates.push(Block("CellarSmokeTop", CELLAR.x + 0.3, CELLAR.z - 0.2, 1.3, 1.3, 1.2, ROOF, { y: R2(gy + 3.0), appearSignal: SIG.cellarBlast }));
+  const M = J.mill;
+  blocks.push(Block("MillBase", M.x, M.z, M.baseW, M.baseW, M.baseH, BRICK));
+  blocks.push(Block("MillStone", M.x, M.z, M.stoneW, M.stoneW, M.stoneH, BRICK, { y: R2(sample(M.x, M.z) + M.baseH + M.stoneH / 2) }));
+}
+
+/** 本家院（四合院，共用墙在老耿家那边画）：院门敞着在南墙西南角。 */
+function BenjiaBlocks(plan, blocks, sample) {
+  const C = B.box;
+  for (const w of ["N", "S", "W"]) { const s = Side(C, w); plan.Add(s.axis, s.fixed, s.from, s.to, V.wallH, `Benjia${w}`); }
+  const GT = B.gate;
+  plan.Cut("x", C.maxZ, GT.x - GT.w / 2, GT.x + GT.w / 2);
+  Lintel(blocks, "BenjiaGateLintel", "x", C.maxZ, GT.x - GT.w / 2, GT.x + GT.w / 2, GT.topH, V.wallH, sample);
+  House(blocks, "BenjiaBeiwu", B.beiwu.box, B.beiwu.roofH);
+  House(blocks, "BenjiaWestWing", B.westWing.box, B.westWing.roofH);
+  House(blocks, "BenjiaEastWing", B.eastWing.box, B.eastWing.roofH);
+  House(blocks, "BenjiaNanwu", B.nanwu.box, B.nanwu.roofH);
+  const vat = L0610_PROP_KINDS.WaterVat, coop = L0610_PROP_KINDS.ChickenCoop, NB = { vat: { x: 89.4, z: 485.2 }, coop: { x: 77.2, z: 488.6 } };
+  blocks.push(Block("BenjiaVat", NB.vat.x, NB.vat.z, vat.w, vat.d, vat.h, vat.semantic, { prop: "WaterVat" }));
+  blocks.push(Block("BenjiaCoop", NB.coop.x, NB.coop.z, coop.w, coop.d, coop.h, coop.semantic, { prop: "ChickenCoop" }));
+}
+
+/** 东街南侧院墙外贴着街的土地庙：三面薄墙 + 顶，开口朝北。 */
 function Shrine(out, sample) {
-  const S = L0610_EAST_YARDS.shrine, t = S.wallT, g = sample(S.x, S.z);
+  const S = ES.shrine, t = S.wallT, g = sample(S.x, S.z);
   const extra = { prop: "Shrine" };
   out.push(Block("ShrineBack", S.x, S.z + S.d / 2 - t / 2, S.w, t, S.h, BRICK, extra));
   out.push(Block("ShrineWest", S.x - S.w / 2 + t / 2, S.z, t, S.d, S.h, BRICK, extra));
@@ -431,130 +610,131 @@ function Shrine(out, sample) {
   out.push(Block("ShrineRoof", S.x, S.z, S.w + 0.2, S.d + 0.2, t, ROOF, { ...extra, y: R2(g + S.h - t / 2 + 0.02) }));
 }
 
-/** 村里其余的院子、街墙、房子、院门（含北边院子链上随 NorthYardGatesBroken 的三道门）。 */
-function VillageBlocks(sample) {
-  const blocks = [], gates = [];
-  const Y = L0610_STREET_YARDS, E = L0610_EAST_YARDS, NB = L0610_NEIGHBOR, C = G.compound, PK = ST.pocket.box, NC = E.northChain;
-  const gw = V.gateW;
+/** 瓦砾堆：几块错落的土坯块（2 高块 + 1 矮块），整体 ≥ 1.6 高。 */
+function RubbleBlocks(out) {
+  for (const r of L0610_RUBBLE) {
+    const c = Math.cos(r.ry), s = Math.sin(r.ry);
+    const Off = (lx, lz) => ({ x: r.x + lx * c + lz * s, z: r.z - lx * s + lz * c });
+    const a = Off(-r.w * 0.22, 0.1), b = Off(r.w * 0.24, -0.15), d = Off(0, r.d * 0.3);
+    out.push(Block(`${r.id}_1`, a.x, a.z, r.w * 0.56, r.d * 0.9, r.h, EARTH, { ry: r.ry + 0.08, prop: "Rubble", rubble: true }));
+    out.push(Block(`${r.id}_2`, b.x, b.z, r.w * 0.56, r.d * 0.85, r.h - 0.15, EARTH, { ry: r.ry - 0.1, prop: "Rubble", rubble: true }));
+    out.push(Block(`${r.id}_3`, d.x, d.z, r.w * 0.9, r.d * 0.5, 0.6, EARTH, { ry: r.ry + 0.25, prop: "Rubble", rubble: true }));
+  }
+}
 
-  // --- 主街两侧的街墙（带院门；巷子不再在主街上开口） ---------------------------------------------
-  const W = Y.westOfMain, EM = Y.eastOfMain;
-  Wall(blocks, "MainWestWall", "z", W.box.maxX, ST.main.fromZ, Y.squareNorthWallZ, W.gatesZ.map((z) => Gap(z, gw)));
-  Wall(blocks, "MainEastWall", "z", EM.box.minX, ST.main.fromZ, PK.minZ, EM.gatesZ.map((z) => Gap(z, gw)));   // 到北角的北墙为止
-  ClosedGate(blocks, "MainWestGate2", "z", W.box.maxX, W.gatesZ[1], gw);
-  ClosedGate(blocks, "MainEastGate1", "z", EM.box.minX, EM.gatesZ[0], gw);
-  // 小空地北角（主街东侧最南那院收掉的西南角）：北墙（开一道院门，10-4 抄后路的日军从这里钻出来）、东墙；再往东是小空地北边原来那截墙
-  Wall(blocks, "PocketNorthWall", "x", PK.minZ, PK.minX, PK.maxX, [Gap(NC.pocketGate.x, NC.pocketGate.w)]);
-  Lintel(blocks, "PocketGateLintel", "x", PK.minZ, NC.pocketGate.x - NC.pocketGate.w / 2, NC.pocketGate.x + NC.pocketGate.w / 2, V.doorTopH, V.wallH, sample);
-  BreakableGate(gates, "PocketGateLeaf", "x", PK.minZ, NC.pocketGate.x, NC.pocketGate.w, SIG.northYardGatesBroken, 1);
-  Wall(blocks, "PocketEastWall", "z", PK.maxX, PK.minZ, Y.squareNorthWallZ, []);
-  Wall(blocks, "SquareNorthWall", "x", Y.squareNorthWallZ, PK.maxX, C.maxX, []);
-  // 主街西边院子：南墙（小空地西头 / 夹道的北边）、隔墙；村北边（夹道两边各一截，夹道口留着）
-  Wall(blocks, "WestYardsSouth", "x", W.box.maxZ, W.box.minX, W.box.maxX, []);
-  for (const z of W.splitsZ) Wall(blocks, `WestYardsSplit${z}`, "x", z, W.box.minX, W.box.maxX, []);
-  Wall(blocks, "WestYardsNorthEdge", "x", ST.main.fromZ, Y.northOfAlleyWest.box.minX, Y.northOfAlleyEast.box.maxX, [Gap(ST.alleyNorth.x, ST.alleyNorth.halfW * 2 + T)]);
-  // 主街东边院子：东墙（到东街北侧院子的北墙为止，再往南是那片院子的西墙）、隔墙、村北边
-  Wall(blocks, "EastYardsEast", "z", EM.box.maxX, EM.box.minZ, E.north.box.minZ, []);
-  for (const z of EM.splitsZ) Wall(blocks, `EastYardsSplit${z}`, "x", z, EM.box.minX, EM.box.maxX, []);
-  // 第五版：最北那院北墙上一道朝路沟的后门（x 110，没门扇：人跑了没关），08-1 两个村民从这里直接下到沟东半截
-  Wall(blocks, "EastYardsNorthEdge", "x", EM.box.minZ, EM.box.minX, EM.box.maxX, [Gap(EM.ditchBackGateX, gw)]);
-  Lintel(blocks, "DitchBackGateLintel", "x", EM.box.minZ, EM.ditchBackGateX - gw / 2, EM.ditchBackGateX + gw / 2, V.doorTopH, V.wallH, sample);
+/** 窄胡同：塌墙（随 LaneWallCollapse）、柴垛、绕路院子的落点由院子表盖；这里出塌墙与柴垛。 */
+function SouthLaneBlocks(plan, blocks, gates) {
+  const CL = SLN.collapse;
+  plan.Cut("z", CL.wallX, CL.fromZ, CL.toZ);
+  gates.push(Block("LaneWallStanding", CL.wallX, (CL.fromZ + CL.toZ) / 2, T, CL.toZ - CL.fromZ, V.wallH, WALL, { signal: SIG.laneWallCollapse }));
+  gates.push(Block("LaneWallFallen", CL.x, CL.z, CL.slab.w, CL.slab.d, CL.slab.t, WALL, { ry: CL.slab.ry, appearSignal: SIG.laneWallCollapse }));
+  gates.push(Block("LaneWallRubble", CL.x - 0.25, CL.z - 0.2, CL.rubble.w, CL.rubble.d, CL.rubble.h, EARTH, { ry: CL.rubble.ry, prop: "Rubble", rubble: true, appearSignal: SIG.laneWallCollapse }));
+  gates.push(Block("LaneWallRubble2", CL.x + 0.4, CL.z + 0.9, 1.2, 1.1, 1.1, EARTH, { ry: -0.5, prop: "Rubble", rubble: true, appearSignal: SIG.laneWallCollapse }));
+  const P = SLN.climb.pile;
+  blocks.push(Block("ClimbPile", P.x, P.z, P.w, P.d, P.h, "canvas", { prop: "Haystack", climb: true }));
+}
 
-  // --- 巷子：北头的夹道（两道墙，北头开在路沟南沿上）、东西那截（主街那头封死）、南北那截的西墙、尽头；
-  //     西边院子的西墙 = x 60 那道（从巷子到邻院南墙，开邻院小门，不放门扇） ---
-  const AN = ST.alleyNorth, AW = ST.alleyWest, AS = ST.alleySouth, WA = Y.westOfAlley;
-  const alleyNorthWallZ = AW.z - AW.halfW - T / 2, alleySouthWallZ = AW.z + AW.halfW + T / 2;
-  Wall(blocks, "AlleyPassageWest", "z", AN.x - AN.halfW - T / 2, ST.main.fromZ, alleyNorthWallZ + T / 2, []);
-  Wall(blocks, "AlleyPassageEast", "z", AN.x + AN.halfW + T / 2, ST.main.fromZ, alleySouthWallZ + T / 2, []);
-  Wall(blocks, "AlleyNorthWall", "x", alleyNorthWallZ, WA.box.maxX, AN.x - AN.halfW, []);
-  Wall(blocks, "AlleySouthWall", "x", alleySouthWallZ, W.box.minX, W.box.maxX, []);   // 一直到主街西墙：巷子不通主街
-  Wall(blocks, "AlleyWestWall", "z", WA.box.maxX, ST.main.fromZ, AS.toZ + T / 2, []);
-  Wall(blocks, "AlleyEndWall", "x", AS.toZ, WA.box.maxX - T / 2, W.box.minX + T / 2, []);
-  // 第五版：主街西边北头那院（z 400…430）西墙上一道朝巷子南北那截的后门（z 425，没门扇），08-1 一个村民从这里钻巷子逃到沟西头
-  Wall(blocks, "WestYardsWest", "z", W.box.minX, alleySouthWallZ, NB.box.maxZ, [Gap(W.alleyBackGateZ, gw), Gap(NB.westDoor.z, NB.westDoor.w)]);
-  Lintel(blocks, "AlleyBackGateLintel", "z", W.box.minX, W.alleyBackGateZ - gw / 2, W.alleyBackGateZ + gw / 2, V.doorTopH, V.wallH, sample);
-  Lintel(blocks, "NeighborDoorLintel", "z", W.box.minX, NB.westDoor.z - NB.westDoor.w / 2, NB.westDoor.z + NB.westDoor.w / 2, V.doorTopH, V.wallH, sample);
-  // 巷子西边的院子：村西边、北边、隔墙
-  Wall(blocks, "VillageWestEdge", "z", WA.box.minX, ST.main.fromZ, WA.box.maxZ, []);
-  Wall(blocks, "WestAlleyYardsNorth", "x", ST.main.fromZ, WA.box.minX, WA.box.maxX, []);
-  for (const z of WA.splitsZ) Wall(blocks, `WestAlleyYardsSplit${z}`, "x", z, WA.box.minX, WA.box.maxX, []);
-  Wall(blocks, "WestAlleyYardsSouth", "x", WA.box.maxZ, WA.box.minX, WA.box.maxX - T / 2, []);
-
-  // --- 东街：两侧街墙（带院门；北侧第二个院是场院，南墙中段不要）、两侧院子的外墙与隔墙、院子链上的门 ---------------
-  const EN = E.north, ES = E.south, FY = E.farmyard;
-  const northWallZ = ST.east.z - ST.east.halfW - T / 2, southWallZ = ST.east.z + ST.east.halfW + T / 2;
-  Wall(blocks, "EastStreetNorthWall", "x", northWallZ, EN.box.minX, EN.box.maxX, [...EN.gatesX.map((x) => Gap(x, gw)), { from: FY.openFromX, to: FY.openToX }]);
-  Wall(blocks, "EastStreetSouthWall", "x", southWallZ, ES.box.minX, ES.box.maxX, ES.gatesX.map((x) => Gap(x, gw)));
-  ClosedGate(blocks, "EastNorthGate3", "x", northWallZ, EN.gatesX[2], gw);
-  ClosedGate(blocks, "EastSouthGate1", "x", southWallZ, ES.gatesX[0], gw);
-  ClosedGate(blocks, "EastSouthGate3", "x", southWallZ, ES.gatesX[2], gw);
-  Wall(blocks, "EastNorthYardsNorth", "x", EN.box.minZ, EN.box.minX, EN.box.maxX, []);
-  // 北侧第一个院的西墙 = 主街东侧最南那院的东墙：开一道门（院子链第二道）
-  Wall(blocks, "EastNorthYardsWest", "z", EN.box.minX, EN.box.minZ, ST.east.z - ST.east.halfW, [Gap(NC.yard1Door.z, NC.yard1Door.w)]);
-  Lintel(blocks, "Yard1DoorLintel", "z", EN.box.minX, NC.yard1Door.z - NC.yard1Door.w / 2, NC.yard1Door.z + NC.yard1Door.w / 2, V.doorTopH, V.wallH, sample);
-  BreakableGate(gates, "Yard1GateLeaf", "z", EN.box.minX, NC.yard1Door.z, NC.yard1Door.w, SIG.northYardGatesBroken, -1);
-  Wall(blocks, "EastNorthYardsEast", "z", EN.box.maxX, EN.box.minZ, ST.east.z - ST.east.halfW, []);
-  for (const x of EN.splitsX) {
-    const isFarmyardWest = x === FY.minX;   // 场院西隔墙：开一道门（院子链第一道）
-    Wall(blocks, `EastNorthSplit${x}`, "z", x, EN.box.minZ, ST.east.z - ST.east.halfW - T, isFarmyardWest ? [Gap(NC.farmyardDoor.z, NC.farmyardDoor.w)] : []);
-    if (isFarmyardWest) {
-      Lintel(blocks, "FarmyardDoorLintel", "z", x, NC.farmyardDoor.z - NC.farmyardDoor.w / 2, NC.farmyardDoor.z + NC.farmyardDoor.w / 2, V.doorTopH, V.wallH, sample);
-      BreakableGate(gates, "FarmyardGateLeaf", "z", x, NC.farmyardDoor.z, NC.farmyardDoor.w, SIG.northYardGatesBroken, -1);
+/** 一条胡同的净空范围（轴对齐盒子）。 */
+function RunBox(r) {
+  return r.axis === "z" ? { minX: r.c - r.halfW, maxX: r.c + r.halfW, minZ: r.from, maxZ: r.to } : { minX: r.from, maxX: r.to, minZ: r.c - r.halfW, maxZ: r.c + r.halfW };
+}
+/**
+ * 胡同两边的墙与死胡同尽头的墙：每条胡同沿两侧各加一道墙（院墙在同一条线上的合并掉），
+ * 横过来的胡同（轴不同的）与丁字路口经过的那一截减掉；caps 里标的那头加一道横墙封死。
+ */
+function LaneWalls(plan) {
+  const runs = STREET_RUNS, boxes = [ST.square.box, ST.pocket.box];
+  for (const r of runs) {
+    const along = r.axis === "z" ? ["minZ", "maxZ"] : ["minX", "maxX"], across = r.axis === "z" ? ["minX", "maxX"] : ["minZ", "maxZ"];
+    for (const side of [-1, 1]) {
+      const fixed = r.c + side * (r.halfW + T / 2);
+      plan.Add(r.axis, fixed, r.from, r.to, V.wallH);
+      for (const q of runs) {
+        if (q === r || q.axis === r.axis) continue;
+        const b = RunBox(q), lo = b[across[0]], hi = b[across[1]];
+        const inside = fixed > lo + 0.1 && fixed < hi - 0.1;                                    // 横穿过去
+        const touches = Math.abs(fixed - lo) <= 0.3 || Math.abs(fixed - hi) <= 0.3;             // 顶在这道墙上
+        const outward = side < 0 ? lo < fixed - 0.5 : hi > fixed + 0.5;                          // 并且往离开这条胡同的那边延伸（丁字口），不是在这条胡同里到头
+        if (inside || (touches && outward)) plan.Cut(r.axis, fixed, Math.max(b[along[0]], r.from), Math.min(b[along[1]], r.to));
+      }
+      for (const b of boxes) if (fixed > b[across[0]] + 0.1 && fixed < b[across[1]] - 0.1) plan.Cut(r.axis, fixed, Math.max(b[along[0]], r.from), Math.min(b[along[1]], r.to));
+    }
+    for (const end of r.caps || []) {
+      const at = end === "from" ? r.from : r.to;
+      plan.Add(r.axis === "z" ? "x" : "z", at, r.c - r.halfW - T / 2, r.c + r.halfW + T / 2, V.wallH);
     }
   }
-  Wall(blocks, "EastSouthYardsSouth", "x", ES.box.maxZ, ES.box.minX, ES.box.maxX, []);
-  Wall(blocks, "EastSouthYardsEast", "z", ES.box.maxX, ST.east.z + ST.east.halfW, ES.box.maxZ, []);
-  for (const x of ES.splitsX) Wall(blocks, `EastSouthSplit${x}`, "z", x, ST.east.z + ST.east.halfW + T, ES.box.maxZ, []);
-  Shrine(blocks, sample);
+}
 
-  // --- 后门外的小路：两边的墙（各开一个口）、南边两片院子的外墙、村南边 ----------------------------
-  const BL = ST.backLane, SWY = Y.southWest, SEY = Y.southEast;
-  Wall(blocks, "BackLaneWestWall", "z", BL.x - BL.halfW - T / 2, BL.fromZ + T / 2, Y.villageSouthZ, [Gap(520.75, gw)]);
-  Wall(blocks, "BackLaneEastWall", "z", BL.x + BL.halfW + T / 2, BL.fromZ, Y.villageSouthZ, [Gap(530.75, gw)]);
-  Wall(blocks, "SouthWestYardWest", "z", SWY.box.minX, NB.box.maxZ, Y.villageSouthZ, []);
-  Wall(blocks, "SouthWestYardSouth", "x", Y.villageSouthZ, SWY.box.minX, SWY.box.maxX, []);
-  Wall(blocks, "SouthEastYardEast", "z", SEY.box.maxX, ES.box.maxZ, Y.villageSouthZ, []);
-  Wall(blocks, "SouthEastYardSouth", "x", Y.villageSouthZ, SEY.box.minX, SEY.box.maxX, []);
-
-  // --- 第五版补满的三块院子：只画不和现成墙重合的那几面 + 隔墙；朝外（河汊子 / 麦地 / 东北进庄的道）不开门，朝里也不开（填实用的） ----
-  //     西南角 (40…60, 492…545)：北墙 = 巷子尽头 z 492（WestAlleyYardsSouth + AlleyEndWall）、东墙 = x 60（WestYardsWest / SouthWestYardWest）现成；画西墙、南墙、隔墙
-  //     东北角 (118.25…232, 388…440)：西墙 = EastYardsEast、南墙 = EastNorthYardsNorth 现成；画北墙（z 388）、东墙（x 232）、隔墙
-  //     东南角 (135…232, 490…545)：西墙 = SouthEastYardEast、北墙 = EastSouthYardsSouth 现成；画东墙（x 232）、南墙、隔墙
-  const FILL = L0610_FILL_YARDS;
-  Wall(blocks, "FillSWWest", "z", FILL.southWest.box.minX, FILL.southWest.box.minZ, Y.villageSouthZ, []);
-  Wall(blocks, "FillSWSouth", "x", Y.villageSouthZ, FILL.southWest.box.minX, FILL.southWest.box.maxX - T / 2, []);
-  for (const z of FILL.southWest.splitsZ) Wall(blocks, `FillSWSplit${z}`, "x", z, FILL.southWest.box.minX + T / 2, FILL.southWest.box.maxX - T / 2, []);
-  Wall(blocks, "FillNENorth", "x", FILL.northEast.box.minZ, FILL.northEast.box.minX + T / 2, FILL.northEast.box.maxX, []);
-  Wall(blocks, "FillNEEast", "z", FILL.northEast.box.maxX, FILL.northEast.box.minZ + T / 2, FILL.northEast.box.maxZ - T / 2, []);
-  for (const x of FILL.northEast.splitsX) Wall(blocks, `FillNESplit${x}`, "z", x, FILL.northEast.box.minZ + T / 2, FILL.northEast.box.maxZ - T / 2, []);
-  Wall(blocks, "FillSEEast", "z", FILL.southEast.box.maxX, FILL.southEast.box.minZ, Y.villageSouthZ, []);
-  Wall(blocks, "FillSESouth", "x", Y.villageSouthZ, FILL.southEast.box.minX + T / 2, FILL.southEast.box.maxX - T / 2, []);
-  for (const x of FILL.southEast.splitsX) Wall(blocks, `FillSESplit${x}`, "z", x, FILL.southEast.box.minZ + T / 2, Y.villageSouthZ - T / 2, []);
-
-  // --- 东北进庄的道边两棵树（foliage 细块：编辑器种树模型，同 0105 的枯树） -----------------------------------
-  (L0610_EAST_ROAD.trees || []).forEach((t, i) => blocks.push(Block(`RoadTree_${i + 1}`, t.x, t.z, 0.42, 0.42, t.h, "foliage")));
-
-  // --- 房子（实心），两座塌了一角；场院（EN2）不盖房；夹道把原来的 NA1 拆成两座；第五版补的院子每院一座（FSW / FNE / FSE） --------
-  const HOUSES = {
-    House_WM1: { minX: 66, maxX: 80, minZ: 402, maxZ: 408 }, House_WM2: { minX: 66, maxX: 80, minZ: 432, maxZ: 438 },
-    House_EM1: { minX: 107, maxX: 117, minZ: 390, maxZ: 400 }, House_EM2: { minX: 107, maxX: 117, minZ: 414, maxZ: 424 }, House_EM3: { minX: 104, maxX: 112, minZ: 437, maxZ: 443 },
-    House_NA1: { minX: 63, maxX: 77, minZ: 386, maxZ: 392 }, House_NA2: { minX: 83, maxX: 95, minZ: 386, maxZ: 392 },
-    House_WA1: { minX: 42, maxX: 54, minZ: 402, maxZ: 410 }, House_WA2: { minX: 42, maxX: 54, minZ: 436, maxZ: 444 }, House_WA3: { minX: 42, maxX: 54, minZ: 468, maxZ: 476 },
-    House_EN1: { minX: 124, maxX: 146, minZ: 441, maxZ: 447 },
-    House_EN3: { minX: 188, maxX: 208, minZ: 441, maxZ: 447 }, House_EN4: { minX: 218, maxX: 230, minZ: 441, maxZ: 447 },
-    House_ES1: { minX: 124, maxX: 142, minZ: 483, maxZ: 489 }, House_ES2: { minX: 152, maxX: 172, minZ: 483, maxZ: 489 },
-    House_ES3: { minX: 184, maxX: 204, minZ: 483, maxZ: 489 }, House_ES4: { minX: 216, maxX: 230, minZ: 483, maxZ: 489 },
-    House_SW1: { minX: 70, maxX: 90, minZ: 520, maxZ: 526 }, House_SE1: { minX: 104, maxX: 124, minZ: 520, maxZ: 526 },
-    // 第五版补的院子：西南角两院（房靠西墙）、东北角四院（房靠北墙，z 392…398：在街口 / 凹路口看东北道那一扇视线的南边）、东南角三院（房靠南）
-    House_FSW1: { minX: 42, maxX: 54, minZ: 500, maxZ: 507 }, House_FSW2: { minX: 42, maxX: 54, minZ: 524, maxZ: 531 },
-    House_FNE1: { minX: 124, maxX: 144, minZ: 392, maxZ: 398 }, House_FNE2: { minX: 156, maxX: 176, minZ: 392, maxZ: 398 },
-    House_FNE3: { minX: 188, maxX: 208, minZ: 392, maxZ: 398 }, House_FNE4: { minX: 218, maxX: 228, minZ: 392, maxZ: 398 },
-    House_FSE1: { minX: 141, maxX: 163, minZ: 520, maxZ: 526 }, House_FSE2: { minX: 176, maxX: 196, minZ: 520, maxZ: 526 }, House_FSE3: { minX: 208, maxX: 226, minZ: 520, maxZ: 526 },
-  };
-  for (const [id, box] of Object.entries(HOUSES)) {
-    if (L0610_COLLAPSED_HOUSES.includes(id)) CollapsedHouse(blocks, id, box);
-    else House(blocks, id, box);
+/** 倒在胡同里的一截墙（静态）：墙上缺一截，墙板横躺在胡同里（0.25 高，跨得过），墙根一堆土（1.2 高，占半边胡同）。 */
+function FallenWallBlocks(plan, out) {
+  for (const f of L0610_FALLEN_WALLS) {
+    const len = f.to - f.from, mid = (f.from + f.to) / 2;
+    plan.Cut(f.axis, f.fixed, f.from, f.to);
+    const off1 = f.side * (T / 2 + 1.0), off2 = f.side * (T / 2 + 0.45);
+    if (f.axis === "x") {
+      out.push(Block(`${f.id}_Slab`, mid + 0.2, f.fixed + off1, len, 2.0, 0.25, WALL, { ry: 0.1, prop: "Rubble", fallen: true }));
+      out.push(Block(`${f.id}_Heap`, mid - 0.4, f.fixed + off2, len * 0.7, 0.9, 1.2, EARTH, { ry: -0.2, prop: "Rubble", rubble: true }));
+      out.push(Block(`${f.id}_Stub`, f.from - 0.3, f.fixed, 0.6, T, 1.1, WALL, { fallen: true }));
+    } else {
+      out.push(Block(`${f.id}_Slab`, f.fixed + off1, mid + 0.2, 2.0, len, 0.25, WALL, { ry: 0.1, prop: "Rubble", fallen: true }));
+      out.push(Block(`${f.id}_Heap`, f.fixed + off2, mid - 0.4, 0.9, len * 0.7, 1.2, EARTH, { ry: -0.2, prop: "Rubble", rubble: true }));
+      out.push(Block(`${f.id}_Stub`, f.fixed, f.from - 0.3, T, 0.6, 1.1, WALL, { fallen: true }));
+    }
   }
+}
+
+/** 全村的墙、房、门、篱、院子链上的三道门、瓦砾、树、摆件、石碾、土地庙、麦秸垛。 */
+function VillageBlocks(sample) {
+  const blocks = [], gates = [];
+  const plan = new WallPlan();
+  GengBlocks(plan, blocks, gates, sample);
+  JiefangBlocks(plan, blocks, gates, sample);
+  BenjiaBlocks(plan, blocks, sample);
+  for (const y of L0610_YARDS) YardBlocks(plan, blocks, gates, y, sample);
+  // 每条胡同两边都是墙（院墙已经盖了大半，这里补齐缝隙），死胡同的尽头封死（caps）；别的胡同横过来的地方留口子
+  LaneWalls(plan);
+  const E3 = ST.east3;
+  // 第一道弯正面墙（x 182、z 460…467）上凿的两个枪眼：正对着街口打
+  for (const [i, lp] of (ES.jogLoopholes || []).entries()) {
+    const LH = V.loophole;
+    plan.Cut("z", lp.x, lp.z - LH.w / 2, lp.z + LH.w / 2);
+    Sill(blocks, `JogLoopholeSill${i + 1}`, "z", lp.x, lp.z - LH.w / 2, lp.z + LH.w / 2, LH.sillH, { loophole: true });
+    Lintel(blocks, `JogLoopholeLintel${i + 1}`, "z", lp.x, lp.z - LH.w / 2, lp.z + LH.w / 2, LH.topH, V.wallH, sample, WALL, { loophole: true });
+  }
+  // 庄子外沿补齐：西墙 x 40（385…545，一个口子都没有：死胡同顶到墙根）、东墙 x 232（388…545，只有东街东头一个口子）
+  plan.Add("z", V.box.minX, ST.main.from, 545, V.wallH, "VillageWestEdge");
+  plan.Add("z", 232, 388, 545, V.wallH, "VillageEastEdge");
+  plan.Cut("z", 232, E3.c - E3.halfW, E3.c + E3.halfW);
+  // 南墙 z 545（只有村南口一个口子）、北墙 z 385（夹道口、主街口、路沟后门）与东北角的北墙 z 388
+  plan.Add("x", 545, V.box.minX, 232, V.wallH, "VillageSouthEdge");
+  plan.Cut("x", 545, ST.backLane.c - ST.backLane.halfW, ST.backLane.c + ST.backLane.halfW);
+  plan.Add("x", ST.main.from, V.box.minX, 118.25, V.wallH, "VillageNorthEdge");
+  plan.Cut("x", ST.main.from, ST.alleyNorth.c - ST.alleyNorth.halfW, ST.alleyNorth.c + ST.alleyNorth.halfW);
+  plan.Cut("x", ST.main.from, ST.main.c - ST.main.halfW, ST.main.c + ST.main.halfW);
+  plan.Add("x", 388, 118.25, 232, V.wallH, "VillageNorthEastEdge");
+  // 丁字路口：西北角 / 东北角的墙由 WM3 / EM3 的缺角盖；东边 x 110 从东街南墙到老耿家北墙那 3 m 由 ES1 的西墙盖
+  // 巷子北头夹道两边的墙从路沟南沿起；A1 到 A2 的拐角等都由院子表盖
+  // 院子链上的三道砸得倒的门（EM3 南墙的院门洞已在院子表里开了洞）
+  const NC = ES.northChain;
+  BreakableGate(gates, "PocketGateLeaf", "x", NC.pocketGate.z, NC.pocketGate.x, NC.pocketGate.w, SIG.northYardGatesBroken, 1);
+  plan.Cut("z", NC.yard1Door.x, NC.yard1Door.z - NC.yard1Door.w / 2, NC.yard1Door.z + NC.yard1Door.w / 2);
+  Lintel(blocks, "Yard1DoorLintel", "z", NC.yard1Door.x, NC.yard1Door.z - NC.yard1Door.w / 2, NC.yard1Door.z + NC.yard1Door.w / 2, V.doorTopH, V.wallH, sample);
+  BreakableGate(gates, "Yard1GateLeaf", "z", NC.yard1Door.x, NC.yard1Door.z, NC.yard1Door.w, SIG.northYardGatesBroken, -1);
+  plan.Cut("z", NC.farmyardDoor.x, NC.farmyardDoor.z - NC.farmyardDoor.w / 2, NC.farmyardDoor.z + NC.farmyardDoor.w / 2);
+  Lintel(blocks, "FarmyardDoorLintel", "z", NC.farmyardDoor.x, NC.farmyardDoor.z - NC.farmyardDoor.w / 2, NC.farmyardDoor.z + NC.farmyardDoor.w / 2, V.doorTopH, V.wallH, sample);
+  BreakableGate(gates, "FarmyardGateLeaf", "z", NC.farmyardDoor.x, NC.farmyardDoor.z, NC.farmyardDoor.w, SIG.northYardGatesBroken, -1);
+  SouthLaneBlocks(plan, blocks, gates);
+  FallenWallBlocks(plan, blocks);
+  plan.Emit(blocks);
+  Shrine(blocks, sample);
+  RubbleBlocks(blocks);
+  // 零散的树（foliage 细块；石榴矮一点）
+  L0610_TREES.forEach((t, i) => blocks.push(Block(`Tree_${String(i + 1).padStart(2, "0")}`, t.x, t.z, t.kind === "pomegranate" ? 0.3 : 0.42, t.kind === "pomegranate" ? 0.3 : 0.42, t.h, "foliage", { tree: t.kind })));
+  (L0610_EAST_ROAD.trees || []).forEach((t, i) => blocks.push(Block(`RoadTree_${i + 1}`, t.x, t.z, 0.42, 0.42, t.h, "foliage")));
+  // 村南口外的大槐树（10-6「往那棵大槐树跑」）：树干粗一点、9 m 高，从窄胡同里望得见树冠
+  const BL = L0610_PLACES.bigLocust;
+  blocks.push(Block("BigLocust", BL.x, BL.z, 0.8, 0.8, BL.h, "foliage", { tree: "locust" }));
   return { blocks, gates };
 }
 
@@ -573,7 +753,6 @@ export function PropBlocks(sample) {
   return out;
 }
 
-/** 老耿驴车上的几箱弹药：06-3 车走了就跟着没了（随信号体块）。车身顶 = 地面 + 1.025（Script_EditorBlockoutPuppets 的 cart 尺寸）。 */
 function CartBoxes(sample) {
   const c = L0610_PLACES.cartStop, k = L0610_PROP_KINDS.AmmoBox;
   const top = sample(c.x, c.z) + 0.75 + 0.55 / 2;
@@ -583,16 +762,13 @@ function CartBoxes(sample) {
 
 /** 全部体块与随信号体块。 */
 export function L0610Blocks(sample) {
-  const geng = GengBlocks(sample), village = VillageBlocks(sample);
-  const blocks = [...geng.blocks, ...village.blocks, ...PropBlocks(sample)];
-  const gates = [...geng.gates, ...village.gates, ...CartBoxes(sample)];
-  // 干沟南岸一排枯树（0105 的表）
+  const village = VillageBlocks(sample);
+  const blocks = [...village.blocks, ...PropBlocks(sample)];
+  const gates = [...village.gates, ...CartBoxes(sample)];
   L0610_FROM_0105.gullyTrees.forEach((t, i) => blocks.push(Block(`DeadTree_${String(i + 1).padStart(2, "0")}`, t.x, t.z, 0.42, 0.42, t.h, "foliage")));
-  // 石碾（东街口）
-  const RL = L0610_PLACES.roller;
+  const RL = ES.roller;
   blocks.push(Block("RollerBase", RL.x, RL.z, RL.baseW, RL.baseW, RL.baseH, BRICK));
   blocks.push(Block("Roller", RL.x, RL.z, RL.w, RL.d, RL.h, BRICK, { y: R2(sample(RL.x, RL.z) + RL.baseH + RL.h / 2) }));
-  // 河汊子沟底的一线浅水（两段）
   const RVW = L0610_RIVER;
   const z0 = RVW.fromZ + RVW.endM, z1 = L0610_BOUNDS.maxZ - 2, zm = (z0 + z1) / 2;
   blocks.push(Block("RiverWater_1", RVW.centerX, (z0 + zm) / 2, RVW.waterW, zm - z0, RVW.waterH, "water", { solid: false }));
@@ -601,95 +777,94 @@ export function L0610Blocks(sample) {
 }
 
 // ---------------------------------------------------------------------------
-// 地标（§2.2 landmarks，2026-10-20）：白盒灰里看不清的特殊地方，编辑器画亮色线框 + 光柱 + 标签。
-// 坐标一律取锚点表的常量（不抄数字）；有尺寸的给 w / d / h（洞 / 门 / 窗 / 窖 / 物件），片区给宽深或半径，地名只给点。
+// 地标（§2.2 landmarks）：白盒灰里看不清的特殊地方，编辑器画亮色线框 + 光柱 + 标签。坐标一律取锚点表的常量。
 
-/** 全部地标。sample 给窖这种要显式 y 的。 */
 export function L0610Landmarks(sample) {
-  const PL = L0610_PLACES, FR = G.frontRoom, K = G.kitchen, SR = G.sideRoom, C = G.compound, E = L0610_EAST_YARDS, NB = L0610_NEIGHBOR;
-  const NC = E.northChain, CG = G.carriageGate, PK = L0610_PROP_KINDS;
-  const T = V.wallT;
+  const PL = L0610_PLACES, BW = G.beiwu, K = G.zaowu, C = G.box, NC = ES.northChain, PK = L0610_PROP_KINDS, LH = V.loophole;
   const L = (id, name, kind, x, z, extra = {}) => ({ id, name, kind, x: R2(x), z: R2(z), ...extra });
   const Size = (w, d, h) => ({ w: R2(w), d: R2(d), h: R2(h) });
-  const DoorX = (x, z, w) => Size(w, T, V.doorTopH);              // 开在东西向墙上的门（门洞沿 x）
-  const DoorZ = (x, z, w) => Size(T, w, V.doorTopH);              // 开在南北向墙上的门（门洞沿 z）
+  const DoorX = (w) => Size(w, T, V.doorTopH);
+  const DoorZ = (w) => Size(T, w, V.doorTopH);
   const Area = (box) => ({ x: R2((box.minX + box.maxX) / 2), z: R2((box.minZ + box.maxZ) / 2), w: R2(box.maxX - box.minX), d: R2(box.maxZ - box.minZ) });
-  const Run = (r) => (r.axis === "z"
-    ? { x: r.c, z: (r.from + r.to) / 2, w: r.half * 2, d: r.to - r.from }
-    : { x: (r.from + r.to) / 2, z: r.c, w: r.to - r.from, d: r.half * 2 });
-  const sq = Area(ST.square.box), pk = Area(ST.pocket.box), fy = Area({ minX: E.farmyard.minX, maxX: E.farmyard.maxX, minZ: E.north.box.minZ, maxZ: ST.east.z - ST.east.halfW });
-  const main = Run(STREET_RUNS[0]), east = Run(STREET_RUNS[1]), passage = Run(STREET_RUNS[2]), alleyW = Run(STREET_RUNS[3]), alleyS = Run(STREET_RUNS[4]), backLane = Run(STREET_RUNS[5]);
+  const Run = (r) => (r.axis === "z" ? { x: r.c, z: (r.from + r.to) / 2, w: r.halfW * 2, d: r.to - r.from } : { x: (r.from + r.to) / 2, z: r.c, w: r.to - r.from, d: r.halfW * 2 });
+  const sq = Area(ST.square.box), pk = Area(ST.pocket.box), fy = Area({ minX: ES.farmyard.minX, maxX: ES.farmyard.maxX, minZ: 440, maxZ: ST.east.c - ST.east.halfW });
   const shooters = L0610_MOUTH_SHOOTERS;
   const shX = (shooters[0].x + shooters[shooters.length - 1].x) / 2, shZ = shooters.reduce((s, p) => s + p.z, 0) / shooters.length;
-  const dog = G.dogHole, crack = G.crack, gate = G.sideGate, SW = G.sharedWall;
-  const cart = PK.OverturnedCart, hay = G.haystack, straw = E.strawStack, shrine = E.shrine, vat = PK.WaterVat, M = G.mill, RL = PL.roller;
-  const cellarY = R2(sample(G.cellar.x, G.cellar.z) + G.cellar.depth / 2);   // 窖：线框从坑底立到院子地面
-  return [
-    // 06：干沟与凹路
+  const cart = PK.OverturnedCart, straw = ES.strawStack, shrine = ES.shrine, M = J.mill, RL = ES.roller, WW = J.westWing;
+  const cellarY = R2(sample(J.cellar.x + 3, J.cellar.z) - J.cellar.depth / 2);
+  const Loophole = (lp) => L(`LmLoophole_${lp.who}`, lp.name, "window", lp.x, lp.z, { ...Size(LH.w, T, LH.topH - LH.sillH), y: R2(sample(lp.x, lp.z) + (LH.sillH + LH.topH) / 2), note: lp.who === "mg" ? "机枪搬到这里；08 四人趴街口压它" : "步枪枪眼" });
+  const out = [
     L("LmGully", "干沟（集结处）", "area", PL.assembly.x, PL.assembly.z, { radiusM: 9, note: "06 回到这里" }),
     L("LmCartStop", PL.cartStop.name, "place", PL.cartStop.x, PL.cartStop.z, { radiusM: 2.2 }),
     L("LmNierRim", PL.nierRim.name, "place", PL.nierRim.x, PL.nierRim.z),
     L("LmLaneHead", "凹路口", "place", PL.laneHead.x, PL.laneHead.z, { radiusM: 2.5 }),
     L("LmLaneEnd", PL.laneEnd.name, "place", PL.laneEnd.x, PL.laneEnd.z),
-    // 村口：路沟、东半截、街口坡道射击位、村北口、巷子口
     L("LmDitch", DT.name, "area", (DT.fromX + DT.toX) / 2, DT.z, { w: DT.toX - DT.fromX, d: DT.floorW + 2 * DT.wallM, note: "沟底 −0.9" }),
     L("LmDitchEast", PL.ditchEast.name, "place", PL.ditchEast.x, PL.ditchEast.z, { radiusM: 6 }),
-    L("LmMouthShooters", "街口坡道射击位", "place", shX, shZ, { w: shooters[shooters.length - 1].x - shooters[0].x + 1.4, d: 1.2, h: 0.5, note: "08 四人趴这里压北窗" }),
+    L("LmMouthShooters", "街口坡道射击位", "place", shX, shZ, { w: shooters[shooters.length - 1].x - shooters[0].x + 1.4, d: 1.2, h: 0.5, note: "08 四人趴这里压堂屋枪眼" }),
     L("LmVillageMouth", PL.villageMouth.name, "place", PL.villageMouth.x, PL.villageMouth.z),
     L("LmAlleyMouth", PL.alleyMouth.name, "place", PL.alleyMouth.x, PL.alleyMouth.z, { radiusM: 1.5 }),
-    // 街与巷
-    L("LmAlleyPassage", ST.alleyNorth.name, "area", passage.x, passage.z, { w: passage.w, d: passage.d }),
-    L("LmAlleyWest", ST.alleyWest.name, "area", alleyW.x, alleyW.z, { w: alleyW.w, d: alleyW.d }),
-    L("LmAlleySouth", ST.alleySouth.name, "area", alleyS.x, alleyS.z, { w: alleyS.w, d: alleyS.d }),
-    L("LmMainStreet", ST.main.name, "area", main.x, main.z, { w: main.w, d: main.d }),
+    // 街巷
+    L("LmMainStreet", ST.main.name, "area", Run(ST.main).x, Run(ST.main).z, { w: Run(ST.main).w, d: Run(ST.main).d }),
     L("LmSquare", ST.square.name, "area", sq.x, sq.z, { w: sq.w, d: sq.d }),
-    L("LmPocket", "小空地北角", "area", pk.x, pk.z, { w: pk.w, d: pk.d, note: "10-4 鬼子从这院门钻出来" }),
-    L("LmEastStreet", ST.east.name, "area", east.x, east.z, { w: east.w, d: east.d }),
-    L("LmBackLane", ST.backLane.name, "area", backLane.x, backLane.z, { w: backLane.w, d: backLane.d }),
-    L("LmCart", PL.cart.name, "prop", PL.cart.x, PL.cart.z, { ...Size(cart.w, cart.d, cart.h), note: "08-3 班长四人躲北侧" }),
-    // 老耿家：北窗、前门、大门与过道、前屋南门、灶屋门、偏屋门、石磨、柴垛、地瓜窖、后门、水缸
-    L("LmNorthWindow", "北窗（机枪）", "window", G.window.x, FR.box.minZ, { ...Size(G.window.w, T, G.window.topH - G.window.sillH), y: R2(sample(G.window.x, FR.box.minZ) + (G.window.sillH + G.window.topH) / 2) }),
-    L("LmFrontDoor", PL.frontDoor.name, "door", G.frontDoor.x, FR.box.minZ, DoorX(G.frontDoor.x, FR.box.minZ, G.frontDoor.w)),
-    L("LmCarriageGate", PL.carriageGate.name, "door", (CG.minX + CG.maxX) / 2, C.minZ, Size(CG.maxX - CG.minX, T, CG.topH)),
-    L("LmGatePassage", PL.gatePassage.name, "area", (FR.box.maxX + G.passageEastX) / 2, (C.minZ + SR.box.minZ) / 2, { w: G.passageEastX - FR.box.maxX, d: SR.box.minZ - C.minZ, note: "08 甩手榴弹的鬼子在这里" }),
-    L("LmRoomYardDoor", PL.roomYardDoor.name, "door", G.roomYardDoor.x, FR.box.maxZ, { ...DoorX(G.roomYardDoor.x, FR.box.maxZ, G.roomYardDoor.w), note: "09-6 从这门看副射手的后背" }),
-    L("LmKitchenDoor", PL.kitchenDoor.name, "door", K.box.maxX, K.door.z, DoorZ(K.box.maxX, K.door.z, K.door.w)),
-    L("LmSideRoomDoor", PL.sideRoomDoor.name, "door", SR.box.minX, SR.door.z, DoorZ(SR.box.minX, SR.door.z, SR.door.w)),
-    L("LmMill", PL.mill.name, "prop", M.x, M.z, Size(M.baseW, M.baseW, M.baseH + M.stoneH)),
-    L("LmHaystack", "柴垛", "prop", hay.x, hay.z, { ...Size(hay.w, hay.d, hay.h), note: "09-2 妮儿缩在它南边" }),
-    L("LmCellar", PL.cellar.name, "pit", G.cellar.x, G.cellar.z, { ...Size(G.cellar.floorW, G.cellar.floorW, G.cellar.depth), y: cellarY, note: "深 2 m，一家人藏在里头" }),
-    L("LmBackDoor", PL.backDoor.name, "door", G.backDoor.x, C.maxZ, DoorX(G.backDoor.x, C.maxZ, G.backDoor.w)),
-    L("LmBackVat", "水缸（堵后门）", "prop", G.backVat.x, G.backVat.z, { ...Size(vat.w, vat.d, vat.h), note: "10-6 老耿推到门东边" }),
-    // 邻院与共用墙上的三个口子
-    L("LmNeighborDoor", PL.neighborDoor.name, "door", NB.box.minX, NB.westDoor.z, DoorZ(NB.box.minX, NB.westDoor.z, NB.westDoor.w)),
-    L("LmDogHole", PL.dogHole.name, "hole", SW.x, dog.z, { ...Size(T + 0.2, dog.w, dog.h), note: `${dog.w} m 宽、${dog.h} m 高，大人钻不过` }),
-    L("LmCrack", PL.crack.name, "hole", SW.x, crack.z, { ...Size(T + 0.2, crack.w, V.wallH), note: "09-3 从这缝看窖口" }),
-    L("LmSideGate", PL.sideGate.name, "door", SW.x, gate.z, { ...Size(T, gate.w, 2.0), note: "09-5 妮儿从里头拔门闩" }),
-    // 东街：石碾、场院、麦秸垛、土地庙、北边三道院门、南边翻墙处、东头、外面的麦地
-    L("LmRoller", PL.roller.name, "prop", RL.x, RL.z, { ...Size(RL.baseW, RL.baseW, RL.baseH + RL.h), note: "10-2 趴它后头顺东街打" }),
-    L("LmFarmyard", E.farmyard.name, "area", fy.x, fy.z, { w: fy.w, d: fy.d }),
+    L("LmPocket", ST.pocket.name, "area", pk.x, pk.z, { w: pk.w, d: pk.d, note: "10-4 鬼子从这院门钻出来" }),
+    L("LmEastStreet", ST.east.name, "area", Run(ST.east).x, Run(ST.east).z, { w: Run(ST.east).w, d: Run(ST.east).d }),
+    L("LmEastJog1", PL.eastJog1.name, "place", PL.eastJog1.x, PL.eastJog1.z, { note: "石碾后看到这里为止" }),
+    L("LmEastJog2", PL.eastJog2.name, "place", PL.eastJog2.x, PL.eastJog2.z),
+    L("LmL4", ST.l4.name, "area", Run(ST.l4).x, Run(ST.l4).z, { w: Run(ST.l4).w, d: Run(ST.l4).d, note: "东头通路口，不堵" }),
+    L("LmCart", PL.cart.name, "prop", PL.cart.x, PL.cart.z, { ...Size(cart.d, cart.w, cart.h), note: "08-3 班长四人躲它北头" }),
+    // 顺子和妮儿那条路
+    ...L0610_ROUTE.segments.map((s, i) => L(`LmRoute_${s.seg}`, `唯一的路·第 ${i + 1} 段 ${s.seg}`, "place", s.line[0].x, s.line[0].z, { radiusM: 1.2, note: s.name })),
+    L("LmJiefangGate", PL.jiefangGate.name, "door", J.gate.x, J.box.maxZ, { ...DoorX(J.gate.w), note: "09 从门缝瞥见院里" }),
+    L("LmJiefangBreach", PL.jiefangBreach.name, "hole", WW.box.minX, (WW.breach.z + WW.breach.zTo) / 2, { ...Size(T + 0.2, WW.breach.zTo - WW.breach.z, WW.roofH), note: "09 从这里钻进西配房" }),
+    L("LmJiefangWindow", PL.jiefangWindow.name, "window", WW.box.maxX, WW.window.z, { ...Size(T, WW.window.w, WW.window.topH - WW.window.sillH), y: R2(sample(WW.box.maxX, WW.window.z) + (WW.window.sillH + WW.window.topH) / 2), note: "从窗洞看窖口（9.7 m）和石磨" }),
+    L("LmJiefangVat", PL.jiefangVat.name, "prop", WW.vat.x, WW.vat.z, { ...Size(0.9, 0.9, 1.0), note: "藏人的大缸" }),
+    L("LmJiefangBeiwuDoor", PL.jiefangBeiwuDoor.name, "door", J.beiwu.door.x, J.beiwu.box.maxZ, { ...DoorX(J.beiwu.door.w), note: "媳妇被拖进去" }),
+    L("LmCellar", PL.cellar.name, "pit", J.cellar.x, J.cellar.z, { ...Size(J.cellar.floorW, J.cellar.floorW, J.cellar.depth), y: cellarY, note: "深 2 m，一家人藏在里头" }),
+    L("LmMill", PL.mill.name, "prop", M.x, M.z, { ...Size(M.baseW, M.baseW, M.baseH + M.stoneH), note: "绑着老汉" }),
+    L("LmBenjiaGate", PL.benjiaGate.name, "door", B.gate.x, B.box.maxZ, DoorX(B.gate.w)),
+    L("LmDogHole", PL.dogHole.name, "hole", C.minX, G.dogHole.z, { ...Size(T + 0.2, G.dogHole.w, G.dogHole.h), note: `${G.dogHole.w} m 宽、${G.dogHole.h} m 高，大人钻不过` }),
+    L("LmSideGate", PL.sideGate.name, "door", C.minX, G.sideGate.z, { ...Size(T, G.sideGate.w, 2.0), note: "老耿家那边闩着；SideGateOpen 开" }),
+    // 老耿家
+    ...BW.loopholes.map(Loophole),
+    L("LmTangwuDoor", PL.tangwuDoor.name, "door", BW.tangwuDoor.x, BW.box.maxZ, DoorX(BW.tangwuDoor.w)),
+    L("LmKitchenDoor", PL.kitchenDoor.name, "door", K.box.maxX, K.door.z, { ...DoorZ(K.door.w), note: "顺子那条路的终点" }),
+    L("LmGengGate", PL.gengGate.name, "door", C.maxX, G.gate.z, { ...DoorZ(G.gate.w), note: "东南角、朝东墙外的窄胡同" }),
+    L("LmGengHaystack", "柴垛（老耿家）", "prop", G.haystack.x, G.haystack.z, Size(G.haystack.w, G.haystack.d, G.haystack.h)),
+    L("LmGengCollapse", "北屋东间（炮轰塌下）", "area", (BW.collapseFromX + BW.box.maxX) / 2, (BW.box.minZ + BW.box.maxZ) / 2, { w: BW.box.maxX - BW.collapseFromX, d: BW.box.maxZ - BW.box.minZ, note: "BarrageHit 起塌一块" }),
+    // 窄胡同
+    L("LmSouthLane", SLN.name, "area", Run(ST.southLane3).x, Run(ST.southLane3).z, { w: Run(ST.southLane3).w, d: Run(ST.southLane3).d, note: "丁字路口到村南口只有这一条" }),
+    L("LmLaneCollapse", PL.laneCollapse.name, "place", PL.laneCollapse.x, PL.laneCollapse.z, { radiusM: 1.6, note: "LaneWallCollapse：西墙倒进胡同" }),
+    L("LmClimbPile", PL.climbPile.name, "prop", SLN.climb.pile.x, SLN.climb.pile.z, { ...Size(SLN.climb.pile.w, SLN.climb.pile.d, SLN.climb.pile.h), note: "踩着翻进旁边院子" }),
+    L("LmDetourGate", PL.detourGate.name, "door", 114.5, 518, { ...DoorZ(1.2), note: "翻墙绕路的出口" }),
+    L("LmVillageSouth", PL.villageSouth.name, "place", PL.villageSouth.x, PL.villageSouth.z, { radiusM: 2.5, note: "11 从这里出村" }),
+    // 东街
+    L("LmRoller", RL.name, "prop", RL.x, RL.z, { ...Size(RL.baseW, RL.baseW, RL.baseH + RL.h), note: "10-2 趴它后头顺东街打" }),
+    L("LmFarmyard", ES.farmyard.name, "area", fy.x, fy.z, { w: fy.w, d: fy.d }),
     L("LmStrawStack", straw.name, "prop", straw.x, straw.z, { ...Size(straw.w, straw.d, straw.h), note: "10-3 掷弹筒组躲北侧" }),
-    L("LmShrine", shrine.name, "prop", shrine.x, shrine.z, { ...Size(shrine.w, shrine.d, shrine.h), note: "10-2 鬼子缩在它东边" }),
-    L("LmNorthGate1", "院门①（场院西隔墙）", "door", NC.farmyardDoor.x, NC.farmyardDoor.z, { ...DoorZ(NC.farmyardDoor.x, NC.farmyardDoor.z, NC.farmyardDoor.w), note: "10-4 砸开" }),
-    L("LmNorthGate2", "院门②（北侧第一个院西墙）", "door", NC.yard1Door.x, NC.yard1Door.z, { ...DoorZ(NC.yard1Door.x, NC.yard1Door.z, NC.yard1Door.w), note: "10-4 砸开" }),
-    L("LmNorthGate3", "院门③（北角北墙）", "door", NC.pocketGate.x, NC.pocketGate.z, { ...DoorX(NC.pocketGate.x, NC.pocketGate.z, NC.pocketGate.w), note: "10-4 砸开，就在石碾背后" }),
-    L("LmSouthClimb", PL.southClimb.name, "place", E.southClimb.x, E.southClimb.z, { ...Size(3, T, V.wallH), note: "10-5 南边两个鬼子翻这段墙" }),
-    L("LmMortarHide", "掷弹筒藏处", "place", E.mortarHide.x, E.mortarHide.z, { radiusM: 1.8 }),
+    L("LmShrine", shrine.name, "prop", shrine.x, shrine.z, { ...Size(shrine.w, shrine.d, shrine.h), note: "10-2 轻机枪缩在它东边" }),
+    ...ES.probes.filter((p) => p.kind !== "shrine").map((p) => L(`LmProbe_${p.id}`, `探头·${p.id}`, p.kind === "door" ? "door" : "window", p.x, p.z, { note: p.note, ...(p.kind === "door" ? DoorX(1.5) : p.kind === "breach" ? { ...Size(1.2, T, 1.5), y: R2(sample(p.x, p.z) + 1.25) } : { ...Size(T, LH.w, LH.topH - LH.sillH), y: R2(sample(p.x, p.z) + 1.1) }) })),
+    L("LmNorthGate1", "院门①（场院西隔墙）", "door", NC.farmyardDoor.x, NC.farmyardDoor.z, { ...DoorZ(NC.farmyardDoor.w), note: "10-4 砸开" }),
+    L("LmNorthGate2", "院门②（北侧第一个院西墙）", "door", NC.yard1Door.x, NC.yard1Door.z, { ...DoorZ(NC.yard1Door.w), note: "10-4 砸开" }),
+    L("LmNorthGate3", "院门③（路口东北角那院南墙）", "door", NC.pocketGate.x, NC.pocketGate.z, { ...DoorX(NC.pocketGate.w), note: "10-4 砸开，就在石碾西北背后" }),
+    L("LmSouthClimb", PL.southClimb.name, "place", ES.southClimb.x, ES.southClimb.z, { ...Size(3, T, V.wallH), note: "10-5 南边两个鬼子翻这段墙" }),
+    L("LmMortarHide", "掷弹筒藏处", "place", ES.mortarHide.x, ES.mortarHide.z, { radiusM: 1.8 }),
     L("LmEastEnd", PL.eastEnd.name, "place", PL.eastEnd.x, PL.eastEnd.z, { radiusM: 2 }),
-    // 第五版：东北进庄的道（看得见鬼子的那一段）、两道没门扇的后门
     L("LmEastRoadView", PL.eastRoadView.name, "place", PL.eastRoadView.x, PL.eastRoadView.z, { radiusM: 6, note: "鬼子顺这条道进庄；07 末 / 08 看得见" }),
-    L("LmAlleyBackGate", PL.alleyBackGate.name, "door", PL.alleyBackGate.x, PL.alleyBackGate.z, { ...DoorZ(PL.alleyBackGate.x, PL.alleyBackGate.z, V.gateW), note: "08-1 村民钻巷子逃到沟西头；没门扇" }),
-    L("LmDitchBackGate", PL.ditchBackGate.name, "door", PL.ditchBackGate.x, PL.ditchBackGate.z, { ...DoorX(PL.ditchBackGate.x, PL.ditchBackGate.z, V.gateW), note: "08-1 两个村民下到沟东半截；没门扇" }),
-    // 村西的河汊子（第五版贴着西墙、沟底齐腰深的水）、村南口
+    L("LmAlleyBackGate", PL.alleyBackGate.name, "door", PL.alleyBackGate.x, PL.alleyBackGate.z, { ...DoorZ(1.2), note: "08-1 村民顺巷子逃到巷子口；没门扇" }),
+    L("LmDitchBackGate", PL.ditchBackGate.name, "door", PL.ditchBackGate.x, PL.ditchBackGate.z, { ...DoorX(V.gateW), note: "08-1 两个村民下到沟东半截；没门扇" }),
+    L("LmMainEastGate", PL.mainEastGate.name, "door", PL.mainEastGate.x, PL.mainEastGate.z, { ...DoorZ(V.gateW), note: "08-1 两个村民冲上主街被打倒" }),
+    ...L0610_RUBBLE.map((r) => L(`Lm${r.id}`, r.name, "prop", r.x, r.z, { ...Size(r.w, r.d, r.h), ry: r.ry })),
+    L("LmBigLocust", PL.bigLocust.name, "prop", PL.bigLocust.x, PL.bigLocust.z, { ...Size(0.8, 0.8, PL.bigLocust.h), note: "10-6「过了槐树就是村口」" }),
+    L("LmPond", PL.pond.name, "pit", POND.x, POND.z, { ...Size(POND.w, POND.d, POND.depth), y: R2(POND_FLOOR_Y + POND.depth / 2), note: "取土坑积的水；1949 年前多数人喝河、坑、沟水" }),
     L("LmRiver", RV.name, "area", RV.centerX, (RV.fromZ + L0610_BOUNDS.maxZ) / 2, { w: RV.floorW + 2 * RV.wallM, d: L0610_BOUNDS.maxZ - RV.fromZ, note: "车下不去；沟底齐腰深的水，抬伤号过不去" }),
-    L("LmVillageSouth", PL.villageSouth.name, "place", PL.villageSouth.x, PL.villageSouth.z, { radiusM: 2.5, note: "11 驴车从这里出村" }),
   ];
+  return out;
 }
 
 // ---------------------------------------------------------------------------
 // 核对
 
-/** 当前信号下在场的实心块（gates 按 signal / appearSignal 取舍）。 */
 export function SolidBlocks(scene, signals = []) {
   const on = new Set(signals);
   const out = scene.blocks.filter((b) => b.solid !== false && b.semantic !== "water");
@@ -700,7 +875,6 @@ export function SolidBlocks(scene, signals = []) {
   return out;
 }
 
-/** 块的实际中心高度（显式 y 或落地：脚在中心与四角最低处，同 Levels.GroundedBlock）。 */
 export function BlockCenterY(b, sample) {
   if (Number.isFinite(b.y)) return b.y;
   const ry = b.ry || 0, c = Math.cos(ry), s = Math.sin(ry), hx = b.w / 2, hz = b.d / 2;
@@ -709,10 +883,6 @@ export function BlockCenterY(b, sample) {
   return lowest + b.h / 2;
 }
 
-/**
- * 从 a 到 b（各给 eye 离地高）的视线有没有被实心块挡住：返回第一块挡住的块（按离 a 的远近），没有返回 null。
- * 只看块，不看地面（地面用 SightBlock）。
- */
 export function BlockSight(blocks, sample, a, b) {
   const ay = sample(a.x, a.z) + a.eye, by = sample(b.x, b.z) + b.eye;
   let best = null;
@@ -735,61 +905,75 @@ export function BlockSight(blocks, sample, a, b) {
   return best ? best.block : null;
 }
 
+/** 从一个洞口（墙上的点）往某个目标看时眼睛该站在哪：洞口中心往后退 back 米、对着目标。 */
+export function HoleEye(hole, target, back, eyeH) {
+  const d = Math.hypot(target.x - hole.x, target.z - hole.z);
+  return { x: hole.x - back * (target.x - hole.x) / d, z: hole.z - back * (target.z - hole.z) / d, eye: eyeH };
+}
+
 /** 测试与 notes 共用的几条视线。 */
 export function L0610SightChecks(scene, sample) {
-  const RL = L0610_PLACES.roller, SG = G.sideGate, SW = G.sharedWall, C = G.cellar, CR = G.crack;
+  const RL = ES.roller, BW = G.beiwu, WW = J.westWing;
   const base = SolidBlocks(scene, []);
-  const gateOpen = SolidBlocks(scene, [SIG.sideGateOpen, SIG.cellarBlast]);
-  // ① 侧门口（门开了，蹲着眼高 1.2）→ 窖口边站着的人（1.5）
-  const pisser = { x: C.x + G.pisserOffset.x, z: C.z + G.pisserOffset.z, eye: 1.5 };
-  const doorway = { x: SW.x + 1.1, z: SG.z, eye: 1.2 };
-  const sideGateToCellar = { block: BlockSight(gateOpen, sample, doorway, pisser)?.id ?? null, ground: SightBlock(sample, doorway, pisser).block };
-  // ② 关着的门：门缝（北侧）里能看见窖口（眼在缝后 0.9 m、对着窖口中心）
-  const crackZ = SG.z - SG.w / 2 + (SG.w - SG.leafW) / 2;
-  const target = { x: C.x, z: C.z, eye: 1.0 };
-  const dir = Math.hypot(target.x - SW.x, target.z - crackZ);
-  const eye09_3 = { x: SW.x - 0.9 * (target.x - SW.x) / dir, z: crackZ - 0.9 * (target.z - crackZ) / dir, eye: 1.5 };
-  const throughGateCrack = BlockSight(base, sample, eye09_3, target)?.id ?? null;
-  const outside = { x: SW.x - 1.0, z: SG.z, eye: 1.6 };
-  const gateClosedBlocks = BlockSight(base, sample, outside, pisser)?.id ?? null;
-  // ③ 墙缝（z 493）：眼在缝后 0.9 m、对着窖口
-  const dir2 = Math.hypot(target.x - SW.x, target.z - CR.z);
-  const eye09_2 = { x: SW.x - 0.9 * (target.x - SW.x) / dir2, z: CR.z - 0.9 * (target.z - CR.z) / dir2, eye: 1.5 };
-  const throughCrack = BlockSight(base, sample, eye09_2, target)?.id ?? null;
-  // ④ 北窗里跪着的机枪手（1.2）→ 村北口站着的人（1.6）；反过来村口蹲着（1.2）→ 窗口
-  const mg = { x: G.mgPost.x, z: G.mgPost.z, eye: 1.2 }, mouth = { x: L0610_PLACES.villageMouth.x, z: L0610_PLACES.villageMouth.z, eye: 1.6 };
-  const windowToMouth = BlockSight(base, sample, mg, mouth)?.id ?? null;
-  const mouthToWindow = BlockSight(base, sample, { ...mouth, eye: 1.2 }, { ...mg, eye: 1.0 })?.id ?? null;
-  const windowGround = SightBlock(sample, mg, mouth).block;
-  // ⑤ 石碾后趴着（0.5）→ 东街东头站着的人（1.0）
-  const prone = { x: RL.x - 2.2, z: RL.z + 0.9, eye: 0.5 }, eastEnd = { x: 230, z: ST.east.z, eye: 1.0 };
-  const rollerToEast = BlockSight(SolidBlocks(scene, [SIG.mgSilenced]), sample, prone, eastEnd)?.id ?? null;
-  const rollerGround = SightBlock(sample, prone, eastEnd).block;
-  // ⑥（第二版）街口坡道上趴着的四个人（0.5）→ 北窗里跪着的机枪手的头（1.15，枪身在窗台上 0.9…1.04）：块与地面都不能挡；翻倒的大车在视线扇外头
+  const mgLp = BW.loopholes.find((lp) => lp.who === "mg");
+  const mgEye = { x: G.mgPost.x, z: G.mgPost.z, eye: 1.1 };
+  const loophole = { x: mgLp.x, z: mgLp.z, eye: mgLp.h };
+  // ① 街口坡道上趴着的四个人（0.5）→ 堂屋枪眼（离地 1.1）：块与地面都不能挡
   const shooters = L0610_MOUTH_SHOOTERS.map((p) => ({ ...p, eye: 0.5 }));
-  const mgHead = { ...mg, eye: 1.15 };
-  const shooterToWindow = shooters.map((p) => ({ at: p, block: BlockSight(base, sample, p, mgHead)?.id ?? null, ground: SightBlock(sample, p, mgHead).block }));
-  // ⑦（第二版）北窗机枪手（1.2）→ 巷子口与巷子各段（跑的人 1.0 / 蹲的人 0.9）：都得被挡（块或地面）
+  const shooterToLoophole = shooters.map((p) => ({ at: p, block: BlockSight(base, sample, p, loophole)?.id ?? null, ground: SightBlock(sample, p, loophole).block }));
+  // ② 枪眼后的机枪手（1.1，就是枪眼的高度）顺主街看到村北口站着的人（1.6）；反过来村口蹲着（1.2）→ 枪眼
+  const mouth = { x: L0610_PLACES.villageMouth.x, z: L0610_PLACES.villageMouth.z, eye: 1.6 };
+  const loopholeToMouth = BlockSight(base, sample, mgEye, mouth)?.id ?? null;
+  const mouthToLoophole = BlockSight(base, sample, { ...mouth, eye: 1.2 }, loophole)?.id ?? null;
+  const loopholeGround = SightBlock(sample, mgEye, mouth).block;
+  // ③ 枪眼后的机枪（1.1）→ 巷子口与巷子各段（跑的人 1.0 / 蹲的人 0.9）：都得被挡
   const alleyPoints = [
-    { name: "巷子口", x: ST.alleyNorth.x, z: L0610_PLACES.alleyMouth.z, eye: 1.0 },
-    { name: "夹道中段", x: ST.alleyNorth.x, z: 391, eye: 1.0 },
-    { name: "夹道南头", x: ST.alleyNorth.x, z: ST.alleyWest.z, eye: 1.0 },
-    { name: "东西那截中段", x: 70, z: ST.alleyWest.z, eye: 1.0 },
-    { name: "巷子拐角", x: ST.alleySouth.x, z: ST.alleyWest.z, eye: 1.0 },
-    { name: "南北那截", x: ST.alleySouth.x, z: 445, eye: 0.9 },
-    { name: "邻院小门口", x: L0610_PLACES.neighborDoor.x - 1, z: L0610_PLACES.neighborDoor.z, eye: 0.9 },
+    { name: "巷子口", x: ST.alleyNorth.c, z: L0610_PLACES.alleyMouth.z, eye: 1.0 },
+    { name: "夹道中段", x: ST.alleyNorth.c, z: 391, eye: 1.0 },
+    { name: "夹道南头", x: ST.alleyNorth.c, z: ST.alleyA2.c, eye: 1.0 },
+    { name: "第一道弯", x: ST.alleyA3.c, z: ST.alleyA2.c, eye: 1.0 },
+    { name: "往南那截", x: ST.alleyA3.c, z: 412, eye: 0.9 },
+    { name: "窄夹道", x: ST.alleyA5.c, z: 440, eye: 0.9 },
+    { name: "街坊家门口", x: J.gate.x, z: ST.l4.c, eye: 0.9 },
   ];
-  const windowToAlley = alleyPoints.map((p) => ({ name: p.name, block: BlockSight(base, sample, mg, p)?.id ?? null, ground: SightBlock(sample, mg, p).block }));
-  // ⑧（第二版）09-6：侧门里几步蹲着（1.2）透过前屋南门看机枪组的后背（跪着的人身体中心 0.8）：两人里至少一个看得见
-  const eye09_6 = { x: G.sightPost09_6.x, z: G.sightPost09_6.z, eye: 1.2 };
-  const mgBacks = [{ who: "机枪手", x: G.mgPost.x, z: G.mgPost.z, eye: 0.8 }, { who: "副射手", x: G.mgLoaderPost.x, z: G.mgLoaderPost.z, eye: 0.8 }];
-  const sideToMgBacks = mgBacks.map((t) => ({ who: t.who, block: BlockSight(gateOpen, sample, eye09_6, t)?.id ?? null }));
-  // ⑨（第二版）北窗机枪手（1.2）→ 翻倒的大车北侧蹲着的班长（0.9）：要被大车挡住
+  const loopholeToAlley = alleyPoints.map((p) => ({ name: p.name, block: BlockSight(base, sample, mgEye, p)?.id ?? null, ground: SightBlock(sample, mgEye, p).block }));
+  // ④ 枪眼后的机枪（1.1）→ 翻倒的大车北头蹲着的人（0.9）：要被大车挡住
   const cart = L0610_PLACES.cart;
-  const behindCart = { x: cart.x - 0.5, z: cart.z - 1.9, eye: 0.9 };
-  const windowToCartHide = BlockSight(base, sample, mg, behindCart)?.id ?? null;
-  // ⑩（第五版）东北进庄的道：凹路尽头（LanePointAtZ(366)，蹲姿眼 1.05）与街口坡道上趴着的顺子（眼 0.32）→ 道上 x 272…290 那一段 1.5 m 高的人：
-  //    院墙 / 房子不许挡（地面另记：凹路口的眼在路底 −0.95 + 1.05 ≈ +0.1，比两侧麦地还低，地面本来就挡，所以 07 末看道的人要爬到坎上）
+  const behindCart = { x: cart.x, z: cart.z - 1.9, eye: 0.9 };
+  const loopholeToCartHide = BlockSight(base, sample, mgEye, behindCart)?.id ?? null;
+  // ⑤ 街坊家：窗洞后 0.6 m 的眼睛（蹲着 1.3）→ 窖口（1.0）与石磨上的人（1.0）；门缝（半掩的门）→ 窖口；豁口外（夹道里）看不见窖口（得钻进去才看得见）
+  const windowHole = { x: WW.box.maxX, z: WW.window.z };
+  const cellarT = { x: J.cellar.x, z: J.cellar.z, eye: 1.0 }, millT = { x: J.mill.x, z: J.mill.z, eye: 1.0 };
+  const eyeWindowCellar = HoleEye(windowHole, cellarT, WW.eyeBackM, 1.3), eyeWindowMill = HoleEye(windowHole, millT, WW.eyeBackM, 1.3);
+  const windowToCellar = BlockSight(base, sample, eyeWindowCellar, cellarT)?.id ?? null;
+  const windowToMill = BlockSight(base, sample, eyeWindowMill, millT)?.id ?? null;
+  const gateHole = { x: J.gate.x + 0.35, z: J.box.maxZ };   // 半掩的门：门扇挂在西边，东半边的门洞敞着
+  const eyeGate = HoleEye(gateHole, cellarT, 1.0, 1.5);
+  const gateToCellar = BlockSight(base, sample, eyeGate, cellarT)?.id ?? null;
+  const gateToBeiwuDoor = BlockSight(base, sample, eyeGate, { x: J.beiwu.door.x, z: J.beiwu.box.maxZ + 0.6, eye: 1.0 })?.id ?? null;
+  const laneEye = { x: ST.alleyA5.c, z: 450, eye: 1.5 };
+  const laneToCellar = BlockSight(base, sample, laneEye, cellarT)?.id ?? null;
+  // 关键帧 09-2 的站点（L0610_JIEFANG.glimpse，站着 1.5）斜着从门洞里看窖口：门扇 / 南屋都不许挡
+  const glimpseEye = { x: J.glimpse.x, z: J.glimpse.z, eye: 1.5 };
+  const glimpseToCellar = BlockSight(base, sample, glimpseEye, cellarT)?.id ?? null;
+  // 窄胡同里望大槐树树冠（离地 8 m）：拐进出村那截以后 (117,523) 与 (117,532)，蹲着 1.2；院墙不挡
+  //（塌墙那截 x 113.25 里 2.2 m 的墙贴着脸，37 m 外的树冠要仰 10° 以上才露头，从那里看不见，拐过第三道弯才看得见）
+  const BL = L0610_PLACES.bigLocust;
+  const laneToLocust = [{ x: ST.backLane.c, z: 523, eye: 1.2 }, { x: ST.backLane.c, z: 532, eye: 1.2 }].map((e) => BlockSight(base, sample, e, { x: BL.x - 0.7, z: BL.z - 0.3, eye: 8.0 })?.id ?? null);   // 看树冠西沿，别打在树干块里
+  // ⑥ 石碾后趴着（0.5）→ 东街里每个探头点（门洞里 / 枪眼后 / 庙后 / 垛前的人 1.0；枪眼目标取枪眼高度）
+  const prone = { x: RL.x - 2.2, z: RL.z + 0.9, eye: 0.5 };
+  // 探头点的目标：门洞 / 豁口 = 从里头探到街上半步的人（1.0）；枪眼 = 洞本身（离地 1.1）；庙 = 庙身（视线该落在庙上）
+  const streetZ = (p) => (p.z < 461 ? ST.east2.c : ST.east.c);
+  const probes = ES.probes.map((p) => {
+    const t = p.kind === "loophole" ? { x: p.x, z: p.z, eye: p.h } : p.kind === "shrine" ? { x: p.x, z: p.z, eye: 1.0 } : { x: p.x, z: p.z + Math.sign(streetZ(p) - p.z) * 0.85, eye: 1.0 };
+    const dist = Math.hypot(p.x - RL.x, p.z - RL.z), deg = Math.atan2(p.z - RL.z, p.x - RL.x) * 180 / Math.PI;
+    return { id: p.id, kind: p.kind, hidden: !!p.hidden, dist: R2(dist), deg: R2(deg), target: t, block: BlockSight(SolidBlocks(scene, [SIG.mgSilenced]), sample, prone, t)?.id ?? null, ground: SightBlock(sample, prone, t).block };
+  });
+  // 庙东北边的轻机枪（0.8）→ 石碾后趴着的人（0.5）：庙不许挡它
+  const mgHideToRoller = BlockSight(SolidBlocks(scene, [SIG.mgSilenced]), sample, { x: ES.mgHide.x, z: ES.mgHide.z, eye: 0.8 }, prone)?.id ?? null;
+  const jogWall = { x: ST.eastJog1.c + ST.eastJog1.halfW - 0.3, z: 464.5, eye: 1.0 };   // 贴着第一道弯正面墙站着的人
+  const rollerToJog = BlockSight(SolidBlocks(scene, [SIG.mgSilenced]), sample, prone, jogWall)?.id ?? null;
+  // ⑦ 东北进庄的道（第五版）：凹路尽头蹲着（1.05）与街口坡道上趴着的顺子（0.32）→ 道上 x 274…290 那一段 1.5 m 高的人
   const laneMouth = { ...LanePointAtZ(366), eye: 1.05 };
   const proneShooter = { ...L0610_MOUTH_SHOOTERS[0], eye: 0.32 };
   const eastRoadTargets = EastRoadViewPoints().map((p) => ({ ...p, eye: 1.5 }));
@@ -799,13 +983,12 @@ export function L0610SightChecks(scene, sample) {
     eastRoad.ramp.push({ at: t, block: BlockSight(base, sample, proneShooter, t)?.id ?? null, ground: SightBlock(sample, proneShooter, t).block });
   }
   return {
-    sideGateToCellar, gateClosedBlocks, throughGateCrack, throughCrack, windowToMouth, mouthToWindow, windowGround, rollerToEast, rollerGround,
-    shooterToWindow, windowToAlley, sideToMgBacks, windowToCartHide, eastRoad,
-    eyes: { crack: eye09_2, gateCrack: eye09_3, doorway, prone, side09_6: eye09_6, behindCart, laneMouth, proneShooter },
+    shooterToLoophole, loopholeToMouth, mouthToLoophole, loopholeGround, loopholeToAlley, loopholeToCartHide,
+    windowToCellar, windowToMill, gateToCellar, gateToBeiwuDoor, laneToCellar, glimpseToCellar, laneToLocust, probes, rollerToJog, mgHideToRoller, eastRoad,
+    eyes: { windowCellar: eyeWindowCellar, windowMill: eyeWindowMill, gate: eyeGate, prone, behindCart, laneMouth, proneShooter, laneEye },
   };
 }
 
-/** 东北进庄的道上「看得见鬼子」那一段（viewFromX…viewToX）：道中线上每 3 m 一个点（含 eastRoadView 本身）。 */
 export function EastRoadViewPoints() {
   const line = ER.line, out = [{ x: L0610_PLACES.eastRoadView.x, z: L0610_PLACES.eastRoadView.z }];
   for (let x = ER.viewFromX; x <= ER.viewToX + 1e-6; x += 3) {
@@ -817,23 +1000,79 @@ export function EastRoadViewPoints() {
   return out;
 }
 
-/** 河汊子某 z 处东坎沿到庄子西墙之间能站人的平地有多宽：从中线往东找第一个高到庄子地面 −0.3 以上的点，到西墙内皮（x 40 − 墙厚/2）的距离。 */
+// ---------------------------------------------------------------------------
+// 可走格子与泛洪（SceneTest 的「只有一条路」用）：0.25 m 一格，人按 0.3 m 半径算；
+// 挡人的块：实心、高 ≥ stepH（0.55，矮篱 0.5 / 矮瓦砾 0.45 跨得过）、下沿低于头顶 1.8（门洞过梁不挡、狗洞过梁挡）；
+// 坑（地面比村里低 0.8 以上）也算不能走（掉得下去爬不上来）。
+
+export function WalkGrid(scene, sample, signals = [], { box = { minX: 40, maxX: 232, minZ: 383, maxZ: 548 }, cell = 0.25, radius = 0.3, stepH = 0.55, headH = 1.8 } = {}) {
+  const cols = Math.round((box.maxX - box.minX) / cell), rows = Math.round((box.maxZ - box.minZ) / cell);
+  const walk = new Uint8Array(cols * rows).fill(1);
+  const X = (ix) => box.minX + (ix + 0.5) * cell, Z = (iz) => box.minZ + (iz + 0.5) * cell;
+  for (let iz = 0; iz < rows; iz++) for (let ix = 0; ix < cols; ix++) {
+    if (sample(X(ix), Z(iz)) < V.y - 0.8) walk[iz * cols + ix] = 0;
+  }
+  for (const b of SolidBlocks(scene, signals)) {
+    if (b.h < stepH) continue;
+    const cy = BlockCenterY(b, sample);
+    const bottom = cy - b.h / 2 - sample(b.x, b.z);
+    if (bottom >= headH) continue;
+    const ry = b.ry || 0, c = Math.cos(ry), s = Math.sin(ry), hw = b.w / 2 + radius, hd = b.d / 2 + radius;
+    const reach = Math.hypot(hw, hd);
+    const ix0 = Math.max(0, Math.floor((b.x - reach - box.minX) / cell)), ix1 = Math.min(cols - 1, Math.ceil((b.x + reach - box.minX) / cell));
+    const iz0 = Math.max(0, Math.floor((b.z - reach - box.minZ) / cell)), iz1 = Math.min(rows - 1, Math.ceil((b.z + reach - box.minZ) / cell));
+    for (let iz = iz0; iz <= iz1; iz++) for (let ix = ix0; ix <= ix1; ix++) {
+      const dx = X(ix) - b.x, dz = Z(iz) - b.z;
+      const lx = dx * c - dz * s, lz = dx * s + dz * c;
+      if (Math.abs(lx) <= hw && Math.abs(lz) <= hd) walk[iz * cols + ix] = 0;
+    }
+  }
+  const Index = (x, z) => {
+    const ix = Math.floor((x - box.minX) / cell), iz = Math.floor((z - box.minZ) / cell);
+    return ix < 0 || iz < 0 || ix >= cols || iz >= rows ? -1 : iz * cols + ix;
+  };
+  return { box, cell, cols, rows, walk, Index, X, Z, At: (x, z) => { const i = Index(x, z); return i >= 0 && walk[i] === 1; } };
+}
+
+/**
+ * 从 start 泛洪（四邻）。links：[{ from, to }] 额外的通路（翻柴垛）；barriers：[(x,z)=>bool] 不许进的格子（测试用来在 L4 东头截断）。
+ * 返回 { reached: Uint8Array, Has(x,z), count }。
+ */
+export function FloodFrom(grid, start, { links = [], barriers = [] } = {}) {
+  const { cols, rows, walk, Index } = grid;
+  const reached = new Uint8Array(cols * rows);
+  const Blocked = (i) => barriers.some((f) => f(grid.X(i % cols), grid.Z(Math.floor(i / cols))));
+  const stack = [];
+  const Seed = (x, z) => { const i = Index(x, z); if (i >= 0 && walk[i] && !reached[i] && !Blocked(i)) { reached[i] = 1; stack.push(i); } };
+  Seed(start.x, start.z);
+  while (stack.length) {
+    const i = stack.pop();
+    const ix = i % cols, iz = Math.floor(i / cols);
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const jx = ix + dx, jz = iz + dz;
+      if (jx < 0 || jz < 0 || jx >= cols || jz >= rows) continue;
+      const j = jz * cols + jx;
+      if (walk[j] && !reached[j] && !Blocked(j)) { reached[j] = 1; stack.push(j); }
+    }
+    for (const l of links) { const a = Index(l.from.x, l.from.z); if (a === i) Seed(l.to.x, l.to.z); }
+  }
+  let count = 0;
+  for (const r of reached) count += r;
+  return { reached, count, Has: (x, z) => { const i = Index(x, z); return i >= 0 && reached[i] === 1; } };
+}
+
 export function RiverEastLedgeAt(sample, z) {
-  const wallFace = L0610_STREET_YARDS.westOfAlley.box.minX - T / 2;   // 39.75
+  const wallFace = 40 - T / 2;
   let rim = wallFace;
   for (let x = RV.centerX; x <= wallFace; x += 0.05) { if (sample(x, z) >= V.y - 0.3) { rim = x; break; } }
   return { rimX: R2(rim), ledgeW: R2(wallFace - rim) };
 }
-
-/** 村口路沟某 x 处：沟底、两沿、沟底宽（高度离沟底 15 cm 内的连续一段）。 */
 export function DitchSectionAt(sample, x) {
   const floor = sample(x, DT.z);
   let run = 0, best = 0;
   for (let z = DT.z - 6; z <= DT.z + 6; z += 0.1) { if (sample(x, z) <= floor + 0.15) { run += 0.1; best = Math.max(best, run); } else run = 0; }
   return { floor: R2(floor), north: R2(sample(x, DT.z - 6)), south: R2(sample(x, DT.z + 6)), floorW: R2(best) };
 }
-
-/** 与 0105 场景文件接得上不：读 Blockout/FirstLevel0105.scene.json（没有就返回 null），在两片重叠的北半截抽样比高度。 */
 export function CompareWith0105(sample) {
   const url = new URL("./Blockout/FirstLevel0105.scene.json", import.meta.url);
   if (!fs.existsSync(url)) return null;
@@ -848,8 +1087,6 @@ export function CompareWith0105(sample) {
   }
   return { worst: R2(worst), at, samples: n };
 }
-
-/** 凹路某 z 处：路底高、两侧地面高、深。 */
 export function LaneDepthAt(sample, z) {
   const line = LANE.line;
   let cx = null;
@@ -861,8 +1098,6 @@ export function LaneDepthAt(sample, z) {
   const floor = sample(cx, z), side = Math.max(sample(cx - 9, z), sample(cx + 9, z));
   return { x: R2(cx), floor: R2(floor), side: R2(side), depth: R2(side - floor) };
 }
-
-/** 河汊子某 z 处：沟底、两岸、沟底宽（高度离沟底 15 cm 内的连续一段）。 */
 export function RiverSectionAt(sample, z) {
   const floor = sample(RV.centerX, z);
   let run = 0, best = 0;
@@ -875,7 +1110,6 @@ export function RiverSectionAt(sample, z) {
 
 const Pts = (line) => line.map((p) => ({ x: p.x, z: p.z }));
 
-/** 生成场景文档。commit / generatedAt 由 CLI 传进来；notes 收抽样核对行（CLI 打到控制台）。 */
 export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", notes = [] } = {}) {
   const { Ground } = L0610Ground();
   const { terrain, minM, maxM } = BakeL0610Grid(Ground);
@@ -887,7 +1121,6 @@ export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", 
     LandmarkIssues(landmarks, errors);
     if (errors.length) throw new Error(`地标表有错：${errors.join("；")}`);
   }
-
   const scene = {
     schema: BLOCKOUT_SCENE_SCHEMA,
     level: L0610_LEVEL_KEY,
@@ -895,13 +1128,14 @@ export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", 
       generator: L0610_SCENE_GENERATOR,
       generatedAt,
       commit,
-      notes: `06–10 新剧本白盒（2026-10-21 第五版）：锚点 Data_EditorBlockoutFirstLevel0610Space；高度 ${L0610_CELL_M} m 网格（${minM}…${maxM} m）；`
-        + "z<205 逐点等于 FirstLevel0105 的地面（交通沟坡道 / 干沟 / 凹路头一段），往南：凹路南段（路底按弧长缓降缓升，直接接进村口路沟）、村口路沟（东西向、沟底 −0.9、街口南壁放缓成坡道、西头通进河汊子）、"
-        + "河汊子（沟底 −2.7、贴着庄子西墙 x 40 的南北向河沟，沟底 1 m 深的水）、耿家庄（整村压平 +0.3、街面压低 12 cm、地瓜窖平底开挖；西南 / 东北 / 东南三角补满院子、外沿一整圈墙）、东北进庄的道（压低 0.15、道边坟头）；"
-        + "体块：院墙带门洞 / 窗洞 / 狗洞 / 墙缝、实心房子、老耿家三间空心屋 + 平顶（没人上房）、两道没门扇的后门（西边院子→巷子 z 425、东边院子→路沟 x 110）、"
-        + "石磨、窖沿与盖板、翻倒的大车（横在主街偏东）、场院的麦秸垛、东街的土地庙、日常摆件、0105 的南岸枯树、道边两棵树；巷子北头的夹道开在路沟南沿上、主街那头封死；"
-        + "gates：CartDeparted / SideGateOpen / CellarBlast / MgSilenced / NorthYardGatesBroken / BackVatMoved / BackDoorOpen（10-20 第四版：缸挪开与门开拆成两个信号，窖壁收直到 0.15）；"
-        + `landmarks（10-20）：${landmarks.length} 个地标（干沟、路沟、街巷、老耿家的门窗 / 窖 / 磨 / 缸、狗洞 / 墙缝 / 侧门、石碾 / 场院 / 麦秸垛 / 土地庙 / 三道院门、河汊子、村南口），编辑器画亮色标记。`,
+      notes: `06–10 新剧本白盒（2026-10-22 第六版空间）：锚点 Data_EditorBlockoutFirstLevel0610Space；高度 ${L0610_CELL_M} m 网格（${minM}…${maxM} m）；`
+        + "z<205 逐点等于 FirstLevel0105 的地面，往南：凹路南段、村口路沟（西头通进河汊子）、河汊子（贴庄子西墙、沟底 1 m 深的水）、"
+        + "耿家庄（整村压平 +0.3、胡同 / 街 / 路口压低 12 cm、街坊家的地瓜窖与村西的取土坑平底开挖）、东北进庄的道；"
+        + `体块：按县志重摆的 ${L0610_YARDS.length + 3} 个院子（四合院 / 半面槽院 / 排房院混着、夹菜园空地与水坑；共墙只画一道），老耿家半面槽院（北屋三间空心、后墙三个枪眼、灶屋两间、东墙院门）、`
+        + "街坊家（北屋空心、西配房塌掉的西北角 / 窗洞 / 大缸、地瓜窖、石磨、半掩的院门）、本家院（共用墙上的狗洞 / 便门）、拐四道弯的巷子与瓦砾堵死的岔路、"
+        + "往南拐三道弯的窄胡同（塌墙处、柴垛、绕路院子）、拐两道弯的东街（门洞 / 枪眼 / 豁口 / 土地庙 / 麦秸垛）、各片错开的小巷与死胡同、塌了一角的房子、倒在胡同里的墙、菜园空宅基粪堆、零散的树、日常摆件、0105 的南岸枯树；"
+        + "gates：CartDeparted / SideGateOpen / CellarBlast / MgSilenced / NorthYardGatesBroken / BarrageHit / LaneWallCollapse；"
+        + `landmarks：${landmarks.length} 个地标。`,
     },
     bounds: { ...L0610_BOUNDS },
     spawn: { x: L0610_SPAWN.x, z: L0610_SPAWN.z, yawDeg: L0610_SPAWN.yawDeg },
@@ -912,50 +1146,35 @@ export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", 
     ways: {
       roads: [
         Pts(LANE.line),
-        [{ x: ST.main.x, z: DT.z }, { x: ST.main.x, z: ST.main.toZ }],
-        [{ x: ST.east.fromX, z: ST.east.z }, { x: ST.east.toX, z: ST.east.z }],
-        [{ x: ST.alleyNorth.x, z: ST.alleyNorth.fromZ }, { x: ST.alleyNorth.x, z: ST.alleyWest.z }, { x: ST.alleySouth.x, z: ST.alleyWest.z }, { x: ST.alleySouth.x, z: ST.alleySouth.toZ }],
-        [{ x: ST.backLane.x, z: ST.backLane.fromZ }, { x: ST.backLane.x, z: ST.backLane.toZ }],
-        Pts(ER.line),   // 第五版：东街东头出去往东北的道
+        [{ x: ST.main.c, z: DT.z }, { x: ST.main.c, z: ST.square.box.maxZ }],
+        Pts(ES.line),
+        Pts(L0610_ROUTE.segments[0].line), Pts(L0610_ROUTE.segments[1].line),
+        Pts(SLN.line),
+        Pts(ER.line),
       ],
       trenches: [
         Pts(L0610_FROM_0105.trafficTrench.filter((p) => p.z >= L0610_BOUNDS.minZ)),
         [{ x: DT.fromX, z: DT.z }, { x: DT.toX, z: DT.z }],
-        [{ x: RV.centerX, z: RV.fromZ + RV.endM }, { x: RV.centerX, z: L0610_BOUNDS.maxZ }],   // 河汊子中线
+        [{ x: RV.centerX, z: RV.fromZ + RV.endM }, { x: RV.centerX, z: L0610_BOUNDS.maxZ }],
       ],
     },
   };
 
-  // --- 抽样核对 ---
   const at = (p) => R2(sample(p.x, p.z));
   const PL = L0610_PLACES;
-  notes.push(`网格 ${terrain.cols}×${terrain.rows}（${terrain.cellM} m），高度 ${minM}…${maxM} m；体块 ${blocks.length}、随信号体块 ${gates.length}`);
+  notes.push(`网格 ${terrain.cols}×${terrain.rows}（${terrain.cellM} m），高度 ${minM}…${maxM} m；体块 ${blocks.length}、随信号体块 ${gates.length}、院子 ${L0610_YARDS.length + 3}`);
   const cmp = CompareWith0105(sample);
   notes.push(`与 0105 接缝（z 121…190 抽 ${cmp?.samples ?? 0} 点）：${cmp ? `最大差 ${cmp.worst} m（(${cmp.at.x},${cmp.at.z})）` : "没有 0105 场景文件，没比"}；`
-    + `干沟沟底 ${at(PL.assembly)}、坡道口 ${at(PL.assemblyEntry)}、凹路口 ${at(PL.laneHead)}、妮儿的坎顶 ${at(PL.nierRim)}、驴车处 ${at(PL.cartStop)}`);
-  const lanes = [170, 199, 230, 260, 300, 340, 370, 376].map((z) => { const r = LaneDepthAt(sample, z); return `z${z} 底 ${r.floor} / 旁 ${r.side} 深 ${r.depth}`; });
-  notes.push(`凹路：${lanes.join(" · ")}；村口（街口坡道顶 (100,385)）${at(PL.villageMouth)}`);
-  const ditches = [60, 80, 100, 115, 124].map((x) => { const r = DitchSectionAt(sample, x); return `x${x} 底 ${r.floor} 沿 ${r.north}/${r.south} 宽 ${r.floorW}`; });
-  notes.push(`村口路沟：${ditches.join(" · ")}；街口坡道 z381.5…385 ${[381.5, 382.5, 383.5, 384.3, 385].map((z) => R2(sample(100, z))).join(" → ")}；趴着的人脚下 ${L0610_MOUTH_SHOOTERS.map((p) => `${p.who} ${R2(sample(p.x, p.z))}`).join(" / ")}`);
-  const rivers = [215, 260, 400, 500].map((z) => { const r = RiverSectionAt(sample, z); return `z${z} 底 ${r.floor} 岸 ${r.west}/${r.east} 宽 ${r.floorW}`; });
-  const ledges = [390, 420, 460, 500, 540].map((z) => { const r = RiverEastLedgeAt(sample, z); return `z${z} 坎沿 x${r.rimX} 到墙 ${r.ledgeW} m`; });
-  notes.push(`河汊子：${rivers.join(" · ")}；东坎沿到庄子西墙：${ledges.join(" · ")}；路沟西头 (38,380) ${R2(sample(38, 380))} / (36,380) ${R2(sample(36, 380))} / 西岸 (27,380) ${R2(sample(27, 380))}`);
-  notes.push(`村里：小空地 ${at(PL.square)} · 后院 ${R2(sample(100, 494))} · 主街 (100,420) ${R2(sample(100, 420))} · 东街 (180,465) ${R2(sample(180, 465))} · 窖底 ${at(PL.cellar)}（深 ${R2(sample(100, 494) - sample(PL.cellar.x, PL.cellar.z))}）· 村南口 ${at(PL.villageSouth)}`);
+    + `干沟沟底 ${at(PL.assembly)}、凹路口 ${at(PL.laneHead)}、驴车处 ${at(PL.cartStop)}`);
+  const lanes = [199, 260, 340, 376].map((z) => { const r = LaneDepthAt(sample, z); return `z${z} 深 ${r.depth}`; });
+  notes.push(`凹路：${lanes.join(" · ")}；村口 ${at(PL.villageMouth)}；路沟 x80 底 ${DitchSectionAt(sample, 80).floor} 宽 ${DitchSectionAt(sample, 80).floorW}；河汊子 z400 底 ${RiverSectionAt(sample, 400).floor}`);
+  notes.push(`村里：路口 ${at(PL.square)} · 老耿家院里 ${at(G.yard.center)} · 街坊家窖底 ${at(PL.cellar)} · 水坑底 ${R2(sample(POND.x, POND.z))} · 村南口 ${at(PL.villageSouth)} · 巷子口 ${at(PL.alleyMouth)}`);
   const s = L0610SightChecks(scene, sample);
-  notes.push(`视线：侧门口→窖边的人 ${s.sideGateToCellar.block ? `被 ${s.sideGateToCellar.block} 挡` : "看得见"}（地面挡 ${s.sideGateToCellar.ground}）· 门关着时 ${s.gateClosedBlocks ? `被 ${s.gateClosedBlocks} 挡` : "居然看得见"}`
-    + ` · 门缝里（眼 (${R2(s.eyes.gateCrack.x)},${R2(s.eyes.gateCrack.z)})）→窖口 ${s.throughGateCrack ? `被 ${s.throughGateCrack} 挡` : "看得见"}`
-    + ` · 墙缝（眼 (${R2(s.eyes.crack.x)},${R2(s.eyes.crack.z)})）→窖口 ${s.throughCrack ? `被 ${s.throughCrack} 挡` : "看得见"}`);
-  notes.push(`视线：北窗→村北口 ${s.windowToMouth ? `被 ${s.windowToMouth} 挡` : "看得见"}（地面挡 ${s.windowGround}）· 村口→北窗 ${s.mouthToWindow ? `被 ${s.mouthToWindow} 挡` : "看得见"}`
-    + ` · 石碾后趴着→东街东头 ${s.rollerToEast ? `被 ${s.rollerToEast} 挡` : "看得见"}（地面挡 ${s.rollerGround}）`);
-  notes.push(`视线（第二版）：街口坡道上趴着→北窗机枪手 ${s.shooterToWindow.map((r) => `${r.at.who} ${r.block ? `被 ${r.block} 挡` : r.ground > 0 ? `地面挡 ${r.ground}` : "看得见"}`).join(" / ")}`
-    + ` · 北窗→巷子 ${s.windowToAlley.map((r) => `${r.name} ${r.block ? `被 ${r.block} 挡` : r.ground > 0 ? "被地面挡" : "看得见！"}`).join(" / ")}`
-    + ` · 侧门里 (${s.eyes.side09_6.x},${s.eyes.side09_6.z}) 透过前屋南门看机枪组后背 ${s.sideToMgBacks.map((r) => `${r.who} ${r.block ? `被 ${r.block} 挡` : "看得见"}`).join(" / ")}`
-    + ` · 北窗→大车北侧蹲着的人 ${s.windowToCartHide ? `被 ${s.windowToCartHide} 挡` : "看得见！"}`);
-  const SayRoad = (r) => `(${r.at.x},${r.at.z}) ${r.block ? `被 ${r.block} 挡` : "块不挡"}${r.ground > 0 ? `/地面挡 ${r.ground}` : ""}`;
-  notes.push(`视线（第五版）：凹路尽头 (${R2(s.eyes.laneMouth.x)},${R2(s.eyes.laneMouth.z)}) 蹲着→东北道 ${s.eastRoad.laneMouth.map(SayRoad).join(" / ")}`
-    + ` · 街口坡道趴着→东北道 ${s.eastRoad.ramp.map(SayRoad).join(" / ")}`);
-  const dh = blocks.filter((b) => b.id.startsWith("SharedWall_")).map((b) => [b.z - b.d / 2, b.z + b.d / 2]).sort((a, b) => a[0] - b[0]);
-  const holes = dh.slice(1).map((r, i) => R2(r[0] - dh[i][1])).filter((w) => w > 0.01);
-  notes.push(`共用墙上的口子（从北到南）：${holes.join(" / ")} m（狗洞 / 墙缝 / 侧门）；狗洞过梁下沿 ${R2(blocks.find((b) => b.id === "DogHoleLintel").y - blocks.find((b) => b.id === "DogHoleLintel").h / 2 - sample(81.5, 488))} m`);
+  notes.push(`视线：街口坡道趴着→堂屋枪眼 ${s.shooterToLoophole.map((r) => `${r.at.who} ${r.block ? `被 ${r.block} 挡` : r.ground > 0 ? `地面挡 ${r.ground}` : "看得见"}`).join(" / ")}`
+    + ` · 枪眼→村北口 ${s.loopholeToMouth ? `被 ${s.loopholeToMouth} 挡` : "看得见"} · 枪眼→巷子 ${s.loopholeToAlley.map((r) => `${r.name} ${r.block || r.ground > 0 ? "挡" : "看得见！"}`).join(" / ")}`
+    + ` · 枪眼→大车北头 ${s.loopholeToCartHide ? `被 ${s.loopholeToCartHide} 挡` : "看得见！"}`);
+  notes.push(`视线：西配房窗洞→窖口 ${s.windowToCellar ? `被 ${s.windowToCellar} 挡` : "看得见"} · →石磨 ${s.windowToMill ? `被 ${s.windowToMill} 挡` : "看得见"} · 半掩的门缝→窖口 ${s.gateToCellar ? `被 ${s.gateToCellar} 挡` : "看得见"}`
+    + ` · 夹道里→窖口 ${s.laneToCellar ? `被 ${s.laneToCellar} 挡` : "看得见"} · 石碾后→探头点 ${s.probes.map((p) => `${p.id} ${p.dist}m/${p.deg}° ${p.block ? `被 ${p.block} 挡` : "看得见"}`).join(" / ")}`);
+  notes.push(`视线：凹路尽头蹲着→东北道 ${s.eastRoad.laneMouth.filter((r) => !r.block).length}/${s.eastRoad.laneMouth.length} 点块不挡 · 街口坡道趴着→东北道 ${s.eastRoad.ramp.filter((r) => !r.block).length}/${s.eastRoad.ramp.length} 点块不挡`);
   return scene;
 }

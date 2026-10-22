@@ -36,11 +36,23 @@ const Pt = (x, z) => ({ x: R2(x), z: R2(z) });
 const Dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const Yaw = (from, to) => R1(YawDegFromTo(from, to));
 const Off = (p, dx, dz) => Pt(p.x + dx, p.z + dz);
-const ROAD_Z = RD.line[0].z, LANE_X = LN.line[0].x, BRIDGE_X = BR.x;
+const ROAD_Z = RD.line[0].z, LANE_X = LN.line[LN.line.length - 1].x, BRIDGE_X = BR.x;   // LANE_X：小路接上大路那一截的 x（第六版小路头上先在 x 117、z 566 以后才是 98）
 /** 大路上按 x 取点（lat > 0 = 路南）。 */
 const RP = (x, lat = 0) => Pt(x, ROAD_Z + lat);
-/** 出村小路上按 z 取点（lat > 0 = 东）。 */
-const LP = (z, lat = 0) => Pt(LANE_X + lat, z);
+/** 出村小路上按 z 取点（折线在 z 上单调；z 在村里（< 村南口）就顺着头一段往北延；lat > 0 = 东）。 */
+const LP = (z, lat = 0) => {
+  const line = LN.line;
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i - 1], b = line[i];
+    if (z <= b.z || i === line.length - 1) {
+      const t = b.z === a.z ? 0 : Math.max(0, Math.min(1, (z - a.z) / (b.z - a.z)));
+      return Pt((z < a.z ? a.x : a.x + (b.x - a.x) * t) + lat, z);
+    }
+  }
+  return Pt(LANE_X + lat, z);
+};
+/** 小路从 fromZ 往北回到村南口再往村里延 toZ 的折线点（给后送队排队用）。 */
+const LaneBack = (fromZ, toZ = 540) => [...LN.line.filter((p) => p.z < fromZ - 0.1).slice().reverse().map((p) => Pt(p.x, p.z)), LP(toZ)];
 /** 浮桥 / 南岸路上按 z 取点（lat > 0 = 东）。 */
 const BP = (z, lat = 0) => Pt(BRIDGE_X + lat, z);
 /** 排水沟中线上按 x 取点（沟底只有 1.6 m 宽，沟里的人一律站中线；lat 往南偏）。 */
@@ -70,8 +82,8 @@ const Area = (name, box, ...portals) => areas.push({ name, box, portals: portals
 const Box = (minX, maxX, minZ, maxZ) => ({ minX, maxX, minZ, maxZ });
 
 // 出村小路：村南口 → 大路
-Node("LaneN", LANE_X, LN.line[0].z); Node("LaneMid", LANE_X, 580); Node("LaneJ", LANE_X, ROAD_Z);
-Chain("LaneN", "LaneMid", "LaneJ");
+Node("LaneN", LN.line[0].x, LN.line[0].z); LN.line.slice(1, -1).forEach((p, i) => Node(`LaneBend${i + 1}`, p.x, p.z)); Node("LaneMid", LANE_X, 580); Node("LaneJ", LANE_X, ROAD_Z);
+Chain("LaneN", ...LN.line.slice(1, -1).map((_, i) => `LaneBend${i + 1}`), "LaneMid", "LaneJ");
 // 大路：东头出界 → 桥头空场
 const ROAD_XS = [150, 40, 2, PL.cartRaidAt.x, -40, -70, -100, -120, BH.trench.x, -140, -150];
 Node("RoadE", ROAD_XS[0], ROAD_Z);
@@ -377,7 +389,7 @@ function Convoy(back, mode = "walk", heading = 90, { exclude = new Set() } = {})
   }
   return out;
 }
-const BackLine = (tail) => (tail.z < ROAD_Z - 0.1 ? [tail, LP(540)] : [tail, RP(LANE_X), LP(540)]);
+const BackLine = (tail) => (tail.z < ROAD_Z - 0.1 ? [tail, ...LaneBack(tail.z)] : [tail, RP(LANE_X), ...LaneBack(ROAD_Z)]);
 
 // 12-3 起大路西段排着过桥的长队：担架、牛车、背着铺盖的百姓、走着的伤兵（30 个），停在路上
 const QUEUE_SLOTS = Array.from({ length: 30 }, (_, i) => {
@@ -471,15 +483,15 @@ function Keyframes() {
 
   // ======================= 12 车边 =======================
   const s12 = { stage: 12, stageTitle: "车边" };
-  // 12-1：出了后门往南，驴车在前头（朝南），顺子走在车尾边上
+  // 12-1：出了村南口往南，驴车在前头（朝南），顺子走在车尾边上（10-22 第六版：老耿家没有后门了，10 末从东墙外的窄胡同出村南口）
   const p121 = Pt(99.7, 589.6);   // 车尾边上（冬瓜那副担架东边一步），不踩担架
   const cart121 = LP(592.6), tail121 = Pt(98.2, 590.9), heizi121 = LP(595.0);
   Add({
     id: "12-1", ...s12, name: "出村",
     player: { x: p121.x, z: p121.z, yawDeg: 180, pitchDeg: -2, stance: "stand" },
-    what: "驴车出后门往南；身后机枪停了、轰一声，老耿家方向冒烟。",
+    what: "驴车出了村南口往南；身后村里的炮停了、轰一声，老耿家方向冒烟。",
     next: { text: "跟着驴车往西去桥头", x: 40, z: ROAD_Z, radiusM: 4 },
-    how: ["车板上横搁着三副担架，冬瓜那副靠车尾，妮儿坐车尾两条腿悬着", "刘文财跟在身后半步，顺子停他也停", "身后村里机枪声停了、「轰」一声闷响", "老耿回头看一眼冒烟的方向，鞭杆搭一下接着走"],
+    how: ["车板上横搁着三副担架，冬瓜那副靠车尾，妮儿坐车尾两条腿悬着", "刘文财跟在身后半步，顺子停他也停", "身后村里的炮停了、「轰」一声闷响（老耿家院门框上那颗手榴弹）", "老耿回头看一眼冒烟的方向，鞭杆搭一下接着走"],
     notes: "车板上三副担架横搁着（ride 挂在 GengCart 上，车板顶 1.025 m）：冬瓜那副靠车尾，另两副（CartLitter1 / 2）上各躺一个伤员；妮儿坐车尾沿（ride，两条腿悬在外头）。黑子用 kind animal 单独一个单位走在车前头。"
       + "后送队 8 副担架 + 7 个走着的伤兵跟在车后头（从小路一直排到村南口）。",
     signals: [],

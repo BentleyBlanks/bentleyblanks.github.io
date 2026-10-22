@@ -37,7 +37,8 @@ assert.ok(cmp.worst <= 0.03, `接缝 z ${L1218_GROUND.seamZ}±1 与 0610 地面�
 if (cmp.file) assert.ok(cmp.file.worst <= 0.02, `村南那一截与 0610 场景文件不一致：最大差 ${cmp.file.worst} m（(${cmp.file.at.x},${cmp.file.at.z})）`);
 else console.log("提示：没有 Blockout/FirstLevel0610.scene.json，跳过与场景文件的比对");
 Near(sample(PL.villageSouth.x, PL.villageSouth.z), 0.3 - 0.12, 0.08, "村南口（0610 的街面）");
-assert.ok(a.blocks.some((x) => x.id === "GengHaystack") && a.blocks.some((x) => x.id === "House_SW1") && a.blocks.some((x) => x.id === "BackDoorLeafOpen"), "0610 村南那一截的块带过来了（含 10-4 开着的后门扇）");
+// 2026-10-22 跟着 0610 第六版：后门没了，带过来的是便门开着的那扇（SideGateLeafOpen）、窄胡同塌下的墙（LaneWallFallen）、村南的院子（House_SW1_1）
+assert.ok(a.blocks.some((x) => x.id === "GengHaystack") && a.blocks.some((x) => x.id === "House_SW1_1") && a.blocks.some((x) => x.id === "SideGateLeafOpen") && a.blocks.some((x) => x.id === "LaneWallFallen"), "0610 村南那一截的块带过来了（含开着的便门扇、塌进胡同的墙）");
 assert.ok(!byId.has("BackDoorLeaf") && !byId.has("BackVat") && !byId.has("SideGateLeaf") && !byId.has("CellarSmoke"), "0610 关着 / 原样的那一份与窖口冒烟不带");
 assert.ok(a.blocks.every((x) => !x.signal && !x.appearSignal), "blocks 里不许带信号");
 

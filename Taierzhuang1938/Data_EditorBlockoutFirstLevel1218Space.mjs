@@ -3,7 +3,9 @@
 //
 // 唯一口径：集成负责人 2026-10-19 在聊天里给用户的 12–18 扩写稿（还没进 Notion）+ 同日的分拍空间图。
 // 坐标与 FirstLevel0105 / FirstLevel0610 同一套：原点 = 01–05 的沟口；X 向东、Z 向南、米；yawDeg 0 朝北、+90 朝西、−90 朝东、180 朝南。
-// 村南那一截（z < 556：老耿家后院、后门、后门外的小路、村南两片院子、河汊子直段）原样用 0610 的地面与体块，不抄数字。
+// 村南那一截（z < 556：老耿家、窄胡同、村南口、村南的院子、河汊子直段）原样用 0610 的地面与体块，不抄数字。
+// 2026-10-22 跟着 0610 第六版空间：村南口从 (98,545) 挪到 (117,545)（出村的窄胡同在老耿家东墙外），出村小路先顺着往南 7 m 再斜回 x 98，
+// 到 z 566 以后照旧是 x 98 的直路（12-1 车尾、顺子、刘文财的站位都在 z ≥ 588，不用动）；老耿家没有后门了，「回头看见冒烟」指老耿家院子。
 // 0610 里没有的往南部分写在这里：出村小路、沿北沙河往西的大路、拐过来往西的河汊子、路边浅沟、排水沟、两道河堤、北沙河、
 // 浮桥、桥头接收院与散兵坑、最后一拨人躲的土坎、远处的铁路桥、南岸往北门的路、北门（挪近了，真实隔着十来里，预演里黑场带过）。
 //
@@ -53,7 +55,7 @@ export const L1218_FROM_0610 = Object.freeze({
   backLane: L0610_STREETS.backLane,   // 后门外往南的小路 x 98、z 506…545
   southYards: Object.freeze({ west: L0610_STREET_YARDS.southWest, east: L0610_STREET_YARDS.southEast }),
   river: L0610_RIVER,                 // 河汊子的横断面（沟底宽、深、两壁、岸上土埂）
-  backDoor: L0610_PLACES.backDoor,
+  gengGate: L0610_PLACES.gengGate,      // 老耿家院门（东墙上，朝窄胡同）；第六版没有后门了
   villageSouth: L0610_PLACES.villageSouth,
 });
 
@@ -82,8 +84,8 @@ export const L1218_HEIGHTS = Object.freeze({
   gateYardY: 0.3,            // 北门内外压平
 });
 
-/** 出村小路：0610 的后门小路（到 z 545）再往南接到大路。 */
-export const L1218_LANE = Object.freeze({ name: "出村小路", line: Line([98, 545], [98, 612]), halfW: 1.5 });
+/** 出村小路：0610 的窄胡同出村（新村南口 (117,545)）先往南 7 m、再斜回 x 98（到 z 566），然后顺着往南接到大路 (98,612)。折线在 z 上单调。 */
+export const L1218_LANE = Object.freeze({ name: "出村小路", line: Line([L0610_PLACES.villageSouth.x, L0610_PLACES.villageSouth.z], [L0610_PLACES.villageSouth.x, 552], [98, 566], [98, 612]), halfW: 1.5 });
 
 /** 大路：沿北沙河北岸东西向，东头出界（鬼子从那边来），西头到桥头空场。路两边各一道浅沟。 */
 export const L1218_ROAD = Object.freeze({
@@ -240,9 +242,9 @@ export const L1218_SIGNALS = Object.freeze({
 
 /** 关键地点。x/z 是中心或站点。 */
 export const L1218_PLACES = Object.freeze({
-  backDoor: L0610_PLACES.backDoor,                                  // 老耿家后门 (98,506)
-  villageSouth: L0610_PLACES.villageSouth,                          // 村南口 (98,545)
-  gengSmoke: P(98, 500),                                            // 12-1 回头看见冒烟的地方（老耿家后院 / 后门那一片）
+  gengGate: L0610_PLACES.gengGate,                                  // 老耿家院门 (108,483.5)（第六版：东墙上，没有后门了）
+  villageSouth: L0610_PLACES.villageSouth,                          // 村南口 (117,545)（第六版挪到窄胡同出村的地方）
+  gengSmoke: P(101, 479),                                           // 12-1 回头看见冒烟的地方（老耿家院子那一片）
   laneJunction: P(98, 612),                                         // 出村小路接上大路
   cartRaidAt: P(-13.5, 612),                                        // 13-1 驴车被扫的地方（车中心）
   ditchMouth: P(-40, 619.5),                                        // 沟口

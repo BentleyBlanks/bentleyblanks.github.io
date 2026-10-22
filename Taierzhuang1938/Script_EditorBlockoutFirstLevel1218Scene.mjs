@@ -185,8 +185,20 @@ function RunDelta(x, z, axis, c, from, to, half, lower) {
   if (d >= 0.9) return 0;
   return -lower * (1 - Smooth((d + 0.3) / 0.6));
 }
+/** 出村小路（折线）压低：离中线 halfW 以内压 laneLower，外 0.9 m 内渐出；z < LANE_FROM_Z 不压（接缝那一截归 0610）。 */
+function LaneDelta(x, z) {
+  let best = Infinity;
+  for (let i = 1; i < LN.line.length; i++) {
+    const a = LN.line[i - 1], b = LN.line[i], dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
+    const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / (len * len)));
+    best = Math.min(best, Math.hypot(x - a.x - dx * t, z - a.z - dz * t));
+  }
+  const d = Math.hypot(Math.max(best - LN.halfW, 0), Math.max(LANE_FROM_Z - z, 0));
+  if (d >= 0.9) return 0;
+  return -H.laneLower * (1 - Smooth((d + 0.3) / 0.6));
+}
 function RoadDelta(x, z) {
-  const lane = RunDelta(x, z, "z", LN.line[0].x, LANE_FROM_Z, LN.line[1].z, LN.halfW, H.laneLower);
+  const lane = LaneDelta(x, z);
   const road = RunDelta(x, z, "x", RD.line[0].z, RD.line[RD.line.length - 1].x, RD.line[0].x, RD.halfW, H.roadLower);
   const south = RunDelta(x, z, "z", L1218_SOUTH.road.line[0].x, L1218_SOUTH.road.line[0].z, L1218_SOUTH.road.line[1].z, L1218_SOUTH.road.halfW, H.roadLower);
   return Math.min(lane, road, south);
@@ -200,7 +212,7 @@ function GutterDelta(x, z) {
     const d = Math.abs(z - gz);
     if (d >= RD.gutterW / 2) continue;
     let w = 1 - Smooth(d / (RD.gutterW / 2));
-    if (side < 0) w *= Smooth((Math.abs(x - LN.line[0].x) - LN.halfW - 1) / 1);   // 出村小路接上大路的地方北边浅沟断开
+    if (side < 0) w *= Smooth((Math.abs(x - LN.line[LN.line.length - 1].x) - LN.halfW - 1) / 1);   // 出村小路接上大路的地方北边浅沟断开
     delta = Math.min(delta, -H.gutterDepth * w * endW);
   }
   return delta;
