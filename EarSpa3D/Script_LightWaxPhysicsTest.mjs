@@ -6,7 +6,8 @@ import * as current from './Script_SoftWaxPhysics.mjs';
 import {CreateWaxFlight,StepWaxFlight,WaxGravityMm} from './Script_WaxFlight.mjs';
 const ModuleUrl=source=>'data:text/javascript;base64,'+Buffer.from(source).toString('base64');
 const utility=ModuleUrl(await fs.readFile(new URL('./Script_Util.js',import.meta.url),'utf8'));
-const source=(await fs.readFile(new URL('./Script_WaxMorphology.mjs',import.meta.url),'utf8')).replace("'./Script_Util.js'",JSON.stringify(utility));
+const source=(await fs.readFile(new URL('./Script_WaxMorphology.mjs',import.meta.url),'utf8')).replace("'./Script_Util.js'",JSON.stringify(utility))
+  .replace(/'\.\/Data_WaxSculptProfiles\.mjs\?[^']*'/,JSON.stringify(new URL('./Data_WaxSculptProfiles.mjs',import.meta.url).href));
 const {BuildWaxShape}=await import(ModuleUrl(source));
 const report={checks:[],flight:[],comparison:null},Check=(condition,label)=>{assert.ok(condition,label);report.checks.push(label);};
 function Body(api,type){

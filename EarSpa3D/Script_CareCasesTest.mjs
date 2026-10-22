@@ -5,6 +5,10 @@ function Check(ok,label){assert.ok(ok,label);checks++;}
 Check(CARE_CASE_IDS.join(',')==='drySheet,softenedWax,deepBend','only requested cases 1, 2 and 5 are added');
 Check(CustomerCase({id:'d1c0',earType:'mixed'})==='drySheet'&&CustomerCase({id:'d1c1',earType:'mixed'})==='softenedWax'&&CustomerCase({id:'d2c1',earType:'mixed'})==='deepBend','business visits rotate the three cases deterministically');
 Check(CustomerCase({id:'d3c0',earType:'oily'})===null,'existing oil service keeps its independent coating layout');
+Check(CustomerCase({id:'d2c1',earType:'mixed'},['scoop'])==='drySheet','a spoon-only career always receives a shallow completable request');
+Check(CustomerCase({id:'d2c1',earType:'mixed'},['scoop','tweezers'])==='drySheet','deep cases wait for both softening and extraction equipment');
+Check(CustomerCase({id:'d2c1',earType:'mixed'},['scoop','drops','tweezers'])==='deepBend','owning the required tools restores the planned deep case');
+Check(CustomerCase({id:'d2c1',earType:'mixed',caseId:'drySheet'},['scoop','drops','tweezers'])==='drySheet','buying tools midway cannot replace an already assigned shallow request');
 Check(!CaseProgress('drySheet',[{id:3,state:'held'}],[]).complete,'detached or carried material does not complete a goal');
 Check(!CaseProgress('drySheet',[],[{id:2,mass:.9}]).complete,'unrelated wax cannot satisfy a target');
 Check(!CaseProgress('drySheet',[],[{id:'3.0',mass:.4},{id:'3.0',mass:.4}]).complete,'duplicate fragment receipts cannot complete a target');

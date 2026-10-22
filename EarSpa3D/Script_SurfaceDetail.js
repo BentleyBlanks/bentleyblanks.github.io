@@ -36,35 +36,46 @@ export function BindWaxAppearance(shader,{type,pale}){
     float waxRenderWet=waxWet*earWetQuality;
     float waxRenderSoft=waxSoft*earWetQuality;
     float waxMottle=SurfaceNoise(waxLocal*4.7);
+    float waxFold=SurfaceNoise(waxLocal*12.0+vec3(waxMottle*2.8,0.0,1.7));
     float waxGrainFilter=SurfaceFilter(waxLocal,38.0);
     float waxGrain=earDetailLayers>2&&waxGrainFilter>0.0?SurfaceNoise(waxLocal*38.0):.5;
     float waxLamellaFilter=SurfaceFilter(waxLocal,63.0);
-    float waxLamella=earDetailLayers>1&&waxLamellaFilter>0.0?sin(waxLocal.y*63.0+waxMottle*9.0):0.0;
+    // Broken and branching keratin ridges have unequal spacing; an unwarped
+    // sine made every material look like parallel embossing on plastic.
+    float waxLamella=earDetailLayers>1&&waxLamellaFilter>0.0?sin(waxLocal.y*47.0+waxLocal.x*19.0+waxMottle*13.0+waxFold*6.0):0.0;
+    float waxCrease=(1.0-smoothstep(.045,.17,abs(waxFold-.48)))*SurfaceFilter(waxLocal,18.0);
+    float waxThinEdge=exp(-max(.006,waxState.x)*${type==='impacted'?'14.0':'24.0'});
     float waxTexture=clamp(pow(max(.001,dot(diffuseColor.rgb,vec3(.299,.587,.114))),.32),0.0,1.0);
-    vec3 waxLow=${pale?'vec3(.52,.33,.145)':type==='impacted'?'vec3(.14,.055,.017)':'vec3(.36,.16,.055)'};
-    vec3 waxHigh=${pale?'vec3(.90,.75,.47)':type==='impacted'?'vec3(.43,.24,.075)':'vec3(.78,.47,.17)'};
-    diffuseColor.rgb=mix(waxLow,waxHigh,clamp(waxTexture*.65+waxMottle*.35,0.0,1.0));
+    vec3 waxLow=${pale?'vec3(.39,.265,.105)':type==='impacted'?'vec3(.022,.0055,.0014)':type==='wet'?'vec3(.30,.095,.009)':'vec3(.29,.125,.031)'};
+    vec3 waxHigh=${pale?'vec3(.82,.68,.39)':type==='impacted'?'vec3(.15,.046,.010)':type==='wet'?'vec3(.78,.41,.082)':'vec3(.68,.40,.12)'};
+    float waxPatch=clamp(waxTexture*.32+waxMottle*.39+waxFold*.29,0.0,1.0);
+    diffuseColor.rgb=mix(waxLow,waxHigh,waxPatch);
+    // The amber centre is optical density, not a painted circular mask. Real
+    // shell thickness is retained during deformation and inherited by cuts.
+    ${type==='wet'?'diffuseColor.rgb*=exp(-max(.0,waxState.x-.010)*vec3(4.7,7.5,11.0));':type==='impacted'?'diffuseColor.rgb*=exp(-max(.0,waxState.x-.060)*vec3(.70,1.0,1.3));':''}
+    diffuseColor.rgb*=1.0-waxCrease*${type==='impacted'?'.22':'.07'}*earSurfaceDetail;
+    diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(1.19,1.17,1.12),waxThinEdge*.38);
     float waxLoad=smoothstep(.025,.19,waxState.y);
     float waxDamage=clamp(waxState.z,0.0,1.0);
     float waxFissure=(1.0-smoothstep(.025,.10,abs(waxGrain-.46)))*waxDamage*waxGrainFilter;
     diffuseColor.rgb*=1.0-waxFissure*.30*earSurfaceDetail;
     float waxKeratin=(waxLamella*.5+.5)*waxLamellaFilter*earSurfaceDetail*(1.0-waxRenderSoft*.7);
-    diffuseColor.rgb*=1.0+${type==='wet'?'.035':'.075'}*(waxKeratin-.5);
+    diffuseColor.rgb*=1.0+${type==='wet'?'.07':'.12'}*(waxKeratin-.5);
     diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(1.22,1.15,1.04),waxCut*.6);
   `);
   shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
     float waxRelief=earSurfaceDetail*(1.0-waxRenderSoft*.65)*(
-      (earDetailLayers>0?(waxMottle-.5)*.009*SurfaceFilter(waxLocal,5.0):0.0)+
-      (earDetailLayers>1?waxLamella*.0022*(.4+waxLoad)*waxLamellaFilter:0.0)+
-      (earDetailLayers>2?(waxGrain-.5)*.002*waxGrainFilter:0.0));
+      (earDetailLayers>0?(waxMottle-.5)*.010*SurfaceFilter(waxLocal,5.0):0.0)+
+      (earDetailLayers>1?(waxFold-.5)*${type==='impacted'?'.013':'.008'}*SurfaceFilter(waxLocal,12.0)-waxCrease*.003+waxLamella*.0021*(.6+waxLoad)*waxLamellaFilter:0.0)+
+      (earDetailLayers>2?(waxGrain-.5)*${type==='wet'?'.002':'.0038'}*waxGrainFilter:0.0));
     normal=SurfaceNormal(normal,waxRelief,-vViewPosition);
     // Broaden unresolved normal highlights at oblique angles (specular AA).
     vec3 waxDx=dFdx(normal),waxDy=dFdy(normal);
     roughnessFactor=min(.92,sqrt(roughnessFactor*roughnessFactor+min(.16,.32*(dot(waxDx,waxDx)+dot(waxDy,waxDy)))));
   `);
   shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
-    roughnessFactor=mix(${type==='wet'?'.34':type==='impacted'?'.58':'.68'},.28,waxRenderWet);
-    roughnessFactor=clamp(roughnessFactor+(waxMottle-.5)*.17+waxCut*.11+waxLoad*.055,.23,.86);
+    roughnessFactor=mix(${type==='wet'?'.37':type==='impacted'?'.56':'.69'},.29,waxRenderWet);
+    roughnessFactor=clamp(roughnessFactor+(waxMottle-.5)*.16+waxCrease*.08+waxCut*.11+waxLoad*.055,.25,.86);
   `);
   // Per-light wax diffusion uses the actual thickness and shadowed radiance.
   // Thin keratin edges transmit amber light; dense plugs retain a dark core.

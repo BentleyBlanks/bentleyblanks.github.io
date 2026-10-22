@@ -1,14 +1,24 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {CreatePeelBody,BindPeelSurface,WritePeelSurface,StepPeelBody} from './Script_PeelPhysics.mjs';
+import {WAX_SCULPT_PROFILES} from './Data_WaxSculptProfiles.mjs';
 
 // Browser .js modules live in a CommonJS repository. Load the shared RNG as ESM
 // for this CPU check without maintaining a second implementation of the RNG.
 const ModuleUrl=source=>'data:text/javascript;base64,'+Buffer.from(source).toString('base64');
 const utility=ModuleUrl(await fs.readFile(new URL('./Script_Util.js',import.meta.url),'utf8'));
-const source=(await fs.readFile(new URL('./Script_WaxMorphology.mjs',import.meta.url),'utf8')).replace("'./Script_Util.js'",JSON.stringify(utility));
+const source=(await fs.readFile(new URL('./Script_WaxMorphology.mjs',import.meta.url),'utf8')).replace("'./Script_Util.js'",JSON.stringify(utility))
+  .replace(/'\.\/Data_WaxSculptProfiles\.mjs\?[^']*'/,JSON.stringify(new URL('./Data_WaxSculptProfiles.mjs',import.meta.url).href));
 const {BuildWaxShape,BuildWaxDebris}=await import(ModuleUrl(source)),{MakeRng}=await import(utility);
 let checks=0;const Check=(condition,label)=>{assert.ok(condition,label);checks++;};
+for(const [type,profile] of Object.entries(WAX_SCULPT_PROFILES.profiles)){
+  Check(profile.rayMisses===0&&profile.top.length===337&&profile.bottom.length===337&&profile.sourceVertices>8000,
+    type+': every runtime sample came from a dense Blender surface ray');
+  const thickness=profile.top.map((z,i)=>z-profile.bottom[i]);
+  Check(thickness.every(v=>v>=.0079)&&Math.max(...thickness)>Math.min(...thickness)*2,
+    type+': sampled surfaces stay separate and retain thin edges / thick interiors');
+}
+Check(Math.max(...WAX_SCULPT_PROFILES.profiles.dry.bottom)>.35,'dry silhouette has a real raised fold, not only a coloured flat sheet');
 function Audit(shape,components){
   const {positions:p,indices:ix}=shape,edges=new Map(),parent=Array.from({length:p.length/3},(_,i)=>i);
   const Root=i=>parent[i]===i?i:parent[i]=Root(parent[i]);
@@ -33,9 +43,12 @@ for(const type of ['dry','wet','impacted']){
   const volumes=[];
   for(let seed=1;seed<=32;seed++){
     const options={seed,type,radii:[.85,1.15]},shape=BuildWaxShape(options);
+    assert.equal(shape.positions.length/3,674,'source sculpt keeps the existing render binding budget');
+    assert.equal(shape.sculpt.source,WAX_SCULPT_PROFILES.sourceSha256,'runtime geometry identifies the dense source bake');
     volumes.push(Audit(shape,1));
     assert.deepEqual(BuildWaxShape(options),shape,'same seed reproduces every surface attribute');
     const body=BindPeelSurface(CreatePeelBody({position:[0,0,0],rotation:[0,0,0,1],normal:[0,0,1],size:.8,type,footprint:options.radii}),shape.positions,shape.indices);
+    assert.equal(body.surface.rest.length,65,'folded profiles do not grow the XPBD solver lattice');
     const output=new Float32Array(shape.positions.length);WritePeelSurface(body,output);
     assert.ok(output.every((v,i)=>Math.abs(v-shape.positions[i])<1e-6),'binding preserves curls and thickness');
     for(let frame=0;frame<3;frame++)StepPeelBody(body,{},1/60);

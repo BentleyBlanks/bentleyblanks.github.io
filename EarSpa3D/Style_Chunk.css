@@ -133,6 +133,19 @@ dialog{padding:23px;max-height:calc(100dvh - 24px)}#settings-dialog>.dialog-head
 #click-help,#tool-depth{font-size:11px;color:var(--ui-cream);padding:9px 11px;background:var(--ui-glass);border:1px solid var(--ui-edge);border-radius:6px}
 #tool-depth{font-variant-numeric:tabular-nums;min-width:66px;text-align:center}
 #action-cancel,#manual-tray{min-height:37px;padding:8px 12px;border:1px solid #d6b98580;border-radius:6px;background:var(--ui-panel);color:var(--ui-cream);font-size:11px;pointer-events:auto}
+#lamp-aim{min-height:37px;padding:8px 12px;border:1px solid var(--ui-edge);border-radius:6px;background:var(--ui-panel);color:var(--ui-cream);font-size:11px;pointer-events:auto}
+#lamp-aim[aria-pressed=true]{border-color:var(--ui-gold);background:#715c35b8}
+.shop-nav{overflow-x:auto;justify-content:flex-start;scrollbar-width:thin}.shop-nav button{flex:0 0 auto;white-space:nowrap}
+.collection-summary{display:block;padding:20px;border:1px solid var(--ui-edge)}
+.collection-summary p{flex:1;min-width:180px;font-size:12px;line-height:1.8;color:var(--ui-muted)}
+.collection-summary .shop-buy{width:auto;min-width:160px}
+.collection-grade-key{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}.collection-grade-key span{font-size:10px;padding:5px 9px;border:1px solid var(--ui-edge);border-radius:4px;color:var(--ui-cream)}
+.collection-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;padding:8px 0}
+.collection-card{position:relative;min-width:0;padding:18px;border:1px solid var(--ui-edge);border-radius:7px;background:#211b16aa}.collection-card :is(h3,h4){font-family:var(--ui-serif);font-size:19px;font-weight:400;margin:13px 0}.collection-card p{font-size:11px;line-height:1.8}
+.collection-emblem{display:grid;place-items:center;width:44px;height:44px;font:24px var(--ui-serif);border-radius:50%;border:1px solid #a28d6e;color:#c6b497;background:#54452f44}
+.collection-card[data-grade="2"] .collection-emblem{color:#d1c6a4;border-color:#aaa277}.collection-card[data-grade="3"] .collection-emblem{color:#e4c287;border-color:#bd9c66}.collection-card[data-grade="4"] .collection-emblem{color:#ead79e;border-color:#d0b86e}.collection-card[data-grade="5"]{border-color:#d6b76a}.collection-card[data-grade="5"] .collection-emblem{color:#ffe5a2;border-color:#ebcc7e;box-shadow:0 0 18px #ebc76c22}
+.light-upgrades{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}.light-upgrades .room-card{min-width:0}.light-upgrades .tool-icon{width:56px;height:80px;object-fit:contain;display:block;margin:0 auto}
+@media(max-width:600px){.collection-grid{grid-template-columns:1fr}.collection-summary .shop-buy{width:100%}.shop-nav{gap:4px}.shop-nav button{padding:10px 13px}.light-upgrades{grid-template-columns:1fr}}
 #manual-tray kbd{font:inherit;font-size:10px;color:var(--ui-gold);margin-left:5px}
 #tool-reticle{position:absolute;z-index:7;pointer-events:none;width:8px;height:8px;border:1px solid #f4deab;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 2px #1d171a99}
 #tool-reticle[data-contact=true]{border-color:#eab380;box-shadow:0 0 0 2px #3c2416aa}

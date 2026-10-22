@@ -16,7 +16,7 @@ import { CreateInput } from "./Script_Input.js?v=ear006-20260911";
 import { CreateCameraRig } from "./Script_Camera.js?v=ear006-20260911";
 import { CreateSession } from "./Script_Session.js?v=ear006-20260911";
 import { CreateHand } from "./Script_Hand.js?v=ear006-20260911";
-import { CreateShop, SHOP_LEVELS } from "./Script_Shop.js?v=ear006-20260911";
+import { CreateShop, SHOP_LEVELS } from "./Script_Shop.js?v=ear050-career-care-20261022";
 import { Clamp, Damp, MakeRng } from "./Script_Util.js?v=ear006-20260911";
 
 /** 动态 import：拿不到就记一笔，页面继续跑。 */

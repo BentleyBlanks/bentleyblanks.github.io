@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {SURFACE_GLSL,BindWaxAppearance} from './Script_SurfaceDetail.js?v=ear044-light-wax-20261008';
+import {SURFACE_GLSL,BindWaxAppearance} from './Script_SurfaceDetail.js?v=ear050-career-care-20261022';
 import {CreateContactOcclusion} from './Script_ContactOcclusion.js?v=ear041-material-response-20261003';
 // imagegen 的图集按通道拆成 GPU 纹理；法线/粗糙度/AO 保持线性，颜色才走 sRGB。
 export async function CreateTactileMaterials(renderer) {
@@ -205,7 +205,7 @@ export async function CreateTactileMaterials(renderer) {
       };material.customProgramCacheKey=()=> 'OilyLipidScattering4';return ConfigureMaterial(material);
     }
     const pale=tone==='paleYellow';
-    const material=new THREE.MeshPhysicalMaterial({...wax,color:type==='impacted'?0xcbb588:type==='wet'?0xd1bfa1:0xfff3d5,roughness:type==='wet'?.27:1,normalScale:new THREE.Vector2(pale?.11:.22,pale?.11:.22),aoMapIntensity:pale?.35:.58,clearcoat:type==='wet'?.8:0,clearcoatRoughness:.13,metalness:0});
+    const material=new THREE.MeshPhysicalMaterial({...wax,color:type==='impacted'?0xcbb588:type==='wet'?0xd1bfa1:0xfff3d5,roughness:type==='wet'?.37:1,normalScale:new THREE.Vector2(pale?.09:.16,pale?.09:.16),aoMapIntensity:pale?.32:.52,clearcoat:type==='wet'?.36:0,clearcoatRoughness:.27,metalness:0,specularIntensity:type==='wet'?.72:.82});
     material.depthWrite=true;material.transparent=false;material.ior=1.46;
     material.userData.waxWet={value:0};material.userData.waxSoft={value:0};
     material.onBeforeCompile=shader=>{
@@ -215,7 +215,7 @@ export async function CreateTactileMaterials(renderer) {
       shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>',`
         diffuseColor.rgb*=mix(vec3(1.0),vec3(.76,.65,.48),waxRenderWet*.55+waxRenderSoft*.45);
         #include <roughnessmap_fragment>`);
-      contact.Bind(shader,{self:material.userData.contactSelf,wall:material.userData.contactWall});material.userData.contactShader=shader;};material.customProgramCacheKey=()=> 'WaxLamellarResponse5'+type+pale;
+      contact.Bind(shader,{self:material.userData.contactSelf,wall:material.userData.contactWall});material.userData.contactShader=shader;};material.customProgramCacheKey=()=> 'WaxSculptLamellar6'+type+pale;
     return ConfigureMaterial(material);
   }
   function WetWax(material,softness,wetness,type){
@@ -223,7 +223,7 @@ export async function CreateTactileMaterials(renderer) {
     // Keep physical state independent of quality, including frozen tray copies.
     material.userData.waxWet.value=wetness;material.userData.waxSoft.value=softness;
     material.roughness=(type==='wet'?.65-.38*quality.wetness:1)*(1-wetness*quality.wetness*.81);
-    material.clearcoat=Math.max(type==='wet'?.48:0,wetness*.68);material.clearcoatRoughness=.27;
+    material.clearcoat=Math.max(type==='wet'?.36:0,wetness*.58);material.clearcoatRoughness=.27;
     const normal=material.userData.dryNormalScale||(material.userData.dryNormalScale=material.normalScale.clone());
     material.normalScale.copy(normal).multiplyScalar(1-softness*.72);
   }

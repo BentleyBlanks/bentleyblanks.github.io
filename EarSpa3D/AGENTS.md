@@ -7,7 +7,7 @@
 | 文件 | 当前职责 |
 | --- | --- |
 | `index.html`、`Script_ChunkGame.js`、`Style_Chunk.css` | 启动、UI、实际输入、营业与设置接线 |
-| `Script_PrecisionInput.mjs` | 电脑精细操作：独立平移、进退、转腕与夹持输入 |
+| `Script_PrecisionInput.mjs` | 辅助贴合输入、短行程刮／夹与可选精细微调 |
 | `Data_CareCases.mjs` | 病例 1／2／5 的布局、目标、碎片归属与额外挑战 |
 | `Script_Core.js`、`Script_ImmersiveScene.js` | 渲染核心、实时耳部场景、器具与物理装配 |
 | `Script_PeelPhysics.mjs`、`Script_SoftWaxPhysics.mjs`、`Script_FractureGeometry.js` | 块体状态、薄壳形变与断口 |
@@ -21,7 +21,8 @@
 ## 按任务查阅
 
 - 改输入、接口、空间、物理或经营，读 [当前契约](Data_Contract.md) 涉及章节，再按其路由查分项；单点文案无需通读旧 API。
-- 当前键鼠操作与 Surgeon Simulator 对标取舍见 [精细操作说明](Data_PrecisionControls.md)；真实输入验收为 `Script_PrecisionPlayTest.mjs`。
+- 当前辅助贴合操作与模拟游戏对标取舍见 [辅助操作说明](Data_PrecisionControls.md)；真实输入验收为 `Script_AssistedPlayTest.mjs`。
+- 经营分级、售价、小费与装备解锁见 [经营成长策划](Data_ProgressionDesign.md)。
 - 病例目标、练习、交单和接待顺序见 [病例说明](Data_CareCases.md)，真实输入验收为 `Script_CareCasesPlayTest.mjs`。
 - 改外耳、工具或材质，按 [分项契约](Data_SystemContracts.md) 定位对应资产说明与源工程。
 - 选测、截图及交互证据见 [验收索引](Data_Verification.md)；单文件交付见 [打包说明](Data_Packaging.md)。

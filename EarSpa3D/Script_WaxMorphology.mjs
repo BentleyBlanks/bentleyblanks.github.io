@@ -1,11 +1,61 @@
 import {MakeRng} from './Script_Util.js';
+import {WAX_SCULPT_PROFILES} from './Data_WaxSculptProfiles.mjs?v=ear050-career-care-20261022';
 
 const tau=Math.PI*2;
 const Clamp=(value,low,high)=>Math.max(low,Math.min(high,value));
 
+// Sampled from the dense maquettes in Model_WaxCareer20261022.blend. Keeping
+// the same radial topology preserves the 65-node XPBD cage and fracture path.
+function BuildSculptWaxShape({seed,type,radii,variant}){
+  const source=WAX_SCULPT_PROFILES.profiles[type]||WAX_SCULPT_PROFILES.profiles.dry;
+  const {segments,rings}=WAX_SCULPT_PROFILES,layer=1+rings*segments;
+  const rng=MakeRng(seed),shift=Math.floor(rng()*segments),phase=rng()*tau;
+  const shear=(rng()-.5)*.14,tilt=(rng()-.5)*.06,relief=.88+rng()*.24;
+  const scale=Math.min(...radii),heightScale=Math.pow(scale,.72)*relief;
+  const contour=Array.from({length:segments},(_,j)=>{
+    const angle=j/segments*tau;
+    return 1+.045*Math.sin(angle*3+phase)+.025*Math.sin(angle*7-phase);
+  });
+  const positions=[],indices=[],uv=[],response=[];
+  for(let side=0;side<2;side++){
+    for(let i=0;i<layer;i++){
+      const ring=i===0?0:1+Math.floor((i-1)/segments),j=i===0?0:(i-1)%segments;
+      const r=ring/rings,k=(j+shift)%segments,index=i===0?0:1+(ring-1)*segments+k;
+      const a=j/segments*tau,rad=source.contour[k]*r*contour[j];
+      const x=Math.cos(a)*rad,y=Math.sin(a)*rad;
+      const px=x+shear*y,py=y*(1+tilt*x);
+      const bottom=source.bottom[index]*heightScale;
+      const thickness=Math.max(.008,(source.top[index]-source.bottom[index])*Math.pow(scale,.3)*relief);
+      // Low-amplitude seed variation follows both faces; it cannot add a
+      // disconnected lamella, invert the shell, or enlarge the contact budget.
+      const wrinkle=type==='dry'?.0025:.004;
+      const localRelief=wrinkle*scale*r*Math.sin(x*9+y*5+phase)*Math.sin(y*7-x*3);
+      positions.push(px*radii[0],py*radii[1],bottom+localRelief+(side===0?thickness:0));
+      // A millimetre-sized flake contains many keratin grains. The previous
+      // nearly full-atlas stretch made its normal cells look like large tiles.
+      uv.push(.5+px*.94,.5+py*.94);response.push(thickness,0,0);
+    }
+    const offset=side*layer;
+    const Face=(a,b,c)=>side===0?indices.push(offset+a,offset+b,offset+c):indices.push(offset+a,offset+c,offset+b);
+    for(let j=0;j<segments;j++)Face(0,1+j,1+(j+1)%segments);
+    for(let ring=1;ring<rings;ring++)for(let j=0;j<segments;j++){
+      const a=1+(ring-1)*segments+j,b=1+ring*segments+j;
+      const c=1+ring*segments+(j+1)%segments,d=1+(ring-1)*segments+(j+1)%segments;
+      Face(a,b,c);Face(a,c,d);
+    }
+  }
+  for(let j=0;j<segments;j++){
+    const a=1+(rings-1)*segments+j,b=1+(rings-1)*segments+(j+1)%segments;
+    indices.push(a,a+layer,b+layer,a,b+layer,b);
+  }
+  return {positions:new Float32Array(positions),indices:new Uint16Array(indices),uv:new Float32Array(uv),response:new Float32Array(response),variant,
+    sculpt:{version:WAX_SCULPT_PROFILES.version,source:WAX_SCULPT_PROFILES.sourceSha256,type,shift}};
+}
+
 // Closed two-sided lamellae in millimetres. A star-shaped XY footprint lets the
 // existing shell solver sample both faces; curls never fold back through the wall.
 export function BuildWaxShape({seed=1,type='dry',radii=[1,1],micro=false,variant='flake'}={}){
+  if(!micro)return BuildSculptWaxShape({seed,type,radii,variant});
   const rng=MakeRng(seed),segments=micro?24:48,rings=micro?3:7;
   const dry=type==='dry',curl=variant==='curl',crumb=variant==='crumb';
   const corners=micro?6:11,contour=Array.from({length:corners},()=>micro?.50+rng()*.50:.74+rng()*.26);

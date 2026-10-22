@@ -1,381 +1,230 @@
-// 采耳小铺的经营环：客人 → 采耳 → 收钱 → 升级 → 更难的客人。
-//
-// 这一层刻意**不碰 three、不碰 DOM**，只吃一局的结算、吐出钱与升级。好处是
-// 平衡数值可以被单独推演和回放，调价不用开浏览器——经营环最容易失衡，也最
-// 需要反复试。
-//
-// 循环设计（一局 = 一位客人）：
-//   ① 今天来 1~3 位客人，客人带自己的耳道（耵聍分布种子、硬结比例、脾气）。
-//   ② 采完结算：清洁度给工时费，舒适度给小费，连击给加成，越界/挖痛要赔。
-//   ③ 钱花在两处：**升级工具**（更省力、更不容易崩碎、更舒服）与**升级铺面**
-//      （更好的灯与场景、更多客人、更高的单价）。
-//   ④ 声望 = 累计满意度的函数，决定来什么档次的客人；客人越难，报酬越高。
-//   ⑤ 打烊 → 明天。存档只存这几个数字，换皮换场景不动存档。
-//
-// 升级的效果必须**真的改变手感**，不能只是数字好看：工具等级会改写
-// comfortGain / crackRisk / idealSpeedRange，这些字段是耵聍判定真正读的。
-
+// Persistent career economy. The physical scene supplies only confirmed harvest
+// receipts; appraisal uses a frozen copy of the original deposits.
 import { Clamp } from "./Script_Util.js?v=ear011-20260911";
-
-const STORAGE_KEY = "earspa3d.shop.v1";
-const MAX_TOOL_LEVEL = 5;
-const MAX_SHOP_LEVEL = 4;
-
-/** 客人档位：难度由耳道里的耵聍分布决定，报酬随之上升 */
+import { CAREER_VERSION, TOOL_CATALOG, LAMP_LEVELS, TOOL_LIGHT, CareerToolId, CaptureWaxSources, ValueWax, AppraiseHarvest, UniqueWaxPieces, WaxSourceId } from './Data_Progression.mjs?v=ear050-career-care-20261022';
+import { CustomerCase, CaseProgress } from './Data_CareCases.mjs?v=ear050-career-care-20261022';
+const STORAGE_KEY = 'earspa3d.shop.v1';
+const MAX_TOOL_LEVEL = 5, MAX_SHOP_LEVEL = 4;
+const LegacyTools = ['scoop', 'tweezers', 'drops', 'feather'];
+const NumberOr = (value, fallback = 0) => Number.isFinite(value) ? Math.max(0, value) : fallback;
+const Copy = value => JSON.parse(JSON.stringify(value));
+const FreshInventory = () => ({tools: ['scoop'], skins: {}, equipped: {}, lights: []});
 export const CUSTOMER_TIERS = [
-  {
-    id: "easy", name: "随便掏掏", minRep: 0,
-    waxCount: [8, 12], impactedRatio: 0.0, wetRatio: 0.25,
-    basePay: 18, patience: 1.0,
-    blurb: "第一次来，有点紧张。",
-  },
-  {
-    id: "normal", name: "常客", minRep: 6,
-    waxCount: [12, 18], impactedRatio: 0.12, wetRatio: 0.35,
-    basePay: 30, patience: 1.0,
-    blurb: "熟门熟路，躺下就开始眯眼。",
-  },
-  {
-    id: "tough", name: "老饕", minRep: 18,
-    waxCount: [16, 24], impactedRatio: 0.25, wetRatio: 0.45,
-    basePay: 46, patience: 0.95,
-    blurb: "耳朵里藏着一块硬的，专门来找人。",
-  },
-  {
-    id: "hard", name: "栓塞重症", minRep: 36,
-    waxCount: [22, 30], impactedRatio: 0.42, wetRatio: 0.5,
-    basePay: 70, patience: 0.9,
-    blurb: "堵了有些年头了，自己都不敢碰。",
-  },
+  {id: 'easy', name: '初访客人', minRep: 0, waxCount: [8, 12], impactedRatio: 0, wetRatio: .25, basePay: 18, patience: 1, blurb: '想先清理入口那片干垢。'},
+  {id: 'normal', name: '常客', minRep: 12, waxCount: [12, 18], impactedRatio: .12, wetRatio: .35, basePay: 24, patience: 1, blurb: '熟门熟路，躺下就眯起眼。'},
+  {id: 'tough', name: '老饕', minRep: 32, waxCount: [16, 24], impactedRatio: .25, wetRatio: .45, basePay: 32, patience: .95, blurb: '有些牢固附着，愿意耐心等你处理。'},
+  {id: 'hard', name: '深部护理', minRep: 60, waxCount: [22, 30], impactedRatio: .42, wetRatio: .5, basePay: 44, patience: .9, blurb: '需要更清楚的照明与精细器具。'},
 ];
-
-/** 铺面等级：解锁氛围、提高单价、增加每日客数 */
 export const SHOP_LEVELS = [
-  { level: 1, name: "街边小摊", cost: 0, moods: ["teaRoom"], customersPerDay: [1, 2], priceMul: 1.0, blurb: "一张躺椅，一盏台灯。" },
-  { level: 2, name: "巷口小铺", cost: 160, moods: ["teaRoom", "morning"], customersPerDay: [2, 3], priceMul: 1.15, blurb: "多了扇窗，白天有光。" },
-  { level: 3, name: "临街雅间", cost: 420, moods: ["teaRoom", "morning", "rainNight"], customersPerDay: [2, 3], priceMul: 1.35, blurb: "雨夜听得见水声，客人最爱。" },
-  { level: 4, name: "老字号采耳", cost: 900, moods: ["teaRoom", "morning", "rainNight", "sleepy"], customersPerDay: [3, 4], priceMul: 1.6, blurb: "榻上铺了软褥，来的人多半会睡着。" },
+  {level: 1, name: '街边小摊', cost: 0, moods: ['teaRoom'], customersPerDay: [1, 2], priceMul: 1, blurb: '一把耳勺，一盏手调台灯。'},
+  {level: 2, name: '巷口小铺', cost: 160, moods: ['teaRoom', 'morning'], customersPerDay: [2, 3], priceMul: 1.15, blurb: '客人更愿意停一会儿。'},
+  {level: 3, name: '临街雅间', cost: 420, moods: ['teaRoom', 'morning', 'rainNight'], customersPerDay: [2, 3], priceMul: 1.35, blurb: '有窗，有雨声，也有老主顾。'},
+  {level: 4, name: '老字号采耳', cost: 900, moods: ['teaRoom', 'morning', 'rainNight', 'sleepy'], customersPerDay: [3, 4], priceMul: 1.6, blurb: '榻上铺了软褥。'},
 ];
-
-/** 升级一件工具到第 level 级的价钱（第 1 级是白送的初始状态） */
-export function ToolUpgradeCost(level) {
-  return [0, 0, 45, 110, 230, 460][Clamp(level, 0, MAX_TOOL_LEVEL)] ?? 0;
-}
-
-export function CreateShop({ seed = 20260910, storage = null } = {}) {
+export function ToolUpgradeCost(level) { return [0, 0, 45, 110, 230, 460][Clamp(level, 0, MAX_TOOL_LEVEL)] ?? 0; }
+export function CreateShop({seed = 20260910, storage = null} = {}) {
   const store = storage || SafeStorage();
-
-  const state = {
-    day: 1,
-    coins: 60,
-    reputation: 0,
-    shopLevel: 1,
-    toolLevels: {},          // id -> 1..5
-    totalEarned: 0,
-    totalCustomers: 0,
-    bestPayout: 0,
-    inventory:{tools:['scoop','tweezers','drops','feather'],skins:{},equipped:{}},
-    unlockedTools: null,     // Set，由外部灌入（EAR_TOOLS 的 id 列表）
-    todayCustomers: [],      // [{ tierId, name, waxSeed, mood, done, paid }]
-    todayIndex: 0,
-    mood: "teaRoom",
-    log: [],
-  };
-
-  // ── 存档：只存数字与 id，不存任何场景对象 ──
+  const state = {day: 1, coins: 0, reputation: 0, shopLevel: 1, lampLevel: 1, toolLevels: {},
+    totalEarned: 0, totalCustomers: 0, bestPayout: 0, collectionEarned: 0, inventory: FreshInventory(),
+    collection: [], soldCollectionIds: [], settledCustomers: [], careerUnlockCount: 0,
+    serviceSources: null, unlockedTools: null, todayCustomers: [], todayIndex: 0, mood: 'teaRoom', log: []};
   function Save() {
     try {
-      store.setItem(STORAGE_KEY, JSON.stringify({
-        day: state.day, coins: state.coins, reputation: state.reputation,
-        shopLevel: state.shopLevel, toolLevels: state.toolLevels,
-        totalEarned: state.totalEarned, totalCustomers: state.totalCustomers,
-        bestPayout: state.bestPayout, mood: state.mood, inventory:state.inventory,version: 2,
-      }));
-    } catch { /* 隐私模式写不了，静默 */ }
+      const {unlockedTools, ...saved} = state;
+      store.setItem(STORAGE_KEY, JSON.stringify({...saved, version: CAREER_VERSION}));
+    } catch { /* Local progress remains available when storage is unavailable. */ }
   }
-
   function Load() {
     try {
-      const raw = store.getItem(STORAGE_KEY);
-      if (!raw) return false;
-      const data = JSON.parse(raw);
-      state.day = data.day ?? 1;
-      state.coins = data.coins ?? 60;
-      state.reputation = data.reputation ?? 0;
-      state.shopLevel = Clamp(data.shopLevel ?? 1, 1, MAX_SHOP_LEVEL);
-      state.toolLevels = data.toolLevels || {};
-      state.totalEarned = data.totalEarned ?? 0;
-      state.totalCustomers = data.totalCustomers ?? 0;
-      state.bestPayout = data.bestPayout ?? 0;
+      const raw = store.getItem(STORAGE_KEY); if (!raw) return false;
+      const data = JSON.parse(raw); if (!data || typeof data !== 'object') return false;
+      const legacy = (data.version || 1) < CAREER_VERSION;
+      for (const key of ['coins', 'reputation', 'totalEarned', 'totalCustomers', 'bestPayout', 'collectionEarned']) state[key] = NumberOr(data[key]);
+      state.day = Math.max(1, Math.floor(NumberOr(data.day, 1)));
+      state.shopLevel = Clamp(NumberOr(data.shopLevel, 1), 1, MAX_SHOP_LEVEL);
+      state.lampLevel = Clamp(NumberOr(data.lampLevel, legacy ? Math.min(3, state.shopLevel) : 1), 1, 3);
+      state.toolLevels = data.toolLevels && typeof data.toolLevels === 'object' ? {...data.toolLevels} : {};
+      const inventory = data.inventory && typeof data.inventory === 'object' ? data.inventory : {};
+      // Legacy free equipment and every bought asset remain owned. New careers
+      // receive only the spoon; migration never resets money or upgrades.
+      state.inventory = {...FreshInventory(), ...inventory,
+        tools: [...new Set(['scoop', ...(legacy ? LegacyTools : []), ...(Array.isArray(inventory.tools) ? inventory.tools : [])])],
+        skins: inventory.skins || {}, equipped: inventory.equipped || {}, lights: Array.isArray(inventory.lights) ? inventory.lights.slice() : []};
+      for (const [id, level] of Object.entries(state.toolLevels)) {
+        const key = CareerToolId(id); if (TOOL_CATALOG[key] && level > 1 && !state.inventory.tools.includes(key)) state.inventory.tools.push(key);
+      }
+      state.careerUnlockCount = Math.max(NumberOr(data.careerUnlockCount), state.totalCustomers, legacy ? 6 : 0);
       state.mood = data.mood || 'teaRoom';
-      state.inventory={tools:['scoop','tweezers','drops','feather'],skins:{},equipped:{},...data.inventory};
-      state.inventory.tools=[...new Set([...state.inventory.tools,'feather'])];
-      return true;
+      state.todayCustomers = Array.isArray(data.todayCustomers) ? data.todayCustomers.map(customer => ({...customer})) : [];
+      state.todayIndex = Math.min(state.todayCustomers.length, Math.floor(NumberOr(data.todayIndex)));
+      state.settledCustomers = [...new Set(Array.isArray(data.settledCustomers) ? data.settledCustomers : [])];
+      state.soldCollectionIds = [...new Set(Array.isArray(data.soldCollectionIds) ? data.soldCollectionIds : [])];
+      const seen = new Set(state.soldCollectionIds);
+      state.collection = (Array.isArray(data.collection) ? data.collection : []).filter(item => {
+        if (!item?.id || seen.has(item.id) || !Number.isFinite(item.value) || item.value < 0) return false;
+        seen.add(item.id); return true;
+      }).map(item => ({...item}));
+      state.serviceSources = data.serviceSources?.customerId && data.serviceSources?.sources ? data.serviceSources : null;
+      state.log = Array.isArray(data.log) ? data.log.slice(0, 30) : [];
+      Save(); return true;
     } catch { return false; }
   }
-
   function Reset() {
-    state.day = 1;
-    state.coins = 60;
-    state.reputation = 0;
-    state.shopLevel = 1;
-    state.toolLevels = {};state.inventory={tools:['scoop','tweezers','drops','feather'],skins:{},equipped:{}};
-    state.totalEarned = 0;
-    state.totalCustomers = 0;
-    state.bestPayout = 0;
-    state.todayCustomers = [];
-    state.todayIndex = 0;
-    state.log = [];
-    Save();
+    Object.assign(state, {day: 1, coins: 0, reputation: 0, shopLevel: 1, lampLevel: 1, toolLevels: {},
+      inventory: FreshInventory(), totalEarned: 0, totalCustomers: 0, bestPayout: 0, collectionEarned: 0,
+      collection: [], soldCollectionIds: [], settledCustomers: [], careerUnlockCount: 0, serviceSources: null,
+      todayCustomers: [], todayIndex: 0, mood: 'teaRoom', log: []}); Save();
   }
-
-  // ── 客人 ──
-  const NAMES = ["老张", "小林", "阿May", "胖叔", "程姑娘", "出租车老李", "楼上的学生",
-    "王阿姨", "夜班护士", "卖花的小陈", "棋摊赵爷", "隔壁理发师"];
-
-  function TierForReputation(rep) {
-    let best = CUSTOMER_TIERS[0];
-    for (const tier of CUSTOMER_TIERS) if (rep >= tier.minRep) best = tier;
-    return best;
-  }
-
+  const NAMES = ['老张', '小林', '阿May', '胖叔', '程姑娘', '出租车老李', '楼上的学生', '王阿姨', '夜班护士', '卖花的小陈', '棋摊赵爷', '隔壁理发师'];
+  function TierForReputation(rep) { let best = CUSTOMER_TIERS[0]; for (const tier of CUSTOMER_TIERS) if (rep >= tier.minRep) best = tier; return best; }
+  function OwnsTool(id) { return state.inventory.tools.includes(CareerToolId(id)); }
   function MakeCustomer(rng, index) {
-    const tier = TierForReputation(state.reputation);
-    const name = rng.pick(NAMES);
-    const [lo, hi] = tier.waxCount;
-    return {
-      id: `d${state.day}c${index}`,
-      tierId: tier.id,
-      tierName: tier.name,
-      name,
-      earType: (state.day + index) % 4 === 3 ? 'oily' : 'mixed',
-      blurb: tier.blurb,
-      waxSeed: (state.day * 7919 + index * 104729 + seed) >>> 0,
-      waxCount: rng.int(lo, hi),
-      impactedRatio: tier.impactedRatio,
-      wetRatio: tier.wetRatio,
-      basePay: tier.basePay,
-      patience: tier.patience,
-      done: false,
-      paid: 0,
-    };
+    const tier = TierForReputation(state.reputation), fullKit = OwnsTool('drops') && OwnsTool('tweezers');
+    const oily = fullKit && OwnsTool('feather') && (state.day + index) % 4 === 3;
+    const choices = fullKit ? ['drySheet', 'softenedWax', 'deepBend'] : ['drySheet'];
+    return {id: `d${state.day}c${index}`, tierId: tier.id, tierName: tier.name, name: rng.pick(NAMES),
+      earType: oily ? 'oily' : 'mixed', caseId: oily ? null : choices[(state.day - 1 + index) % choices.length],
+      blurb: tier.blurb, waxSeed: (state.day * 7919 + index * 104729 + seed) >>> 0,
+      waxCount: rng.int(...tier.waxCount), impactedRatio: tier.impactedRatio, wetRatio: tier.wetRatio,
+      basePay: tier.basePay, patience: tier.patience, done: false, paid: 0};
   }
-
-  /** 开店：按铺面等级排今天几位客人。同一天的客人由 (day, index) 定种子，可复现。 */
   function StartDay(rng) {
-    const shop = SHOP_LEVELS[Clamp(state.shopLevel, 1, MAX_SHOP_LEVEL) - 1];
-    const [lo, hi] = shop.customersPerDay;
-    const count = rng ? rng.int(lo, hi) : lo;
-    state.todayCustomers = Array.from({ length: count }, (_, i) => MakeCustomer(rng || FallbackRng(), i));
-    state.todayIndex = 0;
-    // 氛围只能选已解锁的
+    // Reloading may resume a customer; it must never regenerate paid IDs.
+    if (state.todayCustomers.length && state.todayCustomers.every(customer => customer.done)) NextDay();
+    const shop = SHOP_LEVELS[state.shopLevel - 1];
+    if (!state.todayCustomers.length) {
+      const generator = rng || FallbackRng(), count = generator.int(...shop.customersPerDay);
+      state.todayCustomers = Array.from({length: count}, (_, index) => MakeCustomer(generator, index)); state.todayIndex = 0;
+    } else if (CurrentCustomer()?.done || !CurrentCustomer()) AdvanceCustomer();
     if (!shop.moods.includes(state.mood)) state.mood = shop.moods[0];
-    Save();
-    return { shop, customers: state.todayCustomers, mood: state.mood };
+    Save(); return {shop, customers: state.todayCustomers, mood: state.mood};
   }
-
-  function CurrentCustomer() {
-    return state.todayCustomers[state.todayIndex] || null;
-  }
-
-  function HasNextCustomer() {
-    return state.todayCustomers.some((c) => !c.done);
-  }
-
+  function CurrentCustomer() { return state.todayCustomers[state.todayIndex] || null; }
+  function CustomerKey(customer = CurrentCustomer()) { return customer ? `${customer.id}@${customer.waxSeed}` : ''; }
+  function HasNextCustomer() { return state.todayCustomers.some(customer => !customer.done); }
   function SkipCustomer() {
-    const customer = CurrentCustomer();
-    if (!customer || customer.done) return false;
-    customer.done = true;customer.paid = 0;customer.skipped = true;
-    Save();return true;
+    const customer = CurrentCustomer(); if (!customer || customer.done) return false;
+    customer.done = true; customer.paid = 0; customer.skipped = true; state.serviceSources = null; Save(); return true;
   }
-
-  function AdvanceCustomer() {
-    const idx = state.todayCustomers.findIndex((c) => !c.done);
-    state.todayIndex = idx < 0 ? state.todayCustomers.length : idx;
-    return CurrentCustomer();
+  function AdvanceCustomer() { const index = state.todayCustomers.findIndex(customer => !customer.done); state.todayIndex = index < 0 ? state.todayCustomers.length : index; Save(); return CurrentCustomer(); }
+  function RegisterServiceSources(items, options = {}) {
+    const customer = CurrentCustomer(); if (options.practice || !customer || customer.done) return false;
+    const customerId = CustomerKey(customer);
+    if (state.serviceSources?.customerId === customerId) return false;
+    const sources = CaptureWaxSources(items); if (!Object.keys(sources).length) return false;
+    state.serviceSources = {customerId, sources}; Save(); return true;
   }
-
-  /**
-   * 结算一位客人。
-   * 报酬构成刻意让「干净」和「舒服」都值钱，但**干净更值钱**——这是采耳店的
-   * 真实价值观：掏不干净，再舒服也是没干完活。
-   */
-  function FinishCustomer(summary) {
-    const customer = CurrentCustomer();
-    if (!customer || customer.done) return null;
-    const shop = SHOP_LEVELS[Clamp(state.shopLevel, 1, MAX_SHOP_LEVEL) - 1];
-    const clean = Clamp(summary?.cleanliness01 ?? 0, 0, 1);
-    const comfort = Clamp(summary?.comfort01 ?? 0, 0, 1);
-    const relax = Clamp(summary?.relax01 ?? 0, 0, 1);
-
-    const labor = Math.round(customer.basePay * clean * shop.priceMul);
-    const tip = Math.round(customer.basePay * 0.7 * comfort * shop.priceMul);
-    const comboBonus = Math.min(24, Math.round((summary?.bestCombo ?? 0) * 1.5));
-    const perfect = clean > 0.97 && comfort > 0.7;
-    const perfectBonus = perfect ? Math.round(customer.basePay * 0.5) : 0;
-    // A completed request can be handed in before optional whole-ear cleaning.
-    // Cleanliness and its existing bonuses still use only actually collected mass.
-    const caseBonus = summary?.caseResult?.complete && clean > 0 ? Math.round(customer.basePay * .6 * shop.priceMul) : 0;
-    const payout = labor + tip + comboBonus + perfectBonus + caseBonus;
-
-    state.coins += payout;
-    state.totalEarned += payout;
-    state.totalCustomers += 1;
+  function CurrentSources() { return state.serviceSources?.customerId === CustomerKey() ? state.serviceSources.sources : {}; }
+  function AppraiseWax(piece) { return ValueWax(piece, CurrentSources()); }
+  function FinishCustomer(summary = {}) {
+    const customer = CurrentCustomer(), customerId = CustomerKey(customer);
+    if (summary.practice || !customer || customer.done || state.settledCustomers.includes(customerId)) return null;
+    const shop = SHOP_LEVELS[state.shopLevel - 1], sources = CurrentSources();
+    const confirmedHarvest = UniqueWaxPieces(summary.harvest || []).filter(item => Object.hasOwn(sources, WaxSourceId(item)));
+    const appraisals = AppraiseHarvest(confirmedHarvest, sources);
+    const collectedMass = appraisals.reduce((sum, item) => sum + item.collectedMass, 0);
+    const totalMass = Object.values(sources).reduce((sum, item) => sum + item.mass, 0);
+    // Cleaning and comfort reward require confirmed material; an idle timer or
+    // a claimed cleanliness value alone cannot generate revenue.
+    const clean = totalMass > 0 ? Clamp(collectedMass / totalMass, 0, 1) : 0;
+    const comfort = Clamp(summary.comfort01 ?? 0, 0, 1), relax = Clamp(summary.relax01 ?? 0, 0, 1);
+    const painCount = Math.max(0, NumberOr(summary.painCount));
+    const caseId = CustomerCase(customer, state.inventory.tools);
+    const verifiedCase = CaseProgress(caseId, [], confirmedHarvest);
+    const caseComplete = !!verifiedCase?.complete && collectedMass > 0;
+    const serviceFactor = caseComplete ? 1 : clean;
+    const labor = Math.round(customer.basePay * serviceFactor * shop.priceMul);
+    const tip = painCount > 0 || collectedMass <= 0 ? 0 : Math.round(labor * .55 * comfort);
+    const payout = labor + tip;
+    const knownIds = new Set([...state.soldCollectionIds, ...state.collection.map(item => item.id)]), added = [];
+    for (const appraisal of appraisals) {
+      const id = `${customerId}/${appraisal.sourceId}`;
+      if (knownIds.has(id)) continue;
+      knownIds.add(id); added.push({...appraisal, id, customerId, customerName: customer.name, day: state.day});
+    }
+    state.collection.push(...added); state.coins += payout; state.totalEarned += payout;
+    state.totalCustomers++; state.careerUnlockCount = Math.max(state.careerUnlockCount, state.totalCustomers);
     state.bestPayout = Math.max(state.bestPayout, payout);
-    // 声望只看「活儿干得怎么样」，不看赚了多少
-    state.reputation = Math.max(0,state.reputation+Math.round(clean*3+comfort*3-(1-comfort)*5));
-    customer.done = true;
-    customer.paid = payout;
-
-    const entry = {
-      day: state.day, name: customer.name, tier: customer.tierName,
-      payout, labor, tip, comboBonus, perfectBonus, caseBonus,
-      caseId: summary?.caseResult?.id || null, caseComplete: !!summary?.caseResult?.complete,
-      clean, comfort, relax, verdict: summary?.verdict || "",
-      harvest: summary?.harvest?.length ?? 0,
-    };
-    state.log.unshift(entry);
-    state.log.length = Math.min(30, state.log.length);
-    Save();
-    return entry;
+    const repGain = collectedMass > 0 ? Math.round(serviceFactor * (painCount ? 1 : 2 + comfort * 2)) : 0;
+    state.reputation = Math.max(0, state.reputation + repGain - Math.min(3, painCount));
+    customer.done = true; customer.paid = payout; state.settledCustomers.push(customerId);
+    const entry = {day: state.day, name: customer.name, tier: customer.tierName, payout, labor, tip, painCount,
+      comboBonus: 0, perfectBonus: 0, caseBonus: 0, caseId, caseComplete,
+      clean, comfort, relax, verdict: summary.verdict || '', harvest: appraisals.length,
+      collectionAdded: added.length, collectionValue: added.reduce((sum, item) => sum + item.value, 0),
+      collectionIds: added.map(item => item.id), collectedMass};
+    state.log.unshift(entry); state.log.length = Math.min(30, state.log.length); Save(); return entry;
   }
-
-  function NextDay() {
-    state.day += 1;
-    state.todayCustomers = [];
-    state.todayIndex = 0;
-    Save();
-    return state.day;
+  function SellCollection(id) {
+    const index = state.collection.findIndex(item => item.id === id);
+    if (index < 0 || state.soldCollectionIds.includes(id)) return {ok: false, reason: 'missing', payout: 0};
+    const [item] = state.collection.splice(index, 1), payout = Math.max(0, Math.floor(item.value));
+    state.soldCollectionIds.push(id); state.coins += payout; state.totalEarned += payout; state.collectionEarned += payout;
+    Save(); return {ok: true, payout, count: 1, ids: [id]};
   }
-
-  // ── 升级 ──
-  function ToolLevel(id) {
-    return Clamp(state.toolLevels[id] ?? 1, 1, MAX_TOOL_LEVEL);
+  function SellAllCollection() {
+    const ids = state.collection.map(item => item.id); let payout = 0, count = 0;
+    for (const id of ids) { const result = SellCollection(id); payout += result.payout; count += result.ok ? 1 : 0; }
+    return {ok: count > 0, payout, count, ids};
   }
-
+  function NextDay() { state.day++; state.todayCustomers = []; state.todayIndex = 0; state.serviceSources = null; Save(); return state.day; }
+  function ToolLevel(id) { const key = CareerToolId(id), specId = TOOL_CATALOG[key]?.id || id; return Clamp(state.toolLevels[specId] ?? state.toolLevels[key] ?? 1, 1, MAX_TOOL_LEVEL); }
   function ToolUpgradeOffer(id) {
-    const level = ToolLevel(id);
-    const maxed = level >= MAX_TOOL_LEVEL;
-    const cost = maxed ? 0 : ToolUpgradeCost(level + 1);
-    return { id, level, maxed, cost, affordable: !maxed && state.coins >= cost, next: maxed ? null : level + 1 };
+    const level = ToolLevel(id), maxed = level >= MAX_TOOL_LEVEL, owned = OwnsTool(id), cost = maxed ? 0 : ToolUpgradeCost(level + 1);
+    return {id, level, owned, maxed, cost, affordable: owned && !maxed && state.coins >= cost, next: maxed ? null : level + 1};
   }
-
   function UpgradeTool(id) {
     const offer = ToolUpgradeOffer(id);
-    if (offer.maxed || !offer.affordable) return { ok: false, reason: offer.maxed ? "maxed" : "poor", offer };
-    state.coins -= offer.cost;
-    state.toolLevels[id] = offer.next;
-    Save();
-    return { ok: true, level: offer.next, cost: offer.cost };
+    if (!offer.affordable) return {ok: false, reason: !offer.owned ? 'locked' : offer.maxed ? 'maxed' : 'poor', offer};
+    state.coins -= offer.cost; state.toolLevels[TOOL_CATALOG[CareerToolId(id)]?.id || id] = offer.next; Save(); return {ok: true, level: offer.next, cost: offer.cost};
   }
-
-  function ShopOffer() {
-    const next = state.shopLevel + 1;
-    if (next > MAX_SHOP_LEVEL) return { maxed: true, level: state.shopLevel, cost: 0, affordable: false };
-    const cost = SHOP_LEVELS[next - 1].cost;
-    return { maxed: false, level: state.shopLevel, next, cost, affordable: state.coins >= cost, name: SHOP_LEVELS[next - 1].name };
+  function ToolOffer(id) {
+    const key = CareerToolId(id), item = TOOL_CATALOG[key]; if (!item) return null;
+    const owned = OwnsTool(key), missing = item.requires.filter(required => !OwnsTool(required));
+    const unlocked = state.careerUnlockCount >= item.visits && !missing.length;
+    const requirement = missing.length ? '先添置' + missing.map(required => TOOL_CATALOG[required].name).join('、') : state.careerUnlockCount < item.visits ? `照顾 ${item.visits} 位客人后解锁` : '';
+    return {...item, id: key, owned, unlocked, requirement, affordable: !owned && unlocked && state.coins >= item.cost};
   }
-
-  function UpgradeShop() {
-    const offer = ShopOffer();
-    if (offer.maxed || !offer.affordable) return { ok: false, reason: offer.maxed ? "maxed" : "poor", offer };
-    state.coins -= offer.cost;
-    state.shopLevel = offer.next;
-    Save();
-    return { ok: true, level: state.shopLevel, cost: offer.cost, shop: SHOP_LEVELS[state.shopLevel - 1] };
+  function BuyTool(id) { const item = ToolOffer(id); if (!item?.affordable) return {ok: false, reason: item?.owned ? 'owned' : !item?.unlocked ? 'locked' : 'poor'}; state.coins -= item.cost; state.inventory.tools.push(item.id); Save(); return {ok: true, cost: item.cost}; }
+  function LampOffer() { const next = state.lampLevel + 1, item = LAMP_LEVELS[next - 1], maxed = !item; return {level: state.lampLevel, next: maxed ? null : next, maxed, name: item?.name || LAMP_LEVELS[2].name, cost: item?.cost || 0, affordable: !maxed && state.coins >= item.cost}; }
+  function UpgradeLamp() { const offer = LampOffer(); if (!offer.affordable) return {ok: false}; state.coins -= offer.cost; state.lampLevel = offer.next; Save(); return {ok: true, level: offer.next, cost: offer.cost}; }
+  function ToolLightOffer(id) {
+    const key = CareerToolId(id), eligible = TOOL_LIGHT.tools.includes(key), owned = state.inventory.lights.includes(key);
+    const unlocked = eligible && OwnsTool(key) && ToolLevel(key) >= TOOL_LIGHT.minLevel;
+    return {id: key, eligible, owned, unlocked, cost: TOOL_LIGHT.cost, minLevel: TOOL_LIGHT.minLevel, affordable: unlocked && !owned && state.coins >= TOOL_LIGHT.cost};
   }
-
-  /**
-   * 工具等级对手感的实际改写。
-   * 这些字段是耵聍判定真正读的（`Script_Wax.js` 从 `tool.spec` 取），
-   * 所以升级不是数字游戏，是「同样一勺，现在刮得更干净、更不容易崩碎」。
-   */
+  function BuyToolLight(id) { const offer = ToolLightOffer(id); if (!offer.affordable) return {ok: false}; state.coins -= offer.cost; state.inventory.lights.push(offer.id); Save(); return {ok: true, cost: offer.cost}; }
+  function Lighting(id = 'scoop') { const lamp = LAMP_LEVELS[state.lampLevel - 1], mounted = OwnsTool(id) && state.inventory.lights.includes(CareerToolId(id)); return {level: lamp.level, intensity: lamp.intensity, mounted, label: mounted ? '器具随动灯 · ' + TOOL_CATALOG[CareerToolId(id)].name : lamp.name + ' · 手动调向'}; }
+  function ShopOffer() { const next = state.shopLevel + 1, item = SHOP_LEVELS[next - 1]; return item ? {maxed: false, level: state.shopLevel, next, cost: item.cost, affordable: state.coins >= item.cost, name: item.name} : {maxed: true, level: state.shopLevel, cost: 0, affordable: false}; }
+  function UpgradeShop() { const offer = ShopOffer(); if (!offer.affordable) return {ok: false, offer}; state.coins -= offer.cost; state.shopLevel = offer.next; Save(); return {ok: true, level: offer.next, cost: offer.cost, shop: SHOP_LEVELS[state.shopLevel - 1]}; }
   function LeveledSpec(spec) {
-    if (!spec) return spec;
-    const level = ToolLevel(spec.id);
-    if (level <= 1) return spec;
-    const t = level - 1;                       // 0..4
-    const range = spec.idealSpeedRange;
-    return {
-      ...spec,
-      level,
-      comfortGain: (spec.comfortGain ?? 0.2) * (1 + 0.14 * t),
-      // 崩碎与挖痛的风险随等级下降，但**永远不为零**：手艺还是要有
-      crackRisk: (spec.crackRisk ?? 0.4) * (1 - 0.11 * t),
-      painRisk: (spec.painRisk ?? 0.3) * (1 - 0.1 * t),
-      // 理想速度区间放宽：好工具容错大，慢手新手也能刮干净
-      idealSpeedRange: range
-        ? [range[0] * (1 - 0.06 * t), range[1] * (1 + 0.16 * t)]
-        : range,
-      // 同样的接触取下的量更多
-      efficiencyMul: 1 + 0.1 * t,
-    };
+    if (!spec) return spec; const level = ToolLevel(spec.id); if (level <= 1) return spec;
+    const t = level - 1, range = spec.idealSpeedRange;
+    return {...spec, level, comfortGain: (spec.comfortGain ?? .2) * (1 + .14 * t), crackRisk: (spec.crackRisk ?? .4) * (1 - .11 * t), painRisk: (spec.painRisk ?? .3) * (1 - .1 * t), idealSpeedRange: range ? [range[0] * (1 - .06 * t), range[1] * (1 + .16 * t)] : range, efficiencyMul: 1 + .1 * t};
   }
-
-  const toolCatalog={brush:{name:'柔毛刷',cost:48,detail:'刷松干燥碎屑；不撬硬块'},suction:{name:'微型吸引管',cost:85,detail:'吸走已软化的碎屑，收进滤芯'}};
-  const skinCatalog={walnut:{name:'胡桃木',cost:28,color:'#704126'},jade:{name:'白玉',cost:45,color:'#dbe7cf'}};
-  function ToolOffer(id){const item=toolCatalog[id];if(!item)return null;const owned=state.inventory.tools.includes(id);return{id,...item,owned,affordable:!owned&&state.coins>=item.cost};}
-  function BuyTool(id){const item=ToolOffer(id);if(!item||!item.affordable)return{ok:false};state.coins-=item.cost;state.inventory.tools.push(id);Save();return{ok:true};}
-  function SkinOffer(tool,id){const skin=skinCatalog[id];if(!skin)return null;const owned=(state.inventory.skins[tool]||[]).includes(id);return{...skin,id,tool,owned,equipped:state.inventory.equipped[tool]===id,affordable:owned||state.coins>=skin.cost};}
-  function BuySkin(tool,id){const offer=SkinOffer(tool,id);if(!state.inventory.tools.includes(tool)||!offer?.affordable)return{ok:false};if(!offer.owned){state.coins-=offer.cost;(state.inventory.skins[tool]??=[]).push(id);}state.inventory.equipped[tool]=id;Save();return{ok:true};}
-  function EquipSkin(tool,id){if(id!=='classic'&&!(state.inventory.skins[tool]||[]).includes(id))return false;state.inventory.equipped[tool]=id;Save();return true;}
+  const skinCatalog = {walnut: {name: '胡桃木', cost: 28, color: '#704126'}, jade: {name: '白玉', cost: 45, color: '#dbe7cf'}};
+  function SkinOffer(tool, id) { const skin = skinCatalog[id]; if (!skin) return null; const owned = (state.inventory.skins[tool] || []).includes(id); return {...skin, id, tool, owned, equipped: state.inventory.equipped[tool] === id, affordable: OwnsTool(tool) && (owned || state.coins >= skin.cost)}; }
+  function BuySkin(tool, id) { const offer = SkinOffer(tool, id); if (!offer?.affordable) return {ok: false}; if (!offer.owned) {state.coins -= offer.cost; (state.inventory.skins[tool] ??= []).push(id);} state.inventory.equipped[tool] = id; Save(); return {ok: true}; }
+  function EquipSkin(tool, id) { if (!OwnsTool(tool) || id !== 'classic' && !(state.inventory.skins[tool] || []).includes(id)) return false; state.inventory.equipped[tool] = id; Save(); return true; }
   function Snapshot() {
-    return {
-      day: state.day,
-      inventory:JSON.parse(JSON.stringify(state.inventory)),
-      coins: state.coins,
-      reputation: state.reputation,
-      shopLevel: state.shopLevel,
-      shopName: SHOP_LEVELS[Clamp(state.shopLevel, 1, MAX_SHOP_LEVEL) - 1].name,
-      moods: SHOP_LEVELS[Clamp(state.shopLevel, 1, MAX_SHOP_LEVEL) - 1].moods,
-      priceMul: SHOP_LEVELS[Clamp(state.shopLevel, 1, MAX_SHOP_LEVEL) - 1].priceMul,
-      toolLevels: { ...state.toolLevels },
-      todayCustomers: state.todayCustomers.map((c) => ({ ...c })),
-      todayIndex: state.todayIndex,
-      mood: state.mood,
-      log: state.log.slice(0, 8),
-      totalEarned: state.totalEarned,
-      totalCustomers: state.totalCustomers,
-      bestPayout: state.bestPayout,
-      rarity: TierForReputation(state.reputation).name,
-      maxToolLevel: MAX_TOOL_LEVEL,
-      maxShopLevel: MAX_SHOP_LEVEL,
-    };
+    const shop = SHOP_LEVELS[state.shopLevel - 1];
+    return {day: state.day, inventory: Copy(state.inventory), coins: state.coins, reputation: state.reputation,
+      shopLevel: state.shopLevel, shopName: shop.name, moods: shop.moods, priceMul: shop.priceMul,
+      toolLevels: {...state.toolLevels}, lampLevel: state.lampLevel, lighting: Lighting(),
+      collection: Copy(state.collection), collectionValue: state.collection.reduce((sum, item) => sum + item.value, 0), collectionEarned: state.collectionEarned,
+      todayCustomers: state.todayCustomers.map(customer => ({...customer})), todayIndex: state.todayIndex, mood: state.mood,
+      log: state.log.slice(0, 8), totalEarned: state.totalEarned, totalCustomers: state.totalCustomers, bestPayout: state.bestPayout,
+      rarity: TierForReputation(state.reputation).name, maxToolLevel: MAX_TOOL_LEVEL, maxShopLevel: MAX_SHOP_LEVEL, version: CAREER_VERSION};
   }
-
   Load();
-
-  return {
-    state, Snapshot, Save, Load, Reset,
-    StartDay, NextDay, CurrentCustomer, HasNextCustomer, AdvanceCustomer, SkipCustomer, FinishCustomer,
-    ToolLevel, ToolUpgradeOffer, UpgradeTool, ShopOffer, UpgradeShop, LeveledSpec,
-    TierForReputation,ToolOffer,BuyTool,SkinOffer,BuySkin,EquipSkin,
-    get coins() { return state.coins; },
-    get day() { return state.day; },
-  };
+  return {state, Snapshot, Save, Load, Reset, StartDay, NextDay, CurrentCustomer, HasNextCustomer, AdvanceCustomer, SkipCustomer, FinishCustomer,
+    RegisterServiceSources, AppraiseWax, SellCollection, SellAllCollection, ToolLevel, ToolUpgradeOffer, UpgradeTool,
+    LampOffer, UpgradeLamp, ToolLightOffer, BuyToolLight, Lighting, ShopOffer, UpgradeShop, LeveledSpec,
+    TierForReputation, ToolOffer, BuyTool, SkinOffer, BuySkin, EquipSkin, get coins() {return state.coins;}, get day() {return state.day;}};
 }
-
 function SafeStorage() {
-  try {
-    if (typeof localStorage !== "undefined") {
-      localStorage.setItem("earspa3d.probe", "1");
-      localStorage.removeItem("earspa3d.probe");
-      return localStorage;
-    }
-  } catch { /* 隐私模式/无 DOM */ }
-  const memory = new Map();
-  return {
-    getItem: (k) => (memory.has(k) ? memory.get(k) : null),
-    setItem: (k, v) => memory.set(k, v),
-    removeItem: (k) => memory.delete(k),
-  };
+  try { if (typeof localStorage !== 'undefined') {localStorage.setItem('earspa3d.probe', '1'); localStorage.removeItem('earspa3d.probe'); return localStorage;} } catch { /* Private mode. */ }
+  const memory = new Map(); return {getItem: key => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value), removeItem: key => memory.delete(key)};
 }
-
-function FallbackRng() {
-  return {
-    int: (lo, hi) => Math.floor(lo + (hi - lo + 1) * 0.5),
-    pick: (list) => list[0],
-  };
-}
-
+function FallbackRng() { return {int: (lo, hi) => Math.floor(lo + (hi - lo + 1) * .5), pick: list => list[0]}; }
 export { MAX_TOOL_LEVEL, MAX_SHOP_LEVEL };

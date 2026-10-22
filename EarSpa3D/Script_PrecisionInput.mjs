@@ -1,6 +1,6 @@
 // Independent position, wrist rotation, insertion and grip. No wax selection or
 // motion animation belongs to input: contact is resolved by the visible tool.
-export function CreatePrecisionInput({canvas,Enabled,Cancel,SelectTool,ViewTray,Wake,ToolScreen}) {
+export function CreatePrecisionInput({canvas,Enabled,Cancel,SelectTool,ViewTray,Wake,ToolScreen,assisted=false}) {
   const keys=new Set(),actions=new Set();
   let cursor=null,capture=null,rotating=false,dx=0,dy=0,depth=0,yaw=0,pitch=0;
   let offset={x:0,y:0},pointerInside=false;
@@ -54,7 +54,8 @@ export function CreatePrecisionInput({canvas,Enabled,Cancel,SelectTool,ViewTray,
     if(!Enabled()){Reset();return{dx:0,dy:0,depth:0,yaw:0,pitch:0,roll:0,acting:false,rotating:false};}
     const fine=keys.has('ShiftLeft')||keys.has('ShiftRight'),scale=fine?.25:1;
     const keyX=((keys.has('ArrowRight')?1:0)-(keys.has('ArrowLeft')?1:0))*80*dt,keyY=((keys.has('ArrowDown')?1:0)-(keys.has('ArrowUp')?1:0))*80*dt;
-    const frame={aim:cursor&&!rotating&&!fine&&!keyX&&!keyY?{x:cursor.x+offset.x,y:cursor.y+offset.y}:null,
+    const frame={aim:cursor&&!rotating&&!fine&&!keyX&&!keyY?{x:cursor.x+(assisted?0:offset.x),y:cursor.y+(assisted?0:offset.y)}:null,
+      handDx:(dx+keyX)*scale,handDy:(dy+keyY)*scale,
       dx:((fine?dx:0)+keyX)*scale,dy:((fine?dy:0)+keyY)*scale,
       depth:(depth+((keys.has('KeyW')?1:0)-(keys.has('KeyS')?1:0))*3*dt)*scale,
       yaw:yaw*scale,pitch:pitch*scale,roll:((keys.has('KeyE')?1:0)-(keys.has('KeyQ')?1:0))*1.1*dt*scale,
@@ -62,7 +63,7 @@ export function CreatePrecisionInput({canvas,Enabled,Cancel,SelectTool,ViewTray,
     dx=dy=depth=yaw=pitch=0;return frame;
   }
   function SyncTool(screen,{constrained=false,transitioning=false}={}){
-    if(!cursor)return;
+    if(!cursor||assisted)return;
     const clutch=rotating||keys.has('ShiftLeft')||keys.has('ShiftRight')||[...keys].some(key=>key.startsWith('Arrow'))||transitioning;
     if(clutch||constrained&&Math.hypot(screen.x-cursor.x-offset.x,screen.y-cursor.y-offset.y)>.5)Clutch(screen);
   }

@@ -3,7 +3,7 @@ export const CARE_CASES = Object.freeze({
   drySheet: {
     number: 1, title: '干片练手', condition: '入口浅层 · 4.4 mm',
     request: '先取出入口这片干垢，其他地方可以慢慢清。',
-    guide: '找①的翘边，用耳勺凹面贴住，按住左键缓慢刮、抬起。松脱后亲手撤出，按 T 移到盘上松手。',
+    guide: '移到①附近让耳勺辅助贴住翘边，按住左键短短刮动。松脱后松手，器具会托出并逐件放盘。',
     targets: [{root: 3, label: '入口干片', mass: .9}],
     layout: {3: {type: 'dry', form: 'ribbon'}},
     optional: '整片取出目标干片',
@@ -11,7 +11,7 @@ export const CARE_CASES = Object.freeze({
   softenedWax: {
     number: 2, title: '黏块软化', condition: '浅层黏块 + 干片 · 4.4 mm',
     request: '这块黏得很牢，旁边还有一片干垢。两处处理好就可以了。',
-    guide: '先让滴管口接触①并滴液，约 15 秒软化到 60%，期间可用耳勺处理②。换镊子将①放进两尖之间，闭合后慢慢拉出。',
+    guide: '先让滴管口接触①并滴液，约 15 秒软化到 60%，期间可用耳勺处理②。换镊子移到①，按住闭合后缓慢拖动；松脱后松手放盘。',
     targets: [{root: 2, label: '黏块', mass: .9}, {root: 3, label: '旁侧干片', mass: .9}],
     layout: {2: {type: 'wet', form: 'film', softeningRate: .04}, 3: {type: 'dry', form: 'ribbon'}},
     optional: '软化到 60% 后收走黏块',
@@ -19,15 +19,19 @@ export const CARE_CASES = Object.freeze({
   deepBend: {
     number: 5, title: '弯道深部', condition: '弯道后方 · 14.6 mm',
     request: '深处有一块积垢。入口不必全部清空，先找一条能进去的路线。',
-    guide: '放大观察深处，换长镊，沿管腔用滚轮深入。碰壁先后撤、右键转腕，再用 Q / E 将两尖转到与耳垢表面平行。短耳勺够不到目标；黏块可先滴液软化。',
+    guide: '放大观察深处，先用滴管接触①软化，再换长镊移到目标。器具会辅助进入并转正两尖；按住后短短拖动拉取，松脱后松手放盘。短耳勺够不到深部目标。',
     targets: [{root: 8, label: '深部黏块', mass: .9}],
     layout: {8: {type: 'wet', form: 'film', depth: 14.6}},
     optional: '完整取出深部黏块',
   },
 });
 export const CARE_CASE_IDS = Object.freeze(Object.keys(CARE_CASES));
-export function CustomerCase(customer) {
+export function CustomerCase(customer, ownedTools = null) {
   if (!customer || customer.earType === 'oily') return null;
+  // Practice omits equipment, preserving direct access to every case. Career
+  // visits always have a completable shallow target until the needed tools exist.
+  const equipped = !Array.isArray(ownedTools) || ['drops', 'tweezers'].every(id => ownedTools.includes(id));
+  if (!equipped) return 'drySheet';
   if (Object.hasOwn(CARE_CASES, customer.caseId)) return customer.caseId;
   const match = /^d(\d+)c(\d+)$/.exec(customer.id || '');
   return CARE_CASE_IDS[match ? (Number(match[1]) - 1 + Number(match[2])) % CARE_CASE_IDS.length : 0];
