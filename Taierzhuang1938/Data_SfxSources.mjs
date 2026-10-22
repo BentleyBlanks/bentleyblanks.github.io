@@ -667,6 +667,15 @@ export const SFX_SOURCES = [
     // 这一声决定玩家知不知道自己命中了 —— 全表最不能含糊的一条。
     cuts: [{ cue: "impactFlesh", tail: 0.5, gain: 0.95, whole: true }],
   },
+  {
+    // 2026-10-22 用户在试听页选定（AI 打 AI 接上声音之后入肉声一下子密了，单条会露馅）。
+    id: "ImpactFleshBodyThump",
+    item: "sonniss-gdc-2017-game-audio-bundle-normalized",
+    path: "Gamemaster Audio -  Bullet Impact Sounds/bullet_impact_body_thump_02.mp3",
+    credit: "Gamemaster Audio · 子弹入体闷响 · Sonniss GDC 2017",
+    license: "sonniss",
+    cuts: [{ cue: "impactFlesh", tail: 0.45, gain: 0.95, whole: true, append: true, alignDbfs: -25 }],
+  },
 
   // 2026-09-27 开场改稿（docs/Data_OpeningPinnedRescue20260927.md）：日兵甲原地审问时扇顺子的耳光
   // （用户：「把从枪托改成扇巴掌」）。镜像里真的「扇脸」只有这一条（2015—2026 各届搜过 slap/smack）。
@@ -1883,6 +1892,20 @@ export const SFX_SOURCES = [
       { cue: "bootGrind", durS: 0.58, files: ["AudioSfx_BootGrind_01.mp3"],
         credit: "Volcengine SeedAudio 1.0 · 军靴鞋跟在手背与泥上碾（约 0.6 秒）（BootGrind_take02.mp3） · 2026-10-11" },
     ],
+  },
+  // 2026-10-22 impactDirt 的最终文件表：上方 `ImpactDirt` 实录 + Script_SeedAudioCombatBake 的打土一条。
+  // AI 子弹打土接上声音后同一条反复响会露馅；用户在试听页（打土 / 打地两类 × 两轮共六条）里只留了
+  // 「土坎实录感」那一条，并定打硬地暂时也用它。与 `Type11Variants` 同法：放表尾、只登记不切割，
+  // 部分重烘要和 `ImpactDirt` 一起点名，否则清单里只剩实录那一条。
+  {
+    id: "ImpactDirtVariants",
+    seedAudio: true,
+    bake: "Script_SeedAudioCombatBake.mjs",
+    license: "mixed",
+    credit: "PMSFX 实录 + Volcengine SeedAudio 1.0",
+    cuts: [{ cue: "impactDirt", durS: 0.42,
+      files: ["AudioSfx_ImpactDirt_01.mp3", "AudioSfx_ImpactDirt_02.mp3"],
+      credit: "PMSFX · 弹着夯土 · Sonniss GDC 2020 ／ Volcengine SeedAudio 1.0 · 子弹钻进土坎（SeedDirtSoft_02） · 2026-10-22" }],
   },
   // 战车那一批：成品由 Script_TankAudioBake.mjs 烘，这里只负责在全量 SfxBake 时把它们重新登记进清单。
   ...TANK_SFX.map((entry) => ({

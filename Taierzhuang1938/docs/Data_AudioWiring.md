@@ -186,6 +186,20 @@ window.Taierzhuang.Debug.AudioZone()
 **尚未接**：`FireVehicleBullet` 的墙面弹着（那条路连弹着音本身都没有，
 补它属于另一件事）。
 
+### 3b. AI 弹着（`impactDirt` / `impactFlesh` 等，2026-10-22）
+
+`TryFire` 打偏、环境射击打到墙或地、以及 AI 打中别的兵，之前只有画面没有声音。
+接线是 `AudioWiring.AiBulletImpact` / `AiBulletFlesh`，数在 `AI_IMPACT`：
+
+| 项 | 口径 |
+| --- | --- |
+| 打墙打地 | ≤ 22 m，音量 0.55，材质与玩家子弹同一张表（沙袋 / 土坎 / 平地都走 `impactDirt`） |
+| 打中人体 | ≤ 18 m，音量 0.7，`impactFlesh` |
+| 限速 | 全局 70 ms 一条、每帧最多 2 条；不带 `priority`，预算紧时先丢 |
+| 打地 | 射线没撞到碰撞盒时，弹道末端离地 ≤ `AMBIENT_FIRE.impactAboveM` 就算入土；暂时与打土共用 `impactDirt`（实录 + SeedAudio 打土 A 两条变体） |
+
+硬面打中之后照旧可能跳弹。
+
 ### 4. AI foley
 
 | cue | 触发 | 距离闸 | 限频 |

@@ -4185,9 +4185,7 @@ export class AiDirector {
     if (hit) {
       end.copy(fromV).addScaledVector(dir, hit.t);
       impact = end; normal = new THREE.Vector3(hit.normal[0], hit.normal[1], hit.normal[2]);
-      const tag = hit.box ? hit.box.tag : "wall";
-      surface = tag === "prop" || tag === "balk" || tag === "bridge" || tag === "platform"
-        ? "wood" : (tag === "kan" || tag === "embankment" || tag === "grave") ? "dirt" : "brick";
+      surface = this.ImpactSurface(hit.box);
     } else if (bf?.GroundHeight) {
       const g = bf.GroundHeight(end.x, end.z);
       if (end.y <= g + AMBIENT_FIRE.impactAboveM) { end.y = g; impact = end; normal = new THREE.Vector3(0, 1, 0); }
@@ -4197,6 +4195,7 @@ export class AiDirector {
       vfx.Tracer(fromV, end, { kind: s.side === "nra" ? "nra" : "ija" });
       if (impact) vfx.Impact(impact, normal, surface, { weaponKind: s.weapon.kind });
     }
+    if (impact) this.ctx.audioWiring?.AiBulletImpact(impact, surface, s.fireSequence);
     const gunCue = this.GunCue(s);
     if (this.ctx.audio) this.ctx.audio.PlayGunshot(gunCue, { position: fromV.clone(), volume: 1,
       burst: 1, weaponClass: s.weapon.rpm ? "mg" : "rifle" });
@@ -4211,6 +4210,17 @@ export class AiDirector {
       }
     }
     return true;
+  }
+
+  /**
+   * 弹着表面：与玩家子弹同一张表（装配层注入的 Script_Main.ImpactSurface）。
+   * 没注入时（纯规则测试）退回旧的三选一。
+   */
+  ImpactSurface(box) {
+    if (this.ctx.impactSurface) return this.ctx.impactSurface(box, "brick");
+    const tag = box ? box.tag : "wall";
+    return tag === "prop" || tag === "balk" || tag === "bridge" || tag === "platform"
+      ? "wood" : (tag === "kan" || tag === "embankment" || tag === "grave") ? "dirt" : "brick";
   }
 
   /** 这一发的枪声本体 cue（TryFire 与环境射击共用一处，免得两边各写一份对照）。 */
@@ -5199,6 +5209,7 @@ export class AiDirector {
         if (vfx && part === "head" && vfx.HeadshotBlood) vfx.HeadshotBlood(s.target.ref.actor?.characterRig?.hitboxNodes?.headCenter
           ?.getWorldPosition(new THREE.Vector3()) || aimV, dir, s.target.ref);
         else if (vfx) vfx.Blood(aimV, dir, died ? 1 : 0.5);
+        this.ctx.audioWiring?.AiBulletFlesh(aimV);
       }
     } else {
       // 打偏了：仍然要压制。近失弹从耳边过去，那声音本身就是武器。
@@ -5221,24 +5232,35 @@ export class AiDirector {
         s.target.ref.suppression = Clamp01(s.target.ref.suppression + COMBAT.suppressPerNearMiss);
         this.RememberIncomingFire(s.target.ref,fromV);
       }
-      if (vfx) {
-        // 弹着点由 Resolve 给：散布是按**瞄准误差 × 距离**算的高斯，
-        // 不再是围着瞄点撒的一团各向同性随机数（那个数跟枪、跟距离都没关系）。
-        const bf = this.ctx.battlefield;
-        const h = bf.Raycast(fromV, dir, dist + 6);
-        if (h) {
-          const p = fromV.clone().addScaledVector(dir, h.t);
-          const normal = new THREE.Vector3(h.normal[0], h.normal[1], h.normal[2]);
-          const tag = h.box ? h.box.tag : "wall";
-          const surface = tag === "prop" || tag === "balk" || tag === "bridge" || tag === "platform"
-            ? "wood" : (tag === "kan" || tag === "embankment" || tag === "grave") ? "dirt" : "brick";
-          vfx.Impact(p, normal, surface, { weaponKind: s.weapon.kind });
-          // AI 的流弹也走同一份局部耐久。这里仍只在“真的打到静态碰撞体”时记伤，
-          // 概率命中人物的那一支不会凭空再穿过去伤一堵墙。
-          if (this.ctx.destruction && h.box) {
-            this.ctx.destruction.Hit(h.box, p, s.weapon.damage,
-              { kind: "bullet", normal });
-          }
+      // 弹着点由 Resolve 给：散布是按**瞄准误差 × 距离**算的高斯，
+      // 不再是围着瞄点撒的一团各向同性随机数（那个数跟枪、跟距离都没关系）。
+      const bf = this.ctx.battlefield;
+      const h = bf?.Raycast ? bf.Raycast(fromV, dir, dist + 6) : null;
+      let p = null, normal = null, surface = "dirt", box = null;
+      if (h) {
+        p = fromV.clone().addScaledVector(dir, h.t);
+        normal = new THREE.Vector3(h.normal[0], h.normal[1], h.normal[2]);
+        surface = this.ImpactSurface(h.box);
+        box = h.box;
+      } else if (bf?.GroundHeight) {
+        // 土坎顶与平地是高度函数，不在默认射线世界里。打地暂时与打土共用 impactDirt。
+        p = fromV.clone().addScaledVector(dir, dist);
+        const g = bf.GroundHeight(p.x, p.z);
+        if (p.y <= g + AMBIENT_FIRE.impactAboveM) {
+          p.y = g;
+          normal = new THREE.Vector3(0, 1, 0);
+        } else {
+          p = null;
+        }
+      }
+      if (p) {
+        if (vfx) vfx.Impact(p, normal, surface, { weaponKind: s.weapon.kind });
+        this.ctx.audioWiring?.AiBulletImpact(p, surface, s.fireSequence);
+        // AI 的流弹也走同一份局部耐久。这里仍只在“真的打到静态碰撞体”时记伤，
+        // 概率命中人物的那一支不会凭空再穿过去伤一堵墙。
+        if (this.ctx.destruction && box) {
+          this.ctx.destruction.Hit(box, p, s.weapon.damage,
+            { kind: "bullet", normal });
         }
       }
     }

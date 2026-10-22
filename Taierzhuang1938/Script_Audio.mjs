@@ -3154,7 +3154,8 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-09-30：敌军刀杀 / 脖子中弹的窒息哽咽 neckDeath（两变体），清单新增一个 cue。
 // 2026-10-11：第一关 01–02 开场重构十二条（契约 §6），清单新增十二个 cue。
 // 2026-10-12 R4-Voice：断肢四条、breathInjured、耳光、喊杀七条成品对齐到库线（同文件名、电平变了，SAMPLE_MIX 反算复原响度）。
-export const SFX_PACK_VERSION = "20261012openingfoley-levelline";
+// 2026-10-22：impactDirt 加 SeedAudio 打土一条、impactFlesh 加 Gamemaster 入体闷响一条（AI 弹着接上声音）。
+export const SFX_PACK_VERSION = "20261022aiimpacts";
 // 2026-09-29：清单加了 `bedVariants`（战场远景床的五条无人声候选），戳不动的话浏览器拿着旧清单永远看不到候选。
 // 2026-10-12 R4-Voice：AudioAmb_CarriageRearCheer 对齐到库线（同文件名、电平变了）。
 export const AMB_PACK_VERSION = "20261012battlebeds-levelline";

@@ -425,6 +425,49 @@ Check("硬面跳弹约四分之一（200 次里 30—75 次）",
 Check("土面一次都不跳", player.dirt === 0, `${player.dirt}/200`);
 
 // ---------------------------------------------------------------------------
+// 7b) AI 的弹着：近处出声、远处不出、全局限速；材质与玩家子弹同一张表
+// ---------------------------------------------------------------------------
+const aiImpact = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const audio = T.audio, w = T.audioWiring;
+  const L = audio.listenerPos;
+  const near = { x: L.x + 4, y: L.y - 1.5, z: L.z };
+  const far = { x: L.x + 60, y: L.y, z: L.z };
+  const Req = (cue) => audio.RequestedCount(cue);
+  const Tick = () => { w.time += 0.2; w.frame += 1; };
+  Tick();
+  const d0 = Req("impactDirt");
+  const sandbagNear = w.AiBulletImpact(near, "sandbag", 1);
+  const sameMoment = w.AiBulletImpact(near, "dirt", 2);
+  const dirtPlayed = Req("impactDirt") - d0;
+  Tick();
+  const farPlayed = w.AiBulletImpact(far, "dirt", 3);
+  Tick();
+  const f0 = Req("impactFlesh");
+  const fleshNear = w.AiBulletFlesh(near);
+  const fleshPlayed = Req("impactFlesh") - f0;
+  Tick();
+  const fleshFar = w.AiBulletFlesh(far);
+  const Surface = T.ai?.ctx?.impactSurface;
+  return {
+    sandbagNear, sameMoment, dirtPlayed, farPlayed, fleshNear, fleshPlayed, fleshFar,
+    surfaces: Surface ? [Surface({ tag: "barricade" }, "brick"), Surface({ tag: "missionTank" }, "brick"),
+      Surface({ tag: "whiteboxWall", surface: "wood" }, "brick"), Surface(null, "brick")] : null,
+    aiSurface: T.ai?.ImpactSurface?.({ tag: "sandbagEmplacement" }) ?? null,
+  };
+});
+Check("AI 子弹打在 4 m 外的沙袋上 → impactDirt 一条", aiImpact.sandbagNear && aiImpact.dirtPlayed === 1,
+  JSON.stringify(aiImpact));
+Check("同一时刻的第二发被全局限速挡掉", aiImpact.sameMoment === false, JSON.stringify(aiImpact));
+Check("60 m 外的 AI 弹着不出声", aiImpact.farPlayed === false && aiImpact.fleshFar === false,
+  JSON.stringify(aiImpact));
+Check("AI 打中近处的人 → impactFlesh 一条", aiImpact.fleshNear && aiImpact.fleshPlayed === 1,
+  JSON.stringify(aiImpact));
+Check("AI 拿到装配层的表面表：沙袋 / 战车 / 体块自带 surface / 无盒兜底",
+  JSON.stringify(aiImpact.surfaces) === JSON.stringify(["sandbag", "metal", "wood", "brick"])
+  && aiImpact.aiSurface === "sandbag", JSON.stringify(aiImpact));
+
+// ---------------------------------------------------------------------------
 // 8) 身体 foley：姿态切换出布料声、冲刺出装具声与喘息
 // ---------------------------------------------------------------------------
 const body = await page.evaluate(() => {

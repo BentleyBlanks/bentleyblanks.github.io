@@ -1514,6 +1514,8 @@ async function Boot() {
   destruction.SetWorld(battlefield, physics, navGrid);
   ai = new AiDirector({
     battlefield, actorFactory, scene, vfx, audio, player, nav, physics, destruction, audioWiring,
+    // AI 的弹着与玩家子弹查同一张表面表（碰撞盒自带 surface → SURFACE_BY_TAG → 兜底）。
+    impactSurface: ImpactSurface,
     // 剖析器只用来打 ai/* 子桶标记（关着时是一次布尔检查）；AI 不读它任何状态。
     profiler,
     onActorSpawn: (soldier) => {

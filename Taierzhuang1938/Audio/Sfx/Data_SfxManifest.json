@@ -220,11 +220,12 @@
     },
     "impactDirt": {
       "files": [
-        "AudioSfx_ImpactDirt_01.mp3"
+        "AudioSfx_ImpactDirt_01.mp3",
+        "AudioSfx_ImpactDirt_02.mp3"
       ],
       "seconds": 0.42,
-      "credit": "PMSFX · 弹着夯土 · Sonniss GDC 2020",
-      "license": "sonniss"
+      "credit": "PMSFX · 弹着夯土 · Sonniss GDC 2020 ／ Volcengine SeedAudio 1.0 · 子弹钻进土坎（SeedDirtSoft_02） · 2026-10-22",
+      "license": "mixed"
     },
     "impactWood": {
       "files": [
@@ -245,10 +246,11 @@
     },
     "impactFlesh": {
       "files": [
-        "AudioSfx_ImpactFlesh_01.mp3"
+        "AudioSfx_ImpactFlesh_01.mp3",
+        "AudioSfx_ImpactFlesh_02.mp3"
       ],
       "seconds": 0.5,
-      "credit": "PMSFX · 弹着人体 · Sonniss GDC 2020",
+      "credit": "PMSFX · 弹着人体 · Sonniss GDC 2020 ／ Gamemaster Audio · 子弹入体闷响 · Sonniss GDC 2017",
       "license": "sonniss"
     },
     "footstepDirt": {
@@ -1083,7 +1085,7 @@
       "license": "volcengine"
     }
   },
-  "bakedAt": "2026-10-11",
+  "bakedAt": "2026-10-22",
   "normalization": {
     "normalizedAt": "2026-10-12",
     "tool": "Script_AudioNormalize.mjs",

@@ -24,10 +24,14 @@ const groups = [
   { cue: "bulletWhizz", count: 4, duration: 0.65, hp: 300, lp: 12000,
     prompt: "单颗高速步枪子弹擦着耳边掠过的短促破风呼啸。声音极快靠近、瞬间擦耳、立即远离，音高快速下降，核心是紧凑尖锐的咻嗖和粗糙空气撕裂，整个动作约零点三秒。单声道不预制左右声像。不要枪口声、爆炸、弹着、反弹、持续口哨、吹口哨、鸟鸣、飞机或激光音。",
     variants: ["偏尖锐而极短的一声咻。", "偏沙哑空气质感的一声嗖。", "略低沉且迅速下滑的一声掠过。", "轻微嘶鸣接极短破风尾音的一次掠过。"] },
+  // impactDirt 的第二个变体（_01 是 PMSFX 实录）。清单由 Data_SfxSources 的 ImpactDirtVariants 登记，这里不写。
+  { cue: "impactDirt", count: 1, firstIndex: 2, register: false, duration: 0.5, hp: 60, lp: 18000,
+    prompt: "战场现场实录：一颗高速步枪子弹以七百米每秒钻进离麦克风两三米的土坎。声音极快极短：一记又尖又脆的「啪」像粗树枝被猛然折断，同一瞬间土块被炸开的「扑」，随后几粒土渣和沙子洒落在地上，总长不到零点四秒。干声，没有混响。不是枪口声，不是爆炸，不是拳击，不要低频轰鸣、金属、跳弹呼啸。",
+    variants: [""] },
 ];
 const assets = groups.filter((group) => !only || group.cue === only).flatMap((group) =>
   Array.from({ length: group.count }, (_, index) => ({ ...group,
-    file: `AudioSfx_${group.cue[0].toUpperCase()}${group.cue.slice(1)}_${String(index + 1).padStart(2, "0")}.mp3`,
+    file: `AudioSfx_${group.cue[0].toUpperCase()}${group.cue.slice(1)}_${String(index + (group.firstIndex || 1)).padStart(2, "0")}.mp3`,
     prompt: common + group.prompt + group.variants[index],
   })));
 
@@ -121,15 +125,17 @@ async function Main() {
   const manifestPath = path.join(outputDir, "Data_SfxManifest.json");
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   manifest.licenses.volcengine = SFX_LICENSES.volcengine;
-  for (const group of groups.filter((group) => !only || group.cue === only)) {
+  for (const group of groups.filter((group) => (!only || group.cue === only) && group.register !== false)) {
     const entries = results.filter((result) => result.cue === group.cue);
     manifest.cues[group.cue] = { files: entries.map((entry) => entry.file),
       seconds: Number(Math.max(...entries.map((entry) => entry.seconds)).toFixed(3)),
       credit: `Volcengine SeedAudio 1.0 · ${group.cue} · 2026-09-09`, license: "volcengine" };
   }
   for (const result of results) fs.copyFileSync(path.join(rawDir, "Staged", result.file), path.join(outputDir, result.file));
-  manifest.bakedAt = new Date().toISOString().slice(0, 10);
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+  if (groups.some((group) => (!only || group.cue === only) && group.register !== false)) {
+    manifest.bakedAt = new Date().toISOString().slice(0, 10);
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+  }
   fs.writeFileSync(path.join(rawDir, `Data_Qc${only || "All"}.json`), JSON.stringify(results, null, 2) + "\n");
 }
 Main().catch((error) => { console.error(error.message); process.exitCode = 1; });

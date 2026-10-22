@@ -19,7 +19,7 @@
 
 import { Mulberry32, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import {
-  PROBE, NEAR_MISS, RICOCHET, AI_FOLEY, PLAYER_STEP, BODY_FOLEY,
+  PROBE, NEAR_MISS, RICOCHET, AI_IMPACT, AI_FOLEY, PLAYER_STEP, BODY_FOLEY,
   GRENADE_FOLEY, BLAST_AUDIO, FIRE_SPOT, BATTLE_DENSITY, SUPPRESSION_DIRT,
   TRENCH_ZONE, SUPPRESSION_BODY,
 } from "./Data_Tuning_Audio.mjs";
@@ -210,6 +210,12 @@ export class AudioWiring {
     this.firedAtPlayerFrom = null; // 那个人在哪儿（撒在射手对面那一侧）
     this.surfaceByTag = null;      // Update 递进来的弹着表面表（压制弹着查材质要用）
 
+    // --- AI 弹着（Data_Tuning_Audio.AI_IMPACT）---------------------------
+    this.aiImpactFrame = -1;
+    this.aiImpactInFrame = 0;
+    this.lastAiImpactAt = -99;
+    this.aiImpactCount = 0;        // 取证累计
+
     this.playCounter = 0;
   }
 
@@ -256,6 +262,8 @@ export class AudioWiring {
     this.dirtDebt = 0;
     this.firedAtPlayerAt = -99;
     this.firedAtPlayerFrom = null;
+    this.lastAiImpactAt = -99;
+    this.aiImpactInFrame = 0;
   }
 
   // =========================================================================
@@ -1044,6 +1052,56 @@ export class AudioWiring {
       position: { x: point.x, y: point.y, z: point.z },
       volume: RICOCHET.volume, delay: RICOCHET.delayS,
       pitch: 0.9 + rng() * 0.3,
+    });
+    return true;
+  }
+
+  // =========================================================================
+  // 三之二、AI 的弹着
+  // =========================================================================
+
+  /** 这一帧还许不许再播一条 AI 弹着（全局限速，见 AI_IMPACT）。 */
+  AiImpactAllowed() {
+    if (this.frame !== this.aiImpactFrame) { this.aiImpactFrame = this.frame; this.aiImpactInFrame = 0; }
+    if (this.aiImpactInFrame >= AI_IMPACT.perFrame) return false;
+    return this.time - this.lastAiImpactAt >= AI_IMPACT.minIntervalS;
+  }
+
+  AiImpactPlayed() {
+    this.aiImpactInFrame += 1;
+    this.lastAiImpactAt = this.time;
+    this.aiImpactCount += 1;
+  }
+
+  /**
+   * AI 的子弹打在墙上 / 地上。材质与玩家那几条弹着同一张表（surface 由调用方按
+   * Script_Main.ImpactSurface 查好）；硬面照旧可能跳弹。
+   * @param {object} point 弹着点
+   * @param {string} surface 弹着表面（brick / dirt / sandbag / wood / metal / water / stone）
+   * @param {number} seed 跳弹随机种子（射击序号，回放可复现）
+   */
+  AiBulletImpact(point, surface, seed = 0) {
+    const audio = this.Audio;
+    if (!audio || !point) return false;
+    if (this.DistanceToListener(point) > AI_IMPACT.surfaceWithinM) return false;
+    if (!this.AiImpactAllowed()) return false;
+    this.AiImpactPlayed();
+    audio.Play(IMPACT_BY_SURFACE[surface] || "impactDirt", {
+      position: { x: point.x, y: point.y, z: point.z }, volume: AI_IMPACT.surfaceVolume,
+    });
+    this.Ricochet(point, surface, seed);
+    return true;
+  }
+
+  /** AI 的子弹打中别的兵（战友或日军）。 */
+  AiBulletFlesh(point) {
+    const audio = this.Audio;
+    if (!audio || !point) return false;
+    if (this.DistanceToListener(point) > AI_IMPACT.fleshWithinM) return false;
+    if (!this.AiImpactAllowed()) return false;
+    this.AiImpactPlayed();
+    audio.Play("impactFlesh", {
+      position: { x: point.x, y: point.y, z: point.z }, volume: AI_IMPACT.fleshVolume,
     });
     return true;
   }
