@@ -205,6 +205,8 @@ export const CIVILIAN_RIG_LOOK = Object.freeze({
   bodyKind: "nra",
   modelVariant: 1,
   cloth: Object.freeze([0x2a3147, 0x232326, 0x5b4b36, 0x3a4a5e]),   // 深蓝、黑、土布、靛青
+  // 小孩固定深蓝（2026-10-23：1218 14-2 妮儿按种子抽到土布褐，近镜头里连军帽、红领章看着就是个兵；深蓝跟程序化百姓的蓝布衣一个色）
+  childCloth: 0x2a3147,
   hideMaterials: Object.freeze(["Material #1721585500", "Material #29", "Material #1721585343"]),
 });
 export const BLOCKOUT_BODY_MODES = Object.freeze(["rig", "procedural"]);
@@ -348,7 +350,7 @@ export class BlockoutPuppets {
     const civilianRig = kind === "civilian" && CivilianBodyMode(unit) === "rig";
     const bodyKind = civilianRig ? CIVILIAN_RIG_LOOK.bodyKind : kind;
     const look = civilianRig ? { modelVariant: CIVILIAN_RIG_LOOK.modelVariant, noPool: true, weapon: null,
-      uniformPalette: CIVILIAN_RIG_LOOK.cloth[seed % CIVILIAN_RIG_LOOK.cloth.length] } : {};
+      uniformPalette: unit.kind === "child" ? CIVILIAN_RIG_LOOK.childCloth : CIVILIAN_RIG_LOOK.cloth[seed % CIVILIAN_RIG_LOOK.cloth.length] } : {};
     if (civilianRig) weapon = null;
     try {
       actor = this.actorFactory.Create(bodyKind, { seed, weapon, ...cast, ...(cast.castId ? { noPool: true } : {}), ...look });
@@ -934,8 +936,11 @@ export class BlockoutPuppets {
         colliders.push(...BodyCapsules(rig, actor.root.scale.x || 1, { press: true, carry }));
       }
     }
-    // 只有一边有人：另一边镜像；都没人但被子在走：两角贴地跟着被子走
-    if (gripAsset.headL && !gripAsset.headR) gripAsset.headR = new THREE.Vector3(-gripAsset.headL.x, gripAsset.headL.y, gripAsset.headL.z);
+    // 只有一边有人：另一边镜像（另一角是玩家镜头攥着）；都没人但被子在走：两角贴地跟着被子走。
+    // 2026-10-23 dragSolo（被子单位 / 预演键）：只认真有手攥着的角，另一角不镜像、落地 —— 1218 14-2 顺子扑倒松了手、只剩妮儿攥着一个角在拽。
+    const solo = puppet.drive && puppet.drive.dragSolo !== undefined ? !!puppet.drive.dragSolo : !!puppet.unit.dragSolo;
+    if (solo) { /* 没手的角就空着 */ }
+    else if (gripAsset.headL && !gripAsset.headR) gripAsset.headR = new THREE.Vector3(-gripAsset.headL.x, gripAsset.headL.y, gripAsset.headL.z);
     else if (gripAsset.headR && !gripAsset.headL) gripAsset.headL = new THREE.Vector3(-gripAsset.headR.x, gripAsset.headR.y, gripAsset.headR.z);
     else if (!gripAsset.headL && !gripAsset.headR && puppet.moving) {
       gripAsset.headL = new THREE.Vector3(B.groundGrip.x, B.groundGrip.y, B.groundGrip.z);
@@ -1319,6 +1324,7 @@ export class BlockoutPuppets {
       // 2026-10-20：正式模型（"Type89Tank" / "ox" / "horse"；null = 还是体块）与车自己的牲口显不显示
       model: (() => { const m = puppet.body?.userData.model; return m?.tank ? BLOCKOUT_PUPPETS.tankModel : m?.stretcher ? "BambooStretcher" : m?.blanket ? "SingleBlanket" : m?.kind ?? null; })(),
       blanketDrag: puppet.body?.userData.model?.blanket ? +puppet.body.userData.model.blanket.drag.toFixed(3) : null,
+      blanketDragSolo: puppet.body?.userData.model?.blanket ? (puppet.drive && puppet.drive.dragSolo !== undefined ? !!puppet.drive.dragSolo : !!puppet.unit.dragSolo) : null,
       // 2026-10-21：单被的布料（两角离手多远、最高点、最大拉长、贴地 / 被压住的点数，见 Script_EditorBlockoutBlanket Probe）
       blanketCloth: puppet.body?.userData.model?.blanket ? puppet.body.userData.model.blanket.Probe() : null,
       draftAnimalVisible: puppet.body?.userData.model?.draft ? puppet.body.userData.model.draft.animalRoot.visible : null,

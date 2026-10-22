@@ -512,6 +512,25 @@ Test("ride：合法键通过；on 找不到 / 不是车 / 自己 报错；挂着
   assert.deepEqual(SamplePrevizActor(n.actors[3], 0, null).ride, { on: "L", x: 0, z: 0, y: 0, yawDeg: 0 });
 });
 
+// 2026-10-23：单被「玩家这一角不攥」（演员键 dragSolo，§5.6 / §14.1；1218 14-2 顺子松手后只剩妮儿攥着一个角）
+Test("dragSolo：要是 true / false；取样阶跃、没写过是 undefined（用关键帧单位的）", () => {
+  const cfg = NormalizeBlockout({
+    schema: "tengxian-blockout/1", level: "Test", title: "t",
+    keyframes: [{ id: "k", stage: 1, name: "a", player: { x: 0, z: 0 }, units: [{ id: "Blanket", side: "nra", kind: "litter", name: "冬瓜的单被", bearers: 0, x: 0, z: 0 }] }],
+  });
+  const Doc = (keys) => ({ schema: BLOCKOUT_PREVIZ_SCHEMA, level: "Test", sequences: [{ keyframe: "k", actors: [{ id: "Blanket", keys }] }] });
+  const bad = ValidateBlockoutPreviz(Doc([{ t: 0, dragSolo: "yes" }]), { config: cfg });
+  assert.ok(bad.errors.some(e => e.includes("keys[0].dragSolo 要是 true / false")), bad.errors.join("；"));
+  const good = ValidateBlockoutPreviz(Doc([{ t: 2, dragSolo: true }, { t: 9, dragSolo: false }]), { config: cfg });
+  assert.ok(good.ok, good.errors.join("；"));
+  const entry = NormalizeBlockoutPreviz(Doc([{ t: 2, dragSolo: true }, { t: 9, dragSolo: false }])).sequences[0].actors[0];
+  const base = cfg.keyframes[0].units[0];
+  assert.equal(SamplePrevizActor(entry, 1, base).dragSolo, undefined, "没写过 = undefined（运行时回落到关键帧单位的 dragSolo）");
+  assert.equal(SamplePrevizActor(entry, 2, base).dragSolo, true);
+  assert.equal(SamplePrevizActor(entry, 8.9, base).dragSolo, true);
+  assert.equal(SamplePrevizActor(entry, 9, base).dragSolo, false);
+});
+
 Test("音效别名：§14.3 的四个新别名在 PREVIZ_SFX_ALIASES 里；运行时 PREVIZ_SFX 两张表一致，新别名是 Audio/BlockoutPreviz 下的 url", () => {
   for (const name of ["babyCry", "cellarSob", "gateSmash", "jarShatter"]) assert.ok(PREVIZ_SFX_ALIASES.includes(name), name);
   const src = ReadText(path.join(projectDir, "Script_EditorBlockoutPreviz.mjs"));

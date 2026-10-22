@@ -66,7 +66,7 @@ export const PREVIZ_AIRCRAFT = Object.freeze({
  *（夹到 dur/2）。rate 下限 rateMin（再慢就是定格）；台词不排在慢动作里（校验报警告）。
  */
 export const PREVIZ_SLOWMO = Object.freeze({ rateMin: 0.05, rateMax: 1, fadeDefaultS: 0.25 });
-const KEY_FIELDS = ["stance", "aim", "state", "visible", "carryRole", "woundedWalk", "talking", "clip", "lie", "weapon", "ride"];
+const KEY_FIELDS = ["stance", "aim", "state", "visible", "carryRole", "woundedWalk", "talking", "clip", "lie", "weapon", "ride", "dragSolo"];
 /** 倒地怎么躺（同配置 §3 的 lie）："along" = 顺着朝向躺、头朝前；null = 演员倒地姿态原样。 */
 export const PREVIZ_LIE_MODES = Object.freeze(["along"]);
 const ID_RE = /^[A-Za-z0-9_-]+$/;
@@ -329,7 +329,7 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
         if (units && typeof k.faceTo === "string" && k.faceTo !== "player" && !units.has(k.faceTo) && !SpawnIds(seq).has(k.faceTo)) errors.push(`${kat}.faceTo 在关键帧 ${seq.keyframe} 里找不到：${k.faceTo}`);
         if (k.stance !== undefined && !PREVIZ_STANCES.includes(k.stance)) errors.push(`${kat}.stance 要是 stand / crouch / prone`);
         if (k.state !== undefined && !["alive", "down"].includes(k.state)) errors.push(`${kat}.state 要是 alive / down`);
-        for (const b of ["aim", "visible", "talking"]) if (k[b] !== undefined && typeof k[b] !== "boolean" && !Finite(k[b])) errors.push(`${kat}.${b} 要是 true / false`);
+        for (const b of ["aim", "visible", "talking", "dragSolo"]) if (k[b] !== undefined && typeof k[b] !== "boolean" && !Finite(k[b])) errors.push(`${kat}.${b} 要是 true / false`);
         if (k.woundedWalk !== undefined && typeof k.woundedWalk !== "boolean" && !Finite(k.woundedWalk)) errors.push(`${kat}.woundedWalk 要是 true / false`);
         if (k.carryRole !== undefined && k.carryRole !== null && !["front", "rear"].includes(k.carryRole)) errors.push(`${kat}.carryRole 要是 front / rear / null`);
         if (k.clip !== undefined && k.clip !== null && (typeof k.clip !== "string" || !k.clip)) errors.push(`${kat}.clip 要是片段名或 null`);
@@ -789,7 +789,9 @@ function StepField(track, name, t) {
  * throw：throw 键起 PREVIZ_THROW.clipS 秒内 = { seconds（抡了几秒）, x, z（落点）}，期间 clip 让位、stance 记 stand；否则 null。
  * ride（2026-10-20）：阶跃，没写过沿用 baseUnit / spawn 的 ride；归一化成 { on, x, z, y, yawDeg } 或 null。挂着时 x / z / yawDeg / moving
  * 照位置键算（运行时不用它们，按车的位姿摆人，位置键写了由校验报警告）。
- * @returns {{x,z,yawDeg,stance,aim,state,lie,weapon,ride,visible,carryRole,woundedWalk,talking,clip,clipSeconds,clipHold,throw,moving,speedMps,move}}
+ * dragSolo（2026-10-23，只对单被 litter 有意义）：阶跃，**只有键里写过才有值**（undefined = 用关键帧单位的 dragSolo）：true = 只认真有手攥着的被角，
+ * 另一角不取镜像、落地（§5.6）。
+ * @returns {{x,z,yawDeg,stance,aim,state,lie,weapon,ride,visible,carryRole,woundedWalk,talking,dragSolo,clip,clipSeconds,clipHold,throw,moving,speedMps,move}}
  */
 export function SamplePrevizActor(entry, t, baseUnit, opts = {}) {
   const track = CompilePrevizActor(entry, baseUnit);
@@ -834,6 +836,7 @@ export function SamplePrevizActor(entry, t, baseUnit, opts = {}) {
     carryRole: Value("carryRole", null) || null,
     woundedWalk: !!Value("woundedWalk", false),
     talking: !!Value("talking", false),
+    dragSolo: Value("dragSolo", undefined),
     clip, clipSeconds, clipHold, clipRelease,
     throw: throwState,
     moving, move,

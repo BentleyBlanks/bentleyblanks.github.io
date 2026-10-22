@@ -13,6 +13,8 @@
 //   4. 松手之后（02-4 18.5 s）两角放开、布落平；
 //   5. 连续播 1.5 s：每帧布料耗时（中位数 < 2 ms）、不出 NaN、被头始终在被尾前头（没对折）、拉长有上限；
 //   6. 全程没有未捕获错误。截图存 _shots/EditorBlockoutBlanketCloth/（不提交）。
+//   7. 2026-10-23 dragSolo：FirstLevel1218 14-2 顺子扑倒松手 —— 被子键 dragSolo: true 之前两角都攥着（玩家那角镜像），之后只剩妮儿那一角，
+//      另一角放开落地（§5.6 / §14.1）。
 // ===========================================================================
 
 import fs from "node:fs/promises";
@@ -166,6 +168,41 @@ try {
     Check("连续播：不出 NaN", run.bad.length === 0, J(run.bad.slice(0, 5)));
     Check("连续播：被头始终在被尾前头（没对折）", run.minAlong > 1.0, `头尾沿朝向最近 ${run.minAlong.toFixed(2)} m ${J(run.worst)}`);
     Check("连续播：拉长有上限", run.maxStretch < 1.8, J({ maxStretch: run.maxStretch, minRatio: run.minRatio }));
+  }
+
+  // 7. 2026-10-23 dragSolo（§5.6）：FirstLevel1218 14-2 顺子扑倒松了手 —— 松手前两角都攥着（妮儿一角、玩家那角镜像），
+  //    被子键 dragSolo: true 之后只剩妮儿那一角钉在手上，玩家那角放开落地
+  console.log("--- 1218 14-2 dragSolo");
+  {
+    await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=FirstLevel1218&kf=14-2&quality=whitebox&scale=small&audio=0`,
+      { waitUntil: "load", timeout: 180000 });
+    await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready, null, { timeout: 300000, polling: 200 });
+    await page.waitForFunction(() => window.Tengxian.Debug.Blockout.Probe("BlanketDonggua")?.model === "SingleBlanket", null, { timeout: 120000, polling: 200 });
+    await page.waitForFunction(() => window.Tengxian.Debug.Blockout.Previz.Has("14-2"), null, { timeout: 30000 });
+    const seq = await B(async () => { const r = await fetch("./Blockout/FirstLevel1218.previz.json?t=" + Date.now()); return (await r.json()).sequences.find(s => s.keyframe === "14-2"); });
+    const solo = seq.actors.find(a => a.id === "BlanketDonggua").keys.find(k => k.dragSolo === true);
+    Check("1218 14-2 预演里被子有 dragSolo: true 的键", !!solo, J(solo));
+    await PlayKf("14-2");
+    const Probe2 = (t) => B(async (t) => {
+      const Bl = window.Tengxian.Debug.Blockout;
+      await Bl.Previz.Seek(t);
+      for (let i = 0; i < 3; i++) await new Promise(r => requestAnimationFrame(r));
+      return { blanket: Bl.Probe("BlanketDonggua"), nier: Bl.Probe("Nier") };
+    }, t);
+    const before = await Probe2(Math.max(0.3, solo.t - 0.4));
+    const cb = before.blanket.blanketCloth;
+    Check("松手前：两角都攥着（妮儿一角 + 玩家那角镜像）", before.blanket.blanketDragSolo === false && cb.headL.held && cb.headR.held, J({ solo: before.blanket.blanketDragSolo, headL: cb.headL, headR: cb.headR }));
+    await Shot("1218_14-2_before.png");
+    const after = await Probe2(solo.t + 2.0);
+    const ca = after.blanket.blanketCloth;
+    const held = [ca.headL, ca.headR].filter(c => c.held), loose = [ca.headL, ca.headR].filter(c => !c.held);
+    Check("松手后：只剩一个角被攥着（妮儿），另一角放开落地", after.blanket.blanketDragSolo === true && held.length === 1 && loose.length === 1 && loose[0].aboveGround < 0.2,
+      J({ solo: after.blanket.blanketDragSolo, headL: ca.headL, headR: ca.headR, nierClip: after.nier?.shownClip }));
+    const hands = (p) => [p?.handL, p?.handR].filter(Boolean);
+    const nearNier = held.length ? Math.min(...hands(after.nier).map(h => Dist(held[0], h))) : Infinity;
+    Check("攥着的那角在妮儿手边（< 0.3 m）", nearNier < 0.3, J({ nearNier: +nearNier.toFixed(3) }));
+    await Shot("1218_14-2_after.png");
+    await B(() => window.Tengxian.Debug.Blockout.Previz.Stop());
   }
 } catch (error) {
   Check("没有抛错", false, String(error?.stack || error).slice(0, 600));

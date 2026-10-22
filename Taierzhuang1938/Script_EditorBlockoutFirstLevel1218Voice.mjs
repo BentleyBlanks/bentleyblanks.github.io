@@ -149,7 +149,7 @@ function TargetDb(scene) {
 
 /** 带 pickup 的句子各自成一个单句小场（id 不带点，进文件名）。 */
 const Pickups = (scene) => scene.lines.filter((l) => l.pickup).map((line) => Object.freeze({
-  id: `${scene.id}${line.id.split(".")[1]}Pickup`, beat: scene.beat, keyframe: scene.keyframe, label: `${scene.label}（${line.id} 单句补录）`,
+  id: `${scene.id}${line.id.split(".")[1]}Pickup${line.pickupVersion > 1 ? `V${line.pickupVersion}` : ""}`, beat: scene.beat, keyframe: scene.keyframe, label: `${scene.label}（${line.id} 单句补录）`,
   context: scene.context, cast: Object.freeze([line.who]), lines: Object.freeze([line]), pickupOf: line.id }));
 
 // ---------------------------------------------------------------------------
@@ -384,7 +384,13 @@ async function Main() {
     r.slices.forEach((s, i) => console.log(`  ${r.scene.lines[i].id} ${r.scene.lines[i].speaker.padEnd(4, "　")} ${(s.endS - s.startS).toFixed(2)}s gap ${s.gapBeforeS} cos ${s.speakerCos ?? "-"} cer ${s.cer ?? "-"}「${s.transcript ?? ""}」${s.issues?.length ? " ← " + s.issues.join("；") : ""}`));
     Install(r, manifest, timings);
   }
+  // 台词表里删掉的场（10-23 第二版删了 RoadWest 等九场）：清单不留，mp3 一并删掉；tmp 里的原始返回留着（git 忽略）
   const order = L1218_VOICE_SCENES.map((s) => s.id);
+  for (const gone of manifest.scenes.filter((x) => !order.includes(x.id))) {
+    for (const file of fs.readdirSync(outDir).filter((f) => f.startsWith(`AudioVoice_Blockout1218${gone.id}_`))) fs.rmSync(path.join(outDir, file), { force: true });
+    console.log(`删掉台词表里没有的场 ${gone.id}（${gone.lines.length} 句）`);
+  }
+  manifest.scenes = manifest.scenes.filter((x) => order.includes(x.id));
   manifest.scenes.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
   manifest.generatedAt = new Date().toISOString();
   manifest.requests = (manifest.requests || 0) + requestStats.requests;
