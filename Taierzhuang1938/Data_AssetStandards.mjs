@@ -120,6 +120,10 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 }
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
+  Object.freeze({ id: "Donkey", name: "独立灰驴（无车无套具）", pack: "Donkey/Model_Donkey.glb",
+    sourceTriangles: 50992, actualTriangles: 50992, targetTriangles: 50992, policy: "source",
+    sourceTexture: "驴车 V3 可编辑动物组件、内置 Imagegen 粗短毛、程序蹄壁、CC0 雕刻法线", runtimeTexture: "独立 UV 图集；2K Base / 1K Normal / 512 ORM，无损 WebP 内嵌",
+    note: "只保留驴本体、鬃尾和短毛；无木车、颈垫、套具、笼头或牵绳。28骨、1网格、1材质，保留原地行走/待机；完整源拓扑不减面。" }),
   Object.freeze({ id: "DonkeyCart", name: "灰驴与两轮木车", pack: "DonkeyCart/Model_DonkeyCart.glb",
     sourceTriangles: 88896, actualTriangles: 79500, targetTriangles: 79500, policy: "target",
     sourceTexture: "用户原画、内置 Imagegen 粗短毛与旧榆木 V3、程序蹄壁与端木纹、CC0 雕刻法线", runtimeTexture: "分区 UV 图集；动物 2K Base / 1K Normal、木车 4K Base / 2K Normal，ORM 均 512，无损 WebP 内嵌",

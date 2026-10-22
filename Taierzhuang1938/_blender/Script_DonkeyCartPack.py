@@ -48,7 +48,8 @@ def Pack(source,output):
     report={'source':str(source),'output':str(output),'bytes':output.stat().st_size,'geometrySkinActionsUnchanged':True,
             'nonImageBufferSha256':geometryBefore,'images':images,'animations':[a.get('name') for a in document.get('animations',[])],
             'skins':[{'name':s.get('name'),'jointCount':len(s['joints'])} for s in document.get('skins',[])]}
-    (output.parent/'Data_DonkeyCartPacking.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+    assetName=output.stem.removeprefix('Model_')
+    (output.parent/('Data_'+assetName+'Packing.json')).write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     print(json.dumps(report))
 
 if __name__=='__main__':

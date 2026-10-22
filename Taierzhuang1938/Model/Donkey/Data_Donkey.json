@@ -1,0 +1,164 @@
+{
+  "schema": "tengxian-independent-rigged-prop-v1",
+  "id": "Donkey",
+  "version": "20261022StandaloneV1",
+  "asset": "Model_Donkey.glb",
+  "textureManifest": "Data_DonkeyTextures.json",
+  "sha256": "fb943a4f321b6489656ec4f20f803b96e098d1748394551cc266f2fbc45f21a2",
+  "bytes": 5801424,
+  "units": "metres",
+  "upAxis": "+Y",
+  "facingAxis": "-Z",
+  "sourceCoordinates": "Blender +Y forward / +Z up; exported once to glTF -Z forward / +Y up",
+  "pivotM": [
+    0,
+    0,
+    0
+  ],
+  "nominalWithersHeightM": 1.1,
+  "boundsM": {
+    "min": [
+      -0.18294331431388855,
+      0.00039999998989515007,
+      -1.0661882162094116
+    ],
+    "max": [
+      0.1811765432357788,
+      1.5614452362060547,
+      0.4910862445831299
+    ],
+    "dimensions": [
+      0.36411985754966736,
+      1.5610452362161595,
+      1.5572744607925415
+    ]
+  },
+  "feet": {
+    "construction": "continuous cannon/carpus/hock/fetlock/pastern; single horn wall and recessed sole, short rear feathering",
+    "hoofWallDimensionsM": {
+      "DonkeyFrontLeft": [
+        0.0737999975681305,
+        0.09191912412643433,
+        0.0725347094994504
+      ],
+      "DonkeyFrontRight": [
+        0.0737999975681305,
+        0.09191912412643433,
+        0.0725347094994504
+      ],
+      "DonkeyRearLeft": [
+        0.06863399595022202,
+        0.09191912040114403,
+        0.0725347094994504
+      ],
+      "DonkeyRearRight": [
+        0.06863399595022202,
+        0.09191911667585373,
+        0.0725347094994504
+      ]
+    },
+    "frontCarpusHeightM": 0.48,
+    "rearHockHeightM": 0.47,
+    "fetlockPivotHeightM": 0.155,
+    "source": "_blender/Script_DonkeyCartFeet.py",
+    "appearance": "reference-led creative anatomy; dimensions are authoring choices"
+  },
+  "upperForelegs": {
+    "construction": "reference-aligned elbow/carpus with separately fitted continuous forearm surface",
+    "fitScript": "_blender/Script_DonkeyCartAnatomy.py",
+    "elbowToCarpusOffsetM": {
+      "Left": 0.011666655540466309,
+      "Right": 0.023333311080932617
+    }
+  },
+  "coat": {
+    "construction": "directional source fur, varied roughness, geometric short tufts along the body and limbs",
+    "sourceScript": "_blender/Script_DonkeyCartSurface.py"
+  },
+  "triangles": {
+    "total": 50992,
+    "limit": 80000,
+    "byBatch": {
+      "Animal": 50992
+    },
+    "decimated": false
+  },
+  "runtime": {
+    "meshes": [
+      "DonkeyRuntime"
+    ],
+    "skins": [
+      {
+        "name": "DonkeySkeleton",
+        "jointCount": 28
+      }
+    ],
+    "materials": 1,
+    "maxInfluences": 4,
+    "morphTargets": 0,
+    "uvAtlasCoverage": {
+      "Animal": 0.27962239698204355
+    },
+    "averageTexelsPerMetre": {
+      "Animal": 648.4220236956575
+    }
+  },
+  "animations": {
+    "DonkeyWalk": {
+      "durationS": 1.2,
+      "strideM": 0.68,
+      "speedMps": 0.5666666666666668,
+      "inPlace": true,
+      "supportCompressionM": 0.032
+    },
+    "DonkeyIdle": {
+      "durationS": 3.0
+    }
+  },
+  "motion": "Advance the root along local -Z. Walk time = distance / 0.68 * 1.2 seconds; Idle uses an independent 3-second clock.",
+  "derivation": {
+    "parentAsset": "../DonkeyCart/Model_DonkeyCart.glb",
+    "parentAssetSha256": "23b107b48da924ba0b29ca2fd63473f5db13a234ecb7991769336c88fd11636b",
+    "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\Scene_DonkeyCart.blend",
+    "sourceSha256": "e1c2bbb55db3317e7d18dbc40ad47a6f09a5ff157794694315f31a10a8213ac2",
+    "retainedCollection": "DonkeyEditable",
+    "retainedObjectCount": 269,
+    "removedObjectCount": 270,
+    "scope": "animal body, eyes, ears, mane, tail and short fur only; no cart, shafts, collar, straps, halter or lead rope",
+    "mouthSeamConform": {
+      "maxDistanceBeforeM": 0.04574508219957352,
+      "maxDistanceAfterM": 0.0021782624535262585,
+      "vertices": 30,
+      "weightsUnchanged": true
+    },
+    "skeleton": "all 28 animal bones and both source actions retained; unused DonkeyHitchPivot is kept for rig compatibility"
+  },
+  "verification": {
+    "reimportedStanceSoleRangeM": [
+      0.0003997830208390951,
+      0.0004003627982456237
+    ],
+    "reimportedStanceDriftPerFrameM": 6.537967258031518e-07,
+    "sampleCount": 148,
+    "webpPixelsUnchanged": true,
+    "geometrySkinActionsUnchangedDuringPacking": true,
+    "parentSourceUnchanged": true,
+    "sourceAnatomyEvidence": "Animal body/weights inherit V3 anatomy checks; only the separate decorative mouth seam is conformed. Actual derivative GLB is independently reimported and resampled."
+  },
+  "editableSource": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261022\\Scene_Donkey.blend",
+  "credits": [
+    {
+      "name": "Lyndon Daniels / ChadM Rigged Horse",
+      "license": "CC0",
+      "url": "https://opengameart.org/content/rigged-horse",
+      "use": "retained editable skin topology and sculpt normal, extensively reshaped to the supplied donkey reference"
+    },
+    {
+      "name": "User supplied donkey and cart reference plus built-in Imagegen",
+      "use": "subject identity, reference turnaround and short fur material"
+    }
+  ],
+  "reconstructionScope": "灰驴的比例、毛色与表面细节沿用用户参考图创作复原；尺寸为建模定标，不作为史料规格。",
+  "historicalReferences": [],
+  "rebuild": "node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs"
+}

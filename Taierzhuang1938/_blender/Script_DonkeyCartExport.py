@@ -10,7 +10,9 @@ from mathutils import Matrix
 from mathutils.bvhtree import BVHTree
 
 scene=bpy.context.scene
-base=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020')
+assetName=globals().get('DonkeyAssetName','DonkeyCart')
+standalone=assetName=='Donkey'
+base=Path(scene['DonkeySourceRoot']) if standalone else Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020')
 bakeDir=base/'SourceTextures/Baked';bakeDir.mkdir(parents=True,exist_ok=True)
 project=Path(scene['DonkeyCartProject'])
 atlasNamespace={}
@@ -22,8 +24,10 @@ if runtimeCol:
 runtimeCol=bpy.data.collections.new('RuntimeExport');scene.collection.children.link(runtimeCol)
 scene.frame_set(0)
 editableSourceTriangles=0
+sourceRigs=[bpy.data.objects['DonkeyRig']]
+if not standalone:sourceRigs.append(bpy.data.objects['DonkeyCartRig'])
 for obj in bpy.data.objects:
-    if obj.type=='MESH' and obj.parent in (bpy.data.objects['DonkeyRig'],bpy.data.objects['DonkeyCartRig']):
+    if obj.type=='MESH' and obj.parent in sourceRigs:
         obj.data.calc_loop_triangles();editableSourceTriangles+=len(obj.data.loop_triangles)
 
 def Select(objects,active=None):
@@ -52,6 +56,8 @@ def CloneBatch(sourceRig,label):
     objects=[]
     for original in list(bpy.data.objects):
         if original.type!='MESH' or original.parent!=sourceRig:continue
+        if standalone and original.name not in bpy.data.collections['DonkeyEditable'].all_objects:
+            raise RuntimeError('Standalone donkey contains a non-animal source: '+original.name)
         obj=original.copy();obj.data=original.data.copy();runtimeCol.objects.link(obj)
         obj.name=original.name+'Export';obj.parent=rig
         coords=obj.data.attributes.get('MaterialCoordinates') or obj.data.attributes.new('MaterialCoordinates','FLOAT_VECTOR','POINT')
@@ -92,7 +98,9 @@ def CloneBatch(sourceRig,label):
     return rig,obj
 
 animalRig,animal=CloneBatch(bpy.data.objects['DonkeyRig'],'Animal')
-cartRig,cart=CloneBatch(bpy.data.objects['DonkeyCartRig'],'Cart')
+batches=[(animalRig,animal,'Animal')]
+if not standalone:
+    cartRig,cart=CloneBatch(bpy.data.objects['DonkeyCartRig'],'Cart');batches.append((cartRig,cart,'Cart'))
 scene.render.engine='CYCLES';scene.cycles.samples=8
 scene.render.bake.margin=5;scene.render.bake.use_selected_to_active=False;scene.render.bake.use_clear=True
 scene.render.bake.use_pass_direct=False;scene.render.bake.use_pass_indirect=False;scene.render.bake.use_pass_color=True
@@ -115,13 +123,13 @@ def SaveImage(image):
 
 def Bake(obj,label):
     Select([obj])
-    baseImage=TargetImage(obj,'Texture_DonkeyCart'+label+'Base',2048 if label=='Animal' else 4096)
+    baseImage=TargetImage(obj,'Texture_'+assetName+label+'Base',2048 if label=='Animal' else 4096)
     bpy.ops.object.bake(type='DIFFUSE')
     info=[SaveImage(baseImage)]
-    normalImage=TargetImage(obj,'Texture_DonkeyCart'+label+'Normal',1024 if label=='Animal' else 2048,True)
+    normalImage=TargetImage(obj,'Texture_'+assetName+label+'Normal',1024 if label=='Animal' else 2048,True)
     bpy.ops.object.bake(type='NORMAL',normal_space='TANGENT',normal_r='POS_X',normal_g='POS_Y',normal_b='POS_Z')
     info.append(SaveImage(normalImage))
-    ormImage=TargetImage(obj,'Texture_DonkeyCart'+label+'Orm',512,True)
+    ormImage=TargetImage(obj,'Texture_'+assetName+label+'Orm',512,True)
     restore=[]
     for mat in obj.data.materials:
         nodes,links=mat.node_tree.nodes,mat.node_tree.links
@@ -140,7 +148,7 @@ def Bake(obj,label):
     info.append(SaveImage(ormImage))
     for mat,original,output,emission,combine in restore:
         mat.node_tree.links.new(original,output.inputs['Surface']);mat.node_tree.nodes.remove(emission);mat.node_tree.nodes.remove(combine)
-    mat=bpy.data.materials.new('DonkeyCart'+label+'Pbr');mat.use_nodes=True;mat.use_backface_culling=True
+    mat=bpy.data.materials.new(assetName+label+'Pbr');mat.use_nodes=True;mat.use_backface_culling=True
     nodes,links=mat.node_tree.nodes,mat.node_tree.links;shader=nodes.get('Principled BSDF')
     shader.inputs['Specular IOR Level'].default_value=.18 if label=='Animal' else .20
     uv=nodes.new('ShaderNodeUVMap');uv.uv_map='GameUV'
@@ -165,12 +173,12 @@ def Bake(obj,label):
     obj.data.calc_loop_triangles()
     return {'label':label,'sourceTriangles':obj['sourceTriangles'],'triangles':len(obj.data.loop_triangles),'vertices':len(obj.data.vertices),'budgetSurfaceMaxErrorM':obj.get('budgetSurfaceMaxErrorM',0),'atlasCoverage':obj['atlasCoverage'],'atlasTexelsPerMetre':obj['atlasTexelsPerMetre'],'textures':info}
 
-reports=[Bake(animal,'Animal'),Bake(cart,'Cart')]
-for rig in (animalRig,cartRig):
+reports=[Bake(obj,label) for rig,obj,label in batches]
+for rig,obj,label in batches:
     rig.data.pose_position='POSE'
     for bone in rig.pose.bones:bone.matrix_basis=Matrix.Identity(4)
-scene.frame_set(0);Select([animalRig,animal,cartRig,cart],animal)
-path=base/'Model_DonkeyCartUnpacked.glb'
+scene.frame_set(0);Select([obj for rig,mesh,label in batches for obj in (rig,mesh)],animal)
+path=base/('Model_'+assetName+'Unpacked.glb')
 bpy.ops.export_scene.gltf(filepath=str(path),export_format='GLB',use_selection=True,
  export_apply=False,export_yup=True,export_animations=True,export_animation_mode='NLA_TRACKS',
  export_anim_slide_to_zero=True,export_force_sampling=True,export_frame_range=False,
@@ -181,6 +189,6 @@ report={'path':str(path),'bytes':path.stat().st_size,'batches':reports,'totalTri
 for obj in runtimeCol.objects:obj.hide_render=True;obj.hide_set(True)
 scene.cycles.samples=32
 text=bpy.data.texts.get('Script_DonkeyCartExport.py') or bpy.data.texts.new('Script_DonkeyCartExport.py');text.clear();text.write((project/'_blender/Script_DonkeyCartExport.py').read_text(encoding='utf-8'))
-bpy.ops.wm.save_as_mainfile(filepath=str(base/'Scene_DonkeyCart.blend'))
+bpy.ops.wm.save_as_mainfile(filepath=str(base/('Scene_'+assetName+'.blend')))
 print(json.dumps(report))
 if report['totalTriangles']>80000:raise RuntimeError('Donkey-cart exceeds the project vehicle triangle budget')

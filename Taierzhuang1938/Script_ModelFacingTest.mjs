@@ -279,5 +279,27 @@ Check(actualMin.every((v,i)=>Math.abs(v-donkeySpec.boundsM.min[i])<.00003)&&actu
   "驴车实际蒙皮绑定顶点云与外部 Blender 量测包围盒一致");
 Check(donkeySpec.facingAxis==="-Z" && donkeySpec.upAxis==="+Y" && ["DonkeyWalk","DonkeyIdle","CartRoll"].every(name=>donkey.json.animations.some(a=>a.name===name)),
   "驴车朝向契约与三条必要动画齐备");
+const bareFile=path.join(projectDir,"Model/Donkey/Model_Donkey.glb"),bare=LoadGlb(bareFile);
+const bareSpec=JSON.parse(fs.readFileSync(path.join(projectDir,"Model/Donkey/Data_Donkey.json"),"utf8"));
+const bareCloud=RiggedGlbPoints(bareFile,"DonkeyRuntime"),bareHead=RiggedGlbPoints(bareFile,"DonkeyRuntime","DonkeyHeadPivot");
+const bareMin=[0,1,2].map(axis=>Math.min(...bareCloud.map(p=>p[axis]))),bareMax=[0,1,2].map(axis=>Math.max(...bareCloud.map(p=>p[axis])));
+const bareTriangles=bare.json.meshes.flatMap(m=>m.primitives).reduce((sum,p)=>sum+bare.json.accessors[p.indices].count/3,0);
+Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.length<-.65
+  && bareSpec.facingAxis==="-Z" && bareSpec.upAxis==="+Y" && Math.abs(bareMin[1])<.001 && bareMax[1]>1.48 && bareMax[1]<1.68,
+  "独立驴实际头部朝 -Z、米制 Y-up、蹄底零高与长耳完整高度");
+Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
+  "独立驴实际绑定顶点云与外置工程包围盒一致");
+Check(bare.json.meshes.length===1 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
+  && bare.json.materials.length===1 && bare.json.images.length===3 && bareTriangles===50992 && bareTriangles===bareSpec.triangles.total,
+  "独立驴单网格/单材质/28骨与50,992三角齐备");
+Check(bare.json.animations.length===2 && ["DonkeyWalk","DonkeyIdle"].every(name=>bare.json.animations.some(a=>a.name===name))
+  && !bare.json.nodes.some(n=>/^(Cart|Wheel|Harness|Halter)/.test(n.name||"")) && bareMax[2]<1.2,
+  "独立驴只保留行走/待机，不带车或套具节点及拖车范围");
+for(const animation of bare.json.animations){
+  const times=animation.samplers.map(s=>ReadAccessor(bare,s.input).data);
+  const end=Math.max(...times.map(values=>Math.max(...values)));
+  Check(Math.abs(end-bareSpec.animations[animation.name].durationS)<.00001,
+    `独立驴 ${animation.name} 实际动画时长与契约一致`,end.toFixed(3));
+}
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机机首与战车车头全部按几何复量落在 -Z");

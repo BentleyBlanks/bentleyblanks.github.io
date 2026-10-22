@@ -4,6 +4,22 @@
 
 发布文件为 `Model/DonkeyCart/Model_DonkeyCart.glb`。尺寸、骨架、片段时长、源工程路径与实测结果以同目录的 `Data_DonkeyCart.json` 为准；六张实际使用的 WebP 镜像及来源见 `Data_DonkeyCartTextures.json`。图像源、原始 Blender 工程、对照图和验收页留在本地。
 
+## 无车无套具的独立驴
+
+`Model/Donkey/Model_Donkey.glb` 是 2026-10-22 按用户要求追加的纯驴版。只从 V3 工程的 `DonkeyEditable` 集合保留身体、眼、耳、鬃尾和轮廓短毛，移除木车、车辕、颈垫、全部套具、笼头与牵绳；不能仅删除 `CartRuntime`，因为原动物运行时网格也合并了套具。原驴车文件与源工程不覆盖。
+
+独立驴保留完整动物拓扑和蒙皮，共 50,992 三角、1 个运行时网格、1 个材质。28 根动物骨骼保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。单独重烘 2K Base / 1K Normal / 512 ORM，三张无损 WebP 内嵌并有镜像文件。实际规格以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准。
+
+外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261022/Scene_Donkey.blend`，其中打包图像与重建脚本；`Data_Derivation.json` 记录父工程哈希及保留／删除组件。重建命令：
+
+```powershell
+node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
+```
+
+此入口从保留的 V3 父工程派生，复用相同的图集、导出、无损打包与实际 GLB 重导测蹄逻辑；结束时关闭自己的 Blender 实例。独立版的肩颈、头部、全身和行走实测留在其外置 `Review/` 目录，本地交互页在 worktree 的 `tmp/Donkey/`。新增资产未布设到关卡，不改变现有车队使用的模型。
+
+去掉笼头后的近景发现原装饰嘴缝离真实口鼻表面约 3–4 cm；独立版将这条 30 顶点细管的五个截面中心贴回口鼻，保留管径、面数与头部蒙皮。实际表面距离记录在派生契约，不移动身体或改写驴车版。
+
 ## 源工程与重建
 
 源目录：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020/`，主文件 `Scene_DonkeyCart.blend`。`References/` 保存输入原图副本，`Data_ImageGeneration.json` 保存三次内置 Imagegen 的最终提示词和源图哈希；`ReuseAudit/` 为旧工程只读复制件和骨架调查结果。

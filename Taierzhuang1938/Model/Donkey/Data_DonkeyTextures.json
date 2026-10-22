@@ -1,0 +1,60 @@
+{
+  "schema": "tengxian-independent-prop-textures-v1",
+  "asset": "Donkey",
+  "version": "20261022StandaloneV1",
+  "uv": "one non-overlapping GameUV anatomy atlas exported as UV0",
+  "colorSpace": {
+    "Base": "sRGB",
+    "Normal": "linear OpenGL +Y",
+    "Orm": "linear; R=1, G=roughness, B=metallic"
+  },
+  "sizeReason": "2048 Base / 1024 Normal / 512 ORM retain the V3 animal surface detail.",
+  "source": {
+    "provider": "built-in imagegen + procedural + sourcePack",
+    "furInput": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\SourceTextures\\Texture_DonkeyWeatheredCoatSourceV3.png",
+    "furPromptRecord": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\Refinement20261022\\Data_WeatheredCoatRefinement.json",
+    "surfaceGenerationRecord": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\Refinement20261022\\Data_SurfaceGenerationV3.json",
+    "referenceGenerationRecord": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\Data_ImageGeneration.json",
+    "sculptNormal": "CC0 Lyndon Daniels / ChadM equine surface normal from preserved source"
+  },
+  "bake": {
+    "method": "Cycles diffuse colour only, tangent normal and explicit ORM emission; no direct/indirect lighting in base colour",
+    "script": "_blender/Script_DonkeyCartExport.py",
+    "losslessWebp": true
+  },
+  "textures": [
+    {
+      "name": "Texture_DonkeyAnimalNormal",
+      "file": "Texture_DonkeyAnimalNormal.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 652690,
+      "sha256": "57c92e206215af4f4d37bc070dc2afb1e81575de1465b726037bf824cff5f249",
+      "lossless": true
+    },
+    {
+      "name": "Texture_DonkeyAnimalBase",
+      "file": "Texture_DonkeyAnimalBase.webp",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 1730058,
+      "sha256": "6928c3dfbf2e177ddd6c61f268c63e8183a0ee8a436d0ac5a49a555341eb94e0",
+      "lossless": true
+    },
+    {
+      "name": "Texture_DonkeyAnimalOrm",
+      "file": "Texture_DonkeyAnimalOrm.webp",
+      "size": [
+        512,
+        512
+      ],
+      "bytes": 78324,
+      "sha256": "709aef8993ec0f94fa57a1f6404fc67857c7be5d6486a9e52459a896edc5aa5a",
+      "lossless": true
+    }
+  ]
+}
