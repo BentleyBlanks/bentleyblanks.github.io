@@ -443,10 +443,10 @@
     }
   ],
   "verifiedForReview": true,
-  "userApproved": false,
+  "userApproved": true,
   "review": {
     "verifiedForReview": true,
-    "userApproved": false,
+    "userApproved": true,
     "evidence": {
       "rawLodAudit": {
         "passed": true,
@@ -466,6 +466,12 @@
         "actualSha256": "03d3d4f2d1026b98d9e32ceb113cc4461e0be351c5192dcc1c152d679c88562f",
         "localEvidencePath": "C:\\Users\\Bentl\\.codex\\worktrees\\8240\\bentleyblanks.github.io\\tmp\\SichuanBlanketPack\\Lod40kV13\\BrowserFinal\\Data_BrowserQualityV12.json"
       }
+    },
+    "userApproval": {
+      "approvedOn": "2026-10-22",
+      "timeZone": "Asia/Shanghai",
+      "userInstruction": "就这样吧提交推送",
+      "scope": "Current 39939-triangle V13 model and publication to origin/master"
     }
   }
 }
