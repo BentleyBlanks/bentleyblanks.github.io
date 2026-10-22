@@ -845,6 +845,9 @@ export class BlockoutMap {
       e.preventDefault();
       try { canvas.setPointerCapture(e.pointerId); } catch { /* 合成事件没有真指针 */ }
       const r = canvas.getBoundingClientRect();
+      // 主指针按下（鼠标的每一下、触屏的第一根手指）= 前面没有别的指针还按着：清掉漏收抬起留下的旧记录，
+      // 免得一个没收到 pointerup 的旧指针把这一下当成第二根手指、或者把这一下吞掉
+      if (e.isPrimary) { this.pointers.clear(); this.pinch = null; }
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       // 第二根手指落下：转成双指缩放。正在拖的那一下不再算点选；编辑布设正拖着东西时不接
       if (this.pointers.size === 2 && !this.drag?.edit) {
@@ -853,7 +856,7 @@ export class BlockoutMap {
         canvas.classList.remove("dragging");
         return;
       }
-      if (this.pointers.size > 2 || this.pinch || this.drag) return;
+      if (this.pointers.size > 2 || this.pinch) return;
       // 编辑布设开着时左键归编辑层（挪东西 / 框选 / 放标记；拖空地它自己平移）
       const edit = this.editing && this.editLayer.OnPointerDown(e, e.clientX - r.left, e.clientY - r.top);
       this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, button: e.button, edit, touch: e.pointerType === "touch" };
