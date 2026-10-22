@@ -331,6 +331,8 @@ body.edFpsClean #edRoot .edHint { display: none !important; }
 
 /* 编辑器接管时把 HUD 收起来（过场自己的 .csRoot 必须留着 —— Timeline 要看它） */
 body.edHideHud #hud > [class^="hud"] { display: none !important; }
+/* 第一人称持枪移动检查的外部机位：屏幕中心的准星对的是观察相机，不是玩家视线，藏掉免得误读（视锥那几根黄线才是玩家视线） */
+body.edFpMotionObserver .hudCrosshair { display: none !important; }
 
 /* 窄屏：面板改成上下叠、宽度跟着视口 */
 @media (max-width: 900px) {

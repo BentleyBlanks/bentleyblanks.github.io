@@ -109,7 +109,8 @@ export class FirstPersonGait {
   /**
    * @param {number} dt 秒；≤ 0 时不推进（只用现有状态出姿势）。
    * @param {object} input { playerX, playerY, playerZ（玩家脚下）, anchorX, anchorZ（胯在地面的投影）,
-   *   aimYaw（视线偏航）, grounded, crouch, prone, groundAt(x, z) 可选 }
+   *   aimYaw（视线偏航）, grounded, crouch, prone, groundAt(x, z) 可选,
+   *   hipHeight（胯离玩家脚底多高）/ legReach（胯到踝最远够多远）/ ankleHeight（踝离地）可选：给了就按三维腿长判「够不着就提前迈」 }
    */
   Update(dt, input) {
     const t = this.t;
@@ -219,7 +220,14 @@ export class FirstPersonGait {
       if (this.moving && f.planted) {
         // 急加速 / 急转弯：锁住的脚被拉得太远就提前迈，相位跟过去。
         this._Home(i, input.anchorX, input.anchorZ, this.lowerYaw, tmp);
-        const stretched = Math.hypot(tmp[0] - f.x, tmp[1] - f.z) > t.maxStanceStretchM;
+        const horiz = Math.hypot(tmp[0] - f.x, tmp[1] - f.z);
+        let stretched = horiz > t.maxStanceStretchM;
+        // 竖直方向也算（2026-10-23，沟里坡上实测）：上坡时后脚锁在胯下 0.8–0.9 m，降胯到底也够不着，
+        // IK 只能把脚往上拽 —— 那就是「脚在地上滑」。腿长由身体按骨骼量好传进来。
+        if (!stretched && input.legReach > 0 && Number.isFinite(input.hipHeight)) {
+          const hipY = input.playerY + input.hipHeight - t.maxPelvisDropM;
+          stretched = Math.hypot(horiz, hipY - (f.y + (input.ankleHeight || 0))) > input.legReach - t.reachMarginM;
+        }
         if (stretched && localBefore < beta) this.phase = Frac(beta - 0.5 * i);
         if (Frac(this.phase + 0.5 * i) >= beta && f.plantedS > 0.05) this._StartSwing(f, gaitLift, false, 0);
       }

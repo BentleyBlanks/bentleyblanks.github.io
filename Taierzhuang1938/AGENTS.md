@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **第一人称下半身与持枪移动检查（2026-10-22/23）**：第一人称身体站着转视角腿不动（50° 死区后挪步转身）、走路按距离踩步、着地脚锁地 + 两节骨骼 IK（`Script_FirstPersonGait` + `Data_Tuning_FirstPersonBody`，见 [第一人称身体与持枪](docs/Data_FirstPersonEmbodiment.md)「下半身」）；高级工具 → 武器 → 「第一人称持枪移动检查」是玩法照跑的外部机位叠加层，看腿脚、胯 / 上身朝向、枪手真实位置并实测着地脚滑动（见 [编辑器套件](docs/Data_EditorSuite.md)）。
+
 - **川军折被背包 4 万面交付版（2026-10-22，已确认并授权发布）**：当前 canonical 版本 `20261022Lod40kV13-03d3d4f2` 为 **39939 三角、5 网格、15 张 4K PBR 图**，含全部可隐藏附件；Bundle 9364、Binding 4933、Jacket 2956、StrawMat 14500、Sandals 8186。结构化采样真实草编管条，新 UV 高到低 PBR 投射；3010 个实际 UV 漏射像素从最近有效高表面取样，不造色。ORM 的 AO 与 Metallic/Roughness 全部纹理节点已同步替换；附加组件去 alpha 后仅在 RGB8 和几何字节严格一致时恢复实际原 PNG payload。最终 raw 检查 16191 项、真实浏览器 181 项/3 视图通过；自包含低源实际重开为 5 网格/15 packed 4K 图，Source/Runtime Cycles 外观复核通过。仓库为 glTF+BIN+lossless WebP，完整 GLB 和 `.blend` 留 OneDrive；米制、Y-up、贴背轴心/平背、隐藏及完整短褂抽出保留。已完成验收并获用户发布确认，`userApproved=true`；首轮 38893 碎黑面候选不作交付。来源、重建、最终身份和本资产清理范围见 [40k 制作记录](Model/SichuanBlanketPack/Data_Lod40kV13Plan.md)。
 
 - **川军折被背包质量制作源（QualityV12，已完成并保留）**：23 网格、1829676 三角的自然布褶、毛边、草鞋编织、完整短褂和贴图草席端面均保留；独立完整 PBR 为五部件/十五张 4K 图，高源实际重开通过，完整输出 465 项、浏览器 425 项检查通过。OneDrive 的完成 `.blend` 与 `QualityV12/Exports/Model_SichuanBlanketPackQualityV12.glb` 是当前 V13 的保留制作源，不是最终 4 万三角交付。历史 HighV10/Study/Game 缓存不再作为当前重建的必要入口。见 [QualityV12 制作记录](Model/SichuanBlanketPack/Data_QualityV12Plan.md)。

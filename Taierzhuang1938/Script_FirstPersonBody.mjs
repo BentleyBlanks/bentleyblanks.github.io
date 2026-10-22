@@ -112,9 +112,15 @@ export class FirstPersonBody {
       const n = _va.subVectors(_hip, _knee).cross(_vb.subVectors(_ankle, _knee)).normalize();
       return n.applyQuaternion(leg.calf.getWorldQuaternion(_qa).invert()).clone();
     });
-    for (const action of Object.values(this.actions)) action.setEffectiveWeight(0);
     this.root.scale.setScalar(savedScale);
-    this.legs = { bones, restQ, hinge, ankleHeight };
+    pose("Idle");
+    const legLength = bones.legs.reduce((sum, leg) => {
+      leg.thigh.getWorldPosition(_hip); leg.calf.getWorldPosition(_knee); leg.foot.getWorldPosition(_ankle);
+      return sum + (_hip.distanceTo(_knee) + _knee.distanceTo(_ankle)) / 2;
+    }, 0);
+    for (const action of Object.values(this.actions)) action.setEffectiveWeight(0);
+    this.legs = { bones, restQ, hinge, ankleHeight, legLength };
+    this.hipHeight = bones.legs[0].thigh.getWorldPosition(_hip).y;
     this.gait = new FirstPersonGait(FIRST_PERSON_BODY, { feet });
     this.pelvisDrop = 0;
   }
@@ -144,6 +150,9 @@ export class FirstPersonBody {
         playerX: input.playerPosition.x, playerY: input.playerPosition.y, playerZ: input.playerPosition.z,
         anchorX: this.root.position.x, anchorZ: this.root.position.z, aimYaw,
         grounded: input.grounded !== false, crouch, prone, groundAt: input.bodyGroundAt || null,
+        // 三维腿长判据用上一帧片段里的胯高（站 / 蹲随姿态变）；踮脚跟能多够一点
+        hipHeight: this.hipHeight, ankleHeight: this.legs?.ankleHeight || 0,
+        legReach: this.legs ? this.legs.legLength * FIRST_PERSON_BODY.reachFraction + FIRST_PERSON_BODY.maxHeelLiftM : 0,
       });
     }
     this.root.rotation.set(0, (gait ? gait.lowerYaw : aimYaw) + Math.PI, 0);
@@ -161,7 +170,11 @@ export class FirstPersonBody {
     }
     this.mixer.update(dt);
     this.root.updateWorldMatrix(true, true);
-    if (gait && this.legs) this._ApplyLowerBody(dt, prone);
+    if (gait && this.legs) {
+      // 片段给的胯高（降胯之前），下一帧给规划器判腿够不够得着
+      this.hipHeight = this.legs.bones.legs[0].thigh.getWorldPosition(_hip).y - input.playerPosition.y;
+      this._ApplyLowerBody(dt, prone);
+    }
   }
 
   _ApplyLowerBody(dt, prone) {

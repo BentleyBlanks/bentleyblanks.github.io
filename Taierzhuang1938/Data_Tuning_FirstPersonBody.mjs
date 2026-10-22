@@ -44,6 +44,8 @@ export const FIRST_PERSON_BODY = Object.freeze({
   // 走动中锁住的脚离脚位（胯下）超过它（米）就提前迈出去（急起步、急转弯时的补步）。
   // 降胯到底再踮脚跟，腿最远够到胯下约 0.55 m；留一点余量。
   maxStanceStretchM: 0.5,
+  // 三维腿长判据留的余量（米）：胯高取的是上一帧的，坡上一帧差几厘米，贴着腿长极限判会漏一帧把脚拽动。
+  reachMarginM: 0.03,
   // 原地挪步：脚离脚位多远 / 脚尖偏多少度就挪；转身中门槛更低。
   settleDistM: 0.16,
   settleYawDeg: 30,

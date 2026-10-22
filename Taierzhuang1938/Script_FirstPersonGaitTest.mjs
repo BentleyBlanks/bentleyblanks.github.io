@@ -112,6 +112,25 @@ Check("从站定直接起步到 3.05 m/s（横移）：着地的脚始终在腿�
   assert.ok(worst < T.maxStanceStretchM + 0.12, `planted foot ${worst.toFixed(3)} m from the hips`);
 });
 
+Check("从坑底起步上陡坡（03-1 沟里实测的情形）：锁住的后脚始终在三维腿长以内", () => {
+  const gait = new FirstPersonGait(T, RIG);
+  const leg = { hipHeight: 0.873, legReach: 0.781 * T.reachFraction + T.maxHeelLiftM, ankleHeight: 0.092 };
+  const s = { x: 0, y: -0.83, z: 0 };
+  const Input = () => ({ playerX: s.x, playerY: s.y, playerZ: s.z, anchorX: s.x, anchorZ: s.z + 0.18, aimYaw: 0,
+    grounded: true, crouch: 0, prone: 0, ...leg });
+  for (let i = 0; i < 20; i++) gait.Update(DT, Input());
+  let worst = 0;
+  for (let i = 0; i < 60; i++) {
+    // 2.6 m/s 往前（-z）同时每帧升 2 cm：坡度约 25°
+    s.z -= 2.6 * DT; s.y += 0.02; gait.Update(DT, Input());
+    const hipY = s.y + leg.hipHeight - T.maxPelvisDropM;
+    for (const f of gait.feet) if (f.planted) {
+      worst = Math.max(worst, Math.hypot(f.x - s.x, f.z - (s.z + 0.18), hipY - (f.y + leg.ankleHeight)));
+    }
+  }
+  assert.ok(worst < leg.legReach + 0.08, `planted foot ${worst.toFixed(3)} m from the lowered hips (reach ${leg.legReach.toFixed(3)})`);
+});
+
 Check("瞬移：脚直接落到新位置", () => {
   const { gait, s, Step } = Sim();
   for (let i = 0; i < 10; i++) Step();

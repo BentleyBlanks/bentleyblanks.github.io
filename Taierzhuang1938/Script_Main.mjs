@@ -8966,6 +8966,8 @@ function Frame(dt, render = true) {
   if (impactRange) dt = impactRange.ScaleDt(dt);
   // 人物战场反应测试场的慢放（?reactions=1 才有）。
   if (reactionRange) dt = reactionRange.ScaleDt(dt);
+  // 第一人称持枪移动检查的慢放（高级工具 → 武器；没开 = 原样）。
+  if (editor) dt = editor.ScaleDt(dt);
   state.frame += 1;
   state.elapsed += dt;
   // 叠加层（Debug Rendering）不接管相机也不暂停玩法，所以它的每帧要排在
@@ -9012,6 +9014,8 @@ function Frame(dt, render = true) {
     camera.getWorldDirection(_forward);
     // 特效编辑器直接驱动 VfxSystem；点光包络也必须同帧推进，否则预览里只有火球贴片，
     // 墙地仍旧不亮，退出编辑器才突然补算一大步。
+    // 高级工具开着、没有互斥编辑器时，第一人称持枪移动检查仍按外部机位出画（玩家停着，替身眼睛不重抄）
+    editor?.ApplyOverlayCamera(camera, false);
     if(editor?.activeId==='vfx')lights.Update(0,editor.active.previewTime??state.elapsed,camera.position);
     else lights.Update(dt, state.elapsed, camera.position);
     lights.UpdateShadowFrustum(camera.position, _forward);
@@ -9287,6 +9291,8 @@ function Frame(dt, render = true) {
   lastViewPitch = viewPitch;
   lastLookDeltaYaw = dYaw;
 
+  // 第一人称持枪移动检查：替身眼睛抄这一帧的玩家眼睛，Viewmodel 挂在它下面（没开工具 = 空操作）。
+  editor?.SyncOverlayEye(camera);
   profiler.B("viewmodel");
   if (!player.Alive && viewmodel.deathHands) UpdatePlayerDeath();
   else {
@@ -9433,9 +9439,14 @@ function Frame(dt, render = true) {
   missionRuntime?.opening.ApplyCamera();
   // 白盒编辑器的预演：玩家相机写完之后接管（docs/Data_EditorBlockout.md §14.2）
   // 飞行观察时相机可能离玩家很远：阴影框跟着相机走（同炮击扬尘测试场的自由相机）
-  if (blockout?.ApplyCamera?.(camera) && blockout.flying) { camera.getWorldDirection(_forward); lights.UpdateShadowFrustum(camera.position, _forward); }
+  const blockoutCamera = !!blockout?.ApplyCamera?.(camera);
+  if (blockoutCamera && blockout.flying) { camera.getWorldDirection(_forward); lights.UpdateShadowFrustum(camera.position, _forward); }
   // 炮击扬尘测试场的自由观察相机：玩家相机写完之后接管，阴影框跟着相机走（玩家留在原地）。
-  if (impactRange?.ApplyCamera(camera)) { camera.getWorldDirection(_forward); lights.UpdateShadowFrustum(camera.position, _forward); }
+  const impactCamera = !!impactRange?.ApplyCamera(camera);
+  if (impactCamera) { camera.getWorldDirection(_forward); lights.UpdateShadowFrustum(camera.position, _forward); }
+  // 第一人称持枪移动检查：白盒预演 / 飞行与测试场相机都没接管时，主相机挪到玩家身旁的外部机位
+  //（阴影框留在玩家脚下：机位就在几米内）。
+  if (!blockoutCamera && !impactCamera) editor?.ApplyOverlayCamera(camera, true);
   profiler.E("story/mission");
   if(missionRuntime?.completed){profiler.E('story');return;}
   if (p012Flow) {

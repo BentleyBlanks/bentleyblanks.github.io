@@ -36,6 +36,7 @@ import { ActorEditor } from "./Script_EditorActor.mjs";
 import { FacialEditor } from "./Script_EditorFacial.mjs";
 import { WeaponEditor } from "./Script_EditorWeapon.mjs";
 import { FirstPersonEditor } from "./Script_EditorFirstPerson.mjs";
+import { FirstPersonMotionEditor } from "./Script_EditorFirstPersonMotion.mjs";
 import { VfxEditor } from "./Script_EditorVfx.mjs";
 import { TimelineEditor } from "./Script_EditorTimeline.mjs";
 import { AudioEditor } from "./Script_EditorAudio.mjs";
@@ -71,11 +72,14 @@ const EDITORS = [
 // 渲染调试只读地观察后处理靶；性能剖析甚至要求玩法照跑（量的就是战斗中的帧），读数在独立窗口里。
 // 关卡编排工作台也是叠加层：独立窗口里的 2D 俯视图 + 流程/时间轴，
 // 既不碰 three 场景也不接管相机，「边打边看走到哪一步」正是它的主用例。
-const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, FrameDebuggerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor, OrchestrationEditor];
+// 第一人称持枪移动检查（2026-10-23）也是叠加层：玩法照跑、外部机位边走边看，所以不能是暂停玩法的互斥编辑器；
+// 它是在「武器」菜单里找的东西，同关卡编排一样不进 Debug工具 列表。
+const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, FrameDebuggerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor, OrchestrationEditor,
+  FirstPersonMotionEditor];
 // 「Debug工具」= 除关卡编排外的叠加层，外加 FPS 显示（Data_DevTools.DEBUG_TOOL_IDS 定顺序）。两处入口开关同一份状态：
 // 菜单 设置 → Debug工具，和高级工具菜单栏右侧、音量条旁边的「Debug工具」下拉（2026-10-22，用户：高级工具里也要能开
 // Profiler / Debug Rendering / Frame Debugger）。关卡编排语义上仍是叠加层，但人找它时想的是「我要编关卡」，放在「关卡」菜单。
-const DEBUG_OVERLAYS = OVERLAYS.filter((editor) => editor !== OrchestrationEditor);
+const DEBUG_OVERLAYS = OVERLAYS.filter((editor) => editor !== OrchestrationEditor && editor !== FirstPersonMotionEditor);
 // Debug工具里弹独立浏览器窗口的几项，下拉条目后缀 ↗（同 WINDOW_TOOLS）
 const DEBUG_WINDOW_TOOLS = new Set([ProfilerEditor.id, FrameDebuggerEditor.id, WorldInfoEditor.id, PlayerStateEditor.id]);
 
@@ -89,7 +93,7 @@ const TOOL_MENUS = [
   // 白盒关卡编辑器只是一个跳转入口（整页换成 ?editor=blockout），同贴图管理一样不进互斥表。
   { id: "level", label: "关卡", items: [BlockoutEntry, OrchestrationEditor, TimelineEditor, SquadMarchEditor] },
   { id: "character", label: "角色", items: [ActorEditor, FacialEditor] },
-  { id: "weapon", label: "武器", items: [WeaponEditor, FirstPersonEditor] },
+  { id: "weapon", label: "武器", items: [WeaponEditor, FirstPersonEditor, FirstPersonMotionEditor] },
   { id: "media", label: "特效与声音", items: [VfxEditor, AudioEditor] },
   { id: "assets", label: "资产", items: [PropLibraryEditor, AssetStandardsEditor, TextureEditor] },
 ];
@@ -184,6 +188,7 @@ export class EditorSuite {
       ClosePlayerState: () => suite.CloseOverlay(PlayerStateEditor.id),
       CloseAi: () => suite.CloseOverlay(AiEditor.id),
       CloseOrchestration: () => suite.CloseOverlay(OrchestrationEditor.id),
+      CloseFirstPersonMotion: () => suite.CloseOverlay(FirstPersonMotionEditor.id),
     };
   }
 
@@ -788,6 +793,36 @@ export class EditorSuite {
         this.CloseOverlay(id);
       }
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // 第一人称持枪移动检查的三处主循环接线（Script_Main 只经这里碰它；没开这个工具时全是空操作）
+  // -------------------------------------------------------------------------
+
+  /** 玩家相机与 FOV 写完、Viewmodel.Update 之前调：替身眼睛抄玩家眼睛。 */
+  SyncOverlayEye(camera) {
+    this.overlays.get(FirstPersonMotionEditor.id)?.SyncEye(camera);
+  }
+
+  /**
+   * 剧本 / 白盒预演 / 测试场相机都没接管时调：主相机挪到外部观察机位。fresh = 这一帧玩法照跑、
+   * 玩家相机是新写的；玩法停着（高级工具开着）时传 false。有互斥编辑器在用相机时不接管。→ true = 接管了。
+   */
+  ApplyOverlayCamera(camera, fresh = true) {
+    if (this.active) return false;
+    const overlay = this.overlays.get(FirstPersonMotionEditor.id);
+    if (!overlay) return false;
+    try { return overlay.ApplyCamera(camera, fresh); } catch (error) {
+      console.error(`[Editor] ${FirstPersonMotionEditor.id} 接管相机出错，已关掉：`, error);
+      this.CloseOverlay(FirstPersonMotionEditor.id);
+      return false;
+    }
+  }
+
+  /** 慢放：dt 乘上它（没开工具 = 原样）。 */
+  ScaleDt(dt) {
+    const overlay = this.overlays.get(FirstPersonMotionEditor.id);
+    return overlay ? dt * overlay.TimeScale : dt;
   }
 
   Update(dt) {

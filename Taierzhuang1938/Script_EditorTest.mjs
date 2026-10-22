@@ -165,8 +165,9 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出高级工具", afterGear.panelOpen && afterGear.capturing && afterGear.barVisible && afterGear.emptyInspector,
   `进游戏时指针锁=${locked}`);
-// 菜单栏：游戏 + 六个工具菜单 + 右侧 Debug工具；十七个互斥编辑器 + 关卡编排 + 贴图管理 + 白盒关卡编辑器（整页跳转入口）= 20 个条目
-Check("菜单栏列出全部编辑器入口", afterGear.entries === 20
+// 菜单栏：游戏 + 六个工具菜单 + 右侧 Debug工具；十七个互斥编辑器 + 关卡编排 + 第一人称持枪移动检查（叠加层，2026-10-23）
+// + 贴图管理 + 白盒关卡编辑器（整页跳转入口）= 21 个条目
+Check("菜单栏列出全部编辑器入口", afterGear.entries === 21
   && afterGear.menus.join(",") === "游戏,场景,关卡,角色,武器,特效与声音,资产,Debug工具"
   && afterGear.squadMarch && afterGear.facial && afterGear.textures && afterGear.orchestration && afterGear.blockout,
   `条目=${afterGear.entries}，菜单=${afterGear.menus.join("/")}，白盒关卡编辑器=${afterGear.blockout}`);
