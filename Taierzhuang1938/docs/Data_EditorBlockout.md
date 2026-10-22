@@ -693,6 +693,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 
 ## 12. 变更记录
 
+- 2026-10-22（第一人称转视角身体跟着转、走路脚飘）：改在正片的第一人称身体上（白盒与游戏共用），口径见 [第一人称身体与持枪](Data_FirstPersonEmbodiment.md)「下半身」一节：站着转视角腿不动、超过 50° 才挪步转身；走路按走过的距离踩步、着地的脚锁在地上。
 - 2026-10-21（01–05 防止玩家跳出壕沟）：场景块可选 `tag`（`airWall` 只挡玩家）与 `noClimb`（§2.2）；`Script_Player.ProbeVault` 认 `noClimb`、不隔着隐形墙翻；01–05 胸墙与板桥标不能攀、沟沿一圈 892 段隐形墙（`L0105KeepInWalls`），新闸门 `Script_EditorBlockoutFirstLevel0105KeepInBrowserTest`（§13 末、§10）。
 - 2026-10-21（飞行观察 testFly）：新增 §4.3——`O` 键 / 卡片按钮进出一台不受碰撞的自由相机（WASD 沿视线、E 升 Q 降、Shift ×4、滚轮调速 0.5–400 m/s），玩家原地不动且不吃游戏输入，进时从当前视角起飞、退出相机自然回到玩家视角；预演中不让进、飞行中开播预演或切关自动退出；小地图 / 全关总图画青色相机标记（`MAP_COLORS.fly`，小地图以相机为中心）；`P` 复制的是相机位姿，`pose=` 多第 6 项相机高度；`Debug.Blockout.Fly / FlyState / FlyPose`；`Script_Main` 薄钩子（`BlockoutInputCaptured` 含飞行、放行 `map`、`FlyLook`、阴影框）；门禁 `Script_EditorBlockoutFlyBrowserTest.mjs`。
 - 2026-10-21（编辑布设）：§4.4 全关总图图头加「编辑布设」开关：拖地标 / 体块 / 当前关键帧的人、要点、下一步 / 各关键帧站位，加说明标记，「导出给 Agent」进剪贴板（末行 `数据：` JSON）；不存盘、不动 3D；agent 改到位的条目自动拿掉。新模块 `Script_EditorBlockoutLayoutEdit`（纯）、`Script_EditorBlockoutMapEdit`（DOM + canvas），门禁 `…LayoutEditTest`、`…MapEditBrowserTest`。

@@ -912,6 +912,7 @@ const state = {
 };
 
 let battlefield = null;
+const BodyGroundAt = (x, z) => battlefield ? battlefield.GroundHeight(x, z) : NaN;
 let explosionRange = null;
 /**
  * 物理世界（Rapier）。**与 battlefield 一一对应，换关一起换。**
@@ -9293,6 +9294,8 @@ function Frame(dt, render = true) {
   viewmodel.Update(dt, {
     wallLower: mountView.active ? 0 : player.gunClearance.lower,
     playerPosition: player.position, playerYaw: player.yaw,
+    // 第一人称身体的落脚点跟地形起伏（Script_FirstPersonGait：只取相对玩家脚下的高差）。
+    bodyGroundAt: BodyGroundAt,
     carryBodyVisible: !!p012CarryView?.rig.root.visible && !state.cutscene && !state.menu && player.Alive,
     carryBodyYaw: p012CarryView?.bodyYaw,
     carryBodyCrouch: p012CarryView?.BodyCrouch || 0,
