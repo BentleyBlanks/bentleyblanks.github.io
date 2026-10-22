@@ -10,6 +10,7 @@ parent=Read(project/'Model/DonkeyCart/Data_DonkeyCart.json')
 parentTextures=Read(project/'Model/DonkeyCart/Data_DonkeyCartTextures.json')
 packing=Read(output/'Data_DonkeyPacking.json');bake=Read(base/'Review/Data_ExportBake.json')
 imported=Read(base/'Review/Data_ImportedGlbVerification.json');derivation=Read(base/'Data_Derivation.json')
+native=Read(base/'Review/Data_AnimationMeasurements.json')
 sha=hashlib.sha256(asset.read_bytes()).hexdigest()
 if imported['assetSha256']!=sha:raise RuntimeError('Verification belongs to an older GLB')
 if hashlib.sha256(Path(derivation['source']).read_bytes()).hexdigest()!=derivation['sourceSha256']:raise RuntimeError('Parent source changed during derivation')
@@ -18,17 +19,18 @@ scene.frame_set(0);bpy.context.view_layer.update()
 obj=bpy.data.objects['DonkeyRuntime'];points=[obj.matrix_world@v.co for v in obj.data.vertices]
 points=[Vector((p.x,p.z,-p.y)) for p in points]
 low=[min(p[i] for p in points) for i in range(3)];high=[max(p[i] for p in points) for i in range(3)]
-textures={'schema':'tengxian-independent-prop-textures-v1','asset':'Donkey','version':'20261022StandaloneV1',
+textures={'schema':'tengxian-independent-prop-textures-v1','asset':'Donkey','version':'20261022ReferenceV2',
  'uv':'one non-overlapping GameUV anatomy atlas exported as UV0',
  'colorSpace':parentTextures['colorSpace'],'sizeReason':'2048 Base / 1024 Normal / 512 ORM retain the V3 animal surface detail.',
  'source':{k:v for k,v in parentTextures['source'].items() if k!='elmInput'},
  'bake':parentTextures['bake'],'textures':packing['images']}
 (output/'Data_DonkeyTextures.json').write_text(json.dumps(textures,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-contract={'schema':'tengxian-independent-rigged-prop-v1','id':'Donkey','version':'20261022StandaloneV1','asset':asset.name,
+contract={'schema':'tengxian-independent-rigged-prop-v1','id':'Donkey','version':'20261022ReferenceV2','asset':asset.name,
  'textureManifest':'Data_DonkeyTextures.json','sha256':sha,'bytes':asset.stat().st_size,'units':'metres','upAxis':'+Y','facingAxis':'-Z',
  'sourceCoordinates':parent['sourceCoordinates'],'pivotM':[0,0,0],'nominalWithersHeightM':parent['nominalWithersHeightM'],
  'boundsM':{'min':low,'max':high,'dimensions':[high[i]-low[i] for i in range(3)]},
- 'feet':parent['feet'],'upperForelegs':parent['upperForelegs'],'coat':parent['coat'],
+ 'feet':{**parent['feet'],'frontCarpusHeightM':.39,'rearHockHeightM':.38},'upperForelegs':parent['upperForelegs'],
+ 'coat':{'construction':'fine directional short coat with quiet gray-brown variation, pale belly/muzzle and textured ear interiors','sourceScript':'_blender/Script_DonkeyAppearance.py'},
  'triangles':{'total':bake['totalTriangles'],'limit':80000,'byBatch':{r['label']:r['triangles'] for r in bake['batches']},'decimated':False},
  'runtime':{'meshes':['DonkeyRuntime'],'skins':packing['skins'],'materials':1,'maxInfluences':4,'morphTargets':0,
  'uvAtlasCoverage':{r['label']:r['atlasCoverage'] for r in bake['batches']},'averageTexelsPerMetre':{r['label']:r['atlasTexelsPerMetre'] for r in bake['batches']}},
@@ -39,10 +41,13 @@ contract={'schema':'tengxian-independent-rigged-prop-v1','id':'Donkey','version'
  'retainedObjectCount':len(derivation['retainedObjects']),'removedObjectCount':len(derivation['removedObjects']),
  'scope':'animal body, eyes, ears, mane, tail and short fur only; no cart, shafts, collar, straps, halter or lead rope',
  'mouthSeamConform':derivation['mouthSeamConform'],
- 'skeleton':'all 28 animal bones and both source actions retained; unused DonkeyHitchPivot is kept for rig compatibility'},
+ 'appearance':derivation['appearance'],
+ 'skeleton':'28 bone names and hierarchy retained; carpus/hock lowered by 9 cm, both actions re-solved. Unused DonkeyHitchPivot retained for compatibility.'},
  'verification':{'reimportedStanceSoleRangeM':imported['stanceSoleRangeM'],'reimportedStanceDriftPerFrameM':imported['worstStanceDriftPerFrameM'],
  'sampleCount':len(imported['samples']),'webpPixelsUnchanged':True,'geometrySkinActionsUnchangedDuringPacking':packing['geometrySkinActionsUnchanged'],
- 'parentSourceUnchanged':True,'sourceAnatomyEvidence':'Animal body/weights inherit V3 anatomy checks; only the separate decorative mouth seam is conformed. Actual derivative GLB is independently reimported and resampled.'},
+ 'nativeStanceSoleRangeM':native['stanceSoleRangeM'],'nativeStanceDriftPerFrameM':native['worstStanceDriftPerFrameM'],
+ 'reimportedIdleStanceSoleRangeM':imported['idleStanceSoleRangeM'],
+ 'parentSourceUnchanged':True,'sourceAnatomyEvidence':'V3 body topology and skin weights retained. V2 proportions and lower joint positions are independently reanimated, exported, reimported and resampled.'},
  'editableSource':str(base/'Scene_Donkey.blend'),'credits':parent['credits'],
  'reconstructionScope':'灰驴的比例、毛色与表面细节沿用用户参考图创作复原；尺寸为建模定标，不作为史料规格。',
  'historicalReferences':[],'rebuild':'node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs'}

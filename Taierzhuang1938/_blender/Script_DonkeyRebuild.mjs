@@ -29,7 +29,8 @@ try{
   fs.writeFileSync(driver,`from pathlib import Path\nfile=Path(${JSON.stringify(path.join(scriptDir,file).replaceAll('\\','/'))})\nexec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),{'DonkeyAssetName':'Donkey'})\n`);
   Run(driver);
  }
- Shared('Script_DonkeyCartExport.py');
+ Run(path.join(scriptDir,'Script_DonkeyRefine.py'));
+ Shared('Script_DonkeyCartAnimate.py');Shared('Script_DonkeyCartExport.py');
  execFileSync(process.env.DONKEY_CART_PYTHON||'python',[path.join(scriptDir,'Script_DonkeyCartPack.py'),
   '--input',destination+'/Model_DonkeyUnpacked.glb','--output',path.join(project,'Model/Donkey/Model_Donkey.glb')],{cwd:root,stdio:'inherit'});
  Shared('Script_DonkeyCartVerify.py');Run(path.join(scriptDir,'Script_DonkeyFinalize.py'));

@@ -93,6 +93,19 @@ scene.frame_set(18);Render('Walk',(-4,5,2.8),(0,0 if standalone else -.45,.81),2
 scene.frame_set(26);Render('WalkFeet',(-4,(foreY+hindY)/2,.38),(0,(foreY+hindY)/2,.32),1.40,640,400)
 for frame in (6,27):
     scene.frame_set(frame);Render('WalkUpperForelegs'+str(frame),(-4,.43,.65),(0,.43,.65),.95,640,640)
+if standalone:
+    idleStrip=next(track.strips[0] for track in donkeyRig.animation_data.nla_tracks if 'DonkeyIdle' in track.name)
+    donkeyRig.animation_data.action=idleStrip.action
+    if idleStrip.action_slot:donkeyRig.animation_data.action_slot=idleStrip.action_slot
+    idleSoles=[]
+    for sample in range(31):
+        frame=idleStrip.action_frame_start+(idleStrip.action_frame_end-idleStrip.action_frame_start)*sample/30
+        scene.frame_set(int(frame),subframe=frame-int(frame));bpy.context.view_layer.update()
+        evaluated=animal.evaluated_get(bpy.context.evaluated_depsgraph_get());mesh=evaluated.to_mesh()
+        for indices in soleIndices.values():idleSoles.append(min((evaluated.matrix_world@mesh.vertices[i].co).z for i in indices))
+        evaluated.to_mesh_clear()
+    report['idleStanceSoleRangeM']=[min(idleSoles),max(idleSoles)]
+    if min(idleSoles)<-.0005 or max(idleSoles)>.002:raise RuntimeError('Idle soles leave the ground')
 (base/'Review/Data_ImportedGlbVerification.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
 for obj in imported:bpy.data.objects.remove(obj,do_unlink=True)
 for obj,(render,hidden) in visibility.items():obj.hide_render=render;obj.hide_set(hidden)

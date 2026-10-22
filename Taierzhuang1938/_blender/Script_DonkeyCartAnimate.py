@@ -7,9 +7,10 @@ import bpy, math, json
 from pathlib import Path
 from mathutils import Matrix,Vector
 
-base=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020')
 scene=bpy.context.scene
-rig=bpy.data.objects['DonkeyRig'];cart=bpy.data.objects['DonkeyCartRig'];skin=bpy.data.objects['DonkeyContinuousSkin']
+assetName=globals().get('DonkeyAssetName','DonkeyCart');standalone=assetName=='Donkey'
+base=Path(scene['DonkeySourceRoot']) if standalone else Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020')
+rig=bpy.data.objects['DonkeyRig'];cart=None if standalone else bpy.data.objects['DonkeyCartRig'];skin=bpy.data.objects['DonkeyContinuousSkin']
 rest={b.name:b.matrix_local.copy() for b in rig.data.bones}
 origins={b.name:b.head_local.copy() for b in rig.data.bones}
 suffixes=['Pivot','ElbowPivot','KneePivot','HoofPivot']
@@ -93,7 +94,8 @@ def ClearAnimations(obj):
     obj.animation_data_clear()
     for bone in obj.pose.bones:bone.matrix_basis=Matrix.Identity(4)
 
-for obj in (rig,cart):ClearAnimations(obj)
+for obj in (rig,cart):
+    if obj:ClearAnimations(obj)
 for name in ('DonkeyWalk','DonkeyIdle','CartRoll'):
     action=bpy.data.actions.get(name)
     if action:bpy.data.actions.remove(action)
@@ -112,27 +114,29 @@ for name,start,count,idle in (('DonkeyWalk',1,walkFrames,False),('DonkeyIdle',61
     rig.animation_data.action=None
     results.append({'action':name,'durationS':count/scene.render.fps,'worstSolverMissM':worst})
 
-cart.animation_data_create();roll=bpy.data.actions.new('CartRoll');cart.animation_data.action=roll
-for i in range(61):
-    for name in ('WheelLeft','WheelRight'):
-        bone=cart.pose.bones[name];bone.rotation_mode='QUATERNION';bone.rotation_quaternion=Matrix.Rotation(-2*math.pi*i/60,3,'X').to_quaternion()
-        bone.keyframe_insert('rotation_quaternion',frame=181+i)
-track=cart.animation_data.nla_tracks.new();track.name='CartRoll';strip=track.strips.new('CartRoll',181,roll);strip.extrapolation='NOTHING'
-strip.action_frame_start=181;strip.action_frame_end=241;cart.animation_data.action=None
+if cart:
+    cart.animation_data_create();roll=bpy.data.actions.new('CartRoll');cart.animation_data.action=roll
+    for i in range(61):
+        for name in ('WheelLeft','WheelRight'):
+            bone=cart.pose.bones[name];bone.rotation_mode='QUATERNION';bone.rotation_quaternion=Matrix.Rotation(-2*math.pi*i/60,3,'X').to_quaternion()
+            bone.keyframe_insert('rotation_quaternion',frame=181+i)
+    track=cart.animation_data.nla_tracks.new();track.name='CartRoll';strip=track.strips.new('CartRoll',181,roll);strip.extrapolation='NOTHING'
+    strip.action_frame_start=181;strip.action_frame_end=241;cart.animation_data.action=None
 rig['strideM']=stride;rig['walkPeriodS']=period;rig['gaitDutyFront']=.64;rig['gaitDutyRear']=.66
 rig['walkStanceCompressionM']=.032;rig['idleStanceCompressionM']=.004
 rig['walkCoordinateSystem']='Blender +Y forward; glTF -Z forward; stride clock follows distance'
 rig['sourceRigReuse']='Audited four-pivot limb hierarchy and two-link/folding-cannon solver; donkey rest origins, skin, gait and all harness rebuilt'
-cart['rollDistancePerCycleM']=2*math.pi*cart['wheelRadiusM'];cart['rollClipDurationS']=2
+if cart:cart['rollDistancePerCycleM']=2*math.pi*cart['wheelRadiusM'];cart['rollClipDurationS']=2
 
 # Lead endpoints remain above the ground as the head nods and breathes.
-lead=bpy.data.objects['HalterHangingLead']
-lead.vertex_groups.clear()
-for vertex in lead.data.vertices:
-    t=max(0,min(1,(.954-vertex.co.z)/.936));head=(1-t)**1.8
-    for name,value in (('DonkeyHeadPivot',head),('DonkeyHitchPivot',1-head)):
-        if value>1e-8:
-            group=lead.vertex_groups.get(name) or lead.vertex_groups.new(name=name);group.add([vertex.index],value,'REPLACE')
+if not standalone:
+    lead=bpy.data.objects['HalterHangingLead']
+    lead.vertex_groups.clear()
+    for vertex in lead.data.vertices:
+        t=max(0,min(1,(.954-vertex.co.z)/.936));head=(1-t)**1.8
+        for name,value in (('DonkeyHeadPivot',head),('DonkeyHitchPivot',1-head)):
+            if value>1e-8:
+                group=lead.vertex_groups.get(name) or lead.vertex_groups.new(name=name);group.add([vertex.index],value,'REPLACE')
 
 # Measure actual evaluated skin, rather than only the IK marker's algebra.
 soleIndices={}
@@ -168,7 +172,7 @@ scene.frame_start=1;scene.frame_end=241;scene.frame_set(0)
 for filename in ('Script_DonkeyCartAnimate.py','Script_DonkeyCartReview.py'):
     text=bpy.data.texts.get(filename) or bpy.data.texts.new(filename);text.clear()
     text.write((Path(scene['DonkeyCartProject'])/'_blender'/filename).read_text(encoding='utf-8'))
-bpy.ops.wm.save_as_mainfile(filepath=str(base/'Scene_DonkeyCart.blend'))
+bpy.ops.wm.save_as_mainfile(filepath=str(base/('Scene_'+assetName+'.blend')))
 print(json.dumps({k:v for k,v in report.items() if k!='measurements'}))
 if report['worstSolverMissM']>.0001:raise RuntimeError('Donkey limb target leaves reachable volume')
 if min(r['minSoleZ'] for r in planted)<-.0005 or max(r['minSoleZ'] for r in planted)>.002:raise RuntimeError('Actual planted sole leaves ground tolerance')

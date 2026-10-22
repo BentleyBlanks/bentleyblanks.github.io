@@ -1,7 +1,7 @@
 {
   "schema": "tengxian-independent-prop-textures-v1",
   "asset": "Donkey",
-  "version": "20261022StandaloneV1",
+  "version": "20261022ReferenceV2",
   "uv": "one non-overlapping GameUV anatomy atlas exported as UV0",
   "colorSpace": {
     "Base": "sRGB",
@@ -30,8 +30,8 @@
         1024,
         1024
       ],
-      "bytes": 652690,
-      "sha256": "57c92e206215af4f4d37bc070dc2afb1e81575de1465b726037bf824cff5f249",
+      "bytes": 657068,
+      "sha256": "7cf067409ec7aa03c8632b7378f4c27897cd7deaaab4701b05b5d01c367eb042",
       "lossless": true
     },
     {
@@ -41,8 +41,8 @@
         2048,
         2048
       ],
-      "bytes": 1730058,
-      "sha256": "6928c3dfbf2e177ddd6c61f268c63e8183a0ee8a436d0ac5a49a555341eb94e0",
+      "bytes": 1277760,
+      "sha256": "35b293407cfde61cde864c4bf08ce4106b6f58ef3d09d20e659b4a259ac2e80f",
       "lossless": true
     },
     {
@@ -52,8 +52,8 @@
         512,
         512
       ],
-      "bytes": 78324,
-      "sha256": "709aef8993ec0f94fa57a1f6404fc67857c7be5d6486a9e52459a896edc5aa5a",
+      "bytes": 13992,
+      "sha256": "38da1a29bb7ccde8a0ca2f2695b06ef9c9727963ee768ddcc076a8e3fab307d0",
       "lossless": true
     }
   ]

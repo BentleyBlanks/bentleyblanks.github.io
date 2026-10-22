@@ -290,8 +290,8 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
 Check(bare.json.meshes.length===1 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===1 && bare.json.images.length===3 && bareTriangles===50992 && bareTriangles===bareSpec.triangles.total,
-  "独立驴单网格/单材质/28骨与50,992三角齐备");
+  && bare.json.materials.length===1 && bare.json.images.length===3 && bareTriangles===51128 && bareTriangles===bareSpec.triangles.total,
+  "独立驴单网格/单材质/28骨与51,128三角齐备");
 Check(bare.json.animations.length===2 && ["DonkeyWalk","DonkeyIdle"].every(name=>bare.json.animations.some(a=>a.name===name))
   && !bare.json.nodes.some(n=>/^(Cart|Wheel|Harness|Halter)/.test(n.name||"")) && bareMax[2]<1.2,
   "独立驴只保留行走/待机，不带车或套具节点及拖车范围");
@@ -300,6 +300,13 @@ for(const animation of bare.json.animations){
   const end=Math.max(...times.map(values=>Math.max(...values)));
   Check(Math.abs(end-bareSpec.animations[animation.name].durationS)<.00001,
     `独立驴 ${animation.name} 实际动画时长与契约一致`,end.toFixed(3));
+}
+const bareParents=new Map();bare.json.nodes.forEach((node,index)=>(node.children||[]).forEach(child=>bareParents.set(child,index)));
+function BareWorld(index){const local=NodeMatrix(bare.json.nodes[index]);return bareParents.has(index)?Mat4Mul(BareWorld(bareParents.get(index)),local):local}
+for(const front of ["Front","Rear"]){
+  const expected=front==="Front"?.39:.38;
+  const heights=["Left","Right"].map(side=>BareWorld(bare.json.nodes.findIndex(n=>n.name===`Donkey${front}${side}KneePivot`))[13]);
+  Check(heights.every(height=>Math.abs(height-expected)<.00001),`独立驴 ${front} 关节实际高度符合参考图修订`,heights.map(v=>v.toFixed(3)).join(" / "));
 }
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机机首与战车车头全部按几何复量落在 -Z");

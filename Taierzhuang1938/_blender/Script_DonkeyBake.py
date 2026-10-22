@@ -52,7 +52,7 @@ base.mkdir(parents=True,exist_ok=True);(base/'Review').mkdir(exist_ok=True)
 bpy.context.preferences.filepaths.temporary_directory=str(base/'Recovery')
 record={'source':str(source),'sourceSha256':sourceSha,'retainedCollection':'DonkeyEditable',
         'retainedObjects':sorted(o.name for o in animalObjects),'removedObjects':removed,
-        'geometrySkinAndActions':'animal surfaces, weights, rig transforms and DonkeyWalk/DonkeyIdle retained without retargeting; decorative mouth seam fitted to the muzzle',
+        'geometrySkinAndActions':'V3 animal topology and weights retained; reference-led V2 proportions/materials, lower carpus/hock and re-solved walk/idle; mouth seam fitted to the muzzle',
         'mouthSeamConform':{'maxDistanceBeforeM':max(beforeDistances),'maxDistanceAfterM':max(afterDistances),'vertices':30,'weightsUnchanged':True}}
 (base/'Data_Derivation.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8')
 # Save to the independent destination before any export or material bake.

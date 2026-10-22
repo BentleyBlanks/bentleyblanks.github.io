@@ -1,11 +1,11 @@
 {
   "schema": "tengxian-independent-rigged-prop-v1",
   "id": "Donkey",
-  "version": "20261022StandaloneV1",
+  "version": "20261022ReferenceV2",
   "asset": "Model_Donkey.glb",
   "textureManifest": "Data_DonkeyTextures.json",
-  "sha256": "fb943a4f321b6489656ec4f20f803b96e098d1748394551cc266f2fbc45f21a2",
-  "bytes": 5801424,
+  "sha256": "5f47cac0a7c183fe64ce8e89c94eaa47b06570e0e76eeac5e0994ee3c3b6a8da",
+  "bytes": 5248092,
   "units": "metres",
   "upAxis": "+Y",
   "facingAxis": "-Z",
@@ -18,19 +18,19 @@
   "nominalWithersHeightM": 1.1,
   "boundsM": {
     "min": [
-      -0.18294331431388855,
+      -0.16191062331199646,
       0.00039999998989515007,
-      -1.0661882162094116
+      -1.1251415014266968
     ],
     "max": [
-      0.1811765432357788,
-      1.5614452362060547,
-      0.4910862445831299
+      0.16428737342357635,
+      1.5914452075958252,
+      0.5380862355232239
     ],
     "dimensions": [
-      0.36411985754966736,
-      1.5610452362161595,
-      1.5572744607925415
+      0.3261979967355728,
+      1.59104520760593,
+      1.6632277369499207
     ]
   },
   "feet": {
@@ -57,8 +57,8 @@
         0.0725347094994504
       ]
     },
-    "frontCarpusHeightM": 0.48,
-    "rearHockHeightM": 0.47,
+    "frontCarpusHeightM": 0.39,
+    "rearHockHeightM": 0.38,
     "fetlockPivotHeightM": 0.155,
     "source": "_blender/Script_DonkeyCartFeet.py",
     "appearance": "reference-led creative anatomy; dimensions are authoring choices"
@@ -72,14 +72,14 @@
     }
   },
   "coat": {
-    "construction": "directional source fur, varied roughness, geometric short tufts along the body and limbs",
-    "sourceScript": "_blender/Script_DonkeyCartSurface.py"
+    "construction": "fine directional short coat with quiet gray-brown variation, pale belly/muzzle and textured ear interiors",
+    "sourceScript": "_blender/Script_DonkeyAppearance.py"
   },
   "triangles": {
-    "total": 50992,
+    "total": 51128,
     "limit": 80000,
     "byBatch": {
-      "Animal": 50992
+      "Animal": 51128
     },
     "decimated": false
   },
@@ -97,10 +97,10 @@
     "maxInfluences": 4,
     "morphTargets": 0,
     "uvAtlasCoverage": {
-      "Animal": 0.27962239698204355
+      "Animal": 0.26077012598292754
     },
     "averageTexelsPerMetre": {
-      "Animal": 648.4220236956575
+      "Animal": 625.4811943921901
     }
   },
   "animations": {
@@ -129,21 +129,46 @@
       "maxDistanceBeforeM": 0.04574508219957352,
       "maxDistanceAfterM": 0.0021782624535262585,
       "vertices": 30,
-      "weightsUnchanged": true
+      "weightsUnchanged": true,
+      "refinedMaxDistanceBeforeM": 0.0026113269850611687,
+      "refinedMaxDistanceAfterM": 0.0017615539254620671
     },
-    "skeleton": "all 28 animal bones and both source actions retained; unused DonkeyHitchPivot is kept for rig compatibility"
+    "appearance": {
+      "revision": "20261022ReferenceV2",
+      "source": "user original donkey three-view; cart side image used only for animal identity",
+      "maxBodySurfaceDisplacementM": 0.09544115693899596,
+      "maxHoofDisplacementM": 0.0,
+      "skinWeightsUnchanged": true,
+      "jointHeightsM": {
+        "frontCarpus": 0.39,
+        "rearHock": 0.38
+      },
+      "animation": "re-solve both clips against refined joint heights; original stride and duration retained",
+      "material": "neutral gray-brown short coat, fine directional fibres, pale belly and muzzle",
+      "shape": "more upright neck/poll, extended muzzle, rounded abdomen, locally smoothed shoulder/hamstring, fuller short mane and narrower ear splay"
+    },
+    "skeleton": "28 bone names and hierarchy retained; carpus/hock lowered by 9 cm, both actions re-solved. Unused DonkeyHitchPivot retained for compatibility."
   },
   "verification": {
     "reimportedStanceSoleRangeM": [
-      0.0003997830208390951,
-      0.0004003627982456237
+      0.0003996485029347241,
+      0.00040028514922596514
     ],
     "reimportedStanceDriftPerFrameM": 6.537967258031518e-07,
     "sampleCount": 148,
     "webpPixelsUnchanged": true,
     "geometrySkinActionsUnchangedDuringPacking": true,
+    "nativeStanceSoleRangeM": [
+      0.0003997801977675408,
+      0.0004002187924925238
+    ],
+    "nativeStanceDriftPerFrameM": 3.7175000460257235e-07,
+    "reimportedIdleStanceSoleRangeM": [
+      0.0003997793246526271,
+      0.00040035886922851205
+    ],
     "parentSourceUnchanged": true,
-    "sourceAnatomyEvidence": "Animal body/weights inherit V3 anatomy checks; only the separate decorative mouth seam is conformed. Actual derivative GLB is independently reimported and resampled."
+    "sourceAnatomyEvidence": "V3 body topology and skin weights retained. V2 proportions and lower joint positions are independently reanimated, exported, reimported and resampled."
   },
   "editableSource": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261022\\Scene_Donkey.blend",
   "credits": [
