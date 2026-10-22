@@ -9,7 +9,7 @@ import {CreatePhysicsSettings} from './Script_PhysicsSettings.mjs?v=ear028-physi
 import {CUSTOMER_EARS,CustomerEarType} from './Data_CustomerTypes.mjs?v=ear029-oily-coating-20260912';
 import { ToolIcon } from './Script_ToolIcons.mjs?v=ear014-ui-20260912';
 import { CreateCore } from './Script_Core.js?v=ear043-runtime-performance-20261003';
-import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear050-career-care-20261022';
+import { CreateImmersiveScene } from './Script_ImmersiveScene.js?v=ear051-portrait-20261022';
 import { CreateAudio } from './Script_Audio.js?v=ear035-sticky-scrape-audio-20260912';
 import { LandingSound } from './Script_LandingSound.mjs?v=ear012-size-audio-20260912';
 import { CreateShop } from './Script_Shop.js?v=ear050-career-care-20261022';
@@ -18,7 +18,7 @@ import { CSS_VARS, PALETTE } from './Data_Palette.mjs?v=ear011-20260911';
 
 import { CreateInstrumentShop } from './Script_InstrumentShop.js?v=ear050-career-care-20261022';
 
-const VERSION = 'ear050-career-care-20261022';
+const VERSION = 'ear051-portrait-20261022';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 const TOOL_IDS = { scoop: 'earPickBamboo', tweezers: 'earForceps', drops: 'earDrops',brush:'softBrush',suction:'microSuction',feather:'gooseFeather' };
 const TYPE_NAMES = { dry: '干性薄层', wet: '黏性耳垢', impacted: '紧实硬结', oily:'油性凝胶' };

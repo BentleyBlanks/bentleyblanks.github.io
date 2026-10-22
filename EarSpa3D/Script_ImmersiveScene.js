@@ -1,6 +1,8 @@
 import {ResolveRenderQuality} from './Data_RenderQuality.mjs?v=ear040-render-settings-20260912';
 import {StepBristle} from './Script_BristleDynamics.mjs?v=ear050-career-care-20261022';
 import {CreateCareFeedback} from './Script_CareFeedback.js?v=ear050-career-care-20261022';
+import {CreatePortraitLighting} from './Script_PortraitLighting.js?v=ear051-portrait-20261022';
+import {ApplyPortraitHair,PortraitHairProbe} from './Script_PortraitHair.js?v=ear051-portrait-20261022';
 import {CARE_CASES,CaseRoot} from './Data_CareCases.mjs?v=ear050-career-care-20261022';
 import {FeatherCapacity} from './Script_FeatherSweep.mjs?v=ear039-brush-gather-20260912';
 import {AddFeatherFur,ClearFeatherFur,PrepareFeatherStrands,FEATHER_FUR_LENGTH,FEATHER_FUR_PASSES} from './Script_FeatherFur.js?v=ear031-feather-groom-20260912';
@@ -25,13 +27,13 @@ import {mergeGeometries} from './vendor/three/examples/jsm/utils/BufferGeometryU
 import {FractureGeometry,GeometryVolume,SmoothWaxNormals} from './Script_FractureGeometry.js?v=ear044-light-wax-20261008';
 import {AccelerateStaticRaycast} from './Script_StaticRaycast.js?v=ear012-outer-20260911';
 import { CreateToolContact } from './Script_ToolContact.js?v=ear043-runtime-performance-20261003';
-import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear050-career-care-20261022';
+import { CreateTactileMaterials } from './Script_TactileMaterials.js?v=ear051-portrait-20261022';
 const Clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
 
 // 封闭耳道、真实接触点与实体收集盘共用毫米世界；镜头在取出时连续后退。
 export async function CreateImmersiveScene({ core }) {
   const [asset,materials,profile]=await Promise.all([
-    new GLTFLoader().loadAsync(new URL('./Models/Model_ImmersiveEar.glb?v=ear019-hair-complexion-20260912', import.meta.url).href),
+    new GLTFLoader().loadAsync(new URL('./Models/Model_ImmersiveEar.glb?v=ear051-portrait-20261022', import.meta.url).href),
     CreateTactileMaterials(core.renderer),
     fetch(new URL('./Data_CanalProfile.json?v=ear012-outer-20260911',import.meta.url)).then(response=>response.json()),
     InitializeSlimeKernel(),
@@ -49,7 +51,7 @@ export async function CreateImmersiveScene({ core }) {
     const source = asset.scene.getObjectByName(name);
     if(!source)throw new Error('模型缺少节点：'+name);
     const meshes=[];source.traverse(n=>{if(n.isMesh)meshes.push(n);});
-    const geometries=meshes.map(n=>{const g=n.geometry.clone().applyMatrix4(n.matrixWorld);for(const key of Object.keys(g.attributes))if(!['position','normal','uv','color'].includes(key))g.deleteAttribute(key);if(!g.attributes.uv)g.setAttribute('uv',new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count*2),2));return g;});
+    const geometries=meshes.map(n=>{const g=n.geometry.clone().applyMatrix4(n.matrixWorld);for(const key of Object.keys(g.attributes))if(!['position','normal','uv','color','groomDepth','_groomdepth','_GROOMDEPTH'].includes(key))g.deleteAttribute(key);if(!g.attributes.uv)g.setAttribute('uv',new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count*2),2));return g;});
     const mesh=new THREE.Mesh(geometries.length===1?geometries[0]:mergeGeometries(geometries,true),meshes.length===1?PhysicalCopy(meshes[0].material):meshes.map(m=>PhysicalCopy(m.material)));
     mesh.name = name; return mesh;
   }
@@ -105,19 +107,12 @@ export async function CreateImmersiveScene({ core }) {
     const mesh=Baked(name);
     if(name.includes('Hair')){
       const scalp=name==='Model_ProfileHair',wisps=name==='Model_ProfileHairWisps';
-      mesh.material=new THREE.MeshPhysicalMaterial({map:hairMap,bumpMap:hairMap,bumpScale:.035,color:scalp?0x99918b:0xffffff,roughness:scalp?.75:.62,metalness:0,specularIntensity:.24,anisotropy:0,anisotropyRotation:Math.PI/2,sheen:.10,sheenColor:0x9b8067,sheenRoughness:.72,clearcoat:0,alphaTest:scalp?0:.10,side:THREE.DoubleSide,depthWrite:true});
-      mesh.material.alphaToCoverage=!wisps;
-      if(wisps){mesh.material.map=null;mesh.material.bumpMap=null;mesh.material.alphaTest=0;mesh.material.color.set(0x655046);mesh.material.specularIntensity=.1;mesh.material.transparent=true;mesh.material.opacity=.64;mesh.material.depthWrite=false;}
-      if(!wisps){
-        // Sample a strand-scale slice for color, retaining the full authored edge alpha.
-        mesh.material.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',THREE.ShaderChunk.map_fragment.replace('texture2D( map, vMapUv )','texture2D( map, vec2(.34+vMapUv.x*.18,vMapUv.y) )').replace('diffuseColor *= sampledDiffuseColor;','sampledDiffuseColor.a='+(scalp?'1.0':'texture2D(map,vMapUv).a')+'; diffuseColor *= sampledDiffuseColor;'));};
-        mesh.material.customProgramCacheKey=()=> scalp?'HairOpaqueCoverage2':'LayeredHairStrandScale2';
-        mesh.material.roughness=.54;mesh.material.specularIntensity=.38;
-      }
-      mesh.userData.hairLayer=scalp?'opaqueScalp':wisps?'silhouetteStrands':'threeTexturedCardLayers';
+      ApplyPortraitHair(mesh,{texture:hairMap,kind:scalp?'scalp':wisps?'wisps':'cards'});
+      mesh.userData.hairLayer=scalp?'opaqueScalp':wisps?'silhouetteStrands':'regionalTexturedCards';
     }
     outer.add(mesh);
   }
+  const portraitLighting=CreatePortraitLighting({renderer:core.renderer,scene,key,meshes:outer.children.filter(mesh=>/Temple|OuterEar|ProfileHair|ProfileEyes|ProfileIris/.test(mesh.name))});
   const wall = Baked('Model_Canal'); wall.material.side = THREE.DoubleSide; wall.receiveShadow=true; const drum=Baked('Model_Eardrum');drum.material.dispose();drum.material=materials.Drum(drum.geometry);const hair=Baked('Model_CanalHair');hair.material=new THREE.MeshPhysicalMaterial({color:0xc3b59c,roughness:.67,sheen:.36,sheenColor:0xe7d8be,sheenRoughness:.8,alphaTest:.02,alphaToCoverage:true});canalGroup.add(wall,drum,hair);
   wall.material=materials.Skin();wall.receiveShadow=true;AccelerateStaticRaycast(wall);
   // 入口全景只显示管腔内表面，不暴露剖面外壳；完整原网格仍用于实际壁面射线。
@@ -226,10 +221,10 @@ export async function CreateImmersiveScene({ core }) {
     toolClip.setFromNormalAndCoplanarPoint(toward.clone().negate(),camera.position.clone().addScaledVector(toward,-2.5));
     workingPlane.setFromNormalAndCoplanarPoint(toward, focus);
     outer.visible=(entrance<.94||transferBlend>.15)&&showcaseBlend<.92&&precisionTrayBlend<.9;canalGroup.visible=showcaseBlend<.92&&precisionTrayBlend<.9;
-    // Inside the canal the solid wall's external hull is never visible. Render its
-    // authored inner faces once (also in the refraction pass); retain the complete
-    // original mesh for every collision/raycast and the external transition.
-    entryWall.visible=!outer.visible&&showcaseBlend<.92;wall.visible=!entryWall.visible;
+    // The head hides the canal's external hull in both portrait and inner views.
+    // Render the authored inner faces and entrance collar once, including during
+    // extraction; retain the complete original mesh for every collision/raycast.
+    entryWall.visible=showcaseBlend<.92;wall.visible=false;
     entryAperture.visible=oily&&inspectionDepth<-.03&&entryWall.visible;
     scene.background.set('#191d20');
     scene.backgroundIntensity=.8;scene.backgroundBlurriness=0;
@@ -247,7 +242,12 @@ export async function CreateImmersiveScene({ core }) {
     lamp.target.position.lerp(look,transferBlend);
     lamp.angle=(careEquipment.mounted?.58:.43)+(1-t+transferBlend)*.6;lamp.penumbra=.65;
     lamp.intensity=(lampOn?careEquipment.intensity:0)*t*(1-transferBlend)+transferBlend*190;
-    ambient.intensity=.7*(1-t)+(lampOn?.09+careEquipment.level*.04:.045)*t+transferBlend*.4;key.intensity=1.8*(1-t)+transferBlend*1.4;
+    // Three still uploads the shadow sampler while castShadow is enabled. Create
+    // the first map even for a dark lamp, then stop updating it until illuminated.
+    lamp.shadow.autoUpdate=lamp.intensity>0||!lamp.shadow.map;
+    lamp.shadow.needsUpdate=lamp.shadow.autoUpdate;
+    ambient.intensity=.36*(1-t)+(lampOn?.09+careEquipment.level*.04:.045)*t+transferBlend*.4;key.intensity=1.65*(1-t)+transferBlend*1.4;
+    portraitLighting.Update(Math.max(1-t,transferBlend),outer.visible);
     tray.visible=transferBlend>.2||showcase;collectionTray.Update(dt);
     workMat.visible=precisionMode&&(precisionTrayBlend>.2||showcase);workMat.position.copy(tray.position).add(new THREE.Vector3(0,-2.3,0));
     materials.SetOutside(Math.max(1-t,transferBlend));drum.material.color.setScalar(1-Math.max(1-t,transferBlend)*.92);
@@ -1617,7 +1617,7 @@ export async function CreateImmersiveScene({ core }) {
       });
     },
     SetContact:materials.SetContact,SetRenderQuality,
-    RenderingProbe(){return {slimeKernel:SlimeKernelProbe(),renderQuality:{...renderQuality},shadowSize:lamp.shadow.mapSize.x,reflectionStrength:renderQuality.reflections,furLayers:renderQuality.furLayers,shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayCloseup:showcaseBlend,trayCollection:collectionTray.Probe(),trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolVisible:tool.visible,toolDragMode,draggingTool:!!toolDrag,jawOpening:toolParts.tweezers.children.slice(0,2).map(j=>j.userData.opening??.66),toolPosition:tool.position.toArray(),toolScreen:Project(tool.position),toolDepth:canal.Project(tool.position).depth,toolRotation:tool.quaternion.toArray(),featherShading:'six-pass combed continuous fibers',featherFur:{passes:FEATHER_FUR_PASSES,length:FEATHER_FUR_LENGTH},featherSweep:{capacity:FeatherCapacity(toolLevels.feather),held:featherSweep?.items.length||0,angle:featherSweep?.angle||0},hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,lampEquipment:{...careEquipment},lampPosition:lamp.position.toArray(),sparkles:careFeedback.Probe(),bristles:Object.fromEntries(['brush','feather'].map(id=>[id,{maxBend:Math.max(0,...toolParts[id].children.flatMap(p=>(p.userData.fiberGroups||[]).map(b=>Math.hypot(...(b.dynamics?.offset||[0,0,0]))))),elastic:true}])),shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
+    RenderingProbe(){return {portraitLighting:portraitLighting.Probe(),portraitHair:outer.children.filter(mesh=>mesh.name.includes('ProfileHair')).map(PortraitHairProbe),slimeKernel:SlimeKernelProbe(),renderQuality:{...renderQuality},shadowSize:lamp.shadow.mapSize.x,reflectionStrength:renderQuality.reflections,furLayers:renderQuality.furLayers,shadersWarmed,staticRaycast:true,fiberClusters:Object.fromEntries(['feather','brush'].map(id=>[id,toolParts[id].children.reduce((sum,p)=>sum+(p.userData.fiberGroups?.length||0),0)])),...materials.Probe(),heading,inspectionDepth,inspectionTarget,reachBlocked,toolReach:Reach(lastToolId),traySize:new THREE.Box3().setFromObject(tray).getSize(new THREE.Vector3()).toArray(),trayStandalone:true,trayCloseup:showcaseBlend,trayCollection:collectionTray.Probe(),trayBounds:TrayBounds(),trayInscription:"强迫症的SOPHIA",toolVisible:tool.visible,toolDragMode,draggingTool:!!toolDrag,jawOpening:toolParts.tweezers.children.slice(0,2).map(j=>j.userData.opening??.66),toolPosition:tool.position.toArray(),toolScreen:Project(tool.position),toolDepth:canal.Project(tool.position).depth,toolRotation:tool.quaternion.toArray(),featherShading:'six-pass combed continuous fibers',featherFur:{passes:FEATHER_FUR_PASSES,length:FEATHER_FUR_LENGTH},featherSweep:{capacity:FeatherCapacity(toolLevels.feather),held:featherSweep?.items.length||0,angle:featherSweep?.angle||0},hairCount:360,hairRootFixed:true,profileHairLayers:3,profileHairTexture:'Texture_LayeredDarkHair.png',profileHairWisps:90,hairTime,headRealtime:true,lampOn,lampAim:lamp.target.position.toArray(),lampIntensity:lamp.intensity,lampEquipment:{...careEquipment},lampPosition:lamp.position.toArray(),sparkles:careFeedback.Probe(),bristles:Object.fromEntries(['brush','feather'].map(id=>[id,{maxBend:Math.max(0,...toolParts[id].children.flatMap(p=>(p.userData.fiberGroups||[]).map(b=>Math.hypot(...(b.dynamics?.offset||[0,0,0]))))),elastic:true}])),shadows:core.renderer.shadowMap.enabled,canalVisible:canalGroup.visible,externalContext:outer.visible&&!!(transfer||showcase),outerVisible:outer.visible,irritation:chunks.filter(c=>!c.fragment).map(c=>c.irritation),roughness:chunks.map(c=>c.mesh.material.roughness),clearcoat:chunks.map(c=>c.mesh.material.clearcoat),toolLevels:{...toolLevels},previewTriangles};},
     SetCareLighting(equipment){careEquipment={level:Clamp(equipment?.level||1,1,3),intensity:Clamp(equipment?.intensity||55,35,180),mounted:!!equipment?.mounted,label:equipment?.label||'旧式台灯'};},
     CelebrateWax:careFeedback.Celebrate,
     ToggleLamp(){lampOn=!lampOn;return lampOn;},
@@ -1631,5 +1631,5 @@ export async function CreateImmersiveScene({ core }) {
     Drop(c){c.surfaceWet=Math.max(c.surfaceWet||0,.18);if(!precisionMode&&(!toolDragMode||!toolDrag))ShowTool(c,'drops');dropTarget=c.mesh.position.clone().addScaledVector(c.normal,.18);dropAge=0;droplet.visible=true;droplet.userData.start=lastToolPoint.clone();},
     get chunks(){return chunks;},
     modelInfo:{source:'BlenderMCP',file:'Models/Model_ImmersiveEar.glb',edition:'DirectionalAnatomy',nodes:asset.scene.children.map(n=>n.name)},
-    Dispose(){careFeedback.Dispose();shaderReserve?.traverse(n=>n.material?.dispose());shaderReserve?.removeFromParent();toolParts.feather.children.forEach(p=>ClearFeatherFur(p));collectionTray.Dispose();disposed=true;CancelPreparation();environment.dispose();metalEnvironment.dispose();metalMaterials.clear();anatomy.dispose();root.traverse(n=>{n.geometry?.dispose();});}};
+    Dispose(){portraitLighting.Dispose();careFeedback.Dispose();shaderReserve?.traverse(n=>n.material?.dispose());shaderReserve?.removeFromParent();toolParts.feather.children.forEach(p=>ClearFeatherFur(p));collectionTray.Dispose();disposed=true;CancelPreparation();environment.dispose();metalEnvironment.dispose();metalMaterials.clear();anatomy.dispose();root.traverse(n=>{n.geometry?.dispose();});}};
 }

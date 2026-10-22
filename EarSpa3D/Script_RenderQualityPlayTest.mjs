@@ -77,7 +77,10 @@ try{
   // Normal completion still awards once, then uses the same next-customer path.
   await page.evaluate(()=>{const {core}=__EarSpaDebug,render=core.Render;core.Render=()=>{};try{for(let i=0,n=Math.ceil(__EarSpaProbe().timeRemaining/60)+1;i<n;i++)__EarSpaDebug.StepFrames(3600);}finally{core.Render=render;core.Render();}});
   const completed=await Probe();Check(completed.phase==='complete'&&completed.shop.totalCustomers===initial.shop.totalCustomers+1,'normal timeout still settles a service once');
-  await page.locator('#receipt-next').click();await page.waitForFunction(()=>__EarSpaProbe().phase==='playing',null,{timeout:90000});p=await Probe();
+  await page.locator('#receipt-next').click();
+  Check(await page.locator('#shop-close').isVisible(),'completed service visits the collection shop before the next customer');
+  Check((await Probe()).shop.coins===completed.shop.coins,'opening the between-customer shop does not repeat the service payout');
+  await page.locator('#shop-close').click();await page.waitForFunction(()=>__EarSpaProbe().phase==='playing',null,{timeout:90000});p=await Probe();
   Check(p.shop.totalCustomers===completed.shop.totalCustomers&&p.shop.coins===completed.shop.coins&&p.tray.mass===tray.mass,'normal next button retains payout and tray without double settlement');
   await page.close();
   for(const [width,height] of [[390,844],[320,568],[844,390]]){

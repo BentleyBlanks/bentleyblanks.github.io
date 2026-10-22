@@ -58,7 +58,7 @@
   // 真正的游戏逻辑一行都不在这里——这里出错是最难查的那种，保持它足够小。
   const boot = document.getElementById("ear-boot");
   try {
-    const mod = await import("./Script_ChunkGame.js?v=ear050-career-care-20261022");
+    const mod = await import("./Script_ChunkGame.js?v=ear051-portrait-20261022");
     await mod.Start();
   } catch (error) {
     console.error(error);

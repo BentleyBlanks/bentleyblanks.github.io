@@ -1,4 +1,20 @@
-# 外耳入口与头发修订 · 2026-09-12
+# 外耳入口与人物渲染
+
+## ear051：启动人物的皮肤、头发与光照 · 2026-10-22
+
+以原 `ReferenceProfile/References/Reference_ProfilePhoto.png` 为肤色与黑发质感参考，借鉴 Epic 的 [Photorealistic Character](https://dev.epicgames.com/documentation/en-us/unreal-engine/photorealistic-character?application_version=4.27)、[Subsurface Profile](https://dev.epicgames.com/documentation/en-us/unreal-engine/subsurface-profile-shading-model-in-unreal-engine) 和 [Digital Humans](https://dev.epicgames.com/documentation/en-us/unreal-engine/digital-humans?application_version=4.27) 文档，将表面颜色、粗糙度、微法线、散射和发丝方向分开处理。本轮沿用已有位图，没有调用图片生成。
+
+- [Script_PortraitSkin.js](Script_PortraitSkin.js)：双尺度、归一化的逐光源 RGB 角度散射；耳缘背透与表面漫反射共享能量预算；油脂紧高光与宽高光分别计算 GGX 及环境反射。额头、鼻部、面颊和耳部使用不同的粗糙度／血色权重，微孔按像素足迹过滤，减弱原图集烘焙的橙色与颗粒感。只替换外皮，入口过渡、内部湿润及刺激材质保持独立。
+- [Script_PortraitHair.js](Script_PortraitHair.js)：从根梢 UV 和实际几何计算连续发丝方向，逐光源双瓣高光受真实阴影和衰减控制；真实贴图细丝调制高光能量。底层发帽不透明、粗糙度为 1，外层发片保持深度写入、MSAA 覆盖及匹配的阴影 alpha。`groomDepth` 使用到实体发帽的几何距离，没有以发片编号假造深度。
+- [Script_PortraitLighting.js](Script_PortraitLighting.js)：外部人物独立的 PMREM 反射环境、主光、冷补光与轮廓光。皮肤背面投影与毫米尺度偏移消除自阴影细纹；人物主光只缓存头部与头发的静态投影；移动器具／耳垢仍由检查灯投影，避免缓存残影。熄灭的检查灯仅初始化必要贴图后停止无效阴影更新。进入耳道时外景补光、轮廓光和外皮反射权重归零，起始弱台灯及升级亮度保持原契约。
+
+形体重建由 [Script_PortraitGroom.py](Script_PortraitGroom.py) 完成：保留不透明发帽／后脑幕，120 张发片分为额前覆盖、连续冠部至长尾、后颈叠层；90 根细丝含额前和耳上 3–8 mm 短弧。修复原额前约 32 mm 的发片缺口，移除跨耳长直线，稳定主卡间隙以避免交叠黑缝。三组网格仍为 6384／10560／2880 三角；导出验证 120／90 个独立连通分量、非零三角面积、根梢 UV 和 `_GROOMDEPTH`。
+
+源工程：`C:/Users/Bentl/OneDrive/AI/Models/Blender/EarSpa3D/PortraitRendering20261022/Model_PortraitGroom.blend`；同目录保留 `Baseline_ImmersiveEar.glb` 与基线工程。通过本任务的 `Script_BlenderMcp.mjs start`／`exec` 加载重建脚本，调用 `Build()` 暂存并预览，再 `Build(publish=True)` 写入运行 GLB，最后执行 `node EarSpa3D/Script_CompactModel.mjs` 和 MCP `stop`。脚本把两个重建节点拼回原 GLB，校验其余 62 节点的元数据、accessor 描述、UV／颜色／坐标等二进制 SHA-256 一致；检测到运行资产的非头发节点已更新会拒绝覆盖。
+
+本轮实测：人物渲染 33 项、外耳覆盖 6 项、皮肤散射 6 项、运行预热 8 项、画质／换客 41 项、辅助真实操作 45 项通过；后两者保留实际按钮、鼠标及触屏输入。桌面稳定画面为 167570 三角／33 次绘制，390×844 为 166034／33，844×390 为 167570／33；初始化或重建阴影的单帧另有投影绘制，不以此冒充稳态帧率。移动工具受控场景最高 179538 三角，主光缓存残影差异为 0，检查灯工具投影仍改变 1202 像素。后脑三个角度覆盖为 532/532、532/532、475/475；实际发丝贴图影响 282827 像素。全关灯及内景散射开关差异为 0，工具／油耳／画质切换无首次着色器链接。查看了 1280×720 启动与侧脸、两种触屏比例及真实取出画面；报告和截图留在本地 `_dev` 与源工程 `Review`。
+
+这是 Three/WebGL 前向渲染中的局部光学近似，未实现 UE 的屏幕空间 Burley、时域抗锯齿或逐根毛发体积追踪。原头部来自 MakeHuman 拓扑与宏观形变，未做照片扫描或面部关键点精确拟合；改善材质不能证明人物身份／轮廓与照片一致。当前发片仍有分束规律与局部接边，真实手机的持续帧率需要设备实测。
 
 ## ear026：外部皮肤散射
 

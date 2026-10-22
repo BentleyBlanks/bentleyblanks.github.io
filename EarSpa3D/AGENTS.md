@@ -10,6 +10,7 @@
 | `Script_PrecisionInput.mjs` | 辅助贴合输入、短行程刮／夹与可选精细微调 |
 | `Data_CareCases.mjs` | 病例 1／2／5 的布局、目标、碎片归属与额外挑战 |
 | `Script_Core.js`、`Script_ImmersiveScene.js` | 渲染核心、实时耳部场景、器具与物理装配 |
+| `Script_PortraitSkin.js`、`Script_PortraitHair.js`、`Script_PortraitLighting.js` | 外部人物皮肤、发丝材质与独立肖像照明；重建见 `Script_PortraitGroom.py` |
 | `Script_PeelPhysics.mjs`、`Script_SoftWaxPhysics.mjs`、`Script_FractureGeometry.js` | 块体状态、薄壳形变与断口 |
 | `Script_SlimePhysics.mjs`、`Script_SlimeConstraints.mjs` | 油耳凝胶与体积约束 |
 | `Script_InstrumentInteraction.mjs`、`Script_WaxEdgeContact.mjs` | 工具真实工作端与边缘接触 |
