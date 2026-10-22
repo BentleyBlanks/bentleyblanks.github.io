@@ -15,6 +15,8 @@
 //         「预演 · 标题 · 进度条 · 秒数」，导航栏不响应（.locked），按键只认 N / Esc（中断）。
 //   飞行观察（§4.3，2026-10-21）：卡片右上多一个「飞行观察」按钮（O，进飞行后亮金边）；飞行中卡片底多一条
 //         「飞行 · 速度 · 位置 / 朝向 · 按键提示 · 退出」；导航栏的按键提示里多一个 O；预演播放时整张卡片只剩预演条，飞行条跟着藏。
+//   手机验收（§4.5，2026-10-23）：EnableTouch() 给根加 boTouch（样式见 Style_EditorBlockout.css 末节）：卡片默认收成一行、
+//         点标题展开；总图提示换成手势；复制备用框的提示换成「长按」。摇杆、大按钮、图层面板在 Script_EditorBlockoutTouch。
 //
 // 输入约定：
 // - 本界面 DOM 上的 mousedown / wheel / keydown 一律 stopPropagation —— 游戏的按键路由挂在
@@ -239,6 +241,7 @@ export class BlockoutUi {
     this.btnFly.dataset.tipSide = "left";
     this.btnFly.setAttribute("aria-pressed", "false");
     this.Listen(this.btnFly, "click", () => this.Call("onFly"));
+    this.cardTitleEl = titleWrap;
     head.append(titleWrap, this.btnPreviz, this.btnFly, this.btnCopy, this.btnSave);
 
     // 飞行观察中的那一条：「飞行」标签 + 速度 + 退出；位置 / 朝向；按键提示
@@ -346,6 +349,7 @@ export class BlockoutUi {
     this.statusEl = status;
 
     bar.append(level, layers, status);
+    this.topBarEl = bar;
     this.root.appendChild(bar);
 
     // 旧版提示条（2026-10-19）：打开的是游戏现行的旧版关卡时，在关卡下拉下面挂一条，直接跳新剧本各段
@@ -923,7 +927,7 @@ export class BlockoutUi {
       box.setAttribute("role", "dialog");
       const head = El("div", "boCopyHead");
       this.copyTitle = El("span", "boCopyTitle", "");
-      head.append(this.copyTitle, El("span", "boCopyHint", "按 Ctrl+C 复制，整段贴给 agent"));
+      head.append(this.copyTitle, El("span", "boCopyHint", this.touch ? "长按文字全选、拷贝，整段贴给 agent" : "按 Ctrl+C 复制，整段贴给 agent"));
       const close = Button("boIconBtn boClose", { icon: "close", tip: "关闭（Esc）" });
       close.dataset.tipSide = "left";
       this.Listen(close, "click", () => this.HideCopyText());
@@ -947,6 +951,32 @@ export class BlockoutUi {
     if (!this.copyBox) return;
     this.copyBox.hidden = true;
     if (this.copyBox.contains(document.activeElement)) document.activeElement.blur();
+  }
+
+  /**
+   * 手机验收（§4.5）：触屏层开着时调一次。卡片默认收成一行（阶段号 + 标题 + 站位名 + 一个展开箭头），
+   * 点标题那块展开 / 收起；其余样式由根上的 boTouch 类切换。
+   */
+  EnableTouch() {
+    if (this.touch) return;
+    this.touch = true;
+    this.root.classList.add("boTouch");
+    const chev = El("i", "boCardChevron");
+    chev.innerHTML = ICONS.chevron;
+    this.cardTitleEl.append(chev);
+    this.cardTitleEl.setAttribute("role", "button");
+    this.cardTitleEl.setAttribute("aria-label", "展开 / 收起关键帧说明");
+    this.Listen(this.cardTitleEl, "click", () => this.SetCardCollapsed(!this.cardCollapsed));
+    this.SetCardCollapsed(true);
+    this.mapHintDefault = "双指缩放 · 拖动平移 · 双击看全图 · 点关键帧跳转";
+    this.SetMapHint("");
+  }
+
+  /** 卡片收成一行（true）/ 展开（false）。只在触屏层里用。 */
+  SetCardCollapsed(collapsed) {
+    this.cardCollapsed = !!collapsed;
+    this.cardEl.classList.toggle("collapsed", this.cardCollapsed);
+    this.cardTitleEl.setAttribute("aria-expanded", this.cardCollapsed ? "false" : "true");
   }
 
   SetMapOpen(on) {

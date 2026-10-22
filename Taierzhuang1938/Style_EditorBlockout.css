@@ -595,3 +595,181 @@ body.blockoutPreviz #hud { visibility: hidden !important; }
   .boPrevizSub { font-size: 16px; }
   .boPrevizCaption { bottom: 140px; }
 }
+
+/* --- 手机验收（§4.5，2026-10-23，Script_EditorBlockoutTouch） ------------------------------
+   触屏层开着时（根上 boTouch、body 上 blockoutTouch）只动界面，游戏画面一样不动（枪、手、画质照 PC）：
+   卡片收成一行（点标题展开）、右上「图层」按钮收起关卡下拉 / 图层开关 / 音量、小地图让位给左下摇杆、
+   右下预演 / 飞行 / 地图大按钮（飞行中左边再一列升 / 降 / 加速）、导航栏铺满底边、按键提示与悬停提示收起。
+   刘海与底部横条：index.html 的 viewport-fit=cover 下用 env(safe-area-inset-*) 留边。 */
+body.blockoutTouch { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
+/* iOS 的 100vh 是地址栏收起后的高度，比看得见的高：画布按可见高度铺（渲染尺寸本来取的就是 innerHeight，不铺会被纵向拉伸） */
+body.blockoutTouch canvas#view { height: 100vh; height: 100dvh; }
+/* 转视角的那层透明板：画布与 HUD 之上、编辑器界面（z 30）与开发工具（z 40）之下；加载画面还在时不出 */
+.boTouchLook {
+  position: fixed; inset: 0; z-index: 1;
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+#boot:not(.gone) ~ .boTouchLook { display: none; }
+
+.boRoot.boTouch {
+  --bo-gutter-l: max(12px, env(safe-area-inset-left));
+  --bo-gutter-r: max(12px, env(safe-area-inset-right));
+  --bo-gutter-t: max(12px, env(safe-area-inset-top));
+  --bo-gutter-b: max(10px, env(safe-area-inset-bottom));
+  --bo-touch-nav-h: 58px;
+  /* 摇杆与大按钮的底边：导航栏上方再空 12 px */
+  --bo-touch-above-nav: calc(var(--bo-gutter-b) + var(--bo-touch-nav-h) + 12px);
+  --bo-nav-room: calc(var(--bo-gutter-b) + var(--bo-touch-nav-h) + 10px);
+  -webkit-touch-callout: none;
+}
+.boTouch :is(.boStick, .boTouchActions, .boTouchFly, .boTouchMenuBtn) { pointer-events: auto; }
+.boTouch :is(.boBtn, .boTrackWrap, .boCardTitle) { touch-action: manipulation; }
+/* 悬停提示在触屏上会粘住不走：一律不出 */
+.boTouch [data-tip]::after { display: none !important; }
+/* 收起：按键提示、小地图（让位给摇杆，地图走右下按钮）、记机位（线上只能存本机草稿）、
+   卡片上的预演 / 飞行钮（挪到右下大按钮）、编辑布设与图例（手机上不做批注） */
+.boTouch :is(.boKeys, .boMini, .boSave, .boPrevizBtn, .boFlyBtn, .boFlyHint, .boPrevizHint, .boEditToggle, .boLegend) { display: none !important; }
+/* 游戏 HUD：弹药与状态读数挪不开就收起（准星、受伤反馈、帧率照留） */
+body.blockoutTouch.blockoutMode #hud :is(.hudCombat, .hudState) { display: none !important; }
+
+/* 卡片：左上；收起时只剩一行（阶段号 + 标题 + 站位名 + 展开箭头），点这一行展开 / 收起 */
+.boTouch .boCard {
+  left: var(--bo-gutter-l); top: var(--bo-gutter-t);
+  width: min(380px, calc(100vw - var(--bo-gutter-l) - 150px));
+  max-height: calc(100dvh - var(--bo-gutter-t) - var(--bo-touch-above-nav) - 136px);
+  overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+  padding: 8px 8px 10px 12px;
+}
+.boTouch .boCardHead { align-items: center; }
+.boTouch .boCardTitle { cursor: pointer; flex-wrap: nowrap; align-items: center; min-height: 36px; padding-top: 0; }
+.boTouch :is(.boStageTitle, .boPlace) { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.boTouch .boStageTitle { flex: 0 1 auto; }
+.boTouch .boPlace { flex: 1 1 0; }
+.boCardChevron { flex: 0 0 auto; display: inline-flex; margin-left: auto; color: var(--bo-muted); transition: transform 0.15s ease; }
+.boCardChevron svg { width: 16px; height: 16px; }
+.boTouch .boCard:not(.collapsed) .boCardChevron { transform: rotate(180deg); }
+.boTouch .boCopy { width: 40px; height: 40px; margin: 0; }
+.boTouch .boCard.collapsed > :not(.boCardHead):not(.boFlyBar):not(.boPrevizBar):not(.boEmpty) { display: none; }
+.boTouch .boCard.collapsed .boCardHead { padding-bottom: 0; margin-bottom: 0; border-bottom: 0; }
+.boTouch .boCard.collapsed .boFlyBar { margin-top: 8px; padding-top: 7px; }
+.boTouch .boCard.collapsed .boFlyPos { display: none; }
+.boTouch .boFlyStop, .boTouch .boPrevizStop { width: 40px; height: 40px; }
+
+/* 右上「图层」按钮（游戏齿轮的左边，与齿轮同高）；展开的面板里竖排关卡下拉、图层开关、音量、配置状态 */
+.boTouchMenuBtn {
+  position: absolute; top: 14px; right: 62px; height: 34px; padding: 0 10px 0 7px; gap: 5px; z-index: 8;
+  background: var(--bo-panel); border: 1px solid var(--bo-edge); color: var(--bo-text);
+  font-size: 12.5px; letter-spacing: 0.1em;
+}
+.boTouchMenuBtn.on { color: var(--bo-gold); border-color: var(--bo-gold); background: var(--bo-sel-strong), var(--bo-panel-solid); }
+.boTouchIcon { display: inline-flex; }
+.boTouchIcon svg { width: 20px; height: 20px; display: block; }
+.boTouch .boTopBar { display: none; }
+.boTouch.touchMenu .boTopBar {
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px; z-index: 8;
+  top: 56px; right: var(--bo-gutter-r); height: auto; width: min(320px, calc(100vw - var(--bo-gutter-l) - var(--bo-gutter-r)));
+  max-height: calc(100dvh - 56px - var(--bo-nav-room)); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+  padding: 10px; background: var(--bo-panel-solid); border: 1px solid var(--bo-edge); box-shadow: 0 20px 50px #000b;
+}
+.boTouch .boLevelBtn { width: 100%; max-width: none; min-width: 0; height: 44px; }
+/* 面板会滚动（overflow 会裁掉绝对定位的下拉）：关卡列表改成就地展开 */
+.boTouch .boLevelMenu { position: static; min-width: 0; margin-top: 6px; box-shadow: none; max-height: 46dvh; overflow-y: auto; touch-action: pan-y; }
+.boTouch .boLevelItem { min-height: 44px; white-space: normal; }
+.boTouch .boLevelNote { max-width: none; }
+.boTouch .boLayers { justify-content: stretch; }
+.boTouch .boLayer { flex: 1 1 0; width: auto; height: 44px; }
+.boTouch .boTopBar .edVolume { height: 44px; padding: 0 12px 0 6px; }
+.boTouch .boTopBar .edVolumeRange { display: block; flex: 1 1 auto; width: auto; height: 32px; }
+.boTouch .boTopBar .edVolumeValue { display: inline; }
+.boTouch .boTopBar .edVolumeMute { width: 34px; height: 34px; }
+.boTouch .boStatus { width: 100%; height: 34px; justify-content: flex-start; padding: 0 12px; }
+.boTouch .boStatusTip { position: static; width: auto; margin-top: 6px; }
+.boTouch .boStatus:focus { flex-direction: column; align-items: flex-start; justify-content: center; height: auto; padding: 10px 12px; }
+.boTouch .boEraBanner { top: 56px; right: var(--bo-gutter-r); }
+
+/* 导航栏：铺满底边，按钮 44 px */
+.boTouch .boNav {
+  left: var(--bo-gutter-l); right: var(--bo-gutter-r); bottom: var(--bo-gutter-b); transform: none; width: auto;
+  height: var(--bo-touch-nav-h); padding: 0 8px; column-gap: 8px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px 44px auto;
+}
+.boTouch .boNavBtn { width: 44px; height: 44px; }
+.boTouch .boNavBtn svg { width: 20px; height: 20px; }
+.boTouch .boTrackWrap { height: 52px; }
+.boTouch :is(.boSeg, .boStageNum) { min-width: 8px; }
+.boTouch .boKnob { width: 9px; height: 24px; margin: -12px 0 0 -4.5px; }
+.boTouch .boNavSide { min-width: 0; }
+
+/* 摇杆：左下，导航栏上方 */
+.boStick {
+  position: absolute; left: calc(var(--bo-gutter-l) + 6px); bottom: var(--bo-touch-above-nav); z-index: 4;
+  width: 124px; height: 124px; touch-action: none;
+}
+.boStickRing {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 1.5px solid #c1bdab66; background: radial-gradient(circle, #0809074d 0, #080907a6 72%);
+  box-shadow: 0 10px 30px #0006;
+}
+.boStickKnob {
+  position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%;
+  background: #e4d9bbc4; border: 1px solid #0009; box-shadow: 0 4px 14px #0008;
+  transition: transform 0.12s ease-out;
+}
+.boStick.active .boStickKnob { transition: none; background: #ecdcb2; }
+/* 拖出圈外 = 冲刺 / 飞行加速：圈亮金 */
+.boStick.over .boStickRing { border-color: var(--bo-gold); box-shadow: 0 0 0 3px #edca8340, 0 10px 30px #0006; }
+
+/* 右下大按钮：一列预演 / 飞行 / 地图；飞行中左边再一列升 / 降 / 加速 */
+.boTouchActions, .boTouchFly {
+  position: absolute; bottom: var(--bo-touch-above-nav); z-index: 4;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.boTouchActions { right: calc(var(--bo-gutter-r) + 4px); }
+.boTouchFly { right: calc(var(--bo-gutter-r) + 4px + 58px + 10px); display: none; }
+.touchFly .boTouchFly { display: flex; }
+.boTouchBtn {
+  width: 58px; height: 54px; flex-direction: column; gap: 2px;
+  background: var(--bo-panel); border: 1px solid var(--bo-edge); color: var(--bo-text);
+  box-shadow: 0 10px 28px #0008;
+}
+.boTouchBtn:hover { background: var(--bo-panel); color: var(--bo-text); }
+.boTouchLabel { font-size: 11px; line-height: 13px; letter-spacing: 0.12em; white-space: nowrap; }
+.boTouchBtn.on, .boTouchBtn.held, .boTouchBtn.on:hover {
+  color: var(--bo-gold); border-color: var(--bo-gold); background: var(--bo-sel-strong), var(--bo-panel-solid);
+}
+.boTouchPreviz { color: var(--bo-gold); border-color: #cdb77b88; }
+.boTouchPreviz:hover { color: var(--bo-gold); }
+
+/* 总图开着：手指归地图，摇杆与按钮收起；预演中：摇杆变暗不吃手指，按钮只留「停止」 */
+.touchMap :is(.boStick, .boTouchActions, .boTouchFly, .boTouchMenuBtn) { display: none !important; }
+.touchPreviz .boStick { opacity: 0.3; pointer-events: none !important; }
+.touchPreviz .boTouchActions > :not(.boTouchPreviz) { display: none; }
+.touchPreviz .boTouchFly { display: none; }
+
+/* 全关总图：齿轮那一行以下铺满，导航栏仍在下面 */
+.boTouch .boMapOverlay { padding: calc(var(--bo-gutter-t) + 44px) var(--bo-gutter-r) var(--bo-nav-room) var(--bo-gutter-l); }
+.boTouch .boMapFrame { width: 100%; height: 100%; }
+.boTouch .boMapHead { flex-basis: 46px; gap: 10px; padding: 0 2px 0 12px; }
+.boTouch .boMapName { font-size: 15px; }
+.boTouch .boMapHint { font-size: 11px; }
+.boTouch .boMapHead .boClose { width: 44px; height: 44px; }
+
+/* 提示条、复制备用框、预演字幕 */
+.boTouch .boToasts { top: calc(var(--bo-gutter-t) + 48px); width: calc(100vw - var(--bo-gutter-l) - var(--bo-gutter-r)); }
+.boTouch .boToast { max-width: 100%; font-size: 12.5px; }
+.boTouch .boCopyBox { top: 56px; width: calc(100vw - var(--bo-gutter-l) - var(--bo-gutter-r)); }
+.boTouch .boCopyText { font-size: 11px; white-space: pre-wrap; user-select: text; -webkit-user-select: text; -webkit-touch-callout: default; }
+.boTouch .boCopyHint { white-space: normal; }
+.boTouch .boPrevizSubs { left: 50%; width: calc(100vw - var(--bo-gutter-l) - var(--bo-gutter-r)); bottom: calc(var(--bo-touch-above-nav) + 62px); }
+.boTouch .boPrevizSub { font-size: 15px; padding: 4px 10px 5px; }
+.boTouch .boPrevizCaption { bottom: calc(var(--bo-touch-above-nav) + 120px); max-width: calc(100vw - 32px); font-size: 13px; }
+
+/* 竖屏（窄）：右上那一行只放齿轮与「图层」，卡片挪到它下面铺满宽；帧率挪到左上空出来的角；导航栏去掉计数（卡片里有阶段号） */
+@media (max-width: 560px) {
+  .boTouch .boCard { top: calc(var(--bo-gutter-t) + 46px); width: calc(100vw - var(--bo-gutter-l) - var(--bo-gutter-r)); }
+  .boTouch .boToasts { top: calc(var(--bo-gutter-t) + 96px); }
+  .boTouch .boNav { grid-template-columns: 44px minmax(0, 1fr) 44px 44px; }
+  .boTouch .boNavSide { display: none; }
+  .boTouch .boMapLevel { display: none; }
+  body.blockoutTouch.blockoutMode #hud .hudFps { top: max(18px, env(safe-area-inset-top)); left: max(14px, env(safe-area-inset-left)); right: auto; }
+}

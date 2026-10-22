@@ -19,6 +19,9 @@
 //   WASD 沿视线前后左右、E 升 Q 降、Shift 加速、滚轮调速；玩家本人原地不动（走动 / 开火 / 跳 / 换枪一律不吃）；
 //   进入时从当前视角起飞，退出时相机自然回到玩家的位置与朝向；预演开始时自动退出，预演中不让进。
 //   小地图 / 全关总图画出相机的位置与朝向；「复制当前位置」（P）复制的是飞行相机的位姿。
+//   手机验收（§4.5，2026-10-23，Script_EditorBlockoutTouch）：触屏设备（或 ?touch=1）加一层触屏输入 ——
+//   屏幕空处拖动转视角（宿主的 Look，同鼠标那条链）、左下摇杆走路 / 推飞行相机（TouchMove / UpdateFly 读它）、
+//   右下预演 / 飞行 / 地图大按钮、飞行中升降与加速；画面一样不动，只收界面。
 //
 // 界面（Script_EditorBlockoutUi）与纸面俯视图（Script_EditorBlockoutMap）只走 §4 / §4.1 的接口；
 // 全关总图上的鼠标（滚轮缩放、拖动平移、双击看全图、点关键帧）归地图模块，点选经 onMapPick 回到这里。
@@ -44,6 +47,7 @@ import { BlockoutStore } from "./Script_EditorBlockoutStore.mjs";
 import { BlockoutUi } from "./Script_EditorBlockoutUi.mjs";
 import { BlockoutMap } from "./Script_EditorBlockoutMap.mjs";
 import { BlockoutMapEdit } from "./Script_EditorBlockoutMapEdit.mjs";
+import { BlockoutTouch, WantsTouch } from "./Script_EditorBlockoutTouch.mjs";
 import { LayoutEditSession, BuildLayoutEditExport, FormatLayoutEdit } from "./Script_EditorBlockoutLayoutEdit.mjs";
 import { BlockoutPreviz, PREVIZ_KEY } from "./Script_EditorBlockoutPreviz.mjs";
 import { BlockStandSampler } from "./Script_EditorBlockoutPrevizPlan.mjs";
@@ -166,14 +170,18 @@ export class EditorBlockout {
    *   host      EditorSuite.editorHost（scene / camera / post / actorFactory / game 取值器…）
    *   params    URLSearchParams
    *   PointerLocked / RequestPointerLock / ReleasePointerLock  Script_Main 的指针锁三件
+   *   Look(dx, dy)   往游戏的转头输入里加一笔位移（同鼠标 movementX/Y 的单位；触屏层转视角用）
+   *   UnlockAudio()  音频还没响就解锁一次（触屏层在手指抬起时调，iOS 只认抬起）
    */
-  constructor({ host, params, PointerLocked, RequestPointerLock, ReleasePointerLock }) {
+  constructor({ host, params, PointerLocked, RequestPointerLock, ReleasePointerLock, Look, UnlockAudio }) {
     this.host = host;
     this.game = host.game;
     this.params = params || new URLSearchParams(location.search);
     this.PointerLocked = PointerLocked || (() => false);
     this.RequestPointerLock = RequestPointerLock || (() => {});
     this.ReleasePointerLock = ReleasePointerLock || (() => {});
+    this.Look = Look || (() => {});
+    this.UnlockAudio = UnlockAudio || (() => {});
     this.levelIndex = this.game.state?.phaseIndex ?? 0;
     this.levelKey = BLOCKOUT_LEVELS[this.levelIndex]?.key || BLOCKOUT_LEVELS[BlockoutLevelIndex(null)].key;
     this.store = new BlockoutStore();
@@ -290,6 +298,17 @@ export class EditorBlockout {
     }
     this.previz = new BlockoutPreviz(this);
     this.previzSignals = null;
+    // 手机验收（§4.5）：触屏设备或 ?touch=1 才建；画面不动，只加触屏输入与大按钮
+    this.touch = WantsTouch(this.params) ? new BlockoutTouch({
+      ui: this.ui,
+      handlers: {
+        look: (dx, dy) => this.Look(dx, dy),
+        unlockAudio: () => this.UnlockAudio(),
+        fly: () => this.ToggleFly(),
+        previz: () => { if (this.previz.playing || this.previz.Has()) this.previz.Toggle(); },
+        map: () => this.ToggleMap(),
+      },
+    }) : null;
     this.BindKeys();
 
     this.api = {
@@ -328,6 +347,8 @@ export class EditorBlockout {
       // 飞行观察（§4.3，2026-10-21）：Fly(on?) 进 / 出（不给 = 切换；on 为真时可带机位 {x,y,z,yawDeg,pitchDeg}）→ FlyState；
       // FlyState() 读现状；FlyPose(pose) 把飞行相机摆到任意机位（要在飞行中）。
       Fly: (on, pose) => this.ToggleFly(on, pose),
+      // 手机验收（§4.5）：触屏层现状（摇杆、飞行轴、转视角累计）；没开触屏层 → null
+      Touch: () => this.touch?.State() ?? null,
       FlyState: () => this.FlyState(),
       FlyPose: (pose) => this.SetFlyPose(pose),
       // 编辑布设（§4.4）：开关、此刻的改动记录（会话对象本身，测试直接调它的方法）、导出的文字、写剪贴板
@@ -987,7 +1008,8 @@ export class EditorBlockout {
     if (!game.state?.ready || !game.battlefield) return;
     const camera = this.host.camera;
     camera.getWorldPosition(this._cam);
-    const locked = !!this.PointerLocked();
+    // 触屏层开着时界面永远可点（§4.5）：手指没有指针锁可言；iPad 一类锁得上的窗口、自动化里的假锁也不能把按钮变成只看不点
+    const locked = !this.touch && !!this.PointerLocked();
     if (locked !== this.locked) { this.locked = locked; this.ui.SetInteractive(!locked); }
     // 预演先摆这一帧的演员状态，演员层再按它出姿势；慢动作里演员的动画 dt 跟预演时钟一起缩（TimeScale < 1）
     this.previz.Update(dt);
@@ -1004,6 +1026,7 @@ export class EditorBlockout {
     this.markers.SetUnits(this.liveUnits);
     this.markers.Update(dt);
     this.UpdateCard(false);
+    this.touch?.Sync({ fly: this.fly.active, previz: !!this.previz?.playing, previzAvailable: !!this.ui.previzAvailable, map: this.mapOpen });
     this.mapTimer -= dt;
     if (this.mapTimer <= 0) { this.mapTimer = 1 / BLOCKOUT_EDITOR.mapHz; this.PaintMaps(); }
   }
@@ -1117,6 +1140,15 @@ export class EditorBlockout {
   /** Script_Main 问：走动 / 姿态 / 开火的键是不是归编辑器（预演播放中玩家站在原地）。 */
   CapturesInput() { return !!this.previz?.playing || this.fly.active; }
 
+  /**
+   * Script_Main 每帧读完键盘之后调（§4.5）：触屏摇杆写进走路输入（键盘按着方向键就让键盘）。
+   * 飞行中摇杆归飞行相机（UpdateFly），预演中输入整个被 CapturesInput 清掉。→ true = 写了。
+   */
+  TouchMove(input) {
+    if (!this.touch || this.fly.active) return false;
+    return this.touch.ApplyMove(input);
+  }
+
   /** Script_Main 问：现在是不是飞行观察（鼠标位移转的是飞行相机，不是玩家；阴影框跟着相机走）。 */
   get flying() { return this.fly.active; }
 
@@ -1171,7 +1203,7 @@ export class EditorBlockout {
     this.host.SetViewmodelVisible?.(false);
     this.mapTimer = 0;
     this.UpdateFlyHud(true);
-    if (!quiet) this.ui.Toast(`飞行观察：${BLOCKOUT_FLY.toggleKeyLabel} 退出，玩家留在原地`, "info");
+    if (!quiet) this.ui.Toast(this.touch ? "飞行观察：摇杆飞、右下升降，点「退出」回到玩家" : `飞行观察：${BLOCKOUT_FLY.toggleKeyLabel} 退出，玩家留在原地`, "info");
     return true;
   }
 
@@ -1221,16 +1253,26 @@ export class EditorBlockout {
     return f.speed;
   }
 
-  /** 每帧：按住的键推相机（沿视线前后、横向左右、世界竖直升降），不查碰撞，只留一道地面下限。 */
+  /** 加速：按住 Shift，或触屏的加速开关 / 摇杆拖出圈外（§4.5）。 */
+  FlyBoost() {
+    return BLOCKOUT_FLY.boostKeys.some(code => this.fly.keys.has(code)) || !!this.touch?.FlyAxes().boost;
+  }
+
+  /**
+   * 每帧：按住的键推相机（沿视线前后、横向左右、世界竖直升降），不查碰撞，只留一道地面下限。
+   * 触屏（§4.5）：摇杆与升降钮是连续量，和键盘相加后夹在 [−1, 1]。
+   */
   UpdateFly(dt) {
     const f = this.fly;
     if (!f.active) return;
     const h = f.keys;
-    const forward = (h.has(BLOCKOUT_FLY.forwardKey) ? 1 : 0) - (h.has(BLOCKOUT_FLY.backKey) ? 1 : 0);
-    const strafe = (h.has(BLOCKOUT_FLY.rightKey) ? 1 : 0) - (h.has(BLOCKOUT_FLY.leftKey) ? 1 : 0);
-    const rise = (h.has(BLOCKOUT_FLY.upKey) ? 1 : 0) - (h.has(BLOCKOUT_FLY.downKey) ? 1 : 0);
+    const touch = this.touch?.FlyAxes();
+    const Axis = (key, touchValue) => Math.max(-1, Math.min(1, key + (touchValue || 0)));
+    const forward = Axis((h.has(BLOCKOUT_FLY.forwardKey) ? 1 : 0) - (h.has(BLOCKOUT_FLY.backKey) ? 1 : 0), touch?.forward);
+    const strafe = Axis((h.has(BLOCKOUT_FLY.rightKey) ? 1 : 0) - (h.has(BLOCKOUT_FLY.leftKey) ? 1 : 0), touch?.strafe);
+    const rise = Axis((h.has(BLOCKOUT_FLY.upKey) ? 1 : 0) - (h.has(BLOCKOUT_FLY.downKey) ? 1 : 0), touch?.rise);
     if (forward || strafe || rise) {
-      const boost = BLOCKOUT_FLY.boostKeys.some(code => h.has(code));
+      const boost = this.FlyBoost();
       const step = f.speed * (boost ? BLOCKOUT_FLY.boostScale : 1) * Math.max(0, dt);
       const cp = Math.cos(f.pitch), sp = Math.sin(f.pitch), sy = Math.sin(f.yaw), cy = Math.cos(f.yaw);
       f.pos.x += (-sy * cp * forward + cy * strafe) * step;
@@ -1256,7 +1298,7 @@ export class EditorBlockout {
   UpdateFlyHud(force) {
     const f = this.fly;
     if (!f.active) return;
-    const boost = BLOCKOUT_FLY.boostKeys.some(code => f.keys.has(code));
+    const boost = this.FlyBoost();
     const key = [f.pos.x.toFixed(1), f.pos.y.toFixed(1), f.pos.z.toFixed(1), Math.round(f.yaw / DEG), Math.round(f.pitch / DEG), f.speed.toFixed(2), boost ? 1 : 0].join("|");
     if (!force && key === f.hudKey) return;
     f.hudKey = key;
@@ -1273,7 +1315,7 @@ export class EditorBlockout {
     return {
       active: f.active, key: BLOCKOUT_FLY.toggleKey,
       x: f.pos.x, y: f.pos.y, z: f.pos.z, yawDeg: WrapDeg(f.yaw / DEG), pitchDeg: f.pitch / DEG,
-      speedMps: f.speed, boost: BLOCKOUT_FLY.boostKeys.some(code => f.keys.has(code)), keys: [...f.keys], entered: f.entered,
+      speedMps: f.speed, boost: this.FlyBoost(), keys: [...f.keys], entered: f.entered,
       origin: f.origin ? JSON.parse(JSON.stringify(f.origin)) : null,
       player: player ? { x: player.position.x, y: player.position.y, z: player.position.z, yawDeg: player.yaw / DEG, pitchDeg: player.pitch / DEG, stance: player.stance } : null,
       camera: { x: eye.x, y: eye.y, z: eye.z, yawDeg: Math.atan2(-dir.x, -dir.z) / DEG, pitchDeg: Math.asin(Math.max(-1, Math.min(1, dir.y))) / DEG },
@@ -1622,7 +1664,7 @@ export class EditorBlockout {
     } else {
       this.ReleasePointerLock();
       this.ui.ShowCopyText(text);
-      this.ui.Toast("这个窗口不让写剪贴板：文字已经选好，按 Ctrl+C 复制", "warn");
+      this.ui.Toast(this.touch ? "这个浏览器不让写剪贴板：长按下面的文字全选、拷贝" : "这个窗口不让写剪贴板：文字已经选好，按 Ctrl+C 复制", "warn");
     }
     return { ok: !!method, method, text };
   }
@@ -1669,6 +1711,7 @@ export class EditorBlockout {
     document.removeEventListener("wheel", this.onWheel);
     this.ExitFly({ quiet: true });
     this.previz.Dispose();
+    this.touch?.Dispose();
     this.ResolvePending(false);
     this.puppets.Dispose();
     this.trees.Dispose();

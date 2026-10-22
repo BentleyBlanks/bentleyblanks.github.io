@@ -3475,6 +3475,9 @@ async function Boot() {
     blockout = await CreateBlockoutEditor({
       host: editor.editorHost, params,
       PointerLocked, RequestPointerLock, ReleasePointerLock,
+      // 手机验收（§4.5）：触屏拖动转视角走同一个 lookX / lookY；iOS 只认手指抬起解锁音频，这里给它一个「还没响就解锁」
+      Look: (dx = 0, dy = 0) => { input.lookX += dx; input.lookY += dy; },
+      UnlockAudio: () => { if (audio.ctx?.state !== "running") audio.Unlock(); },
     });
     window.Taierzhuang.Debug.Blockout = blockout.api;
     StartRun();
@@ -7343,6 +7346,8 @@ function IssueOrderByKey(key) {
 
 function ReadKeys() {
   router.Read(input, { ads: player ? player.ads : 0 });
+  // 白盒编辑器的触屏摇杆（手机验收，§4.5）：键盘没按方向键时写进走路输入
+  if (BLOCKOUT) blockout?.TouchMove?.(input);
   if(missionRuntime?.EmptyHands){input.fire=false;input.ads=false;}
   if (SHOT_ADS) input.ads = true;
   if (SHOT_FIRE) input.fire = true;

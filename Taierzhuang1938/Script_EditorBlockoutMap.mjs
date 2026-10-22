@@ -14,6 +14,8 @@
 // 朝向 yawDeg：0 = 朝北（−Z），+90 = 朝西；前方 = (−sin, −cos)。块的 ry（弧度）在画布上是 rotate(−ry)。
 //
 // 输入监听只挂在全关总图那张 canvas 元素上（pointer 事件 + setPointerCapture），**不往 window 挂**。
+// 触屏（手机验收，§4.5，2026-10-23）：同一套 pointer 事件；两根手指 = 以两指中点缩放 + 平移（编辑布设拖东西时不接），
+// 手指点选的半径放大到 TOUCH_PICK_PX、手指抖动 TOUCH_SLOP_PX 以内还算点，两下快点（DOUBLE_TAP_MS 内）= 回到全图。
 //
 // 编辑布设（§4.4，2026-10-21）：SetEditLayer(layer) 挂一个 Script_EditorBlockoutMapEdit；它开着时全关总图的
 // 左键、键盘先问它（它不要的才走平移 / 点关键帧），画动态层前用它的 Override* 换成挪过的位置，画完动态层再调它的 Paint。
@@ -52,6 +54,21 @@ export const VECTOR_PX_PER_M = 4;
 export const MINI_PX_PER_M = 1.6;
 /** 全关总图点关键帧时在画布上派发的事件名（detail: { index }）。 */
 export const MAP_PICK_EVENT = "blockoutmappick";
+/** 点关键帧的拾取半径（CSS px）：鼠标 11，手指 24。 */
+const MOUSE_PICK_PX = 11;
+const TOUCH_PICK_PX = 24;
+/** 按下到抬起累计移动不超过这么多 px 算「点」（鼠标 3，手指会抖）。 */
+const MOUSE_SLOP_PX = 3;
+const TOUCH_SLOP_PX = 10;
+/** 手指两下快点 = 回到全图（鼠标走 dblclick）。 */
+const DOUBLE_TAP_MS = 320;
+const DOUBLE_TAP_PX = 30;
+
+/** 两根手指的中点与间距（CSS px）。 */
+function PinchOf(points) {
+  const [a, b] = [...points.values()];
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, dist: Math.hypot(a.x - b.x, a.y - b.y) };
+}
 
 const BAKE = Object.freeze({
   maxPxPerM: 4,            // 静态层分辨率上限
@@ -183,6 +200,10 @@ export class BlockoutMap {
     this.hover = -1;
     this.cursor = null;         // 全关总图上光标的世界坐标
     this.drag = null;
+    // 按在全关总图上的指针（id → 客户区坐标）与双指缩放的上一帧（中点 + 间距）；手指上一次点的时间与位置（双击）
+    this.pointers = new Map();
+    this.pinch = null;
+    this.lastTap = null;
     this.repaintQueued = false;
     this.fullDirty = false;     // 约过重画、之后还没真画过
     this.disposed = false;
@@ -780,9 +801,9 @@ export class BlockoutMap {
     return { x: (x - v.cx) * v.pxPerM + w / 2, y: (z - v.cz) * v.pxPerM + h / 2 };
   }
 
-  /** 全关总图上 (px, py)（CSS 像素）附近 10 px 内最近的关键帧 → 下标，没有 → −1。 */
-  PickKeyframe(px, py) {
-    let best = -1, bestD = 11;
+  /** 全关总图上 (px, py)（CSS 像素）附近 radius px 内最近的关键帧 → 下标，没有 → −1。 */
+  PickKeyframe(px, py, radius = MOUSE_PICK_PX) {
+    let best = -1, bestD = radius;
     for (const kf of this.keyframes) {
       const p = this.WorldToScreen(kf.x, kf.z);
       const d = Math.hypot(p.x - px, p.y - py);
@@ -824,20 +845,40 @@ export class BlockoutMap {
       e.preventDefault();
       try { canvas.setPointerCapture(e.pointerId); } catch { /* 合成事件没有真指针 */ }
       const r = canvas.getBoundingClientRect();
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      // 第二根手指落下：转成双指缩放。正在拖的那一下不再算点选；编辑布设正拖着东西时不接
+      if (this.pointers.size === 2 && !this.drag?.edit) {
+        this.pinch = PinchOf(this.pointers);
+        if (this.drag) this.drag.moved = Infinity;
+        canvas.classList.remove("dragging");
+        return;
+      }
+      if (this.pointers.size > 2 || this.pinch || this.drag) return;
       // 编辑布设开着时左键归编辑层（挪东西 / 框选 / 放标记；拖空地它自己平移）
       const edit = this.editing && this.editLayer.OnPointerDown(e, e.clientX - r.left, e.clientY - r.top);
-      this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, button: e.button, edit };
+      this.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: 0, button: e.button, edit, touch: e.pointerType === "touch" };
       if (!edit) canvas.classList.add("dragging");
     });
     on("pointermove", (e) => {
       const r = canvas.getBoundingClientRect();
       const px = e.clientX - r.left, py = e.clientY - r.top;
+      if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.pinch) {
+        if (this.pointers.size >= 2 && this.pointers.has(e.pointerId)) {
+          const next = PinchOf(this.pointers);
+          if (this.pinch.dist > 0 && next.dist > 0) this.ZoomAt(this.pinch.x - r.left, this.pinch.y - r.top, next.dist / this.pinch.dist);
+          this.PanBy(next.x - this.pinch.x, next.y - this.pinch.y);
+          this.pinch = next;
+          if (this.drag && this.pointers.has(this.drag.id)) { const p = this.pointers.get(this.drag.id); this.drag.x = p.x; this.drag.y = p.y; }
+        }
+        return;
+      }
       if (this.drag && this.drag.id === e.pointerId) {
         const dx = e.clientX - this.drag.x, dy = e.clientY - this.drag.y;
         this.drag.x = e.clientX; this.drag.y = e.clientY;
         this.drag.moved += Math.abs(dx) + Math.abs(dy);
         if (this.drag.edit) this.editLayer?.OnPointerMove(e, px, py);
-        else if (this.drag.moved > 3) this.PanBy(dx, dy);
+        else if (this.drag.moved > (this.drag.touch ? TOUCH_SLOP_PX : MOUSE_SLOP_PX)) this.PanBy(dx, dy);
       }
       this.cursor = this.ScreenToWorld(px, py);
       if (this.editing) {
@@ -850,7 +891,13 @@ export class BlockoutMap {
       this.RequestFullRepaint();
     });
     const End = (e) => {
-      if (!this.drag || this.drag.id !== e.pointerId) return;
+      this.pointers.delete(e.pointerId);
+      // 双指缩放：少于两根手指就结束；剩下那根手指接着拖是平移（不算点选，moved 已是无穷）
+      if (this.pinch && this.pointers.size < 2) this.pinch = null;
+      if (!this.drag || this.drag.id !== e.pointerId) {
+        try { canvas.releasePointerCapture(e.pointerId); } catch { /* 已释放 */ }
+        return;
+      }
       const drag = this.drag;
       this.drag = null;
       canvas.classList.remove("dragging");
@@ -860,9 +907,20 @@ export class BlockoutMap {
         this.editLayer?.OnPointerUp(e, e.clientX - r.left, e.clientY - r.top);
         return;
       }
-      if (e.type === "pointerup" && drag.moved <= 3 && drag.button === 0) {
+      if (e.type === "pointerup" && drag.moved <= (drag.touch ? TOUCH_SLOP_PX : MOUSE_SLOP_PX) && drag.button === 0) {
         const r = canvas.getBoundingClientRect();
-        const index = this.PickKeyframe(e.clientX - r.left, e.clientY - r.top);
+        const px = e.clientX - r.left, py = e.clientY - r.top;
+        if (drag.touch) {
+          // 手指两下快点 = 回到全图（鼠标那边是 dblclick）
+          const now = performance.now(), last = this.lastTap;
+          this.lastTap = { t: now, x: px, y: py };
+          if (last && now - last.t < DOUBLE_TAP_MS && Math.hypot(px - last.x, py - last.y) < DOUBLE_TAP_PX) {
+            this.lastTap = null;
+            this.FitBounds();
+            return;
+          }
+        }
+        const index = this.PickKeyframe(px, py, drag.touch ? TOUCH_PICK_PX : MOUSE_PICK_PX);
         if (index >= 0) canvas.dispatchEvent(new CustomEvent(MAP_PICK_EVENT, { detail: { index } }));
       }
     };
@@ -878,6 +936,9 @@ export class BlockoutMap {
   DetachFull() {
     for (const off of this.full.off) off();
     this.full.off = [];
+    this.pointers.clear();
+    this.pinch = null;
+    this.drag = null;
     this.full.canvas = null;
   }
 

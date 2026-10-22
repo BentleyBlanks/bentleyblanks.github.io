@@ -396,6 +396,20 @@ export class BlockoutMap {
 - **模块**：`Script_EditorBlockoutLayoutEdit.mjs`（纯，零 three / DOM：`LayoutEditSession` 改动记录 + 撤销栈 200 步、`BuildLayoutEditExport` / `FormatLayoutEdit` / `ParseLayoutEdit`）；`Script_EditorBlockoutMapEdit.mjs`（DOM + canvas 2D，零 three：`BlockoutMapEdit` 开关、工具栏、检查器、拾取、拖动、画）；`BlockoutMap` 加 `SetEditLayer(layer)` / `editing`，`BuildItems` 的每项带 `src`（块原来的 id / 位置 / 尺寸），导出 `BlockCorners` / `BlockStyleFill`；`BlockoutMapScene` 的块带 `id`；`BlockoutUi` 加 `mapHead` / `mapBody` / `mapCloseButton` / `SetMapHint`，`ShowCopyText(text, title)`，焦点在输入框里时编辑器按键不触发；总控 `PushEditContext` / `ExportLayoutEdit`，`Debug.Blockout.LayoutEdit`（`SetActive` / `State` / `Session` / `Export` / `Text` / `Copy` / `Context` / `Focus` / `ScreenPoint`）。
 - **门禁**：`Script_EditorBlockoutLayoutEditTest`（纯 node）、`Script_EditorBlockoutMapEditBrowserTest`（浏览器，0610 08-1 真鼠标：拖狗洞、拖幺娃、框选整座灶屋拖、加标记敲字不串键、Ctrl+Z / Y、方向键、导出进剪贴板能解析、关掉后点关键帧照常跳、配置与场景文件逐字节不变）。
 
+### 4.5 手机验收（触屏层，2026-10-23）
+
+用户原话（10-23）：在外面、用 iPhone、只能打开 github.io，要能验收 agent 做完的白盒效果流程；**除了界面要收一收，游戏画面尽量和 PC 一致，不做画面割舍**（枪和手照留）；虚拟摇杆一直要有；减内存、手机上批注这一轮不做。所以手机验收就是**线上（Pages）的同一个编辑器**，加一层触屏输入，画面、画质、阴影、第一人称都不动。线上本来就不能存盘（§7），手机上「复制当前位置」照旧进剪贴板，贴进手机上的 Claude 对话就行。
+
+- **开关**：触屏设备自动开（`matchMedia("(hover: none) and (pointer: coarse)")`，手机 / 平板）；`?touch=1` 强制开、`?touch=0` 强制关。桌面不开，什么都不变。模块 `Script_EditorBlockoutTouch.mjs`（只有 DOM，零 three；`WantsTouch`、`StickAxes` 是纯函数，数值在 `BLOCKOUT_TOUCH`）。
+- **转视角**：屏幕空处单指拖动。一块铺满全屏的透明板（`#blockoutTouchLook`，z 1：画布与 HUD 之上、编辑器界面 z 30 与开发工具 z 40 之下，加载画面盖着时不出），手指位移 × `lookScale`（2.4，手指 1 px 当鼠标 2.4 px）交给宿主的 `Look(dx, dy)`，与鼠标走同一个 `input.lookX / lookY`（飞行中 `Script_Main` 照旧转给飞行相机）。透明板拦下触屏补发的兼容鼠标事件（不抢指针锁、不开枪、不换枪），`touchstart` 上 `preventDefault`（不双击放大、不弹长按菜单）。预演播放中、总图开着时拖动不转头。
+- **摇杆**（左下，导航栏上方，常驻）：帽最远 48 px，死区 0.12，出死区后 0→1 重新爬；`ApplyMove(input)` 在 `Script_Main.ReadKeys` 读完键盘之后把它写进 `input.forward / strafe`（键盘按着方向键就让键盘），**手指拖到圈半径的 1.3 倍以外 = 冲刺**（圈亮金）。飞行中摇杆推飞行相机（`FlyAxes()`，`UpdateFly` 把它和键盘相加后夹在 ±1），拖出圈外 = ×4 加速。预演中摇杆变暗不吃手指；总图开着时收起。
+- **大按钮**（右下一列，导航栏上方）：预演（这一帧有预演才出现，播放中变「停止」）/ 飞行（飞行中写「退出」）/ 地图。飞行中左边再一列：升 / 降（按住，同 E / Q）、加速（开关，同按住 Shift；退出飞行复位）。预演中只留「停止」。
+- **界面收一收**（根上 `boTouch`、`body` 上 `blockoutTouch`，样式在 `Style_EditorBlockout.css` 末节）：卡片默认收成一行（阶段号 + 标题 + 站位名 + 展开箭头），点这一行展开 / 收起，展开后限高可滚、不压摇杆（`BlockoutUi.EnableTouch / SetCardCollapsed`）；右上关卡下拉 + 图层开关 + 音量 + 状态点收进「图层」按钮的面板（点空处收起，关卡列表就地展开）；小地图让位给摇杆（地图走右下按钮）；按键提示、悬停提示（触屏上会粘住）、记机位（线上只能存本机草稿）、卡片上的预演 / 飞行钮（挪到右下）、编辑布设开关与图例收起；游戏 HUD 的弹药与状态读数收起（准星、受伤反馈、帧率照留）；导航栏铺满底边、按钮 44 px，竖屏去掉计数；竖屏（≤ 560 px 宽）卡片挪到齿轮那一行下面铺满宽，帧率挪到左上角。刘海与底部横条按 `env(safe-area-inset-*)` 留边（`index.html` 已是 `viewport-fit=cover`）。iOS 的 `100vh` 比看得见的高，触屏下画布改用 `100dvh`（渲染尺寸本来就取 `innerHeight`，不改会被纵向拉伸）。
+- **全关总图**：同一套 pointer 事件（`Script_EditorBlockoutMap`）：两根手指 = 以两指中点缩放 + 平移；手指点关键帧的拾取半径 24 px（鼠标 11）、10 px 以内的抖动还算点；两下快点（320 ms 内、30 px 内）= 回到全图。总图头的提示换成手势说明。
+- **音频**：iOS 只把「手指抬起」算作能解锁音频的手势，开机挂的那次 `pointerdown` 解不开；触屏层在每次 `touchend` / `pointerup` 调宿主的 `UnlockAudio()`（`Script_Main` 里判断 `audio.ctx.state` 不是 running 才 `Unlock()`）。Safari 的双指缩放整页（`gesturestart`）拦掉。
+- **宿主钩子**：`CreateBlockoutEditor` 多给 `Look`、`UnlockAudio` 两个函数；`ReadKeys` 末尾 `blockout.TouchMove(input)`。调试口 `Debug.Blockout.Touch()`（摇杆、飞行轴、转视角累计；没开 → null）。
+- **门禁**：`Script_EditorBlockoutTouchBrowserTest`（§10）。真机（iPhone Safari）的帧率、内存、手感只能用户在手机上看，测试里用的是 Chromium 的手机模拟 + CDP 真触摸事件。
+
 ## 5. 关键帧、过渡与标记
 
 ### 5.1 切换
@@ -673,6 +687,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 | `Script_EditorBlockoutBrowserTest.mjs` | 浏览器（游戏） | `?editor=blockout&level=FirstLevel&quality=whitebox&scale=small&audio=0` 启动；没有任务运行时、没有过场；关键帧数与配置一致；`GoTo` 后玩家位置误差 < 0.5 m；`Next` 过渡中单位位置连续变化（不瞬移）、结束后到位；切到 `SecondLevel` 后场景边界与地形变化、再切回；小地图与卡片像素非空；配置文件被外部改写后 3 s 内同步；全程无未捕获错误；截图存 `_shots/EditorBlockout/` |
 | `Script_EditorBlockoutFirstLevel0105KeepInBrowserTest.mjs`（2026-10-21） | 浏览器（游戏） | 01–05 玩家出不了沟：剧本通路逐 0.25 m 在「沟里」且离隐形墙 ≥ 0.4 m；19 处低处 × 8 个方向跳 + 翻三秒每帧都在沟里；射击台翻不过胸墙；顺交通沟 / 支沟走得到；手榴弹飞出沟；预演里翻出沟的 NPC 照常出沟；无错（§13 末） |
 | `Script_EditorBlockoutFlyBrowserTest.mjs`（2026-10-21） | 浏览器（游戏） | `FirstLevel0105` 上钉飞行观察（§4.3）：O 不与 `KEYMAP` / 编辑器键冲突；按钮 / O 键进，起飞位姿 = 进入时相机；W S A D E Q 位移 = 速度 × 时间、Shift ×4、抬头沿视线斜飞、穿墙不查碰撞、唯一的地面下限；滚轮 ×1.25 / 夹上下限且不换枪；鼠标位移（`Debug.Look` 与真 mousemove）转飞行相机、玩家不转；狂按游戏键与左右键后玩家位置 / 朝向 / 姿态 / 血量 / 弹药 / 槽位不变；小地图与全关总图（M）里有青色相机标记；P 复制的是相机位姿、重现链接带第 6 项并真能从该高度起飞；O 退出后相机回到进入时玩家视角（< 2 cm）、枪模还回来；预演中进不去、飞行中开播预演自动退出、切关自动退出；无未捕获错误 |
+| `Script_EditorBlockoutTouchBrowserTest.mjs`（2026-10-23） | 浏览器（游戏，手机模拟） | 手机验收触屏层（§4.5）：`FirstLevel0105` 上 390×844（isMobile + hasTouch，CDP 真触摸、能多指）不带参数自动开；该收的收起、枪模照旧可见；卡片 / 图层按钮 / 齿轮 / 导航栏 / 摇杆 / 大按钮在屏内不重叠、按钮 ≥ 44 px；卡片点标题收起展开；空处拖动转视角（方向、量）；摇杆往前走、松手停、拖出圈外冲刺更快、摇杆与转头两指并用；飞行里摇杆 1 s ≈ 8 m、按住「升」、「加速」×4、玩家原地、退出复位；预演按钮开播 / 停止、预演中摇杆不吃手指、拖动不转头；总图双指放大、两下快点回全图、手指点在关键帧旁 14 px 也能跳；图层面板展开 / 开关 / 点空处收起；导航栏「下一个」；横过来 844×390 同样不重叠；桌面不开触屏层；无未捕获错误；截图存 `_shots/EditorBlockoutTouch/` |
 | `Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs`（2026-10-19） | 浏览器（游戏） | `FirstLevel0610` 的 06-2 上注入一段预演（page.route）：百姓 / 小孩 / 国军军官 / 日军军官都能播预演动作库的片段且姿态真的变了（蹲下片段骨盆比站着低 ≥ 0.25 m、举手片段手比没片段时高 ≥ 0.25 m、趴下片段骨盆 < 0.3 m）、`body:"procedural"` 的百姓还是程序化身体；飞机模型载进来、Seek 到航线中段位置等于 `SamplePrevizAircraft`、在视锥里且正对 `look` 飞机锚、扫射段画出土点、过了末航点不可见；慢动作窗口里 `timeScale` = rate、墙上跑 0.9 s 预演只走 0.3 倍、人物动画时钟与走路同倍率；中断后克隆还回机队；**2026-10-20**：一辆 spawn 的驴车走起来，坐车尾的小孩（`VilSitEdge`，`ride.y` 0.467）与车板上的担架（`y` 1.075）两个时刻都跟着车（位置 = 车位姿 ∘ 本地偏移，误差 < 0.05 m）、小孩骨盆落在车板顶 ±0.1 m、不走路；url 音效 `babyCry`（`page.route` 喂生成的 WAV）装进声库并真放出一条 voice、`cellarSob` 404 只警告一次并进 `missingSfx`（这一趟因此**不带 `audio=0`**）；全程无未捕获错误；截图存 `_shots/EditorBlockoutPrevizRuntime/` |
 
 - 新模块登记 `index.html` import map（带 `?v=`）；`Style_EditorBlockout.css` 加 `<link>`；`Script_TestRunner` 登记上面四个测试与 `changedDomainRules`（`Blockout/` 目录归 editor 域）。
@@ -693,6 +708,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 
 ## 12. 变更记录
 
+- 2026-10-23（手机验收）：新增 §4.5——触屏设备（或 `?touch=1`）自动加一层触屏输入：空处拖动转视角、左下常驻摇杆（拖出圈外冲刺，飞行中推相机）、右下预演 / 飞行 / 地图大按钮、飞行中升 / 降 / 加速；卡片收成一行、右上收进「图层」面板、小地图与按键提示收起；总图双指缩放、两下快点回全图、手指点选放大；iOS 抬手补解锁音频；游戏画面一样不动。新模块 `Script_EditorBlockoutTouch`，`Script_Main` 薄钩子（`Look` / `UnlockAudio` / `TouchMove`），门禁 `Script_EditorBlockoutTouchBrowserTest`。
 - 2026-10-22（第一人称转视角身体跟着转、走路脚飘）：改在正片的第一人称身体上（白盒与游戏共用），口径见 [第一人称身体与持枪](Data_FirstPersonEmbodiment.md)「下半身」一节：站着转视角腿不动、超过 50° 才挪步转身；走路按走过的距离踩步、着地的脚锁在地上。
 - 2026-10-21（01–05 防止玩家跳出壕沟）：场景块可选 `tag`（`airWall` 只挡玩家）与 `noClimb`（§2.2）；`Script_Player.ProbeVault` 认 `noClimb`、不隔着隐形墙翻；01–05 胸墙与板桥标不能攀、沟沿一圈 892 段隐形墙（`L0105KeepInWalls`），新闸门 `Script_EditorBlockoutFirstLevel0105KeepInBrowserTest`（§13 末、§10）。
 - 2026-10-21（飞行观察 testFly）：新增 §4.3——`O` 键 / 卡片按钮进出一台不受碰撞的自由相机（WASD 沿视线、E 升 Q 降、Shift ×4、滚轮调速 0.5–400 m/s），玩家原地不动且不吃游戏输入，进时从当前视角起飞、退出相机自然回到玩家视角；预演中不让进、飞行中开播预演或切关自动退出；小地图 / 全关总图画青色相机标记（`MAP_COLORS.fly`，小地图以相机为中心）；`P` 复制的是相机位姿，`pose=` 多第 6 项相机高度；`Debug.Blockout.Fly / FlyState / FlyPose`；`Script_Main` 薄钩子（`BlockoutInputCaptured` 含飞行、放行 `map`、`FlyLook`、阴影框）；门禁 `Script_EditorBlockoutFlyBrowserTest.mjs`。
