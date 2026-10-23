@@ -37,6 +37,11 @@
 //   · 第五版的结论都保留：河汊子贴西墙、路沟西头通河、东北进庄的道、西边封死、东北角北墙 z 388 让开看东北道的视线、06 / 07 / 08 的地面不动。
 //
 // 第五版（2026-10-21，「随便绕啊现在是」）与更早各版改了什么见 docs/Data_EditorBlockout.md §15（河汊子中线 34.5、路沟西头通河、东北进庄的道、场地到 x 320）。
+//
+// 2026-10-24（用户「班长和顺子应该分两路穿插巷口，而不是傻傻的等着」）：班长那一路（L0610_EAST_YARD_ROUTE）——从主街东边 z 432.5 那道敞着的院门钻进 EM2，
+//   踩墙根的柴垛翻 EM2 / EM3 之间 z 435 那道院墙（人梯），穿 EM3 蹲在它南墙的院门（就是路口东北角 pocket 的北门，z 458）后头；09-7 隔墙甩两颗手榴弹、
+//   撞开门（新信号 EastGateBurst）贴身砍。院子不开口子：翻墙点照 L0610_SOUTH_LANE.climb 的做法做成「柴垛 + from / to 的链接」，SceneTest 的泛洪照旧只有一条路。
+//   路口东北角那道院门从 NorthYardGatesBroken 改挂 EastGateBurst（10-3 北边院子链只剩两道门要砸）。
 // ===========================================================================
 
 import {
@@ -48,7 +53,7 @@ export { PointAlong, PointBeside, LineLength };
 
 export const L0610_LEVEL_KEY = "FirstLevel0610";
 export const L0610_TITLE = "第一关 06–10 · 耿家庄（新剧本白盒）";
-export const L0610_VERSION = "2026-10-22 第六版空间（按县志重摆耿家庄：三种院子混着 / 胡同拐弯 / 瓦砾堵岔路 / 老耿家半面槽院 + 枪眼 / 窄胡同出村 / 东街拐两道弯）";
+export const L0610_VERSION = "2026-10-24 第六版空间 + 班长那一路（按县志重摆耿家庄：三种院子混着 / 胡同拐弯 / 瓦砾堵岔路 / 老耿家半面槽院 + 枪眼 / 窄胡同出村 / 东街拐两道弯；主街东边两个院子里的翻墙点与路口东北角那道门）";
 
 /** 场地范围与高度网格（0.5 m 一格，与 0105 一样）。只烘干沟以北到坡顶那一截当背景，前沿不烘。 */
 export const L0610_BOUNDS = Object.freeze({ minX: -20, maxX: 320, minZ: 120, maxZ: 560 });
@@ -415,6 +420,28 @@ export const L0610_SOUTH_LANE = F({
 });
 
 // ---------------------------------------------------------------------------
+// 班长那一路（2026-10-24，两路穿插）：大车后头 → 主街东边 z 432.5 那道敞着的院门（EM2 西墙）→ EM2 院子 → 踩柴垛翻 z 435 那道院墙（人梯）→ EM3 北屋西边那条 2.5 m 宽的空地 →
+// 蹲在 EM3 南墙的院门（路口东北角 pocket 的北门 z 458、x 106.5，门扇随 EastGateBurst 倒）后头；门外就是墙角那伙鬼子。
+// 全程在堂屋 / 东西两间三个枪眼和墙角哨的视线外：院门在大车的影子里，翻墙点在主街东墙（x 103.25）和 pocket 北墙（z 458）后头（KeyframesTest 逐帧核）。
+const EM2 = L0610_YARDS.find((y) => y.id === "EM2"), EM3 = L0610_YARDS.find((y) => y.id === "EM3");
+export const L0610_EAST_YARD_ROUTE = F({
+  name: "班长那一路（穿主街东边两个院子到路口墙角侧后）",
+  yards: F(["EM2", "EM3"]),
+  gate: F({ x: EM2.box.minX, z: EM2.gate.c, w: EM2.gate.w }),             // EM2 西墙上敞着的院门 (103.25, 432.5)
+  gateOut: P(102.3, EM2.gate.c),                                         // 门外（主街东沿，大车的影子里）
+  gateIn: P(104.4, EM2.gate.c),                                          // 门里
+  wallZ: EM3.box.minZ,                                                   // EM2 / EM3 之间那道院墙（z 435，墙中线）
+  // 柴垛贴着 z 435 那道墙的北面（EM2 这边），from 是柴垛北边起跳的点、to 是翻过去落在 EM3 北屋西边空地上的点（墙另一边 1.4 m）
+  climb: F({ pile: F({ x: 104.75, z: 434.2, w: 1.6, d: 1.1, h: 1.2 }), from: P(104.75, 432.95), to: P(104.75, 436.4), wallZ: EM3.box.minZ }),
+  strip: Box(103.5, EM3.houses[0].box.minX, EM3.box.minZ, EM3.houses[0].box.maxZ),   // EM3 北屋（x 106…116）西边那条空地 x 103.5…106、z 435…440.5
+  stripOut: P(104.8, EM3.houses[0].box.maxZ + 0.9),                      // 空地南头出来进院子
+  pocketGate: F({ x: EM3.gate.c, z: EM3.notch.minZ, w: EM3.gate.w }),    // = L0610_EAST_STREET.northChain.pocketGate (106.5, 458)
+  behindGate: F({ Luo: P(105.8, 456.5), HeYoutian: P(107.3, 456.6), Escort1: P(106.5, 455.1) }),   // 09-6 / 09-7 蹲在门后
+  inPocket: F({ Luo: P(106.2, 460.3), HeYoutian: P(107.6, 461.8), Escort1: P(105.2, 461.6) }),      // 10-1 撞开门冲进 pocket 以后
+  grenadeHits: F([P(107.4, 460.6), P(105.4, 461.4)]),                    // 09-7 两颗手榴弹的落点（pocket 里）
+});
+
+// ---------------------------------------------------------------------------
 // 东街（10 守路口）：石碾在丁字路口东边、朝东；门洞 / 豁口 / 枪眼 / 庙 / 垛都在石碾往东的扇面里、远近错开。
 const ROLLER = F({ name: "石碾", x: 113.2, z: 465.7, w: 1.2, d: 0.9, h: 0.9, baseW: 2.0, baseH: 0.12 });
 export const L0610_EAST_STREET = F({
@@ -536,6 +563,8 @@ export const L0610_PROPS = F([
   Prop("Millstone_E1", 198, 485), Prop("ChickenCoop_E1", 176, 494), Prop("WaterVat_E1", 127, 486), Prop("WaterVat_E2", 206.6, 450.8),
   // 主街两侧、巷子两边的院里
   Prop("Haystack_W1", 80, 440, 0), Prop("ChickenCoop_W1", 74.5, 419), Prop("Millstone_W1", 116.5, 452), Prop("WaterVat_W1", 106, 395),
+  // 班长那一路（10-24）：EM2 院里房前的水缸、EM3 北屋西边空地上的水缸（蹲着能藏人；翻墙的柴垛是 L0610_EAST_YARD_ROUTE.climb.pile，场景生成器单出）
+  Prop("WaterVat_EM2", 108.4, 418.0), Prop("WaterVat_EM3", 104.1, 447.0),
   Prop("Haystack_W2", 56, 436, 0.1), Prop("WaterVat_W3", 66, 412),
   // 村南
   Prop("Haystack_B1", 86, 540, 0), Prop("WaterVat_B1", 124.6, 540.6), Prop("Haystack_B2", 100.6, 515.6, 0.2),
@@ -556,8 +585,9 @@ export const L0610_SIGNALS = F({
   cartDeparted: "CartDeparted",                   // 06-3 起：老耿赶车走了，车上那几箱弹药（体块）跟着车走
   cellarBlast: "CellarBlast",                     // 09 起：街坊家窖里闷响一声，窖口冒烟、盖板飞开
   sideGateOpen: "SideGateOpen",                   // 09 起：本家院与老耿家共用墙上的便门从老耿家那边拔开门闩
+  eastGateBurst: "EastGateBurst",                 // 09-7 起（10-24 两路）：班长三人从 EM3 院里撞开路口东北角那道院门（pocket 北门），门扇倒在 pocket 里
   mgSilenced: "MgSilenced",                       // 10-1 起：堂屋枪眼后的机枪组被从背后打掉；10-2 那挺枪出现在石碾后头
-  northYardGatesBroken: "NorthYardGatesBroken",   // 10-4 起：北边院子链上的三道门被砸倒
+  northYardGatesBroken: "NorthYardGatesBroken",   // 10-3 起：北边院子链上另两道门（场院西隔墙、北侧第一个院西墙）被砸倒；pocket 北门 09-7 已被班长撞开
   barrageHit: "BarrageHit",                       // 10 末起：炮轰——老耿家北屋东间塌一块、石碾旁一堆新瓦砾（草顶着火用烟事件）
   laneWallCollapse: "LaneWallCollapse",           // 10 末起：窄胡同中段西墙倒进胡同，堵死；要踩柴垛翻进旁边院子绕
 });
@@ -586,7 +616,9 @@ export const L0610_PLACES = F({
   river: F({ name: "河汊子", x: L0610_RIVER.centerX, z: 400 }),
   alleyBackGate: F({ name: "夹道东边院子朝夹道的门（08-1 村民钻巷子）", x: 81.25, z: 396 }),
   ditchBackGate: F({ name: "主街东边院子朝路沟的后门", x: 110, z: 385 }),
-  mainEastGate: F({ name: "主街东边朝街开的院门（08-1 两个村民冲出来）", x: 103.25, z: 432.5 }),
+  mainEastGate: F({ name: "主街东边朝街开的院门（村民冲出来；班长钻进去）", x: 103.25, z: 432.5 }),
+  eastClimb: F({ name: "班长那一路翻墙的柴垛", x: 104.75, z: 434.2 }),
+  pocketGate: F({ name: "路口东北角那院的南门（班长蹲门后）", x: 106.5, z: 458 }),
   eastRoadView: F({ name: "东北进庄的道（看得见的那一段）", x: 272, z: 388 }),
   l4Mouth: F({ name: "L4 东头（接丁字路口）", x: 92, z: 468.75 }),
   jiefangGate: F({ name: "街坊家院门（半掩）", x: L0610_JIEFANG.gate.x, z: L0610_JIEFANG.gate.z }),

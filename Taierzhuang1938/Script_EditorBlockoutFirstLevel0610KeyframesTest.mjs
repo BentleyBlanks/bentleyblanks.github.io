@@ -21,7 +21,9 @@ import { BlockSight, SolidBlocks, BlockCenterY } from "./Script_EditorBlockoutFi
 import {
   L0610_BOUNDS as B, L0610_PLACES as P, L0610_GENG as G, L0610_JIEFANG as JF, L0610_BENJIA as BJ, L0610_EAST_STREET as ES, L0610_SOUTH_LANE as SLN,
   L0610_SIGNALS as SIG, L0610_STREETS as ST, L0610_DITCH as DT, L0610_STREET_YARDS as SY, L0610_MOUTH_SHOOTERS, L0610_ROUTE, LanePointAtZ, Station,
+  L0610_EAST_YARD_ROUTE, L0610_YARDS,
 } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
+const yardBox = (id) => L0610_YARDS.find((y) => y.id === id).box;
 
 const issues = [];
 const a = await BuildFirstLevel0610Config({ commit: "test", generatedAt: "A", issues });
@@ -66,8 +68,8 @@ for (const id of IDS) { assert.ok(Unit(id, "Geng"), `${id} 老耿要在`); asser
 // --- 信号按拍起 ---
 const From = (sig, firstId) => IDS.forEach((id, i) => assert.equal(KF(id).signals.includes(sig), i >= IDS.indexOf(firstId), `${id} 的 ${sig}`));
 From(SIG.cartDeparted, "06-3"); From(SIG.cellarBlast, "09-4"); From(SIG.sideGateOpen, "09-5"); From(SIG.mgSilenced, "10-1"); From(SIG.northYardGatesBroken, "10-3");
-From(SIG.barrageHit, "10-5"); From(SIG.laneWallCollapse, "10-6");
-assert.equal(Object.keys(SIG).length, 7, "七个信号都查到了");
+From(SIG.barrageHit, "10-5"); From(SIG.laneWallCollapse, "10-6"); From(SIG.eastGateBurst, "10-1");
+assert.equal(Object.keys(SIG).length, 8, "八个信号都查到了（10-24 两路：+EastGateBurst）");
 
 // --- 06：车在南岸树底下，妮儿蹲在凹路口边上的沟沿上 ---
 assert.ok(DistXZ(Unit("06-1", "GengCart"), P.cartStop) < 0.1 && DistXZ(Unit("06-2", "Nier"), P.nierRim) < 0.1, "06 车在树底下、妮儿在沟沿上");
@@ -142,8 +144,35 @@ for (const uid of ["Luo", "HeYoutian", "Escort1", "Escort2"]) {
 }
 assert.ok(KF("08-3").units.every((u) => u.side !== "nra" || u.z < 420), "08-3 没有人上主街");
 // 08-4：班长四人蹲在大车北侧、都活着；妮儿在巷子里、来路经过路沟西半截与巷子口；老耿被幺娃拽回；一个墙角的鬼子往东街跑；玩家在巷子口里几米
-for (const id of ["08-4", "09-1", "09-7"]) {
-  for (const uid of ["Luo", "HeYoutian", "Escort1", "Escort2"]) assert.ok(Unit(id, uid).z < P.cart.z - 1.2 && Math.abs(Unit(id, uid).x - P.cart.x) < 2.8 && Unit(id, uid).stance === "crouch" && Unit(id, uid).state !== "down", `${id} ${uid} 蹲在大车北侧、活着`);
+for (const uid of ["Luo", "HeYoutian", "Escort1", "Escort2"]) assert.ok(Unit("08-4", uid).z < P.cart.z - 1.2 && Math.abs(Unit("08-4", uid).x - P.cart.x) < 2.8 && Unit("08-4", uid).stance === "crouch" && Unit("08-4", uid).state !== "down", `08-4 ${uid} 蹲在大车北侧、活着`);
+// 两路（10-24）：09 里班长、何有田、Escort1 走东边院子那一路（不在大车后头），Escort2 留在大车后头吸火；正面三个 08-4…09-7 一直趴在坡道上
+{
+  const EYR = L0610_EAST_YARD_ROUTE, EM2 = yardBox("EM2"), EM3 = yardBox("EM3");
+  const TRIO = ["Luo", "HeYoutian", "Escort1"];
+  for (const id of ["09-1", "09-2", "09-3", "09-4", "09-5", "09-6", "09-7"]) {
+    for (const uid of TRIO) {
+      const u = Unit(id, uid);
+      assert.ok(u.state !== "down" && u.stance === "crouch" && !u.aim, `${id} ${uid} 活着、蹲着、不端枪`);
+      assert.ok(!(u.z < P.cart.z - 1.2 && u.z > P.cart.z - 6 && Math.abs(u.x - P.cart.x) < 2.8), `${id} ${uid} 不在大车后头了（两路）`);
+      if (id <= "09-4") assert.ok(InBox(u, EM2, -0.3) && u.z < EYR.wallZ - 0.3, `${id} ${uid} 在 EM2 院里（翻墙前）(${u.x},${u.z})`);
+      else assert.ok(InBox(u, EM3, -0.3) && u.z > EYR.wallZ + 0.3, `${id} ${uid} 在 EM3 院里（翻过墙了）(${u.x},${u.z})`);
+      if (id === "09-6" || id === "09-7") assert.ok(DistXZ(u, EYR.pocketGate) <= 3.0, `${id} ${uid} 蹲在 EM3 南门后头（≤ 3 m），实际 ${DistXZ(u, EYR.pocketGate).toFixed(2)}`);
+    }
+    const e2 = Unit(id, "Escort2");
+    assert.ok(e2.z < P.cart.z - 1.2 && Math.abs(e2.x - P.cart.x) < 2.8 && e2.stance === "crouch" && e2.state !== "down", `${id} Escort2 留在大车北侧吸火`);
+    for (const who of shooterIds) { const u = Unit(id, who); assert.ok(u.stance === "prone" && L0610_MOUTH_SHOOTERS.some((p) => DistXZ(p, u) < 0.05), `${id} ${who} 趴在坡道上某个射击位（打一枪换个窝）`); }
+  }
+  // 09-1 从大车后头顺主街东沿钻院门；09-4 人梯：何有田蹲在柴垛北边起跳点、班长在他身后；09-5 翻墙那一跃的来路经柴垛两边
+  for (const uid of TRIO) {
+    assert.ok(Unit("09-1", uid).path?.some((p) => DistXZ(p, EYR.gateIn) < 0.3) && Unit("09-1", uid).path?.some((p) => DistXZ(p, EYR.gateOut) < 0.3), `09-1 ${uid} 的来路经过 EM2 院门`);
+    assert.ok(Unit("09-5", uid).path?.some((p) => DistXZ(p, EYR.climb.from) < 0.3) && Unit("09-5", uid).path?.some((p) => DistXZ(p, EYR.climb.to) < 0.3), `09-5 ${uid} 翻墙的来路经柴垛两边`);
+  }
+  assert.ok(DistXZ(Unit("09-4", "HeYoutian"), EYR.climb.from) < 0.3 && DistXZ(Unit("09-4", "Luo"), EYR.climb.from) < 1.2 && Unit("09-4", "Luo").z < Unit("09-4", "HeYoutian").z, "09-4 人梯：何有田蹲在柴垛北边、班长在他身后");
+  // 每帧换一次窝：09 相邻两帧里至少一个人换了射击位
+  for (let i = 1; i < 7; i++) {
+    const a1 = `09-${i}`, b1 = `09-${i + 1}`;
+    assert.ok(shooterIds.some((who) => DistXZ(Unit(a1, who), Unit(b1, who)) > 1.0), `${a1}→${b1} 坡道上至少一个人换了窝`);
+  }
 }
 {
   const pl = KF("08-4").player, nier = Unit("08-4", "Nier");
@@ -249,7 +278,10 @@ for (const id of ["10-1", "10-2", "10-3", "10-4", "10-5", "10-6"]) {
   for (const uid of [...HOUSE_IDS, "KitchenIja", "CornerIja1", "CellarIja3"]) assert.equal(Unit(id, uid).state, "down", `${id} ${uid} 该倒了`);
 }
 assert.ok(["CellarIja1", "CellarIja2", "CellarIja4"].every((uid) => Unit("10-1", uid).state !== "down" && Unit("10-1", uid).x > 110 && Unit("10-1", uid).intent?.length), "10-1 墙角剩下的三个往东街跑");
-assert.ok(Unit("10-1", "Luo").z > P.cart.z && Unit("10-1", "Luo").z < ST.square.box.minZ, "10-1 班长从大车后冲上来");
+for (const uid of ["Luo", "HeYoutian", "Escort1"]) assert.ok(InBox(Unit("10-1", uid), ST.pocket.box, 0.3) && Unit("10-1", uid).state !== "down", `10-1 ${uid} 撞开门在路口墙角（pocket）里`);
+assert.equal(Unit("10-1", "Luo").weapon, "Dadao", "10-1 班长手里是大刀（贴身砍）");
+assert.ok(Unit("10-1", "Escort2").z < P.cart.z && Unit("10-1", "Escort2").z > 435 && Math.abs(Unit("10-1", "Escort2").x - ST.main.c) < 3.5, "10-1 Escort2 从大车后头上街");
+for (const uid of ["Yaowa", "LiuWencai", "Squad3"]) assert.ok(Unit("10-1", uid).z > 386 && Unit("10-1", uid).z < 400 && Unit("10-1", uid).stance !== "prone", `10-1 ${uid} 从坡道冲上街`);
 assert.ok(InBox(KF("10-1").player, G.beiwu.box, -0.25) && KF("10-1").player.stance === "stand", "10-1 玩家在北屋里");
 assert.ok(KF("10-2").player.stance === "prone" && Math.abs(KF("10-2").player.yawDeg + 90) < 1 && DistXZ(KF("10-2").player, P.roller) < 3, "10-2 石碾后趴着朝东");
 const EastAlive = (id) => KF(id).units.filter((u) => u.side === "ija" && (u.group === "east") && u.state !== "down");
@@ -420,6 +452,17 @@ assert.equal(SightFrom("10-3", Unit("10-3", "Yaowa"), 0.5, Unit("10-3", "EastMg1
 assert.equal(SightFrom("10-3", Unit("10-3", "Yaowa"), 0.5, { x: ES.northChain.pocketGate.x, z: ES.northChain.pocketGate.z + 1.5 }, 1.0), null, "10-3 石碾后看得见北角那道院门");
 assert.equal(Sight("10-4", Unit("10-4", "Geng"), 1.5), null, "10-4 站在胡同口看得见胡同里的老耿");
 assert.equal(Sight("10-6", SLN.climb.pile, SLN.climb.pile.h + 0.1), null, "10-6 柴垛跟前看得见柴垛顶（踩上去翻墙）");
+// 两路（10-24）：09 每一帧班长三人都不在三个枪眼（枪眼后的人 1.1）和墙角哨（蹲着 1.2）的视线里；10-1 顺子从东间枪眼看得见墙角里的班长（两路会合）
+for (const id of ["09-1", "09-2", "09-3", "09-4", "09-5", "09-6", "09-7"]) {
+  const kf = KF(id);
+  const watchers = [
+    ...["MgGunner", "Rifle1", "Rifle3"].map((w) => ({ name: w, ...Unit(id, w), eye: 1.1 })),
+    ...kf.units.filter((u) => u.side === "ija" && u.state !== "down" && InBox(u, ST.pocket.box, 0.6)).map((u) => ({ name: u.id, x: u.x, z: u.z, eye: 1.2 })),
+  ];
+  assert.ok(watchers.length >= 4, `${id} 枪眼后三个 + 墙角哨至少一个`);
+  for (const uid of ["Luo", "HeYoutian", "Escort1"]) for (const w of watchers) assert.notEqual(SightFrom(id, w, w.eye, Unit(id, uid), 0.9), null, `${id} ${w.name} 不许看见班长那一路的 ${uid} (${Unit(id, uid).x},${Unit(id, uid).z})`);
+}
+assert.equal(SightFrom("10-1", { x: G.beiwu.loopholes[2].x - 0.1, z: G.beiwu.box.minZ + 0.3 }, 1.1, Unit("10-1", "Luo"), 1.0), null, "10-1 顺子贴在东间枪眼上要看得见墙角里的班长（两路会合；枪眼正对着墙角 ±17°）");
 assert.notEqual(Sight("10-6", Unit("10-6", "Luo"), 1.0), null, "10-6 墙那边的班长隔着 2.2 m 的院墙看不见（他在墙头上回身拽人，预演里演）");
 
 const file = new URL("./Blockout/FirstLevel0610.json", import.meta.url);
@@ -427,7 +470,7 @@ if (fs.existsSync(file)) {
   const onDisk = JSON.parse(fs.readFileSync(file, "utf8"));
   if (Strip({ ...onDisk, source: { ...onDisk.source, commit: "test" } }) !== Strip(a)) console.log("提示：Blockout/FirstLevel0610.json 与生成器输出不同（手改过，或没重新 export）");
   // 盘上的 JSON 没有生成器的内部标记（躺在担架上 / 爬坎 / 翻墙 / 钻狗洞），按手改的口径查只该多报这几类
-  const known = /Donggua 站在 LitterDonggua|Cellar(Man|Wife|Granny) 的走位|Nier 的走位穿过 (DogHoleLintel|SharedWall|GengBeiwu|GengZaowu|JiefangBreach|JiefangWestWing)|Nier 的走位在|Geng 的走位在|Villager[145] 的走位在|Officer 的走位在|Luo 的走位(穿过 (Wall_z114p5|ClimbPile|House_DY)|在)|Granny 的走位穿过 CellarSmoke/;
+  const known = /Donggua 站在 LitterDonggua|Cellar(Man|Wife|Granny) 的走位|Nier 的走位穿过 (DogHoleLintel|SharedWall|GengBeiwu|GengZaowu|JiefangBreach|JiefangWestWing)|Nier 的走位在|Geng 的走位在|Villager[145] 的走位在|Officer 的走位在|Luo 的走位(穿过 (Wall_z114p5|ClimbPile|House_DY)|在)|(Luo|HeYoutian|Escort1) 的走位(穿过 (Wall_x435|EastClimbPile)|在)|Granny 的走位穿过 CellarSmoke/;
   const extra = FirstLevel0610Issues(onDisk, { scene }).filter((line) => !known.test(line));
   assert.deepEqual(extra, [], `盘上的 JSON 多报了：\n  ${extra.join("\n  ")}`);
 }

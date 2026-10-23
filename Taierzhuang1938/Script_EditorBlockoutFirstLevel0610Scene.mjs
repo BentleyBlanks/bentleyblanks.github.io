@@ -30,10 +30,11 @@ import {
   L0610_LEVEL_KEY, L0610_BOUNDS, L0610_CELL_M, L0610_HEIGHTS, L0610_PLAIN_PROFILE, L0610_LANE, L0610_DITCH, L0610_RIVER, L0610_VILLAGE,
   L0610_STREETS, L0610_GENG, L0610_JIEFANG, L0610_BENJIA, L0610_YARDS, L0610_RUBBLE, L0610_SOUTH_LANE, L0610_EAST_STREET, L0610_ROUTE, L0610_TREES,
   L0610_EAST_ROAD, L0610_PROP_KINDS, L0610_PROPS, L0610_COLLAPSED_HOUSES, L0610_SIGNALS, L0610_PLACES, L0610_SPAWN, L0610_FROM_0105, L0610_MOUTH_SHOOTERS,
-  L0610_FALLEN_WALLS, LineLength, Station, LanePointAtZ,
+  L0610_FALLEN_WALLS, L0610_EAST_YARD_ROUTE, LineLength, Station, LanePointAtZ,
 } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 
 export { SightBlock, L0610_MOUTH_SHOOTERS };
+const EYR = L0610_EAST_YARD_ROUTE;
 export const L0610_SCENE_GENERATOR = "Script_EditorBlockoutCli.mjs scene FirstLevel0610";
 
 const H = L0610_HEIGHTS;
@@ -634,6 +635,12 @@ function SouthLaneBlocks(plan, blocks, gates) {
   blocks.push(Block("ClimbPile", P.x, P.z, P.w, P.d, P.h, "canvas", { prop: "Haystack", climb: true }));
 }
 
+/** 班长那一路（10-24）：EM2 / EM3 之间 z 435 那道院墙北面墙根的柴垛（踩着翻墙的台阶，同 ClimbPile 的做法：不开口子，只是一块 1.2 高的垛）。 */
+function EastYardBlocks(blocks) {
+  const P = EYR.climb.pile;
+  blocks.push(Block("EastClimbPile", P.x, P.z, P.w, P.d, P.h, "canvas", { prop: "Haystack", climb: true }));
+}
+
 /** 一条胡同的净空范围（轴对齐盒子）。 */
 function RunBox(r) {
   return r.axis === "z" ? { minX: r.c - r.halfW, maxX: r.c + r.halfW, minZ: r.from, maxZ: r.to } : { minX: r.from, maxX: r.to, minZ: r.c - r.halfW, maxZ: r.c + r.halfW };
@@ -717,7 +724,8 @@ function VillageBlocks(sample) {
   // 巷子北头夹道两边的墙从路沟南沿起；A1 到 A2 的拐角等都由院子表盖
   // 院子链上的三道砸得倒的门（EM3 南墙的院门洞已在院子表里开了洞）
   const NC = ES.northChain;
-  BreakableGate(gates, "PocketGateLeaf", "x", NC.pocketGate.z, NC.pocketGate.x, NC.pocketGate.w, SIG.northYardGatesBroken, 1);
+  // 路口东北角那院的南门（pocket 北门）：10-24 起随 EastGateBurst 倒——09-7 班长三人从院里撞开它冲进 pocket；10-3 北边院子链只剩另两道门要砸
+  BreakableGate(gates, "PocketGateLeaf", "x", NC.pocketGate.z, NC.pocketGate.x, NC.pocketGate.w, SIG.eastGateBurst, 1);
   plan.Cut("z", NC.yard1Door.x, NC.yard1Door.z - NC.yard1Door.w / 2, NC.yard1Door.z + NC.yard1Door.w / 2);
   Lintel(blocks, "Yard1DoorLintel", "z", NC.yard1Door.x, NC.yard1Door.z - NC.yard1Door.w / 2, NC.yard1Door.z + NC.yard1Door.w / 2, V.doorTopH, V.wallH, sample);
   BreakableGate(gates, "Yard1GateLeaf", "z", NC.yard1Door.x, NC.yard1Door.z, NC.yard1Door.w, SIG.northYardGatesBroken, -1);
@@ -725,6 +733,7 @@ function VillageBlocks(sample) {
   Lintel(blocks, "FarmyardDoorLintel", "z", NC.farmyardDoor.x, NC.farmyardDoor.z - NC.farmyardDoor.w / 2, NC.farmyardDoor.z + NC.farmyardDoor.w / 2, V.doorTopH, V.wallH, sample);
   BreakableGate(gates, "FarmyardGateLeaf", "z", NC.farmyardDoor.x, NC.farmyardDoor.z, NC.farmyardDoor.w, SIG.northYardGatesBroken, -1);
   SouthLaneBlocks(plan, blocks, gates);
+  EastYardBlocks(blocks);
   FallenWallBlocks(plan, blocks);
   plan.Emit(blocks);
   Shrine(blocks, sample);
@@ -846,14 +855,15 @@ export function L0610Landmarks(sample) {
     ...ES.probes.filter((p) => p.kind !== "shrine").map((p) => L(`LmProbe_${p.id}`, `探头·${p.id}`, p.kind === "door" ? "door" : "window", p.x, p.z, { note: p.note, ...(p.kind === "door" ? DoorX(1.5) : p.kind === "breach" ? { ...Size(1.2, T, 1.5), y: R2(sample(p.x, p.z) + 1.25) } : { ...Size(T, LH.w, LH.topH - LH.sillH), y: R2(sample(p.x, p.z) + 1.1) }) })),
     L("LmNorthGate1", "院门①（场院西隔墙）", "door", NC.farmyardDoor.x, NC.farmyardDoor.z, { ...DoorZ(NC.farmyardDoor.w), note: "10-4 砸开" }),
     L("LmNorthGate2", "院门②（北侧第一个院西墙）", "door", NC.yard1Door.x, NC.yard1Door.z, { ...DoorZ(NC.yard1Door.w), note: "10-4 砸开" }),
-    L("LmNorthGate3", "院门③（路口东北角那院南墙）", "door", NC.pocketGate.x, NC.pocketGate.z, { ...DoorX(NC.pocketGate.w), note: "10-4 砸开，就在石碾西北背后" }),
+    L("LmNorthGate3", "院门③（路口东北角那院南墙）", "door", NC.pocketGate.x, NC.pocketGate.z, { ...DoorX(NC.pocketGate.w), note: "09-6 班长三人蹲在门后、09-7 撞开（EastGateBurst）；就在石碾西北背后" }),
+    L("LmEastClimbPile", PL.eastClimb.name, "prop", EYR.climb.pile.x, EYR.climb.pile.z, { ...Size(EYR.climb.pile.w, EYR.climb.pile.d, EYR.climb.pile.h), note: "09-4 班长三人踩着翻 z 435 那道墙（人梯）" }),
     L("LmSouthClimb", PL.southClimb.name, "place", ES.southClimb.x, ES.southClimb.z, { ...Size(3, T, V.wallH), note: "10-5 南边两个鬼子翻这段墙" }),
     L("LmMortarHide", "掷弹筒藏处", "place", ES.mortarHide.x, ES.mortarHide.z, { radiusM: 1.8 }),
     L("LmEastEnd", PL.eastEnd.name, "place", PL.eastEnd.x, PL.eastEnd.z, { radiusM: 2 }),
     L("LmEastRoadView", PL.eastRoadView.name, "place", PL.eastRoadView.x, PL.eastRoadView.z, { radiusM: 6, note: "鬼子顺这条道进庄；07 末 / 08 看得见" }),
     L("LmAlleyBackGate", PL.alleyBackGate.name, "door", PL.alleyBackGate.x, PL.alleyBackGate.z, { ...DoorZ(1.2), note: "08-1 村民顺巷子逃到巷子口；没门扇" }),
     L("LmDitchBackGate", PL.ditchBackGate.name, "door", PL.ditchBackGate.x, PL.ditchBackGate.z, { ...DoorX(V.gateW), note: "08-1 两个村民下到沟东半截；没门扇" }),
-    L("LmMainEastGate", PL.mainEastGate.name, "door", PL.mainEastGate.x, PL.mainEastGate.z, { ...DoorZ(V.gateW), note: "08-1 两个村民冲上主街被打倒" }),
+    L("LmMainEastGate", PL.mainEastGate.name, "door", PL.mainEastGate.x, PL.mainEastGate.z, { ...DoorZ(V.gateW), note: "08-1 两个村民冲上主街被打倒；08-4 末班长三人从这里钻进院子（在大车的影子里）" }),
     ...L0610_RUBBLE.map((r) => L(`Lm${r.id}`, r.name, "prop", r.x, r.z, { ...Size(r.w, r.d, r.h), ry: r.ry })),
     L("LmBigLocust", PL.bigLocust.name, "prop", PL.bigLocust.x, PL.bigLocust.z, { ...Size(0.8, 0.8, PL.bigLocust.h), note: "10-6「过了槐树就是村口」" }),
     L("LmPond", PL.pond.name, "pit", POND.x, POND.z, { ...Size(POND.w, POND.d, POND.depth), y: R2(POND_FLOOR_Y + POND.depth / 2), note: "取土坑积的水；1949 年前多数人喝河、坑、沟水" }),
@@ -1134,7 +1144,7 @@ export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", 
         + `体块：按县志重摆的 ${L0610_YARDS.length + 3} 个院子（四合院 / 半面槽院 / 排房院混着、夹菜园空地与水坑；共墙只画一道），老耿家半面槽院（北屋三间空心、后墙三个枪眼、灶屋两间、东墙院门）、`
         + "街坊家（北屋空心、西配房塌掉的西北角 / 窗洞 / 大缸、地瓜窖、石磨、半掩的院门）、本家院（共用墙上的狗洞 / 便门）、拐四道弯的巷子与瓦砾堵死的岔路、"
         + "往南拐三道弯的窄胡同（塌墙处、柴垛、绕路院子）、拐两道弯的东街（门洞 / 枪眼 / 豁口 / 土地庙 / 麦秸垛）、各片错开的小巷与死胡同、塌了一角的房子、倒在胡同里的墙、菜园空宅基粪堆、零散的树、日常摆件、0105 的南岸枯树；"
-        + "gates：CartDeparted / SideGateOpen / CellarBlast / MgSilenced / NorthYardGatesBroken / BarrageHit / LaneWallCollapse；"
+        + "gates：CartDeparted / SideGateOpen / CellarBlast / EastGateBurst / MgSilenced / NorthYardGatesBroken / BarrageHit / LaneWallCollapse；"
         + `landmarks：${landmarks.length} 个地标。`,
     },
     bounds: { ...L0610_BOUNDS },

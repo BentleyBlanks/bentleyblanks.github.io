@@ -1,8 +1,8 @@
 {
  "schema": "tengxian-blockout-voice/1",
  "level": "FirstLevel0610",
- "generatedAt": "2026-10-21T19:30:07.849Z",
- "requests": 100,
+ "generatedAt": "2026-10-23T18:03:37.218Z",
+ "requests": 108,
  "note": "占位配音（SeedAudio seed-audio-1.0，整段一次生成后按逐字时间戳切句）。file 相对 Taierzhuang1938/index.html；gapBeforeS 是录音里与上一句的原始间隔；keyframe 是第二版改稿契约 §3 的关键帧 id（06-1…10-6）。",
  "scenes": [
   {
@@ -1324,9 +1324,9 @@
    "id": "LuoSendsShunzi",
    "beat": "08",
    "keyframe": "08-4",
-   "label": "08 班长定计：闭嘴压枪眼、带到她摸到屁股后头",
-   "attempt": 2,
-   "attempts": 2,
+   "label": "08 班长定计：闭嘴压枪眼、带到她摸到屁股后头、老子从东边院子穿过去（两路）",
+   "attempt": 3,
+   "attempts": 1,
    "references": [
     {
      "who": [
@@ -1352,10 +1352,13 @@
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LuoSendsShunzi_01.mp3",
      "durationS": 1.26,
      "gapBeforeS": 0,
-     "sha256": "bbe326a2752079107cd90addf4781c09fbbd2311ef17e5b2605b447787b7bc0b",
-     "speakerCos": 0.831,
-     "cer": 0.3333,
-     "transcript": "笔嘴,压到墙眼。"
+     "sha256": "2a39cbf3a46bb9c9bf1579fddf9378de862547149b3981ee2c86d4d1125b646f",
+     "speakerCos": 0.839,
+     "cer": 0.5,
+     "transcript": "笔嘴,压到墙页。",
+     "issues": [
+      "字错率 0.5 待人耳核对"
+     ]
     },
     {
      "id": "LuoSendsShunzi.02",
@@ -1363,15 +1366,54 @@
      "who": "luo",
      "speaker": "罗班长",
      "lang": "zh",
-     "subtitle": "顺儿！带到她顺巷子摸过去，摸到那狗日的屁股后头！老子在前头给你吸住火！",
-     "text": "顺儿！带到她顺巷子摸过去，摸到那狗日的屁股后头！老子在前头给你吸住火！",
+     "subtitle": "顺儿！带到她顺巷子摸过去，摸到那狗日的屁股后头！老子从东边院子穿过去——你那头一响，老子这头就动手！",
+     "text": "顺儿！带到她顺巷子摸过去，摸到那狗日的屁股后头！老子从东边院子穿过去——你那头一响，老子这头就动手！",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LuoSendsShunzi_02.mp3",
-     "durationS": 5.86,
-     "gapBeforeS": 1.02,
-     "sha256": "8dc0750d2a39ab4c287828bfdd29a732bf20e0a3db5bd4f841224567aba5ccb4",
-     "speakerCos": 0.863,
-     "cer": 0.2258,
-     "transcript": "孙儿,带到他顺乡子摸过去,摸到那狗子的屁股后头。老子在前头给你洗足货。"
+     "durationS": 7.56,
+     "gapBeforeS": 0.23,
+     "sha256": "3b7af08c2aef66053246967394efcb537c8cd9eb5b37a9aee0c8eb5411f1e8c1",
+     "speakerCos": 0.886,
+     "cer": 0.1163,
+     "transcript": "孙儿,带到他村巷子摸过去,摸到那狗子的屁股后头。老子从东边院子穿过去,你那头一向,老子这头就动手。"
+    }
+   ]
+  },
+  {
+   "id": "LuoHoldsMouth",
+   "beat": "08",
+   "keyframe": "08-4",
+   "label": "08 班长冲坡道上的三个：把枪眼压到，打一枪换个窝，莫停",
+   "attempt": 2,
+   "attempts": 2,
+   "references": [
+    {
+     "who": [
+      "luo"
+     ],
+     "owner": "luo",
+     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "LuoHoldsMouth.01",
+     "keyframe": "08-4",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "幺娃！你们三个给老子把枪眼压到，打一枪换个窝，莫停！",
+     "text": "幺娃！你们三个给老子把枪眼压到，打一枪换个窝，莫停！",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LuoHoldsMouth_01.mp3",
+     "durationS": 4.8,
+     "gapBeforeS": 0,
+     "sha256": "93c722e611fc81e09029b024839dd17979fc8d391e165be5254e0f6facc43c30",
+     "speakerCos": 0.895,
+     "cer": 0.2727,
+     "transcript": "要啊,你们三个,给老子把枪烟压倒,打一枪换个窝,摸听。"
     }
    ]
   },
@@ -1418,8 +1460,8 @@
    "id": "PinnedAtCart",
    "beat": "08",
    "keyframe": "08-4",
-   "label": "08 大车后头：过不去了",
-   "attempt": 1,
+   "label": "08 大车后头：过不去了、走院子",
+   "attempt": 2,
    "attempts": 1,
    "references": [
     {
@@ -1430,7 +1472,7 @@
      "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
     }
    ],
-   "targetDb": -16,
+   "targetDb": -16.47,
    "cutMethod": "subtitle",
    "hard": [],
    "flags": [],
@@ -1444,12 +1486,35 @@
      "subtitle": "过不去了！日他先人，一冒头就是一梭子！",
      "text": "过不去了！日他先人，一冒头就是一梭子！",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610PinnedAtCart_01.mp3",
-     "durationS": 5.138,
+     "durationS": 4.78,
      "gapBeforeS": 0,
-     "sha256": "a3315b7340ad6178c3e8061e3f28a9dc3705ebcdc1a91b8006260bb34cea5021",
-     "speakerCos": 0.874,
-     "cer": 0.3125,
-     "transcript": "过不去啦,是他先人,以矛头就是以梭子。"
+     "sha256": "f678254ab1715fb3b0350a4310508caf3ddae8f3846b76741fbbce04fcc6d62c",
+     "speakerCos": 0.879,
+     "cer": 0.4375,
+     "transcript": "过不起了,他显然,以矛头就是以梭子。",
+     "issues": [
+      "字错率 0.4375 待人耳核对"
+     ]
+    },
+    {
+     "id": "PinnedAtCart.02",
+     "keyframe": "08-4",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "走院子！",
+     "text": "走院子！",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610PinnedAtCart_02.mp3",
+     "durationS": 0.456,
+     "gapBeforeS": 0.84,
+     "sha256": "6c39b58f6b574aefb0ef7088d441cb7b89cdbf83ef9ab130732bb3a55e0bd6cd",
+     "speakerCos": 0.55,
+     "cer": 0.6667,
+     "transcript": "周原子。",
+     "issues": [
+      "有声 0.38 s，太短不判嗓子",
+      "字错率 0.6667 待人耳核对"
+     ]
     }
    ]
   },
@@ -1578,6 +1643,45 @@
      "speakerCos": 0.923,
      "cer": 0.125,
      "transcript": "おい 早く肩をつけろ路地口へ行くぞ"
+    }
+   ]
+  },
+  {
+   "id": "LadderWhisper",
+   "beat": "09",
+   "keyframe": "09-4",
+   "label": "09 翻墙：班长，踩到老子肩膀上来",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "heyoutian"
+     ],
+     "owner": "heyoutian",
+     "castSha256": "1ad7b156126131843240afb42dddc9d8f296ae43075b3cb8833606264eb1edbf"
+    }
+   ],
+   "targetDb": -23,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "LadderWhisper.01",
+     "keyframe": "09-4",
+     "who": "heyoutian",
+     "speaker": "何有田",
+     "lang": "zh",
+     "subtitle": "班长，踩到老子肩膀上来。",
+     "text": "班长，踩到老子肩膀上来。",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LadderWhisper_01.mp3",
+     "durationS": 3.645,
+     "gapBeforeS": 0,
+     "sha256": "8e99e59744920cb3a021a241f9a548a38cb0d41fa7a51457b55342b3919ae730",
+     "speakerCos": 0.602,
+     "cer": 0.2,
+     "transcript": "班长,拆得老子肩膀上来。"
     }
    ]
   },
@@ -1786,11 +1890,95 @@
    ]
   },
   {
+   "id": "PocketGrenade",
+   "beat": "09",
+   "keyframe": "09-7",
+   "label": "09 墙角的鬼子：手榴弹！",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "ijaB"
+     ],
+     "owner": "ijaB",
+     "castSha256": "f9ba276de41ef0e4b9e6b98c1c10b7fb83d110825ad44cfe23ec3b61b7ff6040"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "PocketGrenade.01",
+     "keyframe": "09-7",
+     "who": "ijaB",
+     "speaker": "日军",
+     "lang": "ja",
+     "subtitle": "手榴弹！",
+     "text": "てきだんっ！",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610PocketGrenade_01.mp3",
+     "durationS": 2.235,
+     "gapBeforeS": 0,
+     "sha256": "d964f122d10a7ab8ff0a132a791ae012ff5d3ea20407396a05d7edd5c866fe13",
+     "speakerCos": 0.416,
+     "cer": 1,
+     "transcript": "敵団体",
+     "issues": [
+      "字错率 1 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "LuoKillShout",
+   "beat": "09",
+   "keyframe": "09-7",
+   "label": "09 班长撞开门：杀",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "luo"
+     ],
+     "owner": "luo",
+     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "LuoKillShout.01",
+     "keyframe": "09-7",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "杀——！",
+     "text": "杀——！",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LuoKillShout_01.mp3",
+     "durationS": 1.769,
+     "gapBeforeS": 0,
+     "sha256": "30d9df17620bccb27000a9b634d8376e06021cbf0e2124fb8b4c720af8e76606",
+     "speakerCos": 0.358,
+     "cer": 1,
+     "transcript": "撒~~~",
+     "issues": [
+      "字错率 1 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
    "id": "MgSilenced",
    "beat": "10",
    "keyframe": "10-1",
    "label": "10 机枪哑了：冲",
-   "attempt": 1,
+   "attempt": 2,
    "attempts": 1,
    "references": [
     {
@@ -1815,14 +2003,14 @@
      "subtitle": "机枪哑了！冲！日你先人冲啊！",
      "text": "机枪哑了！冲！日你先人冲啊！",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610MgSilenced_01.mp3",
-     "durationS": 3.554,
+     "durationS": 3.614,
      "gapBeforeS": 0,
-     "sha256": "8f3fa3f99b39e7b295c143c1a832b74e6612b22b104fc823e664762a7467a0d4",
-     "speakerCos": 0.871,
-     "cer": 0.3636,
-     "transcript": "机枪压了,冲!日历显然冲啊!",
+     "sha256": "056d0848b1e3f2287d314620d5bb8e5448ac21ccf07a15bb82f4d8630d03579e",
+     "speakerCos": 0.863,
+     "cer": 0.4545,
+     "transcript": "鸡枪压了,冲!日历显然冲啊!",
      "issues": [
-      "字错率 0.3636 待人耳核对"
+      "字错率 0.4545 待人耳核对"
      ]
     }
    ]

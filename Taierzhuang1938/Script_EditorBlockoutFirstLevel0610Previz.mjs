@@ -58,7 +58,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   L0610_PLACES as PL, L0610_GENG as G, L0610_JIEFANG as JF, L0610_BENJIA as BJ, L0610_STREETS as ST, L0610_SIGNALS as SIG, L0610_EAST_STREET as ES,
-  L0610_SOUTH_LANE as SLN, L0610_DITCH as DT, LanePointAtZ, PointBeside, LineLength, Station,
+  L0610_SOUTH_LANE as SLN, L0610_DITCH as DT, L0610_EAST_YARD_ROUTE as EYR, L0610_MOUTH_SHOOTERS, LanePointAtZ, PointBeside, LineLength, Station,
 } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 import { StreetRoute, RoadPointAtX, BIG_LOCUST } from "./Script_EditorBlockoutFirstLevel0610Keyframes.mjs";
 
@@ -1177,16 +1177,26 @@ function S0804(ctx) {
   s.Go("Yaowa", shut + 0.6, shut + 1.8, K3("Yaowa").x, K3("Yaowa").z, { move: "run", stance: "prone", aim: true, yawDeg: 178 });
   const plan = s.Say("LuoSendsShunzi.02", "Luo", s.End("LuoSendsShunzi.01") + 0.5);
   s.Key("Luo", plan - 0.2, { faceTo: ALLEY_MOUTH, clip: POINT_CROUCH });
-  s.Key("Luo", s.End("LuoSendsShunzi.02") + 0.3, { talking: false, clip: null, faceTo: Pt(MAIN_X_AT(), 440) });
-  s.Caption(plan + 0.3, 3.4, "（班长冲二十米外的巷子口吼：带到她顺巷子摸过去，摸到那狗日的屁股后头！老子在前头给你吸住火！）");
+  s.Caption(plan + 0.3, 3.4, "（班长冲二十米外的巷子口吼：带到她顺巷子摸过去，摸到那狗日的屁股后头！老子从东边院子穿过去——你那头一响，老子这头就动手！）");
+  // 两路（10-24）：再扭回头冲坡道上趴着的三个吼——正面吸火的活交给他们：把枪眼压到，打一枪换个窝，莫停
+  const hold = s.Say("LuoHoldsMouth.01", "Luo", s.End("LuoSendsShunzi.02") + 0.4);
+  s.Key("Luo", hold - 0.2, { faceTo: K3("Yaowa"), clip: POINT_CROUCH });
+  s.Key("Luo", s.End("LuoHoldsMouth.01") + 0.3, { talking: false, clip: null, faceTo: Pt(MAIN_X_AT(), 440) });
+  s.Caption(hold + 0.3, 3.2, "（扭回头冲坡道上的三个：把枪眼压到，打一枪换个窝，莫停！——正面吸火的活交给他们三个）");
+  // 坡道上三个照办：各打一枪、换个窝（刘文财往西爬一个射击位，Squad3 爬到顺子空出来的那个）
+  const shuffle0 = s.End("LuoHoldsMouth.01") + 0.6;
+  MouthFire(s, shuffle0, { volume: 0.7 });
+  s.Go("Squad3", shuffle0 + 1.2, shuffle0 + 3.4, SHOOTER_SLOT.player.x, SHOOTER_SLOT.player.z, { move: "run", stance: "prone", aim: true, faceTo: LOOPHOLE });
+  s.Caption(shuffle0 + 1.4, 2.6, "（打一枪，爬到旁边的射击位再打：枪眼追不上）");
   // 交还操作：顺子在巷子里能转头不能走（eye.free），身后的事只听得见
   const FREE0 = go + 7.0;
-  s.Eye(FREE0, 24.0, { stance: "crouch", x: P.x, z: P.z, look: { actor: "Nier", offset: [0, 0.6, 0] }, toYaw: 180, free: true });
+  s.Eye(FREE0, 30.0, { stance: "crouch", x: P.x, z: P.z, look: { actor: "Nier", offset: [0, 0.6, 0] }, toYaw: 180, free: true });
   s.Caption(FREE0 + 0.2, 2.6, "（钻进巷子十来米：交还操作。妮儿在前头拐弯处慢下来了）");
   s.Go("Nier", run1 + 0.4, run1 + 3.4, nier91.x, nier91.z, { move: "walk", depart: { clip: null }, stance: "stand", yawDeg: 180 });
   s.Key("Nier", run1 + 3.6, { stance: "crouch", clip: VIL.cower });
   // 身后：班长带三个人贴主街东边门洞往前摸，三段摸到大车后头；枪眼一梭一梭追着他们打；到了大车后头抬不起头
-  const legs = [[Pt(102.3, 392.0), plan + 1.0], [Pt(102.3, 408.5), plan + 6.0], [Pt(102.3, 432.5), plan + 13.0], [UP(K("Luo")), plan + 19.0]];
+  const legs0 = s.End("LuoHoldsMouth.01") + 1.0;
+  const legs = [[Pt(102.3, 392.0), legs0], [Pt(102.3, 408.5), legs0 + 5.0], [Pt(102.3, 432.5), legs0 + 12.0], [UP(K("Luo")), legs0 + 18.0]];
   const mates = { HeYoutian: [0.2, -1.2], Escort1: [0.1, -2.4], Escort2: [0.2, -3.8] };
   let prevT = 0;
   for (const [to, t0] of legs) {
@@ -1202,26 +1212,81 @@ function S0804(ctx) {
   }
   s.Caption(plan + 2.0, 3.0, "（身后，班长带何有田和两个兵贴着主街东边的门洞一个一个往前摸。隔着一道院墙，巷子里只听得见）");
   const pinned = R(prevT + 1.6); s.Line(pinned, "PinnedAtCart.01", "Luo");   // 用 Line 不用 Say：幺娃的「跑了一个」在它前头，Say 会把后写的句子排到最后一句之后
-  s.Caption(pinned + 0.2, 3.0, "（摸到翻倒的大车后头就压住了：一冒头就是一梭子。他在前头给顺子吸住了火）");
+  s.Caption(pinned + 0.2, 3.0, "（摸到翻倒的大车后头就压住了：一冒头就是一梭子。正面吸火的活在坡道上那三个身上）");
   for (const [dt, dx, dz] of [[2.6, -1.2, -1.4], [5.4, 0.6, -1.6], [8.6, -0.4, -1.1]]) WindowBurst(s, prevT + dt, { volume: 0.5, puffAt: Off(CART_WRECK, dx, dz) });
+  // 两路（10-24）：骂完回头瞅见身后主街东边那道敞着的院门——「走院子！」班长带何有田、Escort1 猫腰顺东沿摸到门里（09-1 的站位），Escort2 留在大车后头冒头打一枪吸火
+  const yard = R(s.End("PinnedAtCart.01") + 0.9); s.Line(yard, "PinnedAtCart.02", "Luo");
+  s.Key("Luo", yard - 0.3, { faceTo: Pt(EYR.gate.x, EYR.gate.z), aim: false });
+  s.Caption(yard + 0.2, 3.2, "（回头瞅见身后那道敞着的院门：走院子！——他要带两个人穿院子摸到墙角那伙鬼子的侧后头）");
+  const go2 = R(s.End("PinnedAtCart.02") + 0.4);
+  const K91 = id => UP(KU(ctx, "09-1", id));
+  TRIO.forEach((id, k) => {
+    const to = K91(id), path = [Pt(102.4, 439.5), EYR.gateOut, EYR.gateIn];
+    const len = RouteLen(s.pos.get(id), [...path, to]);
+    s.Go(id, go2 + k * 1.3, go2 + k * 1.3 + len / 2.2, to.x, to.z, { move: "run", path, depart: { aim: false }, stance: "crouch", aim: false, yawDeg: KU(ctx, "09-1", id).yawDeg });   // 错开 1.3 s：三个人一个跟一个，别挤成一团
+  });
+  s.Caption(go2 + 1.2, 3.4, "（班长、何有田和一个兵猫腰顺主街东沿摸到院门、钻进院子——门在大车的影子里，枪眼看不见。另一个兵留在大车后头）");
+  CartPotShot(s, go2 + 4.6, { volume: 0.5 });
+  s.Caption(go2 + 4.8, 2.6, "（大车后头留下的那个冒头打一枪：枪眼还以为他们都在车后头）");
   // 墙角一个鬼子出路口往东跑：先横过主街的口子（幺娃看得见那 1–2 s）再拐进东街；幺娃喊「跑了一个！」
   const rp = K("CornerIja2").path;
-  let tr = plan + 9.0;
+  const tr0 = R(s.End("LuoHoldsMouth.01") + 2.0);   // 班长两句喊完才跑（幺娃「跑了一个」不压在班长的话上）
+  let tr = tr0;
   for (let i = 1; i < rp.length; i++) { const d = Dist(s.pos.get("CornerIja2"), rp[i]); s.Go("CornerIja2", tr, tr + d / 4.0, rp[i].x, rp[i].z, { move: "run", yawDeg: Yaw(rp[i - 1], rp[i]) }); tr = R(tr + d / 4.0); }
-  const seenT = plan + 9.0 + Dist(rp[0], rp[1]) / 4.0;
+  const seenT = tr0 + Dist(rp[0], rp[1]) / 4.0;
   s.Line(R(seenT + 0.6), "RunnerEast.01", "Yaowa");
   s.Key("Yaowa", seenT + 0.3, { aim: false, faceTo: rp[2] });
   s.Key("Yaowa", s.End("RunnerEast.01") + 0.4, { aim: true, faceTo: LOOPHOLE });
   s.Caption(seenT + 0.4, 3.0, "（墙角一个鬼子出路口横过街口、往东街跑了：是去喊人的）");
   s.Go("CornerIja2", tr, tr + 6.0, 140, ST.east.c, { move: "run", yawDeg: -90 });
   s.Key("CornerIja2", tr + 6.2, { visible: false });
-  MouthFire(s, plan + 4.0, { volume: 0.6, who: ["LiuWencai", "Squad3"] });
-  MouthFire(s, plan + 11.0, { volume: 0.6, who: ["Yaowa", "LiuWencai", "Squad3"] });
-  s.Caption(s.End("PinnedAtCart.01") + 2.6, 2.4, "（接 09）");
-  return s.Done({ durationS: Math.max(s.End("PinnedAtCart.01") + 5.0, tr + 6.4) });
+  MouthFire(s, legs0 + 4.0, { volume: 0.6, who: ["LiuWencai", "Squad3"] });
+  MouthFire(s, legs0 + 11.0, { volume: 0.6, who: ["Yaowa", "LiuWencai", "Squad3"] });
+  s.Caption(go2 + 8.0, 2.4, "（接 09：两路——顺子走巷子，班长穿院子）");
+  return s.Done({ durationS: Math.max(go2 + 10.6, tr + 6.4) });
 }
 /** 主街中线 x（给 08-4 班长吼完回头看街用）。 */
 function MAIN_X_AT() { return ST.main.c; }
+
+// ---------------------------------------------------------------------------
+// 两路（2026-10-24，用户「班长和顺子应该分两路穿插巷口，而不是傻傻的等着」）：顺子那一路（09 全部）照旧；班长那一路是 09 各段的背景戏——
+// 班长、何有田、Escort1 从 08-4 末钻进主街东边的院门起，每一段从本帧的站位挪到下一帧的站位（关键帧 EAST_ROUTE），全程蹲着、不开枪、不出声；
+// 正面吸火的是坡道上三个（每段换一次窝：打一枪、爬到旁边的射击位再打）和留在大车后头的 Escort2（时不时冒头一枪）。
+
+const TRIO = ["Luo", "HeYoutian", "Escort1"];
+const POCKET_GATE_AT = Pt(EYR.pocketGate.x, EYR.pocketGate.z);
+const SHOOTER_SLOT = Object.fromEntries(L0610_MOUTH_SHOOTERS.map(p => [p.who, Pt(p.x, p.z)]));
+/** 班长那一路：这一段里从本帧站位蹲着挪到下一帧（nextKf）的站位；stagger 错开起步。返回最后一个人到位的时刻。 */
+function EastRouteMove(s, ctx, nextKf, t0, { speed = 1.1, stagger = 0.6, ids = TRIO } = {}) {
+  let last = t0;
+  ids.forEach((id, k) => {
+    const to = KU(ctx, nextKf, id), cur = s.pos.get(id);
+    if (!to || !cur || Dist(cur, to) < 0.25) { if (to) s.Key(id, t0 + k * stagger, { yawDeg: to.yawDeg, stance: "crouch", aim: false }); return; }
+    last = Math.max(last, s.Walk(id, t0 + k * stagger, UP(to), { move: "walk", speed, stance: "crouch", aim: false, yawDeg: to.yawDeg }));
+  });
+  return R(last);
+}
+/** 坡道上打一枪换个窝：谁换到哪个射击位（下一帧的窝），趴着爬过去；先各打一枪。返回换完的时刻。 */
+function ShooterShuffle(s, ctx, nextKf, t0, { volume = 0.6 } = {}) {
+  let last = t0;
+  ["Yaowa", "LiuWencai", "Squad3"].forEach((id, k) => {
+    const to = KU(ctx, nextKf, id), cur = s.pos.get(id);
+    if (!to || !cur || Dist(cur, to) < 0.5) return;
+    Shot(s, t0 + k * 0.3, id, { volume });
+    const t1 = R(t0 + 0.8 + k * 0.3 + Dist(cur, to) / 1.6);
+    s.Go(id, t0 + 0.8 + k * 0.3, t1, to.x, to.z, { move: "run", stance: "prone", aim: true, faceTo: LOOPHOLE });
+    last = Math.max(last, t1);
+  });
+  return R(last);
+}
+/** 大车后头的 Escort2 冒头打一枪，枪眼回一梭打在车板上。 */
+function CartPotShot(s, t, { volume = 0.5 } = {}) {
+  s.Key("Escort2", t - 0.3, { stance: "stand", aim: true, faceTo: LOOPHOLE });
+  Shot(s, t, "Escort2", { volume });
+  s.Key("Escort2", t + 0.5, { stance: "crouch" });
+  WindowBurst(s, t + 1.3, { volume, puffAt: Off(CART_WRECK, 0.4, -1.3) });
+  return R(t + 2.0);
+}
 
 // ---------------------------------------------------------------------------
 // 09 摸进老耿家（拉着手走唯一的那条路；蹲着慢慢挪）
@@ -1260,10 +1325,14 @@ function S0901(ctx) {
   s.Caption(6.4, 2.8, "（顺子朝老耿家那边指——隔着几道院墙，就在东南角）");
   s.Eye(8.6, 1.0, { stance: "crouch", look: Pt(100, 478), pitch: -2, toLook: nier, toPitch: -8 });
   s.Caption(9.6, 3.2, "（她攥住他的手往里拽：她知道回家的路。领着她的时候顺子手上没枪——枪背到背上，两人一路拉着手走）");
-  // 街口那边一直在打：班长在大车后头吸着火
+  // 街口那边一直在打：坡道上三个和大车后头的 Escort2 替他吸着火；班长三人（两路）刚钻进主街东边的院门，蹲在门里听了听，贴着院子南墙根往东摸（09-2 的站位）
   Exchange(s, 2.0, { volume: 0.5 });
+  CartPotShot(s, 5.0, { volume: 0.45 });
+  ShooterShuffle(s, ctx, "09-2", 7.6, { volume: 0.5 });
   Exchange(s, 10.0, { volume: 0.5 });
-  s.Caption(13.0, 2.6, "（街口那边一直在打：班长在大车后头替他吸着火）");
+  s.Caption(13.0, 2.6, "（街口那边一直在打：坡道上三个打一枪换个窝、大车后头那个冒头一枪，替两路吸着火）");
+  EastRouteMove(s, ctx, "09-2", 6.0);
+  s.Caption(6.2, 3.0, "（班长三人这时刚钻进主街东边的院门：蹲在门里听了听，贴着院子南墙根往东摸）");
   // 她拽着往南走两步，拐弯
   s.Go("Nier", 12.6, 14.4, ST.alleyNorth.c - 0.6, ST.alleyA2.c - 0.4, { move: "walk", stance: "crouch", yawDeg: 180, depart: { stance: "stand", clip: null } });
   s.Creep(12.8, 1.8, Pt(P.x, P.z), Pt(P.x, 397.2), { actor: "Nier", offset: [0, 0.5, 0] }, { h: 1.05 });
@@ -1283,11 +1352,12 @@ function S0902(ctx) {
   const t = HandInHand(s, 1.0, stops, {
     speed: 1.6, pause: 1.2,
     onStop: (i, tArr) => {
-      if (i === 2) { Exchange(s, tArr + 0.2, { volume: 0.5 }); s.Caption(tArr + 0.4, 2.6, "（机枪一响就贴墙停一停，停了再挪）"); return tArr + 2.6; }
-      if (i === 4) { Exchange(s, tArr + 0.2, { volume: 0.5 }); return tArr + 2.2; }
+      if (i === 2) { Exchange(s, tArr + 0.2, { volume: 0.5 }); s.Caption(tArr + 0.4, 2.6, "（机枪一响就贴墙停一停，停了再挪）"); ShooterShuffle(s, ctx, "09-3", tArr + 2.8, { volume: 0.5 }); return tArr + 2.6; }
+      if (i === 4) { Exchange(s, tArr + 0.2, { volume: 0.5 }); EastRouteMove(s, ctx, "09-3", tArr + 1.0); s.Caption(tArr + 1.2, 3.0, "（班长三人这时在 EM2 院里摸到南墙根的柴垛跟前：墙那边就是路口墙角那伙鬼子的院子）"); return tArr + 2.2; }
       return null;
     },
   });
+  CartPotShot(s, 4.0, { volume: 0.45 });
   // 到了街坊家西南角半掩的院门外：门缝对着院当中的窖口，一眼瞥见
   s.Key("Nier", t, { stance: "crouch", faceTo: "player" });
   s.Eye(t, 4.6, { stance: "crouch", look: CELLAR, pitch: -2, fov: 56 });
@@ -1383,6 +1453,11 @@ function S0903(ctx) {
   WindowBurst(s, s.End("NierWhimperFirst.01") - 1.0, { volume: 0.7 });
   s.Caption(s.End("NierWhimperFirst.01") + 0.2, 3.0, "（没按到也不判失败：外头正好响了一梭机枪，盖过去了）");
   Exchange(s, WATCH + 1.0, { volume: 0.5 });
+  // 两路背景：坡道上换个窝、大车后头一枪；班长三人在柴垛跟前摆开人梯（09-4 的站位：何有田蹲到柴垛北边当垫脚、班长在他身后、一个兵盯着院门）
+  ShooterShuffle(s, ctx, "09-4", WATCH + 3.0, { volume: 0.45 });
+  CartPotShot(s, climb + 1.0, { volume: 0.4 });
+  EastRouteMove(s, ctx, "09-4", stab + 2.0, { speed: 0.9 });
+  s.Caption(stab + 4.2, 3.0, "（班长三人这时在 EM2 南墙根的柴垛跟前摆开人梯：何有田蹲下当垫脚，班长在他身后，一个兵盯着院门）");
   // 看完：院里一个鬼子朝这边走来了（接 09-4）
   const leave = Math.max(grannyClimb + VilClipS(VIL.climbOut) + 1.0, dragT1 + 2.0, s.End("NierWhimperFirst.01") + 1.0);
   s.Caption(leave, 2.4, "（院里一个鬼子朝这边走来了）");
@@ -1423,7 +1498,36 @@ function S0904(ctx) {
   for (let k = 0; k < 4; k++) MouthFire(s, dense + k * 1.1, { volume: 0.75, who: ["Yaowa", "LiuWencai", "Squad3"] });
   WindowBurst(s, dense + 0.6, { volume: 0.7, count: 8 }); WindowBurst(s, dense + 2.6, { volume: 0.7, count: 8 });
   s.Sfx(dense + 1.4, "rifleVolley", { x: 108, z: 462, volume: 0.6 });
-  s.Caption(dense + 0.4, 3.0, "（街上枪声一下子密了：班长在吸火。丁字路口那边吹哨）");
+  CartPotShot(s, dense + 3.2, { volume: 0.5 });
+  s.Caption(dense + 0.4, 3.0, "（街上枪声一下子密了：坡道上三个和大车后头那个在吸火。丁字路口那边吹哨）");
+  // 两路（10-24）：街上一密，班长那一路趁着响动翻墙——人梯：何有田蹲在柴垛北边压着嗓子一句，班长踩柴垛、踩肩膀翻过 z 435 那道墙（VilIjaClimbWall，
+  // 根在柴垛北边的起跳点、面朝南，播完切到墙那边）；Escort1 跟着翻；最后何有田自己翻、墙那边的人把他拉上去（说明字）。落在 EM3 北屋西边的空地上（09-5 的站位）
+  {
+    const FROM = Pt(EYR.climb.from.x, EYR.climb.from.z), TO = Pt(EYR.climb.to.x, EYR.climb.to.z), CLIMB_S = VilClipS(VIL.climbWall);
+    const K5 = id => UP(KU(ctx, "09-5", id));
+    const whisper = s.Say("LadderWhisper.01", "HeYoutian", dense + 1.6);
+    s.Key("HeYoutian", whisper - 0.3, { faceTo: "Luo", stance: "crouch", aim: false });
+    s.Caption(whisper + 0.2, 3.0, "（班长三人这时在翻墙：何有田蹲在柴垛跟前当垫脚，压着嗓子——班长，踩到老子肩膀上来）");
+    // 何有田让开半步（人梯是说明字；片段的根要在起跳点上），班长到起跳点、翻
+    const T1 = s.End("LadderWhisper.01") + 0.4;
+    s.Go("HeYoutian", T1 - 0.2, T1 + 0.4, FROM.x - 0.7, FROM.z - 0.1, { move: "walk", stance: "crouch", aim: false, yawDeg: 180 });
+    s.Go("Luo", T1, T1 + 0.8, FROM.x, FROM.z, { move: "walk", stance: "stand", aim: false, yawDeg: 180 });
+    s.Key("Luo", T1 + 0.9, { clip: VIL.climbWall });
+    s.Key("Luo", T1 + 0.9 + CLIMB_S, { x: TO.x, z: TO.z, move: "cut", clip: null, stance: "crouch", yawDeg: 180 });
+    s.Caption(T1 + 1.0, 3.2, "（班长踩柴垛、踩何有田的肩膀，翻过墙头，落在墙那边北屋西边的空地上）");
+    const T2 = T1 + 0.9 + CLIMB_S + 0.4;
+    s.Go("Luo", T2, T2 + 1.6, K5("Luo").x, K5("Luo").z, { move: "walk", stance: "crouch", aim: false, yawDeg: 180 });
+    s.Go("Escort1", T2 - 0.6, T2 + 0.4, FROM.x, FROM.z, { move: "walk", stance: "stand", aim: false, yawDeg: 180 });
+    s.Key("Escort1", T2 + 0.5, { clip: VIL.climbWall });
+    s.Key("Escort1", T2 + 0.5 + CLIMB_S, { x: TO.x, z: TO.z, move: "cut", clip: null, stance: "crouch", yawDeg: 180 });
+    const T3 = T2 + 0.5 + CLIMB_S + 0.4;
+    s.Go("Escort1", T3, T3 + 1.0, K5("Escort1").x, K5("Escort1").z, { move: "walk", stance: "crouch", aim: false, yawDeg: 180 });
+    s.Go("HeYoutian", T3 - 0.6, T3 + 0.4, FROM.x, FROM.z, { move: "walk", stance: "stand", aim: false, yawDeg: 180 });
+    s.Key("HeYoutian", T3 + 0.5, { clip: VIL.climbWall });
+    s.Key("HeYoutian", T3 + 0.5 + CLIMB_S, { x: K5("HeYoutian").x, z: K5("HeYoutian").z, move: "cut", clip: null, stance: "crouch", yawDeg: 180 });
+    s.Caption(T3 + 0.6, 3.0, "（最后一个没人垫脚：墙那边的班长回身把何有田拉上去。三个人都翻进了路口东北角那院的后头）");
+    ShooterShuffle(s, ctx, "09-5", T2 + 2.0, { volume: 0.45 });
+  }
   // 搜窖那伙的头儿吼：快了结、去路口！院里的赶紧了结
   const hurry = s.Say("CellarHurry.01", "CellarIja1", dense + 2.4);
   s.Key("CellarIja1", hurry - 0.3, { faceTo: GRANNY, clip: VIL.shout });
@@ -1531,6 +1635,11 @@ function S0905(ctx) {
   s.Key("Nier", UNBOLT + VilClipS(VIL.unbolt), { clip: null, stance: "crouch", faceTo: "player" });
   s.Caption(UNBOLT + 0.3, 2.6, "（门闩从那边拔开，便门开了一条缝，露出妮儿的脸）");
   Exchange(s, t + 3.0, { volume: 0.55 });
+  // 两路背景：班长三人从 EM3 北屋西边的空地蹲着摸到南墙的院门后头（09-6 的站位）；坡道上换个窝、大车后头一枪
+  const arrived = EastRouteMove(s, ctx, "09-6", 3.0, { speed: 1.0, stagger: 1.2 });
+  s.Caption(arrived - 1.0, 3.2, "（班长三人这时穿过路口东北角那院，蹲到它南墙的院门后头：门外就是墙角那伙鬼子，隔一道门）");
+  ShooterShuffle(s, ctx, "09-6", t + 6.0, { volume: 0.45 });
+  CartPotShot(s, CRAWL + 1.5, { volume: 0.4 });
   s.Caption(open + 1.8, 2.2, "（进便门）");
   return s.Done({ durationS: open + 4.4 });
 }
@@ -1569,6 +1678,11 @@ function S0906(ctx) {
   });
   s.Eye(t - 2.6, 2.4, { stance: "crouch", x: stops[3].x, z: stops[3].z, look: KITCHEN_DOOR, pitch: -4 });
   s.Caption(t - 2.2, 2.2, "（快到灶屋门口了）");
+  // 两路背景：班长三人蹲在 EM3 南门后头不动，班长贴门缝听外头；坡道上换回原来的窝、大车后头一枪
+  for (const id of TRIO) s.Key(id, 0, { stance: "crouch", aim: false, faceTo: POCKET_GATE_AT });
+  s.Caption(butt + 3.2, 3.0, "（班长三人这时蹲在路口东北角那院的南门后头，贴着门缝听外头：等顺子这头一响）");
+  ShooterShuffle(s, ctx, "09-7", t0 + 2.0, { volume: 0.45 });
+  CartPotShot(s, 3.0, { volume: 0.4 });
   return s.Done({ durationS: t });
 }
 
@@ -1657,7 +1771,61 @@ function S0907(ctx) {
   s.Sfx(fight + 4.1, "bodyFall", in4);
   s.Eye(fight + 0.6, 4.0, { stance: "crouch", x: EYE_DOWN.x, z: EYE_DOWN.z, look: KITCHEN_DOOR, pitch: -2, shake: 0.15 });
   s.Caption(fight + 4.4, 3.0, "（两个都倒在灶屋门口。北屋里剩六个，全朝北打着。接 10）");
-  return s.Done({ durationS: fight + 7.6 });
+  // 两路（10-24）：灶屋这头一响（惨叫），班长那一路动手——惨叫过后约 1 s 东边墙外两声手榴弹（落在 pocket 里，玩家在灶屋里听得见、看不见）、
+  // 鬼子喊叫、班长撞开门（EastGateBurst）抡大刀冲进墙角「杀——！」：手榴弹倒一个（守着的那个）、砍倒一个（拖人的那个），剩下三个往东街跑
+  {
+    const BG = EYR.behindGate, IP = EYR.inPocket, HITS = EYR.grenadeHits;
+    const blast1 = R(s.End("KitchenBitten.01") + 1.0), blast2 = R(blast1 + 0.9);
+    const FlightS = (from, to) => Math.max(0.6, Math.min(1.8, 0.55 + 0.06 * Dist(from, to)));
+    for (const id of TRIO) s.Key(id, 0, { stance: "crouch", aim: false, faceTo: POCKET_GATE_AT });
+    CartPotShot(s, drop + 4.0, { volume: 0.4 });
+    for (const id of ["CellarIja1", "CellarIja2", "CellarIja3", "CellarIja4", "CornerIja1"]) { const u = K(id); s.Key(id, 0, { stance: "crouch", aim: !!u.aim, yawDeg: u.yawDeg }); }
+    const t1 = R(blast1 - 2.15 - FlightS(BG.Luo, HITS[0])), t2 = R(blast2 - 2.15 - FlightS(BG.HeYoutian, HITS[1]));
+    s.Key("Luo", t1, { throw: { x: HITS[0].x, z: HITS[0].z } });
+    s.Key("HeYoutian", t2, { throw: { x: HITS[1].x, z: HITS[1].z } });
+    s.Caption(t1 + 0.3, 3.0, "（灶屋这头一响：班长那一路动手了——门后头两颗手榴弹隔着墙甩进墙角）");
+    s.Line(R(blast1 - 0.5), "PocketGrenade.01", "CellarIja2");   // 用 Line：这句在北屋那两个「どうした」之前，Say 会把它排到最后一句之后
+    s.Key("CellarIja2", blast1 - 0.4, { clip: "DuckBlast" }); s.Key("CellarIja4", blast1 - 0.2, { clip: "DuckBlast" });
+    for (const [tb, p] of [[blast1, HITS[0]], [blast2, HITS[1]]]) {
+      s.Sfx(tb, "grenadeBlast", { x: p.x, z: p.z, volume: 0.9 });
+      s.Ev(tb, "explosion", { x: p.x, z: p.z, kind: "grenade", radius: 2.0 });
+      s.Ev(tb + 0.1, "smoke", { x: p.x, z: p.z, kind: "SmokeDust", dur: 3 });
+      s.Shake(tb, 0.4, 0.25);
+    }
+    s.Caption(blast1 + 0.2, 3.2, "（东边墙外两声手榴弹、鬼子喊叫：隔着两道院墙，灶屋里听得见、看不见）");
+    // 守着的那个挨了第一颗
+    s.Key("CornerIja1", blast1 + 0.05, { clip: "ShotCollapse", clipHold: true });
+    s.Go("CornerIja1", blast1 + 0.1, blast1 + 1.0, UP(KU(ctx, "10-1", "CornerIja1")).x, UP(KU(ctx, "10-1", "CornerIja1")).z, { move: "walk" });
+    s.Key("CornerIja1", blast1 + 1.4, { state: "down", clip: null, yawDeg: 0 });
+    // 撞开门：门扇倒进 pocket（EastGateBurst），班长换大刀冲出去「杀——！」，何有田、Escort1 端枪跟上
+    const burst = R(Math.max(blast2 + 1.2, s.End("KitchenCheck.01") + 0.4));   // 炸了以后撞门；「杀」不压在「どうした」上
+    s.Key("Luo", burst - 0.5, { stance: "stand", weapon: "Dadao", aim: false });
+    s.Signal(burst, SIG.eastGateBurst, true);
+    s.Sfx(burst, "gateSmash", { x: POCKET_GATE_AT.x, z: POCKET_GATE_AT.z, volume: 0.9 });
+    s.Ev(burst + 0.05, "smoke", { x: POCKET_GATE_AT.x, z: POCKET_GATE_AT.z + 0.6, kind: "SmokeDust", dur: 2 });
+    const GATE_N = Pt(POCKET_GATE_AT.x, POCKET_GATE_AT.z - 1.0), GATE_S = Pt(POCKET_GATE_AT.x, POCKET_GATE_AT.z + 1.0);
+    const kill = R(burst + 0.1); s.Line(kill, "LuoKillShout.01", "Luo");
+    s.Key("Luo", burst, { clip: "DadaoAmbush" });
+    s.Go("Luo", burst + 0.6, burst + 1.5, IP.Luo.x, IP.Luo.z, { move: "run", path: [GATE_N, GATE_S], depart: { clip: "CreepDadao" }, stance: "stand", faceTo: "CellarIja3" });
+    s.Caption(burst + 0.2, 3.0, "（班长一肩撞开院门，抡着大刀冲进墙角那伙鬼子里：杀——！贴身砍，不开枪）");
+    const chop = R(burst + 1.6);
+    s.Key("Luo", chop, { clip: "LuoDadaoChopRear", faceTo: "CellarIja3" });
+    s.Sfx(chop + 0.4, "stab", { x: IP.Luo.x, z: IP.Luo.z, volume: 0.8 });
+    s.Key("CellarIja3", chop + 0.5, { stance: "stand", clip: "ShotCollapse", clipHold: true });   // 随机骨架只许通用片段：被砍倒用 ShotCollapse 顶
+    s.Go("CellarIja3", chop + 0.5, chop + 1.7, UP(KU(ctx, "10-1", "CellarIja3")).x, UP(KU(ctx, "10-1", "CellarIja3")).z, { move: "walk" });
+    s.Key("CellarIja3", chop + 2.5, { state: "down", clip: null, yawDeg: 40 });
+    s.Caption(chop + 0.6, 2.8, "（拖人的那个被一刀砍倒；守着的那个已经挨了手榴弹）");
+    for (const [id, dt] of [["HeYoutian", 0.5], ["Escort1", 0.9]]) s.Go(id, burst + dt, burst + dt + 1.1, IP[id].x, IP[id].z, { move: "run", path: [GATE_N, GATE_S], depart: { stance: "stand", aim: true }, stance: "stand", aim: true, faceTo: Pt(109, 463) });
+    Shot(s, burst + 2.0, "HeYoutian", { volume: 0.8 });
+    // 剩下三个往东街跑（10-1 的站位）
+    for (const [id, dt] of [["CellarIja1", 0.2], ["CellarIja2", 0.6], ["CellarIja4", 1.0]]) {
+      const to = UP(KU(ctx, "10-1", id)), via = Pt(108.8, 464.8);
+      s.Go(id, burst + 0.8 + dt, burst + 0.8 + dt + (Dist(s.pos.get(id), via) + Dist(via, to)) / 3.6, to.x, to.z, { move: "run", path: [via], depart: { stance: "stand", aim: false, clip: null }, stance: "stand", yawDeg: -90 });
+    }
+    s.Caption(burst + 3.0, 3.0, "（剩下三个往东街跑了。班长三人占住了路口墙角——两路在丁字路口两头会合，接 10）");
+    void kill;
+    return s.Done({ durationS: Math.max(fight + 7.6, burst + 6.0) });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1716,45 +1884,33 @@ function S1001(ctx) {
   s.Caption(7.0, 2.6, "（机枪一哑：枪眼后头那挺十一年式没人了）");
   s.Eye(8.4, 1.2, { stance: "stand", look: MG_AT, pitch: -4, toLook: UP(K7("Leader")), toPitch: -3 });
   s.Eye(10.0, 1.6, { stance: "stand", look: UP(K7("Leader")), pitch: -3, toLook: UP(K7("Rifle3")), toPitch: -3 });
-  // 机枪一哑，班长从大车后头跳起来、手往前一挥、往前冲（VilNraWaveCharge）：机枪哑了！冲！两面一夹
+  // 两路（10-24）：班长三人已在路口墙角里（09-7 末撞开门砍进去的），手里还提着大刀；墙角倒着两个，跑了的三个在东街头上回头看了一眼
+  const IP = EYR.inPocket;
+  s.Key("Luo", 0, { stance: "stand", weapon: "Dadao", aim: false, faceTo: Pt(109, 463) });
+  for (const id of ["HeYoutian", "Escort1"]) s.Key(id, 0, { stance: "crouch", aim: true, faceTo: Pt(112, 464.5) });
+  for (const id of ["CellarIja1", "CellarIja2", "CellarIja4"]) s.Key(id, 0, { stance: "stand", aim: false, faceTo: Pt(IP.Luo.x, IP.Luo.z) });
+  s.Caption(2.4, 3.0, "（路口墙角里是班长三人：隔墙甩了两颗手榴弹、撞开门砍进去的，倒了两个，跑了三个）");
+  Shot(s, 3.2, "HeYoutian", { volume: 0.7 }); Shot(s, 4.1, "Escort1", { volume: 0.7 });
+  for (const id of ["CellarIja1", "CellarIja2", "CellarIja4"]) s.Key(id, 3.4, { faceTo: Pt(146, ST.east.c) });
+  // 机枪一哑，班长在墙角里扭头冲坡道上吼：机枪哑了！冲！—— 坡道三个和大车后头的 Escort2 顺主街冲上来
   const charge = s.Say("MgSilenced.01", "Luo", 7.6);
-  const luoFrom = Pt(102.3, 443.4), LUO_YAW = 180;
-  s.Place("Luo", 0, luoFrom.x, luoFrom.z, { stance: "crouch", aim: true, yawDeg: LUO_YAW });
-  for (const id of ["HeYoutian", "Escort1", "Escort2"]) { const u = KU(ctx, "09-7", id); s.Place(id, 0, u.x, u.z, { stance: "crouch", aim: true, yawDeg: 180 }); }
-  s.Key("Luo", charge + 0.2, { clip: VIL.waveCharge });
-  const luoUp = RootEndAt(VIL.waveCharge, luoFrom, LUO_YAW);
-  s.Key("Luo", charge + 0.2 + VilClipS(VIL.waveCharge), { x: luoUp.x, z: luoUp.z, move: "cut", clip: null, stance: "stand", yawDeg: LUO_YAW });
-  for (const id of ["Luo", "HeYoutian", "Escort1", "Escort2"]) {
-    const to = K(id);
-    const t0 = id === "Luo" ? charge + 0.2 + VilClipS(VIL.waveCharge) : charge + 1.4;
-    s.Go(id, t0, t0 + Dist(s.pos.get(id), to) / 3.4, to.x, to.z, { move: "run", depart: { stance: "stand" }, stance: "stand", yawDeg: 180, aim: true });
-  }
+  s.Key("Luo", charge - 0.3, { faceTo: Pt(ST.main.c, 392), clip: WAVE_ON });
+  s.Key("Luo", s.End("MgSilenced.01") + 0.4, { clip: null, faceTo: Pt(112, 464.5) });
   for (const id of ["Yaowa", "LiuWencai", "Squad3"]) {
     const u = KU(ctx, "09-7", id), to = K(id);
     s.Place(id, 0, u.x, u.z, { stance: "prone", aim: true, yawDeg: 177 });
     s.Go(id, charge + 1.4, charge + 1.4 + Dist(u, to) / 3.4, to.x, to.z, { move: "run", depart: { stance: "stand" }, stance: "stand", yawDeg: 180 });
   }
-  s.Caption(charge + 0.2, 3.0, "（班长从大车后头跳起来往前冲，沟沿上的三个也跟着冲上街）");
-  // 路口墙角那几个两面挨打：顺子从东间枪眼（正对着墙角 ±17°）打倒守着的那个，班长他们冲过来打倒拖人的那个，剩下三个往东街跑
+  { const u = KU(ctx, "09-7", "Escort2"), to = K("Escort2"); s.Place("Escort2", 0, u.x, u.z, { stance: "crouch", aim: true, yawDeg: 180 }); s.Go("Escort2", charge + 1.2, charge + 1.2 + Dist(u, to) / 3.4, to.x, to.z, { move: "run", depart: { stance: "stand" }, stance: "stand", yawDeg: 180, aim: true }); }
+  s.Caption(charge + 0.2, 3.0, "（班长在墙角里扭头冲八十米外的坡道吼；坡道上的三个爬起来顺主街冲上来，大车后头那个也站起来往前）");
+  // 两路会合：顺子从东间枪眼（正对着墙角 ±17°）看见墙角里的班长三人；班长把大刀插回去、端起枪
   const loop = Pt(G.rifleEastPost.x, G.rifleEastPost.z);
-  s.Cam(12.0, 1.6, { from: { x: P.x, z: P.z, h: 1.55 }, to: { ...loop, h: 1.1 }, look: { x: 108.2, z: 460.4, h: 1.0 } });
-  s.Eye(13.6, 8.0, { stance: "crouch", x: loop.x, z: loop.z - 0.2, look: Pt(108.2, 460.4), pitch: -2, fov: 50 });
-  s.Caption(12.2, 3.0, "（东间的枪眼正对着路口墙角：守在那儿的五个两面挨打）");
-  for (const id of ["CellarIja1", "CellarIja2", "CellarIja3", "CellarIja4", "CornerIja1"]) { const u = KU(ctx, "09-7", id); s.Place(id, 0, u.x, u.z, { state: "alive", stance: "crouch", aim: true, yawDeg: 0 }); }
-  Shot(s, 14.2, "player");
-  s.Key("CornerIja1", 14.3, { clip: "ShotCollapse", clipHold: true });
-  s.Go("CornerIja1", 14.3, 15.2, K("CornerIja1").x, K("CornerIja1").z, { move: "walk" });
-  s.Key("CornerIja1", 15.7, { state: "down", clip: null, yawDeg: 0 });
-  Shot(s, charge + 5.0, "Luo", { volume: 0.8 }); Shot(s, charge + 5.6, "HeYoutian", { volume: 0.8 });
-  s.Key("CellarIja3", charge + 5.7, { clip: "ShotCollapse", clipHold: true });
-  s.Go("CellarIja3", charge + 5.7, charge + 6.6, K("CellarIja3").x, K("CellarIja3").z, { move: "walk" });
-  s.Key("CellarIja3", charge + 7.1, { state: "down", clip: null, yawDeg: 40 });
-  for (const [id, dt] of [["CellarIja1", 0], ["CellarIja2", 0.4], ["CellarIja4", 0.8]]) {
-    const to = UP(K(id));
-    const via = Pt(108.8, 464.8);
-    s.Go(id, 15.6 + dt, 15.6 + dt + (Dist(s.pos.get(id), via) + Dist(via, to)) / 3.6, to.x, to.z, { move: "run", path: [via], depart: { stance: "stand", aim: false }, stance: "stand", yawDeg: -90 });
-  }
-  s.Caption(16.0, 3.0, "（倒两个，剩下三个往东街跑了：东头的枪声近了——喊人那个把大队带回来了）");
+  s.Cam(12.0, 1.6, { from: { x: P.x, z: P.z, h: 1.55 }, to: { ...loop, h: 1.1 }, look: { x: IP.Luo.x, z: IP.Luo.z, h: 1.0 } });
+  s.Eye(13.6, 8.0, { stance: "crouch", x: loop.x, z: loop.z - 0.2, look: Pt(IP.Luo.x, IP.Luo.z), pitch: -2, fov: 50 });
+  s.Caption(12.2, 3.2, "（东间的枪眼正对着路口墙角：班长三人站在墙角里，脚下倒着两个鬼子——两路在丁字路口会合）");
+  s.Key("Luo", 14.6, { weapon: "HanYang", aim: true, faceTo: Pt(146, ST.east.c) });
+  s.Caption(14.8, 2.6, "（班长把大刀插回背上，端起枪朝东）");
+  s.Caption(17.0, 3.0, "（东头的枪声近了——喊人那个把大队带回来了）");
   for (const [t, v] of [[17.0, 0.45], [19.6, 0.6]]) s.Sfx(t, "rifleShot", { x: 180, z: 465, volume: v });
   return s.Done({ durationS: 22.6 });
 }
@@ -1892,18 +2048,20 @@ function S1003(ctx) {
     // 北边院子「咣、咣」砸门，一个院子一个院子往西挪：军官叫人砸北边的院门穿院子抄后路
     const north = s.Say("EastEndOfficer.03", "EastOfficer", h1 + 0.4);
     const GATE_M = 0.55 + 0.15;
-    const n0 = { NorthIja4: [Pt(farmDoor.x + GATE_M, farmDoor.z), 90], NorthIja3: [Pt(yard1Door.x + GATE_M, yard1Door.z), 90], NorthIja2: [Pt(yard1Door.x + 2.2, yard1Door.z + 1.2), 90], NorthIja1: [Pt(POCKET_GATE.x, POCKET_GATE.z - GATE_M), 180] };
+    // 两路（10-24）：北角那道院门（pocket 北门）09-7 已被班长撞开、敞着，院子链上只剩两道门要砸（场院西隔墙、北侧第一个院西墙）；
+    // 最前头那个（NorthIja1）跟着第二道门倒了穿院子到敞着的北角院门外
+    const n0 = { NorthIja4: [Pt(farmDoor.x + GATE_M, farmDoor.z), 90], NorthIja3: [Pt(yard1Door.x + GATE_M, yard1Door.z), 90], NorthIja2: [Pt(yard1Door.x + 2.2, yard1Door.z + 1.2), 90], NorthIja1: [Pt(yard1Door.x + 2.0, yard1Door.z + 1.6), 90] };   // 北侧第一个院里、西厢房南头（别站进 House_EN1_2）
     for (const [id, [p, yaw]] of Object.entries(n0)) s.Place(id, 0, p.x, p.z, { stance: "stand", aim: false, yawDeg: yaw });
     const SMASH_SFX_LEAD = R(0.45 - SFX_FILE.gateSmash.hits[0]);
     const smash = (id, tt, p, v) => { s.Key(id, tt, { clip: VIL.smash }); s.Sfx(tt + SMASH_SFX_LEAD, "gateSmash", { x: p.x, z: p.z, volume: v }); s.Key(id, tt + VilClipS(VIL.smash), { clip: null }); return R(tt + 1.6); };
     const sm0 = s.End("EastEndOfficer.03") + 0.6;
-    smash("NorthIja4", sm0, farmDoor, 0.4); smash("NorthIja3", sm0 + 3.0, yard1Door, 0.6);
-    const broken = smash("NorthIja1", sm0 + 6.4, POCKET_GATE, 0.9);
-    s.Caption(sm0 + 0.6, 3.4, "（北边院子里「咣、咣」砸门，一个院子一个院子往西挪，越来越近：有人要从石碾背后西北角的院子钻出来）");
+    smash("NorthIja4", sm0, farmDoor, 0.4);
+    const broken = smash("NorthIja3", sm0 + 3.4, yard1Door, 0.7);
+    s.Caption(sm0 + 0.6, 3.4, "（北边院子里「咣、咣」砸门，一个院子一个院子往西挪，越来越近：场院的门、北侧第一个院的门——再往西那道北角院门是班长刚撞开的，敞着）");
     s.Signal(broken, SIG.northYardGatesBroken, true);
-    s.Sfx(broken, "dirtFall", { x: POCKET_GATE.x, z: POCKET_GATE.z, volume: 0.7 });
-    s.Ev(broken, "smoke", { x: POCKET_GATE.x, z: POCKET_GATE.z + 0.6, kind: "SmokeDust", dur: 2.5 });
-    s.Caption(broken + 0.2, 2.4, "（北角那道院门倒了）");
+    s.Sfx(broken, "dirtFall", { x: yard1Door.x, z: yard1Door.z, volume: 0.6 });
+    s.Ev(broken, "smoke", { x: yard1Door.x - 0.6, z: yard1Door.z, kind: "SmokeDust", dur: 2.5 });
+    s.Caption(broken + 0.2, 2.8, "（第二道门倒了：有人要从石碾背后西北角那道敞着的院门钻出来）");
     for (const id of ["NorthIja4", "NorthIja3", "NorthIja2"]) {
       const to = UP(K(id));
       const k = ["NorthIja4", "NorthIja3", "NorthIja2"].indexOf(id);
@@ -1911,7 +2069,7 @@ function S1003(ctx) {
       const len = RouteLen(s.pos.get(id), [...path, to]);
       s.Go(id, broken + 0.9 + k * 0.5, broken + 0.9 + k * 0.5 + len / 3.3, to.x, to.z, { move: "run", path, stance: "stand", aim: true, yawDeg: K(id).yawDeg });
     }
-    { const to = UP(K("NorthIja1")); s.Go("NorthIja1", broken + 0.9, broken + 2.0, to.x, to.z, { move: "walk", stance: "crouch", aim: true, yawDeg: K("NorthIja1").yawDeg }); }
+    { const to = UP(K("NorthIja1")), path = [Pt(yard1Door.x, yard1Door.z), Pt(114.5, 452.0)]; const len = RouteLen(s.pos.get("NorthIja1"), [...path, to]); s.Go("NorthIja1", broken + 0.5, broken + 0.5 + len / 3.3, to.x, to.z, { move: "run", path, stance: "crouch", aim: true, yawDeg: K("NorthIja1").yawDeg }); }
     // 班长：左手院子！文财、幺娃，给老子堵到！—— 刘文财和 Squad1 蹲到北角口上
     s.Eye(sm0 + 1.0, 1.4, { stance: "prone", x: P2.x, z: P2.z, look: SHRINE, pitch: 1, toLook: POCKET_GATE, toPitch: 0, fov: 50 });
     s.Key("Luo", broken - 0.6, { faceTo: POCKET_GATE });

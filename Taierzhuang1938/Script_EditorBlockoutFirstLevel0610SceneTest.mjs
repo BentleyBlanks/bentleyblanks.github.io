@@ -25,6 +25,7 @@ import { GullyBankHeights } from "./Script_EditorBlockoutFirstLevel0105Scene.mjs
 import {
   L0610_PLACES as P, L0610_HEIGHTS as H, L0610_VILLAGE as V, L0610_GENG as G, L0610_JIEFANG as J, L0610_BENJIA as B, L0610_STREETS as ST, L0610_SIGNALS as SIG, L0610_FROM_0105,
   L0610_DITCH as DT, L0610_RIVER as RV, L0610_EAST_ROAD as ER, L0610_BOUNDS, L0610_YARDS, L0610_RUBBLE, L0610_SOUTH_LANE as SL, L0610_EAST_STREET as ES, L0610_ROUTE, L0610_LANES,
+  L0610_EAST_YARD_ROUTE,
 } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 
 const opts = { commit: "test", generatedAt: "2026-10-22T00:00:00.000Z" };
@@ -111,7 +112,7 @@ const byId = new Map(all.map((x) => [x.id, x]));
 assert.equal(byId.size, all.length, "块 id 全关唯一");
 assert.ok(a.gates.every((g) => g.signal || g.appearSignal));
 const signals = new Set(a.gates.flatMap((g) => [g.signal, g.appearSignal]).filter(Boolean));
-assert.equal(Object.keys(SIG).length, 7, "七个信号（第六版：加 BarrageHit / LaneWallCollapse，删 BackVatMoved / BackDoorOpen）");
+assert.equal(Object.keys(SIG).length, 8, "八个信号（第六版：加 BarrageHit / LaneWallCollapse，删 BackVatMoved / BackDoorOpen；10-24 两路：加 EastGateBurst）");
 for (const s of Object.values(SIG)) assert.ok(signals.has(s), `随信号体块缺信号 ${s}`);
 assert.ok(!signals.has("BackVatMoved") && !signals.has("BackDoorOpen"), "后门和水缸的信号已经删了");
 assert.equal(byId.get("SideGateLeaf").signal, SIG.sideGateOpen);
@@ -125,11 +126,15 @@ assert.equal(byId.get("GengCollapseRubble").appearSignal, SIG.barrageHit);
 assert.equal(byId.get("RollerRubble").appearSignal, SIG.barrageHit, "石碾旁随炮轰出现一堆新瓦砾");
 assert.equal(byId.get("LaneWallStanding").signal, SIG.laneWallCollapse);
 assert.equal(byId.get("LaneWallRubble").appearSignal, SIG.laneWallCollapse);
-for (const id of ["PocketGateLeaf", "Yard1GateLeaf", "FarmyardGateLeaf"]) {
+for (const id of ["Yard1GateLeaf", "FarmyardGateLeaf"]) {
   assert.equal(byId.get(id)?.signal, SIG.northYardGatesBroken, `${id} 随 NorthYardGatesBroken 消失`);
   assert.equal(byId.get(`${id}Fallen`)?.appearSignal, SIG.northYardGatesBroken);
   assert.ok(byId.get(`${id}Fallen`).h <= 0.1, `${id}Fallen 是倒在地上的`);
 }
+// 10-24 两路：路口东北角那院的南门（pocket 北门）是班长三人 09-7 从院里撞开的，随 EastGateBurst 倒进 pocket；北边院子链只剩两道门随 NorthYardGatesBroken
+assert.equal(byId.get("PocketGateLeaf")?.signal, SIG.eastGateBurst, "PocketGateLeaf 随 EastGateBurst 消失");
+assert.equal(byId.get("PocketGateLeafFallen")?.appearSignal, SIG.eastGateBurst);
+assert.ok(byId.get("PocketGateLeafFallen").h <= 0.1 && byId.get("PocketGateLeafFallen").z > ES.northChain.pocketGate.z, "撞开的门扇倒在 pocket 里（门南边）");
 assert.ok(all.filter((x) => x.signal === SIG.cartDeparted).length >= 2, "车上至少两箱弹药随 CartDeparted 收掉");
 for (const id of ["GengBeiwuRoofWest", "GengZaowu_Roof", "GengTangwuDoorLintel", "GengGateLintel", "DogHoleLintel", "SideGateLintel", "KitchenStove", "GengHaystack",
   "JiefangBeiwu_Roof", "JiefangWestWing_Roof", "JiefangWestWing_WindowSill", "JiefangWestWing_DoorLintel", "JiefangBreachRubble", "JiefangWingVat", "JiefangGateLeaf", "MillStone", "CellarRimNorth",
@@ -309,6 +314,30 @@ const yardById = new Map([...L0610_YARDS.map((y) => [y.id, y.box]), ["GENG", G.b
   assert.ok(!Solid(exit.x, 545) && Solid(exit.x - 1.5, 545) && Solid(exit.x + 1.5, 545), "村南口是村南墙上的口子");
 }
 
+// --- 班长那一路（10-24 两路）：EM2 院门敞着、柴垛贴着 z 435 那道墙、翻墙是「链接」不是口子；蹲在院里的三个点枪眼和墙角哨都看不见 ---
+{
+  const EYR = L0610_EAST_YARD_ROUTE, C = EYR.climb;
+  const pile = byId.get("EastClimbPile");
+  assert.ok(pile && pile.h >= 1.1 && pile.h <= 1.3 && pile.climb && pile.prop === "Haystack", "翻墙的柴垛 1.2 高、标 climb");
+  assert.ok(Math.abs(pile.z + pile.d / 2 - (C.wallZ - T / 2)) < 0.05, "柴垛贴着 z 435 那道墙的北面（EM2 这边）");
+  assert.ok(Solid(C.pile.x, C.wallZ) && Solid(C.pile.x - 1.5, C.wallZ) && Solid(C.pile.x + 1.5, C.wallZ), "柴垛那一截墙没开口子");
+  assert.ok(!Solid(EYR.gate.x, EYR.gate.z) && Solid(EYR.gate.x, EYR.gate.z - 1.5) && Solid(EYR.gate.x, EYR.gate.z + 1.5), "EM2 西墙的院门洞敞着、两边是墙");
+  const gridBox = { minX: 40, maxX: 232, minZ: 385, maxZ: 548 };
+  const grid = WalkGrid(a, sample, [], { box: gridBox });
+  const streetBarrier = (x, z) => x < EYR.gate.x;   // 不往主街那边数
+  const noLink = FloodFrom(grid, EYR.gateIn, { barriers: [streetBarrier] });
+  assert.ok(noLink.Has(C.from.x, C.from.z) && !noLink.Has(C.to.x, C.to.z) && !noLink.Has(EYR.behindGate.Luo.x, EYR.behindGate.Luo.z), "不翻墙从 EM2 进不了 EM3");
+  const linked = FloodFrom(grid, EYR.gateIn, { barriers: [streetBarrier], links: [{ from: C.from, to: C.to }] });
+  assert.ok(linked.Has(C.to.x, C.to.z) && linked.Has(EYR.stripOut.x, EYR.stripOut.z) && linked.Has(EYR.behindGate.Luo.x, EYR.behindGate.Luo.z) && linked.Has(EYR.behindGate.HeYoutian.x, EYR.behindGate.HeYoutian.z), "翻过墙从 EM3 北屋西边的空地能走到南门后头");
+  assert.ok(!linked.Has(EYR.inPocket.Luo.x, EYR.inPocket.Luo.z), "门没撞开之前进不了 pocket");
+  const burst = FloodFrom(WalkGrid(a, sample, [SIG.eastGateBurst], { box: gridBox }), EYR.gateIn, { barriers: [streetBarrier], links: [{ from: C.from, to: C.to }] });
+  assert.ok(burst.Has(EYR.inPocket.Luo.x, EYR.inPocket.Luo.z) && burst.Has(ES.roller.x - 2.2, ES.roller.z), "撞开门就冲得进 pocket、到得了石碾后头");
+  // 视线：三个枪眼后的人（1.1）和墙角哨（蹲着 1.2）都看不见这条路上蹲着的人（0.9）
+  const eyes = [...G.beiwu.loopholes.map((lp) => ({ name: lp.name, x: lp.x, z: lp.z + 1.5, eye: 1.1 })), { name: "墙角哨", x: 108.2, z: 460.4, eye: 1.2 }, { name: "墙角哨 2", x: 105.0, z: 460.0, eye: 1.2 }];
+  const route = [EYR.gateIn, { x: 104.5, z: 433.3 }, C.from, C.to, { x: 104.8, z: 438.6 }, EYR.stripOut, { x: 105.4, z: 449 }, EYR.behindGate.Luo, EYR.behindGate.HeYoutian, EYR.behindGate.Escort1];
+  for (const e of eyes) for (const p of route) assert.notEqual(BlockSight(solids, sample, e, { x: p.x, z: p.z, eye: 0.9 }), null, `${e.name} 不许看见班长那一路上蹲着的人 (${p.x},${p.z})`);
+}
+
 // --- 院子的口径：三种院子、北屋、院门在角上、尺寸 ---
 {
   const kinds = new Set(L0610_YARDS.map((y) => y.kind));
@@ -389,14 +418,15 @@ const yardById = new Map([...L0610_YARDS.map((y) => [y.id, y.box]), ["GENG", G.b
   assert.ok(ES.line.length >= 5 && new Set(ES.line.map((p) => p.z)).size >= 2, "东街拐一两道弯");
   Near(ES.line[ES.line.length - 1].x, ER.line[0].x, 0.01, "东街东头接东北进庄的道"); Near(ES.line[ES.line.length - 1].z, ER.line[0].z, 0.01, "东街东头接东北进庄的道");
   // 院子链三道门、石碾、麦秸垛、土地庙
-  const DoorOpen = (axis, fixed, c, w, what) => {
+  const DoorOpen = (axis, fixed, c, w, what, signal = SIG.northYardGatesBroken) => {
     const box = axis === "x" ? { minX: c - w / 2 + 0.1, maxX: c + w / 2 - 0.1, minZ: fixed - 0.3, maxZ: fixed + 0.3 } : { minX: fixed - 0.3, maxX: fixed + 0.3, minZ: c - w / 2 + 0.1, maxZ: c + w / 2 - 0.1 };
-    assert.deepEqual(SolidBlocks(a, [SIG.northYardGatesBroken]).filter((blk) => blk.h > 0.5 && Intersects(blk, box) && !/Lintel/.test(blk.id)).map((x) => x.id), [], `${what} 门砸倒以后要通`);
+    assert.deepEqual(SolidBlocks(a, [signal]).filter((blk) => blk.h > 0.5 && Intersects(blk, box) && !/Lintel/.test(blk.id)).map((x) => x.id), [], `${what} 门砸倒以后要通`);
     const closed = solids.filter((blk) => blk.h > 0.5 && Intersects(blk, box) && !/Lintel/.test(blk.id));
     assert.ok(closed.length === 1 && closed[0].gate, `${what} 平时要有一扇关着的门`);
   };
   const NC = ES.northChain;
-  DoorOpen("x", NC.pocketGate.z, NC.pocketGate.x, NC.pocketGate.w, "路口东北角那院的院门");
+  DoorOpen("x", NC.pocketGate.z, NC.pocketGate.x, NC.pocketGate.w, "路口东北角那院的院门", SIG.eastGateBurst);
+  assert.ok(SolidBlocks(a, [SIG.northYardGatesBroken]).some((blk) => blk.id === "PocketGateLeaf"), "北边砸门（NorthYardGatesBroken）不动路口东北角那道门：它是班长撞开的");
   DoorOpen("z", NC.yard1Door.x, NC.yard1Door.z, NC.yard1Door.w, "北侧第一个院的西门");
   DoorOpen("z", NC.farmyardDoor.x, NC.farmyardDoor.z, NC.farmyardDoor.w, "场院西隔墙的门");
   assert.ok(NC.pocketGate.x < RL.x && NC.pocketGate.z < RL.z, "院子链的出口在石碾西北背后");

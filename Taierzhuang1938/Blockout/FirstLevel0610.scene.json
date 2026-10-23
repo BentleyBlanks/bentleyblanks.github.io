@@ -3,9 +3,9 @@
   "level": "FirstLevel0610",
   "source": {
     "generator": "Script_EditorBlockoutCli.mjs scene FirstLevel0610",
-    "generatedAt": "2026-10-22T02:20:01.538Z",
-    "commit": "bbd7f445e133ea7fe8a8219e60b05a4058627e3e",
-    "notes": "06–10 新剧本白盒（2026-10-22 第六版空间）：锚点 Data_EditorBlockoutFirstLevel0610Space；高度 0.5 m 网格（-2.7…3.72 m）；z<205 逐点等于 FirstLevel0105 的地面，往南：凹路南段、村口路沟（西头通进河汊子）、河汊子（贴庄子西墙、沟底 1 m 深的水）、耿家庄（整村压平 +0.3、胡同 / 街 / 路口压低 12 cm、街坊家的地瓜窖与村西的取土坑平底开挖）、东北进庄的道；体块：按县志重摆的 67 个院子（四合院 / 半面槽院 / 排房院混着、夹菜园空地与水坑；共墙只画一道），老耿家半面槽院（北屋三间空心、后墙三个枪眼、灶屋两间、东墙院门）、街坊家（北屋空心、西配房塌掉的西北角 / 窗洞 / 大缸、地瓜窖、石磨、半掩的院门）、本家院（共用墙上的狗洞 / 便门）、拐四道弯的巷子与瓦砾堵死的岔路、往南拐三道弯的窄胡同（塌墙处、柴垛、绕路院子）、拐两道弯的东街（门洞 / 枪眼 / 豁口 / 土地庙 / 麦秸垛）、各片错开的小巷与死胡同、塌了一角的房子、倒在胡同里的墙、菜园空宅基粪堆、零散的树、日常摆件、0105 的南岸枯树；gates：CartDeparted / SideGateOpen / CellarBlast / MgSilenced / NorthYardGatesBroken / BarrageHit / LaneWallCollapse；landmarks：79 个地标。"
+    "generatedAt": "2026-10-23T17:29:13.677Z",
+    "commit": "10b6f6c8de6948ca1d2ff5eb8665a7ce017b7815",
+    "notes": "06–10 新剧本白盒（2026-10-22 第六版空间）：锚点 Data_EditorBlockoutFirstLevel0610Space；高度 0.5 m 网格（-2.7…3.72 m）；z<205 逐点等于 FirstLevel0105 的地面，往南：凹路南段、村口路沟（西头通进河汊子）、河汊子（贴庄子西墙、沟底 1 m 深的水）、耿家庄（整村压平 +0.3、胡同 / 街 / 路口压低 12 cm、街坊家的地瓜窖与村西的取土坑平底开挖）、东北进庄的道；体块：按县志重摆的 67 个院子（四合院 / 半面槽院 / 排房院混着、夹菜园空地与水坑；共墙只画一道），老耿家半面槽院（北屋三间空心、后墙三个枪眼、灶屋两间、东墙院门）、街坊家（北屋空心、西配房塌掉的西北角 / 窗洞 / 大缸、地瓜窖、石磨、半掩的院门）、本家院（共用墙上的狗洞 / 便门）、拐四道弯的巷子与瓦砾堵死的岔路、往南拐三道弯的窄胡同（塌墙处、柴垛、绕路院子）、拐两道弯的东街（门洞 / 枪眼 / 豁口 / 土地庙 / 麦秸垛）、各片错开的小巷与死胡同、塌了一角的房子、倒在胡同里的墙、菜园空宅基粪堆、零散的树、日常摆件、0105 的南岸枯树；gates：CartDeparted / SideGateOpen / CellarBlast / EastGateBurst / MgSilenced / NorthYardGatesBroken / BarrageHit / LaneWallCollapse；landmarks：80 个地标。"
   },
   "bounds": {
     "minX": -20,
@@ -3410,6 +3410,19 @@
       "z": 501.3,
       "w": 0.9,
       "d": 1.8,
+      "h": 1.2,
+      "ry": 0,
+      "semantic": "canvas",
+      "solid": true,
+      "prop": "Haystack",
+      "climb": true
+    },
+    {
+      "id": "EastClimbPile",
+      "x": 104.75,
+      "z": 434.2,
+      "w": 1.6,
+      "d": 1.1,
       "h": 1.2,
       "ry": 0,
       "semantic": "canvas",
@@ -7463,6 +7476,30 @@
       "prop": "WaterVat"
     },
     {
+      "id": "WaterVat_EM2",
+      "x": 108.4,
+      "z": 418,
+      "w": 0.8,
+      "d": 0.8,
+      "h": 0.9,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "prop": "WaterVat"
+    },
+    {
+      "id": "WaterVat_EM3",
+      "x": 104.1,
+      "z": 447,
+      "w": 0.8,
+      "d": 0.8,
+      "h": 0.9,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "prop": "WaterVat"
+    },
+    {
       "id": "Haystack_W2",
       "x": 56,
       "z": 436,
@@ -8007,7 +8044,7 @@
       "semantic": "timber",
       "solid": true,
       "gate": true,
-      "signal": "NorthYardGatesBroken"
+      "signal": "EastGateBurst"
     },
     {
       "id": "PocketGateLeafFallen",
@@ -8019,7 +8056,7 @@
       "ry": 0.12,
       "semantic": "timber",
       "solid": true,
-      "appearSignal": "NorthYardGatesBroken"
+      "appearSignal": "EastGateBurst"
     },
     {
       "id": "Yard1GateLeaf",
@@ -8800,7 +8837,18 @@
       "w": 1.5,
       "d": 0.5,
       "h": 2,
-      "note": "10-4 砸开，就在石碾西北背后"
+      "note": "09-6 班长三人蹲在门后、09-7 撞开（EastGateBurst）；就在石碾西北背后"
+    },
+    {
+      "id": "LmEastClimbPile",
+      "name": "班长那一路翻墙的柴垛",
+      "kind": "prop",
+      "x": 104.75,
+      "z": 434.2,
+      "w": 1.6,
+      "d": 1.1,
+      "h": 1.2,
+      "note": "09-4 班长三人踩着翻 z 435 那道墙（人梯）"
     },
     {
       "id": "LmSouthClimb",
@@ -8862,14 +8910,14 @@
     },
     {
       "id": "LmMainEastGate",
-      "name": "主街东边朝街开的院门（08-1 两个村民冲出来）",
+      "name": "主街东边朝街开的院门（村民冲出来；班长钻进去）",
       "kind": "door",
       "x": 103.25,
       "z": 432.5,
       "w": 0.5,
       "d": 1.5,
       "h": 2,
-      "note": "08-1 两个村民冲上主街被打倒"
+      "note": "08-1 两个村民冲上主街被打倒；08-4 末班长三人从这里钻进院子（在大车的影子里）"
     },
     {
       "id": "LmRubbleAlleyEast",
