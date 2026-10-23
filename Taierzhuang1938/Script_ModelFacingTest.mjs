@@ -299,8 +299,8 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
 Check(bare.json.meshes.length===3 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===63032 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
-  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与63,032三角齐备");
+  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===63002 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
+  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与63,002三角齐备");
 const bareBody=bare.json.meshes[bare.json.nodes.find(n=>n.name==="DonkeyRuntime").mesh];
 const bareCoat=bare.json.meshes[bare.json.nodes.find(n=>n.name==="DonkeyCoatRuntime").mesh];
 const bareManeNode=bare.json.nodes.find(n=>n.name==="DonkeyManeRuntime");
@@ -359,6 +359,20 @@ for(const animation of bare.json.animations){
 }
 const bareParents=new Map();bare.json.nodes.forEach((node,index)=>(node.children||[]).forEach(child=>bareParents.set(child,index)));
 function BareWorld(index){const local=NodeMatrix(bare.json.nodes[index]);return bareParents.has(index)?Mat4Mul(BareWorld(bareParents.get(index)),local):local}
+const bareRigOffsetZ=BareWorld(bare.json.nodes.findIndex(n=>n.name==="DonkeySkeleton"))[14];
+const bareTiledOffset=bareBody.primitives.slice(0,bareBody.primitives.indexOf(tiled)).reduce((sum,p)=>sum+bare.json.accessors[p.attributes.POSITION].count,0);
+const bareCoreJoints=ReadAccessor(bare,tiled.attributes.JOINTS_0).data,bareCoreWeights=ReadAccessor(bare,tiled.attributes.WEIGHTS_0).data;
+const bareWeightAccessor=bare.json.accessors[tiled.attributes.WEIGHTS_0],bareWeightDivisor=bareWeightAccessor.normalized?(bareWeightAccessor.componentType===5121?255:65535):1;
+const bareSkin=bare.json.skins[bare.json.nodes.find(n=>n.name==="DonkeyRuntime").skin];
+let bareCoreSamples=0,bareCoreLegMass=0;
+for(let i=0;i<bare.json.accessors[tiled.attributes.POSITION].count;i++){
+  const p=bareCloud[bareTiledOffset+i],sourceY=-p[2]+bareRigOffsetZ;
+  if(Math.abs(p[0])>=.08||sourceY<.20||sourceY>.34||p[1]<.56||p[1]>.78)continue;
+  let legMass=0;
+  for(let c=0;c<4;c++)if(/^Donkey(?:Front|Rear)/.test(bare.json.nodes[bareSkin.joints[bareCoreJoints[i*4+c]]].name))legMass+=bareCoreWeights[i*4+c]/bareWeightDivisor;
+  bareCoreLegMass=Math.max(bareCoreLegMass,legMass);bareCoreSamples++;
+}
+Check(bareCoreSamples>=20&&bareCoreLegMass<.002,"独立驴实际腹部核心蒙皮跟随躯干，避免随迈腿被拉成下垂的包",`${bareCoreSamples} vertices / leg mass ${bareCoreLegMass.toFixed(6)}`);
 for(const front of ["Front","Rear"]){
   const expected=front==="Front"?.38:.375;
   const heights=["Left","Right"].map(side=>BareWorld(bare.json.nodes.findIndex(n=>n.name===`Donkey${front}${side}KneePivot`))[13]);

@@ -75,10 +75,10 @@ def ReferencePigment(skin,anchor):
     ppm=(925-302)/1.10;colors=skin.data.color_attributes['CoatColor'];used=0
     eyeObject=bpy.data.objects['DonkeyEyeLeft'];eyeMatrix=skin.parent.matrix_world.inverted()@eyeObject.matrix_world
     eye=sum((eyeMatrix@v.co for v in eyeObject.data.vertices),Vector())/len(eyeObject.data.vertices);eye.x=abs(eye.x)
-    def Sample(array,u,v):
+    def Sample(array,u,v,radius=2):
         height,width,_=array.shape;ix=int(round(u*width/1536));iy=int(round(v*height/1024))
         if not 3<ix<width-3 or not 3<iy<height-3:return None
-        return np.median(array[iy-2:iy+3,ix-2:ix+3].reshape(-1,3),axis=0)
+        return np.median(array[iy-radius:iy+radius+1,ix-radius:ix+radius+1].reshape(-1,3),axis=0)
     for vertex in skin.data.vertices:
         x,y,z=vertex.co;n=vertex.normal;v=925-ppm*z;viewWeights=viewSampler(vertex.co,n)
         views=[('Side',707-ppm*(y-anchor),viewWeights.x,Vector((-abs(n.x),n.y,n.z)),Vector((-.4,.5,.76)).normalized()),
@@ -92,7 +92,7 @@ def ReferencePigment(skin,anchor):
             rgb=Sample(arrays[0],u,v)
             blend=float(occlusion[name][int(round(v)),int(round(u))])
             if blend>0:
-                bare=Sample(arrays[1],u,v)
+                bare=Sample(arrays[1],u,v,7)
                 if bare is not None and rgb is not None:rgb=rgb*(1-blend)+bare*blend
             if rgb is None or float(np.mean(rgb))>.66:continue
             linear=np.where(rgb<=.04045,rgb/12.92,((rgb+.055)/1.055)**2.4)
@@ -667,16 +667,23 @@ def ApplyReferenceFit(scene,base):
     faceSculpt=faceNamespace['RefineReferenceFace'](skin,rig)
     nostrils=RebuildNostrils(skin)
     topology=topologyNamespace['RepairReferenceSkin'](skin)
+    abdomenNamespace={}
+    exec(compile((project/'_blender/Script_DonkeyAbdomenFit.py').read_text(encoding='utf-8'),'Script_DonkeyAbdomenFit.py','exec'),abdomenNamespace)
+    abdomenFit=abdomenNamespace['FitReferenceAbdomen'](skin,anchor)
+    bm=bmesh.new();bm.from_mesh(skin.data);orientation=topologyNamespace['OrientComponents'](bm)
+    topology['mainVolumeM3']=orientation['components'][0]['volumeM3'];topology['flippedFaces']+=orientation['flippedFaces']
+    bm.to_mesh(skin.data);bm.free();skin.data.update()
     SeatMane(skin,rig);earOffsets=SeatEars(skin,rig);FitEarContours(rig);details=TailAndMouth(rig,collection)
     details['hooves']=hoofRefinement
     details['faceSculpt']=faceSculpt
+    details['abdomenFit']=abdomenFit
     hairNamespace={}
     exec(compile((project/'_blender/Script_DonkeyHair.py').read_text(encoding='utf-8'),'Script_DonkeyHair.py','exec'),hairNamespace)
     details['mane']=hairNamespace['RebuildReferenceMane'](skin,rig,collection)
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261024ReferenceV6'
+    scene['DonkeyReferenceFitRevision']='20261024ReferenceV7'
     scene['DonkeyReferenceFitAnchorY']=anchor
     # Repaint the short pale muzzle rather than the old long horse-like blaze.
     colors=skin.data.color_attributes['CoatColor']

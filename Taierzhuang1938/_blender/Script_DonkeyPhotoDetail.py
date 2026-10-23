@@ -26,14 +26,15 @@ def BuildDetailImages(base):
     yy,xx=np.indices((1024,1536));result={};records=[]
     for name,(left,right) in {'Side':(335,1217),'Front':(34,280),'Rear':(1225,1518)}.items():
         ratios=[];confidences=[]
-        for rgb in arrays:
+        for imageIndex,rgb in enumerate(arrays):
             linear=np.where(rgb<=.04045,rgb/12.92,((rgb+.055)/1.055)**2.4)
             luminance=linear@np.array((.2126,.7152,.0722),dtype=np.float32)
             valid=(rgb.mean(axis=2)<.69)&(xx>left)&(xx<right)&(yy>30)&(yy<925)
             weight=valid.astype(np.float32);numerator=BoxBlur(BoxBlur(luminance*weight));denominator=BoxBlur(BoxBlur(weight))
             low=numerator/np.maximum(.001,denominator)
             confidence=(denominator>.5)&(xx>left)&(xx<right)&(yy>30)&(yy<925)
-            ratio=np.clip(luminance/np.maximum(.005,low),.50,1.80);ratio[~confidence]=1
+            contrast=2.30 if imageIndex==0 else 1.0
+            ratio=np.clip(1+contrast*(luminance/np.maximum(.005,low)-1),.35 if imageIndex==0 else .50,2.15 if imageIndex==0 else 1.80);ratio[~confidence]=1
             ratios.append(ratio);confidences.append(confidence.astype(np.float32))
         blend=occlusion[name];a=(1-blend)*confidences[0];b=blend*confidences[1];confidence=a+b
         ratio=(ratios[0]*a+ratios[1]*b)/np.maximum(.001,confidence);ratio[confidence<.001]=1
@@ -45,7 +46,7 @@ def BuildDetailImages(base):
         path=base/'SourceTextures'/('Texture_DonkeyReference'+name+'Detail.png')
         image.filepath_raw=str(path);image.file_format='PNG';image.save();content=path.read_bytes();image.pack(data=content,data_len=len(content))
         result[name]=image;records.append({'view':name,'path':str(path),'sha256':hashlib.sha256(content).hexdigest(),'size':[1536,1024]})
-    return result,{'method':'masked luminance / normalized local blur; two 9-pixel box passes; ratio clamped to 0.50–1.80',
+    return result,{'method':'masked luminance / normalized local blur; two 9-pixel box passes; original detail contrast 2.30 and guide detail contrast 1.0; ratios clamped separately','contrast':2.30,'occludedGuideContrast':1.0,
         'original':str(original),'originalSha256':hashlib.sha256(original.read_bytes()).hexdigest(),
         'occludedGuide':str(guide),'guideSha256':hashlib.sha256(guide.read_bytes()).hexdigest(),'images':records,
         'occlusionMasks':'_blender/Script_DonkeyReferenceMasks.py; geometric rope footprints including shaded edges; feathered normalized-detail blending'}
@@ -111,7 +112,7 @@ def InstallReferenceDetail(scene,skin,rig,collection,base):
         detail=Math('ADD',Math('MULTIPLY',photographic,usePhoto),Math('MULTIPLY',generic,Math('SUBTRACT',1,usePhoto)))
         multiply=nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1
         links.new(paint.outputs['Color'],multiply.inputs[1]);links.new(Math('MULTIPLY',.75,detail),multiply.inputs[2]);links.new(multiply.outputs[0],shader.inputs['Base Color'])
-    scene['DonkeyReferencePhotoDetail']='20261024ReferenceDetailV1'
+    scene['DonkeyReferencePhotoDetail']='20261024ReferenceDetailV2'
     record['visibility']='fitted-skin BVH depth test from axial source cameras; 4 mm surface tolerance; source-vertex weights baked into UV0'
     record['materials']=[m.name for m in materials];record['runtime']='baked UV0 base colour; independent tiled UV1 fibre normal; no camera projection in GLB'
     (base/'SourceTextures/Data_ReferencePhotoDetail.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8')
