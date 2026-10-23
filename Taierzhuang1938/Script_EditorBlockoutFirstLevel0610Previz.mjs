@@ -272,9 +272,16 @@ class Seq {
     this.out.camera.push(c);
     return this;
   }
-  /** 第一人称蹲着 / 走着挪一段（镜头从 a 平移到 b，一直看着 look）：用 Cam 顶替眼睛的位移。 */
+  /**
+   * 第一人称蹲着 / 走着挪一段（镜头从 a 平移到 b，一直看着 look）：用 Cam 顶替眼睛的位移。
+   * look 落在终点 b 上（「走到哪看哪」）时改看 b 再往前 8 m：不然切镜一切到落幅，机位就悬在看的那个点正上方，画面直直朝下（10-23 用户：不明所以的俯视镜头）。
+   */
   Creep(t, dur, a, b, look, { h = 1.05, lookH = 1.0, fov, shake, ease = "inOut" } = {}) {
-    const L = look.actor ? look : { ...look, h: lookH };
+    let L = look.actor ? look : { ...look, h: lookH };
+    if (!look.actor && Math.hypot(look.x - b.x, look.z - b.z) < 1.5) {
+      const dx = b.x - a.x, dz = b.z - a.z, n = Math.hypot(dx, dz) || 1;
+      L = { x: b.x + (dx / n) * 8, z: b.z + (dz / n) * 8, h: lookH };
+    }
     return this.Cam(t, dur, { from: { ...a, h }, to: { ...b, h }, look: L, ease, ...(fov ? { fov } : {}), ...(shake ? { shake } : {}) });
   }
   /**

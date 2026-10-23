@@ -21,6 +21,7 @@ import { AIRCRAFT_ASSETS } from "./Data_AircraftAssets.mjs";
 import { NormalizeBlockout } from "./Script_EditorBlockoutConfig.mjs";
 
 const ReadText = (file) => readFileSync(file, "utf8");
+const PREVIZ_DEFAULTS_POINT_H = 1.6;   // 点不写 h 时按 PREVIZ_DEFAULTS.pointH
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 let passed = 0;
 function Test(name, fn) {
@@ -549,6 +550,21 @@ for (const level of ["FirstLevel0105", "FirstLevel0610", "FirstLevel1218", "Firs
   let text = null;
   try { text = await fs.readFile(file, "utf8"); } catch { /* 没有 = 这关没有预演 */ }
   if (text === null) continue;
+  // 不许出现没头没脑的俯视镜头（10-23 用户）：机位不能悬在它看的那个点正上方，往下看不超过 60°。
+  // 切镜按起幅和落幅各取一帧（切镜就是这两张画面），只看写死的点（演员、飞机锚跟着人动，另算）。
+  Test(`Blockout/${level}.previz.json 没有朝正下方的镜头`, () => {
+    const doc = JSON.parse(text), bad = [];
+    for (const s of doc.sequences || []) for (const c of s.camera || []) {
+      if (c.eye) continue;
+      for (const [tag, at, look] of [["起幅", c.from, c.look], ["落幅", c.to || c.from, c.lookTo || c.look]]) {
+        if (!at || !look || look.actor || look.aircraft || at.actor || at.aircraft) continue;
+        const d = Math.hypot(at.x - look.x, at.z - look.z), dh = (look.h ?? PREVIZ_DEFAULTS_POINT_H) - (at.h ?? PREVIZ_DEFAULTS_POINT_H);
+        const pitch = Math.atan2(dh, d) * 180 / Math.PI;
+        if (d < 0.5 || pitch < -60) bad.push(`${s.keyframe} t${c.t} ${tag}：离看的点 ${d.toFixed(2)} m、往下 ${(-pitch).toFixed(0)}°`);
+      }
+    }
+    assert.deepEqual(bad, [], "预演里有朝正下方的镜头");
+  });
   Test(`仓库里的 Blockout/${level}.previz.json 过校验`, () => {
     const doc = JSON.parse(text);
     const cfg = NormalizeBlockout(JSON.parse(ReadText(path.join(projectDir, "Blockout", `${level}.json`))));
