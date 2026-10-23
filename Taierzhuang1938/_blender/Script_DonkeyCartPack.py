@@ -11,6 +11,9 @@ def Pack(source,output):
     jsonLength,jsonType=struct.unpack_from('<II',raw,12)
     if jsonType!=0x4E4F534A:raise ValueError('Expected GLB JSON chunk')
     document=json.loads(raw[20:20+jsonLength]);binary=raw[28+jsonLength:]
+    for material in document.get('materials',[]):
+        if material.get('name')=='DonkeyShortCoatPbr':
+            material.update({'alphaMode':'MASK','alphaCutoff':.45,'doubleSided':True})
     def View(index):
         item=document['bufferViews'][index];start=item.get('byteOffset',0)
         return binary[start:start+item['byteLength']]

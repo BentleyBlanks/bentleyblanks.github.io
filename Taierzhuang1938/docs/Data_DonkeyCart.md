@@ -8,9 +8,9 @@
 
 `Model/Donkey/Model_Donkey.glb` 是 2026-10-22 按用户要求追加的纯驴版。只从 V3 工程的 `DonkeyEditable` 集合保留身体、眼、耳、鬃尾和轮廓短毛，移除木车、车辕、颈垫、全部套具、笼头与牵绳；不能仅删除 `CartRuntime`，因为原动物运行时网格也合并了套具。原驴车文件与源工程不覆盖。
 
-独立驴保留动物身体拓扑和蒙皮，V2 共 51,128 三角、1 个运行时网格、1 个材质（V1 为 50,992，V2 尾曲线增加 136 三角）。28 根动物骨骼的名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。单独重烘 2K Base / 1K Normal / 512 ORM，三张无损 WebP 内嵌并有镜像文件。实际规格以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准。
+当前纯驴 V3 为 67,028 三角、身体与短毛两个导出网格、三个材质，共用 28 根骨骼；三材质在 Three.js 中形成三个绘制网格。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。七张无损 WebP 内嵌并有镜像，纹理分工见下方 V3；实际规格以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准。V1 为 50,992 三角，V2 为 51,128 三角、单网格单材质，旧结果保留作对照。
 
-外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261022/Scene_Donkey.blend`，其中打包图像与重建脚本；`Data_Derivation.json` 记录父工程哈希及保留／删除组件。重建命令：
+当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261023/Scene_Donkey.blend`，其中打包图像与重建脚本；`Data_Derivation.json` 记录父工程哈希及保留／删除组件。10-22 源工程作为 V2 留档。重建命令：
 
 ```powershell
 node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
@@ -27,6 +27,18 @@ node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
 前腕由 0.48 m 调到 0.39 m，后跗由 0.47 m 调到 0.38 m，蹄与蹄底顶点保持原位。`Script_DonkeyRefine.py` 在独立工程就绪后运行细化，并将嘴缝收细贴回新口鼻；随后共享动画入口针对新关节重新解算两条片段，保持原周期、步幅与距离时钟，不能直接套用旧 Action 的蒙皮结果。原驴车成品与工程不改变。
 
 旧纯驴源、同机位修改前后图与原图侧视局部留在外置 `RefinementV2/`；重建从保留的驴车 V3 父工程依次派生、细化、重解动作、烘图与验证。以正式 GLB 重导和浏览器的完整周期采样为最终接地证据；本地 `tmp/Donkey/` 可切换修改前、最新版本与原参考图。造型仍属于参考图创作复原，不据数值验收宣称与参考图完全一致。
+
+### 纯驴短硬毛与材质 V3（2026-10-23）
+
+`Script_DonkeyCoat.py` 在 V2 之后处理肋部、肩胛、髋部与面颊起伏，对躯干选定纵向边局部细分，增加 452 三角；新增点插值原蒙皮并归一到最多四权重，蹄面与关节高度保留。腹部和口鼻浅毛、灰黑底毛、风化肋部色差、上眼睑与耳内层次分别按表面位置控制。
+
+原 1,900 个短毛锥体替换为 21,000 根逐根三角短毛，并在轮廓、耳缘与尾梢布置 704 个透明毛片；两者共用 `DonkeyCoatRuntime` 和原 28 骨。160 个粗鬃毛锥体改为 480 根交叉细鬃毛。主体没有使用大片覆盖式毛片，避免侧光下出现碎片状斑块。鬃毛所在的附属材质双面绘制；短毛层为双面 `MASK 0.45`，使用 `HairTint`，消费者按节点 extras 的 `groomCastShadow=false` 关闭微小毛片阴影，身体照常投影。
+
+主体毛色通过 `RuntimeCoatTint` 顶点色控制，1K Base / 1K Normal 在独立 UV1 上按 0.22 m 作者尺度重复，避免把细毛缩进整身图集后丢失。蹄、眼、鬃尾等附属表面保留 UV0 的 2K Base / 1K Normal / 512 ORM；边缘毛另用 1K Base alpha / 1K Normal，共七张图。全部通过标准 glTF PBR、顶点色和 UV 通道表达，不依赖预览页自定义着色器。
+
+内置 Imagegen 制作一张轮廓毛图集及一张连续毛流输入，并对后者做一次缩短、加粗修订。原图、三个完整提示词记录与哈希保存在新源目录 `SourceTextures/` 的 `Data_FurGeneration.json`、`Data_FiberGeneration.json`、`Data_ShortFiberGeneration.json`；最终选用 `Texture_DonkeyCoatFiberShortSource.png`。法线和中性色素图由保留输入技术烘焙，原始生成图片不覆盖。
+
+验收读取最终 packed GLB，核对两个导出网格、三种材质、两套 UV、颜色属性、MASK、28 骨和完整 walk / idle 蹄面采样；近景、侧视、毛流和修改前后比较仍留本地。原驴车成品和源工程不随纯驴更新。
 
 ## 源工程与重建
 

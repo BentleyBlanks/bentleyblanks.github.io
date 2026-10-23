@@ -28,9 +28,11 @@ for obj in rigs:
 for obj in imported:
     helper=obj.type=='MESH' and obj not in meshes
     obj.hide_render=helper;obj.hide_set(helper)
+    if obj.get('groomCastShadow') is False:obj.visible_shadow=False
 scene.frame_set(0);bpy.context.view_layer.update()
 camera=bpy.data.objects['ReviewCamera'];scene.camera=camera
 def Render(name,position,target,scale,width,height):
+    if scene.get('DonkeyVerifyMeasurementsOnly',False):return
     camera.location=position;camera.rotation_euler=(Vector(target)-camera.location).to_track_quat('-Z','Y').to_euler();camera.data.ortho_scale=scale
     scene.render.resolution_x=width;scene.render.resolution_y=height;scene.render.resolution_percentage=100
     scene.render.filepath=str(base/'Review'/('Render_Imported'+name+'.png'));bpy.ops.render.render(write_still=True)
@@ -40,7 +42,7 @@ if not scene.get('DonkeyVerifySkipStatic',False):
     if standalone:Render('HeadNeck',(-3,4,1.6),(0,.65,1.02),1.35,640,640)
 
 donkeyRig=next(o for o in rigs if 'DonkeyFrontLeftHoofPivot' in o.data.bones)
-animal=next(o for o in meshes if o.vertex_groups.get('DonkeyFrontLeftHoofPivot'))
+animal=next(o for o in meshes if o.name.startswith('DonkeyRuntime'))
 soleIndices={}
 for front in ('Front','Rear'):
     for side in ('Left','Right'):
@@ -111,7 +113,8 @@ for obj in imported:bpy.data.objects.remove(obj,do_unlink=True)
 for obj,(render,hidden) in visibility.items():obj.hide_render=render;obj.hide_set(hidden)
 scene.frame_set(0)
 scene['DonkeyVerifySkipStatic']=False
+scene['DonkeyVerifyMeasurementsOnly']=False
 print(json.dumps({k:v for k,v in report.items() if k!='samples'}))
-if report['meshCount']!=(1 if standalone else 2):raise RuntimeError('Unexpected runtime mesh batch count')
+if report['meshCount']!=2:raise RuntimeError('Unexpected runtime mesh batch count')
 if report['stanceSoleRangeM'][0]<-.0005 or report['stanceSoleRangeM'][1]>.002:raise RuntimeError('Reimported actual sole misses the ground')
 if max(drift)>.0001:raise RuntimeError('Reimported actual sole slides against travelled distance')

@@ -8,7 +8,7 @@ const scriptDir=path.dirname(fileURLToPath(import.meta.url));
 const project=path.dirname(scriptDir),root=path.dirname(project);
 const helper=path.join(root,'scripts/Script_BlenderMcp.mjs');
 const source='C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020/Scene_DonkeyCart.blend';
-const destination='C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261022';
+const destination='C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261023';
 if(!fs.statSync(path.join(root,'.git')).isFile())throw Error('Use an exclusive Git worktree');
 if(!fs.existsSync(source))throw Error('Missing preserved V3 source: '+source);
 function Control(args,stdio='pipe'){

@@ -121,9 +121,9 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
   Object.freeze({ id: "Donkey", name: "独立灰驴（无车无套具）", pack: "Donkey/Model_Donkey.glb",
-    sourceTriangles: 51128, actualTriangles: 51128, targetTriangles: 51128, policy: "source",
-    sourceTexture: "驴车 V3 可编辑动物组件、内置 Imagegen 粗短毛、程序蹄壁、CC0 雕刻法线", runtimeTexture: "独立 UV 图集；2K Base / 1K Normal / 512 ORM，无损 WebP 内嵌",
-    note: "只保留驴本体、鬃尾和短毛；无木车、颈垫、套具、笼头或牵绳。28骨、1网格、1材质，保留原地行走/待机；V2按原图细化头颈、浅腹毛与尾根，下调腕/跗并重解动作；保留身体源拓扑，细分尾曲线。" }),
+    sourceTriangles: 67028, actualTriangles: 67028, targetTriangles: 67028, policy: "source",
+    sourceTexture: "V3 按参考图细化身体与毛流；内置 Imagegen 短硬毛和轮廓毛输入、程序蹄壁、CC0 身体拓扑", runtimeTexture: "UV1重复1K细毛Base/Normal与毛色顶点；附属表面2K/1K/512图集，轮廓毛1K透明PBR，无损WebP内嵌",
+    note: "纯驴；28骨、身体/短毛两网格、三材质，保留行走/待机。21,000根短毛几何、704处轮廓/耳缘/尾梢毛片；局部细分肋面，细化鬃毛与耳内层次。总量低于80K，未减面；工程与完整生成记录外置。" }),
   Object.freeze({ id: "DonkeyCart", name: "灰驴与两轮木车", pack: "DonkeyCart/Model_DonkeyCart.glb",
     sourceTriangles: 88896, actualTriangles: 79500, targetTriangles: 79500, policy: "target",
     sourceTexture: "用户原画、内置 Imagegen 粗短毛与旧榆木 V3、程序蹄壁与端木纹、CC0 雕刻法线", runtimeTexture: "分区 UV 图集；动物 2K Base / 1K Normal、木车 4K Base / 2K Normal，ORM 均 512，无损 WebP 内嵌",

@@ -56,6 +56,7 @@ def CloneBatch(sourceRig,label):
     objects=[]
     for original in list(bpy.data.objects):
         if original.type!='MESH' or original.parent!=sourceRig:continue
+        if standalone and original.get('coatCardCount'):continue
         if standalone and original.name not in bpy.data.collections['DonkeyEditable'].all_objects:
             raise RuntimeError('Standalone donkey contains a non-animal source: '+original.name)
         obj=original.copy();obj.data=original.data.copy();runtimeCol.objects.link(obj)
@@ -69,6 +70,11 @@ def CloneBatch(sourceRig,label):
         Select([obj])
         for modifier in list(obj.modifiers):
             if modifier.type!='ARMATURE':bpy.ops.object.modifier_apply(modifier=modifier.name)
+        if standalone:
+            furry=obj.data.attributes.get('FurSurface') or obj.data.attributes.new('FurSurface','INT','FACE')
+            for face in obj.data.polygons:
+                material=obj.data.materials[face.material_index]
+                furry.data[face.index].value=int(material.name.startswith(('DonkeyCartGreyCoat','DonkeyLowerLegShortFur','DonkeyCartFaceFur','DonkeyCartEarInterior')))
         if not obj.data.uv_layers.get('UVMap'):obj.data.uv_layers.new(name='UVMap')
         atlasNamespace['AssignAtlasGroup'](obj,label,original.name)
         objects.append(obj)
@@ -159,21 +165,72 @@ def Bake(obj,label):
     separate=nodes.new('ShaderNodeSeparateColor');separate.mode='RGB';links.new(Texture(ormImage).outputs['Color'],separate.inputs['Color'])
     links.new(separate.outputs['Green'],shader.inputs['Roughness']);links.new(separate.outputs['Blue'],shader.inputs['Metallic'])
     obj.data.materials.clear();obj.data.materials.append(mat)
-    for face in obj.data.polygons:face.material_index=0
+    detail=bpy.data.images.get('Texture_DonkeyCoatDetailNormal') if standalone else None
+    detailUv=obj.data.uv_layers.get('FurDetailUV') if detail else None
+    detailValues=[tuple(value.uv) for value in detailUv.data] if detailUv else None
+    furry=obj.data.attributes.get('FurSurface')
+    sourceColors=obj.data.color_attributes.get('CoatColor')
+    coatTints=[tuple(min(1,max(0,value*.75/.55)) for value in color.color[:3])+(1,) for color in sourceColors.data] if detailValues and sourceColors else None
+    if detailValues:
+        accessory=mat.copy();accessory.name='DonkeyAccessoryPbr';accessory.use_backface_culling=False;obj.data.materials.append(accessory)
+        detailBase=bpy.data.images['Texture_DonkeyCoatDetailBase']
+        baseTexture=next(node for node in nodes if node.type=='TEX_IMAGE' and node.image==baseImage);baseTexture.image=detailBase
+        texture=next(node for node in nodes if node.type=='TEX_IMAGE' and node.image==normalImage);texture.image=detail
+        detailCoordinates=nodes.new('ShaderNodeUVMap');detailCoordinates.uv_map='FurDetailUV'
+        links.new(detailCoordinates.outputs[0],texture.inputs['Vector']);normal.uv_map='FurDetailUV'
+        links.new(detailCoordinates.outputs[0],baseTexture.inputs['Vector'])
+        paint=nodes.new('ShaderNodeVertexColor');paint.layer_name='RuntimeCoatTint'
+        multiply=nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1
+        links.new(baseTexture.outputs['Color'],multiply.inputs[1]);links.new(paint.outputs[0],multiply.inputs[2]);links.new(multiply.outputs[0],shader.inputs['Base Color'])
+        normal.inputs['Strength'].default_value=.65
+        info.extend([SaveImage(detail),SaveImage(detailBase)])
+    for face in obj.data.polygons:face.material_index=0 if not detailValues or furry.data[face.index].value else 1
     # Runtime UV0 is the new atlas. Point paint is fully baked into base colour.
     for layer in list(obj.data.uv_layers):
         if layer.name!='GameUV':obj.data.uv_layers.remove(layer)
     obj.data.uv_layers.active.name='UVMap'
-    uv.uv_map='UVMap';normal.uv_map='UVMap'
+    uv.uv_map='UVMap'
+    if detailValues:
+        layer=obj.data.uv_layers.new(name='FurDetailUV')
+        for item,value in zip(layer.data,detailValues):item.uv=value
+        normal.uv_map='FurDetailUV'
+        # The accessory copy uses only the baked atlas and its UV0 tangents.
+        for node in accessory.node_tree.nodes:
+            if node.type in ('UVMAP','NORMAL_MAP'):node.uv_map='UVMap'
+    else:normal.uv_map='UVMap'
     for attribute in list(obj.data.color_attributes):obj.data.color_attributes.remove(attribute)
+    if coatTints:
+        tint=obj.data.color_attributes.new(name='RuntimeCoatTint',type='FLOAT_COLOR',domain='CORNER')
+        for face in obj.data.polygons:
+            for loop in face.loop_indices:
+                tint.data[loop].color=coatTints[obj.data.loops[loop].vertex_index] if face.material_index==0 else (1,1,1,1)
     coordinate=obj.data.attributes.get('MaterialCoordinates')
     if coordinate:obj.data.attributes.remove(coordinate)
     grouping=obj.data.attributes.get('AtlasGroup')
     if grouping:obj.data.attributes.remove(grouping)
+    if furry:obj.data.attributes.remove(furry)
+    if coatTints:
+        obj.data.color_attributes.active_color_index=0
+        obj.data.color_attributes.render_color_index=0
     obj.data.calc_loop_triangles()
-    return {'label':label,'sourceTriangles':obj['sourceTriangles'],'triangles':len(obj.data.loop_triangles),'vertices':len(obj.data.vertices),'budgetSurfaceMaxErrorM':obj.get('budgetSurfaceMaxErrorM',0),'atlasCoverage':obj['atlasCoverage'],'atlasTexelsPerMetre':obj['atlasTexelsPerMetre'],'textures':info}
+    density=obj['atlasTexelsPerMetre']*(2 if baseImage.size[0]==4096 and label=='Animal' else 1)
+    return {'label':label,'meshName':obj.name,'sourceTriangles':obj['sourceTriangles'],'triangles':len(obj.data.loop_triangles),'vertices':len(obj.data.vertices),'budgetSurfaceMaxErrorM':obj.get('budgetSurfaceMaxErrorM',0),'atlasCoverage':obj['atlasCoverage'],'atlasTexelsPerMetre':density,'textures':info}
 
 reports=[Bake(obj,label) for rig,obj,label in batches]
+if standalone and bpy.data.objects.get('DonkeyShortCoatCards'):
+    source=bpy.data.objects['DonkeyShortCoatCards']
+    coat=source.copy();coat.data=source.data.copy();runtimeCol.objects.link(coat);coat.name='DonkeyCoatRuntime';coat.parent=animalRig
+    for modifier in coat.modifiers:
+        if modifier.type=='ARMATURE':modifier.object=animalRig
+    coat.data.calc_loop_triangles()
+    textures=[]
+    for material in coat.data.materials:
+        for node in material.node_tree.nodes:
+            if node.type=='TEX_IMAGE' and node.image:
+                image=node.image;textures.append({'name':image.name,'size':list(image.size),'path':image.filepath_raw,'sha256':hashlib.sha256(Path(image.filepath_raw).read_bytes()).hexdigest()})
+    reports.append({'label':'Coat','meshName':coat.name,'sourceTriangles':len(coat.data.loop_triangles),'triangles':len(coat.data.loop_triangles),'vertices':len(coat.data.vertices),
+                    'budgetSurfaceMaxErrorM':0,'atlasCoverage':None,'atlasTexelsPerMetre':None,'textures':textures,'uvReuse':'fine fibres sample stable pigment; four atlas cells intentionally reused by limited edge tufts'})
+    batches.append((animalRig,coat,'Coat'))
 for rig,obj,label in batches:
     rig.data.pose_position='POSE'
     for bone in rig.pose.bones:bone.matrix_basis=Matrix.Identity(4)
@@ -183,7 +240,7 @@ bpy.ops.export_scene.gltf(filepath=str(path),export_format='GLB',use_selection=T
  export_apply=False,export_yup=True,export_animations=True,export_animation_mode='NLA_TRACKS',
  export_anim_slide_to_zero=True,export_force_sampling=True,export_frame_range=False,
  export_rest_position_armature=True,export_materials='EXPORT',export_extras=True,
- export_vertex_color='NONE',export_all_vertex_colors=False,export_image_format='AUTO')
+ export_vertex_color='ACTIVE' if standalone else 'NONE',export_all_vertex_colors=False,export_image_format='AUTO')
 report={'path':str(path),'bytes':path.stat().st_size,'batches':reports,'totalTriangles':sum(r['triangles'] for r in reports)}
 (base/'Review/Data_ExportBake.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
 for obj in runtimeCol.objects:obj.hide_render=True;obj.hide_set(True)

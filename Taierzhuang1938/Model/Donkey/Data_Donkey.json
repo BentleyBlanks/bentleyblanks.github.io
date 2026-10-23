@@ -1,11 +1,11 @@
 {
   "schema": "tengxian-independent-rigged-prop-v1",
   "id": "Donkey",
-  "version": "20261022ReferenceV2",
+  "version": "20261023FurV3",
   "asset": "Model_Donkey.glb",
   "textureManifest": "Data_DonkeyTextures.json",
-  "sha256": "5f47cac0a7c183fe64ce8e89c94eaa47b06570e0e76eeac5e0994ee3c3b6a8da",
-  "bytes": 5248092,
+  "sha256": "c4156fac2dfe64a5b7f02578fbb6fea23e762be503ea5cf256c662df4bc96865",
+  "bytes": 13482616,
   "units": "metres",
   "upAxis": "+Y",
   "facingAxis": "-Z",
@@ -18,18 +18,18 @@
   "nominalWithersHeightM": 1.1,
   "boundsM": {
     "min": [
-      -0.16191062331199646,
+      -0.15954427421092987,
       0.00039999998989515007,
       -1.1251415014266968
     ],
     "max": [
-      0.16428737342357635,
-      1.5914452075958252,
+      0.1609637588262558,
+      1.593300461769104,
       0.5380862355232239
     ],
     "dimensions": [
-      0.3261979967355728,
-      1.59104520760593,
+      0.32050803303718567,
+      1.5929004617792089,
       1.6632277369499207
     ]
   },
@@ -72,20 +72,46 @@
     }
   },
   "coat": {
-    "construction": "fine directional short coat with quiet gray-brown variation, pale belly/muzzle and textured ear interiors",
-    "sourceScript": "_blender/Script_DonkeyAppearance.py"
+    "fibres": 21000,
+    "cards": 704,
+    "triangles": 22408,
+    "regionCards": {
+      "0": 322,
+      "1": 22,
+      "2": 0,
+      "3": 360
+    },
+    "sampledSurfaceM2": 1.9399650074504962,
+    "maxInfluences": 4,
+    "version": "20261023FurV3",
+    "method": "individual skinned short fibres, limited alpha-cutout edge tufts and tiled fibre normal detail on UV1",
+    "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\SourceTextures\\Texture_DonkeyShortFurCardsSource.png",
+    "sourceSha256": "03db7521e9987a20f405e647c3c37237ad3006193f993babd2d2a424496e6d09",
+    "alphaCutoff": 0.45,
+    "material": "DonkeyShortCoatPbr",
+    "bodyShape": "shallow individual rib arcs, scapular hollow and pelvic crest",
+    "geometryBudget": 80000,
+    "runtimeGroomName": "DonkeyCoatRuntime",
+    "ribSurfaceAddedTriangles": 452,
+    "pigment": "charcoal gray-brown, warm worn rib peaks, pale underside and muzzle, subdued upper eyelid",
+    "detailNormalUv": "FurDetailUV; author-scaled short-coat flow, 0.22 m per texture repeat",
+    "detailTexelsPerMetre": 4654.545454545455,
+    "sourceScript": "_blender/Script_DonkeyCoat.py",
+    "shadow": "groomCastShadow=false; body and accessories cast shadows, micro-fibre layer receives them"
   },
   "triangles": {
-    "total": 51128,
+    "total": 67028,
     "limit": 80000,
     "byBatch": {
-      "Animal": 51128
+      "Animal": 44620,
+      "Coat": 22408
     },
     "decimated": false
   },
   "runtime": {
     "meshes": [
-      "DonkeyRuntime"
+      "DonkeyRuntime",
+      "DonkeyCoatRuntime"
     ],
     "skins": [
       {
@@ -93,14 +119,16 @@
         "jointCount": 28
       }
     ],
-    "materials": 1,
+    "materials": 3,
     "maxInfluences": 4,
     "morphTargets": 0,
     "uvAtlasCoverage": {
-      "Animal": 0.26077012598292754
+      "Animal": 0.2771005780953912,
+      "Coat": null
     },
     "averageTexelsPerMetre": {
-      "Animal": 625.4811943921901
+      "Animal": 647.1597860568273,
+      "Coat": null
     }
   },
   "animations": {
@@ -147,6 +175,32 @@
       "material": "neutral gray-brown short coat, fine directional fibres, pale belly and muzzle",
       "shape": "more upright neck/poll, extended muzzle, rounded abdomen, locally smoothed shoulder/hamstring, fuller short mane and narrower ear splay"
     },
+    "coat": {
+      "fibres": 21000,
+      "cards": 704,
+      "triangles": 22408,
+      "regionCards": {
+        "0": 322,
+        "1": 22,
+        "2": 0,
+        "3": 360
+      },
+      "sampledSurfaceM2": 1.9399650074504962,
+      "maxInfluences": 4,
+      "version": "20261023FurV3",
+      "method": "individual skinned short fibres, limited alpha-cutout edge tufts and tiled fibre normal detail on UV1",
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\SourceTextures\\Texture_DonkeyShortFurCardsSource.png",
+      "sourceSha256": "03db7521e9987a20f405e647c3c37237ad3006193f993babd2d2a424496e6d09",
+      "alphaCutoff": 0.45,
+      "material": "DonkeyShortCoatPbr",
+      "bodyShape": "shallow individual rib arcs, scapular hollow and pelvic crest",
+      "geometryBudget": 80000,
+      "runtimeGroomName": "DonkeyCoatRuntime",
+      "ribSurfaceAddedTriangles": 452,
+      "pigment": "charcoal gray-brown, warm worn rib peaks, pale underside and muzzle, subdued upper eyelid",
+      "detailNormalUv": "FurDetailUV; author-scaled short-coat flow, 0.22 m per texture repeat",
+      "detailTexelsPerMetre": 4654.545454545455
+    },
     "skeleton": "28 bone names and hierarchy retained; carpus/hock lowered by 9 cm, both actions re-solved. Unused DonkeyHitchPivot retained for compatibility."
   },
   "verification": {
@@ -154,7 +208,7 @@
       0.0003996485029347241,
       0.00040028514922596514
     ],
-    "reimportedStanceDriftPerFrameM": 6.537967258031518e-07,
+    "reimportedStanceDriftPerFrameM": 6.53587586763732e-07,
     "sampleCount": 148,
     "webpPixelsUnchanged": true,
     "geometrySkinActionsUnchangedDuringPacking": true,
@@ -168,9 +222,9 @@
       0.00040035886922851205
     ],
     "parentSourceUnchanged": true,
-    "sourceAnatomyEvidence": "V3 body topology and skin weights retained. V2 proportions and lower joint positions are independently reanimated, exported, reimported and resampled."
+    "sourceAnatomyEvidence": "V2 bone layout and hoof surfaces retained. Selected torso edges are subdivided for rib/scapula form; inserted weights are interpolated and normalized to four influences. Both clips and the packed GLB are independently sampled."
   },
-  "editableSource": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261022\\Scene_Donkey.blend",
+  "editableSource": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\Scene_Donkey.blend",
   "credits": [
     {
       "name": "Lyndon Daniels / ChadM Rigged Horse",

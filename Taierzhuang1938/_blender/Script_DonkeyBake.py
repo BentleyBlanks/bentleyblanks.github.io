@@ -6,7 +6,7 @@ from mathutils.bvhtree import BVHTree
 
 project=Path(bpy.context.scene['DonkeyCartProject'])
 source=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020/Scene_DonkeyCart.blend')
-base=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261022')
+base=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261023')
 if source.resolve()==(base/'Scene_Donkey.blend').resolve():raise RuntimeError('The derivative must use a separate source file')
 sourceSha=hashlib.sha256(source.read_bytes()).hexdigest()
 bpy.ops.wm.open_mainfile(filepath=str(source))

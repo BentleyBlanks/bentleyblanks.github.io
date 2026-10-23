@@ -130,7 +130,7 @@ Check(MESHES.Type95HaGo.triangles === 82142,
 Check(EXTERNAL_GLB_STANDARDS.length === 61
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "SingleBlanket" && record.actualTriangles === 12880 && record.targetTriangles === 12880)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "DonkeyCart" && record.actualTriangles === 79500 && record.targetTriangles <= 80000)
-  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Donkey" && record.actualTriangles === 51128 && record.sourceTriangles === record.actualTriangles)
+  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Donkey" && record.actualTriangles === 67028 && record.sourceTriangles === record.actualTriangles)
   && EXTERNAL_GLB_STANDARDS.every((record) => record.actualTriangles > 0 && record.targetTriangles > 0),
   "外部 GLB 分类登记既有资产、指挥室、接收院陈设、单被、两种草席、驴车与独立驴，共 61 项");
 

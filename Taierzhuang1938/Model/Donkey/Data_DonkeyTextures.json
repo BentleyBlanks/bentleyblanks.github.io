@@ -1,21 +1,49 @@
 {
   "schema": "tengxian-independent-prop-textures-v1",
   "asset": "Donkey",
-  "version": "20261022ReferenceV2",
-  "uv": "one non-overlapping GameUV anatomy atlas exported as UV0",
+  "version": "20261023FurV3",
+  "uv": "unique accessory atlas UV0; repeated fibre Base/Normal on UV1 with RuntimeCoatTint anatomy pigment; reused edge tuft cells with per-root HairTint",
   "colorSpace": {
     "Base": "sRGB",
     "Normal": "linear OpenGL +Y",
     "Orm": "linear; R=1, G=roughness, B=metallic"
   },
-  "sizeReason": "2048 Base / 1024 Normal / 512 ORM retain the V3 animal surface detail.",
+  "sizeReason": "1024 repeated fibre Base/Normal at 0.22 m retains coarse short strands in close views. Accessories use 2048 Base / 1024 baked Normal / 512 ORM; edge tuft Base alpha and Normal 1024. Seven unique images, shared ORM.",
   "source": {
     "provider": "built-in imagegen + procedural + sourcePack",
     "furInput": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\SourceTextures\\Texture_DonkeyWeatheredCoatSourceV3.png",
     "furPromptRecord": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\Refinement20261022\\Data_WeatheredCoatRefinement.json",
     "surfaceGenerationRecord": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\Refinement20261022\\Data_SurfaceGenerationV3.json",
     "referenceGenerationRecord": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\Data_ImageGeneration.json",
-    "sculptNormal": "CC0 Lyndon Daniels / ChadM equine surface normal from preserved source"
+    "sculptNormal": "CC0 Lyndon Daniels / ChadM equine surface normal from preserved source",
+    "shortFurCards": {
+      "provider": "built-in imagegen",
+      "prompt": "Use case: photorealistic-natural. Asset type: ONE production texture atlas for short donkey-fur cards on a real-time 3D animal. Input images 1 and 2 are REFERENCE ONLY for donkey hair character and intrinsic color, not edit targets. Generate a square 2 by 2 grid containing exactly four independent isolated short-fur tufts on a genuinely transparent background. Every cell has wide transparent gutters; no hair reaches any cell border. All tufts point upward: dense planted roots at the bottom, naturally ragged separated fine tips at the top; mostly straight, gently bent coarse short donkey hairs, not wool, feathers, human hair, grass, or long shag. Macro photographic strand fidelity with many individual subtly varied fibers. Upper-left tuft charcoal gray-brown, like the donkey's dark ribs/shoulder; upper-right tuft weathered medium gray-brown with a few warm bleached tips; lower-left tuft dusty pale ivory gray, like the underside/muzzle; lower-right tuft muted gray-beige, like inner-ear and eye-surround hairs. Each tuft fills about 70 percent of its cell width and 75 percent of its cell height, sparse wispy ends transitioning to an opaque root cluster, softly irregular sides. Same physical hair length/scale in all cells. Texture should be intrinsic diffuse color under broad flat cross-polarized light: no cast shadows, no specular glints, no dramatic shading, no background, no skin, no animal body, no harness, no typography, no grid lines, no labels, no borders, no watermark. Preserve all individual fine tip alpha cutouts. This is a game material texture, not a poster or concept illustration.",
+      "output": "C:/Users/Bentl/.codex/generated_images/01a159b2-07c2-7e51-b38a-89155e578cae/exec-492f30ac-d607-49de-85bd-413f9b44e591.png",
+      "references": [
+        "Review/Reference_Head.jpg",
+        "Review/Reference_Coat.jpg"
+      ],
+      "transparent": true
+    },
+    "shortFurFibres": {
+      "provider": "built-in imagegen",
+      "prompt": "Use case: photorealistic-natural. Asset type: one seamless square PBR diffuse source texture of the short coarse coat of the referenced gray donkey. The two attached crops are appearance references only. Fill every pixel edge to edge with dense, close-lying short straight donkey hairs, swept consistently from bottom toward top with very slight natural lateral deviations. Charcoal gray-brown roots and sparse muted warm gray weathered tips; no bald patches. Individual coarse hairs about 5-15 mm long and 0.2-0.4 mm thick, overlapping naturally. The image covers roughly a 12 cm by 12 cm patch of coat. Strongly readable separate short straight fibers, never curly wool, fleece, moss, scales, cracked clay, leather, brush strokes or long human hair. Photograph-like material acquisition, broad flat cross-polarized diffuse illumination, intrinsic albedo only, no highlights, no cast shadows, no directional light gradient, no vignetting, no body silhouette, no skin, no mane, no harness, no labels, no border, no text or watermark. Seamless repeating edges. Uniform material coverage, preserve fine fiber-level contrast while avoiding large dark clumps or mottled islands.",
+      "output": "C:/Users/Bentl/.codex/generated_images/01a159b2-07c2-7e51-b38a-89155e578cae/exec-84c96779-b80f-4793-9210-abc09eede784.png",
+      "purpose": "Continuous close-lying short-fur albedo source and tiled micro-normal derivation",
+      "references": [
+        "Review/Reference_Head.jpg",
+        "Review/Reference_Coat.jpg"
+      ]
+    },
+    "shortFurRefinement": {
+      "provider": "built-in imagegen",
+      "prompt": "Edit this material texture. Change only hair structure: replace the long flowing continuous threads with dense, overlapping SHORT COARSE DONKEY BRISTLES. Each visible individual fiber must terminate within 5 to 12 percent of the whole image height; many naturally broken pointed fiber ends must be visible throughout the middle of the texture, never long continuous wavy lines. Coarse individual strands about 4 to 8 pixels wide in a 1024-pixel image and 50 to 120 pixels long, mixed fine underfur between them. The field is the rough, short gray-brown coat on an elderly working donkey's shoulder/ribs, close-lying hair swept mainly from bottom to top in overlapping staggered short locks. Preserve the charcoal gray-brown palette with muted weathered tips, uniform edge-to-edge seamless coverage, and flat diffuse PBR capture lighting. No highlights, no shadows or light gradient. No outlines, no bald gaps, no curly wool, no fleece, no moss, no scales, no leather, no human hair, no wood grain, no long fur. This is one material albedo texture, not a whole animal or illustration. No text, watermark or border.",
+      "input": "SourceTextures/Texture_DonkeyCoatFiberSource.png",
+      "output": "C:/Users/Bentl/.codex/generated_images/01a159b2-07c2-7e51-b38a-89155e578cae/exec-39aaa09f-7332-4c01-a412-aeba284a7c07.png",
+      "selectedRuntimeSource": "SourceTextures/Texture_DonkeyCoatFiberShortSource.png",
+      "purpose": "Shorter, coarser separated fibres, replacing the first long continuous fibre input"
+    }
   },
   "bake": {
     "method": "Cycles diffuse colour only, tangent normal and explicit ORM emission; no direct/indirect lighting in base colour",
@@ -24,25 +52,47 @@
   },
   "textures": [
     {
-      "name": "Texture_DonkeyAnimalNormal",
-      "file": "Texture_DonkeyAnimalNormal.webp",
+      "name": "Texture_DonkeyShortCoatNormal",
+      "file": "Texture_DonkeyShortCoatNormal.webp",
       "size": [
         1024,
         1024
       ],
-      "bytes": 657068,
-      "sha256": "7cf067409ec7aa03c8632b7378f4c27897cd7deaaab4701b05b5d01c367eb042",
+      "bytes": 924380,
+      "sha256": "b854ecb1df31d69f7f10a645c5fa66e399a2d1df9ee0b3768abdd7b718bb8ef9",
       "lossless": true
     },
     {
-      "name": "Texture_DonkeyAnimalBase",
-      "file": "Texture_DonkeyAnimalBase.webp",
+      "name": "Texture_DonkeyShortCoatBase",
+      "file": "Texture_DonkeyShortCoatBase.webp",
       "size": [
-        2048,
-        2048
+        1024,
+        1024
       ],
-      "bytes": 1277760,
-      "sha256": "35b293407cfde61cde864c4bf08ce4106b6f58ef3d09d20e659b4a259ac2e80f",
+      "bytes": 430846,
+      "sha256": "7d55d41522923ad09d80abb6d05c1d1b0fc385814768658ddc1cc39e8cce3514",
+      "lossless": true
+    },
+    {
+      "name": "Texture_DonkeyCoatDetailNormal",
+      "file": "Texture_DonkeyCoatDetailNormal.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 2498788,
+      "sha256": "7f2856c0a6a7d597f1b5f64c437683fc1af1790f729754f6a6ba6038d22744f5",
+      "lossless": true
+    },
+    {
+      "name": "Texture_DonkeyCoatDetailBase",
+      "file": "Texture_DonkeyCoatDetailBase.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 596862,
+      "sha256": "59ab5b2c2976249d6ecc2e0302f063834c9af4a39fc6d225ab3d047f253d0d40",
       "lossless": true
     },
     {
@@ -52,8 +102,30 @@
         512,
         512
       ],
-      "bytes": 13992,
-      "sha256": "38da1a29bb7ccde8a0ca2f2695b06ef9c9727963ee768ddcc076a8e3fab307d0",
+      "bytes": 16060,
+      "sha256": "2b8a86fefc86a5383de3455332dfcaabde1b74c66730cba41bbd404f5269ad78",
+      "lossless": true
+    },
+    {
+      "name": "Texture_DonkeyAnimalNormal",
+      "file": "Texture_DonkeyAnimalNormal.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 616294,
+      "sha256": "ce808c90ca16fd85349347f8f33ef562c77438a84fbbd1fafced290230ca8f49",
+      "lossless": true
+    },
+    {
+      "name": "Texture_DonkeyAnimalBase",
+      "file": "Texture_DonkeyAnimalBase.webp",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 1152678,
+      "sha256": "4ac8cf0379288eadcd882025419a7b399e9999f24c81bfb481db5964494f69d8",
       "lossless": true
     }
   ]

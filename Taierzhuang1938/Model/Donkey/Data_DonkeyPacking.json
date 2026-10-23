@@ -1,30 +1,52 @@
 {
-  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261022\\Model_DonkeyUnpacked.glb",
-  "output": "C:\\Users\\Bentl\\Documents\\bentleyblanks_Codex_DonkeyCart_20261020\\Taierzhuang1938\\Model\\Donkey\\Model_Donkey.glb",
-  "bytes": 5248092,
+  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\Model_DonkeyUnpacked.glb",
+  "output": "Taierzhuang1938\\Model\\Donkey\\Model_Donkey.glb",
+  "bytes": 13482616,
   "geometrySkinActionsUnchanged": true,
-  "nonImageBufferSha256": "10a2965e9e5c860dd0d89e3f6b2f8738d94e34fdb2f21c2683b131b35ee92c19",
+  "nonImageBufferSha256": "902aa1e511683756c11b3fd1c9997ee7023572b7362ff278d5013f75baba77f3",
   "images": [
     {
-      "name": "Texture_DonkeyAnimalNormal",
-      "file": "Texture_DonkeyAnimalNormal.webp",
+      "name": "Texture_DonkeyShortCoatNormal",
+      "file": "Texture_DonkeyShortCoatNormal.webp",
       "size": [
         1024,
         1024
       ],
-      "bytes": 657068,
-      "sha256": "7cf067409ec7aa03c8632b7378f4c27897cd7deaaab4701b05b5d01c367eb042",
+      "bytes": 924380,
+      "sha256": "b854ecb1df31d69f7f10a645c5fa66e399a2d1df9ee0b3768abdd7b718bb8ef9",
       "lossless": true
     },
     {
-      "name": "Texture_DonkeyAnimalBase",
-      "file": "Texture_DonkeyAnimalBase.webp",
+      "name": "Texture_DonkeyShortCoatBase",
+      "file": "Texture_DonkeyShortCoatBase.webp",
       "size": [
-        2048,
-        2048
+        1024,
+        1024
       ],
-      "bytes": 1277760,
-      "sha256": "35b293407cfde61cde864c4bf08ce4106b6f58ef3d09d20e659b4a259ac2e80f",
+      "bytes": 430846,
+      "sha256": "7d55d41522923ad09d80abb6d05c1d1b0fc385814768658ddc1cc39e8cce3514",
+      "lossless": true
+    },
+    {
+      "name": "Texture_DonkeyCoatDetailNormal",
+      "file": "Texture_DonkeyCoatDetailNormal.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 2498788,
+      "sha256": "7f2856c0a6a7d597f1b5f64c437683fc1af1790f729754f6a6ba6038d22744f5",
+      "lossless": true
+    },
+    {
+      "name": "Texture_DonkeyCoatDetailBase",
+      "file": "Texture_DonkeyCoatDetailBase.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 596862,
+      "sha256": "59ab5b2c2976249d6ecc2e0302f063834c9af4a39fc6d225ab3d047f253d0d40",
       "lossless": true
     },
     {
@@ -34,8 +56,30 @@
         512,
         512
       ],
-      "bytes": 13992,
-      "sha256": "38da1a29bb7ccde8a0ca2f2695b06ef9c9727963ee768ddcc076a8e3fab307d0",
+      "bytes": 16060,
+      "sha256": "2b8a86fefc86a5383de3455332dfcaabde1b74c66730cba41bbd404f5269ad78",
+      "lossless": true
+    },
+    {
+      "name": "Texture_DonkeyAnimalNormal",
+      "file": "Texture_DonkeyAnimalNormal.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 616294,
+      "sha256": "ce808c90ca16fd85349347f8f33ef562c77438a84fbbd1fafced290230ca8f49",
+      "lossless": true
+    },
+    {
+      "name": "Texture_DonkeyAnimalBase",
+      "file": "Texture_DonkeyAnimalBase.webp",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 1152678,
+      "sha256": "4ac8cf0379288eadcd882025419a7b399e9999f24c81bfb481db5964494f69d8",
       "lossless": true
     }
   ],
