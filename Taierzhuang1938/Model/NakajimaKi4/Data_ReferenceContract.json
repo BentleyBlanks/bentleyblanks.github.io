@@ -1,0 +1,61 @@
+{
+  "asset": "NakajimaKi4",
+  "version": "20261023ReferenceV1",
+  "status": "ReferenceReviewedWithDeclaredInference",
+  "selectedConfiguration": "Photo02's 141（中島製） Army Type94 landplane: bare wheels, two open cockpits, lateral exhaust collectors. Other photos provide shape corroboration only; this is not a claim of a proven production subtype or Tengxian deployment",
+  "notion": "https://app.notion.com/p/40260335331c81ce8b26eb0e1cd6f9cb",
+  "primaryManual": "https://dl.ndl.go.jp/pid/8815746",
+  "manualCatalog": "https://ndlsearch.ndl.go.jp/books/R100000002-I024881858",
+  "primaryManualIdentity": "九四式偵察機説明書, Army Air Headquarters, May 1937 revision; NDL USB-13 R213:0837-0998, RG243 USSBS",
+  "dimensionsM": {
+    "upperSpan": 12.0,
+    "lowerSpan": 8.52,
+    "length": 8.25,
+    "height": 3.31,
+    "wheelTrack": 2.25,
+    "tableUpperChord": 1.72,
+    "tableLowerChord": 1.24,
+    "aerodynamicMeanChord": 1.58,
+    "upperOutlineMaxChord": 2.0,
+    "lowerOutlineMaxChord": 1.25,
+    "wingGap": 1.595,
+    "stagger": 0.4725,
+    "dihedralDegrees": 4,
+    "upperIncidenceDegrees": 2,
+    "lowerIncidenceDegrees": 4,
+    "verticalFinLeftIncidenceDegrees": 3.6666666666666665,
+    "tailplaneSpan": 4.36
+  },
+  "dimensionEvidence": {
+    "generalDimensions": "NDL canvas 5, printed p.1. Primary source gives approximately 8.250 m length and 3.310 m height. These override common secondary 7.73 m / 3.50 m values for this reconstruction.",
+    "wingSection": "NDL canvas 6, printed p.2: NACA M6. Coordinate data from UIUC Airfoil Coordinates Database, https://m-selig.ae.illinois.edu/ads/coord/nacam6.dat",
+    "upperWing": "NDL canvas 73, upper wing general drawing, 6000 mm half span and 2000 mm maximum outline chord; table chord is 1720 mm. The 2250 mm general-spec value is wheel track, not wing chord.",
+    "lowerWing": "NDL canvas 74, lower wing general drawing: 3790 mm outer panel plus center attachment gives 8520 mm span; maximum outline chord 1250 mm, table chord 1240 mm",
+    "gapAndStagger": "NDL canvas6, printed p.2: 翼間隔 approx1.595m, 喰違 approx0.4725m, 後退角0deg, 上反角4deg, 翼取付角 upper2deg/lower4deg, vertical fin left3deg40min. Canvas5 1580 mm is aerodynamic mean chord, 1240 mm is lower-wing chord, 2250 mm is wheel track. These separate columns were rechecked as full labeled crops before final geometry review.",
+    "fuselage": "NDL canvases 64 and 68: frame stations, oval sections and aluminum monocoque skin",
+    "tail": "NDL canvases 83 and 84: horizontal and vertical tail drawings",
+    "gear": "NDL canvas 96: divided landing gear and wheel drawing"
+  },
+  "references": [
+    { "id": "Photo01", "url": "https://commons.wikimedia.org/wiki/File:Ki-4_94siki-tei.jpg", "role": "Frontal oblique silhouette, bare wheels, diagonal rigging, propeller and cowl" },
+    { "id": "Photo02", "url": "https://commons.wikimedia.org/wiki/File:Nakajima_Ki-4.jpg", "role": "Primary three-quarter side silhouette, cowl vents, side paneling, cockpit shoulders, tail and undercarriage" },
+    { "id": "Photo03", "url": "https://commons.wikimedia.org/wiki/File:Ki-4_01_00086145.jpg", "role": "Other front-side view, lower wing size, engine face, struts, exposed wheels, underwing racks" }
+  ],
+  "conflicts": [
+    "Notion incorrectly calls Ki-4 a low-wing monoplane. All three photographs and the original manual show a staggered sesquiplane.",
+    "Modern summaries mostly quote length 7.73 m / height 3.50 m; the opened 1937 primary manual says approximately 8.250 m / 3.310 m. The model follows the primary manual and records the disagreement instead of blending dimensions.",
+    "Photo02 shows the small rear-fuselage marking 141（中島製）. Photo01 has different large fuselage numerals and fin type text; these are not transferred to the selected Photo02 configuration. A photographed marking is not evidence of a Tengxian unit or combat history."
+  ],
+  "inferred": [
+    "Paint hues and material reflectance cannot be measured from monochrome/sepia photographs; use restrained silver-doped fabric, aluminum skin and dark engine cowl as a declared reconstruction.",
+    "Cockpit colors, hidden fastener positions, backside details and internal engine plumbing not resolved by the manual photographs are reconstruction.",
+    "Internal tail-cone recess, balance-horn clearance pocket, exact hinge hardware and operational demonstration limits are functional reconstruction; they are checked against real rigid motion rather than claimed as photo-proven factory details.",
+    "Photo02 marking 141（中島製） is readable; the small prefix is transcribed as 機番 with lower confidence. Noto Sans supplies a reconstruction of the ink letterforms, not a claim of the exact original stencil font. Only the photographed side carries this mark.",
+    "Manual73/74 rib labels 1–38 and 1–23 and the denser outer spacing are retained. Outer upper intervals are readable; remaining inner station positions are calibrated from the scanned drawing and are not claimed as a complete factory dimensional survey.",
+    "Photos are same-type appearance references, not Tengxian field photographs. This asset does not establish Ki-4 participation in the Tengxian city assault."
+  ],
+  "sourceProject": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NakajimaKi4/Scene_NakajimaKi4.blend",
+  "referenceArchive": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NakajimaKi4/References",
+  "axes": "Source Blender X right, +Y nose, +Z up. Export glTF X right, Y up, -Z nose. Meters. Origin on centerline at ground datum.",
+  "requiredPivots": ["Pivot_Propeller", "Pivot_WheelLeft", "Pivot_WheelRight", "Pivot_Rudder", "Pivot_ElevatorLeft", "Pivot_ElevatorRight", "Pivot_AileronLeft", "Pivot_AileronRight"]
+}

@@ -3,7 +3,23 @@
   "about": "史实与创作对照的同步记号。Script_HistoryLedgerAudit.mjs 读它决定从哪里开始看改动、--check 读它拦已否决的链接；skill tengxian-fact-fiction-sync 核对完用 --mark-reviewed 写回。",
   "reviewedAt": "2026-10-22T02:32:38.521Z",
   "repoCommit": "6e0074e1a19a34dc30624cc1a1b5cd70e2f925a5",
+  "assetReviews": [
+    {
+      "asset": "NakajimaKi4",
+      "date": "2026-10-23",
+      "scope": "Ki4 appearance reconstruction only; global repo review anchor and unrelated source-page stamps are preserved",
+      "contract": "Model/NakajimaKi4/Data_ReferenceContract.json",
+      "decision": "Same-type appearance evidence; colors and hidden mechanisms inferred; no promotion to confirmed Tengxian combat aircraft",
+      "notionSnapshots": [{"id":"40260335331c81ce8b26eb0e1cd6f9cb","lastEdited":"2026-10-23T10:13:41.111Z"},{"id":"3fd60335331c8194aa82f0b238084d34","lastEdited":"2026-10-23T08:03:48.815Z"},{"id":"3fd60335331c818fa24deadb6d72ca70","lastEdited":"2026-10-23T08:03:56.299Z"}]
+    }
+  ],
   "notionPages": [
+    {
+      "id": "40260335331c81ce8b26eb0e1cd6f9cb",
+      "title": "九四式侦察机｜航空兵团记载候选",
+      "role": "assetReference",
+      "lastEdited": "2026-10-23T10:13:41.111Z"
+    },
     {
       "id": "3fd60335331c818fa24deadb6d72ca70",
       "title": "史实与创作",

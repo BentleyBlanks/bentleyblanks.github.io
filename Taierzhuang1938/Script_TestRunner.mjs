@@ -50,6 +50,7 @@ export const testDefs = {
   HistoryCodexBrowserTest: {file:"Script_HistoryCodexBrowserTest.mjs",timeoutMs:300000,desc:"Archive: sourced records, soft book folds/cancel/back, 17 pages, zoom, disposal and mobile"},
   TracerLifetimeTest: {file:"Script_TracerLifetimeTest.mjs",desc:"Production tracer short-hit boundary, lifetime, endpoint and strict particle validation"},
   AircraftGeometryTest: { file: "Script_AircraftGeometryTest.mjs", desc: "Reviewed Ki21/Ki30 geometry: triangle reduction, source bounds, protected parts and byte-identical images" },
+  NakajimaKi4AssetTest: { file: "Script_NakajimaKi4AssetTest.mjs", desc: "Ki4 actual GLB: primary dimensions, live hinge hierarchy, UV/PBR, finite normals and noncollapsed triangles" },
   PublishAssetsTest: {file:"Script_PublishAssetsTest.mjs",timeoutMs:120000,desc:"GPU publish pipeline: source/dimension/color contracts, cache validation and overrides"},
   PublishAssetsBrowserTest: {file:"Script_PublishAssetsBrowserTest.mjs",timeoutMs:600000,desc:"Published GPU loaders: BC7/DXT formats, RGBA fallback, both UV directions and model pixel comparisons"},
   MenuStartupTest: {file:"Script_MenuStartupTest.mjs",timeoutMs:180000,desc:"Standalone source/bundle menu: no gameplay payload, resource budget, settings and navigation"},
@@ -684,6 +685,7 @@ export const tier0Fast = [
   "BlanketClothTest",
   "ModelFacingTest",
   "AircraftGeometryTest",
+  "NakajimaKi4AssetTest",
   "TestRunnerTest",
   "ModuleGraphTest",
   "HudPromptTest",
@@ -751,6 +753,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "AssetStandardsTest"] },
   singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "TextureStandardsTest", "AssetStandardsTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
   whiteboxQuality: { label: "白盒画质配置与实机", tests: ["WhiteboxQualityTest", "WhiteboxQualityBrowserTest", "WhiteboxShaderWarmTest"] },
@@ -880,6 +883,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  { domain: "nakajimaKi4", pattern: /NakajimaKi4/ },
   { domain: "singleBlanket", pattern: /SingleBlanket|BlanketCloth|EditorBlockoutBlanket/ },
   { domain: "combat", pattern: /FpsGripCorrective|FpsHandSkinWeights|FpsForearmTaper|FpsWristNormalSeam|FpsHandSelfContact|FpsHandPose|HanYangReloadClearance|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },
   {domain:"historyCodex",pattern:/HistoryCodex|HistoryBook|HistoryConscription|HistoryLedger|page-flip|Texture\/Menu\/History\//},

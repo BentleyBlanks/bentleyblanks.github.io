@@ -179,3 +179,15 @@ GPU 发布浏览器回归同时覆盖 Ki21 和 Ki30，继续保留原分辨率�
 本机完整发布构建和产物校验通过（45 张独立 GPU 贴图、11 个 GLB）；浏览器实际解码两机的
 GPU 图、RGBA 回退和原逻辑路径映射均通过，包围盒一致、无 WebGL 错误。Windows 编码产物
 Ki21 为 6,254,004 bytes、Ki30 为 5,116,992 bytes；Linux CI 编码的最终字节数以线上报告为准。
+
+## Ki-4 独立参考复原（2026-10-23）
+
+`Model/NakajimaKi4/Model_NakajimaKi4.glb` 按 Notion 三张同型照片及1937年原始说明书制作，
+为裸轮、错列不等翼、双开放座舱的中岛 Ki-4。原始资料的轮距、翼弦、间隔及角度已逐列核对；
+现代汇编与原件的尺寸冲突保留在资产契约，未混用。主照片141机的标记与另一张照片的大号数字不拼接。
+
+模型是同型外形参考，不证明 Ki-4 已确认参加滕县城内攻城；未改现有任务机型，也未用它冒充八八式。
+高源与源 `.blend` 留在 OneDrive 独立目录，游戏版保留8个真铰链、Base/Normal/ORM和可复现脚本。
+形制依据、推定、字节身份、派生误差与重导/运动检查见
+[资产说明](../Model/NakajimaKi4/README.md)、[参考契约](../Model/NakajimaKi4/Data_ReferenceContract.json)
+和 [导出审计](../Model/NakajimaKi4/Data_ExportAudit.json)。本地对照页、图像、视频不提交。

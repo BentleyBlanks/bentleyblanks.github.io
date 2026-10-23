@@ -1,0 +1,53 @@
+{
+  "archive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\References",
+  "photos": [
+    {
+      "file": "Ki-4_94siki-tei.jpg",
+      "source": "https://commons.wikimedia.org/wiki/File:Ki-4_94siki-tei.jpg",
+      "originalSha256": "21f207079b124b457beebf5ddacd91236632fa9e21f2651762257746455f746c",
+      "bytes": 225891,
+      "dimensions": [
+        1750,
+        1192
+      ]
+    },
+    {
+      "file": "Nakajima_Ki-4.jpg",
+      "source": "https://commons.wikimedia.org/wiki/File:Nakajima_Ki-4.jpg",
+      "originalSha256": "e1667de54980986ace8477dfe21c6400941cd1b855117bac500190055b4e504b",
+      "bytes": 451808,
+      "dimensions": [
+        1920,
+        1036
+      ]
+    },
+    {
+      "file": "Ki-4_01_00086145.jpg",
+      "source": "https://commons.wikimedia.org/wiki/File:Ki-4_01_00086145.jpg",
+      "originalSha256": "0f62e196502bfc5aec3c3be96e57cf69aae5b7d0439e96bef49096c8cc848c64",
+      "bytes": 230465,
+      "dimensions": [
+        1920,
+        1290
+      ]
+    }
+  ],
+  "manualManifest": "https://dl.ndl.go.jp/api/iiif/8815746/manifest.json",
+  "manualCanvasNumbersUsed": [
+    5,
+    6,
+    64,
+    68,
+    72,
+    73,
+    74,
+    75,
+    83,
+    84,
+    96,
+    99,
+    100,
+    118
+  ],
+  "privacy": "Reference originals and all review media retained locally; not published with the model"
+}

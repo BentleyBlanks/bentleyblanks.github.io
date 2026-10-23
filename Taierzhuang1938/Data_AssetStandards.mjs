@@ -120,6 +120,10 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 }
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
+  Object.freeze({ id: "NakajimaKi4", name: "九四式侦察机（同型参考复原）", pack: "NakajimaKi4/Model_NakajimaKi4.glb",
+    sourceTriangles: 177155, actualTriangles: 110275, targetTriangles: 115000, policy: "target",
+    sourceTexture: "三张同型原图、1937原始说明书；按材质分区程序烘焙", runtimeTexture: "24张内嵌Base / OpenGL Normal / ORM；4K机身与布翼，独立钢、橡胶、皮革和排气PBR",
+    note: "独立资产，不替换任务机型。8个真实铰链，glTF -Z机首/米制；高源与完整高质GLB保留OneDrive，游戏版双向顶点-表面采样误差不超过0.558mm。源重开、实际GLB重导及52单部件+9舵面组合通过；照片不证明滕县参战，配色与隐藏内构明确推定。" }),
   Object.freeze({ id: "Donkey", name: "独立灰驴（无车无套具）", pack: "Donkey/Model_Donkey.glb",
     sourceTriangles: 67028, actualTriangles: 67028, targetTriangles: 67028, policy: "source",
     sourceTexture: "V3 按参考图细化身体与毛流；内置 Imagegen 短硬毛和轮廓毛输入、程序蹄壁、CC0 身体拓扑", runtimeTexture: "UV1重复1K细毛Base/Normal与毛色顶点；附属表面2K/1K/512图集，轮廓毛1K透明PBR，无损WebP内嵌",

@@ -1,0 +1,415 @@
+{
+  "version": "20261023ReferenceV1",
+  "runtime": {
+    "path": "Taierzhuang1938\\Model\\NakajimaKi4\\Model_NakajimaKi4.glb",
+    "sha256": "fa083c48af1c6683ecae4a78358a050b28ff8660e1a5a7e8867d6e9ebda81664",
+    "bytes": 17930524,
+    "triangles": 110275,
+    "meshes": 26,
+    "images": 24
+  },
+  "high": {
+    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\Exports\\Model_NakajimaKi4High.glb",
+    "sha256": "479b0bd63f64e5b1c1b5007c2aa0ed90e27c927881a878fcd8ef7d25879cbefe",
+    "bytes": 19578280,
+    "triangles": 177155,
+    "meshes": 678,
+    "images": 24
+  },
+  "source": {
+    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\Scene_NakajimaKi4.blend",
+    "sha256": "9cff8f208d19be3b26be2e78bb20e5e1766be38bb9cdadade7f6b6e974f7b42d",
+    "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\Scene_NakajimaKi4.blend",
+    "packedImages": 24,
+    "objects": 687,
+    "meshes": 638,
+    "curves": 40,
+    "pivots": [
+      "Pivot_Rudder",
+      "Pivot_AileronLeft",
+      "Pivot_AileronRight",
+      "Pivot_ElevatorLeft",
+      "Pivot_ElevatorRight",
+      "Pivot_Propeller",
+      "Pivot_WheelLeft",
+      "Pivot_WheelRight"
+    ],
+    "reopened": true
+  },
+  "dimensionsGltfXyzM": [
+    12.00002384185791,
+    3.311857223510742,
+    8.2550790309906
+  ],
+  "pbrImages": [
+    {
+      "name": "Texture_Ki4LinenNormal",
+      "size": [
+        4096,
+        2048
+      ],
+      "mode": "RGB",
+      "sha256": "98a514a064e9d88cc380ad1e42e42bf43ac153e971653e1498dfc0e716a637d4",
+      "bytes": 1370262
+    },
+    {
+      "name": "Texture_Ki4LinenOrm",
+      "size": [
+        4096,
+        2048
+      ],
+      "mode": "RGB",
+      "sha256": "1c07c3d0092154dceb9cacb813e38e6d2bf059aace86f9f57d43f320cd05dd3c",
+      "bytes": 1614203
+    },
+    {
+      "name": "Texture_Ki4LinenBase",
+      "size": [
+        4096,
+        2048
+      ],
+      "mode": "RGB",
+      "sha256": "94a8141890970a9033f89f8bf17e155d00f661b33afbc02eeef90c338c7a7a25",
+      "bytes": 536214
+    },
+    {
+      "name": "Texture_Ki4FuselageNormal",
+      "size": [
+        4096,
+        2048
+      ],
+      "mode": "RGB",
+      "sha256": "4050e9c8154b831d7f69e488aa2189684cb7c1a11434aaa91ffb2b3e7cc5bc13",
+      "bytes": 2777717
+    },
+    {
+      "name": "Texture_Ki4FuselageOrm",
+      "size": [
+        4096,
+        2048
+      ],
+      "mode": "RGB",
+      "sha256": "65a9a1adb2f479caf37c4d561c327c70e63765f5f858007e717d60ffb49b9b05",
+      "bytes": 868996
+    },
+    {
+      "name": "Texture_Ki4FuselageBase",
+      "size": [
+        4096,
+        2048
+      ],
+      "mode": "RGB",
+      "sha256": "0c5cdbc3d6169d9ed0ab18ffdb9b5e36ba6c40e7e43b5d21dc81cc69ee009d60",
+      "bytes": 2190014
+    },
+    {
+      "name": "Texture_Ki4AluminumNormal",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "4314716cc24eff3b0ba8934d4fd03534995f3e50c9eead6655bd732a95398687",
+      "bytes": 348229
+    },
+    {
+      "name": "Texture_Ki4AluminumOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "a5ce1ea58115584015aa1d38d5a71a42a38b8dfacc754bff7f013cc2e4edef60",
+      "bytes": 131038
+    },
+    {
+      "name": "Texture_Ki4AluminumBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "ce4f3ec27d2d35faa5fb50c4550f62faa4105bd5b396aa98a6f78fa1257db483",
+      "bytes": 67993
+    },
+    {
+      "name": "Texture_Ki4CowlNormal",
+      "size": [
+        2048,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "5ce0d4a91871781de7c8631f45e93e4db66319423eafb4fa731d626eb14408e8",
+      "bytes": 710747
+    },
+    {
+      "name": "Texture_Ki4CowlOrm",
+      "size": [
+        2048,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "c8eff2457e9e903eb9057e2d051ddbdd5f1157340a16afa2b151aa012b8178bb",
+      "bytes": 242647
+    },
+    {
+      "name": "Texture_Ki4CowlBase",
+      "size": [
+        2048,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "3f895da9b6f090dd3a39dace359e780361f51fa94d399f4c9029b8ddfc77472c",
+      "bytes": 113532
+    },
+    {
+      "name": "Texture_Ki4ExhaustNormal",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "07055e514db67afdd906e55b1bd2884939753942d36a43d28b229cafc7953f96",
+      "bytes": 1190131
+    },
+    {
+      "name": "Texture_Ki4ExhaustOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "3e93df66114fda4bda08f20ac5de2500917201467a6672f7672b492a3b6d1e04",
+      "bytes": 390109
+    },
+    {
+      "name": "Texture_Ki4ExhaustBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "0e6bbd7bce86a978180bacfaafc5afbbff97e448c80677336dae1d1b064fbfd7",
+      "bytes": 268326
+    },
+    {
+      "name": "Texture_Ki4SteelNormal",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "4a5ff30df7e8904a5be6b798e99946d7b7154539c7c5d40440a177d677858a14",
+      "bytes": 347730
+    },
+    {
+      "name": "Texture_Ki4SteelOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "57165a18fa7b8ec0fbdf8fdb4d15cc3437dd51921b84ee8f04ce89a6458400ed",
+      "bytes": 130969
+    },
+    {
+      "name": "Texture_Ki4SteelBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "2071df80cac2f4c2d4b2ac302e64824b334ae4ef9803ebc01ef6cb024365367c",
+      "bytes": 62759
+    },
+    {
+      "name": "Texture_Ki4LeatherNormal",
+      "size": [
+        512,
+        512
+      ],
+      "mode": "RGB",
+      "sha256": "696969dcc597ab973fdb42c2253f1e79e4ef7cbea0d374799a23e9a1b4f0804c",
+      "bytes": 146921
+    },
+    {
+      "name": "Texture_Ki4LeatherOrm",
+      "size": [
+        512,
+        512
+      ],
+      "mode": "RGB",
+      "sha256": "6d5bdf80310e00528fddb7041f6e43351815635baa733faf4b5208028a7acb04",
+      "bytes": 38088
+    },
+    {
+      "name": "Texture_Ki4LeatherBase",
+      "size": [
+        512,
+        512
+      ],
+      "mode": "RGB",
+      "sha256": "fc3c112ed11b0e3928fb25f873582887bf05e6c5c7cde46196bbb1ce0f91f16c",
+      "bytes": 28128
+    },
+    {
+      "name": "Texture_Ki4RubberNormal",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "b0b61b2dc2fa69afa0454326841287f29ab1612968a6c6804f1280e1c2986127",
+      "bytes": 735783
+    },
+    {
+      "name": "Texture_Ki4RubberOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "a2750a99d78887bd03522e59dfb758262c4fc0236086e305930e0ffd2e62b810",
+      "bytes": 131788
+    },
+    {
+      "name": "Texture_Ki4RubberBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "c7adcceb82d4db53d00bf0d3e274200233338a00d2f62505c79f15edf59fd5a4",
+      "bytes": 73874
+    }
+  ],
+  "gameDerivation": [
+    {
+      "name": "Rudder",
+      "before": 2576,
+      "after": 900,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 0.0005578769487328827
+    },
+    {
+      "name": "Fuselage_Monocoque",
+      "before": 19216,
+      "after": 6724,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 7.873089634813368e-05
+    },
+    {
+      "name": "LowerWing_Left",
+      "before": 11084,
+      "after": 3878,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 0.000148889739648439
+    },
+    {
+      "name": "LowerWing_Right",
+      "before": 11084,
+      "after": 3878,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 0.00014777206524740905
+    },
+    {
+      "name": "Aileron_Left",
+      "before": 9006,
+      "after": 3152,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 1.979915214178618e-05
+    },
+    {
+      "name": "Aileron_Right",
+      "before": 9006,
+      "after": 3152,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 0.000395970739191398
+    },
+    {
+      "name": "Elevator_Left",
+      "before": 1424,
+      "after": 498,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 0.0002457250957377255
+    },
+    {
+      "name": "Elevator_Right",
+      "before": 1424,
+      "after": 498,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 0.00024573886184953153
+    },
+    {
+      "name": "Tailplane_Left",
+      "before": 1628,
+      "after": 568,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 0.0002903786953538656
+    },
+    {
+      "name": "Tailplane_Right",
+      "before": 1628,
+      "after": 568,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 0.00029037866625003517
+    },
+    {
+      "name": "UpperWing_InboardLeft",
+      "before": 6212,
+      "after": 2174,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 0.00019470442202873528
+    },
+    {
+      "name": "UpperWing_InboardRight",
+      "before": 6212,
+      "after": 2174,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 0.00021383544662967324
+    },
+    {
+      "name": "UpperWing_MainLeft",
+      "before": 9006,
+      "after": 3152,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 0.00013458407192956656
+    },
+    {
+      "name": "UpperWing_MainRight",
+      "before": 9006,
+      "after": 3152,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 0.00015165918739512563
+    },
+    {
+      "name": "UpperWing_TipLeft",
+      "before": 2180,
+      "after": 762,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 0.0001409152609994635
+    },
+    {
+      "name": "UpperWing_TipRight",
+      "before": 2180,
+      "after": 762,
+      "ratio": 0.35,
+      "maxVertexSurfaceErrorM": 0.00014727804227732122
+    }
+  ],
+  "rigidMotionAudit": {
+    "actualGlbReimport": true,
+    "singleComponentSamples": 52,
+    "combinedControlSamples": 9,
+    "trueTriangleIntersections": 0,
+    "maxRadialDriftM": 1.0838191664142016e-06,
+    "maxPivotDriftM": 0.0
+  },
+  "scriptHashPolicy": "UTF-8 with LF line endings; all binary asset hashes remain exact",
+  "scripts": {
+    "Script_NakajimaKi4Audit.py": "d751d258103b16475e77b817bbbabc09c554eb3ef37f1c740b8dbacdcba5c09e",
+    "Script_NakajimaKi4Build.py": "b5bfc553a0a4306cad82f950ca523947ef642fe797a26837967656a2080b138b",
+    "Script_NakajimaKi4Receipt.py": "7a20040f9e2c1168bb3a77f520aa0bf537c58136b3c7531bff41374d1ea62b31",
+    "Script_NakajimaKi4Textures.py": "3a60f322a308c4857b70ebf70b5477966993be9a6141893339b57e016bb410ee"
+  }
+}

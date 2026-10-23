@@ -1,0 +1,37 @@
+{
+  "state": "ReviewedAgainstAvailableReferenceWithDeclaredInference",
+  "version": "20261023ReferenceV1",
+  "runtimeSha256": "fa083c48af1c6683ecae4a78358a050b28ff8660e1a5a7e8867d6e9ebda81664",
+  "mainReference": "Photo02 / Nakajima_Ki-4.jpg / 141（中島製）",
+  "camera": {
+    "azimuthRadians": 1.45,
+    "elevationRadians": -0.04,
+    "radiusM": 14.6,
+    "targetGltfM": [
+      0,
+      2,
+      0.4
+    ],
+    "lensRecovery": "Estimated alignment; original photographic lens parameters are not known",
+    "parkedPitchDegrees": 7.2
+  },
+  "reviewed": [
+    "All three original photographs actually viewed, including localized stencil and structure crops",
+    "Gray silhouette before UV/PBR; front/side/top and primary oblique comparison",
+    "Original manual dimensions and labels rechecked as paired labeled crops",
+    "Staggered sesquiplane, NACA M6 section, original incidence/dihedral/fin setting",
+    "Two open cockpit apertures, windscreen frames, ring mount and nine-cylinder radial",
+    "Bare divided gear, 2.25m wheel track, correctly independent wheel hubs",
+    "Upper38/lower23 rib numbering and denser outer rib sequence",
+    "Photo02 factory marking only; Photo01 alternative markings excluded",
+    "PBR material separation, localized wear/oxidation, no light baked into BaseColor",
+    "Actual GLB reopened; rigid hinge and combined surface tests; all real UI controls"
+  ],
+  "knownUnaddressedVisibleDefects": [],
+  "inferenceIsNotProof": [
+    "Exact paint hue, micro-weathering and hidden cockpit/engine details",
+    "Prefix and letterform reconstruction of the small factory stencil",
+    "Exact unreadable inner rib intervals and hidden control-hinge recess hardware"
+  ],
+  "evidenceLocal": "tmp/NakajimaKi4 and OneDrive NakajimaKi4/Evidence; acceptance pages and images are not published"
+}

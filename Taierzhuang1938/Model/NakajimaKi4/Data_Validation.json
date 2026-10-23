@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-23",
+  "modelSpecific": {
+    "actualSavedSourceReopened": true,
+    "actualDeliveredGlbReimported": true,
+    "singlePartPoses": 52,
+    "combinedControlPoses": 9,
+    "trianglePenetrations": 0,
+    "uiControls": 8,
+    "pbrImageCount": 24,
+    "byteIdentityAndUvNormals": true,
+    "visualReview": "Gray reference alignment followed by PBR review; see Data_ReferenceReview.json"
+  },
+  "passedRepositoryChecks": [
+    "NakajimaKi4AssetTest",
+    "AssetStandardsTest",
+    "HistoryLedgerCheck",
+    "TextTest",
+    "ModuleGraphTest",
+    "HistoryCodexBrowserTest",
+    "MenuStartupTest (source and bundle)",
+    "MotionVectorContractTest",
+    "GeoTest",
+    "TextGatherCheck"
+  ],
+  "localDependencyNote": "MenuStartup rerun used the already-installed project esbuild0.28.2 through a temporary resolver; shared dependency directories were not changed",
+  "existingBaselines": [
+    {
+      "test": "TestRunnerTest",
+      "symptom": "Six existing production files lack domain mappings",
+      "confirmedAgainstUnmodifiedRunner": true,
+      "files": [
+        "Data_ToolsHome.mjs",
+        "Icon_TabSeal16.png",
+        "Icon_TabSeal180.png",
+        "Icon_TabSeal32.png",
+        "Script_FirstPersonGait.mjs",
+        "Script_ToolsHomeField.mjs"
+      ]
+    },
+    {
+      "test": "BootTest",
+      "symptom": "Phase0 VFX-mask readiness timeout and legacy phase distant-IJA-readable material marker count0; full runner also hit240s timeout",
+      "baselineCommit": "453d31c6e38af1bf9ed1247bc48dc41eb28626de",
+      "baselineRootClean": true,
+      "baselineProbe": "The unchanged BootTest logic for phases0and1 was served from the clean main checkout and reproduced both failure classes; this is a scoped diagnostic, not a claim that the full baseline test passes",
+      "gameplayOrShaderCodeChangedByKi4": false
+    }
+  ],
+  "claim": "Model/reference and related scoped checks passed. This receipt does not claim a clean full-repository prepush run."
+}
