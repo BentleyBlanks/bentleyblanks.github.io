@@ -1,4 +1,4 @@
-"""Apply the measured V4 recipe in a separate request after opening Blender."""
+"""Apply the current measured recipe after opening the frozen source."""
 import bpy,json
 from pathlib import Path
 
@@ -13,7 +13,7 @@ record['coat'].update(report['groom'])
 record['coat'].update({'version':report['version'],'detailNormalUv':'FurDetailUV; measured short-coat flow, 0.45 m per texture repeat',
     'detailTexelsPerMetre':1024/.45,'pigment':'calibrated three-view charcoal gray, pale underside and short muzzle; dark chest, coarse short fibre microcontrast',
     'bodyShape':'measured body and foot stance, closed rebuilt neck, rounded sternum, corrected eyes, nasal apertures, ears, mane and tail brush'})
-record['geometrySkinAndActions']='V4 reference fit from preserved bare V3; 28 compatible bones, new rest joints and re-solved walk/idle; closed manifold skin'
+record['geometrySkinAndActions']=report['version']+' fit from preserved bare V3; 28 compatible bones, updated rest joints and re-solved walk/idle; closed manifold skin'
 (base/'Data_Derivation.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8')
 bpy.ops.wm.save_as_mainfile(filepath=str(base/'Scene_Donkey.blend'))
 print(json.dumps(report))

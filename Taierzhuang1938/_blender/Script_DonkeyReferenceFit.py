@@ -237,17 +237,33 @@ def RebuildNostrils(skin):
     shader.inputs['Roughness'].default_value=.90;shader.inputs['Specular IOR Level'].default_value=.12
     reports=[]
     for side,sign in (('Left',-1),('Right',1)):
-        point,_,_,_=tree.ray_cast(Vector((sign*.045,2,.919)),Vector((0,-1,0)),1)
+        point,_,_,_=tree.ray_cast(Vector((sign*.048,2,.926)),Vector((0,-1,0)),1)
         if point is None:raise RuntimeError('Missing muzzle for nasal aperture')
-        normal=Vector((sign*.58,.81,.03)).normalized();u=Vector((0,0,1)).cross(normal).normalized();v=normal.cross(u).normalized()
+        normal=Vector((sign*.70,.714,.03)).normalized();u=Vector((0,0,1)).cross(normal).normalized();v=normal.cross(u).normalized()
+        v=(v*math.cos(math.radians(30))-u*(sign*math.sin(math.radians(30)))).normalized();u=v.cross(normal).normalized()
+        radiusU,radiusV=.0115,.024
         remove=[]
         for face in bm.faces:
             delta=face.calc_center_median()-point
-            vertical=delta.dot(v);horizontal=delta.dot(u)+sign*.25*vertical
-            radius=(horizontal/.0145)**2+(vertical/.0235)**2
+            vertical=delta.dot(v);horizontal=delta.dot(u)
+            radius=(horizontal/radiusU)**2+(vertical/radiusV)**2
             if radius<1 and abs(delta.dot(normal))<.022:remove.append(face)
         if not remove:raise RuntimeError('Nasal aperture did not intersect the skin')
-        bmesh.ops.delete(bm,geom=remove,context='FACES')
+        selected=set(remove);remaining=set(bm.faces)-selected;islandFaces=0
+        # A former closed nasal patch can sit deeper than the new ellipse and
+        # survive as an island inside its annular face selection. Fill only
+        # retained components wholly local to, and enclosed by, this cut.
+        while remaining:
+            seed=remaining.pop();component={seed};queue=[seed];adjacent=False
+            while queue:
+                for edge in queue.pop().edges:
+                    for other in edge.link_faces:
+                        if other in selected:adjacent=True
+                        if other in remaining:remaining.remove(other);component.add(other);queue.append(other)
+            vertices={vertex for face in component for vertex in face.verts}
+            if adjacent and len(component)<300 and all((vertex.co-point).length<.060 for vertex in vertices):
+                selected.update(component);islandFaces+=len(component)
+        bmesh.ops.delete(bm,geom=list(selected),context='FACES')
         edges={e for e in bm.edges if e.is_boundary and all((p.co-point).length<.060 for p in e.verts)}
         vertices={p for e in edges for p in e.verts}
         if len(vertices)<6:raise RuntimeError('Incomplete nasal boundary')
@@ -259,19 +275,19 @@ def RebuildNostrils(skin):
         if len(ordered)!=len(vertices):raise RuntimeError('Nasal boundary has multiple components')
         inner=[];lips=[]
         for vertex in ordered:
-            delta=vertex.co-point;angle=math.atan2(delta.dot(v)/.0235,(delta.dot(u)+sign*.25*delta.dot(v))/.0145)
-            dz=.0235*math.sin(angle);du=.0145*math.cos(angle)-sign*.25*dz
+            delta=vertex.co-point;angle=math.atan2(delta.dot(v)/radiusV,delta.dot(u)/radiusU)
+            dz=radiusV*math.sin(angle);du=radiusU*math.cos(angle)
             border=point+u*du+v*dz
             surface,_,_,_=tree.ray_cast(border+normal*.05,-normal,.1)
             vertex.co=surface if surface is not None else border
-            lip=bm.verts.new(vertex.co+normal*.004);lip[deform][head]=1;lips.append(lip)
+            lip=bm.verts.new(vertex.co+normal*.003);lip[deform][head]=1;lips.append(lip)
             p=bm.verts.new(point+(vertex.co-point)*.72-normal*.023);p[deform][head]=1;inner.append(p)
         for i in range(len(ordered)):
             j=(i+1)%len(ordered)
             face=bm.faces.new((ordered[i],ordered[j],lips[j],lips[i]));face.material_index=0;face.smooth=True
             face=bm.faces.new((lips[i],lips[j],inner[j],inner[i]));face.material_index=material;face.smooth=True
         face=bm.faces.new(tuple(reversed(inner)));face.material_index=material;face.smooth=True
-        reports.append({'side':side,'centre':list(point),'radiiM':[.0145,.0235],'depthM':.023,'rimHeightM':.004,'boundaryVertices':len(ordered)})
+        reports.append({'side':side,'centre':list(point),'radiiM':[radiusU,radiusV],'axisTiltDeg':30,'normal':list(normal),'depthM':.023,'rimHeightM':.003,'boundaryVertices':len(ordered),'removedEnclosedPatchFaces':islandFaces})
     bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));bm.to_mesh(skin.data);bm.free();skin.data.update()
     return reports
 
@@ -412,8 +428,21 @@ def CalibrateCoatPigment(skin):
         abdomen=Smooth(-.065,.035,y)*(1-Smooth(.515,.655,y))
         belly=pale*height*abdomen;value*=1+.80*belly;value.y*=1-.03*belly;value.z*=1-.06*belly
         colors.data[vertex.index].color=(*[min(.65,c) for c in value],1);changed+=1
-    return {'vertices':changed,'darkLinearFactors':list(factors),'bodyPaleGain':1.27,'bellyPaleGain':1.80,'bellyPaleTint':[1,.97,.94],
+    muzzle=CalibrateMuzzlePigment(skin)
+    return {'vertices':changed,'darkLinearFactors':list(factors),'bodyPaleGain':1.27,'bellyPaleGain':1.80,'bellyPaleTint':[1,.97,.94],'muzzle':muzzle,
             'basis':'matched neutral studio illumination and visible original three-view coat patches'}
+
+def CalibrateMuzzlePigment(skin):
+    colors=skin.data.color_attributes['CoatColor'];changed=0
+    for vertex in skin.data.vertices:
+        x,y,z=vertex.co;value=Vector(colors.data[vertex.index].color[:3])
+        pale=Smooth(.06,.18,sum(value)/3)
+        weight=pale*Smooth(1.10,1.22,y)*Smooth(.915,.955,z)*(1-Smooth(1.045,1.11,z))
+        if weight<=0:continue
+        central=1-Smooth(.025,.060,abs(x));gain=1.70+1.50*central
+        tint=(1,1.01,1.10)
+        colors.data[vertex.index].color=(*[min(.80,value[i]*(1+(gain*tint[i]-1)*weight)) for i in range(3)],1);changed+=1
+    return {'vertices':changed,'sideGain':1.70,'centralGain':3.20,'centralFalloffM':[.025,.060],'lowerLipFadeZ':[.915,.955],'tint':[1,1.01,1.10],'maxAlbedo':.80}
 
 def RefineFiberAlbedo(base):
     # Read the immutable V3 image, so rerunning cannot compound contrast.
@@ -467,6 +496,7 @@ def RefineEyes(skin,rig):
         eye=bpy.data.objects['DonkeyEye'+side];matrix=inverse@eye.matrix_world
         centre=sum((matrix@v.co for v in eye.data.vertices),Vector())/len(eye.data.vertices)
         normal=Vector((sign*.78,.62,.03)).normalized();axis=Vector((0,0,1)).cross(normal).normalized();up=normal.cross(axis).normalized()
+        tilt=-sign*math.radians(12);axis=(axis*math.cos(tilt)+up*math.sin(tilt)).normalized();up=normal.cross(axis).normalized()
         hit,_,_,_=tree.ray_cast(centre+normal*.1,-normal,.2)
         centre=hit+normal*.004
         # Rebuild the dark aperture around its actual surface centre. The
@@ -498,7 +528,7 @@ def RefineEyes(skin,rig):
         paint=shader.id_data.nodes.get('ReferenceEyePigment') or shader.id_data.nodes.new('ShaderNodeVertexColor')
         paint.name='ReferenceEyePigment';paint.layer_name='EyePigment'
         shader.id_data.links.new(paint.outputs['Color'],shader.inputs['Base Color'])
-        shader.inputs['Roughness'].default_value=.14;shader.inputs['Specular IOR Level'].default_value=.50
+        shader.inputs['Roughness'].default_value=.20;shader.inputs['Specular IOR Level'].default_value=.50
         for name in ('DonkeyPaleEyeRing'+side,'DonkeyEyelidMargin'+side):
             obj=bpy.data.objects[name];matrix=inverse@obj.matrix_world;back=matrix.inverted()
             if 'PaleEyeRing' in name:
@@ -509,7 +539,7 @@ def RefineEyes(skin,rig):
                     p=centre+axis*(rx*math.cos(angle))+up*(rz*math.sin(angle))
                     hit,_,_,_=tree.ray_cast(p+normal*.05,-normal,.13)
                     if hit is not None:vertex.co=back@(hit+normal*.0013)
-                    shade=[.19,.105,.028][row]*(.85+.30*max(0,math.sin(angle)))
+                    shade=[.14,.065,.027][row]*(1+1.15*max(0,math.sin(angle)))
                     colors.data[vertex.index].color=(shade,shade*.93,shade*.79,1)
             if 'EyelidMargin' in name:
                 vertices=list(obj.data.vertices)
@@ -554,7 +584,7 @@ def ApplyReferenceFit(scene,base):
     anchor=feet['DonkeyFrontLeft'].y
     legZ=[(0,0),(.18,.18),(.38,.375),(.39,.38),(.73,.70),(.94,.93),(1.1,1.08),(1.6,1.57)]
     headZ=[(.80,.80),(.95,.915),(1.10,1.06),(1.245,1.191),(1.355,1.31),(1.60,1.57)]
-    width=[(0,1.20),(.04,1.20),(.10,1.10),(.20,1.0),(.40,1.0),(.50,.82),(.60,.92),(.70,1.25),(.80,1.30),(.90,1.20),(1.0,1.15),(1.10,.98),(1.25,1.0),(1.60,1.0)]
+    width=[(0,1.29),(.04,1.29),(.10,1.14),(.20,1.0),(.40,1.0),(.50,.82),(.60,.92),(.70,1.25),(.80,1.30),(.90,1.20),(1.0,1.15),(1.10,.98),(1.25,1.0),(1.60,1.0)]
     top=[(-.30,-.01),(-.05,.004),(.15,.020),(.30,.033),(.45,.026),(.60,-.036),(.72,-.020),(.88,0)]
     longitudinal=[(-.40,-.22),(-.32,-.20),(-.26,-.18),(-.15,-.09),(-.05,.005),(.15,.185),(.30,.33),(.60,.615),(.69,.69),(.90,.90),(1.50,1.50)]
     def Field(p,row,name='',bone=False):
@@ -628,19 +658,25 @@ def ApplyReferenceFit(scene,base):
     bpy.ops.object.mode_set(mode='OBJECT')
     hoofRefinement=RefineReferenceHooves(skin)
     chestTriangles=RebuildBreast(skin,rig)
-    cavities=CloseHeadCavities(skin);nasalFairing=FairNasalSurface(skin,cavities);nostrils=RebuildNostrils(skin)
     topologyNamespace={}
     exec(compile((project/'_blender/Script_DonkeyTopology.py').read_text(encoding='utf-8'),'Script_DonkeyTopology.py','exec'),topologyNamespace)
+    topologyNamespace['RemoveLegacyNasalShells'](skin)
+    cavities=CloseHeadCavities(skin);nasalFairing=FairNasalSurface(skin,cavities)
+    faceNamespace={}
+    exec(compile((project/'_blender/Script_DonkeyFaceSculpt.py').read_text(encoding='utf-8'),'Script_DonkeyFaceSculpt.py','exec'),faceNamespace)
+    faceSculpt=faceNamespace['RefineReferenceFace'](skin,rig)
+    nostrils=RebuildNostrils(skin)
     topology=topologyNamespace['RepairReferenceSkin'](skin)
     SeatMane(skin,rig);earOffsets=SeatEars(skin,rig);FitEarContours(rig);details=TailAndMouth(rig,collection)
     details['hooves']=hoofRefinement
+    details['faceSculpt']=faceSculpt
     hairNamespace={}
     exec(compile((project/'_blender/Script_DonkeyHair.py').read_text(encoding='utf-8'),'Script_DonkeyHair.py','exec'),hairNamespace)
     details['mane']=hairNamespace['RebuildReferenceMane'](skin,rig,collection)
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261024ReferenceV5'
+    scene['DonkeyReferenceFitRevision']='20261024ReferenceV6'
     scene['DonkeyReferenceFitAnchorY']=anchor
     # Repaint the short pale muzzle rather than the old long horse-like blaze.
     colors=skin.data.color_attributes['CoatColor']

@@ -37,8 +37,7 @@ def OrientComponents(bm):
     bm.normal_update()
     return {'flippedFaces':flipped,'components':sorted(rows,key=lambda r:r['faces'],reverse=True)}
 
-def RepairReferenceSkin(skin):
-    bm=bmesh.new();bm.from_mesh(skin.data)
+def RemoveNasalShells(bm):
     # The old boolean left two closed nasal cutter shells inside the muzzle.
     # They are separate from the animal and from the newly connected apertures.
     removed=0
@@ -46,6 +45,17 @@ def RepairReferenceSkin(skin):
         vertices={v for f in faces for v in f.verts}
         if 20<len(faces)<400 and all(v.co.y>1.20 and .88<v.co.z<1.03 and abs(v.co.x)<.11 for v in vertices):
             removed+=len(faces);bmesh.ops.delete(bm,geom=list(faces),context='FACES')
+    return removed
+
+def RemoveLegacyNasalShells(skin):
+    bm=bmesh.new();bm.from_mesh(skin.data);removed=RemoveNasalShells(bm)
+    bm.to_mesh(skin.data);bm.free();skin.data.update()
+    skin['removedLegacyNasalFaces']=removed
+    return removed
+
+def RepairReferenceSkin(skin):
+    bm=bmesh.new();bm.from_mesh(skin.data)
+    removed=skin.get('removedLegacyNasalFaces',0)+RemoveNasalShells(bm)
     # Replace the narrow graft band instead of capping its overlapping seams.
     z0,z1=.425,.470
     for z in (z0,z1):

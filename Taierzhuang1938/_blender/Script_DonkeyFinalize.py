@@ -79,7 +79,7 @@ contract={'schema':'tengxian-independent-rigged-prop-v1','id':'Donkey','version'
  'sampleCount':len(imported['samples']),'webpPixelsUnchanged':True,'geometrySkinActionsUnchangedDuringPacking':packing['geometrySkinActionsUnchanged'],
  'nativeStanceSoleRangeM':native['stanceSoleRangeM'],'nativeStanceDriftPerFrameM':native['worstStanceDriftPerFrameM'],
  'reimportedIdleStanceSoleRangeM':imported['idleStanceSoleRangeM'],
- 'parentSourceUnchanged':True,'sourceAnatomyEvidence':'V4 measured silhouette, closed manifold neck/skin, rebuilt eyes and nasal cavities; updated compatible rest joints and four-influence skin. Native clips and the packed GLB are independently sampled.' if reference else 'V2 bone layout and hoof surfaces retained; native and packed clips sampled.'},
+ 'parentSourceUnchanged':True,'sourceAnatomyEvidence':'Measured three-view silhouette, closed manifold neck/skin, orbital relief, rebuilt eyes and swept nasal cavities; compatible rest joints and four-influence skin. Native clips and the packed GLB are independently sampled.' if reference else 'V2 bone layout and hoof surfaces retained; native and packed clips sampled.'},
  'editableSource':str(base/'Scene_Donkey.blend'),'credits':parent['credits'],
  'reconstructionScope':'灰驴的比例、毛色与表面细节沿用用户参考图创作复原；尺寸为建模定标，不作为史料规格。',
  'historicalReferences':[],'rebuild':'node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs'}
