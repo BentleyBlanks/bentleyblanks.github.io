@@ -1,0 +1,70 @@
+{
+  "schema": "tengxian-type88-photo-tail-v1",
+  "source": "https://commons.wikimedia.org/wiki/File:Kawasaki_KDA-2_03_(1_20th_scale_model).png",
+  "author": "Motokoka",
+  "license": "CC BY-SA 4.0",
+  "scope": "Museum-reference reconstruction. The visible U-shaped split defines an elevator with an outer forward balance. Heights, sections, joint details and fixed alignment are photographic inferences, not factory dimensions.",
+  "mechanismCrossCheck": "Airwar kda2-2 Type I scheme shows the same forward outer balance; used only to interpret the split, not to replace the Type II reference or its dimensions.",
+  "frame": {
+    "midHeightM": 2.135,
+    "yawDegrees": -2.0733553,
+    "centreAftM": 5.15,
+    "visibleSplitAftM": 5.309,
+    "hingeAxisAftM": 5.341,
+    "hornSplitSpanM": 1.818,
+    "halfSpanM": 2.14
+  },
+  "planform": {
+    "leadingRootSpanM": 0.08,
+    "leadingRootAftM": 4.50,
+    "leadingHornAftM": 4.87,
+    "leadingTipAftM": 5.10,
+    "trailingInnerAftM": 5.785,
+    "trailingTipAftM": 5.48,
+    "movingInnerLeadingSpanM": 0.12,
+    "movingInnerTrailingSpanM": 0.285
+  },
+  "mechanics": {
+    "fixedThicknessM": 0.075,
+    "movingThicknessM": 0.06,
+    "hingeNoseRadiusM": 0.03,
+    "hingeGapM": 0.004,
+    "hornSideGapM": 0.006,
+    "trailingEdgeThicknessM": 0.002
+  },
+  "rudderMechanics": {
+    "hingeAftM": 5.33,
+    "noseRadiusM": 0.0375,
+    "hingeGapM": 0.004,
+    "noseBottomHeightM": 1.76,
+    "noseTopHeightM": 2.626,
+    "scope": "Rounded skin nose about the real yaw axis; section and clearance inferred, rather than a wide open slit."
+  },
+  "verticalTail": {
+    "fixedTopHeightM": 2.62,
+    "balanceGapM": 0.006,
+    "balanceForeAftM": 4.84,
+    "referenceRudderDegrees": 13.55,
+    "neutralRearExtentM": 6.14,
+    "fixedLeadingYZ": [[1.85, 4.42], [2.16, 4.413], [2.62, 4.84]],
+    "balanceLeadingYZ": [[2.626, 4.84], [2.86, 4.94], [3.119478, 5.048757]],
+    "rearCurveYZ": [[3.119478, 5.048757], [2.998094, 5.256293], [2.627116, 5.606951], [1.799862, 6.045251], [1.545778, 6.145959], [1.405165, 6.088184]],
+    "lowerCurveYZ": [[1.405165, 6.088184], [1.43, 5.90], [1.65, 5.40], [1.70, 5.33]],
+    "scope": "Visible balanced-rudder layout, cross-checked with Type II side photographs. High/game curve and bevel detail are compensated about the hinge to retain the same 12.28m neutral length anchor. The non-neutral photograph pose and unmeasured section/joint dimensions are explicitly inferred."
+  },
+  "typeLabel": {
+    "centreHeightM": 2.79333,
+    "centreAftM": 5.24429,
+    "widthM": 0.62,
+    "heightM": 0.128,
+    "baselineSlopeHeightPerAft": -0.40,
+    "scope": "Readable type designation placed on the moving upper balance; opposite side placement inferred."
+  },
+  "observations": {
+    "calibrationFramePixels": [600, 612],
+    "visibleSplitLineRmsPixels": 0.1397588338,
+    "upperSurfaceHeightAssumptionM": 2.165,
+    "hingeEndSpansAfterRectificationM": [1.8150067168, -1.8206829849],
+    "note": "The paired split endpoints constrain a common span in this photographic frame. This does not establish original-aircraft installation tolerances."
+  }
+}

@@ -15,7 +15,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 
 DEFAULT_SOURCE = Path(r"C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\KawasakiType88")
-VERSION = "20261024Surface09"
+VERSION = "20261024Surface11"
 
 
 def Field(width, height, seed, frequencies=(8, 32, 128)):
@@ -195,17 +195,26 @@ class SurfaceBake:
         self.Save("Fuselage", image, orm, [11.9, 2.6], "Body fabric and metal engine panels; darker painted top, localized oil, restrained panel oxidation. Serial/manufacturer legend follows the museum model.")
 
     def Fin(self):
-        w = h = 1024
+        w, h = 2048, 1024
         u, v = Grid(w, h)
         field = Field(w, h, 122, (8, 40, 180))
         base = np.ones((h, w, 3), np.float32) * np.array([.705, .72, .675])
         base *= 1 + field[..., None] * .03
         image = Image.fromarray(RGB(base))
-        self.Stamp(image, "八八式偵察機", .61, .35, .40, .08, (73, 76, 64), cjk=True)
+        paintPath = Path(__file__).resolve().parents[1] / "Model/KawasakiType88/Data_KawasakiType88Paint.json"
+        paint = json.loads(paintPath.read_text(encoding="utf-8"))
+        mask = Image.new("L", (w, h))
+        draw = ImageDraw.Draw(mask)
+        for mark in paint["finMarks"]:
+            draw.polygon([(round(u * w), round((1 - v) * h)) for u, v in mark["uv0"]], fill=0 if mark["hole"] else 255)
+        image.paste((112, 115, 101), mask=mask)
         orm = np.stack((np.ones_like(u), .65 + field * .05, np.full_like(u, .09)), axis=2)
+        ink = np.asarray(mask) > 0
+        orm[ink, 1] = .74
+        orm[ink, 2] = 0
         ink = np.max(np.asarray(image), axis=2) < 120
         orm[ink, 1], orm[ink, 2] = .75, 0
-        self.Save("Fin", image, orm, [2.2, 1.6], "Museum-model tail legend; the photograph's triangular dark areas are treated as shadows, not painted into albedo.")
+        self.Save("Fin", image, orm, [4.4, 1.6], "Two-side atlas of visible museum-model tail ink; opposite-side placement inferred. The photograph's triangular dark areas are shadows, not albedo.")
 
     def Material(self, name, kind, color, roughness, metallic):
         n = 1024
@@ -301,7 +310,7 @@ class SurfaceBake:
             self.DetailNormal(*args)
         paintPath = Path(__file__).resolve().parents[1] / "Model/KawasakiType88/Data_KawasakiType88Paint.json"
         manifest = {"version": VERSION, "generator": str(Path(__file__).name), "albedoContainsLighting": False,
-                    "paintContours": {"file": paintPath.name, "sha256": hashlib.sha256(paintPath.read_bytes()).hexdigest(), "scope": "Legible museum wing numerals only; constant authored paint colour"},
+                    "paintContours": {"file": paintPath.name, "sha256": hashlib.sha256(paintPath.read_bytes()).hexdigest(), "scope": "Legible museum wing numerals and visible tail ink contours; constant authored paint colour. Opposite-side tail placement is inferred."},
                     "referenceScheme": "Kakamigahara Type 88-II scale model 12; not a verified Uchida squadron aircraft", "files": self.records}
         (self.root / "Data_SurfaceSources.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         print(json.dumps({"version": VERSION, "files": len(self.records), "root": str(self.root)}))

@@ -1,14 +1,14 @@
 {
   "version": "20261023LosslessWebp01",
   "output": "Model_KawasakiType88.glb",
-  "inputSha256": "094a8d9f328b615a6089a287beab0e3105003a55c365a6442e289ec1965ee0f5",
-  "outputSha256": "78da1f70719c9f9724f3c201743f44a35f70525e631dbbee1f1e3f9783e5f48e",
-  "inputBytes": 17167456,
-  "outputBytes": 12391100,
+  "inputSha256": "612c6f0d72fb0b5b57c2521ed8aa8ed6ef0ecb380123ff600c2ca78ee518c324",
+  "outputSha256": "84a5bd30b17ed728c18e8a48089af255e21f392700e0036f49571412092918fe",
+  "inputBytes": 17220680,
+  "outputBytes": 12397704,
   "nodesPreserved": true,
   "meshesPreserved": true,
   "accessorsPreserved": true,
-  "nonImageBufferViewsPreserved": 279,
+  "nonImageBufferViewsPreserved": 292,
   "imageCount": 34,
   "images": [
     {
@@ -35,10 +35,10 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "a90f0f042f0f473a497df90f465aace4db3276d5311e6e1ff5cc60257df8916a",
-      "decodedPixelsSha256": "a90f0f042f0f473a497df90f465aace4db3276d5311e6e1ff5cc60257df8916a",
-      "sourceBytes": 3073935,
-      "webpBytes": 1530650,
+      "sourcePixelsSha256": "050d5614949a6831e38b9b640e774c80f0f24822324019b6daab7447ca9eb86f",
+      "decodedPixelsSha256": "050d5614949a6831e38b9b640e774c80f0f24822324019b6daab7447ca9eb86f",
+      "sourceBytes": 3021187,
+      "webpBytes": 1462428,
       "pixelExact": true
     },
     {
@@ -223,36 +223,6 @@
     },
     {
       "index": 14,
-      "name": "Texture_Type88FabricPlainBase",
-      "size": [
-        1024,
-        1024
-      ],
-      "mode": "RGB",
-      "sourceMime": "image/png",
-      "sourcePixelsSha256": "4c22a013eeb1adf4b9722d0307b47c1a62ba72479c1784fd0a244bcaff990738",
-      "decodedPixelsSha256": "4c22a013eeb1adf4b9722d0307b47c1a62ba72479c1784fd0a244bcaff990738",
-      "sourceBytes": 446968,
-      "webpBytes": 314736,
-      "pixelExact": true
-    },
-    {
-      "index": 15,
-      "name": "Texture_Type88FabricPlainOrm",
-      "size": [
-        1024,
-        1024
-      ],
-      "mode": "RGB",
-      "sourceMime": "image/png",
-      "sourcePixelsSha256": "094b5b6f84ff2679d0e0e9dfeb3e833440671c05dcd0148c060eecc682388139",
-      "decodedPixelsSha256": "094b5b6f84ff2679d0e0e9dfeb3e833440671c05dcd0148c060eecc682388139",
-      "sourceBytes": 287683,
-      "webpBytes": 193964,
-      "pixelExact": true
-    },
-    {
-      "index": 16,
       "name": "Texture_Type88AluminumBase",
       "size": [
         1024,
@@ -267,7 +237,7 @@
       "pixelExact": true
     },
     {
-      "index": 17,
+      "index": 15,
       "name": "Texture_Type88AluminumOrm",
       "size": [
         1024,
@@ -282,7 +252,7 @@
       "pixelExact": true
     },
     {
-      "index": 18,
+      "index": 16,
       "name": "Texture_Type88CockpitBase",
       "size": [
         1024,
@@ -297,7 +267,7 @@
       "pixelExact": true
     },
     {
-      "index": 19,
+      "index": 17,
       "name": "Texture_Type88CockpitOrm",
       "size": [
         1024,
@@ -312,7 +282,7 @@
       "pixelExact": true
     },
     {
-      "index": 20,
+      "index": 18,
       "name": "Texture_Type88ExhaustNormal",
       "size": [
         512,
@@ -327,7 +297,7 @@
       "pixelExact": true
     },
     {
-      "index": 21,
+      "index": 19,
       "name": "Texture_Type88ExhaustBase",
       "size": [
         1024,
@@ -342,7 +312,7 @@
       "pixelExact": true
     },
     {
-      "index": 22,
+      "index": 20,
       "name": "Texture_Type88ExhaustOrm",
       "size": [
         1024,
@@ -357,7 +327,7 @@
       "pixelExact": true
     },
     {
-      "index": 23,
+      "index": 21,
       "name": "Texture_Type88LeatherNormal",
       "size": [
         512,
@@ -372,7 +342,7 @@
       "pixelExact": true
     },
     {
-      "index": 24,
+      "index": 22,
       "name": "Texture_Type88LeatherBase",
       "size": [
         1024,
@@ -387,7 +357,7 @@
       "pixelExact": true
     },
     {
-      "index": 25,
+      "index": 23,
       "name": "Texture_Type88LeatherOrm",
       "size": [
         1024,
@@ -402,7 +372,7 @@
       "pixelExact": true
     },
     {
-      "index": 26,
+      "index": 24,
       "name": "Texture_Type88RubberNormal",
       "size": [
         512,
@@ -417,7 +387,7 @@
       "pixelExact": true
     },
     {
-      "index": 27,
+      "index": 25,
       "name": "Texture_Type88RubberBase",
       "size": [
         1024,
@@ -432,7 +402,7 @@
       "pixelExact": true
     },
     {
-      "index": 28,
+      "index": 26,
       "name": "Texture_Type88RubberOrm",
       "size": [
         1024,
@@ -447,7 +417,7 @@
       "pixelExact": true
     },
     {
-      "index": 29,
+      "index": 27,
       "name": "Texture_Type88WoodNormal",
       "size": [
         512,
@@ -462,7 +432,7 @@
       "pixelExact": true
     },
     {
-      "index": 30,
+      "index": 28,
       "name": "Texture_Type88WoodBase",
       "size": [
         1024,
@@ -477,7 +447,7 @@
       "pixelExact": true
     },
     {
-      "index": 31,
+      "index": 29,
       "name": "Texture_Type88WoodOrm",
       "size": [
         1024,
@@ -492,33 +462,63 @@
       "pixelExact": true
     },
     {
-      "index": 32,
+      "index": 30,
       "name": "Texture_Type88FinBase",
+      "size": [
+        2048,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "45e066af5e51602e54bf1babad5d01d53b9b541c355192852c6dcb1b52b75392",
+      "decodedPixelsSha256": "45e066af5e51602e54bf1babad5d01d53b9b541c355192852c6dcb1b52b75392",
+      "sourceBytes": 289253,
+      "webpBytes": 184784,
+      "pixelExact": true
+    },
+    {
+      "index": 31,
+      "name": "Texture_Type88FinOrm",
+      "size": [
+        2048,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "fcba0a516637021e34d2d09b3ab1b6498534dd3533419cfd6599f7247720389e",
+      "decodedPixelsSha256": "fcba0a516637021e34d2d09b3ab1b6498534dd3533419cfd6599f7247720389e",
+      "sourceBytes": 232695,
+      "webpBytes": 153374,
+      "pixelExact": true
+    },
+    {
+      "index": 32,
+      "name": "Texture_Type88FabricPlainBase",
       "size": [
         1024,
         1024
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "9f55f3587ebed7bb7a2d1eddb5aa2dd137853eebe92e075d19c512757121ec2b",
-      "decodedPixelsSha256": "9f55f3587ebed7bb7a2d1eddb5aa2dd137853eebe92e075d19c512757121ec2b",
-      "sourceBytes": 263998,
-      "webpBytes": 170216,
+      "sourcePixelsSha256": "4c22a013eeb1adf4b9722d0307b47c1a62ba72479c1784fd0a244bcaff990738",
+      "decodedPixelsSha256": "4c22a013eeb1adf4b9722d0307b47c1a62ba72479c1784fd0a244bcaff990738",
+      "sourceBytes": 446968,
+      "webpBytes": 314736,
       "pixelExact": true
     },
     {
       "index": 33,
-      "name": "Texture_Type88FinOrm",
+      "name": "Texture_Type88FabricPlainOrm",
       "size": [
         1024,
         1024
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "7c72643ac3e86baed355cd2fdeb47f6daad4d66a6378832a774ba56be1366229",
-      "decodedPixelsSha256": "7c72643ac3e86baed355cd2fdeb47f6daad4d66a6378832a774ba56be1366229",
-      "sourceBytes": 190993,
-      "webpBytes": 132138,
+      "sourcePixelsSha256": "094b5b6f84ff2679d0e0e9dfeb3e833440671c05dcd0148c060eecc682388139",
+      "decodedPixelsSha256": "094b5b6f84ff2679d0e0e9dfeb3e833440671c05dcd0148c060eecc682388139",
+      "sourceBytes": 287683,
+      "webpBytes": 193964,
       "pixelExact": true
     }
   ]

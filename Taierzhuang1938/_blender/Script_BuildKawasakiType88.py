@@ -17,7 +17,7 @@ import bpy
 from mathutils import Vector, Matrix, Quaternion
 
 
-VERSION = "20261024TailBracing15"
+VERSION = "20261024BalancedRudder20"
 PI = math.pi
 TAU = 2 * PI
 SOURCE_DEFAULT = Path(r"C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\KawasakiType88")
@@ -283,7 +283,8 @@ class Builder:
         (-1.65, .53, 1.99, .42, .44), (-.38, .49, 1.97, .39, .42),
         (.55, .445, 1.94, .36, .39), (1.70, .37, 1.90, .31, .34),
         (3.20, .26, 1.85, .24, .26), (4.55, .145, 1.81, .16, .17),
-        (5.60, .075, 1.80, .10, .11), (5.71, .065, 1.80, .09, .10),
+        # End the aft post ahead of the rudder's rounded hinge envelope.
+        (5.18, .075, 1.80, .10, .11), (5.28, .065, 1.80, .09, .10),
     ]
 
     def Section(self, z):
@@ -460,7 +461,7 @@ class Builder:
             for fraction in (-.60, .60):
                 pts = []
                 for j in range(51):
-                    z = -.5 + 6.15 * j / 50
+                    z = -.5 + (self.sections[-1][0] + .44) * j / 50
                     w, cy, up, low = self.Section(z)
                     xFraction = .77 + .23 * (fraction + .8) / 1.6
                     pts.append((side * (w * xFraction + .002), cy + fraction * (up if fraction > 0 else low), z))
@@ -661,15 +662,15 @@ class Builder:
                                                           (side * .62, 1.43, -2.25), (side * .52, 1.40, -1.40)], .055, "Aluminum", 10)
         self.Beam("UpperWingFuelFiller", (0, 3.23, -3.383), (0, 3.29, -3.383), .065, "Aluminum", 24)
 
-    def Foil(self, name, outline, thickness=.055, vertical=False, parent=None, material="Fabric"):
+    def Foil(self, name, outline, thickness=.055, vertical=False, parent=None, material="Fabric", height=2.04, hingeLeadingAft=None):
         # Outline is (span-or-height, aft). Real thin airfoils have closed sides.
         verts, faces, uvs = [], [], []
         n = len(outline)
         for side in (-1, 1):
             for a, z in outline:
-                verts.append((side * thickness / 2, a, z) if vertical else (a, 2.04 + side * thickness / 2, z))
+                verts.append((side * thickness / 2, a, z) if vertical else (a, height + side * thickness / 2, z))
                 u = (z - 4.1) / 2.2
-                uvs.append(((1.22 - u if side > 0 else u), (a - 1.70) / 1.60) if vertical else ((a + 2.5) / 5, (z - 4.1) / 2.2))
+                uvs.append((((.5 + (1 - u) * .5) if side > 0 else u * .5), (a - 1.70) / 1.60) if vertical else ((a + 2.5) / 5, (z - 4.1) / 2.2))
         # Concave root shapes are triangulated by Blender/glTF, not fan-filled.
         faces.extend((tuple(range(n - 1, -1, -1)), tuple(range(n, n * 2))))
         for j in range(n):
@@ -677,55 +678,238 @@ class Builder:
         ob = self.Mesh(name, verts, faces, "Fin" if vertical else "Tail", uvs=uvs, parent=parent)
         mod = ob.modifiers.new("TailSurfaceEdgeRadius", "BEVEL")
         mod.width = thickness * .30
-        mod.segments = 3 if self.high else 2
+        mod.segments = 3 if self.high else (1 if name == "Rudder" else 2)
+        if hingeLeadingAft is not None:
+            mod.limit_method = "WEIGHT"
+            weights = ob.data.attributes.new("bevel_weight_edge", "FLOAT", "EDGE")
+            for edge in ob.data.edges:
+                leading = all(abs(-ob.data.vertices[i].co.y - hingeLeadingAft) < .000001 for i in edge.vertices)
+                weights.data[edge.index].value = 0 if leading else 1
+            for poly in ob.data.polygons:
+                if all(abs(-ob.data.vertices[i].co.y - hingeLeadingAft) < .000001 for i in poly.vertices):
+                    poly.use_smooth = False
         self.Apply(ob, mod)
         return ob
 
+    def TailMovingSurface(self, suffix, side, pivot, data):
+        frame, plan, mechanics = data["frame"], data["planform"], data["mechanics"]
+        midY, axisZ = frame["midHeightM"], frame["hingeAxisAftM"]
+        span, corner = frame["halfSpanM"], frame["hornSplitSpanM"]
+        radius = mechanics["hingeNoseRadiusM"]
+        hornRoot = corner + mechanics["hornSideGapM"] / 2
+        innerFront, innerBack = plan["movingInnerLeadingSpanM"], plan["movingInnerTrailingSpanM"]
+        def Trailing(x):
+            if x <= corner:
+                return plan["trailingInnerAftM"]
+            q = min(1., (x - corner) / (span - corner))
+            return plan["trailingTipAftM"] + (plan["trailingInnerAftM"] - plan["trailingTipAftM"]) * math.sqrt(max(0., 1 - q * q))
+        def Leading(x):
+            q = min(1., max(0., (x - corner) / (span - corner)))
+            return plan["leadingTipAftM"] - (plan["leadingTipAftM"] - plan["leadingHornAftM"]) * math.sqrt(max(0., 1 - q * q))
+        def Loft(name, xs, front, back, frontKind):
+            chordSteps = 18 if self.high else 4
+            verts, faces, uvs = [], [], []
+            stride = chordSteps + 1
+            layerSize = len(xs) * stride
+            for layer in (0, 1):
+                for t in xs:
+                    if frontKind == "body":
+                        xFront = Lerp(innerFront, span, t)
+                        xBack = Lerp(innerBack, span, t)
+                        zFront, zBack = axisZ, Trailing(xBack)
+                    else:
+                        xFront = xBack = t
+                        zFront, zBack = Leading(t), axisZ
+                    for j in range(chordSteps + 1):
+                        u = (1 - math.cos(PI * j / chordSteps)) / 2
+                        x, z = Lerp(xFront, xBack, u), Lerp(zFront, zBack, u)
+                        if frontKind == "body":
+                            q = min(1., max(0., (zBack - z) / .08))
+                        else:
+                            q = math.sqrt(Smooth(min(1., max(0., (z - zFront) / .05))))
+                        half = mechanics["trailingEdgeThicknessM"] / 2 + (radius - mechanics["trailingEdgeThicknessM"] / 2) * q
+                        verts.append((side * x, midY + (1 if layer == 0 else -1) * half, z))
+                        uvs.append(((side * x + 2.5) / 5, (z - 4.1) / 2.2))
+            for layer in (0, 1):
+                for i in range(len(xs) - 1):
+                    for j in range(chordSteps):
+                        a = layer * layerSize + i * stride + j
+                        f = (a, a + stride, a + stride + 1, a + 1)
+                        faces.append(f if layer == 0 else tuple(reversed(f)))
+            for i in range(len(xs) - 1):
+                a, b = i * stride, (i + 1) * stride
+                faces.extend(((a, a + layerSize, b + layerSize, b),
+                              (a + chordSteps, b + chordSteps, b + chordSteps + layerSize, a + chordSteps + layerSize)))
+            for i in (0, len(xs) - 1):
+                for j in range(chordSteps):
+                    a = i * stride + j
+                    faces.append((a, a + 1, a + 1 + layerSize, a + layerSize))
+            ob = self.Mesh(name, verts, faces, "Tail", uvs=uvs, parent=pivot)
+            skinFaces = (len(xs) - 1) * chordSteps * 2
+            for poly in ob.data.polygons:
+                if poly.index >= skinFaces:
+                    poly.use_smooth = False
+            return ob
+        bodySteps = 24 if self.high else 6
+        bodyTs = sorted(set([i / bodySteps for i in range(bodySteps + 1)] + [(corner - innerBack) / (span - innerBack)]))
+        cornerSteps = 18 if self.high else 6
+        bodyTs = sorted(set(bodyTs + [(corner + (span - corner) * math.sin(PI * i / (2 * cornerSteps)) - innerBack) / (span - innerBack)
+                                     for i in range(1, cornerSteps + 1)]))
+        body = Loft("Elevator" + suffix, bodyTs, None, None, "body")
+        hornSteps = 16 if self.high else 6
+        hornXs = [Lerp(hornRoot, span, math.sin(PI * i / (2 * hornSteps))) for i in range(hornSteps + 1)]
+        horn = Loft("Elevator" + suffix + "ForwardBalance", hornXs, None, None, "horn")
+        noseSides = 20 if self.high else 12
+        nose = self.Beam("Elevator" + suffix + "RoundHingeNose", (side * innerFront, midY, axisZ),
+                         (side * hornRoot, midY, axisZ), radius, "Tail", noseSides, parent=pivot)
+        uv = nose.data.uv_layers[0]
+        for poly in nose.data.polygons:
+            if poly.index >= noseSides:
+                poly.use_smooth = False
+            for cornerIndex, loop in enumerate(poly.loop_indices):
+                co = nose.data.vertices[nose.data.loops[loop].vertex_index].co
+                x, y, z = co.x, co.z, -co.y
+                if poly.index < noseSides:
+                    phase = poly.index + (1 if cornerIndex in (1, 2) else 0)
+                    uv.data[loop].uv = ((x + 2.5) / 5, .5 + phase / noseSides * TAU * radius / 2.2)
+                else:
+                    uv.data[loop].uv = (.5 + (y - midY) / 5, .5 + (z - axisZ) / 2.2)
+        # These are rigid skin portions of one elevator, with the nose and
+        # forward aerodynamic balance moving around the same real hinge.
+        bpy.ops.object.select_all(action="DESELECT")
+        for ob in (body, horn, nose):
+            ob.select_set(True)
+        bpy.context.view_layer.objects.active = body
+        deadNames = (horn.name, nose.name)
+        bpy.ops.object.join()
+        for name in deadNames:
+            self.parts.pop(name, None)
+        self.meshes = [ob for ob in self.modelColl.objects if ob.type == "MESH"]
+        return body
+
     def Tail(self):
+        data = json.loads((self.modelDir / "Data_KawasakiType88Tail.json").read_text(encoding="utf-8"))
+        frame, plan, mechanics = data["frame"], data["planform"], data["mechanics"]
+        # Fixed, photo-fitted alignment of this museum-reference reconstruction.
+        # It is not a claim about the original aircraft's factory installation,
+        # and it is not exposed as an extra animated control.
+        centre = (0, frame["midHeightM"], frame["centreAftM"])
+        yaw = math.radians(frame["yawDegrees"])
+        yawCos, yawSin = math.cos(yaw), math.sin(yaw)
+        def Align(point):
+            x, y, z = point
+            z -= centre[2]
+            return (x * yawCos + z * yawSin, y, -x * yawSin + z * yawCos + centre[2])
+        assembly = self.Empty("TailplaneReferenceAssembly", centre, self.root)
+        assembly["fixedReferenceAlignmentDegrees"] = frame["yawDegrees"]
+        assembly["animatedControl"] = False
+        self.root["tailplaneReferenceYawDegrees"] = frame["yawDegrees"]
+        self.root["tailplaneReferenceHeightM"] = frame["midHeightM"]
+        previousParent = self.activeParent
+        self.activeParent = assembly
         for side, suffix in ((-1, "Left"), (1, "Right")):
-            outline = [(side * .08, 4.48), (side * 1.80, 4.85), (side * 2.04, 4.99),
-                       (side * 2.16, 5.10), (side * 2.18, 5.42), (side * .08, 5.42)]
-            self.Foil("HorizontalStabilizer" + suffix, outline, .075)
-            pivot = self.Empty("Elevator" + suffix + "Pivot", (side * .15, 2.04, 5.45), self.root)
+            fixedSpan = frame["hornSplitSpanM"] - mechanics["hornSideGapM"] / 2
+            fixedRear = frame["hingeAxisAftM"] - mechanics["hingeNoseRadiusM"] - mechanics["hingeGapM"]
+            outline = [(side * plan["leadingRootSpanM"], plan["leadingRootAftM"]),
+                       (side * fixedSpan, plan["leadingHornAftM"]), (side * fixedSpan, fixedRear),
+                       (side * plan["leadingRootSpanM"], fixedRear)]
+            self.Foil("HorizontalStabilizer" + suffix, outline, mechanics["fixedThicknessM"], height=frame["midHeightM"])
+            pivot = self.Empty("Elevator" + suffix + "Pivot", (side * .15, frame["midHeightM"], frame["hingeAxisAftM"]), assembly)
             pivot["axisLocal"] = "+X"
             pivot["rangeDegrees"] = [-25., 25.]
             self.controls["Elevator" + suffix] = pivot
-            outline = [(side * .12, 5.46), (side * 2.18, 5.46), (side * 2.17, 5.66),
-                       (side * 2.09, 5.74), (side * 1.97, 5.78), (side * .22, 5.88)]
-            self.Foil("Elevator" + suffix, outline, .06, parent=pivot)
+            self.TailMovingSurface(suffix, side, pivot, data)
             # Type II has two lower members in a V, visible in kda2-20. Their
             # fuselage ends follow the actual lower longeron, not an arbitrary
             # height below the shell. Exact joint hardware remains inferred.
-            tailJoint = (side * 1.67, 2.00, 5.18)
-            for label, z in (("Forward", 4.60), ("Rear", 5.55)):
+            tailJoint = (side * 1.67, frame["midHeightM"] - .04, 5.00)
+            for label, z in (("Forward", 4.60), ("Rear", 5.20)):
                 w, cy, up, low = self.Section(z)
                 bodyJoint = (side * w * .60, cy - low * .98, z)
-                self.Beam("TailplaneLower" + label + "Brace" + suffix, bodyJoint, tailJoint, .015, "Steel", 8)
+                self.Beam("TailplaneLower" + label + "Brace" + suffix, bodyJoint, Align(tailJoint), .015, "Steel", 8, parent=self.root)
                 self.Beam("Tailplane" + label + "ClevisPin" + suffix,
                           (bodyJoint[0] - .035, bodyJoint[1], z),
-                          (bodyJoint[0] + .035, bodyJoint[1], z), .018, "Steel", 8)
+                          (bodyJoint[0] + .035, bodyJoint[1], z), .018, "Steel", 8, parent=self.root)
             self.Beam("TailplaneOuterClevisPin" + suffix,
                       (tailJoint[0] - .040, tailJoint[1], tailJoint[2]),
                       (tailJoint[0] + .040, tailJoint[1], tailJoint[2]), .018, "Steel", 8)
-            self.Beam("TailplaneUpperWire" + suffix, (0, 2.45, 5.12), (side * 1.82, 2.08, 5.13), .005, "Steel", 6)
-            self.Beam("ElevatorHorn" + suffix, (side * .19, 2.06, 5.45), (side * .19, 2.22, 5.46), .016, "Steel", 8, parent=pivot)
+            self.Beam("ElevatorHorn" + suffix, (side * .19, frame["midHeightM"] + .02, frame["hingeAxisAftM"]),
+                      (side * .19, frame["midHeightM"] + .18, frame["hingeAxisAftM"] + .01), .016, "Steel", 8, parent=pivot)
             for j in range(4):
                 x = side * (.40 + .43 * j)
-                self.Beam("ElevatorHinge" + suffix + str(j), (x - .02, 2.04, 5.45), (x + .02, 2.04, 5.45), .006, "Steel", 12)
-        fin = [(1.85, 4.42), (2.10, 4.64), (2.50, 4.96), (2.93, 5.24), (3.14, 5.41),
-               (3.20, 5.59), (3.17, 5.70), (1.84, 5.70)]
+                self.Beam("ElevatorHinge" + suffix + str(j), (x - .02, frame["midHeightM"], frame["hingeAxisAftM"]),
+                          (x + .02, frame["midHeightM"], frame["hingeAxisAftM"]), .006, "Steel", 12)
+        self.Beam("TailplaneCentreMountPin", (-.13, frame["midHeightM"], frame["centreAftM"]),
+                  (.13, frame["midHeightM"], frame["centreAftM"]), .018, "Steel", 8)
+        self.activeParent = previousParent
+        assembly.rotation_euler.z = yaw
+        bpy.context.view_layer.update()
+        rudderData = data["rudderMechanics"]
+        rudderAxis = rudderData["hingeAftM"]
+        finRear = rudderAxis - rudderData["noseRadiusM"] - rudderData["hingeGapM"]
+        vertical = data["verticalTail"]
+        fin = [tuple(p) for p in vertical["fixedLeadingYZ"]] + [(vertical["fixedTopHeightM"], finRear), (1.84, finRear)]
         self.Foil("TypeIITallFixedFin", fin, .092, True)
-        pivot = self.Empty("RudderPivot", (0, 1.85, 5.73), self.root)
+        pivot = self.Empty("RudderPivot", (0, 1.85, rudderAxis), self.root)
         pivot["axisLocal"] = "+Y in glTF / +Z in Blender"
         pivot["rangeDegrees"] = [-25., 25.]
         self.controls["Rudder"] = pivot
-        rudder = [(1.76, 5.755), (3.17, 5.755), (3.16, 5.97), (3.09, 6.07),
-                  (2.91, 6.13), (2.13, 6.14), (1.85, 6.10)]
-        self.Foil("Rudder", rudder, .075, True, pivot)
-        for j, y in enumerate((2.00, 2.48, 2.97)):
-            self.Beam("RudderHinge" + str(j), (0, y - .02, 5.735), (0, y + .02, 5.735), .006, "Steel", 12)
+        def Curve(points):
+            result = []
+            count = 6 if self.high else 2
+            pts = [Vector(p) for p in points]
+            for i in range(len(pts) - 1):
+                a, b = pts[i], pts[i + 1]
+                before = pts[max(0, i - 1)]
+                after = pts[min(len(pts) - 1, i + 2)]
+                ta, tb = (b - before) * .40, (after - a) * .40
+                for j in range(count):
+                    t = j / count
+                    p = (2*t**3 - 3*t*t + 1)*a + (t**3 - 2*t*t + t)*ta + (-2*t**3 + 3*t*t)*b + (t**3 - t*t)*tb
+                    result.append(tuple(p))
+            result.append(tuple(pts[-1]))
+            return result
+        rudder = [(rudderData["noseBottomHeightM"], rudderAxis), (rudderData["noseTopHeightM"], rudderAxis)]
+        rudder += Curve(vertical["balanceLeadingYZ"])
+        rudder += Curve(vertical["rearCurveYZ"])[1:]
+        rudder += Curve(vertical["lowerCurveYZ"])[1:-1]
+        rudderBody = self.Foil("Rudder", rudder, .075, True, pivot, hingeLeadingAft=rudderAxis)
+        # Different curve/bevel detail must not change the selected neutral
+        # length anchor. Preserve the hinge and taper the small correction to
+        # zero there rather than flattening the rear outline at a clipping plane.
+        rearExtent = max(-vertex.co.y for vertex in rudderBody.data.vertices)
+        correction = rearExtent - vertical["neutralRearExtentM"]
+        for vertex in rudderBody.data.vertices:
+            aft = -vertex.co.y
+            if aft > rudderAxis:
+                vertex.co.y += correction * ((aft - rudderAxis) / (rearExtent - rudderAxis)) ** 2
+        rudderBody.data.update()
+        noseSides = 20 if self.high else 12
+        nose = self.Beam("RudderRoundHingeNose", (0, rudderData["noseBottomHeightM"], rudderAxis),
+                         (0, rudderData["noseTopHeightM"], rudderAxis), rudderData["noseRadiusM"], "Tail", noseSides, parent=pivot)
+        uv = nose.data.uv_layers[0]
+        for poly in nose.data.polygons:
+            if poly.index >= noseSides:
+                poly.use_smooth = False
+            for cornerIndex, loop in enumerate(poly.loop_indices):
+                co = nose.data.vertices[nose.data.loops[loop].vertex_index].co
+                x, y, z = co.x, co.z, -co.y
+                if poly.index < noseSides:
+                    phase = poly.index + (1 if cornerIndex in (1, 2) else 0)
+                    uv.data[loop].uv = (.6 + phase / noseSides * TAU * rudderData["noseRadiusM"] / 4.4, (y - 1.7) / 1.6)
+                else:
+                    uv.data[loop].uv = (.5 + x / 4.4, .5 + (z - rudderAxis) / 1.6)
+        bpy.ops.object.select_all(action="DESELECT")
+        rudderBody.select_set(True);nose.select_set(True);bpy.context.view_layer.objects.active = rudderBody
+        noseName = nose.name
+        bpy.ops.object.join()
+        self.parts.pop(noseName, None)
+        self.meshes = [ob for ob in self.modelColl.objects if ob.type == "MESH"]
+        self.root["referenceRudderDegrees"] = vertical["referenceRudderDegrees"]
+        for j, y in enumerate((1.82, 2.18, 2.55)):
+            self.Beam("RudderHinge" + str(j), (0, y - .02, rudderAxis + .005), (0, y + .02, rudderAxis + .005), .006, "Steel", 12)
         for side in (-1, 1):
-            self.Beam("RudderHorn" + str(side), (0, 1.84, 5.88), (side * .25, 1.84, 5.88), .016, "Steel", 8, parent=pivot)
+            self.Beam("RudderHorn" + str(side), (0, 1.84, rudderAxis + .15), (side * .25, 1.84, rudderAxis + .15), .016, "Steel", 8, parent=pivot)
 
     def Wheel(self, side, suffix):
         center = (side * 1.12, .47, -2.91)
@@ -769,7 +953,7 @@ class Builder:
             self.Beam("GearShockWrap" + suffix, (side * .89, .61, -2.96), (side * .99, .49, -2.91), .089, "Ivory", 16)
             self.Beam("GearCrossWire" + suffix, (side * .43, 1.58, -3.50), (-side * .97, .50, -2.91), .007, "Steel", 6)
             self.Box("GearAxleClamp" + suffix, (side * .93, .48, -2.91), (.15, .15, .16), "Steel", .015)
-        self.Beam("TailSkidSocket", (0, 1.72, 5.45), (0, 1.43, 5.48), .074, "Steel", 16)
+        self.Beam("TailSkidSocket", (0, 1.72, 5.27), (0, 1.43, 5.48), .074, "Steel", 16)
         self.Tube("SprungWoodTailSkid", [(0, 1.50, 5.47), (0, 1.16, 5.55), (0, .90, 5.89), (0, .86, 6.10)], .050, "Wood", 12)
         self.Beam("TailSkidSteelShoe", (0, .842, 5.94), (0, .845, 6.13), .057, "Steel", 12, .55)
         self.Beam("TailSkidFrontBrace", (0, 1.65, 4.91), (0, 1.15, 5.55), .023, "Steel", 10)
@@ -910,7 +1094,7 @@ class Builder:
             elif key in ("UpperWing", "LowerUnderside") or (key == "Fabric" and ("Wing" in ob.name or "Aileron" in ob.name)):
                 extent = (15, 2.047 if key == "UpperWing" or "UpperWing" in ob.name or ("Aileron" in ob.name and "Lower" not in ob.name) else 1.72)
             elif key == "Fin":
-                extent = (2.2, 1.6)
+                extent = (4.4, 1.6)
             elif key == "Tail":
                 extent = (5, 2.2)
             elif key == "Wood" and "Blade" in ob.name:
@@ -979,7 +1163,7 @@ class Builder:
         target.image = image
         bakeMat.node_tree.nodes.active = target
         scene.render.engine = "CYCLES"
-        scene.cycles.samples = 16
+        scene.cycles.samples = 64
         scene.render.threads_mode = "FIXED"
         scene.render.threads = 4
         scene.render.bake.use_selected_to_active = False
@@ -988,6 +1172,24 @@ class Builder:
         scene.world.color = (.8, .8, .8)
         self.Progress("BakingOcclusion", resolution=size)
         bpy.ops.object.bake(type="AO")
+        # Suppress Monte Carlo speckle without repainting geometric occlusion.
+        # A one-texel separable filter stays inside the existing bake margin.
+        import numpy as np
+        pixels = np.empty(size * size * 4, dtype=np.float32)
+        image.pixels.foreach_get(pixels)
+        pixels = pixels.reshape((size, size, 4))
+        ao = pixels[:, :, 0].copy()
+        for axis in (0, 1):
+            padding = [(0, 0), (0, 0)]
+            padding[axis] = (1, 1)
+            padded = np.pad(ao, padding, mode="edge")
+            if axis == 0:
+                ao = .2 * padded[:-2] + .6 * padded[1:-1] + .2 * padded[2:]
+            else:
+                ao = .2 * padded[:, :-2] + .6 * padded[:, 1:-1] + .2 * padded[:, 2:]
+        pixels[:, :, :3] = ao[:, :, None]
+        image.pixels.foreach_set(pixels.ravel())
+        image.update()
         output = self.sourceRoot / "Textures" / ("Texture_Type88HighAssemblyAo.png" if self.high else "Texture_Type88GameAssemblyAo.png")
         image.filepath_raw = str(output)
         image.file_format = "PNG"
@@ -1029,6 +1231,8 @@ class Builder:
             ob.data.uv_layers.active = uv
             uv.active_render = True
         scene["surfaceStage"] = "UV PBR plus baked assembly occlusion"
+        scene["occlusionBakeSamples"] = 64
+        scene["occlusionFilter"] = "Separable [0.2, 0.6, 0.2], one texel inside bake margin"
         self.Progress("OcclusionComplete", image=str(output))
 
     def Progress(self, stage, **details):

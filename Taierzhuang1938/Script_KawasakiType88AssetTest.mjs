@@ -34,6 +34,18 @@ g.nodes.forEach((node, index) => (node.children || []).forEach(child => nodes[in
 const root = new THREE.Group();
 for (const index of g.scenes[g.scene || 0].nodes) root.add(nodes[index]);
 root.updateMatrixWorld(true);
+const metadata = root.getObjectByName("KawasakiType88Root").userData;
+Check(Asset.version === metadata.buildVersion + metadata.surfaceSourceVersion.replace(/^\d{8}/, ""), "Runtime version does not identify the actual geometry and surface build");
+Check(metadata.referenceRudderDegrees === Asset.referenceRudderDegrees, "Declared photograph pose differs from the actual rudder metadata");
+const tailAssembly = root.getObjectByName("TailplaneReferenceAssembly");
+Check(Math.abs(root.getObjectByName("KawasakiType88Root").userData.tailplaneReferenceYawDegrees - Asset.referenceTailplaneYawDegrees) < .000001, "Tailplane declaration differs from the actual fixed assembly");
+Check(tailAssembly?.userData.animatedControl === false && !Object.values(Asset.controls).includes(tailAssembly?.name), "Fixed reference alignment became an extra animated control");
+const tailYaw = Asset.referenceTailplaneYawDegrees * Math.PI / 180;
+const elevatorAxis = new THREE.Vector3(Math.cos(tailYaw), 0, -Math.sin(tailYaw));
+for (const name of [Asset.controls.elevatorLeft, Asset.controls.elevatorRight]) {
+  Check(Math.abs(root.getObjectByName(name).getWorldPosition(new THREE.Vector3()).y - Asset.referenceTailplaneHeightM) < .00001, `${name} height differs from the installed plane`);
+  Check(new THREE.Vector3(1, 0, 0).transformDirection(root.getObjectByName(name).matrixWorld).dot(elevatorAxis) > .999999, `${name} axis does not follow the installed tailplane`);
+}
 const geometryCache = new Map();
 function LocalPoints(name) {
   if (geometryCache.has(name)) return geometryCache.get(name);
@@ -96,6 +108,18 @@ for (const [actual, expected] of [[dimensions.x, Asset.dimensionsM.wingspan], [d
   Check(Math.abs(actual - expected) < .004, `Metric extent ${actual} differs from ${expected}`);
 }
 Check(!g.cameras?.length && !g.extensions?.KHR_lights_punctual, "Acceptance lights or cameras leaked into the asset");
+const tail = JSON.parse(fs.readFileSync(path.join(path.dirname(file), "Data_KawasakiType88Tail.json"), "utf8"));
+const rudderPoints = WorldPoints("Rudder");
+Check(rudderPoints.some(point => point.y > tail.verticalTail.fixedTopHeightM + .05 && point.z < tail.rudderMechanics.hingeAftM - .25), "The upper forward rudder balance is missing from the moving mesh");
+const fixedFinPoints = WorldPoints("TypeIITallFixedFin");
+Check(Math.max(...fixedFinPoints.map(point => point.y)) <= tail.verticalTail.fixedTopHeightM + .001, "The moving upper balance was incorrectly filled by the fixed fin");
+const tailInverse = tailAssembly.matrixWorld.clone().invert();
+const tailCentre = new THREE.Vector3(0, tail.frame.midHeightM, tail.frame.centreAftM);
+for (const side of ["Left", "Right"]) {
+  Check(WorldPoints(`Elevator${side}`).map(point => point.applyMatrix4(tailInverse).add(tailCentre)).some(point => Math.abs(point.x) > tail.frame.hornSplitSpanM && point.z < tail.frame.hingeAxisAftM - .1), `${side} outer forward elevator balance is missing from the moving mesh`);
+}
+const paint = JSON.parse(fs.readFileSync(path.join(path.dirname(file), "Data_KawasakiType88Paint.json"), "utf8"));
+Check(paint.finExtraction.connectedComponents === 7 && paint.finMarks.length === 14 && paint.finMarks.every(mark => mark.uv0.length >= 3 && mark.uv0.every(point => point.every(value => value > 0 && value < 1))), "The two-side tail ink contours or their provenance are incomplete");
 Check(g.images.length === Asset.pbr.images && g.materials.length === Asset.pbr.materials && g.images.every(image => image.bufferView != null && image.mimeType === "image/webp"), "Expected the complete embedded WebP PBR set");
 let normalMaterials = 0;
 for (const material of g.materials) {
