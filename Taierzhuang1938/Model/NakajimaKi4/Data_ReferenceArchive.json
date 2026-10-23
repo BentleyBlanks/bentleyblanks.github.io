@@ -1,5 +1,6 @@
 {
   "archive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\References",
+  "surfaceReferenceArchive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\SurfaceV2\\References",
   "photos": [
     {
       "file": "Ki-4_94siki-tei.jpg",
@@ -49,5 +50,5 @@
     100,
     118
   ],
-  "privacy": "Reference originals and all review media retained locally; not published with the model"
+  "privacy": "Historical originals and review sheets retained locally; material albedo input sources are versioned for rebuilding"
 }

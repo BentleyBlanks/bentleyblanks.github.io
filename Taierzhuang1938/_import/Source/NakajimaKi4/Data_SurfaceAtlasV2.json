@@ -1,0 +1,33 @@
+{
+  "provider": "built-in image_gen__imagegen",
+  "file": "Texture_NakajimaKi4SurfaceAtlasV2.png",
+  "sha256": "83267d7420cef713f90b48c751f691b5f044c72fdfa72165f5bce94186e88578",
+  "role": "Generated albedo sample source, explicitly inferred; no historical color proof",
+  "quadrants": [
+    "Aluminum",
+    "DopedLinen",
+    "CowlEnamel",
+    "OxidizedSteel"
+  ],
+  "sourceReference": "Reference_NakajimaKi4SurfaceV2Initial.png",
+  "geometryCaveat": "The original input sheet had inaccurate FRONT wing proportions; it supplies material macro targets only. The final local review sheet was corrected using actual model views. Original manual geometry remains authoritative.",
+  "prompt": "Prompts/Texture_NakajimaKi4SurfaceAtlasV2.txt",
+  "sameTypeReferences": [
+    "https://www.flickr.com/photos/sdasmarchives/7586032330"
+  ],
+  "analogMaterialReferences": [
+    {
+      "url": "https://commons.wikimedia.org/wiki/File:1936_Nakajima_Hikari_3_01.jpg",
+      "author": "TTTNIS",
+      "license": "CC0",
+      "scope": "Cast/fin/oil material character only; not Ha8 production batch or cutaway proof"
+    },
+    {
+      "url": "https://commons.wikimedia.org/wiki/File:1936_Nakajima_Hikari_3_02.jpg",
+      "author": "TTTNIS",
+      "license": "CC0",
+      "scope": "Same museum engine, surface material only"
+    }
+  ],
+  "finalReviewReferenceSha256": "45cab66eb2d66b046b13686f83658c227ee4ee64cf890994e9aeec519ece0c5c"
+}

@@ -11,8 +11,8 @@ from math import sin, cos, pi, sqrt
 
 scriptPath=pathlib.Path(globals().get('__file__','Taierzhuang1938/_blender/Script_NakajimaKi4Build.py')).resolve()
 repoRoot = scriptPath.parents[2]
-assetRoot = repoRoot / 'Taierzhuang1938/Model/NakajimaKi4'
-sourceRoot = pathlib.Path(r'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NakajimaKi4')
+assetRoot = pathlib.Path(os.environ.get('KI4_ASSET_ROOT',str(repoRoot / 'Taierzhuang1938/Model/NakajimaKi4')))
+sourceRoot = pathlib.Path(os.environ.get('KI4_SOURCE_ROOT',r'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NakajimaKi4/SurfaceV2'))
 evidenceRoot = sourceRoot / 'Evidence'
 for folder in [assetRoot, sourceRoot, evidenceRoot]: folder.mkdir(parents=True, exist_ok=True)
 stage = os.environ.get('KI4_STAGE', 'gray')
@@ -30,7 +30,7 @@ root['source'] = 'NDL 8815746, May 1937 manual + three original Ki-4 photographs
 root['historicalScope'] = 'Same-type reference; Tengxian participation not established by this model'
 root['dimensionsSource'] = 'NDL canvas 5: span12.000m, length8.250m, height3.310m'
 root['reconstructionScope'] = 'Unresolved colors, hidden internals and precise serial are inferred'
-root['version'] = '20261023ReferenceV1'
+root['version'] = '20261023SurfaceV2'
 
 def Material(name, color, rough=.5, metal=0):
     mat=bpy.data.materials.new('Material_'+name); mat.use_nodes=True
@@ -43,6 +43,8 @@ def Material(name, color, rough=.5, metal=0):
 mats={
  'Skin':Material('AluminumSkin',(.48,.51,.50),.47,.75),
  'Fabric':Material('SilverDopedLinen',(.56,.58,.56),.67,.05),
+ 'RibTape':Material('DopedLinenRibTape',(.60,.59,.56),.76,.02),
+ 'EngineCast':Material('EngineCastAluminum',(.45,.46,.43),.61,.78),
  'Cowl':Material('DarkCowlEnamel',(.018,.023,.024),.36,.15),
  'Steel':Material('OxidizedSteel',(.105,.12,.125),.48,.8),
  'Bright':Material('MachinedAluminum',(.46,.5,.52),.32,.9),
@@ -54,6 +56,7 @@ mats={
  'Dial':Material('InstrumentFaces',(.012,.016,.015),.5,.12),
  'Wire':Material('RiggingCable',(.16,.18,.18),.38,.95)
 }
+uvDomains={'Skin':(1.5,1.5),'Bright':(1.5,1.5),'Steel':(.5,.5),'Wire':(.5,.5),'EngineCast':(.5,.5),'Exhaust':(1.5,.34),'Leather':(.4,.4),'Tire':(2.70,.29),'Fabric':(6,2),'RibTape':(.014,.20)}
 glass=Material('Windscreen',(.52,.63,.62),.12,0)
 if stage!='gray':
     bs=glass.node_tree.nodes.get('Principled BSDF');bs.inputs['Transmission Weight'].default_value=.65
@@ -78,7 +81,8 @@ def Mesh(name, verts, faces, mat='Skin', uv=None, parent=None, smooth=True):
             axis=max(range(3), key=lambda i:abs(poly.normal[i])); a,b=[i for i in range(3) if i!=axis]
             for idx in poly.loop_indices:
                 v=mesh.vertices[mesh.loops[idx].vertex_index].co
-                layer.data[idx].uv=(v[a]*.5,v[b]*.5)
+                domain=uvDomains.get(mat,(1.5,1.5)) if isinstance(mat,str) else (1.5,1.5)
+                layer.data[idx].uv=(v[a]/domain[0],v[b]/domain[1])
     for p in mesh.polygons:p.use_smooth=smooth
     return obj
 
@@ -97,7 +101,20 @@ def Tube(name,a,b,r,mat='Steel',sides=12,parent=None):
     bpy.ops.mesh.primitive_cylinder_add(vertices=sides,radius=r,depth=d.length,location=(a+b)/2)
     obj=bpy.context.object;obj.name=name;obj.rotation_mode='QUATERNION';obj.rotation_quaternion=d.to_track_quat('Z','Y')
     obj.data.materials.append(mats[mat]);Parent(obj)
-    for p in obj.data.polygons:p.use_smooth=True
+    # Cylindrical wall and planar caps use actual metre UVs. Primitive default
+    # UVs otherwise squash a 1.5m metal sample into a 20mm pushrod or bolt.
+    domain=uvDomains.get(mat)
+    for p in obj.data.polygons:
+        p.use_smooth=abs(p.normal.z)<.5
+        if domain:
+            angles=[math.atan2(obj.data.vertices[obj.data.loops[i].vertex_index].co.y,obj.data.vertices[obj.data.loops[i].vertex_index].co.x)%(2*pi) for i in p.loop_indices]
+            crosses=max(angles)-min(angles)>pi
+            for idx,angle in zip(p.loop_indices,angles):
+                v=obj.data.vertices[obj.data.loops[idx].vertex_index].co
+                if abs(p.normal.z)<.5:
+                    if crosses and angle<pi:angle+=2*pi
+                    obj.data.uv_layers.active.data[idx].uv=(angle*r/domain[0],(v.z+d.length/2)/domain[1])
+                else:obj.data.uv_layers.active.data[idx].uv=(v.x/domain[0],v.y/domain[1])
     if parent:MoveUnder(obj,parent)
     return obj
 
@@ -106,6 +123,12 @@ def Ellipsoid(name,loc,scale,mat='Skin',seg=32,rings=16,parent=None):
     obj=bpy.context.object;obj.name=name;obj.scale=scale
     bpy.ops.object.transform_apply(location=False,rotation=False,scale=True)
     obj.data.materials.append(mats[mat]);Parent(obj)
+    if mat in uvDomains:
+        # Approximate ellipsoid meridian lengths preserve the selected sample scale.
+        domain=uvDomains[mat]
+        for loop in obj.data.uv_layers.active.data:
+            loop.uv.x*=2*pi*sqrt((scale[0]**2+scale[1]**2)/2)/domain[0]
+            loop.uv.y*=pi*sqrt((scale[0]**2+scale[2]**2)/2)/domain[1]
     for p in obj.data.polygons:p.use_smooth=True
     if parent:MoveUnder(obj,parent)
     return obj
@@ -118,6 +141,26 @@ def Curve(name,pts,r,mat='Wire',closed=False,parent=None):
     obj=bpy.data.objects.new(name,data);scene.collection.objects.link(obj);data.materials.append(mats[mat]);Parent(obj)
     if parent:MoveUnder(obj,parent)
     return obj
+
+def ExhaustPipe(name,control,r):
+    # Smooth the photographed collector bends and unwrap by path arc length.
+    controls=[Vector(p) for p in control];points=[]
+    for k in range(len(controls)-1):
+        a=controls[max(0,k-1)];b=controls[k];c=controls[k+1];d=controls[min(len(controls)-1,k+2)]
+        for j in range(8):
+            t=j/8
+            points.append(.5*((2*b)+(-a+c)*t+(2*a-5*b+4*c-d)*t*t+(-a+3*b-3*c+d)*t*t*t))
+    points.append(controls[-1]);vv=[];ff=[];uv=[];arc=0;nr=16
+    for k,point in enumerate(points):
+        tangent=(points[min(k+1,len(points)-1)]-points[max(0,k-1)]).normalized()
+        across=tangent.cross(Vector((1,0,0))).normalized();up=tangent.cross(across).normalized()
+        if k:arc+=(point-points[k-1]).length
+        for j in range(nr+1):
+            angle=2*pi*j/nr;vv.append(point+r*(across*cos(angle)+up*sin(angle)));uv.append((arc/1.5,angle*r/.34))
+    for k in range(len(points)-1):
+        for j in range(nr):
+            a=k*(nr+1)+j;ff.append((a,a+1,a+nr+2,a+nr+1))
+    return Mesh(name,vv,ff,'Exhaust',uv)
 
 def Box(name,loc,scale,mat='Steel',bevel=.01,parent=None):
     bpy.ops.mesh.primitive_cube_add(size=1,location=loc);obj=bpy.context.object;obj.name=name;obj.dimensions=scale
@@ -169,7 +212,17 @@ for idx,(cy,rx,ry) in enumerate(cockpits):
         a=2*pi*k/100;x=rx*sin(a);y=cy+ry*cos(a);localRx=Interp(sections,y,1);rz=Interp(sections,y,2);zc=Interp(sections,y,3)
         z=zc+rz*sqrt(max(0,1-(x/localRx)**2))+.008
         pts.append((x,y,z))
-    Curve('Cockpit_Coaming'+str(idx+1),pts,.021,'Leather',True)
+    # Explicit metre UVs around the leather tube prevent stretched upholstery grain.
+    vv=[];ff=[];uv=[];arc=0;nr=12
+    for i in range(len(pts)+1):
+        k=i%len(pts);point=Vector(pts[k]);tangent=(Vector(pts[(k+1)%len(pts)])-Vector(pts[(k-1)%len(pts)])).normalized()
+        up=(Vector((0,0,1))-tangent*tangent.z).normalized();across=tangent.cross(up).normalized()
+        if i:arc+=(point-Vector(pts[(k-1)%len(pts)])).length
+        for j in range(nr+1):
+            a=2*pi*j/nr;vv.append(point+.021*(up*cos(a)+across*sin(a)));uv.append((arc/.4,a*.021/.4))
+    for i in range(len(pts)):
+        for j in range(nr):a=i*(nr+1)+j;ff.append((a,a+nr+1,a+nr+2,a+1))
+    Mesh('Cockpit_Coaming'+str(idx+1),vv,ff,'Leather',uv)
     # Curved cockpit well lining is a separate dark surface below each opening.
     vv=[];ff=[]
     for level in [0,1]:
@@ -232,7 +285,9 @@ def WingPanel(name,which,side,x0,x1,t0=0,t1=1,parent=None):
             x=side*(x0+(x1-x0)*i/nx)
             for j in range(nt+1):
                 q=(1-cos(pi*j/nt))/2;t=t0+(t1-t0)*q
-                vv.append(WingPoint(x,t,which,top));uv.append((abs(x)/6,t if top else 2-t))
+                vv.append(WingPoint(x,t,which,top))
+                chordM=math.dist(WingPoint(x,0,which,top),WingPoint(x,1,which,top))
+                uv.append((abs(x)/6,t*chordM/2 if top else 2-t*chordM/2))
     layer=(nx+1)*(nt+1)
     for f in range(2):
         for i in range(nx):
@@ -269,12 +324,13 @@ for side,label in [(-1,'Left'),(1,'Right')]:
                 ranges=[(0,.738,None),(.762,1,pivot)] if which=='Upper' and 2.415<abs(x)<5.815 else [(0,1,None)]
                 for start,end,moving in ranges:
                     vv=[];ff=[];uv=[]
+                    tapeChord=math.dist(WingPoint(x,0,which,top),WingPoint(x,1,which,top))
                     for j in range(37):
                         t=start+(end-start)*(1-cos(pi*j/36))/2
                         for d in [-.007,.007]:
-                            vv.append(WingPoint(x+d,t,which,top,.0008 if top else -.0008));uv.append((abs(x+d)/6,t if top else 2-t))
+                            vv.append(WingPoint(x+d,t,which,top,.0018 if top else -.0018));uv.append(((d+.007)/.014,t*tapeChord/.20))
                     for j in range(36):a=j*2;ff.append((a,a+1,a+3,a+2))
-                    tape=Mesh('RibTape_'+which+label+str(i)+('Top' if top else 'Bottom')+str(start),vv,ff,'Fabric',uv)
+                    tape=Mesh('RibTape_'+which+label+str(i)+('Top' if top else 'Bottom')+str(start),vv,ff,'RibTape',uv)
                     if moving:MoveUnder(tape,moving)
     # One interplane compression post and two cabane pairs, per original wing general drawing.
     lowerA=WingPoint(side*2.80,.48,'Lower',True)
@@ -312,7 +368,8 @@ def FlatAirfoil(name,outline,axis='horizontal',thickness=.035,mat='Fabric',paren
             fac=.001+.999*r/nr
             for i,p in enumerate(outline):
                 point=center+(Vector(p)-center)*fac+normal*top*thickness*sqrt(max(0,1-fac*fac))
-                vv.append(point);uv.append((point.x*.25+.5,point.y*.25+.5) if axis=='horizontal' else (point.y*.25+.5,point.z*.25))
+                vv.append(point);domain=uvDomains.get(mat,(1.5,1.5))
+                uv.append(((point.x+6)/domain[0],(point.y+5)/domain[1]) if axis=='horizontal' else ((point.y+5)/domain[0],point.z/domain[1]))
     layer=(nr+1)*n
     for f in range(2):
         for r in range(nr):
@@ -377,9 +434,14 @@ finFrame['manualSetting']='NDL canvas6: vertical surface set left 3deg40min rela
 engineY=2.86;engineZ=1.90
 def RevolveY(name,profile,mat='Cowl',n=96,parent=None):
     vv=[];ff=[];uv=[]
+    distances=[0]
+    for first,last in zip(profile,profile[1:]):distances.append(distances[-1]+math.dist(first,last))
     for j,(y,r) in enumerate(profile):
         for k in range(n+1):
-            a=2*pi*k/n;vv.append((r*sin(a),y,engineZ+r*cos(a)));uv.append((k/n,j/max(1,len(profile)-1)))
+            a=2*pi*k/n;vv.append((r*sin(a),y,engineZ+r*cos(a)))
+            if mat=='Cowl':uv.append((k/n,distances[j]/distances[-1]))
+            else:
+                tile=.5 if mat=='EngineCast' else 1.5;uv.append((a*r/tile,distances[j]/tile))
     for j in range(len(profile)-1):
         for k in range(n):
             a=j*(n+1)+k;ff.append((a,a+1,a+n+2,a+n+1))
@@ -387,14 +449,17 @@ def RevolveY(name,profile,mat='Cowl',n=96,parent=None):
     if parent:MoveUnder(obj,parent)
     return obj
 RevolveY('Cowl_AnnularRing',[(2.63,.674),(2.65,.704),(2.74,.725),(3.18,.725),(3.28,.702),(3.31,.66),(3.28,.626),(3.22,.617),(2.73,.637),(2.63,.674)])
+for k in range(12):
+    a=2*pi*k/12;normal=Vector((sin(a),0,cos(a)));center=Vector((.724*sin(a),2.735,engineZ+.724*cos(a)))
+    Tube('CowlQuarterTurnFastener'+str(k),center,center+normal*.0014,.0030,'Steel',12)
 RevolveY('Engine_AdapterPanels',[(2.25,.608),(2.38,.626),(2.67,.657)],'Skin')
-RevolveY('Engine_Crankcase',[(2.69,.28),(2.87,.29),(3.02,.20),(3.10,.14)],'Steel',64)
+RevolveY('Engine_Crankcase',[(2.69,.28),(2.87,.29),(3.02,.20),(3.10,.14)],'EngineCast',64)
 for i in range(9):
     a=2*pi*i/9;radial=Vector((sin(a),0,cos(a)));base=Vector((0,engineY,engineZ))
     Tube('Engine_Cylinder'+str(i),base+radial*.24,base+radial*.57,.092,'Steel',24)
-    for k in range(12):
-        r=.31+k*.020;Tube('CylinderCoolingFin'+str(i)+'_'+str(k),base+radial*(r-.004),base+radial*(r+.004),.110-(k/12)*.006,'Steel',24)
-    head=base+radial*.60;cover=Ellipsoid('RockerCover'+str(i),head,(.10,.095,.065),'Cowl',24,12)
+    for k in range(24):
+        r=.31+k*(.22/23);Tube('CylinderCoolingFin'+str(i)+'_'+str(k),base+radial*(r-.0016),base+radial*(r+.0016),.110-(k/23)*.006,'Steel',24)
+    head=base+radial*.60;cover=Ellipsoid('RockerCover'+str(i),head,(.10,.095,.065),'EngineCast',24,12)
     cover.rotation_mode='QUATERNION';cover.rotation_quaternion=radial.to_track_quat('Z','Y')
     for delta in [-.045,.045]:
         start=base+radial*.18+Vector((delta,.12,0));end=base+radial*.55+Vector((delta,.07,0));Tube('Pushrod'+str(i)+str(delta),start,end,.010,'Bright',10)
@@ -476,7 +541,7 @@ for side in [-1,1]:
     for n in range(5):
         y=2.35+n*.043
         Curve('CowlCoolingSlot'+str(side)+str(n),[(side*.58,y,2.19),(side*.61,y,2.06)],.013,'Dark')
-    Curve('ExhaustCollector'+str(side),[(side*.61,2.68,1.74),(side*.68,2.42,1.60),(side*.69,1.78,1.40),(side*.70,1.21,1.36)],.053,'Exhaust')
+    ExhaustPipe('ExhaustCollector'+str(side),[(side*.61,2.68,1.74),(side*.68,2.42,1.60),(side*.69,1.78,1.40),(side*.70,1.21,1.36)],.053)
     Tube('ExhaustOutlet'+str(side),(side*.70,1.24,1.36),(side*.70,1.13,1.35),.056,'Dark',24)
     for cy in [2.08,2.43]:
         pts=[BodyPoint(cy,2*pi*k/100,.003) for k in range(100)];Curve('EnginePanelSeam'+str(side)+str(cy),pts,.0014,'Steel',True)
@@ -485,6 +550,24 @@ for side in [-1,1]:
         x=side*(.9+n*.32);anchor=WingPoint(x,.62,'Lower',False);y=anchor[1];z=anchor[2]-.04
         Box('LightBombRack'+str(side)+str(n),(x,y,z),(.075,.32,.037),'Steel',.006)
         for d in [-.10,.10]:Tube('RackHook'+str(side)+str(n)+str(d),(x,y+d,z-.02),(x,y+d,z-.09),.008,'Steel',10)
+
+# SurfaceV2 shallow flush-head relief. The UV fastener seats remain under these
+# real heads; all heads are combined into one static mesh, not 1500 draw calls.
+rivetVerts=[];rivetFaces=[];rivetUv=[]
+for station in [-3.70,-3.05,-2.35,-1.55,-.70,.10,.90,1.65,2.30]:
+    for offset in [-.010,.010]:
+        y=station+offset
+        for k in range(84):
+            theta=2*pi*k/84;point=Vector(BodyPoint(y,theta));rx=Interp(sections,y,1);rz=Interp(sections,y,2)
+            if cos(theta)>0 and any((point.x/cx)**2+((y-cy)/cl)**2<1.12 for cy,cx,cl in cockpits):continue
+            normal=Vector((sin(theta)/rx,0,cos(theta)/rz)).normalized();along=Vector((0,1,0));cross=normal.cross(along).normalized();base=len(rivetVerts)
+            for radius,height in [(.0028,.00008),(.0021,.00050),(.0006,.00068)]:
+                for j in range(8):
+                    a=2*pi*j/8;q=point+normal*height+along*(radius*cos(a))+cross*(radius*sin(a));rivetVerts.append(q);rivetUv.append((.5+.48*cos(a),.5+.48*sin(a)))
+            for ring in range(2):
+                for j in range(8):a=base+ring*8+j;b=base+ring*8+(j+1)%8;rivetFaces.append((a,b,b+8,a+8))
+            rivetFaces.append(tuple(base+16+j for j in range(8)))
+Mesh('Surface_FlushRivetHeads',rivetVerts,rivetFaces,'Bright',rivetUv)
 
 def PbrTextures(mat, name):
     nodes=mat.node_tree.nodes;links=mat.node_tree.links;bs=nodes.get('Principled BSDF')
@@ -510,7 +593,7 @@ def PbrTextures(mat, name):
 if stage=='pbr':
     bodyMat=mats['Skin'].copy();bodyMat.name='Material_FuselageAluminum';body.data.materials.clear();body.data.materials.append(bodyMat)
     PbrTextures(bodyMat,'Fuselage')
-    for mat,name in [(mats['Skin'],'Aluminum'),(mats['Bright'],'Aluminum'),(mats['Fabric'],'Linen'),(mats['Cowl'],'Cowl'),(mats['Steel'],'Steel'),(mats['Wire'],'Steel'),(mats['Tire'],'Rubber'),(mats['Exhaust'],'Exhaust'),(mats['Leather'],'Leather')]:PbrTextures(mat,name)
+    for mat,name in [(mats['Skin'],'Aluminum'),(mats['Bright'],'Aluminum'),(mats['Fabric'],'Linen'),(mats['RibTape'],'RibTape'),(mats['EngineCast'],'EngineCast'),(mats['Cowl'],'Cowl'),(mats['Steel'],'Steel'),(mats['Wire'],'Steel'),(mats['Tire'],'Rubber'),(mats['Exhaust'],'Exhaust'),(mats['Leather'],'Leather')]:PbrTextures(mat,name)
     for image in bpy.data.images:
         if image.source=='FILE':image.pack()
 
@@ -546,7 +629,7 @@ for obj in root.children_recursive:
     bm=bmesh.new();bm.from_mesh(obj.data);bmesh.ops.remove_doubles(bm,verts=bm.verts,dist=.0000001)
     bmesh.ops.dissolve_degenerate(bm,edges=bm.edges,dist=.00000001)
     bmesh.ops.recalc_face_normals(bm,faces=bm.faces);bm.to_mesh(obj.data);bm.free()
-for sourceScript in [scriptPath,scriptPath.with_name('Script_NakajimaKi4Textures.py'),scriptPath.with_name('Script_NakajimaKi4Audit.py')]:
+for sourceScript in sorted(scriptPath.parent.glob('Script_NakajimaKi4*.py')):
     text=bpy.data.texts.get(sourceScript.name) or bpy.data.texts.new(sourceScript.name)
     text.clear();text.write(sourceScript.read_text(encoding='utf8'));text.use_fake_user=True
 bpy.ops.wm.save_as_mainfile(filepath=str(sourceRoot/'Scene_NakajimaKi4.blend'))

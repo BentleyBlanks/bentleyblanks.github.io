@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-23",
+  "date": "2026-10-24",
   "modelSpecific": {
     "actualSavedSourceReopened": true,
     "actualDeliveredGlbReimported": true,
@@ -7,9 +7,14 @@
     "combinedControlPoses": 9,
     "trianglePenetrations": 0,
     "uiControls": 8,
-    "pbrImageCount": 24,
+    "pbrImageCount": 30,
     "byteIdentityAndUvNormals": true,
-    "visualReview": "Gray reference alignment followed by PBR review; see Data_ReferenceReview.json"
+    "visualReview": "Actual V2 front/side/top, seven macros under studio and grazing lights; see Data_ReferenceReview.json",
+    "allEmbeddedPixelsMatchCurrentBake": true,
+    "materialChannelSlotCorrespondence": true,
+    "triangleIntersectionScope": "Non-wheel moving surfaces vs static body and combined control surfaces; wheel tests measure rigidity, pivot and equal rolling",
+    "completeRebakeSame30PngHashes": true,
+    "rebuildEvidence": "OneDrive SurfaceV2/Evidence/Data_RebakeReproducibility.json"
   },
   "passedRepositoryChecks": [
     "NakajimaKi4AssetTest",
@@ -21,7 +26,8 @@
     "MenuStartupTest (source and bundle)",
     "MotionVectorContractTest",
     "GeoTest",
-    "TextGatherCheck"
+    "TextGatherCheck",
+    "TextureStandardsTest (4259 checks)"
   ],
   "localDependencyNote": "MenuStartup rerun used the already-installed project esbuild0.28.2 through a temporary resolver; shared dependency directories were not changed",
   "existingBaselines": [
@@ -36,7 +42,8 @@
         "Icon_TabSeal32.png",
         "Script_FirstPersonGait.mjs",
         "Script_ToolsHomeField.mjs"
-      ]
+      ],
+      "reproducedInSurfaceV2": true
     },
     {
       "test": "BootTest",
@@ -44,8 +51,12 @@
       "baselineCommit": "453d31c6e38af1bf9ed1247bc48dc41eb28626de",
       "baselineRootClean": true,
       "baselineProbe": "The unchanged BootTest logic for phases0and1 was served from the clean main checkout and reproduced both failure classes; this is a scoped diagnostic, not a claim that the full baseline test passes",
-      "gameplayOrShaderCodeChangedByKi4": false
+      "gameplayOrShaderCodeChangedByKi4": false,
+      "surfaceV2Rerun": false,
+      "note": "Inherited scoped baseline evidence from V1; standalone Ki4 is still not loaded by campaign scenes"
     }
   ],
-  "claim": "Model/reference and related scoped checks passed. This receipt does not claim a clean full-repository prepush run."
+  "claim": "Current V2 asset/reference and related scoped checks passed. TestRunnerTest still has the six previously verified mapping failures; no clean full-repository prepush result is claimed.",
+  "runtimeSha256": "89d41a1d511fca777e142811b868cfdc992903555fc975ce868007b4a93bb5d1",
+  "integrationReview": "Rebased on current master; kept upstream Type89 and village ledger additions. Rebuilt font subsets for new upstream glyphs 抡/梯/逊; TextTest and cache-stamp correspondence passed. Current Ki4 material boundary paragraph was scrolled into view and visually inspected."
 }

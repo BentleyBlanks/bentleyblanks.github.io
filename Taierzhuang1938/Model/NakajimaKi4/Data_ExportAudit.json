@@ -1,29 +1,29 @@
 {
-  "version": "20261023ReferenceV1",
+  "version": "20261023SurfaceV2",
   "runtime": {
     "path": "Taierzhuang1938\\Model\\NakajimaKi4\\Model_NakajimaKi4.glb",
-    "sha256": "fa083c48af1c6683ecae4a78358a050b28ff8660e1a5a7e8867d6e9ebda81664",
-    "bytes": 17930524,
-    "triangles": 110275,
-    "meshes": 26,
-    "images": 24
+    "sha256": "89d41a1d511fca777e142811b868cfdc992903555fc975ce868007b4a93bb5d1",
+    "bytes": 62517452,
+    "triangles": 177815,
+    "meshes": 30,
+    "images": 30
   },
   "high": {
-    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\Exports\\Model_NakajimaKi4High.glb",
-    "sha256": "479b0bd63f64e5b1c1b5007c2aa0ed90e27c927881a878fcd8ef7d25879cbefe",
-    "bytes": 19578280,
-    "triangles": 177155,
-    "meshes": 678,
-    "images": 24
+    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\SurfaceV2\\Exports\\Model_NakajimaKi4High.glb",
+    "sha256": "6e2e94620689c54b786914739f8a6fe2fb370581af79019abc95f111598b4a23",
+    "bytes": 64227404,
+    "triangles": 244695,
+    "meshes": 799,
+    "images": 30
   },
   "source": {
-    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\Scene_NakajimaKi4.blend",
-    "sha256": "9cff8f208d19be3b26be2e78bb20e5e1766be38bb9cdadade7f6b6e974f7b42d",
-    "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\Scene_NakajimaKi4.blend",
-    "packedImages": 24,
-    "objects": 687,
-    "meshes": 638,
-    "curves": 40,
+    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\SurfaceV2\\Scene_NakajimaKi4.blend",
+    "sha256": "c4ef69396c5496f7fd56afbce31ac06980e0b07eee3dba874409e40bc410620e",
+    "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\SurfaceV2\\Scene_NakajimaKi4.blend",
+    "packedImages": 30,
+    "objects": 808,
+    "meshes": 763,
+    "curves": 36,
     "pivots": [
       "Pivot_Rudder",
       "Pivot_AileronLeft",
@@ -38,10 +38,49 @@
   },
   "dimensionsGltfXyzM": [
     12.00002384185791,
-    3.311857223510742,
+    3.312857151031494,
     8.2550790309906
   ],
   "pbrImages": [
+    {
+      "name": "Texture_Ki4CowlNormal",
+      "size": [
+        4096,
+        2048
+      ],
+      "mode": "RGB",
+      "sha256": "4ab0745fc43c63a99a0eec6359006215ca6f56d5ea34458b4152c288c80263bb",
+      "bytes": 6948598,
+      "bakedSha256": "4ab0745fc43c63a99a0eec6359006215ca6f56d5ea34458b4152c288c80263bb",
+      "decodedRgbSha256": "59be73f1addfa4778f270bae628195c3d602c4102a138e081680f6549d3e5af5",
+      "allPixelsMatchBake": true
+    },
+    {
+      "name": "Texture_Ki4CowlOrm",
+      "size": [
+        4096,
+        2048
+      ],
+      "mode": "RGB",
+      "sha256": "576549bd215a38483c7d5ff9a52d3b6e78c39abb58579ea82fd9ed52ab9b167a",
+      "bytes": 5540152,
+      "bakedSha256": "576549bd215a38483c7d5ff9a52d3b6e78c39abb58579ea82fd9ed52ab9b167a",
+      "decodedRgbSha256": "f6deaabc95ec0e7e7b4307de746d6782fb4edabd10a5e3ade6a540f79b676fc7",
+      "allPixelsMatchBake": true
+    },
+    {
+      "name": "Texture_Ki4CowlBase",
+      "size": [
+        4096,
+        2048
+      ],
+      "mode": "RGB",
+      "sha256": "39b229960b239a0c610c2944061bd322f6dcc4a3184d4b30a5888b159da1937a",
+      "bytes": 1591002,
+      "bakedSha256": "39b229960b239a0c610c2944061bd322f6dcc4a3184d4b30a5888b159da1937a",
+      "decodedRgbSha256": "4ca6d53009d9c02fc2335b5f87d8f48e284fa0681c9222fbecd37ef8e5792524",
+      "allPixelsMatchBake": true
+    },
     {
       "name": "Texture_Ki4LinenNormal",
       "size": [
@@ -49,8 +88,11 @@
         2048
       ],
       "mode": "RGB",
-      "sha256": "98a514a064e9d88cc380ad1e42e42bf43ac153e971653e1498dfc0e716a637d4",
-      "bytes": 1370262
+      "sha256": "cf8903e0b346c2ae5662f832c1d3b22b7cb9794c5e70ce48a21a0c1d0d13732a",
+      "bytes": 4916994,
+      "bakedSha256": "cf8903e0b346c2ae5662f832c1d3b22b7cb9794c5e70ce48a21a0c1d0d13732a",
+      "decodedRgbSha256": "e7979d2689e9ad775dfe1b8025e38f9868b7ad8e0bcee05ad455924ea4753864",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4LinenOrm",
@@ -59,8 +101,11 @@
         2048
       ],
       "mode": "RGB",
-      "sha256": "1c07c3d0092154dceb9cacb813e38e6d2bf059aace86f9f57d43f320cd05dd3c",
-      "bytes": 1614203
+      "sha256": "c60f8df190079fafe6d8964fd98fced2046ffbd08b935354e97544d9ddc2bb37",
+      "bytes": 1208048,
+      "bakedSha256": "c60f8df190079fafe6d8964fd98fced2046ffbd08b935354e97544d9ddc2bb37",
+      "decodedRgbSha256": "aec42cc525d6ac61da5d1e25a347a7d774bbd5cf5b4da4a74ceebb8546899b3c",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4LinenBase",
@@ -69,8 +114,11 @@
         2048
       ],
       "mode": "RGB",
-      "sha256": "94a8141890970a9033f89f8bf17e155d00f661b33afbc02eeef90c338c7a7a25",
-      "bytes": 536214
+      "sha256": "65c347f4f43a15b83f6d6e96f88ce20141dcb2adf2ee042fb85d909549be5733",
+      "bytes": 5299784,
+      "bakedSha256": "65c347f4f43a15b83f6d6e96f88ce20141dcb2adf2ee042fb85d909549be5733",
+      "decodedRgbSha256": "13fc846f6ec6316b6811571d337de7434185735f8f61f7e8ea93283595238e77",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4FuselageNormal",
@@ -79,8 +127,11 @@
         2048
       ],
       "mode": "RGB",
-      "sha256": "4050e9c8154b831d7f69e488aa2189684cb7c1a11434aaa91ffb2b3e7cc5bc13",
-      "bytes": 2777717
+      "sha256": "814868a923665d6d7267013dd1ad88dbbfd8178739971eeaa7ae2fa54b21c57d",
+      "bytes": 2922346,
+      "bakedSha256": "814868a923665d6d7267013dd1ad88dbbfd8178739971eeaa7ae2fa54b21c57d",
+      "decodedRgbSha256": "8fd73ef1f9de150c28a8c4d733b1ad6391671ffb8de472c0a4cb4fac3a261ab5",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4FuselageOrm",
@@ -89,8 +140,11 @@
         2048
       ],
       "mode": "RGB",
-      "sha256": "65a9a1adb2f479caf37c4d561c327c70e63765f5f858007e717d60ffb49b9b05",
-      "bytes": 868996
+      "sha256": "547b86d5e651d8f3b68b303218960e4c5f04fc82caf68a9f2f9281ea2e4589b6",
+      "bytes": 3801290,
+      "bakedSha256": "547b86d5e651d8f3b68b303218960e4c5f04fc82caf68a9f2f9281ea2e4589b6",
+      "decodedRgbSha256": "861dbf3ab1f449767bc8a95c1ac1671c9a9154ec584c27845603d7e268802dc3",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4FuselageBase",
@@ -99,8 +153,11 @@
         2048
       ],
       "mode": "RGB",
-      "sha256": "0c5cdbc3d6169d9ed0ab18ffdb9b5e36ba6c40e7e43b5d21dc81cc69ee009d60",
-      "bytes": 2190014
+      "sha256": "e1445ff32757e933ef4451253a99e6d8701b3e567b1beb9438c56b63cfcb7386",
+      "bytes": 7602312,
+      "bakedSha256": "e1445ff32757e933ef4451253a99e6d8701b3e567b1beb9438c56b63cfcb7386",
+      "decodedRgbSha256": "dfc192730c8d3af36b8f0772e1062072fd9eaf40da271ddd597f2b408f7194e8",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4AluminumNormal",
@@ -109,8 +166,11 @@
         1024
       ],
       "mode": "RGB",
-      "sha256": "4314716cc24eff3b0ba8934d4fd03534995f3e50c9eead6655bd732a95398687",
-      "bytes": 348229
+      "sha256": "2d8d429dde7226a5da6478fd3d01cb526a529418a75ebfaf707b97adff46f14f",
+      "bytes": 346625,
+      "bakedSha256": "2d8d429dde7226a5da6478fd3d01cb526a529418a75ebfaf707b97adff46f14f",
+      "decodedRgbSha256": "fa284cae1b77899b6f53ea865bebcae06c545229faf2fbde22cf7f5776bc2e31",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4AluminumOrm",
@@ -119,8 +179,11 @@
         1024
       ],
       "mode": "RGB",
-      "sha256": "a5ce1ea58115584015aa1d38d5a71a42a38b8dfacc754bff7f013cc2e4edef60",
-      "bytes": 131038
+      "sha256": "901ec553320e7e71a1f8fd0fdc753819a9c38c705a76d861c61082af480bbd0f",
+      "bytes": 95190,
+      "bakedSha256": "901ec553320e7e71a1f8fd0fdc753819a9c38c705a76d861c61082af480bbd0f",
+      "decodedRgbSha256": "9d4817d9b86fa3f7eead20fd86531d0a33eb144586c1c0f475a4b1b58727393f",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4AluminumBase",
@@ -129,38 +192,89 @@
         1024
       ],
       "mode": "RGB",
-      "sha256": "ce4f3ec27d2d35faa5fb50c4550f62faa4105bd5b396aa98a6f78fa1257db483",
-      "bytes": 67993
+      "sha256": "8d4288ee89580ed3fa69fec7f111027e3799e60c3202c727e098e993e10ccecc",
+      "bytes": 402761,
+      "bakedSha256": "8d4288ee89580ed3fa69fec7f111027e3799e60c3202c727e098e993e10ccecc",
+      "decodedRgbSha256": "a06c9a1bc6179e5c1696c0a74022205066bccef44ce800975a1b29e4300de440",
+      "allPixelsMatchBake": true
     },
     {
-      "name": "Texture_Ki4CowlNormal",
+      "name": "Texture_Ki4RibTapeNormal",
       "size": [
-        2048,
+        512,
         1024
       ],
       "mode": "RGB",
-      "sha256": "5ce0d4a91871781de7c8631f45e93e4db66319423eafb4fa731d626eb14408e8",
-      "bytes": 710747
+      "sha256": "57da6e7e9744a6f2b06295936c6ff65477333194b8ad7eb81fe43d4c4bd3cbab",
+      "bytes": 587068,
+      "bakedSha256": "57da6e7e9744a6f2b06295936c6ff65477333194b8ad7eb81fe43d4c4bd3cbab",
+      "decodedRgbSha256": "60ab1a27e64cf0da07197760a3262dcb572d72a1125fcece7aa52774e67fc513",
+      "allPixelsMatchBake": true
     },
     {
-      "name": "Texture_Ki4CowlOrm",
+      "name": "Texture_Ki4RibTapeOrm",
       "size": [
-        2048,
+        512,
         1024
       ],
       "mode": "RGB",
-      "sha256": "c8eff2457e9e903eb9057e2d051ddbdd5f1157340a16afa2b151aa012b8178bb",
-      "bytes": 242647
+      "sha256": "dbb5ab8c62dc4d714ee9bab558ff01097326a23c5f66e76f28a4d30623ed503c",
+      "bytes": 89410,
+      "bakedSha256": "dbb5ab8c62dc4d714ee9bab558ff01097326a23c5f66e76f28a4d30623ed503c",
+      "decodedRgbSha256": "f976147d7758e0a5d9cef1946faa8b514610da369f300e90cbeb9b31f0b9d0c4",
+      "allPixelsMatchBake": true
     },
     {
-      "name": "Texture_Ki4CowlBase",
+      "name": "Texture_Ki4RibTapeBase",
       "size": [
-        2048,
+        512,
         1024
       ],
       "mode": "RGB",
-      "sha256": "3f895da9b6f090dd3a39dace359e780361f51fa94d399f4c9029b8ddfc77472c",
-      "bytes": 113532
+      "sha256": "1cfe458b74124649575d74db333a39f675a4bcc000c52968c9238b60ef8edf4f",
+      "bytes": 185992,
+      "bakedSha256": "1cfe458b74124649575d74db333a39f675a4bcc000c52968c9238b60ef8edf4f",
+      "decodedRgbSha256": "263b62d5cb313e98cd86bf7d1c8a0ce4bacd979c538fb542e18f7d757d227ad5",
+      "allPixelsMatchBake": true
+    },
+    {
+      "name": "Texture_Ki4EngineCastNormal",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "8b41eaa72101205af26f057fca02e45cf6841b369fc440eee1b0f04352fa5142",
+      "bytes": 1114738,
+      "bakedSha256": "8b41eaa72101205af26f057fca02e45cf6841b369fc440eee1b0f04352fa5142",
+      "decodedRgbSha256": "23419ee599babfd6935f6192e192554a4156e5527203bee125fc5cdf669835b1",
+      "allPixelsMatchBake": true
+    },
+    {
+      "name": "Texture_Ki4EngineCastOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "a939dcb0542458613a380a400147a28606522bcc584077068116cbfc892f9d57",
+      "bytes": 729999,
+      "bakedSha256": "a939dcb0542458613a380a400147a28606522bcc584077068116cbfc892f9d57",
+      "decodedRgbSha256": "4733279cd885940e3c5f574593c62d90c465afb4d38887f94e2614a802ac669b",
+      "allPixelsMatchBake": true
+    },
+    {
+      "name": "Texture_Ki4EngineCastBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sha256": "8baf00da297b2491ab1fda0983fd6adcb777ff3f951d5117f12ddfe2f726761e",
+      "bytes": 685128,
+      "bakedSha256": "8baf00da297b2491ab1fda0983fd6adcb777ff3f951d5117f12ddfe2f726761e",
+      "decodedRgbSha256": "c08dedaeb5416758dccf57cf5ebd295395e361f0da36f98721372859e4923a29",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4ExhaustNormal",
@@ -169,8 +283,11 @@
         1024
       ],
       "mode": "RGB",
-      "sha256": "07055e514db67afdd906e55b1bd2884939753942d36a43d28b229cafc7953f96",
-      "bytes": 1190131
+      "sha256": "38c8af9709fb8574e2e7cdde1c92cac2155d3b71d1dba490eab6ef09ec88713b",
+      "bytes": 1236646,
+      "bakedSha256": "38c8af9709fb8574e2e7cdde1c92cac2155d3b71d1dba490eab6ef09ec88713b",
+      "decodedRgbSha256": "1c18f5f135b1d5a8c7670753830c89cfbaec3c73a1f599754c6ff486a64350c0",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4ExhaustOrm",
@@ -179,8 +296,11 @@
         1024
       ],
       "mode": "RGB",
-      "sha256": "3e93df66114fda4bda08f20ac5de2500917201467a6672f7672b492a3b6d1e04",
-      "bytes": 390109
+      "sha256": "873495096428296a97594955eabdcc8e49bd243d5d092b79d790ecbcefd86169",
+      "bytes": 963522,
+      "bakedSha256": "873495096428296a97594955eabdcc8e49bd243d5d092b79d790ecbcefd86169",
+      "decodedRgbSha256": "c8bf49338b1303f83ebb8add6865e5302fcad407de4a343798d6bdbf517a07aa",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4ExhaustBase",
@@ -189,8 +309,11 @@
         1024
       ],
       "mode": "RGB",
-      "sha256": "0e6bbd7bce86a978180bacfaafc5afbbff97e448c80677336dae1d1b064fbfd7",
-      "bytes": 268326
+      "sha256": "116d2809a846d4a9005fbd627887258f0129810d25baab073df8db66532b6782",
+      "bytes": 1033490,
+      "bakedSha256": "116d2809a846d4a9005fbd627887258f0129810d25baab073df8db66532b6782",
+      "decodedRgbSha256": "8d81ab67023f948a63a48524831b096e7262a20208410004f415f15ba48c44ae",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4SteelNormal",
@@ -199,8 +322,11 @@
         1024
       ],
       "mode": "RGB",
-      "sha256": "4a5ff30df7e8904a5be6b798e99946d7b7154539c7c5d40440a177d677858a14",
-      "bytes": 347730
+      "sha256": "66be9a9d9cac859d4381658470c316b9120968d957c3c9bbb5def17241e3855c",
+      "bytes": 1318466,
+      "bakedSha256": "66be9a9d9cac859d4381658470c316b9120968d957c3c9bbb5def17241e3855c",
+      "decodedRgbSha256": "c9e9f355a1f68848ecd036f93279c4b94d4a06a569d35bde97574a7534ce822c",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4SteelOrm",
@@ -209,8 +335,11 @@
         1024
       ],
       "mode": "RGB",
-      "sha256": "57165a18fa7b8ec0fbdf8fdb4d15cc3437dd51921b84ee8f04ce89a6458400ed",
-      "bytes": 130969
+      "sha256": "7d4d19506efe0f10adba89a277bb2b51055f721b3af1af7dcc58a9671e1a8143",
+      "bytes": 1300085,
+      "bakedSha256": "7d4d19506efe0f10adba89a277bb2b51055f721b3af1af7dcc58a9671e1a8143",
+      "decodedRgbSha256": "48421e5a94e66d5185b2d4b281ea21e9354225e58f29281e96d5a32c624a65e2",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4SteelBase",
@@ -219,38 +348,50 @@
         1024
       ],
       "mode": "RGB",
-      "sha256": "2071df80cac2f4c2d4b2ac302e64824b334ae4ef9803ebc01ef6cb024365367c",
-      "bytes": 62759
+      "sha256": "049612e3891e88eb8758bfb85ad6697cdc58d100cdd2599a3598171c5b8f1e5c",
+      "bytes": 850926,
+      "bakedSha256": "049612e3891e88eb8758bfb85ad6697cdc58d100cdd2599a3598171c5b8f1e5c",
+      "decodedRgbSha256": "a30503b423c4ca1c3b86977a67537e5774b78268dd36892c340f4263a0c33254",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4LeatherNormal",
       "size": [
-        512,
-        512
+        1024,
+        1024
       ],
       "mode": "RGB",
-      "sha256": "696969dcc597ab973fdb42c2253f1e79e4ef7cbea0d374799a23e9a1b4f0804c",
-      "bytes": 146921
+      "sha256": "b930f38210048a251dd7f54c72acbff9b341a5e913aa32aa74321bd9486df4da",
+      "bytes": 1795982,
+      "bakedSha256": "b930f38210048a251dd7f54c72acbff9b341a5e913aa32aa74321bd9486df4da",
+      "decodedRgbSha256": "f4b99950d389404ea08144e75559b3e400654f0cf6584e787b05fb188fbb5834",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4LeatherOrm",
       "size": [
-        512,
-        512
+        1024,
+        1024
       ],
       "mode": "RGB",
-      "sha256": "6d5bdf80310e00528fddb7041f6e43351815635baa733faf4b5208028a7acb04",
-      "bytes": 38088
+      "sha256": "81be90879f927d69b18512f45614ca034bce3de1a374a4dd6328f1025fafd153",
+      "bytes": 1786486,
+      "bakedSha256": "81be90879f927d69b18512f45614ca034bce3de1a374a4dd6328f1025fafd153",
+      "decodedRgbSha256": "fb6acb4dd4d7fc38ce65950797ac858695e0647312edbe3e2526433247ec39ac",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4LeatherBase",
       "size": [
-        512,
-        512
+        1024,
+        1024
       ],
       "mode": "RGB",
-      "sha256": "fc3c112ed11b0e3928fb25f873582887bf05e6c5c7cde46196bbb1ce0f91f16c",
-      "bytes": 28128
+      "sha256": "230aa25644504145ae51d92e96c517b316a0d8f1114728ccbfb315fd95ae187e",
+      "bytes": 1574765,
+      "bakedSha256": "230aa25644504145ae51d92e96c517b316a0d8f1114728ccbfb315fd95ae187e",
+      "decodedRgbSha256": "2a5eb9633cb44d365d57bb0731f2b933ceffd3a0f4a53a863da45f6edef0c721",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4RubberNormal",
@@ -259,8 +400,11 @@
         1024
       ],
       "mode": "RGB",
-      "sha256": "b0b61b2dc2fa69afa0454326841287f29ab1612968a6c6804f1280e1c2986127",
-      "bytes": 735783
+      "sha256": "3fea63e391bb62040257cd5b676226acf496e08e6cc8dfdd67adf3668a8dfd3f",
+      "bytes": 935705,
+      "bakedSha256": "3fea63e391bb62040257cd5b676226acf496e08e6cc8dfdd67adf3668a8dfd3f",
+      "decodedRgbSha256": "a7a3329fe2fbf02df48d8a11bba0489fae4381acee7fa61b6295a03cd19e2242",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4RubberOrm",
@@ -269,8 +413,11 @@
         1024
       ],
       "mode": "RGB",
-      "sha256": "a2750a99d78887bd03522e59dfb758262c4fc0236086e305930e0ffd2e62b810",
-      "bytes": 131788
+      "sha256": "6e8b5b02b320a61ad7ba553af41e6185637a105415086a75f0f1cd982f22b4e3",
+      "bytes": 133674,
+      "bakedSha256": "6e8b5b02b320a61ad7ba553af41e6185637a105415086a75f0f1cd982f22b4e3",
+      "decodedRgbSha256": "f58d6d37cdf013acd40fdc47cfe58926e64ab51e661c539352e1742775df84a7",
+      "allPixelsMatchBake": true
     },
     {
       "name": "Texture_Ki4RubberBase",
@@ -279,8 +426,11 @@
         1024
       ],
       "mode": "RGB",
-      "sha256": "c7adcceb82d4db53d00bf0d3e274200233338a00d2f62505c79f15edf59fd5a4",
-      "bytes": 73874
+      "sha256": "baef9dbfb3e8714ed34fead3c00224d26171f5ad9eb2cd3d92dfbac3ee843e15",
+      "bytes": 205617,
+      "bakedSha256": "baef9dbfb3e8714ed34fead3c00224d26171f5ad9eb2cd3d92dfbac3ee843e15",
+      "decodedRgbSha256": "17bf2deac0dfa7046a8b2e832ff81158cc6c9e00dfc6f73473a22923e92909a0",
+      "allPixelsMatchBake": true
     }
   ],
   "gameDerivation": [
@@ -402,14 +552,15 @@
     "singleComponentSamples": 52,
     "combinedControlSamples": 9,
     "trueTriangleIntersections": 0,
-    "maxRadialDriftM": 1.0838191664142016e-06,
+    "maxRadialDriftM": 1.0630904574426836e-06,
     "maxPivotDriftM": 0.0
   },
   "scriptHashPolicy": "UTF-8 with LF line endings; all binary asset hashes remain exact",
   "scripts": {
-    "Script_NakajimaKi4Audit.py": "d751d258103b16475e77b817bbbabc09c554eb3ef37f1c740b8dbacdcba5c09e",
-    "Script_NakajimaKi4Build.py": "b5bfc553a0a4306cad82f950ca523947ef642fe797a26837967656a2080b138b",
-    "Script_NakajimaKi4Receipt.py": "7a20040f9e2c1168bb3a77f520aa0bf537c58136b3c7531bff41374d1ea62b31",
-    "Script_NakajimaKi4Textures.py": "3a60f322a308c4857b70ebf70b5477966993be9a6141893339b57e016bb410ee"
+    "Script_NakajimaKi4Audit.py": "56efe030238e2504b31b592d206868c3a73a96212e301d9592bb77ef9f880614",
+    "Script_NakajimaKi4Build.py": "1e37ca60ca74e6f25e46bfdd7e0cdbb858445fcb8428ecee787c06d8649c0a55",
+    "Script_NakajimaKi4Receipt.py": "4f7e7b6d8f4737fa3ce87ecd739bfd2f289c5ee1ade9dfabe46676cbf777e51e",
+    "Script_NakajimaKi4SurfaceBake.py": "f540c8e040009246df8b10c10ad3a3098f5232affc9148764c18e4d412a02815",
+    "Script_NakajimaKi4Textures.py": "b5f5a699a3329367e9614c38318fd8ffa01a77adfcb868669ed97b579fece9bf"
   }
 }

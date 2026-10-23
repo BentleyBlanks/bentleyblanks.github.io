@@ -1,0 +1,20 @@
+Use case: historical-scene / material-development reference, one specific aircraft only.
+
+Create one photorealistic material-development reference sheet for the Nakajima Ki-4 Army Type94 landplane, selected bare-wheel 141（中島製） configuration. This is an explicitly inferred reconstruction, not a historical photograph.
+
+Input roles:
+1. Historical Ki-4 photograph: authoritative aircraft identity, silhouette, component relationships and restraint of finish. Keep the staggered unequal biplane wings, two tandem open cockpits, black annular cowl, divided exposed wheels, two-blade propeller and tail skid. Do not add a canopy, wheel spats, floats, monoplane layout, other aircraft type, camouflage or extra markings.
+2. Current model side view: preserve its overall proportions and configuration while substantially improving real surface character. Ignore the screenshot caption and interface.
+3. Hikari engine museum photo: reference ONLY for cast-metal texture, fine cooling-fin character, fastener recesses and localized oil/oxide. Do not copy the cutaway, yellow museum cap, display stand or modern sign into the aircraft.
+
+Layout: a professional wide reference board, very high detail. Top two thirds contain three consistent orthographic views of this exact SAME aircraft: starboard side, front, and top. Full aircraft visible, clean light-gray background, equal material treatment across views. Bottom third contains three large macro photographs of the same surfaces: fuselage aluminum panel with flush fastener seam; silver-doped linen wing/rib-tape region; black-painted cowl lip with adjacent engine/exhaust. Clear restrained labels: SIDE, FRONT, TOP, ALUMINUM SKIN, DOPED LINEN, COWL / ENGINE. Footer: INFERRED MATERIAL RECONSTRUCTION.
+
+Material target, crucial:
+- A maintained 1930s aircraft, not a wreck or a toy. Significant visible surface detail at a one-meter inspection distance, coherent at realistic millimeter/centimeter scales. No uniform grunge filter.
+- Fuselage aluminum: softly oxidized rolled sheet, subtle adjacent-panel tone and roughness differences, directional mill grain, shallow nonuniform sheet waviness around actual fastener rows, hairline abrasions, rubbed service edges, small dark fastener recesses, thin oily dirt around service panels and below the engine. Aluminum must not carry orange ferrous rust.
+- Wings and tail: warm pale silver dope over taut fine linen, a sealed fine weave visible in macro, distinct thin rib tapes and stitch relief, minute tension puckering localized to tapes, a few shallow trailing-edge wrinkles and subtle dirt caught at tape edges. Do not make coarse burlap or thick upholstery. No plastic-smooth white slabs.
+- Cowl: satin nearly black enamel, fine uneven orange peel, small edge chips revealing dull metal, directional handling scratches, rubbed rolled lip, dark grease around fasteners. Avoid mirror-chrome or glossy automotive paint.
+- Engine: cast aluminum-gray crankcase with fine casting grain and worn polished edges, darker finely spaced steel cooling fins, individual bolt heads and recessed grime, uneven oil staining. Exhaust: restrained brown-black heat oxide and light localized ferrous oxidation, not bright red rust everywhere.
+- Tires: charcoal rubber with fine molding/sidewall texture, gently worn tread, localized dusty contact edges. Cockpit coaming/seat leather: fine grain, creases and rubbed contact edges.
+
+Lighting: neutral daylight studio, broad soft illumination plus a gentle grazing source that reveals actual material relief; no hard baked-in dramatic lighting. Fine details must belong to the materials, not just specular highlights. Consistent moderate wear across all views and macro samples. Preserve the proportions, do not redesign the aircraft to create detail. No personnel, scenery, weapons operation, labels or logos other than those requested. Retain the small 141 factory marking only where the historical reference supports it.

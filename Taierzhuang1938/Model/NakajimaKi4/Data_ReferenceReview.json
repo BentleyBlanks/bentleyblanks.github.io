@@ -1,7 +1,7 @@
 {
-  "state": "ReviewedAgainstAvailableReferenceWithDeclaredInference",
-  "version": "20261023ReferenceV1",
-  "runtimeSha256": "fa083c48af1c6683ecae4a78358a050b28ff8660e1a5a7e8867d6e9ebda81664",
+  "state": "ReviewedAgainstSelectedSurfaceTargetsWithDeclaredInference",
+  "version": "20261023SurfaceV2",
+  "runtimeSha256": "89d41a1d511fca777e142811b868cfdc992903555fc975ce868007b4a93bb5d1",
   "mainReference": "Photo02 / Nakajima_Ki-4.jpg / 141（中島製）",
   "camera": {
     "azimuthRadians": 1.45,
@@ -25,7 +25,10 @@
     "Upper38/lower23 rib numbering and denser outer rib sequence",
     "Photo02 factory marking only; Photo01 alternative markings excluded",
     "PBR material separation, localized wear/oxidation, no light baked into BaseColor",
-    "Actual GLB reopened; rigid hinge and combined surface tests; all real UI controls"
+    "Actual GLB reopened; rigid hinge and combined surface tests; all real UI controls",
+    "Final exported V2 under broad studio lights and a separate grazing key; front/side/top, reference oblique and seven material macros",
+    "Decoded RGB equality for every pixel of all 30 current embedded PBR images, and material Base/Normal/ORM slot correspondence",
+    "V1 source and exact runtime preserved in ArchiveV1 before promotion"
   ],
   "knownUnaddressedVisibleDefects": [],
   "inferenceIsNotProof": [
@@ -33,5 +36,61 @@
     "Prefix and letterform reconstruction of the small factory stencil",
     "Exact unreadable inner rib intervals and hidden control-hinge recess hardware"
   ],
-  "evidenceLocal": "tmp/NakajimaKi4 and OneDrive NakajimaKi4/Evidence; acceptance pages and images are not published"
+  "evidenceLocal": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\SurfaceV2\\Evidence",
+  "reviewedAt": "2026-10-24",
+  "reviewedBy": "Codex self-review; no user approval is asserted",
+  "surfaceComparisons": [
+    {
+      "surface": "Aluminum skin",
+      "target": "Generated ALUMINUM SKIN macro, historical photo panel placement",
+      "observed": "Longitudinal rolling grain, crossed hairline contact scratches, restrained sheet reflectance differences, recessed seams and shallow flush heads; removed periodic barrel banding",
+      "views": [
+        "MetalMacro",
+        "MetalMacroRake"
+      ]
+    },
+    {
+      "surface": "Silver-doped linen and rib tape",
+      "target": "Generated DOPED LINEN macro, original manual rib layout",
+      "observed": "Sealed fine weave, warm silver dope, irregular shallow tension creases confined to rib bays, raised tape and paired 25mm-pitch stitch/puncture relief. Relief is visibly tested under a key above the wing plane",
+      "views": [
+        "StitchMacro",
+        "StitchMacroRake",
+        "StitchClose"
+      ]
+    },
+    {
+      "surface": "Dark cowl enamel",
+      "target": "Generated COWL / ENGINE macro",
+      "observed": "Satin enamel specular response, fine orange peel, sparse small chips, coherent rolled-lip wear and service-fastener rubbing; color/roughness/metal/relief masks aligned",
+      "views": [
+        "CowlMacro",
+        "CowlMacroRake"
+      ]
+    },
+    {
+      "surface": "Engine metal and exhaust",
+      "target": "TTTNIS Hikari3 photos and generated COWL / ENGINE macro",
+      "observed": "Isotropic cast grain separate from machined metal, 24 cooling fins per cylinder, localized oil/oxide; exhaust unfolds by arc length with granular heat oxidation and outlet soot",
+      "views": [
+        "EngineMacro",
+        "EngineMacroRake",
+        "ExhaustMacro",
+        "ExhaustMacroRake"
+      ]
+    },
+    {
+      "surface": "Leather and rubber",
+      "target": "CC0 brown_leather at 0.4m, historical photo tire character",
+      "observed": "Measured leather pores and creases on physical coaming/seat UVs; fine matte rubber, molding lines and restrained dust",
+      "views": [
+        "LeatherMacro",
+        "RubberMacro"
+      ]
+    }
+  ],
+  "comparisonLimits": [
+    "Generated sheet is a declared material reconstruction. Original manual and monochrome photos remain geometric authority.",
+    "Lighting response and feature scale are compared across views; this is not a claim of exact historical color, wear location or photographic pixel equality."
+  ]
 }

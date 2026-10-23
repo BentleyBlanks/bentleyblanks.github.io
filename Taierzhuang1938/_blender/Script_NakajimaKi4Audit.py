@@ -2,12 +2,13 @@
 Run on this task's BlenderMCP instance, with the saved source freshly opened.
 Evidence is external and never committed. No source file is overwritten.
 """
-import bpy,json,pathlib,math,re,hashlib
+import bpy,json,pathlib,math,re,hashlib,os
 from mathutils import Vector,Quaternion
 from mathutils.bvhtree import BVHTree
 from mathutils.geometry import intersect_ray_tri
-sourceRoot=pathlib.Path(r'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NakajimaKi4')
+sourceRoot=pathlib.Path(os.environ.get('KI4_SOURCE_ROOT',r'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NakajimaKi4/SurfaceV2'))
 repoRoot=pathlib.Path(globals().get('__file__','Taierzhuang1938/_blender/Script_NakajimaKi4Audit.py')).resolve().parents[2]
+assetRoot=pathlib.Path(os.environ.get('KI4_ASSET_ROOT',str(repoRoot/'Taierzhuang1938/Model/NakajimaKi4')))
 output=sourceRoot/'Evidence'
 assert pathlib.Path(bpy.data.filepath).resolve()==(sourceRoot/'Scene_NakajimaKi4.blend').resolve(), 'Open the saved source first'
 assert bpy.context.scene.get('BlenderMcpTask')=='NakajimaKi4'
@@ -16,10 +17,10 @@ source=bpy.data.objects.get('NakajimaKi4');assert source
 sourcePivots=[o for o in source.children_recursive if o.name.startswith('Pivot_')]
 assert len(sourcePivots)==8 and all(p.children for p in sourcePivots)
 packed=[i for i in bpy.data.images if i.packed_file]
-assert len(packed)==24, 'All authored PBR images must be packed in editable source'
+assert len(packed)==30, 'All ten authored Base/Normal/ORM sets must be packed in editable source'
 sourceInfo={'file':bpy.data.filepath,'packedImages':len(packed),'objects':len(source.children_recursive),'meshes':sum(o.type=='MESH' for o in source.children_recursive),'curves':sum(o.type=='CURVE' for o in source.children_recursive),'pivots':[o.name for o in sourcePivots],'reopened':True}
 before=set(bpy.data.objects)
-bpy.ops.import_scene.gltf(filepath=str(repoRoot/'Taierzhuang1938/Model/NakajimaKi4/Model_NakajimaKi4.glb'))
+bpy.ops.import_scene.gltf(filepath=str(assetRoot/'Model_NakajimaKi4.glb'))
 new=set(bpy.data.objects)-before
 def BaseName(o):return re.sub(r'\.\d{3}$','',o.name)
 gameRoot=next(o for o in new if BaseName(o)=='NakajimaKi4')
@@ -97,7 +98,7 @@ for name,p in sorted(pivots.items()):
         collisions,candidates=Intersections(Tree(meshChildren),staticTree) if 'Wheel' not in name else (None,None)
         motion.append({'pivot':name,'angleDegrees':angle,'maxRadialDriftM':drift,'pivotDriftM':pivotDrift,'staticTriangleIntersections':collisions,'staticBvhCandidates':candidates})
     p.rotation_quaternion=rest;bpy.context.view_layer.update()
-report={'source':sourceInfo,'sourceSha256':hashlib.sha256((sourceRoot/'Scene_NakajimaKi4.blend').read_bytes()).hexdigest(),'runtimeSha256':hashlib.sha256((repoRoot/'Taierzhuang1938/Model/NakajimaKi4/Model_NakajimaKi4.glb').read_bytes()).hexdigest(),'actualGlbReimport':True,'gameMeshes':sum(o.type=='MESH' for o in new),'dimensionsBlenderXyzM':dimensions,'boundsBlenderXyzM':[minimum,maximum],'propellerCenterBlenderM':list(propPos),'rudderCenterBlenderM':list(rudderPos),'motion':motion,'wheelRadiusM':pivots['Pivot_WheelLeft'].get('rollingRadiusM')}
+report={'source':sourceInfo,'sourceSha256':hashlib.sha256((sourceRoot/'Scene_NakajimaKi4.blend').read_bytes()).hexdigest(),'runtimeSha256':hashlib.sha256((assetRoot/'Model_NakajimaKi4.glb').read_bytes()).hexdigest(),'actualGlbReimport':True,'gameMeshes':sum(o.type=='MESH' for o in new),'dimensionsBlenderXyzM':dimensions,'boundsBlenderXyzM':[minimum,maximum],'propellerCenterBlenderM':list(propPos),'rudderCenterBlenderM':list(rudderPos),'motion':motion,'wheelRadiusM':pivots['Pivot_WheelLeft'].get('rollingRadiusM')}
 combined=[]
 rudder=pivots['Pivot_Rudder'];rudderRest=rudder.rotation_quaternion.copy()
 elevators=[pivots['Pivot_ElevatorLeft'],pivots['Pivot_ElevatorRight']];elevatorRest=[p.rotation_quaternion.copy() for p in elevators]

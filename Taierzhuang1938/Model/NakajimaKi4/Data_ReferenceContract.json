@@ -1,7 +1,7 @@
 {
   "asset": "NakajimaKi4",
-  "version": "20261023ReferenceV1",
-  "status": "ReferenceReviewedWithDeclaredInference",
+  "version": "20261023SurfaceV2",
+  "status": "SurfaceV2ReviewedAgainstSelectedTargets",
   "selectedConfiguration": "Photo02's 141（中島製） Army Type94 landplane: bare wheels, two open cockpits, lateral exhaust collectors. Other photos provide shape corroboration only; this is not a claim of a proven production subtype or Tengxian deployment",
   "notion": "https://app.notion.com/p/40260335331c81ce8b26eb0e1cd6f9cb",
   "primaryManual": "https://dl.ndl.go.jp/pid/8815746",
@@ -37,9 +37,21 @@
     "gear": "NDL canvas 96: divided landing gear and wheel drawing"
   },
   "references": [
-    { "id": "Photo01", "url": "https://commons.wikimedia.org/wiki/File:Ki-4_94siki-tei.jpg", "role": "Frontal oblique silhouette, bare wheels, diagonal rigging, propeller and cowl" },
-    { "id": "Photo02", "url": "https://commons.wikimedia.org/wiki/File:Nakajima_Ki-4.jpg", "role": "Primary three-quarter side silhouette, cowl vents, side paneling, cockpit shoulders, tail and undercarriage" },
-    { "id": "Photo03", "url": "https://commons.wikimedia.org/wiki/File:Ki-4_01_00086145.jpg", "role": "Other front-side view, lower wing size, engine face, struts, exposed wheels, underwing racks" }
+    {
+      "id": "Photo01",
+      "url": "https://commons.wikimedia.org/wiki/File:Ki-4_94siki-tei.jpg",
+      "role": "Frontal oblique silhouette, bare wheels, diagonal rigging, propeller and cowl"
+    },
+    {
+      "id": "Photo02",
+      "url": "https://commons.wikimedia.org/wiki/File:Nakajima_Ki-4.jpg",
+      "role": "Primary three-quarter side silhouette, cowl vents, side paneling, cockpit shoulders, tail and undercarriage"
+    },
+    {
+      "id": "Photo03",
+      "url": "https://commons.wikimedia.org/wiki/File:Ki-4_01_00086145.jpg",
+      "role": "Other front-side view, lower wing size, engine face, struts, exposed wheels, underwing racks"
+    }
   ],
   "conflicts": [
     "Notion incorrectly calls Ki-4 a low-wing monoplane. All three photographs and the original manual show a staggered sesquiplane.",
@@ -52,10 +64,52 @@
     "Internal tail-cone recess, balance-horn clearance pocket, exact hinge hardware and operational demonstration limits are functional reconstruction; they are checked against real rigid motion rather than claimed as photo-proven factory details.",
     "Photo02 marking 141（中島製） is readable; the small prefix is transcribed as 機番 with lower confidence. Noto Sans supplies a reconstruction of the ink letterforms, not a claim of the exact original stencil font. Only the photographed side carries this mark.",
     "Manual73/74 rib labels 1–38 and 1–23 and the denser outer spacing are retained. Outer upper intervals are readable; remaining inner station positions are calibrated from the scanned drawing and are not claimed as a complete factory dimensional survey.",
-    "Photos are same-type appearance references, not Tengxian field photographs. This asset does not establish Ki-4 participation in the Tengxian city assault."
+    "Photos are same-type appearance references, not Tengxian field photographs. This asset does not establish Ki-4 participation in the Tengxian city assault.",
+    "SurfaceV2 texture characterization uses explicitly inferred imagegen references and CC0 material analogues; it does not establish exact historical colors, wear or upholstery."
   ],
-  "sourceProject": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NakajimaKi4/Scene_NakajimaKi4.blend",
+  "sourceProject": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NakajimaKi4/SurfaceV2/Scene_NakajimaKi4.blend",
   "referenceArchive": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NakajimaKi4/References",
   "axes": "Source Blender X right, +Y nose, +Z up. Export glTF X right, Y up, -Z nose. Meters. Origin on centerline at ground datum.",
-  "requiredPivots": ["Pivot_Propeller", "Pivot_WheelLeft", "Pivot_WheelRight", "Pivot_Rudder", "Pivot_ElevatorLeft", "Pivot_ElevatorRight", "Pivot_AileronLeft", "Pivot_AileronRight"]
+  "requiredPivots": [
+    "Pivot_Propeller",
+    "Pivot_WheelLeft",
+    "Pivot_WheelRight",
+    "Pivot_Rudder",
+    "Pivot_ElevatorLeft",
+    "Pivot_ElevatorRight",
+    "Pivot_AileronLeft",
+    "Pivot_AileronRight"
+  ],
+  "surfaceEvidence": {
+    "sameType": "SDASM 01_00086146 and original three monochrome photographs",
+    "analogue": "Hikari3 engine photographs by TTTNIS, CC0; PolyHaven brown_leather by RobTuytel, CC0, 0.4m sample",
+    "generated": "Built-in imagegen material board and 4-quadrant albedo atlas; color/wear direction is inferred, not historical proof",
+    "materialTarget": "Macro panels retained while geometry-only sheet corrections use actual model views; real manual remains dimensional authority",
+    "generatedBoardSha256": "45cab66eb2d66b046b13686f83658c227ee4ee64cf890994e9aeec519ece0c5c",
+    "albedoInputManifest": "../../_import/Source/NakajimaKi4/Data_SurfaceSources.json"
+  },
+  "surfaceBudget": {
+    "gameCeilingTriangles": 180000,
+    "reason": "Physical shallow flush-head relief and 24 cooling fins per cylinder retained instead of deleting these visible surface features"
+  },
+  "surfaceReferenceArchive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\SurfaceV2\\References",
+  "v1Archive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ArchiveV1",
+  "surfaceReferences": [
+    {
+      "url": "https://www.flickr.com/photos/sdasmarchives/7586032330",
+      "role": "Additional monochrome same-type SDASM photo, 01_00086146; not a color reference"
+    },
+    {
+      "url": "https://commons.wikimedia.org/wiki/File:1936_Nakajima_Hikari_3_01.jpg",
+      "role": "TTTNIS, CC0, modern Hikari3 casting/fins/patina analogue only"
+    },
+    {
+      "url": "https://commons.wikimedia.org/wiki/File:1936_Nakajima_Hikari_3_02.jpg",
+      "role": "TTTNIS, CC0, second modern Hikari3 material view only"
+    },
+    {
+      "url": "https://polyhaven.com/a/brown_leather",
+      "role": "Rob Tuytel, CC0, 0.4m material sample; not Ki4 upholstery evidence"
+    }
+  ]
 }

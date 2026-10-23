@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {LoadGlb,ReadAccessor,ReadAccessorInt} from './_import/Script_LugouGlbPose.mjs';
-const dir=path.join(import.meta.dirname,'Model/NakajimaKi4');
+const dir=process.env.KI4_ASSET_ROOT??path.join(import.meta.dirname,'Model/NakajimaKi4');
 const glb=LoadGlb(path.join(dir,'Model_NakajimaKi4.glb')),g=glb.json;
 const contract=JSON.parse(fs.readFileSync(path.join(dir,'Data_ReferenceContract.json'),'utf8'));
 const audit=JSON.parse(fs.readFileSync(path.join(dir,'Data_ExportAudit.json'),'utf8'));
@@ -17,7 +17,7 @@ function Transform(m,p){return[m[0]*p[0]+m[4]*p[1]+m[8]*p[2]+m[12],m[1]*p[0]+m[5
 const world=new Map(),parents=new Map(),points=[];
 function Visit(i,m){const n=g.nodes[i],w=Multiply(m,Matrix(n));world.set(i,w);if(n.mesh!==undefined)for(const p of g.meshes[n.mesh].primitives){const a=ReadAccessor(glb,p.attributes.POSITION).data;for(let k=0;k<a.length;k+=3)points.push(Transform(w,a.subarray(k,k+3)));}for(const c of n.children??[]){parents.set(c,i);Visit(c,w);}}
 for(const i of g.scenes[g.scene??0].nodes)Visit(i,Id);
-const min=[0,1,2].map(a=>Math.min(...points.map(p=>p[a]))),max=[0,1,2].map(a=>Math.max(...points.map(p=>p[a]))),dimensions=max.map((x,i)=>x-min[i]);
+const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];for(const p of points)for(let a=0;a<3;a++){min[a]=Math.min(min[a],p[a]);max[a]=Math.max(max[a],p[a]);}const dimensions=max.map((x,i)=>x-min[i]);
 assert.ok(Math.abs(dimensions[0]-12)<.002,'12m upper span, measured from actual world vertices');
 assert.ok(Math.abs(dimensions[1]-3.31)<.04,'manual approximate 3.31m height');
 assert.ok(Math.abs(dimensions[2]-8.25)<.05,'manual approximate 8.25m length');
@@ -40,10 +40,10 @@ for(const mesh of g.meshes)for(const p of mesh.primitives){
  for(let i=0;i<idx.length;i+=3){const [a,b,c]=idx.subarray(i,i+3);assert.ok(Math.max(a,b,c)<pos.length/3);const u=[0,1,2].map(k=>pos[b*3+k]-pos[a*3+k]),v=[0,1,2].map(k=>pos[c*3+k]-pos[a*3+k]);assert.ok(Math.hypot(u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0])>1e-12,'no collapsed delivered triangles');}
  triangles+=idx.length/3;vertices+=pos.length/3;
 }
-assert.ok(triangles<=115000,'independent game derivative stays in the reviewed 115k ceiling');
+assert.ok(triangles<=180000,'SurfaceV2 preserves visible flush-head relief and 24-fin cylinders within the reviewed 180k ceiling');
 assert.equal(triangles,audit.runtime.triangles);assert.equal(g.meshes.length,audit.runtime.meshes);
 assert.ok(g.meshes.length<=40,'static merging preserves efficient rendering without merging hinges');
-assert.equal(g.images.length,24,'eight full Base/Normal/ORM sets');
+assert.equal(g.images.length,30,'ten full Base/Normal/ORM sets, including independent cast metal and rib tape');
 for(const image of g.images){assert.ok(image.bufferView!==undefined,'self-contained GLB');assert.ok(['image/png','image/webp'].includes(image.mimeType));}
 for(const m of g.materials){if(/Shadow|InstrumentFaces|Windscreen/.test(m.name))continue;assert.ok(m.pbrMetallicRoughness.baseColorTexture,m.name+' Base');assert.ok(m.normalTexture,m.name+' Normal');assert.ok(m.pbrMetallicRoughness.metallicRoughnessTexture,m.name+' MR');assert.ok(m.occlusionTexture,m.name+' AO');assert.equal(m.occlusionTexture.index,m.pbrMetallicRoughness.metallicRoughnessTexture.index,m.name+' consistent ORM packing');}
 assert.ok(!g.animations?.length,'author node controls are explicit; no accidental baked whole-model animation');

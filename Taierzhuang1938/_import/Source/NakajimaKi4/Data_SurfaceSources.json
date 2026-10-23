@@ -1,0 +1,29 @@
+{
+  "provider": "built-in image_gen__imagegen",
+  "outputId": "exec-fd3a6c12-c871-4e40-aa26-4446ddd62c7b",
+  "file": "Texture_NakajimaKi4SurfaceAtlasV2.png",
+  "sha256": "83267d7420cef713f90b48c751f691b5f044c72fdfa72165f5bce94186e88578",
+  "size": [
+    1254,
+    1254
+  ],
+  "prompt": "Prompts/Texture_NakajimaKi4SurfaceAtlasV2.txt",
+  "layout": {
+    "topLeft": "rolled aluminum",
+    "topRight": "silver-doped linen",
+    "bottomLeft": "dark cowl enamel",
+    "bottomRight": "oxidized steel"
+  },
+  "physicalSampleM": [
+    0.4,
+    0.4
+  ],
+  "role": "Generated albedo input, explicitly inferred; no historical color/wear claim",
+  "baker": "../../../_blender/Script_NakajimaKi4SurfaceBake.py",
+  "referencePrompts": [
+    "Prompts/Texture_NakajimaKi4SurfaceV2.txt",
+    "Prompts/Texture_NakajimaKi4SurfaceV2Correction.txt"
+  ],
+  "atlasManifest": "Data_SurfaceAtlasV2.json",
+  "leatherManifest": "Leather/Data_BrownLeatherSource.json"
+}

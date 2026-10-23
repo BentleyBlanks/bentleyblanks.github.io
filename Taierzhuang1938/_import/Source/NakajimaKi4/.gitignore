@@ -1,0 +1,4 @@
+# Preserve the exact input provenance needed to rebuild this embedded PBR asset.
+!Data_SurfaceSources.json
+!Data_SurfaceAtlasV2.json
+!Leather/Data_BrownLeatherSource.json

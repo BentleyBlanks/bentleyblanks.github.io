@@ -1,0 +1,33 @@
+{
+  "sourcePage": "https://polyhaven.com/a/brown_leather",
+  "author": "Rob Tuytel",
+  "license": "CC0",
+  "physicalTileM": 0.4,
+  "role": "Material analogue; not proof of Ki4 upholstery or color",
+  "files": {
+    "Base": {
+      "file": "Texture_BrownLeatherBase.jpg",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brown_leather/brown_leather_albedo_1k.jpg",
+      "sha256": "7e9e1d6566d1fd91d4ceb4966c4820361e85d53a7a828b6bab3b2a093a876cd1",
+      "bytes": 503348
+    },
+    "Normal": {
+      "file": "Texture_BrownLeatherNormal.png",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/brown_leather/brown_leather_nor_gl_1k.png",
+      "sha256": "6354daff40330a2fcd6c1061912876ddc79889c960975adba336b013db5edcd5",
+      "bytes": 1925895
+    },
+    "Roughness": {
+      "file": "Texture_BrownLeatherRoughness.png",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/brown_leather/brown_leather_rough_1k.png",
+      "sha256": "80f3b3b886e2ca6deb1b54559457fc50945745df021c7773e39e1bebc9d8daa1",
+      "bytes": 959330
+    },
+    "Ao": {
+      "file": "Texture_BrownLeatherAo.png",
+      "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/brown_leather/brown_leather_ao_1k.png",
+      "sha256": "aa70b757229abd29c8f54789e6c41d48eb19258b42193830ae5c3fc2e7296cb0",
+      "bytes": 789048
+    }
+  }
+}

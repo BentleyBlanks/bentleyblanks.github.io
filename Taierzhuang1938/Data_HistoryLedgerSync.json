@@ -6,24 +6,26 @@
   "assetReviews": [
     {
       "asset": "NakajimaKi4",
-      "date": "2026-10-23",
+      "date": "2026-10-24",
       "scope": "Ki4 appearance reconstruction only; global repo review anchor and unrelated source-page stamps are preserved",
       "contract": "Model/NakajimaKi4/Data_ReferenceContract.json",
-      "decision": "Same-type appearance evidence; colors and hidden mechanisms inferred; no promotion to confirmed Tengxian combat aircraft",
+      "decision": "SurfaceV2: monochrome same-type structure; modern engine/CC0 leather/imagegen material analogues remain inferred. No promotion to confirmed Tengxian combat aircraft",
       "notionSnapshots": [
         {
           "id": "40260335331c81ce8b26eb0e1cd6f9cb",
-          "lastEdited": "2026-10-23T10:13:41.111Z"
+          "lastEdited": "2026-10-23T18:16:58.895Z"
         },
         {
           "id": "3fd60335331c8194aa82f0b238084d34",
-          "lastEdited": "2026-10-23T08:03:48.815Z"
+          "lastEdited": "2026-10-23T18:27:24.293Z"
         },
         {
           "id": "3fd60335331c818fa24deadb6d72ca70",
-          "lastEdited": "2026-10-23T08:03:56.299Z"
+          "lastEdited": "2026-10-23T18:17:02.127Z"
         }
-      ]
+      ],
+      "runtimeSha256": "89d41a1d511fca777e142811b868cfdc992903555fc975ce868007b4a93bb5d1",
+      "reviewScopeNote": "Ki4 material-related rows and source page only. Global review anchor and unrelated Notion/page-source stamps are unchanged."
     },
     {
       "asset": "StrawSleepingMat",
