@@ -47,6 +47,8 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  Type89MediumTankTest: {file:"Script_Type89MediumTankTest.mjs",timeoutMs:120000,desc:"Type89 actual GLB: instanced 80k budget, rigid hinge hierarchy, metre bounds, complete PBR and physical channel values"},
+  Type89MediumTankBrowserTest: {file:"Script_Type89MediumTankBrowserTest.mjs",timeoutMs:180000,desc:"Type89 real renderer: independent treads/all wheels, turret/recoil/hatches, physical PBR colour spaces and reloaded model views"},
   HistoryCodexBrowserTest: {file:"Script_HistoryCodexBrowserTest.mjs",timeoutMs:300000,desc:"Archive: sourced records, soft book folds/cancel/back, 17 pages, zoom, disposal and mobile"},
   TracerLifetimeTest: {file:"Script_TracerLifetimeTest.mjs",desc:"Production tracer short-hit boundary, lifetime, endpoint and strict particle validation"},
   AircraftGeometryTest: { file: "Script_AircraftGeometryTest.mjs", desc: "Reviewed Ki21/Ki30 geometry: triangle reduction, source bounds, protected parts and byte-identical images" },
@@ -534,6 +536,8 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "Type89MediumTankBrowserTest",
+  "ToolsHomeTest",
   "HistoryCodexBrowserTest",
   "PublishAssetsBrowserTest",
   "DevToolsIsolationTest",
@@ -686,6 +690,7 @@ export const tier0Fast = [
   "ModelFacingTest",
   "AircraftGeometryTest",
   "NakajimaKi4AssetTest",
+  "Type89MediumTankTest",
   "TestRunnerTest",
   "ModuleGraphTest",
   "HudPromptTest",
@@ -753,6 +758,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  type89MediumTank: {label:"Type89 standalone articulated reference tank",tests:["Type89MediumTankTest","Type89MediumTankBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "AssetStandardsTest"] },
   singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "TextureStandardsTest", "AssetStandardsTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
@@ -883,6 +889,9 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"type89MediumTank",pattern:/Type89(?:MediumTank|Pbr|GlbCleanup|References|ImportAudit|SourceAudit|Package)/},
+  {domain:"menu",pattern:/ToolsHome|Icon_TabSeal/},
+  {domain:"combat",pattern:/FirstPersonGait/},
   { domain: "nakajimaKi4", pattern: /NakajimaKi4/ },
   { domain: "singleBlanket", pattern: /SingleBlanket|BlanketCloth|EditorBlockoutBlanket/ },
   { domain: "combat", pattern: /FpsGripCorrective|FpsHandSkinWeights|FpsForearmTaper|FpsWristNormalSeam|FpsHandSelfContact|FpsHandPose|HanYangReloadClearance|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },

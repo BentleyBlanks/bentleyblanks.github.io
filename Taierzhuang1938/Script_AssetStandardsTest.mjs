@@ -127,13 +127,14 @@ else CheckServicePistolGrip();
 
 Check(MESHES.Type95HaGo.triangles === 82142,
   "九五式到 80k 仅降 2.6%，保留 82,142 原始三角", String(MESHES.Type95HaGo.triangles));
-Check(EXTERNAL_GLB_STANDARDS.length === 62
+Check(EXTERNAL_GLB_STANDARDS.length === 63
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "SingleBlanket" && record.actualTriangles === 12880 && record.targetTriangles === 12880)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "DonkeyCart" && record.actualTriangles === 79500 && record.targetTriangles <= 80000)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Donkey" && record.actualTriangles === 67028 && record.sourceTriangles === record.actualTriangles)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "NakajimaKi4" && record.sourceTriangles === 177155 && record.actualTriangles === 110275 && record.targetTriangles === 115000)
+  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Type89MediumTank" && record.sourceTriangles === 554716 && record.actualTriangles === 79921 && record.targetTriangles === 80000)
   && EXTERNAL_GLB_STANDARDS.every((record) => record.actualTriangles > 0 && record.targetTriangles > 0),
-  "外部 GLB 分类登记既有资产、指挥室、接收院陈设、单被、两种草席、驴车、独立驴与Ki4，共 62 项");
+  "外部 GLB 分类登记既有资产、指挥室、接收院陈设、单被、两种草席、驴车、独立驴、Ki4与八九式乙型，共 63 项");
 
 const groupIds = new Set(ASSET_STANDARD_GROUPS.map((entry) => entry.id));
 Check(["firearm", "assembly", "melee", "vehicle", "procedural", "external", "texture"]

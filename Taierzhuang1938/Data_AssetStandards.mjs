@@ -120,6 +120,10 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 }
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
+  Object.freeze({ id: "Type89MediumTank", name: "八九式中战车乙型（馆藏外形复原）", pack: "Type89MediumTank/Model_Type89MediumTank.glb",
+    sourceTriangles: 554716, actualTriangles: 79921, targetTriangles: 80000, policy: "target",
+    sourceTexture: "土浦保存车多机位图证；高源保留、按物理表面分区程序烘焙", runtimeTexture: "6套18张内嵌Base / OpenGL Normal / ORM；4K装甲、独立履带/钢件/接触带/排气/玻璃PBR",
+    note: "独立资产，不替换既有Type89Tank。米制Y-up、-Z车头；74节/侧独立履带、30轮组、炮塔/俯仰/后坐/机枪及前后盖轴心保留。高源外置；微细旧损、接触带材质和未见内装标推定，不凭馆藏照认定滕县参战。" }),
   Object.freeze({ id: "NakajimaKi4", name: "九四式侦察机（同型参考复原）", pack: "NakajimaKi4/Model_NakajimaKi4.glb",
     sourceTriangles: 177155, actualTriangles: 110275, targetTriangles: 115000, policy: "target",
     sourceTexture: "三张同型原图、1937原始说明书；按材质分区程序烘焙", runtimeTexture: "24张内嵌Base / OpenGL Normal / ORM；4K机身与布翼，独立钢、橡胶、皮革和排气PBR",

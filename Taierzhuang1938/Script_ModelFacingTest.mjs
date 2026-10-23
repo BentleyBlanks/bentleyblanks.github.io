@@ -320,5 +320,14 @@ for(const front of ["Front","Rear"]){
   const heights=["Left","Right"].map(side=>BareWorld(bare.json.nodes.findIndex(n=>n.name===`Donkey${front}${side}KneePivot`))[13]);
   Check(heights.every(height=>Math.abs(height-expected)<.00001),`独立驴 ${front} 关节实际高度符合参考图修订`,heights.map(v=>v.toFixed(3)).join(" / "));
 }
+const type89ReferenceFile=path.join(projectDir,"Model/Type89MediumTank/Model_Type89MediumTank.glb");
+const type89Reference=LoadGlb(type89ReferenceFile),type89Cannon=GlbPoints(type89ReferenceFile,"Mesh_MainGunRecoil"),type89Cloud=GlbPoints(type89ReferenceFile);
+const type89Low=[0,1,2].map(axis=>type89Cloud.reduce((value,point)=>Math.min(value,point[axis]),Infinity)),type89High=[0,1,2].map(axis=>type89Cloud.reduce((value,point)=>Math.max(value,point[axis]),-Infinity));
+Check(type89Cannon.length>100&&type89Cannon.reduce((sum,point)=>sum+point[2],0)/type89Cannon.length<-.9,
+  "新八九式乙型真实炮管顶点云朝 -Z");
+Check(Math.abs(type89Low[1])<.001&&Math.abs(type89High[0]-type89Low[0]-2.18)<.01&&Math.abs(type89High[2]-type89Low[2]-5.70)<.03&&Math.abs(type89High[1]-2.56)<.015,
+  "新八九式乙型米制Y-up、地面轴心与含尾外廓按真实顶点复量");
+Check(type89Reference.json.nodes.some(node=>node.name==="Node_TurretYaw"&&node.extras?.runtimeAxis==="+Y")&&type89Reference.json.nodes.some(node=>node.name==="Node_MainGunRecoil"&&node.extras?.runtimeAxis==="-Z"),
+  "新八九式乙型导出轴向标注与独立炮塔/后坐节点齐备");
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机机首与战车车头全部按几何复量落在 -Z");

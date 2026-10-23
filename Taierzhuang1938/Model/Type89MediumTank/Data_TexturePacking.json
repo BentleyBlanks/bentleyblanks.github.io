@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "method": "Unused diagnostic alpha removed only for opaque materials; original RGB and resolution retained exactly; lossless WebP or PNG",
+  "beforeBytes": 34276996,
+  "afterBytes": 19502180,
+  "sourceSha256": "7a166ae6ce1d6849970fbc1b4218b4c92ef7a3c30d631bb60a82d8b80752bba5",
+  "runtimeSha256": "d7ac05c3c7fa3cddd145b0ce9798c98f9fc32554fc3c351de3903ab32352b220",
+  "geometrySha256": "70f50224d389b4d397a0dcfbcd19aae02df4e8e19815ebbfec7d4e351cdf57d6",
+  "images": [
+    {
+      "index": 0,
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 9041680,
+      "runtimeBytes": 4714712,
+      "mime": "image/webp",
+      "rgbSha256": "e856048e307748f3ff4414e26d62b06c626f230829276c777feea800922e87ab",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 1,
+      "width": 2048,
+      "height": 2048,
+      "sourceBytes": 2871361,
+      "runtimeBytes": 1555104,
+      "mime": "image/webp",
+      "rgbSha256": "9163b10fd553e5b62a0cc46f40ec97bda9c5d6aaa75dd26a07206e4b5b797915",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 2,
+      "width": 4096,
+      "height": 4096,
+      "sourceBytes": 6404821,
+      "runtimeBytes": 2991906,
+      "mime": "image/webp",
+      "rgbSha256": "15820ae78590f55348115612ef48d1b0b646938ab1dc2961c5e555fb51334be5",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 3,
+      "width": 1024,
+      "height": 1024,
+      "sourceBytes": 755893,
+      "runtimeBytes": 396640,
+      "mime": "image/webp",
+      "rgbSha256": "b4503f08f1213764d113a6ded1c9f1a9522b216e0644987f6e1ae087e33c3bee",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 4,
+      "width": 512,
+      "height": 512,
+      "sourceBytes": 325786,
+      "runtimeBytes": 197188,
+      "mime": "image/webp",
+      "rgbSha256": "1ca84e474a50d1e97597a8df4d2db3d8e633541c3e02572cf7ab610ab40934cb",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 5,
+      "width": 1024,
+      "height": 1024,
+      "sourceBytes": 630128,
+      "runtimeBytes": 286174,
+      "mime": "image/webp",
+      "rgbSha256": "ae5c3701b377980b14744f81bf39688cf70b4fae7e8e8ec60a3841801fe32b54",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 6,
+      "width": 1024,
+      "height": 1024,
+      "sourceBytes": 1144744,
+      "runtimeBytes": 597452,
+      "mime": "image/webp",
+      "rgbSha256": "9412c9d50db8de5b2a6a7d915822eadd085e9d026e3c81d76e18958f58fa5436",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 7,
+      "width": 512,
+      "height": 512,
+      "sourceBytes": 125433,
+      "runtimeBytes": 50792,
+      "mime": "image/webp",
+      "rgbSha256": "240f51b7cf56e8467073ad041a876c04f46d943319972ce499d37e8287c6ada9",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 8,
+      "width": 1024,
+      "height": 1024,
+      "sourceBytes": 199661,
+      "runtimeBytes": 75864,
+      "mime": "image/webp",
+      "rgbSha256": "6f80ec746c013f7ca62aa4cdc99604b5e798400a66dc408d05ef2b94d73bd532",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 9,
+      "width": 512,
+      "height": 512,
+      "sourceBytes": 316856,
+      "runtimeBytes": 159268,
+      "mime": "image/webp",
+      "rgbSha256": "aaed5d7ee005e2d8708bf91cf6d7263380bb4c23c20125826e8db64403ae483c",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 10,
+      "width": 256,
+      "height": 256,
+      "sourceBytes": 33183,
+      "runtimeBytes": 12038,
+      "mime": "image/webp",
+      "rgbSha256": "be6c41faef1a9419fd52a3b11dfcb7f2a7b22b174d9003ba8fee7dc65bc7628a",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 11,
+      "width": 256,
+      "height": 256,
+      "sourceBytes": 4347,
+      "runtimeBytes": 788,
+      "mime": "image/webp",
+      "rgbSha256": "115efa9af470e30ef850c982c88e1c42874793e393030b4e972abd877041f0ba",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 12,
+      "width": 512,
+      "height": 512,
+      "sourceBytes": 369297,
+      "runtimeBytes": 207488,
+      "mime": "image/webp",
+      "rgbSha256": "3e6b1e316f3f050c0278228aa4dbbf3b0812cccd9226bf3e366a1268e1d84fc5",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 13,
+      "width": 512,
+      "height": 512,
+      "sourceBytes": 165455,
+      "runtimeBytes": 77162,
+      "mime": "image/webp",
+      "rgbSha256": "68f2fcb9569f257a0f949a6fcf043407c510f1abfe6a7aaa98bfb2090351f887",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 14,
+      "width": 512,
+      "height": 512,
+      "sourceBytes": 148595,
+      "runtimeBytes": 53630,
+      "mime": "image/webp",
+      "rgbSha256": "f7d263c8100f1a236ee6e98112a3c4e0a8e155fc85b45476b093b862022cd571",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 15,
+      "width": 2048,
+      "height": 2048,
+      "sourceBytes": 7075834,
+      "runtimeBytes": 4712720,
+      "mime": "image/webp",
+      "rgbSha256": "4b514b11d29ebfd99ee9fe2cf081a8eb3287ee9f0c394b2b63eace1f2bb4f6c9",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 16,
+      "width": 1024,
+      "height": 1024,
+      "sourceBytes": 677005,
+      "runtimeBytes": 323372,
+      "mime": "image/webp",
+      "rgbSha256": "cfb55199c24e064efedd8c6ce4a792fa47856b1b2fe92817f576e917dbc789e4",
+      "unusedAlphaRemoved": true
+    },
+    {
+      "index": 17,
+      "width": 2048,
+      "height": 2048,
+      "sourceBytes": 1701673,
+      "runtimeBytes": 803962,
+      "mime": "image/webp",
+      "rgbSha256": "5050b5817022c7460bc20f59a0bc66ad8721cbb692763f9d50244314e89e70b5",
+      "unusedAlphaRemoved": true
+    }
+  ],
+  "reviewMetadataStamp": {
+    "method": "Only two root review extras updated; all BIN bytes and other JSON are exact",
+    "files": [
+      {
+        "file": "Model_Type89MediumTank.glb",
+        "beforeSha256": "1c440474350851fd2b14c4f9314568200d92eb01ca931aad73da9d857784d96f",
+        "sha256": "d7ac05c3c7fa3cddd145b0ce9798c98f9fc32554fc3c351de3903ab32352b220",
+        "beforeBytes": 19502036,
+        "bytes": 19502180,
+        "binaryExact": true
+      },
+      {
+        "file": "Model_Type89MediumTankGamePbr.glb",
+        "beforeSha256": "21ff1adb7616c47a3d371e05b7e6580393d241074349af46fe7a495a36efc39d",
+        "sha256": "7a166ae6ce1d6849970fbc1b4218b4c92ef7a3c30d631bb60a82d8b80752bba5",
+        "beforeBytes": 34276888,
+        "bytes": 34276996,
+        "binaryExact": true
+      },
+      {
+        "file": "Model_Type89MediumTankHighPbr.glb",
+        "beforeSha256": "b7bcf7e742ec501efcfbd679e6cf56d4dc890746e010848ad16eb2534120d29b",
+        "sha256": "36ab935728d636795b21df61366e84c400b8d9c59d6fbd680a36d471f5730cd9",
+        "beforeBytes": 37067196,
+        "bytes": 37067300,
+        "binaryExact": true
+      }
+    ]
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "asset": "Type89MediumTank",
+  "geometryVersion": "20261023GeometryV14",
+  "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
+  "reviewedAt": "2026-10-23",
+  "reviewScope": "Author review of the actual final game GLB: 2007 primary and 2025 front reference poses, rear structure, armor/track close-ups and open maintenance pose. Camera-only landmark fits are diagnostics, not an exact factory survey or historical paint certification. Unseen construction and micro surfaces remain declared inference; this status is not user approval.",
+  "selectedConfiguration": "Type89 I-Go Otsu, restored running vehicle at JGSDF Tsuchiura. Primary appearance state is the 2007 Megapixie photograph; 2025 Hunini views corroborate the same preserved car's closed hatches and geometry. Early Ko nose/cupola features are excluded.",
+  "notion": "https://app.notion.com/p/40260335331c81a18a18e63b0cc14bce",
+  "nominalDimensionsM": {
+    "lengthWithTailAdopted": 5.7,
+    "width": 2.18,
+    "closedHeight": 2.56,
+    "visibleMainBore": 0.057
+  },
+  "dimensionEvidence": {
+    "adopted": "Japanese Type89 summary separates Ko5.75m/Otsu5.70m and gives width2.18m/height2.56m. Independent summaries give5.73m and width2.15-2.18m. The reconstruction records that uncertainty rather than inheriting the legacy game's4.30m normalization.",
+    "sources": [
+      "https://ja.wikipedia.org/wiki/八九式中戦車",
+      "https://en.wikipedia.org/wiki/Type_89_I-Go_medium_tank",
+      "https://www.historyofwar.org/articles/weapons_type_89_chi_ro.html"
+    ],
+    "primarySourceLimit": "The referenced original naval equipment table is a lead, not an opened primary measurement: the supplied public JACAR PDF paths returned404. The American1944 handbook calls the later vehicle Model94 and estimates23ft including ditching tail, which conflicts with later summaries; that estimate was not blended into the adopted envelope.",
+    "detailDimensions": "Wheel stations, panel contours, small fittings and pivots are calibrated from photographs within the nominal envelope. They are reconstruction measurements, not claimed factory dimensions."
+  },
+  "sourceAxes": "Blender X right, +Y nose, +Z up; metres; ground datum under hull center",
+  "runtimeAxes": "glTF X right, +Y up, -Z nose; metres; measured vertex cloud and bore direction are validated",
+  "runtimeTriangleCeiling": 80000,
+  "runtimeRenderedTriangles": 79921,
+  "sourceTrianglesBeforeExportCleanup": 554716,
+  "linksPerSide": 74,
+  "wheelGroupsPerSide": 15,
+  "requiredPivots": [
+    "Node_TrackLeft",
+    "Node_TrackRight",
+    "Node_TurretYaw",
+    "Node_MainGunPitch",
+    "Node_MainGunRecoil",
+    "Node_BowMachineGun",
+    "Node_TurretMachineGun",
+    "Node_CommanderHatchFront",
+    "Node_CommanderHatchRear",
+    "Node_DriverVisionFlap",
+    "Node_SideVisionFlapLeft",
+    "Node_SideVisionFlapRight",
+    "Node_BowHatch",
+    "Node_EngineHatchLeft",
+    "Node_EngineHatchRight"
+  ],
+  "surfaceContract": {
+    "sets": [
+      "Armor",
+      "Steel",
+      "Track",
+      "Rubber",
+      "Exhaust",
+      "Glass"
+    ],
+    "channels": "sRGB Base; linear OpenGL tangent Normal; linear ORM R=AO,G=roughness,B=metallic",
+    "armor": "4096Base/4096Normal/2048ORM",
+    "glass": "dielectric, roughness approximately0.15, transmission0.88, IOR1.5",
+    "shadowMaterial": "constant dark dielectric cavity, no invented interior machinery"
+  },
+  "inferred": [
+    "Original1938 paint cannot be established from a restored2007/2025 museum finish. The chosen hue describes photographic restoration appearance, not a factory paint specification.",
+    "Hidden engine/turret interiors are dark simplified recesses. Bracket backs, concealed fasteners and small hinge construction not resolved in photographs remain reconstruction.",
+    "Contact-band composition is not proven by the available pictures; the dark matte band is a declared material inference.",
+    "Micro paint texture, oxide pits and settled dust are physically zoned authoring details calibrated to visible condition, not measured historical damage.",
+    "Internal guide depth and wheel running clearance were refined against actual re-imported triangle motion. They are functional visual reconstruction rather than manufacturing dimensions.",
+    "Some Commons originals returnedHTTP429; explicitly labeled standard1280px thumbnails were retained, not misrepresented as original photographs. Available original files are preserved separately."
+  ],
+  "historicalBoundary": "Museum/same-type appearance references do not establish participation in the16-18March Tengxian city assault. This independent asset does not replace the legacy Type89Tank or change mission history.",
+  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank",
+  "highProject": "Scene_Type89MediumTankHighPbr.blend",
+  "gameProject": "Scene_Type89MediumTankGamePbr.blend",
+  "primaryPhoto": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
+  "functionalClearanceReview": {
+    "phaseSamples": 36,
+    "testedNearbyPairs": 4566,
+    "contacts": 0,
+    "maximumPenetrationM": 0
+  }
+}

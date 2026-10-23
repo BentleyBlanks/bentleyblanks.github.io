@@ -1,0 +1,269 @@
+{
+  "schema": "Type89MediumTankExportAuditV1",
+  "reviewedAt": "2026-10-23T14:24:55.274Z",
+  "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
+  "userApproved": false,
+  "runtime": {
+    "file": "Model_Type89MediumTank.glb",
+    "sha256": "d7ac05c3c7fa3cddd145b0ce9798c98f9fc32554fc3c351de3903ab32352b220",
+    "bytes": 19502180,
+    "sceneExpandedTriangles": 79921,
+    "meshObjects": 417,
+    "materials": 7,
+    "images": 18,
+    "dimensionsXyzM": [
+      2.180000066757202,
+      2.558000209824741,
+      5.699958517027657
+    ],
+    "nose": "-Z",
+    "up": "+Y",
+    "metres": true,
+    "groundAtZero": true
+  },
+  "highExport": {
+    "file": "Exports/Model_Type89MediumTankHighPbr.glb",
+    "sha256": "36ab935728d636795b21df61366e84c400b8d9c59d6fbd680a36d471f5730cd9",
+    "bytes": 37067300,
+    "sceneExpandedTriangles": 554676
+  },
+  "sourceProjects": [
+    {
+      "quality": "High",
+      "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankHighPbr.blend",
+      "sha256": "bf5b233ecd5cb3ff4fbb75fe223c358e6b83e06aa30578bfbece73a736bdeced",
+      "rawTriangles": 554716,
+      "meshObjects": 217,
+      "materials": 7,
+      "activePackedImages": 18,
+      "editableAuthoringMaterials": 7,
+      "unitScale": 1,
+      "pass": true
+    },
+    {
+      "quality": "Game",
+      "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankGamePbr.blend",
+      "sha256": "bafa9df1c2926dbfd35b41ccfda29b6df7b1bb605dee49e98c0535913311aeb8",
+      "rawTriangles": 79938,
+      "meshObjects": 217,
+      "materials": 7,
+      "activePackedImages": 18,
+      "editableAuthoringMaterials": 7,
+      "unitScale": 1,
+      "pass": true
+    }
+  ],
+  "texturePacking": {
+    "rgbExact": true,
+    "geometryBuffersExact": true,
+    "geometrySha256": "70f50224d389b4d397a0dcfbcd19aae02df4e8e19815ebbfec7d4e351cdf57d6",
+    "audit": "Data_TexturePacking.json"
+  },
+  "importAudit": {
+    "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\Type89MediumTank\\Model_Type89MediumTank.glb",
+    "sha256": "d7ac05c3c7fa3cddd145b0ce9798c98f9fc32554fc3c351de3903ab32352b220",
+    "imported": {
+      "objects": 437,
+      "meshes": 70,
+      "images": 18,
+      "materials": 7,
+      "roots": [
+        "Model_Type89MediumTank"
+      ]
+    },
+    "links": 148,
+    "wheelGroups": 30,
+    "phaseSamples": 36,
+    "testedNearbyPairs": 4566,
+    "contacts": {},
+    "maximumVertexPenetrationM": 0,
+    "pass": true,
+    "note": "BVH contacts include intended rolling contact; penetration above 1mm blocks acceptance"
+  },
+  "motionAudit": {
+    "pass": true,
+    "assertions": [
+      {
+        "name": "Left tread responds independently",
+        "pass": true
+      },
+      {
+        "name": "Right tread stays still",
+        "pass": true
+      },
+      {
+        "name": "Full belt closure",
+        "pass": true,
+        "detail": {
+          "closurePosition": 1.1866308230288976e-7,
+          "closureRotation": 1.3039093804678714e-8
+        }
+      },
+      {
+        "name": "All 30 wheel groups roll at the commanded distance",
+        "pass": true,
+        "detail": {
+          "count": 30,
+          "maxArcErrorM": 1.0408340855860843e-15
+        }
+      },
+      {
+        "name": "Sprocket tooth passage equals shoe passage",
+        "pass": true
+      },
+      {
+        "name": "Turret uses the runtime Y axis",
+        "pass": true
+      },
+      {
+        "name": "Recoil translates along the bore",
+        "pass": true
+      },
+      {
+        "name": "Front and rear cupola hatches have independent hinges",
+        "pass": true
+      },
+      {
+        "name": "All posed transforms are finite and rigid",
+        "pass": true
+      },
+      {
+        "name": "Shoe sweep remains above the ground without scaling",
+        "pass": true,
+        "detail": {
+          "minimumGroundM": -2.384185801957821e-9,
+          "maximumGroundM": -2.384185801957821e-9
+        }
+      }
+    ],
+    "dimensions": [
+      2.180000066757202,
+      2.558000209824741,
+      5.699958517027657
+    ],
+    "linksPerSide": 74,
+    "meshNodes": 123,
+    "browserErrors": []
+  },
+  "realRendererAudit": {
+    "pass": true,
+    "checks": [
+      {
+        "name": "Left/right distance clocks are independent",
+        "pass": true
+      },
+      {
+        "name": "Full articulated belt loop closes",
+        "pass": true,
+        "detail": {
+          "positionError": 1.1866308230288976e-7,
+          "rotationError": 1.3039093804678714e-8
+        }
+      },
+      {
+        "name": "All wheel surfaces use the same travelled distance",
+        "pass": true,
+        "detail": {
+          "wheelCount": 30,
+          "wheelError": 1.0408340855860843e-15
+        }
+      },
+      {
+        "name": "Turret Y axis and bore recoil work",
+        "pass": true
+      },
+      {
+        "name": "Fore/aft hatches open independently",
+        "pass": true
+      },
+      {
+        "name": "Engine lids have separate controls",
+        "pass": true
+      },
+      {
+        "name": "Both machine guns retain working local pivots",
+        "pass": true
+      },
+      {
+        "name": "Poses preserve rigid finite transforms",
+        "pass": true
+      },
+      {
+        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameArmor",
+        "pass": true
+      },
+      {
+        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameSteel",
+        "pass": true
+      },
+      {
+        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameExhaust",
+        "pass": true
+      },
+      {
+        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameGlass",
+        "pass": true
+      },
+      {
+        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameRubber",
+        "pass": true
+      },
+      {
+        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameTrack",
+        "pass": true
+      },
+      {
+        "name": "Glass survives loading as transmission PBR",
+        "pass": true
+      }
+    ],
+    "meshCount": 417,
+    "materials": 7,
+    "rendererTriangles": 159842,
+    "errors": []
+  },
+  "validation": {
+    "byteAssertions": 473,
+    "browserChecks": 15,
+    "focusedRegistryRun": {
+      "passed": 9,
+      "baseline": 0,
+      "failed": 0
+    },
+    "historyCodexBrowser": "passed",
+    "publicationRegistryRun": {
+      "passed": 5,
+      "baseline": 0,
+      "failed": 0,
+      "tests": ["MenuStartupTest", "BrowserBundleTest", "TextureStandardsTest", "PublishAssetsTest", "MotionVectorContractTest"]
+    }
+  },
+  "referenceReview": {
+    "primary": "2007 Tsuchiura restored Otsu",
+    "corroboration": "2025 same vehicle and local rear walkaround",
+    "mainLandmarkRmsPixelsAt640": 2.4346382502457344,
+    "frontLandmarkRmsPixelsAt640": 2.042344882685439,
+    "observed": [
+      "late Otsu nose and side plates",
+      "flat-front extended-rear turret, offset cannon and visible machine guns",
+      "fore/aft commander lids and real vision/maintenance openings",
+      "four-window tread shoes, separate wheels and track circulation",
+      "rear deck, perforated exhaust guard, lamp and ditching tail",
+      "independent high/game PBR close-up and maintenance views"
+    ],
+    "scope": "Author review; camera fits do not prove exact factory dimensions. Paint chemistry, micro wear, contact-band material and concealed construction remain inference.",
+    "localEvidenceOnly": "_shots/Type89MediumTank/Scene_Final*.png; Scene_HistoryEntry_640.jpg; no review imagery is published"
+  },
+  "rebuildScriptSha256": {
+    "_blender/Script_BuildType89MediumTank.mjs": "19dc6f5fcb2b6f50b199549fabb7dcd3f0aaa5da235f3f3d0f1a4b4c9eb05186",
+    "_blender/Script_Type89MediumTank.py": "4f368c80bbf6ca1bbb8cc6cead78136f325b915e336e5fc889a526dea5dc4c1e",
+    "_blender/Script_Type89PbrMaterials.py": "7241a768652a96196c36ca76906cd6ad5f48a4a388a1d94ba074264db94788c9",
+    "_blender/Script_Type89PbrBake.py": "c6e9cf28a0aa50bd3d642a0661e1c52a786de5b01115d2a1302bb55b07e4ea2e",
+    "_blender/Script_Type89GlbCleanup.py": "94d8b364026327408db93a48b49e1647cea4197157600e5afd736bd41e2b98fc",
+    "_blender/Script_Type89ImportAudit.py": "1be4bbefc9ac1047ee2d2ae4b68f5d02324027a98dc59c3853b579a7f8b3cee5",
+    "_blender/Script_Type89SourceAudit.py": "7ebb3280d745b3bc233c9c61dec29a878138a83a6a816be7166b4a6a490bd43f",
+    "_blender/Script_Type89Package.mjs": "7e905474f5083ed2b659365c57133662eb4c592e2910a4000c9aa7af404709ea",
+    "_blender/Script_Type89References.py": "6233143f5bdc552c546e52a0db4f5b1eca7c4423683f89aa2eaeed8adddc87ff",
+    "Model/Type89MediumTank/Script_Type89Motion.mjs": "49b77f62cdee3d7b4999424027085ef4b004adbc0a11b98f7fbc684ca1276241"
+  }
+}

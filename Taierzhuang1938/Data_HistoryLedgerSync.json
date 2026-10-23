@@ -10,7 +10,80 @@
       "scope": "Ki4 appearance reconstruction only; global repo review anchor and unrelated source-page stamps are preserved",
       "contract": "Model/NakajimaKi4/Data_ReferenceContract.json",
       "decision": "Same-type appearance evidence; colors and hidden mechanisms inferred; no promotion to confirmed Tengxian combat aircraft",
-      "notionSnapshots": [{"id":"40260335331c81ce8b26eb0e1cd6f9cb","lastEdited":"2026-10-23T10:13:41.111Z"},{"id":"3fd60335331c8194aa82f0b238084d34","lastEdited":"2026-10-23T08:03:48.815Z"},{"id":"3fd60335331c818fa24deadb6d72ca70","lastEdited":"2026-10-23T08:03:56.299Z"}]
+      "notionSnapshots": [
+        {
+          "id": "40260335331c81ce8b26eb0e1cd6f9cb",
+          "lastEdited": "2026-10-23T10:13:41.111Z"
+        },
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-10-23T08:03:48.815Z"
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-10-23T08:03:56.299Z"
+        }
+      ]
+    },
+    {
+      "asset": "StrawSleepingMat",
+      "date": "2026-10-20",
+      "scope": "Only user-approved KnotDetail4 appearance and collection-point placement; source equipment article reopened, two ledger pages updated, other source-page markers and repoCommit preserved",
+      "notionPages": [
+        "3fd60335331c8194aa82f0b238084d34",
+        "3fd60335331c818fa24deadb6d72ca70"
+      ],
+      "notionLastEdited": {
+        "3fd60335331c8194aa82f0b238084d34": "2026-10-20T05:51:53.617Z",
+        "3fd60335331c818fa24deadb6d72ca70": "2026-10-20T05:51:54.617Z"
+      },
+      "assetContract": "../Model/StrawSleepingMat/Data_Asset.json"
+    },
+    {
+      "asset": "SingleBlanket",
+      "date": "2026-10-19",
+      "scope": "Only the new five-patch thin sheet appearance and historical boundary; other source-page markers and repoCommit preserved",
+      "notionPages": [
+        "3fd60335331c8194aa82f0b238084d34",
+        "3fd60335331c818fa24deadb6d72ca70"
+      ],
+      "assetContract": "Model/Data_SingleBlanket.json"
+    },
+    {
+      "asset": "DonkeyCart",
+      "date": "2026-10-21",
+      "scope": "DonkeyCart exterior and harness only; reference-led creative reconstruction",
+      "notionPages": [
+        "3fd60335331c8194aa82f0b238084d34",
+        "3fd60335331c818fa24deadb6d72ca70"
+      ],
+      "notionLastEdited": {
+        "3fd60335331c8194aa82f0b238084d34": "2026-10-20T17:45:28.187Z",
+        "3fd60335331c818fa24deadb6d72ca70": "2026-10-20T17:45:29.275Z"
+      },
+      "assetContract": "Model/DonkeyCart/Data_DonkeyCart.json",
+      "note": "Unrelated source pages and the global repository review cursor were not marked reviewed by this asset task."
+    },
+    {
+      "asset": "Type89MediumTank",
+      "date": "2026-10-23",
+      "scope": "Only the restored Tsuchiura Otsu appearance, reference boundary and minimal matching ledger additions; preserve the global repository cursor and unrelated source-page timestamps",
+      "contract": "Model/Type89MediumTank/Data_ReferenceContract.json",
+      "decision": "Museum appearance reconstruction; original paint, micro wear and concealed details inferred; no promotion to confirmed March16-18 Tengxian participation",
+      "notionSnapshots": [
+        {
+          "id": "40260335331c81a18a18e63b0cc14bce",
+          "lastEdited": "2026-10-23T06:14:29.417Z"
+        },
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-10-23T13:00:56.778Z"
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-10-23T13:00:58.270Z"
+        }
+      ]
     }
   ],
   "notionPages": [
@@ -84,47 +157,6 @@
     {
       "url": "https://www.marxists.org/chinese/reference-books/shanghaidezaochen/1-03.htm",
       "reason": "周而复长篇小说《上海的早晨》，只能挂在「创作」条目下说明是文学作品"
-    }
-  ],
-  "assetReviews": [
-    {
-      "asset": "StrawSleepingMat",
-      "date": "2026-10-20",
-      "scope": "Only user-approved KnotDetail4 appearance and collection-point placement; source equipment article reopened, two ledger pages updated, other source-page markers and repoCommit preserved",
-      "notionPages": [
-        "3fd60335331c8194aa82f0b238084d34",
-        "3fd60335331c818fa24deadb6d72ca70"
-      ],
-      "notionLastEdited": {
-        "3fd60335331c8194aa82f0b238084d34": "2026-10-20T05:51:53.617Z",
-        "3fd60335331c818fa24deadb6d72ca70": "2026-10-20T05:51:54.617Z"
-      },
-      "assetContract": "../Model/StrawSleepingMat/Data_Asset.json"
-    },
-    {
-      "asset": "SingleBlanket",
-      "date": "2026-10-19",
-      "scope": "Only the new five-patch thin sheet appearance and historical boundary; other source-page markers and repoCommit preserved",
-      "notionPages": [
-        "3fd60335331c8194aa82f0b238084d34",
-        "3fd60335331c818fa24deadb6d72ca70"
-      ],
-      "assetContract": "Model/Data_SingleBlanket.json"
-    },
-    {
-      "asset": "DonkeyCart",
-      "date": "2026-10-21",
-      "scope": "DonkeyCart exterior and harness only; reference-led creative reconstruction",
-      "notionPages": [
-        "3fd60335331c8194aa82f0b238084d34",
-        "3fd60335331c818fa24deadb6d72ca70"
-      ],
-      "notionLastEdited": {
-        "3fd60335331c8194aa82f0b238084d34": "2026-10-20T17:45:28.187Z",
-        "3fd60335331c818fa24deadb6d72ca70": "2026-10-20T17:45:29.275Z"
-      },
-      "assetContract": "Model/DonkeyCart/Data_DonkeyCart.json",
-      "note": "Unrelated source pages and the global repository review cursor were not marked reviewed by this asset task."
     }
   ]
 }
