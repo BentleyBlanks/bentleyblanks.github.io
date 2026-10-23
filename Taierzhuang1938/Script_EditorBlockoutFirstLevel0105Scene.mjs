@@ -39,6 +39,9 @@ import {
   L0105_NORTH_ROAD, L0105_NORTH_ROAD_HALF_W, L0105_FIELD_PATH, L0105_FIELD_PATH_HALF_W, L0105_FIELD_PAINT,
   L0105_FIELD_TREES, L0105_BACKDROP_LONE_TREES, L0105_FIELD_GRAVES, L0105_FARM,
   L0105_BACKDROP, L0105_BACKDROP_ROAD, L0105_BACKDROP_PATHS, L0105_BACKDROP_VILLAGES, L0105_BACKDROP_HILLS,
+  // 2026-10-24 第六版空间
+  L0105_FRONT_PARTS, L0105_FRONT_BAYS, L0105_OLD_POSITION, L0105_NICHES, L0105_POST_ROAD_SOUTH, L0105_FIELD_LANES,
+  L0105_SOUTH_GRAVES, L0105_WOODS, L0105_SOUTH_TREES, L0105_BACKDROP_POST_ROAD, L0105_TANKETTES, FrontStationAtX,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 export const L0105_SCENE_GENERATOR = "Script_EditorBlockoutCli.mjs scene FirstLevel0105";
@@ -195,22 +198,29 @@ const DITCH_BOX = (() => {
   const xs = DITCH.line.map((p) => p.x), zs = DITCH.line.map((p) => p.z), m = DITCH.topW / 2 + DITCH.lipW + PN.scarp.notchR + 2;
   return { minX: Math.min(...xs) - m, maxX: Math.max(...xs) + m, minZ: Math.min(...zs) - m, maxZ: Math.max(...zs) + m };
 })();
-// 坟：两座孤坟 + 坟地五座 + 第三版田里散的单个坟（L0105_FIELD_GRAVES）
-const GRAVES = Object.freeze([...PN.loneGraves, ...PN.graveyard, ...L0105_FIELD_GRAVES]);
+// 坟：两座孤坟 + 坟地五座 + 第三版田里散的单个坟（L0105_FIELD_GRAVES）+ 坑北的两片林（刘家林、赵家林）里的坟（2026-10-24）
+const GRAVES = Object.freeze([...PN.loneGraves, ...PN.graveyard, ...L0105_FIELD_GRAVES, ...L0105_WOODS.filter((w) => w.z < PIT_NORTH_FROM_Z).flatMap((w) => w.graves)]);
+// 南半场（z ≥ −8）的坟：张家林、李家林、田里零散的几座（烘进 Ground，不进 NaturalHeight）
+const SOUTH_GRAVES = Object.freeze([...L0105_SOUTH_GRAVES, ...L0105_WOODS.filter((w) => w.z >= PIT_NORTH_FROM_Z).flatMap((w) => w.graves)]);
 
-/** 点到干水沟中心线：→ { d 横向距离, along 弧长 }（离沟很远时 d = Infinity）。 */
+/** 点到干水沟中心线：→ { d 横向距离, along 弧长, side 在哪一边（+1 = 顺沟走的左手 = 西北岸，−1 = 东南岸） }（离沟很远时 d = Infinity）。 */
 export function DitchStation(x, z) {
-  if (x < DITCH_BOX.minX || x > DITCH_BOX.maxX || z < DITCH_BOX.minZ || z > DITCH_BOX.maxZ) return { d: Infinity, along: 0 };
-  let best = Infinity, at = 0, walked = 0;
+  if (x < DITCH_BOX.minX || x > DITCH_BOX.maxX || z < DITCH_BOX.minZ || z > DITCH_BOX.maxZ) return { d: Infinity, along: 0, side: 1 };
+  let best = Infinity, at = 0, side = 1, walked = 0;
   for (let i = 1; i < DITCH.line.length; i++) {
     const a = DITCH.line[i - 1], b = DITCH.line[i];
     const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
     const t = Clamp01(((x - a.x) * dx + (z - a.z) * dz) / (len * len));
     const d = Math.hypot(x - a.x - dx * t, z - a.z - dz * t);
-    if (d < best) { best = d; at = walked + len * t; }
+    if (d < best) { best = d; at = walked + len * t; side = (dx * (z - a.z) - dz * (x - a.x)) < 0 ? 1 : -1; }
     walked += len;
   }
-  return { d: best, along: at };
+  return { d: best, along: at, side };
+}
+/** 两岸不齐（2026-10-24）：这一岸在弧长 along 处的顶半宽倍数（1 ± bankWobble，两岸各用一条正弦，确定性）。 */
+function DitchBankScale(along, side) {
+  const w = DITCH.bankWobble || 0;
+  return side > 0 ? 1 + w * Math.sin(along * 0.061 + 0.8) : 1 + w * Math.sin(along * 0.047 + 2.9);
 }
 /** 干水沟在这一处的深度系数（西南头最后 endTaperM 渐浅到 0）。 */
 export function DitchDepthAt(along) { return DITCH.depth * Smooth((DITCH_LEN - along) / DITCH.endTaperM); }
@@ -224,14 +234,16 @@ export function PitNorthRoll(x, z) {
 }
 /** 路穿过地坎处的坡道（2026-10-20 第二轮）：大路放宽 roadM、田间小路放宽 pathM，离路中心 R 米内渐变。 */
 const SCARP_ROAD_NOTCH = Object.freeze({ roadM: 14, roadR: 7, pathM: 9, pathR: 4 });
-/** 地坎（≤ 0，北边低 drop）：坎面宽 faceM，干水沟穿过处放宽成豁口，大路 / 小路穿过处放宽成坡道。 */
+/** 地坎（≤ 0，北边低 drop）：坎面宽 faceM，干水沟穿过处放宽成豁口，大路 / 小路穿过处放宽成坡道，旧交通沟穿过处一个窄豁口（2026-10-24）。 */
+const SAP_NOTCH = L0105_OLD_POSITION.sapScarpNotch;
 export function ScarpDelta(x, z, ditchD = DitchStation(x, z).d) {
   const s = PN.scarp;
   const u = ScarpZ(x) - z;   // 坎线以北为正
   let notch = s.notchM * (1 - Smooth(ditchD / s.notchR));
   if (Math.abs(u) < (s.faceM + SCARP_ROAD_NOTCH.roadM) / 2 + 0.5) {
     notch = Math.max(notch, SCARP_ROAD_NOTCH.roadM * (1 - Smooth(DistanceToPolyline(x, z, L0105_NORTH_ROAD) / SCARP_ROAD_NOTCH.roadR)),
-      SCARP_ROAD_NOTCH.pathM * (1 - Smooth(DistanceToPolyline(x, z, L0105_FIELD_PATH) / SCARP_ROAD_NOTCH.pathR)));
+      SCARP_ROAD_NOTCH.pathM * (1 - Smooth(DistanceToPolyline(x, z, L0105_FIELD_PATH) / SCARP_ROAD_NOTCH.pathR)),
+      SAP_NOTCH.m * (1 - Smooth(Math.hypot(x - SAP_NOTCH.x, z - SAP_NOTCH.z) / SAP_NOTCH.r)));
   }
   const W = s.faceM + notch;
   if (u < -W / 2 - 0.01) return 0;
@@ -266,12 +278,14 @@ export function GraveHeight(x, z) {
 }
 /** 干水沟：返回 { cap 开挖后的高度上限（Infinity = 不挖）, lip 沟沿翻土加高 }；base = 起伏 + 地坎后的地面。 */
 function DitchCut(base, st, x, z) {
-  if (!(st.d < DITCH.topW / 2 + DITCH.lipW)) return { cap: Infinity, lip: 0 };
+  if (!(st.d < (DITCH.topW / 2) * (1 + (DITCH.bankWobble || 0)) + DITCH.lipW)) return { cap: Infinity, lip: 0 };
   // 大路北段从沟上过：路面下填平（涵洞土），离路边 3 m 渐回原深
   const fill = Smooth((DistanceToPolyline(x, z, L0105_NORTH_ROAD) - L0105_NORTH_ROAD_HALF_W - 1) / 3);
   if (fill <= 0) return { cap: Infinity, lip: 0 };
   const depth = DitchDepthAt(st.along) * fill;
-  const fh = DITCH.floorW / 2, th = DITCH.topW / 2;
+  // 两岸不齐（2026-10-24）：沟底宽不变，这一岸的顶宽按弧长起伏
+  const fh = DITCH.floorW / 2, th = (DITCH.topW / 2) * DitchBankScale(st.along, st.side);
+  if (st.d >= th + DITCH.lipW) return { cap: Infinity, lip: 0 };
   if (st.d >= th) {
     const u = (st.d - th) / DITCH.lipW;
     return { cap: Infinity, lip: DITCH.lipH * Math.sin(u * Math.PI) * (depth / DITCH.depth) };
@@ -306,14 +320,23 @@ function DistanceToPolyline(x, z, line) {
   return best;
 }
 
-function RoadDelta(x, z) {
-  const d = DistanceToPolyline(x, z, L0105_ROAD);
-  const half = L0105_ROAD_WIDTH_M / 2;
+function RoadDeltaOf(x, z, line, half, lowerM = ROAD_LOWER_M, shoulderM = ROAD_SHOULDER_M) {
+  const d = DistanceToPolyline(x, z, line);
   if (d > half + ROAD_SHOULDER_W + 0.5) return 0;
-  const lower = -ROAD_LOWER_M * (1 - Smooth((d - half + 0.3) / 0.6));
+  const lower = -lowerM * (1 - Smooth((d - half + 0.3) / 0.6));
   const u = (d - half) / ROAD_SHOULDER_W;
-  const shoulder = u > 0 && u < 1 ? ROAD_SHOULDER_M * Math.sin(u * Math.PI) : 0;
+  const shoulder = u > 0 && u < 1 ? shoulderM * Math.sin(u * Math.PI) : 0;
   return lower + shoulder;
+}
+/**
+ * 路面：车道 L0105_ROAD 照旧；2026-10-24 老驿道南段（L0105_POST_ROAD_SOUTH，坑南那截涂不了色，靠这点凹凸认路）、
+ * 南半场的田间小路（浅浅一道）。都只进 Ground，不进 NaturalHeight；都不在 0610 接缝范围（x −18…150、z 121…190）里。
+ */
+function RoadDelta(x, z) {
+  let d = RoadDeltaOf(x, z, L0105_ROAD, L0105_ROAD_WIDTH_M / 2);
+  if (x > 160 && z > -12) d += RoadDeltaOf(x, z, L0105_POST_ROAD_SOUTH, L0105_NORTH_ROAD_HALF_W);
+  if (z > -12) for (const lane of L0105_FIELD_LANES) if (lane[0].z > -12) d += RoadDeltaOf(x, z, lane, L0105_FIELD_PATH_HALF_W, 0.08, 0.03);
+  return d;
 }
 
 // ---------------------------------------------------------------------------
@@ -334,21 +357,59 @@ function FloorWFor(minFloorW) {
 const S = L0105_TRENCH_SECTION;
 const Pts = (line) => line.map((p) => ({ x: p.x, z: p.z }));
 
-/** 网络规格：前沿沟拆两段（西头往北折的那一截弃土堆在西边，东西走向的主段弃土堆在北边）。 */
+/** 前沿链上 x 处的点（折线自西向东 x 单调）。 */
+function FrontPointAtX(x) { return PointAlong(L0105_TRENCHES.front, FrontStationAtX(x)); }
+
+/**
+ * 网络规格（2026-10-24 第六版）：前沿三段各烘一段（西头往北折的那一截弃土堆在西边，东西走向的段弃土堆在北边），段与段之间是浅连沟（窄、1 m 深、不堆弃土），
+ * 每段几个往外凸的射击位（短短一截）；主交通沟 + 第二条交通沟 + 支沟 + 爬沟；北边旧阵地的三段射击沟、往南的旧交通沟、往北通警戒阵地的旧交通沟、两段警戒沟
+ * （旧沟：弃土小、毛边大、塌了几截）。
+ */
 export function L0105TrenchSpec() {
   const front = Pts(L0105_TRENCHES.front);
+  const FP = L0105_FRONT_PARTS;
+  const Part = ([i0, i1]) => front.slice(i0, i1 + 1);
+  const OLD = L0105_OLD_POSITION;
+  const OldJitter = TRENCH_JITTER_SCALE * 2.2;   // 旧沟：毛边大、塌土多
+  const segments = [
+    // 法向 n = (−tz, tx)；minus 一侧：东西段（t=+X）是北，往北折那截（t=−Z）是西。都朝敌。
+    { id: "FrontFlank", preset: "fire", points: [front[1], front[0]], depth: S.front.depth, floorW: FloorWFor(S.front.floorW),
+      bermSide: "minus", jitterScale: TRENCH_JITTER_SCALE, source: "L0105_TRENCHES.front[0..1]（西头直角往北折，护左翼）" },
+    { id: "FrontWest", preset: "fire", points: Part(FP.west), depth: S.front.depth, floorW: FloorWFor(S.front.floorW),
+      bermSide: "minus", jitterScale: TRENCH_JITTER_SCALE, source: "L0105_FRONT_PARTS.west（西邻班那一段）" },
+    { id: "FrontMid", preset: "fire", points: Part(FP.mid), depth: S.front.depth, floorW: FloorWFor(S.front.floorW),
+      bermSide: "minus", jitterScale: TRENCH_JITTER_SCALE, source: "L0105_FRONT_PARTS.mid（本班这一段，沟口在中间）" },
+    { id: "FrontEast", preset: "fire", points: Part(FP.east), depth: S.front.depth, floorW: FloorWFor(S.front.floorW),
+      bermSide: "minus", jitterScale: TRENCH_JITTER_SCALE, source: "L0105_FRONT_PARTS.east（东邻班那一段，01 前已丢）" },
+    { id: "FrontLinkW", preset: "sap", points: Part(FP.linkW), depth: S.frontLink.depth, floorW: S.frontLink.floorW, bankW: 0.8, bermH: 0.1, bermW: 0.9,
+      cornerRadiusM: 0, jitterScale: TRENCH_JITTER_SCALE, source: "L0105_FRONT_PARTS.linkW（西段 ↔ 本班的浅连沟）" },
+    { id: "FrontLinkE", preset: "sap", points: Part(FP.linkE), depth: S.frontLink.depth, floorW: S.frontLink.floorW, bankW: 0.8, bermH: 0.1, bermW: 0.9,
+      cornerRadiusM: 0, jitterScale: TRENCH_JITTER_SCALE, source: "L0105_FRONT_PARTS.linkE（本班 ↔ 东段的浅连沟，03 清沟的从这过来）" },
+    ...L0105_FRONT_BAYS.map((b) => {
+      const p = FrontPointAtX(b.x);
+      return { id: b.id, preset: "sap", points: [{ x: R2(p.x), z: R2(p.z) }, { x: R2(p.x), z: R2(p.z - b.lenM) }], depth: S.frontBay.depth, floorW: S.frontBay.floorW,
+        bankW: 0.7, bermH: 0.3, bermW: 1.0, cornerRadiusM: 0, jitterScale: TRENCH_JITTER_SCALE, source: `L0105_FRONT_BAYS ${b.id}（往外凸的射击位）` };
+    }),
+    { id: "Traffic", preset: "communication", points: Pts(L0105_TRENCHES.traffic), depth: S.traffic.depth,
+      floorW: FloorWFor(S.traffic.floorW), jitterScale: TRENCH_JITTER_SCALE, source: "L0105_TRENCHES.traffic" },
+    { id: "Traffic2", preset: "communication", points: Pts(L0105_TRENCHES.traffic2), depth: S.traffic2.depth,
+      floorW: FloorWFor(S.traffic2.floorW), jitterScale: TRENCH_JITTER_SCALE, source: "L0105_TRENCHES.traffic2（第二条交通沟，西邻班的退路）" },
+    // 北边放弃的旧阵地（沿地坎南沿）：三段射击沟（弃土堆北边，小）、往南的旧交通沟、往北通警戒阵地的旧交通沟、两段警戒沟
+    ...OLD.fire.map((f) => ({ id: f.id, preset: "fire", points: Pts(f.line), depth: S.oldFire.depth, floorW: S.oldFire.floorW, bermH: 0.18, bermW: 1.4,
+      bermSide: "minus", jitterScale: OldJitter, source: `L0105_OLD_POSITION.fire ${f.id}（原来固守的射击沟，放弃了）` })),
+    { id: "OldComm", preset: "sap", points: Pts(OLD.comm), depth: S.oldComm.depth, floorW: S.oldComm.floorW, bankW: 0.9, bermH: 0.08, bermW: 0.8, cornerRadiusM: 0.4,
+      jitterScale: OldJitter, source: "L0105_OLD_POSITION.comm（撤下来走的旧交通沟，浅）" },
+    { id: "OldSap", preset: "sap", points: Pts(OLD.sap), depth: S.oldComm.depth, floorW: S.oldComm.floorW, bankW: 0.9, bermH: 0.08, bermW: 0.8, cornerRadiusM: 0.4,
+      jitterScale: OldJitter, source: "L0105_OLD_POSITION.sap（通警戒阵地的旧交通沟，穿地坎；03 掷弹筒组蹲在坎下那一截）" },
+    ...OLD.outposts.map((f) => ({ id: f.id, preset: "fire", points: Pts(f.line), depth: S.oldOutpost.depth, floorW: S.oldOutpost.floorW, bermH: 0.12, bermW: 1.2,
+      bermSide: "minus", jitterScale: OldJitter, source: `L0105_OLD_POSITION.outposts ${f.id}（警戒阵地的短沟，早撤了）` })),
+  ];
   return {
     version: 1,
     seed: "tengxian1938:L0105:trench",
     earthProfile: TRENCH_EARTH_PROFILE,
     segments: [
-      // 法向 n = (−tz, tx)；minus 一侧：东西段（t=+X）是北，往北折那截（t=−Z）是西。都朝敌。
-      { id: "FrontFlank", preset: "fire", points: [front[1], front[0]], depth: S.front.depth, floorW: FloorWFor(S.front.floorW),
-        bermSide: "minus", jitterScale: TRENCH_JITTER_SCALE, source: "L0105_TRENCHES.front[0..1]（西头直角往北折，护左翼）" },
-      { id: "FrontLine", preset: "fire", points: front.slice(1), depth: S.front.depth, floorW: FloorWFor(S.front.floorW),
-        bermSide: "minus", jitterScale: TRENCH_JITTER_SCALE, source: "L0105_TRENCHES.front[1..]" },
-      { id: "Traffic", preset: "communication", points: Pts(L0105_TRENCHES.traffic), depth: S.traffic.depth,
-        floorW: FloorWFor(S.traffic.floorW), jitterScale: TRENCH_JITTER_SCALE, source: "L0105_TRENCHES.traffic" },
+      ...segments,
       // 支沟自西向东：plus 一侧是南。弃土只堆南沿，堆成一道土垄（北沿留给日军机枪架枪）。
       { id: "Branch", preset: "communication", points: Pts(L0105_TRENCHES.branch), depth: S.branch.depth,
         floorW: FloorWFor(S.branch.floorW), bermSide: "plus", bermH: L0105_BRANCH_SOUTH_BERM.h, bermW: L0105_BRANCH_SOUTH_BERM.w,
@@ -424,6 +485,94 @@ function CarveDisc(h, x, z, cx, cz, r, floorY, wallM) {
 }
 
 // ---------------------------------------------------------------------------
+// 5c. 2026-10-24 第六版：龛、排长掩蔽部、预备队浅坑、旧阵地的坑与塌方、南半场的坟包（都只进 Ground，不进 NaturalHeight）
+
+/** 旋转的方盒开挖：中心 (cx,cz)，本地 u 轴朝 (ux,uz)（单位向量），半长 hu、半宽 hv；盒里是 floorY，外面 wallM 内陡起。 */
+function CarveLocalBox(h, x, z, cx, cz, ux, uz, hu, hv, floorY, wallM) {
+  const dx = x - cx, dz = z - cz;
+  const lu = dx * ux + dz * uz, lv = -dx * uz + dz * ux;
+  const qu = Math.abs(lu) - hu, qv = Math.abs(lv) - hv;
+  const sdf = Math.hypot(Math.max(qu, 0), Math.max(qv, 0)) + Math.min(Math.max(qu, qv), 0);
+  if (sdf >= wallM) return h;
+  const k = sdf <= 0 ? 1 : 1 - Smooth(sdf / wallM);
+  return Math.min(h, Lerp(h, floorY, k));
+}
+
+const NICHE_LINES = Object.freeze({ front: L0105_TRENCHES.front, traffic: L0105_TRENCHES.traffic, traffic2: L0105_TRENCHES.traffic2 });
+const NICHE_DEPTH = Object.freeze({ front: S.front.depth, traffic: S.traffic.depth, traffic2: S.traffic2.depth });
+const NICHE_FLOOR_HALF = Object.freeze({ front: FloorWFor(S.front.floorW) / 2, traffic: FloorWFor(S.traffic.floorW) / 2, traffic2: FloorWFor(S.traffic2.floorW) / 2 });
+/** 龛的几何（摆块、开挖、地标共用）：→ { id, kind, x, z（龛心）, ux, uz（顺沟）, hu, hv, floorY, mouth {x,z}（沟底边上的开口中心） }。 */
+export const L0105_NICHE_SHAPES = Object.freeze(L0105_NICHES.map((n) => {
+  const line = NICHE_LINES[n.on];
+  const c = PointBeside(line, n.d, 0);
+  const r = c.headingYawDeg * Math.PI / 180;
+  const fx = -Math.sin(r), fz = -Math.cos(r), lx = -Math.cos(r), lz = Math.sin(r);   // 前方、左手
+  const edge = NICHE_FLOOR_HALF[n.on];
+  const off = n.side * (edge + n.acrossM / 2);
+  const x = c.x + lx * off, z = c.z + lz * off;
+  const mouth = { x: R2(c.x + lx * n.side * edge), z: R2(c.z + lz * n.side * edge) };
+  return Object.freeze({ id: n.id, kind: n.kind, on: n.on, x: R2(x), z: R2(z), ux: fx, uz: fz, side: n.side, lx: lx * n.side, lz: lz * n.side,
+    hu: n.lenM / 2, hv: n.acrossM / 2 + 0.2, floorY: R2(NaturalHeight(c.x, c.z) - NICHE_DEPTH[n.on]), mouth });
+}));
+const NICHE_BOX = (() => {
+  const xs = L0105_NICHE_SHAPES.map((n) => n.x), zs = L0105_NICHE_SHAPES.map((n) => n.z);
+  return { minX: Math.min(...xs) - 4, maxX: Math.max(...xs) + 4, minZ: Math.min(...zs) - 4, maxZ: Math.max(...zs) + 4 };
+})();
+function CarveNiches(h, x, z) {
+  if (x < NICHE_BOX.minX || x > NICHE_BOX.maxX || z < NICHE_BOX.minZ || z > NICHE_BOX.maxZ) return h;
+  for (const n of L0105_NICHE_SHAPES) {
+    if (Math.abs(x - n.x) > 3 || Math.abs(z - n.z) > 3) continue;
+    h = CarveLocalBox(h, x, z, n.x, n.z, n.ux, n.uz, n.hu, n.hv, n.floorY, 0.45);
+  }
+  return h;
+}
+
+const PSH = P.platoonShelter;
+const PSH_BOX = Object.freeze({ minX: PSH.x - PSH.w / 2, maxX: PSH.x + PSH.w / 2, minZ: PSH.z - PSH.d / 2, maxZ: PSH.z + PSH.d / 2 });
+const OLD = L0105_OLD_POSITION;
+const RESERVE = P.reserve;
+/** 南半场（z ≥ −8）的坟包：张家林、李家林、田里零散的单坟。圆顶，底半径同坟地。 */
+function SouthMound(x, z) {
+  if (z < PIT_NORTH_FROM_Z) return 0;
+  let best = 0;
+  const R = PN.graveBaseR;
+  for (const g of SOUTH_GRAVES) {
+    const r = Math.hypot(x - g.x, z - g.z);
+    if (r >= R) continue;
+    best = Math.max(best, g.h * Math.pow(1 - (r / R) * (r / R), 1.2));
+  }
+  return best;
+}
+/** 旧交通沟塌了的几截：沟底在塌点前后 2 m 回填到自然地面下 0.3 m（土堆块另摆）。 */
+function OldCollapses(h, x, z, natural) {
+  if (z > -80) return h;
+  for (const [line, alongs] of [[OLD.comm, OLD.commCollapsed], [OLD.sap, OLD.sapCollapsed]]) {
+    for (const c of alongs) {
+      const p = PointAlong(line, c);
+      const d = Math.hypot(x - p.x, z - p.z);
+      if (d > 2.6) continue;
+      const k = 1 - Smooth((d - 1.4) / 1.2);
+      h = Math.max(h, Lerp(h, natural - 0.3, k));
+    }
+  }
+  return h;
+}
+/** 第六版的坑：旧阵地的空机枪掩体、掩蔽部、警戒散兵坑、掷弹筒组蹲的圆坑；排长掩蔽部；坡后预备队的浅坑。 */
+function SixthRoundCarves(h, x, z, natural) {
+  if (z < -150) {
+    for (const n of OLD.mgNests) h = CarveBox(h, x, z, { minX: n.x - OLD.mgNest.w / 2, maxX: n.x + OLD.mgNest.w / 2, minZ: n.z - OLD.mgNest.d / 2, maxZ: n.z + OLD.mgNest.d / 2 }, NaturalHeight(n.x, n.z) - OLD.mgNest.depth, 0.4);
+    const sh = OLD.shelter;
+    h = CarveBox(h, x, z, { minX: sh.x - sh.w / 2, maxX: sh.x + sh.w / 2, minZ: sh.z - sh.d / 2, maxZ: sh.z + sh.d / 2 }, NaturalHeight(sh.x, sh.z) - sh.floorDepth, 0.35);
+    for (const f of OLD.foxholes) h = CarveDisc(h, x, z, f.x, f.z, OLD.foxholeR, NaturalHeight(f.x, f.z) - OLD.foxholeDepth, 0.4);
+    h = CarveDisc(h, x, z, P.mortar.x, P.mortar.z, OLD.mortarBay.r, NaturalHeight(P.mortar.x, P.mortar.z) - OLD.mortarBay.depth, 0.5);
+    return OldCollapses(h, x, z, natural);
+  }
+  if (z > 15 && z < 40) h = CarveBox(h, x, z, PSH_BOX, NaturalHeight(PSH.x, PSH.z) - PSH.floorDepth, 0.4);
+  if (z > 130 && z < 158 && x < -20) for (const q of RESERVE.pits) h = CarveDisc(h, x, z, q.x, q.z, RESERVE.pitR, NaturalHeight(q.x, q.z) - RESERVE.pitDepth, 0.5);
+  return h;
+}
+
+// ---------------------------------------------------------------------------
 // 地面合成
 
 /** 建好的地面函数（含壕沟 / 坑 / 洞）与几个平底高度。 */
@@ -434,8 +583,11 @@ export function L0105Ground() {
   const dugoutFloorY = NaturalHeight(DUG.x, DUG.z) - DUG.floorDepth;
   const Ground = (x, z) => {
     const natural = NaturalHeight(x, z);
-    let h = natural + RoadDelta(x, z);
+    let h = natural + RoadDelta(x, z) + SouthMound(x, z);
     h = plan.Apply(x, z, h, natural + TrafficBaseLift(x, z));
+    // 2026-10-24：沟壁上的龛（弹药 / 手榴弹 / 让担架）、排长掩蔽部、预备队浅坑、旧阵地的坑与塌方
+    h = CarveNiches(h, x, z);
+    h = SixthRoundCarves(h, x, z, natural);
     // 支沟口：交通沟里夹到交通沟底（支沟端头别把交通沟挖深）
     if (x > JUNCTION_ZONE.minX && x < JUNCTION_ZONE.maxX && Math.abs(z - BranchZAt(x)) < JUNCTION_ZONE.halfZ) {
       h = Math.max(h, natural - S.traffic.depth);
@@ -762,7 +914,91 @@ export function L0105Blocks(sample, floors) {
   // --- 坑北前景（2026-10-20）：树桩、坟地柏树、麦秸垛、田里零星的树（田埂 / 坟包 / 干水沟 / 地坎在高度场里） ----------
   blocks.push(...PitNorthBlocks(sample));
 
+  // --- 2026-10-24 第六版：龛里的箱子、机枪坑的弹药箱、排长掩蔽部、预备队、连弹药所、旧阵地的摆设、林里的柏树、南半场零星的树 ----------
+  const sixth = SixthRoundBlocks(sample);
+  blocks.push(...sixth.blocks);
+  Object.assign(facts, sixth.facts);
+
   return { blocks, gates, facts };
+}
+
+/**
+ * 第六版的体块（2026-10-24）。显式 y 的按 sample（烘好的网格）算；龛里的箱子落在龛底（floorY）。
+ * 弹药龛两三个弹药箱（小木箱）、手榴弹龛一两个小箱；机枪坑东南角两个弹药箱；排长掩蔽部顶上横木 + 覆土、里头一部野战电话；
+ * 预备队三个浅坑北沿各一垛土袋；连弹药所：箱子一堆、苫布、两垛土袋；旧阵地：空机枪掩体北沿土袋、掩蔽部西半边顶 + 东半边塌下来的顶板和土、
+ * 丢下的弹药箱、破枪、旧交通沟塌方的土堆；四片林的柏树；南半场零星的树。
+ */
+export function SixthRoundBlocks(sample) {
+  const out = [];
+  const N2 = (i) => String(i + 1).padStart(2, "0");
+  const Tree = (id, x, z, h) => out.push(Block(id, x, z, 0.6, 0.6, h, "foliage", { prop: "Tree" }));
+  const Low = (x, z, w, d) => Math.min(sample(x, z), sample(x - w / 2, z - d / 2), sample(x + w / 2, z - d / 2), sample(x - w / 2, z + d / 2), sample(x + w / 2, z + d / 2));
+  const facts = { ammoNiches: 0, grenadeNiches: 0, litterNiches: 0 };
+  // 龛：箱子顺着沟放在龛底（本地 X 顺沟）
+  for (const n of L0105_NICHE_SHAPES) {
+    const ry = Math.round(Math.atan2(-n.uz, n.ux) * 1000) / 1000;
+    const inward = { x: n.lx, z: n.lz };   // 往墙里
+    if (n.kind === "ammo") {
+      facts.ammoNiches += 1;
+      // 两个并排在底下、一个摞在上面
+      for (const [k, du, dv] of [[1, -0.3, 0.05], [2, 0.3, 0.05]]) {
+        out.push(Block(`${n.id}_Crate${k}`, n.x + n.ux * du + inward.x * dv, n.z + n.uz * du + inward.z * dv, 0.55, 0.38, 0.32, "timber", { ry, prop: "AmmoCrate", y: R2(n.floorY + 0.16) }));
+      }
+      out.push(Block(`${n.id}_Crate3`, n.x + n.ux * 0.05 + inward.x * 0.05, n.z + n.uz * 0.05 + inward.z * 0.05, 0.55, 0.38, 0.32, "timber", { ry: R2(ry + 0.05), prop: "AmmoCrate", y: R2(n.floorY + 0.48) }));
+    } else if (n.kind === "grenade") {
+      facts.grenadeNiches += 1;
+      out.push(Block(`${n.id}_Box1`, n.x - n.ux * 0.2, n.z - n.uz * 0.2, 0.45, 0.3, 0.28, "timber", { ry, prop: "GrenadeBox", y: R2(n.floorY + 0.14) }));
+      out.push(Block(`${n.id}_Box2`, n.x + n.ux * 0.25, n.z + n.uz * 0.25, 0.45, 0.3, 0.28, "timber", { ry: R2(ry - 0.08), prop: "GrenadeBox", y: R2(n.floorY + 0.14) }));
+    } else facts.litterNiches += 1;
+  }
+  // 机枪坑东南角的弹药箱
+  const pa = P.pitAmmo, pitY = sample(PIT.x, PIT.z);
+  out.push(Block("PitAmmoCrate1", pa.x, pa.z, 0.55, 0.38, 0.32, "timber", { prop: "AmmoCrate", y: R2(pitY + 0.16) }));
+  out.push(Block("PitAmmoCrate2", pa.x - 0.6, pa.z + 0.1, 0.55, 0.38, 0.32, "timber", { ry: 0.2, prop: "AmmoCrate", y: R2(pitY + 0.16) }));
+  // 排长掩蔽部兼通信所：东边 2.6 m 盖顶（横木 + 覆土），沟那一侧 1.4 m 留作出入口；里头靠北墙一部野战电话、一条木凳
+  {
+    const s = P.platoonShelter, floorY = NaturalHeight(s.x, s.z) - s.floorDepth, clear = 1.9, roofW = 2.6;
+    const roofX = s.x + s.w / 2 - roofW / 2;
+    out.push(Block("PlatoonShelterRoofTimber", roofX, s.z, roofW + 0.4, s.d + 0.8, 0.25, "timber", { y: R2(floorY + clear + 0.125) }));
+    out.push(Block("PlatoonShelterRoofEarth", roofX + 0.1, s.z, roofW + 0.8, s.d + 1.2, 0.45, "earthDark", { y: R2(floorY + clear + 0.25 + 0.225) }));
+    out.push(Block("PlatoonFieldPhone", s.x + 1.3, s.z - 1.2, 0.45, 0.35, 0.3, "timber", { prop: "FieldPhone", y: R2(floorY + 0.55) }));
+    out.push(Block("PlatoonBench", s.x + 1.3, s.z - 1.2, 1.6, 0.45, 0.4, "timber", { y: R2(floorY + 0.2) }));
+  }
+  // 坡后预备队：三个浅坑北沿各一垛土袋（朝北）
+  P.reserve.pits.forEach((q, i) => out.push(Block(`ReserveSandbag${i + 1}`, q.x, q.z - P.reserve.pitR - 0.4, 1.8, 0.8, 0.6, "cover", { cover: { ...FACE_NORTH } })));
+  // 连弹药所：一堆箱子（两层）、苫布盖着、两垛土袋在北边
+  {
+    const c = P.companyAmmo, y0 = Low(c.x, c.z, 3, 2);
+    const crates = [[-0.9, -0.5], [0, -0.5], [0.9, -0.5], [-0.45, 0.4], [0.45, 0.4]];
+    crates.forEach(([dx, dz], i) => out.push(Block(`CompanyAmmoCrate${i + 1}`, c.x + dx, c.z + dz, 0.8, 0.5, 0.5, "timber", { prop: "AmmoCrate", y: R2(y0 + 0.25) })));
+    out.push(Block("CompanyAmmoCrate6", c.x - 0.45, c.z - 0.1, 0.8, 0.5, 0.5, "timber", { prop: "AmmoCrate", y: R2(y0 + 0.75), ry: 0.1 }));
+    out.push(Block("CompanyAmmoTarp", c.x, c.z, 3.2, 2.0, 0.08, "canvas", { y: R2(y0 + 1.06) }));
+    out.push(Block("CompanyAmmoSandbag1", c.x - 1.2, c.z - 1.9, 2.0, 0.8, 0.8, "cover", { cover: { ...FACE_NORTH } }));
+    out.push(Block("CompanyAmmoSandbag2", c.x + 1.2, c.z - 1.9, 2.0, 0.8, 0.8, "cover", { cover: { ...FACE_NORTH } }));
+  }
+  // 旧阵地（放弃了）
+  {
+    OLD.mgNests.forEach((n) => out.push(Block(`${n.id}_Sandbags`, n.x, n.z - OLD.mgNest.d / 2 - 1.5, OLD.mgNest.w + 0.6, 0.6, 0.45, "cover", { cover: { ...FACE_NORTH } })));
+    const sh = OLD.shelter, floorY = NaturalHeight(sh.x, sh.z) - sh.floorDepth, clear = 1.7;
+    // 西半边的顶还在：横木 + 覆土；东半边塌了：顶板斜着落在坑里（歪一点、矮一截）、土堆在上面
+    out.push(Block("OldShelterRoofTimber", sh.x - sh.w / 4, sh.z, sh.w / 2 + 0.4, sh.d + 0.8, 0.25, "timber", { y: R2(floorY + clear + 0.125) }));
+    out.push(Block("OldShelterRoofEarth", sh.x - sh.w / 4, sh.z, sh.w / 2 + 0.6, sh.d + 1.2, 0.4, "earthDark", { y: R2(floorY + clear + 0.25 + 0.2) }));
+    out.push(Block("OldShelterFallenSlab", sh.x + sh.w / 4 + 0.2, sh.z + 0.3, sh.w / 2 - 0.2, sh.d - 0.6, 0.22, "timber", { ry: 0.16, y: R2(floorY + 0.45) }));
+    out.push(Block("OldShelterFallenEarth", sh.x + sh.w / 4 + 0.3, sh.z + 0.2, sh.w / 2 - 0.4, sh.d - 1.0, 0.8, "earthDark", { ry: 0.1, y: R2(floorY + 0.95) }));
+    OLD.crates.forEach((c, i) => out.push(Block(`OldCrate_${N2(i)}`, c.x, c.z, 0.6, 0.4, 0.35, "timber", { ry: R2((i * 0.7) % 1.5), prop: "AmmoCrate" })));
+    OLD.rifles.forEach((c, i) => out.push(Block(`OldRifle_${N2(i)}`, c.x, c.z, 1.1, 0.09, 0.09, "timber", { ry: R2(0.3 + i * 0.9), prop: "BrokenRifle" })));
+    let k = 0;
+    for (const [line, alongs] of [[OLD.comm, OLD.commCollapsed], [OLD.sap, OLD.sapCollapsed]]) {
+      for (const c of alongs) {
+        const p = PointAlong(line, c), r = p.headingYawDeg * Math.PI / 180, fx = -Math.sin(r), fz = -Math.cos(r);
+        out.push(Block(`OldCollapse_${N2(k++)}`, p.x, p.z, 2.2, 1.3, 0.35, "earthDark", { ry: R2(Math.atan2(-fz, fx)), prop: "Collapse" }));
+      }
+    }
+  }
+  // 林（家族坟地）里的柏树；南半场零星的树
+  for (const w of L0105_WOODS) w.cypresses.forEach((t, i) => out.push(Block(`${w.id}_Cypress${i + 1}`, t.x, t.z, 1.1, 1.1, t.h, "foliage", { prop: "Cypress" })));
+  L0105_SOUTH_TREES.forEach((t, i) => Tree(`SouthTree_${N2(i)}`, t.x, t.z, t.h));
+  return { blocks: out, facts };
 }
 
 /**
@@ -803,10 +1039,53 @@ function Hash01(i, salt = 0) {
 
 const FARM = L0105_FARM;
 const Pick = (range, u) => range[0] + (range[1] - range[0]) * u;
-/** 组排的一条南北界在 x 处的 z（"scarp" = 地坎中心线；出了场地按边界上的值延长，远景里的田接得上）。 */
+/** 组排的一条南北界在 x 处的 z（"scarp" = 地坎中心线、田埂 id = 那道田埂的中心线；出了场地按边界上的值延长，远景里的田接得上）。 */
 export function FarmEdgeZ(edge, x) {
-  if (edge === "scarp") return ScarpZ(Math.max(L0105_BOUNDS.minX, Math.min(L0105_BOUNDS.maxX, x)));
+  const cx = Math.max(L0105_BOUNDS.minX, Math.min(L0105_BOUNDS.maxX, x));
+  if (edge === "scarp") return ScarpZ(cx);
+  if (typeof edge === "string") { const b = PN.bunds.find((q) => q.id === edge); if (!b) throw new Error(`FarmEdgeZ：没有田埂 ${edge}`); return BundZ(b, cx); }
   return edge;
+}
+/** 多边形裁一条半平面（Sutherland–Hodgman）。 */
+function ClipPoly(pts, inside, cross) {
+  const out = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    const ia = inside(a), ib = inside(b);
+    if (ia) out.push(a);
+    if (ia !== ib) out.push(cross(a, b));
+  }
+  return out;
+}
+/** 多边形按 x 范围裁（只裁竖直的两条边）。 */
+function ClipPolyX(poly, xMin, xMax) {
+  const At = (a, b, x) => ({ x, z: a.z + (b.z - a.z) * (x - a.x) / (b.x - a.x) });
+  let pts = ClipPoly(poly, (p) => p.x >= xMin, (a, b) => At(a, b, xMin));
+  pts = ClipPoly(pts, (p) => p.x <= xMax, (a, b) => At(a, b, xMax));
+  return pts;
+}
+/** 多边形按 z ≥ zMin 裁（斜条地被场地北边界截断时，截口处的 x 要按斜度算，不能只把 z 夹住）。 */
+export function ClipPolyZ(poly, zMin) {
+  return ClipPoly(poly, (p) => p.z >= zMin, (a, b) => ({ x: a.x + (b.x - a.x) * (zMin - a.z) / (b.z - a.z), z: zMin }));
+}
+/**
+ * 一块地的多边形（2026-10-24 拼块）：条地在这一片里斜 shearDeg（x 随 z 线性偏），裁到片的 x 范围 [gx0, gx1]；
+ * 南北界按 FarmEdgeZ（地坎 / 田埂是曲线，按 stepM 取点）。南北界各往外多 pad（排与排之间的小路留给底色）。
+ */
+export function ParcelPoly(p, row, gx0, gx1, pad, stepM = 6) {
+  const t = Math.tan((p.shearDeg || 0) * Math.PI / 180);
+  const cx = (p.x0 + p.x1) / 2;
+  const zMid = (FarmEdgeZ(row.south, cx) + FarmEdgeZ(row.north, cx)) / 2;
+  const S = (x) => FarmEdgeZ(row.south, x) - pad, N = (x) => FarmEdgeZ(row.north, x) + pad;
+  const south = [], north = [];
+  const n = Math.max(1, Math.ceil((p.x1 - p.x0) / stepM));
+  for (let i = 0; i <= n; i++) {
+    const x = p.x0 + (p.x1 - p.x0) * i / n;
+    south.push({ x: x + (S(x) - zMid) * t, z: S(x) });
+    north.push({ x: x + (N(x) - zMid) * t, z: N(x) });
+  }
+  const poly = [...south, ...north.reverse()];
+  return t === 0 ? poly : ClipPolyX(poly, gx0, gx1);
 }
 /** 种什么：按 crops 的比例抽；kind + 两档深浅里的哪一档。 */
 function PickCrop(u, shadeU) {
@@ -817,16 +1096,19 @@ function PickCrop(u, shadeU) {
 export function CropColor(c) { return L0105_FIELD_PAINT[c.kind][c.shade]; }
 
 /**
- * 切田：→ { rows: [{ index, south, north }], groups: [{ row, index, x0, x1, strips: bool }], parcels: [{ row, group, x0, x1, crop }] }。
- * 组排：rowsZ 定的几排之后按 rowLen 往北排到 region.minZ；每排从 originX 起按 groupW 切组（每排起点错开）；
- * 组里按 stripW 切条（最后一条把剩下的分匀，不留细边），左右相邻两条不种同一样；组心离坑 > stripRadiusM 的一组一块。
+ * 切田（2026-10-24 拼块）：→ { rows: [{ index, south, north }], groups: [{ row, index, x0, x1, gx0, gx1, whole, shearDeg, poly }],
+ *   parcels: [{ row, group, x0, x1, w, crop, shearDeg, whole }] }。
+ * 组排：rowsZ 定的几排之后按 rowLen 往北排到 region.minZ；每排从 originX 起按 groupW（50–110 m）切片（每排起点错开）；
+ * 每片自己的方向 shearDeg（±FARM.shearDeg 里按序号抽）；约 wholeFrac 的片整块不分条；其余按 stripW（10–32 m）切条（最后一条把剩下的分匀，不留细边），
+ * 左右相邻两条不种同一样；片心离坑 > polyRadiusM 的（远景里）一片一块、不斜（poly = false，轴对齐矩形）。
  */
 export function FarmLayout() {
   const edges = [...FARM.rowsZ];
   for (let k = 0; ; k++) {
     const last = edges[edges.length - 1];
-    if (last <= FARM.region.minZ) break;
-    edges.push(Math.max(FARM.region.minZ, Math.round(last - Pick(FARM.rowLen, Hash01(k, 31)))));
+    if (typeof last === "number" && last <= FARM.region.minZ) break;
+    const lastZ = typeof last === "number" ? last : FarmEdgeZ(last, P.pit.x);
+    edges.push(Math.max(FARM.region.minZ, Math.round(lastZ - Pick(FARM.rowLen, Hash01(k, 31)))));
   }
   const rows = [], groups = [], parcels = [];
   const pit = { x: P.pit.x, z: P.pit.z };
@@ -840,19 +1122,23 @@ export function FarmLayout() {
       x = x1;
       if (x1 < FARM.region.minX) continue;
       const midZ = (FarmEdgeZ(row.south, (x0 + x1) / 2) + FarmEdgeZ(row.north, (x0 + x1) / 2)) / 2;
-      const strips = Math.hypot((x0 + x1) / 2 - pit.x, midZ - pit.z) <= FARM.stripRadiusM;
-      const group = { row: r, index: g, x0, x1, strips };
-      groups.push(group);
+      const poly = Math.hypot((x0 + x1) / 2 - pit.x, midZ - pit.z) <= FARM.polyRadiusM;
       const key = r * 1000 + g;
+      const whole = Hash01(key, 67) < FARM.wholeFrac;
+      // 方向：±shearDeg 里抽，但别太小（不然看不出各片方向不同）
+      const u = Hash01(key, 71);
+      const shearDeg = poly && !whole ? Math.round((u < 0.5 ? -1 : 1) * (0.3 + 0.7 * Hash01(key, 73)) * FARM.shearDeg * 10) / 10 : 0;
       const gx0 = x0 + FARM.pathHalfW, gx1 = x1 - FARM.pathHalfW;
-      if (!strips) {
-        parcels.push({ row: r, group: g, x0: gx0, x1: gx1, crop: PickCrop(Hash01(key, 53), Hash01(key, 59)) });
+      const group = { row: r, index: g, x0, x1, gx0, gx1, whole, shearDeg, poly };
+      groups.push(group);
+      if (whole || !poly) {
+        parcels.push({ row: r, group: g, x0: gx0, x1: gx1, w: R2(gx1 - gx0), crop: PickCrop(Hash01(key, 53), Hash01(key, 59)), shearDeg: 0, whole: true });
         continue;
       }
       let sx = gx0, prev = null;
       for (let s = 0; sx < gx1 - 0.01; s++) {
-        const u = Hash01(key * 100 + s, 47);
-        let sw = FARM.stripW[0] + (FARM.stripW[1] - FARM.stripW[0]) * Math.pow(u, 1.4);
+        const su = Hash01(key * 100 + s, 47);
+        let sw = FARM.stripW[0] + (FARM.stripW[1] - FARM.stripW[0]) * Math.pow(su, 1.2);
         const rem = gx1 - sx;
         if (rem <= FARM.stripW[1] && rem - sw < FARM.stripW[0]) sw = rem;
         else if (rem - sw < FARM.stripW[0]) sw = rem / 2;
@@ -861,7 +1147,7 @@ export function FarmLayout() {
           const kinds = FARM.crops.map((c) => c[0]).filter((k) => k !== prev.kind);
           crop = { kind: kinds[Hash01(key * 100 + s, 61) < 0.5 ? 0 : 1], shade: crop.shade };
         }
-        parcels.push({ row: r, group: g, x0: sx, x1: sx + sw, crop });
+        parcels.push({ row: r, group: g, x0: R2(sx), x1: R2(sx + sw), w: R2(sw), crop, shearDeg, whole: false });
         prev = crop;
         sx += sw;
       }
@@ -896,46 +1182,60 @@ export function L0105Paint(farm = FarmLayout()) {
   const C = L0105_FIELD_PAINT, B = L0105_BOUNDS;
   const out = [];
   const X0 = B.minX - 2, X1 = B.maxX + 2, Z1 = B.minZ - 2;
-  // 扫清带：z −12…−80（避开坑、散兵坑、爬沟和前沿沟西头北折那一截）
+  // 扫清带：z −12…−80（避开坑、散兵坑、爬沟；东段前沿沟往北错了 9 m，它的北沿弃土那一截也留出来）
   out.push({ id: "Cleared", color: C.cleared, feather: 1.5, poly: [
-    PPt(B.minX, -80), PPt(B.maxX, -80), PPt(B.maxX, -12), PPt(-1.5, -12), PPt(-1.5, -17.5), PPt(-11.5, -17.5), PPt(-11.5, -12),
-    PPt(-56, -12), PPt(-56, -27), PPt(-68, -27), PPt(-68, -12), PPt(B.minX, -12)] });
+    PPt(B.minX, -80), PPt(B.maxX, -80), PPt(B.maxX, -12), PPt(104, -12), PPt(104, -18), PPt(38, -18), PPt(38, -12),
+    PPt(-1.5, -12), PPt(-1.5, -17.5), PPt(-11.5, -17.5), PPt(-11.5, -12), PPt(B.minX, -12)] });
   // 爬沟、丙位散兵坑一圈是挖出来的土（扫清带上留的那个缺口）
   out.push({ id: "SapSpoil", color: C.ditchSoil, strength: 0.75, feather: 1.2, poly: [PPt(-1.5, -12), PPt(-1.5, -17.5), PPt(-11.5, -17.5), PPt(-11.5, -12)] });
-  // 田间小路底色：整片坑北先涂成小路色，田块之间留下的缝就是组与组、排与排之间的小路
+  // 田间小路底色：整片坑北先涂成小路色，田块之间留下的缝就是片与片、排与排之间的小路
   out.push({ id: "FarmPaths", color: C.fieldPath, feather: 0.6, poly: [PPt(X0, -80), PPt(X1, -80), PPt(X1, Z1), PPt(X0, Z1)] });
-  // 窄条田（场地里那几组）
+  // 拼块田（场地里那几片）：条地按片的方向斜，裁到片的范围里
   const ph = FARM.pathHalfW;
   for (const p of farm.parcels) {
-    const row = farm.rows[p.row];
-    const x0 = Math.max(X0, p.x0), x1 = Math.min(X1, p.x1);
-    if (!(x1 - x0 > 0.2)) continue;
-    const s0 = row.south, n0 = row.north;
-    const SouthZ = (x) => FarmEdgeZ(s0, x) - ph, NorthZ = (x) => Math.max(Z1, FarmEdgeZ(n0, x) + ph);
-    if (SouthZ((x0 + x1) / 2) < Z1) continue;
-    const south = s0 === "scarp" ? SampleCurve(SouthZ, x0, x1, 6) : [PPt(x0, SouthZ(x0)), PPt(x1, SouthZ(x1))];
-    const north = (n0 === "scarp" ? SampleCurve(NorthZ, x0, x1, 6) : [PPt(x0, NorthZ(x0)), PPt(x1, NorthZ(x1))]).reverse();
-    out.push({ id: `Field_${p.row + 1}_${String(p.group).padStart(2, "0")}_${String(Math.round(p.x0 * 10))}`, color: CropColor(p.crop), feather: 0.8, poly: [...south, ...north] });
+    const row = farm.rows[p.row], group = farm.groups.find((g) => g.row === p.row && g.index === p.group);
+    if (group.x1 < X0 || group.x0 > X1) continue;
+    const gx0 = Math.max(X0, group.gx0), gx1 = Math.min(X1, group.gx1);
+    if (!(gx1 - gx0 > 0.2)) continue;
+    const cx = (p.x0 + p.x1) / 2;
+    if (FarmEdgeZ(row.south, cx) - ph < Z1) continue;
+    const poly = ClipPolyZ(ParcelPoly({ ...p, x0: Math.max(gx0, p.x0), x1: Math.min(gx1, p.x1) }, row, gx0, gx1, -ph), Z1).map((q) => PPt(q.x, q.z));
+    if (poly.length < 3) continue;
+    out.push({ id: `Field_${p.row + 1}_${String(p.group).padStart(2, "0")}_${String(Math.round(p.x0 * 10))}`, color: CropColor(p.crop), feather: 0.8, poly });
   }
   // 田埂（烘进高度场的那几道）
   for (const b of PN.bunds) out.push({ id: `Bund_${b.id}`, color: C.bund, strength: 0.75, feather: 0.8, halfW: 0.45, line: SampleCurve((q) => BundZ(b, q), b.minX, b.maxX, 5) });
-  // 干水沟两边翻出来的新土（连沟一起涂）
-  out.push({ id: "DitchSoil", color: C.ditchSoil, strength: 0.9, feather: 0.8, halfW: PR1(DITCH.topW / 2 + DITCH.lipW), line: DITCH.line.map((p) => PPt(p.x, p.z)) });
+  // 干沙沟：两边翻出来的新土（连沟一起涂）+ 沟底的沙（2026-10-24）
+  out.push({ id: "DitchSoil", color: C.ditchSoil, strength: 0.9, feather: 0.8, halfW: PR1(DITCH.topW / 2 * (1 + (DITCH.bankWobble || 0)) + DITCH.lipW), line: DITCH.line.map((p) => PPt(p.x, p.z)) });
+  out.push({ id: "DitchSand", color: C.ditchSand, strength: 0.95, feather: 0.9, halfW: PR1(DITCH.floorW / 2 + 0.5), line: DITCH.line.map((p) => PPt(p.x, p.z)) });
   // 地坎坎面
   out.push({ id: "ScarpFace", color: C.scarpFace, strength: 0.9, feather: 0.8, halfW: 1.3, line: SampleCurve(ScarpZ, B.minX, B.maxX, 5) });
-  // 坟包：坟地与两座孤坟是老坟，田里散的单个坟是新土
+  // 北边放弃的旧阵地（2026-10-24）：沟沿塌土 + 蒿草的灰绿，跟现在的沟分得开
+  for (const f of OLD.fire) out.push({ id: `OldTrench_${f.id}`, color: OLD.paint, strength: 0.85, feather: 0.9, halfW: OLD.paintHalfW, line: f.line.map((p) => PPt(p.x, p.z)) });
+  out.push({ id: "OldTrench_Comm", color: OLD.paint, strength: 0.8, feather: 0.9, halfW: PR1(OLD.paintHalfW - 0.6), line: OLD.comm.map((p) => PPt(p.x, p.z)) });
+  out.push({ id: "OldTrench_Sap", color: OLD.paint, strength: 0.8, feather: 0.9, halfW: PR1(OLD.paintHalfW - 0.6), line: OLD.sap.map((p) => PPt(p.x, p.z)) });
+  for (const f of OLD.outposts) out.push({ id: `OldTrench_${f.id}`, color: OLD.paint, strength: 0.85, feather: 0.9, halfW: PR1(OLD.paintHalfW - 0.3), line: f.line.map((p) => PPt(p.x, p.z)) });
+  OLD.foxholes.forEach((f, i) => out.push({ id: `OldFoxhole_${String(i + 1).padStart(2, "0")}`, color: OLD.paint, strength: 0.85, feather: 0.6, poly: Octagon(f.x, f.z, 1.6) }));
+  // 坟包：坟地与两座孤坟是老坟，田里散的单个坟是新土；林里的坟是老坟
   [...PN.loneGraves.map((g, i) => ({ id: `LoneGrave${i + 1}`, ...g })), ...PN.graveyard].forEach((g) => {
     out.push({ id: `Grave_${g.id}`, color: C.graveSoil, feather: 0.6, poly: Octagon(g.x, g.z, 1.9) });
   });
   L0105_FIELD_GRAVES.forEach((g, i) => out.push({ id: `FieldGrave_${String(i + 1).padStart(2, "0")}`, color: C.newSoil, feather: 0.6, poly: Octagon(g.x, g.z, 1.9) }));
-  // 路：大路在坑北这一截（到 z −11.5，南面不涂）+ 大路北段（到北边界）+ 田间小路
+  for (const w of L0105_WOODS) if (w.z < PIT_NORTH_FROM_Z) {
+    out.push({ id: `${w.id}_Ground`, color: C.graveSoil, strength: 0.6, feather: 1.5, poly: [PPt(w.x - w.w / 2, w.z - w.d / 2), PPt(w.x + w.w / 2, w.z - w.d / 2), PPt(w.x + w.w / 2, w.z + w.d / 2), PPt(w.x - w.w / 2, w.z + w.d / 2)] });
+    w.graves.forEach((g, i) => out.push({ id: `${w.id}_Grave${i + 1}`, color: C.graveSoil, feather: 0.6, poly: Octagon(g.x, g.z, 1.9) }));
+  }
+  // 路：车道在坑北这一截（到 z −11.5，南面不涂）+ 老驿道北段（到北边界）与南段在坑北的那一截 + 田间小路 + 坑北的两条田间小路（2026-10-24）
   {
     const endZ = -11.5;   // 圆头 + 柔边不过 z −8
     const a = L0105_ROAD[0], b = L0105_ROAD[1], t = (endZ - a.z) / (b.z - a.z);
     out.push({ id: "RoadNorthEnd", color: C.road, feather: 0.8, halfW: PR1(L0105_ROAD_WIDTH_M / 2), line: [PPt(a.x, a.z), PPt(a.x + (b.x - a.x) * t, endZ)] });
+    const c = L0105_POST_ROAD_SOUTH[0], d = L0105_POST_ROAD_SOUTH[1], u = (endZ - c.z) / (d.z - c.z);
+    out.push({ id: "PostRoadNorthEnd", color: C.road, feather: 0.8, halfW: L0105_NORTH_ROAD_HALF_W, line: [PPt(c.x, c.z), PPt(c.x + (d.x - c.x) * u, endZ)] });
   }
   out.push({ id: "NorthRoad", color: C.road, feather: 0.8, halfW: L0105_NORTH_ROAD_HALF_W, line: L0105_NORTH_ROAD.map((p) => PPt(p.x, p.z)) });
   out.push({ id: "FieldPath", color: C.path, feather: 0.6, halfW: L0105_FIELD_PATH_HALF_W, line: L0105_FIELD_PATH.map((p) => PPt(p.x, p.z)) });
+  L0105_FIELD_LANES.forEach((lane, i) => { if (lane[0].z < -12) out.push({ id: `FieldLane_${i + 1}`, color: C.path, feather: 0.6, halfW: L0105_FIELD_PATH_HALF_W, line: lane.map((p) => PPt(p.x, p.z)) }); });
   return out;
 }
 
@@ -1042,10 +1342,17 @@ export function L0105Backdrop(sample, farm = FarmLayout()) {
   const groundY = R2(sum / n);
   const palette = [], ci = new Map();
   const Ci = (color) => { if (!ci.has(color)) { ci.set(color, palette.length); palette.push(color); } return ci.get(color); };
-  const rects = [];
+  const rects = [], polys = [];
   const ph = FARM.pathHalfW;
   for (const p of farm.parcels) {
     const row = farm.rows[p.row], cx = (p.x0 + p.x1) / 2;
+    const group = farm.groups.find((g) => g.row === p.row && g.index === p.group);
+    // 600 m 以内（2026-10-24 拼块）：跟场地里一样的斜条多边形；再远一片一块、轴对齐矩形
+    if (group.poly) {
+      const poly = ParcelPoly(p, row, group.gx0, group.gx1, -ph).map((q) => PPt(q.x, q.z));
+      if (poly.length >= 3) polys.push({ id: `BdField_${p.row + 1}_${String(p.group).padStart(2, "0")}_${String(Math.round(p.x0 * 10))}`, color: CropColor(p.crop), feather: 0.8, poly });
+      continue;
+    }
     const z0 = FarmEdgeZ(row.south, cx) - ph, z1 = FarmEdgeZ(row.north, cx) + ph;   // z0 南（大）、z1 北（小）
     if (!(z0 - z1 > 0.5)) continue;
     rects.push([R1(p.x0), R1(z1), R1(p.x1), R1(z0), Ci(CropColor(p.crop))]);
@@ -1054,12 +1361,14 @@ export function L0105Backdrop(sample, farm = FarmLayout()) {
     { id: "BdCleared", color: C.cleared, feather: 1.5, poly: [PPt(FR.minX, FARM.cleared.minZ), PPt(FR.maxX, FARM.cleared.minZ), PPt(FR.maxX, FARM.cleared.maxZ), PPt(FR.minX, FARM.cleared.maxZ)] },
     { id: "BdFarmPaths", color: C.fieldPath, feather: 1, poly: [PPt(FR.minX, FR.minZ), PPt(FR.maxX, FR.minZ), PPt(FR.maxX, FR.maxZ), PPt(FR.minX, FR.maxZ)] },
     { id: "BdFields", rects, palette },
+    ...polys,
   ];
   for (const v of L0105_BACKDROP_VILLAGES) {
     paint.push({ id: `BdVillage${v.id}Ground`, color: C.yard, feather: 4, poly: Ellipse(v.x, v.z, v.rx + 6, v.rz + 6) });
     paint.push({ id: `BdVillage${v.id}Threshing`, color: C.threshing, feather: 2, poly: [PPt(v.x - v.rx * 0.6, v.z + v.rz + 10), PPt(v.x - v.rx * 0.2, v.z + v.rz + 10), PPt(v.x - v.rx * 0.2, v.z + v.rz + 26), PPt(v.x - v.rx * 0.6, v.z + v.rz + 26)] });
   }
   paint.push({ id: "BdRoad", color: C.road, feather: 0.8, halfW: L0105_NORTH_ROAD_HALF_W, line: L0105_BACKDROP_ROAD.map((p) => PPt(p.x, p.z)) });
+  paint.push({ id: "BdPostRoad", color: C.road, feather: 0.8, halfW: L0105_NORTH_ROAD_HALF_W, line: L0105_BACKDROP_POST_ROAD.map((p) => PPt(p.x, p.z)) });
   L0105_BACKDROP_PATHS.forEach((line, i) => paint.push({ id: `BdPath${i + 1}`, color: C.path, feather: 0.8, halfW: L0105_FIELD_PATH_HALF_W, line: line.map((p) => PPt(p.x, p.z)) }));
 
   const shapes = [];
@@ -1077,7 +1386,7 @@ export function L0105Backdrop(sample, farm = FarmLayout()) {
 }
 
 /** 折线（米）上的弧长 → 点 + 走向；摆件、板桥用。 */
-const LINES = Object.freeze({ front: L0105_TRENCHES.front, traffic: L0105_TRENCHES.traffic, branch: L0105_TRENCHES.branch });
+const LINES = Object.freeze({ front: L0105_TRENCHES.front, traffic: L0105_TRENCHES.traffic, traffic2: L0105_TRENCHES.traffic2, branch: L0105_TRENCHES.branch });
 
 /**
  * 日常摆件 → 体块。长边顺着沟（ry 按走向转），贴 lat 那一侧；能挡子弹的写 cover，朝向 = 防的方向：
@@ -1093,7 +1402,7 @@ export function PropBlocks() {
     const ry = Math.atan2(-fz, fx);                       // 本地 X（长边）对齐行进方向
     const extra = { ry: Math.round(ry * 1000) / 1000, prop: p.kind };
     if (k.cover) {
-      const face = p.on === "front" ? { x: 0, z: -1 } : p.on === "traffic" ? { x: -fx, z: -fz } : { x: fx, z: fz };
+      const face = p.on === "front" ? { x: 0, z: -1 } : (p.on === "traffic" || p.on === "traffic2") ? { x: -fx, z: -fz } : { x: fx, z: fz };
       extra.cover = { faceX: R2(face.x), faceZ: R2(face.z) };
     }
     const b = Block(p.id, at.x, at.z, k.len, k.across, k.h, k.semantic, extra);
@@ -1310,6 +1619,8 @@ export function GullyBankHeights(sample) {
  * 坑北前景的核对（notes 与 SceneTest 共用）。观察者 = 坑里北壁射击台上站着的人（坑底 + 踏台 0.7 + 眼高 1.62，世界高 pitEyeY），
  * 沿胸墙 x −3…3 与甲位五个点。sample = 烘好的网格。
  */
+/** 旧阵地的所有沟线（核对时跳过它们附近）。 */
+export const OLD_LINES = Object.freeze([...L0105_OLD_POSITION.fire.map((f) => f.line), L0105_OLD_POSITION.comm, L0105_OLD_POSITION.sap, ...L0105_OLD_POSITION.outposts.map((f) => f.line)]);
 export const PIT_NORTH_DITCH_HEAD_M = 1.2;   // 干水沟里弯着腰走 / 蹲着的人，头顶离沟底
 export const PIT_NORTH_MORTAR_HEAD_M = 1.25; // 掷弹筒组蹲着，头顶离地
 export function PitNorthObservers(sample) {
@@ -1330,27 +1641,33 @@ export function PitNorthChecks(sample) {
   const bunds = [];
   for (const b of PN.bunds) for (let x = b.minX + 6; x <= b.maxX - 6; x += 10) {
     const z = BundZ(b, x);
-    if (DitchStation(x, z).d < 4 || GraveHeight(x, z + 2) > 0 || GraveHeight(x, z - 2) > 0) continue;
+    if (DitchStation(x, z).d < (PN.ditch.topW / 2) * 1.3 + 2 || GraveHeight(x, z + 2) > 0 || GraveHeight(x, z - 2) > 0) continue;
+    if (OLD_LINES.some((line) => DistanceToPolyline(x, z, line) < 5)) continue;   // 2026-10-24：旧阵地的沟从田埂边上过
     bunds.push({ id: b.id, x, h: R2(sample(x, z) - (sample(x, z - 2) + sample(x, z + 2)) / 2) });
   }
   // 干水沟：沿沟每 3 m（尽头渐浅段不算）量深 = 两沿外 2.6 m 的地面平均 − 沟底
   const ditchRows = [];
   const tops = [];
+  const rimOff = PN.ditch.topW / 2 * (1 + (PN.ditch.bankWobble || 0)) + PN.ditch.lipW + 0.4;   // 两岸翻土外面的地面
   for (let d = 2; d <= DITCH_LEN - PN.ditch.endTaperM - 1; d += 3) {
-    const c = PointBeside(PN.ditch.line, d, 0), l = PointBeside(PN.ditch.line, d, 2.6), r = PointBeside(PN.ditch.line, d, -2.6);
+    const c = PointBeside(PN.ditch.line, d, 0), l = PointBeside(PN.ditch.line, d, rimOff), r = PointBeside(PN.ditch.line, d, -rimOff);
     if (Math.abs(ScarpZ(c.x) - c.z) < PN.scarp.notchR + 8) continue;   // 豁口那一截是斜的
     if (DistanceToPolyline(c.x, c.z, L0105_NORTH_ROAD) < L0105_NORTH_ROAD_HALF_W + 6) continue;   // 大路从沟上过，那一截填平了
     const floor = sample(c.x, c.z);
     tops.push(R2((sample(l.x, l.z) + sample(r.x, r.z)) / 2 - floor));
     ditchRows.push({ x: c.x, z: c.z, eye: PIT_NORTH_DITCH_HEAD_M });
   }
-  // 地坎：坎线南 6 m 与北 6 m 的地面差（离豁口 10 m 以外，每 10 m）
+  // 地坎：坎线南 9.5 m（旧阵地的沟在坎线南 4–8 m，量它后面）与北 6 m 的地面差（离豁口 10 m 以外，每 10 m；旧沟 / 掩体 / 坑窝的地方不算）
   const drops = [];
   for (let x = L0105_BOUNDS.minX + 5; x <= L0105_BOUNDS.maxX - 5; x += 10) {
     const z = ScarpZ(x);
-    if (DitchStation(x, z).d < 10) continue;
+    if (DitchStation(x, z).d < 14) continue;
     if (DistanceToPolyline(x, z, L0105_NORTH_ROAD) < 12 || DistanceToPolyline(x, z, L0105_FIELD_PATH) < 8) continue;   // 路穿过处是坡道
-    drops.push(R2(sample(x, z + 6) - sample(x, z - 6) - (PitNorthRoll(x, z + 6) - PitNorthRoll(x, z - 6))));
+    if (Math.hypot(x - SAP_NOTCH.x, z - SAP_NOTCH.z) < SAP_NOTCH.r + 6) continue;   // 旧交通沟穿过处是窄豁口（2026-10-24）
+    const south = { x, z: z + 9.5 }, north = { x, z: z - 6 };
+    if (OLD_LINES.some((line) => DistanceToPolyline(south.x, south.z, line) < 3.5 || DistanceToPolyline(north.x, north.z, line) < 3.5)) continue;
+    if (OLD.mgNests.some((n) => Math.abs(n.x - x) < 3) || Math.abs(OLD.shelter.x - x) < 5) continue;
+    drops.push(R2(sample(south.x, south.z) - sample(north.x, north.z) - (PitNorthRoll(south.x, south.z) - PitNorthRoll(north.x, north.z))));
   }
   // 豁口：顺着沟走，1 m 内最大高差
   let notchStep = 0;
@@ -1367,8 +1684,8 @@ export function PitNorthChecks(sample) {
   };
   const m = P.mortar;
   const mortar = Run([[m.x - 1, m.z], [m.x + 1.2, m.z - 0.6], [m.x, m.z], [m.x + 0.8, m.z + 0.9]].map(([x, z]) => ({ x, z, eye: PIT_NORTH_MORTAR_HEAD_M })));
-  // 烟：要「看得见」，取最容易被挡的那一对（block 最大）
-  const smokeRows = Run([{ x: m.x, z: m.z + 2, eye: 3.0 }]);
+  // 烟：要「看得见」，取最容易被挡的那一对（block 最大）。2026-10-24：烟从旧交通沟东边的地面上冒（mortarSmoke），不在沟底
+  const smokeRows = Run([{ x: P.mortarSmoke.x, z: P.mortarSmoke.z, eye: 3.0 }]);
   const smoke = { worst: R2(Math.max(...smokeRows.rows.map((r) => r.block))) };
   const ditch = Run(ditchRows);
   const fireA = { x: P.fireA.x, z: P.fireA.z, eyeY: obs.pitEyeY };
@@ -1471,7 +1788,7 @@ export function L0105Landmarks(sample, blocks, bridgeDeckTop) {
     L("LmFireB", P.fireB.name, "place", P.fireB.x, P.fireB.z, { radiusM: 0.8, note: "朝东挡沟里清过来的" }),
     L("LmFireC", P.fireC.name, "pit", P.fireC.x, P.fireC.z, { ...Size(P.fireC.radiusM * 2, P.fireC.radiusM * 2, P.fireC.depth), y: PitY(P.fireC, P.fireC.depth), note: "朝西北护侧翼" }),
     L("LmParapet", P.parapet.name, "prop", par.x, par.z, { ...Size(par.w, par.d, par.h), note: "03-4 战车一炮打塌中间一截" }),
-    L("LmFrontWestFold", "前沿沟西头北折", "area", front[0].x, (front[0].z + front[1].z) / 2, { w: L0105_TRENCH_SECTION.front.floorW, d: R2(front[1].z - front[0].z), note: "西段守军顺沟撤到沟口" }),
+    L("LmFrontWestFold", "前沿沟西头北折", "area", front[0].x, (front[0].z + front[1].z) / 2, { w: L0105_TRENCH_SECTION.front.floorW, d: R2(Math.abs(front[1].z - front[0].z)), note: "西段守军顺沟撤到沟口" }),
     L("LmCorner1", P.corner1.name, "place", P.corner1.x, P.corner1.z, { radiusM: 1.5, note: "04 第一次回身顶" }),
     L("LmBend", P.bend.name, "place", P.bend.x, P.bend.z, { radiusM: 1.5, note: "04 第二次回身" }),
     // 03 坑北：孤坟、坟地、麦秸垛、干水沟、地坎、掷弹筒、五道田埂、战车露头
@@ -1481,11 +1798,34 @@ export function L0105Landmarks(sample, blocks, bridgeDeckTop) {
     L("LmDitchMid", "干水沟（深 1.2 m）", "place", ditchMid.x, ditchMid.z, { radiusM: 2, note: "弯着腰走，坑里看不见头" }),
     L("LmDitchEnd", "干水沟尽头", "place", emerge.x, emerge.z, { radiusM: 3, note: "03 沟里那个班从这出沟" }),
     L("LmScarp", "地坎（北低 2 m）", "place", 16, ScarpZ(16), { radiusM: 4, note: "03 人从坎后那片低地翻上来" }),
-    L("LmMortar", P.mortar.name, "place", P.mortar.x, P.mortar.z, { radiusM: 2, note: "坑里只看得见发射的烟" }),
+    L("LmMortar", P.mortar.name, "place", P.mortar.x, P.mortar.z, { radiusM: 2, note: "蹲在旧交通沟里（坎下），坑里只看得见发射的烟" }),
     ...PN.bunds.map((b) => L(`LmBund${b.id}`, `田埂 ${b.id}（离坑约 ${Math.round(Math.abs(BundZ(b, bundLabelX) - P.pit.z) / 5) * 5} m）`, "place", bundLabelX, BundZ(b, bundLabelX), { radiusM: 1, note: "03 跃进扑在埂后" })),
-    L("LmTankSeen", P.tankFirstSeen.name, "place", P.tankFirstSeen.x, P.tankFirstSeen.z, { radiusM: 4, note: "03-4 战车从这条路露头" }),
+    L("LmTankSeen", P.tankFirstSeen.name, "place", P.tankFirstSeen.x, P.tankFirstSeen.z, { radiusM: 6, note: "03-4 三辆九四式轻装甲车从东边麦田冒出来" }),
+    // 2026-10-24 第六版：三段前沿、第二条交通沟、龛、排长掩蔽部、预备队、连弹药所、连指挥所、旧阵地、林、驿道岔口、05 的 B / C 车
+    L("LmFrontWest", "前沿西段（西邻班）", "area", (FRONT_W_MID.x), FRONT_W_MID.z, { w: 42, d: 6, note: "整体往南错 8 m，浅连沟通本班" }),
+    L("LmFrontEast", "前沿东段（东邻班）", "area", FRONT_E_MID.x, FRONT_E_MID.z, { w: 54, d: 6, note: "01 前已丢，03 从这经浅沟清过来" }),
+    L("LmTraffic2", "第二条交通沟（西邻班）", "place", L0105_TRENCHES.traffic2[2].x, L0105_TRENCHES.traffic2[2].z, { radiusM: 2, note: "西邻班的退路，通坡后预备队；01–05 的戏不走它" }),
+    L("LmPlatoonShelter", P.platoonShelter.name, "pit", P.platoonShelter.x, P.platoonShelter.z, { ...Size(P.platoonShelter.w, P.platoonShelter.d, P.platoonShelter.floorDepth), y: PitY(P.platoonShelter, P.platoonShelter.floorDepth), note: "交通沟东壁上，从沟里进；里头一部野战电话" }),
+    L("LmReserve", P.reserve.name, "area", P.reserve.x, P.reserve.z, { radiusM: 6, note: "坡后几个浅坑 + 土袋" }),
+    L("LmCompanyAmmo", P.companyAmmo.name, "prop", P.companyAmmo.x, P.companyAmmo.z, { ...Size(3.2, 2.0, 1.1), note: "坡后、路口边，箱子盖着苫布" }),
+    L("LmCompanyPost", P.companyPost.name, "place", P.companyPost.x, P.companyPost.z, { radiusM: 3, note: "干沟里，不加体块（人多）" }),
+    ...L0105_NICHE_SHAPES.filter((n) => n.kind !== "litter").map((n) => L(`Lm${n.id}`, n.kind === "ammo" ? "弹药龛" : "手榴弹龛", "prop", n.x, n.z, { ...Size(n.hu * 2, (n.hv - 0.2) * 2, 0.9), ry: R2(Math.atan2(-n.uz, n.ux)), y: R2(n.floorY + 0.45), note: n.kind === "ammo" ? "沟后壁，两三个弹药箱" : "跟弹药龛隔开 ≥ 3 m" })),
+    L("LmLitterNiches", "让担架的龛（主交通沟）", "place", L0105_NICHE_SHAPES.find((n) => n.id === "LitterNiche_05").x, L0105_NICHE_SHAPES.find((n) => n.id === "LitterNiche_05").z, { radiusM: 1.2, note: "板桥以北每隔约 10 m 一个，沟壁凹进 0.75 m" }),
+    L("LmOldLine", "原来的阵地（放弃了）", "area", 0, OLD_LINE_Z, { w: 200, d: 14, note: "沿地坎南沿三段旧沟、空机枪掩体、掩蔽部；东边鬼子一迂回就放弃了" }),
+    L("LmOldShelter", "旧掩蔽部（顶塌了半边）", "pit", OLD.shelter.x, OLD.shelter.z, { ...Size(OLD.shelter.w, OLD.shelter.d, OLD.shelter.floorDepth), y: PitY(OLD.shelter, OLD.shelter.floorDepth) }),
+    ...OLD.mgNests.map((n, i) => L(`LmOldMgNest${i + 1}`, "空机枪掩体", "pit", n.x, n.z, { ...Size(OLD.mgNest.w, OLD.mgNest.d, OLD.mgNest.depth), y: PitY(n, OLD.mgNest.depth) })),
+    L("LmOldComm", "撤下来走的旧交通沟", "place", OLD.comm[2].x, OLD.comm[2].z, { radiusM: 2, note: "浅 0.9 m，塌了几截" }),
+    L("LmOldSap", "通警戒阵地的旧交通沟", "place", OLD.sap[6].x, OLD.sap[6].z, { radiusM: 2, note: "穿地坎往北，03 掷弹筒组蹲在坎下那一截" }),
+    L("LmOutposts", "警戒阵地（早撤了）", "area", 20, -448, { w: 150, d: 30, note: "两段短沟 + 几个空散兵坑" }),
+    ...L0105_WOODS.map((w) => L(`Lm${w.id}`, w.name, "area", w.x, w.z, { w: w.w, d: w.d, note: `家族坟地：${w.graves.length} 座坟、${w.cypresses.length} 棵柏树` })),
+    L("LmRoadFork", "驿道 / 车道岔口", "place", L0105_ROAD[0].x, L0105_ROAD[0].z, { radiusM: 4, note: "老驿道北通界河、南到耿家庄东头；车道往西南过板桥" }),
+    L("LmTankBStop", "B 车停的沟沿", "place", L0105_TANKETTES.bStop.x, L0105_TANKETTES.bStop.z, { radiusM: 3, note: "05：过不了交通沟，停在沟沿上打坡顶" }),
+    L("LmTankCStall", "C 车抛锚的地方", "place", L0105_TANKETTES.cStall.x, L0105_TANKETTES.cStall.z, { radiusM: 3, note: "05：半路熄火，两个乘员拿车上的机枪就地打" }),
   ];
 }
+const FRONT_W_MID = PointAlong(L0105_TRENCHES.front, FrontStationAtX(-49));
+const FRONT_E_MID = PointAlong(L0105_TRENCHES.front, FrontStationAtX(71));
+const OLD_LINE_Z = R2(ScarpZ(0) + 5);
 
 /** 生成场景文档。commit / generatedAt 由 CLI 传进来；notes 收抽样核对行（CLI 打到控制台）。 */
 export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", notes = [] } = {}) {
@@ -1560,14 +1900,18 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
     const bdShapes = {}; for (const sh of backdrop.shapes) bdShapes[sh.kind] = (bdShapes[sh.kind] || 0) + 1;
     const rects = backdrop.paint.find((p) => p.rects)?.rects || [];
     notes.push(`坑北第三版：涂色 ${paint.length} 项（场地里窄条田 ${fieldStrips.length} 条，宽 ${R2(Math.min(...widths))}…${R2(Math.max(...widths))} m，按颜色 ${Object.entries(kinds).map(([c, n]) => `${c}×${n}`).join(" ")}）；`
-      + `散坟 ${L0105_FIELD_GRAVES.length} 座；田里零星的树 ${count(/^FieldTree_/)}（不沿路种）；`
+      + `散坟 ${L0105_FIELD_GRAVES.length} 座（坑南另 ${L0105_SOUTH_GRAVES.length} 座）；林 ${L0105_WOODS.length} 片（柏树 ${count(/_Cypress\d/)}）；田里零星的树 ${count(/^FieldTree_/)} + 坑南 ${count(/^SouthTree_/)}（不沿路种）；`
+      + `片的朝向 ${[...new Set(farm.groups.filter((g) => g.poly && !g.whole && g.x1 > -110 && g.x0 < 320 && g.row <= 4).map((g) => g.shearDeg))].length} 种；`
+      + `龛：弹药 ${facts.ammoNiches}、手榴弹 ${facts.grenadeNiches}、让担架 ${facts.litterNiches}；旧阵地射击沟 ${OLD.fire.length} 段、警戒沟 ${OLD.outposts.length} 段；`
       + `地面：坑沿 (0,−11) ${R2(sample(0, -11))} · 坎上 (28,−190) ${R2(sample(28, -190))} · 坎下 (28,−213) ${R2(sample(28, -213))} · (30,−260) ${R2(sample(30, -260))} · (30,−340) ${R2(sample(30, -340))} · 北边界 (30,−480) ${R2(sample(30, -480))}；`
       + `色带 ${southMinM}…${southMaxM}（钉在南面；全场 ${minM}…${maxM}）`);
     notes.push(`远景层：地面高 ${backdrop.ground.y} m、铺出去 ${backdrop.ground.radiusM} m、远裁剪 ${backdrop.far} m；田块 ${rects.length} 块；体块 ${Object.entries(bdShapes).map(([k, n]) => `${k}×${n}`).join(" ")}；`
       + `村子 ${L0105_BACKDROP_VILLAGES.map((v) => `${v.id} (${v.x},${v.z}) 离坑 ${Math.round(Math.hypot(v.x - P.pit.x, v.z - P.pit.z))} m`).join("、")}`);
   }
+  const FW = (x) => { const p = FrontPointAtX(x); return [p.x, p.z]; };
   const widths = [
-    ["前沿沟 x−30", -30.5, 0, 0, 1], ["前沿沟 x60", 56, 0, 0.5, 1], ["前沿沟西折", -62, -12, 1, 0],
+    ["前沿西段 x−50", ...FW(-50), 0, 1], ["前沿中段 x−9", ...FW(-9), 0, 1], ["前沿中段 x16", ...FW(16), 0, 1], ["前沿东段 x62", ...FW(62), 0, 1], ["前沿西折", -70, 0, 1, 0],
+    ["浅连沟（东）", ...FW(37), 0.6, 1], ["第二条交通沟", -47, 30, 5, 1],
     ["交通沟南直段", 12.5, 32, 23, 1], ["交通沟斜段", 26, 76.6, 42, -18], ["交通沟坡顶", 35, 128, 1, 0], ["交通沟板桥下", 35, 116.5, 1, 0], ["支沟中段", 42, 65.8, 2.6, 41.1],
   ].map(([name, x, z, nx, nz]) => { const r = FloorWidthAt(sample, x, z, nx, nz); return `${name} ${r.width}（深 ${r.depth}）`; });
   notes.push(`沟底宽（开挖深度离最深处 5 cm 内，网格插值后）：${widths.join(" · ")}；名义 floorW ${FloorWFor(S.traffic.floorW)}（最窄 ≥ ${S.traffic.floorW}），爬沟 ${S.crawlSap.floorW}`);
@@ -1591,9 +1935,10 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
       generatedAt,
       commit,
       notes: `01–05 新剧本白盒：锚点 Data_EditorBlockoutFirstLevel0105Space；高度 ${L0105_CELL_M} m 网格（${minM}…${maxM} m）；`
-        + "壕沟 = Script_TrenchPlan.CompileTrenchNetwork（前沿两段 + 交通 + 支沟 + 爬沟；交通沟板桥下加深、坡顶变浅、坡道下到干沟靠改基准面；支沟弃土只堆南沿成土垄）；"
-        + "集结处 = 坡后干沟（沟底 −1.0、两岸 2.5 m 陡坎、南岸坎顶一道 0.6–0.8 m 矮土埂、南岸枯树、东南头接凹路）；坑 / 散兵坑 / 洞为平底开挖；沟里日常摆件；路口板桥（白盒先做，剧本这一拍待拍板）；"
-        + "gates：DugoutCollapsed / PitShelled / TankDisabled（桥面两块门板压断）。",
+        + "壕沟 = Script_TrenchPlan.CompileTrenchNetwork（2026-10-24 第六版：前沿三段 + 两条浅连沟 + 射击位，主交通沟 + 第二条交通沟 + 支沟 + 爬沟，北边旧阵地的三段射击沟 / 两条旧交通沟 / 两段警戒沟；"
+        + "交通沟板桥下加深、坡顶变浅、坡道下到干沟靠改基准面；支沟弃土只堆南沿成土垄；沟壁上有弹药 / 手榴弹 / 让担架的龛）；"
+        + "集结处 = 坡后干沟（沟底 −1.0、两岸 2.5 m 陡坎、南岸坎顶一道 0.6–0.8 m 矮土埂、南岸枯树、东南头接凹路）；坑 / 散兵坑 / 洞 / 排长掩蔽部为平底开挖；沟里日常摆件；路口板桥（白盒先做，剧本这一拍待拍板）；"
+        + "gates：DugoutCollapsed / PitShelled（掷弹筒弹打塌一截胸墙）/ TankDisabled（A 车瘫在桥头，桥面两块门板压断）。",
     },
     bounds: { ...L0105_BOUNDS },
     spawn: { x: L0105_SPAWN.x, z: L0105_SPAWN.z, yawDeg: L0105_SPAWN.yawDeg },
@@ -1610,8 +1955,9 @@ export async function BuildFirstLevel0105Scene({ commit = "", generatedAt = "", 
     // 2026-10-20：地标（§2.2 landmarks，编辑器「地标」开关）：洞、支沟、三处回身打的掩体、板桥、坑与三个射位、坑北的坟 / 垛 / 沟 / 坎 / 田埂
     landmarks,
     ways: {
-      roads: [Pts(L0105_ROAD), Pts(L0105_SUNKEN_LANE.line), Pts(L0105_NORTH_ROAD), Pts(L0105_FIELD_PATH)],
-      trenches: [Pts(L0105_TRENCHES.front), Pts(L0105_TRENCHES.traffic), Pts(L0105_TRENCHES.branch), Pts(L0105_TRENCHES.crawlSap)],
+      roads: [Pts(L0105_ROAD), Pts(L0105_SUNKEN_LANE.line), Pts(L0105_NORTH_ROAD), Pts(L0105_FIELD_PATH), Pts(L0105_POST_ROAD_SOUTH), ...L0105_FIELD_LANES.map(Pts)],
+      trenches: [Pts(L0105_TRENCHES.front), Pts(L0105_TRENCHES.traffic), Pts(L0105_TRENCHES.traffic2), Pts(L0105_TRENCHES.branch), Pts(L0105_TRENCHES.crawlSap),
+        ...OLD.fire.map((f) => Pts(f.line)), Pts(OLD.comm), Pts(OLD.sap), ...OLD.outposts.map((f) => Pts(f.line))],
     },
   };
   return scene;

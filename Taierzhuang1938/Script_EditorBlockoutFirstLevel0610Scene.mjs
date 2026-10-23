@@ -31,6 +31,10 @@ import {
   L0610_STREETS, L0610_GENG, L0610_JIEFANG, L0610_BENJIA, L0610_YARDS, L0610_RUBBLE, L0610_SOUTH_LANE, L0610_EAST_STREET, L0610_ROUTE, L0610_TREES,
   L0610_EAST_ROAD, L0610_PROP_KINDS, L0610_PROPS, L0610_COLLAPSED_HOUSES, L0610_SIGNALS, L0610_PLACES, L0610_SPAWN, L0610_FROM_0105, L0610_MOUTH_SHOOTERS,
   L0610_FALLEN_WALLS, L0610_EAST_YARD_ROUTE, LineLength, Station, LanePointAtZ,
+  // 第八版
+  L0610_LANE_SIDE, L0610_ROADS, L0610_FOOTPATHS, L0610_FIELD_ZONES, L0610_FIELDS, L0610_FIELD_RIDGE, L0610_GROVES, L0610_FIELD_GRAVES, L0610_FIELD_TREES, L0610_EDGE_CLUMPS,
+  L0610_THRESHING, L0610_OUTER_GARDENS, L0610_OUTER_POND, L0610_OUTER_DUNG, L0610_FARMSTEADS, L0610_WELLS, L0610_FIELD_SHRINE, L0610_WATCHTOWER, L0610_TEMPLE, L0610_SHOP, L0610_TOILET,
+  L0610_LANE_PATHS, L0610_LOCKED_YARDS, L0610_YARD_POSE, L0610_DROPPED_YARDS, L0610_NAMED_TOILETS, RiverAtZ, Hash01, PointInPoly, PathNearest, YardPose, YardToWorld, YardCorners, ToiletFor, YardGateWorld,
 } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 
 export { SightBlock, L0610_MOUTH_SHOOTERS };
@@ -137,18 +141,32 @@ function DitchCap(h, x, z) {
   return Lerp(floor, h, Smooth((dz - DITCH_HALF) / wallM));
 }
 
-// 河汊子
+// 河汊子（第八版：弯河）。横断面照旧：到中线折线的距离 d ≤ 本段半宽 → 沟底；再往外 wallM 陡起；岸上一道土埂。凸岸泥滩、苇子洼、西来小沟另算。
 const RV = L0610_RIVER;
 export const RIVER_FLOOR_Y = R2(H.plain - RV.depth + 0.3);
-export const RIVER_EAST_RIM_X = RV.centerX + RV.floorW / 2 + RV.wallM;
-const RIVER_BOX = Object.freeze({ minX: RV.centerX - RV.floorW / 2, maxX: RV.centerX + RV.floorW / 2, minZ: RV.fromZ, maxZ: RV.toZ + 50 });
+export const RIVER_EAST_RIM_X = RV.centerX + RV.floorW / 2 + RV.wallM;   // 接缝 / 路沟那一段的东坎沿（40）
 function EastBankFactor(z) {
   const off = RV.eastBankOff;
   if (!off) return 1;
   return 1 - Smooth((z - off.fromZ) / off.fadeM) * (1 - Smooth((z - off.toZ) / off.fadeM));
 }
+/** 到河中线折线的距离与本段半宽（半宽沿折线线性插）。 */
+export function RiverNearest(x, z) {
+  const line = RV.line, hw = RV.halfW;
+  let best = { dist: Infinity, halfW: hw[0], side: 1, t: 0, seg: 0 };
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i - 1], b = line[i];
+    const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
+    const t = Clamp01(((x - a.x) * dx + (z - a.z) * dz) / (len * len));
+    const px = a.x + dx * t, pz = a.z + dz * t;
+    const d = Math.hypot(x - px, z - pz);
+    if (d < best.dist) best = { dist: d, halfW: hw[i - 1] + (hw[i] - hw[i - 1]) * t, side: Math.sign((x - px) * dz - (z - pz) * dx) || 1, t, seg: i - 1 };
+  }
+  return best;
+}
 function RiverCarve(h, x, z) {
-  const sdf = RectSdf(x, z, RIVER_BOX);
+  const n = RiverNearest(x, z);
+  const sdf = n.dist - n.halfW;
   if (sdf >= RV.wallM + RV.bankW) return h;
   const fade = Smooth((z - RV.fromZ + RV.wallM) / RV.endM);
   if (sdf < RV.wallM) {
@@ -156,8 +174,174 @@ function RiverCarve(h, x, z) {
     return Math.min(h, Lerp(h, Lerp(h, RIVER_FLOOR_Y, fade), k));
   }
   const u = (sdf - RV.wallM) / RV.bankW;
-  const bank = x > RV.centerX ? EastBankFactor(z) : 1;
+  const bank = x > RiverAtZ(z).x ? EastBankFactor(z) : 1;
   return h + RV.bankH * Math.sin(u * Math.PI) * fade * bank;
+}
+/** 凸岸泥滩：每个弯的内侧一片椭圆，壁换成缓坡到 −1.4（水面上头 0.3，烂泥）。 */
+function MudFlats(h, x, z) {
+  const M = RV.mud;
+  for (const b of RV.bends) {
+    const r = RiverAtZ(b.z);
+    const cx = b.x + b.side * (r.halfW + 2.0);
+    const e = Math.hypot((x - cx) / M.rx, (z - b.z) / M.rz);
+    if (e >= 1 + M.fadeM / M.rx) continue;
+    const k = e <= 1 ? 1 : 1 - Smooth((e - 1) * M.rx / M.fadeM);
+    h = Math.min(h, Lerp(h, M.y, k));
+  }
+  return h;
+}
+/** 苇子洼：河弯离开庄子西墙那一段（z 380…464），河东坎沿到墙根 x 39.75 之间烂泥 −0.9；贴墙那 0.35 m 抬回来（墙脚不悬空）。 */
+function MarshCarve(h, x, z) {
+  const M = RV.marsh;
+  if (x >= M.eastX || z < M.fromZ || z > M.toZ + M.fadeOutM) return h;
+  const r = RiverAtZ(z);
+  if (x < r.x) return h;
+  const wz = Smooth((z - M.fromZ) / M.fadeInM) * (1 - Smooth((z - M.toZ) / M.fadeOutM));
+  const wx = 1 - Smooth((x - (M.eastX - M.edgeFadeM)) / M.edgeFadeM);
+  const w = wz * wx;
+  return w > 0 ? Math.min(h, Lerp(h, M.floorY, w)) : h;
+}
+/** 西来小沟：河西一条 2.5 m 宽、−1.3 深的小沟汇进河汊子。 */
+function TributaryCarve(h, x, z) {
+  const T = RV.tributary;
+  const n = NearestOnLine(T.line, x, z);
+  const sdf = n.dist - T.halfW;
+  if (sdf >= T.wallM) return h;
+  const k = sdf <= 0 ? 1 : 1 - Smooth(sdf / T.wallM);
+  return Math.min(h, Lerp(h, T.floorY, k));
+}
+
+// 凹路两边土坎高低不一（第八版）：离路中线 innerM…outerM 这一带，东 / 西各加一点、沿 z 起伏
+function LaneSideBanks(x, z) {
+  const B = LANE.banks;
+  if (z < B.fromZ - 10 || z > B.toZ + 10) return 0;
+  const n = NearestOnLine(LANE.line, x, z);
+  if (n.dist < B.innerM - 1 || n.dist > B.outerM + 4) return 0;
+  const ring = Smooth((n.dist - (B.innerM - 1)) / 2) * (1 - Smooth((n.dist - B.outerM) / 4));
+  const span = Smooth((z - B.fromZ) / 10) * (1 - Smooth((z - B.toZ) / 10));   // z ≤ 205 是 0105 的地面，不碰
+  const east = x > LanePointAtZ(Math.max(LANE.line[0].z, Math.min(z, LANE.line[LANE.line.length - 1].z))).x;
+  const s = east ? B.east : B.west;
+  return (s.base + s.amp * Math.sin(z / s.periodM * Math.PI * 2 + (east ? 0.4 : 2.1))) * ring * span;
+}
+
+// 第八版的路：老驿道 / 往东邻庄的大道（压低 0.12–0.15）、田间小路（压低 0.08）
+function RoadsDelta(x, z) {
+  let d = 0;
+  if (z < NORTH_SPLIT_Z) return 0;   // z < 205 是 0105 的地面（驿道北头那一截要 0105 自己烘）
+  const fadeN = Smooth((z - NORTH_SPLIT_Z) / 6);
+  for (const r of L0610_ROADS) {
+    const o = Math.max(NearestOnLine(r.line, x, z).dist - r.halfW, 0);
+    if (o < 0.9) d = Math.min(d, -r.lowerM * (1 - Smooth((o + 0.3) / 0.6)));
+  }
+  for (const p of L0610_FOOTPATHS) {
+    const o = Math.max(NearestOnLine(p.line, x, z).dist - p.halfW, 0);
+    if (o < 0.6) d = Math.min(d, -0.08 * (1 - Smooth((o + 0.2) / 0.4)));
+  }
+  return d * fadeN;
+}
+/** 离任何一条路（凹路 / 东北道 / 驿道 / 东邻庄大道 / 田间小路）的净距（到路边）。 */
+export function DistanceToAnyRoad(x, z) {
+  let best = Math.max(NearestOnLine(LANE.line, x, z).dist - LANE.floorW / 2 - LANE.wallM, 0);
+  best = Math.min(best, Math.max(NearestOnLine(ER.line, x, z).dist - ER.halfW, 0));
+  for (const r of L0610_ROADS) best = Math.min(best, Math.max(NearestOnLine(r.line, x, z).dist - r.halfW, 0));
+  for (const p of L0610_FOOTPATHS) best = Math.min(best, Math.max(NearestOnLine(p.line, x, z).dist - p.halfW, 0));
+  return best;
+}
+
+// 田（第八版）：拼块里按条；田埂烘进高度场（条与条之间、块的四边）。路、河、林、场院、菜园、独院、坑、庄子跟前不烘。
+const FIELD_PIECES = L0610_FIELDS.map((p) => ({ ...p, c: Math.cos(p.angleDeg * Math.PI / 180), s: Math.sin(p.angleDeg * Math.PI / 180), zone: L0610_FIELD_ZONES.find((zn) => zn.id === p.zone) }));
+/** (x,z) 落在哪块田的哪条上：{ piece, u, v, strip }（先到的块算数；在区域多边形外不算）。 */
+export function FieldAt(x, z) {
+  for (const p of FIELD_PIECES) {
+    const dx = x - p.x, dz = z - p.z;
+    const u = dx * p.c - dz * p.s, v = dx * p.s + dz * p.c;   // 同块的 ry：块转 angle（俯视逆时针）
+    if (Math.abs(u) > p.w / 2 || Math.abs(v) > p.d / 2) continue;
+    if (!PointInPoly(x, z, p.zone.poly)) return null;
+    const strip = p.strips.find((st) => u >= st.from && u < st.to) || p.strips[p.strips.length - 1];
+    return { piece: p, u, v, strip };
+  }
+  return null;
+}
+const RIDGE_MASK = Object.freeze([
+  ...L0610_GROVES.map((g) => ({ x: g.x, z: g.z, r: Math.hypot(g.w, g.d) / 2 + 2 })),
+  ...L0610_THRESHING.map((t) => ({ x: t.x, z: t.z, r: Math.hypot(t.w, t.d) / 2 + 2 })),
+  ...L0610_OUTER_GARDENS.map((g) => ({ x: g.x, z: g.z, r: Math.hypot(g.w, g.d) / 2 + 2 })),
+  ...L0610_FARMSTEADS.map((f) => ({ x: f.x, z: f.z, r: Math.hypot(f.w, f.d) / 2 + 3 })),
+  { x: L0610_OUTER_POND.x, z: L0610_OUTER_POND.z, r: Math.max(L0610_OUTER_POND.rx, L0610_OUTER_POND.rz) + 3 },
+  { x: L0610_FIELD_SHRINE.x, z: L0610_FIELD_SHRINE.z, r: 7 },
+  ...L0610_WELLS.map((w) => ({ x: w.x, z: w.z, r: 3 })),
+]);
+function FieldMaskOk(x, z) {
+  if (z > 547) return false;   // 接缝 z 556 两边的地面要跟 1218 逐点一样（1218 的地面没有田埂）
+  if (RectOutside(x, z, V.box) < 12) return false;
+  if (DistanceToAnyRoad(x, z) < 1.2) return false;
+  if (Math.abs(z - DT.z) < DT.floorW / 2 + DT.rampWallM + 2 && x >= DT.fromX - 4 && x <= DT.toX + 6) return false;
+  const rn = RiverNearest(x, z);
+  if (rn.dist < rn.halfW + RV.wallM + RV.bankW + 1.5) return false;
+  if (NearestOnLine(RV.tributary.line, x, z).dist < RV.tributary.halfW + RV.tributary.wallM + 1.5) return false;
+  if (x < RV.marsh.eastX + 2 && z > RV.marsh.fromZ - 3 && z < RV.marsh.toZ + 8 && x > 15) return false;
+  for (const m of RIDGE_MASK) if (Math.hypot(x - m.x, z - m.z) < m.r) return false;
+  return true;
+}
+function FieldRidge(x, z) {
+  const f = FieldAt(x, z);
+  if (!f || !FieldMaskOk(x, z)) return 0;
+  const R = L0610_FIELD_RIDGE, p = f.piece;
+  let d = Math.min(Math.abs(f.u - f.strip.from), Math.abs(f.strip.to - f.u), p.d / 2 - Math.abs(f.v));
+  if (d >= R.halfW) return 0;
+  return R.h * (1 - Smooth(d / R.halfW));
+}
+
+// 林里的坟头、田里的单坟、坎上的坟：圆包
+const ALL_GRAVES = (() => {
+  const out = [];
+  for (const g of L0610_GROVES) {
+    const c = Math.cos(g.ry), s = Math.sin(g.ry);
+    for (const [lx, lz, r, h] of g.graves) out.push({ x: g.x + lx * c + lz * s, z: g.z - lx * s + lz * c, r, h });
+  }
+  for (const g of L0610_FIELD_GRAVES) out.push({ x: g.x, z: g.z, r: g.r, h: g.h });
+  for (const g of L0610_LANE_SIDE.graves) out.push({ x: g.x, z: g.z, r: g.r, h: g.h });
+  return out;
+})();
+function GraveBumps(x, z) {
+  let dh = 0;
+  for (const g of ER.graves || []) {
+    const r = Math.hypot(x - g.x, z - g.z);
+    if (r < g.r) dh += g.h * (1 - Smooth(r / g.r));
+  }
+  for (const g of ALL_GRAVES) {
+    if (Math.abs(x - g.x) > g.r || Math.abs(z - g.z) > g.r) continue;
+    const r = Math.hypot(x - g.x, z - g.z);
+    if (r < g.r) dh += g.h * (1 - Smooth(r / g.r));
+  }
+  return dh;
+}
+
+// 场院、独院：压平（转过的矩形）；庄东北的取土坑：椭圆坑
+function RotRectSdf(x, z, cx, cz, w, d, ry) {
+  const c = Math.cos(ry), s = Math.sin(ry), dx = x - cx, dz = z - cz;
+  const lx = dx * c - dz * s, lz = dx * s + dz * c;
+  const qx = Math.abs(lx) - w / 2, qz = Math.abs(lz) - d / 2;
+  return Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0);
+}
+function FlattenPads(h, x, z, base) {
+  for (const t of L0610_THRESHING) {
+    const w = 1 - Smooth(RotRectSdf(x, z, t.x, t.z, t.w, t.d, t.ry) / 2.5);
+    if (w > 0) h = Lerp(h, base(t.x, t.z), w);
+  }
+  for (const f of L0610_FARMSTEADS) {
+    const w = 1 - Smooth(RotRectSdf(x, z, f.x, f.z, f.w + 2, f.d + 2, f.ry) / 2.5);
+    if (w > 0) h = Lerp(h, base(f.x, f.z), w);
+  }
+  return h;
+}
+export const OUTER_POND_FLOOR_Y = R2(H.village - L0610_OUTER_POND.depth);
+function OuterPondCarve(h, x, z) {
+  const Pd = L0610_OUTER_POND;
+  const e = Math.hypot((x - Pd.x) / Pd.rx, (z - Pd.z) / Pd.rz);
+  if (e >= 1 + Pd.fadeM / Pd.rx) return h;
+  const k = e <= 1 ? 1 : 1 - Smooth((e - 1) * Pd.rx / Pd.fadeM);
+  return Math.min(h, Lerp(h, OUTER_POND_FLOOR_Y, k));
 }
 
 // 东北进庄的道
@@ -167,19 +351,11 @@ function EastRoadDelta(x, z) {
   if (d >= 0.9) return 0;
   return -ER.lowerM * (1 - Smooth((d + 0.3) / 0.6));
 }
-function GraveBumps(x, z) {
-  let dh = 0;
-  for (const g of ER.graves || []) {
-    const r = Math.hypot(x - g.x, z - g.z);
-    if (r < g.r) dh += g.h * (1 - Smooth(r / g.r));
-  }
-  return dh;
-}
-
 function VillageWeight(x, z) { return 1 - Smooth(RectOutside(x, z, V.box) / V.fadeM); }
 
-// 街巷压低：所有净空条 + 丁字路口
+// 街巷压低：所有净空条 + 丁字路口 + 折线胡同（第八版）
 export const STREET_RUNS = Object.freeze(Object.values(ST).filter((r) => r.axis));
+export const LANE_PATHS = Object.freeze(Object.values(L0610_LANE_PATHS));
 function StreetDelta(x, z) {
   let d = Infinity;
   for (const r of STREET_RUNS) {
@@ -188,6 +364,7 @@ function StreetDelta(x, z) {
     d = Math.min(d, Math.hypot(Math.max(Math.abs(across - r.c) - r.halfW, 0), over));
   }
   d = Math.min(d, RectSdf(x, z, ST.square.box));
+  if (RectOutside(x, z, V.box) < 1) for (const p of LANE_PATHS) { const n = PathNearest(p, x, z); d = Math.min(d, Math.max(n.dist - n.halfW, 0)); }
   if (d >= 0.9) return 0;
   return -V.streetLowerM * (1 - Smooth((d + 0.3) / 0.6));
 }
@@ -207,16 +384,27 @@ function CarveBox(h, x, z, box, floorY, wallM) {
 }
 
 export function L0610Ground() {
-  const Ground = (x, z) => {
+  const Plain = (x, z) => {   // 开挖以前的「自然地面」（村子压平、坎的高低、压平的场院 / 独院）
     let h = BaseHeight(x, z);
+    h += LaneSideBanks(x, z);
     const vw = VillageWeight(x, z);
     if (vw > 0) h = Lerp(h, V.y, vw);
+    return h;
+  };
+  const Ground = (x, z) => {
+    let h = Plain(x, z);
+    h = FlattenPads(h, x, z, Plain);
+    h += FieldRidge(x, z);
     const cap = LaneCap(x, z);
     if (cap < h) h = cap;
     const ditch = DitchCap(h, x, z);
     if (ditch < h) h = ditch;
     h = RiverCarve(h, x, z);
-    h += Math.min(StreetDelta(x, z), EastRoadDelta(x, z));
+    h = MudFlats(h, x, z);
+    h = MarshCarve(h, x, z);
+    h = TributaryCarve(h, x, z);
+    h = OuterPondCarve(h, x, z);
+    h += Math.min(StreetDelta(x, z), EastRoadDelta(x, z), RoadsDelta(x, z));
     h += GraveBumps(x, z);
     h = CarveBox(h, x, z, CELLAR_BOX, CELLAR_FLOOR_Y, CELLAR.wallM);
     h = CarveBox(h, x, z, POND_BOX, POND_FLOOR_Y, 1.6);
@@ -443,10 +631,13 @@ function YardBlocks(plan, out, gates, y, sample) {
     const id = h.id ? `House_${h.id}` : `House_${y.id}_${i + 1}`;
     if (h.hollow) {
       const lps = (h.loopholes || []).map((lp) => ({ wall: "N", x: lp.x }));
-      HollowHouse(plan, out, id, h.box, h.h, sample, { loopholes: lps, breach: h.breach ? { wall: "N", x: h.breach.x, w: h.breach.w, sillH: h.breach.sillH } : null, door: { wall: "S", x: (h.box.minX + h.box.maxX) / 2, w: V.doorW } });
+      HollowHouse(plan, out, id, h.box, h.h, sample, { loopholes: lps, breach: h.breach ? { wall: "N", x: h.breach.x, w: h.breach.w, sillH: h.breach.sillH } : null,
+        door: h.door || { wall: "S", x: (h.box.minX + h.box.maxX) / 2, w: V.doorW }, window: h.window || null });
     } else if (L0610_COLLAPSED_HOUSES.includes(id)) CollapsedHouse(out, id, h.box, h.h);
     else House(out, id, h.box, h.h);
   });
+  // 茅圈（第八版）：离院门最远又不压房子的角
+  ToiletBlocks(out, y.id, ToiletFor(y), { cx: (y.box.minX + y.box.maxX) / 2, cz: (y.box.minZ + y.box.maxZ) / 2, ry: 0, s: 1 }, sample);
   if (y.kind === "pond") {
     const p = y.pond;
     out.push(Block(`PondWater_${y.id}`, p.x, p.z, p.w - 0.6, p.d - 0.6, p.waterH, "water", { y: R2(POND_FLOOR_Y + p.waterH / 2 - 0.02), solid: false }));
@@ -673,22 +864,378 @@ function LaneWalls(plan) {
   }
 }
 
-/** 倒在胡同里的一截墙（静态）：墙上缺一截，墙板横躺在胡同里（0.25 高，跨得过），墙根一堆土（1.2 高，占半边胡同）。 */
-function FallenWallBlocks(plan, out) {
-  for (const f of L0610_FALLEN_WALLS) {
-    const len = f.to - f.from, mid = (f.from + f.to) / 2;
-    plan.Cut(f.axis, f.fixed, f.from, f.to);
-    const off1 = f.side * (T / 2 + 1.0), off2 = f.side * (T / 2 + 0.45);
-    if (f.axis === "x") {
-      out.push(Block(`${f.id}_Slab`, mid + 0.2, f.fixed + off1, len, 2.0, 0.25, WALL, { ry: 0.1, prop: "Rubble", fallen: true }));
-      out.push(Block(`${f.id}_Heap`, mid - 0.4, f.fixed + off2, len * 0.7, 0.9, 1.2, EARTH, { ry: -0.2, prop: "Rubble", rubble: true }));
-      out.push(Block(`${f.id}_Stub`, f.from - 0.3, f.fixed, 0.6, T, 1.1, WALL, { fallen: true }));
-    } else {
-      out.push(Block(`${f.id}_Slab`, f.fixed + off1, mid + 0.2, 2.0, len, 0.25, WALL, { ry: 0.1, prop: "Rubble", fallen: true }));
-      out.push(Block(`${f.id}_Heap`, f.fixed + off2, mid - 0.4, 0.9, len * 0.7, 1.2, EARTH, { ry: -0.2, prop: "Rubble", rubble: true }));
-      out.push(Block(`${f.id}_Stub`, f.fixed, f.from - 0.3, T, 0.6, 1.1, WALL, { fallen: true }));
+// ---------------------------------------------------------------------------
+// 第八版：转过的院子、折线胡同、茅圈、独院、庙 / 铺 / 炮楼 / 井 / 场院 / 菜园 / 林 / 树 / 河岸
+
+/** 转过的块：局部 (lx,lz) 以 (cx,cz) 为原点、按 ry 转；块本身也转 ry（加 extraRy）。 */
+function RBlock(id, pose, lx, lz, w, d, h, semantic, extra = {}, extraRy = 0) {
+  const p = YardToWorld(pose, lx, lz, false);
+  return Block(id, p.x, p.z, w, d, h, semantic, { ...extra, ry: R2(pose.ry + extraRy) });
+}
+/** 转过的过梁（显式 y，按门中心的地面）。 */
+function RLintel(id, pose, lx, lz, len, bottomH, topH, sample, across = false) {
+  const p = YardToWorld(pose, lx, lz, false);
+  const y = R2(sample(p.x, p.z) + (bottomH + topH) / 2);
+  return Block(id, p.x, p.z, across ? T : len, across ? len : T, topH - bottomH, WALL, { y, ry: R2(pose.ry) });
+}
+
+/**
+ * 茅圈（厕所连猪圈）：三面矮土墙 + 一个口（朝院子中间）+ 里面一个坑（矮块）。toilet：{ lx, lz }（院子局部，未缩）；pose 院子姿态（局部偏移按 s 缩）。
+ */
+function ToiletBlocks(out, yardId, toilet, pose, sample, open = null) {
+  if (!toilet) return;
+  const TL = L0610_TOILET, lx = toilet.lx * pose.s, lz = toilet.lz * pose.s;
+  let openX = Math.abs(lx) >= Math.abs(lz) ? -Math.sign(lx) : 0, openZ = openX ? 0 : -Math.sign(lz);   // 口子朝院子中间
+  if (open) { openX = open === "W" ? -1 : open === "E" ? 1 : 0; openZ = open === "N" ? -1 : open === "S" ? 1 : 0; }
+  const sides = [["N", 0, -TL.d / 2, TL.w, TL.wallT], ["S", 0, TL.d / 2, TL.w, TL.wallT], ["W", -TL.w / 2, 0, TL.wallT, TL.d], ["E", TL.w / 2, 0, TL.wallT, TL.d]];
+  for (const [name, ox, oz, w, d] of sides) {
+    const isOpen = (name === "N" && openZ < 0) || (name === "S" && openZ > 0) || (name === "W" && openX < 0) || (name === "E" && openX > 0);
+    if (isOpen) continue;
+    out.push(RBlock(`Toilet_${yardId}_${name}`, pose, lx + ox, lz + oz, w, d, TL.wallH, EARTH, { toilet: true }));
+  }
+  out.push(RBlock(`Toilet_${yardId}_Pit`, pose, lx + 0.2 * (openX ? -openX : 0), lz + 0.2 * (openZ ? -openZ : 0), 0.9, 0.9, 0.06, EARTH, { toilet: true, prop: "Pit" }));
+}
+
+/**
+ * 转过的院子的院门对着直胡同时，在胡同的墙（LaneWalls 加的那道，或死胡同的封头）上开口：门洞中心往外 2 m 这一截碰到哪道墙就在那里开 门宽 + 0.8。
+ * 院门对着折线胡同的（锁定的 / 转过的都算）由 PathLaneWalls 按 YardGateGaps 留口子。
+ */
+function CutRunWallForGate(plan, gw) {
+  const far = { x: gw.x + gw.normal.x * 3.2, z: gw.z + gw.normal.z * 3.2 };   // 门外 3.2 m 以内碰到的墙：转过的院子往里收了，门外有一小块门道
+  const Hit = (axis, fixed, from, to) => {
+    // 线段 gw→far 与这条墙线（axis x：z = fixed；axis z：x = fixed）的交点
+    const a = axis === "x" ? gw.z : gw.x, b = axis === "x" ? far.z : far.x;
+    if ((a - fixed) * (b - fixed) > 0) return null;
+    const t = Math.abs(b - a) < 1e-9 ? 0 : (fixed - a) / (b - a);
+    const along = axis === "x" ? gw.x + (far.x - gw.x) * t : gw.z + (far.z - gw.z) * t;
+    return along >= from - 0.3 && along <= to + 0.3 ? along : null;
+  };
+  for (const r of STREET_RUNS) {
+    for (const side of [-1, 1]) {
+      const fixed = r.c + side * (r.halfW + T / 2);
+      const at = Hit(r.axis, fixed, r.from, r.to);
+      if (at !== null) plan.Cut(r.axis, fixed, at - 1.15, at + 1.15);
+    }
+    for (const end of r.caps || []) {
+      const fixed = end === "from" ? r.from : r.to, axis = r.axis === "z" ? "x" : "z";
+      const at = Hit(axis, fixed, r.c - r.halfW - T / 2, r.c + r.halfW + T / 2);
+      if (at !== null) plan.Cut(axis, fixed, at - 1.15, at + 1.15);
     }
   }
+}
+/** 所有院门（世界坐标）对着折线胡同的：在那条胡同的墙上留的口子 { path, at, len, side }。 */
+function YardGateGaps() {
+  const out = [];
+  for (const y of L0610_YARDS) {
+    if (!y.gate) continue;
+    const gw = YardGateWorld(y);
+    for (const p of LANE_PATHS) {
+      const n = PathNearest(p, gw.out.x, gw.out.z);
+      if (n.dist > n.halfW + T + 2.6) continue;   // 门外 3.2 m 以内（门道）
+      const a = p.line[n.seg], b = p.line[n.seg + 1];
+      const side = Math.sign((b.x - a.x) * (gw.z - a.z) - (b.z - a.z) * (gw.x - a.x)) || 1;   // +1 = 行进方向的右手（x 东 z 南：往东走右手是南）
+      out.push({ path: p.id, at: n.at, len: y.gate.w + 0.8, side });
+    }
+  }
+  return out;
+}
+
+/** 转过的院子（第八版）：院墙四面（院门那面留洞 + 过梁 + 关着的门扇）、房子（不缩，按缩过的院子夹在里头）、菜园的矮篱、树、茅圈。 */
+function RotatedYardBlocks(out, y, pose, sample, plan) {
+  if (y.gate && plan) CutRunWallForGate(plan, YardGateWorld(y));
+  const b = y.box, hw = (b.maxX - b.minX) / 2 * pose.s, hd = (b.maxZ - b.minZ) / 2 * pose.s;
+  const wallH = y.wallH ?? V.wallH, fences = new Set(y.fences || []);
+  const g = y.gate;
+  const gateOn = g ? g.wall : null;
+  const gl = g ? (g.wall === "N" || g.wall === "S" ? (g.c - (b.minX + b.maxX) / 2) * pose.s : (g.c - (b.minZ + b.maxZ) / 2) * pose.s) : 0;
+  for (const side of ["N", "S", "W", "E"]) {
+    const horizontal = side === "N" || side === "S";
+    const fixed = side === "N" ? -hd : side === "S" ? hd : side === "W" ? -hw : hw;
+    const half = horizontal ? hw : hd;
+    if (fences.has(side)) {
+      out.push(horizontal ? RBlock(`Fence_${y.id}_${side}`, pose, 0, fixed, half * 2, 0.3, V.fenceH, EARTH, { fence: true }) : RBlock(`Fence_${y.id}_${side}`, pose, fixed, 0, 0.3, half * 2, V.fenceH, EARTH, { fence: true }));
+      continue;
+    }
+    if (gateOn === side) {
+      const a0 = -half, a1 = gl - g.w / 2, b0 = gl + g.w / 2, b1 = half;
+      const seg = (tag, from, to) => {
+        if (to - from < 0.05) return;
+        const mid = (from + to) / 2, len = to - from;
+        out.push(horizontal ? RBlock(`Wall_${y.id}_${side}${tag}`, pose, mid, fixed, len, T, wallH, WALL) : RBlock(`Wall_${y.id}_${side}${tag}`, pose, fixed, mid, T, len, wallH, WALL));
+      };
+      seg("a", a0, a1); seg("b", b0, b1);
+      out.push(horizontal ? RLintel(`Gate_${y.id}_Lintel`, pose, gl, fixed, g.w, V.doorTopH, wallH, sample) : RLintel(`Gate_${y.id}_Lintel`, pose, fixed, gl, g.w, V.doorTopH, wallH, sample, true));
+      if (g.leaf === "closed") out.push(horizontal ? RBlock(`Gate_${y.id}_Leaf`, pose, gl, fixed, g.w - 0.1, 0.08, 2.0, WOOD, { gate: true }) : RBlock(`Gate_${y.id}_Leaf`, pose, fixed, gl, 0.08, g.w - 0.1, 2.0, WOOD, { gate: true }));
+      continue;
+    }
+    out.push(horizontal ? RBlock(`Wall_${y.id}_${side}`, pose, 0, fixed, half * 2, T, wallH, WALL) : RBlock(`Wall_${y.id}_${side}`, pose, fixed, 0, T, half * 2, wallH, WALL));
+  }
+  const cx = (b.minX + b.maxX) / 2, cz = (b.minZ + b.maxZ) / 2;
+  const Fit = (hb) => {   // 房子偏移按 s 缩，再夹在缩过的院子里（墙里退 0.5）
+    const w = hb.maxX - hb.minX, d = hb.maxZ - hb.minZ;
+    let lx = ((hb.minX + hb.maxX) / 2 - cx) * pose.s, lz = ((hb.minZ + hb.maxZ) / 2 - cz) * pose.s;
+    lx = Math.max(-hw + 0.5 + w / 2, Math.min(hw - 0.5 - w / 2, lx));
+    lz = Math.max(-hd + 0.5 + d / 2, Math.min(hd - 0.5 - d / 2, lz));
+    return { lx, lz, w, d };
+  };
+  const fitted = [];
+  y.houses.forEach((h, i) => {
+    const id = h.id ? `House_${h.id}` : `House_${y.id}_${i + 1}`;
+    const f = Fit(h.box);
+    fitted.push(f);
+    if (L0610_COLLAPSED_HOUSES.includes(id)) {
+      const cw = Math.min(4, f.w / 2), cd = Math.min(3, f.d / 2);
+      out.push(RBlock(`${id}_A`, pose, f.lx - cw / 2, f.lz, f.w - cw, f.d, h.h, BRICK, { house: true }));
+      out.push(RBlock(`${id}_B`, pose, f.lx + f.w / 2 - cw / 2, f.lz - cd / 2, cw, f.d - cd, h.h, BRICK, { house: true }));
+      const k = L0610_PROP_KINDS.Rubble;
+      out.push(RBlock(`${id}_Rubble`, pose, f.lx + f.w / 2 - cw / 2 + 0.3, f.lz + f.d / 2 - cd / 2 + 0.4, k.w, k.d, k.h, k.semantic, { prop: "Rubble" }, 0.3));
+    } else out.push(RBlock(id, pose, f.lx, f.lz, f.w, f.d, h.h, BRICK, { house: true }));
+  });
+  // 茅圈：在缩过的院子里重新找角（房子没缩，按夹好的房子算）；局部坐标已经是缩过的，ToiletBlocks 不再乘 s
+  if (ToiletFor(y) !== null && !["garden", "pond", "farmyard", "temple"].includes(y.kind) && g) {
+    const TL = L0610_TOILET, ins = TL.inset + TL.w / 2;
+    const gp = g.wall === "S" ? [gl, hd] : g.wall === "N" ? [gl, -hd] : g.wall === "E" ? [hw, gl] : [-hw, gl];
+    const cs = [[-hw + ins, -hd + ins], [hw - ins, -hd + ins], [-hw + ins, hd - ins], [hw - ins, hd - ins]].sort((p, q) => Math.hypot(q[0] - gp[0], q[1] - gp[1]) - Math.hypot(p[0] - gp[0], p[1] - gp[1]));
+    const pick = cs.find((c) => Math.hypot(c[0] - gp[0], c[1] - gp[1]) >= 2.4 && !fitted.some((f) => c[0] + TL.w / 2 > f.lx - f.w / 2 - 0.2 && c[0] - TL.w / 2 < f.lx + f.w / 2 + 0.2 && c[1] + TL.d / 2 > f.lz - f.d / 2 - 0.2 && c[1] - TL.d / 2 < f.lz + f.d / 2 + 0.2));
+    if (pick) ToiletBlocks(out, y.id, { lx: pick[0], lz: pick[1] }, { ...pose, s: 1 }, sample);
+  }
+}
+
+/** 院子的树（转过的院子里的树跟着转；外头的照旧）。 */
+function YardTreeWorld(y, t) {
+  const pose = YardPose(y);
+  if (!pose.ry) return { x: t.x, z: t.z };
+  return YardToWorld(pose, (t.x - pose.cx), (t.z - pose.cz));
+}
+
+/** 折线胡同的墙：每段两边各一道转过的块（内角处各伸 ext 搭住）；封头；塌墙的缺口 + 倒下的墙板与土堆；接口处让开。 */
+function PathLaneWalls(out, plan) {
+  const paths = L0610_LANE_PATHS;
+  const ByRun = (id) => ST[id];
+  const gateGaps = YardGateGaps();
+  for (const p of Object.values(paths)) {
+    const line = p.line, n = line.length;
+    const segLen = [], cum = [0];
+    for (let i = 1; i < n; i++) { segLen.push(Math.hypot(line[i].x - line[i - 1].x, line[i].z - line[i - 1].z)); cum.push(cum[i - 1] + segLen[i - 1]); }
+    const total = cum[n - 1];
+    // 缺口：自己的 gaps + 别的折线接到我身上的口子 + 对着我的院门
+    const gaps = [...(p.gaps || []).map((g) => ({ at: g.at, len: g.len, side: g.side, id: g.id })), ...gateGaps.filter((g) => g.path === p.id)];
+    for (const q of Object.values(paths)) for (const j of q.joins || []) {
+      if (j.path !== p.id) continue;
+      const near = PathNearest(p, j.at.x, j.at.z);
+      // 子胡同从哪边接进来：看它离接点 2 m 的那一点在我哪一边
+      const qStart = Math.hypot(q.line[0].x - j.at.x, q.line[0].z - j.at.z) < 0.5;
+      const probe = qStart ? q.line[1] : q.line[q.line.length - 2];
+      const seg = p.line[near.seg], seg2 = p.line[near.seg + 1];
+      const dx = seg2.x - seg.x, dz = seg2.z - seg.z;
+      const side = Math.sign(dx * (probe.z - seg.z) - dz * (probe.x - seg.x)) || 1;   // +1 = 右手（行进方向的右边；x 东 z 南）
+      gaps.push({ at: near.at, len: 2 * (qStart ? q.halfW[0] : q.halfW[q.halfW.length - 1]) + 0.5, side });
+    }
+    // 两头：接到直胡同的头上（续着走，不伸）/ 接到别的胡同的身上（让开人家的半宽 + 墙）/ 封头
+    const trim = { from: 0, to: 0 };
+    for (const j of p.joins || []) {
+      if (j.run && j.end) continue;   // 续着直胡同的头：墙贴着接上
+      const atStart = Math.hypot(line[0].x - j.at.x, line[0].z - j.at.z) < 0.5;
+      let room = 0;
+      if (j.run) { const r = ByRun(j.run); room = r.halfW + T; plan.Cut(r.axis, r.c + (r.axis === "z" ? (j.at.x < r.c ? -1 : 1) : (j.at.z < r.c ? -1 : 1)) * (r.halfW + T / 2), (r.axis === "z" ? j.at.z : j.at.x) - (atStart ? p.halfW[0] : p.halfW[n - 1]) - 0.2, (r.axis === "z" ? j.at.z : j.at.x) + (atStart ? p.halfW[0] : p.halfW[n - 1]) + 0.2); }
+      else { const near = PathNearest(paths[j.path], j.at.x, j.at.z); room = near.halfW + T; }
+      if (atStart) trim.from = Math.max(trim.from, room); else trim.to = Math.max(trim.to, room);
+    }
+    const EXT = 0.8;
+    for (let i = 0; i < n - 1; i++) {
+      const a = line[i], b = line[i + 1], len = segLen[i];
+      const ux = (b.x - a.x) / len, uz = (b.z - a.z) / len;
+      const ry = Math.atan2(-uz, ux);
+      const hwA = p.halfW[i], hwB = p.halfW[i + 1];
+      for (const side of [-1, 1]) {
+        const nx = side * -uz, nz = side * ux;   // +1 = 右手
+        // 这一段这一边的墙：从 s0 到 s1（沿段的弧长），减去缺口
+        let s0 = i === 0 ? trim.from : -EXT, s1 = i === n - 2 ? len - trim.to : len + EXT;
+        const pieces = [[s0, s1]];
+        for (const g of gaps) {
+          if (g.side !== side) continue;
+          const g0 = g.at - g.len / 2 - cum[i], g1 = g.at + g.len / 2 - cum[i];
+          for (let k = pieces.length - 1; k >= 0; k--) {
+            const [q0, q1] = pieces[k];
+            if (g1 <= q0 || g0 >= q1) continue;
+            pieces.splice(k, 1);
+            if (g0 > q0) pieces.push([q0, g0]);
+            if (g1 < q1) pieces.push([g1, q1]);
+          }
+        }
+        pieces.sort((u, v) => u[0] - v[0]).forEach(([q0, q1], k) => {
+          if (q1 - q0 < 0.1) return;
+          const mid = (q0 + q1) / 2, t = Clamp01(mid / len);
+          const hw = hwA + (hwB - hwA) * t;
+          const cx = a.x + ux * mid + nx * (hw + T / 2), cz = a.z + uz * mid + nz * (hw + T / 2);
+          out.push(Block(`PathWall_${p.id}_${i + 1}${side < 0 ? "L" : "R"}${k ? String.fromCharCode(97 + k) : ""}`, cx, cz, q1 - q0, T, V.wallH, WALL, { ry: R2(ry) }));
+        });
+      }
+      // 这一段上的塌墙：墙板横在胡同里、墙根一堆土、一截残墙
+      for (const g of gaps) {
+        if (!g.id || g.at < cum[i] || g.at >= cum[i + 1]) continue;
+        const sAt = g.at - cum[i], t = Clamp01(sAt / len), hw = hwA + (hwB - hwA) * t;
+        const nx = g.side * -uz, nz = g.side * ux;   // 墙在这一边；倒进胡同 = 往 −n 那边
+        const wx = a.x + ux * sAt, wz = a.z + uz * sAt;
+        const slabOff = hw + T / 2 - 1.0, heapOff = hw + T / 2 - 0.45;
+        out.push(Block(`${g.id}_Slab`, wx + ux * 0.2 + nx * slabOff, wz + uz * 0.2 + nz * slabOff, g.len, 2.0, 0.25, WALL, { ry: R2(ry + 0.1), prop: "Rubble", fallen: true }));
+        out.push(Block(`${g.id}_Heap`, wx - ux * 0.4 + nx * heapOff, wz - uz * 0.4 + nz * heapOff, g.len * 0.7, 0.9, 1.2, EARTH, { ry: R2(ry - 0.2), prop: "Rubble", rubble: true }));
+        const stubS = sAt - g.len / 2 - 0.3, so = hw + T / 2;
+        out.push(Block(`${g.id}_Stub`, a.x + ux * stubS + nx * so, a.z + uz * stubS + nz * so, 0.6, T, 1.1, WALL, { ry: R2(ry), fallen: true }));
+      }
+    }
+    for (const end of p.caps || []) {
+      const i = end === "from" ? 0 : n - 1, j = end === "from" ? 1 : n - 2;
+      const v = line[i], w = line[j], len = Math.hypot(w.x - v.x, w.z - v.z);
+      const ux = (w.x - v.x) / len, uz = (w.z - v.z) / len, hw = p.halfW[i];
+      out.push(Block(`PathCap_${p.id}_${end}`, v.x, v.z, T, 2 * hw + 2 * T, V.wallH, WALL, { ry: R2(Math.atan2(-uz, ux)) }));
+    }
+  }
+}
+
+/** 外沿的单门独院：院墙 + 院门（关着）+ 一排房（排房院）或北屋 + 厢房（半面槽院）+ 茅圈 + 一棵树。 */
+function FarmsteadBlocks(out, sample) {
+  for (const f of L0610_FARMSTEADS) {
+    const pose = { cx: f.x, cz: f.z, ry: f.ry, s: 1 };
+    const hw = f.w / 2, hd = f.d / 2;
+    const gateSide = f.gate, gw = V.gateW;
+    for (const side of ["N", "S", "W", "E"]) {
+      const horizontal = side === "N" || side === "S";
+      const fixed = side === "N" ? -hd : side === "S" ? hd : side === "W" ? -hw : hw;
+      const half = horizontal ? hw : hd;
+      if (side === gateSide) {
+        const gl = horizontal ? half - 2.0 : half - 2.0;   // 院门在角上
+        const seg = (tag, from, to) => { if (to - from < 0.05) return; const mid = (from + to) / 2, len = to - from; out.push(horizontal ? RBlock(`Wall_${f.id}_${side}${tag}`, pose, mid, fixed, len, T, V.wallH, WALL) : RBlock(`Wall_${f.id}_${side}${tag}`, pose, fixed, mid, T, len, V.wallH, WALL)); };
+        seg("a", -half, gl - gw / 2); seg("b", gl + gw / 2, half);
+        out.push(horizontal ? RLintel(`Gate_${f.id}_Lintel`, pose, gl, fixed, gw, V.doorTopH, V.wallH, sample) : RLintel(`Gate_${f.id}_Lintel`, pose, fixed, gl, gw, V.doorTopH, V.wallH, sample, true));
+        out.push(horizontal ? RBlock(`Gate_${f.id}_Leaf`, pose, gl, fixed, gw - 0.1, 0.08, 2.0, WOOD, { gate: true }) : RBlock(`Gate_${f.id}_Leaf`, pose, fixed, gl, 0.08, gw - 0.1, 2.0, WOOD, { gate: true }));
+        continue;
+      }
+      out.push(horizontal ? RBlock(`Wall_${f.id}_${side}`, pose, 0, fixed, half * 2, T, V.wallH, WALL) : RBlock(`Wall_${f.id}_${side}`, pose, fixed, 0, T, half * 2, V.wallH, WALL));
+    }
+    // 房子：北屋贴北墙；半面槽院再加一间厢房
+    const bw = Math.min(10, f.w - 3), bd = 4.8;
+    out.push(RBlock(`House_${f.id}_1`, pose, 0, -hd + 0.5 + bd / 2, bw, bd, V.houseH, BRICK, { house: true }));
+    if (f.kind === "banmian") out.push(RBlock(`House_${f.id}_2`, pose, hw - 0.5 - 2, Math.min(hd - 0.6 - 3, -hd + 0.5 + bd + 0.6 + 3), 4, 6, V.wingH, BRICK, { house: true }));
+    // 茅圈：南边一角（北屋占着北边；厢房在东边时放西南角）
+    const TL = L0610_TOILET;
+    const tl = { lx: (gateSide === "W" && f.kind === "paifang" ? 1 : -1) * (hw - TL.inset - TL.w / 2), lz: hd - TL.inset - TL.d / 2 };
+    ToiletBlocks(out, f.id, tl, pose, sample);
+    const tr = YardToWorld(pose, hw * 0.3, hd * 0.3, false);
+    out.push(Block(`Tree_${f.id}`, tr.x, tr.z, 0.42, 0.42, 5.5, "foliage", { tree: "paulownia" }));
+  }
+}
+
+/** 关帝庙殿里的课桌与香案、杂货铺的柜台、村外小庙、土炮楼、井、场院、菜园、取土坑、粪堆、去掉的院子、林、树、河岸。 */
+function OutsideBlocks(out, sample) {
+  // 关帝庙（兼村塾）：香案靠北墙、六张破课桌
+  const TP = L0610_TEMPLE;
+  out.push(Block("TempleAltar", TP.altar.x, TP.altar.z, TP.altar.w, TP.altar.d, TP.altar.h, WOOD, { prop: "Altar" }));
+  TP.desks.forEach(([x, z], i) => out.push(Block(`TempleDesk_${i + 1}`, x, z, 1.2, 0.5, 0.75, WOOD, { ry: (i % 2 ? -0.06 : 0.05), prop: "Desk" })));
+  // 杂货铺：柜台
+  const SH = L0610_SHOP;
+  out.push(Block("ShopCounter", SH.counter.x, SH.counter.z, SH.counter.w, SH.counter.d, SH.counter.h, WOOD, { prop: "Counter" }));
+  // 村外小庙：三面墙 2.6，门洞里砌死的砖，东墙塌了一截（瓦砾），半个顶
+  const FS = L0610_FIELD_SHRINE, fp = { cx: FS.x, cz: FS.z, ry: FS.ry, s: 1 }, fhw = FS.w / 2, fhd = FS.d / 2;
+  out.push(RBlock("FieldShrine_N", fp, 0, -fhd, FS.w, T, FS.wallH, BRICK));
+  out.push(RBlock("FieldShrine_W", fp, -fhw, 0, T, FS.d, FS.wallH, BRICK));
+  out.push(RBlock("FieldShrine_Ea", fp, fhw, -fhd / 2, T, fhd, FS.wallH, BRICK));
+  out.push(RBlock("FieldShrine_Eb", fp, fhw, fhd / 2, T, fhd, 0.9, BRICK, { fallen: true }));   // 东墙南半截塌了
+  out.push(RBlock("FieldShrine_Sa", fp, -(fhw + FS.doorW / 2) / 2, fhd, fhw - FS.doorW / 2, T, FS.wallH, BRICK));
+  out.push(RBlock("FieldShrine_Sb", fp, (fhw + FS.doorW / 2) / 2, fhd, fhw - FS.doorW / 2, T, FS.wallH, BRICK));
+  out.push(RBlock("FieldShrine_DoorBrick", fp, 0, fhd, FS.doorW, T - 0.1, 2.0, "structure", { bricked: true }));
+  out.push(RLintel("FieldShrine_DoorLintel", fp, 0, fhd, FS.doorW, 2.0, FS.wallH, sample));
+  out.push(RBlock("FieldShrine_Rubble", fp, fhw + 0.6, fhd / 2 + 0.4, 2.2, 2.0, 0.7, EARTH, { prop: "Rubble" }, 0.4));
+  {
+    const c = YardToWorld(fp, -fhw / 2, 0, false);
+    out.push(Block("FieldShrine_Roof", c.x, c.z, fhw + 0.3, FS.d + 0.3, 0.2, ROOF, { y: R2(sample(c.x, c.z) + FS.wallH - 0.1), ry: R2(FS.ry) }));
+  }
+  // 土炮楼
+  const WT = L0610_WATCHTOWER;
+  out.push(Block("WatchTower", WT.x, WT.z, WT.w, WT.d, WT.h, "structure", { tower: true }));
+  out.push(Block("WatchTowerParapet", WT.x, WT.z, WT.w + 0.4, WT.d + 0.4, 0.5, WALL, { y: R2(sample(WT.x, WT.z) + WT.h + 0.25) }));
+  // 井：井台（矮块，跨得过）；浇地井加辘轳架（两根柱 + 横梁）
+  for (const w of L0610_WELLS) {
+    out.push(Block(`${w.id}_Rim`, w.x, w.z, 1.2, 1.2, w.rimH, BRICK, { prop: "Well" }));
+    if (w.kind === "irrigation") {
+      out.push(Block(`${w.id}_PostW`, w.x - 0.85, w.z, 0.15, 0.15, w.frameH, WOOD, { prop: "Well" }));
+      out.push(Block(`${w.id}_PostE`, w.x + 0.85, w.z, 0.15, 0.15, w.frameH, WOOD, { prop: "Well" }));
+      out.push(Block(`${w.id}_Beam`, w.x, w.z, 1.9, 0.12, 0.12, WOOD, { prop: "Well", y: R2(sample(w.x, w.z) + w.frameH - 0.06) }));
+    }
+  }
+  // 场院：麦秸垛、石磙
+  for (const t of L0610_THRESHING) {
+    const pose = { cx: t.x, cz: t.z, ry: t.ry, s: 1 };
+    t.stacks.forEach(([lx, lz, r], i) => out.push(RBlock(`${t.id}_Stack${i + 1}`, pose, lx, lz, r * 2, r * 2, 2.4, "canvas", { prop: "StrawStack" }, 0.2 * i)));
+    out.push(RBlock(`${t.id}_Roller`, pose, t.roller[0], t.roller[1], 1.5, 0.7, 0.7, BRICK, { prop: "Roller" }, t.roller[2]));
+  }
+  // 庄外的菜园：四面矮篱
+  for (const g of L0610_OUTER_GARDENS) {
+    const pose = { cx: g.x, cz: g.z, ry: g.ry, s: 1 };
+    out.push(RBlock(`Fence_${g.id}_N`, pose, 0, -g.d / 2, g.w, 0.3, V.fenceH, EARTH, { fence: true }));
+    out.push(RBlock(`Fence_${g.id}_S`, pose, 0, g.d / 2, g.w, 0.3, V.fenceH, EARTH, { fence: true }));
+    out.push(RBlock(`Fence_${g.id}_W`, pose, -g.w / 2, 0, 0.3, g.d, V.fenceH, EARTH, { fence: true }));
+    out.push(RBlock(`Fence_${g.id}_E`, pose, g.w / 2, 0, 0.3, g.d, V.fenceH, EARTH, { fence: true }));
+  }
+  // 取土坑的水、粪堆
+  const OP = L0610_OUTER_POND;
+  out.push(Block("OuterPondWater", OP.x, OP.z, OP.rx * 1.6, OP.rz * 1.6, OP.waterH, "water", { y: R2(OUTER_POND_FLOOR_Y + OP.waterH / 2 - 0.02), solid: false }));
+  const dk = L0610_PROP_KINDS.DungHeap;
+  L0610_OUTER_DUNG.forEach((d, i) => out.push(Block(`DungHeap_O${i + 1}`, d.x, d.z, dk.w, dk.d, dk.h, dk.semantic, { ry: d.ry, prop: "DungHeap" })));
+  // 去掉的院子：空地 + 一团树 + 一截塌了的旧院墙 + 瓦砾
+  for (const dy of L0610_DROPPED_YARDS) {
+    dy.trees.forEach(([x, z, h], i) => out.push(Block(`Tree_${dy.id}_${i + 1}`, x, z, 0.42, 0.42, h, "foliage", { tree: "paulownia" })));
+    const r = dy.ruin;
+    out.push(Block(`Ruin_${dy.id}`, r.x, r.z, r.w, r.d, r.h, WALL, { ry: r.ry, fallen: true }));
+    out.push(Block(`RuinRubble_${dy.id}`, r.x + 2.5, r.z + 1.2, 2.0, 1.6, 0.6, EARTH, { ry: r.ry + 0.5, prop: "Rubble" }));
+  }
+  // 林：松柏 / 杂树、义林的木牌
+  for (const g of L0610_GROVES) {
+    const pose = { cx: g.x, cz: g.z, ry: g.ry, s: 1 };
+    g.trees.forEach(([lx, lz, h], i) => out.push(RBlock(`Tree_${g.id}_${i + 1}`, pose, lx, lz, 0.42, 0.42, h, "foliage", { tree: g.kind === "family" ? "cypress" : "scrub" })));
+    (g.markers || []).forEach(([lx, lz], i) => out.push(RBlock(`Marker_${g.id}_${i + 1}`, pose, lx, lz - 0.9, 0.25, 0.05, 0.8, WOOD, { prop: "GraveMarker" }, 0.1 * i)));
+  }
+  // 田里零星的树、庄子外沿的树丛、凹路坎上的树
+  L0610_FIELD_TREES.forEach((t, i) => out.push(Block(`Tree_F${String(i + 1).padStart(2, "0")}`, t.x, t.z, 0.42, 0.42, t.h, "foliage", { tree: "paulownia" })));
+  L0610_EDGE_CLUMPS.forEach((c, i) => { for (let k = 0; k < c.n; k++) out.push(Block(`Tree_C${i + 1}_${k + 1}`, R2(c.x + (Hash01(i, k, 1) - 0.5) * 10), R2(c.z + (Hash01(i, k, 2) - 0.5) * 10), 0.42, 0.42, R2(5 + Hash01(i, k, 3) * 2.5), "foliage", { tree: "paulownia" })); });
+  L0610_LANE_SIDE.trees.forEach((t, i) => out.push(Block(`Tree_L${i + 1}`, t.x, t.z, 0.42, 0.42, t.h, "foliage", { tree: "locust" })));
+  // 河岸：零散的柳树、枯芦苇丛（岸上，庄子那一段东岸不放）；苇子洼里的芦苇
+  for (let i = 0; i < RV.bankTrees; i++) {
+    const z = 206 + Hash01(i, 11) * 330, r = RiverAtZ(z), side = Hash01(i, 12) < 0.5 ? -1 : 1;
+    if (side > 0 && z > 376 && z < 552) continue;
+    const x = R2(r.x + side * (r.halfW + RV.wallM + 0.8 + Hash01(i, 13) * 2.5)), zz = R2(z);
+    if (NearestOnLine(RV.tributary.line, x, zz).dist < 3 || DistanceToAnyRoad(x, zz) < 2) continue;
+    if (Hash01(i, 14) < 0.55) out.push(Block(`Reed_${String(i + 1).padStart(2, "0")}`, x, zz, 1.3, 1.3, 1.8, "foliage", { reed: true, solid: false }));
+    else out.push(Block(`Willow_${String(i + 1).padStart(2, "0")}`, x, zz, 0.42, 0.42, R2(4.5 + Hash01(i, 15) * 2.5), "foliage", { tree: "willow" }));
+  }
+  for (let i = 0; i < RV.marsh.reeds; i++) {
+    const z = R2(386 + Hash01(i, 21) * 74), r = RiverAtZ(z);
+    const x = R2(r.x + r.halfW + RV.wallM + 0.6 + Hash01(i, 22) * Math.max(0.5, RV.marsh.eastX - 1.2 - (r.x + r.halfW + RV.wallM + 0.6)));
+    out.push(Block(`MarshReed_${String(i + 1).padStart(2, "0")}`, x, z, 1.2, 1.2, 1.7, "foliage", { reed: true, solid: false }));
+  }
+}
+
+/** 河汊子沟底的水（第八版：一段一段跟着弯走；最后一截直的到 z 558 还叫 RiverWater_2，1218 从它末尾接）、西来小沟的水。 */
+function RiverWaterBlocks() {
+  const out = [];
+  const line = RV.line, hw = RV.halfW;
+  const z0 = RV.fromZ + RV.endM, zTail = 520, z1 = L0610_BOUNDS.maxZ - 2;
+  let k = 0;
+  for (let i = 1; i < line.length; i++) {
+    const a = line[i - 1], b = line[i];
+    if (b.z <= z0 || a.z >= zTail) continue;
+    const ta = Math.max(0, (z0 - a.z) / (b.z - a.z)), tb = Math.min(1, (zTail - a.z) / (b.z - a.z));
+    const ax = a.x + (b.x - a.x) * ta, az = a.z + (b.z - a.z) * ta, bx = a.x + (b.x - a.x) * tb, bz = a.z + (b.z - a.z) * tb;
+    const len = Math.hypot(bx - ax, bz - az) + 0.6, w = (hw[i - 1] + hw[i]) * 0.5 * 2;
+    out.push(Block(`RiverWater_1_${String(++k).padStart(2, "0")}`, (ax + bx) / 2, (az + bz) / 2, w, len, RV.waterH, "water", { solid: false, y: R2(RIVER_FLOOR_Y + RV.waterH / 2), ry: R2(Math.atan2(bx - ax, bz - az)) }));   // 块的 d 轴顺着这一段
+  }
+  out.push(Block("RiverWater_2", RV.centerX, (zTail + z1) / 2, RV.waterW, z1 - zTail, RV.waterH, "water", { solid: false, y: R2(RIVER_FLOOR_Y + RV.waterH / 2) }));
+  const TR = RV.tributary;
+  for (let i = 1; i < TR.line.length; i++) {
+    const a = TR.line[i - 1], b = TR.line[i], len = Math.hypot(b.x - a.x, b.z - a.z) + 0.4;
+    out.push(Block(`TributaryWater_${i}`, (a.x + b.x) / 2, (a.z + b.z) / 2, len, TR.halfW * 2, TR.waterH, "water", { solid: false, y: R2(TR.floorY + TR.waterH / 2), ry: R2(Math.atan2(-(b.z - a.z), b.x - a.x)) }));
+  }
+  return out;
 }
 
 /** 全村的墙、房、门、篱、院子链上的三道门、瓦砾、树、摆件、石碾、土地庙、麦秸垛。 */
@@ -698,9 +1245,18 @@ function VillageBlocks(sample) {
   GengBlocks(plan, blocks, gates, sample);
   JiefangBlocks(plan, blocks, gates, sample);
   BenjiaBlocks(plan, blocks, sample);
-  for (const y of L0610_YARDS) YardBlocks(plan, blocks, gates, y, sample);
+  // 三个有名字的院子的茅圈（第八版）
+  for (const [id, t] of Object.entries(L0610_NAMED_TOILETS)) ToiletBlocks(blocks, id, { lx: 0, lz: 0 }, { cx: t.x, cz: t.z, ry: 0, s: 1 }, sample, t.open);
+  // 院子：锁定的轴对齐（墙进总表）；其余转过的（第八版）各自出块
+  for (const y of L0610_YARDS) {
+    const pose = YardPose(y);
+    if (pose.ry) RotatedYardBlocks(blocks, y, pose, sample, plan);
+    else YardBlocks(plan, blocks, gates, y, sample);
+  }
   // 每条胡同两边都是墙（院墙已经盖了大半，这里补齐缝隙），死胡同的尽头封死（caps）；别的胡同横过来的地方留口子
   LaneWalls(plan);
+  // 折线胡同（第八版）：两边转过的墙、封头、塌墙的缺口；接到直胡同身上的在它墙上开口
+  PathLaneWalls(blocks, plan);
   const E3 = ST.east3;
   // 第一道弯正面墙（x 182、z 460…467）上凿的两个枪眼：正对着街口打
   for (const [i, lp] of (ES.jogLoopholes || []).entries()) {
@@ -734,12 +1290,19 @@ function VillageBlocks(sample) {
   BreakableGate(gates, "FarmyardGateLeaf", "z", NC.farmyardDoor.x, NC.farmyardDoor.z, NC.farmyardDoor.w, SIG.northYardGatesBroken, -1);
   SouthLaneBlocks(plan, blocks, gates);
   EastYardBlocks(blocks);
-  FallenWallBlocks(plan, blocks);
   plan.Emit(blocks);
+  // 庄子西墙 x 40 那一道（苇子洼那一段墙脚的地是 −0.9）：块显式给 y，顶在村里地面 +2.2、底到 −0.3，墙脚不悬空、也不矮一截
+  for (const b of blocks) if (/^VillageWestEdge_/.test(b.id)) { b.h = R2(V.wallH + 0.6); b.y = R2(V.y + V.wallH - b.h / 2); }
   Shrine(blocks, sample);
   RubbleBlocks(blocks);
-  // 零散的树（foliage 细块；石榴矮一点）
-  L0610_TREES.forEach((t, i) => blocks.push(Block(`Tree_${String(i + 1).padStart(2, "0")}`, t.x, t.z, t.kind === "pomegranate" ? 0.3 : 0.42, t.kind === "pomegranate" ? 0.3 : 0.42, t.h, "foliage", { tree: t.kind })));
+  FarmsteadBlocks(blocks, sample);
+  OutsideBlocks(blocks, sample);
+  // 零散的树（foliage 细块；石榴矮一点）；转过的院子里的树跟着院子转
+  L0610_TREES.forEach((t, i) => {
+    const y = t.yard && L0610_YARDS.find((q) => q.id === t.yard);
+    const p = y ? YardTreeWorld(y, t) : { x: t.x, z: t.z };
+    blocks.push(Block(`Tree_${String(i + 1).padStart(2, "0")}`, p.x, p.z, t.kind === "pomegranate" ? 0.3 : 0.42, t.kind === "pomegranate" ? 0.3 : 0.42, t.h, "foliage", { tree: t.kind }));
+  });
   (L0610_EAST_ROAD.trees || []).forEach((t, i) => blocks.push(Block(`RoadTree_${i + 1}`, t.x, t.z, 0.42, 0.42, t.h, "foliage")));
   // 村南口外的大槐树（10-6「往那棵大槐树跑」）：树干粗一点、9 m 高，从窄胡同里望得见树冠
   const BL = L0610_PLACES.bigLocust;
@@ -778,10 +1341,7 @@ export function L0610Blocks(sample) {
   const RL = ES.roller;
   blocks.push(Block("RollerBase", RL.x, RL.z, RL.baseW, RL.baseW, RL.baseH, BRICK));
   blocks.push(Block("Roller", RL.x, RL.z, RL.w, RL.d, RL.h, BRICK, { y: R2(sample(RL.x, RL.z) + RL.baseH + RL.h / 2) }));
-  const RVW = L0610_RIVER;
-  const z0 = RVW.fromZ + RVW.endM, z1 = L0610_BOUNDS.maxZ - 2, zm = (z0 + z1) / 2;
-  blocks.push(Block("RiverWater_1", RVW.centerX, (z0 + zm) / 2, RVW.waterW, zm - z0, RVW.waterH, "water", { solid: false }));
-  blocks.push(Block("RiverWater_2", RVW.centerX, (zm + z1) / 2, RVW.waterW, z1 - zm, RVW.waterH, "water", { solid: false }));
+  blocks.push(...RiverWaterBlocks());
   return { blocks, gates };
 }
 
@@ -867,7 +1427,24 @@ export function L0610Landmarks(sample) {
     ...L0610_RUBBLE.map((r) => L(`Lm${r.id}`, r.name, "prop", r.x, r.z, { ...Size(r.w, r.d, r.h), ry: r.ry })),
     L("LmBigLocust", PL.bigLocust.name, "prop", PL.bigLocust.x, PL.bigLocust.z, { ...Size(0.8, 0.8, PL.bigLocust.h), note: "10-6「过了槐树就是村口」" }),
     L("LmPond", PL.pond.name, "pit", POND.x, POND.z, { ...Size(POND.w, POND.d, POND.depth), y: R2(POND_FLOOR_Y + POND.depth / 2), note: "取土坑积的水；1949 年前多数人喝河、坑、沟水" }),
-    L("LmRiver", RV.name, "area", RV.centerX, (RV.fromZ + L0610_BOUNDS.maxZ) / 2, { w: RV.floorW + 2 * RV.wallM, d: L0610_BOUNDS.maxZ - RV.fromZ, note: "车下不去；沟底齐腰深的水，抬伤号过不去" }),
+    L("LmRiver", RV.name, "area", RV.centerX, (RV.fromZ + L0610_BOUNDS.maxZ) / 2, { w: RV.floorW + 2 * RV.wallM, d: L0610_BOUNDS.maxZ - RV.fromZ, note: "弯河（第八版）；车下不去；沟底齐腰深的水，抬伤号过不去" }),
+    // 第八版
+    L("LmTemple", PL.temple.name, "area", PL.temple.x, PL.temple.z, { w: 24, d: 22, note: "主街西边那院改的；北边三间正殿、殿里课桌（村塾）" }),
+    L("LmShop", PL.shop.name, "prop", PL.shop.x, PL.shop.z, { ...Size(4, 7, 3), note: "EM1 临街一间：门板窗、柜台" }),
+    L("LmFieldShrine", PL.fieldShrine.name, "prop", PL.fieldShrine.x, PL.fieldShrine.z, { ...Size(L0610_FIELD_SHRINE.w, L0610_FIELD_SHRINE.d, L0610_FIELD_SHRINE.wallH), ry: L0610_FIELD_SHRINE.ry, note: "东北大道边、离庄子七八十米" }),
+    L("LmWatchTower", PL.watchTower.name, "prop", PL.watchTower.x, PL.watchTower.z, { ...Size(L0610_WATCHTOWER.w, L0610_WATCHTOWER.d, L0610_WATCHTOWER.h), note: "庄子东北角大户院子角上，5×5、7.5 高" }),
+    ...L0610_WELLS.map((w) => L(`Lm${w.id}`, w.name, "prop", w.x, w.z, Size(1.2, 1.2, w.rimH))),
+    L("LmMarsh", PL.marsh.name, "area", PL.marsh.x, PL.marsh.z, { w: 14, d: 84, note: "河弯离开庄子西墙那一段：烂泥 −0.9，走不了人" }),
+    L("LmTributary", PL.tributary.name, "place", PL.tributary.x, PL.tributary.z, { radiusM: 4, note: "河西一条小沟汇进河汊子（两股并一股）" }),
+    L("LmGengGrove", PL.gengGrove.name, "area", PL.gengGrove.x, PL.gengGrove.z, { w: 30, d: 20, note: "耿家的坟地（松柏）；林外两座小坟" }),
+    L("LmWangGrove", PL.wangGrove.name, "area", PL.wangGrove.x, PL.wangGrove.z, { w: 18, d: 12 }),
+    L("LmYiGrove", PL.yiGrove.name, "area", PL.yiGrove.x, PL.yiGrove.z, { w: 16, d: 11, note: "外乡人埋这里：杂树、小坟、没字的木牌" }),
+    L("LmThreshing1", PL.threshing1.name, "area", PL.threshing1.x, PL.threshing1.z, { w: 22, d: 13, note: "麦秸垛、石磙" }),
+    L("LmThreshing2", PL.threshing2.name, "area", PL.threshing2.x, PL.threshing2.z, { w: 20, d: 14 }),
+    L("LmPostRoad", PL.postRoad.name, "place", PL.postRoad.x, PL.postRoad.z, { radiusM: 4, note: "北通界河，南接东北大道" }),
+    L("LmEastVillageRoad", PL.eastVillageRoad.name, "place", PL.eastVillageRoad.x, PL.eastVillageRoad.z, { radiusM: 4 }),
+    L("LmOuterPond", PL.outerPond.name, "pit", PL.outerPond.x, PL.outerPond.z, { ...Size(L0610_OUTER_POND.rx * 2, L0610_OUTER_POND.rz * 2, L0610_OUTER_POND.depth), y: R2(OUTER_POND_FLOOR_Y + L0610_OUTER_POND.depth / 2) }),
+    ...L0610_FARMSTEADS.map((f) => L(`Lm${f.id}`, f.name, "area", f.x, f.z, { w: f.w, d: f.d, ry: f.ry })),
   ];
   return out;
 }
@@ -1074,7 +1651,7 @@ export function FloodFrom(grid, start, { links = [], barriers = [] } = {}) {
 export function RiverEastLedgeAt(sample, z) {
   const wallFace = 40 - T / 2;
   let rim = wallFace;
-  for (let x = RV.centerX; x <= wallFace; x += 0.05) { if (sample(x, z) >= V.y - 0.3) { rim = x; break; } }
+  for (let x = RiverAtZ(z).x; x <= wallFace; x += 0.05) { if (sample(x, z) >= V.y - 0.3) { rim = x; break; } }
   return { rimX: R2(rim), ledgeW: R2(wallFace - rim) };
 }
 export function DitchSectionAt(sample, x) {
@@ -1108,11 +1685,40 @@ export function LaneDepthAt(sample, z) {
   const floor = sample(cx, z), side = Math.max(sample(cx - 9, z), sample(cx + 9, z));
   return { x: R2(cx), floor: R2(floor), side: R2(side), depth: R2(side - floor) };
 }
+/** 河汊子横断面（第八版：按中线折线在 z 处的 x 量；东西 10 m 外的岸）。 */
 export function RiverSectionAt(sample, z) {
-  const floor = sample(RV.centerX, z);
+  const cx = RiverAtZ(z).x;
+  const floor = sample(cx, z);
   let run = 0, best = 0;
-  for (let x = RV.centerX - 10; x <= RV.centerX + 10; x += 0.1) { if (sample(x, z) <= floor + 0.15) { run += 0.1; best = Math.max(best, run); } else run = 0; }
-  return { floor: R2(floor), west: R2(sample(RV.centerX - 10, z)), east: R2(sample(RV.centerX + 10, z)), floorW: R2(best) };
+  for (let x = cx - 12; x <= cx + 12; x += 0.1) { if (sample(x, z) <= floor + 0.15) { run += 0.1; best = Math.max(best, run); } else run = 0; }
+  // 西岸取中线外 13 m（凸岸泥滩最宽 11 m 多一点，岸要在泥滩外头量）；东岸 11 m（再远就进了村里的取土坑）
+  return { x: R2(cx), floor: R2(floor), west: R2(sample(cx - 13, z)), east: R2(sample(cx + 11, z)), floorW: R2(best) };
+}
+/** 河汊子中线相邻两段的方向差（度）：天然的弯河该有好几处 ≥ 10°。 */
+export function RiverBendAngles() {
+  const line = RV.line, out = [];
+  for (let i = 1; i < line.length - 1; i++) {
+    const a = Math.atan2(line[i].x - line[i - 1].x, line[i].z - line[i - 1].z), b = Math.atan2(line[i + 1].x - line[i].x, line[i + 1].z - line[i].z);
+    out.push({ z: line[i].z, deg: R2(Math.abs(((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * 180 / Math.PI) });
+  }
+  return out;
+}
+/** 折线胡同的拐角（度，0 = 直）与直段长：给门禁用。 */
+export function LaneCorners() {
+  const out = [];
+  const Angle = (a, b, c) => { const u = Math.atan2(b.x - a.x, b.z - a.z), v = Math.atan2(c.x - b.x, c.z - b.z); return R2(Math.abs(((v - u + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * 180 / Math.PI); };
+  for (const p of LANE_PATHS) for (let i = 1; i < p.line.length - 1; i++) out.push({ lane: p.id, x: p.line[i].x, z: p.line[i].z, deg: Angle(p.line[i - 1], p.line[i], p.line[i + 1]), locked: false });
+  // 直胡同之间的拐角（轴对齐的 = 90°）：巷子 / L4 / 夹道 / 窄胡同 / 东街的弯
+  const pairs = [["alleyNorth", "alleyA2"], ["alleyA2", "alleyA3"], ["alleyA3", "alleyA4"], ["alleyA4", "alleyA5"], ["alleyA5", "l4"], ["passage", "passageEnd"],
+    ["southLane1", "southLane2"], ["southLane2", "southLane3"], ["southLane3", "southLane4"], ["southLane4", "backLane"], ["east", "eastJog1"], ["eastJog1", "east2"], ["east2", "eastJog2"], ["eastJog2", "east3"]];
+  for (const [a, b] of pairs) out.push({ lane: `${a}+${b}`, deg: 90, locked: true });
+  return out;
+}
+/** 胡同最长的直段（米）：直胡同按 from…to，折线按段。 */
+export function LaneStraightRuns() {
+  const out = STREET_RUNS.map((r) => ({ lane: r.id, len: R2(r.to - r.from) }));
+  for (const p of LANE_PATHS) for (let i = 1; i < p.line.length; i++) out.push({ lane: `${p.id}#${i}`, len: R2(Math.hypot(p.line[i].x - p.line[i - 1].x, p.line[i].z - p.line[i - 1].z)) });
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -1138,8 +1744,9 @@ export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", 
       generator: L0610_SCENE_GENERATOR,
       generatedAt,
       commit,
-      notes: `06–10 新剧本白盒（2026-10-22 第六版空间）：锚点 Data_EditorBlockoutFirstLevel0610Space；高度 ${L0610_CELL_M} m 网格（${minM}…${maxM} m）；`
-        + "z<205 逐点等于 FirstLevel0105 的地面，往南：凹路南段、村口路沟（西头通进河汊子）、河汊子（贴庄子西墙、沟底 1 m 深的水）、"
+      notes: `06–10 新剧本白盒（2026-10-24 第八版空间）：锚点 Data_EditorBlockoutFirstLevel0610Space；高度 ${L0610_CELL_M} m 网格（${minM}…${maxM} m）；`
+        + "z<205 逐点等于 FirstLevel0105 的地面，往南：凹路南段（几道缓弯、两边坎高低不一）、村口路沟（西头通进河汊子）、河汊子（天然的弯河：凸岸泥滩、苇子洼、西来小沟；沟底 1 m 深的水）、"
+        + "拼块的田（田埂烘进高度场）、林里的坟头、老驿道 / 往东邻庄的大道 / 田间小路、场院与独院压平、庄东北的取土坑；"
         + "耿家庄（整村压平 +0.3、胡同 / 街 / 路口压低 12 cm、街坊家的地瓜窖与村西的取土坑平底开挖）、东北进庄的道；"
         + `体块：按县志重摆的 ${L0610_YARDS.length + 3} 个院子（四合院 / 半面槽院 / 排房院混着、夹菜园空地与水坑；共墙只画一道），老耿家半面槽院（北屋三间空心、后墙三个枪眼、灶屋两间、东墙院门）、`
         + "街坊家（北屋空心、西配房塌掉的西北角 / 窗洞 / 大缸、地瓜窖、石磨、半掩的院门）、本家院（共用墙上的狗洞 / 便门）、拐四道弯的巷子与瓦砾堵死的岔路、"
@@ -1161,11 +1768,15 @@ export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", 
         Pts(L0610_ROUTE.segments[0].line), Pts(L0610_ROUTE.segments[1].line),
         Pts(SLN.line),
         Pts(ER.line),
+        ...L0610_ROADS.map((r) => Pts(r.line)),
+        ...L0610_FOOTPATHS.map((p) => Pts(p.line)),
+        ...LANE_PATHS.map((p) => Pts(p.line)),
       ],
       trenches: [
         Pts(L0610_FROM_0105.trafficTrench.filter((p) => p.z >= L0610_BOUNDS.minZ)),
         [{ x: DT.fromX, z: DT.z }, { x: DT.toX, z: DT.z }],
-        [{ x: RV.centerX, z: RV.fromZ + RV.endM }, { x: RV.centerX, z: L0610_BOUNDS.maxZ }],
+        Pts(RV.line.filter((p) => p.z >= RV.fromZ + RV.endM && p.z <= L0610_BOUNDS.maxZ)),
+        Pts(RV.tributary.line),
       ],
     },
   };

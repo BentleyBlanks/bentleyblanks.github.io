@@ -28,6 +28,7 @@ import {
   L0105_GULLY, L0105_GULLY_POCKETS, L0105_SUNKEN_LANE, L0105_PROPS, L0105_BRIDGE, InGullyFloor, PointBeside,
   L0105_RUSH_STATIONS, L0105_RUSH_KEY, L0105_RUSH_FALLEN, RushStation,
   L0105_DITCH_SQUAD, DitchSquadStart, DitchSquadFallenAt, DitchEmerge, L0105_PIT_NORTH, ScarpZ,
+  L0105_TANKETTES as TK, L0105_OLD_POSITION,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 export const FIRST_LEVEL_0105_GENERATOR = "Script_EditorBlockoutCli.mjs export FirstLevel0105";
@@ -253,7 +254,7 @@ export function TrenchRoute(a, b) {
 // 单位与 POI
 
 const META = new WeakMap();
-const UNIT_KEY_ORDER = ["id", "side", "kind", "name", "castId", "role", "group", "weapon", "x", "z", "yawDeg", "stance", "aim", "state", "lie", "bearers", "arc", "speedMps", "path", "intent", "guess"];
+const UNIT_KEY_ORDER = ["id", "side", "kind", "shape", "name", "castId", "role", "group", "weapon", "x", "z", "yawDeg", "stance", "aim", "state", "lie", "bearers", "arc", "speedMps", "path", "intent", "guess"];
 
 /**
  * 一个单位。at = {x,z}；o：
@@ -270,6 +271,7 @@ const UNIT_KEY_ORDER = ["id", "side", "kind", "name", "castId", "role", "group",
 function U(id, side, at, o = {}) {
   const u = { id, side, x: R2(at.x), z: R2(at.z) };
   if (o.kind && o.kind !== "soldier") u.kind = o.kind;
+  if (o.shape) u.shape = o.shape;   // 战车的外形（2026-10-24）："tankette" = 九四式轻装甲车（Script_EditorBlockoutPuppets 按它出体块，没有炮）
   if (o.name) u.name = o.name;
   if (o.castId) u.castId = o.castId;
   if (o.role) u.role = o.role;
@@ -347,7 +349,12 @@ const IJA = {
   IjaMgGunner: { name: "支沟机枪", role: "machineGun", weapon: "Type11", group: "vanguard", castId: "ijaC" },
   IjaMgLoader: { name: "副射手", role: "loader", group: "vanguard" },
   Interpreter: { name: "翻译", role: "interpreter", group: "vanguard", castId: "interpreter" },
-  Tank: { name: "战车", kind: "tank", group: "tank" },
+  // 2026-10-24：三辆九四式轻装甲车（kind tank、shape tankette；没有炮，一挺机枪）。A 上板桥、B 停在沟沿、C 半路抛锚
+  TankA: { name: "轻装甲车 A", kind: "tank", shape: TK.shape, group: "tankettes" },
+  TankB: { name: "轻装甲车 B", kind: "tank", shape: TK.shape, group: "tankettes" },
+  TankC: { name: "轻装甲车 C", kind: "tank", shape: TK.shape, group: "tankettes" },
+  TankCrewC1: { name: "C 车的机枪（乘员）", role: "machineGun", weapon: "Type11", group: "tankCrew" },
+  TankCrewC2: { name: "C 车乘员", role: "loader", group: "tankCrew" },
 };
 const J = (id, at, o = {}) => U(id, "ija", at, { ...(IJA[id] || {}), ...o });
 
@@ -407,6 +414,14 @@ const LMG_W_LOADER = Pt(-28.34, -117.58), LMG_E_LOADER = Pt(36.0, -139.4);
 const MORTAR_1 = Pt(PL.mortar.x - 1, PL.mortar.z), MORTAR_2 = Pt(PL.mortar.x + 1.2, PL.mortar.z - 0.6);
 const TANK_SEEN = Pt(PL.tankFirstSeen.x, PL.tankFirstSeen.z);
 const TANK_STOP = Pt(PL.tankStop.x, PL.tankStop.z);
+const SW_YAW = 135;   // 朝西南（三辆轻装甲车从东边麦田斜插过来的方向）
+/**
+ * 三辆轻装甲车（2026-10-24）：03-4 在东边麦田冒头（seen）、03-5 往前一段（advance）；都朝西南。B 的机枪扫坑沿（射界到胸墙）。
+ * 旧阵地沟边没收的尸体（OldDead1–5，我方，倒着）03 的几帧都摆上。
+ */
+const TanketteUnits = (where, o = {}) => TK.ids.map((id) => J(id, Pt(where[id].x, where[id].z), { yaw: SW_YAW, straight: true, ...(id === "TankB" ? { arc: ArcTo(where[id], PL.parapet, 4, 6) } : { arc: null }), ...o }));
+const OldDeadUnits = () => L0105_OLD_POSITION.bodies.map((b) => N(b.id, Pt(b.x, b.z), { name: "没收的尸体（旧阵地）", yaw: b.yawDeg, down: true, group: "oldLine", straight: true }));
+const TANKETTE_INF = (list) => list.map((p, i) => J(`TankInf${i + 1}`, Pt(p.x, p.z), { group: "tankEscort", role: "rifleman", yaw: SW_YAW, straight: true }));
 /** 板桥本地坐标 → 世界：along 顺路（往西南为正），across 横着桥面（往东南为正）。 */
 function BridgePt(along, across) {
   const r = L0105_BRIDGE.yawDeg * Math.PI / 180, fx = -Math.sin(r), fz = -Math.cos(r);
@@ -537,7 +552,7 @@ function Keyframes() {
     what: "人都出洞了，班长在洞口回头催。冬瓜按住顺子的手：「顺儿，今天就跑。」",
     next: { text: "跟冬瓜往洞口跑", x: PL.dugoutMouth.x, z: PL.dugoutMouth.z, radiusM: 1.5 },
     how: ["班长「磨啥子，跟斗走！」", "包口露出老百姓的短褂", "顺子先朝洞口看一眼", "冬瓜压着嗓子说话"],
-    notes: "外面：西段守军接到撤退令，沿前沿沟往沟口撤（RetreatNra*）；东段（x≥25）刚丢。其余人沿支沟往西走（刘文财扛弹药箱，何有田第一个钻出去）。Notion 待定：冬瓜手抖系不上背包带，背包是顺子帮他捆的。",
+    notes: "外面：西段守军接到撤退令，沿前沿沟往沟口撤（RetreatNra*）；东段（x ≥ 44，东邻班那一段）刚丢，本班与东邻班之间只有一条浅连沟。其余人沿支沟往西走（刘文财扛弹药箱，何有田第一个钻出去）。Notion 待定：冬瓜手抖系不上背包带，背包是顺子帮他捆的。",
     units: [
       N("Donggua", dg013, { face: p013, stance: "crouch" }),
       N("Luo", Pt(PL.dugoutMouth.x - 0.6, PL.dugoutMouth.z), { yaw: -90 }),
@@ -939,7 +954,7 @@ function Keyframes() {
       N("PitNra3", PIT.pitNra3, { face: PL.fireC, stance: "crouch", guess: true }),
       N("PitNra4", PIT.pitNra4, { face: PL.parapet, stance: "crouch", role: "grenadeBundle", guess: true }),
       ...[-30, -18].map((x, i) => N(`RetreatNraW${i + 1}`, FrontAtX(x, i ? 0.5 : -0.5), { yaw: -80, group: "westFront", to: [PL.mouth, T(T_CORNER1 + 6)], guess: true })),
-      ...lmgUnits(), ...mortarUnits(), ...RushUnits("03-2"), ...DitchSquadUnits("03-2"),
+      ...lmgUnits(), ...mortarUnits(), ...RushUnits("03-2"), ...DitchSquadUnits("03-2"), ...OldDeadUnits(),
     ],
     pois: [...pitPois(), Poi("ShellHit", "掷弹筒弹落点（坑东沿）", "danger", SHELL_032.hit, 1.5), scarpPoi()],
   });
@@ -962,21 +977,21 @@ function Keyframes() {
       N("PitNra2", PIT.pitNra2, { yaw: 180, down: true, lie: "along", guess: true }),
       N("PitNra3", Pt(PL.fireC.x, PL.fireC.z), { yaw: PL.fireC.yawDeg, aim: true, guess: true }),
       N("PitNra4", PIT.pitNra4, { face: PL.parapet, stance: "crouch", role: "grenadeBundle", guess: true }),
-      ...lmgUnits(), ...mortarUnits(), ...RushUnits("03-3"), ...DitchSquadUnits("03-3"),
+      ...lmgUnits(), ...mortarUnits(), ...RushUnits("03-3"), ...DitchSquadUnits("03-3"), ...OldDeadUnits(),
       ...TrenchClearers([lost03 + 27, lost03 + 33, lost03 + 39], { to: FrontAtX(lost03) }),
     ],
     pois: [...pitPois(), POI.frontLost("03"), scarpPoi(), ditchEndPoi()],
   });
 
-  const tankArc = ArcTo(TANK_SEEN, PL.parapet, 4, 4);
   const p34 = Pt(PL.fireA.x + 1.0, PL.fireA.z + 0.3);   // 胸墙塌下来的土埋了甲位，往东让开一步（还在射击踏台上）
   Add({
-    id: "03-4", ...s03, name: "变坏：机枪手中弹、战车露头",
-    player: { x: p34.x, z: p34.z, yawDeg: R1(Yaw(p34, TANK_SEEN) + 25), pitchDeg: 1, stance: "crouch" },
-    what: "机枪手腿上中弹，幺娃把他往后拖；路那头战车露头，一炮打在坑沿。",
+    id: "03-4", ...s03, name: "变坏：机枪手中弹、轻装甲车冒头",
+    player: { x: p34.x, z: p34.z, yawDeg: R1(Yaw(p34, TANK_SEEN)), pitchDeg: 1, stance: "crouch" },
+    what: "机枪手腿上中弹，幺娃把他往后拖；东边麦田里冒出三辆轻装甲车，机枪扫着坑沿，一发掷弹筒弹打塌一截胸墙。",
     next: { text: "看坑沿外那捆手榴弹", x: BUNDLE.x, z: BUNDLE.z, radiusM: 1 },
-    how: ["掷弹筒弹落在捷克式旁边", "战车一炮打塌一截胸墙", "抱手榴弹的弟兄爬出去，死在坑沿外", "那捆手榴弹落在沟沿上"],
-    notes: "机枪手 03-4 先算倒地（刚中弹），03-5 起由幺娃架着走。战车炮口射界画到坑沿。坑外（第四轮）：正面这时才趴到 F2（约 140 m）；沟里那个班的轻机枪架在沟尽头打丙位，步兵趴在 N2 后（离坑约 60 m）、出沟时倒了两个；东头清沟的到了约 15 m。",
+    how: ["掷弹筒弹落在捷克式旁边", "东边麦田里三辆轻装甲车一前两后斜插过来，机枪扫坑沿", "又一发掷弹筒弹打塌一截胸墙", "抱手榴弹的弟兄爬出去，死在坑沿外", "那捆手榴弹落在沟沿上"],
+    notes: "机枪手 03-4 先算倒地（刚中弹），03-5 起由幺娃架着走。2026-10-24：日军没有坦克，是九四式轻装甲车（3.36 × 1.62 × 1.63 m、2 人、1 挺机枪、没有炮；两个中队 34 辆，从不单车行动），三辆一组从东边麦田 x 260–300 冒出来往西南斜插，B 车的机枪射界画到坑沿；"
+      + "胸墙那一截是掷弹筒弹打塌的（原来「战车一炮」）。坑外（第四轮）：正面这时才趴到 F2（约 140 m）；沟里那个班的轻机枪架在沟尽头打丙位，步兵趴在 N2 后（离坑约 60 m）、出沟时倒了两个；东头清沟的从东段经浅连沟清到了本班这段约 15 m 处。",
     signals: [SIG.pitShelled],
     units: [
       N("Luo", Pt(PL.fireB.x - 0.2, PL.fireB.z - 0.2), { yaw: PL.fireB.yawDeg, aim: true }),
@@ -987,11 +1002,11 @@ function Keyframes() {
       N("PitNra2", PIT.pitNra2, { yaw: 180, down: true, lie: "along", guess: true }),
       N("PitNra3", Pt(PL.fireC.x, PL.fireC.z), { yaw: PL.fireC.yawDeg, aim: true, guess: true }),
       N("PitNra4", BUNDLE_MAN, { yaw: 0, down: true, climb: true, path: [Pt(PL.parapet.x + 0.5, PL.parapet.z), BUNDLE_MAN] }),
-      J("Tank", TANK_SEEN, { yaw: PL.tankFirstSeen.yawDeg, arc: tankArc, straight: true, path: Slice(L0105_ROAD, Station(L0105_ROAD, TANK_SEEN) - 14, Station(L0105_ROAD, TANK_SEEN)) }),
-      ...lmgUnits(), ...mortarUnits(), ...RushUnits("03-4"), ...DitchSquadUnits("03-4"),
+      ...TanketteUnits(TK.seen, { from: null }),
+      ...lmgUnits(), ...mortarUnits(), ...RushUnits("03-4"), ...DitchSquadUnits("03-4"), ...OldDeadUnits(),
       ...TrenchClearers([lost03 + 2, lost03 + 7, lost03 + 13]),
     ],
-    pois: [Poi("Bundle", "那捆手榴弹", "objective", BUNDLE, 0.8), Poi("TankSeen", "战车露头", "danger", TANK_SEEN, 5), ...pitPois()],
+    pois: [Poi("Bundle", "那捆手榴弹", "objective", BUNDLE, 0.8), Poi("TankSeen", "三辆轻装甲车（东边麦田）", "danger", TANK_SEEN, 24), ...pitPois()],
   });
 
   const p35 = Pt(PL.fireA.x + 1.6, PL.fireA.z + 1.2);   // 踏台下、塌土东边
@@ -1013,8 +1028,8 @@ function Keyframes() {
       N("PitNra3", T(10.0, -0.5), { yaw: T(10).heading, to: T(T_SOUTH_END + 13), guess: true }),
       N("PitNra4", BUNDLE_MAN, { yaw: 0, down: true }),
       N("RearguardNra", FrontAtX(-4, 0.4), { name: "殿后的兵", yaw: -85, to: [PL.mouth, T(T_BEND + 3)], from: FrontAtX(-26, 0.4) }),
-      J("Tank", TANK_SEEN, { yaw: PL.tankFirstSeen.yawDeg, arc: tankArc, straight: true, intent: RoadRoute(TANK_SEEN, RoadBack(70)) }),
-      ...lmgUnits(), ...mortarUnits(), ...RushUnits("03-5"), ...DitchSquadUnits("03-5"),
+      ...TanketteUnits(TK.advance, { toStraight: true }).map((u) => ({ ...u, intent: [Pt(u.x - 12, u.z + 12)] })),
+      ...lmgUnits(), ...mortarUnits(), ...RushUnits("03-5"), ...DitchSquadUnits("03-5"), ...OldDeadUnits(),
       ...TrenchClearers([lost03 - 3, lost03 + 2, lost03 + 8]),
     ],
     pois: [Poi("Bundle", "那捆手榴弹", "objective", BUNDLE, 0.8), POI.corner1("poi"), POI.mouth("landmark")],
@@ -1066,14 +1081,15 @@ function Keyframes() {
 
   const p43 = T(T_CORNER2 + 1.0, 0.2);
   const tank43 = RoadBack(40);
-  const tankInf = (m, i, o = {}) => J(`TankInf${i + 1}`, RoadBack(m, i % 2 ? 1.6 : -1.6), { group: "tankEscort", role: "rifleman", yaw: ROAD_YAW, straight: true, ...o });
+  // 2026-10-24：A 车从东边麦田拐上车道（在驿道 / 车道岔口 (175,−40) 拐进来）；B / C 还在车道北边的田里斜插；徒步步兵在两三百米后头
+  const tankARoute = [Pt(TK.advance.TankA.x, TK.advance.TankA.z), Pt(210, -72), Pt(L0105_ROAD[0].x, L0105_ROAD[0].z), ...RoadRoute(L0105_ROAD[0], tank43)];
   Add({
     id: "04-3", ...s04, name: "退到拐角 2：履带声",
     player: { x: p43.x, z: p43.z, yawDeg: Yaw(p43, tank43), pitchDeg: 4, stance: "crouch" },
-    what: "退到拐角 2，路上传来履带声：战车顺着路追下来了，离路口还有几十米。",
+    what: "退到拐角 2，东边传来履带声：三辆轻装甲车斜插过来了，打头的那辆拐上了车道，离路口还有几十米。",
     next: { text: "退到路口", x: PL.crossing.x, z: PL.crossing.z, radiusM: 3 },
-    how: ["履带声从东北的路上传来", "跟车步兵跟在车后", "沟里的鬼子还在后头追"],
-    notes: "战车离路口约 40 m（推测）；跟车步兵三人在车后。战车从 03 露头处顺路开过来。",
+    how: ["履带声从东边传来", "打头的 A 车拐上车道，另两辆还在田里", "徒步的鬼子步兵在两三百米后头，没跟上", "沟里的鬼子还在后头追"],
+    notes: "A 车离路口约 40 m（推测）；B 车在车道北边的田里、C 车还在东边；徒步步兵三人在两三百米后头（史料：装甲车在最前头、步兵徒步跟）。",
     signals: [SIG.pitShelled],
     units: [
       // 10-18 第三轮：班长先到路口、站在板桥北沿外一步回身招呼（原来站在桥面北沿底下，站直了头顶贴着横木）
@@ -1085,31 +1101,46 @@ function Keyframes() {
       J("IjaTrench1", T(T_SOUTH_END - 6, 0.5), { yaw: 0, down: true }),
       J("IjaTrench2", T(T_BRANCH + 4, -0.5), { yaw: T(T_BRANCH + 4).heading, aim: true }),
       J("IjaTrench3", T(T_BRANCH - 1, 0.4), { yaw: T(T_BRANCH - 1).heading }),
-      J("Tank", tank43, { yaw: ROAD_YAW, straight: true, path: [Pt(RoadBack(70).x, RoadBack(70).z), ...RoadRoute(RoadBack(70), tank43)] }),
-      tankInf(46, 0, { from: RoadBack(78, -1.6), fromStraight: true }), tankInf(50, 1, { from: RoadBack(82, 1.6), fromStraight: true }), tankInf(54, 2, { from: RoadBack(86, -1.6), fromStraight: true }),
+      J("TankA", tank43, { yaw: ROAD_YAW, straight: true, path: tankARoute }),
+      J("TankB", Pt(TK.field043.TankB.x, TK.field043.TankB.z), { yaw: SW_YAW, straight: true, arc: null, path: [Pt(TK.advance.TankB.x, TK.advance.TankB.z), Pt(205, -60), Pt(TK.field043.TankB.x, TK.field043.TankB.z)] }),
+      J("TankC", Pt(TK.field043.TankC.x, TK.field043.TankC.z), { yaw: SW_YAW, straight: true, arc: null, path: [Pt(TK.advance.TankC.x, TK.advance.TankC.z), Pt(228, -50), Pt(TK.field043.TankC.x, TK.field043.TankC.z)] }),
+      ...TANKETTE_INF(TK.infantry),
     ],
-    pois: [POI.corner2("landmark"), POI.crossing("poi"), Poi("TankRoad", "战车（路上）", "danger", tank43, 4)],
+    pois: [POI.corner2("landmark"), POI.crossing("poi"), Poi("TankRoad", "A 车（拐上了车道）", "danger", tank43, 4), Poi("TankField", "B / C 车（田里）", "danger", Pt(TK.field043.TankB.x, TK.field043.TankB.z), 6)],
   });
 
-  // ======================= 05 沟里伏击战车（路口板桥） =======================
-  // 班长判断：战车要追上来，交通沟太宽、车跨不过去，只有走路口那座板桥才过得了沟——带顺子钻到桥下的沟底趴着等；
-  // 幺娃架着机枪手缩在桥南几步。战车压上板桥，板子嘎吱、土从板缝往下漏；车刚过桥，顺子从桥边探身把那捆手榴弹甩上车尾，
-  // 车瘫在桥头（TankDisabled，桥面两块门板压断下沉），横着把路堵死。剧本这一拍用户还没最后拍板，白盒先按这个做。
-  const s05 = { stage: 5, stageTitle: "沟里伏击战车" };
+  // ======================= 05 沟里伏击轻装甲车（路口板桥） =======================
+  // 2026-10-24：三辆一组从东边麦田斜插过来、不走大路：A 拐上车道压上板桥——班长判断：交通沟太宽、车跨不过去（九四式越壕只有一米多），
+  // 只有走路口那座板桥才过得了沟——带顺子钻到桥下的沟底趴着等；幺娃架着机枪手缩在桥南几步。A 压上板桥，板子嘎吱、土从板缝往下漏；
+  // 车刚过桥，顺子从桥边探身把那捆手榴弹甩上车尾，A 瘫在桥头（TankDisabled，桥面两块门板压断下沉），横着把桥堵死。
+  // B 冲到交通沟东边沟沿过不去，停在沟沿上打机枪（打坡顶方向，别打到桥下的人）；C 半路抛锚，两个乘员钻出来拿车上的机枪就地打；
+  // 徒步的鬼子步兵在后头两三百米，还没跟上。剧本这一拍用户还没最后拍板，白盒先按这个做。
+  const s05 = { stage: 5, stageTitle: "沟里伏击轻装甲车" };
   const BRIDGE_C = Pt(L0105_BRIDGE.x, L0105_BRIDGE.z);
   const BRIDGE_YAW = L0105_BRIDGE.yawDeg;
   const underMe = T(T_CROSSING + 0.6, -0.5);                 // 桥面底下、中间那根横木旁边
   const underLuo = T(T_CROSSING - 0.9, 0.55);
   const yaowa51 = T(T_CROSSING + 7, 0.45), gunner51 = T(T_CROSSING + 7, -0.45);
   const tank51 = RoadBack(15);
+  const B_STOP = Pt(TK.bStop.x, TK.bStop.z), C_STALL = Pt(TK.cStall.x, TK.cStall.z);
+  const B_ARC = ArcTo(B_STOP, TK.bArcTarget, 8, 10);
+  const crewC = { gunner: Pt(TK.cCrew.gunner.x, TK.cCrew.gunner.z), loader: Pt(TK.cCrew.loader.x, TK.cCrew.loader.z) };
+  const C_ARC = ArcTo(crewC.gunner, PL.crest, 10, 10);
+  const infMid = TK.infantry.map((p, i) => Pt((p.x + TK.infantryEnd[i].x) / 2, (p.z + TK.infantryEnd[i].z) / 2));
+  const TankCStalled = (o = {}) => J("TankC", C_STALL, { name: "轻装甲车 C（抛锚）", yaw: TK.cStall.yawDeg, straight: true, arc: null, ...o });
+  const TankBAtRim = (o = {}) => J("TankB", B_STOP, { name: "轻装甲车 B（沟沿）", yaw: TK.bStop.yawDeg, straight: true, arc: B_ARC, ...o });
+  const CrewC = (prone) => [
+    J("TankCrewC1", crewC.gunner, { face: PL.crest, stance: prone ? "prone" : "crouch", aim: prone, straight: true, ...(prone ? { arc: C_ARC } : {}) }),
+    J("TankCrewC2", crewC.loader, { face: PL.crest, stance: prone ? "prone" : "crouch", straight: true }),
+  ];
   Add({
     id: "05-1", ...s05, name: "板桥底下：缩在沟底",
     player: { x: underMe.x, z: underMe.z, yawDeg: Yaw(underMe, tank51), pitchDeg: 18, stance: "prone" },
-    what: "班长看了一眼路上的战车：「它要过来，只有走那座板桥。」带顺子钻到桥下的沟底趴着。",
+    what: "班长看了一眼车道上的 A 车：「它要过来，只有走那座板桥。」带顺子钻到桥下的沟底趴着。田里那辆 C 车噗噗两声熄了火。",
     next: { text: "趴在桥下别动" },
-    how: ["履带声越来越近", "桥面门板缝里透光", "幺娃架着机枪手缩在桥南几步", "它一过沟，坡后撤下去的人就全在枪口底下"],
+    how: ["履带声越来越近", "桥面门板缝里透光", "幺娃架着机枪手缩在桥南几步", "它一过沟，坡后撤下去的人就全在枪口底下", "田里 C 车抛锚，两个乘员钻出来"],
     notes: "路口那段交通沟上搭了一座简易板桥：三根顺路方向的横木上铺门板，桥面 3.8 m 宽、与两头路面齐平，驴车和担架都过得去；桥下照常是沟，沟底到横木底约 1.8 m。"
-      + "交通沟太宽，战车只能走板桥过沟。班长的判断不新增配音，预演里用说明字。剧本这一拍用户还没最后拍板（Notion 待定：路口要不要盖木板），白盒先按这个做。",
+      + "交通沟太宽（九四式越壕约 1.4 m），轻装甲车只能走板桥过沟。班长的判断不新增配音，预演里用说明字。C 车在 (150,42) 抛锚（史料：这车故障多）。剧本这一拍用户还没最后拍板（Notion 待定：路口要不要盖木板），白盒先按这个做。",
     signals: [SIG.pitShelled],
     units: [
       N("Luo", underLuo, { face: tank51, stance: "crouch" }),
@@ -1118,19 +1149,22 @@ function Keyframes() {
       N("Yaowa", yaowa51, { face: BRIDGE_C, stance: "crouch" }),
       J("IjaTrench2", T(T_CORNER2 + 8, -0.5), { yaw: T(T_CORNER2 + 8).heading, aim: true }),
       J("IjaTrench3", T(T_CORNER2 + 3, 0.4), { yaw: T(T_CORNER2 + 3).heading }),
-      J("Tank", tank51, { yaw: ROAD_YAW, straight: true, path: RoadRoute(tank43, tank51) }),
-      tankInf(21, 0, { path: RoadRoute(RoadBack(46, -1.6), RoadBack(21, -1.6)) }), tankInf(25, 1, { path: RoadRoute(RoadBack(50, 1.6), RoadBack(25, 1.6)) }), tankInf(29, 2, { path: RoadRoute(RoadBack(54, -1.6), RoadBack(29, -1.6)) }),
+      J("TankA", tank51, { yaw: ROAD_YAW, straight: true, path: RoadRoute(tank43, tank51) }),
+      J("TankB", Pt(TK.field051.TankB.x, TK.field051.TankB.z), { yaw: SW_YAW, straight: true, arc: null, path: [TK.bRoute[0], Pt(TK.field051.TankB.x, TK.field051.TankB.z)].map((p) => Pt(p.x, p.z)) }),
+      TankCStalled({ path: [Pt(TK.field043.TankC.x, TK.field043.TankC.z), C_STALL] }),
+      ...CrewC(false),
+      ...TANKETTE_INF(infMid),
     ],
-    pois: [POI.crossing("landmark"), POI.crest("poi")],
+    pois: [POI.crossing("landmark"), POI.crest("poi"), Poi("TankC", "C 车抛锚", "danger", C_STALL, 4)],
   });
 
   Add({
-    id: "05-2", ...s05, name: "战车压上板桥",
+    id: "05-2", ...s05, name: "A 车压上板桥",
     player: { x: underMe.x, z: underMe.z, yawDeg: Yaw(underMe, BRIDGE_C), pitchDeg: 32, stance: "prone" },
-    what: "战车压上板桥，门板嘎吱响，土从板缝往下漏，车底就在头顶。",
+    what: "A 车压上板桥，门板嘎吱响，土从板缝往下漏，车底就在头顶。B 车冲到沟沿过不去，停在那打机枪。",
     next: { text: "车一过桥就甩那捆手榴弹" },
-    how: ["履带从头顶压过去", "板子嘎吱响、往下弯", "土从板缝往下漏"],
-    notes: "战车车身正压在板桥上（桥面上、车底离顺子不到 2 m）；跟车步兵还在车后。人在桥下沟底，摆位检查按高差认作「在桥下」，不算站在车身脚印里。",
+    how: ["履带从头顶压过去", "板子嘎吱响、往下弯", "土从板缝往下漏", "B 车停在沟东边的沟沿上，机枪打坡顶那一带"],
+    notes: "A 车车身正压在板桥上（桥面上、车底离顺子不到 2 m）。B 车停在交通沟东沿（约 (39.5,98.5)），车头探在沟沿上，机枪朝坡顶打、不朝桥下；C 车抛锚的两个乘员趴在车边拿机枪打坡顶。人在桥下沟底，摆位检查按高差认作「在桥下」，不算站在车身脚印里。",
     signals: [SIG.pitShelled],
     units: [
       // 10-18 第三轮：蹲着缩在桥下（原来趴着：从趴到蹲那一下动作库先站起来再跪，头顶贴着横木）
@@ -1140,23 +1174,25 @@ function Keyframes() {
       N("Yaowa", yaowa51, { face: BRIDGE_C, stance: "crouch" }),
       J("IjaTrench2", T(T_CORNER2 + 13, -0.5), { yaw: T(T_CORNER2 + 13).heading, aim: true }),
       J("IjaTrench3", T(T_CORNER2 + 8.5, 0.4), { yaw: T(T_CORNER2 + 8.5).heading }),
-      J("Tank", BRIDGE_C, { yaw: BRIDGE_YAW, straight: true, path: RoadRoute(tank51, BRIDGE_C) }),
-      tankInf(7, 0, { path: RoadRoute(RoadBack(21, -1.6), RoadBack(7, -1.6)) }), tankInf(11, 1, { path: RoadRoute(RoadBack(25, 1.6), RoadBack(11, 1.6)) }), tankInf(15, 2, { path: RoadRoute(RoadBack(29, -1.6), RoadBack(15, -1.6)) }),
+      J("TankA", BRIDGE_C, { yaw: BRIDGE_YAW, straight: true, path: RoadRoute(tank51, BRIDGE_C) }),
+      TankBAtRim({ path: [TK.bRoute[2], B_STOP].map((p) => Pt(p.x, p.z)) }),
+      TankCStalled(),
+      ...CrewC(true),
+      ...TANKETTE_INF(infMid.map((p) => Pt(p.x - 6, p.z + 6))),
     ],
-    pois: [POI.crossing("danger")],
+    pois: [POI.crossing("danger"), Poi("TankB", "B 车（沟沿上打机枪）", "danger", B_STOP, 4)],
   });
 
   const p53 = T(T_CROSSING + 4.6, -1.5);   // 桥面西南边沿外一步、贴西壁站起来探身（站直了眼睛刚好够得着车尾顶）
   const stopR = PL.tankStop.yawDeg * Math.PI / 180;
-  const tankRear = Pt(TANK_STOP.x + Math.sin(stopR) * 2.9, TANK_STOP.z + Math.cos(stopR) * 2.9);
-  const blocked = [RoadBack(9, -1.6), RoadBack(12, 1.6), RoadBack(15, -1.6)];
+  const tankRear = Pt(TANK_STOP.x + Math.sin(stopR) * 1.7, TANK_STOP.z + Math.cos(stopR) * 1.7);   // 轻装甲车短：车尾在车心后 1.7 m
   Add({
     id: "05-3", ...s05, name: "甩手榴弹炸车尾",
     player: { x: p53.x, z: p53.z, yawDeg: Yaw(p53, tankRear), pitchDeg: 22, stance: "stand" },
-    what: "车刚过桥，顺子从桥边探身把那捆手榴弹甩上车尾。战车瘫在桥头，横着把路堵死。",
+    what: "车刚过桥，顺子从桥边探身把那捆手榴弹甩上车尾。A 车瘫在桥上，横着把桥堵死。",
     next: { text: "搭把手，架机枪手翻坡顶", x: PL.crest.x, z: PL.crest.z, radiusM: 3 },
-    how: ["幺娃「顺儿哥，搭把手！」", "车体残骸斜在桥头路上", "桥面压断了两块门板", "跟车步兵和沟里追来的鬼子被堵在桥那头"],
-    notes: "TankDisabled：战车停在锚点 tankStop（桥头西南、车身斜着堵住路），场景 gates 里桥面中间两块门板压断下沉——后面的人过不了沟。",
+    how: ["幺娃「顺儿哥，搭把手！」", "A 车残骸斜在桥头路上", "桥面压断了两块门板", "B 车过不了沟、C 车趴窝，沟里追来的鬼子被堵在桥那头"],
+    notes: "TankDisabled：A 车停在锚点 tankStop（桥头西南、车身斜着堵住桥），场景 gates 里桥面中间两块门板压断下沉——后面的人过不了沟。B 车还停在沟东沿上打机枪，C 车的两个乘员趴在车边打；徒步步兵刚走到驿道岔口一带，还有两百米。",
     signals: [SIG.pitShelled, SIG.tankDisabled],
     units: [
       // 10-18 第三轮：班长原来站在桥下正中、站直了头顶贴着桥板（桥下横木底离沟底只有 1.76 m，压断的两块门板塌下来后只剩 1.5 m）：
@@ -1167,34 +1203,42 @@ function Keyframes() {
       N("Yaowa", yaowa51, { face: p53 }),
       J("IjaTrench2", T(T_CROSSING - 13, -0.5), { yaw: T(T_CROSSING - 13).heading, aim: true }),
       J("IjaTrench3", T(T_CROSSING - 17, 0.4), { yaw: T(T_CROSSING - 17).heading }),
-      J("Tank", TANK_STOP, { name: "战车（瘫）", yaw: PL.tankStop.yawDeg, straight: true, arc: null, path: [Pt(BRIDGE_C.x, BRIDGE_C.z), TANK_STOP].slice(1) }),
-      ...blocked.map((p, i) => J(`TankInf${i + 1}`, p, { group: "tankEscort", role: "rifleman", face: BRIDGE_C, stance: i === 1 ? "crouch" : undefined, straight: true })),
+      J("TankA", TANK_STOP, { name: "轻装甲车 A（瘫）", yaw: PL.tankStop.yawDeg, straight: true, arc: null, path: [Pt(BRIDGE_C.x, BRIDGE_C.z), TANK_STOP].slice(1) }),
+      TankBAtRim(),
+      TankCStalled(),
+      ...CrewC(true),
+      ...TANKETTE_INF(TK.infantryEnd),
     ],
-    pois: [Poi("TankWreck", "战车（瘫在桥头）", "landmark", TANK_STOP, 4), Poi("BrokenBoards", "压断的门板", "danger", BRIDGE_C, 2), POI.crest("objective")],
+    pois: [Poi("TankWreck", "A 车（瘫在桥头）", "landmark", TANK_STOP, 4), Poi("BrokenBoards", "压断的门板", "danger", BRIDGE_C, 2), POI.crest("objective"), Poi("TankB", "B 车（沟沿上）", "danger", B_STOP, 4)],
   });
 
   const p54 = Pt(PL.assemblyEntry.x + 0.8, PL.assemblyEntry.z + 3.0);
-  const crestIja = [[-7, -2.5], [5.5, -3], [10, -1.5], [-12, -1]].map(([dx, dz]) => Pt(PL.crest.x + dx, PL.crest.z + dz));
-  const crestIjaIds = ["TankInf1", "TankInf2", "TankInf3", "IjaTrench2"];
+  // 2026-10-24：坡顶上架枪的是沟里追来的那两个（徒步步兵还没跟上来，B 车过不了沟）；都绕桥东头上坡顶（BRIDGE_EAST_DETOUR）
+  const crestIja = [[5.5, -3], [-12, -1]].map(([dx, dz]) => Pt(PL.crest.x + dx, PL.crest.z + dz));
+  const crestIjaIds = ["IjaTrench3", "IjaTrench2"];
   Add({
     id: "05-4", ...s05, name: "翻过坡顶下到干沟，回头：不撵了？",
     player: { x: p54.x, z: p54.z, yawDeg: Yaw(p54, PL.crest), pitchDeg: 14, stance: "stand" },
     what: "翻过坡顶、下到干沟里回头：鬼子停在坡顶上架枪，没追下来。刘文财：「……不撵了？」",
     next: { text: "「表看了，走！」顺干沟往东", x: PL.laneHead.x, z: PL.laneHead.z, radiusM: 4 },
-    how: ["班长「表看了，走！」", "鬼子趴在坡顶上架枪", "顺子和幺娃架着机枪手，最后一个回来"],
-    notes: "坡顶上的鬼子是跟车步兵和沟里追来的那几个，桥面压断了过不来，从桥东头绕过沟爬上坡顶（位置推测）。干沟两岸陡坎挡着，他们得走到坎沿上才看得见沟底。06 接着在这条干沟里（冬瓜头一趟就抬走了）。",
+    how: ["班长「表看了，走！」", "鬼子趴在坡顶上架枪", "B 车的机枪还在沟那头响", "顺子和幺娃架着机枪手，最后一个回来"],
+    notes: "坡顶上的鬼子是沟里追来的那两个，桥面压断了过不来，从桥东头绕过沟爬上坡顶（位置推测）；B 车停在沟东沿上打坡顶，C 车趴窝，徒步步兵还在驿道岔口一带。干沟两岸陡坎挡着，他们得走到坎沿上才看得见沟底。06 接着在这条干沟里（冬瓜头一趟就抬走了）。",
     signals: [SIG.pitShelled, SIG.tankDisabled],
     units: [
       N("Luo", Pt(p54.x - 1.4, p54.z + 2.6), { yaw: 180 }),
       N("LiuWencai", Pt(p54.x - 2.6, p54.z + 0.8), { face: PL.crest }),
       N("Gunner", Pt(p54.x + 0.9, p54.z - 0.6), { face: PL.assembly, stance: "crouch" }),
       N("Yaowa", Pt(p54.x + 1.8, p54.z - 1.2), { face: PL.crest }),
-      J("Tank", TANK_STOP, { name: "战车（瘫）", yaw: PL.tankStop.yawDeg, straight: true, arc: null }),
+      J("TankA", TANK_STOP, { name: "轻装甲车 A（瘫）", yaw: PL.tankStop.yawDeg, straight: true, arc: null }),
+      TankBAtRim(),
+      TankCStalled(),
+      ...CrewC(true),
+      ...TANKETTE_INF(TK.infantryEnd),
       // 10-18 第三轮：都绕桥东头上坡顶（BRIDGE_EAST_DETOUR），沟里追来的那个先绕过靠沟壁的门板、从沟东沿爬出来
       ...crestIja.map((p, i) => J(crestIjaIds[i], p, { group: "crestHold", role: "rifleman", face: PL.assembly, stance: "prone", aim: true, straight: true, guess: true, climb: true,
-        path: [...(i === 3 ? [T(T_CROSSING - 11.4, 0), T(T_CROSSING - 10.6, 5)] : []), ...BRIDGE_EAST_DETOUR, p] })),
+        path: [...(i === 1 ? [T(T_CROSSING - 11.4, 0), T(T_CROSSING - 10.6, 5)] : [T(T_CROSSING - 15.4, 0), T(T_CROSSING - 14.6, 5)]), ...BRIDGE_EAST_DETOUR, p] })),
     ],
-    pois: [POI.crest("danger"), POI.assembly("landmark"), Poi("LaneHead", "凹路口（往后送）", "objective", PL.laneHead, 2.5), Poi("TankWreck", "战车（瘫在桥头）", "landmark", TANK_STOP, 4)],
+    pois: [POI.crest("danger"), POI.assembly("landmark"), Poi("LaneHead", "凹路口（往后送）", "objective", PL.laneHead, 2.5), Poi("TankWreck", "A 车（瘫在桥头）", "landmark", TANK_STOP, 4)],
   });
 
   return K;
@@ -1242,6 +1286,7 @@ const ZONES = Object.freeze([
   { id: "C", name: "交通沟", stages: [2, 5], box: { minX: -6, maxX: 42, minZ: 0, maxZ: 131 } },
   { id: "D", name: "路口板桥、坡顶与干沟（集结处）", stages: [2, 5], box: { minX: 8, maxX: 86, minZ: 110, maxZ: 162 } },
   { id: "E", name: "坑北开阔地（03 日军）", stages: [3, 3], box: { minX: -60, maxX: 60, minZ: -222, maxZ: -28 } },
+  { id: "F", name: "东边麦田（03-4 / 05 三辆轻装甲车）", stages: [3, 5], box: { minX: 100, maxX: 310, minZ: -200, maxZ: 60 } },
 ]);
 
 /**
@@ -1292,6 +1337,7 @@ export async function LoadSceneLayout() {
 export const L0105_CHECK = Object.freeze({
   personM: 0.6, playerM: 0.6, playerDownM: 0.4, litterM: 1.0, carryM: 0.5, carryReachM: 1.6, nextM: 2,
   tank: { w: 2.18, d: 5.75, marginM: 0.3 },
+  tankette: { w: 1.62, d: 3.36, marginM: 0.3 },   // 2026-10-24：九四式轻装甲车（shape "tankette"）
   body: { radiusM: 0.3, toleranceM: 0.08, fromM: 0.5, toM: 1.4, unitTallM: 0.9, routeTallM: 1.6 },
   playerBody: { radiusM: 0.3, toleranceM: 0.01, fromM: 0.35, toM: 1.6 },
   stepM: 0.25, climbWindowM: 1.0, climbM: 1.2, stepUpM: 0.75,
@@ -1362,10 +1408,12 @@ function SegDist(p, a, b) {
   const t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2)) : 0;
   return Math.hypot(p.x - a.x - dx * t, p.z - a.z - dz * t);
 }
+/** 车身尺寸：按 shape（tankette = 九四式轻装甲车，不写 = 八九式）。 */
+const TankDims = (v) => (v.shape === "tankette" ? L0105_CHECK.tankette : L0105_CHECK.tank);
 /** 车身脚印上中心、四角、四边中点 9 处取最高的地面（同运行时 TankGroundY，只看高度场）。 */
 function TankFootGround(ground, v) {
   const r = v.yawDeg * Math.PI / 180, fx = -Math.sin(r), fz = -Math.cos(r), sx = -fz, sz = fx;
-  const hl = L0105_CHECK.tank.d / 2, hw = L0105_CHECK.tank.w / 2;
+  const hl = TankDims(v).d / 2, hw = TankDims(v).w / 2;
   let best = -Infinity;
   for (const a of [-1, 0, 1]) for (const b of [-1, 0, 1]) best = Math.max(best, ground(v.x + fx * hl * a + sx * hw * b, v.z + fz * hl * a + sz * hw * b));
   return best;
@@ -1373,7 +1421,7 @@ function TankFootGround(ground, v) {
 function OnTank(p, v, margin) {
   const r = v.yawDeg * Math.PI / 180, fx = -Math.sin(r), fz = -Math.cos(r);
   const dx = p.x - v.x, dz = p.z - v.z;
-  return Math.abs(dx * fx + dz * fz) < L0105_CHECK.tank.d / 2 + margin && Math.abs(-dx * fz + dz * fx) < L0105_CHECK.tank.w / 2 + margin;
+  return Math.abs(dx * fx + dz * fz) < TankDims(v).d / 2 + margin && Math.abs(-dx * fz + dz * fx) < TankDims(v).w / 2 + margin;
 }
 
 /**
@@ -1413,8 +1461,13 @@ export function FirstLevel0105Issues(doc, { scene = null, meta = new Map() } = {
       if (Dist(l, kf.player) < C.litterM - 0.2) out.push(`${kf.id} 玩家站在 ${l.id} 上`);
     }
     for (const v of kf.units.filter((u) => u.kind === "tank")) {
-      // 桥下的沟底（比车身脚下低 ≥ 1.5 m）不算：05 战车压过板桥时人趴在桥下
-      const tankY = ground ? TankFootGround(ground, v) : null;
+      // 桥下的沟底（比车身脚下低 ≥ 1.5 m）不算：05 战车压过板桥时人趴在桥下。
+      // 2026-10-24：轻装甲车短（3.36 m），压在桥上时脚印九个点全在沟里，高度场量不到桥面——车心在板桥上就按桥面（两头路面）算
+      let tankY = ground ? TankFootGround(ground, v) : null;
+      if (tankY !== null && Dist(v, L0105_BRIDGE) <= L0105_BRIDGE.spanM / 2 + 1) {
+        const r = L0105_BRIDGE.yawDeg * Math.PI / 180, fx = -Math.sin(r), fz = -Math.cos(r), half = L0105_BRIDGE.spanM / 2 + 0.5;
+        tankY = Math.max(tankY, ground(L0105_BRIDGE.x + fx * half, L0105_BRIDGE.z + fz * half), ground(L0105_BRIDGE.x - fx * half, L0105_BRIDGE.z - fz * half));
+      }
       const Under = (p) => tankY !== null && ground(p.x, p.z) < tankY - 1.5;
       for (const u of people) if (OnTank(u, v, C.tank.marginM) && !Under(u)) out.push(`${kf.id} ${u.id} 站在车身 ${v.id} 下 / 上`);
       if (OnTank(kf.player, v, 0) && !Under(kf.player)) out.push(`${kf.id} 玩家在车身 ${v.id} 的脚印里`);

@@ -26,6 +26,7 @@ import {
   L0105_PLACES as PL, L0105_TRENCHES, L0105_ROAD, L0105_BRIDGE, L0105_PROPS, PointBeside, LineLength,
   L0105_GULLY, L0105_GULLY_POCKETS, L0105_SUNKEN_LANE,
   L0105_PIT_NORTH, L0105_RUSH_STATIONS, L0105_RUSH_FALLEN, L0105_DITCH_SQUAD, DitchSquadFallenAt, RushStation, ScarpZ,
+  L0105_TANKETTES as TK,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 import { PREVIZ_THROW, SamplePrevizActor, NormalizeBlockoutPreviz } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES } from "./Data_BlockoutPrevizClips.mjs";
@@ -225,10 +226,10 @@ const DUG_MOUTH = { x: PL.dugoutMouth.x, z: PL.dugoutMouth.z };
 const PIT_GUN = { x: 0, z: -7 };
 const MORTAR = { x: PL.mortar.x, z: PL.mortar.z };
 
-/** 掷弹筒一发：嘭（远处冒烟）→ 约 5.5 s 后落地。效果挂落地。 */
+/** 掷弹筒一发：嘭（远处冒烟）→ 约 5.5 s 后落地。效果挂落地。2026-10-24：掷弹筒组蹲在旧交通沟里，烟从沟东边的地面上冒（PL.mortarSmoke），坑里看得见。 */
 function Mortar(s, tPop, hit, { kind = "launcher", radius = 4, shake = 0.45 } = {}) {
   s.Sfx(tPop, "mortarPop", { x: MORTAR.x, z: MORTAR.z });
-  s.Ev(tPop, "smoke", { x: MORTAR.x, z: MORTAR.z + 2, kind: "SmokeWhite", dur: 4 });
+  s.Ev(tPop, "smoke", { x: PL.mortarSmoke.x, z: PL.mortarSmoke.z, kind: "SmokeWhite", dur: 4 });
   const tHit = tPop + 5.5;
   s.Sfx(tHit, "mortarImpact", { x: hit.x, z: hit.z });
   s.Ev(tHit, "explosion", { x: hit.x, z: hit.z, kind, radius });
@@ -1570,22 +1571,24 @@ function S0303(ctx) {
   }
   // 身后：撤下来的人一个个从沟口过去，越来越稀
   for (const [id, t] of [["RetreatPass1", 6.0], ["RetreatPass2", 30.0]]) {
-    s.Spawn(id, { x: -20, z: -1.4, yawDeg: -80 }, { visible: false });
+    // 2026-10-24：前沿改三段后，从西段里出发、顺着折线（经浅连沟）跑到沟口
+    s.Spawn(id, { ...Pt2(FrontAtX(-33, 0.4)), yawDeg: -80 }, { visible: false });
     s.Key(id, t, { visible: true });
-    s.Go(id, t, t + 12, 0.6, 12, { move: "run", path: [{ x: -5, z: 0 }, { x: 0, z: 0.5 }] });
+    s.Go(id, t, t + 12, 0.6, 12, { move: "run", path: [...L0105_TRENCHES.front.filter(v => v.x > -33 && v.x < -5).map(v => ({ x: v.x, z: v.z })), { x: -5, z: 0 }, { x: 0, z: 0.5 }] });
     s.Key(id, t + 12.2, { visible: false });
   }
   return s.Done({ durationS: 60.0 });
 }
 
 function S0304(ctx) {
-  const s = new Seq(ctx, "03-4", "变坏：机枪手中弹、战车露头");
+  const s = new Seq(ctx, "03-4", "变坏：机枪手中弹、轻装甲车冒头");
   // 开场：机枪手还在坑沿打，抱手榴弹的弟兄在坑里
   s.Place("Gunner", 0, -1.2, -9.2, { state: "alive", stance: "crouch", aim: true, yawDeg: 0 });
   s.Place("Yaowa", 0, -2.4, -8.4, { clip: "YaowaSitLoad", faceTo: "Gunner" });
   s.Place("PitNra4", 0, -0.6, -6.4, { state: "alive", stance: "crouch", yawDeg: -8 });
   s.Place("PitNra1", 0, -2.6, -8.95, { aim: true, yawDeg: 0 }); // 让开顺子的视线（布设里他在顺子右手 0.9 m）；站在射击台平处，别贴着坑壁
-  s.Place("Tank", 0, 175, -40, { visible: false });
+  // 三辆轻装甲车开场还在东边麦田深处（看不见），一会儿冒出来
+  for (const id of TK.ids) s.Place(id, 0, TK.seen[id].x + 24, TK.seen[id].z - 24, { yawDeg: 135, visible: false });
   MortarCrew(s, 0.8);
   s.Eye(0, 5, { stance: "stand", look: { x: 0, z: -40 }, pitch: 1, toYaw: 20 }); // 站在射击台上才看得出胸墙
   Shot(s, 0.4, "Gunner", { count: 6, sfx: "mgBurstNear" }); Shot(s, 3.4, "Gunner", { count: 6, sfx: "mgBurstNear" });
@@ -1603,21 +1606,32 @@ function S0304(ctx) {
   // 倒地的人被拖：只平移、顺着躺，头朝拖他的幺娃（行进方向）；用 crawl 的慢速，整个窗口匀速滑过去
   s.Go("Gunner", pull + 0.6, pull + 3.4, -1.0, -7.6, { move: "crawl", yawDeg: Yaw({ x: -1.0, z: -7.6 }, { x: -1.6, z: -6.3 }) });
   s.Key("Yaowa", pull + 3.6, { clip: null, yawDeg: -7.9 });
-  // 路那头战车露了头
+  // 东边麦田里冒出三辆轻装甲车（2026-10-24：九四式，没有炮、一挺机枪；一前两后斜插过来），B 车的机枪扫坑沿
   const tank = pull + 4.0;
-  s.Key("Tank", tank, { visible: true });
-  s.Go("Tank", tank, tank + 7.4, 159, -20, { move: "run", yawDeg: 142 });
-  s.Sfx(tank, "tankTracks", { x: 168, z: -30 }); s.Sfx(tank + 4, "tankTracks", { x: 162, z: -24 });
-  s.Eye(tank + 1.0, 2.2, { stance: "stand", look: { x: -1.2, z: -8.4 }, pitch: -6, toYaw: -61, toPitch: 1 });
-  // 一炮打在坑沿（150 m，弹着约 0.25 s 后）
-  const gun = tank + 8.0;
-  s.Ev(gun, "muzzle", { x: 157.2, z: -18.6, h: 2.0 });
-  s.Sfx(gun, "tankGun", { x: 159, z: -20 });
-  s.Ev(gun + 0.25, "explosion", { x: 0.3, z: -10.6, kind: "tank", radius: 6 });
-  s.Sfx(gun + 0.25, "shellBlast", { x: 0.3, z: -10.6 });
-  s.Ev(gun + 0.3, "signal", { name: "PitShelled", on: true });
-  s.Shake(gun + 0.25, 0.9, 1);
-  s.Ev(gun + 0.3, "smoke", { x: 0.3, z: -10.8, kind: "SmokeDust", dur: 5 });
+  const SEEN = TK.seen, FAR = { x: PL.tankFirstSeen.x, z: PL.tankFirstSeen.z };
+  for (const [id, dt] of [["TankA", 0], ["TankB", 1.2], ["TankC", 2.0]]) {
+    s.Key(id, tank + dt, { visible: true });
+    s.Go(id, tank + dt, tank + dt + 9.0, SEEN[id].x, SEEN[id].z, { move: "run", yawDeg: 135 });
+  }
+  s.Sfx(tank, "tankTracks", { x: 286, z: -170, volume: 0.5 }); s.Sfx(tank + 4, "tankTracks", { x: 276, z: -160, volume: 0.6 }); s.Sfx(tank + 8, "tankTracks", { x: 268, z: -150, volume: 0.6 });
+  s.Caption(tank + 1.2, 4.2, "（东边麦田里冒出三辆轻装甲车，一前两后斜插过来，机枪扫着坑沿）");
+  // 举枪瞄着看（收窄视野）：280 m 外的车在 60° 里只有几个像素
+  s.Eye(tank + 1.0, 2.2, { stance: "stand", look: { x: -1.2, z: -8.4 }, pitch: -6, toLook: FAR, toPitch: 1, fov: 24 });
+  s.Eye(tank + 3.2, 4.6, { stance: "stand", look: FAR, pitch: 1, fov: 24 });
+  for (const [t, k] of [[tank + 4.4, 0], [tank + 7.0, 1]]) {
+    const b = { x: SEEN.TankB.x + 24 - 24 * Math.min(1, (t - tank - 1.2) / 9), z: SEEN.TankB.z - 24 + 24 * Math.min(1, (t - tank - 1.2) / 9) };
+    s.Ev(t, "muzzle", { x: R(b.x - 0.6), z: R(b.z + 0.6), h: 1.5, count: 8, interval: 0.11 });
+    s.Sfx(t, "mgBurstFar", { x: R(b.x), z: R(b.z), volume: 0.7 });
+    for (let i = 0; i < 5; i++) Puff(s, R(t + 0.5 + i * 0.12), { x: R(3.2 - k * 1.2 - i * 1.1), z: i % 2 ? -11.3 : -11.0 });
+    s.Sfx(t + 0.5, "strafeDirt", { x: 0.6, z: -11.2, volume: 0.4 });
+  }
+  // 又一发掷弹筒弹打在坑沿（远处的掷弹筒组「嘭」都落在 0.8 + 2k 上）：胸墙塌了一截（原来「战车一炮」；轻装甲车没有炮）
+  const pop2 = 0.8 + 2 * Math.ceil((tank + 2.5 - 0.8) / 2);
+  s.Eye(pop2 + 4.0, 1.2, { stance: "stand", look: FAR, pitch: 1, fov: 24, toLook: { x: 0.3, z: -10.6 }, toPitch: -8 });
+  const gun = Mortar(s, pop2, { x: 0.3, z: -10.6 }, { radius: 5, shake: 1 });
+  s.Ev(gun + 0.05, "signal", { name: "PitShelled", on: true });
+  s.Ev(gun + 0.1, "smoke", { x: 0.3, z: -10.8, kind: "SmokeDust", dur: 5 });
+  s.Caption(gun + 0.3, 2.4, "（掷弹筒弹打塌一截胸墙）");
   // 一个弟兄抱着一捆手榴弹爬出去，死在坑沿外，那捆手榴弹落在沟沿上
   // 2026-10-19：猫腰到坑沿 → 扑出去（PvStandToProneDive）→ 抱着那捆爬（PvCrawlCarryBundle，右臂夹着手榴弹捆，枪背着）
   const crawl = gun + 2.6;
@@ -1625,7 +1639,7 @@ function S0304(ctx) {
   s.Go("PitNra4", crawl - 3.4, crawl - 0.5, lip.x, lip.z, { move: "walk", depart: { stance: "crouch" }, stance: "crouch" });
   Dive(s, "PitNra4", crawl - 0.4, Yaw(lip, out), { clip: "PvCrawlCarryBundle" });
   s.Go("PitNra4", crawl + 0.8, crawl + 5.4, out.x, out.z, { move: "crawl" });
-  s.Eye(crawl - 0.4, 1.4, { stance: "stand", yaw: -61, pitch: 1, toLook: { x: 0.4, z: -12 }, toPitch: -14 });
+  s.Eye(crawl - 0.4, 1.4, { stance: "stand", look: { x: 0.3, z: -10.6 }, pitch: -8, toLook: { x: 0.4, z: -12 }, toPitch: -14 });
   Shot(s, crawl + 5.6, "IjaLmgWest", { count: 5, sfx: "mgBurstFar" });
   Puff(s, crawl + 5.9, { x: 0.9, z: -14.2 });
   s.Key("PitNra4", crawl + 6.0, { state: "down", clip: null });
@@ -1656,9 +1670,9 @@ function S0305(ctx) {
   s.Place("Yaowa", 0, -1.6, -6.3, { stance: "crouch" });
   s.Place("PitNra1", 0, 2.7, -8.7, { aim: true });
   s.Place("PitNra3", 0, -3.0, -6.6, { stance: "crouch" });
-  s.Place("RearguardNra", 0, -26, 2.4, { yawDeg: -85 });
+  { const p = Pt2(FrontAtX(-33, 0.4)); s.Place("RearguardNra", 0, p.x, p.z, { yawDeg: -85 }); }
   // 殿后的兵跑过沟口：后头没得人了！
-  s.Go("RearguardNra", 0, 6.4, -2.0, -0.2, { move: "run", path: [{ x: -14, z: -3.5 }, { x: -5, z: 0 }] });
+  s.Go("RearguardNra", 0, 6.4, -2.0, -0.2, { move: "run", path: [Pt2(FrontAtX(-14, 0.4)), { x: -5, z: 0 }] });   // 2026-10-24：顺着改了形的本班这段沟跑
   s.Eye(0, 4, { stance: "crouch", look: { x: -5, z: 0 }, pitch: 2 });
   s.Say("PitLeave.01", "RearguardNra", 4.8);
   s.Go("RearguardNra", 7.0, 11.0, 0.8, 12.0, { move: "run", path: [{ x: 0.2, z: 1.0 }] });
@@ -1764,7 +1778,10 @@ function S0403(ctx) {
   s.Place("Gunner", 0, 28.0, 80.6, { woundedWalk: true }); s.Place("Yaowa", 0, 28.8, 80.2);
   s.Place("Luo", 0, 31.6, 95.0); s.Place("LiuWencai", 0, 30.8, 88.0);
   s.Place("IjaTrench2", 0, 18.0, 56.0, { aim: false }); s.Place("IjaTrench3", 0, 16.6, 52.6);
-  s.Place("Tank", 0, 86.4, 67.0); s.Place("TankInf1", 0, 90.0, 61.8); s.Place("TankInf2", 0, 95.0, 61.4); s.Place("TankInf3", 0, 95.6, 56.2);
+  // 2026-10-24：A 车刚在驿道 / 车道岔口拐上车道，B / C 还在东边田里斜插；徒步步兵在两三百米后头（关键帧里的位置，不动）
+  const fork = { x: L0105_ROAD[0].x, z: L0105_ROAD[0].z };
+  s.Place("TankA", 0, fork.x + 12, fork.z - 6, { yawDeg: 150 });
+  s.Place("TankB", 0, 205, -60, { yawDeg: 135 }); s.Place("TankC", 0, 228, -50, { yawDeg: 135 });
   s.Cam(0, 4.4, { from: { x: 24.6, z: 72.4, h: 1.4 }, to: { x: 30.36, z: 86.95, h: 1.4 }, look: { actor: "Yaowa", offset: [0, 1.2, 0] }, ease: "linear" });
   SupportGo(s, 0, 8.0, { x: 30.54, z: 91.99 }, { path: [{ x: 29.6, z: 85.6 }] });
   { const l = KU(ctx, "04-3", "Luo"); s.Go("Luo", 0, 6.0, l.x, l.z, { move: "run", yawDeg: l.yawDeg }); }  // 板桥北沿外一步（10-18 第三轮挪出桥底）
@@ -1779,15 +1796,15 @@ function S0403(ctx) {
   for (const t of [6.2, 8.4]) Shot(s, t, "player");
   Shot(s, 7.0, "IjaTrench2"); Puff(s, 7.05, { x: 29.4, z: 85.2 });
   s.Key("IjaTrench2", 9.0, { stance: "crouch" });
-  // 路上传来履带声
-  s.Sfx(9.6, "tankTracks", { x: 80, z: 74, volume: 0.6 });
-  s.Sfx(13.6, "tankTracks", { x: 74, z: 80, volume: 0.8 });
-  s.Sfx(17.6, "tankTracks", { x: 68, z: 85, volume: 1.0 });
-  s.Caption(10.2, 3.2, "（路上传来履带声）");
-  s.Go("Tank", 9.0, 20.0, 64.1, 88.56, { move: "walk", yawDeg: 133.3 });
-  s.Go("TankInf1", 9.0, 20.0, 67.37, 83.28, { move: "walk" });
-  s.Go("TankInf2", 9.0, 20.0, 72.48, 82.86, { move: "walk" });
-  s.Go("TankInf3", 9.0, 20.0, 73.19, 77.79, { move: "walk" });
+  // 东边传来履带声：A 车顺车道开过来，B / C 在田里斜插
+  s.Sfx(9.6, "tankTracks", { x: 150, z: -8, volume: 0.5 });
+  s.Sfx(13.6, "tankTracks", { x: 120, z: 30, volume: 0.7 });
+  s.Sfx(17.6, "tankTracks", { x: 90, z: 68, volume: 0.9 });
+  s.Caption(10.2, 3.6, "（东边传来履带声：打头的那辆拐上了车道，另两辆还在田里）");
+  // 轻装甲车田里跑 3–4 m/s（九四式最快 40 km/h，越野慢得多）：出发点放得近一点
+  s.Place("TankA", 0, 128, 20, { yawDeg: 133.3 }); s.Place("TankB", 0, 178, -28, { yawDeg: 135 });
+  { const a = KU(ctx, "04-3", "TankA"); s.Go("TankA", 2.0, 20.0, a.x, a.z, { move: "run", path: [{ x: 105, z: 50 }], yawDeg: 133.3 }); }
+  { const b = KU(ctx, "04-3", "TankB"), c = KU(ctx, "04-3", "TankC"); s.Go("TankB", 2.0, 20.0, b.x, b.z, { move: "run", yawDeg: 135 }); s.Go("TankC", 2.0, 20.0, c.x, c.z, { move: "run", yawDeg: 135 }); }
   s.Eye(11.0, 2.4, { stance: "crouch", look: { x: 23.02, z: 70.97 }, pitch: 2, toYaw: -92.7, toPitch: 4 });
   s.Eye(19.0, 1.6, { stance: "crouch", yaw: -92.7, pitch: 4, toLook: KU(ctx, "04-3", "Luo"), toPitch: 1 });
   s.Key("Luo", 19.0, { faceTo: "player", clip: "PvStandBeckonL" });
@@ -1802,10 +1819,12 @@ function S0501(ctx) {
   const K = id => KU(ctx, "05-1", id);
   const ME = KP(ctx, "05-1");
   const luo = K("Luo");
-  // 开场：战车还在路上往这边来；班长站在板桥北边几步的沟里，看了一眼路
-  const tank0 = RoadBack(30), inf0 = [RoadBack(36, -1.6), RoadBack(40, 1.6), RoadBack(44, -1.6)];
-  s.Place("Tank", 0, tank0.x, tank0.z, { yawDeg: 133.3 });
-  ["TankInf1", "TankInf2", "TankInf3"].forEach((id, k) => s.Place(id, 0, inf0[k].x, inf0[k].z));
+  // 开场：A 车还在车道上往这边来；B 车在车道北边的田里斜插；C 车在田里半路抛锚；班长站在板桥北边几步的沟里，看了一眼路
+  const tank0 = RoadBack(30);
+  s.Place("TankA", 0, tank0.x, tank0.z, { yawDeg: 133.3 });
+  s.Place("TankB", 0, TK.bRoute[0].x, TK.bRoute[0].z, { yawDeg: 135 });
+  s.Place("TankC", 0, 166, 27, { yawDeg: 135 });
+  s.Place("TankCrewC1", 0, 166, 27, { visible: false }); s.Place("TankCrewC2", 0, 166, 27, { visible: false });
   const luo0 = TP(T_CROSSING - 4.5, 0.6), me0 = TP(T_CROSSING - 6.5, -0.2);
   s.Place("Luo", 0, luo0.x, luo0.z, { stance: "stand", faceTo: RoadBack(25) });
   const gy0 = TP(T_CROSSING - 9, -0.45), yw0 = TP(T_CROSSING - 9, 0.45);
@@ -1815,7 +1834,7 @@ function S0501(ctx) {
   for (const [t, v] of [[0.6, 0.55], [4.6, 0.7], [8.6, 0.85], [12.6, 1.0]]) s.Sfx(t, "tankTracks", { x: RoadBack(24).x, z: RoadBack(24).z, volume: v });
   // 班长的判断（不新增配音，用说明字）
   s.Key("Luo", 1.4, { clip: "PvStandPointL", clipHold: true, faceTo: BRIDGE });
-  s.Caption(1.6, 3.6, "（班长看了一眼路上的战车：它要过来，只有走那座板桥——沟太宽，车跨不过去）");
+  s.Caption(1.6, 3.6, "（班长看了一眼车道上的 A 车：它要过来，只有走那座板桥——沟太宽，这种小车跨不过去）");
   s.Key("Luo", 4.0, { clip: null });
   // 他拽着顺子钻到桥下的沟底趴着；幺娃架着机枪手从桥下钻过去，缩在桥南几步
   // 10-18 第三轮：桥下横木底离沟底只有 1.76 m，钻进桥底之前就猫下腰（出发那一刻就蹲，走的是蹲姿），头顶离横木底 ≥ 0.1 m
@@ -1826,9 +1845,14 @@ function S0501(ctx) {
   s.Cam(4.6, 2.2, { from: { ...TP(T_CROSSING - 5.6, -0.2), h: 1.2 }, to: { x: ME.x, z: ME.z, h: 0.45 }, look: { ...RoadBack(18), h: 1.4 }, lookTo: { ...BRIDGE, h: 2.4 } });
   s.Caption(5.2, 2.4, "（班长拽着顺子钻到桥下的沟底趴着）");
   s.Eye(6.8, 3.4, { stance: "prone", look: { ...BRIDGE, x: BRIDGE.x + 0.4 }, pitch: 60, toLook: RoadBack(15), toPitch: 16 });
-  // 战车顺着路逼近，要从桥上过
-  s.Go("Tank", 2.0, 16.0, K("Tank").x, K("Tank").z, { move: "walk", yawDeg: 133.3 });
-  for (const id of ["TankInf1", "TankInf2", "TankInf3"]) s.Go(id, 2.0, 16.0, K(id).x, K(id).z, { move: "walk" });
+  // A 车顺着车道逼近，要从桥上过；B 车在田里往沟沿冲；C 车开着开着噗噗两声熄了火，两个乘员钻出来
+  s.Go("TankA", 2.0, 16.0, K("TankA").x, K("TankA").z, { move: "walk", yawDeg: 133.3 });
+  s.Go("TankB", 2.0, 16.0, K("TankB").x, K("TankB").z, { move: "walk", yawDeg: 135 });
+  s.Go("TankC", 2.0, 7.0, K("TankC").x, K("TankC").z, { move: "run", yawDeg: TK.cStall.yawDeg });
+  s.Sfx(5.2, "tankTracks", { x: 160, z: 32, volume: 0.5 }); s.Sfx(7.0, "tankTracks", { x: K("TankC").x, z: K("TankC").z, volume: 0.25 });
+  s.Caption(7.2, 3.0, "（田里那辆 C 车噗噗两声，熄了火；两个乘员掀开舱盖钻出来）");
+  s.Key("TankCrewC1", 9.4, { x: K("TankCrewC1").x, z: K("TankCrewC1").z, move: "cut", visible: true, stance: "crouch", faceTo: PL.crest });
+  s.Key("TankCrewC2", 10.2, { x: K("TankCrewC2").x, z: K("TankCrewC2").z, move: "cut", visible: true, stance: "crouch", faceTo: PL.crest });
   s.Shake(10.0, 6.0, 0.12);
   s.Sfx(11.0, "dirtFall", { x: BRIDGE.x, z: BRIDGE.z, volume: 0.4 });
   // 回头看一眼：幺娃架着机枪手缩在桥南几步
@@ -1843,14 +1867,23 @@ function S0502(ctx) {
   const ME = KP(ctx, "05-2");
   const bridgeYaw = L0105_BRIDGE.yawDeg;
   const start = RoadBack(14), past = RoadBack(-5.5, 0);
-  s.Place("Tank", 0, start.x, start.z, { yawDeg: 133.3 });
-  const inf0 = [RoadBack(21, -1.6), RoadBack(25, 1.6), RoadBack(29, -1.6)];
-  ["TankInf1", "TankInf2", "TankInf3"].forEach((id, k) => s.Place(id, 0, inf0[k].x, inf0[k].z));
-  // 桥下仰看：战车从东北顺路压过来
+  s.Place("TankA", 0, start.x, start.z, { yawDeg: 133.3 });
+  // B 车从田里冲到交通沟东沿、停住打机枪（打坡顶那一带，不朝桥下）；C 车趴窝，两个乘员趴在车边打
+  s.Place("TankB", 0, TK.bRoute[2].x, TK.bRoute[2].z, { yawDeg: 135 });
+  s.Go("TankB", 0.4, 6.0, K("TankB").x, K("TankB").z, { move: "run", yawDeg: TK.bStop.yawDeg });
+  s.Sfx(0.6, "tankTracks", { x: TK.bRoute[2].x, z: TK.bRoute[2].z, volume: 0.6 });
+  s.Caption(6.2, 3.0, "（B 车冲到沟沿过不去——这种小车只能跨一米多宽的沟——停在那打机枪）");
+  const bMuzzle = { x: R(K("TankB").x - 0.5), z: R(K("TankB").z - 0.4) };
+  for (const t of [6.6, 9.2]) {
+    s.Ev(t, "muzzle", { x: bMuzzle.x, z: bMuzzle.z, h: 1.5, count: 8, interval: 0.11 });
+    s.Sfx(t, "mgBurstFar", { x: K("TankB").x, z: K("TankB").z, volume: 0.9 });
+    for (let i = 0; i < 4; i++) Puff(s, R(t + 0.5 + i * 0.14), { x: R(46 + i * 4), z: R(128.6 + (i % 2) * 0.8) });
+  }
+  for (const t of [3.0, 7.6]) Shot(s, t, "TankCrewC1", { count: 6, sfx: "mgBurstFar" });
+  // 桥下仰看：A 车从东北顺路压过来
   s.Eye(0, 3.0, { stance: "prone", look: start, pitch: 14, toLook: RoadBack(8), toPitch: 22 });
   for (const [t, v] of [[0.4, 1.0], [3.4, 1.1], [6.0, 1.2], [8.6, 1.0]]) s.Sfx(t, "tankTracks", { x: BRIDGE.x, z: BRIDGE.z, volume: v });
-  s.Go("Tank", 0.3, 6.6, BRIDGE.x, BRIDGE.z, { move: "walk", yawDeg: bridgeYaw });
-  for (const id of ["TankInf1", "TankInf2", "TankInf3"]) s.Go(id, 0.3, 10.0, K(id).x, K(id).z, { move: "walk" });
+  s.Go("TankA", 0.3, 6.6, BRIDGE.x, BRIDGE.z, { move: "walk", yawDeg: bridgeYaw });
   // 换到沟里桥南几步看：战车压上板桥
   const side = TP(T_CROSSING + 11.5, -0.9);   // 幺娃他们身后几步，越过他们看板桥
   s.Cam(3.0, 3.4, { from: { ...side, h: 1.5 }, to: { ...TP(T_CROSSING + 10.5, -1.0), h: 1.45 }, look: { ...RoadBack(5), h: 2.2 }, lookTo: { ...BRIDGE, h: 2.0 } });
@@ -1873,7 +1906,7 @@ function S0502(ctx) {
   // 朝西北（正对桥面南沿，沿一下成一条横线）、仰 28°：下半是门板底面，中间是桥沿，上面是车身，再往上是天
   s.Eye(6.4, 3.0, { stance: "crouch", x: under.x, z: under.z, yaw: 38, pitch: 26, toPitch: 30, fov: 76, shake: 0.4 });
   s.Ev(6.6, "smoke", { x: R(under.x - 1.0), z: R(under.z - 2.2), kind: "SmokeDust", dur: 3.5 });
-  s.Go("Tank", 7.6, 10.4, past.x, past.z, { move: "walk", yawDeg: 128 });
+  s.Go("TankA", 7.6, 10.4, past.x, past.z, { move: "walk", yawDeg: 128 });
   s.Eye(9.4, 1.6, { stance: "crouch", x: under.x, z: under.z, yaw: 38, pitch: 30, toLook: past, toPitch: 14, fov: 76 });
   return s.Done({ durationS: 11.2 });
 }
@@ -1882,14 +1915,21 @@ function S0503(ctx) {
   const s = new Seq(ctx, "05-3", "甩手榴弹炸车尾");
   const K = id => KU(ctx, "05-3", id);
   const ME = KP(ctx, "05-3");
-  const stop = K("Tank");
+  const stop = K("TankA");
   const r = stop.yawDeg * Math.PI / 180;
-  const rear = { x: R(stop.x + Math.sin(r) * 2.9), z: R(stop.z + Math.cos(r) * 2.9) };
+  const rear = { x: R(stop.x + Math.sin(r) * 1.7), z: R(stop.z + Math.cos(r) * 1.7) };   // 轻装甲车短：车尾在车心后 1.7 m
   // 车刚过桥：车屁股还对着桥头
   const past = RoadBack(-5.5, 0);
-  s.Place("Tank", 0, past.x, past.z, { yawDeg: 128 });
-  s.Go("Tank", 0, 2.4, stop.x, stop.z, { move: "walk", yawDeg: stop.yawDeg });
+  s.Place("TankA", 0, past.x, past.z, { yawDeg: 128 });
+  s.Go("TankA", 0, 2.4, stop.x, stop.z, { move: "walk", yawDeg: stop.yawDeg });
   s.Ev(0, "signal", { name: "TankDisabled", on: false });
+  // B 车还停在沟东沿上打坡顶，C 车的机枪也在田里响
+  const bMuzzle = { x: R(K("TankB").x - 0.5), z: R(K("TankB").z - 0.4) };
+  for (const t of [1.0, 9.0]) {
+    s.Ev(t, "muzzle", { x: bMuzzle.x, z: bMuzzle.z, h: 1.5, count: 8, interval: 0.11 });
+    s.Sfx(t, "mgBurstFar", { x: K("TankB").x, z: K("TankB").z, volume: 0.8 });
+  }
+  Shot(s, 5.0, "TankCrewC1", { count: 6, sfx: "mgBurstFar" });
   const under = KP(ctx, "05-2");
   s.Cam(0, 1.6, { from: { x: under.x, z: under.z, h: 0.4 }, to: { x: ME.x, z: ME.z, h: 1.62 }, look: { ...BRIDGE, h: 2.6 }, lookTo: { ...rear, h: 2.6 } });
   // 甩手榴弹（10-18 第二轮：原来第一人称贴着车尾，满屏车屁股）：换成顺子身后斜上方的宽镜头，
@@ -1913,9 +1953,9 @@ function S0503(ctx) {
   s.Shake(boom, 0.8, 0.8);
   s.Ev(boom + 0.1, "smoke", { x: rear.x, z: rear.z, kind: "SmokeBlack", dur: 20 });
   s.Ev(boom + 0.1, "signal", { name: "TankDisabled", on: true });
-  s.Caption(boom + 0.6, 2.6, "（车瘫在桥头，斜着把路堵死；桥面压断了两块门板）");
-  // 后面的鬼子一时跟不上来
-  s.Key("TankInf1", boom + 0.6, { stance: "crouch" }); s.Key("TankInf2", boom + 0.4, { stance: "crouch" });
+  s.Caption(boom + 0.6, 2.6, "（A 车瘫在桥头，斜着把桥堵死；桥面压断了两块门板）");
+  // 后面的鬼子一时跟不上来：B 车过不了沟、C 车趴窝，徒步步兵还在两百米外
+  s.Caption(boom + 3.4, 2.6, "（B 车过不了沟、C 车趴窝，徒步的鬼子还在两百米外）");
   Shot(s, boom + 2.0, "Luo"); Shot(s, boom + 3.6, "Luo");
   const across = RoadBack(11);
   s.Key("Shunzi", boom + 0.8, { visible: false });
@@ -1938,8 +1978,14 @@ function S0504(ctx) {
   s.Place("Yaowa", 0, K3("Yaowa").x, K3("Yaowa").z, { stance: "stand" });
   const luo0 = TP(T_END - 3, 0.5), liu0 = TP(T_END - 1, -0.5);
   s.Place("Luo", 0, luo0.x, luo0.z, { yawDeg: 0 }); s.Place("LiuWencai", 0, liu0.x, liu0.z, { yawDeg: 0 });
-  const enemies0 = [["TankInf1", RoadBack(9, -1.6)], ["TankInf2", RoadBack(12, 1.6)], ["TankInf3", RoadBack(15, -1.6)], ["IjaTrench2", TP(T_CROSSING - 13, -0.5)]];
+  // 2026-10-24：追上坡顶的只有沟里追来的那两个（徒步步兵还没跟上来，B 车过不了沟）
+  const enemies0 = [["IjaTrench2", TP(T_CROSSING - 13, -0.5)], ["IjaTrench3", TP(T_CROSSING - 17, 0.4)]];
   for (const [id, p] of enemies0) s.Place(id, 0, p.x, p.z, { stance: "stand", aim: false });
+  const bMuzzle = { x: R(K("TankB").x - 0.5), z: R(K("TankB").z - 0.4) };
+  for (const t of [2.0, 11.0]) {
+    s.Ev(t, "muzzle", { x: bMuzzle.x, z: bMuzzle.z, h: 1.5, count: 8, interval: 0.11 });
+    s.Sfx(t, "mgBurstFar", { x: K("TankB").x, z: K("TankB").z, volume: 0.7 });
+  }
   const gEnd = K("Gunner"), yEnd = K("Yaowa");
   SupportGo(s, 0, 13.0, gEnd, { path: [TP(T_CREST, -0.45), ramp], faceTo: PL.assembly });
   void yEnd;
@@ -1950,7 +1996,7 @@ function S0504(ctx) {
   for (const [id] of enemies0) {
     const to = K(id);
     // 10-18 第三轮：桥面压断了，绕桥东头过沟（不从桥底、不穿横木端头），同 05-4 关键帧的 path
-    s.Go(id, 3.0, 14.0, to.x, to.z, { move: "run", stance: "prone", aim: true, faceTo: PL.assembly, path: [...(id === "IjaTrench2" ? [TP(T_CROSSING - 11.4, 0), TP(T_CROSSING - 10.6, 5)] : []), ...BRIDGE_EAST_DETOUR] });
+    s.Go(id, 3.0, 14.0, to.x, to.z, { move: "run", stance: "prone", aim: true, faceTo: PL.assembly, path: [...(id === "IjaTrench2" ? [TP(T_CROSSING - 11.4, 0), TP(T_CROSSING - 10.6, 5)] : [TP(T_CROSSING - 15.4, 0), TP(T_CROSSING - 14.6, 5)]), ...BRIDGE_EAST_DETOUR] });
   }
   // 回头
   s.Eye(12.8, 1.4, { stance: "stand", yaw: 175, pitch: 0, toLook: PL.crest, toPitch: 14 });

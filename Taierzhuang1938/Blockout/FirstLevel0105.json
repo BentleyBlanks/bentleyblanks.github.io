@@ -5,8 +5,8 @@
   "source": {
     "generator": "Script_EditorBlockoutCli.mjs export FirstLevel0105",
     "gameVersion": "Notion 01–05 剧本 + 空间拓扑关系（2026-10-18）",
-    "commit": "9be17ce51dcb09e2fe4810c9ad1b646eb9658155",
-    "generatedAt": "2026-10-20T17:09:56.141Z"
+    "commit": "ffc42722fe88f7875104b8044d764a994ab339b9",
+    "generatedAt": "2026-10-23T20:08:58.938Z"
   },
   "zones": [
     {
@@ -77,6 +77,20 @@
         "maxX": 60,
         "minZ": -222,
         "maxZ": -28
+      }
+    },
+    {
+      "id": "F",
+      "name": "东边麦田（03-4 / 05 三辆轻装甲车）",
+      "stages": [
+        3,
+        5
+      ],
+      "box": {
+        "minX": 100,
+        "maxX": 310,
+        "minZ": -200,
+        "maxZ": 60
       }
     }
   ],
@@ -428,8 +442,8 @@
           "id": "FrontLost",
           "name": "前沿沟东段已丢",
           "kind": "danger",
-          "x": 37,
-          "z": -2.92,
+          "x": 56,
+          "z": -9.71,
           "radiusM": 6
         }
       ],
@@ -460,7 +474,7 @@
         "顺子先朝洞口看一眼",
         "冬瓜压着嗓子说话"
       ],
-      "notes": "外面：西段守军接到撤退令，沿前沿沟往沟口撤（RetreatNra*）；东段（x≥25）刚丢。其余人沿支沟往西走（刘文财扛弹药箱，何有田第一个钻出去）。Notion 待定：冬瓜手抖系不上背包带，背包是顺子帮他捆的。",
+      "notes": "外面：西段守军接到撤退令，沿前沿沟往沟口撤（RetreatNra*）；东段（x ≥ 44，东邻班那一段）刚丢，本班与东邻班之间只有一条浅连沟。其余人沿支沟往西走（刘文财扛弹药箱，何有田第一个钻出去）。Notion 待定：冬瓜手抖系不上背包带，背包是顺子帮他捆的。",
       "units": [
         {
           "id": "Donggua",
@@ -618,24 +632,32 @@
           "side": "nra",
           "group": "westFront",
           "x": -39.75,
-          "z": -1.9,
+          "z": 5.93,
           "yawDeg": -80,
           "intent": [
             {
-              "x": -40,
-              "z": -2.33
+              "x": -39.63,
+              "z": 5.66
             },
             {
-              "x": -38,
-              "z": -3.5
+              "x": -31,
+              "z": 9.5
             },
             {
-              "x": -26,
-              "z": 3.5
+              "x": -28,
+              "z": 6.2
             },
             {
-              "x": -14,
-              "z": -3.5
+              "x": -23,
+              "z": 5.2
+            },
+            {
+              "x": -18,
+              "z": 2.4
+            },
+            {
+              "x": -12,
+              "z": -0.8
             },
             {
               "x": -5,
@@ -660,21 +682,29 @@
           "id": "RetreatNra2",
           "side": "nra",
           "group": "westFront",
-          "x": -29.75,
-          "z": 0.73,
+          "x": -30.37,
+          "z": 8.06,
           "yawDeg": -80,
           "intent": [
             {
               "x": -30,
-              "z": 1.16
+              "z": 8.4
             },
             {
-              "x": -26,
-              "z": 3.5
+              "x": -28,
+              "z": 6.2
             },
             {
-              "x": -14,
-              "z": -3.5
+              "x": -23,
+              "z": 5.2
+            },
+            {
+              "x": -18,
+              "z": 2.4
+            },
+            {
+              "x": -12,
+              "z": -0.8
             },
             {
               "x": -5,
@@ -699,17 +729,17 @@
           "id": "RetreatNra3",
           "side": "nra",
           "group": "westFront",
-          "x": -19.75,
-          "z": 0.43,
+          "x": -19.76,
+          "z": 3.96,
           "yawDeg": -80,
           "intent": [
             {
               "x": -20,
-              "z": 0
+              "z": 3.52
             },
             {
-              "x": -14,
-              "z": -3.5
+              "x": -12,
+              "z": -0.8
             },
             {
               "x": -5,
@@ -734,13 +764,13 @@
           "id": "RetreatNra4",
           "side": "nra",
           "group": "westFront",
-          "x": -10.82,
-          "z": -2.8,
+          "x": -10.94,
+          "z": -1.18,
           "yawDeg": -80,
           "intent": [
             {
               "x": -11,
-              "z": -2.33
+              "z": -0.69
             },
             {
               "x": -5,
@@ -775,8 +805,8 @@
           "id": "FrontLost",
           "name": "前沿沟东段已丢",
           "kind": "danger",
-          "x": 37,
-          "z": -2.92,
+          "x": 56,
+          "z": -9.71,
           "radiusM": 6
         },
         {
@@ -5182,21 +5212,29 @@
           "id": "RetreatNraW1",
           "side": "nra",
           "group": "westFront",
-          "x": -30.25,
-          "z": 1.6,
+          "x": -29.63,
+          "z": 8.74,
           "yawDeg": -80,
           "intent": [
             {
               "x": -30,
-              "z": 1.17
+              "z": 8.4
             },
             {
-              "x": -26,
-              "z": 3.5
+              "x": -28,
+              "z": 6.2
             },
             {
-              "x": -14,
-              "z": -3.5
+              "x": -23,
+              "z": 5.2
+            },
+            {
+              "x": -18,
+              "z": 2.4
+            },
+            {
+              "x": -12,
+              "z": -0.8
             },
             {
               "x": -5,
@@ -5221,17 +5259,17 @@
           "id": "RetreatNraW2",
           "side": "nra",
           "group": "westFront",
-          "x": -18.25,
-          "z": -1.6,
+          "x": -18.24,
+          "z": 1.96,
           "yawDeg": -80,
           "intent": [
             {
               "x": -18,
-              "z": -1.17
+              "z": 2.4
             },
             {
-              "x": -14,
-              "z": -3.5
+              "x": -12,
+              "z": -0.8
             },
             {
               "x": -5,
@@ -5313,8 +5351,8 @@
           "role": "mortar",
           "group": "mortar",
           "x": 27,
-          "z": -213,
-          "yawDeg": 172.5,
+          "z": -216,
+          "yawDeg": 172.6,
           "stance": "crouch"
         },
         {
@@ -5323,8 +5361,8 @@
           "role": "mortarLoader",
           "group": "mortar",
           "x": 29.2,
-          "z": -213.6,
-          "yawDeg": 172,
+          "z": -216.6,
+          "yawDeg": 172.1,
           "stance": "crouch"
         },
         {
@@ -5469,8 +5507,8 @@
           "side": "ija",
           "role": "rifleman",
           "group": "ditchSquad",
-          "x": -21.24,
-          "z": -104.38,
+          "x": -21.23,
+          "z": -104.39,
           "yawDeg": 123.4,
           "stance": "crouch"
         },
@@ -5479,7 +5517,7 @@
           "side": "ija",
           "role": "rifleman",
           "group": "ditchSquad",
-          "x": -18.57,
+          "x": -18.56,
           "z": -106.15,
           "yawDeg": 123.4,
           "stance": "crouch"
@@ -5489,10 +5527,60 @@
           "side": "ija",
           "role": "rifleman",
           "group": "ditchSquad",
-          "x": -15.9,
+          "x": -15.89,
           "z": -107.91,
           "yawDeg": 123.4,
           "stance": "crouch"
+        },
+        {
+          "id": "OldDead1",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": -20,
+          "z": -205.53,
+          "yawDeg": 80,
+          "state": "down"
+        },
+        {
+          "id": "OldDead2",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": 8,
+          "z": -199.82,
+          "yawDeg": -120,
+          "state": "down"
+        },
+        {
+          "id": "OldDead3",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": 60,
+          "z": -200,
+          "yawDeg": 30,
+          "state": "down"
+        },
+        {
+          "id": "OldDead4",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": -72,
+          "z": -202.5,
+          "yawDeg": 160,
+          "state": "down"
+        },
+        {
+          "id": "OldDead5",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": 52,
+          "z": -196.31,
+          "yawDeg": -60,
+          "state": "down"
         }
       ],
       "pois": [
@@ -5525,7 +5613,7 @@
           "name": "掷弹筒（只看得见烟）",
           "kind": "danger",
           "x": 28,
-          "z": -213,
+          "z": -216,
           "radiusM": 6
         },
         {
@@ -5782,8 +5870,8 @@
           "role": "mortar",
           "group": "mortar",
           "x": 27,
-          "z": -213,
-          "yawDeg": 172.5,
+          "z": -216,
+          "yawDeg": 172.6,
           "stance": "crouch"
         },
         {
@@ -5792,8 +5880,8 @@
           "role": "mortarLoader",
           "group": "mortar",
           "x": 29.2,
-          "z": -213.6,
-          "yawDeg": 172,
+          "z": -216.6,
+          "yawDeg": 172.1,
           "stance": "crouch"
         },
         {
@@ -5938,8 +6026,8 @@
           "side": "ija",
           "role": "rifleman",
           "group": "ditchSquad",
-          "x": -21.24,
-          "z": -104.38,
+          "x": -21.23,
+          "z": -104.39,
           "yawDeg": 123.4,
           "stance": "crouch"
         },
@@ -5948,7 +6036,7 @@
           "side": "ija",
           "role": "rifleman",
           "group": "ditchSquad",
-          "x": -18.57,
+          "x": -18.56,
           "z": -106.15,
           "yawDeg": 123.4,
           "stance": "crouch"
@@ -5958,40 +6046,94 @@
           "side": "ija",
           "role": "rifleman",
           "group": "ditchSquad",
-          "x": -15.9,
+          "x": -15.89,
           "z": -107.91,
           "yawDeg": 123.4,
           "stance": "crouch"
+        },
+        {
+          "id": "OldDead1",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": -20,
+          "z": -205.53,
+          "yawDeg": 80,
+          "state": "down"
+        },
+        {
+          "id": "OldDead2",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": 8,
+          "z": -199.82,
+          "yawDeg": -120,
+          "state": "down"
+        },
+        {
+          "id": "OldDead3",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": 60,
+          "z": -200,
+          "yawDeg": 30,
+          "state": "down"
+        },
+        {
+          "id": "OldDead4",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": -72,
+          "z": -202.5,
+          "yawDeg": 160,
+          "state": "down"
+        },
+        {
+          "id": "OldDead5",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": 52,
+          "z": -196.31,
+          "yawDeg": -60,
+          "state": "down"
         },
         {
           "id": "IjaTrench1",
           "side": "ija",
           "role": "rifleman",
           "group": "trenchClear",
-          "x": 39.7,
-          "z": -1.82,
+          "x": 40.44,
+          "z": -7.05,
           "yawDeg": 90,
           "aim": true,
           "intent": [
             {
               "x": 40,
-              "z": -2.33
+              "z": -7.45
             },
             {
-              "x": 38,
-              "z": -3.5
+              "x": 37,
+              "z": -4.2
+            },
+            {
+              "x": 30,
+              "z": 0.6
             },
             {
               "x": 26,
-              "z": 3.5
+              "z": -1.6
             },
             {
-              "x": 14,
-              "z": -3.5
+              "x": 19,
+              "z": 1
             },
             {
               "x": 13,
-              "z": -3.11
+              "z": -1.74
             }
           ]
         },
@@ -6000,8 +6142,8 @@
           "side": "ija",
           "role": "rifleman",
           "group": "trenchClear",
-          "x": 46.3,
-          "z": 0.65,
+          "x": 46.33,
+          "z": -10.98,
           "yawDeg": 90
         },
         {
@@ -6009,8 +6151,8 @@
           "side": "ija",
           "role": "rifleman",
           "group": "trenchClear",
-          "x": 52.3,
-          "z": 2.85,
+          "x": 52.27,
+          "z": -7.17,
           "yawDeg": 90
         }
       ],
@@ -6044,7 +6186,7 @@
           "name": "掷弹筒（只看得见烟）",
           "kind": "danger",
           "x": 28,
-          "z": -213,
+          "z": -216,
           "radiusM": 6
         },
         {
@@ -6052,7 +6194,7 @@
           "name": "前沿沟东段已丢",
           "kind": "danger",
           "x": 25,
-          "z": 2.92,
+          "z": -1.23,
           "radiusM": 6
         },
         {
@@ -6078,15 +6220,15 @@
       "id": "03-4",
       "stage": 3,
       "stageTitle": "逆着人流上去，守坑",
-      "name": "变坏：机枪手中弹、战车露头",
+      "name": "变坏：机枪手中弹、轻装甲车冒头",
       "player": {
         "x": 1.8,
         "z": -8.9,
-        "yawDeg": -61,
+        "yawDeg": -62.7,
         "pitchDeg": 1,
         "stance": "crouch"
       },
-      "what": "机枪手腿上中弹，幺娃把他往后拖；路那头战车露头，一炮打在坑沿。",
+      "what": "机枪手腿上中弹，幺娃把他往后拖；东边麦田里冒出三辆轻装甲车，机枪扫着坑沿，一发掷弹筒弹打塌一截胸墙。",
       "next": {
         "text": "看坑沿外那捆手榴弹",
         "x": 1.6,
@@ -6095,11 +6237,12 @@
       },
       "how": [
         "掷弹筒弹落在捷克式旁边",
-        "战车一炮打塌一截胸墙",
+        "东边麦田里三辆轻装甲车一前两后斜插过来，机枪扫坑沿",
+        "又一发掷弹筒弹打塌一截胸墙",
         "抱手榴弹的弟兄爬出去，死在坑沿外",
         "那捆手榴弹落在沟沿上"
       ],
-      "notes": "机枪手 03-4 先算倒地（刚中弹），03-5 起由幺娃架着走。战车炮口射界画到坑沿。坑外（第四轮）：正面这时才趴到 F2（约 140 m）；沟里那个班的轻机枪架在沟尽头打丙位，步兵趴在 N2 后（离坑约 60 m）、出沟时倒了两个；东头清沟的到了约 15 m。",
+      "notes": "机枪手 03-4 先算倒地（刚中弹），03-5 起由幺娃架着走。2026-10-24：日军没有坦克，是九四式轻装甲车（3.36 × 1.62 × 1.63 m、2 人、1 挺机枪、没有炮；两个中队 34 辆，从不单车行动），三辆一组从东边麦田 x 260–300 冒出来往西南斜插，B 车的机枪射界画到坑沿；胸墙那一截是掷弹筒弹打塌的（原来「战车一炮」）。坑外（第四轮）：正面这时才趴到 F2（约 140 m）；沟里那个班的轻机枪架在沟尽头打丙位，步兵趴在 N2 后（离坑约 60 m）、出沟时倒了两个；东头清沟的从东段经浅连沟清到了本班这段约 15 m 处。",
       "signals": [
         "PitShelled"
       ],
@@ -6214,29 +6357,42 @@
           ]
         },
         {
-          "id": "Tank",
+          "id": "TankA",
           "side": "ija",
           "kind": "tank",
-          "name": "战车",
-          "group": "tank",
-          "x": 159,
-          "z": -20,
-          "yawDeg": 142,
+          "shape": "tankette",
+          "name": "轻装甲车 A",
+          "group": "tankettes",
+          "x": 262,
+          "z": -178,
+          "yawDeg": 135
+        },
+        {
+          "id": "TankB",
+          "side": "ija",
+          "kind": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 B",
+          "group": "tankettes",
+          "x": 292,
+          "z": -150,
+          "yawDeg": 135,
           "arc": {
             "halfDeg": 4,
-            "rangeM": 163.3,
-            "yawDeg": 93.4
-          },
-          "path": [
-            {
-              "x": 167.87,
-              "z": -30.84
-            },
-            {
-              "x": 159.28,
-              "z": -19.78
-            }
-          ]
+            "rangeM": 329.6,
+            "yawDeg": 115.5
+          }
+        },
+        {
+          "id": "TankC",
+          "side": "ija",
+          "kind": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 C",
+          "group": "tankettes",
+          "x": 276,
+          "z": -118,
+          "yawDeg": 135
         },
         {
           "id": "IjaLmgWest",
@@ -6299,8 +6455,8 @@
           "role": "mortar",
           "group": "mortar",
           "x": 27,
-          "z": -213,
-          "yawDeg": 172.5,
+          "z": -216,
+          "yawDeg": 172.6,
           "stance": "crouch"
         },
         {
@@ -6309,8 +6465,8 @@
           "role": "mortarLoader",
           "group": "mortar",
           "x": 29.2,
-          "z": -213.6,
-          "yawDeg": 172,
+          "z": -216.6,
+          "yawDeg": 172.1,
           "stance": "crouch"
         },
         {
@@ -6430,7 +6586,7 @@
           "group": "ditchSquad",
           "weapon": "Type11",
           "x": -67.47,
-          "z": -73.68,
+          "z": -73.69,
           "yawDeg": -135.1,
           "stance": "prone",
           "aim": true,
@@ -6494,34 +6650,92 @@
           "aim": true
         },
         {
+          "id": "OldDead1",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": -20,
+          "z": -205.53,
+          "yawDeg": 80,
+          "state": "down"
+        },
+        {
+          "id": "OldDead2",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": 8,
+          "z": -199.82,
+          "yawDeg": -120,
+          "state": "down"
+        },
+        {
+          "id": "OldDead3",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": 60,
+          "z": -200,
+          "yawDeg": 30,
+          "state": "down"
+        },
+        {
+          "id": "OldDead4",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": -72,
+          "z": -202.5,
+          "yawDeg": 160,
+          "state": "down"
+        },
+        {
+          "id": "OldDead5",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": 52,
+          "z": -196.31,
+          "yawDeg": -60,
+          "state": "down"
+        },
+        {
           "id": "IjaTrench1",
           "side": "ija",
           "role": "rifleman",
           "group": "trenchClear",
-          "x": 14.7,
-          "z": -2.4,
+          "x": 14.75,
+          "z": -0.28,
           "yawDeg": 90,
           "aim": true,
           "path": [
             {
               "x": 40,
-              "z": -2.33
+              "z": -7.45
             },
             {
-              "x": 38,
-              "z": -3.5
+              "x": 37,
+              "z": -4.2
+            },
+            {
+              "x": 30,
+              "z": 0.6
             },
             {
               "x": 26,
-              "z": 3.5
+              "z": -1.6
+            },
+            {
+              "x": 19,
+              "z": 1
             },
             {
               "x": 15,
-              "z": -2.92
+              "z": -0.83
             },
             {
-              "x": 14.7,
-              "z": -2.4
+              "x": 14.75,
+              "z": -0.28
             }
           ]
         },
@@ -6530,29 +6744,37 @@
           "side": "ija",
           "role": "rifleman",
           "group": "trenchClear",
-          "x": 20.3,
-          "z": -0.52,
+          "x": 19.79,
+          "z": 0.07,
           "yawDeg": 90,
           "path": [
             {
               "x": 46,
-              "z": 1.17
+              "z": -10.48
             },
             {
-              "x": 38,
-              "z": -3.5
+              "x": 44,
+              "z": -11.79
+            },
+            {
+              "x": 37,
+              "z": -4.2
+            },
+            {
+              "x": 30,
+              "z": 0.6
             },
             {
               "x": 26,
-              "z": 3.5
+              "z": -1.6
             },
             {
               "x": 20,
-              "z": 0
+              "z": 0.63
             },
             {
-              "x": 20.3,
-              "z": -0.52
+              "x": 19.79,
+              "z": 0.07
             }
           ]
         },
@@ -6561,29 +6783,37 @@
           "side": "ija",
           "role": "rifleman",
           "group": "trenchClear",
-          "x": 25.7,
-          "z": 4.02,
+          "x": 26.21,
+          "z": -1.04,
           "yawDeg": 90,
           "path": [
             {
               "x": 52,
-              "z": 2.33
+              "z": -7.71
             },
             {
-              "x": 50,
-              "z": 3.5
+              "x": 51,
+              "z": -7.21
             },
             {
-              "x": 38,
-              "z": -3.5
+              "x": 44,
+              "z": -11.79
             },
             {
-              "x": 26,
-              "z": 3.5
+              "x": 37,
+              "z": -4.2
             },
             {
-              "x": 25.7,
-              "z": 4.02
+              "x": 30,
+              "z": 0.6
+            },
+            {
+              "x": 26.4,
+              "z": -1.38
+            },
+            {
+              "x": 26.21,
+              "z": -1.04
             }
           ]
         }
@@ -6599,11 +6829,11 @@
         },
         {
           "id": "TankSeen",
-          "name": "战车露头",
+          "name": "三辆轻装甲车（东边麦田）",
           "kind": "danger",
-          "x": 159,
-          "z": -20,
-          "radiusM": 5
+          "x": 275,
+          "z": -150,
+          "radiusM": 24
         },
         {
           "id": "FireA",
@@ -6634,7 +6864,7 @@
           "name": "掷弹筒（只看得见烟）",
           "kind": "danger",
           "x": 28,
-          "z": -213,
+          "z": -216,
           "radiusM": 6
         }
       ]
@@ -6916,16 +7146,24 @@
           "yawDeg": -85,
           "path": [
             {
-              "x": -25.8,
-              "z": 3.15
+              "x": -26.08,
+              "z": 5.41
             },
             {
-              "x": -25.7,
-              "z": 3.32
+              "x": -26,
+              "z": 5.8
             },
             {
-              "x": -14,
-              "z": -3.5
+              "x": -23,
+              "z": 5.2
+            },
+            {
+              "x": -18,
+              "z": 2.4
+            },
+            {
+              "x": -12,
+              "z": -0.8
             },
             {
               "x": -5,
@@ -6964,27 +7202,58 @@
           ]
         },
         {
-          "id": "Tank",
+          "id": "TankA",
           "side": "ija",
           "kind": "tank",
-          "name": "战车",
-          "group": "tank",
-          "x": 159,
-          "z": -20,
-          "yawDeg": 142,
+          "shape": "tankette",
+          "name": "轻装甲车 A",
+          "group": "tankettes",
+          "x": 252,
+          "z": -167,
+          "yawDeg": 135,
+          "intent": [
+            {
+              "x": 240,
+              "z": -155
+            }
+          ]
+        },
+        {
+          "id": "TankB",
+          "side": "ija",
+          "kind": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 B",
+          "group": "tankettes",
+          "x": 281,
+          "z": -139,
+          "yawDeg": 135,
           "arc": {
             "halfDeg": 4,
-            "rangeM": 163.3,
-            "yawDeg": 93.4
+            "rangeM": 314.9,
+            "yawDeg": 114.6
           },
           "intent": [
             {
-              "x": 105,
-              "z": 50
-            },
+              "x": 269,
+              "z": -127
+            }
+          ]
+        },
+        {
+          "id": "TankC",
+          "side": "ija",
+          "kind": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 C",
+          "group": "tankettes",
+          "x": 265,
+          "z": -107,
+          "yawDeg": 135,
+          "intent": [
             {
-              "x": 85.93,
-              "z": 67.98
+              "x": 253,
+              "z": -95
             }
           ]
         },
@@ -7049,8 +7318,8 @@
           "role": "mortar",
           "group": "mortar",
           "x": 27,
-          "z": -213,
-          "yawDeg": 172.5,
+          "z": -216,
+          "yawDeg": 172.6,
           "stance": "crouch"
         },
         {
@@ -7059,8 +7328,8 @@
           "role": "mortarLoader",
           "group": "mortar",
           "x": 29.2,
-          "z": -213.6,
-          "yawDeg": 172,
+          "z": -216.6,
+          "yawDeg": 172.1,
           "stance": "crouch"
         },
         {
@@ -7111,9 +7380,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 16.34,
-          "z": -132.83,
-          "yawDeg": 172.6,
+          "x": 16.78,
+          "z": -132.16,
+          "yawDeg": 172.4,
           "stance": "prone",
           "aim": true
         },
@@ -7122,9 +7391,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush3",
-          "x": 22.34,
-          "z": -136.83,
-          "yawDeg": 170.2,
+          "x": 22.78,
+          "z": -136.16,
+          "yawDeg": 170,
           "stance": "prone",
           "aim": true
         },
@@ -7133,9 +7402,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 42.34,
-          "z": -150.16,
-          "yawDeg": 163.5,
+          "x": 42.78,
+          "z": -149.5,
+          "yawDeg": 163.3,
           "stance": "prone",
           "aim": true
         },
@@ -7144,9 +7413,9 @@
           "side": "ija",
           "role": "rifleman",
           "group": "rush4",
-          "x": 48.34,
-          "z": -154.16,
-          "yawDeg": 161.8,
+          "x": 48.78,
+          "z": -153.5,
+          "yawDeg": 161.6,
           "stance": "prone",
           "aim": true
         },
@@ -7180,7 +7449,7 @@
           "group": "ditchSquad",
           "weapon": "Type11",
           "x": -67.47,
-          "z": -73.68,
+          "z": -73.69,
           "yawDeg": -135.1,
           "stance": "prone",
           "aim": true,
@@ -7244,30 +7513,80 @@
           "aim": true
         },
         {
+          "id": "OldDead1",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": -20,
+          "z": -205.53,
+          "yawDeg": 80,
+          "state": "down"
+        },
+        {
+          "id": "OldDead2",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": 8,
+          "z": -199.82,
+          "yawDeg": -120,
+          "state": "down"
+        },
+        {
+          "id": "OldDead3",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": 60,
+          "z": -200,
+          "yawDeg": 30,
+          "state": "down"
+        },
+        {
+          "id": "OldDead4",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": -72,
+          "z": -202.5,
+          "yawDeg": 160,
+          "state": "down"
+        },
+        {
+          "id": "OldDead5",
+          "side": "nra",
+          "name": "没收的尸体（旧阵地）",
+          "group": "oldLine",
+          "x": 52,
+          "z": -196.31,
+          "yawDeg": -60,
+          "state": "down"
+        },
+        {
           "id": "IjaTrench1",
           "side": "ija",
           "role": "rifleman",
           "group": "trenchClear",
-          "x": 10.22,
-          "z": -1.39,
+          "x": 10.18,
+          "z": -1,
           "yawDeg": 90,
           "aim": true,
           "path": [
             {
               "x": 15,
-              "z": -2.92
+              "z": -0.83
             },
             {
-              "x": 14,
-              "z": -3.5
+              "x": 12,
+              "z": -2.2
             },
             {
               "x": 10,
-              "z": -1.95
+              "z": -1.57
             },
             {
-              "x": 10.22,
-              "z": -1.39
+              "x": 10.18,
+              "z": -1
             }
           ]
         },
@@ -7276,21 +7595,25 @@
           "side": "ija",
           "role": "rifleman",
           "group": "trenchClear",
-          "x": 15.3,
-          "z": -3.43,
+          "x": 15.25,
+          "z": -1.37,
           "yawDeg": 90,
           "path": [
             {
               "x": 20,
-              "z": 0
+              "z": 0.63
+            },
+            {
+              "x": 19,
+              "z": 1
             },
             {
               "x": 15,
-              "z": -2.92
+              "z": -0.83
             },
             {
-              "x": 15.3,
-              "z": -3.43
+              "x": 15.25,
+              "z": -1.37
             }
           ]
         },
@@ -7299,21 +7622,25 @@
           "side": "ija",
           "role": "rifleman",
           "group": "trenchClear",
-          "x": 20.7,
-          "z": 1.1,
+          "x": 21.21,
+          "z": 0.82,
           "yawDeg": 90,
           "path": [
             {
+              "x": 26.4,
+              "z": -1.38
+            },
+            {
               "x": 26,
-              "z": 3.5
+              "z": -1.6
             },
             {
               "x": 21,
-              "z": 0.58
+              "z": 0.26
             },
             {
-              "x": 20.7,
-              "z": 1.1
+              "x": 21.21,
+              "z": 0.82
             }
           ]
         }
@@ -7506,7 +7833,7 @@
           "path": [
             {
               "x": 10,
-              "z": -1.95
+              "z": -1.57
             },
             {
               "x": 5,
@@ -7538,11 +7865,11 @@
           "path": [
             {
               "x": 15,
-              "z": -2.92
+              "z": -0.83
             },
             {
-              "x": 14,
-              "z": -3.5
+              "x": 12,
+              "z": -2.2
             },
             {
               "x": 5,
@@ -7578,11 +7905,15 @@
           "path": [
             {
               "x": 21,
-              "z": 0.58
+              "z": 0.26
             },
             {
-              "x": 14,
-              "z": -3.5
+              "x": 19,
+              "z": 1
+            },
+            {
+              "x": 12,
+              "z": -2.2
             },
             {
               "x": 5,
@@ -7924,7 +8255,7 @@
         "pitchDeg": 4,
         "stance": "crouch"
       },
-      "what": "退到拐角 2，路上传来履带声：战车顺着路追下来了，离路口还有几十米。",
+      "what": "退到拐角 2，东边传来履带声：三辆轻装甲车斜插过来了，打头的那辆拐上了车道，离路口还有几十米。",
       "next": {
         "text": "退到路口",
         "x": 35,
@@ -7932,11 +8263,12 @@
         "radiusM": 3
       },
       "how": [
-        "履带声从东北的路上传来",
-        "跟车步兵跟在车后",
+        "履带声从东边传来",
+        "打头的 A 车拐上车道，另两辆还在田里",
+        "徒步的鬼子步兵在两三百米后头，没跟上",
         "沟里的鬼子还在后头追"
       ],
-      "notes": "战车离路口约 40 m（推测）；跟车步兵三人在车后。战车从 03 露头处顺路开过来。",
+      "notes": "A 车离路口约 40 m（推测）；B 车在车道北边的田里、C 车还在东边；徒步步兵三人在两三百米后头（史料：装甲车在最前头、步兵徒步跟）。",
       "signals": [
         "PitShelled"
       ],
@@ -8116,18 +8448,31 @@
           ]
         },
         {
-          "id": "Tank",
+          "id": "TankA",
           "side": "ija",
           "kind": "tank",
-          "name": "战车",
-          "group": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 A",
+          "group": "tankettes",
           "x": 64.1,
           "z": 88.56,
           "yawDeg": 133.3,
           "path": [
             {
-              "x": 85.93,
-              "z": 67.98
+              "x": 252,
+              "z": -167
+            },
+            {
+              "x": 210,
+              "z": -72
+            },
+            {
+              "x": 175,
+              "z": -40
+            },
+            {
+              "x": 105,
+              "z": 50
             },
             {
               "x": 64.1,
@@ -8136,61 +8481,81 @@
           ]
         },
         {
+          "id": "TankB",
+          "side": "ija",
+          "kind": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 B",
+          "group": "tankettes",
+          "x": 135,
+          "z": 12,
+          "yawDeg": 135,
+          "path": [
+            {
+              "x": 281,
+              "z": -139
+            },
+            {
+              "x": 205,
+              "z": -60
+            },
+            {
+              "x": 135,
+              "z": 12
+            }
+          ]
+        },
+        {
+          "id": "TankC",
+          "side": "ija",
+          "kind": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 C",
+          "group": "tankettes",
+          "x": 192,
+          "z": 0,
+          "yawDeg": 135,
+          "path": [
+            {
+              "x": 265,
+              "z": -107
+            },
+            {
+              "x": 228,
+              "z": -50
+            },
+            {
+              "x": 192,
+              "z": 0
+            }
+          ]
+        },
+        {
           "id": "TankInf1",
           "side": "ija",
           "role": "rifleman",
           "group": "tankEscort",
-          "x": 67.37,
-          "z": 83.28,
-          "yawDeg": 133.3,
-          "path": [
-            {
-              "x": 90.65,
-              "z": 61.33
-            },
-            {
-              "x": 67.37,
-              "z": 83.28
-            }
-          ]
+          "x": 300,
+          "z": -128,
+          "yawDeg": 135
         },
         {
           "id": "TankInf2",
           "side": "ija",
           "role": "rifleman",
           "group": "tankEscort",
-          "x": 72.48,
-          "z": 82.86,
-          "yawDeg": 133.3,
-          "path": [
-            {
-              "x": 95.76,
-              "z": 60.91
-            },
-            {
-              "x": 72.48,
-              "z": 82.86
-            }
-          ]
+          "x": 306,
+          "z": -121,
+          "yawDeg": 135
         },
         {
           "id": "TankInf3",
           "side": "ija",
           "role": "rifleman",
           "group": "tankEscort",
-          "x": 73.19,
-          "z": 77.79,
-          "yawDeg": 133.3,
-          "path": [
-            {
-              "x": 96.48,
-              "z": 55.84
-            },
-            {
-              "x": 73.19,
-              "z": 77.79
-            }
-          ]
+          "x": 296,
+          "z": -114,
+          "yawDeg": 135
         }
       ],
       "pois": [
@@ -8212,18 +8577,26 @@
         },
         {
           "id": "TankRoad",
-          "name": "战车（路上）",
+          "name": "A 车（拐上了车道）",
           "kind": "danger",
           "x": 64.1,
           "z": 88.56,
           "radiusM": 4
+        },
+        {
+          "id": "TankField",
+          "name": "B / C 车（田里）",
+          "kind": "danger",
+          "x": 135,
+          "z": 12,
+          "radiusM": 6
         }
       ]
     },
     {
       "id": "05-1",
       "stage": 5,
-      "stageTitle": "沟里伏击战车",
+      "stageTitle": "沟里伏击轻装甲车",
       "name": "板桥底下：缩在沟底",
       "player": {
         "x": 34.5,
@@ -8232,7 +8605,7 @@
         "pitchDeg": 18,
         "stance": "prone"
       },
-      "what": "班长看了一眼路上的战车：「它要过来，只有走那座板桥。」带顺子钻到桥下的沟底趴着。",
+      "what": "班长看了一眼车道上的 A 车：「它要过来，只有走那座板桥。」带顺子钻到桥下的沟底趴着。田里那辆 C 车噗噗两声熄了火。",
       "next": {
         "text": "趴在桥下别动"
       },
@@ -8240,9 +8613,10 @@
         "履带声越来越近",
         "桥面门板缝里透光",
         "幺娃架着机枪手缩在桥南几步",
-        "它一过沟，坡后撤下去的人就全在枪口底下"
+        "它一过沟，坡后撤下去的人就全在枪口底下",
+        "田里 C 车抛锚，两个乘员钻出来"
       ],
-      "notes": "路口那段交通沟上搭了一座简易板桥：三根顺路方向的横木上铺门板，桥面 3.8 m 宽、与两头路面齐平，驴车和担架都过得去；桥下照常是沟，沟底到横木底约 1.8 m。交通沟太宽，战车只能走板桥过沟。班长的判断不新增配音，预演里用说明字。剧本这一拍用户还没最后拍板（Notion 待定：路口要不要盖木板），白盒先按这个做。",
+      "notes": "路口那段交通沟上搭了一座简易板桥：三根顺路方向的横木上铺门板，桥面 3.8 m 宽、与两头路面齐平，驴车和担架都过得去；桥下照常是沟，沟底到横木底约 1.8 m。交通沟太宽（九四式越壕约 1.4 m），轻装甲车只能走板桥过沟。班长的判断不新增配音，预演里用说明字。C 车在 (150,42) 抛锚（史料：这车故障多）。剧本这一拍用户还没最后拍板（Notion 待定：路口要不要盖木板），白盒先按这个做。",
       "signals": [
         "PitShelled"
       ],
@@ -8405,11 +8779,12 @@
           ]
         },
         {
-          "id": "Tank",
+          "id": "TankA",
           "side": "ija",
           "kind": "tank",
-          "name": "战车",
-          "group": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 A",
+          "group": "tankettes",
           "x": 45.91,
           "z": 105.71,
           "yawDeg": 133.3,
@@ -8421,49 +8796,96 @@
           ]
         },
         {
+          "id": "TankB",
+          "side": "ija",
+          "kind": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 B",
+          "group": "tankettes",
+          "x": 85,
+          "z": 72,
+          "yawDeg": 135,
+          "path": [
+            {
+              "x": 110,
+              "z": 52
+            },
+            {
+              "x": 85,
+              "z": 72
+            }
+          ]
+        },
+        {
+          "id": "TankC",
+          "side": "ija",
+          "kind": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 C（抛锚）",
+          "group": "tankettes",
+          "x": 150,
+          "z": 42,
+          "yawDeg": 135,
+          "path": [
+            {
+              "x": 192,
+              "z": 0
+            },
+            {
+              "x": 150,
+              "z": 42
+            }
+          ]
+        },
+        {
+          "id": "TankCrewC1",
+          "side": "ija",
+          "name": "C 车的机枪（乘员）",
+          "role": "machineGun",
+          "group": "tankCrew",
+          "weapon": "Type11",
+          "x": 147.2,
+          "z": 44.2,
+          "yawDeg": 127.7,
+          "stance": "crouch"
+        },
+        {
+          "id": "TankCrewC2",
+          "side": "ija",
+          "name": "C 车乘员",
+          "role": "loader",
+          "group": "tankCrew",
+          "x": 148.4,
+          "z": 46,
+          "yawDeg": 126.9,
+          "stance": "crouch"
+        },
+        {
           "id": "TankInf1",
           "side": "ija",
           "role": "rifleman",
           "group": "tankEscort",
-          "x": 49.18,
-          "z": 100.43,
-          "yawDeg": 133.3,
-          "path": [
-            {
-              "x": 50.28,
-              "z": 101.59
-            }
-          ]
+          "x": 281,
+          "z": -110,
+          "yawDeg": 135
         },
         {
           "id": "TankInf2",
           "side": "ija",
           "role": "rifleman",
           "group": "tankEscort",
-          "x": 54.29,
-          "z": 100.01,
-          "yawDeg": 133.3,
-          "path": [
-            {
-              "x": 53.19,
-              "z": 98.85
-            }
-          ]
+          "x": 287,
+          "z": -103.5,
+          "yawDeg": 135
         },
         {
           "id": "TankInf3",
           "side": "ija",
           "role": "rifleman",
           "group": "tankEscort",
-          "x": 55,
-          "z": 94.94,
-          "yawDeg": 133.3,
-          "path": [
-            {
-              "x": 56.1,
-              "z": 96.11
-            }
-          ]
+          "x": 277,
+          "z": -96.5,
+          "yawDeg": 135
         }
       ],
       "pois": [
@@ -8482,14 +8904,22 @@
           "x": 35,
           "z": 131,
           "radiusM": 3
+        },
+        {
+          "id": "TankC",
+          "name": "C 车抛锚",
+          "kind": "danger",
+          "x": 150,
+          "z": 42,
+          "radiusM": 4
         }
       ]
     },
     {
       "id": "05-2",
       "stage": 5,
-      "stageTitle": "沟里伏击战车",
-      "name": "战车压上板桥",
+      "stageTitle": "沟里伏击轻装甲车",
+      "name": "A 车压上板桥",
       "player": {
         "x": 34.5,
         "z": 116.6,
@@ -8497,16 +8927,17 @@
         "pitchDeg": 32,
         "stance": "prone"
       },
-      "what": "战车压上板桥，门板嘎吱响，土从板缝往下漏，车底就在头顶。",
+      "what": "A 车压上板桥，门板嘎吱响，土从板缝往下漏，车底就在头顶。B 车冲到沟沿过不去，停在那打机枪。",
       "next": {
         "text": "车一过桥就甩那捆手榴弹"
       },
       "how": [
         "履带从头顶压过去",
         "板子嘎吱响、往下弯",
-        "土从板缝往下漏"
+        "土从板缝往下漏",
+        "B 车停在沟东边的沟沿上，机枪打坡顶那一带"
       ],
-      "notes": "战车车身正压在板桥上（桥面上、车底离顺子不到 2 m）；跟车步兵还在车后。人在桥下沟底，摆位检查按高差认作「在桥下」，不算站在车身脚印里。",
+      "notes": "A 车车身正压在板桥上（桥面上、车底离顺子不到 2 m）。B 车停在交通沟东沿（约 (39.5,98.5)），车头探在沟沿上，机枪朝坡顶打、不朝桥下；C 车抛锚的两个乘员趴在车边拿机枪打坡顶。人在桥下沟底，摆位检查按高差认作「在桥下」，不算站在车身脚印里。",
       "signals": [
         "PitShelled"
       ],
@@ -8597,11 +9028,12 @@
           ]
         },
         {
-          "id": "Tank",
+          "id": "TankA",
           "side": "ija",
           "kind": "tank",
-          "name": "战车",
-          "group": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 A",
+          "group": "tankettes",
           "x": 35,
           "z": 116,
           "yawDeg": 128.3,
@@ -8613,49 +9045,97 @@
           ]
         },
         {
+          "id": "TankB",
+          "side": "ija",
+          "kind": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 B（沟沿）",
+          "group": "tankettes",
+          "x": 39.5,
+          "z": 98.5,
+          "yawDeg": 135,
+          "arc": {
+            "halfDeg": 8,
+            "rangeM": 44.2,
+            "yawDeg": -154.9
+          },
+          "path": [
+            {
+              "x": 60,
+              "z": 88
+            },
+            {
+              "x": 39.5,
+              "z": 98.5
+            }
+          ]
+        },
+        {
+          "id": "TankC",
+          "side": "ija",
+          "kind": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 C（抛锚）",
+          "group": "tankettes",
+          "x": 150,
+          "z": 42,
+          "yawDeg": 135
+        },
+        {
+          "id": "TankCrewC1",
+          "side": "ija",
+          "name": "C 车的机枪（乘员）",
+          "role": "machineGun",
+          "group": "tankCrew",
+          "weapon": "Type11",
+          "x": 147.2,
+          "z": 44.2,
+          "yawDeg": 127.7,
+          "stance": "prone",
+          "aim": true,
+          "arc": {
+            "halfDeg": 10,
+            "rangeM": 151.9,
+            "yawDeg": 127.7
+          }
+        },
+        {
+          "id": "TankCrewC2",
+          "side": "ija",
+          "name": "C 车乘员",
+          "role": "loader",
+          "group": "tankCrew",
+          "x": 148.4,
+          "z": 46,
+          "yawDeg": 126.9,
+          "stance": "prone"
+        },
+        {
           "id": "TankInf1",
           "side": "ija",
           "role": "rifleman",
           "group": "tankEscort",
-          "x": 39,
-          "z": 110.03,
-          "yawDeg": 133.3,
-          "path": [
-            {
-              "x": 40.1,
-              "z": 111.19
-            }
-          ]
+          "x": 275,
+          "z": -104,
+          "yawDeg": 135
         },
         {
           "id": "TankInf2",
           "side": "ija",
           "role": "rifleman",
           "group": "tankEscort",
-          "x": 44.1,
-          "z": 109.62,
-          "yawDeg": 133.3,
-          "path": [
-            {
-              "x": 43,
-              "z": 108.46
-            }
-          ]
+          "x": 281,
+          "z": -97.5,
+          "yawDeg": 135
         },
         {
           "id": "TankInf3",
           "side": "ija",
           "role": "rifleman",
           "group": "tankEscort",
-          "x": 44.82,
-          "z": 104.55,
-          "yawDeg": 133.3,
-          "path": [
-            {
-              "x": 45.91,
-              "z": 105.71
-            }
-          ]
+          "x": 271,
+          "z": -90.5,
+          "yawDeg": 135
         }
       ],
       "pois": [
@@ -8666,22 +9146,30 @@
           "x": 35,
           "z": 116,
           "radiusM": 3
+        },
+        {
+          "id": "TankB",
+          "name": "B 车（沟沿上打机枪）",
+          "kind": "danger",
+          "x": 39.5,
+          "z": 98.5,
+          "radiusM": 4
         }
       ]
     },
     {
       "id": "05-3",
       "stage": 5,
-      "stageTitle": "沟里伏击战车",
+      "stageTitle": "沟里伏击轻装甲车",
       "name": "甩手榴弹炸车尾",
       "player": {
         "x": 33.5,
         "z": 120.6,
-        "yawDeg": 47.8,
+        "yawDeg": 63.6,
         "pitchDeg": 22,
         "stance": "stand"
       },
-      "what": "车刚过桥，顺子从桥边探身把那捆手榴弹甩上车尾。战车瘫在桥头，横着把路堵死。",
+      "what": "车刚过桥，顺子从桥边探身把那捆手榴弹甩上车尾。A 车瘫在桥上，横着把桥堵死。",
       "next": {
         "text": "搭把手，架机枪手翻坡顶",
         "x": 35,
@@ -8690,11 +9178,11 @@
       },
       "how": [
         "幺娃「顺儿哥，搭把手！」",
-        "车体残骸斜在桥头路上",
+        "A 车残骸斜在桥头路上",
         "桥面压断了两块门板",
-        "跟车步兵和沟里追来的鬼子被堵在桥那头"
+        "B 车过不了沟、C 车趴窝，沟里追来的鬼子被堵在桥那头"
       ],
-      "notes": "TankDisabled：战车停在锚点 tankStop（桥头西南、车身斜着堵住路），场景 gates 里桥面中间两块门板压断下沉——后面的人过不了沟。",
+      "notes": "TankDisabled：A 车停在锚点 tankStop（桥头西南、车身斜着堵住桥），场景 gates 里桥面中间两块门板压断下沉——后面的人过不了沟。B 车还停在沟东沿上打机枪，C 车的两个乘员趴在车边打；徒步步兵刚走到驿道岔口一带，还有两百米。",
       "signals": [
         "PitShelled",
         "TankDisabled"
@@ -8708,7 +9196,7 @@
           "role": "squadLeader",
           "x": 35.6,
           "z": 119.2,
-          "yawDeg": 73.8,
+          "yawDeg": 84.9,
           "stance": "crouch",
           "aim": true,
           "path": [
@@ -8804,11 +9292,12 @@
           ]
         },
         {
-          "id": "Tank",
+          "id": "TankA",
           "side": "ija",
           "kind": "tank",
-          "name": "战车（瘫）",
-          "group": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 A（瘫）",
+          "group": "tankettes",
           "x": 28.7,
           "z": 120.1,
           "yawDeg": 148,
@@ -8820,38 +9309,93 @@
           ]
         },
         {
+          "id": "TankB",
+          "side": "ija",
+          "kind": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 B（沟沿）",
+          "group": "tankettes",
+          "x": 39.5,
+          "z": 98.5,
+          "yawDeg": 135,
+          "arc": {
+            "halfDeg": 8,
+            "rangeM": 44.2,
+            "yawDeg": -154.9
+          }
+        },
+        {
+          "id": "TankC",
+          "side": "ija",
+          "kind": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 C（抛锚）",
+          "group": "tankettes",
+          "x": 150,
+          "z": 42,
+          "yawDeg": 135
+        },
+        {
+          "id": "TankCrewC1",
+          "side": "ija",
+          "name": "C 车的机枪（乘员）",
+          "role": "machineGun",
+          "group": "tankCrew",
+          "weapon": "Type11",
+          "x": 147.2,
+          "z": 44.2,
+          "yawDeg": 127.7,
+          "stance": "prone",
+          "aim": true,
+          "arc": {
+            "halfDeg": 10,
+            "rangeM": 151.9,
+            "yawDeg": 127.7
+          }
+        },
+        {
+          "id": "TankCrewC2",
+          "side": "ija",
+          "name": "C 车乘员",
+          "role": "loader",
+          "group": "tankCrew",
+          "x": 148.4,
+          "z": 46,
+          "yawDeg": 126.9,
+          "stance": "prone"
+        },
+        {
           "id": "TankInf1",
           "side": "ija",
           "role": "rifleman",
           "group": "tankEscort",
-          "x": 40.45,
-          "z": 108.66,
-          "yawDeg": 143.4
+          "x": 262,
+          "z": -92,
+          "yawDeg": 135
         },
         {
           "id": "TankInf2",
           "side": "ija",
           "role": "rifleman",
           "group": "tankEscort",
-          "x": 44.83,
-          "z": 108.93,
-          "yawDeg": 125.7,
-          "stance": "crouch"
+          "x": 268,
+          "z": -86,
+          "yawDeg": 135
         },
         {
           "id": "TankInf3",
           "side": "ija",
           "role": "rifleman",
           "group": "tankEscort",
-          "x": 44.82,
-          "z": 104.55,
-          "yawDeg": 139.4
+          "x": 258,
+          "z": -79,
+          "yawDeg": 135
         }
       ],
       "pois": [
         {
           "id": "TankWreck",
-          "name": "战车（瘫在桥头）",
+          "name": "A 车（瘫在桥头）",
           "kind": "landmark",
           "x": 28.7,
           "z": 120.1,
@@ -8872,13 +9416,21 @@
           "x": 35,
           "z": 131,
           "radiusM": 3
+        },
+        {
+          "id": "TankB",
+          "name": "B 车（沟沿上）",
+          "kind": "danger",
+          "x": 39.5,
+          "z": 98.5,
+          "radiusM": 4
         }
       ]
     },
     {
       "id": "05-4",
       "stage": 5,
-      "stageTitle": "沟里伏击战车",
+      "stageTitle": "沟里伏击轻装甲车",
       "name": "翻过坡顶下到干沟，回头：不撵了？",
       "player": {
         "x": 35.8,
@@ -8897,9 +9449,10 @@
       "how": [
         "班长「表看了，走！」",
         "鬼子趴在坡顶上架枪",
+        "B 车的机枪还在沟那头响",
         "顺子和幺娃架着机枪手，最后一个回来"
       ],
-      "notes": "坡顶上的鬼子是跟车步兵和沟里追来的那几个，桥面压断了过不来，从桥东头绕过沟爬上坡顶（位置推测）。干沟两岸陡坎挡着，他们得走到坎沿上才看得见沟底。06 接着在这条干沟里（冬瓜头一趟就抬走了）。",
+      "notes": "坡顶上的鬼子是沟里追来的那两个，桥面压断了过不来，从桥东头绕过沟爬上坡顶（位置推测）；B 车停在沟东沿上打坡顶，C 车趴窝，徒步步兵还在驿道岔口一带。干沟两岸陡坎挡着，他们得走到坎沿上才看得见沟底。06 接着在这条干沟里（冬瓜头一趟就抬走了）。",
       "signals": [
         "PitShelled",
         "TankDisabled"
@@ -9017,47 +9570,101 @@
           ]
         },
         {
-          "id": "Tank",
+          "id": "TankA",
           "side": "ija",
           "kind": "tank",
-          "name": "战车（瘫）",
-          "group": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 A（瘫）",
+          "group": "tankettes",
           "x": 28.7,
           "z": 120.1,
           "yawDeg": 148
         },
         {
+          "id": "TankB",
+          "side": "ija",
+          "kind": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 B（沟沿）",
+          "group": "tankettes",
+          "x": 39.5,
+          "z": 98.5,
+          "yawDeg": 135,
+          "arc": {
+            "halfDeg": 8,
+            "rangeM": 44.2,
+            "yawDeg": -154.9
+          }
+        },
+        {
+          "id": "TankC",
+          "side": "ija",
+          "kind": "tank",
+          "shape": "tankette",
+          "name": "轻装甲车 C（抛锚）",
+          "group": "tankettes",
+          "x": 150,
+          "z": 42,
+          "yawDeg": 135
+        },
+        {
+          "id": "TankCrewC1",
+          "side": "ija",
+          "name": "C 车的机枪（乘员）",
+          "role": "machineGun",
+          "group": "tankCrew",
+          "weapon": "Type11",
+          "x": 147.2,
+          "z": 44.2,
+          "yawDeg": 127.7,
+          "stance": "prone",
+          "aim": true,
+          "arc": {
+            "halfDeg": 10,
+            "rangeM": 151.9,
+            "yawDeg": 127.7
+          }
+        },
+        {
+          "id": "TankCrewC2",
+          "side": "ija",
+          "name": "C 车乘员",
+          "role": "loader",
+          "group": "tankCrew",
+          "x": 148.4,
+          "z": 46,
+          "yawDeg": 126.9,
+          "stance": "prone"
+        },
+        {
           "id": "TankInf1",
           "side": "ija",
           "role": "rifleman",
-          "group": "crestHold",
-          "x": 28,
-          "z": 128.5,
-          "yawDeg": -130,
-          "stance": "prone",
-          "aim": true,
-          "path": [
-            {
-              "x": 40.1,
-              "z": 111.97
-            },
-            {
-              "x": 43.82,
-              "z": 116.68
-            },
-            {
-              "x": 40.5,
-              "z": 124
-            },
-            {
-              "x": 28,
-              "z": 128.5
-            }
-          ],
-          "guess": true
+          "group": "tankEscort",
+          "x": 262,
+          "z": -92,
+          "yawDeg": 135
         },
         {
           "id": "TankInf2",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "tankEscort",
+          "x": 268,
+          "z": -86,
+          "yawDeg": 135
+        },
+        {
+          "id": "TankInf3",
+          "side": "ija",
+          "role": "rifleman",
+          "group": "tankEscort",
+          "x": 258,
+          "z": -79,
+          "yawDeg": 135
+        },
+        {
+          "id": "IjaTrench3",
           "side": "ija",
           "role": "rifleman",
           "group": "crestHold",
@@ -9067,6 +9674,14 @@
           "stance": "prone",
           "aim": true,
           "path": [
+            {
+              "x": 32.47,
+              "z": 100.81
+            },
+            {
+              "x": 37.53,
+              "z": 100.78
+            },
             {
               "x": 40.1,
               "z": 111.97
@@ -9082,36 +9697,6 @@
             {
               "x": 40.5,
               "z": 128
-            }
-          ],
-          "guess": true
-        },
-        {
-          "id": "TankInf3",
-          "side": "ija",
-          "role": "rifleman",
-          "group": "crestHold",
-          "x": 45,
-          "z": 129.5,
-          "yawDeg": -153.9,
-          "stance": "prone",
-          "aim": true,
-          "path": [
-            {
-              "x": 40.1,
-              "z": 111.97
-            },
-            {
-              "x": 43.82,
-              "z": 116.68
-            },
-            {
-              "x": 40.5,
-              "z": 124
-            },
-            {
-              "x": 45,
-              "z": 129.5
             }
           ],
           "guess": true
@@ -9182,7 +9767,7 @@
         },
         {
           "id": "TankWreck",
-          "name": "战车（瘫在桥头）",
+          "name": "A 车（瘫在桥头）",
           "kind": "landmark",
           "x": 28.7,
           "z": 120.1,

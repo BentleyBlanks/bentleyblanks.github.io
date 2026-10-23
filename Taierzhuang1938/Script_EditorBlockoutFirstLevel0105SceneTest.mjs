@@ -24,15 +24,16 @@ import {
   BuildFirstLevel0105Scene, FloorWidthAt, NaturalHeight, L0105SightChecks, GullyFloorExtent, GullyBankHeights, PropPassage, PropsPerStraight,
   GullySouthBerm, GullySouthBermTop, L0105_GULLY_SOUTH_BERM_LENGTH,
   PitNorthChecks, PitNorthHeight, PitNorthRoll, DitchStation, BundHeight, GraveHeight, SightBlockFromY, PitNorthObservers, PIT_NORTH_DITCH_HEAD_M,
-  FarmLayout,
+  FarmLayout, L0105_NICHE_SHAPES, OLD_LINES,
 } from "./Script_EditorBlockoutFirstLevel0105Scene.mjs";
 import {
   L0105_PLACES as P, L0105_HEIGHTS as H, L0105_TRENCH_SECTION as S, L0105_GULLY as G, L0105_BRIDGE as BR,
-  L0105_PROPS, L0105_PROP_KINDS, L0105_SUNKEN_LANE, L0105_GULLY_SOUTH_BERM as SB, PointBeside, GullyU, InGullyFloor,
-  L0105_ROAD, L0105_GULLY_POCKETS, L0105_GULLY_TREES,
+  L0105_PROPS, L0105_PROP_KINDS, L0105_SUNKEN_LANE, L0105_GULLY_SOUTH_BERM as SB, PointBeside, PointAlong, GullyU, InGullyFloor,
+  L0105_ROAD, L0105_GULLY_POCKETS, L0105_GULLY_TREES, L0105_TRENCHES, L0105_FRONT_PARTS, FrontStationAtX,
   L0105_PIT_NORTH as PN, L0105_BOUNDS, L0105_RUSH_STATIONS, L0105_RUSH_FALLEN, L0105_DITCH_SQUAD, DitchSquadStart, RushStation, ScarpZ, LineLength,
   L0105_NORTH_ROAD, L0105_FIELD_PATH, L0105_FIELD_TREES, L0105_BACKDROP_LONE_TREES, L0105_BACKDROP_PATHS, L0105_FIELD_PAINT, L0105_FIELD_GRAVES, L0105_FARM,
   L0105_BACKDROP_ROAD, L0105_BACKDROP_VILLAGES, L0105_BACKDROP_HILLS, L0105_HEIGHTS,
+  L0105_OLD_POSITION, L0105_WOODS, L0105_SOUTH_TREES, L0105_POST_ROAD_SOUTH, L0105_FIELD_LANES, L0105_BACKDROP_POST_ROAD,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
 
 const opts = { commit: "test", generatedAt: "2026-10-18T00:00:00.000Z" };
@@ -116,11 +117,136 @@ assert.ok(sights.southObservers >= 25, "南边平地的观察点太少（凹路�
 assert.ok(sights.mgToCrawl.worst > 0.1, `北沿机枪看得见南沿土垄外爬的人：${JSON.stringify(sights.mgToCrawl.worstRow)}`);
 assert.ok(sights.pinnedToSteps.worst <= 0, "洞口趴着要能顺着支沟看见台阶那头的人");
 
-// --- 沟底宽 ---
-for (const [x, z, nx, nz, min] of [[-30.5, 0, 0, 1, 3.4], [56, 0, 0.5, 1, 3.4], [-62, -12, 1, 0, 3.4], [12.5, 32, 23, 1, 3.4],
-  [26, 76.6, 42, -18, 3.4], [35, 128, 1, 0, 3.4], [35, 116.5, 1, 0, 3.4], [42, 65.8, 2.6, 41.1, 3.4]]) {
+// --- 沟底宽（2026-10-24：前沿三段各量一处、西折、第二条交通沟；浅连沟窄但 ≥ 2.2）---
+const FrontAt = (x) => PointAlong(L0105_TRENCHES.front, FrontStationAtX(x));
+for (const [name, x, z, nx, nz, min] of [["前沿西段", FrontAt(-50).x, FrontAt(-50).z, 0, 1, 3.4], ["前沿中段", FrontAt(-9).x, FrontAt(-9).z, 0, 1, 3.4],
+  ["前沿中段", FrontAt(16).x, FrontAt(16).z, 0, 1, 3.4], ["前沿东段", FrontAt(62).x, FrontAt(62).z, 0, 1, 3.4], ["前沿西折", -70, 0, 1, 0, 3.4],
+  ["浅连沟（东）", FrontAt(37).x, FrontAt(37).z, 0.6, 1, 2.2], ["第二条交通沟", -47, 30, 5, 1, 3.4],
+  ["交通沟南直段", 12.5, 32, 23, 1, 3.4], ["交通沟斜段", 26, 76.6, 42, -18, 3.4], ["交通沟坡顶", 35, 128, 1, 0, 3.4], ["交通沟板桥下", 35, 116.5, 1, 0, 3.4], ["支沟中段", 42, 65.8, 2.6, 41.1, 3.4]]) {
   const r = FloorWidthAt(sample, x, z, nx, nz);
-  assert.ok(r.width >= min, `沟底宽 (${x},${z}) ${r.width} < ${min}`);
+  assert.ok(r.width >= min, `${name}沟底宽 (${x.toFixed(1)},${z.toFixed(1)}) ${r.width} < ${min}`);
+}
+
+// --- 2026-10-24 第六版空间 ---
+{
+  const all = [...a.blocks, ...a.gates], C = L0105_FIELD_PAINT;
+  const FP = L0105_FRONT_PARTS, front = L0105_TRENCHES.front;
+  const Part = ([i0, i1]) => front.slice(i0, i1 + 1);
+  // 前沿三段：每段 30–60 m 长、至少 4 个折点、相邻折距不全相等；段与段之间有浅连沟（深 0.9–1.1）；西段往南错、东段往北错
+  for (const [name, range] of [["西段", FP.west], ["中段", FP.mid], ["东段", FP.east]]) {
+    const pts = Part(range), len = pts[pts.length - 1].x - pts[0].x;
+    assert.ok(len >= 30 && len <= 60, `前沿${name}长 ${len} m（要 30–60）`);
+    assert.ok(pts.length >= 4, `前沿${name}折点 ${pts.length} 个（要 ≥ 4）`);
+    const steps = pts.slice(1).map((p, i) => Math.round((p.x - pts[i].x) * 10) / 10);
+    assert.ok(new Set(steps).size >= 2, `前沿${name}折距全一样（${steps.join("/")}），像机器画的锯齿`);
+    for (let i = 1; i < pts.length; i++) assert.ok(Math.abs(pts[i].z - pts[i - 1].z) >= 1.0 || name === "中段", `前沿${name}第 ${i} 折前后没错开`);
+  }
+  assert.ok(Part(FP.west).every((p) => p.z >= 5) && Part(FP.east).every((p) => p.z <= -6), "西段整体往南错、东段整体往北错");
+  for (const [name, range] of [["西", FP.linkW], ["东", FP.linkE]]) {
+    const pts = Part(range), mid = PointAlong(pts, LineLength(pts) / 2);
+    const cut = Cut({ x: mid.x, z: mid.z });
+    assert.ok(cut >= 0.85 && cut <= 1.15, `${name}边浅连沟深 ${cut.toFixed(2)}（要 0.9–1.1）`);
+  }
+  // 沟口那 10 m 平的、机枪坑 / 三个射位 / 散兵坑 / 爬沟一点没动
+  assert.deepEqual(Part(FP.mid).filter((p) => Math.abs(p.x) <= 5).map((p) => [p.x, p.z]), [[-5, 0], [5, 0]], "沟口那 10 m 照旧");
+  assert.deepEqual([P.pit.x, P.pit.z, P.fireA.x, P.fireB.x, P.fireC.x, P.fireC.z], [0, -7, 0.8, 4.5, -9, -15], "机枪坑、三个射位、散兵坑不动");
+  assert.deepEqual(L0105_TRENCHES.crawlSap.map((p) => [p.x, p.z]), [[-3.5, -9], [-8, -14]], "爬沟不动");
+  assert.deepEqual(L0105_TRENCHES.traffic.map((p) => [p.x, p.z]), [[0, 0], [0.5, 11], [13, 21], [12, 44], [30, 86], [35, 116], [35, 131], [35, 144]], "主交通沟一个点不改（0610 import 它）");
+  // 第二条交通沟：从西段往后通坡后，不跟主交通沟相交（两条线最近也隔 20 m 以上）
+  const T2 = L0105_TRENCHES.traffic2;
+  const DistLine = (x, z, line) => { let best = Infinity; for (let i = 1; i < line.length; i++) { const a0 = line[i - 1], a1 = line[i], dx = a1.x - a0.x, dz = a1.z - a0.z, l2 = dx * dx + dz * dz; const k = Math.max(0, Math.min(1, ((x - a0.x) * dx + (z - a0.z) * dz) / l2)); best = Math.min(best, Math.hypot(x - a0.x - dx * k, z - a0.z - dz * k)); } return best; };
+  assert.ok(T2.length >= 5 && T2[0].z < 12 && T2[T2.length - 1].z >= 140, "第二条交通沟从前沿西段通到坡后");
+  for (let d = 0; d <= LineLength(T2); d += 2) { const q = PointBeside(T2, d, 0); assert.ok(DistLine(q.x, q.z, L0105_TRENCHES.traffic) >= 20, `第二条交通沟离主交通沟太近 (${q.x.toFixed(1)},${q.z.toFixed(1)})`); }
+  Near(Cut({ x: -47, z: 30 }), S.traffic2.depth, 0.15, "第二条交通沟深");
+  assert.ok(DistLine(T2[0].x, T2[0].z, Part(FP.west)) <= 3, "第二条交通沟接在前沿西段上");
+  // 主交通沟：让担架的龛 ≥ 8 个、板桥以北、沟壁凹进去 0.6–0.8 m
+  const litter = L0105_NICHE_SHAPES.filter((n) => n.kind === "litter");
+  assert.ok(litter.length >= 8 && litter.every((n) => n.on === "traffic" && n.z < 108), "主交通沟板桥以北每隔约 10 m 一个让担架的龛");
+  for (const n of litter) {
+    const depth = NaturalHeight(n.x, n.z) - sample(n.x, n.z);
+    assert.ok(depth >= 1.6, `让担架的龛 ${n.id} 没挖进沟壁（深 ${depth.toFixed(2)}）`);
+    assert.ok(n.hv - 0.2 >= 0.3 && n.hv - 0.2 <= 0.4, `让担架的龛 ${n.id} 凹进去 ${((n.hv - 0.2) * 2).toFixed(2)} m（要 0.6–0.8）`);
+  }
+  // 弹药龛 ≥ 6、手榴弹龛 ≥ 3，每个手榴弹龛离最近的弹药龛 ≥ 3 m；龛里有箱子；机枪坑边有弹药箱
+  const ammo = L0105_NICHE_SHAPES.filter((n) => n.kind === "ammo"), gren = L0105_NICHE_SHAPES.filter((n) => n.kind === "grenade");
+  assert.ok(ammo.length >= 6 && gren.length >= 3, `弹药龛 ${ammo.length}、手榴弹龛 ${gren.length}`);
+  for (const g of gren) assert.ok(Math.min(...ammo.map((q) => Math.hypot(q.x - g.x, q.z - g.z))) >= 3, `手榴弹龛 ${g.id} 离弹药龛不到 3 m`);
+  for (const n of [...ammo, ...gren]) assert.ok(all.filter((b) => b.id.startsWith(n.id + "_")).length >= 2, `龛 ${n.id} 里没箱子`);
+  assert.ok(all.filter((b) => /^PitAmmoCrate/.test(b.id)).length >= 2, "机枪坑边要有弹药箱");
+  for (const seg of ["W", "M", "E"]) assert.ok(ammo.filter((n) => n.id.includes(`_${seg}`)).length >= 2 && gren.some((n) => n.id.endsWith(`_${seg}`)), `前沿${seg}段要有弹药龛和手榴弹龛`);
+  // 排长掩蔽部兼通信所、坡后预备队、连弹药所、连指挥所（地标）
+  Near(Cut(P.platoonShelter), P.platoonShelter.floorDepth, 0.1, "排长掩蔽部深");
+  assert.ok(all.some((b) => b.id === "PlatoonShelterRoofTimber") && all.some((b) => b.id === "PlatoonFieldPhone"), "排长掩蔽部要有顶和野战电话");
+  assert.ok(P.reserve.z > P.crest.z && P.companyAmmo.z > P.crest.z, "预备队、连弹药所在坡顶以南");
+  for (const q of P.reserve.pits) Near(Cut(q), P.reserve.pitDepth, 0.1, `预备队浅坑 (${q.x},${q.z})`);
+  assert.ok(all.filter((b) => /^CompanyAmmoCrate/.test(b.id)).length >= 5 && all.some((b) => b.id === "CompanyAmmoTarp"), "连弹药所要有一堆箱子和苫布");
+  assert.ok(a.landmarks.some((lm) => lm.name === P.companyPost.name && InGullyFloor(lm, 0.5)), "连指挥所 / 绷带所的地标在干沟里");
+  assert.ok(!a.blocks.some((b) => Math.hypot(b.x - P.companyPost.x, b.z - P.companyPost.z) < 3 && !/^KeepIn_/.test(b.id)), "连指挥所不加体块（干沟里人多）");
+  // 北边放弃的旧阵地：≥ 3 段射击沟、都在地坎南边高的一侧、每段不规则；空机枪掩体 ≥ 3、掩蔽部顶塌了半边；尸体 / 弹药箱 / 破枪；旧交通沟往南、往北（掷弹筒蹲在里面）；警戒沟 ≥ 2 段 + 散兵坑
+  const OLD = L0105_OLD_POSITION;
+  assert.ok(OLD.fire.length >= 3, "旧阵地射击沟 ≥ 3 段");
+  for (const f of OLD.fire) {
+    assert.ok(f.line.every((p) => p.z > ScarpZ(p.x) + 1.5 && p.z < ScarpZ(p.x) + 10), `${f.id} 要在地坎南边高的一侧、离坎沿不远`);
+    const steps = f.line.slice(1).map((p, i) => Math.round((p.x - f.line[i].x) * 10) / 10);
+    assert.ok(f.line.length >= 4 && new Set(steps).size >= 2, `${f.id} 折点太少或折距全一样`);
+    const mid = PointAlong(f.line, LineLength(f.line) / 2);
+    Near(Cut(mid), S.oldFire.depth, 0.25, `${f.id} 深`);
+    assert.ok(sample(mid.x, mid.z) > sample(mid.x, ScarpZ(mid.x) - 6) + 0.3, `${f.id} 沟底要比坎下的地还高`);
+  }
+  for (let i = 1; i < OLD.fire.length; i++) assert.ok(OLD.fire[i].line[0].x - OLD.fire[i - 1].line[OLD.fire[i - 1].line.length - 1].x >= 12, "旧阵地的段与段之间要断开");
+  assert.ok(OLD.mgNests.length >= 3 && OLD.mgNests.every((n) => Math.abs(Cut(n) - OLD.mgNest.depth) < 0.25 && all.some((b) => b.id === `${n.id}_Sandbags`)), `三个空机枪掩体（沟上掏的方坑 + 北沿土袋）：深 ${OLD.mgNests.map((n) => Cut(n).toFixed(2)).join("/")}`);
+  assert.ok(all.some((b) => b.id === "OldShelterRoofTimber") && all.some((b) => b.id === "OldShelterFallenSlab"), "掩蔽部顶塌了半边");
+  assert.ok(all.filter((b) => /^OldCrate_/.test(b.id)).length >= 4 && all.filter((b) => /^OldRifle_/.test(b.id)).length >= 3 && all.filter((b) => /^OldCollapse_/.test(b.id)).length >= 3, "丢下的弹药箱、破枪、塌方土堆");
+  assert.ok(OLD.comm[0].z < -195 && OLD.comm[OLD.comm.length - 1].z >= -145 && OLD.comm[OLD.comm.length - 1].z <= -80, "旧交通沟从旧阵地往南（到干沙沟北岸外十来米）");
+  Near(Cut(PointAlong(OLD.comm, 15)), S.oldComm.depth, 0.2, "旧交通沟深（浅）");
+  assert.ok(DistLine(P.mortar.x, P.mortar.z, OLD.sap) <= 1 && P.mortar.z < ScarpZ(P.mortar.x) - 3, "掷弹筒组蹲在通警戒阵地的旧交通沟里、坎下那一截");
+  assert.ok(OLD.outposts.length >= 2 && OLD.outposts.every((f) => f.line.every((p) => p.z <= -435 && p.z >= -465)) && OLD.foxholes.length >= 3, "警戒阵地：两段短沟 + 散兵坑");
+  for (const f of OLD.foxholes) Near(Cut(f), OLD.foxholeDepth, 0.15, `散兵坑 (${f.x},${f.z})`);
+  assert.ok(a.paint.filter((p) => /^OldTrench_/.test(p.id)).length >= OLD.fire.length + 2 && a.paint.some((p) => p.id === "OldTrench_Comm" && p.color === OLD.paint), "旧沟有自己的涂色（跟现在的沟分得开）");
+  assert.ok(!a.paint.some((p) => p.id.startsWith("OldTrench_") && p.color === C.ditchSoil), "旧沟的颜色别跟干水沟翻土一样");
+  // 干沙沟：顶宽 8–10、沟底 5–6（沙色）、深 1.3–1.5、两岸不齐
+  assert.ok(PN.ditch.topW >= 8 && PN.ditch.topW <= 10 && PN.ditch.floorW >= 5 && PN.ditch.floorW <= 6 && PN.ditch.depth >= 1.3 && PN.ditch.depth <= 1.5, "干沙沟断面");
+  assert.ok(a.paint.some((p) => p.id === "DitchSand" && p.color === C.ditchSand), "沟底涂沙色");
+  {
+    let uneven = 0;
+    for (const d of [60, 110, 160, 210, 260]) {
+      const c = PointBeside(PN.ditch.line, d, 0), l = PointBeside(PN.ditch.line, d, 1), nx = l.x - c.x, nz = l.z - c.z;
+      const Edge = (dir) => { let s = 0; const floor = sample(c.x, c.z); for (let u = 0.5; u <= 8; u += 0.1) { if (sample(c.x + nx * u * dir, c.z + nz * u * dir) >= floor + PN.ditch.depth * 0.9) { s = u; break; } } return s; };
+      if (Math.abs(Edge(1) - Edge(-1)) >= 0.4) uneven += 1;
+    }
+    assert.ok(uneven >= 2, `干沙沟两岸要不齐（${uneven} 处不齐）`);
+  }
+  // 田是拼块：场地里的片朝向至少 4 种、没有一整片同宽的竖条、约五分之一整块
+  const farm = FarmLayout();
+  const siteGroups = farm.groups.filter((g) => g.row <= 4 && g.x1 > L0105_BOUNDS.minX && g.x0 < L0105_BOUNDS.maxX && g.poly);
+  const dirs = new Set(siteGroups.filter((g) => !g.whole).map((g) => g.shearDeg));
+  assert.ok(dirs.size >= 4 && [...dirs].every((d) => Math.abs(d) <= L0105_FARM.shearDeg && Math.abs(d) >= 3), `片的朝向 ${dirs.size} 种（要 ≥ 4，每片 ±3…14°）`);
+  for (const g of siteGroups.filter((q) => !q.whole)) {
+    const ws = farm.parcels.filter((p) => p.row === g.row && p.group === g.index).map((p) => Math.round(p.w * 2) / 2);
+    if (ws.length >= 3) assert.ok(new Set(ws).size >= 2, `row ${g.row} group ${g.index} 一整排同宽的竖条`);
+    for (const w of ws) assert.ok(w >= 9.9 && w <= 32.1, `row ${g.row} group ${g.index} 条宽 ${w}（要 10–32）`);
+    assert.ok(g.x1 - g.x0 >= 50 && g.x1 - g.x0 <= 110, `片宽 ${g.x1 - g.x0}（要 50–110）`);
+  }
+  const wholeFrac = siteGroups.filter((g) => g.whole).length / siteGroups.length;
+  assert.ok(wholeFrac >= 0.08 && wholeFrac <= 0.35, `整块不分条的片占 ${(wholeFrac * 100).toFixed(0)}%（要约五分之一）`);
+  // 林 ≥ 3 片（坟 5–7、柏树 3–5）；南半场零星的树离路 ≥ 10 m、彼此 ≥ 25 m
+  assert.ok(L0105_WOODS.length >= 3 && L0105_WOODS.every((w) => w.graves.length >= 5 && w.graves.length <= 7 && w.cypresses.length >= 3 && w.cypresses.length <= 5), "家族坟地（林）≥ 3 片，坟 5–7、柏树 3–5");
+  for (const w of L0105_WOODS) assert.equal(all.filter((b) => b.id.startsWith(`${w.id}_Cypress`)).length, w.cypresses.length, `${w.name} 的柏树`);
+  for (const w of L0105_WOODS) for (const g of w.graves) { let ring = 0; for (let i = 0; i < 12; i++) { const ang = i * Math.PI / 6; ring += sample(g.x + Math.cos(ang) * (PN.graveBaseR + 1), g.z + Math.sin(ang) * (PN.graveBaseR + 1)); } assert.ok(Math.abs(sample(g.x, g.z) - ring / 12 - g.h) < 0.15, `${w.name} 的坟 (${g.x},${g.z}) 没烘进高度场`); }
+  const st = all.filter((b) => /^SouthTree_/.test(b.id));
+  assert.equal(st.length, L0105_SOUTH_TREES.length, "南半场零星的树照锚点表");
+  for (const t of st) {
+    for (const line of [L0105_ROAD, L0105_POST_ROAD_SOUTH, ...L0105_FIELD_LANES, L0105_TRENCHES.traffic, L0105_TRENCHES.traffic2, L0105_TRENCHES.front]) assert.ok(DistLine(t.x, t.z, line) >= 10, `${t.id} (${t.x},${t.z}) 挨着路 / 沟`);
+    for (const u of st) if (u !== t) assert.ok(Math.hypot(u.x - t.x, u.z - t.z) >= 25, `${t.id} 和 ${u.id} 挨得太近`);
+  }
+  // 老驿道：有头有尾——从北边界下来，过岔口 (175,−40) 往东南一直到 z ≥ 40（场地里到南边界，远景里接着往东南）
+  assert.deepEqual([L0105_POST_ROAD_SOUTH[0].x, L0105_POST_ROAD_SOUTH[0].z], [L0105_ROAD[0].x, L0105_ROAD[0].z], "驿道南段从车道岔口接出去");
+  assert.ok(L0105_POST_ROAD_SOUTH[L0105_POST_ROAD_SOUTH.length - 1].z >= 40, "驿道往南到 z ≥ 40");
+  assert.ok(Math.hypot(L0105_BACKDROP_POST_ROAD[0].x - L0105_POST_ROAD_SOUTH[L0105_POST_ROAD_SOUTH.length - 1].x, L0105_BACKDROP_POST_ROAD[0].z - L0105_POST_ROAD_SOUTH[L0105_POST_ROAD_SOUTH.length - 1].z) < 0.01, "远景里的驿道接在场地里那段的头上");
+  assert.ok(!all.some((b) => /Poplar|RoadTree/.test(b.id)), "驿道没有行道树");
+  assert.ok(sample(185, 2) < NaturalHeight(185, 2) - 0.05, "驿道南段在坑南靠路面压低认路");
+  // 三辆轻装甲车露头的地方在东边麦田里（场地东扩到 320）
+  assert.ok(L0105_BOUNDS.maxX >= 310 && P.tankFirstSeen.x >= 250 && P.tankFirstSeen.z <= -100, "轻装甲车从东边麦田 x 260–300 冒出来");
 }
 
 const all = [...a.blocks, ...a.gates];
@@ -207,19 +333,20 @@ const pn = PitNorthChecks(sample);
 for (const g of pn.graves) assert.ok(g.h >= 0.95 && g.h <= 1.35 && Math.abs(g.h - g.want) <= 0.1, `坟 ${g.id} 高 ${g.h}（要 ${g.want}，1.0–1.3）`);
 assert.equal(pn.graves.length, 7, "两座孤坟 + 坟地五座");
 assert.ok(pn.bunds.length >= 60 && pn.bundMin >= 0.25 && pn.bundMax <= 0.36, `田埂高 ${pn.bundMin}…${pn.bundMax}（要约 0.3）`);
-assert.ok(pn.ditchDepthMin >= 1.15 && pn.ditchDepthMax <= 1.6, `干水沟深 ${pn.ditchDepthMin}…${pn.ditchDepthMax}（自然地面往下 1.2 + 沟沿翻土）`);
+assert.ok(pn.ditchDepthMin >= 1.2 && pn.ditchDepthMax <= 1.75, `干沙沟深 ${pn.ditchDepthMin}…${pn.ditchDepthMax}（自然地面往下 1.4 + 沟沿翻土）`);
 {
-  // 断面：沟底宽约 1.5（离最深处 10 cm 内）；沟沿（翻土顶）到沟底 ≥ 1.2
-  for (const d of [20, 60, 120, 170, 200]) {
+  // 断面（2026-10-24 北沙河小支沟的样子）：沟底宽 5–6（离最深处 10 cm 内）；沟沿（翻土顶）到沟底 ≥ 1.2
+  const rimU = PN.ditch.topW / 2 * (1 + PN.ditch.bankWobble) + PN.ditch.lipW + 0.4;
+  for (const d of [70, 180, 230, 260, 300]) {   // 避开驿道从沟上过的那一截（约 d 100，路面下填平）和穿地坎的豁口（约 d 120）
     const c = PointBeside(PN.ditch.line, d, 0), l = PointBeside(PN.ditch.line, d, 1);
     const nx = l.x - c.x, nz = l.z - c.z;
-    const prof = []; for (let u = -3; u <= 3.001; u += 0.05) prof.push([u, sample(c.x + nx * u, c.z + nz * u)]);
+    const prof = []; for (let u = -6; u <= 6.001; u += 0.05) prof.push([u, sample(c.x + nx * u, c.z + nz * u)]);
     const floor = Math.min(...prof.map((p) => p[1]));
     const flat = prof.filter((p) => p[1] <= floor + 0.1).map((p) => p[0]);
     const floorW = Math.max(...flat) - Math.min(...flat);
-    assert.ok(floorW >= 0.9 && floorW <= 2.2, `干水沟 d${d} 沟底宽 ${floorW.toFixed(2)}（要约 1.5）`);
-    const rimY = (sample(c.x + nx * 2.2, c.z + nz * 2.2) + sample(c.x - nx * 2.2, c.z - nz * 2.2)) / 2;
-    assert.ok(rimY - floor >= 1.2, `干水沟 d${d} 沟沿到沟底 ${(rimY - floor).toFixed(2)}（蹲着头不露要 ≥ 1.2）`);
+    assert.ok(floorW >= 4.5 && floorW <= 6.8, `干沙沟 d${d} 沟底宽 ${floorW.toFixed(2)}（要 5–6）`);
+    const rimY = (sample(c.x + nx * rimU, c.z + nz * rimU) + sample(c.x - nx * rimU, c.z - nz * rimU)) / 2;
+    assert.ok(rimY - floor >= 1.2, `干沙沟 d${d} 沟沿到沟底 ${(rimY - floor).toFixed(2)}（蹲着头不露要 ≥ 1.2）`);
   }
   assert.ok(LineLength(PN.ditch.line) > 290, "干水沟全长");
   // 尽头在坑西北约 100 m、渐浅到地面；不和坑、前沿沟、交通沟相交
@@ -229,7 +356,7 @@ assert.ok(pn.ditchDepthMin >= 1.15 && pn.ditchDepthMax <= 1.6, `干水沟深 ${p
   assert.ok(Math.abs(Cut(end)) < 0.2, `干水沟尽头要渐浅到地面：${Cut(end).toFixed(2)}`);
   for (const p of [P.pit, { x: -62, z: -22 }, { x: 0, z: 0 }, { x: 0.5, z: 11 }]) assert.ok(DitchStation(p.x, p.z).d > 40, "干水沟离坑 / 前沿沟 / 交通沟太近");
 }
-assert.ok(pn.scarpMin >= 1.7 && pn.scarpMax <= 2.3, `地坎落差 ${pn.scarpMin}…${pn.scarpMax}（北低南高约 2 m）`);
+assert.ok(pn.scarpMin >= 1.7 && pn.scarpMax <= 2.5, `地坎落差 ${pn.scarpMin}…${pn.scarpMax}（北低南高约 2 m；2026-10-24 起量坎线南 9.5 m，旧阵地的沟在 4–8 m）`);
 {
   // 坎面陡：坎线两侧各 1 m 落差 ≥ 1.2 m；豁口处顺沟走 1 m 内高差 ≤ 0.6 m
   for (const x of [-80, -20, 28, 80, 170]) {
@@ -285,8 +412,8 @@ assert.ok(pn.lmgW.block <= 0 && pn.lmgE.block <= 0, `坑里要看得见两挺轻
 }
 {
   // 扫清带基本平：z −8…−80 内坑北前景只加了田埂、孤坟（和干水沟尽头），没有起伏、没有地坎（原来坑北略低的那 0.8 m 缓坡照旧）
-  for (let z = -8.5; z >= -80; z -= 1.5) for (let x = -100; x <= 185; x += 1.5) {
-    if (DitchStation(x, z).d < 6) continue;
+  for (let z = -8.5; z >= -80; z -= 1.5) for (let x = -100; x <= 315; x += 1.5) {
+    if (DitchStation(x, z).d < 8) continue;   // 2026-10-24 沙沟宽了（顶宽 8.6 + 两岸不齐 + 翻土）
     const add = PitNorthHeight(x, z, 0);
     assert.ok(Math.abs(add - Math.max(BundHeight(x, z), GraveHeight(x, z))) < 1e-9, "扫清带里除了田埂 / 孤坟还加了别的起伏：(" + x + "," + z + ") " + add);
   }
@@ -294,16 +421,19 @@ assert.ok(pn.lmgW.block <= 0 && pn.lmgE.block <= 0, `坑里要看得见两挺轻
   for (const [x, z] of [[0, -7.9], [50, 0], [35, 120], [-100, 150]]) assert.equal(PitNorthHeight(x, z, 0.37), 0.37, `坑北的改动碰到了 (${x},${z})`);
   // 第三版压平：地坎以北那一大片 = 前沿一带 + 坑北略低 0.8 m − 地坎 2 m + ±1 m 的大起伏（+ 原来那层 ±0.33 m 的小起伏；田埂 / 坟 / 干水沟 / 路以外逐点对得上，没有往北抬的坡）
   let rlo = Infinity, rhi = -Infinity, worst = 0, n = 0;
-  for (let z = -230; z >= -478; z -= 6) for (let x = -106; x <= 186; x += 6) {
-    if (DitchStation(x, z).d < 5 || GraveHeight(x, z) > 0 || BundHeight(x, z) > 0) continue;
+  const OLDP = L0105_OLD_POSITION;
+  for (let z = -230; z >= -478; z -= 6) for (let x = -106; x <= 316; x += 6) {
+    if (DitchStation(x, z).d < 8 || GraveHeight(x, z) > 0 || BundHeight(x, z) > 0) continue;
     const want = L0105_HEIGHTS.front + L0105_HEIGHTS.fieldNorthDip - PN.scarp.drop + PitNorthRoll(x, z);
-    const near = [L0105_NORTH_ROAD, L0105_FIELD_PATH].some((line) => { for (let i = 1; i < line.length; i++) { const p0 = line[i - 1], p1 = line[i]; const dx = p1.x - p0.x, dz = p1.z - p0.z; const t = Math.max(0, Math.min(1, ((x - p0.x) * dx + (z - p0.z) * dz) / (dx * dx + dz * dz))); if (Math.hypot(x - p0.x - dx * t, z - p0.z - dz * t) < 9) return true; } return false; });
+    const near = [L0105_NORTH_ROAD, L0105_FIELD_PATH, ...OLD_LINES].some((line) => { for (let i = 1; i < line.length; i++) { const p0 = line[i - 1], p1 = line[i]; const dx = p1.x - p0.x, dz = p1.z - p0.z; const t = Math.max(0, Math.min(1, ((x - p0.x) * dx + (z - p0.z) * dz) / (dx * dx + dz * dz))); if (Math.hypot(x - p0.x - dx * t, z - p0.z - dz * t) < 9) return true; } return false; });
     if (near) continue;
+    // 2026-10-24：旧阵地的坑（警戒散兵坑、掷弹筒的圆坑）也是 Ground 里挖的，不算
+    if (OLDP.foxholes.some((f) => Math.hypot(f.x - x, f.z - z) < 4) || Math.hypot(P.mortar.x - x, P.mortar.z - z) < 5) continue;
     worst = Math.max(worst, Math.abs(sample(x, z) - want)); n += 1;
     rlo = Math.min(rlo, sample(x, z)); rhi = Math.max(rhi, sample(x, z));
   }
   assert.ok(n > 1000 && worst < 0.36, `坑北压平：坎下的地面跟「−2.8 + 大起伏」差 ${worst.toFixed(2)} m（${n} 点；前沿一带那层 ±0.33 m 的小起伏照旧）`);
-  assert.ok(rhi - rlo >= 0.8 && rhi - rlo <= 2.1, `坎下的地面起伏 ${(rhi - rlo).toFixed(2)} m（只留 ±1 m 的低频起伏）`);
+  assert.ok(rhi - rlo >= 0.8 && rhi - rlo <= 2.7, `坎下的地面起伏 ${(rhi - rlo).toFixed(2)} m（只留 ±1 m 的低频起伏 + 前沿一带那层 ±0.33 m 的小起伏；2026-10-24 东扩到 x 320 后两头都量到了）`);
   for (let x = -100; x <= 180; x += 20) { const r = PitNorthRoll(x, -400); assert.ok(Math.abs(r) <= 1.0001, `大起伏超过 ±1 m：${r}`); }
 }
 {
@@ -328,42 +458,40 @@ assert.ok(pn.lmgW.block <= 0 && pn.lmgE.block <= 0, `坑里要看得见两挺轻
   for (const item of paint) for (const p of item.poly || item.line) assert.ok(p.z + (item.halfW || 0) + (item.feather || 1) / 2 < -8, `涂色 ${item.id} 伸到了 z ≥ −8：(${p.x},${p.z})`);
   // 栅格烘出来南面一点没涂（z ≥ −8 处覆盖度 0）
   const gp = BuildGroundPaint(paint, a.bounds), rgb = [0.5, 0.5, 0.5];
-  for (let x = -110; x <= 190; x += 2) assert.equal(gp.Blend(x, -7.9, rgb), 0, `z −7.9 x ${x} 被涂了色`);
+  for (let x = -110; x <= 320; x += 2) assert.equal(gp.Blend(x, -7.9, rgb), 0, `z −7.9 x ${x} 被涂了色`);
   assert.ok(gp.Blend(30, -50, [0, 0, 0]) > 0.99 && gp.Blend(30, -260, [0, 0, 0]) > 0.99 && gp.Blend(30, -470, [0, 0, 0]) > 0.99, "扫清带、坎下、北边界都要涂满");
-  // 窄条田：南北向长条（比宽长得多），宽 5–20 m（场地边上被裁的不算）、宽窄不一；翻地 + 撂荒过半
+  // 拼块田（2026-10-24）：条地 10–32 m 宽（按 FarmLayout 的名义宽，多边形因为斜了外包框更宽）、宽窄不一；翻地 + 撂荒过半
   const C = L0105_FIELD_PAINT;
   const strips = paint.filter((p) => /^Field_/.test(p.id));
-  assert.ok(strips.length >= 80, `场地里的窄条田 ${strips.length}`);
+  assert.ok(strips.length >= 60, `场地里的田块 ${strips.length}`);
   const kind = (c) => (C.wheat.includes(c) ? "wheat" : C.plowed.includes(c) ? "plowed" : C.fallow.includes(c) ? "fallow" : "?");
   const counts = { wheat: 0, plowed: 0, fallow: 0 };
-  const widths = [];
   for (const f of strips) {
     const k = kind(f.color); assert.notEqual(k, "?", `田块 ${f.id} 颜色 ${f.color} 不是麦地 / 翻地 / 撂荒`); counts[k] += 1;
-    const xs = f.poly.map((p) => p.x), zs = f.poly.map((p) => p.z), w = Math.max(...xs) - Math.min(...xs), len = Math.max(...zs) - Math.min(...zs);
-    if (Math.min(...xs) > L0105_BOUNDS.minX - 1.9 && Math.max(...xs) < L0105_BOUNDS.maxX + 1.9) { widths.push(w); assert.ok(w >= 4.99 && w <= 20.01, `田块 ${f.id} 宽 ${w.toFixed(1)}（要 5–20）`); }
-    if (Math.min(...zs) > L0105_BOUNDS.minZ - 1.9) assert.ok(len > w * 2, `田块 ${f.id} 不是南北向的长条：宽 ${w.toFixed(1)} 长 ${len.toFixed(1)}`);
+    assert.ok(f.poly.length >= 3 && f.poly.every((p) => p.z < -8), `田块 ${f.id} 的多边形不对`);
   }
-  assert.ok(Math.max(...widths) - Math.min(...widths) >= 10, `田块宽窄要不一：${Math.min(...widths).toFixed(1)}…${Math.max(...widths).toFixed(1)}`);
   assert.ok(counts.plowed + counts.fallow >= strips.length * 0.55, `翻地 + 撂荒要多一些：${JSON.stringify(counts)}`);
-  // 一组里相邻两条不种同一样；组与组之间留小路（2·pathHalfW）
+  // 一片里相邻两条不种同一样；片与片之间留小路（2·pathHalfW）
   const farm = FarmLayout();
   for (let i = 1; i < farm.parcels.length; i++) {
     const p0 = farm.parcels[i - 1], p1 = farm.parcels[i];
-    if (p0.row === p1.row && p0.group === p1.group) assert.notEqual(p0.crop.kind, p1.crop.kind, `组里相邻两条一样：row ${p0.row} group ${p0.group}`);
+    if (p0.row === p1.row && p0.group === p1.group) assert.notEqual(p0.crop.kind, p1.crop.kind, `片里相邻两条一样：row ${p0.row} group ${p0.group}`);
   }
-  const fieldGroups = farm.groups.filter((g) => g.row <= 3 && g.x1 > L0105_BOUNDS.minX && g.x0 < L0105_BOUNDS.maxX);
+  const fieldGroups = farm.groups.filter((g) => g.row <= 4 && g.x1 > L0105_BOUNDS.minX && g.x0 < L0105_BOUNDS.maxX);
   const perGroup = fieldGroups.map((g) => farm.parcels.filter((p) => p.row === g.row && p.group === g.index).length);
-  assert.ok(fieldGroups.length >= 6 && perGroup.filter((n) => n >= 8).length >= 4, `场地里的组 ${fieldGroups.length}，每组条数 ${perGroup.join("/")}`);
-  assert.ok(paint.some((p) => p.id === "FarmPaths" && p.color === C.fieldPath), "组间田间小路（底色）");
-  // 路：大路一个点不动；北段接在大路北头一直通到北边界，远景层的大路从那里接着往北
-  assert.deepEqual(L0105_ROAD.map((p) => [p.x, p.z]), [[175, -40], [105, 50], [35, 116], [-20, 152], [-100, 185]], "大路 L0105_ROAD 不许动（战车路线）");
-  assert.deepEqual([L0105_NORTH_ROAD[0].x, L0105_NORTH_ROAD[0].z], [175, -40], "大路北段从大路北头接出去");
+  const widths = farm.parcels.filter((p) => !p.whole && fieldGroups.some((g) => g.row === p.row && g.index === p.group)).map((p) => p.w);
+  assert.ok(fieldGroups.length >= 10 && perGroup.filter((n) => n >= 3).length >= 6, `场地里的片 ${fieldGroups.length}，每片条数 ${perGroup.join("/")}`);
+  assert.ok(Math.max(...widths) - Math.min(...widths) >= 10, `条地宽窄要不一：${Math.min(...widths).toFixed(1)}…${Math.max(...widths).toFixed(1)}`);
+  assert.ok(paint.some((p) => p.id === "FarmPaths" && p.color === C.fieldPath), "片间田间小路（底色）");
+  // 路：车道一个点不动；老驿道北段接在车道北头一直通到北边界，远景层的大路从那里接着往北
+  assert.deepEqual(L0105_ROAD.map((p) => [p.x, p.z]), [[175, -40], [105, 50], [35, 116], [-20, 152], [-100, 185]], "车道 L0105_ROAD 不许动（05 A 车的路线）");
+  assert.deepEqual([L0105_NORTH_ROAD[0].x, L0105_NORTH_ROAD[0].z], [175, -40], "驿道北段从车道北头接出去");
   const roadEnd = L0105_NORTH_ROAD[L0105_NORTH_ROAD.length - 1];
-  assert.equal(roadEnd.z, L0105_BOUNDS.minZ, "大路北段通到北边界");
+  assert.equal(roadEnd.z, L0105_BOUNDS.minZ, "驿道北段通到北边界");
   assert.deepEqual([L0105_BACKDROP_ROAD[0].x, L0105_BACKDROP_ROAD[0].z], [roadEnd.x, roadEnd.z], "远景层的大路接在场地里那段的头上");
   const roads = a.ways.roads.map((l) => JSON.stringify(l.map((p) => [p.x, p.z])));
-  assert.ok(roads.includes(JSON.stringify(L0105_ROAD.map((p) => [p.x, p.z]))), "ways.roads 里大路原样");
-  assert.equal(roads.length, 4, "ways.roads：大路、凹路、大路北段、田间小路");
+  assert.ok(roads.includes(JSON.stringify(L0105_ROAD.map((p) => [p.x, p.z]))), "ways.roads 里车道原样");
+  assert.equal(roads.length, 5 + L0105_FIELD_LANES.length, "ways.roads：车道、凹路、驿道北段、田间小路、驿道南段、几条田间小路");
   const pathEnd = L0105_FIELD_PATH[L0105_FIELD_PATH.length - 1];
   assert.ok(Math.hypot(pathEnd.x + 31, pathEnd.z + 122) < 15, "田间小路通到坟地一带");
   assert.equal(L0105_FIELD_PATH[0].z, L0105_BOUNDS.minZ, "田间小路往北出场地");
@@ -385,7 +513,7 @@ assert.ok(pn.lmgW.block <= 0 && pn.lmgE.block <= 0, `坑里要看得见两挺轻
   const graveSpots = [...L0105_FIELD_GRAVES, ...PN.loneGraves, ...PN.graveyard];
   for (const t of ft) {
     assert.ok(IsSceneTreeBlock(t) && t.h >= 10 && t.h <= 14, `${t.id} 要能种成树（${t.h} m）`);
-    for (const line of [L0105_NORTH_ROAD, L0105_FIELD_PATH, L0105_ROAD]) assert.ok(DistLine(t.x, t.z, line) >= 10, `${t.id} (${t.x},${t.z}) 挨着路`);
+    for (const line of [L0105_NORTH_ROAD, L0105_FIELD_PATH, L0105_ROAD, L0105_POST_ROAD_SOUTH, ...L0105_FIELD_LANES]) assert.ok(DistLine(t.x, t.z, line) >= 10, `${t.id} (${t.x},${t.z}) 挨着路`);
     assert.ok(DitchStation(t.x, t.z).d >= 3 && Math.abs(ScarpZ(t.x) - t.z) >= 6, `${t.id} (${t.x},${t.z}) 在沟里 / 坎上`);
     assert.ok(graveSpots.every((g) => Math.hypot(g.x - t.x, g.z - t.z) >= 3), `${t.id} (${t.x},${t.z}) 长在坟包上`);
     assert.ok(!(t.x > -75 && t.x < 75 && t.z > -215) && t.z < -90, `${t.id} (${t.x},${t.z}) 在扫清带或 03 跃进的那一片里`);
@@ -402,7 +530,7 @@ assert.ok(pn.lmgW.block <= 0 && pn.lmgE.block <= 0, `坑里要看得见两挺轻
       assert.equal(t.kind, "tree");
       for (const line of [L0105_BACKDROP_ROAD, ...L0105_BACKDROP_PATHS]) assert.ok(DL(t.x, t.z, line) >= 20, `${t.id} (${t.x},${t.z}) 挨着远景的路`);
       for (const v of L0105_BACKDROP_VILLAGES) assert.ok(Math.abs(t.x - v.x) > v.rx + v.ringM + 20 || Math.abs(t.z - v.z) > v.rz + v.ringM + 20, `${t.id} 在村 ${v.id} 边上`);
-      assert.ok(t.z < L0105_BOUNDS.minZ, `${t.id} 应在场地外`);
+      assert.ok(t.z < L0105_BOUNDS.minZ || t.x > L0105_BOUNDS.maxX || t.x < L0105_BOUNDS.minX, `${t.id} 应在场地外`);
     }
   }
   // 场地里没有村子（第三版挪进远景层）、没有炮楼
@@ -418,11 +546,11 @@ assert.ok(pn.lmgW.block <= 0 && pn.lmgE.block <= 0, `坑里要看得见两挺轻
     for (const st of stations) assert.ok(Math.hypot(st.x - g.x, st.z - g.z) > 8, `散坟 (${g.x},${g.z}) 挨着跃进站位 (${st.x},${st.z})`);
     assert.ok(DitchStation(g.x, g.z).d > 8, `散坟 (${g.x},${g.z}) 挨着干水沟`);
     assert.ok(Math.hypot(g.x - P.mortar.x, g.z - P.mortar.z) > 20, `散坟 (${g.x},${g.z}) 挨着掷弹筒组`);
-    for (const line of [L0105_NORTH_ROAD, L0105_FIELD_PATH]) for (let d = 0; d <= LineLength(line); d += 2) { const q = PointBeside(line, d, 0); assert.ok(Math.hypot(q.x - g.x, q.z - g.z) > 6, `散坟 (${g.x},${g.z}) 压着路`); }
+    for (const line of [L0105_NORTH_ROAD, L0105_FIELD_PATH, ...L0105_FIELD_LANES]) for (let d = 0; d <= LineLength(line); d += 2) { const q = PointBeside(line, d, 0); assert.ok(Math.hypot(q.x - g.x, q.z - g.z) > 6, `散坟 (${g.x},${g.z}) 压着路`); }
     assert.ok(paint.some((p) => /^FieldGrave_/.test(p.id) && p.color === C.newSoil && Math.abs(p.poly[0].x - g.x - 1.9) < 0.11 && Math.abs(p.poly[0].z - g.z) < 0.11), `散坟 (${g.x},${g.z}) 没涂新土色`);
   }
   // 色带钉在南面（z ≥ −8）的最低 / 最高点：坑北压平变低了也不改南面的颜色
-  assert.deepEqual(a.heightTint, { lo: -2.68, hi: 3.72 }, `heightTint ${JSON.stringify(a.heightTint)}`);
+  assert.ok(a.heightTint.lo === -2.68 && a.heightTint.hi >= 3.7 && a.heightTint.hi <= 3.9, `heightTint ${JSON.stringify(a.heightTint)}（钉在南面：最低还是干沟一带 −2.68，最高 3.7–3.9；2026-10-24 东扩后南面最高点在东边的坡顶台地上）`);
 
   // --- 远景层 ---
   const bd = a.backdrop;

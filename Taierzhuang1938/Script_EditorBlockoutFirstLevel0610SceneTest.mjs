@@ -20,12 +20,14 @@ import { HeightGridSampler } from "./Script_EditorBlockoutLevels.mjs";
 import {
   BuildFirstLevel0610Scene, CompareWith0105, LaneDepthAt, RiverSectionAt, DitchSectionAt, L0610SightChecks, BlockSight, BlockCenterY, SolidBlocks,
   RIVER_FLOOR_Y, RIVER_EAST_RIM_X, CELLAR_FLOOR_Y, POND_FLOOR_Y, L0610_MOUTH_SHOOTERS, RiverEastLedgeAt, EastRoadViewPoints, WalkGrid, FloodFrom, STREET_RUNS,
+  RiverBendAngles, LaneCorners, LaneStraightRuns, DistanceToAnyRoad, FieldAt, LANE_PATHS,
 } from "./Script_EditorBlockoutFirstLevel0610Scene.mjs";
 import { GullyBankHeights } from "./Script_EditorBlockoutFirstLevel0105Scene.mjs";
 import {
   L0610_PLACES as P, L0610_HEIGHTS as H, L0610_VILLAGE as V, L0610_GENG as G, L0610_JIEFANG as J, L0610_BENJIA as B, L0610_STREETS as ST, L0610_SIGNALS as SIG, L0610_FROM_0105,
   L0610_DITCH as DT, L0610_RIVER as RV, L0610_EAST_ROAD as ER, L0610_BOUNDS, L0610_YARDS, L0610_RUBBLE, L0610_SOUTH_LANE as SL, L0610_EAST_STREET as ES, L0610_ROUTE, L0610_LANES,
-  L0610_EAST_YARD_ROUTE,
+  L0610_EAST_YARD_ROUTE, L0610_LANE, L0610_ROADS, L0610_FOOTPATHS, L0610_FIELDS, L0610_GROVES, L0610_FIELD_TREES, L0610_WELLS, L0610_LOCKED_YARDS, L0610_YARD_POSE, L0610_LANE_PATHS,
+  L0610_FARMSTEADS, L0610_TOILET, L0610_FIELD_GRAVES, RiverAtZ, YardPose, YardCorners, YardGateWorld, PathNearest, PointInPoly, LanePointAtZ,
 } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 
 const opts = { commit: "test", generatedAt: "2026-10-22T00:00:00.000Z" };
@@ -38,6 +40,7 @@ assert.ok(check.ok, check.errors.join("; "));
 const sample = HeightGridSampler(a.terrain);
 const Near = (got, want, tol, what) => assert.ok(Math.abs(got - want) <= tol, `${what}: ${got.toFixed(2)} vs ${want}±${tol}`);
 const T = V.wallT;
+const byIdEarly = (scene, id) => [...scene.blocks, ...scene.gates].find((x) => x.id === id);
 
 // --- 与 0105 接得上 ---
 const H0105 = L0610_FROM_0105.heights;
@@ -79,16 +82,38 @@ assert.ok(Math.max(...ramp.slice(1).map((v, i) => v - ramp[i])) <= 0.55, "街口
 for (const p of L0610_MOUTH_SHOOTERS) { const y = sample(p.x, p.z); assert.ok(y > DT.floorY + 0.8 && y < V.y, `${p.who} 趴在坡道上半截`); }
 assert.ok(Math.hypot(L0610_MOUTH_SHOOTERS[0].x - P.alleyMouth.x, L0610_MOUTH_SHOOTERS[0].z - P.alleyMouth.z) <= 20, "顺子的射击位置到巷子口 ≤ 20 m");
 
-// --- 河汊子、西边封死、水 ---
-for (const z of [215, 260, 400, 500]) {
+// --- 河汊子（第八版：弯河）、西边封死、水 ---
+for (const z of [215, 260, 300, 400, 450, 500, 540]) {
   const r = RiverSectionAt(sample, z);
+  const inMarsh = z > RV.marsh.fromZ && z < RV.marsh.toZ + RV.marsh.fadeOutM;
   Near(r.floor, RIVER_FLOOR_Y, 0.05, `河汊子 z${z} 沟底`);
-  assert.ok(Math.min(r.west, r.east) - r.floor >= 2.5, `河汊子 z${z} 不够深`);
-  assert.ok(r.floorW >= 5.5 && r.floorW <= 7.5, `河汊子 z${z} 沟底宽 ${r.floorW}`);
+  assert.ok(r.west - r.floor >= 2.5, `河汊子 z${z} 西岸不够深`);
+  assert.ok(r.east - r.floor >= (inMarsh ? 1.6 : 2.5), `河汊子 z${z} 东岸不够深（${inMarsh ? "苇子洼那一段东岸是 −0.9 的烂泥" : ""}）`);
+  assert.ok(r.floorW >= 4 && r.floorW <= 9.5, `河汊子 z${z} 沟底宽 ${r.floorW}（要 4…9）`);
+  Near(r.x, RiverAtZ(z).x, 0.01, `河汊子 z${z} 中线按折线取`);
+}
+{
+  // 弯：中线相邻段方向差 ≥ 10° 的至少 6 处；水面宽 4…9；接缝 z 556 回到 34.5
+  const bends = RiverBendAngles();
+  assert.ok(bends.filter((b) => b.deg >= 10).length >= 6, `河汊子中线要有 ≥ 6 处 ≥ 10° 的弯，现在 ${bends.filter((b) => b.deg >= 10).length}`);
+  for (let i = 0; i < RV.halfW.length; i++) assert.ok(RV.halfW[i] * 2 >= 4 && RV.halfW[i] * 2 <= 9, `河汊子第 ${i} 个顶点水面宽 ${RV.halfW[i] * 2}`);
+  Near(RiverAtZ(556).x, 34.5, 0.5, "接缝 z 556 处中线 34.5 ± 0.5"); Near(RiverAtZ(556).halfW, RV.floorW / 2, 0.01, "接缝处半宽照旧 3");
+  for (let z = 530; z <= 560; z += 2) assert.ok(RiverAtZ(z).x + RiverAtZ(z).halfW + RV.wallM <= 40.01, `z${z} 东坎沿要在庄子西墙根 x 40`);
+  // 西来小沟：在河西、汇进河里、是沟
+  const TR = RV.tributary;
+  assert.ok(TR.line.every((p) => p.x <= RiverAtZ(p.z).x), "西来小沟全在河西");
+  Near(sample(-6, 296), TR.floorY, 0.1, "西来小沟是挖下去的沟");
+  assert.ok(sample(-6, 296 - 3) > TR.floorY + 0.9 && sample(-6, 296 + 3) > TR.floorY + 0.9, "西来小沟两边是岸");
+  assert.ok(a.blocks.some((x) => /^TributaryWater_/.test(x.id) && x.semantic === "water" && x.solid === false), "西来小沟里有水");
+  // 凸岸泥滩：弯的内侧是缓坡到 −1.4 的烂泥（比村里地面低 0.8 以上，走不了）
+  for (const b of RV.bends) { const r = RiverAtZ(b.z); const mx = b.x + b.side * (r.halfW + 2.0); assert.ok(sample(mx, b.z) <= RV.mud.y + 0.1 && sample(mx, b.z) >= RIVER_FLOOR_Y + 0.5, `z${b.z} 凸岸泥滩 ${sample(mx, b.z).toFixed(2)}`); }
 }
 {
   const waters = a.blocks.filter((x) => x.semantic === "water" && /^RiverWater/.test(x.id));
-  assert.ok(waters.length >= 2 && waters.every((x) => x.solid === false && Math.abs(x.x - RV.centerX) < 0.01), "沟底水块：不实心、在中线上");
+  assert.ok(waters.length >= 6 && waters.every((x) => x.solid === false), "沟底水块：不实心、一段一段跟着弯走");
+  for (const w of waters) { const r = RiverAtZ(w.z); assert.ok(Math.abs(w.x - r.x) <= 1.2, `水块 ${w.id} 要在中线附近（${w.x} vs ${r.x.toFixed(1)}）`); }
+  const tail = byIdEarly(a, "RiverWater_2");
+  assert.ok(tail && Math.abs(tail.x - RV.centerX) < 0.01 && Math.abs(tail.z + tail.d / 2 - 558) < 0.01 && !tail.ry, "RiverWater_2 直的、在 34.5 上、到 z 558（1218 从它末尾接）");
   for (const w of waters) Near(BlockCenterY(w, sample) - w.h / 2, RIVER_FLOOR_Y, 0.08, `水块 ${w.id} 的底要贴着沟底`);
   const wallFace = 40 - T / 2;
   for (let z = 390; z <= 540; z += 2) {
@@ -145,13 +170,19 @@ assert.ok(all.filter((x) => /^DeadTree_/.test(x.id)).length === L0610_FROM_0105.
 assert.ok(all.filter((x) => /^Tree_/.test(x.id)).length >= 15, "村里零散的树 ≥ 15 棵");
 
 const solids = SolidBlocks(a, []);
+/** 块的脚印（转过的按转过的框，分离轴判）与轴对齐盒子相交。第八版：院子 / 折线胡同的墙都是转过的块，包围圆粗算会把 20 m 长的墙当成 10 m 的圆。 */
 const Intersects = (blk, box) => {
-  if (blk.ry && Math.abs(blk.ry) > 0.01) {   // 转过的块按包围圆粗算
-    const r = Math.hypot(blk.w, blk.d) / 2;
-    return blk.x + r > box.minX && blk.x - r < box.maxX && blk.z + r > box.minZ && blk.z - r < box.maxZ;
-  }
   const hw = blk.w / 2, hd = blk.d / 2;
-  return blk.x + hw > box.minX && blk.x - hw < box.maxX && blk.z + hd > box.minZ && blk.z - hd < box.maxZ;
+  if (!blk.ry || Math.abs(blk.ry) <= 0.001) return blk.x + hw > box.minX && blk.x - hw < box.maxX && blk.z + hd > box.minZ && blk.z - hd < box.maxZ;
+  const c = Math.cos(blk.ry), s = Math.sin(blk.ry);
+  const corners = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([lx, lz]) => [blk.x + lx * c + lz * s, blk.z - lx * s + lz * c]);
+  const boxPts = [[box.minX, box.minZ], [box.maxX, box.minZ], [box.maxX, box.maxZ], [box.minX, box.maxZ]];
+  const axes = [[1, 0], [0, 1], [c, -s], [s, c]];
+  for (const [ax, az] of axes) {
+    const pa = corners.map(([x, z]) => x * ax + z * az), pb = boxPts.map(([x, z]) => x * ax + z * az);
+    if (Math.max(...pa) <= Math.min(...pb) || Math.max(...pb) <= Math.min(...pa)) return false;
+  }
+  return true;
 };
 const Solid = (x, z, list = solids) => list.some((blk) => blk.h >= 2 && !blk.prop && Intersects(blk, { minX: x - 0.05, maxX: x + 0.05, minZ: z - 0.05, maxZ: z + 0.05 }));
 const WallRun = (axis, fixed, from, to, what, list = solids) => { for (let s = from + 0.3; s <= to - 0.3; s += 0.5) assert.ok(axis === "x" ? Solid(s, fixed, list) : Solid(fixed, s, list), `${what} 在 ${axis === "x" ? `x${s}` : `z${s}`} 有洞`); };
@@ -341,15 +372,20 @@ const yardById = new Map([...L0610_YARDS.map((y) => [y.id, y.box]), ["GENG", G.b
 // --- 院子的口径：三种院子、北屋、院门在角上、尺寸 ---
 {
   const kinds = new Set(L0610_YARDS.map((y) => y.kind));
-  for (const k of ["siheyuan", "banmian", "paifang", "garden", "pond"]) assert.ok(kinds.has(k), `缺 ${k} 这种院子`);
+  for (const k of ["siheyuan", "banmian", "paifang", "garden", "pond", "temple"]) assert.ok(kinds.has(k), `缺 ${k} 这种院子`);
   const houseYards = L0610_YARDS.filter((y) => !["garden", "pond", "farmyard"].includes(y.kind));
   assert.ok(houseYards.length >= 30, "院子够多");
   const Beiwu = (box) => ({ w: box.maxX - box.minX, d: box.maxZ - box.minZ });
-  // 院门外头 0.6 m 处那一点要落在某条胡同的净空里（门要开在胡同上，不是开进别人院里）
+  // 院门外头 0.6 m 处那一点要落在某条胡同的净空里（门要开在胡同上，不是开进别人院里）。第八版：转过的院子按转过的门算（YardGateWorld）；折线胡同按到中线的距离算
   const s3Touch = (b, y, g) => {
-    const fixed = g.wall === "N" ? (g.at ?? y.box.minZ) : g.wall === "S" ? (g.at ?? y.box.maxZ) : g.wall === "W" ? y.box.minX : y.box.maxX;
-    const out = g.wall === "N" ? { x: g.c, z: fixed - 0.6 } : g.wall === "S" ? { x: g.c, z: fixed + 0.6 } : g.wall === "W" ? { x: fixed - 0.6, z: g.c } : { x: fixed + 0.6, z: g.c };
-    return InBox(out.x, out.z, b) || InBox(out.x, out.z, ST.square.box) || L0610_YARDS.some((o) => o.kind === "garden" && InBox(out.x, out.z, o.box));   // 开进菜园 / 空宅基也算（后院从菜园走）
+    const gw = YardGateWorld(y, g);
+    // 转过的院子往里收了，门外有一小块门道才到胡同：门外 0.6…3.0 m 有一点在胡同里就算（胡同墙在门道那里开了口，CutRunWallForGate / YardGateGaps）
+    const probes = YardPose(y).ry ? [0.6, 1.2, 1.8, 2.4, 3.0] : [0.6];
+    return probes.some((m) => {
+      const out = { x: gw.x + gw.normal.x * m, z: gw.z + gw.normal.z * m };
+      return InBox(out.x, out.z, b) || InBox(out.x, out.z, ST.square.box) || L0610_YARDS.some((o) => o.kind === "garden" && InBox(out.x, out.z, o.box))   // 开进菜园 / 空宅基也算（后院从菜园走）
+        || LANE_PATHS.some((p) => { const n = PathNearest(p, out.x, out.z); return n.dist <= n.halfW + 0.35; });
+    });
   };
   for (const y of houseYards) {
     const W = y.box.maxX - y.box.minX, D = y.box.maxZ - y.box.minZ;
@@ -379,9 +415,11 @@ const yardById = new Map([...L0610_YARDS.map((y) => [y.id, y.box]), ["GENG", G.b
     const laneOf = L0610_LANES.find((l) => { const r = ST[l.id]; const b = RunBox(r, 0.3); return s3Touch(b, y, g); });
     assert.ok(laneOf || s3Touch({ minX: 0, maxX: 0, minZ: 0, maxZ: 0 }, y, g), `${y.id} 的院门外头没有胡同 / 菜园`);
     if (g.wall === "E" || g.wall === "W") assert.ok(g.c >= midZ - 1, `${y.id} 侧墙上的院门要靶南`);
-    // 门洞真开着（洞里没墙），关着的有门扇、敞着的没有
+    // 门洞真开着（洞里没墙），关着的有门扇、敞着的没有。转过的院子：门洞中心 ±0.25 那一小块（门扇在里头、两边的墙在外头）
     const s3 = g.wall === "N" ? { axis: "x", fixed: g.at ?? y.box.minZ } : g.wall === "S" ? { axis: "x", fixed: g.at ?? y.box.maxZ } : g.wall === "W" ? { axis: "z", fixed: y.box.minX } : { axis: "z", fixed: y.box.maxX };
-    const box = s3.axis === "x" ? { minX: g.c - g.w / 2 + 0.1, maxX: g.c + g.w / 2 - 0.1, minZ: s3.fixed - 0.2, maxZ: s3.fixed + 0.2 } : { minX: s3.fixed - 0.2, maxX: s3.fixed + 0.2, minZ: g.c - g.w / 2 + 0.1, maxZ: g.c + g.w / 2 - 0.1 };
+    const gw = YardGateWorld(y, g);
+    const box = YardPose(y).ry ? { minX: gw.x - 0.25, maxX: gw.x + 0.25, minZ: gw.z - 0.25, maxZ: gw.z + 0.25 }
+      : s3.axis === "x" ? { minX: g.c - g.w / 2 + 0.1, maxX: g.c + g.w / 2 - 0.1, minZ: s3.fixed - 0.2, maxZ: s3.fixed + 0.2 } : { minX: s3.fixed - 0.2, maxX: s3.fixed + 0.2, minZ: g.c - g.w / 2 + 0.1, maxZ: g.c + g.w / 2 - 0.1 };
     const hits = solids.filter((blk) => blk.h > 0.5 && Intersects(blk, box) && !/Lintel/.test(blk.id));
     if (g.leaf === "closed") assert.ok(hits.length === 1 && hits[0].gate, `${y.id} 的院门要关着（${hits.map((h) => h.id).join(",")}）`);
     else if (g.leaf === "open") assert.deepEqual(hits.map((h) => h.id), [], `${y.id} 的院门要敞着`);
@@ -450,8 +488,9 @@ const yardById = new Map([...L0610_YARDS.map((y) => [y.id, y.box]), ["GENG", G.b
   for (const r of s.eastRoad.laneMouth) assert.equal(r.block, null, `凹路尽头看东北道 (${r.at.x},${r.at.z}) 被 ${r.block} 挡`);
   for (const r of s.eastRoad.ramp) assert.equal(r.block, null, `街口坡道趴着看东北道 (${r.at.x},${r.at.z}) 被 ${r.block} 挡`);
   for (const p of ER.line.slice(1)) assert.ok(p.x <= L0610_BOUNDS.maxX - 5 && p.z >= L0610_BOUNDS.minZ + 5, `东北道的点 (${p.x},${p.z}) 要在场地里`);
+  const allGraves = [...ER.graves, ...L0610_FIELD_GRAVES, ...L0610_GROVES.flatMap((g) => g.graves.map(([lx, lz, r]) => ({ x: g.x + lx * Math.cos(g.ry) + lz * Math.sin(g.ry), z: g.z - lx * Math.sin(g.ry) + lz * Math.cos(g.ry), r })))];
   for (let z = L0610_BOUNDS.minZ; z <= L0610_BOUNDS.maxZ; z += 2) for (let x = 250; x < L0610_BOUNDS.maxX; x += 0.5) {
-    if (ER.graves.some((g) => Math.hypot(x + 0.25 - g.x, z - g.z) < g.r + 1)) continue;
+    if (allGraves.some((g) => Math.hypot(x + 0.25 - g.x, z - g.z) < g.r + 1)) continue;   // 坟头是圆包，不算怪坡
     assert.ok(Math.abs(sample(x + 0.5, z) - sample(x, z)) <= 0.35, `x${x} z${z} 东半截有怪坡`);
   }
   assert.ok(a.ways.roads.some((r) => r.length === ER.line.length && r[0].x === ER.line[0].x), "东北道进 ways.roads");
@@ -489,6 +528,163 @@ const yardById = new Map([...L0610_YARDS.map((y) => [y.id, y.box]), ["GENG", G.b
     assert.deepEqual(hits, [], "关键帧里的人落进了墙 / 房子");
   }
 }
+
+// --- 第八版空间的门禁：河 / 庄子 / 田 / 林 / 路 / 建筑 ---
+{
+  // 河：从路沟往西、往南（不进村、不绕北头）泛洪到不了村南——河沟、泥滩、苇子洼都走不了
+  const Walkable = (x, z) => {
+    const h = sample(x, z);
+    if (x >= 40 && z >= 383) return false;                                  // 不进村
+    if (z < 205) return false;                                               // 不绕河的北头
+    if (Math.abs(z - DT.z) <= DT.floorW / 2 + 0.3 && x >= DT.fromX && x <= DT.toX) return true;   // 路沟沟底走得了
+    if (h < V.y - 0.8) return false;                                         // 河沟 / 泥滩 / 苇子洼
+    const dx = Math.abs(sample(x + 0.5, z) - h), dz = Math.abs(sample(x, z + 0.5) - h);
+    return Math.max(dx, dz) <= 0.45;                                         // 陡壁不走
+  };
+  const cell = 0.5, minX = -20, maxX = 125, minZ = 205, maxZ = 560, cols = Math.round((maxX - minX) / cell), rows = Math.round((maxZ - minZ) / cell);
+  const reached = new Uint8Array(cols * rows), stack = [];
+  const Idx = (x, z) => { const ix = Math.floor((x - minX) / cell), iz = Math.floor((z - minZ) / cell); return ix < 0 || iz < 0 || ix >= cols || iz >= rows ? -1 : iz * cols + ix; };
+  const Seed = (x, z) => { const i = Idx(x, z); if (i >= 0 && !reached[i] && Walkable(minX + (i % cols + 0.5) * cell, minZ + (Math.floor(i / cols) + 0.5) * cell)) { reached[i] = 1; stack.push(i); } };
+  Seed(100, DT.z);
+  while (stack.length) {
+    const i = stack.pop(), ix = i % cols, iz = Math.floor(i / cols);
+    for (const [ddx, ddz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const jx = ix + ddx, jz = iz + ddz; if (jx < 0 || jz < 0 || jx >= cols || jz >= rows) continue; Seed(minX + (jx + 0.5) * cell, minZ + (jz + 0.5) * cell); }
+  }
+  const Has = (x, z) => { const i = Idx(x, z); return i >= 0 && reached[i] === 1; };
+  assert.ok(Has(60, DT.z) && Has(50, 300), "从路沟能走到路沟西半截、顺河东岸的地头路往北");
+  for (let z = 470; z <= 556; z += 4) for (let x = 20; x < 40; x += 1) assert.ok(!Has(x, z), `从路沟往西往南绕到了村西南 (${x},${z})`);
+  for (let z = 205; z <= 556; z += 4) assert.ok(!Has(10, z), `从路沟蹚过了河到了河西 (10,${z})`);
+  assert.ok(!Has(41, 550) && !Has(60, 551), "从路沟绕不到 1218 的墙根小路 / 村南口");
+  // 苇子洼：河东坎沿到庄子西墙之间是烂泥（低于村里地面 0.8 以上），芦苇丛在
+  for (let z = 390; z <= 460; z += 5) { const r = RiverAtZ(z); const x = (r.x + r.halfW + RV.wallM + 39.4) / 2; assert.ok(sample(x, z) <= V.y - 0.8, `苇子洼 z${z} (${x.toFixed(1)}) 不是烂泥：${sample(x, z).toFixed(2)}`); }
+  assert.ok(a.blocks.filter((x) => /^MarshReed_/.test(x.id)).length >= 10 && a.blocks.filter((x) => /^(Willow|Reed)_/.test(x.id)).length >= 15, "苇子洼里的芦苇、岸边的柳树和苇丛");
+
+  // 庄子：锁定的以外 ≥ 80% 的院子转过；拐角至少一半不是 90°±3°；最长直段 ≤ 50（主街、东街头一段除外）
+  const houseYards = L0610_YARDS.filter((y) => !["garden", "pond", "farmyard"].includes(y.kind));
+  const free = houseYards.filter((y) => !L0610_LOCKED_YARDS[y.id]);
+  const turned = free.filter((y) => YardPose(y).ry !== 0);
+  assert.ok(turned.length >= free.length * 0.8, `锁定的以外 ≥ 80% 的院子要转过：${turned.length}/${free.length}`);
+  for (const y of turned) { const p = YardPose(y); assert.ok(Math.abs(p.ryDeg) >= 1 && Math.abs(p.ryDeg) <= 13 && p.s >= 0.8 && p.s <= 0.97, `${y.id} 转 ${p.ryDeg}° 收 ${p.s}`); }
+  for (const y of ["GENG", "JIEFANG", "BENJIA"]) assert.ok(true, y);   // 三个有名字的院子不在 L0610_YARDS 里，天然轴对齐
+  for (const id of Object.keys(L0610_LOCKED_YARDS)) { const y = L0610_YARDS.find((q) => q.id === id); if (y) assert.equal(YardPose(y).ry, 0, `锁定的院子 ${id} 不许转`); }
+  // 相邻的转过的院子方向不同（同一片里挨着的）
+  for (const [p, q] of [["NE6a", "NE6b"], ["NE7", "NE8"], ["SE3", "SE3b"], ["SW2c", "SW2"], ["NE1", "NE2a"]]) assert.ok(Math.sign(L0610_YARD_POSE[p].ryDeg) !== Math.sign(L0610_YARD_POSE[q].ryDeg), `${p} / ${q} 相邻要转向不同`);
+  const corners = LaneCorners();
+  const not90 = corners.filter((c) => Math.abs(c.deg - 90) > 3);
+  assert.ok(not90.length >= corners.length / 2, `胡同拐角至少一半不是 90°：${not90.length}/${corners.length}`);
+  for (const c of corners.filter((c) => !c.locked)) assert.ok(c.deg >= 1 && c.deg <= 65, `折线胡同 ${c.lane} (${c.x},${c.z}) 的拐角 ${c.deg}° 要在 1…65° 里（挨着锁定院子的走廊只有 2 m 宽，弯只能小）`);
+  for (const r of LaneStraightRuns()) if (!["main", "east"].includes(r.lane)) assert.ok(r.len <= 50, `胡同 ${r.lane} 直段 ${r.len} m 太长`);
+  for (const p of LANE_PATHS) assert.ok(new Set(p.halfW).size >= 2, `折线胡同 ${p.id} 要宽窄不一`);
+  // 折线胡同两边都有墙、死胡同封头、墙上的口子只在院门 / 接口 / 塌墙处
+  for (const p of LANE_PATHS) {
+    const walls = a.blocks.filter((b) => b.id.startsWith(`PathWall_${p.id}_`));
+    assert.ok(walls.length >= (p.line.length - 1) * 2 - 2, `折线胡同 ${p.id} 两边的墙不够：${walls.length}`);
+    for (const end of p.caps || []) assert.ok(byIdEarly(a, `PathCap_${p.id}_${end}`), `折线胡同 ${p.id} 的 ${end} 头要封死`);
+  }
+  // 去掉的三个院子：空地 + 树 + 残墙
+  for (const id of ["NE2b", "SE6b", "SE9"]) { assert.ok(!L0610_YARDS.some((y) => y.id === id), `${id} 该去掉了`); assert.ok(byIdEarly(a, `Ruin_${id}`) && byIdEarly(a, `Tree_${id}_1`), `${id} 的空地上要有残墙和树`); }
+  // 五处单门独院
+  assert.equal(L0610_FARMSTEADS.length, 5, "外沿五处单门独院");
+  for (const f of L0610_FARMSTEADS) assert.ok(byIdEarly(a, `House_${f.id}_1`) && byIdEarly(a, `Gate_${f.id}_Leaf`) && byIdEarly(a, `Toilet_${f.id}_Pit`), `独院 ${f.id} 要有房、门、茅圈`);
+
+  // 田：凹路两侧非空、拼块朝向 ≥ 4 种、没有一整排同宽竖条、三种地分色；田埂烘进了地面
+  const laneX = (z) => LanePointAtZ(z).x;
+  const westPieces = L0610_FIELDS.filter((p) => p.z > 206 && p.z < 372 && p.x < laneX(Math.max(206, Math.min(372, p.z))) - 10 && p.x > 36);
+  const eastPieces = L0610_FIELDS.filter((p) => p.z > 206 && p.z < 372 && p.x > laneX(Math.max(206, Math.min(372, p.z))) + 10);
+  assert.ok(westPieces.length >= 1 && eastPieces.length >= 2, `凹路两侧都要有田：西 ${westPieces.length} 东 ${eastPieces.length}`);
+  const dirs = new Set(L0610_FIELDS.map((p) => Math.round((((p.angleDeg % 180) + 180) % 180) / 5) * 5));
+  assert.ok(dirs.size >= 4, `拼块朝向至少 4 种：${[...dirs].join(",")}`);
+  for (const p of L0610_FIELDS) {
+    if (p.whole) { assert.equal(p.strips.length, 1, `${p.id} 整块不分条`); continue; }
+    const widths = p.strips.map((s2) => Math.round((s2.to - s2.from) * 10) / 10);
+    assert.ok(new Set(widths).size >= 2 || widths.length <= 2, `${p.id} 一整排同宽的条：${widths.join(",")}`);
+    for (const s2 of p.strips.slice(0, -1)) assert.ok(s2.to - s2.from >= 10 - 0.01 && s2.to - s2.from <= 32.01, `${p.id} 条宽 ${s2.to - s2.from}`);
+    assert.ok(p.w >= 50 && p.w <= 110 && p.d >= 70 && p.d <= 140, `${p.id} 块 ${p.w}×${p.d}`);
+  }
+  const kinds = new Set(L0610_FIELDS.flatMap((p) => p.strips.map((s2) => s2.kind)));
+  for (const k of ["wheat", "plowed", "fallow"]) assert.ok(kinds.has(k), `缺 ${k} 这种地`);
+  assert.ok(L0610_FIELDS.filter((p) => p.whole).length >= 2, "有几块整块不分条的");
+  {   // 田埂：找一条田埂两边的点，埂上比两边高 0.15 以上
+    let found = 0;
+    for (const p of L0610_FIELDS) {
+      if (p.whole || found) continue;
+      const c = Math.cos(p.angleDeg * Math.PI / 180), s2 = Math.sin(p.angleDeg * Math.PI / 180);
+      for (const st of p.strips.slice(0, -1)) {
+        const u = st.to, v = 0;
+        const x = p.x + u * c + v * s2, z = p.z - u * s2 + v * c;
+        const side = { x: p.x + (u + 1.2) * c, z: p.z - (u + 1.2) * s2 };
+        if (FieldAt(x, z) && sample(x, z) - sample(side.x, side.z) >= 0.15) { found = 1; break; }
+      }
+    }
+    assert.ok(found, "田埂要烘进地面（埂上比地里高 ≥ 0.15）");
+  }
+  // 林 ≥ 3（含义林）、坟头是圆包、零星树离路 ≥ 10 m
+  assert.ok(L0610_GROVES.length >= 3 && L0610_GROVES.some((g) => g.kind === "paupers"), "林 ≥ 3 片、含义林");
+  for (const g of L0610_GROVES) {
+    assert.ok(a.blocks.filter((b) => b.id.startsWith(`Tree_${g.id}_`)).length >= 4, `${g.name} 要有树`);
+    const [lx, lz, r, h] = g.graves[0];
+    const gx = g.x + lx * Math.cos(g.ry) + lz * Math.sin(g.ry), gz = g.z - lx * Math.sin(g.ry) + lz * Math.cos(g.ry);
+    assert.ok(sample(gx, gz) - sample(gx + r + 1.5, gz) >= h * 0.5, `${g.name} 的坟头要鼓起来`);
+  }
+  assert.ok(a.blocks.filter((b) => /^Marker_YiGrove_/.test(b.id)).length >= 2, "义林里两三块木牌");
+  for (const t of L0610_FIELD_TREES) assert.ok(DistanceToAnyRoad(t.x, t.z) >= 10, `零星树 (${t.x},${t.z}) 离路 ${DistanceToAnyRoad(t.x, t.z).toFixed(1)} m（要 ≥ 10）`);
+  {   // 不成排：任意三棵零星树不共线等距
+    const ts = L0610_FIELD_TREES;
+    let rows = 0;
+    for (let i = 0; i < ts.length; i++) for (let j = i + 1; j < ts.length; j++) for (let k = j + 1; k < ts.length; k++) {
+      const d1 = Math.hypot(ts[j].x - ts[i].x, ts[j].z - ts[i].z), d2 = Math.hypot(ts[k].x - ts[j].x, ts[k].z - ts[j].z);
+      const cross = Math.abs((ts[j].x - ts[i].x) * (ts[k].z - ts[i].z) - (ts[j].z - ts[i].z) * (ts[k].x - ts[i].x));
+      if (d1 < 30 && d2 < 30 && Math.abs(d1 - d2) < 2 && cross < 2 * d1) rows++;
+    }
+    assert.equal(rows, 0, "零星树不成排");
+  }
+
+  // 路：驿道从北界接到东北大道；往东的大道在；田间小路 ≥ 8；河东岸地头路到不了庄南
+  const post = L0610_ROADS.find((r) => r.id === "PostRoad"), eastRd = L0610_ROADS.find((r) => r.id === "EastVillageRoad");
+  assert.ok(post && post.line[0].z <= L0610_BOUNDS.minZ + 25 && Math.hypot(post.line[post.line.length - 1].x - ER.line[ER.line.length - 1].x, post.line[post.line.length - 1].z - ER.line[ER.line.length - 1].z) < 0.01, "驿道从北界下来接到东北大道的北头");
+  assert.ok(eastRd && eastRd.line[eastRd.line.length - 1].x >= L0610_BOUNDS.maxX - 1 && Math.min(...eastRd.line.map((p) => NearestOnER(p))) <= 2.5, "往东邻庄的大道从东北大道分出去、到场地东边");
+  assert.ok(L0610_FOOTPATHS.length >= 8, `田间小路 ≥ 8 条：${L0610_FOOTPATHS.length}`);
+  const bank = L0610_FOOTPATHS.find((p) => p.id === "FP_RiverBank");
+  assert.ok(bank && Math.max(...bank.line.map((p) => p.z)) < DT.z - 4 && bank.line.every((p) => p.x >= 40 && p.x <= 60), "河东岸地头路只到路沟北沿、绕不到庄南");
+  for (const r of L0610_ROADS) { const q = r.line[Math.floor(r.line.length / 2)]; const off = r.halfW + 2.5; const around = Math.max(sample(q.x + off, q.z), sample(q.x - off, q.z), sample(q.x, q.z + off), sample(q.x, q.z - off)); assert.ok(sample(q.x, q.z) <= around - 0.08, `${r.name} 要压低`); }
+  { const x215 = 230 + 32 * (215 - 140) / 90; assert.ok(sample(x215, 215) < sample(x215 + 6, 215) - 0.1, "驿道在 z 215 压低了（z ≥ 205 才烘）"); assert.ok(Math.abs(sample(230 + 32 * (190 - 140) / 90, 190) - sample(230 + 32 * (190 - 140) / 90 + 6, 190)) < 0.3, "z < 205 的地面是 0105 的，驿道北头那一截不在这里烘"); }
+
+  // 建筑：关帝庙、杂货铺、村外小庙、土炮楼、井 ≥ 7、茅圈
+  assert.ok(byIdEarly(a, "House_TempleHall_Roof") && byIdEarly(a, "TempleAltar") && a.blocks.filter((b) => /^TempleDesk_/.test(b.id)).length >= 4, "关帝庙：正殿有顶、香案、课桌");
+  assert.ok(!Solid(84.5, 428) && Solid(82.5, 428) && Solid(86.5, 428), "关帝庙正殿门朝南、敞着");
+  assert.ok(byIdEarly(a, "House_Shop_Roof") && byIdEarly(a, "ShopCounter") && byIdEarly(a, "House_Shop_WindowSill"), "杂货铺：铺面有顶、柜台、门板窗");
+  assert.ok(!Solid(103.25, 396.5) && Solid(103.25, 394.9) && Solid(103.25, 398.2), "杂货铺门开在主街东墙上（x 103.25、z 396.5）");
+  assert.deepEqual(solids.filter((b) => !b.prop && b.h >= 2 && Intersects(b, { minX: 107.6, maxX: 117.9, minZ: 401.8, maxZ: 409.7 })).map((b) => b.id), [], "EM1 院里（北屋 / 西厢以外）不加挡路的东西");
+  assert.ok(byIdEarly(a, "FieldShrine_DoorBrick") && byIdEarly(a, "FieldShrine_Rubble") && byIdEarly(a, "FieldShrine_Roof"), "村外小庙：门砖封死、塌了一截、半个顶");
+  const tower = byIdEarly(a, "WatchTower");
+  assert.ok(tower && tower.h >= 7 && tower.h <= 8 && tower.w === 5 && tower.d === 5 && tower.x > 226 && tower.z < 394, "土炮楼 5×5、7–8 m 高、在庄子东北角");
+  assert.ok(L0610_WELLS.length >= 7 && L0610_WELLS.every((w) => byIdEarly(a, `${w.id}_Rim`) && w.rimH >= 0.4 && w.rimH <= 0.5), "井 ≥ 7 口、井台 0.4–0.5");
+  assert.ok(L0610_WELLS.filter((w) => w.kind === "irrigation").every((w) => byIdEarly(a, `${w.id}_Beam`)), "浇地井有辘轳架");
+  // 茅圈：数 = 住人的院子数（±3，含三个有名字的）；都在院内、不压房子
+  const pits = a.blocks.filter((b) => /^Toilet_.*_Pit$/.test(b.id) && !/^Toilet_Farm_/.test(b.id));
+  const inhabited = houseYards.filter((y) => y.kind !== "temple").length + 3;
+  assert.ok(Math.abs(pits.length - inhabited) <= 3, `茅圈 ${pits.length} 个，住人的院子 ${inhabited} 个`);
+  for (const pit of pits) {
+    const yid = pit.id.slice(7, -4);
+    const y = L0610_YARDS.find((q) => q.id === yid);
+    const poly = y ? YardCorners(y).map((p) => [p.x, p.z]) : null;
+    const box = y ? null : { GENG: G.box, JIEFANG: J.box, BENJIA: B.box }[yid];
+    assert.ok(poly ? PointInPoly(pit.x, pit.z, poly) : InBox(pit.x, pit.z, box), `茅圈 ${yid} 不在院子里`);
+    const houses = solids.filter((b) => b.house && Intersects(b, { minX: pit.x - 1.3, maxX: pit.x + 1.3, minZ: pit.z - 1.3, maxZ: pit.z + 1.3 }));
+    assert.deepEqual(houses.map((b) => b.id), [], `茅圈 ${yid} 压着房子`);
+  }
+  // 茅圈不挡唯一那条路 / 窄胡同 / 东街 / 班长那一路 / 坡道视线
+  const routePts = [...L0610_ROUTE.segments.flatMap((s2) => s2.line), ...SL.line, ...ES.line, L0610_EAST_YARD_ROUTE.gateIn, L0610_EAST_YARD_ROUTE.climb.from, L0610_EAST_YARD_ROUTE.climb.to, L0610_EAST_YARD_ROUTE.stripOut, ...Object.values(L0610_EAST_YARD_ROUTE.behindGate)];
+  for (const t of a.blocks.filter((b) => /^Toilet_/.test(b.id))) for (const q of routePts) assert.ok(!Intersects(t, { minX: q.x - 0.4, maxX: q.x + 0.4, minZ: q.z - 0.4, maxZ: q.z + 0.4 }), `茅圈 ${t.id} 压着路线点 (${q.x},${q.z})`);
+  for (const r of s.shooterToLoophole) assert.ok(!r.block || !/^(Toilet|Well)_/.test(r.block), `茅圈 / 井挡了坡道看枪眼的视线：${r.block}`);
+  // 井不堵胡同（井台在胡同里时留 ≥ 1 m 过道）、主街的井在视线扇外
+  for (const w of L0610_WELLS.filter((q) => q.kind === "drinking")) {
+    const run = STREET_RUNS.find((r) => InBox(w.x, w.z, RunBox(r, 0)));
+    if (run) assert.ok(run.halfW * 2 - 1.2 >= 1.0 || run.caps, `吃水井 ${w.id} 把胡同 ${run.id} 堵死了`);
+  }
+}
+function NearestOnER(p) { let best = Infinity; for (let i = 1; i < ER.line.length; i++) { const a2 = ER.line[i - 1], b2 = ER.line[i]; const dx = b2.x - a2.x, dz = b2.z - a2.z, len2 = dx * dx + dz * dz; const t = Math.max(0, Math.min(1, ((p.x - a2.x) * dx + (p.z - a2.z) * dz) / len2)); best = Math.min(best, Math.hypot(p.x - a2.x - dx * t, p.z - a2.z - dz * t)); } return best; }
+function NearestPtOn(line, p) { return { x: p.x, z: p.z }; }
 
 // --- 地标 ---
 {

@@ -99,11 +99,56 @@ for (const id of ["02E-1", "02E-2"]) {
 }
 assert.ok(KF("05-4").player.z > 141, "05-4 下到干沟");
 assert.ok(KF("03-1").player.z > 135 && KF("03-1").player.yawDeg > -45 && KF("03-1").player.yawDeg < 45, "03-1 从干沟口往北走");
-// 05 板桥：05-2 战车压在桥上，人在桥下
-const tank52 = Unit("05-2", "Tank");
-assert.ok(DistXZ(tank52, P.crossing) < 0.5, "05-2 战车在板桥上");
+// 05 板桥：05-2 A 车压在桥上，人在桥下
+const tank52 = Unit("05-2", "TankA");
+assert.ok(DistXZ(tank52, P.crossing) < 0.5, "05-2 A 车在板桥上");
 assert.ok(DistXZ(KF("05-2").player, P.crossing) < 2 && KF("05-2").player.stance === "prone", "05-2 顺子趴在桥下");
-assert.ok(KF("05-3").signals.includes("TankDisabled") && DistXZ(Unit("05-3", "Tank"), P.tankStop) < 0.5, "05-3 战车瘫在桥头");
+assert.ok(KF("05-3").signals.includes("TankDisabled") && DistXZ(Unit("05-3", "TankA"), P.tankStop) < 0.5, "05-3 A 车瘫在桥头");
+
+// --- 2026-10-24 第六版：三辆九四式轻装甲车、掷弹筒在旧沟里、旧阵地的尸体 ---
+{
+  const { L0105_TANKETTES: TK, L0105_OLD_POSITION: OLD, L0105_TRENCHES: TR } = await import("./Data_EditorBlockoutFirstLevel0105Space.mjs");
+  const DistLine = (p, line) => { let best = Infinity; for (let i = 1; i < line.length; i++) { const a0 = line[i - 1], a1 = line[i], dx = a1.x - a0.x, dz = a1.z - a0.z, l2 = dx * dx + dz * dz; const k = Math.max(0, Math.min(1, ((p.x - a0.x) * dx + (p.z - a0.z) * dz) / l2)); best = Math.min(best, Math.hypot(p.x - a0.x - dx * k, p.z - a0.z - dz * k)); } return best; };
+  // 03-4：三辆在东边麦田冒出来（x 240–310、z −200…−100），都是 tankette，名字 / 文字里没有「炮」；没有叫 Tank 的旧单位
+  for (const id of ["03-4", "03-5"]) {
+    for (const uid of TK.ids) {
+      const u = Unit(id, uid);
+      assert.ok(u && u.kind === "tank" && u.shape === "tankette", `${id} ${uid} 要是 tank + shape tankette`);
+      assert.ok(u.x >= 240 && u.x <= 310 && u.z >= -200 && u.z <= -100, `${id} ${uid} 要在东边麦田里 (${u.x},${u.z})`);
+      assert.ok(!/炮/.test(u.name), `${id} ${uid} 的名字带「炮」`);
+    }
+    assert.ok(!KF(id).units.some((u) => u.id === "Tank"), `${id} 还有旧的 Tank 单位`);
+    assert.ok(!/一炮|炮口|战车/.test(KF(id).what + KF(id).how.join("")), `${id} 的文字里还有战车 / 炮`);
+  }
+  assert.ok(KF("03-4").signals.includes("PitShelled") && /掷弹筒/.test(KF("03-4").how.join("")), "03-4 胸墙是掷弹筒弹打塌的");
+  // 05：A 过桥瘫在桥头、B 停在交通沟东沿（全程不过沟）、C 在田里抛锚（05-1 起不动）、两个乘员在车边；徒步步兵两三百米后头
+  const trafficXAt = (z) => { for (let i = 1; i < TR.traffic.length; i++) { const a = TR.traffic[i - 1], b = TR.traffic[i]; if ((z - a.z) * (z - b.z) <= 0 && b.z !== a.z) return a.x + (b.x - a.x) * (z - a.z) / (b.z - a.z); } return TR.traffic[TR.traffic.length - 1].x; };
+  for (const kf of a.keyframes) {
+    const b = kf.units.find((u) => u.id === "TankB"), c = kf.units.find((u) => u.id === "TankC");
+    if (b) assert.ok(b.x - trafficXAt(b.z) >= 4 || b.z < 0, `${kf.id} B 车过了交通沟 (${b.x},${b.z})`);
+    if (c) assert.ok(c.x - trafficXAt(Math.max(0, c.z)) >= 4 || c.z < 0, `${kf.id} C 车过了交通沟 (${c.x},${c.z})`);
+    for (const u of kf.units) if (u.kind === "tank") assert.equal(u.shape, "tankette", `${kf.id} ${u.id} 不是轻装甲车`);
+  }
+  for (const id of ["05-2", "05-3", "05-4"]) assert.ok(DistXZ(Unit(id, "TankB"), TK.bStop) < 0.5, `${id} B 车停在沟沿 (${TK.bStop.x},${TK.bStop.z})`);
+  for (const id of ["05-1", "05-2", "05-3", "05-4"]) {
+    assert.ok(DistXZ(Unit(id, "TankC"), TK.cStall) < 0.5, `${id} C 车抛锚在 (${TK.cStall.x},${TK.cStall.z})`);
+    for (const uid of ["TankCrewC1", "TankCrewC2"]) {
+      const u = Unit(id, uid);
+      assert.ok(u && DistXZ(u, TK.cStall) < 6 && u.state !== "down", `${id} ${uid} 要在 C 车边上`);
+      if (id !== "05-1") assert.equal(u.stance, "prone", `${id} ${uid} 要趴着打`);
+    }
+    for (const uid of ["TankInf1", "TankInf2", "TankInf3"]) assert.ok(DistXZ(Unit(id, uid), P.crossing) > 180, `${id} ${uid} 徒步步兵要在两三百米后头`);
+  }
+  assert.ok(DistXZ(Unit("05-4", "TankA"), P.tankStop) < 0.5, "05-4 A 车还瘫在桥头");
+  assert.ok(Unit("04-3", "TankA").path?.some((p) => DistXZ(p, { x: 175, z: -40 }) < 2), "04-3 A 车从驿道 / 车道岔口拐上车道");
+  // 03：掷弹筒组蹲在旧交通沟里（坎下那一截）；旧阵地沟边有没收的尸体
+  for (const id of ["03-2", "03-3", "03-4", "03-5"]) {
+    const m = Unit(id, "IjaMortar1");
+    assert.ok(DistLine(m, OLD.sap) <= 2.5, `${id} 掷弹筒要蹲在旧交通沟里（离沟心 ${DistLine(m, OLD.sap).toFixed(1)} m）`);
+    const dead = KF(id).units.filter((u) => /^OldDead/.test(u.id));
+    assert.ok(dead.length >= 3 && dead.every((u) => u.state === "down" && u.side === "nra"), `${id} 旧阵地沟边要有没收的尸体`);
+  }
+}
 
 // 壕沟网走位：洞口到坑必须经支沟口、沟口（不直线翻野地）
 const route = TrenchRoute(P.dugoutMouth, P.pit);

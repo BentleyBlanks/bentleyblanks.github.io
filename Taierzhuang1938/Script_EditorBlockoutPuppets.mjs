@@ -123,6 +123,11 @@ export const BLOCKOUT_PUPPETS = Object.freeze({
   /** 百姓 / 小孩的身体缺省："rig" = NRA 骨架占位身体（能放片段）；"procedural" = 旧的程序化 tzm 身体。单位字段 body 可覆盖。 */
   civilianBody: "rig",
   tank: { w: 2.18, d: 5.75, h: 1.2, turretW: 1.5, turretD: 1.7, turretH: 0.75, barrel: 1.6 },
+  /**
+   * 九四式轻装甲车（2026-10-24，单位 kind "tank" + shape "tankette"）：史料 3.36 × 1.62 × 1.63 m、2 人、1 挺机枪、没有炮。
+   * 履带箱 0.5 高、车体 0.65、小机枪塔 0.48（偏右前），加起来 1.63；塔上一截机枪管 0.5 m，没有炮管。白盒下跟 tank 一样只是体块（不换正式模型）。
+   */
+  tankette: { w: 1.62, d: 3.36, trackH: 0.5, hullH: 0.65, turretW: 0.7, turretD: 0.8, turretH: 0.48, turretX: 0.33, turretZ: -0.55, mg: 0.5 },
   litter: { w: 0.7, d: 2.1, y: 0.78, groundY: 0.12, bearerGapM: 0.55,
     /** 正式担架模型在担架组里的摆法（文件头 2026-10-21）：转 180°（前头朝 −Z）、竿心落到组原点 + 0.03。 */
     modelYaw: Math.PI, modelY: 0.03 - 0.12 },
@@ -272,19 +277,22 @@ export function LitterPose(unit, down = unit?.state === "down") {
   return { y: l.y, tilt: 0 };
 }
 
-/** 战车脚印上取地面的几处（车身局部坐标，米）：中心、四角、四边中点。 */
-export function TankFootprintPoints() {
-  const t = BLOCKOUT_PUPPETS.tank, hw = t.w / 2 + 0.08, hd = t.d / 2;
+/** 战车的外形（单位 shape）："tankette" = 九四式轻装甲车，其余 = 八九式。 */
+export function TankShape(unit) { return unit?.shape === "tankette" ? "tankette" : "tank"; }
+
+/** 战车脚印上取地面的几处（车身局部坐标，米）：中心、四角、四边中点。shape 见 TankShape。 */
+export function TankFootprintPoints(shape = "tank") {
+  const t = BLOCKOUT_PUPPETS[shape] || BLOCKOUT_PUPPETS.tank, hw = t.w / 2 + 0.08, hd = t.d / 2;
   const out = [];
   for (const lx of [-hw, 0, hw]) for (const lz of [-hd, 0, hd]) out.push([lx, lz]);
   return out;
 }
 
 /** 战车放在脚印里最高的地面上（车身不陷进沟里）。groundAt(x,z) → y。 */
-export function TankGroundY(groundAt, x, z, yawDeg) {
+export function TankGroundY(groundAt, x, z, yawDeg, shape = "tank") {
   const ry = yawDeg * DEG, c = Math.cos(ry), s = Math.sin(ry);
   let best = -Infinity;
-  for (const [lx, lz] of TankFootprintPoints()) best = Math.max(best, groundAt(x + lx * c + lz * s, z - lx * s + lz * c));
+  for (const [lx, lz] of TankFootprintPoints(shape)) best = Math.max(best, groundAt(x + lx * c + lz * s, z - lx * s + lz * c));
   return best;
 }
 
@@ -397,7 +405,15 @@ export class BlockoutPuppets {
     boxes.name = "BlockoutBoxes";
     group.userData.boxes = boxes;
     if (unit.kind !== "litter") group.add(boxes);
-    if (unit.kind === "tank") {
+    if (unit.kind === "tank" && TankShape(unit) === "tankette") {
+      // 九四式轻装甲车（2026-10-24）：履带箱 + 矮车体 + 偏右前的小机枪塔 + 一截机枪管；没有炮管
+      const t = P.tankette;
+      Box(boxes, m.dark, t.w + 0.1, t.trackH, t.d * 0.98, 0, t.trackH / 2, 0);
+      Box(boxes, side, t.w - 0.2, t.hullH, t.d * 0.92, 0, t.trackH + t.hullH / 2, 0.05);
+      const turretY = t.trackH + t.hullH + t.turretH / 2;
+      Box(boxes, side, t.turretW, t.turretH, t.turretD, t.turretX, turretY, t.turretZ);
+      Box(boxes, m.dark, 0.07, 0.07, t.mg, t.turretX, turretY + 0.08, t.turretZ - t.turretD / 2 - t.mg / 2);
+    } else if (unit.kind === "tank") {
       const t = P.tank;
       Box(boxes, side, t.w, t.h, t.d, 0, 0.35 + t.h / 2, 0);
       Box(boxes, m.dark, t.w + 0.16, 0.7, t.d * 0.96, 0, 0.35, 0);
@@ -630,7 +646,7 @@ export class BlockoutPuppets {
     const seat = this._Seat(puppet);
     puppet.seat = seat;
     if (seat) { puppet.x = seat.x; puppet.z = seat.z; puppet.yawDeg = seat.yawDeg; puppet.moving = false; puppet.speedMps = 0; }
-    const y = seat ? seat.y : puppet.unit.kind === "tank" ? TankGroundY(this.groundAt, puppet.x, puppet.z, puppet.yawDeg) : this.groundAt(puppet.x, puppet.z);
+    const y = seat ? seat.y : puppet.unit.kind === "tank" ? TankGroundY(this.groundAt, puppet.x, puppet.z, puppet.yawDeg, TankShape(puppet.unit)) : this.groundAt(puppet.x, puppet.z);
     const ry = puppet.yawDeg * DEG;
     if (puppet.body) {
       puppet.body.visible = puppet.visible;
@@ -772,6 +788,11 @@ export class BlockoutPuppets {
     const body = puppet.body, unit = puppet.unit;
     if (!body?.userData.boxes || body.userData.model !== undefined) return;
     let model = null;
+    if (unit.kind === "tank" && TankShape(unit) === "tankette") {
+      // 九四式轻装甲车没有正式模型（八九式那辆带炮，不对）：一直用体块
+      body.userData.model = null;
+      return;
+    }
     if (unit.kind === "tank") {
       const library = this.library;
       if (!library?.Get) { body.userData.model = null; return; }
@@ -979,7 +1000,7 @@ export class BlockoutPuppets {
     const x = d ? d.x : carrier.x, z = d ? d.z : carrier.z, yawDeg = d ? d.yawDeg : carrier.yawDeg;
     const ride = this._RideOf(carrier);
     const above = ride ? this._CarrierPose(ride.on, depth + 1) : null;
-    const pose = above ? RideWorldPose(above, ride) : { x, z, yawDeg, y: carrier.unit.kind === "tank" ? TankGroundY(this.groundAt, x, z, yawDeg) : this.groundAt(x, z) };
+    const pose = above ? RideWorldPose(above, ride) : { x, z, yawDeg, y: carrier.unit.kind === "tank" ? TankGroundY(this.groundAt, x, z, yawDeg, TankShape(carrier.unit)) : this.groundAt(x, z) };
     if (carrier.unit.kind === "litter") pose.y += above ? 0 : LitterPose(carrier.unit, d ? d.state === "down" : !!carrier.down).y;
     return pose;
   }
@@ -1278,7 +1299,7 @@ export class BlockoutPuppets {
     if (!puppet) return null;
     const human = puppet.humans[0];
     const rig = human?.actor.characterRig;
-    const ground = puppet.unit.kind === "tank" ? TankGroundY(this.groundAt, puppet.x, puppet.z, puppet.yawDeg) : this.groundAt(puppet.x, puppet.z);
+    const ground = puppet.unit.kind === "tank" ? TankGroundY(this.groundAt, puppet.x, puppet.z, puppet.yawDeg, TankShape(puppet.unit)) : this.groundAt(puppet.x, puppet.z);
     let pelvisY = null, headY = null, pelvisXZ = null, headXZ = null, handR = null, handL = null;
     const feet = [];
     try {
