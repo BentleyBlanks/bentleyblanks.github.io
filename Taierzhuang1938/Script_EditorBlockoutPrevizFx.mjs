@@ -14,6 +14,7 @@
 //   · 烟（events[].type === "smoke"，2026-10-18 第三轮补）：持续窗口 [t, t + dur) 里一团团往上冒的简易烟球，窗口结束后
 //     已冒出来的那几团照常散完。SmokeDust = 褐黄土雾（贴地、铺得开、冒得矮，05-2 板缝漏土）、SmokeWhite = 灰白烟
 //     （掷弹筒出膛、烟幕）、SmokeBlack = 黑烟柱（05-3 战车起火）。每团的出生时刻按槽位等间隔排好，同一 t 同一画面。
+//     可选 scale（2026-10-24）：远处房子着火要冒过房顶时放大——冒的高度乘 scale，烟团大小、飘散、寿命乘 √scale。
 //   · 枪口火（events[].type === "muzzle"）：每一发一下亮黄火光（0.07 s）+ 一小团灰烟（0.6 s），位置由预演给（演员枪口 / 事件点）。
 //   烟和枪口火同爆炸，只在白盒且特效关时画（其它画质 VfxSystem 的烟源、枪口火自己画得出来）。
 // 颜色按曝光预补（同 Script_EditorBlockoutMarkers：叠加层画在色调映射之前）。
@@ -273,6 +274,8 @@ export class BlockoutPrevizFx {
    * 每团活 lifeS 秒：往上冒（先快后慢）、往外飘、胀大、先浓后淡。→ 画了没有。
    */
   PoseSmoke(sm, index, e, look, local, dur, groundY) {
+    const k = Number.isFinite(e.scale) ? e.scale : 1, ks = Math.sqrt(k);
+    if (k !== 1) look = { ...look, lifeS: look.lifeS * ks, rise: look.rise * k, spread: look.spread * ks, r0: look.r0 * ks, r1: look.r1 * ks };
     const n = sm.puffs.length, life = look.lifeS, per = life / n;
     sm.color.setRGB(look.color[0], look.color[1], look.color[2]);
     let any = false;

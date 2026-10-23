@@ -1,10 +1,10 @@
 {
  "schema": "tengxian-blockout-previz/1",
  "level": "FirstLevel0610",
- "title": "第一关 06–10 预演（第二版：占位动作 + 占位配音）",
+ "title": "第一关 06–10 预演（第九版：两路不上主街 + 占位动作 + 占位配音）",
  "source": {
   "generator": "node Taierzhuang1938/Script_EditorBlockoutFirstLevel0610Previz.mjs --force",
-  "note": "剧本 Notion 06–10（10-19 第二版）；手改前先想好：重跑生成器会覆盖"
+  "note": "剧本 Notion 06–10（10-24 第九版：07–10 新稿）；手改前先想好：重跑生成器会覆盖"
  },
  "voice": "./Blockout/FirstLevel0610.voice.json",
  "faceTracks": "./Audio/Blockout0610/Data_Blockout0610FaceTracks.json",
@@ -4227,7 +4227,7 @@
     },
     {
      "t": 19.8,
-     "dur": 4.8,
+     "dur": 2.6,
      "from": {
       "x": 100.76,
       "z": 353.9,
@@ -4244,12 +4244,27 @@
       "h": 1.62
      },
      "lookTo": {
-      "x": 283,
-      "z": 360.33,
-      "h": 1
+      "x": 186,
+      "z": 440,
+      "h": 4
      },
      "fov": 60,
      "ease": "linear"
+    },
+    {
+     "t": 22.4,
+     "dur": 2.2,
+     "from": {
+      "x": 101.44,
+      "z": 369.06,
+      "h": 1.62
+     },
+     "look": {
+      "x": 216,
+      "z": 367,
+      "h": 1
+     },
+     "fov": 50
     },
     {
      "t": 24.6,
@@ -5737,26 +5752,20 @@
      "id": "RoadIja1",
      "keys": [
       {
-       "t": 0.5,
-       "x": 279.44,
-       "z": 368.12,
+       "t": 0.6,
+       "x": 214.5,
+       "z": 366,
        "move": "cut"
       },
       {
-       "t": 28.6,
-       "x": 274.65,
-       "z": 381.17,
+       "t": 28.2,
+       "x": 218.1,
+       "z": 370.4,
        "move": "walk",
-       "path": [
-        {
-         "x": 276.81,
-         "z": 375.41
-        }
-       ],
        "stance": "crouch",
        "faceTo": {
-        "x": 267.12,
-        "z": 403.4
+        "x": 226.5,
+        "z": 386
        }
       }
      ]
@@ -5765,26 +5774,20 @@
      "id": "RoadIja2",
      "keys": [
       {
-       "t": 0.9,
-       "x": 285.47,
-       "z": 355.18,
+       "t": 1.1,
+       "x": 217.5,
+       "z": 362.5,
        "move": "cut"
       },
       {
-       "t": 28.3,
-       "x": 281.62,
-       "z": 365.44,
+       "t": 27.9,
+       "x": 221.1,
+       "z": 366.9,
        "move": "walk",
-       "path": [
-        {
-         "x": 283.78,
-         "z": 359.68
-        }
-       ],
        "stance": "crouch",
        "faceTo": {
-        "x": 273.15,
-        "z": 386.6
+        "x": 226.5,
+        "z": 386
        }
       }
      ]
@@ -5793,26 +5796,20 @@
      "id": "RoadIja3",
      "keys": [
       {
-       "t": 1.3,
-       "x": 289.54,
-       "z": 343.14,
+       "t": 1.6,
+       "x": 212,
+       "z": 370.5,
        "move": "cut"
       },
       {
-       "t": 28,
-       "x": 284.76,
-       "z": 354.29,
+       "t": 27.6,
+       "x": 215.6,
+       "z": 374.9,
        "move": "walk",
-       "path": [
-        {
-         "x": 286.92,
-         "z": 349.25
-        }
-       ],
        "stance": "crouch",
        "faceTo": {
-        "x": 277.22,
-        "z": 375.75
+        "x": 226.5,
+        "z": 386
        }
       }
      ]
@@ -5821,26 +5818,20 @@
      "id": "RoadIja4",
      "keys": [
       {
-       "t": 1.7,
-       "x": 295.55,
-       "z": 331.9,
+       "t": 2.1,
+       "x": 219,
+       "z": 368,
        "move": "cut"
       },
       {
-       "t": 27.7,
-       "x": 291.69,
-       "z": 340.66,
+       "t": 27.3,
+       "x": 222.6,
+       "z": 372.4,
        "move": "walk",
-       "path": [
-        {
-         "x": 293.85,
-         "z": 335.62
-        }
-       ],
        "stance": "crouch",
        "faceTo": {
-        "x": 283.23,
-        "z": 359.72
+        "x": 226.5,
+        "z": 386
        }
       }
      ]
@@ -5867,26 +5858,38 @@
     {
      "t": 0,
      "type": "smoke",
-     "x": 100,
-     "z": 474,
+     "x": 186,
+     "z": 443,
      "kind": "SmokeBlack",
-     "dur": 30.6
+     "dur": 30.6,
+     "scale": 3
     },
     {
      "t": 0,
      "type": "smoke",
-     "x": 160,
-     "z": 450,
+     "x": 170,
+     "z": 424.5,
      "kind": "SmokeBlack",
-     "dur": 30.6
+     "dur": 30.6,
+     "scale": 3
     },
     {
      "t": 0,
      "type": "smoke",
-     "x": 70,
-     "z": 452,
+     "x": 224,
+     "z": 443,
      "kind": "SmokeBlack",
-     "dur": 30.6
+     "dur": 30.6,
+     "scale": 3
+    },
+    {
+     "t": 0,
+     "type": "smoke",
+     "x": 205,
+     "z": 447,
+     "kind": "SmokeBlack",
+     "dur": 30.6,
+     "scale": 3
     },
     {
      "t": 0.3,
@@ -5933,8 +5936,16 @@
     {
      "t": 20.1,
      "type": "caption",
-     "text": "（麦地那头就是耿家庄：一片土坯院墙和树，几处房顶冒着烟，庄子里一阵一阵响枪）",
-     "dur": 3
+     "text": "（麦地那头就是耿家庄。冒烟的都在东头：东边几座塌了角的房，一两处草顶着了火；枪声也从东头一阵一阵传来，夹着听不清的日本话）",
+     "dur": 2.4
+    },
+    {
+     "t": 20.2,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 186,
+     "z": 455,
+     "volume": 0.45
     },
     {
      "t": 20.6,
@@ -5942,37 +5953,45 @@
      "name": "mgBurstFar",
      "x": 100,
      "z": 471.5,
-     "volume": 0.55
-    },
-    {
-     "t": 22.4,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 100,
-     "z": 430,
      "volume": 0.5
     },
     {
-     "t": 23.1,
-     "type": "caption",
-     "text": "（左前方东北那条道上，几个鬼子弯着腰往庄子东头钻：就是占了老耿家那伙的尾巴）",
-     "dur": 2.6
+     "t": 21,
+     "type": "sfx",
+     "name": "ijaShoutFar",
+     "x": 192,
+     "z": 452,
+     "volume": 0.35
     },
     {
-     "t": 23.6,
+     "t": 22.1,
      "type": "sfx",
-     "name": "rifleShot",
-     "x": 150,
-     "z": 465,
+     "name": "rifleVolley",
+     "x": 170,
+     "z": 440,
      "volume": 0.4
     },
     {
-     "t": 24.4,
+     "t": 22.6,
+     "type": "caption",
+     "text": "（东北角：道上最后几个鬼子离了大路，弯着腰斜穿麦地往土炮楼那边钻——占了老耿家那伙的尾巴，一百多米）",
+     "dur": 3
+    },
+    {
+     "t": 23.4,
      "type": "sfx",
-     "name": "mgBurstFar",
-     "x": 100,
-     "z": 471.5,
-     "volume": 0.6
+     "name": "ijaShoutFar",
+     "x": 176,
+     "z": 462,
+     "volume": 0.3
+    },
+    {
+     "t": 24.2,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 200,
+     "z": 448,
+     "volume": 0.4
     },
     {
      "t": 24.6,
@@ -6085,8 +6104,8 @@
   },
   {
    "keyframe": "08-1",
-   "title": "村口：枪眼里的机枪顺着街扫，活下来的走岔路",
-   "durationS": 30.34,
+   "title": "村口：枪眼里的机枪顺着街扫，东头跑来的村民挨了一梭子扑进沟",
+   "durationS": 56.2,
    "then": "next",
    "camera": [
     {
@@ -6127,19 +6146,6 @@
      }
     },
     {
-     "t": 9.99,
-     "dur": 1,
-     "eye": {
-      "x": 97.4,
-      "z": 384.3,
-      "stance": "prone",
-      "yawDeg": -178.26,
-      "pitchDeg": -1,
-      "toYawDeg": 92.3,
-      "toPitchDeg": -3
-     }
-    },
-    {
      "t": 10.89,
      "dur": 1,
      "eye": {
@@ -6153,19 +6159,6 @@
      }
     },
     {
-     "t": 11.99,
-     "dur": 0.8,
-     "eye": {
-      "x": 97.4,
-      "z": 384.3,
-      "stance": "prone",
-      "yawDeg": 92.3,
-      "pitchDeg": -3,
-      "toYawDeg": 11.89,
-      "toPitchDeg": -14
-     }
-    },
-    {
      "t": 13.89,
      "dur": 1,
      "eye": {
@@ -6174,25 +6167,105 @@
       "stance": "prone",
       "yawDeg": -76.12,
       "pitchDeg": -6,
-      "toYawDeg": -178.26,
-      "toPitchDeg": -1
+      "toLook": {
+       "x": 166,
+       "z": 385.2,
+       "h": 0.8
+      }
      }
     },
     {
-     "t": 18.9,
+     "t": 14.89,
+     "dur": 1,
+     "eye": {
+      "x": 97.4,
+      "z": 384.3,
+      "stance": "prone",
+      "look": {
+       "x": 166,
+       "z": 385.2,
+       "h": 0.8
+      },
+      "toLook": {
+       "x": 226.6,
+       "z": 386.5,
+       "h": 1
+      }
+     }
+    },
+    {
+     "t": 15.89,
+     "dur": 1,
+     "eye": {
+      "x": 97.4,
+      "z": 384.3,
+      "stance": "prone",
+      "look": {
+       "x": 226.6,
+       "z": 386.5,
+       "h": 1
+      },
+      "toLook": {
+       "actor": "Villager1",
+       "offset": [
+        0,
+        0.9,
+        0
+       ]
+      }
+     }
+    },
+    {
+     "t": 16.89,
+     "dur": 20.15,
+     "eye": {
+      "x": 97.4,
+      "z": 384.3,
+      "stance": "prone",
+      "look": {
+       "actor": "Villager1",
+       "offset": [
+        0,
+        0.9,
+        0
+       ]
+      }
+     }
+    },
+    {
+     "t": 37.04,
+     "dur": 1,
+     "eye": {
+      "x": 97.4,
+      "z": 384.3,
+      "stance": "prone",
+      "look": {
+       "actor": "Villager1",
+       "offset": [
+        0,
+        0.9,
+        0
+       ]
+      },
+      "toYawDeg": -67.75,
+      "toPitchDeg": -10
+     }
+    },
+    {
+     "t": 44.76,
      "dur": 1.2,
      "eye": {
       "x": 97.4,
       "z": 384.3,
       "stance": "prone",
-      "yawDeg": 11.89,
-      "pitchDeg": -14,
+      "yawDeg": -67.75,
+      "pitchDeg": -10,
       "toYawDeg": -49.4,
       "toPitchDeg": -4
      }
     },
     {
-     "t": 27.14,
+     "t": 53,
      "dur": 1.2,
      "eye": {
       "x": 97.4,
@@ -6211,49 +6284,76 @@
      "keys": [
       {
        "t": 0,
-       "x": 82.45,
-       "z": 396,
+       "x": 166,
+       "z": 385.2,
        "move": "cut",
        "state": "alive",
        "stance": "stand",
-       "yawDeg": 90,
+       "yawDeg": 81.9,
        "clip": "VilPanicRun"
       },
       {
-       "t": 0.8,
-       "x": 82.45,
-       "z": 396,
+       "t": 13.89,
+       "x": 166,
+       "z": 385.2,
        "move": "cut"
       },
       {
-       "t": 12.59,
-       "x": 97,
-       "z": 382.4,
+       "t": 35.19,
+       "clip": "VilDuckProne",
+       "clipHold": true,
+       "stance": "prone"
+      },
+      {
+       "t": 36.44,
+       "x": 104,
+       "z": 381.6,
        "move": "run",
        "path": [
         {
-         "x": 80,
-         "z": 396
+         "x": 140,
+         "z": 381.5
         },
         {
-         "x": 80,
-         "z": 384.2
+         "x": 125,
+         "z": 377.5
         },
         {
-         "x": 80.6,
-         "z": 380.8
+         "x": 107.2,
+         "z": 377
         },
         {
-         "x": 97,
-         "z": 382.4
+         "x": 106.3,
+         "z": 379.6
         }
-       ]
+       ],
+       "yawDeg": 131.01
       },
       {
-       "t": 12.59,
+       "t": 36.84,
        "stance": "crouch",
-       "faceTo": "player",
-       "clip": "VilCrouchHold"
+       "faceTo": "Luo",
+       "clip": null
+      },
+      {
+       "t": 38.04,
+       "clip": "PvCrouchPointL",
+       "faceTo": {
+        "x": 180,
+        "z": 384
+       }
+      },
+      {
+       "t": 38.34,
+       "faceTo": "Luo"
+      },
+      {
+       "t": 44.56,
+       "clip": "VilCrouchHold",
+       "faceTo": {
+        "x": 104,
+        "z": 378.6
+       }
       }
      ]
     },
@@ -6444,6 +6544,57 @@
      ]
     },
     {
+     "id": "NeCornerIja",
+     "keys": [
+      {
+       "t": 0,
+       "x": 228.2,
+       "z": 388.1,
+       "move": "cut",
+       "stance": "crouch",
+       "aim": false,
+       "yawDeg": 90,
+       "visible": false
+      },
+      {
+       "t": 14.49,
+       "x": 226.6,
+       "z": 386.5,
+       "move": "cut",
+       "visible": true,
+       "stance": "crouch",
+       "aim": true,
+       "yawDeg": 85.5
+      },
+      {
+       "t": 16.69,
+       "x": 228.2,
+       "z": 388.1,
+       "move": "cut",
+       "visible": false
+      }
+     ]
+    },
+    {
+     "id": "Luo",
+     "keys": [
+      {
+       "t": 11.09,
+       "faceTo": {
+        "x": 110,
+        "z": 385
+       }
+      },
+      {
+       "t": 13.69,
+       "faceTo": {
+        "x": 100,
+        "z": 470
+       }
+      }
+     ]
+    },
+    {
      "id": "Geng",
      "keys": [
       {
@@ -6465,7 +6616,7 @@
        "move": "cut"
       },
       {
-       "t": 29.74,
+       "t": 55.6,
        "x": 278.74,
        "z": 370.26,
        "move": "walk",
@@ -6493,7 +6644,7 @@
        "move": "cut"
       },
       {
-       "t": 29.44,
+       "t": 55.3,
        "x": 285.69,
        "z": 354.66,
        "move": "walk",
@@ -6521,7 +6672,7 @@
        "move": "cut"
       },
       {
-       "t": 29.14,
+       "t": 55,
        "x": 288.85,
        "z": 344.75,
        "move": "walk",
@@ -6542,12 +6693,12 @@
    ],
    "lines": [
     {
-     "t": 13.39,
+     "t": 38.44,
      "line": "VillageMouth.01",
      "actor": "Villager1"
     },
     {
-     "t": 20.3,
+     "t": 46.16,
      "line": "GengHome.01",
      "actor": "Geng"
     }
@@ -6597,12 +6748,6 @@
      "radius": 0.8
     },
     {
-     "t": 7.59,
-     "type": "caption",
-     "text": "（左手边夹道里有脚步声：有人顺着巷子跑过来）",
-     "dur": 3
-    },
-    {
      "t": 9.19,
      "type": "muzzle",
      "actor": "MgGunner",
@@ -6642,14 +6787,14 @@
     {
      "t": 11.09,
      "type": "caption",
-     "text": "（右手边：北边院子朝沟的后门里跑出来的两个，已经溜下沟、缩进后送队里）",
+     "text": "（右手边：北边院子朝沟的后门里钻出来的两个，已经溜下沟、缩进后送队里。班长看了那道后门一眼——记住了）",
      "dur": 3
     },
     {
-     "t": 12.59,
+     "t": 14.09,
      "type": "caption",
-     "text": "（从巷子口滚进路沟，趴在顺子脚边）",
-     "dur": 2.4
+     "text": "（东头：一个村民从庄子东北角跑出来，六七十米外，顺着北墙根、路沟北沿往西跑）",
+     "dur": 3
     },
     {
      "t": 14.69,
@@ -6683,26 +6828,97 @@
      "radius": 0.8
     },
     {
-     "t": 18.3,
+     "t": 15.49,
+     "type": "muzzle",
+     "actor": "NeCornerIja",
+     "count": 6,
+     "interval": 0.11
+    },
+    {
+     "t": 15.49,
+     "type": "sfx",
+     "name": "mgBurstFar",
+     "x": 226.6,
+     "z": 386.5,
+     "volume": 0.55
+    },
+    {
+     "t": 15.59,
      "type": "caption",
-     "text": "（他之后跟着后送队一起走）",
+     "text": "（东北角土炮楼的墙后冒出一两个鬼子，打来一梭子：土在他脚后跟溅起一串。不往沟里打）",
+     "dur": 3
+    },
+    {
+     "t": 15.74,
+     "type": "explosion",
+     "x": 150.37,
+     "z": 377.6,
+     "kind": "grenade",
+     "radius": 0.8
+    },
+    {
+     "t": 15.88,
+     "type": "explosion",
+     "x": 147.78,
+     "z": 377.6,
+     "kind": "grenade",
+     "radius": 0.8
+    },
+    {
+     "t": 16.02,
+     "type": "explosion",
+     "x": 145.19,
+     "z": 377.6,
+     "kind": "grenade",
+     "radius": 0.8
+    },
+    {
+     "t": 16.16,
+     "type": "explosion",
+     "x": 141.95,
+     "z": 377.6,
+     "kind": "grenade",
+     "radius": 0.8
+    },
+    {
+     "t": 17.89,
+     "type": "caption",
+     "text": "（那人露一下就缩回墙后头，不再出来）",
+     "dur": 2.2
+    },
+    {
+     "t": 35.39,
+     "type": "caption",
+     "text": "（他扑进路沟东半截）",
      "dur": 2.4
     },
     {
-     "t": 20.5,
+     "t": 37.04,
+     "type": "caption",
+     "text": "（手脚并用爬到坡道边，冲班长喘着说）",
+     "dur": 2.6
+    },
+    {
+     "t": 44.16,
+     "type": "caption",
+     "text": "（边说边往东指。他之后跟着后送队一起走）",
+     "dur": 2.4
+    },
+    {
+     "t": 46.36,
      "type": "caption",
      "text": "（老耿盯着那个枪眼。那是他家）",
      "dur": 2.6
     },
     {
-     "t": 27.74,
+     "t": 53.6,
      "type": "muzzle",
      "actor": "MgGunner",
      "count": 6,
      "interval": 0.11
     },
     {
-     "t": 27.74,
+     "t": 53.6,
      "type": "sfx",
      "name": "mgBurstFar",
      "x": 100,
@@ -6710,7 +6926,7 @@
      "volume": 0.8
     },
     {
-     "t": 27.99,
+     "t": 53.85,
      "type": "explosion",
      "x": 99.6,
      "z": 388,
@@ -6718,7 +6934,7 @@
      "radius": 0.8
     },
     {
-     "t": 28.29,
+     "t": 54.15,
      "type": "explosion",
      "x": 100.5,
      "z": 389.4,
@@ -6730,12 +6946,12 @@
   {
    "keyframe": "08-2",
    "title": "绕不过去：东边走不得、河汊子、东墙外头那条小胡同、等天黑、打",
-   "durationS": 50.4,
+   "durationS": 45.57,
    "then": "next",
    "camera": [
     {
      "t": 0,
-     "dur": 1.4,
+     "dur": 0.8,
      "eye": {
       "x": 97.4,
       "z": 384.3,
@@ -6745,31 +6961,31 @@
      }
     },
     {
-     "t": 1.5,
-     "dur": 1.4,
+     "t": 0.8,
+     "dur": 1.6,
      "eye": {
       "x": 97.4,
       "z": 384.3,
-      "stance": "crouch",
+      "stance": "prone",
       "yawDeg": -25.35,
       "pitchDeg": 4,
       "toLook": {
-       "x": 286,
-       "z": 352.67,
+       "x": 226.6,
+       "z": 386.5,
        "h": 1
       }
      }
     },
     {
-     "t": 5.92,
-     "dur": 1,
+     "t": 2.4,
+     "dur": 1.4,
      "eye": {
       "x": 97.4,
       "z": 384.3,
       "stance": "prone",
       "look": {
-       "x": 286,
-       "z": 352.67,
+       "x": 226.6,
+       "z": 386.5,
        "h": 1
       },
       "toYawDeg": -25.35,
@@ -6777,7 +6993,7 @@
      }
     },
     {
-     "t": 7.72,
+     "t": 10.12,
      "dur": 1,
      "eye": {
       "x": 97.4,
@@ -6790,7 +7006,7 @@
      }
     },
     {
-     "t": 11.02,
+     "t": 13.42,
      "dur": 1.2,
      "eye": {
       "x": 97.4,
@@ -6803,7 +7019,7 @@
      }
     },
     {
-     "t": 15.26,
+     "t": 17.66,
      "dur": 0.8,
      "eye": {
       "x": 97.4,
@@ -6816,7 +7032,7 @@
      }
     },
     {
-     "t": 21,
+     "t": 23.4,
      "dur": 1.2,
      "eye": {
       "x": 97.4,
@@ -6832,7 +7048,7 @@
      }
     },
     {
-     "t": 27.66,
+     "t": 30.06,
      "dur": 1,
      "eye": {
       "x": 97.4,
@@ -6845,7 +7061,7 @@
      }
     },
     {
-     "t": 29.81,
+     "t": 32.21,
      "dur": 0.8,
      "eye": {
       "x": 97.4,
@@ -6858,7 +7074,7 @@
      }
     },
     {
-     "t": 34.82,
+     "t": 37.22,
      "dur": 1,
      "eye": {
       "x": 97.4,
@@ -6871,7 +7087,7 @@
      }
     },
     {
-     "t": 48.2,
+     "t": 43.37,
      "dur": 1.4,
      "eye": {
       "x": 97.4,
@@ -6891,49 +7107,32 @@
       {
        "t": 0,
        "faceTo": {
-        "x": 286,
-        "z": 352.67
+        "x": 226.6,
+        "z": 386.5
        },
        "clip": "PvCrouchTalkRifle"
       },
       {
-       "t": 6.02,
+       "t": 8.42,
        "faceTo": "Geng"
       },
       {
-       "t": 34.92,
+       "t": 37.32,
        "faceTo": {
         "x": 100,
         "z": 470
        }
       },
       {
-       "t": 38.62,
-       "faceTo": "LiuWencai",
+       "t": 40.62,
+       "faceTo": {
+        "x": 100,
+        "z": 470
+       },
        "clip": "PvCrouchPointL"
       },
       {
-       "t": 39.62,
-       "faceTo": "Yaowa",
-       "clip": "PvCrouchPointL"
-      },
-      {
-       "t": 40.42,
-       "faceTo": "player",
-       "clip": "PvCrouchPointL"
-      },
-      {
-       "t": 44.62,
-       "faceTo": "HeYoutian",
-       "clip": "PvCrouchPointL"
-      },
-      {
-       "t": 45.82,
-       "faceTo": "Escort1",
-       "clip": "PvCrouchPointL"
-      },
-      {
-       "t": 48.2,
+       "t": 43.37,
        "faceTo": {
         "x": 100,
         "z": 470
@@ -6946,11 +7145,11 @@
      "id": "Geng",
      "keys": [
       {
-       "t": 6.92,
+       "t": 9.32,
        "faceTo": "Luo"
       },
       {
-       "t": 10.62,
+       "t": 13.02,
        "faceTo": {
         "x": 34.5,
         "z": 400
@@ -6958,12 +7157,12 @@
        "clip": "PvStandPointL"
       },
       {
-       "t": 15.36,
+       "t": 17.76,
        "faceTo": "Luo",
        "clip": null
       },
       {
-       "t": 21.4,
+       "t": 23.8,
        "faceTo": {
         "x": 100,
         "z": 470
@@ -6971,7 +7170,7 @@
        "clip": "PvStandPointL"
       },
       {
-       "t": 27.26,
+       "t": 29.66,
        "faceTo": "Luo",
        "clip": null
       }
@@ -7089,7 +7288,7 @@
      "id": "Yaowa",
      "keys": [
       {
-       "t": 48.1,
+       "t": 43.27,
        "faceTo": {
         "x": 100,
         "z": 470
@@ -7102,7 +7301,7 @@
      "id": "HeYoutian",
      "keys": [
       {
-       "t": 48.4,
+       "t": 43.57,
        "faceTo": "Luo"
       }
      ]
@@ -7111,7 +7310,7 @@
      "id": "Escort1",
      "keys": [
       {
-       "t": 48.4,
+       "t": 43.57,
        "faceTo": "Luo"
       }
      ]
@@ -7120,7 +7319,7 @@
      "id": "Escort2",
      "keys": [
       {
-       "t": 48.4,
+       "t": 43.57,
        "faceTo": "Luo"
       }
      ]
@@ -7128,55 +7327,55 @@
    ],
    "lines": [
     {
-     "t": 1.2,
+     "t": 3.6,
      "line": "NoWayAsk.01",
      "actor": "Luo"
     },
     {
-     "t": 6.32,
+     "t": 8.72,
      "line": "NoWayAsk.02",
      "actor": "Luo"
     },
     {
-     "t": 10.42,
+     "t": 12.82,
      "line": "NoWayGeng.01",
      "actor": "Geng"
     },
     {
-     "t": 15.76,
+     "t": 18.16,
      "line": "NoWayMedic.01",
      "actor": "Medic"
     },
     {
-     "t": 21.6,
+     "t": 24,
      "line": "NoWayGeng.02",
      "actor": "Geng"
     },
     {
-     "t": 28.66,
+     "t": 31.06,
      "line": "NoWayOfficer.01",
      "actor": "Officer"
     },
     {
-     "t": 30.01,
+     "t": 32.41,
      "line": "DecideShunzi.01"
     },
     {
-     "t": 32.44,
+     "t": 34.84,
      "line": "DecideMedic.01",
      "actor": "Medic"
     },
     {
-     "t": 37.02,
+     "t": 39.42,
      "line": "DecideLuo.01",
      "actor": "Luo"
     }
    ],
    "events": [
     {
-     "t": 1.8,
+     "t": 1,
      "type": "caption",
-     "text": "（顺子撑起半个身子，顺着庄子北沿往东看：东北进庄的那条道上，远远还有两三个鬼子在往庄里走）",
+     "text": "（班长扭头朝东看了一眼。顺子跟着看：东北角刚才打枪的那个墙角，现在没人；道上远远还有两三个鬼子在往庄里走）",
      "dur": 3
     },
     {
@@ -7211,14 +7410,14 @@
      "radius": 0.8
     },
     {
-     "t": 15.36,
+     "t": 17.76,
      "type": "muzzle",
      "actor": "MgGunner",
      "count": 6,
      "interval": 0.11
     },
     {
-     "t": 15.36,
+     "t": 17.76,
      "type": "sfx",
      "name": "mgBurstFar",
      "x": 100,
@@ -7226,7 +7425,7 @@
      "volume": 0.8
     },
     {
-     "t": 15.61,
+     "t": 18.01,
      "type": "explosion",
      "x": 100.8,
      "z": 388.6,
@@ -7234,7 +7433,7 @@
      "radius": 0.8
     },
     {
-     "t": 15.91,
+     "t": 18.31,
      "type": "explosion",
      "x": 101.7,
      "z": 390,
@@ -7242,20 +7441,20 @@
      "radius": 0.8
     },
     {
-     "t": 27.26,
+     "t": 29.66,
      "type": "caption",
      "text": "（往南只有一条路：老耿家东墙外头那条窄胡同，胡同口就挨着老耿家——挨着那个枪眼。墙根有个狗洞，老耿没想起来：那是小孩走的路）",
      "dur": 3.2
     },
     {
-     "t": 30.61,
+     "t": 33.01,
      "type": "muzzle",
      "actor": "MgGunner",
      "count": 6,
      "interval": 0.11
     },
     {
-     "t": 30.61,
+     "t": 33.01,
      "type": "sfx",
      "name": "mgBurstFar",
      "x": 100,
@@ -7263,7 +7462,7 @@
      "volume": 0.8
     },
     {
-     "t": 30.86,
+     "t": 33.26,
      "type": "explosion",
      "x": 99.2,
      "z": 387,
@@ -7271,7 +7470,7 @@
      "radius": 0.8
     },
     {
-     "t": 31.16,
+     "t": 33.56,
      "type": "explosion",
      "x": 100.1,
      "z": 388.4,
@@ -7279,7 +7478,7 @@
      "radius": 0.8
     },
     {
-     "t": 35.22,
+     "t": 37.62,
      "type": "caption",
      "text": "（班长盯着枪眼，啐了一口）",
      "dur": 2.4
@@ -7289,7 +7488,7 @@
   {
    "keyframe": "08-3",
    "title": "压枪眼：枪眼一梭打沟沿；班长四人蹲在街口等着",
-   "durationS": 40,
+   "durationS": 41,
    "then": "next",
    "camera": [
     {
@@ -7303,6 +7502,32 @@
       "pitchDeg": -1
      },
      "shake": 0.05
+    },
+    {
+     "t": 36.4,
+     "dur": 1,
+     "eye": {
+      "x": 97.4,
+      "z": 384.3,
+      "stance": "prone",
+      "yawDeg": 180,
+      "pitchDeg": -1,
+      "toYawDeg": -64.72,
+      "toPitchDeg": 2
+     }
+    },
+    {
+     "t": 37.4,
+     "dur": 3.4,
+     "eye": {
+      "x": 97.4,
+      "z": 384.3,
+      "stance": "prone",
+      "yawDeg": -64.72,
+      "pitchDeg": 2,
+      "toYawDeg": -48.3,
+      "toPitchDeg": 2
+     }
     }
    ],
    "actors": [
@@ -7411,6 +7636,50 @@
        "move": "run",
        "stance": "crouch",
        "yawDeg": -95.7
+      }
+     ]
+    },
+    {
+     "id": "Walker04",
+     "keys": [
+      {
+       "t": 0,
+       "x": 104.6,
+       "z": 380.9,
+       "move": "cut",
+       "stance": "crouch",
+       "state": "alive",
+       "yawDeg": 160
+      },
+      {
+       "t": 37.35,
+       "clip": "ShotCollapse",
+       "clipHold": true
+      },
+      {
+       "t": 38.7,
+       "state": "down",
+       "clip": null,
+       "yawDeg": 160
+      }
+     ]
+    },
+    {
+     "id": "Nier",
+     "keys": [
+      {
+       "t": 0,
+       "stance": "crouch",
+       "yawDeg": 135,
+       "clip": "VilCrouchHold"
+      },
+      {
+       "t": 37.8,
+       "clip": "VilCowerWhimper",
+       "faceTo": {
+        "x": 104.6,
+        "z": 380.9
+       }
       }
      ]
     }
@@ -8000,24 +8269,76 @@
      "radius": 0.8
     },
     {
+     "t": 36.6,
+     "type": "muzzle",
+     "actor": "MgGunner",
+     "count": 8,
+     "interval": 0.11
+    },
+    {
+     "t": 36.6,
+     "type": "sfx",
+     "name": "mgBurstFar",
+     "x": 100,
+     "z": 471.5,
+     "volume": 1
+    },
+    {
      "t": 36.75,
      "type": "explosion",
      "x": 99.1,
      "z": 386.9,
      "kind": "grenade",
      "radius": 0.8
+    },
+    {
+     "t": 36.9,
+     "type": "explosion",
+     "x": 101.8,
+     "z": 383.6,
+     "kind": "grenade",
+     "radius": 0.8
+    },
+    {
+     "t": 37.1,
+     "type": "explosion",
+     "x": 103.2,
+     "z": 381.8,
+     "kind": "grenade",
+     "radius": 0.8
+    },
+    {
+     "t": 37.2,
+     "type": "caption",
+     "text": "（机枪回过来一梭扫到沟里：妮儿身边一个伤兵中枪，血溅了她一脸。她缩在沟底不动了）",
+     "dur": 3.4
+    },
+    {
+     "t": 37.3,
+     "type": "explosion",
+     "x": 105,
+     "z": 381.2,
+     "kind": "grenade",
+     "radius": 0.8
+    },
+    {
+     "t": 37.4,
+     "type": "sfx",
+     "name": "bodyFall",
+     "x": 104.6,
+     "z": 380.9
     }
    ]
   },
   {
    "keyframe": "08-4",
-   "title": "妮儿跑·班长定计：追进巷子，班长四人摸到大车后头，墙角一个鬼子往东跑",
-   "durationS": 76.06,
+   "title": "班长定计·分三拨：有田穿院子、顺儿走巷子、坡道上压枪眼；妮儿趁乱跟进巷子",
+   "durationS": 50.61,
    "then": "next",
    "camera": [
     {
      "t": 0,
-     "dur": 2,
+     "dur": 1.2,
      "eye": {
       "x": 97.4,
       "z": 384.3,
@@ -8027,7 +8348,7 @@
      }
     },
     {
-     "t": 2,
+     "t": 1.2,
      "dur": 1,
      "eye": {
       "x": 97.4,
@@ -8035,76 +8356,23 @@
       "stance": "prone",
       "yawDeg": 180,
       "pitchDeg": -1,
-      "toYawDeg": -64.72,
-      "toPitchDeg": 2
+      "toYawDeg": -62.3,
+      "toPitchDeg": 3
      }
     },
     {
-     "t": 3.6,
-     "dur": 1.2,
+     "t": 2.2,
+     "dur": 8.61,
      "eye": {
       "x": 97.4,
       "z": 384.3,
       "stance": "prone",
-      "yawDeg": -64.72,
-      "pitchDeg": 2,
-      "toYawDeg": -25.87,
-      "toPitchDeg": 2
+      "yawDeg": -62.3,
+      "pitchDeg": 3
      }
     },
     {
-     "t": 4.8,
-     "dur": 1.8,
-     "eye": {
-      "x": 97.4,
-      "z": 384.3,
-      "stance": "prone",
-      "yawDeg": -25.87,
-      "pitchDeg": 2,
-      "toYawDeg": 69.27,
-      "toPitchDeg": 1
-     }
-    },
-    {
-     "t": 6.6,
-     "dur": 3.2,
-     "eye": {
-      "x": 97.4,
-      "z": 384.3,
-      "stance": "prone",
-      "yawDeg": 69.27,
-      "pitchDeg": 1,
-      "toYawDeg": -70.71,
-      "toPitchDeg": 4
-     }
-    },
-    {
-     "t": 9.8,
-     "dur": 5.94,
-     "eye": {
-      "x": 97.4,
-      "z": 384.3,
-      "stance": "prone",
-      "yawDeg": -70.71,
-      "pitchDeg": 4,
-      "toYawDeg": 89.01,
-      "toPitchDeg": 0
-     }
-    },
-    {
-     "t": 14.12,
-     "dur": 0.8,
-     "eye": {
-      "x": 97.4,
-      "z": 384.3,
-      "stance": "prone",
-      "yawDeg": 89.01,
-      "pitchDeg": 0,
-      "toPitchDeg": -2
-     }
-    },
-    {
-     "t": 14.92,
+     "t": 11.61,
      "dur": 1,
      "from": {
       "x": 97.4,
@@ -8124,7 +8392,7 @@
      "ease": "inOut"
     },
     {
-     "t": 15.92,
+     "t": 12.61,
      "dur": 3.4,
      "from": {
       "x": 97.2,
@@ -8144,7 +8412,7 @@
      "ease": "linear"
     },
     {
-     "t": 19.32,
+     "t": 16.01,
      "dur": 1.4,
      "from": {
       "x": 84,
@@ -8164,7 +8432,7 @@
      "ease": "inOut"
     },
     {
-     "t": 20.72,
+     "t": 17.41,
      "dur": 1.2,
      "from": {
       "x": 80,
@@ -8172,12 +8440,9 @@
       "h": 1.1
      },
      "look": {
-      "actor": "Nier",
-      "offset": [
-       0,
-       0.6,
-       0
-      ]
+      "x": 80,
+      "z": 400,
+      "h": 1
      },
      "to": {
       "x": 80,
@@ -8187,21 +8452,14 @@
      "ease": "inOut"
     },
     {
-     "t": 21.92,
-     "dur": 30,
+     "t": 18.61,
+     "dur": 32,
      "eye": {
       "x": 80,
       "z": 388.6,
       "stance": "crouch",
-      "look": {
-       "actor": "Nier",
-       "offset": [
-        0,
-        0.6,
-        0
-       ]
-      },
-      "toYawDeg": 180,
+      "yawDeg": 180,
+      "pitchDeg": -2,
       "free": true
      }
     }
@@ -8217,10 +8475,10 @@
        "move": "cut",
        "stance": "crouch",
        "yawDeg": 135,
-       "clip": "VilCrouchHold"
+       "clip": "VilCowerWhimper"
       },
       {
-       "t": 3.6,
+       "t": 19.81,
        "x": 102.9,
        "z": 379.4,
        "move": "cut",
@@ -8228,9 +8486,9 @@
        "clip": "VilPanicRun"
       },
       {
-       "t": 15.74,
-       "x": 80.2,
-       "z": 392.6,
+       "t": 28.97,
+       "x": 80.4,
+       "z": 384,
        "move": "run",
        "path": [
         {
@@ -8240,32 +8498,14 @@
         {
          "x": 80.4,
          "z": 380
-        },
-        {
-         "x": 80,
-         "z": 384
         }
        ]
       },
       {
-       "t": 16.14,
-       "x": 80.2,
-       "z": 392.6,
-       "move": "cut",
-       "clip": null
-      },
-      {
-       "t": 19.14,
-       "x": 80.2,
-       "z": 395.7,
-       "move": "walk",
-       "stance": "stand",
-       "yawDeg": 180
-      },
-      {
-       "t": 19.34,
+       "t": 29.17,
        "stance": "crouch",
-       "clip": "VilCowerWhimper"
+       "clip": "VilCrouchHold",
+       "yawDeg": 180
       }
      ]
     },
@@ -8284,24 +8524,24 @@
        }
       },
       {
-       "t": 5,
+       "t": 21.01,
        "x": 101.6,
        "z": 380.7,
        "move": "cut"
       },
       {
-       "t": 6.6,
+       "t": 22.61,
        "x": 99.4,
        "z": 383.6,
        "move": "run",
        "yawDeg": 91.18
       },
       {
-       "t": 7,
+       "t": 23.01,
        "clip": "VilReachPinned"
       },
       {
-       "t": 9.4,
+       "t": 25.41,
        "x": 100.06,
        "z": 383.59,
        "move": "cut",
@@ -8310,26 +8550,21 @@
        "yawDeg": 91.18
       },
       {
-       "t": 10,
+       "t": 26.01,
        "x": 100.06,
        "z": 383.59,
        "move": "cut"
       },
       {
-       "t": 11.2,
+       "t": 27.21,
        "x": 102,
        "z": 382.3,
        "move": "walk",
        "stance": "crouch",
-       "faceTo": "player"
-      },
-      {
-       "t": 11.4,
-       "clip": "PvCrouchPointL"
-      },
-      {
-       "t": 14.12,
-       "clip": null
+       "faceTo": {
+        "x": 80,
+        "z": 384
+       }
       }
      ]
     },
@@ -8341,19 +8576,7 @@
        "x": 104.6,
        "z": 380.9,
        "move": "cut",
-       "stance": "crouch",
-       "state": "alive",
-       "yawDeg": 160
-      },
-      {
-       "t": 2.75,
-       "clip": "ShotCollapse",
-       "clipHold": true
-      },
-      {
-       "t": 4.1,
        "state": "down",
-       "clip": null,
        "yawDeg": 160
       }
      ]
@@ -8368,10 +8591,10 @@
        "move": "cut",
        "stance": "prone",
        "aim": true,
-       "yawDeg": 178
+       "yawDeg": -179.7
       },
       {
-       "t": 5.4,
+       "t": 21.41,
        "x": 99.5,
        "z": 384.4,
        "move": "cut",
@@ -8379,7 +8602,7 @@
        "aim": false
       },
       {
-       "t": 6.8,
+       "t": 22.81,
        "x": 100.15,
        "z": 383.58,
        "move": "run",
@@ -8387,11 +8610,11 @@
        "yawDeg": 91.18
       },
       {
-       "t": 7,
+       "t": 23.01,
        "clip": "VilNraYankBack"
       },
       {
-       "t": 9.4,
+       "t": 25.41,
        "x": 100.73,
        "z": 383.57,
        "move": "cut",
@@ -8400,7 +8623,16 @@
        "faceTo": "Geng"
       },
       {
-       "t": 20.87,
+       "t": 26.41,
+       "x": 100.73,
+       "z": 383.57,
+       "move": "cut"
+      },
+      {
+       "t": 28.01,
+       "x": 99.5,
+       "z": 384.4,
+       "move": "run",
        "stance": "prone",
        "aim": true,
        "faceTo": {
@@ -8409,22 +8641,13 @@
        }
       },
       {
-       "t": 20.87,
-       "x": 100.73,
-       "z": 383.57,
+       "t": 29.81,
+       "x": 99.5,
+       "z": 384.4,
        "move": "cut"
       },
       {
-       "t": 22.07,
-       "x": 99.5,
-       "z": 384.4,
-       "move": "run",
-       "stance": "prone",
-       "aim": true,
-       "yawDeg": 178
-      },
-      {
-       "t": 38.68,
+       "t": 30.95,
        "aim": false,
        "faceTo": {
         "x": 99.4,
@@ -8432,12 +8655,65 @@
        }
       },
       {
-       "t": 42.79,
+       "t": 31.12,
+       "x": 97.4,
+       "z": 384.3,
+       "move": "run",
+       "stance": "prone",
        "aim": true,
        "faceTo": {
         "x": 100,
         "z": 470
        }
+      },
+      {
+       "t": 35.06,
+       "aim": true,
+       "faceTo": {
+        "x": 100,
+        "z": 470
+       }
+      }
+     ]
+    },
+    {
+     "id": "LiuWencai",
+     "keys": [
+      {
+       "t": 0,
+       "x": 102.6,
+       "z": 384.2,
+       "move": "cut",
+       "stance": "prone",
+       "aim": true,
+       "yawDeg": 178.3
+      },
+      {
+       "t": 12.71,
+       "aim": false,
+       "faceTo": "Luo"
+      },
+      {
+       "t": 17.01,
+       "aim": true,
+       "faceTo": {
+        "x": 100,
+        "z": 470
+       }
+      }
+     ]
+    },
+    {
+     "id": "Squad3",
+     "keys": [
+      {
+       "t": 0,
+       "x": 101.1,
+       "z": 384.5,
+       "move": "cut",
+       "stance": "prone",
+       "aim": true,
+       "yawDeg": 179.3
       }
      ]
     },
@@ -8450,15 +8726,34 @@
        "z": 382.2,
        "move": "cut",
        "stance": "crouch",
+       "aim": false,
        "yawDeg": 175.5
       },
       {
-       "t": 19.97,
-       "faceTo": "LiuWencai",
+       "t": 0.8,
+       "faceTo": {
+        "x": 110,
+        "z": 385
+       }
+      },
+      {
+       "t": 2.1,
+       "faceTo": "player",
+       "clip": "PvCrouchTalkRifle",
        "talking": true
       },
       {
-       "t": 21.83,
+       "t": 3.6,
+       "faceTo": "HeYoutian",
+       "clip": "PvCrouchPointL"
+      },
+      {
+       "t": 5.6,
+       "faceTo": "player",
+       "clip": "PvCrouchPointL"
+      },
+      {
+       "t": 7.4,
        "faceTo": {
         "x": 80,
         "z": 384
@@ -8466,139 +8761,64 @@
        "clip": "PvCrouchPointL"
       },
       {
-       "t": 29.79,
-       "faceTo": {
-        "id": "Yaowa",
-        "side": "nra",
-        "name": "幺娃",
-        "castId": "yaowa",
-        "x": 99.5,
-        "z": 384.4,
-        "yawDeg": -179.7,
-        "stance": "prone",
-        "aim": true,
-        "arc": {
-         "halfDeg": 4,
-         "rangeM": 89.6,
-         "yawDeg": -179.7
-        },
-        "speedMps": 3.2
-       },
-       "clip": "PvCrouchPointL"
-      },
-      {
-       "t": 35.09,
+       "t": 10.71,
        "talking": false,
        "clip": null,
        "faceTo": {
-        "x": 100,
-        "z": 440
+        "x": 110,
+        "z": 385
        }
       },
       {
-       "t": 35.79,
+       "t": 11.31,
        "x": 101.4,
        "z": 382.2,
        "move": "cut",
        "clip": null
       },
       {
-       "t": 38.87,
-       "x": 102.3,
-       "z": 392,
-       "move": "run",
-       "stance": "crouch",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 40.79,
-       "x": 102.3,
-       "z": 392,
-       "move": "cut"
-      },
-      {
-       "t": 45.95,
-       "x": 102.3,
-       "z": 408.5,
-       "move": "run",
-       "stance": "crouch",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 47.79,
-       "x": 102.3,
-       "z": 408.5,
-       "move": "cut"
-      },
-      {
-       "t": 55.29,
-       "x": 102.3,
-       "z": 432.5,
-       "move": "run",
-       "stance": "crouch",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 57.32,
-       "x": 102.3,
-       "z": 443.8,
-       "move": "run",
-       "stance": "crouch",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 64.3,
-       "faceTo": {
-        "x": 103.25,
-        "z": 432.5
-       },
-       "aim": false
-      },
-      {
-       "t": 65.46,
-       "x": 102.3,
-       "z": 443.8,
-       "move": "cut",
-       "aim": false
-      },
-      {
-       "t": 71.84,
-       "x": 104.6,
-       "z": 433.1,
+       "t": 14.31,
+       "x": 109.8,
+       "z": 382.3,
        "move": "run",
        "path": [
         {
-         "x": 102.4,
-         "z": 439.5
+         "x": 103.6,
+         "z": 382.4
         },
         {
-         "x": 102.3,
-         "z": 432.5
-        },
-        {
-         "x": 104.4,
-         "z": 432.5
+         "x": 107.6,
+         "z": 382.5
         }
        ],
        "stance": "crouch",
        "aim": false,
-       "yawDeg": 180
+       "yawDeg": -175.76
+      },
+      {
+       "t": 14.71,
+       "x": 109.8,
+       "z": 382.3,
+       "move": "cut"
+      },
+      {
+       "t": 16.91,
+       "x": 109.3,
+       "z": 387.6,
+       "move": "run",
+       "path": [
+        {
+         "x": 110,
+         "z": 383.3
+        },
+        {
+         "x": 110,
+         "z": 386.6
+        }
+       ],
+       "stance": "crouch",
+       "aim": false,
+       "yawDeg": 168.7
       }
      ]
     },
@@ -8611,99 +8831,59 @@
        "z": 382.9,
        "move": "cut",
        "stance": "crouch",
+       "aim": false,
        "yawDeg": 59.7
       },
       {
-       "t": 36.19,
+       "t": 11.91,
        "x": 102.6,
        "z": 382.9,
-       "move": "cut"
-      },
-      {
-       "t": 39.27,
-       "x": 102.5,
-       "z": 390.8,
-       "move": "run",
-       "stance": "crouch",
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 41.19,
-       "x": 102.5,
-       "z": 390.8,
-       "move": "cut"
-      },
-      {
-       "t": 46.35,
-       "x": 102.5,
-       "z": 407.3,
-       "move": "run",
-       "stance": "crouch",
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 48.19,
-       "x": 102.5,
-       "z": 407.3,
-       "move": "cut"
-      },
-      {
-       "t": 55.69,
-       "x": 102.5,
-       "z": 431.3,
-       "move": "run",
-       "stance": "crouch",
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 57.72,
-       "x": 102.5,
-       "z": 442.6,
-       "move": "run",
-       "stance": "crouch",
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 66.76,
-       "x": 102.5,
-       "z": 442.6,
        "move": "cut",
-       "aim": false
+       "clip": null
       },
       {
-       "t": 72.76,
-       "x": 104.5,
-       "z": 431.5,
+       "t": 14.91,
+       "x": 108.6,
+       "z": 382.5,
        "move": "run",
        "path": [
         {
-         "x": 102.4,
-         "z": 439.5
+         "x": 103.6,
+         "z": 382.4
         },
         {
-         "x": 102.3,
-         "z": 432.5
-        },
-        {
-         "x": 104.4,
-         "z": 432.5
+         "x": 107.6,
+         "z": 382.5
         }
        ],
        "stance": "crouch",
        "aim": false,
-       "yawDeg": -90
+       "yawDeg": -150.75
+      },
+      {
+       "t": 15.71,
+       "x": 108.6,
+       "z": 382.5,
+       "move": "cut"
+      },
+      {
+       "t": 17.91,
+       "x": 107.9,
+       "z": 386.9,
+       "move": "run",
+       "path": [
+        {
+         "x": 110,
+         "z": 383.3
+        },
+        {
+         "x": 110,
+         "z": 386.6
+        }
+       ],
+       "stance": "crouch",
+       "aim": false,
+       "yawDeg": 168.7
       }
      ]
     },
@@ -8716,99 +8896,59 @@
        "z": 381.3,
        "move": "cut",
        "stance": "crouch",
+       "aim": false,
        "yawDeg": -132
       },
       {
-       "t": 36.19,
+       "t": 12.51,
        "x": 100.4,
        "z": 381.3,
-       "move": "cut"
-      },
-      {
-       "t": 39.27,
-       "x": 102.4,
-       "z": 389.6,
-       "move": "run",
-       "stance": "crouch",
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 41.19,
-       "x": 102.4,
-       "z": 389.6,
-       "move": "cut"
-      },
-      {
-       "t": 46.35,
-       "x": 102.4,
-       "z": 406.1,
-       "move": "run",
-       "stance": "crouch",
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 48.19,
-       "x": 102.4,
-       "z": 406.1,
-       "move": "cut"
-      },
-      {
-       "t": 55.69,
-       "x": 102.4,
-       "z": 430.1,
-       "move": "run",
-       "stance": "crouch",
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 57.72,
-       "x": 102.4,
-       "z": 441.4,
-       "move": "run",
-       "stance": "crouch",
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 68.06,
-       "x": 102.4,
-       "z": 441.4,
        "move": "cut",
-       "aim": false
+       "clip": null
       },
       {
-       "t": 73.56,
-       "x": 105.5,
-       "z": 432.5,
+       "t": 15.51,
+       "x": 111,
+       "z": 382.5,
        "move": "run",
        "path": [
         {
-         "x": 102.4,
-         "z": 439.5
+         "x": 103.6,
+         "z": 382.4
         },
         {
-         "x": 102.3,
-         "z": 432.5
-        },
-        {
-         "x": 104.4,
-         "z": 432.5
+         "x": 107.6,
+         "z": 382.5
         }
        ],
        "stance": "crouch",
        "aim": false,
-       "yawDeg": -90
+       "yawDeg": 158.2
+      },
+      {
+       "t": 16.71,
+       "x": 111,
+       "z": 382.5,
+       "move": "cut"
+      },
+      {
+       "t": 18.91,
+       "x": 110.6,
+       "z": 387.3,
+       "move": "run",
+       "path": [
+        {
+         "x": 110,
+         "z": 383.3
+        },
+        {
+         "x": 110,
+         "z": 386.6
+        }
+       ],
+       "stance": "crouch",
+       "aim": false,
+       "yawDeg": 0
       }
      ]
     },
@@ -8821,73 +8961,22 @@
        "z": 382,
        "move": "cut",
        "stance": "crouch",
+       "aim": false,
        "yawDeg": -95.7
       },
       {
-       "t": 36.19,
+       "t": 11.01,
        "x": 99.4,
        "z": 382,
-       "move": "cut"
+       "move": "cut",
+       "stance": "crouch"
       },
       {
-       "t": 39.27,
-       "x": 102.5,
-       "z": 388.2,
+       "t": 13.21,
+       "x": 97.4,
+       "z": 384.3,
        "move": "run",
-       "stance": "crouch",
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 41.19,
-       "x": 102.5,
-       "z": 388.2,
-       "move": "cut"
-      },
-      {
-       "t": 46.35,
-       "x": 102.5,
-       "z": 404.7,
-       "move": "run",
-       "stance": "crouch",
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 48.19,
-       "x": 102.5,
-       "z": 404.7,
-       "move": "cut"
-      },
-      {
-       "t": 55.69,
-       "x": 102.5,
-       "z": 428.7,
-       "move": "run",
-       "stance": "crouch",
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 57.72,
-       "x": 102.5,
-       "z": 440,
-       "move": "run",
-       "stance": "crouch",
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 69.76,
-       "stance": "stand",
+       "stance": "prone",
        "aim": true,
        "faceTo": {
         "x": 100,
@@ -8895,8 +8984,22 @@
        }
       },
       {
-       "t": 70.56,
-       "stance": "crouch"
+       "t": 30.71,
+       "x": 97.4,
+       "z": 384.3,
+       "move": "cut"
+      },
+      {
+       "t": 32.02,
+       "x": 99.5,
+       "z": 384.4,
+       "move": "run",
+       "stance": "prone",
+       "aim": true,
+       "faceTo": {
+        "x": 100,
+        "z": 470
+       }
       }
      ]
     },
@@ -8912,161 +9015,97 @@
        "yawDeg": 0
       },
       {
-       "t": 36.79,
+       "t": 29.06,
        "x": 108.7,
        "z": 462.6,
        "move": "cut"
       },
       {
-       "t": 38.38,
+       "t": 30.65,
        "x": 102.4,
        "z": 461.8,
        "move": "run",
        "yawDeg": 82.76
       },
       {
-       "t": 39.41,
+       "t": 31.68,
        "x": 99.4,
        "z": 464.6,
        "move": "run",
        "yawDeg": 133.03
       },
       {
-       "t": 40.62,
+       "t": 32.89,
        "x": 103.8,
        "z": 466.6,
        "move": "run",
        "yawDeg": -114.44
       },
       {
-       "t": 42.05,
+       "t": 34.32,
        "x": 109.4,
        "z": 465.4,
        "move": "run",
        "yawDeg": -77.91
       },
       {
-       "t": 42.81,
+       "t": 35.08,
        "x": 112.4,
        "z": 465,
        "move": "run",
        "yawDeg": -82.41
       },
       {
-       "t": 43.81,
+       "t": 36.08,
        "x": 116.4,
        "z": 465.1,
        "move": "run",
        "yawDeg": -91.43
       },
       {
-       "t": 49.81,
+       "t": 42.08,
        "x": 140,
        "z": 465,
        "move": "run",
        "yawDeg": -90
       },
       {
-       "t": 50.01,
+       "t": 42.28,
        "visible": false
-      }
-     ]
-    },
-    {
-     "id": "LiuWencai",
-     "keys": [
-      {
-       "t": 16.02,
-       "aim": false,
-       "faceTo": {
-        "x": 90,
-        "z": 381
-       }
-      },
-      {
-       "t": 21.07,
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      }
-     ]
-    },
-    {
-     "id": "Squad3",
-     "keys": [
-      {
-       "t": 36.59,
-       "x": 101.1,
-       "z": 384.5,
-       "move": "cut"
-      },
-      {
-       "t": 38.79,
-       "x": 97.4,
-       "z": 384.3,
-       "move": "run",
-       "stance": "prone",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
       }
      ]
     }
    ],
    "lines": [
     {
-     "t": 4.6,
+     "t": 2.4,
+     "line": "LuoSplitsUp.01",
+     "actor": "Luo"
+    },
+    {
+     "t": 13.01,
+     "line": "LiuMutters.01",
+     "actor": "LiuWencai"
+    },
+    {
+     "t": 16.21,
+     "line": "LuoShutUp.01",
+     "actor": "Luo"
+    },
+    {
+     "t": 20.61,
      "line": "NierRuns.01",
      "actor": "Geng"
     },
     {
-     "t": 8.5,
+     "t": 24.51,
      "line": "NierRuns.02",
      "actor": "Yaowa"
     },
     {
-     "t": 11.6,
-     "line": "NierRuns.03",
-     "actor": "Geng"
-    },
-    {
-     "t": 16.32,
-     "line": "LiuWhereTo.01",
-     "actor": "LiuWencai"
-    },
-    {
-     "t": 20.27,
-     "line": "LuoSendsShunzi.01",
-     "actor": "Luo"
-    },
-    {
-     "t": 22.03,
-     "line": "LuoSendsShunzi.02",
-     "actor": "Luo"
-    },
-    {
-     "t": 29.99,
-     "line": "LuoHoldsMouth.01",
-     "actor": "Luo"
-    },
-    {
-     "t": 38.98,
+     "t": 31.25,
      "line": "RunnerEast.01",
      "actor": "Yaowa"
-    },
-    {
-     "t": 58.92,
-     "line": "PinnedAtCart.01",
-     "actor": "Luo"
-    },
-    {
-     "t": 64.6,
-     "line": "PinnedAtCart.02",
-     "actor": "Luo"
     }
    ],
    "events": [
@@ -9074,7 +9113,7 @@
      "t": 0.4,
      "type": "muzzle",
      "actor": "player",
-     "count": 3,
+     "count": 2,
      "interval": 0.6
     },
     {
@@ -9085,210 +9124,85 @@
      "z": 388.6
     },
     {
-     "t": 2,
-     "type": "muzzle",
-     "actor": "MgGunner",
-     "count": 8,
-     "interval": 0.11
-    },
-    {
-     "t": 2,
-     "type": "sfx",
-     "name": "mgBurstFar",
-     "x": 100,
-     "z": 471.5,
-     "volume": 1
-    },
-    {
-     "t": 2.3,
-     "type": "explosion",
-     "x": 101.8,
-     "z": 383.6,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 2.5,
-     "type": "explosion",
-     "x": 103.2,
-     "z": 381.8,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 2.6,
+     "t": 0.9,
      "type": "caption",
-     "text": "（机枪扫到沟里：妮儿身边一个伤兵中枪，血溅了她一脸）",
-     "dur": 3
+     "text": "（班长瞄了一眼东边那道后门）",
+     "dur": 2.2
     },
     {
      "t": 2.7,
-     "type": "explosion",
-     "x": 105,
-     "z": 381.2,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 2.8,
-     "type": "sfx",
-     "name": "bodyFall",
-     "x": 104.6,
-     "z": 380.9
-    },
-    {
-     "t": 3.8,
      "type": "caption",
-     "text": "（她爬起来就跑：顺着路沟往西，横穿街口，钻进巷子——那是她回家的路。她听不见枪声）",
+     "text": "（压到枪眼！有田，跟老子穿院子。顺儿，你走巷子，摸到他屁股后头。哪个先到哪个先打！——一句话分三拨）",
+     "dur": 3.6
+    },
+    {
+     "t": 11.41,
+     "type": "caption",
+     "text": "（班长带何有田和一个后送队的兵顺沟底往东，爬上南沿猫腰钻进后门——进了主街东边那院；另一个兵爬上坡道补顺子的射击位）",
      "dur": 3.2
     },
     {
-     "t": 4.8,
-     "type": "muzzle",
-     "actor": "MgGunner",
-     "count": 8,
-     "interval": 0.11
-    },
-    {
-     "t": 4.8,
-     "type": "sfx",
-     "name": "mgBurstFar",
-     "x": 100,
-     "z": 471.5,
-     "volume": 1
-    },
-    {
-     "t": 6.47,
-     "type": "explosion",
-     "x": 95.59,
-     "z": 380.72,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 7.2,
+     "t": 11.81,
      "type": "caption",
-     "text": "（子弹追着她的脚后跟打在土里）",
+     "text": "（没人催，顺子自己爬起来：猫着腰顺沟南沿往西，拐进巷子。约 5 秒不能操作）",
      "dur": 2.6
     },
     {
-     "t": 7.44,
-     "type": "explosion",
-     "x": 92.79,
-     "z": 380.98,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 7.5,
+     "t": 12.61,
      "type": "muzzle",
      "actor": "MgGunner",
      "count": 6,
      "interval": 0.11
     },
     {
-     "t": 7.5,
+     "t": 12.61,
      "type": "sfx",
      "name": "mgBurstFar",
      "x": 100,
      "z": 471.5,
-     "volume": 1
+     "volume": 0.8
     },
     {
-     "t": 7.75,
+     "t": 12.86,
      "type": "explosion",
-     "x": 97.81,
-     "z": 384.03,
+     "x": 101,
+     "z": 384,
      "kind": "grenade",
      "radius": 0.8
     },
     {
-     "t": 8.05,
+     "t": 13.16,
      "type": "explosion",
-     "x": 98.71,
-     "z": 385.43,
+     "x": 101.9,
+     "z": 385.4,
      "kind": "grenade",
      "radius": 0.8
     },
     {
-     "t": 8.4,
+     "t": 13.21,
      "type": "caption",
-     "text": "（幺娃一把把他拽回沟里）",
+     "text": "（刘文财趴在东边，看见顺子一个人往西爬，扭头冲沟底嘟囔了半句）",
      "dur": 2.6
     },
     {
-     "t": 8.41,
-     "type": "explosion",
-     "x": 89.98,
-     "z": 381.17,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 9.51,
-     "type": "explosion",
-     "x": 86.82,
-     "z": 380.98,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 10.48,
-     "type": "explosion",
-     "x": 84.01,
-     "z": 380.8,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 13.92,
+     "t": 15.01,
      "type": "caption",
-     "text": "（顺子趴的地方离巷子口最近。没人下令——他自己爬起来追进去。约 5 秒不能操作）",
+     "text": "（三个人一个跟一个钻进后门，蹲在门里听了听）",
+     "dur": 2.6
+    },
+    {
+     "t": 16.41,
+     "type": "caption",
+     "text": "（班长头也不回：闭嘴！压到枪眼！）",
      "dur": 2.4
     },
     {
-     "t": 15.12,
-     "type": "caption",
-     "text": "（顺子爬起来，猫着腰顺沟南沿往西跑，拐进巷子）",
-     "dur": 2.6
-    },
-    {
-     "t": 16.52,
-     "type": "caption",
-     "text": "（刘文财趴在东边，只看见顺子扔下射位往西钻——他以为顺子要开小差，吼了半句）",
-     "dur": 2.8
-    },
-    {
-     "t": 22.12,
-     "type": "caption",
-     "text": "（钻进巷子十来米：交还操作。妮儿在前头拐弯处慢下来了）",
-     "dur": 2.6
-    },
-    {
-     "t": 22.33,
-     "type": "caption",
-     "text": "（班长冲二十米外的巷子口吼：带到她顺巷子摸过去，摸到那狗日的屁股后头！老子从东边院子穿过去——你那头一响，老子这头就动手！）",
-     "dur": 3.4
-    },
-    {
-     "t": 24.03,
-     "type": "caption",
-     "text": "（身后，班长带何有田和两个兵贴着主街东边的门洞一个一个往前摸。隔着一道院墙，巷子里只听得见）",
-     "dur": 3
-    },
-    {
-     "t": 30.29,
-     "type": "caption",
-     "text": "（扭回头冲坡道上的三个：把枪眼压到，打一枪换个窝，莫停！——正面吸火的活交给他们三个）",
-     "dur": 3.2
-    },
-    {
-     "t": 35.39,
+     "t": 17.41,
      "type": "muzzle",
      "actor": "Yaowa"
     },
     {
-     "t": 35.39,
+     "t": 17.41,
      "type": "sfx",
      "name": "rifleShot",
      "x": 99.5,
@@ -9296,25 +9210,12 @@
      "volume": 0.7
     },
     {
-     "t": 35.74,
-     "type": "muzzle",
-     "actor": "LiuWencai"
-    },
-    {
-     "t": 35.74,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 102.6,
-     "z": 384.2,
-     "volume": 0.7
-    },
-    {
-     "t": 36.09,
+     "t": 17.76,
      "type": "muzzle",
      "actor": "Squad3"
     },
     {
-     "t": 36.09,
+     "t": 17.76,
      "type": "sfx",
      "name": "rifleShot",
      "x": 101.1,
@@ -9322,47 +9223,137 @@
      "volume": 0.7
     },
     {
-     "t": 36.79,
-     "type": "caption",
-     "text": "（打一枪，爬到旁边的射击位再打：枪眼追不上）",
-     "dur": 2.6
+     "t": 18.11,
+     "type": "muzzle",
+     "actor": "LiuWencai"
     },
     {
-     "t": 38.78,
-     "type": "caption",
-     "text": "（墙角一个鬼子出路口横过街口、往东街跑了：是去喊人的）",
-     "dur": 3
+     "t": 18.11,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 102.6,
+     "z": 384.2,
+     "volume": 0.7
     },
     {
-     "t": 39.47,
+     "t": 18.81,
      "type": "muzzle",
      "actor": "MgGunner",
      "count": 6,
      "interval": 0.11
     },
     {
-     "t": 39.47,
+     "t": 18.81,
      "type": "sfx",
      "name": "mgBurstFar",
      "x": 100,
      "z": 471.5,
-     "volume": 0.5
+     "volume": 0.8
     },
     {
-     "t": 39.72,
+     "t": 18.81,
+     "type": "caption",
+     "text": "（钻进巷子十来米：交还操作。能转头，不能走）",
+     "dur": 2.6
+    },
+    {
+     "t": 19.06,
      "type": "explosion",
-     "x": 100.7,
-     "z": 390.8,
+     "x": 101.8,
+     "z": 384.4,
      "kind": "grenade",
      "radius": 0.8
     },
     {
-     "t": 39.79,
+     "t": 19.36,
+     "type": "explosion",
+     "x": 102.7,
+     "z": 385.8,
+     "kind": "grenade",
+     "radius": 0.8
+    },
+    {
+     "t": 20.21,
+     "type": "caption",
+     "text": "（身后：妮儿趁乱溜出沟，顺沟底往西、爬上南沿，跟着钻进了巷子。顺子看不见她，只听得见）",
+     "dur": 3.2
+    },
+    {
+     "t": 23.51,
+     "type": "muzzle",
+     "actor": "MgGunner",
+     "count": 6,
+     "interval": 0.11
+    },
+    {
+     "t": 23.51,
+     "type": "sfx",
+     "name": "mgBurstFar",
+     "x": 100,
+     "z": 471.5,
+     "volume": 0.9
+    },
+    {
+     "t": 23.76,
+     "type": "explosion",
+     "x": 97.81,
+     "z": 384.03,
+     "kind": "grenade",
+     "radius": 0.8
+    },
+    {
+     "t": 24.06,
+     "type": "explosion",
+     "x": 98.71,
+     "z": 385.43,
+     "kind": "grenade",
+     "radius": 0.8
+    },
+    {
+     "t": 24.41,
+     "type": "caption",
+     "text": "（老耿爬出沟去追，幺娃一把把他拽回沟里：一梭子刚打在他跟前）",
+     "dur": 2.6
+    },
+    {
+     "t": 29.01,
+     "type": "muzzle",
+     "actor": "Yaowa"
+    },
+    {
+     "t": 29.01,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 99.5,
+     "z": 384.4,
+     "volume": 0.7
+    },
+    {
+     "t": 29.61,
+     "type": "caption",
+     "text": "（坡道上四个：打一枪，爬到旁边的射击位再打——枪眼追不上）",
+     "dur": 2.6
+    },
+    {
+     "t": 29.91,
+     "type": "muzzle",
+     "actor": "Escort2"
+    },
+    {
+     "t": 29.91,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 97.4,
+     "z": 384.3,
+     "volume": 0.7
+    },
+    {
+     "t": 30.97,
      "type": "muzzle",
      "actor": "LiuWencai"
     },
     {
-     "t": 39.79,
+     "t": 30.97,
      "type": "sfx",
      "name": "rifleShot",
      "x": 102.6,
@@ -9370,48 +9361,31 @@
      "volume": 0.6
     },
     {
-     "t": 40.02,
-     "type": "explosion",
-     "x": 101.6,
-     "z": 392.2,
-     "kind": "grenade",
-     "radius": 0.8
+     "t": 31.05,
+     "type": "caption",
+     "text": "（墙角一个鬼子出路口横过街口、往东街跑了：是去喊人的）",
+     "dur": 3
     },
     {
-     "t": 40.14,
+     "t": 31.32,
      "type": "muzzle",
      "actor": "Squad3"
     },
     {
-     "t": 40.14,
+     "t": 31.32,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 101.1,
+     "z": 384.5,
      "volume": 0.6
     },
     {
-     "t": 46.55,
+     "t": 31.67,
      "type": "muzzle",
-     "actor": "MgGunner",
-     "count": 6,
-     "interval": 0.11
+     "actor": "Escort2"
     },
     {
-     "t": 46.55,
-     "type": "sfx",
-     "name": "mgBurstFar",
-     "x": 100,
-     "z": 471.5,
-     "volume": 0.5
-    },
-    {
-     "t": 46.79,
-     "type": "muzzle",
-     "actor": "Yaowa"
-    },
-    {
-     "t": 46.79,
+     "t": 31.67,
      "type": "sfx",
      "name": "rifleShot",
      "x": 99.5,
@@ -9419,327 +9393,168 @@
      "volume": 0.6
     },
     {
-     "t": 46.8,
-     "type": "explosion",
-     "x": 100.7,
-     "z": 407.3,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 47.1,
-     "type": "explosion",
-     "x": 101.6,
-     "z": 408.7,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 47.14,
+     "t": 32.37,
      "type": "muzzle",
-     "actor": "LiuWencai"
+     "actor": "MgGunner",
+     "count": 6,
+     "interval": 0.11
     },
     {
-     "t": 47.14,
+     "t": 32.37,
      "type": "sfx",
-     "name": "rifleShot",
-     "x": 102.6,
+     "name": "mgBurstFar",
+     "x": 100,
+     "z": 471.5,
+     "volume": 0.6
+    },
+    {
+     "t": 32.62,
+     "type": "explosion",
+     "x": 100.6,
      "z": 384.2,
-     "volume": 0.6
-    },
-    {
-     "t": 47.49,
-     "type": "muzzle",
-     "actor": "Squad3"
-    },
-    {
-     "t": 47.49,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
-     "volume": 0.6
-    },
-    {
-     "t": 55.89,
-     "type": "muzzle",
-     "actor": "MgGunner",
-     "count": 6,
-     "interval": 0.11
-    },
-    {
-     "t": 55.89,
-     "type": "sfx",
-     "name": "mgBurstFar",
-     "x": 100,
-     "z": 471.5,
-     "volume": 0.5
-    },
-    {
-     "t": 56.14,
-     "type": "explosion",
-     "x": 100.7,
-     "z": 431.3,
      "kind": "grenade",
      "radius": 0.8
     },
     {
-     "t": 56.44,
+     "t": 32.92,
      "type": "explosion",
-     "x": 101.6,
-     "z": 432.7,
+     "x": 101.5,
+     "z": 385.6,
      "kind": "grenade",
      "radius": 0.8
     },
     {
-     "t": 57.92,
-     "type": "muzzle",
-     "actor": "MgGunner",
-     "count": 6,
-     "interval": 0.11
-    },
-    {
-     "t": 57.92,
-     "type": "sfx",
-     "name": "mgBurstFar",
-     "x": 100,
-     "z": 471.5,
-     "volume": 0.5
-    },
-    {
-     "t": 58.17,
-     "type": "explosion",
-     "x": 100.7,
-     "z": 442.6,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 58.47,
-     "type": "explosion",
-     "x": 101.6,
-     "z": 444,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 59.12,
+     "t": 47.61,
      "type": "caption",
-     "text": "（摸到翻倒的大车后头就压住了：一冒头就是一梭子。正面吸火的活在坡道上那三个身上）",
-     "dur": 3
-    },
-    {
-     "t": 59.92,
-     "type": "muzzle",
-     "actor": "MgGunner",
-     "count": 6,
-     "interval": 0.11
-    },
-    {
-     "t": 59.92,
-     "type": "sfx",
-     "name": "mgBurstFar",
-     "x": 100,
-     "z": 471.5,
-     "volume": 0.5
-    },
-    {
-     "t": 60.17,
-     "type": "explosion",
-     "x": 101,
-     "z": 444.6,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 60.47,
-     "type": "explosion",
-     "x": 101.9,
-     "z": 446,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 62.72,
-     "type": "muzzle",
-     "actor": "MgGunner",
-     "count": 6,
-     "interval": 0.11
-    },
-    {
-     "t": 62.72,
-     "type": "sfx",
-     "name": "mgBurstFar",
-     "x": 100,
-     "z": 471.5,
-     "volume": 0.5
-    },
-    {
-     "t": 62.97,
-     "type": "explosion",
-     "x": 102.8,
-     "z": 444.4,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 63.27,
-     "type": "explosion",
-     "x": 103.7,
-     "z": 445.8,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 64.8,
-     "type": "caption",
-     "text": "（回头瞅见身后那道敞着的院门：走院子！——他要带两个人穿院子摸到墙角那伙鬼子的侧后头）",
-     "dur": 3.2
-    },
-    {
-     "t": 65.92,
-     "type": "muzzle",
-     "actor": "MgGunner",
-     "count": 6,
-     "interval": 0.11
-    },
-    {
-     "t": 65.92,
-     "type": "sfx",
-     "name": "mgBurstFar",
-     "x": 100,
-     "z": 471.5,
-     "volume": 0.5
-    },
-    {
-     "t": 66.17,
-     "type": "explosion",
-     "x": 101.8,
-     "z": 444.9,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 66.47,
-     "type": "explosion",
-     "x": 102.7,
-     "z": 446.3,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 66.66,
-     "type": "caption",
-     "text": "（班长、何有田和一个兵猫腰顺主街东沿摸到院门、钻进院子——门在大车的影子里，枪眼看不见。另一个兵留在大车后头）",
-     "dur": 3.4
-    },
-    {
-     "t": 70.06,
-     "type": "muzzle",
-     "actor": "Escort2"
-    },
-    {
-     "t": 70.06,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 102.5,
-     "z": 440,
-     "volume": 0.5
-    },
-    {
-     "t": 70.26,
-     "type": "caption",
-     "text": "（大车后头留下的那个冒头打一枪：枪眼还以为他们都在车后头）",
+     "text": "（接 09：三拨——顺子走巷子，班长穿院子，坡道上压枪眼）",
      "dur": 2.6
-    },
-    {
-     "t": 71.36,
-     "type": "muzzle",
-     "actor": "MgGunner",
-     "count": 6,
-     "interval": 0.11
-    },
-    {
-     "t": 71.36,
-     "type": "sfx",
-     "name": "mgBurstFar",
-     "x": 100,
-     "z": 471.5,
-     "volume": 0.5
-    },
-    {
-     "t": 71.61,
-     "type": "explosion",
-     "x": 102.6,
-     "z": 444.7,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 71.91,
-     "type": "explosion",
-     "x": 103.5,
-     "z": 446.1,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 73.46,
-     "type": "caption",
-     "text": "（接 09：两路——顺子走巷子，班长穿院子）",
-     "dur": 2.4
     }
    ]
   },
   {
    "keyframe": "09-1",
-   "title": "抓住妮儿：她发抖、脸上是血，攥住他的手往里拽",
-   "durationS": 15.6,
+   "title": "死胡同：顺子走到头被瓦砾堵死，妮儿从后头追上来拽他衣角、往南带",
+   "durationS": 22.8,
    "then": "next",
    "camera": [
     {
      "t": 0,
-     "dur": 2.4,
+     "dur": 1.2,
      "eye": {
       "x": 80,
-      "z": 394.5,
+      "z": 388.6,
       "stance": "crouch",
-      "yawDeg": -170.54,
-      "pitchDeg": -10
+      "yawDeg": 180,
+      "pitchDeg": -4
      }
     },
     {
-     "t": 6,
-     "dur": 1.4,
-     "eye": {
-      "x": 80,
-      "z": 394.5,
-      "stance": "crouch",
-      "yawDeg": -170.54,
-      "pitchDeg": -10,
-      "toYawDeg": -166.53,
-      "toPitchDeg": -2
-     }
-    },
-    {
-     "t": 8.6,
-     "dur": 1,
-     "eye": {
-      "x": 80,
-      "z": 394.5,
-      "stance": "crouch",
-      "yawDeg": -166.53,
-      "pitchDeg": -2,
-      "toYawDeg": -170.54,
-      "toPitchDeg": -8
-     }
-    },
-    {
-     "t": 12.8,
-     "dur": 1.8,
+     "t": 1.2,
+     "dur": 5.2,
      "from": {
       "x": 80,
-      "z": 394.5,
+      "z": 388.6,
+      "h": 1.05
+     },
+     "look": {
+      "x": 80,
+      "z": 406,
+      "h": 1
+     },
+     "to": {
+      "x": 80,
+      "z": 399.8,
+      "h": 1.05
+     },
+     "ease": "linear"
+    },
+    {
+     "t": 6.4,
+     "dur": 3.6,
+     "from": {
+      "x": 80,
+      "z": 399.8,
+      "h": 1.05
+     },
+     "look": {
+      "x": 60,
+      "z": 400,
+      "h": 1
+     },
+     "to": {
+      "x": 73,
+      "z": 400.1,
+      "h": 1.05
+     },
+     "ease": "linear"
+    },
+    {
+     "t": 10,
+     "dur": 2,
+     "from": {
+      "x": 73,
+      "z": 400.1,
+      "h": 1.05
+     },
+     "look": {
+      "x": 60,
+      "z": 400,
+      "h": 1
+     },
+     "to": {
+      "x": 69.95,
+      "z": 400.1,
+      "h": 1.05
+     },
+     "ease": "linear"
+    },
+    {
+     "t": 12,
+     "dur": 2.6,
+     "eye": {
+      "x": 69.95,
+      "z": 400.1,
+      "stance": "crouch",
+      "yawDeg": 90,
+      "pitchDeg": -6
+     }
+    },
+    {
+     "t": 14.6,
+     "dur": 1,
+     "eye": {
+      "x": 69.95,
+      "z": 400.1,
+      "stance": "crouch",
+      "yawDeg": 90,
+      "pitchDeg": -6,
+      "toYawDeg": -90,
+      "toPitchDeg": -6
+     }
+    },
+    {
+     "t": 15.6,
+     "dur": 3.8,
+     "eye": {
+      "x": 69.95,
+      "z": 400.1,
+      "stance": "crouch",
+      "look": {
+       "actor": "Nier",
+       "offset": [
+        0,
+        1,
+        0
+       ]
+      }
+     }
+    },
+    {
+     "t": 19.4,
+     "dur": 3,
+     "from": {
+      "x": 69.95,
+      "z": 400.1,
       "h": 1.05
      },
      "look": {
@@ -9751,8 +9566,8 @@
       ]
      },
      "to": {
-      "x": 80,
-      "z": 397.2,
+      "x": 71.2,
+      "z": 402.5,
       "h": 1.05
      },
      "ease": "inOut"
@@ -9764,94 +9579,96 @@
      "keys": [
       {
        "t": 0,
-       "stance": "crouch",
-       "yawDeg": 0,
-       "clip": "VilCowerWhimper"
-      },
-      {
-       "t": 3.4,
-       "faceTo": "player",
-       "clip": null
-      },
-      {
-       "t": 12.6,
-       "x": 80.2,
-       "z": 395.7,
+       "x": 80.4,
+       "z": 384,
        "move": "cut",
-       "stance": "stand",
+       "stance": "crouch",
+       "yawDeg": 180,
+       "clip": "VilCrouchHold"
+      },
+      {
+       "t": 2.4,
+       "x": 80.4,
+       "z": 384,
+       "move": "cut",
        "clip": null
       },
       {
-       "t": 14.4,
-       "x": 79.4,
-       "z": 399.6,
+       "t": 7.6,
+       "x": 80.2,
+       "z": 399,
        "move": "walk",
        "stance": "crouch",
        "yawDeg": 180
-      }
-     ]
-    },
-    {
-     "id": "Escort2",
-     "keys": [
+      },
       {
-       "t": 4.7,
+       "t": 7.8,
+       "x": 80.2,
+       "z": 399,
+       "move": "cut"
+      },
+      {
+       "t": 14.6,
+       "x": 70.23,
+       "z": 400.1,
+       "move": "walk",
+       "path": [
+        {
+         "x": 73,
+         "z": 400.35
+        }
+       ],
+       "stance": "crouch",
+       "yawDeg": 90
+      },
+      {
+       "t": 14.8,
+       "clip": "VilClingHem",
+       "stance": "stand"
+      },
+      {
+       "t": 15.7,
+       "x": 70.23,
+       "z": 400.1,
+       "move": "cut"
+      },
+      {
+       "t": 16.4,
+       "x": 70.8,
+       "z": 400.1,
+       "move": "walk",
        "stance": "stand",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
+       "yawDeg": 90
       },
       {
-       "t": 5.5,
+       "t": 17,
+       "clip": "PvStandShakeHead",
+       "faceTo": "player"
+      },
+      {
+       "t": 18.8,
+       "clip": null,
        "stance": "crouch"
-      }
-     ]
-    },
-    {
-     "id": "Yaowa",
-     "keys": [
+      },
       {
-       "t": 8.4,
-       "x": 97.4,
-       "z": 384.3,
+       "t": 19.2,
+       "x": 70.8,
+       "z": 400.1,
        "move": "cut"
       },
       {
-       "t": 9.71,
-       "x": 99.5,
-       "z": 384.4,
-       "move": "run",
-       "stance": "prone",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      }
-     ]
-    },
-    {
-     "id": "LiuWencai",
-     "keys": [
-      {
-       "t": 8.7,
-       "x": 101.1,
-       "z": 384.5,
-       "move": "cut"
-      },
-      {
-       "t": 9.66,
-       "x": 102.6,
-       "z": 384.2,
-       "move": "run",
-       "stance": "prone",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
+       "t": 22.2,
+       "x": 71.2,
+       "z": 403.3,
+       "move": "walk",
+       "path": [
+        {
+         "x": 70.7,
+         "z": 400.3
+        }
+       ],
+       "stance": "crouch",
+       "yawDeg": 180
       }
      ]
     },
@@ -9859,15 +9676,38 @@
      "id": "Squad3",
      "keys": [
       {
-       "t": 9,
+       "t": 9.4,
+       "x": 101.1,
+       "z": 384.5,
+       "move": "cut"
+      },
+      {
+       "t": 10.4,
+       "x": 99.5,
+       "z": 384.4,
+       "move": "run",
+       "stance": "prone",
+       "aim": true,
+       "faceTo": {
+        "x": 100,
+        "z": 470
+       }
+      }
+     ]
+    },
+    {
+     "id": "Escort2",
+     "keys": [
+      {
+       "t": 9.7,
        "x": 99.5,
        "z": 384.4,
        "move": "cut"
       },
       {
-       "t": 10.31,
-       "x": 97.4,
-       "z": 384.3,
+       "t": 10.7,
+       "x": 101.1,
+       "z": 384.5,
        "move": "run",
        "stance": "prone",
        "aim": true,
@@ -9882,19 +9722,33 @@
      "id": "Luo",
      "keys": [
       {
-       "t": 6,
-       "x": 104.6,
-       "z": 433.1,
+       "t": 2,
+       "x": 109.3,
+       "z": 387.6,
        "move": "cut"
       },
       {
-       "t": 7.19,
-       "x": 105.9,
-       "z": 433,
+       "t": 21.01,
+       "x": 104.75,
+       "z": 412.6,
        "move": "walk",
+       "path": [
+        {
+         "x": 108.4,
+         "z": 389
+        },
+        {
+         "x": 108.3,
+         "z": 400.5
+        },
+        {
+         "x": 104.75,
+         "z": 404.5
+        }
+       ],
        "stance": "crouch",
        "aim": false,
-       "yawDeg": -108.4
+       "yawDeg": 180
       }
      ]
     },
@@ -9902,19 +9756,37 @@
      "id": "HeYoutian",
      "keys": [
       {
-       "t": 6.6,
-       "x": 104.5,
-       "z": 431.5,
+       "t": 2.6,
+       "x": 107.9,
+       "z": 386.9,
        "move": "cut"
       },
       {
-       "t": 6.89,
-       "x": 104.4,
-       "z": 431.2,
+       "t": 20.53,
+       "x": 104.75,
+       "z": 409.7,
        "move": "walk",
+       "path": [
+        {
+         "x": 109.22,
+         "z": 387.78
+        },
+        {
+         "x": 108.4,
+         "z": 389
+        },
+        {
+         "x": 108.3,
+         "z": 400.5
+        },
+        {
+         "x": 104.75,
+         "z": 404.5
+        }
+       ],
        "stance": "crouch",
        "aim": false,
-       "yawDeg": -108.4
+       "yawDeg": 180
       }
      ]
     },
@@ -9922,19 +9794,41 @@
      "id": "Escort1",
      "keys": [
       {
-       "t": 7.2,
-       "x": 105.5,
-       "z": 432.5,
+       "t": 3.2,
+       "x": 110.6,
+       "z": 387.3,
        "move": "cut"
       },
       {
-       "t": 8.64,
-       "x": 106.8,
-       "z": 431.6,
+       "t": 19.5,
+       "x": 105.1,
+       "z": 406.6,
        "move": "walk",
+       "path": [
+        {
+         "x": 109.86,
+         "z": 386.81
+        },
+        {
+         "x": 108.4,
+         "z": 389
+        },
+        {
+         "x": 108.3,
+         "z": 400.5
+        },
+        {
+         "x": 104.75,
+         "z": 404.5
+        },
+        {
+         "x": 104.75,
+         "z": 406.6
+        }
+       ],
        "stance": "crouch",
        "aim": false,
-       "yawDeg": 0
+       "yawDeg": -33.7
       }
      ]
     }
@@ -9944,16 +9838,22 @@
     {
      "t": 0.3,
      "type": "caption",
-     "text": "（进巷子十来米，追上她：她蹲在墙根发抖，脸上是血——是那个伤兵的）",
+     "text": "（一个人往里摸。身后的枪声一阵一阵，没回头）",
      "dur": 3
     },
     {
-     "t": 2,
+     "t": 2.2,
+     "type": "caption",
+     "text": "（班长三人这时刚钻进后门：蹲在门里听了听，贴着杂货铺的后墙往院子南头摸——南头那道墙挨过炮，塌了一角）",
+     "dur": 3.4
+    },
+    {
+     "t": 3,
      "type": "muzzle",
      "actor": "Yaowa"
     },
     {
-     "t": 2,
+     "t": 3,
      "type": "sfx",
      "name": "rifleShot",
      "x": 97.4,
@@ -9961,173 +9861,12 @@
      "volume": 0.35
     },
     {
-     "t": 2.35,
+     "t": 3.35,
      "type": "muzzle",
      "actor": "LiuWencai"
     },
     {
-     "t": 2.35,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 101.1,
-     "z": 384.5,
-     "volume": 0.35
-    },
-    {
-     "t": 2.7,
-     "type": "muzzle",
-     "actor": "Squad3"
-    },
-    {
-     "t": 2.7,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 99.5,
-     "z": 384.4,
-     "volume": 0.35
-    },
-    {
-     "t": 3.2,
-     "type": "muzzle",
-     "actor": "MgGunner",
-     "count": 6,
-     "interval": 0.11
-    },
-    {
-     "t": 3.2,
-     "type": "sfx",
-     "name": "mgBurstFar",
-     "x": 100,
-     "z": 471.5,
-     "volume": 0.5
-    },
-    {
-     "t": 3.6,
-     "type": "caption",
-     "text": "（顺子抓住她的手。她听不见，回头看见是他才不挣了）",
-     "dur": 3
-    },
-    {
-     "t": 5,
-     "type": "muzzle",
-     "actor": "Escort2"
-    },
-    {
-     "t": 5,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 102.5,
-     "z": 440,
-     "volume": 0.45
-    },
-    {
-     "t": 6.2,
-     "type": "caption",
-     "text": "（班长三人这时刚钻进主街东边的院门：蹲在门里听了听，贴着院子南墙根往东摸）",
-     "dur": 3
-    },
-    {
-     "t": 6.3,
-     "type": "muzzle",
-     "actor": "MgGunner",
-     "count": 6,
-     "interval": 0.11
-    },
-    {
-     "t": 6.3,
-     "type": "sfx",
-     "name": "mgBurstFar",
-     "x": 100,
-     "z": 471.5,
-     "volume": 0.45
-    },
-    {
-     "t": 6.4,
-     "type": "caption",
-     "text": "（顺子朝老耿家那边指——隔着几道院墙，就在东南角）",
-     "dur": 2.8
-    },
-    {
-     "t": 6.55,
-     "type": "explosion",
-     "x": 102.6,
-     "z": 444.7,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 6.85,
-     "type": "explosion",
-     "x": 103.5,
-     "z": 446.1,
-     "kind": "grenade",
-     "radius": 0.8
-    },
-    {
-     "t": 7.6,
-     "type": "muzzle",
-     "actor": "Yaowa"
-    },
-    {
-     "t": 7.6,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
-     "volume": 0.5
-    },
-    {
-     "t": 7.9,
-     "type": "muzzle",
-     "actor": "LiuWencai"
-    },
-    {
-     "t": 7.9,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 101.1,
-     "z": 384.5,
-     "volume": 0.5
-    },
-    {
-     "t": 8.2,
-     "type": "muzzle",
-     "actor": "Squad3"
-    },
-    {
-     "t": 8.2,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 99.5,
-     "z": 384.4,
-     "volume": 0.5
-    },
-    {
-     "t": 9.6,
-     "type": "caption",
-     "text": "（她攥住他的手往里拽：她知道回家的路。领着她的时候顺子手上没枪——枪背到背上，两人一路拉着手走）",
-     "dur": 3.2
-    },
-    {
-     "t": 10,
-     "type": "muzzle",
-     "actor": "Yaowa"
-    },
-    {
-     "t": 10,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 99.5,
-     "z": 384.4,
-     "volume": 0.35
-    },
-    {
-     "t": 10.35,
-     "type": "muzzle",
-     "actor": "LiuWencai"
-    },
-    {
-     "t": 10.35,
+     "t": 3.35,
      "type": "sfx",
      "name": "rifleShot",
      "x": 102.6,
@@ -10135,27 +9874,27 @@
      "volume": 0.35
     },
     {
-     "t": 10.7,
+     "t": 3.7,
      "type": "muzzle",
      "actor": "Squad3"
     },
     {
-     "t": 10.7,
+     "t": 3.7,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 101.1,
+     "z": 384.5,
      "volume": 0.35
     },
     {
-     "t": 11.2,
+     "t": 4.2,
      "type": "muzzle",
      "actor": "MgGunner",
      "count": 6,
      "interval": 0.11
     },
     {
-     "t": 11.2,
+     "t": 4.2,
      "type": "sfx",
      "name": "mgBurstFar",
      "x": 100,
@@ -10163,25 +9902,141 @@
      "volume": 0.5
     },
     {
-     "t": 13,
+     "t": 6.6,
      "type": "caption",
-     "text": "（街口那边一直在打：坡道上三个打一枪换个窝、大车后头那个冒头一枪，替两路吸着火）",
+     "text": "（第一道弯：往南是一条，往西也是一条。直着拐进了往西那条）",
+     "dur": 2.8
+    },
+    {
+     "t": 8.6,
+     "type": "muzzle",
+     "actor": "Squad3"
+    },
+    {
+     "t": 8.6,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 101.1,
+     "z": 384.5,
+     "volume": 0.5
+    },
+    {
+     "t": 8.9,
+     "type": "muzzle",
+     "actor": "Escort2"
+    },
+    {
+     "t": 8.9,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 99.5,
+     "z": 384.4,
+     "volume": 0.5
+    },
+    {
+     "t": 12.2,
+     "type": "caption",
+     "text": "（走到头：塌下来的墙把路堵死了，一堆土坯高过人头）",
+     "dur": 2.8
+    },
+    {
+     "t": 14,
+     "type": "muzzle",
+     "actor": "Yaowa"
+    },
+    {
+     "t": 14,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 97.4,
+     "z": 384.3,
+     "volume": 0.35
+    },
+    {
+     "t": 14.35,
+     "type": "muzzle",
+     "actor": "LiuWencai"
+    },
+    {
+     "t": 14.35,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 102.6,
+     "z": 384.2,
+     "volume": 0.35
+    },
+    {
+     "t": 14.7,
+     "type": "muzzle",
+     "actor": "Squad3"
+    },
+    {
+     "t": 14.7,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 99.5,
+     "z": 384.4,
+     "volume": 0.35
+    },
+    {
+     "t": 14.8,
+     "type": "caption",
+     "text": "（身后有人拽他衣角）",
      "dur": 2.6
+    },
+    {
+     "t": 15.2,
+     "type": "muzzle",
+     "actor": "MgGunner",
+     "count": 6,
+     "interval": 0.11
+    },
+    {
+     "t": 15.2,
+     "type": "sfx",
+     "name": "mgBurstFar",
+     "x": 100,
+     "z": 471.5,
+     "volume": 0.5
+    },
+    {
+     "t": 15.2,
+     "type": "caption",
+     "text": "（街口那边一直在打：坡道上四个打一枪换个窝，替两路吸着火）",
+     "dur": 2.6
+    },
+    {
+     "t": 15.8,
+     "type": "caption",
+     "text": "（是妮儿。脸上还糊着那个伤兵的血，整个人在抖——她是自己追上来的）",
+     "dur": 3.2
+    },
+    {
+     "t": 17.2,
+     "type": "caption",
+     "text": "（她朝他摇头：不是这边）",
+     "dur": 2.4
+    },
+    {
+     "t": 19,
+     "type": "caption",
+     "text": "（顺子抓住她的手。她攥住他的手往回拽、往南带：她知道回家的路。领着她的时候顺子手上没枪——枪背到背上，两人一路拉着手走）",
+     "dur": 3.4
     }
    ]
   },
   {
    "keyframe": "09-2",
    "title": "一眼瞥见：街坊家门口，院里有鬼子在吼，地底下有人哭",
-   "durationS": 74.3,
+   "durationS": 65.89,
    "then": "next",
    "camera": [
     {
      "t": 0,
      "dur": 1,
      "eye": {
-      "x": 80,
-      "z": 397.2,
+      "x": 71.2,
+      "z": 402.5,
       "stance": "crouch",
       "look": {
        "actor": "Nier",
@@ -10195,33 +10050,10 @@
     },
     {
      "t": 1,
-     "dur": 5.65,
+     "dur": 12.44,
      "from": {
-      "x": 80,
-      "z": 397.2,
-      "h": 1.05
-     },
-     "look": {
-      "actor": "Nier",
-      "offset": [
-       0,
-       0.5,
-       0
-      ]
-     },
-     "to": {
-      "x": 71.4,
-      "z": 400,
-      "h": 1.05
-     },
-     "ease": "linear"
-    },
-    {
-     "t": 7.85,
-     "dur": 14,
-     "from": {
-      "x": 71.4,
-      "z": 400,
+      "x": 71.2,
+      "z": 402.5,
       "h": 1.05
      },
      "look": {
@@ -10240,7 +10072,7 @@
      "ease": "linear"
     },
     {
-     "t": 24.45,
+     "t": 16.04,
      "dur": 4.76,
      "from": {
       "x": 71,
@@ -10263,7 +10095,7 @@
      "ease": "linear"
     },
     {
-     "t": 30.41,
+     "t": 22,
      "dur": 14.38,
      "from": {
       "x": 63.4,
@@ -10286,7 +10118,7 @@
      "ease": "linear"
     },
     {
-     "t": 46.99,
+     "t": 38.58,
      "dur": 13.84,
      "from": {
       "x": 63,
@@ -10309,7 +10141,7 @@
      "ease": "linear"
     },
     {
-     "t": 62.03,
+     "t": 53.62,
      "dur": 1.74,
      "from": {
       "x": 63,
@@ -10332,7 +10164,7 @@
      "ease": "linear"
     },
     {
-     "t": 64.97,
+     "t": 56.56,
      "dur": 4.6,
      "eye": {
       "x": 65.79,
@@ -10344,7 +10176,7 @@
      "fov": 56
     },
     {
-     "t": 71.2,
+     "t": 62.79,
      "dur": 1.4,
      "from": {
       "x": 65.79,
@@ -10370,49 +10202,35 @@
      "keys": [
       {
        "t": 0,
-       "x": 79.4,
-       "z": 399.6,
+       "x": 71.2,
+       "z": 403.3,
        "move": "cut",
        "stance": "crouch",
        "yawDeg": 180
       },
       {
        "t": 0.8,
-       "x": 79.4,
-       "z": 399.6,
+       "x": 71.2,
+       "z": 403.3,
        "move": "cut",
        "clip": null
       },
       {
-       "t": 6.45,
-       "x": 70.64,
-       "z": 400.25,
-       "move": "walk",
-       "stance": "crouch",
-       "yawDeg": 108.03
-      },
-      {
-       "t": 7.65,
-       "x": 70.64,
-       "z": 400.25,
-       "move": "cut"
-      },
-      {
-       "t": 21.65,
+       "t": 13.24,
        "x": 70.99,
        "z": 423.2,
        "move": "walk",
        "stance": "crouch",
-       "yawDeg": 178.98
+       "yawDeg": 179.42
       },
       {
-       "t": 24.25,
+       "t": 15.84,
        "x": 70.99,
        "z": 423.2,
        "move": "cut"
       },
       {
-       "t": 29.01,
+       "t": 20.6,
        "x": 62.6,
        "z": 423.06,
        "move": "walk",
@@ -10420,13 +10238,13 @@
        "yawDeg": 94.51
       },
       {
-       "t": 30.21,
+       "t": 21.8,
        "x": 62.6,
        "z": 423.06,
        "move": "cut"
       },
       {
-       "t": 44.59,
+       "t": 36.18,
        "x": 62.99,
        "z": 446.8,
        "move": "walk",
@@ -10434,13 +10252,13 @@
        "yawDeg": 179
       },
       {
-       "t": 46.79,
+       "t": 38.38,
        "x": 62.99,
        "z": 446.8,
        "move": "cut"
       },
       {
-       "t": 60.63,
+       "t": 52.22,
        "x": 63,
        "z": 468.95,
        "move": "walk",
@@ -10448,13 +10266,13 @@
        "yawDeg": -180
       },
       {
-       "t": 61.83,
+       "t": 53.42,
        "x": 63,
        "z": 468.95,
        "move": "cut"
       },
       {
-       "t": 63.57,
+       "t": 55.16,
        "x": 66.59,
        "z": 468.23,
        "move": "walk",
@@ -10462,18 +10280,18 @@
        "yawDeg": -91.23
       },
       {
-       "t": 64.97,
+       "t": 56.56,
        "stance": "crouch",
        "faceTo": "player"
       },
       {
-       "t": 71.2,
+       "t": 62.79,
        "x": 66.59,
        "z": 468.23,
        "move": "cut"
       },
       {
-       "t": 72.8,
+       "t": 64.39,
        "x": 63.6,
        "z": 468.2,
        "move": "walk",
@@ -10483,18 +10301,41 @@
      ]
     },
     {
-     "id": "Yaowa",
+     "id": "LiuWencai",
      "keys": [
       {
-       "t": 25.45,
-       "x": 99.5,
-       "z": 384.4,
+       "t": 17.34,
+       "x": 102.6,
+       "z": 384.2,
        "move": "cut"
       },
       {
-       "t": 26.45,
+       "t": 18.3,
        "x": 101.1,
        "z": 384.5,
+       "move": "run",
+       "stance": "prone",
+       "aim": true,
+       "faceTo": {
+        "x": 100,
+        "z": 470
+       }
+      }
+     ]
+    },
+    {
+     "id": "Escort2",
+     "keys": [
+      {
+       "t": 17.94,
+       "x": 101.1,
+       "z": 384.5,
+       "move": "cut"
+      },
+      {
+       "t": 18.9,
+       "x": 102.6,
+       "z": 384.2,
        "move": "run",
        "stance": "prone",
        "aim": true,
@@ -10509,13 +10350,13 @@
      "id": "Luo",
      "keys": [
       {
-       "t": 45.79,
-       "x": 105.9,
-       "z": 433,
+       "t": 37.38,
+       "x": 104.75,
+       "z": 412.6,
        "move": "cut"
       },
       {
-       "t": 46.65,
+       "t": 55.12,
        "x": 105.6,
        "z": 432.1,
        "move": "walk",
@@ -10529,13 +10370,13 @@
      "id": "HeYoutian",
      "keys": [
       {
-       "t": 46.39,
-       "x": 104.4,
-       "z": 431.2,
+       "t": 37.98,
+       "x": 104.75,
+       "z": 409.7,
        "move": "cut"
       },
       {
-       "t": 48.01,
+       "t": 59.12,
        "x": 104.75,
        "z": 432.95,
        "move": "walk",
@@ -10549,37 +10390,29 @@
      "id": "Escort1",
      "keys": [
       {
-       "t": 46.99,
-       "x": 106.8,
-       "z": 431.6,
+       "t": 38.58,
+       "x": 105.1,
+       "z": 406.6,
        "move": "cut"
       },
       {
-       "t": 49.55,
+       "t": 61.37,
        "x": 104,
        "z": 431.3,
        "move": "walk",
+       "path": [
+        {
+         "x": 104.75,
+         "z": 406.6
+        },
+        {
+         "x": 104.75,
+         "z": 411.6
+        }
+       ],
        "stance": "crouch",
        "aim": false,
-       "yawDeg": 168.2
-      }
-     ]
-    },
-    {
-     "id": "Escort2",
-     "keys": [
-      {
-       "t": 3.7,
-       "stance": "stand",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 4.5,
-       "stance": "crouch"
+       "yawDeg": -2.2
       }
      ]
     },
@@ -10587,7 +10420,7 @@
      "id": "CellarIja1",
      "keys": [
       {
-       "t": 64.97,
+       "t": 56.56,
        "faceTo": {
         "x": 73.5,
         "z": 460.5
@@ -10595,7 +10428,7 @@
        "clip": "VilIjaShoutPoint"
       },
       {
-       "t": 70.2,
+       "t": 61.79,
        "clip": null
       }
      ]
@@ -10603,12 +10436,12 @@
    ],
    "lines": [
     {
-     "t": 66.17,
+     "t": 57.76,
      "line": "CellarShout.01",
      "actor": "CellarIja1"
     },
     {
-     "t": 67.28,
+     "t": 58.87,
      "line": "CellarShout.02",
      "actor": "CellarIja1"
     }
@@ -10629,8 +10462,8 @@
      "t": 4,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.5,
-     "z": 440,
+     "x": 102.6,
+     "z": 384.2,
      "volume": 0.45
     },
     {
@@ -10651,58 +10484,26 @@
     {
      "t": 5.55,
      "type": "explosion",
-     "x": 102.6,
-     "z": 444.7,
+     "x": 100.8,
+     "z": 384.6,
      "kind": "grenade",
      "radius": 0.8
     },
     {
      "t": 5.85,
      "type": "explosion",
-     "x": 103.5,
-     "z": 446.1,
+     "x": 101.7,
+     "z": 386,
      "kind": "grenade",
      "radius": 0.8
     },
     {
-     "t": 22.05,
+     "t": 13.64,
      "type": "muzzle",
      "actor": "Yaowa"
     },
     {
-     "t": 22.05,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 99.5,
-     "z": 384.4,
-     "volume": 0.35
-    },
-    {
-     "t": 22.25,
-     "type": "caption",
-     "text": "（机枪一响就贴墙停一停，停了再挪）",
-     "dur": 2.6
-    },
-    {
-     "t": 22.4,
-     "type": "muzzle",
-     "actor": "LiuWencai"
-    },
-    {
-     "t": 22.4,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 102.6,
-     "z": 384.2,
-     "volume": 0.35
-    },
-    {
-     "t": 22.75,
-     "type": "muzzle",
-     "actor": "Squad3"
-    },
-    {
-     "t": 22.75,
+     "t": 13.64,
      "type": "sfx",
      "name": "rifleShot",
      "x": 97.4,
@@ -10710,14 +10511,46 @@
      "volume": 0.35
     },
     {
-     "t": 23.25,
+     "t": 13.84,
+     "type": "caption",
+     "text": "（机枪一响就贴墙停一停，停了再挪）",
+     "dur": 2.6
+    },
+    {
+     "t": 13.99,
+     "type": "muzzle",
+     "actor": "LiuWencai"
+    },
+    {
+     "t": 13.99,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 102.6,
+     "z": 384.2,
+     "volume": 0.35
+    },
+    {
+     "t": 14.34,
+     "type": "muzzle",
+     "actor": "Squad3"
+    },
+    {
+     "t": 14.34,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 99.5,
+     "z": 384.4,
+     "volume": 0.35
+    },
+    {
+     "t": 14.84,
      "type": "muzzle",
      "actor": "MgGunner",
      "count": 6,
      "interval": 0.11
     },
     {
-     "t": 23.25,
+     "t": 14.84,
      "type": "sfx",
      "name": "mgBurstFar",
      "x": 100,
@@ -10725,25 +10558,51 @@
      "volume": 0.5
     },
     {
-     "t": 24.65,
+     "t": 16.54,
      "type": "muzzle",
-     "actor": "Yaowa"
+     "actor": "LiuWencai"
     },
     {
-     "t": 24.65,
+     "t": 16.54,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 99.5,
-     "z": 384.4,
+     "x": 102.6,
+     "z": 384.2,
      "volume": 0.5
     },
     {
-     "t": 44.99,
+     "t": 17.14,
+     "type": "muzzle",
+     "actor": "Escort2"
+    },
+    {
+     "t": 17.14,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 101.1,
+     "z": 384.5,
+     "volume": 0.5
+    },
+    {
+     "t": 36.58,
      "type": "muzzle",
      "actor": "Yaowa"
     },
     {
-     "t": 44.99,
+     "t": 36.58,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 97.4,
+     "z": 384.3,
+     "volume": 0.35
+    },
+    {
+     "t": 36.93,
+     "type": "muzzle",
+     "actor": "LiuWencai"
+    },
+    {
+     "t": 36.93,
      "type": "sfx",
      "name": "rifleShot",
      "x": 101.1,
@@ -10751,46 +10610,33 @@
      "volume": 0.35
     },
     {
-     "t": 45.34,
-     "type": "muzzle",
-     "actor": "LiuWencai"
-    },
-    {
-     "t": 45.34,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 102.6,
-     "z": 384.2,
-     "volume": 0.35
-    },
-    {
-     "t": 45.69,
+     "t": 37.28,
      "type": "muzzle",
      "actor": "Squad3"
     },
     {
-     "t": 45.69,
+     "t": 37.28,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 99.5,
+     "z": 384.4,
      "volume": 0.35
     },
     {
-     "t": 45.99,
+     "t": 37.58,
      "type": "caption",
-     "text": "（班长三人这时在 EM2 院里摸到南墙根的柴垛跟前：墙那边就是路口墙角那伙鬼子的院子）",
+     "text": "（班长三人这时一个一个钻过那道塌墙的豁口，顺主街东墙里头那条空地往南头的柴垛摸：墙那边就是路口墙角那伙鬼子的院子）",
      "dur": 3
     },
     {
-     "t": 46.19,
+     "t": 37.78,
      "type": "muzzle",
      "actor": "MgGunner",
      "count": 6,
      "interval": 0.11
     },
     {
-     "t": 46.19,
+     "t": 37.78,
      "type": "sfx",
      "name": "mgBurstFar",
      "x": 100,
@@ -10798,13 +10644,13 @@
      "volume": 0.5
     },
     {
-     "t": 65.17,
+     "t": 56.76,
      "type": "caption",
      "text": "（街坊家西南角的院门半掩着。拉着手走过门口，门缝里一眼看见院当中的窖口）",
      "dur": 3
     },
     {
-     "t": 65.37,
+     "t": 56.96,
      "type": "sfx",
      "name": "cellarSob",
      "x": 73.5,
@@ -10812,13 +10658,13 @@
      "volume": 0.7
     },
     {
-     "t": 69.8,
+     "t": 61.39,
      "type": "caption",
      "text": "（一个鬼子拎着手榴弹冲窖口吼「出来！」，地底下有人在哭。不在门口停）",
      "dur": 2.8
     },
     {
-     "t": 69.9,
+     "t": 61.49,
      "type": "sfx",
      "name": "cellarSob",
      "x": 73.5,
@@ -10826,7 +10672,7 @@
      "volume": 0.6
     },
     {
-     "t": 71.5,
+     "t": 63.09,
      "type": "caption",
      "text": "（两人缩回墙根。妮儿拽着他绕到西边的窄夹道去）",
      "dur": 2.8
@@ -11305,14 +11151,14 @@
      "keys": [
       {
        "t": 24.92,
-       "x": 101.1,
-       "z": 384.5,
+       "x": 97.4,
+       "z": 384.3,
        "move": "cut"
       },
       {
-       "t": 27.24,
-       "x": 97.4,
-       "z": 384.3,
+       "t": 26.23,
+       "x": 99.5,
+       "z": 384.4,
        "move": "run",
        "stance": "prone",
        "aim": true,
@@ -11328,14 +11174,14 @@
      "keys": [
       {
        "t": 25.52,
-       "x": 97.4,
-       "z": 384.3,
+       "x": 99.5,
+       "z": 384.4,
        "move": "cut"
       },
       {
        "t": 26.83,
-       "x": 99.5,
-       "z": 384.4,
+       "x": 97.4,
+       "z": 384.3,
        "move": "run",
        "stance": "prone",
        "aim": true,
@@ -11343,24 +11189,6 @@
         "x": 100,
         "z": 470
        }
-      }
-     ]
-    },
-    {
-     "id": "Escort2",
-     "keys": [
-      {
-       "t": 25.42,
-       "stance": "stand",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 26.22,
-       "stance": "crouch"
       }
      ]
     },
@@ -11405,13 +11233,23 @@
        "move": "cut"
       },
       {
-       "t": 36.06,
+       "t": 37.22,
        "x": 106.1,
        "z": 432.6,
        "move": "walk",
+       "path": [
+        {
+         "x": 104.75,
+         "z": 432.95
+        },
+        {
+         "x": 104.75,
+         "z": 432.6
+        }
+       ],
        "stance": "crouch",
        "aim": false,
-       "yawDeg": 87.6
+       "yawDeg": 3.7
       }
      ]
     }
@@ -11459,8 +11297,8 @@
      "t": 22.12,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 101.1,
-     "z": 384.5,
+     "x": 97.4,
+     "z": 384.3,
      "volume": 0.35
     },
     {
@@ -11472,8 +11310,8 @@
      "t": 22.47,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.6,
-     "z": 384.2,
+     "x": 101.1,
+     "z": 384.5,
      "volume": 0.35
     },
     {
@@ -11485,8 +11323,8 @@
      "t": 22.82,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 99.5,
+     "z": 384.4,
      "volume": 0.35
     },
     {
@@ -11513,8 +11351,8 @@
      "t": 24.12,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 101.1,
-     "z": 384.5,
+     "x": 97.4,
+     "z": 384.3,
      "volume": 0.45
     },
     {
@@ -11532,8 +11370,8 @@
      "t": 24.72,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 99.5,
+     "z": 384.4,
      "volume": 0.45
     },
     {
@@ -11545,8 +11383,8 @@
      "t": 25.72,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.5,
-     "z": 440,
+     "x": 102.6,
+     "z": 384.2,
      "volume": 0.4
     },
     {
@@ -11567,16 +11405,16 @@
     {
      "t": 27.27,
      "type": "explosion",
-     "x": 102.6,
-     "z": 444.7,
+     "x": 100.8,
+     "z": 384.6,
      "kind": "grenade",
      "radius": 0.8
     },
     {
      "t": 27.57,
      "type": "explosion",
-     "x": 103.5,
-     "z": 446.1,
+     "x": 101.7,
+     "z": 386,
      "kind": "grenade",
      "radius": 0.8
     },
@@ -12215,24 +12053,6 @@
      ]
     },
     {
-     "id": "Escort2",
-     "keys": [
-      {
-       "t": 9.9,
-       "stance": "stand",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 10.7,
-       "stance": "crouch"
-      }
-     ]
-    },
-    {
      "id": "HeYoutian",
      "keys": [
       {
@@ -12387,14 +12207,14 @@
      "keys": [
       {
        "t": 20.15,
-       "x": 97.4,
-       "z": 384.3,
+       "x": 99.5,
+       "z": 384.4,
        "move": "cut"
       },
       {
-       "t": 21.46,
-       "x": 99.5,
-       "z": 384.4,
+       "t": 21.15,
+       "x": 101.1,
+       "z": 384.5,
        "move": "run",
        "stance": "prone",
        "aim": true,
@@ -12410,37 +12230,14 @@
      "keys": [
       {
        "t": 20.45,
-       "x": 102.6,
-       "z": 384.2,
-       "move": "cut"
-      },
-      {
-       "t": 23.7,
-       "x": 97.4,
-       "z": 384.3,
-       "move": "run",
-       "stance": "prone",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      }
-     ]
-    },
-    {
-     "id": "Squad3",
-     "keys": [
-      {
-       "t": 20.75,
-       "x": 99.5,
-       "z": 384.4,
-       "move": "cut"
-      },
-      {
-       "t": 21.75,
        "x": 101.1,
        "z": 384.5,
+       "move": "cut"
+      },
+      {
+       "t": 21.45,
+       "x": 99.5,
+       "z": 384.4,
        "move": "run",
        "stance": "prone",
        "aim": true,
@@ -12497,8 +12294,8 @@
      "t": 7,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 99.5,
+     "z": 384.4,
      "volume": 0.75
     },
     {
@@ -12510,8 +12307,8 @@
      "t": 7.35,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.6,
-     "z": 384.2,
+     "x": 101.1,
+     "z": 384.5,
      "volume": 0.75
     },
     {
@@ -12544,8 +12341,8 @@
      "t": 7.7,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 99.5,
-     "z": 384.4,
+     "x": 97.4,
+     "z": 384.3,
      "volume": 0.75
     },
     {
@@ -12557,8 +12354,8 @@
      "t": 8.1,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 99.5,
+     "z": 384.4,
      "volume": 0.75
     },
     {
@@ -12578,8 +12375,8 @@
      "t": 8.45,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.6,
-     "z": 384.2,
+     "x": 101.1,
+     "z": 384.5,
      "volume": 0.75
     },
     {
@@ -12591,8 +12388,8 @@
      "t": 8.8,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 99.5,
-     "z": 384.4,
+     "x": 97.4,
+     "z": 384.3,
      "volume": 0.75
     },
     {
@@ -12610,8 +12407,8 @@
      "t": 9.2,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 99.5,
+     "z": 384.4,
      "volume": 0.75
     },
     {
@@ -12623,8 +12420,8 @@
      "t": 9.55,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.6,
-     "z": 384.2,
+     "x": 101.1,
+     "z": 384.5,
      "volume": 0.75
     },
     {
@@ -12651,8 +12448,8 @@
      "t": 9.9,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 99.5,
-     "z": 384.4,
+     "x": 97.4,
+     "z": 384.3,
      "volume": 0.75
     },
     {
@@ -12664,8 +12461,8 @@
      "t": 10.2,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.5,
-     "z": 440,
+     "x": 102.6,
+     "z": 384.2,
      "volume": 0.5
     },
     {
@@ -12677,8 +12474,8 @@
      "t": 10.3,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 99.5,
+     "z": 384.4,
      "volume": 0.75
     },
     {
@@ -12690,8 +12487,8 @@
      "t": 10.65,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.6,
-     "z": 384.2,
+     "x": 101.1,
+     "z": 384.5,
      "volume": 0.75
     },
     {
@@ -12703,8 +12500,8 @@
      "t": 11,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 99.5,
-     "z": 384.4,
+     "x": 97.4,
+     "z": 384.3,
      "volume": 0.75
     },
     {
@@ -12725,16 +12522,16 @@
     {
      "t": 11.75,
      "type": "explosion",
-     "x": 102.6,
-     "z": 444.7,
+     "x": 100.8,
+     "z": 384.6,
      "kind": "grenade",
      "radius": 0.8
     },
     {
      "t": 12.05,
      "type": "explosion",
-     "x": 103.5,
-     "z": 446.1,
+     "x": 101.7,
+     "z": 386,
      "kind": "grenade",
      "radius": 0.8
     },
@@ -12792,8 +12589,8 @@
      "t": 19.35,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 99.5,
+     "z": 384.4,
      "volume": 0.45
     },
     {
@@ -12805,21 +12602,8 @@
      "t": 19.65,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.6,
-     "z": 384.2,
-     "volume": 0.45
-    },
-    {
-     "t": 19.95,
-     "type": "muzzle",
-     "actor": "Squad3"
-    },
-    {
-     "t": 19.95,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 99.5,
-     "z": 384.4,
+     "x": 101.1,
+     "z": 384.5,
      "volume": 0.45
     },
     {
@@ -13708,58 +13492,12 @@
      "keys": [
       {
        "t": 57.96,
-       "x": 99.5,
-       "z": 384.4,
-       "move": "cut"
-      },
-      {
-       "t": 59.27,
-       "x": 97.4,
-       "z": 384.3,
-       "move": "run",
-       "stance": "prone",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      }
-     ]
-    },
-    {
-     "id": "LiuWencai",
-     "keys": [
-      {
-       "t": 58.26,
-       "x": 97.4,
-       "z": 384.3,
-       "move": "cut"
-      },
-      {
-       "t": 59.57,
-       "x": 99.5,
-       "z": 384.4,
-       "move": "run",
-       "stance": "prone",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      }
-     ]
-    },
-    {
-     "id": "Squad3",
-     "keys": [
-      {
-       "t": 58.56,
        "x": 101.1,
        "z": 384.5,
        "move": "cut"
       },
       {
-       "t": 59.52,
+       "t": 58.92,
        "x": 102.6,
        "z": 384.2,
        "move": "run",
@@ -13776,17 +13514,22 @@
      "id": "Escort2",
      "keys": [
       {
-       "t": 63.38,
-       "stance": "stand",
+       "t": 58.86,
+       "x": 102.6,
+       "z": 384.2,
+       "move": "cut"
+      },
+      {
+       "t": 59.82,
+       "x": 101.1,
+       "z": 384.5,
+       "move": "run",
+       "stance": "prone",
        "aim": true,
        "faceTo": {
         "x": 100,
         "z": 470
        }
-      },
-      {
-       "t": 64.18,
-       "stance": "crouch"
       }
      ]
     }
@@ -13820,8 +13563,8 @@
      "t": 18.24,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 99.5,
-     "z": 384.4,
+     "x": 101.1,
+     "z": 384.5,
      "volume": 0.385
     },
     {
@@ -13839,8 +13582,8 @@
      "t": 18.59,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 99.5,
+     "z": 384.4,
      "volume": 0.385
     },
     {
@@ -13852,8 +13595,8 @@
      "t": 18.94,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 101.1,
-     "z": 384.5,
+     "x": 97.4,
+     "z": 384.3,
      "volume": 0.385
     },
     {
@@ -13904,8 +13647,8 @@
      "t": 54.16,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 99.5,
-     "z": 384.4,
+     "x": 101.1,
+     "z": 384.5,
      "volume": 0.385
     },
     {
@@ -13917,8 +13660,8 @@
      "t": 54.51,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 99.5,
+     "z": 384.4,
      "volume": 0.385
     },
     {
@@ -13930,8 +13673,8 @@
      "t": 54.86,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 101.1,
-     "z": 384.5,
+     "x": 97.4,
+     "z": 384.3,
      "volume": 0.385
     },
     {
@@ -13958,34 +13701,21 @@
      "t": 57.16,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 99.5,
-     "z": 384.4,
-     "volume": 0.45
-    },
-    {
-     "t": 57.46,
-     "type": "muzzle",
-     "actor": "LiuWencai"
-    },
-    {
-     "t": 57.46,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
-     "volume": 0.45
-    },
-    {
-     "t": 57.76,
-     "type": "muzzle",
-     "actor": "Squad3"
-    },
-    {
-     "t": 57.76,
-     "type": "sfx",
-     "name": "rifleShot",
      "x": 101.1,
      "z": 384.5,
+     "volume": 0.45
+    },
+    {
+     "t": 58.06,
+     "type": "muzzle",
+     "actor": "Escort2"
+    },
+    {
+     "t": 58.06,
+     "type": "sfx",
+     "name": "rifleShot",
+     "x": 102.6,
+     "z": 384.2,
      "volume": 0.45
     },
     {
@@ -14003,8 +13733,8 @@
      "t": 63.68,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.5,
-     "z": 440,
+     "x": 101.1,
+     "z": 384.5,
      "volume": 0.4
     },
     {
@@ -14025,16 +13755,16 @@
     {
      "t": 65.23,
      "type": "explosion",
-     "x": 102.6,
-     "z": 444.7,
+     "x": 100.8,
+     "z": 384.6,
      "kind": "grenade",
      "radius": 0.8
     },
     {
      "t": 65.53,
      "type": "explosion",
-     "x": 103.5,
-     "z": 446.1,
+     "x": 101.7,
+     "z": 386,
      "kind": "grenade",
      "radius": 0.8
     },
@@ -14339,29 +14069,6 @@
      ]
     },
     {
-     "id": "Yaowa",
-     "keys": [
-      {
-       "t": 15.37,
-       "x": 97.4,
-       "z": 384.3,
-       "move": "cut"
-      },
-      {
-       "t": 16.68,
-       "x": 99.5,
-       "z": 384.4,
-       "move": "run",
-       "stance": "prone",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      }
-     ]
-    },
-    {
      "id": "LiuWencai",
      "keys": [
       {
@@ -14371,9 +14078,9 @@
        "move": "cut"
       },
       {
-       "t": 17.61,
-       "x": 102.6,
-       "z": 384.2,
+       "t": 16.98,
+       "x": 97.4,
+       "z": 384.3,
        "move": "run",
        "stance": "prone",
        "aim": true,
@@ -14389,14 +14096,14 @@
      "keys": [
       {
        "t": 15.97,
-       "x": 102.6,
-       "z": 384.2,
+       "x": 97.4,
+       "z": 384.3,
        "move": "cut"
       },
       {
-       "t": 16.93,
-       "x": 101.1,
-       "z": 384.5,
+       "t": 17.28,
+       "x": 99.5,
+       "z": 384.4,
        "move": "run",
        "stance": "prone",
        "aim": true,
@@ -14404,24 +14111,6 @@
         "x": 100,
         "z": 470
        }
-      }
-     ]
-    },
-    {
-     "id": "Escort2",
-     "keys": [
-      {
-       "t": 2.7,
-       "stance": "stand",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 3.5,
-       "stance": "crouch"
       }
      ]
     }
@@ -14448,8 +14137,8 @@
      "t": 3,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.5,
-     "z": 440,
+     "x": 101.1,
+     "z": 384.5,
      "volume": 0.4
     },
     {
@@ -14470,16 +14159,16 @@
     {
      "t": 4.55,
      "type": "explosion",
-     "x": 102.6,
-     "z": 444.7,
+     "x": 100.8,
+     "z": 384.6,
      "kind": "grenade",
      "radius": 0.8
     },
     {
      "t": 4.85,
      "type": "explosion",
-     "x": 103.5,
-     "z": 446.1,
+     "x": 101.7,
+     "z": 386,
      "kind": "grenade",
      "radius": 0.8
     },
@@ -14525,8 +14214,8 @@
      "t": 12.57,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 102.6,
+     "z": 384.2,
      "volume": 0.5249999999999999
     },
     {
@@ -14551,8 +14240,8 @@
      "t": 13.27,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.6,
-     "z": 384.2,
+     "x": 97.4,
+     "z": 384.3,
      "volume": 0.5249999999999999
     },
     {
@@ -14571,19 +14260,6 @@
      "volume": 0.75
     },
     {
-     "t": 14.57,
-     "type": "muzzle",
-     "actor": "Yaowa"
-    },
-    {
-     "t": 14.57,
-     "type": "sfx",
-     "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
-     "volume": 0.45
-    },
-    {
      "t": 14.87,
      "type": "muzzle",
      "actor": "LiuWencai"
@@ -14605,8 +14281,8 @@
      "t": 15.17,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.6,
-     "z": 384.2,
+     "x": 97.4,
+     "z": 384.3,
      "volume": 0.45
     },
     {
@@ -14618,8 +14294,8 @@
      "t": 17.87,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 102.6,
+     "z": 384.2,
      "volume": 0.5249999999999999
     },
     {
@@ -14644,8 +14320,8 @@
      "t": 18.57,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.6,
-     "z": 384.2,
+     "x": 97.4,
+     "z": 384.3,
      "volume": 0.5249999999999999
     },
     {
@@ -14672,8 +14348,8 @@
      "t": 23.16,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 97.4,
-     "z": 384.3,
+     "x": 102.6,
+     "z": 384.2,
      "volume": 0.5249999999999999
     },
     {
@@ -14698,8 +14374,8 @@
      "t": 23.86,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.6,
-     "z": 384.2,
+     "x": 97.4,
+     "z": 384.3,
      "volume": 0.5249999999999999
     },
     {
@@ -15321,24 +14997,6 @@
      ]
     },
     {
-     "id": "Escort2",
-     "keys": [
-      {
-       "t": 5.1,
-       "stance": "stand",
-       "aim": true,
-       "faceTo": {
-        "x": 100,
-        "z": 470
-       }
-      },
-      {
-       "t": 5.9,
-       "stance": "crouch"
-      }
-     ]
-    },
-    {
      "id": "CellarIja1",
      "keys": [
       {
@@ -15581,8 +15239,8 @@
      "t": 5.4,
      "type": "sfx",
      "name": "rifleShot",
-     "x": 102.5,
-     "z": 440,
+     "x": 101.1,
+     "z": 384.5,
      "volume": 0.4
     },
     {
@@ -15609,16 +15267,16 @@
     {
      "t": 6.95,
      "type": "explosion",
-     "x": 102.6,
-     "z": 444.7,
+     "x": 100.8,
+     "z": 384.6,
      "kind": "grenade",
      "radius": 0.8
     },
     {
      "t": 7.25,
      "type": "explosion",
-     "x": 103.5,
-     "z": 446.1,
+     "x": 101.7,
+     "z": 386,
      "kind": "grenade",
      "radius": 0.8
     },
@@ -16442,8 +16100,8 @@
      "keys": [
       {
        "t": 0,
-       "x": 99.5,
-       "z": 384.4,
+       "x": 102.6,
+       "z": 384.2,
        "move": "cut",
        "stance": "prone",
        "aim": true,
@@ -16451,13 +16109,13 @@
       },
       {
        "t": 9,
-       "x": 99.5,
-       "z": 384.4,
+       "x": 102.6,
+       "z": 384.2,
        "move": "cut",
        "stance": "stand"
       },
       {
-       "t": 11.24,
+       "t": 11.48,
        "x": 99.4,
        "z": 392,
        "move": "run",
@@ -16471,8 +16129,8 @@
      "keys": [
       {
        "t": 0,
-       "x": 102.6,
-       "z": 384.2,
+       "x": 97.4,
+       "z": 384.3,
        "move": "cut",
        "stance": "prone",
        "aim": true,
@@ -16480,13 +16138,13 @@
       },
       {
        "t": 9,
-       "x": 102.6,
-       "z": 384.2,
+       "x": 97.4,
+       "z": 384.3,
        "move": "cut",
        "stance": "stand"
       },
       {
-       "t": 10.59,
+       "t": 10.97,
        "x": 101.6,
        "z": 389.5,
        "move": "run",
@@ -16500,6 +16158,35 @@
      "keys": [
       {
        "t": 0,
+       "x": 99.5,
+       "z": 384.4,
+       "move": "cut",
+       "stance": "prone",
+       "aim": true,
+       "yawDeg": 177
+      },
+      {
+       "t": 9,
+       "x": 99.5,
+       "z": 384.4,
+       "move": "cut",
+       "stance": "stand"
+      },
+      {
+       "t": 11.98,
+       "x": 100.3,
+       "z": 394.5,
+       "move": "run",
+       "stance": "stand",
+       "yawDeg": 180
+      }
+     ]
+    },
+    {
+     "id": "Escort2",
+     "keys": [
+      {
+       "t": 0,
        "x": 101.1,
        "z": 384.5,
        "move": "cut",
@@ -16515,38 +16202,9 @@
        "stance": "stand"
       },
       {
-       "t": 11.95,
-       "x": 100.3,
-       "z": 394.5,
-       "move": "run",
-       "stance": "stand",
-       "yawDeg": 180
-      }
-     ]
-    },
-    {
-     "id": "Escort2",
-     "keys": [
-      {
-       "t": 0,
-       "x": 102.5,
-       "z": 440,
-       "move": "cut",
-       "stance": "crouch",
-       "aim": true,
-       "yawDeg": 180
-      },
-      {
-       "t": 8.8,
-       "x": 102.5,
-       "z": 440,
-       "move": "cut",
-       "stance": "stand"
-      },
-      {
-       "t": 9.14,
-       "x": 101.9,
-       "z": 441,
+       "t": 12.82,
+       "x": 98.3,
+       "z": 397.2,
        "move": "run",
        "stance": "stand",
        "yawDeg": 180,
@@ -16679,7 +16337,7 @@
     {
      "t": 7.8,
      "type": "caption",
-     "text": "（班长在墙角里扭头冲八十米外的坡道吼；坡道上的三个爬起来顺主街冲上来，大车后头那个也站起来往前）",
+     "text": "（班长在墙角里扭头冲八十米外的坡道吼；坡道上的四个爬起来顺主街冲上来——大车后头没有人）",
      "dur": 3
     },
     {
@@ -17224,8 +16882,8 @@
      "keys": [
       {
        "t": 0,
-       "x": 101.9,
-       "z": 441,
+       "x": 98.3,
+       "z": 397.2,
        "move": "cut",
        "stance": "stand",
        "aim": true,
@@ -17233,20 +16891,24 @@
       },
       {
        "t": 3,
-       "x": 101.9,
-       "z": 441,
+       "x": 98.3,
+       "z": 397.2,
        "move": "cut",
        "clip": null
       },
       {
-       "t": 12.4,
+       "t": 26.05,
        "x": 105.4,
        "z": 467.2,
        "move": "run",
        "path": [
         {
-         "x": 101.53,
-         "z": 440.74
+         "x": 100,
+         "z": 397.2
+        },
+        {
+         "x": 100,
+         "z": 420
         },
         {
          "x": 97.8,

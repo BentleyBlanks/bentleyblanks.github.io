@@ -1,8 +1,8 @@
 {
  "schema": "tengxian-blockout-voice/1",
  "level": "FirstLevel0610",
- "generatedAt": "2026-10-23T18:03:37.218Z",
- "requests": 108,
+ "generatedAt": "2026-10-23T21:44:05.974Z",
+ "requests": 115,
  "note": "占位配音（SeedAudio seed-audio-1.0，整段一次生成后按逐字时间戳切句）。file 相对 Taierzhuang1938/index.html；gapBeforeS 是录音里与上一句的原始间隔；keyframe 是第二版改稿契约 §3 的关键帧 id（06-1…10-6）。",
  "scenes": [
   {
@@ -806,8 +806,8 @@
    "id": "VillageMouth",
    "beat": "08",
    "keyframe": "08-1",
-   "label": "08 村口：滚进沟里的村民",
-   "attempt": 1,
+   "label": "08 村口：从东头跑来扑进沟里的村民",
+   "attempt": 2,
    "attempts": 1,
    "references": [
     {
@@ -832,12 +832,15 @@
      "subtitle": "东头……过来的……进庄了……",
      "text": "东头……过来的……进庄了……",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610VillageMouth_01.mp3",
-     "durationS": 4.712,
+     "durationS": 5.521,
      "gapBeforeS": 0,
-     "sha256": "9f57f7965a63742e2533072a0e8c2640893e3579b12c3c3f9e852db6088c5b29",
-     "speakerCos": 0.872,
-     "cer": 0.25,
-     "transcript": "懂头,怪来的,进庄了。"
+     "sha256": "9908d9e0ba726daf9a77159f1bf1202430acd066bc098dd14da04f3dc9024ff1",
+     "speakerCos": 0.83,
+     "cer": 0.5,
+     "transcript": "懂头儿,过来的,精壮了。",
+     "issues": [
+      "字错率 0.5 待人耳核对"
+     ]
     }
    ]
   },
@@ -1157,7 +1160,7 @@
    "beat": "08",
    "keyframe": "08-2",
    "label": "08 绕不过去：日他妈，打",
-   "attempt": 2,
+   "attempt": 3,
    "attempts": 1,
    "references": [
     {
@@ -1179,17 +1182,145 @@
      "who": "luo",
      "speaker": "罗班长",
      "lang": "zh",
-     "subtitle": "……日他妈。打！文财、幺娃、顺儿，给老子把那个枪眼压到，一口气都不准它喘！有田，你两个，跟到我！",
-     "text": "……日他妈。打！文财、幺娃、顺儿，给老子把那个枪眼压到，一口气都不准它喘！有田，你两个，跟到我！",
+     "subtitle": "……日他妈。打！给老子把那个枪眼压到！",
+     "text": "……日他妈。打！给老子把那个枪眼压到！",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610DecideLuo_01.mp3",
-     "durationS": 10.78,
+     "durationS": 3.554,
      "gapBeforeS": 0,
-     "sha256": "6bdbcdbd07dea5309bd4e909f626fdc4bc171d60764964aea3a7a251bdf86484",
-     "speakerCos": 0.944,
-     "cer": 0.4722,
-     "transcript": "嘴,死他妈的。打!文采、姚娃、孙儿,给老子拔了个强烟压刀,以抠齐都不准他穿。尤田,你两个,跟到我。",
+     "sha256": "1af983a70abb8cbceb10848e1605cc8ec3272e10fb4245310df616aae2101c5c",
+     "speakerCos": 0.873,
+     "cer": 0.3571,
+     "transcript": "大,给老子把那个墙眼压到。",
      "issues": [
-      "字错率 0.4722 待人耳核对"
+      "字错率 0.3571 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "LuoSplitsUp",
+   "beat": "08",
+   "keyframe": "08-4",
+   "label": "08 班长定计：压到枪眼，有田穿院子，顺儿走巷子，哪个先到哪个先打",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "luo"
+     ],
+     "owner": "luo",
+     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
+    }
+   ],
+   "targetDb": -19,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "LuoSplitsUp.01",
+     "keyframe": "08-4",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "压到枪眼！有田，跟老子穿院子。顺儿，你走巷子，摸到他屁股后头。哪个先到哪个先打！",
+     "text": "压到枪眼！有田，跟老子穿院子。顺儿，你走巷子，摸到他屁股后头。哪个先到哪个先打！",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LuoSplitsUp_01.mp3",
+     "durationS": 8.01,
+     "gapBeforeS": 0,
+     "sha256": "69df25cdc593a9c81d840dc932e8b6158429ac1db90dbabe47c341e81d52190f",
+     "speakerCos": 0.944,
+     "cer": 0.3636,
+     "transcript": "有天,跟老子穿圆子,孙儿,你走巷子,摸到他屁股后头,拉个弦倒,拉个弦打。",
+     "issues": [
+      "字错率 0.3636 待人耳核对"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "LiuMutters",
+   "beat": "08",
+   "keyframe": "08-4",
+   "label": "08 刘文财：让他一个人走？……",
+   "attempt": 1,
+   "attempts": 3,
+   "references": [
+    {
+     "who": [
+      "liuwencai"
+     ],
+     "owner": "liuwencai",
+     "castSha256": "fa79d46b054e3a5a80c67062498097b15711adbce8cc2b48259af5da5d5da285"
+    }
+   ],
+   "targetDb": -23,
+   "cutMethod": "subtitle",
+   "hard": [
+    "LiuMutters.01 疑似念错（字错率 1.1667）"
+   ],
+   "flags": [],
+   "lines": [
+    {
+     "id": "LiuMutters.01",
+     "keyframe": "08-4",
+     "who": "liuwencai",
+     "speaker": "刘文财",
+     "lang": "zh",
+     "subtitle": "让他一个人走？……",
+     "text": "让他一个人走？……",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LiuMutters_01.mp3",
+     "durationS": 2.996,
+     "gapBeforeS": 0,
+     "sha256": "62b5b6cf99315e92e2d6b3c5d4795461792842209ec3d6fda880ccf01c16ad3c",
+     "speakerCos": 0.86,
+     "cer": 1.1667,
+     "transcript": "长他一国人奏, 死可不得。",
+     "issues": [
+      "疑似念错（字错率 1.1667）"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "LuoShutUp",
+   "beat": "08",
+   "keyframe": "08-4",
+   "label": "08 班长：闭嘴，压到枪眼",
+   "attempt": 1,
+   "attempts": 1,
+   "references": [
+    {
+     "who": [
+      "luo"
+     ],
+     "owner": "luo",
+     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
+    }
+   ],
+   "targetDb": -16,
+   "cutMethod": "subtitle",
+   "hard": [],
+   "flags": [],
+   "lines": [
+    {
+     "id": "LuoShutUp.01",
+     "keyframe": "08-4",
+     "who": "luo",
+     "speaker": "罗班长",
+     "lang": "zh",
+     "subtitle": "闭嘴！压到枪眼！",
+     "text": "闭嘴！压到枪眼！",
+     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LuoShutUp_01.mp3",
+     "durationS": 1.89,
+     "gapBeforeS": 0,
+     "sha256": "fce80a0a529798beb302f149f5a3a39a283ce81ad767624bd0298ef41d7af54e",
+     "speakerCos": 0.816,
+     "cer": 0.6667,
+     "transcript": "闭嘴,丫头强艳。",
+     "issues": [
+      "字错率 0.6667 待人耳核对"
      ]
     }
    ]
@@ -1198,8 +1329,8 @@
    "id": "NierRuns",
    "beat": "08",
    "keyframe": "08-4",
-   "label": "08 妮儿跑：妮儿、不要命了嗦、老总俺妮儿",
-   "attempt": 2,
+   "label": "08 妮儿跑：妮儿、不要命了嗦",
+   "attempt": 3,
    "attempts": 1,
    "references": [
     {
@@ -1231,12 +1362,12 @@
      "subtitle": "妮儿！妮儿——！",
      "text": "妮儿！妮儿——！",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610NierRuns_01.mp3",
-     "durationS": 2.07,
+     "durationS": 2.48,
      "gapBeforeS": 0,
-     "sha256": "52dd44f877427b2b5a072f843a0fe2a847af52d3f3709853d7c1991e091e9d4e",
-     "speakerCos": 0.632,
+     "sha256": "7362f9b3fa62c823d716e5b024f80c19f1b0f352a55c7cb55dfaf8494db44979",
+     "speakerCos": 0.643,
      "cer": 1,
-     "transcript": "呀呀!",
+     "transcript": "呀!呀!",
      "issues": [
       "字错率 1 待人耳核对"
      ]
@@ -1250,170 +1381,12 @@
      "subtitle": "老人家你不要命了嗦！",
      "text": "老人家你不要命了嗦！",
      "file": "./Audio/Blockout0610/AudioVoice_Blockout0610NierRuns_02.mp3",
-     "durationS": 2.45,
-     "gapBeforeS": 0.01,
-     "sha256": "7f08a7e4a7ee84c8a257b92d4ec8d99948498134b54409e79c3b1ad2104ed23f",
-     "speakerCos": 0.705,
+     "durationS": 1.95,
+     "gapBeforeS": 0.32,
+     "sha256": "b0b37f84eee0135f71407f10596bb544dbd8bf21671eae04d1d1d6efba58a296",
+     "speakerCos": 0.709,
      "cer": 0.2222,
-     "transcript": "老人家你不要明了说!"
-    },
-    {
-     "id": "NierRuns.03",
-     "keyframe": "08-4",
-     "who": "geng",
-     "speaker": "老耿",
-     "lang": "zhNorth",
-     "subtitle": "老总！俺妮儿——！",
-     "text": "老总！俺妮儿——！",
-     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610NierRuns_03.mp3",
-     "durationS": 2.119,
-     "gapBeforeS": 0.04,
-     "sha256": "a017665510163b08263edfa250b6642b6aeae9483612ae952ccfa396f26f4512",
-     "speakerCos": 0.751,
-     "cer": 0.6,
-     "transcript": "老总, 阿姨啊!",
-     "issues": [
-      "字错率 0.6 待人耳核对"
-     ]
-    }
-   ]
-  },
-  {
-   "id": "LiuWhereTo",
-   "beat": "08",
-   "keyframe": "08-4",
-   "label": "08 刘文财：往哪……（半句）",
-   "attempt": 1,
-   "attempts": 1,
-   "references": [
-    {
-     "who": [
-      "liuwencai"
-     ],
-     "owner": "liuwencai",
-     "castSha256": "fa79d46b054e3a5a80c67062498097b15711adbce8cc2b48259af5da5d5da285"
-    }
-   ],
-   "targetDb": -16,
-   "cutMethod": "subtitle",
-   "hard": [],
-   "flags": [],
-   "lines": [
-    {
-     "id": "LiuWhereTo.01",
-     "keyframe": "08-4",
-     "who": "liuwencai",
-     "speaker": "刘文财",
-     "lang": "zh",
-     "subtitle": "顺子！你狗日的往哪……",
-     "text": "顺子！你狗日的往哪……",
-     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LiuWhereTo_01.mp3",
-     "durationS": 3.946,
-     "gapBeforeS": 0,
-     "sha256": "76c65e54ec25bf66c615529fb30469a752f57a17ea93ade3a0e6b5c1c1c8fa30",
-     "speakerCos": 0.831,
-     "cer": 0.5,
-     "transcript": "笋子你狗子咧,往哪儿?",
-     "issues": [
-      "字错率 0.5 待人耳核对"
-     ]
-    }
-   ]
-  },
-  {
-   "id": "LuoSendsShunzi",
-   "beat": "08",
-   "keyframe": "08-4",
-   "label": "08 班长定计：闭嘴压枪眼、带到她摸到屁股后头、老子从东边院子穿过去（两路）",
-   "attempt": 3,
-   "attempts": 1,
-   "references": [
-    {
-     "who": [
-      "luo"
-     ],
-     "owner": "luo",
-     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
-    }
-   ],
-   "targetDb": -16,
-   "cutMethod": "subtitle",
-   "hard": [],
-   "flags": [],
-   "lines": [
-    {
-     "id": "LuoSendsShunzi.01",
-     "keyframe": "08-4",
-     "who": "luo",
-     "speaker": "罗班长",
-     "lang": "zh",
-     "subtitle": "闭嘴！压到枪眼！",
-     "text": "闭嘴！压到枪眼！",
-     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LuoSendsShunzi_01.mp3",
-     "durationS": 1.26,
-     "gapBeforeS": 0,
-     "sha256": "2a39cbf3a46bb9c9bf1579fddf9378de862547149b3981ee2c86d4d1125b646f",
-     "speakerCos": 0.839,
-     "cer": 0.5,
-     "transcript": "笔嘴,压到墙页。",
-     "issues": [
-      "字错率 0.5 待人耳核对"
-     ]
-    },
-    {
-     "id": "LuoSendsShunzi.02",
-     "keyframe": "08-4",
-     "who": "luo",
-     "speaker": "罗班长",
-     "lang": "zh",
-     "subtitle": "顺儿！带到她顺巷子摸过去，摸到那狗日的屁股后头！老子从东边院子穿过去——你那头一响，老子这头就动手！",
-     "text": "顺儿！带到她顺巷子摸过去，摸到那狗日的屁股后头！老子从东边院子穿过去——你那头一响，老子这头就动手！",
-     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LuoSendsShunzi_02.mp3",
-     "durationS": 7.56,
-     "gapBeforeS": 0.23,
-     "sha256": "3b7af08c2aef66053246967394efcb537c8cd9eb5b37a9aee0c8eb5411f1e8c1",
-     "speakerCos": 0.886,
-     "cer": 0.1163,
-     "transcript": "孙儿,带到他村巷子摸过去,摸到那狗子的屁股后头。老子从东边院子穿过去,你那头一向,老子这头就动手。"
-    }
-   ]
-  },
-  {
-   "id": "LuoHoldsMouth",
-   "beat": "08",
-   "keyframe": "08-4",
-   "label": "08 班长冲坡道上的三个：把枪眼压到，打一枪换个窝，莫停",
-   "attempt": 2,
-   "attempts": 2,
-   "references": [
-    {
-     "who": [
-      "luo"
-     ],
-     "owner": "luo",
-     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
-    }
-   ],
-   "targetDb": -16,
-   "cutMethod": "subtitle",
-   "hard": [],
-   "flags": [],
-   "lines": [
-    {
-     "id": "LuoHoldsMouth.01",
-     "keyframe": "08-4",
-     "who": "luo",
-     "speaker": "罗班长",
-     "lang": "zh",
-     "subtitle": "幺娃！你们三个给老子把枪眼压到，打一枪换个窝，莫停！",
-     "text": "幺娃！你们三个给老子把枪眼压到，打一枪换个窝，莫停！",
-     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610LuoHoldsMouth_01.mp3",
-     "durationS": 4.8,
-     "gapBeforeS": 0,
-     "sha256": "93c722e611fc81e09029b024839dd17979fc8d391e165be5254e0f6facc43c30",
-     "speakerCos": 0.895,
-     "cer": 0.2727,
-     "transcript": "要啊,你们三个,给老子把枪烟压倒,打一枪换个窝,摸听。"
+     "transcript": "老人家,你不要明了唆!"
     }
    ]
   },
@@ -1453,68 +1426,6 @@
      "speakerCos": 0.805,
      "cer": 0.3333,
      "transcript": "抛了一狗,往东边抛了。"
-    }
-   ]
-  },
-  {
-   "id": "PinnedAtCart",
-   "beat": "08",
-   "keyframe": "08-4",
-   "label": "08 大车后头：过不去了、走院子",
-   "attempt": 2,
-   "attempts": 1,
-   "references": [
-    {
-     "who": [
-      "luo"
-     ],
-     "owner": "luo",
-     "castSha256": "65acf484568c6e5c079e278bf8329774b0c0106fd057f9048bb4a233b18ce8be"
-    }
-   ],
-   "targetDb": -16.47,
-   "cutMethod": "subtitle",
-   "hard": [],
-   "flags": [],
-   "lines": [
-    {
-     "id": "PinnedAtCart.01",
-     "keyframe": "08-4",
-     "who": "luo",
-     "speaker": "罗班长",
-     "lang": "zh",
-     "subtitle": "过不去了！日他先人，一冒头就是一梭子！",
-     "text": "过不去了！日他先人，一冒头就是一梭子！",
-     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610PinnedAtCart_01.mp3",
-     "durationS": 4.78,
-     "gapBeforeS": 0,
-     "sha256": "f678254ab1715fb3b0350a4310508caf3ddae8f3846b76741fbbce04fcc6d62c",
-     "speakerCos": 0.879,
-     "cer": 0.4375,
-     "transcript": "过不起了,他显然,以矛头就是以梭子。",
-     "issues": [
-      "字错率 0.4375 待人耳核对"
-     ]
-    },
-    {
-     "id": "PinnedAtCart.02",
-     "keyframe": "08-4",
-     "who": "luo",
-     "speaker": "罗班长",
-     "lang": "zh",
-     "subtitle": "走院子！",
-     "text": "走院子！",
-     "file": "./Audio/Blockout0610/AudioVoice_Blockout0610PinnedAtCart_02.mp3",
-     "durationS": 0.456,
-     "gapBeforeS": 0.84,
-     "sha256": "6c39b58f6b574aefb0ef7088d441cb7b89cdbf83ef9ab130732bb3a55e0bd6cd",
-     "speakerCos": 0.55,
-     "cer": 0.6667,
-     "transcript": "周原子。",
-     "issues": [
-      "有声 0.38 s，太短不判嗓子",
-      "字错率 0.6667 待人耳核对"
-     ]
     }
    ]
   },

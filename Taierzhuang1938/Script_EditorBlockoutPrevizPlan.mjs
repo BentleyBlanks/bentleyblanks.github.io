@@ -39,6 +39,8 @@ export const PREVIZ_SFX_ALIASES = Object.freeze([
   "planeDrone", "planeDive", "strafeNear", "strafeFar", "strafeDirt",
   // 2026-10-20（06–10 耿家庄）：直接放 Audio/BlockoutPreviz/ 里的文件（运行时 PREVIZ_SFX 写 url）
   "babyCry", "cellarSob", "gateSmash", "jarShatter",
+  // 2026-10-24（06–10 第九版 07-4）：远处听不清的日本话——直接放现成的日语占位配音（运行时 PREVIZ_SFX 写 url）
+  "ijaShoutFar",
 ]);
 /**
  * 投弹（演员键 throw，2026-10-18 第三轮）：throw 键的 t = 开始抡（播步兵投弹片段 GrenadeThrow，Script_InfantryAnimation「背枪投弹」）。
@@ -382,6 +384,7 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
         NeedPoint();
         if (e.kind !== undefined && !PREVIZ_SMOKE_KINDS.includes(e.kind)) errors.push(`${eat}.kind 要是 ${PREVIZ_SMOKE_KINDS.join(" / ")}`);
         if (e.dur !== undefined && !(Finite(e.dur) && e.dur > 0)) errors.push(`${eat}.dur 要是正数`);
+        if (e.scale !== undefined && !(Finite(e.scale) && e.scale >= 0.3 && e.scale <= 6)) errors.push(`${eat}.scale 要是 0.3–6（白盒简易烟放大几倍）`);
       } else if (e.type === "muzzle") {
         if (typeof e.actor === "string") { if (units && e.actor !== "player" && !units.has(e.actor) && !SpawnIds(seq).has(e.actor)) errors.push(`${eat}.actor 在关键帧 ${seq.keyframe} 里找不到：${e.actor}`); }
         else NeedPoint();

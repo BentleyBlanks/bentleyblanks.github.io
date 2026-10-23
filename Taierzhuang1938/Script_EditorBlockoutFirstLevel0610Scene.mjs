@@ -826,10 +826,20 @@ function SouthLaneBlocks(plan, blocks, gates) {
   blocks.push(Block("ClimbPile", P.x, P.z, P.w, P.d, P.h, "canvas", { prop: "Haystack", climb: true }));
 }
 
-/** 班长那一路（10-24）：EM2 / EM3 之间 z 435 那道院墙北面墙根的柴垛（踩着翻墙的台阶，同 ClimbPile 的做法：不开口子，只是一块 1.2 高的垛）。 */
-function EastYardBlocks(blocks) {
+/**
+ * 班长那一路（10-24）：EM2 / EM3 之间 z 435 那道院墙北面墙根的柴垛（踩着翻墙的台阶，同 ClimbPile 的做法：不开口子，只是一块 1.2 高的垛）。
+ * 第九版（同日）：EM1 / EM2 之间 z 410 那道墙挨过炮塌了一角——豁口（墙总表里 Cut 掉 w + 两边各 0.3 的参差段，再补两截矮墙头当参差的断口）、
+ * 地上两堆碎土坯（≤ 0.45 高，人踩得过去；做法同街坊家西配房的豁口 JiefangBreachRubble）。
+ */
+function EastYardBlocks(plan, blocks) {
   const P = EYR.climb.pile;
   blocks.push(Block("EastClimbPile", P.x, P.z, P.w, P.d, P.h, "canvas", { prop: "Haystack", climb: true }));
+  const B = EYR.breach, JAG = 0.3;
+  plan.Cut("x", B.z, B.x - B.w / 2 - JAG, B.x + B.w / 2 + JAG);
+  blocks.push(Block("Em1BreachStubW", B.x - B.w / 2 - JAG / 2, B.z, JAG, T, 1.3, WALL, { breach: true }));
+  blocks.push(Block("Em1BreachStubE", B.x + B.w / 2 + JAG / 2, B.z, JAG, T, 1.05, WALL, { breach: true }));
+  blocks.push(Block("Em1BreachRubble", B.x - 0.55, B.z - 0.75, 1.2, 0.9, 0.42, EARTH, { ry: 0.3, prop: "Rubble", breach: true }));
+  blocks.push(Block("Em1BreachRubble2", B.x + 0.6, B.z + 0.8, 1.0, 0.8, 0.35, EARTH, { ry: -0.35, prop: "Rubble", breach: true }));
 }
 
 /** 一条胡同的净空范围（轴对齐盒子）。 */
@@ -1289,7 +1299,7 @@ function VillageBlocks(sample) {
   Lintel(blocks, "FarmyardDoorLintel", "z", NC.farmyardDoor.x, NC.farmyardDoor.z - NC.farmyardDoor.w / 2, NC.farmyardDoor.z + NC.farmyardDoor.w / 2, V.doorTopH, V.wallH, sample);
   BreakableGate(gates, "FarmyardGateLeaf", "z", NC.farmyardDoor.x, NC.farmyardDoor.z, NC.farmyardDoor.w, SIG.northYardGatesBroken, -1);
   SouthLaneBlocks(plan, blocks, gates);
-  EastYardBlocks(blocks);
+  EastYardBlocks(plan, blocks);
   plan.Emit(blocks);
   // 庄子西墙 x 40 那一道（苇子洼那一段墙脚的地是 −0.9）：块显式给 y，顶在村里地面 +2.2、底到 −0.3，墙脚不悬空、也不矮一截
   for (const b of blocks) if (/^VillageWestEdge_/.test(b.id)) { b.h = R2(V.wallH + 0.6); b.y = R2(V.y + V.wallH - b.h / 2); }
@@ -1417,13 +1427,14 @@ export function L0610Landmarks(sample) {
     L("LmNorthGate2", "院门②（北侧第一个院西墙）", "door", NC.yard1Door.x, NC.yard1Door.z, { ...DoorZ(NC.yard1Door.w), note: "10-4 砸开" }),
     L("LmNorthGate3", "院门③（路口东北角那院南墙）", "door", NC.pocketGate.x, NC.pocketGate.z, { ...DoorX(NC.pocketGate.w), note: "09-6 班长三人蹲在门后、09-7 撞开（EastGateBurst）；就在石碾西北背后" }),
     L("LmEastClimbPile", PL.eastClimb.name, "prop", EYR.climb.pile.x, EYR.climb.pile.z, { ...Size(EYR.climb.pile.w, EYR.climb.pile.d, EYR.climb.pile.h), note: "09-4 班长三人踩着翻 z 435 那道墙（人梯）" }),
+    L("LmEm1Breach", PL.em1Breach.name, "hole", EYR.breach.x, EYR.breach.z, { ...Size(EYR.breach.w, T + 0.2, V.wallH), note: "09-2 班长三人从 EM1 钻进 EM2（挨过炮塌的一角，墙头参差、地上碎土坯）" }),
     L("LmSouthClimb", PL.southClimb.name, "place", ES.southClimb.x, ES.southClimb.z, { ...Size(3, T, V.wallH), note: "10-5 南边两个鬼子翻这段墙" }),
     L("LmMortarHide", "掷弹筒藏处", "place", ES.mortarHide.x, ES.mortarHide.z, { radiusM: 1.8 }),
     L("LmEastEnd", PL.eastEnd.name, "place", PL.eastEnd.x, PL.eastEnd.z, { radiusM: 2 }),
     L("LmEastRoadView", PL.eastRoadView.name, "place", PL.eastRoadView.x, PL.eastRoadView.z, { radiusM: 6, note: "鬼子顺这条道进庄；07 末 / 08 看得见" }),
     L("LmAlleyBackGate", PL.alleyBackGate.name, "door", PL.alleyBackGate.x, PL.alleyBackGate.z, { ...DoorZ(1.2), note: "08-1 村民顺巷子逃到巷子口；没门扇" }),
-    L("LmDitchBackGate", PL.ditchBackGate.name, "door", PL.ditchBackGate.x, PL.ditchBackGate.z, { ...DoorX(V.gateW), note: "08-1 两个村民下到沟东半截；没门扇" }),
-    L("LmMainEastGate", PL.mainEastGate.name, "door", PL.mainEastGate.x, PL.mainEastGate.z, { ...DoorZ(V.gateW), note: "08-1 两个村民冲上主街被打倒；08-4 末班长三人从这里钻进院子（在大车的影子里）" }),
+    L("LmDitchBackGate", PL.ditchBackGate.name, "door", PL.ditchBackGate.x, PL.ditchBackGate.z, { ...DoorX(V.gateW), note: "08-1 两个村民下到沟东半截；08-4 末班长三人从这里钻进 EM1（班长那一路）；没门扇" }),
+    L("LmMainEastGate", PL.mainEastGate.name, "door", PL.mainEastGate.x, PL.mainEastGate.z, { ...DoorZ(V.gateW), note: "08-1 两个村民冲上主街被打倒" }),
     ...L0610_RUBBLE.map((r) => L(`Lm${r.id}`, r.name, "prop", r.x, r.z, { ...Size(r.w, r.d, r.h), ry: r.ry })),
     L("LmBigLocust", PL.bigLocust.name, "prop", PL.bigLocust.x, PL.bigLocust.z, { ...Size(0.8, 0.8, PL.bigLocust.h), note: "10-6「过了槐树就是村口」" }),
     L("LmPond", PL.pond.name, "pit", POND.x, POND.z, { ...Size(POND.w, POND.d, POND.depth), y: R2(POND_FLOOR_Y + POND.depth / 2), note: "取土坑积的水；1949 年前多数人喝河、坑、沟水" }),

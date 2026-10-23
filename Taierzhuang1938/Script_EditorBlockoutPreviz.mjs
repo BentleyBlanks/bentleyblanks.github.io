@@ -93,6 +93,8 @@ export const PREVIZ_SFX = Object.freeze({
   cellarSob: { url: "./Audio/BlockoutPreviz/Sfx_CellarSob.mp3" },
   gateSmash: { url: "./Audio/BlockoutPreviz/Sfx_GateSmash.mp3" },
   jarShatter: { url: "./Audio/BlockoutPreviz/Sfx_JarShatter.mp3" },
+  // 2026-10-24（06–10 第九版 07-4）：远处听不清的日本话——直接放一条现成的日语占位配音（09-4 搜窖的头儿那句，远远放、小音量；不另配音）
+  ijaShoutFar: { url: "./Audio/Blockout0610/AudioVoice_Blockout0610CellarHurry_01.mp3" },
 });
 const SMOKE_KIND = Object.freeze({ SmokeDust: "dust", SmokeWhite: "screen", SmokeBlack: "black" });
 const SMOKE_DEFAULT_S = 6;

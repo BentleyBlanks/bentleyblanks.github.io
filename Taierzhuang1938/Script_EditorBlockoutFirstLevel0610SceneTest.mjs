@@ -365,8 +365,25 @@ const yardById = new Map([...L0610_YARDS.map((y) => [y.id, y.box]), ["GENG", G.b
   assert.ok(burst.Has(EYR.inPocket.Luo.x, EYR.inPocket.Luo.z) && burst.Has(ES.roller.x - 2.2, ES.roller.z), "撞开门就冲得进 pocket、到得了石碾后头");
   // 视线：三个枪眼后的人（1.1）和墙角哨（蹲着 1.2）都看不见这条路上蹲着的人（0.9）
   const eyes = [...G.beiwu.loopholes.map((lp) => ({ name: lp.name, x: lp.x, z: lp.z + 1.5, eye: 1.1 })), { name: "墙角哨", x: 108.2, z: 460.4, eye: 1.2 }, { name: "墙角哨 2", x: 105.0, z: 460.0, eye: 1.2 }];
-  const route = [EYR.gateIn, { x: 104.5, z: 433.3 }, C.from, C.to, { x: 104.8, z: 438.6 }, EYR.stripOut, { x: 105.4, z: 449 }, EYR.behindGate.Luo, EYR.behindGate.HeYoutian, EYR.behindGate.Escort1];
+  const route = [EYR.backGateIn, ...EYR.em1, EYR.breach.from, EYR.breach.to, { x: 104.5, z: 433.3 }, C.from, C.to, { x: 104.8, z: 438.6 }, EYR.stripOut, { x: 105.4, z: 449 }, EYR.behindGate.Luo, EYR.behindGate.HeYoutian, EYR.behindGate.Escort1];
   for (const e of eyes) for (const p of route) assert.notEqual(BlockSight(solids, sample, e, { x: p.x, z: p.z, eye: 0.9 }), null, `${e.name} 不许看见班长那一路上蹲着的人 (${p.x},${p.z})`);
+  // 第九版（10-24）：班长那一路从路沟后门进 EM1——后门里头是院子（北屋挪到门东边了）；EM1 / EM2 之间 z 410 那道墙塌了一角：豁口 ≥ 1.4 m、两边是墙、地上的碎土坯踩得过（≤ 0.5）；
+  // 从后门里不翻墙能走到 EM1 院子南头、过豁口到 EM2 西边空地的柴垛跟前，仍进不了 EM3；主街那边（x < 103.25）照旧不数
+  const BG = EYR.backGate, BR = EYR.breach;
+  assert.ok(!Solid(BG.x, BG.z) && Solid(BG.x - 1.5, BG.z) && Solid(BG.x + 1.5, BG.z), "路沟后门洞敞着、两边是墙");
+  assert.ok(!Solid(BG.x, BG.z + 1.2) && !Solid(BG.x, BG.z + 2.5) && !Solid(EYR.em1[0].x, EYR.em1[0].z), "后门里头是院子（EM1 的北屋不再堵在门里）");
+  assert.ok(!Solid(BR.x, BR.z) && Solid(BR.x - 1.6, BR.z) && Solid(BR.x + 2.0, BR.z), "EM1 / EM2 之间那道墙上的豁口敞着、两边是墙");
+  // 口子的宽度按 ≥ 1 m 高的墙（含参差的矮墙头）算：人钻得过的那一截
+  const Wallish = (x, z) => solids.some((blk) => blk.h >= 1.0 && !blk.prop && Intersects(blk, { minX: x - 0.05, maxX: x + 0.05, minZ: z - 0.05, maxZ: z + 0.05 }));
+  let gap = 0; for (let x = BR.x - 2; x <= BR.x + 2; x += 0.05) { if (!Wallish(x, BR.z)) gap += 0.05; }
+  assert.ok(gap >= 1.4 && gap <= 2.2, `豁口 ${gap.toFixed(2)} m 宽（要 1.4–2.2）`);
+  const rubble = solids.filter((blk) => /^Em1BreachRubble/.test(blk.id));
+  assert.ok(rubble.length >= 2 && rubble.every((blk) => blk.h <= 0.5 && Math.abs(blk.z - BR.z) < 1.6), "豁口两边地上有碎土坯堆，矮得踩得过去");
+  assert.ok(solids.some((blk) => /^Em1BreachStub/.test(blk.id) && blk.h < V.wallH - 0.5), "豁口断口处墙头参差（有一截矮下去的墙头）");
+  const fromGate = FloodFrom(grid, EYR.backGateIn, { barriers: [streetBarrier] });
+  assert.ok(fromGate.Has(EYR.em1.at(-1).x, EYR.em1.at(-1).z) && fromGate.Has(BR.from.x, BR.from.z) && fromGate.Has(BR.to.x, BR.to.z) && fromGate.Has(C.from.x, C.from.z), "从后门里能走到 EM1 南头、过豁口到 EM2 柴垛跟前");
+  assert.ok(!fromGate.Has(C.to.x, C.to.z) && !fromGate.Has(EYR.behindGate.Luo.x, EYR.behindGate.Luo.z), "过了豁口不翻墙还是进不了 EM3");
+  assert.ok(a.landmarks.some((lm) => lm.id === "LmEm1Breach" && lm.kind === "hole" && Math.abs(lm.x - BR.x) < 0.1), "豁口有地标");
 }
 
 // --- 院子的口径：三种院子、北屋、院门在角上、尺寸 ---
