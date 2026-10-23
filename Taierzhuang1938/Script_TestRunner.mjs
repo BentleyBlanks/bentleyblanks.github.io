@@ -199,6 +199,8 @@ export const testDefs = {
   ExplosionRulesTest: { file: "Script_ExplosionRulesTest.mjs", desc: "爆炸配置、稀疏地形叠加/坡度/上限、返掷窗口与完整资产目录（纯 Node）" },
   DismembermentTest: { file: "Script_DismembermentTest.mjs", desc: "断肢规则层：肢体表与命中体互核、顶点分类、index 三角守恒、六类来源判定与预算 FIFO（纯 Node，毫秒级）" },
   ModelFacingTest: { file: "Script_ModelFacingTest.mjs", desc: "外部模型朝向闸：飞机 GLB 机首按 noseDir 落到 -Z、战车 tzm 炮口/车头在 -Z，全部用顶点云复量（纯 Node，秒级）" },
+  KawasakiType88AssetTest: { file: "Script_KawasakiType88AssetTest.mjs", desc: "八八式二型实际 GLB：米制、预算、完整 PBR、十个轴心、推杆端点与轮动" },
+  KawasakiType88BrowserTest: { file: "Script_KawasakiType88AssetTest.mjs", args: ["--browser"], timeoutMs: 120000, desc: "八八式二型真实 GLTFLoader、PBR UV/色彩空间与 GPU 渲染" },
   CraterSurfaceTest: { file: "Script_CraterSurfaceTest.mjs", desc: "真实连续爆炸后无水平焦痕环带，HDR 像素对照及普通弹孔保留" },
   ExplosionRangeTest: { file: "Script_ExplosionRangeTest.mjs", timeoutMs: 8 * 60 * 1000, desc: "爆炸白盒：真实F拾取/返掷/战车/炮击、地形网格/Rapier/人物穿坑与复位" },
   DustFlowTest: { file: "Script_DustFlowTest.mjs", desc: "落地扬尘规则层：合成锯齿壕沟上沟里炸被夹住、尘顺沟成带；平地圆、斜砸下游多、守恒、逐位可复现、随风漂、自己收工（纯 Node）" },
@@ -537,6 +539,7 @@ export const testDefs = {
 
 export const browserTests = new Set([
   "Type89MediumTankBrowserTest",
+  "KawasakiType88BrowserTest",
   "ToolsHomeTest",
   "HistoryCodexBrowserTest",
   "PublishAssetsBrowserTest",
@@ -688,6 +691,7 @@ export const tier0Fast = [
   "SingleBlanketAssetTest",
   "BlanketClothTest",
   "ModelFacingTest",
+  "KawasakiType88AssetTest",
   "AircraftGeometryTest",
   "NakajimaKi4AssetTest",
   "Type89MediumTankTest",
@@ -760,6 +764,7 @@ export const tier2 = [
 export const domains = {
   type89MediumTank: {label:"Type89 standalone articulated reference tank",tests:["Type89MediumTankTest","Type89MediumTankBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "AssetStandardsTest"] },
+  kawasakiType88: { label: "八八式侦察机二型独立资产", tests: ["KawasakiType88AssetTest", "KawasakiType88BrowserTest", "ModelFacingTest", "AssetStandardsTest", "ModuleGraphTest"] },
   singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "TextureStandardsTest", "AssetStandardsTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
   whiteboxQuality: { label: "白盒画质配置与实机", tests: ["WhiteboxQualityTest", "WhiteboxQualityBrowserTest", "WhiteboxShaderWarmTest"] },
@@ -893,6 +898,10 @@ const changedDomainRules = [
   {domain:"menu",pattern:/ToolsHome|Icon_TabSeal/},
   {domain:"combat",pattern:/FirstPersonGait/},
   { domain: "nakajimaKi4", pattern: /NakajimaKi4/ },
+  { domain: "kawasakiType88", pattern: /KawasakiType88/ },
+  { domain: "editor", pattern: /(?:Data_ToolsHome|Script_ToolsHomeField)\.mjs/ },
+  { domain: "menu", pattern: /Icon_TabSeal(?:16|32|180)\.png/ },
+  { domain: "combat", pattern: /Script_FirstPersonGait\.mjs/ },
   { domain: "singleBlanket", pattern: /SingleBlanket|BlanketCloth|EditorBlockoutBlanket/ },
   { domain: "combat", pattern: /FpsGripCorrective|FpsHandSkinWeights|FpsForearmTaper|FpsWristNormalSeam|FpsHandSelfContact|FpsHandPose|HanYangReloadClearance|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },
   {domain:"historyCodex",pattern:/HistoryCodex|HistoryBook|HistoryConscription|HistoryLedger|page-flip|Texture\/Menu\/History\//},

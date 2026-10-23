@@ -14,6 +14,7 @@ import { LoadGlb, ReadAccessor } from "./_import/Script_LugouGlbPose.mjs";
 import { AIRCRAFT_ASSETS, NoseYaw } from "./Data_AircraftAssets.mjs";
 import { MESHES } from "./Data_Meshes.mjs";
 import { STRAW_SLEEPING_MAT_ASSETS } from "./Data_StrawSleepingMat.mjs";
+import { KAWASAKI_TYPE88_ASSET } from "./Data_KawasakiType88.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const TOLERANCE_DEG = 12;
@@ -94,12 +95,15 @@ function RiggedGlbPoints(file,meshName,boneName=null){
  * 量一架飞机的机首方向（局部 XZ 单位向量）。返回 null 表示两条判据打架，
  * 那就不是这套启发式能判的模型，得人工登记别的证据。
  */
-function MeasureNose(points) {
+function MeasureNose(points, axisPoints = points) {
   let mx = 0, mz = 0;
   for (const p of points) { mx += p[0]; mz += p[2]; }
   mx /= points.length; mz /= points.length;
+  let axisMx = 0, axisMz = 0;
+  for (const p of axisPoints) { axisMx += p[0]; axisMz += p[2]; }
+  axisMx /= axisPoints.length; axisMz /= axisPoints.length;
   let sxx = 0, sxz = 0, szz = 0;
-  for (const p of points) { const x = p[0] - mx, z = p[2] - mz; sxx += x * x; sxz += x * z; szz += z * z; }
+  for (const p of axisPoints) { const x = p[0] - axisMx, z = p[2] - axisMz; sxx += x * x; sxz += x * z; szz += z * z; }
   // 机身是最长的那一根：主轴取 XZ 协方差的大特征向量。
   const theta = 0.5 * Math.atan2(2 * sxz, sxx - szz);
   const ux = Math.cos(theta), uz = Math.sin(theta);
@@ -125,12 +129,17 @@ const Heading = (x, z) => Math.atan2(x, z);
 const AngleErrorDeg = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) * 180 / Math.PI;
 
 console.log("== 飞机 GLB ==");
-for (const spec of AIRCRAFT_ASSETS) {
+for (const spec of [...AIRCRAFT_ASSETS, KAWASAKI_TYPE88_ASSET]) {
   const file = path.join(projectDir, spec.url.replace(/^\.\//, "").replace(/\?.*$/, ""));
   Check(fs.existsSync(file), `${spec.id} 模型存在`, file);
   if (!fs.existsSync(file)) continue;
   Check(!!spec.noseDir && Number.isFinite(spec.noseDir.x) && Number.isFinite(spec.noseDir.z), `${spec.id} 登记了 noseDir`);
-  const measured = MeasureNose(GlbPoints(file));
+  // A wide-span biplane's full-cloud PCA follows the wings. Its separate
+  // fuselage supplies the measured long axis; both independent nose-sign
+  // checks still use the complete exported vertex cloud.
+  const axisPoints = spec.fuselageMesh ? GlbPoints(file, spec.fuselageMesh) : undefined;
+  if (spec.fuselageMesh) Check(axisPoints.length > 100, `${spec.id} 独立机身顶点云存在`, `${axisPoints.length} points`);
+  const measured = MeasureNose(GlbPoints(file), axisPoints);
   Check(!!measured, `${spec.id} 两条机首判据一致（尾翼端更宽 / 机翼偏向机头）`);
   if (!measured || !spec.noseDir) continue;
   const declaredError = AngleErrorDeg(Heading(measured.x, measured.z), Heading(spec.noseDir.x, spec.noseDir.z));
