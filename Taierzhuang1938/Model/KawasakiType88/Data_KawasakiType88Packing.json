@@ -1,14 +1,14 @@
 {
   "version": "20261023LosslessWebp01",
   "output": "Model_KawasakiType88.glb",
-  "inputSha256": "2752abcca77f687c250ff48c3fe8caf62a4ff61314770099868c7088efbae303",
-  "outputSha256": "80ea288761decf34d90f80ea59884a91c9742e6a7494485b66adbf1da729a735",
-  "inputBytes": 17163800,
-  "outputBytes": 12407152,
+  "inputSha256": "48d14a6b217e5fe6d92a1bc83f1610973529d56c0f9e1a496426653dd6467c32",
+  "outputSha256": "516d997eab8e18ea20d05e3c33367b4b099f6863d9d8984cda1ad0bd9b65aa17",
+  "inputBytes": 17080372,
+  "outputBytes": 12325484,
   "nodesPreserved": true,
   "meshesPreserved": true,
   "accessorsPreserved": true,
-  "nonImageBufferViewsPreserved": 280,
+  "nonImageBufferViewsPreserved": 281,
   "imageCount": 34,
   "images": [
     {
@@ -35,10 +35,10 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "410123eb60e3e02b426885c12c9fa5e402053ca8475361ebbfbe7b6b1ed2ee94",
-      "decodedPixelsSha256": "410123eb60e3e02b426885c12c9fa5e402053ca8475361ebbfbe7b6b1ed2ee94",
-      "sourceBytes": 3052543,
-      "webpBytes": 1514472,
+      "sourcePixelsSha256": "d147e36bfe85a33943c46f754c48fa4bc38f5d18ba34a00883278e522d637a3b",
+      "decodedPixelsSha256": "d147e36bfe85a33943c46f754c48fa4bc38f5d18ba34a00883278e522d637a3b",
+      "sourceBytes": 3044404,
+      "webpBytes": 1508090,
       "pixelExact": true
     },
     {

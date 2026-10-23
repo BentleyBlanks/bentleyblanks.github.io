@@ -90,6 +90,20 @@
       "materialReviewedAt": "2026-10-24",
       "materialReview": "Model/Type89MediumTank/Data_MaterialReview.json",
       "materialScope": "Appearance-only rematch from recovered original and same-car close-ups; historical labels and Notion source-page timestamps remain unchanged"
+    },
+    {
+      "asset": "KawasakiType88",
+      "date": "2026-10-23",
+      "scope": "Only the Type 88-II reference appearance, museum serial/colour and inference boundary; original Jiang2015 page51 visually checked. Unrelated source pages and global repoCommit cursor preserved.",
+      "notionPages": [
+        "3fd60335331c8194aa82f0b238084d34",
+        "3fd60335331c818fa24deadb6d72ca70"
+      ],
+      "notionLastEdited": {
+        "3fd60335331c8194aa82f0b238084d34": "2026-10-23T12:23:21.118Z",
+        "3fd60335331c818fa24deadb6d72ca70": "2026-10-23T12:23:23.306Z"
+      },
+      "assetContract": "Model/KawasakiType88/Data_KawasakiType88.json"
     }
   ],
   "notionPages": [

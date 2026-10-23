@@ -17,7 +17,7 @@ import bpy
 from mathutils import Vector, Matrix, Quaternion
 
 
-VERSION = "20261023HollowExhaust09"
+VERSION = "20261023WingStagger11"
 PI = math.pi
 TAU = 2 * PI
 SOURCE_DEFAULT = Path(r"C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\KawasakiType88")
@@ -354,7 +354,17 @@ class Builder:
                 poly.material_index = 1
         # Actual holes, cut through the upper shell, not black painted ovals.
         for label, z, rx, rz in (("Pilot", -1.32, .425, .51), ("Observer", -.143, .395, .445)):
-            cutter = self.Ellipsoid("Tool" + label + "Opening", (0, 2.60, z), (rx, 1.02, rz), None, 64, 32)
+            outline = self.OpeningOutline(label, z, rx, rz)
+            if label == "Pilot":
+                cutterVerts = [(x, y, zz) for y in (1.50, 3.40) for x, zz in outline]
+                n = len(outline)
+                cutterFaces = [tuple(range(n - 1, -1, -1)), tuple(range(n, n * 2))]
+                cutterFaces += [(i, (i + 1) % n, (i + 1) % n + n, i + n) for i in range(n)]
+                cutter = self.Mesh("ToolPilotOpening", cutterVerts, cutterFaces, None)
+                import bmesh
+                bm = bmesh.new(); bm.from_mesh(cutter.data); bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces)); bm.to_mesh(cutter.data); bm.free()
+            else:
+                cutter = self.Ellipsoid("Tool" + label + "Opening", (0, 2.60, z), (rx, 1.02, rz), None, 64, 32)
             mod = body.modifiers.new(label + "OpenCockpit", "BOOLEAN")
             mod.operation = "DIFFERENCE"
             mod.solver = "EXACT"
@@ -363,20 +373,18 @@ class Builder:
             self.meshes.remove(cutter)
             bpy.data.objects.remove(cutter, do_unlink=True)
             rim = []
-            for j in range(96):
-                t = TAU * j / 96
-                x, zz = rx * math.cos(t), z + rz * math.sin(t)
+            for x, zz in outline:
                 rim.append((x, self.Top(x, zz) + .007, zz))
             self.Tube(label + "PaddedLeatherCoaming", rim, .034, "Leather", 10, True)
             linerVerts, linerFaces = [], []
+            linerOutline = self.OpeningOutline(label, z, rx - .025, rz - .025)
+            n = len(linerOutline)
             for level in range(2):
-                for j in range(64):
-                    t = TAU * j / 64
-                    x, zz = (rx - .025) * math.cos(t), z + (rz - .025) * math.sin(t)
+                for x, zz in linerOutline:
                     linerVerts.append((x, self.Top(x, zz) - .025 - level * .55, zz))
-            for j in range(64):
-                linerFaces.append((j, (j + 1) % 64, (j + 1) % 64 + 64, j + 64))
-            linerFaces.append(tuple(range(64, 128)))
+            for j in range(n):
+                linerFaces.append((j, (j + 1) % n, (j + 1) % n + n, j + n))
+            linerFaces.append(tuple(range(n, n * 2)))
             self.Mesh(label + "InteriorTub", linerVerts, linerFaces, "Cockpit")
             self.Box(label + "SeatPan", (0, 1.82, z + .04), (.48, .07, .40), "Leather", .035)
             back = self.Box(label + "SeatBack", (0, 2.02, z + .29), (.48, .42, .075), "Leather", .045)
@@ -470,10 +478,26 @@ class Builder:
             self.Beam("WindscreenSideFrame" + str(side), (side * .35, 2.39, -1.69), (side * .35, 2.62, -1.69), .009, "Aluminum")
         self.Tube("WindscreenTopFrame", [(v[0], v[1], v[2]) for v in verts[17:]], .009, "Aluminum", 6)
 
+    def OpeningOutline(self, label, z, rx, rz):
+        if label != "Pilot":
+            return [(rx * math.cos(TAU * i / 96), z + rz * math.sin(TAU * i / 96)) for i in range(96)]
+        # The main reference has a flat forward lip, rounded front corners,
+        # short parallel sides and a rounded aft end, rather than a porthole.
+        a = rx * .62
+        cornerX, cornerZ, sideEnd = rx - a, rz * .31, rz * .04
+        out = []
+        out += [(Lerp(-a, a, i / 8), z - rz) for i in range(8)]
+        out += [(a + cornerX * math.cos(-PI / 2 + PI / 2 * i / 8), z - rz + cornerZ + cornerZ * math.sin(-PI / 2 + PI / 2 * i / 8)) for i in range(8)]
+        out += [(rx, z + Lerp(-rz + cornerZ, sideEnd, i / 8)) for i in range(8)]
+        out += [(rx * math.cos(PI * i / 24), z + sideEnd + (rz - sideEnd) * math.sin(PI * i / 24)) for i in range(24)]
+        out += [(-rx, z + Lerp(sideEnd, -rz + cornerZ, i / 8)) for i in range(8)]
+        out += [(-a + cornerX * math.cos(PI + PI / 2 * i / 8), z - rz + cornerZ + cornerZ * math.sin(PI + PI / 2 * i / 8)) for i in range(8)]
+        return out
+
     def WingPoint(self, x, u, upper=True, top=True):
         halfSpan = 7.5 if upper else 6.62
         chord = 1.88 if upper else 1.72
-        lead = -3.833 if upper else -3.37
+        lead = -3.833 if upper else -3.12
         tipStart = halfSpan - .50
         factor = 1.0
         if abs(x) > tipStart:
@@ -572,7 +596,7 @@ class Builder:
             self.WingPatch("LowerWingInner" + suffix, side * .48, side * 2.35, 0, 1, False)
             self.WingPatch("LowerWingOuter" + suffix, side * 2.35, side * 6.12, 0, .735, False)
             self.WingPatch("LowerWingFixedTip" + suffix, side * 6.12, side * 6.62, 0, 1, False)
-            lowerHingeZ = -3.37 + 1.72 * .739 + .065
+            lowerHingeZ = -3.12 + 1.72 * .739 + .065
             lowerHingeY = sum(self.WingPoint(side * 2.35, .735, False, top)[1] for top in (True, False)) / 2
             lowerPivot = self.Hinge("AileronLower" + suffix, (side * 2.35, lowerHingeY, lowerHingeZ), tilt)
             lowerPivot["rangeDegrees"] = [-22., 18.]
@@ -616,20 +640,20 @@ class Builder:
             curve.driver.expression = "a"
             # Broad single outer I-strut and a long diagonal. No light-bomber
             # four-strut W-shaped centre section is added.
-            a, b = (side * 4.13, 1.39, -2.65), (side * 4.42, 3.18, -3.113)
+            a, b = (side * 4.13, 1.39, -2.40), (side * 4.42, 3.18, -3.113)
             self.Beam("InterplaneIBeam" + suffix, a, b, .07, "Aluminum", 12, 2.1)
-            self.Beam("LongDiagonalStrut" + suffix, (side * .55, 1.51, -2.38), b, .035, "Aluminum", 12)
+            self.Beam("LongDiagonalStrut" + suffix, (side * .55, 1.51, -2.13), b, .035, "Aluminum", 12)
             self.Beam("CabaneForward" + suffix, (side * .52, 2.32, -3.67), (side * .77, 3.09, -3.593), .031, "Aluminum")
             self.Beam("CabaneAft" + suffix, (side * .50, 2.34, -2.12), (side * .77, 3.11, -2.333), .031, "Aluminum")
             self.Beam("CabaneCrossBrace" + suffix, (side * .52, 2.32, -3.67), (side * .77, 3.11, -2.333), .004, "Steel", 6)
-            self.Beam("LandingWire" + suffix, (side * .78, 3.09, -3.583), (side * 4.13, 1.40, -2.70), .008, "Steel", 6)
-            self.Beam("FlyingWire" + suffix, (side * .53, 1.50, -3.15), (side * 4.42, 3.18, -3.153), .008, "Steel", 6)
-            for x, y, z in (a, b, (side * .55, 1.51, -2.38)):
+            self.Beam("LandingWire" + suffix, (side * .78, 3.09, -3.583), (side * 4.13, 1.40, -2.45), .008, "Steel", 6)
+            self.Beam("FlyingWire" + suffix, (side * .53, 1.50, -2.90), (side * 4.42, 3.18, -3.153), .008, "Steel", 6)
+            for x, y, z in (a, b, (side * .55, 1.51, -2.13)):
                 self.Ellipsoid("StrutClevis" + suffix + str(z), (x, y, z), (.065, .055, .055), "Steel", 16, 8)
         # Root fairings and centre-section fuel filler.
         for side in (-1, 1):
-            self.Tube("LowerWingRootFillet" + str(side), [(side * .53, 1.52, -3.37), (side * .61, 1.47, -3.0),
-                                                          (side * .62, 1.43, -2.5), (side * .52, 1.40, -1.65)], .055, "Aluminum", 10)
+            self.Tube("LowerWingRootFillet" + str(side), [(side * .53, 1.52, -3.12), (side * .61, 1.47, -2.75),
+                                                          (side * .62, 1.43, -2.25), (side * .52, 1.40, -1.40)], .055, "Aluminum", 10)
         self.Beam("UpperWingFuelFiller", (0, 3.23, -3.383), (0, 3.29, -3.383), .065, "Aluminum", 24)
 
     def Foil(self, name, outline, thickness=.055, vertical=False, parent=None, material="Fabric"):

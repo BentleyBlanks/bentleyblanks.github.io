@@ -1,0 +1,139 @@
+{
+  "schema": "tengxian-reference-aircraft-v1",
+  "id": "KawasakiType88",
+  "title": "Type 88-II reconnaissance reference reconstruction",
+  "status": "in-review",
+  "version": "WingStagger11-Surface05",
+  "runtime": {
+    "file": "Model_KawasakiType88.glb",
+    "sha256": "516d997eab8e18ea20d05e3c33367b4b099f6863d9d8984cda1ad0bd9b65aa17",
+    "bytes": 12325484,
+    "triangles": 76473,
+    "meshes": 40,
+    "nodes": 55,
+    "materials": 17,
+    "images": 34,
+    "metresPerUnit": 1,
+    "noseDir": {
+      "x": 0,
+      "z": -1
+    },
+    "dimensionsM": {
+      "wingspan": 15.0,
+      "height": 3.3804311752319336,
+      "length": 12.279999732971191
+    },
+    "campaignEnabled": false
+  },
+  "source": {
+    "directory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\KawasakiType88",
+    "highProject": "Scene_KawasakiType88High.blend",
+    "gameProject": "Scene_KawasakiType88Game.blend",
+    "highExport": "Exports/Model_KawasakiType88High.glb",
+    "highExportSha256": "7bdb86bd98f590233aed989856f6b7d33ad66e7a5ae979e85c0e5cbc86bbb4a1",
+    "projectsActuallyReopened": [
+      {
+        "project": "Scene_KawasakiType88High.blend",
+        "triangles": 226659,
+        "meshes": 283,
+        "usedFileImages": 34,
+        "packedImages": 34,
+        "controls": 10,
+        "metresPerUnit": 1.0,
+        "gltfSettingsInputs": [
+          "Dispersion",
+          "Iridescence Factor",
+          "Iridescence Thickness Minimum",
+          "Occlusion",
+          "Thickness"
+        ],
+        "surfaceVersion": "20261023Surface05"
+      },
+      {
+        "project": "Scene_KawasakiType88Game.blend",
+        "triangles": 76473,
+        "meshes": 40,
+        "usedFileImages": 34,
+        "packedImages": 34,
+        "controls": 10,
+        "metresPerUnit": 1.0,
+        "gltfSettingsInputs": [
+          "Dispersion",
+          "Iridescence Factor",
+          "Iridescence Thickness Minimum",
+          "Occlusion",
+          "Thickness"
+        ],
+        "surfaceVersion": "20261023Surface05"
+      }
+    ]
+  },
+  "reconstructionScope": "Type 88-II scout. The museum model serial 12 and appearance are a reference choice, not a verified Uchida squadron aircraft. No light-bomber extra centre struts or bomb racks.",
+  "historicalReferences": [
+    {
+      "url": "https://commons.wikimedia.org/wiki/File:Kawasaki_KDA-2_03_(1_20th_scale_model).png",
+      "scope": "Museum 1/20 Type 88-II model, Motokoka 2020-06-09, CC BY-SA 4.0; appearance only",
+      "originalSha256": "504e24d96a4cc43406385990e27b49184e5eec57d39f1ca8f80f9b8a5385291f"
+    },
+    {
+      "url": "https://www.airwar.ru/enc/other1/kda2.html",
+      "scope": "Historical Type II photographs; mixed variants were screened, kda2-11 used for secondary form"
+    },
+    {
+      "url": "https://ja.wikipedia.org/wiki/八八式偵察機",
+      "scope": "Explicit Type II secondary specification: span15m, length12.28m, nominal height3.38m; factory dimension drawing not acquired"
+    },
+    {
+      "url": "https://ousar.lib.okayama-u.ac.jp/files/public/5/53301/20160528122710481090/scs_014_047_070.pdf",
+      "scope": "Original PDF page5/printed51 visually read; research cites 10thDivision Type88x12 but notes AirCorps Type94 record conflict. Does not identify our subtype/serial/colour"
+    }
+  ],
+  "inferences": [
+    "Airfoil section, slight dihedral and unseen structural sections remain image-derived.",
+    "Hidden cockpit equipment and hardware arrangement are reconstruction choices.",
+    "Uncalibrated museum photograph informs colour relationships; it does not prove wartime paint reflectance.",
+    "Propeller diameter follows the main image proportions; a secondary 3.3m statement has not been checked against a factory drawing.",
+    "Alternative generic length12.80m, kit span15.2m and a 1933 Flight transcription disagree; chosen anchors are the table explicitly labelled II, without averaging.",
+    "Illegible tiny service marks are represented as linework, not claimed transcriptions."
+  ],
+  "pbr": {
+    "baseUv": 0,
+    "normalUv": 1,
+    "assemblyAoUv": 2,
+    "metallicRoughness": "G roughness, B metallic",
+    "allEmbeddedImagesPixelExact": true,
+    "fabricDetailTileM": 0.0832,
+    "fabricYarnPitchM": 0.00065,
+    "metalDetailTileM": 0.2,
+    "albedoContainsLighting": false,
+    "surfaceGenerator": "_blender/Script_KawasakiType88Surface.py"
+  },
+  "controls": [
+    "PropellerPivot",
+    "WheelLeftPivot",
+    "WheelRightPivot",
+    "RudderPivot",
+    "ElevatorLeftPivot",
+    "ElevatorRightPivot",
+    "AileronLeftPivot",
+    "AileronRightPivot",
+    "AileronLowerLeftPivot",
+    "AileronLowerRightPivot"
+  ],
+  "validation": {
+    "actualReimportSha256": "516d997eab8e18ea20d05e3c33367b4b099f6863d9d8984cda1ad0bd9b65aa17",
+    "actualReimportMissingImages": [],
+    "actualReimportMotionChecks": 91,
+    "actualReimportMotionIssues": [],
+    "actualReimportAxisChecks": 10,
+    "cameraWeightedRmsPixelsAt600": 1.4855844168198173,
+    "cameraFitIsNotWholeImageIdentityProof": true,
+    "sourceProjectsSelfContained": true,
+    "packingAudit": "Data_KawasakiType88Packing.json",
+    "fullPrepushStatus": "Stopped at existing SpeakerGestureTest: FrontObservation.02 consecutive Luo gestures; related source files unchanged by this model task."
+  },
+  "localReview": {
+    "url": "http://127.0.0.1:8118/tmp/KawasakiType88/index.html",
+    "pagesAndScreenshotsNotPublished": true
+  }
+}
