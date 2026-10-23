@@ -1,31 +1,34 @@
 {
   "file": "Model/Model_SingleBlanket.glb",
-  "sha256": "15a16e38cbd97076d1fee5d400d3d4f36fd5c20072877547c8e9cc510e6b8b08",
-  "vertices": 3111,
-  "triangles": 6000,
+  "sha256": "2b83eb41892c71c1a950141f2f2cd156ad60ee17f07149dc1342238e6e37873e",
+  "vertices": 6442,
+  "triangles": 12880,
   "joints": 217,
   "topology": {
     "welded": true,
+    "closedShell": true,
+    "thicknessM": 0.014,
     "connectedComponents": 1,
-    "boundaryEdges": 220,
-    "minTriangleAreaM2": 0.0002363738772146462,
-    "minEdgeLengthM": 0.015330791473388672,
+    "boundaryEdges": 0,
+    "minTriangleAreaM2": 0.000088386885899401,
+    "minEdgeLengthM": 0.008062232385653689,
     "maxEdgeLengthM": 0.0422703341459013
   },
   "bilinearWeightMaxError": 2.9785730437659197e-8,
   "nonzeroInfluences": {
-    "4": 3111
+    "2": 52,
+    "4": 6390
   },
   "weightSumMaxError": 4.0978193283081055e-8,
   "rootMaxWeight": 0,
-  "cpuRestMaxDeviationM": 4.1265041413235495e-8,
-  "cpuLiftInterpolationMaxErrorM": 0,
+  "cpuRestMaxDeviationM": 4.1266038388062314e-8,
+  "cpuLiftInterpolationMaxErrorM": 5.551115123125783e-17,
   "cpuLiftOutsideSupportMaxDeviationM": 0,
-  "cpuLiftAffectedVertices": 20,
+  "cpuLiftAffectedVertices": 48,
   "crumpledSizeGltfM": [
-    0.45000003816425815,
-    0.2500000112853278,
-    0.4499999820575223
+    0.45076865320197673,
+    0.2636099900970534,
+    0.46065803743843964
   ],
   "unfoldStartMaxErrorM": 0,
   "unfoldEndMaxErrorM": 0,
@@ -37,15 +40,6 @@
     "Blanket_Crumpled",
     "Blanket_Unfold"
   ],
-  "deterministicHeadlessRebuilds": {
-    "blender": "5.1.2",
-    "runs": 2,
-    "identical": true,
-    "hashes": [
-      "15a16e38cbd97076d1fee5d400d3d4f36fd5c20072877547c8e9cc510e6b8b08",
-      "15a16e38cbd97076d1fee5d400d3d4f36fd5c20072877547c8e9cc510e6b8b08"
-    ]
-  },
   "khronosValidator": {
     "errors": 0,
     "warnings": 1,

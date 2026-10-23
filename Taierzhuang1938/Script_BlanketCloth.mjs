@@ -5,8 +5,8 @@
 // 在世界空间里模拟这 216 个点，再把每根骨摆到它的质点上、朝向取该点处布面的切线标架（法线跟着转，光照对）。
 // 顶点由 GPU 蒙皮按双线性插出来，不改几何、不逐顶点上传。骨格间距 12.7 × 11.2 cm，比这更细的褶子出不来——够白盒用。
 //
-// 求解：位置动力学（PBD），固定子步 1/90 s、每子步 10 轮约束。约束三种：相邻（不许拉长、压短较软，布能堆起来）、
-// 对角（抗剪）、隔一根（抗弯，很弱：薄棉布）。碰撞：地面（外部给的高度函数，每帧每点采一次；一下子高出 0.3 m 以上的实心块
+// 求解：位置动力学（PBD），固定子步 1/90 s、每子步 12 轮约束。约束三种：相邻（不许拉长、压短很软，布能堆起来）、
+// 对角（抗剪）、隔一根（抗弯，很弱：薄棉布）；外加从攥着的被角出发的长程系绳（2026-10-23，拳头附近不被拉成尖角）。碰撞：地面（外部给的高度函数，每帧每点采一次；一下子高出 0.3 m 以上的实心块
 // 不认，台阶按 1 m/s 渐进抬），身体胶囊（躺在被子上的人、拖的人的腿）：身体正下方的点按住在地上并跟着身体走（被压住、
 // 静摩擦），其余从胶囊里推出去。头端两角可以钉到目标点上（拽被角的手），钉上时以有限速度挪过去，不瞬移。没有自碰撞。
 // PBD 的速度 = 子步位移 / h：被身体推开、被地面顶起的那一下限速（不然 0.3 m 的推开就是 27 m/s，布会被弹上天），
@@ -20,12 +20,15 @@ export const BLANKET_CLOTH = Object.freeze({
   substepS: 1 / 90,
   /** 一帧最多推这么多个子步；更长的帧（卡顿 / 快进）只推这么多，布慢下来但不炸。 */
   maxSubsteps: 6,
-  iterations: 10,
+  iterations: 12,
   gravity: 9.81,
   /** 空气阻尼（每秒衰减率）。 */
   airDamping: 1.2,
-  /** 约束刚度（每轮投影的比例）：拉长、压短、对角、隔一根。 */
-  stretch: 1, compress: 0.3, shear: 0.5, bend: 0.06,
+  /**
+   * 约束刚度（每轮投影的比例）：拉长、压短、对角、隔一根。2026-10-23 压短 / 抗弯 / 抗剪调软（原 0.3 / 0.06 / 0.5）：
+   * PBD 的实际刚度随轮数涨（0.3 跑 10 轮 ≈ 0.97），布几乎压不短、堆不出褶，一大片光滑地卷着，像皮。
+   */
+  stretch: 1, compress: 0.02, shear: 0.3, bend: 0.008,
   /** 质点离地（防闪；网格在骨间是直线插值，坑洼地上还会再低一点）。 */
   groundOffsetM: 0.012,
   /** 贴地时每子步损失的水平速度比例（土布在土上）。 */
@@ -38,6 +41,22 @@ export const BLANKET_CLOTH = Object.freeze({
   bodyMarginM: 0.03,
   /** 被角挪到手上的最大速度。 */
   grabSpeedMps: 3,
+  /**
+   * 长程系绳（2026-10-23，用户：拖起来像一张皮）：每个硬钉的点到其余各点的距离不许超过静止距离 × tetherSlack，
+   * 超了按 tether 的比例往钉点拉。只靠相邻约束 10 轮收不住，钉点旁的一格会被拉长到 1.5 倍（尖角、像拉开的胶皮）。
+   */
+  tether: 1, tetherSlack: 1.02,
+  /**
+   * 离钉点远处放松（2026-10-23）：静止距离从 tetherNearM 到 tetherFarM，允许的拉长从 tetherSlack 线性放到 tetherSlackFar。
+   * 拖人片段的拳头比被头远约 1 m（Data_EditorBlockout §5.6、拖人站位），完全不可拉长时整床被子会从冬瓜身下被抽走；
+   * 拉长只许出在远离拳头、平铺在身下的那段，拳头附近（看得最清楚的尖角）不拉长。
+   */
+  tetherNearM: 0.4, tetherFarM: 1.9, tetherSlackFar: 1.5,
+  /**
+   * 拳头攥一把（2026-10-23）：被角旁边沿侧边的 gatherSide 个点也软钉到拳头下方（第 m 个低 gatherDropM × m），
+   * 刚度 gatherK —— 布被攥成一团，从拳头往下散出褶子，不是被一个尖角挑起来。
+   */
+  gatherSide: 1, gatherK: 0.15, gatherDropM: 0.06,
   /** 被子一帧挪这么远 = 跳了（预演跳时间、关键帧切换）：重新铺。 */
   resetJumpM: 1.2,
   /** 重新铺之后先空推这么久（被角从平铺的位置挪到手上、布落定），每步速度乘 settleDamp。 */
@@ -96,6 +115,10 @@ export class ClothGrid {
       if (c + 2 < cols) Add(Id(r, c), Id(r, c + 2), 2);
       if (r + 2 < rows) Add(Id(r, c), Id(r + 2, c), 2);
     }
+    // 静止距离表（长程系绳用）：216 × 216
+    this.restDist = new Float32Array(this.n * this.n);
+    for (let i = 0; i < this.n; i++) for (let j = 0; j < this.n; j++)
+      this.restDist[i * this.n + j] = Math.hypot(rest[i * 3] - rest[j * 3], rest[i * 3 + 1] - rest[j * 3 + 1], rest[i * 3 + 2] - rest[j * 3 + 2]);
     // 打平成数组（热循环里不碰对象）
     this.ci = new Uint16Array(constraints.length * 2);
     this.cl = new Float32Array(constraints.length);
@@ -119,17 +142,17 @@ export class ClothGrid {
 
   /**
    * 钉住 / 放开一个质点（target = null 放开）。k = 1 硬钉（质点跟着锚点走）；k < 1 软钉（每轮往锚点拉 k，布够不着时停在半路）。
-   * 锚点从质点当前位置以 grabSpeedMps 挪向目标（刚抓上时不瞬移）。
+   * 锚点从质点当前位置以 grabSpeedMps 挪向目标（刚抓上时不瞬移）。gather = 攥进拳头的那几个点（不当系绳的起点、不算「两角」）。
    */
-  SetPin(i, target, k = 1) {
+  SetPin(i, target, k = 1, gather = false) {
     if (!target) {
       if (this.pins.has(i)) { this.pins.delete(i); this.inv[i] = 1; }
       return;
     }
     let pin = this.pins.get(i);
-    if (!pin) { pin = { target: new THREE.Vector3(), anchor: new THREE.Vector3().fromArray(this.x, i * 3), grabbed: false, k }; this.pins.set(i, pin); }
+    if (!pin) { pin = { target: new THREE.Vector3(), anchor: new THREE.Vector3().fromArray(this.x, i * 3), grabbed: false, k, gather }; this.pins.set(i, pin); }
     pin.target.copy(target);
-    pin.k = k;
+    pin.k = k; pin.gather = gather;
     this.inv[i] = k >= 1 ? 0 : 1;
   }
 
@@ -219,6 +242,7 @@ export class ClothGrid {
         const o = i * 3, a = pin.anchor, k = pin.k;
         x[o] += (a.x - x[o]) * k; x[o + 1] += (a.y - x[o + 1]) * k; x[o + 2] += (a.z - x[o + 2]) * k;
       }
+      if (cfg.tether > 0) this._Tether(cfg);
       this._Collide(it === cfg.iterations - 1, h);
     }
     // 速度 = 位移 / h（限速；被推开 / 顶起的那一下不算成速度）；贴地的摩擦、被身体压住的跟着身体走
@@ -238,6 +262,25 @@ export class ClothGrid {
       } else if (this.contact[i]) {
         v[o] *= fr; v[o + 2] *= fr;
         if (v[o + 1] < 0) v[o + 1] = 0;
+      }
+    }
+  }
+
+  /** 长程系绳：离硬钉点比静止距离（× slack）远的点往钉点拉（文件头 / BLANKET_CLOTH.tether）。 */
+  _Tether(cfg) {
+    const x = this.x, inv = this.inv, n = this.n, D = this.restDist, k = cfg.tether;
+    const near = cfg.tetherNearM, span = Math.max(1e-6, cfg.tetherFarM - near), s0 = cfg.tetherSlack, s1 = cfg.tetherSlackFar;
+    for (const [p, pin] of this.pins) {
+      if (pin.k < 1 || pin.gather) continue;
+      const op = p * 3, ax = x[op], ay = x[op + 1], az = x[op + 2], row = p * n;
+      for (let i = 0; i < n; i++) {
+        if (inv[i] === 0) continue;
+        const o = i * 3, dx = x[o] - ax, dy = x[o + 1] - ay, dz = x[o + 2] - az;
+        const r = D[row + i], f = r <= near ? 0 : r >= near + span ? 1 : (r - near) / span;
+        const d2 = dx * dx + dy * dy + dz * dz, L = r * (s0 + (s1 - s0) * f);
+        if (d2 <= L * L) continue;
+        const d = Math.sqrt(d2), s = k * (d - L) / d;
+        x[o] -= dx * s; x[o + 1] -= dy * s; x[o + 2] -= dz * s;
       }
     }
   }
@@ -369,6 +412,11 @@ export class BlanketClothRig {
     this.corners = {
       headL: this.cloth.Index(0, 0), headR: this.cloth.Index(0, this.cols - 1),
       tailL: this.cloth.Index(this.rows - 1, 0), tailR: this.cloth.Index(this.rows - 1, this.cols - 1),
+    };
+    /** 攥被角时一起攥进拳头的点：沿侧边往被尾数（BLANKET_CLOTH.gatherSide），近的在前。 */
+    this.gathers = {
+      headL: Array.from({ length: this.rows - 1 }, (_, m) => this.cloth.Index(m + 1, 0)),
+      headR: Array.from({ length: this.rows - 1 }, (_, m) => this.cloth.Index(m + 1, this.cols - 1)),
     };
     this.frames = this.bones.map(() => new THREE.Quaternion());
     this.lastRoot = null;

@@ -16,7 +16,7 @@ import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
 import { BlanketClothRig } from "./Script_BlanketCloth.mjs";
 
 export const BLOCKOUT_BLANKET = Object.freeze({
-  url: "./Model/Model_SingleBlanket.glb?v=20261020SingleBlanketRig217",
+  url: "./Model/Model_SingleBlanket.glb?v=20261023SingleBlanketShell",
   flatClip: "Blanket_Flat",
   dragClip: "Blanket_DragPose",
   /** 平铺 ↔ 拖拽的过渡快慢（每秒趋近的比例，指数平滑；只在 cloth = false 时用）。 */
@@ -50,7 +50,25 @@ export function LoadBlockoutBlanket() {
 }
 
 const _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion();
-const _w = new THREE.Matrix4(), _center = new THREE.Vector3();
+const _w = new THREE.Matrix4(), _center = new THREE.Vector3(), _gather = new THREE.Vector3();
+
+/**
+ * 两只手攥被角：角硬钉（k）在拳头上，沿侧边的 gatherSide 个点软钉到拳头下方一点点（攥成一把，2026-10-23）；没手就都放开。
+ */
+function Grip(rig, grips, k, groundAt) {
+  const cloth = rig.cloth, cfg = cloth.cfg;
+  for (const key of ["headL", "headR"]) {
+    const grip = grips[key] || null;
+    cloth.SetPin(rig.corners[key], grip, k);
+    rig.gathers[key].forEach((i, m) => {
+      if (!grip || m >= cfg.gatherSide) { cloth.SetPin(i, null); return; }
+      _gather.copy(grip); _gather.y -= cfg.gatherDropM * (m + 1);
+      const g = groundAt(_gather.x, _gather.z);
+      if (Number.isFinite(g)) _gather.y = Math.max(_gather.y, g + cfg.groundOffsetM);
+      cloth.SetPin(i, _gather, cfg.gatherK, true);
+    });
+  }
+}
 
 /**
  * 一副被子。root 原点 = 被子中心、平铺时贴在 y = 0，头端 +Z。
@@ -122,13 +140,11 @@ export function CreateBlockoutBlanket(asset) {
         this.resets += 1;
         this.lastReset = { root: _center.toArray().map(v => +v.toFixed(3)), headL: grips.headL?.toArray().map(v => +v.toFixed(3)) || null };
         cloth.Settle(cloth.cfg.settleS, () => {
-          cloth.SetPin(rig.corners.headL, grips.headL || null, k);
-          cloth.SetPin(rig.corners.headR, grips.headR || null, k);
+          Grip(rig, grips, k, groundAt);
           cloth.SampleGround(groundAt);
         });
       }
-      cloth.SetPin(rig.corners.headL, grips.headL || null, k);
-      cloth.SetPin(rig.corners.headR, grips.headR || null, k);
+      Grip(rig, grips, k, groundAt);
       if (dt > 0) {
         cloth.SampleGround(groundAt);
         this.steps += cloth.Step(dt);

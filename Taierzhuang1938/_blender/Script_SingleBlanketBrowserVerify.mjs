@@ -45,14 +45,15 @@ try {
   const snapshots={};for(const name of names)snapshots[name]=await page.evaluate(n=>window.SingleBlanket.SetPose(n),name);
   const end=await page.evaluate(()=>window.SingleBlanket.SetPose('Blanket_Unfold',44/30));
   const maxError=(a,b)=>Math.max(...a.points.map((p,i)=>Math.hypot(...p.map((v,k)=>v-b.points[i][k]))));
-  assert.equal(snapshots.Blanket_Flat.bones,217);assert.equal(snapshots.Blanket_Flat.triangles,6000);
+  assert.equal(snapshots.Blanket_Flat.bones,217);assert.equal(snapshots.Blanket_Flat.triangles,12880);
   assert.ok(snapshots.Blanket_DragPose.size[1]>0.6);
   assert.ok(maxError(snapshots.Blanket_Crumpled,snapshots.Blanket_Unfold)<1e-5);
   assert.ok(maxError(snapshots.Blanket_Flat,end)<1e-5);
-  assert.ok(Math.max(...snapshots.Blanket_Crumpled.size.map((v,k)=>Math.abs(v-[0.45,0.25,0.45][k])))<0.001);
+  // Mid-surface fitted to 0.45 x 0.25 x 0.45 m; the 1.4 cm shell adds at most its thickness + hem (2026-10-23).
+  assert.ok(snapshots.Blanket_Crumpled.size.every((v,k)=>v-[0.45,0.25,0.45][k]>-0.001&&v-[0.45,0.25,0.45][k]<0.022));
   await page.evaluate(()=>window.SingleBlanket.SetPose('Blanket_DragPose'));
   await page.locator('canvas').screenshot({path:path.join(reviewDir,'Scene_BrowserDragPose.png')});
-  const report={sha256:meta.sha256,errors,clips:names,bones:217,triangles:6000,crumpledSizeM:snapshots.Blanket_Crumpled.size,
+  const report={sha256:meta.sha256,errors,clips:names,bones:217,triangles:12880,crumpledSizeM:snapshots.Blanket_Crumpled.size,
     unfoldStartMaxErrorM:maxError(snapshots.Blanket_Crumpled,snapshots.Blanket_Unfold),unfoldEndMaxErrorM:maxError(snapshots.Blanket_Flat,end)};
   assert.deepEqual(errors,[]);fs.writeFileSync(path.join(reviewDir,'Data_BrowserCheck.json'),JSON.stringify(report,null,2));
   fs.copyFileSync(path.join(reviewDir,'Data_BrowserCheck.json'),path.join(sourceDir,'Review/Data_BrowserCheck.json'));

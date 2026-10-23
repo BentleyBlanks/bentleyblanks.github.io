@@ -122,13 +122,13 @@ function SkinAll() {
   const { positions, normals } = SkinAll();
   const world = mesh.matrixWorld;
   let err = 0, nErr = 0;
-  const up = new THREE.Vector3(0, 1, 0);
+  const worldRot = new THREE.Matrix3().setFromMatrix4(world);
   for (let i = 0; i < position.count; i++) {
     err = Math.max(err, positions[i].distanceTo(new THREE.Vector3().fromBufferAttribute(position, i).applyMatrix4(world)));
-    nErr = Math.max(nErr, normals[i].angleTo(up));
+    nErr = Math.max(nErr, normals[i].angleTo(new THREE.Vector3().fromBufferAttribute(normal, i).applyMatrix3(worldRot).normalize()));
   }
-  Check(err < 1e-5, "被子整体挪、转 180° 后重铺写回骨头：蒙皮出来的 3111 个顶点 = 静止顶点 × 被子世界矩阵", `最大偏差 ${err.toExponential(2)} m`);
-  Check(nErr < 1e-4, "平铺时法线全朝上", `最大偏角 ${nErr.toExponential(2)} rad`);
+  Check(err < 1e-5, `被子整体挪、转 180° 后重铺写回骨头：蒙皮出来的 ${position.count} 个顶点 = 静止顶点 × 被子世界矩阵`, `最大偏差 ${err.toExponential(2)} m`);
+  Check(nErr < 1e-4, "平铺时法线 = 静止法线跟着被子转（上层朝上、下层朝下、卷边朝外）", `最大偏角 ${nErr.toExponential(2)} rad`);
 }
 
 // ---------------------------------------------------------------------------
@@ -147,14 +147,21 @@ console.log("--- 2. 弯曲");
   const inv = world.clone().invert();
   let rErr = 0, nErr = 0;
   const a = new THREE.Vector3(), expect = new THREE.Vector3(), worldRot = new THREE.Matrix3().setFromMatrix4(world);
+  // 2026-10-23 被子是 1.4 cm 的双层壳：上层（静止 y = +7 mm，朝上那面）卷在里面、离轴 R − 7 mm，下层在外面 R + 7 mm；
+  // 卷边那圈（y = 0）在两层之间，法线朝侧面，不查
+  let layerErr = 0;
   for (let i = 0; i < position.count; i++) {
     a.copy(positions[i]).applyMatrix4(inv);
-    const dy = a.y - R, dz = a.z;
-    rErr = Math.max(rErr, Math.abs(Math.hypot(dy, dz) - R));
-    expect.set(0, -dy, -dz).normalize().applyMatrix3(worldRot).normalize();   // 布面朝外（静止时朝上的那面）= 指向轴
+    const dy = a.y - R, dz = a.z, restY = position.getY(i);
+    rErr = Math.max(rErr, Math.abs(Math.hypot(dy, dz) - (R - restY)));
+    if (Math.abs(restY) < 1e-4) continue;
+    layerErr = Math.max(layerErr, Math.abs(Math.abs(restY) - 0.007));
+    if (Math.abs(normal.getY(i)) < 0.999) continue;   // 两层最外一圈：静止法线已经向卷边过渡（平铺那条查过）
+        expect.set(0, -dy, -dz).normalize().multiplyScalar(Math.sign(restY)).applyMatrix3(worldRot).normalize();   // 上层指向轴、下层背离轴
     nErr = Math.max(nErr, normals[i].angleTo(expect));
   }
-  Check(rErr < 0.006, "卷成 R = 0.6 m 的圆筒：蒙皮出来的顶点离轴 = R（骨间按双线性 + 骨头朝向插值）", `最大偏差 ${(rErr * 1000).toFixed(2)} mm`);
+  Check(layerErr < 1e-4, "上下两层离骨面各 7 mm（被子厚 1.4 cm）", `最大偏差 ${(layerErr * 1000).toFixed(3)} mm`);
+  Check(rErr < 0.006, "卷成 R = 0.6 m 的圆筒：蒙皮出来的顶点离轴 = R ∓ 半厚（骨间按双线性 + 骨头朝向插值，厚度跟着布面法线走）", `最大偏差 ${(rErr * 1000).toFixed(2)} mm`);
   Check(nErr < 6 * Math.PI / 180, "法线跟着布面转（骨头取布面标架）", `最大偏角 ${(nErr * 180 / Math.PI).toFixed(2)}°`);
 }
 
@@ -222,11 +229,32 @@ function Drag({ seconds = 6, hold = BLANKET_CLOTH.bodyHold } = {}) {
   for (let c = 0; c < cols; c++) { const t = cloth.Index(rows - 1, c), h = cloth.Index(0, c); tailY = Math.max(tailY, x[t * 3 + 1]); tailZ += x[t * 3 + 2] / cols; headZ += x[h * 3 + 2] / cols; }
   Check(Has(x) && Has(cloth.v), "拖 6 s 不出 NaN");
   Check(corner.distanceTo(pinL.target) < 1e-6, "被角在手里（硬钉）", `离手 ${corner.distanceTo(pinL.target).toExponential(2)} m`);
-  Check(tailY < off + 0.02, "尾巴拖在地上", `尾行最高 ${F(tailY)} m`);
+  // 2026-10-23 压短调软之后，拖着走的被尾会堆出一道几厘米高的褶（布该有的样子）；要防的是尾巴被提起来
+  Check(tailY < off + 0.08, "尾巴拖在地上（允许堆出几厘米的褶）", `尾行最高 ${F(tailY)} m`);
   Check(headZ - tailZ > 1.2 && headZ > center, "没对折：被头在前、被尾在后", `头尾相距 ${F(headZ - tailZ, 2)} m`);
   Check(pressedMax > 0, "身下有布被压住（人躺在被子上）", `最多 ${pressedMax} 点`);
-  Check(s.maxStretch < 1.5 && s.minRatio > 0.5, "相邻质点间距拉长 / 压短有上限", `${F(s.maxStretch, 3)} / ${F(s.minRatio, 3)}`);
-  Check(msPerFrame < 3, "每帧（1/60 s，6 个子步 × 10 轮）耗时", `${msPerFrame.toFixed(3)} ms`);
+  // 2026-10-23：拳头比被头远约 1 m（站位够不着，Data_EditorBlockout §5.6），不可拉长的布只能从人身下抽出来；现在的取舍是
+  // 露在外面的布基本不拉长，够不着的那段长度挤在压住区的边上（人身子盖着的那一格）
+  const pressedRows = new Set();
+  for (let i = 0; i < cloth.n; i++) if (cloth.pressed[i]) pressedRows.add(Math.floor(i / cols));
+  const nearPressed = (r) => pressedRows.has(r) || pressedRows.has(r - 1) || pressedRows.has(r + 1);
+  let exposedMax = 0;
+  for (let c = 0; c < cloth.cl.length; c++) {
+    const i = cloth.ci[c * 2], j = cloth.ci[c * 2 + 1];
+    if (cloth.ck[c] !== 0 || nearPressed(Math.floor(i / cols)) || nearPressed(Math.floor(j / cols))) continue;
+    exposedMax = Math.max(exposedMax, Math.hypot(x[j * 3] - x[i * 3], x[j * 3 + 1] - x[i * 3 + 1], x[j * 3 + 2] - x[i * 3 + 2]) / cloth.cl[c]);
+  }
+  Check(exposedMax < 1.2, "露在外面（不在压住区和它旁边一排）的相邻点拉长 < 20%", F(exposedMax, 3));
+  Check(s.maxStretch < 2.5 && s.minRatio > 0.3, "相邻质点间距拉长 / 压短有上限（压住区边上那一格最多 2.5 倍）", `${F(s.maxStretch, 3)} / ${F(s.minRatio, 3)}`);
+  // 2026-10-23 长程系绳：拳头附近（前 6 行）不被拉成尖角（以前这里一格能拉到 1.45 倍，像拉开的胶皮）
+  let nearMax = 0;
+  for (let c = 0; c < cloth.cl.length; c++) {
+    const i = cloth.ci[c * 2], j = cloth.ci[c * 2 + 1];
+    if (cloth.ck[c] !== 0 || Math.floor(i / cols) > 5 || Math.floor(j / cols) > 5) continue;
+    nearMax = Math.max(nearMax, Math.hypot(x[j * 3] - x[i * 3], x[j * 3 + 1] - x[i * 3 + 1], x[j * 3 + 2] - x[i * 3 + 2]) / cloth.cl[c]);
+  }
+  Check(nearMax < 1.12, "拳头附近（前 6 行）相邻点拉长 < 12%", F(nearMax, 3));
+  Check(msPerFrame < 3, "每帧（1/60 s，6 个子步 × 12 轮 + 长程系绳）耗时", `${msPerFrame.toFixed(3)} ms`);
   const again = Drag();
   Check(again.cloth.x.every((v, i) => v === cloth.x[i]), "同样的输入两次结果逐位相同");
 }

@@ -1,4 +1,4 @@
-"""Rebuild the approved five-patch thin sheet in Blender 5.1, without simulation.
+"""Rebuild the approved five-patch single blanket (1.4 cm shell) in Blender 5.1, without simulation.
 
 GUI authoring uses scripts/Script_BlenderMcp.mjs. Headless reproduction:
 blender --background --python Script_SingleBlanketBake.py -- --output-dir <dir>
@@ -52,6 +52,27 @@ def BilinearWeights(point):
             (BoneName(row+1, column+1), u*v)]
 
 
+# 2026-10-23 (user: the dragged sheet's thickness was wrong; read as a hide): a closed 1.4 cm shell instead
+# of a zero-thickness sheet. Top and bottom copies of the 50x60 grid sit +/- half the thickness about the
+# bone plane Z=0 (bones, weights and sockets are unchanged: each vertex keeps the bilinear weights of its
+# X/Y position, so the bone surface frames carry the offset along the cloth normal), and a two-strip
+# rounded hem joins them through a ring that bulges outward at Z=0.
+thicknessM, hemBulgeM = 0.014, 0.004
+
+
+def BoundaryLoop():
+    """Grid (i, j) of the boundary, counter-clockwise seen from +Z, with the in-plane outward direction."""
+    loop = [(i, 0) for i in range(widthSegments)]
+    loop += [(widthSegments, j) for j in range(lengthSegments)]
+    loop += [(i, lengthSegments) for i in range(widthSegments, 0, -1)]
+    loop += [(0, j) for j in range(lengthSegments, 0, -1)]
+    def Outward(i, j):
+        x = -1 if i == 0 else 1 if i == widthSegments else 0
+        y = -1 if j == 0 else 1 if j == lengthSegments else 0
+        return Vector((x, y, 0)).normalized()
+    return [(i, j, Outward(i, j)) for i, j in loop]
+
+
 def CreateMesh():
     rng = random.Random(19380317)
     # Paired inward offsets keep the geometric centre exactly at the origin.
@@ -64,8 +85,9 @@ def CreateMesh():
         amount = amount*amount*(3-2*amount)
         return controls[lower]*(1-amount)+controls[lower+1]*amount
 
-    vertices, faces = [], []
     stride = widthSegments+1
+    gridCount = stride*(lengthSegments+1)
+    plane = []
     for j in range(lengthSegments+1):
         for i in range(widthSegments+1):
             x, y = -0.70 + 1.40*i/widthSegments, -0.95 + 1.90*j/lengthSegments
@@ -73,26 +95,47 @@ def CreateMesh():
                 x += (1 if i == 0 else -1)*EdgeOffset(j, lengthSegments, edgeX)
             if j in (0, lengthSegments):
                 y += (1 if j == 0 else -1)*EdgeOffset(i, widthSegments, edgeY)
-            vertices.append((x, y, 0.0))
+            plane.append((x, y))
+    half = thicknessM/2
+    vertices = [(x, y, half) for x, y in plane] + [(x, y, -half) for x, y in plane]
+    boundary = BoundaryLoop()
+    ringStart = len(vertices)
+    for i, j, outward in boundary:
+        x, y = plane[j*stride+i]
+        vertices.append((x+outward.x*hemBulgeM, y+outward.y*hemBulgeM, 0.0))
+    faces = []
     for j in range(lengthSegments):
         for i in range(widthSegments):
             k = j*stride+i
             faces.append((k, k+1, k+stride+1, k+stride))
+    for j in range(lengthSegments):
+        for i in range(widthSegments):
+            k = gridCount+j*stride+i
+            faces.append((k, k+stride, k+stride+1, k+1))
+    for n, (i, j, _) in enumerate(boundary):
+        a, b = j*stride+i, boundary[(n+1) % len(boundary)][1]*stride+boundary[(n+1) % len(boundary)][0]
+        ma, mb = ringStart+n, ringStart+(n+1) % len(boundary)
+        faces.append((a, ma, mb, b))
+        faces.append((ma, gridCount+a, gridCount+b, mb))
     meshData = bpy.data.meshes.new("Blanket_Geometry")
     meshData.from_pydata(vertices, [], faces)
     meshData.update()
     mesh = bpy.data.objects.new("Blanket_Mesh", meshData)
     bpy.context.collection.objects.link(mesh)
     uv = meshData.uv_layers.new(name="UVMap")
+    ringGrid = {ringStart+n: j*stride+i for n, (i, j, _) in enumerate(boundary)}
     for polygon in meshData.polygons:
         polygon.use_smooth = True
         for loopIndex in polygon.loop_indices:
             vertexIndex = meshData.loops[loopIndex].vertex_index
-            i, j = vertexIndex % stride, vertexIndex // stride
+            # Bottom copies and the hem ring share the top vertex's UV (no seams; the hem is the edge colour).
+            gridIndex = ringGrid.get(vertexIndex, vertexIndex % gridCount)
+            i, j = gridIndex % stride, gridIndex // stride
             # Head-up top views show +X (L) on image left.
             uv.data[loopIndex].uv = (1-i/widthSegments, 1-j/lengthSegments)
     mesh.shape_key_add(name="Basis")
     mesh.shape_key_add(name="Crumpled")
+    mesh["Layers"] = {"gridCount": gridCount, "ringStart": ringStart}
     return mesh
 
 
@@ -149,22 +192,28 @@ def CreateSockets(rig):
     return sockets
 
 
+# 2026-10-23 cloth shading (user: renders like a hide): opaque (closed shell, no alpha cut-outs), soft
+# cotton sheen, low specular, and a tiling crease + plain-weave detail normal instead of the near-flat
+# atlas normal. The detail map repeats every 0.25 m via a Mapping node -> KHR_texture_transform.
+sheenTint, sheenRoughness, specularLevel = (0.32, 0.30, 0.28), 0.65, 0.30
+detailTileM, detailNormalStrength = 0.25, 1.0
+
+
 def CreateMaterial():
     material = bpy.data.materials.new("Mat_SingleBlanket")
     material.use_nodes = True
     material.use_backface_culling = False
-    material.surface_render_method = "DITHERED"
-    material.alpha_threshold = 0.5
     tree = material.node_tree
     bsdf = tree.nodes.get("Principled BSDF")
     bsdf.inputs["Metallic"].default_value = 0
     bsdf.inputs["Roughness"].default_value = 0.92
+    bsdf.inputs["Specular IOR Level"].default_value = specularLevel
     # glTF encodes sheen strength in its colour factor, rather than a separate
     # weight. Keep Blender and the exported MeshPhysicalMaterial consistent.
     bsdf.inputs["Sheen Weight"].default_value = 1.0
-    bsdf.inputs["Sheen Tint"].default_value = (0.10, 0.10, 0.10, 1.0)
-    bsdf.inputs["Sheen Roughness"].default_value = 0.90
-    for channel in ("Base", "Normal", "Orm"):
+    bsdf.inputs["Sheen Tint"].default_value = (*sheenTint, 1.0)
+    bsdf.inputs["Sheen Roughness"].default_value = sheenRoughness
+    for channel in ("Base", "DetailNormal", "Orm"):
         imagePath = projectDir / f"Texture/Texture_SingleBlanket{channel}.webp"
         if not imagePath.exists():
             raise FileNotFoundError(imagePath)
@@ -175,14 +224,16 @@ def CreateMaterial():
         node.name, node.image, node.extension = f"Texture_SingleBlanket{channel}", image, "EXTEND"
         if channel == "Base":
             tree.links.new(node.outputs["Color"], bsdf.inputs["Base Color"])
-            clip = tree.nodes.new("ShaderNodeMath")
-            clip.operation = "GREATER_THAN"
-            clip.inputs[1].default_value = 0.5
-            tree.links.new(node.outputs["Alpha"], clip.inputs[0])
-            tree.links.new(clip.outputs[0], bsdf.inputs["Alpha"])
-        elif channel == "Normal":
+        elif channel == "DetailNormal":
+            node.extension = "REPEAT"
+            coordinates = tree.nodes.new("ShaderNodeTexCoord")
+            mapping = tree.nodes.new("ShaderNodeMapping")
+            mapping.vector_type = "POINT"
+            mapping.inputs["Scale"].default_value = (1.40/detailTileM, 1.90/detailTileM, 1.0)
+            tree.links.new(coordinates.outputs["UV"], mapping.inputs["Vector"])
+            tree.links.new(mapping.outputs["Vector"], node.inputs["Vector"])
             normal = tree.nodes.new("ShaderNodeNormalMap")
-            normal.inputs["Strength"].default_value = 0.35
+            normal.inputs["Strength"].default_value = detailNormalStrength
             tree.links.new(node.outputs["Color"], normal.inputs["Color"])
             tree.links.new(normal.outputs["Normal"], bsdf.inputs["Normal"])
         else:
@@ -278,30 +329,51 @@ def CreatePoses(mesh):
             if r == 0 and c in (0, boneColumnCount-1):
                 released.z = 0
             poses["Blanket_Crumpled"][name] = FoldedSurface(rest[name].x/0.7, rest[name].y/0.95)
-    deltas = []
-    for vertex in mesh.data.vertices:
-        cage = Vector((0, 0, 0))
-        for name, weight in BilinearWeights(vertex.co):
-            cage += weight*poses["Blanket_Crumpled"][name]
-        desired = FoldedSurface(vertex.co.x/0.7, vertex.co.y/0.95)
-        u, v = vertex.co.x/0.7, vertex.co.y/0.95
-        desired.z += 0.0025*math.sin(9*u+2*v)*math.sin(11*v-1.3*u)
-        deltas.append(desired-cage)
-    finalPoints = []
-    for vertex, delta in zip(mesh.data.vertices, deltas):
-        point = delta.copy()
-        for name, weight in BilinearWeights(vertex.co):
-            point += weight*poses["Blanket_Crumpled"][name]
-        finalPoints.append(point)
-    low = Vector(tuple(min(v[k] for v in finalPoints) for k in range(3)))
-    high = Vector(tuple(max(v[k] for v in finalPoints) for k in range(3)))
+    # Crumpled mid-surface on the 51x61 grid (the old single sheet), then each layer is offset along it.
+    layers = mesh["Layers"]
+    gridCount, ringStart = layers["gridCount"], layers["ringStart"]
+    stride = widthSegments+1
+    def Desired(co):
+        u, v = co.x/0.7, co.y/0.95
+        point = FoldedSurface(u, v)
+        point.z += 0.0025*math.sin(9*u+2*v)*math.sin(11*v-1.3*u)
+        return point
+    gridPoints = [Desired(mesh.data.vertices[k].co) for k in range(gridCount)]
+    low = Vector(tuple(min(v[k] for v in gridPoints) for k in range(3)))
+    high = Vector(tuple(max(v[k] for v in gridPoints) for k in range(3)))
     scale = Vector((0.45/(high.x-low.x), 0.45/(high.y-low.y), 0.25/(high.z-low.z)))
     offset = Vector((-(high.x+low.x)*0.5*scale.x, -(high.y+low.y)*0.5*scale.y, -low.z*scale.z))
+    surface = [Vector(tuple(p[k]*scale[k]+offset[k] for k in range(3))) for p in gridPoints]
+    def GridAt(i, j):
+        return surface[min(lengthSegments, max(0, j))*stride+min(widthSegments, max(0, i))]
+    normals, outwards = [], {}
+    for j in range(lengthSegments+1):
+        for i in range(widthSegments+1):
+            du = GridAt(i+1, j)-GridAt(i-1, j)
+            dv = GridAt(i, j+1)-GridAt(i, j-1)
+            normals.append(du.cross(dv).normalized())
+    for n, (i, j, outward) in enumerate(BoundaryLoop()):
+        k = j*stride+i
+        tangent = (GridAt(i+int(outward.x > 0.1)-int(outward.x < -0.1), j)-GridAt(i, j))*abs(outward.x) +                   (GridAt(i, j+int(outward.y > 0.1)-int(outward.y < -0.1))-GridAt(i, j))*abs(outward.y)
+        tangent -= normals[k]*tangent.dot(normals[k])
+        outwards[ringStart+n] = (k, tangent.normalized() if tangent.length > 1e-9 else Vector((0, 0, 0)))
     for name, value in poses["Blanket_Crumpled"].items():
         poses["Blanket_Crumpled"][name] = Vector(tuple(value[k]*scale[k]+offset[k] for k in range(3)))
     key = mesh.data.shape_keys.key_blocks["Crumpled"]
-    for vertex, delta in zip(mesh.data.vertices, deltas):
-        key.data[vertex.index].co = vertex.co + Vector(tuple(delta[k]*scale[k] for k in range(3)))
+    half = thicknessM/2
+    for vertex in mesh.data.vertices:
+        index = vertex.index
+        if index in outwards:
+            k, tangent = outwards[index]
+            desired = surface[k]+tangent*hemBulgeM
+        else:
+            k = index % gridCount
+            desired = surface[k]+normals[k]*(half if index < gridCount else -half)
+        # Pre-skin position: skinning only translates in this pose, by the bilinear bone displacement.
+        displacement = Vector((0, 0, 0))
+        for name, weight in BilinearWeights(vertex.co):
+            displacement += weight*(poses["Blanket_Crumpled"][name]-rest[name])
+        key.data[index].co = desired-displacement
     lift = {n: v.copy() for n, v in rest.items()}
     lift["Blanket_CornerHeadL"].z = lift["Blanket_CornerHeadR"].z = 0.8
     drape = {n: v.copy() for n, v in rest.items()}
@@ -437,18 +509,24 @@ def EvaluatedPoints(mesh):
 
 def CheckSource(rig, mesh, sockets, poses):
     ClearPose(rig, mesh)
-    assert len(mesh.data.vertices) == (widthSegments+1)*(lengthSegments+1)
-    assert len(mesh.data.polygons) == widthSegments*lengthSegments
-    assert all(len(p.vertices) == 4 and p.area > 1e-8 and p.normal.z > 0.99 for p in mesh.data.polygons)
+    gridCount, sheetQuads, hemEdges = (widthSegments+1)*(lengthSegments+1), widthSegments*lengthSegments, 2*(widthSegments+lengthSegments)
+    assert len(mesh.data.vertices) == 2*gridCount+hemEdges
+    assert len(mesh.data.polygons) == 2*sheetQuads+2*hemEdges
+    polygons = mesh.data.polygons
+    assert all(len(p.vertices) == 4 and p.area > 1e-8 for p in polygons)
+    assert all(p.normal.z > 0.99 for p in polygons[:sheetQuads]) and all(p.normal.z < -0.99 for p in polygons[sheetQuads:2*sheetQuads])
+    # Hem quads face outward (away from the sheet centre in X/Y).
+    assert all(p.normal.to_2d().dot(p.center.to_2d()) > 0 for p in polygons[2*sheetQuads:])
     edgeUses = {}
     for polygon in mesh.data.polygons:
         for edge in polygon.edge_keys:
             edgeUses[edge] = edgeUses.get(edge, 0)+1
-    assert all(count in (1, 2) for count in edgeUses.values())
-    assert sum(count == 1 for count in edgeUses.values()) == 2*(widthSegments+lengthSegments)
-    assert len(mesh.data.vertices)-len(mesh.data.edges)+len(mesh.data.polygons) == 1
+    # A closed, manifold shell: every edge shared by exactly two faces, genus 0.
+    assert all(count == 2 for count in edgeUses.values())
+    assert len(mesh.data.vertices)-len(mesh.data.edges)+len(mesh.data.polygons) == 2
     edgeLengths = [(mesh.data.vertices[e.vertices[0]].co-mesh.data.vertices[e.vertices[1]].co).length for e in mesh.data.edges]
-    topology = {"gridSegments": [widthSegments, lengthSegments],
+    topology = {"gridSegments": [widthSegments, lengthSegments], "layers": 2, "thicknessM": thicknessM,
+                "hemBulgeM": hemBulgeM, "hemQuads": 2*hemEdges, "closedShell": True,
                 "boundaryEdges": sum(count == 1 for count in edgeUses.values()),
                 "minQuadAreaM2": min(p.area for p in mesh.data.polygons),
                 "minEdgeLengthM": min(edgeLengths), "maxEdgeLengthM": max(edgeLengths)}
@@ -493,7 +571,8 @@ def CheckSource(rig, mesh, sockets, poses):
     bpy.context.view_layer.update()
     crumpled = EvaluatedPoints(mesh)
     size = [max(p[k] for p in crumpled)-min(p[k] for p in crumpled) for k in range(3)]
-    assert max(abs(a-b) for a, b in zip(size, (0.45, 0.45, 0.25))) < 1e-5, size
+    # The mid-surface is fitted to 0.45 x 0.45 x 0.25 m; the shell adds at most its thickness and hem.
+    assert all(-1e-5 < a-b < thicknessM+2*hemBulgeM for a, b in zip(size, (0.45, 0.45, 0.25))), size
     ClearPose(rig, mesh)
     return {"restMaxDeviationM": restError, "weightSumMaxError": sumError,
             "nonzeroInfluences": counts, "liftHeadLHeightM": 0.60, "liftAffectedVertices": affected,
@@ -700,7 +779,9 @@ def Main():
     assert "inverseBindMatrices" in document["skins"][0]
     assert [a["name"] for a in document["animations"]] == list(clipNames)
     assert len(document["meshes"][0]["primitives"][0]["targets"]) == 1
-    assert document["materials"][0]["alphaMode"] == "MASK"
+    material = document["materials"][0]
+    assert material.get("alphaMode", "OPAQUE") == "OPAQUE"
+    assert "KHR_texture_transform" in material["normalTexture"].get("extensions", {}), material["normalTexture"]
     checks.update(CheckRoundTrip(path, originalPoints))
     CreateProxy()
     rig.animation_data.use_nla = True

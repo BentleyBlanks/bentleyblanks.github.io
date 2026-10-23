@@ -87,16 +87,20 @@ const MaxError=(a,b)=>Math.max(...a.map((p,i)=>Distance(p,b[i])));
 const Size=points=>[0,1,2].map(k=>Math.max(...points.map(p=>p[k]))-Math.min(...points.map(p=>p[k])));
 assert.equal(doc.skins.length,1);assert.equal(skin.joints.length,217);assert.equal(ibm.length,217);
 assert.equal(doc.meshes.length,1);assert.equal(doc.meshes[0].primitives.length,1);
-assert.equal(positions.length,3111);assert.equal(Accessor(primitive.indices).length/3,6000);
-// A single welded, connected sheet is needed by the future per-vertex solver.
+// 2026-10-23: a closed 1.4 cm shell (top + bottom 51x61 grids at y=+/-7 mm, 220-vertex rounded hem ring).
+assert.equal(positions.length,6442);assert.equal(Accessor(primitive.indices).length/3,12880);
+// One welded, connected, closed surface.
 const triangles=Accessor(primitive.indices).flat();
 const edges=new Map(),connected=Array.from({length:positions.length},(_,i)=>i);
 function Find(i){while(connected[i]!==i){connected[i]=connected[connected[i]];i=connected[i];}return i;}
 let minTriangleArea=Infinity,minEdgeLength=Infinity,maxEdgeLength=0;
 for(let i=0;i<triangles.length;i+=3){
   const ids=triangles.slice(i,i+3),a=positions[ids[0]],b=positions[ids[1]],c=positions[ids[2]];
-  const areaY=((b[2]-a[2])*(c[0]-a[0])-(b[0]-a[0])*(c[2]-a[2]))/2;
-  assert.ok(areaY>1e-8,'Non-degenerate, consistently upward triangles');minTriangleArea=Math.min(minTriangleArea,areaY);
+  const areaY=((b[2]-a[2])*(c[0]-a[0])-(b[0]-a[0])*(c[2]-a[2]))/2, ys=[a[1],b[1],c[1]];
+  if(ys.every(y=>y>0.0069))assert.ok(areaY>1e-8,'Top layer: non-degenerate, facing up');
+  else if(ys.every(y=>y<-0.0069))assert.ok(areaY<-1e-8,'Bottom layer: non-degenerate, facing down');
+  const area=Math.hypot(...[0,1,2].map(k=>{const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];return u[(k+1)%3]*v[(k+2)%3]-u[(k+2)%3]*v[(k+1)%3];}))/2;
+  assert.ok(area>1e-8,'Non-degenerate triangle');minTriangleArea=Math.min(minTriangleArea,area);
   for(let k=0;k<3;k++){
     const p=ids[k],q=ids[(k+1)%3],key=p<q?`${p},${q}`:`${q},${p}`;
     edges.set(key,(edges.get(key)||0)+1);connected[Find(p)]=Find(q);
@@ -105,20 +109,21 @@ for(let i=0;i<triangles.length;i+=3){
 }
 assert.equal(new Set(positions.map(p=>p.map(v=>v.toFixed(7)).join(','))).size,positions.length);
 assert.equal(new Set(positions.map((_,i)=>Find(i))).size,1);
-assert.ok([...edges.values()].every(n=>n===1||n===2));
-assert.equal([...edges.values()].filter(n=>n===1).length,220);
-assert.equal(positions.length-edges.size+triangles.length/3,1);
-assert.ok(minEdgeLength>1.4/50-0.015-1e-6&&maxEdgeLength<0.05);
+assert.ok([...edges.values()].every(n=>n===2),'Closed manifold shell');
+assert.equal(positions.length-edges.size+triangles.length/3,2);
+assert.ok(minEdgeLength>0.007&&maxEdgeLength<0.05);
 assert.equal(primitive.targets.length,1);assert.ok(primitive.targets[0].NORMAL!==undefined);
 assert.deepEqual(doc.meshes[0].extras.targetNames,['Crumpled']);
 assert.ok(primitive.attributes.JOINTS_1===undefined && primitive.attributes.WEIGHTS_1===undefined);
 const material=doc.materials[0];
-assert.equal(material.name,'Mat_SingleBlanket');assert.equal(material.alphaMode,'MASK');
-assert.equal(material.alphaCutoff??0.5,0.5);assert.equal(material.doubleSided,true);
-assert.ok(Math.abs(material.normalTexture.scale-0.35)<1e-6);
+assert.equal(material.name,'Mat_SingleBlanket');assert.equal(material.alphaMode??'OPAQUE','OPAQUE');assert.equal(material.doubleSided,true);
+// Tiling crease + weave detail normal, 0.25 m repeat across the 1.4 x 1.9 m UV.
+assert.ok(Math.abs((material.normalTexture.scale??1)-1)<1e-6);
+assert.deepEqual(material.normalTexture.extensions.KHR_texture_transform.scale.map(v=>+v.toFixed(4)),[5.6,7.6]);
 assert.ok(material.extensions?.KHR_materials_sheen);
-assert.ok(material.extensions.KHR_materials_sheen.sheenColorFactor.every(v=>Math.abs(v-0.10)<1e-6));
-assert.ok(Math.abs(material.extensions.KHR_materials_sheen.sheenRoughnessFactor-0.90)<1e-6);
+assert.ok(material.extensions.KHR_materials_sheen.sheenColorFactor.every((v,k)=>Math.abs(v-[0.32,0.30,0.28][k])<1e-6));
+assert.ok(Math.abs(material.extensions.KHR_materials_sheen.sheenRoughnessFactor-0.65)<1e-6);
+assert.ok(Math.abs(material.extensions.KHR_materials_specular.specularFactor-0.6)<1e-6);
 assert.equal(doc.images.length,3);assert.ok(doc.images.every(i=>i.bufferView!==undefined&&!i.uri));
 assert.ok(!JSON.stringify(doc.extensionsUsed||[]).includes('draco'));
 assert.ok(!doc.nodes.some(n=>n.name?.startsWith('Ref_')||n.camera!==undefined));
@@ -149,7 +154,7 @@ weights.forEach((row,i)=>{
 assert.ok(sumError<0.001&&rootWeight===0&&bilinearWeightMaxError<1e-7);
 const rest=State(), restPoints=SkinPoints(rest), unskinned=positions.map(p=>Point(rest.world[meshNode],p));
 const restError=MaxError(restPoints,unskinned);assert.ok(restError<0.0001);
-assert.ok(Math.max(...unskinned.map(p=>Math.abs(p[1])))<0.0001);
+assert.ok(Math.max(...unskinned.map(p=>Math.abs(p[1])))<0.007+1e-6);
 for(let r=0;r<18;r++)for(let c=0;c<12;c++)assert.ok(Distance(Point(rest.world[byName.get(BoneName(r,c))],[0,0,0]),[x[c],0,-y[r]])<0.0001);
 const headL=byName.get('Blanket_CornerHeadL'), liftMatrix=[...rest.world[headL]];liftMatrix[13]+=0.6;
 const lifted=SkinPoints(rest,new Map([[headL,liftMatrix]]));
@@ -176,7 +181,8 @@ const flat=SkinPoints(states[0]),crumpled=SkinPoints(states[3]);
 const unfolded=SkinPoints(State(doc.animations[4],44)), unfoldStart=SkinPoints(states[4]);
 const unfoldStartError=MaxError(crumpled,unfoldStart),unfoldEndError=MaxError(flat,unfolded);
 assert.ok(unfoldStartError<1e-6&&unfoldEndError<1e-6);
-const crumpledSize=Size(crumpled);assert.ok(Math.max(...crumpledSize.map((v,k)=>Math.abs(v-[0.45,0.25,0.45][k])))<0.0001);
+// Mid-surface fitted to 0.45 x 0.25 x 0.45 m; the shell adds at most its thickness + hem.
+const crumpledSize=Size(crumpled);assert.ok(crumpledSize.every((v,k)=>v-[0.45,0.25,0.45][k]>-1e-4&&v-[0.45,0.25,0.45][k]<0.022));
 const drag=states[1];
 assert.ok(Distance(Point(drag.world[headL],[0,0,0]),[0.55,0.70,1.15])<0.0001);
 const gripError=Distance(Point(drag.world[byName.get('Socket_GripHeadL')],[0,0,0]),[0.55,0.70,1.15]);
@@ -191,11 +197,11 @@ for(const pin of source.simulationMesh.cornerPins){
   const socket=Point(rest.world[byName.get(pin.socket)],[0,0,0]);
   const offset=pin.restOffsetGltfM;assert.equal(offset.length,3);
   assert.ok(Distance(positions[pin.vertexGlb],socket.map((v,k)=>v+offset[k]))<1e-7);
-  assert.ok(Distance(positions[pin.vertexGlb],socket)<0.022);
+  assert.ok(Distance(positions[pin.vertexGlb],socket)<0.025);
 }
 const sha256=crypto.createHash('sha256').update(raw).digest('hex');assert.equal(source.sha256,sha256);
-const report={file:'Model/Model_SingleBlanket.glb',sha256,vertices:positions.length,triangles:6000,joints:217,
-  topology:{welded:true,connectedComponents:1,boundaryEdges:220,minTriangleAreaM2:minTriangleArea,minEdgeLengthM:minEdgeLength,maxEdgeLengthM:maxEdgeLength},
+const report={file:'Model/Model_SingleBlanket.glb',sha256,vertices:positions.length,triangles:12880,joints:217,
+  topology:{welded:true,closedShell:true,thicknessM:0.014,connectedComponents:1,boundaryEdges:0,minTriangleAreaM2:minTriangleArea,minEdgeLengthM:minEdgeLength,maxEdgeLengthM:maxEdgeLength},
   bilinearWeightMaxError,
   nonzeroInfluences:influenceCounts,weightSumMaxError:sumError,rootMaxWeight:rootWeight,
   cpuRestMaxDeviationM:restError,cpuLiftInterpolationMaxErrorM:liftError,

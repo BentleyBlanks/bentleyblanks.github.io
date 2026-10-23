@@ -1,6 +1,6 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-10-20",
+  "date": "2026-10-23",
   "name": "SingleBlanket",
   "preset": "singleBlanketAtlas",
   "source": {
@@ -76,8 +76,8 @@
       "file": "Texture_SingleBlanketBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 287576,
-      "sha256": "d91a69cf2ab33d43ea4d8125111b427355f54354b4075c3c6083fe2b3281d733"
+      "bytes": 101410,
+      "sha256": "175afd16689c244626190624c467bdc0709b2e1384f9232d4eeaac791b465653"
     },
     {
       "channel": "Normal",
@@ -96,7 +96,7 @@
       "sha256": "bd7cac9c90e2684d2f5f4d09599357c18d1fe733462a9bf30790e8ac495e55c3"
     }
   ],
-  "totalBytes": 694354,
+  "totalBytes": 508188,
   "metrics": {
     "meanSrgb": [
       0.6531,
@@ -125,5 +125,38 @@
     "alphaSource": "_import/Source/SingleBlanket/Texture_SingleBlanketReferenceAlpha.png",
     "alphaSha256": "430389dff04d84524fecc8d7da5fa52598fa1f1812254f24b5a99ea14e28950a",
     "method": "Approved imagegen RGB projected into square UV; prior edge alpha retained; no repainting"
+  },
+  "clothPass20261023": {
+    "base": {
+      "base": "Texture/Texture_SingleBlanketBase.webp",
+      "fineDetailKeptOnBody": 0.3,
+      "alpha": "opaque",
+      "hem": {
+        "widthM": 0.028,
+        "darken": 0.06,
+        "stitchFromEdgeM": 0.017,
+        "stitchPitchM": 0.018
+      }
+    },
+    "detailNormal": {
+      "detailNormal": "Texture/Texture_SingleBlanketDetailNormal.webp",
+      "size": [
+        512,
+        512
+      ],
+      "tileM": 0.25,
+      "creases": 110,
+      "weavePitchM": 0.001953125,
+      "slopeDegP95": 7.35,
+      "convention": "gl",
+      "file": {
+        "channel": "DetailNormal",
+        "file": "Texture_SingleBlanketDetailNormal.webp",
+        "width": 512,
+        "height": 512,
+        "bytes": 201330,
+        "sha256": "20910fcc081a762d706795cc4e3d51c974eb00510bb52752916696672d4541d2"
+      }
+    }
   }
 }

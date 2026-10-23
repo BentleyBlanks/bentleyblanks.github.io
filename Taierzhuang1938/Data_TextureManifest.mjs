@@ -133,7 +133,16 @@ export const TEXTURE_MANIFEST = Object.freeze([
     consumers: [{ file: "_blender/Script_SingleBlanketBake.py", token: "Texture_SingleBlanket" }],
     files: [["Texture_SingleBlanketBase.webp", "Base", 1024, 1024],
       ["Texture_SingleBlanketNormal.webp", "Normal", 1024, 1024], ["Texture_SingleBlanketOrm.webp", "Orm", 1024, 1024]],
-    note: "Rebuild sources; embedded in Model_SingleBlanket.glb, no separate boot or level requests",
+    note: "Rebuild sources; embedded in Model_SingleBlanket.glb, no separate boot or level requests. 2026-10-23 cloth pass: Base opaque with hem and softened imagegen relief; the near-flat atlas Normal is no longer used by the GLB, which repeats the 0.25 m DetailNormal (creases + plain weave) via KHR_texture_transform",
+  },
+  {
+    id: "SingleBlanketDetailNormal", kind: "detail", tier: "offline",
+    packing: "RGB tangent-space normal (OpenGL +Y), lossless; 0.25 m square repeat: 110 soft crease ridges + ~2 mm plain weave",
+    bake: "_import/Script_SingleBlanketTextureBake.py",
+    source: { provider: "procedural", date: "2026-10-23", ref: "_import/Script_SingleBlanketTextureBake.py" },
+    consumers: [{ file: "_blender/Script_SingleBlanketBake.py", token: "Texture_SingleBlanket" }],
+    files: [["Texture_SingleBlanketDetailNormal.webp", "Detail", 512, 512]],
+    note: "Embedded in Model_SingleBlanket.glb as normalTexture with KHR_texture_transform 5.6 x 7.6; the cloth solver's 11-13 cm bone grid cannot fold finer than this",
   },
   {
     id: "SingleBlanketStoryMask", kind: "decal", tier: "offline",

@@ -1,12 +1,21 @@
 # 五补丁薄土布单被
 
-2026-10-19，Blender 5.1.2。按用户确认的五补丁三视图制作；随后按“看起来不柔软”的反馈改细棉布织纹、减轻浮雕、重做圆缓软褶和垂覆。单层薄布，无填充、厚度、绗缝、约束、IK、驱动器或布料模拟。
+2026-10-19，Blender 5.1.2。按用户确认的五补丁三视图制作；随后按“看起来不柔软”的反馈改细棉布织纹、减轻浮雕、重做圆缓软褶和垂覆。无填充、绗缝、约束、IK、驱动器；资产里不带布料模拟（游戏内实时模拟见文末）。
+
+**2026-10-23 厚度与布面（用户：拖冬瓜的被子厚度有问题，模拟和渲染都像一张皮）**：
+
+- 网格从零厚度单片改成 **1.4 cm 封闭双层壳**：上下两份 50×60 网格各在骨面（Z=0）上下 7 mm，四周一圈圆卷边（两条四边形带，中间那圈在 Z=0、往外鼓 4 mm）。骨骼、权重、挂点、五个动作不变：每个顶点仍按自己 X/Y 的双线性权重蒙皮，骨头取布面标架，所以厚度跟着布面法线走（`Script_BlanketClothTest` 卷圆筒：两层离轴 R ∓ 7 mm，偏差 2.6 mm）。6442 顶点、6440 四边形、12880 三角；每条边都恰好两个面、V−E+F=2。形态键 Crumpled 按中面（原单片）偏移出两层与卷边，团起来的包围盒比 0.45×0.45×0.25 m 多出不到一个厚度。
+- 材质改**不透明**（壳子是封闭的，alpha 裁边会露出空心）。原来 3–4.5 cm 宽的毛边透明带由邻近布面推拉填满，做成卷边：暗 6%、离边 1.7 cm 一道疏针脚。
+- 基色去掉 imagegen 烘进去的「蚯蚓纹」明暗（3–10 像素的弯曲浮雕光影，近看像皮革 / 羊皮纸）：保留 5 像素低通的亮度（污渍、旧色、补丁深浅），亮布面只留 30% 的细节，补丁与针脚全留；色相饱和度不动。
+- 法线不再用 1024 图集法线（实测近乎全平），改用 **512×512、0.25 m 一块的平铺细皱 + 平纹织纹法线**（110 道随机软折痕，主方向两组；约 2 mm 一根纱的平纹），经 Mapping 节点导出为 `KHR_texture_transform`（5.6×7.6 次）。布料求解器的骨格 11–13 cm，比这更细的皱只能靠它。
+- 绒光 `sheenColor` 0.32/0.30/0.28（原 0.10）、`sheenRoughness` 0.65（原 0.90）；`KHR_materials_specular` 0.6（Blender Specular IOR Level 0.3，棉布反光低）。
+- 两步都在重建脚本里：`_import/Script_SingleBlanketTextureBake.py` 的 `FinishBase` / `BakeDetailNormal`（烘焙记录 `clothPass20261023`），`_blender/Script_SingleBlanketBake.py` 的 `CreateMesh` / `CreateMaterial`。下文「网格」「材质」两节的单层 / MASK / normalTexture 0.35 等数字是 10-20 版的，以本段为准。
 
 2026-10-20续修：按用户要求，变形骨从72根再增至216根，采用纵18行×横12列，另保留1根Root，共217骨。主网格保留50×60、3111顶点、3000四边形、6000三角；全部权重与五个动作已按新骨格重建。材质直接以已确认的imagegen V3正视布面作为UV投影源，保留原补丁轮廓、织纹与旧色；法线 relief 0.06毫米、scale 0.35，粗糙度约0.92，减轻浮雕与亮绒光。垂覆顶点相对替身顶部的最小间距由上版约3厘米缩至约1厘米。
 
 ## 交付与重建
 
-- 游戏资产：[Model_SingleBlanket.glb](../Model/Model_SingleBlanket.glb)，1,581,076字节；[机器契约](../Model/Data_SingleBlanket.json)。
+- 游戏资产：[Model_SingleBlanket.glb](../Model/Model_SingleBlanket.glb)，1,757,168字节（2026-10-23 双层壳）；[机器契约](../Model/Data_SingleBlanket.json)。
 - [独立泥血遮罩](../Texture/Texture_SingleBlanketMask.webp)，1024×1024，无损WebP，未接进材质。
 - [Blender重建脚本](../_blender/Script_SingleBlanketBake.py)、[贴图烘焙](../_import/Script_SingleBlanketTextureBake.py)、[独立GLB/CPU校验](../_blender/Script_SingleBlanketVerify.mjs)、[浏览器GLTFLoader校验](../_blender/Script_SingleBlanketBrowserVerify.mjs)、[出图脚本](../_blender/Script_SingleBlanketShots.py)。
 - 源工程：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/SingleBlanket/Scene_SingleBlanket.blend`。参考、截图、对标图在同目录的`Reference/`与`Review/`，均不入仓库。
@@ -318,7 +327,7 @@ Base RGBA、Normal、ORM均1024×1024，全部内嵌GLB。平纹洗旧棉布、�
 | 两次独立无界面复建 | SHA-256完全相同，且与交付GLB一致 |
 | 浏览器GLTFLoader | 五动作正常读入、217骨、6000三角；展开首尾偏差≤2.6×10⁻⁸米，无页面错误 |
 
-GLB SHA-256：`15a16e38cbd97076d1fee5d400d3d4f36fd5c20072877547c8e9cc510e6b8b08`。
+GLB SHA-256（2026-10-23 双层壳）：`2b83eb41892c71c1a950141f2f2cd156ad60ee17f07149dc1342238e6e37873e`。
 
 ## 游戏内实时模拟
 
