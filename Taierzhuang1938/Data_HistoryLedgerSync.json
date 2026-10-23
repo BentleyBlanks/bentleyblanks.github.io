@@ -83,7 +83,11 @@
           "id": "3fd60335331c818fa24deadb6d72ca70",
           "lastEdited": "2026-10-23T13:00:58.270Z"
         }
-      ]
+      ],
+      "materialRevision": "SurfaceV2",
+      "materialReviewedAt": "2026-10-24",
+      "materialReview": "Model/Type89MediumTank/Data_MaterialReview.json",
+      "materialScope": "Appearance-only rematch from recovered original and same-car close-ups; historical labels and Notion source-page timestamps remain unchanged"
     }
   ],
   "notionPages": [

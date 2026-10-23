@@ -9,6 +9,7 @@ not a claim about its original 1938 factory finish.
 import bpy
 import bmesh
 import math
+import hashlib
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
@@ -20,7 +21,17 @@ def Attribute(mesh,name,dataType='FLOAT'):
     return existing or mesh.attributes.new(name,dataType,'POINT')
 
 
-def PrepareSurfaceAttributes(objects, samples=12, onObject=None):
+def PrepareSurfaceAttributes(objects, samples=12, onObject=None, allObjects=None):
+    # Sample the assembled vehicle, including every tread instance. Per-part AO
+    # misses the dark seams, fender underside and dirt-catching wheel recesses.
+    points=[];triangles=[]
+    for obj in allObjects or objects:
+        if obj.type!='MESH':continue
+        obj.data.calc_loop_triangles();base=len(points)
+        points.extend(obj.matrix_world@vertex.co for vertex in obj.data.vertices)
+        triangles.extend(tuple(base+index for index in face.vertices) for face in obj.data.loop_triangles)
+    assembly=BVHTree.FromPolygons(points,triangles,all_triangles=True,epsilon=.000001)
+    del points,triangles
     seen=set()
     for obj in objects:
         if obj.type!='MESH' or obj.data in seen:
@@ -32,12 +43,16 @@ def PrepareSurfaceAttributes(objects, samples=12, onObject=None):
         bm.verts.ensure_lookup_table();bm.normal_update()
         bvh=BVHTree.FromBMesh(bm,epsilon=.000005)
         rest=Attribute(mesh,'RestCoord','FLOAT_VECTOR')
+        restWorld=Attribute(mesh,'RestWorld','FLOAT_VECTOR')
         height=Attribute(mesh,'RestHeight')
         convex=Attribute(mesh,'SurfaceConvex')
         cavity=Attribute(mesh,'SurfaceCavity')
         ao=Attribute(mesh,'SurfaceAO')
         dust=Attribute(mesh,'SurfaceDust')
         finish=Attribute(mesh,'SurfaceFinish')
+        part=Attribute(mesh,'SurfacePart')
+        wear=Attribute(mesh,'SurfaceWear')
+        partSeed=int(hashlib.sha256(obj.name.encode()).hexdigest()[:8],16)/0xffffffff
         if not any(value.value for value in finish.data):
             # Explicit zero finish on gun-jacket components is meaningful.
             if not any(token in obj.name for token in ['MachineGun','Mg']):
@@ -46,7 +61,11 @@ def PrepareSurfaceAttributes(objects, samples=12, onObject=None):
         isWheel=any(token in obj.name for token in ['Wheel','Idler','Sprocket','Roller'])
         for i,vertex in enumerate(bm.verts):
             rest.data[i].vector=vertex.co
-            height.data[i].value=(obj.matrix_world@vertex.co).z
+            worldPoint=obj.matrix_world@vertex.co
+            restWorld.data[i].vector=worldPoint
+            height.data[i].value=worldPoint.z
+            part.data[i].value=partSeed
+            wear.data[i].value=min(1,max(0,(vertex.co.z+.005)/.025)) if isShoe else 0
             dust.data[i].value=.8 if isShoe else (.55 if isWheel else 0)
             normal=vertex.normal.normalized()
             signed=[]
@@ -59,19 +78,20 @@ def PrepareSurfaceAttributes(objects, samples=12, onObject=None):
             if normal.length<.5:
                 ao.data[i].value=1
                 continue
+            normal=(obj.matrix_world.to_3x3().inverted().transposed()@normal).normalized()
             tangent=normal.cross(Vector((0,0,1)))
             if tangent.length<.1:tangent=normal.cross(Vector((0,1,0)))
             tangent.normalize();bitangent=normal.cross(tangent).normalized()
             occlusion=0
-            origin=vertex.co+normal*.0006
+            origin=worldPoint+normal*.0009
             for sample in range(samples):
                 u=(sample+.5)/samples
                 angle=sample*2.399963229728653
                 radial=math.sqrt(u)
                 direction=tangent*(math.cos(angle)*radial)+bitangent*(math.sin(angle)*radial)+normal*math.sqrt(1-u)
-                hit=bvh.ray_cast(origin,direction,.060)[0]
-                occlusion+=hit is not None
-            ao.data[i].value=max(.20,1-occlusion/max(1,samples)*.75)
+                hit,_,_,distance=assembly.ray_cast(origin,direction,.22)
+                occlusion+=max(0,1-distance/.22) if hit is not None else 0
+            ao.data[i].value=max(.24,1-occlusion/max(1,samples)*.78)
         bm.free()
         if onObject:onObject(obj.name,len(seen))
 
@@ -125,6 +145,15 @@ class SurfaceGraph:
         self.Link(coordinate,node.inputs['Vector'])
         return node.outputs['Fac']
 
+    def Scale(self,coordinate,scale):
+        node=self.nodes.new('ShaderNodeVectorMath');node.operation='MULTIPLY'
+        self.Link(coordinate,node.inputs[0]);node.inputs[1].default_value=scale
+        return node.outputs[0]
+
+    def Ramp(self,value,low,high):
+        x=self.Math('MULTIPLY',self.Math('SUBTRACT',value,low),1/(high-low),True)
+        return self.Math('MULTIPLY',self.Math('MULTIPLY',x,x),self.Math('SUBTRACT',3,self.Math('MULTIPLY',x,2)),True)
+
     def Build(self):
         role=self.role
         coordinate=self.Attr('RestCoord','Vector')
@@ -134,34 +163,46 @@ class SurfaceGraph:
         ambient=self.Attr('SurfaceAO')
         dustBias=self.Attr('SurfaceDust')
         finish=self.Attr('SurfaceFinish')
-        grain=self.Noise(coordinate,720 if role=='Armor' else 440,2)
-        macro=self.Noise(coordinate,8.5,4)
-        breakup=self.Noise(coordinate,115,3)
+        world=self.Attr('RestWorld','Vector')
+        part=self.Attr('SurfacePart')
+        wear=self.Attr('SurfaceWear')
+        grain=self.Noise(coordinate,380 if role=='Armor' else 260,3)
+        macro=self.Noise(world,5.5,5)
+        breakup=self.Noise(coordinate,135,3)
+        meso=self.Noise(coordinate,75,4)
+        drips=self.Noise(self.Scale(world,(28,28,1.8)),1,3)
+        split=self.nodes.new('ShaderNodeSeparateXYZ');self.Link(coordinate,split.inputs[0])
         geometry=self.nodes.new('ShaderNodeNewGeometry')
         bevel=self.nodes.new('ShaderNodeBevel');bevel.samples=4;bevel.inputs['Radius'].default_value=.0018
         dot=self.nodes.new('ShaderNodeVectorMath');dot.operation='DOT_PRODUCT'
         self.links.new(geometry.outputs['Normal'],dot.inputs[0]);self.links.new(bevel.outputs['Normal'],dot.inputs[1])
         pixelEdge=self.Math('MULTIPLY',self.Math('SUBTRACT',1,dot.outputs['Value']),28,True)
         restrainedEdge=self.Math('MAXIMUM',pixelEdge,self.Math('MULTIPLY',convex,.035))
-        lower=self.Math('MULTIPLY',self.Math('SUBTRACT',.72,height),1.8,True)
-        dust=self.Math('MAXIMUM',self.Math('MULTIPLY',lower,.28),self.Math('MULTIPLY',dustBias,.35))
-        dust=self.Math('MULTIPLY',dust,self.Math('ADD',.4,self.Math('MULTIPLY',macro,.6)),True)
-        chip=self.Math('MULTIPLY',self.Math('GREATER_THAN',restrainedEdge,.075),self.Math('GREATER_THAN',breakup,.57),True)
-        oxide=self.Math('MULTIPLY',self.Math('MAXIMUM',cavity,self.Math('SUBTRACT',1,ambient)),self.Math('GREATER_THAN',breakup,.48),True)
-        dustColor=self.Color((.205,.174,.108))
-        oxideColor=self.Color((.095,.033,.012))
+        lower=self.Math('MULTIPLY',self.Math('SUBTRACT',1.35,height),1.2,True)
+        recess=self.Math('MAXIMUM',cavity,self.Math('SUBTRACT',1,ambient))
+        dust=self.Math('MULTIPLY',self.Math('MAXIMUM',self.Math('MULTIPLY',lower,.22),self.Math('MULTIPLY',dustBias,.18)),self.Math('ADD',.3,self.Math('MULTIPLY',macro,1.0)),True)
+        chip=self.Math('MULTIPLY',self.Ramp(restrainedEdge,.12,.5),self.Ramp(breakup,.59,.72),True)
+        oxide=self.Math('MULTIPLY',recess,self.Ramp(breakup,.48,.68),True)
+        dustColor=self.Color((.16,.125,.060))
+        oxideColor=self.Color((.10,.045,.018))
         steelColor=self.Color((.38,.41,.41))
-        variation=self.Math('ADD',.94,self.Math('MULTIPLY',macro,.12))
+        variation=self.Math('ADD',.77,self.Math('ADD',self.Math('MULTIPLY',macro,.39),self.Math('MULTIPLY',part,.065)))
+        relief=self.Math('ADD',self.Math('MULTIPLY',grain,.40),self.Math('MULTIPLY',meso,.60))
         if role=='Armor':
-            base=self.Color((.205,.188,.091))
+            base=self.Color((.205,.151,.075))
             multiply=self.nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1
             self.Link(base,multiply.inputs[1]);self.Link(variation,multiply.inputs[2]);base=multiply.outputs[0]
-            chip=self.Math('MULTIPLY',chip,.96)
-            oxide=self.Math('MULTIPLY',oxide,.10)
-            base=self.Mix(base,steelColor,chip);base=self.Mix(base,oxideColor,oxide);base=self.Mix(base,dustColor,dust)
-            metallic=self.Math('MULTIPLY',chip,.96)
-            rough=self.Math('ADD',.68,self.Math('MULTIPLY',macro,.12),True)
-            bumpDistance=.00022
+            film=self.Math('MULTIPLY',lower,self.Math('ADD',.32,self.Math('MULTIPLY',drips,.30)))
+            base=self.Mix(base,self.Color((.058,.040,.009)),film)
+            base=self.Mix(base,self.Color((.10,.079,.041)),self.Math('MULTIPLY',chip,.75))
+            base=self.Mix(base,steelColor,self.Math('MULTIPLY',chip,.18))
+            oxide=self.Math('MULTIPLY',oxide,.12)
+            base=self.Mix(base,oxideColor,oxide);base=self.Mix(base,dustColor,dust)
+            # Thin paint has a broad satin lobe with local dull chalk, rather
+            # than one roughness value and a uniformly smooth plastic skin.
+            metallic=self.Math('MULTIPLY',chip,.20)
+            rough=self.Math('ADD',.52,self.Math('ADD',self.Math('MULTIPLY',meso,.22),self.Math('MULTIPLY',drips,.13)),True)
+            bumpDistance=.00072
         elif role=='Steel':
             base=self.Mix(self.Color((.020,.026,.031)),self.Color((.19,.21,.21)),finish)
             base=self.Mix(base,steelColor,self.Math('MULTIPLY',chip,.75))
@@ -169,30 +210,43 @@ class SurfaceGraph:
             base=self.Mix(base,oxideColor,oxide);base=self.Mix(base,dustColor,dust)
             metallic=self.Math('MULTIPLY',.96,self.Math('SUBTRACT',1,self.Math('MAXIMUM',oxide,dust)),True)
             rough=self.Math('ADD',.38,self.Math('MULTIPLY',macro,.20),True)
-            bumpDistance=.00018
+            bumpDistance=.00035
         elif role=='Track':
-            base=self.Mix(self.Color((.068,.079,.078)),steelColor,self.Math('MULTIPLY',chip,.85))
-            oxide=self.Math('MULTIPLY',oxide,.58)
+            outward=self.Ramp(split.outputs['Z'],-.010,.012)
+            running=self.Ramp(split.outputs['Z'],.016,.032)
+            mottling=self.Ramp(meso,.16,.85)
+            cast=self.Mix(self.Color((.17,.18,.17)),self.Color((.32,.34,.32)),mottling)
+            base=self.Mix(self.Color((.036,.032,.023)),cast,outward)
+            base=self.Mix(base,self.Color((.42,.44,.43)),self.Math('MULTIPLY',running,self.Ramp(grain,.30,.72)))
+            oxide=self.Math('MULTIPLY',self.Math('MULTIPLY',recess,self.Ramp(meso,.40,.68)),.30)
             base=self.Mix(base,oxideColor,oxide)
-            dust=self.Math('MULTIPLY',self.Math('SUBTRACT',1,self.Math('MULTIPLY',convex,.70)),self.Math('ADD',.12,self.Math('MULTIPLY',macro,.20)),True)
+            dust=self.Math('MULTIPLY',self.Math('SUBTRACT',1,running),self.Math('ADD',.06,self.Math('MULTIPLY',meso,.10)),True)
             base=self.Mix(base,dustColor,dust)
-            metallic=self.Math('MULTIPLY',.97,self.Math('SUBTRACT',1,self.Math('MAXIMUM',oxide,dust)),True)
-            rough=self.Math('ADD',.54,self.Math('MULTIPLY',macro,.25),True)
-            bumpDistance=.00065
+            # The photographed 2007 outer shoe is light abraded cast steel with
+            # ingrained film; the later orange-rust shoe is not copied wholesale.
+            metallic=self.Math('ADD',.66,self.Math('MULTIPLY',running,.28),True)
+            metallic=self.Math('MULTIPLY',metallic,self.Math('SUBTRACT',1,oxide),True)
+            rough=self.Mix(self.Math('ADD',.51,self.Math('MULTIPLY',meso,.16)),.34,running)
+            abrasion=self.Ramp(self.Noise(self.Scale(coordinate,(180,9,170)),1,2),.64,.77)
+            abrasion=self.Math('MULTIPLY',abrasion,outward)
+            base=self.Mix(base,self.Color((.37,.39,.38)),self.Math('MULTIPLY',abrasion,.55))
+            rough=self.Mix(rough,.33,self.Math('MULTIPLY',abrasion,.65))
+            relief=self.Math('ADD',self.Math('MULTIPLY',grain,.40),self.Math('MULTIPLY',meso,.60))
+            bumpDistance=.0016
         elif role=='Rubber':
-            base=self.Mix(self.Color((.027,.025,.020)),dustColor,self.Math('ADD',.24,self.Math('MULTIPLY',macro,.24),True))
+            base=self.Mix(self.Color((.034,.029,.020)),dustColor,self.Math('ADD',.16,self.Math('MULTIPLY',meso,.25),True))
             metallic=0.0;rough=self.Math('ADD',.80,self.Math('MULTIPLY',macro,.13),True);bumpDistance=.00020
         elif role=='Exhaust':
-            base=self.Mix(self.Color((.045,.040,.034)),self.Color((.12,.041,.014)),self.Math('ADD',.23,self.Math('MULTIPLY',macro,.45),True))
-            split=self.nodes.new('ShaderNodeSeparateXYZ');self.Link(coordinate,split.inputs[0])
+            base=self.Mix(self.Color((.035,.027,.021)),self.Color((.18,.073,.027)),self.Ramp(meso,.20,.80))
             heat=self.Math('MULTIPLY',self.Math('SUBTRACT',self.Math('MULTIPLY',split.outputs['Y'],-1),.32),2.5,True)
             base=self.Mix(base,self.Color((.009,.011,.012)),heat)
-            metallic=.35;rough=self.Math('ADD',.72,self.Math('MULTIPLY',macro,.20),True);bumpDistance=.00055
+            metallic=.35;rough=self.Math('ADD',.70,self.Math('MULTIPLY',meso,.24),True);bumpDistance=.0014
         elif role=='Glass':
             base=self.Color((.91,.95,.96));metallic=0.0
             rough=self.Math('ADD',.12,self.Math('MULTIPLY',grain,.055),True)
             wave=self.nodes.new('ShaderNodeTexWave');wave.wave_type='BANDS';wave.bands_direction='X';wave.wave_profile='SIN'
             wave.inputs['Scale'].default_value=110;wave.inputs['Distortion'].default_value=.15;self.Link(coordinate,wave.inputs['Vector']);grain=wave.outputs['Color'];bumpDistance=.00027
+            relief=grain
             self.shader.inputs['Transmission Weight'].default_value=.88
             self.shader.inputs['IOR'].default_value=1.50
             ambient=1.0
@@ -202,7 +256,7 @@ class SurfaceGraph:
         if hasattr(rough,'node') and rough.type=='RGBA':
             convert=self.nodes.new('ShaderNodeRGBToBW');self.links.new(rough,convert.inputs[0]);rough=convert.outputs[0]
         bump=self.nodes.new('ShaderNodeBump');bump.inputs['Strength'].default_value=.62;bump.inputs['Distance'].default_value=bumpDistance
-        self.Link(grain,bump.inputs['Height'])
+        self.Link(relief,bump.inputs['Height'])
         self.Link(base,self.shader.inputs['Base Color']);self.Link(rough,self.shader.inputs['Roughness']);self.Link(metallic,self.shader.inputs['Metallic']);self.links.new(bump.outputs['Normal'],self.shader.inputs['Normal'])
         microAo=self.Math('SUBTRACT',1,self.Math('MULTIPLY',self.Math('GREATER_THAN',grain,.70),.07)) if role not in ['Glass','Shadow'] else 1.0
         ambient=self.Math('MULTIPLY',ambient,microAo,True)

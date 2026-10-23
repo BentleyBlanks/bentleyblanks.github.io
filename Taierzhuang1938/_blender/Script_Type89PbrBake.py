@@ -24,7 +24,9 @@ sourceDir=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89
 reviewDir=repoDir/'Taierzhuang1938/_shots/Type89MediumTank'
 assetDir=repoDir/'Taierzhuang1938/Model/Type89MediumTank'
 probe=os.environ.get('TYPE89_PBR_PROBE','0')=='1'
-workName='Probe' if probe else 'Final'
+revision=os.environ.get('TYPE89_PBR_REVISION','')
+workName=(revision+'Probe' if probe else revision) if revision else ('Probe' if probe else 'Final')
+probeSize=int(os.environ.get('TYPE89_PBR_PROBE_SIZE','256'))
 mapDir=sourceDir/'Pbr'/workName
 mapDir.mkdir(parents=True,exist_ok=True)
 reviewDir.mkdir(parents=True,exist_ok=True)
@@ -278,7 +280,7 @@ def BakeAtlases(label,target,source,graphs,scratch):
         repair=ProjectionRepair(source,target,role) if source is not None else None
         repairs={}
         baseSize,normalSize,dataSize=sizes[role]
-        if probe:baseSize=min(baseSize,256);normalSize=min(normalSize,256);dataSize=min(dataSize,128)
+        if probe:baseSize=min(baseSize,probeSize);normalSize=min(normalSize,probeSize);dataSize=min(dataSize,max(128,probeSize//2))
         rawChannels={};files={}
         for channel in ['Base','Normal','Roughness','Metallic','Ao','Coverage']:
             size=baseSize if channel=='Base' else (normalSize if channel=='Normal' else dataSize)
@@ -412,7 +414,7 @@ def Main():
     for obj in highMeshes:
         for slot in obj.material_slots:slot.material=graphs[RoleOf(slot.material)].material
     Progress('surfaceAttributes',objects=len(highMeshes))
-    pbr.PrepareSurfaceAttributes(highMeshes,samples=4 if probe else 12,onObject=lambda name,count:Progress('surfaceAttributes',object=name,objectCount=count,objectTotal=len(highMeshes)))
+    pbr.PrepareSurfaceAttributes(highMeshes,samples=6 if probe else 16,onObject=lambda name,count:Progress('surfaceAttributes',object=name,objectCount=count,objectTotal=len(highMeshes)),allObjects=list(highObjects.values()))
     Unwrap(highMeshes,'High');Unwrap(gameMeshes,'Game')
     highProxy=Proxy(highMeshes,'BakeProxy_High');gameProxy=Proxy(gameMeshes,'BakeProxy_Game')
     for obj in highObjects.values():Visible(obj,False)

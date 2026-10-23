@@ -17,11 +17,13 @@
 ```powershell
 node Taierzhuang1938/_blender/Script_BuildType89MediumTank.mjs --quality=High --no-render
 node Taierzhuang1938/_blender/Script_BuildType89MediumTank.mjs --quality=Game --no-render
-node Taierzhuang1938/_blender/Script_BuildType89MediumTank.mjs --stage=Pbr --no-render
+node Taierzhuang1938/_blender/Script_BuildType89MediumTank.mjs --stage=Pbr --revision=SurfaceV2 --no-render
 node Taierzhuang1938/_blender/Script_Type89Package.mjs
 ```
 
-入口在本 worktree 自己的 BlenderMCP 实例内执行，保存后关闭；原始工程与备份均留在上述目录。`--probe` 为本地小图管线检查。PBR 烘焙只合并临时副本，交付节点保持独立；投射漏点从最近的有效高源表面取样，法线同时转换高低模切线基，记录修补数量与距离。零面积导出三角单独清理，不改顶点、贴图或关节。
+入口在本 worktree 自己的 BlenderMCP 实例内执行，保存后关闭；原始工程与备份均留在上述目录。`--probe --probe-size=1024 --revision=SurfaceV2` 为本地材质试烘，不发布试烘文件。PBR 烘焙只合并临时副本，交付节点保持独立；投射漏点从最近的有效高源表面取样，法线同时转换高低模切线基，记录修补数量与距离。零面积导出三角单独清理，不改顶点、贴图或关节。
+
+SurfaceV2 已按用户意见重做漆膜、下部污膜、履带磨蚀与排气氧化层，首版源与 GLB 留在源目录 `History/MaterialV1/`。参考原片、近景来源及实际复核证据见 [材质复核记录](Data_MaterialReview.json)。完整烘焙之后，`Script_Type89PbrRecoat.py` 可通过受控 Blender `start --batch` 只调整 Base；它验证全部 UV/几何及 24 张高低模 Normal/ORM 原图保持一致，不沿用旧 Base 冒充新表面。
 
 高低两版都保存自包含 `.blend` 与完整 PBR GLB。高源保留物理表面作者材质，游戏版使用独立 UV 和高源法线投射。运行时打包只规范未被材质使用的诊断 alpha，并逐像素核对 RGB，再选无损 WebP/PNG；原 RGBA 图仍保存在源目录。
 

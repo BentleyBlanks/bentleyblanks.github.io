@@ -9,7 +9,7 @@ const repo = path.resolve(here, '../..');
 const controller = path.join(repo, 'scripts/Script_BlenderMcp.mjs');
 const args = process.argv.slice(2);
 if (args.includes('--help')) {
-  console.log('Build one Type89MediumTank source/derived mesh through its own BlenderMCP round.\n  --quality=High|Game (default High)\n  --stage=Gray|Pbr (Pbr bakes both retained high and derived game sources)\n  --probe (256px local PBR pipeline check; never publishes the probe asset)\n  --views=FrontLeft,Front,RearLeft\n  --no-render\nThe .blend is saved in the prescribed OneDrive model directory. Temporary GLB/review images stay local. Pbr requires the task HighGray/GameGray sources. The owned Blender instance is stopped in finally.');
+  console.log('Build one Type89MediumTank source/derived mesh through its own BlenderMCP round.\n  --quality=High|Game (default High)\n  --stage=Gray|Pbr (Pbr bakes both retained high and derived game sources)\n  --probe (local PBR pipeline check; never publishes the probe asset)\n  --probe-size=256 (use 1024 for material review)\n  --revision=SurfaceV2 (separate raw map/checkpoint folder)\n  --views=FrontLeft,Front,RearLeft\n  --no-render\nThe .blend is saved in the prescribed OneDrive model directory. Temporary GLB/review images stay local. Pbr requires the task HighGray/GameGray sources. The owned Blender instance is stopped in finally.');
   process.exit(0);
 }
 const Read = (name, fallback) => args.find((item) => item.startsWith(`--${name}=`))?.split('=').slice(1).join('=') ?? fallback;
@@ -32,10 +32,12 @@ try {
   const started = Call(['start', ...(stage==='Pbr'?[blend]:[]), '--task', 'Type89MediumTank']);
   port = started.port ?? started.instance?.port;
   if (!port) throw new Error(`No task port in start response: ${JSON.stringify(started)}`);
-  const code = `import os\nos.environ['TYPE89_QUALITY']=${JSON.stringify(quality)}\nos.environ['TYPE89_STAGE']=${JSON.stringify(stage)}\nos.environ['TYPE89_PBR_PROBE']=${JSON.stringify(args.includes('--probe')?'1':'0')}\nos.environ['TYPE89_RENDER']=${JSON.stringify(args.includes('--no-render') ? '0' : '1')}\nos.environ['TYPE89_VIEWS']=${JSON.stringify(Read('views', 'FrontLeft,Front,RearLeft'))}\nscriptPath=${JSON.stringify(script)}\nexec(compile(open(scriptPath,encoding='utf8').read(),scriptPath,'exec'),{'__file__':scriptPath,'__name__':'__main__'})\n`;
+  const code = `import os\nos.environ['TYPE89_QUALITY']=${JSON.stringify(quality)}\nos.environ['TYPE89_STAGE']=${JSON.stringify(stage)}\nos.environ['TYPE89_PBR_PROBE']=${JSON.stringify(args.includes('--probe')?'1':'0')}\nos.environ['TYPE89_PBR_PROBE_SIZE']=${JSON.stringify(Read('probe-size','256'))}\nos.environ['TYPE89_PBR_REVISION']=${JSON.stringify(Read('revision',''))}\nos.environ['TYPE89_RENDER']=${JSON.stringify(args.includes('--no-render') ? '0' : '1')}\nos.environ['TYPE89_VIEWS']=${JSON.stringify(Read('views', 'FrontLeft,Front,RearLeft'))}\nscriptPath=${JSON.stringify(script)}\nexec(compile(open(scriptPath,encoding='utf8').read(),scriptPath,'exec'),{'__file__':scriptPath,'__name__':'__main__'})\n`;
   const executed = Call(['exec', '--port', String(port), '--stdin', '--timeout', stage==='Pbr'?'3600':'600'], code);
   fs.writeFileSync(path.join(logDir, `Log_${quality}${stage}Build.json`), JSON.stringify(executed, null, 2));
-  console.log(fs.readFileSync(path.join(repo, `Taierzhuang1938/_shots/Type89MediumTank/${stage==='Pbr'?'Data_Pbr'+(args.includes('--probe')?'Probe':'Final')+'Build.json':'Data_'+quality+stage+'Build.json'}`), 'utf8'));
+  const revision=Read('revision','');
+  const workName=revision?(revision+(args.includes('--probe')?'Probe':'')):(args.includes('--probe')?'Probe':'Final');
+  console.log(fs.readFileSync(path.join(repo, `Taierzhuang1938/_shots/Type89MediumTank/${stage==='Pbr'?'Data_Pbr'+workName+'Build.json':'Data_'+quality+stage+'Build.json'}`), 'utf8'));
 } finally {
   if (port) console.log(JSON.stringify(Call(['stop', '--port', String(port)])));
 }

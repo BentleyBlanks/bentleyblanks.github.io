@@ -18,14 +18,21 @@
     "commonsTitle": "File:Type 89 Yi-Go at Tsuchira.jpg",
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
     "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Type_89_Yi-Go_at_Tsuchira.jpg",
-    "downloadStatus": "original HTTP 429; Wikimedia-recommended thumbnail retained",
-    "sha256": "3228d1f102a276c6c3808f602a0ef47ee02a9029d5e2076ea5043bf38bdbd3e9",
-    "width": 1280,
-    "height": 938,
+    "downloadStatus": "original recovered during material rematch; prior 1280 thumbnail retained separately",
+    "sha256": "b202694fd5daaa0abae01f5eac61e25c98a5eaecf0d2e3a1118adedff03b5321",
+    "width": 3275,
+    "height": 2399,
     "originalWidth": 3275,
     "originalHeight": 2399,
     "artist": "<a href=\"//commons.wikimedia.org/wiki/User:Megapixie\" title=\"User:Megapixie\">User:Megapixie</a>",
-    "license": "Public domain"
+    "license": "Public domain",
+    "retainedThumbnail": {
+      "width": 1280,
+      "height": 938,
+      "sha256": "3228d1f102a276c6c3808f602a0ef47ee02a9029d5e2076ea5043bf38bdbd3e9",
+      "downloadStatus": "original HTTP 429; Wikimedia-recommended thumbnail retained"
+    },
+    "file": "MaterialV2/Reference_Primary2007Original.jpg"
   },
   {
     "id": 3,
@@ -152,5 +159,57 @@
     "originalHeight": 3402,
     "artist": "<a href=\"//commons.wikimedia.org/wiki/User:Hunini\" title=\"User:Hunini\">Hunini</a>",
     "license": "CC BY-SA 4.0"
+  },
+  {
+    "id": 31,
+    "file": "MaterialV2/Reference_TrafficDriveClose.jpg",
+    "sourceUrl": "https://trafficnews.jp/photo/82388",
+    "originalUrl": "https://trafficnews.jp/wp-content/uploads/2018/12/82388_ph24.jpg",
+    "downloadStatus": "downloaded",
+    "sha256": "ca59bbbd9c7aac2047b952fc19771786f9cc3bde2ae4de2f9166e5eaaa548d46",
+    "width": 600,
+    "height": 400,
+    "artist": "PANZER editorial department",
+    "license": "Copyright owner retained; local reference only; no photographic pixels embedded in the model",
+    "purpose": "PANZER editorial; drive close-up; later restored state"
+  },
+  {
+    "id": 32,
+    "file": "MaterialV2/Reference_TrafficTrackWear.jpg",
+    "sourceUrl": "https://trafficnews.jp/photo/82388",
+    "originalUrl": "https://trafficnews.jp/wp-content/uploads/2018/12/82388_ph29.jpg",
+    "downloadStatus": "downloaded",
+    "sha256": "49b701b1b651bc9ddb2d1ceea8a8951f2f8b0fc4ff57a1fce6469bce2ddadc25",
+    "width": 600,
+    "height": 400,
+    "artist": "PANZER editorial department",
+    "license": "Copyright owner retained; local reference only; no photographic pixels embedded in the model",
+    "purpose": "PANZER editorial; worn tread close-up; later restored state"
+  },
+  {
+    "id": 33,
+    "file": "MaterialV2/Reference_Traffic2010.jpg",
+    "sourceUrl": "https://trafficnews.jp/photo/82388",
+    "originalUrl": "https://trafficnews.jp/wp-content/uploads/2018/12/82388_ph19.jpg",
+    "downloadStatus": "downloaded",
+    "sha256": "9775db5d22d262a5fa4462da5fc215758659954262fae15017bfd1f00d404f77",
+    "width": 600,
+    "height": 400,
+    "artist": "PANZER editorial department",
+    "license": "Copyright owner retained; local reference only; no photographic pixels embedded in the model",
+    "purpose": "PANZER editorial; 2010 exhibition"
+  },
+  {
+    "id": 34,
+    "file": "MaterialV2/Reference_Traffic2007.jpg",
+    "sourceUrl": "https://trafficnews.jp/photo/82388",
+    "originalUrl": "https://trafficnews.jp/wp-content/uploads/2018/12/82388_ph21.jpg",
+    "downloadStatus": "downloaded",
+    "sha256": "75ff42a2bb13dc765f885b9be7fe6eedbd14fe86921f010366a63cca9b624ef6",
+    "width": 600,
+    "height": 400,
+    "artist": "PANZER editorial department",
+    "license": "Copyright owner retained; local reference only; no photographic pixels embedded in the model",
+    "purpose": "PANZER editorial; 2007 restoration unveiling"
   }
 ]

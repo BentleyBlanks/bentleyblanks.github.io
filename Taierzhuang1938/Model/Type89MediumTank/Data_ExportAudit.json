@@ -1,12 +1,12 @@
 {
-  "schema": "Type89MediumTankExportAuditV1",
-  "reviewedAt": "2026-10-23T14:24:55.274Z",
+  "schema": "Type89MediumTankExportAuditV2",
+  "reviewedAt": "2026-10-23T18:00:28.366Z",
   "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
   "userApproved": false,
   "runtime": {
     "file": "Model_Type89MediumTank.glb",
-    "sha256": "d7ac05c3c7fa3cddd145b0ce9798c98f9fc32554fc3c351de3903ab32352b220",
-    "bytes": 19502180,
+    "sha256": "921d70562c4ebf41e8142c1fff8c2eb4bd09ecb43675957ed00428de159afc08",
+    "bytes": 20797132,
     "sceneExpandedTriangles": 79921,
     "meshObjects": 417,
     "materials": 7,
@@ -23,15 +23,15 @@
   },
   "highExport": {
     "file": "Exports/Model_Type89MediumTankHighPbr.glb",
-    "sha256": "36ab935728d636795b21df61366e84c400b8d9c59d6fbd680a36d471f5730cd9",
-    "bytes": 37067300,
+    "sha256": "8260ee49c6d3dc9ab0f13702fcb7edd49243da40220f9cc3748f0f7b6bf293c0",
+    "bytes": 38836680,
     "sceneExpandedTriangles": 554676
   },
   "sourceProjects": [
     {
       "quality": "High",
       "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankHighPbr.blend",
-      "sha256": "bf5b233ecd5cb3ff4fbb75fe223c358e6b83e06aa30578bfbece73a736bdeced",
+      "sha256": "11853d47665dfcf9c82ad7ef09d709b654a310e85710f3cecc149c4bd1d2d758",
       "rawTriangles": 554716,
       "meshObjects": 217,
       "materials": 7,
@@ -43,7 +43,7 @@
     {
       "quality": "Game",
       "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankGamePbr.blend",
-      "sha256": "bafa9df1c2926dbfd35b41ccfda29b6df7b1bb605dee49e98c0535913311aeb8",
+      "sha256": "8f312f934382e164524356d6752f5fb559ca6e98ad315d54953cb69ed427fb68",
       "rawTriangles": 79938,
       "meshObjects": 217,
       "materials": 7,
@@ -61,7 +61,7 @@
   },
   "importAudit": {
     "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\Type89MediumTank\\Model_Type89MediumTank.glb",
-    "sha256": "d7ac05c3c7fa3cddd145b0ce9798c98f9fc32554fc3c351de3903ab32352b220",
+    "sha256": "921d70562c4ebf41e8142c1fff8c2eb4bd09ecb43675957ed00428de159afc08",
     "imported": {
       "objects": 437,
       "meshes": 70,
@@ -230,12 +230,17 @@
       "baseline": 0,
       "failed": 0
     },
-    "historyCodexBrowser": "passed",
-    "publicationRegistryRun": {
-      "passed": 5,
-      "baseline": 0,
-      "failed": 0,
-      "tests": ["MenuStartupTest", "BrowserBundleTest", "TextureStandardsTest", "PublishAssetsTest", "MotionVectorContractTest"]
+    "priorUnchangedRuntimeChecks": {
+      "commit": "1c6a6608",
+      "tests": [
+        "MenuStartupTest",
+        "BrowserBundleTest",
+        "TextureStandardsTest",
+        "PublishAssetsTest",
+        "MotionVectorContractTest",
+        "HistoryCodexBrowserTest"
+      ],
+      "note": "Passed for V1; gameplay, renderer and historical text were not changed by this material pass. Not claimed as newly rerun SurfaceV2 visual evidence."
     }
   },
   "referenceReview": {
@@ -251,19 +256,29 @@
       "rear deck, perforated exhaust guard, lamp and ditching tail",
       "independent high/game PBR close-up and maintenance views"
     ],
-    "scope": "Author review; camera fits do not prove exact factory dimensions. Paint chemistry, micro wear, contact-band material and concealed construction remain inference.",
-    "localEvidenceOnly": "_shots/Type89MediumTank/Scene_Final*.png; Scene_HistoryEntry_640.jpg; no review imagery is published"
+    "scope": "Author visual comparison of SurfaceV2 actual packed game GLB and independent high output: paint film, dirt, abraded cast tread and oxide under reference approximation and neutral daylight. Colour averages diagnose exposure only. The user rejected MaterialV1; its appearance sign-off is superseded. Exact pigment chemistry, microscopic damage and concealed construction remain inferred.",
+    "localEvidenceOnly": "_shots/Type89MediumTank/Scene_Final*.png; Scene_HistoryEntry_640.jpg; no review imagery is published",
+    "material": "Data_MaterialReview.json",
+    "primaryOriginal": "3275x2399 recovered 2007 original; SHA recorded in Data_ReferenceArchive.json"
   },
   "rebuildScriptSha256": {
-    "_blender/Script_BuildType89MediumTank.mjs": "19dc6f5fcb2b6f50b199549fabb7dcd3f0aaa5da235f3f3d0f1a4b4c9eb05186",
+    "_blender/Script_BuildType89MediumTank.mjs": "e5ef66c938416433cd9bdf2986ac683508aee52911a892e349a1501f70d9de69",
     "_blender/Script_Type89MediumTank.py": "4f368c80bbf6ca1bbb8cc6cead78136f325b915e336e5fc889a526dea5dc4c1e",
-    "_blender/Script_Type89PbrMaterials.py": "7241a768652a96196c36ca76906cd6ad5f48a4a388a1d94ba074264db94788c9",
-    "_blender/Script_Type89PbrBake.py": "c6e9cf28a0aa50bd3d642a0661e1c52a786de5b01115d2a1302bb55b07e4ea2e",
+    "_blender/Script_Type89PbrMaterials.py": "648300e7bcc8285ce82ae2a9560abd9a3c7f89a31344fc38276859f5654f1a09",
+    "_blender/Script_Type89PbrBake.py": "5ef4695ea16ce57e0e93ba5f49642d0d56a8c1d203e9cf1a57c0ad9881f1527f",
     "_blender/Script_Type89GlbCleanup.py": "94d8b364026327408db93a48b49e1647cea4197157600e5afd736bd41e2b98fc",
     "_blender/Script_Type89ImportAudit.py": "1be4bbefc9ac1047ee2d2ae4b68f5d02324027a98dc59c3853b579a7f8b3cee5",
     "_blender/Script_Type89SourceAudit.py": "7ebb3280d745b3bc233c9c61dec29a878138a83a6a816be7166b4a6a490bd43f",
     "_blender/Script_Type89Package.mjs": "7e905474f5083ed2b659365c57133662eb4c592e2910a4000c9aa7af404709ea",
     "_blender/Script_Type89References.py": "6233143f5bdc552c546e52a0db4f5b1eca7c4423683f89aa2eaeed8adddc87ff",
-    "Model/Type89MediumTank/Script_Type89Motion.mjs": "49b77f62cdee3d7b4999424027085ef4b004adbc0a11b98f7fbc684ca1276241"
+    "Model/Type89MediumTank/Script_Type89Motion.mjs": "49b77f62cdee3d7b4999424027085ef4b004adbc0a11b98f7fbc684ca1276241",
+    "_blender/Script_Type89PbrRecoat.py": "e3e01158636110e74b6399baf9562fce41935ec3d7a017293201ffa16236ed43"
+  },
+  "surfaceRevision": "SurfaceV2",
+  "baseRecoat": {
+    "pass": true,
+    "geometryAndUvSha256BeforeAndAfter": "2814ec7158cb291d6a6bd14d78bc4a7ebe2fe2f8b889e892a4c9217c45040c5c",
+    "preservedNormalOrmOriginalImages": 24,
+    "materialScriptSha256": "648300e7bcc8285ce82ae2a9560abd9a3c7f89a31344fc38276859f5654f1a09"
   }
 }

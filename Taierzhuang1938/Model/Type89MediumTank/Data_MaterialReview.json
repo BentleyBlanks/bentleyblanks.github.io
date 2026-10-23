@@ -1,0 +1,246 @@
+{
+  "revision": "SurfaceV2",
+  "status": "ReferenceMatchedInAuthorReview",
+  "previousRevision": "MaterialV1 rejected by user for surface fidelity; previous technical checks do not prove appearance alignment",
+  "primary": {
+    "source": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
+    "file": "Reference_Primary2007Original.jpg",
+    "sha256": "b202694fd5daaa0abae01f5eac61e25c98a5eaecf0d2e3a1118adedff03b5321",
+    "width": 3275,
+    "height": 2399
+  },
+  "supplement": [
+    {
+      "file": "Reference_TrafficDriveClose.jpg",
+      "url": "https://trafficnews.jp/wp-content/uploads/2018/12/82388_ph24.jpg",
+      "sourcePage": "https://trafficnews.jp/photo/82388",
+      "note": "PANZER editorial; drive close-up; later restored state",
+      "size": [
+        600,
+        400
+      ],
+      "sha256": "ca59bbbd9c7aac2047b952fc19771786f9cc3bde2ae4de2f9166e5eaaa548d46",
+      "status": "downloaded"
+    },
+    {
+      "file": "Reference_TrafficTrackWear.jpg",
+      "url": "https://trafficnews.jp/wp-content/uploads/2018/12/82388_ph29.jpg",
+      "sourcePage": "https://trafficnews.jp/photo/82388",
+      "note": "PANZER editorial; worn tread close-up; later restored state",
+      "size": [
+        600,
+        400
+      ],
+      "sha256": "49b701b1b651bc9ddb2d1ceea8a8951f2f8b0fc4ff57a1fce6469bce2ddadc25",
+      "status": "downloaded"
+    },
+    {
+      "file": "Reference_Traffic2010.jpg",
+      "url": "https://trafficnews.jp/wp-content/uploads/2018/12/82388_ph19.jpg",
+      "sourcePage": "https://trafficnews.jp/photo/82388",
+      "note": "PANZER editorial; 2010 exhibition",
+      "size": [
+        600,
+        400
+      ],
+      "sha256": "9775db5d22d262a5fa4462da5fc215758659954262fae15017bfd1f00d404f77",
+      "status": "downloaded"
+    },
+    {
+      "file": "Reference_Traffic2007.jpg",
+      "url": "https://trafficnews.jp/wp-content/uploads/2018/12/82388_ph21.jpg",
+      "sourcePage": "https://trafficnews.jp/photo/82388",
+      "note": "PANZER editorial; 2007 restoration unveiling",
+      "size": [
+        600,
+        400
+      ],
+      "sha256": "75ff42a2bb13dc765f885b9be7fe6eedbd14fe86921f010366a63cca9b624ef6",
+      "status": "downloaded"
+    }
+  ],
+  "scope": "Tsuchiura Otsu 2007 appearance; later close-ups support surface construction and wear placement, not wholesale adoption of later orange rust",
+  "changes": [
+    "warm olive paint, multiscale film relief and weak gravity streaks",
+    "global assembled occlusion at seams, beneath fenders and in wheel recesses",
+    "light grey abraded outer track web, darker protected underside, separate grouser contact and directional abrasion",
+    "broken oxide and thermal surface on the exhaust",
+    "reference comparison in a daylight environment with one broad overhead key rather than three competing studio lights"
+  ],
+  "pending": [],
+  "imagegen": {
+    "used": false,
+    "reason": "The original 2007 photograph and same-vehicle close-ups are now available; continue from these references first"
+  },
+  "probeColorDiagnostic": {
+    "note": "Approximate flat-region RGB averages under matched camera; not a microtexture or material acceptance test",
+    "turret": {
+      "photo": [
+        132.4,
+        115.2,
+        80.4
+      ],
+      "probe": [
+        135.3,
+        115.4,
+        79.6
+      ]
+    },
+    "upperSide": {
+      "photo": [
+        103.9,
+        86.9,
+        51.7
+      ],
+      "probe": [
+        104.4,
+        87.2,
+        56.3
+      ]
+    },
+    "lowerSkirt": {
+      "photo": [
+        89.8,
+        74.3,
+        43.1
+      ],
+      "probe": [
+        101,
+        85.4,
+        57.7
+      ]
+    }
+  },
+  "requiredViews": [
+    "same-camera 2007 overall",
+    "paint film near view",
+    "track cast web and grouser near view",
+    "rear exhaust near view",
+    "second neutral lighting check",
+    "actual packed GLB reload and independent source reopen"
+  ],
+  "reviewedAt": "2026-10-23T17:56:29.314Z",
+  "userApproved": false,
+  "materialScriptSha256": "648300e7bcc8285ce82ae2a9560abd9a3c7f89a31344fc38276859f5654f1a09",
+  "evidence": [
+    {
+      "aspect": "paint",
+      "reference": "References/MaterialV2/Preview_PrimaryPaint.jpg and Preview_PrimaryTurret.jpg",
+      "observed": "Warm olive film, restrained local mottling, fine uneven coating and weak gravity streaks; lower dirty film corrected after full-bake review",
+      "actualGame": "Scene_FinalSurfaceV2PackedArmor_640.jpg",
+      "actualHigh": "Scene_FinalSurfaceV2HighHighArmor_640.jpg"
+    },
+    {
+      "aspect": "cast tread and abrasion",
+      "reference": "References/MaterialV2/Preview_PrimaryTrack.jpg; Reference_TrafficTrackWear.jpg",
+      "observed": "Light grey abraded outer webs, separate brighter contact ribs, darker protected holes, fine cast relief and directional abrasion; first probe stone-like mottling was reduced",
+      "actualGame": "Scene_FinalSurfaceV2PackedTrack_640.jpg",
+      "neutral": "Scene_FinalSurfaceV2NeutralTrack_640.jpg"
+    },
+    {
+      "aspect": "oxide and rear finish",
+      "reference": "2007 primary rear region and same-vehicle rear walkaround",
+      "observed": "Warm broken exhaust oxide, coarse relief and dark heat region remain separate from the painted guard and transmission lamp",
+      "actualGame": "Scene_FinalSurfaceV2PackedRear_640.jpg",
+      "actualHigh": "Scene_FinalSurfaceV2HighHighRear_640.jpg"
+    },
+    {
+      "aspect": "lighting independence",
+      "observed": "Same actual GLB inspected in reference approximation and neutral daylight; no material, texture or geometry swap between light profiles",
+      "referenceProfile": "Scene_FinalSurfaceV2PackedMain_640.jpg",
+      "neutralProfile": "Scene_FinalSurfaceV2NeutralMain_640.jpg"
+    }
+  ],
+  "fullBake": {
+    "report": "Data_PbrSurfaceV2Build.json",
+    "baseRefit": "Data_PbrSurfaceV2RecoatBuild.json",
+    "geometryUvUnchanged": true,
+    "normalOrmOriginalImagesUnchanged": 24
+  },
+  "finalColorDiagnostic": {
+    "note": "Flat-region RGB averages at matched 640px camera, for colour/exposure diagnosis only. These do not prove microtexture fidelity or factory pigment chemistry.",
+    "turret": {
+      "photo": [
+        132.4,
+        115.2,
+        80.4
+      ],
+      "model": [
+        136,
+        116.4,
+        79.3
+      ]
+    },
+    "upperSide": {
+      "photo": [
+        103.9,
+        86.9,
+        51.7
+      ],
+      "model": [
+        103.5,
+        86.5,
+        53.7
+      ]
+    },
+    "lowerSkirt": {
+      "photo": [
+        89.8,
+        74.3,
+        43.1
+      ],
+      "model": [
+        91,
+        76.7,
+        46.8
+      ]
+    }
+  },
+  "referenceLighting": {
+    "hemisphere": {
+      "sky": "#e1e8df",
+      "ground": "#756650",
+      "intensity": 2.1
+    },
+    "key": {
+      "color": "#fff5e6",
+      "intensity": 7.4,
+      "position": [
+        -1.8,
+        12,
+        -3
+      ]
+    },
+    "environmentIntensity": 0.65,
+    "acesExposure": 1.09,
+    "note": "Approximate image-matching illumination, not a recovered original HDRI or a claim about solar position"
+  },
+  "neutralLighting": {
+    "hemisphere": {
+      "sky": "#ffffff",
+      "ground": "#777777",
+      "intensity": 2
+    },
+    "key": {
+      "color": "#ffffff",
+      "intensity": 3.8,
+      "position": [
+        -4,
+        7,
+        -4
+      ]
+    },
+    "environmentIntensity": 0.65,
+    "acesExposure": 1
+  },
+  "consideredButNotUsed": [
+    {
+      "url": "https://polyhaven.com/a/blue_metal_plate",
+      "reason": "Donor seam lines, blue coating and industrial wear pattern do not match this vehicle; no pixels or maps used"
+    }
+  ],
+  "limits": "Pigment chemistry, microscopic damage and concealed/contact-band construction remain reconstruction. This is an author visual review of reference-supported finish, not user approval or a pixel-for-pixel scan.",
+  "runtimeSha256": "921d70562c4ebf41e8142c1fff8c2eb4bd09ecb43675957ed00428de159afc08",
+  "runtimeBytes": 20797132,
+  "packedRgbExact": true
+}

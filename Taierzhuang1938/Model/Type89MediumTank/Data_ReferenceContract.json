@@ -2,8 +2,10 @@
   "asset": "Type89MediumTank",
   "geometryVersion": "20261023GeometryV14",
   "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
-  "reviewedAt": "2026-10-23",
-  "reviewScope": "Author review of the actual final game GLB: 2007 primary and 2025 front reference poses, rear structure, armor/track close-ups and open maintenance pose. Camera-only landmark fits are diagnostics, not an exact factory survey or historical paint certification. Unseen construction and micro surfaces remain declared inference; this status is not user approval.",
+  "materialRevision": "SurfaceV2",
+  "materialReview": "Data_MaterialReview.json",
+  "reviewedAt": "2026-10-24",
+  "reviewScope": "SurfaceV2 actual packed game GLB and independent high source inspected against the recovered 3275x2399 primary 2007 photograph and four new same-car reference views, including paint, cast tread/contact abrasion and rear oxide close-ups under two light profiles. MaterialV1 was rejected by the user. Camera fits and channel checks are not used as proof of surface fidelity. See Data_MaterialReview.json for the visual evidence and declared limits; user approval is not implied.",
   "selectedConfiguration": "Type89 I-Go Otsu, restored running vehicle at JGSDF Tsuchiura. Primary appearance state is the 2007 Megapixie photograph; 2025 Hunini views corroborate the same preserved car's closed hatches and geometry. Early Ko nose/cupola features are excluded.",
   "notion": "https://app.notion.com/p/40260335331c81a18a18e63b0cc14bce",
   "nominalDimensionsM": {
@@ -58,7 +60,8 @@
     "channels": "sRGB Base; linear OpenGL tangent Normal; linear ORM R=AO,G=roughness,B=metallic",
     "armor": "4096Base/4096Normal/2048ORM",
     "glass": "dielectric, roughness approximately0.15, transmission0.88, IOR1.5",
-    "shadowMaterial": "constant dark dielectric cavity, no invented interior machinery"
+    "shadowMaterial": "constant dark dielectric cavity, no invented interior machinery",
+    "method": "Reference-calibrated metre-scaled coating, abrasion, oxide and dirt masks with independent Base/Normal/ORM; SurfaceV2 full bake plus verified Base-only pigment adjustment"
   },
   "inferred": [
     "Original1938 paint cannot be established from a restored2007/2025 museum finish. The chosen hue describes photographic restoration appearance, not a factory paint specification.",
@@ -66,7 +69,7 @@
     "Contact-band composition is not proven by the available pictures; the dark matte band is a declared material inference.",
     "Micro paint texture, oxide pits and settled dust are physically zoned authoring details calibrated to visible condition, not measured historical damage.",
     "Internal guide depth and wheel running clearance were refined against actual re-imported triangle motion. They are functional visual reconstruction rather than manufacturing dimensions.",
-    "Some Commons originals returnedHTTP429; explicitly labeled standard1280px thumbnails were retained, not misrepresented as original photographs. Available original files are preserved separately."
+    "The primary 2007 original was recovered during material review (3275x2399). Some other Commons originals remain unavailable and their explicitly labeled standard 1280px thumbnails are retained."
   ],
   "historicalBoundary": "Museum/same-type appearance references do not establish participation in the16-18March Tengxian city assault. This independent asset does not replace the legacy Type89Tank or change mission history.",
   "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank",
