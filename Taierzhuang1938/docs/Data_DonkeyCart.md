@@ -8,9 +8,9 @@
 
 `Model/Donkey/Model_Donkey.glb` 是 2026-10-22 按用户要求追加的纯驴版。只从 V3 工程的 `DonkeyEditable` 集合保留身体、眼、耳、鬃尾和轮廓短毛，移除木车、车辕、颈垫、全部套具、笼头与牵绳；不能仅删除 `CartRuntime`，因为原动物运行时网格也合并了套具。原驴车文件与源工程不覆盖。
 
-当前纯驴 V4 为 67,694 三角、身体与短毛两个导出网格、三个材质，共用 28 根骨骼；三材质在 Three.js 中形成三个绘制网格。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。六张无损 WebP 内嵌并有镜像；实际规格以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准。V1 为 50,992 三角，V2 为 51,128 三角，V3 为 67,028 三角，旧结果保留作对照。
+当前纯驴 V5 为 63,132 三角、身体／短毛／鬃毛三个导出网格、四个材质，共用 28 根骨骼；在 Three.js 中形成四个绘制网格。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。七张无损 WebP 内嵌并有镜像；实际规格以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准。V1 为 50,992 三角，V2 为 51,128 三角，V3 为 67,028 三角，V4 为 67,694 三角，旧结果保留作对照。
 
-当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261023/ReferenceFitV4/Scene_Donkey.blend`，其中打包图像与重建脚本；`Data_Derivation.json` 记录父工程及冻结 V3 中间源的哈希、组件和拟合量测。10-22、10-23 原目录分别保留 V2、V3。重建命令：
+当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261024/ReferenceFitV5/Scene_Donkey.blend`，其中打包图像与重建脚本；`Data_Derivation.json` 记录父工程及冻结 V3 中间源的哈希、组件和拟合量测。10-22、10-23 原目录保留 V2、V3、V4。重建命令：
 
 ```powershell
 node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
@@ -20,7 +20,15 @@ node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
 
 去掉笼头后的近景发现原装饰嘴缝离真实口鼻表面约 3–4 cm；独立版将这条 30 顶点细管的五个截面中心贴回口鼻，保留管径、面数与头部蒙皮。实际表面距离记录在派生契约，不移动身体或改写驴车版。
 
-### 纯驴三视图比例与表现 V4（2026-10-24）
+### 纯驴鬃额毛、眼部与蹄尾表现 V5（2026-10-24）
+
+`Script_DonkeyHair.py` 从原始三视图提取线性亮度透明轮廓，生成独立 512×256 RGBA 图集；没有新增生成式图片。移除旧不透明鬃额毛条，主鬃毛采用 40 行弯曲带与 12 个横截毛片；额前毛沿 13 个实际皮肤根点弯曲、后倾，并加一片窄交叉毛片。每个根点从实际三角面的重心插值取得最多四个骨权重，三个运行时网格共享原 28 骨。
+
+鬃额毛独立为 `DonkeyManeRuntime`、双面 `DonkeyManePbr`，使用标准 `BLEND`；Three.js 应为透明、不写深度、`alphaTest=0`。短毛层仍使用双面 `MASK 0.45`，两层节点均声明 `groomCastShadow=false`。导出／打包保留各自材质与节点，不能将鬃毛并入不透明附属材质，也不能继承短毛的裁切阈值。整体保留 21,000 根短毛、877 个轮廓／耳缘／尾梢毛片四边面。
+
+眼部扩大实际眼裂、保留暗褐虹膜和横瞳并降低角膜粗糙度；蹄子在原连续环线内降低蹄冠、收圆承重边和后跟，原蹄底最低点及刚性权重保留。尾刷向后自然散开、末梢错落渐细。验收使用 packed GLB 的三视图、斜侧近景、行走／待机完整周期接地采样；记录在 V5 外置源 `Review/`。数值门禁通过不能替代外观对照，也不表示与参考图逐像素一致。
+
+### 纯驴三视图比例与表现 V4（2026-10-24，V5 沿用）
 
 `Script_DonkeyReferenceFit.py` 以原图地面 Y=925、肩高 1.10 m 和前蹄位置标定统一尺度，校正头部、胸臀宽度、背腹线、蹄长和错步站姿。`Script_DonkeyNeckRebuild.py` 用共边椭圆环重建颈部并平滑两端，不叠加布尔补胸。`Script_DonkeyTopology.py` 重接前腿 0.425–0.470 m 的旧 T 接缝、移除两块游离鼻腔壳，逐连通部件解算一致朝向和正体积；不直接给重叠接缝封口，以免产生不可定向连接并把全身翻到内侧。实际主体皮肤为零开口、零非流形边、零面朝向冲突。眼球、眼睑、鼻翼及内凹鼻腔随新头部重建，耳廓按原正视校准，鬃尾贴回实际皮肤，尾刷缩短到参考范围。
 

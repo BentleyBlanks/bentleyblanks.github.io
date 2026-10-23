@@ -281,7 +281,7 @@ Check(donkeySpec.facingAxis==="-Z" && donkeySpec.upAxis==="+Y" && ["DonkeyWalk",
   "驴车朝向契约与三条必要动画齐备");
 const bareFile=path.join(projectDir,"Model/Donkey/Model_Donkey.glb"),bare=LoadGlb(bareFile);
 const bareSpec=JSON.parse(fs.readFileSync(path.join(projectDir,"Model/Donkey/Data_Donkey.json"),"utf8"));
-const bareCloud=[...RiggedGlbPoints(bareFile,"DonkeyRuntime"),...RiggedGlbPoints(bareFile,"DonkeyCoatRuntime")],bareHead=RiggedGlbPoints(bareFile,"DonkeyRuntime","DonkeyHeadPivot");
+const bareCloud=["DonkeyRuntime","DonkeyCoatRuntime","DonkeyManeRuntime"].flatMap(name=>RiggedGlbPoints(bareFile,name)),bareHead=RiggedGlbPoints(bareFile,"DonkeyRuntime","DonkeyHeadPivot");
 const bareMin=[0,1,2].map(axis=>bareCloud.reduce((v,p)=>Math.min(v,p[axis]),Infinity)),bareMax=[0,1,2].map(axis=>bareCloud.reduce((v,p)=>Math.max(v,p[axis]),-Infinity));
 const bareTriangles=bare.json.meshes.flatMap(m=>m.primitives).reduce((sum,p)=>sum+bare.json.accessors[p.indices].count/3,0);
 Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.length<-.65
@@ -289,11 +289,13 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
   "独立驴实际头部朝 -Z、米制 Y-up、蹄底零高与长耳完整高度");
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
-Check(bare.json.meshes.length===2 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===3 && bare.json.images.length===6 && bareTriangles===67694 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
-  "独立驴身体与短毛共用28骨，三材质/六图与67,694三角齐备");
+Check(bare.json.meshes.length===3 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
+  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===63132 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
+  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与63,132三角齐备");
 const bareBody=bare.json.meshes[bare.json.nodes.find(n=>n.name==="DonkeyRuntime").mesh];
 const bareCoat=bare.json.meshes[bare.json.nodes.find(n=>n.name==="DonkeyCoatRuntime").mesh];
+const bareManeNode=bare.json.nodes.find(n=>n.name==="DonkeyManeRuntime");
+const bareMane=bare.json.meshes[bareManeNode.mesh];
 const tiled=bareBody.primitives.find(p=>bare.json.materials[p.material].name.startsWith("DonkeyAnimalPbr"));
 const coatMaterial=bare.json.materials[bareCoat.primitives[0].material];
 const accessoryMaterial=bare.json.materials.find(m=>m.name.startsWith('DonkeyAccessoryPbr'));
@@ -331,7 +333,12 @@ Check(tiled.attributes.COLOR_0===undefined && tiled.attributes.TEXCOORD_1!==unde
 Check(coatMaterial.alphaMode==="MASK" && Math.abs(coatMaterial.alphaCutoff-.45)<.000001 && coatMaterial.doubleSided===true
   && bareCoat.primitives.every(p=>p.attributes.COLOR_0!==undefined && p.attributes.JOINTS_0!==undefined && p.attributes.WEIGHTS_0!==undefined),
   "独立驴短毛实际带颜色和蒙皮，轮廓毛使用双面MASK 0.45");
-Check(accessoryMaterial?.doubleSided===true,"独立驴细鬃毛所在附属材质双面，侧面不被剔除");
+const maneMaterial=bare.json.materials[bareMane.primitives[0].material];
+Check(maneMaterial.name==="DonkeyManePbr"&&maneMaterial.alphaMode==="BLEND"&&maneMaterial.alphaCutoff===undefined&&maneMaterial.doubleSided===true
+  &&bareManeNode.extras?.groomCastShadow===false&&bareManeNode.skin===bare.json.nodes.find(n=>n.name==="DonkeyRuntime").skin
+  &&bareMane.primitives.every(p=>p.attributes.COLOR_0!==undefined&&p.attributes.JOINTS_0!==undefined&&p.attributes.WEIGHTS_0!==undefined),
+  "独立驴鬃额毛使用独立双面BLEND材质、共享蒙皮及明确的免投影节点");
+Check(accessoryMaterial?.doubleSided===true,"独立驴眼、鼻与尾部附属材质保留双面绘制");
 Check(bare.json.animations.length===2 && ["DonkeyWalk","DonkeyIdle"].every(name=>bare.json.animations.some(a=>a.name===name))
   && !bare.json.nodes.some(n=>/^(Cart|Wheel|Harness|Halter)/.test(n.name||"")) && bareMax[2]<1.2,
   "独立驴只保留行走/待机，不带车或套具节点及拖车范围");

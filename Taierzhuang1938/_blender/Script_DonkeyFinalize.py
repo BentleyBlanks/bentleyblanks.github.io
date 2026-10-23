@@ -32,6 +32,8 @@ textures={'schema':'tengxian-independent-prop-textures-v1','asset':'Donkey','ver
 if photoDetail:
     textures['uv']='UV0 unique reference-detail base colour and accessory PBR atlas; independent repeated UV1 fibre normal; edge tuft atlas with per-root HairTint'
     textures['sizeReason']='Shared 2048 reference-detail Base, 1024 accessory Normal, 1024 repeated fibre Normal at 0.45 m, shared 512 ORM; 1024 edge tuft Base/Normal. Six unique embedded lossless WebP images.'
+if scene.get('DonkeyReferenceMane'):
+    textures['sizeReason']='Shared 2048 reference-detail Base, 1024 accessory Normal, 1024 repeated fibre Normal at 0.45 m, shared 512 ORM, 1024 edge tuft Base/Normal, and 512x256 reference-silhouette mane/forelock RGBA atlas. Seven unique embedded lossless WebP images.'
 textures['source']['shortFurCards']=Read(base/'SourceTextures/Data_FurGeneration.json')
 textures['source']['shortFurFibres']=Read(base/'SourceTextures/Data_FiberGeneration.json')
 textures['source']['shortFurRefinement']=Read(base/'SourceTextures/Data_ShortFiberGeneration.json')
@@ -60,7 +62,7 @@ contract={'schema':'tengxian-independent-rigged-prop-v1','id':'Donkey','version'
  'feet':feet,'upperForelegs':upperForelegs,
  'coat':{**derivation['coat'],'sourceScript':'_blender/Script_DonkeyReferenceFit.py' if reference else '_blender/Script_DonkeyCoat.py','shadow':'groomCastShadow=false; body and accessories cast shadows, micro-fibre layer receives them'},
  'triangles':{'total':bake['totalTriangles'],'limit':80000,'byBatch':{r['label']:r['triangles'] for r in bake['batches']},'decimated':False},
- 'runtime':{'meshes':runtimeNames,'skins':packing['skins'],'materials':3,'maxInfluences':4,'morphTargets':0,
+ 'runtime':{'meshes':runtimeNames,'skins':packing['skins'],'materials':4 if scene.get('DonkeyReferenceMane') else 3,'maxInfluences':4,'morphTargets':0,
  'uvAtlasCoverage':{r['label']:r['atlasCoverage'] for r in bake['batches']},'averageTexelsPerMetre':{r['label']:r['atlasTexelsPerMetre'] for r in bake['batches']}},
  'animations':{name:parent['animations'][name] for name in ('DonkeyWalk','DonkeyIdle')},
  'motion':'Advance the root along local -Z. Walk time = distance / 0.68 * 1.2 seconds; Idle uses an independent 3-second clock.',

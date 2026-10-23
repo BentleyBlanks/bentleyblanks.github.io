@@ -1,4 +1,4 @@
-"""Measured three-view V4 fit; retain the pure animal and its 28-bone rig."""
+"""Measured three-view fit; retain the pure animal and its 28-bone rig."""
 import bpy,bmesh,math,json
 from pathlib import Path
 from mathutils import Vector
@@ -61,7 +61,7 @@ def RebuildBreast(skin,rig):
 
 def ReferencePigment(skin,anchor):
     original='C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020/References/Image_DonkeyOriginalThreeView.png'
-    guide='C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261023/ReferenceFitV4/Image_NakedAnatomyGuide.png'
+    guide=str(Path(bpy.context.scene['DonkeySourceRoot'])/'Image_NakedAnatomyGuide.png')
     arrays=[]
     for path in (original,guide):
         image=bpy.data.images.load(path,check_existing=True);width,height=image.size
@@ -360,8 +360,8 @@ def TailAndMouth(rig,collection):
     for strand in range(260):
         z=rng.uniform(.80,.91);nearest=sorted(stemPoints,key=lambda p:abs(p.z-z))[:12];centre=sum(nearest,Vector())/len(nearest);centre.z=z
         angle=rng.uniform(0,2*math.pi);root=centre+Vector((math.cos(angle),math.sin(angle),0))*rng.uniform(.003,.009)
-        endZ=rng.uniform(.30,.47);spread=.012+.025*Smooth(.30,.44,endZ)
-        end=root+Vector((rng.uniform(-spread,spread),rng.uniform(.004,.022),endZ-z))
+        endZ=rng.uniform(.28,.47);spread=.022+.030*Smooth(.28,.44,endZ)
+        end=root+Vector((rng.uniform(-spread,spread),rng.uniform(-.060,.010),endZ-z))
         middle=root.lerp(end,.55)+Vector((rng.uniform(-.006,.006),-.004,0))
         for axis in (Vector((1,0,0)),Vector((0,1,0))):
             start=len(vertices)
@@ -375,7 +375,30 @@ def TailAndMouth(rig,collection):
         for name,weight in row.items():
             group=obj.vertex_groups.get(name) or obj.vertex_groups.new(name=name);group.add([i],weight,'REPLACE')
     modifier=obj.modifiers.new('DonkeyTailSkin','ARMATURE');modifier.object=rig
-    return {'tailFineStrands':260,'tailStemProfile':profile,'brushEndRangeM':[.30,.47],'mouthInterior':False}
+    return {'tailFineStrands':260,'tailStemProfile':profile,'brushEndRangeM':[.28,.47],'mouthInterior':False}
+
+def RefineReferenceHooves(skin):
+    """Round the existing horn rings, preserving their rigid planted soles."""
+    owners=skin.data.attributes['FootOwner'];records={}
+    for owner in range(1,5):
+        points=[v for v in skin.data.vertices if owners.data[v.index].value==owner]
+        bottom=[v.co.copy() for v in points if v.co.z<.006]
+        centre=sum(bottom,Vector())/len(bottom)
+        for vertex in points:
+            p=vertex.co;z=p.z
+            if z>=.145:continue
+            # A shorter coronet, inset heel and small rounded bearing edge.
+            taper=1-Smooth(.075,.145,z)
+            p.z=.0004+(z-.0004)*(1-.17*taper)
+            p.y+=.010*Smooth(.015,.065,z)*taper
+            p.x=centre.x+(p.x-centre.x)*(.94+.06*Smooth(.04,.10,z))
+            bevel=(1-Smooth(.0004,.006,z))*.0025
+            radial=Vector((p.x-centre.x,p.y-centre.y,0))
+            if radial.length>1e-6:p-=radial.normalized()*bevel
+            p.z+=.0015*(min(1,abs(p.x-centre.x)/.043)**4)*(1-Smooth(.006,.018,z))
+        records[str(owner)]={'soleMinZ':min(v.co.z for v in points),'rigidSolePreserved':True}
+    skin.data.update()
+    return {'method':'rounded existing horn rings, lower coronet and inset heel; same rigid hoof weights','feet':records}
 
 def CalibrateCoatPigment(skin):
     colors=skin.data.color_attributes['CoatColor'];changed=0
@@ -394,7 +417,7 @@ def CalibrateCoatPigment(skin):
 
 def RefineFiberAlbedo(base):
     # Read the immutable V3 image, so rerunning cannot compound contrast.
-    source=base.parent/'SourceTextures/Texture_DonkeyCoatDetailBase.png'
+    source=Path(bpy.context.scene.get('DonkeyReferenceInputRoot','C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261023'))/'SourceTextures/Texture_DonkeyCoatDetailBase.png'
     original=bpy.data.images.load(str(source),check_existing=False)
     width,height=original.size;pixels=np.array(original.pixels[:],dtype=np.float32).reshape(height,width,4)
     bpy.data.images.remove(original)
@@ -453,7 +476,7 @@ def RefineEyes(skin,rig):
             latitude=-math.pi/2+math.pi*i/rings
             for j in range(segments):
                 angle=2*math.pi*j/segments
-                vertices.append(centre+axis*(.023*math.cos(latitude)*math.cos(angle))+up*(.009*math.sin(latitude))+normal*(.012*math.cos(latitude)*math.sin(angle)))
+                vertices.append(centre+axis*(.0265*math.cos(latitude)*math.cos(angle))+up*(.012*math.sin(latitude))+normal*(.012*math.cos(latitude)*math.sin(angle)))
                 if i:
                     a=(i-1)*segments+j;b=(i-1)*segments+(j+1)%segments;c=i*segments+(j+1)%segments;d=i*segments+j
                     faces.append((a,b,c,d))
@@ -466,14 +489,23 @@ def RefineEyes(skin,rig):
         group=eye.vertex_groups.get('DonkeyHeadPivot') or eye.vertex_groups.new(name='DonkeyHeadPivot')
         group.add(list(range(len(mesh.vertices))),1,'REPLACE')
         shader=mesh.materials[0].node_tree.nodes.get('Principled BSDF')
-        shader.inputs['Base Color'].default_value=(.003,.002,.001,1);shader.inputs['Roughness'].default_value=.38;shader.inputs['Specular IOR Level'].default_value=.10
+        pigment=mesh.color_attributes.get('EyePigment') or mesh.color_attributes.new(name='EyePigment',type='FLOAT_COLOR',domain='POINT')
+        for vertex in mesh.vertices:
+            delta=matrix@vertex.co-centre;du=delta.dot(axis);dv=delta.dot(up)
+            pupil=1-Smooth(.8,1.1,(du/.020)**2+(dv/.0045)**2)
+            value=Vector((.014,.008,.004)).lerp(Vector((.002,.0015,.001)),pupil)
+            pigment.data[vertex.index].color=(*value,1)
+        paint=shader.id_data.nodes.get('ReferenceEyePigment') or shader.id_data.nodes.new('ShaderNodeVertexColor')
+        paint.name='ReferenceEyePigment';paint.layer_name='EyePigment'
+        shader.id_data.links.new(paint.outputs['Color'],shader.inputs['Base Color'])
+        shader.inputs['Roughness'].default_value=.14;shader.inputs['Specular IOR Level'].default_value=.50
         for name in ('DonkeyPaleEyeRing'+side,'DonkeyEyelidMargin'+side):
             obj=bpy.data.objects[name];matrix=inverse@obj.matrix_world;back=matrix.inverted()
             if 'PaleEyeRing' in name:
                 colors=obj.data.color_attributes['CoatColor']
                 for vertex in obj.data.vertices:
                     row=vertex.index//40;angle=2*math.pi*(vertex.index%40)/40
-                    rx,rz=[(.0245,.0105),(.032,.020),(.042,.030)][row]
+                    rx,rz=[(.0275,.0130),(.035,.023),(.043,.032)][row]
                     p=centre+axis*(rx*math.cos(angle))+up*(rz*math.sin(angle))
                     hit,_,_,_=tree.ray_cast(p+normal*.05,-normal,.13)
                     if hit is not None:vertex.co=back@(hit+normal*.0013)
@@ -483,7 +515,7 @@ def RefineEyes(skin,rig):
                 vertices=list(obj.data.vertices)
                 for start in range(0,len(vertices),6):
                     ring=vertices[start:start+6];old=sum((matrix@v.co for v in ring),Vector())/len(ring)
-                    angle=2*math.pi*(start//6)/40;p=centre+axis*(.024*math.cos(angle))+up*(.0100*math.sin(angle))
+                    angle=2*math.pi*(start//6)/40;p=centre+axis*(.027*math.cos(angle))+up*(.0130*math.sin(angle))
                     hit,_,_,_=tree.ray_cast(p+normal*.05,-normal,.13)
                     if hit is not None:
                         shift=hit+normal*.0018-old
@@ -594,19 +626,21 @@ def ApplyReferenceFit(scene,base):
         if bone.name=='DonkeyRoot':target=sourceBones[bone.name]
         bone.head=target;bone.tail=target+Vector((0,.075,0))
     bpy.ops.object.mode_set(mode='OBJECT')
+    hoofRefinement=RefineReferenceHooves(skin)
     chestTriangles=RebuildBreast(skin,rig)
     cavities=CloseHeadCavities(skin);nasalFairing=FairNasalSurface(skin,cavities);nostrils=RebuildNostrils(skin)
     topologyNamespace={}
     exec(compile((project/'_blender/Script_DonkeyTopology.py').read_text(encoding='utf-8'),'Script_DonkeyTopology.py','exec'),topologyNamespace)
     topology=topologyNamespace['RepairReferenceSkin'](skin)
     SeatMane(skin,rig);earOffsets=SeatEars(skin,rig);FitEarContours(rig);details=TailAndMouth(rig,collection)
+    details['hooves']=hoofRefinement
     hairNamespace={}
     exec(compile((project/'_blender/Script_DonkeyHair.py').read_text(encoding='utf-8'),'Script_DonkeyHair.py','exec'),hairNamespace)
     details['mane']=hairNamespace['RebuildReferenceMane'](skin,rig,collection)
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261024ReferenceV4'
+    scene['DonkeyReferenceFitRevision']='20261024ReferenceV5'
     scene['DonkeyReferenceFitAnchorY']=anchor
     # Repaint the short pale muzzle rather than the old long horse-like blaze.
     colors=skin.data.color_attributes['CoatColor']

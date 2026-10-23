@@ -260,8 +260,8 @@ def BuildGroom(skin,rig,collection,material,count=21000):
             height=rng.uniform(.74,.88);points=sorted((matrix@v.co for v in stem.data.vertices),key=lambda p:abs(p.z-height))[:12]
             centre=sum(points,Vector())/len(points);centre.z=height
             root=centre+normal*rng.uniform(.002,.007);length=height-rng.uniform(.31,.46)
-            flow=Vector((0,rng.uniform(.015,.045),-1)).normalized();across=flow.cross(normal).normalized();start=len(vertices)
-            width=rng.uniform(.005,.011)
+            flow=Vector((0,rng.uniform(-.12,.015),-1)).normalized();across=flow.cross(normal).normalized();start=len(vertices)
+            width=rng.uniform(.008,.017)
             for t,half in ((0,width*.45),(.55,width*.55),(1,.0003)):
                 centre=root+flow*length*t+normal*(.002*math.sin(math.pi*t))
                 vertices.extend((centre-across*half,centre+across*half));normals.extend((tuple(normal),tuple(normal)))

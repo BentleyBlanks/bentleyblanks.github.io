@@ -1,9 +1,9 @@
 {
-  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\ReferenceFitV4\\Model_DonkeyUnpacked.glb",
+  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV5\\Model_DonkeyUnpacked.glb",
   "output": "C:\\Users\\Bentl\\Documents\\bentleyblanks_Codex_DonkeyCart_20261020\\Taierzhuang1938\\Model\\Donkey\\Model_Donkey.glb",
-  "bytes": 13119268,
+  "bytes": 12567592,
   "geometrySkinActionsUnchanged": true,
-  "nonImageBufferSha256": "7f28defeebee9e9cbf582a24bd9ca8ce525fbe47ed2eeb14ba5069b19affb0bc",
+  "nonImageBufferSha256": "f2fa1c36c21fd0c80dc08de3846fd73076b1aa7646014dfbc98e571535ae9389",
   "images": [
     {
       "name": "Texture_DonkeyShortCoatNormal",
@@ -28,6 +28,17 @@
       "lossless": true
     },
     {
+      "name": "Texture_DonkeyManeBase",
+      "file": "Texture_DonkeyManeBase.webp",
+      "size": [
+        512,
+        256
+      ],
+      "bytes": 20510,
+      "sha256": "7cce6135746fd24d2dc92b5c7fc18bc57978ebe254de3d630ad746268573e2b4",
+      "lossless": true
+    },
+    {
       "name": "Texture_DonkeyCoatDetailNormal",
       "file": "Texture_DonkeyCoatDetailNormal.webp",
       "size": [
@@ -45,8 +56,8 @@
         2048,
         2048
       ],
-      "bytes": 1395510,
-      "sha256": "5f0e3cfd9e1e67b0e803021f2627eaabc73f386731510e594513a8cef61320c9",
+      "bytes": 1403560,
+      "sha256": "0a93d40f48904027e10bdeca0b67287828a4f06455bc9c0c321004ee655a3bbc",
       "lossless": true
     },
     {
@@ -56,8 +67,8 @@
         512,
         512
       ],
-      "bytes": 17160,
-      "sha256": "d1f7d7b0d6c463ba7ca4a33ff649319ae68ed81f5aaf6b405365e04b1db4193d",
+      "bytes": 17132,
+      "sha256": "a50cdaed376f56b3d06c38df0deaf2c876d1db05aefd9d0ff865d659dfe99bc2",
       "lossless": true
     },
     {
@@ -67,8 +78,8 @@
         1024,
         1024
       ],
-      "bytes": 647546,
-      "sha256": "af35199455e3ca86ca025c83db8afb769d5fdc2a7ea369532d06feab99a13a67",
+      "bytes": 657610,
+      "sha256": "a4e9f1b8a7da724f6c6cc17d33b82a2349c9944561ea3d6169b3b9baeab30086",
       "lossless": true
     }
   ],

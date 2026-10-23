@@ -1,14 +1,14 @@
 {
   "schema": "tengxian-independent-prop-textures-v1",
   "asset": "Donkey",
-  "version": "20261024ReferenceV4",
+  "version": "20261024ReferenceV5",
   "uv": "UV0 unique reference-detail base colour and accessory PBR atlas; independent repeated UV1 fibre normal; edge tuft atlas with per-root HairTint",
   "colorSpace": {
     "Base": "sRGB",
     "Normal": "linear OpenGL +Y",
     "Orm": "linear; R=1, G=roughness, B=metallic"
   },
-  "sizeReason": "Shared 2048 reference-detail Base, 1024 accessory Normal, 1024 repeated fibre Normal at 0.45 m, shared 512 ORM; 1024 edge tuft Base/Normal. Six unique embedded lossless WebP images.",
+  "sizeReason": "Shared 2048 reference-detail Base, 1024 accessory Normal, 1024 repeated fibre Normal at 0.45 m, shared 512 ORM, 1024 edge tuft Base/Normal, and 512x256 reference-silhouette mane/forelock RGBA atlas. Seven unique embedded lossless WebP images.",
   "source": {
     "provider": "built-in imagegen + procedural + sourcePack",
     "furInput": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\SourceTextures\\Texture_DonkeyWeatheredCoatSourceV3.png",
@@ -76,12 +76,12 @@
         "method": "masked luminance / normalized local blur; two 9-pixel box passes; ratio clamped to 0.50–1.80",
         "original": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
         "originalSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
-        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\ReferenceFitV4\\Image_NakedAnatomyGuide.png",
+        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV5\\Image_NakedAnatomyGuide.png",
         "guideSha256": "8130715142837beed8957c59ffc775500d4b6ff96bf99a61b51f8759dc9d0c4a",
         "images": [
           {
             "view": "Side",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\ReferenceFitV4\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV5\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
             "sha256": "fdc3ee73bdcdb321a93ef9d2ce204520447fa9be2783162c01c5a01b185aaa82",
             "size": [
               1536,
@@ -90,7 +90,7 @@
           },
           {
             "view": "Front",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\ReferenceFitV4\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV5\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
             "sha256": "b3da234ddd5275eb2a25f376faf3cdb42440f33e7a3e360a8b35d61dd3373382",
             "size": [
               1536,
@@ -99,7 +99,7 @@
           },
           {
             "view": "Rear",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\ReferenceFitV4\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV5\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
             "sha256": "177c3f321127b5c1146c3d970bb6a291e4cd4b4f4646b65cedf1d24c96eab900",
             "size": [
               1536,
@@ -110,9 +110,9 @@
         "occlusionMasks": "_blender/Script_DonkeyReferenceMasks.py; geometric rope footprints including shaded edges; feathered normalized-detail blending",
         "visibility": "fitted-skin BVH depth test from axial source cameras; 4 mm surface tolerance; source-vertex weights baked into UV0",
         "materials": [
-          "DonkeyLowerLegShortFur",
-          "DonkeyCartFaceFur",
           "DonkeyCartGreyCoat",
+          "DonkeyCartFaceFur",
+          "DonkeyLowerLegShortFur",
           "DonkeyCartEarInterior"
         ],
         "runtime": "baked UV0 base colour; independent tiled UV1 fibre normal; no camera projection in GLB"
@@ -148,6 +148,17 @@
       "lossless": true
     },
     {
+      "name": "Texture_DonkeyManeBase",
+      "file": "Texture_DonkeyManeBase.webp",
+      "size": [
+        512,
+        256
+      ],
+      "bytes": 20510,
+      "sha256": "7cce6135746fd24d2dc92b5c7fc18bc57978ebe254de3d630ad746268573e2b4",
+      "lossless": true
+    },
+    {
       "name": "Texture_DonkeyCoatDetailNormal",
       "file": "Texture_DonkeyCoatDetailNormal.webp",
       "size": [
@@ -165,8 +176,8 @@
         2048,
         2048
       ],
-      "bytes": 1395510,
-      "sha256": "5f0e3cfd9e1e67b0e803021f2627eaabc73f386731510e594513a8cef61320c9",
+      "bytes": 1403560,
+      "sha256": "0a93d40f48904027e10bdeca0b67287828a4f06455bc9c0c321004ee655a3bbc",
       "lossless": true
     },
     {
@@ -176,8 +187,8 @@
         512,
         512
       ],
-      "bytes": 17160,
-      "sha256": "d1f7d7b0d6c463ba7ca4a33ff649319ae68ed81f5aaf6b405365e04b1db4193d",
+      "bytes": 17132,
+      "sha256": "a50cdaed376f56b3d06c38df0deaf2c876d1db05aefd9d0ff865d659dfe99bc2",
       "lossless": true
     },
     {
@@ -187,8 +198,8 @@
         1024,
         1024
       ],
-      "bytes": 647546,
-      "sha256": "af35199455e3ca86ca025c83db8afb769d5fdc2a7ea369532d06feab99a13a67",
+      "bytes": 657610,
+      "sha256": "a4e9f1b8a7da724f6c6cc17d33b82a2349c9944561ea3d6169b3b9baeab30086",
       "lossless": true
     }
   ]

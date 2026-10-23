@@ -245,6 +245,19 @@ if standalone and bpy.data.objects.get('DonkeyShortCoatCards'):
     reports.append({'label':'Coat','meshName':coat.name,'sourceTriangles':len(coat.data.loop_triangles),'triangles':len(coat.data.loop_triangles),'vertices':len(coat.data.vertices),
                     'budgetSurfaceMaxErrorM':0,'atlasCoverage':None,'atlasTexelsPerMetre':None,'textures':textures,'uvReuse':'fine fibres sample stable pigment; four atlas cells intentionally reused by limited edge tufts'})
     batches.append((animalRig,coat,'Coat'))
+if standalone and bpy.data.objects.get('DonkeyReferenceMane'):
+    source=bpy.data.objects['DonkeyReferenceMane'];mane=source.copy();mane.data=source.data.copy()
+    runtimeCol.objects.link(mane);mane.name='DonkeyManeRuntime';mane.parent=animalRig
+    for modifier in mane.modifiers:
+        if modifier.type=='ARMATURE':modifier.object=animalRig
+    mane.data.calc_loop_triangles();textures=[]
+    for material in mane.data.materials:
+        for node in material.node_tree.nodes:
+            if node.type=='TEX_IMAGE' and node.image:
+                image=node.image;textures.append({'name':image.name,'size':list(image.size),'path':image.filepath_raw,'sha256':hashlib.sha256(Path(image.filepath_raw).read_bytes()).hexdigest()})
+    reports.append({'label':'Mane','meshName':mane.name,'sourceTriangles':len(mane.data.loop_triangles),'triangles':len(mane.data.loop_triangles),'vertices':len(mane.data.vertices),
+                    'budgetSurfaceMaxErrorM':0,'atlasCoverage':None,'atlasTexelsPerMetre':None,'textures':textures,'method':'reference-silhouette ribbons, standard BLEND material'})
+    batches.append((animalRig,mane,'Mane'))
 for rig,obj,label in batches:
     rig.data.pose_position='POSE'
     for bone in rig.pose.bones:bone.matrix_basis=Matrix.Identity(4)

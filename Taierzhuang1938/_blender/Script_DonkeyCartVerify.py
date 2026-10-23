@@ -115,6 +115,7 @@ scene.frame_set(0)
 scene['DonkeyVerifySkipStatic']=False
 scene['DonkeyVerifyMeasurementsOnly']=False
 print(json.dumps({k:v for k,v in report.items() if k!='samples'}))
-if report['meshCount']!=2:raise RuntimeError('Unexpected runtime mesh batch count')
+expectedMeshCount=3 if standalone and scene.get('DonkeyReferenceMane',False) else 2
+if report['meshCount']!=expectedMeshCount:raise RuntimeError('Unexpected runtime mesh batch count')
 if report['stanceSoleRangeM'][0]<-.0005 or report['stanceSoleRangeM'][1]>.002:raise RuntimeError('Reimported actual sole misses the ground')
 if max(drift)>.0001:raise RuntimeError('Reimported actual sole slides against travelled distance')

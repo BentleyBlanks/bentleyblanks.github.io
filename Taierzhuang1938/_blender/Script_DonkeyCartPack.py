@@ -14,6 +14,8 @@ def Pack(source,output):
     for material in document.get('materials',[]):
         if material.get('name')=='DonkeyShortCoatPbr':
             material.update({'alphaMode':'MASK','alphaCutoff':.45,'doubleSided':True})
+        if material.get('name')=='DonkeyManePbr':
+            material.update({'alphaMode':'BLEND','doubleSided':True});material.pop('alphaCutoff',None)
     def View(index):
         item=document['bufferViews'][index];start=item.get('byteOffset',0)
         return binary[start:start+item['byteLength']]
