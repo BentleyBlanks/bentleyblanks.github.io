@@ -35,9 +35,9 @@ export const BLOCKOUT_LEVELS = Object.freeze([
     era: "rewrite", badge: "新剧本", short: "06–10", note: "06–10：干沟 → 凹路 → 耿家庄（10-19 剧本）",
     scene: Object.freeze({ kind: "file", url: "./Blockout/FirstLevel0610.scene.json",
       placeholder: Object.freeze({ bounds: { minX: -20, maxX: 320, minZ: 120, maxZ: 560 }, spawn: { x: 35, z: 147, yawDeg: -90 } }) }) }),
-  // 2026-10-19：12–18 新剧本（出村 → 北沙河北岸大路 → 空袭 → 排水沟 → 桥头接收院 → 守桥头、过浮桥 → 北门），与 0610 同一套坐标；锚点 Data_EditorBlockoutFirstLevel1218Space
-  Object.freeze({ key: "FirstLevel1218", label: "第一关 12–18 · 北沙河（新剧本）", configUrl: "./Blockout/FirstLevel1218.json",
-    era: "rewrite", badge: "新剧本", short: "12–18", note: "12–18：出村 → 北沙河大路 → 空袭 → 桥头接收院 → 浮桥 → 北门（10-19 剧本）",
+  // 2026-10-19：12–18 新剧本，与 0610 同一套坐标；锚点 Data_EditorBlockoutFirstLevel1218Space。2026-10-23 按 11–14 改稿重做、把 11 也放进来（11 出村 → 石板桥 → 空袭 → 渡口 → 北门），关卡键不变
+  Object.freeze({ key: "FirstLevel1218", label: "第一关 11–18 · 石板桥与渡口（新剧本）", configUrl: "./Blockout/FirstLevel1218.json",
+    era: "rewrite", badge: "新剧本", short: "11–18", note: "11–18：出村 → 石板桥 → 空袭 → 渡口 → 北门（10-23 改稿）",
     scene: Object.freeze({ kind: "file", url: "./Blockout/FirstLevel1218.scene.json",
       placeholder: Object.freeze({ bounds: { minX: -250, maxX: 150, minZ: 480, maxZ: 895 }, spawn: { x: 98, z: 590, yawDeg: 180 } }) }) }),
 ]);
