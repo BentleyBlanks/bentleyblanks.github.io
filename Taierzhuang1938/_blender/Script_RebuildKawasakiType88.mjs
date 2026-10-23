@@ -46,6 +46,7 @@ for (const detail of details) {
     const glb = detail === "high" ? path.join(sourceRoot, "Exports/Model_KawasakiType88High.glb")
       : path.join(repoRoot, "Taierzhuang1938/Model/KawasakiType88/Model_KawasakiType88.glb");
     Run(python, ["Taierzhuang1938/_blender/Script_KawasakiType88Pack.py", "--input", glb]);
+    if (detail === "high") fs.copyFileSync(glb, path.join(repoRoot, "tmp/KawasakiType88/Model_KawasakiType88High.glb"));
   }
 }
 Run(process.execPath, ["scripts/Script_BlenderMcp.mjs", "status", "--scan"]);

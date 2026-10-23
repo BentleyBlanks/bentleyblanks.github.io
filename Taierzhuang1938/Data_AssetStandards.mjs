@@ -129,7 +129,7 @@ export const EXTERNAL_GLB_STANDARDS = Object.freeze([
     sourceTexture: "同型原图与1937原始说明书；现代发动机材质类比、CC0皮革及内置imagegen推定材质图", runtimeTexture: "SurfaceV2：30张内嵌Base / OpenGL Normal / ORM；4K机身、布翼与机罩，独立肋带、铸件、钢、橡胶、皮革和排气PBR",
     note: "独立资产，不替换任务机型。180k上限保留浅铆钉实体、24片气缸散热片与顺弧排气管，30网格/8真实铰链，glTF -Z机首/米制；高源与V1归档留OneDrive，游戏版双向顶点-表面采样误差不超过0.558mm。源重开、实际GLB重导、52单部件+9舵面组合及30张图逐像素一致性通过；配色、旧损与隐藏内构仍为推定，不证明滕县参战。" }),
   Object.freeze({ id: "KawasakiType88", name: "八八式侦察机二型参考复原", pack: "KawasakiType88/Model_KawasakiType88.glb",
-    sourceTriangles: 226659, actualTriangles: 76473, targetTriangles: 80000, policy: "target",
+    sourceTriangles: 226755, actualTriangles: 79129, targetTriangles: 80000, policy: "target",
     sourceTexture: "同型照片与馆藏二型模型；独立可编辑高源、程序作者 UV PBR", runtimeTexture: "原分区 Base / Normal / Roughness-Metallic 与装配 AO，10 个可动节点",
     note: "独立游戏派生保留所有部件和轴心；高源不减面。二型上下副翼外露推杆联动；馆藏 12 号外观不等于已确认的滕县实机编号。尚未自动启用到既有编队。" }),
   Object.freeze({ id: "Donkey", name: "独立灰驴（无车无套具）", pack: "Donkey/Model_Donkey.glb",

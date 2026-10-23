@@ -1,14 +1,14 @@
 {
   "version": "20261023LosslessWebp01",
   "output": "Model_KawasakiType88.glb",
-  "inputSha256": "48d14a6b217e5fe6d92a1bc83f1610973529d56c0f9e1a496426653dd6467c32",
-  "outputSha256": "516d997eab8e18ea20d05e3c33367b4b099f6863d9d8984cda1ad0bd9b65aa17",
-  "inputBytes": 17080372,
-  "outputBytes": 12325484,
+  "inputSha256": "094a8d9f328b615a6089a287beab0e3105003a55c365a6442e289ec1965ee0f5",
+  "outputSha256": "78da1f70719c9f9724f3c201743f44a35f70525e631dbbee1f1e3f9783e5f48e",
+  "inputBytes": 17167456,
+  "outputBytes": 12391100,
   "nodesPreserved": true,
   "meshesPreserved": true,
   "accessorsPreserved": true,
-  "nonImageBufferViewsPreserved": 281,
+  "nonImageBufferViewsPreserved": 279,
   "imageCount": 34,
   "images": [
     {
@@ -28,17 +28,17 @@
     },
     {
       "index": 1,
-      "name": "Texture_Type88GameAssemblyAo",
+      "name": "Texture_Type88AssemblyAo",
       "size": [
         2048,
         2048
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "d147e36bfe85a33943c46f754c48fa4bc38f5d18ba34a00883278e522d637a3b",
-      "decodedPixelsSha256": "d147e36bfe85a33943c46f754c48fa4bc38f5d18ba34a00883278e522d637a3b",
-      "sourceBytes": 3044404,
-      "webpBytes": 1508090,
+      "sourcePixelsSha256": "a90f0f042f0f473a497df90f465aace4db3276d5311e6e1ff5cc60257df8916a",
+      "decodedPixelsSha256": "a90f0f042f0f473a497df90f465aace4db3276d5311e6e1ff5cc60257df8916a",
+      "sourceBytes": 3073935,
+      "webpBytes": 1530650,
       "pixelExact": true
     },
     {
@@ -95,10 +95,10 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "389111d874a3bcb2c0d94f542055116dc8717ab52da266a60f9119ee9a143fbd",
-      "decodedPixelsSha256": "389111d874a3bcb2c0d94f542055116dc8717ab52da266a60f9119ee9a143fbd",
-      "sourceBytes": 562109,
-      "webpBytes": 422428,
+      "sourcePixelsSha256": "b10013b3dc47bdb86bb3a1bb96d05c203794fa3aa8109fe4c2404933931d8b94",
+      "decodedPixelsSha256": "b10013b3dc47bdb86bb3a1bb96d05c203794fa3aa8109fe4c2404933931d8b94",
+      "sourceBytes": 512648,
+      "webpBytes": 362470,
       "pixelExact": true
     },
     {
@@ -110,10 +110,10 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "e51e131a7df6011dcf1023c1fd8b89c3f35daf5eeff678dc7c487d1a6a9cc005",
-      "decodedPixelsSha256": "e51e131a7df6011dcf1023c1fd8b89c3f35daf5eeff678dc7c487d1a6a9cc005",
-      "sourceBytes": 486853,
-      "webpBytes": 331404,
+      "sourcePixelsSha256": "5460fbb191e6dc5527b65bec4772a568ba13fa0427418b5801dab35b7c1f6883",
+      "decodedPixelsSha256": "5460fbb191e6dc5527b65bec4772a568ba13fa0427418b5801dab35b7c1f6883",
+      "sourceBytes": 488267,
+      "webpBytes": 330676,
       "pixelExact": true
     },
     {
@@ -155,10 +155,10 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "357ce32cf82729522099909378efb12e6315426d7bf9623b886ffebb9443223f",
-      "decodedPixelsSha256": "357ce32cf82729522099909378efb12e6315426d7bf9623b886ffebb9443223f",
-      "sourceBytes": 517125,
-      "webpBytes": 369598,
+      "sourcePixelsSha256": "0e1d35562c06e4c25b1368b8fd5a295f151b64168cdd21fef7b9c0ce6f01230c",
+      "decodedPixelsSha256": "0e1d35562c06e4c25b1368b8fd5a295f151b64168cdd21fef7b9c0ce6f01230c",
+      "sourceBytes": 518246,
+      "webpBytes": 368578,
       "pixelExact": true
     },
     {
@@ -170,10 +170,10 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "b459db4eaca7b2eb61a6fb0fabf4aca5ca5b4d86f8d93f491f77fd316925b78b",
-      "decodedPixelsSha256": "b459db4eaca7b2eb61a6fb0fabf4aca5ca5b4d86f8d93f491f77fd316925b78b",
-      "sourceBytes": 491055,
-      "webpBytes": 332822,
+      "sourcePixelsSha256": "b27a65934993b93943b35cb7b503f6722395fba043ddcd6894a9cd9eff33085d",
+      "decodedPixelsSha256": "b27a65934993b93943b35cb7b503f6722395fba043ddcd6894a9cd9eff33085d",
+      "sourceBytes": 488112,
+      "webpBytes": 330156,
       "pixelExact": true
     },
     {

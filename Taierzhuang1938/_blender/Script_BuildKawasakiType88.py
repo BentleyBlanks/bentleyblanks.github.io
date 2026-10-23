@@ -17,7 +17,7 @@ import bpy
 from mathutils import Vector, Matrix, Quaternion
 
 
-VERSION = "20261023WingStagger11"
+VERSION = "20261024TailBracing15"
 PI = math.pi
 TAU = 2 * PI
 SOURCE_DEFAULT = Path(r"C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\KawasakiType88")
@@ -436,15 +436,15 @@ class Builder:
             for j in range(6):
                 z = -5.39 + j * .235
                 w, cy, up, low = self.Section(z)
-                mountY = cy + .22
-                mountX = w * (1 - min(.999, .22 / up) ** (2 / .615)) ** (.615 / 2)
+                mountY = cy + .04
+                mountX = w * (1 - min(.999, .04 / up) ** (2 / .615)) ** (.615 / 2)
                 a = Vector((side * (mountX - .015), mountY, z))
                 b = Vector((side * (mountX + .115), mountY, z + .012))
-                c = Vector((side * (mountX + .125), cy + .12, z + .05))
-                d = Vector((side * (mountX + .125), cy + .025, z + .06))
-                steps = 11 if self.high else 4
+                c = Vector((side * (mountX + .125), cy - .06, z + .05))
+                d = Vector((side * (mountX + .125), cy - .155, z + .06))
+                steps = 11 if self.high else 6
                 points = [tuple((1-t)**3*a + 3*(1-t)**2*t*b + 3*(1-t)*t*t*c + t**3*d) for t in (k/steps for k in range(steps + 1))]
-                self.Tube("ExhaustStack" + str(side) + str(j), points, .035, "Exhaust", 20 if self.high else 12, innerRadius=.032)
+                self.Tube("ExhaustStack" + str(side) + str(j), points, .035, "Exhaust", 20 if self.high else 16, innerRadius=.032)
                 axis = (b-a).normalized()
                 self.Beam("ExhaustInnerShadow" + str(side) + str(j), tuple(a - axis * .006), tuple(a - axis * .003), .0315, "Ink", 16 if self.high else 12)
         # Type II rounded suspended radiator, not the Type I frontal box.
@@ -496,8 +496,8 @@ class Builder:
 
     def WingPoint(self, x, u, upper=True, top=True):
         halfSpan = 7.5 if upper else 6.62
-        chord = 1.88 if upper else 1.72
-        lead = -3.833 if upper else -3.12
+        chord = 2.047 if upper else 1.72
+        lead = -3.684 if upper else -3.12
         tipStart = halfSpan - .50
         factor = 1.0
         if abs(x) > tipStart:
@@ -512,9 +512,11 @@ class Builder:
             localChord -= cut
         z = localLead + localChord * u
         y = (3.106 if upper else 1.32) + .018 * abs(x)
-        thickness = .115 if upper else .11
+        # Planform was fitted independently from the painted roundels. Retain
+        # the original absolute airfoil depth and the 3.38 m height anchor.
+        thickness = .115 * 1.88 / chord if upper else .11
         yt = 5 * thickness * localChord * (0.2969 * math.sqrt(max(u, .000001)) - .1260 * u - .3516 * u * u + .2843 * u ** 3 - .1036 * u ** 4)
-        camber = .024 * localChord * math.sin(PI * u)
+        camber = .024 * (1.88 / chord if upper else 1) * localChord * math.sin(PI * u)
         rib = math.exp(-((abs(x) / .275 - round(abs(x) / .275)) / .18) ** 2)
         sag = .0065 * factor * (rib - .5) * math.sin(PI * u) ** .8
         y += camber + (yt * (1 if top else -1)) + sag * (1 if top else -.35)
@@ -580,7 +582,7 @@ class Builder:
             self.WingPatch("UpperWingInner" + suffix, side * .80, side * 2.35, 0, 1, True)
             self.WingPatch("UpperWingOuter" + suffix, side * 2.35, side * 7.00, 0, .735, True)
             self.WingPatch("UpperWingFixedTip" + suffix, side * 7.00, side * 7.50, 0, 1, True)
-            hingeZ = -3.833 + 1.88 * .739 + .070
+            hingeZ = -3.684 + 2.047 * .739 + .070
             hingeY = sum(self.WingPoint(side * 2.35, .735, True, top)[1] for top in (True, False)) / 2
             tilt = math.atan(side * .018)
             pivot = self.Hinge("Aileron" + suffix, (side * 2.35, hingeY, hingeZ), tilt)
@@ -640,14 +642,17 @@ class Builder:
             curve.driver.expression = "a"
             # Broad single outer I-strut and a long diagonal. No light-bomber
             # four-strut W-shaped centre section is added.
-            a, b = (side * 4.13, 1.39, -2.40), (side * 4.42, 3.18, -3.113)
+            a = (side * 4.13, 1.39, -2.40)
+            b = self.WingPoint(side * 4.42, .383, True, False)
             self.Beam("InterplaneIBeam" + suffix, a, b, .07, "Aluminum", 12, 2.1)
             self.Beam("LongDiagonalStrut" + suffix, (side * .55, 1.51, -2.13), b, .035, "Aluminum", 12)
-            self.Beam("CabaneForward" + suffix, (side * .52, 2.32, -3.67), (side * .77, 3.09, -3.593), .031, "Aluminum")
-            self.Beam("CabaneAft" + suffix, (side * .50, 2.34, -2.12), (side * .77, 3.11, -2.333), .031, "Aluminum")
-            self.Beam("CabaneCrossBrace" + suffix, (side * .52, 2.32, -3.67), (side * .77, 3.11, -2.333), .004, "Steel", 6)
-            self.Beam("LandingWire" + suffix, (side * .78, 3.09, -3.583), (side * 4.13, 1.40, -2.45), .008, "Steel", 6)
-            self.Beam("FlyingWire" + suffix, (side * .53, 1.50, -2.90), (side * 4.42, 3.18, -3.153), .008, "Steel", 6)
+            forwardCabane = self.WingPoint(side * .77, .13, True, False)
+            aftCabane = self.WingPoint(side * .77, .80, True, False)
+            self.Beam("CabaneForward" + suffix, (side * .52, 2.32, -3.67), forwardCabane, .031, "Aluminum")
+            self.Beam("CabaneAft" + suffix, (side * .50, 2.34, -2.12), aftCabane, .031, "Aluminum")
+            self.Beam("CabaneCrossBrace" + suffix, (side * .52, 2.32, -3.67), aftCabane, .004, "Steel", 6)
+            self.Beam("LandingWire" + suffix, forwardCabane, (side * 4.13, 1.40, -2.45), .008, "Steel", 6)
+            self.Beam("FlyingWire" + suffix, (side * .53, 1.50, -2.90), b, .008, "Steel", 6)
             for x, y, z in (a, b, (side * .55, 1.51, -2.13)):
                 self.Ellipsoid("StrutClevis" + suffix + str(z), (x, y, z), (.065, .055, .055), "Steel", 16, 8)
         # Root fairings and centre-section fuel filler.
@@ -662,7 +667,7 @@ class Builder:
         n = len(outline)
         for side in (-1, 1):
             for a, z in outline:
-                verts.append((side * thickness / 2, a, z) if vertical else (a, 1.86 + side * thickness / 2, z))
+                verts.append((side * thickness / 2, a, z) if vertical else (a, 2.04 + side * thickness / 2, z))
                 u = (z - 4.1) / 2.2
                 uvs.append(((1.22 - u if side > 0 else u), (a - 1.70) / 1.60) if vertical else ((a + 2.5) / 5, (z - 4.1) / 2.2))
         # Concave root shapes are triangulated by Blender/glTF, not fan-filled.
@@ -678,22 +683,35 @@ class Builder:
 
     def Tail(self):
         for side, suffix in ((-1, "Left"), (1, "Right")):
-            outline = [(side * .08, 4.68), (side * 1.72, 4.83), (side * 1.96, 4.87),
-                       (side * 2.08, 4.98), (side * 2.10, 5.61), (side * .08, 5.61)]
+            outline = [(side * .08, 4.48), (side * 1.80, 4.85), (side * 2.04, 4.99),
+                       (side * 2.16, 5.10), (side * 2.18, 5.42), (side * .08, 5.42)]
             self.Foil("HorizontalStabilizer" + suffix, outline, .075)
-            pivot = self.Empty("Elevator" + suffix + "Pivot", (side * .15, 1.86, 5.64), self.root)
+            pivot = self.Empty("Elevator" + suffix + "Pivot", (side * .15, 2.04, 5.45), self.root)
             pivot["axisLocal"] = "+X"
             pivot["rangeDegrees"] = [-25., 25.]
             self.controls["Elevator" + suffix] = pivot
-            outline = [(side * .12, 5.65), (side * 2.10, 5.65), (side * 2.09, 5.92),
-                       (side * 2.01, 6.04), (side * 1.89, 6.08), (side * .22, 6.08)]
+            outline = [(side * .12, 5.46), (side * 2.18, 5.46), (side * 2.17, 5.66),
+                       (side * 2.09, 5.74), (side * 1.97, 5.78), (side * .22, 5.88)]
             self.Foil("Elevator" + suffix, outline, .06, parent=pivot)
-            self.Beam("TailplaneLowerBrace" + suffix, (side * .10, 1.62, 4.60), (side * 1.67, 1.82, 5.18), .015, "Steel", 8)
-            self.Beam("TailplaneUpperWire" + suffix, (0, 2.45, 5.12), (side * 1.82, 1.90, 5.13), .005, "Steel", 6)
-            self.Beam("ElevatorHorn" + suffix, (side * .19, 1.88, 5.64), (side * .19, 2.04, 5.65), .016, "Steel", 8, parent=pivot)
+            # Type II has two lower members in a V, visible in kda2-20. Their
+            # fuselage ends follow the actual lower longeron, not an arbitrary
+            # height below the shell. Exact joint hardware remains inferred.
+            tailJoint = (side * 1.67, 2.00, 5.18)
+            for label, z in (("Forward", 4.60), ("Rear", 5.55)):
+                w, cy, up, low = self.Section(z)
+                bodyJoint = (side * w * .60, cy - low * .98, z)
+                self.Beam("TailplaneLower" + label + "Brace" + suffix, bodyJoint, tailJoint, .015, "Steel", 8)
+                self.Beam("Tailplane" + label + "ClevisPin" + suffix,
+                          (bodyJoint[0] - .035, bodyJoint[1], z),
+                          (bodyJoint[0] + .035, bodyJoint[1], z), .018, "Steel", 8)
+            self.Beam("TailplaneOuterClevisPin" + suffix,
+                      (tailJoint[0] - .040, tailJoint[1], tailJoint[2]),
+                      (tailJoint[0] + .040, tailJoint[1], tailJoint[2]), .018, "Steel", 8)
+            self.Beam("TailplaneUpperWire" + suffix, (0, 2.45, 5.12), (side * 1.82, 2.08, 5.13), .005, "Steel", 6)
+            self.Beam("ElevatorHorn" + suffix, (side * .19, 2.06, 5.45), (side * .19, 2.22, 5.46), .016, "Steel", 8, parent=pivot)
             for j in range(4):
                 x = side * (.40 + .43 * j)
-                self.Beam("ElevatorHinge" + suffix + str(j), (x - .02, 1.86, 5.64), (x + .02, 1.86, 5.64), .006, "Steel", 12)
+                self.Beam("ElevatorHinge" + suffix + str(j), (x - .02, 2.04, 5.45), (x + .02, 2.04, 5.45), .006, "Steel", 12)
         fin = [(1.85, 4.42), (2.10, 4.64), (2.50, 4.96), (2.93, 5.24), (3.14, 5.41),
                (3.20, 5.59), (3.17, 5.70), (1.84, 5.70)]
         self.Foil("TypeIITallFixedFin", fin, .092, True)
@@ -762,7 +780,7 @@ class Builder:
         pivot = self.Empty("PropellerPivot", (0, 1.95, -5.98), self.root)
         pivot["axisLocal"] = "+Z in glTF / -Y in Blender"
         pivot["rpmPreview"] = 480.0
-        pivot["referenceRestAngleDegrees"] = -43.74638577345526
+        pivot["referenceRestAngleDegrees"] = -45.53991560518907
         self.controls["Propeller"] = pivot
         # Two opposite handed blade lofts, with chord twist and a thin trailing
         # edge. The tip is rounded; no flat rectangle or intersecting oval.
@@ -806,7 +824,7 @@ class Builder:
             t = TAU * j / 8
             self.Beam("PropellerHubBolt" + str(j), (.122 * math.cos(t), 1.95 + .122 * math.sin(t), -6.085),
                       (.122 * math.cos(t), 1.95 + .122 * math.sin(t), -6.11), .011, "Steel", 6, parent=pivot)
-        pivot.rotation_euler.y = math.radians(43.74638577345526)
+        pivot.rotation_euler.y = math.radians(45.53991560518907)
         bpy.context.view_layer.update()
 
     def Recalculate(self):
@@ -890,7 +908,7 @@ class Builder:
             if key in ("Fuselage", "FuselageMetal"):
                 extent = (11.90, 2.60)
             elif key in ("UpperWing", "LowerUnderside") or (key == "Fabric" and ("Wing" in ob.name or "Aileron" in ob.name)):
-                extent = (15, 1.88)
+                extent = (15, 2.047 if key == "UpperWing" or "UpperWing" in ob.name or ("Aileron" in ob.name and "Lower" not in ob.name) else 1.72)
             elif key == "Fin":
                 extent = (2.2, 1.6)
             elif key == "Tail":
@@ -1063,7 +1081,7 @@ class Builder:
             ob.location = P(pos)
             ob.rotation_euler = (P((0, 1.5, 0)) - ob.location).to_track_quat("-Z", "Y").to_euler()
         for name, pos, target, scale, roll in [
-            ("ReferenceMuseum", (-12.3295006761, 20.9937718039, .20151421869), (0, 1.7, 0), 13.7691135933, 0),
+            ("ReferenceMuseum", (-11.89151574965536, 21.65799278539144, .6349742654383759), (0, 1.7, 0), 13.792923310324952, 0),
             ("ReferenceHistoricII", (15, 2.7, -16), (0, 1.7, -.4), 17.0, 0),
             ("PortElevation", (-23, 2.0, 0), (0, 1.8, 0), 14.0, 0),
             ("FrontElevation", (0, 2.0, -24), (0, 1.8, -.5), 16.0, 0),
@@ -1077,8 +1095,8 @@ class Builder:
                 data.sensor_fit = "HORIZONTAL"
                 data.sensor_width = 36
                 data.lens = (Vector(pos) - Vector(target)).length * 36 / scale
-                data.shift_x = -.5013797022764699 / scale
-                data.shift_y = -.209774384298742 / scale
+                data.shift_x = -.49026538836903455 / scale
+                data.shift_y = -.20440654915649972 / scale
             ob = bpy.data.objects.new("Camera" + name, data)
             self.stageColl.objects.link(ob)
             ob.location = P(pos)
@@ -1088,7 +1106,7 @@ class Builder:
                 right = (right - normal * normal.dot(right)).normalized()
                 up = normal.cross(right).normalized()
                 matrix = Matrix((P(right), P(up), P(normal))).transposed().to_4x4()
-                ob.rotation_euler = (matrix @ Matrix.Rotation(math.radians(2.4197296274 if name == "ReferenceMuseum" else 0), 4, "Z")).to_euler()
+                ob.rotation_euler = (matrix @ Matrix.Rotation(math.radians(2.4100124311212983 if name == "ReferenceMuseum" else 0), 4, "Z")).to_euler()
             else:
                 quat = (P(target) - ob.location).to_track_quat("-Z", "Y")
                 ob.rotation_euler = (quat.to_matrix().to_4x4() @ Matrix.Rotation(math.radians(roll), 4, "Z")).to_euler()

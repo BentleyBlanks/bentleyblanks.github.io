@@ -15,7 +15,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 
 DEFAULT_SOURCE = Path(r"C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\KawasakiType88")
-VERSION = "20261023Surface05"
+VERSION = "20261024Surface09"
 
 
 def Field(width, height, seed, frequencies=(8, 32, 128)):
@@ -97,6 +97,8 @@ class SurfaceBake:
 
     def Wing(self, name, markings):
         w, h = 4096, 1024
+        chordM = 2.047 if name == "UpperWing" else 1.72
+        roundelChordFraction = .4664 if name == "UpperWing" else .574519
         u, v = Grid(w, h)
         x = u * 15 - 7.5
         field = Field(w, h, 88, (12, 80, 320))
@@ -113,8 +115,12 @@ class SurfaceBake:
         image = Image.fromarray(RGB(base))
         if markings:
             draw = ImageDraw.Draw(image)
-            for centerX in (-6.277641, 6.277641):
-                mask = ((x - centerX) ** 2 + ((v - .574519) * 1.88) ** 2) < .630752 ** 2
+            # Lower-wing undersides are unphotographed reconstruction. Their
+            # markings must fit the shorter lower span rather than being cut
+            # by a tip through reuse of the upper-wing paint coordinates.
+            spanCenterM = 6.192 if name == "UpperWing" else 5.50
+            for centerX in (-spanCenterM, spanCenterM):
+                mask = ((x - centerX) ** 2 + ((v - roundelChordFraction) * chordM) ** 2) < .635 ** 2
                 array = np.asarray(image).copy()
                 paint = np.stack((.60 + field * .025, .23 + field * .008, .24 + field * .009), axis=2)
                 array[mask] = RGB(paint)[mask]
@@ -122,14 +128,18 @@ class SurfaceBake:
                 orm[mask, 1] = .67
                 orm[mask, 2] = .0
             if markings == "upper":
-                # The reference model's two numerals are at independently
-                # observed positions; no claim about Uchida aircraft numbers.
-                self.Stamp(image, "12", (3.00 + 7.5) / 15, .52, 1.65 / 15, 1.25 / 1.88, (24, 26, 24), flipVertical=True)
-                self.Stamp(image, "12", (-3.00 + 7.5) / 15, .52, 1.65 / 15, 1.25 / 1.88, (24, 26, 24), flipVertical=True)
+                # Independently observed hand-painted strokes, rectified onto
+                # UV0. Only vector boundaries are used; the paint is authored
+                # here, with no photographic colour, shadow or highlight.
+                paintPath = Path(__file__).resolve().parents[1] / "Model/KawasakiType88/Data_KawasakiType88Paint.json"
+                paint = json.loads(paintPath.read_text(encoding="utf-8"))
+                draw = ImageDraw.Draw(image)
+                for mark in paint["marks"]:
+                    draw.polygon([(round(u * w), round((1 - v) * h)) for u, v in mark["uv0"]], fill=(24, 26, 24))
             ink = np.max(np.asarray(image), axis=2) < 65
             orm[ink, 1] = .75
             orm[ink, 2] = .0
-        self.Save(name, image, orm, [15, 1.88], "Silver-doped fabric; rib tape, root handling dirt and leading-edge dust. Markings from the museum model, not a verified combat serial.")
+        self.Save(name, image, orm, [15, chordM], "Silver-doped fabric; rib tape, root handling dirt and leading-edge dust. Markings from the museum model, not a verified combat serial.")
 
     def Fuselage(self):
         w, h = 4096, 1024
@@ -289,7 +299,9 @@ class SurfaceBake:
                      ("Wood", "wood", .20, .000055), ("Leather", "leather", .0832, .00013),
                      ("Rubber", "rubber", .20, .000065)]:
             self.DetailNormal(*args)
+        paintPath = Path(__file__).resolve().parents[1] / "Model/KawasakiType88/Data_KawasakiType88Paint.json"
         manifest = {"version": VERSION, "generator": str(Path(__file__).name), "albedoContainsLighting": False,
+                    "paintContours": {"file": paintPath.name, "sha256": hashlib.sha256(paintPath.read_bytes()).hexdigest(), "scope": "Legible museum wing numerals only; constant authored paint colour"},
                     "referenceScheme": "Kakamigahara Type 88-II scale model 12; not a verified Uchida squadron aircraft", "files": self.records}
         (self.root / "Data_SurfaceSources.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         print(json.dumps({"version": VERSION, "files": len(self.records), "root": str(self.root)}))

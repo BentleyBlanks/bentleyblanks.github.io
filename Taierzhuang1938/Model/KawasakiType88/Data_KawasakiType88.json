@@ -3,12 +3,12 @@
   "id": "KawasakiType88",
   "title": "Type 88-II reconnaissance reference reconstruction",
   "status": "in-review",
-  "version": "WingStagger11-Surface05",
+  "version": "TailBracing15-Surface09",
   "runtime": {
     "file": "Model_KawasakiType88.glb",
-    "sha256": "516d997eab8e18ea20d05e3c33367b4b099f6863d9d8984cda1ad0bd9b65aa17",
-    "bytes": 12325484,
-    "triangles": 76473,
+    "sha256": "78da1f70719c9f9724f3c201743f44a35f70525e631dbbee1f1e3f9783e5f48e",
+    "bytes": 12391100,
+    "triangles": 79129,
     "meshes": 40,
     "nodes": 55,
     "materials": 17,
@@ -30,12 +30,12 @@
     "highProject": "Scene_KawasakiType88High.blend",
     "gameProject": "Scene_KawasakiType88Game.blend",
     "highExport": "Exports/Model_KawasakiType88High.glb",
-    "highExportSha256": "7bdb86bd98f590233aed989856f6b7d33ad66e7a5ae979e85c0e5cbc86bbb4a1",
+    "highExportSha256": "783678e53c3aa965c913df3cd8f6338619a24951aed746721bb9813b6b6e30fa",
     "projectsActuallyReopened": [
       {
         "project": "Scene_KawasakiType88High.blend",
-        "triangles": 226659,
-        "meshes": 283,
+        "triangles": 226755,
+        "meshes": 291,
         "usedFileImages": 34,
         "packedImages": 34,
         "controls": 10,
@@ -47,11 +47,13 @@
           "Occlusion",
           "Thickness"
         ],
-        "surfaceVersion": "20261023Surface05"
+        "surfaceVersion": "20261024Surface09",
+        "packedImagesMatchGeneratedFiles": true,
+        "matchedGeneratedImages": 33
       },
       {
         "project": "Scene_KawasakiType88Game.blend",
-        "triangles": 76473,
+        "triangles": 79129,
         "meshes": 40,
         "usedFileImages": 34,
         "packedImages": 34,
@@ -64,7 +66,9 @@
           "Occlusion",
           "Thickness"
         ],
-        "surfaceVersion": "20261023Surface05"
+        "surfaceVersion": "20261024Surface09",
+        "packedImagesMatchGeneratedFiles": true,
+        "matchedGeneratedImages": 33
       }
     ]
   },
@@ -77,7 +81,7 @@
     },
     {
       "url": "https://www.airwar.ru/enc/other1/kda2.html",
-      "scope": "Historical Type II photographs; mixed variants were screened, kda2-11 used for secondary form"
+      "scope": "Historical Type II photographs; mixed variants screened. kda2-11 supports the front/side form and kda2-20 shows the doubled V tailplane braces."
     },
     {
       "url": "https://ja.wikipedia.org/wiki/八八式偵察機",
@@ -94,7 +98,8 @@
     "Uncalibrated museum photograph informs colour relationships; it does not prove wartime paint reflectance.",
     "Propeller diameter follows the main image proportions; a secondary 3.3m statement has not been checked against a factory drawing.",
     "Alternative generic length12.80m, kit span15.2m and a 1933 Flight transcription disagree; chosen anchors are the table explicitly labelled II, without averaging.",
-    "Illegible tiny service marks are represented as linework, not claimed transcriptions."
+    "Illegible tiny service marks are represented as linework, not claimed transcriptions.",
+    "Lower-wing underside roundel placement is inferred; these surfaces are not visible in the primary museum photograph."
   ],
   "pbr": {
     "baseUv": 0,
@@ -106,7 +111,14 @@
     "fabricYarnPitchM": 0.00065,
     "metalDetailTileM": 0.2,
     "albedoContainsLighting": false,
-    "surfaceGenerator": "_blender/Script_KawasakiType88Surface.py"
+    "surfaceGenerator": "_blender/Script_KawasakiType88Surface.py",
+    "upperWingChordM": 2.047,
+    "lowerWingChordM": 1.72,
+    "paintContours": {
+      "file": "Data_KawasakiType88Paint.json",
+      "sha256": "b84bc114119469a18be2ed409ee5ffeb26557b5a09d322121e14ecee762653d9",
+      "scope": "Four legible wing numeral contours; constant authored paint, no source photographic illumination"
+    }
   },
   "controls": [
     "PropellerPivot",
@@ -121,16 +133,20 @@
     "AileronLowerRightPivot"
   ],
   "validation": {
-    "actualReimportSha256": "516d997eab8e18ea20d05e3c33367b4b099f6863d9d8984cda1ad0bd9b65aa17",
+    "actualReimportSha256": "78da1f70719c9f9724f3c201743f44a35f70525e631dbbee1f1e3f9783e5f48e",
     "actualReimportMissingImages": [],
-    "actualReimportMotionChecks": 91,
+    "actualReimportMotionChecks": 154,
     "actualReimportMotionIssues": [],
     "actualReimportAxisChecks": 10,
-    "cameraWeightedRmsPixelsAt600": 1.4855844168198173,
+    "cameraWeightedRmsPixelsAt600": 2.4439466322128407,
     "cameraFitIsNotWholeImageIdentityProof": true,
     "sourceProjectsSelfContained": true,
     "packingAudit": "Data_KawasakiType88Packing.json",
-    "fullPrepushStatus": "Stopped at existing SpeakerGestureTest: FrontObservation.02 consecutive Luo gestures; related source files unchanged by this model task."
+    "fullPrepushStatus": "Stopped at existing SpeakerGestureTest: FrontObservation.02 consecutive Luo gestures; related source files unchanged by this model task.",
+    "localHighPreviewMatchesSource": true,
+    "cameraFitScalarResidualCount": 104,
+    "generatedInputImagesMatchPackedSource": true,
+    "actualExportedVBraceCount": 4
   },
   "localReview": {
     "url": "http://127.0.0.1:8118/tmp/KawasakiType88/index.html",
