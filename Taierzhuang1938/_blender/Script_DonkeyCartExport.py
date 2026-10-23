@@ -12,6 +12,7 @@ from mathutils.bvhtree import BVHTree
 scene=bpy.context.scene
 assetName=globals().get('DonkeyAssetName','DonkeyCart')
 standalone=assetName=='Donkey'
+referencePhoto=standalone and bool(scene.get('DonkeyReferencePhotoDetail'))
 base=Path(scene['DonkeySourceRoot']) if standalone else Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020')
 bakeDir=base/'SourceTextures/Baked';bakeDir.mkdir(parents=True,exist_ok=True)
 project=Path(scene['DonkeyCartProject'])
@@ -170,20 +171,29 @@ def Bake(obj,label):
     detailValues=[tuple(value.uv) for value in detailUv.data] if detailUv else None
     furry=obj.data.attributes.get('FurSurface')
     sourceColors=obj.data.color_attributes.get('CoatColor')
-    coatTints=[tuple(min(1,max(0,value*.75/.55)) for value in color.color[:3])+(1,) for color in sourceColors.data] if detailValues and sourceColors else None
+    coatTints=[tuple(min(1,max(0,value*.75/.55)) for value in color.color[:3])+(1,) for color in sourceColors.data] if detailValues and sourceColors and not referencePhoto else None
     if detailValues:
         accessory=mat.copy();accessory.name='DonkeyAccessoryPbr';accessory.use_backface_culling=False;obj.data.materials.append(accessory)
+        if scene.get('DonkeyReferenceFitRevision'):
+            shader.inputs['Specular IOR Level'].default_value=.24
+            # glTF sheen has no separate weight. Blender 5.2 exports Tint as
+            # sheenColorFactor, so fold the source weight into that colour.
+            shader.inputs['Sheen Weight'].default_value=1;shader.inputs['Sheen Roughness'].default_value=.80
+            shader.inputs['Sheen Tint'].default_value=(.0056,.0049,.0042,1)
         detailBase=bpy.data.images['Texture_DonkeyCoatDetailBase']
-        baseTexture=next(node for node in nodes if node.type=='TEX_IMAGE' and node.image==baseImage);baseTexture.image=detailBase
+        baseTexture=next(node for node in nodes if node.type=='TEX_IMAGE' and node.image==baseImage)
+        if not referencePhoto:baseTexture.image=detailBase
         texture=next(node for node in nodes if node.type=='TEX_IMAGE' and node.image==normalImage);texture.image=detail
         detailCoordinates=nodes.new('ShaderNodeUVMap');detailCoordinates.uv_map='FurDetailUV'
         links.new(detailCoordinates.outputs[0],texture.inputs['Vector']);normal.uv_map='FurDetailUV'
-        links.new(detailCoordinates.outputs[0],baseTexture.inputs['Vector'])
-        paint=nodes.new('ShaderNodeVertexColor');paint.layer_name='RuntimeCoatTint'
-        multiply=nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1
-        links.new(baseTexture.outputs['Color'],multiply.inputs[1]);links.new(paint.outputs[0],multiply.inputs[2]);links.new(multiply.outputs[0],shader.inputs['Base Color'])
-        normal.inputs['Strength'].default_value=.65
-        info.extend([SaveImage(detail),SaveImage(detailBase)])
+        if not referencePhoto:
+            links.new(detailCoordinates.outputs[0],baseTexture.inputs['Vector'])
+            paint=nodes.new('ShaderNodeVertexColor');paint.layer_name='RuntimeCoatTint'
+            multiply=nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1
+            links.new(baseTexture.outputs['Color'],multiply.inputs[1]);links.new(paint.outputs[0],multiply.inputs[2]);links.new(multiply.outputs[0],shader.inputs['Base Color'])
+        normal.inputs['Strength'].default_value=.8 if scene.get('DonkeyReferenceFitRevision') else .65
+        info.append(SaveImage(detail))
+        if not referencePhoto:info.append(SaveImage(detailBase))
     for face in obj.data.polygons:face.material_index=0 if not detailValues or furry.data[face.index].value else 1
     # Runtime UV0 is the new atlas. Point paint is fully baked into base colour.
     for layer in list(obj.data.uv_layers):
@@ -205,6 +215,10 @@ def Bake(obj,label):
             for loop in face.loop_indices:
                 tint.data[loop].color=coatTints[obj.data.loops[loop].vertex_index] if face.material_index==0 else (1,1,1,1)
     coordinate=obj.data.attributes.get('MaterialCoordinates')
+    if coordinate:obj.data.attributes.remove(coordinate)
+    coordinate=obj.data.attributes.get('ReferenceCoordinates')
+    if coordinate:obj.data.attributes.remove(coordinate)
+    coordinate=obj.data.attributes.get('ReferenceViewWeights')
     if coordinate:obj.data.attributes.remove(coordinate)
     grouping=obj.data.attributes.get('AtlasGroup')
     if grouping:obj.data.attributes.remove(grouping)

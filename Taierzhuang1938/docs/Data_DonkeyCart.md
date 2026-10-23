@@ -8,17 +8,29 @@
 
 `Model/Donkey/Model_Donkey.glb` 是 2026-10-22 按用户要求追加的纯驴版。只从 V3 工程的 `DonkeyEditable` 集合保留身体、眼、耳、鬃尾和轮廓短毛，移除木车、车辕、颈垫、全部套具、笼头与牵绳；不能仅删除 `CartRuntime`，因为原动物运行时网格也合并了套具。原驴车文件与源工程不覆盖。
 
-当前纯驴 V3 为 67,028 三角、身体与短毛两个导出网格、三个材质，共用 28 根骨骼；三材质在 Three.js 中形成三个绘制网格。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。七张无损 WebP 内嵌并有镜像，纹理分工见下方 V3；实际规格以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准。V1 为 50,992 三角，V2 为 51,128 三角、单网格单材质，旧结果保留作对照。
+当前纯驴 V4 为 67,694 三角、身体与短毛两个导出网格、三个材质，共用 28 根骨骼；三材质在 Three.js 中形成三个绘制网格。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。六张无损 WebP 内嵌并有镜像；实际规格以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准。V1 为 50,992 三角，V2 为 51,128 三角，V3 为 67,028 三角，旧结果保留作对照。
 
-当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261023/Scene_Donkey.blend`，其中打包图像与重建脚本；`Data_Derivation.json` 记录父工程哈希及保留／删除组件。10-22 源工程作为 V2 留档。重建命令：
+当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261023/ReferenceFitV4/Scene_Donkey.blend`，其中打包图像与重建脚本；`Data_Derivation.json` 记录父工程及冻结 V3 中间源的哈希、组件和拟合量测。10-22、10-23 原目录分别保留 V2、V3。重建命令：
 
 ```powershell
 node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
 ```
 
-此入口从保留的 V3 父工程派生，复用相同的图集、导出、无损打包与实际 GLB 重导测蹄逻辑；结束时关闭自己的 Blender 实例。独立版的肩颈、头部、全身和行走实测留在其外置 `Review/` 目录，本地交互页在 worktree 的 `tmp/Donkey/`。新增资产未布设到关卡，不改变现有车队使用的模型。
+此入口从 `ReferenceFitV4/Scene_DonkeyBeforeReferenceFit.blend` 的冻结纯驴 V3 中间源派生，经测量修形、重解动作、图集重烘、无损打包与实际 GLB 重导测蹄；结束时关闭自己的 Blender 实例。更早从驴车分离纯驴的配方仍在 `Script_DonkeyBake.py` / `Script_DonkeyRefine.py`。独立版的肩颈、头部、全身和行走实测留在外置 `Review/` 目录，本地交互页在 worktree 的 `tmp/Donkey/`。新增资产未布设到关卡。
 
 去掉笼头后的近景发现原装饰嘴缝离真实口鼻表面约 3–4 cm；独立版将这条 30 顶点细管的五个截面中心贴回口鼻，保留管径、面数与头部蒙皮。实际表面距离记录在派生契约，不移动身体或改写驴车版。
+
+### 纯驴三视图比例与表现 V4（2026-10-24）
+
+`Script_DonkeyReferenceFit.py` 以原图地面 Y=925、肩高 1.10 m 和前蹄位置标定统一尺度，校正头部、胸臀宽度、背腹线、蹄长和错步站姿。`Script_DonkeyNeckRebuild.py` 用共边椭圆环重建颈部并平滑两端，不叠加布尔补胸。`Script_DonkeyTopology.py` 重接前腿 0.425–0.470 m 的旧 T 接缝、移除两块游离鼻腔壳，逐连通部件解算一致朝向和正体积；不直接给重叠接缝封口，以免产生不可定向连接并把全身翻到内侧。实际主体皮肤为零开口、零非流形边、零面朝向冲突。眼球、眼睑、鼻翼及内凹鼻腔随新头部重建，耳廓按原正视校准，鬃尾贴回实际皮肤，尾刷缩短到参考范围。
+
+保留 21,000 根短毛，重采样 854 个轮廓／耳缘／尾梢毛片四边面；鬃毛重建为 64 束、448 根成束细条，额毛为 32 束、160 根，尾刷改成弯曲、渐细的多段毛片和 260 根细毛。UV1 使用 0.45 m 重复尺度的独立毛流法线，侧向毛流坐标由斜率积分生成，四肢使用独立纵向毛流。原图不可见的套具覆盖区域才使用去套具辅助图；辅助图的原输出、完整提示词和输入哈希留在 `Data_NakedGuideGeneration.json`，原始参考不改写。
+
+`Script_DonkeyPhotoDetail.py` 提取三视图的局部细毛亮度比值，归一化大范围光照，经源网格 BVH 的照片可见性检查后烘入 UV0 的共享 2K 底色；标准 GLB 中没有实时照片投射，也不再重复乘身体顶点色。`Script_DonkeyReferenceMasks.py` 用原图中实测的绳带路径填补暗处绳痕；原图和辅助图先分别提取归一化细节，再羽化混合，避免套具边缘残影及矩形接缝。没有照片覆盖的表面和眼鼻边缘使用原短毛细节补齐。输出共用 2K Base、1K 附属法线、1K 毛流法线、512 ORM 与短毛 1K Base/Normal，合计六图。各源图、遮挡方法和哈希随派生契约保存。
+
+新前腕／后跗高度为 0.380 / 0.375 m，28 骨名称与层级保留。待机沿用错步站姿；行走目标在左右静止蹄位之间取中心，并按新关节重解，不能复用旧 Action 的蒙皮结果。动画入口显式进入 Pose 模式，避免从造型 Rest 模式出发时出现“有关键帧却没评估蒙皮”的假回放。
+
+源材质弱毛光权重 0.035 必须并入 glTF 的 `sheenColorFactor`，实际颜色为 `[0.0056,0.0049,0.0042]`；Blender 5.2 直接导出 Tint 会丢掉该权重、令成品发灰。增强毛纹保存后显式替换 packed payload，避免重开源工程又取回旧像素。共享导出入口及 `Script_ModelFacingTest.mjs` 检查实际毛光、皮肤共享边朝向和正体积，主体保留背面剔除；双面 Cycles 渲染和蹄底数值不能代替浏览器实机检查。验收读取最终 packed GLB 的真实材质、尺寸及完整 walk / idle 蹄底；原图、同机位对照、遮罩与浏览器画面均只留本地。原驴车成品与工程保持原版本。
 
 ### 纯驴外观 V2
 

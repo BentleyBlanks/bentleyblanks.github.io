@@ -1,14 +1,14 @@
 {
   "schema": "tengxian-independent-prop-textures-v1",
   "asset": "Donkey",
-  "version": "20261023FurV3",
-  "uv": "unique accessory atlas UV0; repeated fibre Base/Normal on UV1 with RuntimeCoatTint anatomy pigment; reused edge tuft cells with per-root HairTint",
+  "version": "20261024ReferenceV4",
+  "uv": "UV0 unique reference-detail base colour and accessory PBR atlas; independent repeated UV1 fibre normal; edge tuft atlas with per-root HairTint",
   "colorSpace": {
     "Base": "sRGB",
     "Normal": "linear OpenGL +Y",
     "Orm": "linear; R=1, G=roughness, B=metallic"
   },
-  "sizeReason": "1024 repeated fibre Base/Normal at 0.22 m retains coarse short strands in close views. Accessories use 2048 Base / 1024 baked Normal / 512 ORM; edge tuft Base alpha and Normal 1024. Seven unique images, shared ORM.",
+  "sizeReason": "Shared 2048 reference-detail Base, 1024 accessory Normal, 1024 repeated fibre Normal at 0.45 m, shared 512 ORM; 1024 edge tuft Base/Normal. Six unique embedded lossless WebP images.",
   "source": {
     "provider": "built-in imagegen + procedural + sourcePack",
     "furInput": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\SourceTextures\\Texture_DonkeyWeatheredCoatSourceV3.png",
@@ -43,6 +43,80 @@
       "output": "C:/Users/Bentl/.codex/generated_images/01a159b2-07c2-7e51-b38a-89155e578cae/exec-39aaa09f-7332-4c01-a412-aeba284a7c07.png",
       "selectedRuntimeSource": "SourceTextures/Texture_DonkeyCoatFiberShortSource.png",
       "purpose": "Shorter, coarser separated fibres, replacing the first long continuous fibre input"
+    },
+    "referenceFit": {
+      "original": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020/References/Image_DonkeyOriginalThreeView.png",
+      "occludedAnatomyGuide": {
+        "provider": "built-in imagegen",
+        "purpose": "Supporting estimate of harness-occluded anatomy; original visible shapes remain acceptance reference",
+        "prompt": "Use case: precise-object-edit. This is a supporting anatomy reference, not a redesign. Edit this exact three-view gray donkey reference by removing ONLY all rope halter, hanging lead ropes, padded collar and harness/straps. Fill the previously covered areas with anatomically natural continuous short donkey fur and ordinary chest/neck muscle, without artificial folds, hanging flaps, bulges or scars. Preserve the SAME animal identity, head and muzzle shape, eye placement/expression, ear shape/pose, lean ribs, belly depth, hip shape, leg proportions, hoof shapes, tail, all three standing poses, camera directions, figure positions, image framing, studio background and lighting. Preserve the original gray-brown weathered short coat, pale muzzle/eye surroundings/underside and fine strand detail outside the removed tack. Keep front, side and rear in the same places and at the same scale. No new animal, no body resculpting, no changes to visible silhouettes, no cart, saddle, people, text, labels, border or watermark.",
+        "input": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020/Refinement20261022/Image_DonkeyOriginalThreeView_Preview.jpg",
+        "output": "Image_NakedAnatomyGuide.png"
+      },
+      "scope": "original visible coat retained as the target; generated bare guide fills tack-covered head/neck regions before pigment and normalized-detail baking",
+      "fibreRepeatM": 0.45,
+      "fibreMicrocontrast": 2.0,
+      "colorCalibration": {
+        "vertices": 16015,
+        "darkLinearFactors": [
+          1.5,
+          1.5800000429153442,
+          1.7999999523162842
+        ],
+        "bodyPaleGain": 1.27,
+        "bellyPaleGain": 1.8,
+        "bellyPaleTint": [
+          1,
+          0.97,
+          0.94
+        ],
+        "basis": "matched neutral studio illumination and visible original three-view coat patches"
+      },
+      "photoDetail": {
+        "method": "masked luminance / normalized local blur; two 9-pixel box passes; ratio clamped to 0.50–1.80",
+        "original": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
+        "originalSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
+        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\ReferenceFitV4\\Image_NakedAnatomyGuide.png",
+        "guideSha256": "8130715142837beed8957c59ffc775500d4b6ff96bf99a61b51f8759dc9d0c4a",
+        "images": [
+          {
+            "view": "Side",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\ReferenceFitV4\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
+            "sha256": "fdc3ee73bdcdb321a93ef9d2ce204520447fa9be2783162c01c5a01b185aaa82",
+            "size": [
+              1536,
+              1024
+            ]
+          },
+          {
+            "view": "Front",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\ReferenceFitV4\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
+            "sha256": "b3da234ddd5275eb2a25f376faf3cdb42440f33e7a3e360a8b35d61dd3373382",
+            "size": [
+              1536,
+              1024
+            ]
+          },
+          {
+            "view": "Rear",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\ReferenceFitV4\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
+            "sha256": "177c3f321127b5c1146c3d970bb6a291e4cd4b4f4646b65cedf1d24c96eab900",
+            "size": [
+              1536,
+              1024
+            ]
+          }
+        ],
+        "occlusionMasks": "_blender/Script_DonkeyReferenceMasks.py; geometric rope footprints including shaded edges; feathered normalized-detail blending",
+        "visibility": "fitted-skin BVH depth test from axial source cameras; 4 mm surface tolerance; source-vertex weights baked into UV0",
+        "materials": [
+          "DonkeyLowerLegShortFur",
+          "DonkeyCartFaceFur",
+          "DonkeyCartGreyCoat",
+          "DonkeyCartEarInterior"
+        ],
+        "runtime": "baked UV0 base colour; independent tiled UV1 fibre normal; no camera projection in GLB"
+      }
     }
   },
   "bake": {
@@ -85,14 +159,14 @@
       "lossless": true
     },
     {
-      "name": "Texture_DonkeyCoatDetailBase",
-      "file": "Texture_DonkeyCoatDetailBase.webp",
+      "name": "Texture_DonkeyAnimalBase",
+      "file": "Texture_DonkeyAnimalBase.webp",
       "size": [
-        1024,
-        1024
+        2048,
+        2048
       ],
-      "bytes": 596862,
-      "sha256": "59ab5b2c2976249d6ecc2e0302f063834c9af4a39fc6d225ab3d047f253d0d40",
+      "bytes": 1395510,
+      "sha256": "5f0e3cfd9e1e67b0e803021f2627eaabc73f386731510e594513a8cef61320c9",
       "lossless": true
     },
     {
@@ -102,8 +176,8 @@
         512,
         512
       ],
-      "bytes": 16060,
-      "sha256": "2b8a86fefc86a5383de3455332dfcaabde1b74c66730cba41bbd404f5269ad78",
+      "bytes": 17160,
+      "sha256": "d1f7d7b0d6c463ba7ca4a33ff649319ae68ed81f5aaf6b405365e04b1db4193d",
       "lossless": true
     },
     {
@@ -113,19 +187,8 @@
         1024,
         1024
       ],
-      "bytes": 616294,
-      "sha256": "ce808c90ca16fd85349347f8f33ef562c77438a84fbbd1fafced290230ca8f49",
-      "lossless": true
-    },
-    {
-      "name": "Texture_DonkeyAnimalBase",
-      "file": "Texture_DonkeyAnimalBase.webp",
-      "size": [
-        2048,
-        2048
-      ],
-      "bytes": 1152678,
-      "sha256": "4ac8cf0379288eadcd882025419a7b399e9999f24c81bfb481db5964494f69d8",
+      "bytes": 647546,
+      "sha256": "af35199455e3ca86ca025c83db8afb769d5fdc2a7ea369532d06feab99a13a67",
       "lossless": true
     }
   ]

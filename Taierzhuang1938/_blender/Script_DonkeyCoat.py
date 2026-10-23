@@ -152,13 +152,18 @@ def FineMane(rig,collection):
 
 def BuildGroom(skin,rig,collection,material,count=21000):
     rng=random.Random(19381023);skin.data.calc_loop_triangles()
+    referenceFlow={}
+    if bpy.context.scene.get('DonkeyReferenceFitRevision'):
+        file=__import__('pathlib').Path(bpy.context.scene['DonkeyCartProject'])/'_blender/Script_DonkeyCoatFlow.py'
+        exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),referenceFlow)
     triangles=[];cumulative=[];total=0
     for triangle in skin.data.loop_triangles:
         face=skin.data.polygons[triangle.polygon_index]
         materialName=skin.data.materials[face.material_index].name
         if not materialName.startswith(('DonkeyCartGreyCoat','DonkeyLowerLegShortFur')):continue
         points=[skin.data.vertices[i].co for i in triangle.vertices];centre=sum(points,Vector())/3
-        if centre.z<.20:continue
+        minimumFurZ=.12 if bpy.context.scene.get('DonkeyReferenceFitRevision') else .20
+        if centre.z<minimumFurZ:continue
         if centre.y>1.16 and centre.z<1.13:continue
         area=triangle.area
         density=.55 if centre.z<.55 else .65 if centre.y>.95 else 1
@@ -217,12 +222,15 @@ def BuildGroom(skin,rig,collection,material,count=21000):
         rootColor=sum((Vector(color.data[i].color[:3])*w for i,w in zip(ids,bary)),Vector())
         pale=Smooth(.065,.17,brightness)
         tile=2 if rng.random()<pale else (1 if rng.random()<.12 else 0)
-        if root.y>.88:flow=Vector((0,.45,-1))
+        if referenceFlow:
+            limbMass=sum(w for name,w in row.items() if name.startswith(('DonkeyFront','DonkeyRear')))
+            flow=referenceFlow['HairFlow'](root,limbMass)
+        elif root.y>.88:flow=Vector((0,.45,-1))
         elif root.z<.62:flow=Vector((0,-.12,-1))
         elif root.y>.58:flow=Vector((0,-.72,-.75))
         else:flow=Vector((0,-1,-.30))
         flow+=Vector((rng.uniform(-.2,.2),rng.uniform(-.14,.14),rng.uniform(-.14,.14)))
-        length=rng.uniform(.006,.013) if root.z>.60 else rng.uniform(.004,.009)
+        length=rng.uniform(.012,.023) if root.z<.20 else rng.uniform(.006,.013) if root.z>.60 else rng.uniform(.004,.009)
         Fiber(root,normal,flow,rng.uniform(.00025,.00065),length,row,tile,rootColor)
         if normal.z>.55 and root.z>.75 and rng.random()<.075:
             Add(root,normal,flow,rng.uniform(.008,.014),rng.uniform(.010,.017),row,tile,.0014,rootColor)
@@ -237,10 +245,33 @@ def BuildGroom(skin,rig,collection,material,count=21000):
             root=points[0]*(1-a-b)+points[1]*a+points[2]*b
             normal=transform.to_3x3()@triangle.normal;normal.normalize()
             Add(root,normal,Vector((0,.12,1)),rng.uniform(.004,.007),rng.uniform(.005,.010),{'DonkeyEar'+side+'Pivot':1},3,.001,(.068,.063,.052),False)
+    if bpy.context.scene.get('DonkeyReferenceFitRevision'):
+        stem=bpy.data.objects['DonkeyThinTail'];matrix=rig.matrix_world.inverted()@stem.matrix_world
+        stemPoints=[matrix@v.co for v in stem.data.vertices]
+        for sample in range(48):
+            height=rng.uniform(.90,.99);nearest=sorted(stemPoints,key=lambda p:abs(p.z-height))[:12];centre=sum(nearest,Vector())/len(nearest);centre.z=height
+            angle=rng.uniform(0,2*math.pi);normal=Vector((math.cos(angle),math.sin(angle),0))
+            root=centre+normal*rng.uniform(.008,.012)
+            Add(root,normal,Vector((0,0,-1)),rng.uniform(.003,.005),rng.uniform(.010,.018),{'DonkeyTailPivot':1},0,.001,(.020,.019,.018),False)
     for sample in range(90):
         angle=rng.random()*2*math.pi;normal=Vector((math.cos(angle),math.sin(angle),0))
-        root=Vector((.010,-.295,rng.uniform(.43,.49)))+normal*rng.uniform(.002,.009)
-        Add(root,normal,Vector((0,-.035,-1)),rng.uniform(.010,.019),rng.uniform(.15,.20),{'DonkeyTailTipPivot':1},0,.001,(.012,.011,.010),False)
+        if bpy.context.scene.get('DonkeyReferenceFitRevision'):
+            stem=bpy.data.objects['DonkeyThinTail'];matrix=rig.matrix_world.inverted()@stem.matrix_world
+            height=rng.uniform(.74,.88);points=sorted((matrix@v.co for v in stem.data.vertices),key=lambda p:abs(p.z-height))[:12]
+            centre=sum(points,Vector())/len(points);centre.z=height
+            root=centre+normal*rng.uniform(.002,.007);length=height-rng.uniform(.31,.46)
+            flow=Vector((0,rng.uniform(.015,.045),-1)).normalized();across=flow.cross(normal).normalized();start=len(vertices)
+            width=rng.uniform(.005,.011)
+            for t,half in ((0,width*.45),(.55,width*.55),(1,.0003)):
+                centre=root+flow*length*t+normal*(.002*math.sin(math.pi*t))
+                vertices.extend((centre-across*half,centre+across*half));normals.extend((tuple(normal),tuple(normal)))
+                uvs.extend(((0,.5+.5*t),(.5,.5+.5*t)))
+                tint=tuple(min(1,max(.003,value*.75/means[0][i])) for i,value in enumerate((.012,.011,.010)))+(1,)
+                colors.extend((tint,tint));rows.extend(({'DonkeyTailTipPivot':1},{'DonkeyTailTipPivot':1}))
+            faces.extend(((start,start+1,start+3,start+2),(start+2,start+3,start+5,start+4)));regions['0']+=2
+            continue
+        else:root=Vector((.010,-.295,rng.uniform(.43,.49)))+normal*rng.uniform(.002,.009);length=rng.uniform(.15,.20)
+        Add(root,normal,Vector((0,-.035,-1)),rng.uniform(.010,.019),length,{'DonkeyTailTipPivot':1},0,.001,(.012,.011,.010),False)
     mesh=bpy.data.meshes.new('DonkeyShortCoatCards');mesh.from_pydata(vertices,[],faces);mesh.update();mesh.materials.append(material)
     for face in mesh.polygons:face.use_smooth=True
     mesh.normals_split_custom_set_from_vertices(normals)

@@ -290,16 +290,44 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
 Check(bare.json.meshes.length===2 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===3 && bare.json.images.length===7 && bareTriangles===67028 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
-  "独立驴身体与短毛共用28骨，三材质/七图与67,028三角齐备");
+  && bare.json.materials.length===3 && bare.json.images.length===6 && bareTriangles===67694 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
+  "独立驴身体与短毛共用28骨，三材质/六图与67,694三角齐备");
 const bareBody=bare.json.meshes[bare.json.nodes.find(n=>n.name==="DonkeyRuntime").mesh];
 const bareCoat=bare.json.meshes[bare.json.nodes.find(n=>n.name==="DonkeyCoatRuntime").mesh];
 const tiled=bareBody.primitives.find(p=>bare.json.materials[p.material].name.startsWith("DonkeyAnimalPbr"));
 const coatMaterial=bare.json.materials[bareCoat.primitives[0].material];
 const accessoryMaterial=bare.json.materials.find(m=>m.name.startsWith('DonkeyAccessoryPbr'));
-Check(tiled.attributes.COLOR_0!==undefined && tiled.attributes.TEXCOORD_1!==undefined
-  && bare.json.materials[tiled.material].pbrMetallicRoughness.baseColorTexture.texCoord===1 && bare.json.materials[tiled.material].normalTexture.texCoord===1,
-  "独立驴毛色顶点与独立UV1细毛Base/Normal实际保留");
+function BareWindingEvidence(primitive){
+  const positions=ReadAccessor(bare,primitive.attributes.POSITION),indices=ReadAccessor(bare,primitive.indices).data;
+  const vertices=new Map(),ids=[];const edges=new Map();let signedVolume=0;
+  for(let i=0;i<positions.count;i++){
+    const key=[0,1,2].map(axis=>Math.round(positions.data[i*3+axis]*1e6)).join(',');
+    if(!vertices.has(key))vertices.set(key,vertices.size);ids.push(vertices.get(key));
+  }
+  for(let i=0;i<indices.length;i+=3){
+    const points=[0,1,2].map(c=>[0,1,2].map(axis=>positions.data[indices[i+c]*3+axis]));
+    const [a,b,c]=points;
+    signedVolume+=(a[0]*(b[1]*c[2]-b[2]*c[1])+a[1]*(b[2]*c[0]-b[0]*c[2])+a[2]*(b[0]*c[1]-b[1]*c[0]))/6;
+    for(let j=0;j<3;j++){
+      const from=ids[indices[i+j]],to=ids[indices[i+(j+1)%3]];
+      if(from===to)continue;
+      const key=from<to?`${from}:${to}`:`${to}:${from}`,row=edges.get(key)||{count:0,direction:0};
+      row.count++;row.direction+=from<to?1:-1;edges.set(key,row);
+    }
+  }
+  return {signedVolume,windingConflicts:[...edges.values()].filter(e=>e.count===2&&e.direction!==0).length};
+}
+const bareWinding=BareWindingEvidence(tiled);
+Check(bareWinding.windingConflicts===0&&bareWinding.signedVolume>.08&&bareWinding.signedVolume<.25
+  && bare.json.materials[tiled.material].doubleSided!==true,
+  "独立驴实际皮肤三角面朝向连续、体积向外且保留背面剔除",JSON.stringify(bareWinding));
+const bareSheen=bare.json.materials[tiled.material].extensions?.KHR_materials_sheen;
+Check(bareSheen?.sheenColorFactor?.every((value,i)=>Math.abs(value-[.0056,.0049,.0042][i])<.000001)
+  && Math.abs(bareSheen.sheenRoughnessFactor-.8)<.000001,
+  "独立驴 GLB 毛光颜色包含源权重，不把弱毛光导成灰白覆盖");
+Check(tiled.attributes.COLOR_0===undefined && tiled.attributes.TEXCOORD_1!==undefined
+  && (bare.json.materials[tiled.material].pbrMetallicRoughness.baseColorTexture.texCoord??0)===0 && bare.json.materials[tiled.material].normalTexture.texCoord===1,
+  "独立驴参考细毛底色使用UV0，独立UV1毛流法线保留且不重复乘顶点色");
 Check(coatMaterial.alphaMode==="MASK" && Math.abs(coatMaterial.alphaCutoff-.45)<.000001 && coatMaterial.doubleSided===true
   && bareCoat.primitives.every(p=>p.attributes.COLOR_0!==undefined && p.attributes.JOINTS_0!==undefined && p.attributes.WEIGHTS_0!==undefined),
   "独立驴短毛实际带颜色和蒙皮，轮廓毛使用双面MASK 0.45");
@@ -316,7 +344,7 @@ for(const animation of bare.json.animations){
 const bareParents=new Map();bare.json.nodes.forEach((node,index)=>(node.children||[]).forEach(child=>bareParents.set(child,index)));
 function BareWorld(index){const local=NodeMatrix(bare.json.nodes[index]);return bareParents.has(index)?Mat4Mul(BareWorld(bareParents.get(index)),local):local}
 for(const front of ["Front","Rear"]){
-  const expected=front==="Front"?.39:.38;
+  const expected=front==="Front"?.38:.375;
   const heights=["Left","Right"].map(side=>BareWorld(bare.json.nodes.findIndex(n=>n.name===`Donkey${front}${side}KneePivot`))[13]);
   Check(heights.every(height=>Math.abs(height-expected)<.00001),`独立驴 ${front} 关节实际高度符合参考图修订`,heights.map(v=>v.toFixed(3)).join(" / "));
 }

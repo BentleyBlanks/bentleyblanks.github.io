@@ -1,9 +1,9 @@
 {
-  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\Model_DonkeyUnpacked.glb",
-  "output": "Taierzhuang1938\\Model\\Donkey\\Model_Donkey.glb",
-  "bytes": 13482616,
+  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\ReferenceFitV4\\Model_DonkeyUnpacked.glb",
+  "output": "C:\\Users\\Bentl\\Documents\\bentleyblanks_Codex_DonkeyCart_20261020\\Taierzhuang1938\\Model\\Donkey\\Model_Donkey.glb",
+  "bytes": 13119268,
   "geometrySkinActionsUnchanged": true,
-  "nonImageBufferSha256": "902aa1e511683756c11b3fd1c9997ee7023572b7362ff278d5013f75baba77f3",
+  "nonImageBufferSha256": "7f28defeebee9e9cbf582a24bd9ca8ce525fbe47ed2eeb14ba5069b19affb0bc",
   "images": [
     {
       "name": "Texture_DonkeyShortCoatNormal",
@@ -39,14 +39,14 @@
       "lossless": true
     },
     {
-      "name": "Texture_DonkeyCoatDetailBase",
-      "file": "Texture_DonkeyCoatDetailBase.webp",
+      "name": "Texture_DonkeyAnimalBase",
+      "file": "Texture_DonkeyAnimalBase.webp",
       "size": [
-        1024,
-        1024
+        2048,
+        2048
       ],
-      "bytes": 596862,
-      "sha256": "59ab5b2c2976249d6ecc2e0302f063834c9af4a39fc6d225ab3d047f253d0d40",
+      "bytes": 1395510,
+      "sha256": "5f0e3cfd9e1e67b0e803021f2627eaabc73f386731510e594513a8cef61320c9",
       "lossless": true
     },
     {
@@ -56,8 +56,8 @@
         512,
         512
       ],
-      "bytes": 16060,
-      "sha256": "2b8a86fefc86a5383de3455332dfcaabde1b74c66730cba41bbd404f5269ad78",
+      "bytes": 17160,
+      "sha256": "d1f7d7b0d6c463ba7ca4a33ff649319ae68ed81f5aaf6b405365e04b1db4193d",
       "lossless": true
     },
     {
@@ -67,19 +67,8 @@
         1024,
         1024
       ],
-      "bytes": 616294,
-      "sha256": "ce808c90ca16fd85349347f8f33ef562c77438a84fbbd1fafced290230ca8f49",
-      "lossless": true
-    },
-    {
-      "name": "Texture_DonkeyAnimalBase",
-      "file": "Texture_DonkeyAnimalBase.webp",
-      "size": [
-        2048,
-        2048
-      ],
-      "bytes": 1152678,
-      "sha256": "4ac8cf0379288eadcd882025419a7b399e9999f24c81bfb481db5964494f69d8",
+      "bytes": 647546,
+      "sha256": "af35199455e3ca86ca025c83db8afb769d5fdc2a7ea369532d06feab99a13a67",
       "lossless": true
     }
   ],

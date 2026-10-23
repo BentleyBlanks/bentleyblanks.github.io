@@ -11,6 +11,8 @@ scene=bpy.context.scene
 assetName=globals().get('DonkeyAssetName','DonkeyCart');standalone=assetName=='Donkey'
 base=Path(scene['DonkeySourceRoot']) if standalone else Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020')
 rig=bpy.data.objects['DonkeyRig'];cart=None if standalone else bpy.data.objects['DonkeyCartRig'];skin=bpy.data.objects['DonkeyContinuousSkin']
+rig.data.pose_position='POSE'
+if cart:cart.data.pose_position='POSE'
 rest={b.name:b.matrix_local.copy() for b in rig.data.bones}
 origins={b.name:b.head_local.copy() for b in rig.data.bones}
 suffixes=['Pivot','ElbowPivot','KneePivot','HoofPivot']
@@ -69,8 +71,12 @@ def WorldPose(phase,idle=False):
             names=[stem+s for s in suffixes];p=[origins[n].copy() for n in names]
             offset=(.75 if front else 0)+(.5 if side=='Right' else 0)
             step=(phase+offset)%1
-            ty,tz,arc,planted=(p[3].y,p[3].z,0,True) if idle else FootTarget(p[3],step,front)
-            rootShift=(ty-p[3].y)*(.22 if front else .07) if not idle else 0
+            gaitPoint=p[3].copy()
+            if standalone and scene.get('DonkeyReferenceFootCenters') and not idle:
+                label='Front' if front else 'Rear'
+                gaitPoint.y=sum(origins['Donkey'+label+s+'HoofPivot'].y for s in ('Left','Right'))/2
+            ty,tz,arc,planted=(p[3].y,p[3].z,0,True) if idle else FootTarget(gaitPoint,step,front)
+            rootShift=(ty-gaitPoint.y)*(.22 if front else .07) if not idle else 0
             shifted=[point+Vector((0,rootShift,bob)) for point in p]
             fold=(-.60 if front else .48)*arc
             pivot,elbow,cannon,miss=Solve(shifted,(ty,tz),fold)
