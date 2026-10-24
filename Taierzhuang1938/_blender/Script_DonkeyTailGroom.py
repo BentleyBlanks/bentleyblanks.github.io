@@ -10,7 +10,10 @@ def RebuildTailGroom(skin,rig,collection,material):
             bpy.data.objects.remove(obj,do_unlink=True)
     tail=bpy.data.objects['DonkeyThinTail'];matrix=rig.matrix_world.inverted()@tail.matrix_world;back=matrix.inverted()
     points=[matrix@v.co for v in tail.data.vertices]
-    for first in range(0,len(points),8):
+    # A finished source may be reopened for grooming. Its .60 m core is
+    # already tapered; applying the original .38 m remap twice shortens it.
+    taperCore=min(p.z for p in points)<.50
+    for first in range(0,len(points),8) if taperCore else ():
         ring=points[first:first+8];centre=sum(ring,Vector())/len(ring)
         if centre.z>=.80:continue
         fraction=max(0,min(1,(centre.z-.38)/.42));newZ=.60+.20*fraction
@@ -27,28 +30,39 @@ def RebuildTailGroom(skin,rig,collection,material):
     bpy.data.images.remove(image)
     if len(palette)<100:raise RuntimeError('No reference tail pigment samples')
     rng=random.Random(19381030);vertices=[];faces=[];normals=[];colors=[];weights=[];uvs=[]
-    guideEnds=(.24,.30,.34,.39,.32,.45,.35,.28,.36,.42,.31,.27,.38)
+    guideEnds=(.32,.36,.34,.39,.32,.42,.35,.31,.36,.39,.33,.34,.38)
     guideCount=len(guideEnds);guides=[]
     for guide in range(guideCount):
-        angle=2*math.pi*guide/guideCount;spread=rng.uniform(.022,.045)
-        guides.append((math.cos(angle)*spread,math.sin(angle)*spread,rng.uniform(-.020,.020),rng.uniform(-.022,.022),guideEnds[guide]))
+        angle=2*math.pi*guide/guideCount
+        guides.append((math.cos(angle),math.sin(angle),rng.uniform(-.010,.010),rng.uniform(-.008,.008),guideEnds[guide]))
     def Centre(z):
         return Vector((.009,float(np.interp(z,(.22,.40,.58,.76,.90),(-.165,-.178,-.184,-.167,-.150))),z))
     for strand in range(480):
-        gx,gy,bendX,bendY,guideEnd=guides[strand%guideCount];rootZ=rng.uniform(.77,.92)
-        endZ=guideEnd+rng.uniform(-.015,.025) if strand<360 else rng.uniform(.45,.62)
+        gx,gy,bendX,bendY,guideEnd=guides[strand%guideCount];rootZ=rng.uniform(.80,.92)
+        # Fill the brush cross-section instead of duplicating thirteen outer
+        # guide endpoints. Stratification keeps density through the centre;
+        # weak guide attraction retains small, irregular natural clumps.
+        angle=strand*math.pi*(3-math.sqrt(5));radius=math.sqrt((strand%120+.5)/120)
+        dx=.055*(.80*radius*math.cos(angle)+.20*gx)
+        dy=.022*(.80*radius*math.sin(angle)+.20*gy)
+        interior=strand>=300 and strand<420
+        endZ=rng.uniform(.265,.355) if interior else rng.uniform(.47,.62) if strand>=420 else guideEnd+rng.uniform(-.012,.020)
         rootAngle=rng.uniform(0,2*math.pi);root=Centre(rootZ)+Vector((math.cos(rootAngle)*.007,math.sin(rootAngle)*.007,0))
-        end=Centre(endZ)+Vector((gx+rng.gauss(0,.0015),gy+rng.gauss(0,.0015),0))
+        # The longest central fibres curl toward the hock. They remain visible
+        # between the legs from behind, while the side leg occludes their tips.
+        curl=max(0,min(1,(.365-endZ)/.075));curl=curl*curl*(3-2*curl)
+        end=Centre(endZ)+Vector((dx*.45 if interior else dx,dy+.065*curl,0))
         angle=rng.uniform(0,2*math.pi);across=Vector((math.cos(angle),math.sin(angle),0))
         tangent=(end-root).normalized();across=(across-tangent*across.dot(tangent)).normalized();normal=across.cross(tangent).normalized()
         halfWidth=rng.uniform(.00050,.00110);pigment=palette[rng.randrange(len(palette))]*rng.uniform(.80,1.40)
         first=len(vertices)
-        for t,taper in ((0,.75),(.38,1),(.76,.45),(1,.04)):
-            point=root.lerp(end,t)+Vector((bendX*math.sin(math.pi*t),bendY*math.sin(math.pi*t),0))
+        for t,taper in ((0,.75),(.38,1),(.76,.65),(1,.12)):
+            wave=math.sin(math.pi*t)
+            point=root.lerp(end,t)+Vector(((bendX+.20*dx)*wave,(bendY-.025*curl)*wave,0))
             vertices.extend((point-across*halfWidth*taper,point+across*halfWidth*taper));normals.extend((tuple(normal),tuple(normal)))
             color=tuple(float(max(.005,min(.16,value*(.90+.16*t)))) for value in pigment)+(1,)
             colors.extend((color,color));row={'DonkeyTailPivot':.35*(1-t),'DonkeyTailTipPivot':.65+.35*t};weights.extend((row,row))
-            uvs.extend(((.2498,.57),(.2502,.5702)))
+            uvs.extend(((.2498,.5700+.0006*t),(.2502,.5700+.0006*t)))
         for level in range(3):
             a=first+level*2;faces.append((a,a+1,a+3,a+2))
     mesh=bpy.data.meshes.new('DonkeyReferenceTailVolume');mesh.from_pydata(vertices,[],faces);mesh.materials.append(material);mesh.update()
@@ -64,6 +78,6 @@ def RebuildTailGroom(skin,rig,collection,material):
             group=obj.vertex_groups.get(name) or obj.vertex_groups.new(name=name);group.add([index],weight,'REPLACE')
     modifier=obj.modifiers.new('DonkeyTailGroomSkin','ARMATURE');modifier.object=rig
     obj['coatCardCount']=len(faces);obj['groomCastShadow']=False;obj.visible_shadow=False
-    return {'fibres':480,'guides':guideCount,'triangles':len(faces)*2,'halfWidthM':[.00050,.00110],'endHeightM':[.225,.62],'longClumpEndHeightsM':list(guideEnds),'longFibres':360,'interiorFibres':120,
+    return {'fibres':480,'guides':guideCount,'triangles':len(faces)*2,'halfWidthM':[.00050,.00110],'endHeightM':[.265,.62],'longClumpEndHeightsM':list(guideEnds),'outerFibres':300,'interiorFibres':120,'shortFibres':60,
             'coreEndHeightM':.60,'coreTipRadiusM':.0012,'material':'DonkeyShortCoatPbr','exportLayer':'DonkeyCoatRuntime',
-            'pigment':'reference tail linear RGB samples, varied per strand','method':'three-segment curved strips, staggered ends and near-zero tip widths; no large brush cards'}
+            'pigment':'reference tail linear RGB samples, varied per strand','method':'filled elliptical brush with stratified fibres, weak guide clumping, staggered ends and forward-curled inner tips; three segments per fibre and monotonic UVs'}
