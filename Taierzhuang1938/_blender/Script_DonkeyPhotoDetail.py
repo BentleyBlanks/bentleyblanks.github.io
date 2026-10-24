@@ -25,6 +25,11 @@ def BuildDetailImages(base):
     occlusion=maskNamespace['BuildOcclusionWeights']()
     yy,xx=np.indices((1024,1536));result={};records=[]
     for name,(left,right) in {'Side':(335,1217),'Front':(34,280),'Rear':(1225,1518)}.items():
+        cavity=np.zeros((1024,1536),dtype=np.float32)
+        cavities={'Side':[(359.3,391.8,9,17)],'Front':[(131.8,402.5,9,17),(182.3,402.8,9,17)],'Rear':[]}[name]
+        for u,v,rx,ry in cavities:
+            radius=np.sqrt(((xx-u)/rx)**2+((yy-v)/ry)**2);t=np.clip((radius-1)/.25,0,1)
+            cavity=np.maximum(cavity,1-t*t*(3-2*t))
         ratios=[];confidences=[]
         for imageIndex,rgb in enumerate(arrays):
             linear=np.where(rgb<=.04045,rgb/12.92,((rgb+.055)/1.055)**2.4)
@@ -35,6 +40,7 @@ def BuildDetailImages(base):
             confidence=(denominator>.5)&(xx>left)&(xx<right)&(yy>30)&(yy<925)
             contrast=2.30 if imageIndex==0 else 1.0
             ratio=np.clip(1+contrast*(luminance/np.maximum(.005,low)-1),.35 if imageIndex==0 else .50,2.15 if imageIndex==0 else 1.80);ratio[~confidence]=1
+            ratio=ratio*(1-cavity)+cavity
             ratios.append(ratio);confidences.append(confidence.astype(np.float32))
         blend=occlusion[name];a=(1-blend)*confidences[0];b=blend*confidences[1];confidence=a+b
         ratio=(ratios[0]*a+ratios[1]*b)/np.maximum(.001,confidence);ratio[confidence<.001]=1
@@ -46,7 +52,7 @@ def BuildDetailImages(base):
         path=base/'SourceTextures'/('Texture_DonkeyReference'+name+'Detail.png')
         image.filepath_raw=str(path);image.file_format='PNG';image.save();content=path.read_bytes();image.pack(data=content,data_len=len(content))
         result[name]=image;records.append({'view':name,'path':str(path),'sha256':hashlib.sha256(content).hexdigest(),'size':[1536,1024]})
-    return result,{'method':'masked luminance / normalized local blur; two 9-pixel box passes; original detail contrast 2.30 and guide detail contrast 1.0; ratios clamped separately','contrast':2.30,'occludedGuideContrast':1.0,
+    return result,{'method':'masked luminance / normalized local blur; two 9-pixel box passes; original detail contrast 2.30 and guide detail contrast 1.0; ratios clamped separately','contrast':2.30,'occludedGuideContrast':1.0,'cavityProtection':'feathered measured source nostril footprints excluded from pigment-like dark detail; cavity darkness is geometry',
         'original':str(original),'originalSha256':hashlib.sha256(original.read_bytes()).hexdigest(),
         'occludedGuide':str(guide),'guideSha256':hashlib.sha256(guide.read_bytes()).hexdigest(),'images':records,
         'occlusionMasks':'_blender/Script_DonkeyReferenceMasks.py; geometric rope footprints including shaded edges; feathered normalized-detail blending'}
@@ -61,7 +67,7 @@ def InstallReferenceDetail(scene,skin,rig,collection,base):
     materials=set()
     for obj in collection.objects:
         if obj.type!='MESH':continue
-        furry=[m for m in obj.data.materials if m and m.name.startswith(('DonkeyCartGreyCoat','DonkeyLowerLegShortFur','DonkeyCartFaceFur','DonkeyCartEarInterior'))]
+        furry=[m for m in obj.data.materials if m and m.name.startswith(('DonkeyCartGreyCoat','DonkeyLowerLegShortFur','DonkeyCartFaceFur','DonkeyCartEarInterior','DonkeyNasalPad'))]
         if not furry:continue
         materials.update(furry);transform=inverse@obj.matrix_world
         attribute=obj.data.attributes.get('ReferenceCoordinates') or obj.data.attributes.new('ReferenceCoordinates','FLOAT_VECTOR','POINT')
@@ -74,7 +80,8 @@ def InstallReferenceDetail(scene,skin,rig,collection,base):
     for material in materials:
         nodes,links=material.node_tree.nodes,material.node_tree.links
         shader=next(n for n in nodes if n.type=='BSDF_PRINCIPLED');paint=next(n for n in nodes if n.type=='VERTEX_COLOR')
-        fibre=next(n for n in nodes if n.type=='TEX_IMAGE' and n.image and n.image.name=='Texture_DonkeyCoatDetailBase')
+        fibre=next((n for n in nodes if n.type=='TEX_IMAGE' and n.image and n.image.name=='Texture_DonkeyCoatDetailBase'),None)
+        nasalPad=material.name.startswith('DonkeyNasalPad')
         def Math(operation,a,b=0):
             node=nodes.new('ShaderNodeMath');node.operation=operation
             for index,value in enumerate((a,b)):
@@ -100,14 +107,17 @@ def InstallReferenceDetail(scene,skin,rig,collection,base):
         total=Math('ADD',weights['Side'],Math('ADD',weights['Front'],weights['Rear']))
         validTotal=Math('ADD',validWeights[0],Math('ADD',validWeights[1],validWeights[2]))
         photographic=Math('DIVIDE',Math('ADD',terms[0],Math('ADD',terms[1],terms[2])),Math('MAXIMUM',.001,validTotal))
+        if nasalPad:photographic=Math('ADD',1,Math('DIVIDE',Math('SUBTRACT',photographic,1),2.3))
         confidence=Clamp(Math('DIVIDE',validTotal,Math('MAXIMUM',.001,total)))
         dx=Math('DIVIDE',Math('SUBTRACT',Math('ABSOLUTE',x),eyeCentre.x),.050)
         dy=Math('DIVIDE',Math('SUBTRACT',y,eyeCentre.y),.050);dz=Math('DIVIDE',Math('SUBTRACT',z,eyeCentre.z),.035)
         distance=Math('SQRT',Math('ADD',Math('MULTIPLY',dx,dx),Math('ADD',Math('MULTIPLY',dy,dy),Math('MULTIPLY',dz,dz))))
         protectEye=Math('SUBTRACT',1,Clamp(Math('DIVIDE',Math('SUBTRACT',distance,.7),.5)))
         protectNose=Math('MULTIPLY',Clamp(Math('DIVIDE',Math('SUBTRACT',y,1.16),.08)),Clamp(Math('DIVIDE',Math('SUBTRACT',1.10,z),.10)))
-        protect=Math('MAXIMUM',protectEye,protectNose)
-        luminance=nodes.new('ShaderNodeRGBToBW');links.new(fibre.outputs['Color'],luminance.inputs[0]);generic=Math('DIVIDE',luminance.outputs[0],.55)
+        protect=protectEye if nasalPad else Math('MAXIMUM',protectEye,protectNose)
+        if fibre:
+            luminance=nodes.new('ShaderNodeRGBToBW');links.new(fibre.outputs['Color'],luminance.inputs[0]);generic=Math('DIVIDE',luminance.outputs[0],.55)
+        else:generic=1
         usePhoto=Math('MULTIPLY',confidence,Math('SUBTRACT',1,protect))
         detail=Math('ADD',Math('MULTIPLY',photographic,usePhoto),Math('MULTIPLY',generic,Math('SUBTRACT',1,usePhoto)))
         multiply=nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1

@@ -1,11 +1,11 @@
 {
   "schema": "tengxian-independent-rigged-prop-v1",
   "id": "Donkey",
-  "version": "20261024ReferenceV8",
+  "version": "20261024ReferenceV9",
   "asset": "Model_Donkey.glb",
   "textureManifest": "Data_DonkeyTextures.json",
-  "sha256": "b52cd06a06cc5d3e7f51fd2e8268bf85ec9f1b05e9c7555af3c2f80f73b93071",
-  "bytes": 14733272,
+  "sha256": "44821a97c16157a8c183920f64daae708fe7bb9d243bb7543c20d56a5bd15d4c",
+  "bytes": 14425744,
   "units": "metres",
   "upAxis": "+Y",
   "facingAxis": "-Z",
@@ -20,7 +20,7 @@
     "min": [
       -0.20206531882286072,
       0.00039999998989515007,
-      -1.1173174381256104
+      -1.1167150735855103
     ],
     "max": [
       0.20429711043834686,
@@ -30,7 +30,7 @@
     "dimensions": [
       0.4063624292612076,
       1.5700224109750707,
-      1.5568842887878418
+      1.5562819242477417
     ]
   },
   "feet": {
@@ -83,7 +83,7 @@
     },
     "sampledSurfaceM2": 1.931572017124267,
     "maxInfluences": 4,
-    "version": "20261024ReferenceV8",
+    "version": "20261024ReferenceV9",
     "method": "individual skinned short fibres, limited alpha-cutout edge tufts and tiled fibre normal detail on UV1",
     "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\SourceTextures\\Texture_DonkeyShortFurCardsSource.png",
     "sourceSha256": "03db7521e9987a20f405e647c3c37237ad3006193f993babd2d2a424496e6d09",
@@ -100,10 +100,10 @@
     "shadow": "groomCastShadow=false; body and accessories cast shadows, micro-fibre layer receives them"
   },
   "triangles": {
-    "total": 77934,
+    "total": 78124,
     "limit": 80000,
     "byBatch": {
-      "Animal": 40054,
+      "Animal": 40244,
       "Coat": 37724,
       "Mane": 156
     },
@@ -125,12 +125,12 @@
     "maxInfluences": 4,
     "morphTargets": 0,
     "uvAtlasCoverage": {
-      "Animal": 0.3553202896102305,
+      "Animal": 0.30184278781659124,
       "Coat": null,
       "Mane": null
     },
     "averageTexelsPerMetre": {
-      "Animal": 711.7246522580608,
+      "Animal": 654.2347343318603,
       "Coat": null,
       "Mane": null
     }
@@ -191,7 +191,7 @@
       },
       "sampledSurfaceM2": 1.931572017124267,
       "maxInfluences": 4,
-      "version": "20261024ReferenceV8",
+      "version": "20261024ReferenceV9",
       "method": "individual skinned short fibres, limited alpha-cutout edge tufts and tiled fibre normal detail on UV1",
       "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\SourceTextures\\Texture_DonkeyShortFurCardsSource.png",
       "sourceSha256": "03db7521e9987a20f405e647c3c37237ad3006193f993babd2d2a424496e6d09",
@@ -206,7 +206,7 @@
       "detailTexelsPerMetre": 2275.5555555555557
     },
     "referenceFit": {
-      "version": "20261024ReferenceV8",
+      "version": "20261024ReferenceV9",
       "referenceImage": "Image_DonkeyOriginalThreeView.png",
       "calibration": {
         "groundPixelY": 925,
@@ -220,7 +220,7 @@
       "maxSkinDisplacementM": 0.23415090219101242,
       "meanSkinDisplacementM": 0.05473768158698771,
       "chestSurfaceAddedTriangles": 0,
-      "referencePigmentVertices": 11819,
+      "referencePigmentVertices": 11803,
       "neckLoft": {
         "version": "ReferenceNeckLoftV1",
         "cutY": [
@@ -275,47 +275,127 @@
       "nostrils": [
         {
           "side": "Left",
+          "method": "curved alar opening around an elliptic nasal pad; shaded mucosal wall and dark airway floor",
           "centre": [
-            -0.04800000041723251,
-            1.3113598823547363,
-            0.9259999990463257
+            -0.04767210781574249,
+            1.310564398765564,
+            0.9279999732971191
           ],
-          "radiiM": [
-            0.0115,
-            0.024
+          "phiRange": [
+            0.45999999999999996,
+            0.94
           ],
-          "axisTiltDeg": 30,
-          "normal": [
-            -0.6997565031051636,
-            0.7137516140937805,
-            0.029989562928676605
-          ],
-          "depthM": 0.023,
-          "rimHeightM": 0.003,
-          "boundaryVertices": 47,
-          "removedEnclosedPatchFaces": 24
+          "zSlopeMPerRadian": 0.07,
+          "verticalRadiusM": 0.013,
+          "boundaryVertices": 55,
+          "boundaryAngleCorrectionRad": 0.47486706236003107,
+          "closedPinchFaces": 1,
+          "removedEnclosedPatchFaces": 121,
+          "envelopeMaxDisplacementM": 0.025,
+          "frontProfile": [
+            [
+              0.875,
+              1.2862025499343872
+            ],
+            [
+              0.89,
+              1.310265302658081
+            ],
+            [
+              0.905,
+              1.3251965045928955
+            ],
+            [
+              0.92,
+              1.331673502922058
+            ],
+            [
+              0.935,
+              1.331776738166809
+            ],
+            [
+              0.95,
+              1.3303656578063965
+            ],
+            [
+              0.965,
+              1.3292635679244995
+            ],
+            [
+              0.98,
+              1.3284932374954224
+            ],
+            [
+              1.0,
+              1.3259862661361694
+            ],
+            [
+              1.02,
+              1.3229053020477295
+            ]
+          ]
         },
         {
           "side": "Right",
+          "method": "curved alar opening around an elliptic nasal pad; shaded mucosal wall and dark airway floor",
           "centre": [
-            0.04800000041723251,
-            1.3113596439361572,
-            0.9259999990463257
+            0.04767210781574249,
+            1.310564398765564,
+            0.9279999732971191
           ],
-          "radiiM": [
-            0.0115,
-            0.024
+          "phiRange": [
+            0.45999999999999996,
+            0.94
           ],
-          "axisTiltDeg": 30,
-          "normal": [
-            0.6997565031051636,
-            0.7137516140937805,
-            0.029989562928676605
-          ],
-          "depthM": 0.023,
-          "rimHeightM": 0.003,
-          "boundaryVertices": 47,
-          "removedEnclosedPatchFaces": 24
+          "zSlopeMPerRadian": 0.07,
+          "verticalRadiusM": 0.013,
+          "boundaryVertices": 53,
+          "boundaryAngleCorrectionRad": 0.5191357077111143,
+          "closedPinchFaces": 0,
+          "removedEnclosedPatchFaces": 121,
+          "envelopeMaxDisplacementM": 0.025,
+          "frontProfile": [
+            [
+              0.875,
+              1.2862025499343872
+            ],
+            [
+              0.89,
+              1.310265302658081
+            ],
+            [
+              0.905,
+              1.3251965045928955
+            ],
+            [
+              0.92,
+              1.331673502922058
+            ],
+            [
+              0.935,
+              1.331776738166809
+            ],
+            [
+              0.95,
+              1.3303656578063965
+            ],
+            [
+              0.965,
+              1.3292635679244995
+            ],
+            [
+              0.98,
+              1.3284932374954224
+            ],
+            [
+              1.0,
+              1.3259862661361694
+            ],
+            [
+              1.02,
+              1.3229053020477295
+            ]
+          ]
         }
       ],
       "topology": {
@@ -347,7 +427,7 @@
         "boundaryEdges": 0,
         "nonmanifoldEdges": 0,
         "windingConflicts": 0,
-        "mainVolumeM3": 0.1442214591145607,
+        "mainVolumeM3": 0.14414552990205443,
         "flippedFaces": 0
       },
       "earRootOffsets": {
@@ -409,8 +489,7 @@
           }
         },
         "faceSculpt": {
-          "method": "lateral alar recess, rounded interaural crown, subtle supraorbital ridge and connected throat junction fairing",
-          "alarRecessM": 0.016,
+          "method": "rounded interaural crown, subtle supraorbital ridge and connected throat junction fairing",
           "maxCrownRaiseM": 0.02,
           "maxOrbitalReliefM": 0.0038,
           "maxDisplacementM": 0.019999980829879766
@@ -592,7 +671,7 @@
             "sourceObject": "DonkeyReferenceManeVolume"
           },
           "method": "reference-alpha ribbons backed by thin curved triangular-tube fibres rooted to actual skin",
-          "texture": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV8\\SourceTextures\\Texture_DonkeyManeBase.png",
+          "texture": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV9\\SourceTextures\\Texture_DonkeyManeBase.png",
           "textureSha256": "ba2cf2aea6b975cb9f9f4a25e5523215ced1d552544cab039ee18c21d79680c2",
           "sourceSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b"
         },
@@ -639,6 +718,13 @@
               ]
             }
           ]
+        },
+        "nasalPad": {
+          "material": "DonkeyNasalPad",
+          "faces": 4730,
+          "roughness": 0.72,
+          "normal": "fine 0.25 mm procedural skin relief baked on UV0; no coarse repeated fibre normal",
+          "pigment": "reference blend strengthened below the upper white muzzle; soft height transition"
         }
       },
       "boneCount": 28,
@@ -663,7 +749,7 @@
       },
       "material": "short pale muzzle, calibrated charcoal-gray coat and pale belly, 0.45 m fibre repeat and doubled microcontrast",
       "colorCalibration": {
-        "vertices": 15981,
+        "vertices": 16076,
         "darkLinearFactors": [
           1.5,
           1.5800000429153442,
@@ -677,7 +763,7 @@
           0.94
         ],
         "muzzle": {
-          "vertices": 3085,
+          "vertices": 4326,
           "sideGain": 1.7,
           "centralGain": 3.2,
           "centralFalloffM": [
@@ -693,6 +779,11 @@
             1.01,
             1.1
           ],
+          "nasalPadLinearRgb": [
+            0.09,
+            0.07,
+            0.058
+          ],
           "maxAlbedo": 0.8
         },
         "basis": "matched neutral studio illumination and visible original three-view coat patches"
@@ -705,22 +796,23 @@
           "boundaryEdges": 0,
           "nonmanifoldEdges": 0,
           "windingConflicts": 0,
-          "mainVolumeM3": 0.1442214591145607
+          "mainVolumeM3": 0.14414552990205443
         }
       },
       "photoDetail": {
         "method": "masked luminance / normalized local blur; two 9-pixel box passes; original detail contrast 2.30 and guide detail contrast 1.0; ratios clamped separately",
         "contrast": 2.3,
         "occludedGuideContrast": 1.0,
+        "cavityProtection": "feathered measured source nostril footprints excluded from pigment-like dark detail; cavity darkness is geometry",
         "original": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
         "originalSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
-        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV8\\Image_NakedAnatomyGuide.png",
+        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV9\\Image_NakedAnatomyGuide.png",
         "guideSha256": "8130715142837beed8957c59ffc775500d4b6ff96bf99a61b51f8759dc9d0c4a",
         "images": [
           {
             "view": "Side",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV8\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
-            "sha256": "7fc6d47ba5e805f8b21940a18b113e03a70554eee9f103545c7a2972a2362351",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV9\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
+            "sha256": "d53f93047439811b1966b11990b5d1f993e8224e82f934b33e521bd53baaa7d5",
             "size": [
               1536,
               1024
@@ -728,8 +820,8 @@
           },
           {
             "view": "Front",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV8\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
-            "sha256": "d6978db47eb8f7513164f4376feb437ecf23f27c6767ab20b842bdc3eb69b66f",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV9\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
+            "sha256": "11618fa54c957f533279c955e93fe40e88c6443829bc5289d808f3404eaa1a1e",
             "size": [
               1536,
               1024
@@ -737,7 +829,7 @@
           },
           {
             "view": "Rear",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV8\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV9\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
             "sha256": "ef5d8b1ac83cec630467e8244236c71b80238d05199fbf89f99d87c7b1a7aff4",
             "size": [
               1536,
@@ -748,8 +840,9 @@
         "occlusionMasks": "_blender/Script_DonkeyReferenceMasks.py; geometric rope footprints including shaded edges; feathered normalized-detail blending",
         "visibility": "fitted-skin BVH depth test from axial source cameras; 4 mm surface tolerance; source-vertex weights baked into UV0",
         "materials": [
-          "DonkeyCartEarInterior",
+          "DonkeyNasalPad",
           "DonkeyCartGreyCoat",
+          "DonkeyCartEarInterior",
           "DonkeyCartFaceFur",
           "DonkeyLowerLegShortFur"
         ],
@@ -777,7 +870,7 @@
       0.00039962775190360844,
       0.0004001638444606215
     ],
-    "reimportedStanceDriftPerFrameM": 6.340585384963238e-07,
+    "reimportedStanceDriftPerFrameM": 6.336131424429514e-07,
     "sampleCount": 148,
     "webpPixelsUnchanged": true,
     "geometrySkinActionsUnchangedDuringPacking": true,
@@ -793,7 +886,7 @@
     "parentSourceUnchanged": true,
     "sourceAnatomyEvidence": "Measured three-view silhouette, closed manifold neck/skin, orbital relief, rebuilt eyes and swept nasal cavities; compatible rest joints and four-influence skin. Native clips and the packed GLB are independently sampled."
   },
-  "editableSource": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV8\\Scene_Donkey.blend",
+  "editableSource": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV9\\Scene_Donkey.blend",
   "credits": [
     {
       "name": "Lyndon Daniels / ChadM Rigged Horse",

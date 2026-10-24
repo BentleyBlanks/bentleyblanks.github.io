@@ -89,7 +89,8 @@ def ReferencePigment(skin,anchor):
             if weight<.02:continue
             limits=(335,1217) if name=='Side' else (34,280) if name=='Front' else (1225,1518)
             if not limits[0]<u<limits[1] or not 30<v<925:continue
-            rgb=Sample(arrays[0],u,v)
+            padSample=Smooth(1.235,1.285,y)*(1-Smooth(.940,.965,z))
+            rgb=Sample(arrays[0],u,v,12 if padSample>.25 else 2)
             blend=float(occlusion[name][int(round(v)),int(round(u))])
             if blend>0:
                 bare=Sample(arrays[1],u,v,7)
@@ -100,6 +101,8 @@ def ReferencePigment(skin,anchor):
             value+=Vector(albedo)*weight;total+=weight
         if total<.05:continue
         old=Vector(colors.data[vertex.index].color[:3]);mix=.60 if y>.90 else .82
+        nasalPad=Smooth(1.235,1.285,y)*(1-Smooth(.940,.965,z))
+        mix=max(mix,.96*nasalPad)
         if abs(abs(x)-eye.x)<.055 and abs(y-eye.y)<.045 and abs(z-eye.z)<.035:mix=.20
         colors.data[vertex.index].color=(*old.lerp(value/total,mix),1);used+=1
     return used
@@ -229,67 +232,10 @@ def CloseHeadCavities(skin):
     return closed
 
 def RebuildNostrils(skin):
-    tree=BVHTree.FromPolygons([v.co for v in skin.data.vertices],[tuple(p.vertices) for p in skin.data.polygons])
-    bm=bmesh.new();bm.from_mesh(skin.data);deform=bm.verts.layers.deform.verify()
-    head=skin.vertex_groups['DonkeyHeadPivot'].index
-    material=next(i for i,m in enumerate(skin.data.materials) if 'NostrilInterior' in m.name)
-    shader=skin.data.materials[material].node_tree.nodes.get('Principled BSDF')
-    shader.inputs['Roughness'].default_value=.90;shader.inputs['Specular IOR Level'].default_value=.12
-    reports=[]
-    for side,sign in (('Left',-1),('Right',1)):
-        point,_,_,_=tree.ray_cast(Vector((sign*.048,2,.926)),Vector((0,-1,0)),1)
-        if point is None:raise RuntimeError('Missing muzzle for nasal aperture')
-        normal=Vector((sign*.70,.714,.03)).normalized();u=Vector((0,0,1)).cross(normal).normalized();v=normal.cross(u).normalized()
-        v=(v*math.cos(math.radians(30))-u*(sign*math.sin(math.radians(30)))).normalized();u=v.cross(normal).normalized()
-        radiusU,radiusV=.0115,.024
-        remove=[]
-        for face in bm.faces:
-            delta=face.calc_center_median()-point
-            vertical=delta.dot(v);horizontal=delta.dot(u)
-            radius=(horizontal/radiusU)**2+(vertical/radiusV)**2
-            if radius<1 and abs(delta.dot(normal))<.022:remove.append(face)
-        if not remove:raise RuntimeError('Nasal aperture did not intersect the skin')
-        selected=set(remove);remaining=set(bm.faces)-selected;islandFaces=0
-        # A former closed nasal patch can sit deeper than the new ellipse and
-        # survive as an island inside its annular face selection. Fill only
-        # retained components wholly local to, and enclosed by, this cut.
-        while remaining:
-            seed=remaining.pop();component={seed};queue=[seed];adjacent=False
-            while queue:
-                for edge in queue.pop().edges:
-                    for other in edge.link_faces:
-                        if other in selected:adjacent=True
-                        if other in remaining:remaining.remove(other);component.add(other);queue.append(other)
-            vertices={vertex for face in component for vertex in face.verts}
-            if adjacent and len(component)<300 and all((vertex.co-point).length<.060 for vertex in vertices):
-                selected.update(component);islandFaces+=len(component)
-        bmesh.ops.delete(bm,geom=list(selected),context='FACES')
-        edges={e for e in bm.edges if e.is_boundary and all((p.co-point).length<.060 for p in e.verts)}
-        vertices={p for e in edges for p in e.verts}
-        if len(vertices)<6:raise RuntimeError('Incomplete nasal boundary')
-        ordered=[];current=next(iter(vertices));previous=None
-        while current not in ordered:
-            ordered.append(current);neighbors=[e.other_vert(current) for e in current.link_edges if e in edges and e.other_vert(current)!=previous]
-            if not neighbors:break
-            previous,current=current,neighbors[0]
-        if len(ordered)!=len(vertices):raise RuntimeError('Nasal boundary has multiple components')
-        inner=[];lips=[]
-        for vertex in ordered:
-            delta=vertex.co-point;angle=math.atan2(delta.dot(v)/radiusV,delta.dot(u)/radiusU)
-            dz=radiusV*math.sin(angle);du=radiusU*math.cos(angle)
-            border=point+u*du+v*dz
-            surface,_,_,_=tree.ray_cast(border+normal*.05,-normal,.1)
-            vertex.co=surface if surface is not None else border
-            lip=bm.verts.new(vertex.co+normal*.003);lip[deform][head]=1;lips.append(lip)
-            p=bm.verts.new(point+(vertex.co-point)*.72-normal*.023);p[deform][head]=1;inner.append(p)
-        for i in range(len(ordered)):
-            j=(i+1)%len(ordered)
-            face=bm.faces.new((ordered[i],ordered[j],lips[j],lips[i]));face.material_index=0;face.smooth=True
-            face=bm.faces.new((lips[i],lips[j],inner[j],inner[i]));face.material_index=material;face.smooth=True
-        face=bm.faces.new(tuple(reversed(inner)));face.material_index=material;face.smooth=True
-        reports.append({'side':side,'centre':list(point),'radiiM':[radiusU,radiusV],'axisTiltDeg':30,'normal':list(normal),'depthM':.023,'rimHeightM':.003,'boundaryVertices':len(ordered),'removedEnclosedPatchFaces':islandFaces})
-    bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));bm.to_mesh(skin.data);bm.free();skin.data.update()
-    return reports
+    project=Path(bpy.context.scene['DonkeyCartProject']);file=project/'_blender/Script_DonkeyNasalEnvelope.py';namespace={}
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),namespace)
+    return namespace['RebuildWrappedNostrils'](skin)
+
 
 def FairNasalSurface(skin,cavities):
     points=[v.co.copy() for v in skin.data.vertices];maximum=0
@@ -438,11 +384,14 @@ def CalibrateMuzzlePigment(skin):
         x,y,z=vertex.co;value=Vector(colors.data[vertex.index].color[:3])
         pale=Smooth(.06,.18,sum(value)/3)
         weight=pale*Smooth(1.10,1.22,y)*Smooth(.915,.955,z)*(1-Smooth(1.045,1.11,z))
-        if weight<=0:continue
         central=1-Smooth(.025,.060,abs(x));gain=1.70+1.50*central
         tint=(1,1.01,1.10)
-        colors.data[vertex.index].color=(*[min(.80,value[i]*(1+(gain*tint[i]-1)*weight)) for i in range(3)],1);changed+=1
-    return {'vertices':changed,'sideGain':1.70,'centralGain':3.20,'centralFalloffM':[.025,.060],'lowerLipFadeZ':[.915,.955],'tint':[1,1.01,1.10],'maxAlbedo':.80}
+        pad=Smooth(1.235,1.285,y)*(1-Smooth(.935,.965,z))
+        if weight<=0 and pad<=0:continue
+        neutral=Vector((.090,.070,.058))
+        value=Vector([min(.80,value[i]*(1+(gain*tint[i]-1)*weight)) for i in range(3)]).lerp(neutral,pad)
+        colors.data[vertex.index].color=(*value,1);changed+=1
+    return {'vertices':changed,'sideGain':1.70,'centralGain':3.20,'centralFalloffM':[.025,.060],'lowerLipFadeZ':[.915,.955],'tint':[1,1.01,1.10],'nasalPadLinearRgb':[.090,.070,.058],'maxAlbedo':.80}
 
 def RefineFiberAlbedo(base):
     # Read the immutable V3 image, so rerunning cannot compound contrast.
@@ -586,6 +535,30 @@ def SeatMouthSeam(skin,rig):
         shader=next(n for n in material.node_tree.nodes if n.type=='BSDF_PRINCIPLED')
         shader.inputs['Base Color'].default_value=(.015,.012,.009,1);shader.inputs['Roughness'].default_value=.95;shader.inputs['Specular IOR Level'].default_value=.08
 
+def InstallNasalPad(skin):
+    material=bpy.data.materials.get('DonkeyNasalPad') or bpy.data.materials.new('DonkeyNasalPad');material.use_nodes=True
+    nodes,links=material.node_tree.nodes,material.node_tree.links;nodes.clear()
+    shader=nodes.new('ShaderNodeBsdfPrincipled');output=nodes.new('ShaderNodeOutputMaterial');links.new(shader.outputs['BSDF'],output.inputs['Surface'])
+    shader.inputs['Roughness'].default_value=.72;shader.inputs['Specular IOR Level'].default_value=.22
+    paint=nodes.new('ShaderNodeVertexColor');paint.layer_name='CoatColor'
+    multiply=nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1;multiply.inputs[2].default_value=(.75,.75,.75,1)
+    links.new(paint.outputs['Color'],multiply.inputs[1]);links.new(multiply.outputs[0],shader.inputs['Base Color'])
+    geometry=nodes.new('ShaderNodeNewGeometry');noise=nodes.new('ShaderNodeTexNoise')
+    noise.inputs['Scale'].default_value=180;noise.inputs['Detail'].default_value=2
+    links.new(geometry.outputs['Position'],noise.inputs['Vector'])
+    bump=nodes.new('ShaderNodeBump');bump.inputs['Strength'].default_value=.25;bump.inputs['Distance'].default_value=.001
+    links.new(noise.outputs['Fac'],bump.inputs['Height']);links.new(bump.outputs['Normal'],shader.inputs['Normal'])
+    slot=skin.data.materials.find(material.name)
+    if slot<0:skin.data.materials.append(material);slot=len(skin.data.materials)-1
+    faces=0
+    for face in skin.data.polygons:
+        name=skin.data.materials[face.material_index].name
+        if not name.startswith(('DonkeyCartGreyCoat','DonkeyCartFaceFur')):continue
+        centre=sum((skin.data.vertices[i].co for i in face.vertices),Vector())/len(face.vertices)
+        if centre.y>1.230 and centre.z<.963:face.material_index=slot;faces+=1
+    if not faces:raise RuntimeError('No nasal pad surface was selected')
+    return {'material':material.name,'faces':faces,'roughness':.72,'normal':'fine 0.25 mm procedural skin relief baked on UV0; no coarse repeated fibre normal','pigment':'reference blend strengthened below the upper white muzzle; soft height transition'}
+
 
 
 def ApplyReferenceFit(scene,base):
@@ -702,7 +675,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261024ReferenceV8'
+    scene['DonkeyReferenceFitRevision']='20261024ReferenceV9'
     scene['DonkeyReferenceFitAnchorY']=anchor
     # Repaint the short pale muzzle rather than the old long horse-like blaze.
     colors=skin.data.color_attributes['CoatColor']
@@ -717,7 +690,8 @@ def ApplyReferenceFit(scene,base):
         value=baseColor.lerp(muzzle,pale);old=Vector(colors.data[vertex.index].color[:3])
         colors.data[vertex.index].color=(*old.lerp(value,head),1)
     projected=ReferencePigment(skin,anchor);colorCalibration=CalibrateCoatPigment(skin)
-    details['eyes']=RefineEyes(skin,rig);SeatMouthSeam(skin,rig);FinishFurResponse(rig,collection);flowReport=RefreshFlow(skin,rig,collection)
+    details['eyes']=RefineEyes(skin,rig);SeatMouthSeam(skin,rig);FinishFurResponse(rig,collection)
+    details['nasalPad']=InstallNasalPad(skin);flowReport=RefreshFlow(skin,rig,collection)
     photoNamespace={}
     exec(compile((project/'_blender/Script_DonkeyPhotoDetail.py').read_text(encoding='utf-8'),'Script_DonkeyPhotoDetail.py','exec'),photoNamespace)
     photoDetail=photoNamespace['InstallReferenceDetail'](scene,skin,rig,collection,base)

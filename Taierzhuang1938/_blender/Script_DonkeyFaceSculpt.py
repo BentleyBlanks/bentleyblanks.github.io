@@ -1,4 +1,4 @@
-"""Reference-led alar recess, orbital ridge and continuous throat fairing."""
+"""Reference-led rounded crown, orbital ridge and continuous throat fairing."""
 import bpy,math
 from mathutils import Vector
 
@@ -14,11 +14,6 @@ def RefineReferenceFace(skin,rig):
         p=vertex.co;x,y,z=p
         crown=(1-Smooth(0,.085,abs(x)))*(1-Smooth(.015,.070,abs(y-1.125)))*Smooth(1.21,1.275,z)
         p.z+=.020*crown
-        # The side photograph places the alar hollow behind the nasal tip.
-        # A lateral recess changes side depth while retaining frontal width.
-        lateral=Smooth(.020,.050,abs(x))*(1-Smooth(.080,.105,abs(x)))
-        nasal=lateral*Smooth(1.235,1.285,y)*math.exp(-((z-.944)/.071)**4)
-        p.y-=.016*nasal
         sign=-1 if x<0 else 1;centre=Vector((sign*eyeCentre.x,eyeCentre.y,eyeCentre.z))
         normal=Vector((sign*.78,.62,.03)).normalized();axis=Vector((0,0,1)).cross(normal).normalized();up=normal.cross(axis).normalized()
         delta=Vector((x,y,z))-centre;du=delta.dot(axis);dv=delta.dot(up);depth=delta.dot(normal)
@@ -43,5 +38,5 @@ def RefineReferenceFace(skin,rig):
             if change.length>.001:change*=.001/change.length
             vertex.co=p+change
     skin.data.update()
-    return {'method':'lateral alar recess, rounded interaural crown, subtle supraorbital ridge and connected throat junction fairing',
-            'alarRecessM':.016,'maxCrownRaiseM':.020,'maxOrbitalReliefM':.0038,'maxDisplacementM':max((v.co-p).length for v,p in zip(skin.data.vertices,original))}
+    return {'method':'rounded interaural crown, subtle supraorbital ridge and connected throat junction fairing',
+            'maxCrownRaiseM':.020,'maxOrbitalReliefM':.0038,'maxDisplacementM':max((v.co-p).length for v,p in zip(skin.data.vertices,original))}
