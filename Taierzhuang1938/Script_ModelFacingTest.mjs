@@ -299,8 +299,8 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
 Check(bare.json.meshes.length===3 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===79240 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
-  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与79,240三角齐备");
+  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===78844 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
+  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与78,844三角齐备");
 const bareBody=bare.json.meshes[bare.json.nodes.find(n=>n.name==="DonkeyRuntime").mesh];
 const bareCoat=bare.json.meshes[bare.json.nodes.find(n=>n.name==="DonkeyCoatRuntime").mesh];
 const bareManeNode=bare.json.nodes.find(n=>n.name==="DonkeyManeRuntime");
@@ -342,6 +342,23 @@ Check(tiled.attributes.COLOR_0===undefined && tiled.attributes.TEXCOORD_1!==unde
 Check(coatMaterial.alphaMode==="MASK" && Math.abs(coatMaterial.alphaCutoff-.45)<.000001 && coatMaterial.doubleSided===true
   && bareCoat.primitives.every(p=>p.attributes.COLOR_0!==undefined && p.attributes.JOINTS_0!==undefined && p.attributes.WEIGHTS_0!==undefined),
   "独立驴短毛实际带颜色和蒙皮，轮廓毛使用双面MASK 0.45");
+const tailSkin=bare.json.skins[bare.json.nodes.find(n=>n.name==="DonkeyCoatRuntime").skin];
+let tailTriangles=0,tailReversedNormals=0;
+for(const primitive of bareCoat.primitives){
+  const positions=ReadAccessor(bare,primitive.attributes.POSITION).data,normals=ReadAccessor(bare,primitive.attributes.NORMAL).data;
+  const joints=ReadAccessor(bare,primitive.attributes.JOINTS_0).data,weights=ReadAccessor(bare,primitive.attributes.WEIGHTS_0).data;
+  const indices=ReadAccessor(bare,primitive.indices).data;
+  const tailVertex=index=>[0,1,2,3].every(c=>weights[index*4+c]===0||/^DonkeyTail(?:Tip)?Pivot$/.test(bare.json.nodes[tailSkin.joints[joints[index*4+c]]].name));
+  for(let i=0;i<indices.length;i+=3){
+    const ids=Array.from(indices.slice(i,i+3));if(!ids.every(tailVertex))continue;tailTriangles++;
+    const [a,b,c]=ids.map(index=>Array.from(positions.slice(index*3,index*3+3)));
+    const ab=b.map((value,j)=>value-a[j]),ac=c.map((value,j)=>value-a[j]);
+    const face=[ab[1]*ac[2]-ab[2]*ac[1],ab[2]*ac[0]-ab[0]*ac[2],ab[0]*ac[1]-ab[1]*ac[0]],length=Math.hypot(...face);
+    if(length<1e-12)continue;
+    if(ids.some(index=>face.reduce((sum,value,j)=>sum+value*normals[index*3+j],0)/length<.5))tailReversedNormals++;
+  }
+}
+Check(tailTriangles>0&&tailReversedNormals===0,"独立驴实际尾束的作者法线与三角面朝向一致，避免双面毛丝反向受光",JSON.stringify({tailTriangles,tailReversedNormals}));
 const maneMaterial=bare.json.materials[bareMane.primitives[0].material];
 Check(maneMaterial.name==="DonkeyManePbr"&&maneMaterial.alphaMode==="BLEND"&&maneMaterial.alphaCutoff===undefined&&maneMaterial.doubleSided===true
   &&bareManeNode.extras?.groomCastShadow===false&&bareManeNode.skin===bare.json.nodes.find(n=>n.name==="DonkeyRuntime").skin

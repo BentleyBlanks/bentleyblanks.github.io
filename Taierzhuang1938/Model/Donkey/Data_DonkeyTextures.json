@@ -1,7 +1,7 @@
 {
   "schema": "tengxian-independent-prop-textures-v1",
   "asset": "Donkey",
-  "version": "20261024ReferenceV12",
+  "version": "20261024ReferenceV13",
   "uv": "UV0 unique reference-detail base colour and accessory PBR atlas; independent repeated UV1 fibre normal; edge tuft atlas with per-root HairTint",
   "colorSpace": {
     "Base": "sRGB",
@@ -103,12 +103,12 @@
         "cavityProtection": "feathered source nostril shadows and oral crease/highlight footprints excluded from pigment-like detail; anatomical creases remain geometry",
         "original": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
         "originalSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
-        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV12\\Image_NakedAnatomyGuide.png",
+        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV13Fur\\Image_NakedAnatomyGuide.png",
         "guideSha256": "8130715142837beed8957c59ffc775500d4b6ff96bf99a61b51f8759dc9d0c4a",
         "images": [
           {
             "view": "Side",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV12\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV13Fur\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
             "sha256": "8d73e8a356d807d9fb3020310c402bd4a3d1974ad459a4a0e02c15d0cdb68852",
             "size": [
               1536,
@@ -117,7 +117,7 @@
           },
           {
             "view": "Front",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV12\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV13Fur\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
             "sha256": "236a334f07bb01ec8e773154b89937e02d37bca1cc1b87973060c66c7019151f",
             "size": [
               1536,
@@ -126,7 +126,7 @@
           },
           {
             "view": "Rear",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV12\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV13Fur\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
             "sha256": "ef5d8b1ac83cec630467e8244236c71b80238d05199fbf89f99d87c7b1a7aff4",
             "size": [
               1536,
@@ -137,11 +137,11 @@
         "occlusionMasks": "_blender/Script_DonkeyReferenceMasks.py; geometric rope footprints including shaded edges; feathered normalized-detail blending",
         "visibility": "fitted-skin BVH depth test from axial source cameras; 4 mm surface tolerance; source-vertex weights baked into UV0",
         "materials": [
-          "DonkeyNasalPad",
+          "DonkeyCartGreyCoat",
           "DonkeyCartFaceFur",
           "DonkeyLowerLegShortFur",
-          "DonkeyCartEarInterior",
-          "DonkeyCartGreyCoat"
+          "DonkeyNasalPad",
+          "DonkeyCartEarInterior"
         ],
         "runtime": "baked UV0 base colour; independent tiled UV1 fibre normal; no camera projection in GLB",
         "pigmentProjection": {
@@ -166,14 +166,14 @@
           "nasalCavityProtection": "source cavity and oral crease/highlight footprints excluded from colour projection",
           "fineCompensation": {
             "radiusPixels": 1,
-            "amount": 0.65,
+            "amount": 1.25,
             "sourceSampling": "Closest during offline bake; ordinary filtered runtime sampler unchanged"
           },
           "images": [
             {
               "view": "Side",
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV12\\SourceTextures\\Texture_DonkeyReferenceSidePigment.png",
-              "sha256": "03b5e02d735fa9f875c9ddcaf8a8572c473e221dc45ca33e480010409ac834fa",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV13Fur\\SourceTextures\\Texture_DonkeyReferenceSidePigment.png",
+              "sha256": "c83427f503394f5f636edc0e27bd4442ebe4a00ae1b7fa9bd41659a3ecc10747",
               "size": [
                 1536,
                 1024
@@ -181,8 +181,8 @@
             },
             {
               "view": "Front",
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV12\\SourceTextures\\Texture_DonkeyReferenceFrontPigment.png",
-              "sha256": "2ecaeb4feb138dae005ebe51a442078465be163106a6b0aa2b8e961fde3939ba",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV13Fur\\SourceTextures\\Texture_DonkeyReferenceFrontPigment.png",
+              "sha256": "fd000c01578801b1097f6ef0af20aee8aad2a13ec2f5f3c74f1dd906c2058887",
               "size": [
                 1536,
                 1024
@@ -190,8 +190,8 @@
             },
             {
               "view": "Rear",
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV12\\SourceTextures\\Texture_DonkeyReferenceRearPigment.png",
-              "sha256": "90583cc76a0de648e21323463b38c5c1763f296653fdda330c03bff6d8bdcd55",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV13Fur\\SourceTextures\\Texture_DonkeyReferenceRearPigment.png",
+              "sha256": "3401153c133468803d39ae6a78971151ae8ec700231da93af6b604f745c0e224",
               "size": [
                 1536,
                 1024
@@ -208,7 +208,7 @@
               "sha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b"
             },
             {
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV12\\Image_NakedAnatomyGuide.png",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV13Fur\\Image_NakedAnatomyGuide.png",
               "sha256": "8130715142837beed8957c59ffc775500d4b6ff96bf99a61b51f8759dc9d0c4a"
             }
           ],
@@ -252,8 +252,8 @@
         512,
         256
       ],
-      "bytes": 19634,
-      "sha256": "c34ed983cc2310bb158d0d1f92b6bd28389a4a0276ee39ece5f5be1920965a48",
+      "bytes": 31292,
+      "sha256": "39297a882fb53a1926963ec4c95d32f732e99c3a9c95669140818c13b23c2f59",
       "lossless": true
     },
     {
@@ -274,8 +274,8 @@
         2048,
         2048
       ],
-      "bytes": 2172816,
-      "sha256": "4059291ed025a302380873b19f804df8546b95e84b9bc77763283568cc915fd9",
+      "bytes": 2351940,
+      "sha256": "baab19b1c2829ffbbfe60b51e2584a123e23801df67d9eaf839a6f6c854865c3",
       "lossless": true
     },
     {
@@ -285,8 +285,8 @@
         512,
         512
       ],
-      "bytes": 22698,
-      "sha256": "4b36c8a4ab7ed20b0e9f42d96363c39003d5fce7c5c572d5dc1f72d613464f33",
+      "bytes": 23430,
+      "sha256": "5ee9bfcf69715374f3046cc9c04d70fcbbdbf944410b85dd3e1a2c4fa2fc657d",
       "lossless": true
     },
     {
@@ -296,8 +296,8 @@
         1024,
         1024
       ],
-      "bytes": 789860,
-      "sha256": "63786e5d4277a4c1ead95520e3c3a3f06d2403bc9e518a46703588c8adcf1497",
+      "bytes": 808300,
+      "sha256": "3ded3266222671633399e0f15bd07d4fc955151a83c9c25b37bb6768eb854445",
       "lossless": true
     }
   ]

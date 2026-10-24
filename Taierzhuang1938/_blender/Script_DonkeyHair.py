@@ -55,13 +55,15 @@ def RebuildReferenceMane(skin,rig,collection):
     eye=bpy.data.objects['DonkeyEyeLeft'];matrix=rig.matrix_world.inverted()@eye.matrix_world
     eyeY=sum((matrix@v.co).y for v in eye.data.vertices)/len(eye.data.vertices)
     foreY=float(bpy.context.scene.get('DonkeyReferenceForelockY',eyeY-.040));bpy.context.scene['DonkeyReferenceForelockY']=foreY
-    foreRoot,_=Root(0,foreY)
+    foreRoot,_=Root(0,foreY);foreRgb=np.zeros((128,128,3),dtype=np.float32)
     for column in range(128):
         x=-.045+.090*column/127;bg=Luminance(Sample(156.5-ppm*x,925-ppm*max(1.50,foreRoot.z+.20),'Front'))
         for row in range(128):
-            d=foreHeight-(foreHeight+below)*row/127;value=Luminance(Sample(156.5-ppm*x,925-ppm*(foreRoot.z+d),'Front'))
+            d=foreHeight-(foreHeight+below)*row/127;rgb=Sample(156.5-ppm*x,925-ppm*(foreRoot.z+d),'Front');foreRgb[row,column]=rgb;value=Luminance(rgb)
             opacity=max(0,min(1,(bg-value)/max(.1,bg-.007)));alpha[128+row,column]=opacity if opacity>.04 else 0
     values=np.ones((256,512,4),dtype=np.float32);values[:,:,:3]=.73535698;values[:,:,3]=alpha
+    foreFade=np.clip((foreHeight-(foreHeight+below)*np.arange(128)/127)/.030,0,1)
+    values[128:,:128,:3]=foreRgb;values[128:,:128,3]=alpha[128:,:128]*.30*foreFade[:,None]
     image=bpy.data.images.get('Texture_DonkeyManeBase') or bpy.data.images.new('Texture_DonkeyManeBase',width=512,height=256,alpha=True)
     if tuple(image.size)!=(512,256):image.scale(512,256)
     image.colorspace_settings.name='sRGB';image.alpha_mode='CHANNEL_PACKED'
@@ -82,13 +84,24 @@ def RebuildReferenceMane(skin,rig,collection):
             vertices.append(root+growth*((height+below)*t-below));uvs.append((index/39,.625+.375*t));weights.append(bones)
         if index:
             a=(index-1)*3;b=index*3;faces.extend(((a,a+1,b+1,b),(a+1,a+2,b+2,b+1)))
+    foreStart=len(vertices)
+    # The curved front layer carries the reference's subpixel flyaways and
+    # shaft highlights. Fine 3D fibres still give oblique views their volume.
+    for index in range(32):
+        x=-.045+.090*index/31;root,bones=Root(x,foreY)
+        for t in (0,.5,1):
+            d=(foreHeight+below)*t-below
+            vertices.append(Vector((x,root.y+.012+.20*d+.007*math.sin(math.pi*t),foreRoot.z+d)))
+            uvs.append((index/31*127/512,1/256+t*127/256));weights.append(bones)
+        if index:
+            a=foreStart+(index-1)*3;b=foreStart+index*3;faces.extend(((a,a+1,b+1,b),(a+1,a+2,b+2,b+1)))
     # Curved fibres provide transverse thickness and the entire forelock;
     # cross-cards create an unnaturally straight dark strip from axial views.
     mesh=bpy.data.meshes.new('DonkeyReferenceMane');mesh.from_pydata(vertices,[],faces);mesh.materials.append(material);mesh.update()
     for face in mesh.polygons:face.use_smooth=True
     layer=mesh.uv_layers.new(name='UVMap');tint=mesh.color_attributes.new(name='HairTint',type='FLOAT_COLOR',domain='POINT')
     for loop in mesh.loops:layer.data[loop.index].uv=uvs[loop.vertex_index]
-    for value in tint.data:value.color=(.014,.013,.011,1)
+    for index,value in enumerate(tint.data):value.color=(.90,.927,.99,1) if index>=foreStart else (.014,.013,.011,1)
     mesh.color_attributes.active_color_index=0;mesh.color_attributes.render_color_index=0
     obj=bpy.data.objects.new('DonkeyReferenceMane',mesh);collection.objects.link(obj);obj.parent=rig
     for index,bones in enumerate(weights):
@@ -99,14 +112,14 @@ def RebuildReferenceMane(skin,rig,collection):
     volumeVertices=[];volumeFaces=[];volumeUvs=[];volumeWeights=[];volumeColors=[]
     rng=random.Random(19381028)
     def AddVolumeStrand(root,bones,direction,length,bend,radius,tintGain=1,bendMid=.45):
-        start=len(volumeVertices);points=[root-Vector((0,0,.002)),root+direction*(length*.52)+bend*bendMid,root+direction*length+bend]
+        start=len(volumeVertices);points=[root-Vector((0,0,.002)),root+direction*(length*.52)+bend*bendMid+Vector((0,rng.uniform(-.004,.004),0)),root+direction*length+bend]
         for level,point in enumerate(points[:2]):
             tangent=(points[1]-points[0] if level==0 else points[2]-points[0]).normalized()
             across=Vector((1,0,0));across=(across-tangent*across.dot(tangent)).normalized();other=tangent.cross(across).normalized()
             for j in range(3):
                 angle=2*math.pi*j/3;volumeVertices.append(point+(radius if level==0 else radius*.65)*(across*math.cos(angle)+other*math.sin(angle)))
         volumeVertices.append(points[2]);volumeWeights.extend([bones]*7)
-        gain=rng.uniform(.72,1.22)*tintGain
+        gain=rng.uniform(.65,1.45)*tintGain
         volumeColors.extend([(.014*gain,.013*gain,.011*gain,1)]*6+[(.0154*gain,.0143*gain,.0121*gain,1)])
         u,v=.25,.57;epsilon=.0002
         volumeFaces.append((start+2,start+1,start));volumeUvs.append(((u-epsilon,v-epsilon),(u+epsilon,v-epsilon),(u,v+epsilon)))
@@ -115,6 +128,21 @@ def RebuildReferenceMane(skin,rig,collection):
             lo=u-epsilon+2*epsilon*j/3;hi=u-epsilon+2*epsilon*(j+1)/3
             volumeFaces.append((a,b,d,c));volumeUvs.append(((lo,v),(hi,v),(hi,v+epsilon),(lo,v+epsilon)))
             volumeFaces.append((c,d,start+6));volumeUvs.append(((lo,v+epsilon),(hi,v+epsilon),((lo+hi)/2,v+2*epsilon)))
+    def AddForelockStrand(root,bones,direction,length,bend,halfWidth):
+        # A fibre is a bent, tapered strip, rather than a millimetre-wide solid
+        # cone. Independent strip angles preserve volume from front/side views.
+        start=len(volumeVertices);points=[root-Vector((0,0,.002)),root+direction*(length*.48)+bend*.34,root+direction*length+bend]
+        tangent=(points[-1]-points[0]).normalized();angle=rng.uniform(0,2*math.pi)
+        across=Vector((math.cos(angle),math.sin(angle),0));across-=tangent*across.dot(tangent);across.normalize()
+        gain=rng.uniform(.65,1.55)*3.7
+        for level,(point,taper) in enumerate(zip(points,(1,.62,.025))):
+            volumeVertices.extend((point-across*halfWidth*taper,point+across*halfWidth*taper))
+            volumeWeights.extend((bones,bones));color=(.014*gain*(1+.12*level),.013*gain*(1+.12*level),.011*gain*(1+.12*level),1)
+            volumeColors.extend((color,color))
+        u,v=.25,.57;epsilon=.0002
+        for level in range(2):
+            a=start+level*2;volumeFaces.append((a,a+1,a+3,a+2))
+            volumeUvs.append(((u-epsilon,v),(u+epsilon,v),(u+epsilon,v+epsilon),(u-epsilon,v+epsilon)))
     for strand in range(1100):
         y=.635+.415*(strand+.5)/256 if strand<256 else rng.uniform(.635,1.05)
         root,bones=Root(rng.uniform(-.0045,.0045),y);column=round((y-.635)/.415*511)
@@ -135,20 +163,19 @@ def RebuildReferenceMane(skin,rig,collection):
     groups=[group for group in groups if len(group)>=3]
     tuftColumns=[max(group,key=lambda column:foreProfile[column]) for group in groups]
     if not groups:raise RuntimeError('Reference forelock has no usable connected upper lobes')
-    for strand in range(400):
-        tufted=strand<320
+    for strand in range(760):
+        tufted=strand<360
         if tufted:
             group=groups[strand%len(groups)];tipColumn=rng.uniform(group[0],group[-1])
-            tipX=-.045+.09*tipColumn/127
+            tipX=-.045+.09*tipColumn/127+rng.gauss(0,.0025)
             tipX=max(-.043,min(.043,tipX))
         else:tipX=rng.uniform(-.043,.043)
-        x=max(-.038,min(.038,tipX*.80+rng.gauss(0,.007))) if tufted else rng.uniform(-.035,.035)
-        y=foreY+rng.gauss(0,.0025);root,bones=Root(x,y);column=round((tipX+.045)/.09*127)
+        x=max(-.038,min(.038,tipX*.75+rng.gauss(0,.010))) if tufted else rng.uniform(-.038,.038)
+        y=foreY+rng.gauss(0,.004);root,bones=Root(x,y);column=round((tipX+.045)/.09*127)
         extent=foreProfile[column];direction=Vector((0,.20,1)).normalized()
-        targetZ=foreRoot.z+extent*(rng.uniform(.98,1.00) if tufted else rng.uniform(.40,.70))
+        targetZ=foreRoot.z+extent*(.60+.41*rng.random()**.70 if tufted else rng.uniform(.25,.70))
         length=max(.003,(targetZ-root.z)/direction.z)
-        radius=rng.uniform(.00080,.0012) if tufted else rng.uniform(.00075,.0012)
-        AddVolumeStrand(root,bones,direction,length,Vector((tipX-x,(tipX/.045)*.004+rng.uniform(-.0015,.0015),0)),radius,1.0,.40)
+        AddForelockStrand(root,bones,direction,length,Vector((tipX-x,(tipX/.045)*.006+rng.uniform(-.005,.005),0)),rng.uniform(.00020,.00045))
     volumeMesh=bpy.data.meshes.new('DonkeyReferenceManeVolume');volumeMesh.from_pydata(volumeVertices,[],volumeFaces);volumeMesh.update()
     volumeMesh.materials.append(bpy.data.objects['DonkeyShortCoatCards'].data.materials[0])
     for face in volumeMesh.polygons:face.use_smooth=True
@@ -165,6 +192,6 @@ def RebuildReferenceMane(skin,rig,collection):
     modifier=volume.modifiers.new('DonkeyManeVolumeSkin','ARMATURE');modifier.object=rig
     volume['coatCardCount']=len(volumeFaces);volume['groomCastShadow']=False;volume.visible_shadow=False
     bpy.context.scene['DonkeyManeTufts']='[]';bpy.context.scene['DonkeyReferenceMane']=True
-    return {'mainRows':40,'crossCards':0,'forelockColumns':0,'forelockCrossCards':0,'triangles':sum(len(f)-2 for f in faces),'exportLayer':'DonkeyManeRuntime',
-            'forelockRootY':foreY,'volumeFibres':{'main':1100,'forelock':400,'forelockPeakColumns':sorted(tuftColumns),'forelockLobeColumns':[[group[0],group[-1]] for group in groups],'forelockForegroundAlpha':.65,'forelockUpperLobeFraction':.82,'forelockTuftedFibres':320,'forelockStrandRadiusM':[.00080,.0012],'forelockRootSpreadStdM':.007,'triangles':sum(len(f)-2 for f in volumeFaces),'mainTintGain':4.0,'pathBendFraction':{'main':.45,'forelock':.40},'spread':'broad rooted bundles narrow into connected reference foreground lobes, with dense shorter interior fill; global reference height preserves the tip envelope','exportLayer':'DonkeyCoatRuntime','material':'DonkeyShortCoatPbr','alpha':'MASK 0.45; depth writing','sourceObject':volume.name},
-            'method':'reference-alpha ribbons backed by thin curved triangular-tube fibres rooted to actual skin','texture':str(path),'textureSha256':hashlib.sha256(content).hexdigest(),'sourceSha256':hashlib.sha256(original.read_bytes()).hexdigest()}
+    return {'mainRows':40,'crossCards':0,'forelockColumns':32,'forelockCrossCards':0,'forelockLayer':'curved front reference RGB/alpha at 0.30 opacity, 30 mm root fade, backed by individual 3D strands','triangles':sum(len(f)-2 for f in faces),'exportLayer':'DonkeyManeRuntime',
+            'forelockRootY':foreY,'volumeFibres':{'main':1100,'forelock':760,'forelockPeakColumns':sorted(tuftColumns),'forelockLobeColumns':[[group[0],group[-1]] for group in groups],'forelockForegroundAlpha':.65,'forelockUpperLobeFraction':.82,'forelockTuftedFibres':360,'forelockHalfWidthM':[.00020,.00045],'forelockRootSpreadStdM':.010,'triangles':sum(len(f)-2 for f in volumeFaces),'mainTintGain':4.0,'forelockTintGain':3.7,'pathBendFraction':{'main':.45,'forelock':.34},'spread':'fine curved strips spread across three reference lobes; staggered lengths and narrow tapered tips replace solid cones','exportLayer':'DonkeyCoatRuntime','material':'DonkeyShortCoatPbr','alpha':'MASK 0.45; depth writing','sourceObject':volume.name},
+            'method':'reference-alpha side ribbon, curved triangular-tube main mane and fine curved forelock strips rooted to actual skin','texture':str(path),'textureSha256':hashlib.sha256(content).hexdigest(),'sourceSha256':hashlib.sha256(original.read_bytes()).hexdigest()}

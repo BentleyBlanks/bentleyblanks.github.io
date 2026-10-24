@@ -236,13 +236,14 @@ if standalone and bpy.data.objects.get('DonkeyShortCoatCards'):
     coat=source.copy();coat.data=source.data.copy();runtimeCol.objects.link(coat);coat.name='DonkeyCoatRuntime';coat.parent=animalRig
     for modifier in coat.modifiers:
         if modifier.type=='ARMATURE':modifier.object=animalRig
-    volumeSource=bpy.data.objects.get('DonkeyReferenceManeVolume')
-    if volumeSource:
+    for volumeName in ('DonkeyReferenceManeVolume','DonkeyReferenceTailVolume'):
+        volumeSource=bpy.data.objects.get(volumeName)
+        if not volumeSource:continue
         volume=volumeSource.copy();volume.data=volumeSource.data.copy();runtimeCol.objects.link(volume);volume.parent=animalRig
         for modifier in volume.modifiers:
             if modifier.type=='ARMATURE':modifier.object=animalRig
         Select([coat,volume],coat);bpy.ops.object.join();coat=bpy.context.object
-        if len(coat.data.materials)!=1:raise RuntimeError('Mane volume must share the existing masked coat material')
+        if len(coat.data.materials)!=1:raise RuntimeError('Volume groom must share the existing masked coat material')
     coat.data.calc_loop_triangles()
     textures=[]
     for material in coat.data.materials:
@@ -250,7 +251,7 @@ if standalone and bpy.data.objects.get('DonkeyShortCoatCards'):
             if node.type=='TEX_IMAGE' and node.image:
                 image=node.image;textures.append({'name':image.name,'size':list(image.size),'path':image.filepath_raw,'sha256':hashlib.sha256(Path(image.filepath_raw).read_bytes()).hexdigest()})
     reports.append({'label':'Coat','meshName':coat.name,'sourceTriangles':len(coat.data.loop_triangles),'triangles':len(coat.data.loop_triangles),'vertices':len(coat.data.vertices),
-                    'budgetSurfaceMaxErrorM':0,'atlasCoverage':None,'atlasTexelsPerMetre':None,'textures':textures,'uvReuse':'fine fibres sample stable pigment; edge tufts use four cells; mane-volume tubes sample the opaque root region'})
+                    'budgetSurfaceMaxErrorM':0,'atlasCoverage':None,'atlasTexelsPerMetre':None,'textures':textures,'uvReuse':'fine fibres, mane tubes, forelock and tail strands sample stable opaque pigment; edge tufts use four cells'})
     batches.append((animalRig,coat,'Coat'))
 if standalone and bpy.data.objects.get('DonkeyReferenceMane'):
     source=bpy.data.objects['DonkeyReferenceMane'];mane=source.copy();mane.data=source.data.copy()

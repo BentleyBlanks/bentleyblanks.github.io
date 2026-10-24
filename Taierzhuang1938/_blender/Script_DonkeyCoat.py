@@ -258,6 +258,7 @@ def BuildGroom(skin,rig,collection,material,count=21000):
             root=centre+normal*rng.uniform(.008,.012)
             Add(root,normal,Vector((0,0,-1)),rng.uniform(.003,.005),rng.uniform(.010,.018),{'DonkeyTailPivot':1},0,.001,(.020,.019,.018),False)
     for sample in range(90):
+        if bpy.context.scene.get('DonkeyReferenceFineTail'):break
         angle=rng.random()*2*math.pi;normal=Vector((math.cos(angle),math.sin(angle),0))
         if bpy.context.scene.get('DonkeyReferenceFitRevision'):
             stem=bpy.data.objects['DonkeyThinTail'];matrix=rig.matrix_world.inverted()@stem.matrix_world

@@ -23,7 +23,7 @@ def InstallReferencePigment(scene,skin,rig,base):
         confidence*=1-facialFeatures[view]
         linear=np.where(rgb<=.04045,rgb/12.92,((rgb+.055)/1.055)**2.4)
         low=np.stack([blur(linear[:,:,channel],1) for channel in range(3)],axis=2)
-        linear=np.clip(linear+.65*(linear-low),0,1)
+        linear=np.clip(linear+1.25*(linear-low),0,1)
         rgb=np.where(linear<=.0031308,linear*12.92,1.055*linear**(1/2.4)-.055)
         pixels=np.ones((1024,1536,4),dtype=np.float32);pixels[:,:,:3]=rgb;pixels[:,:,3]=confidence
         name='Texture_DonkeyReference'+view+'Pigment'
@@ -92,7 +92,7 @@ def InstallReferencePigment(scene,skin,rig,base):
     record={'method':'full reference RGB with per-view normal-based illumination compensation for body and facial fur; hairless nasal pad keeps its independent skin material; anatomical feature footprints and hidden/background pixels retain calibrated appearance',
         'linearGain':gain,'linearGainRgb':[.50,.515,.55],'mixStrength':mixStrength,'headTransitionY':[.88,.98],
         'headMixStrength':.88,'eyeProtectionRadiiM':[.040,.040,.020],'nasalCavityProtection':'source cavity and oral crease/highlight footprints excluded from colour projection',
-        'fineCompensation':{'radiusPixels':1,'amount':.65,'sourceSampling':'Closest during offline bake; ordinary filtered runtime sampler unchanged'},'images':records,'materials':materials,
+        'fineCompensation':{'radiusPixels':1,'amount':1.25,'sourceSampling':'Closest during offline bake; ordinary filtered runtime sampler unchanged'},'images':records,'materials':materials,
         'sources':[{'path':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()} for path in paths],
         'runtime':'offline UV0 bake into existing 2K base; no additional runtime image, material, camera projection or shader'}
     (base/'SourceTextures/Data_ReferencePigment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8');return record

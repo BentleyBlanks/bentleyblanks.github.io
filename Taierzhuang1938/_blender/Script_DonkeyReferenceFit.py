@@ -684,7 +684,8 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261024ReferenceV12'
+    scene['DonkeyReferenceFitRevision']='20261024ReferenceV13'
+    scene['DonkeyReferenceFineTail']=True
     scene['DonkeyReferenceFitAnchorY']=anchor
     # Repaint the short pale muzzle rather than the old long horse-like blaze.
     colors=skin.data.color_attributes['CoatColor']
@@ -712,6 +713,10 @@ def ApplyReferenceFit(scene,base):
     coatNamespace={}
     exec(compile((project/'_blender/Script_DonkeyCoat.py').read_text(encoding='utf-8'),'Script_DonkeyCoat.py','exec'),coatNamespace)
     newGroom,groomReport=coatNamespace['BuildGroom'](skin,rig,collection,groomMaterial)
+    tailNamespace={}
+    exec(compile((project/'_blender/Script_DonkeyTailGroom.py').read_text(encoding='utf-8'),'Script_DonkeyTailGroom.py','exec'),tailNamespace)
+    details['tailGroom']=tailNamespace['RebuildTailGroom'](skin,rig,collection,groomMaterial)
+    details['tailFineStrands']=details['tailGroom']['fibres'];details['brushEndRangeM']=details['tailGroom']['endHeightM']
     report={'version':scene['DonkeyReferenceFitRevision'],'referenceImage':'Image_DonkeyOriginalThreeView.png',
             'calibration':{'groundPixelY':925,'withersPixel':[749,302],'pixelsPerMetre':(925-302)/1.10,'nearForeSolePixelX':707},
             'maxSkinDisplacementM':max(moved),'meanSkinDisplacementM':sum(moved)/len(moved),'chestSurfaceAddedTriangles':chestTriangles,'referencePigmentVertices':projected,'neckLoft':neckLoft,'restoredOldNostrils':cavities,'nasalSurfaceFairing':nasalFairing,'nostrils':nostrils,'topology':topology,'earRootOffsets':earOffsets,'details':details,
