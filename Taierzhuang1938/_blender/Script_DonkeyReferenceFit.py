@@ -352,6 +352,8 @@ def RefineReferenceHooves(skin):
             # A shorter coronet, inset heel and small rounded bearing edge.
             taper=1-Smooth(.075,.145,z)
             p.z=.0004+(z-.0004)*(1-.17*taper)
+            # Raise the coronet without altering the existing standing rim.
+            p.z+=.11*(z-.0004)*taper*Smooth(.006,.018,z)
             p.y+=.010*Smooth(.015,.065,z)*taper
             p.x=centre.x+(p.x-centre.x)*(.94+.06*Smooth(.04,.10,z))
             bevel=(1-Smooth(.0004,.006,z))*.0025
@@ -360,7 +362,7 @@ def RefineReferenceHooves(skin):
             p.z+=.0015*(min(1,abs(p.x-centre.x)/.043)**4)*(1-Smooth(.006,.018,z))
         records[str(owner)]={'soleMinZ':min(v.co.z for v in points),'rigidSolePreserved':True}
     skin.data.update()
-    return {'method':'rounded existing horn rings, lower coronet and inset heel; same rigid hoof weights','feet':records}
+    return {'method':'rounded existing horn rings, fuller coronet and inset heel; existing standing rim and rigid hoof weights preserved','coronetHeightGainFactor':.11,'contactRimProtectedBelowM':.006,'feet':records}
 
 def CalibrateCoatPigment(skin):
     colors=skin.data.color_attributes['CoatColor'];changed=0
@@ -649,6 +651,9 @@ def ApplyReferenceFit(scene,base):
         bone.head=target;bone.tail=target+Vector((0,.075,0))
     bpy.ops.object.mode_set(mode='OBJECT')
     hoofRefinement=RefineReferenceHooves(skin)
+    hoofNamespace={}
+    exec(compile((project/'_blender/Script_DonkeyHoofSurface.py').read_text(encoding='utf-8'),'Script_DonkeyHoofSurface.py','exec'),hoofNamespace)
+    hoofRefinement['surface']=hoofNamespace['RefineHoofSurface'](skin)
     chestTriangles=RebuildBreast(skin,rig)
     topologyNamespace={}
     exec(compile((project/'_blender/Script_DonkeyTopology.py').read_text(encoding='utf-8'),'Script_DonkeyTopology.py','exec'),topologyNamespace)
@@ -679,7 +684,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261024ReferenceV10'
+    scene['DonkeyReferenceFitRevision']='20261024ReferenceV11'
     scene['DonkeyReferenceFitAnchorY']=anchor
     # Repaint the short pale muzzle rather than the old long horse-like blaze.
     colors=skin.data.color_attributes['CoatColor']

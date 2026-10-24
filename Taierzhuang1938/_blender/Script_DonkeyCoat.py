@@ -156,12 +156,14 @@ def BuildGroom(skin,rig,collection,material,count=21000):
     if bpy.context.scene.get('DonkeyReferenceFitRevision'):
         file=__import__('pathlib').Path(bpy.context.scene['DonkeyCartProject'])/'_blender/Script_DonkeyCoatFlow.py'
         exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),referenceFlow)
-    triangles=[];cumulative=[];total=0
+    triangles=[];cumulative=[];total=0;coronetTriangles=[];coronetCumulative=[];coronetArea=0
     for triangle in skin.data.loop_triangles:
         face=skin.data.polygons[triangle.polygon_index]
         materialName=skin.data.materials[face.material_index].name
         if not materialName.startswith(('DonkeyCartGreyCoat','DonkeyLowerLegShortFur')):continue
         points=[skin.data.vertices[i].co for i in triangle.vertices];centre=sum(points,Vector())/3
+        if bpy.context.scene.get('DonkeyReferenceFitRevision') and materialName.startswith('DonkeyLowerLegShortFur') and .065<centre.z<.083:
+            coronetArea+=triangle.area;coronetCumulative.append(coronetArea);coronetTriangles.append(triangle)
         minimumFurZ=.12 if bpy.context.scene.get('DonkeyReferenceFitRevision') else .20
         if centre.z<minimumFurZ:continue
         if centre.y>1.16 and centre.z<1.13:continue
@@ -206,8 +208,10 @@ def BuildGroom(skin,rig,collection,material,count=21000):
         colors.extend([tint,tint,tuple(min(1,value*1.10) for value in tint[:3])+(1,)])
         rows.extend([row]*3)
     color=skin.data.color_attributes['CoatColor']
+    coronetFibres=min(480,count) if coronetTriangles else 0
     for sample in range(count):
-        triangle=triangles[bisect.bisect_left(cumulative,rng.random()*total)]
+        coronet=sample<coronetFibres
+        triangle=coronetTriangles[bisect.bisect_left(coronetCumulative,rng.random()*coronetArea)] if coronet else triangles[bisect.bisect_left(cumulative,rng.random()*total)]
         a,b=rng.random(),rng.random()
         if a+b>1:a,b=1-a,1-b
         bary=(1-a-b,a,b);ids=triangle.vertices
@@ -230,8 +234,8 @@ def BuildGroom(skin,rig,collection,material,count=21000):
         elif root.y>.58:flow=Vector((0,-.72,-.75))
         else:flow=Vector((0,-1,-.30))
         flow+=Vector((rng.uniform(-.2,.2),rng.uniform(-.14,.14),rng.uniform(-.14,.14)))
-        length=rng.uniform(.012,.023) if root.z<.20 else rng.uniform(.006,.013) if root.z>.60 else rng.uniform(.004,.009)
-        Fiber(root,normal,flow,rng.uniform(.00025,.00065),length,row,tile,rootColor)
+        length=rng.uniform(.009,.014) if coronet else rng.uniform(.012,.023) if root.z<.20 else rng.uniform(.006,.013) if root.z>.60 else rng.uniform(.004,.009)
+        Fiber(root,normal,flow,rng.uniform(.0007,.0012) if coronet else rng.uniform(.00025,.00065),length,row,tile,rootColor)
         if normal.z>.55 and root.z>.75 and rng.random()<.075:
             Add(root,normal,flow,rng.uniform(.008,.014),rng.uniform(.010,.017),row,tile,.0014,rootColor)
     # Soft ear rims and terminal tail brush share the same cutout atlas.
@@ -286,7 +290,7 @@ def BuildGroom(skin,rig,collection,material,count=21000):
     modifier=obj.modifiers.new('DonkeyCoatSkin','ARMATURE');modifier.object=rig
     obj['coatAlphaCutoff']=.45;obj['coatCardCount']=sum(len(f)==4 for f in faces);obj['coatFibreCount']=count;obj['groomPrimitiveCount']=len(faces);obj['coatDensityPerM2']=count/total
     obj.visible_shadow=False;obj['groomCastShadow']=False
-    return obj,{'fibres':count,'cards':sum(len(f)==4 for f in faces),'triangles':sum(len(f)-2 for f in faces),'regionCards':regions,'sampledSurfaceM2':total,'maxInfluences':4}
+    return obj,{'fibres':count,'coronetFibres':coronetFibres,'coronetAreaM2':coronetArea,'coronetLengthM':[.009,.014],'coronetWidthM':[.0007,.0012],'cards':sum(len(f)==4 for f in faces),'triangles':sum(len(f)-2 for f in faces),'regionCards':regions,'sampledSurfaceM2':total,'maxInfluences':4}
 
 def DetailCoat(base,skin,collection):
     image=bpy.data.images.load(str(base/'SourceTextures/Texture_DonkeyCoatFiberShortSource.png'),check_existing=True)

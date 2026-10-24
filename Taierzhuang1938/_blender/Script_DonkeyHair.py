@@ -123,23 +123,32 @@ def RebuildReferenceMane(skin,rig,collection):
         AddVolumeStrand(root,bones,growth,length,Vector((spread,rng.uniform(-.0015,.0015),0)),rng.uniform(.00022,.00038),4.0)
     foreProfile=[]
     for column in range(128):
-        occupied=np.where(alpha[128:,column]>.24)[0]
+        occupied=np.where(alpha[128:,column]>.65)[0]
         foreProfile.append(max(.008,foreHeight-(foreHeight+below)*int(occupied[0])/127) if len(occupied) else .008)
-    tuftColumns=[]
-    for column in sorted(range(8,120),key=lambda column:-foreProfile[column]):
-        if foreProfile[column]>.016 and all(abs(column-other)>=14 for other in tuftColumns):tuftColumns.append(column)
-        if len(tuftColumns)==7:break
-    if not tuftColumns:raise RuntimeError('Reference forelock has no usable tuft peaks')
+    # Strong foreground contrast separates the real three peaks from the
+    # studio background gradient. Connected upper lobes define whole tufts.
+    groups=[];cut=max(foreProfile)*.82
+    for column in range(8,120):
+        if foreProfile[column]<=cut:continue
+        if not groups or column>groups[-1][-1]+4:groups.append([column])
+        else:groups[-1].append(column)
+    groups=[group for group in groups if len(group)>=3]
+    tuftColumns=[max(group,key=lambda column:foreProfile[column]) for group in groups]
+    if not groups:raise RuntimeError('Reference forelock has no usable connected upper lobes')
     for strand in range(400):
         tufted=strand<320
         if tufted:
-            tuft=tuftColumns[strand%len(tuftColumns)];tipX=-.045+.09*tuft/127+rng.gauss(0,.0015)
+            group=groups[strand%len(groups)];tipColumn=rng.uniform(group[0],group[-1])
+            tipX=-.045+.09*tipColumn/127
             tipX=max(-.043,min(.043,tipX))
         else:tipX=rng.uniform(-.043,.043)
-        x=max(-.026,min(.026,rng.gauss(0,.012)))
-        y=foreY+rng.uniform(-.006,.006);root,bones=Root(x,y);column=round((tipX+.045)/.09*127)
-        extent=foreProfile[column];length=extent*rng.uniform(.88,1.00) if tufted else extent*rng.uniform(.40,.70)
-        AddVolumeStrand(root,bones,Vector((0,-.12,1)).normalized(),length,Vector((tipX-x,rng.uniform(-.003,.003),0)),rng.uniform(.00035,.00055),1.0,.70)
+        x=max(-.038,min(.038,tipX*.80+rng.gauss(0,.007))) if tufted else rng.uniform(-.035,.035)
+        y=foreY+rng.gauss(0,.0025);root,bones=Root(x,y);column=round((tipX+.045)/.09*127)
+        extent=foreProfile[column];direction=Vector((0,.20,1)).normalized()
+        targetZ=foreRoot.z+extent*(rng.uniform(.98,1.00) if tufted else rng.uniform(.40,.70))
+        length=max(.003,(targetZ-root.z)/direction.z)
+        radius=rng.uniform(.00080,.0012) if tufted else rng.uniform(.00075,.0012)
+        AddVolumeStrand(root,bones,direction,length,Vector((tipX-x,(tipX/.045)*.004+rng.uniform(-.0015,.0015),0)),radius,1.0,.40)
     volumeMesh=bpy.data.meshes.new('DonkeyReferenceManeVolume');volumeMesh.from_pydata(volumeVertices,[],volumeFaces);volumeMesh.update()
     volumeMesh.materials.append(bpy.data.objects['DonkeyShortCoatCards'].data.materials[0])
     for face in volumeMesh.polygons:face.use_smooth=True
@@ -157,5 +166,5 @@ def RebuildReferenceMane(skin,rig,collection):
     volume['coatCardCount']=len(volumeFaces);volume['groomCastShadow']=False;volume.visible_shadow=False
     bpy.context.scene['DonkeyManeTufts']='[]';bpy.context.scene['DonkeyReferenceMane']=True
     return {'mainRows':40,'crossCards':0,'forelockColumns':0,'forelockCrossCards':0,'triangles':sum(len(f)-2 for f in faces),'exportLayer':'DonkeyManeRuntime',
-            'forelockRootY':foreY,'volumeFibres':{'main':1100,'forelock':400,'forelockTuftColumns':sorted(tuftColumns),'forelockTuftedFibres':320,'triangles':sum(len(f)-2 for f in volumeFaces),'mainTintGain':4.0,'pathBendFraction':{'main':.45,'forelock':.70},'spread':'narrow roots and laterally fanned tips; forelock bundles follow reference alpha peaks','exportLayer':'DonkeyCoatRuntime','material':'DonkeyShortCoatPbr','alpha':'MASK 0.45; depth writing','sourceObject':volume.name},
+            'forelockRootY':foreY,'volumeFibres':{'main':1100,'forelock':400,'forelockPeakColumns':sorted(tuftColumns),'forelockLobeColumns':[[group[0],group[-1]] for group in groups],'forelockForegroundAlpha':.65,'forelockUpperLobeFraction':.82,'forelockTuftedFibres':320,'forelockStrandRadiusM':[.00080,.0012],'forelockRootSpreadStdM':.007,'triangles':sum(len(f)-2 for f in volumeFaces),'mainTintGain':4.0,'pathBendFraction':{'main':.45,'forelock':.40},'spread':'broad rooted bundles narrow into connected reference foreground lobes, with dense shorter interior fill; global reference height preserves the tip envelope','exportLayer':'DonkeyCoatRuntime','material':'DonkeyShortCoatPbr','alpha':'MASK 0.45; depth writing','sourceObject':volume.name},
             'method':'reference-alpha ribbons backed by thin curved triangular-tube fibres rooted to actual skin','texture':str(path),'textureSha256':hashlib.sha256(content).hexdigest(),'sourceSha256':hashlib.sha256(original.read_bytes()).hexdigest()}
