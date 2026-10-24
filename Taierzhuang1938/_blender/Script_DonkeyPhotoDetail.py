@@ -23,13 +23,10 @@ def BuildDetailImages(base):
     maskNamespace={};file=Path(bpy.context.scene['DonkeyCartProject'])/'_blender/Script_DonkeyReferenceMasks.py'
     exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),maskNamespace)
     occlusion=maskNamespace['BuildOcclusionWeights']()
+    facialFeatures=maskNamespace['BuildFacialFeatureWeights']()
     yy,xx=np.indices((1024,1536));result={};records=[]
     for name,(left,right) in {'Side':(335,1217),'Front':(34,280),'Rear':(1225,1518)}.items():
-        cavity=np.zeros((1024,1536),dtype=np.float32)
-        cavities={'Side':[(359.3,391.8,9,17)],'Front':[(131.8,402.5,9,17),(182.3,402.8,9,17)],'Rear':[]}[name]
-        for u,v,rx,ry in cavities:
-            radius=np.sqrt(((xx-u)/rx)**2+((yy-v)/ry)**2);t=np.clip((radius-1)/.25,0,1)
-            cavity=np.maximum(cavity,1-t*t*(3-2*t))
+        cavity=facialFeatures[name]
         ratios=[];confidences=[]
         for imageIndex,rgb in enumerate(arrays):
             linear=np.where(rgb<=.04045,rgb/12.92,((rgb+.055)/1.055)**2.4)
@@ -52,7 +49,7 @@ def BuildDetailImages(base):
         path=base/'SourceTextures'/('Texture_DonkeyReference'+name+'Detail.png')
         image.filepath_raw=str(path);image.file_format='PNG';image.save();content=path.read_bytes();image.pack(data=content,data_len=len(content))
         result[name]=image;records.append({'view':name,'path':str(path),'sha256':hashlib.sha256(content).hexdigest(),'size':[1536,1024]})
-    return result,{'method':'masked luminance / normalized local blur; two 9-pixel box passes; original detail contrast 2.30 and guide detail contrast 1.0; ratios clamped separately','contrast':2.30,'occludedGuideContrast':1.0,'cavityProtection':'feathered measured source nostril footprints excluded from pigment-like dark detail; cavity darkness is geometry',
+    return result,{'method':'masked luminance / normalized local blur; two 9-pixel box passes; original detail contrast 2.30 and guide detail contrast 1.0; ratios clamped separately','contrast':2.30,'occludedGuideContrast':1.0,'cavityProtection':'feathered source nostril shadows and oral crease/highlight footprints excluded from pigment-like detail; anatomical creases remain geometry',
         'original':str(original),'originalSha256':hashlib.sha256(original.read_bytes()).hexdigest(),
         'occludedGuide':str(guide),'guideSha256':hashlib.sha256(guide.read_bytes()).hexdigest(),'images':records,
         'occlusionMasks':'_blender/Script_DonkeyReferenceMasks.py; geometric rope footprints including shaded edges; feathered normalized-detail blending'}

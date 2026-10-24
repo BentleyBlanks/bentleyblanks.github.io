@@ -4,7 +4,7 @@ import numpy as np
 def BuildOcclusionMasks(width=1536,height=1024):
     yy,xx=np.indices((height,width),dtype=np.float32);xx*=1536/width;yy*=1024/height
     side=(xx>565)&(xx<785)&(yy>230)&(yy<595)
-    front=((xx>45)&(xx<270)&(yy>295)&(yy<575))|((xx>146)&(xx<170)&(yy>350))
+    front=((xx>45)&(xx<270)&(yy>425)&(yy<575))|((xx>146)&(xx<170)&(yy>430))
     rear=(xx>1250)&(xx<1505)&(yy>180)&(yy<365)
     def Stroke(mask,points,radius):
         for a,b in zip(points,points[1:]):
@@ -17,6 +17,9 @@ def BuildOcclusionMasks(width=1536,height=1024):
     Stroke(side,[(463,344),(443,375),(429,411),(425,437)],13)
     Stroke(front,[(110,175),(105,220),(100,270),(105,325)],13)
     Stroke(front,[(212,170),(220,225),(225,270),(217,325)],13)
+    Stroke(front,[(96,338),(124,317),(160,318),(193,326),(221,346)],13)
+    Stroke(front,[(103,315),(87,342),(80,361),(84,375)],13)
+    Stroke(front,[(212,322),(228,345),(235,371)],13)
     result={'Side':side,'Front':front,'Rear':rear}
     for u,v in ((519,180),(498,270),(516,329),(396,328),(581,524)):
         if not side[min(height-1,int(v*height/1024)),min(width-1,int(u*width/1536))]:raise RuntimeError('Observed reference tack pixel is not masked')
@@ -24,6 +27,10 @@ def BuildOcclusionMasks(width=1536,height=1024):
         if side[min(height-1,int(v*height/1024)),min(width-1,int(u*width/1536))]:raise RuntimeError('Visible reference coat was masked as tack')
     for u,v in ((1334,310),(1394,319)):
         if not rear[min(height-1,int(v*height/1024)),min(width-1,int(u*width/1536))]:raise RuntimeError('Observed rear-view collar pixel is not masked')
+    for u,v in ((156,318),(86,350),(222,350),(135,485)):
+        if not front[min(height-1,int(v*height/1024)),min(width-1,int(u*width/1536))]:raise RuntimeError('Observed front-view tack pixel is not masked')
+    for u,v in ((156,380),(134,402),(182,402)):
+        if front[min(height-1,int(v*height/1024)),min(width-1,int(u*width/1536))]:raise RuntimeError('Visible front muzzle was masked as tack')
     return result
 
 def BuildOcclusionWeights(width=1536,height=1024):
@@ -36,4 +43,19 @@ def BuildOcclusionWeights(width=1536,height=1024):
             padded=np.pad(values,((radius,radius),(0,0)),mode='edge');summed=np.pad(np.cumsum(padded,axis=0,dtype=np.float64),((1,0),(0,0)))
             values=(summed[size:]-summed[:-size])/size
         result[name]=values.astype(np.float32)
+    return result
+
+def BuildFacialFeatureWeights(width=1536,height=1024):
+    """Keep photographed aperture shadows and oral highlights out of albedo."""
+    yy,xx=np.indices((height,width),dtype=np.float32);xx*=1536/width;yy*=1024/height
+    result={name:np.zeros((height,width),dtype=np.float32) for name in ('Side','Front','Rear')}
+    def Fade(radius):
+        t=np.clip((radius-1)/.30,0,1);return 1-t*t*(3-2*t)
+    for view,ellipses in {'Side':[(359.3,391.8,9,17)],'Front':[(131.8,402.5,9,17),(182.3,402.8,9,17),(156.5,439,44,16)],'Rear':[]}.items():
+        for u,v,rx,ry in ellipses:result[view]=np.maximum(result[view],Fade(np.sqrt(((xx-u)/rx)**2+((yy-v)/ry)**2)))
+    points=[(373,443),(397,437),(419,414)]
+    for a,b in zip(points,points[1:]):
+        dx,dy=b[0]-a[0],b[1]-a[1];t=np.clip(((xx-a[0])*dx+(yy-a[1])*dy)/(dx*dx+dy*dy),0,1)
+        distance=np.sqrt((xx-a[0]-t*dx)**2+(yy-a[1]-t*dy)**2)
+        result['Side']=np.maximum(result['Side'],Fade(distance/9))
     return result

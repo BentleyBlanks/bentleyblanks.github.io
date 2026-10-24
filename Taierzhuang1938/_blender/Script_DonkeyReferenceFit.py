@@ -684,7 +684,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261024ReferenceV11'
+    scene['DonkeyReferenceFitRevision']='20261024ReferenceV12'
     scene['DonkeyReferenceFitAnchorY']=anchor
     # Repaint the short pale muzzle rather than the old long horse-like blaze.
     colors=skin.data.color_attributes['CoatColor']
@@ -704,6 +704,9 @@ def ApplyReferenceFit(scene,base):
     photoNamespace={}
     exec(compile((project/'_blender/Script_DonkeyPhotoDetail.py').read_text(encoding='utf-8'),'Script_DonkeyPhotoDetail.py','exec'),photoNamespace)
     photoDetail=photoNamespace['InstallReferenceDetail'](scene,skin,rig,collection,base)
+    pigmentNamespace={}
+    exec(compile((project/'_blender/Script_DonkeyReferencePigment.py').read_text(encoding='utf-8'),'Script_DonkeyReferencePigment.py','exec'),pigmentNamespace)
+    photoDetail['pigmentProjection']=pigmentNamespace['InstallReferencePigment'](scene,skin,rig,base)
     previousGroom=bpy.data.objects['DonkeyShortCoatCards'];groomMaterial=previousGroom.data.materials[0]
     bpy.data.objects.remove(previousGroom,do_unlink=True)
     coatNamespace={}
@@ -715,7 +718,7 @@ def ApplyReferenceFit(scene,base):
             'boneCount':len(rig.data.bones),'jointHeightsM':{front:float(rig.data.bones['Donkey'+front+'LeftKneePivot'].head_local.z) for front in ('Front','Rear')},
             'standingPose':'far forefoot forward, far hindfoot forward; centred foot targets during walk',
             'shape':'broader muzzle/skull and barrel, shorter axial silhouette, corrected eye height, back/belly profile and sternum','groom':groomReport,
-            'material':'short pale muzzle, calibrated charcoal-gray coat and pale belly, 0.45 m fibre repeat and doubled microcontrast',
+            'material':'visible full-RGB reference coat/face pigment with illumination compensation; anatomical apertures and hidden pixels retain calibrated fallback; independent 0.45 m fibre-normal repeat',
             'colorCalibration':colorCalibration,'flow':flowReport,'photoDetail':photoDetail,'landmarkFit':{'skullForwardM':.029,'muzzleForwardM':.014,'eyeRaiseM':.006,'midBackRaiseM':.014,'croupBackM':.040,'croupRaiseM':.008}}
     (base/'Data_ReferenceFit.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     return report
