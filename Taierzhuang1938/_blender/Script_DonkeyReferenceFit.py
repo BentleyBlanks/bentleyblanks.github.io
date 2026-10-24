@@ -491,14 +491,21 @@ def FinishFurResponse(rig,collection):
 
 def RefineEyes(skin,rig):
     tree=BVHTree.FromPolygons([v.co for v in skin.data.vertices],[tuple(p.vertices) for p in skin.data.polygons])
-    inverse=rig.matrix_world.inverted()
+    inverse=rig.matrix_world.inverted();reports=[]
+    eyeRadiusU,eyeRadiusV,eyeRadiusN=.0245,.011,.0075
+    centreOffset=-.0015;openingU,openingV=.0235,.0095
     for side,sign in (('Left',-1),('Right',1)):
         eye=bpy.data.objects['DonkeyEye'+side];matrix=inverse@eye.matrix_world
         centre=sum((matrix@v.co for v in eye.data.vertices),Vector())/len(eye.data.vertices)
         normal=Vector((sign*.78,.62,.03)).normalized();axis=Vector((0,0,1)).cross(normal).normalized();up=normal.cross(axis).normalized()
         tilt=-sign*math.radians(12);axis=(axis*math.cos(tilt)+up*math.sin(tilt)).normalized();up=normal.cross(axis).normalized()
         hit,_,_,_=tree.ray_cast(centre+normal*.1,-normal,.2)
-        centre=hit+normal*.004
+        centre=hit+normal*centreOffset
+        def Cornea(du,dv):
+            depth=eyeRadiusN*math.sqrt(max(.0001,1-(du/eyeRadiusU)**2-(dv/eyeRadiusV)**2))
+            point=centre+axis*du+up*dv+normal*depth
+            surfaceNormal=(axis*(du/eyeRadiusU**2)+up*(dv/eyeRadiusV**2)+normal*(depth/eyeRadiusN**2)).normalized()
+            return point,surfaceNormal,depth
         # Rebuild the dark aperture around its actual surface centre. The
         # inherited object origin predates the head fit and cannot locate lids.
         vertices=[];faces=[];segments=32;rings=16
@@ -506,7 +513,7 @@ def RefineEyes(skin,rig):
             latitude=-math.pi/2+math.pi*i/rings
             for j in range(segments):
                 angle=2*math.pi*j/segments
-                vertices.append(centre+axis*(.0265*math.cos(latitude)*math.cos(angle))+up*(.012*math.sin(latitude))+normal*(.012*math.cos(latitude)*math.sin(angle)))
+                vertices.append(centre+axis*(eyeRadiusU*math.cos(latitude)*math.cos(angle))+up*(eyeRadiusV*math.sin(latitude))+normal*(eyeRadiusN*math.cos(latitude)*math.sin(angle)))
                 if i:
                     a=(i-1)*segments+j;b=(i-1)*segments+(j+1)%segments;c=i*segments+(j+1)%segments;d=i*segments+j
                     faces.append((a,b,c,d))
@@ -522,7 +529,7 @@ def RefineEyes(skin,rig):
         pigment=mesh.color_attributes.get('EyePigment') or mesh.color_attributes.new(name='EyePigment',type='FLOAT_COLOR',domain='POINT')
         for vertex in mesh.vertices:
             delta=matrix@vertex.co-centre;du=delta.dot(axis);dv=delta.dot(up)
-            pupil=1-Smooth(.8,1.1,(du/.020)**2+(dv/.0045)**2)
+            pupil=1-Smooth(.8,1.1,(du/.0185)**2+(dv/.0043)**2)
             value=Vector((.014,.008,.004)).lerp(Vector((.002,.0015,.001)),pupil)
             pigment.data[vertex.index].color=(*value,1)
         paint=shader.id_data.nodes.get('ReferenceEyePigment') or shader.id_data.nodes.new('ShaderNodeVertexColor')
@@ -532,27 +539,39 @@ def RefineEyes(skin,rig):
         for name in ('DonkeyPaleEyeRing'+side,'DonkeyEyelidMargin'+side):
             obj=bpy.data.objects[name];matrix=inverse@obj.matrix_world;back=matrix.inverted()
             if 'PaleEyeRing' in name:
+                if len(obj.data.vertices)!=120:raise RuntimeError('Unexpected orbital ring topology')
                 colors=obj.data.color_attributes['CoatColor']
                 for vertex in obj.data.vertices:
                     row=vertex.index//40;angle=2*math.pi*(vertex.index%40)/40
-                    rx,rz=[(.0275,.0130),(.035,.023),(.043,.032)][row]
+                    rx,rz=[(.0238,.0098),(.033,.021),(.043,.032)][row]
                     p=centre+axis*(rx*math.cos(angle))+up*(rz*math.sin(angle))
                     hit,_,_,_=tree.ray_cast(p+normal*.05,-normal,.13)
-                    if hit is not None:vertex.co=back@(hit+normal*.0013)
+                    if row==0:
+                        point,surfaceNormal,_=Cornea(rx*math.cos(angle),rz*math.sin(angle))
+                        vertex.co=back@(point+surfaceNormal*.00035)
+                    elif hit is not None:vertex.co=back@(hit+normal*(.0013+(.0012*max(0,math.sin(angle)) if row==1 else 0)))
                     shade=[.14,.065,.027][row]*(1+1.15*max(0,math.sin(angle)))
                     colors.data[vertex.index].color=(shade,shade*.93,shade*.79,1)
             if 'EyelidMargin' in name:
                 vertices=list(obj.data.vertices)
+                if len(vertices)!=240:raise RuntimeError('Unexpected eyelid margin topology')
                 for start in range(0,len(vertices),6):
-                    ring=vertices[start:start+6];old=sum((matrix@v.co for v in ring),Vector())/len(ring)
-                    angle=2*math.pi*(start//6)/40;p=centre+axis*(.027*math.cos(angle))+up*(.0130*math.sin(angle))
-                    hit,_,_,_=tree.ray_cast(p+normal*.05,-normal,.13)
-                    if hit is not None:
-                        shift=hit+normal*.0018-old
-                        for vertex in ring:vertex.co=back@(matrix@vertex.co+shift)
+                    ring=vertices[start:start+6];angle=2*math.pi*(start//6)/40
+                    du,dv=openingU*math.cos(angle),openingV*math.sin(angle);point,surfaceNormal,depth=Cornea(du,dv)
+                    derivativeU,derivativeV=-openingU*math.sin(angle),openingV*math.cos(angle)
+                    derivativeN=-eyeRadiusN**2*(du*derivativeU/eyeRadiusU**2+dv*derivativeV/eyeRadiusV**2)/max(.00001,depth)
+                    tangent=(axis*derivativeU+up*derivativeV+normal*derivativeN).normalized();across=tangent.cross(surfaceNormal).normalized()
+                    radius=.0010+.0005*max(0,math.sin(angle));point+=surfaceNormal*.0003
+                    for j,vertex in enumerate(ring):
+                        theta=2*math.pi*j/6;vertex.co=back@(point+radius*(surfaceNormal*math.cos(theta)+across*math.sin(theta)))
+                bm=bmesh.new();bm.from_mesh(obj.data);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces))
+                if bm.calc_volume(signed=True)<0:bmesh.ops.reverse_faces(bm,faces=list(bm.faces))
+                bm.to_mesh(obj.data);bm.free()
             obj.data.update()
+        reports.append({'side':side,'centre':list(centre),'radiiM':[eyeRadiusU,eyeRadiusV,eyeRadiusN],'centreOffsetM':centreOffset,'nominalCornealApexM':centreOffset+eyeRadiusN,'lidOpeningRadiiM':[openingU,openingV]})
     material=next(m for m in bpy.data.materials if m.name.startswith('DonkeyCartEyelid'))
-    shader=material.node_tree.nodes.get('Principled BSDF');shader.inputs['Base Color'].default_value=(.012,.009,.006,1);shader.inputs['Specular IOR Level'].default_value=.18
+    shader=material.node_tree.nodes.get('Principled BSDF');shader.inputs['Base Color'].default_value=(.025,.018,.012,1);shader.inputs['Roughness'].default_value=.72;shader.inputs['Specular IOR Level'].default_value=.18
+    return {'version':'ReferenceEyeWrapV1','method':'seated cornea with eyelid margin and inner orbital fur following the actual ellipsoid surface','eyes':reports}
 
 def SeatMouthSeam(skin,rig):
     tree=BVHTree.FromPolygons([v.co for v in skin.data.vertices],[tuple(p.vertices) for p in skin.data.polygons])
@@ -683,7 +702,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261024ReferenceV7'
+    scene['DonkeyReferenceFitRevision']='20261024ReferenceV8'
     scene['DonkeyReferenceFitAnchorY']=anchor
     # Repaint the short pale muzzle rather than the old long horse-like blaze.
     colors=skin.data.color_attributes['CoatColor']
@@ -698,7 +717,7 @@ def ApplyReferenceFit(scene,base):
         value=baseColor.lerp(muzzle,pale);old=Vector(colors.data[vertex.index].color[:3])
         colors.data[vertex.index].color=(*old.lerp(value,head),1)
     projected=ReferencePigment(skin,anchor);colorCalibration=CalibrateCoatPigment(skin)
-    RefineEyes(skin,rig);SeatMouthSeam(skin,rig);FinishFurResponse(rig,collection);flowReport=RefreshFlow(skin,rig,collection)
+    details['eyes']=RefineEyes(skin,rig);SeatMouthSeam(skin,rig);FinishFurResponse(rig,collection);flowReport=RefreshFlow(skin,rig,collection)
     photoNamespace={}
     exec(compile((project/'_blender/Script_DonkeyPhotoDetail.py').read_text(encoding='utf-8'),'Script_DonkeyPhotoDetail.py','exec'),photoNamespace)
     photoDetail=photoNamespace['InstallReferenceDetail'](scene,skin,rig,collection,base)

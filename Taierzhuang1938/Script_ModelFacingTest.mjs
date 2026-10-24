@@ -299,8 +299,8 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
 Check(bare.json.meshes.length===3 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===63002 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
-  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与63,002三角齐备");
+  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===77934 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
+  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与77,934三角齐备");
 const bareBody=bare.json.meshes[bare.json.nodes.find(n=>n.name==="DonkeyRuntime").mesh];
 const bareCoat=bare.json.meshes[bare.json.nodes.find(n=>n.name==="DonkeyCoatRuntime").mesh];
 const bareManeNode=bare.json.nodes.find(n=>n.name==="DonkeyManeRuntime");

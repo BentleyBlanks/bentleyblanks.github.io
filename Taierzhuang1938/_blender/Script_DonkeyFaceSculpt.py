@@ -12,6 +12,8 @@ def RefineReferenceFace(skin,rig):
     eyeCentre.x=abs(eyeCentre.x)
     for vertex in skin.data.vertices:
         p=vertex.co;x,y,z=p
+        crown=(1-Smooth(0,.085,abs(x)))*(1-Smooth(.015,.070,abs(y-1.125)))*Smooth(1.21,1.275,z)
+        p.z+=.020*crown
         # The side photograph places the alar hollow behind the nasal tip.
         # A lateral recess changes side depth while retaining frontal width.
         lateral=Smooth(.020,.050,abs(x))*(1-Smooth(.080,.105,abs(x)))
@@ -41,5 +43,5 @@ def RefineReferenceFace(skin,rig):
             if change.length>.001:change*=.001/change.length
             vertex.co=p+change
     skin.data.update()
-    return {'method':'lateral alar recess preserves frontal width; subtle supraorbital ridge and connected throat junction fairing',
-            'alarRecessM':.016,'maxOrbitalReliefM':.0038,'maxDisplacementM':max((v.co-p).length for v,p in zip(skin.data.vertices,original))}
+    return {'method':'lateral alar recess, rounded interaural crown, subtle supraorbital ridge and connected throat junction fairing',
+            'alarRecessM':.016,'maxCrownRaiseM':.020,'maxOrbitalReliefM':.0038,'maxDisplacementM':max((v.co-p).length for v,p in zip(skin.data.vertices,original))}

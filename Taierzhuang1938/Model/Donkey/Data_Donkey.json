@@ -1,11 +1,11 @@
 {
   "schema": "tengxian-independent-rigged-prop-v1",
   "id": "Donkey",
-  "version": "20261024ReferenceV7",
+  "version": "20261024ReferenceV8",
   "asset": "Model_Donkey.glb",
   "textureManifest": "Data_DonkeyTextures.json",
-  "sha256": "15fe8541a680b034a47fbbadf308341597d30e50ae05fab837f52cd891e84808",
-  "bytes": 13343504,
+  "sha256": "b52cd06a06cc5d3e7f51fd2e8268bf85ec9f1b05e9c7555af3c2f80f73b93071",
+  "bytes": 14733272,
   "units": "metres",
   "upAxis": "+Y",
   "facingAxis": "-Z",
@@ -23,13 +23,13 @@
       -1.1173174381256104
     ],
     "max": [
-      0.2050541192293167,
-      1.570422649383545,
+      0.20429711043834686,
+      1.5704224109649658,
       0.43956685066223145
     ],
     "dimensions": [
-      0.40711943805217743,
-      1.5700226493936498,
+      0.4063624292612076,
+      1.5700224109750707,
       1.5568842887878418
     ]
   },
@@ -73,17 +73,17 @@
   },
   "coat": {
     "fibres": 21000,
-    "cards": 846,
-    "triangles": 22692,
+    "cards": 862,
+    "triangles": 22724,
     "regionCards": {
-      "0": 460,
-      "1": 22,
-      "2": 4,
+      "0": 474,
+      "1": 27,
+      "2": 1,
       "3": 360
     },
-    "sampledSurfaceM2": 1.9299790613486703,
+    "sampledSurfaceM2": 1.931572017124267,
     "maxInfluences": 4,
-    "version": "20261024ReferenceV7",
+    "version": "20261024ReferenceV8",
     "method": "individual skinned short fibres, limited alpha-cutout edge tufts and tiled fibre normal detail on UV1",
     "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\SourceTextures\\Texture_DonkeyShortFurCardsSource.png",
     "sourceSha256": "03db7521e9987a20f405e647c3c37237ad3006193f993babd2d2a424496e6d09",
@@ -100,12 +100,12 @@
     "shadow": "groomCastShadow=false; body and accessories cast shadows, micro-fibre layer receives them"
   },
   "triangles": {
-    "total": 63002,
+    "total": 77934,
     "limit": 80000,
     "byBatch": {
       "Animal": 40054,
-      "Coat": 22692,
-      "Mane": 256
+      "Coat": 37724,
+      "Mane": 156
     },
     "decimated": false
   },
@@ -125,12 +125,12 @@
     "maxInfluences": 4,
     "morphTargets": 0,
     "uvAtlasCoverage": {
-      "Animal": 0.3734041530050406,
+      "Animal": 0.3553202896102305,
       "Coat": null,
       "Mane": null
     },
     "averageTexelsPerMetre": {
-      "Animal": 729.6159264900159,
+      "Animal": 711.7246522580608,
       "Coat": null,
       "Mane": null
     }
@@ -154,7 +154,7 @@
     "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\Scene_DonkeyCart.blend",
     "sourceSha256": "e1c2bbb55db3317e7d18dbc40ad47a6f09a5ff157794694315f31a10a8213ac2",
     "retainedCollection": "DonkeyEditable",
-    "retainedObjectCount": 18,
+    "retainedObjectCount": 19,
     "removedObjectCount": 270,
     "scope": "animal body, eyes, ears, mane, tail and short fur only; no cart, shafts, collar, straps, halter or lead rope",
     "mouthSeamConform": {
@@ -181,17 +181,17 @@
     },
     "coat": {
       "fibres": 21000,
-      "cards": 846,
-      "triangles": 22692,
+      "cards": 862,
+      "triangles": 22724,
       "regionCards": {
-        "0": 460,
-        "1": 22,
-        "2": 4,
+        "0": 474,
+        "1": 27,
+        "2": 1,
         "3": 360
       },
-      "sampledSurfaceM2": 1.9299790613486703,
+      "sampledSurfaceM2": 1.931572017124267,
       "maxInfluences": 4,
-      "version": "20261024ReferenceV7",
+      "version": "20261024ReferenceV8",
       "method": "individual skinned short fibres, limited alpha-cutout edge tufts and tiled fibre normal detail on UV1",
       "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\SourceTextures\\Texture_DonkeyShortFurCardsSource.png",
       "sourceSha256": "03db7521e9987a20f405e647c3c37237ad3006193f993babd2d2a424496e6d09",
@@ -206,7 +206,7 @@
       "detailTexelsPerMetre": 2275.5555555555557
     },
     "referenceFit": {
-      "version": "20261024ReferenceV7",
+      "version": "20261024ReferenceV8",
       "referenceImage": "Image_DonkeyOriginalThreeView.png",
       "calibration": {
         "groundPixelY": 925,
@@ -220,7 +220,7 @@
       "maxSkinDisplacementM": 0.23415090219101242,
       "meanSkinDisplacementM": 0.05473768158698771,
       "chestSurfaceAddedTriangles": 0,
-      "referencePigmentVertices": 11797,
+      "referencePigmentVertices": 11819,
       "neckLoft": {
         "version": "ReferenceNeckLoftV1",
         "cutY": [
@@ -347,12 +347,12 @@
         "boundaryEdges": 0,
         "nonmanifoldEdges": 0,
         "windingConflicts": 0,
-        "mainVolumeM3": 0.14407757322299544,
+        "mainVolumeM3": 0.1442214591145607,
         "flippedFaces": 0
       },
       "earRootOffsets": {
-        "Left": -0.008496621131896864,
-        "Right": -0.008607128143310439
+        "Left": -0.00807032871246327,
+        "Right": -0.008185484886169325
       },
       "details": {
         "tailFineStrands": 260,
@@ -409,10 +409,11 @@
           }
         },
         "faceSculpt": {
-          "method": "lateral alar recess preserves frontal width; subtle supraorbital ridge and connected throat junction fairing",
+          "method": "lateral alar recess, rounded interaural crown, subtle supraorbital ridge and connected throat junction fairing",
           "alarRecessM": 0.016,
+          "maxCrownRaiseM": 0.02,
           "maxOrbitalReliefM": 0.0038,
-          "maxDisplacementM": 0.016000032721577746
+          "maxDisplacementM": 0.019999980829879766
         },
         "abdomenFit": {
           "version": "ReferenceAbdomenV1",
@@ -559,15 +560,85 @@
         },
         "mane": {
           "mainRows": 40,
-          "crossCards": 12,
-          "forelockColumns": 13,
-          "forelockCrossCards": 1,
-          "triangles": 256,
+          "crossCards": 0,
+          "forelockColumns": 0,
+          "forelockCrossCards": 0,
+          "triangles": 156,
           "exportLayer": "DonkeyManeRuntime",
-          "method": "fixed skinned ribbons with reference-derived alpha silhouette",
-          "texture": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV7\\SourceTextures\\Texture_DonkeyManeBase.png",
-          "textureSha256": "c52c09dc26350e6eef382c010e45cd3e021b678a95f1b23c9f1e8c7d547c793c",
+          "forelockRootY": 1.1222414493429067,
+          "volumeFibres": {
+            "main": 1100,
+            "forelock": 400,
+            "forelockTuftColumns": [
+              11,
+              27,
+              47,
+              62,
+              78,
+              92,
+              106
+            ],
+            "forelockTuftedFibres": 320,
+            "triangles": 15000,
+            "mainTintGain": 4.0,
+            "pathBendFraction": {
+              "main": 0.45,
+              "forelock": 0.7
+            },
+            "spread": "narrow roots and laterally fanned tips; forelock bundles follow reference alpha peaks",
+            "exportLayer": "DonkeyCoatRuntime",
+            "material": "DonkeyShortCoatPbr",
+            "alpha": "MASK 0.45; depth writing",
+            "sourceObject": "DonkeyReferenceManeVolume"
+          },
+          "method": "reference-alpha ribbons backed by thin curved triangular-tube fibres rooted to actual skin",
+          "texture": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV8\\SourceTextures\\Texture_DonkeyManeBase.png",
+          "textureSha256": "ba2cf2aea6b975cb9f9f4a25e5523215ced1d552544cab039ee18c21d79680c2",
           "sourceSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b"
+        },
+        "eyes": {
+          "version": "ReferenceEyeWrapV1",
+          "method": "seated cornea with eyelid margin and inner orbital fur following the actual ellipsoid surface",
+          "eyes": [
+            {
+              "side": "Left",
+              "centre": [
+                -0.09569888561964035,
+                1.1589083671569824,
+                1.1898943185806274
+              ],
+              "radiiM": [
+                0.0245,
+                0.011,
+                0.0075
+              ],
+              "centreOffsetM": -0.0015,
+              "nominalCornealApexM": 0.006,
+              "lidOpeningRadiiM": [
+                0.0235,
+                0.0095
+              ]
+            },
+            {
+              "side": "Right",
+              "centre": [
+                0.09563152492046356,
+                1.1590181589126587,
+                1.1898990869522095
+              ],
+              "radiiM": [
+                0.0245,
+                0.011,
+                0.0075
+              ],
+              "centreOffsetM": -0.0015,
+              "nominalCornealApexM": 0.006,
+              "lidOpeningRadiiM": [
+                0.0235,
+                0.0095
+              ]
+            }
+          ]
         }
       },
       "boneCount": 28,
@@ -579,15 +650,15 @@
       "shape": "broader muzzle/skull and barrel, shorter axial silhouette, corrected eye height, back/belly profile and sternum",
       "groom": {
         "fibres": 21000,
-        "cards": 846,
-        "triangles": 22692,
+        "cards": 862,
+        "triangles": 22724,
         "regionCards": {
-          "0": 460,
-          "1": 22,
-          "2": 4,
+          "0": 474,
+          "1": 27,
+          "2": 1,
           "3": 360
         },
-        "sampledSurfaceM2": 1.9299790613486703,
+        "sampledSurfaceM2": 1.931572017124267,
         "maxInfluences": 4
       },
       "material": "short pale muzzle, calibrated charcoal-gray coat and pale belly, 0.45 m fibre repeat and doubled microcontrast",
@@ -634,7 +705,7 @@
           "boundaryEdges": 0,
           "nonmanifoldEdges": 0,
           "windingConflicts": 0,
-          "mainVolumeM3": 0.14407757322299544
+          "mainVolumeM3": 0.1442214591145607
         }
       },
       "photoDetail": {
@@ -643,12 +714,12 @@
         "occludedGuideContrast": 1.0,
         "original": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
         "originalSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
-        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV7\\Image_NakedAnatomyGuide.png",
+        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV8\\Image_NakedAnatomyGuide.png",
         "guideSha256": "8130715142837beed8957c59ffc775500d4b6ff96bf99a61b51f8759dc9d0c4a",
         "images": [
           {
             "view": "Side",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV7\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV8\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
             "sha256": "7fc6d47ba5e805f8b21940a18b113e03a70554eee9f103545c7a2972a2362351",
             "size": [
               1536,
@@ -657,7 +728,7 @@
           },
           {
             "view": "Front",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV7\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV8\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
             "sha256": "d6978db47eb8f7513164f4376feb437ecf23f27c6767ab20b842bdc3eb69b66f",
             "size": [
               1536,
@@ -666,7 +737,7 @@
           },
           {
             "view": "Rear",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV7\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV8\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
             "sha256": "ef5d8b1ac83cec630467e8244236c71b80238d05199fbf89f99d87c7b1a7aff4",
             "size": [
               1536,
@@ -677,10 +748,10 @@
         "occlusionMasks": "_blender/Script_DonkeyReferenceMasks.py; geometric rope footprints including shaded edges; feathered normalized-detail blending",
         "visibility": "fitted-skin BVH depth test from axial source cameras; 4 mm surface tolerance; source-vertex weights baked into UV0",
         "materials": [
+          "DonkeyCartEarInterior",
           "DonkeyCartGreyCoat",
           "DonkeyCartFaceFur",
-          "DonkeyLowerLegShortFur",
-          "DonkeyCartEarInterior"
+          "DonkeyLowerLegShortFur"
         ],
         "runtime": "baked UV0 base colour; independent tiled UV1 fibre normal; no camera projection in GLB"
       },
@@ -706,7 +777,7 @@
       0.00039962775190360844,
       0.0004001638444606215
     ],
-    "reimportedStanceDriftPerFrameM": 6.340339126394146e-07,
+    "reimportedStanceDriftPerFrameM": 6.340585384963238e-07,
     "sampleCount": 148,
     "webpPixelsUnchanged": true,
     "geometrySkinActionsUnchangedDuringPacking": true,
@@ -722,7 +793,7 @@
     "parentSourceUnchanged": true,
     "sourceAnatomyEvidence": "Measured three-view silhouette, closed manifold neck/skin, orbital relief, rebuilt eyes and swept nasal cavities; compatible rest joints and four-influence skin. Native clips and the packed GLB are independently sampled."
   },
-  "editableSource": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV7\\Scene_Donkey.blend",
+  "editableSource": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV8\\Scene_Donkey.blend",
   "credits": [
     {
       "name": "Lyndon Daniels / ChadM Rigged Horse",
