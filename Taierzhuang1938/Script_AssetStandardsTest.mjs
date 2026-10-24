@@ -12,6 +12,7 @@ import {
 } from "./Data_AssetStandards.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
+const type89Contract = JSON.parse(fs.readFileSync(path.join(projectDir, "Model/Type89MediumTank/Data_ReferenceContract.json"), "utf8"));
 const index = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", "Data_ModelIndex.json"), "utf8"));
 const built = new Map(index.models.map((entry) => [entry.name, entry]));
 const pythonRules = fs.readFileSync(path.join(projectDir, "_blender", "AssetBudgets.py"), "utf8");
@@ -134,7 +135,7 @@ Check(EXTERNAL_GLB_STANDARDS.length === 67
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "DonkeyCart" && record.actualTriangles === 79500 && record.targetTriangles <= 80000)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Donkey" && record.actualTriangles === 79206 && record.sourceTriangles === 79212 && record.targetTriangles === record.actualTriangles)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "NakajimaKi4" && record.sourceTriangles === 244695 && record.actualTriangles === 177815 && record.targetTriangles === 180000)
-  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Type89MediumTank" && record.sourceTriangles === 1119346 && record.selectedGameSourceTriangles === 83992 && record.actualTriangles === 83992 && record.targetTriangles === 80000)
+  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Type89MediumTank" && record.sourceTriangles === type89Contract.sourceTrianglesBeforeExportCleanup && record.selectedGameSourceTriangles === type89Contract.selectedGameSourceTrianglesBeforeCleanup && record.actualTriangles === type89Contract.runtimeRenderedTriangles && record.targetTriangles === type89Contract.runtimeTriangleTarget)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "KawasakiType88" && record.sourceTriangles === 237875 && record.actualTriangles === 79649 && record.targetTriangles === 80000)
   && EXTERNAL_GLB_STANDARDS.every((record) => record.actualTriangles > 0 && record.targetTriangles > 0),
   "外部 GLB 分类登记既有资产、独立布料测试三件及飞机战车，共 67 项");

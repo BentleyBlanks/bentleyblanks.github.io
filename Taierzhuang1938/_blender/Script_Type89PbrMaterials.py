@@ -22,23 +22,17 @@ def Attribute(mesh,name,dataType='FLOAT'):
 
 
 def PrepareSurfaceAttributes(objects, samples=12, onObject=None, allObjects=None):
-    # Sample the assembled vehicle, including every tread instance. Per-part AO
-    # misses the dark seams, fender underside and dirt-catching wheel recesses.
-    points=[];triangles=[]
-    for obj in allObjects or objects:
-        if obj.type!='MESH':continue
-        obj.data.calc_loop_triangles();base=len(points)
-        points.extend(obj.matrix_world@vertex.co for vertex in obj.data.vertices)
-        triangles.extend(tuple(base+index for index in face.vertices) for face in obj.data.loop_triangles)
-    assembly=BVHTree.FromPolygons(points,triangles,all_triangles=True,epsilon=.000001)
-    del points,triangles
+    # Broad armor no longer receives a few vertex AO samples stretched across
+    # metre-wide faces. The authoring shader samples the assembled scene per
+    # shading point. Only articulated lids retain local self-occlusion so a
+    # closed rest pose is not painted onto their opened inner faces.
     seen=set()
     for obj in objects:
         if obj.type!='MESH' or obj.data in seen:
             continue
         seen.add(obj.data)
         mesh=obj.data
-        selfOcclusion='BowRoundPortCover' in obj.name
+        selfOcclusion=any(token in obj.name for token in ['BowRoundPortCover','CommanderHatchFront','CommanderHatchRear'])
         inverseWorld=obj.matrix_world.inverted()
         mesh.calc_loop_triangles()
         bm=bmesh.new();bm.from_mesh(mesh)
@@ -55,6 +49,7 @@ def PrepareSurfaceAttributes(objects, samples=12, onObject=None, allObjects=None
         part=Attribute(mesh,'SurfacePart')
         wear=Attribute(mesh,'SurfaceWear')
         wheel=Attribute(mesh,'SurfaceWheel')
+        selfOnly=Attribute(mesh,'SurfaceSelfOcclusionOnly')
         partSeed=int(hashlib.sha256(obj.name.encode()).hexdigest()[:8],16)/0xffffffff
         if not any(value.value for value in finish.data):
             # Explicit zero finish on gun-jacket components is meaningful.
@@ -71,6 +66,7 @@ def PrepareSurfaceAttributes(objects, samples=12, onObject=None, allObjects=None
             wear.data[i].value=min(1,max(0,(vertex.co.z+.005)/.025)) if isShoe else 0
             dust.data[i].value=.8 if isShoe else (.55 if isWheel else 0)
             wheel.data[i].value=1.0 if isWheel else 0.0
+            selfOnly.data[i].value=1.0 if selfOcclusion else 0.0
             normal=vertex.normal.normalized()
             signed=[]
             for edge in vertex.link_edges:
@@ -79,7 +75,7 @@ def PrepareSurfaceAttributes(objects, samples=12, onObject=None, allObjects=None
             curvature=sum(signed)/max(1,len(signed))
             convex.data[i].value=min(1,max(0,(curvature-.035)*4.0))
             cavity.data[i].value=min(1,max(0,(-curvature-.020)*5.0))
-            if normal.length<.5:
+            if normal.length<.5 or not selfOcclusion:
                 ao.data[i].value=1
                 continue
             normal=(obj.matrix_world.to_3x3().inverted().transposed()@normal).normalized()
@@ -98,7 +94,6 @@ def PrepareSurfaceAttributes(objects, samples=12, onObject=None, allObjects=None
                     # bake its closed-state contact with the fixed bow onto
                     # the gold inner face that becomes visible when opened.
                     hit,_,_,distance=bvh.ray_cast(inverseWorld@origin,inverseWorld.to_3x3()@direction,.22)
-                else:hit,_,_,distance=assembly.ray_cast(origin,direction,.22)
                 occlusion+=max(0,1-distance/.22) if hit is not None else 0
             ao.data[i].value=max(.24,1-occlusion/max(1,samples)*.78)
         bm.free()
@@ -169,7 +164,12 @@ class SurfaceGraph:
         height=self.Attr('RestHeight')
         convex=self.Attr('SurfaceConvex')
         cavity=self.Attr('SurfaceCavity')
-        ambient=self.Attr('SurfaceAO')
+        localAmbient=self.Attr('SurfaceAO')
+        selfOnly=self.Attr('SurfaceSelfOcclusionOnly')
+        sceneAo=self.nodes.new('ShaderNodeAmbientOcclusion');sceneAo.samples=16;sceneAo.inputs['Distance'].default_value=.16;sceneAo.label='PerShadingPointAssemblyAO'
+        ambient=self.Mix(sceneAo.outputs['AO'],localAmbient,selfOnly)
+        microCavity=self.nodes.new('ShaderNodeAmbientOcclusion');microCavity.samples=8;microCavity.inputs['Distance'].default_value=.012;microCavity.label='PerShadingPointSmallCavity'
+        cavity=self.Mix(self.Math('SUBTRACT',1,microCavity.outputs['AO'],True),cavity,selfOnly)
         dustBias=self.Attr('SurfaceDust')
         finish=self.Attr('SurfaceFinish')
         world=self.Attr('RestWorld','Vector')
@@ -178,7 +178,7 @@ class SurfaceGraph:
         wheel=self.Attr('SurfaceWheel')
         # Paint texture is fine spray/rolled film, not millimetre-deep gravel.
         # Keep its normal energy below the cast-steel shoe's physical relief.
-        grain=self.Noise(coordinate,1150 if role in ['Armor','Guard'] else 650,3)
+        grain=self.Noise(coordinate,190 if role in ['Armor','Guard'] else 650,3)
         macro=self.Noise(world,5.5,5)
         breakup=self.Noise(coordinate,135,3)
         meso=self.Noise(coordinate,75,4)
@@ -187,18 +187,21 @@ class SurfaceGraph:
         geometry=self.nodes.new('ShaderNodeNewGeometry')
         bevel=self.nodes.new('ShaderNodeBevel');bevel.samples=4;bevel.inputs['Radius'].default_value=.0018
         dot=self.nodes.new('ShaderNodeVectorMath');dot.operation='DOT_PRODUCT'
+        # Compare shaded normals. A polygon's true normal differs from its
+        # smooth curved surface even far from an edge; using that difference
+        # falsely scattered bare-steel chips across the whole turret barrel.
         self.links.new(geometry.outputs['Normal'],dot.inputs[0]);self.links.new(bevel.outputs['Normal'],dot.inputs[1])
         pixelEdge=self.Math('MULTIPLY',self.Math('SUBTRACT',1,dot.outputs['Value']),28,True)
         restrainedEdge=self.Math('MAXIMUM',pixelEdge,self.Math('MULTIPLY',convex,.035))
         lower=self.Math('MULTIPLY',self.Math('SUBTRACT',1.35,height),1.2,True)
         recess=self.Math('MAXIMUM',cavity,self.Math('SUBTRACT',1,ambient))
-        dust=self.Math('MULTIPLY',self.Math('MAXIMUM',self.Math('MULTIPLY',lower,.22),self.Math('MULTIPLY',dustBias,.18)),self.Math('ADD',.3,self.Math('MULTIPLY',macro,1.0)),True)
-        chip=self.Math('MULTIPLY',self.Ramp(restrainedEdge,.12,.5),self.Ramp(breakup,.59,.72),True)
+        dust=self.Math('MULTIPLY',self.Math('MAXIMUM',self.Math('MULTIPLY',lower,.10),self.Math('MULTIPLY',dustBias,.10)),self.Math('ADD',.3,self.Math('MULTIPLY',macro,1.0)),True)
+        chip=self.Math('MULTIPLY',self.Ramp(restrainedEdge,.16,.70),self.Ramp(breakup,.52,.70),True)
         oxide=self.Math('MULTIPLY',recess,self.Ramp(breakup,.48,.68),True)
         dustColor=self.Color((.16,.125,.060))
         oxideColor=self.Color((.10,.045,.018))
         steelColor=self.Color((.38,.41,.41))
-        variation=self.Math('ADD',.91,self.Math('ADD',self.Math('MULTIPLY',macro,.12),self.Math('MULTIPLY',part,.020)))
+        variation=self.Math('ADD',.85,self.Math('ADD',self.Math('MULTIPLY',macro,.10),self.Math('ADD',self.Math('MULTIPLY',meso,.12),self.Math('MULTIPLY',part,.020))))
         relief=self.Math('ADD',self.Math('MULTIPLY',grain,.82),self.Math('MULTIPLY',meso,.18))
         if role in ['Armor','Guard']:
             # Recovered2007 paint is a warm olive-brown. The earlier V3 green
@@ -220,23 +223,35 @@ class SurfaceGraph:
             # Coating stays dielectric. Only actual chipped masks reveal steel;
             # satin paint and pressed-wheel dishes obtain their sheen from a
             # coherent specular lobe, not a uniform metallic paint multiplier.
-            metallic=self.Math('MULTIPLY',chip,.90)
-            rough=self.Math('ADD',.43,self.Math('ADD',self.Math('MULTIPLY',meso,.13),self.Math('MULTIPLY',drips,.055)),True)
-            rough=self.Math('SUBTRACT',rough,self.Math('MULTIPLY',wheel,.035),True)
-            rough=self.Mix(rough,.31,self.Math('MULTIPLY',chip,.75))
+            # Millimetre-scale film relief survives the atlas texel footprint.
+            # It breaks the reflected lobe on broad rolled plates without
+            # putting metre-wide shading or vertex gradients into the albedo.
+            filmPores=self.Ramp(self.Noise(coordinate,245,3),.61,.79)
+            pressedGrain=self.Noise(self.Scale(coordinate,(95,18,120)),1,3)
+            relief=self.Math('ADD',self.Math('MULTIPLY',grain,.70),self.Math('ADD',self.Math('MULTIPLY',pressedGrain,.14),self.Math('MULTIPLY',filmPores,.16)))
+            base=self.Mix(base,self.Color((.071,.052,.024)),self.Math('MULTIPLY',filmPores,.075))
+            metallic=self.Math('MULTIPLY',chip,.96)
+            rough=self.Math('ADD',.37,self.Math('ADD',self.Math('MULTIPLY',meso,.16),self.Math('ADD',self.Math('MULTIPLY',filmPores,.15),self.Math('MULTIPLY',drips,.045))),True)
+            rough=self.Math('SUBTRACT',rough,self.Math('MULTIPLY',wheel,.025),True)
+            rough=self.Mix(rough,.255,self.Math('MULTIPLY',chip,.90))
             badge=self.Attr('MuseumBadge')
             base=self.Mix(base,self.Color((.55,.34,.055)),badge)
             metallic=self.Mix(metallic,.38,badge)
             rough=self.Mix(rough,.43,badge)
-            bumpDistance=.00014
+            ambient=self.Mix(ambient,1.0,badge)
+            # Noise's useful height range is much less than one. This distance
+            # yields about0.1mm film relief, not a literal1mm displacement.
+            bumpDistance=.0010
         elif role=='Steel':
             base=self.Mix(self.Color((.020,.026,.031)),self.Color((.19,.21,.21)),finish)
             base=self.Mix(base,steelColor,self.Math('MULTIPLY',chip,.75))
             oxide=self.Math('MULTIPLY',oxide,.25)
             base=self.Mix(base,oxideColor,oxide);base=self.Mix(base,dustColor,dust)
             metallic=self.Math('MULTIPLY',.96,self.Math('SUBTRACT',1,self.Math('MAXIMUM',oxide,dust)),True)
-            rough=self.Math('ADD',.29,self.Math('MULTIPLY',macro,.16),True)
-            bumpDistance=.00012
+            brushed=self.Noise(self.Scale(coordinate,(150,8,180)),1,3)
+            rough=self.Math('ADD',.25,self.Math('ADD',self.Math('MULTIPLY',macro,.14),self.Math('MULTIPLY',brushed,.08)),True)
+            relief=self.Math('ADD',self.Math('MULTIPLY',grain,.70),self.Math('MULTIPLY',brushed,.30))
+            bumpDistance=.00038
         elif role=='Track':
             outward=self.Ramp(split.outputs['Z'],-.010,.012)
             running=self.Ramp(split.outputs['Z'],.016,.032)
@@ -244,6 +259,8 @@ class SurfaceGraph:
             cast=self.Mix(self.Color((.12,.14,.15)),self.Color((.30,.32,.32)),mottling)
             base=self.Mix(self.Color((.036,.032,.023)),cast,outward)
             base=self.Mix(base,self.Color((.42,.44,.43)),self.Math('MULTIPLY',running,.85))
+            castPits=self.Ramp(self.Noise(coordinate,420,3),.65,.81)
+            base=self.Mix(base,self.Color((.038,.041,.040)),self.Math('MULTIPLY',castPits,.40))
             oxide=self.Math('MULTIPLY',self.Math('MULTIPLY',recess,self.Ramp(meso,.40,.68)),.30)
             base=self.Mix(base,oxideColor,oxide)
             dust=self.Math('MULTIPLY',self.Math('SUBTRACT',1,running),self.Math('ADD',.06,self.Math('MULTIPLY',meso,.10)),True)
@@ -252,13 +269,13 @@ class SurfaceGraph:
             # ingrained film; the later orange-rust shoe is not copied wholesale.
             metallic=self.Math('ADD',.89,self.Math('MULTIPLY',running,.08),True)
             metallic=self.Math('MULTIPLY',metallic,self.Math('SUBTRACT',1,self.Math('MAXIMUM',oxide,dust)),True)
-            rough=self.Mix(self.Math('ADD',.39,self.Math('MULTIPLY',meso,.14)),.255,running)
+            rough=self.Mix(self.Math('ADD',.37,self.Math('ADD',self.Math('MULTIPLY',meso,.17),self.Math('MULTIPLY',castPits,.13))),.225,running)
             abrasion=self.Ramp(self.Noise(self.Scale(coordinate,(180,9,170)),1,2),.64,.77)
             abrasion=self.Math('MULTIPLY',abrasion,outward)
             base=self.Mix(base,self.Color((.37,.39,.38)),self.Math('MULTIPLY',abrasion,.55))
             rough=self.Mix(rough,.33,self.Math('MULTIPLY',abrasion,.65))
-            relief=self.Math('ADD',self.Math('MULTIPLY',grain,.84),self.Math('MULTIPLY',meso,.16))
-            bumpDistance=.00038
+            relief=self.Math('SUBTRACT',self.Math('ADD',self.Math('MULTIPLY',grain,.70),self.Math('MULTIPLY',meso,.16)),self.Math('MULTIPLY',castPits,.30))
+            bumpDistance=.0014
         elif role=='Rubber':
             base=self.Mix(self.Color((.034,.029,.020)),dustColor,self.Math('ADD',.16,self.Math('MULTIPLY',meso,.25),True))
             metallic=0.0;rough=self.Math('ADD',.80,self.Math('MULTIPLY',macro,.13),True);bumpDistance=.00020
@@ -283,6 +300,15 @@ class SurfaceGraph:
             convert=self.nodes.new('ShaderNodeRGBToBW');self.links.new(rough,convert.inputs[0]);rough=convert.outputs[0]
         bump=self.nodes.new('ShaderNodeBump');bump.inputs['Strength'].default_value=.62;bump.inputs['Distance'].default_value=bumpDistance
         self.Link(relief,bump.inputs['Height'])
+        if role=='Armor':
+            # Flat wheel annuli are real pressed/cast planes. Smooth vertex
+            # normals inherited from the scalloped rim made these broad steel
+            # faces look oil-canned. Retain micro relief over the actual plane.
+            trueAxes=self.nodes.new('ShaderNodeSeparateXYZ');self.Link(geometry.outputs['True Normal'],trueAxes.inputs[0])
+            plane=self.Math('MULTIPLY',wheel,self.Math('GREATER_THAN',self.Math('ABSOLUTE',trueAxes.outputs['X']),.97))
+            flat=self.nodes.new('ShaderNodeVectorMath');flat.operation='SCALE';self.Link(geometry.outputs['True Normal'],flat.inputs[0]);self.Link(plane,flat.inputs['Scale'])
+            curved=self.nodes.new('ShaderNodeVectorMath');curved.operation='SCALE';self.Link(geometry.outputs['Normal'],curved.inputs[0]);self.Link(self.Math('SUBTRACT',1,plane),curved.inputs['Scale'])
+            combined=self.nodes.new('ShaderNodeVectorMath');combined.operation='ADD';self.links.new(flat.outputs['Vector'],combined.inputs[0]);self.links.new(curved.outputs['Vector'],combined.inputs[1]);self.links.new(combined.outputs['Vector'],bump.inputs['Normal'])
         self.Link(base,self.shader.inputs['Base Color']);self.Link(rough,self.shader.inputs['Roughness']);self.Link(metallic,self.shader.inputs['Metallic']);self.links.new(bump.outputs['Normal'],self.shader.inputs['Normal'])
         microAo=self.Math('SUBTRACT',1,self.Math('MULTIPLY',self.Math('GREATER_THAN',grain,.70),.07)) if role not in ['Glass','Shadow'] else 1.0
         ambient=self.Math('MULTIPLY',ambient,microAo,True)

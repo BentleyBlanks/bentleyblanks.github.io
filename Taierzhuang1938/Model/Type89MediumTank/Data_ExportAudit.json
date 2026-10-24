@@ -1,24 +1,24 @@
 {
-  "schema": "Type89MediumTankExportAuditV4",
-  "reviewedAt": "2026-10-24T12:30:33.291114+00:00",
-  "status": "AuthorTechnicallyAndVisuallyReviewed_WithDeclaredLimits",
+  "schema": "Type89MediumTankExportAuditV5",
+  "reviewedAt": "2026-10-24T18:08:01.081025+00:00",
+  "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
   "userApproved": false,
-  "geometryVersion": "20261024GeometryV31",
-  "materialRevision": "SurfaceV4",
+  "geometryVersion": "20261024GeometryV32",
+  "materialRevision": "SurfaceV5",
   "referenceReview": "Data_GeometryReviewV3.json",
   "runtime": {
     "file": "Model_Type89MediumTank.glb",
-    "sha256": "412a7c785351ffaae49339968f1e3d8a498640d5edfff02d6dfa19d9fe8d1464",
-    "bytes": 22817348,
-    "sceneExpandedTriangles": 83992,
-    "meshNodes": 219,
-    "loadedPrimitiveMeshes": 270,
+    "sha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
+    "bytes": 30155884,
+    "sceneExpandedTriangles": 240278,
+    "meshNodes": 222,
+    "loadedPrimitiveMeshes": 276,
     "materials": 8,
     "images": 21,
     "dimensionsXyzM": [
       2.186000108718872,
-      2.564016064272145,
-      5.701873309712088
+      2.5639407277669655,
+      5.701738713542861
     ],
     "nose": "-Z",
     "up": "+Y",
@@ -27,19 +27,19 @@
   },
   "highExport": {
     "file": "Exports/Model_Type89MediumTankHighPbr.glb",
-    "sha256": "3ed64d2c828d98b474aa5bc7367a9c21de78eb0ee960c696436a8b9823b87e45",
-    "bytes": 50310152,
-    "sceneExpandedTriangles": 1111852
+    "sha256": "2670640b69c23e4d7f5fa01fddf38a31c6ee30740e14d3e33e8142110d10ef70",
+    "bytes": 58475908,
+    "sceneExpandedTriangles": 1123316
   },
   "sourceProjects": [
     {
       "quality": "High",
       "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankHighPbr.blend",
-      "sha256": "101d1582827e73326e8cce4f929832ee6a6c0931c570dd62e4d17dabb2457e26",
-      "geometryVersion": "20261024GeometryV31",
-      "geometryRecipeSha256": "0cb1db33edd14a817b16ce00e3285a8d0619bfa7aec54a09decb3c6d2034c23b",
-      "rawTriangles": 1119346,
-      "meshObjects": 219,
+      "sha256": "94395aaaaa51d99cebaf6ce88d1420fb24b2c4c63ca8a55e9670673e1ac3e8fb",
+      "geometryVersion": "20261024GeometryV32",
+      "geometryRecipeSha256": "96ff8a0c7d36e2f022c0c567248d3d905866d231b58ec59b9f782e80302bc8cc",
+      "rawTriangles": 1130810,
+      "meshObjects": 222,
       "materials": 8,
       "activePackedImages": 21,
       "editableAuthoringMaterials": 8,
@@ -49,11 +49,11 @@
     {
       "quality": "Game",
       "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankGamePbr.blend",
-      "sha256": "394e0312528aca574ae7c8eb1831cdd6fb53ab7ae152b33333d24020c57b2a3a",
-      "geometryVersion": "20261024GeometryV31",
-      "geometryRecipeSha256": "0cb1db33edd14a817b16ce00e3285a8d0619bfa7aec54a09decb3c6d2034c23b",
-      "rawTriangles": 83992,
-      "meshObjects": 219,
+      "sha256": "010390f63a0044b1da09dbdeec702973ee232e39434e6c79b249e8423b128fcf",
+      "geometryVersion": "20261024GeometryV32",
+      "geometryRecipeSha256": "96ff8a0c7d36e2f022c0c567248d3d905866d231b58ec59b9f782e80302bc8cc",
+      "rawTriangles": 240278,
+      "meshObjects": 222,
       "materials": 8,
       "activePackedImages": 21,
       "editableAuthoringMaterials": 8,
@@ -62,26 +62,334 @@
     }
   ],
   "bakeInputs": {
-    "geometryRecipeSha256": "0cb1db33edd14a817b16ce00e3285a8d0619bfa7aec54a09decb3c6d2034c23b",
-    "geometrySourceSha256": "0d44b0c539b515625719b7876e3827e69014d53a9edccea96ca1128834ad5ec3",
-    "gameGeometrySourceSha256": "daaf668a21e7ab22be75dbe1078ad61922c7a2e05274001089923a9917208a6f",
-    "materialAuthoringScriptSha256": "7746a7135750f6cea3f89a554952f65ec1754bdf1a5b909ff614eb7b569432bb",
-    "bakeScriptSha256": "ed60b04bb70876396f5862aaff50578ead3bb3f0c11afadaa23942c8df14314e"
+    "geometryRecipeSha256": "96ff8a0c7d36e2f022c0c567248d3d905866d231b58ec59b9f782e80302bc8cc",
+    "geometrySourceSha256": "60af60bcd2d20ab3815cbbb9c44522db7788ae326d77292c20e1ac397d29aad4",
+    "gameGeometrySourceSha256": "efeae3a57ddecb0887a94813713740553e1b5ec213796588850b9c537f26a368",
+    "materialAuthoringScriptSha256": "2821ecc1f73dbced277fff0d99a0fb14de5f5d017698a1d9d0d29ab800bc1b7f",
+    "bakeScriptSha256": "c29775dcd04eb421792da38a69d7829cc0a116ef07b8913fc0ff89f915636ec9"
   },
   "gameDataProjection": "BakedHighBaseAndScalarChannels; Armor target retains actual HighRubber contact surfaces; geometric/bump normals projected independently",
+  "processingSteps": {
+    "projectionRefinement": {
+      "method": "Independent projected hit coverage plus opaque-black albedo/invalid-normal detection; missing texels sampled from actual frozen high triangles and converted to the low tangent frame. No invented colour, unchanged35mm nearest-source limit.",
+      "scriptSha256": "14538d9676f510c29c0cac3d4b2ed38de4fe8319b92a67a3e888a9b38a17d6d4",
+      "currentBakerSha256": "a507a1169bcf375476a404dc44e928e7a243b6d33926ca5686acfba1fb3db168",
+      "originalBakerSha256": "c29775dcd04eb421792da38a69d7829cc0a116ef07b8913fc0ff89f915636ec9",
+      "gameSourceSha256": "90f06a2863196ee1a9ed78d1da48db95f316669322ef93b96c48ab8ed20bc813",
+      "unpackedRuntimeSha256": "d75e134727f2b434f997f351722934d3f0986b0f5027749727dd5d76b9314ac2",
+      "repairs": {
+        "Armor": {
+          "Base": {
+            "repairedTexels": 62015,
+            "maximumNearestHighDistanceM": 0.006600759923458099,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Normal": {
+            "repairedTexels": 61972,
+            "maximumNearestHighDistanceM": 0.006600759923458099,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Roughness": {
+            "repairedTexels": 29630,
+            "maximumNearestHighDistanceM": 0.0209999680519104,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Metallic": {
+            "repairedTexels": 29630,
+            "maximumNearestHighDistanceM": 0.0209999680519104,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Ao": {
+            "repairedTexels": 29630,
+            "maximumNearestHighDistanceM": 0.0209999680519104,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          }
+        },
+        "Steel": {
+          "Base": {
+            "repairedTexels": 4,
+            "maximumNearestHighDistanceM": 0.0017652410315349698,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Normal": {
+            "repairedTexels": 4,
+            "maximumNearestHighDistanceM": 0.0017652410315349698,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Roughness": {
+            "repairedTexels": 1,
+            "maximumNearestHighDistanceM": 0.0004470811691135168,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Metallic": {
+            "repairedTexels": 1,
+            "maximumNearestHighDistanceM": 0.0004470811691135168,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Ao": {
+            "repairedTexels": 1,
+            "maximumNearestHighDistanceM": 0.0004470811691135168,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          }
+        },
+        "Track": {
+          "Base": {
+            "repairedTexels": 168,
+            "maximumNearestHighDistanceM": 0.00011453737533884123,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Normal": {
+            "repairedTexels": 168,
+            "maximumNearestHighDistanceM": 0.00011453737533884123,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Roughness": {
+            "repairedTexels": 56,
+            "maximumNearestHighDistanceM": 0.0001366201468044892,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Metallic": {
+            "repairedTexels": 56,
+            "maximumNearestHighDistanceM": 0.0001366201468044892,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Ao": {
+            "repairedTexels": 56,
+            "maximumNearestHighDistanceM": 0.0001366201468044892,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          }
+        },
+        "Rubber": {
+          "Base": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Normal": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Roughness": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Metallic": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Ao": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          }
+        },
+        "Exhaust": {
+          "Base": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Normal": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Roughness": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Metallic": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Ao": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          }
+        },
+        "Glass": {
+          "Base": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Normal": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Roughness": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Metallic": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Ao": {
+            "repairedTexels": 0,
+            "maximumNearestHighDistanceM": 0.0,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          }
+        }
+      },
+      "hardwareFields": {
+        "components": 862,
+        "triangles": 19332,
+        "channels": {
+          "Base": {
+            "repairedTexels": 22977,
+            "maximumNearestHighDistanceM": 0.006600759923458099,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Normal": {
+            "repairedTexels": 22977,
+            "maximumNearestHighDistanceM": 0.006600759923458099,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Roughness": {
+            "repairedTexels": 12927,
+            "maximumNearestHighDistanceM": 0.0209999680519104,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Metallic": {
+            "repairedTexels": 12927,
+            "maximumNearestHighDistanceM": 0.0209999680519104,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Ao": {
+            "repairedTexels": 12927,
+            "maximumNearestHighDistanceM": 0.0209999680519104,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          }
+        },
+        "source": "Nearest actual high fields for complete small connected rivet/hex components; no fabricated colour or normal;35mm limit retained"
+      },
+      "highTangentCorrection": {
+        "correctedStoredVertices": 2,
+        "rows": [
+          {
+            "mesh": "BowMgBarrel.002",
+            "material": "Material_Type89HighSteel",
+            "correctedStoredVertices": 2
+          }
+        ]
+      }
+    },
+    "detailNormalTransfer": {
+      "repairedTexels": 8241,
+      "maximumNearestHighDistanceM": 0.0033003538846969604,
+      "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal",
+      "parts": [
+        "Mesh_BowMgMount"
+      ],
+      "triangles": 504,
+      "scope": "All mapped detail normal texels; nearest actual retained-high surface, unchanged35mm gate"
+    },
+    "normalRefinement": {
+      "scope": "Only armor normals rebaked. Actual planar wheel annuli use true surface normals under the existing micro relief; all geometry,UVs and original material fields preserved.",
+      "currentMaterialScriptSha256": "6c5078f3c1d5dfb9a1efbf591f89cd27607d75c6e20fa3caff28c68e1f6e92e1",
+      "scriptSha256": "5eacb4132706a9c399419f6fe00502f69312b11f4328f220786005fecbfc7095",
+      "hardwareFields": {
+        "components": 862,
+        "triangles": 19332,
+        "channels": {
+          "Base": {
+            "repairedTexels": 22977,
+            "maximumNearestHighDistanceM": 0.006600759923458099,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Normal": {
+            "repairedTexels": 22977,
+            "maximumNearestHighDistanceM": 0.006600759923458099,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Roughness": {
+            "repairedTexels": 12927,
+            "maximumNearestHighDistanceM": 0.0209999680519104,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Metallic": {
+            "repairedTexels": 12927,
+            "maximumNearestHighDistanceM": 0.0209999680519104,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          },
+          "Ao": {
+            "repairedTexels": 12927,
+            "maximumNearestHighDistanceM": 0.0209999680519104,
+            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+          }
+        },
+        "source": "Nearest actual high fields for complete small connected rivet/hex components; no fabricated colour or normal;35mm limit retained"
+      },
+      "sources": [
+        {
+          "quality": "Game",
+          "sourceSha256": "4a174216d55f353e79ccfa963aa358b79132bc77f44f57cfb777962c135e6dfc",
+          "unpackedExportSha256": "a5b36f9b377371be566ad2508ed0b968b5e1b9d7b8400cc69e2d7a861639f5ab"
+        },
+        {
+          "quality": "High",
+          "sourceSha256": "f14ce67bab61ccc2bcf8aa2a6bae42a7acf349f29adc7ae588eb2ebba471389e",
+          "unpackedExportSha256": "3996334a8aaba28599a9328b76f252fe78c73849c78ef52aa947ff842041900b"
+        }
+      ]
+    },
+    "sourceReviewStamp": {
+      "method": "Only acceptance/reference metadata stamped after actual final-file review; geometry,UVs and textures retained",
+      "sourceProjects": [
+        {
+          "quality": "High",
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankHighPbr.blend",
+          "sha256": "94395aaaaa51d99cebaf6ce88d1420fb24b2c4c63ca8a55e9670673e1ac3e8fb",
+          "geometryVersion": "20261024GeometryV32",
+          "geometryRecipeSha256": "96ff8a0c7d36e2f022c0c567248d3d905866d231b58ec59b9f782e80302bc8cc",
+          "rawTriangles": 1130810,
+          "meshObjects": 222,
+          "materials": 8,
+          "activePackedImages": 21,
+          "editableAuthoringMaterials": 8,
+          "unitScale": 1.0,
+          "pass": true
+        },
+        {
+          "quality": "Game",
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankGamePbr.blend",
+          "sha256": "010390f63a0044b1da09dbdeec702973ee232e39434e6c79b249e8423b128fcf",
+          "geometryVersion": "20261024GeometryV32",
+          "geometryRecipeSha256": "96ff8a0c7d36e2f022c0c567248d3d905866d231b58ec59b9f782e80302bc8cc",
+          "rawTriangles": 240278,
+          "meshObjects": 222,
+          "materials": 8,
+          "activePackedImages": 21,
+          "editableAuthoringMaterials": 8,
+          "unitScale": 1.0,
+          "pass": true
+        }
+      ]
+    }
+  },
   "texturePacking": {
     "rgbExact": true,
     "opacityRgbaExact": true,
     "geometryBuffersExact": true,
-    "geometrySha256": "ecc12c6f67bfc218a43837c6ede95b0a64fe804b2f351d09588f4773f1bb17f9",
+    "geometrySha256": "69d3616bfd61483f1c6b2a7fd70c961e4c691b8141fd2c5937e485201d4ac2f4",
     "audit": "Data_TexturePacking.json"
   },
   "importAudit": {
     "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\Type89MediumTank\\Model_Type89MediumTank.glb",
-    "sha256": "412a7c785351ffaae49339968f1e3d8a498640d5edfff02d6dfa19d9fe8d1464",
+    "sha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
     "imported": {
-      "objects": 441,
-      "meshes": 72,
+      "objects": 447,
+      "meshes": 75,
       "images": 21,
       "materials": 8,
       "roots": [
@@ -132,25 +440,25 @@
           34,
           35
         ],
-        "trianglePairs": 5516,
+        "trianglePairs": 10244,
         "maximumVertexPenetrationM": 0.0009344220161437988,
         "deepestContact": {
           "frame": 0,
-          "link": "Node_TrackLinkLeft001",
+          "link": "Node_TrackLinkLeft000",
           "pointWorld": [
             -0.9830656051635742,
-            0.6447592377662659,
-            2.574345350265503
+            0.7869434952735901,
+            2.5927650928497314
           ],
           "pointRelativeWheel": [
             -0.07606559991836548,
-            -0.12225675582885742,
-            0.3943452835083008
+            0.02000260353088379,
+            0.4127650260925293
           ],
           "nearestWorld": [
             -0.984000027179718,
-            0.6447592377662659,
-            2.574345350265503
+            0.7869434952735901,
+            2.5927650928497314
           ],
           "surfaceNormal": [
             -1.0,
@@ -198,25 +506,25 @@
           34,
           35
         ],
-        "trianglePairs": 5516,
+        "trianglePairs": 10244,
         "maximumVertexPenetrationM": 0.0009344220161437988,
         "deepestContact": {
           "frame": 0,
-          "link": "Node_TrackLinkRight001",
+          "link": "Node_TrackLinkRight000",
           "pointWorld": [
             0.8309344053268433,
-            0.6447592377662659,
-            2.574345350265503
+            0.7869434952735901,
+            2.5927650928497314
           ],
           "pointRelativeWheel": [
             -0.07606559991836548,
-            -0.12225675582885742,
-            0.3943452835083008
+            0.02000260353088379,
+            0.4127650260925293
           ],
           "nearestWorld": [
             0.8299999833106995,
-            0.6447592377662659,
-            2.574345350265503
+            0.7869434952735901,
+            2.5927650928497314
           ],
           "surfaceNormal": [
             -1.0,
@@ -225,171 +533,514 @@
           ]
         }
       },
-      "Node_LeadingWheelLeft": {
-        "frames": [
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23
-        ],
-        "trianglePairs": 144,
-        "maximumVertexPenetrationM": 0.00036453486700338544,
-        "deepestContact": {
-          "frame": 17,
-          "link": "Node_TrackLinkLeft030",
-          "pointWorld": [
-            -0.8309344053268433,
-            0.0684938058257103,
-            -1.4789416790008545
-          ],
-          "pointRelativeWheel": [
-            0.07606559991836548,
-            -0.14452219009399414,
-            -0.028941631317138672
-          ],
-          "nearestWorld": [
-            -0.8309344053268433,
-            0.06813497841358185,
-            -1.4790059328079224
-          ],
-          "surfaceNormal": [
-            -0.0,
-            -0.9843432903289795,
-            -0.17626212537288666
-          ]
-        }
-      },
-      "Node_LeadingWheelRight": {
-        "frames": [
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23
-        ],
-        "trianglePairs": 144,
-        "maximumVertexPenetrationM": 0.00036453486700338544,
-        "deepestContact": {
-          "frame": 17,
-          "link": "Node_TrackLinkRight030",
-          "pointWorld": [
-            0.8309344053268433,
-            0.0684938058257103,
-            -1.4789416790008545
-          ],
-          "pointRelativeWheel": [
-            -0.07606559991836548,
-            -0.14452219009399414,
-            -0.028941631317138672
-          ],
-          "nearestWorld": [
-            0.8309344053268433,
-            0.06813497841358185,
-            -1.4790059328079224
-          ],
-          "surfaceNormal": [
-            -0.0,
-            -0.9843432903289795,
-            -0.17626212537288666
-          ]
-        }
-      },
       "Node_RoadWheelLeft08": {
         "frames": [
-          33,
-          34,
+          1,
           35
         ],
-        "trianglePairs": 74,
-        "maximumVertexPenetrationM": 0.0007145851116092672,
-        "deepestContact": {
-          "frame": 35,
-          "link": "Node_TrackLinkLeft009",
-          "pointWorld": [
-            -0.8309344053268433,
-            0.06242121756076813,
-            1.745537519454956
-          ],
-          "pointRelativeWheel": [
-            0.07606559991836548,
-            -0.13459472358226776,
-            0.03553760051727295
-          ],
-          "nearestWorld": [
-            -0.8309344053268433,
-            0.06170810014009476,
-            1.7455832958221436
-          ],
-          "surfaceNormal": [
-            0.0,
-            -0.997944712638855,
-            0.06408022344112396
-          ]
-        }
+        "trianglePairs": 16,
+        "maximumVertexPenetrationM": 0.0
       },
       "Node_RoadWheelRight08": {
         "frames": [
-          33,
-          34,
+          1,
           35
         ],
-        "trianglePairs": 74,
-        "maximumVertexPenetrationM": 0.0007145890256197163,
-        "deepestContact": {
-          "frame": 35,
-          "link": "Node_TrackLinkRight009",
-          "pointWorld": [
-            0.9830656051635742,
-            0.06242121756076813,
-            1.745537519454956
-          ],
-          "pointRelativeWheel": [
-            0.07606559991836548,
-            -0.13459472358226776,
-            0.03553760051727295
-          ],
-          "nearestWorld": [
-            0.9830656051635742,
-            0.061708103865385056,
-            1.745583415031433
-          ],
-          "surfaceNormal": [
-            0.0,
-            -0.9979446530342102,
-            0.06408023089170456
-          ]
-        }
+        "trianglePairs": 16,
+        "maximumVertexPenetrationM": 0.0
+      },
+      "Node_LeadingWheelLeft": {
+        "frames": [
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19
+        ],
+        "trianglePairs": 88,
+        "maximumVertexPenetrationM": 0.0
+      },
+      "Node_LeadingWheelRight": {
+        "frames": [
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19
+        ],
+        "trianglePairs": 88,
+        "maximumVertexPenetrationM": 0.0
       }
     },
     "maximumVertexPenetrationM": 0.0009344220161437988,
     "fixedCoverGroups": 10,
-    "fixedPairs": 5366,
+    "fixedPairs": 5378,
     "fixedContacts": {},
     "maximumFixedCoverPenetrationM": 0.0,
     "pass": true,
-    "note": "Actual exported triangles; wheel rolling contact allowed below1mm; fixed hull/fender/cover intersections above1mm block acceptance"
+    "note": "Actual exported triangles; wheel rolling contact allowed below1mm; fixed hull/fender/cover intersections above1mm block acceptance",
+    "hardwareSweep": [
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 0,
+        "trianglePairs": 4,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 0,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 0,
+        "trianglePairs": 657,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 2,
+        "trianglePairs": 4,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 2,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 2,
+        "trianglePairs": 654,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 5,
+        "trianglePairs": 4,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 5,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 5,
+        "trianglePairs": 654,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 15,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 15,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 15,
+        "trianglePairs": 630,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 30,
+        "trianglePairs": 10,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 30,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 30,
+        "trianglePairs": 647,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 45,
+        "trianglePairs": 2,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 45,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 45,
+        "trianglePairs": 619,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 55,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 55,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 55,
+        "trianglePairs": 593,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 65,
+        "trianglePairs": 10,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 65,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 65,
+        "trianglePairs": 624,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 0,
+        "trianglePairs": 18,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 0,
+        "trianglePairs": 321,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 2,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 2,
+        "trianglePairs": 317,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 5,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 5,
+        "trianglePairs": 309,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 15,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 15,
+        "trianglePairs": 306,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 30,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 30,
+        "trianglePairs": 314,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 60,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 60,
+        "trianglePairs": 272,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 90,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 90,
+        "trianglePairs": 281,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 135,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 135,
+        "trianglePairs": 284,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 165,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 165,
+        "trianglePairs": 284,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 175,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 175,
+        "trianglePairs": 291,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 0,
+        "trianglePairs": 18,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 0,
+        "trianglePairs": 323,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 2,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 2,
+        "trianglePairs": 320,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 5,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 5,
+        "trianglePairs": 312,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 15,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 15,
+        "trianglePairs": 313,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 30,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 30,
+        "trianglePairs": 312,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 60,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 60,
+        "trianglePairs": 278,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 90,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 90,
+        "trianglePairs": 277,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 135,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 135,
+        "trianglePairs": 291,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 165,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 165,
+        "trianglePairs": 285,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 175,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 175,
+        "trianglePairs": 284,
+        "maximumPenetrationM": 0.0
+      }
+    ],
+    "maximumHardwarePenetrationM": 0.0
   },
   "highImportAudit": {
     "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\Model_Type89MediumTankHighPbr.glb",
-    "sha256": "3ed64d2c828d98b474aa5bc7367a9c21de78eb0ee960c696436a8b9823b87e45",
+    "sha256": "2670640b69c23e4d7f5fa01fddf38a31c6ee30740e14d3e33e8142110d10ef70",
     "imported": {
-      "objects": 441,
-      "meshes": 72,
+      "objects": 447,
+      "meshes": 75,
       "images": 21,
       "materials": 8,
       "roots": [
@@ -718,11 +1369,462 @@
     "fixedContacts": {},
     "maximumFixedCoverPenetrationM": 0.0,
     "pass": true,
-    "note": "Actual exported triangles; wheel rolling contact allowed below1mm; fixed hull/fender/cover intersections above1mm block acceptance"
+    "note": "Actual exported triangles; wheel rolling contact allowed below1mm; fixed hull/fender/cover intersections above1mm block acceptance",
+    "hardwareSweep": [
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 0,
+        "trianglePairs": 14,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 0,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 0,
+        "trianglePairs": 1008,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 2,
+        "trianglePairs": 14,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 2,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 2,
+        "trianglePairs": 1028,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 5,
+        "trianglePairs": 14,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 5,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 5,
+        "trianglePairs": 1050,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 15,
+        "trianglePairs": 14,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 15,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 15,
+        "trianglePairs": 1045,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 30,
+        "trianglePairs": 14,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 30,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 30,
+        "trianglePairs": 1049,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 45,
+        "trianglePairs": 14,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 45,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 45,
+        "trianglePairs": 1030,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 55,
+        "trianglePairs": 14,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 55,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 55,
+        "trianglePairs": 1048,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowPlate",
+        "angleDegrees": 65,
+        "trianglePairs": 14,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_Hull",
+        "angleDegrees": 65,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_BowHatch",
+        "target": "Node_BowDoorFixedHinge",
+        "angleDegrees": 65,
+        "trianglePairs": 1019,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 0,
+        "trianglePairs": 44,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 0,
+        "trianglePairs": 534,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 2,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 2,
+        "trianglePairs": 528,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 5,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 5,
+        "trianglePairs": 512,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 15,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 15,
+        "trianglePairs": 501,
+        "maximumPenetrationM": 7.21818651072681e-07
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 30,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 30,
+        "trianglePairs": 492,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 60,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 60,
+        "trianglePairs": 464,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 90,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 90,
+        "trianglePairs": 443,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 135,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 135,
+        "trianglePairs": 461,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 165,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 165,
+        "trianglePairs": 459,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_Hull",
+        "angleDegrees": 175,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapLeft",
+        "target": "Node_SideVisionFrameLeft",
+        "angleDegrees": 175,
+        "trianglePairs": 447,
+        "maximumPenetrationM": 8.214483386836946e-07
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 0,
+        "trianglePairs": 42,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 0,
+        "trianglePairs": 526,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 2,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 2,
+        "trianglePairs": 527,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 5,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 5,
+        "trianglePairs": 509,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 15,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 15,
+        "trianglePairs": 509,
+        "maximumPenetrationM": 1.8688806449063122e-06
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 30,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 30,
+        "trianglePairs": 494,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 60,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 60,
+        "trianglePairs": 453,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 90,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 90,
+        "trianglePairs": 439,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 135,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 135,
+        "trianglePairs": 459,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 165,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 165,
+        "trianglePairs": 442,
+        "maximumPenetrationM": 1.7389538697898388e-09
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_Hull",
+        "angleDegrees": 175,
+        "trianglePairs": 0,
+        "maximumPenetrationM": 0.0
+      },
+      {
+        "moving": "Node_SideVisionFlapRight",
+        "target": "Node_SideVisionFrameRight",
+        "angleDegrees": 175,
+        "trianglePairs": 442,
+        "maximumPenetrationM": 8.04328010417521e-07
+      }
+    ],
+    "maximumHardwarePenetrationM": 1.8688806449063122e-06
   },
   "motionAudit": {
     "pass": true,
-    "geometryVersion": "20261024GeometryV31",
+    "geometryVersion": "20261024GeometryV32",
     "assertions": [
       {
         "name": "Left tread responds independently",
@@ -772,20 +1874,20 @@
         "name": "Shoe sweep remains above the ground without scaling",
         "pass": true,
         "detail": {
-          "minimumGroundM": -7.3164706043691674e-09,
-          "maximumGroundM": -7.3164706043691674e-09
+          "minimumGroundM": -7.316470160223187e-09,
+          "maximumGroundM": -7.316470160223187e-09
         }
       }
     ],
     "dimensions": [
       2.186000108718872,
-      2.564016064272145,
-      5.701873309712088
+      2.5639407277669655,
+      5.701738713542861
     ],
     "linksPerSide": 74,
-    "meshNodes": 270,
+    "meshNodes": 276,
     "browserErrors": [],
-    "assetSha256": "412a7c785351ffaae49339968f1e3d8a498640d5edfff02d6dfa19d9fe8d1464"
+    "assetSha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57"
   },
   "runtimeBrowserAudit": {
     "pass": true,
@@ -867,13 +1969,15 @@
         "pass": true
       }
     ],
-    "meshCount": 270,
+    "meshCount": 276,
     "materials": 8,
-    "rendererTriangles": 167984,
+    "rendererTriangles": 480556,
     "errors": []
   },
   "articulationDiagnostic": {
     "diagnosticOnly": true,
+    "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\Type89MediumTank\\Model_Type89MediumTank.glb",
+    "sha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
     "maxDepth": 0.0009953394765034318,
     "rows": [
       {
@@ -888,17 +1992,17 @@
         "part": "FrontCap",
         "angle": 0,
         "target": "Node_CommanderHatchRear",
-        "pairs": 78,
+        "pairs": 79,
         "maxDepth": 1.4901161193847656e-08,
         "deepest": {
           "point": [
             -0.29100000858306885,
-            2.5090160369873047,
+            2.5089406967163086,
             -0.06999999284744263
           ],
           "nearest": [
             -0.29100000858306885,
-            2.5090160369873047,
+            2.5089406967163086,
             -0.07000000774860382
           ]
         }
@@ -915,17 +2019,17 @@
         "part": "RearCap",
         "angle": 0,
         "target": "Node_CommanderHatchFront",
-        "pairs": 78,
+        "pairs": 79,
         "maxDepth": 1.4901161193847656e-08,
         "deepest": {
           "point": [
             0.000999998301267624,
-            2.5280160903930664,
+            2.5279407501220703,
             -0.07000000774860382
           ],
           "nearest": [
             0.000999998301267624,
-            2.5280160903930664,
+            2.5279407501220703,
             -0.06999999284744263
           ]
         }
@@ -939,12 +2043,12 @@
         "deepest": {
           "point": [
             -0.09208706766366959,
-            2.516050338745117,
+            2.515974998474121,
             -0.3571753203868866
           ],
           "nearest": [
             -0.09179814159870148,
-            2.516050338745117,
+            2.515974998474121,
             -0.35622283816337585
           ]
         }
@@ -1401,7 +2505,7 @@
         "part": "RoundBowCover",
         "angle": 90,
         "target": "Node_BowPlate",
-        "pairs": 108,
+        "pairs": 111,
         "maxDepth": 0,
         "deepest": null
       },
@@ -1449,7 +2553,7 @@
         "part": "RoundBowCover",
         "angle": 150,
         "target": "Node_BowPlate",
-        "pairs": 40,
+        "pairs": 44,
         "maxDepth": 0,
         "deepest": null
       },
@@ -1474,8 +2578,19 @@
         "angle": 180,
         "target": "Node_BowPlate",
         "pairs": 69,
-        "maxDepth": 0,
-        "deepest": null
+        "maxDepth": 4.577450454235077e-07,
+        "deepest": {
+          "point": [
+            -0.16599999368190765,
+            1.6194353103637695,
+            -1.352551817893982
+          ],
+          "nearest": [
+            -0.16349999606609344,
+            1.611240029335022,
+            -1.3591158390045166
+          ]
+        }
       },
       {
         "part": "RoundBowCover",
@@ -1494,52 +2609,93 @@
         "deepest": null
       }
     ],
-    "note": "Actual exported gray meshes; hinge bearing neighborhoods excluded. Nearest-normal depth is diagnostic and needs local visual interpretation at edges."
+    "note": "Actual exported meshes; hinge bearing neighborhoods excluded. Nearest-normal depth is diagnostic and needs local visual interpretation at edges."
+  },
+  "performance": {
+    "scope": "One isolated asset, same neutral review page,1600x1000 layout, browser audio muted. Local measurements are not full-game scene guarantees.",
+    "rows": [
+      {
+        "label": "RejectedV31",
+        "loadMs": 2875,
+        "frame": {
+          "samples": 90,
+          "medianMs": 9.800000011920929,
+          "p95Ms": 15
+        },
+        "cpuSubmission": {
+          "samples": 30,
+          "medianMs": 7.700000002980232,
+          "p95Ms": 10.200000002980232
+        },
+        "gpu": {
+          "samples": 8,
+          "medianMs": 4.802816,
+          "p95Ms": 6.35008
+        },
+        "triangles": 250352,
+        "drawCalls": 804,
+        "textures": 26,
+        "geometries": 125,
+        "gpuRenderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 Ti (0x00002182) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "errors": []
+      },
+      {
+        "label": "V32",
+        "loadMs": 1409,
+        "frame": {
+          "samples": 90,
+          "medianMs": 10.099999994039536,
+          "p95Ms": 12.399999991059303
+        },
+        "cpuSubmission": {
+          "samples": 30,
+          "medianMs": 6.299999997019768,
+          "p95Ms": 8.799999997019768
+        },
+        "gpu": {
+          "samples": 8,
+          "medianMs": 5.328896,
+          "p95Ms": 6.31552
+        },
+        "triangles": 714662,
+        "drawCalls": 822,
+        "textures": 26,
+        "geometries": 131,
+        "gpuRenderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 Ti (0x00002182) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "errors": []
+      }
+    ]
   },
   "rawFileChecks": {
-    "passed": 504,
-    "total": 504
+    "passed": 532,
+    "total": 532
   },
   "localEvidenceOnly": true,
-  "visualAcceptance": "Current packed V31 exports inspected in neutral close-ups and reference-approximation whole/front/track/rear views against the recovered same-car photograph corpus. Source/reference observations are separate from numeric gates. V26 rejection remains part of the record; user approval and scan-level equality are not claimed.",
-  "previousRejection": "User rejected V26 shape, dimensions and metallic texture. Its author visual sign-off is superseded.",
-  "processingSteps": {
-    "exportTangents": null,
-    "nearestDetailNormals": {
-      "repairedTexels": 13170,
-      "maximumNearestHighDistanceM": 0.002985522150993347,
-      "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal",
-      "parts": [
-        "Mesh_BowMgMount"
-      ],
-      "triangles": 504,
-      "scope": "All mapped detail normal texels; nearest actual retained-high surface, unchanged35mm gate"
-    },
-    "note": "Chronological pre-pack processing identities; runtime/highExport above are the final packed identities."
-  },
+  "visualAcceptance": "Final packed game/high whole-car and component views author-compared with recovered same-car references after V31 rejection; declared inferred paint, microscopic wear and hidden structures are retained.",
+  "previousRejection": "V31 rejected for exposed turret faces, insufficient tracks/rivets/joints, plastic response and interpolated colour; its old author visual sign-off is withdrawn.",
   "currentRebuildScripts": {
-    "Script_Type89MediumTank.py": "aadb905c087a97ffa4afd774da8a2c7f86948431d0f28d585f4fe8ccb58e0b62",
-    "Script_Type89DetailedParts.py": "d8e8efd3b56d9dda36384421764611836bc4a3b170cb8a05011a296437a64598",
-    "Script_Type89PbrMaterials.py": "7746a7135750f6cea3f89a554952f65ec1754bdf1a5b909ff614eb7b569432bb",
-    "Script_Type89PbrBake.py": "ed60b04bb70876396f5862aaff50578ead3bb3f0c11afadaa23942c8df14314e",
-    "Script_Type89TangentExport.py": "c87a719d4f5a2f63037997ad5e2ebb0d785f1dcb1e523974a01fd868a7904945",
-    "Script_Type89DetailNormalTransfer.py": "f9f564c145d0be5ed3e1b0cdc68d3ff2b35c2e7970ce4e863579106974c2efc7"
+    "Script_Type89MediumTank.py": "4da68e0b6f20c126c45c0bc743ab7928a2f7c2842e2c06f541e6dcca28935dfc",
+    "Script_Type89DetailedParts.py": "fa9e7373a2cdb07bd9131108e157fc9527d7e580e66a352d26526fa5e8e3d8c3",
+    "Script_Type89PbrMaterials.py": "6c5078f3c1d5dfb9a1efbf591f89cd27607d75c6e20fa3caff28c68e1f6e92e1",
+    "Script_Type89PbrBake.py": "a507a1169bcf375476a404dc44e928e7a243b6d33926ca5686acfba1fb3db168",
+    "Script_Type89ExportBasis.py": "afbac761df1518118e2133c82084b6af5c0aca1943ce115aadb633b15dd6d52e",
+    "Script_Type89ProjectionRepair.py": "14538d9676f510c29c0cac3d4b2ed38de4fe8319b92a67a3e888a9b38a17d6d4"
   },
-  "appearanceReview": "Data_GeometryReviewV3.json",
-  "materialReview": "Data_MaterialReview.json",
   "repositoryRegression": {
     "profile": "quick",
-    "passed": 94,
-    "failed": 3,
-    "total": 97,
+    "total": 137,
+    "passedAfterCacheStampFix": 133,
+    "knownBaselineFailures": 4,
     "newRelatedFailures": 0,
-    "failedTests": [
-      "SpeakerGestureTest",
-      "RiggedModelTest",
-      "IjaAlertGaitTest"
-    ],
-    "baselineCommit": "734b2d6cab1c1327966da05bd6b231547e803f83",
-    "baselineReproduced": true,
+    "baselineCommit": "d6fd24b6d16fdbd3d4be2e636f96b2d50a05e73d",
     "baselineSnapshotFiles": 241,
     "baselineAssertions": [
       {
@@ -1556,8 +2712,13 @@
         "test": "IjaAlertGaitTest",
         "exitCode": 1,
         "assertion": "AssertionError [ERR_ASSERTION]: WalkIn: alert gait at a trot\r"
+      },
+      {
+        "test": "MissionOrchestrationFilterTest",
+        "exitCode": 1,
+        "assertion": "AssertionError [ERR_ASSERTION]: 这一关十八组（实际 24）\r"
       }
     ],
-    "scope": "All three failures reproduced with exact current-master files in an ignored read-only snapshot. ModuleGraph/cache-stamp check was corrected and passes. Type89 raw504/browser17/motion10/import/source/rigid gates passed; no assertion or baseline policy weakened."
+    "scope": "Four failures reproduced on the exact pre-change HEAD. The new numeric cache stamp was fixed and ModuleGraph rerun successfully; unrelated assertions were not changed."
   }
 }

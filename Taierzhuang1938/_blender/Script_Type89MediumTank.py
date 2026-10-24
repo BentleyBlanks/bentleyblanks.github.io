@@ -25,6 +25,7 @@ stage = os.environ.get('TYPE89_STAGE', 'Gray')
 segments = 64 if quality == 'High' else 24
 parts = {}
 materials = {}
+partStats = {'rivetHeads':0,'hexFasteners':0}
 trackPath = []
 trackLength = 0.0
 sprocketPitchRadius = .428
@@ -197,13 +198,23 @@ def Tube(name, start, end, radius, material, parent=None, count=None, capEnds=Tr
 
 
 def Rivet(position, normal, parent, radius=.009, material=None):
+    partStats['rivetHeads']+=1
     height=.005*radius/.009
     if quality!='High':
-        vertices=[(radius*math.cos(i*math.pi/3),radius*math.sin(i*math.pi/3),0) for i in range(6)]+[(0,0,height)]
-        # The backing disk is buried in its plate and never contributes to the
-        # visible rivet. Spend those triangles on reference-visible hardware.
-        faces=[(i,(i+1)%6,6) for i in range(6)]
+        # A pressed round head needs actual shoulder volume. A six-face cone
+        # projected as chipped holes at the user's inspection distance.
+        count=8
+        vertices=[(radius*math.cos(i*2*math.pi/count),radius*math.sin(i*2*math.pi/count),0) for i in range(count)]
+        vertices.extend((radius*.74*math.cos(i*2*math.pi/count),radius*.74*math.sin(i*2*math.pi/count),height*.70) for i in range(count))
+        vertices.append((0,0,height))
+        faces=[(i,(i+1)%count,(i+1)%count+count,i+count) for i in range(count)]
+        faces.extend((i+count,(i+1)%count+count,count*2) for i in range(count))
         obj=Mesh('Rivet',vertices,faces,material or materials['Armor'],parent,smooth=True)
+        analytic=[]
+        for x,y,z in vertices:
+            value=Vector((x/(radius*radius),y/(radius*radius),z/(height*height)))
+            analytic.append(tuple(value.normalized()) if value.length else (0,0,1))
+        obj.data.normals_split_custom_set_from_vertices(analytic)
         obj.location=position
         obj.rotation_mode='QUATERNION';obj.rotation_quaternion=Vector(normal).to_track_quat('Z','Y')
         return obj
@@ -216,6 +227,7 @@ def Rivet(position, normal, parent, radius=.009, material=None):
 
 
 def HexBolt(position, normal, parent, radius=.011, depth=.009, material=None):
+    partStats['hexFasteners']+=1
     vertices=[(radius*math.cos(i*math.pi/3),radius*math.sin(i*math.pi/3),z) for z in [0,depth] for i in range(6)]
     faces=[(i,(i+1)%6,(i+1)%6+6,i+6) for i in range(6)]+[tuple(range(6,12))]
     obj=Mesh('HexFastener',vertices,faces,material or materials['Armor'],parent,.0008 if quality=='High' else 0)
@@ -247,7 +259,7 @@ def ShallowHatchLid(parent, side, hingeOffset=.260, closedOffset=0):
 def CastWheelFlange(parent, radius, discSign, driven=False):
     # Two mirrored cast flanges. The old model put both pressed faces toward
     # +X, leaving the main photograph's left wheel face flat and featureless.
-    innerCount=36 if quality=='High' else 18
+    innerCount=36 if quality=='High' else 24
     outerCount=innerCount*4
     rimMax=sprocketPitchRadius-.006 if driven else radius
     rimMin=radius*.91 if not driven else min(radius,rimMax-.027)
@@ -282,7 +294,7 @@ def CastWheelFlange(parent, radius, discSign, driven=False):
         for x in [discSign*.061,discSign*.077]:
             for r,w in [(.24*radius,.014),(.76*radius,.022)]:
                 v.extend(tuple(Vector((x,0,0))+radial*r+tangent*s*w) for s in [-1,1])
-        Mesh('CastRadialWheelRib',v,[(0,2,3,1),(0,4,6,2),(1,3,7,5),(4,5,7,6),(2,6,7,3)],materials['Armor'],parent,.003 if quality=='High' else 0,smooth=True)
+        Mesh('CastRadialWheelRib',v,[(0,2,3,1),(0,4,6,2),(1,3,7,5),(4,5,7,6),(2,6,7,3)],materials['Armor'],parent,.003,smooth=True)
 
 
 def RivetLine(start, end, spacing, normal, parent, radius=.009):
@@ -373,6 +385,11 @@ def HullGeometry(root):
     innerDoorOutline=[(-.32+(x+.32)*.965,-.115+(z+.115)*.965) for x,z in hatchOutline]
     cutter=PolygonPrism('BowDoorOpeningCutter',innerDoorOutline,'Y',.36,(0,-.06,0),black,front,0)
     CutOpening([bowPlate,upperBody,lowerBody],cutter)
+    rebateOuter=[(-.32+(x+.32)*1.015,-.115+(z+.115)*1.015) for x,z in hatchOutline]
+    rebateInner=[(-.32+(x+.32)*.930,-.115+(z+.115)*.930) for x,z in hatchOutline]
+    rebate=PolygonPrism('BowDoorOverlappingRebate',rebateOuter,'Y',.012,(0,.006,0),armor,front,.001)
+    cutter=PolygonPrism('BowDoorRebateBore',rebateInner,'Y',.08,(0,.006,0),black,front,0)
+    CutOpening([rebate],cutter)
     PolygonPrism('BowDoorInteriorBack',innerDoorOutline,'Y',.010,(0,-.16,0),black,front,0)
     hingeAngle=math.atan2(-.110,.770)
     hingeOrigin=Vector((-.555,.032,-.115))
@@ -381,19 +398,27 @@ def HullGeometry(root):
     inverseHinge=Matrix.Rotation(hingeAngle,3,'Y').inverted()
     doorOutline=[]
     for x,z in hatchOutline:
-        point=inverseHinge@(Vector((x,.032,z))-hingeOrigin)
+        point=inverseHinge@(Vector((x,.0245,z))-hingeOrigin)
         doorOutline.append((point.x,point.z))
-    PolygonPrism('BowAccessDoor',doorOutline,'Y',.021,(0,0,0),armor,hatch,.005)
+    PolygonPrism('BowAccessDoor',doorOutline,'Y',.014,(0,-.0075,0),armor,hatch,.002)
+    fixedHinge=Node('Node_BowDoorFixedHinge',hingeOrigin,front)
+    fixedHinge.rotation_euler.y=hingeAngle
     for z in [-.31,-.08,.15,.34]:
-        Tube('BowDoorHinge',(-.012,.027,z-.052),(-.012,.027,z+.052),.017,armor,hatch)
-        Box('HingeLeaf',(.055,.027,z),(.10,.018,.035),armor,hatch)
-    latchPosition=inverseHinge@(Vector((-.105,.067,-.275))-hingeOrigin)
+        Box('BowDoorMovingHingeLeaf',(.048,.0035,z),(.090,.008,.032),armor,hatch,.001)
+        Box('BowDoorFixedHingeLeaf',(-.035,-.012,z),(.070,.010,.036),armor,fixedHinge,.001)
+        for a,b,parent in [(z-.055,z-.020,fixedHinge),(z-.019,z+.019,hatch),(z+.020,z+.055,fixedHinge)]:
+            Tube('BowDoorInterleavedKnuckle',(0,0,a),(0,0,b),.017,armor,parent,16 if quality=='High' else 10)
+        Tube('BowDoorHingeAxle',(0,0,z-.062),(0,0,z+.062),.005,steel,fixedHinge,12 if quality=='High' else 8)
+        for x in [.035,.073]:Rivet((x,.0080,z),(0,1,0),hatch,.006)
+        for x in [-.022,-.052]:Rivet((x,-.0065,z),(0,1,0),fixedHinge,.006)
+    latchPosition=inverseHinge@(Vector((-.105,.0385,-.275))-hingeOrigin)
     latch=Node('Node_BowDoorLatch',latchPosition,hatch,axis='localY',rangeDegrees=[-35,35])
     PolygonPrism('BowLatchBase',[(-.035,-.055),(.035,-.055),(.050,.025),(0,.070),(-.050,.025)],'Y',.012,(0,0,0),armor,latch,.003)
     for a,b in [((0,.020,-.040),(.020,.035,.105)),((.020,.035,.105),(.065,.044,.073)),((.065,.044,.073),(.060,.044,-.030)),((.060,.044,-.030),(0,.020,-.040))]:
         Tube('BowLatchLoop',a,b,.009,armor,latch,12 if quality=='High' else 8)
+    for z in [-.035,.045]:Box('BowLatchAttachedFoot',(.012,.013,z),(.025,.016,.020),armor,latch,.001)
     for z in [-.04,.035]:
-        Rivet((-.027,.014,z),(0,1,0),latch,.008)
+        Rivet((-.027,.0068,z),(0,1,0),latch,.008)
     # Driver's vision flap: vehicle right, not the early-model reversed layout.
     cutter=PolygonPrism('DriverVisionOpeningCutter',RoundedRectangle(.280,.145,.008,3 if quality=='High' else 1),'Y',.30,(.235,-.06,.41),black,front,0)
     CutOpening([bowPlate,upperBody],cutter)
@@ -483,14 +508,40 @@ def HullGeometry(root):
         for y in [-.63,-.05,.53,1.13,1.46]:
             roofZ=1.67+(y+.72)/1.915*.11
             HullRivetLine(side,y,1.41,y,min(1.75,roofZ-.035),.10)
-        sideVisionSample=HullSurface(side,1.03,1.60)
+        sideVisionY=.950;sideVisionZ=1.565
+        sideVisionSample=HullSurface(side,sideVisionY,sideVisionZ)
         sideVisionX=sideVisionSample[0].x if sideVisionSample else side*.82
-        cutter=Box('SideVisionOpeningCutter',(sideVisionX,1.03,1.60),(.25,.155,.185),black,hull,0)
+        sideNormal=sideVisionSample[1] if sideVisionSample else Vector((side,0,.093)).normalized()
+        sideUp=(Vector((0,0,1))-sideNormal*sideNormal.z).normalized()
+        sideX=sideNormal*side;sideY=sideUp.cross(sideX).normalized()
+        sideRotation=Matrix((sideX,sideY,sideUp)).transposed().to_quaternion()
+        cutter=Box('SideVisionOpeningCutter',(sideVisionX,sideVisionY,sideVisionZ),(.30,.142,.322),black,hull,0)
         CutOpening([upperBody],cutter)
-        Box('SideVisionRecess',(sideVisionX-side*.09,1.03,1.60),(.012,.160,.190),black,hull,.003)
-        sideHatch=Node('Node_SideVisionFlap'+('Left' if side<0 else 'Right'),(sideVisionX+side*.025,1.135,1.60),hull,axis='localZ',rangeDegrees=[-175,0] if side<0 else [0,175])
-        Box('SideVisionCover',(0,-.102,0),(.024,.20,.22),armor,sideHatch,.004)
-        Tube('SideVisionHinge',(0,0,-.11),(0,0,.11),.012,steel,sideHatch)
+        frameCenter=Vector((sideVisionX,sideVisionY,sideVisionZ))+sideNormal*.002
+        sideFrame=Node('Node_SideVisionFrame'+('Left' if side<0 else 'Right'),frameCenter,hull)
+        sideFrame.rotation_mode='QUATERNION';sideFrame.rotation_quaternion=sideRotation
+        frame=PolygonPrism('SideVisionRebatedFrame',RoundedRectangle(.195,.390,.010,5 if quality=='High' else 2),'X',.006,(0,0,0),armor,sideFrame,.001)
+        cutter=PolygonPrism('SideVisionFrameBore',RoundedRectangle(.142,.322,.006,4 if quality=='High' else 2),'X',.08,(0,0,0),black,sideFrame,0)
+        CutOpening([frame],cutter)
+        Box('SideVisionRecess',(-side*.075,0,0),(.010,.145,.325),black,sideFrame,0)
+        hingeLocation=frameCenter+sideRotation@Vector((side*.014,.086,0))
+        sideHatch=Node('Node_SideVisionFlap'+('Left' if side<0 else 'Right'),hingeLocation,hull,axis='localZ',rangeDegrees=[-175,0] if side<0 else [0,175])
+        sideHatch.rotation_mode='QUATERNION';sideHatch.rotation_quaternion=sideRotation
+        # Back of the closed lid seats half a millimetre beyond the frame's
+        # outer face; the old position overlapped its rebate by three mm.
+        cover=PolygonPrism('SideVisionRoundedCover',RoundedRectangle(.170,.360,.010,6 if quality=='High' else 3),'X',.008,(-side*.0065,-.086,0),armor,sideHatch,.0008)
+        slit=Box('SideVisionTrueSlit',(-side*.0065,-.086,0),(.06,.070,.0025),black,sideHatch,0)
+        CutOpening([cover],slit)
+        for a,b,moving in [(-.150,-.103,False),(-.102,-.052,True),(-.051,.051,False),(.052,.102,True),(.103,.150,False)]:
+            parent=sideHatch if moving else sideFrame
+            x=0 if moving else side*.014;y=0 if moving else .086
+            Tube('SideVisionInterleavedKnuckle',(x,y,a),(x,y,b),.010,armor,parent,16 if quality=='High' else 10)
+        Tube('SideVisionFixedHingePin',(side*.014,.086,-.158),(side*.014,.086,.158),.004,steel,sideFrame,12 if quality=='High' else 8)
+        for z in [-.115,.115]:
+            Box('SideVisionHingeLug',(-side*.005,-.025,z),(.014,.055,.025),armor,sideHatch,.001)
+            Rivet((-side*.002,-.027,z),(side,0,0),sideHatch,.007)
+        for z in [-.105,.105]:Rivet((-side*.002,-.130,z),(side,0,0),sideHatch,.006)
+        Tube('SideVisionInnerStayEye',(-side*.016,-.145,-.105),(-side*.016,-.125,-.105),.006,armor,sideHatch,10 if quality=='High' else 8)
         BuildTrackFender(quality,hull,side,armor,Mesh,Tube)
         for y in [-1.88,-1.15,-.45,.28,1.00]:
             PolygonPrism('FenderSupport',[(y-.09,1.29),(y+.09,1.29),(y-.06,1.27)],'X',.025,(side*.92,0,0),armor,hull)
@@ -587,16 +638,20 @@ def Wheel(parent, name, position, radius, width=.23, side=1, road=True):
                 rim=[(r,sign*offset) for r,offset in [(radius*.98,x-.022),(radius,x-.022),(radius,x+.022),(radius*.98,x+.022)]]
                 Lathe('RoadRimWear',rim,(0,0,0),materials['Rubber'],pivot,'X',segments//2,closeProfile=True)
             else:
-                # The old intermediate back ring was exactly coplanar. Its
-                # removal preserves both faces and spends no silhouette detail.
-                profile=[(.018,x-.020),(radius,x-.020),(radius,x+.020),(radius*.82,x+.020),(radius*.60,x-.005),(radius*.40,x-.005),(.035,x+.025),(.018,x+.025)]
+                # Retain the pressed shoulder and rolled rim in the actual
+                # game silhouette. Sixteen-sided bowls lost these transitions
+                # even when their high-source normals were projected correctly.
+                profile=[(.018,x-.026),(radius*.62,x-.026),(radius*.87,x-.015),(radius*.94,x-.024),
+                         (radius,x-.021),(radius,x+.017),(radius*.975,x+.021),
+                         (radius*.82,x+.021),(radius*.76,x+.015),(radius*.70,x+.002),
+                         (radius*.60,x-.005),(radius*.40,x-.005),(.035,x+.025),(.018,x+.025)]
                 profile=[(r,sign*offset) for r,offset in profile]
-                discSegments=24 if 'LeadingWheel' in name else 16
+                discSegments=32
                 disc=Lathe('PressedRoadWheel',profile,(0,0,0),armor,pivot,'X',discSegments,capEnds=False)
                 disc.data.materials.append(materials['Rubber'])
                 for polygon in disc.data.polygons:
-                    if discSegments<=polygon.index<2*discSegments:polygon.material_index=1
-                    if polygon.index//discSegments in [2,4,6]:polygon.use_smooth=False
+                    if 4*discSegments<=polygon.index<5*discSegments:polygon.material_index=1
+                    if polygon.index//discSegments in [6,10,12]:polygon.use_smooth=False
         hub=Lathe('HubCap',[(.025,side*.077),(.025,side*.090),(.018,side*.096)],(0,0,0),armor,pivot,'X',24 if quality=='High' else 12)
         if quality!='High':
             # Its rear disk lies inside the wheel's coplanar hub annulus and
@@ -618,8 +673,8 @@ def Wheel(parent, name, position, radius, width=.23, side=1, road=True):
                 CastWheelFlange(pivot,radius,discSign,'RearSprocket' in name)
             else:
                 x=.057
-                profile=[(innerRadius,x-.024),(radius*.67,x-.024),(radius*.90,x-.020),(radius,x-.020),(radius,x+.020),(radius*.91,x+.020),(radius*.84,x+.004),(bossRadius,x+.004),(bossRadius*.81,x+.027),(innerRadius,x+.027)] if quality=='High' else [(innerRadius,x-.020),(radius,x-.020),(radius,x+.020),(radius*.82,x+.002),(bossRadius,x+.002),(innerRadius,x+.024)]
-                Lathe('IdlerPressedDisc',[(r,discSign*offset) for r,offset in profile],(0,0,0),armor,pivot,'X',segments if quality=='High' else 12)
+                profile=[(innerRadius,x-.024),(radius*.67,x-.024),(radius*.90,x-.020),(radius,x-.020),(radius,x+.020),(radius*.91,x+.020),(radius*.84,x+.004),(bossRadius,x+.004),(bossRadius*.81,x+.027),(innerRadius,x+.027)]
+                Lathe('IdlerPressedDisc',[(r,discSign*offset) for r,offset in profile],(0,0,0),armor,pivot,'X',segments if quality=='High' else 24)
         Lathe('IdlerCentralHub',[(hubRadius*.84,-width/2),(hubRadius,-width*.4),(hubRadius,width*.4),(hubRadius*.84,width/2)],(0,0,0),armor,pivot,'X',24 if quality=='High' else 12)
         if radius<.1:HexBolt((side*.089,0,0),(side,0,0),pivot,.008,.006)
     return pivot
@@ -678,13 +733,13 @@ def Suspension(hull, side):
         def Smooth(value):
             t=max(0,min(1,value));return t*t*(3-2*t)
         return (y,z-.17*Smooth((y-.65)/.65)*Smooth((z-.40)/.45))
-    plate=[(2.04,1.10),(1.94,1.22),(1.33,1.22),(1.22,1.18),(1.18,1.03),(.91,.87),(.68,.67),(.45,.59),(.45,.38),(.78,.37),(1.22,.38),(1.48,.42),(1.72,.51),(1.99,.68),(2.05,.83)]
+    plate=[(2.04,1.10),(1.94,1.22),(1.33,1.22),(1.22,1.18),(1.18,1.03),(.91,.87),(.68,.67),(.45,.59),(.58,.38),(.78,.37),(1.22,.38),(1.48,.42),(1.72,.51),(1.99,.68),(2.05,.83)]
     plate=[CasePoint(y,z) for y,z in plate]
     PolygonPrism('TensionerHousing',plate,'X',.036,(side*1.044,0,0),armor,group,.004)
     if quality in ['High','Game']:
         # Raised stamped reinforcement visible below the idler adjuster. Its
         # relief/fasteners project into the game's dedicated normal/ORM atlas.
-        rail=[CasePoint(y,z) for y,z in [(2.00,.83),(1.86,.83),(1.74,.91),(1.63,.93),(1.30,.93),(1.18,.89),(1.02,.74),(.82,.60),(.66,.58)]]
+        rail=[CasePoint(y,z) for y,z in [(2.00,.83),(1.86,.83),(1.74,.91),(1.63,.93),(1.30,.93),(1.18,.89),(1.02,.74),(.82,.60),(.66,.58),(.46,.58)]]
         railVertices=[]
         for i,(y,z) in enumerate(rail):
             a=Vector(rail[max(0,i-1)]);b=Vector(rail[min(len(rail)-1,i+1)])
@@ -720,7 +775,11 @@ def Suspension(hull, side):
     for panel,(frontY,rearY) in enumerate([(1.51,.48),(.48,-.61),(-.61,-1.67)]):
         panelNode=Node('Node_SuspensionCover%s%02d'%(label,panel+1),(side*.754,frontY,coverInnerHeight),group,axis='localY',rangeDegrees=[0,45])
         length=frontY-rearY
-        vertices=[(0,0,0),(0,-length,0),(side*.276,-length,-coverSlopeDrop),(side*.276,0,-coverSlopeDrop),(side*.276,0,-coverSkirtDrop),(side*.276,-length,-coverSkirtDrop)]
+        # Original17 exposes a slanted cheek/skirt lap: the lower front corner
+        # of the second skirt reaches forward under the tensioner cheek. Keep
+        # the cheek's thickness outside the skirt instead of a butt-ended box.
+        frontLowerLap=.10 if panel==1 else 0
+        vertices=[(0,0,0),(0,-length,0),(side*.276,-length,-coverSlopeDrop),(side*.276,0,-coverSlopeDrop),(side*.276,frontLowerLap,-coverSkirtDrop),(side*.276,-length,-coverSkirtDrop)]
         Mesh('SlopingSuspensionCover',vertices,[(0,1,2,3),(3,2,5,4)],armor,panelNode,0)
         solid=panelNode.children[-1].modifiers.new('ArmorSheetThickness','SOLIDIFY'); solid.thickness=.008
         slopeNormal=Vector((side*coverSlopeDrop,0,.276)).normalized()
@@ -746,7 +805,29 @@ def Suspension(hull, side):
         # The vertical skirt joins have paired upright rivets, rather than the
         # unsupported long horizontal row across each blank lower sheet.
         for y in [-.023,-length+.023]:
-            for drop in [.059,.132,.205]:Rivet((side*.283,y,-coverSlopeDrop-drop),(side,0,0),panelNode,.006)
+            for drop in [.059,.132,.205]:
+                lap=frontLowerLap*drop/(coverSkirtDrop-coverSlopeDrop) if y==-.023 else 0
+                Rivet((side*.283,y+lap,-coverSlopeDrop-drop),(side,0,0),panelNode,.006)
+    # The raised cheek flange turns onto the adjacent folded cover. Its short
+    # bent lap is visible beside the rear-most cheek rivet in original17.
+    lapSlopeNormal=Vector((side*coverSlopeDrop,0,.276)).normalized()
+    lapPath=[Vector((side*1.068,.55,.580)),Vector((side*1.068,.46,.580))]
+    for y,z in [(.400,.602),(.400,.635)]:
+        surfaceX=.754+.276*(coverInnerHeight-z)/coverSlopeDrop
+        lapPath.append(Vector((side*surfaceX,y,z))+lapSlopeNormal*.003)
+    lapNormals=[Vector((side,0,0)),Vector((side,0,0)),lapSlopeNormal,lapSlopeNormal]
+    lapVertices=[];lapFaces=[]
+    for i,point in enumerate(lapPath):
+        tangent=(lapPath[min(i+1,len(lapPath)-1)]-lapPath[max(0,i-1)]).normalized()
+        width=lapNormals[i].cross(tangent).normalized()*.014
+        for depth in [-.002,.002]:
+            for sign in [-1,1]:lapVertices.append(tuple(point+lapNormals[i]*depth+width*sign))
+    for i in range(len(lapPath)-1):
+        a=i*4;b=a+4
+        lapFaces.extend([(a,a+1,b+1,b),(a+2,b+2,b+3,a+3),(a,b,b+2,a+2),(a+1,a+3,b+3,b+1)])
+    lapFaces.extend([(0,2,3,1),(12,13,15,14)])
+    Mesh('TensionerSkirtFoldedLap',lapVertices,lapFaces,armor,group,.0007,smooth=True)
+    Rivet(lapPath[-1]+lapSlopeNormal*.0025,lapSlopeNormal,group,.006)
     return group
 
 
@@ -899,7 +980,8 @@ def TurretGeometry(hull):
         a=Vector(PlanPoint(angle-.0001,z));b=Vector(PlanPoint(angle+.0001,z))
         tangent=b-a
         return Vector((tangent.y,-tangent.x,.000025)).normalized()
-    # Cut-out at the flat front is a real opening.
+    # Retain the complete front wall. Removing a full-height angular strip
+    # for the gun left a real exposed gap above and below the mantlet frame.
     count=72 if quality=='High' else 40
     vertices=[]
     for z in [.055,.659]:
@@ -907,11 +989,15 @@ def TurretGeometry(hull):
     faces=[]
     for i in range(count):
         mid=(i+.5)*2*math.pi/count
-        if abs(mid-math.pi/2)<.305:
-            continue
         faces.append((i,(i+1)%count,(i+1)%count+count,i+count))
     shell=Mesh('TurretArmoredShell',vertices,faces,armor,turret,smooth=True)
+    for polygon in shell.data.polygons:
+        if all(abs(shell.data.vertices[i].co.y-.640*((.717-(shell.data.vertices[i].co.z-.055)/.604*.097)/.717))<1e-6 for i in polygon.vertices):polygon.use_smooth=False
     solid=shell.modifiers.new('TurretWallThickness','SOLIDIFY'); solid.thickness=.016
+    bpy.context.view_layer.objects.active=shell
+    bpy.ops.object.modifier_apply(modifier=solid.name)
+    cutter=PolygonPrism('TurretFrontGunOpening',RoundedRectangle(.426,.390,.008,4 if quality=='High' else 2),'Y',.46,(0,.610,.351),shadow,turret,0)
+    CutOpening([shell],cutter)
     topOutline=[PlanPoint(2*math.pi*i/count,.659)[:2] for i in range(count)]
     roof=PolygonPrism('TurretRoof',topOutline,'Z',.012,(0,0,.666),armor,turret,0)
     cutter=Lathe('CommanderOpeningCutter',[(.289,-.10),(.289,.10)],(0,-.13,.666),shadow,turret,count=64 if quality=='High' else 32)
@@ -932,6 +1018,9 @@ def TurretGeometry(hull):
                 continue
             point=Vector(PlanPoint(angle,z));normal=PlanNormal(angle,z)
             Rivet(point+normal*.001,normal,turret,.009)
+    for x in [-.20,-.12,-.04,.04,.12,.20]:
+        z=.622;scale=(.717-(z-.055)/.604*.097)/.717
+        Rivet((x,.640*scale+.001,z),PlanNormal(math.pi/2,z),turret,.009)
     # Paired stiffener seams and the lower mounting groups visible in the
     # primary original. The old seven uniform five-pair ladders omitted the
     # characteristic wider groups around the lower side attachment points.
@@ -1101,7 +1190,7 @@ def Main():
     bpy.context.scene['BlenderMcpTask']='Type89MediumTank'
     bpy.context.scene['Type89Stage']=stage
     bpy.context.scene['Type89Quality']=quality
-    root=Node('Model_Type89MediumTank',assetVersion='20261024GeometryV31',geometryVersion='20261024GeometryV31',variant='Type89Otsu_Tsuchiura',sourceNose='+Y',exportNose='-Z',units='metres',acceptance='IN_PROGRESS_GRAY')
+    root=Node('Model_Type89MediumTank',assetVersion='20261024GeometryV32',geometryVersion='20261024GeometryV32',variant='Type89Otsu_Tsuchiura',sourceNose='+Y',exportNose='-Z',units='metres',acceptance='IN_PROGRESS_GRAY')
     recipe=Path(__file__).read_bytes()+(Path(__file__).parent/'Script_Type89DetailedParts.py').read_bytes()
     root['geometryRecipeSha256']=hashlib.sha256(recipe).hexdigest()
     hull=HullGeometry(root)
@@ -1136,7 +1225,7 @@ def Main():
             mesh.calc_loop_triangles()
             triangles+=len(mesh.loop_triangles)
             evaluated.to_mesh_clear()
-    report={'stage':stage,'quality':quality,'triangles':triangles,'nodeCount':len(list(root.children_recursive)),'trackLengthM':trackLength,'trackLinksPerSide':parts['Node_TrackLeft']['linkCount'],'sourceBlend':bpy.data.filepath,'geometryAccepted':False,'materialAccepted':False,'dimensionsStatus':'photo-proportioned; primary dimension source still under verification'}
+    report={'stage':stage,'quality':quality,'triangles':triangles,'nodeCount':len(list(root.children_recursive)),'partStats':partStats,'trackLengthM':trackLength,'trackLinksPerSide':parts['Node_TrackLeft']['linkCount'],'sourceBlend':bpy.data.filepath,'geometryAccepted':False,'materialAccepted':False,'dimensionsStatus':'photo-proportioned; primary dimension source still under verification'}
     (reviewDir/('Data_%s%sBuild.json'%(quality,stage))).write_text(json.dumps(report,indent=2),encoding='utf8')
     print(json.dumps(report))
     if os.environ.get('TYPE89_RENDER','1')=='1':

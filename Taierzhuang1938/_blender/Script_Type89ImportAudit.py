@@ -128,7 +128,31 @@ for frame in range(36):
                     row['maximumVertexPenetrationM']=max(row['maximumVertexPenetrationM'],-signed);fixedPenetration=max(fixedPenetration,-signed)
 for row in contacts.values():row['frames']=sorted(row['frames'])
 for row in fixedContacts.values():row['frames']=sorted(row['frames'])
+hardwareRows=[];hardwarePenetration=0.0
+for moving,sign,targets,angles in [
+    ('Node_BowHatch',1,['Node_BowPlate','Node_Hull','Node_BowDoorFixedHinge'],[0,2,5,15,30,45,55,65]),
+    ('Node_SideVisionFlapLeft',-1,['Node_Hull','Node_SideVisionFrameLeft'],[0,2,5,15,30,60,90,135,165,175]),
+    ('Node_SideVisionFlapRight',1,['Node_Hull','Node_SideVisionFrameRight'],[0,2,5,15,30,60,90,135,165,175])]:
+    for angle in angles:
+        index=indicesByName[moving]
+        world=World({index:static[index]@Matrix.Rotation(math.radians(sign*angle),4,'Y')})
+        a=Geometry(index,world);av=Bvh(a);axisWorld=world[index];origin=axisWorld.translation
+        axis=(axisWorld.to_3x3()@Vector((0,1,0))).normalized()
+        bearingRadius=.020 if 'SideVision'in moving else .025
+        for target in targets:
+            # A hidden dark back is a simplified interior, not sheet metal.
+            targetGeometry=Geometry(indicesByName[target],world,True)
+            targetBvh=Bvh(targetGeometry);pairs=av.overlap(targetBvh);depth=0.0
+            for vertexIndex in {j for first,second in pairs for j in a[1][first]}:
+                point=a[0][vertexIndex];delta=point-origin
+                if (delta-axis*delta.dot(axis)).length<bearingRadius:continue
+                nearest,normal,_,_=targetBvh.find_nearest(point)
+                if nearest is not None:depth=max(depth,-(point-nearest).dot(normal))
+            hardwareRows.append({'moving':moving,'target':target,'angleDegrees':angle,'trianglePairs':len(pairs),'maximumPenetrationM':depth})
+            hardwarePenetration=max(hardwarePenetration,depth)
 report={'file':str(file.resolve()),'sha256':hashlib.sha256(data).hexdigest(),'imported':imported,'links':len(links),'wheelGroups':len(wheels),'phaseSamples':36,'testedNearbyPairs':testedPairs,'contacts':contacts,'maximumVertexPenetrationM':maximumPenetration,'fixedCoverGroups':len(fixedData),'fixedPairs':fixedPairs,'fixedContacts':fixedContacts,'maximumFixedCoverPenetrationM':fixedPenetration,'pass':maximumPenetration<.001 and fixedPenetration<.001,'note':'Actual exported triangles; wheel rolling contact allowed below1mm; fixed hull/fender/cover intersections above1mm block acceptance'}
+report.update(hardwareSweep=hardwareRows,maximumHardwarePenetrationM=hardwarePenetration)
+report['pass']=report['pass'] and hardwarePenetration<.001
 (reviewDir/'Data_ImportedCollisionAudit.json').write_text(json.dumps(report,indent=2),encoding='utf8')
 print(json.dumps(report))
 if not report['pass']:raise RuntimeError('Moving track/wheel intersection exceeds 1mm')

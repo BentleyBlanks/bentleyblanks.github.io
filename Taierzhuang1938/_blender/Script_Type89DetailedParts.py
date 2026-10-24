@@ -94,20 +94,22 @@ def BuildCastTrackShoe(quality,pitchScale,track,steel,Mesh,PolygonPrism,RoundedR
     # normals continuous and leaves the guide-side clearance unchanged.
     for vertex in plate.data.vertices:
         if vertex.co.z>0:vertex.co.z=.022-.162*vertex.co.y
-    if quality=='High':
-        for x in [-.161,.161]:
-            cutter=Lathe('ShoePinEyeCutter',[(.0085,-.07),(.0085,.07)],(x,-.052,0),track,None,'Z',20)
-            CutOpening([plate],cutter)
-        modifier=plate.modifiers.new('RoundedCastEdges','BEVEL');modifier.width=.0040;modifier.segments=4
-        modifier=plate.modifiers.new('CastCornerNormals','WEIGHTED_NORMAL');modifier.keep_sharp=True
+    for x in [-.161,.161]:
+        cutter=Lathe('ShoePinEyeCutter',[(.0085,-.07),(.0085,.07)],(x,-.052,0),track,None,'Z',20 if quality=='High' else 10)
+        CutOpening([plate],cutter)
+    # Cast edges affect both the silhouette and the moving grazing highlight.
+    # Keep a real four-millimetre chamfer in the game mesh; a normal-map-only
+    # corner left each link looking like a sharp rectangular toy casting.
+    modifier=plate.modifiers.new('RoundedCastEdges','BEVEL');modifier.width=.0040;modifier.segments=4 if quality=='High' else 1
+    modifier=plate.modifiers.new('CastCornerNormals','WEIGHTED_NORMAL');modifier.keep_sharp=True
     for x in [-.122,0,.122]:
         # The pin eyes belong to the same casting. They are not separate,
         # uniformly bright machined-steel tubes. Keep their outer crown behind
         # the true trailing relief instead of filling that photographed notch.
         if quality=='High':
-            Lathe('ShoePinBarrel',[(.0133,-.036),(.01805,-.031),(.019,-.023),(.019,.023),(.01805,.031),(.0133,.036)],(x,.057*pitchScale,-.010),track,None,'X',16)
+            Lathe('ShoePinBarrel',[(.0133,-.036),(.01805,-.031),(.019,-.023),(.019,.023),(.01805,.031),(.0133,.036)],(x,.057*pitchScale,-.010),track,None,'X',16,closeProfile=True)
         else:
-            Tube('ShoePinBarrel',(x-.036,.057*pitchScale,-.010),(x+.036,.057*pitchScale,-.010),.019,track,None,6,capEnds=False)
+            Lathe('ShoePinBarrel',[(.0133,-.036),(.019,-.036),(.019,.036),(.0133,.036)],(x,.057*pitchScale,-.010),track,None,'X',8,closeProfile=True)
     # The solid end buttons of the old shoe were unsupported by the close-up;
     # the small circles on the outside flange are the pin-eye bores above.
     PolygonPrism('ShoeGuideHorn',[(y*pitchScale,z) for y,z in [(-.037,-.014),(-.016,-.065),(.014,-.065),(.038,-.014)]],'X',.032,(0,0,0),track,None,.003 if quality=='High' else 0)

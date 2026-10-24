@@ -46,7 +46,7 @@ function Walk(index,parent){
 for(const root of g.scenes[g.scene??0].nodes)Walk(root,identity);
 Check(triangles===contract.runtimeRenderedTriangles&&triangles<=contract.runtimeTriangleCeiling,'Vehicle budget counts every repeated shoe after zero-area cleanup',String(triangles));
 const selectedGame=contract.selectedGameSourceTrianglesBeforeCleanup??triangles;
-Check(contract.runtimeTriangleTarget===80000&&(triangles<=80000||((selectedGame-80000)/selectedGame<=.05&&contract.budgetPolicy==='PreserveSelectedGameTopologyWithinFivePercent')),'Existing five-percent rule funds visible detail without another topology reduction',JSON.stringify({selectedGame,actual:triangles,target:contract.runtimeTriangleTarget,ceiling:contract.runtimeTriangleCeiling}));
+Check(contract.runtimeTriangleTarget===240000&&contract.runtimeTriangleCeiling===252000&&(triangles<=240000||((selectedGame-240000)/selectedGame<=.05&&contract.budgetPolicy==='PreserveSelectedGameTopologyWithinFivePercent')),'Explicit240k close-detail budget retains real cast corners, bores and pressed rims within the existing five-percent policy',JSON.stringify({selectedGame,actual:triangles,target:contract.runtimeTriangleTarget,ceiling:contract.runtimeTriangleCeiling}));
 const removedZeroArea=(g.asset.extras?.Type89ZeroAreaCleanup??[]).reduce((sum,row)=>sum+row.removedRenderedTriangles,0);
 Check(selectedGame-triangles===removedZeroArea&&contract.exportRemovedZeroAreaTriangles===removedZeroArea,'Every source/export triangle difference is accounted for by zero-area cleanup',String(removedZeroArea));
 Check(nonFinite===0&&normalError<2e-4&&degenerate===0,'Finite geometry, unit normals, noncollapsed triangles',JSON.stringify({nonFinite,normalError,degenerate}));
@@ -124,10 +124,20 @@ Check(shoeGeometry.faces.length>0&&[-.375,-.150,.150,.375].every(ratio=>!RayHits
 // Probe through the cast face at87.56mm, with a neighbouring solid-web control.
 Check([-.336,0,.336].every(ratio=>!RayHits(shoeGeometry,[ratio*shoeWidth,.10,.065],[0,-1,0],.20))&&!RayHits(shoeGeometry,[0,.10,-.059],[0,-1,0],.095)&&RayHits(shoeGeometry,[.074*shoeWidth,.10,-.059],[0,-1,0],.095),'Photographed flange keyways and trailing central relief are true silhouette cut-outs');
 Check([-.429,.429].every(ratio=>RayHits(shoeGeometry,[ratio*shoeWidth,.10,-.015],[0,-1,0],.20)),'Outer shoe windows retain their cast side webs');
+Check([-.161,.161].every(x=>!RayHits(shoeGeometry,[x*.320/.366,.10,.052],[0,-1,0],.20)&&RayHits(shoeGeometry,[x*.320/.366,.10,.035],[0,-1,0],.20)),'Small flange pin-eye bores are open through real metal with solid adjacent casting');
+const knuckleZ=-.057*(.150/.119);
+Check(!RayHits(shoeGeometry,[-.055,-.010,knuckleZ],[1,0,0],.110)&&RayHits(shoeGeometry,[-.055,.004,knuckleZ],[1,0,0],.110),'Cast pin knuckles retain a real axial bore and a surrounding barrel wall');
+for(const side of ['Left','Right']){
+  const sign=side==='Left'?-1:1,cover=LocalGeometry('Node_SideVisionFlap'+side,true),frame=LocalGeometry('Node_SideVisionFrame'+side,true);
+  Check(!RayHits(cover,[sign*.10,0,.086],[-sign,0,0],.20)&&RayHits(cover,[sign*.10,.010,.086],[-sign,0,0],.20),'Side vision cover has a true narrow slit and solid adjacent lid: '+side);
+  Check(!RayHits(frame,[sign*.10,0,0],[-sign,0,0],.20)&&RayHits(frame,[sign*.10,0,.085],[-sign,0,0],.20),'Side vision frame has a real aperture and solid rebate flange: '+side);
+}
 const turretGeometry=LocalGeometry('Node_TurretYaw',true);
 const bowGeometry=LocalGeometry('Node_BowPlate',true);
 Check(!RayHits(bowGeometry,[-.13,.30,-.20],[0,0,1],.30)&&RayHits(bowGeometry,[-.215,.30,-.20],[0,0,1],.30),'Round bow port has a true opening and solid surrounding armor beneath its independent cover');
 Check(!RayHits(turretGeometry,[0,.30,-.80],[0,0,1],.25)&&RayHits(turretGeometry,[.24,.30,-.80],[0,0,1],.25),'Mantlet aperture is cut through armor and its border remains solid');
+Check([-.16,-.08,0,.08,.16].every(x=>RayHits(turretGeometry,[x,.506,-.90],[0,0,1],.45)),'Front turret armor is closed above the mantlet, without the exposed full-height shell strip');
+Check([-.12,0,.12].every(x=>RayHits(turretGeometry,[x,.080,-.90],[0,0,1],.45)),'Front turret armor is closed below the mantlet while the actual gun aperture stays open');
 const towGeometry=LocalGeometry('Node_BowTowClevis',true);
 Check(!RayHits(towGeometry,[-.12,.010,-.095],[1,0,0],.24)&&RayHits(towGeometry,[-.12,0,-.045],[1,0,0],.24),'Tow eyes have transverse bores and solid surrounding metal');
 const gunMountGeometry=LocalGeometry('Node_MainGunPitch',true);
@@ -166,11 +176,34 @@ function UvSamples(materialIndex){
   return output;
 }
 function Sample(image,uv,channel){const x=Math.min(image.info.width-1,Math.max(0,Math.floor(uv[0]*image.info.width))),y=Math.min(image.info.height-1,Math.max(0,Math.floor(uv[1]*image.info.height)));return image.data[(y*image.info.width+x)*4+channel]/255;}
+function MappedMisses(materialIndex,base,normal,masked){
+  let weight=0,black=0,invalidNormal=0,samples=0;
+  for(const mesh of g.meshes)for(const primitive of mesh.primitives){
+    if(primitive.material!==materialIndex)continue;
+    const uv=ReadAccessor(glb,primitive.attributes.TEXCOORD_0).data,indices=ReadAccessor(glb,primitive.indices).data;
+    for(let k=0;k<indices.length;k+=3){
+      const p=[0,1,2].map(i=>uv.slice(indices[k+i]*2,indices[k+i]*2+2));
+      const area=Math.abs((p[1][0]-p[0][0])*(p[2][1]-p[0][1])-(p[1][1]-p[0][1])*(p[2][0]-p[0][0]))*.5;
+      // Include the small rivet facets excluded by the broad colour averages.
+      if(area*base.info.width*base.info.height<.25)continue;
+      for(const bary of [[1/3,1/3,1/3],[.65,.175,.175],[.175,.65,.175],[.175,.175,.65]]){
+        const sample=[0,1].map(axis=>p.reduce((sum,point,i)=>sum+point[axis]*bary[i],0));
+        if(masked&&Sample(base,sample,3)<.5)continue;
+        const rgb=[0,1,2].map(channel=>Sample(base,sample,channel)),n=[0,1,2].map(channel=>Sample(normal,sample,channel)*2-1),length=Math.hypot(...n);
+        weight+=area;samples++;if(rgb.every(value=>value<.04))black+=area;if(length<.55||length>1.25)invalidNormal+=area;
+      }
+    }
+  }
+  return {samples,blackFraction:black/weight,invalidNormalFraction:invalidNormal/weight};
+}
 for(const [index,material] of g.materials.entries()){
   if(material.name.endsWith('Shadow'))continue;
   const role=material.name.replace('Material_Type89Game',''),pbr=material.pbrMetallicRoughness;
   Check(pbr.baseColorTexture&&material.normalTexture&&pbr.metallicRoughnessTexture&&material.occlusionTexture&&material.occlusionTexture.index===pbr.metallicRoughnessTexture.index,'Complete Base/Normal/ORM with real AO: '+role);
   const [base,normal,orm]=await Promise.all([ImageFor(pbr.baseColorTexture),ImageFor(material.normalTexture),ImageFor(pbr.metallicRoughnessTexture)]);
+  const misses=MappedMisses(index,base,normal,role==='Guard');
+  Check(misses.samples>0&&misses.blackFraction<1e-5,'Actual mapped surfaces contain no opaque-black projection fragments: '+role,JSON.stringify(misses));
+  Check(misses.invalidNormalFraction<1e-5,'Actual mapped normals contain no opaque ray-miss vectors: '+role,String(misses.invalidNormalFraction));
   if(role==='Armor'){
     Check(base.info.width===4096&&normal.info.width===4096&&orm.info.width===2048,'Full-resolution armor atlases');
     const cover=nodesByName.get('Mesh_BowRoundPortCover'),badgeSamples=[];

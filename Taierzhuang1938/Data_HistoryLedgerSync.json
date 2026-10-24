@@ -117,13 +117,13 @@
           "lastEdited": "2026-10-23T13:00:58.270Z"
         }
       ],
-      "materialRevision": "SurfaceV4",
-      "materialReviewedAt": "2026-10-24",
+      "materialRevision": "SurfaceV5",
+      "materialReviewedAt": "2026-10-25",
       "materialReview": "Model/Type89MediumTank/Data_MaterialReview.json",
-      "materialScope": "V31 appearance rematch: photograph-proportioned running gear,320mm casting/70mm return-rim adoption, planar pressed lips and satin paint/cast steel; all dimensions and micro wear remain reconstruction rather than factory proof",
-      "historicalBoundaryCheckedAt": "2026-10-24",
-      "historicalBoundaryCheck": "Only this asset boundary and its existing Notion ledger row checked. Geometry, colors and hidden details remain reconstruction; no new participation claim or history-source promotion. Global repository cursor and unrelated page stamps preserved.",
-      "appearanceReviewStatus": "V31AuthorComparedWithDeclaredGameLodAndPhotographicLimits",
+      "materialScope": "V32 same-car geometry/detail and physical surface repair. Exact wear,paint and concealed hinge structures remain inferred; no participation claim changes.",
+      "historicalBoundaryCheckedAt": "2026-10-25",
+      "historicalBoundaryCheck": "Re-read the current Type89 source page and its existing Notion ledger row/bullet. They already cover museum appearance, inferred micro wear/hidden hardware and no March16-18 Tengxian participation; no new historical assertion required an external content edit. Preserve global cursor and unrelated page stamps.",
+      "appearanceReviewStatus": "V32ActualPackedAuthorReview_DeclaredInferences",
       "notionRowSnapshots": [
         {
           "id": "40260335331c81a18a18e63b0cc14bce",
@@ -141,7 +141,8 @@
           "scope": "Type89 appearance bullet only"
         }
       ],
-      "geometryRevision": "GeometryV31"
+      "geometryRevision": "GeometryV32",
+      "runtimeSha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57"
     },
     {
       "asset": "KawasakiType88",

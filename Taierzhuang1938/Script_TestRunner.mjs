@@ -47,7 +47,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
-  Type89MediumTankTest: {file:"Script_Type89MediumTankTest.mjs",timeoutMs:120000,desc:"Type89 actual GLB: instanced 80k budget, rigid hinge hierarchy, metre bounds, complete PBR and physical channel values"},
+  Type89MediumTankTest: {file:"Script_Type89MediumTankTest.mjs",timeoutMs:120000,desc:"Type89 actual GLB: explicit240k close-detail budget, rigid hinges, metre bounds, PBR, mapped hit coverage and finite tangent bases"},
   Type89MediumTankBrowserTest: {file:"Script_Type89MediumTankBrowserTest.mjs",timeoutMs:180000,desc:"Type89 real renderer: independent treads/all wheels, turret/recoil/hatches, physical PBR colour spaces and reloaded model views"},
   HistoryCodexBrowserTest: {file:"Script_HistoryCodexBrowserTest.mjs",timeoutMs:300000,desc:"Archive: sourced records, soft book folds/cancel/back, 17 pages, zoom, disposal and mobile"},
   TracerLifetimeTest: {file:"Script_TracerLifetimeTest.mjs",desc:"Production tracer short-hit boundary, lifetime, endpoint and strict particle validation"},

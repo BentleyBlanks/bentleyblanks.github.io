@@ -1,11 +1,11 @@
 {
   "asset": "Type89MediumTank",
-  "geometryVersion": "20261024GeometryV31",
+  "geometryVersion": "20261024GeometryV32",
   "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
-  "materialRevision": "SurfaceV4",
+  "materialRevision": "SurfaceV5",
   "materialReview": "Data_MaterialReview.json",
-  "reviewedAt": "2026-10-24",
-  "reviewScope": "Current packed V31 exports inspected in neutral close-ups and reference-approximation whole/front/track/rear views against the recovered same-car photograph corpus. Source/reference observations are separate from numeric gates. V26 rejection remains part of the record; user approval and scan-level equality are not claimed.",
+  "reviewedAt": "2026-10-25",
+  "reviewScope": "Exact final V32 packed game/high files compared against the recovered same-car photographs, neutral component close-ups and reference-approximation whole/front/track/rear views. Technical tests and source observations remain separate; V31 rejection remains recorded.",
   "selectedConfiguration": "Type89 I-Go Otsu, restored running vehicle at JGSDF Tsuchiura. Primary appearance state is the 2007 Megapixie photograph; 2025 Hunini views corroborate the same preserved car's closed hatches and geometry. Early Ko nose/cupola features are excluded.",
   "notion": "https://app.notion.com/p/40260335331c81a18a18e63b0cc14bce",
   "nominalDimensionsM": {
@@ -26,9 +26,9 @@
   },
   "sourceAxes": "Blender X right, +Y nose, +Z up; metres; ground datum under hull center",
   "runtimeAxes": "glTF X right, +Y up, -Z nose; metres; measured vertex cloud and bore direction are validated",
-  "runtimeTriangleCeiling": 84000,
-  "runtimeRenderedTriangles": 83992,
-  "sourceTrianglesBeforeExportCleanup": 1119346,
+  "runtimeTriangleCeiling": 252000,
+  "runtimeRenderedTriangles": 240278,
+  "sourceTrianglesBeforeExportCleanup": 1130810,
   "linksPerSide": 74,
   "wheelGroupsPerSide": 15,
   "requiredPivots": [
@@ -65,8 +65,9 @@
     "armor": "4096Base/4096Normal/2048ORM",
     "glass": "dielectric, roughness approximately0.15, transmission0.88, IOR1.5",
     "shadowMaterial": "constant dark dielectric cavity, no invented interior machinery",
-    "method": "Complete V26 high/game Base/Normal/ORM bake, guarded gray/material/bake-script inputs; game Armor3mm cage/12mm projection and high-field repair; no photographic lighting in Base",
-    "guard": "2048Base RGBA MASK/2048Normal/1024ORM, double-sided; mapped-surface hole coverage tested"
+    "method": "Complete V32 high/game Base/Normal/ORM bake; per-shading-point assembled AO/cavity, no sparse assembly vertex-AO interpolation; native-resolution high sampling,3mm Armor cage/12mm projection and unchanged35mm nearest-source repair limit",
+    "guard": "2048Base RGBA MASK/2048Normal/1024ORM, double-sided; mapped-surface hole coverage tested",
+    "normalRefinement": "Planar and shallow conical wheel faces use actual face normals under the existing micro relief; geometry and Base/ORM fields are retained."
   },
   "inferred": [
     "Original1938 paint cannot be established from a restored2007/2025 museum finish. The chosen hue describes photographic restoration appearance, not a factory paint specification.",
@@ -86,50 +87,53 @@
     "phaseSamples": 36,
     "testedNearbyPairs": 4716,
     "fixedGroups": 10,
-    "fixedPairs": 5366,
+    "fixedPairs": 5378,
     "maximumWheelPenetrationM": 0.0009344220161437988,
     "maximumFixedPenetrationM": 0.0,
-    "runtimeSha256": "412a7c785351ffaae49339968f1e3d8a498640d5edfff02d6dfa19d9fe8d1464",
-    "highMaximumWheelPenetrationM": 0.0009344220161437988
+    "maximumHardwarePenetrationM": 0.0,
+    "hardwareSweepPairs": 64,
+    "runtimeSha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
+    "highMaximumWheelPenetrationM": 0.0009344220161437988,
+    "highMaximumHardwarePenetrationM": 1.8688806449063122e-06
   },
   "geometryReview": "Data_GeometryReviewV3.json",
-  "workingGeometryNote": "Current V31 high/game exports and source projects were technically verified, then compared component by component with declared photographic and game-LOD limits; user approval is not implied.",
+  "workingGeometryNote": "V32 final files checked after opaque-hit/subpixel repair, valid tangent export and wheel-plane normal refinement. Museum/photo reconstruction and concealed details remain explicitly inferred.",
   "workingSourceTriangles": {
-    "High": 1119346,
-    "Game": 83992
+    "High": 1130810,
+    "Game": 240278
   },
   "workingBudget": {
-    "target": 80000,
-    "proposedCeiling": 84000,
+    "target": 240000,
+    "proposedCeiling": 252000,
     "policy": "PreserveSelectedGameTopologyWithinFivePercent",
-    "requiredReductionFraction": 0.04752833603200305
+    "requiredReductionFraction": 0.0011569931496017113
   },
-  "runtimeTriangleTarget": 80000,
-  "selectedGameSourceTrianglesBeforeCleanup": 83992,
+  "runtimeTriangleTarget": 240000,
+  "selectedGameSourceTrianglesBeforeCleanup": 240278,
   "budgetPolicy": "PreserveSelectedGameTopologyWithinFivePercent",
   "candidateIdentity": {
     "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\Type89MediumTank\\Model_Type89MediumTank.glb",
-    "sha256": "412a7c785351ffaae49339968f1e3d8a498640d5edfff02d6dfa19d9fe8d1464",
-    "bytes": 22817348,
-    "triangles": 83992,
+    "sha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
+    "bytes": 30155884,
+    "triangles": 240278,
     "images": 21,
     "materials": 8,
-    "meshNodes": 219,
+    "meshNodes": 222,
     "geometryVersions": [
-      "20261024GeometryV31"
+      "20261024GeometryV32"
     ],
     "cleanup": []
   },
   "candidateHighIdentity": {
     "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\Model_Type89MediumTankHighPbr.glb",
-    "sha256": "3ed64d2c828d98b474aa5bc7367a9c21de78eb0ee960c696436a8b9823b87e45",
-    "bytes": 50310152,
-    "triangles": 1111852,
+    "sha256": "2670640b69c23e4d7f5fa01fddf38a31c6ee30740e14d3e33e8142110d10ef70",
+    "bytes": 58475908,
+    "triangles": 1123316,
     "images": 21,
     "materials": 8,
-    "meshNodes": 219,
+    "meshNodes": 222,
     "geometryVersions": [
-      "20261024GeometryV31"
+      "20261024GeometryV32"
     ],
     "cleanup": [
       {
@@ -158,13 +162,13 @@
       }
     ]
   },
-  "geometryRecipeSha256": "0cb1db33edd14a817b16ce00e3285a8d0619bfa7aec54a09decb3c6d2034c23b",
+  "geometryRecipeSha256": "96ff8a0c7d36e2f022c0c567248d3d905866d231b58ec59b9f782e80302bc8cc",
   "exportRemovedZeroAreaTriangles": 0,
   "accessoryState": "2007 exposed cylindrical perforated bow-MG jacket and opening round cover with inner star; pointed removable2025 cover excluded. Rest joints are closed; the2007 review pose opens them with Type89Motion.",
   "userApproved": false,
-  "reopenedScope": "The user rejected V26 dimensions, shape and materials. Prior author review and numeric passes do not prove fidelity. Independent photo geometry, proportions and surface comparison are now in progress.",
-  "geometryRevisionInProgress": "20261024GeometryV31",
-  "materialRevisionInProgress": "SurfaceV4",
+  "reopenedScope": "User accepts broad shape, rejects exposed missing faces, insufficient track/rivet/joint detail, plastic material response and false colour interpolation. V31 author sign-off and numeric tests do not prove completion.",
+  "geometryRevisionInProgress": "20261024GeometryV32",
+  "materialRevisionInProgress": "SurfaceV5",
   "measuredRunningGear": {
     "kind": "PhotographProportionedReconstruction_NotFactoryDimensions",
     "referenceIds": [
@@ -203,5 +207,14 @@
     "widthEvidenceLimit": "Photographic reconstruction;1944USapprox12inch table only corroborates narrower direction, not exact museum or factory dimensions",
     "pinEndClearance": "Outer pin-eye inner ends stop at abs localX81mm, leaving space outside the paired wheel faces",
     "highContactBand": "Exact nominal radius; only the buried coincident painted cylinder was removed"
+  },
+  "reopenedAt": "2026-10-24T13:46:08.413665+00:00",
+  "detailBudgetRevision": {
+    "previousTarget": 80000,
+    "previousCeiling": 84000,
+    "target": 240000,
+    "ceiling": 252000,
+    "reason": "User rejected visible low-detail cast links, rivets, wheel transitions and joints. Preserve actual cast-edge chamfers, pin-eye/knuckle bores,32-sided pressed wheel profiles and rounded rivets in the game derivative. Independent asset only; legacy gameplay Type89Tank is unchanged. Final browser costs recorded separately.",
+    "userApproved": false
   }
 }

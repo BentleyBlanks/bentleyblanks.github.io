@@ -34,6 +34,7 @@ sys.path.insert(0,str(here))
 import Script_Type89PbrMaterials as pbr
 importlib.reload(pbr)
 from Script_Type89GlbCleanup import CleanGlb
+from Script_Type89ExportBasis import RepairExportTangents
 roles=pbr.roles
 sizes={'Armor':(4096,4096,2048),'Steel':(1024,1024,512),'Track':(2048,2048,1024),'Rubber':(512,512,512),'Exhaust':(1024,1024,512),'Glass':(256,512,256),'Guard':(2048,2048,1024)}
 started=time.time()
@@ -250,6 +251,19 @@ class ProjectionRepair:
         size=image.size[0]
         buffer=np.empty(size*size*4,dtype=np.float32);image.pixels.foreach_get(buffer);pixels=buffer.reshape(size,size,4)
         missing=pixels[:,:,3]<.5
+        # Cycles writes opaque black for some selected-to-active ray misses.
+        # Alpha alone therefore silently certified missing albedo/AO texels.
+        # Use an independently projected geometric hit mask as well; it is
+        # baked before the material channels with constant emitted coverage.
+        coverageFile=mapDir/('Texture_Type89Game'+self.role+'Coverage.png')
+        if coverageFile.exists():
+            coverage=ReadRawImage(coverageFile)[:,:,0]
+            rows=np.minimum(coverage.shape[0]-1,((np.arange(size)+.5)*coverage.shape[0]/size).astype(int))
+            columns=np.minimum(coverage.shape[1]-1,((np.arange(size)+.5)*coverage.shape[1]/size).astype(int))
+            missing|=coverage[np.ix_(rows,columns)]<.5
+        if channel=='Base':missing|=np.max(pixels[:,:,:3],axis=2)<.012
+        if channel=='Normal':missing|=np.abs(np.linalg.norm(pixels[:,:,:3]*2-1,axis=2)-1)>.15
+        invalid=missing.copy()
         if force:missing[:]=True
         highImage=ReadRawImage(mapDir/('Texture_Type89High'+self.role+channel+'.png'))
         count=0;maximumDistance=0.0
@@ -268,6 +282,26 @@ class ProjectionRepair:
             gamma=(edgeA[0]*pointY-edgeA[1]*pointX)/denominator
             alpha=1-beta-gamma
             keep=(alpha>=-1e-6)&(beta>=-1e-6)&(gamma>=-1e-6)
+            # A real thin bevel island may cross a texel without containing
+            # its centre. Sample the closest point ON that same UV triangle
+            # for intersected cells, rather than leaving an opaque miss in
+            # the very pixel the rasterized mesh will later read.
+            weightsArray=np.stack((alpha,beta,gamma),axis=1)
+            outside=np.nonzero(~keep)[0]
+            if len(outside):
+                points=np.stack((xs[outside]+.5,ys[outside]+.5),axis=1)
+                closestDistance=np.full(len(outside),np.inf);closestWeights=np.zeros((len(outside),3))
+                for first,second in [(0,1),(1,2),(2,0)]:
+                    delta=uv[second]-uv[first];length=float(np.dot(delta,delta))
+                    if length<1e-20:continue
+                    t=np.clip(((points-uv[first])@delta)/length,0,1)
+                    nearest=uv[first]+t[:,None]*delta;distance=np.sum((points-nearest)**2,axis=1)
+                    better=distance<closestDistance
+                    closestDistance[better]=distance[better];closestWeights[better]=0
+                    closestWeights[better,first]=1-t[better];closestWeights[better,second]=t[better]
+                covered=closestDistance<=.501
+                keep[outside[covered]]=True;weightsArray[outside[covered]]=closestWeights[covered]
+            alpha,beta,gamma=weightsArray.T
             for x,y,wa,wb,wc in zip(xs[keep],ys[keep],alpha[keep],beta[keep],gamma[keep]):
                 if not missing[y,x]:continue
                 weights=(float(wa),float(wb),float(wc))
@@ -280,6 +314,9 @@ class ProjectionRepair:
                     color[:3]=[(worldNormal.dot(axis)+1)*.5 for axis in [lt,lb,ln]]
                 color[3]=1;pixels[y,x]=color;missing[y,x]=False
                 count+=1;maximumDistance=max(maximumDistance,float(distance))
+        # Opaque ray-miss pixels outside the UV triangles must not become
+        # trusted gutter seeds; they otherwise bleed black into valid rims.
+        pixels[missing&invalid,3]=0
         # Extend only genuinely sampled texels into a narrow mip-safe gutter.
         for iteration in range(16 if not probe else 4):
             valid=pixels[:,:,3]>.5;pending=~valid;filled=0
@@ -320,6 +357,35 @@ def TransferDetailNormals(highProxy,gameProxy,gameMeshes,gameMaps,partNames=('Me
     result.update(parts=list(partNames),triangles=len(repair.lowTriangles),scope='All mapped detail normal texels; nearest actual retained-high surface, unchanged35mm gate')
     reports['Game/DetailNormals']=result
     return result
+
+
+def TransferHardwarePbr(highProxy,gameProxy,gameMaps):
+    """Nearest actual high fields for the differing rivet/hex-head profiles."""
+    mesh=gameProxy.data;adjacency=[[]for vertex in mesh.vertices]
+    for edge in mesh.edges:
+        a,b=edge.vertices;adjacency[a].append(b);adjacency[b].append(a)
+    remaining=set(range(len(mesh.vertices)));selected=set();components=0
+    while remaining:
+        seed=remaining.pop();component={seed};queue=[seed]
+        while queue:
+            for vertex in adjacency[queue.pop()]:
+                if vertex in remaining:remaining.remove(vertex);component.add(vertex);queue.append(vertex)
+        if len(component)not in [12,17]:continue
+        points=[mesh.vertices[index].co for index in component]
+        if max(max(point[i]for point in points)-min(point[i]for point in points)for i in range(3))>.09:continue
+        selected.update(component);components+=1
+    repair=ProjectionRepair(highProxy,gameProxy,'Armor')
+    repair.lowTriangles=[triangle for triangle in repair.lowTriangles if all(index in selected for index in triangle.vertices)]
+    assert repair.lowTriangles,'No small hardware components found'
+    results={}
+    for channel in ['Base','Normal','Roughness','Metallic','Ao']:
+        file=mapDir/('Texture_Type89GameArmor'+channel+'.png');image=bpy.data.images.load(str(file),check_existing=False);image.colorspace_settings.name='Non-Color'
+        results[channel]=repair.Repair(image,channel,force=True);SaveImage(image,file);bpy.data.images.remove(image)
+    raw={channel:ReadRawImage(mapDir/('Texture_Type89GameArmor'+channel+'.png'))[:,:,0]for channel in ['Ao','Roughness','Metallic']}
+    size=raw['Ao'].shape[0];pixels=np.ones((size,size,4),dtype=np.float32)
+    for index,channel in enumerate(['Ao','Roughness','Metallic']):pixels[:,:,index]=raw[channel]
+    image=Image('HardwareArmorOrm',size,'Non-Color',(1,.7,0,1));image.pixels.foreach_set(pixels.reshape(-1));image.update();SaveImage(image,Path(gameMaps['Armor']['Orm']));bpy.data.images.remove(image)
+    return {'components':components,'triangles':len(repair.lowTriangles),'channels':results,'source':'Nearest actual high fields for complete small connected rivet/hex components; no fabricated colour or normal;35mm limit retained'}
 
 
 def TargetNodes(materials,role,image,scratch):
@@ -380,7 +446,7 @@ def BakeAtlases(label,target,source,graphs,scratch,roleScope=None):
             # borrow a texel from a different source triangle to hide a miss.
             baseSize=min(baseSize,probeSize);normalSize=min(normalSize,probeSize);dataSize=min(dataSize,max(128,probeSize//2))
         rawChannels={};files={};opacity=None
-        channels=['Base','Normal','Roughness','Metallic','Ao','Coverage']+(['Opacity'] if role=='Guard' else [])
+        channels=['Coverage','Base','Normal','Roughness','Metallic','Ao']+(['Opacity'] if role=='Guard' else [])
         for channel in channels:
             size=baseSize if channel in ['Base','Opacity'] else (normalSize if channel=='Normal' else dataSize)
             colorSpace='sRGB' if channel=='Base' else 'Non-Color'
@@ -394,7 +460,7 @@ def BakeAtlases(label,target,source,graphs,scratch,roleScope=None):
             image=Image('Bake_'+label+role+channel,size,colorSpace,default)
             TargetNodes(allMaterials,role,image,scratch)
             for graph in graphs.values():graph.SetBakeChannel(channel)
-            binding=BindBakedHighChannel(roleSource,role,channel) if selectedToActive and channel not in ['Normal','Opacity'] else None
+            binding=BindBakedHighChannel(roleSource,role,channel) if selectedToActive and channel not in ['Normal','Opacity','Coverage'] else None
             bpy.ops.object.select_all(action='DESELECT')
             Visible(target,True);target.select_set(True)
             if source is not None:
@@ -544,6 +610,7 @@ def Export(root,path):
             for obj in objects:obj.data=original
             if triangulated.users==0:bpy.data.meshes.remove(triangulated)
     CleanGlb(path)
+    RepairExportTangents(path)
 
 
 def Main():
@@ -593,9 +660,20 @@ def Main():
     workFile=sourceDir/('Scene_Type89MediumTankPbr'+workName+'Work.blend')
     bpy.ops.wm.save_as_mainfile(filepath=str(workFile))
     Visible(gameProxy,False)
+    # These original instances supply complete assembled occlusion to the
+    # per-shading-point AO nodes (including all148 tread links). Only the
+    # active UV proxy is selected for the high bake.
+    uniqueHigh=set(highMeshes)
+    for obj in highObjects.values():
+        # The proxy already contains each unique mesh at this transform.
+        # Only additional instances are needed as occluders; coincident
+        # originals would duplicate the very same baked surface.
+        Visible(obj,obj.type!='MESH' or obj not in uniqueHigh)
     highMaps=BakeAtlases('High',highProxy,None,graphs,scratch)
+    for obj in highObjects.values():Visible(obj,False)
     gameMaps=BakeAtlases('Game',gameProxy,highProxy,graphs,scratch)
     TransferDetailNormals(highProxy,gameProxy,gameMeshes,gameMaps)
+    reports['Game/HardwarePbr']=TransferHardwarePbr(highProxy,gameProxy,gameMaps)
     highMats={role:BakedMaterial(role,highMaps.get(role),'High') for role in roles+['Shadow']}
     gameMats={role:BakedMaterial(role,gameMaps.get(role),'Game') for role in roles+['Shadow']}
     Assign(highRoot,highMats);Assign(gameRoot,gameMats)

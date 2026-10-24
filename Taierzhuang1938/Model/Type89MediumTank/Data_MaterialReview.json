@@ -1,7 +1,7 @@
 {
-  "revision": "SurfaceV4",
-  "status": "AuthorSurfaceCompared_WithDeclaredGameLodLimits",
-  "previousRevision": "V26/SurfaceV3 rejected for dimensions, shape and metallic surface quality; prior author visual sign-off does not certify this candidate.",
+  "revision": "SurfaceV5",
+  "status": "V32AuthorComparedActualPackedSurfaceV5",
+  "previousRevision": "V31/SurfaceV4 rejected for exposed faces, insufficient geometry detail, plastic appearance and colour interpolation. Its old author sign-off cannot certify this candidate.",
   "primary": {
     "source": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
     "file": "Reference_Primary2007Original.jpg",
@@ -61,10 +61,10 @@
   ],
   "scope": "Tsuchiura Otsu 2007 appearance; later close-ups support surface construction and wear placement, not wholesale adoption of later orange rust",
   "changes": [
-    "Fine satin dielectric coating: paint height scale.14mm instead of.95mm; only exposed steel masks use metallic response",
-    "Cast shoe relief.38mm instead of1.6mm; smoother coherent worn grouser response, separate oxide/dust masks",
-    "Cast rather than machined pin-eye finish; freshly projected broad wheel lips and shallow pressed dishes",
-    "Full-resolution high/game Base/Normal/ORM rebake after V31 geometry; low armor atlas receives actual high rubber contact surfaces, unchanged35mm repair limit"
+    "Per-shading-point assembled AO/cavity replaces broad-face interpolation of sparse vertex rays; only flipping lids keep local self-occlusion. Bake proxy supplies unique surfaces; extra high instances supply the remaining articulated tread occluders.",
+    "Paint uses millimetre-scale film pores, directional pressed texture and varied satin roughness; bare edge steel remains a separate metallic mask. Film height controls are authoring ranges, not measured coating thickness.",
+    "Cast tracks retain real chamfered edges, flange bores and hollow knuckles, pitted cast relief, directional running-face abrasion, separate oxide/dust and metallic worn metal.",
+    "Complete native-resolution high/game rebake. Existing packed pixels, authored tangents and strict actual-triangle clearance checks are validated again after export."
   ],
   "pending": [],
   "imagegen": {
@@ -79,15 +79,15 @@
     "second neutral lighting check",
     "actual packed GLB reload and independent source reopen"
   ],
-  "reviewedAt": "2026-10-24T12:38:51.561789+00:00",
+  "reviewedAt": "2026-10-24T18:08:01.081025+00:00",
   "userApproved": false,
-  "materialScriptSha256": "7746a7135750f6cea3f89a554952f65ec1754bdf1a5b909ff614eb7b569432bb",
+  "materialScriptSha256": "6c5078f3c1d5dfb9a1efbf591f89cd27607d75c6e20fa3caff28c68e1f6e92e1",
   "fullBake": {
-    "geometryVersion": "20261024GeometryV31",
-    "bakeScriptSha256": "ed60b04bb70876396f5862aaff50578ead3bb3f0c11afadaa23942c8df14314e",
-    "materialAuthoringScriptSha256": "7746a7135750f6cea3f89a554952f65ec1754bdf1a5b909ff614eb7b569432bb",
+    "geometryVersion": "20261024GeometryV32",
+    "bakeScriptSha256": "c29775dcd04eb421792da38a69d7829cc0a116ef07b8913fc0ff89f915636ec9",
+    "materialAuthoringScriptSha256": "2821ecc1f73dbced277fff0d99a0fb14de5f5d017698a1d9d0d29ab800bc1b7f",
     "gameDataProjection": "BakedHighBaseAndScalarChannels; Armor target retains actual HighRubber contact surfaces; geometric/bump normals projected independently",
-    "report": "Data_PbrSurfaceV4GeometryV31Build.json"
+    "report": "Data_PbrSurfaceV5GeometryV32Build.json"
   },
   "referenceLighting": {
     "hemisphere": {
@@ -137,11 +137,11 @@
     "Game macro rim/facet lighting differs slightly from the retained high source; no normal/AO/shadow-disable diagnostic is represented as final appearance.",
     "Primary crop and telephoto camera fits remain provisional; color averages and numeric checks do not certify exact photographic equality."
   ],
-  "runtimeSha256": "921d70562c4ebf41e8142c1fff8c2eb4bd09ecb43675957ed00428de159afc08",
+  "runtimeSha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
   "runtimeBytes": 20797132,
   "packedRgbExact": true,
-  "workingGeometry": "20261024GeometryV31",
-  "candidateSha256": "412a7c785351ffaae49339968f1e3d8a498640d5edfff02d6dfa19d9fe8d1464",
+  "workingGeometry": "20261024GeometryV32",
+  "candidateSha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
   "historicalSurfaceV2ColorDiagnostic": {
     "note": "Historical SurfaceV2 diagnostic, rejected by user. These values do not describe the V23/V25 candidate and are not used for current acceptance.",
     "turret": {
@@ -198,7 +198,7 @@
     "sameGeometryAndUv": true
   },
   "newMuseumAppearance": "2007 cylindrical perforated MG jacket and inner gold five-point badge on an independently flipping round cover. Badge colour is a museum-photo reconstruction, not original1938 paint proof.",
-  "reopenedScope": "The user rejected V26 dimensions, shape and materials. Prior author review and numeric passes do not prove fidelity. Independent photo geometry, proportions and surface comparison are now in progress.",
+  "reopenedScope": "User accepts broad shape, rejects exposed missing faces, insufficient track/rivet/joint detail, plastic material response and false colour interpolation. V31 author sign-off and numeric tests do not prove completion.",
   "historicalV26Evidence": [
     {
       "aspect": "paint and coating",
@@ -273,29 +273,77 @@
       ]
     }
   },
+  "reopenedAt": "2026-10-24T13:46:08.418685+00:00",
+  "historicalV31Evidence": [],
+  "normalRefinement": {
+    "scope": "Only armor normals rebaked. Actual planar wheel annuli use true surface normals under the existing micro relief; all geometry,UVs and original material fields preserved.",
+    "currentMaterialScriptSha256": "6c5078f3c1d5dfb9a1efbf591f89cd27607d75c6e20fa3caff28c68e1f6e92e1",
+    "scriptSha256": "5eacb4132706a9c399419f6fe00502f69312b11f4328f220786005fecbfc7095",
+    "hardwareFields": {
+      "components": 862,
+      "triangles": 19332,
+      "channels": {
+        "Base": {
+          "repairedTexels": 22977,
+          "maximumNearestHighDistanceM": 0.006600759923458099,
+          "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+        },
+        "Normal": {
+          "repairedTexels": 22977,
+          "maximumNearestHighDistanceM": 0.006600759923458099,
+          "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+        },
+        "Roughness": {
+          "repairedTexels": 12927,
+          "maximumNearestHighDistanceM": 0.0209999680519104,
+          "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+        },
+        "Metallic": {
+          "repairedTexels": 12927,
+          "maximumNearestHighDistanceM": 0.0209999680519104,
+          "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+        },
+        "Ao": {
+          "repairedTexels": 12927,
+          "maximumNearestHighDistanceM": 0.0209999680519104,
+          "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
+        }
+      },
+      "source": "Nearest actual high fields for complete small connected rivet/hex components; no fabricated colour or normal;35mm limit retained"
+    },
+    "sources": [
+      {
+        "quality": "Game",
+        "sourceSha256": "4a174216d55f353e79ccfa963aa358b79132bc77f44f57cfb777962c135e6dfc",
+        "unpackedExportSha256": "a5b36f9b377371be566ad2508ed0b968b5e1b9d7b8400cc69e2d7a861639f5ab"
+      },
+      {
+        "quality": "High",
+        "sourceSha256": "f14ce67bab61ccc2bcf8aa2a6bae42a7acf349f29adc7ae588eb2ebba471389e",
+        "unpackedExportSha256": "3996334a8aaba28599a9328b76f252fe78c73849c78ef52aa947ff842041900b"
+      }
+    ]
+  },
   "evidence": [
-    {
-      "aspect": "satin coating and cast steel",
-      "result": "Fine dielectric paint response, cast steel, smoother contact abrasion and recessed oxide/dust remain separate; the final actual game/high files were inspected without disabling their PBR channels.",
-      "game": "Scene_FinalV31PackedReferenceMain_640.jpg",
-      "high": "Scene_V31PackedHighRoadWheels_640.jpg"
-    },
-    {
-      "aspect": "low/high wheel profile agreement",
-      "result": "Wheel fronts have a broad planar pressed lip, shallow dish and real central boss. The same eight low rings now follow the high boss volume; forged supports sit between the paired discs rather than covering the visible front. Actual final game/high wheel faces checked.",
-      "game": "Scene_V31PackedGameLeadingWheel_640.jpg",
-      "high": "Scene_V31PackedHighRoadWheels_640.jpg"
-    },
-    {
-      "aspect": "track cast web and steel response",
-      "result": "Actual casting is320mm wide against nativefront16, with four open windows, asymmetric web, leading keyways and trailing relief.74links per side,70mm return rims and corresponding upper run retained. Pin-eye inner ends clear the wheel faces; worn cast steel is distinct from paint.",
-      "game": "Scene_FinalV31PackedReferenceTrack_640.jpg"
-    },
-    {
-      "aspect": "body and rear finish",
-      "result": "Actual turret/bow/deck/guard close-ups checked under neutral light and overall views under reference-approximation light. The game near rim and curved-casting shading limits remain declared.",
-      "game": "Scene_V31PackedGameRearDeck_640.jpg",
-      "high": "Scene_V31PackedHighRearDeck_640.jpg"
-    }
+    "Scene_FinalV32PackedReferenceMain_640.jpg",
+    "Scene_FinalV32PackedReferenceFront_640.jpg",
+    "Scene_FinalV32PackedReferenceTrack_640.jpg",
+    "Scene_FinalV32PackedReferenceRear_640.jpg",
+    "Scene_FinalV32PackedNeutralMain_640.jpg",
+    "Scene_FinalV32PackedNeutralArmor_640.jpg",
+    "Scene_FinalV32PackedNeutralTrack_640.jpg",
+    "Scene_FinalV32PackedNeutralRear_640.jpg",
+    "Scene_V32PackedGameSideCoverClosed_640.jpg",
+    "Scene_V32PackedGameBowHardware_640.jpg",
+    "Scene_V32PackedGameRoadWheels_640.jpg",
+    "Scene_V32PackedGameRearBearing_640.jpg",
+    "Scene_V32PackedHighRoadWheels_640.jpg"
+  ],
+  "highSha256": "2670640b69c23e4d7f5fa01fddf38a31c6ee30740e14d3e33e8142110d10ef70",
+  "observations": [
+    "Mapped albedo and normal ray-miss fractions are zero in the independent UV-surface probes, including small hardware facets.",
+    "Paint remains a dielectric coating with fine pores/pressed texture; cast tread metal, polished contact surfaces, oxide and dust have distinct normal/roughness/metallic fields.",
+    "Reference and neutral profiles show the same material partitions. No lighting change was used as a substitute for geometry or texture correction.",
+    "Exact microscopic wear and museum repaint colour remain photographic reconstruction, not a claim about the1938 factory finish."
   ]
 }
