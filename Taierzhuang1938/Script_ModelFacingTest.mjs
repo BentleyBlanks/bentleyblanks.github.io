@@ -15,6 +15,7 @@ import { AIRCRAFT_ASSETS, NoseYaw } from "./Data_AircraftAssets.mjs";
 import { MESHES } from "./Data_Meshes.mjs";
 import { STRAW_SLEEPING_MAT_ASSETS } from "./Data_StrawSleepingMat.mjs";
 import { KAWASAKI_TYPE88_ASSET } from "./Data_KawasakiType88.mjs";
+import { CLOTH_LAB_ASSETS } from "./Data_Tuning_ClothRange.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const TOLERANCE_DEG = 12;
@@ -424,5 +425,30 @@ Check(Math.abs(type89Low[1])<.001&&Math.abs(type89High[0]-type89Low[0]-2.18)<.01
   "新八九式乙型米制Y-up、地面轴心与含尾外廓按真实顶点复量");
 Check(type89Reference.json.nodes.some(node=>node.name==="Node_TurretYaw"&&node.extras?.runtimeAxis==="+Y")&&type89Reference.json.nodes.some(node=>node.name==="Node_MainGunRecoil"&&node.extras?.runtimeAxis==="-Z"),
   "新八九式乙型导出轴向标注与独立炮塔/后坐节点齐备");
+console.log("== 独立布料测试资产：平铺+Y，头端+Z ==");
+for (const spec of CLOTH_LAB_ASSETS) {
+  const file = path.join(projectDir, "Model", "ClothLab", spec.file);
+  const glb = LoadGlb(file), g = glb.json;
+  const meshNode = g.nodes.find(node => node.mesh !== undefined && node.skin !== undefined);
+  Check(!!meshNode, `${spec.id} 独立布面为真实蒙皮网格`);
+  if (!meshNode) continue;
+  const points = RiggedGlbPoints(file, meshNode.name);
+  const low = [0, 1, 2].map(axis => points.reduce((value, point) => Math.min(value, point[axis]), Infinity));
+  const high = [0, 1, 2].map(axis => points.reduce((value, point) => Math.max(value, point[axis]), -Infinity));
+  Check(points.length > 5000 && Math.abs(high[0] - low[0] - spec.width) < .01
+    && Math.abs(high[2] - low[2] - spec.length) < .01 && Math.abs(high[0] + low[0]) < .001 && Math.abs(high[2] + low[2]) < .001,
+    `${spec.id} 实际绑定顶点云为米制、布面居中且宽长符合专用配置`, JSON.stringify({ low, high }));
+  Check(low[1] < 0 && high[1] > 0 && high[1] - low[1] < .13,
+    `${spec.id} 厚度沿Y、上下两层跨越平铺骨面`);
+  const skin = g.skins[meshNode.skin], inverse = ReadAccessor(glb, skin.inverseBindMatrices);
+  const corner = name => {
+    const index = skin.joints.findIndex(joint => g.nodes[joint].name === name);
+    return index < 0 ? null : Array.from(inverse.data.slice(index * 16 + 12, index * 16 + 15), value => -value);
+  };
+  const headL = corner("Blanket_CornerHeadL"), headR = corner("Blanket_CornerHeadR"), tailL = corner("Blanket_CornerTailL");
+  Check(skin.joints.length === 217 && headL?.[0] > 0 && headL[2] > 0 && headR?.[0] < 0 && headR[2] > 0 && tailL?.[2] < 0
+    && Math.abs(headL[0] * 2 - spec.width) < .001 && Math.abs(headL[2] * 2 - spec.length) < .001,
+    `${spec.id} 真实逆绑定矩阵确认头端+Z、左角+X与217骨格`, JSON.stringify({ headL, headR, tailL }));
+}
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
-console.log("PASS ModelFacingTest: 飞机机首与战车车头全部按几何复量落在 -Z");
+console.log("PASS ModelFacingTest: 飞机/战车朝向及独立布料米制/绑定方向均通过几何复量");

@@ -5,6 +5,32 @@
   "repoCommit": "8ad3a798572dd00299ee8226c103fee48bd51c61",
   "assetReviews": [
     {
+      "asset": "ClothLab",
+      "date": "2026-10-24",
+      "scope": "Only the independent cloth-lab quilt, door curtain and Sichuan banner study; preserve global repoCommit, reviewedAt and unrelated source-page stamps",
+      "assetContract": "Model/ClothLab/Data_ClothLabAssets.json",
+      "decision": "Quilt loft, quilting, wear, curtain appearance and all simulation choices are artistic study. The banner uses a Sichuan death-flag motif; red diagonal bands, borders, typography, proportions and deformation are artistic choices, not an exact original reproduction or a Tengxian presence claim.",
+      "verifiedSources": [
+        {
+          "url": "https://china.cnr.cn/gdgg/20250722/t20250722_527276606.shtml",
+          "checkedOn": "2026-10-24",
+          "scope": "CNR / Voice of China 2025-07-22 report and family oral history support the 1937 Anxian Wang Jiantang departure flag background and identify the museum display as a later reproduction; no support claimed for the cloth-lab decorative design, size or Tengxian use"
+        }
+      ],
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-10-24T14:57:23.414Z",
+          "scope": "Two added cloth-lab rows and dated status note verified; unrelated rows retained"
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-10-24T14:57:25.848Z",
+          "scope": "Two added cloth-lab creative-boundary bullets verified; unrelated wording retained"
+        }
+      ]
+    },
+    {
       "asset": "NakajimaKi4",
       "date": "2026-10-24",
       "scope": "Ki4 appearance reconstruction only; global repo review anchor and unrelated source-page stamps are preserved",

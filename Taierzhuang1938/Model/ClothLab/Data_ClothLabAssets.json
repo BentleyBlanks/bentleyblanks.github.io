@@ -1,0 +1,215 @@
+{
+  "version": "20261024ClothLabV3BindingUv",
+  "blenderVersion": "5.2.1 LTS",
+  "coordinates": "Blender (x,y,z) -> glTF (x,z,-y); cloth head row 0 is +Z; column 0 is +X; flat bones at Y=0",
+  "rig": {
+    "rows": 18,
+    "columns": 12,
+    "root": "Blanket_Root",
+    "bones": 217,
+    "gridNames": "Blanket_Grid_r{row}_c{column}",
+    "corners": [
+      "Blanket_CornerHeadL",
+      "Blanket_CornerHeadR",
+      "Blanket_CornerTailL",
+      "Blanket_CornerTailR"
+    ],
+    "independentChildren": true,
+    "weights": "At most four bilinear neighbours per vertex"
+  },
+  "assets": [
+    {
+      "id": "DongguaQuilt",
+      "width": 1.4,
+      "length": 1.9,
+      "thickness": 0.074,
+      "hem": 0.014,
+      "texture": "DongguaQuiltTopBase",
+      "underside": "DongguaQuiltBottomBase",
+      "normalStrength": 0.48,
+      "file": "Model_DongguaQuilt.glb",
+      "vertices": 6858,
+      "triangles": 13712,
+      "meshes": 1,
+      "primitives": 3,
+      "materials": [
+        "Mat_DongguaQuiltFront",
+        "Mat_DongguaQuiltBack",
+        "Mat_DongguaQuiltBinding"
+      ],
+      "textureCount": 3,
+      "textureSize": [
+        1024,
+        1024
+      ],
+      "embeddedTextures": true,
+      "roughness": 0.96,
+      "metallic": 0,
+      "specularIorLevel": 0.18,
+      "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\ClothLab\\Scene_DongguaQuilt.blend",
+      "checks": {
+        "closedShell": true,
+        "boundaryEdges": 0,
+        "eulerCharacteristic": 2,
+        "weightSumMaxError": 4.470348358154297e-08,
+        "cornerPullMaxErrorM": 2.9802322387695312e-08,
+        "thicknessRangeM": [
+          0.014000000432133675,
+          0.08533438667654991
+        ],
+        "tangents": [
+          {
+            "material": "Mat_DongguaQuiltFront",
+            "vertices": 3315,
+            "minTangentLength": 0.9999355136592147,
+            "maxNormalDotTangentAbs": 0.00012379676726497618
+          },
+          {
+            "material": "Mat_DongguaQuiltBack",
+            "vertices": 3315,
+            "minTangentLength": 0.9999330403311383,
+            "maxNormalDotTangentAbs": 9.993439445699082e-05
+          },
+          {
+            "material": "Mat_DongguaQuiltBinding",
+            "vertices": 687,
+            "minTangentLength": 0.9999501502307833,
+            "maxNormalDotTangentAbs": 0.00010415049622441303
+          }
+        ],
+        "roundTripMaxDeviationM": 0.0
+      },
+      "sha256": "acf5a6413d65d0a74c6e6cac0f83b8f81b1f89e8594f28f5522db937dcf44813",
+      "bytes": 1107988,
+      "classification": "Artistic reconstruction; cloth-lab-only study"
+    },
+    {
+      "id": "DoorCurtain",
+      "width": 1.25,
+      "length": 1.9,
+      "thickness": 0.032,
+      "hem": 0.01,
+      "texture": "DoorCurtainBase",
+      "normalStrength": 0.42,
+      "file": "Model_DoorCurtain.glb",
+      "vertices": 6858,
+      "triangles": 13712,
+      "meshes": 1,
+      "primitives": 3,
+      "materials": [
+        "Mat_DoorCurtainFront",
+        "Mat_DoorCurtainBack",
+        "Mat_DoorCurtainBinding"
+      ],
+      "textureCount": 2,
+      "textureSize": [
+        1024,
+        1024
+      ],
+      "embeddedTextures": true,
+      "roughness": 0.96,
+      "metallic": 0,
+      "specularIorLevel": 0.18,
+      "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\ClothLab\\Scene_DoorCurtain.blend",
+      "checks": {
+        "closedShell": true,
+        "boundaryEdges": 0,
+        "eulerCharacteristic": 2,
+        "weightSumMaxError": 4.284083843231201e-08,
+        "cornerPullMaxErrorM": 2.9802322387695312e-08,
+        "thicknessRangeM": [
+          0.009999999776482582,
+          0.03499999828636646
+        ],
+        "tangents": [
+          {
+            "material": "Mat_DoorCurtainFront",
+            "vertices": 3315,
+            "minTangentLength": 0.9999423499944811,
+            "maxNormalDotTangentAbs": 9.996210641627368e-05
+          },
+          {
+            "material": "Mat_DoorCurtainBack",
+            "vertices": 3315,
+            "minTangentLength": 0.9999433200528562,
+            "maxNormalDotTangentAbs": 0.0001014570763082645
+          },
+          {
+            "material": "Mat_DoorCurtainBinding",
+            "vertices": 687,
+            "minTangentLength": 0.9999501971705773,
+            "maxNormalDotTangentAbs": 0.00010003141749617694
+          }
+        ],
+        "roundTripMaxDeviationM": 0.0
+      },
+      "sha256": "fb42a77a3c11a0cc79673ac6e3f84882e887fe6f9d17b894dd3981a0da95d5a0",
+      "bytes": 976112,
+      "classification": "Artistic reconstruction; cloth-lab-only study"
+    },
+    {
+      "id": "SichuanBanner",
+      "width": 1.45,
+      "length": 1.75,
+      "thickness": 0.0025,
+      "hem": 0.0025,
+      "texture": "SichuanBannerBase",
+      "normalStrength": 0.28,
+      "file": "Model_SichuanBanner.glb",
+      "vertices": 6858,
+      "triangles": 13712,
+      "meshes": 1,
+      "primitives": 3,
+      "materials": [
+        "Mat_SichuanBannerFront",
+        "Mat_SichuanBannerBack",
+        "Mat_SichuanBannerBinding"
+      ],
+      "textureCount": 2,
+      "textureSize": [
+        1024,
+        1024
+      ],
+      "embeddedTextures": true,
+      "roughness": 0.96,
+      "metallic": 0,
+      "specularIorLevel": 0.18,
+      "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\ClothLab\\Scene_SichuanBanner.blend",
+      "checks": {
+        "closedShell": true,
+        "boundaryEdges": 0,
+        "eulerCharacteristic": 2,
+        "weightSumMaxError": 4.470348358154297e-08,
+        "cornerPullMaxErrorM": 1.862645149230957e-09,
+        "thicknessRangeM": [
+          0.0024999998859129846,
+          0.0025000001187436283
+        ],
+        "tangents": [
+          {
+            "material": "Mat_SichuanBannerFront",
+            "vertices": 3315,
+            "minTangentLength": 0.999946273775611,
+            "maxNormalDotTangentAbs": 0.00010000120528275147
+          },
+          {
+            "material": "Mat_SichuanBannerBack",
+            "vertices": 3315,
+            "minTangentLength": 0.999946273775611,
+            "maxNormalDotTangentAbs": 9.999609217492544e-05
+          },
+          {
+            "material": "Mat_SichuanBannerBinding",
+            "vertices": 687,
+            "minTangentLength": 0.9999740862747093,
+            "maxNormalDotTangentAbs": 0.0001000060947262682
+          }
+        ],
+        "roundTripMaxDeviationM": 0.0
+      },
+      "sha256": "3be6dd880e157ae88a467515a25b4c65306b295b4925aba5199077d128266155",
+      "bytes": 1034596,
+      "classification": "Artistic reconstruction; cloth-lab-only study"
+    }
+  ]
+}

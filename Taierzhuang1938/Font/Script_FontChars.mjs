@@ -26,6 +26,7 @@ const UI_MODULES = [
   "Data_History.mjs",        // 史实注记页
   "Data_HistoryCodex.mjs",   // 资料馆的史料原稿
   "Data_Levels.mjs",         // 关卡名与目标
+  "Data_ClothRange.mjs",
   "Data_Range.mjs",          // 靶场工位说明
 ];
 

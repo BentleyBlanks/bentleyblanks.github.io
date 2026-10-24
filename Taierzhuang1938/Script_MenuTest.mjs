@@ -1596,8 +1596,8 @@ async function CheckMissionList() {
     brief.selected === 8 && brief.mark === "沙盒" && brief.no === "靶",   // 枪械专项后保留原玩法靶场
     `selected=${brief.selected} mark=${brief.mark} no=${brief.no}`);
   Check("选章列出操作、枪械、玩法、爆炸、白刃、断肢、炮击扬尘、人物战场反应八项测试入口（第一关已归入正式章节）",
-    brief.sandboxes.length === 8
-      && brief.sandboxes.map((entry) => entry.no).join(",") === "跃,枪,靶,爆,刃,肢,尘,震"
+    brief.sandboxes.length === 9
+      && brief.sandboxes.map((entry) => entry.no).join(",") === "跃,枪,靶,爆,刃,肢,尘,震,布"
       && brief.sandboxes.every((entry) => entry.mark === "沙盒")
       && brief.sandboxes[0].name.includes("操作交互测试场")
       && brief.sandboxes[1].name.includes("枪械白盒靶场")
@@ -1607,6 +1607,7 @@ async function CheckMissionList() {
       && brief.sandboxes[5].name.includes("断肢测试场")
       && brief.sandboxes[6].name.includes("炮击扬尘测试场")
       && brief.sandboxes[7].name.includes("人物战场反应测试场")
+      && brief.sandboxes[8].name.includes("布料模拟测试场")
       && !brief.sandboxes.some((entry) => /第一关|P0\/P1\/P2/.test(entry.name))
       && brief.sandboxes.every((entry) => !entry.name.includes("界河")),
     JSON.stringify(brief.sandboxes));

@@ -64,6 +64,9 @@ import { ShellImpactRangeField } from "./Script_ShellImpactRangeField.mjs";
 import { ShellImpactRange } from "./Script_ShellImpactRange.mjs";
 import { BATTLE_REACTION_RANGE_PHASE, BATTLE_REACTION_RANGE_ID } from "./Data_BattleReactionRange.mjs";
 import { BattleReactionRange } from "./Script_BattleReactionRange.mjs";
+import { CLOTH_RANGE_PHASE, CLOTH_RANGE_ID } from "./Data_ClothRange.mjs";
+import { ClothRangeField } from "./Script_ClothRangeField.mjs";
+import { ClothRange } from "./Script_ClothRange.mjs";
 import { BLAST_FLINCH } from "./Data_Tuning_BlastReaction.mjs";
 import { TOOLS_HOME_PHASE, TOOLS_HOME_ID } from "./Data_ToolsHome.mjs";
 import { ToolsHomeField } from "./Script_ToolsHomeField.mjs";
@@ -203,6 +206,7 @@ function BootStartLabel() {
   if (EXPLOSION_TEST) return T("boot.start.explosionRange");
   if (IMPACT_TEST) return T("boot.start.impactRange");
   if (REACTION_TEST) return T("boot.start.reactionRange");
+  if (CLOTH_TEST) return T("boot.start.clothRange");
   if (GORE_TEST) return T("boot.start.goreRange");
   if (PREVIEW) return T("boot.start.preview");
   return T("boot.start.play");
@@ -318,6 +322,8 @@ const IMPACT_TEST = params.get("impacts") === "1";
  * 看第一人称近爆反应、听耳朵受损。口径见 docs/Data_BattleReactionRange.md。
  */
 const REACTION_TEST = params.get("reactions") === "1";
+// A self-contained cloth laboratory; campaign simulation settings stay untouched.
+const CLOTH_TEST = params.get("cloth") === "1";
 // 内容总闸的运行时覆盖。`?gore=0` 一段肢体都不掉（`Data_Tuning_Gore.ENABLED` 与
 // `Debug.Gore.SetEnabled` 是另外两个入口，三者任一关闭即关闭）。
 // **`?gore=0` 压过设置面板那一位**（见 ApplyGraphics 里 graphics.gore 那一段）：
@@ -363,12 +369,13 @@ const FULL_SCENE_VIEW = FULL_SCENE
  * （Data_ToolsHome 文件头）。给了 phase / whitebox 等关卡参数时仍是老规矩：先建那一关再开工具。
  */
 const TOOLS_HOME = DEV_TOOLS_ENABLED && EDITOR_PARAM === "tools" && !SHOT && !PREVIEW && PHASE_PARAM === null
-  && !(MOVEMENT_RANGE || EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || GORE_TEST || IMPACT_TEST || REACTION_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE || BLOCKOUT);
-const SANDBOX = MOVEMENT_RANGE || EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || GORE_TEST || IMPACT_TEST || REACTION_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE || BLOCKOUT || TOOLS_HOME;
+  && !(MOVEMENT_RANGE || EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || GORE_TEST || IMPACT_TEST || REACTION_TEST || CLOTH_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE || BLOCKOUT);
+const SANDBOX = MOVEMENT_RANGE || EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || GORE_TEST || IMPACT_TEST || REACTION_TEST || CLOTH_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE || BLOCKOUT || TOOLS_HOME;
 const PHASE_TABLE = TOOLS_HOME ? [TOOLS_HOME_PHASE] : BLOCKOUT ? BLOCKOUT_PHASES : MOVEMENT_RANGE ? [MOVEMENT_RANGE_PHASE] : EXPLOSION_TEST ? [EXPLOSION_RANGE_PHASE] : WEAPON_RANGE ? [WEAPON_RANGE_PHASE] : RANGE ? [RANGE_PHASE]
   : GORE_TEST ? [GORE_RANGE_PHASE]
   : IMPACT_TEST ? [SHELL_IMPACT_RANGE_PHASE]
   : REACTION_TEST ? [BATTLE_REACTION_RANGE_PHASE]
+  : CLOTH_TEST ? [CLOTH_RANGE_PHASE]
   : MELEE_TEST ? [MELEE_QTE_PHASE]
     : FIRST_LEVEL_P012_WHITEBOX ? [ARCHIVED_P012_FIXTURE ? ARCHIVED_P012_PHASE : FIRST_LEVEL_P012_WHITEBOX_PHASE]
       : JIEHE ? [JIEHE_SANDBOX_PHASE]
@@ -378,7 +385,7 @@ const PHASE_TABLE = TOOLS_HOME ? [TOOLS_HOME_PHASE] : BLOCKOUT ? BLOCKOUT_PHASES
 // 无音频环境（或审片时主动关音频）也必须能完整收口。AudioEngine 自己会对
 // AudioContext 缺失降级，这个开关只负责不建上下文，避免 preview=...&audio=0
 // 在无头/禁音浏览器里留下悬挂的加载与定时器。
-const AUDIO_ENABLED = !SHOT && params.get("audio") !== "0";
+const AUDIO_ENABLED = !CLOTH_TEST && !SHOT && params.get("audio") !== "0";
 // 截图工具显式打开手动步进后，页面 rAF 不得偷偷推进过场；普通出图模式仍
 // 保留原有的自动循环，只有 Script_CutsceneShot 传 manual=1 才启用此闸。
 const MANUAL_STEP = params.get("manual") === "1";
@@ -1059,6 +1066,8 @@ let goreRange = null;
 let impactRange = null;
 /** 人物战场反应测试场的运行时（?reactions=1）；其余入口下永远是 null。 */
 let reactionRange = null;
+/** The cloth runtime owns its camera and simulation only in ?cloth=1. */
+let clothRange = null;
 // 下令轮盘。HUD 那条静态横排（1跟我来 2向前…）已经撤掉：
 // ER2 的指挥手感是"按住 Tab 推一下鼠标松手"，眼睛不用离开战场。
 const wheel = new RadialWheel(hudRoot);
@@ -1109,6 +1118,7 @@ function ApplyDebugOptions() {
   if (IMPACT_TEST) options.invincible = true;
   // 人物战场反应测试场同理：炸点就在人身边。
   if (REACTION_TEST) options.invincible = true;
+  if (CLOTH_TEST) options.invincible = true;
   // 白盒关卡编辑器同理（只看布设），且只改这一份拷贝，不调会落盘的 SetDebugOption。
   if (BLOCKOUT || TOOLS_HOME) options.invincible = true;
   player?.SetDebugOptions(options);
@@ -2943,6 +2953,7 @@ async function Boot() {
   if (goreRange) window.Taierzhuang.Debug.GoreRange = goreRange.api;
   if (impactRange) window.Taierzhuang.Debug.ShellImpact = impactRange.api;
   if (reactionRange) window.Taierzhuang.Debug.BattleReaction = reactionRange.api;
+  if (clothRange) window.Taierzhuang.Debug.ClothRange = clothRange.api;
 
   // --- 靶场取证口（只在 ?range=1 下存在；口径在 docs/Data_TestRange.md） ----
   // 人机共用：agent 用 State/Targets 断言、GoTo/AimAt 摆位，真人在旁边看同一片场。
@@ -3360,11 +3371,12 @@ async function Boot() {
       // 玩家可见的测试场景集中保留核心玩法入口。界河与过场仍可通过
       // ?jiehe=1 / ?preview=... 直达，供自动化与内部验收使用，不再混入选章。
       // P0/P1/P2 白盒不在这一组：它已是正式章节组里的「第一关」（CAMPAIGN_ENTRIES[0]）。
-      sandboxes: [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE, GORE_RANGE_PHASE, SHELL_IMPACT_RANGE_PHASE, BATTLE_REACTION_RANGE_PHASE],
+      sandboxes: [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE, GORE_RANGE_PHASE, SHELL_IMPACT_RANGE_PHASE, BATTLE_REACTION_RANGE_PHASE, CLOTH_RANGE_PHASE],
       sandboxMode: MOVEMENT_RANGE ? "movement" : WEAPON_RANGE ? "weapons" : EXPLOSION_TEST ? "explosions" : RANGE ? "range" : MELEE_TEST ? "melee"
         : GORE_TEST ? "gore"
         : IMPACT_TEST ? "impacts"
         : REACTION_TEST ? "reactions"
+        : CLOTH_TEST ? "cloth"
         : FIRST_LEVEL_P012_WHITEBOX ? "firstLevelP012Whitebox" : JIEHE ? "jiehe" : false,
       PlaySandbox: (key) => GoToSandbox(key),
       // 机位表按**建好的那一片**取，不按「第几章」取：`?phase=overview` 与
@@ -3513,6 +3525,7 @@ const WORLD_CLASSES = {
   [SHELL_IMPACT_RANGE_ID]: ShellImpactRangeField,
   // 人物战场反应测试场借同一片场地（壕沟、分层土壤、布景）。
   [BATTLE_REACTION_RANGE_ID]: ShellImpactRangeField,
+  [CLOTH_RANGE_ID]: ClothRangeField,
   [TOOLS_HOME_ID]: ToolsHomeField,
   [MELEE_QTE_LEVEL_ID]: RangeField,
   [FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID]: FirstLevelWhiteboxField,
@@ -3540,6 +3553,7 @@ function GoToSandbox(key, {stage = null} = {}) {
   url.searchParams.delete("gore");
   url.searchParams.delete("impacts");
   url.searchParams.delete("reactions");
+  url.searchParams.delete("cloth");
   url.searchParams.delete("whitebox");
   url.searchParams.delete("missionStage");
   url.searchParams.delete("jiehe");
@@ -3551,6 +3565,7 @@ function GoToSandbox(key, {stage = null} = {}) {
   else if (key === "gore") url.searchParams.set("gore", "1");
   else if (key === "impacts") url.searchParams.set("impacts", "1");
   else if (key === "reactions") url.searchParams.set("reactions", "1");
+  else if (key === "cloth") url.searchParams.set("cloth", "1");
   else if (key === "firstLevelP012Whitebox") url.searchParams.set("whitebox", "p012");
   else if (key === "jiehe") url.searchParams.set("jiehe", "1");
   url.searchParams.delete("phase");
@@ -3584,6 +3599,8 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   goreRange?.Dispose(); goreRange = null;
   impactRange?.Dispose(); impactRange = null;
   reactionRange?.Dispose(); reactionRange = null;
+  clothRange?.Dispose(); clothRange = null;
+  if (window.Taierzhuang?.Debug) delete window.Taierzhuang.Debug.ClothRange;
   // 通用开关（phase.groundImpactDust）：离开本关（换关 / 重建）一律先关掉炮弹落地扬尘，进关时再按新一关的开关打开。
   vfx?.SetGroundImpactDust?.(false); vfx?.SetGroundSampler?.(null);
   // 通用开关（phase.blastReaction）：近爆身体反应与耳朵模型同理，离开本关先关，进关再按新一关的开关打开。
@@ -3596,7 +3613,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   ClearExternalProps();
   if(phase.whitebox?.p012)ClearTrimProps(scene);
   if (battlefield) { battlefield.deformation?.Dispose(); battlefield.Dispose(); battlefield = null; }
-  levelBounds = MakeLevelBounds(phase.bounds, phase.whitebox?.p012 || phase.id === MELEE_QTE_LEVEL_ID ? 1 : 10);
+  levelBounds = MakeLevelBounds(phase.bounds, phase.whitebox?.p012 || phase.id === MELEE_QTE_LEVEL_ID || phase.id === CLOTH_RANGE_ID ? 1 : 10);
   const World = WorldClassFor(phase);
   battlefield = new World(scene, library, {
     quality: QUALITY,
@@ -3629,7 +3646,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   // 上一轮 PCG 自己的碰撞盒挡自己，所有候选都被判成重叠。
   battlefield.propPcgBlockers = battlefield.colliders.slice();
   // TownDressing is bounds-based, not phase-based: independent IDs alone do not isolate it.
-  const external = phase.whitebox?.p012 || phase.blockout || phase.id === EXPLOSION_RANGE_ID || phase.id === MOVEMENT_RANGE_ID || phase.id === GORE_RANGE_ID || phase.id === TOOLS_HOME_ID ? {count:0,generatedCount:0,pcgCount:0,pcgStats:null,pcgErrors:[],failed:[],colliders:[],streamer:null} : await AddExternalProps({
+  const external = phase.whitebox?.p012 || phase.blockout || phase.id === EXPLOSION_RANGE_ID || phase.id === MOVEMENT_RANGE_ID || phase.id === GORE_RANGE_ID || phase.id === CLOTH_RANGE_ID || phase.id === TOOLS_HOME_ID ? {count:0,generatedCount:0,pcgCount:0,pcgStats:null,pcgErrors:[],failed:[],colliders:[],streamer:null} : await AddExternalProps({
     scene, library, phaseId: FieldIdFor(phase), bounds: phase.bounds,
     groundAt: (x, z) => battlefield.GroundHeight(x, z),
     blockers: battlefield.propPcgBlockers,
@@ -3659,7 +3676,7 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   }
   // tzm 饰件层（信号机/站灯/窗花/门五金…）：与外部 GLB 布景同一个异步槽位，
   // 但物理契约不同（多数无碰撞、可悬空安装），所以是平行的一层，见 Script_TrimProps 文件头。
-  const trim = phase.whitebox?.p012 || phase.blockout || phase.id === EXPLOSION_RANGE_ID || phase.id === MOVEMENT_RANGE_ID || phase.id === GORE_RANGE_ID || phase.id === SHELL_IMPACT_RANGE_ID || phase.id === BATTLE_REACTION_RANGE_ID || phase.id === TOOLS_HOME_ID ? {count:0,failed:[],colliders:[]} : await AddTrimProps({ scene, library, phaseId: FieldIdFor(phase) });
+  const trim = phase.whitebox?.p012 || phase.blockout || phase.id === EXPLOSION_RANGE_ID || phase.id === MOVEMENT_RANGE_ID || phase.id === GORE_RANGE_ID || phase.id === SHELL_IMPACT_RANGE_ID || phase.id === BATTLE_REACTION_RANGE_ID || phase.id === CLOTH_RANGE_ID || phase.id === TOOLS_HOME_ID ? {count:0,failed:[],colliders:[]} : await AddTrimProps({ scene, library, phaseId: FieldIdFor(phase) });
   battlefield.trimProps = trim;
   if (trim.colliders?.length) {
     battlefield.colliders.push(...trim.colliders);
@@ -3900,6 +3917,8 @@ function ClearRuntime() {
   weaponRange?.Dispose(); weaponRange = null;
   impactRange?.Dispose(); impactRange = null;
   reactionRange?.Dispose(); reactionRange = null;
+  clothRange?.Dispose(); clothRange = null;
+  if (window.Taierzhuang?.Debug) delete window.Taierzhuang.Debug.ClothRange;
   meleeCombat?.Cancel("levelChange");
   // 摆点层：交互点、后送队、计时器与运行时道具全按关摆，一律清掉。
   // **缺席宣告不在这里清**（那在 companion 手里，是剧情事实不是关卡状态）。
@@ -4083,7 +4102,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   // CountSide("nra") 都会把他们数进去，于是撒兵自动少撒同样多 ——
   // 场上活人总数一个没多，开机红线（drawCalls / triangles）不受影响。
   // 名册默认从本章 beats 的 who 推导（该章说过话的战斗员自动在场），INT2 按章精修。
-  if (!MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !GORE_TEST && !IMPACT_TEST && !REACTION_TEST && !BLOCKOUT && !TOOLS_HOME && !PREVIEW && !cutsceneOnly && !deprecated && companion) {
+  if (!MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !GORE_TEST && !IMPACT_TEST && !REACTION_TEST && !CLOTH_TEST && !BLOCKOUT && !TOOLS_HOME && !PREVIEW && !cutsceneOnly && !deprecated && companion) {
     companion.BeginLevel(contentId, {
       // 名册**优先走章节数据点名**（INT2 起七章都写了 roster）；没写才由 beats 推。
       // 推导只收「该章说过话的战斗员」—— 军医、参谋、师长这些 combatant:false 的人
@@ -4107,7 +4126,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   // 章节摆点：**排在具名同伴之后**（罗班长要先站出来，摆点层才拿得到他的句柄），
   // 也排在 SeedSoldiers 之前（后送队要从 nra 名额里出人，撒兵才会自动少撒同样多）。
   // 靶场／白刃训练场／预览／过场承载章都不摆；第一关白盒有正式第一章内容。
-  if (!phase.whitebox?.fullMission && !MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !GORE_TEST && !IMPACT_TEST && !REACTION_TEST && !BLOCKOUT && !TOOLS_HOME && !PREVIEW && !cutsceneOnly && !deprecated && setpieces) {
+  if (!phase.whitebox?.fullMission && !MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !GORE_TEST && !IMPACT_TEST && !REACTION_TEST && !CLOTH_TEST && !BLOCKOUT && !TOOLS_HOME && !PREVIEW && !cutsceneOnly && !deprecated && setpieces) {
     setpieces.BeginLevel(contentId, phase);
   }
   interact.Clear("P012");
@@ -4509,7 +4528,17 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   // 通用开关：本关要近爆的第一人称身体反应与耳朵模型 trauma（phase.blastReaction）就开；离开本关在 BuildField 里关。
   player.SetBlastReaction(!!phase.blastReaction);
   audio?.SetEarModel?.(phase.blastReaction ? "trauma" : "legacy");
-  if (MOVEMENT_RANGE) {
+  if (CLOTH_TEST) {
+    state.pinned = true;
+    clothRange?.Dispose();
+    clothRange = new ClothRange({
+      battlefield, player, camera, scene, library, canvas, renderer, post, state,
+      CanUse: () => state.ready && state.running && !state.menu && !state.cutscene && !UiCapturing(),
+      SetViewmodelHidden: (hidden) => { if (viewmodel?.root) viewmodel.root.visible = !hidden; },
+    });
+    clothRange.UpdateCamera(0);
+    if (window.Taierzhuang?.Debug) window.Taierzhuang.Debug.ClothRange = clothRange.api;
+  } else if (MOVEMENT_RANGE) {
     state.pinned = true;
     movementRange = new MovementRange({ player, scene, battlefield,
       CanUse: () => state.ready && state.running && !state.menu && !state.cutscene && !UiCapturing() });
@@ -5503,7 +5532,7 @@ const PIN_RELEASE_GRACE_S = PACING.pinReleaseGraceS;
 /** 换下一关。关末过场 -> 下一关关前过场 -> 建切片。 */
 async function AdvanceLevel(opts = {}) {
   // The gun laboratory has no campaign completion, including explicit debug calls.
-  if (MOVEMENT_RANGE || WEAPON_RANGE || EXPLOSION_TEST || GORE_TEST || IMPACT_TEST || REACTION_TEST || BLOCKOUT || TOOLS_HOME) return state.phaseIndex;
+  if (MOVEMENT_RANGE || WEAPON_RANGE || EXPLOSION_TEST || GORE_TEST || IMPACT_TEST || REACTION_TEST || CLOTH_TEST || BLOCKOUT || TOOLS_HOME) return state.phaseIndex;
   if (state.advancing) return state.phaseIndex;
   // 走到这里就算这一关过了：菜单的「继续」与选章里的「已通过」都读这条
   Progress.MarkCleared(PHASE_TABLE[state.phaseIndex].id, state.phaseIndex);
@@ -6462,7 +6491,7 @@ let rawInputActive = false;
  * fromClick：这次是玩家在画面上点击发起的（只有这种被「root document」拒才退成右键拖动，见上）。
  */
 function RequestPointerLock({ fromClick = false } = {}) {
-  if (SHOT || altMouseFree || UiCapturing() || BlockoutMouseCaptured()) return;
+  if (CLOTH_TEST || SHOT || altMouseFree || UiCapturing() || BlockoutMouseCaptured()) return;
   if (escapeHeld) { lockAfterEscape = true; return; }
   if (FAKE_POINTER_LOCK) {
     if (!fakeLocked) { fakeLocked = true; OnPointerLockChange(); }
@@ -6668,6 +6697,7 @@ function StartRun() {
   ShowBoot(false);
   state.menu = false;
   state.running = true;
+  if (CLOTH_TEST) { hudRoot.style.display = "none"; clothRange?.UpdateCamera(0); return; }
   if (SHOT) return;
   audio.Unlock();
   // 开场过场。EnterLevel(initial) 是按 cutscenes:false 建的场（开机不能夺控制权），
@@ -7167,6 +7197,7 @@ const router = new InputRouter({
   Context: () => (state.ordersOpen ? "orders" : "world"),
   // 没拿到指针锁的第一次点击只用来抢锁，不该同时打出一枪
   Guard: (e) => {
+    if (CLOTH_TEST) return false;
     if (frameDebugger.frozen) return false;
     if (!state.running) return false;
     // 编辑器开着：这一下鼠标是在点面板/摆东西，不是在抢指针锁开枪
@@ -7196,6 +7227,7 @@ const router = new InputRouter({
     return !!meleeCombat?.HandleInput(detail.code,detail.down,detail.repeat);
   },
   OnAction: (action, detail) => {
+    if (CLOTH_TEST) return;
     if (frameDebugger.frozen) return;
     if(missionRuntime?.controls)return;
     if (missionRuntime?.ReceivingFood && (["crouch","prone","traverse"].includes(action) || action.startsWith("stance:"))) return;
@@ -9056,6 +9088,19 @@ function Frame(dt, render = true) {
   // 建切片期间（换关）也只走画面：碰撞盒表正在被换掉，规则层这时候查什么都是错的
   if (!state.ready) return;
 
+  // The laboratory owns orbit input and simulation time, without FPS movement or combat side effects.
+  if (clothRange) {
+    clothRange.Update(dt);
+    clothRange.UpdateCamera(dt);
+    hudRoot.style.display = "none";
+    sky.Update(state.elapsed);
+    lights.Update(dt, state.elapsed, camera.position);
+    camera.getWorldDirection(_forward);
+    lights.UpdateShadowFrustum(camera.position, _forward);
+    if (render) RenderScene(dt);
+    return;
+  }
+
   if (state.deathTimer > 0) {
     state.deathTimer -= dt;
     if (state.deathTimer <= 0 && state.pendingRespawn) {
@@ -9582,7 +9627,7 @@ function Frame(dt, render = true) {
     else if (GORE_TEST) { /* GoreRange reseeds only on demand. */ }
     else if (BLOCKOUT) { /* Blockout units are editor-owned puppets; nothing to reseed. */ }
     else if (TOOLS_HOME) { /* The tools home is an empty lot. */ }
-    else if (!EXPLOSION_TEST && !IMPACT_TEST && !REACTION_TEST) SeedSoldiers(phase);
+    else if (!EXPLOSION_TEST && !IMPACT_TEST && !REACTION_TEST && !CLOTH_TEST) SeedSoldiers(phase);
     profiler.E("spawn");
   }
 
@@ -9777,7 +9822,7 @@ function RenderScene(dt) {
 function RenderSceneContent(dt) {
   missionRuntime?.frontShow?.bunker.BeforeRender();
   // 白盒编辑器的预演播放中：相机不在玩家身上，枪模与第一人称身体一起藏（播完 / 中断由编辑器还原枪模）
-  const openingBody=(player?.Alive && missionRuntime?.frontShow?.bunker.CameraActive) || BlockoutInputCaptured();
+  const openingBody=CLOTH_TEST || (player?.Alive && missionRuntime?.frontShow?.bunker.CameraActive) || BlockoutInputCaptured();
   if(openingBody&&viewmodel)viewmodel.root.visible=false;
   if (viewmodel?.body) viewmodel.body.root.visible = !openingBody && !!player?.Alive && !(player.meleeCameraDrop > 0.05) && !state.cutscene && !state.menu && !UiCapturing();
   const phase = PHASE_TABLE[state.phaseIndex];

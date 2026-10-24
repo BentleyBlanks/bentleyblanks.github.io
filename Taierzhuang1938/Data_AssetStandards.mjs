@@ -151,6 +151,15 @@ export const EXTERNAL_GLB_STANDARDS = Object.freeze([
     sourceTexture: "用户确认参考图、内置 imagegen 的柔软旧棉布图集",
     runtimeTexture: "1024 Base（不透明、卷边）/ ORM + 512 平铺细皱织纹法线 内嵌，独立剧情泥血遮罩",
     policy: "source", note: "2026-10-23 起 1.4 cm 双层封闭壳（上下两层 50x60 四边形 + 圆卷边一圈）；纵18行x横12列共216变形骨加Root，217骨、精确双线性、一个形态键、五个NLA动作；参考布面直接UV投影。_blender/Script_SingleBlanketBake.py 重建；头端+Z，四个角骨与挂点名称保留。" }),
+  ...[["DongguaQuilt", "冬瓜厚棉被测试件", "约8cm棉胎、疏格绗缝、窄包边与独立正反面"],
+    ["DoorCurtain", "进门棉门帘测试件", "约3cm夹棉门帘、长条绗缝和加固包边"],
+    ["SichuanBanner", "川军出川锦旗测试件", "薄布锦旗、独立正反面与包边；题字和配色为创作预览"]]
+    .map(([id, name, description]) => Object.freeze({
+      id, name, pack: `ClothLab/Model_${id}.glb`, sourceTriangles: 13712, actualTriangles: 13712,
+      targetTriangles: 13712, policy: "source", sourceTexture: "Blender程序造型与程序棉布纹理",
+      runtimeTexture: "内嵌正反面Base与平铺Normal；Front / Back / Binding三种不透明棉布材质",
+      note: `${description}。独立布料测试场专用，原单被资产和模拟配置不变；封闭双层壳，18×12骨格加Root共217骨，头端+Z、左角+X。_blender/Script_ClothLabAssetsBake.py重建；外观按创作复原标注。`,
+    })),
   Object.freeze({ id: "WardProps", name: "接收院药柜与医疗陈设", pack: "Model_WardProps.glb",
     sourceTriangles: 44524, actualTriangles: 44524, targetTriangles: 50000,
     sourceTexture: "项目 VillageTimber PBR / Blender 材质", runtimeTexture: "作者 UV、内嵌旧木 PBR、陶／搪瓷／药瓶独立材质",

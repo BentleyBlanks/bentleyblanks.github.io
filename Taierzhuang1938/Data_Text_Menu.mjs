@@ -219,6 +219,11 @@ export const TEXT = Object.freeze({
   "menu.sandbox.impacts.exit": "退出炮击扬尘测试场",
   "menu.sandbox.reactions.where": "人物战场反应测试场",
   "menu.sandbox.reactions.exit": "退出人物战场反应测试场",
+  "menu.sandbox.cloth.where": "布料模拟测试场",
+  "menu.sandbox.cloth.exit": "退出布料模拟测试场",
+  "boot.start.clothRange": "进入布料模拟测试场",
+  "range.build.clothFixtures": "搭建布料试验台",
+  "range.build.clothReady": "布料试验台就绪",
   // 第一关现在就是 P0/P1/P2 白盒（Data_Menu.CAMPAIGN_ENTRIES），玩家面前只叫「第一关」。
   "menu.sandbox.firstLevelP012Whitebox.where": "第一关",
   "menu.sandbox.firstLevelP012Whitebox.exit": "退出第一关",
