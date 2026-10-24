@@ -116,6 +116,10 @@ def InstallReferenceDetail(scene,skin,rig,collection,base):
             luminance=nodes.new('ShaderNodeRGBToBW');links.new(fibre.outputs['Color'],luminance.inputs[0]);generic=Math('DIVIDE',luminance.outputs[0],.55)
         else:generic=1
         usePhoto=Math('MULTIPLY',confidence,Math('SUBTRACT',1,protect))
+        if scene.get('DonkeyReferenceLegSections'):
+            leg=nodes.new('ShaderNodeAttribute');leg.attribute_name='LegProjectionProtection';usePhoto=Math('MULTIPLY',usePhoto,Math('SUBTRACT',1,Clamp(leg.outputs['Fac'])))
+        if scene.get('DonkeyTailRootRevision'):
+            repair=nodes.new('ShaderNodeAttribute');repair.attribute_name='TailRootRepairBlend';usePhoto=Math('MULTIPLY',usePhoto,Math('SUBTRACT',1,Clamp(repair.outputs['Fac'])))
         detail=Math('ADD',Math('MULTIPLY',photographic,usePhoto),Math('MULTIPLY',generic,Math('SUBTRACT',1,usePhoto)))
         multiply=nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1
         links.new(paint.outputs['Color'],multiply.inputs[1]);links.new(Math('MULTIPLY',.75,detail),multiply.inputs[2]);links.new(multiply.outputs[0],shader.inputs['Base Color'])

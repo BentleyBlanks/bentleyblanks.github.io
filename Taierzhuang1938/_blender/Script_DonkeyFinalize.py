@@ -1,5 +1,5 @@
 """Describe the verified standalone GLB and archive its independent source."""
-import bpy,json,hashlib
+import bpy,json,hashlib,struct
 from pathlib import Path
 from mathutils import Vector,Matrix
 
@@ -9,6 +9,17 @@ def Read(path):return json.loads(path.read_text(encoding='utf-8'))
 parent=Read(project/'Model/DonkeyCart/Data_DonkeyCart.json')
 parentTextures=Read(project/'Model/DonkeyCart/Data_DonkeyCartTextures.json')
 packing=Read(output/'Data_DonkeyPacking.json');bake=Read(base/'Review/Data_ExportBake.json')
+if scene.get('DonkeyReferenceLegSections'):
+    # The delivered glTF index accessors are authoritative. Runtime explicit
+    # triangulation can differ from the earlier polygon tessellation cache.
+    raw=asset.read_bytes();length=struct.unpack_from('<I',raw,12)[0];document=json.loads(raw[20:20+length])
+    for row in bake['batches']:
+        node=next(n for n in document['nodes'] if n.get('name')==row['meshName'])
+        row.setdefault('preExportTriangleEstimate',row['triangles'])
+        row['triangles']=sum(document['accessors'][p['indices']]['count']//3 for p in document['meshes'][node['mesh']]['primitives'])
+    bake['totalTriangles']=sum(row['triangles'] for row in bake['batches'])
+    bake['triangleCountAuthority']='actual delivered glTF index accessors'
+    (base/'Review/Data_ExportBake.json').write_text(json.dumps(bake,indent=2)+'\n',encoding='utf-8')
 imported=Read(base/'Review/Data_ImportedGlbVerification.json');derivation=Read(base/'Data_Derivation.json')
 native=Read(base/'Review/Data_AnimationMeasurements.json')
 reference=derivation.get('referenceFit');version=reference['version'] if reference else '20261023FurV3'
@@ -87,6 +98,13 @@ contract={'schema':'tengxian-independent-rigged-prop-v1','id':'Donkey','version'
  'historicalReferences':[],'rebuild':'node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs'}
 if scene.get('DonkeyEyeRevision'):
     contract['runtime']['specularTransfer']=next(row.get('specularTransfer') for row in bake['batches'] if row['label']=='Animal')
+if scene.get('DonkeyReferenceLegSections'):
+    uvProof=Read(base/'Review/Data_UvOverlapVerification.json')
+    if uvProof['overlapPixels'] or uvProof['legOverlapPixels']:raise RuntimeError('Unique Base Color atlas contains overlapping bake texels')
+    contract['verification']['bakeUvOverlapTexels']=uvProof['overlapPixels']
+    contract['verification']['bakeUvLegOverlapTexels']=uvProof['legOverlapPixels']
+    contract['verification']['runtimeTriangulation']='explicit source-derived triangles shared by bake and glTF export; editable source polygons retained'
+    contract['triangles']['sourceBeforeRuntimeTriangulationTotal']=sum(row['sourceTriangles'] for row in bake['batches'])
 (output/'Data_Donkey.json').write_text(json.dumps(contract,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 for file in sorted((project/'_blender').glob('Script_Donkey*')):
     if file.suffix not in ('.py','.mjs'):continue

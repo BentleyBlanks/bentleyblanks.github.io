@@ -1,7 +1,7 @@
 {
   "schema": "tengxian-independent-prop-textures-v1",
   "asset": "Donkey",
-  "version": "20261024ReferenceV16",
+  "version": "20261024ReferenceV18",
   "uv": "UV0 unique reference-detail base colour and accessory PBR atlas; independent repeated UV1 fibre normal; edge tuft atlas with per-root HairTint",
   "colorSpace": {
     "Base": "sRGB",
@@ -103,12 +103,12 @@
         "cavityProtection": "feathered source nostril shadows and oral crease/highlight footprints excluded from pigment-like detail; anatomical creases remain geometry",
         "original": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
         "originalSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
-        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV16\\Image_NakedAnatomyGuide.png",
+        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV18\\Image_NakedAnatomyGuide.png",
         "guideSha256": "8130715142837beed8957c59ffc775500d4b6ff96bf99a61b51f8759dc9d0c4a",
         "images": [
           {
             "view": "Side",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV16\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV18\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
             "sha256": "8d73e8a356d807d9fb3020310c402bd4a3d1974ad459a4a0e02c15d0cdb68852",
             "size": [
               1536,
@@ -117,7 +117,7 @@
           },
           {
             "view": "Front",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV16\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV18\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
             "sha256": "236a334f07bb01ec8e773154b89937e02d37bca1cc1b87973060c66c7019151f",
             "size": [
               1536,
@@ -126,7 +126,7 @@
           },
           {
             "view": "Rear",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV16\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV18\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
             "sha256": "ef5d8b1ac83cec630467e8244236c71b80238d05199fbf89f99d87c7b1a7aff4",
             "size": [
               1536,
@@ -137,11 +137,11 @@
         "occlusionMasks": "_blender/Script_DonkeyReferenceMasks.py; geometric rope footprints including shaded edges; feathered normalized-detail blending",
         "visibility": "fitted-skin BVH depth test from axial source cameras; 4 mm surface tolerance; source-vertex weights baked into UV0; V14 anterior muzzle uses horizontal normal azimuth so frontal lower lips do not inherit the side-photo floor weight",
         "materials": [
-          "DonkeyCartGreyCoat",
           "DonkeyCartEarInterior",
+          "DonkeyCartGreyCoat",
+          "DonkeyLowerLegShortFur",
           "DonkeyNasalPad",
-          "DonkeyCartFaceFur",
-          "DonkeyLowerLegShortFur"
+          "DonkeyCartFaceFur"
         ],
         "runtime": "baked UV0 base colour; independent tiled UV1 fibre normal; no camera projection in GLB",
         "pigmentProjection": {
@@ -172,7 +172,7 @@
           "images": [
             {
               "view": "Side",
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV16\\SourceTextures\\Texture_DonkeyReferenceSidePigment.png",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV18\\SourceTextures\\Texture_DonkeyReferenceSidePigment.png",
               "sha256": "c83427f503394f5f636edc0e27bd4442ebe4a00ae1b7fa9bd41659a3ecc10747",
               "size": [
                 1536,
@@ -181,7 +181,7 @@
             },
             {
               "view": "Front",
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV16\\SourceTextures\\Texture_DonkeyReferenceFrontPigment.png",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV18\\SourceTextures\\Texture_DonkeyReferenceFrontPigment.png",
               "sha256": "fd000c01578801b1097f6ef0af20aee8aad2a13ec2f5f3c74f1dd906c2058887",
               "size": [
                 1536,
@@ -190,7 +190,7 @@
             },
             {
               "view": "Rear",
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV16\\SourceTextures\\Texture_DonkeyReferenceRearPigment.png",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV18\\SourceTextures\\Texture_DonkeyReferenceRearPigment.png",
               "sha256": "3401153c133468803d39ae6a78971151ae8ec700231da93af6b604f745c0e224",
               "size": [
                 1536,
@@ -209,11 +209,552 @@
               "sha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b"
             },
             {
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV16\\Image_NakedAnatomyGuide.png",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV18\\Image_NakedAnatomyGuide.png",
               "sha256": "8130715142837beed8957c59ffc775500d4b6ff96bf99a61b51f8759dc9d0c4a"
             }
           ],
           "runtime": "offline UV0 bake into existing 2K base; no additional runtime image, material, camera projection or shader"
+        },
+        "legPigment": {
+          "method": "same-limb cylindrical correspondence from photographed visible coat strips; short-fur microvariation separated from low-frequency photo shading, calibrated dark coat and anatomical upper medial pale fur; feathered cap/side blend; no global projection or generated guide on limbs",
+          "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
+          "sourceSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
+          "atlas": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261024\\ReferenceFitV18\\SourceTextures\\Texture_DonkeyLegPigment.png",
+          "sha256": "3a640fba71f00df4643bbce3a60433d0a7275c3c444772a2ba25e84c7ce2ed64",
+          "sourceBoundaryRows": {
+            "SideFront": [
+              [
+                450,
+                658,
+                749
+              ],
+              [
+                500,
+                671,
+                751
+              ],
+              [
+                550,
+                690,
+                750
+              ],
+              [
+                600,
+                692,
+                735
+              ],
+              [
+                650,
+                695,
+                739
+              ],
+              [
+                700,
+                696,
+                744
+              ],
+              [
+                750,
+                700,
+                738
+              ],
+              [
+                800,
+                702,
+                740
+              ],
+              [
+                850,
+                707,
+                746
+              ],
+              [
+                875,
+                704,
+                729
+              ],
+              [
+                925,
+                696,
+                728
+              ]
+            ],
+            "SideRear": [
+              [
+                450,
+                1033,
+                1113
+              ],
+              [
+                500,
+                1064,
+                1129
+              ],
+              [
+                550,
+                1080,
+                1131
+              ],
+              [
+                600,
+                1101,
+                1137
+              ],
+              [
+                650,
+                1122,
+                1160
+              ],
+              [
+                700,
+                1132,
+                1170
+              ],
+              [
+                750,
+                1132,
+                1166
+              ],
+              [
+                800,
+                1131,
+                1162
+              ],
+              [
+                850,
+                1126,
+                1165
+              ],
+              [
+                875,
+                1118,
+                1158
+              ],
+              [
+                925,
+                1100,
+                1145
+              ]
+            ],
+            "FrontLeft": [
+              [
+                450,
+                178,
+                264
+              ],
+              [
+                500,
+                180,
+                258
+              ],
+              [
+                550,
+                177,
+                242
+              ],
+              [
+                600,
+                177,
+                237
+              ],
+              [
+                650,
+                181,
+                227
+              ],
+              [
+                700,
+                177,
+                227
+              ],
+              [
+                725,
+                179,
+                231
+              ],
+              [
+                750,
+                185,
+                226
+              ],
+              [
+                800,
+                190,
+                223
+              ],
+              [
+                850,
+                183,
+                233
+              ],
+              [
+                925,
+                193,
+                245
+              ]
+            ],
+            "FrontRight": [
+              [
+                450,
+                43,
+                134
+              ],
+              [
+                500,
+                45,
+                137
+              ],
+              [
+                550,
+                69,
+                137
+              ],
+              [
+                600,
+                74,
+                136
+              ],
+              [
+                650,
+                85,
+                136
+              ],
+              [
+                700,
+                84,
+                142
+              ],
+              [
+                725,
+                80,
+                140
+              ],
+              [
+                750,
+                86,
+                134
+              ],
+              [
+                800,
+                88,
+                130
+              ],
+              [
+                850,
+                78,
+                131
+              ],
+              [
+                925,
+                67,
+                115
+              ]
+            ],
+            "RearLeft": [
+              [
+                450,
+                1272,
+                1367
+              ],
+              [
+                500,
+                1277,
+                1355
+              ],
+              [
+                550,
+                1295,
+                1348
+              ],
+              [
+                600,
+                1308,
+                1345
+              ],
+              [
+                650,
+                1317,
+                1351
+              ],
+              [
+                700,
+                1315,
+                1367
+              ],
+              [
+                750,
+                1321,
+                1362
+              ],
+              [
+                800,
+                1324,
+                1356
+              ],
+              [
+                850,
+                1315,
+                1357
+              ],
+              [
+                900,
+                1306,
+                1352
+              ],
+              [
+                925,
+                1301,
+                1351
+              ]
+            ],
+            "RearRight": [
+              [
+                450,
+                1425,
+                1514
+              ],
+              [
+                500,
+                1430,
+                1512
+              ],
+              [
+                550,
+                1436,
+                1495
+              ],
+              [
+                600,
+                1441,
+                1481
+              ],
+              [
+                650,
+                1426,
+                1471
+              ],
+              [
+                700,
+                1418,
+                1469
+              ],
+              [
+                750,
+                1422,
+                1464
+              ],
+              [
+                800,
+                1427,
+                1461
+              ],
+              [
+                850,
+                1426,
+                1470
+              ],
+              [
+                900,
+                1431,
+                1480
+              ],
+              [
+                925,
+                1434,
+                1484
+              ]
+            ]
+          },
+          "sampling": [
+            {
+              "leg": "DonkeyFrontLeft",
+              "sideDonor": "near foreleg",
+              "capDonor": "FrontLeft"
+            },
+            {
+              "leg": "DonkeyFrontRight",
+              "sideDonor": "near foreleg",
+              "capDonor": "FrontRight"
+            },
+            {
+              "leg": "DonkeyRearLeft",
+              "sideDonor": "near hindleg",
+              "capDonor": "RearLeft"
+            },
+            {
+              "leg": "DonkeyRearRight",
+              "sideDonor": "near hindleg",
+              "capDonor": "RearRight"
+            }
+          ],
+          "sourceChecks": [
+            {
+              "view": "Side",
+              "boundaryFirstRow": [
+                450,
+                658,
+                749
+              ],
+              "samples": 316032,
+              "lightPixelSamples": 16,
+              "sourceXRange": [
+                668.6228100801903,
+                744.5968776326314
+              ]
+            },
+            {
+              "view": "Front",
+              "boundaryFirstRow": [
+                450,
+                178,
+                264
+              ],
+              "samples": 316032,
+              "lightPixelSamples": 2211,
+              "sourceXRange": [
+                181.51616763678314,
+                255.19101282391767
+              ]
+            },
+            {
+              "view": "Side",
+              "boundaryFirstRow": [
+                450,
+                658,
+                749
+              ],
+              "samples": 316032,
+              "lightPixelSamples": 16,
+              "sourceXRange": [
+                668.6228100801903,
+                744.5968776326314
+              ]
+            },
+            {
+              "view": "Front",
+              "boundaryFirstRow": [
+                450,
+                43,
+                134
+              ],
+              "samples": 316032,
+              "lightPixelSamples": 571,
+              "sourceXRange": [
+                51.61359038195924,
+                136.7562709538882
+              ]
+            },
+            {
+              "view": "Side",
+              "boundaryFirstRow": [
+                450,
+                1033,
+                1113
+              ],
+              "samples": 316032,
+              "lightPixelSamples": 0,
+              "sourceXRange": [
+                1046.2016386886517,
+                1166.5595049853373
+              ]
+            },
+            {
+              "view": "Rear",
+              "boundaryFirstRow": [
+                450,
+                1272,
+                1367
+              ],
+              "samples": 316032,
+              "lightPixelSamples": 2112,
+              "sourceXRange": [
+                1281.2528159870599,
+                1362.2970176857375
+              ]
+            },
+            {
+              "view": "Side",
+              "boundaryFirstRow": [
+                450,
+                1033,
+                1113
+              ],
+              "samples": 316032,
+              "lightPixelSamples": 0,
+              "sourceXRange": [
+                1046.2016386886517,
+                1166.5595049853373
+              ]
+            },
+            {
+              "view": "Rear",
+              "boundaryFirstRow": [
+                450,
+                1425,
+                1514
+              ],
+              "samples": 316032,
+              "lightPixelSamples": 1888,
+              "sourceXRange": [
+                1422.6083576142746,
+                1505.7121192386128
+              ]
+            }
+          ],
+          "paletteSourceBoxes": {
+            "ForeSideDark": [
+              707,
+              750,
+              732,
+              830
+            ],
+            "HindSideDark": [
+              1136,
+              760,
+              1159,
+              825
+            ],
+            "ForeFrontDark": [
+              207,
+              765,
+              220,
+              825
+            ],
+            "ForeMedialPale": [
+              185,
+              565,
+              198,
+              610
+            ]
+          },
+          "paletteCalibratedLinearRgb": {
+            "ForeSideDark": [
+              0.03967416286468506,
+              0.031027867048978808,
+              0.029000582918524743
+            ],
+            "HindSideDark": [
+              0.038536958396434784,
+              0.032043365091085435,
+              0.031028376519680025
+            ],
+            "ForeFrontDark": [
+              0.02206984907388687,
+              0.018760345578193664,
+              0.018470363318920137
+            ],
+            "ForeMedialPale": [
+              0.18876586854457855,
+              0.15328321650624277,
+              0.12807480245828629
+            ]
+          },
+          "vertices": 5807,
+          "materials": [
+            "DonkeyCartGreyCoat",
+            "DonkeyLowerLegShortFur"
+          ],
+          "runtime": "baked into existing UV0 2K Base Color; shared UV1 fur normal unchanged; no additional runtime image or projection"
         }
       }
     }
@@ -275,8 +816,8 @@
         2048,
         2048
       ],
-      "bytes": 2412652,
-      "sha256": "2a11760e6595b6947d0f48c92669909b25ea1ad5d861d904d0f4498f3341d1af",
+      "bytes": 3130732,
+      "sha256": "d52dbf639183a6c32151a42eade0093841b83c27eecfdec50c18c79aaac74eb1",
       "lossless": true
     },
     {
@@ -286,8 +827,8 @@
         512,
         512
       ],
-      "bytes": 24492,
-      "sha256": "4e4bccf2f37868f6f916055c4d1733084ca00e12eb0ac513c3fd845694c88b1d",
+      "bytes": 30690,
+      "sha256": "afe3d269c94f03bbaea84916c45da9196d56c2b7326459fc9e320595b3a3bba5",
       "lossless": true
     },
     {
@@ -297,8 +838,8 @@
         1024,
         1024
       ],
-      "bytes": 840906,
-      "sha256": "a7f145fcf6477ce1b07cde48ec50b4ef4cae4a47414449a302c0ac48218d99f1",
+      "bytes": 1200496,
+      "sha256": "3e351fd5fd0f75b20cc5bcfea91bcf294ee4e7b3982a93568f64738c630057e8",
       "lossless": true
     }
   ],

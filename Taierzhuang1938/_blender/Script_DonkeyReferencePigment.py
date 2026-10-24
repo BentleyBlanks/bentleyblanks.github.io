@@ -91,6 +91,10 @@ def InstallReferencePigment(scene,skin,rig,base):
         strength=Math('ADD',Math('MULTIPLY',mixStrength,body),Math('MULTIPLY',.88,Math('MULTIPLY',smooth,eyeKeep)))
         scope=nodes.new('ShaderNodeAttribute');scope.attribute_name='ReferencePigmentScope'
         amount=Math('MULTIPLY',scope.outputs['Fac'],Math('MULTIPLY',strength,confidence))
+        if scene.get('DonkeyReferenceLegSections'):
+            leg=nodes.new('ShaderNodeAttribute');leg.attribute_name='LegProjectionProtection';amount=Math('MULTIPLY',amount,Math('SUBTRACT',1,Clamp(leg.outputs['Fac'])))
+        if scene.get('DonkeyTailRootRevision'):
+            repair=nodes.new('ShaderNodeAttribute');repair.attribute_name='TailRootRepairBlend';amount=Math('MULTIPLY',amount,Math('SUBTRACT',1,Clamp(repair.outputs['Fac'])))
         mix=nodes.new('ShaderNodeMixRGB');links.new(amount,mix.inputs[0]);links.new(previous,mix.inputs[1]);links.new(pigment,mix.inputs[2]);links.new(mix.outputs[0],shader.inputs['Base Color']);materials.append(material.name)
     record={'method':'full reference RGB with per-view normal-based illumination compensation for body, facial fur and the V14 nasal pad; the pad retains its independent skin normal; anatomical feature footprints and hidden/background pixels retain calibrated appearance',
         'linearGain':gain,'linearGainRgb':[.50,.515,.55],'mixStrength':mixStrength,'headTransitionY':[.88,.98],

@@ -85,6 +85,13 @@ def CloneBatch(sourceRig,label):
     # Joining preserves group membership and one instance of the shared armature.
     for modifier in list(obj.modifiers)[1:]:
         if modifier.type=='ARMATURE':obj.modifiers.remove(modifier)
+    if standalone and scene.get('DonkeyReferenceLegSections'):
+        # Bake and export the same explicit triangles. A warped quad's UV
+        # tessellation must not change between Cycles and the glTF exporter.
+        import bmesh
+        bm=bmesh.new();bm.from_mesh(obj.data)
+        bmesh.ops.triangulate(bm,faces=list(bm.faces),quad_method='BEAUTY',ngon_method='BEAUTY')
+        bm.to_mesh(obj.data);bm.free();obj.data.update()
     obj.data.calc_loop_triangles();obj['sourceTriangles']=len(obj.data.loop_triangles)
     # Preserve the animal's anatomy and all editable source detail. If the whole
     # asset exceeds the vehicle budget, reduce only runtime bevel/rivet density.

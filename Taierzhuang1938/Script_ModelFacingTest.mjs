@@ -299,8 +299,11 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
 Check(bare.json.meshes.length===3 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===79748 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
-  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与79,748三角齐备");
+  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===79206 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
+  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与79,206三角齐备");
+Check(bareSpec.verification.bakeUvOverlapTexels===0 && bareSpec.verification.bakeUvLegOverlapTexels===0
+  && bareSpec.triangles.sourceBeforeRuntimeTriangulationTotal===79212,
+  "独立驴制作源登记零重叠烘焙图集与显式运行时三角化；最终GLB的UV覆盖另作独立验证");
 const upperBodyFit=bareSpec.derivation.referenceFit.details.upperBodyFit;
 Check(upperBodyFit.refinementTriangles===274&&upperBodyFit.sideProfileUnchanged===true&&upperBodyFit.maximumHeadDisplacementM===0&&upperBodyFit.maximumLowerLimbDisplacementM===0
   &&upperBodyFit.integrity.boundaryEdges===0&&upperBodyFit.integrity.nonmanifoldEdges===0,
