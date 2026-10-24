@@ -1,4 +1,5 @@
 """Axial-photo visibility in the fitted rest mesh; baked, never view dependent."""
+import bpy,math
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
@@ -7,6 +8,10 @@ def BuildViewSampler(skin):
     def Weights(point,normal,photo=False):
         power=4 if photo else 2
         values=[abs(normal.x)**4+.03 if photo else (abs(normal.x)+.15)**2,max(0,normal.y)**power,max(0,-normal.y)**power]
+        if photo and bpy.context.scene.get('DonkeyMuzzleRevision') and point.y>1.21 and point.z<1.10:
+            horizontal=math.hypot(normal.x,normal.y)
+            if horizontal>.03:
+                values=[(abs(normal.x)/horizontal)**4,(max(0,normal.y)/horizontal)**4,(max(0,-normal.y)/horizontal)**4]
         directions=(Vector((-1 if point.x<=0 else 1,0,0)),Vector((0,1,0)),Vector((0,-1,0)))
         for i,(weight,direction) in enumerate(zip(values,directions)):
             if weight<1e-8:continue

@@ -40,7 +40,10 @@ def InstallReferencePigment(scene,skin,rig,base):
     eyeCentre=sum((eyeMatrix@v.co for v in eye.data.vertices),Vector())/len(eye.data.vertices);eyeCentre.x=abs(eyeCentre.x)
     ppm=(925-302)/1.10;anchor=scene['DonkeyReferenceFitAnchorY'];gain=.50;mixStrength=.95;materials=[]
     for material in skin.data.materials:
-        if not material or not material.name.startswith(('DonkeyCartGreyCoat','DonkeyLowerLegShortFur','DonkeyCartFaceFur')):continue
+        if not material:continue
+        furry=material.name.startswith(('DonkeyCartGreyCoat','DonkeyLowerLegShortFur','DonkeyCartFaceFur'))
+        nasal=bool(scene.get('DonkeyMuzzleRevision')) and material.name.startswith('DonkeyNasalPad')
+        if not (furry or nasal):continue
         nodes,links=material.node_tree.nodes,material.node_tree.links
         shader=next(n for n in nodes if n.type=='BSDF_PRINCIPLED');previous=shader.inputs['Base Color'].links[0].from_socket
         def Math(operation,a,b=0):
@@ -89,7 +92,7 @@ def InstallReferencePigment(scene,skin,rig,base):
         scope=nodes.new('ShaderNodeAttribute');scope.attribute_name='ReferencePigmentScope'
         amount=Math('MULTIPLY',scope.outputs['Fac'],Math('MULTIPLY',strength,confidence))
         mix=nodes.new('ShaderNodeMixRGB');links.new(amount,mix.inputs[0]);links.new(previous,mix.inputs[1]);links.new(pigment,mix.inputs[2]);links.new(mix.outputs[0],shader.inputs['Base Color']);materials.append(material.name)
-    record={'method':'full reference RGB with per-view normal-based illumination compensation for body and facial fur; hairless nasal pad keeps its independent skin material; anatomical feature footprints and hidden/background pixels retain calibrated appearance',
+    record={'method':'full reference RGB with per-view normal-based illumination compensation for body, facial fur and the V14 nasal pad; the pad retains its independent skin normal; anatomical feature footprints and hidden/background pixels retain calibrated appearance',
         'linearGain':gain,'linearGainRgb':[.50,.515,.55],'mixStrength':mixStrength,'headTransitionY':[.88,.98],
         'headMixStrength':.88,'eyeProtectionRadiiM':[.040,.040,.020],'nasalCavityProtection':'source cavity and oral crease/highlight footprints excluded from colour projection',
         'fineCompensation':{'radiusPixels':1,'amount':1.25,'sourceSampling':'Closest during offline bake; ordinary filtered runtime sampler unchanged'},'images':records,'materials':materials,

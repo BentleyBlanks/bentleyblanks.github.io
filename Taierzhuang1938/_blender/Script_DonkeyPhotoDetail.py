@@ -120,7 +120,7 @@ def InstallReferenceDetail(scene,skin,rig,collection,base):
         multiply=nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1
         links.new(paint.outputs['Color'],multiply.inputs[1]);links.new(Math('MULTIPLY',.75,detail),multiply.inputs[2]);links.new(multiply.outputs[0],shader.inputs['Base Color'])
     scene['DonkeyReferencePhotoDetail']='20261024ReferenceDetailV2'
-    record['visibility']='fitted-skin BVH depth test from axial source cameras; 4 mm surface tolerance; source-vertex weights baked into UV0'
+    record['visibility']='fitted-skin BVH depth test from axial source cameras; 4 mm surface tolerance; source-vertex weights baked into UV0; V14 anterior muzzle uses horizontal normal azimuth so frontal lower lips do not inherit the side-photo floor weight'
     record['materials']=[m.name for m in materials];record['runtime']='baked UV0 base colour; independent tiled UV1 fibre normal; no camera projection in GLB'
     (base/'SourceTextures/Data_ReferencePhotoDetail.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8')
     return record

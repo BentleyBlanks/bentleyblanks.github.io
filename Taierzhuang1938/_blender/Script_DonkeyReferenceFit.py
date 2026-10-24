@@ -553,13 +553,18 @@ def InstallNasalPad(skin):
     slot=skin.data.materials.find(material.name)
     if slot<0:skin.data.materials.append(material);slot=len(skin.data.materials)-1
     faces=0
+    if bpy.context.scene.get('DonkeyMuzzleRevision'):
+        coatSlot=next(i for i,m in enumerate(skin.data.materials) if m.name.startswith('DonkeyCartGreyCoat'))
+        for face in skin.data.polygons:
+            if skin.data.materials[face.material_index].name.startswith('DonkeyNasalPad'):face.material_index=coatSlot
     for face in skin.data.polygons:
         name=skin.data.materials[face.material_index].name
         if not name.startswith(('DonkeyCartGreyCoat','DonkeyCartFaceFur')):continue
         centre=sum((skin.data.vertices[i].co for i in face.vertices),Vector())/len(face.vertices)
-        if centre.y>1.230 and centre.z<.963:face.material_index=slot;faces+=1
+        selected=centre.y>1.292 and .887<centre.z<.963 if bpy.context.scene.get('DonkeyMuzzleRevision') else centre.y>1.230 and centre.z<.963
+        if selected:face.material_index=slot;faces+=1
     if not faces:raise RuntimeError('No nasal pad surface was selected')
-    return {'material':material.name,'faces':faces,'roughness':.72,'normal':'fine 0.25 mm procedural skin relief baked on UV0; no coarse repeated fibre normal','pigment':'reference blend strengthened below the upper white muzzle; soft height transition'}
+    return {'material':material.name,'faces':faces,'roughness':.72,'normal':'fine 0.25 mm procedural skin relief baked on UV0; no coarse repeated fibre normal','pigment':'full reference RGB for the V14 nasal pad; fur retained on the chin and posterior muzzle','region':{'minimumY':1.292,'heightM':[.887,.963]} if bpy.context.scene.get('DonkeyMuzzleRevision') else {'minimumY':1.230,'maximumZ':.963}}
 
 
 
@@ -684,7 +689,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261024ReferenceV13'
+    scene['DonkeyReferenceFitRevision']='20261024ReferenceV14'
     scene['DonkeyReferenceFineTail']=True
     scene['DonkeyReferenceFitAnchorY']=anchor
     # Repaint the short pale muzzle rather than the old long horse-like blaze.
@@ -699,8 +704,11 @@ def ApplyReferenceFit(scene,base):
         baseColor=Vector((.027,.026,.023));muzzle=Vector((.28,.27,.245))
         value=baseColor.lerp(muzzle,pale);old=Vector(colors.data[vertex.index].color[:3])
         colors.data[vertex.index].color=(*old.lerp(value,head),1)
+    muzzleNamespace={}
+    exec(compile((project/'_blender/Script_DonkeyMuzzle.py').read_text(encoding='utf-8'),'Script_DonkeyMuzzle.py','exec'),muzzleNamespace)
+    details['muzzle']=muzzleNamespace['ApplyReferenceMuzzle'](scene,skin,rig)
     projected=ReferencePigment(skin,anchor);colorCalibration=CalibrateCoatPigment(skin)
-    details['eyes']=RefineEyes(skin,rig);SeatMouthSeam(skin,rig);FinishFurResponse(rig,collection)
+    details['eyes']=RefineEyes(skin,rig);FinishFurResponse(rig,collection)
     details['nasalPad']=InstallNasalPad(skin);flowReport=RefreshFlow(skin,rig,collection)
     photoNamespace={}
     exec(compile((project/'_blender/Script_DonkeyPhotoDetail.py').read_text(encoding='utf-8'),'Script_DonkeyPhotoDetail.py','exec'),photoNamespace)

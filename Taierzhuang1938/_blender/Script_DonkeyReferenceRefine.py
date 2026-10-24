@@ -8,6 +8,9 @@ exec(compile((project/'_blender/Script_DonkeyReferenceFit.py').read_text(encodin
 report=namespace['ApplyReferenceFit'](scene,base)
 record=json.loads((base/'Data_Derivation.json').read_text(encoding='utf-8'))
 record['referenceFit']=report
+if report['details'].get('muzzle'):
+    record['previousMouthSeamConform']=record['mouthSeamConform']
+    record['mouthSeamConform']={**report['details']['muzzle']['mouth'],'sourceScript':'_blender/Script_DonkeyMuzzle.py'}
 record['referenceRetainedObjects']=sorted(o.name for o in bpy.data.collections['DonkeyEditable'].all_objects)
 record['coat'].update(report['groom'])
 record['coat'].update({'version':report['version'],'detailNormalUv':'FurDetailUV; measured short-coat flow, 0.45 m per texture repeat',

@@ -18,6 +18,9 @@ def AssignAtlasGroup(obj,label,sourceName):
     attribute=obj.data.attributes.get('AtlasGroup') or obj.data.attributes.new('AtlasGroup','INT','FACE')
     for face in obj.data.polygons:
         value=group
+        if label=='Animal' and sourceName=='DonkeyContinuousSkin' and bpy.context.scene.get('DonkeyMuzzleRevision'):
+            centre=sum((obj.data.vertices[i].co.y for i in face.vertices))/len(face.vertices)
+            if centre>1.21:value=6
         if label=='Cart' and sourceName.startswith('CartFloorPlank') and face.normal.z<-.5:value=3
         attribute.data[face.index].value=value
 
@@ -30,6 +33,9 @@ def AuthorGameUv(obj,label):
     else:
         rectangles={0:(.005,.005,.630,.990),1:(.645,.005,.350,.350),2:(.645,.365,.350,.350),3:(.645,.725,.350,.270)}
     groups=obj.data.attributes['AtlasGroup'];bpy.context.tool_settings.mesh_select_mode=(False,False,True)
+    if label=='Animal' and bpy.context.scene.get('DonkeyMuzzleRevision'):
+        if any(value.value in (2,3) for value in groups.data):raise RuntimeError('Bare muzzle atlas reserve overlaps tack charts')
+        rectangles[6]=(.805,.203,.190,.386)
     counts={}
     for group,(x,y,width,height) in rectangles.items():
         faces=[face for face in obj.data.polygons if groups.data[face.index].value==group]
