@@ -11,7 +11,11 @@ function Write(key, value) {
 }
 
 export function LoadGraphicsProfile(search = "") {
-  return ResolveGraphicsProfile(new URLSearchParams(search).get("quality"), Read(GRAPHICS_PROFILE_STORAGE_KEY, null));
+  const params = new URLSearchParams(search), requested = params.get("quality");
+  const profile = ResolveGraphicsProfile(requested, Read(GRAPHICS_PROFILE_STORAGE_KEY, null));
+  // This material laboratory needs the original surfaces. Keep explicit quality
+  // choices and textured saved tiers, without changing the global preference.
+  return params.get("cloth") === "1" && !GRAPHICS_PROFILES.includes(requested) && profile === "whitebox" ? "high" : profile;
 }
 export function LoadWhiteboxConfig() {
   const saved = Read(WHITEBOX_STORAGE_KEY, null);

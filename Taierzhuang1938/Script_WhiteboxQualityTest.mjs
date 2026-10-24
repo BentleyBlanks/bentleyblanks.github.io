@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { WHITEBOX_DEFAULTS, NormalizeWhiteboxConfig, WhiteboxPassPlan, ResolveGraphicsProfile,
-  WhiteboxGraphicsOverrides, WHITEBOX_STORAGE_KEY, WHITEBOX_CARDS } from "./Data_Tuning_Whitebox.mjs";
+  WhiteboxGraphicsOverrides, WHITEBOX_STORAGE_KEY, GRAPHICS_PROFILE_STORAGE_KEY, WHITEBOX_CARDS } from "./Data_Tuning_Whitebox.mjs";
 import { LoadWhiteboxConfig, SaveWhiteboxConfig, LoadGraphicsProfile, CreateGraphicsProfileApi } from "./Script_GraphicsProfile.mjs";
 import { LoadSavedGraphics } from "./Script_EditorSettings.mjs";
+import { SandboxUrl } from "./Data_StartupRouting.mjs";
+import { WhiteboxSceneRenderer } from "./Script_WhiteboxRendering.mjs";
+import * as THREE from "three";
 
 assert.equal(ResolveGraphicsProfile(null, null), "whitebox");
 assert.equal(ResolveGraphicsProfile("high", "whitebox"), "high");
@@ -54,6 +57,32 @@ assert.equal(JSON.parse(memory.get(WHITEBOX_STORAGE_KEY)).schema, WHITEBOX_DEFAU
 assert.equal(LoadWhiteboxConfig().shadows, false);
 memory.set("tengxian1938_graphics_v1", JSON.stringify({ taa: true, gi: true, profile: "high" }));
 assert.equal(LoadGraphicsProfile(), "whitebox", "legacy graphics cannot change the new default");
+// Cloth is a material inspection scene. Its local fallback must not rewrite the
+// user's global presentation or whitebox options, including when entered from a menu.
+for (const [saved, query, expected] of [
+  [null, "?cloth=1", "high"], ["whitebox", "?cloth=1", "high"],
+  ["low", "?cloth=1", "low"], ["medium", "?cloth=1", "medium"],
+  ["high", "?cloth=1", "high"], ["ultra", "?cloth=1", "ultra"],
+  ["whitebox", "?cloth=1&quality=low", "low"], ["medium", "?cloth=1&quality=whitebox", "whitebox"],
+  ["whitebox", "?cloth=1&quality=invalid", "high"],
+  [null, "", "whitebox"], ["whitebox", "?weapons=1", "whitebox"],
+  ["whitebox", "?cloth=0", "whitebox"], ["medium", "?range=1", "medium"],
+]) {
+  if (saved === null) memory.delete(GRAPHICS_PROFILE_STORAGE_KEY);
+  else memory.set(GRAPHICS_PROFILE_STORAGE_KEY, JSON.stringify(saved));
+  const before = [...memory];
+  assert.equal(LoadGraphicsProfile(query), expected, `scene profile saved=${saved} query=${query}`);
+  assert.deepEqual([...memory], before, "resolving a scene profile never writes storage");
+}
+memory.set(GRAPHICS_PROFILE_STORAGE_KEY, "corrupt");
+assert.equal(LoadGraphicsProfile("?cloth=1"), "high");
+assert.equal(LoadGraphicsProfile(), "whitebox");
+memory.delete(GRAPHICS_PROFILE_STORAGE_KEY);
+const clothEntry = SandboxUrl("https://example.test/?quality=whitebox", "cloth");
+assert.equal(new URL(clothEntry).search, "?cloth=1");
+assert.equal(new URL(SandboxUrl(clothEntry, "weapons")).search, "?weapons=1", "Leaving the lab does not carry a temporary high override into another scene");
+assert.equal(new URL(SandboxUrl("https://example.test/?quality=low", "cloth")).search, "?quality=low&cloth=1");
+assert.equal(new URL(SandboxUrl("https://example.test/?quality=whitebox", "weapons")).search, "?quality=whitebox&weapons=1");
 const graphics = { profile: "whitebox", taa: false, gi: false };
 assert.equal(LoadSavedGraphics(graphics), 0);
 assert.equal(graphics.taa, false);
@@ -72,7 +101,31 @@ assert.equal(LoadWhiteboxConfig().gridSize, 2);
 assert.equal(LoadWhiteboxConfig().gridColor, "#334455");
 memory.set(WHITEBOX_STORAGE_KEY, "corrupt");
 assert.deepEqual(LoadWhiteboxConfig(), WHITEBOX_DEFAULTS);
+{
+  // Exercise the actual cached Begin/restore path: the source material is restored
+  // after each draw, so inspecting it alone used to miss an inert wireframe toggle.
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+  const source = new THREE.MeshStandardMaterial({ wireframe: false });
+  const geometry = new THREE.BoxGeometry(), mesh = new THREE.Mesh(geometry, source);
+  scene.add(mesh);
+  const whitebox = new WhiteboxSceneRenderer(scene, { ...WHITEBOX_DEFAULTS });
+  try {
+    let restore = whitebox.Begin(scene, camera);
+    const cached = mesh.material;
+    assert.notEqual(cached, source); assert.equal(cached.wireframe, false); restore();
+    assert.equal(mesh.material, source);
+    source.wireframe = true;
+    restore = whitebox.Begin(scene, camera);
+    assert.equal(mesh.material, cached, "wireframe toggles reuse the cached whitebox material");
+    assert.equal(mesh.material.wireframe, true, "the actual draw material follows wireframe on"); restore();
+    source.wireframe = false;
+    restore = whitebox.Begin(scene, camera);
+    assert.equal(mesh.material.wireframe, false, "the same cached draw material follows wireframe off"); restore();
+  } finally { whitebox.Dispose(); geometry.dispose(); source.dispose(); }
+}
 globalThis.localStorage = { getItem() { throw new Error("denied"); }, setItem() { throw new Error("denied"); } };
 assert.equal(LoadGraphicsProfile(), "whitebox");
+assert.equal(LoadGraphicsProfile("?cloth=1"), "high", "cloth remains textured when storage is unavailable");
+assert.equal(LoadGraphicsProfile("?cloth=1&quality=whitebox"), "whitebox");
 assert.equal(SaveWhiteboxConfig({}), false);
-console.log("PASS whitebox default, migration, schema, dependency plan, persistence and agent API");
+console.log("PASS whitebox defaults, cloth route isolation, cached wireframe, migration, persistence and agent API");

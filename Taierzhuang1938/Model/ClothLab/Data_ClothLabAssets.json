@@ -1,5 +1,5 @@
 {
-  "version": "20261024ClothLabV3BindingUv",
+  "version": "20261025ClothLabV4SoftCotton",
   "blenderVersion": "5.2.1 LTS",
   "coordinates": "Blender (x,y,z) -> glTF (x,z,-y); cloth head row 0 is +Z; column 0 is +X; flat bones at Y=0",
   "rig": {
@@ -22,11 +22,15 @@
       "id": "DongguaQuilt",
       "width": 1.4,
       "length": 1.9,
-      "thickness": 0.074,
-      "hem": 0.014,
+      "thickness": 0.08,
+      "hem": 0.026,
       "texture": "DongguaQuiltTopBase",
       "underside": "DongguaQuiltBottomBase",
-      "normalStrength": 0.48,
+      "normalStrength": 0.72,
+      "normalTexture": "DongguaCottonDetailNormal",
+      "detailTileM": 0.18,
+      "specular": 0.1,
+      "surface": "Faded grey blue cotton / warm grey cotton lining; uneven cotton filling; creative study",
       "file": "Model_DongguaQuilt.glb",
       "vertices": 6858,
       "triangles": 13712,
@@ -45,42 +49,42 @@
       "embeddedTextures": true,
       "roughness": 0.96,
       "metallic": 0,
-      "specularIorLevel": 0.18,
+      "specularIorLevel": 0.1,
       "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\ClothLab\\Scene_DongguaQuilt.blend",
       "checks": {
         "closedShell": true,
         "boundaryEdges": 0,
         "eulerCharacteristic": 2,
         "weightSumMaxError": 4.470348358154297e-08,
-        "cornerPullMaxErrorM": 2.9802322387695312e-08,
+        "cornerPullMaxErrorM": 1.4901161193847656e-08,
         "thicknessRangeM": [
-          0.014000000432133675,
-          0.08533438667654991
+          0.026000000536441803,
+          0.09279390424489975
         ],
         "tangents": [
           {
             "material": "Mat_DongguaQuiltFront",
             "vertices": 3315,
-            "minTangentLength": 0.9999355136592147,
-            "maxNormalDotTangentAbs": 0.00012379676726497618
+            "minTangentLength": 0.9999383701045841,
+            "maxNormalDotTangentAbs": 0.00011444587458551121
           },
           {
             "material": "Mat_DongguaQuiltBack",
             "vertices": 3315,
-            "minTangentLength": 0.9999330403311383,
-            "maxNormalDotTangentAbs": 9.993439445699082e-05
+            "minTangentLength": 0.9999340556793337,
+            "maxNormalDotTangentAbs": 0.00010815358265858777
           },
           {
             "material": "Mat_DongguaQuiltBinding",
             "vertices": 687,
-            "minTangentLength": 0.9999501502307833,
-            "maxNormalDotTangentAbs": 0.00010415049622441303
+            "minTangentLength": 0.9999508871990076,
+            "maxNormalDotTangentAbs": 0.00011022105027347351
           }
         ],
         "roundTripMaxDeviationM": 0.0
       },
-      "sha256": "acf5a6413d65d0a74c6e6cac0f83b8f81b1f89e8594f28f5522db937dcf44813",
-      "bytes": 1107988,
+      "sha256": "5f1f3c4d23c87bc8b8a4cb3a3157eac32cb588e67d5ed69490970ff1caa1cfe9",
+      "bytes": 1271964,
       "classification": "Artistic reconstruction; cloth-lab-only study"
     },
     {

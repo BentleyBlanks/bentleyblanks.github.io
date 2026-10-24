@@ -1,14 +1,14 @@
 # 布料测试场独立资产
 
-2026-10-24 首版。三件仅供布料测试场调整与比较，不替换正片的 `Model_SingleBlanket.glb`，也不修改旧布料参数。尺寸、补丁、颜色、绗缝及旗面布局均为**创作复原**。锦旗以川军“死字旗”的白底黑字作为外观主题；红边与斜绸带是本测试模型的简化设计，不能当作馆藏原件的逐项复刻。
+2026-10-24 首版，当前棉被为 2026-10-25 V4 柔软棉絮版。三件仅供布料测试场调整与比较，不替换正片的 `Model_SingleBlanket.glb`，也不修改旧布料参数。尺寸、颜色、绗缝及旗面布局均为**创作复原**。锦旗以川军“死字旗”的白底黑字作为外观主题；红边与斜绸带是本测试模型的简化设计，不能当作馆藏原件的逐项复刻。
 
 | 文件 | 平面尺寸 | 双层厚度 | 材质 |
 | --- | --- | --- | --- |
-| `Model_DongguaQuilt.glb` | 1.40 × 1.90 m | 包边 1.4 cm，主体非均匀填棉、峰值 8.53 cm | 灰褐旧棉布、原五块补丁的派生底色、稀疏绗缝、独立深色背面与包边 |
+| `Model_DongguaQuilt.glb` | 1.40 × 1.90 m | 标称填充 8 cm，圆包边 2.6 cm，非均匀棉絮峰值 9.28 cm | 褪色灰蓝棉布面、暖灰棉里、细平纹棉纤维、柔软包边与压实绗缝 |
 | `Model_DoorCurtain.glb` | 1.25 × 1.90 m | 包边 1 cm，主体峰值 3.5 cm | 暗黄灰棉门帘，三道纵向缝线、下缘积灰、角部修补 |
 | `Model_SichuanBanner.glb` | 1.45 × 1.75 m | 2.5 mm | 米白底、黑色楷体“死”、暗红边与对角绸带 |
 
-包边在四周各增加最多 2 mm；旗的包边各增加 0.8 mm。厚度来自闭合网格，不依赖双面材质伪装：上下各一层 50 × 64 四边形网格，加连续侧边；每件 6,858 作者顶点、13,712 三角、1 网格 / 3 材质。GLB 按材质与 UV 拆分顶点，检查封闭性时须按位置焊接。各材质为不透明棉布，metallic 0、roughness 0.96、Blender Specular IOR Level 0.18，低强度平纹/细褶法线与柔和 sheen。
+圆包边向四周各增加最多 8 mm（棉被）、2 mm（门帘）、0.8 mm（旗）。厚度来自闭合网格，不依赖双面材质伪装：上下各一层 50 × 64 四边形网格，加连续侧边；每件 6,858 作者顶点、13,712 三角、1 网格 / 3 材质。GLB 按材质与 UV 拆分顶点，检查封闭性时须按位置焊接。各材质为不透明棉布，metallic 0、roughness 0.96；Blender Specular IOR Level 棉被为 0.10、其余两件为 0.18，棉布细法线与柔和 sheen 表现纤维。
 
 ## 绑定契约
 
@@ -33,9 +33,9 @@ node scripts/Script_BlenderMcp.mjs stop
 node scripts/Script_BlenderMcp.mjs status --scan
 ```
 
-有多个本树实例时，对 `exec` / `stop` 加入启动结果的 `--port`。烘焙脚本拒绝覆盖该源目录之外的已打开 Blender 文件。Python 纹理脚本需要 Pillow、numpy 和 Windows `simkai.ttf`；字体只栅格化一个字，不再分发字体文件。棉被底色由旧 `Texture_SingleBlanketBase.webp` 派生，法线复用 `Texture_SingleBlanketDetailNormal.webp`，两份旧输入文件均只读。每份 GLB 自包含最多 1024² 的 WebP 图片：棉被 3 图，门帘与旗各 2 图。
+有多个本树实例时，对 `exec` / `stop` 加入启动结果的 `--port`。烘焙脚本拒绝覆盖该源目录之外的已打开 Blender 文件。Python 纹理脚本需要 Pillow、numpy；旗字另需 Windows `simkai.ttf`（只栅格化一个字，不分发字体文件）。V4 棉被改用独立程序化棉布底色和 `Texture_DongguaCottonDetailNormal`，不再借用旧棉被斑驳底图/细褶法线；门帘与旗保留原法线。每份 GLB 自包含最多 1024² 的 WebP 图片：棉被 3 图，门帘与旗各 2 图。
 
-单件复建可通过 `runpy.run_path` 的 `init_globals={"ClothLabOnly":"DongguaQuilt"}` 运行烘焙脚本；无界面批处理也接受 `--only DongguaQuilt`。这条路径读取已有元数据，另外两件 GLB 不重新导出。
+仅改棉被先执行纹理脚本的 `--only-quilt`，再通过 `runpy.run_path` 的 `init_globals={"ClothLabOnly":"DongguaQuilt"}` 运行烘焙脚本；无界面批处理也接受 `--only DongguaQuilt`。这条路径读取已有元数据，另外两件 GLB 不重新导出。导出先写 `_BakePending.glb`，通过验证、保存源工程后才原子替换正式 GLB。
 
 ## V2 棉被填充与绗缝
 
@@ -45,7 +45,15 @@ node scripts/Script_BlenderMcp.mjs status --scan
 
 V1/V2 的侧边沿用了平面 UV，上下层在 UV 中重叠，侧边法线贴图的切线因此退化。V3 对三件的 Binding 单独展开为“累计周长 × 实际壳厚”的有面积条带，正反面 UV、造型、骨架、贴图、材质参数保持 V2；门帘和旗由此也产生新 GLB 哈希。
 
-烘焙出口直接读取 GLB 的 NORMAL/TANGENT 验证，九个 primitive 的切线均非零、长度误差小于 6.7e-5，最大 `abs(dot(N,T))` 小于 1.24e-4（导出数值舍入）。Binding 三件最大值分别为 1.042e-4 / 1.001e-4 / 1.001e-4。逐项结果保存在 JSON 的 `checks.tangents`；当前身份为 `20261024ClothLabV3BindingUv`。
+V3 烘焙出口直接读取 GLB 的 NORMAL/TANGENT 验证，九个 primitive 的切线均非零、长度误差小于 6.7e-5，最大 `abs(dot(N,T))` 小于 1.24e-4（导出数值舍入）。Binding 三件最大值分别为 1.042e-4 / 1.001e-4 / 1.001e-4。逐项结果保存在 JSON 的 `checks.tangents`。
+
+## V4 灰蓝棉被重做（2026-10-25）
+
+用户仍认为棉被像硬皮布篷，因此本版重新制作棉被面料与填充形体，不继续沿用旧五块夸张破补与粗斑。灰蓝面布和暖灰棉里都是创作配色，不代表川军统一被装。独立平纹法线以 0.18 m 瓦片中的 192 道纱线形成约 0.94 mm 的细织纹，叠加少量短纤维；不再包含宽裂纹、硬皱皮与大块污损。
+
+圆包边厚 2.6 cm，角部收圆 1.3 cm；主体名义厚度 8 cm、非均匀填棉峰值 9.28 cm，弯曲时保留上下层体积。三道纵缝和四道横缝略有自然曲折，实际凹槽压实棉絮而非仅画一张格子贴图。所有格骨头端、独立子骨关系、双线性蒙皮、三角预算及门帘/旗二进制保持不变。
+
+`Script_ClothLabAssetsQuiltPosePreview.py` 用真实 GLB 的骨头施加弯曲披覆和双角提起两种姿态，同时旋转布面标架，让厚度沿布面法线转动。两张 640 × 480 本地图为 `Preview_QuiltV4Drape.jpg` / `Preview_QuiltV4Lift.jpg`；能看到填棉鼓起、压实缝线、软圆边与内里。它们是作者检查姿态，运行时垂坠仍需在测试场实际求解器中验收。当前身份 `20261025ClothLabV4SoftCotton`；棉被三 primitive 最大 `abs(dot(N,T))` 为 1.145e-4、1.082e-4、1.103e-4，闭壳与导出重导入零偏差继续通过。
 
 ## 首轮验证
 

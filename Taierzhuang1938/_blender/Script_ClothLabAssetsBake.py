@@ -24,8 +24,10 @@ widthSegments, lengthSegments = 50, 64
 cornerNames = {(0, 0): "Blanket_CornerHeadL", (0, columns-1): "Blanket_CornerHeadR",
                (rows-1, 0): "Blanket_CornerTailL", (rows-1, columns-1): "Blanket_CornerTailR"}
 assetSpecs = (
-    {"id": "DongguaQuilt", "width": 1.4, "length": 1.9, "thickness": 0.074, "hem": 0.014,
-     "texture": "DongguaQuiltTopBase", "underside": "DongguaQuiltBottomBase", "normalStrength": 0.48},
+    {"id": "DongguaQuilt", "width": 1.4, "length": 1.9, "thickness": 0.080, "hem": 0.026,
+     "texture": "DongguaQuiltTopBase", "underside": "DongguaQuiltBottomBase", "normalStrength": 0.72,
+     "normalTexture": "DongguaCottonDetailNormal", "detailTileM": 0.18, "specular": 0.10,
+     "surface": "Faded grey blue cotton / warm grey cotton lining; uneven cotton filling; creative study"},
     {"id": "DoorCurtain", "width": 1.25, "length": 1.9, "thickness": 0.032, "hem": 0.010,
      "texture": "DoorCurtainBase", "normalStrength": 0.42},
     {"id": "SichuanBanner", "width": 1.45, "length": 1.75, "thickness": 0.0025, "hem": 0.0025,
@@ -59,18 +61,24 @@ def Surface(u, v, spec):
     # A flat bone plane with unequal filling and small wrinkled skin on both sides.
     # No segmented pressure cells: the outer silhouette remains a single cotton quilt.
     if spec["id"] == "DongguaQuilt":
-        loose = (0.0030*math.sin(u*11+v*8)+0.0021*math.cos(u*18-v*13)
-                 +0.0012*math.sin(u*45+v*18)*math.sin(v*29-u*12))
+        # A thick, softly rounded filling envelope. Broad cotton clumps vary in
+        # volume; stitched troughs compress the filling, not a fake colour grid.
+        edgeBlend = math.sin(min(1, edge/.085)*math.pi*.5)
+        loose = (.0031*math.sin(u*10+v*8)+.0025*math.cos(u*16-v*11)
+                 +.0014*math.sin(u*31+v*15)*math.sin(v*23-u*10))
         seam = 0.0
-        for n, center in enumerate((.23, .51, .78)):
-            curve = center+.009*math.sin(v*11+n*1.8)+.006*math.sin(v*29+.3*n)
-            seam = max(seam, math.exp(-((u-curve)/.024)**2))
-        for n, center in enumerate((.18, .46, .77)):
-            curve = center+.006*math.sin(u*12+n)+.003*math.sin(u*32)
-            seam = max(seam, math.exp(-((v-curve)/.018)**2))
+        for n, center in enumerate((.22, .49, .77)):
+            curve = center+.013*math.sin(v*8+n*1.8)+.005*math.sin(v*25+.3*n)
+            seam = max(seam, math.exp(-((u-curve)/.029)**2))
+        for n, center in enumerate((.16, .38, .64, .84)):
+            curve = center+.009*math.sin(u*10+n)+.003*math.sin(u*27)
+            seam = max(seam, math.exp(-((v-curve)/.022)**2))
         half = spec["hem"]/2+(spec["thickness"]/2-spec["hem"]/2)*edgeBlend
-        half += edgeBlend*(loose-0.012*seam)
-        middle = edgeBlend*(0.0014*math.sin(u*24+v*17)+.0010*math.sin(v*39-u*12))
+        half += edgeBlend*(loose-.015*seam)
+        middle = edgeBlend*(.0018*math.sin(u*21+v*14)+.0013*math.sin(v*29-u*9))
+        # Round off only the cloth silhouette; the control bones keep their exact grid.
+        corner = Smooth((abs(x)-(width/2-.045))/.045)*Smooth((abs(y)-(length/2-.045))/.045)
+        x -= math.copysign(.013*corner, x); y -= math.copysign(.013*corner, y)
     elif spec["id"] == "DoorCurtain":
         seam = max(math.exp(-((u-(n/4+.004*math.sin(v*9+n)))/.010)**2) for n in range(1, 4))
         half = spec["hem"]/2+(spec["thickness"]/2-spec["hem"]/2)*edgeBlend
@@ -107,7 +115,7 @@ def CreateMesh(spec):
         outward = Vector((-1 if i == 0 else 1 if i == widthSegments else 0,
                           -1 if j == 0 else 1 if j == lengthSegments else 0, 0)).normalized()
         # A narrow rolled binding, continuous and closed, with its own matte colour.
-        bulge = .002 if spec["id"] != "SichuanBanner" else .0008
+        bulge = .008 if spec["id"] == "DongguaQuilt" else .002 if spec["id"] != "SichuanBanner" else .0008
         vertices.append((x+outward.x*bulge, y+outward.y*bulge, middle))
     for n, (i, j) in enumerate(boundary):
         a = j*stride+i
@@ -157,10 +165,10 @@ def CreateMaterial(name, texture, spec, tint=None):
     bsdf = tree.nodes.get("Principled BSDF")
     bsdf.inputs["Roughness"].default_value = .96
     bsdf.inputs["Metallic"].default_value = 0
-    bsdf.inputs["Specular IOR Level"].default_value = .18
+    bsdf.inputs["Specular IOR Level"].default_value = spec.get("specular", .18)
     bsdf.inputs["Sheen Weight"].default_value = 1
-    bsdf.inputs["Sheen Tint"].default_value = (.20, .18, .15, 1)
-    bsdf.inputs["Sheen Roughness"].default_value = .80
+    bsdf.inputs["Sheen Tint"].default_value = (.28, .31, .33, 1) if spec["id"] == "DongguaQuilt" else (.20, .18, .15, 1)
+    bsdf.inputs["Sheen Roughness"].default_value = .88 if spec["id"] == "DongguaQuilt" else .80
     if texture:
         image = bpy.data.images.load(str(sourceDir / f"Textures/Texture_{texture}.png"), check_existing=True)
         image.colorspace_settings.name = "sRGB"
@@ -170,14 +178,17 @@ def CreateMaterial(name, texture, spec, tint=None):
         tree.links.new(node.outputs["Color"], bsdf.inputs["Base Color"])
     else:
         bsdf.inputs["Base Color"].default_value = (*tint, 1)
-    normalImage = bpy.data.images.load(str(projectDir / "Texture/Texture_SingleBlanketDetailNormal.webp"), check_existing=True)
+    normalPath = (sourceDir / f"Textures/Texture_{spec['normalTexture']}.png" if spec.get("normalTexture") else
+                  projectDir / "Texture/Texture_SingleBlanketDetailNormal.webp")
+    normalImage = bpy.data.images.load(str(normalPath), check_existing=True)
     normalImage.colorspace_settings.name = "Non-Color"
     normalImage.pack()
     node = tree.nodes.new("ShaderNodeTexImage")
     node.image, node.extension = normalImage, "REPEAT"
     uv = tree.nodes.new("ShaderNodeTexCoord")
     mapping = tree.nodes.new("ShaderNodeMapping")
-    mapping.inputs["Scale"].default_value = (spec["width"]/.25, spec["length"]/.25, 1)
+    tile = spec.get("detailTileM", .25)
+    mapping.inputs["Scale"].default_value = (spec["width"]/tile, spec["length"]/tile, 1)
     tree.links.new(uv.outputs["UV"], mapping.inputs["Vector"])
     tree.links.new(mapping.outputs["Vector"], node.inputs["Vector"])
     normal = tree.nodes.new("ShaderNodeNormalMap")
@@ -317,7 +328,7 @@ def BuildAsset(spec):
     rig = CreateRig(mesh, spec)
     mesh.data.materials.append(CreateMaterial(f"Mat_{spec['id']}Front", spec["texture"], spec))
     mesh.data.materials.append(CreateMaterial(f"Mat_{spec['id']}Back", spec.get("underside", spec["texture"]), spec))
-    tint = (.15, .125, .09) if spec["id"] != "SichuanBanner" else (.18, .018, .012)
+    tint = (.115, .17, .20) if spec["id"] == "DongguaQuilt" else (.15, .125, .09) if spec["id"] != "SichuanBanner" else (.18, .018, .012)
     mesh.data.materials.append(CreateMaterial(f"Mat_{spec['id']}Binding", None, spec, tint))
     mesh["HistoricalClassification"] = "Artistic reconstruction / 创作复原"
     mesh["RuntimeUse"] = "Cloth lab only; campaign not replaced"
@@ -327,13 +338,14 @@ def BuildAsset(spec):
     mesh.select_set(True)
     bpy.context.view_layer.objects.active = rig
     path = outputDir / f"Model_{spec['id']}.glb"
-    bpy.ops.export_scene.gltf(filepath=str(path), export_format="GLB", use_selection=True,
+    pendingPath = path.with_name(path.stem+"_BakePending.glb")
+    bpy.ops.export_scene.gltf(filepath=str(pendingPath), export_format="GLB", use_selection=True,
         export_yup=True, export_apply=False, export_texcoords=True, export_normals=True,
         export_tangents=True, export_image_format="WEBP", export_image_quality=95,
         export_materials="EXPORT", export_animations=False, export_def_bones=False,
         export_skins=True, export_all_influences=False, export_extras=True,
         export_draco_mesh_compression_enable=False)
-    document, binary = ReadGlb(path)
+    document, binary = ReadGlb(pendingPath)
     assert len(document["skins"]) == 1 and len(document["skins"][0]["joints"]) == 217
     assert len(document["meshes"]) == 1
     assert len(document["materials"]) == 3
@@ -342,14 +354,15 @@ def BuildAsset(spec):
             assert not any(key in node for key in ("matrix", "translation", "rotation", "scale")), node
     assert all("bufferView" in image for image in document["images"])
     checks["tangents"] = CheckTangents(document, binary)
-    checks["roundTripMaxDeviationM"] = CheckRoundTrip(path, mesh)
+    checks["roundTripMaxDeviationM"] = CheckRoundTrip(pendingPath, mesh)
     blendPath = sourceDir / f"Scene_{spec['id']}.blend"
     bpy.ops.wm.save_as_mainfile(filepath=str(blendPath), compress=True)
+    pendingPath.replace(path)
     report = {**spec, "file": path.name, "vertices": len(mesh.data.vertices),
         "triangles": sum(len(p.vertices)-2 for p in mesh.data.polygons), "meshes": 1,
         "primitives": len(document["meshes"][0]["primitives"]), "materials": [m["name"] for m in document["materials"]],
         "textureCount": len(document["images"]), "textureSize": [1024, 1024], "embeddedTextures": True,
-        "roughness": .96, "metallic": 0, "specularIorLevel": .18,
+        "roughness": .96, "metallic": 0, "specularIorLevel": spec.get("specular", .18),
         "sourceBlend": str(blendPath), "checks": checks, "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
         "bytes": path.stat().st_size, "classification": "Artistic reconstruction; cloth-lab-only study"}
     print("CLOTH_LAB_ASSET " + json.dumps(report, ensure_ascii=False))
@@ -372,7 +385,7 @@ def Main():
     prior = json.loads(priorPath.read_text(encoding="utf-8")) if only and priorPath.exists() else {}
     priorAssets = {asset["id"]: asset for asset in prior.get("assets", [])}
     reports = [BuildAsset(spec) if not only or spec["id"] == only else priorAssets[spec["id"]] for spec in assetSpecs]
-    report = {"version": "20261024ClothLabV3BindingUv", "blenderVersion": bpy.app.version_string,
+    report = {"version": "20261025ClothLabV4SoftCotton", "blenderVersion": bpy.app.version_string,
         "coordinates": "Blender (x,y,z) -> glTF (x,z,-y); cloth head row 0 is +Z; column 0 is +X; flat bones at Y=0",
         "rig": {"rows": rows, "columns": columns, "root": "Blanket_Root", "bones": 217,
             "gridNames": "Blanket_Grid_r{row}_c{column}", "corners": list(cornerNames.values()),

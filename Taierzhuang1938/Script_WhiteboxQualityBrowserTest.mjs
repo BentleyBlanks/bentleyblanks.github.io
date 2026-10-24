@@ -143,7 +143,10 @@ try {
     editor.kind = "ija"; editor.modelVariant = null; editor.Rebuild(); T.StepFrames(3);
   });
   await page.screenshot({ path: path.join(output, "WhiteboxEnemy.png") });
-  await page.evaluate(() => { window.Tengxian.editor.Open("graphics"); });
+  await page.evaluate(() => {
+    window.Tengxian.editor.Exit({ all: true });
+    window.Tengxian.settings.Open("graphics");
+  });
   await page.getByRole("button", { name: "编辑白盒画质", exact: true }).click();
   assert.equal(await page.locator('[data-whitebox-option="terrainTextures"]').getAttribute("aria-pressed"), "true");
   assert.equal(await page.locator('[data-whitebox-option="ssao"]').getAttribute("aria-pressed"), "false");

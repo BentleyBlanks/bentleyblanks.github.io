@@ -1,10 +1,11 @@
 """Deterministic cloth-lab texture preparation; Python + Pillow + numpy.
 
-This reuses the existing cotton atlas and detail normal without changing either.
+The quilt uses a dedicated fine cotton recipe; the other studies retain their sources.
 New packed 1024 px textures stay beside the editable Blender source, outside Git.
 The banner is an artistic study, not a facsimile of a museum object.
 """
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -35,33 +36,57 @@ def Main():
     textureDir.mkdir(parents=True, exist_ok=True)
     v, u = np.mgrid[0:size, 0:size]/(size-1)
     edge = np.minimum.reduce((u*1.4, (1-u)*1.4, v*1.9, (1-v)*1.9))
-    with Image.open(projectDir / "Texture/Texture_SingleBlanketBase.webp") as image:
-        original = np.asarray(image.convert("RGB").resize((size, size)), dtype=float)
-    quilt = original*np.array((0.81, 0.76, 0.67))
-    quilt += (Cotton(1924, (0, 0, 0)))*0.35
-    # Sparse hand quilting. UV image X is reversed relative to the mesh's +X
-    # coordinate, so the sewn lines must use meshU to sit in the actual grooves.
+    # Faded blue cotton, not a tinted reuse of the old mottled hide-like atlas.
+    # Wear is broad and quiet; yarn and short fibres live in the fine normal map.
+    quilt = Cotton(1924, (112, 136, 150))
+    quilt += (3.8*np.sin(u*5.7+v*3.1)+2.0*np.cos(v*8.9-u*2))[..., None]
+    fade = np.exp(-edge/.055)
+    quilt += fade[..., None]*np.array((8, 8, 6))
+    # UV image X is reversed relative to the mesh's +X coordinate.
     meshU = 1-u
     quiltSeam = np.zeros_like(u)
     stitch = np.zeros_like(u)
-    for n, center in enumerate((0.23, 0.51, 0.78)):
-        curve = center+0.009*np.sin(v*11+n*1.8)+0.006*np.sin(v*29+0.3*n)
-        line = np.exp(-((meshU-curve)/0.0022)**2)
-        quiltSeam = np.maximum(quiltSeam, np.exp(-((meshU-curve)/0.0065)**2))
-        stitch = np.maximum(stitch, line*(np.sin(v*2*np.pi*105+n) > 0.30))
-    for n, center in enumerate((0.18, 0.46, 0.77)):
-        curve = center+0.006*np.sin(meshU*12+n)+0.003*np.sin(meshU*32)
-        line = np.exp(-((v-curve)/0.0018)**2)
-        quiltSeam = np.maximum(quiltSeam, np.exp(-((v-curve)/0.0055)**2))
-        stitch = np.maximum(stitch, line*(np.sin(meshU*2*np.pi*80+n) > 0.25))
-    quilt *= 1-0.23*quiltSeam[..., None]
-    quilt = quilt*(1-0.62*stitch[..., None])+np.array((167, 154, 129))*0.62*stitch[..., None]
+    for n, center in enumerate((0.22, 0.49, 0.77)):
+        curve = center+0.013*np.sin(v*8+n*1.8)+0.005*np.sin(v*25+0.3*n)
+        line = np.exp(-((meshU-curve)/0.0015)**2)
+        quiltSeam = np.maximum(quiltSeam, np.exp(-((meshU-curve)/0.007)**2))
+        stitch = np.maximum(stitch, line*(np.sin(v*2*np.pi*126+n) > 0.12))
+    for n, center in enumerate((0.16, 0.38, 0.64, 0.84)):
+        curve = center+0.009*np.sin(meshU*10+n)+0.003*np.sin(meshU*27)
+        line = np.exp(-((v-curve)/0.0013)**2)
+        quiltSeam = np.maximum(quiltSeam, np.exp(-((v-curve)/0.006)**2))
+        stitch = np.maximum(stitch, line*(np.sin(meshU*2*np.pi*96+n) > 0.12))
+    # Soft woven binding and two rows of modest running stitch, not leather piping.
+    binding = np.exp(-((edge-.018)/.010)**4)
+    hemStitch = np.exp(-((edge-.030)/.0015)**2)*(np.sin((u*1.4+v*1.9)*2*np.pi/.018) > .2)
+    stitch = np.maximum(stitch, hemStitch)
+    quilt *= (1-.12*quiltSeam-.10*binding)[..., None]
+    quilt = quilt*(1-.50*stitch[..., None])+np.array((174, 184, 182))*.50*stitch[..., None]
     Save("DongguaQuiltTopBase", quilt)
-    bottom = Cotton(1938, (131, 121, 100))
-    wear = np.exp(-edge/0.07)*12
-    bottom -= wear[..., None]
-    bottom *= 1-0.09*quiltSeam[..., None]
+    bottom = Cotton(1938, (176, 170, 153))
+    bottom += (2.3*np.sin(u*5+v*7))[..., None]
+    bottom *= (1-.10*quiltSeam-.035*fade)[..., None]
+    bottom = bottom*(1-.32*stitch[..., None])+np.array((204, 196, 177))*.32*stitch[..., None]
     Save("DongguaQuiltBottomBase", bottom)
+    # A tileable sub-millimetre plain weave. No broad cracked/pebbled normal relief.
+    yy, xx = np.mgrid[0:size, 0:size]/size
+    phaseX, phaseY = xx*2*np.pi*192, yy*2*np.pi*192
+    weave = .22*np.cos(phaseX)*(.72+.28*np.sin(phaseY/2)) + .22*np.cos(phaseY)*(.72-.28*np.sin(phaseX/2))
+    fibres = .020*np.sin(xx*2*np.pi*401+yy*2*np.pi*8)+.014*np.sin(yy*2*np.pi*377-xx*2*np.pi*13)
+    height = weave+fibres
+    du = (np.roll(height,-1,axis=1)-np.roll(height,1,axis=1))*.5
+    dv = (np.roll(height,-1,axis=0)-np.roll(height,1,axis=0))*.5
+    normals = np.stack((-du, dv, np.ones_like(du)), axis=-1)
+    normals /= np.linalg.norm(normals,axis=-1)[...,None]
+    Save("DongguaCottonDetailNormal", (normals*.5+.5)*255)
+    quiltRecipe = {"version": "20261025SoftCottonV4", "source": "Deterministic procedural cotton; no old atlas pixels",
+                   "palette": "faded grey blue face / warm grey cotton lining", "resolution": [size,size],
+                   "detailTileM": .18, "yarnSpacingM": .18/192,
+                   "textures": ["Texture_DongguaQuiltTopBase.png", "Texture_DongguaQuiltBottomBase.png", "Texture_DongguaCottonDetailNormal.png"]}
+    (sourceDir/"Data_DongguaQuiltTextureRecipe.json").write_text(json.dumps(quiltRecipe,indent=2),encoding="utf-8")
+    if "--only-quilt" in sys.argv:
+        print(json.dumps(quiltRecipe))
+        return
     curtain = Cotton(1942, (127, 119, 92))
     seams = np.maximum.reduce([np.exp(-((u-(n/4+0.004*np.sin(v*9+n)))/0.002)**2) for n in range(1, 4)])
     curtain *= 1-0.11*seams[..., None]
@@ -89,7 +114,8 @@ def Main():
     banner = banner*(1-inkMask[..., None])+ink*inkMask[..., None]
     Save("SichuanBannerBase", banner)
     report = {"resolution": [size, size], "font": "Windows simkai.ttf (rasterized single glyph; font not redistributed)",
-        "sourceCotton": "Texture/Texture_SingleBlanketBase.webp", "normal": "Texture/Texture_SingleBlanketDetailNormal.webp",
+        "sourceCotton": "Deterministic procedural cotton",
+        "normal": {"quilt": "Texture_DongguaCottonDetailNormal.png", "others": "Texture/Texture_SingleBlanketDetailNormal.webp"},
         "classification": "Artistic reconstruction; no historical dimensions or exact inscription claimed",
         "files": sorted(path.name for path in textureDir.glob("*.png"))}
     (sourceDir / "Data_TextureRecipe.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -129,6 +129,8 @@ function SyncWhiteboxMaterial(material, source) {
   material.opacity = source.opacity;
   material.transparent = source.transparent && source.opacity < 1;
   material.allowOverride = source.allowOverride;
+  material.wireframe = !!source.wireframe;
+  material.wireframeLinewidth = source.wireframeLinewidth ?? 1;
 }
 
 function IsWhiteboxDepthOnly(sources) {

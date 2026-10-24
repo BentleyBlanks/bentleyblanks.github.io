@@ -3571,6 +3571,7 @@ function GoToSandbox(key, {stage = null} = {}) {
   url.searchParams.delete("phase");
   url.searchParams.delete("preview");
   url.searchParams.delete("menu");
+  if (key === "cloth" && url.searchParams.get("quality") === "whitebox") url.searchParams.delete("quality");
   if (key === "firstLevelP012Whitebox" && stage != null) url.searchParams.set("missionStage",stage);
   window.location.assign(url.toString());
   return url.toString();

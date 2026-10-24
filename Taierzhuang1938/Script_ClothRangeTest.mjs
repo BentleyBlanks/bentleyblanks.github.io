@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { registerHooks } from 'node:module';
 import { CLOTH_LAB_ASSETS, CLOTH_LAB_PRESETS, CLOTH_LAB_CONTROLS, CLOTH_LAB_SIM, ClampClothParameter } from './Data_Tuning_ClothRange.mjs';
-import { ApplyClothWind } from './Script_ClothLabSimulation.mjs';
+import { ApplyClothWind, ClothLabContactFriction } from './Script_ClothLabSimulation.mjs';
 import { LoadGlb, SerializeGlb, ReadAccessor } from './_import/Script_LugouGlbPose.mjs';
 
 const vendor = new URL('./vendor/three/', import.meta.url);
@@ -97,6 +97,102 @@ function WindGrid(horizontal = false) {
   const collapsed = WindGrid(); collapsed.x.fill(0);
   ApplyClothWind(collapsed, { wind: 3, density: .5 }, .4, 1 / 60);
   Check(collapsed.v.every(value => value === 0), 'A degenerate patch does not produce NaN');
+}
+
+// Contact tests use the same grid and substeps as the live lab. They measure
+// travel, support, separation and carry, not just coefficient assignment.
+function ContactGrid(mu, { rows = 3, cols = 3, width = .16, length = .16, y = .82, x = .14, ground = -3 } = {}) {
+  const rest = new Float32Array(rows * cols * 3);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const o = (r * cols + c) * 3; rest[o] = width * (.5 - c / Math.max(1, cols - 1)); rest[o + 2] = length * (.5 - r / Math.max(1, rows - 1));
+  }
+  const grid = new ClothGrid(rest, rows, cols, { ...CLOTH_LAB_PRESETS.quilt, groundFriction: mu, groundOffsetM: .052,
+    bodyMarginM: .056, airDamping: 0, tether: 0, maxSpeedMps: 4 });
+  grid.Reset(new THREE.Matrix4().makeTranslation(x, y, 0)); grid.SampleGround(() => ground, true);
+  const friction = new ClothLabContactFriction(grid);
+  return { grid, friction };
+}
+const ContactCenter = grid => {
+  const center = [0, 0, 0];
+  for (let i = 0; i < grid.n; i++) for (let k = 0; k < 3; k++) center[k] += grid.x[i * 3 + k] / grid.n;
+  return center;
+};
+const ContactCapsule = (x = 0) => [{ id: 'Support', a: new THREE.Vector3(x, .46, -.5), b: new THREE.Vector3(x, .46, .5), r: .28 }];
+{
+  function Slide(mu) {
+    const sample = ContactGrid(mu);
+    sample.friction.SetColliders(ContactCapsule());
+    for (let f = 0; f < 120; f++) sample.grid.Step(1 / 60);
+    return { ...sample, center: ContactCenter(sample.grid) };
+  }
+  const low = Slide(.02), high = Slide(.9);
+  Check(low.center[0] > .5 && low.center[1] < 0 && Math.abs(high.center[0] - .14) < .04 && high.center[1] > .7,
+    'Capsule friction is observable: low friction slides off, high friction keeps the patch supported', JSON.stringify({ low: low.center, high: high.center }));
+  Check(high.friction.Stats().body > 0 && high.friction.Stats().sticking > 0, 'Body contacts enter static friction without ground contact or pressed/carry flags');
+  const before = high.center;
+  for (let f = 0; f < 180; f++) high.grid.Step(1 / 60);
+  const after = ContactCenter(high.grid);
+  Check(Math.hypot(after[0] - before[0], after[2] - before[2]) < .003, 'Static capsule contact prevents slow constraint-projection creep');
+  high.friction.SetColliders([]);
+  const releaseY = after[1];
+  for (let f = 0; f < 15; f++) high.grid.Step(1 / 60);
+  Check(ContactCenter(high.grid)[1] < releaseY - .20 && high.friction.Stats().contacts === 0, 'Removing support releases the cloth immediately without a sticky anchor');
+  low.friction.Dispose(); high.friction.Dispose();
+}
+{
+  function DrivenGround(mu, acceleration) {
+    const sample = ContactGrid(mu, { rows: 5, cols: 5, width: .4, length: .4, x: 0, y: .052, ground: 0 });
+    for (let f = 0; f < 120; f++) {
+      for (let i = 0; i < sample.grid.n; i++) sample.grid.v[i * 3] += acceleration / 60;
+      sample.grid.Step(1 / 60);
+    }
+    const result = { center: ContactCenter(sample.grid), stats: sample.friction.Stats() };
+    sample.friction.Dispose(); return result;
+  }
+  const low = DrivenGround(.02, 1.2), high = DrivenGround(.9, 1.2), overcome = DrivenGround(.9, 12);
+  Check(low.center[0] > 1.5 && Math.abs(high.center[0]) < .002 && high.stats.sticking === 25,
+    'Ground static friction resists a sustained subthreshold force while low friction slips', JSON.stringify({ low: low.center[0], high: high.center[0] }));
+  Check(overcome.center[0] > .5 && overcome.stats.sliding > 0, 'A force above the Coulomb limit breaks static contact into sliding');
+}
+{
+  const low = ContactGrid(0, { x: 0, y: 2 }), high = ContactGrid(1.5, { x: 0, y: 2 });
+  for (const sample of [low, high]) for (let i = 0; i < sample.grid.n; i++) sample.grid.v[i * 3] = .7;
+  for (let f = 0; f < 20; f++) { low.grid.Step(1 / 60); high.grid.Step(1 / 60); }
+  Check(low.grid.x.every((value, i) => value === high.grid.x[i]) && low.grid.v.every((value, i) => value === high.grid.v[i]),
+    'Friction has exactly no effect while airborne and out of contact');
+  Check(high.grid.cfg.groundFriction === 1.5, 'The displayed coefficient is restored after temporarily bypassing legacy velocity damping');
+  const originalSubstep = high.friction.originalSubstep, originalCollide = high.friction.originalCollide;
+  high.friction.Dispose(); low.friction.Dispose();
+  Check(high.grid._Substep === originalSubstep && high.grid._Collide === originalCollide, 'Disposal restores only the wrapped instance methods');
+}
+{
+  function Carried(mu) {
+    const sample = ContactGrid(mu, { x: 0, y: .796 });
+    sample.friction.SetColliders(ContactCapsule(0), 1 / 60);
+    for (let f = 1; f <= 120; f++) { sample.friction.SetColliders(ContactCapsule(f / 120 * .3), 1 / 60); sample.grid.Step(1 / 60); }
+    const result = ContactCenter(sample.grid); sample.friction.Dispose(); return result;
+  }
+  const low = Carried(0), high = Carried(.9);
+  Check(Math.abs(high[0] - .3) < .035 && high[1] > .7 && Math.abs(low[0] - .3) > .25,
+    'A translating capsule carries contacting high-friction cloth in its local tangential motion', JSON.stringify({ low, high }));
+}
+{
+  const sample = ContactGrid(.9, { rows: 18, cols: 12, width: 1.4, length: 1.9, x: -3, y: 1.05, ground: 0 });
+  sample.grid.cfg.airDamping = CLOTH_LAB_PRESETS.quilt.airDamping;
+  sample.friction.SetColliders([
+    { a: new THREE.Vector3(-3, .46, -.185), b: new THREE.Vector3(-3, .46, .285), r: .28 },
+    ...[-1, 1].map(side => ({ a: new THREE.Vector3(-3 + side * .14, .27, -.86), b: new THREE.Vector3(-3 + side * .14, .27, -.38), r: .105 })),
+    { a: new THREE.Vector3(-3, .47, .84), b: new THREE.Vector3(-3, .47, .84), r: .17 },
+  ]);
+  for (let f = 0; f < 600; f++) {
+    ApplyClothWind(sample.grid, CLOTH_LAB_PRESETS.quilt, f / 60, 1 / 60);
+    sample.grid.SampleGround(() => 0); sample.grid.Step(1 / 60);
+  }
+  const center = ContactCenter(sample.grid), stats = sample.grid.Stats();
+  Check(sample.grid.x.every(Number.isFinite) && sample.grid.v.every(Number.isFinite) && center[1] > .45
+    && Math.hypot(center[0] + 3, center[2]) < .08 && stats.maxStretch < 1.1,
+    'Full 18 × 12 quilt remains draped after ten seconds with wind and high contact friction', JSON.stringify({ center, maxStretch: stats.maxStretch }));
+  sample.friction.Dispose();
 }
 
 function WithoutTextures(glb) {

@@ -435,8 +435,9 @@ for (const spec of CLOTH_LAB_ASSETS) {
   const points = RiggedGlbPoints(file, meshNode.name);
   const low = [0, 1, 2].map(axis => points.reduce((value, point) => Math.min(value, point[axis]), Infinity));
   const high = [0, 1, 2].map(axis => points.reduce((value, point) => Math.max(value, point[axis]), -Infinity));
-  Check(points.length > 5000 && Math.abs(high[0] - low[0] - spec.width) < .01
-    && Math.abs(high[2] - low[2] - spec.length) < .01 && Math.abs(high[0] + low[0]) < .001 && Math.abs(high[2] + low[2]) < .001,
+  const hemWidth = spec.bindingOutsetM * 2;
+  Check(points.length > 5000 && Math.abs(high[0] - low[0] - (spec.width + hemWidth)) < .001
+    && Math.abs(high[2] - low[2] - (spec.length + hemWidth)) < .001 && Math.abs(high[0] + low[0]) < .001 && Math.abs(high[2] + low[2]) < .001,
     `${spec.id} 实际绑定顶点云为米制、布面居中且宽长符合专用配置`, JSON.stringify({ low, high }));
   Check(low[1] < 0 && high[1] > 0 && high[1] - low[1] < .13,
     `${spec.id} 厚度沿Y、上下两层跨越平铺骨面`);

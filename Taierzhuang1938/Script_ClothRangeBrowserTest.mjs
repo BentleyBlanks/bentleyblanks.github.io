@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 import { LaunchBrowser } from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import { ServeRoot } from './Script_DevServer.mjs';
-import { CLOTH_LAB_ASSETS, CLOTH_LAB_PRESETS, CLOTH_LAB_CONTROLS } from './Data_Tuning_ClothRange.mjs';
+import { CLOTH_LAB_ASSETS, CLOTH_LAB_PRESETS, CLOTH_LAB_CONTROLS, CLOTH_LAB_SIM } from './Data_Tuning_ClothRange.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const out = path.resolve(here, '..', 'tmp', 'ClothRange');
@@ -19,22 +19,79 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors = [], result = {};
 page.on('pageerror', error => { errors.push(String(error)); console.log('PAGE ERROR', String(error)); });
 page.on('console', message => { if (message.type() === 'error') { errors.push(message.text()); console.log('CONSOLE ERROR', message.text().slice(0, 300)); } });
-await page.addInitScript(() => {
+const savedProfile = JSON.stringify('whitebox');
+const savedWhitebox = JSON.stringify({ schema: 2, assetTextures: false, grid: true, gridSize: 2, surfaceColor: '#909397' });
+await page.addInitScript(({ savedProfile, savedWhitebox }) => {
   localStorage.setItem('tengxian1938_audio_v1', JSON.stringify({ master: 0 }));
   localStorage.setItem('tengxian1938_tools_volume_v1', JSON.stringify({ volume: 0, muted: true }));
-});
+  localStorage.setItem('tengxian1938_graphics_profile_v1', savedProfile);
+  localStorage.setItem('tengxian1938_whitebox_v1', savedWhitebox);
+}, { savedProfile, savedWhitebox });
 const State = () => page.evaluate(() => window.Taierzhuang.Debug.ClothRange.State());
 const Item = (state, id) => state.items.find(item => item.id === id);
 async function Advance(count, render = false) {
-  return page.evaluate(({ count, render }) => {
+  return page.evaluate(({ count, render, maxSteps }) => {
     const t = window.Taierzhuang, api = t.Debug.ClothRange;
     let remaining = count;
     while (remaining > 0) {
       const n = Math.min(120, remaining); api.Step(n);
-      t.StepFrames(Math.ceil(n / 4), 1 / 60, render); remaining -= n;
+      t.StepFrames(Math.ceil(n / maxSteps), 1 / 60, render); remaining -= n;
     }
     return api.State();
-  }, { count, render });
+  }, { count, render, maxSteps: CLOTH_LAB_SIM.maxSteps });
+}
+const Detail = () => page.evaluate(() => {
+  const t = window.Taierzhuang, state = t.Debug.ClothRange.State();
+  return { ...state, geometry: state.items.map(item => {
+    let low = Infinity, high = -Infinity;
+    t.scene.getObjectByName(`ClothLab_${item.id}`).traverse(object => {
+      if (!object.isSkinnedMesh) return;
+      const p = object.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) { low = Math.min(low, p.getY(i)); high = Math.max(high, p.getY(i)); }
+    });
+    return { id: item.id, spanY: high - low };
+  }) };
+});
+async function Drag(key, target) {
+  const locator = page.locator(`[data-cloth-param="${key}"]`);
+  await locator.scrollIntoViewIfNeeded();
+  const control = await locator.evaluate(input => ({ min: +input.min, max: +input.max, value: +input.value, step: +input.step }));
+  const box = await locator.boundingBox(); assert.ok(box && box.width > 80, `${key}: visible native range`);
+  const inset = 8, span = box.width - inset * 2;
+  const At = value => box.x + inset + (value - control.min) / (control.max - control.min) * span;
+  const before = await Detail();
+  await page.mouse.move(At(control.value), box.y + box.height / 2); await page.mouse.down();
+  await page.mouse.move(At(target), box.y + box.height / 2, { steps: 16 }); await page.mouse.up();
+  const after = await Detail(), id = after.selected;
+  assert.equal(id, before.selected);
+  assert.ok(Math.abs(Item(after, id).cfg[key] - target) <= control.step * 2 + 1e-8,
+    `${id} ${key}: real mouse drag reaches ${target}; got ${Item(after, id).cfg[key]}`);
+  const value = await locator.inputValue(); assert.equal(+value, Item(after, id).cfg[key], `${id} ${key}: range and solver configuration agree`);
+  for (const other of before.items.filter(item => item.id !== id)) {
+    assert.deepEqual(Item(after, other.id).cfg, other.cfg, `${id} ${key}: ${other.id} parameters stay private`);
+    if (before.paused) assert.equal(Item(after, other.id).poseChecksum, other.poseChecksum, `${id} ${key}: paused ${other.id} pose is unchanged`);
+  }
+  (result.nativeEdits ||= []).push({ id, key, target, value: +value, before, after });
+  return { before, after };
+}
+async function DrawMaterials(wireframe) {
+  return page.evaluate(wireframe => {
+    const t = window.Taierzhuang, api = t.Debug.ClothRange, records = [], restore = [];
+    api.Pause(true); api.Wireframe(wireframe);
+    t.scene.getObjectByName('ClothRangeSamples').traverse(object => {
+      if (!object.isSkinnedMesh) return;
+      const original = object.onBeforeRender;
+      object.onBeforeRender = function (renderer, scene, camera, geometry, material, group) {
+        original?.call(this, renderer, scene, camera, geometry, material, group);
+        if (material.isMeshStandardMaterial || material.isMeshPhysicalMaterial)
+          records.push({ object: object.name, material: material.name, wireframe: !!material.wireframe, map: !!material.map });
+      };
+      restore.push(() => { object.onBeforeRender = original; });
+    });
+    try { t.StepFrames(2, 1 / 60, true); }
+    finally { for (const fn of restore) fn(); }
+    return records;
+  }, wireframe);
 }
 async function Shot(name) {
   await page.evaluate(() => window.Taierzhuang.StepFrames(2, 1 / 60, true));
@@ -52,17 +109,38 @@ function Healthy(state, label) {
   }
 }
 
+let releaseBanner = null, bannerRouteFinished = null, bannerRouteStarted = false;
+const routeErrors = [];
 try {
   const base = process.env.CLOTH_PREVIEW || `http://127.0.0.1:${server.address().port}`;
-  await page.goto(`${base}/Taierzhuang1938/?cloth=1&shot=1&manual=1&quality=high&scale=small`, { timeout: 180000 });
+  const bannerGate = new Promise(resolve => { releaseBanner = resolve; });
+  let finishBannerRoute;
+  bannerRouteFinished = new Promise(resolve => { finishBannerRoute = resolve; });
+  const bannerPattern = '**/Model/ClothLab/Model_SichuanBanner.glb*';
+  await page.route(bannerPattern, async route => {
+    bannerRouteStarted = true;
+    try { await bannerGate; await route.continue(); }
+    catch (error) { routeErrors.push(String(error.stack || error)); }
+    finally { finishBannerRoute(); }
+  }, { times: 1 });
+  await page.goto(`${base}/Taierzhuang1938/?cloth=1&shot=1&manual=1&scale=small`, { waitUntil: 'domcontentloaded', timeout: 180000 });
+  console.log('BOOT cloth page loaded; awaiting lab host with final asset held');
   await page.waitForFunction(() => window.Taierzhuang?.state.ready && window.Taierzhuang.Debug.ClothRange, null, { timeout: 300000 });
+  await page.locator('[data-cloth-select="banner"]').click();
+  assert.equal((await State()).selected, 'banner');
+  assert.equal((await State()).ready, false, 'Last GLB remains delayed while a user selects the banner');
+  assert.ok(bannerRouteStarted, 'The last cloth GLB was actually intercepted');
+  releaseBanner(); await bannerRouteFinished;
+  assert.deepEqual(routeErrors, [], `Delayed asset route failed: ${routeErrors.join(' | ')}`);
+  console.log('BOOT loading-time banner selection recorded; final asset released');
   await page.waitForFunction(() => {
     const state = window.Taierzhuang.Debug.ClothRange.State(); return state.ready || state.error;
   }, null, { timeout: 180000 });
   result.boot = await page.evaluate(() => {
     const t = window.Taierzhuang, api = t.Debug.ClothRange;
     t.state.menu = false; api.Pause(true); t.StepFrames(3, 1 / 60, true);
-    return { level: t.Debug.Level().id, state: api.State(),
+    return { level: t.Debug.Level().id, state: api.State(), graphics: t.GraphicsProfile.Inspect(), camera: t.camera.position.toArray(),
+      savedProfile: localStorage.getItem('tengxian1938_graphics_profile_v1'), savedWhitebox: localStorage.getItem('tengxian1938_whitebox_v1'),
       panel: { visible: !document.getElementById('cloth-range-panel')?.hidden,
         title: document.querySelector('#cloth-range-panel h2')?.textContent,
         samples: document.querySelectorAll('[data-cloth-select]').length,
@@ -71,6 +149,11 @@ try {
       audio: JSON.parse(localStorage.getItem('tengxian1938_audio_v1')).master };
   });
   assert.equal(result.boot.level, 'ClothRange');
+  assert.equal(result.boot.graphics.profile, 'high', 'Bare cloth URL uses original materials even with a saved whitebox preference');
+  assert.equal(result.boot.graphics.whitebox, false);
+  assert.equal(result.boot.savedProfile, savedProfile); assert.equal(result.boot.savedWhitebox, savedWhitebox);
+  assert.equal(result.boot.state.selected, 'banner');
+  assert.ok(result.boot.camera[0] > 2, 'Completing the final GLB preserves the selected banner camera');
   Healthy(result.boot.state, 'boot');
   assert.deepEqual(result.boot.state.items.map(item => item.id), CLOTH_LAB_ASSETS.map(item => item.id));
   assert.ok(result.boot.state.items.every(item => item.points === 216 && item.skinnedCount > 0 && item.materialCount >= 3));
@@ -141,6 +224,111 @@ try {
   });
   assert.ok(result.tangentFrames.length === 9 && result.tangentFrames.every(row => row.maxDot < .003 && row.minLength > .999), JSON.stringify(result.tangentFrames));
   console.log('PASS UI selection / parameter bounds / five profiles / private shell thickness');
+
+  await page.evaluate(() => window.Taierzhuang.Debug.ClothRange.ShowPanel(false));
+  const solidDraw = await DrawMaterials(false), solidImage = await page.screenshot();
+  const wireDraw = await DrawMaterials(true), wireImage = await page.screenshot();
+  for (const [name, bytes] of [['Solid', solidImage], ['Wire', wireImage]]) {
+    fs.writeFileSync(path.join(out, `Scene_Wireframe${name}.png`), bytes);
+    await sharp(bytes).resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 })
+      .toFile(path.join(out, `Scene_Wireframe${name}_640.jpg`));
+  }
+  assert.ok(solidDraw.length >= 9 && solidDraw.every(row => !row.wireframe && !row.material.startsWith('Whitebox_')));
+  assert.ok(solidDraw.filter(row => row.map).length >= 6, 'The actual main draw uses the imported cloth maps');
+  assert.ok(wireDraw.length >= 9 && wireDraw.every(row => row.wireframe), 'Every actual cloth draw switches to wireframe');
+  const solidPixels = await sharp(solidImage).resize({ width: 320 }).removeAlpha().raw().toBuffer();
+  const wirePixels = await sharp(wireImage).resize({ width: 320 }).removeAlpha().raw().toBuffer();
+  assert.equal(solidPixels.length, wirePixels.length);
+  let changedPixels = 0;
+  for (let i = 0; i < solidPixels.length; i += 3)
+    if (Math.abs(solidPixels[i] - wirePixels[i]) + Math.abs(solidPixels[i + 1] - wirePixels[i + 1]) + Math.abs(solidPixels[i + 2] - wirePixels[i + 2]) > 60) changedPixels++;
+  result.wireframe = { solidDraw, wireDraw, changedFraction: changedPixels / (solidPixels.length / 3) };
+  const fullSolid = await sharp(solidImage).removeAlpha().raw().toBuffer(), fullWire = await sharp(wireImage).removeAlpha().raw().toBuffer();
+  let fullChanged = 0;
+  for (let i = 0; i < fullSolid.length; i += 3)
+    if (Math.abs(fullSolid[i] - fullWire[i]) + Math.abs(fullSolid[i + 1] - fullWire[i + 1]) + Math.abs(fullSolid[i + 2] - fullWire[i + 2]) > 60) fullChanged++;
+  result.wireframe.fullChangedFraction = fullChanged / (fullSolid.length / 3);
+  console.log('WIRE PIXELS', JSON.stringify({ preview: result.wireframe.changedFraction, full: result.wireframe.fullChangedFraction }));
+  assert.ok(result.wireframe.changedFraction > .005, `Wireframe changes visible pixels: ${result.wireframe.changedFraction}`);
+  await Shot('Wireframe'); await DrawMaterials(false);
+  await page.evaluate(() => window.Taierzhuang.Debug.ClothRange.ShowPanel(true));
+  console.log('PASS actual textured draw / wireframe material switch / visible pixel change');
+
+  result.nativeSamples = [];
+  for (const id of ['quilt', 'curtain', 'banner']) {
+    await page.locator(`[data-cloth-select="${id}"]`).click();
+    await page.evaluate(id => {
+      const api = window.Taierzhuang.Debug.ClothRange;
+      api.Preset(id); api.Action(id === 'quilt' ? 'drape' : 'hang'); api.Pause(true);
+    }, id);
+    assert.match(await page.locator('[data-cloth-playback]').innerText(), /暂停/, `${id}: inherited pause is explicit`);
+    const pauseButton = page.locator('[data-cloth-action="pause"]'); await pauseButton.scrollIntoViewIfNeeded();
+    const pauseBox = await pauseButton.boundingBox(), firstControl = await page.locator('[data-cloth-param]').first().boundingBox();
+    assert.ok(pauseBox && firstControl && pauseBox.y < firstControl.y, `${id}: playback controls appear above the parameters`);
+    await Drag('wind', 0); const calm = await Advance(120);
+    await Drag('wind', 6.5); const windy = await Advance(120); Healthy(windy, `${id} native wind`);
+    if (id !== 'quilt') assert.notEqual(Item(windy, id).poseChecksum, Item(calm, id).poseChecksum, `${id}: native wind edit changes the hanging pose`);
+    const thick = await Drag('thickness', .09);
+    const Span = state => state.geometry.find(row => row.id === id).spanY;
+    const thicknessRatio = Item(thick.after, id).cfg.thickness / Item(thick.before, id).cfg.thickness;
+    assert.ok(Math.abs(Span(thick.after) / Span(thick.before) - thicknessRatio) < 1e-5, `${id}: native thickness changes this sample's real shell`);
+    const stiff = await Drag('bend', .5);
+    assert.equal(Item(stiff.after, id).poseChecksum, Item(stiff.before, id).poseChecksum, `${id}: stiffness editing respects pause`);
+    assert.equal(stiff.after.paused, true);
+    await page.locator('[data-cloth-action="preview"]').click();
+    const started = await State(); assert.equal(started.paused, false, `${id}: preview automatically continues the simulation`);
+    assert.equal(Item(started, id).cfg.bend, Item(stiff.after, id).cfg.bend, `${id}: preview keeps edited parameters`);
+    await page.evaluate(() => window.Taierzhuang.StepFrames(90, 1 / 60, false));
+    const played = await State(); Healthy(played, `${id} parameter preview`);
+    assert.ok(played.clock > started.clock);
+    assert.notEqual(Item(played, id).poseChecksum, Item(started, id).poseChecksum, `${id}: preview visibly exercises the edited sample`);
+    result.nativeSamples.push({ id, calm, windy, started, played });
+    await page.evaluate(id => {
+      const api = window.Taierzhuang.Debug.ClothRange;
+      api.Pause(true); api.Preset(id); api.Action(id === 'quilt' ? 'drape' : 'hang');
+    }, id);
+  }
+  console.log('PASS real mouse sliders for all samples / private configs and paused poses / visible preview action');
+
+  result.slide = [];
+  const CenterX = () => page.evaluate(() => {
+    const t = window.Taierzhuang, id = t.Debug.ClothRange.State().selected;
+    let sum = 0, count = 0;
+    t.scene.getObjectByName(`ClothLab_${id}`).traverse(object => {
+      if (!object.isBone || object.name === 'Blanket_Root') return;
+      sum += object.getWorldPosition(object.position.clone()).x; count++;
+    });
+    return sum / count;
+  });
+  for (const id of ['quilt', 'curtain', 'banner']) {
+    await page.locator(`[data-cloth-select="${id}"]`).click();
+    await page.evaluate(id => {
+      const api = window.Taierzhuang.Debug.ClothRange;
+      api.Preset(id); api.Pause(true); api.Set('wind', 0); api.Set('airDamping', .2);
+    }, id);
+    const distances = [];
+    for (const friction of [0, 1.5]) {
+      await page.evaluate(friction => window.Taierzhuang.Debug.ClothRange.Set('groundFriction', friction), friction);
+      await page.locator('[data-cloth-action="slide"]').click();
+      const startX = await CenterX(); const state = await Advance(60); Healthy(state, `${id} slide ${friction}`);
+      const distance = Math.abs(await CenterX() - startX);
+      assert.equal(Item(state, id).pins.length, 0, `${id}: floor slide releases all header pins`);
+      distances.push({ friction, distance, state });
+    }
+    assert.ok(distances[0].distance > .25 && distances[1].distance < distances[0].distance * .55,
+      `${id}: visible floor-slide friction comparison ${JSON.stringify(distances.map(row => ({ friction: row.friction, distance: row.distance })))}`);
+    result.slide.push({ id, distances });
+    if (id !== 'quilt') {
+      await page.locator('[data-cloth-action="hang"]').click();
+      assert.equal(Item(await Advance(1), id).pins.length, 12, `${id}: hang restores the header attachments`);
+    }
+    await page.evaluate(id => {
+      const api = window.Taierzhuang.Debug.ClothRange;
+      api.Preset(id); api.Action(id === 'quilt' ? 'drape' : 'hang');
+    }, id);
+  }
+  await page.locator('[data-cloth-select="quilt"]').click();
+  console.log('PASS all-sample floor slide / low versus high friction / restore hanging');
 
   await page.evaluate(() => { const api = window.Taierzhuang.Debug.ClothRange; api.Action('drape'); api.Reset(); });
   result.drape = await Advance(180); Healthy(result.drape, 'drape');
@@ -232,7 +420,7 @@ try {
   await Shot('Overview');
   result.final = await State(); Healthy(result.final, 'final');
   // Exercise the actual boot button and rAF path as well as the deterministic probe.
-  await page.goto(`${base}/Taierzhuang1938/?cloth=1&quality=high&scale=small`, { timeout: 180000 });
+  await page.goto(`${base}/Taierzhuang1938/?cloth=1&scale=small`, { timeout: 180000 });
   await page.waitForFunction(() => window.Taierzhuang?.state.ready && window.Taierzhuang.Debug.ClothRange?.State().ready, null, { timeout: 300000 });
   await page.locator('#bootStart').click();
   await page.waitForFunction(() => window.Taierzhuang.state.running && window.Taierzhuang.Debug.ClothRange.State().clock > .2, null, { timeout: 30000 });
@@ -252,12 +440,40 @@ try {
   await page.locator('[data-cloth-action="pause"]').click();
   await page.waitForFunction(clock => window.Taierzhuang.Debug.ClothRange.State().clock > clock, realPaused.clock, { timeout: 10000 });
   result.normal = await State(); Healthy(result.normal, 'normal entry');
+  result.normalProfile = await page.evaluate(() => ({ profile: window.Taierzhuang.GraphicsProfile.Inspect().profile,
+    storedProfile: localStorage.getItem('tengxian1938_graphics_profile_v1'), storedWhitebox: localStorage.getItem('tengxian1938_whitebox_v1') }));
+  assert.equal(result.normalProfile.profile, 'high');
+  assert.equal(result.normalProfile.storedProfile, savedProfile); assert.equal(result.normalProfile.storedWhitebox, savedWhitebox);
   console.log('PASS normal boot / rAF / pointer orbit / real-time pause / Esc resume');
+
+  // An explicit whitebox URL still wins. Exercise its cached DRAW material too,
+  // since source material.wireframe alone cannot detect the old replacement bug.
+  await page.goto(`${base}/Taierzhuang1938/?cloth=1&quality=whitebox&shot=1&manual=1&scale=small`, { timeout: 180000 });
+  await page.waitForFunction(() => window.Taierzhuang?.state.ready && window.Taierzhuang.Debug.ClothRange?.State().ready,
+    null, { timeout: 300000 });
+  const explicitProfile = await page.evaluate(() => {
+    const t = window.Taierzhuang; t.state.menu = false; t.Debug.ClothRange.Pause(true);
+    return t.GraphicsProfile.Inspect().profile;
+  });
+  assert.equal(explicitProfile, 'whitebox');
+  const whiteSolid = await DrawMaterials(false), whiteWire = await DrawMaterials(true), whiteBack = await DrawMaterials(false);
+  assert.ok(whiteSolid.length >= 9 && whiteSolid.every(row => row.material.startsWith('Whitebox_') && !row.wireframe));
+  assert.ok(whiteWire.length >= 9 && whiteWire.every(row => row.material.startsWith('Whitebox_') && row.wireframe),
+    'Cached whitebox replacement materials follow the live wireframe toggle');
+  assert.ok(whiteBack.length >= 9 && whiteBack.every(row => !row.wireframe));
+  result.explicitWhitebox = { profile: explicitProfile, solid: whiteSolid, wire: whiteWire, restored: whiteBack };
+  console.log('PASS explicit whitebox choice / actual cached draw wireframe on and off');
   assert.deepEqual(errors, [], `Console errors: ${errors.join(' | ')}`);
   console.log('ClothRangeBrowserTest: all passed');
+} catch (error) {
+  result.failure = String(error.stack || error);
+  throw error;
 } finally {
+  releaseBanner?.();
+  if (bannerRouteStarted) await bannerRouteFinished;
+  result.routeErrors = routeErrors;
   result.errors = errors;
   fs.writeFileSync(path.join(out, 'Test_Result.json'), JSON.stringify(result, null, 2));
-  await browser.close();
+  await browser.close().catch(error => { console.error('Browser cleanup failed:', String(error)); });
   server?.close();
 }
