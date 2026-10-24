@@ -50,6 +50,18 @@ Check(contract.runtimeTriangleTarget===80000&&(triangles<=80000||((selectedGame-
 const removedZeroArea=(g.asset.extras?.Type89ZeroAreaCleanup??[]).reduce((sum,row)=>sum+row.removedRenderedTriangles,0);
 Check(selectedGame-triangles===removedZeroArea&&contract.exportRemovedZeroAreaTriangles===removedZeroArea,'Every source/export triangle difference is accounted for by zero-area cleanup',String(removedZeroArea));
 Check(nonFinite===0&&normalError<2e-4&&degenerate===0,'Finite geometry, unit normals, noncollapsed triangles',JSON.stringify({nonFinite,normalError,degenerate}));
+let tangentMissing=0,tangentUnitError=0,tangentDotError=0,tangentHandednessErrors=0;
+for(const mesh of g.meshes)for(const primitive of mesh.primitives){
+  if(!g.materials[primitive.material].normalTexture)continue;
+  if(primitive.attributes.TANGENT===undefined){tangentMissing++;continue;}
+  const normals=ReadAccessor(glb,primitive.attributes.NORMAL).data,tangents=ReadAccessor(glb,primitive.attributes.TANGENT).data;
+  for(let i=0;i<normals.length/3;i++){
+    tangentUnitError=Math.max(tangentUnitError,Math.abs(Math.hypot(...tangents.slice(i*4,i*4+3))-1));
+    tangentDotError=Math.max(tangentDotError,Math.abs(normals[i*3]*tangents[i*4]+normals[i*3+1]*tangents[i*4+1]+normals[i*3+2]*tangents[i*4+2]));
+    if(Math.abs(tangents[i*4+3])!==1)tangentHandednessErrors++;
+  }
+}
+Check(tangentMissing===0&&tangentUnitError<2e-4&&tangentDotError<2e-4&&tangentHandednessErrors===0,'Normal-mapped primitives retain unit orthogonal authored tangents and signed handedness',JSON.stringify({tangentMissing,tangentUnitError,tangentDotError,tangentHandednessErrors}));
 const size=high.map((value,i)=>value-low[i]);
 Check(Math.abs(size[0]-2.18)<.01&&Math.abs(size[1]-2.56)<.015&&Math.abs(size[2]-5.70)<.03&&Math.abs(low[1])<.001,'Measured metre scale and ground origin',JSON.stringify({low,high,size}));
 Check(cannon.length>100&&cannon.reduce((sum,point)=>sum+point[2],0)/cannon.length<-.9,'Actual cannon vertex cloud faces -Z');
@@ -92,11 +104,26 @@ function RayHits(geometry,origin,direction,maxDistance){
   return false;
 }
 const shoeGeometry=LocalGeometry('Node_TrackLinkLeft000');
-Check(shoeGeometry.faces.length>0&&[-.137,-.055,.055,.137].every(x=>!RayHits(shoeGeometry,[x,.10,0],[0,-1,0],.20))&&RayHits(shoeGeometry,[0,.10,0],[0,-1,0],.20),'Four true cast-shoe windows and a solid middle web');
+const shoeWidth=Math.max(...shoeGeometry.vertices.map(p=>p[0]))-Math.min(...shoeGeometry.vertices.map(p=>p[0]));
+Check(Math.abs(shoeWidth-.320)<.0005,'Actual casting width follows the same-car front-photo320mm reconstruction',String(shoeWidth));
+for(const side of ['Left','Right']){
+  const sign=side==='Left'?-1:1,wheel=nodesByName.get('Node_LeadingWheel'+side),position=wheel.translation;
+  const support=LocalGeometry('Node_Suspension'+side),disc=LocalGeometry(wheel.name);
+  const offsets=[[.075,-.055],[.045,-.055]];
+  Check(offsets.every(([y,z])=>RayHits(disc,[sign*.30,y,z],[-sign,0,0],.25)&&!RayHits(support,[sign*1.2,position[1]+y,position[2]+z],[-sign,0,0],.25)),
+    'Reference-visible leading wheel dish is unobstructed by the fixed support: '+side);
+  const roller=nodesByName.get('Node_ReturnRoller'+side+'01'),nextRoller=nodesByName.get('Node_ReturnRoller'+side+'02');
+  const rollerGeometry=LocalGeometry(roller.name),radius=Math.max(...rollerGeometry.vertices.map(p=>Math.hypot(p[1],p[2])));
+  const stationPitch=Math.hypot(...nextRoller.translation.map((value,i)=>value-roller.translation[i])),ratio=radius/stationPitch;
+  // Independent2007/2025 rim measurements constrain this visible proportion;
+  // camera fits and chosen factory-scale assumptions are not acceptance gates.
+  Check(ratio>.086&&ratio<.100,'Return-rim size agrees with the measured adjacent-axle proportion: '+side,JSON.stringify({radius,stationPitch,ratio}));
+}
+Check(shoeGeometry.faces.length>0&&[-.375,-.150,.150,.375].every(ratio=>!RayHits(shoeGeometry,[ratio*shoeWidth,.10,0],[0,-1,0],.20))&&RayHits(shoeGeometry,[0,.10,0],[0,-1,0],.20),'Four true cast-shoe windows and a solid middle web');
 // The rear pin is visible behind the trailing notch (first hit at100.08mm).
 // Probe through the cast face at87.56mm, with a neighbouring solid-web control.
-Check([-.123,0,.123].every(x=>!RayHits(shoeGeometry,[x,.10,.065],[0,-1,0],.20))&&!RayHits(shoeGeometry,[0,.10,-.059],[0,-1,0],.095)&&RayHits(shoeGeometry,[.027,.10,-.059],[0,-1,0],.095),'Photographed flange keyways and trailing central relief are true silhouette cut-outs');
-Check([-.157,.157].every(x=>RayHits(shoeGeometry,[x,.10,-.015],[0,-1,0],.20)),'Outer shoe windows retain their cast side webs');
+Check([-.336,0,.336].every(ratio=>!RayHits(shoeGeometry,[ratio*shoeWidth,.10,.065],[0,-1,0],.20))&&!RayHits(shoeGeometry,[0,.10,-.059],[0,-1,0],.095)&&RayHits(shoeGeometry,[.074*shoeWidth,.10,-.059],[0,-1,0],.095),'Photographed flange keyways and trailing central relief are true silhouette cut-outs');
+Check([-.429,.429].every(ratio=>RayHits(shoeGeometry,[ratio*shoeWidth,.10,-.015],[0,-1,0],.20)),'Outer shoe windows retain their cast side webs');
 const turretGeometry=LocalGeometry('Node_TurretYaw',true);
 const bowGeometry=LocalGeometry('Node_BowPlate',true);
 Check(!RayHits(bowGeometry,[-.13,.30,-.20],[0,0,1],.30)&&RayHits(bowGeometry,[-.215,.30,-.20],[0,0,1],.30),'Round bow port has a true opening and solid surrounding armor beneath its independent cover');

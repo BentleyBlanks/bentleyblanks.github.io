@@ -79,8 +79,12 @@ def BuildCastTrackShoe(quality,pitchScale,track,steel,Mesh,PolygonPrism,RoundedR
              (-.012,.043),(-.018,.061),(-.126,.061),(-.170,.010),(-.177,-.034)]
     plate=PolygonPrism('CastShoePlate',outline,'Z',.025,(0,0,0),track,None,0)
     for side in [-1,1]:
-        center=RoundedRectangle(.070,.086,.017,4 if quality=='High' else 1)
-        cutter=PolygonPrism('ShoeCenterWindow',center,'Z',.12,(side*.055,0,0),track,None,0)
+        # The two large cast openings have a straight grouser-side shoulder
+        # and a tapered, rounded guide-side heel. Equal capsule slots made the
+        # centre web and the lower corners read unlike originals16/20.
+        center=[(.027,-.039),(.083,-.039),(.092,-.027),(.087,.020),
+                (.073,.040),(.043,.043),(.027,.029),(.020,-.020)]
+        cutter=PolygonPrism('ShoeCenterWindow',[(side*x,y) for x,y in center],'Z',.12,(0,0,0),track,None,0)
         CutOpening([plate],cutter)
         outer=[(.113,-.022),(.151,-.022),(.147,.014),(.138,.027),(.118,.027),(.111,.015)]
         cutter=PolygonPrism('ShoeOuterWindow',[(side*x,y) for x,y in outer],'Z',.12,(0,0,0),track,None,0)
@@ -94,10 +98,16 @@ def BuildCastTrackShoe(quality,pitchScale,track,steel,Mesh,PolygonPrism,RoundedR
         for x in [-.161,.161]:
             cutter=Lathe('ShoePinEyeCutter',[(.0085,-.07),(.0085,.07)],(x,-.052,0),track,None,'Z',20)
             CutOpening([plate],cutter)
-        modifier=plate.modifiers.new('RoundedCastEdges','BEVEL');modifier.width=.0025;modifier.segments=3
+        modifier=plate.modifiers.new('RoundedCastEdges','BEVEL');modifier.width=.0040;modifier.segments=4
         modifier=plate.modifiers.new('CastCornerNormals','WEIGHTED_NORMAL');modifier.keep_sharp=True
     for x in [-.122,0,.122]:
-        Tube('ShoePinBarrel',(x-.036,.057*pitchScale,-.009),(x+.036,.057*pitchScale,-.009),.018,steel,None,12 if quality=='High' else 6,capEnds=quality=='High')
+        # The pin eyes belong to the same casting. They are not separate,
+        # uniformly bright machined-steel tubes. Keep their outer crown behind
+        # the true trailing relief instead of filling that photographed notch.
+        if quality=='High':
+            Lathe('ShoePinBarrel',[(.0133,-.036),(.01805,-.031),(.019,-.023),(.019,.023),(.01805,.031),(.0133,.036)],(x,.057*pitchScale,-.010),track,None,'X',16)
+        else:
+            Tube('ShoePinBarrel',(x-.036,.057*pitchScale,-.010),(x+.036,.057*pitchScale,-.010),.019,track,None,6,capEnds=False)
     # The solid end buttons of the old shoe were unsupported by the close-up;
     # the small circles on the outside flange are the pin-eye bores above.
     PolygonPrism('ShoeGuideHorn',[(y*pitchScale,z) for y,z in [(-.037,-.014),(-.016,-.065),(.014,-.065),(.038,-.014)]],'X',.032,(0,0,0),track,None,.003 if quality=='High' else 0)

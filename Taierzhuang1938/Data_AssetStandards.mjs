@@ -121,9 +121,9 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
   Object.freeze({ id: "Type89MediumTank", name: "八九式中战车乙型（馆藏外形复原）", pack: "Type89MediumTank/Model_Type89MediumTank.glb",
-    sourceTriangles: 885866, selectedGameSourceTriangles: 84136, actualTriangles: 83839, exportRemovedZeroAreaTriangles: 297, targetTriangles: 80000, policy: "target",
-    sourceTexture: "土浦保存车多机位图证；高源保留、按物理表面分区程序烘焙", runtimeTexture: "SurfaceV3：7套21张内嵌Base / OpenGL Normal / ORM；4K装甲、2K实孔排气罩MASK；履带/钢件/接触带/排气/玻璃PBR",
-    note: "独立资产，不替换既有Type89Tank。选定游戏源再减至80k只需4.92%，按既有5%规则保留可见拓扑。米制Y-up、-Z车头；74节/侧独立履带、30轮组及各可动轴心保留。高源外置；微细旧损、接触带材质和未见内装标推定，不凭馆藏照认定滕县参战。" }),
+    sourceTriangles: 1119346, selectedGameSourceTriangles: 83992, actualTriangles: 83992, exportRemovedZeroAreaTriangles: 0, targetTriangles: 80000, policy: "target",
+    sourceTexture: "土浦保存车多机位图证；高源保留、按物理表面分区程序烘焙", runtimeTexture: "SurfaceV4：7套21张内嵌Base / OpenGL Normal / ORM；4K细漆层、2K实孔排气罩MASK；铸钢/磨亮接触带/排气/玻璃PBR",
+    note: "独立资产，不替换既有Type89Tank。选定游戏源再减至80k只需4.75%，按既有5%规则保留可见拓扑。米制Y-up、-Z车头；74节/侧独立履带、30轮组及各可动轴心保留。轮缘按同车原片比例复原；微细旧损、接触带材质和未见内装标推定，不凭馆藏照认定滕县参战。" }),
   Object.freeze({ id: "NakajimaKi4", name: "九四式侦察机（同型参考复原）", pack: "NakajimaKi4/Model_NakajimaKi4.glb",
     sourceTriangles: 244695, actualTriangles: 177815, targetTriangles: 180000, policy: "target",
     sourceTexture: "同型原图与1937原始说明书；现代发动机材质类比、CC0皮革及内置imagegen推定材质图", runtimeTexture: "SurfaceV2：30张内嵌Base / OpenGL Normal / ORM；4K机身、布翼与机罩，独立肋带、铸件、钢、橡胶、皮革和排气PBR",

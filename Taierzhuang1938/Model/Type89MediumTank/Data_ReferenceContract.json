@@ -1,11 +1,11 @@
 {
   "asset": "Type89MediumTank",
-  "geometryVersion": "20261024GeometryV26",
+  "geometryVersion": "20261024GeometryV31",
   "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
-  "materialRevision": "SurfaceV3",
+  "materialRevision": "SurfaceV4",
   "materialReview": "Data_MaterialReview.json",
   "reviewedAt": "2026-10-24",
-  "reviewScope": "Actual V26 high/game exports reviewed component by component against native same-car references;2007 paint/accessory state with posed open covers,2025 views for stable structure/closed states. All12 entries and material evidence are recorded separately from technical gates. Small game LOD approximations and unobserved details remain declared; user approval is not implied.",
+  "reviewScope": "Current packed V31 exports inspected in neutral close-ups and reference-approximation whole/front/track/rear views against the recovered same-car photograph corpus. Source/reference observations are separate from numeric gates. V26 rejection remains part of the record; user approval and scan-level equality are not claimed.",
   "selectedConfiguration": "Type89 I-Go Otsu, restored running vehicle at JGSDF Tsuchiura. Primary appearance state is the 2007 Megapixie photograph; 2025 Hunini views corroborate the same preserved car's closed hatches and geometry. Early Ko nose/cupola features are excluded.",
   "notion": "https://app.notion.com/p/40260335331c81a18a18e63b0cc14bce",
   "nominalDimensionsM": {
@@ -27,8 +27,8 @@
   "sourceAxes": "Blender X right, +Y nose, +Z up; metres; ground datum under hull center",
   "runtimeAxes": "glTF X right, +Y up, -Z nose; metres; measured vertex cloud and bore direction are validated",
   "runtimeTriangleCeiling": 84000,
-  "runtimeRenderedTriangles": 83839,
-  "sourceTrianglesBeforeExportCleanup": 885866,
+  "runtimeRenderedTriangles": 83992,
+  "sourceTrianglesBeforeExportCleanup": 1119346,
   "linksPerSide": 74,
   "wheelGroupsPerSide": 15,
   "requiredPivots": [
@@ -84,87 +84,124 @@
   "primaryPhoto": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
   "functionalClearanceReview": {
     "phaseSamples": 36,
-    "testedNearbyPairs": 4750,
+    "testedNearbyPairs": 4716,
     "fixedGroups": 10,
-    "fixedPairs": 5466,
-    "maximumWheelPenetrationM": 0.0,
+    "fixedPairs": 5366,
+    "maximumWheelPenetrationM": 0.0009344220161437988,
     "maximumFixedPenetrationM": 0.0,
-    "runtimeSha256": "71f4068920abed10c5921e8b64d784d14d69cf2bb2b42aceb818a3659898e5cf"
+    "runtimeSha256": "412a7c785351ffaae49339968f1e3d8a498640d5edfff02d6dfa19d9fe8d1464",
+    "highMaximumWheelPenetrationM": 0.0009344220161437988
   },
   "geometryReview": "Data_GeometryReviewV3.json",
-  "workingGeometryNote": "V26 actual packed candidate passed the recorded technical and12-component photographic author review; no pending source/shape items remain within the declared same-car2007 reconstruction scope.",
+  "workingGeometryNote": "Current V31 high/game exports and source projects were technically verified, then compared component by component with declared photographic and game-LOD limits; user approval is not implied.",
   "workingSourceTriangles": {
-    "High": 885866,
-    "Game": 84136
+    "High": 1119346,
+    "Game": 83992
   },
   "workingBudget": {
     "target": 80000,
     "proposedCeiling": 84000,
     "policy": "PreserveSelectedGameTopologyWithinFivePercent",
-    "requiredReductionFraction": 0.0491585052771703
+    "requiredReductionFraction": 0.04752833603200305
   },
   "runtimeTriangleTarget": 80000,
-  "selectedGameSourceTrianglesBeforeCleanup": 84136,
+  "selectedGameSourceTrianglesBeforeCleanup": 83992,
   "budgetPolicy": "PreserveSelectedGameTopologyWithinFivePercent",
   "candidateIdentity": {
-    "file": "Taierzhuang1938/Model/Type89MediumTank/Model_Type89MediumTank.glb",
-    "sha256": "71f4068920abed10c5921e8b64d784d14d69cf2bb2b42aceb818a3659898e5cf",
-    "bytes": 21970684,
-    "triangles": 83839,
-    "materials": 8,
+    "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\Type89MediumTank\\Model_Type89MediumTank.glb",
+    "sha256": "412a7c785351ffaae49339968f1e3d8a498640d5edfff02d6dfa19d9fe8d1464",
+    "bytes": 22817348,
+    "triangles": 83992,
     "images": 21,
+    "materials": 8,
     "meshNodes": 219,
     "geometryVersions": [
-      "20261024GeometryV26"
+      "20261024GeometryV31"
     ],
-    "cleanup": [
-      {
-        "mesh": "DeflectorPressedRib",
-        "removedStorageTriangles": 1,
-        "instances": 1,
-        "removedRenderedTriangles": 1
-      },
-      {
-        "mesh": "CastShoePlate",
-        "removedStorageTriangles": 2,
-        "instances": 148,
-        "removedRenderedTriangles": 296
-      }
-    ]
+    "cleanup": []
   },
   "candidateHighIdentity": {
-    "file": "Taierzhuang1938/_shots/Type89MediumTank/Model_Type89MediumTankHighPbr.glb",
-    "sha256": "2bec0f1e2f9e53ca5c6afa5fff59d13ef802067e831ddfb2f4b66abc138011cf",
-    "bytes": 36484036,
-    "triangles": 878506,
-    "materials": 8,
+    "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\Model_Type89MediumTankHighPbr.glb",
+    "sha256": "3ed64d2c828d98b474aa5bc7367a9c21de78eb0ee960c696436a8b9823b87e45",
+    "bytes": 50310152,
+    "triangles": 1111852,
     "images": 21,
+    "materials": 8,
     "meshNodes": 219,
     "geometryVersions": [
-      "20261024GeometryV26"
+      "20261024GeometryV31"
     ],
     "cleanup": [
       {
-        "mesh": "BowMgBarrel.001",
-        "removedStorageTriangles": 7300,
+        "mesh": "BowMgBarrel.002",
+        "removedStorageTriangles": 7286,
         "instances": 1,
-        "removedRenderedTriangles": 7300
+        "removedRenderedTriangles": 7286
       },
       {
-        "mesh": "ExhaustExit.001",
+        "mesh": "ExhaustExit.002",
         "removedStorageTriangles": 52,
         "instances": 1,
         "removedRenderedTriangles": 52
       },
       {
-        "mesh": "GunTrunnion.001",
+        "mesh": "CastShoePlate.002",
+        "removedStorageTriangles": 1,
+        "instances": 148,
+        "removedRenderedTriangles": 148
+      },
+      {
+        "mesh": "GunTrunnion.002",
         "removedStorageTriangles": 8,
         "instances": 1,
         "removedRenderedTriangles": 8
       }
     ]
   },
-  "geometryRecipeSha256": "f5e61d2d46f59eb1000ada2a73f510cd34589d0047f1b6dc68af77a4bb9c06b2",
-  "exportRemovedZeroAreaTriangles": 297,
-  "accessoryState": "2007 exposed cylindrical perforated bow-MG jacket and opening round cover with inner star; pointed removable2025 cover excluded. Rest joints are closed; the2007 review pose opens them with Type89Motion."
+  "geometryRecipeSha256": "0cb1db33edd14a817b16ce00e3285a8d0619bfa7aec54a09decb3c6d2034c23b",
+  "exportRemovedZeroAreaTriangles": 0,
+  "accessoryState": "2007 exposed cylindrical perforated bow-MG jacket and opening round cover with inner star; pointed removable2025 cover excluded. Rest joints are closed; the2007 review pose opens them with Type89Motion.",
+  "userApproved": false,
+  "reopenedScope": "The user rejected V26 dimensions, shape and materials. Prior author review and numeric passes do not prove fidelity. Independent photo geometry, proportions and surface comparison are now in progress.",
+  "geometryRevisionInProgress": "20261024GeometryV31",
+  "materialRevisionInProgress": "SurfaceV4",
+  "measuredRunningGear": {
+    "kind": "PhotographProportionedReconstruction_NotFactoryDimensions",
+    "referenceIds": [
+      2,
+      19
+    ],
+    "returnOuterRingRadiusFitM": [
+      0.06891445288954763,
+      0.06772513528863394
+    ],
+    "adoptedReturnRadiusM": 0.07,
+    "radiusToFirstStationPitchRange": [
+      0.086,
+      0.1
+    ],
+    "sourceAssumptions": "Native visible rim contours, fixed nominal envelope, same-car axle stations and explicitly provisional camera fits. Axial rim feature/edge uncertainty retained.",
+    "leadingSupport": "Between paired discs;2007 shows an unobstructed outer dish on both sides",
+    "clearanceAdjustment": "Inner suspension-cover fold lowered20mm; outer fold and skirt bottom retained; unchanged1mm actual-triangle gate",
+    "adoptedTrackCastingWidthM": 0.32,
+    "trackCentreXPreservedM": 0.907,
+    "widthReferenceId": 16,
+    "widthProjectionAt640": {
+      "old366mmApprox": [
+        476.4,
+        552.0
+      ],
+      "adopted320mmApprox": [
+        481.1,
+        547.3
+      ],
+      "visiblePhotoEdgeApprox": [
+        481,
+        547
+      ]
+    },
+    "widthEvidenceLimit": "Photographic reconstruction;1944USapprox12inch table only corroborates narrower direction, not exact museum or factory dimensions",
+    "pinEndClearance": "Outer pin-eye inner ends stop at abs localX81mm, leaving space outside the paired wheel faces",
+    "highContactBand": "Exact nominal radius; only the buried coincident painted cylinder was removed"
+  }
 }

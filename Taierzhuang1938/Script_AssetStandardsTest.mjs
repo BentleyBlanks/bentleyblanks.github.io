@@ -132,7 +132,7 @@ Check(EXTERNAL_GLB_STANDARDS.length === 64
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "DonkeyCart" && record.actualTriangles === 79500 && record.targetTriangles <= 80000)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Donkey" && record.actualTriangles === 79748 && record.sourceTriangles === record.actualTriangles)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "NakajimaKi4" && record.sourceTriangles === 244695 && record.actualTriangles === 177815 && record.targetTriangles === 180000)
-  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Type89MediumTank" && record.sourceTriangles === 885866 && record.selectedGameSourceTriangles === 84136 && record.actualTriangles === 83839 && record.targetTriangles === 80000)
+  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Type89MediumTank" && record.sourceTriangles === 1119346 && record.selectedGameSourceTriangles === 83992 && record.actualTriangles === 83992 && record.targetTriangles === 80000)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "KawasakiType88" && record.sourceTriangles === 237875 && record.actualTriangles === 79649 && record.targetTriangles === 80000)
   && EXTERNAL_GLB_STANDARDS.every((record) => record.actualTriangles > 0 && record.targetTriangles > 0),
   "外部 GLB 分类登记既有资产、指挥室、接收院陈设、单被、两种草席、驴车、独立驴、Ki4、八八式与八九式乙型，共 64 项");

@@ -86,13 +86,13 @@
           "lastEdited": "2026-10-23T13:00:58.270Z"
         }
       ],
-      "materialRevision": "SurfaceV3",
+      "materialRevision": "SurfaceV4",
       "materialReviewedAt": "2026-10-24",
       "materialReview": "Model/Type89MediumTank/Data_MaterialReview.json",
-      "materialScope": "Appearance-only rematch from recovered original and same-car close-ups; historical labels and Notion source-page timestamps remain unchanged",
+      "materialScope": "V31 appearance rematch: photograph-proportioned running gear,320mm casting/70mm return-rim adoption, planar pressed lips and satin paint/cast steel; all dimensions and micro wear remain reconstruction rather than factory proof",
       "historicalBoundaryCheckedAt": "2026-10-24",
       "historicalBoundaryCheck": "Only this asset boundary and its existing Notion ledger row checked. Geometry, colors and hidden details remain reconstruction; no new participation claim or history-source promotion. Global repository cursor and unrelated page stamps preserved.",
-      "appearanceReviewStatus": "AuthorReviewedWithDeclaredInferences",
+      "appearanceReviewStatus": "V31AuthorComparedWithDeclaredGameLodAndPhotographicLimits",
       "notionRowSnapshots": [
         {
           "id": "40260335331c81a18a18e63b0cc14bce",
@@ -110,7 +110,7 @@
           "scope": "Type89 appearance bullet only"
         }
       ],
-      "geometryRevision": "GeometryV26"
+      "geometryRevision": "GeometryV31"
     },
     {
       "asset": "KawasakiType88",

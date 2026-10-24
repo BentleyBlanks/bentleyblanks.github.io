@@ -54,6 +54,7 @@ def PrepareSurfaceAttributes(objects, samples=12, onObject=None, allObjects=None
         finish=Attribute(mesh,'SurfaceFinish')
         part=Attribute(mesh,'SurfacePart')
         wear=Attribute(mesh,'SurfaceWear')
+        wheel=Attribute(mesh,'SurfaceWheel')
         partSeed=int(hashlib.sha256(obj.name.encode()).hexdigest()[:8],16)/0xffffffff
         if not any(value.value for value in finish.data):
             # Explicit zero finish on gun-jacket components is meaningful.
@@ -69,6 +70,7 @@ def PrepareSurfaceAttributes(objects, samples=12, onObject=None, allObjects=None
             part.data[i].value=partSeed
             wear.data[i].value=min(1,max(0,(vertex.co.z+.005)/.025)) if isShoe else 0
             dust.data[i].value=.8 if isShoe else (.55 if isWheel else 0)
+            wheel.data[i].value=1.0 if isWheel else 0.0
             normal=vertex.normal.normalized()
             signed=[]
             for edge in vertex.link_edges:
@@ -173,7 +175,10 @@ class SurfaceGraph:
         world=self.Attr('RestWorld','Vector')
         part=self.Attr('SurfacePart')
         wear=self.Attr('SurfaceWear')
-        grain=self.Noise(coordinate,380 if role=='Armor' else 260,3)
+        wheel=self.Attr('SurfaceWheel')
+        # Paint texture is fine spray/rolled film, not millimetre-deep gravel.
+        # Keep its normal energy below the cast-steel shoe's physical relief.
+        grain=self.Noise(coordinate,1150 if role in ['Armor','Guard'] else 650,3)
         macro=self.Noise(world,5.5,5)
         breakup=self.Noise(coordinate,135,3)
         meso=self.Noise(coordinate,75,4)
@@ -194,7 +199,7 @@ class SurfaceGraph:
         oxideColor=self.Color((.10,.045,.018))
         steelColor=self.Color((.38,.41,.41))
         variation=self.Math('ADD',.91,self.Math('ADD',self.Math('MULTIPLY',macro,.12),self.Math('MULTIPLY',part,.020)))
-        relief=self.Math('ADD',self.Math('MULTIPLY',grain,.40),self.Math('MULTIPLY',meso,.60))
+        relief=self.Math('ADD',self.Math('MULTIPLY',grain,.82),self.Math('MULTIPLY',meso,.18))
         if role in ['Armor','Guard']:
             # Recovered2007 paint is a warm olive-brown. The earlier V3 green
             # (.120,.115,.065) lost its red/green separation in the actual PBR
@@ -206,49 +211,54 @@ class SurfaceGraph:
             self.Link(base,multiply.inputs[1]);self.Link(variation,multiply.inputs[2]);base=multiply.outputs[0]
             film=self.Math('MULTIPLY',lower,self.Math('ADD',.32,self.Math('MULTIPLY',drips,.30)))
             base=self.Mix(base,self.Color((.046,.0344,.0124)),self.Math('MULTIPLY',film,.25))
-            base=self.Mix(base,self.Color((.10,.0632,.0254)),self.Math('MULTIPLY',chip,.75))
-            base=self.Mix(base,steelColor,self.Math('MULTIPLY',chip,.18))
+            base=self.Mix(base,self.Color((.10,.0632,.0254)),self.Math('MULTIPLY',chip,.28))
+            base=self.Mix(base,steelColor,self.Math('MULTIPLY',chip,.82))
             oxide=self.Math('MULTIPLY',oxide,.12)
             base=self.Mix(base,oxideColor,oxide);base=self.Mix(base,dustColor,dust)
             # Thin paint has a broad satin lobe with local dull chalk, rather
             # than one roughness value and a uniformly smooth plastic skin.
-            metallic=self.Math('MULTIPLY',chip,.20)
-            rough=self.Math('ADD',.60,self.Math('ADD',self.Math('MULTIPLY',meso,.20),self.Math('MULTIPLY',drips,.10)),True)
+            # Coating stays dielectric. Only actual chipped masks reveal steel;
+            # satin paint and pressed-wheel dishes obtain their sheen from a
+            # coherent specular lobe, not a uniform metallic paint multiplier.
+            metallic=self.Math('MULTIPLY',chip,.90)
+            rough=self.Math('ADD',.43,self.Math('ADD',self.Math('MULTIPLY',meso,.13),self.Math('MULTIPLY',drips,.055)),True)
+            rough=self.Math('SUBTRACT',rough,self.Math('MULTIPLY',wheel,.035),True)
+            rough=self.Mix(rough,.31,self.Math('MULTIPLY',chip,.75))
             badge=self.Attr('MuseumBadge')
             base=self.Mix(base,self.Color((.55,.34,.055)),badge)
             metallic=self.Mix(metallic,.38,badge)
             rough=self.Mix(rough,.43,badge)
-            bumpDistance=.00095
+            bumpDistance=.00014
         elif role=='Steel':
             base=self.Mix(self.Color((.020,.026,.031)),self.Color((.19,.21,.21)),finish)
             base=self.Mix(base,steelColor,self.Math('MULTIPLY',chip,.75))
             oxide=self.Math('MULTIPLY',oxide,.25)
             base=self.Mix(base,oxideColor,oxide);base=self.Mix(base,dustColor,dust)
             metallic=self.Math('MULTIPLY',.96,self.Math('SUBTRACT',1,self.Math('MAXIMUM',oxide,dust)),True)
-            rough=self.Math('ADD',.38,self.Math('MULTIPLY',macro,.20),True)
-            bumpDistance=.00035
+            rough=self.Math('ADD',.29,self.Math('MULTIPLY',macro,.16),True)
+            bumpDistance=.00012
         elif role=='Track':
             outward=self.Ramp(split.outputs['Z'],-.010,.012)
             running=self.Ramp(split.outputs['Z'],.016,.032)
             mottling=self.Ramp(meso,.16,.85)
-            cast=self.Mix(self.Color((.14,.15,.14)),self.Color((.28,.30,.28)),mottling)
+            cast=self.Mix(self.Color((.12,.14,.15)),self.Color((.30,.32,.32)),mottling)
             base=self.Mix(self.Color((.036,.032,.023)),cast,outward)
-            base=self.Mix(base,self.Color((.42,.44,.43)),self.Math('MULTIPLY',running,self.Ramp(grain,.30,.72)))
+            base=self.Mix(base,self.Color((.42,.44,.43)),self.Math('MULTIPLY',running,.85))
             oxide=self.Math('MULTIPLY',self.Math('MULTIPLY',recess,self.Ramp(meso,.40,.68)),.30)
             base=self.Mix(base,oxideColor,oxide)
             dust=self.Math('MULTIPLY',self.Math('SUBTRACT',1,running),self.Math('ADD',.06,self.Math('MULTIPLY',meso,.10)),True)
             base=self.Mix(base,dustColor,dust)
             # The photographed 2007 outer shoe is light abraded cast steel with
             # ingrained film; the later orange-rust shoe is not copied wholesale.
-            metallic=self.Math('ADD',.66,self.Math('MULTIPLY',running,.28),True)
-            metallic=self.Math('MULTIPLY',metallic,self.Math('SUBTRACT',1,oxide),True)
-            rough=self.Mix(self.Math('ADD',.51,self.Math('MULTIPLY',meso,.16)),.34,running)
+            metallic=self.Math('ADD',.89,self.Math('MULTIPLY',running,.08),True)
+            metallic=self.Math('MULTIPLY',metallic,self.Math('SUBTRACT',1,self.Math('MAXIMUM',oxide,dust)),True)
+            rough=self.Mix(self.Math('ADD',.39,self.Math('MULTIPLY',meso,.14)),.255,running)
             abrasion=self.Ramp(self.Noise(self.Scale(coordinate,(180,9,170)),1,2),.64,.77)
             abrasion=self.Math('MULTIPLY',abrasion,outward)
             base=self.Mix(base,self.Color((.37,.39,.38)),self.Math('MULTIPLY',abrasion,.55))
             rough=self.Mix(rough,.33,self.Math('MULTIPLY',abrasion,.65))
-            relief=self.Math('ADD',self.Math('MULTIPLY',grain,.40),self.Math('MULTIPLY',meso,.60))
-            bumpDistance=.0016
+            relief=self.Math('ADD',self.Math('MULTIPLY',grain,.84),self.Math('MULTIPLY',meso,.16))
+            bumpDistance=.00038
         elif role=='Rubber':
             base=self.Mix(self.Color((.034,.029,.020)),dustColor,self.Math('ADD',.16,self.Math('MULTIPLY',meso,.25),True))
             metallic=0.0;rough=self.Math('ADD',.80,self.Math('MULTIPLY',macro,.13),True);bumpDistance=.00020

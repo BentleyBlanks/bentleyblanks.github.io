@@ -39,12 +39,17 @@ wheelCenterX = .907
 frontIdlerY = 1.88
 rearSprocketY = -2.18
 trackPitchM = .150
+trackWidthM = .320
 trackLinksPerSide = 74
 roadWheelPairs = [(.80,.45),(.10,-.25),(-.66,-1.01),(-1.36,-1.71)]
 # Primary-photo axle rays and the independent side view agree on a falling
 # return run. The previous equal-height row lifted the belt and led its front
 # three rollers too far forward.
 returnRollerStations = [(.812,1.078),(.049,1.050),(-.686,1.016),(-1.414,.973)]
+# Two independent native-photo rim measurements give67.7/68.9mm for the
+# visible outer ring. Adopt70mm including its small rolled edge;82mm enlarged
+# every return wheel against the measured axle spacing and the big end wheels.
+returnRollerRadius = .070
 
 
 def Material(name, color, roughness=.7, metallic=0):
@@ -557,20 +562,41 @@ def Wheel(parent, name, position, radius, width=.23, side=1, road=True):
         for sign in [-1,1]:
             x=.057
             if quality=='High':
-                profile=[(.018,x-.026),(radius*.62,x-.026),(radius*.87,x-.015),(radius*.94,x-.024),(radius,x-.021),(radius,x+.021),(radius*.89,x+.021),(radius*.83,x-.004),(radius*.60,x-.015),(radius*.40,x-.015),(.035,x+.025),(.018,x+.025)]
+                # Original2007 wheels have a broad pressed outer lip and a
+                # shallow dish with a rolled transition. The previous narrow
+                # lip/deep cone made the small wheels look like toy bowls.
+                profile=[(.018,x-.026),(radius*.62,x-.026),(radius*.87,x-.015),(radius*.94,x-.024),
+                         (radius,x-.021),(radius,x+.017),(radius*.975,x+.021),
+                         (radius*.82,x+.021),(radius*.76,x+.015),(radius*.70,x+.002),
+                         (radius*.60,x-.005),(radius*.40,x-.005),(.035,x+.025),(.018,x+.025)]
                 profile=[(r,sign*offset) for r,offset in profile]
-                Lathe('PressedRoadWheel',profile,(0,0,0),armor,pivot,'X',segments//2)
-                rim=[(r,sign*offset) for r,offset in [(radius*.98,x-.022),(radius*1.006,x-.022),(radius*1.006,x+.022),(radius*.98,x+.022)]]
+                disc=Lathe('PressedRoadWheel',profile,(0,0,0),armor,pivot,'X',segments//2)
+                # These annuli are pressed planes. Smoothing them into the
+                # adjacent rolled edge inflated the photographed flat lip.
+                for polygon in disc.data.polygons:
+                    if polygon.index//(segments//2) in [6,10,12]:polygon.use_smooth=False
+                # The contact band below owns the nominal outer cylinder.
+                # Remove the coincident painted wall underneath it, keeping
+                # one physical surface instead of inflating the high wheel.
+                bm=bmesh.new();bm.from_mesh(disc.data);bm.faces.ensure_lookup_table()
+                buried=[face for face in bm.faces if face.index//(segments//2)==4]
+                bmesh.ops.delete(bm,geom=buried,context='FACES_ONLY')
+                bm.to_mesh(disc.data);bm.free();disc.data.update()
+                # A thin contact skin follows the measured radius; the old
+                # .6percent oversize inflated high wheels into narrow shoes.
+                rim=[(r,sign*offset) for r,offset in [(radius*.98,x-.022),(radius,x-.022),(radius,x+.022),(radius*.98,x+.022)]]
                 Lathe('RoadRimWear',rim,(0,0,0),materials['Rubber'],pivot,'X',segments//2,closeProfile=True)
             else:
                 # The old intermediate back ring was exactly coplanar. Its
                 # removal preserves both faces and spends no silhouette detail.
-                profile=[(.018,x-.020),(radius,x-.020),(radius,x+.020),(radius*.85,x-.003),(radius*.60,x-.015),(.034,x-.015),(.034,x+.020),(.018,x+.020)]
+                profile=[(.018,x-.020),(radius,x-.020),(radius,x+.020),(radius*.82,x+.020),(radius*.60,x-.005),(radius*.40,x-.005),(.035,x+.025),(.018,x+.025)]
                 profile=[(r,sign*offset) for r,offset in profile]
-                disc=Lathe('PressedRoadWheel',profile,(0,0,0),armor,pivot,'X',16,capEnds=False)
+                discSegments=24 if 'LeadingWheel' in name else 16
+                disc=Lathe('PressedRoadWheel',profile,(0,0,0),armor,pivot,'X',discSegments,capEnds=False)
                 disc.data.materials.append(materials['Rubber'])
                 for polygon in disc.data.polygons:
-                    if 16<=polygon.index<2*16:polygon.material_index=1
+                    if discSegments<=polygon.index<2*discSegments:polygon.material_index=1
+                    if polygon.index//discSegments in [2,4,6]:polygon.use_smooth=False
         hub=Lathe('HubCap',[(.025,side*.077),(.025,side*.090),(.018,side*.096)],(0,0,0),armor,pivot,'X',24 if quality=='High' else 12)
         if quality!='High':
             # Its rear disk lies inside the wheel's coplanar hub annulus and
@@ -618,9 +644,14 @@ def Suspension(hull, side):
             Tube('SpringClamp',(-.025,dy,.15),(-.025,dy,.24),.011,armor,bogie)
     Wheel(group,'Node_LeadingWheel'+label,(x,leadingWheelY,leadingWheelHeight),leadingWheelRadius,side=side)
     armOutline=[(leadingWheelY-.04,.23),(leadingWheelY+.06,.24),(leadingWheelY+.19,.49),(leadingWheelY+.30,.67),(leadingWheelY+.25,.73),(leadingWheelY+.11,.58),(leadingWheelY-.01,.36)]
-    PolygonPrism('LeadingWheelForgedArm',armOutline,'X',.055,(side*.978,0,0),armor,group,.005)
-    for y,z in [(leadingWheelY+.06,.32),(leadingWheelY+.16,.49),(leadingWheelY+.23,.63)]:
-        HexBolt((side*1.010,y,z),(side,0,0),group,.014,.011)
+    # Both2007 leading-wheel faces are fully visible. The arm belongs between
+    # the paired discs; its old X=.978 placed a broad blade in front of the
+    # outer dish. Retain the forged support without covering that visible face.
+    PolygonPrism('LeadingWheelForgedArm',armOutline,'X',.055,(side*wheelCenterX,0,0),armor,group,.005)
+    for index,(y,z) in enumerate([(leadingWheelY+.06,.32),(leadingWheelY+.16,.49),(leadingWheelY+.23,.63)]):
+        # The lower head sits inside the paired discs; keep it flush enough
+        # to clear the back of the rotating pressed wheel away from its axle.
+        HexBolt((side*(wheelCenterX+(.028 if index==0 else .032)),y,z),(side,0,0),group,.014,.003 if index==0 else .006)
     idler=Wheel(group,'Node_FrontIdler'+label,(x,frontIdlerY,.850),.433,.25,side,False)
     idler['geometryRadiusM']=.433
     idler['radiusM']=.451
@@ -640,7 +671,7 @@ def Suspension(hull, side):
     for y in [-1.75,-1.88,-2.01,-2.14]:Rivet((side*1.047,y,.958),(side,0,0),group,.009)
     for angle in [math.pi/2-i*math.pi/6 for i in range(7)]:Rivet((side*1.047,rearSprocketY-.148*math.cos(angle),.790+.165*math.sin(angle)),(side,0,0),group,.008)
     for i,(y,z) in enumerate(returnRollerStations):
-        Wheel(group,'Node_ReturnRoller%s%02d'%(label,i+1),(x,y,z),.082,.13,side,False)
+        Wheel(group,'Node_ReturnRoller%s%02d'%(label,i+1),(x,y,z),returnRollerRadius,.13,side,False)
         Tube('RollerBracket',(side*.65,y,z-.05),(side*.85,y,z),.025,armor,group)
     # Front idler tensioning housing is fixed; the wheel rotates behind it.
     def CasePoint(y,z):
@@ -680,36 +711,42 @@ def Suspension(hull, side):
     HexBolt((side*1.044,2.066,.85),(0,1,0),group,.019,.023)
     Tube('GreaseCylinderLockWire',(side*1.067,2.058,.834),(side*1.075,2.034,.870),.003,steel,group,8)
     # Sloping removable suspension covers, folded vertical bottom skirts.
+    # The smaller measured return wheels lower the upper belt. Lower only the
+    # inner cover fold20mm; keep the photographed outer fold/bottom in place.
+    # This clears the rear top rivets without lifting the belt off its rollers.
+    coverInnerHeight=1.025
+    coverSlopeDrop=.426
+    coverSkirtDrop=.655
     for panel,(frontY,rearY) in enumerate([(1.51,.48),(.48,-.61),(-.61,-1.67)]):
-        panelNode=Node('Node_SuspensionCover%s%02d'%(label,panel+1),(side*.754,frontY,1.045),group,axis='localY',rangeDegrees=[0,45])
+        panelNode=Node('Node_SuspensionCover%s%02d'%(label,panel+1),(side*.754,frontY,coverInnerHeight),group,axis='localY',rangeDegrees=[0,45])
         length=frontY-rearY
-        vertices=[(0,0,0),(0,-length,0),(side*.276,-length,-.446),(side*.276,0,-.446),(side*.276,0,-.675),(side*.276,-length,-.675)]
+        vertices=[(0,0,0),(0,-length,0),(side*.276,-length,-coverSlopeDrop),(side*.276,0,-coverSlopeDrop),(side*.276,0,-coverSkirtDrop),(side*.276,-length,-coverSkirtDrop)]
         Mesh('SlopingSuspensionCover',vertices,[(0,1,2,3),(3,2,5,4)],armor,panelNode,0)
         solid=panelNode.children[-1].modifiers.new('ArmorSheetThickness','SOLIDIFY'); solid.thickness=.008
+        slopeNormal=Vector((side*coverSlopeDrop,0,.276)).normalized()
         for y in [-.04,-length+.04]:
             for t in [0,.25,.5,.75,1]:
-                Rivet((side*(.276*t+.006),y,-.446*t+.003),(side*.850,0,.526),panelNode,.007)
+                Rivet((side*(.276*t+.006),y,-coverSlopeDrop*t+.003),slopeNormal,panelNode,.007)
         # Same-car originals17/19 resolve a middle hinge row in the slope and
         # three hinges per panel at the lower fold. The old six-per-panel
         # cylinders duplicated the joints and omitted every middle leaf.
-        slopeAngle=side*math.atan2(.446,.276)
-        slopeNormal=Vector((side*.850,0,.526))
+        slopeAngle=side*math.atan2(coverSlopeDrop,.276)
         for y in [-.08,-length*.50,-length+.08]:
-            center=Vector((side*.138,y,-.223))+slopeNormal*.004
+            center=Vector((side*.138,y,-coverSlopeDrop*.5))+slopeNormal*.004
             leaf=Box('SuspensionMiddleHingeLeaf',center,(.073,.073,.002),armor,panelNode,.0008 if quality=='High' else 0)
             leaf.rotation_euler.y=slopeAngle
             pinCenter=center+slopeNormal*.004
             Tube('SuspensionMiddleHinge',pinCenter+Vector((0,-.038,0)),pinCenter+Vector((0,.038,0)),.0065,armor,panelNode,12 if quality=='High' else 6)
             for delta in [-.026,.026]:
-                point=center+Vector((side*.526*delta,0,-.850*delta))+slopeNormal*.0015
+                point=center+Vector((side*slopeNormal.z*delta,0,-abs(slopeNormal.x)*delta))+slopeNormal*.0015
                 Rivet(point,slopeNormal,panelNode,.0045)
-            Tube('SkirtHinge',(side*.282,y-.032,-.446),(side*.282,y+.032,-.446),.007,armor,panelNode,12 if quality=='High' else 6)
-            Box('SkirtHingeLeaf',(side*.282,y,-.463),(.002,.070,.034),armor,panelNode,.0008 if quality=='High' else 0)
-            for dy in [-.023,.023]:Rivet((side*.284,y+dy,-.475),(side,0,0),panelNode,.0045)
+            Tube('SkirtHinge',(side*.282,y-.032,-coverSlopeDrop),(side*.282,y+.032,-coverSlopeDrop),.007,armor,panelNode,12 if quality=='High' else 6)
+            Box('SkirtHingeLeaf',(side*.282,y,-coverSlopeDrop-.017),(.002,.070,.034),armor,panelNode,.0008 if quality=='High' else 0)
+            for dy in [-.023,.023]:Rivet((side*.284,y+dy,-coverSlopeDrop-.029),(side,0,0),panelNode,.0045)
         # The vertical skirt joins have paired upright rivets, rather than the
         # unsupported long horizontal row across each blank lower sheet.
         for y in [-.023,-length+.023]:
-            for z in [-.505,-.578,-.651]:Rivet((side*.283,y,z),(side,0,0),panelNode,.006)
+            for drop in [.059,.132,.205]:Rivet((side*.283,y,-coverSlopeDrop-drop),(side,0,0),panelNode,.006)
     return group
 
 
@@ -742,7 +779,7 @@ def BuildTrackPath():
         lower=hull[:frontIndex+1]
         # The heavy upper run rests on its four rollers and sags between them;
         # a single convex envelope bridges over the photographed lower row.
-        supports=[(frontIdlerY,.85,.451)]+[(y,z,.106) for y,z in returnRollerStations]+[(rearSprocketY,.79,sprocketPitchRadius)]
+        supports=[(frontIdlerY,.85,.451)]+[(y,z,returnRollerRadius+.024) for y,z in returnRollerStations]+[(rearSprocketY,.79,sprocketPitchRadius)]
         sagDepths=[.065,.025,.025,.025,.060]
         def UpperHeight(y):
             candidates=[z+math.sqrt(max(0,radius*radius-(y-center)**2)) for center,z,radius in supports if abs(y-center)<=radius]
@@ -796,7 +833,7 @@ def TrackSample(distance):
 def TrackGeometry(hull,side):
     global trackLinkMesh
     label='Left' if side<0 else 'Right'
-    group=Node('Node_Track'+label,parent=hull,loopLengthM=trackLength,axis='independentDistanceM')
+    group=Node('Node_Track'+label,parent=hull,loopLengthM=trackLength,widthM=trackWidthM,axis='independentDistanceM')
     steel=materials['Track']
     pin=materials['Steel']
     pitchScale=trackPitchM/.119
@@ -804,6 +841,26 @@ def TrackGeometry(hull,side):
         before=set(bpy.data.objects)
         BuildCastTrackShoe(quality,pitchScale,steel,pin,Mesh,PolygonPrism,RoundedRectangle,CutOpening,Lathe,Tube)
         shoeObjects=sorted(set(bpy.data.objects)-before,key=lambda obj:obj.name)
+        # Preserve the native-photo pattern proportions while correcting the
+        # whole casting's transverse width. The366mm prototype exceeded the
+        # actual front-photo edges;320mm fits them without moving any axles.
+        bpy.ops.object.select_all(action='DESELECT')
+        transverse=Matrix.Diagonal((trackWidthM/.366,1,1,1))
+        for obj in shoeObjects:
+            obj.matrix_world=transverse@obj.matrix_world
+            obj.select_set(True)
+        bpy.context.view_layer.objects.active=shoeObjects[0]
+        bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
+        # The casting neck ends at the outside of each paired wheel, rather
+        # than crossing its flange after the width correction. Trim only the
+        # inner ends of the two outer pin eyes; the centre knuckle/guide and
+        # the photographed slot stations retain their scaled locations.
+        for obj in shoeObjects:
+            if not obj.name.startswith('ShoePinBarrel'):continue
+            for vertex in obj.data.vertices:
+                if .06<abs(vertex.co.x)<.081:
+                    vertex.co.x=math.copysign(.081,vertex.co.x)
+            obj.data.update()
         template=JoinObjects(shoeObjects,'Mesh_CastTrackShoe',None)
         trackLinkMesh=template.data
         bpy.data.objects.remove(template,do_unlink=True)
@@ -1044,7 +1101,7 @@ def Main():
     bpy.context.scene['BlenderMcpTask']='Type89MediumTank'
     bpy.context.scene['Type89Stage']=stage
     bpy.context.scene['Type89Quality']=quality
-    root=Node('Model_Type89MediumTank',assetVersion='20261024GeometryV26',geometryVersion='20261024GeometryV26',variant='Type89Otsu_Tsuchiura',sourceNose='+Y',exportNose='-Z',units='metres',acceptance='IN_PROGRESS_GRAY')
+    root=Node('Model_Type89MediumTank',assetVersion='20261024GeometryV31',geometryVersion='20261024GeometryV31',variant='Type89Otsu_Tsuchiura',sourceNose='+Y',exportNose='-Z',units='metres',acceptance='IN_PROGRESS_GRAY')
     recipe=Path(__file__).read_bytes()+(Path(__file__).parent/'Script_Type89DetailedParts.py').read_bytes()
     root['geometryRecipeSha256']=hashlib.sha256(recipe).hexdigest()
     hull=HullGeometry(root)

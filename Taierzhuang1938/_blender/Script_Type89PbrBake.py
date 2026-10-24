@@ -129,7 +129,11 @@ def RoleProxy(source,role):
     duplicate=source.copy();duplicate.data=source.data.copy();duplicate.name='BakeSource_'+role
     bpy.context.scene.collection.objects.link(duplicate)
     bm=bmesh.new();bm.from_mesh(duplicate.data)
-    remove=[face for face in bm.faces if RoleOf(duplicate.data.materials[face.material_index])!=role]
+    # A low pressed-wheel front uses its armor atlas for the thin contact band
+    # represented by separate rubber geometry in the retained high source.
+    # Keep that actual source surface instead of shooting through the band.
+    allowed={role,'Rubber'} if role=='Armor' else {role}
+    remove=[face for face in bm.faces if RoleOf(duplicate.data.materials[face.material_index])not in allowed]
     bmesh.ops.delete(bm,geom=remove,context='FACES')
     bm.to_mesh(duplicate.data);bm.free();duplicate.data.update()
     return duplicate
@@ -212,10 +216,11 @@ class ProjectionRepair:
         return tangent,bitangent,normal
 
     def SampleHigh(self,point,highImage):
-        candidates=[self.bvh.find_nearest(point)]
-        candidates.extend(sorted(self.bvh.find_nearest_range(point,.035),key=lambda row:row[3]))
+        def Candidates():
+            yield self.bvh.find_nearest(point)
+            yield from sorted(self.bvh.find_nearest_range(point,.035),key=lambda row:row[3])
         visited=set()
-        for hit,_,index,distance in candidates:
+        for hit,_,index,distance in Candidates():
             if index is None or index in visited or distance>.035:continue
             visited.add(index)
             triangle=self.highTriangles[index]
@@ -241,10 +246,11 @@ class ProjectionRepair:
             return highImage[minY+nearest[0],minX+nearest[1]].copy(),triangle,weights,float(distance)
         raise RuntimeError('No valid baked high surface within35mm for '+self.role+' at '+str(tuple(point)))
 
-    def Repair(self,image,channel):
+    def Repair(self,image,channel,force=False):
         size=image.size[0]
         buffer=np.empty(size*size*4,dtype=np.float32);image.pixels.foreach_get(buffer);pixels=buffer.reshape(size,size,4)
         missing=pixels[:,:,3]<.5
+        if force:missing[:]=True
         highImage=ReadRawImage(mapDir/('Texture_Type89High'+self.role+channel+'.png'))
         count=0;maximumDistance=0.0
         for triangle in self.lowTriangles:
@@ -299,6 +305,23 @@ def SaveImage(image,path):
     image.file_format='PNG';image.filepath_raw=str(path);image.save()
 
 
+def TransferDetailNormals(highProxy,gameProxy,gameMeshes,gameMaps,partNames=('Mesh_BowMgMount',)):
+    def UvKey(uv):return (round(uv[0],7),round(uv[1],7))
+    keys=set()
+    for obj in gameMeshes:
+        if obj.name not in partNames:continue
+        for value in obj.data.uv_layers.active.data:keys.add(UvKey(value.uv))
+    repair=ProjectionRepair(highProxy,gameProxy,'Armor')
+    repair.lowTriangles=[triangle for triangle in repair.lowTriangles if all(UvKey(repair.uvLow[loop].uv)in keys for loop in triangle.loops)]
+    assert repair.lowTriangles,'No requested detail UV triangles'
+    file=Path(gameMaps['Armor']['Normal']);image=bpy.data.images.load(str(file),check_existing=False);image.colorspace_settings.name='Non-Color'
+    Progress('nearestDetailNormals',triangles=len(repair.lowTriangles),parts=list(partNames))
+    result=repair.Repair(image,'Normal',force=True);SaveImage(image,file);bpy.data.images.remove(image)
+    result.update(parts=list(partNames),triangles=len(repair.lowTriangles),scope='All mapped detail normal texels; nearest actual retained-high surface, unchanged35mm gate')
+    reports['Game/DetailNormals']=result
+    return result
+
+
 def TargetNodes(materials,role,image,scratch):
     for material in materials:
         if material is None:continue
@@ -307,6 +330,35 @@ def TargetNodes(materials,role,image,scratch):
         if node is None:node=material.node_tree.nodes.new('ShaderNodeTexImage');node.name='Type89BakeTarget'
         node.image=image if RoleOf(material)==role else scratch
         material.node_tree.nodes.active=node;node.select=True
+
+
+def BindBakedHighChannel(source,role,channel):
+    # Keep colour/scalar projection tied to the retained high atlas, avoiding
+    # a second evaluation of bevel-driven wear under a different ray context.
+    # True geometric/bump normals still use the normal-projection pass.
+    originals=[slot.material for slot in source.material_slots]
+    used={polygon.material_index for polygon in source.data.polygons};materials={};images=[]
+    for index in sorted(used):
+        actualRole=RoleOf(originals[index])
+        if actualRole not in materials:
+            image=bpy.data.images.load(str(mapDir/('Texture_Type89High'+actualRole+channel+'.png')),check_existing=False)
+            image.colorspace_settings.name='sRGB' if channel=='Base' else 'Non-Color';images.append(image)
+            material=bpy.data.materials.new('Material_Type89HighChannelProjection')
+            material.use_nodes=True;material['Type89Role']=actualRole
+            nodes=material.node_tree.nodes;links=material.node_tree.links;nodes.clear()
+            output=nodes.new('ShaderNodeOutputMaterial');emission=nodes.new('ShaderNodeEmission');texture=nodes.new('ShaderNodeTexImage')
+            texture.image=image;emission.inputs['Strength'].default_value=1
+            links.new(texture.outputs['Color'],emission.inputs['Color']);links.new(emission.outputs['Emission'],output.inputs['Surface'])
+            materials[actualRole]=material
+        source.material_slots[index].material=materials[actualRole]
+    return originals,list(materials.values()),images
+
+
+def RestoreHighChannel(source,binding):
+    originals,materials,images=binding
+    for slot,original in zip(source.material_slots,originals):slot.material=original
+    for material in materials:bpy.data.materials.remove(material)
+    for image in images:bpy.data.images.remove(image)
 
 
 def BakeAtlases(label,target,source,graphs,scratch,roleScope=None):
@@ -320,7 +372,13 @@ def BakeAtlases(label,target,source,graphs,scratch,roleScope=None):
         repair=ProjectionRepair(source,target,role) if source is not None else None
         repairs={}
         baseSize,normalSize,dataSize=sizes[role]
-        if probe:baseSize=min(baseSize,probeSize);normalSize=min(normalSize,probeSize);dataSize=min(dataSize,max(128,probeSize//2))
+        if probe and label=='Game':
+            # A source island can be narrower than one pixel in a512px data
+            # atlas even though its real surface is only2mm from the receiver.
+            # Keep native high-source sampling during probes; only lower the
+            # game preview resolution. Never widen the35mm repair limit or
+            # borrow a texel from a different source triangle to hide a miss.
+            baseSize=min(baseSize,probeSize);normalSize=min(normalSize,probeSize);dataSize=min(dataSize,max(128,probeSize//2))
         rawChannels={};files={};opacity=None
         channels=['Base','Normal','Roughness','Metallic','Ao','Coverage']+(['Opacity'] if role=='Guard' else [])
         for channel in channels:
@@ -336,6 +394,7 @@ def BakeAtlases(label,target,source,graphs,scratch,roleScope=None):
             image=Image('Bake_'+label+role+channel,size,colorSpace,default)
             TargetNodes(allMaterials,role,image,scratch)
             for graph in graphs.values():graph.SetBakeChannel(channel)
+            binding=BindBakedHighChannel(roleSource,role,channel) if selectedToActive and channel not in ['Normal','Opacity'] else None
             bpy.ops.object.select_all(action='DESELECT')
             Visible(target,True);target.select_set(True)
             if source is not None:
@@ -358,6 +417,7 @@ def BakeAtlases(label,target,source,graphs,scratch,roleScope=None):
                 cage=.003 if selectedToActive and role=='Armor' else .022
                 distance=.012 if selectedToActive and role=='Armor' else .050
                 bpy.ops.object.bake(type='NORMAL' if channel=='Normal' else 'EMIT',use_selected_to_active=selectedToActive,use_clear=False,margin=0 if channel=='Opacity' else scene.render.bake.margin,cage_extrusion=cage,max_ray_distance=distance)
+            if binding:RestoreHighChannel(roleSource,binding)
             file=mapDir/('Texture_Type89'+label+role+channel+'.png')
             SaveImage(image,file)
             repairedImage=None
@@ -459,8 +519,30 @@ def SelectRoot(root):
 
 
 def Export(root,path):
-    SelectRoot(root)
-    bpy.ops.export_scene.gltf(filepath=str(path),export_format='GLB',use_selection=True,export_apply=True,export_yup=True,export_extras=True,export_animations=False,export_cameras=False,export_lights=False)
+    # glTF's tangent export cannot evaluate n-gons. Triangulate temporary
+    # shared-data copies with the same custom-normal policy as the bake proxy;
+    # the editable source and its UVs/normals remain untouched.
+    groups={}
+    for obj in root.children_recursive:
+        if obj.type=='MESH':groups.setdefault(obj.data,[]).append(obj)
+    replacements=[]
+    try:
+        for original,objects in groups.items():
+            temporary=bpy.data.objects.new('Type89ExportTriangulation',original.copy())
+            bpy.context.scene.collection.objects.link(temporary)
+            modifier=temporary.modifiers.new('ExportOnlyTriangulation','TRIANGULATE')
+            if hasattr(modifier,'keep_custom_normals'):modifier.keep_custom_normals=True
+            bpy.context.view_layer.objects.active=temporary
+            bpy.ops.object.modifier_apply(modifier=modifier.name)
+            triangulated=temporary.data;bpy.data.objects.remove(temporary,do_unlink=True)
+            for obj in objects:obj.data=triangulated
+            replacements.append((original,triangulated,objects))
+        SelectRoot(root)
+        bpy.ops.export_scene.gltf(filepath=str(path),export_format='GLB',use_selection=True,export_apply=True,export_tangents=True,export_yup=True,export_extras=True,export_animations=False,export_cameras=False,export_lights=False)
+    finally:
+        for original,triangulated,objects in replacements:
+            for obj in objects:obj.data=original
+            if triangulated.users==0:bpy.data.meshes.remove(triangulated)
     CleanGlb(path)
 
 
@@ -513,6 +595,7 @@ def Main():
     Visible(gameProxy,False)
     highMaps=BakeAtlases('High',highProxy,None,graphs,scratch)
     gameMaps=BakeAtlases('Game',gameProxy,highProxy,graphs,scratch)
+    TransferDetailNormals(highProxy,gameProxy,gameMeshes,gameMaps)
     highMats={role:BakedMaterial(role,highMaps.get(role),'High') for role in roles+['Shadow']}
     gameMats={role:BakedMaterial(role,gameMaps.get(role),'Game') for role in roles+['Shadow']}
     Assign(highRoot,highMats);Assign(gameRoot,gameMats)
@@ -549,7 +632,7 @@ def Main():
         assetDir.mkdir(parents=True,exist_ok=True)
         (assetDir/'Model_Type89MediumTank.glb').write_bytes(gameOutput.read_bytes())
         (exportedDir/gameOutput.name).write_bytes(gameOutput.read_bytes())
-    report={'probe':probe,'elapsedSeconds':time.time()-started,'highBlend':str(highBlend),'gameBlend':str(gameBlend),'highGlb':str(highOutput),'gameGlb':str(gameOutput),'highMaps':highMaps,'gameMaps':gameMaps,'geometryVersion':highRoot['geometryVersion'],'geometryRecipeSha256':highRoot['geometryRecipeSha256'],'geometrySourceSha256':sourceHashes[str(highFile)],'gameGeometrySourceSha256':sourceHashes[str(gameFile)],'materialAuthoringScriptSha256':authoringHash,'bakeScriptSha256':bakeScriptHash,'materialAccepted':False,'scope':'restored Tsuchiura car; micro-wear and unobserved interiors are explicitly inferred'}
+    report={'probe':probe,'elapsedSeconds':time.time()-started,'highBlend':str(highBlend),'gameBlend':str(gameBlend),'highGlb':str(highOutput),'gameGlb':str(gameOutput),'highMaps':highMaps,'gameMaps':gameMaps,'gameDataProjection':'BakedHighBaseAndScalarChannels; Armor target retains actual HighRubber contact surfaces; geometric/bump normals projected independently','exportBasis':'ExplicitMikkTangents_TemporarySharedTriangulationCopies','projectionRepairs':reports,'detailNormalTransfer':reports.get('Game/DetailNormals'),'geometryVersion':highRoot['geometryVersion'],'geometryRecipeSha256':highRoot['geometryRecipeSha256'],'geometrySourceSha256':sourceHashes[str(highFile)],'gameGeometrySourceSha256':sourceHashes[str(gameFile)],'materialAuthoringScriptSha256':authoringHash,'bakeScriptSha256':bakeScriptHash,'materialAccepted':False,'scope':'restored Tsuchiura car; micro-wear and unobserved interiors are explicitly inferred'}
     (reviewDir/('Data_Pbr'+workName+'Build.json')).write_text(json.dumps(report,indent=2),encoding='utf8')
     Progress('complete',report=str(reviewDir/('Data_Pbr'+workName+'Build.json')))
 

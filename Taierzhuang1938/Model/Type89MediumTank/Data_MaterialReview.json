@@ -1,7 +1,7 @@
 {
-  "revision": "SurfaceV3",
-  "status": "AuthorReviewedWithDeclaredInferences",
-  "previousRevision": "GeometryV14/SurfaceV2 rejected by user; prior channel, source and visual sign-offs are superseded for fidelity.",
+  "revision": "SurfaceV4",
+  "status": "AuthorSurfaceCompared_WithDeclaredGameLodLimits",
+  "previousRevision": "V26/SurfaceV3 rejected for dimensions, shape and metallic surface quality; prior author visual sign-off does not certify this candidate.",
   "primary": {
     "source": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
     "file": "Reference_Primary2007Original.jpg",
@@ -61,10 +61,10 @@
   ],
   "scope": "Tsuchiura Otsu 2007 appearance; later close-ups support surface construction and wear placement, not wholesale adoption of later orange rust",
   "changes": [
-    "Restrained large-scale mottling and lower film; warm olive-brown pigment calibrated from the actual same-light V23 render against the 2007 primary, then authored into V25.",
-    "Actual high punched-sheet guard and game UV0 MASK opacity,51columns across0.88m",
-    "Fresh high-to-game Base/Normal/ORM reprojection after geometry rematch",
-    "Mapped-surface opacity tests and triangle-ray tests for shoe windows, mantlet and tow bores"
+    "Fine satin dielectric coating: paint height scale.14mm instead of.95mm; only exposed steel masks use metallic response",
+    "Cast shoe relief.38mm instead of1.6mm; smoother coherent worn grouser response, separate oxide/dust masks",
+    "Cast rather than machined pin-eye finish; freshly projected broad wheel lips and shallow pressed dishes",
+    "Full-resolution high/game Base/Normal/ORM rebake after V31 geometry; low armor atlas receives actual high rubber contact surfaces, unchanged35mm repair limit"
   ],
   "pending": [],
   "imagegen": {
@@ -79,88 +79,15 @@
     "second neutral lighting check",
     "actual packed GLB reload and independent source reopen"
   ],
-  "reviewedAt": "2026-10-24T03:16:11.367731+00:00",
+  "reviewedAt": "2026-10-24T12:38:51.561789+00:00",
   "userApproved": false,
-  "materialScriptSha256": "648300e7bcc8285ce82ae2a9560abd9a3c7f89a31344fc38276859f5654f1a09",
-  "evidence": [
-    {
-      "aspect": "paint and coating",
-      "reference": "Recovered2007 primary; structural2025 photos are not a paint prescription",
-      "result": "Warm olive-brown pigment, reduced macro mottling/lower film and fine metre-scaled coating compared on both actual exports. Source pigment corrected after the too-grey-green V23 render.",
-      "game": "Scene_FinalSurfaceV3V26GameArmor_640.jpg",
-      "high": "Scene_FinalSurfaceV3V26HighArmor_640.jpg"
-    },
-    {
-      "aspect": "cast shoes and wear",
-      "reference": "Native16/20 construction;2007 primary and32 wear partition",
-      "result": "Light abraded outer web, protected dark recesses, cast relief and separate contact abrasion retained. Later orange rust was not copied wholesale.",
-      "game": "Scene_FinalSurfaceV3V26GameTrack_640.jpg",
-      "high": "Scene_FinalSurfaceV3V26HighTrack_640.jpg"
-    },
-    {
-      "aspect": "guard, exhaust and glass",
-      "reference": "2/19/24/34",
-      "result": "Painted punched sheet remains distinct from oxidised exhaust and dielectric glazed lamp; actual near/far MASK holes checked.",
-      "game": "Scene_V26GameRearDeck_640.jpg",
-      "high": "Scene_V26HighRearDeck_640.jpg"
-    },
-    {
-      "aspect": "projection and articulation",
-      "result": "Game Armor3mm cage/12mm rays remove the large false edge-chip projection; independent round cover exposes mapped gold inner badge. Geometry, real normals and AO retained; no shader-disable diagnostic used as final output.",
-      "game": "Scene_V26GameBowOpenCover_640.jpg",
-      "high": "Scene_V26HighBowOpenCover_640.jpg"
-    },
-    {
-      "aspect": "lighting independence",
-      "result": "Same actual packed game file inspected under unchanged reference-approximation and neutral profiles. Grazing shadow-map hatching was isolated by a shadow-only diagnostic; it was not baked into or painted out of the maps.",
-      "referenceProfile": "Scene_FinalSurfaceV3V26GameMain_640.jpg",
-      "neutralProfile": "Scene_FinalSurfaceV3V26NeutralMain_640.jpg"
-    }
-  ],
+  "materialScriptSha256": "7746a7135750f6cea3f89a554952f65ec1754bdf1a5b909ff614eb7b569432bb",
   "fullBake": {
-    "report": "Data_PbrSurfaceV3GeometryV26Build.json",
-    "geometryVersion": "20261024GeometryV26",
-    "bakeScriptSha256": "13bbca1f883bc8a1db642a1b4bab5b9eccaf88651c3efe830fc0ef65c06904ac",
-    "materialAuthoringScriptSha256": "4120f43393fa79bbae2ed8fd0cae91b0fce3ddedc4542192125843bfeb931f75"
-  },
-  "finalColorDiagnostic": {
-    "note": "Flat-region RGB averages at matched 640px camera, for colour/exposure diagnosis only. These do not prove microtexture fidelity or factory pigment chemistry.",
-    "turret": {
-      "photo": [
-        132.4,
-        115.2,
-        80.4
-      ],
-      "model": [
-        136,
-        116.4,
-        79.3
-      ]
-    },
-    "upperSide": {
-      "photo": [
-        103.9,
-        86.9,
-        51.7
-      ],
-      "model": [
-        103.5,
-        86.5,
-        53.7
-      ]
-    },
-    "lowerSkirt": {
-      "photo": [
-        89.8,
-        74.3,
-        43.1
-      ],
-      "model": [
-        91,
-        76.7,
-        46.8
-      ]
-    }
+    "geometryVersion": "20261024GeometryV31",
+    "bakeScriptSha256": "ed60b04bb70876396f5862aaff50578ead3bb3f0c11afadaa23942c8df14314e",
+    "materialAuthoringScriptSha256": "7746a7135750f6cea3f89a554952f65ec1754bdf1a5b909ff614eb7b569432bb",
+    "gameDataProjection": "BakedHighBaseAndScalarChannels; Armor target retains actual HighRubber contact surfaces; geometric/bump normals projected independently",
+    "report": "Data_PbrSurfaceV4GeometryV31Build.json"
   },
   "referenceLighting": {
     "hemisphere": {
@@ -205,12 +132,16 @@
       "reason": "Donor seam lines, blue coating and industrial wear pattern do not match this vehicle; no pixels or maps used"
     }
   ],
-  "limits": "Museum-photo reconstruction: hidden construction, original pigment chemistry, contact-band material and exact microscopic damage are not measured historical facts. Game small rivets/curves and pin bores are bounded LOD/projection approximations to the retained high source. This is author review, not user approval or a pixel-identical scan.",
+  "limits": [
+    "Paint chemistry, coating micro-height, tiny damage and contact-band composition are inferred from photographs.",
+    "Game macro rim/facet lighting differs slightly from the retained high source; no normal/AO/shadow-disable diagnostic is represented as final appearance.",
+    "Primary crop and telephoto camera fits remain provisional; color averages and numeric checks do not certify exact photographic equality."
+  ],
   "runtimeSha256": "921d70562c4ebf41e8142c1fff8c2eb4bd09ecb43675957ed00428de159afc08",
   "runtimeBytes": 20797132,
   "packedRgbExact": true,
-  "workingGeometry": "20261024GeometryV26",
-  "candidateSha256": "71f4068920abed10c5921e8b64d784d14d69cf2bb2b42aceb818a3659898e5cf",
+  "workingGeometry": "20261024GeometryV31",
+  "candidateSha256": "412a7c785351ffaae49339968f1e3d8a498640d5edfff02d6dfa19d9fe8d1464",
   "historicalSurfaceV2ColorDiagnostic": {
     "note": "Historical SurfaceV2 diagnostic, rejected by user. These values do not describe the V23/V25 candidate and are not used for current acceptance.",
     "turret": {
@@ -266,5 +197,105 @@
     "scope": "Game Armor only; the22mm cage selected neighbouring/back faces around thin lids. V25 targeted rebake verified a substantial reduction of false dark edge chips. V26 uses this in the complete bake.",
     "sameGeometryAndUv": true
   },
-  "newMuseumAppearance": "2007 cylindrical perforated MG jacket and inner gold five-point badge on an independently flipping round cover. Badge colour is a museum-photo reconstruction, not original1938 paint proof."
+  "newMuseumAppearance": "2007 cylindrical perforated MG jacket and inner gold five-point badge on an independently flipping round cover. Badge colour is a museum-photo reconstruction, not original1938 paint proof.",
+  "reopenedScope": "The user rejected V26 dimensions, shape and materials. Prior author review and numeric passes do not prove fidelity. Independent photo geometry, proportions and surface comparison are now in progress.",
+  "historicalV26Evidence": [
+    {
+      "aspect": "paint and coating",
+      "reference": "Recovered2007 primary; structural2025 photos are not a paint prescription",
+      "result": "Warm olive-brown pigment, reduced macro mottling/lower film and fine metre-scaled coating compared on both actual exports. Source pigment corrected after the too-grey-green V23 render.",
+      "game": "Scene_FinalSurfaceV3V26GameArmor_640.jpg",
+      "high": "Scene_FinalSurfaceV3V26HighArmor_640.jpg"
+    },
+    {
+      "aspect": "cast shoes and wear",
+      "reference": "Native16/20 construction;2007 primary and32 wear partition",
+      "result": "Light abraded outer web, protected dark recesses, cast relief and separate contact abrasion retained. Later orange rust was not copied wholesale.",
+      "game": "Scene_FinalSurfaceV3V26GameTrack_640.jpg",
+      "high": "Scene_FinalSurfaceV3V26HighTrack_640.jpg"
+    },
+    {
+      "aspect": "guard, exhaust and glass",
+      "reference": "2/19/24/34",
+      "result": "Painted punched sheet remains distinct from oxidised exhaust and dielectric glazed lamp; actual near/far MASK holes checked.",
+      "game": "Scene_V26GameRearDeck_640.jpg",
+      "high": "Scene_V26HighRearDeck_640.jpg"
+    },
+    {
+      "aspect": "projection and articulation",
+      "result": "Game Armor3mm cage/12mm rays remove the large false edge-chip projection; independent round cover exposes mapped gold inner badge. Geometry, real normals and AO retained; no shader-disable diagnostic used as final output.",
+      "game": "Scene_V26GameBowOpenCover_640.jpg",
+      "high": "Scene_V26HighBowOpenCover_640.jpg"
+    },
+    {
+      "aspect": "lighting independence",
+      "result": "Same actual packed game file inspected under unchanged reference-approximation and neutral profiles. Grazing shadow-map hatching was isolated by a shadow-only diagnostic; it was not baked into or painted out of the maps.",
+      "referenceProfile": "Scene_FinalSurfaceV3V26GameMain_640.jpg",
+      "neutralProfile": "Scene_FinalSurfaceV3V26NeutralMain_640.jpg"
+    }
+  ],
+  "historicalV26ColorDiagnostic": {
+    "note": "Flat-region RGB averages at matched 640px camera, for colour/exposure diagnosis only. These do not prove microtexture fidelity or factory pigment chemistry.",
+    "turret": {
+      "photo": [
+        132.4,
+        115.2,
+        80.4
+      ],
+      "model": [
+        136,
+        116.4,
+        79.3
+      ]
+    },
+    "upperSide": {
+      "photo": [
+        103.9,
+        86.9,
+        51.7
+      ],
+      "model": [
+        103.5,
+        86.5,
+        53.7
+      ]
+    },
+    "lowerSkirt": {
+      "photo": [
+        89.8,
+        74.3,
+        43.1
+      ],
+      "model": [
+        91,
+        76.7,
+        46.8
+      ]
+    }
+  },
+  "evidence": [
+    {
+      "aspect": "satin coating and cast steel",
+      "result": "Fine dielectric paint response, cast steel, smoother contact abrasion and recessed oxide/dust remain separate; the final actual game/high files were inspected without disabling their PBR channels.",
+      "game": "Scene_FinalV31PackedReferenceMain_640.jpg",
+      "high": "Scene_V31PackedHighRoadWheels_640.jpg"
+    },
+    {
+      "aspect": "low/high wheel profile agreement",
+      "result": "Wheel fronts have a broad planar pressed lip, shallow dish and real central boss. The same eight low rings now follow the high boss volume; forged supports sit between the paired discs rather than covering the visible front. Actual final game/high wheel faces checked.",
+      "game": "Scene_V31PackedGameLeadingWheel_640.jpg",
+      "high": "Scene_V31PackedHighRoadWheels_640.jpg"
+    },
+    {
+      "aspect": "track cast web and steel response",
+      "result": "Actual casting is320mm wide against nativefront16, with four open windows, asymmetric web, leading keyways and trailing relief.74links per side,70mm return rims and corresponding upper run retained. Pin-eye inner ends clear the wheel faces; worn cast steel is distinct from paint.",
+      "game": "Scene_FinalV31PackedReferenceTrack_640.jpg"
+    },
+    {
+      "aspect": "body and rear finish",
+      "result": "Actual turret/bow/deck/guard close-ups checked under neutral light and overall views under reference-approximation light. The game near rim and curved-casting shading limits remain declared.",
+      "game": "Scene_V31PackedGameRearDeck_640.jpg",
+      "high": "Scene_V31PackedHighRearDeck_640.jpg"
+    }
+  ]
 }
