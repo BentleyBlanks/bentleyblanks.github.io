@@ -86,10 +86,31 @@
           "lastEdited": "2026-10-23T13:00:58.270Z"
         }
       ],
-      "materialRevision": "SurfaceV2",
+      "materialRevision": "SurfaceV3",
       "materialReviewedAt": "2026-10-24",
       "materialReview": "Model/Type89MediumTank/Data_MaterialReview.json",
-      "materialScope": "Appearance-only rematch from recovered original and same-car close-ups; historical labels and Notion source-page timestamps remain unchanged"
+      "materialScope": "Appearance-only rematch from recovered original and same-car close-ups; historical labels and Notion source-page timestamps remain unchanged",
+      "historicalBoundaryCheckedAt": "2026-10-24",
+      "historicalBoundaryCheck": "Only this asset boundary and its existing Notion ledger row checked. Geometry, colors and hidden details remain reconstruction; no new participation claim or history-source promotion. Global repository cursor and unrelated page stamps preserved.",
+      "appearanceReviewStatus": "AuthorReviewedWithDeclaredInferences",
+      "notionRowSnapshots": [
+        {
+          "id": "40260335331c81a18a18e63b0cc14bce",
+          "lastEdited": "2026-10-23T06:14:29.417Z",
+          "scope": "asset reference page"
+        },
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-10-23T20:35:06.301Z",
+          "scope": "Type89 appearance row only"
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-10-23T20:42:29.668Z",
+          "scope": "Type89 appearance bullet only"
+        }
+      ],
+      "geometryRevision": "GeometryV26"
     },
     {
       "asset": "KawasakiType88",

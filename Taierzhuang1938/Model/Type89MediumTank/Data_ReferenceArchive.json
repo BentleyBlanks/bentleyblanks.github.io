@@ -95,70 +95,105 @@
     "commonsTitle": "File:Imperial Japanese Army Type 89 Medium Tank Otsu front view at JGSDF Camp Tsuchiura September 28, 2025.jpg",
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Imperial_Japanese_Army_Type_89_Medium_Tank_Otsu_front_view_at_JGSDF_Camp_Tsuchiura_September_28,_2025.jpg",
     "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/6/60/Imperial_Japanese_Army_Type_89_Medium_Tank_Otsu_front_view_at_JGSDF_Camp_Tsuchiura_September_28%2C_2025.jpg",
-    "downloadStatus": "original HTTP 429; Wikimedia-recommended thumbnail retained",
-    "sha256": "3dfb892c37f9b33dba0d22aa3131f38f8fdeb5e6e3d44198ee59f7276039ba92",
-    "width": 1280,
-    "height": 852,
+    "downloadStatus": "Original recovered and decoded during GeometryV3 component review",
+    "sha256": "3be5f18578935fa305de06ed4b668a4b81f4f42095fc43166880a8ee4be1c431",
+    "width": 5408,
+    "height": 3600,
     "originalWidth": 5408,
     "originalHeight": 3600,
     "artist": "<a href=\"//commons.wikimedia.org/wiki/User:Hunini\" title=\"User:Hunini\">Hunini</a>",
-    "license": "CC BY-SA 4.0"
+    "license": "CC BY-SA 4.0",
+    "thumbnailHistory": {
+      "downloadStatus": "original HTTP 429; Wikimedia-recommended thumbnail retained",
+      "sha256": "3dfb892c37f9b33dba0d22aa3131f38f8fdeb5e6e3d44198ee59f7276039ba92",
+      "width": 1280,
+      "height": 852
+    },
+    "file": "GeometryV3/Reference_16_Original.jpg"
   },
   {
     "id": 17,
     "commonsTitle": "File:Imperial Japanese Army Type 89 Medium Tank Otsu left front view at JGSDF Camp Tsuchiura September 28, 2025 01.jpg",
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Imperial_Japanese_Army_Type_89_Medium_Tank_Otsu_left_front_view_at_JGSDF_Camp_Tsuchiura_September_28,_2025_01.jpg",
     "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/0/0a/Imperial_Japanese_Army_Type_89_Medium_Tank_Otsu_left_front_view_at_JGSDF_Camp_Tsuchiura_September_28%2C_2025_01.jpg",
-    "downloadStatus": "original HTTP 429; Wikimedia-recommended thumbnail retained",
-    "sha256": "9d6a76dfa0a75ac9e6e3e82354f8d19cb716709acf41b6dacd3e112061dfc39a",
-    "width": 1280,
-    "height": 852,
+    "downloadStatus": "Original recovered and decoded during GeometryV3 component review",
+    "sha256": "6f47d839834943e62f7b3d4b6fcbbe07e421dd4ffe32433e30c60328c5242607",
+    "width": 4883,
+    "height": 3251,
     "originalWidth": 4883,
     "originalHeight": 3251,
     "artist": "<a href=\"//commons.wikimedia.org/wiki/User:Hunini\" title=\"User:Hunini\">Hunini</a>",
-    "license": "CC BY-SA 4.0"
+    "license": "CC BY-SA 4.0",
+    "thumbnailHistory": {
+      "downloadStatus": "original HTTP 429; Wikimedia-recommended thumbnail retained",
+      "sha256": "9d6a76dfa0a75ac9e6e3e82354f8d19cb716709acf41b6dacd3e112061dfc39a",
+      "width": 1280,
+      "height": 852
+    },
+    "file": "GeometryV3/Reference_17_Original.jpg"
   },
   {
     "id": 18,
     "commonsTitle": "File:Imperial Japanese Army Type 89 Medium Tank Otsu left front view at JGSDF Camp Tsuchiura September 28, 2025 02.jpg",
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Imperial_Japanese_Army_Type_89_Medium_Tank_Otsu_left_front_view_at_JGSDF_Camp_Tsuchiura_September_28,_2025_02.jpg",
     "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b9/Imperial_Japanese_Army_Type_89_Medium_Tank_Otsu_left_front_view_at_JGSDF_Camp_Tsuchiura_September_28%2C_2025_02.jpg",
-    "downloadStatus": "original HTTP 429; Wikimedia-recommended thumbnail retained",
-    "sha256": "41bb5e7dd62178153275ce28822e1fbd40e9c324c1f60ad742b1daece777da19",
-    "width": 1280,
-    "height": 852,
+    "downloadStatus": "Original recovered and decoded during GeometryV3 component review",
+    "sha256": "788fa5752b716a92faa5a62e4864b014b495f73cf2cc50d708394378d9df0047",
+    "width": 4348,
+    "height": 2894,
     "originalWidth": 4348,
     "originalHeight": 2894,
     "artist": "<a href=\"//commons.wikimedia.org/wiki/User:Hunini\" title=\"User:Hunini\">Hunini</a>",
-    "license": "CC BY-SA 4.0"
+    "license": "CC BY-SA 4.0",
+    "thumbnailHistory": {
+      "downloadStatus": "original HTTP 429; Wikimedia-recommended thumbnail retained",
+      "sha256": "41bb5e7dd62178153275ce28822e1fbd40e9c324c1f60ad742b1daece777da19",
+      "width": 1280,
+      "height": 852
+    },
+    "file": "GeometryV3/Reference_18_Original.jpg"
   },
   {
     "id": 19,
     "commonsTitle": "File:Imperial Japanese Army Type 89 Medium Tank Otsu left side view at JGSDF Camp Tsuchiura September 28, 2025.jpg",
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Imperial_Japanese_Army_Type_89_Medium_Tank_Otsu_left_side_view_at_JGSDF_Camp_Tsuchiura_September_28,_2025.jpg",
     "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e0/Imperial_Japanese_Army_Type_89_Medium_Tank_Otsu_left_side_view_at_JGSDF_Camp_Tsuchiura_September_28%2C_2025.jpg",
-    "downloadStatus": "original HTTP 429; Wikimedia-recommended thumbnail retained",
-    "sha256": "123a6cfefe2d21c56f06d41386fe1d0b6b63ba26802369e07fbd4c8530aed684",
-    "width": 1280,
-    "height": 852,
+    "downloadStatus": "Original recovered and decoded during GeometryV3 component review",
+    "sha256": "dfc518d257f191d76fee2f6dbde14f42b1835ee063a3fe5d571d1e286a1f1c8e",
+    "width": 5408,
+    "height": 3600,
     "originalWidth": 5408,
     "originalHeight": 3600,
     "artist": "<a href=\"//commons.wikimedia.org/wiki/User:Hunini\" title=\"User:Hunini\">Hunini</a>",
-    "license": "CC BY-SA 4.0"
+    "license": "CC BY-SA 4.0",
+    "thumbnailHistory": {
+      "downloadStatus": "original HTTP 429; Wikimedia-recommended thumbnail retained",
+      "sha256": "123a6cfefe2d21c56f06d41386fe1d0b6b63ba26802369e07fbd4c8530aed684",
+      "width": 1280,
+      "height": 852
+    },
+    "file": "GeometryV3/Reference_19_Original.jpg"
   },
   {
     "id": 20,
     "commonsTitle": "File:Imperial Japanese Army Type 89 Medium Tank Otsu right front view at JGSDF Camp Tsuchiura September 28, 2025.jpg",
     "sourceUrl": "https://commons.wikimedia.org/wiki/File:Imperial_Japanese_Army_Type_89_Medium_Tank_Otsu_right_front_view_at_JGSDF_Camp_Tsuchiura_September_28,_2025.jpg",
     "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Imperial_Japanese_Army_Type_89_Medium_Tank_Otsu_right_front_view_at_JGSDF_Camp_Tsuchiura_September_28%2C_2025.jpg",
-    "downloadStatus": "original HTTP 429; Wikimedia-recommended thumbnail retained",
-    "sha256": "8ed48d9e018461e107a422104675412097d9bcfa593a2e89bc6cd716eac4b85c",
-    "width": 1280,
-    "height": 1024,
+    "downloadStatus": "Original recovered and decoded during GeometryV3 component review",
+    "sha256": "d7a7defee483daec636c743d408e6c95bb5c33c8a34ccb37d1a4c82a6555512f",
+    "width": 4252,
+    "height": 3402,
     "originalWidth": 4252,
     "originalHeight": 3402,
     "artist": "<a href=\"//commons.wikimedia.org/wiki/User:Hunini\" title=\"User:Hunini\">Hunini</a>",
-    "license": "CC BY-SA 4.0"
+    "license": "CC BY-SA 4.0",
+    "thumbnailHistory": {
+      "downloadStatus": "original HTTP 429; Wikimedia-recommended thumbnail retained",
+      "sha256": "8ed48d9e018461e107a422104675412097d9bcfa593a2e89bc6cd716eac4b85c",
+      "width": 1280,
+      "height": 1024
+    },
+    "file": "GeometryV3/Reference_20_Original.jpg"
   },
   {
     "id": 31,

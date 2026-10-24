@@ -20,6 +20,7 @@ sys.path.insert(0,str(here))
 import Script_Type89PbrBake as bake
 import Script_Type89PbrMaterials as pbr
 importlib.reload(pbr)
+assert pbr.roles==['Armor','Steel','Track','Rubber','Exhaust','Glass'],'Legacy SurfaceV2 shortcut supports six sets only; use a full bake for SurfaceV3/Guard'
 source=bake.sourceDir
 bpy.ops.wm.open_mainfile(filepath=str(source/'Scene_Type89MediumTankGamePbr.blend'))
 assert bpy.context.scene['Type89Stage']=='Pbr'

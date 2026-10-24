@@ -9,14 +9,19 @@ repoDir=Path(__file__).resolve().parents[2]
 sourceDir=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank')
 report=[]
 markReviewed='--mark-reviewed' in sys.argv
+contract=json.loads((repoDir/'Taierzhuang1938/Model/Type89MediumTank/Data_ReferenceContract.json').read_text(encoding='utf8'))
 if markReviewed:
-    contract=json.loads((repoDir/'Taierzhuang1938/Model/Type89MediumTank/Data_ReferenceContract.json').read_text(encoding='utf8'))
     assert contract['status']=='TechnicallyAndVisuallyReviewedWithDeclaredInferences','Finish reference review before stamping source files'
-for quality,expected in [('High',554716),('Game',79938)]:
+recipe=None
+for quality,expected in [('High',contract['sourceTrianglesBeforeExportCleanup']),('Game',contract['selectedGameSourceTrianglesBeforeCleanup'])]:
     file=sourceDir/f'Scene_Type89MediumTank{quality}Pbr.blend'
     bpy.ops.wm.open_mainfile(filepath=str(file))
     scene=bpy.context.scene
     root=bpy.data.objects['Model_Type89MediumTank']
+    assert root['geometryVersion']==contract['geometryVersion'],root.get('geometryVersion')
+    assert root.get('geometryRecipeSha256'),'Missing reproducible geometry recipe identity'
+    if recipe is None:recipe=root['geometryRecipeSha256']
+    else:assert root['geometryRecipeSha256']==recipe,'High/game editable sources come from different recipes'
     objects=[root]+list(root.children_recursive)
     meshes=[obj for obj in objects if obj.type=='MESH']
     triangles=0
@@ -42,15 +47,15 @@ for quality,expected in [('High',554716),('Game',79938)]:
     assert scene['Type89Stage']=='Pbr' and scene['Type89Quality']==quality
     assert scene.unit_settings.system=='METRIC' and scene.unit_settings.scale_length==1
     assert triangles==expected,(quality,triangles,expected)
-    assert len(images)==18 and len(materials)==7,(len(images),len(materials),[mat.name for mat in authoring])
-    assert all(bpy.data.materials.get('Material_Type89'+role+'Authoring') for role in ['Armor','Steel','Track','Rubber','Exhaust','Glass'])
+    assert len(images)==21 and len(materials)==8,(len(images),len(materials),[mat.name for mat in authoring])
+    assert all(bpy.data.materials.get('Material_Type89'+role+'Authoring') for role in ['Armor','Steel','Track','Rubber','Exhaust','Glass','Guard'])
     assert len([obj for obj in objects if obj.name.startswith('Node_TrackLink')])==148
     assert all(bpy.data.objects.get(name) for name in ['Node_MainGunPitch','Node_MainGunRecoil','Node_CommanderHatchFront','Node_CommanderHatchRear'])
     if markReviewed:
         root['acceptance']='TECHNICALLY_AND_VISUALLY_REVIEWED_WITH_DECLARED_INFERENCES'
         root['referenceReview']='Restored Tsuchiura Otsu; inferred surfaces/interiors recorded in Data_ReferenceContract.json'
         bpy.ops.wm.save_as_mainfile(filepath=str(file))
-    row={'quality':quality,'file':str(file),'sha256':hashlib.sha256(file.read_bytes()).hexdigest(),'rawTriangles':triangles,'meshObjects':len(meshes),'materials':len(materials),'activePackedImages':len(images),'editableAuthoringMaterials':len(authoring),'unitScale':scene.unit_settings.scale_length,'pass':True}
+    row={'quality':quality,'file':str(file),'sha256':hashlib.sha256(file.read_bytes()).hexdigest(),'geometryVersion':root['geometryVersion'],'geometryRecipeSha256':recipe,'rawTriangles':triangles,'meshObjects':len(meshes),'materials':len(materials),'activePackedImages':len(images),'editableAuthoringMaterials':len(authoring),'unitScale':scene.unit_settings.scale_length,'pass':True}
     report.append(row)
 result={'pass':True,'sourceProjects':report,'note':'Counts include every repeated track instance. Game export separately removes zero-area triangles without changing the editable source.'}
 (repoDir/'Taierzhuang1938/_shots/Type89MediumTank/Data_SourceReopenAudit.json').write_text(json.dumps(result,indent=2),encoding='utf8')

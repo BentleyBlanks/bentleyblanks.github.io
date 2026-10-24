@@ -1,7 +1,7 @@
 {
-  "revision": "SurfaceV2",
-  "status": "ReferenceMatchedInAuthorReview",
-  "previousRevision": "MaterialV1 rejected by user for surface fidelity; previous technical checks do not prove appearance alignment",
+  "revision": "SurfaceV3",
+  "status": "AuthorReviewedWithDeclaredInferences",
+  "previousRevision": "GeometryV14/SurfaceV2 rejected by user; prior channel, source and visual sign-offs are superseded for fidelity.",
   "primary": {
     "source": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
     "file": "Reference_Primary2007Original.jpg",
@@ -61,55 +61,15 @@
   ],
   "scope": "Tsuchiura Otsu 2007 appearance; later close-ups support surface construction and wear placement, not wholesale adoption of later orange rust",
   "changes": [
-    "warm olive paint, multiscale film relief and weak gravity streaks",
-    "global assembled occlusion at seams, beneath fenders and in wheel recesses",
-    "light grey abraded outer track web, darker protected underside, separate grouser contact and directional abrasion",
-    "broken oxide and thermal surface on the exhaust",
-    "reference comparison in a daylight environment with one broad overhead key rather than three competing studio lights"
+    "Restrained large-scale mottling and lower film; warm olive-brown pigment calibrated from the actual same-light V23 render against the 2007 primary, then authored into V25.",
+    "Actual high punched-sheet guard and game UV0 MASK opacity,51columns across0.88m",
+    "Fresh high-to-game Base/Normal/ORM reprojection after geometry rematch",
+    "Mapped-surface opacity tests and triangle-ray tests for shoe windows, mantlet and tow bores"
   ],
   "pending": [],
   "imagegen": {
     "used": false,
     "reason": "The original 2007 photograph and same-vehicle close-ups are now available; continue from these references first"
-  },
-  "probeColorDiagnostic": {
-    "note": "Approximate flat-region RGB averages under matched camera; not a microtexture or material acceptance test",
-    "turret": {
-      "photo": [
-        132.4,
-        115.2,
-        80.4
-      ],
-      "probe": [
-        135.3,
-        115.4,
-        79.6
-      ]
-    },
-    "upperSide": {
-      "photo": [
-        103.9,
-        86.9,
-        51.7
-      ],
-      "probe": [
-        104.4,
-        87.2,
-        56.3
-      ]
-    },
-    "lowerSkirt": {
-      "photo": [
-        89.8,
-        74.3,
-        43.1
-      ],
-      "probe": [
-        101,
-        85.4,
-        57.7
-      ]
-    }
   },
   "requiredViews": [
     "same-camera 2007 overall",
@@ -119,43 +79,49 @@
     "second neutral lighting check",
     "actual packed GLB reload and independent source reopen"
   ],
-  "reviewedAt": "2026-10-23T17:56:29.314Z",
+  "reviewedAt": "2026-10-24T03:16:11.367731+00:00",
   "userApproved": false,
   "materialScriptSha256": "648300e7bcc8285ce82ae2a9560abd9a3c7f89a31344fc38276859f5654f1a09",
   "evidence": [
     {
-      "aspect": "paint",
-      "reference": "References/MaterialV2/Preview_PrimaryPaint.jpg and Preview_PrimaryTurret.jpg",
-      "observed": "Warm olive film, restrained local mottling, fine uneven coating and weak gravity streaks; lower dirty film corrected after full-bake review",
-      "actualGame": "Scene_FinalSurfaceV2PackedArmor_640.jpg",
-      "actualHigh": "Scene_FinalSurfaceV2HighHighArmor_640.jpg"
+      "aspect": "paint and coating",
+      "reference": "Recovered2007 primary; structural2025 photos are not a paint prescription",
+      "result": "Warm olive-brown pigment, reduced macro mottling/lower film and fine metre-scaled coating compared on both actual exports. Source pigment corrected after the too-grey-green V23 render.",
+      "game": "Scene_FinalSurfaceV3V26GameArmor_640.jpg",
+      "high": "Scene_FinalSurfaceV3V26HighArmor_640.jpg"
     },
     {
-      "aspect": "cast tread and abrasion",
-      "reference": "References/MaterialV2/Preview_PrimaryTrack.jpg; Reference_TrafficTrackWear.jpg",
-      "observed": "Light grey abraded outer webs, separate brighter contact ribs, darker protected holes, fine cast relief and directional abrasion; first probe stone-like mottling was reduced",
-      "actualGame": "Scene_FinalSurfaceV2PackedTrack_640.jpg",
-      "neutral": "Scene_FinalSurfaceV2NeutralTrack_640.jpg"
+      "aspect": "cast shoes and wear",
+      "reference": "Native16/20 construction;2007 primary and32 wear partition",
+      "result": "Light abraded outer web, protected dark recesses, cast relief and separate contact abrasion retained. Later orange rust was not copied wholesale.",
+      "game": "Scene_FinalSurfaceV3V26GameTrack_640.jpg",
+      "high": "Scene_FinalSurfaceV3V26HighTrack_640.jpg"
     },
     {
-      "aspect": "oxide and rear finish",
-      "reference": "2007 primary rear region and same-vehicle rear walkaround",
-      "observed": "Warm broken exhaust oxide, coarse relief and dark heat region remain separate from the painted guard and transmission lamp",
-      "actualGame": "Scene_FinalSurfaceV2PackedRear_640.jpg",
-      "actualHigh": "Scene_FinalSurfaceV2HighHighRear_640.jpg"
+      "aspect": "guard, exhaust and glass",
+      "reference": "2/19/24/34",
+      "result": "Painted punched sheet remains distinct from oxidised exhaust and dielectric glazed lamp; actual near/far MASK holes checked.",
+      "game": "Scene_V26GameRearDeck_640.jpg",
+      "high": "Scene_V26HighRearDeck_640.jpg"
+    },
+    {
+      "aspect": "projection and articulation",
+      "result": "Game Armor3mm cage/12mm rays remove the large false edge-chip projection; independent round cover exposes mapped gold inner badge. Geometry, real normals and AO retained; no shader-disable diagnostic used as final output.",
+      "game": "Scene_V26GameBowOpenCover_640.jpg",
+      "high": "Scene_V26HighBowOpenCover_640.jpg"
     },
     {
       "aspect": "lighting independence",
-      "observed": "Same actual GLB inspected in reference approximation and neutral daylight; no material, texture or geometry swap between light profiles",
-      "referenceProfile": "Scene_FinalSurfaceV2PackedMain_640.jpg",
-      "neutralProfile": "Scene_FinalSurfaceV2NeutralMain_640.jpg"
+      "result": "Same actual packed game file inspected under unchanged reference-approximation and neutral profiles. Grazing shadow-map hatching was isolated by a shadow-only diagnostic; it was not baked into or painted out of the maps.",
+      "referenceProfile": "Scene_FinalSurfaceV3V26GameMain_640.jpg",
+      "neutralProfile": "Scene_FinalSurfaceV3V26NeutralMain_640.jpg"
     }
   ],
   "fullBake": {
-    "report": "Data_PbrSurfaceV2Build.json",
-    "baseRefit": "Data_PbrSurfaceV2RecoatBuild.json",
-    "geometryUvUnchanged": true,
-    "normalOrmOriginalImagesUnchanged": 24
+    "report": "Data_PbrSurfaceV3GeometryV26Build.json",
+    "geometryVersion": "20261024GeometryV26",
+    "bakeScriptSha256": "13bbca1f883bc8a1db642a1b4bab5b9eccaf88651c3efe830fc0ef65c06904ac",
+    "materialAuthoringScriptSha256": "4120f43393fa79bbae2ed8fd0cae91b0fce3ddedc4542192125843bfeb931f75"
   },
   "finalColorDiagnostic": {
     "note": "Flat-region RGB averages at matched 640px camera, for colour/exposure diagnosis only. These do not prove microtexture fidelity or factory pigment chemistry.",
@@ -239,8 +205,66 @@
       "reason": "Donor seam lines, blue coating and industrial wear pattern do not match this vehicle; no pixels or maps used"
     }
   ],
-  "limits": "Pigment chemistry, microscopic damage and concealed/contact-band construction remain reconstruction. This is an author visual review of reference-supported finish, not user approval or a pixel-for-pixel scan.",
+  "limits": "Museum-photo reconstruction: hidden construction, original pigment chemistry, contact-band material and exact microscopic damage are not measured historical facts. Game small rivets/curves and pin bores are bounded LOD/projection approximations to the retained high source. This is author review, not user approval or a pixel-identical scan.",
   "runtimeSha256": "921d70562c4ebf41e8142c1fff8c2eb4bd09ecb43675957ed00428de159afc08",
   "runtimeBytes": 20797132,
-  "packedRgbExact": true
+  "packedRgbExact": true,
+  "workingGeometry": "20261024GeometryV26",
+  "candidateSha256": "71f4068920abed10c5921e8b64d784d14d69cf2bb2b42aceb818a3659898e5cf",
+  "historicalSurfaceV2ColorDiagnostic": {
+    "note": "Historical SurfaceV2 diagnostic, rejected by user. These values do not describe the V23/V25 candidate and are not used for current acceptance.",
+    "turret": {
+      "photo": [
+        132.4,
+        115.2,
+        80.4
+      ],
+      "probe": [
+        135.3,
+        115.4,
+        79.6
+      ]
+    },
+    "upperSide": {
+      "photo": [
+        103.9,
+        86.9,
+        51.7
+      ],
+      "probe": [
+        104.4,
+        87.2,
+        56.3
+      ]
+    },
+    "lowerSkirt": {
+      "photo": [
+        89.8,
+        74.3,
+        43.1
+      ],
+      "probe": [
+        101,
+        85.4,
+        57.7
+      ]
+    }
+  },
+  "paintCorrection": {
+    "priorProblem": "Actual V23 SurfaceV3 GLB was too grey-green in the same unchanged reference illumination; prior recorded colour values were stale V2 data.",
+    "authoringBaseLinearRgb": [
+      0.12,
+      0.092,
+      0.0403
+    ],
+    "evidence": "Scene_PaintDiagnosticWarmOliveA_640.jpg; diagnostic only, full actual bake still required.",
+    "referenceState": "2007 restoration appearance; 2025 structural photos do not prescribe paint colour."
+  },
+  "projectionCorrection": {
+    "cageExtrusionM": 0.003,
+    "maxRayDistanceM": 0.012,
+    "scope": "Game Armor only; the22mm cage selected neighbouring/back faces around thin lids. V25 targeted rebake verified a substantial reduction of false dark edge chips. V26 uses this in the complete bake.",
+    "sameGeometryAndUv": true
+  },
+  "newMuseumAppearance": "2007 cylindrical perforated MG jacket and inner gold five-point badge on an independently flipping round cover. Badge colour is a museum-photo reconstruction, not original1938 paint proof."
 }

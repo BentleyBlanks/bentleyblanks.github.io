@@ -35,7 +35,7 @@ import Script_Type89PbrMaterials as pbr
 importlib.reload(pbr)
 from Script_Type89GlbCleanup import CleanGlb
 roles=pbr.roles
-sizes={'Armor':(4096,4096,2048),'Steel':(1024,1024,512),'Track':(2048,2048,1024),'Rubber':(512,512,512),'Exhaust':(1024,1024,512),'Glass':(256,512,256)}
+sizes={'Armor':(4096,4096,2048),'Steel':(1024,1024,512),'Track':(2048,2048,1024),'Rubber':(512,512,512),'Exhaust':(1024,1024,512),'Glass':(256,512,256),'Guard':(2048,2048,1024)}
 started=time.time()
 progress={'phase':'prepare','probe':probe,'completed':[],'startedUnix':started}
 reports={}
@@ -72,6 +72,10 @@ def Unwrap(objects,label):
         if not obj.data.uv_layers:obj.data.uv_layers.new(name='UVMap')
         obj.data.uv_layers.active_index=0
         obj.data.uv_layers.active.active_render=True
+        # The grey guard has its own preview UV name. A joined proxy otherwise
+        # creates two UV channels and leaves this object's UVMap coordinates0.
+        for layer in list(obj.data.uv_layers)[1:]:obj.data.uv_layers.remove(layer)
+        obj.data.uv_layers.active.name='UVMap'
     bpy.context.scene.tool_settings.use_uv_select_sync=True
     bpy.context.scene.tool_settings.mesh_select_mode=(False,False,True)
     for role in roles:
@@ -112,6 +116,7 @@ def Proxy(objects,name):
     obj=bpy.context.object
     transform=obj.matrix_world.copy();obj.data.transform(transform);obj.matrix_world=Matrix.Identity(4)
     obj.name=name
+    assert len(obj.data.uv_layers)==1 and obj.data.uv_layers.active.name=='UVMap','Bake proxy must have one common UV channel'
     triangulate=obj.modifiers.new('BakeOnlyTriangulation','TRIANGULATE')
     if hasattr(triangulate,'keep_custom_normals'):triangulate.keep_custom_normals=True
     bpy.context.view_layer.objects.active=obj
@@ -137,6 +142,41 @@ def ReadRawImage(path):
     pixels=np.empty(width*height*4,dtype=np.float32);image.pixels.foreach_get(pixels)
     bpy.data.images.remove(image)
     return pixels.reshape(height,width,4)
+
+
+def RasterGuardOpacity(target,image):
+    """Raster the high guard's shared punch pattern in the new low atlas.
+
+    Bake margins dilate no-hit pixels and close small real holes. Stored sheet
+    coordinates preserve those holes without sampling an unrelated surface.
+    """
+    mesh=target.data;mesh.calc_loop_triangles();size=image.size[0]
+    material=next(mat for mat in mesh.materials if RoleOf(mat)=='Guard')
+    coord=mesh.attributes.get('GuardCoord');assert coord is not None,'Guard sheet coordinates must survive proxy joining'
+    uvData=mesh.uv_layers.active.data;pixels=np.zeros((size,size,4),dtype=np.float32)
+    rows=material['GuardRows'];columns=material['GuardColumns'];arc=material['GuardArcLength'];length=material['GuardLength']
+    half=material['GuardHoleHalf'];corner=material['GuardHoleCorner'];cellS=arc/rows;cellY=length/columns
+    for triangle in mesh.loop_triangles:
+        if RoleOf(mesh.materials[triangle.material_index])!='Guard':continue
+        uv=np.array([uvData[loop].uv[:] for loop in triangle.loops])*size
+        cs=np.array([coord.data[index].vector[:2] for index in triangle.vertices])
+        a,b,c=uv;u=b-a;v=c-a;denominator=u[0]*v[1]-u[1]*v[0]
+        if abs(denominator)<1e-12:continue
+        minX=max(0,int(np.floor(uv[:,0].min())));maxX=min(size-1,int(np.ceil(uv[:,0].max())))
+        minY=max(0,int(np.floor(uv[:,1].min())));maxY=min(size-1,int(np.ceil(uv[:,1].max())))
+        yy,xx=np.mgrid[minY:maxY+1,minX:maxX+1];px=xx+.5-a[0];py=yy+.5-a[1]
+        beta=(px*v[1]-py*v[0])/denominator;gamma=(u[0]*py-u[1]*px)/denominator;alpha=1-beta-gamma
+        inside=(alpha>=-1e-6)&(beta>=-1e-6)&(gamma>=-1e-6)
+        values=alpha[...,None]*cs[0]+beta[...,None]*cs[1]+gamma[...,None]*cs[2]
+        ds=(np.mod(values[:,:,0]*rows,1)-.5)*cellS;dy=(np.mod(values[:,:,1]*columns,1)-.5)*cellY
+        qx=np.abs(ds)-(half-corner);qy=np.abs(dy)-(half-corner)
+        distance=np.sqrt(np.maximum(qx,0)**2+np.maximum(qy,0)**2)+np.minimum(np.maximum(qx,qy),0)-corner
+        derivative=np.diag([arc,length])@np.column_stack((cs[1]-cs[0],cs[2]-cs[0]))@np.linalg.inv(np.column_stack((u,v)))
+        footprint=max(np.linalg.norm(derivative[:,0]),np.linalg.norm(derivative[:,1]),1e-7)
+        opacity=np.clip(.5+distance/footprint,0,1)
+        block=pixels[minY:maxY+1,minX:maxX+1];block[inside,:3]=opacity[inside,None];block[inside,3]=1
+    image.pixels.foreach_set(pixels.reshape(-1));image.update()
+    return {'source':'same rounded punch dimensions as actual high mesh; stored sheet coordinates rastered in low UV atlas','solidTexels':int(np.count_nonzero((pixels[:,:,3]>.5)&(pixels[:,:,0]>=.5))),'holeTexels':int(np.count_nonzero((pixels[:,:,3]>.5)&(pixels[:,:,0]<.5)))}
 
 
 def Barycentric(point,a,b,c):
@@ -269,24 +309,25 @@ def TargetNodes(materials,role,image,scratch):
         material.node_tree.nodes.active=node;node.select=True
 
 
-def BakeAtlases(label,target,source,graphs,scratch):
+def BakeAtlases(label,target,source,graphs,scratch,roleScope=None):
     scene=bpy.context.scene
     selectedToActive=source is not None
     allMaterials=list({material for material in target.data.materials if material})
     result={}
-    for role in roles:
+    for role in roleScope or roles:
         if not any(RoleOf(material)==role for material in allMaterials):continue
         roleSource=RoleProxy(source,role) if source is not None else None
         repair=ProjectionRepair(source,target,role) if source is not None else None
         repairs={}
         baseSize,normalSize,dataSize=sizes[role]
         if probe:baseSize=min(baseSize,probeSize);normalSize=min(normalSize,probeSize);dataSize=min(dataSize,max(128,probeSize//2))
-        rawChannels={};files={}
-        for channel in ['Base','Normal','Roughness','Metallic','Ao','Coverage']:
-            size=baseSize if channel=='Base' else (normalSize if channel=='Normal' else dataSize)
+        rawChannels={};files={};opacity=None
+        channels=['Base','Normal','Roughness','Metallic','Ao','Coverage']+(['Opacity'] if role=='Guard' else [])
+        for channel in channels:
+            size=baseSize if channel in ['Base','Opacity'] else (normalSize if channel=='Normal' else dataSize)
             colorSpace='sRGB' if channel=='Base' else 'Non-Color'
-            baseDefaults={'Armor':(.205,.188,.091),'Steel':(.10,.12,.13),'Track':(.068,.079,.078),'Rubber':(.05,.04,.028),'Exhaust':(.05,.035,.020),'Glass':(.91,.95,.96)}
-            if channel=='Coverage':default=(0,0,0,0)
+            baseDefaults={'Armor':(.205,.188,.091),'Steel':(.10,.12,.13),'Track':(.068,.079,.078),'Rubber':(.05,.04,.028),'Exhaust':(.05,.035,.020),'Glass':(.91,.95,.96),'Guard':(.205,.151,.075)}
+            if channel in ['Coverage','Opacity']:default=(0,0,0,0)
             elif channel=='Normal':default=(.5,.5,1,0)
             elif channel=='Base':default=(*baseDefaults[role],0)
             elif channel=='Metallic':default=(0,0,0,0)
@@ -308,11 +349,19 @@ def BakeAtlases(label,target,source,graphs,scratch):
             scene.render.bake.normal_space='TANGENT'
             scene.render.bake.target='IMAGE_TEXTURES'
             Progress('bake',quality=label,material=role,channel=channel,size=size)
-            bpy.ops.object.bake(type='NORMAL' if channel=='Normal' else 'EMIT',use_selected_to_active=selectedToActive,use_clear=False,margin=scene.render.bake.margin,cage_extrusion=.022,max_ray_distance=.050)
+            if role=='Guard' and channel=='Opacity' and selectedToActive:
+                reports[label+'/GuardOpacity']=RasterGuardOpacity(target,image)
+            else:
+                # Thin commander lids/rims sit only millimetres apart. A22mm
+                # cage projected neighbouring or reverse faces onto the game
+                # edge and produced false dark chipping in Normal/AO.
+                cage=.003 if selectedToActive and role=='Armor' else .022
+                distance=.012 if selectedToActive and role=='Armor' else .050
+                bpy.ops.object.bake(type='NORMAL' if channel=='Normal' else 'EMIT',use_selected_to_active=selectedToActive,use_clear=False,margin=0 if channel=='Opacity' else scene.render.bake.margin,cage_extrusion=cage,max_ray_distance=distance)
             file=mapDir/('Texture_Type89'+label+role+channel+'.png')
             SaveImage(image,file)
             repairedImage=None
-            if repair is not None and channel!='Coverage':
+            if repair is not None and channel not in ['Coverage','Opacity']:
                 # Work on saved raw bytes for both sides, so sRGB albedo is
                 # copied exactly once without a second gamma conversion.
                 repairedImage=bpy.data.images.load(str(file),check_existing=False)
@@ -321,7 +370,10 @@ def BakeAtlases(label,target,source,graphs,scratch):
                 repairs[channel]=repair.Repair(repairedImage,channel)
                 SaveImage(repairedImage,file)
             readImage=repairedImage or image
-            if channel in ['Roughness','Metallic','Ao']:
+            if channel=='Opacity':
+                pixels=np.empty(size*size*4,dtype=np.float32);readImage.pixels.foreach_get(pixels)
+                opacity=pixels.reshape(size,size,4)[:,:,0].copy();del pixels
+            elif channel in ['Roughness','Metallic','Ao']:
                 pixels=np.empty(size*size*4,dtype=np.float32);readImage.pixels.foreach_get(pixels)
                 rawChannels[channel]=pixels.reshape(size,size,4)[:,:,0].copy()
                 del pixels
@@ -336,6 +388,11 @@ def BakeAtlases(label,target,source,graphs,scratch):
         orm.pixels.foreach_set(packed.reshape(-1));orm.update()
         ormFile=mapDir/('Texture_Type89'+label+role+'Orm.png');SaveImage(orm,ormFile);bpy.data.images.remove(orm)
         files['Orm']=str(ormFile)
+        if opacity is not None:
+            baseImage=bpy.data.images.load(files['Base'],check_existing=False);baseImage.colorspace_settings.name='Non-Color'
+            rgba=np.empty(baseSize*baseSize*4,dtype=np.float32);baseImage.pixels.foreach_get(rgba)
+            rgba=rgba.reshape(baseSize,baseSize,4);rgba[:,:,3]=opacity
+            baseImage.pixels.foreach_set(rgba.reshape(-1));baseImage.update();SaveImage(baseImage,Path(files['Base']));bpy.data.images.remove(baseImage)
         result[role]=files
         if roleSource is not None:bpy.data.objects.remove(roleSource,do_unlink=True)
         reports[label+'/'+role]=repairs
@@ -360,6 +417,10 @@ def BakedMaterial(role,files,label):
         image.colorspace_settings.name='sRGB' if channel=='Base' else 'Non-Color';image.pack()
         node=nodes.new('ShaderNodeTexImage');node.image=image;node.label=channel;textures[channel]=node
     links.new(textures['Base'].outputs['Color'],shader.inputs['Base Color'])
+    if role=='Guard':
+        cutoff=nodes.new('ShaderNodeMath');cutoff.operation='GREATER_THAN';cutoff.inputs[1].default_value=.5
+        links.new(textures['Base'].outputs['Alpha'],cutoff.inputs[0]);links.new(cutoff.outputs[0],shader.inputs['Alpha'])
+        material.use_backface_culling=False
     normal=nodes.new('ShaderNodeNormalMap');normal.inputs['Strength'].default_value=1;links.new(textures['Normal'].outputs['Color'],normal.inputs['Color']);links.new(normal.outputs[0],shader.inputs['Normal'])
     separate=nodes.new('ShaderNodeSeparateColor');separate.mode='RGB';links.new(textures['Orm'].outputs['Color'],separate.inputs[0]);links.new(separate.outputs['Green'],shader.inputs['Roughness']);links.new(separate.outputs['Blue'],shader.inputs['Metallic'])
     group=bpy.data.node_groups.get('glTF Material Output')
@@ -368,6 +429,21 @@ def BakedMaterial(role,files,label):
     settings=nodes.new('ShaderNodeGroup');settings.node_tree=group;links.new(separate.outputs['Red'],settings.inputs['Occlusion'])
     if role=='Glass':shader.inputs['Transmission Weight'].default_value=.88;shader.inputs['IOR'].default_value=1.50
     return material
+
+
+def ClearBakeTargets(objects):
+    # A targeted rebake uses the existing runtime materials as its receivers.
+    # Unconnected scratch targets are not part of the editable packed PBR set.
+    seen=set();removed=0
+    for obj in objects:
+        if obj.type!='MESH':continue
+        for material in obj.data.materials:
+            if material is None or material in seen or not material.use_nodes:continue
+            seen.add(material);node=material.node_tree.nodes.get('Type89BakeTarget')
+            if node:
+                assert not any(output.is_linked for output in node.outputs),'A bake target must not drive the runtime shader'
+                material.node_tree.nodes.remove(node);removed+=1
+    return removed
 
 
 def Assign(root,materials):
@@ -392,7 +468,11 @@ def Main():
     assert 'Type89MediumTank' in bpy.data.filepath and 'GameGray' in bpy.data.filepath,'Open this task GameGray source before PBR baking'
     assert bpy.context.scene.get('BlenderMcpTask')=='Type89MediumTank','Wrong BlenderMCP task'
     gameRoot=bpy.data.objects['Model_Type89MediumTank']
+    gameFile=Path(bpy.data.filepath)
     highFile=sourceDir/'Scene_Type89MediumTankHighGray.blend'
+    sourceHashes={str(file):hashlib.sha256(file.read_bytes()).hexdigest() for file in [highFile,gameFile]}
+    authoringHash=hashlib.sha256((here/'Script_Type89PbrMaterials.py').read_bytes()).hexdigest()
+    bakeScriptHash=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     Progress('appendHighSource')
     with bpy.data.libraries.load(str(highFile),link=False) as (dataFrom,dataTo):
         requested=[name for name in dataFrom.objects if name.startswith(('Model_Type89MediumTank','Node_','Mesh_'))]
@@ -403,8 +483,16 @@ def Main():
         if obj is None:continue
         highCollection.objects.link(obj);obj.name='High_'+original;highObjects[original]=obj
     highRoot=highObjects['Model_Type89MediumTank']
+    assert gameRoot['geometryVersion']==highRoot['geometryVersion'],'High/game geometry versions differ'
+    assert gameRoot.get('geometryRecipeSha256') and gameRoot['geometryRecipeSha256']==highRoot.get('geometryRecipeSha256'),'Rebuild both gray sources from the same geometry recipe before baking'
     bpy.context.view_layer.update()
     gameMeshes=UniqueMeshes(gameRoot);highMeshes=UniqueMeshes(highRoot)
+    for obj in gameMeshes:
+        for slot in obj.material_slots:
+            if RoleOf(slot.material)=='Guard':
+                shader=next(node for node in slot.material.node_tree.nodes if node.type=='BSDF_PRINCIPLED')
+                for link in list(shader.inputs['Alpha'].links):slot.material.node_tree.links.remove(link)
+                shader.inputs['Alpha'].default_value=1.0
     for obj in [gameRoot]+list(gameRoot.children_recursive):Visible(obj,False)
     for obj in highObjects.values():Visible(obj,False)
     bpy.context.scene.render.engine='CYCLES';bpy.context.scene.cycles.samples=4 if probe else 16
@@ -442,11 +530,6 @@ def Main():
     Export(gameRoot,gameOutput)
     gameBlend=sourceDir/('Scene_Type89MediumTankGamePbr'+('Probe' if probe else '')+'.blend')
     bpy.ops.wm.save_as_mainfile(filepath=str(gameBlend))
-    if not probe:
-        assetDir.mkdir(parents=True,exist_ok=True)
-        (assetDir/'Model_Type89MediumTank.glb').write_bytes(gameOutput.read_bytes())
-        (sourceDir/'Exports').mkdir(exist_ok=True)
-        (sourceDir/'Exports'/gameOutput.name).write_bytes(gameOutput.read_bytes())
     # Save an independent editable high source and a complete high PBR export.
     for obj in [gameRoot]+list(gameRoot.children_recursive):bpy.data.objects.remove(obj,do_unlink=True)
     for original,obj in highObjects.items():obj.name=original;Visible(obj,True)
@@ -459,7 +542,14 @@ def Main():
     bpy.ops.wm.save_as_mainfile(filepath=str(highBlend))
     exportedDir=sourceDir/'Exports';exportedDir.mkdir(exist_ok=True)
     (exportedDir/highOutput.name).write_bytes(highOutput.read_bytes())
-    report={'probe':probe,'elapsedSeconds':time.time()-started,'highBlend':str(highBlend),'gameBlend':str(gameBlend),'highGlb':str(highOutput),'gameGlb':str(gameOutput),'highMaps':highMaps,'gameMaps':gameMaps,'geometrySourceSha256':hashlib.sha256(highFile.read_bytes()).hexdigest(),'materialAuthoringScriptSha256':hashlib.sha256((here/'Script_Type89PbrMaterials.py').read_bytes()).hexdigest(),'materialAccepted':False,'scope':'restored Tsuchiura car; micro-wear and unobserved interiors are explicitly inferred'}
+    assert all(hashlib.sha256(Path(file).read_bytes()).hexdigest()==digest for file,digest in sourceHashes.items()),'Gray source changed during the bake; do not promote this candidate'
+    assert hashlib.sha256((here/'Script_Type89PbrMaterials.py').read_bytes()).hexdigest()==authoringHash,'Authoring material script changed during the bake'
+    assert hashlib.sha256(Path(__file__).read_bytes()).hexdigest()==bakeScriptHash,'PBR bake script changed during the bake'
+    if not probe:
+        assetDir.mkdir(parents=True,exist_ok=True)
+        (assetDir/'Model_Type89MediumTank.glb').write_bytes(gameOutput.read_bytes())
+        (exportedDir/gameOutput.name).write_bytes(gameOutput.read_bytes())
+    report={'probe':probe,'elapsedSeconds':time.time()-started,'highBlend':str(highBlend),'gameBlend':str(gameBlend),'highGlb':str(highOutput),'gameGlb':str(gameOutput),'highMaps':highMaps,'gameMaps':gameMaps,'geometryVersion':highRoot['geometryVersion'],'geometryRecipeSha256':highRoot['geometryRecipeSha256'],'geometrySourceSha256':sourceHashes[str(highFile)],'gameGeometrySourceSha256':sourceHashes[str(gameFile)],'materialAuthoringScriptSha256':authoringHash,'bakeScriptSha256':bakeScriptHash,'materialAccepted':False,'scope':'restored Tsuchiura car; micro-wear and unobserved interiors are explicitly inferred'}
     (reviewDir/('Data_Pbr'+workName+'Build.json')).write_text(json.dumps(report,indent=2),encoding='utf8')
     Progress('complete',report=str(reviewDir/('Data_Pbr'+workName+'Build.json')))
 

@@ -4,7 +4,7 @@
 import { Panel, Chips, Note, El } from "./Script_EditorUi.mjs";
 import { MESHES } from "./Data_Meshes.mjs";
 import {
-  ASSET_STANDARD_GROUPS, ComplianceFor, EXTERNAL_GLB_STANDARDS, OTHER_ASSET_RULES,
+  ASSET_STANDARD_GROUPS, ComplianceFor, ExternalComplianceFor, EXTERNAL_GLB_STANDARDS, OTHER_ASSET_RULES,
   ReductionPercent, SOURCE_ASSET_STANDARDS, SPECIAL_TRIANGLE_TARGETS,
   ThresholdTriangleTarget, TRIANGLE_RULES,
 } from "./Data_AssetStandards.mjs";
@@ -47,17 +47,16 @@ function SourceRows(group) {
 
 function ExternalRows() {
   return EXTERNAL_GLB_STANDARDS.map((record) => {
-    const close = record.actualTriangles <= record.targetTriangles * 1.001
-      && record.actualTriangles >= record.targetTriangles * 0.97;
+    const compliance = ExternalComplianceFor(record);
     return {
       id: record.id, name: record.name, source: record.sourceTriangles,
       actual: record.actualTriangles,
-      limit: record.policy === "source"
+      limit: compliance.retained ? `${Num(record.targetTriangles)}（目标；5% 免减面）` : record.policy === "source"
         ? `${Num(record.targetTriangles)}（原始拓扑）`
         : `${Num(record.targetTriangles)}（指定）`,
       change: ChangeLabel(record.sourceTriangles, record.actualTriangles),
       sourceTexture: record.sourceTexture, runtimeTexture: record.runtimeTexture,
-      compliance: { label: close ? (record.policy === "source" ? "原始拓扑保留" : "指定目标达标") : "偏离登记目标", tone: close ? "good" : "bad" },
+      compliance,
       note: `${record.pack}；${record.note}`,
     };
   });

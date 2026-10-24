@@ -7,7 +7,7 @@ import { WEAPONS, LOADOUTS, WeaponShelved } from "./Data_Weapons.mjs";
 import { MESHES } from "./Data_Meshes.mjs";
 import { FPS_ARM_POSES } from "./Data_FpsArmPoses.mjs";
 import {
-  ASSET_STANDARD_GROUPS, ComplianceFor, EXTERNAL_GLB_STANDARDS, MIN_DECIMATION_REDUCTION,
+  ASSET_STANDARD_GROUPS, ComplianceFor, ExternalComplianceFor, EXTERNAL_GLB_STANDARDS, MIN_DECIMATION_REDUCTION,
   SCENE_RENDER_LIMITS, SOURCE_ASSET_STANDARDS, SPECIAL_TRIANGLE_TARGETS, TRIANGLE_RULES,
 } from "./Data_AssetStandards.mjs";
 
@@ -132,10 +132,17 @@ Check(EXTERNAL_GLB_STANDARDS.length === 64
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "DonkeyCart" && record.actualTriangles === 79500 && record.targetTriangles <= 80000)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Donkey" && record.actualTriangles === 78124 && record.sourceTriangles === record.actualTriangles)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "NakajimaKi4" && record.sourceTriangles === 244695 && record.actualTriangles === 177815 && record.targetTriangles === 180000)
-  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Type89MediumTank" && record.sourceTriangles === 554716 && record.actualTriangles === 79921 && record.targetTriangles === 80000)
+  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Type89MediumTank" && record.sourceTriangles === 885866 && record.selectedGameSourceTriangles === 84136 && record.actualTriangles === 83839 && record.targetTriangles === 80000)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "KawasakiType88" && record.sourceTriangles === 237875 && record.actualTriangles === 79649 && record.targetTriangles === 80000)
   && EXTERNAL_GLB_STANDARDS.every((record) => record.actualTriangles > 0 && record.targetTriangles > 0),
   "外部 GLB 分类登记既有资产、指挥室、接收院陈设、单被、两种草席、驴车、独立驴、Ki4、八八式与八九式乙型，共 64 项");
+
+Check(ExternalComplianceFor({actualTriangles:82202,targetTriangles:80000,selectedGameSourceTriangles:82202,policy:"target"}).retained
+  && ExternalComplianceFor({actualTriangles:81906,targetTriangles:80000,selectedGameSourceTriangles:82202,exportRemovedZeroAreaTriangles:296,policy:"target"}).retained
+  && !ExternalComplianceFor({actualTriangles:81906,targetTriangles:80000,selectedGameSourceTriangles:82202,policy:"target"}).retained
+  && !ExternalComplianceFor({actualTriangles:90000,targetTriangles:80000,selectedGameSourceTriangles:90000,policy:"target"}).retained
+  && !ExternalComplianceFor({actualTriangles:82202,targetTriangles:80000,policy:"target"}).retained,
+  "外部GLB的5%免减面须有选定游戏源登记，且不能放过超阈值源或无登记偏离");
 
 const groupIds = new Set(ASSET_STANDARD_GROUPS.map((entry) => entry.id));
 Check(["firearm", "assembly", "melee", "vehicle", "procedural", "external", "texture"]

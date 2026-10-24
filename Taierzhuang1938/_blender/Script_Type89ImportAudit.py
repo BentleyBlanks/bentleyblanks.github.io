@@ -24,7 +24,7 @@ bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=str(file))
 imported={'objects':len(bpy.data.objects),'meshes':len(bpy.data.meshes),'images':len(bpy.data.images),'materials':len(bpy.data.materials),'roots':[obj.name for obj in bpy.data.objects if obj.parent is None]}
 data=file.read_bytes();jsonLength,jsonType=struct.unpack_from('<II',data,12);g=json.loads(data[20:20+jsonLength]);offset=20+jsonLength;binary=data[offset+8:]
-path=json.loads((repoDir/'Taierzhuang1938/Model/Type89MediumTank/Data_TrackPath.json').read_text())
+path=json.loads((repoDir/'Taierzhuang1938/Model/Type89MediumTank/Data_TrackPath.json').read_text(encoding='utf8'))
 def Access(index):
     accessor=g['accessors'][index];view=g['bufferViews'][accessor['bufferView']]
     count={'SCALAR':1,'VEC2':2,'VEC3':3,'VEC4':4}[accessor['type']]
@@ -63,10 +63,11 @@ def World(pose):
         for child in g['nodes'][i].get('children',[]):Visit(child,matrix)
     for root in g['scenes'][g.get('scene',0)]['nodes']:Visit(root,Matrix.Identity(4))
     return matrices
-def Geometry(index,world):
+def Geometry(index,world,direct=False):
     vertices=[];triangles=[]
     def Visit(i):
         node=g['nodes'][i]
+        if direct and i!=index and node.get('name','').startswith('Node_'):return
         if 'mesh'in node:
             points,faces=meshes[node['mesh']];base=len(vertices)
             vertices.extend(world[i]@point for point in points);triangles.extend(tuple(base+j for j in face) for face in faces)
@@ -74,6 +75,14 @@ def Geometry(index,world):
     Visit(index)
     return vertices,triangles
 def Bvh(geometry):return BVHTree.FromPolygons(*geometry,all_triangles=True,epsilon=0)
+def Bounds(geometry):return [(min(point[a] for point in geometry[0]),max(point[a] for point in geometry[0])) for a in range(3)]
+def BoundsOverlap(a,b):return all(a[i][0]<=b[i][1] and b[i][0]<=a[i][1] for i in range(3))
+fixed=[i for i,node in enumerate(g['nodes']) if node.get('name') in ['Node_Hull','Node_BowPlate','Node_SuspensionLeft','Node_SuspensionRight'] or node.get('name','').startswith('Node_SuspensionCover')]
+fixedWorld=World({});fixedData={}
+for index in fixed:
+    geometry=Geometry(index,fixedWorld,True)
+    if geometry[0]:fixedData[index]=(geometry,Bvh(geometry),Bounds(geometry))
+fixedContacts={};fixedPenetration=0.0;fixedPairs=0
 contacts={};maximumPenetration=0.0;testedPairs=0
 for frame in range(36):
     distance=path['pitchM']*frame/36;pose={}
@@ -87,7 +96,6 @@ for frame in range(36):
     for link in links:
         center=world[link].translation
         nearby=[wheel for wheel in wheels if abs(world[wheel].translation.x-center.x)<.25 and (world[wheel].translation-center).length<g['nodes'][wheel]['extras'].get('geometryRadiusM',g['nodes'][wheel]['extras']['radiusM'])+.14]
-        if not nearby:continue
         linkGeometry=Geometry(link,world);linkBvh=Bvh(linkGeometry)
         for wheel in nearby:
             testedPairs+=1;wheelGeometry,wheelBvh=wheelData[wheel]
@@ -104,8 +112,23 @@ for frame in range(36):
                     if -signed>row['maximumVertexPenetrationM']:
                         row['deepestContact']={'frame':frame,'link':g['nodes'][link]['name'],'pointWorld':list(point),'pointRelativeWheel':list(point-world[wheel].translation),'nearestWorld':list(nearest),'surfaceNormal':list(normal)}
                     row['maximumVertexPenetrationM']=max(row['maximumVertexPenetrationM'],-signed);maximumPenetration=max(maximumPenetration,-signed)
+        linkBounds=Bounds(linkGeometry)
+        for index,(geometry,bvh,bounds) in fixedData.items():
+            if not BoundsOverlap(linkBounds,bounds):continue
+            fixedPairs+=1;overlap=linkBvh.overlap(bvh)
+            if not overlap:continue
+            key=g['nodes'][index]['name'];row=fixedContacts.setdefault(key,{'frames':set(),'trianglePairs':0,'maximumVertexPenetrationM':0.0})
+            row['frames'].add(frame);row['trianglePairs']+=len(overlap)
+            for vertexIndex in {j for a,b in overlap for j in linkGeometry[1][a]}:
+                point=linkGeometry[0][vertexIndex];nearest,normal,_,_=bvh.find_nearest(point)
+                if nearest is None:continue
+                signed=(point-nearest).dot(normal)
+                if signed<0:
+                    if -signed>row['maximumVertexPenetrationM']:row['deepestContact']={'frame':frame,'link':g['nodes'][link]['name'],'pointWorld':list(point),'nearestWorld':list(nearest),'surfaceNormal':list(normal)}
+                    row['maximumVertexPenetrationM']=max(row['maximumVertexPenetrationM'],-signed);fixedPenetration=max(fixedPenetration,-signed)
 for row in contacts.values():row['frames']=sorted(row['frames'])
-report={'file':str(file.resolve()),'sha256':hashlib.sha256(data).hexdigest(),'imported':imported,'links':len(links),'wheelGroups':len(wheels),'phaseSamples':36,'testedNearbyPairs':testedPairs,'contacts':contacts,'maximumVertexPenetrationM':maximumPenetration,'pass':maximumPenetration<.001,'note':'BVH contacts include intended rolling contact; penetration above 1mm blocks acceptance'}
-(reviewDir/'Data_ImportedCollisionAudit.json').write_text(json.dumps(report,indent=2))
+for row in fixedContacts.values():row['frames']=sorted(row['frames'])
+report={'file':str(file.resolve()),'sha256':hashlib.sha256(data).hexdigest(),'imported':imported,'links':len(links),'wheelGroups':len(wheels),'phaseSamples':36,'testedNearbyPairs':testedPairs,'contacts':contacts,'maximumVertexPenetrationM':maximumPenetration,'fixedCoverGroups':len(fixedData),'fixedPairs':fixedPairs,'fixedContacts':fixedContacts,'maximumFixedCoverPenetrationM':fixedPenetration,'pass':maximumPenetration<.001 and fixedPenetration<.001,'note':'Actual exported triangles; wheel rolling contact allowed below1mm; fixed hull/fender/cover intersections above1mm block acceptance'}
+(reviewDir/'Data_ImportedCollisionAudit.json').write_text(json.dumps(report,indent=2),encoding='utf8')
 print(json.dumps(report))
 if not report['pass']:raise RuntimeError('Moving track/wheel intersection exceeds 1mm')

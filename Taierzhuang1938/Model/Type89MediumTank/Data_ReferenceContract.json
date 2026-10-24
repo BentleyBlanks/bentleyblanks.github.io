@@ -1,11 +1,11 @@
 {
   "asset": "Type89MediumTank",
-  "geometryVersion": "20261023GeometryV14",
+  "geometryVersion": "20261024GeometryV26",
   "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
-  "materialRevision": "SurfaceV2",
+  "materialRevision": "SurfaceV3",
   "materialReview": "Data_MaterialReview.json",
   "reviewedAt": "2026-10-24",
-  "reviewScope": "SurfaceV2 actual packed game GLB and independent high source inspected against the recovered 3275x2399 primary 2007 photograph and four new same-car reference views, including paint, cast tread/contact abrasion and rear oxide close-ups under two light profiles. MaterialV1 was rejected by the user. Camera fits and channel checks are not used as proof of surface fidelity. See Data_MaterialReview.json for the visual evidence and declared limits; user approval is not implied.",
+  "reviewScope": "Actual V26 high/game exports reviewed component by component against native same-car references;2007 paint/accessory state with posed open covers,2025 views for stable structure/closed states. All12 entries and material evidence are recorded separately from technical gates. Small game LOD approximations and unobserved details remain declared; user approval is not implied.",
   "selectedConfiguration": "Type89 I-Go Otsu, restored running vehicle at JGSDF Tsuchiura. Primary appearance state is the 2007 Megapixie photograph; 2025 Hunini views corroborate the same preserved car's closed hatches and geometry. Early Ko nose/cupola features are excluded.",
   "notion": "https://app.notion.com/p/40260335331c81a18a18e63b0cc14bce",
   "nominalDimensionsM": {
@@ -26,9 +26,9 @@
   },
   "sourceAxes": "Blender X right, +Y nose, +Z up; metres; ground datum under hull center",
   "runtimeAxes": "glTF X right, +Y up, -Z nose; metres; measured vertex cloud and bore direction are validated",
-  "runtimeTriangleCeiling": 80000,
-  "runtimeRenderedTriangles": 79921,
-  "sourceTrianglesBeforeExportCleanup": 554716,
+  "runtimeTriangleCeiling": 84000,
+  "runtimeRenderedTriangles": 83839,
+  "sourceTrianglesBeforeExportCleanup": 885866,
   "linksPerSide": 74,
   "wheelGroupsPerSide": 15,
   "requiredPivots": [
@@ -46,7 +46,10 @@
     "Node_SideVisionFlapRight",
     "Node_BowHatch",
     "Node_EngineHatchLeft",
-    "Node_EngineHatchRight"
+    "Node_EngineHatchRight",
+    "Node_DriverPortShutter",
+    "Node_BowDoorLatch",
+    "Node_BowRoundPortCover"
   ],
   "surfaceContract": {
     "sets": [
@@ -55,13 +58,15 @@
       "Track",
       "Rubber",
       "Exhaust",
-      "Glass"
+      "Glass",
+      "Guard"
     ],
     "channels": "sRGB Base; linear OpenGL tangent Normal; linear ORM R=AO,G=roughness,B=metallic",
     "armor": "4096Base/4096Normal/2048ORM",
     "glass": "dielectric, roughness approximately0.15, transmission0.88, IOR1.5",
     "shadowMaterial": "constant dark dielectric cavity, no invented interior machinery",
-    "method": "Reference-calibrated metre-scaled coating, abrasion, oxide and dirt masks with independent Base/Normal/ORM; SurfaceV2 full bake plus verified Base-only pigment adjustment"
+    "method": "Complete V26 high/game Base/Normal/ORM bake, guarded gray/material/bake-script inputs; game Armor3mm cage/12mm projection and high-field repair; no photographic lighting in Base",
+    "guard": "2048Base RGBA MASK/2048Normal/1024ORM, double-sided; mapped-surface hole coverage tested"
   },
   "inferred": [
     "Original1938 paint cannot be established from a restored2007/2025 museum finish. The chosen hue describes photographic restoration appearance, not a factory paint specification.",
@@ -69,7 +74,8 @@
     "Contact-band composition is not proven by the available pictures; the dark matte band is a declared material inference.",
     "Micro paint texture, oxide pits and settled dust are physically zoned authoring details calibrated to visible condition, not measured historical damage.",
     "Internal guide depth and wheel running clearance were refined against actual re-imported triangle motion. They are functional visual reconstruction rather than manufacturing dimensions.",
-    "The primary 2007 original was recovered during material review (3275x2399). Some other Commons originals remain unavailable and their explicitly labeled standard 1280px thumbnails are retained."
+    "The primary 2007 original was recovered during material review (3275x2399). Some other Commons originals remain unavailable and their explicitly labeled standard 1280px thumbnails are retained.",
+    "The2007 primary shows an exposed cylindrical perforated bow-MG jacket and an open round cover with an inner five-point badge. The pointed removable cover in2025 photos is a different accessory state and is not substituted into the2007 appearance."
   ],
   "historicalBoundary": "Museum/same-type appearance references do not establish participation in the16-18March Tengxian city assault. This independent asset does not replace the legacy Type89Tank or change mission history.",
   "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank",
@@ -78,8 +84,87 @@
   "primaryPhoto": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
   "functionalClearanceReview": {
     "phaseSamples": 36,
-    "testedNearbyPairs": 4566,
-    "contacts": 0,
-    "maximumPenetrationM": 0
-  }
+    "testedNearbyPairs": 4750,
+    "fixedGroups": 10,
+    "fixedPairs": 5466,
+    "maximumWheelPenetrationM": 0.0,
+    "maximumFixedPenetrationM": 0.0,
+    "runtimeSha256": "71f4068920abed10c5921e8b64d784d14d69cf2bb2b42aceb818a3659898e5cf"
+  },
+  "geometryReview": "Data_GeometryReviewV3.json",
+  "workingGeometryNote": "V26 actual packed candidate passed the recorded technical and12-component photographic author review; no pending source/shape items remain within the declared same-car2007 reconstruction scope.",
+  "workingSourceTriangles": {
+    "High": 885866,
+    "Game": 84136
+  },
+  "workingBudget": {
+    "target": 80000,
+    "proposedCeiling": 84000,
+    "policy": "PreserveSelectedGameTopologyWithinFivePercent",
+    "requiredReductionFraction": 0.0491585052771703
+  },
+  "runtimeTriangleTarget": 80000,
+  "selectedGameSourceTrianglesBeforeCleanup": 84136,
+  "budgetPolicy": "PreserveSelectedGameTopologyWithinFivePercent",
+  "candidateIdentity": {
+    "file": "Taierzhuang1938/Model/Type89MediumTank/Model_Type89MediumTank.glb",
+    "sha256": "71f4068920abed10c5921e8b64d784d14d69cf2bb2b42aceb818a3659898e5cf",
+    "bytes": 21970684,
+    "triangles": 83839,
+    "materials": 8,
+    "images": 21,
+    "meshNodes": 219,
+    "geometryVersions": [
+      "20261024GeometryV26"
+    ],
+    "cleanup": [
+      {
+        "mesh": "DeflectorPressedRib",
+        "removedStorageTriangles": 1,
+        "instances": 1,
+        "removedRenderedTriangles": 1
+      },
+      {
+        "mesh": "CastShoePlate",
+        "removedStorageTriangles": 2,
+        "instances": 148,
+        "removedRenderedTriangles": 296
+      }
+    ]
+  },
+  "candidateHighIdentity": {
+    "file": "Taierzhuang1938/_shots/Type89MediumTank/Model_Type89MediumTankHighPbr.glb",
+    "sha256": "2bec0f1e2f9e53ca5c6afa5fff59d13ef802067e831ddfb2f4b66abc138011cf",
+    "bytes": 36484036,
+    "triangles": 878506,
+    "materials": 8,
+    "images": 21,
+    "meshNodes": 219,
+    "geometryVersions": [
+      "20261024GeometryV26"
+    ],
+    "cleanup": [
+      {
+        "mesh": "BowMgBarrel.001",
+        "removedStorageTriangles": 7300,
+        "instances": 1,
+        "removedRenderedTriangles": 7300
+      },
+      {
+        "mesh": "ExhaustExit.001",
+        "removedStorageTriangles": 52,
+        "instances": 1,
+        "removedRenderedTriangles": 52
+      },
+      {
+        "mesh": "GunTrunnion.001",
+        "removedStorageTriangles": 8,
+        "instances": 1,
+        "removedRenderedTriangles": 8
+      }
+    ]
+  },
+  "geometryRecipeSha256": "f5e61d2d46f59eb1000ada2a73f510cd34589d0047f1b6dc68af77a4bb9c06b2",
+  "exportRemovedZeroAreaTriangles": 297,
+  "accessoryState": "2007 exposed cylindrical perforated bow-MG jacket and opening round cover with inner star; pointed removable2025 cover excluded. Rest joints are closed; the2007 review pose opens them with Type89Motion."
 }

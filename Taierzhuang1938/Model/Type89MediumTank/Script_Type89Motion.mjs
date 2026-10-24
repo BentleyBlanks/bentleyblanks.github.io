@@ -78,12 +78,14 @@ export class Type89Motion {
     recoil.position.z += Clamp(pose.recoilM ?? 0, 0, .10);
     this.Rotate("Node_BowMachineGun", [0, 1, 0], Clamp(pose.bowMachineGunYaw ?? 0, -.174533, .174533));
     this.Rotate("Node_TurretMachineGun", [1, 0, 0], Clamp(pose.turretMachineGunPitch ?? 0, -.174533, .174533));
-    const commander = Clamp(pose.commanderHatches ?? 0, 0, 1.745329);
-    this.Rotate("Node_CommanderHatchFront", [1, 0, 0], -Clamp(pose.commanderHatchFront ?? commander, 0, 1.745329));
-    this.Rotate("Node_CommanderHatchRear", [1, 0, 0], Clamp(pose.commanderHatchRear ?? commander, 0, 1.745329));
+    const commander = Clamp(pose.commanderHatches ?? 0, 0, Math.PI);
+    this.Rotate("Node_CommanderHatchFront", [1, 0, 0], -Clamp(pose.commanderHatchFront ?? commander, 0, Math.PI));
+    this.Rotate("Node_CommanderHatchRear", [1, 0, 0], Clamp(pose.commanderHatchRear ?? commander, 0, Math.PI));
     this.Rotate("Node_SideVisionFlapLeft", [0, 1, 0], -Clamp(pose.leftSideVisionFlap ?? 0, 0, 3.054326));
     this.Rotate("Node_SideVisionFlapRight", [0, 1, 0], Clamp(pose.rightSideVisionFlap ?? 0, 0, 3.054326));
     this.Rotate("Node_DriverVisionFlap", [1, 0, 0], Clamp(pose.driverVisionFlap ?? 0, 0, 1.745329));
+    this.Rotate("Node_DriverPortShutter", [0, 0, -1], Clamp(pose.driverPortShutter ?? 0, 0, Math.PI));
+    this.Rotate("Node_BowRoundPortCover", [1, 0, 0], Clamp(pose.bowRoundPortCover ?? 0, 0, Math.PI));
     this.Rotate("Node_BowHatch", [0, 1, 0], Clamp(pose.bowHatch ?? 0, 0, 1.134464));
     this.Rotate("Node_BowDoorLatch", [0, 0, -1], Clamp(pose.bowDoorLatch ?? 0, -.610865, .610865));
     const engine = Clamp(pose.engineHatches ?? 0, 0, .872665);
@@ -94,10 +96,13 @@ export class Type89Motion {
 
   SetTravel(leftM, rightM) {
     if (![leftM, rightM].every(Number.isFinite)) throw new TypeError("Track travel must be finite");
-    this.distance.Left = leftM;
-    this.distance.Right = rightM;
+    const requested = { Left: leftM, Right: rightM };
     for (const side of ["Left", "Right"]) {
-      const distance = this.distance[side];
+      const distance = requested[side];
+      // Preserve the imported rest transforms of a stationary bank exactly.
+      // Re-evaluating zero travel introduces a float32/float64 round trip.
+      if (distance === this.distance[side]) continue;
+      this.distance[side] = distance;
       for (const node of this.tracks[side]) {
         const sample = SampleTrackPath(this.path, node.userData.phaseM - distance);
         const rest = this.rest.get(node.name);

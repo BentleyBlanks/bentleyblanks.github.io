@@ -13,7 +13,7 @@ import hashlib
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
-roles=['Armor','Steel','Track','Rubber','Exhaust','Glass']
+roles=['Armor','Steel','Track','Rubber','Exhaust','Glass','Guard']
 
 
 def Attribute(mesh,name,dataType='FLOAT'):
@@ -38,6 +38,8 @@ def PrepareSurfaceAttributes(objects, samples=12, onObject=None, allObjects=None
             continue
         seen.add(obj.data)
         mesh=obj.data
+        selfOcclusion='BowRoundPortCover' in obj.name
+        inverseWorld=obj.matrix_world.inverted()
         mesh.calc_loop_triangles()
         bm=bmesh.new();bm.from_mesh(mesh)
         bm.verts.ensure_lookup_table();bm.normal_update()
@@ -89,7 +91,12 @@ def PrepareSurfaceAttributes(objects, samples=12, onObject=None, allObjects=None
                 angle=sample*2.399963229728653
                 radial=math.sqrt(u)
                 direction=tangent*(math.cos(angle)*radial)+bitangent*(math.sin(angle)*radial)+normal*math.sqrt(1-u)
-                hit,_,_,distance=assembly.ray_cast(origin,direction,.22)
+                if selfOcclusion:
+                    # This cover flips180degrees in the2007 reference. Do not
+                    # bake its closed-state contact with the fixed bow onto
+                    # the gold inner face that becomes visible when opened.
+                    hit,_,_,distance=bvh.ray_cast(inverseWorld@origin,inverseWorld.to_3x3()@direction,.22)
+                else:hit,_,_,distance=assembly.ray_cast(origin,direction,.22)
                 occlusion+=max(0,1-distance/.22) if hit is not None else 0
             ao.data[i].value=max(.24,1-occlusion/max(1,samples)*.78)
         bm.free()
@@ -186,23 +193,32 @@ class SurfaceGraph:
         dustColor=self.Color((.16,.125,.060))
         oxideColor=self.Color((.10,.045,.018))
         steelColor=self.Color((.38,.41,.41))
-        variation=self.Math('ADD',.77,self.Math('ADD',self.Math('MULTIPLY',macro,.39),self.Math('MULTIPLY',part,.065)))
+        variation=self.Math('ADD',.91,self.Math('ADD',self.Math('MULTIPLY',macro,.12),self.Math('MULTIPLY',part,.020)))
         relief=self.Math('ADD',self.Math('MULTIPLY',grain,.40),self.Math('MULTIPLY',meso,.60))
-        if role=='Armor':
-            base=self.Color((.205,.151,.075))
+        if role in ['Armor','Guard']:
+            # Recovered2007 paint is a warm olive-brown. The earlier V3 green
+            # (.120,.115,.065) lost its red/green separation in the actual PBR
+            # render, despite the old colour-diagnostic record. Same-light
+            # comparison of the real GLB, then a pigment-only diagnostic,
+            # resolves the coating hue without changing illumination.
+            base=self.Color((.120,.092,.0403))
             multiply=self.nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1
             self.Link(base,multiply.inputs[1]);self.Link(variation,multiply.inputs[2]);base=multiply.outputs[0]
             film=self.Math('MULTIPLY',lower,self.Math('ADD',.32,self.Math('MULTIPLY',drips,.30)))
-            base=self.Mix(base,self.Color((.058,.040,.009)),film)
-            base=self.Mix(base,self.Color((.10,.079,.041)),self.Math('MULTIPLY',chip,.75))
+            base=self.Mix(base,self.Color((.046,.0344,.0124)),self.Math('MULTIPLY',film,.25))
+            base=self.Mix(base,self.Color((.10,.0632,.0254)),self.Math('MULTIPLY',chip,.75))
             base=self.Mix(base,steelColor,self.Math('MULTIPLY',chip,.18))
             oxide=self.Math('MULTIPLY',oxide,.12)
             base=self.Mix(base,oxideColor,oxide);base=self.Mix(base,dustColor,dust)
             # Thin paint has a broad satin lobe with local dull chalk, rather
             # than one roughness value and a uniformly smooth plastic skin.
             metallic=self.Math('MULTIPLY',chip,.20)
-            rough=self.Math('ADD',.52,self.Math('ADD',self.Math('MULTIPLY',meso,.22),self.Math('MULTIPLY',drips,.13)),True)
-            bumpDistance=.00072
+            rough=self.Math('ADD',.60,self.Math('ADD',self.Math('MULTIPLY',meso,.20),self.Math('MULTIPLY',drips,.10)),True)
+            badge=self.Attr('MuseumBadge')
+            base=self.Mix(base,self.Color((.55,.34,.055)),badge)
+            metallic=self.Mix(metallic,.38,badge)
+            rough=self.Mix(rough,.43,badge)
+            bumpDistance=.00095
         elif role=='Steel':
             base=self.Mix(self.Color((.020,.026,.031)),self.Color((.19,.21,.21)),finish)
             base=self.Mix(base,steelColor,self.Math('MULTIPLY',chip,.75))
@@ -215,7 +231,7 @@ class SurfaceGraph:
             outward=self.Ramp(split.outputs['Z'],-.010,.012)
             running=self.Ramp(split.outputs['Z'],.016,.032)
             mottling=self.Ramp(meso,.16,.85)
-            cast=self.Mix(self.Color((.17,.18,.17)),self.Color((.32,.34,.32)),mottling)
+            cast=self.Mix(self.Color((.14,.15,.14)),self.Color((.28,.30,.28)),mottling)
             base=self.Mix(self.Color((.036,.032,.023)),cast,outward)
             base=self.Mix(base,self.Color((.42,.44,.43)),self.Math('MULTIPLY',running,self.Ramp(grain,.30,.72)))
             oxide=self.Math('MULTIPLY',self.Math('MULTIPLY',recess,self.Ramp(meso,.40,.68)),.30)
@@ -260,7 +276,9 @@ class SurfaceGraph:
         self.Link(base,self.shader.inputs['Base Color']);self.Link(rough,self.shader.inputs['Roughness']);self.Link(metallic,self.shader.inputs['Metallic']);self.links.new(bump.outputs['Normal'],self.shader.inputs['Normal'])
         microAo=self.Math('SUBTRACT',1,self.Math('MULTIPLY',self.Math('GREATER_THAN',grain,.70),.07)) if role not in ['Glass','Shadow'] else 1.0
         ambient=self.Math('MULTIPLY',ambient,microAo,True)
-        self.channels={'Base':base,'Roughness':rough,'Metallic':metallic,'Ao':ambient}
+        # High-source guard holes are geometry. An emitted coverage/opacity pass
+        # projects the real openings into the game's continuous curved sheet.
+        self.channels={'Base':base,'Roughness':rough,'Metallic':metallic,'Ao':ambient,'Opacity':1.0}
         return self
 
     def SetBakeChannel(self,channel):

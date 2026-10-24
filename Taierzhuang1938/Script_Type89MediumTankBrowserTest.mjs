@@ -42,6 +42,8 @@ try{const path=await fetch('/Taierzhuang1938/Model/Type89MediumTank/Data_TrackPa
     motion.Reset();motion.SetPose({turretYaw:Math.PI/2,mainGunPitch:.18,recoilM:.08,commanderHatchFront:1.1,commanderHatchRear:.8,driverVisionFlap:1.4,leftSideVisionFlap:2.8,bowHatch:.8,engineHatches:.65});
     Check('Turret Y axis and bore recoil work',Math.abs(motion.nodes.get('Node_TurretYaw').quaternion.y-Math.SQRT1_2)<1e-6&&Math.abs(motion.nodes.get('Node_MainGunRecoil').position.z-motion.rest.get('Node_MainGunRecoil').position[2]-.08)<1e-6);
     Check('Fore/aft hatches open independently',motion.nodes.get('Node_CommanderHatchFront').quaternion.x<0&&motion.nodes.get('Node_CommanderHatchRear').quaternion.x>0);
+    motion.SetPose({bowRoundPortCover:Math.PI});
+    Check('Round bow cover flips fully to reveal its inner badge',Math.abs(motion.nodes.get('Node_BowRoundPortCover').quaternion.x)> .999999);
     motion.SetPose({engineHatchLeft:.6,engineHatchRight:0,bowMachineGunYaw:.12,turretMachineGunPitch:.1});
     Check('Engine lids have separate controls',Math.abs(motion.nodes.get('Node_EngineHatchLeft').quaternion.z)>.25&&Math.abs(motion.nodes.get('Node_EngineHatchRight').quaternion.z)<1e-7);
     Check('Both machine guns retain working local pivots',1-Math.abs(motion.nodes.get('Node_BowMachineGun').quaternion.dot(new THREE.Quaternion().fromArray(motion.rest.get('Node_BowMachineGun').quaternion)))>1e-4&&1-Math.abs(motion.nodes.get('Node_TurretMachineGun').quaternion.dot(new THREE.Quaternion().fromArray(motion.rest.get('Node_TurretMachineGun').quaternion)))>1e-4);

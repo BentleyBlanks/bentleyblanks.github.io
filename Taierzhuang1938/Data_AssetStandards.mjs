@@ -121,9 +121,9 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
   Object.freeze({ id: "Type89MediumTank", name: "八九式中战车乙型（馆藏外形复原）", pack: "Type89MediumTank/Model_Type89MediumTank.glb",
-    sourceTriangles: 554716, actualTriangles: 79921, targetTriangles: 80000, policy: "target",
-    sourceTexture: "土浦保存车多机位图证；高源保留、按物理表面分区程序烘焙", runtimeTexture: "SurfaceV2：6套18张内嵌Base / OpenGL Normal / ORM；4K装甲、独立履带/钢件/接触带/排气/玻璃PBR",
-    note: "独立资产，不替换既有Type89Tank。米制Y-up、-Z车头；74节/侧独立履带、30轮组、炮塔/俯仰/后坐/机枪及前后盖轴心保留。高源外置；微细旧损、接触带材质和未见内装标推定，不凭馆藏照认定滕县参战。" }),
+    sourceTriangles: 885866, selectedGameSourceTriangles: 84136, actualTriangles: 83839, exportRemovedZeroAreaTriangles: 297, targetTriangles: 80000, policy: "target",
+    sourceTexture: "土浦保存车多机位图证；高源保留、按物理表面分区程序烘焙", runtimeTexture: "SurfaceV3：7套21张内嵌Base / OpenGL Normal / ORM；4K装甲、2K实孔排气罩MASK；履带/钢件/接触带/排气/玻璃PBR",
+    note: "独立资产，不替换既有Type89Tank。选定游戏源再减至80k只需4.92%，按既有5%规则保留可见拓扑。米制Y-up、-Z车头；74节/侧独立履带、30轮组及各可动轴心保留。高源外置；微细旧损、接触带材质和未见内装标推定，不凭馆藏照认定滕县参战。" }),
   Object.freeze({ id: "NakajimaKi4", name: "九四式侦察机（同型参考复原）", pack: "NakajimaKi4/Model_NakajimaKi4.glb",
     sourceTriangles: 244695, actualTriangles: 177815, targetTriangles: 180000, policy: "target",
     sourceTexture: "同型原图与1937原始说明书；现代发动机材质类比、CC0皮革及内置imagegen推定材质图", runtimeTexture: "SurfaceV2：30张内嵌Base / OpenGL Normal / ORM；4K机身、布翼与机罩，独立肋带、铸件、钢、橡胶、皮革和排气PBR",
@@ -287,6 +287,20 @@ export function ThresholdTriangleTarget(sourceTriangles, limit) {
 export function ReductionPercent(sourceTriangles, actualTriangles) {
   if (!Number.isFinite(sourceTriangles) || sourceTriangles <= 0) return null;
   return (1 - actualTriangles / sourceTriangles) * 100;
+}
+
+export function ExternalComplianceFor(record) {
+  const selected = record.selectedGameSourceTriangles;
+  const removed = record.exportRemovedZeroAreaTriangles ?? 0;
+  const retained = Number.isFinite(selected) && selected > record.targetTriangles
+    && ThresholdTriangleTarget(selected, record.targetTriangles) === selected
+    && Number.isInteger(removed) && removed >= 0
+    && record.actualTriangles === selected - removed;
+  const close = record.actualTriangles <= record.targetTriangles * 1.001
+    && record.actualTriangles >= record.targetTriangles * .97;
+  return { label: retained ? "5% 免减面" : close
+    ? (record.policy === "source" ? "原始拓扑保留" : "指定目标达标") : "偏离登记目标",
+    tone: retained || close ? "good" : "bad", retained };
 }
 
 export function ComplianceFor(id, actualTriangles) {

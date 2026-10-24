@@ -8,6 +8,7 @@ import {LoadGlb,ReadAccessor} from './_import/Script_LugouGlbPose.mjs';
 const here=path.dirname(fileURLToPath(import.meta.url));
 const file=path.join(here,'Model/Type89MediumTank/Model_Type89MediumTank.glb');
 const glb=LoadGlb(file),g=glb.json;
+const contract=JSON.parse(fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_ReferenceContract.json'),'utf8'));
 let failures=0,checks=0;
 function Check(condition,name,detail=''){checks++;if(!condition)failures++;console.log(`${condition?'ok  ':'FAIL'} ${name}${detail?'  '+detail:''}`);}
 function Matrix(node){
@@ -43,7 +44,11 @@ function Walk(index,parent){
   for(const child of node.children??[])Walk(child,world);
 }
 for(const root of g.scenes[g.scene??0].nodes)Walk(root,identity);
-Check(triangles===79921&&triangles<=80000,'Vehicle budget counts every repeated shoe after zero-area cleanup',String(triangles));
+Check(triangles===contract.runtimeRenderedTriangles&&triangles<=contract.runtimeTriangleCeiling,'Vehicle budget counts every repeated shoe after zero-area cleanup',String(triangles));
+const selectedGame=contract.selectedGameSourceTrianglesBeforeCleanup??triangles;
+Check(contract.runtimeTriangleTarget===80000&&(triangles<=80000||((selectedGame-80000)/selectedGame<=.05&&contract.budgetPolicy==='PreserveSelectedGameTopologyWithinFivePercent')),'Existing five-percent rule funds visible detail without another topology reduction',JSON.stringify({selectedGame,actual:triangles,target:contract.runtimeTriangleTarget,ceiling:contract.runtimeTriangleCeiling}));
+const removedZeroArea=(g.asset.extras?.Type89ZeroAreaCleanup??[]).reduce((sum,row)=>sum+row.removedRenderedTriangles,0);
+Check(selectedGame-triangles===removedZeroArea&&contract.exportRemovedZeroAreaTriangles===removedZeroArea,'Every source/export triangle difference is accounted for by zero-area cleanup',String(removedZeroArea));
 Check(nonFinite===0&&normalError<2e-4&&degenerate===0,'Finite geometry, unit normals, noncollapsed triangles',JSON.stringify({nonFinite,normalError,degenerate}));
 const size=high.map((value,i)=>value-low[i]);
 Check(Math.abs(size[0]-2.18)<.01&&Math.abs(size[1]-2.56)<.015&&Math.abs(size[2]-5.70)<.03&&Math.abs(low[1])<.001,'Measured metre scale and ground origin',JSON.stringify({low,high,size}));
@@ -53,8 +58,64 @@ for(const side of ['Left','Right']){
   const wheels=g.nodes.filter(node=>node.name?.includes(side)&&/^Node_(RoadWheel|LeadingWheel|FrontIdler|RearSprocket|ReturnRoller)/.test(node.name));
   Check(links.length===74&&wheels.length===15,'Independent links and all rotating wheel groups: '+side,`${links.length}/${wheels.length}`);
 }
-for(const name of ['Node_TurretYaw','Node_MainGunPitch','Node_MainGunRecoil','Node_BowMachineGun','Node_TurretMachineGun','Node_CommanderHatchFront','Node_CommanderHatchRear','Node_BowHatch','Node_DriverVisionFlap','Node_EngineHatchLeft','Node_EngineHatchRight'])Check(nodesByName.has(name),'Movable part survives export: '+name);
+for(const name of ['Node_TurretYaw','Node_MainGunPitch','Node_MainGunRecoil','Node_BowMachineGun','Node_TurretMachineGun','Node_CommanderHatchFront','Node_CommanderHatchRear','Node_BowHatch','Node_BowDoorLatch','Node_DriverVisionFlap','Node_DriverPortShutter','Node_EngineHatchLeft','Node_EngineHatchRight'])Check(nodesByName.has(name),'Movable part survives export: '+name);
 Check(nodesByName.get('Node_TurretYaw')?.extras?.runtimeAxis==='+Y'&&nodesByName.get('Node_MainGunRecoil')?.extras?.runtimeAxis==='-Z','Source and runtime axes are distinguished');
+Check(g.nodes.some(node=>node.extras?.geometryVersion===contract.geometryVersion),'The exported geometry matches this reference contract');
+
+// Test physical openings against the exported triangles, independently of
+// dark paint, normal maps or metadata claiming that an opening exists.
+function LocalGeometry(name,armorOnly=false,excludeShadow=false){
+  const index=g.nodes.findIndex(node=>node.name===name),vertices=[],faces=[];
+  if(index<0)return {vertices,faces};
+  function Visit(i,parent,isRoot=false){
+    const node=g.nodes[i],matrix=Multiply(parent,isRoot?identity:Matrix(node));
+    if(node.mesh!==undefined)for(const primitive of g.meshes[node.mesh].primitives){
+      if(armorOnly&&!g.materials[primitive.material].name.endsWith('Armor'))continue;
+      if(excludeShadow&&g.materials[primitive.material].name.endsWith('Shadow'))continue;
+      const positions=ReadAccessor(glb,primitive.attributes.POSITION).data,indices=ReadAccessor(glb,primitive.indices).data,base=vertices.length;
+      for(let k=0;k<positions.length;k+=3){const [x,y,z]=positions.slice(k,k+3);vertices.push([matrix[0]*x+matrix[4]*y+matrix[8]*z+matrix[12],matrix[1]*x+matrix[5]*y+matrix[9]*z+matrix[13],matrix[2]*x+matrix[6]*y+matrix[10]*z+matrix[14]]);}
+      for(let k=0;k<indices.length;k+=3)faces.push([base+indices[k],base+indices[k+1],base+indices[k+2]]);
+    }
+    for(const child of node.children??[])if(!g.nodes[child].name?.startsWith('Node_'))Visit(child,matrix);
+  }
+  Visit(index,identity,true);return {vertices,faces};
+}
+const Sub=(a,b)=>a.map((v,i)=>v-b[i]),Dot=(a,b)=>a.reduce((sum,v,i)=>sum+v*b[i],0),Cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+function RayHits(geometry,origin,direction,maxDistance){
+  for(const face of geometry.faces){
+    const [a,b,c]=face.map(i=>geometry.vertices[i]),edge1=Sub(b,a),edge2=Sub(c,a),p=Cross(direction,edge2),det=Dot(edge1,p);
+    if(Math.abs(det)<1e-10)continue;
+    const t=Sub(origin,a),u=Dot(t,p)/det;if(u<0||u>1)continue;
+    const q=Cross(t,edge1),v=Dot(direction,q)/det;if(v<0||u+v>1)continue;
+    const distance=Dot(edge2,q)/det;if(distance>1e-6&&distance<maxDistance)return true;
+  }
+  return false;
+}
+const shoeGeometry=LocalGeometry('Node_TrackLinkLeft000');
+Check(shoeGeometry.faces.length>0&&[-.137,-.055,.055,.137].every(x=>!RayHits(shoeGeometry,[x,.10,0],[0,-1,0],.20))&&RayHits(shoeGeometry,[0,.10,0],[0,-1,0],.20),'Four true cast-shoe windows and a solid middle web');
+// The rear pin is visible behind the trailing notch (first hit at100.08mm).
+// Probe through the cast face at87.56mm, with a neighbouring solid-web control.
+Check([-.123,0,.123].every(x=>!RayHits(shoeGeometry,[x,.10,.065],[0,-1,0],.20))&&!RayHits(shoeGeometry,[0,.10,-.059],[0,-1,0],.095)&&RayHits(shoeGeometry,[.027,.10,-.059],[0,-1,0],.095),'Photographed flange keyways and trailing central relief are true silhouette cut-outs');
+Check([-.157,.157].every(x=>RayHits(shoeGeometry,[x,.10,-.015],[0,-1,0],.20)),'Outer shoe windows retain their cast side webs');
+const turretGeometry=LocalGeometry('Node_TurretYaw',true);
+const bowGeometry=LocalGeometry('Node_BowPlate',true);
+Check(!RayHits(bowGeometry,[-.13,.30,-.20],[0,0,1],.30)&&RayHits(bowGeometry,[-.215,.30,-.20],[0,0,1],.30),'Round bow port has a true opening and solid surrounding armor beneath its independent cover');
+Check(!RayHits(turretGeometry,[0,.30,-.80],[0,0,1],.25)&&RayHits(turretGeometry,[.24,.30,-.80],[0,0,1],.25),'Mantlet aperture is cut through armor and its border remains solid');
+const towGeometry=LocalGeometry('Node_BowTowClevis',true);
+Check(!RayHits(towGeometry,[-.12,.010,-.095],[1,0,0],.24)&&RayHits(towGeometry,[-.12,0,-.045],[1,0,0],.24),'Tow eyes have transverse bores and solid surrounding metal');
+const gunMountGeometry=LocalGeometry('Node_MainGunPitch',true);
+Check(!RayHits(gunMountGeometry,[-.035,-.020,-.16],[0,0,1],.09)&&RayHits(gunMountGeometry,[-.14,-.020,-.16],[0,0,1],.09),'Sight shield has an open inner notch and a solid outer arm');
+Check(!RayHits(gunMountGeometry,[-.025,-.024,-.16],[0,0,1],.18)&&RayHits(gunMountGeometry,[-.045,-.024,-.16],[0,0,1],.18),'A real vertical slit remains in the separate sight backing plate');
+const boreGeometry=LocalGeometry('Node_MainGunRecoil',false,true);
+Check(!RayHits(boreGeometry,[0,.032,-.80],[0,0,1],.18)&&RayHits(boreGeometry,[.035,.032,-.80],[0,0,1],.18),'Main bore stays physically open behind the flat muzzle annulus');
+const allBoreGeometry=LocalGeometry('Node_MainGunRecoil');
+const UniqueRing=points=>[...new Map(points.map(p=>[`${p[0].toFixed(8)},${p[1].toFixed(8)}`,p])).values()];
+const metalRing=UniqueRing(allBoreGeometry.vertices.filter(p=>Math.abs(p[2]+.712)<1e-5&&Math.abs(Math.hypot(p[0],p[1]-.032)-.0285)<2e-6))
+  .sort((a,b)=>Math.atan2(a[1]-.032,a[0])-Math.atan2(b[1]-.032,b[0]));
+const linerRing=UniqueRing(allBoreGeometry.vertices.filter(p=>Math.abs(p[2]+.7072)<1e-5&&Math.hypot(p[0],p[1]-.032)>.027&&Math.hypot(p[0],p[1]-.032)<.0285));
+const minimumMetalChord=Math.min(...metalRing.map((p,i)=>{const q=metalRing[(i+1)%metalRing.length],a=p[1]-.032,b=q[1]-.032;return Math.abs(p[0]*b-a*q[0])/Math.hypot(q[0]-p[0],b-a);}));
+const maximumLinerRadius=Math.max(...linerRing.map(p=>Math.hypot(p[0],p[1]-.032)));
+Check(metalRing.length>=24&&linerRing.length>=24&&minimumMetalChord-maximumLinerRadius>.0002,'Dark bore liner stays inside the actual low-poly metal chords',JSON.stringify({minimumMetalChord,maximumLinerRadius,gapM:minimumMetalChord-maximumLinerRadius}));
 
 const imageCache=new Map();
 async function ImageFor(textureInfo){
@@ -83,7 +144,22 @@ for(const [index,material] of g.materials.entries()){
   const role=material.name.replace('Material_Type89Game',''),pbr=material.pbrMetallicRoughness;
   Check(pbr.baseColorTexture&&material.normalTexture&&pbr.metallicRoughnessTexture&&material.occlusionTexture&&material.occlusionTexture.index===pbr.metallicRoughnessTexture.index,'Complete Base/Normal/ORM with real AO: '+role);
   const [base,normal,orm]=await Promise.all([ImageFor(pbr.baseColorTexture),ImageFor(material.normalTexture),ImageFor(pbr.metallicRoughnessTexture)]);
-  if(role==='Armor')Check(base.info.width===4096&&normal.info.width===4096&&orm.info.width===2048,'Full-resolution armor atlases');
+  if(role==='Armor'){
+    Check(base.info.width===4096&&normal.info.width===4096&&orm.info.width===2048,'Full-resolution armor atlases');
+    const cover=nodesByName.get('Mesh_BowRoundPortCover'),badgeSamples=[];
+    if(cover?.mesh!==undefined)for(const primitive of g.meshes[cover.mesh].primitives){
+      const positions=ReadAccessor(glb,primitive.attributes.POSITION).data,uv=ReadAccessor(glb,primitive.attributes.TEXCOORD_0).data,indices=ReadAccessor(glb,primitive.indices).data;
+      for(let k=0;k<indices.length;k+=3){
+        const tri=[0,1,2].map(i=>positions.slice(indices[k+i]*3,indices[k+i]*3+3));
+        // Raised inner star has a23mm centre and15-17mm corners, behind the
+        // plain closed lid. Select the actual facets, not blank atlas pixels.
+        if(!tri.every(p=>p[2]>.0145&&p[1]<-.025)||!tri.some(p=>p[2]>.0225))continue;
+        const sample=[0,1].map(axis=>[0,1,2].reduce((sum,i)=>sum+uv[indices[k+i]*2+axis],0)/3);
+        badgeSamples.push([0,1,2].map(channel=>Sample(base,sample,channel)));
+      }
+    }
+    Check(badgeSamples.length===10&&badgeSamples.every(([r,g,b])=>r>.70&&g>.54&&b<.40),'Inner five-point badge survives as geometry and mapped2007 gold colour',JSON.stringify(badgeSamples));
+  }
   const samples=UvSamples(index);let weight=0,white=0,metal=0,rough=0,normalVariation=0;
   for(const sample of samples){weight+=sample.area;const rgb=[0,1,2].map(channel=>Sample(base,sample.uv,channel));if(rgb.every(value=>value>.99))white+=sample.area;metal+=Sample(orm,sample.uv,2)*sample.area;rough+=Sample(orm,sample.uv,1)*sample.area;normalVariation+=(Math.abs(Sample(normal,sample.uv,0)-.5)+Math.abs(Sample(normal,sample.uv,1)-.5))*sample.area;}
   const values={metal:metal/weight,rough:rough/weight,white:white/weight,normalVariation:normalVariation/weight};
@@ -91,7 +167,18 @@ for(const [index,material] of g.materials.entries()){
   if(['Rubber','Glass'].includes(role))Check(values.metal<.005,'Dielectric material has zero metallic channel: '+role,String(values.metal));
   if(role==='Glass')Check(values.rough<.26&&material.extensions?.KHR_materials_transmission?.transmissionFactor>.8,'Actual glass roughness and transmission');
   if(role==='Exhaust')Check(Math.abs(values.metal-.35)<.04,'Exhaust metallic scalar is not stale roughness');
+  if(role==='Guard'){
+    let clear=0,solid=0,total=0;
+    for(const mesh of g.meshes)for(const primitive of mesh.primitives){
+      if(primitive.material!==index)continue;
+      const uv=ReadAccessor(glb,primitive.attributes.TEXCOORD_0).data,indices=ReadAccessor(glb,primitive.indices).data;
+      for(let i=0;i<indices.length;i+=3){const p=[0,1,2].map(k=>uv.slice(indices[i+k]*2,indices[i+k]*2+2));for(const a of [.15,.50,.85])for(const seed of [.15,.50,.85]){const b=(1-a)*seed,c=1-a-b,sample=[0,1].map(axis=>p[0][axis]*a+p[1][axis]*b+p[2][axis]*c),alpha=Sample(base,sample,3);total++;if(alpha<.25)clear++;if(alpha>.75)solid++;}}
+    }
+    Check(material.alphaMode==='MASK'&&(material.alphaCutoff??.5)===.5&&material.doubleSided===true&&(pbr.baseColorTexture.texCoord??0)===0,'Perforated guard loads as a double-sided UV0 alpha mask');
+    Check(total>100&&clear/total>.10&&clear/total<.45&&solid/total>.40,'Holes remain visible on mapped guard surfaces, excluding atlas background',JSON.stringify({clear,solid,total}));
+    Check(base.info.width===2048&&normal.info.width===2048&&orm.info.width===1024,'Guard retains its full-resolution opacity and PBR maps');
+  }
 }
-Check(imageCache.size===18,'Six complete physical PBR sets',String(imageCache.size));
+Check(imageCache.size===21,'Seven complete physical PBR sets',String(imageCache.size));
 console.log(`Type89MediumTank: ${checks-failures}/${checks} passed`);
 process.exitCode=failures?1:0;
