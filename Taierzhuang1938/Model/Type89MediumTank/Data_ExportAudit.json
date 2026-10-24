@@ -1526,5 +1526,38 @@
     "Script_Type89DetailNormalTransfer.py": "f9f564c145d0be5ed3e1b0cdc68d3ff2b35c2e7970ce4e863579106974c2efc7"
   },
   "appearanceReview": "Data_GeometryReviewV3.json",
-  "materialReview": "Data_MaterialReview.json"
+  "materialReview": "Data_MaterialReview.json",
+  "repositoryRegression": {
+    "profile": "quick",
+    "passed": 94,
+    "failed": 3,
+    "total": 97,
+    "newRelatedFailures": 0,
+    "failedTests": [
+      "SpeakerGestureTest",
+      "RiggedModelTest",
+      "IjaAlertGaitTest"
+    ],
+    "baselineCommit": "734b2d6cab1c1327966da05bd6b231547e803f83",
+    "baselineReproduced": true,
+    "baselineSnapshotFiles": 241,
+    "baselineAssertions": [
+      {
+        "test": "SpeakerGestureTest",
+        "exitCode": 1,
+        "assertion": "AssertionError [ERR_ASSERTION]: FrontObservation.02: luo gestured on his previous line too\r"
+      },
+      {
+        "test": "RiggedModelTest",
+        "exitCode": 1,
+        "assertion": "AssertionError [ERR_ASSERTION]: FPS arm materials enter the shared PBR/debug chain as non-metals\r"
+      },
+      {
+        "test": "IjaAlertGaitTest",
+        "exitCode": 1,
+        "assertion": "AssertionError [ERR_ASSERTION]: WalkIn: alert gait at a trot\r"
+      }
+    ],
+    "scope": "All three failures reproduced with exact current-master files in an ignored read-only snapshot. ModuleGraph/cache-stamp check was corrected and passes. Type89 raw504/browser17/motion10/import/source/rigid gates passed; no assertion or baseline policy weakened."
+  }
 }
