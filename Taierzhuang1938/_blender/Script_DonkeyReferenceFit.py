@@ -678,7 +678,11 @@ def ApplyReferenceFit(scene,base):
     legNamespace={}
     exec(compile((project/'_blender/Script_DonkeyLegRefine.py').read_text(encoding='utf-8'),'Script_DonkeyLegRefine.py','exec'),legNamespace)
     legFit=legNamespace['FitReferenceLegs'](skin,rig)
+    upperBodyNamespace={}
+    exec(compile((project/'_blender/Script_DonkeyUpperBody.py').read_text(encoding='utf-8'),'Script_DonkeyUpperBody.py','exec'),upperBodyNamespace)
+    upperBodyFit=upperBodyNamespace['FitUpperBody'](scene,skin)
     SeatMane(skin,rig);earOffsets=SeatEars(skin,rig);FitEarContours(rig);details=TailAndMouth(rig,collection)
+    details['upperBodyFit']=upperBodyFit
     details['legFit']=legFit
     details['hooves']=hoofRefinement
     details['faceSculpt']=faceSculpt
@@ -689,7 +693,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261024ReferenceV15'
+    scene['DonkeyReferenceFitRevision']='20261024ReferenceV16'
     scene['DonkeyReferenceFineTail']=True
     scene['DonkeyReferenceFitAnchorY']=anchor
     # Repaint the short pale muzzle rather than the old long horse-like blaze.

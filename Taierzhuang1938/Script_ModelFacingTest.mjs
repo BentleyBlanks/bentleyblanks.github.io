@@ -299,8 +299,12 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
 Check(bare.json.meshes.length===3 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===79410 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
-  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与79,410三角齐备");
+  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===79748 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
+  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与79,748三角齐备");
+const upperBodyFit=bareSpec.derivation.referenceFit.details.upperBodyFit;
+Check(upperBodyFit.refinementTriangles===274&&upperBodyFit.sideProfileUnchanged===true&&upperBodyFit.maximumHeadDisplacementM===0&&upperBodyFit.maximumLowerLimbDisplacementM===0
+  &&upperBodyFit.integrity.boundaryEdges===0&&upperBodyFit.integrity.nonmanifoldEdges===0,
+  "独立驴上躯干记录包含局部截面、侧向整形及头部/下肢保护；实际轮廓另行投影验证");
 const muzzleFit=bareSpec.derivation.referenceFit.details.muzzle;
 Check(muzzleFit.integrity.anteriorCrossings===0&&muzzleFit.integrity.boundaryEdges===0&&muzzleFit.integrity.nonmanifoldEdges===0
   &&muzzleFit.mouth.stations===21&&muzzleFit.mouth.vertices===126&&muzzleFit.mouth.surfaceDistanceM[1]<.001,
