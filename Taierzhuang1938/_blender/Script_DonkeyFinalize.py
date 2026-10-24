@@ -37,6 +37,8 @@ if scene.get('DonkeyReferenceMane'):
 textures['source']['shortFurCards']=Read(base/'SourceTextures/Data_FurGeneration.json')
 textures['source']['shortFurFibres']=Read(base/'SourceTextures/Data_FiberGeneration.json')
 textures['source']['shortFurRefinement']=Read(base/'SourceTextures/Data_ShortFiberGeneration.json')
+if scene.get('DonkeyEyeRevision'):
+    textures['ormAlpha']='Linear glTF specularFactor for accessory surfaces, baked as twice source Specular IOR Level; RGB remains AO/Roughness/Metallic; not transparency'
 if reference:
     textures['source']['referenceFit']={'original':'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020/References/Image_DonkeyOriginalThreeView.png',
         'occludedAnatomyGuide':Read(base/'Data_NakedGuideGeneration.json'),'scope':'original visible coat retained as the target; generated bare guide fills tack-covered head/neck regions before pigment and normalized-detail baking',
@@ -83,6 +85,8 @@ contract={'schema':'tengxian-independent-rigged-prop-v1','id':'Donkey','version'
  'editableSource':str(base/'Scene_Donkey.blend'),'credits':parent['credits'],
  'reconstructionScope':'灰驴的比例、毛色与表面细节沿用用户参考图创作复原；尺寸为建模定标，不作为史料规格。',
  'historicalReferences':[],'rebuild':'node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs'}
+if scene.get('DonkeyEyeRevision'):
+    contract['runtime']['specularTransfer']=next(row.get('specularTransfer') for row in bake['batches'] if row['label']=='Animal')
 (output/'Data_Donkey.json').write_text(json.dumps(contract,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 for file in sorted((project/'_blender').glob('Script_Donkey*')):
     if file.suffix not in ('.py','.mjs'):continue

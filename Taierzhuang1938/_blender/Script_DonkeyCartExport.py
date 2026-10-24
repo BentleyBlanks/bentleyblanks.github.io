@@ -4,7 +4,8 @@ Source object material coordinates are preserved as a point attribute before
 joining, so grain/fur scale and direction survive batching and UV replacement.
 Editable components remain in the external Blender project.
 """
-import bpy,math,json,hashlib
+import bpy,math,json,hashlib,struct
+import numpy as np
 from pathlib import Path
 from mathutils import Matrix
 from mathutils.bvhtree import BVHTree
@@ -112,10 +113,10 @@ scene.render.engine='CYCLES';scene.cycles.samples=8
 scene.render.bake.margin=5;scene.render.bake.use_selected_to_active=False;scene.render.bake.use_clear=True
 scene.render.bake.use_pass_direct=False;scene.render.bake.use_pass_indirect=False;scene.render.bake.use_pass_color=True
 
-def TargetImage(obj,name,size,nonColor=False):
+def TargetImage(obj,name,size,nonColor=False,alpha=False):
     previous=bpy.data.images.get(name)
     if previous:bpy.data.images.remove(previous,do_unlink=True)
-    image=bpy.data.images.new(name,width=size,height=size,alpha=False)
+    image=bpy.data.images.new(name,width=size,height=size,alpha=alpha)
     image.colorspace_settings.name='Non-Color' if nonColor else 'sRGB'
     image.file_format='PNG';image.filepath_raw=str(bakeDir/(name+'.png'))
     for mat in obj.data.materials:
@@ -136,7 +137,8 @@ def Bake(obj,label):
     normalImage=TargetImage(obj,'Texture_'+assetName+label+'Normal',1024 if label=='Animal' else 2048,True)
     bpy.ops.object.bake(type='NORMAL',normal_space='TANGENT',normal_r='POS_X',normal_g='POS_Y',normal_b='POS_Z')
     info.append(SaveImage(normalImage))
-    ormImage=TargetImage(obj,'Texture_'+assetName+label+'Orm',512,True)
+    transferSpecular=standalone and bool(scene.get('DonkeyEyeRevision')) and label=='Animal'
+    ormImage=TargetImage(obj,'Texture_'+assetName+label+'Orm',512,True,alpha=transferSpecular)
     restore=[]
     for mat in obj.data.materials:
         nodes,links=mat.node_tree.nodes,mat.node_tree.links
@@ -152,6 +154,24 @@ def Bake(obj,label):
         links.new(combine.outputs['Color'],emission.inputs['Color']);links.new(emission.outputs['Emission'],output.inputs['Surface'])
         restore.append((mat,original,output,emission,combine))
     bpy.ops.object.bake(type='EMIT')
+    specularReport=None
+    if transferSpecular:
+        originalPixels=np.array(ormImage.pixels[:],dtype=np.float32).reshape(512,512,4);originalRgb=np.rint(originalPixels[:,:,:3]*255).astype(np.uint8)
+        specularImage=TargetImage(obj,'Texture_'+assetName+label+'SpecularBake',512,True);specularNodes=[];sourceFactors={}
+        for sourceMaterial,original,output,emission,combine in restore:
+            sourceNodes,sourceLinks=sourceMaterial.node_tree.nodes,sourceMaterial.node_tree.links;sourceShader=next(n for n in sourceNodes if n.type=='BSDF_PRINCIPLED');socket=sourceShader.inputs['Specular IOR Level']
+            multiply=sourceNodes.new('ShaderNodeMath');multiply.operation='MULTIPLY';multiply.use_clamp=True;multiply.inputs[1].default_value=2
+            multiply.inputs[0].default_value=socket.default_value
+            if socket.is_linked:sourceLinks.new(socket.links[0].from_socket,multiply.inputs[0])
+            sourceLinks.new(multiply.outputs[0],emission.inputs['Color']);specularNodes.append((sourceMaterial,multiply));sourceFactors[sourceMaterial.name]=min(1,2*socket.default_value) if not socket.is_linked else 'source texture'
+        bpy.ops.object.bake(type='EMIT')
+        specularPixels=np.array(specularImage.pixels[:],dtype=np.float32).reshape(512,512,4);originalPixels[:,:,3]=specularPixels[:,:,0]
+        ormImage.alpha_mode='CHANNEL_PACKED';ormImage.pixels.foreach_set(originalPixels.ravel());ormImage.update()
+        check=np.array(ormImage.pixels[:],dtype=np.float32).reshape(512,512,4)
+        if not np.array_equal(originalRgb,np.rint(check[:,:,:3]*255).astype(np.uint8)):raise RuntimeError('Specular alpha packing changed ORM RGB')
+        for sourceMaterial,node in specularNodes:sourceMaterial.node_tree.nodes.remove(node)
+        bpy.data.images.remove(specularImage,do_unlink=True)
+        specularReport={'channel':'ORM alpha','encoding':'linear glTF specularFactor = clamp(2 * source Specular IOR Level, 0, 1)','sourceFactors':sourceFactors,'ormRgbUnchanged':True,'runtimeImagesAdded':0}
     info.append(SaveImage(ormImage))
     for mat,original,output,emission,combine in restore:
         mat.node_tree.links.new(original,output.inputs['Surface']);mat.node_tree.nodes.remove(emission);mat.node_tree.nodes.remove(combine)
@@ -174,6 +194,10 @@ def Bake(obj,label):
     coatTints=[tuple(min(1,max(0,value*.75/.55)) for value in color.color[:3])+(1,) for color in sourceColors.data] if detailValues and sourceColors and not referencePhoto else None
     if detailValues:
         accessory=mat.copy();accessory.name='DonkeyAccessoryPbr';accessory.use_backface_culling=False;obj.data.materials.append(accessory)
+        if transferSpecular:
+            accessoryShader=next(n for n in accessory.node_tree.nodes if n.type=='BSDF_PRINCIPLED');accessoryOrm=next(n for n in accessory.node_tree.nodes if n.type=='TEX_IMAGE' and n.image==ormImage)
+            scale=accessory.node_tree.nodes.new('ShaderNodeMath');scale.operation='MULTIPLY';scale.inputs[1].default_value=.5
+            accessory.node_tree.links.new(accessoryOrm.outputs['Alpha'],scale.inputs[0]);accessory.node_tree.links.new(scale.outputs[0],accessoryShader.inputs['Specular IOR Level'])
         if scene.get('DonkeyReferenceFitRevision'):
             shader.inputs['Specular IOR Level'].default_value=.24
             # glTF sheen has no separate weight. Blender 5.2 exports Tint as
@@ -228,7 +252,7 @@ def Bake(obj,label):
         obj.data.color_attributes.render_color_index=0
     obj.data.calc_loop_triangles()
     density=obj['atlasTexelsPerMetre']*(2 if baseImage.size[0]==4096 and label=='Animal' else 1)
-    return {'label':label,'meshName':obj.name,'sourceTriangles':obj['sourceTriangles'],'triangles':len(obj.data.loop_triangles),'vertices':len(obj.data.vertices),'budgetSurfaceMaxErrorM':obj.get('budgetSurfaceMaxErrorM',0),'atlasCoverage':obj['atlasCoverage'],'atlasTexelsPerMetre':density,'textures':info}
+    return {'label':label,'meshName':obj.name,'sourceTriangles':obj['sourceTriangles'],'triangles':len(obj.data.loop_triangles),'vertices':len(obj.data.vertices),'budgetSurfaceMaxErrorM':obj.get('budgetSurfaceMaxErrorM',0),'atlasCoverage':obj['atlasCoverage'],'atlasTexelsPerMetre':density,'textures':info,'specularTransfer':specularReport}
 
 reports=[Bake(obj,label) for rig,obj,label in batches]
 if standalone and bpy.data.objects.get('DonkeyShortCoatCards'):
@@ -276,7 +300,22 @@ bpy.ops.export_scene.gltf(filepath=str(path),export_format='GLB',use_selection=T
  export_anim_slide_to_zero=True,export_force_sampling=True,export_frame_range=False,
  export_rest_position_armature=True,export_materials='EXPORT',export_extras=True,
  export_vertex_color='ACTIVE' if standalone else 'NONE',export_all_vertex_colors=False,export_image_format='AUTO')
+imageDedup=None
+if standalone and scene.get('DonkeyEyeRevision'):
+    raw=path.read_bytes();jsonLength=struct.unpack_from('<I',raw,12)[0];document=json.loads(raw[20:20+jsonLength]);binary=raw[28+jsonLength:];images=[];aliases={};seen={}
+    for index,item in enumerate(document.get('images',[])):
+        view=document['bufferViews'][item['bufferView']];offset=view.get('byteOffset',0);content=binary[offset:offset+view['byteLength']];key=(item.get('mimeType'),hashlib.sha256(content).hexdigest())
+        if key not in seen:seen[key]=len(images);images.append(item)
+        aliases[index]=seen[key]
+    imageDedup={'before':len(document.get('images',[])),'after':len(images),'binaryUnchanged':True}
+    if len(images)!=len(document.get('images',[])):
+        document['images']=images
+        for texture in document.get('textures',[]):
+            if 'source' in texture:texture['source']=aliases[texture['source']]
+        encoded=json.dumps(document,separators=(',',':')).encode();encoded+=b' '*(-len(encoded)%4)
+        body=struct.pack('<II',len(encoded),0x4e4f534a)+encoded+struct.pack('<II',len(binary),0x004e4942)+binary;path.write_bytes(struct.pack('<III',0x46546c67,2,12+len(body))+body)
 report={'path':str(path),'bytes':path.stat().st_size,'batches':reports,'totalTriangles':sum(r['triangles'] for r in reports)}
+if imageDedup:report['imageDedup']=imageDedup
 (base/'Review/Data_ExportBake.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
 for obj in runtimeCol.objects:obj.hide_render=True;obj.hide_set(True)
 scene.cycles.samples=32

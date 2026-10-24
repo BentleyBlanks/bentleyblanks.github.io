@@ -689,7 +689,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261024ReferenceV14'
+    scene['DonkeyReferenceFitRevision']='20261024ReferenceV15'
     scene['DonkeyReferenceFineTail']=True
     scene['DonkeyReferenceFitAnchorY']=anchor
     # Repaint the short pale muzzle rather than the old long horse-like blaze.
@@ -708,7 +708,12 @@ def ApplyReferenceFit(scene,base):
     exec(compile((project/'_blender/Script_DonkeyMuzzle.py').read_text(encoding='utf-8'),'Script_DonkeyMuzzle.py','exec'),muzzleNamespace)
     details['muzzle']=muzzleNamespace['ApplyReferenceMuzzle'](scene,skin,rig)
     projected=ReferencePigment(skin,anchor);colorCalibration=CalibrateCoatPigment(skin)
-    details['eyes']=RefineEyes(skin,rig);FinishFurResponse(rig,collection)
+    details['eyes']=RefineEyes(skin,rig)
+    eyeNamespace={}
+    exec(compile((project/'_blender/Script_DonkeyEyes.py').read_text(encoding='utf-8'),'Script_DonkeyEyes.py','exec'),eyeNamespace)
+    details['eyes']['socketFit']=eyeNamespace['ApplyReferenceEyeSockets'](scene,skin,rig)
+    details['muzzle']['integrity']=muzzleNamespace['CheckMuzzleIntegrity'](skin)
+    FinishFurResponse(rig,collection)
     details['nasalPad']=InstallNasalPad(skin);flowReport=RefreshFlow(skin,rig,collection)
     photoNamespace={}
     exec(compile((project/'_blender/Script_DonkeyPhotoDetail.py').read_text(encoding='utf-8'),'Script_DonkeyPhotoDetail.py','exec'),photoNamespace)

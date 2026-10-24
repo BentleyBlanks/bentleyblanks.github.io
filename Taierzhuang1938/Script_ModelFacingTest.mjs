@@ -299,8 +299,8 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
 Check(bare.json.meshes.length===3 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===79654 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
-  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与79,654三角齐备");
+  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===79410 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
+  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与79,410三角齐备");
 const muzzleFit=bareSpec.derivation.referenceFit.details.muzzle;
 Check(muzzleFit.integrity.anteriorCrossings===0&&muzzleFit.integrity.boundaryEdges===0&&muzzleFit.integrity.nonmanifoldEdges===0
   &&muzzleFit.mouth.stations===21&&muzzleFit.mouth.vertices===126&&muzzleFit.mouth.surfaceDistanceM[1]<.001,
@@ -312,6 +312,15 @@ const bareMane=bare.json.meshes[bareManeNode.mesh];
 const tiled=bareBody.primitives.find(p=>bare.json.materials[p.material].name.startsWith("DonkeyAnimalPbr"));
 const coatMaterial=bare.json.materials[bareCoat.primitives[0].material];
 const accessoryMaterial=bare.json.materials.find(m=>m.name.startsWith('DonkeyAccessoryPbr'));
+const accessorySpecular=accessoryMaterial.extensions?.KHR_materials_specular;
+const ImageOfTexture=index=>bare.json.textures[index].extensions?.EXT_texture_webp?.source??bare.json.textures[index].source;
+Check(accessorySpecular?.specularTexture&&(accessorySpecular.specularFactor??1)===1&&(accessorySpecular.specularTexture.texCoord??0)===0
+  &&ImageOfTexture(accessorySpecular.specularTexture.index)===ImageOfTexture(accessoryMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index)
+  &&bareSpec.runtime.specularTransfer.ormRgbUnchanged===true&&bareSpec.runtime.specularTransfer.runtimeImagesAdded===0,
+  "独立驴附属高光读取共享ORM的alpha，保留源部件强度且不增加图像");
+const orbitalFit=bareSpec.derivation.referenceFit.details.eyes.socketFit;
+Check(orbitalFit.integrity.orbitalCrossings===0&&orbitalFit.integrity.boundaryEdges===0&&orbitalFit.integrity.nonmanifoldEdges===0&&orbitalFit.globeGeometryUnchanged===true,
+  "独立驴连续眼眶保留零交叠、闭合及原眼球几何记录；完整源码重建另执行实际几何检查");
 function BareWindingEvidence(primitive){
   const positions=ReadAccessor(bare,primitive.attributes.POSITION),indices=ReadAccessor(bare,primitive.indices).data;
   const vertices=new Map(),ids=[];const edges=new Map();let signedVolume=0;
