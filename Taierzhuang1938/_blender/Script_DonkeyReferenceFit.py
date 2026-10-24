@@ -15,6 +15,17 @@ def Curve(rows,value):
         if a[0]<=value<=b[0]:
             t=(value-a[0])/(b[0]-a[0]);return a[1]+(b[1]-a[1])*t
 
+def NormalizeReferenceSkinWeights(skin):
+    changed=0;maximum=0
+    for vertex in skin.data.vertices:
+        row=sorted(((g.group,g.weight) for g in vertex.groups if g.weight>1e-8),key=lambda item:-item[1]);maximum=max(maximum,len(row));row=row[:4];total=sum(w for _,w in row)
+        if total<1e-8:raise RuntimeError('Unweighted reference skin vertex: '+str(vertex.index))
+        if len(vertex.groups)>4 or abs(total-1)>1e-6:
+            for group in list(vertex.groups):skin.vertex_groups[group.group].remove([vertex.index])
+            for group,weight in row:skin.vertex_groups[group].add([vertex.index],weight/total,'REPLACE')
+            changed+=1
+    return {'trimmedVertices':changed,'maximumBefore':maximum,'maximumAfter':max(len(v.groups) for v in skin.data.vertices),'method':'strongest four source influences normalized before groom sampling and animation export'}
+
 def RebuildBreast(skin,rig):
     # Preserve the connected skin and its weights. A boolean over the old open
     # nostril/leg seams subdivides distant faces into nonmanifold overlaps.
@@ -130,6 +141,8 @@ def RefreshFlow(skin,rig,collection):
             furry=material.name.startswith(('DonkeyCartGreyCoat','DonkeyLowerLegShortFur','DonkeyCartFaceFur','DonkeyCartEarInterior'))
             centre=sum((transform@obj.data.vertices[i].co for i in face.vertices),Vector())/len(face.vertices)
             limbMass=sum(sum(g.weight for g in obj.data.vertices[i].groups if obj.vertex_groups[g.group].name.startswith(('DonkeyFront','DonkeyRear'))) for i in face.vertices)/len(face.vertices)
+            appearance=obj.data.attributes.get('LimbAppearanceMass')
+            if appearance:limbMass=sum(sum(appearance.data[i].color) for i in face.vertices)/len(face.vertices)
             leg=obj.name=='DonkeyThinTail' or (centre.z<.75 and limbMass>.65)
             for loop in face.loop_indices:
                 vertex=obj.data.loops[loop].vertex_index;key=(vertex,axis,leg)
@@ -681,8 +694,12 @@ def ApplyReferenceFit(scene,base):
     upperBodyNamespace={}
     exec(compile((project/'_blender/Script_DonkeyUpperBody.py').read_text(encoding='utf-8'),'Script_DonkeyUpperBody.py','exec'),upperBodyNamespace)
     upperBodyFit=upperBodyNamespace['FitUpperBody'](scene,skin)
+    chestNamespace={}
+    exec(compile((project/'_blender/Script_DonkeyChest.py').read_text(encoding='utf-8'),'Script_DonkeyChest.py','exec'),chestNamespace)
+    chestFit=chestNamespace['FitReferenceChest'](scene,skin,rig)
     SeatMane(skin,rig);earOffsets=SeatEars(skin,rig);FitEarContours(rig);details=TailAndMouth(rig,collection)
     details['upperBodyFit']=upperBodyFit
+    details['chest']=chestFit
     details['legFit']=legFit
     details['hooves']=hoofRefinement
     details['faceSculpt']=faceSculpt
@@ -693,7 +710,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261024ReferenceV18'
+    scene['DonkeyReferenceFitRevision']='20261025ReferenceV19'
     scene['DonkeyReferenceFineTail']=True
     scene['DonkeyReferenceFitAnchorY']=anchor
     # Repaint the short pale muzzle rather than the old long horse-like blaze.
@@ -720,6 +737,10 @@ def ApplyReferenceFit(scene,base):
     exec(compile((project/'_blender/Script_DonkeyTailRoot.py').read_text(encoding='utf-8'),'Script_DonkeyTailRoot.py','exec'),tailRootNamespace)
     details['tailRoot']=tailRootNamespace['ApplyReferenceTailRoot'](scene,skin,rig)
     details['muzzle']['integrity']=muzzleNamespace['CheckMuzzleIntegrity'](skin)
+    details['appearanceOwnership']=chestNamespace['CacheLimbAppearance'](skin)
+    details['skinWeightCanonicalization']=NormalizeReferenceSkinWeights(skin)
+    details['pectoralBinding']=chestNamespace['BindReferencePectorals'](scene,skin)
+    details['pectoralEdges']=chestNamespace['ApplyPectoralEdges'](scene,skin)
     FinishFurResponse(rig,collection)
     details['nasalPad']=InstallNasalPad(skin);flowReport=RefreshFlow(skin,rig,collection)
     photoNamespace={}
@@ -731,6 +752,7 @@ def ApplyReferenceFit(scene,base):
     legPigmentNamespace={}
     exec(compile((project/'_blender/Script_DonkeyLegPigment.py').read_text(encoding='utf-8'),'Script_DonkeyLegPigment.py','exec'),legPigmentNamespace)
     photoDetail['legPigment']=legPigmentNamespace['InstallLegPigment'](scene,skin,rig,base)
+    details['skinWeights']=NormalizeReferenceSkinWeights(skin)
     previousGroom=bpy.data.objects['DonkeyShortCoatCards'];groomMaterial=previousGroom.data.materials[0]
     bpy.data.objects.remove(previousGroom,do_unlink=True)
     coatNamespace={}

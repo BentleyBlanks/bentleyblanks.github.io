@@ -118,13 +118,15 @@ def InstallReferenceDetail(scene,skin,rig,collection,base):
         usePhoto=Math('MULTIPLY',confidence,Math('SUBTRACT',1,protect))
         if scene.get('DonkeyReferenceLegSections'):
             leg=nodes.new('ShaderNodeAttribute');leg.attribute_name='LegProjectionProtection';usePhoto=Math('MULTIPLY',usePhoto,Math('SUBTRACT',1,Clamp(leg.outputs['Fac'])))
+        if scene.get('DonkeyReferenceChestRevision'):
+            underside=nodes.new('ShaderNodeAttribute');underside.attribute_name='ChestUndersideBlend';usePhoto=Math('MULTIPLY',usePhoto,Math('SUBTRACT',1,Clamp(underside.outputs['Fac'])))
         if scene.get('DonkeyTailRootRevision'):
             repair=nodes.new('ShaderNodeAttribute');repair.attribute_name='TailRootRepairBlend';usePhoto=Math('MULTIPLY',usePhoto,Math('SUBTRACT',1,Clamp(repair.outputs['Fac'])))
         detail=Math('ADD',Math('MULTIPLY',photographic,usePhoto),Math('MULTIPLY',generic,Math('SUBTRACT',1,usePhoto)))
         multiply=nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1
         links.new(paint.outputs['Color'],multiply.inputs[1]);links.new(Math('MULTIPLY',.75,detail),multiply.inputs[2]);links.new(multiply.outputs[0],shader.inputs['Base Color'])
     scene['DonkeyReferencePhotoDetail']='20261024ReferenceDetailV2'
-    record['visibility']='fitted-skin BVH depth test from axial source cameras; 4 mm surface tolerance; source-vertex weights baked into UV0; V14 anterior muzzle uses horizontal normal azimuth so frontal lower lips do not inherit the side-photo floor weight'
+    record['visibility']='fitted-skin BVH depth test from axial source cameras; 4 mm surface tolerance; source-vertex weights baked into UV0; anterior muzzle uses horizontal normal azimuth; the pectoral region prioritizes its frontal source to prevent side-view collar-fill streaks on downward-facing breast skin'
     record['materials']=[m.name for m in materials];record['runtime']='baked UV0 base colour; independent tiled UV1 fibre normal; no camera projection in GLB'
     (base/'SourceTextures/Data_ReferencePhotoDetail.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8')
     return record

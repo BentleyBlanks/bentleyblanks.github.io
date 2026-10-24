@@ -12,12 +12,12 @@ from mathutils import Vector
 def InstallLegPigment(scene,skin,rig,base):
     project=Path(scene['DonkeyCartProject']);ns={};file=project/'_blender/Script_DonkeyLegSections.py'
     exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),ns)
-    stems,masses,profiles=ns['MeasureLegSections'](skin);curve=ns['Curve'];smooth=ns['Smooth']
+    stems,masses,profiles=ns['MeasureLegSections'](skin,True);curve=ns['Curve'];smooth=ns['Smooth']
     source=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020/References/Image_DonkeyOriginalThreeView.png')
     original=bpy.data.images.load(str(source),check_existing=False)
     rgb=np.array(original.pixels[:],dtype=np.float32).reshape(1024,1536,4)[::-1,:,:3];bpy.data.images.remove(original)
     linear=np.where(rgb<=.04045,rgb/12.92,((rgb+.055)/1.055)**2.4)
-    paletteBoxes={'ForeSideDark':[707,750,732,830],'HindSideDark':[1136,760,1159,825],'ForeFrontDark':[207,765,220,825],'ForeMedialPale':[185,565,198,610]}
+    paletteBoxes={'ForeSideDark':[707,750,732,830],'HindSideDark':[1136,760,1159,825],'ForeFrontDark':[207,765,220,825],'ForeMedialPale':[185,565,198,610],'RearMedialLeft':[1331,565,1338,595],'RearMedialRight':[1448,565,1455,595]}
     palette={name:np.median(linear[top:bottom,left:right].reshape(-1,3),axis=0)*(.50/.75)*np.array([1,1.03,1.10]) for name,(left,top,right,bottom) in paletteBoxes.items()}
     detailNamespace={};detailFile=project/'_blender/Script_DonkeyPhotoDetail.py';exec(compile(detailFile.read_text(encoding='utf-8'),detailFile.name,'exec'),detailNamespace)
     blur=detailNamespace['BoxBlur']
@@ -66,10 +66,14 @@ def InstallLegPigment(scene,skin,rig,base):
         low=np.stack([blur(blur(photographic[:,:,c],8),8) for c in range(3)],axis=2)
         detail=np.clip(photographic/np.maximum(.008,low),.55,1.65)
         dark=np.mean([palette['ForeSideDark'],palette['HindSideDark'],palette['ForeFrontDark']],axis=0)
-        pale=palette['ForeMedialPale']
+        pale=palette['ForeMedialPale'] if front else np.mean([palette['RearMedialLeft'],palette['RearMedialRight']],axis=0)
         inward=np.maximum(0,nx*(1 if left else -1))
         upper=np.clip((yy-.50)/.20,0,1);upper=upper*upper*(3-2*upper)
-        paleWeight=np.clip((inward-.02)/.55,0,1)*upper*np.clip((ny+.65)/1.15,0,1) if front else np.zeros_like(nx)
+        if front:paleWeight=np.clip((inward-.02)/.55,0,1)*upper*np.clip((ny+.65)/1.15,0,1)
+        else:
+            faceLuma=face@np.array([.2126,.7152,.0722]);photoPale=np.clip((blur(blur(faceLuma,4),4)-.055)/.095,0,1);photoPale=photoPale*photoPale*(3-2*photoPale)
+            heightMask=np.clip((yy-.43)/.19,0,1);heightMask=heightMask*heightMask*(3-2*heightMask)
+            paleWeight=photoPale*np.clip((inward-.10)/.65,0,1)*np.clip((-ny+.40)/1.20,0,1)*heightMask
         color=(dark+(pale-dark)*paleWeight[:,:,None])*(1+1.05*(detail-1))
         atlas[:,index*tileWidth:(index+1)*tileWidth,:3]=np.where(color<=.0031308,color*12.92,1.055*color**(1/2.4)-.055)
         sampling.append({'leg':stem,'sideDonor':'near '+('foreleg' if front else 'hindleg'),'capDonor':('Front' if front else 'Rear')+('Left' if left else 'Right')})
@@ -86,11 +90,10 @@ def InstallLegPigment(scene,skin,rig,base):
         cx,cy,wx,wy=[curve([(r[0],r[c]) for r in rows],p.z) for c in (1,2,3,4)]
         theta=(math.atan2((p.x-cx)/max(.01,wx*.5),(p.y-cy)/max(.01,wy*.5))+math.pi)/(2*math.pi)
         coordinates.append((index,theta,p.z/.90))
-        spatial=(smooth(.54,.60,p.y)*(1-smooth(.75,.82,p.y)) if front else smooth(-.25,-.15,p.y)*(1-smooth(.10,.20,p.y)))*smooth(.055,.095,abs(p.x))
-        ownership=max(smooth(.25,.65,row[stem]),spatial)
-        amount=ownership*(1-smooth(.72,.86,p.z) if front else 1-smooth(.67,.86,p.z))
+        ownership=smooth(.45,.85,row[stem])
+        amount=ownership*(1-smooth(.66,.74,p.z) if front else 1-smooth(.67,.86,p.z))
         mask.data[vertex.index].value=amount
-        protected=max(smooth(.20,.60,row[stem]),spatial)*(1-smooth(.78,.88,p.z));protection.data[vertex.index].value=protected
+        protected=amount;protection.data[vertex.index].value=protected
         if amount>0:
             col=int(np.clip(index*tileWidth+gutter+theta*(bodyWidth-1),0,tileWidth*4-1));line=int(np.clip((1-p.z/.90)*(height-1),0,height-1));value=atlas[line,col,:3]
             value=np.where(value<=.04045,value/12.92,((value+.055)/1.055)**2.4)
@@ -108,7 +111,7 @@ def InstallLegPigment(scene,skin,rig,base):
         nodes,links=material.node_tree.nodes,material.node_tree.links;shader=next(n for n in nodes if n.type=='BSDF_PRINCIPLED');previous=shader.inputs['Base Color'].links[0].from_socket
         uv=nodes.new('ShaderNodeUVMap');uv.uv_map='LegPigmentUV';texture=nodes.new('ShaderNodeTexImage');texture.image=image;texture.extension='EXTEND';links.new(uv.outputs[0],texture.inputs[0])
         blend=nodes.new('ShaderNodeAttribute');blend.attribute_name='LegPigmentBlend';mix=nodes.new('ShaderNodeMixRGB');links.new(blend.outputs['Fac'],mix.inputs[0]);links.new(previous,mix.inputs[1]);links.new(texture.outputs['Color'],mix.inputs[2]);links.new(mix.outputs[0],shader.inputs['Base Color']);materials.append(material.name)
-    record={'method':'same-limb cylindrical correspondence from photographed visible coat strips; short-fur microvariation separated from low-frequency photo shading, calibrated dark coat and anatomical upper medial pale fur; feathered cap/side blend; no global projection or generated guide on limbs',
+    record={'method':'bone-owned limb correspondence below the fore-elbow transition; photographed short-fur microvariation separated from photo shading; calibrated dark coat, fore medial pale fur, and source-derived rear posteromedial pale-fur confidence; no positional override onto the breast or generated guide on limbs',
         'source':str(source),'sourceSha256':hashlib.sha256(source.read_bytes()).hexdigest(),'atlas':str(path),'sha256':hashlib.sha256(content).hexdigest(),'sourceBoundaryRows':boundaries,'sampling':sampling,'sourceChecks':sourceChecks,'paletteSourceBoxes':paletteBoxes,'paletteCalibratedLinearRgb':{name:value.tolist() for name,value in palette.items()},'vertices':count,'materials':materials,
         'runtime':'baked into existing UV0 2K Base Color; shared UV1 fur normal unchanged; no additional runtime image or projection'}
     (base/'SourceTextures/Data_LegPigment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8');scene['DonkeyLegPigmentRevision']='20261024PartAwareV1';return record

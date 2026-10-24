@@ -24,6 +24,8 @@ def AssignAtlasGroup(obj,label,sourceName):
         if label=='Animal' and sourceName=='DonkeyContinuousSkin' and bpy.context.scene.get('DonkeyReferenceLegSections'):
             stems=['DonkeyFrontLeft','DonkeyFrontRight','DonkeyRearLeft','DonkeyRearRight']
             mass=[sum(g.weight for i in face.vertices for g in obj.data.vertices[i].groups if obj.vertex_groups[g.group].name.startswith(stem))/len(face.vertices) for stem in stems]
+            appearance=obj.data.attributes.get('LimbAppearanceMass')
+            if appearance:mass=[sum(appearance.data[i].color[c] for i in face.vertices)/len(face.vertices) for c in range(4)]
             z=sum(obj.data.vertices[i].co.z for i in face.vertices)/len(face.vertices)
             if z<.82 and max(mass)>.35:value=8+mass.index(max(mass))
         if label=='Cart' and sourceName.startswith('CartFloorPlank') and face.normal.z<-.5:value=3

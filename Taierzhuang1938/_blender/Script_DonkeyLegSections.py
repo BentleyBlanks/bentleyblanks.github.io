@@ -18,10 +18,12 @@ def Curve(rows,height):
             t=(height-a)/(b-a)
             return (2*t**3-3*t*t+1)*x+(t**3-2*t*t+t)*(b-a)*tangent[i]+(-2*t**3+3*t*t)*y+(t**3-t*t)*(b-a)*tangent[i+1]
 
-def MeasureLegSections(skin):
+def MeasureLegSections(skin,appearance=False):
     stems=['DonkeyFrontLeft','DonkeyFrontRight','DonkeyRearLeft','DonkeyRearRight']
     owners={g.index:next((s for s in stems if g.name.startswith(s)),None) for g in skin.vertex_groups}
     masses=[{s:sum(g.weight for g in v.groups if owners[g.group]==s) for s in stems} for v in skin.data.vertices]
+    cached=skin.data.attributes.get('LimbAppearanceMass') if appearance else None
+    if cached:masses=[{s:float(cached.data[v.index].color[i]) for i,s in enumerate(stems)} for v in skin.data.vertices]
     levels=[.09+i*.01 for i in range(79)];sections={s:[[] for z in levels] for s in stems}
     points=[v.co.copy() for v in skin.data.vertices]
     for edge in skin.data.edges:

@@ -36,6 +36,15 @@ def InstallReferencePigment(scene,skin,rig,base):
     for vertex in skin.data.vertices:attribute.data[vertex.index].vector=(normalMatrix@vertex.normal).normalized()
     scope=skin.data.attributes.get('ReferencePigmentScope') or skin.data.attributes.new('ReferencePigmentScope','FLOAT','POINT')
     for value in scope.data:value.value=1
+    if scene.get('DonkeyReferenceChestRevision'):
+        underside=skin.data.attributes.get('ChestUndersideBlend') or skin.data.attributes.new('ChestUndersideBlend','FLOAT','POINT')
+        def Smooth(a,b,v):
+            t=max(0,min(1,(v-a)/(b-a)));return t*t*(3-2*t)
+        for vertex in skin.data.vertices:
+            p=transform@vertex.co;n=(normalMatrix@vertex.normal).normalized()
+            area=Smooth(.50,.60,p.y)*(1-Smooth(.86,.96,p.y))*Smooth(.55,.60,p.z)*(1-Smooth(.70,.76,p.z))*(1-Smooth(.18,.22,abs(p.x)))
+            vertical=abs(n.y)/max(.001,float(np.hypot(n.y,n.z)));weight=area*Smooth(.40,.80,-n.z)*(1-Smooth(.45,.70,vertical))
+            underside.data[vertex.index].value=weight;scope.data[vertex.index].value=1-weight
     eye=bpy.data.objects['DonkeyEyeLeft'];eyeMatrix=rig.matrix_world.inverted()@eye.matrix_world
     eyeCentre=sum((eyeMatrix@v.co for v in eye.data.vertices),Vector())/len(eye.data.vertices);eyeCentre.x=abs(eyeCentre.x)
     ppm=(925-302)/1.10;anchor=scene['DonkeyReferenceFitAnchorY'];gain=.50;mixStrength=.95;materials=[]

@@ -92,6 +92,8 @@ def CloneBatch(sourceRig,label):
         bm=bmesh.new();bm.from_mesh(obj.data)
         bmesh.ops.triangulate(bm,faces=list(bm.faces),quad_method='BEAUTY',ngon_method='BEAUTY')
         bm.to_mesh(obj.data);bm.free();obj.data.update()
+        obj['runtimeMeshValidated']=bool(obj.data.validate(verbose=False,clean_customdata=False))
+        obj.data.update()
     obj.data.calc_loop_triangles();obj['sourceTriangles']=len(obj.data.loop_triangles)
     # Preserve the animal's anatomy and all editable source detail. If the whole
     # asset exceeds the vehicle budget, reduce only runtime bevel/rivet density.

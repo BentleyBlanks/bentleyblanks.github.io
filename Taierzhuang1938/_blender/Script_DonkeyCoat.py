@@ -228,6 +228,8 @@ def BuildGroom(skin,rig,collection,material,count=21000):
         tile=2 if rng.random()<pale else (1 if rng.random()<.12 else 0)
         if referenceFlow:
             limbMass=sum(w for name,w in row.items() if name.startswith(('DonkeyFront','DonkeyRear')))
+            appearance=skin.data.attributes.get('LimbAppearanceMass')
+            if appearance:limbMass=sum(sum(appearance.data[i].color)*w for i,w in zip(ids,bary))
             flow=referenceFlow['HairFlow'](root,limbMass)
         elif root.y>.88:flow=Vector((0,.45,-1))
         elif root.z<.62:flow=Vector((0,-.12,-1))
