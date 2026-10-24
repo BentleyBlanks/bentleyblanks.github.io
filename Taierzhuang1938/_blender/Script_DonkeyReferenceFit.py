@@ -665,7 +665,11 @@ def ApplyReferenceFit(scene,base):
     bm=bmesh.new();bm.from_mesh(skin.data);orientation=topologyNamespace['OrientComponents'](bm)
     topology['mainVolumeM3']=orientation['components'][0]['volumeM3'];topology['flippedFaces']+=orientation['flippedFaces']
     bm.to_mesh(skin.data);bm.free();skin.data.update()
+    legNamespace={}
+    exec(compile((project/'_blender/Script_DonkeyLegRefine.py').read_text(encoding='utf-8'),'Script_DonkeyLegRefine.py','exec'),legNamespace)
+    legFit=legNamespace['FitReferenceLegs'](skin,rig)
     SeatMane(skin,rig);earOffsets=SeatEars(skin,rig);FitEarContours(rig);details=TailAndMouth(rig,collection)
+    details['legFit']=legFit
     details['hooves']=hoofRefinement
     details['faceSculpt']=faceSculpt
     details['abdomenFit']=abdomenFit
@@ -675,7 +679,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261024ReferenceV9'
+    scene['DonkeyReferenceFitRevision']='20261024ReferenceV10'
     scene['DonkeyReferenceFitAnchorY']=anchor
     # Repaint the short pale muzzle rather than the old long horse-like blaze.
     colors=skin.data.color_attributes['CoatColor']
