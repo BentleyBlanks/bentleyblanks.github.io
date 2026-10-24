@@ -1,4 +1,4 @@
-// Fit the bare V21 donkey from its frozen V3 intermediate; preserve prior sources.
+// Fit the bare V22 donkey from its frozen V3 intermediate; preserve prior sources.
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -7,7 +7,7 @@ import {execFileSync} from 'node:child_process';
 const scriptDir=path.dirname(fileURLToPath(import.meta.url));
 const project=path.dirname(scriptDir),root=path.dirname(project);
 const helper=path.join(root,'scripts/Script_BlenderMcp.mjs');
-const destination='C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261025/ReferenceFitV21';
+const destination='C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261025/ReferenceFitV22';
 const source='C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261023/ReferenceFitV4/Scene_DonkeyBeforeReferenceFit.blend';
 if(!fs.statSync(path.join(root,'.git')).isFile())throw Error('Use an exclusive Git worktree');
 if(!fs.existsSync(source))throw Error('Missing preserved V3 source: '+source);

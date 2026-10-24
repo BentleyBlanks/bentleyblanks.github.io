@@ -28,6 +28,10 @@ def AssignAtlasGroup(obj,label,sourceName):
             if appearance:mass=[sum(appearance.data[i].color[c] for i in face.vertices)/len(face.vertices) for c in range(4)]
             z=sum(obj.data.vertices[i].co.z for i in face.vertices)/len(face.vertices)
             if z<.82 and max(mass)>.35:value=8+mass.index(max(mass))
+        if label=='Animal' and sourceName=='DonkeyContinuousSkin' and bpy.context.scene.get('DonkeyReferenceHornCharts') and obj.data.materials[face.material_index].name.startswith('DonkeyHoofHorn'):
+            owners={obj.data.attributes['FootOwner'].data[i].value for i in face.vertices}
+            if len(owners)!=1 or next(iter(owners)) not in (1,2,3,4):raise RuntimeError('Horn chart has ambiguous anatomical ownership')
+            value=11+next(iter(owners))
         if label=='Cart' and sourceName.startswith('CartFloorPlank') and face.normal.z<-.5:value=3
         attribute.data[face.index].value=value
 
@@ -43,6 +47,12 @@ def AuthorGameUv(obj,label):
     else:
         rectangles={0:(.005,.005,.630,.990),1:(.645,.005,.350,.350),2:(.645,.365,.350,.350),3:(.645,.725,.350,.270)}
     groups=obj.data.attributes['AtlasGroup'];bpy.context.tool_settings.mesh_select_mode=(False,False,True)
+    hornCharts=label=='Animal' and bpy.context.scene.get('DonkeyReferenceHornCharts')
+    if hornCharts:
+        if any(value.value==5 for value in groups.data):raise RuntimeError('Horn atlas reserve is occupied by legacy silhouette cards')
+        # The obsolete silhouette reserve is unused by the independent groom.
+        # Four continuous wall charts retain the original leg atlas allocation.
+        for foot in range(4):rectangles[12+foot]=(.809+(foot%2)*.095,.801+(foot//2)*.094,.086,.085)
     if label=='Animal' and bpy.context.scene.get('DonkeyMuzzleRevision'):
         if any(value.value in (2,3) for value in groups.data):raise RuntimeError('Bare muzzle atlas reserve overlaps tack charts')
         rectangles[6]=(.805,.203,.190,.386)
@@ -50,6 +60,18 @@ def AuthorGameUv(obj,label):
     for group,(x,y,width,height) in rectangles.items():
         faces=[face for face in obj.data.polygons if groups.data[face.index].value==group]
         if not faces:continue
+        if hornCharts and group in (12,13,14,15):
+            coordinates=obj.data.attributes['HoofRestCoordinates']
+            for face in faces:
+                angles=[(math.atan2(coordinates.data[i].vector.x,coordinates.data[i].vector.y)+math.pi)/(2*math.pi) for i in face.vertices]
+                crosses=max(angles)-min(angles)>.5
+                for loop,angle in zip(face.loop_indices,angles):
+                    if crosses and angle<.5:angle+=1
+                    z=coordinates.data[obj.data.loops[loop].vertex_index].vector.z
+                    u=.04+.90*angle;v=.04+.90*max(0,min(1,z/.072))
+                    if not 0<=u<=1:raise RuntimeError('Horn wrap escaped its guarded chart')
+                    uv.data[loop].uv=(x+u*width,y+v*height)
+            counts[group]=len(faces);continue
         bpy.ops.object.mode_set(mode='EDIT');bm=bmesh.from_edit_mesh(obj.data);layer=bm.faces.layers.int['AtlasGroup']
         for face in bm.faces:face.select_set(False)
         for face in bm.faces:
@@ -118,6 +140,7 @@ def RepairBakeUvOverlaps(obj,rectangles):
             for pair in report['pairs']:
                 face=max(pair['faces']);group=groups.data[face].value;bad.setdefault(group,set()).add(face)
             for group,isolated in bad.items():
+                if bpy.context.scene.get('DonkeyReferenceHornCharts') and group in (12,13,14,15):raise RuntimeError('Continuous horn chart contains overlapping bake texels: '+str(sorted(isolated)))
                 x,y,width,height=rectangles[group];uv=obj.data.uv_layers['GameUV'];obj.data.uv_layers.active=uv;uv.active_render=True
                 for face in obj.data.polygons:
                     if groups.data[face.index].value!=group:continue
