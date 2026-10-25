@@ -10,6 +10,8 @@
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 
 export const MID_TUNING = Object.freeze({
+  // AirFirst: north-bank visual signal; location/color are staging, not a documented Tengxian shot.
+  signalFlare: Object.freeze({preset:'SignalRed',from:{x:92,z:92},at:{x:78,z:140}}),
   // -------------------------------------------------------------------------
   // 08 主街受阻
   // -------------------------------------------------------------------------

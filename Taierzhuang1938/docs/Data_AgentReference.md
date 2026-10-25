@@ -686,6 +686,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 
 ### 照明弹（第四关的招牌机制）
 - `Script_Flare.mjs` —— 五相位时间线（升空 / 顶空点燃 / 伞降燃烧 / 熄灭 / **暗适应**）。
+  可见弹体、伞衣/悬索、烟迹与火星在 `Script_FlareVisual`；新类型数值 `Data_Tuning_FlareEffects`，白盒绝对时间桥接 `Script_FlareTrack`。正式游戏与特效编辑器同源，见 [信号与照明效果](Data_FlareEffects.md)。
   **纯规则，不 import three**；两条预设 `FLARE_PRESETS`，两枚都是剧情节拍。
 - **暴露机制是它的另一半产物**：燃烧期把 `Script_Ai.SIGHT_BY_STANCE` 三档**同乘**一个倍率
   （敌我一起暴露）。乘法保住了「姿态决定被发现的距离」；写入口只有 `AiDirector.SetSightScale`，

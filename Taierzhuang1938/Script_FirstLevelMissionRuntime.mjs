@@ -2392,6 +2392,7 @@ export class FirstLevelMissionRuntime {
   }
   StartAir(pass, lead = 0) {
     this.StopAirSound();
+    if(pass===1){if(this.airFlare)this.flare?.Abort(this.airFlare);this.airFlare=this.flare?.LaunchFlare(MID_TUNING.signalFlare);}
     this.air = { pass, time: -lead, shots: 0, lastShot: -Infinity };
   }
   // Straight run north at airSpeedMps, anchored so the aircraft is over the old event positions at the event times.
@@ -3053,6 +3054,7 @@ export class FirstLevelMissionRuntime {
     };
   }
   Dispose() {
+    if(this.airFlare)this.flare?.Abort(this.airFlare);
     this.RemoveBunkerRifle();
     this.leaderGuide?.Dispose();
     this.ClearReturnWarning();

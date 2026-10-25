@@ -49,6 +49,7 @@ import { DustFieldSystem } from "./Script_DustFieldRenderer.mjs";
 import { DustTuningFor } from "./Script_DustFlow.mjs";
 import { GROUND_IMPACT_BURSTS } from "./Data_Tuning_GroundImpact.mjs";
 import { EXPLOSIVES } from "./Data_Explosives.mjs";
+import { FlareVisuals } from "./Script_FlareVisual.mjs";
 
 // ---------------------------------------------------------------------------
 // 色板：全部来自 docs/Data_HistoryMaterial.md 的考据表。
@@ -506,6 +507,7 @@ export class VfxSystem {
     this.root.frustumCulled = false;
     this.root.matrixAutoUpdate = false;
     scene.add(this.root);
+    this.flareVisuals = new FlareVisuals(this.root);
 
     // 1x1 兜底深度图：WebGL2 下未绑定的 sampler 是未定义行为，哪怕分支里不采样也得挂一张
     this.fallbackDepth = new THREE.DataTexture(
@@ -1974,6 +1976,7 @@ export class VfxSystem {
   }
 
   Dispose() {
+    this.flareVisuals.Dispose();
     this.dustFields?.Dispose(); this.dustFields = null;
     this.battleSmoke?.Dispose();
     this.particles.Dispose();

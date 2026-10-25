@@ -648,16 +648,11 @@ function S1302(ctx) {
   // 开场：人堆趴着（关键帧），兵趴着；喊飞机的那个（浮桥头拦人的兵）还站着
   s.Key("FerryGuard2", 0, { stance: "stand", aim: false, faceTo: FERRY_SQ });
   s.Key("Donggua", 0, { clip: LIE_WRITHE });
-  // 对岸一颗信号弹拖着烟打上天，落在渡口上空（没有信号弹特效：白烟 + 高处一点火光 + 说明字）
+  // 对岸信号弹：正式弹道、短燃烧红星与烟迹；颜色与摆点为创作复原。
   s.Eye(0, 2.0, { stance: "prone", look: MG, pitch: 4 });
-  s.Sfx(0.8, "mortarPop", { x: MG.x, z: MG.z, volume: 0.6 });
-  s.Ev(0.8, "smoke", { x: MG.x + 1.0, z: MG.z - 0.6, kind: "SmokeWhite", dur: 3 });
-  s.Caption(0.6, 3.0, "（对岸一颗信号弹拖着烟打上天——没有信号弹特效，白烟 + 说明字顶）");
-  s.Eye(2.0, 2.0, { stance: "prone", look: MG, pitch: 4, toLook: FLARE, toPitch: 40 });
-  s.Ev(2.4, "explosion", { x: FLARE.x, z: FLARE.z, kind: "grenade", radius: 0.6, h: 9 });
-  s.Ev(2.5, "smoke", { x: FLARE.x, z: FLARE.z, kind: "SmokeWhite", dur: 6 });
-  s.Caption(3.6, 2.4, "（信号弹落在渡口上空）");
-  s.Eye(4.0, 2.0, { stance: "prone", look: FLARE, pitch: 40, toLook: Pt(200, 672), toPitch: 6 });
+  s.Ev(0.8, "flare", { x: MG.x, z: MG.z, atX: FLARE.x, atZ: FLARE.z, preset: "SignalRed" });
+  s.Eye(2.0, 3.4, { stance: "prone", look: MG, pitch: 4, toLook: FLARE, toPitch: 78 });
+  s.Eye(5.4, 0.6, { stance: "prone", look: FLARE, pitch: 78, toLook: Pt(200, 672), toPitch: 6 });
   // 几秒后东边顺着河传来嗡嗡声：两架飞机贴着河面压下来，顺着浮桥从桥头一路扫到人堆、扫到驴车
   const STRAFE = { t0: 9.6, t1: 11.2, from: Pt(-5, 664), to: Pt(-1, 604), hz: 24 };
   TwoPlanes(s, [

@@ -431,7 +431,7 @@ function DesignChecks(doc, norm, config, layout, ground, StandFor, voiceLines, e
     if (!Keys(s, "BreachMg").some(k => k.state === "down") || !Keys(s, "BreachLoader").some(k => k.x !== undefined && k.move === "crawl")) errors.push("13-1：机枪手倒了副射手要爬上来接着打"); }
   // 13-2：信号弹；两架飞机扫射段穿过浮桥头和人堆；桥上有人倒下藏掉；扫到车那一刻 CartOverturned、冬瓜摔到单被上；「飞机！趴倒！」
   { const s = Seq("13-2"), planes = s.aircraft || [], strafes = planes.flatMap(p => p.strafe || []);
-    if (!Has(s, "smoke", e => e.kind === "SmokeWhite" && Dist(e, PL.flareAt) < 3) || !Has(s, "explosion", e => e.h >= 5 && Dist(e, PL.flareAt) < 3) || !Cap(s, /信号弹/)) errors.push("13-2：信号弹要有白烟 + 高处火光 + 说明字");
+    if (!Has(s, "flare", e => e.preset === "SignalRed" && Math.hypot(e.atX-PL.flareAt.x,e.atZ-PL.flareAt.z)<3)) errors.push("13-2：信号弹必须使用正式弹道特效到达渡口上空");
     if (!strafes.length) errors.push("13-2：要有扫射段");
     for (const st of strafes) {
       const SegD = p => { const dx = st.to.x - st.from.x, dz = st.to.z - st.from.z, l2 = dx * dx + dz * dz; const k = Math.max(0, Math.min(1, ((p.x - st.from.x) * dx + (p.z - st.from.z) * dz) / l2)); return Math.hypot(p.x - st.from.x - dx * k, p.z - st.from.z - dz * k); };

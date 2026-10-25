@@ -5,6 +5,20 @@
   "repoCommit": "8ad3a798572dd00299ee8226c103fee48bd51c61",
   "assetReviews": [
     {
+      "asset": "FlareEffects",
+      "date": "2026-10-25",
+      "scope": "Signal and white parachute illumination effects only. Preserve global audit cursors and unrelated history reviews.",
+      "assetContract": "docs/Data_FlareEffects.md",
+      "decision": "TM-E 30-480 (1944) chapter X section 17 was opened and verified: colored stars, parachute variants and reported 4–15 s signal-pistol burning time. It does not identify the 1938 Tengxian shot. Exact staging, color meaning, canopy appearance, luminance and trajectories remain reconstruction choices.",
+      "source": "https://www.lonesentry.com/manuals/handbook-japanese-military/signal-equipment.html",
+      "notionLedger": "3fd60335331c8194aa82f0b238084d34",
+      "notionParent": "3fd60335331c818fa24deadb6d72ca70",
+      "notionVerifiedAt": [
+        "2026-10-25T09:28:03.059Z",
+        "2026-10-25T09:28:04.705Z"
+      ]
+    },
+    {
       "asset": "ClothLab",
       "date": "2026-10-25",
       "scope": "Only the independent cloth-lab quilt, door curtain, Sichuan banner and generic material comparison samples; preserve global repoCommit, reviewedAt and unrelated source-page stamps",

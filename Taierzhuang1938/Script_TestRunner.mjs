@@ -279,6 +279,7 @@ export const testDefs = {
   EmplacementTest: { file: "Script_EmplacementTest.mjs", desc: "架设机枪位：接管/离位、射界限位、过热曲线、两种卡壳、NPC 占位互斥、补弹（纯 Node，毫秒级）" },
   AircraftStrafeTest: { file: "Script_AircraftStrafeTest.mjs", desc: "日机扫射航线：相位机四拍、弹着线推进与追人群、必死/必不死白名单、玩家躲避窗口、音效降级（纯 Node，毫秒级）" },
   FlareTest: { file: "Script_FlareTest.mjs", desc: "照明弹：五相位时间线、光强包络、敌我暴露倍率与暗适应、姿态比例不变、定时序列、音效降级（纯 Node，毫秒级）" },
+  FlareEffectsBrowserTest: {file:"Script_FlareEffectsBrowserTest.mjs",timeoutMs:600000,desc:"Signal and illumination: actual rendering, deterministic seek, ground lighting, cleanup and blockout playback"},
   TelegraphTest: { file: "Script_TelegraphTest.mjs", desc: "发报：码组推进、接头松脱与重连、报码纸勾选、走开进度保留、两个交互点预制、音效降级（纯 Node，毫秒级）" },
   RiggedModelTest: { file: "Script_RiggedModelTest.mjs", desc: "第一人称手臂 GLB 的二进制契约（纯 Node，秒级）" },
   FpsGripCorrectiveAssetTest: { file: "Script_FpsGripCorrectiveAssetTest.mjs", desc: "握持 ShapeKey：原 GLB 前缀与描述不变、默认关闭、三通道与手部权重隔离（纯 Node）" },
@@ -560,6 +561,7 @@ export const browserTests = new Set([
   "ParticleVolumeBrowserTest",
   "ParticleChannelsTest",
   "ParticleEditorControlsTest",
+  "FlareEffectsBrowserTest",
   "ParticleEditorWhiteboxTest",
   "ParticleEditorTest",
   "FirstLevelDistantSmokeBrowserTest",
@@ -768,6 +770,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  flareEffects:{label:'Signal and illumination flares',tests:['FlareTest','FlareEffectsBrowserTest','ModuleGraphTest','ParticleEditorControlsTest','ParticleEditorWhiteboxTest']},
   type89MediumTank: {label:"Type89 standalone articulated reference tank",tests:["Type89MediumTankTest","Type89MediumTankBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "AssetStandardsTest"] },
   kawasakiType88: { label: "八八式侦察机二型独立资产", tests: ["KawasakiType88AssetTest", "KawasakiType88BrowserTest", "ModelFacingTest", "AssetStandardsTest", "ModuleGraphTest"] },
@@ -901,6 +904,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:'flareEffects',pattern:/Flare(?:Visual|Track|Effects|Test|\.mjs)|Tuning_Flare/},
   {domain:'combat',pattern:/HanYang173R/},
   {domain:"type89MediumTank",pattern:/Type89(?:MediumTank|Pbr|GlbCleanup|References|ImportAudit|SourceAudit|Package)/},
   {domain:"menu",pattern:/ToolsHome|Icon_TabSeal/},

@@ -1,4 +1,5 @@
-// 《台儿庄：血战滕县》照明弹 —— 第四关「东关之夜」的招牌机制。
+// 《台儿庄：血战滕县》信号 / 照明弹。2026-10-25 新效果见 docs/Data_FlareEffects.md。
+// 下方 CH4 注释描述保留的 legacy 预设；不代表恢复已下线的第四关脚本。
 //
 // **纯规则，不许 import three。** 「这一秒它在哪儿、有多亮、谁被照出来了」
 // 三件事与画面无关，所以整条时间线在纯 Node 里跑得完（回归口 `Script_FlareTest.mjs`）。
@@ -32,10 +33,10 @@
 // 由 `host.SetSpotting(scale)` 交给 `AiDirector.SetSightScale()`，
 // 熄灭并过完暗适应之后**一定要还原成 1**（Reset / Abort 两条路也要还）。
 //
-// ── 性能：一盏灯，零新增 draw call ──────────────────────────────────────────
+// ── 性能：每弹一盏池灯，最多五个视觉 draw call ─────────────────────────────
 // 灯走 `LightRig` 现有的**固定预算火光池**（AddFire/UpdateFire/RemoveFire）：
 // 灯槽数量不变、castShadow 恒 false、不新建任何阴影管线。烟走 `VfxSystem` 现有的
-// 烟源池。所以 BootTest 的 drawCalls ≤ 5000 / triangles ≤ 600 万两条红线一动不动。
+// 烟源池（legacy）；新效果用定长烟迹 / 火星实例和伞面 / 悬索，细则见 Data_FlareEffects。
 //
 // ── 音效 ────────────────────────────────────────────────────────────────────
 // 四条 key（flareLaunch / flareIgnite / flareBurn / flareOut）由 A2 批登记在
@@ -72,6 +73,25 @@
 import { Mulberry32, Clamp, Clamp01, SmoothStep } from "./Script_Noise.mjs";
 import { T } from "./Script_Text.mjs";
 import { FLARE_SFX, FLARE_DEFAULTS, FLARE_PRESETS } from "./Data_Flares.mjs";
+import { FLARE_EFFECTS, FLARE_ART } from "./Data_Tuning_FlareEffects.mjs";
+
+/** Absolute flight path: launch-relative altitude, never draped over terrain. */
+export function SampleFlarePosition(f,t) {
+  const u=Clamp01(t/f.ascendS),s=Math.max(0,t-f.ascendS);
+  if(!f.physical){
+    const swing=Math.sin(f.swayPhase+s*2*Math.PI/f.swayPeriodS)*f.swayM;
+    return t<f.ascendS?{x:f.from.x+(f.at.x-f.from.x)*SmoothStep(0,1,u),z:f.from.z+(f.at.z-f.from.z)*SmoothStep(0,1,u),y:f.groundY+f.apexM*(2*u-u*u)}:
+      {x:f.at.x+Math.sin(f.driftDirRad)*f.driftMS*s+Math.cos(f.driftDirRad)*swing,z:f.at.z+Math.cos(f.driftDirRad)*f.driftMS*s-Math.sin(f.driftDirRad)*swing,y:f.groundY+Math.max(1.5,f.apexM-f.descendMS*s)};
+  }
+  if(t<f.ascendS)return {x:f.from.x+(f.at.x-f.from.x)*u,z:f.from.z+(f.at.z-f.from.z)*u,
+    y:f.groundY+FLARE_ART.launchHeight+f.apexM*(2*u-u*u)};
+  const drag=f.parachute!==false?FLARE_ART.dragS:2.5,coast=drag*(1-Math.exp(-s/drag));
+  const fall=f.parachute!==false?f.descendMS*(s-FLARE_ART.dragS*(1-Math.exp(-s/FLARE_ART.dragS))):.5*FLARE_ART.gravity*s*s;
+  const sway=f.parachute!==false?Math.sin(f.swayPhase+s*2*Math.PI/f.swayPeriodS)*f.swayM*SmoothStep(0,1,s):0;
+  return {x:f.at.x+(f.at.x-f.from.x)/f.ascendS*coast+Math.sin(f.driftDirRad)*f.driftMS*(s-coast)+sway,
+    z:f.at.z+(f.at.z-f.from.z)/f.ascendS*coast+Math.cos(f.driftDirRad)*f.driftMS*(s-coast),
+    y:f.groundY+FLARE_ART.launchHeight+f.apexM-fall};
+}
 
 /** 五个相位 + 两个端点。`idle` 是没有照明弹时的取值。 */
 export const FLARE_PHASES = Object.freeze(["idle", "ascend", "ignite", "burn", "fade", "adapt", "done"]);
@@ -192,7 +212,7 @@ export class FlareDirector {
    * @returns {string|null} 这一枚的 id；打不出来返回 null
    */
   LaunchFlare(spec = {}) {
-    const preset = spec.preset ? FLARE_PRESETS[spec.preset] : null;
+    const preset = spec.preset ? (FLARE_PRESETS[spec.preset] || FLARE_EFFECTS[spec.preset]) : null;
     if (spec.preset && !preset) { this.stats.refused += 1; return null; }
     if (this.flares.length >= this.maxActive) { this.stats.refused += 1; return null; }
     const cfg = { ...FLARE_DEFAULTS, ...(preset || {}), ...spec };
@@ -209,9 +229,11 @@ export class FlareDirector {
     const groundY = this.Ground(from.x, from.z);
     const flare = {
       id: `flare${this.serial}`,
-      presetId: preset ? preset.id : (spec.preset || null),
+      presetId: preset?.id || spec.preset || null,
       label: String(cfg.label || T(cfg.labelKey || FLARE_DEFAULTS.labelKey)),
       from, at, groundY,
+      physical:cfg.physical===true,parachute:cfg.parachute!==false,kind:cfg.kind||"illumination",
+      candleCd:Number.isFinite(cfg.candleCd)?Math.max(0,cfg.candleCd):null,
       apexM: Math.max(4, Num(cfg.apexM, FLARE_DEFAULTS.apexM)),
       ascendS, igniteS, burnS, fadeS, adaptS,
       // 四个相位的累计边界。算一次存起来：每帧现算四个加法没错，但边界是
@@ -247,7 +269,7 @@ export class FlareDirector {
       pos: { x: from.x, y: groundY, z: from.z },
       agl: 0,
       intensity: 0,
-      lightHandle: null, smokeHandle: null,
+      lightHandle: null, smokeHandle: null, visualHandle:null,
       burnLoopLeft: 0,
       beats: [],
       beganAt: this.Time(),
@@ -255,6 +277,7 @@ export class FlareDirector {
     this.flares.push(flare);
     this.stats.launched += 1;
     this.Place(flare, 0);
+    flare.visualHandle=this.host.AddVisual?.(flare)??null;
     // 灯在**升空那一刻**就要，不是等点燃：发射筒那一下与上升的余烬本来就有光，
     // 而且先要到灯槽，点燃那一帧才不会因为抢不到槽而「亮了但墙没亮」。
     flare.lightHandle = this.host.AddLight?.({
@@ -402,7 +425,11 @@ export class FlareDirector {
    */
   Place(flare, step) {
     const p = flare.pos;
-    if (flare.phase === "ascend") {
+    if(flare.physical){
+      Object.assign(p,SampleFlarePosition(flare,flare.t));
+      const ground=this.Ground(p.x,p.z);flare.landed=p.y<=ground;
+      p.y=Math.max(ground+.02,p.y);flare.agl=p.y-ground;
+    } else if (flare.phase === "ascend") {
       const u = Clamp01(flare.t / flare.ascendS);
       // 1-(1-u)² 是「起手快、到顶慢」：发射筒把它推出去，之后一路减速到顶点。
       flare.agl = flare.apexM * (1 - (1 - u) * (1 - u));
@@ -419,7 +446,7 @@ export class FlareDirector {
       p.x = flare.at.x + dx + Math.cos(flare.driftDirRad) * swing;
       p.z = flare.at.z + dz - Math.sin(flare.driftDirRad) * swing;
     }
-    p.y = this.Ground(p.x, p.z) + flare.agl;
+    if(!flare.physical)p.y = this.Ground(p.x, p.z) + flare.agl;
     if (step > 0 && flare.smokeHandle !== null) this.host.MoveSmoke?.(flare.smokeHandle, { ...p });
   }
 
@@ -454,10 +481,12 @@ export class FlareDirector {
       level = (1 - u) * (1 - u);
       flicker = this.Flicker(flare, t);
     }
+    if(flare.landed)level=0;
     flare.level = level;
     flare.brightness = level * flicker;
     flare.intensity = Math.min(flare.maxIntensity,
-      flare.groundLux * flare.agl * flare.agl * flare.brightness);
+      (flare.candleCd??flare.groundLux * flare.agl * flare.agl) * flare.brightness);
+    if(flare.visualHandle!==null)this.host.MoveVisual?.(flare.visualHandle,flare);
     if (flare.lightHandle === null) return;
     this.host.MoveLight?.(flare.lightHandle, {
       position: { ...flare.pos },
@@ -552,6 +581,7 @@ export class FlareDirector {
   /** 三条收尾路径（走完 / Abort / Reset）的共同出口。 */
   Finish(flare, reason, completed) {
     this.DropVisuals(flare);
+    if(flare.visualHandle!==null){this.host.RemoveVisual?.(flare.visualHandle);flare.visualHandle=null;}
     const index = this.flares.indexOf(flare);
     if (index >= 0) this.flares.splice(index, 1);
     const summary = {
@@ -559,7 +589,7 @@ export class FlareDirector {
       seconds: flare.t,
       beats: flare.beats.map((b) => b.name),
       apexM: flare.apexM,
-      peakIntensity: flare.groundLux * flare.apexM * flare.apexM,
+      peakIntensity: flare.candleCd ?? flare.groundLux * flare.apexM * flare.apexM,
     };
     this.lastFlare = summary;
     flare.phase = "done";
@@ -612,6 +642,7 @@ export class FlareDirector {
       presetId: flare.presetId,
       label: flare.label,
       phase: flare.phase,
+      kind:flare.kind,parachute:flare.parachute,physical:flare.physical,
       t: flare.t,
       x: flare.pos.x, y: flare.pos.y, z: flare.pos.z,
       agl: flare.agl,
@@ -648,6 +679,7 @@ export class FlareDirector {
       lastFlare: this.lastFlare ? { ...this.lastFlare } : null,
       sfx: Object.fromEntries(this.sfxPick),
       presets: Object.keys(FLARE_PRESETS),
+      effects: Object.keys(FLARE_EFFECTS),
     };
   }
 }
@@ -676,6 +708,9 @@ export class FlareDirector {
  */
 export function MakeFlareHost(deps = {}) {
   return {
+    AddVisual:(flare)=>deps.vfx?.flareVisuals?.Add(flare),
+    MoveVisual:(handle,flare)=>deps.vfx?.flareVisuals?.Update(handle,flare),
+    RemoveVisual:(handle)=>deps.vfx?.flareVisuals?.Remove(handle),
     Time: () => deps.Time?.() ?? 0,
     Play: (name, opts = {}) => deps.audio?.Play(name, opts) ?? null,
     Hint: (text, seconds) => deps.hud?.Hint(text, seconds),

@@ -502,4 +502,29 @@ console.log("ok  ⑨ 闸门：maxActive、参数校验、掉帧不吞相位");
 }
 console.log("ok  ⑩ 取证口：脱敏快照，回调与内部句柄不外泄");
 
+// Physical effects: real ballistic continuity, fixed candle intensity, terrain independence,
+// no signal-driven AI exposure, and owned visual resources on all termination paths.
+for(const preset of ['SignalRed','Illumination']){
+  const visuals=new Set();
+  const {sys}=MakeRig({GroundHeight:(x)=>x>101?12:0,
+    AddVisual:f=>{const h={f};visuals.add(h);return h;},MoveVisual:()=>{},RemoveVisual:h=>visuals.delete(h)});
+  sys.LaunchFlare({preset,from:{x:100,z:0},at:{x:108,z:0},driftMS:0});
+  const f=sys.flares[0];Step(sys,1);
+  const u=f.t/f.ascendS;
+  Check(Math.abs(f.pos.y-(1.1+100*(2*u-u*u)))<1e-8,'Flight is launch-relative, not lifted by a terrain step');
+  Step(sys,f.ascendS-f.t-.02);const before={...f.pos};Step(sys,.04);
+  Check(Math.hypot(f.pos.x-before.x,f.pos.y-before.y,f.pos.z-before.z)<.2,'No apex teleport');
+  Step(sys,1);const y=f.pos.y;Step(sys,1);
+  if(preset==='Illumination'){
+    Check(y-f.pos.y>2&&y-f.pos.y<2.5,'Canopy converges to its descent rate');
+    Check(Math.abs(f.intensity/f.brightness-18000)<1e-8,'Candle output stays fixed as it descends');
+  }else{
+    Check(y-f.pos.y>10,'Unretarded signal star falls ballistically');
+    Check(sys.SightScale===1,'Signal does not globally reveal soldiers');
+  }
+  Check(visuals.size===1,'One owned visual per flare');
+  Step(sys,30);Check(visuals.size===0&&!sys.Active,'Burnout retires smoke, light and canopy');
+  sys.LaunchFlare({preset,from:{x:0,z:0}});sys.Abort();Check(!visuals.size,'Abort retires visual');
+  sys.LaunchFlare({preset,from:{x:0,z:0}});sys.Reset();Check(!visuals.size,'Reset retires visual');
+}
 console.log(`\nFlareTest 通过：${checks} 条断言`);

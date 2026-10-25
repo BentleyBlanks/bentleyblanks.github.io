@@ -4483,6 +4483,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   if (p012Flow) state.storyObjective = p012Flow.CurrentObjective().text;
   missionRuntime?.Dispose();
   missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
+    flare,
     scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,stageJump,stageJumpMidCutscenes,viewmodel,
     // 只用来打 story/mission/* 子桶标记；没有它就静默不记（测试夹具不传也照跑）。
     profiler,

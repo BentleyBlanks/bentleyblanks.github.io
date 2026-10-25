@@ -48,6 +48,7 @@ import { SampleSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
 import { LoadFaceTracks, SampleLineFaceTrack } from "./Script_FaceTrack.mjs";
 import { SOUND_NAMES } from "./Script_Audio.mjs";
 import { BlockoutPrevizFx } from "./Script_EditorBlockoutPrevizFx.mjs";
+import { FlareTrack } from "./Script_FlareTrack.mjs";
 import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES, PREVIZ_WEAPON_SLUNG } from "./Data_BlockoutPrevizClips.mjs";
 
 export const PREVIZ_KEY = "KeyN";
@@ -136,6 +137,7 @@ export class BlockoutPreviz {
     this.fx = null;
     try { this.fx = new BlockoutPrevizFx({ post: editor.host.post, scene: editor.host.scene }); }
     catch (error) { console.warn("[BlockoutPreviz] 简易爆炸层建不起来", error); }
+    this.flareTrack=this.fx?new FlareTrack(this.fx.root,editor.host,(x,z)=>editor.standAt(x,z)):null;
     // 飞机（2026-10-19）：模型借游戏机队，声音走 PREVIZ_SFX 别名表（planeDrone 是持续声，起一条 voice 逐帧搬）
     this.air = null;
     try {
@@ -470,6 +472,7 @@ export class BlockoutPreviz {
     run.smoke.clear();
     this.editor.puppets.ReleaseDrive();
     this.fx?.Clear();
+    this.flareTrack?.Clear();
     this.air?.Clear();
     this.editor.SetPrevizSignals(null);
     this.host.SetViewmodelVisible?.(true);
@@ -569,6 +572,8 @@ export class BlockoutPreviz {
     try { this.air?.Update(t, { fire, from, groundAt: this.editor.standAt, listener: this.editor._cam }); }
     catch (error) { console.warn("[BlockoutPreviz] aircraft failed", error); }
     this.UpdateFx(t);
+    this.flareTrack?.Update(run.seq.events,t,{fire,from});
+    if(this.flareTrack?.visuals.items.size)this.fx.root.visible=true;
     this.RenderOverlays(PrevizOverlays(run.seq, t), lines);
   }
 
@@ -964,6 +969,7 @@ export class BlockoutPreviz {
   Dispose() {
     this.Stop({ restore: false });
     this.UnbindFreeLook();
+    this.flareTrack?.Dispose();
     this.fx?.Dispose();
     this.air?.Dispose();
     this.elOverlay.remove(); this.elCaption.remove(); this.elSubs.remove();

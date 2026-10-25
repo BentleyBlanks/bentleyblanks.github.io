@@ -3638,7 +3638,7 @@
     },
     {
      "t": 2,
-     "dur": 2,
+     "dur": 3.4,
      "eye": {
       "x": -2.19,
       "z": 607.12,
@@ -3646,18 +3646,18 @@
       "yawDeg": -31.74,
       "pitchDeg": 4,
       "toYawDeg": 39.21,
-      "toPitchDeg": 40
+      "toPitchDeg": 78
      }
     },
     {
-     "t": 4,
-     "dur": 2,
+     "t": 5.4,
+     "dur": 0.6,
      "eye": {
       "x": -2.19,
       "z": 607.12,
       "stance": "prone",
       "yawDeg": 39.21,
-      "pitchDeg": 40,
+      "pitchDeg": 78,
       "toYawDeg": -107.79,
       "toPitchDeg": 6
      }
@@ -4078,49 +4078,13 @@
    ],
    "events": [
     {
-     "t": 0.6,
-     "type": "caption",
-     "text": "（对岸一颗信号弹拖着烟打上天——没有信号弹特效，白烟 + 说明字顶）",
-     "dur": 3
-    },
-    {
      "t": 0.8,
-     "type": "sfx",
-     "name": "mortarPop",
+     "type": "flare",
      "x": 42.3,
      "z": 535.2,
-     "volume": 0.6
-    },
-    {
-     "t": 0.8,
-     "type": "smoke",
-     "x": 43.3,
-     "z": 534.6,
-     "kind": "SmokeWhite",
-     "dur": 3
-    },
-    {
-     "t": 2.4,
-     "type": "explosion",
-     "x": -8,
-     "z": 600,
-     "kind": "grenade",
-     "radius": 0.6,
-     "h": 9
-    },
-    {
-     "t": 2.5,
-     "type": "smoke",
-     "x": -8,
-     "z": 600,
-     "kind": "SmokeWhite",
-     "dur": 6
-    },
-    {
-     "t": 3.6,
-     "type": "caption",
-     "text": "（信号弹落在渡口上空）",
-     "dur": 2.4
+     "atX": -8,
+     "atZ": 600,
+     "preset": "SignalRed"
     },
     {
      "t": 5.4,

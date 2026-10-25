@@ -10,8 +10,12 @@ import {MergeParticleModules,NormalizeParticleModules,EvaluateCurve,IntegrateCur
 import {Mulberry32} from './Script_Noise.mjs';
 import {FIRST_LEVEL_DISTANT_SMOKE} from './Data_FirstLevelDistantSmoke.mjs';
 import {PARTICLE_SURFACE_ART} from './Data_Tuning_Particles.mjs';
+import {FlareDirector,MakeFlareHost} from './Script_Flare.mjs';
+import {FlareVisuals} from './Script_FlareVisual.mjs';
+import {FLARE_EFFECTS} from './Data_Tuning_FlareEffects.mjs';
 
 const INSTANT_EFFECTS = [
+  ...Object.entries(FLARE_EFFECTS).map(([id,spec])=>({id,name:spec.label,note:'史料类型参考 · 完整升空、燃烧、熄灭 · 可切换近景',flare:true})),
   ...[['VolumeFire','三维体积 · 营火',true],['VolumePlume','三维体积 · 烟流',true],['VolumeDensePlume','三维体积 · 浓烟',true],['VolumeDustImpact','三维体积 · 土尘冲击',false],['VolumeExplosion','三维体积 · 燃油爆炸',false]].map(([id,name,continuous])=>({
     id,name,note:'CC0 流体模拟 · 多视角体积',continuous,particleHandle:true,run:(v,s)=>v.particles.Create({preset:id,modules:{main:{startSize:s}},name:'VolumePreview/'+id}),
   })),
@@ -85,6 +89,9 @@ export class VfxEditor {
     this.wind.copy(this.savedWind);
     this.savedVfxVisible = vfx.root.visible;
     this.savedVfxTime = vfx.time;
+    this.savedFlareVisuals=vfx.flareVisuals;this.savedFlareVisible=vfx.flareVisuals.root.visible;
+    vfx.flareVisuals.root.visible=false;vfx.flareVisuals=new FlareVisuals(vfx.root);
+    this.flarePreview=new FlareDirector(MakeFlareHost({vfx,lights:this.host.lights}),{exposure:false,seed:this.seed});
     this.savedVfxRandom = vfx.random;
     // 预览必须是隔离的：现关烟柱不能在摄影棚期间偷偷推进，预览的弹孔/爆炸也
     // 不能关掉工具后留在正片原点。保存池与持续源，退出时逐字节还原。
@@ -148,7 +155,9 @@ export class VfxEditor {
   Exit() {
     cancelAnimationFrame(this.seekFrame);document.removeEventListener('keydown',this.onPreviewKey,true);
     this.Stop();
+    this.SetNightPreview(false);
     const vfx = this.host.vfx;
+    vfx.flareVisuals.Dispose();vfx.flareVisuals=this.savedFlareVisuals;vfx.flareVisuals.root.visible=this.savedFlareVisible;
     vfx.bloodEffects.EndPreview(this.savedBlood);vfx.bloodSpurts=vfx.bloodEffects.sources;
     vfx.particles.Dispose();
     vfx.particles = this.savedParticleEffects;
@@ -224,7 +233,7 @@ export class VfxEditor {
     ['play','pause','step','restart','stop'].forEach((key,i)=>buttons.children[i].dataset.vfxAction=key);this.pauseButton=buttons.children[1];
     this.timeSlider=Slider(playback,{label:'时间',min:0,max:10,step:1/60,value:0,format:v=>v.toFixed(2)+' s',onInput:value=>this.QueueSeek(value)});
     this.timeSlider.root.querySelector('input').dataset.vfxTime='true';
-    Select(playback,'时间轴长度',[{value:10,label:'10 秒'},{value:30,label:'30 秒'},{value:60,label:'60 秒'}],10,value=>this.timeSlider.root.querySelector('input').max=value);
+    this.timeLength=Select(playback,'时间轴长度',[{value:10,label:'10 秒'},{value:30,label:'30 秒'},{value:60,label:'60 秒'}],10,value=>this.timeSlider.root.querySelector('input').max=value);
     Select(playback,'播放速度',[.1,.25,.5,1,2].map(value=>({value,label:value+'×'})),1,value=>{this.speed=Number(value)});
     Note(playback,'空格暂停/继续 · → 单帧 · Shift+→ 十帧 · Home 归零');
     this.message=Note(transport,'');this.message.setAttribute('role','status');this.message.dataset.vfxStatus='true';
@@ -243,6 +252,9 @@ export class VfxEditor {
     seed.addEventListener('change',()=>{const value=Number(seed.value);if(Number.isInteger(value)&&value>=0&&value<=4294967295){this.seed=value;this.Play();}});environment.appendChild(seed);
     Toggle(environment,'显示米格',true,on=>this.studio.SetGridVisible(on));
     ButtonRow(environment,[{label:'适配镜头',onClick:()=>this.FrameEffect()}]);Note(environment,'在画面空白处拖动旋转，滚轮缩放。');
+    Select(environment,'信号／照明弹镜头',[{value:'flight',label:'完整弹道'},{value:'follow',label:'跟随燃烧体近景'},{value:'ground',label:'地面照明检查'}],'flight',value=>{this.flareCamera=value;this.FrameEffect();});
+    Toggle(environment,'夜间照明对照',false,on=>this.SetNightPreview(on));
+    Note(environment,'弹药按米制预览，不受整体缩放影响；风控制伞降与烟迹。照明弹约 24 秒完整结束，可将时间轴切到 30 秒。');
     const layers=Section(this.tabs.modules,'粒子层');
     this.layerSelect=Select(layers,'编辑层',[],null,key=>{this.selectedLayer=key;this.inspector.Show()});this.layerSelect.root.dataset.vfxLayer='true';
     const presets=this.host.vfx.particles.Presets();this.addPreset=Select(layers,'新粒子层',presets,'FireTongue',()=>{});
@@ -304,6 +316,7 @@ export class VfxEditor {
   });}
   Stop(){
     this.CaptureLayers();const vfx=this.host.vfx;
+    this.flarePreview?.Reset();
     if(this.handle)vfx.RemoveSceneEffect(this.handle);this.handle=0;
     if(vfx.dust){vfx.dust.Dispose();vfx.dust=null;}
     for(const id of this.sampleParticleIds)if(vfx.particles.systems.has(id))vfx.particles.Remove(id);this.sampleParticleIds=[];
@@ -318,6 +331,11 @@ export class VfxEditor {
     api.presetOverrides.clear();for(const [key,patch]of this.layerPatches)if(key.startsWith('preset:'))api.presetOverrides.set(key.slice(7),patch);
     api.Restart();for(const channel of api.channels.values())if(api.systems.has(channel.particleId))channel.system.Play({restart:true});api.renderer.Flush();this.ApplyWind();this.previewTime=0;this.loopTimer=0;this.paused=false;
     if(SCENE_EFFECTS[this.effectId])this.handle=vfx.SceneEffect({x:0,y:.04,z:0},this.effectId,{scale:this.scale});
+    else if(FLARE_EFFECTS[this.effectId]){
+      this.flarePreview.rnd=Mulberry32(this.seed);
+      this.flarePreview.LaunchFlare({preset:this.effectId,from:{x:-12,z:0},at:{x:0,z:0},driftMS:Math.hypot(this.wind.x,this.wind.z),driftDirRad:Math.atan2(this.wind.x,this.wind.z)});
+      this.timeSlider.root.querySelector('input').max=30;this.timeLength.Set(30);
+    }
     else {const effect=INSTANT_EFFECTS.find(effect=>effect.id===this.effectId),result=effect?.run(vfx,this.scale);if(effect?.sourceHandle)this.handle=result;if(effect?.particleHandle)this.sampleParticleIds.push(result.id);}
     for(const layer of this.customLayers){const definition=JSON.parse(JSON.stringify(layer.definition)),patch=this.layerPatches.get(layer.key);
       if(patch)definition.modules=MergeParticleModules(definition.modules,patch);const created=api.Import(definition);api.Get(created.id).editorKey=layer.key;this.customIds.push(created.id);}
@@ -331,6 +349,8 @@ export class VfxEditor {
   }
   Advance(dt){
     let remaining=Math.max(0,dt);do{const step=Math.min(1/60,remaining);this.previewTime+=step;
+      this.flarePreview?.Update(step);
+      if(FLARE_EFFECTS[this.effectId]&&this.flareCamera==='follow')this.TrackFlare();
       this.host.vfx.Update(step,this.host.camera,this.previewTime);if(this.savedLighting)this.host.lights.Update(step,this.previewTime,this.host.camera.position);
       remaining-=step;
     }while(remaining>1e-9);
@@ -342,6 +362,12 @@ export class VfxEditor {
     this.loopTimer=this.previewTime;this.paused=true;this.host.post?.NotifyCameraCut();this.RefreshLayers(true);this.UpdateFacts();return this.Inspect();}
   QueueSeek(seconds){this.seekTarget=seconds;if(this.seekFrame)return;this.seekFrame=requestAnimationFrame(()=>{this.seekFrame=0;if(this.panel)this.Try(()=>this.Seek(this.seekTarget))});}
   FrameEffect(){
+    if(FLARE_EFFECTS[this.effectId]){
+      if(this.flareCamera==='ground'){this.studio.Frame(1.8,14);this.studio.orbit.pitch=.45;this.studio.ApplyCamera();return;}
+      const near=this.flareCamera==='follow';this.studio.maxDistance=320;this.studio.Frame(near?4:110,near?9:160);
+      if(near)this.TrackFlare();else{this.studio.orbit.target.set(0,48,0);this.studio.ApplyCamera();}
+      this.host.post?.NotifyCameraCut();return;
+    }
     const id=this.effectId,small=/^(Muzzle|Impact|Blood|ShellCasings)/.test(id);
     let height=/^Bomb/.test(id)?(id==='BombHeavy'?42:28)*this.scale:/Explosion/.test(id)?(id==='ExplosionShell'?9:6)*this.scale:/Smoke|Plume/.test(id)?7:small?1.8:3.4*this.scale;
     let center=null;
@@ -386,6 +412,17 @@ export class VfxEditor {
     if(center){this.studio.orbit.target.copy(center);this.studio.ApplyCamera();}
     this.host.post?.NotifyCameraCut();
   }
+  TrackFlare(){const f=this.flarePreview?.flares[0];if(f){this.studio.orbit.target.set(f.pos.x,f.pos.y+.8,f.pos.z);this.studio.ApplyCamera();}}
+  SetNightPreview(on){
+    const scene=this.host.scene;
+    if(on&&!this.nightSnapshot){
+      const sky=scene.getObjectByName('SkyDome'),lights=scene.children.filter(o=>o.isDirectionalLight||o.isAmbientLight||o.isLightProbe);
+      this.nightSnapshot={sky,skyVisible:sky?.visible,background:scene.background,fog:scene.fog,lights:lights.map(o=>[o,o.intensity])};
+      if(sky)sky.visible=false;scene.background=new THREE.Color(0x02050b);scene.fog=null;
+      for(const light of lights)light.intensity=light.isDirectionalLight ? .006 : .008;
+    }else if(!on&&this.nightSnapshot){const s=this.nightSnapshot;if(s.sky)s.sky.visible=s.skyVisible;scene.background=s.background;scene.fog=s.fog;for(const [light,intensity]of s.lights)light.intensity=intensity;this.nightSnapshot=null;}
+    this.host.post?.NotifyCameraCut();
+  }
   AddLayer(preset){return this.Try(()=>{const api=this.host.vfx.particles,created=api.Create({preset,name:'自建 '+preset});const key='custom:'+(++this.customIndex);
     api.Get(created.id).editorKey=key;this.customLayers.push({key,definition:api.Export(created.id)});this.customIds.push(created.id);this.selectedLayer=key;this.playing=true;this.RefreshLayers(true);return created;});}
   DeleteLayer(){if(!this.selectedLayer?.startsWith('custom:')){this.Status('预置效果层可在 Renderer 中关闭显示；删除用于自建层。');return;}
@@ -415,16 +452,19 @@ export class VfxEditor {
     for(const [id,entry]of target.systems){const key=this.Key(entry),patch=this.layerPatches.get(key);if(patch){target.Configure(id,patch);changed++;}}
     for(const [key,patch]of this.layerPatches)if(key.startsWith('preset:'))target.presetOverrides.set(key.slice(7),patch);
     this.Status('已更新关卡中的 '+changed+' 个同名粒子层；可退出预览查看。');return {changed};});}
-  Inspect(){return {effect:this.effectId,time:this.previewTime,paused:this.paused,playing:this.playing,seed:this.seed,selectedLayer:this.selectedLayer,
+  Inspect(){return {effect:this.effectId,time:this.previewTime,paused:this.paused,playing:this.playing,seed:this.seed,selectedLayer:this.selectedLayer,flare:this.flarePreview?.State(),
     layers:[...this.layerRecords].map(([key,value])=>({key,id:value.id,profile:value.profile,preset:value.preset})),particles:this.host.vfx.particles.Inspect()};}
   UpdateFacts(){if(!this.facts)return;const entries=this.host.vfx.particles.Inspect().entries;
     this.facts.Set('当前效果',ALL_EFFECTS.find(effect=>effect.id===this.effectId)?.name||this.effectId);
     this.facts.Set('预览时间',this.previewTime.toFixed(2)+' s');this.facts.Set('存活粒子',entries.reduce((n,e)=>n+e.particleCount,0));
     this.facts.Set('参与层数',this.layerRecords.size);this.facts.Set('丢弃',entries.reduce((n,e)=>n+e.dropped,0));this.facts.Set('随机种子',this.seed);
+    if(FLARE_EFFECTS[this.effectId]){const f=this.flarePreview?.flares[0];this.facts.Set('弹药阶段',f?.phase||'done');this.facts.Set('离地高度',f?f.agl.toFixed(1)+' m':'—');}
     this.timeSlider?.Set(this.previewTime);if(this.pauseButton)this.pauseButton.textContent=this.paused?'继续':'暂停';}
   Update(dt){
     const step=this.playing&&!this.paused?Math.max(0,Math.min(.1,dt||0))*this.speed:0;
-    if(!this.IsContinuous()&&this.playing&&!this.paused&&this.loop){this.loopTimer+=step;if(this.loopTimer>=this.loopInterval){this.Play();}}
+    if(!this.IsContinuous()&&this.playing&&!this.paused&&this.loop){this.loopTimer+=step;
+      const again=FLARE_EFFECTS[this.effectId]?this.previewTime>0&&!this.flarePreview.Active:this.loopTimer>=this.loopInterval;
+      if(again)this.Play();}
     this.Advance(step);this.uiAge+=Math.max(0,dt||0);if(this.uiAge>.15||step===0){this.uiAge=0;this.RefreshLayers();this.UpdateFacts();}
   }
 

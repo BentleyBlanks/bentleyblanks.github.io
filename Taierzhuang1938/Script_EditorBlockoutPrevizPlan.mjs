@@ -31,7 +31,7 @@ export const PREVIZ_MOVE_SPEED = Object.freeze({ walk: 1.4, run: 3.5, crawl: 0.5
 export const PREVIZ_MOVES = Object.freeze(["walk", "run", "crawl", "drag", "cut"]);
 export const PREVIZ_STANCES = Object.freeze(["stand", "crouch", "prone"]);
 export const PREVIZ_DEFAULTS = Object.freeze({ pointH: 1.6, fov: 60, ease: "inOut", turnS: 0.4, subtitleHoldS: 0.35 });
-export const PREVIZ_EVENT_TYPES = Object.freeze(["flash", "black", "caption", "explosion", "smoke", "muzzle", "shake", "signal", "sfx"]);
+export const PREVIZ_EVENT_TYPES = Object.freeze(["flash", "black", "caption", "explosion", "smoke", "muzzle", "shake", "signal", "sfx", "flare"]);
 export const PREVIZ_SMOKE_KINDS = Object.freeze(["SmokeDust", "SmokeWhite", "SmokeBlack"]);
 export const PREVIZ_SFX_ALIASES = Object.freeze([
   "artilleryFar", "artilleryNear", "shellBlast", "tinnitus", "mgBurstFar", "mgBurstNear", "rifleVolley", "rifleShot",
@@ -379,6 +379,11 @@ export function ValidateBlockoutPreviz(doc, { config = null, voice = null } = {}
         NeedPoint();
         if (e.radius !== undefined && !(Finite(e.radius) && e.radius > 0)) errors.push(`${eat}.radius 要是正数`);
         if (e.h !== undefined && !(Finite(e.h) && e.h >= 0 && e.h <= 10)) errors.push(`${eat}.h 要是 0–10 米（爆点离地高）`);
+      }
+      else if(e.type==='flare'){
+        NeedPoint();
+        if(!['SignalRed','Illumination'].includes(e.preset))errors.push(`${eat}.preset must be SignalRed / Illumination`);
+        if(!Finite(e.atX)||!Finite(e.atZ))errors.push(`${eat} requires finite atX / atZ`);
       }
       else if (e.type === "smoke") {
         NeedPoint();
