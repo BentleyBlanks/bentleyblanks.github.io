@@ -6,6 +6,8 @@
 
 ## 模块与数据
 
+共用组合特效 `Tengxian.Particles.FallingSoil` 将细砂/薄尘接入本系统，少量实体土块补有限表面扫掠碰撞、碎裂和接触起尘；未把通用粒子模块升级为任意碰撞/子发射器系统。接口、预算、编辑器和近似限制见 [共用落土](Data_FallingSoil.md)。
+
 | 模块 | 已实现参数 |
 | --- | --- |
 | Main | duration、loop、prewarm、startDelay、lifetime/speed/size/rotation、startColor、gravityModifier、maxParticles、randomSeed、simulationSpeed、world/local |

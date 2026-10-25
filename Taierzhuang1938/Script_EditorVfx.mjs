@@ -13,8 +13,12 @@ import {PARTICLE_SURFACE_ART} from './Data_Tuning_Particles.mjs';
 import {FlareDirector,MakeFlareHost} from './Script_Flare.mjs';
 import {FlareVisuals} from './Script_FlareVisual.mjs';
 import {FLARE_EFFECTS} from './Data_Tuning_FlareEffects.mjs';
+import {FALLING_SOIL_PRESETS} from './Data_Tuning_FallingSoil.mjs';
+import {FallingSoilInspector} from './Script_EditorFallingSoil.mjs';
+import {NormalizeFallingSoil,NormalizeSoilPreview} from './Script_FallingSoilRules.mjs';
 
 const INSTANT_EFFECTS = [
+  ...Object.entries(FALLING_SOIL_PRESETS).map(([id,spec])=>({id,name:spec.label,note:spec.note,soil:true})),
   ...Object.entries(FLARE_EFFECTS).map(([id,spec])=>({id,name:spec.label,note:'史料类型参考 · 完整升空、燃烧、熄灭 · 可切换近景',flare:true})),
   ...[['VolumeFire','三维体积 · 营火',true],['VolumePlume','三维体积 · 烟流',true],['VolumeDensePlume','三维体积 · 浓烟',true],['VolumeDustImpact','三维体积 · 土尘冲击',false],['VolumeExplosion','三维体积 · 燃油爆炸',false]].map(([id,name,continuous])=>({
     id,name,note:'CC0 流体模拟 · 多视角体积',continuous,particleHandle:true,run:(v,s)=>v.particles.Create({preset:id,modules:{main:{startSize:s}},name:'VolumePreview/'+id}),
@@ -64,7 +68,8 @@ export class VfxEditor {
     this.studio = host.studio;
     this.cameraMode = "studio";
     this.panel = null;
-    this.effectId = "FireMedium";
+    const requested=new URLSearchParams(location.search).get('effect');
+    this.effectId = ALL_EFFECTS.some(effect=>effect.id===requested)?requested:"FireMedium";
     this.handle = 0;
     this.scale = 1;
     this.loop = true;
@@ -153,6 +158,7 @@ export class VfxEditor {
     };
     document.addEventListener('keydown',this.onPreviewKey,true);
     this.Play();
+    if(FALLING_SOIL_PRESETS[this.effectId])this.FrameEffect();
     return this;
   }
 
@@ -242,9 +248,10 @@ export class VfxEditor {
     Select(playback,'播放速度',[.1,.25,.5,1,2].map(value=>({value,label:value+'×'})),1,value=>{this.speed=Number(value)});
     Note(playback,'空格暂停/继续 · → 单帧 · Shift+→ 十帧 · Home 归零');
     this.message=Note(transport,'');this.message.setAttribute('role','status');this.message.dataset.vfxStatus='true';
-    const tabs=ButtonRow(transport,[{label:'效果库',onClick:()=>this.ShowTab('library')},{label:'粒子模块',onClick:()=>this.ShowTab('modules')},{label:'预设',onClick:()=>this.ShowTab('presets')}]);
-    ['library','modules','presets'].forEach((key,i)=>tabs.children[i].dataset.vfxTab=key);
-    this.tabs={};for(const key of ['library','modules','presets']){const box=El('div');box.dataset.vfxPanel=key;body.appendChild(box);this.tabs[key]=box;}
+    const tabs=ButtonRow(transport,[{label:'效果库',onClick:()=>this.ShowTab('library')},{label:'粒子模块',onClick:()=>this.ShowTab('modules')},{label:'落土参数',onClick:()=>this.ShowTab('soil')},{label:'预设',onClick:()=>this.ShowTab('presets')}]);
+    ['library','modules','soil','presets'].forEach((key,i)=>tabs.children[i].dataset.vfxTab=key);
+    this.tabs={};for(const key of ['library','modules','soil','presets']){const box=El('div');box.dataset.vfxPanel=key;body.appendChild(box);this.tabs[key]=box;}
+    this.soil=new FallingSoilInspector(this,this.tabs.soil);
     const library=Section(this.tabs.library,'效果库');
     this.effectList=ListBox(library,{height:240,onPick:id=>this.SelectEffect(id)});
     this.effectList.Fill(ALL_EFFECTS.map(effect=>({id:effect.id,name:effect.name,tail:effect.continuous?'持续':'瞬时',title:effect.note})));this.effectList.Select(this.effectId);
@@ -279,9 +286,9 @@ export class VfxEditor {
     file.addEventListener('change',async()=>{const chosen=file.files?.[0];if(!chosen)return;const text=await chosen.text();if(this.panel)this.Try(()=>this.Import(JSON.parse(text)));});storage.appendChild(file);
     ButtonRow(storage,[{label:'应用参数到当前关卡同名层',onClick:()=>this.ApplyToScene()}]);
     Note(storage,'应用到关卡会更新已存在及后续生成的同名层；不会直接改写项目源文件。');
-    this.facts=Facts(Section(body,'运行状态'));this.RefreshSaved();this.ShowTab('library');
+    this.facts=Facts(Section(body,'运行状态'));this.RefreshSaved();this.ShowTab(FALLING_SOIL_PRESETS[this.effectId]?'soil':'library');
   }
-  ShowTab(tab){for(const [key,box]of Object.entries(this.tabs))box.hidden=key!==tab;if(tab==='modules')this.inspector.Show();}
+  ShowTab(tab){for(const [key,box]of Object.entries(this.tabs))box.hidden=key!==tab;if(tab==='modules')this.inspector.Show();if(tab==='soil')this.soil.Show();}
   Status(message,error=false){if(!this.message)return;this.message.textContent=message;this.message.style.color=error?'#ffae98':'#c9d6c7';}
   Try(run){try{return run()}catch(error){this.Status(error.message,true);return false}}
   IsContinuous(){return !!SCENE_EFFECTS[this.effectId]||!!INSTANT_EFFECTS.find(effect=>effect.id===this.effectId)?.continuous;}
@@ -294,11 +301,11 @@ export class VfxEditor {
     this.banks.set(this.effectId,{patches:this.layerPatches,custom:this.customLayers});this.effectId=id;
     this.effectList?.Select(id);
     const bank=this.banks.get(id);this.layerPatches=bank?.patches||new Map();this.customLayers=bank?.custom||[];this.selectedLayer=null;
-    if(id==='Empty')this.loop=false;this.Play();this.FrameEffect();
+    if(id==='Empty')this.loop=false;this.Play();this.FrameEffect();if(FALLING_SOIL_PRESETS[id])this.ShowTab('soil');
   }
   CaptureLayers(){
     const api=this.host.vfx.particles;
-    for(const [id,entry]of api.systems){if(!entry.system.emitted&&!entry.editorKey&&!entry.name.startsWith('Burning/'))continue;
+    for(const [id,entry]of api.systems){if(entry.editorKey?.startsWith('soil:'))continue;if(!entry.system.emitted&&!entry.editorKey&&!entry.name.startsWith('Burning/'))continue;
       const key=this.Key(entry);this.layerRecords.set(key,{id,key,...api.Export(id),capacity:api.renderer.streams.get(entry.system)?.capacity});}
   }
   RefreshLayers(force=false){
@@ -322,6 +329,7 @@ export class VfxEditor {
   Stop(){
     this.CaptureLayers();const vfx=this.host.vfx;
     this.flarePreview?.Reset();
+    this.soil?.End();
     if(this.handle)vfx.RemoveSceneEffect(this.handle);this.handle=0;
     if(vfx.dust){vfx.dust.Dispose();vfx.dust=null;}
     for(const id of this.sampleParticleIds)if(vfx.particles.systems.has(id))vfx.particles.Remove(id);this.sampleParticleIds=[];
@@ -336,7 +344,8 @@ export class VfxEditor {
     for(const [name,channel]of api.channels){if(!api.systems.has(channel.particleId))continue;api.Configure(channel.particleId,this.baseModules.get(name));const patch=this.layerPatches.get('channel:'+name);if(patch)api.Configure(channel.particleId,patch);}
     api.presetOverrides.clear();for(const [key,patch]of this.layerPatches)if(key.startsWith('preset:'))api.presetOverrides.set(key.slice(7),patch);
     api.Restart();for(const channel of api.channels.values())if(api.systems.has(channel.particleId))channel.system.Play({restart:true});api.renderer.Flush();this.ApplyWind();this.previewTime=0;this.loopTimer=0;this.paused=false;
-    if(SCENE_EFFECTS[this.effectId])this.handle=vfx.SceneEffect({x:0,y:.04,z:0},this.effectId,{scale:this.scale});
+    if(FALLING_SOIL_PRESETS[this.effectId])this.soil.Begin();
+    else if(SCENE_EFFECTS[this.effectId])this.handle=vfx.SceneEffect({x:0,y:.04,z:0},this.effectId,{scale:this.scale});
     else if(FLARE_EFFECTS[this.effectId]){
       this.flarePreview.rnd=Mulberry32(this.seed);
       this.flarePreview.LaunchFlare({preset:this.effectId,from:{x:-12,z:0},at:{x:0,z:0},driftMS:Math.hypot(this.wind.x,this.wind.z),driftDirRad:Math.atan2(this.wind.x,this.wind.z)});
@@ -358,6 +367,7 @@ export class VfxEditor {
       this.flarePreview?.Update(step);
       if(FLARE_EFFECTS[this.effectId]&&this.flareCamera==='follow')this.TrackFlare();
       this.host.vfx.Update(step,this.host.camera,this.previewTime);if(this.savedLighting)this.host.lights.Update(step,this.previewTime,this.host.camera.position);
+      this.soil?.Update(this.previewTime);
       remaining-=step;
     }while(remaining>1e-9);
   }
@@ -368,6 +378,7 @@ export class VfxEditor {
     this.loopTimer=this.previewTime;this.paused=true;this.host.post?.NotifyCameraCut();this.RefreshLayers(true);this.UpdateFacts();return this.Inspect();}
   QueueSeek(seconds){this.seekTarget=seconds;if(this.seekFrame)return;this.seekFrame=requestAnimationFrame(()=>{this.seekFrame=0;if(this.panel)this.Try(()=>this.Seek(this.seekTarget))});}
   FrameEffect(){
+    if(FALLING_SOIL_PRESETS[this.effectId]){this.soil.Frame();return;}
     if(FLARE_EFFECTS[this.effectId]){
       if(this.flareCamera==='ground'){this.studio.Frame(1.8,14);this.studio.orbit.pitch=.45;this.studio.ApplyCamera();return;}
       const near=this.flareCamera==='follow';this.studio.maxDistance=320;this.studio.Frame(near?4:110,near?9:160);
@@ -434,11 +445,12 @@ export class VfxEditor {
     const record=this.ReadLayer();if(record&&this.host.vfx.particles.systems.has(record.id))this.host.vfx.particles.Remove(record.id);
     this.customLayers=this.customLayers.filter(layer=>layer.key!==this.selectedLayer);this.layerPatches.delete(this.selectedLayer);this.layerRecords.delete(this.selectedLayer);this.selectedLayer=null;this.RefreshLayers(true);}
   Export(){return {version:1,kind:'TengxianParticleEffect',effect:this.effectId,seed:this.seed,scale:this.scale,wind:[this.wind.x,this.wind.z],
-    layers:Object.fromEntries(this.layerPatches),custom:JSON.parse(JSON.stringify(this.customLayers))};}
+    layers:Object.fromEntries(this.layerPatches),custom:JSON.parse(JSON.stringify(this.customLayers)),soil:this.soil?.Export()};}
   Import(data){
     if(data?.version!==1||data.kind!=='TengxianParticleEffect'||!ALL_EFFECTS.some(effect=>effect.id===data.effect))throw new Error('不是受支持的粒子效果预设。');
     if(!Number.isInteger(data.seed)||data.seed<0||data.seed>4294967295||!Number.isFinite(data.scale)||data.scale<.25||data.scale>3)throw new Error('预设的种子或缩放无效。');
     if(!Array.isArray(data.wind)||data.wind.length!==2||data.wind.some(n=>!Number.isFinite(n)||Math.abs(n)>4))throw new Error('预设风速无效。');
+    if(data.soil){if(data.soil.kind!=='TengxianFallingSoil'||data.soil.version!==1||data.soil.preset!==data.effect)throw new Error('落土预设无效。');NormalizeFallingSoil(data.soil.config,data.effect);NormalizeSoilPreview(data.soil.preview);}
     const patches=new Map(Object.entries(data.layers||{}));for(const [key,patch]of patches){if(!/^(channel|preset|custom):[A-Za-z0-9_]+$/.test(key))throw new Error('粒子层标识无效。');MergeParticleModules(NormalizeParticleModules(),patch);}
     const custom=data.custom||[];if(!Array.isArray(custom)||custom.length>24)throw new Error('最多支持 24 个自建粒子层。');
     const api=this.host.vfx.particles;if(new Set(custom.map(layer=>layer.key)).size!==custom.length)throw new Error('自建层标识不能重复。');
@@ -446,7 +458,8 @@ export class VfxEditor {
     for(const layer of custom){if(!/^custom:\d+$/.test(layer.key)||!layer.definition)throw new Error('自建粒子层无效。');NormalizeParticleModules(layer.definition.modules);
       if(layer.definition.profile?!api.profiles.has(layer.definition.profile):!api.Presets().includes(layer.definition.preset))throw new Error('缺少预设使用的渲染配置。');}
     this.Stop();this.effectId=data.effect;this.seed=data.seed;this.scale=data.scale;this.wind.set(data.wind[0],0,data.wind[1]);this.layerPatches=patches;
-    this.customLayers=JSON.parse(JSON.stringify(custom));this.customIndex=Math.max(0,...custom.map(layer=>Number(layer.key.slice(7))));this.effectList.Select(this.effectId);this.selectedLayer=null;this.Play();this.Status('预设已载入。');return this.Inspect();
+    if(data.soil)this.soil.Import(data.soil);
+    this.customLayers=JSON.parse(JSON.stringify(custom));this.customIndex=Math.max(0,...custom.map(layer=>Number(layer.key.slice(7))));this.effectList.Select(this.effectId);this.selectedLayer=null;this.Play();if(data.soil)this.ShowTab('soil');this.Status('预设已载入。');return this.Inspect();
   }
   ReadSaved(){try{return JSON.parse(localStorage.getItem('Tengxian.ParticleEffectPresets.v1')||'{}')}catch{return {}}}
   RefreshSaved(){const saved=this.ReadSaved();this.savedSelect?.Fill(Object.keys(saved).map(value=>({value,label:value})));}
@@ -454,21 +467,25 @@ export class VfxEditor {
   LoadLocal(){this.Try(()=>{const data=this.ReadSaved()[this.savedSelect.Value()];if(!data)throw new Error('请选择已保存的预设。');this.Import(data);});}
   Download(){const text=JSON.stringify(this.Export(),null,2);this.json.value=text;const url=URL.createObjectURL(new Blob([text],{type:'application/json'}));const link=El('a');link.href=url;link.download='Data_ParticleEffect_'+this.effectId+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
   ApplyToScene(){return this.Try(()=>{const target=this.savedParticleEffects;let changed=0;
+    if(this.soil?.selected){const config=this.soil.Config();for(const [id,e]of target.FallingSoil.entries)if(e.preset===this.effectId){target.FallingSoil.Configure(id,config);changed++;}
+      this.Status('已更新关卡中 '+changed+' 个同预设落土源。永久配置请使用导出的 soil 数据。');return {changed};}
     for(const [id,entry]of target.systems){const key=this.Key(entry),patch=this.layerPatches.get(key);if(patch){target.Configure(id,patch);changed++;}}
     for(const [key,patch]of this.layerPatches)if(key.startsWith('preset:'))target.presetOverrides.set(key.slice(7),patch);
     this.Status('已更新关卡中的 '+changed+' 个同名粒子层；可退出预览查看。');return {changed};});}
   Inspect(){return {effect:this.effectId,time:this.previewTime,paused:this.paused,playing:this.playing,seed:this.seed,selectedLayer:this.selectedLayer,flare:this.flarePreview?.State(),
+    soil:this.soil?.Inspect(),
     layers:[...this.layerRecords].map(([key,value])=>({key,id:value.id,profile:value.profile,preset:value.preset})),particles:this.host.vfx.particles.Inspect()};}
   UpdateFacts(){if(!this.facts)return;const entries=this.host.vfx.particles.Inspect().entries;
     this.facts.Set('当前效果',ALL_EFFECTS.find(effect=>effect.id===this.effectId)?.name||this.effectId);
     this.facts.Set('预览时间',this.previewTime.toFixed(2)+' s');this.facts.Set('存活粒子',entries.reduce((n,e)=>n+e.particleCount,0));
     this.facts.Set('参与层数',this.layerRecords.size);this.facts.Set('丢弃',entries.reduce((n,e)=>n+e.dropped,0));this.facts.Set('随机种子',this.seed);
     if(FLARE_EFFECTS[this.effectId]){const f=this.flarePreview?.flares[0];this.facts.Set('弹药阶段',f?.phase||'done');this.facts.Set('离地高度',f?f.agl.toFixed(1)+' m':'—');}
+    const soil=this.soil?.Inspect();if(soil){this.facts.Set('参与层数',['grains','clods','dust'].filter(layer=>this.soil.Config()[layer].enabled).length);this.facts.Set('细砂 / 土块 / 细尘',Object.values(soil.live).join(' / '));this.facts.Set('碰撞 / 二次起尘',soil.impacts+' / '+soil.grainImpacts);this.facts.Set('表面射线',soil.rays);}
     this.timeSlider?.Set(this.previewTime);if(this.pauseButton)this.pauseButton.textContent=this.paused?'继续':'暂停';}
   Update(dt){
     const step=this.playing&&!this.paused?Math.max(0,Math.min(.1,dt||0))*this.speed:0;
     if(!this.IsContinuous()&&this.playing&&!this.paused&&this.loop){this.loopTimer+=step;
-      const again=FLARE_EFFECTS[this.effectId]?this.previewTime>0&&!this.flarePreview.Active:this.loopTimer>=this.loopInterval;
+      const again=FALLING_SOIL_PRESETS[this.effectId]?this.previewTime>0&&!this.soil.Inspect()?.active:FLARE_EFFECTS[this.effectId]?this.previewTime>0&&!this.flarePreview.Active:this.loopTimer>=this.loopInterval;
       if(again)this.Play();}
     this.Advance(step);this.uiAge+=Math.max(0,dt||0);if(this.uiAge>.15||step===0){this.uiAge=0;this.RefreshLayers();this.UpdateFacts();}
   }

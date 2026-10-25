@@ -38,7 +38,7 @@ function CurveGraph(parent,keys,onChange,{min=0,max=4}={}){
    {label:'适配曲线',onClick:()=>{({low,high}=AutoRange());Draw();}}]);
  axisLabel=Note(parent,'');Draw();
 }
-function CurveField(parent,label,value,onChange,{min=0,max=4,step=.01,path=''}={}){
+export function CurveField(parent,label,value,onChange,{min=0,max=4,step=.01,path=''}={}){
  const box=El('div');box.style.cssText='padding:6px 0;border-bottom:1px solid #343b3e';parent.appendChild(box);
  let current=Clone(value),body=El('div');
  const mode=typeof value==='number'?'constant':Array.isArray(value)?'curve':value.mode;
@@ -55,7 +55,7 @@ function CurveField(parent,label,value,onChange,{min=0,max=4,step=.01,path=''}={
    else for(const key of ['min','max']){Note(body,key==='min'?'下限曲线':'上限曲线');CurveGraph(body,Array.isArray(current[key])?current[key]:[[0,EvaluateCurve(current[key],0)],[1,EvaluateCurve(current[key],1)]],keys=>Set({...current,[key]:keys}),{min,max});}
  }Draw(mode);
 }
-function ColorField(parent,label,color,onChange){
+export function ColorField(parent,label,color,onChange){
  let value=[...color],gain=Math.max(1,...value.slice(0,3));const swatch=El('input');swatch.type='color';swatch.setAttribute('aria-label',label);
  swatch.value='#'+new THREE.Color().fromArray(value.slice(0,3).map(n=>n/gain)).getHexString();Row(parent,label,swatch);
  swatch.addEventListener('input',()=>{value=[...new THREE.Color(swatch.value).toArray().map(n=>n*gain),value[3]];onChange([...value]);});

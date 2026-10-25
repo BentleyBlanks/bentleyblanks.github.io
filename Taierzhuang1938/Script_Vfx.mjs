@@ -799,6 +799,9 @@ export class VfxSystem {
         this.previousSceneHook.call(hookScene, renderer, hookScene, camera, target);
       }
       this.root.visible = !hookScene.overrideMaterial && hookScene.userData.whiteboxEffects !== false;
+      // Opaque falling clods participate in prepass and real object velocity;
+      // they still obey the same game/preview whitebox effect visibility.
+      this.particles.FallingSoil.SetVisible(hookScene.userData.whiteboxEffects!==false);
     };
     scene.onBeforeRender = this.sceneHook;
   }
@@ -898,6 +901,10 @@ export class VfxSystem {
   /** 地面高度采样（含弹坑形变）：(x, z) => y。落地扬尘靠它知道沟在哪。 */
   SetGroundSampler(fn) { this.groundSampler = typeof fn === "function" ? fn : null; }
 
+  /** Shared terrain + static-world casts. No fixed-plane fallback for falling soil. */
+  SetFallingSoilSurface(host) { this.particles.FallingSoil.SetSurface(host); }
+  FallingSoil(options={},host={}) { return this.particles.FallingSoil.Create(options,host); }
+
   /** 清掉所有还在飘的落地扬尘（测试场「清空」、换关）。 */
   ClearGroundImpacts() { this.dustFields?.Clear(); }
 
@@ -919,6 +926,7 @@ export class VfxSystem {
     // 记一份机位。Blood 要按距离补尺寸（见那边的抬头），而粒子是**世界尺寸**的
     // 广告牌，只有拿到相机才知道它在屏幕上究竟有几个像素。
     if (camera) this.eye.copy(camera.position);
+    this.particles.FallingSoil.eye.copy(this.eye);
     this.UpdateBurningLights();
 
     if (step > 0) this.particles.Resume();

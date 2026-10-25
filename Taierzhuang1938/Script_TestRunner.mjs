@@ -75,6 +75,8 @@ export const testDefs = {
   FirstLevelVegetationTest: {file:"Script_FirstLevelVegetationTest.mjs",desc:"第一关植被撒点：不进路线/锚点/实体/沟底/路面、高卡视线门槛、实例上限、确定性、图集卡片表与烘焙记录一致（纯 Node）"},
   BreakableTreesBrowserTest: {file:"Script_BreakableTreesBrowserTest.mjs",timeoutMs:300000,desc:"Actual first-level trees: explosion, collider removal, falling, grounding and disposal"},
   ParticleModulesTest: {file:"Script_ParticleModulesTest.mjs",desc:"Unity-style particle modules, deterministic timeline and validated agent inputs"},
+  FallingSoilTest: {file:"Script_FallingSoilTest.mjs",desc:"Shared falling soil: sources, world motion, deterministic contacts, fragments, dust, full schema and budgets"},
+  FallingSoilBrowserTest: {file:"Script_FallingSoilBrowserTest.mjs",timeoutMs:600000,desc:"Production falling soil in VFX editor: pixels, controls, presets, replay, whitebox, collision, isolation and disposal"},
   ParticleVolumeTest: {file:"Script_ParticleVolumeTest.mjs",desc:"CC0 volume source hashes, bounded atlas dimensions, timestamps and public configuration"},
   ParticleVolumeBrowserTest: {file:"Script_ParticleVolumeBrowserTest.mjs",timeoutMs:120000,desc:"True 3D particle volumes: shared simulation, GPU animation, replay, depth, HDR alpha and disposal"},
   ParticleBrowserTest: {file:"Script_ParticleBrowserTest.mjs",timeoutMs:120000,desc:"Production fire GPU: replay, pause, motion, occlusion, alpha and batched rendering"},
@@ -545,6 +547,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "FallingSoilBrowserTest",
   "Type89MediumTankBrowserTest",
   "KawasakiType88BrowserTest",
   "ToolsHomeTest",
@@ -785,7 +788,7 @@ export const domains = {
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   firstLevelDressing: {label:"第一关道具换模型、碎砖瓦与植被",tests:["FirstLevelPropDressingTest","WardPropsTest","FirstLevelVegetationTest","FirstLevelWhiteboxBrowserTest","SamplerBudgetTest","MotionVectorContractTest","ModuleGraphTest"]},
-  particles: {label:"Modular particles and agent API",tests:["TracerLifetimeTest","ParticleModulesTest","ParticleVolumeTest","ParticleVolumeBrowserTest","ParticleBrowserTest","ParticleChannelsTest","ParticleEditorControlsTest","ParticleEditorWhiteboxTest","ParticleEditorTest","FirstLevelSmokeOriginsTest"]},
+  particles: {label:"Modular particles and agent API",tests:["TracerLifetimeTest","ParticleModulesTest","FallingSoilTest","FallingSoilBrowserTest","ParticleVolumeTest","ParticleVolumeBrowserTest","ParticleBrowserTest","ParticleChannelsTest","ParticleEditorControlsTest","ParticleEditorWhiteboxTest","ParticleEditorTest","FirstLevelSmokeOriginsTest"]},
   distantSmoke: {label:"First-level distant smoke composition",tests:["FirstLevelDistantSmokeTest","FirstLevelSmokeOriginsTest","FirstLevelDistantSmokeBrowserTest"]},
   skyGrade: {label:"第一关天空 / 调色 / 室内天光遮蔽 / 曝光锚点",tests:["FirstLevelSkyGradeTest","FirstLevelSkyGradeBrowserTest","ModuleGraphTest"]},
   openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningSetTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest","OpeningLensTest","OpeningLensBrowserTest","OpeningStoryboardShotsTest"]},
@@ -908,6 +911,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:'particles',pattern:/FallingSoil/},
   {domain:'flareEffects',pattern:/Flare(?:Visual|Track|Effects|Test|\.mjs)|Tuning_Flare/},
   {domain:'combat',pattern:/HanYang173R/},
   {domain:"type89MediumTank",pattern:/Type89(?:MediumTank|Pbr|GlbCleanup|References|ImportAudit|SourceAudit|Package)/},

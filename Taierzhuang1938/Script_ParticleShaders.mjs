@@ -453,6 +453,12 @@ void main() {
     * smoothstep(-1.0, -0.15, p.x) * (0.35 + 0.4 * grit);
   mask = max(head, tail) * (0.78 + 0.22 * grit);
   color = mix(vColor, vColorAlt, grit * 0.55);
+#elif defined(SHAPE_SOILGRAIN)
+  // Millimetre grains: irregular solid silhouette and a shaded face, no glow.
+  float face = Vnoise(p * 3.1 + vSeed * 41.0);
+  float edge = 0.66 + Vnoise(p * 2.2 + vSeed * 19.0) * 0.25;
+  mask = 1.0 - smoothstep(edge - 0.12, edge, length(p * vec2(1.0, 0.78)));
+  color *= 0.65 + face * 0.65 + p.y * 0.12;
 #elif defined(SHAPE_PUFF)
   // 烟/尘：两层不同尺度的噪声让每一片都是一团卷起来的絮，而不是一张
   // 单调的柔边圆盘。只啃外轮廓仍会读成“半透明云”；要让中心密度也有起伏，
@@ -624,7 +630,7 @@ void main() {
   vec3 lit = uSkyColor + uSunColor * (0.34 + 0.66 * wrapped);
   // 前向散射：视线越接近太阳方向，边缘越透亮（逆光的烟会"发光"）
   float forward = pow(max(dot(vViewDir, uSunDirection), 0.0), 4.0);
-#ifndef SHAPE_MUD
+#if !defined(SHAPE_MUD) && !defined(SHAPE_SOILGRAIN)
   // 湿泥是实的，不透光：前向散射只给烟尘
   lit += uSunColor * forward * 0.55 * (1.0 - mask * 0.75);
 #endif

@@ -4,6 +4,7 @@ import {ParticleRenderer} from './Script_ParticleRenderer.mjs';
 import {PARTICLE_PRESETS, BurningParticleModules} from './Data_Tuning_Particles.mjs';
 import {ParticleChannel} from './Script_ParticleChannel.mjs';
 import {PARTICLE_VOLUME_ASSETS} from './Data_ParticleVolumeAssets.mjs';
+import {FallingSoilEffects} from './Script_FallingSoil.mjs';
 
 // The production interface is also the agent interface. All inputs/outputs are JSON.
 export class ParticleEffects {
@@ -11,6 +12,7 @@ export class ParticleEffects {
    this.parent=root;this.shared=shared;this.quality=quality;this.root=new THREE.Group();
    this.root.name='ModularParticleSystems';root.add(this.root);
    this.renderer=new ParticleRenderer(this.root,shared,quality);this.systems=new Map();this.profiles=new Map();this.channels=new Map();this.presetOverrides=new Map();this.volumeBursts=new Map();this.nextId=1;this.disposed=false;this.wind={x:.35,z:-.15};
+   this.FallingSoil=new FallingSoilEffects(this);
  }
  Presets() {return Object.keys(PARTICLE_PRESETS);}
  Profiles() {return [...this.profiles].map(([name,p])=>({name,capacity:p.capacity,renderer:p.config.renderer||'billboard',shape:p.config.renderer==='mesh'?p.config.geometryName:p.config.shape,orientation:p.config.orient}));}
@@ -20,6 +22,7 @@ export class ParticleEffects {
    this.channels.set(profile,channel);this.Get(id).channel=channel;return channel;
  }
  Modules() {return {modules:[...PARTICLE_MODULES],curves:['constant','twoConstants','curve','twoCurves'],
+   compositeEffects:{fallingSoil:{presets:this.FallingSoil.Presets(),sourceRotation:true,worldSpace:true,hostSurfaces:true,finiteClodCollision:true,sampledGrainCollision:true}},
    shapes:['point','circle','cone','sphere','box','beam'],renderers:['flame','smoke','ember','mote','windowMote','volume','bakedVolume','material'],volumeAssets:Object.keys(PARTICLE_VOLUME_ASSETS),profiles:this.Profiles(),simulationSpace:['world','local'],
    defaults:NormalizeParticleModules(),controls:['Create','Play','Pause','Stop','Clear','Emit','Simulate','Move','Configure','Inspect','GetParticles','Export','Import','Remove','VolumeBurst','Ready'],
    unsupported:['collisionModule','trails','subEmitters','textureSheetAnimationModule','arbitraryMeshAssets','localRotationAndScale']};}
@@ -101,7 +104,7 @@ export class ParticleEffects {
  }
  Inspect(id) {
    if(id){const e=this.Get(id);return {id,name:e.name,preset:e.preset,profile:e.profile,...e.system.Inspect()};}
-   return {version:1,...this.renderer.Inspect(),entries:[...this.systems.keys()].map(key=>this.Inspect(key))};
+   return {version:1,...this.renderer.Inspect(),fallingSoil:this.FallingSoil.Inspect(),entries:[...this.systems.keys()].map(key=>this.Inspect(key))};
  }
  GetParticles(id,{limit=32}={}) {
    if(!Number.isInteger(limit)||limit<0||limit>256)throw new Error('particle sample limit: integer 0–256 required');
@@ -128,9 +131,9 @@ export class ParticleEffects {
  Export(id) {const entry=this.Get(id);return {version:1,preset:entry.preset,profile:entry.profile,name:entry.name,position:[...entry.system.position],modules:JSON.parse(JSON.stringify(entry.system.modules))};}
  Import(data) {if(data?.version!==1)throw new Error('Unsupported particle preset version');return this.Create(data);}
  Remove(id) {const {system,channel}=this.Get(id);channel?.Detach();system.Stop({clear:true});this.renderer.Remove(system);this.systems.delete(id);this.renderer.Flush();return true;}
- Update(dt) {for(const {system}of this.systems.values())system.Update(dt);this.renderer.Flush();}
- Restart() {for(const entry of this.systems.values()){const {system}=entry;entry.restartPending=entry.restartPending||(system.started&&system.emitting&&system.state==='playing');system.onClear(system);system.Reset();}this.renderer.Flush();}
+ Update(dt) {this.FallingSoil.Update(dt);for(const {system}of this.systems.values())system.Update(dt);this.renderer.Flush();}
+ Restart() {this.FallingSoil.Clear();for(const entry of this.systems.values()){const {system}=entry;entry.restartPending=entry.restartPending||(system.started&&system.emitting&&system.state==='playing');system.onClear(system);system.Reset();}this.renderer.Flush();}
  Resume() {for(const entry of this.systems.values())if(entry.restartPending){entry.restartPending=false;entry.system.Play();}}
- Fork() {const fork=new ParticleEffects(this.parent,this.shared,this.quality);fork.SetWind(this.wind);for(const [name,p]of this.profiles){const channel=fork.Channel(name,p.capacity,p.config),original=this.channels.get(name);if(original&&this.systems.has(original.particleId))fork.Configure(channel.particleId,original.system.modules);}fork.presetOverrides=new Map(this.presetOverrides);return fork;}
- Dispose() {if(this.disposed)return;this.renderer.Dispose();this.root.removeFromParent();this.systems.clear();this.channels.clear();this.profiles.clear();this.disposed=true;}
+ Fork() {const fork=new ParticleEffects(this.parent,this.shared,this.quality);fork.SetWind(this.wind);for(const [name,p]of this.profiles){const original=this.channels.get(name);if(!original){fork.profiles.set(name,p);continue;}const channel=fork.Channel(name,p.capacity,p.config);if(this.systems.has(original.particleId))fork.Configure(channel.particleId,original.system.modules);}fork.presetOverrides=new Map(this.presetOverrides);fork.FallingSoil.SetSurface(this.FallingSoil.defaultHost);return fork;}
+ Dispose() {if(this.disposed)return;this.FallingSoil.Dispose();this.renderer.Dispose();this.root.removeFromParent();this.systems.clear();this.channels.clear();this.profiles.clear();this.disposed=true;}
 }
