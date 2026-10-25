@@ -42,7 +42,8 @@ const library=new MaterialLibrary(null),orm=new THREE.Texture(),mat=new THREE.Me
 library.ConfigureExternalPbr(mat);assert.equal(mat.metalnessMap,null);
 assert(PatchesOf(mat).some(p=>String(p.key).includes('orm')),'folded ORM must keep its shader patch without post effects');
 const calibration=JSON.parse(fs.readFileSync(path.join(dir,'Data_MaterialCalibration.json'),'utf8'));
-assert.equal(calibration.gameSha256,report.gameSha256);assert.equal(calibration.parts.length,40);
+assert.equal(calibration.gameSha256,report.gameSha256);assert.equal(calibration.parts.length,41);
+assert(!D.wood.includes('SideWoodButton')&&D.metalReflectanceGains.SideWoodButton>0,'source ORM defines the side button as metal');
 // Loading another level reuses the source material. Calibration must not
 // accumulate, and its energy bound must survive alongside packed ORM decoding.
 const mesh=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial({metalness:1,roughness:1,roughnessMap:orm,metalnessMap:orm}));

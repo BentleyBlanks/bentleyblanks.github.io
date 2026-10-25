@@ -307,10 +307,26 @@ export class WhiteboxSceneRenderer {
     if (this.sky && !c.sky) Set(this.sky, "visible", false);
   }
 
+  // Keep the existing sky PMREM only on opted-in weapon materials. Explicit
+  // envMap bindings use material intensity/rotation rather than the scene's;
+  // mirror both, and restore them after the frame. Shared materials bind once.
+  _WeaponEnvironment(Set, material, environment, scene) {
+    if (this.config.environment || !this.config.weaponReflections || !environment) return;
+    if (Array.isArray(material)) {
+      for (const m of material) this._WeaponEnvironment(Set, m, environment, scene);
+      return;
+    }
+    if (!material?.isMeshStandardMaterial || !material.userData.whiteboxWeaponReflection || material.envMap) return;
+    Set(material, "envMap", environment);
+    Set(material, "envMapIntensity", scene.environmentIntensity);
+    Set(material, "envMapRotation", scene.environmentRotation);
+  }
+
   _BeginTraverse(scene, camera, compileRoots) {
     const c = this.config, restore = [], stats = { meshes: 0, whiteMeshes: 0, terrainMeshes: 0, characterMeshes: 0, hiddenEffects: 0, cutoutMeshes: 0, waterMeshes: 0 };
     const Set = (object, key, value) => { restore.push([object, key, object[key]]); object[key] = value; };
     const mode = this._LightingMode();
+    const environment = scene.environment;
     this._BeginScene(Set, scene);
     const visited = compileRoots ? new WeakSet() : null;
     // 白盒出画时藏掉的特效。compile 不看 visible，只能把材质摘掉它才跳过（粒子那一族
@@ -339,7 +355,10 @@ export class WhiteboxSceneRenderer {
       const character = IsWhiteboxCharacter(object);
       stats.meshes++; if (terrain) stats.terrainMeshes++;
       if (character) stats.characterMeshes++;
-      if (terrain ? c.terrainTextures : character ? c.characterTextures : c.assetTextures) return;
+      if (terrain ? c.terrainTextures : character ? c.characterTextures : c.assetTextures) {
+        this._WeaponEnvironment(Set, object.material, environment, scene);
+        return;
+      }
       // 水面：蓝灰水色 + 天空反光（WHITEBOX_WATER），不画网格。人物与地形不可能是水，先判它们。
       const water = !terrain && !character && IsWhiteboxWater(object);
       if (water) stats.waterMeshes++;
@@ -379,6 +398,7 @@ export class WhiteboxSceneRenderer {
     };
     const mode = this._LightingMode();
     const stats = { meshes: 0, whiteMeshes: 0, terrainMeshes: 0, characterMeshes: 0, hiddenEffects: 0, cutoutMeshes: 0, waterMeshes: 0 };
+    const environment = scene.environment;
     this._BeginScene(Set, scene);
     const children = scene.children;
     for (let t = 0; t < children.length; t += 1) {
@@ -404,7 +424,10 @@ export class WhiteboxSceneRenderer {
         stats.meshes++;
         if (entry.terrain) stats.terrainMeshes++;
         if (entry.character) stats.characterMeshes++;
-        if (!entry.white) continue;
+        if (!entry.white) {
+          this._WeaponEnvironment(Set, object.material, environment, scene);
+          continue;
+        }
         if (entry.water) stats.waterMeshes++;
         else if (entry.cutout) stats.cutoutMeshes++;
         if (entry.sources) for (let i = 0; i < entry.sources.length; i += 1) SyncWhiteboxMaterial(entry.white[i], entry.sources[i]);

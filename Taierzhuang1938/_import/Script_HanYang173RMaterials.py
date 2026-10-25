@@ -18,7 +18,7 @@ def Linear(c):return np.where(c<=.04045,c/12.92,((c+.055)/1.055)**2.4)
 gains={};rows=[]
 for node in d['nodes']:
     name=node.get('name','')
-    if 'mesh' not in node or 'Wood' in name:continue
+    if 'mesh' not in node or ('Wood' in name and name!='SideWoodButton'):continue
     p=d['meshes'][node['mesh']]['primitives'][0];pbr=d['materials'][p['material']]['pbrMetallicRoughness']
     uv=Read(p['attributes']['TEXCOORD_0'])[Read(p['indices']).reshape((-1,3))].mean(axis=1)
     image=d['images'][d['textures'][pbr['baseColorTexture']['index']]['source']];v=d['bufferViews'][image['bufferView']]

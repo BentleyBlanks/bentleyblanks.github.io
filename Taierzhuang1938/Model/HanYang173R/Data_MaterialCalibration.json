@@ -414,6 +414,18 @@
       "targetLinearLuma": 0.5
     },
     {
+      "part": "SideWoodButton",
+      "sourceBaseMedianSrgb": [
+        85.0,
+        89.0,
+        95.0
+      ],
+      "sourceMedianLinearLuma": 0.09902275223023582,
+      "gain": 5.049,
+      "darkFinish": false,
+      "targetLinearLuma": 0.5
+    },
+    {
       "part": "Sight_LowContinuousLeaf_NoUnknownNumbers",
       "sourceBaseMedianSrgb": [
         46.0,

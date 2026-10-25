@@ -28,6 +28,8 @@
 
 默认每帧只运行 **main → whiteboxOutput**：中性基础灯光、几何深度测试、太阳级联阴影（烘焙在 main 那一次出画里）、线性色转 sRGB 和剧情黑场/眼皮。高级效果与预通道/HZB、GTAO/SSIL、SSR、室内遮蔽、自阴影、GI、簇光、大气、体积雾、TAA/FXAA、Bloom、景深、运动模糊、自动曝光、调色均关闭。调试工具主动打开时仍允许线框/调试叠加。
 
+**枪械环境反射（2026-10-25，用户确认）**：`weaponReflections` 默认开，`environment` 仍默认关。目前汉阳造 173R 的材质通过 `userData.whiteboxWeaponReflection` 登记；只在保留原贴图时临时绑定关卡已有的天空 PMREM，强度和旋转沿用关卡环境。皮肤、地形及灰盒场景不因此得到环境贴图。预热与逐帧出画共用该规则，出画后恢复材质；沿用天空系统在启动／换天光时的 PMREM 烘焙，不增加逐帧反射捕获或屏幕 pass。旧存档缺少此新字段时取默认 true，明确保存的 false 保留。可在现有编辑区关闭「保留枪械环境反射」；开启整个「环境贴图 / IBL」时改走正常全场景 IBL，避免重复叠加。
+
 **太阳阴影（2026-10-02 起默认开，用户要求）**：`shadows` 默认 true。中性光照旧，不切到整套关卡灯光：出画时只把关卡太阳的级联灯（`Script_Csm` 的 `SunCascade0..N`，Script_Main 以 `sunCascades` 交给 `WhiteboxSceneRenderer`）留着投影，第 0 盏换成白色，白盒环境光与它按 `WHITEBOX_LIGHTING.shadowAmbient` / `shadowSun`（1.25 / 2.3）配比，白盒自己那盏不投影的太阳收起；其余关卡灯照旧藏掉。方向跟关卡太阳走（第一关高度约 52°），受光地面亮度与旧口径（ambient 1.8 + sun 1.4）基本相同，影子处约为受光面的四成。规则在 `Script_WhiteboxRendering._LightingMode`，预热提交与逐帧出画共用。之前的存档把每个默认值都写了出去，存着的 `shadows:false` 按旧默认迁移（`WHITEBOX_DEFAULTS.schema` = 2，`LoadWhiteboxConfig`）；新存档里玩家自己关掉的保留。
 
 这是一项渲染表现配置，资产、骨骼、几何/碰撞与加载预算沿用 high。原始材质在出画后原样还回，材质切换不修改资产文件或模拟状态。现有后期管线的中间资源仍可预留，关闭表示不执行对应 Feature/Pass，不承诺免下载所有资产或零显存占用。无 alpha 贴图的植被卡片会显示其真实几何轮廓；有 alpha 贴图的卡片按上面的规则保留裁切。

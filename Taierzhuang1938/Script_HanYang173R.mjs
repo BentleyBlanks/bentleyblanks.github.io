@@ -19,6 +19,7 @@ export function ConfigureHanYang173R(asset, library) {
     if(!mesh.isMesh) return;
     const material = mesh.material;
     material.name = `HanYang173R_${mesh.name}`;
+    material.userData.whiteboxWeaponReflection = true;
     material.userData.hanYangAuthoredColor ||= material.color.toArray();
     material.userData.hanYangAuthoredRoughness ??= material.roughness;
     const wood=D.wood.includes(mesh.name);

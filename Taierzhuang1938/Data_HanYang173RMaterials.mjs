@@ -34,6 +34,7 @@ export const HANYANG_METAL_GAINS = Object.freeze({
   "RearTab": 6.012,
   "RearTopExternalLever": 16.477,
   "ReceiverOuterCollar": 16.527,
+  "SideWoodButton": 5.049,
   "Sight_LowContinuousLeaf_NoUnknownNumbers": 2.5,
   "Sight_LowCrossPiece": 2.5,
   "Sight_ShallowRoundSeat": 2.5,

@@ -36,4 +36,12 @@ Primary sources: Danny Chan's [Material Advances in Call of Duty: WWII, SIGGRAPH
 
 The Demo also already has GGX indirect-specular multiscattering in Three, micro-shadowing, horizon occlusion, SSAO multibounce, an independent first-person FOV treatment and first-person self shadow. WWII's separate diffuse-BRDF improvement is not the direct remedy for a fully metallic surface.
 
-The default whitebox configuration separately disables environment/IBL. Keeping a textured gun while removing its reflection environment can make shaded metal dark even with calibrated materials. The user has been asked whether to preserve weapon reflections in whitebox; no default/profile change or new rendering technique is authorized by this research alone.
+The user subsequently approved retaining weapon reflections in whitebox. `weaponReflections` now defaults to true: the current sky PMREM is bound only to the rifle's marked materials during the existing draw, while global scene IBL stays off. The existing `main → whiteboxOutput` pass list is unchanged. The optional algorithms above remain unimplemented and await user selection.
+
+## Wood follow-up
+
+The user also identified the wood as too dark. An unchanged production pose and fixed exposure were used to compare gains 6, 12 and 18. Gain 12 was selected to retain a dark brown finish: wood median display luma rose from 18.69 to 40.47 in test daylight, 16.99 to 36.96 under the physical roof, 9.71 to 20.54 in overcast, and 9.58 to 21.21 in the night preset. This adjusts the three wood parts' albedo multiplier only; it does not add fill lights, emission or another pass, nor alter normal/roughness maps. `SideWoodButton` has a fully metallic source ORM and is now calibrated with metal despite its name. The GLB and all source image bytes remain unchanged.
+
+These numbers describe this Demo's appearance, not measured COD14 wood radiance. The original metal-reference comparison above remains a historical before/after of the metal revision. Current browser acceptance covers both material classes in high day/shadow/overcast/night/ADS, plus the actual default-whitebox canvas with reflection off/on and verifies scene/skin isolation and unchanged pass count.
+
+Validation also passes whitebox presentation, sampler budget (maximum 12/16), frame-graph, asset integrity, module graph, test registry and text checks. `WhiteboxShaderWarmTest` still reports three late programs on the opening helmet/bread props. The unmodified `7aeb3f1f` baseline reproduces the identical three users/cache keys (96→99 programs; this revision 101→104); this is an existing failure, not a clean warmup pass. No baseline assertion was weakened. Weapon-only reflection toggles and steady drawing compile no recurring programs.

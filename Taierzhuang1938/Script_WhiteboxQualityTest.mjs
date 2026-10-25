@@ -26,6 +26,8 @@ assert.equal(WhiteboxGraphicsOverrides({ shadows: false }).shadows, false);
 assert.equal(WhiteboxGraphicsOverrides({}).taa, false);
 assert.equal(WHITEBOX_DEFAULTS.characterTextures, true);
 assert.equal(WHITEBOX_DEFAULTS.assetTextures, false);
+assert.equal(WHITEBOX_DEFAULTS.weaponReflections, true);
+assert.equal(WHITEBOX_DEFAULTS.environment, false);
 assert.equal(WHITEBOX_DEFAULTS.cardTextures, true, "alpha-cut cards (foliage, grass) keep their texture colour in whitebox: no white-spike fields");
 assert.equal(NormalizeWhiteboxConfig({ cardTextures: false }).cardTextures, false, "the card switch can be turned off (back to the flat surface colour)");
 assert.ok(WHITEBOX_CARDS.desaturate >= 0 && WHITEBOX_CARDS.desaturate <= 0.8 && WHITEBOX_CARDS.brightness > 0.2 && WHITEBOX_CARDS.brightness < 1, "card tint numbers stay in a sane range");
@@ -101,6 +103,39 @@ assert.equal(LoadWhiteboxConfig().gridSize, 2);
 assert.equal(LoadWhiteboxConfig().gridColor, "#334455");
 memory.set(WHITEBOX_STORAGE_KEY, "corrupt");
 assert.deepEqual(LoadWhiteboxConfig(), WHITEBOX_DEFAULTS);
+{
+  // Weapon-only IBL must be identical during shader warmup and actual draws,
+  // and must never leak into shared world/skin materials or later high frames.
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+  const environment = new THREE.Texture(), geometry = new THREE.BoxGeometry();
+  scene.environment = environment; scene.environmentIntensity = 0.7;
+  scene.environmentRotation.y = 0.4;
+  const weapon = new THREE.MeshStandardMaterial({ envMapIntensity: 1.3 });
+  weapon.userData.whiteboxWeaponReflection = true;
+  const skin = new THREE.MeshStandardMaterial(), wall = new THREE.MeshStandardMaterial();
+  const rotation = weapon.envMapRotation, actor = new THREE.Group();
+  actor.userData.whiteboxCharacter = true;
+  actor.add(new THREE.Mesh(geometry, weapon), new THREE.Mesh(geometry, [weapon, skin]));
+  const background = new THREE.Mesh(geometry, wall); scene.add(actor, background);
+  const config = NormalizeWhiteboxConfig(), wb = new WhiteboxSceneRenderer(scene, config);
+  for (const compile of [false, true]) {
+    const restore = wb.Begin(scene, camera, compile ? { compileRoots: [actor] } : {});
+    assert.equal(scene.environment, null);
+    assert.equal(weapon.envMap, environment);
+    assert.equal(weapon.envMapIntensity, 0.7, 'explicit binding matches Three scene IBL, once per shared material');
+    assert.equal(weapon.envMapRotation, scene.environmentRotation);
+    assert.equal(skin.envMap, null); assert.equal(background.material.envMap, null);
+    restore(); assert.equal(weapon.envMap, null); assert.equal(weapon.envMapIntensity, 1.3);
+    assert.equal(weapon.envMapRotation, rotation); assert.equal(scene.environment, environment);
+  }
+  config.weaponReflections = false;
+  let restore = wb.Begin(scene, camera); assert.equal(weapon.envMap, null); restore();
+  config.weaponReflections = true; config.characterTextures = false;
+  restore = wb.Begin(scene, camera); assert.equal(weapon.envMap, null); assert.equal(actor.children[0].material.envMap, null); restore();
+  config.characterTextures = true; config.environment = true;
+  restore = wb.Begin(scene, camera); assert.equal(weapon.envMap, null); assert.equal(scene.environment, environment); restore();
+  wb.Dispose(); geometry.dispose(); weapon.dispose(); skin.dispose(); wall.dispose(); environment.dispose();
+}
 {
   // Exercise the actual cached Begin/restore path: the source material is restored
   // after each draw, so inspecting it alone used to miss an inert wireframe toggle.

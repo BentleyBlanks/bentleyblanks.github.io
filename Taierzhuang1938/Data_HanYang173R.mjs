@@ -5,11 +5,12 @@ export const HANYANG_173R = Object.freeze({
   version: '173R-20261025',
   url: './Model/HanYang173R/Model_HanYang173R.glb?v=173r-20261025',
   sourceSha256: '3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c',
-  wood: ['MainWood_ContinuousLowerShoulder', 'FrontWood_ContinuousOval', 'UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront', 'SideWoodButton'],
+  // SideWoodButton is metal in the source ORM despite its object name.
+  wood: ['MainWood_ContinuousLowerShoulder', 'FrontWood_ContinuousOval', 'UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront'],
   // Source wood is near-black (visible base texels ~41/29/20 sRGB). A linear
   // reflectance gain retains grain/roughness while fitting the game's filmic
   // exposure. This is an artistic runtime adaptation, not a source rebake.
-  woodReflectanceGain: 6,
+  woodReflectanceGain: 12,
   metalReflectanceGains: HANYANG_METAL_GAINS,
   metalRoughnessGain: 1.4,
   maximumReflectance: .95,

@@ -748,7 +748,7 @@ if (post.prepassPass) post.prepassPass.staticBatch = prepassStaticBatch;
 // 必须排在任何水面材质建出来之前（材质按预设缓存，建完就定型）。
 SetWaterSsr(ssrUniforms ? post.ssrPass.trace : null);
 const sky = new SkyDome(renderer, { quality: QUALITY,
-  environment: !WHITEBOX_CONFIG || WHITEBOX_CONFIG.environment,
+  environment: !WHITEBOX_CONFIG || WHITEBOX_CONFIG.environment || WHITEBOX_CONFIG.weaponReflections,
   atmosphere: !WHITEBOX_CONFIG || WHITEBOX_CONFIG.atmosphere });
 scene.add(sky.mesh);
 // 水面借天空 uniform：反射的天顶/地平线/太阳色随时段预设一起换（Script_Water）

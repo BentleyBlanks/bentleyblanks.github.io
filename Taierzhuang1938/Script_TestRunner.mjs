@@ -48,7 +48,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 
 export const testDefs = {
   HanYang173RAssetTest: {file:'Script_HanYang173RAssetTest.mjs',desc:'HanYang 60k actual GLB, all 44 parts, source PBR payload identity, tangent frames and packed material decoding'},
-  HanYang173RBrowserTest: {file:'Script_HanYang173RBrowserTest.mjs',timeoutMs:360000,desc:'Actual HanYang 173R FPS/world identity and high-quality day/shadow/night lighting'},
+  HanYang173RBrowserTest: {file:'Script_HanYang173RBrowserTest.mjs',timeoutMs:600000,desc:'Actual HanYang 173R FPS/world identity, high wood/metal lighting and whitebox weapon-only reflections'},
   Type89MediumTankTest: {file:"Script_Type89MediumTankTest.mjs",timeoutMs:120000,desc:"Type89 actual GLB: explicit240k close-detail budget, rigid hinges, metre bounds, PBR, mapped hit coverage and finite tangent bases"},
   Type89MediumTankBrowserTest: {file:"Script_Type89MediumTankBrowserTest.mjs",timeoutMs:180000,desc:"Type89 real renderer: independent treads/all wheels, turret/recoil/hatches, physical PBR colour spaces and reloaded model views"},
   HistoryCodexBrowserTest: {file:"Script_HistoryCodexBrowserTest.mjs",timeoutMs:300000,desc:"Archive: sourced records, soft book folds/cancel/back, 17 pages, zoom, disposal and mobile"},

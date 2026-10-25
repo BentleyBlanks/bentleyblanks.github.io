@@ -16,6 +16,7 @@ export const WHITEBOX_CONTROLS = [
   ["sky", "天空与云层", "材质与场景", false],
   ["effects", "粒子、烟火与贴花", "材质与场景", false],
   ["environment", "环境贴图 / IBL", "材质与场景", false],
+  ["weaponReflections", "保留枪械环境反射", "材质与场景", true],
   ["materialShading", "POM / 细节法线 / 皮肤散射", "材质与场景", false],
   // 2026-10-02 用户定：白盒也要太阳影子。中性光照旧，借关卡太阳的级联灯投影（Script_WhiteboxRendering._LightingMode）。
   ["shadows", "太阳级联阴影 CSM（中性光下投关卡太阳的影子）", "光照 Feature", true],

@@ -2,8 +2,14 @@
 // materials and does not become a production render pass.
 import * as THREE from 'three';
 export function MeasureHanYangPixels(game){
- const renderer=game.renderer,ldr=game.post.targets.ldr,w=ldr.width,h=ldr.height;
- const color=new Uint8Array(w*h*4);renderer.readRenderTargetPixels(ldr,0,0,w,h,color);
+ const renderer=game.renderer,ldr=game.post.targets.ldr;
+ // Default whitebox writes directly to the canvas, not the unused LDR target.
+ // Read synchronously after StepFrames, before drawing the temporary mask.
+ const screen=game.post.whiteboxConfig&&!game.post.whiteboxConfig.fxaa&&game.post.whiteboxPasses.has('whiteboxOutput');
+ const size=screen?renderer.getDrawingBufferSize(new THREE.Vector2()):null,w=screen?size.x:ldr.width,h=screen?size.y:ldr.height;
+ const color=new Uint8Array(w*h*4);
+ if(screen){const gl=renderer.getContext();gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,color);}
+ else renderer.readRenderTargetPixels(ldr,0,0,w,h,color);
  const red=new THREE.MeshBasicMaterial({color:0xff0000,toneMapped:false}),green=new THREE.MeshBasicMaterial({color:0x00ff00,toneMapped:false}),black=new THREE.MeshBasicMaterial({color:0,toneMapped:false});
  const scene=new THREE.Scene();scene.matrixWorldAutoUpdate=false;scene.children.push(game.viewmodel.root);
  const target=new THREE.WebGLRenderTarget(w,h,{type:THREE.UnsignedByteType,minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter});

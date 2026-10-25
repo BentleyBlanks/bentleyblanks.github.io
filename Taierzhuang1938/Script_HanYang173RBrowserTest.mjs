@@ -36,10 +36,10 @@ try{
  assert.equal(evidence.identity.worldTriangles,59901);assert.equal(evidence.identity.parts,44);assert(evidence.identity.privateGeometry);
  for(const m of evidence.identity.materials){assert.equal(m.base,'srgb');assert.equal(m.normal,'');assert.equal(m.orm,'');assert(m.folded&&m.patches.some(p=>p.includes('orm')),m.part);}
  evidence.lighting=[];
- for(const mode of ['Day','Shadow','Night','Ads']){
+ for(const mode of ['Day','Shadow','Overcast','Night','Ads']){
   const row=await page.evaluate(async mode=>{
    const g=window.Taierzhuang;
-   if(mode==='Night')g.Debug.ApplySky('night');else g.Debug.RestoreSky();
+   if(mode==='Night')g.Debug.ApplySky('night');else if(mode==='Overcast')g.Debug.ApplySky('firstLevelBattleDay');else g.Debug.RestoreSky();
    window.__hyRoof.visible=mode==='Shadow';
    document.dispatchEvent(new MouseEvent(mode==='Ads'?'mousedown':'mouseup',{button:2,bubbles:true}));
    g.StepFrames(90,1/60,false);g.post.hasTaaHistory=false;g.StepFrames(24);
@@ -68,7 +68,9 @@ try{
    assert(row.surfaces.metal.pixels>5000,'actual visible metal mask');
    assert(row.surfaces.metal.p50>(mode==='Day'?18:10)&&row.surfaces.metal.blackFraction<(mode==='Day'?.45:.50),'metal must retain midtones in light and shade');
    assert(row.surfaces.metal.p95<235,'broad metal highlights must retain headroom');
+   assert(row.surfaces.wood.p50>(mode==='Day'?30:25)&&row.surfaces.wood.p95<150,'wood grain must be readable in daylight and shadow with highlight headroom');
   }
+  if(mode==='Overcast'||mode==='Night')assert(row.surfaces.wood.p50>14&&row.surfaces.wood.blackFraction<.20,'wood must retain dark midtones in the overcast/night presets');
   evidence.lighting.push(row);await page.screenshot({path:path.join(out,`Scene_${mode}.png`)});
  }
  evidence.openGrip=await page.evaluate(()=>{
@@ -83,8 +85,52 @@ try{
   const rifle=fd.Events({text:'HanYang173R',draw:true,limit:150});fd.Release();return {summary,rifle};
  });
  assert(evidence.frame.rifle.rows.length>0,'production frame includes authored rifle draws');
+ // The user's default presentation must retain weapon IBL without enabling
+ // whole-scene IBL or any additional render pass. Read the real canvas output.
+ await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?weapons=1&manual=1&shot=1&quality=whitebox&scale=small&audio=0`,{timeout:120000});
+ await page.waitForFunction(()=>window.Taierzhuang?.state?.ready,null,{timeout:240000});
+ evidence.whitebox=[];
+ await page.evaluate(async()=>{
+  const g=window.Taierzhuang,T=await import('three');
+  g.interact.hooks.TakeWeapon('HanYang',5);g.Debug.WeaponRange.GoTo('firing');
+  g.player.health=100;g.player.spawnGrace=999;g.player.pitch=0;g.player.aimPitch=0;g.StepFrames(90);
+  window.__hyUpdate=g.viewmodel.Update;g.viewmodel.Update=()=>{};
+  const roof=new T.Mesh(new T.BoxGeometry(12,.2,12),new T.MeshStandardMaterial({color:0x666666,roughness:1}));
+  roof.position.copy(g.player.position);roof.position.y+=4;roof.castShadow=true;roof.visible=false;g.scene.add(roof);window.__hyRoof=roof;
+ });
+ for(const mode of ['Day','Shadow','Ads'])for(const reflection of [false,true]){
+  const row=await page.evaluate(async({mode,reflection})=>{
+   const g=window.Taierzhuang,c=g.post.whiteboxScene.config;
+   window.__hyRoof.visible=mode==='Shadow';c.weaponReflections=reflection;
+   if(mode==='Ads'&&g.player.ads<.99){
+    g.viewmodel.Update=window.__hyUpdate;
+    document.dispatchEvent(new MouseEvent('mousedown',{button:2,bubbles:true}));g.StepFrames(90);
+    g.viewmodel.Update=()=>{};
+   }
+   const {MeasureHanYangPixels}=await import('./_import/Script_HanYang173RPixelProbe.mjs');
+   g.StepFrames(12);const surfaces=MeasureHanYangPixels(g);g.StepFrames(1);
+   const expected=g.scene.environment,restore=g.post.whiteboxScene.Begin(g.scene,g.camera);
+   let bound=0,leaks=0;
+   g.scene.traverseVisible(o=>{for(const m of [o.material].flat())if(expected&&m?.envMap===expected){if(m.userData.whiteboxWeaponReflection)bound++;else leaks++;}});
+   const during={environment:g.scene.environment===null,generated:!!expected?.isTexture,bound,leaks};restore();
+   const programs=g.renderer.info.programs.length;g.StepFrames(12);
+   return {mode,reflection,surfaces,during,restored:g.scene.environment===expected,
+    newPrograms:g.renderer.info.programs.length-programs,passes:g.GraphicsProfile.Inspect().renderedPasses,
+    glError:g.renderer.getContext().getError(),ads:g.player.ads};
+  },{mode,reflection});
+  evidence.whitebox.push(row);
+  assert(row.during.generated&&row.during.environment&&row.restored&&row.during.leaks===0,'IBL is generated, weapon-only and restored after rendering');
+  assert.equal(row.during.bound>0,reflection);assert.equal(row.glError,0);assert.equal(row.newPrograms,0);
+  assert.deepEqual(row.passes,['main','whiteboxOutput']);
+  if(reflection){
+   const before=evidence.whitebox.at(-2);
+   assert(row.surfaces.metal.p50>before.surfaces.metal.p50+10,'actual shaded metal receives environment reflection');
+   assert(row.surfaces.wood.p50>30&&row.surfaces.wood.p95<245,'whitebox wood remains readable without broad clipping');
+   await page.screenshot({path:path.join(out,`Scene_Whitebox${mode}.png`)});
+  }
+ }
  assert.deepEqual(errors,[]);
- console.log('ok HanYang173R actual game: 59901 triangles, 44 PBR parts, private FPS/world geometry, high-quality day/shadow/night/ADS and frame graph');
+ console.log('ok HanYang173R actual game: 59901 triangles, 44 PBR parts, high day/shadow/overcast/night/ADS, whitebox weapon-only IBL and unchanged pass count');
 }finally{
  await fs.writeFile(path.join(out,'Data_Acceptance.json'),JSON.stringify({evidence,errors},null,2));
  await browser.close();await new Promise(r=>server.close(r));
