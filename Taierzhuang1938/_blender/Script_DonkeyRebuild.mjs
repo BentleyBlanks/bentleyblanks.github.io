@@ -1,4 +1,4 @@
-// Fit the bare V30 donkey from its frozen V3 intermediate; preserve prior sources.
+// Fit the bare V35 donkey from its frozen V3 intermediate; preserve prior sources.
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -10,6 +10,7 @@ const helper=path.join(root,'scripts/Script_BlenderMcp.mjs');
 const source='C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261023/ReferenceFitV4/Scene_DonkeyBeforeReferenceFit.blend';
 if(!fs.statSync(path.join(root,'.git')).isFile())throw Error('Use an exclusive Git worktree');
 if(!fs.existsSync(source))throw Error('Missing preserved V3 source: '+source);
+if(!fs.existsSync(path.join(scriptDir,'Data_DonkeyJointFitV35.json')))throw Error('Missing authored V35 joint-fit recipe');
 function Control(args,stdio='pipe'){
  return execFileSync(process.execPath,[helper,...args],{cwd:root,encoding:'utf8',stdio,maxBuffer:16*1024*1024});
 }

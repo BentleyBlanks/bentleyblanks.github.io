@@ -170,7 +170,7 @@ def BuildGroom(skin,rig,collection,material,count=21000,pigmentSampler=None):
         if centre.z<minimumFurZ:continue
         if centre.y>1.16 and centre.z<1.13:continue
         area=triangle.area
-        density=.55 if centre.z<.55 else .65 if centre.y>.95 else 1
+        density=(.80 if bpy.context.scene.get('DonkeyJointFitReport') else .55) if centre.z<.55 else .65 if centre.y>.95 else 1
         total+=area*density;cumulative.append(total);triangles.append(triangle)
     if not triangles:raise RuntimeError('No furry skin surface')
     vertices=[];faces=[];uvs=[];rows=[];colors=[];normals=[];regions={str(i):0 for i in range(4)}

@@ -48,7 +48,7 @@ def BuildLegAlbedo(rgb,blur):
         padded=np.pad(micro,((12,12),(0,0)),mode='edge')
         summed=np.pad(np.cumsum(padded,axis=0,dtype=np.float64),((1,0),(0,0)))
         column=(summed[25:]-summed[:-25])/25
-        micro=np.clip(micro/np.maximum(.5,column),.65,1.45)
+        micro=np.clip(micro/np.maximum(.5,column),.90,1.12)
         sourceX=(lo+hi)*.5+np.clip(horizontal,-1,1)*width*.40
         color=Fetch(low,sourceX,sourceY)
         light=np.array((-.4,.5,.76) if view=='Side' else (-.3,.5,.81) if view=='Front' else (.3,-.5,.81));light/=np.linalg.norm(light)
@@ -65,10 +65,10 @@ def BuildLegAlbedo(rgb,blur):
         # Suppress a coherent source-row stripe while retaining variations
         # between actual individual hairs. There is no synthetic noise.
         rowMean=np.mean(np.stack([Fetch(micro,lo+width*t,sourceY) for t in np.linspace(.2,.8,16)]),axis=0)
-        detail=np.clip(detail/np.maximum(.5,rowMean),.65,1.45)
+        detail=1+1.25*(np.clip(detail/np.maximum(.5,rowMean),.90,1.12)-1)
         active=(sourceY>460)&(sourceY<870)
         sourceChecks.append({'view':view,'donor':key,'samples':int(np.count_nonzero(active)),'sourceXRange':[float(sourceX[active].min()),float(sourceX[active].max())]})
-        projected=np.clip(Fetch(micro,sourceX,sourceY)/np.maximum(.5,rowMean),.65,1.45)
+        projected=1+1.25*(np.clip(Fetch(micro,sourceX,sourceY)/np.maximum(.5,rowMean),.90,1.12)-1)
         return color,projected,detail
     dark=np.mean([palette['ForeSideDark'],palette['HindSideDark'],palette['ForeFrontDark']],axis=0)
     for index,stem in enumerate(['DonkeyFrontLeft','DonkeyFrontRight','DonkeyRearLeft','DonkeyRearRight']):
@@ -82,7 +82,7 @@ def BuildLegAlbedo(rgb,blur):
         # Dark fibres retain bounded, same-limb photographic mottling;
         # directional light and joint recesses are supplied by PBR geometry.
         sideBase=palette['ForeSideDark' if front else 'HindSideDark']
-        mottling=np.clip(side/np.maximum(.008,sideBase),.82,1.22)
+        mottling=np.clip(side/np.maximum(.008,sideBase),.90,1.10)
         pigment=dark*mottling
         pale=palette['ForeMedialPale'] if front else np.mean([palette['RearMedialLeft'],palette['RearMedialRight']],axis=0)
         capPigment=np.minimum(pale,np.maximum(dark,face))
@@ -97,7 +97,7 @@ def BuildLegAlbedo(rgb,blur):
         color=np.maximum(0,pigment*detail[:,:,None])
         atlas[:,index*tileWidth:(index+1)*tileWidth,:3]=np.where(color<=.0031308,color*12.92,1.055*color**(1/2.4)-.055)
         sampling.append({'leg':stem,'sideDonor':sideKey,'capDonor':capKey})
-    record={'method':'silhouette-masked source-space filtering; charcoal pigment with bounded photographic short-hair detail; broad joint shadows suppressed; same-limb frontal/rear pale pigment and periodic hidden-cap extension',
+    record={'revision':'20261026ShadowSeparatedLegV35','method':'silhouette-masked source-space pigment; same-limb sampled charcoal/pale coat with bounded photographic microdetail; coherent tendon/row shadows removed before cylindrical correspondence; periodic detail only on hidden caps',
         'sourceBoundaryRows':BOUNDARIES,'sampling':sampling,'sourceChecks':sourceChecks,'paletteSourceBoxes':PALETTE_BOXES,'paletteCalibratedLinearRgb':{name:value.tolist() for name,value in palette.items()},
-        'sourcePigmentBlurRadiusPixels':6,'sourceMicroBlurRadiusPixels':4,'sourceVerticalCoherenceWindowPixels':25,'microRatioRange':[.65,1.45],'microStrength':1.0,'darkMottlingRatioRange':[.82,1.22],'silhouetteMaskedFiltering':True,'hiddenCapRepeats':round(math.pi/.60),'visibleDetailIsPhotographic':True,'periodicDetailScope':'unphotographed cap only','detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
+        'sourcePigmentBlurRadiusPixels':6,'sourceMicroBlurRadiusPixels':4,'sourceVerticalCoherenceWindowPixels':25,'microRatioRange':[.90,1.12],'microStrength':1.25,'darkMottlingRatioRange':[.90,1.10],'silhouetteMaskedFiltering':True,'hiddenCapRepeats':round(math.pi/.60),'visibleDetailIsPhotographic':True,'periodicDetailScope':'unphotographed cap only','detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
     return atlas,record

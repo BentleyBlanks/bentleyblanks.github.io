@@ -7,8 +7,11 @@ from mathutils.bvhtree import BVHTree
 from mathutils.geometry import barycentric_transform
 
 def RebuildReferenceMane(skin,rig,collection):
+    removedLegacyMane=[]
     for obj in list(collection.objects):
-        if obj.name=='DonkeyManeFineFibres' or obj.name.startswith(('DonkeyForelockFibre','DonkeyReferenceMane')):
+        if obj.name=='DonkeyDenseManeBase':
+            obj.data.calc_loop_triangles();removedLegacyMane.append({'name':obj.name,'triangles':len(obj.data.loop_triangles)})
+        if obj.name in ('DonkeyManeFineFibres','DonkeyDenseManeBase') or obj.name.startswith(('DonkeyForelockFibre','DonkeyReferenceMane')):
             bpy.data.objects.remove(obj,do_unlink=True)
     skin.data.calc_loop_triangles();triangles=list(skin.data.loop_triangles)
     tree=BVHTree.FromPolygons([v.co for v in skin.data.vertices],[tuple(t.vertices) for t in triangles],all_triangles=True)
@@ -44,6 +47,7 @@ def RebuildReferenceMane(skin,rig,collection):
     group=skin.vertex_groups['DonkeyFrontLeftHoofPivot'].index
     soles=[v.co.y for v in skin.data.vertices if v.co.z<.035 and any(g.group==group and g.weight>.98 for g in v.groups)]
     anchor=sum(soles)/len(soles);ppm=(925-302)/1.10;growth=Vector((0,-.4,1)).normalized();height=.130;below=.010;foreHeight=.165
+    foreHalfWidth=.065;foreRootHalfWidth=.050
     alpha=np.zeros((256,512),dtype=np.float32)
     for column in range(512):
         y=.635+.415*column/511;root,_=Root(0,y)
@@ -55,15 +59,17 @@ def RebuildReferenceMane(skin,rig,collection):
     eye=bpy.data.objects['DonkeyEyeLeft'];matrix=rig.matrix_world.inverted()@eye.matrix_world
     eyeY=sum((matrix@v.co).y for v in eye.data.vertices)/len(eye.data.vertices)
     foreY=float(bpy.context.scene.get('DonkeyReferenceForelockY',eyeY-.040));bpy.context.scene['DonkeyReferenceForelockY']=foreY
-    foreRoot,_=Root(0,foreY);foreRgb=np.zeros((128,128,3),dtype=np.float32)
-    for column in range(128):
-        x=-.045+.090*column/127;bg=Luminance(Sample(156.5-ppm*x,925-ppm*max(1.50,foreRoot.z+.20),'Front'))
-        for row in range(128):
-            d=foreHeight-(foreHeight+below)*row/127;rgb=Sample(156.5-ppm*x,925-ppm*(foreRoot.z+d),'Front');foreRgb[row,column]=rgb;value=Luminance(rgb)
-            opacity=max(0,min(1,(bg-value)/max(.1,bg-.007)));alpha[128+row,column]=opacity if opacity>.04 else 0
+    foreRoot,_=Root(0,foreY);earTriangles=[]
+    for side in ['Left','Right']:
+        for prefix in ['DonkeyPinna','DonkeyRolledEarRim']:
+            ear=bpy.data.objects[prefix+side];ear.data.calc_loop_triangles();matrix=rig.matrix_world.inverted()@ear.matrix_world
+            earTriangles.extend([[list(matrix@ear.data.vertices[i].co) for i in tri.vertices] for tri in ear.data.loop_triangles])
+    foreNamespace={};file=project/'_blender/Script_DonkeyForelock.py';exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),foreNamespace)
+    foreRgb,foreAlpha,foreProfile,groups,foreReport=foreNamespace['ExtractForelock'](arrays[0],foreRoot.z,earTriangles,foreHalfWidth,foreHeight,below,ppm)
+    alpha[128:,:128]=foreAlpha
     values=np.ones((256,512,4),dtype=np.float32);values[:,:,:3]=.73535698;values[:,:,3]=alpha
     foreFade=np.clip((foreHeight-(foreHeight+below)*np.arange(128)/127)/.030,0,1)
-    values[128:,:128,:3]=foreRgb;values[128:,:128,3]=alpha[128:,:128]*.30*foreFade[:,None]
+    values[128:,:128,:3]=foreRgb;values[128:,:128,3]=alpha[128:,:128]*foreFade[:,None]
     image=bpy.data.images.get('Texture_DonkeyManeBase') or bpy.data.images.new('Texture_DonkeyManeBase',width=512,height=256,alpha=True)
     if tuple(image.size)!=(512,256):image.scale(512,256)
     image.colorspace_settings.name='sRGB';image.alpha_mode='CHANNEL_PACKED'
@@ -88,7 +94,7 @@ def RebuildReferenceMane(skin,rig,collection):
     # The curved front layer carries the reference's subpixel flyaways and
     # shaft highlights. Fine 3D fibres still give oblique views their volume.
     for index in range(32):
-        x=-.045+.090*index/31;root,bones=Root(x,foreY)
+        x=-foreHalfWidth+2*foreHalfWidth*index/31;root,bones=Root(x,foreY)
         for t in (0,.5,1):
             d=(foreHeight+below)*t-below
             vertices.append(Vector((x,root.y+.012+.20*d+.007*math.sin(math.pi*t),foreRoot.z+d)))
@@ -149,33 +155,22 @@ def RebuildReferenceMane(skin,rig,collection):
         occupied=np.where(alpha[:96,column]>.24)[0];extent=max(.003,height-(height+below)*int(occupied[0])/95) if len(occupied) else .003
         length=extent*(.985 if strand<256 else rng.uniform(.55,.99));spread=max(-.020,min(.020,rng.gauss(0,.009)))
         AddVolumeStrand(root,bones,growth,length,Vector((spread,rng.uniform(-.0015,.0015),0)),rng.uniform(.00022,.00038),4.0)
-    foreProfile=[]
-    for column in range(128):
-        occupied=np.where(alpha[128:,column]>.65)[0]
-        foreProfile.append(max(.008,foreHeight-(foreHeight+below)*int(occupied[0])/127) if len(occupied) else .008)
-    # Strong foreground contrast separates the real three peaks from the
-    # studio background gradient. Connected upper lobes define whole tufts.
-    groups=[];cut=max(foreProfile)*.82
-    for column in range(8,120):
-        if foreProfile[column]<=cut:continue
-        if not groups or column>groups[-1][-1]+4:groups.append([column])
-        else:groups[-1].append(column)
-    groups=[group for group in groups if len(group)>=3]
     tuftColumns=[max(group,key=lambda column:foreProfile[column]) for group in groups]
     if not groups:raise RuntimeError('Reference forelock has no usable connected upper lobes')
+    validColumns=[i for i,v in enumerate(foreProfile) if v>.006]
     for strand in range(760):
         tufted=strand<360
         if tufted:
             group=groups[strand%len(groups)];tipColumn=rng.uniform(group[0],group[-1])
-            tipX=-.045+.09*tipColumn/127+rng.gauss(0,.0025)
-            tipX=max(-.043,min(.043,tipX))
-        else:tipX=rng.uniform(-.043,.043)
-        x=max(-.038,min(.038,tipX*.75+rng.gauss(0,.010))) if tufted else rng.uniform(-.038,.038)
-        y=foreY+rng.gauss(0,.004);root,bones=Root(x,y);column=round((tipX+.045)/.09*127)
+            tipX=-foreHalfWidth+2*foreHalfWidth*tipColumn/127+rng.gauss(0,.0025)
+            tipX=max(-foreHalfWidth*.96,min(foreHalfWidth*.96,tipX))
+        else:tipX=-foreHalfWidth+2*foreHalfWidth*(rng.choice(validColumns)+rng.uniform(-.4,.4))/127
+        x=max(-foreRootHalfWidth,min(foreRootHalfWidth,tipX*.75+rng.gauss(0,.010))) if tufted else rng.uniform(-foreRootHalfWidth,foreRootHalfWidth)
+        y=foreY+rng.gauss(0,.004);root,bones=Root(x,y);column=round((tipX+foreHalfWidth)/(2*foreHalfWidth)*127)
         extent=foreProfile[column];direction=Vector((0,.20,1)).normalized()
         targetZ=foreRoot.z+extent*(.60+.41*rng.random()**.70 if tufted else rng.uniform(.25,.70))
         length=max(.003,(targetZ-root.z)/direction.z)
-        AddForelockStrand(root,bones,direction,length,Vector((tipX-x,(tipX/.045)*.006+rng.uniform(-.005,.005),0)),rng.uniform(.00020,.00045))
+        AddForelockStrand(root,bones,direction,length,Vector((tipX-x,(tipX/foreHalfWidth)*.006+rng.uniform(-.005,.005),0)),rng.uniform(.00020,.00045))
     volumeMesh=bpy.data.meshes.new('DonkeyReferenceManeVolume');volumeMesh.from_pydata(volumeVertices,[],volumeFaces);volumeMesh.update()
     volumeMesh.materials.append(bpy.data.objects['DonkeyShortCoatCards'].data.materials[0])
     for face in volumeMesh.polygons:face.use_smooth=True
@@ -192,6 +187,6 @@ def RebuildReferenceMane(skin,rig,collection):
     modifier=volume.modifiers.new('DonkeyManeVolumeSkin','ARMATURE');modifier.object=rig
     volume['coatCardCount']=len(volumeFaces);volume['groomCastShadow']=False;volume.visible_shadow=False
     bpy.context.scene['DonkeyManeTufts']='[]';bpy.context.scene['DonkeyReferenceMane']=True
-    return {'mainRows':40,'crossCards':0,'forelockColumns':32,'forelockCrossCards':0,'forelockLayer':'curved front reference RGB/alpha at 0.30 opacity, 30 mm root fade, backed by individual 3D strands','triangles':sum(len(f)-2 for f in faces),'exportLayer':'DonkeyManeRuntime',
-            'forelockRootY':foreY,'volumeFibres':{'main':1100,'forelock':760,'forelockPeakColumns':sorted(tuftColumns),'forelockLobeColumns':[[group[0],group[-1]] for group in groups],'forelockForegroundAlpha':.65,'forelockUpperLobeFraction':.82,'forelockTuftedFibres':360,'forelockHalfWidthM':[.00020,.00045],'forelockRootSpreadStdM':.010,'triangles':sum(len(f)-2 for f in volumeFaces),'mainTintGain':4.0,'forelockTintGain':3.7,'pathBendFraction':{'main':.45,'forelock':.34},'spread':'fine curved strips spread across three reference lobes; staggered lengths and narrow tapered tips replace solid cones','exportLayer':'DonkeyCoatRuntime','material':'DonkeyShortCoatPbr','alpha':'MASK 0.45; depth writing','sourceObject':volume.name},
+    return {'mainRows':40,'crossCards':0,'removedLegacySolidMane':removedLegacyMane,'forelockColumns':32,'forelockCrossCards':0,'forelockLayer':'curved front reference RGB/foreground matte at full opacity, 30 mm root fade, backed by individual 3D strands','forelockExtraction':foreReport,'forelockSourceWidthM':2*foreHalfWidth,'forelockRootWidthM':2*foreRootHalfWidth,'triangles':sum(len(f)-2 for f in faces),'exportLayer':'DonkeyManeRuntime',
+            'forelockRootY':foreY,'volumeFibres':{'main':1100,'forelock':760,'forelockPeakColumns':sorted(tuftColumns),'forelockLobeColumns':[[group[0],group[-1]] for group in groups],'forelockForegroundAlpha':.32,'forelockUpperLobeFraction':.40,'forelockPeakSeparationColumns':18,'forelockTuftedFibres':360,'forelockHalfWidthM':[.00020,.00045],'forelockRootSpreadStdM':.010,'triangles':sum(len(f)-2 for f in volumeFaces),'mainTintGain':4.0,'forelockTintGain':3.7,'pathBendFraction':{'main':.45,'forelock':.34},'spread':'fine curved strips spread across the measured reference lobes; staggered lengths and narrow tapered tips replace solid cones','exportLayer':'DonkeyCoatRuntime','material':'DonkeyShortCoatPbr','alpha':'MASK 0.45; depth writing','sourceObject':volume.name},
             'method':'reference-alpha side ribbon, curved triangular-tube main mane and fine curved forelock strips rooted to actual skin','texture':str(path),'textureSha256':hashlib.sha256(content).hexdigest(),'sourceSha256':hashlib.sha256(original.read_bytes()).hexdigest()}

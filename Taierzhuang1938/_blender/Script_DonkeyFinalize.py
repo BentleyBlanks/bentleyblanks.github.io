@@ -6,6 +6,14 @@ from mathutils import Vector,Matrix
 scene=bpy.context.scene;project=Path(scene['DonkeyCartProject']);base=Path(scene['DonkeySourceRoot'])
 output=project/'Model/Donkey';asset=output/'Model_Donkey.glb'
 def Read(path):return json.loads(path.read_text(encoding='utf-8'))
+def RequireMotion(file,region):
+    motion=Read(base/'Review'/file)
+    if (not motion['pass'] or motion['assetSha256']!=sha or motion['region']!=region
+        or motion['walkSamples']!=145 or motion['idleSamples']!=37 or motion['visibilityDirections']!=14
+        or motion['visibilityToleranceM']!=.00025 or not motion['furOcclusionIgnored']
+        or motion['restCrossings'] or motion['maximumVisibleCrossings']):
+        raise RuntimeError('Complete current-asset '+region+' motion verification is required')
+    return motion
 parent=Read(project/'Model/DonkeyCart/Data_DonkeyCart.json')
 parentTextures=Read(project/'Model/DonkeyCart/Data_DonkeyCartTextures.json')
 packing=Read(output/'Data_DonkeyPacking.json');bake=Read(base/'Review/Data_ExportBake.json')
@@ -99,11 +107,18 @@ contract={'schema':'tengxian-independent-rigged-prop-v1','id':'Donkey','version'
 if scene.get('DonkeyEyeRevision'):
     contract['runtime']['specularTransfer']=next(row.get('specularTransfer') for row in bake['batches'] if row['label']=='Animal')
 if scene.get('DonkeyReferenceForeSwingClearanceDeg'):
-    motion=Read(base/'Review/Data_PectoralMotionIntegrity.json')
-    if not motion['pass'] or motion['assetSha256']!=sha:raise RuntimeError('Dense motion verification is missing or belongs to an older GLB')
+    motion=RequireMotion('Data_PectoralMotionIntegrity.json','Pectoral')
     contract['animations']['DonkeyWalk']={**contract['animations']['DonkeyWalk'],'foreSwingClearance':{'leftMaximumDegrees':scene['DonkeyReferenceForeSwingClearanceDeg'],'rightMaximumDegrees':scene.get('DonkeyReferenceForeRightSwingClearanceDeg',0),'onlyUnplanted':True,'forwardStrideUnchanged':True}}
     contract['verification']['nativeLateralStanceDriftPerFrameM']=native['worstLateralStanceDriftPerFrameM']
     contract['verification']['pectoralMotionIntegrity']={key:value for key,value in motion.items() if key!='poses'}
+    if scene.get('DonkeyReferenceFitRevision') in ['20261025ReferenceV32','20261025ReferenceV33','20261026ReferenceV35']:
+        hindMotion=RequireMotion('Data_HindMotionIntegrity.json','Hind')
+        contract['verification']['hindMotionIntegrity']={key:value for key,value in hindMotion.items() if key!='poses'}
+    if scene.get('DonkeyReferenceFitRevision') in ['20261025ReferenceV33','20261026ReferenceV35']:
+        lowerMotion=RequireMotion('Data_LowerBodyMotionIntegrity.json','LowerBody')
+        contract['verification']['lowerBodyMotionIntegrity']={key:value for key,value in lowerMotion.items() if key!='poses'}
+if native.get('jointArcs'):
+    contract['animations']['DonkeyWalk']['jointArcs']=native['jointArcs']
 if scene.get('DonkeyReferenceLegSections'):
     uvProof=Read(base/'Review/Data_UvOverlapVerification.json')
     if uvProof['overlapPixels'] or uvProof['legOverlapPixels']:raise RuntimeError('Unique Base Color atlas contains overlapping bake texels')
@@ -115,13 +130,16 @@ if scene.get('DonkeyReferenceLegSections'):
 for file in sorted((project/'_blender').glob('Script_Donkey*')):
     if file.suffix not in ('.py','.mjs'):continue
     text=bpy.data.texts.get(file.name) or bpy.data.texts.new(file.name);text.clear();text.write(file.read_text(encoding='utf-8'));text.use_fake_user=True
+for name in ('Data_DonkeyPectoralEdges.json','Data_DonkeyJointFitV35.json'):
+    file=project/'_blender'/name
+    text=bpy.data.texts.get(name) or bpy.data.texts.new(name);text.clear();text.write(file.read_text(encoding='utf-8'));text.use_fake_user=True
 for file in (base/'Data_Derivation.json',output/'Data_Donkey.json',output/'Data_DonkeyTextures.json'):
     text=bpy.data.texts.get(file.name) or bpy.data.texts.new(file.name);text.clear();text.write(file.read_text(encoding='utf-8'));text.use_fake_user=True
 for file in (base/'SourceTextures').glob('Data_*Generation.json'):
     text=bpy.data.texts.get(file.name) or bpy.data.texts.new(file.name);text.clear();text.write(file.read_text(encoding='utf-8'));text.use_fake_user=True
 rig=bpy.data.objects['DonkeyRig'];rig.data.pose_position='POSE'
 for bone in rig.pose.bones:bone.matrix_basis=Matrix.Identity(4)
-scene.frame_start=1;scene.frame_end=37
+scene.frame_start=1;scene.frame_end=native.get('jointArcs',{}).get('walkSamples',37)
 camera=bpy.data.objects['ReviewCamera'];camera.location=(-4,5,2.8);camera.rotation_euler=(Vector((0,0,.81))-camera.location).to_track_quat('-Z','Y').to_euler();camera.data.ortho_scale=2.5
 scene.render.resolution_x=640;scene.render.resolution_y=400;scene.render.resolution_percentage=100
 for action in bpy.data.actions:

@@ -58,4 +58,4 @@ def InstallLegPigment(scene,skin,rig,base):
         blend=nodes.new('ShaderNodeAttribute');blend.attribute_name='LegPigmentBlend';mix=nodes.new('ShaderNodeMixRGB');links.new(blend.outputs['Fac'],mix.inputs[0]);links.new(previous,mix.inputs[1]);links.new(texture.outputs['Color'],mix.inputs[2]);links.new(mix.outputs[0],shader.inputs['Base Color']);materials.append(material.name)
     record={**sourceRecord,'source':str(source),'sourceSha256':hashlib.sha256(source.read_bytes()).hexdigest(),'atlas':str(path),'sha256':hashlib.sha256(content).hexdigest(),'vertices':count,'materials':materials,
         'runtime':'baked into existing UV0 2K Base Color; shared UV1 fur normal unchanged; no additional runtime image or projection'}
-    (base/'SourceTextures/Data_LegPigment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8');scene['DonkeyLegPigmentRevision']='20261025SourceScaleAlbedoV30';return record
+    (base/'SourceTextures/Data_LegPigment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8');scene['DonkeyLegPigmentRevision']='20261026ShadowSeparatedV35';return record

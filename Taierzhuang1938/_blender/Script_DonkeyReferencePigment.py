@@ -48,6 +48,7 @@ def InstallReferencePigment(scene,skin,rig,base):
     eye=bpy.data.objects['DonkeyEyeLeft'];eyeMatrix=rig.matrix_world.inverted()@eye.matrix_world
     eyeCentre=sum((eyeMatrix@v.co for v in eye.data.vertices),Vector())/len(eye.data.vertices);eyeCentre.x=abs(eyeCentre.x)
     ppm=(925-302)/1.10;anchor=scene['DonkeyReferenceFitAnchorY'];gain=.50;mixStrength=.95;materials=[]
+    eyeProtection=(.028,.028,.012) if scene.get('DonkeyHeadFitReport') else (.040,.040,.020)
     for material in skin.data.materials:
         if not material:continue
         furry=material.name.startswith(('DonkeyCartGreyCoat','DonkeyLowerLegShortFur','DonkeyCartFaceFur'))
@@ -94,7 +95,7 @@ def InstallReferencePigment(scene,skin,rig,base):
         confidence=Clamp(Math('DIVIDE',validTotal,Math('MAXIMUM',.001,total)))
         fade=Clamp(Math('DIVIDE',Math('SUBTRACT',y,.88),.10));smooth=Math('MULTIPLY',Math('MULTIPLY',fade,fade),Math('SUBTRACT',3,Math('MULTIPLY',2,fade)))
         body=Math('SUBTRACT',1,smooth)
-        dx=Math('DIVIDE',Math('SUBTRACT',Math('ABSOLUTE',x),eyeCentre.x),.040);dy=Math('DIVIDE',Math('SUBTRACT',y,eyeCentre.y),.040);dz=Math('DIVIDE',Math('SUBTRACT',z,eyeCentre.z),.020)
+        dx=Math('DIVIDE',Math('SUBTRACT',Math('ABSOLUTE',x),eyeCentre.x),eyeProtection[0]);dy=Math('DIVIDE',Math('SUBTRACT',y,eyeCentre.y),eyeProtection[1]);dz=Math('DIVIDE',Math('SUBTRACT',z,eyeCentre.z),eyeProtection[2])
         distance=Math('SQRT',Math('ADD',Math('MULTIPLY',dx,dx),Math('ADD',Math('MULTIPLY',dy,dy),Math('MULTIPLY',dz,dz))))
         fadeEye=Clamp(Math('DIVIDE',Math('SUBTRACT',distance,.7),.4));eyeKeep=Math('MULTIPLY',Math('MULTIPLY',fadeEye,fadeEye),Math('SUBTRACT',3,Math('MULTIPLY',2,fadeEye)))
         strength=Math('ADD',Math('MULTIPLY',mixStrength,body),Math('MULTIPLY',.88,Math('MULTIPLY',smooth,eyeKeep)))
@@ -107,7 +108,7 @@ def InstallReferencePigment(scene,skin,rig,base):
         mix=nodes.new('ShaderNodeMixRGB');links.new(amount,mix.inputs[0]);links.new(previous,mix.inputs[1]);links.new(pigment,mix.inputs[2]);links.new(mix.outputs[0],shader.inputs['Base Color']);materials.append(material.name)
     record={'method':'full reference RGB with per-view normal-based illumination compensation for body, facial fur and the V14 nasal pad; the pad retains its independent skin normal; anatomical feature footprints and hidden/background pixels retain calibrated appearance',
         'linearGain':gain,'linearGainRgb':[.50,.515,.55],'mixStrength':mixStrength,'headTransitionY':[.88,.98],
-        'headMixStrength':.88,'eyeProtectionRadiiM':[.040,.040,.020],'nasalCavityProtection':'source cavity and oral crease/highlight footprints excluded from colour projection',
+        'headMixStrength':.88,'eyeProtectionRadiiM':list(eyeProtection),'nasalCavityProtection':'source cavity and oral crease/highlight footprints excluded from colour projection',
         'fineCompensation':{'radiusPixels':1,'amount':1.25,'sourceSampling':'Closest during offline bake; ordinary filtered runtime sampler unchanged'},'images':records,'materials':materials,
         'sources':[{'path':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()} for path in paths],
         'runtime':'offline UV0 bake into existing 2K base; no additional runtime image, material, camera projection or shader'}

@@ -690,6 +690,7 @@ def ApplyReferenceFit(scene,base):
     bm.to_mesh(skin.data);bm.free();skin.data.update()
     legNamespace={}
     exec(compile((project/'_blender/Script_DonkeyLegSections.py').read_text(encoding='utf-8'),'Script_DonkeyLegSections.py','exec'),legNamespace)
+    bpy.ops.wm.save_as_mainfile(filepath=str(base/'Scene_DonkeyBeforeLimbFit.blend'))
     legFit=legNamespace['FitReferenceLegs'](skin,rig)
     upperBodyNamespace={}
     exec(compile((project/'_blender/Script_DonkeyUpperBody.py').read_text(encoding='utf-8'),'Script_DonkeyUpperBody.py','exec'),upperBodyNamespace)
@@ -710,7 +711,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261025ReferenceV30'
+    scene['DonkeyReferenceFitRevision']='20261026ReferenceV35'
     scene['DonkeyReferenceBodyTuftLimit']=288
     scene['DonkeyReferencePaleFringe']=True
     scene['DonkeyReferenceForeSwingClearanceDeg']=2.5
@@ -748,7 +749,26 @@ def ApplyReferenceFit(scene,base):
     limbTopology={};file=project/'_blender/Script_DonkeyLimbTopology.py'
     exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),limbTopology)
     details['axillaryTopology']=limbTopology['FinishAxillaryTopology'](scene,skin)
+    hindNamespace={};file=project/'_blender/Script_DonkeyHindFit.py'
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),hindNamespace)
+    details['hindBinding']=hindNamespace['BindReferenceHindLegs'](scene,skin,rig)
+    headNamespace={};file=project/'_blender/Script_DonkeyHeadFit.py'
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),headNamespace)
+    details['headFit']=headNamespace['ApplyReferenceHead'](scene,skin,rig,collection)
+    details['postHeadOrbitalIntegrity']=eyeNamespace['CheckOrbitalIntegrity'](skin)
+    details['muzzle']['integrity']=muzzleNamespace['CheckMuzzleIntegrity'](skin)
+    limbSurface={};file=project/'_blender/Script_DonkeyLimbSurface.py'
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),limbSurface)
+    details['limbSurface']=limbSurface['FairReferenceLegSurfaces'](scene,skin)
+    forearmNamespace={};file=project/'_blender/Script_DonkeyForearmCollar.py'
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),forearmNamespace)
+    details['forearmCollars']=forearmNamespace['FitForearmCollars'](scene,skin)
+    details['hindBinding']['harmonicRoots']=hindNamespace['HarmonicHindRoots'](skin,.25,.96,1.03)
+    details['hindBinding']['pasterns']=hindNamespace['RigidHindPasterns'](skin)
     FinishFurResponse(rig,collection)
+    jointNamespace={};file=project/'_blender/Script_DonkeyJointFit.py'
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),jointNamespace)
+    details['jointFit']=jointNamespace['ApplyJointFit'](scene,skin,rig)
     details['nasalPad']=InstallNasalPad(skin);flowReport=RefreshFlow(skin,rig,collection)
     photoNamespace={}
     exec(compile((project/'_blender/Script_DonkeyPhotoDetail.py').read_text(encoding='utf-8'),'Script_DonkeyPhotoDetail.py','exec'),photoNamespace)
@@ -759,6 +779,9 @@ def ApplyReferenceFit(scene,base):
     legPigmentNamespace={}
     exec(compile((project/'_blender/Script_DonkeyLegPigment.py').read_text(encoding='utf-8'),'Script_DonkeyLegPigment.py','exec'),legPigmentNamespace)
     photoDetail['legPigment']=legPigmentNamespace['InstallLegPigment'](scene,skin,rig,base)
+    earNamespace={};file=project/'_blender/Script_DonkeyEarCoat.py'
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),earNamespace)
+    photoDetail['earCoat']=earNamespace['InstallEarCoat'](scene,rig,base)
     details['skinWeights']=NormalizeReferenceSkinWeights(skin)
     previousGroom=bpy.data.objects['DonkeyShortCoatCards'];groomMaterial=previousGroom.data.materials[0]
     bpy.data.objects.remove(previousGroom,do_unlink=True)

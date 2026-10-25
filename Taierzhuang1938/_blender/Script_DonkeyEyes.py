@@ -67,7 +67,10 @@ def RebuildEyeSockets(skin,rig):
                     du,dv=PolarProfile(angle,.026,.012,False);point=centre+axis*du+up*dv-normal*.014
                 vertex=bm.verts.new(point);vertex[deform][head]=1
                 if color:
-                    shade=(.030+.055*(radial*radial*(3-2*radial)))*(1+.50*max(0,math.sin(angle))) if radial is not None else 0
+                    if radial is not None:
+                        inner=max(0,min(1,(radial-.72)/.28));inner=inner*inner*(3-2*inner)
+                        shade=(.030+.030*(1-radial))*(1-.72*inner)*(1+.35*max(0,math.sin(angle)))
+                    else:shade=0
                     vertex[color]=(shade,shade*.94,shade*.84,1) if radial is not None else pigment
                 ring.append(vertex)
             rings.append(ring)

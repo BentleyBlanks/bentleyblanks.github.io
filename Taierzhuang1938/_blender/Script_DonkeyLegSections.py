@@ -1,6 +1,8 @@
 """Continuous anatomical limb sections, fitted independently of photo pigment."""
 import bpy,math
 from mathutils import Vector
+from pathlib import Path
+import numpy as np
 
 def Smooth(a,b,value):
     t=max(0,min(1,(value-a)/(b-a)));return t*t*(3-2*t)
@@ -46,7 +48,7 @@ def MeasureLegSections(skin,appearance=False):
         profiles[stem]=rows
     return stems,masses,profiles
 
-def FitReferenceLegs(skin,rig):
+def FitReferenceLegs(skin,rig,rearOnly=False):
     bpy.context.scene['DonkeyReferenceLegSections']=True
     stems,masses,profiles=MeasureLegSections(skin);source=[v.co.copy() for v in skin.data.vertices]
     horn={i for f in skin.data.polygons if skin.data.materials[f.material_index].name.startswith('DonkeyHoofHorn') for i in f.vertices}
@@ -55,14 +57,17 @@ def FitReferenceLegs(skin,rig):
     frontY=[(0.12, 0.65), (0.155, 0.644167), (0.24, 0.669), (0.3, 0.671), (0.38, 0.672), (0.48, 0.674), (0.6, 0.679), (0.7, 0.689), (0.8, 0.692)]
     frontWidth=[(.12,.066),(.155,.075),(.22,.058),(.30,.060),(.345,.077),(.38,.091),(.425,.083),(.50,.085),(.60,.101),(.66,.115),(.72,.132),(.80,.165)]
     frontDepth=[(.12,.066),(.155,.080),(.22,.064),(.30,.061),(.38,.080),(.45,.083),(.54,.088),(.60,.095),(.66,.112),(.72,.140),(.80,.178)]
-    rearX=[(.12,.107),(.155,.1063),(.24,.1067),(.30,.103),(.34,.099),(.375,.098),(.40,.103),(.44,.115),(.48,.126),(.58,.136),(.68,.142)]
-    rearY=[(.12,-.080),(.155,-.087719),(.24,-.092),(.33,-.099),(.375,-.095273),(.43,-.069),(.50,-.041),(.58,.005),(.65,.035),(.70,.055)]
-    # The rear view shows a distinct transverse hock, wider than the cannon
-    # and the short tibial neck above it. Its old monotonic taper erased that
-    # joint and put its centre too far laterally. Preserve the side depth and
-    # the original horn/sole while fitting this local rear-view silhouette.
-    rearWidth=[(.12,.065),(.155,.072),(.22,.055),(.30,.059),(.34,.076),(.375,.090),(.40,.090),(.44,.084),(.48,.092),(.56,.115),(.64,.145),(.72,.175)]
-    rearDepth=[(.12,.065),(.155,.076),(.22,.059),(.30,.056),(.355,.073),(.40,.080),(.48,.105),(.56,.145),(.64,.190),(.72,.240)]
+    sourceNamespace={};file=Path(bpy.context.scene['DonkeyCartProject'])/'_blender/Script_DonkeyLegAlbedo.py';exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),sourceNamespace)
+    boundaries=sourceNamespace['BOUNDARIES'];ppm=(925-302)/1.10;anchor=float(bpy.context.scene.get('DonkeyReferenceFitAnchorY',.692091405))
+    rearX=[];rearY=[];rearWidth=[];rearDepth=[]
+    for z in [.12,.155,.22,.30,.34,.375,.40,.44,.48,.56,.60,.64,.68,.72,.78,.84]:
+        pixelY=925-ppm*z;boxes={}
+        for key in ['SideRear','RearLeft','RearRight']:
+            rows=boundaries[key];boxes[key]=[float(np.interp(pixelY,[r[0] for r in rows],[r[c] for r in rows])) for c in [1,2]]
+        sl,sh=boxes['SideRear'];ll,lh=boxes['RearLeft'];rl,rh=boxes['RearRight']
+        rearX.append((z,((1394-(ll+lh)/2)+((rl+rh)/2-1394))/2/ppm))
+        rearY.append((z,anchor+(707-(sl+sh)/2)/ppm))
+        rearWidth.append((z,((lh-ll)+(rh-rl))/2/ppm*.96));rearDepth.append((z,(sh-sl)/ppm*.96))
     offsets={kind:rig.data.bones['Donkey'+kind+'RightHoofPivot'].head_local.y-rig.data.bones['Donkey'+kind+'LeftHoofPivot'].head_local.y for kind in ('Front','Rear')}
     def Centre(stem,z):
         front='Front' in stem;right=stem.endswith('Right');sign=1 if right else -1
@@ -72,15 +77,16 @@ def FitReferenceLegs(skin,rig):
     changes={s:[] for s in stems}
     for v,p,row in zip(skin.data.vertices,source,masses):
         stem=max(stems,key=lambda s:row[s]);front='Front' in stem
+        if rearOnly and front:continue
         # Complete the narrow old elbow before joining the existing chest
         # boundary. Extending cylindrical limb coordinates into the axilla
         # folds its two surfaces, so retain the original trunk ownership.
         ownership=Smooth(.40,.85,row[stem])
-        strength=ownership*Smooth(.100,.145,p.z)*(1-Smooth(.64,.70,p.z) if front else 1-Smooth(.56,.72,p.z))
+        strength=ownership*Smooth(.100,.145,p.z)*(1-Smooth(.64,.70,p.z) if front else 1-Smooth(.68,.84,p.z))
         if v.index in horn or strength<=0:continue
         rows=profiles[stem];cx,cy,wx,wy=[Curve([(r[0],r[c]) for r in rows],p.z) for c in (1,2,3,4)]
         dx,dy=(p.x-cx)/max(.01,wx*.5),(p.y-cy)/max(.01,wy*.5)
-        radius=max(.1,math.hypot(dx,dy));fair=.85/radius+.15
+        radius=max(.1,math.hypot(dx,dy));fair=.85/radius+.15 if front else .98/radius+.02
         tx,ty=Centre(stem,p.z);width=Curve(frontWidth if front else rearWidth,p.z);depth=Curve(frontDepth if front else rearDepth,p.z)
         target=Vector((tx+dx*fair*width*.5,ty+dy*fair*depth*.5,p.z))
         v.co=p.lerp(target,strength);changes[stem].append((v.co-p).length)
@@ -89,13 +95,13 @@ def FitReferenceLegs(skin,rig):
     for b in rig.data.edit_bones:
         stem=next((s for s in stems if b.name.startswith(s)),None)
         if not stem or b.name.endswith('HoofPivot') or b.name==stem+'Pivot':continue
+        if rearOnly and 'Front' in stem:continue
         old=b.head.copy();x,y=Centre(stem,b.head.z)
-        if 'Rear' in stem and b.name.endswith('ElbowPivot'):x,y=(1 if stem.endswith('Right') else -1)*.13,.055
         b.head.x=x;b.head.y=y;b.tail=b.head+Vector((0,.075,0));movedBones[b.name]=list(b.head-old)
     bpy.ops.object.mode_set(mode='OBJECT');skin.data.update()
     soleError=max((v.co-p).length for v,p in zip(skin.data.vertices,source) if p.z<.035)
     hornError=max((skin.data.vertices[i].co-source[i]).length for i in horn)
     if soleError>1e-8 or hornError>1e-8:raise RuntimeError('Limb fit changed rigid horn or planted soles')
-    return {'revision':'20261025ContinuousLimbV30','targetReference':'original frontal, rear and near-side limb silhouettes; metre calibration from 1.10 m withers and 623 source pixels','method':'continuous forearm/elbow and tibia/hock sections with protected axillary boundary; shape-preserving anatomical sections, restrained carpus/hock and straight slender cannon; preserved horn and soles','forearmRootBlendHeightM':[.64,.70],'hindRootBlendHeightM':[.56,.72],
+    return {'revision':'20261025ThreeViewLimbV32','frontRevision':'20261025ContinuousLimbV30','targetReference':'original frontal, rear and near-side limb silhouettes; metre calibration from 1.10 m withers and 623 source pixels','method':'continuous forearm/elbow with protected axillary boundary; hind X/Y centres and width/depth derived from actual rear and side source bounds; preserved horn and soles','forearmRootBlendHeightM':[.64,.70],'hindRootBlendHeightM':[.68,.84],'hindSourceBounds':{key:boundaries[key] for key in ['SideRear','RearLeft','RearRight']},'hindPhotographicWidthFactor':.96,
         'maxDisplacementM':{s:max(d,default=0) for s,d in changes.items()},'sourceSections':profiles,'frontCentreX':frontX,'frontCentreY':frontY,'frontWidth':frontWidth,'frontDepth':frontDepth,
         'rearCentreX':rearX,'rearCentreY':rearY,'rearWidth':rearWidth,'rearDepth':rearDepth,'standingOffsetY':offsets,'boneDisplacementM':movedBones,'soleDisplacementM':soleError,'hornDisplacementM':hornError}

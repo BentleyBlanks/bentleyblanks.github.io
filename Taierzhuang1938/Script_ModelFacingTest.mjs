@@ -300,15 +300,15 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
 Check(bare.json.meshes.length===3 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===79992 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
-  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与79,992三角齐备");
+  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===79622 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
+  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与79,622三角齐备");
 Check(bareSpec.verification.bakeUvOverlapTexels===0 && bareSpec.verification.bakeUvLegOverlapTexels===0
-  && bareSpec.triangles.sourceBeforeRuntimeTriangulationTotal===79992,
+  && bareSpec.triangles.sourceBeforeRuntimeTriangulationTotal===79622,
   "独立驴制作源登记零重叠烘焙图集与显式运行时三角化；最终GLB的UV覆盖另作独立验证");
 const pectoral=bareSpec.derivation.referenceFit.details;
 const forelegFit=pectoral.legFit;
 const legAlbedo=bareSpec.derivation.referenceFit.photoDetail.legPigment;
-Check(forelegFit?.revision==='20261025ContinuousLimbV30'&&forelegFit.soleDisplacementM===0&&forelegFit.hornDisplacementM===0
+Check(forelegFit?.revision==='20261025ThreeViewLimbV32'&&forelegFit.frontRevision==='20261025ContinuousLimbV30'&&forelegFit.soleDisplacementM===0&&forelegFit.hornDisplacementM===0
   &&['frontCentreX','frontCentreY','frontWidth','frontDepth'].every(key=>forelegFit[key].length>=8&&forelegFit[key].every(row=>row.every(Number.isFinite)))
   &&Object.keys(forelegFit.boneDisplacementM).every(name=>!name.endsWith('HoofPivot')),
   "独立驴四腿由原图前/侧/后视拟合连续截面，保留刚性蹄壳和接地；实际截面与动作另行验收");
@@ -334,7 +334,23 @@ Check(pectoralMotion?.pass===true&&pectoralMotion.assetSha256===bareSpec.sha256
   &&pectoralMotion.restCrossings===0&&pectoralMotion.maximumVisibleCrossings===0
   &&foreSwing.leftMaximumDegrees===2.5&&foreSwing.rightMaximumDegrees===6&&foreSwing.onlyUnplanted===true
   &&bareSpec.verification.nativeLateralStanceDriftPerFrameM<.0001,
-  "独立驴当前GLB具备加密胸区动作证据，前腿仅摆动时外展且着地不横滑");
+  "独立驴当前GLB具备加密胸区动作证据，保留离地回摆且着地蹄点不横滑");
+const jointFit=pectoral.jointFit,jointArcs=bareSpec.animations.DonkeyWalk.jointArcs;
+Check(bareSpec.version==='20261026ReferenceV35'&&jointFit?.version==='20261026JointFitV35'
+  &&jointFit.maximumInfluences===4&&jointFit.boneCount===28&&jointFit.morphTargetsAdded===0
+  &&jointFit.surfaceCorrectionSourcePixels<1&&jointFit.edges.maximumRestSurfaceBoundM<=.0005&&jointFit.edgesAfter.maximumRestSurfaceBoundM<=.0005
+  &&jointArcs?.bakeFps===120&&jointArcs.maximumHoofTargetErrorM<.00001&&jointArcs.maximumReachCompressionM<=.006,
+  "独立驴V35关节配方保留28骨与四权重，局部顶点修正小于原图一像素；三维肘膝路径锁定请求蹄点");
+for(const [key,region] of [['hindMotionIntegrity','Hind'],['lowerBodyMotionIntegrity','LowerBody']]){
+  const proof=bareSpec.verification[key];
+  Check(proof?.pass===true&&proof.assetSha256===bareSpec.sha256&&proof.region===region
+    &&proof.walkSamples===145&&proof.idleSamples===37&&proof.visibilityDirections===14&&proof.furOcclusionIgnored===true
+    &&proof.visibilityToleranceM===.00025&&proof.restCrossings===0&&proof.maximumVisibleCrossings===0,
+    `独立驴实际GLB的${region}完整动作检查通过，图像和源网格结果不替代交付文件证据`);
+}
+Check(pectoral.mane.removedLegacySolidMane.some(row=>row.name==='DonkeyDenseManeBase'&&row.triangles===284)
+  &&!bareSpec.verification.lowerBodyMotionIntegrity.componentProof.componentTriangleCounts.includes(284),
+  "独立驴源与实际GLB均移除遗留实体鬃毛底条，参考轮廓层与立体细毛保留");
 const upperBodyFit=bareSpec.derivation.referenceFit.details.upperBodyFit;
 Check(upperBodyFit.refinementTriangles===274&&upperBodyFit.sideProfileUnchanged===true&&upperBodyFit.maximumHeadDisplacementM===0&&upperBodyFit.maximumLowerLimbDisplacementM===0
   &&upperBodyFit.integrity.boundaryEdges===0&&upperBodyFit.integrity.nonmanifoldEdges===0,

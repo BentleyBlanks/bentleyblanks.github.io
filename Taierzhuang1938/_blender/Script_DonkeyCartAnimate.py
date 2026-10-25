@@ -16,7 +16,15 @@ if cart:cart.data.pose_position='POSE'
 rest={b.name:b.matrix_local.copy() for b in rig.data.bones}
 origins={b.name:b.head_local.copy() for b in rig.data.bones}
 suffixes=['Pivot','ElbowPivot','KneePivot','HoofPivot']
-stride=.68;walkFrames=36;period=walkFrames/scene.render.fps
+jointArcSettings=dict(scene.get('DonkeyReferenceJointArcs',{})) if standalone else {}
+jointArcSolver=None
+jointReachSolver=None
+if jointArcSettings:
+    jointArcNamespace={};jointArcFile=Path(scene['DonkeyCartProject'])/'_blender/Script_DonkeyLimbClearance.py'
+    exec(compile(jointArcFile.read_text(encoding='utf-8'),jointArcFile.name,'exec'),jointArcNamespace)
+    jointArcSolver=jointArcNamespace['SolveLimbClearance']
+    jointReachSolver=jointArcNamespace['ReachCompression']
+stride=.68;walkFrames=round(1.2*scene.render.fps) if jointArcSettings else 36;period=walkFrames/scene.render.fps
 
 def Wrap(value):return math.atan2(math.sin(value),math.cos(value))
 
@@ -50,6 +58,8 @@ def WorldPose(phase,idle=False):
     # A standing limb is almost straight. During locomotion the torso settles
     # into its support limbs instead of forcing the knee backward for reach.
     bob=(-.004+.0025*math.sin(2*math.pi*phase) if idle else -.032+.005*math.sin(4*math.pi*phase-.5))
+    reachCompression=jointReachSolver(origins,phase,bob,FootTarget,bool(scene.get('DonkeyReferenceFootCenters'))) if jointReachSolver and not idle else 0
+    bob-=reachCompression
     worlds={'DonkeyRoot':rest['DonkeyRoot'].copy(),'DonkeyHitchPivot':rest['DonkeyHitchPivot'].copy()}
     movement=Matrix.Translation((.002*math.sin(2*math.pi*phase),0,bob))
     worlds['DonkeyBodyPivot']=movement@rest['DonkeyBodyPivot']
@@ -77,6 +87,7 @@ def WorldPose(phase,idle=False):
                 gaitPoint.y=sum(origins['Donkey'+label+s+'HoofPivot'].y for s in ('Left','Right'))/2
             ty,tz,arc,planted=(p[3].y,p[3].z,0,True) if idle else FootTarget(gaitPoint,step,front)
             rootShift=(ty-gaitPoint.y)*(.22 if front else .07) if not idle else 0
+            if jointArcSettings and not front:rootShift=0
             shifted=[point+Vector((0,rootShift,bob)) for point in p]
             fold=(-.60 if front else .48)*arc
             pivot,elbow,cannon,miss=Solve(shifted,(ty,tz),fold)
@@ -85,15 +96,19 @@ def WorldPose(phase,idle=False):
             for i in range(1,4):points.append(points[i-1]+Matrix.Rotation(angles[i-1],3,'X')@(p[i]-p[i-1]))
             for name,point,angle in zip(names,points,angles):worlds[name]=Matrix.Translation(point)@Matrix.Rotation(angle,4,'X')
             splay=0
-            clearanceDegrees=scene.get('DonkeyReferenceForeSwingClearanceDeg',0) if side=='Left' else scene.get('DonkeyReferenceForeRightSwingClearanceDeg',0)
-            if standalone and clearanceDegrees and front and not idle and not planted:
+            if front:clearanceDegrees=scene.get('DonkeyReferenceForeSwingClearanceDeg',0) if side=='Left' else scene.get('DonkeyReferenceForeRightSwingClearanceDeg',0)
+            else:clearanceDegrees=scene.get('DonkeyReferenceHindSwingClearanceDeg',0) if side=='Left' else scene.get('DonkeyReferenceHindRightSwingClearanceDeg',0)
+            if standalone and clearanceDegrees and not idle and not planted:
                 # Small swing-only lateral arcs clear the fitted axillae.
                 # Stance, forward stride and the sagittal solver stay
                 # unchanged; the whole limb uses one coherent rigid turn.
                 splay=math.radians(clearanceDegrees)*arc*(1 if side=='Left' else -1)
                 centre=points[0];turn=Matrix.Translation(centre)@Matrix.Rotation(splay,4,'Y')@Matrix.Translation(-centre)
                 for name in names:worlds[name]=turn@worlds[name]
-            metrics.append({'stem':stem,'step':step,'planted':planted,'target':[ty,tz],'foot':list(worlds[names[3]].translation),'miss':miss,'swingSplayRad':splay})
+            metrics.append({'stem':stem,'step':step,'planted':planted,'target':[ty,tz],'foot':list(worlds[names[3]].translation),'miss':miss,'swingSplayRad':splay,'reachCompressionM':reachCompression})
+    if jointArcSolver and not idle:
+        arcs=jointArcSolver(worlds,metrics,origins,jointArcSettings,stride)
+        for item in arcs:next(m for m in metrics if m['stem']==item['stem'])['jointArc']=item
     return worlds,metrics
 
 def ApplyWorlds(worlds,frame=None):
@@ -116,7 +131,9 @@ for name in ('DonkeyWalk','DonkeyIdle','CartRoll'):
     if action:bpy.data.actions.remove(action)
 
 results=[]
-for name,start,count,idle in (('DonkeyWalk',1,walkFrames,False),('DonkeyIdle',61,90,True)):
+idleStart=2*scene.render.fps+1 if jointArcSettings else 61
+idleFrames=3*scene.render.fps if jointArcSettings else 90
+for name,start,count,idle in (('DonkeyWalk',1,walkFrames,False),('DonkeyIdle',idleStart,idleFrames,True)):
     rig.animation_data_create();action=bpy.data.actions.new(name);rig.animation_data.action=action
     worst=0
     for i in range(count+1):
@@ -186,8 +203,13 @@ for stem in soleIndices:
 report={'actions':results,'strideM':stride,'periodS':period,'speedMps':stride/period,
         'stanceSoleRangeM':[min(r['minSoleZ'] for r in planted),max(r['minSoleZ'] for r in planted)],
         'worstStanceDriftPerFrameM':max(drift),'worstLateralStanceDriftPerFrameM':max(driftX),'foreSwingClearanceDegrees':scene.get('DonkeyReferenceForeSwingClearanceDeg',0) if standalone else 0,'foreRightSwingClearanceDegrees':scene.get('DonkeyReferenceForeRightSwingClearanceDeg',0) if standalone else 0,'worstSolverMissM':max(r['miss'] for r in measurements),'measurements':measurements}
+if jointArcSettings:
+    report['jointArcs']={'settingsM':jointArcSettings,'solver':'3D joint arcs with exact requested hoof targets and fixed pelvic hip origins',
+        'maximumHoofTargetErrorM':max((r.get('jointArc',{}).get('hoofErrorM',0) for r in measurements),default=0),'bakeFps':scene.render.fps,
+        'maximumReachCompressionM':max(r.get('reachCompressionM',0) for r in measurements),
+        'walkSamples':walkFrames+1,'idleSamples':idleFrames+1}
 (base/'Review/Data_AnimationMeasurements.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
-scene.frame_start=1;scene.frame_end=241;scene.frame_set(0)
+scene.frame_start=1;scene.frame_end=max(241,idleStart+idleFrames+1);scene.frame_set(0)
 for filename in ('Script_DonkeyCartAnimate.py','Script_DonkeyCartReview.py'):
     text=bpy.data.texts.get(filename) or bpy.data.texts.new(filename);text.clear()
     text.write((Path(scene['DonkeyCartProject'])/'_blender'/filename).read_text(encoding='utf-8'))
