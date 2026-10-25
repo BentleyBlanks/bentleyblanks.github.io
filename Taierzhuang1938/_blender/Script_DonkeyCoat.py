@@ -224,6 +224,7 @@ def BuildGroom(skin,rig,collection,material,count=21000,pigmentSampler=None):
         brightness=float(np.mean(pigmentSampler(root))) if max(fore,breast)>0 else 0
         breast*=Smooth(.025,.10,brightness);fore*=Smooth(.06,.16,brightness)
         return max(fore,breast),breast
+    bodyTufts=0;bodyTuftLimit=bpy.context.scene.get('DonkeyReferenceBodyTuftLimit')
     for sample in range(count):
         coronet=sample<coronetFibres
         triangle=coronetTriangles[bisect.bisect_left(coronetCumulative,rng.random()*coronetArea)] if coronet else triangles[bisect.bisect_left(cumulative,rng.random()*total)]
@@ -279,7 +280,11 @@ def BuildGroom(skin,rig,collection,material,count=21000,pigmentSampler=None):
             if key not in fringeTargets or weight>fringeTargets[key][1]:fringeTargets[key]=(triangle,weight)
         if useFringe and not coronet and belly<.01 and fringe<.01 and -.10<root.y<.94 and .25<root.z<1.14:fringeDonors.append(first)
         if normal.z>.55 and root.z>.75 and rng.random()<.075:
-            Add(root,normal,flow,rng.uniform(.008,.014),rng.uniform(.010,.017),row,tile,.0014,rootColor)
+            tuftWidth=rng.uniform(.008,.014);tuftLength=rng.uniform(.010,.017)
+            # Preserve random draws and all fine-fringe slots; bound only
+            # the additional dorsal cards after a changed skin tessellation.
+            if bodyTuftLimit is None or bodyTufts<bodyTuftLimit:
+                Add(root,normal,flow,tuftWidth,tuftLength,row,tile,.0014,rootColor);bodyTufts+=1
     if useFringe and fringeTargets and fringeDonors:
         originalRng=rng;rng=random.Random(19381029);targets=list(fringeTargets.values());cdf=[];weightTotal=0
         for _,weight in targets:weightTotal+=weight;cdf.append(weightTotal)
@@ -398,7 +403,7 @@ def BuildGroom(skin,rig,collection,material,count=21000,pigmentSampler=None):
     modifier=obj.modifiers.new('DonkeyCoatSkin','ARMATURE');modifier.object=rig
     obj['coatAlphaCutoff']=.45;obj['coatCardCount']=sum(len(f)==4 for f in faces)+bellyStrips+2*fringeStrips;obj['coatFibreCount']=count-2*bellyStrips-4*fringeStrips;obj['coatRootSamples']=count;obj['groomPrimitiveCount']=len(faces);obj['coatDensityPerM2']=count/total
     obj.visible_shadow=False;obj['groomCastShadow']=False
-    return obj,{'fibres':count-2*bellyStrips-4*fringeStrips,'rootSamples':count,'coronetFibres':coronetFibres,'coronetAreaM2':coronetArea,'coronetLengthM':[.009,.014],'coronetWidthM':[.0007,.0012],'cards':sum(len(f)==4 for f in faces)+bellyStrips+2*fringeStrips,'triangles':sum(len(f)-2 for f in faces),'regionCards':regions,'sampledSurfaceM2':total,'maxInfluences':4,
+    return obj,{'fibres':count-2*bellyStrips-4*fringeStrips,'rootSamples':count,'bodyTufts':bodyTufts,'bodyTuftLimit':bodyTuftLimit,'coronetFibres':coronetFibres,'coronetAreaM2':coronetArea,'coronetLengthM':[.009,.014],'coronetWidthM':[.0007,.0012],'cards':sum(len(f)==4 for f in faces)+bellyStrips+2*fringeStrips,'triangles':sum(len(f)-2 for f in faces),'regionCards':regions,'sampledSurfaceM2':total,'maxInfluences':4,
         'paleFringe':{'sampleFibres':fringeFibres,'redistributedBodySamples':redistributed,'curvedWisps':fringeStrips,'lengthRangeM':[min(fringeLengths,default=0),max(fringeLengths,default=0)],'liftRangeM':[min(fringeLifts,default=0),max(fringeLifts,default=0)],'wispLengthRangeM':[.030,.0527],'wispLiftRangeM':[.012,.016],'wispRootWidthRangeM':[.00102,.0013],'wispSegments':2,'method':'pale medial foreleg and breast fibres lengthened and lifted; body fine-fibre slots reallocated to the pale fringe with an independent deterministic stream; four existing triangles reused per curved strand; root sample and triangle budgets retained'},
         'bellyCoat':{'sampleFibres':bellyFibres,'fineFibres':bellyFibres-2*bellyStrips,'pairedStrips':bellyStrips,'sampleLengthRangeM':[min(bellyLengths,default=0),max(bellyLengths,default=0)],'sampleLiftRangeM':[min(bellyLifts,default=0),max(bellyLifts,default=0)],'stripLengthRangeM':[.0199,.022],'stripLiftRangeM':[.005275,.0065],'method':'bounded pale ventral fibres: downward/backward flow, up to 1.55x length and 3x normal lift; pairs of existing fine triangles reused as narrow opaque tapered strips; same source samples, random sequence and triangle budget'}}
 

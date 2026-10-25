@@ -22,9 +22,7 @@ def BuildLegAlbedo(rgb,blur):
     palette={name:np.median(linear[top:bottom,left:right].reshape(-1,3),axis=0)*gain*tint for name,(left,top,right,bottom) in PALETTE_BOXES.items()}
     # Filtering is performed in original photo pixels, where x/y have the
     # same physical scale. The old atlas-space blur had unequal scales.
-    low=np.stack([blur(blur(linear[:,:,c],5),5) for c in range(3)],axis=2)
-    luminance=linear@np.array([.2126,.7152,.0722]);microLow=blur(blur(luminance,4),4)
-    micro=np.clip(luminance/np.maximum(.008,microLow),.60,1.55)
+    luminance=linear@np.array([.2126,.7152,.0722])
     height=1024;tileWidth=384;bodyWidth=256;gutter=64
     yy=np.linspace(.90,0,height)[:,None];sourceY=np.broadcast_to(925-yy*(925-302)/1.10,(height,tileWidth))
     angle=(np.arange(tileWidth)-gutter)/(bodyWidth-1)*2*math.pi-math.pi
@@ -36,6 +34,21 @@ def BuildLegAlbedo(rgb,blur):
         return (field[iy,ix]*(1-fx)+field[iy,ix+1]*fx)*(1-fy)+(field[iy+1,ix]*(1-fx)+field[iy+1,ix+1]*fx)*fy
     def Sample(key,horizontal,normal,view):
         rows=BOUNDARIES[key];ys=np.array([r[0] for r in rows]);lo=np.interp(sourceY,ys,[r[1] for r in rows]);hi=np.interp(sourceY,ys,[r[2] for r in rows]);width=hi-lo
+        # Filter only this limb's pixels. Blurring the entire photograph
+        # pulled pale background/other legs across a narrow dark cannon.
+        fy,fx=np.indices(luminance.shape);left=np.interp(fy,ys,[r[1] for r in rows]);right=np.interp(fy,ys,[r[2] for r in rows]);margin=(right-left)*.08
+        valid=((fx>=left+margin)&(fx<=right-margin)&(fy>=ys[0]-80)&(fy<=ys[-1])).astype(np.float32)
+        denominator=np.maximum(.0001,blur(blur(valid,6),6))
+        low=np.stack([blur(blur(linear[:,:,c]*valid,6),6)/denominator for c in range(3)],axis=2)
+        microLow=blur(luminance*valid,4)/np.maximum(.0001,blur(valid,4))
+        micro=luminance/np.maximum(.008,microLow)
+        # Tendon highlights form long vertical cables in a photo. Remove
+        # their coherent column component while retaining short curved hairs
+        # at their original scale; a 25-pixel vertical window exceeds a hair.
+        padded=np.pad(micro,((12,12),(0,0)),mode='edge')
+        summed=np.pad(np.cumsum(padded,axis=0,dtype=np.float64),((1,0),(0,0)))
+        column=(summed[25:]-summed[:-25])/25
+        micro=np.clip(micro/np.maximum(.5,column),.65,1.45)
         sourceX=(lo+hi)*.5+np.clip(horizontal,-1,1)*width*.40
         color=Fetch(low,sourceX,sourceY)
         light=np.array((-.4,.5,.76) if view=='Side' else (-.3,.5,.81) if view=='Front' else (.3,-.5,.81));light/=np.linalg.norm(light)
@@ -44,7 +57,8 @@ def BuildLegAlbedo(rgb,blur):
         # Circumference is pi times the photographed diameter. Use that
         # arc length for detail instead of stretching one projection over
         # the whole sleeve. Two phased donors feather the periodic cut.
-        phase=np.broadcast_to(np.mod((angle+math.pi)/(2*math.pi)*math.pi/.60,1),(height,tileWidth))
+        repeats=round(math.pi/.60)
+        phase=np.broadcast_to(np.mod((angle+math.pi)/(2*math.pi)*repeats,1),(height,tileWidth))
         a=Fetch(micro,lo+width*(.20+.60*phase),sourceY)
         b=Fetch(micro,lo+width*(.20+.60*np.mod(phase+.5,1)),sourceY)
         wa=np.sin(math.pi*phase)**2;detail=a*wa+b*(1-wa)
@@ -54,7 +68,7 @@ def BuildLegAlbedo(rgb,blur):
         detail=np.clip(detail/np.maximum(.5,rowMean),.65,1.45)
         active=(sourceY>460)&(sourceY<870)
         sourceChecks.append({'view':view,'donor':key,'samples':int(np.count_nonzero(active)),'sourceXRange':[float(sourceX[active].min()),float(sourceX[active].max())]})
-        projected=np.clip(Fetch(micro,sourceX,sourceY),.65,1.45)
+        projected=np.clip(Fetch(micro,sourceX,sourceY)/np.maximum(.5,rowMean),.65,1.45)
         return color,projected,detail
     dark=np.mean([palette['ForeSideDark'],palette['HindSideDark'],palette['ForeFrontDark']],axis=0)
     for index,stem in enumerate(['DonkeyFrontLeft','DonkeyFrontRight','DonkeyRearLeft','DonkeyRearRight']):
@@ -68,7 +82,7 @@ def BuildLegAlbedo(rgb,blur):
         # Dark fibres retain bounded, same-limb photographic mottling;
         # directional light and joint recesses are supplied by PBR geometry.
         sideBase=palette['ForeSideDark' if front else 'HindSideDark']
-        mottling=np.clip(side/np.maximum(.008,sideBase),.70,1.50)
+        mottling=np.clip(side/np.maximum(.008,sideBase),.82,1.22)
         pigment=dark*mottling
         pale=palette['ForeMedialPale'] if front else np.mean([palette['RearMedialLeft'],palette['RearMedialRight']],axis=0)
         capPigment=np.minimum(pale,np.maximum(dark,face))
@@ -80,10 +94,10 @@ def BuildLegAlbedo(rgb,blur):
         # Source-facing surfaces retain the photographed detail at its
         # actual location. Periodic donors only fill the unphotographed cap;
         # repeating them over visible faces creates artificial dapple spots.
-        color=np.maximum(0,pigment*(1+1.15*(detail-1))[:,:,None])
+        color=np.maximum(0,pigment*detail[:,:,None])
         atlas[:,index*tileWidth:(index+1)*tileWidth,:3]=np.where(color<=.0031308,color*12.92,1.055*color**(1/2.4)-.055)
         sampling.append({'leg':stem,'sideDonor':sideKey,'capDonor':capKey})
-    record={'method':'source-scale RGB pigment smoothing and bounded same-limb mottling; source-facing cap/side preserve photographed short-fur placement; physical-circumference periodic detail with feathered cuts only fills the unphotographed cap',
+    record={'method':'silhouette-masked source-space filtering; charcoal pigment with bounded photographic short-hair detail; broad joint shadows suppressed; same-limb frontal/rear pale pigment and periodic hidden-cap extension',
         'sourceBoundaryRows':BOUNDARIES,'sampling':sampling,'sourceChecks':sourceChecks,'paletteSourceBoxes':PALETTE_BOXES,'paletteCalibratedLinearRgb':{name:value.tolist() for name,value in palette.items()},
-        'sourcePigmentBlurRadiusPixels':5,'sourceMicroBlurRadiusPixels':4,'microRatioRange':[.65,1.45],'microStrength':1.15,'darkMottlingRatioRange':[.70,1.50],'visibleDetailIsPhotographic':True,'periodicDetailScope':'unphotographed cap only','detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
+        'sourcePigmentBlurRadiusPixels':6,'sourceMicroBlurRadiusPixels':4,'sourceVerticalCoherenceWindowPixels':25,'microRatioRange':[.65,1.45],'microStrength':1.0,'darkMottlingRatioRange':[.82,1.22],'silhouetteMaskedFiltering':True,'hiddenCapRepeats':round(math.pi/.60),'visibleDetailIsPhotographic':True,'periodicDetailScope':'unphotographed cap only','detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
     return atlas,record

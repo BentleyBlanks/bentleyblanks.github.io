@@ -53,15 +53,15 @@ def FitReferenceLegs(skin,rig):
     # Absolute metre sections replace the old independent depth multipliers.
     frontX=[(0.12, 0.096), (0.155, 0.09567), (0.24, 0.092), (0.3, 0.087), (0.38, 0.085), (0.48, 0.087), (0.6, 0.09), (0.7, 0.115), (0.8, 0.145)]
     frontY=[(0.12, 0.65), (0.155, 0.644167), (0.24, 0.669), (0.3, 0.671), (0.38, 0.672), (0.48, 0.674), (0.6, 0.679), (0.7, 0.689), (0.8, 0.692)]
-    frontWidth=[(0.12, 0.066), (0.155, 0.075), (0.22, 0.061), (0.3, 0.068), (0.345, 0.083), (0.38, 0.1), (0.425, 0.086), (0.5, 0.086), (0.6, 0.11), (0.69, 0.112), (0.78, 0.145)]
-    frontDepth=[(0.12, 0.066), (0.155, 0.08), (0.22, 0.071), (0.3, 0.067), (0.38, 0.083), (0.45, 0.081), (0.54, 0.078), (0.6, 0.085), (0.63, 0.095), (0.7, 0.122), (0.78, 0.15)]
+    frontWidth=[(.12,.066),(.155,.075),(.22,.058),(.30,.060),(.345,.077),(.38,.091),(.425,.083),(.50,.085),(.60,.101),(.66,.115),(.72,.132),(.80,.165)]
+    frontDepth=[(.12,.066),(.155,.080),(.22,.064),(.30,.061),(.38,.080),(.45,.083),(.54,.088),(.60,.095),(.66,.112),(.72,.140),(.80,.178)]
     rearX=[(.12,.107),(.155,.1063),(.24,.1067),(.30,.103),(.34,.099),(.375,.098),(.40,.103),(.44,.115),(.48,.126),(.58,.136),(.68,.142)]
     rearY=[(.12,-.080),(.155,-.087719),(.24,-.092),(.33,-.099),(.375,-.095273),(.43,-.069),(.50,-.041),(.58,.005),(.65,.035),(.70,.055)]
     # The rear view shows a distinct transverse hock, wider than the cannon
     # and the short tibial neck above it. Its old monotonic taper erased that
     # joint and put its centre too far laterally. Preserve the side depth and
     # the original horn/sole while fitting this local rear-view silhouette.
-    rearWidth=[(.12,.065),(.155,.072),(.22,.057),(.30,.062),(.34,.086),(.375,.094),(.40,.094),(.44,.071),(.48,.080),(.56,.105),(.64,.140),(.72,.175)]
+    rearWidth=[(.12,.065),(.155,.072),(.22,.055),(.30,.059),(.34,.076),(.375,.090),(.40,.090),(.44,.084),(.48,.092),(.56,.115),(.64,.145),(.72,.175)]
     rearDepth=[(.12,.065),(.155,.076),(.22,.059),(.30,.056),(.355,.073),(.40,.080),(.48,.105),(.56,.145),(.64,.190),(.72,.240)]
     offsets={kind:rig.data.bones['Donkey'+kind+'RightHoofPivot'].head_local.y-rig.data.bones['Donkey'+kind+'LeftHoofPivot'].head_local.y for kind in ('Front','Rear')}
     def Centre(stem,z):
@@ -72,7 +72,11 @@ def FitReferenceLegs(skin,rig):
     changes={s:[] for s in stems}
     for v,p,row in zip(skin.data.vertices,source,masses):
         stem=max(stems,key=lambda s:row[s]);front='Front' in stem
-        strength=Smooth(.40,.85,row[stem])*Smooth(.100,.145,p.z)*(1-Smooth(.62,.70,p.z) if front else 1-Smooth(.56,.72,p.z))
+        # Complete the narrow old elbow before joining the existing chest
+        # boundary. Extending cylindrical limb coordinates into the axilla
+        # folds its two surfaces, so retain the original trunk ownership.
+        ownership=Smooth(.40,.85,row[stem])
+        strength=ownership*Smooth(.100,.145,p.z)*(1-Smooth(.64,.70,p.z) if front else 1-Smooth(.56,.72,p.z))
         if v.index in horn or strength<=0:continue
         rows=profiles[stem];cx,cy,wx,wy=[Curve([(r[0],r[c]) for r in rows],p.z) for c in (1,2,3,4)]
         dx,dy=(p.x-cx)/max(.01,wx*.5),(p.y-cy)/max(.01,wy*.5)
@@ -92,6 +96,6 @@ def FitReferenceLegs(skin,rig):
     soleError=max((v.co-p).length for v,p in zip(skin.data.vertices,source) if p.z<.035)
     hornError=max((skin.data.vertices[i].co-source[i]).length for i in horn)
     if soleError>1e-8 or hornError>1e-8:raise RuntimeError('Limb fit changed rigid horn or planted soles')
-    return {'revision':'20261025ThreeViewLegV28','targetReference':'original frontal and near-side foreleg silhouettes; metre calibration from 1.10 m withers and 623 source pixels','method':'independent metre-scale anatomical sections; shape-preserving cubic centreline/width/depth, faired radial contours and continuous root transitions; preserved horn and soles',
+    return {'revision':'20261025ContinuousLimbV30','targetReference':'original frontal, rear and near-side limb silhouettes; metre calibration from 1.10 m withers and 623 source pixels','method':'continuous forearm/elbow and tibia/hock sections with protected axillary boundary; shape-preserving anatomical sections, restrained carpus/hock and straight slender cannon; preserved horn and soles','forearmRootBlendHeightM':[.64,.70],'hindRootBlendHeightM':[.56,.72],
         'maxDisplacementM':{s:max(d,default=0) for s,d in changes.items()},'sourceSections':profiles,'frontCentreX':frontX,'frontCentreY':frontY,'frontWidth':frontWidth,'frontDepth':frontDepth,
         'rearCentreX':rearX,'rearCentreY':rearY,'rearWidth':rearWidth,'rearDepth':rearDepth,'standingOffsetY':offsets,'boneDisplacementM':movedBones,'soleDisplacementM':soleError,'hornDisplacementM':hornError}

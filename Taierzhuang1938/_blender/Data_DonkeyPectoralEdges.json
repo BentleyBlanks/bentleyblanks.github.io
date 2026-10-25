@@ -1,6 +1,7 @@
 {
-  "method": "deterministic local triangulation of the new three-view foreleg/chest surface; fitted vertices and four-bone weights retained; no subsequent diagonal rotations",
+  "method": "skinning-aware local edge rotation on the three-view foreleg refit; unchanged vertices, bone weights and gait; convex rest patches with a 0.5 mm orthogonal-surface bound",
   "canonicalPectoralTriangles": true,
+  "sourceReferenceSha256": "214b879a3a9efba3683aaebd4bed477645f124d174e78a8e1e435de44ccff78d",
   "canonicalPectoralRegionM": {
     "absX": 0.25,
     "y": [
@@ -12,6 +13,68 @@
       1.08
     ]
   },
-  "sourceReferenceSha256": "214b879a3a9efba3683aaebd4bed477645f124d174e78a8e1e435de44ccff78d",
-  "flips": []
+  "flips": [
+    {
+      "oldEdge": [
+        [
+          -0.1642254739999771,
+          0.6910362243652344,
+          0.6903340816497803
+        ],
+        [
+          -0.15443924069404602,
+          0.6903194189071655,
+          0.6488736867904663
+        ]
+      ],
+      "newEdge": [
+        [
+          -0.1618911772966385,
+          0.6896860599517822,
+          0.6789316534996033
+        ],
+        [
+          -0.15207967162132263,
+          0.7060016989707947,
+          0.6596542000770569
+        ]
+      ],
+      "restSurfaceBoundM": 6.748093266356005e-06,
+      "triangles": [
+        32505,
+        33660
+      ]
+    },
+    {
+      "oldEdge": [
+        [
+          0.1279425472021103,
+          0.7336189150810242,
+          0.6484445333480835
+        ],
+        [
+          0.12791703641414642,
+          0.7336269021034241,
+          0.6483999490737915
+        ]
+      ],
+      "newEdge": [
+        [
+          0.12792937457561493,
+          0.7336306571960449,
+          0.6484349966049194
+        ],
+        [
+          0.13211005926132202,
+          0.7266800403594971,
+          0.6417241096496582
+        ]
+      ],
+      "restSurfaceBoundM": 1.481640269387533e-06,
+      "triangles": [
+        8511,
+        34068
+      ]
+    }
+  ]
 }

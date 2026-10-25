@@ -710,7 +710,8 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261025ReferenceV29'
+    scene['DonkeyReferenceFitRevision']='20261025ReferenceV30'
+    scene['DonkeyReferenceBodyTuftLimit']=288
     scene['DonkeyReferencePaleFringe']=True
     scene['DonkeyReferenceForeSwingClearanceDeg']=2.5
     scene['DonkeyReferenceForeRightSwingClearanceDeg']=6.0
@@ -744,6 +745,9 @@ def ApplyReferenceFit(scene,base):
     details['skinWeightCanonicalization']=NormalizeReferenceSkinWeights(skin)
     details['pectoralBinding']=chestNamespace['BindReferencePectorals'](scene,skin)
     details['pectoralEdges']=chestNamespace['ApplyPectoralEdges'](scene,skin)
+    limbTopology={};file=project/'_blender/Script_DonkeyLimbTopology.py'
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),limbTopology)
+    details['axillaryTopology']=limbTopology['FinishAxillaryTopology'](scene,skin)
     FinishFurResponse(rig,collection)
     details['nasalPad']=InstallNasalPad(skin);flowReport=RefreshFlow(skin,rig,collection)
     photoNamespace={}

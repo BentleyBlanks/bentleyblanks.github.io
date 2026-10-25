@@ -4,6 +4,7 @@ from pathlib import Path
 from mathutils import Vector,Matrix
 
 scene=bpy.context.scene
+measurementsOnly=bool(scene.get('DonkeyVerifyMeasurementsOnly',False))
 project=Path(scene['DonkeyCartProject'])
 assetName=globals().get('DonkeyAssetName','DonkeyCart')
 standalone=assetName=='Donkey'
@@ -32,7 +33,7 @@ for obj in imported:
 scene.frame_set(0);bpy.context.view_layer.update()
 camera=bpy.data.objects['ReviewCamera'];scene.camera=camera
 def Render(name,position,target,scale,width,height):
-    if scene.get('DonkeyVerifyMeasurementsOnly',False):return
+    if measurementsOnly:return
     camera.location=position;camera.rotation_euler=(Vector(target)-camera.location).to_track_quat('-Z','Y').to_euler();camera.data.ortho_scale=scale
     scene.render.resolution_x=width;scene.render.resolution_y=height;scene.render.resolution_percentage=100
     scene.render.filepath=str(base/'Review'/('Render_Imported'+name+'.png'));bpy.ops.render.render(write_still=True)
