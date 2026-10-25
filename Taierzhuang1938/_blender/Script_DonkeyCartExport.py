@@ -266,6 +266,12 @@ def Bake(obj,label):
 reports=[Bake(obj,label) for rig,obj,label in batches]
 if standalone and bpy.data.objects.get('DonkeyShortCoatCards'):
     source=bpy.data.objects['DonkeyShortCoatCards']
+    if scene.get('DonkeyReferencePaleFringe'):
+        namespace={};file=project/'_blender/Script_DonkeyCoat.py';exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),namespace)
+        source,fringeReport=namespace['RebuildPaleFringeAfterBake'](bpy.data.objects['DonkeyContinuousSkin'],bpy.data.objects['DonkeyRig'],bpy.data.collections['DonkeyEditable'],source,animal)
+        record=json.loads((base/'Data_Derivation.json').read_text(encoding='utf-8'));record['coat'].update(fringeReport);record['referenceFit']['groom'].update(fringeReport)
+        (base/'Data_Derivation.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8')
+        reference=json.loads((base/'Data_ReferenceFit.json').read_text(encoding='utf-8'));reference['groom'].update(fringeReport);(base/'Data_ReferenceFit.json').write_text(json.dumps(reference,indent=2)+'\n',encoding='utf-8')
     coat=source.copy();coat.data=source.data.copy();runtimeCol.objects.link(coat);coat.name='DonkeyCoatRuntime';coat.parent=animalRig
     for modifier in coat.modifiers:
         if modifier.type=='ARMATURE':modifier.object=animalRig

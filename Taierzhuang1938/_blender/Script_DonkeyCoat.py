@@ -3,6 +3,7 @@ import bpy,bmesh,math,random,json,hashlib,bisect
 from pathlib import Path
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
+from mathutils.geometry import barycentric_transform
 import numpy as np
 furRepeatM=.22
 
@@ -150,8 +151,9 @@ def FineMane(rig,collection):
             group=obj.vertex_groups.get(name) or obj.vertex_groups.new(name=name);group.add([i],value,'REPLACE')
     modifier=obj.modifiers.new('DonkeyManeSkin','ARMATURE');modifier.object=rig
 
-def BuildGroom(skin,rig,collection,material,count=21000):
+def BuildGroom(skin,rig,collection,material,count=21000,pigmentSampler=None):
     rng=random.Random(19381023);skin.data.calc_loop_triangles()
+    useFringe=bool(bpy.context.scene.get('DonkeyReferencePaleFringe')) and pigmentSampler is not None
     referenceFlow={}
     if bpy.context.scene.get('DonkeyReferenceFitRevision'):
         file=__import__('pathlib').Path(bpy.context.scene['DonkeyCartProject'])/'_blender/Script_DonkeyCoatFlow.py'
@@ -194,12 +196,14 @@ def BuildGroom(skin,rig,collection,material,count=21000):
         uvs.extend([(left,bottom),(left+.5,bottom),(left+.5,bottom+.5),(left,bottom+.5)])
         tint=tuple(min(1,max(.01,color[i]*.75/means[tile][i])) for i in range(3))+(1,)
         colors.extend([tint]*4);rows.extend([row]*4);regions[str(tile)]+=1
-    def Fiber(root,normal,flow,width,length,row,tile,color,liftScale=1):
+    def Fiber(root,normal,flow,width,length,row,tile,color,liftScale=1,twist=0):
         flow-=normal*flow.dot(normal)
         if flow.length<.01:flow=normal.cross(Vector((1,0,0)))
         flow.normalize();across=flow.cross(normal).normalized();start=len(vertices)
         lift=rng.uniform(.0007,.0022)*liftScale
-        lower=root-normal*.0002;upper=root+flow*length+normal*lift
+        if twist:
+            direction=(flow*length+normal*lift).normalized();across=(across*math.cos(twist)+direction.cross(across)*math.sin(twist)).normalized()
+        lower=root-normal*(.0002+(.55*width*abs(across.dot(normal)) if twist else 0));upper=root+flow*length+normal*lift
         vertices.extend([lower-across*width/2,lower+across*width/2,upper]);faces.append((start,start+1,start+2))
         normals.extend([tuple(normal)]*3)
         left=.5*(tile%2);bottom=.5*(1-tile//2)
@@ -212,6 +216,14 @@ def BuildGroom(skin,rig,collection,material,count=21000):
     color=skin.data.color_attributes['CoatColor']
     coronetFibres=min(480,count) if coronetTriangles else 0
     bellyFibres=0;bellyLengths=[];bellyLifts=[];bellyStripSamples=[]
+    fringeFibres=0;fringeLengths=[];fringeLifts=[];fringeStripSamples=[];fringeTags={};fringeRoots={};fringeTips={};fringeTargets={};fringeDonors=[];redistributed=0
+    def FringeAmounts(root,normal,foreMass):
+        medial=max(0,normal.x*(1 if root.x<0 else -1))
+        fore=Smooth(.45,.54,root.z)*(1-Smooth(.69,.77,root.z))*Smooth(.45,.55,root.y)*(1-Smooth(.86,.96,root.y))*Smooth(.45,.85,foreMass)*Smooth(.20,.65,medial)
+        breast=(1-Smooth(.12,.18,abs(root.x)))*Smooth(.56,.64,root.z)*(1-Smooth(.76,.83,root.z))*Smooth(.55,.62,root.y)*(1-Smooth(.90,1.0,root.y))*Smooth(.10,.60,-normal.z)*(1-Smooth(.35,.70,foreMass))
+        brightness=float(np.mean(pigmentSampler(root))) if max(fore,breast)>0 else 0
+        breast*=Smooth(.025,.10,brightness);fore*=Smooth(.06,.16,brightness)
+        return max(fore,breast),breast
     for sample in range(count):
         coronet=sample<coronetFibres
         triangle=coronetTriangles[bisect.bisect_left(coronetCumulative,rng.random()*coronetArea)] if coronet else triangles[bisect.bisect_left(cumulative,rng.random()*total)]
@@ -229,7 +241,7 @@ def BuildGroom(skin,rig,collection,material,count=21000):
         rootColor=sum((Vector(color.data[i].color[:3])*w for i,w in zip(ids,bary)),Vector())
         pale=Smooth(.065,.17,brightness)
         tile=2 if rng.random()<pale else (1 if rng.random()<.12 else 0)
-        belly=0
+        belly=0;fringe=0;breastFringe=0
         if referenceFlow:
             limbMass=sum(w for name,w in row.items() if name.startswith(('DonkeyFront','DonkeyRear')))
             appearance=skin.data.attributes.get('LimbAppearanceMass')
@@ -240,6 +252,10 @@ def BuildGroom(skin,rig,collection,material,count=21000):
             # outside this bounded, softly blended anatomical region.
             belly=Smooth(.15,.65,-normal.z)*Smooth(.55,.61,root.z)*(1-Smooth(.77,.84,root.z))*Smooth(-.08,.02,root.y)*(1-Smooth(.50,.60,root.y))*Smooth(.06,.14,brightness)*(1-Smooth(.35,.65,limbMass))
             if belly>0:flow=flow.lerp(Vector((0,-.4,-1)).normalized(),belly)
+            if useFringe:
+                foreMass=sum(sum(appearance.data[i].color[:2])*w for i,w in zip(ids,bary)) if appearance else sum(w for name,w in row.items() if name.startswith('DonkeyFront'))
+                fringe,breastFringe=FringeAmounts(root,normal,foreMass) if belly<.01 else (0,0)
+                if fringe>0:flow=flow.lerp(Vector((.65*math.tanh(root.x/.035)*breastFringe/max(.0001,fringe),-.25,-1)).normalized(),fringe)
         elif root.y>.88:flow=Vector((0,.45,-1))
         elif root.z<.62:flow=Vector((0,-.12,-1))
         elif root.y>.58:flow=Vector((0,-.72,-.75))
@@ -248,12 +264,49 @@ def BuildGroom(skin,rig,collection,material,count=21000):
         length=rng.uniform(.009,.014) if coronet else rng.uniform(.012,.023) if root.z<.20 else rng.uniform(.006,.013) if root.z>.60 else rng.uniform(.004,.009)
         width=rng.uniform(.0007,.0012) if coronet else rng.uniform(.00025,.00065)
         first=len(vertices)
-        lift=Fiber(root,normal,flow,width*(1+.75*belly),length*(1+.55*belly),row,tile,rootColor,1+2*belly)
+        lift=Fiber(root,normal,flow,width*(1+.75*belly+.5*fringe),length*(1+.55*belly+1.6*fringe+1.3*breastFringe),row,tile,rootColor,1+2*belly+7*fringe,.75*fringe)
         if belly>.01:
             bellyFibres+=1;bellyLengths.append(length*(1+.55*belly));bellyLifts.append(lift)
         if belly>.65:bellyStripSamples.append((first,root.copy(),normal.copy(),flow.copy(),dict(row),rootColor.copy(),belly))
+        if fringe>0:
+            fringeTags.update({first+i:fringe for i in range(3)})
+            fringeRoots.update({first+i:root.copy() for i in range(3)});fringeTips.update({first+i:float(i==2) for i in range(3)})
+        if fringe>.01:
+            fringeFibres+=1;fringeLengths.append(length*(1+1.6*fringe+1.3*breastFringe));fringeLifts.append(lift)
+        if fringe>.60:fringeStripSamples.append((first,root.copy(),normal.copy(),flow.copy(),dict(row),rootColor.copy(),fringe,breastFringe))
+        if useFringe and fringe>.30:
+            key=tuple(triangle.vertices);weight=triangle.area*max(fringe,2*breastFringe)
+            if key not in fringeTargets or weight>fringeTargets[key][1]:fringeTargets[key]=(triangle,weight)
+        if useFringe and not coronet and belly<.01 and fringe<.01 and -.10<root.y<.94 and .25<root.z<1.14:fringeDonors.append(first)
         if normal.z>.55 and root.z>.75 and rng.random()<.075:
             Add(root,normal,flow,rng.uniform(.008,.014),rng.uniform(.010,.017),row,tile,.0014,rootColor)
+    if useFringe and fringeTargets and fringeDonors:
+        originalRng=rng;rng=random.Random(19381029);targets=list(fringeTargets.values());cdf=[];weightTotal=0
+        for _,weight in targets:weightTotal+=weight;cdf.append(weightTotal)
+        appearance=skin.data.attributes['LimbAppearanceMass']
+        for first in rng.sample(fringeDonors,min(4000,len(fringeDonors))):
+            accepted=None
+            for attempt in range(12):
+                triangle=targets[bisect.bisect_left(cdf,rng.random()*weightTotal)][0];a,b=rng.random(),rng.random()
+                if a+b>1:a,b=1-a,1-b
+                bary=(1-a-b,a,b);ids=triangle.vertices;root=sum((skin.data.vertices[i].co*w for i,w in zip(ids,bary)),Vector());normal=sum((skin.data.vertices[i].normal*w for i,w in zip(ids,bary)),Vector()).normalized()
+                foreMass=sum(sum(appearance.data[i].color[:2])*w for i,w in zip(ids,bary));amount,breastAmount=FringeAmounts(root,normal,foreMass)
+                if amount>.55:accepted=(amount,breastAmount);break
+            if accepted is None:continue
+            weights={}
+            for i,w in zip(ids,bary):
+                for group in skin.data.vertices[i].groups:
+                    name=skin.vertex_groups[group.group].name;weights[name]=weights.get(name,0)+group.weight*w
+            row=dict(sorted(weights.items(),key=lambda item:-item[1])[:4]);totalWeight=sum(row.values());row={name:w/totalWeight for name,w in row.items()}
+            pigment=sum((Vector(color.data[i].color[:3])*w for i,w in zip(ids,bary)),Vector());flow=referenceFlow['HairFlow'](root,foreMass).lerp(Vector((.65*math.tanh(root.x/.035)*breastAmount/max(.0001,amount),-.25,-1)).normalized(),amount)
+            flow+=Vector((rng.uniform(-.2,.2),rng.uniform(-.14,.14),rng.uniform(-.14,.14)));length=rng.uniform(.006,.013)*(1+1.6*amount+1.3*breastAmount);width=rng.uniform(.00025,.00065)*(1+.5*amount)
+            start=len(vertices);faceCount=len(faces);lift=Fiber(root,normal,flow,width,length,row,2,pigment,1+7*amount,.75*amount)
+            for values in [vertices,normals,uvs,rows,colors]:values[first:first+3]=values[start:start+3];del values[start:]
+            del faces[faceCount:]
+            for i in range(3):fringeTags[first+i]=amount;fringeRoots[first+i]=root.copy();fringeTips[first+i]=float(i==2)
+            fringeFibres+=1;fringeLengths.append(length);fringeLifts.append(lift);redistributed+=1
+            if amount>.60:fringeStripSamples.append((first,root.copy(),normal.copy(),flow.copy(),dict(row),pigment.copy(),amount,breastAmount))
+        rng=originalRng
     # Reuse pairs of existing fine triangles for fine tapered strips. This
     # improves the ventral fringe without adding triangles or random draws.
     bellyStrips=min(400,len(bellyStripSamples)//2)
@@ -267,6 +320,26 @@ def BuildGroom(skin,rig,collection,material,count=21000):
             vertices[vertex]=corners[corner];uvs[vertex]=coordinates[corner];normals[vertex]=tuple(normal);rows[vertex]=dict(row)
             colors[vertex]=tuple(min(1,v*(1.06 if corner>=2 else 1)) for v in tint[:3])+(1,)
     regions['2']+=bellyStrips
+    # Four existing fibres become a two-segment curved wisp. All duplicated
+    # shared corners retain the same skin weights through both segments.
+    fringeStrips=min(1000,len(fringeStripSamples)//4)
+    for index in range(fringeStrips):
+        a,b,c,d=fringeStripSamples[index*4:index*4+4];first,root,normal,flow,row,pigment,amount,breastAmount=a
+        flow-=normal*flow.dot(normal);flow.normalize();across=flow.cross(normal).normalized()
+        length=(.024+.010*amount)*(1+.55*breastAmount/max(.0001,amount));width=.0006+.0007*amount;upper=root+flow*length+normal*(.006+.010*amount)
+        direction=(upper-root).normalized();angle=.70+.20*((index*7)%5)/4;across=(across*math.cos(angle)+direction.cross(across)*math.sin(angle)).normalized()
+        lower=root-normal*(.0003+width*.45*abs(across.dot(normal)))-flow*.001
+        curl=(.003+.004*((index*11)%7)/6)*(1 if index%3 else -1)
+        middle=root+flow*length*.50+normal*(.006+.010*amount)*.85+across*curl*.20
+        upper=root+flow*length*.92+normal*(.006+.010*amount)*.90+across*curl
+        corners=[lower-across*width/2,lower+across*width/2,middle+across*width*.55,middle-across*width*.55,upper+across*width*.10,upper-across*width*.10]
+        coordinates=[(.2498,.0700),(.2502,.0700),(.2502,.0702),(.2498,.0702),(.2502,.0704),(.2498,.0704)];tint=tuple(min(1,max(.003,pigment[k]*.75/means[2][k])) for k in range(3))+(1,)
+        slots=[s+i for s in [a[0],b[0],c[0],d[0]] for i in range(3)]
+        for vertex,corner in zip(slots,[0,1,2,0,2,3,3,2,4,3,4,5]):
+            vertices[vertex]=corners[corner];uvs[vertex]=coordinates[corner];normals[vertex]=tuple(normal);rows[vertex]=dict(row);fringeTags[vertex]=amount
+            fringeRoots[vertex]=root.copy();fringeTips[vertex]=float(corner>=4)
+            colors[vertex]=tuple(min(1,v*(1.06 if corner>=4 else 1)) for v in tint[:3])+(1,)
+    regions['2']+=2*fringeStrips
     # Soft ear rims and terminal tail brush share the same cutout atlas.
     for side in ('Left','Right'):
         ear=bpy.data.objects['DonkeyPinna'+side];ear.data.calc_loop_triangles()
@@ -311,6 +384,11 @@ def BuildGroom(skin,rig,collection,material,count=21000):
     mesh.normals_split_custom_set_from_vertices(normals)
     tint=mesh.color_attributes.new(name='HairTint',type='FLOAT_COLOR',domain='POINT')
     for i,value in enumerate(colors):tint.data[i].color=value
+    if useFringe:
+        attribute=mesh.attributes.new(name='PaleFringeBlend',type='FLOAT',domain='POINT')
+        for i,weight in fringeTags.items():attribute.data[i].value=weight
+        roots=mesh.attributes.new(name='PaleFringeRoot',type='FLOAT_VECTOR',domain='POINT');tips=mesh.attributes.new(name='PaleFringeTip',type='FLOAT',domain='POINT')
+        for i,point in fringeRoots.items():roots.data[i].vector=point;tips.data[i].value=fringeTips[i]
     uv=mesh.uv_layers.new(name='UVMap')
     for loop in mesh.loops:uv.data[loop.index].uv=uvs[loop.vertex_index]
     obj=bpy.data.objects.new('DonkeyShortCoatCards',mesh);collection.objects.link(obj);obj.parent=rig
@@ -318,92 +396,70 @@ def BuildGroom(skin,rig,collection,material,count=21000):
         for name,weight in row.items():
             group=obj.vertex_groups.get(name) or obj.vertex_groups.new(name=name);group.add([index],weight,'REPLACE')
     modifier=obj.modifiers.new('DonkeyCoatSkin','ARMATURE');modifier.object=rig
-    obj['coatAlphaCutoff']=.45;obj['coatCardCount']=sum(len(f)==4 for f in faces)+bellyStrips;obj['coatFibreCount']=count-2*bellyStrips;obj['coatRootSamples']=count;obj['groomPrimitiveCount']=len(faces);obj['coatDensityPerM2']=count/total
+    obj['coatAlphaCutoff']=.45;obj['coatCardCount']=sum(len(f)==4 for f in faces)+bellyStrips+2*fringeStrips;obj['coatFibreCount']=count-2*bellyStrips-4*fringeStrips;obj['coatRootSamples']=count;obj['groomPrimitiveCount']=len(faces);obj['coatDensityPerM2']=count/total
     obj.visible_shadow=False;obj['groomCastShadow']=False
-    return obj,{'fibres':count-2*bellyStrips,'rootSamples':count,'coronetFibres':coronetFibres,'coronetAreaM2':coronetArea,'coronetLengthM':[.009,.014],'coronetWidthM':[.0007,.0012],'cards':sum(len(f)==4 for f in faces)+bellyStrips,'triangles':sum(len(f)-2 for f in faces),'regionCards':regions,'sampledSurfaceM2':total,'maxInfluences':4,
+    return obj,{'fibres':count-2*bellyStrips-4*fringeStrips,'rootSamples':count,'coronetFibres':coronetFibres,'coronetAreaM2':coronetArea,'coronetLengthM':[.009,.014],'coronetWidthM':[.0007,.0012],'cards':sum(len(f)==4 for f in faces)+bellyStrips+2*fringeStrips,'triangles':sum(len(f)-2 for f in faces),'regionCards':regions,'sampledSurfaceM2':total,'maxInfluences':4,
+        'paleFringe':{'sampleFibres':fringeFibres,'redistributedBodySamples':redistributed,'curvedWisps':fringeStrips,'lengthRangeM':[min(fringeLengths,default=0),max(fringeLengths,default=0)],'liftRangeM':[min(fringeLifts,default=0),max(fringeLifts,default=0)],'wispLengthRangeM':[.030,.0527],'wispLiftRangeM':[.012,.016],'wispRootWidthRangeM':[.00102,.0013],'wispSegments':2,'method':'pale medial foreleg and breast fibres lengthened and lifted; body fine-fibre slots reallocated to the pale fringe with an independent deterministic stream; four existing triangles reused per curved strand; root sample and triangle budgets retained'},
         'bellyCoat':{'sampleFibres':bellyFibres,'fineFibres':bellyFibres-2*bellyStrips,'pairedStrips':bellyStrips,'sampleLengthRangeM':[min(bellyLengths,default=0),max(bellyLengths,default=0)],'sampleLiftRangeM':[min(bellyLifts,default=0),max(bellyLifts,default=0)],'stripLengthRangeM':[.0199,.022],'stripLiftRangeM':[.005275,.0065],'method':'bounded pale ventral fibres: downward/backward flow, up to 1.55x length and 3x normal lift; pairs of existing fine triangles reused as narrow opaque tapered strips; same source samples, random sequence and triangle budget'}}
 
-def DetailCoat(base,skin,collection):
-    image=bpy.data.images.load(str(base/'SourceTextures/Texture_DonkeyCoatFiberShortSource.png'),check_existing=True)
-    image.pack();copy=image.copy();copy.scale(1024,1024)
-    p=np.array(copy.pixels[:],dtype=np.float32).reshape(1024,1024,4)
-    gray=p[:,:,:3]@np.array([.2126,.7152,.0722],dtype=np.float32)
-    pigment=np.clip(.55+.25*(gray/max(.01,float(np.mean(gray)))-1),.30,.80)
-    albedo=np.ones_like(p);albedo[:,:,:3]=(1.055*pigment**(1/2.4)-.055)[:,:,None]
-    tile=bpy.data.images.new('Texture_DonkeyCoatDetailBase',width=1024,height=1024,alpha=False)
-    tile.pixels.foreach_set(albedo.ravel());tile.filepath_raw=str(base/'SourceTextures/Texture_DonkeyCoatDetailBase.png');tile.file_format='PNG';tile.save();tile.pack()
-    blur=sum(np.roll(np.roll(gray,dy,axis=0),dx,axis=1) for dy in (-4,0,4) for dx in (-4,0,4))/9
-    height=gray-blur
-    dx=(np.roll(height,-1,axis=1)-np.roll(height,1,axis=1))*3.2
-    dy=(np.roll(height,-1,axis=0)-np.roll(height,1,axis=0))*3.2
-    length=np.sqrt(dx*dx+dy*dy+1);values=np.empty_like(p)
-    values[:,:,0]=(-dx/length+1)*.5;values[:,:,1]=(-dy/length+1)*.5;values[:,:,2]=(1/length+1)*.5;values[:,:,3]=1
-    values[:8,:8,:3]=(.5,.5,1)
-    normal=bpy.data.images.new('Texture_DonkeyCoatDetailNormal',width=1024,height=1024,alpha=False)
-    normal.colorspace_settings.name='Non-Color';normal.pixels.foreach_set(values.ravel())
-    normal.filepath_raw=str(base/'SourceTextures/Texture_DonkeyCoatDetailNormal.png');normal.file_format='PNG';normal.save();normal.pack()
-    materials={m for obj in collection.objects if obj.type=='MESH' for m in obj.data.materials if m and m.name.startswith(('DonkeyCartGreyCoat','DonkeyLowerLegShortFur','DonkeyCartFaceFur','DonkeyCartEarInterior'))}
-    for material in materials:
-        nodes,links=material.node_tree.nodes,material.node_tree.links;nodes.clear()
-        shader=nodes.new('ShaderNodeBsdfPrincipled');shader.inputs['Roughness'].default_value=.84;shader.inputs['Specular IOR Level'].default_value=.20
-        output=nodes.new('ShaderNodeOutputMaterial');links.new(shader.outputs[0],output.inputs[0])
-        uv=nodes.new('ShaderNodeUVMap');uv.uv_map='CoatFlowUV'
-        tex=nodes.new('ShaderNodeTexImage');tex.image=tile;links.new(uv.outputs[0],tex.inputs[0])
-        paint=nodes.new('ShaderNodeVertexColor');paint.layer_name='CoatColor'
-        gain=nodes.new('ShaderNodeMixRGB');gain.blend_type='MULTIPLY';gain.inputs[0].default_value=1;gain.inputs[2].default_value=(.75/.55,.75/.55,.75/.55,1)
-        links.new(paint.outputs[0],gain.inputs[1])
-        multiply=nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1
-        links.new(gain.outputs[0],multiply.inputs[1]);links.new(tex.outputs[0],multiply.inputs[2]);links.new(multiply.outputs[0],shader.inputs['Base Color'])
-        normalTexture=nodes.new('ShaderNodeTexImage');normalTexture.image=normal;links.new(uv.outputs[0],normalTexture.inputs[0])
-        mapping=nodes.new('ShaderNodeNormalMap');mapping.uv_map='CoatFlowUV';mapping.inputs['Strength'].default_value=.65
-        links.new(normalTexture.outputs[0],mapping.inputs['Color']);links.new(mapping.outputs[0],shader.inputs['Normal'])
-    for obj in collection.objects:
-        if obj.type!='MESH' or obj.name=='DonkeyShortCoatCards':continue
-        source=obj.data.uv_layers.get('CoatFlowUV')
-        if not source:continue
-        layer=obj.data.uv_layers.new(name='FurDetailUV')
-        transform=skin.parent.matrix_world.inverted()@obj.matrix_world
-        for face in obj.data.polygons:
-            furry=obj.data.materials[face.material_index] in materials
-            normal=transform.to_3x3()@face.normal;axis=max(range(3),key=lambda i:abs(normal[i]))
-            for loop in face.loop_indices:
-                p=transform@obj.data.vertices[obj.data.loops[loop].vertex_index].co
-                if axis==0:
-                    head=Smooth(.84,1.00,p.y);leg=1-Smooth(.53,.68,p.z)
-                    dy=-1*(1-head)+.45*head;dz=-.30*(1-head)-head
-                    dy=dy*(1-leg)-.12*leg;dz=dz*(1-leg)-leg
-                    length=math.hypot(dy,dz);dy/=length;dz/=length
-                    coord=((dz*p.y-dy*p.z)/furRepeatM,(dy*p.y+dz*p.z)/furRepeatM)
-                elif axis==1:coord=(p.x/furRepeatM,-p.z/furRepeatM)
-                else:coord=(p.x/furRepeatM,-p.y/furRepeatM)
-                source.data[loop].uv=coord
-                layer.data[loop].uv=coord if furry else (.003,.003)
+def FringeLinearPixels(image):
+    loaded=bpy.data.images.load(bpy.path.abspath(image.filepath_raw),check_existing=False);width,height=loaded.size
+    pixels=np.array(loaded.pixels[:],dtype=np.float32).reshape(height,width,4)[:,:,:3];bpy.data.images.remove(loaded)
+    return np.where(pixels<=.04045,pixels/12.92,((pixels+.055)/1.055)**2.4)
 
-def RefineCoat(scene,base):
-    skin=bpy.data.objects['DonkeyContinuousSkin'];rig=bpy.data.objects['DonkeyRig'];collection=bpy.data.collections['DonkeyEditable']
-    if scene.get('DonkeyCoatRevision')=='20261023FurV3':raise RuntimeError('Load the V2 source before applying V3 coat')
-    SurfaceShape(skin)
-    ReferencePigment(skin);FineMane(rig,collection)
-    # Match the undercoat pigment to card roots. The old coarse photo tint was
-    # being multiplied twice; keep its microrelief while removing that blotch.
-    for material in skin.data.materials:
-        if not material.name.startswith(('DonkeyCartGreyCoat','DonkeyLowerLegShortFur')):continue
-        nodes,links=material.node_tree.nodes,material.node_tree.links;shader=next(n for n in nodes if n.type=='BSDF_PRINCIPLED')
-        paint=next(n for n in nodes if n.type=='VERTEX_COLOR')
-        pigment=nodes.new('ShaderNodeMixRGB');pigment.blend_type='MULTIPLY';pigment.inputs[0].default_value=1;pigment.inputs[2].default_value=(.75,.75,.75,1)
-        links.new(paint.outputs[0],pigment.inputs[1]);links.new(pigment.outputs[0],shader.inputs['Base Color'])
-    previous=bpy.data.objects.get('DonkeyShortCoatSilhouette')
-    if previous:bpy.data.objects.remove(previous,do_unlink=True)
-    DetailCoat(base,skin,collection)
-    material=HairMaterial(base);obj,report=BuildGroom(skin,rig,collection,material)
-    scene['DonkeyCoatRevision']='20261023FurV3'
-    report.update({'version':scene['DonkeyCoatRevision'],'method':'individual skinned short fibres, limited alpha-cutout edge tufts and tiled fibre normal detail on UV1',
-                  'source':str(base/'SourceTextures/Texture_DonkeyShortFurCardsSource.png'),
-                  'sourceSha256':hashlib.sha256((base/'SourceTextures/Texture_DonkeyShortFurCardsSource.png').read_bytes()).hexdigest(),
-                  'alphaCutoff':.45,'material':'DonkeyShortCoatPbr','bodyShape':'shallow individual rib arcs, scapular hollow and pelvic crest',
-                  'geometryBudget':80000,'runtimeGroomName':'DonkeyCoatRuntime','ribSurfaceAddedTriangles':skin['ribSurfaceAddedTriangles'],
-                  'pigment':'charcoal gray-brown, warm worn rib peaks, pale underside and muzzle, subdued upper eyelid',
-                  'detailNormalUv':'FurDetailUV; author-scaled short-coat flow, 0.22 m per texture repeat',
-                  'detailTexelsPerMetre':1024/furRepeatM})
-    (base/'Review/Data_CoatRefinement.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
-    return report
+def FringeSamplePixels(pixels,uv):
+    height,width=pixels.shape[:2];x=max(0,min(width-1,float(uv[0])*(width-1)));y=max(0,min(height-1,float(uv[1])*(height-1)));i,j=int(x),int(y);fx,fy=x-i,y-j
+    return (pixels[j,i]*(1-fx)+pixels[j,min(width-1,i+1)]*fx)*(1-fy)+(pixels[min(height-1,j+1),i]*(1-fx)+pixels[min(height-1,j+1),min(width-1,i+1)]*fx)*fy
+
+def BuildBodyPigmentSampler(animal,sourceSpace):
+    bpy.context.view_layer.update()
+    image=next(n.image for m in animal.data.materials for n in m.node_tree.nodes if n.type=='TEX_IMAGE' and n.image and n.image.name.startswith('Texture_DonkeyAnimalBase'))
+    pixels=FringeLinearPixels(image);animal.data.calc_loop_triangles();triangles=list(animal.data.loop_triangles)
+    tree=BVHTree.FromPolygons([v.co for v in animal.data.vertices],[tuple(t.vertices) for t in triangles],all_triangles=True);transform=animal.matrix_world.inverted()@sourceSpace.matrix_world;uvMap=animal.data.uv_layers['UVMap'];cache={}
+    report={'sourceSpace':sourceSpace.name,'bodyImage':image.name,'bodyPath':bpy.path.abspath(image.filepath_raw),'roots':0,'maximumSurfaceDistanceM':0,'samples':[]}
+    def SampleRoot(root):
+        point=transform@root;key=tuple(round(c,7) for c in point)
+        if key not in cache:
+            hit,_,index,distance=tree.find_nearest(point)
+            if distance>.002:raise RuntimeError('Fringe pigment root is outside the corresponding body surface: '+str(distance))
+            triangle=triangles[index];points=[animal.data.vertices[i].co for i in triangle.vertices];bary=barycentric_transform(hit,*points,Vector((1,0,0)),Vector((0,1,0)),Vector((0,0,1)))
+            uv=sum((uvMap.data[loop].uv*w for loop,w in zip(triangle.loops,bary)),Vector((0,0)));cache[key]=FringeSamplePixels(pixels,uv)
+            report['roots']=len(cache);report['maximumSurfaceDistanceM']=max(report['maximumSurfaceDistanceM'],distance)
+            if len(report['samples'])<12:report['samples'].append({'root':list(root),'distanceM':distance,'uv':list(uv),'linearRgb':cache[key].tolist()})
+        return cache[key]
+    return SampleRoot,report
+
+def MatchPaleFringePigment(coat,animal,bodySampler=None):
+    """Match new fringe roots to the actual baked body, after the UV0 bake."""
+    mask=coat.data.attributes.get('PaleFringeBlend');roots=coat.data.attributes.get('PaleFringeRoot');tips=coat.data.attributes.get('PaleFringeTip')
+    if not mask or not roots:return None
+    bpy.context.view_layer.update()
+    if bodySampler is None:bodySampler,_=BuildBodyPigmentSampler(animal,coat)
+    image=next(n.image for n in coat.data.materials[0].node_tree.nodes if n.type=='TEX_IMAGE' and n.image and n.image.name.startswith('Texture_DonkeyShortCoatBase'))
+    pixels=FringeLinearPixels(image);uvs={loop.vertex_index:coat.data.uv_layers.active.data[loop.index].uv.copy() for loop in coat.data.loops};paint=coat.data.color_attributes['HairTint'];changes=[]
+    for vertex in coat.data.vertices:
+        i=vertex.index
+        if mask.data[i].value<=0:continue
+        target=bodySampler(roots.data[i].vector)*(1+.04*(tips.data[i].value if tips else 0));tint=np.clip(target/np.maximum(.01,FringeSamplePixels(pixels,uvs[i])),.003,1)
+        old=np.array(paint.data[i].color[:3]);paint.data[i].color=(*tint,1);changes.append(float(np.max(np.abs(tint-old))))
+    return {'method':'new fringe tints sampled from actual baked body UV0 at stored surface roots; atlas pigment normalized per vertex','vertices':len(changes),'maximumTintChange':max(changes,default=0),'hairImage':image.name,'existingGroomOutsideFringeChanged':False}
+
+def RebuildPaleFringeAfterBake(skin,rig,collection,original,animal):
+    sampler,samplerReport=BuildBodyPigmentSampler(animal,skin)
+    candidate,report=BuildGroom(skin,rig,collection,original.data.materials[0],pigmentSampler=sampler)
+    if len(candidate.data.vertices)!=len(original.data.vertices) or len(candidate.data.loops)!=len(original.data.loops):raise RuntimeError('Pale fringe changed the source vertex/triangle budget')
+    mask=candidate.data.attributes['PaleFringeBlend'];oldNormals=[None]*len(original.data.vertices);newNormals=[None]*len(candidate.data.vertices)
+    for loop in original.data.loops:oldNormals[loop.vertex_index]=original.data.corner_normals[loop.index].vector.copy()
+    for loop in candidate.data.loops:newNormals[loop.vertex_index]=candidate.data.corner_normals[loop.index].vector.copy()
+    preserved=0
+    for a,b in zip(original.data.vertices,candidate.data.vertices):
+        if mask.data[b.index].value>0:continue
+        b.co=a.co;candidate.data.color_attributes['HairTint'].data[b.index].color=original.data.color_attributes['HairTint'].data[a.index].color;newNormals[b.index]=oldNormals[a.index];preserved+=1
+        oldWeights={original.vertex_groups[g.group].name:g.weight for g in a.groups};newWeights={candidate.vertex_groups[g.group].name:g.weight for g in b.groups}
+        if oldWeights!=newWeights:raise RuntimeError('Untouched fringe-exterior skin weights changed')
+    for a,b in zip(original.data.loops,candidate.data.loops):
+        if mask.data[b.vertex_index].value<=0:candidate.data.uv_layers.active.data[b.index].uv=original.data.uv_layers.active.data[a.index].uv
+    candidate.data.normals_split_custom_set_from_vertices(newNormals);candidate.data.update()
+    report['pigmentTransfer']=MatchPaleFringePigment(candidate,animal,sampler);report['pigmentSampler']=samplerReport;report['exteriorVerticesPreserved']=preserved
+    name=original.name;bpy.data.objects.remove(original,do_unlink=True);candidate.name=name
+    return candidate,report

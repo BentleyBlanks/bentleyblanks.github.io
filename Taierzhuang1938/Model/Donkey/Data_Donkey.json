@@ -1,11 +1,11 @@
 {
   "schema": "tengxian-independent-rigged-prop-v1",
   "id": "Donkey",
-  "version": "20261025ReferenceV28",
+  "version": "20261025ReferenceV29",
   "asset": "Model_Donkey.glb",
   "textureManifest": "Data_DonkeyTextures.json",
-  "sha256": "cb4ecc8bd72da7d56f870af4416ea83e551a99b464788672cab1d75efdf992ac",
-  "bytes": 16757236,
+  "sha256": "ef05b65ccfea3a9468e21202d5ffa0dd938392b06fc2e654d2fdd06fef22de47",
+  "bytes": 16757268,
   "units": "metres",
   "upAxis": "+Y",
   "facingAxis": "-Z",
@@ -18,7 +18,7 @@
   "nominalWithersHeightM": 1.1,
   "boundsM": {
     "min": [
-      -0.20329031348228455,
+      -0.20224584639072418,
       0.00039999998989515007,
       -1.121999979019165
     ],
@@ -28,7 +28,7 @@
       0.41769352555274963
     ],
     "dimensions": [
-      0.4090961366891861,
+      0.40805166959762573,
       1.5700224109750707,
       1.5396935045719147
     ]
@@ -72,18 +72,18 @@
     }
   },
   "coat": {
-    "fibres": 20200,
-    "cards": 1057,
+    "fibres": 16200,
+    "cards": 3057,
     "triangles": 22314,
     "regionCards": {
       "0": 267,
       "1": 25,
-      "2": 405,
+      "2": 2405,
       "3": 360
     },
     "sampledSurfaceM2": 2.060616948156667,
     "maxInfluences": 4,
-    "version": "20261025ReferenceV28",
+    "version": "20261025ReferenceV29",
     "method": "individual skinned short fibres, limited alpha-cutout edge tufts and tiled fibre normal detail on UV1",
     "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\SourceTextures\\Texture_DonkeyShortFurCardsSource.png",
     "sourceSha256": "03db7521e9987a20f405e647c3c37237ad3006193f993babd2d2a424496e6d09",
@@ -107,6 +107,33 @@
       0.0007,
       0.0012
     ],
+    "paleFringe": {
+      "sampleFibres": 4992,
+      "redistributedBodySamples": 4000,
+      "curvedWisps": 1000,
+      "lengthRangeM": [
+        0.004321575877315438,
+        0.05069445456096964
+      ],
+      "liftRangeM": [
+        0.0007891265345572509,
+        0.01759859455388
+      ],
+      "wispLengthRangeM": [
+        0.03,
+        0.0527
+      ],
+      "wispLiftRangeM": [
+        0.012,
+        0.016
+      ],
+      "wispRootWidthRangeM": [
+        0.00102,
+        0.0013
+      ],
+      "wispSegments": 2,
+      "method": "pale medial foreleg and breast fibres lengthened and lifted; body fine-fibre slots reallocated to the pale fringe with an independent deterministic stream; four existing triangles reused per curved strand; root sample and triangle budgets retained"
+    },
     "bellyCoat": {
       "sampleFibres": 2126,
       "fineFibres": 1326,
@@ -129,6 +156,227 @@
       ],
       "method": "bounded pale ventral fibres: downward/backward flow, up to 1.55x length and 3x normal lift; pairs of existing fine triangles reused as narrow opaque tapered strips; same source samples, random sequence and triangle budget"
     },
+    "pigmentTransfer": {
+      "method": "new fringe tints sampled from actual baked body UV0 at stored surface roots; atlas pigment normalized per vertex",
+      "vertices": 15468,
+      "maximumTintChange": 0.42505696415901184,
+      "hairImage": "Texture_DonkeyShortCoatBase",
+      "existingGroomOutsideFringeChanged": false
+    },
+    "pigmentSampler": {
+      "sourceSpace": "DonkeyContinuousSkin",
+      "bodyImage": "Texture_DonkeyAnimalBase",
+      "bodyPath": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV29\\SourceTextures\\Baked\\Texture_DonkeyAnimalBase.png",
+      "roots": 7213,
+      "maximumSurfaceDistanceM": 0.0010778920259326696,
+      "samples": [
+        {
+          "root": [
+            0.06474767625331879,
+            0.6741036772727966,
+            0.6757974028587341
+          ],
+          "distanceM": 5.960464477539063e-08,
+          "uv": [
+            0.5118647217750549,
+            0.027035824954509735
+          ],
+          "linearRgb": [
+            0.28616175055503845,
+            0.24928165972232819,
+            0.21661260724067688
+          ]
+        },
+        {
+          "root": [
+            0.04749668017029762,
+            0.6886187195777893,
+            0.49194079637527466
+          ],
+          "distanceM": 1.1175870895385742e-08,
+          "uv": [
+            0.296283096075058,
+            0.7098923325538635
+          ],
+          "linearRgb": [
+            0.10123693943023682,
+            0.08258654177188873,
+            0.06955336034297943
+          ]
+        },
+        {
+          "root": [
+            0.04444200173020363,
+            0.7063212394714355,
+            0.5675638914108276
+          ],
+          "distanceM": 1.1175870895385742e-08,
+          "uv": [
+            0.27721765637397766,
+            0.6753592491149902
+          ],
+          "linearRgb": [
+            0.19777944684028625,
+            0.1553965061903,
+            0.12405814230442047
+          ]
+        },
+        {
+          "root": [
+            -0.08485390245914459,
+            0.7076390981674194,
+            0.6621939539909363
+          ],
+          "distanceM": 7.450580596923828e-09,
+          "uv": [
+            0.14858093857765198,
+            0.9059877991676331
+          ],
+          "linearRgb": [
+            0.2267591953277588,
+            0.1845545470714569,
+            0.16189853847026825
+          ]
+        },
+        {
+          "root": [
+            -0.045879267156124115,
+            0.8457986116409302,
+            0.8291375637054443
+          ],
+          "distanceM": 7.450580596923828e-09,
+          "uv": [
+            0.5286256670951843,
+            0.2578127980232239
+          ],
+          "linearRgb": [
+            0.029937436804175377,
+            0.022826656699180603,
+            0.02093331888318062
+          ]
+        },
+        {
+          "root": [
+            -0.10926059633493423,
+            0.73729407787323,
+            0.7321918606758118
+          ],
+          "distanceM": 7.450580596923828e-09,
+          "uv": [
+            0.08662503957748413,
+            0.9516326189041138
+          ],
+          "linearRgb": [
+            0.06532740592956543,
+            0.048638127744197845,
+            0.04134254902601242
+          ]
+        },
+        {
+          "root": [
+            -0.017534008249640465,
+            0.7699061036109924,
+            0.7406034469604492
+          ],
+          "distanceM": 1.862645149230957e-09,
+          "uv": [
+            0.5366069078445435,
+            0.3007351756095886
+          ],
+          "linearRgb": [
+            0.09002207219600677,
+            0.06778818368911743,
+            0.05799665302038193
+          ]
+        },
+        {
+          "root": [
+            0.1081300899386406,
+            0.781242847442627,
+            0.8009872436523438
+          ],
+          "distanceM": 7.450580596923828e-09,
+          "uv": [
+            0.3855402171611786,
+            0.7565242648124695
+          ],
+          "linearRgb": [
+            0.05496843904256821,
+            0.04026232659816742,
+            0.03995397314429283
+          ]
+        },
+        {
+          "root": [
+            -0.07289378345012665,
+            0.6375393867492676,
+            0.5050821900367737
+          ],
+          "distanceM": 0.0,
+          "uv": [
+            0.11431313306093216,
+            0.7318313121795654
+          ],
+          "linearRgb": [
+            0.04685528948903084,
+            0.039555393159389496,
+            0.036975350230932236
+          ]
+        },
+        {
+          "root": [
+            0.09315428137779236,
+            0.8093568086624146,
+            0.8227258324623108
+          ],
+          "distanceM": 1.4901161193847656e-08,
+          "uv": [
+            0.34351450204849243,
+            0.8523452877998352
+          ],
+          "linearRgb": [
+            0.02177426964044571,
+            0.017971519380807877,
+            0.01650681532919407
+          ]
+        },
+        {
+          "root": [
+            0.0749104917049408,
+            0.7663471698760986,
+            0.7491805553436279
+          ],
+          "distanceM": 5.960464477539063e-08,
+          "uv": [
+            0.32526281476020813,
+            0.8762258291244507
+          ],
+          "linearRgb": [
+            0.04531566798686981,
+            0.0338657945394516,
+            0.032141707837581635
+          ]
+        },
+        {
+          "root": [
+            0.07480393350124359,
+            0.8135074377059937,
+            0.8076761364936829
+          ],
+          "distanceM": 0.0,
+          "uv": [
+            0.3374420702457428,
+            0.8497759103775024
+          ],
+          "linearRgb": [
+            0.03942761570215225,
+            0.03161757439374924,
+            0.03089355118572712
+          ]
+        }
+      ]
+    },
+    "exteriorVerticesPreserved": 50160,
     "sourceScript": "_blender/Script_DonkeyReferenceFit.py",
     "shadow": "groomCastShadow=false; body and accessories cast shadows, micro-fibre layer receives them"
   },
@@ -358,18 +606,18 @@
       "shape": "more upright neck/poll, extended muzzle, rounded abdomen, locally smoothed shoulder/hamstring, fuller short mane and narrower ear splay"
     },
     "coat": {
-      "fibres": 20200,
-      "cards": 1057,
+      "fibres": 16200,
+      "cards": 3057,
       "triangles": 22314,
       "regionCards": {
         "0": 267,
         "1": 25,
-        "2": 405,
+        "2": 2405,
         "3": 360
       },
       "sampledSurfaceM2": 2.060616948156667,
       "maxInfluences": 4,
-      "version": "20261025ReferenceV28",
+      "version": "20261025ReferenceV29",
       "method": "individual skinned short fibres, limited alpha-cutout edge tufts and tiled fibre normal detail on UV1",
       "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\SourceTextures\\Texture_DonkeyShortFurCardsSource.png",
       "sourceSha256": "03db7521e9987a20f405e647c3c37237ad3006193f993babd2d2a424496e6d09",
@@ -393,6 +641,33 @@
         0.0007,
         0.0012
       ],
+      "paleFringe": {
+        "sampleFibres": 4992,
+        "redistributedBodySamples": 4000,
+        "curvedWisps": 1000,
+        "lengthRangeM": [
+          0.004321575877315438,
+          0.05069445456096964
+        ],
+        "liftRangeM": [
+          0.0007891265345572509,
+          0.01759859455388
+        ],
+        "wispLengthRangeM": [
+          0.03,
+          0.0527
+        ],
+        "wispLiftRangeM": [
+          0.012,
+          0.016
+        ],
+        "wispRootWidthRangeM": [
+          0.00102,
+          0.0013
+        ],
+        "wispSegments": 2,
+        "method": "pale medial foreleg and breast fibres lengthened and lifted; body fine-fibre slots reallocated to the pale fringe with an independent deterministic stream; four existing triangles reused per curved strand; root sample and triangle budgets retained"
+      },
       "bellyCoat": {
         "sampleFibres": 2126,
         "fineFibres": 1326,
@@ -414,10 +689,231 @@
           0.0065
         ],
         "method": "bounded pale ventral fibres: downward/backward flow, up to 1.55x length and 3x normal lift; pairs of existing fine triangles reused as narrow opaque tapered strips; same source samples, random sequence and triangle budget"
-      }
+      },
+      "pigmentTransfer": {
+        "method": "new fringe tints sampled from actual baked body UV0 at stored surface roots; atlas pigment normalized per vertex",
+        "vertices": 15468,
+        "maximumTintChange": 0.42505696415901184,
+        "hairImage": "Texture_DonkeyShortCoatBase",
+        "existingGroomOutsideFringeChanged": false
+      },
+      "pigmentSampler": {
+        "sourceSpace": "DonkeyContinuousSkin",
+        "bodyImage": "Texture_DonkeyAnimalBase",
+        "bodyPath": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV29\\SourceTextures\\Baked\\Texture_DonkeyAnimalBase.png",
+        "roots": 7213,
+        "maximumSurfaceDistanceM": 0.0010778920259326696,
+        "samples": [
+          {
+            "root": [
+              0.06474767625331879,
+              0.6741036772727966,
+              0.6757974028587341
+            ],
+            "distanceM": 5.960464477539063e-08,
+            "uv": [
+              0.5118647217750549,
+              0.027035824954509735
+            ],
+            "linearRgb": [
+              0.28616175055503845,
+              0.24928165972232819,
+              0.21661260724067688
+            ]
+          },
+          {
+            "root": [
+              0.04749668017029762,
+              0.6886187195777893,
+              0.49194079637527466
+            ],
+            "distanceM": 1.1175870895385742e-08,
+            "uv": [
+              0.296283096075058,
+              0.7098923325538635
+            ],
+            "linearRgb": [
+              0.10123693943023682,
+              0.08258654177188873,
+              0.06955336034297943
+            ]
+          },
+          {
+            "root": [
+              0.04444200173020363,
+              0.7063212394714355,
+              0.5675638914108276
+            ],
+            "distanceM": 1.1175870895385742e-08,
+            "uv": [
+              0.27721765637397766,
+              0.6753592491149902
+            ],
+            "linearRgb": [
+              0.19777944684028625,
+              0.1553965061903,
+              0.12405814230442047
+            ]
+          },
+          {
+            "root": [
+              -0.08485390245914459,
+              0.7076390981674194,
+              0.6621939539909363
+            ],
+            "distanceM": 7.450580596923828e-09,
+            "uv": [
+              0.14858093857765198,
+              0.9059877991676331
+            ],
+            "linearRgb": [
+              0.2267591953277588,
+              0.1845545470714569,
+              0.16189853847026825
+            ]
+          },
+          {
+            "root": [
+              -0.045879267156124115,
+              0.8457986116409302,
+              0.8291375637054443
+            ],
+            "distanceM": 7.450580596923828e-09,
+            "uv": [
+              0.5286256670951843,
+              0.2578127980232239
+            ],
+            "linearRgb": [
+              0.029937436804175377,
+              0.022826656699180603,
+              0.02093331888318062
+            ]
+          },
+          {
+            "root": [
+              -0.10926059633493423,
+              0.73729407787323,
+              0.7321918606758118
+            ],
+            "distanceM": 7.450580596923828e-09,
+            "uv": [
+              0.08662503957748413,
+              0.9516326189041138
+            ],
+            "linearRgb": [
+              0.06532740592956543,
+              0.048638127744197845,
+              0.04134254902601242
+            ]
+          },
+          {
+            "root": [
+              -0.017534008249640465,
+              0.7699061036109924,
+              0.7406034469604492
+            ],
+            "distanceM": 1.862645149230957e-09,
+            "uv": [
+              0.5366069078445435,
+              0.3007351756095886
+            ],
+            "linearRgb": [
+              0.09002207219600677,
+              0.06778818368911743,
+              0.05799665302038193
+            ]
+          },
+          {
+            "root": [
+              0.1081300899386406,
+              0.781242847442627,
+              0.8009872436523438
+            ],
+            "distanceM": 7.450580596923828e-09,
+            "uv": [
+              0.3855402171611786,
+              0.7565242648124695
+            ],
+            "linearRgb": [
+              0.05496843904256821,
+              0.04026232659816742,
+              0.03995397314429283
+            ]
+          },
+          {
+            "root": [
+              -0.07289378345012665,
+              0.6375393867492676,
+              0.5050821900367737
+            ],
+            "distanceM": 0.0,
+            "uv": [
+              0.11431313306093216,
+              0.7318313121795654
+            ],
+            "linearRgb": [
+              0.04685528948903084,
+              0.039555393159389496,
+              0.036975350230932236
+            ]
+          },
+          {
+            "root": [
+              0.09315428137779236,
+              0.8093568086624146,
+              0.8227258324623108
+            ],
+            "distanceM": 1.4901161193847656e-08,
+            "uv": [
+              0.34351450204849243,
+              0.8523452877998352
+            ],
+            "linearRgb": [
+              0.02177426964044571,
+              0.017971519380807877,
+              0.01650681532919407
+            ]
+          },
+          {
+            "root": [
+              0.0749104917049408,
+              0.7663471698760986,
+              0.7491805553436279
+            ],
+            "distanceM": 5.960464477539063e-08,
+            "uv": [
+              0.32526281476020813,
+              0.8762258291244507
+            ],
+            "linearRgb": [
+              0.04531566798686981,
+              0.0338657945394516,
+              0.032141707837581635
+            ]
+          },
+          {
+            "root": [
+              0.07480393350124359,
+              0.8135074377059937,
+              0.8076761364936829
+            ],
+            "distanceM": 0.0,
+            "uv": [
+              0.3374420702457428,
+              0.8497759103775024
+            ],
+            "linearRgb": [
+              0.03942761570215225,
+              0.03161757439374924,
+              0.03089355118572712
+            ]
+          }
+        ]
+      },
+      "exteriorVerticesPreserved": 50160
     },
     "referenceFit": {
-      "version": "20261025ReferenceV28",
+      "version": "20261025ReferenceV29",
       "referenceImage": "Image_DonkeyOriginalThreeView.png",
       "calibration": {
         "groundPixelY": 925,
@@ -3778,7 +4274,7 @@
             "sourceObject": "DonkeyReferenceManeVolume"
           },
           "method": "reference-alpha side ribbon, curved triangular-tube main mane and fine curved forelock strips rooted to actual skin",
-          "texture": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV28\\SourceTextures\\Texture_DonkeyManeBase.png",
+          "texture": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV29\\SourceTextures\\Texture_DonkeyManeBase.png",
           "textureSha256": "1fbfad7666bd4d9edbe1a8f973da129785c9d6a549034448567f1a18316b9f89",
           "sourceSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b"
         },
@@ -4268,7 +4764,7 @@
       "standingPose": "far forefoot forward, far hindfoot forward; centred foot targets during walk",
       "shape": "broader muzzle/skull and barrel, shorter axial silhouette, corrected eye height, back/belly profile and sternum",
       "groom": {
-        "fibres": 20200,
+        "fibres": 16200,
         "rootSamples": 21000,
         "coronetFibres": 480,
         "coronetAreaM2": 0.01900850803144749,
@@ -4280,16 +4776,43 @@
           0.0007,
           0.0012
         ],
-        "cards": 1057,
+        "cards": 3057,
         "triangles": 22314,
         "regionCards": {
           "0": 267,
           "1": 25,
-          "2": 405,
+          "2": 2405,
           "3": 360
         },
         "sampledSurfaceM2": 2.060616948156667,
         "maxInfluences": 4,
+        "paleFringe": {
+          "sampleFibres": 4992,
+          "redistributedBodySamples": 4000,
+          "curvedWisps": 1000,
+          "lengthRangeM": [
+            0.004321575877315438,
+            0.05069445456096964
+          ],
+          "liftRangeM": [
+            0.0007891265345572509,
+            0.01759859455388
+          ],
+          "wispLengthRangeM": [
+            0.03,
+            0.0527
+          ],
+          "wispLiftRangeM": [
+            0.012,
+            0.016
+          ],
+          "wispRootWidthRangeM": [
+            0.00102,
+            0.0013
+          ],
+          "wispSegments": 2,
+          "method": "pale medial foreleg and breast fibres lengthened and lifted; body fine-fibre slots reallocated to the pale fringe with an independent deterministic stream; four existing triangles reused per curved strand; root sample and triangle budgets retained"
+        },
         "bellyCoat": {
           "sampleFibres": 2126,
           "fineFibres": 1326,
@@ -4311,7 +4834,228 @@
             0.0065
           ],
           "method": "bounded pale ventral fibres: downward/backward flow, up to 1.55x length and 3x normal lift; pairs of existing fine triangles reused as narrow opaque tapered strips; same source samples, random sequence and triangle budget"
-        }
+        },
+        "pigmentTransfer": {
+          "method": "new fringe tints sampled from actual baked body UV0 at stored surface roots; atlas pigment normalized per vertex",
+          "vertices": 15468,
+          "maximumTintChange": 0.42505696415901184,
+          "hairImage": "Texture_DonkeyShortCoatBase",
+          "existingGroomOutsideFringeChanged": false
+        },
+        "pigmentSampler": {
+          "sourceSpace": "DonkeyContinuousSkin",
+          "bodyImage": "Texture_DonkeyAnimalBase",
+          "bodyPath": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV29\\SourceTextures\\Baked\\Texture_DonkeyAnimalBase.png",
+          "roots": 7213,
+          "maximumSurfaceDistanceM": 0.0010778920259326696,
+          "samples": [
+            {
+              "root": [
+                0.06474767625331879,
+                0.6741036772727966,
+                0.6757974028587341
+              ],
+              "distanceM": 5.960464477539063e-08,
+              "uv": [
+                0.5118647217750549,
+                0.027035824954509735
+              ],
+              "linearRgb": [
+                0.28616175055503845,
+                0.24928165972232819,
+                0.21661260724067688
+              ]
+            },
+            {
+              "root": [
+                0.04749668017029762,
+                0.6886187195777893,
+                0.49194079637527466
+              ],
+              "distanceM": 1.1175870895385742e-08,
+              "uv": [
+                0.296283096075058,
+                0.7098923325538635
+              ],
+              "linearRgb": [
+                0.10123693943023682,
+                0.08258654177188873,
+                0.06955336034297943
+              ]
+            },
+            {
+              "root": [
+                0.04444200173020363,
+                0.7063212394714355,
+                0.5675638914108276
+              ],
+              "distanceM": 1.1175870895385742e-08,
+              "uv": [
+                0.27721765637397766,
+                0.6753592491149902
+              ],
+              "linearRgb": [
+                0.19777944684028625,
+                0.1553965061903,
+                0.12405814230442047
+              ]
+            },
+            {
+              "root": [
+                -0.08485390245914459,
+                0.7076390981674194,
+                0.6621939539909363
+              ],
+              "distanceM": 7.450580596923828e-09,
+              "uv": [
+                0.14858093857765198,
+                0.9059877991676331
+              ],
+              "linearRgb": [
+                0.2267591953277588,
+                0.1845545470714569,
+                0.16189853847026825
+              ]
+            },
+            {
+              "root": [
+                -0.045879267156124115,
+                0.8457986116409302,
+                0.8291375637054443
+              ],
+              "distanceM": 7.450580596923828e-09,
+              "uv": [
+                0.5286256670951843,
+                0.2578127980232239
+              ],
+              "linearRgb": [
+                0.029937436804175377,
+                0.022826656699180603,
+                0.02093331888318062
+              ]
+            },
+            {
+              "root": [
+                -0.10926059633493423,
+                0.73729407787323,
+                0.7321918606758118
+              ],
+              "distanceM": 7.450580596923828e-09,
+              "uv": [
+                0.08662503957748413,
+                0.9516326189041138
+              ],
+              "linearRgb": [
+                0.06532740592956543,
+                0.048638127744197845,
+                0.04134254902601242
+              ]
+            },
+            {
+              "root": [
+                -0.017534008249640465,
+                0.7699061036109924,
+                0.7406034469604492
+              ],
+              "distanceM": 1.862645149230957e-09,
+              "uv": [
+                0.5366069078445435,
+                0.3007351756095886
+              ],
+              "linearRgb": [
+                0.09002207219600677,
+                0.06778818368911743,
+                0.05799665302038193
+              ]
+            },
+            {
+              "root": [
+                0.1081300899386406,
+                0.781242847442627,
+                0.8009872436523438
+              ],
+              "distanceM": 7.450580596923828e-09,
+              "uv": [
+                0.3855402171611786,
+                0.7565242648124695
+              ],
+              "linearRgb": [
+                0.05496843904256821,
+                0.04026232659816742,
+                0.03995397314429283
+              ]
+            },
+            {
+              "root": [
+                -0.07289378345012665,
+                0.6375393867492676,
+                0.5050821900367737
+              ],
+              "distanceM": 0.0,
+              "uv": [
+                0.11431313306093216,
+                0.7318313121795654
+              ],
+              "linearRgb": [
+                0.04685528948903084,
+                0.039555393159389496,
+                0.036975350230932236
+              ]
+            },
+            {
+              "root": [
+                0.09315428137779236,
+                0.8093568086624146,
+                0.8227258324623108
+              ],
+              "distanceM": 1.4901161193847656e-08,
+              "uv": [
+                0.34351450204849243,
+                0.8523452877998352
+              ],
+              "linearRgb": [
+                0.02177426964044571,
+                0.017971519380807877,
+                0.01650681532919407
+              ]
+            },
+            {
+              "root": [
+                0.0749104917049408,
+                0.7663471698760986,
+                0.7491805553436279
+              ],
+              "distanceM": 5.960464477539063e-08,
+              "uv": [
+                0.32526281476020813,
+                0.8762258291244507
+              ],
+              "linearRgb": [
+                0.04531566798686981,
+                0.0338657945394516,
+                0.032141707837581635
+              ]
+            },
+            {
+              "root": [
+                0.07480393350124359,
+                0.8135074377059937,
+                0.8076761364936829
+              ],
+              "distanceM": 0.0,
+              "uv": [
+                0.3374420702457428,
+                0.8497759103775024
+              ],
+              "linearRgb": [
+                0.03942761570215225,
+                0.03161757439374924,
+                0.03089355118572712
+              ]
+            }
+          ]
+        },
+        "exteriorVerticesPreserved": 50160
       },
       "material": "visible full-RGB reference coat/face pigment with illumination compensation; anatomical apertures and hidden pixels retain calibrated fallback; independent 0.45 m fibre-normal repeat",
       "colorCalibration": {
@@ -4372,12 +5116,12 @@
         "cavityProtection": "feathered source nostril shadows and oral crease/highlight footprints excluded from pigment-like detail; anatomical creases remain geometry",
         "original": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
         "originalSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
-        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV28\\Image_NakedAnatomyGuide.png",
+        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV29\\Image_NakedAnatomyGuide.png",
         "guideSha256": "8130715142837beed8957c59ffc775500d4b6ff96bf99a61b51f8759dc9d0c4a",
         "images": [
           {
             "view": "Side",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV28\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV29\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
             "sha256": "8d73e8a356d807d9fb3020310c402bd4a3d1974ad459a4a0e02c15d0cdb68852",
             "size": [
               1536,
@@ -4386,7 +5130,7 @@
           },
           {
             "view": "Front",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV28\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV29\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
             "sha256": "236a334f07bb01ec8e773154b89937e02d37bca1cc1b87973060c66c7019151f",
             "size": [
               1536,
@@ -4395,7 +5139,7 @@
           },
           {
             "view": "Rear",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV28\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV29\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
             "sha256": "ef5d8b1ac83cec630467e8244236c71b80238d05199fbf89f99d87c7b1a7aff4",
             "size": [
               1536,
@@ -4407,10 +5151,10 @@
         "visibility": "fitted-skin BVH depth test from axial source cameras; 4 mm surface tolerance; source-vertex weights baked into UV0; anterior muzzle uses horizontal normal azimuth; the pectoral region prioritizes its frontal source to prevent side-view collar-fill streaks on downward-facing breast skin",
         "materials": [
           "DonkeyCartFaceFur",
-          "DonkeyNasalPad",
           "DonkeyLowerLegShortFur",
           "DonkeyCartEarInterior",
-          "DonkeyCartGreyCoat"
+          "DonkeyCartGreyCoat",
+          "DonkeyNasalPad"
         ],
         "runtime": "baked UV0 base colour; independent tiled UV1 fibre normal; no camera projection in GLB",
         "pigmentProjection": {
@@ -4441,7 +5185,7 @@
           "images": [
             {
               "view": "Side",
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV28\\SourceTextures\\Texture_DonkeyReferenceSidePigment.png",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV29\\SourceTextures\\Texture_DonkeyReferenceSidePigment.png",
               "sha256": "c83427f503394f5f636edc0e27bd4442ebe4a00ae1b7fa9bd41659a3ecc10747",
               "size": [
                 1536,
@@ -4450,7 +5194,7 @@
             },
             {
               "view": "Front",
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV28\\SourceTextures\\Texture_DonkeyReferenceFrontPigment.png",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV29\\SourceTextures\\Texture_DonkeyReferenceFrontPigment.png",
               "sha256": "fd000c01578801b1097f6ef0af20aee8aad2a13ec2f5f3c74f1dd906c2058887",
               "size": [
                 1536,
@@ -4459,7 +5203,7 @@
             },
             {
               "view": "Rear",
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV28\\SourceTextures\\Texture_DonkeyReferenceRearPigment.png",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV29\\SourceTextures\\Texture_DonkeyReferenceRearPigment.png",
               "sha256": "3401153c133468803d39ae6a78971151ae8ec700231da93af6b604f745c0e224",
               "size": [
                 1536,
@@ -4478,7 +5222,7 @@
               "sha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b"
             },
             {
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV28\\Image_NakedAnatomyGuide.png",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV29\\Image_NakedAnatomyGuide.png",
               "sha256": "8130715142837beed8957c59ffc775500d4b6ff96bf99a61b51f8759dc9d0c4a"
             }
           ],
@@ -5013,7 +5757,7 @@
           "detailUsesSyntheticNoise": false,
           "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
           "sourceSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
-          "atlas": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV28\\SourceTextures\\Texture_DonkeyLegPigment.png",
+          "atlas": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV29\\SourceTextures\\Texture_DonkeyLegPigment.png",
           "sha256": "46be175681f0733e70d2e0f1c7fefff2748dc1f08b539eccbfa6fc08f3a4fe30",
           "vertices": 5219,
           "materials": [
@@ -5062,7 +5806,7 @@
     "sourceAnatomyEvidence": "Measured three-view silhouette, closed manifold neck/skin, orbital relief, rebuilt eyes and swept nasal cavities; compatible rest joints and four-influence skin. Native clips and the packed GLB are independently sampled.",
     "nativeLateralStanceDriftPerFrameM": 5.960464477539063e-08,
     "pectoralMotionIntegrity": {
-      "assetSha256": "cb4ecc8bd72da7d56f870af4416ea83e551a99b464788672cab1d75efdf992ac",
+      "assetSha256": "ef05b65ccfea3a9468e21202d5ffa0dd938392b06fc2e654d2fdd06fef22de47",
       "walkSamples": 145,
       "idleSamples": 37,
       "visibilityDirections": 14,
@@ -5076,7 +5820,7 @@
     "bakeUvLegOverlapTexels": 0,
     "runtimeTriangulation": "explicit source-derived triangles shared by bake and glTF export; editable source polygons retained"
   },
-  "editableSource": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV28\\Scene_Donkey.blend",
+  "editableSource": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261025\\ReferenceFitV29\\Scene_Donkey.blend",
   "credits": [
     {
       "name": "Lyndon Daniels / ChadM Rigged Horse",
