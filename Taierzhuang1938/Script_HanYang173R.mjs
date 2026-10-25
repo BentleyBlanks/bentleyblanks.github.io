@@ -10,7 +10,7 @@ export function LoadHanYang173R() {
     for(const name of [...D.wood,...D.bolt,...D.cocking,D.trigger])
       if(!names.has(name)) throw new Error(`173R missing part: ${name}`);
     return {gltf, materials: new Map()};
-  }).catch(error=>{console.warn(`[HanYang173R] model unavailable; using legacy fallback: ${error.message}`);return null;});
+  }).catch(error=>{loading=null;throw new Error(`汉阳造 173R 模型载入失败，请刷新重试：${error.message}`,{cause:error});});
 }
 
 export function ConfigureHanYang173R(asset, library) {
@@ -41,6 +41,7 @@ export function ConfigureHanYang173R(asset, library) {
 // Private geometry for FPS: Equip/Dispose and movable bolt groups may mutate it.
 // World geometry is also owned by the factory cache, while PBR textures are shared.
 export function InstantiateHanYang173R(asset,{batch=false}={}) {
+  if(!asset?.gltf?.scene)throw new Error('汉阳造 173R 尚未载入；请先完成模型预载。');
   const root = new THREE.Group(); root.name='HanYang173R';
   root.userData.assetVersion=D.version;
   const nodes=new Map(), meshes=[], groups={};

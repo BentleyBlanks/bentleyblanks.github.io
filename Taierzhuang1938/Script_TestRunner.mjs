@@ -49,6 +49,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 export const testDefs = {
   HanYang173RAssetTest: {file:'Script_HanYang173RAssetTest.mjs',desc:'HanYang 60k actual GLB, all 44 parts, source PBR payload identity, tangent frames and packed material decoding'},
   HanYang173RBrowserTest: {file:'Script_HanYang173RBrowserTest.mjs',timeoutMs:600000,desc:'Actual HanYang 173R FPS/world identity, high wood/metal lighting and whitebox weapon-only reflections'},
+  HanYang173RDefaultTest: {file:'Script_HanYang173RDefaultTest.mjs',timeoutMs:720000,desc:'Default blockout rifle, both arm paths, retired model absence and explicit GLB failure'},
   Type89MediumTankTest: {file:"Script_Type89MediumTankTest.mjs",timeoutMs:120000,desc:"Type89 actual GLB: explicit240k close-detail budget, rigid hinges, metre bounds, PBR, mapped hit coverage and finite tangent bases"},
   Type89MediumTankBrowserTest: {file:"Script_Type89MediumTankBrowserTest.mjs",timeoutMs:180000,desc:"Type89 real renderer: independent treads/all wheels, turret/recoil/hatches, physical PBR colour spaces and reloaded model views"},
   HistoryCodexBrowserTest: {file:"Script_HistoryCodexBrowserTest.mjs",timeoutMs:300000,desc:"Archive: sourced records, soft book folds/cancel/back, 17 pages, zoom, disposal and mobile"},
@@ -620,7 +621,7 @@ export const browserTests = new Set([
   "MachineGunCaptivesAnimationTest",
   "CarriagePropVelocityTest",
   "DraftCartEditorTest",
-  "MotionVectorContractTest", "FpsRifleViewTest", "HanYang173RBrowserTest",
+  "MotionVectorContractTest", "FpsRifleViewTest", "HanYang173RBrowserTest", "HanYang173RDefaultTest",
   "BrowserBundleTest",
 
   "CoverLeanBrowserTest", "MovementRangeTest",
@@ -817,7 +818,7 @@ export const domains = {
     tier2Tests:["FpsReloadClearanceTest","HanYangReloadClearanceTest"],
     tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmActionsTest", "FirearmHandlingBrowserTest", "FirearmResponseBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsRifleViewTest", "FpsGripCorrectiveAssetTest", "FpsHandSkinWeightsTest", "FpsForearmTaperTest", "FpsWristNormalSeamTest", "FpsHandSelfContactTest", "FpsHandLeftSelfContactTest", "FpsHandPoseTest", "FpsSleeveTest", "FpsHandAnatomyTest", "FpsHandContactTest", "FpsElbowArcTest", "FpsReloadMechanicsTest", "FpsGripEditorTest", "FpsAnimationTest", "FpsDadaoProjectionTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
-      "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "HanYang173RAssetTest", "HanYang173RBrowserTest", "ModelFacingTest",
+      "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "HanYang173RAssetTest", "HanYang173RBrowserTest", "HanYang173RDefaultTest", "ModelFacingTest",
       // 受击物理反应挂在 TakeHit/Kill/Actor.Update 上：碰伤害口径、人物动画、死亡的改动连着它们一起跑。
       "HitReactionTest", "HitReactionBrowserTest",
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：

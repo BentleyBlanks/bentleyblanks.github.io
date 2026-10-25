@@ -16,6 +16,7 @@ import { Panel, Section, Slider, Chips, Toggle, Button, ButtonRow, Facts, Note, 
   from "./Script_EditorUi.mjs";
 import { WEAPONS, AMMO, LOADOUTS, WeaponShelved } from "./Data_Weapons.mjs";
 import { MESHES, WEAPON_MESH_BY_ID, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
+import { EXTERNAL_GLB_STANDARDS } from "./Data_AssetStandards.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";
 
 const KIND_LABEL = {
@@ -666,7 +667,10 @@ export class WeaponEditor {
 
     const meshId = WEAPON_MESH_BY_ID[this.weaponId];
     const mesh = meshId ? MESHES[meshId] : null;
-    if (mesh) {
+    const authored = this.weaponId==='HanYang' ? EXTERNAL_GLB_STANDARDS.find(asset=>asset.id==='HanYang173R') : null;
+    if (authored) {
+      F("模型", `${authored.pack} · ${authored.actualTriangles} 三角`);
+    } else if (mesh) {
       F("模型", `${mesh.file} · ${mesh.triangles} 三角`);
       F("draw call", `high ${mesh.draws.high} / low ${mesh.draws.low}`);
     } else {

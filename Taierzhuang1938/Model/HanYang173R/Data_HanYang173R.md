@@ -1,6 +1,6 @@
 # Dots HanYang 173R game integration
 
-The current HanYang first-person, carried and dropped world model uses Dots' 173R delivery. The old `Model_HanYang.tzm.json` is retained as a load-failure fallback. Source geometry is metres, Y-up and muzzle −Z; the muzzle lip and butt-cap vertex clouds independently verify this in `Script_ModelFacingTest.mjs`.
+The HanYang first-person, carried and dropped world model uses only Dots' 173R delivery. The user requested complete retirement of the old gun: its TZM file, model/source registry entries, procedural builder and automatic importer entry are removed. Asset loading failure reports a retry error rather than substituting another rifle. Source geometry is metres, Y-up and muzzle −Z; the muzzle lip and butt-cap vertex clouds independently verify this in `Script_ModelFacingTest.mjs`.
 
 ## Asset identity and provenance
 
@@ -20,6 +20,8 @@ Source packages and source Blender projects remain outside Git:
 ## Runtime and lighting
 
 `Data_HanYang173R.mjs` owns authored part names, mechanical mounts, ADS pitch and material calibration. `Script_HanYang173R.mjs` uses `ManagedGLTFLoader`, configures the existing material library and creates private FPS/world geometry while sharing textures. Source materials are not disposed when a weapon instance is swapped.
+
+The default player rifle is `Data_Weapons.DEFAULT_PLAYER_WEAPON` (HanYang), including the remaining legacy loadouts and identity fallback; intentional unarmed story states remain unarmed. All blockout-editor phases already select HanYang. The authored gun is passed to Viewmodel separately from the optional rigged-arm bundle, so `arms=legacy` cannot select an old gun. `Script_HanYang173RDefaultTest` checks the actual editor startup without `TakeWeapon`, both arm paths, FPS/world triangle identity, zero retired-asset requests and explicit GLB failure. The weapon editor reports the GLB's real triangle count rather than retired TZM metadata.
 
 Base color is sRGB; normal/ORM are linear. The original wood has very dark base texels (representative visible pixels around sRGB 41/29/20). Following the user's wood-brightness review, the linear reflectance gain is 12 (previously 6); normals and roughness remain authored, with no emission or exposure boost. The COD14 comparison calibrates 41 metal parts: `SideWoodButton` is classified by its metallic ORM, despite its name. Exposed steel uses per-part linear reflectance normalization, roughness gain 1.4, and a 0.95 effective reflectance bound; sights/interior lips retain a darker finish. These are artistic runtime adaptations and leave the source image files unchanged. Gains are applied from saved original multipliers, so repeated configuration cannot accumulate brightness. Rebuild metal gains with `_import/Script_HanYang173RMaterials.py`; metadata is in `Data_MaterialCalibration.json`, runtime values in `Data_HanYang173RMaterials.mjs`. The bounds use the existing material-patch registry in the forward pass and precede diagnostic channel capture. No additional production pass is introduced. Comparison, limitations and optional public techniques are in [the COD14 study](Data_Cod14LightingStudy.md).
 

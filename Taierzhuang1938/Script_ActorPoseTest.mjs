@@ -132,7 +132,10 @@ try {
           for (const weaponId of ["ZhongZheng", "HanYang", "Type38"]) {
           const bare = factory.WeaponGeometry(weaponId);
           const fixed = factory.WeaponGeometry(weaponId, 0, { includeBayonet: true });
-          check((bare.source === "model") === modeled, `${weaponId}: wrong geometry source tested`);
+          const expectModel = modeled || weaponId === "HanYang";
+          check((bare.source === "model") === expectModel, `${weaponId}: wrong geometry source tested`);
+          if(weaponId==='HanYang')check([...bare.geometries.values()].reduce((sum,g)=>sum+(g.index?.count||g.attributes.position.count)/3,0)===59901,
+            'HanYang must retain its authored GLB even when the TZM cache is empty');
           const bareCount = VertexCount(bare.geometries);
           check(VertexCount(fixed.geometries) > bareCount,
             `${quality}/${modeled}: fixed bayonet has no additional vertices`);
@@ -149,7 +152,7 @@ try {
             `${quality}/${modeled}/${weaponId}: bare source still contains a blade ahead of its muzzle`);
           check(VertexCount(factory.WeaponGeometry(weaponId).geometries) === bareCount,
             `${quality}/${modeled}: fixed variant contaminated shared bare geometry`);
-          bayonetMeshes.push(`${quality}/${modeled ? "model" : "procedural"}/${weaponId}:${bareCount}->${VertexCount(fixed.geometries)}`);
+          bayonetMeshes.push(`${quality}/${expectModel ? "model" : "procedural"}/${weaponId}:${bareCount}->${VertexCount(fixed.geometries)}`);
           }
         }
       }

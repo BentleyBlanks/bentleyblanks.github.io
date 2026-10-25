@@ -344,14 +344,15 @@ export function PlayerSlotKey(slot) {
 }
 
 /** 玩家在各关的携行。杂牌部队的弹药必须是紧的。 */
+export const DEFAULT_PLAYER_WEAPON = "HanYang";
 export const LOADOUTS = {
-  L0_Wall: { primary: "ZhongZheng", secondary: null, melee: null,
+  L0_Wall: { primary: DEFAULT_PLAYER_WEAPON, secondary: null, melee: null,
     throwables: { Grenade: 3 }, spareClips: 6, note: "上墙前领的：一支枪，三十发子弹，三枚手榴弹。" },
-  L1_Breach: { primary: "ZhongZheng", secondary: null, melee: "Dadao",
+  L1_Breach: { primary: DEFAULT_PLAYER_WEAPON, secondary: null, melee: "Dadao",
     throwables: { Grenade: 5 }, spareClips: 5 },
   L2_RoomWar: { primary: "HanYang", secondary: null, melee: "Dadao",
     throwables: { Grenade: 6, GrenadeBundle: 2 }, spareClips: 4,
-    note: "中正式打坏了，换了支汉阳造 —— 杂牌部队就是这么换枪的。" },
+    note: "携行：汉阳造、大刀和手榴弹。" },
   L3_WhiteTowel: { primary: "HanYang", secondary: null, melee: "Dadao",
     throwables: { Grenade: 8 }, spareClips: 3,
     note: "携行：汉阳造、大刀和手榴弹。" },

@@ -1,5 +1,7 @@
 # HanYang handle topology repair
 
+Historical record only: this TZM rifle and its repair script were retired at the user's request on 2026-10-25. They can be recovered from Git history, but are no longer shipped or used as a fallback. The sole runtime rifle and current rebuild instructions are in [HanYang 173R](../Model/HanYang173R/Data_HanYang173R.md).
+
 The first-person view previously selected individual steel triangles by their
 centroids. This cut the handle socket and also selected long receiver-sleeve
 triangles. Rotating and translating that selection exposed holes and lifted an

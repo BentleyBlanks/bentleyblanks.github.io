@@ -794,6 +794,7 @@ function BuildDadao(buckets, d, quality) {
 // 换枪只换一个 Group，据枪姿势 / 枪口位置 / 拉栓点全都不用跟着改。
 // ---------------------------------------------------------------------------
 function BuildWeaponGeometry(id, quality, includeBayonet = false) {
+  if(id==='HanYang')throw new Error('汉阳造必须使用已预载的 173R 模型。');
   const data = WEAPONS[id];
   const buckets = new Map();
   // 枪的木/钢两桶不合并（全木或全钢的剪影一眼就错），只合小件（刀柄缠布、红布条）
@@ -839,11 +840,6 @@ function BuildWeaponGeometry(id, quality, includeBayonet = false) {
       Add(buckets, "steel", TubeZ(0.011, 0.011, 0.012, 6, GUN_TILE.steel), { x: 0.058, y: bore + 0.020, z: 0.01 });
     }
 
-    if (id === "HanYang") {
-      // 老套筒：枪管外那层薄套筒，是它区别于中正式的剪影特征
-      Add(buckets, "steel", TubeZ(0.0155, 0.0165, Math.abs(muzzleZ) * 0.52, seg, GUN_TILE.steel),
-        { y: bore, z: muzzleZ * 0.66 });
-    }
     if (id === "Type38") {
       // 三八式的防尘滑盖：机匣上方一块随栓前后滑动的薄板
       Add(buckets, "steel", GunSteelBox(0.030, 0.010, 0.145, "dustCover"), { y: bore + 0.026, z: -0.05 });
@@ -3666,7 +3662,7 @@ export class ActorFactory {
    * （它们在 Actor 构造函数里被调，那条路上不能有 await），只会去 meshDocs 里拿
    * 已经解码好的文档；没预读就一律走程序化方块几何 —— 不报错、不黑屏，只是没换模。
    *
-   * 一个模型 404 也只作废那一个 id（LoadDocument 返回 null 不抛），别的照用。
+   * 普通 TZM 404 只作废该 id。汉阳造 173R 是必需资产，加载失败显式中止并提示重试。
    */
   async PreloadMeshes() {
     if (this.meshLoading) return this.meshLoading;
@@ -3730,7 +3726,7 @@ export class ActorFactory {
    * @returns {{root, nodes, tris, draws, bounds} | null}
    */
   ModelInstance(meshId, materials) {
-    if(meshId==='HanYang'&&this.hanYang173R)return InstantiateHanYang173R(this.hanYang173R,{batch:true});
+    if(meshId==='HanYang')return InstantiateHanYang173R(this.hanYang173R,{batch:true});
     const doc = this.meshDocs.get(meshId);
     const entry = MESHES[meshId];
     if (!doc || !entry) return null;
@@ -3746,7 +3742,7 @@ export class ActorFactory {
   }
 
   _InstantiateMesh(id) {
-    if(id==='HanYang'&&this.hanYang173R)return InstantiateHanYang173R(this.hanYang173R,{batch:true});
+    if(id==='HanYang')return InstantiateHanYang173R(this.hanYang173R,{batch:true});
     const doc = this.meshDocs.get(id);
     const entry = MESHES[id];
     if (!doc || !entry) return null;
@@ -3999,7 +3995,7 @@ export class ActorFactory {
   }
 
   /**
-   * 手持武器的几何 + 挂点。先试模型，读不到退回 BuildWeaponGeometry。
+   * 手持武器的几何 + 挂点。汉阳造只用 173R；其余武器保留原有备用形体规则。
    * 返回的形状两条路完全一致：{ geometries, muzzle, gripFront, bolt, twoHanded }，
    * 所以 Actor.SetWeapon 一行都不用改。
    */
@@ -4033,7 +4029,7 @@ export class ActorFactory {
   /** 从 TZM 模型取一把枪。挂点全部读模型的 muzzle / gripL，不再自己猜枪口在哪。 */
   _ModelWeaponGeometry(weaponId, variant = 0, includeBayonet = false, detail = false) {
     const id = WeaponMeshId(weaponId, variant);
-    if (!id || !this.meshDocs.has(id)) return null;
+    if (!id || (id!=='HanYang'&&!this.meshDocs.has(id))) return null;
     const data = WEAPONS[weaponId];
     const built = this._InstantiateMesh(id);
     if (!built || !built.nodes.has("muzzle")) return null;

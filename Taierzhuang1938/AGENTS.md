@@ -12,7 +12,7 @@
 
 - **信号弹与照明弹（2026-10-25）**：正式 `FlareDirector` 共用可见燃烧体、烟迹、火星与伞降渲染；第一关 AirFirst 与白盒 13-2 接红色信号星，特效编辑器新增两项、弹道/近景/地面镜头及夜间对照。装备类型参考1944年日军手册，具体滕县事件、颜色含义和视觉参数仍属创作复原。见[信号与照明效果](docs/Data_FlareEffects.md)，门禁 `FlareTest` / `FlareEffectsBrowserTest`，旧照明弹视距与节奏契约保留。
 
-- **Dots 汉阳造 173R 接入（2026-10-25）**：当前 FPS／携带／掉落枪采用 59,901 三角、44 部件和原始 PBR 图；完整制作源留 OneDrive，旧 TZM 只作加载故障回退。专用双手握姿与原生 Idle 已同步；开栓避拇指、松栓先退出再松指。材质库修复无后期时 ORM 折叠漏注入，木托／金属在现有材质 pass 内校准反射输入；木托增益 12、按 ORM 修正侧钮金属分类，原图字节保留。用户确认白盒保留枪械环境反射：只给登记材质绑定已有 PMREM，场景 IBL 仍关闭、无新增 pass。[COD14 明暗对标与公开技术候选](Model/HanYang173R/Data_Cod14LightingStudy.md)区分本轮材质修复与待用户决定的新算法。接线、重建与验收口径见[173R 资产说明](Model/HanYang173R/Data_HanYang173R.md)，门禁 `HanYang173RAssetTest` / `HanYang173RBrowserTest` 及原持枪／换弹检查。
+- **Dots 汉阳造 173R 接入（2026-10-25）**：当前 FPS／携带／掉落枪采用 59,901 三角、44 部件和原始 PBR 图；完整制作源留 OneDrive。旧 TZM、登记、程序化回退与导入入口已按用户要求移除；模型载入失败显式提示重试。主角默认步枪统一汉阳造，枪模不再依赖骨骼手臂开关。专用双手握姿与原生 Idle 已同步；开栓避拇指、松栓先退出再松指。材质库修复无后期时 ORM 折叠漏注入，木托／金属在现有材质 pass 内校准反射输入；木托增益 12、按 ORM 修正侧钮金属分类，原图字节保留。用户确认白盒保留枪械环境反射：只给登记材质绑定已有 PMREM，场景 IBL 仍关闭、无新增 pass。[COD14 明暗对标与公开技术候选](Model/HanYang173R/Data_Cod14LightingStudy.md)区分本轮材质修复与待用户决定的新算法。接线、重建与验收口径见[173R 资产说明](Model/HanYang173R/Data_HanYang173R.md)，门禁 `HanYang173RAssetTest` / `HanYang173RBrowserTest` / `HanYang173RDefaultTest` 及原持枪／换弹检查。
 
 - **独立布料模拟测试场（2026-10-24）**：选章「测试场景」新增 `?cloth=1`，展示冬瓜厚棉被、进门棉门帘、川军出川锦旗与细棉/绸/帆/羊毛四样片；九档预设、同风力对比、十项参数、披覆/提角/松手/推帘/阵风、暂停单步与参数导出。`Data_Tuning_ClothRange` 只管本场，私有 `BlanketClothRig` / 几何 / 材质实例；旧布料默认配置和单被资产不变。三件新封闭壳 GLB 在 `Model/ClothLab/`，源工程在 OneDrive。没有自碰撞和棉絮体积压缩，不以厚壳代称完整厚织物求解。口径 [布料测试场](docs/Data_ClothRange.md)，门禁 `ClothRangeTest` / `ClothRangeBrowserTest`。
 

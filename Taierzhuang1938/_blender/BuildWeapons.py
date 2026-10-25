@@ -271,56 +271,6 @@ def BuildZhongZheng():
 # 汉阳造 1.250 m —— 枪管外那层薄套筒是它的剪影特征
 # ---------------------------------------------------------------------------
 
-def BuildHanYang():
-    total = 1.250
-    muzzleZ = -(total - BUTT_Z)
-    root = Node("root")
-    body = root.Child("body")
-    foreEnd = muzzleZ * 0.50
-
-    body.Add("wood", BoltRifleStock(total, foreEnd, comb=0.96), tile=T_WOOD)
-
-    receiver = Box(0.033, 0.046, 0.185, bevel=0.004)
-    Transform(receiver, y=BORE - 0.004, z=-0.050)
-    body.Add("steel", receiver, tile=T_STEEL)
-    # 曼利夏式漏夹弹仓：这一支的弹仓是**真的凸在托腹外面**的（跟毛瑟的内置不同），
-    # 但原来摆的位置只露出 1 mm，等于白建。压到露出 8 mm。
-    mag = Box(0.030, 0.044, 0.062, bevel=0.003)
-    Transform(mag, y=BORE - 0.047, z=-0.040)
-    body.Add("steel", mag, tile=T_STEEL)
-    body.Add("steel", TriggerGuard(0.024, -0.010, -0.012), tile=T_STEEL)
-    trigger = Box(0.005, 0.018, 0.008)
-    Transform(trigger, y=-0.020, z=0.004)
-    body.Add("steel", trigger, tile=T_STEEL)
-
-    # **枪管套筒**：φ32 的薄壁圆筒一路包到枪口附近。88 式的识别点，
-    # 没有它就跟中正式分不出来 —— 而这两把枪在第 31 师是混装的。
-    #
-    # 注意 z 是**递减**才是往枪口去（枪管沿 -Z）。这里最早写成 muzzleZ - 0.055，
-    # 结果套筒跑到枪口前头去了，而且 LoftZ 的环序反了整段面朝里。
-    # 全长断言（BuildAll 的 WEAPON_LENGTH）就是为了逮这一类。
-    # 起点同样退进机匣里 40 mm。
-    body.Add("steel", TubeAlongZ(-0.100, muzzleZ + 0.055, 0.0162, 0.0158, segments=10), tile=T_STEEL)
-    # 套筒尽头露出的一小截枪管 + 枪口帽
-    body.Add("steel", TubeAlongZ(muzzleZ + 0.075, muzzleZ, 0.0090, 0.0082), tile=T_STEEL)
-    capRing = LoftZ([Ring(muzzleZ + 0.062, rx=0.0135, rz=0.0135, cz=BORE),
-                     Ring(muzzleZ + 0.040, rx=0.0135, rz=0.0135, cz=BORE)],
-                    SEG, capStart=False, capEnd=False, smooth=False)
-    body.Add("steel", capRing, tile=T_STEEL)
-
-    body.Add("steel", BoltHandle(-0.026, 0.62), tile=T_STEEL)
-    body.Add("steel", LadderSight(-0.160), tile=T_STEEL)
-    body.Add("steel", FrontSight(muzzleZ + 0.020), tile=T_STEEL)
-    body.Add("steel", SlingSwivels([(foreEnd * 0.8, -0.010), (BUTT_Z - 0.110, -0.044)]), tile=T_STEEL)
-
-    Mounts(body, muzzleZ - 0.008, muzzleZ * 0.42, -0.160, magY=BORE - 0.050, magZ=-0.040)
-    return root
-
-
-# ---------------------------------------------------------------------------
-# ZB-26 轻机枪 1.165 m —— 弹匣从上方插、枪管上提把、前段两脚架
-# ---------------------------------------------------------------------------
-
 def BuildZb26():
     total = 1.165
     muzzleZ = -(total - BUTT_Z)
@@ -640,7 +590,6 @@ def BuildDadao():
 
 WEAPON_BUILDERS = {
     "ZhongZheng": BuildZhongZheng,
-    "HanYang": BuildHanYang,
     "Zb26": BuildZb26,
     "Type38": BuildType38,
     "ServicePistol": BuildServicePistol,

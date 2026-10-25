@@ -107,25 +107,6 @@ SOURCES = {
                 "包布与独立子弹，只保留木托、机匣、枪机、扳机和机械瞄具；"
                 "全长按中正式史实 1.110 m 缩放。",
     },
-    "HanYang": {
-        "file": os.path.join("Model_Gewehr88", "scene.gltf"),
-        "lengthM": 1.250,
-        "kind": "rifle",
-        "matName": {"Material": "wood", "Material.004": "steel", "Material.005": "steel",
-                    "Material.006": "steel", "Material.007": "steel"},
-        "noDetails": True,
-        # 照门高度。**旧值 0.055（默认档）作废**：那是照"整支枪挂在准星左边"的
-        # 那一版几何量的 —— 瞄准点当时压根不在枪上，扫 0.055—0.076 当然档档干净。
-        # 2026-08-26 把枪对回瞄准线之后重量（同 Script_AdsSightTest 的上半窗指标）：
-        # 0.050→663、0.054→528、0.058→818、0.062→159、0.066→95、0.070→0、0.074→0、
-        # 0.078 起整窗也归零。取 0.072：上半窗干净，整窗仍留着五十来个像素 ——
-        # 那是准星尖与照门肩，一副能读的照门/准星画面；再往上枪就整个沉出窗外了。
-        "mounts": {"muzzleZ": -1.003, "gripZ": -0.418, "sightZ": -0.160,
-                   "sightY": 0.072, "magY": BORE - 0.050, "magZ": -0.040},
-        "note": "CC-BY Gewehr 88（Sketchfab / TastyTony）→ 汉阳八八式。整长套筒、"
-                "曼利夏漏夹弹仓与露出式通条是八八式自带的剪影，不再用 Kar98k 拉长加套筒。"
-                "全长按史实 1.250 m。",
-    },
     "Type38": {
         "file": os.path.join("Model_Type38Arisaka", "scene.gltf"),
         "lengthM": 1.276,

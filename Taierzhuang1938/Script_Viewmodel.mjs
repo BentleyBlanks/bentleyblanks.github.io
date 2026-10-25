@@ -628,8 +628,8 @@ function MakeHand(materials, side, key) {
 // 原点放在握把上而不是枪托底，是因为所有姿势（腰射/开镜/冲刺）都是绕着握持手转的。
 
 /**
- * 三支栓动步枪共用一套骨架，差别全在这张表里。
- * 长度都对得上 Data_Weapons：中正式 1.110 / 汉阳造 1.250 / 三八式 1.276。
+ * 其余栓动步枪的程序化备用形体；汉阳造只使用独立 173R GLB。
+ * 长度对应 Data_Weapons：中正式 1.110 / 三八式 1.276。
  */
 const RIFLE_SPECS = {
   ZhongZheng: {
@@ -639,14 +639,6 @@ const RIFLE_SPECS = {
     forend: [-0.200, -0.615], handguard: [-0.225, -0.560],
     bands: [-0.440, -0.600], dustCover: false,
     bayonetZ: -0.800, bayonetLen: 0.395,
-  },
-  HanYang: {
-    boreY: 0.052, buttZ: 0.2925, muzzleZ: -0.9575,
-    barrelR: 0.0080, jacketR: 0.0136,            // "老套筒"：枪管外的薄套筒 = 它的剪影
-    rearSightZ: -0.2800, frontSightZ: -0.9050,
-    forend: [-0.200, -0.700], handguard: [-0.225, -0.640],
-    bands: [-0.470, -0.690], dustCover: false,
-    bayonetZ: -0.940, bayonetLen: 0.395,
   },
   Type38: {
     boreY: 0.050, buttZ: 0.2925, muzzleZ: -0.9835,
@@ -1126,7 +1118,6 @@ function BuildDadao(materials, weapon, key) {
 
 const BUILDERS = {
   ZhongZheng: BuildBoltRifle,
-  HanYang: BuildBoltRifle,
   Type38: BuildBoltRifle,
   Zb26: BuildZb26,
   ServicePistol: BuildServicePistol,
@@ -1305,8 +1296,9 @@ function BuildFromModel(materials, weapon, key, doc, authoredAsset=null) {
   let built = null;
   try {
     // Preserve mechanical node boundaries while building private FPS geometry.
-    built = authoredAsset ? InstantiateHanYang173R(authoredAsset) : InstantiateModel(doc, { materials: table, batch: false });
+    built = key==='HanYang' ? InstantiateHanYang173R(authoredAsset) : InstantiateModel(doc, { materials: table, batch: false });
   } catch (error) {
+    if(key==='HanYang')throw error;
     console.warn(`[Viewmodel] ${key} 模型实例化失败：${String(error).slice(0, 160)}`);
     return null;
   }
@@ -1371,7 +1363,7 @@ function BuildFromModel(materials, weapon, key, doc, authoredAsset=null) {
   const isBoltRifle = weapon?.kind === "boltRifle";
   const mechanism = {
     ZhongZheng: { pivot:[0,0.040,-0.115], handle:[0.030,0.010,-0.115], cutX:0.016, width:0.012, seat:[0,0.040,-0.083] },
-    HanYang: authoredAsset ? HANYANG_173R.mechanism : { pivot:[0,0.042,-0.147], handle:[0.053,0.042,-0.147], cutX:0.015, width:0.014, seat:[0,0.041,-0.110] },
+    HanYang: HANYANG_173R.mechanism,
     Type38: { pivot:[0,0.045,-0.122], handle:[0.067,0.045,-0.122], cutX:0.013, width:0.014, seat:[0,0.047,-0.185] },
     Zb26: { pivot:[0,-0.005,-0.176], handle:[0.034,-0.005,-0.176], cutX:0.016, width:0.010, seat:[0,0.115,-0.228] },
   }[key];
@@ -1527,13 +1519,13 @@ export class Viewmodel {
    */
   constructor(library, {
     fov = 55, depthBudget = 0.90, autoBolt = true, seed = "viewmodel", meshDocs = null,
-    riggedAssets = null, grenadeAsset = null,
+    riggedAssets = null, grenadeAsset = null, hanYangAsset = riggedAssets?.hanYang173R ?? null,
   } = {}) {
     this.library = library;
     // 解码好的 TZM 文档（ActorFactory.PreloadMeshes 已经拉过一遍，这里复用同一份，
     // 不再自己 fetch —— 同一个模型解码两次是白花的内存与开机时间）。
     this.meshDocs = meshDocs;
-    this.hanYang173R=riggedAssets?.hanYang173R||null;
+    this.hanYang173R=hanYangAsset;
     this.grenadeAsset = grenadeAsset;
     this.rigSource = "box";
     this.materials = BuildMaterials(library);
@@ -2108,11 +2100,14 @@ export class Viewmodel {
     if (["enBloc","stripper"].includes(this.weapon.reloadKind))
       for (let count = 1; count < 5; count += 1) this._ReloadRoundGeometry(reloadProfile, count);
 
-    // 先试 TZM 模型（MODEL_FP 里的几把），读不到或没登记就退回手搭 rig。
-    // 所有可持枪械优先走 TZM：三八式防尘盖、捷克式上插直匣等识别细节已在模型里。
+    // HanYang is the required authored GLB, independent of the arm renderer
+    // and TZM registry. Other weapons retain their existing model policies.
     const meshId = MODEL_FP.has(weaponId) ? WeaponMeshId(weaponId, this.weaponVariant) : null;
     const doc = meshId && this.meshDocs ? this.meshDocs.get(meshId) : null;
-    this.rig = doc ? BuildFromModel(this.materials, this.weapon, weaponId, doc,weaponId==='HanYang'?this.hanYang173R:null) : null;
+    this.rig = weaponId==='HanYang'
+      ? BuildFromModel(this.materials,this.weapon,weaponId,null,this.hanYang173R)
+      : doc ? BuildFromModel(this.materials,this.weapon,weaponId,doc) : null;
+    if(weaponId==='HanYang'&&!this.rig)throw new Error('汉阳造 173R 装配失败，请重新载入模型。');
     if (this.rig && weaponId === "Dadao") {
       // Measured TZM thin edge is +Y; the authored grip expects it along -Y.
       // Correct only the private model mount, before attaching either hand.

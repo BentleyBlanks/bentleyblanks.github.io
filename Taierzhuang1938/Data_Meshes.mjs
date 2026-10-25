@@ -136,17 +136,6 @@ export const MESHES = {
       + "剔除现代瞄准镜、包布和独立子弹，仅保留老式栓动枪轮廓，"
       + "全程不减面，并按中正式史实全长 1.110 m 导入。",
   },
-  HanYang: {
-    file: "Model_HanYang.tzm.json", category: "weapon",
-    activeRuntime: 'HanYang173R', // ActorFactory / Viewmodel use the shared GLB; TZM is an explicit fallback.
-    triangles: 2828, meshBlocks: 4, nodes: 12, joints: 0,
-    materials: ["steel", "wood"], mounts: [...WEAPON_MOUNTS,"feedMouth","ejection","boltOpen"],
-    span: [0.08049, 0.19341, 1.25000], lengthM: 1.250,
-    note: "汉阳造。几何来自 CC-BY Gewehr 88（Sketchfab / TastyTony）—— 汉阳八八式"
-      + "的母型就是 Gewehr 88：整长套筒、曼利夏漏夹弹仓与露出式通条都是模型自带的，"
-      + "不再用 Kar98k 拉长加假套筒。",
-    draws: { high: 2, medium: 2, low: 2 },
-  },
   Zb26: {
     file: "Model_Zb26.tzm.json", category: "weapon",
     triangles: 29930, meshBlocks: 6, nodes: 11, joints: 0,
@@ -413,6 +402,7 @@ export function AllMeshUrls() {
 
 /** 武器 id → Data_Weapons.mjs 的武器 id。两边同名，这层只是把约定写死。 */
 export const WEAPON_MESH_BY_ID = {
+  // HanYang is resolved by its required GLB loader, not the TZM registry above.
   ZhongZheng: "ZhongZheng", HanYang: "HanYang", Zb26: "Zb26", Type38: "Type38",
   ServicePistol: "ServicePistol", Type11: "Type11", Type92Hmg: "Type92Hmg",
   Grenade: "Grenade", GrenadeBundle: "Grenade", Dadao: "Dadao",

@@ -177,7 +177,7 @@ import {
   MENU_SCENE, OVERVIEW_PHASE, FULL_SCENE_PHASE, JIEHE_SANDBOX_PHASE, CAMPAIGN_ENTRIES,
 } from "./Data_Menu.mjs";
 import {
-  WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE, PLAYER_SLOT_ORDER, PLAYER_GUN_SLOTS, PlayerSlotKey, WeaponShelved,
+  WEAPONS, LOADOUTS, AMMO, IJA_SQUAD, GUN_MELEE, PLAYER_SLOT_ORDER, PLAYER_GUN_SLOTS, PlayerSlotKey, WeaponShelved, DEFAULT_PLAYER_WEAPON,
 } from "./Data_Weapons.mjs";
 import { WEAPON_MESH_VARIANTS, WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE, NAME_POOL } from "./Data_Battle.mjs";
@@ -1057,7 +1057,7 @@ function BlockoutInputCaptured() {
 function SetDevToolsHidden(hidden) {
   editor?.SetHidden(hidden || !!SHOT);
 }
-let currentWeapon = "HanYang";
+let currentWeapon = DEFAULT_PLAYER_WEAPON;
 let weaponRange = null;
 let movementRange = null;
 /** 断肢测试场的运行时（?gore=1）；其余入口下永远是 null。 */
@@ -1484,6 +1484,7 @@ async function Boot() {
     depthBudget: 1.22,
     meshDocs: actorFactory.meshDocs,
     riggedAssets: RIGGED_ARMS ? actorFactory.riggedAssets : null,
+    hanYangAsset: actorFactory.hanYang173R,
     grenadeAsset,
   });
   camera.add(viewmodel.root);
@@ -6076,7 +6077,8 @@ function RespawnPlayer(initial = false) {
   emplacement?.Reset("respawn");
   carryHidGun = false;
   const seed = 7919 * (state.fallen.length + 1) + state.phaseIndex * 131;
-  state.identity = phase.whitebox?.p012 ? {name:CAST.shunzi.short,fullName:CAST.shunzi.name,castId:"shunzi",weapon:"HanYang"} : MakeSoldierIdentity(seed);
+  state.identity = phase.whitebox?.p012 ? {name:CAST.shunzi.short,fullName:CAST.shunzi.name,castId:"shunzi",weapon:DEFAULT_PLAYER_WEAPON}
+    : {...MakeSoldierIdentity(seed),weapon:DEFAULT_PLAYER_WEAPON};
   currentWeapon = state.identity.weapon;
 
   // 靶场（sandbox）阵亡后也回出生工位：那套「退到路标后方」的算法是给战线写的，
