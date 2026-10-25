@@ -1,4 +1,4 @@
-// Fit the bare V23 donkey from its frozen V3 intermediate; preserve prior sources.
+// Fit the bare V24 donkey from its frozen V3 intermediate; preserve prior sources.
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -7,7 +7,7 @@ import {execFileSync} from 'node:child_process';
 const scriptDir=path.dirname(fileURLToPath(import.meta.url));
 const project=path.dirname(scriptDir),root=path.dirname(project);
 const helper=path.join(root,'scripts/Script_BlenderMcp.mjs');
-const destination='C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261025/ReferenceFitV23';
+const destination='C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261025/ReferenceFitV24';
 const source='C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261023/ReferenceFitV4/Scene_DonkeyBeforeReferenceFit.blend';
 if(!fs.statSync(path.join(root,'.git')).isFile())throw Error('Use an exclusive Git worktree');
 if(!fs.existsSync(source))throw Error('Missing preserved V3 source: '+source);
@@ -33,7 +33,7 @@ try{
  Shared('Script_DonkeyCartAnimate.py');Shared('Script_DonkeyCartExport.py');
  execFileSync(process.env.DONKEY_CART_PYTHON||'python',[path.join(scriptDir,'Script_DonkeyCartPack.py'),
   '--input',destination+'/Model_DonkeyUnpacked.glb','--output',path.join(project,'Model/Donkey/Model_Donkey.glb')],{cwd:root,stdio:'inherit'});
- Shared('Script_DonkeyCartVerify.py');Run(path.join(scriptDir,'Script_DonkeyFinalize.py'));
+ Shared('Script_DonkeyCartVerify.py');Shared('Script_DonkeyMotionVerify.py');Run(path.join(scriptDir,'Script_DonkeyFinalize.py'));
  console.log('Rebuilt '+path.join(project,'Model/Donkey/Model_Donkey.glb'));
 }finally{
  Control(['stop','--port',String(instance.port),'--json'],'inherit');

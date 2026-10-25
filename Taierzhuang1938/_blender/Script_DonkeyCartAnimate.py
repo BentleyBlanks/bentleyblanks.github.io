@@ -84,7 +84,15 @@ def WorldPose(phase,idle=False):
             points=[shifted[0]]
             for i in range(1,4):points.append(points[i-1]+Matrix.Rotation(angles[i-1],3,'X')@(p[i]-p[i-1]))
             for name,point,angle in zip(names,points,angles):worlds[name]=Matrix.Translation(point)@Matrix.Rotation(angle,4,'X')
-            metrics.append({'stem':stem,'step':step,'planted':planted,'target':[ty,tz],'foot':list(points[3]),'miss':miss})
+            splay=0
+            if standalone and scene.get('DonkeyReferenceForeSwingClearanceDeg') and front and side=='Left' and not idle and not planted:
+                # A small swing-only lateral arc clears the asymmetric fitted
+                # axilla. Stance, forward stride and the sagittal solver stay
+                # unchanged; the whole limb uses one coherent rigid turn.
+                splay=math.radians(scene['DonkeyReferenceForeSwingClearanceDeg'])*arc
+                centre=points[0];turn=Matrix.Translation(centre)@Matrix.Rotation(splay,4,'Y')@Matrix.Translation(-centre)
+                for name in names:worlds[name]=turn@worlds[name]
+            metrics.append({'stem':stem,'step':step,'planted':planted,'target':[ty,tz],'foot':list(worlds[names[3]].translation),'miss':miss,'swingSplayRad':splay})
     return worlds,metrics
 
 def ApplyWorlds(worlds,frame=None):
@@ -130,6 +138,7 @@ if cart:
     strip.action_frame_start=181;strip.action_frame_end=241;cart.animation_data.action=None
 rig['strideM']=stride;rig['walkPeriodS']=period;rig['gaitDutyFront']=.64;rig['gaitDutyRear']=.66
 rig['walkStanceCompressionM']=.032;rig['idleStanceCompressionM']=.004
+if standalone and scene.get('DonkeyReferenceForeSwingClearanceDeg'):rig['foreSwingClearanceDegrees']=scene['DonkeyReferenceForeSwingClearanceDeg']
 rig['walkCoordinateSystem']='Blender +Y forward; glTF -Z forward; stride clock follows distance'
 rig['sourceRigReuse']='Audited four-pivot limb hierarchy and two-link/folding-cannon solver; donkey rest origins, skin, gait and all harness rebuilt'
 if cart:cart['rollDistancePerCycleM']=2*math.pi*cart['wheelRadiusM'];cart['rollClipDurationS']=2
@@ -161,18 +170,20 @@ for frame in range(1,walkFrames+2):
         if not points:raise RuntimeError('Missing actual sole surface: '+item['stem'])
         item['frame']=frame;item['minSoleZ']=min(v.z for v in points)
         item['meanSoleY']=sum(v.y for v in points)/len(points)
+        item['meanSoleX']=sum(v.x for v in points)/len(points)
         measurements.append(item)
     evaluated.to_mesh_clear()
 planted=[row for row in measurements if row['planted']]
-drift=[]
+drift=[];driftX=[]
 for stem in soleIndices:
     rows=[row for row in measurements if row['stem']==stem]
     for a,b in zip(rows,rows[1:]):
         if a['planted'] and b['planted'] and 0<b['step']-a['step']<.1:
             drift.append(abs(b['meanSoleY']-a['meanSoleY']+stride/walkFrames))
+            driftX.append(abs(b['meanSoleX']-a['meanSoleX']))
 report={'actions':results,'strideM':stride,'periodS':period,'speedMps':stride/period,
         'stanceSoleRangeM':[min(r['minSoleZ'] for r in planted),max(r['minSoleZ'] for r in planted)],
-        'worstStanceDriftPerFrameM':max(drift),'worstSolverMissM':max(r['miss'] for r in measurements),'measurements':measurements}
+        'worstStanceDriftPerFrameM':max(drift),'worstLateralStanceDriftPerFrameM':max(driftX),'foreSwingClearanceDegrees':scene.get('DonkeyReferenceForeSwingClearanceDeg',0) if standalone else 0,'worstSolverMissM':max(r['miss'] for r in measurements),'measurements':measurements}
 (base/'Review/Data_AnimationMeasurements.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
 scene.frame_start=1;scene.frame_end=241;scene.frame_set(0)
 for filename in ('Script_DonkeyCartAnimate.py','Script_DonkeyCartReview.py'):
@@ -183,3 +194,4 @@ print(json.dumps({k:v for k,v in report.items() if k!='measurements'}))
 if report['worstSolverMissM']>.0001:raise RuntimeError('Donkey limb target leaves reachable volume')
 if min(r['minSoleZ'] for r in planted)<-.0005 or max(r['minSoleZ'] for r in planted)>.002:raise RuntimeError('Actual planted sole leaves ground tolerance')
 if max(drift)>.0001:raise RuntimeError('Actual planted sole slides against travelled distance')
+if max(driftX)>.0001:raise RuntimeError('Actual planted sole slides laterally')

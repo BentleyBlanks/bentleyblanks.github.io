@@ -98,6 +98,12 @@ contract={'schema':'tengxian-independent-rigged-prop-v1','id':'Donkey','version'
  'historicalReferences':[],'rebuild':'node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs'}
 if scene.get('DonkeyEyeRevision'):
     contract['runtime']['specularTransfer']=next(row.get('specularTransfer') for row in bake['batches'] if row['label']=='Animal')
+if scene.get('DonkeyReferenceForeSwingClearanceDeg'):
+    motion=Read(base/'Review/Data_PectoralMotionIntegrity.json')
+    if not motion['pass'] or motion['assetSha256']!=sha:raise RuntimeError('Dense motion verification is missing or belongs to an older GLB')
+    contract['animations']['DonkeyWalk']={**contract['animations']['DonkeyWalk'],'foreSwingClearance':{'leftMaximumDegrees':scene['DonkeyReferenceForeSwingClearanceDeg'],'rightMaximumDegrees':0,'onlyUnplanted':True,'forwardStrideUnchanged':True}}
+    contract['verification']['nativeLateralStanceDriftPerFrameM']=native['worstLateralStanceDriftPerFrameM']
+    contract['verification']['pectoralMotionIntegrity']={key:value for key,value in motion.items() if key!='poses'}
 if scene.get('DonkeyReferenceLegSections'):
     uvProof=Read(base/'Review/Data_UvOverlapVerification.json')
     if uvProof['overlapPixels'] or uvProof['legOverlapPixels']:raise RuntimeError('Unique Base Color atlas contains overlapping bake texels')

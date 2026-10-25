@@ -68,10 +68,16 @@ def InstallLegPigment(scene,skin,rig,base):
         dark=np.mean([palette['ForeSideDark'],palette['HindSideDark'],palette['ForeFrontDark']],axis=0)
         pale=palette['ForeMedialPale'] if front else np.mean([palette['RearMedialLeft'],palette['RearMedialRight']],axis=0)
         inward=np.maximum(0,nx*(1 if left else -1))
-        upper=np.clip((yy-.50)/.20,0,1);upper=upper*upper*(3-2*upper)
         if front:
-            paleWeight=np.clip((inward-.02)/.55,0,1)*upper*np.clip((ny+.65)/1.15,0,1)
-            pigment=dark+(pale-dark)*paleWeight[:,:,None]
+            frontPigment=np.stack([blur(blur(face[:,:,c],8),8) for c in range(3)],axis=2)
+            frontPigment=np.minimum(pale,np.maximum(dark,frontPigment))
+            heightMask=np.clip((yy-.32)/.13,0,1);heightMask=heightMask*heightMask*(3-2*heightMask)
+            frontFacing=np.clip((ny+.20)/.85,0,1);frontFacing=frontFacing*frontFacing*(3-2*frontFacing)
+            # Source RGB already places the inner light stripe on the front
+            # cap. Extend it around the medial wall without multiplying by a
+            # second inward-normal mask that erases the photographed patch.
+            coverage=np.maximum(frontFacing,inward*inward)
+            pigment=dark+(frontPigment-dark)*(coverage*heightMask)[:,:,None]
         else:
             heightMask=np.clip((yy-.36)/.10,0,1);heightMask=heightMask*heightMask*(3-2*heightMask)
             # The rear photograph already locates the medial pale patch.
@@ -120,7 +126,7 @@ def InstallLegPigment(scene,skin,rig,base):
         nodes,links=material.node_tree.nodes,material.node_tree.links;shader=next(n for n in nodes if n.type=='BSDF_PRINCIPLED');previous=shader.inputs['Base Color'].links[0].from_socket
         uv=nodes.new('ShaderNodeUVMap');uv.uv_map='LegPigmentUV';texture=nodes.new('ShaderNodeTexImage');texture.image=image;texture.extension='EXTEND';links.new(uv.outputs[0],texture.inputs[0])
         blend=nodes.new('ShaderNodeAttribute');blend.attribute_name='LegPigmentBlend';mix=nodes.new('ShaderNodeMixRGB');links.new(blend.outputs['Fac'],mix.inputs[0]);links.new(previous,mix.inputs[1]);links.new(texture.outputs['Color'],mix.inputs[2]);links.new(mix.outputs[0],shader.inputs['Base Color']);materials.append(material.name)
-    record={'method':'bone-owned limb correspondence below the fore-elbow transition; photographed short-fur microvariation separated from photo shading; continuous rear-view RGB bounded by same-limb dark/light fur samples, with gradual rear-cap and hock falloffs; no luminance threshold paint or duplicate inward-normal mask; no positional override onto the breast or generated guide on limbs',
+    record={'method':'bone-owned limb correspondence below the fore-elbow transition; short-fur microvariation separated from photo shading; continuous front/rear RGB bounded by same-limb dark/light samples; front cap retains the photographed light stripe and wraps onto the medial wall, fading near the carpus; gradual rear-cap/hock falloffs; no duplicate inward mask or generated guide on limbs',
         'source':str(source),'sourceSha256':hashlib.sha256(source.read_bytes()).hexdigest(),'atlas':str(path),'sha256':hashlib.sha256(content).hexdigest(),'sourceBoundaryRows':boundaries,'sampling':sampling,'sourceChecks':sourceChecks,'paletteSourceBoxes':paletteBoxes,'paletteCalibratedLinearRgb':{name:value.tolist() for name,value in palette.items()},'vertices':count,'materials':materials,
         'runtime':'baked into existing UV0 2K Base Color; shared UV1 fur normal unchanged; no additional runtime image or projection'}
-    (base/'SourceTextures/Data_LegPigment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8');scene['DonkeyLegPigmentRevision']='20261024PartAwareV1';return record
+    (base/'SourceTextures/Data_LegPigment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8');scene['DonkeyLegPigmentRevision']='20261025ForeMedialV24';return record
