@@ -300,12 +300,22 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
 Check(bare.json.meshes.length===3 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===79952 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
-  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与79,952三角齐备");
+  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===79980 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
+  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与79,980三角齐备");
 Check(bareSpec.verification.bakeUvOverlapTexels===0 && bareSpec.verification.bakeUvLegOverlapTexels===0
-  && bareSpec.triangles.sourceBeforeRuntimeTriangulationTotal===79952,
+  && bareSpec.triangles.sourceBeforeRuntimeTriangulationTotal===79980,
   "独立驴制作源登记零重叠烘焙图集与显式运行时三角化；最终GLB的UV覆盖另作独立验证");
 const pectoral=bareSpec.derivation.referenceFit.details;
+const forelegFit=pectoral.frontalForelegFit;
+const legAlbedo=bareSpec.derivation.referenceFit.photoDetail.legPigment;
+Check(forelegFit?.maximumProtectedPointChangeM===0&&forelegFit.maximumYZChangeM===0&&forelegFit.maximumHornChangeM===0
+  &&forelegFit.changedVertices>500&&forelegFit.transverseRootScale>0&&forelegFit.transverseRootScale<1
+  &&Object.entries(forelegFit.boneChangesM).every(([name,delta])=>name.startsWith('DonkeyFront')&&!name.endsWith('HoofPivot')&&delta[1]===0&&delta[2]===0),
+  "独立驴前腿空间拟合登记头蹄与Y/Z保护、胸腿连续收拢及相容关节；实际轮廓与动作另行验收");
+Check(legAlbedo.detailUsesAtlasSpaceBlur===false&&legAlbedo.detailUsesSyntheticNoise===false
+  &&legAlbedo.sourceSha256===bareSpec.derivation.referenceFit.photoDetail.originalSha256
+  &&legAlbedo.sampling.length===4&&new Set(legAlbedo.sampling.map(row=>row.leg)).size===4,
+  "独立驴腿部底色在原图尺度分离毛色与细毛，四腿具备摄影归属且不在拉伸图块上高通");
 Check(pectoral.chest.integrity.boundaryEdges===0&&pectoral.chest.integrity.nonmanifoldEdges===0&&pectoral.chest.integrity.chestCrossings===0
   &&pectoral.skinWeights.maximumAfter===4&&pectoral.pectoralBinding.maxInfluences===4&&pectoral.pectoralBinding.geometryDisplacementM===0
   &&pectoral.pectoralEdges.integrity.chestCrossings===0&&pectoral.pectoralEdges.maximumRestSurfaceBoundM<=.0005,
