@@ -297,6 +297,13 @@ if standalone and bpy.data.objects.get('DonkeyReferenceMane'):
     runtimeCol.objects.link(mane);mane.name='DonkeyManeRuntime';mane.parent=animalRig
     for modifier in mane.modifiers:
         if modifier.type=='ARMATURE':modifier.object=animalRig
+    brushSource=bpy.data.objects.get('DonkeyReferenceTailBrush')
+    if brushSource:
+        brush=brushSource.copy();brush.data=brushSource.data.copy();runtimeCol.objects.link(brush);brush.parent=animalRig
+        for modifier in brush.modifiers:
+            if modifier.type=='ARMATURE':modifier.object=animalRig
+        Select([mane,brush],mane);bpy.ops.object.join();mane=bpy.context.object
+        if len(mane.data.materials)!=1:raise RuntimeError('Tail brush must share the existing mane atlas and material')
     mane.data.calc_loop_triangles();textures=[]
     for material in mane.data.materials:
         for node in material.node_tree.nodes:

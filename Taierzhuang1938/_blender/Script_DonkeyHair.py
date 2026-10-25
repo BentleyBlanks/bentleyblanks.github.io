@@ -70,6 +70,9 @@ def RebuildReferenceMane(skin,rig,collection):
     values=np.ones((256,512,4),dtype=np.float32);values[:,:,:3]=.73535698;values[:,:,3]=alpha
     foreFade=np.clip((foreHeight-(foreHeight+below)*np.arange(128)/127)/.030,0,1)
     values[128:,:128,:3]=foreRgb;values[128:,:128,3]=alpha[128:,:128]*foreFade[:,None]
+    tailNamespace={};file=project/'_blender/Script_DonkeyTailBrush.py';exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),tailNamespace)
+    tailPixels,tailReport=tailNamespace['ExtractTailReference'](arrays[0]);values[128:,128:]=tailPixels.transpose(1,0,2)
+    bpy.context.scene['DonkeyTailBrushProfilePixels']=json.dumps(tailReport['sideCentrelinePixels'])
     image=bpy.data.images.get('Texture_DonkeyManeBase') or bpy.data.images.new('Texture_DonkeyManeBase',width=512,height=256,alpha=True)
     if tuple(image.size)!=(512,256):image.scale(512,256)
     image.colorspace_settings.name='sRGB';image.alpha_mode='CHANNEL_PACKED'
@@ -189,4 +192,4 @@ def RebuildReferenceMane(skin,rig,collection):
     bpy.context.scene['DonkeyManeTufts']='[]';bpy.context.scene['DonkeyReferenceMane']=True
     return {'mainRows':40,'crossCards':0,'removedLegacySolidMane':removedLegacyMane,'forelockColumns':32,'forelockCrossCards':0,'forelockLayer':'curved front reference RGB/foreground matte at full opacity, 30 mm root fade, backed by individual 3D strands','forelockExtraction':foreReport,'forelockSourceWidthM':2*foreHalfWidth,'forelockRootWidthM':2*foreRootHalfWidth,'triangles':sum(len(f)-2 for f in faces),'exportLayer':'DonkeyManeRuntime',
             'forelockRootY':foreY,'volumeFibres':{'main':1100,'forelock':760,'forelockPeakColumns':sorted(tuftColumns),'forelockLobeColumns':[[group[0],group[-1]] for group in groups],'forelockForegroundAlpha':.32,'forelockUpperLobeFraction':.40,'forelockPeakSeparationColumns':18,'forelockTuftedFibres':360,'forelockHalfWidthM':[.00020,.00045],'forelockRootSpreadStdM':.010,'triangles':sum(len(f)-2 for f in volumeFaces),'mainTintGain':4.0,'forelockTintGain':3.7,'pathBendFraction':{'main':.45,'forelock':.34},'spread':'fine curved strips spread across the measured reference lobes; staggered lengths and narrow tapered tips replace solid cones','exportLayer':'DonkeyCoatRuntime','material':'DonkeyShortCoatPbr','alpha':'MASK 0.45; depth writing','sourceObject':volume.name},
-            'method':'reference-alpha side ribbon, curved triangular-tube main mane and fine curved forelock strips rooted to actual skin','texture':str(path),'textureSha256':hashlib.sha256(content).hexdigest(),'sourceSha256':hashlib.sha256(original.read_bytes()).hexdigest()}
+            'tailBrushAtlas':tailReport,'method':'reference-alpha side ribbon, curved triangular-tube main mane and fine curved forelock strips rooted to actual skin','texture':str(path),'textureSha256':hashlib.sha256(content).hexdigest(),'sourceSha256':hashlib.sha256(original.read_bytes()).hexdigest()}

@@ -40,15 +40,18 @@ def BuildLegAlbedo(rgb,blur):
         valid=((fx>=left+margin)&(fx<=right-margin)&(fy>=ys[0]-80)&(fy<=ys[-1])).astype(np.float32)
         denominator=np.maximum(.0001,blur(blur(valid,6),6))
         low=np.stack([blur(blur(linear[:,:,c]*valid,6),6)/denominator for c in range(3)],axis=2)
-        microLow=blur(luminance*valid,4)/np.maximum(.0001,blur(valid,4))
-        micro=luminance/np.maximum(.008,microLow)
+        microLow=blur(luminance*valid,8)/np.maximum(.0001,blur(valid,8))
+        fineLow=blur(luminance*valid,2)/np.maximum(.0001,blur(valid,2))
+        fine=luminance/np.maximum(.008,fineLow)
+        clump=fineLow/np.maximum(.008,microLow)
         # Tendon highlights form long vertical cables in a photo. Remove
         # their coherent column component while retaining short curved hairs
         # at their original scale; a 25-pixel vertical window exceeds a hair.
-        padded=np.pad(micro,((12,12),(0,0)),mode='edge')
+        padded=np.pad(clump,((12,12),(0,0)),mode='edge')
         summed=np.pad(np.cumsum(padded,axis=0,dtype=np.float64),((1,0),(0,0)))
         column=(summed[25:]-summed[:-25])/25
-        micro=np.clip(micro/np.maximum(.5,column),.90,1.12)
+        micro=np.clip(fine,.72,1.65)*np.clip(clump/np.maximum(.5,column),.90,1.13)
+        micro=np.clip(micro,.70,1.50)
         sourceX=(lo+hi)*.5+np.clip(horizontal,-1,1)*width*.40
         color=Fetch(low,sourceX,sourceY)
         light=np.array((-.4,.5,.76) if view=='Side' else (-.3,.5,.81) if view=='Front' else (.3,-.5,.81));light/=np.linalg.norm(light)
@@ -65,10 +68,10 @@ def BuildLegAlbedo(rgb,blur):
         # Suppress a coherent source-row stripe while retaining variations
         # between actual individual hairs. There is no synthetic noise.
         rowMean=np.mean(np.stack([Fetch(micro,lo+width*t,sourceY) for t in np.linspace(.2,.8,16)]),axis=0)
-        detail=1+1.25*(np.clip(detail/np.maximum(.5,rowMean),.90,1.12)-1)
+        detail=np.clip(detail/np.maximum(.5,rowMean),.70,1.50)
         active=(sourceY>460)&(sourceY<870)
         sourceChecks.append({'view':view,'donor':key,'samples':int(np.count_nonzero(active)),'sourceXRange':[float(sourceX[active].min()),float(sourceX[active].max())]})
-        projected=1+1.25*(np.clip(Fetch(micro,sourceX,sourceY)/np.maximum(.5,rowMean),.90,1.12)-1)
+        projected=np.clip(Fetch(micro,sourceX,sourceY)/np.maximum(.5,rowMean),.70,1.50)
         return color,projected,detail
     dark=np.mean([palette['ForeSideDark'],palette['HindSideDark'],palette['ForeFrontDark']],axis=0)
     for index,stem in enumerate(['DonkeyFrontLeft','DonkeyFrontRight','DonkeyRearLeft','DonkeyRearRight']):
@@ -97,7 +100,7 @@ def BuildLegAlbedo(rgb,blur):
         color=np.maximum(0,pigment*detail[:,:,None])
         atlas[:,index*tileWidth:(index+1)*tileWidth,:3]=np.where(color<=.0031308,color*12.92,1.055*color**(1/2.4)-.055)
         sampling.append({'leg':stem,'sideDonor':sideKey,'capDonor':capKey})
-    record={'revision':'20261026ShadowSeparatedLegV35','method':'silhouette-masked source-space pigment; same-limb sampled charcoal/pale coat with bounded photographic microdetail; coherent tendon/row shadows removed before cylindrical correspondence; periodic detail only on hidden caps',
+    record={'revision':'20261026ShadowSeparatedLegV36','method':'silhouette-masked source-space pigment; same-limb charcoal/pale coat with short hair and small clump contrast retained; coherent tendon/row shadows removed before cylindrical correspondence; periodic detail only on hidden caps',
         'sourceBoundaryRows':BOUNDARIES,'sampling':sampling,'sourceChecks':sourceChecks,'paletteSourceBoxes':PALETTE_BOXES,'paletteCalibratedLinearRgb':{name:value.tolist() for name,value in palette.items()},
-        'sourcePigmentBlurRadiusPixels':6,'sourceMicroBlurRadiusPixels':4,'sourceVerticalCoherenceWindowPixels':25,'microRatioRange':[.90,1.12],'microStrength':1.25,'darkMottlingRatioRange':[.90,1.10],'silhouetteMaskedFiltering':True,'hiddenCapRepeats':round(math.pi/.60),'visibleDetailIsPhotographic':True,'periodicDetailScope':'unphotographed cap only','detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
+        'sourcePigmentBlurRadiusPixels':6,'sourceMicroBlurRadiusPixels':8,'sourceFineBlurRadiusPixels':2,'sourceFineRatioRange':[.72,1.65],'sourceClumpRatioRange':[.90,1.13],'sourceVerticalCoherenceWindowPixels':25,'microRatioRange':[.70,1.50],'microStrength':1.0,'darkMottlingRatioRange':[.90,1.10],'silhouetteMaskedFiltering':True,'hiddenCapRepeats':round(math.pi/.60),'visibleDetailIsPhotographic':True,'periodicDetailScope':'unphotographed cap only','detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
     return atlas,record

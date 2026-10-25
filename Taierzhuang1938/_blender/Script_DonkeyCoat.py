@@ -171,6 +171,9 @@ def BuildGroom(skin,rig,collection,material,count=21000,pigmentSampler=None):
         if centre.y>1.16 and centre.z<1.13:continue
         area=triangle.area
         density=(.80 if bpy.context.scene.get('DonkeyJointFitReport') else .55) if centre.z<.55 else .65 if centre.y>.95 else 1
+        if bpy.context.scene.get('DonkeyLowerLimbReliefReport') and .12<centre.z<.53:
+            joint=max(math.exp(-((centre.z-.375)/.045)**2),math.exp(-((centre.z-.165)/.035)**2))
+            density*=1+1.4*joint
         total+=area*density;cumulative.append(total);triangles.append(triangle)
     if not triangles:raise RuntimeError('No furry skin surface')
     vertices=[];faces=[];uvs=[];rows=[];colors=[];normals=[];regions={str(i):0 for i in range(4)}
@@ -216,6 +219,7 @@ def BuildGroom(skin,rig,collection,material,count=21000,pigmentSampler=None):
     color=skin.data.color_attributes['CoatColor']
     coronetFibres=min(480,count) if coronetTriangles else 0
     bellyFibres=0;bellyLengths=[];bellyLifts=[];bellyStripSamples=[]
+    jointFibres=0;jointLengths=[];jointLifts=[]
     fringeFibres=0;fringeLengths=[];fringeLifts=[];fringeStripSamples=[];fringeTags={};fringeRoots={};fringeTips={};fringeTargets={};fringeDonors=[];redistributed=0
     def FringeAmounts(root,normal,foreMass):
         medial=max(0,normal.x*(1 if root.x<0 else -1))
@@ -242,12 +246,15 @@ def BuildGroom(skin,rig,collection,material,count=21000,pigmentSampler=None):
         rootColor=sum((Vector(color.data[i].color[:3])*w for i,w in zip(ids,bary)),Vector())
         pale=Smooth(.065,.17,brightness)
         tile=2 if rng.random()<pale else (1 if rng.random()<.12 else 0)
-        belly=0;fringe=0;breastFringe=0
+        belly=0;fringe=0;breastFringe=0;jointFur=0
         if referenceFlow:
             limbMass=sum(w for name,w in row.items() if name.startswith(('DonkeyFront','DonkeyRear')))
             appearance=skin.data.attributes.get('LimbAppearanceMass')
             if appearance:limbMass=sum(sum(appearance.data[i].color)*w for i,w in zip(ids,bary))
             flow=referenceFlow['HairFlow'](root,limbMass)
+            if bpy.context.scene.get('DonkeyLowerLimbReliefReport') and limbMass>.80 and .12<root.z<.53:
+                jointFur=max(math.exp(-((root.z-.375)/.045)**2),math.exp(-((root.z-.165)/.035)**2))
+                flow+=Vector((.38*math.tanh(root.x/.04),-.24,0))*jointFur
             # Pale ventral hairs hang down and stand farther off the skin.
             # Keep the same samples/random draws and leave limb/coronet fur
             # outside this bounded, softly blended anatomical region.
@@ -265,7 +272,9 @@ def BuildGroom(skin,rig,collection,material,count=21000,pigmentSampler=None):
         length=rng.uniform(.009,.014) if coronet else rng.uniform(.012,.023) if root.z<.20 else rng.uniform(.006,.013) if root.z>.60 else rng.uniform(.004,.009)
         width=rng.uniform(.0007,.0012) if coronet else rng.uniform(.00025,.00065)
         first=len(vertices)
-        lift=Fiber(root,normal,flow,width*(1+.75*belly+.5*fringe),length*(1+.55*belly+1.6*fringe+1.3*breastFringe),row,tile,rootColor,1+2*belly+7*fringe,.75*fringe)
+        lift=Fiber(root,normal,flow,width*(1+.75*belly+.5*fringe),length*(1+.55*belly+1.6*fringe+1.3*breastFringe+1.25*jointFur),row,tile,rootColor,1+2*belly+7*fringe+2*jointFur,.75*fringe)
+        if jointFur>.10:
+            jointFibres+=1;jointLengths.append(length*(1+1.25*jointFur));jointLifts.append(lift)
         if belly>.01:
             bellyFibres+=1;bellyLengths.append(length*(1+.55*belly));bellyLifts.append(lift)
         if belly>.65:bellyStripSamples.append((first,root.copy(),normal.copy(),flow.copy(),dict(row),rootColor.copy(),belly))
@@ -404,6 +413,7 @@ def BuildGroom(skin,rig,collection,material,count=21000,pigmentSampler=None):
     obj['coatAlphaCutoff']=.45;obj['coatCardCount']=sum(len(f)==4 for f in faces)+bellyStrips+2*fringeStrips;obj['coatFibreCount']=count-2*bellyStrips-4*fringeStrips;obj['coatRootSamples']=count;obj['groomPrimitiveCount']=len(faces);obj['coatDensityPerM2']=count/total
     obj.visible_shadow=False;obj['groomCastShadow']=False
     return obj,{'fibres':count-2*bellyStrips-4*fringeStrips,'rootSamples':count,'bodyTufts':bodyTufts,'bodyTuftLimit':bodyTuftLimit,'coronetFibres':coronetFibres,'coronetAreaM2':coronetArea,'coronetLengthM':[.009,.014],'coronetWidthM':[.0007,.0012],'cards':sum(len(f)==4 for f in faces)+bellyStrips+2*fringeStrips,'triangles':sum(len(f)-2 for f in faces),'regionCards':regions,'sampledSurfaceM2':total,'maxInfluences':4,
+        'lowerLimbFur':{'sampleFibres':jointFibres,'jointDensityGain':2.4,'maximumLengthGain':2.25,'maximumLiftGain':3,'lengthRangeM':[min(jointLengths,default=0),max(jointLengths,default=0)],'liftRangeM':[min(jointLifts,default=0),max(jointLifts,default=0)],'method':'redistribute the fixed fine-fibre sample budget toward carpal/fetlock coats; longer, splayed tips follow their shallow joint relief'},
         'paleFringe':{'sampleFibres':fringeFibres,'redistributedBodySamples':redistributed,'curvedWisps':fringeStrips,'lengthRangeM':[min(fringeLengths,default=0),max(fringeLengths,default=0)],'liftRangeM':[min(fringeLifts,default=0),max(fringeLifts,default=0)],'wispLengthRangeM':[.030,.0527],'wispLiftRangeM':[.012,.016],'wispRootWidthRangeM':[.00102,.0013],'wispSegments':2,'method':'pale medial foreleg and breast fibres lengthened and lifted; body fine-fibre slots reallocated to the pale fringe with an independent deterministic stream; four existing triangles reused per curved strand; root sample and triangle budgets retained'},
         'bellyCoat':{'sampleFibres':bellyFibres,'fineFibres':bellyFibres-2*bellyStrips,'pairedStrips':bellyStrips,'sampleLengthRangeM':[min(bellyLengths,default=0),max(bellyLengths,default=0)],'sampleLiftRangeM':[min(bellyLifts,default=0),max(bellyLifts,default=0)],'stripLengthRangeM':[.0199,.022],'stripLiftRangeM':[.005275,.0065],'method':'bounded pale ventral fibres: downward/backward flow, up to 1.55x length and 3x normal lift; pairs of existing fine triangles reused as narrow opaque tapered strips; same source samples, random sequence and triangle budget'}}
 

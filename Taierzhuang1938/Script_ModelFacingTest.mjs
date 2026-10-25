@@ -300,10 +300,10 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
 Check(bare.json.meshes.length===3 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===79622 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
-  "独立驴身体、短毛与鬃毛共用28骨，四材质/七图与79,622三角齐备");
+  && bare.json.materials.length===4 && bare.json.images.length===7 && bareTriangles===79738 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
+  "独立驴身体、短毛与鬃尾毛共用28骨，四材质/七图与79,738三角齐备");
 Check(bareSpec.verification.bakeUvOverlapTexels===0 && bareSpec.verification.bakeUvLegOverlapTexels===0
-  && bareSpec.triangles.sourceBeforeRuntimeTriangulationTotal===79622,
+  && bareSpec.triangles.sourceBeforeRuntimeTriangulationTotal===79738,
   "独立驴制作源登记零重叠烘焙图集与显式运行时三角化；最终GLB的UV覆盖另作独立验证");
 const pectoral=bareSpec.derivation.referenceFit.details;
 const forelegFit=pectoral.legFit;
@@ -336,11 +336,16 @@ Check(pectoralMotion?.pass===true&&pectoralMotion.assetSha256===bareSpec.sha256
   &&bareSpec.verification.nativeLateralStanceDriftPerFrameM<.0001,
   "独立驴当前GLB具备加密胸区动作证据，保留离地回摆且着地蹄点不横滑");
 const jointFit=pectoral.jointFit,jointArcs=bareSpec.animations.DonkeyWalk.jointArcs;
-Check(bareSpec.version==='20261026ReferenceV35'&&jointFit?.version==='20261026JointFitV35'
+Check(bareSpec.version==='20261026ReferenceV36'&&jointFit?.version==='20261026JointFitV35'
   &&jointFit.maximumInfluences===4&&jointFit.boneCount===28&&jointFit.morphTargetsAdded===0
   &&jointFit.surfaceCorrectionSourcePixels<1&&jointFit.edges.maximumRestSurfaceBoundM<=.0005&&jointFit.edgesAfter.maximumRestSurfaceBoundM<=.0005
   &&jointArcs?.bakeFps===120&&jointArcs.maximumHoofTargetErrorM<.00001&&jointArcs.maximumReachCompressionM<=.006,
   "独立驴V35关节配方保留28骨与四权重，局部顶点修正小于原图一像素；三维肘膝路径锁定请求蹄点");
+const lowerRelief=pectoral.lowerLimbRelief;
+Check(lowerRelief?.version==='20261026LowerLimbReliefV36'&&lowerRelief.maximumDisplacementM<=.0033
+  &&lowerRelief.protectedHoofAndRootDisplacementM===0&&lowerRelief.bonesChanged===0&&lowerRelief.weightsChanged===false
+  &&Object.keys(lowerRelief.byLeg).length===4&&Object.values(lowerRelief.byLeg).every(row=>row.vertices>500),
+  "独立驴四腿补充有方向的关节和肌腱浅起伏，保护蹄壳、腿根与既有骨架权重");
 for(const [key,region] of [['hindMotionIntegrity','Hind'],['lowerBodyMotionIntegrity','LowerBody']]){
   const proof=bareSpec.verification[key];
   Check(proof?.pass===true&&proof.assetSha256===bareSpec.sha256&&proof.region===region
@@ -449,6 +454,19 @@ Check(maneMaterial.name==="DonkeyManePbr"&&maneMaterial.alphaMode==="BLEND"&&man
   &&bareManeNode.extras?.groomCastShadow===false&&bareManeNode.skin===bare.json.nodes.find(n=>n.name==="DonkeyRuntime").skin
   &&bareMane.primitives.every(p=>p.attributes.COLOR_0!==undefined&&p.attributes.JOINTS_0!==undefined&&p.attributes.WEIGHTS_0!==undefined),
   "独立驴鬃额毛使用独立双面BLEND材质、共享蒙皮及明确的免投影节点");
+let tailBrushTriangles=0,tailBrushUvValid=true;
+for(const primitive of bareMane.primitives){
+  const joints=ReadAccessor(bare,primitive.attributes.JOINTS_0).data,weights=ReadAccessor(bare,primitive.attributes.WEIGHTS_0).data;
+  const uv=ReadAccessor(bare,primitive.attributes.TEXCOORD_0).data,indices=ReadAccessor(bare,primitive.indices).data;
+  const isTail=index=>[0,1,2,3].every(c=>weights[index*4+c]===0||/^DonkeyTail(?:Tip)?Pivot$/.test(bare.json.nodes[tailSkin.joints[joints[index*4+c]]].name));
+  for(let i=0;i<indices.length;i+=3){
+    const ids=Array.from(indices.slice(i,i+3));if(!ids.every(isTail))continue;tailBrushTriangles++;
+    tailBrushUvValid&&=ids.every(index=>uv[index*2]>=.25&&uv[index*2]<=1&&uv[index*2+1]>=.5&&uv[index*2+1]<=1);
+  }
+}
+Check(tailBrushTriangles===108&&tailBrushUvValid&&pectoral.tailGroom.referenceBrush.fibresRetained===480
+  &&pectoral.mane.tailBrushAtlas.runtimeImagesAdded===0&&pectoral.mane.tailBrushAtlas.runtimeMaterialsAdded===0,
+  "独立驴实际GLB的108三角尾刷使用既有鬃毛图集空区和尾骨，保留480条细毛且不新增图像或材质");
 Check(accessoryMaterial?.doubleSided===true,"独立驴眼、鼻与尾部附属材质保留双面绘制");
 Check(bare.json.animations.length===2 && ["DonkeyWalk","DonkeyIdle"].every(name=>bare.json.animations.some(a=>a.name===name))
   && !bare.json.nodes.some(n=>/^(Cart|Wheel|Harness|Halter)/.test(n.name||"")) && bareMax[2]<1.2,
