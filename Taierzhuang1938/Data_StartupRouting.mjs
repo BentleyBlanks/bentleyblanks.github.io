@@ -11,7 +11,7 @@ export function SandboxUrl(href, key, {stage = null} = {}) {
   const params = {movement: 'movement', weapons: 'weapons', range: 'range', explosions: 'explosions',
     melee: 'melee', gore: 'gore', impacts: 'impacts', reactions: 'reactions', cloth: 'cloth', firstLevelP012Whitebox: 'whitebox', jiehe: 'jiehe'};
   if (params[key]) url.searchParams.set(params[key], key === 'firstLevelP012Whitebox' ? 'p012' : '1');
-  if (key === 'cloth' && url.searchParams.get('quality') === 'whitebox') url.searchParams.delete('quality');
+  if (url.searchParams.get('quality') === 'whitebox' || new URL(href).searchParams.get('editor') === 'blockout') url.searchParams.delete('quality');
   if (key === 'firstLevelP012Whitebox' && stage != null) url.searchParams.set('missionStage', stage);
   return url.href;
 }

@@ -1,5 +1,5 @@
 import {
-  GRAPHICS_PROFILES, GRAPHICS_PROFILE_STORAGE_KEY, WHITEBOX_STORAGE_KEY,
+  GRAPHICS_PROFILES, GRAPHICS_PROFILE_STORAGE_KEY, BLOCKOUT_PROFILE_STORAGE_KEY, DEFAULT_GRAPHICS_PROFILE, WHITEBOX_STORAGE_KEY,
   WHITEBOX_CONTROLS, WHITEBOX_DEFAULTS, NormalizeWhiteboxConfig, ResolveGraphicsProfile, WhiteboxPassPlan,
 } from "./Data_Tuning_Whitebox.mjs";
 
@@ -12,10 +12,13 @@ function Write(key, value) {
 
 export function LoadGraphicsProfile(search = "") {
   const params = new URLSearchParams(search), requested = params.get("quality");
-  const profile = ResolveGraphicsProfile(requested, Read(GRAPHICS_PROFILE_STORAGE_KEY, null));
-  // This material laboratory needs the original surfaces. Keep explicit quality
-  // choices and textured saved tiers, without changing the global preference.
-  return params.get("cloth") === "1" && !GRAPHICS_PROFILES.includes(requested) && profile === "whitebox" ? "high" : profile;
+  if (params.get("editor") === "blockout") {
+    const saved = Read(BLOCKOUT_PROFILE_STORAGE_KEY, null);
+    return ResolveGraphicsProfile(requested, GRAPHICS_PROFILES.includes(saved) ? saved : "whitebox");
+  }
+  // Legacy global whitebox saves belong to the editor; normal saved tiers survive.
+  const saved = Read(GRAPHICS_PROFILE_STORAGE_KEY, null);
+  return ResolveGraphicsProfile(requested, saved === "whitebox" ? null : saved);
 }
 export function LoadWhiteboxConfig() {
   const saved = Read(WHITEBOX_STORAGE_KEY, null);
@@ -28,16 +31,18 @@ export function LoadWhiteboxConfig() {
   return NormalizeWhiteboxConfig(saved);
 }
 export function SaveWhiteboxConfig(config) { return Write(WHITEBOX_STORAGE_KEY, NormalizeWhiteboxConfig(config)); }
-export function SaveGraphicsProfile(profile) {
+export function SaveGraphicsProfile(profile, search = globalThis.location?.search || "") {
   if (!GRAPHICS_PROFILES.includes(profile)) throw new Error(`Unknown graphics profile: ${profile}`);
-  return Write(GRAPHICS_PROFILE_STORAGE_KEY, profile);
+  if (new URLSearchParams(search).get("editor") === "blockout") return Write(BLOCKOUT_PROFILE_STORAGE_KEY, profile);
+  // Explicit whitebox is a local debug URL, never the next player's default.
+  return profile === "whitebox" || Write(GRAPHICS_PROFILE_STORAGE_KEY, profile);
 }
 
 export function CreateGraphicsProfileApi({ profile, config, post, renderer }) {
   return {
     Inspect() {
       return {
-        profile, defaultProfile: "whitebox", whitebox: profile === "whitebox", tier: post.quality,
+        profile, defaultProfile: new URLSearchParams(globalThis.location?.search || "").get("editor") === "blockout" ? "whitebox" : DEFAULT_GRAPHICS_PROFILE, whitebox: profile === "whitebox", tier: post.quality,
         config: { ...config }, defaults: { ...WHITEBOX_DEFAULTS },
         allowedPasses: profile === "whitebox" ? WhiteboxPassPlan(config) : post.passes.map((p) => p.name),
         renderedPasses: [...(post.lastRenderedPasses || [])],

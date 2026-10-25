@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import { WHITEBOX_DEFAULTS, NormalizeWhiteboxConfig, WhiteboxPassPlan, ResolveGraphicsProfile,
-  WhiteboxGraphicsOverrides, WHITEBOX_STORAGE_KEY, GRAPHICS_PROFILE_STORAGE_KEY, WHITEBOX_CARDS } from "./Data_Tuning_Whitebox.mjs";
-import { LoadWhiteboxConfig, SaveWhiteboxConfig, LoadGraphicsProfile, CreateGraphicsProfileApi } from "./Script_GraphicsProfile.mjs";
+  WhiteboxGraphicsOverrides, WHITEBOX_STORAGE_KEY, GRAPHICS_PROFILE_STORAGE_KEY, BLOCKOUT_PROFILE_STORAGE_KEY, WHITEBOX_CARDS } from "./Data_Tuning_Whitebox.mjs";
+import { LoadWhiteboxConfig, SaveWhiteboxConfig, SaveGraphicsProfile, LoadGraphicsProfile, CreateGraphicsProfileApi } from "./Script_GraphicsProfile.mjs";
 import { LoadSavedGraphics } from "./Script_EditorSettings.mjs";
 import { SandboxUrl } from "./Data_StartupRouting.mjs";
 import { WhiteboxSceneRenderer } from "./Script_WhiteboxRendering.mjs";
 import * as THREE from "three";
 
-assert.equal(ResolveGraphicsProfile(null, null), "whitebox");
+assert.equal(ResolveGraphicsProfile(null, null), "high");
 assert.equal(ResolveGraphicsProfile("high", "whitebox"), "high");
 assert.equal(ResolveGraphicsProfile(null, "ultra"), "ultra");
-assert.equal(ResolveGraphicsProfile("bad", "bad"), "whitebox");
+assert.equal(ResolveGraphicsProfile("bad", "bad"), "high");
 assert.deepEqual(WhiteboxPassPlan(), ["main", "wireframe", "debugOverlay", "whiteboxOutput"]);
 assert.deepEqual(NormalizeWhiteboxConfig({ terrainTextures: "false", ssr: 1, renderScale: NaN,
   surfaceColor: "invalid", unexpected: true }), WHITEBOX_DEFAULTS);
@@ -58,7 +58,7 @@ SaveWhiteboxConfig({ shadows: false });
 assert.equal(JSON.parse(memory.get(WHITEBOX_STORAGE_KEY)).schema, WHITEBOX_DEFAULTS.schema, "saves are stamped with the current schema");
 assert.equal(LoadWhiteboxConfig().shadows, false);
 memory.set("tengxian1938_graphics_v1", JSON.stringify({ taa: true, gi: true, profile: "high" }));
-assert.equal(LoadGraphicsProfile(), "whitebox", "legacy graphics cannot change the new default");
+assert.equal(LoadGraphicsProfile(), "high", "legacy graphics cannot change the new default");
 // Cloth is a material inspection scene. Its local fallback must not rewrite the
 // user's global presentation or whitebox options, including when entered from a menu.
 for (const [saved, query, expected] of [
@@ -67,8 +67,8 @@ for (const [saved, query, expected] of [
   ["high", "?cloth=1", "high"], ["ultra", "?cloth=1", "ultra"],
   ["whitebox", "?cloth=1&quality=low", "low"], ["medium", "?cloth=1&quality=whitebox", "whitebox"],
   ["whitebox", "?cloth=1&quality=invalid", "high"],
-  [null, "", "whitebox"], ["whitebox", "?weapons=1", "whitebox"],
-  ["whitebox", "?cloth=0", "whitebox"], ["medium", "?range=1", "medium"],
+  [null, "", "high"], ["whitebox", "?weapons=1", "high"],
+  ["whitebox", "?cloth=0", "high"], ["medium", "?range=1", "medium"],
 ]) {
   if (saved === null) memory.delete(GRAPHICS_PROFILE_STORAGE_KEY);
   else memory.set(GRAPHICS_PROFILE_STORAGE_KEY, JSON.stringify(saved));
@@ -78,13 +78,26 @@ for (const [saved, query, expected] of [
 }
 memory.set(GRAPHICS_PROFILE_STORAGE_KEY, "corrupt");
 assert.equal(LoadGraphicsProfile("?cloth=1"), "high");
-assert.equal(LoadGraphicsProfile(), "whitebox");
+assert.equal(LoadGraphicsProfile(), "high");
 memory.delete(GRAPHICS_PROFILE_STORAGE_KEY);
 const clothEntry = SandboxUrl("https://example.test/?quality=whitebox", "cloth");
 assert.equal(new URL(clothEntry).search, "?cloth=1");
 assert.equal(new URL(SandboxUrl(clothEntry, "weapons")).search, "?weapons=1", "Leaving the lab does not carry a temporary high override into another scene");
 assert.equal(new URL(SandboxUrl("https://example.test/?quality=low", "cloth")).search, "?quality=low&cloth=1");
-assert.equal(new URL(SandboxUrl("https://example.test/?quality=whitebox", "weapons")).search, "?quality=whitebox&weapons=1");
+assert.equal(new URL(SandboxUrl("https://example.test/?quality=whitebox", "weapons")).search, "?weapons=1");
+// Editor and player preferences never overwrite one another. The historical
+// whitebox=p012 route is gameplay, not a presentation request.
+SaveGraphicsProfile("medium");
+assert.equal(LoadGraphicsProfile("?editor=blockout"), "whitebox");
+SaveGraphicsProfile("low", "?editor=blockout");
+assert.equal(LoadGraphicsProfile("?editor=blockout"), "low");
+assert.equal(LoadGraphicsProfile("?whitebox=p012"), "medium");
+SaveGraphicsProfile("whitebox", "?editor=blockout");
+SaveGraphicsProfile("whitebox", "?weapons=1");
+assert.equal(LoadGraphicsProfile("?weapons=1"), "medium");
+assert.equal(LoadGraphicsProfile("?weapons=1&quality=whitebox"), "whitebox");
+assert.equal(JSON.parse(memory.get(BLOCKOUT_PROFILE_STORAGE_KEY)), "whitebox");
+assert.equal(new URL(SandboxUrl("https://example.test/?editor=blockout&quality=low&level=FirstLevel", "weapons")).searchParams.has("quality"), false);
 const graphics = { profile: "whitebox", taa: false, gi: false };
 assert.equal(LoadSavedGraphics(graphics), 0);
 assert.equal(graphics.taa, false);
@@ -159,7 +172,8 @@ assert.deepEqual(LoadWhiteboxConfig(), WHITEBOX_DEFAULTS);
   } finally { whitebox.Dispose(); geometry.dispose(); source.dispose(); }
 }
 globalThis.localStorage = { getItem() { throw new Error("denied"); }, setItem() { throw new Error("denied"); } };
-assert.equal(LoadGraphicsProfile(), "whitebox");
+assert.equal(LoadGraphicsProfile(), "high");
+assert.equal(LoadGraphicsProfile("?editor=blockout"), "whitebox");
 assert.equal(LoadGraphicsProfile("?cloth=1"), "high", "cloth remains textured when storage is unavailable");
 assert.equal(LoadGraphicsProfile("?cloth=1&quality=whitebox"), "whitebox");
 assert.equal(SaveWhiteboxConfig({}), false);

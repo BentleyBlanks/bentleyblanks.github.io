@@ -22,7 +22,7 @@ try {
     }
   });
   const base = `http://127.0.0.1:${server.address().port}/Taierzhuang1938/`;
-  await page.goto(`${base}?whitebox=p012&missionStage=4&manual=1&scale=small&audio=0`, { waitUntil: "domcontentloaded", timeout: 240000 });
+  await page.goto(`${base}?whitebox=p012&quality=whitebox&missionStage=4&manual=1&scale=small&audio=0`, { waitUntil: "domcontentloaded", timeout: 240000 });
   await Ready();
   console.log("Whitebox default loaded");
   const state = await page.evaluate(async () => {

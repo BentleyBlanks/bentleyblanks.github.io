@@ -8,7 +8,7 @@ export function BuildWhiteboxQualityUi(settings, body) {
   Note(section, profile === "whitebox" ? "当前：白盒画质 · 下方可编辑并保存配置"
     : `当前：${profile} · 美术渲染`);
   ButtonRow(section, [
-    { label: "白盒（默认）", cls: profile === "whitebox" ? "on" : "", onClick: () => settings.Reload("whitebox") },
+    { label: new URLSearchParams(globalThis.location?.search || "").get("editor") === "blockout" ? "白盒（默认）" : "白盒", cls: profile === "whitebox" ? "on" : "", onClick: () => settings.Reload("whitebox") },
     ...["low", "medium", "high", "ultra"].map((quality) => ({
       label: quality, cls: profile === quality ? "on" : "", onClick: () => settings.Reload(quality),
     })),

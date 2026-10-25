@@ -109,3 +109,22 @@ export const WEAPON_RANGE_PHASE = {
   loadoutOverride: { primary: "HanYang", secondary: null, melee: "Dadao",
     throwables: { Grenade: 0, GrenadeBundle: 0 }, spareClips: 12, note: "长桌可领取全部枪械。" },
 };
+
+// The gun lab retains all playable weapons/targets, but no campaign scenery or sound packs.
+// Type89 surfaces remain in the shared ActorMaterials table (also used by weapons).
+export const WEAPON_RANGE_STARTUP = Object.freeze({
+  pbrSets: Object.freeze(["Steel", "WoodStock", "GrenadePbr", "DadaoPbr", "Ground", "CraterScorched", "Type89Armor", "Type89Track",
+    "LugouqiaoType11AmmoBox", "LugouqiaoType11Body", "LugouqiaoType11BodyAlt", "LugouqiaoType11Fore"]),
+  audio: Object.freeze({ voice: false, ambience: false, music: false,
+    sfx: Object.freeze([
+      "rifleNra", "rifleNraFar", "rifleIja", "rifleIjaFar", "rifleHanYang", "boltHanYang", "bolt", "stripperLoad", "magIn",
+      "zb26", "type11", "type92", "zb26Far", "type11Far", "type92Far", "mgOverheat", "mgCharge", "shellDrop",
+      "gunTailOpenRifle", "gunTailStreetRifle", "gunTailInteriorRifle", "gunTailOpenMg", "gunTailInteriorMg",
+      "bulletCrack", "bulletWhizz", "ricochet", "impactBrick", "impactDirt", "impactWood", "impactMetal", "impactFlesh", "impactStone",
+      "footstepDirt", "footstepRubble", "footstepWood", "footstepStone", "footstepGrass", "footstepMud",
+      "clothMove", "gearRattle", "gearRustle", "breathHeavy", "breathInjured", "bodyLand", "bodyFall", "hurt", "heartbeat",
+      "hitGrunt", "painMoan", "neckDeath", "goreSever", "goreLimbLand",
+      "grenadePin", "grenadeThrow", "grenadeBounce", "grenadeRoll", "explosionNear", "explosionMid", "explosionFar", "debrisFall", "fireSpot",
+      "dadaoSwing", "dadaoHit", "bayonetHit", "bayonetFixClick", "bayonetStabBody", "bayonetTwist", "clothRip", "boltRattle", "grenadeKnock",
+    ]) }),
+});

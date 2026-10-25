@@ -1,7 +1,8 @@
 // Default presentation profile. Pure data/rules; see docs/Data_WhiteboxQuality.md.
-export const DEFAULT_GRAPHICS_PROFILE = "whitebox";
+export const DEFAULT_GRAPHICS_PROFILE = "high";
 export const GRAPHICS_PROFILES = ["whitebox", "low", "medium", "high", "ultra"];
 export const WHITEBOX_STORAGE_KEY = "tengxian1938_whitebox_v1";
+export const BLOCKOUT_PROFILE_STORAGE_KEY = "tengxian1938_blockout_profile_v1";
 export const GRAPHICS_PROFILE_STORAGE_KEY = "tengxian1938_graphics_profile_v1";
 
 // These controls are shared by the editor, agent API and validation. A new visual

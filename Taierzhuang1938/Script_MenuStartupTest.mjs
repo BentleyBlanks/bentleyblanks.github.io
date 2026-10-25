@@ -26,17 +26,18 @@ try {
       for (const file of bundle.files) await page.route('**/' + file.name + '?*', route => route.fulfill({contentType: 'text/javascript', body: file.code}));
     }
     const started = performance.now();
-    await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?quality=high`, {waitUntil: 'commit'});
+    await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/`, {waitUntil: 'commit'});
     await page.waitForFunction(() => window.Tengxian?.state.ready && window.Tengxian?.menu.open, null, {timeout: 90000});
     const readyMs = performance.now() - started;
     const snapshot = await page.evaluate(() => {
       const g = window.Tengxian;
-      return {state: g.state, room: g.Debug.CommandRoom(), actors: !!g.actorFactory, physics: !!g.physics,
+      return {profile: g.GraphicsProfile.Inspect().profile, state: g.state, room: g.Debug.CommandRoom(), actors: !!g.actorFactory, physics: !!g.physics,
         battlefield: !!g.battlefield, viewmodel: !!g.viewmodel, animation: g.state.levelWarm,
         particles: g.MenuParticles?.Modules().renderers,
         bytes: performance.getEntriesByType('resource').reduce((n, e) => n + e.decodedBodySize, 0)};
     });
     assert.ok(snapshot.room.ready && snapshot.state.standaloneMenu);
+    assert.equal(snapshot.profile, "high", "fresh player menu uses normal presentation");
     assert.ok(snapshot.particles?.includes('windowMote'), 'standalone menu exposes the shared particle API');
     assert.ok(!snapshot.actors && !snapshot.physics && !snapshot.battlefield && !snapshot.viewmodel && !snapshot.animation);
     // The model, paper artwork, fonts and optional boot paper are the entire title payload.

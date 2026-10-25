@@ -51,7 +51,7 @@ import { PrepareCraterDebris } from "./Script_CraterDebris.mjs";
 import { TerrainDeformationView } from "./Script_TerrainDeformationView.mjs";
 import { RegisterGrenadeReturn } from "./Script_GrenadeReturn.mjs";
 import { WeaponRangeField } from "./Script_WeaponRangeField.mjs";
-import { WEAPON_RANGE_PHASE, WEAPON_RANGE_LEVEL_ID } from "./Data_WeaponRange.mjs";
+import { WEAPON_RANGE_PHASE, WEAPON_RANGE_LEVEL_ID, WEAPON_RANGE_STARTUP } from "./Data_WeaponRange.mjs";
 import { WeaponRangeRuntime } from "./Script_WeaponRangeRuntime.mjs";
 import { MOVEMENT_RANGE_PHASE, MOVEMENT_RANGE_ID } from "./Data_MovementRange.mjs";
 import { MovementRangeField } from "./Script_MovementRangeField.mjs";
@@ -787,7 +787,7 @@ let gi = (GI_ON && graphics.gi)
   : null;
 if (gi) gi.enabled = true;
 const hud = new Hud(hudRoot);
-const audio = new AudioEngine({ enabled: AUDIO_ENABLED });
+const audio = new AudioEngine({ enabled: AUDIO_ENABLED, assetPolicy: WEAPON_RANGE ? WEAPON_RANGE_STARTUP.audio : null });
 // 顺子打空弹药时骂一句（第一次必骂，之后按概率）。规则在 Script_PlayerVent；剧情对白在说、人倒了就等着。
 const playerVent = new PlayerVent({ audio, Blocked: () => !player?.Alive || !!audio.dialogueYield });
 audio.allowAutonomousBark = () => AllowAutonomousBark(PHASE_TABLE[state.phaseIndex],
@@ -1372,7 +1372,8 @@ async function Boot() {
 
 
   setStep(T("boot.step.loadPbr"), BOOT.progress.loadPbr.from);
-  const pbrQueue = PBR_SETS.slice();
+  const pbrQueue = PBR_SETS.filter(set => !WEAPON_RANGE || WEAPON_RANGE_STARTUP.pbrSets.includes(set.name));
+  const pbrTotal = pbrQueue.length;
   const pbrFailed = [];
   let pbrDone = 0;
   const RunPbrLane = async () => {
@@ -1391,13 +1392,13 @@ async function Boot() {
           + String(error).slice(0, 160));
       }
       pbrDone += 1;
-      setStep(T("boot.step.loadPbrProgress", { done: pbrDone, total: PBR_SETS.length }),
-        BootProgress(BOOT.progress.loadPbr, pbrDone / PBR_SETS.length));
+      setStep(T("boot.step.loadPbrProgress", { done: pbrDone, total: pbrTotal }),
+        BootProgress(BOOT.progress.loadPbr, pbrDone / pbrTotal));
     }
   };
   await Promise.all(Array.from({ length: PBR_LANES }, RunPbrLane));
   if (pbrFailed.length) {
-    console.warn(`[Main] 共 ${pbrFailed.length}/${PBR_SETS.length} 套外部 PBR 走了程序化退路：`
+    console.warn(`[Main] 共 ${pbrFailed.length}/${pbrTotal} 套外部 PBR 走了程序化退路：`
       + pbrFailed.join("、"));            // @text-ok console.warn 的续行，是诊断输出
   }
 
@@ -1405,12 +1406,12 @@ async function Boot() {
   // 排在这里而不是模块顶：前面几步（外部 PBR / GLB）正把网络占满，
   // 而从建物理到装骨架这一段网络是闲的。不 await —— 它自己失败自己算，
   // 拉不到时 Unlock 之后的 LoadPacks 会照原路再来一次。
-  audio.PrefetchPacks?.();
+  if (!WEAPON_RANGE) audio.PrefetchPacks?.();
 
   // 物理引擎的 wasm（2.8 MB，本地 vendor 里）。**必须排在建关之前** ——
   // BuildField 末尾就要拿它建碰撞体了。
   setStep(T("boot.step.physics"), BOOT.progress.physics);
-  await Promise.all([InitPhysics(), PrepareCraterDebris(library)]);
+  await Promise.all([InitPhysics(), WEAPON_RANGE ? null : PrepareCraterDebris(library)]);
 
   const phase = PHASE_TABLE[state.phaseIndex];
   const preset = sky.Apply(phase.sky);
@@ -1422,7 +1423,7 @@ async function Boot() {
   scene.fog = null;
 
   aircraft = new AircraftFlight(scene);
-  aircraft.Load().catch((error) => console.warn("AircraftFlight: model load failed", error));
+  if (!WEAPON_RANGE) aircraft.Load().catch((error) => console.warn("AircraftFlight: model load failed", error));
 
   await BuildField(PHASE_TABLE[state.phaseIndex], setStep,
     BOOT.progress.field.from, BOOT.progress.field.to, NextFrame);
@@ -1448,7 +1449,7 @@ async function Boot() {
   // 人和枪的模型必须在造第一个 Actor 之前读完：KindGeometry / WeaponGeometry 是同步的
   // （它们在 Actor 构造函数里被调），拿不到文档就一律退回程序化方块几何。
   // 十四个 .tzm.json 加起来不到 300 KB，这一步的成本远小于"跑起来才发现没换模"。
-  const meshes = await actorFactory.PreloadMeshes();
+  const meshes = await actorFactory.PreloadMeshes({ weaponsOnly: WEAPON_RANGE });
   await NextFrame();
   // 白刃全身动画库（每阵营 7.7 MB）正常开机不等它：主菜单出现后才在后台拉
   // （OpenMenu），进关前基本能到。白刃实验室与它的测试要一开机就能摆姿势，等。
@@ -1460,8 +1461,10 @@ async function Boot() {
   setStep(T("boot.step.actorsProgress", { loaded: meshes.loaded, requested: meshes.requested }),
     BOOT.progress.actorMeshes);
   // 担架 GLB 与手榴弹一起等：CreateStretcherGeometry 是同步的，进关前得已经在手里；读不到就开机失败。
-  const [grenadeAsset] = await Promise.all([LoadGrenadeAsset(), LoadStretcherAsset(), LoadCigaretteAsset()]);
+  const [grenadeAsset] = await Promise.all([LoadGrenadeAsset(), ...(WEAPON_RANGE ? [] : [LoadStretcherAsset(), LoadCigaretteAsset()])]);
   await NextFrame();
+  // Start the lab sound queue after the required models have finished downloading.
+  if (WEAPON_RANGE) audio.PrefetchPacks?.();
   vfx = new VfxSystem(scene, library, {
     quality: QUALITY, maxParticles: SCALE.vfxBudget, lights,
   });
@@ -3544,40 +3547,10 @@ function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField;
  * 夹成 0；从靶场退出时又会把玩家按到某一关的切片上）、`preview`（序章预览与
  * 靶场是互斥的两条旁路）、`menu=0`（进去就没有暂停菜单，也就没有退出靶场的路）。
  */
-function GoToSandbox(key, {stage = null} = {}) {
-  const url = new URL(window.location.href);
-  url.searchParams.delete("menuPreview");
-  url.searchParams.delete("menuPreviewUi");
-  url.searchParams.delete("movement");
-  url.searchParams.delete("range");
-  url.searchParams.delete("explosions");
-  url.searchParams.delete("weapons");
-  url.searchParams.delete("melee");
-  url.searchParams.delete("gore");
-  url.searchParams.delete("impacts");
-  url.searchParams.delete("reactions");
-  url.searchParams.delete("cloth");
-  url.searchParams.delete("whitebox");
-  url.searchParams.delete("missionStage");
-  url.searchParams.delete("jiehe");
-  if (key === "movement") url.searchParams.set("movement", "1");
-  else if (key === "weapons") url.searchParams.set("weapons", "1");
-  else if (key === "range") url.searchParams.set("range", "1");
-  else if (key === "explosions") url.searchParams.set("explosions", "1");
-  else if (key === "melee") url.searchParams.set("melee", "1");
-  else if (key === "gore") url.searchParams.set("gore", "1");
-  else if (key === "impacts") url.searchParams.set("impacts", "1");
-  else if (key === "reactions") url.searchParams.set("reactions", "1");
-  else if (key === "cloth") url.searchParams.set("cloth", "1");
-  else if (key === "firstLevelP012Whitebox") url.searchParams.set("whitebox", "p012");
-  else if (key === "jiehe") url.searchParams.set("jiehe", "1");
-  url.searchParams.delete("phase");
-  url.searchParams.delete("preview");
-  url.searchParams.delete("menu");
-  if (key === "cloth" && url.searchParams.get("quality") === "whitebox") url.searchParams.delete("quality");
-  if (key === "firstLevelP012Whitebox" && stage != null) url.searchParams.set("missionStage",stage);
-  window.location.assign(url.toString());
-  return url.toString();
+function GoToSandbox(key, options = {}) {
+  const url = SandboxUrl(window.location.href, key, options);
+  window.location.assign(url);
+  return url;
 }
 
 /**

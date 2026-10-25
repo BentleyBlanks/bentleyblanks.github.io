@@ -408,6 +408,7 @@ export const testDefs = {
   BayonetTest: { file: "Script_BayonetTest.mjs", desc: "刺刀：装卸与架势独立、轻重突刺与空枪" },
   RangeTest: { file: "Script_RangeTest.mjs", desc: "玩法测试靶场（?range=1）：木桩兵 + 枪/镜/刀/刺刀/手榴弹全链路" },
   TestSceneLightingTest: { file: "Script_TestSceneLightingTest.mjs", timeoutMs: 10 * 60 * 1000, desc: "测试场共享光照、四向灰卡、十四角色与正片还原" },
+  WeaponRangeStartupBrowserTest: {file: "Script_WeaponRangeStartupBrowserTest.mjs", timeoutMs: 420000, desc: "Weapon lab resource scope, normal default, old save migration and audio after entry"},
   WeaponRangeTest: { file: "Script_WeaponRangeTest.mjs", timeoutMs: 20 * 60 * 1000,
     desc: "全枪械白盒：桌面 F 拾取、无限弹药/换弹、10–200米静动靶与真实命中" },
   MeleeAnimationTest: { file: "Script_MeleeAnimationTest.mjs", timeoutMs: 15 * 60 * 1000, desc: "Blender 全骨骼与第一人称 54 动作、握持可见性及源工程样本" },
@@ -553,6 +554,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "WeaponRangeStartupBrowserTest",
   "FallingSoilBrowserTest",
   "Type89MediumTankBrowserTest",
   "KawasakiType88BrowserTest",
@@ -825,7 +827,7 @@ export const domains = {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
     tier2Tests:["FpsReloadClearanceTest","HanYangReloadClearanceTest"],
     tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmActionsTest", "FirearmHandlingBrowserTest", "FirearmResponseBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
-      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsRifleViewTest", "FpsGripCorrectiveAssetTest", "FpsHandSkinWeightsTest", "FpsForearmTaperTest", "FpsWristNormalSeamTest", "FpsHandSelfContactTest", "FpsHandLeftSelfContactTest", "FpsHandPoseTest", "FpsSleeveTest", "FpsHandAnatomyTest", "FpsHandContactTest", "FpsElbowArcTest", "FpsReloadMechanicsTest", "FpsGripEditorTest", "FpsAnimationTest", "FpsDadaoProjectionTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
+      "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsRifleViewTest", "FpsGripCorrectiveAssetTest", "FpsHandSkinWeightsTest", "FpsForearmTaperTest", "FpsWristNormalSeamTest", "FpsHandSelfContactTest", "FpsHandLeftSelfContactTest", "FpsHandPoseTest", "FpsSleeveTest", "FpsHandAnatomyTest", "FpsHandContactTest", "FpsElbowArcTest", "FpsReloadMechanicsTest", "FpsGripEditorTest", "FpsAnimationTest", "FpsDadaoProjectionTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponRangeStartupBrowserTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "NeckDeathTest", "NeckDeathBrowserTest", "AssetStandardsTest", "HanYang173RAssetTest", "HanYang173RBrowserTest", "HanYang173RDefaultTest", "ModelFacingTest",
       // 受击物理反应挂在 TakeHit/Kill/Actor.Update 上：碰伤害口径、人物动画、死亡的改动连着它们一起跑。
       "HitReactionTest", "HitReactionBrowserTest",

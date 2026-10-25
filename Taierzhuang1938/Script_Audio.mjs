@@ -4350,7 +4350,8 @@ class LoopLayer {
 // AudioEngine
 // ===========================================================================
 export class AudioEngine {
-  constructor({ enabled = true, recordedPacks = true } = {}) {
+  constructor({ enabled = true, recordedPacks = true, assetPolicy = null } = {}) {
+    this.assetPolicy = assetPolicy;
     this.recordedPacks = recordedPacks;
     this.enabled = enabled;
     this.ctx = null;
@@ -4770,6 +4771,10 @@ export class AudioEngine {
    * 失败一律吞掉：Unlock 之后的 LoadPacks 会照常自己再拉一次（那时这张表是空的，
    * 走的就是原来的老路）。
    */
+  SfxEntries(manifest) {
+    return Object.entries(manifest.cues || {}).filter(([cue]) => !this.assetPolicy?.sfx || this.assetPolicy.sfx.includes(cue));
+  }
+
   async PrefetchPacks() {
     if (this.recordedPacks === false || !this.enabled || this.disposed || this.prefetching) return 0;
     this.prefetching = true;
@@ -4793,10 +4798,10 @@ export class AudioEngine {
     const ManifestFiles = (groups) => groups.flatMap((group) => Object.values(group || {})
       .flatMap((entry) => entry.files || (entry.file ? [entry.file] : [])));
     await Promise.all([
-      Pack(SFX_BASE, "Data_SfxManifest.json", SFX_PACK_VERSION, (m) => ManifestFiles([m.cues])),
+      Pack(SFX_BASE, "Data_SfxManifest.json", SFX_PACK_VERSION, (m) => ManifestFiles([Object.fromEntries(this.SfxEntries(m))])),
       // 床按装载计划取：默认（layered）阻塞下载底床 A 顶替旧 battleFar，旧床与叠加用的 B / C / E 都不在这里
       //（B / C / E 开机之后后台下载，见 LoadBattleOverlayBeds）；单选一条只下载那一条。
-      Pack(AMB_BASE, "Data_AmbManifest.json", AMB_PACK_VERSION, (m) => AmbFilesToFetch(m, AmbBedChoice(m).choice)),
+      this.assetPolicy?.ambience === false ? null : Pack(AMB_BASE, "Data_AmbManifest.json", AMB_PACK_VERSION, (m) => AmbFilesToFetch(m, AmbBedChoice(m).choice)),
     ]);
     this.prefetchedCount = ok;
     return ok;
@@ -4822,7 +4827,7 @@ export class AudioEngine {
     // VOICE_LINES 那 166 条（战场口令 + ch0/ch1 章节台词，含 04 关中过场那 9 条）
     // 一条都不载，`Play("voice.ch1_*")` 在 `RECIPES` 那一行静默返回 null。
     // 症状是「过场只有字幕没有声音」「整关一句喊话都没有」，而日志、voiceErrors 全是干净的。
-    if (!this.voicePackReady && !this.voiceLoading && a.voice < PACK_ATTEMPTS) {
+    if (this.assetPolicy?.voice !== false && !this.voicePackReady && !this.voiceLoading && a.voice < PACK_ATTEMPTS) {
       this.voiceLoading = true;
       a.voice += 1;
       this.LoadVoicePack().catch(() => {}).then(() => { this.voiceLoading = false; });
@@ -4835,7 +4840,7 @@ export class AudioEngine {
     }
     // 环境床约 1.2 MB，是三个包里最大的一份，但**必须和别的并行拉**：
     // 串在音效后面的话，开局头十几秒是一片死寂，那正是玩家第一次听这个游戏的时候。
-    if (!this.ambReady && !this.ambLoading && a.amb < PACK_ATTEMPTS) {
+    if (this.assetPolicy?.ambience !== false && !this.ambReady && !this.ambLoading && a.amb < PACK_ATTEMPTS) {
       this.ambLoading = true;
       a.amb += 1;
       this.LoadAmbPack(AMB_BASE).then((n) => {
@@ -4848,7 +4853,7 @@ export class AudioEngine {
     if (this.ambReady && this.BedOverlayIncomplete()) this.QueueBedOverlayLoad();
     // 音乐 1.8 MB，最后拉。同样要在载完后补一次 —— 否则「进城前」那段
     // 永远赶不上开机那一刻。
-    if (!this.musicReady && !this.musicLoading && a.music < PACK_ATTEMPTS) {
+    if (this.assetPolicy?.music !== false && !this.musicReady && !this.musicLoading && a.music < PACK_ATTEMPTS) {
       this.musicLoading = true;
       a.music += 1;
       this.LoadMusicPack(MUSIC_BASE).then((n) => {
@@ -5076,7 +5081,7 @@ export class AudioEngine {
       return 0;
     }
     this.sfxManifest = manifest;
-    const entries = Object.entries(manifest.cues || {});
+    const entries = this.SfxEntries(manifest);
     let ok = 0;
     await Promise.all(entries.map(async ([cue, entry]) => {
       const files = entry.files || (entry.file ? [entry.file] : []);

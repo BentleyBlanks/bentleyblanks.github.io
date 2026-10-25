@@ -3664,7 +3664,7 @@ export class ActorFactory {
    *
    * 普通 TZM 404 只作废该 id。汉阳造 173R 是必需资产，加载失败显式中止并提示重试。
    */
-  async PreloadMeshes() {
+  async PreloadMeshes({ weaponsOnly = false } = {}) {
     if (this.meshLoading) return this.meshLoading;
     const wanted = new Set([
       // SoldierNra / SoldierIja 已从正式通路废弃：军人 GLB 失败时宁可显式退回 box，
@@ -3675,7 +3675,11 @@ export class ActorFactory {
       ...Object.values(WEAPON_MESH_VARIANTS).flat(),
       ...Object.values(BAYONET_MESH_BY_WEAPON),
     ]);
-    const ids = [...wanted].filter((id) => MESHES[id]);
+    const playable = new Set([
+      ...Object.values(WEAPONS).filter(weapon => weapon.kind !== "vehicle").map(weapon => WEAPON_MESH_BY_ID[weapon.id]),
+      ...Object.values(WEAPON_MESH_VARIANTS).flat(), ...Object.values(BAYONET_MESH_BY_WEAPON),
+    ]);
+    const ids = [...wanted].filter((id) => MESHES[id] && (!weaponsOnly || playable.has(id)));
     this.meshLoading = (async () => {
       // Authored weapon atlases load with their models, before either world
       // actors or FPS rigs obtain materials. They never enter menu startup.

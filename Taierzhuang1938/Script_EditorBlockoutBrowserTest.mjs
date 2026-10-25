@@ -6,7 +6,7 @@
 //
 // 先在 node 里核几条纯规则（关卡注册表、phase 形状、高度网格与渲染格逐点一致、入口地址、
 // 场景文件的水块、担架人数、射界扇近处淡出），再开一页游戏：
-//   1. ?editor=blockout&level=FirstLevel&quality=whitebox&scale=small&audio=0 启动；
+//   1. ?editor=blockout&level=FirstLevel&scale=small&audio=0 启动；
 //      没有任务运行时、没有过场；关键帧数与配置一致；第一次烘纸面地图等加载画面收掉 1.5 s 之后；
 //   2. GoTo 之后玩家位置误差 < 0.5 m；
 //   3. 按键 , . Y M Esc；过渡途中被打断后标记用的是新关键帧的单位；
@@ -109,9 +109,9 @@ const sceneText = await fs.readFile(path.join(projectDir, "Blockout", "SecondLev
 }
 {
   const url = new URL(BlockoutEntry.Url("http://127.0.0.1:9/Taierzhuang1938/?whitebox=p012&missionStage=3&phase=2&quality=high&scale=small&audio=0"));
-  Check("启动面板入口：跳到 ?editor=blockout&level=FirstLevel0105（新剧本），只保留画质 / 规模 / 音频", url.pathname === "/Taierzhuang1938/"
+  Check("启动面板入口：跳到 ?editor=blockout&level=FirstLevel0105（新剧本），只保留规模 / 音频，白盒画质独立", url.pathname === "/Taierzhuang1938/"
     && url.searchParams.get("editor") === "blockout" && url.searchParams.get("level") === "FirstLevel0105"
-    && url.searchParams.get("quality") === "high" && url.searchParams.get("scale") === "small" && url.searchParams.get("audio") === "0"
+    && !url.searchParams.has("quality") && url.searchParams.get("scale") === "small" && url.searchParams.get("audio") === "0"
     && !url.searchParams.has("whitebox") && !url.searchParams.has("missionStage") && !url.searchParams.has("phase"), url.search);
   Check("启动面板入口：已经在编辑器里时认得出", BlockoutEntry.Active("?editor=blockout&level=SecondLevel") && !BlockoutEntry.Active("?editor=tools"));
 }
@@ -187,15 +187,18 @@ async function WaitSync(predicate, arg, timeout = SYNC_BUDGET_MS) {
 const metrics = {};
 try {
   console.log("--- boot");
+  await page.addInitScript(() => localStorage.setItem("tengxian1938_graphics_profile_v1", JSON.stringify("high")));
   const bootStart = Date.now();
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=FirstLevel&quality=whitebox&scale=small&audio=0`,
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=FirstLevel&scale=small&audio=0`,
     { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready,
     null, { timeout: 300000 });
   metrics.bootMs = Date.now() - bootStart;
+  Check("白盒编辑器默认白盒，不继承玩家 high", await page.evaluate(() => Tengxian.GraphicsProfile.Inspect().profile) === "whitebox");
   const boot = await page.evaluate(() => {
     const T = window.Tengxian;
     return {
+      profile: T.GraphicsProfile.Inspect().profile,
       state: T.Debug.Blockout.State(),
       missionRuntime: T.editor?.host?.game?.missionRuntime ?? null,
       cutscene: !!T.cutscene?.Playing,
