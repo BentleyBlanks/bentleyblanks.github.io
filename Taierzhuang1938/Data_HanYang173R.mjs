@@ -1,5 +1,6 @@
 // Dots 173R author-space metres, +Y up, muzzle -Z. Values are measured in the
 // delivered GLB; weapon operation remains driven by the existing game timeline.
+import {HANYANG_METAL_GAINS} from './Data_HanYang173RMaterials.mjs';
 export const HANYANG_173R = Object.freeze({
   version: '173R-20261025',
   url: './Model/HanYang173R/Model_HanYang173R.glb?v=173r-20261025',
@@ -9,6 +10,9 @@ export const HANYANG_173R = Object.freeze({
   // reflectance gain retains grain/roughness while fitting the game's filmic
   // exposure. This is an artistic runtime adaptation, not a source rebake.
   woodReflectanceGain: 6,
+  metalReflectanceGains: HANYANG_METAL_GAINS,
+  metalRoughnessGain: 1.4,
+  maximumReflectance: .95,
   bolt: ['HandledCylinder', 'HandleRoot', 'HandleNeck', 'HandleSphere'],
   cocking: ['RearCockingExterior', 'RearOuterCover_RoundedSideReturn', 'RearSmallCover', 'RearSmallPin', 'RearTab', 'RearTopExternalLever'],
   frontSight: ['HY150_RoundedUpperExterior', 'HY150_ExteriorSideRelief_Neg', 'HY150_ExteriorSideRelief_Pos', 'HY151_LowRearShoulder'],

@@ -56,11 +56,19 @@ try{
     for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)for(let c=0;c<3;c++)rgb[c]+=pixels[((y+dy)*ldr.width+x+dx)*4+c]/25;
     woodSamples.push({part:hit.object.userData.hanYang173RPart,rgb});
    }
+   const {MeasureHanYangPixels}=await import('./_import/Script_HanYang173RPixelProbe.mjs');
+   const surfaces=MeasureHanYangPixels(g);
+   g.post.hasTaaHistory=false;g.StepFrames(1);
    return {mode,sky:g.sky.presetName,sun:g.lights.sun.intensity,ambient:g.lights.ambient.intensity,probe:g.lights.globalProbe.intensity,
-    exposure:g.post.uniformsComposite.uExposure.value,meanLuma:sum/(pixels.length/4),maximum,woodSamples,glError:g.renderer.getContext().getError(),ads:g.player.ads};
+    exposure:g.post.uniformsComposite.uExposure.value,meanLuma:sum/(pixels.length/4),maximum,woodSamples,surfaces,glError:g.renderer.getContext().getError(),ads:g.player.ads};
   },mode);
   assert.equal(row.glError,0);assert(row.meanLuma>2&&row.meanLuma<245&&row.maximum>30);
   if(mode==='Day')assert(row.woodSamples.length>=2&&row.woodSamples.every(s=>s.rgb[0]>s.rgb[2]*1.2&&s.rgb[0]>16),'daylight wood must retain a readable warm albedo, not the old purple-black floor');
+  if(mode==='Day'||mode==='Shadow'){
+   assert(row.surfaces.metal.pixels>5000,'actual visible metal mask');
+   assert(row.surfaces.metal.p50>(mode==='Day'?18:10)&&row.surfaces.metal.blackFraction<(mode==='Day'?.45:.50),'metal must retain midtones in light and shade');
+   assert(row.surfaces.metal.p95<235,'broad metal highlights must retain headroom');
+  }
   evidence.lighting.push(row);await page.screenshot({path:path.join(out,`Scene_${mode}.png`)});
  }
  evidence.openGrip=await page.evaluate(()=>{

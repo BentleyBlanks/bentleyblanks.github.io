@@ -6,6 +6,7 @@ import {createHash} from 'node:crypto';
 import {HANYANG_173R as D} from './Data_HanYang173R.mjs';
 import {MaterialLibrary} from './Script_Materials.mjs';
 import {PatchesOf} from './Script_MaterialPatches.mjs';
+import {ConfigureHanYang173R} from './Script_HanYang173R.mjs';
 import * as THREE from 'three';
 const dir=path.join(path.dirname(fileURLToPath(import.meta.url)),'Model/HanYang173R');
 const report=JSON.parse(fs.readFileSync(path.join(dir,'Data_GameGeometry.json'),'utf8'));
@@ -40,4 +41,18 @@ for(const p of report.parts.filter(p=>!p.gameplayAdaptation))assert(Math.max(p.g
 const library=new MaterialLibrary(null),orm=new THREE.Texture(),mat=new THREE.MeshStandardMaterial({roughnessMap:orm,metalnessMap:orm});
 library.ConfigureExternalPbr(mat);assert.equal(mat.metalnessMap,null);
 assert(PatchesOf(mat).some(p=>String(p.key).includes('orm')),'folded ORM must keep its shader patch without post effects');
+const calibration=JSON.parse(fs.readFileSync(path.join(dir,'Data_MaterialCalibration.json'),'utf8'));
+assert.equal(calibration.gameSha256,report.gameSha256);assert.equal(calibration.parts.length,40);
+// Loading another level reuses the source material. Calibration must not
+// accumulate, and its energy bound must survive alongside packed ORM decoding.
+const mesh=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial({metalness:1,roughness:1,roughnessMap:orm,metalnessMap:orm}));
+mesh.name='ReceiverOuterCollar';const scene=new THREE.Group();scene.add(mesh);
+const asset={gltf:{scene},materials:new Map()};ConfigureHanYang173R(asset,library);
+const once={color:mesh.material.color.toArray(),roughness:mesh.material.roughness};ConfigureHanYang173R(asset,library);
+assert.deepEqual({color:mesh.material.color.toArray(),roughness:mesh.material.roughness},once);
+assert.equal(PatchesOf(mesh.material).filter(p=>p.key==='hanYangReflectance1').length,1);
+assert(PatchesOf(mesh.material).some(p=>String(p.key).includes('orm')));
+const shader={uniforms:{},vertexShader:THREE.ShaderLib.standard.vertexShader,fragmentShader:THREE.ShaderLib.standard.fragmentShader};
+mesh.material.onBeforeCompile(shader,{});assert(shader.fragmentShader.includes('min(diffuseColor.rgb, vec3(0.950))'));
+mesh.geometry.dispose();mesh.material.dispose();
 console.log(`ok HanYang173R: ${triangles} triangles, ${vertices} vertices, 44 parts, 132 byte-exact source PBR images, finite tangent frames and ORM decoding`);

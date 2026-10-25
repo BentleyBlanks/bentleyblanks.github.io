@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {ManagedGLTFLoader} from './Script_ModelImports.mjs';
 import {HANYANG_173R as D} from './Data_HanYang173R.mjs';
+import {ApplyPatches,MakePatch,PatchesOf} from './Script_MaterialPatches.mjs';
 
 let loading;
 export function LoadHanYang173R() {
@@ -19,9 +20,19 @@ export function ConfigureHanYang173R(asset, library) {
     const material = mesh.material;
     material.name = `HanYang173R_${mesh.name}`;
     material.userData.hanYangAuthoredColor ||= material.color.toArray();
+    material.userData.hanYangAuthoredRoughness ??= material.roughness;
+    const wood=D.wood.includes(mesh.name);
     material.color.fromArray(material.userData.hanYangAuthoredColor)
-      .multiplyScalar(D.wood.includes(mesh.name)?D.woodReflectanceGain:1);
+      .multiplyScalar(wood?D.woodReflectanceGain:D.metalReflectanceGains[mesh.name]||1);
+    material.roughness=material.userData.hanYangAuthoredRoughness*(wood?1:D.metalRoughnessGain);
     library.ConfigureExternalPbr(material,{mesh});
+    // Bound the effective textured reflectance, rather than clipping the
+    // authoring multiplier and leaving every dark conductor near black.
+    const key='hanYangReflectance1';
+    ApplyPatches(mesh.material,[MakePatch({key,fragment:[
+      ['#include <color_fragment>',`diffuseColor.rgb = min(diffuseColor.rgb, vec3(${D.maximumReflectance.toFixed(3)}));`],
+      ['#include <roughnessmap_fragment>','roughnessFactor = clamp(roughnessFactor, 0.0, 1.0);'],
+    ]}),...(PatchesOf(mesh.material)||[]).filter(p=>p.key!==key)]);
     asset.materials.set(material.name,mesh.material);
   });
 }
