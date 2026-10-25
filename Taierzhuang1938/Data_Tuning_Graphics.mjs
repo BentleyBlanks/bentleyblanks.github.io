@@ -199,7 +199,7 @@ export const QUALITY_PRESETS = {
     // 这一档的雾色仍由大气透视供（atmosphere 开着），只是散射按解析式一条常数走。
     volumetrics: false,
     // 级联阴影四档全开（low 是 2 级）；接触阴影 low 不跑。
-    csm: true, contactShadows: false,
+    csm: true, contactShadows: false, flareShadows: false,
     // 落地扬尘（Script_PostGroundDust）按这个比例渲染体积再按深度放大（2026-10-22 帧取证：镜头被尘包住时全分辨率一团要 15–27 ms GPU）。
     groundDustScale: 0.5,
     // low 的定位是「能跑」：POM 与细节法线整个不编（省的是采样数与寄存器，
@@ -221,7 +221,7 @@ export const QUALITY_PRESETS = {
     // 噪声全交给时域累积压。静止画面收敛得和 high 一样干净，动起来会脏一点。
     ssr: true, ssrScale: 0.5, ssrSteps: 32, ssrResolveTaps: 0,
     volumetrics: true,
-    csm: true, contactShadows: true,
+    csm: true, contactShadows: true, flareShadows: true,
     groundDustScale: 0.5,
     pom: 8, pomRefine: 4, pomSelfShadow: false, detailNormal: true,
     microShadow: true, horizonOcclusion: true, skinSss: true,
@@ -248,7 +248,7 @@ export const QUALITY_PRESETS = {
     //（3394×1348 实测 hiz+trace+resolve+temporal 合计见 docs §4.8）。
     ssr: true, ssrScale: 0.5, ssrSteps: 48, ssrResolveTaps: 4,
     volumetrics: true,
-    csm: true, contactShadows: true,
+    csm: true, contactShadows: true, flareShadows: true,
     groundDustScale: 0.5,
     pom: 16, pomRefine: 5, pomSelfShadow: false, detailNormal: true,
     microShadow: true, horizonOcclusion: true, skinSss: true,
@@ -268,7 +268,7 @@ export const QUALITY_PRESETS = {
     // ultra：全分辨率追踪（不再有半分辨率上采样的边缘渗色）+ 64 步 + 8 抽样解算。
     ssr: true, ssrScale: 1.0, ssrSteps: 64, ssrResolveTaps: 8,
     volumetrics: true,
-    csm: true, contactShadows: true,
+    csm: true, contactShadows: true, flareShadows: true,
     groundDustScale: 1.0,
     // ultra 才开 POM 自阴影：那是每像素再走 8 步高度图，砖缝里投出的细影
     // 在 1440p 上是三四个像素的事，只有主动选 ultra 的人值得为它付这一笔。

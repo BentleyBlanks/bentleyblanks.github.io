@@ -78,6 +78,16 @@ import { FLARE_EFFECTS, FLARE_ART } from "./Data_Tuning_FlareEffects.mjs";
 /** Absolute flight path: launch-relative altitude, never draped over terrain. */
 export function SampleFlarePosition(f,t) {
   if(f.landing&&t>=f.landing.t)return {...f.landing.position};
+  const slide=f.flightSlides?.findLast(s=>t>=s.t);
+  if(slide){
+    const dt=t-slide.t,drag=.35,coast=drag*(1-Math.exp(-dt/drag));
+    const deploy=f.parachute&&!f.launchObstructed?Math.max(slide.t,f.ignitedAt):Infinity;
+    const free=Math.min(dt,deploy-slide.t),vy=slide.velocity.y-FLARE_ART.gravity*free;
+    let y=slide.position.y+slide.velocity.y*free-.5*FLARE_ART.gravity*free*free;
+    if(t>deploy){const s=t-deploy;y-=f.descendMS*s;y+=(vy+f.descendMS)*FLARE_ART.dragS*(1-Math.exp(-s/FLARE_ART.dragS));}
+    return {x:slide.position.x+slide.velocity.x*coast+slide.wind.x*(dt-coast),y,
+      z:slide.position.z+slide.velocity.z*coast+slide.wind.z*(dt-coast)};
+  }
   const u=Clamp01(t/f.ascendS),s=Math.max(0,t-f.ascendS);
   if(!f.physical){
     const swing=Math.sin(f.swayPhase+s*2*Math.PI/f.swayPeriodS)*f.swayM;
@@ -95,15 +105,34 @@ export function SampleFlarePosition(f,t) {
 }
 
 /** First terrain intersection, solved once so realtime and absolute seeks agree. */
-export function FlareLanding(f,ground,fromTime=f.ascendS) {
+export function FlareLanding(f,ground,fromTime=null,trace=null) {
   if(!f.physical)return null;
-  const Hit=t=>{const p=SampleFlarePosition(f,t);return {p,h:ground(p.x,p.z)};};
-  const first=Math.max(f.ascendS,fromTime),initial=Hit(first);
+  const flight={...f,landing:null,flightSlides:[...(f.flightSlides||[])]};
+  const Hit=t=>{const p=SampleFlarePosition(flight,t);return {p,h:ground(p.x,p.z)};};
+  const Land=(t,position,surface='terrain',normal=[0,1,0])=>({t,position,surface,normal,slides:flight.flightSlides});
+  const first=Math.max(0,fromTime??(trace?0:f.ascendS)),initial=Hit(first),step=trace?.1:.25;
   if(initial.p.y<=initial.h+FLARE_ART.groundClearance)return {t:first,position:{x:initial.p.x,y:initial.h+FLARE_ART.groundClearance,z:initial.p.z}};
-  for(let t=first+.25;t<=FLARE_ART.maxFlightS;t+=.25){
-    const hit=Hit(t);if(hit.p.y>hit.h+FLARE_ART.groundClearance)continue;
-    let lo=t-.25,hi=t;for(let k=0;k<20;k++){const mid=(lo+hi)*.5,h=Hit(mid);if(h.p.y>h.h+FLARE_ART.groundClearance)lo=mid;else hi=mid;}
-    const at=Hit(hi);return {t:hi,position:{x:at.p.x,y:at.h+FLARE_ART.groundClearance,z:at.p.z}};
+  let previous=initial.p;
+  for(let t=first+step;t<=FLARE_ART.maxFlightS;t+=step){
+    const hit=Hit(t),contact=trace?.(previous,hit.p);
+    if(contact){
+      const ratio=Clamp01(contact.fraction),at=t-step+step*ratio,n=contact.normal||[0,1,0];
+      const position={x:contact.point.x+n[0]*FLARE_ART.groundClearance,y:contact.point.y+n[1]*FLARE_ART.groundClearance,z:contact.point.z+n[2]*FLARE_ART.groundClearance};
+      if(n[1]>.25)return Land(at,position,contact.surface||'solid',n);
+      // Slide along a facade or fall away from a ceiling, never freeze in midair.
+      const before=SampleFlarePosition(flight,Math.max(0,at-.001)),after=SampleFlarePosition(flight,at+.001);
+      const velocity={x:(after.x-before.x)/.002,y:(after.y-before.y)/.002,z:(after.z-before.z)/.002};
+      const inward=Math.min(0,velocity.x*n[0]+velocity.y*n[1]+velocity.z*n[2]);
+      velocity.x-=inward*n[0];velocity.y-=inward*n[1];velocity.z-=inward*n[2];
+      const wind={x:Math.sin(f.driftDirRad)*f.driftMS,z:Math.cos(f.driftDirRad)*f.driftMS},wn=wind.x*n[0]+wind.z*n[2];wind.x-=wn*n[0];wind.z-=wn*n[2];
+      if(flight.flightSlides.length<8)flight.flightSlides.push({t:at,position,velocity,wind,normal:n});
+      previous=SampleFlarePosition(flight,t);continue;
+    }
+    if(hit.p.y<=hit.h+FLARE_ART.groundClearance){
+      let lo=t-step,hi=t;for(let k=0;k<20;k++){const mid=(lo+hi)*.5,h=Hit(mid);if(h.p.y>h.h+FLARE_ART.groundClearance)lo=mid;else hi=mid;}
+      const at=Hit(hi);return Land(hi,{x:at.p.x,y:at.h+FLARE_ART.groundClearance,z:at.p.z});
+    }
+    previous=hit.p;
   }
   return null;
 }
@@ -235,6 +264,7 @@ export class FlareDirector {
     const from = Flat(cfg.from);
     if (!from) { this.stats.refused += 1; return null; }
     const at = Flat(cfg.at) || { x: from.x, z: from.z };
+    if(cfg.physical)this.host.BeginFlight?.();
 
     this.serial += 1;
     const ascendS = Math.max(0.05, Num(cfg.ascendS, FLARE_DEFAULTS.ascendS));
@@ -288,15 +318,20 @@ export class FlareDirector {
       agl: 0,
       intensity: 0,
       lightHandle: null, smokeHandle: null, visualHandle:null,
-      burnLoopLeft: 0,
+      burnLoopLeft: 0, voices: [],
       beats: [],
       beganAt: this.Time(),
     };
-    flare.landing=FlareLanding(flare,(x,z)=>this.Ground(x,z));
+    flare.landing=FlareLanding(flare,(x,z)=>this.Ground(x,z),null,this.host.TraceSegment);
+    const obstruction=flare.landing?.slides?.[0];
+    flare.launchObstructed=!!(flare.parachute&&obstruction&&obstruction.t<flare.ignitedAt);
+    if(flare.launchObstructed)flare.landing=FlareLanding(flare,(x,z)=>this.Ground(x,z),null,this.host.TraceSegment);
+    flare.flightSlides=flare.landing?.slides;
     flare.carrierLanding=flare.physical&&flare.parachute
-      ? FlareLanding({...flare,parachute:false,landing:null,swayM:0},(x,z)=>this.Ground(x,z)) : null;
+      ? FlareLanding({...flare,parachute:false,landing:null,flightSlides:null,swayM:0},(x,z)=>this.Ground(x,z),null,this.host.TraceSegment) : null;
     if(flare.physical&&flare.parachute)flare.endAt=Math.max(flare.clearAt,
       (flare.landing?.t??FLARE_ART.maxFlightS)+FLARE_ART.settleS+FLARE_ART.groundHoldS+FLARE_ART.groundFadeS);
+    if(flare.launchObstructed){flare.clearAt=flare.landing.t;flare.endAt=Math.max(FLARE_ART.smokeLife,flare.landing.t+3);}
     this.flares.push(flare);
     this.stats.launched += 1;
     this.Place(flare, 0);
@@ -307,12 +342,13 @@ export class FlareDirector {
       position: { ...flare.pos },
       intensity: 0, radius: flare.lightRadiusM, color: flare.lightColor,
       flicker: false, priority: 1.6, label: flare.label,
+      flareShadow: flare.parachute,
     }) ?? null;
     flare.smokeHandle = flare.smokeRate > 0
       ? (this.host.AddSmoke?.({ position: { ...flare.pos }, rate: flare.smokeRate }) ?? null)
       : null;
     this.Beat(flare, "launch");
-    this.Sfx("launch", { position: { ...flare.pos }, volume: 0.95 });
+    this.Sfx("launch", { position: { ...flare.pos }, volume: 0.95 },voice=>this.TrackVoice(flare,"launch",voice));
     return flare.id;
   }
 
@@ -406,6 +442,7 @@ export class FlareDirector {
       this.Place(flare, step);
       this.StepLight(flare);
       this.StepBurnLoop(flare, step);
+      this.MoveSounds(flare);
       if (flare.phase === "done") this.Finish(flare, "done", true);
     }
 
@@ -415,13 +452,14 @@ export class FlareDirector {
 
   /** 相位机：四条边界一次不多一次不少，节拍在跨过边界的那一帧推。 */
   StepPhase(flare) {
-    if (flare.phase === "ascend" && flare.t >= flare.ignitedAt) {
+    if(flare.launchObstructed&&flare.phase==='ascend'&&flare.t>=flare.landing.t){flare.phase='spent';this.stats.cleared++;this.Beat(flare,'clear');this.DropVisuals(flare);}
+    if (!flare.launchObstructed && flare.phase === "ascend" && flare.t >= flare.ignitedAt) {
       flare.phase = "ignite";
       this.stats.ignited += 1;
       this.Beat(flare, "ignite");
       // 点燃声跟随这一帧的燃烧体；现代物理预设可分别选择出膛或顶空点燃。
       this.Place(flare, 0);
-      this.Sfx("ignite", { position: { ...flare.pos }, volume: 0.9 });
+      this.Sfx("ignite", { position: { ...flare.pos }, volume: 0.9 },voice=>this.TrackVoice(flare,"ignite",voice));
       flare.burnLoopLeft = 0;                       // 点燃那一帧就起嘶声
     }
     if (flare.phase === "ignite" && flare.t >= flare.burnAt) flare.phase = "burn";
@@ -430,7 +468,7 @@ export class FlareDirector {
       flare.phase = "adapt";
       this.stats.burnedOut += 1;
       this.Beat(flare, "out");
-      this.Sfx("out", { position: { ...flare.pos }, volume: 0.7 });
+      this.Sfx("out", { position: { ...flare.pos }, volume: 0.7 },voice=>this.TrackVoice(flare,"out",voice));
       // 收灯与 legacy 烟源；独立的余烟和实物伞体继续按各自寿命运行。
       this.DropVisuals(flare);
     }
@@ -453,14 +491,17 @@ export class FlareDirector {
       // A crater made while the flare is airborne invalidates its old ground hit.
       // Keep the launch altitude fixed, and solve only the remaining trajectory.
       if(!flare.landed&&flare.landing){const hit=flare.landing.position;
-        if(Math.abs(this.Ground(hit.x,hit.z)+FLARE_ART.groundClearance-hit.y)>.001){
-          flare.landing=FlareLanding({...flare,landing:null},(x,z)=>this.Ground(x,z),flare.t);
+        const support=flare.landing.surface==='solid'?(this.host.SurfaceHeight?.(hit)??this.Ground(hit.x,hit.z)):this.Ground(hit.x,hit.z);
+        const clearance=FLARE_ART.groundClearance/Math.max(.25,flare.landing.normal?.[1]??1);
+        if(Math.abs(support+clearance-hit.y)>FLARE_ART.surfaceRecheckM){
+          flare.landing=FlareLanding({...flare,landing:null},(x,z)=>this.Ground(x,z),flare.t,this.host.TraceSegment);
+          flare.flightSlides=flare.landing?.slides||flare.flightSlides;
           if(flare.parachute)flare.endAt=Math.max(flare.clearAt,(flare.landing?.t??FLARE_ART.maxFlightS)+FLARE_ART.settleS+FLARE_ART.groundHoldS+FLARE_ART.groundFadeS);
         }
       }
       Object.assign(p,SampleFlarePosition(flare,flare.t));
       const ground=this.Ground(p.x,p.z);flare.landed=!!flare.landing&&flare.t>=flare.landing.t;
-      p.y=Math.max(ground+.02,p.y);flare.agl=p.y-ground;
+      p.y=Math.max(ground+FLARE_ART.groundClearance,p.y);flare.agl=p.y-ground;
     } else if (flare.phase === "ascend") {
       const u = Clamp01(flare.t / flare.ascendS);
       // 1-(1-u)² 是「起手快、到顶慢」：发射筒把它推出去，之后一路减速到顶点。
@@ -513,7 +554,7 @@ export class FlareDirector {
       level = (1 - u) * (1 - u);
       flicker = this.Flicker(flare, t);
     }
-    if(flare.landed)level=0;
+    if(flare.launchObstructed)level=0;
     flare.level = level;
     flare.brightness = level * flicker;
     flare.intensity = Math.min(flare.maxIntensity,
@@ -539,10 +580,26 @@ export class FlareDirector {
   /** 燃烧嘶声：Play 没有 loop 语义，所以按素材长度重触发。 */
   StepBurnLoop(flare, step) {
     if (flare.phase !== "burn" && flare.phase !== "ignite") return;
-    flare.burnLoopLeft -= step;
+    const now=this.host.AudioTime?.();
+    const elapsed=Number.isFinite(now)&&Number.isFinite(flare.audioTime)?Math.max(0,now-flare.audioTime):step;
+    flare.audioTime=now;
+    flare.burnLoopLeft -= elapsed;
     if (flare.burnLoopLeft > 0) return;
     flare.burnLoopLeft = FLARE_SFX.burn.loopEveryS ?? 5.6;
-    this.Sfx("burn", { position: { ...flare.pos } });
+    this.Sfx("burn", { position: { ...flare.pos } },voice=>this.TrackVoice(flare,"burn",voice));
+  }
+
+  TrackVoice(flare,kind,voice){
+    flare.voices=flare.voices.filter(v=>this.host.VoiceAlive?.(v.voice)!==false);
+    while(flare.voices.length>=4)this.host.StopVoice?.(flare.voices.shift().voice,0);
+    flare.voices.push({kind,voice});
+  }
+  MoveSounds(flare){
+    flare.voices=flare.voices.filter(v=>this.host.VoiceAlive?.(v.voice)!==false);
+    for(const v of flare.voices)this.host.MoveVoice?.(v.voice,{...flare.pos});
+  }
+  StopSounds(flare,keepOut=false,fadeS=0){
+    flare.voices=flare.voices.filter(v=>{if(keepOut&&v.kind==='out')return true;this.host.StopVoice?.(v.voice,fadeS);return false;});
   }
 
   /**
@@ -599,7 +656,8 @@ export class FlareDirector {
   // 收尾、节拍、音效
   // -------------------------------------------------------------------------
 
-  DropVisuals(flare) {
+  DropVisuals(flare,fadeS=.04) {
+    this.StopSounds(flare,true,fadeS);
     if (flare.lightHandle !== null) {
       this.host.RemoveLight?.(flare.lightHandle);
       flare.lightHandle = null;
@@ -612,7 +670,9 @@ export class FlareDirector {
 
   /** 三条收尾路径（走完 / Abort / Reset）的共同出口。 */
   Finish(flare, reason, completed) {
-    this.DropVisuals(flare);
+    if(completed&&flare.launchObstructed){reason='obstructed';completed=false;}
+    this.DropVisuals(flare,0);
+    this.StopSounds(flare);
     if(flare.visualHandle!==null){this.host.RemoveVisual?.(flare.visualHandle);flare.visualHandle=null;}
     const index = this.flares.indexOf(flare);
     if (index >= 0) this.flares.splice(index, 1);
@@ -649,14 +709,14 @@ export class FlareDirector {
    * 放一条本层的音效。A2 批那四条实录的同名配方合上之前 `Play` 会返回假值 ——
    * 那时退到备胎，并**把结果记下来**：一条 key 只解析一次，不会每次都白试一遍。
    */
-  Sfx(key, opts = {}) {
+  Sfx(key, opts = {}, onVoice = null) {
     const spec = FLARE_SFX[key];
     if (!spec || typeof this.host.Play !== "function") return null;
     const picked = this.sfxPick.get(key);
     const names = picked ? [picked] : spec.names;
     for (const name of names) {
       const played = this.host.Play(name, { volume: spec.volume, ...opts });
-      if (played) { this.sfxPick.set(key, name); return name; }
+      if (played) { this.sfxPick.set(key, name); onVoice?.(played); return name; }
     }
     return null;
   }
@@ -675,6 +735,7 @@ export class FlareDirector {
       label: flare.label,
       phase: flare.phase,
       landed:!!flare.landed,landingAt:flare.landing?.t??null,retireAt:flare.endAt,
+      landingSurface:flare.landing?.surface??'terrain',launchObstructed:!!flare.launchObstructed,
       kind:flare.kind,parachute:flare.parachute,physical:flare.physical,
       t: flare.t,
       x: flare.pos.x, y: flare.pos.y, z: flare.pos.z,
@@ -682,6 +743,7 @@ export class FlareDirector {
       level: flare.level,
       brightness: flare.brightness,
       intensity: flare.intensity,
+      soundVoices:flare.voices.length,
       radius: flare.lightRadiusM,
       color: flare.lightColor,
       beats: flare.beats.map((b) => b.name),
@@ -740,20 +802,42 @@ export class FlareDirector {
  *   Player()        玩家（音效定位）
  */
 export function MakeFlareHost(deps = {}) {
+  const GroundHeight=(x,z)=>deps.Battlefield?.()?.GroundHeight(x,z)??0;
+  const TraceSegment=(from,to)=>{
+    const bf=deps.Battlefield?.(),dx=to.x-from.x,dy=to.y-from.y,dz=to.z-from.z,len=Math.hypot(dx,dy,dz);
+    if(len<1e-6)return null;
+    const dir={x:dx/len,y:dy/len,z:dz/len},hit=bf?.Raycast?.(from,dir,len,{terrain:true});
+    const physical=hit?{fraction:hit.t/len,point:{x:from.x+dir.x*hit.t,y:from.y+dir.y*hit.t,z:from.z+dir.z*hit.t},normal:hit.normal,surface:hit.box?.terrain?'terrain':'solid'}:null;
+    const roof=deps.vfx?.flareSurfaces?.TraceSegment(from,to);
+    return roof&&(!physical||roof.fraction<physical.fraction)?roof:physical;
+  };
+  const SurfaceHeight=point=>{
+    const floor=GroundHeight(point.x,point.z),y=point.y+.15;
+    const from={x:point.x,y,z:point.z},to={x:point.x,y:floor-.1,z:point.z};
+    // Broad gameplay boxes can surround a sloped roof. For final surface contact
+    // prefer the visible mesh, rather than a zero-distance "inside box" hit.
+    const hit=deps.vfx?.flareSurfaces?.TraceSegment(from,to)??TraceSegment(from,to);
+    return hit&&hit.fraction>1e-6?hit.point.y:floor;
+  };
   return {
-    AddVisual:(flare)=>deps.vfx?.flareVisuals?.Add(flare),
+    BeginFlight:()=>deps.vfx?.flareSurfaces?.Refresh(),
+    AddVisual:(flare)=>deps.vfx?.flareVisuals?.Add(flare,SurfaceHeight),
     MoveVisual:(handle,flare)=>deps.vfx?.flareVisuals?.Update(handle,flare),
     RemoveVisual:(handle)=>deps.vfx?.flareVisuals?.Remove(handle),
     Time: () => deps.Time?.() ?? 0,
+    AudioTime:()=>deps.audio?.ctx?.currentTime,
     Play: (name, opts = {}) => deps.audio?.Play(name, opts) ?? null,
+    MoveVoice:(voice,position)=>deps.audio?.MoveVoice(voice,position),
+    StopVoice:(voice,fadeS)=>deps.audio?.StopVoice(voice,fadeS),
+    VoiceAlive:voice=>!Array.isArray(voice?.nodes)||voice.nodes.length>0,
     Hint: (text, seconds) => deps.hud?.Hint(text, seconds),
     Say: (who, text, seconds) => deps.hud?.Say(who, text, seconds),
     Signal: (name) => deps.Story?.()?.Signal(name),
-    GroundHeight: (x, z) => deps.Battlefield?.()?.GroundHeight(x, z) ?? 0,
-    // 灯：走火光池现有的固定预算，castShadow 恒 false，不新建阴影管线。
+    GroundHeight,TraceSegment,SurfaceHeight,
+    // Fixed cluster light budget; parachute flares receive the dedicated packed shadow.
     AddLight: (spec) => deps.lights?.AddFire(spec.position, {
       intensity: spec.intensity, radius: spec.radius, color: spec.color,
-      flicker: false, priority: spec.priority ?? 1.6,
+      flicker: false, priority: spec.priority ?? 1.6, flareShadow:spec.flareShadow,
     }) ?? null,
     MoveLight: (handle, spec) => deps.lights?.UpdateFire(handle, spec),
     RemoveLight: (handle) => deps.lights?.RemoveFire(handle),

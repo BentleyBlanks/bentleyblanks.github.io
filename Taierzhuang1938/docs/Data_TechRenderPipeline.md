@@ -142,6 +142,7 @@ function generateShadowMapTypeDefine( parameters ) {
  5a interiorSky           装了屋子表的关卡才跑：室内天光可见度乘进 AO 图的 R（§5.11）
  5b contactShadows        屏幕空间接触阴影（只压直射太阳）→ 合进 SSIL 靶的 alpha（§6）
  5c groundDust            落地扬尘降分辨率体积（Script_PostGroundDust，groundDustScale；只在有尘时跑，main 里那张全屏片按深度放大叠上，见 Data_ShellImpactDust「性能」）
+ 5d flareShadows          伞降照明的有限深度投影 → 簇光纹理GPU保留行（中档以上，见 Data_FlareEffects）
  6  main                  HDR 主场景（AO / SSIL / SSR / 簇状局部光由材质补丁注入；ultra 才 4×MSAA）
  7  wireframe             着色模式非 shaded 时叠一层三角形边线
  8  debugOverlay          Rapier 碰撞体线框等（同一张 hdr 靶与深度）
@@ -3132,6 +3133,7 @@ node Taierzhuang1938/Script_FlareTest.mjs           # 照明弹（走火源池 =
 | `ssr` / `ssrColor` | 内部 | 追踪靶 `ssrScale×` + 颜色 mip 链 | ssr 按内部纹素；**`ssrColor` 读的是输出域的 sceneColor**，2×2 盒式的纹素偏移改成问靶自己（`ctx.sceneColor.width/height`） |
 | `gtao` / `ssilHistory` | 内部 | `aoScale×` 靶 + 颜色历史 | gtao 按内部纹素（`uFullResolution = ctx.width/height`）；`ssilHistory` 只按 uv blit，没有纹素偏移 |
 | `contactShadows` | 内部 | 半分辨率 | 按内部纹素 |
+| `flareShadows` | 固定 | 两张512²深度；一张1024×64 RGBA32F打包靶 | 每帧一张，复制至簇光纹理保留行；不支持浮点颜色靶时降级 |
 | `main` | 内部 | `hdr` | — |
 | 体积雾三趟 | 内部 | froxel 图集 + 全（内部）分辨率 apply | 按 uv；**`uFogScatter` 是内部分辨率而 composite 在输出分辨率采它** —— 双线性放大，散射本来就是低频量（froxel 网格 x/y 才 160–240 格），可接受，见 §8.6 已知近似 |
 | `taa` | **输出**（解算靶） | `taaA/taaB` | 权重核以**输入像素**度量（见 17.2），历史与输出在输出网格 |
@@ -6756,3 +6758,7 @@ frame·k)` 抖动（不抖就是同心环带）、透过率 `< 0.01` 提前退�
 预通道已改 MRT 并产出速度（§1.6 / §3）、体积雾已实装（froxel，§8）、
 CSM 已实装（三级 + PCSS + 接触阴影，§6）、3D LUT 与镜头脏污已实装（§14.3 / §13.4）、
 粒子/贴片材质的 `allowOverride = false` 已成硬约束（§1.5）、TAA 已实装并升级成 TAAU（§9）。
+
+### 2026-10-26：伞降照明弹阴影
+
+`Script_FlareShadows` 的 `flareShadows` pass 位于 main 前；`SetSunShadowSource` 同时提供 LightRig。中档以上按 `preset.flareShadows` 启用，白盒不进入。原生深度相机不加入场景灯，保持蒙皮/镂空/破坏深度契约；线性深度打包进 `uClusterData` 的GPU保留行，CPU只更新元数据行，不增加PBR采样器。最多两槽、每帧一张更新，上一张图保存自己的世界矩阵。具体预算、有限视锥与体积雾边界见 [信号与照明效果](Data_FlareEffects.md)。门禁 `FlareShadowBrowserTest` 覆盖真实HDR遮挡、移动屋顶、双灯交替、相机移动与退出；共享簇光和帧图仍跑原门禁。

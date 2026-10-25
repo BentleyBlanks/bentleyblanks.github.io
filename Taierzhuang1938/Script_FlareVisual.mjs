@@ -97,19 +97,20 @@ function Candle(){
  const mesh=new THREE.Mesh(new THREE.CylinderGeometry(A.candleRadius,A.candleRadius,A.candleHeight,12),material);
  mesh.name='FlareCandleHousing';return mesh;
 }
-const matrix=new THREE.Matrix4(),pos=new THREE.Vector3(),scale=new THREE.Vector3(),q=new THREE.Quaternion();
+const matrix=new THREE.Matrix4(),pos=new THREE.Vector3(),scale=new THREE.Vector3(),q=new THREE.Quaternion(),landRotation=new THREE.Quaternion(),up=new THREE.Vector3(0,1,0),normal=new THREE.Vector3();
 function Put(mesh,i,x,y,z,size,age,seed=0,aspect=1){pos.set(x,y,z);scale.set(size,size*aspect,size);matrix.compose(pos,q,scale);mesh.setMatrixAt(i,matrix);mesh.geometry.attributes.age.setX(i,age);mesh.geometry.attributes.seed.setX(i,seed);}
 function Flush(mesh){mesh.instanceMatrix.needsUpdate=true;mesh.geometry.attributes.age.needsUpdate=true;mesh.geometry.attributes.seed.needsUpdate=true;}
 const Smooth=(a,b,x)=>THREE.MathUtils.smoothstep(x,a,b);
+const FoldedHeight=(a,r)=>A.foldedClothBaseM+A.foldedClothWrinkleM*(Math.sin(a*3+r*14)+1);
 
 export class FlareVisuals {
  constructor(parent,lights=null){this.root=new THREE.Group();this.root.name='FlareEffects';parent.add(this.root);this.items=new Set();this.lights=lights;this.ambient=new THREE.Color();this.sun=new THREE.Color();}
- Add(flare){
+ Add(flare,surfaceHeight=null){
   const root=new THREE.Group(),head=Cards(1,0,flare.lightColor),smoke=Cards(A.smokeCount,1,flare.lightColor),sparks=Cards(A.sparkCount,2,0xffac50),suspension=MakeSuspension(),candle=Candle();
   const canopy=suspension.group;canopy.add(candle);
   const carrier=Candle();carrier.name='FlareDiscardedCarrier';carrier.scale.set(1.18,1.35,1.18);
   root.name='Flare/'+flare.id;root.add(head,smoke,sparks,canopy,carrier);this.root.add(root);
-  const item={root,head,smoke,sparks,canopy,candle,carrier,...suspension};this.items.add(item);this.Update(item,flare);return item;
+  const item={root,head,smoke,sparks,canopy,candle,carrier,surfaceHeight,...suspension};this.items.add(item);this.Update(item,flare);return item;
  }
  Lighting(){
   const l=this.lights;this.ambient.setRGB(A.ambientFloor,A.ambientFloor,A.ambientFloor);this.sun.setRGB(0,0,0);
@@ -119,13 +120,38 @@ export class FlareVisuals {
  }
  Cloth(item,f,opened,settle,fade){
   const {cloth,cords,segments,rings}=item,p=cloth.geometry.attributes.position;
-  const baseY=(A.leaderLength+A.cordLength)*(1-settle)+.035*settle;
+  const baseY=(A.leaderLength+A.cordLength)*(1-settle);
   const radius=A.canopyRadius*(.06+.94*opened),height=A.canopyHeight*(1-settle);
+  // Cache the contact deformation once per landing. Raised tile rows must not
+  // disappear through the collapsed cloth even when the candle fell between them.
+  if(settle>0&&item.surfaceHeight&&item.contactLanding!==f.landing){
+   item.contactLanding=f.landing;item.contactOffsets=new Float32Array(p.count*3);
+   const q=new THREE.Quaternion().setFromUnitVectors(up,new THREE.Vector3().fromArray(f.landing.normal||[0,1,0]).normalize());
+   const inverse=q.clone().invert(),point=new THREE.Vector3(),offset=new THREE.Vector3(),base=new THREE.Vector3();
+   for(let j=0;j<=rings;j++)for(let i=0;i<=segments;i++){
+    const r=j/rings,a=i/segments*Math.PI*2,rr=A.ventRadius+(radius-A.ventRadius)*r,index=j*(segments+1)+i;
+    base.set(Math.cos(a)*rr,FoldedHeight(a,r),Math.sin(a)*rr);point.copy(base).applyQuaternion(q).add(item.canopy.position);
+    let y=item.surfaceHeight({x:point.x,y:point.y+A.clothContactProbeM,z:point.z});
+    const arc=rr*A.clothArcRatio,reach=arc*A.clothDrapeMaxRatio;
+    if(point.y-y>A.clothDrapeThresholdM){
+     // Slack cloth hangs over a roof edge. Shorten its horizontal span as it
+     // sags, rather than stretching a rigid disc half a metre above the tiles.
+     const sag=Math.min(reach,point.y-y),shrink=Math.sqrt(Math.max(0,1-(sag/arc)**2));
+     point.set(base.x*shrink,base.y,base.z*shrink).applyQuaternion(q).add(item.canopy.position);
+     y=item.surfaceHeight({x:point.x,y:point.y+A.clothContactProbeM,z:point.z});
+    }
+    const delta=y+A.groundClearance-point.y;
+    point.y+=point.y-y>A.clothDrapeThresholdM?Math.max(-reach,delta):Math.max(0,delta);
+    offset.copy(point).sub(item.canopy.position).applyQuaternion(inverse).sub(base);
+    offset.toArray(item.contactOffsets,index*3);
+   }
+  }
   for(let j=0;j<=rings;j++)for(let i=0;i<=segments;i++){
    const r=j/rings,a=i/segments*Math.PI*2,rr=A.ventRadius+(radius-A.ventRadius)*r;
    const panel=Math.sin(a*A.ribs*.5)**2,flutter=Math.sin(a*3+f.t*3.7+r*9)*.006*r*r*(1-settle);
-   const y=baseY+height*Math.pow(1-r*r,.7)+panel*.018*r*(1-settle)+flutter+settle*.018*(Math.sin(a*3+r*14)+1);
-   p.setXYZ(j*(segments+1)+i,Math.cos(a)*rr,y,Math.sin(a)*rr);
+   const y=baseY+height*Math.pow(1-r*r,.7)+panel*.018*r*(1-settle)+flutter+settle*FoldedHeight(a,r);
+   const index=j*(segments+1)+i,c=item.contactOffsets,o=index*3;
+   p.setXYZ(index,Math.cos(a)*rr+(c?.[o]||0)*settle,y+(c?.[o+1]||0)*settle,Math.sin(a)*rr+(c?.[o+2]||0)*settle);
   }p.needsUpdate=true;cloth.geometry.computeVertexNormals();
   const c=cords.geometry.attributes.position;let k=0;
   c.setXYZ(k++,0,A.candleHeight+A.candleLift,0);c.setXYZ(k++,0,A.leaderLength*(1-settle)+.04*settle,0);
@@ -145,17 +171,22 @@ export class FlareVisuals {
   const {head,smoke,sparks,canopy}=item,t=f.t,since=t-f.ignitedAt;
   const opened=Smooth(0,A.openingS,since),settle=f.landed?Smooth(0,A.settleS,t-f.landing.t):0;
   const fade=f.landed?1-Smooth(f.endAt-A.groundFadeS,f.endAt,t):1;
-  head.material.uniforms.clock.value=t;head.material.uniforms.power.value=since>=0&&!f.landed?f.brightness:0;
+  head.material.uniforms.clock.value=t;head.material.uniforms.power.value=since>=0?f.brightness:0;
   Put(head,0,f.pos.x,f.pos.y,f.pos.z,A.glowSize,0);Flush(head);
-  canopy.visible=f.parachute!==false&&since>=0;
-  canopy.position.set(f.pos.x,f.pos.y,f.pos.z);canopy.rotation.z=Math.sin(since*2+f.swayPhase)*.055*opened*(1-settle);canopy.rotation.x=Math.sin(since*1.7)*.035*opened*(1-settle);
+  canopy.visible=f.parachute!==false&&!f.launchObstructed&&since>=0;
+  canopy.position.set(f.pos.x,f.pos.y,f.pos.z);canopy.rotation.set(Math.sin(since*1.7)*.035*opened*(1-settle),0,Math.sin(since*2+f.swayPhase)*.055*opened*(1-settle));
+  if(settle>0){normal.fromArray(f.landing.normal||[0,1,0]).normalize();landRotation.setFromUnitVectors(up,normal);canopy.quaternion.slerp(landRotation,settle);}
   if(canopy.visible)this.Cloth(item,f,opened,settle,fade);
   item.carrier.visible=f.physical&&f.parachute&&t<(f.carrierLanding?.t??0)+3;
   if(item.carrier.visible){
-    const carrierPose=SampleFlarePosition({...f,parachute:false,landing:f.carrierLanding,swayM:0},t);
+    const carrierPose=SampleFlarePosition({...f,parachute:false,landing:f.carrierLanding,flightSlides:f.carrierLanding?.slides,swayM:0},t);
     item.carrier.position.set(carrierPose.x,carrierPose.y+A.candleHeight*.65,carrierPose.z);
     item.carrier.rotation.set(Math.max(0,t-f.ignitedAt)*4,0,Math.max(0,t-f.ignitedAt)*2.3);
-    if(f.carrierLanding&&t>=f.carrierLanding.t){item.carrier.rotation.set(0,0,Math.PI*.5);item.carrier.position.y=carrierPose.y+A.candleRadius*1.18;}
+    if(f.carrierLanding&&t>=f.carrierLanding.t){
+      normal.fromArray(f.carrierLanding.normal||[0,1,0]).normalize();landRotation.setFromUnitVectors(up,normal);
+      item.carrier.rotation.set(0,0,Math.PI*.5);item.carrier.quaternion.premultiply(landRotation);
+      item.carrier.position.set(carrierPose.x,carrierPose.y,carrierPose.z).addScaledVector(normal,A.candleRadius*1.18);
+    }
     item.carrier.material.opacity=1-Smooth((f.carrierLanding?.t??0)+2,(f.carrierLanding?.t??0)+3,t);
   }
   const u=smoke.material.uniforms;u.ambient.value.copy(this.ambient).add(this.sun.clone().multiplyScalar(.65));u.lightPosition.value.set(f.pos.x,f.pos.y,f.pos.z);u.candle.value=f.intensity;

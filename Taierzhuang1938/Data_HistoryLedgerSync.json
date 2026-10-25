@@ -6,7 +6,7 @@
   "assetReviews": [
     {
       "asset": "FlareEffects",
-      "date": "2026-10-25",
+      "date": "2026-10-26",
       "scope": "Signal and white parachute illumination effects only. Preserve global audit cursors and unrelated history reviews.",
       "assetContract": "docs/Data_FlareEffects.md",
       "decision": "TM-E 30-480 (1944) chapter X section 17 was opened and verified: colored stars, parachute variants and reported 4–15 s signal-pistol burning time. It does not identify the 1938 Tengxian shot. Exact staging, color meaning, canopy appearance, luminance and trajectories remain reconstruction choices.",
@@ -14,13 +14,15 @@
       "notionLedger": "3fd60335331c8194aa82f0b238084d34",
       "notionParent": "3fd60335331c818fa24deadb6d72ca70",
       "notionVerifiedAt": [
-        "2026-10-25T11:57:54.441Z",
-        "2026-10-25T11:42:29.123Z"
+        "2026-10-25T16:01:47.824Z",
+        "2026-10-25T16:01:48.979Z"
       ],
-      "visualRevision": "2026102502",
+      "visualRevision": "2026102601",
       "structureSource": "https://en.wikisource.org/wiki/Objects_Dropped_From_The_Air",
       "structureReview": "Verified title page: Ministry of Home Security, 3rd edition, 1944; section 15 and figure 57. German aerial flare structure and burnt-out remains are period comparisons, not measurements of the Japanese small flare. AWM REL31335 is dated circa 1953 and is used only as a fabric/attachment material study. No Tengxian use claim upgraded.",
-      "acceptanceScope": "Shared effect lifecycle and optical refinements only; overall realism remains active. See docs/Data_FlareRealismAudit.md for verified and still-unverified items. Global audit cursors remain unchanged."
+      "acceptanceScope": "Historical optical distinction, shared game/editor lifecycle, actual rendered-roof contact, spatial audio, packed depth shadows and bounded night metering verified. See Data_FlareRealismAudit for exact tests, existing unrelated EditorTest failures and reconstruction limits. Global audit cursors unchanged.",
+      "illuminationSource": "https://www.bulletpicker.com/pdf/Japanese-Ammunition-Part-4.pdf",
+      "illuminationReview": "Original title and printed pp.70–71 verified: Military Intelligence Division, War Department, 20 July 1945; Type95 (1935), 70mm parachute illumination, approx.20s / 90,000 candlepower. Explicitly not recovered; Japanese-source intelligence, not specimen measurement or Tengxian use proof. Height, descent, wind, canopy and scene exposure remain reconstruction."
     },
     {
       "asset": "ClothLab",

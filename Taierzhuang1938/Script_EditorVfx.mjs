@@ -12,6 +12,7 @@ import {FIRST_LEVEL_DISTANT_SMOKE} from './Data_FirstLevelDistantSmoke.mjs';
 import {PARTICLE_SURFACE_ART} from './Data_Tuning_Particles.mjs';
 import {FlareDirector,MakeFlareHost} from './Script_Flare.mjs';
 import {FlareVisuals} from './Script_FlareVisual.mjs';
+import {FlareSurfaceIndex} from './Script_FlareSurfaces.mjs';
 import {FLARE_EFFECTS} from './Data_Tuning_FlareEffects.mjs';
 import {FALLING_SOIL_PRESETS} from './Data_Tuning_FallingSoil.mjs';
 import {FallingSoilInspector} from './Script_EditorFallingSoil.mjs';
@@ -96,6 +97,7 @@ export class VfxEditor {
     this.savedVfxTime = vfx.time;
     this.savedFlareVisuals=vfx.flareVisuals;this.savedFlareVisible=vfx.flareVisuals.root.visible;
     vfx.flareVisuals.root.visible=false;vfx.flareVisuals=new FlareVisuals(vfx.root,this.host.lights);
+    this.savedFlareSurfaces=vfx.flareSurfaces;vfx.flareSurfaces=new FlareSurfaceIndex(this.host.scene,this.host.library);
     this.flarePreview=new FlareDirector(MakeFlareHost({vfx,lights:this.host.lights}),{exposure:false,seed:this.seed});
     this.savedVfxRandom = vfx.random;
     // 预览必须是隔离的：现关烟柱不能在摄影棚期间偷偷推进，预览的弹孔/爆炸也
@@ -120,6 +122,8 @@ export class VfxEditor {
     this.savedNextSourceId = vfx.nextSourceId;
     this.savedParticles = this.CaptureParticles(vfx);
     this.savedLighting=this.host.lights?.BeginEffectPreview?.();
+    this.savedFlareExposure=this.host.post?.exposurePass?.transientWeight||0;
+    if(this.host.post?.exposurePass)this.host.post.exposurePass.transientWeight=0;
     if(!this.savedLighting)for (const source of this.savedSources.values()) vfx.DetachSourceLight(source);
     vfx.smokeSources = new Map();
     for (const pool of Object.values(vfx.pools)) pool.Clear();
@@ -168,6 +172,7 @@ export class VfxEditor {
     this.SetNightPreview(false);
     const vfx = this.host.vfx;
     vfx.flareVisuals.Dispose();vfx.flareVisuals=this.savedFlareVisuals;vfx.flareVisuals.root.visible=this.savedFlareVisible;
+    vfx.flareSurfaces.Clear();vfx.flareSurfaces=this.savedFlareSurfaces;
     vfx.bloodEffects.EndPreview(this.savedBlood);vfx.bloodSpurts=vfx.bloodEffects.sources;
     vfx.particles.Dispose();
     vfx.particles = this.savedParticleEffects;
@@ -196,6 +201,7 @@ export class VfxEditor {
     this.studio.maxDistance=this.savedStudioMaxDistance;
     this.studio.pad.geometry=this.savedPadGeometry;this.flarePadGeometry.dispose();
     if(this.savedLighting)this.host.lights.EndEffectPreview(this.savedLighting,this.savedVfxTime);
+    if(this.host.post?.exposurePass){this.host.post.exposurePass.transientWeight=this.savedFlareExposure;this.host.post.exposurePass.RequestReset();}
     vfx.root.visible = this.savedVfxVisible;
     this.savedSources = null;
     this.savedParticles = null;
@@ -348,7 +354,7 @@ export class VfxEditor {
     else if(SCENE_EFFECTS[this.effectId])this.handle=vfx.SceneEffect({x:0,y:.04,z:0},this.effectId,{scale:this.scale});
     else if(FLARE_EFFECTS[this.effectId]){
       this.flarePreview.rnd=Mulberry32(this.seed);
-      this.flarePreview.LaunchFlare({preset:this.effectId,from:{x:-12,z:0},at:{x:0,z:0},driftMS:Math.hypot(this.wind.x,this.wind.z),driftDirRad:Math.atan2(this.wind.x,this.wind.z)});
+      this.flarePreview.LaunchFlare({preset:this.effectId,from:{x:FLARE_EFFECTS[this.effectId].previewFromXM,z:0},at:{x:0,z:0},driftMS:Math.hypot(this.wind.x,this.wind.z),driftDirRad:Math.atan2(this.wind.x,this.wind.z)});
       this.timeSlider.root.querySelector('input').max=60;this.timeLength.Set(60);
     }
     else {const effect=INSTANT_EFFECTS.find(effect=>effect.id===this.effectId),result=effect?.run(vfx,this.scale);if(effect?.sourceHandle)this.handle=result;if(effect?.particleHandle)this.sampleParticleIds.push(result.id);}
@@ -433,7 +439,7 @@ export class VfxEditor {
   SetNightPreview(on){
     if(on&&!this.nightSnapshot){
       const environment=this.host.game.GetEnvironmentState?.();
-      if(!environment||!this.host.game.ApplyEnvironment?.('night'))return false;
+      if(!environment||!this.host.game.ApplyEnvironment?.('firstLevelNight'))return false;
       this.nightSnapshot={environment};
     }else if(!on&&this.nightSnapshot){this.host.game.RestoreEnvironmentState(this.nightSnapshot.environment);this.nightSnapshot=null;}
     this.host.post?.NotifyCameraCut();

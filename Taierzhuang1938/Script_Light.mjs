@@ -346,12 +346,13 @@ export class LightRig {
    * `priority` 让照明弹在灯槽紧张时压过远处常驻的火：它是这一关唯一的主光源。
    */
   AddFire(position, {
-    intensity = 6, radius = 20, color = 0xff7a2a, flicker = true, priority = 1,
+    intensity = 6, radius = 20, color = 0xff7a2a, flicker = true, priority = 1, flareShadow = false,
   } = {}) {
     const handle = this.nextFireHandle;
     this.nextFireHandle += 1;
     this.fireSources.set(handle, {
       handle,
+      flareShadow: !!flareShadow,
       position: new THREE.Vector3(position.x, position.y, position.z),
       color: new THREE.Color(color),
       base: Math.max(0, Number(intensity) || 0),
@@ -655,7 +656,7 @@ export class LightRig {
       cluster.AddPoint(
         state.position.x, state.position.y, state.position.z,
         color.r * k, color.g * k, color.b * k,
-        state.currentRadius, state.score);
+        state.currentRadius, state.score, state.flareShadow ? state : null);
     }
     if (this.clusterTier.spots) {
       for (const state of this.spotSources.values()) {
@@ -700,7 +701,7 @@ export class LightRig {
     if (!this.heroShadow || !this.heroLight) return;
     let best = null;
     for (const state of this.fireSources.values()) {
-      if (state.currentIntensity <= 0) continue;
+      if (state.currentIntensity <= 0 || state.flareShadow) continue;
       if (!best || state.score > best.score) best = state;
     }
     for (const state of this.explosionEnvelopes) {

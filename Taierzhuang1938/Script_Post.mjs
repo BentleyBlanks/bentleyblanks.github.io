@@ -26,6 +26,8 @@
 //   4) ssr                  Script_PostSsr         min-Hi-Z + 随机 GGX 追踪 + 解算 + 时域
 //   5) gtao                 Script_PostGtao        地平线基 AO + 弯曲法线 + SSIL（半分辨率）
 //   5b) contactShadows      Script_ContactShadows  屏幕空间接触阴影（只压直射太阳）
+//   5c) groundDust          Script_PostGroundDust  低分辨率落土扬尘
+//   5d) flareShadows        Script_FlareShadows    簇光纹理中的伞降照明深度阴影
 //   6) main                 （本文件）HDR 主场景，AO / SSIL / SSR / 簇状局部光由材质补丁注入
 //   7) wireframe            Script_PostDebug       着色模式非 shaded 时叠一层线
 //   8) debugOverlay         Script_PostDebug       Rapier 碰撞体线框等
@@ -80,6 +82,7 @@ import {
 } from "./Script_PostPrepass.mjs";
 import { TerrainBlendPass } from './Script_TerrainBlend.mjs';
 import { TerrainTrailsPass } from './Script_TerrainTrails.mjs';
+import { FlareShadowsPass } from './Script_FlareShadows.mjs';
 import { GtaoPass } from "./Script_PostGtao.mjs";
 import { InteriorSkyPass } from "./Script_InteriorSkyOcclusion.mjs";
 import { SsrPass, SsrColorPass } from "./Script_PostSsr.mjs";
@@ -224,6 +227,7 @@ export class PostPipeline {
     this.terrainBlendPass = new TerrainBlendPass(this);
     // 脚印与痕迹（docs/Data_TerrainTrails.md）：世界空间的环形痕迹靶，地形材质在 main（与 terrainBlend 的捕获）里采。
     this.terrainTrailsPass = new TerrainTrailsPass(this);
+    this.flareShadowsPass = new FlareShadowsPass(this);
     this.prepassPass = new PrepassPass(this, { destruction });
     this.ssrPass = new SsrPass(this);
     this.ssrColorPass = new SsrColorPass(this, this.ssrPass);
@@ -285,6 +289,7 @@ export class PostPipeline {
       // 落地扬尘降分辨率体积（Script_PostGroundDust）：要预通道深度截断射线，产出的靶由主场景里那张全屏片按深度放大叠上，
       // 所以卡在预通道之后、main 之前。没尘 / 关掉时 Idle 让尘团退回主场景全分辨率画。
       this.groundDustPass,
+      this.flareShadowsPass,
       {
         name: "main",
         Enabled: () => true,
@@ -625,6 +630,8 @@ export class PostPipeline {
   SetGroundDustSource(system) { this.groundDustPass?.SetSource(system); }
 
   SetSunShadowSource(lightRig) {
+    this.flareShadowsPass.SetSource(lightRig);
+    this.exposurePass.flareSource=lightRig;
     this.debugPass.SetSunShadowSource(lightRig);
     this.volumetricsPass.SetSunShadowSource(lightRig);
   }

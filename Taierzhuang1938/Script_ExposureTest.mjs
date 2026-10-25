@@ -264,6 +264,25 @@ async function ProbeSection(page) {
       bright.dispose();
     }
 
+    // Uncalibrated night: a flare meters real scene luminance, never lifts the
+    // authored night, and returns smoothly after the source is extinguished.
+    {
+      const savedSource=exposure.flareSource,bright=Grey(1.6),dark=Grey(.02),sources=new Map();
+      exposure.flareSource={fireSources:sources};exposure.transientWeight=0;
+      exposure.SetMode('anchored');exposure.SetAnchorOverride(null);exposure.RequestReset();
+      const ctx={renderer,blitter:post.blitter,sceneColor:{texture:bright,width:1,height:1},
+        width:post.width,height:post.height,frame:0,options:{exposure:2.7,dt:1/60,skyPreset:'firstLevelNight'}};
+      const Frame=()=>{exposure.Prepare(ctx);exposure.Render(ctx);return exposure.ReadState(renderer).gain;};
+      for(let i=0;i<15;i++)Frame();const baseline=Frame();
+      sources.set(1,{flareShadow:true,currentIntensity:90000});const onset=Frame();
+      for(let i=0;i<120;i++)Frame();const burning=Frame();
+      sources.clear();ctx.sceneColor.texture=dark;const outFirst=Frame(),recovery=[];
+      for(let i=0;i<360;i++)recovery.push(Frame());
+      out.flareAdaptation={baseline,onset,burning,outFirst,recovered:recovery.at(-1),
+        neverBrightens:recovery.every(v=>v<=1.001),smoothRecovery:recovery.every((v,i)=>i===0||v>=recovery[i-1]-.002)};
+      exposure.flareSource=savedSource;exposure.transientWeight=0;exposure.RequestReset();bright.dispose();dark.dispose();
+    }
+
     // --- 5) LUT 一致性：256 级灰阶 + 彩色样本，两条路差 ≤ 1/255 -------------
     {
       exposure.SetMode("anchored");
@@ -850,6 +869,10 @@ if (!probe) {
     probe.histogram.error < 0.01 && probe.histogram.nonZeroBins > 1,
     JSON.stringify(probe.histogram));
   const grey = probe.midGrey.pixel;
+  const fa=probe.flareAdaptation;
+  Check("照明弹：未标定夜景压暗、平滑恢复、不提升夜间基准",
+    fa.baseline===1&&fa.onset>fa.burning&&fa.burning<.8&&fa.outFirst<.99&&fa.recovered>.98&&fa.neverBrightens&&fa.smoothRecovery,
+    JSON.stringify(fa));
   Check("均匀 0.18 灰 → 绝对模式收敛到中灰 sRGB 118±6",
     grey.every((v) => Math.abs(v - 118) <= 6),
     JSON.stringify(probe.midGrey));

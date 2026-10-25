@@ -795,6 +795,9 @@ const gfx = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const before = { w: T.post.width, h: T.post.height, shadow: T.renderer.shadowMap.enabled };
   const g = T.settings.active;
+  // This assertion measures the manual scale itself. Background GPU load may
+  // activate the independent automatic multiplier (e.g. .6*.92), so disable it.
+  g.gfx.autoQuality = false;
   g.gfx.renderScale = 0.6;
   g.gfx.bloom = 0.25;
   g.gfx.fov = 62;

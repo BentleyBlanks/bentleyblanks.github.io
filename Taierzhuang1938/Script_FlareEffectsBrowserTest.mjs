@@ -51,10 +51,10 @@ try{
   let delta=0,pixels=0;for(let i=0;i<lit.length;i+=4){const d=lit[i]+lit[i+1]+lit[i+2]-dark[i]-dark[i+1]-dark[i+2];if(d>3){delta+=d;pixels++;}}
   return {delta,pixels};
  });assert.ok(optical.pixels>30,'Smoke must respond to the physical light, not remain emissive: '+JSON.stringify(optical));
- await page.evaluate(()=>{const e=Tengxian.ParticleEditor;e.Seek(20);e.FrameEffect();Tengxian.StepFrames(2,0,true);});
+ await page.evaluate(()=>{const e=Tengxian.ParticleEditor;e.Seek(e.flarePreview.flares[0].outAt+.5);e.FrameEffect();Tengxian.StepFrames(2,0,true);});
  await Capture('AfterBurnNight');
  await page.evaluate(()=>Tengxian.ParticleEditor.SetNightPreview(false));
- const descent=await page.evaluate(()=>{const e=Tengxian.ParticleEditor;e.Seek(30);e.FrameEffect();Tengxian.StepFrames(2,0,true);
+ const descent=await page.evaluate(()=>{const e=Tengxian.ParticleEditor;e.Seek(e.flarePreview.flares[0].clearAt+.1);e.FrameEffect();Tengxian.StepFrames(2,0,true);
   const f=e.flarePreview.flares[0],v=[...Tengxian.vfx.flareVisuals.items][0];return {phase:f.phase,height:f.agl,light:f.intensity,canopy:v.canopy.visible,landing:f.landing.t};});
  assert.equal(descent.phase,'spent');assert.ok(descent.height>20&&descent.light===0&&descent.canopy);await Capture('SpentDescent');
  const landed=await page.evaluate(t=>{const e=Tengxian.ParticleEditor;e.Seek(t+1.1);e.FrameEffect();Tengxian.StepFrames(2,0,true);
@@ -131,6 +131,7 @@ try{
   const result={stage:g.Debug.FirstLevelMission().stage,launched:state.stats.launched,view:state.view,visuals:g.vfx.flareVisuals.items.size};
   await g.Debug.FirstLevelJump(11);result.cleared=g.Debug.Flare.State().view===null&&g.vfx.flareVisuals.items.size===0;return result;});
  assert.ok(campaign.launched>=1&&campaign.visuals===1&&campaign.view.flares[0].presetId==='SignalRed',JSON.stringify(campaign));
+ assert.ok(campaign.view.flares[0].agl>50,'The campaign signal must actually climb above the buildings');
  assert.ok(campaign.cleared);console.log('ok campaign signal',JSON.stringify(campaign));
  assert.deepEqual(errors,[]);await fs.writeFile(path.join(out,'Data_FlareReport.json'),JSON.stringify({lighting,optical,descent,landed,resources,performance,cleanup,previz,campaign,errors},null,2));
  console.log('FlareEffectsBrowserTest passed');

@@ -32,6 +32,7 @@ import {
   MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON, VERT_QUAD, QUAD_CAMERA,
 } from "./Script_PostCommon.mjs";
 import { AUTO_EXPOSURE, SkyExposureFor } from "./Data_Tuning_Camera.mjs";
+import { FLARE_EXPOSURE } from "./Data_Tuning_FlareEffects.mjs";
 
 // ===========================================================================
 // 色调映射曲线库（GLSL + JS 镜像）
@@ -313,6 +314,8 @@ uniform float uSpeedDown;
 uniform float uDt;
 uniform float uSnap;           // 1 = 直接吸附目标（复位/换关/首帧）
 uniform float uNeutral;        // 1 = 只测量不作用（没有标定数据时的兜底）
+uniform float uTransientWeight;
+uniform float uTransientStart;
 uniform float uGainMin;
 uniform float uGainMax;
 varying vec2 vUv;
@@ -341,6 +344,7 @@ void main() {
   float evTarget = clamp(evScene - uEvBias, uEvAnchor - uEvUp, uEvAnchor + uEvDown);
 
   vec4 previous = texture2D(uPrevious, vec2(0.5));
+  if(uTransientStart > 0.5) previous.g = uEvAnchor;
   float ev = evTarget;
   if (uSnap < 0.5) {
     // 暗→亮（EV 升）比亮→暗快：瞳孔收缩远快于暗适应（UE 默认 3.0 / 1.0）
@@ -348,7 +352,7 @@ void main() {
     ev = evTarget + (previous.g - evTarget) * exp(-uDt * speed);
   }
   float gain = clamp(exp2(uEvAnchor - ev), uGainMin, uGainMax);
-  if (uNeutral > 0.5) gain = 1.0;
+  if (uNeutral > 0.5) gain = mix(1.0,gain,uTransientWeight);
   gl_FragColor = vec4(gain, ev, evTarget, avgLog);
 }
 `;
@@ -555,6 +559,8 @@ export class ExposurePass {
       uDt: { value: 1 / 60 },
       uSnap: { value: 1 },
       uNeutral: { value: 0 },
+      uTransientWeight: { value: 0 },
+      uTransientStart: { value: 0 },
       uGainMin: { value: A.gainMin },
       uGainMax: { value: A.gainMax },
     };
@@ -658,6 +664,13 @@ export class ExposurePass {
    * （表现是「关了画面还在动」，极难定位）。
    */
   Prepare(ctx) {
+    let flareLit=false;
+    if(this.flareSource?.fireSources)for(const source of this.flareSource.fireSources.values()){
+      if(source.flareShadow&&source.currentIntensity>0){flareLit=true;break;}
+    }
+    this.transientStart=flareLit&&!(this.transientWeight>0);
+    this.transientWeight=flareLit?1:(this.transientWeight||0)*Math.exp(-Math.max(0,ctx.options.dt??1/60)/FLARE_EXPOSURE.recoveryS);
+    if(this.transientWeight<FLARE_EXPOSURE.cutoff)this.transientWeight=0;
     this.active = this.Enabled(ctx);
     if (!this.active) {
       // 关着时保持复位待命：一打开就吸附，不从几分钟前的旧状态爬过来
@@ -722,6 +735,12 @@ export class ExposurePass {
     U.uEvBias.value = (this.anchor.evBias ?? 0) + this.userBiasEv;
     U.uEvUp.value = this.anchor.evUp ?? 1.5;
     U.uEvDown.value = this.anchor.evDown ?? 1.5;
+    U.uTransientWeight.value = !hasCalibration&&this.mode!=="absolute" ? (this.transientWeight||0) : 0;
+    U.uTransientStart.value = U.uTransientWeight.value>0&&this.transientStart ? 1 : 0;
+    if(U.uTransientWeight.value>0){
+      U.uEvAnchor.value=AbsoluteAnchorEv(ctx.options.exposure??1,this.tonemap);
+      U.uEvUp.value=0;U.uEvDown.value=FLARE_EXPOSURE.maxDarkEv;
+    }
     U.uDt.value = Math.min(0.25, Math.max(1 / 240, ctx.options.dt ?? 1 / 60));
     U.uSnap.value = this.snapFrames > 0 ? 1 : 0;
     U.uPrevious.value = this.stateTargets[this.flip].texture;

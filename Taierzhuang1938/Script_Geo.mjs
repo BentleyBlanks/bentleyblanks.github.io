@@ -216,8 +216,10 @@ export function MergeGeometries(geometries) {
   const uv = new Float32Array(vertexCount * 2);
   const index = vertexCount > 65535 ? new Uint32Array(indexCount) : new Uint16Array(indexCount);
   let vo = 0, io = 0;
+  const effectSurfaceRanges=[];
   for (const g of list) {
     const p = g.attributes.position, nAttr = g.attributes.normal, uAttr = g.attributes.uv;
+    for(const [start,count]of g.userData.effectSurfaceRanges||(g.userData.effectSurface?[[0,g.index?.count??p.count]]:[]))effectSurfaceRanges.push([io+start,count]);
     position.set(p.array.subarray(0, p.count * 3), vo * 3);
     if (nAttr) normal.set(nAttr.array.subarray(0, p.count * 3), vo * 3);
     if (uAttr) uv.set(uAttr.array.subarray(0, p.count * 2), vo * 2);
@@ -236,6 +238,7 @@ export function MergeGeometries(geometries) {
   merged.setAttribute("normal", new THREE.BufferAttribute(normal, 3));
   merged.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
   merged.setIndex(new THREE.BufferAttribute(index, 1));
+  if(effectSurfaceRanges.length)merged.userData.effectSurfaceRanges=effectSurfaceRanges;
   merged.computeBoundingSphere();
   return merged;
 }
@@ -276,6 +279,8 @@ export function PlaceGeometry(geometry, { x = 0, y = 0, z = 0, ry = 0, rx = 0, r
   }
   const e = _placeMatrix.elements;
   const out = new THREE.BufferGeometry();
+  if(geometry.userData.effectSurface)out.userData.effectSurface=true;
+  if(geometry.userData.effectSurfaceRanges)out.userData.effectSurfaceRanges=geometry.userData.effectSurfaceRanges.map(r=>r.slice());
 
   const sp = src.position;
   const count = sp.count;

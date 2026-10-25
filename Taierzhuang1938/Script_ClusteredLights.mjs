@@ -46,6 +46,7 @@
 //     `cluster` 前缀，顺手避开。
 
 import * as THREE from "three";
+import { FLARE_SHADOW } from "./Data_Tuning_FlareEffects.mjs";
 import {
   ClusterGrid, ConeBoundingSphere, LIGHT_TYPE, LIGHT_DECAY,
   CLUSTER_NEAR, CLUSTER_DATA_TEX_WIDTH, MakeClusterTier,
@@ -105,6 +106,8 @@ uniform vec4 uClusterDepth;
 uniform vec2 uClusterScreen;
 // x = 索引带的起始**分量号** y = 光源数据带的起始**纹素号**
 uniform vec2 uClusterBands;
+uniform mat4 uFlareShadowMatrix[${FLARE_SHADOW.slots}];
+uniform vec4 uFlareShadowInfo[${FLARE_SHADOW.slots}];
 
 // 分量寻址：一张 RGBA32F 里的第 n 个 32 位格。簇表与索引存的是整数，
 // 贴着 float 的位型放进去（floatBitsToUint 取回）—— 因为三张表合并成一张是
@@ -119,6 +122,27 @@ uint ClusterUnit(int unit) {
 // 整个纹素（光源数据带用，一次取样拿四个 float）。
 vec4 ClusterTexel(int clusterTexel) {
   return texelFetch(uClusterData, ivec2(clusterTexel & 1023, clusterTexel >> 10), 0);
+}
+// Matrix maps current view space to the LAST rendered shadow camera. Keeping
+// that matrix with its map prevents alternating slots from swimming as we move.
+float ClusterFlareShadow(int slot, vec3 position, vec3 normal) {
+  vec4 info = uFlareShadowInfo[slot];
+  if (info.w < 0.5) return 1.0;
+  vec4 p = uFlareShadowMatrix[slot] * vec4(position + normal * ${FLARE_SHADOW.normalBiasM}, 1.0);
+  vec2 uv = p.xy / p.w * 0.5 + 0.5;
+  if (p.w <= 0.0 || any(lessThan(uv,vec2(0.0))) || any(greaterThan(uv,vec2(1.0)))) return 1.0;
+  vec2 pixel = uv * ${FLARE_SHADOW.size}.0 - 0.5;
+  ivec2 base = ivec2(floor(pixel));
+  vec2 f = fract(pixel);
+  float visibility = 0.0;
+  for(int y=0;y<2;y++) for(int x=0;x<2;x++) {
+    ivec2 q = clamp(base+ivec2(x,y),ivec2(0),ivec2(${FLARE_SHADOW.size-1}));
+    int index = q.y * ${FLARE_SHADOW.size} + q.x;
+    float depth = ClusterTexel(int(info.x) + (index >> 2))[index & 3];
+    vec2 weight = mix(vec2(1.0)-f, f, vec2(float(x),float(y)));
+    visibility += step(p.w - info.y, depth) * weight.x * weight.y;
+  }
+  return visibility;
 }`;
 
 /**
@@ -174,6 +198,8 @@ if (uClusterParams.w > 0.5) {
     clusterLight.direction = clusterVector / max(clusterDist, 1e-4);
     clusterLight.color = clusterT1.rgb
       * getDistanceAttenuation(clusterDist, clusterRange, ${LIGHT_DECAY.toFixed(1)});
+    if (clusterKind < -0.5) clusterLight.color *= ClusterFlareShadow(
+      int(-clusterKind - 1.0), geometryPosition, geometryNormal);
     if (clusterKind > 0.5 && clusterKind < 1.5) {
       vec4 clusterT2 = ClusterTexel(clusterTexel0 + 2);
       vec4 clusterT3 = ClusterTexel(clusterTexel0 + 3);
@@ -203,6 +229,8 @@ export function BindClusterUniforms(uniforms, cluster) {
   uniforms.uClusterParams = u.uClusterParams;
   uniforms.uClusterDepth = u.uClusterDepth;
   uniforms.uClusterScreen = u.uClusterScreen;
+  uniforms.uFlareShadowMatrix = u.uFlareShadowMatrix;
+  uniforms.uFlareShadowInfo = u.uFlareShadowInfo;
   return uniforms;
 }
 
@@ -235,6 +263,7 @@ export class ClusteredLights {
     this.sourceScore = new Float32Array(MAX_SOURCES);
     this.sourceOrder = new Int32Array(MAX_SOURCES);
     this.sourceCount = 0;
+    this.sourceShadow = new Array(MAX_SOURCES).fill(null);
 
     // --- 送进 GPU 的那一批 -------------------------------------------------
     this.spheres = new Float64Array(this.maxLights * 4);   // 视空间 x,y,深度,半径
@@ -260,7 +289,9 @@ export class ClusteredLights {
     const lightBase = (indexBase + indexUnits + 3) & ~3;
     const lightUnits = this.maxLights * TEXELS_PER_LIGHT * 4;
     const rowUnits = CLUSTER_DATA_TEX_WIDTH * 4;
-    const totalUnits = Math.ceil((lightBase + lightUnits) / rowUnits) * rowUnits;
+    this.metadataUnits = Math.ceil((lightBase + lightUnits) / rowUnits) * rowUnits;
+    this.shadowBase = this.metadataUnits / 4;
+    const totalUnits = this.metadataUnits + FLARE_SHADOW.slots * FLARE_SHADOW.size ** 2;
     this.dataUnits = totalUnits;
     this.indexBase = indexBase;
     this.lightBase = lightBase;
@@ -286,6 +317,8 @@ export class ClusteredLights {
     this.dataTexture.needsUpdate = true;
 
     this.uniforms = {
+      uFlareShadowMatrix: {value:Array.from({length:FLARE_SHADOW.slots},()=>new THREE.Matrix4())},
+      uFlareShadowInfo: {value:Array.from({length:FLARE_SHADOW.slots},()=>new THREE.Vector4())},
       uClusterData: { value: this.dataTexture },
       // x = 索引带起始分量号 y = 光源数据带起始**纹素**号
       uClusterBands: { value: new THREE.Vector2(indexBase, lightBase >> 2) },
@@ -344,13 +377,16 @@ export class ClusteredLights {
     this.sourceShape[s + 1] = penumbraCos;
     this.sourceShape[s + 2] = halfLength;
     this.sourceScore[i] = score;
+    this.sourceShadow[i] = null;
     this.sourceCount = i + 1;
     return i;
   }
 
   /** 点光。`color` 是线性 rgb **已乘强度**（与 three 的 uniforms.color 同口径）。 */
-  AddPoint(x, y, z, r, g, b, radius, score = 0) {
-    return this._PushSource(x, y, z, r, g, b, radius, LIGHT_TYPE.POINT, 0, 0, 1, -1, -1, 0, score);
+  AddPoint(x, y, z, r, g, b, radius, score = 0, shadowSource = null) {
+    const i = this._PushSource(x, y, z, r, g, b, radius, LIGHT_TYPE.POINT, 0, 0, 1, -1, -1, 0, score);
+    if(i>=0)this.sourceShadow[i]=shadowSource;
+    return i;
   }
 
   /**
@@ -478,8 +514,7 @@ export class ClusteredLights {
 
     // [4] 上传。三段在同一块内存里，一次传完（ultra 约 450 KB，与三张表时代相同）——
     // three 对已分配过的 DataTexture 走 texSubImage2D，不重新分配显存。
-    this.dataTexture.needsUpdate = true;
-
+    this.UploadMetadata();
     params.set(this.grid.tilesX, this.grid.tilesY, this.grid.slices, active > 0 ? 1 : 0);
     const depth = this.uniforms.uClusterDepth.value;
     depth.set(this.grid.sliceScale, this.grid.sliceBias, this.grid.near, this.grid.far);
@@ -497,6 +532,15 @@ export class ClusteredLights {
     stats.clusters = this.grid.clusterCount;
     this.buildMs = gridStats.buildMs;
     return stats;
+  }
+
+  UploadMetadata() {
+    // Three r185 update ranges are component offsets and must not cross rows.
+    // Preserve GPU-owned shadow rows across subsequent CPU light/grid uploads.
+    this.dataTexture.clearUpdateRanges();
+    for(let start=0;start<this.metadataUnits;start+=CLUSTER_DATA_TEX_WIDTH*4)
+      this.dataTexture.addUpdateRange(start,CLUSTER_DATA_TEX_WIDTH*4);
+    this.dataTexture.needsUpdate=true;
   }
 
   /**

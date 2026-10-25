@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 import {
   FlareDirector, FLARE_PRESETS, FLARE_DEFAULTS, FLARE_SFX, FLARE_PHASES, FLARE_BEATS,
 } from "./Script_Flare.mjs";
+import {FLARE_ART} from './Data_Tuning_FlareEffects.mjs';
 
 const dirHere = path.dirname(fileURLToPath(import.meta.url));
 let checks = 0;
@@ -525,9 +526,9 @@ for(const preset of ['SignalRed','Illumination']){
   }
   Check(visuals.size===1,'One owned visual per flare');
   if(preset==='Illumination'){
-    Step(sys,30-f.t);Check(visuals.size===1&&f.phase==='spent'&&f.pos.y>20,'Burnt-out canopy remains airborne until actual landing');
+    Step(sys,f.clearAt+.1-f.t);Check(visuals.size===1&&f.phase==='spent'&&f.pos.y>20,'Burnt-out canopy remains airborne until actual landing');
     Check(f.intensity===0&&f.lightHandle===null&&sys.SightScale===1,'Spent canopy has no light or lingering AI adaptation');
-    const at=f.landing.t;Step(sys,at-f.t+.1);Check(f.landed&&Math.abs(f.pos.y-12.025)<1e-5,'Candle reaches the sampled terrain, not a hard-coded plane');
+    const at=f.landing.t;Step(sys,at-f.t+.1);Check(f.landed&&Math.abs(f.pos.y-12-FLARE_ART.groundClearance)<1e-5,'Candle reaches the sampled terrain, not a hard-coded plane');
     const p={...f.pos};Step(sys,1);Check(JSON.stringify(f.pos)===JSON.stringify(p),'Landed remains no longer drift along the ground');
   }
   Step(sys,60);Check(visuals.size===0&&!sys.Active,'Completed ground fade retires all resources');
@@ -548,6 +549,53 @@ for(const preset of ['SignalRed','Illumination']){
  Step(sys,20);const f=sys.flares[0],old=f.landing.t;floor=-10;Step(sys,.1);
  Check(f.landing.t>old+4,'Terrain lowered during flight moves the ground intersection later');
  Step(sys,old+1-f.t);Check(!f.landed&&f.pos.y<0,'Canopy continues below the old terrain instead of hovering');
- Step(sys,f.landing.t-f.t+.1);Check(f.landed&&Math.abs(f.pos.y+9.975)<1e-5,'Changed terrain receives the spent candle');
+ Step(sys,f.landing.t-f.t+.1);Check(f.landed&&Math.abs(f.pos.y+10-FLARE_ART.groundClearance)<1e-5,'Changed terrain receives the spent candle');
+}
+// Thin roofs must be hit even when a whole frame crosses their thickness.
+{
+ let roof=true;
+ const {sys}=MakeRig({SurfaceHeight:()=>roof?8:0,TraceSegment:(a,b)=>{
+   if(!roof||a.y<8||b.y>8||a.y===b.y)return null;
+   const fraction=(a.y-8)/(a.y-b.y),x=a.x+(b.x-a.x)*fraction;
+   return x>=5&&x<=15?{fraction,point:{x,y:8,z:0},normal:[0,1,0],surface:'solid'}:null;
+ }});
+ sys.LaunchFlare({preset:'Illumination',from:{x:0,z:0},at:{x:8,z:0},driftMS:0,swayM:0});
+ let f=sys.flares[0];Check(f.landing.surface==='solid'&&Math.abs(f.landing.position.y-8-FLARE_ART.groundClearance)<1e-6,'Descending candle rests on the roof');
+ Check(f.carrierLanding.surface==='solid','Discarded case uses the same solid collision world');
+ Step(sys,20);const old=f.landing.t;roof=false;Step(sys,.1);Check(f.landing.t>old+3,'Removing a roof before arrival invalidates that landing');
+ Step(sys,f.landing.t-f.t+.1);Check(f.landed&&Math.abs(f.pos.y-FLARE_ART.groundClearance)<1e-5,'Destroyed roof does not leave the candle suspended');
+}
+{
+ const {sys}=MakeRig({TraceSegment:(a,b)=>{
+   if(a.x>=5||b.x<5)return null;const fraction=(5-a.x)/(b.x-a.x);
+   return {fraction,point:{x:5,y:a.y+(b.y-a.y)*fraction,z:0},normal:[-1,0,0],surface:'solid'};
+ }});
+ sys.LaunchFlare({preset:'Illumination',from:{x:0,z:0},at:{x:8,z:0},driftMS:0,swayM:0});
+ const f=sys.flares[0];Check(f.launchObstructed,'Carrier hit before deployment is marked obstructed');
+ Step(sys,6);Check(f.pos.x<5&&f.intensity===0&&sys.stats.ignited===0,'Obstructed carrier does not pass through the wall or ignite a floating canopy');
+ Step(sys,20);Check(!sys.Active&&sys.lastFlare.reason==='obstructed','Obstructed flight has a finite cleanup path');
+}
+{
+ const voices=[],stops=[];const {sys}=MakeRig({
+   Play:(name,opts)=>{const v={name,nodes:[{}],position:{...opts.position}};voices.push(v);return v;},
+   VoiceAlive:v=>v.nodes.length>0,MoveVoice:(v,p)=>{v.position={...p};},
+   StopVoice:(v,fade)=>{stops.push({name:v.name,fade});v.nodes.length=0;},
+ });
+ sys.LaunchFlare({preset:'Illumination',from:{x:0,z:0},at:{x:10,z:0}});Step(sys,7);
+ const f=sys.flares[0],burn=voices.find(v=>v.name==='flareBurn');
+ Check(!!burn&&Math.abs(burn.position.y-f.pos.y)<1e-8,'Burn sound follows the current candle position');
+ Step(sys,f.outAt-f.t+.02);
+ Check(voices.filter(v=>v.name==='flareBurn').every(v=>!v.nodes.length),'Burnout stops all overlapping burn voices');
+ Check(stops.some(s=>s.name==='flareBurn'&&s.fade>0),'Natural burnout uses a short click-free fade');
+ Check(f.voices.every(v=>v.kind==='out'),'Only the natural extinguishing tail remains after burnout');
+ sys.Reset();Check(voices.every(v=>!v.nodes.length),'Reset removes the remaining extinguishing tail');
+ sys.LaunchFlare({preset:'SignalRed',from:{x:0,z:0}});Step(sys,1);sys.Abort();
+ Check(voices.every(v=>!v.nodes.length),'Abort leaves no orphaned flare voices');
+}
+{
+ let clock=0,burns=0;const {sys}=MakeRig({AudioTime:()=>clock,Play:name=>{if(name==='flareBurn')burns++;return null;}});
+ sys.LaunchFlare({preset:'Illumination',from:{x:0,z:0}});Step(sys,6);const first=burns;
+ Step(sys,7);Check(burns===first,'Frozen audio clock does not stack extra burn recordings when simulation advances');
+ clock=6;Step(sys,.01);Check(burns===first+1,'Slow simulation still restarts the recorded burn on audio-clock time');
 }
 console.log(`\nFlareTest 通过：${checks} 条断言`);

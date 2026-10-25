@@ -52,8 +52,9 @@ export class BuildSink {
     return this;
   }
 
-  Add(materialName, geometry) {
+  Add(materialName, geometry, { effectSurface = false } = {}) {
     if (!geometry) return;
+    if(effectSurface)geometry.userData.effectSurface=true;
     const key = this.sector + materialName;
     if (!this.buckets.has(key)) this.buckets.set(key, []);
     this.buckets.get(key).push(geometry);
@@ -112,7 +113,11 @@ export class BuildSink {
     const meshes = [];
     const pick = resolve || ((name) => library.Get(name));
     for (const [key, list] of this.buckets) {
+      const effectSurfaceRanges=[];let surfaceOffset=0;
+      for(const g of list){const count=g.index?.count??g.attributes.position?.count??0;
+        for(const [start,n]of g.userData.effectSurfaceRanges||(g.userData.effectSurface?[[0,count]]:[]))effectSurfaceRanges.push([surfaceOffset+start,n]);surfaceOffset+=count;}
       const geometry = MergeGeometries(list);
+      if(effectSurfaceRanges.length)geometry.userData.effectSurfaceRanges=effectSurfaceRanges;
       if (!geometry.attributes.position || geometry.attributes.position.count === 0) continue;
       const bar = key.indexOf("|");
       const name = bar < 0 ? key : key.slice(bar + 1);
@@ -519,6 +524,7 @@ function MakeHardRoofShell(sampler, {
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
   g.computeVertexNormals();
+  g.userData.effectSurface=true;
   return g;
 }
 
@@ -601,6 +607,7 @@ export function MakeGablePrism(depth, baseY, eaveY, ridgeY, thickness, tile, see
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
   g.setAttribute("normal", new THREE.Float32BufferAttribute(nrm, 3));
+  g.userData.effectSurface=true;
   return g;
 }
 
@@ -678,6 +685,7 @@ export function AddGableTrim(sink, {
       g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
       g.setAttribute("uv", new THREE.Float32BufferAttribute(uvA, 2));
       g.computeVertexNormals();
+      g.userData.effectSurface=true;
       return g;
     };
     for (const s of [-1, 1]) {
@@ -755,12 +763,13 @@ export function AddHardMountainRoof(sink, {
   const slopeLen = Math.hypot(halfDepth, rise);
   const angle = Math.atan2(rise, halfDepth);
   const tileMat = burnt ? "BrickWallSooty" : "RoofTile";
+  const AddRoof=geometry=>sink.Add(tileMat,geometry,{effectSurface:true});
   const partialRuin = ruined === "partial";
 
   const sampler = HardRoofSampler({ width, halfDepth, overhang, eaveY, ridgeY });
   if (!ruined) {
     for (const side of [-1, 1]) {
-      sink.Add(tileMat, PlaceGeometry(
+      AddRoof(PlaceGeometry(
         MakeHardRoofShell(sampler, {
           width, overhang, side, thickness: 0.26,
           tile: TILE_METERS.roof, seed: `${seed}:s${side}`,
@@ -802,12 +811,12 @@ export function AddHardMountainRoof(sink, {
           };
           // 檐口瓦头（滴水）：参考图檐口下缘是一排小圆头，不是一条光边。
           const tip = At(1);
-          sink.Add(tileMat, PlaceGeometry(
+          AddRoof( PlaceGeometry(
             MakeBox(0.115, 0.10, 0.13, TILE_METERS.roof, `${seed}:瓦头${side}${i}`),
             { x: tip[0], y: tip[1] - 0.035, z: tip[2], ry }));
           for (let k = 0; k < 2; k += 1) {
             const a = At(k / 2), b = At((k + 1) / 2);
-            sink.Add(tileMat, PlaceGeometry(
+            AddRoof( PlaceGeometry(
               MakeBox(0.07, 0.065, Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]),
                 TILE_METERS.roof, `${seed}:垄${side}${i}${k}`),
               {
@@ -821,7 +830,7 @@ export function AddHardMountainRoof(sink, {
       }
     }
     // 正脊：小青瓦逐层叠砌，做成一条略高的带
-    sink.Add(tileMat, PlaceGeometry(
+    AddRoof( PlaceGeometry(
       MakeBox(width + overhang * 2, 0.22, 0.38, TILE_METERS.roof, `${seed}:ridge`),
       { x, y: ridgeY + 0.07, z, ry }));
   } else if (partialRuin) {
@@ -829,14 +838,14 @@ export function AddHardMountainRoof(sink, {
     // 一眼认出这是原来那栋房，而不是切状态时换了一只废墟模型。
     const survivingSide = (HashString(`${seed}:survivingSlope`) & 1) ? 1 : -1;
     const missingSide = -survivingSide;
-    sink.Add(tileMat, PlaceGeometry(
+    AddRoof(PlaceGeometry(
       MakeHardRoofShell(sampler, {
         width, overhang, side: survivingSide, thickness: 0.26,
         tile: TILE_METERS.roof, seed: `${seed}:partialSlope`,
       }),
       { x, y: 0, z, ry },
     ));
-    sink.Add(tileMat, PlaceGeometry(
+    AddRoof(PlaceGeometry(
       MakeHardRoofShell(sampler, {
         width, overhang, side: missingSide, thickness: 0.26,
         tile: TILE_METERS.roof, seed: `${seed}:damagedSlope`, segmentsX: 12, segmentsU: 10,
@@ -3361,6 +3370,7 @@ function MakeGateRoofShell(width, depth, {
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
   geometry.userData.gateRoof = { halfW, halfD, ridgeHalf, rise, cornerLift, hipTop, zg };
+  geometry.userData.effectSurface=true;
   return geometry;
 }
 
@@ -3691,7 +3701,7 @@ export function AddGateTower(sink, {
       return cornerLift * t * t;
     };
     const PlaceLocal = (material, geometry) => sink.Add(material,
-      PlaceGeometry(geometry, { x, y: yEave, z, ry }));
+      PlaceGeometry(geometry, { x, y: yEave, z, ry }), {effectSurface:material==="GateRoofTile"});
 
     PlaceLocal("GateRoofTile", MakeGateRoofShell(w, d, {
       eaveOut, rise, cornerLift, thickness: 0.15, seed: `${seed}:${tag}:shell`,

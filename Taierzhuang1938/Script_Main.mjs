@@ -3944,6 +3944,7 @@ function ClearRuntime() {
   // 照明弹同理，而且**它还欠着 AI 一笔账**：Reset 会把发现距离倍率还原成 1。
   // 不还的话下一关一进去满场 2.4 倍视距，表现成「敌人隔着两百米就开火」。
   flare?.Reset("levelChange");
+  vfx.flareSurfaces.Clear();
   // 发的那封电报也不许跨关：底噪要停，报码纸要收。
   telegraph?.Reset("levelChange");
   // 具名同伴按关摆：不清的话上一关那几个人会连着 handle 一起留到下一关，
@@ -4659,6 +4660,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   // 这一片切片是哪一章的。菜单靠它决定用哪一组机位，StartLevel 靠它决定要不要重建。
   // **借片的章不改它**：地皮还是上一次建的那一片，改了菜单会去取一组不存在的机位。
   if (!cutsceneOnly || initial) state.builtPhase = state.phaseIndex;
+  // Build the read-only roof query while loading, not on the first visible flare.
+  vfx.flareSurfaces.Refresh();
   state.ready = true;
   state.advancing = false;
   // 过场承载章的收尾：过场播完就接下一章。放在 advancing 清掉之后 ——
