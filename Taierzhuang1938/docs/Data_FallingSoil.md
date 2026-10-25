@@ -1,6 +1,6 @@
 # 共用落土：洞顶、板缝与断口
 
-入口：高级工具 → 特效与声音 → 特效预览，效果库选择 **落土 · 洞顶震落 / 板缝漏土 / 断口余土**。直达：`/Taierzhuang1938/?editor=vfx&effect=SoilCeilingShake&quality=high`。默认白盒也临时保留特效原材质，退出恢复；完整光照按 high 验收。
+入口：高级工具 → 特效与声音 → 特效预览，效果库选择 **落土 · 洞顶震落 / 板缝漏土 / 断口余土**。推荐直达 `/Taierzhuang1938/?editor=tools&tool=vfx&effect=SoilCeilingShake&quality=high&audio=0`：沿用现有工具首页的 `tool=vfx` 路由，不先构建整关；`audio=0` 只关闭此视觉预览的声音。默认白盒也临时保留特效原材质，退出恢复；完整光照按 high 验收。需要挂着第一关宿主检查时仍可用 `?whitebox=p012&editor=vfx`。
 
 本轮只交付共享效果与现有编辑器接入，不改第一关 01/05 剧情，不自动替换其历史落土实现。三种情境是参数预设，没有按关卡号分叉。外观与时序是美术创作参数，不作为历史测量。
 

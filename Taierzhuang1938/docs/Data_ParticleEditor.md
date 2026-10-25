@@ -4,6 +4,8 @@
 
 也可直接打开 `/Taierzhuang1938/?whitebox=p012&editor=vfx&quality=high`。关卡准备好后自动进入编辑器，背景游戏暂停。使用正式 VfxSystem、ParticleSystem、材质与后处理，预览不另造一套效果。
 
+只检查特效时可用 `/Taierzhuang1938/?editor=tools&tool=vfx&quality=high`，从现有工具首页直接打开同一编辑器，避免先构建整关；视觉静音验收可加 `audio=0`。
+
 从默认白盒画质的高级工具进入时，编辑器临时保留粒子和舞台的原材质，避免白盒的“隐藏特效”规则造成空白预览；退出后恢复原规则，不修改游戏画质或本机偏好。天空与后期仍采用当前画质，完整光照和泛光需要 `quality=high`。`ParticleEditorWhiteboxTest` 使用不带 quality 的 `?editor=tools` 入口（工具首页），点击特效预览和扬尘，比较真实粒子像素并检查退出还原。
 
 ## 操作
