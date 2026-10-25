@@ -10,6 +10,8 @@ export const CLOTH_RANGE_STATIONS = Object.freeze([
   Object.freeze({ id: "Silk", name: "绸布", x: -1.5, z: 4.2, radius: 1.2, materialSample: true }),
   Object.freeze({ id: "Canvas", name: "帆布", x: 1.5, z: 4.2, radius: 1.2, materialSample: true }),
   Object.freeze({ id: "Wool", name: "羊毛毯", x: 4.5, z: 4.2, radius: 1.2, materialSample: true }),
+  Object.freeze({ id: "SingleBlanket", name: "薄单被吸血样片", x: -1.6, z: -4.2, radius: 1.2, materialSample: true }),
+  Object.freeze({ id: "Towel", name: "毛巾吸血样片", x: 1.6, z: -4.2, radius: 1.2, materialSample: true }),
 ]);
 export const CLOTH_RANGE_FIXTURES = Object.freeze({
   curtain: Object.freeze({ x: 0, z: 0, openingWidth: 1.5, top: 2.5, beam: 0.12, depth: 0.20 }),
@@ -20,12 +22,12 @@ export const CLOTH_RANGE_FIXTURES = Object.freeze({
 });
 export const CLOTH_RANGE_PHASE = Object.freeze({
   id: CLOTH_RANGE_ID, sandbox: true, sandboxKey: "cloth", sandboxGlyph: "布",
-  date: "布料实验", label: "布料模拟测试场", place: "七种布料 · 材质对比",
+  date: "布料实验", label: "布料模拟测试场", place: "九件布料 · 材质与吸血对比",
   sky: "testSceneDay", ambience: "overcast", music: null, minutes: 600,
   story: CLOTH_RANGE_ID, cutsceneIn: null, cutsceneOut: null,
-  brief: ["七种布料独立对比：冬瓜的厚棉被、进门棉门帘、川军出川锦旗，以及细棉布、绸布、帆布和羊毛毯四件实验材质样片。参数只在本场景生效，不改现有布料。",
-    "前排四件样片采用相同尺寸与挂架，便于对比材质。拖动画面转动观察，滚轮缩放；直接在面板切换预设、调参数、施加扰动或暂停逐帧查看。"],
-  objectives: ["对比七种布料的厚度、垂坠和运动"],
+  brief: ["九件布料独立对比：厚棉被、棉门帘、锦旗、四种材质样片，以及薄单被与毛巾吸血样片。参数只在本场景生效，不改现有布料。",
+    "前排四件对比材质，后排两件对比吸血、洇染与背面渗透。拖动画面转动观察，滚轮缩放；用面板注入、持续供血、掀角、折叠或暂停单步。"],
+  objectives: ["对比布料的厚度、垂坠、运动与吸血洇染"],
   mechanic: "测试场：独立观察相机，玩家无敌，无敌军与武器。",
   nraPool: 9999, poolGain: 0, ijaPool: 9999, ijaPressure: 0, ijaSpawn: [], ijaSupport: [],
   ijaForce: { lmgEvery: 13, hmgTeams: 0, engineers: false, armor: 0, motorTransport: "rearOnly" },

@@ -48,10 +48,10 @@ for (const [file, expected] of legacy) {
 const defaultBefore = JSON.stringify(BLANKET_CLOTH);
 Check(Object.isFrozen(BLANKET_CLOTH), 'Production defaults remain frozen');
 Check(!/from\s+['"]three['"]/.test(fs.readFileSync(new URL('./Data_Tuning_ClothRange.mjs', import.meta.url), 'utf8')), 'Lab tuning is pure data');
-const sampleIds = ['quilt', 'curtain', 'banner', 'muslin', 'silk', 'canvas', 'wool'];
+const sampleIds = ['quilt', 'curtain', 'banner', 'muslin', 'silk', 'canvas', 'wool', 'singleBlanket', 'towel'];
 const materialSampleIds = ['muslin', 'silk', 'canvas', 'wool'];
-Check(Object.keys(CLOTH_LAB_PRESETS).sort().join(',') === [...sampleIds, 'thin', 'cotton'].sort().join(','), 'Nine cloth profiles include all seven independent samples');
-Check(CLOTH_LAB_ASSETS.map(spec => spec.id).join(',') === sampleIds.join(','), 'Seven selectable cloth samples have distinct identities');
+Check(Object.keys(CLOTH_LAB_PRESETS).sort().join(',') === [...sampleIds, 'thin', 'cotton'].sort().join(','), 'Eleven cloth profiles include all nine independent samples');
+Check(CLOTH_LAB_ASSETS.map(spec => spec.id).join(',') === sampleIds.join(','), 'Nine selectable cloth samples have distinct identities');
 Check(new Set(CLOTH_LAB_ASSETS.map(spec => spec.file)).size === 3, 'Four material samples reuse the banner shell; only three GLB source assets exist');
 for (const [i, id] of materialSampleIds.entries()) {
   const spec = CLOTH_LAB_ASSETS.find(item => item.id === id);
@@ -119,7 +119,8 @@ function WindGrid(horizontal = false) {
 // New swatches author their own maps rather than displaying the historical
 // banner's lettering. All objects and backing bytes belong to one factory call.
 const materialRecipes = [];
-for (const kind of materialSampleIds) {
+const materialKinds = [...materialSampleIds, 'towel'];
+for (const kind of materialKinds) {
   const pack = CreateClothSampleMaterials(kind), duplicate = CreateClothSampleMaterials(kind);
   Check(pack.materials.length === 3 && pack.materials.every(material => material.isMeshPhysicalMaterial
     && material.userData.clothSampleKind === kind), `${kind}: three physical cloth materials carry the sample identity`);
@@ -144,8 +145,8 @@ for (const kind of materialSampleIds) {
   Check([...disposeCounts.values()].every(count => count === 1), `${kind}: repeated disposal releases each private material and texture exactly once`);
   materialRecipes.push({ kind, baseHash, normalHash });
 }
-Check(new Set(materialRecipes.map(recipe => recipe.baseHash)).size === materialSampleIds.length
-  && new Set(materialRecipes.map(recipe => recipe.normalHash)).size === materialSampleIds.length, 'Muslin, silk, canvas and wool have distinct authored colour and weave maps');
+Check(new Set(materialRecipes.map(recipe => recipe.baseHash)).size === materialKinds.length
+  && new Set(materialRecipes.map(recipe => recipe.normalHash)).size === materialKinds.length, 'Muslin, silk, canvas, wool and towel have distinct authored colour and weave maps');
 assert.throws(() => CreateClothSampleMaterials('unknown'), RangeError);
 
 // Contact tests use the same grid and substeps as the live lab. They measure

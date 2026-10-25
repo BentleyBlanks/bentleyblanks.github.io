@@ -224,6 +224,8 @@ export const testDefs = {
   SingleBlanketAssetTest: { file: "_blender/Script_SingleBlanketVerify.mjs", desc: "单被217骨、6000三角、精确蒙皮、五动作、形态键、挂点与独立CPU绑定核验" },
   BlanketClothTest: { file: "Script_BlanketClothTest.mjs", desc: "单被布料模拟（2026-10-21，纯 Node）：真 GLB 的 18×12 骨格 / 角骨 / 静止朝向、挪转后重铺写回骨头蒙皮不变形、卷成圆筒时顶点离轴 = 半径且法线跟着转、平铺不动 / 落下落平、两角钉手拖人不对折不出 NaN、交叠不弹飞、实心块不当地面、台阶渐进抬、逐位确定、每帧耗时" },
   ClothRangeTest: { file: "Script_ClothRangeTest.mjs", desc: "独立布料测试场：旧被子字节保护、预设与参数边界、真实风压/面密度、三件GLB骨格/厚度/蒙皮/材质" },
+  ClothBloodTest: { file: "Script_ClothBloodTest.mjs", desc: "Cloth absorption: conservation, two-sided transport, drying, multi-source capacity and deterministic replay" },
+  ClothBloodBrowserTest: { file: "Script_ClothBloodBrowserTest.mjs", timeoutMs: 600000, desc: "Cloth blood in the real lab: normal materials, front/back, fiber attachment, controls, replay and sampler budget" },
   ClothRangeBrowserTest: { file: "Script_ClothRangeBrowserTest.mjs", timeoutMs: 600000, desc: "布料测试场实机：三样品、参数隔离、暂停/步进/动作/阵风、骨骼历史、高画质截图" },
   AssetStandardsTest: { file: "Script_AssetStandardsTest.mjs", desc: "源/实际面数、枪械 30k、战车 80k、三件翻倍特例与编辑器清单一致性（纯 Node）" },
   GeoTest: { file: "Script_GeoTest.mjs", desc: "几何快路等价性：MakeBox/PlaceGeometry 与 three 通用路逐浮点相同" },
@@ -646,6 +648,7 @@ export const browserTests = new Set([
   "ShellImpactRangeBrowserTest",
   "BattleReactionRangeBrowserTest",
   "ClothRangeBrowserTest",
+  "ClothBloodBrowserTest",
 ]);
 
 export const tier0Fast = [
@@ -698,6 +701,7 @@ export const tier0Fast = [
   "SingleBlanketAssetTest",
   "BlanketClothTest",
   "ClothRangeTest",
+  "ClothBloodTest",
   "ModelFacingTest",
   "KawasakiType88AssetTest",
   "AircraftGeometryTest",
@@ -775,7 +779,7 @@ export const domains = {
   nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "AssetStandardsTest"] },
   kawasakiType88: { label: "八八式侦察机二型独立资产", tests: ["KawasakiType88AssetTest", "KawasakiType88BrowserTest", "ModelFacingTest", "AssetStandardsTest", "ModuleGraphTest"] },
   singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "TextureStandardsTest", "AssetStandardsTest"] },
-  clothRange: { label: "独立布料测试场与厚棉被、门帘、出川锦旗", tests: ["ClothRangeTest", "ClothRangeBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
+  clothRange: { label: "独立布料测试场与双面吸血", tests: ["ClothRangeTest", "ClothBloodTest", "ClothRangeBrowserTest", "ClothBloodBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
   whiteboxQuality: { label: "白盒画质配置与实机", tests: ["WhiteboxQualityTest", "WhiteboxQualityBrowserTest", "WhiteboxShaderWarmTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
@@ -915,7 +919,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /Icon_TabSeal(?:16|32|180)\.png/ },
   { domain: "combat", pattern: /Script_FirstPersonGait\.mjs/ },
   { domain: "singleBlanket", pattern: /SingleBlanket|BlanketCloth|EditorBlockoutBlanket/ },
-  { domain: "clothRange", pattern: /ClothRange|ClothLab|ClothSample|DongguaQuilt|DoorCurtain|SichuanBanner/ },
+  { domain: "clothRange", pattern: /ClothRange|ClothLab|ClothSample|ClothBlood|DongguaQuilt|DoorCurtain|SichuanBanner/ },
   { domain: "combat", pattern: /FpsGripCorrective|FpsHandSkinWeights|FpsForearmTaper|FpsWristNormalSeam|FpsHandSelfContact|FpsHandPose|HanYangReloadClearance|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },
   {domain:"historyCodex",pattern:/HistoryCodex|HistoryBook|HistoryConscription|HistoryLedger|page-flip|Texture\/Menu\/History\//},
   { domain: "combat", pattern: /AircraftGeometry|OptimizeKi21|OptimizeKi30|Model_MitsubishiKi(21Ia|30)/ },

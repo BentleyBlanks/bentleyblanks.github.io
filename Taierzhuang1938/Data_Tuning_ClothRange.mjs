@@ -9,6 +9,8 @@ export const CLOTH_LAB_PRESETS = Object.freeze({
   silk: Object.freeze({ stretch: 1, compress: 0.008, shear: 0.22, bend: 0.002, airDamping: 0.55, groundFriction: 0.18, density: 0.09, thickness: 0.001, roughness: 0.28, wind: 3 }),
   canvas: Object.freeze({ stretch: 1, compress: 0.5, shear: 0.9, bend: 0.35, airDamping: 2.8, groundFriction: 0.8, density: 0.65, thickness: 0.006, roughness: 0.92, wind: 3 }),
   wool: Object.freeze({ stretch: 1, compress: 0.11, shear: 0.5, bend: 0.055, airDamping: 5.3, groundFriction: 1.05, density: 1.1, thickness: 0.015, roughness: 1, wind: 3 }),
+  singleBlanket: Object.freeze({ stretch: 1, compress: 0.02, shear: 0.3, bend: 0.008, airDamping: 1.2, groundFriction: 0.45, density: 0.18, thickness: 0.003, roughness: 0.97, wind: 0 }),
+  towel: Object.freeze({ stretch: 1, compress: 0.05, shear: 0.42, bend: 0.026, airDamping: 3.2, groundFriction: 0.85, density: 0.55, thickness: 0.009, roughness: 1, wind: 0 }),
 });
 export const CLOTH_LAB_CONTROLS = Object.freeze([
   { key: 'thickness', min: 0.001, max: 0.12, step: 0.001, unit: 'mm', scale: 1000 },
@@ -30,11 +32,18 @@ export const CLOTH_LAB_ASSETS = Object.freeze([
     id, file: 'Model_SichuanBanner.glb', material: id, sample: true, x: -4.5 + index * 3, z: 4.2,
     width: 1.45, length: 1.75, bindingOutsetM: 0.0008, thickness: 0.0025, top: 2.8, preset: id,
   })),
+  ...['singleBlanket', 'towel'].map((id, index) => Object.freeze({
+    id, file: 'Model_SichuanBanner.glb', material: id === 'towel' ? 'towel' : 'muslin', bloodSample: true,
+    bloodProfile: id === 'towel' ? 'towel' : 'thin', x: -1.6 + index * 3.2, z: -4.2,
+    width: 1.45, length: 1.75, bindingOutsetM: 0.0008, thickness: 0.0025, top: 2.8, preset: id,
+  })),
 ]);
 export const CLOTH_LAB_SIM = Object.freeze({ stepS: 1 / 60, maxSteps: 4, iterations: 12, maxSpeedMps: 4,
   gustS: 1.5, gustMps: 4, sampleGustMps: 1, windAccelerationMax: 18, pressure: 0.12, bodyY: 0.46, bodyRadius: 0.28,
   frictionDynamicRatio: 0.75, frictionContactSlopM: 0.0015, frictionMaxCoefficient: 1.5, frictionMaxSurfaceSpeedMps: 6,
   slideSpeedMps: 2, slideZ: 2, comparisonWindMps: 3,
+  bloodAdvanceS: 60, bloodCompareAmountMl: 30,
+  inspectTopM: 2.8, inspectCameraFloorM: 0.2,
   cameraMin: 1.1, cameraMax: 15, cameraTurn: 0.006, cameraZoom: 0.001, cameraPan: 0.0015 });
 export function ClampClothParameter(key, value) {
   const control = CLOTH_LAB_CONTROLS.find(item => item.key === key);

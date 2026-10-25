@@ -5,7 +5,7 @@ import * as THREE from 'three';
 
 const Size = 512;
 const Tau = Math.PI * 2;
-const Recipe = '20261025ClothSamplesV1';
+const Recipe = '20261025ClothSamplesV2';
 // These describe textile appearance, not the laboratory's separate physics presets.
 const Fabrics = Object.freeze({
   muslin: { seed: 31415, color: [218, 211, 190], tileM: .12, yarns: 128,
@@ -17,6 +17,8 @@ const Fabrics = Object.freeze({
     roughness: .96, normalScale: .88, specular: .18, sheen: .22, sheenColor: 0xa79e76, sheenRoughness: .92 },
   wool: { seed: 14142, color: [131, 94, 67], tileM: .18, yarns: 96,
     roughness: 1, normalScale: .68, specular: .16, sheen: .80, sheenColor: 0xb28b68, sheenRoughness: 1 },
+  towel: { seed: 22573, color: [209, 203, 181], tileM: .14, yarns: 64,
+    roughness: 1, normalScale: 1.24, specular: .18, sheen: .65, sheenColor: 0xd9d2b9, sheenRoughness: .98 },
 });
 
 function Clamp(value, low = 0, high = 1) { return Math.max(low, Math.min(high, value)); }
@@ -62,6 +64,23 @@ function BakeFabric(kind, fabric) {
       height = .76 * weave + .035 * Math.sin(Tau * (u * 256 + v * 4)) + grain * .028;
       light = (weave - .75) * 12 + broad * 7 + grain * 3;
       rough = .95 + grain * .045 - (weave - .75) * .035;
+    } else if (kind === 'towel') {
+      // Cotton pile loops are about 3-4 mm apart, large enough to survive the
+      // close-view mip level. Their offsets, tilt, height and radius vary per
+      // loop; tapered ring profiles do not make a regular embossed brick grid.
+      const loopU = u * 36, loopV = v * 44, cellX = Math.floor(loopU), cellY = Math.floor(loopV);
+      const jitterX = Hash(cellX, cellY, fabric.seed + 3) - .5;
+      const jitterY = Hash(cellX, cellY, fabric.seed + 4) - .5;
+      const variety = Hash(cellX, cellY, fabric.seed + 5);
+      const localX = loopU - cellX - .5 - jitterX * .18;
+      const localY = loopV - cellY - .5 - jitterY * .18;
+      const radius = Math.hypot(localX * .92 + localY * jitterX * .7, localY * 1.18);
+      const rim = (radius - (.22 + variety * .025)) / .06;
+      const loop = Math.exp(-rim * rim) * (.72 + variety * .28);
+      const tuft = SmoothNoise(u, v, 64, fabric.seed + 2) - .5;
+      height = loop * .76 + tuft * .22 + grain * .07;
+      light = (loop - .3) * 21 + tuft * 8 + broad * 4 + grain * 3;
+      rough = .98 + grain * .02 - loop * .02;
     } else {
       // Dense short fibres and irregular fine tufts, not embossed leather islands.
       // The high, broad sheen approximates the pile without transparent fibre cards.
