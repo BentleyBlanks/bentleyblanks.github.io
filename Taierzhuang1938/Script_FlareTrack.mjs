@@ -2,7 +2,7 @@
 import {FlareDirector,MakeFlareHost} from './Script_Flare.mjs';
 import {FlareVisuals} from './Script_FlareVisual.mjs';
 export class FlareTrack {
- constructor(parent,host,groundAt){this.visuals=new FlareVisuals(parent);this.host=host;this.groundAt=groundAt;this.items=new Map();}
+ constructor(parent,host,groundAt){this.visuals=new FlareVisuals(parent,host.lights);this.host=host;this.groundAt=groundAt;this.items=new Map();}
  Update(events,t,{fire=false,from=-1}={}){
   for(let i=0;i<events.length;i++){
    const e=events[i];if(e.type!=='flare')continue;const age=t-e.t;

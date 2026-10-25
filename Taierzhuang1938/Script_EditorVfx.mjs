@@ -90,7 +90,7 @@ export class VfxEditor {
     this.savedVfxVisible = vfx.root.visible;
     this.savedVfxTime = vfx.time;
     this.savedFlareVisuals=vfx.flareVisuals;this.savedFlareVisible=vfx.flareVisuals.root.visible;
-    vfx.flareVisuals.root.visible=false;vfx.flareVisuals=new FlareVisuals(vfx.root);
+    vfx.flareVisuals.root.visible=false;vfx.flareVisuals=new FlareVisuals(vfx.root,this.host.lights);
     this.flarePreview=new FlareDirector(MakeFlareHost({vfx,lights:this.host.lights}),{exposure:false,seed:this.seed});
     this.savedVfxRandom = vfx.random;
     // 预览必须是隔离的：现关烟柱不能在摄影棚期间偷偷推进，预览的弹孔/爆炸也
@@ -124,6 +124,10 @@ export class VfxEditor {
     vfx.dust=null;
     this.studio.Open(this.host.hideInStudio);
     this.savedStudioMaxDistance=this.studio.maxDistance;
+    this.savedPadGeometry=this.studio.pad.geometry;
+    this.flarePadGeometry=this.savedPadGeometry.clone();this.flarePadGeometry.scale(20,1,20);
+    const padUv=this.flarePadGeometry.attributes.uv;
+    for(let i=0;i<padUv.count;i++)padUv.setXY(i,(padUv.getX(i)-.5)*20+.5,(padUv.getY(i)-.5)*20+.5);
     // The studio owns the visible scene here. Keep its authored particle/mesh
     // materials without changing the game's whitebox config or saved preferences.
     const whitebox=this.host.post?.whiteboxScene;
@@ -184,6 +188,7 @@ export class VfxEditor {
     if(this.savedWhiteboxConfig){const whitebox=this.host.post.whiteboxScene;whitebox.config=this.savedWhiteboxConfig;whitebox.Invalidate();this.savedWhiteboxConfig=null;}
     this.studio.Close();
     this.studio.maxDistance=this.savedStudioMaxDistance;
+    this.studio.pad.geometry=this.savedPadGeometry;this.flarePadGeometry.dispose();
     if(this.savedLighting)this.host.lights.EndEffectPreview(this.savedLighting,this.savedVfxTime);
     vfx.root.visible = this.savedVfxVisible;
     this.savedSources = null;
@@ -254,7 +259,7 @@ export class VfxEditor {
     ButtonRow(environment,[{label:'适配镜头',onClick:()=>this.FrameEffect()}]);Note(environment,'在画面空白处拖动旋转，滚轮缩放。');
     Select(environment,'信号／照明弹镜头',[{value:'flight',label:'完整弹道'},{value:'follow',label:'跟随燃烧体近景'},{value:'ground',label:'地面照明检查'}],'flight',value=>{this.flareCamera=value;this.FrameEffect();});
     Toggle(environment,'夜间照明对照',false,on=>this.SetNightPreview(on));
-    Note(environment,'弹药按米制预览，不受整体缩放影响；风控制伞降与烟迹。照明弹约 24 秒完整结束，可将时间轴切到 30 秒。');
+    Note(environment,'弹药按米制预览，不受整体缩放影响；风与种子在重播时应用。照明弹熄灭后继续伞降、落地收拢；60 秒时间轴可查看完整过程。');
     const layers=Section(this.tabs.modules,'粒子层');
     this.layerSelect=Select(layers,'编辑层',[],null,key=>{this.selectedLayer=key;this.inspector.Show()});this.layerSelect.root.dataset.vfxLayer='true';
     const presets=this.host.vfx.particles.Presets();this.addPreset=Select(layers,'新粒子层',presets,'FireTongue',()=>{});
@@ -326,6 +331,7 @@ export class VfxEditor {
   }
   Play(){
     this.Stop();const vfx=this.host.vfx,api=vfx.particles;this.layerRecords.clear();
+    this.studio.pad.geometry=FLARE_EFFECTS[this.effectId]?this.flarePadGeometry:this.savedPadGeometry;
     vfx.time=0;vfx.shared.uTime.value=0;vfx.nextSourceId=1+(this.seed%65535);vfx.random=Mulberry32(this.seed);vfx.bloodEffects.random=vfx.random;
     for(const [name,channel]of api.channels){if(!api.systems.has(channel.particleId))continue;api.Configure(channel.particleId,this.baseModules.get(name));const patch=this.layerPatches.get('channel:'+name);if(patch)api.Configure(channel.particleId,patch);}
     api.presetOverrides.clear();for(const [key,patch]of this.layerPatches)if(key.startsWith('preset:'))api.presetOverrides.set(key.slice(7),patch);
@@ -334,7 +340,7 @@ export class VfxEditor {
     else if(FLARE_EFFECTS[this.effectId]){
       this.flarePreview.rnd=Mulberry32(this.seed);
       this.flarePreview.LaunchFlare({preset:this.effectId,from:{x:-12,z:0},at:{x:0,z:0},driftMS:Math.hypot(this.wind.x,this.wind.z),driftDirRad:Math.atan2(this.wind.x,this.wind.z)});
-      this.timeSlider.root.querySelector('input').max=30;this.timeLength.Set(30);
+      this.timeSlider.root.querySelector('input').max=60;this.timeLength.Set(60);
     }
     else {const effect=INSTANT_EFFECTS.find(effect=>effect.id===this.effectId),result=effect?.run(vfx,this.scale);if(effect?.sourceHandle)this.handle=result;if(effect?.particleHandle)this.sampleParticleIds.push(result.id);}
     for(const layer of this.customLayers){const definition=JSON.parse(JSON.stringify(layer.definition)),patch=this.layerPatches.get(layer.key);
@@ -414,14 +420,13 @@ export class VfxEditor {
   }
   TrackFlare(){const f=this.flarePreview?.flares[0];if(f){this.studio.orbit.target.set(f.pos.x,f.pos.y+.8,f.pos.z);this.studio.ApplyCamera();}}
   SetNightPreview(on){
-    const scene=this.host.scene;
     if(on&&!this.nightSnapshot){
-      const sky=scene.getObjectByName('SkyDome'),lights=scene.children.filter(o=>o.isDirectionalLight||o.isAmbientLight||o.isLightProbe);
-      this.nightSnapshot={sky,skyVisible:sky?.visible,background:scene.background,fog:scene.fog,lights:lights.map(o=>[o,o.intensity])};
-      if(sky)sky.visible=false;scene.background=new THREE.Color(0x02050b);scene.fog=null;
-      for(const light of lights)light.intensity=light.isDirectionalLight ? .006 : .008;
-    }else if(!on&&this.nightSnapshot){const s=this.nightSnapshot;if(s.sky)s.sky.visible=s.skyVisible;scene.background=s.background;scene.fog=s.fog;for(const [light,intensity]of s.lights)light.intensity=intensity;this.nightSnapshot=null;}
+      const environment=this.host.game.GetEnvironmentState?.();
+      if(!environment||!this.host.game.ApplyEnvironment?.('night'))return false;
+      this.nightSnapshot={environment};
+    }else if(!on&&this.nightSnapshot){this.host.game.RestoreEnvironmentState(this.nightSnapshot.environment);this.nightSnapshot=null;}
     this.host.post?.NotifyCameraCut();
+    return true;
   }
   AddLayer(preset){return this.Try(()=>{const api=this.host.vfx.particles,created=api.Create({preset,name:'自建 '+preset});const key='custom:'+(++this.customIndex);
     api.Get(created.id).editorKey=key;this.customLayers.push({key,definition:api.Export(created.id)});this.customIds.push(created.id);this.selectedLayer=key;this.playing=true;this.RefreshLayers(true);return created;});}

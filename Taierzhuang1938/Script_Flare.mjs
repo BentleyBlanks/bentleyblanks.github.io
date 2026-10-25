@@ -77,6 +77,7 @@ import { FLARE_EFFECTS, FLARE_ART } from "./Data_Tuning_FlareEffects.mjs";
 
 /** Absolute flight path: launch-relative altitude, never draped over terrain. */
 export function SampleFlarePosition(f,t) {
+  if(f.landing&&t>=f.landing.t)return {...f.landing.position};
   const u=Clamp01(t/f.ascendS),s=Math.max(0,t-f.ascendS);
   if(!f.physical){
     const swing=Math.sin(f.swayPhase+s*2*Math.PI/f.swayPeriodS)*f.swayM;
@@ -93,8 +94,22 @@ export function SampleFlarePosition(f,t) {
     y:f.groundY+FLARE_ART.launchHeight+f.apexM-fall};
 }
 
-/** 五个相位 + 两个端点。`idle` 是没有照明弹时的取值。 */
-export const FLARE_PHASES = Object.freeze(["idle", "ascend", "ignite", "burn", "fade", "adapt", "done"]);
+/** First terrain intersection, solved once so realtime and absolute seeks agree. */
+export function FlareLanding(f,ground,fromTime=f.ascendS) {
+  if(!f.physical)return null;
+  const Hit=t=>{const p=SampleFlarePosition(f,t);return {p,h:ground(p.x,p.z)};};
+  const first=Math.max(f.ascendS,fromTime),initial=Hit(first);
+  if(initial.p.y<=initial.h+FLARE_ART.groundClearance)return {t:first,position:{x:initial.p.x,y:initial.h+FLARE_ART.groundClearance,z:initial.p.z}};
+  for(let t=first+.25;t<=FLARE_ART.maxFlightS;t+=.25){
+    const hit=Hit(t);if(hit.p.y>hit.h+FLARE_ART.groundClearance)continue;
+    let lo=t-.25,hi=t;for(let k=0;k<20;k++){const mid=(lo+hi)*.5,h=Hit(mid);if(h.p.y>h.h+FLARE_ART.groundClearance)lo=mid;else hi=mid;}
+    const at=Hit(hi);return {t:hi,position:{x:at.p.x,y:at.h+FLARE_ART.groundClearance,z:at.p.z}};
+  }
+  return null;
+}
+
+/** 五个光照相位 + 烧尽伞体的 spent + 两个端点。 */
+export const FLARE_PHASES = Object.freeze(["idle", "ascend", "ignite", "burn", "fade", "adapt", "spent", "done"]);
 
 /**
  * 四个节拍（`OnPhase(beat, view)` 的第一个参数，也是 `signals` 表的键）。
@@ -214,7 +229,8 @@ export class FlareDirector {
   LaunchFlare(spec = {}) {
     const preset = spec.preset ? (FLARE_PRESETS[spec.preset] || FLARE_EFFECTS[spec.preset]) : null;
     if (spec.preset && !preset) { this.stats.refused += 1; return null; }
-    if (this.flares.length >= this.maxActive) { this.stats.refused += 1; return null; }
+    if (this.flares.filter(f=>f.phase!=="spent").length >= this.maxActive
+      || this.flares.length >= this.maxActive+FLARE_ART.maxSpent) { this.stats.refused += 1; return null; }
     const cfg = { ...FLARE_DEFAULTS, ...(preset || {}), ...spec };
     const from = Flat(cfg.from);
     if (!from) { this.stats.refused += 1; return null; }
@@ -222,6 +238,7 @@ export class FlareDirector {
 
     this.serial += 1;
     const ascendS = Math.max(0.05, Num(cfg.ascendS, FLARE_DEFAULTS.ascendS));
+    const ignitionS = cfg.physical ? Math.max(.01,Num(cfg.ignitionS,ascendS)) : ascendS;
     const igniteS = Math.max(0.05, Num(cfg.igniteS, FLARE_DEFAULTS.igniteS));
     const burnS = Math.max(0.1, Num(cfg.burnS, FLARE_DEFAULTS.burnS));
     const fadeS = Math.max(0.05, Num(cfg.fadeS, FLARE_DEFAULTS.fadeS));
@@ -238,11 +255,12 @@ export class FlareDirector {
       ascendS, igniteS, burnS, fadeS, adaptS,
       // 四个相位的累计边界。算一次存起来：每帧现算四个加法没错，但边界是
       // 判等用的（`t >= ignitedAt` 那一类），存起来才不会因为浮点重排差一帧。
-      ignitedAt: ascendS,
-      burnAt: ascendS + igniteS,
-      fadeAt: ascendS + igniteS + burnS,
-      outAt: ascendS + igniteS + burnS + fadeS,
-      endAt: ascendS + igniteS + burnS + fadeS + adaptS,
+      ignitedAt: ignitionS,
+      burnAt: ignitionS + igniteS,
+      fadeAt: ignitionS + igniteS + burnS,
+      outAt: ignitionS + igniteS + burnS + fadeS,
+      clearAt: ignitionS + igniteS + burnS + fadeS + adaptS,
+      endAt: ignitionS + igniteS + burnS + fadeS + adaptS,
       descendMS: Math.max(0, Num(cfg.descendMS, FLARE_DEFAULTS.descendMS)),
       driftMS: Math.max(0, Num(cfg.driftMS, FLARE_DEFAULTS.driftMS)),
       driftDirRad: Num(cfg.driftDirRad, FLARE_DEFAULTS.driftDirRad),
@@ -274,6 +292,11 @@ export class FlareDirector {
       beats: [],
       beganAt: this.Time(),
     };
+    flare.landing=FlareLanding(flare,(x,z)=>this.Ground(x,z));
+    flare.carrierLanding=flare.physical&&flare.parachute
+      ? FlareLanding({...flare,parachute:false,landing:null,swayM:0},(x,z)=>this.Ground(x,z)) : null;
+    if(flare.physical&&flare.parachute)flare.endAt=Math.max(flare.clearAt,
+      (flare.landing?.t??FLARE_ART.maxFlightS)+FLARE_ART.settleS+FLARE_ART.groundHoldS+FLARE_ART.groundFadeS);
     this.flares.push(flare);
     this.stats.launched += 1;
     this.Place(flare, 0);
@@ -396,7 +419,7 @@ export class FlareDirector {
       flare.phase = "ignite";
       this.stats.ignited += 1;
       this.Beat(flare, "ignite");
-      // 「噗」的一下在**顶空**响，不在发射筒那儿 —— 定位取这一帧的光球位置。
+      // 点燃声跟随这一帧的燃烧体；现代物理预设可分别选择出膛或顶空点燃。
       this.Place(flare, 0);
       this.Sfx("ignite", { position: { ...flare.pos }, volume: 0.9 });
       flare.burnLoopLeft = 0;                       // 点燃那一帧就起嘶声
@@ -408,14 +431,15 @@ export class FlareDirector {
       this.stats.burnedOut += 1;
       this.Beat(flare, "out");
       this.Sfx("out", { position: { ...flare.pos }, volume: 0.7 });
-      // 灯与烟在这一刻就收：暗适应那几秒是**眼睛**的事，天上已经什么都没有了。
+      // 收灯与 legacy 烟源；独立的余烟和实物伞体继续按各自寿命运行。
       this.DropVisuals(flare);
     }
-    if (flare.phase === "adapt" && flare.t >= flare.endAt) {
-      flare.phase = "done";
+    if (flare.phase === "adapt" && flare.t >= flare.clearAt) {
+      flare.phase = flare.endAt>flare.clearAt ? "spent" : "done";
       this.stats.cleared += 1;
       this.Beat(flare, "clear");
     }
+    if(flare.phase==="spent"&&flare.t>=flare.endAt)flare.phase="done";
   }
 
   /**
@@ -426,8 +450,16 @@ export class FlareDirector {
   Place(flare, step) {
     const p = flare.pos;
     if(flare.physical){
+      // A crater made while the flare is airborne invalidates its old ground hit.
+      // Keep the launch altitude fixed, and solve only the remaining trajectory.
+      if(!flare.landed&&flare.landing){const hit=flare.landing.position;
+        if(Math.abs(this.Ground(hit.x,hit.z)+FLARE_ART.groundClearance-hit.y)>.001){
+          flare.landing=FlareLanding({...flare,landing:null},(x,z)=>this.Ground(x,z),flare.t);
+          if(flare.parachute)flare.endAt=Math.max(flare.clearAt,(flare.landing?.t??FLARE_ART.maxFlightS)+FLARE_ART.settleS+FLARE_ART.groundHoldS+FLARE_ART.groundFadeS);
+        }
+      }
       Object.assign(p,SampleFlarePosition(flare,flare.t));
-      const ground=this.Ground(p.x,p.z);flare.landed=p.y<=ground;
+      const ground=this.Ground(p.x,p.z);flare.landed=!!flare.landing&&flare.t>=flare.landing.t;
       p.y=Math.max(ground+.02,p.y);flare.agl=p.y-ground;
     } else if (flare.phase === "ascend") {
       const u = Clamp01(flare.t / flare.ascendS);
@@ -468,7 +500,7 @@ export class FlareDirector {
     let flicker = 1;
     if (flare.phase === "ascend") {
       // 升空的余烬：一点点就够，只为让玩家看见「有个东西在往上走」。
-      level = 0.05 * Clamp01(t / flare.ascendS);
+      level = flare.physical ? 0 : 0.05 * Clamp01(t / flare.ascendS);
     } else if (flare.phase === "ignite") {
       const u = Clamp01((t - flare.ignitedAt) / flare.igniteS);
       // 冲头带一点过冲：镁一点着的头半秒比稳定燃烧还亮。
@@ -642,6 +674,7 @@ export class FlareDirector {
       presetId: flare.presetId,
       label: flare.label,
       phase: flare.phase,
+      landed:!!flare.landed,landingAt:flare.landing?.t??null,retireAt:flare.endAt,
       kind:flare.kind,parachute:flare.parachute,physical:flare.physical,
       t: flare.t,
       x: flare.pos.x, y: flare.pos.y, z: flare.pos.z,

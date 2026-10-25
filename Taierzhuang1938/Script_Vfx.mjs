@@ -507,7 +507,7 @@ export class VfxSystem {
     this.root.frustumCulled = false;
     this.root.matrixAutoUpdate = false;
     scene.add(this.root);
-    this.flareVisuals = new FlareVisuals(this.root);
+    this.flareVisuals = new FlareVisuals(this.root,this.lights);
 
     // 1x1 兜底深度图：WebGL2 下未绑定的 sampler 是未定义行为，哪怕分支里不采样也得挂一张
     this.fallbackDepth = new THREE.DataTexture(

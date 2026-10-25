@@ -121,7 +121,7 @@ const Basic = (over = {}) => ({ from: { x: 100, z: 0 }, at: { x: 60, z: 10 }, ..
   Check(P.narrowLane.exposeSight > P.crossLane.exposeSight, "窄巷那枚暴露得更狠（敌我十余米）");
   Check(P.narrowLane.adaptSight < P.crossLane.adaptSight,
     "窄巷那枚熄灭后更黑 ——「谁是谁，只能靠喊」");
-  Check(FLARE_PHASES.length === 7 && FLARE_BEATS.length === 4, "相位表七项、节拍表四项");
+  Check(FLARE_PHASES.length === 8 && FLARE_PHASES.includes('spent') && FLARE_BEATS.length === 4, "八相位含烧尽残骸，仍为四个剧情节拍");
 }
 console.log("ok  ① 档案表：两条预设 = §5 那两枚，signals 是引擎侧契约常量");
 
@@ -510,6 +510,7 @@ for(const preset of ['SignalRed','Illumination']){
     AddVisual:f=>{const h={f};visuals.add(h);return h;},MoveVisual:()=>{},RemoveVisual:h=>visuals.delete(h)});
   sys.LaunchFlare({preset,from:{x:100,z:0},at:{x:108,z:0},driftMS:0});
   const f=sys.flares[0];Step(sys,1);
+  Check(preset==='SignalRed'?f.phase==='burn'&&f.intensity>0:f.phase==='ascend'&&f.intensity===0,'Signal star burns during ascent; closed illumination carrier stays dark');
   const u=f.t/f.ascendS;
   Check(Math.abs(f.pos.y-(1.1+100*(2*u-u*u)))<1e-8,'Flight is launch-relative, not lifted by a terrain step');
   Step(sys,f.ascendS-f.t-.02);const before={...f.pos};Step(sys,.04);
@@ -517,14 +518,36 @@ for(const preset of ['SignalRed','Illumination']){
   Step(sys,1);const y=f.pos.y;Step(sys,1);
   if(preset==='Illumination'){
     Check(y-f.pos.y>2&&y-f.pos.y<2.5,'Canopy converges to its descent rate');
-    Check(Math.abs(f.intensity/f.brightness-18000)<1e-8,'Candle output stays fixed as it descends');
+    Check(Math.abs(f.intensity/f.brightness-f.candleCd)<1e-8,'Candle output stays fixed as it descends');
   }else{
     Check(y-f.pos.y>10,'Unretarded signal star falls ballistically');
     Check(sys.SightScale===1,'Signal does not globally reveal soldiers');
   }
   Check(visuals.size===1,'One owned visual per flare');
-  Step(sys,30);Check(visuals.size===0&&!sys.Active,'Burnout retires smoke, light and canopy');
+  if(preset==='Illumination'){
+    Step(sys,30-f.t);Check(visuals.size===1&&f.phase==='spent'&&f.pos.y>20,'Burnt-out canopy remains airborne until actual landing');
+    Check(f.intensity===0&&f.lightHandle===null&&sys.SightScale===1,'Spent canopy has no light or lingering AI adaptation');
+    const at=f.landing.t;Step(sys,at-f.t+.1);Check(f.landed&&Math.abs(f.pos.y-12.025)<1e-5,'Candle reaches the sampled terrain, not a hard-coded plane');
+    const p={...f.pos};Step(sys,1);Check(JSON.stringify(f.pos)===JSON.stringify(p),'Landed remains no longer drift along the ground');
+  }
+  Step(sys,60);Check(visuals.size===0&&!sys.Active,'Completed ground fade retires all resources');
   sys.LaunchFlare({preset,from:{x:0,z:0}});sys.Abort();Check(!visuals.size,'Abort retires visual');
   sys.LaunchFlare({preset,from:{x:0,z:0}});sys.Reset();Check(!visuals.size,'Reset retires visual');
+}
+{
+ const visuals=new Set();const {sys}=MakeRig({AddVisual:f=>{visuals.add(f);return f;},RemoveVisual:f=>visuals.delete(f)},{maxActive:1});
+ for(let i=0;i<5;i++){
+   const id=sys.LaunchFlare({preset:'Illumination',from:{x:0,z:0},burnS:.1,fadeS:.05,adaptS:.1});
+   Check(!!id,'A spent parachute does not reserve the live light slot');Step(sys,5.2);
+ }
+ Check(sys.Count===5&&sys.LaunchFlare({preset:'Illumination',from:{x:0,z:0}})===null,'Spent renderers have a finite separate budget');
+ sys.Reset();Check(visuals.size===0,'Reset releases every spent canopy');
+}
+{
+ let floor=0;const {sys}=MakeRig({GroundHeight:()=>floor});sys.LaunchFlare({preset:'Illumination',from:{x:0,z:0}});
+ Step(sys,20);const f=sys.flares[0],old=f.landing.t;floor=-10;Step(sys,.1);
+ Check(f.landing.t>old+4,'Terrain lowered during flight moves the ground intersection later');
+ Step(sys,old+1-f.t);Check(!f.landed&&f.pos.y<0,'Canopy continues below the old terrain instead of hovering');
+ Step(sys,f.landing.t-f.t+.1);Check(f.landed&&Math.abs(f.pos.y+9.975)<1e-5,'Changed terrain receives the spent candle');
 }
 console.log(`\nFlareTest 通过：${checks} 条断言`);

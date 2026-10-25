@@ -1,104 +1,181 @@
-// Shared game/editor renderer. Absolute-time smoke/sparks make scrubbing deterministic.
-// No billboard art download: small emissive source, soft smoke, physical canopy and cords.
+// Shared absolute-time flare optics. Cloth is a reconstruction, not a measured cartridge.
 import * as THREE from 'three';
 import {FLARE_ART as A} from './Data_Tuning_FlareEffects.mjs';
 import {SampleFlarePosition} from './Script_Flare.mjs';
 
-const VERTEX=`varying vec2 vUv; varying float vAge;
-attribute float age;
-void main(){vUv=uv;vAge=age;
-  vec4 center=modelViewMatrix*instanceMatrix*vec4(0.,0.,0.,1.);
-  float size=length(instanceMatrix[0].xyz);
-  center.xy+=position.xy*size;
-  gl_Position=projectionMatrix*center;}`;
+const VERTEX=`varying vec2 vUv;varying float vAge;varying float vSeed;varying vec3 vWorld;
+attribute float age;attribute float seed;
+void main(){vUv=uv;vAge=age;vSeed=seed;
+ vec4 world=modelMatrix*instanceMatrix*vec4(0.,0.,0.,1.);vWorld=world.xyz;
+ vec4 center=viewMatrix*world;
+ vec2 up=(viewMatrix*vec4(0.,1.,0.,0.)).xy;up=length(up)>.01?normalize(up):vec2(0.,1.);
+ vec2 right=vec2(up.y,-up.x);
+ center.xy+=right*position.x*length(instanceMatrix[0].xyz)+up*position.y*length(instanceMatrix[1].xyz);
+ gl_Position=projectionMatrix*center;}`;
 const FRAGMENT=`precision highp float;
-varying vec2 vUv;varying float vAge;
-uniform vec3 tint;uniform float mode;uniform float clock;uniform float power;
+varying vec2 vUv;varying float vAge;varying float vSeed;varying vec3 vWorld;
+uniform vec3 tint;uniform vec3 ambient;uniform vec3 lightPosition;
+uniform float mode;uniform float clock;uniform float power;uniform float candle;uniform float scatter;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
-return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1)),f.x),f.y);}
-void main(){vec2 p=(vUv-.5)*2.;float r=length(p);if(r>1.||vAge<0.)discard;
-if(mode<.5){
- float n=noise(p*7.+vec2(clock*2.,-clock*7.));
- float core=exp(-dot(p*vec2(1.5,.8),p*vec2(1.5,.8))*85.)*(.8+.2*n);
- float halo=exp(-r*r*12.)*.12;
- float colored=1.-smoothstep(.05,.3,tint.g);
- gl_FragColor=vec4((tint*halo*mix(4.,9.,colored)+mix(tint,vec3(1),mix(.65,.02,colored))*core*mix(14.,4.,colored))*power,1.);
-}else{
- float n=noise(p*3.+vAge*2.)*.65+noise(p*8.-vAge)*.35;
- float edge=1.-smoothstep(.3,1.,r);
- float alpha=edge*(.35+.65*n)*sin(3.14159*clamp(vAge,0.,1.))*.34;
- gl_FragColor=vec4(tint,alpha);
-}
-#include <tonemapping_fragment>
-#include <colorspace_fragment>
+ return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1)),f.x),f.y);}
+float fbm(vec2 p){return .57*noise(p)+.28*noise(p*2.03+11.)+.15*noise(p*4.11-7.);}
+void main(){vec2 p=(vUv-.5)*2.;float r2=dot(p,p);if(r2>1.||vAge<0.)discard;
+ if(mode<.5){
+  float n=fbm(p*9.+vec2(clock*1.4,-clock*9.));
+  float width=.055+.035*n;
+  float tongue=exp(-pow((p.x+.03*sin(clock*13.+p.y*20.))/width,2.))*smoothstep(-.17,-.08,p.y)*(1.-smoothstep(.08,.48,p.y))*(.4+.6*n);
+  float core=exp(-r2*170.)*(.8+.2*n),halo=exp(-r2*20.)*.018;
+  float colored=1.-smoothstep(.05,.3,tint.g);
+  vec3 flame=mix(tint,vec3(1),mix(.75,.04,colored));
+  gl_FragColor=vec4((flame*(core*14.+tongue*5.)+tint*halo*4.)*power,1.);
+ }else if(mode>1.5){
+  float heat=pow(max(0.,1.-vAge),1.8);
+  gl_FragColor=vec4(mix(vec3(1.,.14,.01),vec3(1.,.8,.35),heat)*exp(-r2*12.)*heat*7.,1.);
+ }else{
+  vec2 q=p+vec2(vSeed*17.,vSeed*9.)+vec2(vAge*.3,-vAge*.5);
+  float n=fbm(q*3.5),edge=pow(max(0.,1.-r2),1.5);
+  float density=edge*smoothstep(.18,.72,n)*smoothstep(0.,.08,vAge)*pow(1.-vAge,1.2);
+  vec3 delta=vWorld-lightPosition;
+  vec3 incident=ambient+tint*candle*scatter/(dot(delta,delta)+4.);
+  gl_FragColor=vec4(vec3(.46,.45,.42)*incident,1.-exp(-density*.52));
+ }
+ #include <tonemapping_fragment>
+ #include <colorspace_fragment>
+}`;
+const CLOTH_VERTEX=`varying vec2 vUv;varying vec3 vNormal;
+void main(){vUv=uv;vNormal=normalize(mat3(modelMatrix)*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
+const CLOTH_FRAGMENT=`varying vec2 vUv;varying vec3 vNormal;
+uniform sampler2D weave;uniform vec3 ambient;uniform vec3 sun;uniform vec3 sunDirection;
+uniform vec3 selfLight;uniform float opacity;
+void main(){vec3 n=normalize(vNormal);if(!gl_FrontFacing)n=-n;
+ vec3 albedo=texture2D(weave,vUv).rgb;
+ // Housing shields the upward hemisphere: only scattered/reflected candle light.
+ vec3 illumination=ambient*(.55+.45*abs(n.y))+sun*max(0.,dot(n,sunDirection))+selfLight*(.6+.4*(1.-vUv.y));
+ gl_FragColor=vec4(albedo*illumination,opacity);
+ #include <tonemapping_fragment>
+ #include <colorspace_fragment>
 }`;
 
 function Cards(count,mode,color){
  const geometry=new THREE.PlaneGeometry(1,1);
  geometry.setAttribute('age',new THREE.InstancedBufferAttribute(new Float32Array(count).fill(-1),1));
+ geometry.setAttribute('seed',new THREE.InstancedBufferAttribute(new Float32Array(count),1));
  const material=new THREE.ShaderMaterial({vertexShader:VERTEX,fragmentShader:FRAGMENT,
-  uniforms:{tint:{value:new THREE.Color(color)},mode:{value:mode},clock:{value:0},power:{value:1}},
-  transparent:true,depthWrite:false,depthTest:true,blending:mode===0?THREE.AdditiveBlending:THREE.NormalBlending});
+  uniforms:{tint:{value:new THREE.Color(color)},ambient:{value:new THREE.Color()},lightPosition:{value:new THREE.Vector3()},
+    mode:{value:mode},clock:{value:0},power:{value:1},candle:{value:0},scatter:{value:A.smokeScatter}},
+  transparent:true,depthWrite:false,depthTest:true,blending:mode===1?THREE.NormalBlending:THREE.AdditiveBlending});
  const mesh=new THREE.InstancedMesh(geometry,material,count);mesh.frustumCulled=false;
- mesh.name=mode===0?'FlareRadiance':'FlareSmoke';return mesh;
+ mesh.name=mode===0?'FlareRadiance':mode===1?'FlareSmoke':'FlareEmbers';return mesh;
 }
-function Canopy(){
- const geometry=new THREE.SphereGeometry(A.canopyRadius,32,10,0,Math.PI*2,0,Math.PI*.5);
- const p=geometry.attributes.position;
- for(let i=0;i<p.count;i++){
-  const x=p.getX(i),z=p.getZ(i),theta=Math.atan2(z,x),r=Math.hypot(x,z)/A.canopyRadius;
-  p.setY(i,p.getY(i)*A.canopyHeight/A.canopyRadius-.025*Math.cos(theta*A.ribs)*r*r);
- }geometry.computeVertexNormals();
- // Thin translucent fabric belongs to the transparent-effects pass (no opaque
- // prepass/motion-vector claim for this VfxRoot-owned canopy).
- const material=new THREE.MeshStandardMaterial({color:0xaca18b,roughness:1,side:THREE.DoubleSide,transparent:true,opacity:.94,depthWrite:false});
- const canopy=new THREE.Mesh(geometry,material);canopy.name='FlareSilkCanopy';canopy.position.y=A.cordLength;
- const points=[];for(let i=0;i<A.ribs;i++){const a=i/A.ribs*Math.PI*2;
-  points.push(0,.12,0,Math.cos(a)*A.canopyRadius,A.cordLength,Math.sin(a)*A.canopyRadius);}
- const cords=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(points,3)),
-  new THREE.LineBasicMaterial({color:0x9d937d,transparent:true,opacity:.9,depthWrite:false}));cords.name='FlareSuspensionLines';
- const group=new THREE.Group();group.add(canopy,cords);return group;
+function SilkMap(){
+ const w=512,h=128,data=new Uint8Array(w*h*4);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+  const u=x/w*A.ribs,seam=Math.min(u%1,1-u%1)<.018,rim=y>h-4;
+  const value=(seam?.62:rim?.68:.82)*((x+y)%2?1:.97),i=(y*w+x)*4;
+  data.set([Math.round(value*255),Math.round(value*249),Math.round(value*230),255],i);
+ }
+ const map=new THREE.DataTexture(data,w,h);map.colorSpace=THREE.SRGBColorSpace;
+ map.wrapS=THREE.RepeatWrapping;map.magFilter=THREE.LinearFilter;map.minFilter=THREE.LinearMipmapLinearFilter;map.generateMipmaps=true;map.needsUpdate=true;return map;
+}
+function MakeSuspension(){
+ const segments=64,rings=12,positions=[],uv=[],indices=[];
+ for(let j=0;j<=rings;j++)for(let i=0;i<=segments;i++){positions.push(0,0,0);uv.push(i/segments,j/rings);}
+ for(let j=0;j<rings;j++)for(let i=0;i<segments;i++){const a=j*(segments+1)+i,b=a+segments+1;indices.push(a,b,a+1,b,b+1,a+1);}
+ const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+ geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geometry.setIndex(indices);
+ const material=new THREE.ShaderMaterial({vertexShader:CLOTH_VERTEX,fragmentShader:CLOTH_FRAGMENT,side:THREE.DoubleSide,
+  transparent:true,depthWrite:false,uniforms:{weave:{value:SilkMap()},ambient:{value:new THREE.Color()},sun:{value:new THREE.Color()},
+   sunDirection:{value:new THREE.Vector3(0,1,0)},selfLight:{value:new THREE.Color()},opacity:{value:.96}}});
+ const cloth=new THREE.Mesh(geometry,material);cloth.name='FlareSilkCanopy';cloth.frustumCulled=false;
+ const cords=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array((A.ribs*4+2)*3),3)),
+  new THREE.LineBasicMaterial({color:0x887b61,transparent:true,opacity:.7,depthWrite:false}));cords.name='FlareSuspensionLines';cords.frustumCulled=false;
+ const group=new THREE.Group();group.add(cloth,cords);return {group,cloth,cords,segments,rings};
+}
+function Candle(){
+ const material=new THREE.MeshStandardMaterial({color:0x534d40,metalness:.35,roughness:.78,transparent:true,opacity:1,depthWrite:false});
+ const mesh=new THREE.Mesh(new THREE.CylinderGeometry(A.candleRadius,A.candleRadius,A.candleHeight,12),material);
+ mesh.name='FlareCandleHousing';return mesh;
 }
 const matrix=new THREE.Matrix4(),pos=new THREE.Vector3(),scale=new THREE.Vector3(),q=new THREE.Quaternion();
-function Put(mesh,i,x,y,z,size,age){pos.set(x,y,z);scale.setScalar(size);matrix.compose(pos,q,scale);mesh.setMatrixAt(i,matrix);mesh.geometry.attributes.age.setX(i,age);}
-function Flush(mesh){mesh.instanceMatrix.needsUpdate=true;mesh.geometry.attributes.age.needsUpdate=true;}
+function Put(mesh,i,x,y,z,size,age,seed=0,aspect=1){pos.set(x,y,z);scale.set(size,size*aspect,size);matrix.compose(pos,q,scale);mesh.setMatrixAt(i,matrix);mesh.geometry.attributes.age.setX(i,age);mesh.geometry.attributes.seed.setX(i,seed);}
+function Flush(mesh){mesh.instanceMatrix.needsUpdate=true;mesh.geometry.attributes.age.needsUpdate=true;mesh.geometry.attributes.seed.needsUpdate=true;}
+const Smooth=(a,b,x)=>THREE.MathUtils.smoothstep(x,a,b);
 
 export class FlareVisuals {
- constructor(parent){this.root=new THREE.Group();this.root.name='FlareEffects';parent.add(this.root);this.items=new Set();}
+ constructor(parent,lights=null){this.root=new THREE.Group();this.root.name='FlareEffects';parent.add(this.root);this.items=new Set();this.lights=lights;this.ambient=new THREE.Color();this.sun=new THREE.Color();}
  Add(flare){
-  const root=new THREE.Group(),head=Cards(1,0,flare.lightColor),smoke=Cards(A.smokeCount,1,0xaaa99f),sparks=Cards(A.sparkCount,0,0xffac50),canopy=Canopy();
-  root.name='Flare/'+flare.id;root.add(head,smoke,sparks,canopy);this.root.add(root);
-  const item={root,head,smoke,sparks,canopy};this.items.add(item);this.Update(item,flare);return item;
+  const root=new THREE.Group(),head=Cards(1,0,flare.lightColor),smoke=Cards(A.smokeCount,1,flare.lightColor),sparks=Cards(A.sparkCount,2,0xffac50),suspension=MakeSuspension(),candle=Candle();
+  const canopy=suspension.group;canopy.add(candle);
+  const carrier=Candle();carrier.name='FlareDiscardedCarrier';carrier.scale.set(1.18,1.35,1.18);
+  root.name='Flare/'+flare.id;root.add(head,smoke,sparks,canopy,carrier);this.root.add(root);
+  const item={root,head,smoke,sparks,canopy,candle,carrier,...suspension};this.items.add(item);this.Update(item,flare);return item;
+ }
+ Lighting(){
+  const l=this.lights;this.ambient.setRGB(A.ambientFloor,A.ambientFloor,A.ambientFloor);this.sun.setRGB(0,0,0);
+  if(l){this.ambient.add(l.ambient.color.clone().multiplyScalar(l.ambient.intensity*1.5));
+    this.ambient.addScalar((l.globalProbe?.intensity??0)*.25);this.sun.copy(l.sun.color).multiplyScalar(l.sun.intensity*.45);
+  }else this.ambient.setRGB(.14,.15,.17);
+ }
+ Cloth(item,f,opened,settle,fade){
+  const {cloth,cords,segments,rings}=item,p=cloth.geometry.attributes.position;
+  const baseY=(A.leaderLength+A.cordLength)*(1-settle)+.035*settle;
+  const radius=A.canopyRadius*(.06+.94*opened),height=A.canopyHeight*(1-settle);
+  for(let j=0;j<=rings;j++)for(let i=0;i<=segments;i++){
+   const r=j/rings,a=i/segments*Math.PI*2,rr=A.ventRadius+(radius-A.ventRadius)*r;
+   const panel=Math.sin(a*A.ribs*.5)**2,flutter=Math.sin(a*3+f.t*3.7+r*9)*.006*r*r*(1-settle);
+   const y=baseY+height*Math.pow(1-r*r,.7)+panel*.018*r*(1-settle)+flutter+settle*.018*(Math.sin(a*3+r*14)+1);
+   p.setXYZ(j*(segments+1)+i,Math.cos(a)*rr,y,Math.sin(a)*rr);
+  }p.needsUpdate=true;cloth.geometry.computeVertexNormals();
+  const c=cords.geometry.attributes.position;let k=0;
+  c.setXYZ(k++,0,A.candleHeight+A.candleLift,0);c.setXYZ(k++,0,A.leaderLength*(1-settle)+.04*settle,0);
+  for(let i=0;i<A.ribs;i++){
+   const joinY=A.leaderLength*(1-settle)+.04*settle,end=new THREE.Vector3().fromBufferAttribute(p,rings*(segments+1)+Math.round(i/A.ribs*segments));
+   c.setXYZ(k++,0,joinY,0);c.setXYZ(k++,end.x*.5,(joinY+end.y)*.5-settle*.03,end.z*.5);
+   c.setXYZ(k++,end.x*.5,(joinY+end.y)*.5-settle*.03,end.z*.5);c.setXYZ(k++,end.x,end.y,end.z);
+  }c.needsUpdate=true;cords.geometry.setDrawRange(0,k);
+  const u=cloth.material.uniforms;u.ambient.value.copy(this.ambient);u.sun.value.copy(this.sun);u.sunDirection.value.copy(this.lights?.sunDirection??new THREE.Vector3(0,1,0));
+  u.selfLight.value.setHex(f.lightColor).multiplyScalar(f.intensity*A.canopySelfLight);u.opacity.value=.96*fade;
+  cords.material.color.copy(this.ambient).add(this.sun).multiplyScalar(.3).add(new THREE.Color(f.lightColor).multiplyScalar(f.intensity*A.canopySelfLight*.3));cords.material.opacity=.75*fade;
+  item.candle.position.set(0,(A.candleLift+A.candleHeight*.5)*(1-settle)+A.candleRadius*settle,0);
+  item.candle.rotation.z=settle*Math.PI*.5;item.candle.material.opacity=fade;
  }
  Update(item,f){
-  if(!this.items.has(item))return;
+  if(!this.items.has(item))return;this.Lighting();
   const {head,smoke,sparks,canopy}=item,t=f.t,since=t-f.ignitedAt;
-  head.material.uniforms.clock.value=t;head.material.uniforms.power.value=f.brightness;
+  const opened=Smooth(0,A.openingS,since),settle=f.landed?Smooth(0,A.settleS,t-f.landing.t):0;
+  const fade=f.landed?1-Smooth(f.endAt-A.groundFadeS,f.endAt,t):1;
+  head.material.uniforms.clock.value=t;head.material.uniforms.power.value=since>=0&&!f.landed?f.brightness:0;
   Put(head,0,f.pos.x,f.pos.y,f.pos.z,A.glowSize,0);Flush(head);
   canopy.visible=f.parachute!==false&&since>=0;
-  const opened=THREE.MathUtils.smoothstep(since,0,A.openingS);
-  canopy.position.set(f.pos.x,f.pos.y,f.pos.z);canopy.scale.set(.08+.92*opened,.3+.7*opened,.08+.92*opened);
-  canopy.rotation.z=Math.sin(since*2+f.swayPhase)*.07*opened;canopy.rotation.x=Math.sin(since*1.7)*.05*opened;
-  // White fabric catches the candle's own upward light without another light slot.
-  canopy.children[0].material.emissive.setHex(f.lightColor).multiplyScalar(.018*f.brightness);
+  canopy.position.set(f.pos.x,f.pos.y,f.pos.z);canopy.rotation.z=Math.sin(since*2+f.swayPhase)*.055*opened*(1-settle);canopy.rotation.x=Math.sin(since*1.7)*.035*opened*(1-settle);
+  if(canopy.visible)this.Cloth(item,f,opened,settle,fade);
+  item.carrier.visible=f.physical&&f.parachute&&t<(f.carrierLanding?.t??0)+3;
+  if(item.carrier.visible){
+    const carrierPose=SampleFlarePosition({...f,parachute:false,landing:f.carrierLanding,swayM:0},t);
+    item.carrier.position.set(carrierPose.x,carrierPose.y+A.candleHeight*.65,carrierPose.z);
+    item.carrier.rotation.set(Math.max(0,t-f.ignitedAt)*4,0,Math.max(0,t-f.ignitedAt)*2.3);
+    if(f.carrierLanding&&t>=f.carrierLanding.t){item.carrier.rotation.set(0,0,Math.PI*.5);item.carrier.position.y=carrierPose.y+A.candleRadius*1.18;}
+    item.carrier.material.opacity=1-Smooth((f.carrierLanding?.t??0)+2,(f.carrierLanding?.t??0)+3,t);
+  }
+  const u=smoke.material.uniforms;u.ambient.value.copy(this.ambient).add(this.sun.clone().multiplyScalar(.65));u.lightPosition.value.set(f.pos.x,f.pos.y,f.pos.z);u.candle.value=f.intensity;
   for(let i=0;i<A.smokeCount;i++){
    const born=(Math.floor(t*A.smokeHz)-i)/A.smokeHz,age=t-born;
-   if(born<.08||born>f.outAt||age>A.smokeLife){Put(smoke,i,0,0,0,0,-1);continue;}
-   const p=SampleFlarePosition(f,born),burn=born>=f.ignitedAt;
-   const seed=Math.sin(born*74.7+f.swayPhase),spread=.10+age*.12;
-   Put(smoke,i,p.x+Math.sin(f.driftDirRad)*f.driftMS*age+seed*spread,
-    p.y+age*.5,p.z+Math.cos(f.driftDirRad)*f.driftMS*age+Math.cos(born*43.1)*spread,
-    (burn?.24:.12)+age*.28,age/A.smokeLife);
+   const launch=born>=0&&born<.16;
+   if((born<f.ignitedAt&&!launch)||born>f.outAt||age>A.smokeLife){Put(smoke,i,0,0,0,0,-1);continue;}
+   const p=launch?{x:f.from.x,y:f.groundY+A.launchHeight,z:f.from.z}:SampleFlarePosition(f,born);
+   const seed=Math.sin(born*74.7+f.swayPhase)*.5+.5;
+   const spread=.04+age*.1+(f.parachute&&!launch ? .3*Smooth(.25,.9,age) : 0);
+   Put(smoke,i,p.x+Math.sin(f.driftDirRad)*f.driftMS*age+Math.sin(born*3.7+age)*spread,p.y+age*.55,
+    p.z+Math.cos(f.driftDirRad)*f.driftMS*age+Math.cos(born*4.1-age*.4)*spread,.18+age*.3,age/A.smokeLife,seed);
   }Flush(smoke);
-  smoke.material.uniforms.tint.value.setHex(0xaaa99f).lerp(new THREE.Color(f.lightColor),.1*f.brightness);
   for(let i=0;i<A.sparkCount;i++){
-   const born=(Math.floor(t*22)-i)/22,age=t-born;
+   const born=(Math.floor(t*A.sparkHz)-i)/A.sparkHz,age=t-born;
    if(born<f.ignitedAt||born>f.outAt||age>A.sparkLife){Put(sparks,i,0,0,0,0,-1);continue;}
    const p=SampleFlarePosition(f,born),a=born*137.5;
-   Put(sparks,i,p.x+Math.sin(a)*age*.4,p.y-age*.9-4.905*age*age,p.z+Math.cos(a)*age*.4,.045*(1-age/A.sparkLife),0);
-  }sparks.material.uniforms.power.value=f.brightness*.6;Flush(sparks);
+   Put(sparks,i,p.x+Math.sin(a)*age*.3,p.y-age*.65-.5*A.gravity*age*age,p.z+Math.cos(a)*age*.3,.024,age/A.sparkLife,0,1+age*3);
+  }Flush(sparks);
  }
- Remove(item){if(!this.items.delete(item))return;item.root.removeFromParent();item.root.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});}
+ Remove(item){if(!this.items.delete(item))return;item.root.removeFromParent();item.cloth.material.uniforms.weave.value.dispose();item.root.traverse(o=>{if(o.isInstancedMesh)o.dispose();o.geometry?.dispose();o.material?.dispose();});}
  Dispose(){for(const item of [...this.items])this.Remove(item);this.root.removeFromParent();}
 }

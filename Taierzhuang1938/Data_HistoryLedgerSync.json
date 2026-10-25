@@ -14,9 +14,13 @@
       "notionLedger": "3fd60335331c8194aa82f0b238084d34",
       "notionParent": "3fd60335331c818fa24deadb6d72ca70",
       "notionVerifiedAt": [
-        "2026-10-25T09:28:03.059Z",
-        "2026-10-25T09:28:04.705Z"
-      ]
+        "2026-10-25T11:57:54.441Z",
+        "2026-10-25T11:42:29.123Z"
+      ],
+      "visualRevision": "2026102502",
+      "structureSource": "https://en.wikisource.org/wiki/Objects_Dropped_From_The_Air",
+      "structureReview": "Verified title page: Ministry of Home Security, 3rd edition, 1944; section 15 and figure 57. German aerial flare structure and burnt-out remains are period comparisons, not measurements of the Japanese small flare. AWM REL31335 is dated circa 1953 and is used only as a fabric/attachment material study. No Tengxian use claim upgraded.",
+      "acceptanceScope": "Shared effect lifecycle and optical refinements only; overall realism remains active. See docs/Data_FlareRealismAudit.md for verified and still-unverified items. Global audit cursors remain unchanged."
     },
     {
       "asset": "ClothLab",
