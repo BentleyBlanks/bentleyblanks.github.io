@@ -194,11 +194,12 @@ def BuildGroom(skin,rig,collection,material,count=21000):
         uvs.extend([(left,bottom),(left+.5,bottom),(left+.5,bottom+.5),(left,bottom+.5)])
         tint=tuple(min(1,max(.01,color[i]*.75/means[tile][i])) for i in range(3))+(1,)
         colors.extend([tint]*4);rows.extend([row]*4);regions[str(tile)]+=1
-    def Fiber(root,normal,flow,width,length,row,tile,color):
+    def Fiber(root,normal,flow,width,length,row,tile,color,liftScale=1):
         flow-=normal*flow.dot(normal)
         if flow.length<.01:flow=normal.cross(Vector((1,0,0)))
         flow.normalize();across=flow.cross(normal).normalized();start=len(vertices)
-        lower=root-normal*.0002;upper=root+flow*length+normal*rng.uniform(.0007,.0022)
+        lift=rng.uniform(.0007,.0022)*liftScale
+        lower=root-normal*.0002;upper=root+flow*length+normal*lift
         vertices.extend([lower-across*width/2,lower+across*width/2,upper]);faces.append((start,start+1,start+2))
         normals.extend([tuple(normal)]*3)
         left=.5*(tile%2);bottom=.5*(1-tile//2)
@@ -207,8 +208,10 @@ def BuildGroom(skin,rig,collection,material,count=21000):
         tint=tuple(min(1,max(.003,color[i]*.75/means[tile][i])) for i in range(3))+(1,)
         colors.extend([tint,tint,tuple(min(1,value*1.10) for value in tint[:3])+(1,)])
         rows.extend([row]*3)
+        return lift
     color=skin.data.color_attributes['CoatColor']
     coronetFibres=min(480,count) if coronetTriangles else 0
+    bellyFibres=0;bellyLengths=[];bellyLifts=[];bellyStripSamples=[]
     for sample in range(count):
         coronet=sample<coronetFibres
         triangle=coronetTriangles[bisect.bisect_left(coronetCumulative,rng.random()*coronetArea)] if coronet else triangles[bisect.bisect_left(cumulative,rng.random()*total)]
@@ -226,20 +229,44 @@ def BuildGroom(skin,rig,collection,material,count=21000):
         rootColor=sum((Vector(color.data[i].color[:3])*w for i,w in zip(ids,bary)),Vector())
         pale=Smooth(.065,.17,brightness)
         tile=2 if rng.random()<pale else (1 if rng.random()<.12 else 0)
+        belly=0
         if referenceFlow:
             limbMass=sum(w for name,w in row.items() if name.startswith(('DonkeyFront','DonkeyRear')))
             appearance=skin.data.attributes.get('LimbAppearanceMass')
             if appearance:limbMass=sum(sum(appearance.data[i].color)*w for i,w in zip(ids,bary))
             flow=referenceFlow['HairFlow'](root,limbMass)
+            # Pale ventral hairs hang down and stand farther off the skin.
+            # Keep the same samples/random draws and leave limb/coronet fur
+            # outside this bounded, softly blended anatomical region.
+            belly=Smooth(.15,.65,-normal.z)*Smooth(.55,.61,root.z)*(1-Smooth(.77,.84,root.z))*Smooth(-.08,.02,root.y)*(1-Smooth(.50,.60,root.y))*Smooth(.06,.14,brightness)*(1-Smooth(.35,.65,limbMass))
+            if belly>0:flow=flow.lerp(Vector((0,-.4,-1)).normalized(),belly)
         elif root.y>.88:flow=Vector((0,.45,-1))
         elif root.z<.62:flow=Vector((0,-.12,-1))
         elif root.y>.58:flow=Vector((0,-.72,-.75))
         else:flow=Vector((0,-1,-.30))
         flow+=Vector((rng.uniform(-.2,.2),rng.uniform(-.14,.14),rng.uniform(-.14,.14)))
         length=rng.uniform(.009,.014) if coronet else rng.uniform(.012,.023) if root.z<.20 else rng.uniform(.006,.013) if root.z>.60 else rng.uniform(.004,.009)
-        Fiber(root,normal,flow,rng.uniform(.0007,.0012) if coronet else rng.uniform(.00025,.00065),length,row,tile,rootColor)
+        width=rng.uniform(.0007,.0012) if coronet else rng.uniform(.00025,.00065)
+        first=len(vertices)
+        lift=Fiber(root,normal,flow,width*(1+.75*belly),length*(1+.55*belly),row,tile,rootColor,1+2*belly)
+        if belly>.01:
+            bellyFibres+=1;bellyLengths.append(length*(1+.55*belly));bellyLifts.append(lift)
+        if belly>.65:bellyStripSamples.append((first,root.copy(),normal.copy(),flow.copy(),dict(row),rootColor.copy(),belly))
         if normal.z>.55 and root.z>.75 and rng.random()<.075:
             Add(root,normal,flow,rng.uniform(.008,.014),rng.uniform(.010,.017),row,tile,.0014,rootColor)
+    # Reuse pairs of existing fine triangles for fine tapered strips. This
+    # improves the ventral fringe without adding triangles or random draws.
+    bellyStrips=min(400,len(bellyStripSamples)//2)
+    for index in range(bellyStrips):
+        a,b=bellyStripSamples[index*2:index*2+2];first,root,normal,flow,row,pigment,amount=a
+        across=flow.cross(normal).normalized();length=.016+.006*amount;width=.0012+.0008*amount
+        lower=root-normal*.0003-flow*.001;upper=root+flow*length+normal*(.003+.0035*amount)
+        corners=[lower-across*width/2,lower+across*width/2,upper+across*width*.15,upper-across*width*.15]
+        coordinates=[(.2498,.0700),(.2502,.0700),(.2502,.0704),(.2498,.0704)];tint=tuple(min(1,max(.003,pigment[c]*.75/means[2][c])) for c in range(3))+(1,)
+        for vertex,corner in zip([a[0],a[0]+1,a[0]+2,b[0],b[0]+1,b[0]+2],[0,1,2,0,2,3]):
+            vertices[vertex]=corners[corner];uvs[vertex]=coordinates[corner];normals[vertex]=tuple(normal);rows[vertex]=dict(row)
+            colors[vertex]=tuple(min(1,v*(1.06 if corner>=2 else 1)) for v in tint[:3])+(1,)
+    regions['2']+=bellyStrips
     # Soft ear rims and terminal tail brush share the same cutout atlas.
     for side in ('Left','Right'):
         ear=bpy.data.objects['DonkeyPinna'+side];ear.data.calc_loop_triangles()
@@ -291,9 +318,10 @@ def BuildGroom(skin,rig,collection,material,count=21000):
         for name,weight in row.items():
             group=obj.vertex_groups.get(name) or obj.vertex_groups.new(name=name);group.add([index],weight,'REPLACE')
     modifier=obj.modifiers.new('DonkeyCoatSkin','ARMATURE');modifier.object=rig
-    obj['coatAlphaCutoff']=.45;obj['coatCardCount']=sum(len(f)==4 for f in faces);obj['coatFibreCount']=count;obj['groomPrimitiveCount']=len(faces);obj['coatDensityPerM2']=count/total
+    obj['coatAlphaCutoff']=.45;obj['coatCardCount']=sum(len(f)==4 for f in faces)+bellyStrips;obj['coatFibreCount']=count-2*bellyStrips;obj['coatRootSamples']=count;obj['groomPrimitiveCount']=len(faces);obj['coatDensityPerM2']=count/total
     obj.visible_shadow=False;obj['groomCastShadow']=False
-    return obj,{'fibres':count,'coronetFibres':coronetFibres,'coronetAreaM2':coronetArea,'coronetLengthM':[.009,.014],'coronetWidthM':[.0007,.0012],'cards':sum(len(f)==4 for f in faces),'triangles':sum(len(f)-2 for f in faces),'regionCards':regions,'sampledSurfaceM2':total,'maxInfluences':4}
+    return obj,{'fibres':count-2*bellyStrips,'rootSamples':count,'coronetFibres':coronetFibres,'coronetAreaM2':coronetArea,'coronetLengthM':[.009,.014],'coronetWidthM':[.0007,.0012],'cards':sum(len(f)==4 for f in faces)+bellyStrips,'triangles':sum(len(f)-2 for f in faces),'regionCards':regions,'sampledSurfaceM2':total,'maxInfluences':4,
+        'bellyCoat':{'sampleFibres':bellyFibres,'fineFibres':bellyFibres-2*bellyStrips,'pairedStrips':bellyStrips,'sampleLengthRangeM':[min(bellyLengths,default=0),max(bellyLengths,default=0)],'sampleLiftRangeM':[min(bellyLifts,default=0),max(bellyLifts,default=0)],'stripLengthRangeM':[.0199,.022],'stripLiftRangeM':[.005275,.0065],'method':'bounded pale ventral fibres: downward/backward flow, up to 1.55x length and 3x normal lift; pairs of existing fine triangles reused as narrow opaque tapered strips; same source samples, random sequence and triangle budget'}}
 
 def DetailCoat(base,skin,collection):
     image=bpy.data.images.load(str(base/'SourceTextures/Texture_DonkeyCoatFiberShortSource.png'),check_existing=True)

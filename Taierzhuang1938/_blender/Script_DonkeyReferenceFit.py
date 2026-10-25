@@ -710,7 +710,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261025ReferenceV22'
+    scene['DonkeyReferenceFitRevision']='20261025ReferenceV23'
     scene['DonkeyReferenceFineTail']=True
     scene['DonkeyReferenceFitAnchorY']=anchor
     # Repaint the short pale muzzle rather than the old long horse-like blaze.
