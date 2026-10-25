@@ -1,4 +1,4 @@
-// The laboratory's static floor, curtain frame and banner stand are sector-batched.
+// The laboratory's static floor, curtain frame and comparison stands are sector-batched.
 // Cloth meshes, contacts and their visual examples belong exclusively to Script_ClothRange.
 import * as THREE from "three";
 import { RangeField } from "./Script_RangeField.mjs";
@@ -45,6 +45,20 @@ export class ClothRangeField extends RangeField {
     }
     this.Block(sink, "Metal", "BannerCrossbar", f.x, f.top + f.beam / 2, f.z,
       f.width + 0.40, f.beam, f.beam, true);
+    // Identical rear supports leave the full comparison swatches clear: posts
+    // sit outside their edges, the beam above their header, and feet below their hem.
+    const s = CLOTH_RANGE_FIXTURES.materialStand;
+    sink.SetSector("ClothMaterialStands");
+    for (const station of CLOTH_RANGE_STATIONS.filter(item => item.materialSample)) {
+      for (const side of [-1, 1]) {
+        const x = station.x + side * (s.openingWidth + s.beam) / 2;
+        this.Block(sink, "Wood", station.id + "Post" + side, x, s.top / 2, station.z, s.beam, s.top, s.depth, true);
+        this.Block(sink, "Metal", station.id + "Foot" + side, x, s.footHeight / 2, station.z,
+          s.footWidth, s.footHeight, s.footDepth);
+      }
+      this.Block(sink, "Wood", station.id + "Crossbar", station.x, s.top + s.beam / 2, station.z,
+        s.openingWidth + 2 * s.beam, s.beam, s.depth, true);
+    }
     this.meshes.push(...sink.Flush(this.scene, { Get: name => this.materials.get(name) }));
     this.colliders = sink.colliders;
     this.BuildCollisionGrid();

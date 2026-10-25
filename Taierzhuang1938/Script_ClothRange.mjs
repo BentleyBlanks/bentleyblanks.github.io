@@ -5,6 +5,7 @@ import { CloneSkinnedRig } from './Script_SkinnedClone.mjs';
 import { CloneShadedMaterial } from './Script_Materials.mjs';
 import { BlanketClothRig } from './Script_BlanketCloth.mjs';
 import { ApplyClothWind, ClothLabContactFriction } from './Script_ClothLabSimulation.mjs';
+import { CreateClothSampleMaterials } from './Script_ClothSampleMaterials.mjs';
 import { T } from './Script_Text.mjs';
 import { CLOTH_LAB_ASSETS, CLOTH_LAB_PRESETS, CLOTH_LAB_CONTROLS, CLOTH_LAB_SIM as S, ClampClothParameter } from './Data_Tuning_ClothRange.mjs';
 
@@ -15,8 +16,9 @@ const Style = `
 #cloth-range-panel *{box-sizing:border-box}#cloth-range-panel h2{font-size:19px;margin:0 0 3px;font-weight:650}#cloth-range-panel h3{font-size:12px;color:#bdbaab;font-weight:500;letter-spacing:.08em;margin:18px 0 8px}#cloth-range-panel p{font-size:12px;color:#c2c4b8;margin:7px 0}
 #cloth-range-panel button,#cloth-range-panel select{background:#373d3b;border:1px solid #636b62;color:#e9e4d5;border-radius:4px;font:inherit;padding:7px 9px;cursor:pointer}#cloth-range-panel button:hover{background:#4d554c}#cloth-range-panel button[aria-pressed=true]{background:#d2bf85;color:#252922;border-color:#d2bf85}#cloth-range-panel button:disabled{opacity:.4;cursor:wait}
 #cloth-range-panel .cloth-playback{position:sticky;top:-16px;z-index:2;background:#202827;padding:10px 0 12px;border-bottom:1px solid #69725e}#cloth-range-panel [data-cloth-playback]{color:#dcc487;font-weight:600;margin:6px 0}#cloth-range-panel .cloth-editing{font-weight:600;color:#e1d5ad}
-#cloth-range-panel .cloth-tabs{display:grid;gap:5px;margin:14px 0}#cloth-range-panel .cloth-tabs button{text-align:left}#cloth-range-panel .cloth-buttons{display:flex;flex-wrap:wrap;gap:5px}#cloth-range-panel select{width:100%}#cloth-range-panel .cloth-control{display:grid;grid-template-columns:1fr 100px;gap:2px 8px;margin:8px 0;align-items:center}#cloth-range-panel output{color:#dcc487;text-align:right;font-variant-numeric:tabular-nums}#cloth-range-panel input[type=range]{grid-column:1/3;width:100%;margin:3px 0;accent-color:#c8b77d;cursor:pointer}#cloth-range-panel .cloth-note{border-left:2px solid #c2ad74;padding-left:9px;margin-top:12px}#cloth-range-panel .cloth-limit{font-size:11px;color:#a5aaa0;border-top:1px solid #535a50;padding-top:10px}#cloth-range-panel [data-cloth-stats]{font:11px/1.5 ui-monospace,monospace;color:#bfc2af;margin:12px 0 5px}
+#cloth-range-panel .cloth-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin:14px 0}#cloth-range-panel .cloth-tabs button{text-align:left}#cloth-range-panel .cloth-buttons{display:flex;flex-wrap:wrap;gap:5px}#cloth-range-panel select{width:100%}#cloth-range-panel .cloth-control{display:grid;grid-template-columns:1fr 100px;gap:2px 8px;margin:8px 0;align-items:center}#cloth-range-panel output{color:#dcc487;text-align:right;font-variant-numeric:tabular-nums}#cloth-range-panel input[type=range]{grid-column:1/3;width:100%;margin:3px 0;accent-color:#c8b77d;cursor:pointer}#cloth-range-panel .cloth-note{border-left:2px solid #c2ad74;padding-left:9px;margin-top:12px}#cloth-range-panel .cloth-limit{font-size:11px;color:#a5aaa0;border-top:1px solid #535a50;padding-top:10px}#cloth-range-panel [data-cloth-stats]{font:11px/1.5 ui-monospace,monospace;color:#bfc2af;margin:12px 0 5px}
 #cloth-range-toggle{position:fixed;left:16px;bottom:16px;z-index:25;background:#252d29;color:#e7dfc9;border:1px solid #777c68;border-radius:4px;padding:7px 12px;font:12px system-ui;cursor:pointer}#cloth-range-hint{position:fixed;right:16px;bottom:16px;z-index:23;background:#202823bd;color:#eee8d5;padding:8px 14px;border-radius:4px;font:12px system-ui;pointer-events:none}
+#cloth-range-labels{position:fixed;inset:0;z-index:22;pointer-events:none}#cloth-range-labels button{position:absolute;transform:translate(-50%,-100%);pointer-events:auto;background:#202823e0;color:#eee8d5;border:1px solid #9b9f83;border-radius:4px;padding:5px 9px;white-space:nowrap;font:12px system-ui;cursor:pointer}
 @media(max-width:700px){#cloth-range-panel{width:256px;left:8px;top:8px;bottom:48px;padding:12px}#cloth-range-hint{max-width:45%;font-size:10px;right:8px}#cloth-range-toggle{left:8px;bottom:8px}}
 `;
 
@@ -27,7 +29,7 @@ export class ClothRange {
     this.panelShown = true; this.wireframe = false; this.disposed = false; this.listeners = [];
     this.target = V(-3, 0.65, 0); this.radius = 3.6; this.azimuth = 0.5; this.elevation = 0.56;
     this.root = new THREE.Group(); this.root.name = 'ClothRangeSamples'; host.scene.add(this.root);
-    this.resources = new Set(); this.loadedResources = new Set();
+    this.resources = new Set(); this.loadedResources = new Set(); this.materialBundles = new Set();
     this.MakeBody(); this.MakePanel(); this.BindCamera();
     host.SetViewmodelHidden?.(true);
     this.api = {
@@ -35,6 +37,7 @@ export class ClothRange {
       Reset: () => this.Reset(), Pause: on => this.Pause(on), Step: count => this.Step(count), Gust: () => this.Gust(),
       Action: id => this.Action(id), Camera: id => this.Camera(id), Export: () => this.Export(),
       ShowPanel: on => this.ShowPanel(on), Wireframe: on => this.Wireframe(on),
+      Compare: () => this.Compare(),
     };
     this.loading = this.Load();
   }
@@ -63,18 +66,23 @@ export class ClothRange {
   }
   async Load() {
     try {
-      const loader = new ManagedGLTFLoader();
+      const loader = new ManagedGLTFLoader(), sources = new Map();
       for (const spec of CLOTH_LAB_ASSETS) {
         const url = `./Model/ClothLab/${spec.file}?v=${Version}`;
-        const asset = await loader.loadAsync(url);
+        if (!sources.has(spec.file)) sources.set(spec.file, loader.loadAsync(url));
+        const asset = await sources.get(spec.file);
         asset.scene.traverse(o => { if (o.isMesh) { this.loadedResources.add(o.geometry); for (const m of Array.isArray(o.material) ? o.material : [o.material]) { this.loadedResources.add(m); for (const value of Object.values(m)) if (value?.isTexture) this.loadedResources.add(value); } } });
         if (this.disposed) { for (const resource of this.loadedResources) resource.dispose?.(); return; }
         const root = CloneSkinnedRig(asset.scene); root.name = `ClothLab_${spec.id}`;
+        const bundle = spec.material ? CreateClothSampleMaterials(spec.material, { wireframe: this.wireframe }) : null;
+        if (bundle) this.materialBundles.add(bundle);
         const meshes = [];
         root.traverse(o => {
           if (!o.isMesh) return;
           o.geometry = this.Own(o.geometry.clone());
-          const materials = (Array.isArray(o.material) ? o.material : [o.material]).map(m => this.Own(CloneShadedMaterial(m)));
+          const materials = (Array.isArray(o.material) ? o.material : [o.material]).map(m => bundle
+            ? bundle.materials[/Binding$/.test(m.name) ? 2 : /Back$/.test(m.name) ? 1 : 0]
+            : this.Own(CloneShadedMaterial(m)));
           o.material = Array.isArray(o.material) ? materials : materials[0];
           o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
           meshes.push({ mesh: o, base: Float32Array.from(o.geometry.attributes.position.array),
@@ -141,14 +149,14 @@ export class ClothRange {
   ResetItem(item) {
     item.gustUntil = 0; item.pushStart = -Infinity;
     if (item.action === 'slide') {
-      item.root.position.set(item.spec.x, item.rig.cloth.cfg.groundOffsetM, S.slideZ);
+      item.root.position.set(item.spec.x, item.rig.cloth.cfg.groundOffsetM, (item.spec.z || 0) + S.slideZ);
       item.root.rotation.set(0, 0, 0);
       if (item.id === 'quilt') this.body.visible = false;
     } else if (item.id === 'quilt') {
       item.root.position.set(item.spec.x, item.action === 'drape' ? 1.05 : 0.7, 0);
       item.root.rotation.set(0, 0, 0); this.body.visible = item.action === 'drape';
     } else {
-      item.root.position.set(item.spec.x, item.spec.top - item.spec.length / 2, 0);
+      item.root.position.set(item.spec.x, item.spec.top - item.spec.length / 2, item.spec.z || 0);
       item.root.rotation.set(-Math.PI / 2, 0, Math.PI);
     }
     item.root.updateMatrixWorld(true);
@@ -193,7 +201,7 @@ export class ClothRange {
     for (const item of this.items) {
       const grid = item.rig.cloth;
       this.Pins(item); this.Colliders(item, dt); grid.SampleGround(() => 0);
-      const gust = Math.max(0, (item.gustUntil - this.clock) / S.gustS) * S.gustMps;
+      const gust = Math.max(0, (item.gustUntil - this.clock) / S.gustS) * (item.spec.sample ? S.sampleGustMps : S.gustMps);
       ApplyClothWind(grid, item.cfg, this.clock, dt, gust);
       grid.Step(dt); item.rig.Apply();
     }
@@ -229,12 +237,21 @@ export class ClothRange {
   Pause(on = !this.paused) { this.paused = !!on; this.accumulator = 0; this.stepFrames = 0; this.PaintValues(); return this.paused; }
   Step(count = 1) { this.paused = true; this.stepFrames += Math.min(120, Math.max(1, Math.floor(Number(count) || 1))); this.PaintValues(); return this.stepFrames; }
   Gust() { const item = this.Current(); if (!item) return false; item.gustUntil = this.clock + S.gustS; return true; }
+  Compare() {
+    if (!this.ready) return false;
+    for (const item of this.items.filter(item => item.spec.sample)) {
+      if (item.cfg.wind !== S.comparisonWindMps) item.preset = 'custom';
+      item.cfg.wind = S.comparisonWindMps; item.rig.cloth.cfg.wind = S.comparisonWindMps;
+      item.action = 'hang'; this.ResetItem(item); item.gustUntil = this.clock + S.gustS;
+    }
+    this.Select('muslin'); this.Pause(false); this.Camera('samples'); return true;
+  }
   Action(id) {
     const item = this.Current(); if (!item) return false;
     if (id === 'preview') {
       item.action = item.id === 'quilt' ? 'drape' : 'hang'; this.ResetItem(item);
       if (item.id === 'curtain') item.pushStart = this.clock;
-      if (item.id === 'banner') item.gustUntil = this.clock + S.gustS;
+      if (item.id === 'banner' || item.spec.sample) item.gustUntil = this.clock + S.gustS;
       this.Pause(false); this.Camera(item.id); this.PaintValues(); return true;
     }
     if (id === 'slide' || (id === 'hang' && item.id !== 'quilt')) {
@@ -265,7 +282,7 @@ export class ClothRange {
         const cloth = item.rig.cloth; let checksum = 0, finite = true;
         for (let i = 0; i < cloth.x.length; i++) { checksum += cloth.x[i] * (i + 1); finite &&= Number.isFinite(cloth.x[i]); }
         return { id: item.id, cfg: { ...item.cfg }, preset: item.preset, action: item.action, asset: item.url,
-          points: cloth.n, meshCount: item.meshes.length, skinnedCount: item.meshes.filter(e => e.mesh.isSkinnedMesh).length,
+          materialKind: item.spec.material || null, points: cloth.n, meshCount: item.meshes.length, skinnedCount: item.meshes.filter(e => e.mesh.isSkinnedMesh).length,
           materialCount: new Set(item.meshes.flatMap(e => e.materials)).size, stats: cloth.Stats(), friction: item.friction.Stats(), finite, poseChecksum: +checksum.toFixed(6),
           pins: [...cloth.pins].filter(([, pin]) => pin.k >= 1).map(([index, pin]) => ({ index, target: pin.target.toArray(),
             position: Array.from(cloth.x.slice(index * 3, index * 3 + 3)), gapM: pin.target.distanceTo(new THREE.Vector3().fromArray(cloth.x, index * 3)) })),
@@ -273,10 +290,12 @@ export class ClothRange {
       }) };
   }
   Camera(id = this.selected) {
-    if (id === 'overview') { this.target.set(0, 1.2, 0); this.radius = 9.2; this.azimuth = 0.16; this.elevation = 0.34; }
+    this.cameraView = id;
+    if (id === 'overview') { this.target.set(0, 1.2, 1.7); this.radius = 12.5; this.azimuth = 0.32; this.elevation = 0.52; }
+    else if (id === 'samples') { this.target.set(0, 1.7, 4.2); this.radius = 9.5; this.azimuth = 0; this.elevation = 0.08; }
     else { const spec = CLOTH_LAB_ASSETS.find(entry => entry.id === id); if (!spec) return false;
       const sliding = this.items.find(item => item.id === id)?.action === 'slide';
-      this.target.set(spec.x, sliding ? 0.15 : id === 'quilt' ? 0.65 : 1.55, sliding ? S.slideZ : 0); this.radius = sliding || id === 'quilt' ? 3.45 : 3.7;
+      this.target.set(spec.x, sliding ? 0.15 : id === 'quilt' ? 0.65 : 1.55, (spec.z || 0) + (sliding ? S.slideZ : 0)); this.radius = sliding || id === 'quilt' ? 3.45 : 3.7;
       this.azimuth = sliding || id === 'quilt' ? 0.55 : 0.16; this.elevation = sliding || id === 'quilt' ? 0.58 : 0.12;
     }
     this.Cut(); this.UpdateCamera(); return true;
@@ -309,12 +328,24 @@ export class ClothRange {
     const width = window.innerWidth, height = window.innerHeight;
     const panelWidth = this.panelShown ? (width <= 700 ? 264 : 340) : 0;
     if (camera.setViewOffset) camera.setViewOffset(width, height, -panelWidth / 2, 0, width, height);
+    for (const label of this.labels || []) {
+      const point = label.point.clone().project(camera);
+      const visible = ['overview', 'samples'].includes(this.cameraView) && point.z > -1 && point.z < 1 && Math.abs(point.x) < 1 && Math.abs(point.y) < 1;
+      label.button.hidden = !visible;
+      if (visible) { label.button.style.left = `${(point.x + 1) * width / 2}px`; label.button.style.top = `${(1 - point.y) * height / 2}px`; }
+    }
   }
   MakePanel() {
     this.style = document.createElement('style'); this.style.textContent = Style; document.head.appendChild(this.style);
     this.panel = document.createElement('section'); this.panel.id = 'cloth-range-panel'; this.panel.setAttribute('aria-label', T('cloth.title')); document.body.appendChild(this.panel);
     this.toggle = document.createElement('button'); this.toggle.id = 'cloth-range-toggle'; document.body.appendChild(this.toggle);
     this.hint = document.createElement('div'); this.hint.id = 'cloth-range-hint'; this.hint.textContent = T('cloth.instructions'); document.body.appendChild(this.hint);
+    this.labelRoot = document.createElement('div'); this.labelRoot.id = 'cloth-range-labels'; document.body.appendChild(this.labelRoot);
+    this.labels = CLOTH_LAB_ASSETS.filter(spec => spec.sample).map(spec => {
+      const button = document.createElement('button'); button.type = 'button'; button.textContent = T(`cloth.${spec.id}`); button.hidden = true;
+      this.labelRoot.appendChild(button); this.Listen(button, 'click', () => this.Select(spec.id));
+      return { button, point: V(spec.x, spec.top + 0.35, spec.z || 0) };
+    });
     this.Listen(this.toggle, 'click', () => this.ShowPanel(!this.panelShown));
     this.Listen(this.panel, 'pointerdown', event => event.stopPropagation());
     this.Listen(this.panel, 'keydown', event => { if (event.code !== 'Escape') event.stopPropagation(); });
@@ -325,6 +356,7 @@ export class ClothRange {
       if (action === 'reset') this.Reset(); else if (action === 'pause') this.Pause(); else if (action === 'step') this.Step();
       else if (action === 'restore') this.Preset(this.Current()?.spec.preset); else if (action === 'export') this.Download();
       else if (action === 'overview' || action === 'focus') this.Camera(action === 'overview' ? action : this.selected);
+      else if (action === 'compare') this.Compare();
       else if (action === 'wireframe') this.Wireframe(); else this.Action(action);
     });
     this.Listen(this.panel, 'input', event => { const key = event.target.dataset.clothParam; if (key) this.Set(key, event.target.value); });
@@ -339,7 +371,8 @@ export class ClothRange {
       <div class="cloth-tabs">${CLOTH_LAB_ASSETS.map(spec => `<button type="button" data-cloth-select="${spec.id}" aria-pressed="${spec.id === this.selected}">${T(`cloth.${spec.id}`)}</button>`).join('')}</div>
       ${!this.ready ? `<p role="status">${T(this.error ? 'cloth.error' : 'cloth.loading')}</p>` : `
       <div class="cloth-playback"><p class="cloth-editing">${T('cloth.editing', { name: T(`cloth.${this.selected}`) })}</p><p data-cloth-playback></p><div class="cloth-buttons">${this.Button('pause')}${this.Button('step')}${this.Button('preview')}</div></div>
-      <div class="cloth-buttons">${this.Button('focus')}${this.Button('overview')}${this.Button('wireframe')}</div>
+      <div class="cloth-buttons">${this.Button('focus')}${this.Button('overview')}${this.Button('wireframe')}${this.Button('compare')}</div>
+      ${item?.spec.sample ? `<p>${T('cloth.compare.note')}</p>` : ''}
       <p class="cloth-note">${T(`cloth.${this.selected}.note`)}</p>
       <h3>${T('cloth.actions')}</h3><div class="cloth-buttons">${(this.selected === 'quilt' ? ['drape', 'lift', 'drop'] : this.selected === 'curtain' ? ['push', 'gust', 'hang'] : ['gust', 'hang']).map(id => this.Button(id)).join('')}${this.Button('slide')}${this.Button('reset')}</div><p>${T('cloth.contactHint')}</p>
       <h3>${T('cloth.presets')}</h3><select data-cloth-preset aria-label="${T('cloth.presets')}">${Object.keys(CLOTH_LAB_PRESETS).map(id => `<option value="${id}">${T(`cloth.${['thin', 'cotton'].includes(id) ? id : `preset.${id}`}`)}</option>`).join('')}<option value="custom" disabled>${T('cloth.custom')}</option></select>
@@ -367,9 +400,10 @@ export class ClothRange {
   ShowPanel(on = true) { this.panelShown = !!on; if (this.panel) this.panel.hidden = !on; if (this.toggle) this.toggle.textContent = T(on ? 'cloth.hide' : 'cloth.show'); this.Cut(); return this.panelShown; }
   Dispose() {
     this.disposed = true; for (const remove of this.listeners) remove(); this.listeners.length = 0;
-    for (const element of [this.panel, this.toggle, this.hint, this.style]) element?.remove();
+    for (const element of [this.panel, this.toggle, this.hint, this.labelRoot, this.style]) element?.remove();
     this.root.removeFromParent();
     for (const item of this.items) item.friction.Dispose();
+    for (const bundle of this.materialBundles) bundle.Dispose();
     const skeletons = new Set(); this.root.traverse(o => { if (o.skeleton) skeletons.add(o.skeleton); }); for (const skeleton of skeletons) skeleton.dispose?.();
     for (const resource of new Set([...this.resources, ...this.loadedResources])) resource.dispose?.();
     this.host.camera.clearViewOffset?.(); const canvas = this.host.canvas || this.host.renderer?.domElement; if (canvas) canvas.style.touchAction = this.oldTouchAction || '';

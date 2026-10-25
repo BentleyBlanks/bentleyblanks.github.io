@@ -7,7 +7,7 @@
     {
       "asset": "ClothLab",
       "date": "2026-10-25",
-      "scope": "Only the independent cloth-lab quilt, door curtain and Sichuan banner study; preserve global repoCommit, reviewedAt and unrelated source-page stamps",
+      "scope": "Only the independent cloth-lab quilt, door curtain, Sichuan banner and generic material comparison samples; preserve global repoCommit, reviewedAt and unrelated source-page stamps",
       "assetContract": "Model/ClothLab/Data_ClothLabAssets.json",
       "decision": "Quilt loft, quilting, wear, curtain appearance and all simulation choices are artistic study. The banner uses a Sichuan death-flag motif; red diagonal bands, borders, typography, proportions and deformation are artistic choices, not an exact original reproduction or a Tengxian presence claim.",
       "appearanceRevision": "20261025ClothLabV4SoftCotton",
@@ -15,6 +15,8 @@
       "appearanceReview": "DongguaQuilt V4 only: faded grey-blue cotton face, warm-grey cotton lining, uneven soft filling and rounded binding replace the former large patches and leather-like surface detail. Colour, weave, wear, quilting and edge construction remain artistic material-study choices, not a documented 1938 issue pattern or an original-object reproduction. DoorCurtain, SichuanBanner and the production blanket are outside this appearance revision.",
       "notionReviewOn": "2026-10-25",
       "notionReview": "Re-read the two existing ClothLab ledger rows and matching parent-page bullets. Their generic creative-appearance boundary already covers V4 and contains no quilt colour or patch-count claim, so no Notion or player-facing codex edit was needed. Source verification remains dated 2026-10-24; global repository and unrelated page cursors are preserved.",
+      "materialSamplesReviewedOn": "2026-10-25",
+      "materialSamplesReview": "Muslin, silk, canvas and wool are generic experimental material swatches on identical comparison stands. Their weave, colour, dimensions and simulated response are creative test specifications; no historical issue pattern, wartime object or Tengxian usage is claimed. They introduce no historical assertion requiring an additional player-facing or Notion ledger entry; the existing cloth-study creative boundary remains unchanged.",
       "verifiedSources": [
         {
           "url": "https://china.cnr.cn/gdgg/20250722/t20250722_527276606.shtml",

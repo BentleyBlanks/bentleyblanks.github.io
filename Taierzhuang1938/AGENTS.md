@@ -6,7 +6,7 @@
 
 ## 当前入口与任务范围
 
-- **独立布料模拟测试场（2026-10-24）**：选章「测试场景」新增 `?cloth=1`，展示冬瓜厚棉被、进门棉门帘、川军出川锦旗；五档预设、十项参数、披覆/提角/松手/推帘/阵风、暂停单步与参数导出。`Data_Tuning_ClothRange` 只管本场，私有 `BlanketClothRig` / 几何 / 材质实例；旧布料默认配置和单被资产不变。三件新封闭壳 GLB 在 `Model/ClothLab/`，源工程在 OneDrive。没有自碰撞和棉絮体积压缩，不以厚壳代称完整厚织物求解。口径 [布料测试场](docs/Data_ClothRange.md)，门禁 `ClothRangeTest` / `ClothRangeBrowserTest`。
+- **独立布料模拟测试场（2026-10-24）**：选章「测试场景」新增 `?cloth=1`，展示冬瓜厚棉被、进门棉门帘、川军出川锦旗与细棉/绸/帆/羊毛四样片；九档预设、同风力对比、十项参数、披覆/提角/松手/推帘/阵风、暂停单步与参数导出。`Data_Tuning_ClothRange` 只管本场，私有 `BlanketClothRig` / 几何 / 材质实例；旧布料默认配置和单被资产不变。三件新封闭壳 GLB 在 `Model/ClothLab/`，源工程在 OneDrive。没有自碰撞和棉絮体积压缩，不以厚壳代称完整厚织物求解。口径 [布料测试场](docs/Data_ClothRange.md)，门禁 `ClothRangeTest` / `ClothRangeBrowserTest`。
 
 - **八八式侦察机二型参考重建（2026-10-23）**：独立 `Model/KawasakiType88/`，可编辑高源、PBR 游戏派生、真实舵面与上下副翼推杆；原工程在 OneDrive，重建走 `_blender/Script_RebuildKawasakiType88.mjs`。`campaignEnabled:false`，登记资产不自动替换正片编队。馆藏模型的编号、外观与隐蔽结构按参考复原标注，内田中队八八／九四异记保留。来源、契约及验收见[八八式资产说明](Model/KawasakiType88/Data_KawasakiType88.md)。
 

@@ -22,6 +22,7 @@ const THREE = await import('three');
 const { GLTFLoader } = await import('./vendor/three/examples/jsm/loaders/GLTFLoader.js');
 const { BLANKET_CLOTH, ClothGrid, BlanketClothRig } = await import('./Script_BlanketCloth.mjs');
 const { CloneSkinnedRig } = await import('./Script_SkinnedClone.mjs');
+const { CreateClothSampleMaterials } = await import('./Script_ClothSampleMaterials.mjs');
 hooks.deregister();
 
 let checks = 0;
@@ -47,7 +48,19 @@ for (const [file, expected] of legacy) {
 const defaultBefore = JSON.stringify(BLANKET_CLOTH);
 Check(Object.isFrozen(BLANKET_CLOTH), 'Production defaults remain frozen');
 Check(!/from\s+['"]three['"]/.test(fs.readFileSync(new URL('./Data_Tuning_ClothRange.mjs', import.meta.url), 'utf8')), 'Lab tuning is pure data');
-Check(Object.keys(CLOTH_LAB_PRESETS).join(',') === 'thin,cotton,quilt,curtain,banner', 'Five cloth profiles are available');
+const sampleIds = ['quilt', 'curtain', 'banner', 'muslin', 'silk', 'canvas', 'wool'];
+const materialSampleIds = ['muslin', 'silk', 'canvas', 'wool'];
+Check(Object.keys(CLOTH_LAB_PRESETS).sort().join(',') === [...sampleIds, 'thin', 'cotton'].sort().join(','), 'Nine cloth profiles include all seven independent samples');
+Check(CLOTH_LAB_ASSETS.map(spec => spec.id).join(',') === sampleIds.join(','), 'Seven selectable cloth samples have distinct identities');
+Check(new Set(CLOTH_LAB_ASSETS.map(spec => spec.file)).size === 3, 'Four material samples reuse the banner shell; only three GLB source assets exist');
+for (const [i, id] of materialSampleIds.entries()) {
+  const spec = CLOTH_LAB_ASSETS.find(item => item.id === id);
+  Check(spec.sample === true && spec.material === id && spec.file === 'Model_SichuanBanner.glb'
+    && spec.preset === id && spec.z === 4.2 && spec.x === [-4.5, -1.5, 1.5, 4.5][i]
+    && spec.width === 1.45 && spec.length === 1.75 && spec.top === 2.8, `${id}: independent material identity and second-row placement share the supported thin-shell rig`);
+}
+Check(CLOTH_LAB_CONTROLS.find(control => control.key === 'roughness').min === .2
+  && CLOTH_LAB_CONTROLS.find(control => control.key === 'density').min === .08, 'Controls expose silky roughness and light muslin surface density');
 Check(new Set(CLOTH_LAB_CONTROLS.map(item => item.key)).size === CLOTH_LAB_CONTROLS.length, 'Every parameter has one control');
 for (const [id, preset] of Object.entries(CLOTH_LAB_PRESETS)) {
   Check(Object.isFrozen(preset), `${id}: shared profile is immutable`);
@@ -84,6 +97,10 @@ function WindGrid(horizontal = false) {
   ApplyClothWind(light, { wind: 2, density: .5 }, .4, 1 / 60);
   ApplyClothWind(heavy, { wind: 2, density: 1 }, .4, 1 / 60);
   Check(light.v[14] > 0 && Math.abs(light.v[14] - heavy.v[14] * 2) < 1e-7, 'Doubling surface density halves aerodynamic acceleration');
+  const muslin = WindGrid(), doubleMuslin = WindGrid();
+  ApplyClothWind(muslin, { wind: 1, density: .08 }, .4, 1 / 60);
+  ApplyClothWind(doubleMuslin, { wind: 1, density: .16 }, .4, 1 / 60);
+  Check(muslin.v[14] > 0 && Math.abs(muslin.v[14] - doubleMuslin.v[14] * 2) < 1e-7, 'The new 0.08 kg/m² lower bound has no hidden density dead zone');
   Check(light.v.slice(0, 3).every(value => value === 0) && light.v.every(Number.isFinite), 'Pinned particles receive no wind and outputs stay finite');
   const flat = WindGrid(true); ApplyClothWind(flat, { wind: 2, density: .5 }, .4, 1 / 60);
   Check(flat.v[13] > 0 && flat.v[14] === 0 && light.v[13] === 0, 'Wind pressure follows the actual surface normal');
@@ -98,6 +115,38 @@ function WindGrid(horizontal = false) {
   ApplyClothWind(collapsed, { wind: 3, density: .5 }, .4, 1 / 60);
   Check(collapsed.v.every(value => value === 0), 'A degenerate patch does not produce NaN');
 }
+
+// New swatches author their own maps rather than displaying the historical
+// banner's lettering. All objects and backing bytes belong to one factory call.
+const materialRecipes = [];
+for (const kind of materialSampleIds) {
+  const pack = CreateClothSampleMaterials(kind), duplicate = CreateClothSampleMaterials(kind);
+  Check(pack.materials.length === 3 && pack.materials.every(material => material.isMeshPhysicalMaterial
+    && material.userData.clothSampleKind === kind), `${kind}: three physical cloth materials carry the sample identity`);
+  const textures = new Set(pack.materials.flatMap(material => [material.map, material.normalMap, material.roughnessMap]));
+  Check(textures.size === 3 && [...textures].every(texture => texture?.isDataTexture && texture.image.width === 512
+    && texture.image.height === 512 && texture.image.data.length === 512 * 512 * 4), `${kind}: dedicated base, normal and roughness maps are real 512² RGBA textures`);
+  const base = pack.materials[0].map, normal = pack.materials[0].normalMap, roughness = pack.materials[0].roughnessMap;
+  Check(base.colorSpace === THREE.SRGBColorSpace && normal.colorSpace === THREE.NoColorSpace && roughness.colorSpace === THREE.NoColorSpace,
+    `${kind}: base color is sRGB and normal/roughness remain linear data`);
+  Check(pack.materials.every((material, i) => material !== duplicate.materials[i]
+    && material.map !== duplicate.materials[i].map && material.map.image.data !== duplicate.materials[i].map.image.data), `${kind}: repeated factory calls share no material, texture or mutable image buffer`);
+  const baseHash = Hash(base.image.data), normalHash = Hash(normal.image.data);
+  Check(baseHash === Hash(duplicate.materials[0].map.image.data) && normalHash === Hash(duplicate.materials[0].normalMap.image.data), `${kind}: material generation is deterministic`);
+  const originalByte = base.image.data[0]; duplicate.materials[0].map.image.data[0] ^= 255;
+  duplicate.materials[0].roughness = .27;
+  Check(base.image.data[0] === originalByte && pack.materials[0].roughness !== .27, `${kind}: editing one swatch cannot alter another`);
+  if (kind === 'silk') Check(pack.materials[0].roughness < .4 && pack.materials[0].anisotropy > .5, 'Silk exposes a smooth directional fabric highlight');
+  if (kind === 'wool') Check(pack.materials[0].roughness > .9 && pack.materials[0].sheen > .7, 'Wool keeps a rough surface and strong soft fibre sheen');
+  const disposeCounts = new Map([...pack.materials, ...textures].map(resource => [resource, 0]));
+  for (const resource of disposeCounts.keys()) resource.addEventListener('dispose', () => disposeCounts.set(resource, disposeCounts.get(resource) + 1));
+  pack.Dispose(); pack.Dispose(); duplicate.Dispose();
+  Check([...disposeCounts.values()].every(count => count === 1), `${kind}: repeated disposal releases each private material and texture exactly once`);
+  materialRecipes.push({ kind, baseHash, normalHash });
+}
+Check(new Set(materialRecipes.map(recipe => recipe.baseHash)).size === materialSampleIds.length
+  && new Set(materialRecipes.map(recipe => recipe.normalHash)).size === materialSampleIds.length, 'Muslin, silk, canvas and wool have distinct authored colour and weave maps');
+assert.throws(() => CreateClothSampleMaterials('unknown'), RangeError);
 
 // Contact tests use the same grid and substeps as the live lab. They measure
 // travel, support, separation and carry, not just coefficient assignment.
@@ -245,7 +294,7 @@ function ShellTopology(glb) {
 const measuredAssets = [];
 for (const spec of CLOTH_LAB_ASSETS) {
   const file = new URL(`./Model/ClothLab/${spec.file}`, import.meta.url);
-  Check(fs.existsSync(file), `${spec.id}: separate asset exists`);
+  Check(fs.existsSync(file), `${spec.id}: registered source shell exists`);
   const glb = LoadGlb(file), g = glb.json;
   Check((g.images || []).length >= 2 && g.images.every(image => Number.isInteger(image.bufferView)), `${spec.id}: PBR images are embedded`);
   Check(g.materials.length >= 3 && g.materials.every(material => (material.alphaMode || 'OPAQUE') === 'OPAQUE'

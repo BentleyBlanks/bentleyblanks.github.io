@@ -1,6 +1,7 @@
 // Wind is applied only to the lab's private grid. Surface density changes acceleration,
 // never gravity; aerodynamic force follows the actual deformed surface normal.
-import { CLOTH_LAB_SIM as S } from './Data_Tuning_ClothRange.mjs';
+import { CLOTH_LAB_SIM as S, CLOTH_LAB_CONTROLS } from './Data_Tuning_ClothRange.mjs';
+const minDensity = CLOTH_LAB_CONTROLS.find(control => control.key === 'density').min;
 
 /** Position-level Coulomb contact, installed on one laboratory grid only.
  * The production solver retains its own ground damping and body-drag contract.
@@ -147,7 +148,7 @@ export function ApplyClothWind(cloth, cfg, time, dt, gust = 0) {
     const flutter = 0.75 + 0.25 * Math.sin(time * 2.8 + r * 0.43 + c * 0.21);
     const relative = (speed * 0.3 - v[o]) * nx + (speed * 0.12 - v[o + 1]) * ny + (speed * flutter - v[o + 2]) * nz;
     const force = Math.max(-S.windAccelerationMax, Math.min(S.windAccelerationMax,
-      S.pressure * relative * Math.abs(relative) / Math.max(0.1, cfg.density)));
+      S.pressure * relative * Math.abs(relative) / Math.max(minDensity, cfg.density)));
     v[o] += nx * force * dt; v[o + 1] += ny * force * dt; v[o + 2] += nz * force * dt;
   }
 }

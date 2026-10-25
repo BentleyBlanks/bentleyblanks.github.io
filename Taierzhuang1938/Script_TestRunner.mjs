@@ -908,7 +908,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /Icon_TabSeal(?:16|32|180)\.png/ },
   { domain: "combat", pattern: /Script_FirstPersonGait\.mjs/ },
   { domain: "singleBlanket", pattern: /SingleBlanket|BlanketCloth|EditorBlockoutBlanket/ },
-  { domain: "clothRange", pattern: /ClothRange|ClothLab|DongguaQuilt|DoorCurtain|SichuanBanner/ },
+  { domain: "clothRange", pattern: /ClothRange|ClothLab|ClothSample|DongguaQuilt|DoorCurtain|SichuanBanner/ },
   { domain: "combat", pattern: /FpsGripCorrective|FpsHandSkinWeights|FpsForearmTaper|FpsWristNormalSeam|FpsHandSelfContact|FpsHandPose|HanYangReloadClearance|FpsZbContactGeometry|FpsElbowArc|Script_RiggedModel\.mjs/ },
   {domain:"historyCodex",pattern:/HistoryCodex|HistoryBook|HistoryConscription|HistoryLedger|page-flip|Texture\/Menu\/History\//},
   { domain: "combat", pattern: /AircraftGeometry|OptimizeKi21|OptimizeKi30|Model_MitsubishiKi(21Ia|30)/ },

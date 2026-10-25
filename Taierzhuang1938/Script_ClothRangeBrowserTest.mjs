@@ -11,12 +11,18 @@ import { ServeRoot } from './Script_DevServer.mjs';
 import { CLOTH_LAB_ASSETS, CLOTH_LAB_PRESETS, CLOTH_LAB_CONTROLS, CLOTH_LAB_SIM } from './Data_Tuning_ClothRange.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const sampleIds = CLOTH_LAB_ASSETS.map(spec => spec.id);
+const materialSampleIds = ['muslin', 'silk', 'canvas', 'wool'];
 const out = path.resolve(here, '..', 'tmp', 'ClothRange');
 fs.mkdirSync(out, { recursive: true });
 const server = process.env.CLOTH_PREVIEW ? null : await ServeRoot(path.resolve(here, '..'), 0);
 const browser = await LaunchBrowser({ extraArgs: ['--mute-audio'] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-const errors = [], result = {};
+const errors = [], result = {}, sourceRequests = new Map();
+page.on('request', request => {
+  const file = /\/Model\/ClothLab\/(Model_[^/?]+\.glb)/.exec(request.url())?.[1];
+  if (file && request.method() === 'GET') sourceRequests.set(file, (sourceRequests.get(file) || 0) + 1);
+});
 page.on('pageerror', error => { errors.push(String(error)); console.log('PAGE ERROR', String(error)); });
 page.on('console', message => { if (message.type() === 'error') { errors.push(message.text()); console.log('CONSOLE ERROR', message.text().slice(0, 300)); } });
 const savedProfile = JSON.stringify('whitebox');
@@ -84,7 +90,8 @@ async function DrawMaterials(wireframe) {
       object.onBeforeRender = function (renderer, scene, camera, geometry, material, group) {
         original?.call(this, renderer, scene, camera, geometry, material, group);
         if (material.isMeshStandardMaterial || material.isMeshPhysicalMaterial)
-          records.push({ object: object.name, material: material.name, wireframe: !!material.wireframe, map: !!material.map });
+          records.push({ object: object.name, material: material.name, wireframe: !!material.wireframe, map: !!material.map,
+            sample: material.userData?.clothSampleKind || null });
       };
       restore.push(() => { object.onBeforeRender = original; });
     });
@@ -157,9 +164,60 @@ try {
   Healthy(result.boot.state, 'boot');
   assert.deepEqual(result.boot.state.items.map(item => item.id), CLOTH_LAB_ASSETS.map(item => item.id));
   assert.ok(result.boot.state.items.every(item => item.points === 216 && item.skinnedCount > 0 && item.materialCount >= 3));
-  assert.equal(result.boot.panel.samples, 3); assert.equal(result.boot.panel.controls, CLOTH_LAB_CONTROLS.length);
+  assert.equal(result.boot.panel.samples, sampleIds.length); assert.equal(result.boot.panel.controls, CLOTH_LAB_CONTROLS.length);
   assert.equal(result.boot.panel.presets, Object.keys(CLOTH_LAB_PRESETS).length);
   assert.ok(result.boot.panel.visible && result.boot.panel.title.includes('布料')); assert.equal(result.boot.audio, 0);
+  const expectedMeshes = result.boot.state.items.reduce((sum, item) => sum + item.skinnedCount, 0);
+  result.sourceRequests = Object.fromEntries(sourceRequests);
+  assert.equal(sourceRequests.get('Model_SichuanBanner.glb'), 1, 'One banner source request serves the flag and four material samples');
+  assert.equal(sourceRequests.size, 3, 'Seven samples load only three source GLBs');
+  result.instances = await page.evaluate(({ specs, sampleIds }) => {
+    const t = window.Taierzhuang, state = t.Debug.ClothRange.State();
+    const allGeometry = [], allPositions = [], allMaterials = [], allSkeletons = [], sampleTextures = [], rows = [];
+    const bannerMaps = new Set();
+    t.scene.getObjectByName('ClothLab_banner').traverse(object => {
+      if (object.isMesh) for (const m of [object.material].flat()) if (m.map) bannerMaps.add(m.map);
+    });
+    for (const spec of specs) {
+      const root = t.scene.getObjectByName(`ClothLab_${spec.id}`), materials = [], skeletons = new Set();
+      root.traverse(object => {
+        if (!object.isSkinnedMesh) return;
+        allGeometry.push(object.geometry); allPositions.push(object.geometry.attributes.position.array);
+        skeletons.add(object.skeleton); materials.push(...[object.material].flat());
+      });
+      allSkeletons.push(...skeletons); allMaterials.push(...materials);
+      const ownTextures = new Set(materials.flatMap(material => [material.map, material.normalMap, material.roughnessMap]).filter(Boolean));
+      const sample = sampleIds.includes(spec.id);
+      if (sample) sampleTextures.push(...ownTextures);
+      rows.push({ id: spec.id, root: root.position.toArray(), skeletons: skeletons.size,
+        cfgRoughness: state.items.find(item => item.id === spec.id).cfg.roughness,
+        materials: materials.map(material => ({ name: material.name, kind: material.userData.clothSampleKind ?? null,
+          roughness: material.roughness, sheen: material.sheen ?? 0, anisotropy: material.anisotropy ?? 0,
+          map: !!material.map, ownImage: !!material.map?.isDataTexture, inheritedBannerMap: bannerMaps.has(material.map),
+          baseColorSpace: material.map?.colorSpace, normalColorSpace: material.normalMap?.colorSpace,
+          roughnessColorSpace: material.roughnessMap?.colorSpace })),
+        textures: ownTextures.size });
+    }
+    return { rows, geometryCount: allGeometry.length, privateGeometry: new Set(allGeometry).size,
+      privatePositions: new Set(allPositions).size, materialCount: allMaterials.length, privateMaterials: new Set(allMaterials).size,
+      privateSkeletons: new Set(allSkeletons).size, sampleTextureCount: sampleTextures.length, privateSampleTextures: new Set(sampleTextures).size };
+  }, { specs: CLOTH_LAB_ASSETS, sampleIds: materialSampleIds });
+  assert.equal(result.instances.geometryCount, expectedMeshes);
+  assert.equal(result.instances.privateGeometry, expectedMeshes); assert.equal(result.instances.privatePositions, expectedMeshes);
+  assert.equal(result.instances.privateMaterials, result.instances.materialCount);
+  assert.equal(result.instances.privateSkeletons, sampleIds.length);
+  assert.equal(result.instances.privateSampleTextures, materialSampleIds.length * 3);
+  assert.equal(result.instances.sampleTextureCount, materialSampleIds.length * 3);
+  for (const id of materialSampleIds) {
+    const row = result.instances.rows.find(item => item.id === id), spec = CLOTH_LAB_ASSETS.find(item => item.id === id);
+    assert.ok(Math.abs(row.root[0] - spec.x) < 1e-6 && Math.abs(row.root[2] - spec.z) < 1e-6, `${id}: actual mesh uses the second-row position`);
+    assert.ok(row.skeletons === 1 && row.textures === 3 && row.materials.length === 3);
+    assert.ok(row.materials.every(material => material.kind === id && material.map && material.ownImage && !material.inheritedBannerMap
+      && material.baseColorSpace === 'srgb' && material.normalColorSpace === '' && material.roughnessColorSpace === ''
+      && Math.abs(material.roughness - row.cfgRoughness) < 1e-8), `${id}: original sample maps, color spaces and current roughness reach all surfaces`);
+  }
+  assert.ok(result.instances.rows.find(row => row.id === 'silk').materials.every(material => material.anisotropy > .5));
+  assert.ok(result.instances.rows.find(row => row.id === 'wool').materials.every(material => material.sheen > .7));
   console.log('PASS cloth scene / panel / embedded skinned assets');
 
   const stopped = await State();
@@ -178,7 +236,7 @@ try {
   const afterEdit = await State();
   assert.equal(afterEdit.selected, 'curtain'); assert.equal(Item(afterEdit, 'curtain').cfg.bend, .22);
   assert.equal(Item(afterEdit, 'curtain').preset, 'custom');
-  for (const id of ['quilt', 'banner']) assert.deepEqual(Item(afterEdit, id).cfg, Item(beforeEdit, id).cfg, `${id} is isolated from curtain edits`);
+  for (const id of sampleIds.filter(id => id !== 'curtain')) assert.deepEqual(Item(afterEdit, id).cfg, Item(beforeEdit, id).cfg, `${id} is isolated from curtain edits`);
   result.bounds = await page.evaluate(() => {
     const api = window.Taierzhuang.Debug.ClothRange;
     return { low: api.Set('density', -5), high: api.Set('density', 50), nan: api.Set('density', NaN), unknown: api.Set('missing', 1), state: api.State() };
@@ -204,9 +262,9 @@ try {
   });
   assert.ok(Math.abs(result.thickness.b / result.thickness.a - .5) < 1e-5, 'Thickness control changes real shell geometry');
   assert.ok(Math.abs(result.thickness.restored - result.thickness.a) < 1e-6);
-  result.tangentFrames = await page.evaluate(() => {
+  result.tangentFrames = await page.evaluate(ids => {
     const t = window.Taierzhuang, api = t.Debug.ClothRange, reports = [];
-    for (const id of ['quilt', 'curtain', 'banner']) {
+    for (const id of ids) {
       api.Select(id); api.Set('thickness', .12);
       t.scene.getObjectByName(`ClothLab_${id}`).traverse(object => {
         if (!object.isSkinnedMesh) return;
@@ -221,8 +279,8 @@ try {
       api.Preset(id);
     }
     api.Select('quilt'); return reports;
-  });
-  assert.ok(result.tangentFrames.length === 9 && result.tangentFrames.every(row => row.maxDot < .003 && row.minLength > .999), JSON.stringify(result.tangentFrames));
+  }, sampleIds);
+  assert.ok(result.tangentFrames.length === expectedMeshes && result.tangentFrames.every(row => row.maxDot < .003 && row.minLength > .999), JSON.stringify(result.tangentFrames));
   console.log('PASS UI selection / parameter bounds / five profiles / private shell thickness');
 
   await page.evaluate(() => window.Taierzhuang.Debug.ClothRange.ShowPanel(false));
@@ -233,9 +291,10 @@ try {
     await sharp(bytes).resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 })
       .toFile(path.join(out, `Scene_Wireframe${name}_640.jpg`));
   }
-  assert.ok(solidDraw.length >= 9 && solidDraw.every(row => !row.wireframe && !row.material.startsWith('Whitebox_')));
-  assert.ok(solidDraw.filter(row => row.map).length >= 6, 'The actual main draw uses the imported cloth maps');
-  assert.ok(wireDraw.length >= 9 && wireDraw.every(row => row.wireframe), 'Every actual cloth draw switches to wireframe');
+  assert.ok(solidDraw.length >= expectedMeshes && solidDraw.every(row => !row.wireframe && !row.material.startsWith('Whitebox_')));
+  assert.ok(solidDraw.filter(row => row.map).length >= sampleIds.length * 2, 'The actual main draw uses every cloth sample map');
+  assert.ok(materialSampleIds.every(id => solidDraw.some(row => row.sample === id && row.map)), 'All four procedural material types reach the real main draw');
+  assert.ok(wireDraw.length >= expectedMeshes && wireDraw.every(row => row.wireframe), 'Every actual cloth draw switches to wireframe');
   const solidPixels = await sharp(solidImage).resize({ width: 320 }).removeAlpha().raw().toBuffer();
   const wirePixels = await sharp(wireImage).resize({ width: 320 }).removeAlpha().raw().toBuffer();
   assert.equal(solidPixels.length, wirePixels.length);
@@ -255,7 +314,7 @@ try {
   console.log('PASS actual textured draw / wireframe material switch / visible pixel change');
 
   result.nativeSamples = [];
-  for (const id of ['quilt', 'curtain', 'banner']) {
+  for (const id of sampleIds) {
     await page.locator(`[data-cloth-select="${id}"]`).click();
     await page.evaluate(id => {
       const api = window.Taierzhuang.Debug.ClothRange;
@@ -275,6 +334,18 @@ try {
     const stiff = await Drag('bend', .5);
     assert.equal(Item(stiff.after, id).poseChecksum, Item(stiff.before, id).poseChecksum, `${id}: stiffness editing respects pause`);
     assert.equal(stiff.after.paused, true);
+    if (materialSampleIds.includes(id)) {
+      const smooth = await Drag('roughness', .25);
+      const renderedRoughness = await page.evaluate(id => {
+        const values = [];
+        window.Taierzhuang.scene.getObjectByName(`ClothLab_${id}`).traverse(object => {
+          if (object.isSkinnedMesh) for (const material of [object.material].flat()) values.push(material.roughness);
+        });
+        return values;
+      }, id);
+      assert.ok(renderedRoughness.length === 3 && renderedRoughness.every(value => Math.abs(value - Item(smooth.after, id).cfg.roughness) < 1e-8),
+        `${id}: native roughness slider updates all private cloth materials`);
+    }
     await page.locator('[data-cloth-action="preview"]').click();
     const started = await State(); assert.equal(started.paused, false, `${id}: preview automatically continues the simulation`);
     assert.equal(Item(started, id).cfg.bend, Item(stiff.after, id).cfg.bend, `${id}: preview keeps edited parameters`);
@@ -300,7 +371,7 @@ try {
     });
     return sum / count;
   });
-  for (const id of ['quilt', 'curtain', 'banner']) {
+  for (const id of sampleIds) {
     await page.locator(`[data-cloth-select="${id}"]`).click();
     await page.evaluate(id => {
       const api = window.Taierzhuang.Debug.ClothRange;
@@ -329,6 +400,50 @@ try {
   }
   await page.locator('[data-cloth-select="quilt"]').click();
   console.log('PASS all-sample floor slide / low versus high friction / restore hanging');
+
+  await page.evaluate(ids => {
+    const api = window.Taierzhuang.Debug.ClothRange; api.Pause(true);
+    ids.forEach((id, index) => { api.Select(id); api.Set('bend', .1 + index * .07); api.Set('wind', 6.5); });
+  }, materialSampleIds);
+  const beforeCompare = await State();
+  await page.locator('[data-cloth-action="compare"]').click();
+  const compared = await State();
+  assert.equal(compared.selected, 'muslin'); assert.equal(compared.paused, false);
+  for (const old of beforeCompare.items.filter(item => !materialSampleIds.includes(item.id))) {
+    const after = Item(compared, old.id);
+    assert.deepEqual(after.cfg, old.cfg, `${old.id}: comparison does not overwrite the original sample's parameters`);
+    assert.equal(after.poseChecksum, old.poseChecksum, `${old.id}: comparison does not reset the original sample's pose`);
+    assert.equal(after.action, old.action);
+  }
+  for (const id of materialSampleIds) {
+    const before = Item(beforeCompare, id), after = Item(compared, id);
+    assert.equal(after.action, 'hang'); assert.equal(after.pins.length, 12);
+    assert.equal(after.cfg.wind, CLOTH_LAB_SIM.comparisonWindMps);
+    assert.deepEqual({ ...after.cfg, wind: before.cfg.wind }, before.cfg, `${id}: comparison preserves every user parameter except common wind`);
+  }
+  await page.evaluate(() => window.Taierzhuang.StepFrames(90, 1 / 60, false));
+  const comparisonPlayed = await State(); Healthy(comparisonPlayed, 'same-wind material comparison');
+  for (const id of materialSampleIds) assert.notEqual(Item(comparisonPlayed, id).poseChecksum, Item(compared, id).poseChecksum, `${id}: common wind drives the actual cloth`);
+  const response = await page.evaluate(specs => specs.map(spec => {
+    let sum = 0, count = 0;
+    window.Taierzhuang.scene.getObjectByName(`ClothLab_${spec.id}`).traverse(object => {
+      if (!object.isBone || object.name === 'Blanket_Root') return;
+      sum += object.getWorldPosition(object.position.clone()).z - spec.z; count++;
+    });
+    return { id: spec.id, meanWindDeflectionM: sum / count };
+  }), CLOTH_LAB_ASSETS.filter(spec => spec.sample));
+  assert.ok(response.every(row => Number.isFinite(row.meanWindDeflectionM))
+    && new Set(response.map(row => Math.round(row.meanWindDeflectionM * 100))).size >= 3,
+    `Different fabrics visibly respond differently to the same wind: ${JSON.stringify(response)}`);
+  await page.evaluate(() => window.Taierzhuang.Debug.ClothRange.Pause(true));
+  result.comparison = { before: beforeCompare, after: compared, played: comparisonPlayed, response };
+  await Shot('MaterialSamplesCompare');
+  await page.evaluate(ids => {
+    const api = window.Taierzhuang.Debug.ClothRange;
+    for (const id of ids) { api.Select(id); api.Preset(id); api.Action('hang'); }
+    api.Select('quilt');
+  }, materialSampleIds);
+  console.log('PASS four private material samples / same-wind comparison / original samples preserved');
 
   await page.evaluate(() => { const api = window.Taierzhuang.Debug.ClothRange; api.Action('drape'); api.Reset(); });
   result.drape = await Advance(180); Healthy(result.drape, 'drape');
@@ -405,7 +520,7 @@ try {
     const snapshot = structuredClone(value), before = api.State(); value.items[0].parameters.bend = 99;
     return { value: snapshot, isolated: api.State().items[0].cfg.bend === before.items[0].cfg.bend };
   });
-  assert.equal(result.export.value.scope, 'ClothRangeOnly'); assert.equal(result.export.value.items.length, 3);
+  assert.equal(result.export.value.scope, 'ClothRangeOnly'); assert.equal(result.export.value.items.length, sampleIds.length);
   assert.ok(result.export.isolated, 'Export contains detached values');
   await page.evaluate(() => { const api = window.Taierzhuang.Debug.ClothRange; api.Select('quilt'); api.Preset('quilt'); api.Action('drape'); });
   await Advance(180);
@@ -457,10 +572,10 @@ try {
   });
   assert.equal(explicitProfile, 'whitebox');
   const whiteSolid = await DrawMaterials(false), whiteWire = await DrawMaterials(true), whiteBack = await DrawMaterials(false);
-  assert.ok(whiteSolid.length >= 9 && whiteSolid.every(row => row.material.startsWith('Whitebox_') && !row.wireframe));
-  assert.ok(whiteWire.length >= 9 && whiteWire.every(row => row.material.startsWith('Whitebox_') && row.wireframe),
+  assert.ok(whiteSolid.length >= expectedMeshes && whiteSolid.every(row => row.material.startsWith('Whitebox_') && !row.wireframe));
+  assert.ok(whiteWire.length >= expectedMeshes && whiteWire.every(row => row.material.startsWith('Whitebox_') && row.wireframe),
     'Cached whitebox replacement materials follow the live wireframe toggle');
-  assert.ok(whiteBack.length >= 9 && whiteBack.every(row => !row.wireframe));
+  assert.ok(whiteBack.length >= expectedMeshes && whiteBack.every(row => !row.wireframe));
   result.explicitWhitebox = { profile: explicitProfile, solid: whiteSolid, wire: whiteWire, restored: whiteBack };
   console.log('PASS explicit whitebox choice / actual cached draw wireframe on and off');
   assert.deepEqual(errors, [], `Console errors: ${errors.join(' | ')}`);
