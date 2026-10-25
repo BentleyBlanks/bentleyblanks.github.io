@@ -1,0 +1,1022 @@
+{
+  "sourceSha256": "3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c",
+  "gameSha256": "30b1f4984c47e4852e7ee967d599ab337443ab596abe73634e4dd90d92c55fcd",
+  "triangles": 59901,
+  "repairedTangents": 45491,
+  "parts": [
+    {
+      "part": "ButtCap_LimitedProfileBlend",
+      "sourceTriangles": 4864,
+      "gameTriangles": 476,
+      "gameToSourceMaxM": 0.00011704934149747714,
+      "sourceToGameMaxM": 0.00018406505114398897,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "FrontBand_ContinuousEnvelopeContact",
+      "sourceTriangles": 1152,
+      "gameTriangles": 1152,
+      "gameToSourceMaxM": 0,
+      "sourceToGameMaxM": 0,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "FrontBandSideStrip",
+      "sourceTriangles": 36,
+      "gameTriangles": 36,
+      "gameToSourceMaxM": 0,
+      "sourceToGameMaxM": 0,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "FrontSideBoss_LowRoundedExterior",
+      "sourceTriangles": 716,
+      "gameTriangles": 70,
+      "gameToSourceMaxM": 0.00010726600157795474,
+      "sourceToGameMaxM": 0.00017974941874854267,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "FrontWood_ContinuousOval",
+      "sourceTriangles": 4732,
+      "gameTriangles": 462,
+      "gameToSourceMaxM": 9.96330491034314e-05,
+      "sourceToGameMaxM": 0.0001265172177227214,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "HandledCylinder",
+      "sourceTriangles": 1878,
+      "gameTriangles": 1878,
+      "gameToSourceMaxM": 0,
+      "sourceToGameMaxM": 0,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "HandleNeck",
+      "sourceTriangles": 380,
+      "gameTriangles": 380,
+      "gameToSourceMaxM": 0,
+      "sourceToGameMaxM": 0,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "HandleRoot",
+      "sourceTriangles": 164,
+      "gameTriangles": 164,
+      "gameToSourceMaxM": 0,
+      "sourceToGameMaxM": 0,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "HandleSphere",
+      "sourceTriangles": 720,
+      "gameTriangles": 720,
+      "gameToSourceMaxM": 0,
+      "sourceToGameMaxM": 0,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "HY150_ExteriorSideRelief_Neg",
+      "sourceTriangles": 1032,
+      "gameTriangles": 100,
+      "gameToSourceMaxM": 3.81222453142982e-05,
+      "sourceToGameMaxM": 4.68343059765175e-05,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "HY150_ExteriorSideRelief_Pos",
+      "sourceTriangles": 1032,
+      "gameTriangles": 100,
+      "gameToSourceMaxM": 3.81222453142982e-05,
+      "sourceToGameMaxM": 4.683431689045392e-05,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "HY150_RoundedUpperExterior",
+      "sourceTriangles": 1048,
+      "gameTriangles": 1048,
+      "gameToSourceMaxM": 0,
+      "sourceToGameMaxM": 0,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "HY150_VisualFrontSleeve",
+      "sourceTriangles": 1916,
+      "gameTriangles": 186,
+      "gameToSourceMaxM": 0.00021093948453199118,
+      "sourceToGameMaxM": 0.0003057809663005173,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "HY151_LowRearShoulder",
+      "sourceTriangles": 764,
+      "gameTriangles": 74,
+      "gameToSourceMaxM": 2.707078783714678e-05,
+      "sourceToGameMaxM": 4.0196606278186664e-05,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "HY153_VisualMouthLipAndShallowRecess",
+      "sourceTriangles": 502,
+      "gameTriangles": 49,
+      "gameToSourceMaxM": 0.0004628293972928077,
+      "sourceToGameMaxM": 0.0003266909334342927,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "HY155_ContinuousInnerEdgeTrim_Neg",
+      "sourceTriangles": 872,
+      "gameTriangles": 84,
+      "gameToSourceMaxM": 0.0002090171619784087,
+      "sourceToGameMaxM": 0.00036351796006783843,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "HY155_ContinuousInnerEdgeTrim_Pos",
+      "sourceTriangles": 872,
+      "gameTriangles": 84,
+      "gameToSourceMaxM": 0.0002090171619784087,
+      "sourceToGameMaxM": 0.0003635199973359704,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "LongOuterSteel_TrueRound",
+      "sourceTriangles": 2230,
+      "gameTriangles": 218,
+      "gameToSourceMaxM": 0.00012946959759574383,
+      "sourceToGameMaxM": 0.0002366597909713164,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "LowerPlateGuard_FlatSideNarrowReturn",
+      "sourceTriangles": 4648,
+      "gameTriangles": 454,
+      "gameToSourceMaxM": 6.414193921955302e-05,
+      "sourceToGameMaxM": 9.2435693659354e-05,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "MainWood_ContinuousLowerShoulder",
+      "sourceTriangles": 183704,
+      "gameTriangles": 32211,
+      "gameToSourceMaxM": 2.1554073100560345e-05,
+      "sourceToGameMaxM": 8.427218563156202e-05,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "MiddleSideDisk",
+      "sourceTriangles": 1920,
+      "gameTriangles": 187,
+      "gameToSourceMaxM": 6.194590241648257e-05,
+      "sourceToGameMaxM": 0.00012237978808116168,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "PlateExterior_ShallowSurfaceMark_1",
+      "sourceTriangles": 2208,
+      "gameTriangles": 216,
+      "gameToSourceMaxM": 1.9619345039245673e-05,
+      "sourceToGameMaxM": 0.0002403515245532617,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "PlateExterior_ShallowSurfaceMark_2",
+      "sourceTriangles": 2208,
+      "gameTriangles": 216,
+      "gameToSourceMaxM": 7.641163392690942e-06,
+      "sourceToGameMaxM": 9.073644832824357e-06,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "PlateExterior_ShallowSurfaceMark_3",
+      "sourceTriangles": 2208,
+      "gameTriangles": 216,
+      "gameToSourceMaxM": 7.765989721519873e-06,
+      "sourceToGameMaxM": 9.353194400318898e-06,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "RearBand_ControlledCrown",
+      "sourceTriangles": 1152,
+      "gameTriangles": 1152,
+      "gameToSourceMaxM": 0,
+      "sourceToGameMaxM": 0,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "RearBand_ExternalAttachmentBridge",
+      "sourceTriangles": 188,
+      "gameTriangles": 18,
+      "gameToSourceMaxM": 6.594588921871036e-05,
+      "sourceToGameMaxM": 0.00037018940201960504,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "RearBand_ExternalAttachmentLoop",
+      "sourceTriangles": 2304,
+      "gameTriangles": 224,
+      "gameToSourceMaxM": 0.00014513653877656907,
+      "sourceToGameMaxM": 0.00022237257508095354,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "RearCockingExterior",
+      "sourceTriangles": 412,
+      "gameTriangles": 412,
+      "gameToSourceMaxM": 0,
+      "sourceToGameMaxM": 0,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "RearOuterCover_RoundedSideReturn",
+      "sourceTriangles": 2936,
+      "gameTriangles": 287,
+      "gameToSourceMaxM": 3.588385879993439e-05,
+      "sourceToGameMaxM": 6.044620386091992e-05,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "RearSmallCover",
+      "sourceTriangles": 44,
+      "gameTriangles": 44,
+      "gameToSourceMaxM": 0,
+      "sourceToGameMaxM": 0,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "RearSmallPin",
+      "sourceTriangles": 20,
+      "gameTriangles": 20,
+      "gameToSourceMaxM": 0,
+      "sourceToGameMaxM": 0,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "RearStock_ExternalAttachmentBridge",
+      "sourceTriangles": 188,
+      "gameTriangles": 18,
+      "gameToSourceMaxM": 6.914518598932773e-05,
+      "sourceToGameMaxM": 0.00039191587711684406,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "RearStock_ExternalAttachmentLoop",
+      "sourceTriangles": 2304,
+      "gameTriangles": 224,
+      "gameToSourceMaxM": 0.0001193079151562415,
+      "sourceToGameMaxM": 0.0001749249640852213,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "RearTab",
+      "sourceTriangles": 4788,
+      "gameTriangles": 469,
+      "gameToSourceMaxM": 4.293093297746964e-06,
+      "sourceToGameMaxM": 7.452449153788621e-06,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "RearTopExternalLever",
+      "sourceTriangles": 9482,
+      "gameTriangles": 929,
+      "gameToSourceMaxM": 3.547634150891099e-06,
+      "sourceToGameMaxM": 2.4652749743836466e-06,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "ReceiverOuterCollar",
+      "sourceTriangles": 1200,
+      "gameTriangles": 1200,
+      "gameToSourceMaxM": 0,
+      "sourceToGameMaxM": 0,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "SideWoodButton",
+      "sourceTriangles": 1920,
+      "gameTriangles": 188,
+      "gameToSourceMaxM": 5.5076172429835424e-05,
+      "sourceToGameMaxM": 0.00010242292046314105,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "Sight_LowContinuousLeaf_NoUnknownNumbers",
+      "sourceTriangles": 796,
+      "gameTriangles": 77,
+      "gameToSourceMaxM": 0.0001091946687665768,
+      "sourceToGameMaxM": 0.0003639120259322226,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "Sight_LowCrossPiece",
+      "sourceTriangles": 188,
+      "gameTriangles": 264,
+      "gameToSourceMaxM": 4.293184918680026e-09,
+      "sourceToGameMaxM": 0,
+      "gameplayAdaptation": "4.5mm rear sight notch"
+    },
+    {
+      "part": "Sight_ShallowRoundSeat",
+      "sourceTriangles": 796,
+      "gameTriangles": 77,
+      "gameToSourceMaxM": 0.00018554927373770624,
+      "sourceToGameMaxM": 0.00045746975229121745,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "Sight_SideRoundHead_1",
+      "sourceTriangles": 960,
+      "gameTriangles": 94,
+      "gameToSourceMaxM": 9.053584653884172e-05,
+      "sourceToGameMaxM": 0.00013626297004520893,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "Sight_SideRoundHead_-1",
+      "sourceTriangles": 960,
+      "gameTriangles": 94,
+      "gameToSourceMaxM": 9.053584653884172e-05,
+      "sourceToGameMaxM": 0.00013626297004520893,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "Trigger_FlatCurvedExternalStrip",
+      "sourceTriangles": 1436,
+      "gameTriangles": 1436,
+      "gameToSourceMaxM": 0,
+      "sourceToGameMaxM": 0,
+      "gameplayAdaptation": null
+    },
+    {
+      "part": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront",
+      "sourceTriangles": 41590,
+      "gameTriangles": 11893,
+      "gameToSourceMaxM": 5.074305136076873e-06,
+      "sourceToGameMaxM": 1.1489803000586107e-05,
+      "gameplayAdaptation": null
+    }
+  ],
+  "texturePayloads": [
+    {
+      "name": "ButtCap_LimitedProfileBlend_Normal",
+      "mimeType": "image/png",
+      "sha256": "73a4b960e9ab4e0f40b55541970d071b1671c50515042f64476c4362f6ba59a1"
+    },
+    {
+      "name": "ButtCap_LimitedProfileBlend_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "29de3d5bfd1858e7bd82293e9d12d173ade82c4c8238cbd1452dce3868634c6d"
+    },
+    {
+      "name": "ButtCap_LimitedProfileBlend_ORM",
+      "mimeType": "image/png",
+      "sha256": "fd87654b1eadb81674984b6843ccb17fd920c5539ed8215cb3a48b67a82608ee"
+    },
+    {
+      "name": "FrontBand_ContinuousEnvelopeContact_Normal",
+      "mimeType": "image/png",
+      "sha256": "586c42b52ee3dc0430f0194e90c3c8004ef3614e48a8b2e548f14945d4ac2b76"
+    },
+    {
+      "name": "FrontBand_ContinuousEnvelopeContact_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "8cb13da84f173e3902638da0700e6f69b647052fb5e4bdea7fbf75ab526b10f7"
+    },
+    {
+      "name": "FrontBand_ContinuousEnvelopeContact_ORM",
+      "mimeType": "image/png",
+      "sha256": "0511e1ece720393cc577476746c8550508e8f3475b8ec4a8a1cee631386b1208"
+    },
+    {
+      "name": "FrontBandSideStrip_Normal",
+      "mimeType": "image/png",
+      "sha256": "7d07e3f5233aa60530292b8d87f803172a169e2c9276a9ff8ebe2f5b1c6b5018"
+    },
+    {
+      "name": "FrontBandSideStrip_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "a89912450a9aba89b75a434d55c0131b8912cd6cfe5167043ef441fce9f8685c"
+    },
+    {
+      "name": "FrontBandSideStrip_ORM",
+      "mimeType": "image/png",
+      "sha256": "d356000fd237d63562f0ebfaecb2b9fc013a3f907348e929c8fa5ae7484838e6"
+    },
+    {
+      "name": "FrontSideBoss_LowRoundedExterior_Normal",
+      "mimeType": "image/png",
+      "sha256": "68bca5e3e30042a54971a35fd94d8593c99d2f22e7c689fdfdd23322e990bafb"
+    },
+    {
+      "name": "FrontSideBoss_LowRoundedExterior_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "9d114fb97e8f6472dad40c42f6d9c51f7ea8d2f4d224b5c639b12c9d50d9aa87"
+    },
+    {
+      "name": "FrontSideBoss_LowRoundedExterior_ORM",
+      "mimeType": "image/png",
+      "sha256": "2bef72f14a095104e15cea1a4c489d212d8520ab611baea7dfa4b4bfc83e0794"
+    },
+    {
+      "name": "FrontWood_ContinuousOval_Normal",
+      "mimeType": "image/png",
+      "sha256": "b48c16744adeec687ccea78deae76d9c92d052c6b542892ca54f167cc05f9027"
+    },
+    {
+      "name": "FrontWood_ContinuousOval_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "939257ba9cd8f01c0f7132bd444cca5a0f809a4f4f468922285511a407baa0e8"
+    },
+    {
+      "name": "FrontWood_ContinuousOval_ORM",
+      "mimeType": "image/png",
+      "sha256": "69b46bd32c0d01772f410a2f4de91bb8dd8cf03e635989bc68e0096e43bcd713"
+    },
+    {
+      "name": "HandledCylinder_Normal",
+      "mimeType": "image/png",
+      "sha256": "ede368fcc023ef2500e9e1afe73deca39151a71dc7e51063ffc9344899b6a2e5"
+    },
+    {
+      "name": "HandledCylinder_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "54e8a372636fce768dc0291a63c0cb9c9cd81cf9479febdbae28edcc3b87fc64"
+    },
+    {
+      "name": "HandledCylinder_ORM",
+      "mimeType": "image/png",
+      "sha256": "690f4129c3ef4596fa3e9f2c0c198edef0f74ea4472d1b6671ceb485e6413faa"
+    },
+    {
+      "name": "HandleNeck_Normal",
+      "mimeType": "image/png",
+      "sha256": "2331f5d662446dbb8fe532539ea7a1399f5b49cad38e599173598f8615175c6d"
+    },
+    {
+      "name": "HandleNeck_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "8b4a5cf000338baadbf8aeb0d60a2ece77e17360c3bc99017d88d25ef2d1f37d"
+    },
+    {
+      "name": "HandleNeck_ORM",
+      "mimeType": "image/png",
+      "sha256": "2ecf2ccaf78b459605b7e75ebe77e9fd71c397747d731332640304fd0f38a716"
+    },
+    {
+      "name": "HandleRoot_Normal",
+      "mimeType": "image/png",
+      "sha256": "3e35c7d17f725a138c12a1ffc0092d4e9be8d168a27bf6a94d9b8acfabf1f910"
+    },
+    {
+      "name": "HandleRoot_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "f20692751378f0c33869ed03d1957c5df498a841acd31bd7906ba910af14f8fe"
+    },
+    {
+      "name": "HandleRoot_ORM",
+      "mimeType": "image/png",
+      "sha256": "e89655467cd18c34c8800b921fb0f4838b011bff924df8b42a3fa5efc9d35dcd"
+    },
+    {
+      "name": "HandleSphere_Normal",
+      "mimeType": "image/png",
+      "sha256": "d69dab7fd2e34c0209bce95e089d20a3c8220112082400196e114428fb18e1e4"
+    },
+    {
+      "name": "HandleSphere_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "aa89cd864adcece66105d42004a6655e4115ba4d3c4b63e217aa3c8a43d11884"
+    },
+    {
+      "name": "HandleSphere_ORM",
+      "mimeType": "image/png",
+      "sha256": "bac34963ad7b6668ed20b2c4897ca7c8693b27624fec71b2a75a6d3171e4c176"
+    },
+    {
+      "name": "HY150_ExteriorSideRelief_Neg_Normal",
+      "mimeType": "image/png",
+      "sha256": "f56627691d53a345243304a2f6bbf948de1b3a55813eba5dfd330727d54eba8d"
+    },
+    {
+      "name": "HY150_ExteriorSideRelief_Neg_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "24f2878adecc551162101c24e6f27829846f35422a873bcc8bd696aa46acac02"
+    },
+    {
+      "name": "HY150_ExteriorSideRelief_Neg_ORM",
+      "mimeType": "image/png",
+      "sha256": "fa1e4f7bfaf722388726da1d6e484148be482fc04290a5fb2a274f48e5b8acc7"
+    },
+    {
+      "name": "HY150_ExteriorSideRelief_Pos_Normal",
+      "mimeType": "image/png",
+      "sha256": "e555fb0b5b128b8bc31aef78310b1768cf7de695fe1a53c88b9c67c8b74f8e8a"
+    },
+    {
+      "name": "HY150_ExteriorSideRelief_Pos_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "475443f9b19178d8e0afbf0898744eaf34311d7b5c29fda394a901d5f10ef6a9"
+    },
+    {
+      "name": "HY150_ExteriorSideRelief_Pos_ORM",
+      "mimeType": "image/png",
+      "sha256": "b35f3ffb9b8d1012c94e6a8471cec3c6cb0a7f5d72dd60aa0af4c984c0934ae0"
+    },
+    {
+      "name": "HY150_RoundedUpperExterior_Normal",
+      "mimeType": "image/png",
+      "sha256": "618511bcc45429471f421bbe94835bc39b185cc306e914eb66d10da26e9cd2fc"
+    },
+    {
+      "name": "HY150_RoundedUpperExterior_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "4e3c265b68b70ea91c6fa925b0e7c67ff1761e94e0c74f56e652a1d5f3b40abd"
+    },
+    {
+      "name": "HY150_RoundedUpperExterior_ORM",
+      "mimeType": "image/png",
+      "sha256": "6e882fc09a4b74e336edc15d68786095a4e5e974270809bd79309f5852039488"
+    },
+    {
+      "name": "HY150_VisualFrontSleeve_Normal",
+      "mimeType": "image/png",
+      "sha256": "1065d349b052779e34123e042b59b986db43b5eb7ed35ee43316f2f036e7fcfa"
+    },
+    {
+      "name": "HY150_VisualFrontSleeve_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "f0ebdeb1882fc13958160419cf3d8aedf3094f346880779e1b6241b74f7d5ff1"
+    },
+    {
+      "name": "HY150_VisualFrontSleeve_ORM",
+      "mimeType": "image/png",
+      "sha256": "9f2dbdbd1b73706c7966a2f8936e392dc240ad9f659de04d32a4a52ed8490187"
+    },
+    {
+      "name": "HY151_LowRearShoulder_Normal",
+      "mimeType": "image/png",
+      "sha256": "c051ccfa92e18be6855f1eb9fa5509be3d97d3847ab124bffb61f236f2541027"
+    },
+    {
+      "name": "HY151_LowRearShoulder_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "b2bd48e70b444b502d30ba75d9af24ccb1ca9ec90e5f556cbf05d7824b34e476"
+    },
+    {
+      "name": "HY151_LowRearShoulder_ORM",
+      "mimeType": "image/png",
+      "sha256": "3d726f0168cfd3184e3a310244687d91a7c78b1c50b915c251e8f6deb3da2ff6"
+    },
+    {
+      "name": "HY153_VisualMouthLipAndShallowRecess_Normal",
+      "mimeType": "image/png",
+      "sha256": "b3a7f3a28a2cd77835d2e8a757297c26e89b20eeddbed0d5e0a77f82ff4d80de"
+    },
+    {
+      "name": "HY153_VisualMouthLipAndShallowRecess_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "9a238c894e9f684af5677baf5b641337cf244f1a688bd31f2b4de89e7ac7a9c3"
+    },
+    {
+      "name": "HY153_VisualMouthLipAndShallowRecess_ORM",
+      "mimeType": "image/png",
+      "sha256": "0a1573cba0cd0a5f90466044cab6cb0a7a68d44b9c1162e2e5307805fea01261"
+    },
+    {
+      "name": "HY155_ContinuousInnerEdgeTrim_Neg_Normal",
+      "mimeType": "image/png",
+      "sha256": "575c02358b05b9d58a541109c3534b2eb7bab4e99b0b4f01f0da8855901ba0db"
+    },
+    {
+      "name": "HY155_ContinuousInnerEdgeTrim_Neg_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "ed3f1930d7a64c7f7bd23f46be56181f167a5c879eb86e503a35ab8c8dab636d"
+    },
+    {
+      "name": "HY155_ContinuousInnerEdgeTrim_Neg_ORM",
+      "mimeType": "image/png",
+      "sha256": "7076effbdd0906f909a515321902fa41ae892ee3dce1161bc44e04b68d129bab"
+    },
+    {
+      "name": "HY155_ContinuousInnerEdgeTrim_Pos_Normal",
+      "mimeType": "image/png",
+      "sha256": "5f9e399bdf13b6f85445df4f9114fdbee48bee0afea3d79bc4405b25f1900855"
+    },
+    {
+      "name": "HY155_ContinuousInnerEdgeTrim_Pos_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "eca531e37045d2f99e60857d6ef265b0df5f6b79e939316481ced1c1b57c5b49"
+    },
+    {
+      "name": "HY155_ContinuousInnerEdgeTrim_Pos_ORM",
+      "mimeType": "image/png",
+      "sha256": "5964b84adbe373d324b9141b63e37424953b6c9cfe73782017cdf81023ae4e14"
+    },
+    {
+      "name": "LongOuterSteel_TrueRound_Normal",
+      "mimeType": "image/png",
+      "sha256": "1d209c2aef8f539ffdd57b9ae9bb88d65922f5f55c55065e73ac434332d66976"
+    },
+    {
+      "name": "LongOuterSteel_TrueRound_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "5d85c8d9cc65bc3a369b09fc8a1a44996be614f96ef20907ec17fa34e5112f73"
+    },
+    {
+      "name": "LongOuterSteel_TrueRound_ORM",
+      "mimeType": "image/png",
+      "sha256": "0c2ee0ebb0925fc3edba966e0b44244ead3812f1defe1730b875c1d8db9d061c"
+    },
+    {
+      "name": "LowerPlateGuard_FlatSideNarrowReturn_Normal",
+      "mimeType": "image/png",
+      "sha256": "fbb3ec640b7c6bf7d65014436c3d511b4e609b9ba360c431d849d4b575c8b363"
+    },
+    {
+      "name": "LowerPlateGuard_FlatSideNarrowReturn_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "7d1b6382104d960c1a5ea5c0f7b62bae2a4183a6d7bbac4388c0997e20b62161"
+    },
+    {
+      "name": "LowerPlateGuard_FlatSideNarrowReturn_ORM",
+      "mimeType": "image/png",
+      "sha256": "2f61f85cce66fc5a26338a9b87ed853c764510f08908fc3b7c278aad084c1d71"
+    },
+    {
+      "name": "MainWood_ContinuousLowerShoulder_Normal",
+      "mimeType": "image/png",
+      "sha256": "e5687d39b67dc1a5afa2dc78f9178ccf48f30b85da7f20722197251166b42713"
+    },
+    {
+      "name": "MainWood_ContinuousLowerShoulder_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "b47479314bfc51c68c468e7227b138c6ec4d9a2b62f6d2c2b1827b0885410308"
+    },
+    {
+      "name": "MainWood_ContinuousLowerShoulder_ORM",
+      "mimeType": "image/png",
+      "sha256": "f4650b7d51e806598f46b6ed69f4991fe4a7bc894d8eae3275b47a595d0376e0"
+    },
+    {
+      "name": "MiddleSideDisk_Normal",
+      "mimeType": "image/png",
+      "sha256": "f874dc006984d143ab7b71487c504b8f6f8d844f06864dcb95fda474fbf3937c"
+    },
+    {
+      "name": "MiddleSideDisk_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "08998a11707f15d34cdec26f5b15e6cf9c12dbee48116acba547d7ddedc41a99"
+    },
+    {
+      "name": "MiddleSideDisk_ORM",
+      "mimeType": "image/png",
+      "sha256": "436a9c2561f9f4526a4c5a10b3af6082ebe0fc67eb192e81fd9e9ad9644cfbcf"
+    },
+    {
+      "name": "PlateExterior_ShallowSurfaceMark_1_Normal",
+      "mimeType": "image/png",
+      "sha256": "e2ab0f5767ff1f088f915e6b3c0588d476a1a14fe428e74b31ae7ae84f951a06"
+    },
+    {
+      "name": "PlateExterior_ShallowSurfaceMark_1_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "42d45a962f925199aaf6f8b002c89c42117048f2c23515788215596af225ceed"
+    },
+    {
+      "name": "PlateExterior_ShallowSurfaceMark_1_ORM",
+      "mimeType": "image/png",
+      "sha256": "1cf27046057e1a4efa774cb6bd7edf68d65093cb29aefeaa0ccbf645a7703ac2"
+    },
+    {
+      "name": "PlateExterior_ShallowSurfaceMark_2_Normal",
+      "mimeType": "image/png",
+      "sha256": "fa5eb376dfdd3b30d0a409dc703e79f2fd91d96dc1d0e94e377471c0cbe68065"
+    },
+    {
+      "name": "PlateExterior_ShallowSurfaceMark_2_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "06d8c1c5c8caaf77d495e71a622fde6aa9f7015f551d34fba259cc2f26ea1948"
+    },
+    {
+      "name": "PlateExterior_ShallowSurfaceMark_2_ORM",
+      "mimeType": "image/png",
+      "sha256": "4bb125a37fd8e783d5dbd369078d0b8fd927ac10453fbeb41f171308e5ec8b6c"
+    },
+    {
+      "name": "PlateExterior_ShallowSurfaceMark_3_Normal",
+      "mimeType": "image/png",
+      "sha256": "f4014c1c41f533c1019ba791a623b012ae82ccece68e346ef666ff4aa1e66b02"
+    },
+    {
+      "name": "PlateExterior_ShallowSurfaceMark_3_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "46f324a6e06babb924900a7ac84770ec78eca0d80b847a3a82f086f95acd1299"
+    },
+    {
+      "name": "PlateExterior_ShallowSurfaceMark_3_ORM",
+      "mimeType": "image/png",
+      "sha256": "bf76d0a9721ce07718bebe3adf5e05478f7f6dfab8c041726b7d16b46857353e"
+    },
+    {
+      "name": "RearBand_ControlledCrown_Normal",
+      "mimeType": "image/png",
+      "sha256": "db2c9389ab0aa93f3c360f36b5a6720e05b08a6a07001eacd51a7b2528571e94"
+    },
+    {
+      "name": "RearBand_ControlledCrown_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "c38385837a4c0f0e71238d446b7aa1a5822dec824710bf32f56896366ede932a"
+    },
+    {
+      "name": "RearBand_ControlledCrown_ORM",
+      "mimeType": "image/png",
+      "sha256": "8ebb4ac26aaecde27d4fd79f52c240eef6249f0835ca2ed7fbbaa34909172528"
+    },
+    {
+      "name": "RearBand_ExternalAttachmentBridge_Normal",
+      "mimeType": "image/png",
+      "sha256": "7bd921da3e797f83e328b4d2ee80cd96b33093a83065f61c3b310b0df1f3024d"
+    },
+    {
+      "name": "RearBand_ExternalAttachmentBridge_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "e9cd8a091400b84d69d30fe4e0090bdcc1315a8aeee1bb590559465fccf0a44e"
+    },
+    {
+      "name": "RearBand_ExternalAttachmentBridge_ORM",
+      "mimeType": "image/png",
+      "sha256": "02632825543a666024ea4cc091feed2a4e3c59ae3cb4acd73df1a85abbced117"
+    },
+    {
+      "name": "RearBand_ExternalAttachmentLoop_Normal",
+      "mimeType": "image/png",
+      "sha256": "ab316a3dd730c956ca666ab6ca357dc99e9f0b20661db65890642f1fa22af024"
+    },
+    {
+      "name": "RearBand_ExternalAttachmentLoop_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "da2a1cbc9294c5854495f04e31ab5bfbcd72569717d748e84b65181caecf35b8"
+    },
+    {
+      "name": "RearBand_ExternalAttachmentLoop_ORM",
+      "mimeType": "image/png",
+      "sha256": "b81d8455a0dec86bed013d87d1be99b2a9a82fee8822c2f6db5337b28873b8b7"
+    },
+    {
+      "name": "RearCockingExterior_Normal",
+      "mimeType": "image/png",
+      "sha256": "e647f94288964333019b8321468d3e571d07a3243229ece4dcf8d9001f21af2a"
+    },
+    {
+      "name": "RearCockingExterior_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "adec365ecb7aa71142619022f5dab84baf7a5c6335ae4149a71452f96d64c320"
+    },
+    {
+      "name": "RearCockingExterior_ORM",
+      "mimeType": "image/png",
+      "sha256": "e08245ed0679938e145fd234043e09e147cece167be3b4e1fec04dc32df11534"
+    },
+    {
+      "name": "RearOuterCover_RoundedSideReturn_Normal",
+      "mimeType": "image/png",
+      "sha256": "39a0224b5a39af1acb00fae8f57806425c7e7457b616def790925bca3f669e24"
+    },
+    {
+      "name": "RearOuterCover_RoundedSideReturn_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "d0d4ae704765c7eddccbf73f4d459af2e9f0c125eedc409eb65cfc5ea070f9ca"
+    },
+    {
+      "name": "RearOuterCover_RoundedSideReturn_ORM",
+      "mimeType": "image/png",
+      "sha256": "a1f5d8250aba6a00ccb6dab48577cbfb35041f94c2fdd40b857fcbb397f4788b"
+    },
+    {
+      "name": "RearSmallCover_Normal",
+      "mimeType": "image/png",
+      "sha256": "4d2d325a457efff2e6b5b2bf0267beeec5663e06ed8ce35aac7829802e4aaa0a"
+    },
+    {
+      "name": "RearSmallCover_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "6b046712d93a2527fb75f48640e777ba0728da12fe75603d373cbd903e198448"
+    },
+    {
+      "name": "RearSmallCover_ORM",
+      "mimeType": "image/png",
+      "sha256": "fcfebcdaa34baef3c2283fecd1cbb457809ae77cba38b0ec660cd5e7958e8f7d"
+    },
+    {
+      "name": "RearSmallPin_Normal",
+      "mimeType": "image/png",
+      "sha256": "46bf560aa394a87a28440deaffe6b328d168fabfd47f036c7d44879bd074dc5f"
+    },
+    {
+      "name": "RearSmallPin_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "6e8fc0a435ff88ee6507f7945abf16d6b36b42dbca5f42910ceb19c25909499d"
+    },
+    {
+      "name": "RearSmallPin_ORM",
+      "mimeType": "image/png",
+      "sha256": "3d1f9c0c6db760dd1a0ddbb47bcec26266c7f29d8ed341b0d04dcc4d8dea61c8"
+    },
+    {
+      "name": "RearStock_ExternalAttachmentBridge_Normal",
+      "mimeType": "image/png",
+      "sha256": "507bf44836cf09f9008edaab5a91393e34a177535497bd5ae65d9776105a67ec"
+    },
+    {
+      "name": "RearStock_ExternalAttachmentBridge_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "f9aa9f32c14a3e72a75aa37ef173dfd2ad3c510630c478cc481b22e756b78559"
+    },
+    {
+      "name": "RearStock_ExternalAttachmentBridge_ORM",
+      "mimeType": "image/png",
+      "sha256": "da5d9050fcd17043a6230614fa43d7c860d90ed7a749812bd2628822c55ded17"
+    },
+    {
+      "name": "RearStock_ExternalAttachmentLoop_Normal",
+      "mimeType": "image/png",
+      "sha256": "960caf65b8f3c7bdf68850774158ffc4527a577c545647be8b81c4fe416d00a7"
+    },
+    {
+      "name": "RearStock_ExternalAttachmentLoop_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "9da5efb086eb3e005481b995ac19dc571baad8c13b8bf7498e4812b0b7758d85"
+    },
+    {
+      "name": "RearStock_ExternalAttachmentLoop_ORM",
+      "mimeType": "image/png",
+      "sha256": "38a3d64c7bee9737fcb2fb9409758853d5a0cab1599c65370541dea06bc9686d"
+    },
+    {
+      "name": "RearTab_Normal",
+      "mimeType": "image/png",
+      "sha256": "a48d252e06a45f76b2b50ac151e78b7d4a4d3eb0b0c866a413356811b5c88b88"
+    },
+    {
+      "name": "RearTab_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "c39c7cf265a352f1ee999f69b0808da9cd4ab4bc0adf51746b8f89f1f720f1b4"
+    },
+    {
+      "name": "RearTab_ORM",
+      "mimeType": "image/png",
+      "sha256": "645a690aed700d96770ba07010eb6b9f7ec802158f9c09e0d0fc82ee90a7b7bb"
+    },
+    {
+      "name": "RearTopExternalLever_Normal",
+      "mimeType": "image/png",
+      "sha256": "6791488f19983cabb85cbbc62c6d1085785642fc9238aa7c779b439bf89b24f8"
+    },
+    {
+      "name": "RearTopExternalLever_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "bd1e4b2428954e5039d21e78ef8b9c3277dd31623020e8803f49b02efbe72cde"
+    },
+    {
+      "name": "RearTopExternalLever_ORM",
+      "mimeType": "image/png",
+      "sha256": "31915745cc232615e2f3af41b92c15ce95f0ddd4ec258baba02fde235d2cee25"
+    },
+    {
+      "name": "ReceiverOuterCollar_Normal",
+      "mimeType": "image/png",
+      "sha256": "77b6676a51f6665d3ec28cd255449315feba891bae1a702f93e3f6a8db453c6c"
+    },
+    {
+      "name": "ReceiverOuterCollar_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "0fdc5f7689a25859e93162bf3f89e0daa93ddcb37a94518c9ecb9ca5c7b6c451"
+    },
+    {
+      "name": "ReceiverOuterCollar_ORM",
+      "mimeType": "image/png",
+      "sha256": "6fba5af5241001e8b3007d436d2373e6ba90c9f60aaedab4230e72283ab53e6c"
+    },
+    {
+      "name": "SideWoodButton_Normal",
+      "mimeType": "image/png",
+      "sha256": "11910dfeb78044e5afde6da4055c7a8cdcf421f2d7a35d60eacf16b3db839599"
+    },
+    {
+      "name": "SideWoodButton_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "bfd80331c7d25831d647804d4d58362c0b6ae4ebdda61aaa5697680e395082b6"
+    },
+    {
+      "name": "SideWoodButton_ORM",
+      "mimeType": "image/png",
+      "sha256": "cd40c596898d5674eea1b3530d7e4ca2b3d898181c4c7adf24f4e5e1bb4ce116"
+    },
+    {
+      "name": "Sight_LowContinuousLeaf_NoUnknownNumbers_Normal",
+      "mimeType": "image/png",
+      "sha256": "1fac2581c5bcd7518f4ffff20e5376e3388ea14333f4a7ecd8dde0b21d7bde29"
+    },
+    {
+      "name": "Sight_LowContinuousLeaf_NoUnknownNumbers_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "4bae2807b1e2381c80fdf60846f4f9754386b0cc7552f690291cfb53a2121968"
+    },
+    {
+      "name": "Sight_LowContinuousLeaf_NoUnknownNumbers_ORM",
+      "mimeType": "image/png",
+      "sha256": "d290fa36fd207051d5e0b8445f22bae11be2147a2822ad074ce285eafe804a0c"
+    },
+    {
+      "name": "Sight_LowCrossPiece_Normal",
+      "mimeType": "image/png",
+      "sha256": "80ddca5574f7f8f6991ce9762592320225d04e3d918f9657232bd6349d0e6407"
+    },
+    {
+      "name": "Sight_LowCrossPiece_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "b7b1337501e264d60655661cfcd6a5b630154d6a8cfca14e18bddf394bdd9357"
+    },
+    {
+      "name": "Sight_LowCrossPiece_ORM",
+      "mimeType": "image/png",
+      "sha256": "9168fb7d84f3a48dc7bb717ec9f1945e4e4844a0071ecabf250f5fb5c839046c"
+    },
+    {
+      "name": "Sight_ShallowRoundSeat_Normal",
+      "mimeType": "image/png",
+      "sha256": "c6aa3275dfc574daa761f6d64127899df2163bf138c13a2bb9d06b93782ced68"
+    },
+    {
+      "name": "Sight_ShallowRoundSeat_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "cac92726ab98aebbfae6ce46a1494412b9bd9ee7ba73bf00d2255acb7f386f13"
+    },
+    {
+      "name": "Sight_ShallowRoundSeat_ORM",
+      "mimeType": "image/png",
+      "sha256": "138c57676d42a679958acc9607aec073445f2ae5cf2cd5a5926a0c488d058ffc"
+    },
+    {
+      "name": "Sight_SideRoundHead_1_Normal",
+      "mimeType": "image/png",
+      "sha256": "5136311d63e85ab7314010e9b2e1aa4cc85450c9b7e79ea1dc0a88932056dfc8"
+    },
+    {
+      "name": "Sight_SideRoundHead_1_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "34e03cb931bb6ad5d67dedc40f4ae3a0a1c64f7ee241fc8d386a57a13bc6bbbd"
+    },
+    {
+      "name": "Sight_SideRoundHead_1_ORM",
+      "mimeType": "image/png",
+      "sha256": "364d70a1609534042e5ef204f59f284680896bf592a3d9b3dc78a2456954cb5d"
+    },
+    {
+      "name": "Sight_SideRoundHead_-1_Normal",
+      "mimeType": "image/png",
+      "sha256": "5136311d63e85ab7314010e9b2e1aa4cc85450c9b7e79ea1dc0a88932056dfc8"
+    },
+    {
+      "name": "Sight_SideRoundHead_-1_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "34e03cb931bb6ad5d67dedc40f4ae3a0a1c64f7ee241fc8d386a57a13bc6bbbd"
+    },
+    {
+      "name": "Sight_SideRoundHead_-1_ORM",
+      "mimeType": "image/png",
+      "sha256": "364d70a1609534042e5ef204f59f284680896bf592a3d9b3dc78a2456954cb5d"
+    },
+    {
+      "name": "Trigger_FlatCurvedExternalStrip_Normal",
+      "mimeType": "image/png",
+      "sha256": "9b00fc284f75d2115895db4c067aa3c105f691949928a6a980ac41265fb1fd3b"
+    },
+    {
+      "name": "Trigger_FlatCurvedExternalStrip_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "bb6c4f601c7fab5f6c49b03a141fb61b3f6d3a49c778619657901ce52956a402"
+    },
+    {
+      "name": "Trigger_FlatCurvedExternalStrip_ORM",
+      "mimeType": "image/png",
+      "sha256": "3f907cc2725d801859ab3d93e23b8d788d102a0d253d68ec28c782647231739e"
+    },
+    {
+      "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_Normal",
+      "mimeType": "image/png",
+      "sha256": "a7d717775e48e12c8d8e78e888e62e3c8d5380baf1ca7e8e9e2a1225350098b2"
+    },
+    {
+      "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_BaseColor",
+      "mimeType": "image/png",
+      "sha256": "b21eec47c100532cf4bf11ed3e98e1ce26155794119f15ead13afd95b45d6c6e"
+    },
+    {
+      "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_ORM",
+      "mimeType": "image/png",
+      "sha256": "bdc4fa69457bd50b1fa1d3601fd0f5f1b3b72992f007500b99cbdd188e729e21"
+    }
+  ]
+}

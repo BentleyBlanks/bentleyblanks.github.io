@@ -37,6 +37,20 @@ try {
       const handleRadius = Point(vm.rig.boltHandleNode,new THREE.Vector3())
         .sub(Point(vm.rig.parts.bolt,new THREE.Vector3())).setZ(0).normalize();
       let rearTang=null,rearBar=null;
+      const authored173R=id==='HanYang'&&vm.rig.assetVersion?.startsWith('173R-');
+      const RearPlugZ=()=>{
+        const ray=new THREE.Ray(new THREE.Vector3(0,.042,.05),new THREE.Vector3(0,0,-1)),hit=new THREE.Vector3();
+        const inverse=vm.rig.group.matrixWorld.clone().invert();let closest=Infinity;
+        vm.rig.parts.cockingPiece?.traverse(mesh=>{
+          if(!mesh.isMesh)return;const p=mesh.geometry.attributes.position,index=mesh.geometry.index,m=inverse.clone().multiply(mesh.matrixWorld);
+          for(let i=0;i<index.count;i+=3){
+            const triangle=[0,1,2].map(j=>new THREE.Vector3().fromBufferAttribute(p,index.getX(i+j)).applyMatrix4(m));
+            if(ray.intersectTriangle(...triangle,false,hit))closest=Math.min(closest,ray.origin.distanceTo(hit));
+          }
+        });
+        return .05-closest;
+      };
+      const closedPlugZ=id==='HanYang'?RearPlugZ():null;
       if(id==="HanYang") {
         // This screw-bearing receiver leaf stays on the stock. It was once
         // misclassified as a cocking piece and floated behind the open bolt.
@@ -44,6 +58,14 @@ try {
         vm.rig.group.traverse(mesh=>{
           if(!mesh.isMesh||mesh.isSkinnedMesh||!mesh.name.endsWith("_steel"))return;
           const p=mesh.geometry.attributes.position;
+          if(authored173R){
+            // Dots has separate named collar and safety lever, unlike the
+            // legacy receiver leaf. Use their actual geometry as witnesses.
+            const local=new THREE.Vector3().fromBufferAttribute(p,0),position=Point(mesh,local);
+            if(mesh.userData.hanYang173RPart==='ReceiverOuterCollar'){rearTang={mesh,local,position};best=0;}
+            if(mesh.userData.hanYang173RPart==='RearTopExternalLever')rearBar={mesh,local,position};
+            return;
+          }
           for(let i=0;i<p.count;i++) {
             const local=new THREE.Vector3().fromBufferAttribute(p,i),position=Point(mesh,local),distance=position.distanceTo(target);
             if(distance<best){best=distance;rearTang={mesh,local,position};}
@@ -84,17 +106,9 @@ try {
             Check(Math.abs(row.handleLiftRad-Math.PI/2)<.0001,"HanYang: the physical handle stops short of its 90-degree unlocked position");
             // Opening the cylinder must expose a solid supported plug, rather
             // than leaving the safety paddle floating above an empty tube.
-            const ray=new THREE.Ray(new THREE.Vector3(0,.042,.05),new THREE.Vector3(0,0,-1)),hit=new THREE.Vector3();
-            const inverse=vm.rig.group.matrixWorld.clone().invert();let closest=Infinity;
-            vm.rig.parts.cockingPiece.traverse(mesh=>{
-              if(!mesh.isMesh)return;const p=mesh.geometry.attributes.position,index=mesh.geometry.index,m=inverse.clone().multiply(mesh.matrixWorld);
-              for(let i=0;i<index.count;i+=3) {
-                const triangle=[0,1,2].map(j=>new THREE.Vector3().fromBufferAttribute(p,index.getX(i+j)).applyMatrix4(m));
-                if(ray.intersectTriangle(...triangle,false,hit))closest=Math.min(closest,ray.origin.distanceTo(hit));
-              }
-            });
-            row.rearPlugHitZ=.05-closest;
-            Check(Number.isFinite(closest)&&row.rearPlugHitZ>vm.rig.boltTravel-.095&&row.rearPlugHitZ<vm.rig.boltTravel-.070,
+            row.rearPlugHitZ=RearPlugZ();row.closedPlugZ=closedPlugZ;
+            Check(Number.isFinite(row.rearPlugHitZ)&&Number.isFinite(closedPlugZ)
+              &&Math.abs(row.rearPlugHitZ-closedPlugZ-vm.rig.boltTravel)<.00001,
               "HanYang: the open bolt has no supporting rear plug");
           }
         }

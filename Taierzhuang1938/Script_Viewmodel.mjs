@@ -46,6 +46,8 @@ import { Mulberry32, HashString, Clamp, Clamp01, Mix } from "./Script_Noise.mjs"
 import { MakeBox, MergeGeometries } from "./Script_Geo.mjs";
 import { MarkForegroundPrepass } from "./Script_Post.mjs";
 import { InstantiateModel } from "./Script_MeshLoad.mjs";
+import { InstantiateHanYang173R } from "./Script_HanYang173R.mjs";
+import { HANYANG_173R } from "./Data_HanYang173R.mjs";
 import { WEAPON_MESH_BY_ID, WeaponMeshId, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
 import { FpsArmRig } from "./Script_RiggedModel.mjs";
 import { FpsArmPose, FPS_HAND_SHAPES } from "./Data_FpsArmPoses.mjs";
@@ -1293,7 +1295,7 @@ function SplitFpsMechanism(group, key, name, pivot, select) {
   return moving;
 }
 
-function BuildFromModel(materials, weapon, key, doc) {
+function BuildFromModel(materials, weapon, key, doc, authoredAsset=null) {
   const armPose = FpsArmPose(key);
   if (!armPose) throw new Error(`缺少逐枪第一人称姿势数据：${key}`);
   const table = {};
@@ -1303,7 +1305,7 @@ function BuildFromModel(materials, weapon, key, doc) {
   let built = null;
   try {
     // Preserve mechanical node boundaries while building private FPS geometry.
-    built = InstantiateModel(doc, { materials: table, batch: false });
+    built = authoredAsset ? InstantiateHanYang173R(authoredAsset) : InstantiateModel(doc, { materials: table, batch: false });
   } catch (error) {
     console.warn(`[Viewmodel] ${key} 模型实例化失败：${String(error).slice(0, 160)}`);
     return null;
@@ -1357,10 +1359,10 @@ function BuildFromModel(materials, weapon, key, doc) {
   }
   const authoredFront = built.nodes.get("frontSight"), authoredRear = built.nodes.get("rearSight");
   let ironSights;
-  if (key === "Zb26" && authoredFront && authoredRear) {
+  if ((key === "Zb26" || authoredAsset) && authoredFront && authoredRear) {
     const CollectMeshes = (root) => { const list = []; root.traverse((mesh) => { if (mesh.isMesh) list.push(mesh); }); return list; };
     ironSights = { front: CollectMeshes(authoredFront), rear: CollectMeshes(authoredRear),
-      frontRegion: { x: sight.x, z: -0.836, base: 0.060 } };
+      frontRegion: authoredAsset ? {x:0,z:-0.965,base:0.0458} : { x: sight.x, z: -0.836, base: 0.060 } };
   } else ironSights = RepairIronSights(group, materials, key, sight);
   const magazine = Mount("magazine", new THREE.Vector3(0, 0, -0.08));
   // ADS eye relief keeps the complete stock in front of the camera. Hiding the
@@ -1369,7 +1371,7 @@ function BuildFromModel(materials, weapon, key, doc) {
   const isBoltRifle = weapon?.kind === "boltRifle";
   const mechanism = {
     ZhongZheng: { pivot:[0,0.040,-0.115], handle:[0.030,0.010,-0.115], cutX:0.016, width:0.012, seat:[0,0.040,-0.083] },
-    HanYang: { pivot:[0,0.042,-0.147], handle:[0.053,0.042,-0.147], cutX:0.015, width:0.014, seat:[0,0.041,-0.110] },
+    HanYang: authoredAsset ? HANYANG_173R.mechanism : { pivot:[0,0.042,-0.147], handle:[0.053,0.042,-0.147], cutX:0.015, width:0.014, seat:[0,0.041,-0.110] },
     Type38: { pivot:[0,0.045,-0.122], handle:[0.067,0.045,-0.122], cutX:0.013, width:0.014, seat:[0,0.047,-0.185] },
     Zb26: { pivot:[0,-0.005,-0.176], handle:[0.034,-0.005,-0.176], cutX:0.016, width:0.010, seat:[0,0.115,-0.228] },
   }[key];
@@ -1457,6 +1459,8 @@ function BuildFromModel(materials, weapon, key, doc) {
     // 大刀与手榴弹的模型没有 sight，仍会退化成“举到眼前”；导入枪模则必须读取
     // 已经写进 TZM 的 sight 挂点。过去这里硬编码 null，三把新枪都丢了铁瞄。
     sight,
+    aimRotation: authoredAsset ? HANYANG_173R.aimRotation : null,
+    assetVersion: authoredAsset ? HANYANG_173R.version : null,
     hands: {
       right: { x: hr.position[0], y: hr.position[1], z: hr.position[2], rx: hr.rotation[0], ry: hr.rotation[1], rz: hr.rotation[2] },
       left: { x: hl.position[0], y: hl.position[1], z: hl.position[2], rx: hl.rotation[0], ry: hl.rotation[1], rz: hl.rotation[2] },
@@ -1529,6 +1533,7 @@ export class Viewmodel {
     // 解码好的 TZM 文档（ActorFactory.PreloadMeshes 已经拉过一遍，这里复用同一份，
     // 不再自己 fetch —— 同一个模型解码两次是白花的内存与开机时间）。
     this.meshDocs = meshDocs;
+    this.hanYang173R=riggedAssets?.hanYang173R||null;
     this.grenadeAsset = grenadeAsset;
     this.rigSource = "box";
     this.materials = BuildMaterials(library);
@@ -2107,7 +2112,7 @@ export class Viewmodel {
     // 所有可持枪械优先走 TZM：三八式防尘盖、捷克式上插直匣等识别细节已在模型里。
     const meshId = MODEL_FP.has(weaponId) ? WeaponMeshId(weaponId, this.weaponVariant) : null;
     const doc = meshId && this.meshDocs ? this.meshDocs.get(meshId) : null;
-    this.rig = doc ? BuildFromModel(this.materials, this.weapon, weaponId, doc) : null;
+    this.rig = doc ? BuildFromModel(this.materials, this.weapon, weaponId, doc,weaponId==='HanYang'?this.hanYang173R:null) : null;
     if (this.rig && weaponId === "Dadao") {
       // Measured TZM thin edge is +Y; the authored grip expects it along -Y.
       // Correct only the private model mount, before attaching either hand.
@@ -2286,6 +2291,8 @@ export class Viewmodel {
       throw new Error(`${this.weaponId || kind} 的 ADS 姿势要求 sight，但模型没有 sight`);
     }
     const s = this.rig.sight;
+    const rotation=this.rig.aimRotation||spec?.rotation||[0,0,0];
+    const alignedSight=this.rig.aimRotation ? s.clone().applyEuler(new THREE.Euler(...rotation,'YXZ')) : s;
     // 正常玩法没有 override，照门仍严格解到相机中心。编辑器可临时把枪挪开，
     // 用红色弹道中心反查模型在实际 ADS FOV 下应当修多少。
     const offset = this.ironSightOffsetOverride || { x: 0, y: 0 };
@@ -2294,10 +2301,10 @@ export class Viewmodel {
       offset.y * SIGHT_CALIBRATION_PER_PX,
       0);
     return {
-      px: -s.x + this.adsOffset.x + (spec?.offset?.[0] || 0),
-      py: -s.y + this.adsOffset.y + (spec?.offset?.[1] || 0),
-      pz: -(spec?.eyeDistance ?? SIGHT_EYE_DISTANCE) - s.z + (spec?.offset?.[2] || 0),
-      rx: spec?.rotation?.[0] || 0, ry: spec?.rotation?.[1] || 0, rz: spec?.rotation?.[2] || 0,
+      px: -alignedSight.x + this.adsOffset.x + (spec?.offset?.[0] || 0),
+      py: -alignedSight.y + this.adsOffset.y + (spec?.offset?.[1] || 0),
+      pz: -(spec?.eyeDistance ?? SIGHT_EYE_DISTANCE) - alignedSight.z + (spec?.offset?.[2] || 0),
+      rx: rotation[0], ry: rotation[1], rz: rotation[2],
     };
   }
 
@@ -2964,6 +2971,13 @@ export class Viewmodel {
       else this.riggedArms.SetPoseState({ ads: Clamp01(ads), adsGrip: Clamp01(this.adsGrip), sprint: Clamp01(sprintValue),
         reload: this.action?.kind === "reload", reloadBlend: this.reloadBlend, melee: !!input.meleeCombat,
         fire: 1-Ease.InOut(Ease.Seg(this.flashTime,0.055,0.18)) });
+      // SetPoseState rebuilds contact targets from the authored holding pose.
+      // Apply the open-mechanism offset after that reset, before the IK solve.
+      if(this.rig?.assetVersion){
+        const open=Clamp01((this.rig.parts.bolt?.position.z||0)/this.rig.boltTravel);
+        this.gripContactRight.position.addScaledVector(new THREE.Vector3(...HANYANG_173R.openGripOffset),open);
+        if(this.boltOpen&&!this.action)this.handRight.group.position.copy(this.gripContactRight.position);
+      }
       if (this.meleeVideoFrame) this._ApplyMeleeVideo();
       const throwTrack = this._ThrowTrack();
       if(throwTrack) this._ApplyGrenadeThrow(throwTrack);
@@ -3316,7 +3330,7 @@ export class Viewmodel {
         {at:graspAt*clearance.boltEntryTurnAt,...boltClear},
         {at:graspAt,...placement},
         {at:releaseAt,...placement},
-        {at:Mix(releaseAt,1,.15),...placement,shape:"packetBoltClear"},
+        {at:Mix(releaseAt,1,.15),...placement,position:grip.clone().add(new THREE.Vector3(...clearance.boltExit)),shape:"packetBolt"},
         {at:Mix(releaseAt,1,clearance.boltReleaseExitAt),...boltClear},
         {at:Mix(releaseAt,1,clearance.boltReturnReadyAt),...holdingClear},
       ]);
@@ -3391,7 +3405,12 @@ export class Viewmodel {
   _WorkingHandPath(side, t, points) {
     const key = side === "right" ? "r" : "l";
     const base = { at:0, position:this.handBase[side], rotation:this.handBaseRot[side].toArray().slice(0,3), weight:0 };
-    const frames = [base,...points,{...base,at:1}];
+    const finish={...base,at:1};
+    if(side==='right'&&this.rig?.assetVersion){
+      if(this.action?.startedOpen)base.position=base.position.clone().add(new THREE.Vector3(...HANYANG_173R.openGripOffset));
+      if(this.action?.kind==='bolt'&&this.pendingHoldOpen)finish.position=finish.position.clone().add(new THREE.Vector3(...HANYANG_173R.openGripOffset));
+    }
+    const frames = [base,...points,finish];
     const index = Math.max(1,frames.findIndex(p=>p.at>=t));
     const start = frames[index-1], end = frames[index];
     const u = Ease.Seg(t,start.at,end.at);
@@ -3446,7 +3465,9 @@ export class Viewmodel {
       const thumbHoldingWeight=handoff
         ?1-ThumbPhase(0,handoff.releaseEnd)+ThumbPhase(handoff.recoverStart,1)
         :undefined;
-      this.riggedArms.operationPose[key] = {shape:start.shape || end.shape,nextShape:end.shape || start.shape,shapeMix:mix,digitMix,thumbHoldingWeight};
+      const fingerHandoff=side==='right'&&this.rig?.assetVersion&&this.action?.kind==='reload'?FPS_PACKET_RELOAD.fingerHandoff:null;
+      const fingerHoldingWeight=fingerHandoff?1-ThumbPhase(fingerHandoff.releaseStart,fingerHandoff.releaseEnd):undefined;
+      this.riggedArms.operationPose[key] = {shape:start.shape || end.shape,nextShape:end.shape || start.shape,shapeMix:mix,digitMix,thumbHoldingWeight,fingerHoldingWeight};
     }
   }
 
@@ -3647,6 +3668,7 @@ export class Viewmodel {
       rotation:this.handBaseRot.right.toArray().slice(0,3),shape:"packetClear"};
     const gripUnwrap={...gripClear,position:this.handBase.right.clone().add(new THREE.Vector3(...clearance.unwrap))};
     this._ReloadHandFrames(t, motion, {clip,oldClip,press:push,clear,latch,bolt,gripClear,gripUnwrap,
+      boltExit:{...Outside(bolt,clearance.boltExit),shape:"packetBolt"},
       boltClear:{...Outside(bolt,clearance.bolt),shape:"packetBoltClear"},clipClear:Outside(clip,clearance.prop),
       oldClipClear:Outside(oldClip,clearance.prop),pressClear:Outside(push,clearance.press),
       latchClear:Outside(latch,clearance.latch)});

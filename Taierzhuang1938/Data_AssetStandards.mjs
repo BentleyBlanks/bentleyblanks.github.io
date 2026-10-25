@@ -120,6 +120,11 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 }
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
+  Object.freeze({id:'HanYang173R',name:'汉阳造173R（当前手持与世界模型）',pack:'HanYang173R/Model_HanYang173R.glb',
+    sourceTriangles:295470,actualTriangles:59901,targetTriangles:60000,policy:'target',
+    sourceTexture:'用户提供的Dots 173R完整源与标准PBR烘焙图；来源限制见随附说明',
+    runtimeTexture:'44独立部件、132张原字节PBR图；Base sRGB、线性ORM及16-bit OpenGL法线',
+    note:'按用户2026-10-25指定的6万三角目标。原高源留OneDrive；未改部件双向顶点/表面误差≤0.463mm；照门缺口为游戏瞄准补件。第一人称、角色和掉落枪共用米制-Z朝向；旧HanYang TZM仅保留为加载故障回退。'}),
   Object.freeze({ id: "Type89MediumTank", name: "八九式中战车乙型（馆藏外形复原）", pack: "Type89MediumTank/Model_Type89MediumTank.glb",
     sourceTriangles: 1130810, selectedGameSourceTriangles: 240278, actualTriangles: 240278, exportRemovedZeroAreaTriangles: 0, targetTriangles: 240000, policy: "target",
     sourceTexture: "土浦保存车多机位图证；高源保留、按物理表面分区程序烘焙", runtimeTexture: "SurfaceV5：7套21张内嵌Base / OpenGL Normal / ORM；4K逐点遮蔽与细漆层、2K实孔排气罩MASK；铸钢/磨亮接触带/排气/玻璃PBR",

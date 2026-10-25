@@ -235,23 +235,25 @@ try {
         const region = vm.rig.ironSights?.frontRegion;
         if (region) {
           const Vec3 = T.camera.position.constructor;
+          const samples = [];
+          let top = -Infinity;
           for (const mesh of vm.rig.ironSights.front) {
             const pos = mesh.geometry.attributes.position;
-            const samples = [];
-            let top = -Infinity;
             for (let i = 0; i < pos.count; i += 1) {
               if (mesh.name === "VmIronSight_FrontBlade"
                 || (Math.abs(pos.getX(i) - region.x) <= 0.004
                   && Math.abs(pos.getZ(i) - region.z) <= 0.016 && pos.getY(i) > region.base)) {
                 const v = new Vec3().fromBufferAttribute(pos, i);
                 if (v.y > top) top = v.y;
-                samples.push(v);
+                samples.push({v,mesh});
               }
             }
-            for (const v of samples) if (v.y >= top - 0.00005) {
+          }
+          // A compound authored sight includes its base and side shoulders.
+          // Measure the crown of the complete blade, not each part's own top.
+          for (const {v,mesh} of samples) if (v.y >= top - 0.00005) {
               v.applyMatrix4(mesh.matrixWorld).project(T.camera);
               physicalFront.push({ x: v.x * halfWidth, y: -v.y * halfHeight });
-            }
           }
         }
         const tip = physicalFront.length ? {

@@ -11,6 +11,7 @@ export const ASSET_PUBLISH = Object.freeze({
   minSourceToGpuRatio: 0.2,
   // These are production models. Reference/review models and unused legacy assets remain source-only.
   models: Object.freeze([
+    'Model/HanYang173R/Model_HanYang173R.glb',
     'Model/BaconHandoff/Model_CuredPork.glb',
     ...['Ija01','Ija02','Ija03','Ija06','Nra02','Nra05','Nra06'].map(id => `Model/Character/Model_Tengxian${id}.glb`),
     ...['AsianHousePair','AsianHouseRow','BreakableDeadTree','ChineseRuralHouse','Cigarette',

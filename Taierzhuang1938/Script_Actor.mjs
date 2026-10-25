@@ -31,6 +31,7 @@ import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS } from "./Script_G
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { LoadRiggedAssets } from "./Script_RiggedModel.mjs";
+import { LoadHanYang173R, ConfigureHanYang173R, InstantiateHanYang173R } from "./Script_HanYang173R.mjs";
 import { SetShadowSkip } from "./Script_ShadowSkip.mjs";
 import {
   CreateLugouCharacterRig,
@@ -3688,11 +3689,15 @@ export class ActorFactory {
         try { await this.library.LoadExternalSet(set.name, set); }
         catch { textureFailures.push(set.name); }
       }));
-      const [docs, riggedAssets, characterAssets] = await Promise.all([
+      const [docs, riggedAssets, characterAssets, hanYang173R] = await Promise.all([
         Promise.all(ids.map((id) => LoadDocument(MeshUrl(id)))),
         LoadRiggedAssets(),
         LoadLugouCharacterAssets(),
+        LoadHanYang173R(),
       ]);
+      ConfigureHanYang173R(hanYang173R,this.library);
+      this.hanYang173R=hanYang173R;
+      riggedAssets.hanYang173R=hanYang173R;
       ids.forEach((id, i) => { if (docs[i]) this.meshDocs.set(id, docs[i]); });
       this.riggedAssets = riggedAssets;
       this.characterAssets = characterAssets;
@@ -3725,6 +3730,7 @@ export class ActorFactory {
    * @returns {{root, nodes, tris, draws, bounds} | null}
    */
   ModelInstance(meshId, materials) {
+    if(meshId==='HanYang'&&this.hanYang173R)return InstantiateHanYang173R(this.hanYang173R,{batch:true});
     const doc = this.meshDocs.get(meshId);
     const entry = MESHES[meshId];
     if (!doc || !entry) return null;
@@ -3740,6 +3746,7 @@ export class ActorFactory {
   }
 
   _InstantiateMesh(id) {
+    if(id==='HanYang'&&this.hanYang173R)return InstantiateHanYang173R(this.hanYang173R,{batch:true});
     const doc = this.meshDocs.get(id);
     const entry = MESHES[id];
     if (!doc || !entry) return null;
@@ -4050,7 +4057,7 @@ export class ActorFactory {
       }
     }
     if (!geometries.size) return null;
-    HealBucket(geometries, id, "weapon");
+    if(!built.authored)HealBucket(geometries, id, "weapon");
 
     const Mount = (name) => {
       const node = built.nodes.get(name);
@@ -4169,6 +4176,7 @@ export class ActorFactory {
       : (spec.shoe === "clothShoe" ? HEX.clothShoe : HEX.strawShoe);
 
     return {
+      ...Object.fromEntries(this.hanYang173R?.materials||[]),
       uniform,
       trouser,
       accessory,

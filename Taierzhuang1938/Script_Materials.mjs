@@ -767,7 +767,9 @@ export class MaterialLibrary {
     if (spec) spec.hasAoMap = !!(orm && (orm.ao || material.aoMap)) || !!surface?.providesMaterialAo;
     const shading = this._ShadingPatch(material);
     const ssrPack = ssr === undefined ? this.ssr : ssr;
-    if (!this.ssao && !this.gi && !ssrPack && !shading && !destruction && !surface) return material;
+    // Folding removes metalnessMap/aoMap, so its replacement must also run in
+    // unlit-feature previews and low quality, even without screen-space effects.
+    if (!orm && !this.ssao && !this.gi && !ssrPack && !shading && !destruction && !surface) return material;
     return InjectIndirectLighting(material, {
       ssao: this.ssao, gi: this.gi, ssr: ssrPack, destruction, shading, surface,
     });

@@ -494,5 +494,13 @@ for (const spec of CLOTH_LAB_ASSETS) {
     && Math.abs(headL[0] * 2 - spec.width) < .001 && Math.abs(headL[2] * 2 - spec.length) < .001,
     `${spec.id} 真实逆绑定矩阵确认头端+Z、左角+X与217骨格`, JSON.stringify({ headL, headR, tailL }));
 }
+const hanYangFile=path.join(projectDir,'Model/HanYang173R/Model_HanYang173R.glb');
+const hanYangMouth=GlbPoints(hanYangFile,'HY153_VisualMouthLipAndShallowRecess');
+const hanYangButt=GlbPoints(hanYangFile,'ButtCap_LimitedProfileBlend');
+const Center=points=>[0,1,2].map(axis=>points.reduce((sum,p)=>sum+p[axis],0)/points.length);
+const mouth=Center(hanYangMouth),butt=Center(hanYangButt);
+Check(hanYangMouth.length>20&&hanYangButt.length>20&&mouth[2]<-.99&&butt[2]>.23
+  &&Math.abs(mouth[0])<.001&&mouth[1]>.03&&mouth[1]<.05,
+  'HanYang173R 真实枪口与托底点云确认米制、Y-up、枪口-Z',JSON.stringify({mouth,butt}));
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机/战车朝向及独立布料米制/绑定方向均通过几何复量");

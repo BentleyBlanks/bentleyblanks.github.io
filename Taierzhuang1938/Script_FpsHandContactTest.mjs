@@ -368,6 +368,8 @@ try {
       return hit;
     };
     const HanYangTriggerTriangles=()=>{
+      const authored=Triangles(vm.rig.group,o=>o.userData.weaponPart==='trigger');
+      if(authored.length)return authored;
       const geometry=CreateReloadClearanceGeometry(THREE),surface=geometry.Surface(Triangles(vm.rig.group,o=>o.name==='HanYang_body_steel'));
       const components=surface.components.filter(c=>{const s=c.tree.box.getSize(new THREE.Vector3()),p=c.tree.box.getCenter(new THREE.Vector3());return c.closed&&s.x>.008&&s.x<.011&&s.y>.035&&s.y<.045&&s.z>.010&&s.z<.016&&p.z>-.09&&p.z<-.075;});
       if(components.length!==1)throw Error('Actual isolated HanYang trigger is missing');

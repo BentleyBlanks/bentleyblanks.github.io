@@ -317,7 +317,10 @@ export const TEST_SCENE_DAY = {
   envIntensity: 0.70, shProbeIntensity: 0.85, ambientColor: 0xffffff, ambientIntensity: 1.0,
   fog: { density: 0, falloff: 30, max: 0,
     sky: [0.50, 0.56, 0.65], ground: [0.42, 0.44, 0.47], sunGain: 0,
-    desat: 0, flatten: 0 },
+    desat: 0, flatten: 0,
+    // Material review daylight must not inherit the cinematic purple lift:
+    // it overwhelmed dark wood/steel even while the gray-card test passed.
+    grade: {lift:[0,0,0],gain:[1,1,1],shadow:0,highlight:0,contrastCurve:'soft'} },
   exposure: 0.62, godStrength: 0, bloom: 0, saturation: 1, contrast: 1,
   // 测试场是六个白盒共用的基准，灰卡基线（Script_TestSceneLightingTest）对它最敏感。
   // Mie 2.4 不是"干净空气"：手调的那张天本来就偏白偏平（天顶 B/R 只有 1.9，

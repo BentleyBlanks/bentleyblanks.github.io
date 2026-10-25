@@ -159,6 +159,25 @@
         "3fd60335331c818fa24deadb6d72ca70": "2026-10-23T12:23:23.306Z"
       },
       "assetContract": "Model/KawasakiType88/Data_KawasakiType88.json"
+    },
+    {
+      "asset": "HanYang173R",
+      "date": "2026-10-25",
+      "scope": "Only the Dots HanYang173R appearance and game adaptations; global repository/source-page cursors unchanged",
+      "assetContract": "Model/HanYang173R/Data_HanYang173R.md",
+      "decision": "Creative reconstruction: exterior proportions, wood/metal aging, gameplay sight notch, hand contact and runtime reflectance calibration. No claim about an identified Tengxian soldier or measured issued-rifle specification.",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-10-25T06:01:00.840Z",
+          "scope": "Added HanYang173R creative appearance row and verified readback"
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-10-25T06:01:01.796Z",
+          "scope": "Added matching creative appearance bullet and verified readback"
+        }
+      ]
     }
   ],
   "notionPages": [

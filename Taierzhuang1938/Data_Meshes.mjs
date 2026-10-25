@@ -138,6 +138,7 @@ export const MESHES = {
   },
   HanYang: {
     file: "Model_HanYang.tzm.json", category: "weapon",
+    activeRuntime: 'HanYang173R', // ActorFactory / Viewmodel use the shared GLB; TZM is an explicit fallback.
     triangles: 2828, meshBlocks: 4, nodes: 12, joints: 0,
     materials: ["steel", "wood"], mounts: [...WEAPON_MOUNTS,"feedMouth","ejection","boltOpen"],
     span: [0.08049, 0.19341, 1.25000], lengthM: 1.250,

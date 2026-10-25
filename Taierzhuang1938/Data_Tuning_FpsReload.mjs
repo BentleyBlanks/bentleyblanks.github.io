@@ -94,14 +94,15 @@ export const FPS_PACKET_RELOAD = Object.freeze({
   // Thumb opposition leaves/returns to the current authored holding pose
   // independently of the already-authored spatial hand contact path.
   thumbHandoff: {releaseEnd:.060,recoverStart:.948},
+  fingerHandoff: {releaseStart:.018,releaseEnd:.035},
   seatedAt: 0.50,
   retainedAt: 0.68,
   clearOffset: [0.030, 0.045, 0.025],
-  latchOffset: [0.025, 0.006, -0.025],
+  latchOffset: [0.040, 0.006, -0.025],
   // Release the original grip before changing its digits or palm frame.
   // The bolt grip remains unchanged until its pads have cleared the knob.
   handClearance: {
-    grip: [.060, 0, 0], unwrap: [.022, 0, 0], bolt: [.050, 0, 0], prop: [.050, .010, 0],
+    grip: [.060, 0, 0], unwrap: [.022, 0, 0], bolt: [.050, 0, 0], boltExit: [.030, -.030, .015], prop: [.050, .010, 0],
     press: [.050, .025, .010], latch: [.050, 0, 0],
     boltEntryExitAt: .26, boltEntryTurnAt: .90,
     boltReleaseExitAt: .35, boltReturnReadyAt: .76,
@@ -121,7 +122,7 @@ export const FPS_PACKET_RELOAD = Object.freeze({
     { at: .755, anchor: "boltClear", flow: true },
     { at: .820, anchor: "bolt" },
     { at: .940, anchor: "bolt" },
-    { at: .948, anchor: "bolt", shape: "packetBoltClear" },
+    { at: .948, anchor: "boltExit", shape: "packetBolt" },
     { at: .958, anchor: "boltClear", flow: true, through: true },
     { at: .988, anchor: "gripClear", flow: true },
   ],
@@ -168,7 +169,7 @@ export const FPS_PACKET_RELOAD = Object.freeze({
       { at: .785, anchor: "boltClear", flow: true },
       { at: .820, anchor: "bolt" },
       { at: .940, anchor: "bolt" },
-      { at: .948, anchor: "bolt", shape: "packetBoltClear" },
+      { at: .948, anchor: "boltExit", shape: "packetBolt" },
       { at: .958, anchor: "boltClear", flow: true, through: true },
       { at: .988, anchor: "gripClear", flow: true },
     ],

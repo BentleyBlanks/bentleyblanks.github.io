@@ -95,7 +95,8 @@ export function ApplyAnatomicalFingers(rig) {
       const match = bone.name.match(/finger(\d)(\d)?$/i);
       if (!match) continue;
       const finger = Number(match[1]); const segment = Number(match[2] || 0);
-      const workingBlend=operationBlend*(finger===0?1-THREE.MathUtils.clamp(operation?.thumbHoldingWeight??0,0,1):1);
+      const holdingWeight=finger===0?operation?.thumbHoldingWeight:operation?.fingerHoldingWeight;
+      const workingBlend=operationBlend*(1-THREE.MathUtils.clamp(holdingWeight??0,0,1));
       const authored = contact?.fingerRotations?.[match[1]+(match[2]||'')];
       const authoredTrigger = contact?.triggerRotations?.[match[1]+(match[2]||'')];
       const workingKey=match[1]+(match[2]||'');
