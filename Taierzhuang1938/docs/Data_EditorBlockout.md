@@ -66,6 +66,7 @@ export function HeightGridSampler(terrain);            // int16 厘米网格 →
 ```
 
 - `BLOCKOUT_LEVELS` 的 key 必须 ⊆ `Script_EditorBlockoutConfig.BLOCKOUT_LEVEL_KEYS`（存档口只认这张表）。
+- **关卡下拉的行（2026-10-25）**：一片场地一行；关卡可选 `parts: [{ id, from, label, short, note }]`，按剧本段落把一片场地拆成几行、共用同一个关卡键。`BLOCKOUT_MENU` 是摊平后的行（`{ id, key, from, label, era, badge, note, short }`，第一行 id 沿用关卡键），`BlockoutMenuRow(idOrKey)` 查行，`BlockoutMenuIdAt(levelKey, keyframeIds, index)` 算此刻落在哪一行（`from` 不晚于当前关键帧的最后一行）。现在只有 `FirstLevel1218` 拆成「11–14 · 转运与空袭」（`FirstLevel1218`，从 `11-1`）和「15–18 · 冬瓜之死与炸桥」（`FirstLevel1218_15`，从 `15-1`），新剧本四行对上 Notion 剧本的四大段。选别的场地的行 = 换关并跳到 `from`；选同一片场地的行 = 只跳关键帧；翻关键帧翻过 `15-1`，下拉的当前行跟着变。`?level=` 也认行 id（`BlockoutLevelIndex` 先换成关卡键），没写 `kf` 时从那一行的 `from` 开始；地址栏仍写关卡键 + `kf`。`Debug.Blockout.SwitchLevel` 同样认行 id。
 - phase 形状（照 `MOVEMENT_RANGE_PHASE`，**从零写，不得展开 `FIRST_LEVEL_MISSION_PHASE`**，否则会继承 `contentId` 把第一关故事拍与同伴带进来）：
   `{ id: "Blockout_<key>", label, date: "", blockout: { key, configUrl, scene, Prepare }, sandbox: true, ambientAircraft: false, sky, ambience: null, music: null, minutes: 600, brief: [], bounds, spawn: {x,z,ry}, zones: [≥1], objectives: [与 zones 同长], nraPool: 9999, ijaPool: 0, ijaPressure: 0, ijaSpawn: [], ijaSupport: [], hud: { objectiveMarkers: false }, loadoutOverride: { primary: "HanYang", secondary: null, melee: "Dadao", throwables: { Grenade: 3 }, spareClips: 12 }, cameraFar: 650, whitebox: { layout, blockout: true, actorCapacity: 160 } }`。
   不得带 `contentId` / `p012` / `fullMission` / `smokeColumns` / `roster` / `chapter`。
@@ -273,7 +274,7 @@ export function NormalizeRide(ride);                // → { on, x, z, y, yawDeg
 ```js
 export class BlockoutUi {
   constructor(root, handlers) // handlers: { onPrev, onNext, onSeek(index), onLevel(key), onLayer(name, on), onSavePose(), onReplay(), onOpenMap(), onCloseMap(), onMapPick(index) }
-  SetLevels(levels /*[{key,label}]*/, currentKey)
+  SetLevels(levels /*[{key,label}]*/, currentKey)   // 总控传的 key 是菜单行 id（§2 BLOCKOUT_MENU），onLevel 回的也是行 id
   SetKeyframes(list /*[{id,stage,stageTitle,name}]*/, index)
   SetCard({ stage, stageTitle, name, what, next: { text, distanceM, relYawDeg } | null, how, notes, guessCount })
   SetLayers({ arcs, intents, labels, xray, landmarks, stations })   // labels: true|false|"named"|"all"|"off"（2026-10-20）
@@ -710,6 +711,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 
 ## 12. 变更记录
 
+- 2026-10-25（关卡下拉照 Notion 四大段）：用户「明明设计了四个大段落，白盒剧本里只有 3 个」——11–14 和 15–18 合在 `FirstLevel1218` 一片场地里只占一行。§2 加 `parts` / `BLOCKOUT_MENU`：这片场地在下拉里拆成 11–14、15–18 两行，选 15–18 跳到 `15-1`，翻关键帧时当前行跟着变；`?level=FirstLevel1218_15` 直接打开 15–18。场地、配置、预演文件都不动。检查在 `Script_EditorBlockoutConfigTest`。
 - 2026-10-23（手机验收）：新增 §4.5——触屏设备（或 `?touch=1`）自动加一层触屏输入：空处拖动转视角、左下常驻摇杆（拖出圈外冲刺，飞行中推相机）、右下预演 / 飞行 / 地图大按钮、飞行中升 / 降 / 加速；卡片收成一行、右上收进「图层」面板、小地图与按键提示收起；总图双指缩放、两下快点回全图、手指点选放大；iOS 抬手补解锁音频；游戏画面一样不动。新模块 `Script_EditorBlockoutTouch`，`Script_Main` 薄钩子（`Look` / `UnlockAudio` / `TouchMove`），门禁 `Script_EditorBlockoutTouchBrowserTest`。
 - 2026-10-22（第一人称转视角身体跟着转、走路脚飘）：改在正片的第一人称身体上（白盒与游戏共用），口径见 [第一人称身体与持枪](Data_FirstPersonEmbodiment.md)「下半身」一节：站着转视角腿不动、超过 50° 才挪步转身；走路按走过的距离踩步、着地的脚锁在地上。
 - 2026-10-21（01–05 防止玩家跳出壕沟）：场景块可选 `tag`（`airWall` 只挡玩家）与 `noClimb`（§2.2）；`Script_Player.ProbeVault` 认 `noClimb`、不隔着隐形墙翻；01–05 胸墙与板桥标不能攀、沟沿一圈 892 段隐形墙（`L0105KeepInWalls`），新闸门 `Script_EditorBlockoutFirstLevel0105KeepInBrowserTest`（§13 末、§10）。

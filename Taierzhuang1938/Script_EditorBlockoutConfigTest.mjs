@@ -50,7 +50,7 @@ import { MISSION_PLACEMENT as P, MISSION_ANCHORS as A, MISSION_LAYOUT } from "./
 import { WHITEBOX_0518_CAMERA_BY_ID } from "./Data_FirstLevelWhitebox0518Cameras.mjs";
 import { END_TUNING } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { MISSION_SCENARIO_SIGNALS } from "./Data_FirstLevelMissionGates.mjs";
-import { LayoutFromSceneDoc, BuildGroundPaint, BlockoutTintColor, BackdropBlend, RasterizeBackdropPaint, BLOCKOUT_CAMERA_FAR } from "./Script_EditorBlockoutLevels.mjs";
+import { LayoutFromSceneDoc, BuildGroundPaint, BlockoutTintColor, BackdropBlend, RasterizeBackdropPaint, BLOCKOUT_CAMERA_FAR, BLOCKOUT_LEVELS, BLOCKOUT_MENU, BlockoutLevelIndex, BlockoutMenuRow, BlockoutMenuIdAt } from "./Script_EditorBlockoutLevels.mjs";
 import { BlockoutTreeSpots } from "./Script_EditorBlockoutTrees.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -798,6 +798,26 @@ Check("单位可选 ride（2026-10-20）：挂到车 / 战车 / 担架上；对�
   const fwd = ForwardFromYawDeg(-90);
   assert.ok(near(fwd.x, 1) && near(fwd.z, 0));
   for (const level of ["FirstLevel", "SecondLevel"]) for (const k of COMMITTED[level].keyframes) for (const u of k.units) assert.ok(!("ride" in u), `${level} ${k.id} ${u.id} 不该有 ride`);
+});
+
+// ---------------------------------------------------------------------------
+// 关卡下拉的行（2026-10-25）：新剧本照 Notion 分四段，11–14 / 15–18 共用 FirstLevel1218 一片场地
+Check("关卡下拉：新剧本四行、15–18 跳 15-1、当前行随关键帧变、?level= 认行 id", () => {
+  const rewrites = BLOCKOUT_MENU.filter(r => r.era === "rewrite");
+  assert.deepEqual(rewrites.map(r => r.short), ["01–05", "06–10", "11–14", "15–18"]);
+  assert.equal(new Set(BLOCKOUT_MENU.map(r => r.id)).size, BLOCKOUT_MENU.length, "行 id 不重");
+  for (const level of BLOCKOUT_LEVELS) assert.ok(BLOCKOUT_MENU.some(r => r.id === level.key && r.key === level.key), `${level.key} 的第一行沿用关卡键`);
+  const r15 = BlockoutMenuRow("FirstLevel1218_15");
+  assert.equal(r15.key, "FirstLevel1218");
+  assert.equal(r15.from, "15-1");
+  assert.equal(BLOCKOUT_LEVELS[BlockoutLevelIndex("FirstLevel1218_15")].key, "FirstLevel1218");
+  const ids = COMMITTED.FirstLevel1218.keyframes.map(k => k.id);
+  for (const r of BLOCKOUT_MENU) if (r.from) assert.ok(ids.includes(r.from), `${r.id} 的起始帧 ${r.from} 在配置里`);
+  assert.equal(BlockoutMenuIdAt("FirstLevel1218", ids, -1), "FirstLevel1218");
+  assert.equal(BlockoutMenuIdAt("FirstLevel1218", ids, ids.indexOf("14-3")), "FirstLevel1218");
+  assert.equal(BlockoutMenuIdAt("FirstLevel1218", ids, ids.indexOf("15-1")), "FirstLevel1218_15");
+  assert.equal(BlockoutMenuIdAt("FirstLevel1218", ids, ids.length - 1), "FirstLevel1218_15");
+  assert.equal(BlockoutMenuIdAt("FirstLevel0610", [], 0), "FirstLevel0610");
 });
 
 console.log(unitWarnings.length ? `警告：${unitWarnings.length} 个单位落在实心块里（不算失败）：\n  ${unitWarnings.join("\n  ")}` : "单位都不在实心块里");

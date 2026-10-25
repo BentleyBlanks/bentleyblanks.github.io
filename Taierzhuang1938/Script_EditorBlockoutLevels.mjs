@@ -19,7 +19,7 @@ import { BLOCKOUT_LEVEL_KEYS, ValidateBlockoutScene } from "./Script_EditorBlock
 // 数组顺序别动：levelIndex 同时索引 BLOCKOUT_PHASES，下拉里的分组顺序由界面自己排。
 export const BLOCKOUT_LEVELS = Object.freeze([
   Object.freeze({ key: "FirstLevel", label: "第一关 · 往南的路", configUrl: "./Blockout/FirstLevel.json",
-    era: "legacy", badge: "旧版", note: "游戏里现行的第一关（旧剧本：老周、破墙机枪、拔刀军官）；新剧本已拆成 01–05 / 06–10 / 12–18 三段",
+    era: "legacy", badge: "旧版", note: "游戏里现行的第一关（旧剧本：老周、破墙机枪、拔刀军官）；新剧本分 01–05 / 06–10 / 11–14 / 15–18 四段",
     scene: Object.freeze({ kind: "firstLevelMission" }) }),
   Object.freeze({ key: "SecondLevel", label: "第二关 · 手榴弹雨（空间草稿）", configUrl: "./Blockout/SecondLevel.json",
     era: "draft", badge: "草稿", note: "第二关的空间草稿",
@@ -36,11 +36,41 @@ export const BLOCKOUT_LEVELS = Object.freeze([
     scene: Object.freeze({ kind: "file", url: "./Blockout/FirstLevel0610.scene.json",
       placeholder: Object.freeze({ bounds: { minX: -20, maxX: 320, minZ: 120, maxZ: 560 }, spawn: { x: 35, z: 147, yawDeg: -90 } }) }) }),
   // 2026-10-19：12–18 新剧本，与 0610 同一套坐标；锚点 Data_EditorBlockoutFirstLevel1218Space。2026-10-23 按 11–14 改稿重做、把 11 也放进来（11 出村 → 石板桥 → 空袭 → 渡口 → 北门），关卡键不变
+  // 2026-10-25：Notion 剧本第一关分四大段，11–14 与 15–18 一路连着走、共用这一片场地，下拉里按 parts 拆成两行（见 BLOCKOUT_MENU）
   Object.freeze({ key: "FirstLevel1218", label: "第一关 11–18 · 石板桥与渡口（新剧本）", configUrl: "./Blockout/FirstLevel1218.json",
     era: "rewrite", badge: "新剧本", short: "11–18", note: "11–18：出村 → 石板桥 → 空袭 → 渡口 → 北门（10-23 改稿）",
+    parts: Object.freeze([
+      Object.freeze({ id: "FirstLevel1218", from: "11-1", label: "第一关 11–14 · 转运与空袭（新剧本）", short: "11–14",
+        note: "11–14：出村 → 石板桥 → 机枪压渡口 → 飞机来 → 松手（10-23 改稿）" }),
+      Object.freeze({ id: "FirstLevel1218_15", from: "15-1", label: "第一关 15–18 · 冬瓜之死与炸桥（新剧本）", short: "15–18",
+        note: "15–18：河堤底下 → 接收院 → 门槛 → 守桥头、炸浮桥 → 北门（与 11–14 同一片场地）" }),
+    ]),
     scene: Object.freeze({ kind: "file", url: "./Blockout/FirstLevel1218.scene.json",
       placeholder: Object.freeze({ bounds: { minX: -250, maxX: 150, minZ: 480, maxZ: 895 }, spawn: { x: 98, z: 590, yawDeg: 180 } }) }) }),
 ]);
+
+// 关卡下拉的行（2026-10-25）：一片场地一行；写了 parts 的场地按剧本段落拆成几行、共用同一个关卡键。
+// id 是行的名字（第一行沿用关卡键，老链接与 onLevel(key) 照旧），from 是这一段第一个关键帧（选这一行 = 换到这片场地并跳到这一帧）。
+export const BLOCKOUT_MENU = Object.freeze(BLOCKOUT_LEVELS.flatMap(({ key, label, era, badge, note, short, parts }) =>
+  (parts || [{ id: key, label, note, short }]).map(part => Object.freeze({
+    id: part.id, key, from: part.from || null, label: part.label, era, badge, note: part.note || "", short: part.short || "",
+  }))));
+
+/** 菜单行 id 或关卡键 → 那一行（关卡键给的是它的第一行）；都不是 → null。 */
+export function BlockoutMenuRow(idOrKey) {
+  return BLOCKOUT_MENU.find(row => row.id === idOrKey) || BLOCKOUT_MENU.find(row => row.key === idOrKey) || null;
+}
+
+/** 此刻落在哪一行：同一关卡键的几行里，from 不晚于当前关键帧的最后一行。keyframeIds 是这一关关键帧 id 的顺序。 */
+export function BlockoutMenuIdAt(levelKey, keyframeIds, index) {
+  const rows = BLOCKOUT_MENU.filter(row => row.key === levelKey);
+  let id = rows[0]?.id ?? levelKey;
+  for (const row of rows) {
+    const at = row.from ? keyframeIds.indexOf(row.from) : 0;
+    if (at >= 0 && at <= index) id = row.id;
+  }
+  return id;
+}
 
 // 存档口只认 BLOCKOUT_LEVEL_KEYS。这里只报不抛：Script_Main 开机就 import 本模块，抛了整个游戏起不来。
 for (const level of BLOCKOUT_LEVELS) {
@@ -662,7 +692,9 @@ export const BLOCKOUT_PHASES = Object.freeze(BLOCKOUT_LEVELS.map(MakeBlockoutPha
 export const BLOCKOUT_DEFAULT_LEVEL = "FirstLevel0105";
 
 export function BlockoutLevelIndex(key) {
-  const index = BLOCKOUT_LEVELS.findIndex(level => level.key === key);
+  // ?level= 也认菜单行 id（FirstLevel1218_15 → FirstLevel1218 那片场地）
+  const levelKey = BlockoutMenuRow(key)?.key ?? key;
+  const index = BLOCKOUT_LEVELS.findIndex(level => level.key === levelKey);
   return index >= 0 ? index : Math.max(0, BLOCKOUT_LEVELS.findIndex(level => level.key === BLOCKOUT_DEFAULT_LEVEL));
 }
 

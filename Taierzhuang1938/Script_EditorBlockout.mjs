@@ -29,7 +29,7 @@
 
 import * as THREE from "three";
 import {
-  BLOCKOUT_LEVELS, BLOCKOUT_PHASES, BlockoutLevelIndex, BlockoutTintColor, BlockoutWaterBlocks, BlockoutMapScene,
+  BLOCKOUT_LEVELS, BLOCKOUT_PHASES, BLOCKOUT_MENU, BlockoutLevelIndex, BlockoutMenuRow, BlockoutMenuIdAt, BlockoutTintColor, BlockoutWaterBlocks, BlockoutMapScene,
 } from "./Script_EditorBlockoutLevels.mjs";
 import {
   ValidateBlockout, NormalizeBlockout, KeyframeIndex, PlanTransition, DefaultArc, YawDegFromTo, BlockoutConfigPath, NormalizeLandmarks,
@@ -272,7 +272,7 @@ export class EditorBlockout {
       onPrev: () => { if (!this.previz?.playing) this.Prev(); },
       onNext: () => { if (!this.previz?.playing) this.Next(); },
       onSeek: (index) => { if (!this.previz?.playing) this.GoTo(index, { animate: index === this.index + 1 }); },
-      onLevel: (key) => { this.SwitchLevel(key); },
+      onLevel: (id) => { this.PickMenu(id); },
       onLayer: (name, on) => { this.SetLayers({ [name]: on }); },
       onSavePose: () => { this.SavePose(); },
       onCopy: () => { this.CopySnapshot(); },
@@ -396,7 +396,7 @@ export class EditorBlockout {
   // 启动 / 切关
 
   async Start() {
-    this.ui.SetLevels(BLOCKOUT_LEVELS.map(({ key: k, label, era, badge, note, short }) => ({ key: k, label, era, badge, note, short })), this.levelKey);
+    this.PushLevels();
     // 记住的开关选择要同时推给界面、标记层、俯视图（2026-10-20）
     this.SetLayers({});
     this.ui.SetStatus({ state: "loading", message: "正在读配置", writable: false, saveReason: "" });
@@ -404,7 +404,8 @@ export class EditorBlockout {
     await this.LoadConfig();
     this.SetupLevel();
     await this.previz.Load({ force: true });
-    const kf = this.params.get("kf");
+    // 没写 kf 时，?level= 给的是菜单行（如 FirstLevel1218_15）就从那一段第一帧开始
+    const kf = this.params.get("kf") ?? BlockoutMenuRow(this.params.get("level"))?.from ?? null;
     // 「重现」链接带来的机位：落到关键帧之后再摆（地址栏里的 pose 由 ReplaceUrl 去掉，之后翻关键帧不再套用）
     const pose = ParsePoseParam(this.params.get("pose"));
     let index = kf != null ? KeyframeIndex(this.doc, kf) : 0;
@@ -665,8 +666,31 @@ export class EditorBlockout {
     }
   }
 
-  /** 换关：回收演员与标记 → JumpToLevel（整片重建）→ 读新配置 → 地图重烘 → 改地址栏。 */
+  /** 关卡下拉的行（菜单行 id 当 UI 的 key 用；§2 BLOCKOUT_MENU）。当前行随关键帧变：11–18 那片场地翻到 15-1 就落到 15–18 那一行。 */
+  PushLevels() {
+    const id = BlockoutMenuIdAt(this.levelKey, (this.doc?.keyframes || []).map(k => k.id), this.index);
+    if (id === this.menuId) return;
+    this.menuId = id;
+    this.ui.SetLevels(BLOCKOUT_MENU.map(({ id: key, label, era, badge, note, short }) => ({ key, label, era, badge, note, short })), id);
+  }
+
+  /** 下拉 / 旧版提示条选了一行：别的场地 → 换关并跳到那一段第一帧；同一片场地 → 只跳关键帧。 */
+  PickMenu(id) {
+    const row = BLOCKOUT_MENU.find(r => r.id === id);
+    if (!row) return Promise.resolve(false);
+    if (row.key !== this.levelKey || this.switching) return this.SwitchLevel(row.id);
+    if (this.previz?.playing) this.previz.Stop({ restore: false });
+    return this.GoTo(row.from ?? 0, { animate: false }).then((ok) => { if (ok) this.ui.Toast(`已切到${row.label}`, "info"); return ok; });
+  }
+
+  /**
+   * 换关：回收演员与标记 → JumpToLevel（整片重建）→ 读新配置 → 地图重烘 → 改地址栏。
+   * key 可以是关卡键，也可以是菜单行 id（换过去后跳到那一段第一帧）。
+   */
   async SwitchLevel(key) {
+    const row = BLOCKOUT_MENU.find(r => r.id === key);
+    const startKf = row?.from ?? null;
+    if (row) key = row.key;
     const index = BLOCKOUT_LEVELS.findIndex(level => level.key === key);
     if (index < 0) return false;
     if (this.switching) await this.switching.catch(() => {});
@@ -699,9 +723,10 @@ export class EditorBlockout {
       this.ReplaceUrl();
       this.SetupLevel();
       await this.previz.Load({ force: true });
-      this.ui.SetLevels(BLOCKOUT_LEVELS.map(({ key: k, label, era, badge, note, short }) => ({ key: k, label, era, badge, note, short })), this.levelKey);
-      await this.GoTo(0, { animate: false });
-      this.ui.Toast(`已切到${this.level.label}`, "info");
+      const start = startKf != null ? KeyframeIndex(this.doc, startKf) : 0;
+      await this.GoTo(Math.max(0, start), { animate: false });
+      this.PushLevels();
+      this.ui.Toast(`已切到${BLOCKOUT_MENU.find(r => r.id === this.menuId)?.label || this.level.label}`, "info");
       return true;
     })();
     this.switching = run;
@@ -846,6 +871,7 @@ export class EditorBlockout {
     this.ui.SetKeyframes(this.KeyframeList(), index);
     this.map.SetKeyframes(this.doc.keyframes.map(k => ({ id: k.id, stage: k.stage, stageLabel: k.stageLabel, player: { x: k.player.x, z: k.player.z } })), index);
     this.markers.SetStations(this.StationList(), index);
+    this.PushLevels();
     this.PushEditContext();
     // 地图开着时跳关键帧：图跟着挪到新站位（比例不变）；编辑布设开着时不挪（正在对着某处改）
     if (this.mapOpen && !this.mapEdit.active) this.FocusMapOnPlayer();
