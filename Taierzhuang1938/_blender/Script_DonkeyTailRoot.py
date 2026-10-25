@@ -23,7 +23,12 @@ def RestoreRumpPigment(skin):
     return {'vertices':changed,'method':'calibrated neighbouring rump pigment replaces the tail-photo footprint; generic directional fibre detail retained','lateralFullMaskM':.012,'lateralFadeEndM':.032,'heightFadeM':[.50,.60,.99,1.04],'rearFalloffM':[.12,.22]}
 
 def RepairTailRoot(skin,rig):
-    tree=BVHTree.FromPolygons([v.co for v in skin.data.vertices],[tuple(f.vertices) for f in skin.data.polygons]);centre=Vector((0,-.10,.91));radiusX,radiusZ=.045,.075
+    skin.data.calc_loop_triangles();sourceTriangles=[tuple(t.vertices) for t in skin.data.loop_triangles]
+    tree=BVHTree.FromPolygons([v.co for v in skin.data.vertices],sourceTriangles,all_triangles=True);centre=Vector((0,-.10,.91));radiusX,radiusZ=.045,.075
+    def SurfaceNormal(point):
+        hit,_,face,_=tree.find_nearest(point);ids=sourceTriangles[face];points=[skin.data.vertices[i].co for i in ids]
+        bary=barycentric_transform(hit,*points,Vector((1,0,0)),Vector((0,1,0)),Vector((0,0,1)))
+        return sum((skin.data.vertices[i].normal*w for i,w in zip(ids,bary)),Vector()).normalized()
     samples=[];depths=[]
     for x in [-.065,-.050,-.035,-.028,.028,.035,.050,.065]:
         for i in range(15):
@@ -66,7 +71,7 @@ def RepairTailRoot(skin,rig):
     for radial in [.80,.60,.40,.20]:
         ring=[];t=1-radial
         for i in range(count):
-            fraction=i/count;segment=next(j for j in range(len(ordered)) if fractions[j]<=fraction<=fractions[j+1]);blend=(fraction-fractions[segment])/max(1e-10,fractions[segment+1]-fractions[segment]);a,b=ordered[segment],ordered[(segment+1)%len(ordered)];outer=a.co.lerp(b.co,blend);_,normal,_,_=tree.find_nearest(outer)
+            fraction=i/count;segment=next(j for j in range(len(ordered)) if fractions[j]<=fraction<=fractions[j+1]);blend=(fraction-fractions[segment])/max(1e-10,fractions[segment+1]-fractions[segment]);a,b=ordered[segment],ordered[(segment+1)%len(ordered)];outer=a.co.lerp(b.co,blend);normal=SurfaceNormal(outer)
             delta=centre-outer;denominator=normal.y if abs(normal.y)>.15 else (-.15 if normal.y<0 else .15);d0=-(normal.x*delta.x+normal.z*delta.z)/denominator;d0=max(-.05,min(.05,d0));d1=coefficients[1]*delta.x/radiusX+coefficients[2]*delta.z/radiusZ
             y=(2*t**3-3*t*t+1)*outer.y+(t**3-2*t*t+t)*d0+(-2*t**3+3*t*t)*centre.y+(t**3-t*t)*d1;point=outer.lerp(centre,t);point.y=y
             outerWeights={group:a[deform].get(group,0)*(1-blend)+b[deform].get(group,0)*blend for group in set(a[deform].keys())|set(b[deform].keys())};weights={group:outerWeights.get(group,0)*radial+averageWeights.get(group,0)*t for group in set(outerWeights)|set(averageWeights)};pigment=a[color].lerp(b[color],blend).lerp(averageColor,t) if color else None;ring.append(New(point,weights,pigment))
@@ -85,7 +90,7 @@ def RepairTailRoot(skin,rig):
     for i in range(count):Face((rings[-1][i],rings[-1][(i+1)%count],point))
     bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));after=sum(len(f.verts)-2 for f in bm.faces);audit={'boundaryEdges':sum(e.is_boundary for e in bm.edges),'nonmanifoldEdges':sum(not e.is_manifold for e in bm.edges),'volumeM3':bm.calc_volume(signed=True)}
     if audit['boundaryEdges'] or audit['nonmanifoldEdges']:raise RuntimeError('Tail-root repair damaged closed skin')
-    bm.to_mesh(skin.data);bm.free();skin.data.update();return {'method':'legacy stub removed by elliptical-prism cut; continuous Hermite rump patch from intact lateral surface samples','centre':list(centre),'radiiM':[radiusX,radiusZ],'sampleCount':len(samples),'boundaryVertices':len(ordered),'removedTriangles':removed,'skinTriangleDelta':after-before,'boundaryAngleCorrectionRad':correction,'integrity':audit}
+    bm.to_mesh(skin.data);bm.free();skin.data.update();return {'method':'legacy stub removed by elliptical-prism cut; continuous Hermite rump patch from intact lateral surface samples','boundaryNormal':'barycentric smooth source normals; shared-edge interpolation independent of closest-face ordering','centre':list(centre),'radiiM':[radiusX,radiusZ],'sampleCount':len(samples),'boundaryVertices':len(ordered),'removedTriangles':removed,'skinTriangleDelta':after-before,'boundaryAngleCorrectionRad':correction,'integrity':audit}
 
 def RemoveOccludedChannel(skin):
     namespace={};file=Path(bpy.context.scene['DonkeyCartProject'])/'_blender/Script_DonkeyTopology.py';exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),namespace)

@@ -66,6 +66,15 @@ def BindReferencePectorals(scene,skin,collar=.06):
 
 def ApplyPectoralEdges(scene,skin):
     file=Path(scene['DonkeyCartProject'])/'_blender/Data_DonkeyPectoralEdges.json';record=json.loads(file.read_text(encoding='utf-8'));bm=bmesh.new();bm.from_mesh(skin.data);errors=[]
+    canonicalPolygons=0;canonicalPlaneDeviation=0
+    if record.get('canonicalPectoralTriangles'):
+        region=record['canonicalPectoralRegionM']
+        faces=[f for f in bm.faces if all(abs(v.co.x)<region['absX'] and region['y'][0]<v.co.y<region['y'][1] and region['z'][0]<v.co.z<region['z'][1] for v in f.verts)]
+        for face in faces:
+            if len(face.verts)<4:continue
+            points=np.array([v.co[:] for v in face.verts]);centre=points.mean(axis=0);_,_,axes=np.linalg.svd(points-centre,full_matrices=False)
+            canonicalPlaneDeviation=max(canonicalPlaneDeviation,float(2*np.max(np.abs((points-centre)@axes[-1]))));canonicalPolygons+=1
+        bmesh.ops.triangulate(bm,faces=faces,quad_method='BEAUTY',ngon_method='BEAUTY')
     for item in record['flips']:
         vertices=[]
         for point in item['oldEdge']+item['newEdge']:
@@ -83,7 +92,7 @@ def ApplyPectoralEdges(scene,skin):
         if not any(e.other_vert(c)==d for e in c.link_edges):raise RuntimeError('Pectoral diagonal rotation failed')
     bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces));bm.to_mesh(skin.data);bm.free();skin.data.update();integrity=CheckChestIntegrity(skin)
     if integrity['boundaryEdges'] or integrity['nonmanifoldEdges'] or integrity['chestCrossings']:raise RuntimeError('Pectoral edge rotation damaged the rest surface')
-    return {'method':record['method'],'rotatedEdges':len(record['flips']),'maximumCoordinateMatchErrorM':max(errors,default=0),'maximumRestSurfaceBoundM':max((r['restSurfaceBoundM'] for r in record['flips']),default=0),'geometryVertexDisplacementM':0,'integrity':integrity}
+    return {'method':record['method'],'rotatedEdges':len(record['flips']),'canonicalPectoralTriangles':bool(record.get('canonicalPectoralTriangles')),'canonicalPolygonCount':canonicalPolygons,'canonicalPlaneDeviationBoundM':canonicalPlaneDeviation,'canonicalScope':'local explicit source triangles define the new three-view fitted surface; the 0.5 mm rotation bound applies only to any subsequent diagonal rotations','maximumCoordinateMatchErrorM':max(errors,default=0),'maximumRestSurfaceBoundM':max((r['restSurfaceBoundM'] for r in record['flips']),default=0),'geometryVertexDisplacementM':0,'integrity':integrity}
 
 def CheckChestIntegrity(skin):
     mesh=skin.data;mesh.calc_loop_triangles();triangles=list(mesh.loop_triangles);points=[v.co.copy() for v in mesh.vertices]

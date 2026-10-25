@@ -85,11 +85,12 @@ def WorldPose(phase,idle=False):
             for i in range(1,4):points.append(points[i-1]+Matrix.Rotation(angles[i-1],3,'X')@(p[i]-p[i-1]))
             for name,point,angle in zip(names,points,angles):worlds[name]=Matrix.Translation(point)@Matrix.Rotation(angle,4,'X')
             splay=0
-            if standalone and scene.get('DonkeyReferenceForeSwingClearanceDeg') and front and side=='Left' and not idle and not planted:
-                # A small swing-only lateral arc clears the asymmetric fitted
-                # axilla. Stance, forward stride and the sagittal solver stay
+            clearanceDegrees=scene.get('DonkeyReferenceForeSwingClearanceDeg',0) if side=='Left' else scene.get('DonkeyReferenceForeRightSwingClearanceDeg',0)
+            if standalone and clearanceDegrees and front and not idle and not planted:
+                # Small swing-only lateral arcs clear the fitted axillae.
+                # Stance, forward stride and the sagittal solver stay
                 # unchanged; the whole limb uses one coherent rigid turn.
-                splay=math.radians(scene['DonkeyReferenceForeSwingClearanceDeg'])*arc
+                splay=math.radians(clearanceDegrees)*arc*(1 if side=='Left' else -1)
                 centre=points[0];turn=Matrix.Translation(centre)@Matrix.Rotation(splay,4,'Y')@Matrix.Translation(-centre)
                 for name in names:worlds[name]=turn@worlds[name]
             metrics.append({'stem':stem,'step':step,'planted':planted,'target':[ty,tz],'foot':list(worlds[names[3]].translation),'miss':miss,'swingSplayRad':splay})
@@ -138,7 +139,8 @@ if cart:
     strip.action_frame_start=181;strip.action_frame_end=241;cart.animation_data.action=None
 rig['strideM']=stride;rig['walkPeriodS']=period;rig['gaitDutyFront']=.64;rig['gaitDutyRear']=.66
 rig['walkStanceCompressionM']=.032;rig['idleStanceCompressionM']=.004
-if standalone and scene.get('DonkeyReferenceForeSwingClearanceDeg'):rig['foreSwingClearanceDegrees']=scene['DonkeyReferenceForeSwingClearanceDeg']
+if standalone and scene.get('DonkeyReferenceForeSwingClearanceDeg'):
+    rig['foreSwingClearanceDegrees']=scene['DonkeyReferenceForeSwingClearanceDeg'];rig['foreRightSwingClearanceDegrees']=scene.get('DonkeyReferenceForeRightSwingClearanceDeg',0)
 rig['walkCoordinateSystem']='Blender +Y forward; glTF -Z forward; stride clock follows distance'
 rig['sourceRigReuse']='Audited four-pivot limb hierarchy and two-link/folding-cannon solver; donkey rest origins, skin, gait and all harness rebuilt'
 if cart:cart['rollDistancePerCycleM']=2*math.pi*cart['wheelRadiusM'];cart['rollClipDurationS']=2
@@ -183,7 +185,7 @@ for stem in soleIndices:
             driftX.append(abs(b['meanSoleX']-a['meanSoleX']))
 report={'actions':results,'strideM':stride,'periodS':period,'speedMps':stride/period,
         'stanceSoleRangeM':[min(r['minSoleZ'] for r in planted),max(r['minSoleZ'] for r in planted)],
-        'worstStanceDriftPerFrameM':max(drift),'worstLateralStanceDriftPerFrameM':max(driftX),'foreSwingClearanceDegrees':scene.get('DonkeyReferenceForeSwingClearanceDeg',0) if standalone else 0,'worstSolverMissM':max(r['miss'] for r in measurements),'measurements':measurements}
+        'worstStanceDriftPerFrameM':max(drift),'worstLateralStanceDriftPerFrameM':max(driftX),'foreSwingClearanceDegrees':scene.get('DonkeyReferenceForeSwingClearanceDeg',0) if standalone else 0,'foreRightSwingClearanceDegrees':scene.get('DonkeyReferenceForeRightSwingClearanceDeg',0) if standalone else 0,'worstSolverMissM':max(r['miss'] for r in measurements),'measurements':measurements}
 (base/'Review/Data_AnimationMeasurements.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
 scene.frame_start=1;scene.frame_end=241;scene.frame_set(0)
 for filename in ('Script_DonkeyCartAnimate.py','Script_DonkeyCartReview.py'):

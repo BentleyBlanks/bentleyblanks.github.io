@@ -54,18 +54,21 @@ def BuildLegAlbedo(rgb,blur):
         detail=np.clip(detail/np.maximum(.5,rowMean),.65,1.45)
         active=(sourceY>460)&(sourceY<870)
         sourceChecks.append({'view':view,'donor':key,'samples':int(np.count_nonzero(active)),'sourceXRange':[float(sourceX[active].min()),float(sourceX[active].max())]})
-        return color,detail
+        projected=np.clip(Fetch(micro,sourceX,sourceY),.65,1.45)
+        return color,projected,detail
     dark=np.mean([palette['ForeSideDark'],palette['HindSideDark'],palette['ForeFrontDark']],axis=0)
     for index,stem in enumerate(['DonkeyFrontLeft','DonkeyFrontRight','DonkeyRearLeft','DonkeyRearRight']):
         front='Front' in stem;left=stem.endswith('Left');sideKey='SideFront' if front else 'SideRear';capKey=('Front' if front else 'Rear')+('Left' if left else 'Right')
-        side,sideDetail=Sample(sideKey,-ny,(-np.abs(nx),ny),'Side')
-        face,faceDetail=Sample(capKey,-nx if front else nx,(-nx,np.abs(ny) if front else -np.abs(ny)),'Front' if front else 'Rear')
+        side,sideProjected,sideFallback=Sample(sideKey,-ny,(-np.abs(nx),ny),'Side')
+        face,faceDetail,_=Sample(capKey,-nx if front else nx,(-nx,np.abs(ny) if front else -np.abs(ny)),'Front' if front else 'Rear')
         w=np.maximum(0,ny if front else -ny)**3;sideWeight=np.abs(nx)**3+np.maximum(0,-ny if front else ny)**3;w=w/np.maximum(.001,w+sideWeight)
+        visibleSide=np.abs(nx)**3/np.maximum(.001,sideWeight)
+        sideDetail=sideProjected*visibleSide+sideFallback*(1-visibleSide)
         detail=sideDetail*(1-w)+faceDetail*w
         # Dark fibres retain bounded, same-limb photographic mottling;
         # directional light and joint recesses are supplied by PBR geometry.
         sideBase=palette['ForeSideDark' if front else 'HindSideDark']
-        mottling=np.clip(side/np.maximum(.008,sideBase),.82,1.24)
+        mottling=np.clip(side/np.maximum(.008,sideBase),.70,1.50)
         pigment=dark*mottling
         pale=palette['ForeMedialPale'] if front else np.mean([palette['RearMedialLeft'],palette['RearMedialRight']],axis=0)
         capPigment=np.minimum(pale,np.maximum(dark,face))
@@ -74,10 +77,13 @@ def BuildLegAlbedo(rgb,blur):
         if front:coverage=np.maximum(facing,np.maximum(0,nx*(1 if left else -1))**2)
         else:coverage=facing
         pigment=pigment+(capPigment-pigment)*(coverage*heightMask)[:,:,None]
-        color=np.maximum(0,pigment*(1+.95*(detail-1))[:,:,None])
+        # Source-facing surfaces retain the photographed detail at its
+        # actual location. Periodic donors only fill the unphotographed cap;
+        # repeating them over visible faces creates artificial dapple spots.
+        color=np.maximum(0,pigment*(1+1.15*(detail-1))[:,:,None])
         atlas[:,index*tileWidth:(index+1)*tileWidth,:3]=np.where(color<=.0031308,color*12.92,1.055*color**(1/2.4)-.055)
         sampling.append({'leg':stem,'sideDonor':sideKey,'capDonor':capKey})
-    record={'method':'source-scale RGB pigment smoothing; bounded same-limb dark mottling and continuous photographed medial pigment; original-pixel short-fur high pass tiled at physical circumference with feathered periodic cuts and source-row normalization',
+    record={'method':'source-scale RGB pigment smoothing and bounded same-limb mottling; source-facing cap/side preserve photographed short-fur placement; physical-circumference periodic detail with feathered cuts only fills the unphotographed cap',
         'sourceBoundaryRows':BOUNDARIES,'sampling':sampling,'sourceChecks':sourceChecks,'paletteSourceBoxes':PALETTE_BOXES,'paletteCalibratedLinearRgb':{name:value.tolist() for name,value in palette.items()},
-        'sourcePigmentBlurRadiusPixels':5,'sourceMicroBlurRadiusPixels':4,'microRatioRange':[.65,1.45],'microStrength':.95,'detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
+        'sourcePigmentBlurRadiusPixels':5,'sourceMicroBlurRadiusPixels':4,'microRatioRange':[.65,1.45],'microStrength':1.15,'darkMottlingRatioRange':[.70,1.50],'visibleDetailIsPhotographic':True,'periodicDetailScope':'unphotographed cap only','detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
     return atlas,record

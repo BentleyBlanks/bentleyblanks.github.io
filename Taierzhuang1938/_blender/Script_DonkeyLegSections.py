@@ -51,10 +51,10 @@ def FitReferenceLegs(skin,rig):
     stems,masses,profiles=MeasureLegSections(skin);source=[v.co.copy() for v in skin.data.vertices]
     horn={i for f in skin.data.polygons if skin.data.materials[f.material_index].name.startswith('DonkeyHoofHorn') for i in f.vertices}
     # Absolute metre sections replace the old independent depth multipliers.
-    frontX=[(.12,.096),(.155,.09567),(.24,.100),(.33,.103),(.38,.104),(.48,.111),(.60,.126),(.70,.132),(.80,.145)]
-    frontY=[(.12,.650),(.155,.644167),(.23,.655),(.33,.662),(.38,.666),(.48,.671),(.60,.669),(.70,.666),(.80,.666)]
-    frontWidth=[(.12,.066),(.155,.075),(.22,.059),(.30,.055),(.345,.064),(.38,.088),(.425,.076),(.50,.068),(.60,.088),(.69,.112),(.78,.145)]
-    frontDepth=[(.12,.066),(.155,.080),(.22,.071),(.30,.071),(.38,.087),(.45,.084),(.54,.099),(.63,.120),(.70,.147),(.78,.165)]
+    frontX=[(0.12, 0.096), (0.155, 0.09567), (0.24, 0.092), (0.3, 0.087), (0.38, 0.085), (0.48, 0.087), (0.6, 0.09), (0.7, 0.115), (0.8, 0.145)]
+    frontY=[(0.12, 0.65), (0.155, 0.644167), (0.24, 0.669), (0.3, 0.671), (0.38, 0.672), (0.48, 0.674), (0.6, 0.679), (0.7, 0.689), (0.8, 0.692)]
+    frontWidth=[(0.12, 0.066), (0.155, 0.075), (0.22, 0.061), (0.3, 0.068), (0.345, 0.083), (0.38, 0.1), (0.425, 0.086), (0.5, 0.086), (0.6, 0.11), (0.69, 0.112), (0.78, 0.145)]
+    frontDepth=[(0.12, 0.066), (0.155, 0.08), (0.22, 0.071), (0.3, 0.067), (0.38, 0.083), (0.45, 0.081), (0.54, 0.078), (0.6, 0.085), (0.63, 0.095), (0.7, 0.122), (0.78, 0.15)]
     rearX=[(.12,.107),(.155,.1063),(.24,.1067),(.30,.103),(.34,.099),(.375,.098),(.40,.103),(.44,.115),(.48,.126),(.58,.136),(.68,.142)]
     rearY=[(.12,-.080),(.155,-.087719),(.24,-.092),(.33,-.099),(.375,-.095273),(.43,-.069),(.50,-.041),(.58,.005),(.65,.035),(.70,.055)]
     # The rear view shows a distinct transverse hock, wider than the cannon
@@ -92,6 +92,6 @@ def FitReferenceLegs(skin,rig):
     soleError=max((v.co-p).length for v,p in zip(skin.data.vertices,source) if p.z<.035)
     hornError=max((skin.data.vertices[i].co-source[i]).length for i in horn)
     if soleError>1e-8 or hornError>1e-8:raise RuntimeError('Limb fit changed rigid horn or planted soles')
-    return {'method':'independent metre-scale anatomical sections; shape-preserving cubic centreline/width/depth, faired radial contours and continuous root transitions; preserved horn and soles',
+    return {'revision':'20261025ThreeViewLegV28','targetReference':'original frontal and near-side foreleg silhouettes; metre calibration from 1.10 m withers and 623 source pixels','method':'independent metre-scale anatomical sections; shape-preserving cubic centreline/width/depth, faired radial contours and continuous root transitions; preserved horn and soles',
         'maxDisplacementM':{s:max(d,default=0) for s,d in changes.items()},'sourceSections':profiles,'frontCentreX':frontX,'frontCentreY':frontY,'frontWidth':frontWidth,'frontDepth':frontDepth,
         'rearCentreX':rearX,'rearCentreY':rearY,'rearWidth':rearWidth,'rearDepth':rearDepth,'standingOffsetY':offsets,'boneDisplacementM':movedBones,'soleDisplacementM':soleError,'hornDisplacementM':hornError}

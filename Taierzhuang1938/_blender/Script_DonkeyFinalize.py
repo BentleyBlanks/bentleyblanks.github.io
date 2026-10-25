@@ -101,7 +101,7 @@ if scene.get('DonkeyEyeRevision'):
 if scene.get('DonkeyReferenceForeSwingClearanceDeg'):
     motion=Read(base/'Review/Data_PectoralMotionIntegrity.json')
     if not motion['pass'] or motion['assetSha256']!=sha:raise RuntimeError('Dense motion verification is missing or belongs to an older GLB')
-    contract['animations']['DonkeyWalk']={**contract['animations']['DonkeyWalk'],'foreSwingClearance':{'leftMaximumDegrees':scene['DonkeyReferenceForeSwingClearanceDeg'],'rightMaximumDegrees':0,'onlyUnplanted':True,'forwardStrideUnchanged':True}}
+    contract['animations']['DonkeyWalk']={**contract['animations']['DonkeyWalk'],'foreSwingClearance':{'leftMaximumDegrees':scene['DonkeyReferenceForeSwingClearanceDeg'],'rightMaximumDegrees':scene.get('DonkeyReferenceForeRightSwingClearanceDeg',0),'onlyUnplanted':True,'forwardStrideUnchanged':True}}
     contract['verification']['nativeLateralStanceDriftPerFrameM']=native['worstLateralStanceDriftPerFrameM']
     contract['verification']['pectoralMotionIntegrity']={key:value for key,value in motion.items() if key!='poses'}
 if scene.get('DonkeyReferenceLegSections'):
