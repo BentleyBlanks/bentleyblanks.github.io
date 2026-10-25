@@ -65,7 +65,7 @@ def RebuildTailGroom(skin,rig,collection,material):
         tangent=(end-root).normalized();across=(across-tangent*across.dot(tangent)).normalized();normal=across.cross(tangent).normalized()
         halfWidth=rng.uniform(.00035,.00075);pigment=palette[rng.randrange(len(palette))]*rng.uniform(.80,1.40)
         first=len(vertices)
-        for t,taper in ((0,.75),(.38,1),(.76,.55),(1,.02)):
+        for t,taper in ((0,.75),(.38,1),(.93,.70),(1,.02)):
             wave=math.sin(math.pi*t)
             point=root.lerp(end,t)+Vector(((bendX+.20*dx)*wave,(bendY-.004*curl)*wave,0))
             vertices.extend((point-across*halfWidth*taper,point+across*halfWidth*taper));normals.extend((tuple(normal),tuple(normal)))
@@ -91,4 +91,5 @@ def RebuildTailGroom(skin,rig,collection,material):
     return {'referenceBrush':brush,'fibres':480,'guides':guideCount,'triangles':len(faces)*2,'halfWidthM':[.00035,.00075],'endHeightM':[min(p.z for p in vertices),.62],'longClumpEndHeightsM':list(guideEnds),'outerFibres':300,'interiorFibres':120,'shortFibres':60,
             'coreEndHeightM':.60,'coreTipRadiusM':.0012,'material':'DonkeyShortCoatPbr','exportLayer':'DonkeyCoatRuntime',
             'pigment':'reference tail linear RGB samples, varied per strand','centreline':'alpha-weighted original side-reference tail centroids','maximumCoreCentrelineCorrectionM':coreCentrelineMaximum,
+            'fibreProfile':[[0,.75],[.38,1],[.93,.70],[1,.02]],'tipTaperSpanFraction':.07,
             'method':'filled elliptical brush with coherent guide clumps, longer staggered tips and a measured side centreline; three segments per fibre and monotonic UVs'}
