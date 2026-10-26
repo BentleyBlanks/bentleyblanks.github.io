@@ -303,7 +303,7 @@ def BuildAbutment():
 def Rebuild():
     task = bpy.context.scene.get("BlenderMcpTask")
     existing = bpy.data.filepath
-    if existing and not str(Path(existing)).lower().startswith(str(SOURCE).lower()):
+    if existing and SOURCE.resolve() not in Path(existing).resolve().parents:
         raise RuntimeError("Refusing to replace a Blender scene outside this bridge source directory: " + existing)
     if task not in (None, "BeishaheBridge"):
         raise RuntimeError("This BlenderMCP scene belongs to another task: " + str(task))
