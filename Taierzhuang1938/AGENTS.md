@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **北沙河铁路大桥独立候选（2026-10-26）**：`Model_BeishaheBridge.glb` 以JACAR邻桥低矮钢桁与现代约280米桥址量级作对标，14×20米、米制PBR；1938本桥原照仍未确认，跨数、构件和细部为创作。重建入口 `_blender/Script_BuildBeishaheBridge.py`，源工程留OneDrive；未替换44米白盒或旧浮桥剧情。见[资产口径](docs/Data_BeishaheBridge.md)，门禁 `BeishaheBridgeTest`，本地验收页与截图不提交。
+
 - **布料双面吸血（2026-10-25）**：`?cloth=1` 增加薄单被与毛巾织物样片、接触处注入/供血/停供、正反面与折叠检查、独立血迹时间回放。共用 `ClothBlood` 用静止坐标双层格场保留血色，湿润与干燥独立；材质沿用伤口色调、织纹与粗糙度逻辑，不改蒙皮和 MotionVector。仅测试场接入，原剧情、布料默认配置与三件 GLB 保留。相对容量与背渗未作物理实测标定，无流挂/接触转印。见[布料吸血](docs/Data_ClothBlood.md)，门禁 `ClothBloodTest` / `ClothBloodBrowserTest`。
 
 - **共用洞顶 / 板缝落土（2026-10-26 视觉续调）**：`Particles.FallingSoil` / `Vfx.FallingSoil` 共用细土流、有限碰撞实体土块、下落尘帘和贴地起尘；按公开实拍参考调整密度与尺度，七档覆盖轻漏灰、细土、明显落灰、板缝、震落、较重崩落与余土。异相漏点、偏细粒径和尺寸阻力区分过程，灰主导档用薄体积尘云；完整参数/曲线/预算可编辑、保存和 JSON 往返。宿主接共享地形/阻挡与运动源，原 01/05 剧情不变。口径 [共用落土](docs/Data_FallingSoil.md)、[参考对照与出图](docs/Data_FallingSoilReference.md)，门禁 `FallingSoilTest` / `FallingSoilBrowserTest`；像素通过不能替代参考画面对照。

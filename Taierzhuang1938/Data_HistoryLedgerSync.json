@@ -5,6 +5,38 @@
   "repoCommit": "9e04298c71f59f5d346efb52438817be3877fca3",
   "assetReviews": [
     {
+      "asset": "BeishaheBridge",
+      "date": "2026-10-26",
+      "scope": "Independent reference-led candidate only; no replacement of the current whitebox bridge or story. Preserve global reviewedAt/repoCommit and unrelated page/source cursors.",
+      "runtimeAsset": "Model_BeishaheBridge.glb",
+      "assetContract": "docs/Data_BeishaheBridge.md",
+      "spec": "_blender/Data_BeishaheBridgeSpec.json",
+      "runtimeSidecar": "Model/Data_BeishaheBridge.json",
+      "decision": "Exact A remains 0: no confirmed photograph of the 1938 Beishahe bridge was found. Low half-through truss form is a creative comparison with JACAR neighboring bridges and a 1934 Xianning bridge, not an exact historical reconstruction. Span count, dimensions, piers, paint, wear and concealed hardware remain inferred.",
+      "source": "https://www.jacar.archives.go.jp/content/item/aj12/C200008287100/raw/C11111424100.c0947120012.sinasinajihenhokushi_055.1370_01.pdf",
+      "sourceReview": "Official PDF request returned 200/application/pdf; original complete scan pages and photo 6/12 crops were opened. Photo 12 is captioned Tengxian north 1 km / 567 km; photo 6 is 560 km Jiehe. Neither is identified as the Beishahe bridge. Metadata page returned 403 to the web reader; it was not treated as verified page text.",
+      "scaleBoundary": "Modern OSM railway bridge segments and Esri imagery constrain a present-day floodplain crossing of about 280 m; the visible main channel is about 35-50 m. These are modern map estimates, not evidence of bridge length, pier positions or water level in March 1938. The candidate 14 x 20 m short spans and 1.435 m gauge are design choices, not Beishahe-specific archival measurements.",
+      "generatedReferenceBoundary": "Imagegen studies supplement local construction detail and material design only; generated images are not historical photographs or evidence.",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-10-26T08:54:25.763Z",
+          "scope": "Existing chapter-one railway-bridge creative row and dated status note enhanced; 111 rows retained and only the bridge row changed."
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-10-26T08:54:24.831Z",
+          "scope": "Existing creative road/bridge bullet minimally enhanced; no duplicate event added."
+        },
+        {
+          "id": "3eb60335331c81fda6dfe38153bcec45",
+          "lastEdited": "2026-10-25T10:22:31.491Z",
+          "scope": "Bridge compilation read for neighboring and period comparison images, modern GPS and Exact A=0 boundary; source page not edited."
+        }
+      ],
+      "acceptanceScope": "Historical-boundary synchronization only; no claim that the model has completed visual matching or runtime acceptance."
+    },
+    {
       "asset": "FlareEffects",
       "date": "2026-10-26",
       "scope": "Signal and white parachute illumination effects only. Preserve global audit cursors and unrelated history reviews.",

@@ -97,6 +97,9 @@ const SINGLE_BLANKET_ASSET_BYTES = 1024 * 1024;
 // 2026-10-22 白盒关卡编辑器的河沟示意两张反照率（泥 ~300 KB、水 ~60 KB，tier=editor）：只有 ?editor=blockout 下载，
 // 不进 boot / level 预算；全目录原本就顶着上限（63.79 / 63.81 MB），按它们的体积单列 384 KB。
 const EDITOR_CREEK_SKETCH_BYTES = 384 * 1024;
+// One new 369,312-byte bridge steel PBR set, kept at 1024/512 px for metre-scale
+// corrosion detail. Embedded in the independent GLB, with no boot/level request.
+const BEISHAHE_METAL_ASSET_BYTES = 384 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -114,14 +117,30 @@ export const TEXTURE_BUDGETS = Object.freeze({
     // Loaded with the title menu, never promoted into the shared boot PBR_SETS.
     // 2026-10-05: seven campaign maps + three historical papers add about 4 MB.
     // Only the selected pair is requested (< 1 MB), not the whole campaign set.
-    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES, // Also includes lossless command-room irradiance.
+    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + BEISHAHE_METAL_ASSET_BYTES, // Also includes lossless command-room irradiance.
     // editor：2026-10-22 白盒编辑器河沟示意加两张 1024 反照率（泥 ~300 KB、水 ~60 KB），只在 ?editor=blockout 下载，玩家不碰；上限抬到 1 MB。
     editor: 1 * 1024 * 1024,
   }),
-  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES,
+  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES + BEISHAHE_METAL_ASSET_BYTES,
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
+  {
+    id: "BeishaheSteel", kind: "material", tier: "lazy", toneClass: "wornSteel",
+    metersPerTile: 1,
+    bake: "_import/Script_BakePbrTexture.py",
+    bakeRecord: "_import/TextureBakes/Texture_BeishaheSteel.json",
+    source: { provider: "imagegen", date: "2026-10-26",
+      ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-ae319032-a472-4d8b-90bf-6d81dc0b344a",
+      prompt: "_import/Prompts/Texture_BeishaheSteel.txt",
+      note: "内置 imagegen 生成无花纹旧钢面；按既有 baker 定色/法线/ORM，仅嵌入独立桥梁 GLB，未加入开机或第一关贴图集。源图与 .blend 留 OneDrive。" },
+    consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishaheSteel" }],
+    files: [
+      ["Texture_BeishaheSteelBase.webp", "Base", 1024, 1024],
+      ["Texture_BeishaheSteelNormal.webp", "Normal", 512, 512],
+      ["Texture_BeishaheSteelOrm.webp", "Orm", 512, 512],
+    ],
+  },
   {
     id: "SingleBlanket", kind: "material", tier: "offline",
     toneClass: null, metersPerTile: null,

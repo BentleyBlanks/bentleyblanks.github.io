@@ -1,0 +1,4 @@
+Use case: historical-scene
+Asset type: square seamless physically based material albedo source for a 1938 riveted railway bridge's steel; no geometry baked into it.
+Primary request: perfectly front-facing flat sheet of aged charcoal gray painted steel with fine irregular oxidized surface, subtle brown rust freckles occupying about 12 percent, tiny gray chips, restrained mottled iron grain. Uniform neutral diffuse illumination, medium-dark gray (rough average RGB 90,87,80), low contrast, enough color variation to read as iron outdoors. Seamless tiling texture over a roughly 1 metre square area.
+Constraints: pure surface color without lighting/shadows/reflections; no rivets, no bolts, no seams, no plate edges, no embossed or diamond tread, no circles, no text, no objects, no directional bands, no border, no dramatic orange rust. Realistic scale, not stylized. Fill the entire image edge to edge.

@@ -195,6 +195,7 @@ export const testDefs = {
   // Retired from 18 on 2026-09-30 (the steel truss bridge is not in the level any more); kept only as a self-check of the standalone Model_RailBridge.glb and its sidecar
   // (no game layout / terrain binding), so it is not in the firstLevel / firstLevelTail domains any more.
   RailBridgeTest: {file:"Script_RailBridgeTest.mjs",desc:"(retired from 18) standalone Model_RailBridge.glb self-check: baked GLB/sidecar/snapshot agreement, debris at rest, real GLB detonation timeline, particle budget"},
+  BeishaheBridgeTest: {file:"Script_BeishaheBridgeTest.mjs",desc:"Standalone Beishahe 280 m bridge: actual GLB metric bounds, complete PBR, per-span bearing geometry, inner rail gauge and open low half-through trusses"},
   Type89DamageTest: {file:"Script_Type89DamageTest.mjs",desc:"Blender tank fracture geometry, both struck sides, terrain contact and smoke lifecycle"},
   FirstLevelTankProbeTest: {file:"Script_FirstLevelTankProbe.mjs",timeoutMs:1800000,desc:"第一关战车专项探针：03→06 真实输入开声音跑一趟，记露面/每发主炮预兆与落点/机枪点射/05 攻击路线威胁窗口/反应/毁伤序列/常驻循环数与电平，并摆位拍五张关键画面（人工审）"},
   FirstLevelTankBrainTest: {file:"Script_FirstLevelTankBrainTest.mjs",desc:"第一关战车纯规则大脑：驾驶加减速/原地转、预兆链、目标过滤、散布收敛、机枪走进来、死角、反应、护兵槽、两段毁伤（纯 Node，秒级）"},
@@ -815,6 +816,7 @@ export const domains = {
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest','DraftCartEditorTest']},
   railBridgeModel: {label:'退役钢桁架铁路桥模型自检（不在第一关里）',tests:['RailBridgeTest']},
+  beishaheBridge: {label:'北沙河独立史料复原桥资产（不改变剧情）',tests:['BeishaheBridgeTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","LitterGaitTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
   firstLevel: {label:'新版第一关完整任务',tests:['SandbagStandardTest','FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTerrainTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','FirstLevelFarBankTest','PontoonBridgeTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','MissionAreaGuardTest','MissionAreaGuardBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','LitterGaitTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionPeopleCadenceTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','CartCorpseBumpTest','FirstLevelFrontTest','FirstLevelCollectionCareTest','FirstLevelFrontPressureTest','FirstLevelFrontCounterattackTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest','FirstLevelFrontCheckpoint04Test','FirstLevelFrontCheckpoint05Test','FirstLevelFrontCheckpoint05BombFirstTest','FirstLevelRearDoorWalkTest']},
@@ -1049,6 +1051,7 @@ const changedDomainRules = [
   // 18 浮桥的模型与毁桥演出（Blender 烘焙产物 + 运行时 + 地形快照）：文件名里没有 FirstLevel。
   // （钢桁架铁路桥 2026-09-30 退役：它的自检 RailBridgeTest 不再挂在 firstLevel / firstLevelTail 域里。）
   {domain:"railBridgeModel",pattern:/RailBridge/},
+  {domain:"beishaheBridge",pattern:/BeishaheBridge|BeishaheSteel/},
   {domain:"firstLevel",pattern:/PontoonBridge/},
   {domain:"firstLevelTail",pattern:/PontoonBridge/},
   // 第二波玩法包的新模块（阶段 1–7 / 8–14 / 15–18）：文件名不带 FirstLevelMission 前缀，单列一条。

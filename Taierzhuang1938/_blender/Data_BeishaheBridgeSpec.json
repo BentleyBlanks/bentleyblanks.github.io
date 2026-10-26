@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "version": "2026102601",
+  "name": "BeishaheBridge",
+  "units": "m",
+  "coordinateSystem": "X east, Y up, Z south; origin at bridge center, sleeper top Y=0",
+  "lengthM": 280,
+  "spanCount": 14,
+  "spanPitchM": 20,
+  "expansionGapM": 0.12,
+  "panelsPerSpan": 8,
+  "trussCenterOffsetM": 1.85,
+  "trussTopY": 2,
+  "trussBottomY": -0.55,
+  "gaugeM": 1.435,
+  "railHeadWidthM": 0.065,
+  "railHeightM": 0.14,
+  "sleeperLengthM": 2.8,
+  "sleeperWidthM": 0.24,
+  "sleeperDepthM": 0.16,
+  "sleeperSpacingM": 0.6,
+  "bearingTopY": -0.69,
+  "pierTopY": -1.02,
+  "foundationY": -5.3,
+  "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, pier dimensions, deck elevation, weathering and colors are authored design. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
+  "historicalReferences": [
+    {"id":"JacarPhoto12", "url":"https://www.jacar.archives.go.jp/das/meta-en/C11111424100", "image":"JACAR C11111424100 appendix photo 12, 567 km bridge north of Tengxian", "supports":"Nearby 1938 low pony truss silhouette, straight upper chord, inclined end posts, open above the track. Not identified as Beishahe itself."},
+    {"id":"JacarPhoto6", "url":"https://www.jacar.archives.go.jp/content/item/aj12/C200008287100/raw/C11111424100.c0947120012.sinasinajihenhokushi_055.1370_01.pdf", "image":"Appendix photo 6, 560 km Jiehe bridge", "supports":"Nearby short steel trusses, masonry support and demolition appearance. Not the Beishahe bridge."},
+    {"id":"NotionResearch", "url":"https://app.notion.com/p/3eb60335331c81fda6dfe38153bcec45", "supports":"User research archive; exact 1938 Beishahe bridge photograph still unconfirmed."}
+  ],
+  "mapMeasurement": {
+    "centerWgs84":[117.10696,35.14496],
+    "osmApi":"https://api.openstreetmap.org/api/0.6/map?bbox=117.102,35.140,117.112,35.150",
+    "modernBridgeWays":[
+      {"id":1052215401,"endpoints":[[117.1058401,35.1460436],[117.1078470,35.1441111]],"lengthM":281.802},
+      {"id":1052215402,"endpoints":[[117.1057539,35.1459361],[117.1077463,35.1440263]],"lengthM":279.029}
+    ],
+    "imagery":"Esri World Imagery; OSM bridge endpoints checked against visible modern bridge ends",
+    "mainWaterChannelEstimateM":[35,50],
+    "uncertainty":"Modern mapped crossing includes floodplain. Water-channel estimate is image interpretation, approximately +/-5 to 10 m. Neither establishes the 1938 bank position or original bridge length. Model is deliberately rounded to 280 m."
+  }
+}
