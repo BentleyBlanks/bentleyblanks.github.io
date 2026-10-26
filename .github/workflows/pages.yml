@@ -55,7 +55,7 @@ jobs:
         id: gpu-assets
         with:
           path: ${{ runner.temp }}/tengxian-gpu-cache
-          key: tengxian-gpu-${{ runner.os }}-v1-${{ hashFiles('Taierzhuang1938/Texture/**', 'Taierzhuang1938/Model/**/*.glb', 'Taierzhuang1938/*Publish*.mjs', 'Taierzhuang1938/Script_TextureImport*.mjs', 'Taierzhuang1938/Data_TextureImportSettings.json', 'Taierzhuang1938/Data_TextureManifest.mjs', 'package.json') }}
+          key: tengxian-gpu-${{ runner.os }}-v1-${{ hashFiles('Taierzhuang1938/Texture/**', 'Taierzhuang1938/Model/**/*.glb', 'Taierzhuang1938/*Publish*.mjs', 'Taierzhuang1938/Script_AstcEncoder.mjs', 'Taierzhuang1938/Script_TextureImportPixels.mjs', 'Taierzhuang1938/Script_TextureImport*.mjs', 'Taierzhuang1938/Data_TextureImportSettings.json', 'Taierzhuang1938/Data_TextureManifest.mjs', 'package.json') }}
           restore-keys: |
             tengxian-gpu-${{ runner.os }}-v1-
       - name: Build and validate GPU publication assets

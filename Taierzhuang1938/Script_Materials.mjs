@@ -10,7 +10,7 @@
 import * as THREE from "three";
 import { RECIPES, BakeDetailNormal, BakeSkinLut } from "./Script_TexBake.mjs";
 import { TextureBaker } from "./Script_TextureBaker.mjs";
-import { TextureImportOf, ApplyTextureImport, PrepareImportedTexture, LoadKtxTexture, ResolveTextureImportUrl } from "./Script_TextureImports.mjs";
+import { TextureImportOf, MobileTextureImportOf, ApplyTextureImport, PrepareImportedTexture, LoadKtxTexture, ResolveTextureImportUrl } from "./Script_TextureImports.mjs";
 import { SSR } from "./Data_Tuning_Graphics.mjs";
 import {
   ApplyPatches, IndirectLightingPatches, MakeDestructionPatch, FoldOrmMaps, PatchesOf,
@@ -551,8 +551,9 @@ export class MaterialLibrary {
    * 这个 img 元素 —— TextureLoader 只在成功回调里才把 image 挂到 texture 上。
    */
   _LoadExternalImage(url, srgb, timeoutMs, flipY = true) {
-    const imported = TextureImportOf(url);
-    url = ResolveTextureImportUrl(url);
+    // 手机版贴图（1024 + ASTC，Data_MobileAssetRuntime）只在手机 / 平板且显卡认 ASTC 时才有；否则就是电脑版那条
+    const desktop = TextureImportOf(url), imported = MobileTextureImportOf(url, desktop) || desktop;
+    url = ResolveTextureImportUrl(url, imported);
     if (imported?.format.startsWith("ktx2")) {
       const path = flipY ? url : url.replace(/Texture\/[^?]+/, `Texture/${imported.unflipped}`);
       return new Promise((resolve, reject) => {

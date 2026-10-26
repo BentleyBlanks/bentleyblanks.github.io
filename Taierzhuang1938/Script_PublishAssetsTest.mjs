@@ -21,7 +21,8 @@ try{
  let seed=1938;for(let i=0;i<data.length;i+=4){seed=(Math.imul(seed,1664525)+1013904223)>>>0;data[i]=seed&255;data[i+1]=(seed>>>8)&255;data[i+2]=(seed>>>16)&255;data[i+3]=255;}
  const pixels=await sharp(data,{raw:{width,height,channels:4}}).webp({lossless:true}).toBuffer();
  await fs.writeFile(path.join(source,'Texture',file),pixels);await fs.writeFile(path.join(out,'Texture',file),pixels);
- const options={cacheDir:cache,textureFiles:[file],modelFiles:[],log:()=>{}};
+ // 手机版另有 Script_PublishMobileAssetsTest；这里只测电脑版那条（也不必下载 astcenc）
+ const options={cacheDir:cache,textureFiles:[file],modelFiles:[],mobile:false,log:()=>{}};
  const before=Hash(pixels),cold=await BuildPublishAssets(source,out,options);
  assert.equal(cold.textures.length,1,'the ordinary GPU path publishes eligible same-size texture data');
  assert.ok(cold.cache.misses>0);assert.equal(cold.cache.hits,0);
@@ -37,7 +38,7 @@ try{
  assert.equal(InspectKtx(encoded,width,height,'srgb').gpuBytes,10936);
  assert.throws(()=>InspectKtx(encoded,width/2,height),/dimensions/);
  assert.throws(()=>InspectKtx(encoded,width,height,'linear'),/color space|codec/);
- const entries=await fs.readdir(cache);await fs.writeFile(path.join(cache,entries[0],entry.filename),'corrupt');
+ const entries=(await fs.readdir(cache)).filter(name=>/^[a-f0-9]{64}$/.test(name));await fs.writeFile(path.join(cache,entries[0],entry.filename),'corrupt');
  const rebuilt=await BuildPublishAssets(source,out,options);assert.equal(rebuilt.cache.misses,1,'corrupt cached bytes are rebuilt');
  assert.equal(Hash(await fs.readFile(path.join(out,'Texture',entry.output))),Hash(encoded));
  // Explicit source settings override automatic GPU policy without changing source pixels.

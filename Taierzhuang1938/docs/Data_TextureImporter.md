@@ -78,3 +78,19 @@ KTX2 与同版本 Three r185 loader／WASM 一起自托管，运行时最多两�
 回归：`Script_PublishAssetsTest` 覆盖自动转换、源保护、显式覆盖、缓存稳定与损坏恢复；`Script_PublishAssetsBrowserTest` 无参数时自行构建三模型最小 staging，可重复执行，不依赖先运行手工构建。结果位于忽略的 `_shots/GpuPublish/`。
 
 保存端点为 `/__textures/status|save|preview|result/...`，仅 localhost 回环可写／编码，同源 JSON、固定配置目标、路径白名单、请求体上限、串行编码和原子写入。编码失败会显示实际错误，不伪造预览或静默发布源图。
+
+## 手机版贴图（2026-10-26）
+
+用户在 iPhone 上开线上白盒编辑器，内存超限被 Safari 刷掉（实测显存里的贴图约 1.5 GB：人物、第一人称枪手的图都被「原图已经很小」那条规则留成了未压缩 RGBA）。用户定的口径：**手机上大部分贴图最长边 1024、ASTC 6×6；法线图 1024、ASTC 4×4**（6×6 压法线会起颗粒）；电脑端一个字节不变。
+
+- **为什么不走 Basis**：Basis 在 iPhone 上只能转成 ASTC 4×4，转不出 6×6。手机版用 ARM 官方 astcenc（`Script_AstcEncoder`，固定 5.7.0、核 SHA-256，按平台下载到发布缓存目录；`ASTCENC_PATH` 可指向现成的可执行文件）直接压成原生 ASTC 块，装进 KTX2（vkFormat ASTC，zstd 超压缩），three 的 KTX2Loader 走 raw 路径上传。
+- **打包**（`Script_PublishMobileAssets`，由 `Script_BuildPublishAssets` 在电脑版产物之后、写内容戳之前调；参数在 `Data_AssetPublish.MOBILE_ASSETS`）：
+  - 独立贴图：`TextureCatalog` 里 GPU 采样的那些（界面、CPU 读像素、纹理数组、离线源不碰），各出翻转 / 不翻转两份；开了 Read/Write 或手动配了 ios / android 平台版本的尊重原配置。
+  - 模型：游戏代码里引用到的每个 `Model/**.glb` 都出手机版（不限于电脑版登记的那几个）：只换嵌入图（`image/ktx2` + `KHR_texture_basisu`），回读核对几何 / 骨骼 / 动作 / 材质逐字节不变；外链图、一张图被颜色和数据两种槽共用、meshopt 的跳过并写进报告。
+  - 缩小：颜色图整体 lanczos3；数据图与法线图逐通道缩（先把通道取成单独一张图再缩——同一条 sharp 管线里 `extractChannel().resize()` 会让四个通道变成同一个灰度，2026-10-26 踩过）；法线每级重新归一。mip 逐级缩、逐级编码。
+  - 缓存：键 = 源像素字节 + 参数 + 编码器 SHA-256 + `ASTC_PIPELINE`（改了编码流程就加一）；缓存不可信，读回要能解析。CI 缓存键也包含 `Script_AstcEncoder` / `Script_TextureImportPixels`。
+  - 产物：`Data_MobileAssetRuntime.mjs`（`{ textures: { 源: [翻转版, 不翻转版, s|l] }, models: { 源 glb: 手机版 glb } }`，全游戏约 7 KB gzip）与报告里的 `mobile` 一节。2026-10-26 本机全量：182 张独立贴图、30 个模型 / 514 张嵌入图，全游戏手机版贴图显存合计约 258 MB；第一次全量编码约 10 分钟，之后命中缓存。
+- **运行时**（`Script_TextureImports`）：`MobileAssetsActive()` = 手机 / 平板（iPhone、iPad、安卓）**且**显卡认 `WEBGL_compressed_texture_astc`；`?mobileAssets=0` 强制不用，`=1` 只要认 ASTC 就用（电脑上对比看，SwiftShader 认 ASTC）。渲染器交过来之后才判断。只有项目自己的贴图加载器（`ManagedTextureLoader`、材质库 `_LoadExternalImage`）和 `ManagedGLTFLoader` 会换手机版；全局 URL 改写不换，别处直接读图的代码拿到的仍是原图。采样设置（包裹、过滤、各向异性）沿用电脑版的导入配置。
+- **效果**（2026-10-26，SwiftShader 手机尺寸，白盒 01–05 的 03-1）：显存里的贴图 1549 MB → 299 MB。近看第一人称枪的木纹比电脑版糊（1024 的预期损失），用户要求先统一 1024、看对比图再决定枪和手要不要单独开 2048。
+- **门禁**：`Script_PublishMobileAssetsTest`（真资产小打包：尺寸 / 格式 / mip / zstd、解回像素与原图逐通道比、翻转、模型只换图、电脑版对照表不含手机版；SwiftShader 里 `?mobileAssets=1/0` 加载器拿到 ASTC / 电脑版）。
+

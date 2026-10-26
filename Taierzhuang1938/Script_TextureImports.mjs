@@ -1,19 +1,52 @@
 import * as THREE from "three";
 import { TEXTURE_IMPORT_RUNTIME } from "./Data_TextureImportRuntime.mjs";
 import { ASSET_PUBLISH_RUNTIME } from "./Data_AssetPublishRuntime.mjs";
+import { MOBILE_ASSET_RUNTIME } from "./Data_MobileAssetRuntime.mjs";
 
-let renderer, ktxPromise;
+let renderer, ktxPromise, mobileAssets = null;
 export function SetTextureImportRenderer(value) {
   renderer = value;
-  THREE.DefaultLoadingManager.setURLModifier(ResolveTextureImportUrl);
+  mobileAssets = null;
+  THREE.DefaultLoadingManager.setURLModifier((url) => ResolveTextureImportUrl(url));
 }
-export function ResolveTextureImportUrl(url) {
-  const entry = TextureImportOf(url);
+export function ResolveTextureImportUrl(url, entry = TextureImportOf(url)) {
   return entry?.output ? String(url).replace(/Texture\/[^?#]+/, `Texture/${entry.output}`) : url;
 }
+
+/**
+ * 手机版贴图与模型（Data_MobileAssetRuntime，Pages 发布时生成：1024 + ASTC 6×6 / 法线 4×4）用不用：
+ * 手机 / 平板（iPhone、iPad、安卓）并且这块显卡认 ASTC 才用；?mobileAssets=0 强制不用，=1 只要显卡认 ASTC 就用（电脑上对比看）。
+ * 要等渲染器交过来才判断（之前加载的照旧走电脑版），判一次就记住。
+ */
+export function MobileAssetsActive() {
+  if (mobileAssets !== null) return mobileAssets;
+  if (!renderer) return false;
+  let forced = null;
+  try { forced = new URLSearchParams(globalThis.location?.search || "").get("mobileAssets"); } catch { forced = null; }
+  const astc = !!renderer.extensions?.has?.("WEBGL_compressed_texture_astc");
+  if (forced === "0") return (mobileAssets = false);
+  if (forced === "1") return (mobileAssets = astc);
+  const agent = globalThis.navigator?.userAgent || "";
+  const handheld = /android/i.test(agent) || /iPad|iPhone|iPod/.test(agent) || (/Mac/.test(agent) && (globalThis.navigator?.maxTouchPoints || 0) > 1);
+  return (mobileAssets = handheld && astc);
+}
+
+/** 手机版贴图条目（只给本模块的 ManagedTextureLoader 用；全局 URL 改写不走它，别处直接读图的代码拿到的仍是原图）。 */
+export function MobileTextureImportOf(url, desktop = TextureImportOf(url)) {
+  if (!MobileAssetsActive()) return null;
+  const pathname = String(url).split(/[?#]/)[0];
+  const key = pathname.slice(pathname.lastIndexOf("/Texture/") + 9).replace(/^\.\/Texture\//, "");
+  const row = MOBILE_ASSET_RUNTIME.textures[key];
+  if (!row || desktop?.readWrite || desktop?.cpuFile) return null;
+  // 采样设置（包裹、过滤、各向异性）沿用电脑版的导入配置；尺寸、格式、mip 由手机版文件自带
+  const { wrapU, wrapV, filterMode, anisotropy } = desktop || {};
+  return { format: "ktx2-astc-mobile", output: row[0], unflipped: row[1], colorSpace: row[2] === "s" ? "srgb" : "linear",
+    mipmaps: "inherit", wrapU, wrapV, filterMode, anisotropy, mobile: true };
+}
+
 export function ResolvePublishedModelUrl(url) {
   const match = String(url).match(/(^|\/)(Model\/[^?#]+)/);
-  const output = match && ASSET_PUBLISH_RUNTIME[match[2]];
+  const output = match && ((MobileAssetsActive() && MOBILE_ASSET_RUNTIME.models[match[2]]) || ASSET_PUBLISH_RUNTIME[match[2]]);
   return output ? String(url).replace(match[2], output) : url;
 }
 export function TextureImportOf(url) {
@@ -98,8 +131,8 @@ export async function LoadKtxTexture(url, format = "ktx2-uastc") {
 export class ManagedTextureLoader extends THREE.TextureLoader {
   constructor(manager, { flipY = true } = {}) { super(manager); this.importFlipY = flipY; }
   load(url, onLoad, onProgress, onError) {
-    const entry = TextureImportOf(url);
-    url = ResolveTextureImportUrl(url);
+    const desktop = TextureImportOf(url), entry = MobileTextureImportOf(url, desktop) || desktop;
+    url = ResolveTextureImportUrl(url, entry);
     if (!entry?.format.startsWith("ktx2")) return super.load(url, texture => {
       PrepareImportedTexture(texture, entry, url, this.importFlipY).then(() => { onLoad?.(texture); ApplyTextureImport(texture, entry); texture.needsUpdate = true; }).catch(error => onError ? onError(error) : console.error(error));
     }, onProgress, onError);

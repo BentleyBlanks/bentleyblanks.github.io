@@ -787,7 +787,10 @@ let gi = (GI_ON && graphics.gi)
   : null;
 if (gi) gi.enabled = true;
 const hud = new Hud(hudRoot);
-const audio = new AudioEngine({ enabled: AUDIO_ENABLED, assetPolicy: WEAPON_RANGE ? WEAPON_RANGE_STARTUP.audio : null });
+// 白盒关卡编辑器：关卡表里 ambience / music 都是 null，环境床与配乐从来不放，就不下载、不解码
+//（解码后的 PCM 约 370 MB，手机上一半的内存超限就是它，2026-10-26 实测）。音效、台词照旧。
+const audio = new AudioEngine({ enabled: AUDIO_ENABLED,
+  assetPolicy: WEAPON_RANGE ? WEAPON_RANGE_STARTUP.audio : BLOCKOUT ? { ambience: false, music: false } : null });
 // 顺子打空弹药时骂一句（第一次必骂，之后按概率）。规则在 Script_PlayerVent；剧情对白在说、人倒了就等着。
 const playerVent = new PlayerVent({ audio, Blocked: () => !player?.Alive || !!audio.dialogueYield });
 audio.allowAutonomousBark = () => AllowAutonomousBark(PHASE_TABLE[state.phaseIndex],

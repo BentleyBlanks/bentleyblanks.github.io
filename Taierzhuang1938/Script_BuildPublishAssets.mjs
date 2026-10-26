@@ -11,6 +11,7 @@ import {EncodeTexture, BasisEncoderInfo} from './Script_TextureImportBuild.mjs';
 import {BuildTextureImports} from './Script_BuildTextureImports.mjs';
 import {CachedFiles, Hash, Within} from './Script_PublishCache.mjs';
 import {read as ReadKtx} from './vendor/three/examples/jsm/libs/ktx-parse.module.js';
+import {BuildMobileAssets} from './Script_PublishMobileAssets.mjs';
 
 const require = createRequire(import.meta.url);
 const ownDir = path.dirname(fileURLToPath(import.meta.url));
@@ -100,7 +101,7 @@ export function GlbImageRoles(doc) {
   for (const material of doc.materials || []) Visit(material);
   return roles;
 }
-export async function BuildPublishAssets(projectDir, outputDir, {cacheDir = null, textureFiles = null, modelFiles = null, log = console.log} = {}) {
+export async function BuildPublishAssets(projectDir, outputDir, {cacheDir = null, textureFiles = null, modelFiles = null, mobile = true, mobileModelFiles = null, log = console.log} = {}) {
   projectDir = path.resolve(projectDir); outputDir = path.resolve(outputDir);
   if (projectDir === outputDir) throw Error('Publish assets require a separate staging directory');
   const toolchain = await Toolchain(projectDir), stats = {hits: 0, misses: 0};
@@ -213,10 +214,14 @@ export async function BuildPublishAssets(projectDir, outputDir, {cacheDir = null
     await fs.rm(work,{recursive:true,force:true});
   }
   await fs.writeFile(Within(outputDir,'Data_AssetPublishRuntime.mjs'),`export const ASSET_PUBLISH_RUNTIME = ${JSON.stringify(modelRuntime)};\n`);
+  // 手机版贴图与模型（1024 + ASTC 6×6 / 法线 4×4）：另出一套，电脑端的产物与对照表不动。
+  if (mobile) report.mobile = await BuildMobileAssets(projectDir, outputDir, {cacheDir, desktopRuntime: runtime, settings,
+    textureFiles, modelFiles: mobileModelFiles, log});
+  else await fs.writeFile(Within(outputDir,'Data_MobileAssetRuntime.mjs'),'export const MOBILE_ASSET_RUNTIME = {"textures":{},"models":{}};\n');
   // Source tools still use import maps. Give generated tables content stamps too,
   // rather than only relying on the game/menu bundle's stamp.
   const runtimeVersions = {};
-  for(const file of ['Data_TextureImportRuntime.mjs','Data_AssetPublishRuntime.mjs'])
+  for(const file of ['Data_TextureImportRuntime.mjs','Data_AssetPublishRuntime.mjs','Data_MobileAssetRuntime.mjs'])
     runtimeVersions['./'+file] = './'+file+'?v='+BigInt('0x'+Hash(await fs.readFile(Within(outputDir,file))).slice(0,13)).toString();
   for(const item of await fs.readdir(outputDir,{withFileTypes:true})) {
     if(!item.isFile()||!item.name.endsWith('.html'))continue;
