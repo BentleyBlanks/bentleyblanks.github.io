@@ -62,8 +62,16 @@ const MAP_FOCUS_SPAN_M = 220;
 /** 「复制当前位置」里准星射线打多远。 */
 const AIM_RAY_M = 300;
 
+/** 场景文件的版本戳：Pages 给 ETag / Last-Modified，本地预览只给长度。 */
+function SceneStampOf(response) {
+  const h = response.headers;
+  return h.get("etag") || h.get("last-modified") || h.get("content-length") || null;
+}
+
 export const BLOCKOUT_EDITOR = Object.freeze({
   pollS: 2,
+  /** 每几次轮询查一次场景文件有没有被重烘（配置变了另外立刻查）。 */
+  sceneEvery: 5,
   mapHz: 8,
   miniPxPerM: 1.6,
   freeSpotM: 3,
@@ -224,6 +232,10 @@ export class EditorBlockout {
     this.saving = false;
     this.saveGen = 0;
     this.syncCount = 0;
+    this.sceneStamp = null;
+    this.scenePollN = 0;
+    this.sceneReloads = 0;
+    this.reloadScene = false;
     this.syncRejected = 0;
     this.lastSyncMs = null;
     // 第一次烘纸面地图：等加载画面收掉、再跑一阵游戏帧（见 BLOCKOUT_EDITOR.firstBakeDelayMs）
@@ -319,6 +331,8 @@ export class EditorBlockout {
       Replay: () => this.Replay(),
       SwitchLevel: (key) => this.SwitchLevel(key),
       Reload: () => this.Reload(),
+      /** 外部同步轮询一次（取证用；平时每 pollS 秒自己跑）。 */
+      Poll: () => this.Poll(),
       Units: () => this.puppets.Live(),
       ToggleMap: (open) => this.ToggleMap(open),
       SetLayers: (partial) => this.SetLayers(partial),
@@ -531,11 +545,12 @@ export class EditorBlockout {
     this.markers.SetLandmarks([]);
     this.map.SetLandmarks([]);
     if (!url) { this.PushEditContext(); return []; }
-    let list = [];
+    let list = [], stamp = null;
     const paths = { landmarks: new Map(), blocks: new Map() };
     try {
       const response = await globalThis.fetch(`${url}?t=${Date.now()}`, { cache: "no-store" });
       if (response.ok) {
+        stamp = SceneStampOf(response);
         const doc = await response.json();
         list = NormalizeLandmarks(doc?.landmarks);
         (doc?.landmarks || []).forEach((lm, i) => { if (lm?.id) paths.landmarks.set(String(lm.id), `landmarks[${i}]`); });
@@ -545,6 +560,7 @@ export class EditorBlockout {
       console.warn("[Blockout] landmarks load failed", error);
     }
     if (this.levelKey !== levelKey || this.landmarksLevel !== levelKey) return [];
+    this.sceneStamp = stamp;
     this.landmarks = list;
     this.scenePaths = paths;
     this.markers.SetLandmarks(list);
@@ -810,7 +826,13 @@ export class EditorBlockout {
       const result = await this.store.Load(levelKey, { knownText: this.configText ?? undefined });
       // 网络抖一下不算「外部修改」；切关途中读到的是上一关的；读的时候存过档，读到的可能是旧文
       if (this.switching || this.saving || gen !== this.saveGen || levelKey !== this.levelKey) return;
-      if (result.state === "error" || result.state === "same" || (result.text ?? null) === this.configText) { this.previz.Poll(); return; }
+      const configChanged = !(result.state === "error" || result.state === "same" || (result.text ?? null) === this.configText);
+      // 场景文件（几何）只在进关时读一次；生成器重烘了它而页面一直开着，新关键帧会摆进旧场地（2026-10-26：旧北沙河的水面
+      // 盖在新村子的地洞上）。配置一变就查一次，平时每 sceneEvery 次轮询查一次；变了就整片重建，停在原来的关键帧。
+      if (configChanged || ++this.scenePollN % BLOCKOUT_EDITOR.sceneEvery === 0) {
+        if (await this.SceneChanged(levelKey)) { this.reloadScene = true; return; }
+      }
+      if (!configChanged) { this.previz.Poll(); return; }
       this.previz.Poll({ configChanged: true });
       const t0 = performance.now();
       if (await this.Resync(result, { external: true })) {
@@ -821,7 +843,32 @@ export class EditorBlockout {
       console.warn("[Blockout] poll failed", error);
     } finally {
       this.polling = false;
+      // try 里提前 return 也要走到这里（重建不能放在 try 之后）
+      if (this.reloadScene) { this.reloadScene = false; this.ReloadScene(); }
     }
+  }
+
+  /** 场景文件的戳（ETag / Last-Modified / 长度）和进关时读到的不一样 → true。读不到、没有戳、不是文件场景 → false。 */
+  async SceneChanged(levelKey) {
+    const url = this.level?.scene?.kind === "file" ? this.level.scene.url : null;
+    if (!url || !this.sceneStamp) return false;
+    let stamp = null;
+    try {
+      const response = await globalThis.fetch(`${url}?t=${Date.now()}`, { method: "HEAD", cache: "no-store" });
+      if (response.ok) stamp = SceneStampOf(response);
+    } catch { return false; }
+    return !!stamp && levelKey === this.levelKey && stamp !== this.sceneStamp;
+  }
+
+  /** 场景文件被外部重烘：整片重建这一关，回到原来的关键帧。 */
+  async ReloadScene() {
+    if (this.switching || this.saving) return false;
+    const kfId = this.doc?.keyframes?.[this.index]?.id ?? null;
+    this.sceneReloads += 1;
+    const ok = await this.SwitchLevel(this.levelKey);
+    if (ok && kfId != null) await this.GoTo(kfId, { animate: false });
+    this.ui.Toast("场景文件更新了，场地已重建", "info");
+    return ok;
   }
 
   // -------------------------------------------------------------------------
@@ -1705,7 +1752,7 @@ export class EditorBlockout {
       count: this.doc?.keyframes.length ?? 0, transitioning: this.puppets.transitioning,
       units: this.puppets.puppets.size, configState: this.configState, configMessage: this.configMessage,
       mapOpen: this.mapOpen, pointerLocked: !!this.PointerLocked(), switching: !!this.switching,
-      layers: { ...this.layers }, signals: [...(this.signals || [])], syncCount: this.syncCount,
+      layers: { ...this.layers }, signals: [...(this.signals || [])], syncCount: this.syncCount, sceneStamp: this.sceneStamp, sceneReloads: this.sceneReloads,
       syncRejected: this.syncRejected, lastSyncMs: this.lastSyncMs, staleConfig: this.staleConfig,
       revision: this.revision ?? null, saving: this.saving,
       lastPlan: this.lastPlan || null, writable: this.writable, previz: !!this.previz?.playing, fly: this.fly.active,
