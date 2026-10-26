@@ -711,7 +711,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261026ReferenceV43'
+    scene['DonkeyReferenceFitRevision']='20261026ReferenceV44'
     scene['DonkeyReferenceBodyTuftLimit']=288
     scene['DonkeyReferencePaleFringe']=True
     scene['DonkeyReferenceForeSwingClearanceDeg']=2.5
@@ -787,6 +787,9 @@ def ApplyReferenceFit(scene,base):
     exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),archNamespace)
     details['hindArch']=archNamespace['RoundHindArch'](scene,skin)
     details['hindArchBinding']=archNamespace['BindHindArch'](scene,skin)
+    planeNamespace={};file=project/'_blender/Script_DonkeyJointPlanes.py'
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),planeNamespace)
+    details['jointPlanes']=planeNamespace['ApplyJointPlanes'](scene,skin)
     details['nasalPad']=InstallNasalPad(skin);flowReport=RefreshFlow(skin,rig,collection)
     photoNamespace={}
     exec(compile((project/'_blender/Script_DonkeyPhotoDetail.py').read_text(encoding='utf-8'),'Script_DonkeyPhotoDetail.py','exec'),photoNamespace)

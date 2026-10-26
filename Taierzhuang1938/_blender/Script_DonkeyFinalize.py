@@ -121,10 +121,10 @@ if scene.get('DonkeyReferenceForeSwingClearanceDeg'):
     contract['animations']['DonkeyWalk']={**contract['animations']['DonkeyWalk'],'foreSwingClearance':{'leftMaximumDegrees':scene['DonkeyReferenceForeSwingClearanceDeg'],'rightMaximumDegrees':scene.get('DonkeyReferenceForeRightSwingClearanceDeg',0),'onlyUnplanted':True,'forwardStrideUnchanged':True}}
     contract['verification']['nativeLateralStanceDriftPerFrameM']=native['worstLateralStanceDriftPerFrameM']
     contract['verification']['pectoralMotionIntegrity']={key:value for key,value in motion.items() if key!='poses'}
-    if scene.get('DonkeyReferenceFitRevision') in ['20261025ReferenceV32','20261025ReferenceV33','20261026ReferenceV35','20261026ReferenceV36','20261026ReferenceV37','20261026ReferenceV38','20261026ReferenceV39','20261026ReferenceV40','20261026ReferenceV41','20261026ReferenceV42','20261026ReferenceV43']:
+    if scene.get('DonkeyReferenceFitRevision') in ['20261025ReferenceV32','20261025ReferenceV33','20261026ReferenceV35','20261026ReferenceV36','20261026ReferenceV37','20261026ReferenceV38','20261026ReferenceV39','20261026ReferenceV40','20261026ReferenceV41','20261026ReferenceV42','20261026ReferenceV43','20261026ReferenceV44']:
         hindMotion=RequireMotion('Data_HindMotionIntegrity.json','Hind')
         contract['verification']['hindMotionIntegrity']={key:value for key,value in hindMotion.items() if key!='poses'}
-    if scene.get('DonkeyReferenceFitRevision') in ['20261025ReferenceV33','20261026ReferenceV35','20261026ReferenceV36','20261026ReferenceV37','20261026ReferenceV38','20261026ReferenceV39','20261026ReferenceV40','20261026ReferenceV41','20261026ReferenceV42','20261026ReferenceV43']:
+    if scene.get('DonkeyReferenceFitRevision') in ['20261025ReferenceV33','20261026ReferenceV35','20261026ReferenceV36','20261026ReferenceV37','20261026ReferenceV38','20261026ReferenceV39','20261026ReferenceV40','20261026ReferenceV41','20261026ReferenceV42','20261026ReferenceV43','20261026ReferenceV44']:
         lowerMotion=RequireMotion('Data_LowerBodyMotionIntegrity.json','LowerBody')
         contract['verification']['lowerBodyMotionIntegrity']={key:value for key,value in lowerMotion.items() if key!='poses'}
 if native.get('jointArcs'):
