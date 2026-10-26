@@ -16,7 +16,7 @@ BOUNDARIES={
  'RearRight':[(450,1417,1514),(500,1415,1512),(550,1420,1495),(600,1425,1481),(650,1426,1471),(700,1418,1469),(750,1422,1464),(800,1427,1461),(850,1426,1470),(900,1431,1480),(925,1434,1484)]}
 PALETTE_BOXES={'ForeSideDark':[707,750,732,830],'HindSideDark':[1136,760,1159,825],'ForeFrontDark':[207,765,220,825],'ForeMedialPale':[185,565,198,610],'RearMedialLeft':[1339,577,1354,610],'RearMedialRight':[1430,577,1445,610]}
 
-def BuildLegAlbedo(rgb,blur):
+def BuildLegAlbedo(rgb,blur,returnRelief=False):
     linear=np.where(rgb<=.04045,rgb/12.92,((rgb+.055)/1.055)**2.4)
     tint=np.array([1,1.03,1.10]);gain=.50/.75
     palette={name:np.median(linear[top:bottom,left:right].reshape(-1,3),axis=0)*gain*tint for name,(left,top,right,bottom) in PALETTE_BOXES.items()}
@@ -27,7 +27,7 @@ def BuildLegAlbedo(rgb,blur):
     yy=np.linspace(.90,0,height)[:,None];sourceY=np.broadcast_to(925-yy*(925-302)/1.10,(height,tileWidth))
     angle=(np.arange(tileWidth)-gutter)/(bodyWidth-1)*2*math.pi-math.pi
     nx=np.broadcast_to(np.sin(angle),(height,tileWidth));ny=np.broadcast_to(np.cos(angle),(height,tileWidth))
-    atlas=np.ones((height,tileWidth*4,4),dtype=np.float32);sourceChecks=[];sampling=[]
+    atlas=np.ones((height,tileWidth*4,4),dtype=np.float32);reliefAtlas=np.full((height,tileWidth*4),.5,dtype=np.float32);sourceChecks=[];sampling=[];hueLuminanceErrors=[]
     def Fetch(field,x,y):
         x=np.clip(x,0,1534);y=np.clip(y,0,1022);ix=x.astype(int);iy=y.astype(int);fx=x-ix;fy=y-iy
         if field.ndim==3:fx=fx[:,:,None];fy=fy[:,:,None]
@@ -40,6 +40,12 @@ def BuildLegAlbedo(rgb,blur):
         valid=((fx>=left+margin)&(fx<=right-margin)&(fy>=ys[0]-80)&(fy<=ys[-1])).astype(np.float32)
         denominator=np.maximum(.0001,blur(blur(valid,6),6))
         low=np.stack([blur(blur(linear[:,:,c]*valid,6),6)/denominator for c in range(3)],axis=2)
+        # Separate local photographic hue from scalar illumination/fur relief.
+        fineDen=np.maximum(.0001,blur(luminance*valid,1));coarseDen=np.maximum(.0001,blur(luminance*valid,8))
+        fineRgb=np.stack([blur(linear[:,:,c]*valid,1) for c in range(3)],axis=2)
+        coarseRgb=np.stack([blur(linear[:,:,c]*valid,8) for c in range(3)],axis=2)
+        chroma=np.clip((fineRgb/fineDen[:,:,None])/np.maximum(.10,coarseRgb/coarseDen[:,:,None]),.65,1.40)
+        confidence=np.clip((fineDen-.004)/.008,0,1);chroma=1+(chroma-1)*confidence[:,:,None]
         microLow=blur(luminance*valid,8)/np.maximum(.0001,blur(valid,8))
         fineLow=blur(luminance*valid,2)/np.maximum(.0001,blur(valid,2))
         fine=luminance/np.maximum(.008,fineLow)
@@ -51,7 +57,9 @@ def BuildLegAlbedo(rgb,blur):
         summed=np.pad(np.cumsum(padded,axis=0,dtype=np.float64),((1,0),(0,0)))
         column=(summed[25:]-summed[:-25])/25
         micro=np.clip(fine,.72,1.65)*np.clip(clump/np.maximum(.5,column),.90,1.13)
-        micro=np.clip(micro,.70,1.50)
+        micro=np.clip(micro,.70,1.50);baseMicro=micro.copy()
+        micro=np.clip(fine,.65,2.80)*np.clip(clump/np.maximum(.5,column),.75,1.60)
+        micro=np.clip(micro,.65,2.50)
         sourceX=(lo+hi)*.5+np.clip(horizontal,-1,1)*width*.40
         color=Fetch(low,sourceX,sourceY)
         light=np.array((-.4,.5,.76) if view=='Side' else (-.3,.5,.81) if view=='Front' else (.3,-.5,.81));light/=np.linalg.norm(light)
@@ -62,26 +70,34 @@ def BuildLegAlbedo(rgb,blur):
         # the whole sleeve. Two phased donors feather the periodic cut.
         repeats=round(math.pi/.60)
         phase=np.broadcast_to(np.mod((angle+math.pi)/(2*math.pi)*repeats,1),(height,tileWidth))
-        a=Fetch(micro,lo+width*(.20+.60*phase),sourceY)
-        b=Fetch(micro,lo+width*(.20+.60*np.mod(phase+.5,1)),sourceY)
+        a=Fetch(baseMicro,lo+width*(.20+.60*phase),sourceY)
+        b=Fetch(baseMicro,lo+width*(.20+.60*np.mod(phase+.5,1)),sourceY)
         wa=np.sin(math.pi*phase)**2;detail=a*wa+b*(1-wa)
         # Suppress a coherent source-row stripe while retaining variations
         # between actual individual hairs. There is no synthetic noise.
         rowMean=np.mean(np.stack([Fetch(micro,lo+width*t,sourceY) for t in np.linspace(.2,.8,16)]),axis=0)
-        detail=np.clip(detail/np.maximum(.5,rowMean),.70,1.50)
+        hiddenMean=np.mean(np.stack([Fetch(baseMicro,lo+width*t,sourceY) for t in np.linspace(.2,.8,16)]),axis=0)
+        detail=np.clip(detail/np.maximum(.5,hiddenMean),.70,1.50)
         active=(sourceY>460)&(sourceY<870)
         sourceChecks.append({'view':view,'donor':key,'samples':int(np.count_nonzero(active)),'sourceXRange':[float(sourceX[active].min()),float(sourceX[active].max())]})
-        projected=np.clip(Fetch(micro,sourceX,sourceY)/np.maximum(.5,rowMean),.70,1.50)
-        return color,projected,detail
+        projected=np.clip(Fetch(micro,sourceX,sourceY)/np.maximum(.5,rowMean),.65,2.50)
+        baseProjected=np.clip(Fetch(baseMicro,sourceX,sourceY)/np.maximum(.5,hiddenMean),.70,1.50)
+        projectedChroma=Fetch(chroma,sourceX,sourceY)
+        ca=Fetch(chroma,lo+width*(.20+.60*phase),sourceY)
+        cb=Fetch(chroma,lo+width*(.20+.60*np.mod(phase+.5,1)),sourceY)
+        fallbackChroma=ca*wa[:,:,None]+cb*(1-wa[:,:,None])
+        return color,baseProjected,detail,projectedChroma,fallbackChroma,projected
     dark=np.mean([palette['ForeSideDark'],palette['HindSideDark'],palette['ForeFrontDark']],axis=0)
     for index,stem in enumerate(['DonkeyFrontLeft','DonkeyFrontRight','DonkeyRearLeft','DonkeyRearRight']):
         front='Front' in stem;left=stem.endswith('Left');sideKey='SideFront' if front else 'SideRear';capKey=('Front' if front else 'Rear')+('Left' if left else 'Right')
-        side,sideProjected,sideFallback=Sample(sideKey,-ny,(-np.abs(nx),ny),'Side')
-        face,faceDetail,_=Sample(capKey,-nx if front else nx,(-nx,np.abs(ny) if front else -np.abs(ny)),'Front' if front else 'Rear')
+        side,sideProjected,sideFallback,sideChroma,hiddenChroma,sideRelief=Sample(sideKey,-ny,(-np.abs(nx),ny),'Side')
+        face,faceDetail,_,faceChroma,_,faceRelief=Sample(capKey,-nx if front else nx,(-nx,np.abs(ny) if front else -np.abs(ny)),'Front' if front else 'Rear')
         w=np.maximum(0,ny if front else -ny)**3;sideWeight=np.abs(nx)**3+np.maximum(0,-ny if front else ny)**3;w=w/np.maximum(.001,w+sideWeight)
         visibleSide=np.abs(nx)**3/np.maximum(.001,sideWeight)
         sideDetail=sideProjected*visibleSide+sideFallback*(1-visibleSide)
         detail=sideDetail*(1-w)+faceDetail*w
+        reliefDetail=(sideRelief*visibleSide+sideFallback*(1-visibleSide))*(1-w)+faceRelief*w
+        reliefAtlas[:,index*tileWidth:(index+1)*tileWidth]=np.clip(.5+.25*(reliefDetail-1),0,1)
         # Dark fibres retain bounded, same-limb photographic mottling;
         # directional light and joint recesses are supplied by PBR geometry.
         sideBase=palette['ForeSideDark' if front else 'HindSideDark']
@@ -98,9 +114,14 @@ def BuildLegAlbedo(rgb,blur):
         # actual location. Periodic donors only fill the unphotographed cap;
         # repeating them over visible faces creates artificial dapple spots.
         color=np.maximum(0,pigment*detail[:,:,None])
+        sideHue=sideChroma*visibleSide[:,:,None]+hiddenChroma*(1-visibleSide[:,:,None])
+        hue=sideHue*(1-w[:,:,None])+faceChroma*w[:,:,None]
+        oldLuma=color@np.array([.2126,.7152,.0722]);colored=color*hue
+        color=colored*(oldLuma/np.maximum(.000001,colored@np.array([.2126,.7152,.0722])))[:,:,None]
+        hueLuminanceErrors.append(float(np.max(np.abs(color@np.array([.2126,.7152,.0722])-oldLuma))))
         atlas[:,index*tileWidth:(index+1)*tileWidth,:3]=np.where(color<=.0031308,color*12.92,1.055*color**(1/2.4)-.055)
         sampling.append({'leg':stem,'sideDonor':sideKey,'capDonor':capKey})
-    record={'revision':'20261026ShadowSeparatedLegV36','method':'silhouette-masked source-space pigment; same-limb charcoal/pale coat with short hair and small clump contrast retained; coherent tendon/row shadows removed before cylindrical correspondence; periodic detail only on hidden caps',
+    record={'revision':'20261026ShadowSeparatedLegV38','method':'silhouette-masked source-space pigment; same-limb charcoal/pale pigment with local RGB chroma; stronger photographic hair/clump residual reserved for surface relief; coherent tendon/row shadows removed before cylindrical correspondence; periodic detail only on hidden caps',
         'sourceBoundaryRows':BOUNDARIES,'sampling':sampling,'sourceChecks':sourceChecks,'paletteSourceBoxes':PALETTE_BOXES,'paletteCalibratedLinearRgb':{name:value.tolist() for name,value in palette.items()},
-        'sourcePigmentBlurRadiusPixels':6,'sourceMicroBlurRadiusPixels':8,'sourceFineBlurRadiusPixels':2,'sourceFineRatioRange':[.72,1.65],'sourceClumpRatioRange':[.90,1.13],'sourceVerticalCoherenceWindowPixels':25,'microRatioRange':[.70,1.50],'microStrength':1.0,'darkMottlingRatioRange':[.90,1.10],'silhouetteMaskedFiltering':True,'hiddenCapRepeats':round(math.pi/.60),'visibleDetailIsPhotographic':True,'periodicDetailScope':'unphotographed cap only','detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
-    return atlas,record
+        'sourcePigmentBlurRadiusPixels':6,'sourceMicroBlurRadiusPixels':8,'sourceFineBlurRadiusPixels':2,'sourceFineRatioRange':[.65,2.80],'sourceClumpRatioRange':[.75,1.60],'sourceVerticalCoherenceWindowPixels':25,'microRatioRange':[.70,1.50],'reliefDetailRatioRange':[.65,2.50],'microStrength':1.0,'darkMottlingRatioRange':[.90,1.10],'sourceChromaBlurRadiiPixels':[1,8],'sourceChromaRatioRange':[.65,1.40],'hueStagePreservesLuminance':True,'maximumHueLuminanceError':max(hueLuminanceErrors),'hiddenCapMicroRatioRange':[.70,1.50],'silhouetteMaskedFiltering':True,'hiddenCapRepeats':round(math.pi/.60),'visibleDetailIsPhotographic':True,'periodicDetailScope':'unphotographed cap only','detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
+    return (atlas,reliefAtlas,record) if returnRelief else (atlas,record)

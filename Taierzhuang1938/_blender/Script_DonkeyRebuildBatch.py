@@ -15,7 +15,7 @@ if args.resume:
     bpy.ops.wm.open_mainfile(filepath=str(source))
     if Path(bpy.context.scene.get('DonkeyCartProject','')).resolve()!=project.resolve():raise RuntimeError('Resume source belongs to another project/worktree')
     if not bpy.context.scene.get('DonkeyReferenceFitRevision'):raise RuntimeError('Resume source has not completed the reference fit')
-    if bpy.context.scene['DonkeyReferenceFitRevision']!='20261026ReferenceV37':raise RuntimeError('Resume requires the current V37 source; rebuild from the frozen input to migrate an older source')
+    if bpy.context.scene['DonkeyReferenceFitRevision']!='20261026ReferenceV38':raise RuntimeError('Resume requires the current V38 source; rebuild from the frozen input to migrate an older source')
 else:
     bpy.context.scene['DonkeyCartProject']=str(project);Run('Script_DonkeyReferenceBake.py');Run('Script_DonkeyReferenceRefine.py')
 base=Path(bpy.context.scene['DonkeySourceRoot']);python=os.environ.get('DONKEY_CART_PYTHON','python')
@@ -48,4 +48,6 @@ try:Run('Script_DonkeyCartVerify.py')
 finally:bpy.context.scene['DonkeyVerifyMeasurementsOnly']=False
 Run('Script_DonkeyMotionVerify.py');Run('Script_DonkeyFinalize.py')
 subprocess.run([python,str(scripts/'Script_DonkeyFringeVerify.py'),'--asset',str(project/'Model/Donkey/Model_Donkey.glb'),'--contract',str(project/'Model/Donkey/Data_Donkey.json')],cwd=root,check=True)
+if bpy.context.scene.get('DonkeyReferenceBakedCoatRelief'):
+    subprocess.run([python,str(scripts/'Script_DonkeyFringeVerify.py'),'--asset',str(project/'Model/Donkey/Model_Donkey.glb'),'--contract',str(project/'Model/Donkey/Data_Donkey.json'),'--kind','dark'],cwd=root,check=True)
 print(json.dumps({'rebuilt':str(project/'Model/Donkey/Model_Donkey.glb'),'source':str(base/'Scene_Donkey.blend'),'mode':'headless owned batch'}),flush=True)

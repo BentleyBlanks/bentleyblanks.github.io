@@ -1,9 +1,9 @@
 {
-  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261026\\ReferenceFitV37\\Model_DonkeyUnpacked.glb",
+  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261026\\ReferenceFitV38\\Model_DonkeyUnpacked.glb",
   "output": "C:\\Users\\Bentl\\Documents\\bentleyblanks_Codex_DonkeyCart_20261020\\Taierzhuang1938\\Model\\Donkey\\Model_Donkey.glb",
-  "bytes": 17521124,
+  "bytes": 18579364,
   "geometrySkinActionsUnchanged": true,
-  "nonImageBufferSha256": "3102d07ce5eae98730509cc746d86ac0c463b2a6cf7475b7b552be1f31760b83",
+  "nonImageBufferSha256": "183664321619c00a1c4622fdc9bb22a23f4b97e0fbf2bba58aeb4993a05dc160",
   "images": [
     {
       "name": "Texture_DonkeyShortCoatNormal",
@@ -39,14 +39,14 @@
       "lossless": true
     },
     {
-      "name": "Texture_DonkeyCoatDetailNormal",
-      "file": "Texture_DonkeyCoatDetailNormal.webp",
+      "name": "Texture_DonkeyAnimalNormal",
+      "file": "Texture_DonkeyAnimalNormal.webp",
       "size": [
-        1024,
-        1024
+        2048,
+        2048
       ],
-      "bytes": 2498788,
-      "sha256": "7f2856c0a6a7d597f1b5f64c437683fc1af1790f729754f6a6ba6038d22744f5",
+      "bytes": 5307770,
+      "sha256": "4767fb617e99ebee4d0badfc29ec8f7200c1539ffb94c4f5711210cbbbc637c2",
       "lossless": true
     },
     {
@@ -56,8 +56,8 @@
         2048,
         2048
       ],
-      "bytes": 3581804,
-      "sha256": "0f47a1dbec095816b4d14acc83904933d9da614d8fa6cfaeb3cbd24c5e6807e9",
+      "bytes": 3600604,
+      "sha256": "9a80c5d5ed630f447fc7af3212137de775e7d1d0443ab079f78abe1f33f727ea",
       "lossless": true
     },
     {
@@ -69,17 +69,6 @@
       ],
       "bytes": 23204,
       "sha256": "9a45b719285073074d382cebf6971d46cbca8c883f092aca73c45519fe15d76b",
-      "lossless": true
-    },
-    {
-      "name": "Texture_DonkeyAnimalNormal",
-      "file": "Texture_DonkeyAnimalNormal.webp",
-      "size": [
-        1024,
-        1024
-      ],
-      "bytes": 1378160,
-      "sha256": "14d3322eaee476afa18dd7363e7cb81a06db0c47c8d090d501843d626fa2c866",
       "lossless": true
     }
   ],

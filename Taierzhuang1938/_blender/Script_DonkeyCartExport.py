@@ -14,6 +14,7 @@ scene=bpy.context.scene
 assetName=globals().get('DonkeyAssetName','DonkeyCart')
 standalone=assetName=='Donkey'
 referencePhoto=standalone and bool(scene.get('DonkeyReferencePhotoDetail'))
+bakedCoatRelief=standalone and bool(scene.get('DonkeyReferenceBakedCoatRelief'))
 base=Path(scene['DonkeySourceRoot']) if standalone else Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020')
 bakeDir=base/'SourceTextures/Baked';bakeDir.mkdir(parents=True,exist_ok=True)
 project=Path(scene['DonkeyCartProject'])
@@ -143,7 +144,7 @@ def Bake(obj,label):
     baseImage=TargetImage(obj,'Texture_'+assetName+label+'Base',2048 if label=='Animal' else 4096)
     bpy.ops.object.bake(type='DIFFUSE')
     info=[SaveImage(baseImage)]
-    normalImage=TargetImage(obj,'Texture_'+assetName+label+'Normal',1024 if label=='Animal' else 2048,True)
+    normalImage=TargetImage(obj,'Texture_'+assetName+label+'Normal',2048 if bakedCoatRelief or label!='Animal' else 1024,True)
     bpy.ops.object.bake(type='NORMAL',normal_space='TANGENT',normal_r='POS_X',normal_g='POS_Y',normal_b='POS_Z')
     info.append(SaveImage(normalImage))
     transferSpecular=standalone and bool(scene.get('DonkeyEyeRevision')) and label=='Animal'
@@ -216,16 +217,17 @@ def Bake(obj,label):
         detailBase=bpy.data.images['Texture_DonkeyCoatDetailBase']
         baseTexture=next(node for node in nodes if node.type=='TEX_IMAGE' and node.image==baseImage)
         if not referencePhoto:baseTexture.image=detailBase
-        texture=next(node for node in nodes if node.type=='TEX_IMAGE' and node.image==normalImage);texture.image=detail
-        detailCoordinates=nodes.new('ShaderNodeUVMap');detailCoordinates.uv_map='FurDetailUV'
-        links.new(detailCoordinates.outputs[0],texture.inputs['Vector']);normal.uv_map='FurDetailUV'
+        if not bakedCoatRelief:
+            texture=next(node for node in nodes if node.type=='TEX_IMAGE' and node.image==normalImage);texture.image=detail
+            detailCoordinates=nodes.new('ShaderNodeUVMap');detailCoordinates.uv_map='FurDetailUV'
+            links.new(detailCoordinates.outputs[0],texture.inputs['Vector']);normal.uv_map='FurDetailUV'
         if not referencePhoto:
             links.new(detailCoordinates.outputs[0],baseTexture.inputs['Vector'])
             paint=nodes.new('ShaderNodeVertexColor');paint.layer_name='RuntimeCoatTint'
             multiply=nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=1
             links.new(baseTexture.outputs['Color'],multiply.inputs[1]);links.new(paint.outputs[0],multiply.inputs[2]);links.new(multiply.outputs[0],shader.inputs['Base Color'])
-        normal.inputs['Strength'].default_value=.8 if scene.get('DonkeyReferenceFitRevision') else .65
-        info.append(SaveImage(detail))
+        normal.inputs['Strength'].default_value=1 if bakedCoatRelief else .8 if scene.get('DonkeyReferenceFitRevision') else .65
+        if not bakedCoatRelief:info.append(SaveImage(detail))
         if not referencePhoto:info.append(SaveImage(detailBase))
     for face in obj.data.polygons:face.material_index=0 if not detailValues or furry.data[face.index].value else 1
     # Runtime UV0 is the new atlas. Point paint is fully baked into base colour.
@@ -234,9 +236,10 @@ def Bake(obj,label):
     obj.data.uv_layers.active.name='UVMap'
     uv.uv_map='UVMap'
     if detailValues:
-        layer=obj.data.uv_layers.new(name='FurDetailUV')
-        for item,value in zip(layer.data,detailValues):item.uv=value
-        normal.uv_map='FurDetailUV'
+        if not bakedCoatRelief:
+            layer=obj.data.uv_layers.new(name='FurDetailUV')
+            for item,value in zip(layer.data,detailValues):item.uv=value
+        normal.uv_map='UVMap' if bakedCoatRelief else 'FurDetailUV'
         # The accessory copy uses only the baked atlas and its UV0 tangents.
         for node in accessory.node_tree.nodes:
             if node.type in ('UVMAP','NORMAL_MAP'):node.uv_map='UVMap'

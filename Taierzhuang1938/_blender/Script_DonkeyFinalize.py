@@ -32,6 +32,11 @@ imported=Read(base/'Review/Data_ImportedGlbVerification.json');derivation=Read(b
 native=Read(base/'Review/Data_AnimationMeasurements.json')
 reference=derivation.get('referenceFit');version=reference['version'] if reference else '20261023FurV3'
 photoDetail=reference.get('photoDetail') if reference else None
+if scene.get('DonkeyReferenceBakedCoatRelief'):
+    derivation['coat']['detailNormalUv']='UV0; 2048 complete baked coat/accessory normal, including reference-local limb clumps'
+    derivation['coat']['detailNormalTexelsPerMetre']='unique UV0 atlas; original 0.45 m fibre frequency is an authoring input'
+    derivation['coat']['normalMode']='bakedSourceCoatRelief'
+    (base/'Data_Derivation.json').write_text(json.dumps(derivation,indent=2)+'\n',encoding='utf-8')
 sha=hashlib.sha256(asset.read_bytes()).hexdigest()
 if imported['assetSha256']!=sha:raise RuntimeError('Verification belongs to an older GLB')
 if hashlib.sha256(Path(derivation['source']).read_bytes()).hexdigest()!=derivation['sourceSha256']:raise RuntimeError('Parent source changed during derivation')
@@ -53,6 +58,11 @@ if photoDetail:
     textures['sizeReason']='Shared 2048 reference-detail Base, 1024 accessory Normal, 1024 repeated fibre Normal at 0.45 m, shared 512 ORM; 1024 edge tuft Base/Normal. Six unique embedded lossless WebP images.'
 if scene.get('DonkeyReferenceMane'):
     textures['sizeReason']='Shared 2048 reference-detail Base, 1024 accessory Normal, 1024 repeated fibre Normal at 0.45 m, shared 512 ORM, 1024 edge tuft Base/Normal, and 512x256 reference-silhouette mane/forelock RGBA atlas. Seven unique embedded lossless WebP images.'
+if scene.get('DonkeyReferenceBakedCoatRelief'):
+    textures['uv']='UV0 unique pigment and complete baked coat/accessory normal; edge tufts and mane/tail keep their own atlases'
+    textures['sizeReason']='Shared 2048 Base and 2048 baked Normal, shared 512 ORM, 1024 edge tuft Base/Normal and 512x256 mane/tail RGBA atlas. Six embedded lossless WebP images; the authoring fibre texture remains packed in the source.'
+    obsolete=output/'Texture_DonkeyCoatDetailNormal.webp'
+    if obsolete.exists():obsolete.unlink()
 textures['source']['shortFurCards']=Read(base/'SourceTextures/Data_FurGeneration.json')
 textures['source']['shortFurFibres']=Read(base/'SourceTextures/Data_FiberGeneration.json')
 textures['source']['shortFurRefinement']=Read(base/'SourceTextures/Data_ShortFiberGeneration.json')
@@ -111,10 +121,10 @@ if scene.get('DonkeyReferenceForeSwingClearanceDeg'):
     contract['animations']['DonkeyWalk']={**contract['animations']['DonkeyWalk'],'foreSwingClearance':{'leftMaximumDegrees':scene['DonkeyReferenceForeSwingClearanceDeg'],'rightMaximumDegrees':scene.get('DonkeyReferenceForeRightSwingClearanceDeg',0),'onlyUnplanted':True,'forwardStrideUnchanged':True}}
     contract['verification']['nativeLateralStanceDriftPerFrameM']=native['worstLateralStanceDriftPerFrameM']
     contract['verification']['pectoralMotionIntegrity']={key:value for key,value in motion.items() if key!='poses'}
-    if scene.get('DonkeyReferenceFitRevision') in ['20261025ReferenceV32','20261025ReferenceV33','20261026ReferenceV35','20261026ReferenceV36','20261026ReferenceV37']:
+    if scene.get('DonkeyReferenceFitRevision') in ['20261025ReferenceV32','20261025ReferenceV33','20261026ReferenceV35','20261026ReferenceV36','20261026ReferenceV37','20261026ReferenceV38']:
         hindMotion=RequireMotion('Data_HindMotionIntegrity.json','Hind')
         contract['verification']['hindMotionIntegrity']={key:value for key,value in hindMotion.items() if key!='poses'}
-    if scene.get('DonkeyReferenceFitRevision') in ['20261025ReferenceV33','20261026ReferenceV35','20261026ReferenceV36','20261026ReferenceV37']:
+    if scene.get('DonkeyReferenceFitRevision') in ['20261025ReferenceV33','20261026ReferenceV35','20261026ReferenceV36','20261026ReferenceV37','20261026ReferenceV38']:
         lowerMotion=RequireMotion('Data_LowerBodyMotionIntegrity.json','LowerBody')
         contract['verification']['lowerBodyMotionIntegrity']={key:value for key,value in lowerMotion.items() if key!='poses'}
 if native.get('jointArcs'):

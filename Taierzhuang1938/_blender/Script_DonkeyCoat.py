@@ -354,6 +354,12 @@ def BuildGroom(skin,rig,collection,material,count=21000,pigmentSampler=None):
             fringeRoots[vertex]=root.copy();fringeTips[vertex]=float(corner>=4)
             colors[vertex]=tuple(min(1,v*(1.06 if corner>=4 else 1)) for v in tint[:3])+(1,)
     regions['2']+=2*fringeStrips
+    darkLegTufts={'wisps':0,'trianglesAdded':0};darkLegVertices=[]
+    if useFringe and bpy.context.scene.get('DonkeyReferenceBakedCoatRelief'):
+        namespace={};file=Path(bpy.context.scene['DonkeyCartProject'])/'_blender/Script_DonkeyLegTufts.py'
+        exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),namespace)
+        darkLegTufts=namespace['ReuseLegTufts'](skin,vertices,faces,normals,uvs,rows,colors,fringeTags,pigmentSampler,means)
+        darkLegVertices=darkLegTufts.pop('_retargetedVertices',[])
     # Soft ear rims and terminal tail brush share the same cutout atlas.
     for side in ('Left','Right'):
         ear=bpy.data.objects['DonkeyPinna'+side];ear.data.calc_loop_triangles()
@@ -399,6 +405,8 @@ def BuildGroom(skin,rig,collection,material,count=21000,pigmentSampler=None):
     tint=mesh.color_attributes.new(name='HairTint',type='FLOAT_COLOR',domain='POINT')
     for i,value in enumerate(colors):tint.data[i].color=value
     if useFringe:
+        darkMask=mesh.attributes.new(name='DarkLegTuft',type='INT',domain='POINT')
+        for i in darkLegVertices:darkMask.data[i].value=1
         attribute=mesh.attributes.new(name='PaleFringeBlend',type='FLOAT',domain='POINT')
         for i,weight in fringeTags.items():attribute.data[i].value=weight
         roots=mesh.attributes.new(name='PaleFringeRoot',type='FLOAT_VECTOR',domain='POINT');tips=mesh.attributes.new(name='PaleFringeTip',type='FLOAT',domain='POINT')
@@ -410,9 +418,9 @@ def BuildGroom(skin,rig,collection,material,count=21000,pigmentSampler=None):
         for name,weight in row.items():
             group=obj.vertex_groups.get(name) or obj.vertex_groups.new(name=name);group.add([index],weight,'REPLACE')
     modifier=obj.modifiers.new('DonkeyCoatSkin','ARMATURE');modifier.object=rig
-    obj['coatAlphaCutoff']=.45;obj['coatCardCount']=sum(len(f)==4 for f in faces)+bellyStrips+2*fringeStrips;obj['coatFibreCount']=count-2*bellyStrips-4*fringeStrips;obj['coatRootSamples']=count;obj['groomPrimitiveCount']=len(faces);obj['coatDensityPerM2']=count/total
+    obj['coatAlphaCutoff']=.45;obj['coatCardCount']=sum(len(f)==4 for f in faces)+bellyStrips+2*fringeStrips+2*darkLegTufts['wisps'];obj['coatFibreCount']=count-2*bellyStrips-4*fringeStrips-4*darkLegTufts['wisps'];obj['coatRootSamples']=count;obj['groomPrimitiveCount']=len(faces);obj['coatDensityPerM2']=count/total
     obj.visible_shadow=False;obj['groomCastShadow']=False
-    return obj,{'fibres':count-2*bellyStrips-4*fringeStrips,'rootSamples':count,'bodyTufts':bodyTufts,'bodyTuftLimit':bodyTuftLimit,'coronetFibres':coronetFibres,'coronetAreaM2':coronetArea,'coronetLengthM':[.009,.014],'coronetWidthM':[.0007,.0012],'cards':sum(len(f)==4 for f in faces)+bellyStrips+2*fringeStrips,'triangles':sum(len(f)-2 for f in faces),'regionCards':regions,'sampledSurfaceM2':total,'maxInfluences':4,
+    return obj,{'fibres':count-2*bellyStrips-4*fringeStrips-4*darkLegTufts['wisps'],'rootSamples':count,'bodyTufts':bodyTufts,'bodyTuftLimit':bodyTuftLimit,'coronetFibres':coronetFibres,'coronetAreaM2':coronetArea,'coronetLengthM':[.009,.014],'coronetWidthM':[.0007,.0012],'cards':sum(len(f)==4 for f in faces)+bellyStrips+2*fringeStrips+2*darkLegTufts['wisps'],'triangles':sum(len(f)-2 for f in faces),'regionCards':regions,'sampledSurfaceM2':total,'maxInfluences':4,'darkLegTufts':darkLegTufts,
         'lowerLimbFur':{'sampleFibres':jointFibres,'jointDensityGain':2.4,'maximumLengthGain':2.25,'maximumLiftGain':3,'lengthRangeM':[min(jointLengths,default=0),max(jointLengths,default=0)],'liftRangeM':[min(jointLifts,default=0),max(jointLifts,default=0)],'method':'redistribute the fixed fine-fibre sample budget toward carpal/fetlock coats; longer, splayed tips follow their shallow joint relief'},
         'paleFringe':{'sampleFibres':fringeFibres,'redistributedBodySamples':redistributed,'curvedWisps':fringeStrips,'lengthRangeM':[min(fringeLengths,default=0),max(fringeLengths,default=0)],'liftRangeM':[min(fringeLifts,default=0),max(fringeLifts,default=0)],'wispLengthRangeM':[.030,.0527],'wispLiftRangeM':[.012,.016],'wispRootWidthRangeM':[.00102,.0013],'wispSegments':2,'method':'pale medial foreleg and breast fibres lengthened and lifted; body fine-fibre slots reallocated to the pale fringe with an independent deterministic stream; four existing triangles reused per curved strand; root sample and triangle budgets retained'},
         'bellyCoat':{'sampleFibres':bellyFibres,'fineFibres':bellyFibres-2*bellyStrips,'pairedStrips':bellyStrips,'sampleLengthRangeM':[min(bellyLengths,default=0),max(bellyLengths,default=0)],'sampleLiftRangeM':[min(bellyLifts,default=0),max(bellyLifts,default=0)],'stripLengthRangeM':[.0199,.022],'stripLiftRangeM':[.005275,.0065],'method':'bounded pale ventral fibres: downward/backward flow, up to 1.55x length and 3x normal lift; pairs of existing fine triangles reused as narrow opaque tapered strips; same source samples, random sequence and triangle budget'}}
@@ -463,17 +471,17 @@ def RebuildPaleFringeAfterBake(skin,rig,collection,original,animal):
     sampler,samplerReport=BuildBodyPigmentSampler(animal,skin)
     candidate,report=BuildGroom(skin,rig,collection,original.data.materials[0],pigmentSampler=sampler)
     if len(candidate.data.vertices)!=len(original.data.vertices) or len(candidate.data.loops)!=len(original.data.loops):raise RuntimeError('Pale fringe changed the source vertex/triangle budget')
-    mask=candidate.data.attributes['PaleFringeBlend'];oldNormals=[None]*len(original.data.vertices);newNormals=[None]*len(candidate.data.vertices)
+    mask=candidate.data.attributes['PaleFringeBlend'];darkMask=candidate.data.attributes.get('DarkLegTuft');oldNormals=[None]*len(original.data.vertices);newNormals=[None]*len(candidate.data.vertices)
     for loop in original.data.loops:oldNormals[loop.vertex_index]=original.data.corner_normals[loop.index].vector.copy()
     for loop in candidate.data.loops:newNormals[loop.vertex_index]=candidate.data.corner_normals[loop.index].vector.copy()
     preserved=0
     for a,b in zip(original.data.vertices,candidate.data.vertices):
-        if mask.data[b.index].value>0:continue
+        if mask.data[b.index].value>0 or (darkMask and darkMask.data[b.index].value):continue
         b.co=a.co;candidate.data.color_attributes['HairTint'].data[b.index].color=original.data.color_attributes['HairTint'].data[a.index].color;newNormals[b.index]=oldNormals[a.index];preserved+=1
         oldWeights={original.vertex_groups[g.group].name:g.weight for g in a.groups};newWeights={candidate.vertex_groups[g.group].name:g.weight for g in b.groups}
         if oldWeights!=newWeights:raise RuntimeError('Untouched fringe-exterior skin weights changed')
     for a,b in zip(original.data.loops,candidate.data.loops):
-        if mask.data[b.vertex_index].value<=0:candidate.data.uv_layers.active.data[b.index].uv=original.data.uv_layers.active.data[a.index].uv
+        if mask.data[b.vertex_index].value<=0 and not (darkMask and darkMask.data[b.vertex_index].value):candidate.data.uv_layers.active.data[b.index].uv=original.data.uv_layers.active.data[a.index].uv
     candidate.data.normals_split_custom_set_from_vertices(newNormals);candidate.data.update()
     report['pigmentTransfer']=MatchPaleFringePigment(candidate,animal,sampler);report['pigmentSampler']=samplerReport;report['exteriorVerticesPreserved']=preserved
     name=original.name;bpy.data.objects.remove(original,do_unlink=True);candidate.name=name

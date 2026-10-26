@@ -18,10 +18,13 @@ def InstallLegPigment(scene,skin,rig,base):
     rgb=np.array(original.pixels[:],dtype=np.float32).reshape(1024,1536,4)[::-1,:,:3];bpy.data.images.remove(original)
     detailNamespace={};detailFile=project/'_blender/Script_DonkeyPhotoDetail.py';exec(compile(detailFile.read_text(encoding='utf-8'),detailFile.name,'exec'),detailNamespace)
     albedoNamespace={};albedoFile=project/'_blender/Script_DonkeyLegAlbedo.py';exec(compile(albedoFile.read_text(encoding='utf-8'),albedoFile.name,'exec'),albedoNamespace)
-    atlas,sourceRecord=albedoNamespace['BuildLegAlbedo'](rgb,detailNamespace['BoxBlur'])
+    atlas,relief,sourceRecord=albedoNamespace['BuildLegAlbedo'](rgb,detailNamespace['BoxBlur'],True)
     height,tileWidth,bodyWidth,gutter=1024,384,256,64
     image=bpy.data.images.get('Texture_DonkeyLegPigment') or bpy.data.images.new('Texture_DonkeyLegPigment',width=tileWidth*4,height=height,alpha=False);image.colorspace_settings.name='sRGB'
     image.pixels.foreach_set(atlas[::-1].copy().ravel());path=base/'SourceTextures/Texture_DonkeyLegPigment.png';image.filepath_raw=str(path);image.file_format='PNG';image.save();content=path.read_bytes();image.pack(data=content,data_len=len(content))
+    reliefImage=bpy.data.images.get('Texture_DonkeyLegRelief') or bpy.data.images.new('Texture_DonkeyLegRelief',width=tileWidth*4,height=height,alpha=False)
+    reliefImage.colorspace_settings.name='Non-Color';reliefPixels=np.ones_like(atlas);reliefPixels[:,:,:3]=relief[:,:,None]
+    reliefImage.pixels.foreach_set(reliefPixels[::-1].copy().ravel());reliefPath=base/'SourceTextures/Texture_DonkeyLegRelief.png';reliefImage.filepath_raw=str(reliefPath);reliefImage.file_format='PNG';reliefImage.save();reliefImage.pack()
     layer=skin.data.uv_layers.get('LegPigmentUV') or skin.data.uv_layers.new(name='LegPigmentUV')
     mask=skin.data.attributes.get('LegPigmentBlend') or skin.data.attributes.new('LegPigmentBlend','FLOAT','POINT')
     protection=skin.data.attributes.get('LegProjectionProtection') or skin.data.attributes.new('LegProjectionProtection','FLOAT','POINT')
@@ -56,6 +59,14 @@ def InstallLegPigment(scene,skin,rig,base):
         nodes,links=material.node_tree.nodes,material.node_tree.links;shader=next(n for n in nodes if n.type=='BSDF_PRINCIPLED');previous=shader.inputs['Base Color'].links[0].from_socket
         uv=nodes.new('ShaderNodeUVMap');uv.uv_map='LegPigmentUV';texture=nodes.new('ShaderNodeTexImage');texture.image=image;texture.extension='EXTEND';links.new(uv.outputs[0],texture.inputs[0])
         blend=nodes.new('ShaderNodeAttribute');blend.attribute_name='LegPigmentBlend';mix=nodes.new('ShaderNodeMixRGB');links.new(blend.outputs['Fac'],mix.inputs[0]);links.new(previous,mix.inputs[1]);links.new(texture.outputs['Color'],mix.inputs[2]);links.new(mix.outputs[0],shader.inputs['Base Color']);materials.append(material.name)
+        normalSource=shader.inputs['Normal'].links[0].from_socket if shader.inputs['Normal'].is_linked else None
+        heightTexture=nodes.new('ShaderNodeTexImage');heightTexture.image=reliefImage;heightTexture.extension='EXTEND';links.new(uv.outputs[0],heightTexture.inputs[0])
+        heightMix=nodes.new('ShaderNodeMixRGB');heightMix.inputs[1].default_value=(.5,.5,.5,1);links.new(blend.outputs['Fac'],heightMix.inputs[0]);links.new(heightTexture.outputs['Color'],heightMix.inputs[2])
+        bump=nodes.new('ShaderNodeBump');bump.inputs['Strength'].default_value=.65;bump.inputs['Distance'].default_value=.0008;links.new(heightMix.outputs[0],bump.inputs['Height'])
+        if normalSource is not None:links.new(normalSource,bump.inputs['Normal'])
+        links.new(bump.outputs['Normal'],shader.inputs['Normal'])
     record={**sourceRecord,'source':str(source),'sourceSha256':hashlib.sha256(source.read_bytes()).hexdigest(),'atlas':str(path),'sha256':hashlib.sha256(content).hexdigest(),'vertices':count,'materials':materials,
-        'runtime':'baked into existing UV0 2K Base Color; shared UV1 fur normal unchanged; no additional runtime image or projection'}
-    (base/'SourceTextures/Data_LegPigment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8');scene['DonkeyLegPigmentRevision']='20261026ShadowSeparatedV36';return record
+        'relief':{'source':str(reliefPath),'sha256':hashlib.sha256(reliefPath.read_bytes()).hexdigest(),'strength':.65,'distanceM':.0008,'sourceHeightRange':[float(relief.min()),float(relief.max())],'runtime':'source-height only; baked together with existing coat relief into shared UV0 2K Normal'},
+        'runtime':'UV0 2K Base retains bounded pigment/chroma; source-facing clump relief is baked into shared UV0 2K Normal; no view-dependent runtime projection'}
+    scene['DonkeyReferenceBakedCoatRelief']=True
+    (base/'SourceTextures/Data_LegPigment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8');scene['DonkeyLegPigmentRevision']='20261026ShadowSeparatedV38';return record
