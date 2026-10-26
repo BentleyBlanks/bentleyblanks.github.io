@@ -346,13 +346,14 @@ export class LightRig {
    * `priority` 让照明弹在灯槽紧张时压过远处常驻的火：它是这一关唯一的主光源。
    */
   AddFire(position, {
-    intensity = 6, radius = 20, color = 0xff7a2a, flicker = true, priority = 1, flareShadow = false,
+    intensity = 6, radius = 20, color = 0xff7a2a, flicker = true, priority = 1, flareShadow = false, autoSmoke = true,
   } = {}) {
     const handle = this.nextFireHandle;
     this.nextFireHandle += 1;
     this.fireSources.set(handle, {
       handle,
       flareShadow: !!flareShadow,
+      autoSmoke: autoSmoke !== false,
       position: new THREE.Vector3(position.x, position.y, position.z),
       color: new THREE.Color(color),
       base: Math.max(0, Number(intensity) || 0),

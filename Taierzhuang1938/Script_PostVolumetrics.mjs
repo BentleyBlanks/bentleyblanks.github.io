@@ -1096,12 +1096,15 @@ export class VolumetricsPass {
     const rig = this.sunShadowRig;
     const want = params.fireSmoke > 0 && rig && rig.fireSources ? rig.fireSources : null;
     for (const [handle, state] of this.fogVolumes) {
-      if (state.auto && (!want || !want.has(state.source))) this.fogVolumes.delete(handle);
+      if (state.auto && (!want || !want.has(state.source) || want.get(state.source).autoSmoke === false)) this.fogVolumes.delete(handle);
     }
     if (!want) return;
     const existing = new Map();
     for (const state of this.fogVolumes.values()) if (state.auto) existing.set(state.source, state);
     for (const fire of want.values()) {
+      // A flare's light reaches hundreds of metres, but its smoke does not.
+      // Its own moving particle trail already accounts for the combustion.
+      if (fire.autoSmoke === false) continue;
       const radius = Math.max(2, fire.radius * params.fireSmokeRadius);
       const density = params.fireSmoke * params.density * params.densityScale;
       let state = existing.get(fire.handle);

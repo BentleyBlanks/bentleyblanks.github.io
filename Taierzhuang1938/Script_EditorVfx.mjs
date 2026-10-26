@@ -14,6 +14,7 @@ import {FlareDirector,MakeFlareHost} from './Script_Flare.mjs';
 import {FlareVisuals} from './Script_FlareVisual.mjs';
 import {FlareSurfaceIndex} from './Script_FlareSurfaces.mjs';
 import {FLARE_EFFECTS,FLARE_PREVIEW} from './Data_Tuning_FlareEffects.mjs';
+import {FlarePreviewField} from './Script_EditorFlareField.mjs';
 import {FALLING_SOIL_PRESETS} from './Data_Tuning_FallingSoil.mjs';
 import {FallingSoilInspector} from './Script_EditorFallingSoil.mjs';
 import {NormalizeFallingSoil,NormalizeSoilPreview} from './Script_FallingSoilRules.mjs';
@@ -71,7 +72,9 @@ export class VfxEditor {
     this.panel = null;
     const requested=new URLSearchParams(location.search).get('effect');
     this.effectId = ALL_EFFECTS.some(effect=>effect.id===requested)?requested:"FireMedium";
-    this.flareCamera=FLARE_PREVIEW.camera;
+    const requestedCamera=new URLSearchParams(location.search).get('flareCamera');
+    this.flareCamera=['follow','field','flight','ground'].includes(requestedCamera)?requestedCamera:FLARE_PREVIEW.camera;
+    this.previewEnvironment=null;
     this.handle = 0;
     this.scale = 1;
     this.loop = true;
@@ -92,6 +95,7 @@ export class VfxEditor {
 
   Enter(root) {
     const vfx = this.host.vfx;
+    this.previewEnvironment=null;
     this.savedWind = vfx.wind.clone();
     this.wind.copy(this.savedWind);
     this.savedVfxVisible = vfx.root.visible;
@@ -135,9 +139,8 @@ export class VfxEditor {
     this.studio.Open(this.host.hideInStudio);
     this.savedStudioMaxDistance=this.studio.maxDistance;
     this.savedPadGeometry=this.studio.pad.geometry;
-    this.flarePadGeometry=this.savedPadGeometry.clone();this.flarePadGeometry.scale(20,1,20);
-    const padUv=this.flarePadGeometry.attributes.uv;
-    for(let i=0;i<padUv.count;i++)padUv.setXY(i,(padUv.getX(i)-.5)*20+.5,(padUv.getY(i)-.5)*20+.5);
+    this.flareField=new FlarePreviewField(this.studio,this.host.library);
+    this.flarePadGeometry=this.flareField.groundGeometry;
     // The studio owns the visible scene here. Keep its authored particle/mesh
     // materials without changing the game's whitebox config or saved preferences.
     const whitebox=this.host.post?.whiteboxScene;
@@ -170,7 +173,8 @@ export class VfxEditor {
   Exit() {
     cancelAnimationFrame(this.seekFrame);document.removeEventListener('keydown',this.onPreviewKey,true);
     this.Stop();
-    this.SetNightPreview(false);
+    this.SetPreviewEnvironment('original');
+    this.flareField.Dispose();
     const vfx = this.host.vfx;
     vfx.flareVisuals.Dispose();vfx.flareVisuals=this.savedFlareVisuals;vfx.flareVisuals.root.visible=this.savedFlareVisible;
     vfx.flareSurfaces.Clear();vfx.flareSurfaces=this.savedFlareSurfaces;
@@ -254,6 +258,10 @@ export class VfxEditor {
     this.timeLength=Select(playback,'时间轴长度',[{value:10,label:'10 秒'},{value:30,label:'30 秒'},{value:60,label:'60 秒'}],10,value=>this.timeSlider.root.querySelector('input').max=value);
     Select(playback,'播放速度',[.1,.25,.5,1,2].map(value=>({value,label:value+'×'})),1,value=>{this.speed=Number(value)});
     Note(playback,'空格暂停/继续 · → 单帧 · Shift+→ 十帧 · Home 归零');
+    this.environmentSelect=Select(playback,'预览昼夜',[{value:'original',label:'进入时环境'},{value:'day',label:'白天 · 看结构'},{value:'night',label:'夜晚 · 看照明'}],this.previewEnvironment||'original',value=>this.SetPreviewEnvironment(value));
+    this.environmentSelect.root.dataset.vfxEnvironment='true';
+    this.flareCameraSelect=Select(playback,'弹药镜头',[{value:'follow',label:'燃烧体近景'},{value:'field',label:'夜间照明全景'},{value:'flight',label:'完整弹道'},{value:'ground',label:'地面与阴影'}],this.flareCamera,value=>{this.flareCamera=value;this.FrameEffect();});
+    this.flareCameraSelect.root.dataset.flareCamera='true';
     this.message=Note(transport,'');this.message.setAttribute('role','status');this.message.dataset.vfxStatus='true';
     const tabs=ButtonRow(transport,[{label:'效果库',onClick:()=>this.ShowTab('library')},{label:'粒子模块',onClick:()=>this.ShowTab('modules')},{label:'落土参数',onClick:()=>this.ShowTab('soil')},{label:'预设',onClick:()=>this.ShowTab('presets')}]);
     ['library','modules','soil','presets'].forEach((key,i)=>tabs.children[i].dataset.vfxTab=key);
@@ -271,9 +279,7 @@ export class VfxEditor {
     seed.addEventListener('change',()=>{const value=Number(seed.value);if(Number.isInteger(value)&&value>=0&&value<=4294967295){this.seed=value;this.Play();}});environment.appendChild(seed);
     Toggle(environment,'显示米格',true,on=>this.studio.SetGridVisible(on));
     ButtonRow(environment,[{label:'适配镜头',onClick:()=>this.FrameEffect()}]);Note(environment,'在画面空白处拖动旋转，滚轮缩放。');
-    const flareCamera=Select(environment,'信号／照明弹镜头',[{value:'follow',label:'跟随燃烧体近景'},{value:'flight',label:'完整弹道'},{value:'ground',label:'地面照明检查'}],this.flareCamera,value=>{this.flareCamera=value;this.FrameEffect();});
-    flareCamera.root.dataset.flareCamera='true';
-    Toggle(environment,'夜间照明对照',false,on=>this.SetNightPreview(on));
+    Note(environment,'昼夜和弹药镜头在顶部播放栏。照明场中的立柱高 1.7 米，前后间距 50 米；屋顶与矮墙用来检查照明范围及投影。');
     Note(environment,'弹药按米制预览，不受整体缩放影响；风与种子在重播时应用。照明弹熄灭后继续伞降、落地收拢；60 秒时间轴可查看完整过程。');
     const layers=Section(this.tabs.modules,'粒子层');
     this.layerSelect=Select(layers,'编辑层',[],null,key=>{this.selectedLayer=key;this.inspector.Show()});this.layerSelect.root.dataset.vfxLayer='true';
@@ -348,6 +354,9 @@ export class VfxEditor {
   Play(){
     this.Stop();const vfx=this.host.vfx,api=vfx.particles;this.layerRecords.clear();
     this.studio.pad.geometry=FLARE_EFFECTS[this.effectId]?this.flarePadGeometry:this.savedPadGeometry;
+    this.flareField.SetVisible(!!FLARE_EFFECTS[this.effectId]);
+    this.flareCameraSelect.root.closest('.edRow').hidden=!FLARE_EFFECTS[this.effectId];
+    if(FLARE_EFFECTS[this.effectId]&&this.previewEnvironment===null)this.SetPreviewEnvironment(FLARE_PREVIEW.environment);
     vfx.time=0;vfx.shared.uTime.value=0;vfx.nextSourceId=1+(this.seed%65535);vfx.random=Mulberry32(this.seed);vfx.bloodEffects.random=vfx.random;
     for(const [name,channel]of api.channels){if(!api.systems.has(channel.particleId))continue;api.Configure(channel.particleId,this.baseModules.get(name));const patch=this.layerPatches.get('channel:'+name);if(patch)api.Configure(channel.particleId,patch);}
     api.presetOverrides.clear();for(const [key,patch]of this.layerPatches)if(key.startsWith('preset:'))api.presetOverrides.set(key.slice(7),patch);
@@ -386,6 +395,7 @@ export class VfxEditor {
     this.loopTimer=this.previewTime;this.paused=true;this.host.post?.NotifyCameraCut();this.RefreshLayers(true);this.UpdateFacts();return this.Inspect();}
   QueueSeek(seconds){this.seekTarget=seconds;if(this.seekFrame)return;this.seekFrame=requestAnimationFrame(()=>{this.seekFrame=0;if(this.panel)this.Try(()=>this.Seek(this.seekTarget))});}
   FrameEffect(){
+    this.flareCameraSelect?.Set(this.flareCamera);
     // The studio inherits a map's clip range. A 100 m flight viewed from up to
     // 320 m needs its own range; ordinary previews and studio exit restore it.
     const camera=this.host.camera,baseFar=this.studio.saved?.far??camera.far;
@@ -394,7 +404,13 @@ export class VfxEditor {
     if(FALLING_SOIL_PRESETS[this.effectId]){this.soil.Frame();return;}
     if(FLARE_EFFECTS[this.effectId]){
       this.studio.maxDistance=FLARE_PREVIEW.maxDistanceM;
-      if(this.flareCamera==='ground'){this.studio.Frame(1.8,14);this.studio.orbit.pitch=.45;this.studio.ApplyCamera();return;}
+      if(this.flareCamera==='ground'||this.flareCamera==='field'){
+        const field=this.flareCamera==='field',o=this.studio.orbit;
+        o.target.fromArray(field?FLARE_PREVIEW.fieldTarget:FLARE_PREVIEW.groundTarget);
+        o.dist=field?FLARE_PREVIEW.fieldDistanceM:FLARE_PREVIEW.groundDistanceM;
+        o.pitch=field?FLARE_PREVIEW.fieldPitch:FLARE_PREVIEW.groundPitch;o.yaw=FLARE_PREVIEW.fieldYaw;
+        this.studio.ApplyCamera();this.host.post?.NotifyCameraCut();return;
+      }
       const near=this.flareCamera==='follow';this.studio.Frame(near?4:FLARE_PREVIEW.overviewHeightM,near?FLARE_PREVIEW.followDistanceM:FLARE_PREVIEW.overviewDistanceM);
       if(near)this.TrackFlare();else{this.studio.orbit.target.set(0,FLARE_PREVIEW.overviewTargetY,0);this.studio.ApplyCamera();}
       this.host.post?.NotifyCameraCut();return;
@@ -445,11 +461,16 @@ export class VfxEditor {
   }
   TrackFlare(){const f=this.flarePreview?.flares[0];if(f){this.studio.orbit.target.set(f.pos.x,f.pos.y+.8,f.pos.z);this.studio.ApplyCamera();}}
   SetNightPreview(on){
-    if(on&&!this.nightSnapshot){
+    return this.SetPreviewEnvironment(on?'night':'original');
+  }
+  SetPreviewEnvironment(mode){
+    if(!['original','day','night'].includes(mode))return false;
+    if(mode!=='original'){
       const environment=this.host.game.GetEnvironmentState?.();
-      if(!environment||!this.host.game.ApplyEnvironment?.('firstLevelNight'))return false;
-      this.nightSnapshot={environment};
-    }else if(!on&&this.nightSnapshot){this.host.game.RestoreEnvironmentState(this.nightSnapshot.environment);this.nightSnapshot=null;}
+      if(!environment||!this.host.game.ApplyEnvironment?.(mode==='night'?FLARE_PREVIEW.nightPreset:FLARE_PREVIEW.dayPreset))return false;
+      if(!this.nightSnapshot)this.nightSnapshot={environment};
+    }else if(this.nightSnapshot){this.host.game.RestoreEnvironmentState(this.nightSnapshot.environment);this.nightSnapshot=null;}
+    this.previewEnvironment=mode;this.environmentSelect?.Set(mode);
     this.host.post?.NotifyCameraCut();
     return true;
   }

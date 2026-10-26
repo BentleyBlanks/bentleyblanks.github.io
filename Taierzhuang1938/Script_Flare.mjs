@@ -837,7 +837,7 @@ export function MakeFlareHost(deps = {}) {
     // Fixed cluster light budget; parachute flares receive the dedicated packed shadow.
     AddLight: (spec) => deps.lights?.AddFire(spec.position, {
       intensity: spec.intensity, radius: spec.radius, color: spec.color,
-      flicker: false, priority: spec.priority ?? 1.6, flareShadow:spec.flareShadow,
+      flicker: false, priority: spec.priority ?? 1.6, flareShadow:spec.flareShadow, autoSmoke:false,
     }) ?? null,
     MoveLight: (handle, spec) => deps.lights?.UpdateFire(handle, spec),
     RemoveLight: (handle) => deps.lights?.RemoveFire(handle),

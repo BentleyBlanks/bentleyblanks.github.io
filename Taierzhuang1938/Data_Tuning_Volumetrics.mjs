@@ -207,6 +207,11 @@ export const VOLUMETRIC_PRESETS = {
     ambientScale: 1.0, pointScale: 0.18, noiseAmount: 0.28, noiseScale: 0.016,
     fireSmoke: 1.4, far: 220,
   },
+  flarePreviewNight: {
+    densityScale:.84,albedo:.88,anisotropy:.30,sunScale:.35,
+    ambientScale:1,pointScale:.18,noiseAmount:.28,noiseScale:.016,
+    fireSmoke:1.4,far:260,
+  },
   // 拂晓总反攻 11°：全场画面权重最高的一档。低太阳 + 街底冷影，
   // g 给到 0.58，斜射光柱穿过巷口是这一关的招牌画面。
   // 2026-09-08 美术定稿：sunScale 1.0 → 1.8，ambientScale 1.0 → 0.82

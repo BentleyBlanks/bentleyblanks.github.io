@@ -286,6 +286,7 @@ export const testDefs = {
   AircraftStrafeTest: { file: "Script_AircraftStrafeTest.mjs", desc: "日机扫射航线：相位机四拍、弹着线推进与追人群、必死/必不死白名单、玩家躲避窗口、音效降级（纯 Node，毫秒级）" },
   FlareTest: { file: "Script_FlareTest.mjs", desc: "照明弹：五相位时间线、光强包络、敌我暴露倍率与暗适应、姿态比例不变、定时序列、音效降级（纯 Node，毫秒级）" },
   FlareCameraBrowserTest: {file:"Script_FlareCameraBrowserTest.mjs",timeoutMs:600000,desc:"Flare editor default/direct cameras: visible pixels, full-flight clipping and camera restoration"},
+  FlareNightBrowserTest: {file:"Script_FlareNightBrowserTest.mjs",timeoutMs:600000,desc:"Flare night/day UI, wide illumination footprint, reference shadows and smoke isolation"},
   FlareEffectsBrowserTest: {file:"Script_FlareEffectsBrowserTest.mjs",timeoutMs:600000,desc:"Signal and illumination: actual rendering, deterministic seek, ground lighting, cleanup and blockout playback"},
   FlareSurfaceTest: {file:"Script_FlareSurfaceTest.mjs",desc:"Authored roof triangles, holes, visibility, transforms and real flare landing"},
   FlareShadowBrowserTest: {file:"Script_FlareShadowBrowserTest.mjs",timeoutMs:600000,desc:"Packed flare depth shadows: blocked/unblocked pixels, moving casters, two slots and sampler budget"},
@@ -579,6 +580,7 @@ export const browserTests = new Set([
   "ParticleEditorControlsTest",
   "FlareEffectsBrowserTest",
   "FlareCameraBrowserTest",
+  "FlareNightBrowserTest",
   "FlareWorldBrowserTest",
   "FlareShadowBrowserTest",
   "ParticleEditorWhiteboxTest",
@@ -792,7 +794,7 @@ export const tier2 = [
 ];
 
 export const domains = {
-  flareEffects:{label:'Signal and illumination flares',tests:['FlareTest','FlareSurfaceTest','FlareEffectsBrowserTest','FlareCameraBrowserTest','FlareWorldBrowserTest','FlareShadowBrowserTest','ModuleGraphTest','ParticleEditorControlsTest','ParticleEditorWhiteboxTest']},
+  flareEffects:{label:'Signal and illumination flares',tests:['FlareTest','FlareSurfaceTest','FlareEffectsBrowserTest','FlareCameraBrowserTest','FlareNightBrowserTest','FlareWorldBrowserTest','FlareShadowBrowserTest','ModuleGraphTest','ParticleEditorControlsTest','ParticleEditorWhiteboxTest']},
   type89MediumTank: {label:"Type89 standalone articulated reference tank",tests:["Type89MediumTankTest","Type89MediumTankBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "AssetStandardsTest"] },
   kawasakiType88: { label: "八八式侦察机二型独立资产", tests: ["KawasakiType88AssetTest", "KawasakiType88BrowserTest", "ModelFacingTest", "AssetStandardsTest", "ModuleGraphTest"] },
@@ -927,7 +929,7 @@ export const domains = {
 
 const changedDomainRules = [
   {domain:'particles',pattern:/FallingSoil/},
-  {domain:'flareEffects',pattern:/Flare(?:Visual|Camera|Shadow|Surface|World|Track|Effects|Test|\.mjs)|Tuning_Flare/},
+  {domain:'flareEffects',pattern:/Flare(?:Visual|Camera|Night|Field|Shadow|Surface|World|Track|Effects|Test|\.mjs)|Tuning_Flare/},
   {domain:'combat',pattern:/HanYang173R/},
   {domain:"type89MediumTank",pattern:/Type89(?:MediumTank|Pbr|GlbCleanup|References|ImportAudit|SourceAudit|Package)/},
   {domain:"menu",pattern:/ToolsHome|Icon_TabSeal/},

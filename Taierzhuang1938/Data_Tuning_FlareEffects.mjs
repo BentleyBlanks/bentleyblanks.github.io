@@ -22,11 +22,23 @@ export const FLARE_EFFECTS = Object.freeze({
 export const FLARE_PREVIEW = Object.freeze({
   camera:"follow",farM:600,maxDistanceM:320,followDistanceM:9,
   overviewDistanceM:180,overviewHeightM:110,overviewTargetY:50,
+  environment:"night",dayPreset:"testSceneDay",nightPreset:"flarePreviewNight",
+  fieldTarget:[0,48,0],fieldDistanceM:190,fieldPitch:.04,fieldYaw:Math.PI+.18,
+  groundTarget:[0,1.7,0],groundDistanceM:75,groundPitch:.07,
+});
+
+// Clear, weak-moon studio night. Campaign night grading remains unchanged.
+export const FLARE_PREVIEW_NIGHT = Object.freeze({
+  lightIntensity:.025,envIntensity:.12,shProbeIntensity:.018,ambientIntensity:.004,
+  exposure:1.15,smoke:.12,smokeColor:[.004,.006,.010],
+  cloudDeck:{structure:1,underside:.6,gap:.85,silver:0,scale:1,coverage:.8,softness:.5,warp:.35,shade:[.0012,.0014,.002]},
+  fog:{density:.002,falloff:14,max:.9,sky:[.003,.004,.007],ground:[.002,.003,.004],sunGain:.02,desat:.1,flatten:0},
+  atmosphere:{sunIrradiance:.12,skyFloor:[.0005,.0008,.0015]},
 });
 
 export const FLARE_ART = Object.freeze({
   gravity:9.81, launchHeight:1.1, openingS:.65, dragS:.45,
-  canopyRadius:.45, canopyHeight:.22, cordLength:1.25, leaderLength:.45, ventRadius:.022, ribs:8,
+  canopyRadius:.45, canopyHeight:.38, cordLength:1.25, leaderLength:.45, ventRadius:.022, ribs:8,
   candleRadius:.022, candleHeight:.16, candleLift:.045,
   glowSize:1.3, smokeCount:128, smokeHz:20, smokeLife:6,
   sparkCount:18, sparkHz:30, sparkLife:.55,
@@ -37,6 +49,10 @@ export const FLARE_ART = Object.freeze({
   maxFlightS:120, maxSpent:4,
   // Photometric approximations for smoke scattering and the housing-shielded cloth.
   smokeScatter:.00015, canopySelfLight:.000004, ambientFloor:.001,
+  // Renderer calibration, not ammunition measurements. Keep the hot core well
+  // above its lit surroundings; half-float-safe radiance, shared by game/editor.
+  radiancePerCd:.02,radianceMax:42000,signalRadiancePerCd:.2,
+  smokeOpacity:.26,smokeRiseMS:.7,smokeDragS:.18,
 });
 
 // Two persistent maps, one update per frame. Stored in the existing RGBA32F

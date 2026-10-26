@@ -5,10 +5,11 @@ import {SampleFlarePosition} from './Script_Flare.mjs';
 
 const VERTEX=`varying vec2 vUv;varying float vAge;varying float vSeed;varying vec3 vWorld;
 attribute float age;attribute float seed;
+uniform vec3 flameAxis;uniform float mode;
 void main(){vUv=uv;vAge=age;vSeed=seed;
  vec4 world=modelMatrix*instanceMatrix*vec4(0.,0.,0.,1.);vWorld=world.xyz;
  vec4 center=viewMatrix*world;
- vec2 up=(viewMatrix*vec4(0.,1.,0.,0.)).xy;up=length(up)>.01?normalize(up):vec2(0.,1.);
+ vec2 up=(viewMatrix*vec4(mode<.5?flameAxis:vec3(0.,1.,0.),0.)).xy;up=length(up)>.01?normalize(up):vec2(0.,1.);
  vec2 right=vec2(up.y,-up.x);
  center.xy+=right*position.x*length(instanceMatrix[0].xyz)+up*position.y*length(instanceMatrix[1].xyz);
  gl_Position=projectionMatrix*center;}`;
@@ -16,6 +17,7 @@ const FRAGMENT=`precision highp float;
 varying vec2 vUv;varying float vAge;varying float vSeed;varying vec3 vWorld;
 uniform vec3 tint;uniform vec3 ambient;uniform vec3 lightPosition;
 uniform float mode;uniform float clock;uniform float power;uniform float candle;uniform float scatter;
+uniform float opacityScale;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1)),f.x),f.y);}
@@ -23,12 +25,16 @@ float fbm(vec2 p){return .57*noise(p)+.28*noise(p*2.03+11.)+.15*noise(p*4.11-7.)
 void main(){vec2 p=(vUv-.5)*2.;float r2=dot(p,p);if(r2>1.||vAge<0.)discard;
  if(mode<.5){
   float n=fbm(p*9.+vec2(clock*1.4,-clock*9.));
-  float width=.055+.035*n;
-  float tongue=exp(-pow((p.x+.03*sin(clock*13.+p.y*20.))/width,2.))*smoothstep(-.17,-.08,p.y)*(1.-smoothstep(.08,.48,p.y))*(.4+.6*n);
-  float core=exp(-r2*170.)*(.8+.2*n),halo=exp(-r2*20.)*.018;
+  float width=.045+.025*n;
+  float tongue=exp(-pow((p.x+.022*sin(clock*13.+p.y*20.))/width,2.))*smoothstep(-.04,.02,p.y)*(1.-smoothstep(.04,.35,p.y))*(.25+.75*n);
+  // Pixel-area filtering prevents a physically small star disappearing between
+  // samples in the full-flight view. Integral stays constant as its radius grows.
+  float footprint=max(length(dFdx(p)),length(dFdy(p)));
+  float radius2=.0025+footprint*footprint*.35;
+  float core=exp(-r2/radius2)*.0025/radius2*(.85+.15*n);
   float colored=1.-smoothstep(.05,.3,tint.g);
-  vec3 flame=mix(tint,vec3(1),mix(.75,.04,colored));
-  gl_FragColor=vec4((flame*(core*14.+tongue*5.)+tint*halo*4.)*power,1.);
+  vec3 flame=mix(tint,vec3(1),mix(.9,.006,colored));
+  gl_FragColor=vec4((flame*core+tint*tongue*.07)*power,1.);
  }else if(mode>1.5){
   float heat=pow(max(0.,1.-vAge),1.8);
   gl_FragColor=vec4(mix(vec3(1.,.14,.01),vec3(1.,.8,.35),heat)*exp(-r2*12.)*heat*7.,1.);
@@ -38,7 +44,7 @@ void main(){vec2 p=(vUv-.5)*2.;float r2=dot(p,p);if(r2>1.||vAge<0.)discard;
   float density=edge*smoothstep(.18,.72,n)*smoothstep(0.,.08,vAge)*pow(1.-vAge,1.2);
   vec3 delta=vWorld-lightPosition;
   vec3 incident=ambient+tint*candle*scatter/(dot(delta,delta)+4.);
-  gl_FragColor=vec4(vec3(.46,.45,.42)*incident,1.-exp(-density*.52));
+  gl_FragColor=vec4(vec3(.46,.45,.42)*incident,1.-exp(-density*opacityScale));
  }
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
@@ -63,7 +69,8 @@ function Cards(count,mode,color){
  geometry.setAttribute('seed',new THREE.InstancedBufferAttribute(new Float32Array(count),1));
  const material=new THREE.ShaderMaterial({vertexShader:VERTEX,fragmentShader:FRAGMENT,
   uniforms:{tint:{value:new THREE.Color(color)},ambient:{value:new THREE.Color()},lightPosition:{value:new THREE.Vector3()},
-    mode:{value:mode},clock:{value:0},power:{value:1},candle:{value:0},scatter:{value:A.smokeScatter}},
+    mode:{value:mode},clock:{value:0},power:{value:1},candle:{value:0},scatter:{value:A.smokeScatter},
+    flameAxis:{value:new THREE.Vector3(0,-1,0)},opacityScale:{value:A.smokeOpacity}},
   transparent:true,depthWrite:false,depthTest:true,blending:mode===1?THREE.NormalBlending:THREE.AdditiveBlending});
  const mesh=new THREE.InstancedMesh(geometry,material,count);mesh.frustumCulled=false;
  mesh.name=mode===0?'FlareRadiance':mode===1?'FlareSmoke':'FlareEmbers';return mesh;
@@ -94,7 +101,11 @@ function MakeSuspension(){
 }
 function Candle(){
  const material=new THREE.MeshStandardMaterial({color:0x534d40,metalness:.35,roughness:.78,transparent:true,opacity:1,depthWrite:false});
- const mesh=new THREE.Mesh(new THREE.CylinderGeometry(A.candleRadius,A.candleRadius,A.candleHeight,12),material);
+ // Rolled rim and shoulder on the spent candle, authored in metres and kept
+ // parametric with the canopy. Not a claim about an identified Type 95 casing.
+ const r=A.candleRadius,h=A.candleHeight;
+ const profile=[[0,-h/2],[r*.83,-h/2],[r*1.06,-h*.46],[r,-h*.39],[r,h*.35],[r*.92,h*.48],[r*.5,h/2],[0,h/2]].map(p=>new THREE.Vector2(...p));
+ const mesh=new THREE.Mesh(new THREE.LatheGeometry(profile,16),material);
  mesh.name='FlareCandleHousing';return mesh;
 }
 const matrix=new THREE.Matrix4(),pos=new THREE.Vector3(),scale=new THREE.Vector3(),q=new THREE.Quaternion(),landRotation=new THREE.Quaternion(),up=new THREE.Vector3(0,1,0),normal=new THREE.Vector3();
@@ -114,14 +125,19 @@ export class FlareVisuals {
  }
  Lighting(){
   const l=this.lights;this.ambient.setRGB(A.ambientFloor,A.ambientFloor,A.ambientFloor);this.sun.setRGB(0,0,0);
-  if(l){this.ambient.add(l.ambient.color.clone().multiplyScalar(l.ambient.intensity*1.5));
-    this.ambient.addScalar((l.globalProbe?.intensity??0)*.25);this.sun.copy(l.sun.color).multiplyScalar(l.sun.intensity*.45);
+  if(l){this.ambient.add(l.ambient.color.clone().multiplyScalar(l.ambient.intensity));
+    // The probe's strength is not white irradiance: use its actual SH constant
+    // band, as the PBR environment does, rather than making night smoke glow.
+    const sh=l.globalProbe?.sh.coefficients[0],gain=(l.globalProbe?.intensity??0)*.886227/Math.PI;
+    if(sh)this.ambient.add(new THREE.Color().setRGB(Math.max(0,sh.x)*gain,Math.max(0,sh.y)*gain,Math.max(0,sh.z)*gain));
+    this.sun.copy(l.sun.color).multiplyScalar(l.sun.intensity/Math.PI);
   }else this.ambient.setRGB(.14,.15,.17);
  }
  Cloth(item,f,opened,settle,fade){
   const {cloth,cords,segments,rings}=item,p=cloth.geometry.attributes.position;
-  const baseY=(A.leaderLength+A.cordLength)*(1-settle);
-  const radius=A.canopyRadius*(.06+.94*opened),height=A.canopyHeight*(1-settle);
+  const extension=.15+.85*opened;
+  const baseY=(A.leaderLength+A.cordLength)*extension*(1-settle);
+  const radius=A.canopyRadius*(.06+.94*opened),height=A.canopyHeight*opened*(1-settle);
   // Cache the contact deformation once per landing. Raised tile rows must not
   // disappear through the collapsed cloth even when the candle fell between them.
   if(settle>0&&item.surfaceHeight&&item.contactLanding!==f.landing){
@@ -147,16 +163,17 @@ export class FlareVisuals {
    }
   }
   for(let j=0;j<=rings;j++)for(let i=0;i<=segments;i++){
-   const r=j/rings,a=i/segments*Math.PI*2,rr=A.ventRadius+(radius-A.ventRadius)*r;
-   const panel=Math.sin(a*A.ribs*.5)**2,flutter=Math.sin(a*3+f.t*3.7+r*9)*.006*r*r*(1-settle);
-   const y=baseY+height*Math.pow(1-r*r,.7)+panel*.018*r*(1-settle)+flutter+settle*FoldedHeight(a,r);
+   const r=j/rings,a=i/segments*Math.PI*2,theta=r*Math.PI*.5;
+   const panel=Math.sin(a*A.ribs*.5)**2,flutter=Math.sin(a*3+f.t*3.7+r*9)*.004*r*r*(1-settle);
+   const rr=A.ventRadius+(radius-A.ventRadius)*((1-settle)*Math.sin(theta)+settle*r)*(1-.045*panel*r*(1-settle));
+   const y=baseY+height*Math.cos(theta)+panel*.025*r*(1-settle)+flutter+settle*FoldedHeight(a,r);
    const index=j*(segments+1)+i,c=item.contactOffsets,o=index*3;
    p.setXYZ(index,Math.cos(a)*rr+(c?.[o]||0)*settle,y+(c?.[o+1]||0)*settle,Math.sin(a)*rr+(c?.[o+2]||0)*settle);
   }p.needsUpdate=true;cloth.geometry.computeVertexNormals();
   const c=cords.geometry.attributes.position;let k=0;
-  c.setXYZ(k++,0,A.candleHeight+A.candleLift,0);c.setXYZ(k++,0,A.leaderLength*(1-settle)+.04*settle,0);
+  c.setXYZ(k++,0,A.candleHeight+A.candleLift,0);c.setXYZ(k++,0,A.leaderLength*extension*(1-settle)+.04*settle,0);
   for(let i=0;i<A.ribs;i++){
-   const joinY=A.leaderLength*(1-settle)+.04*settle,end=new THREE.Vector3().fromBufferAttribute(p,rings*(segments+1)+Math.round(i/A.ribs*segments));
+   const joinY=A.leaderLength*extension*(1-settle)+.04*settle,end=new THREE.Vector3().fromBufferAttribute(p,rings*(segments+1)+Math.round(i/A.ribs*segments));
    c.setXYZ(k++,0,joinY,0);c.setXYZ(k++,end.x*.5,(joinY+end.y)*.5-settle*.03,end.z*.5);
    c.setXYZ(k++,end.x*.5,(joinY+end.y)*.5-settle*.03,end.z*.5);c.setXYZ(k++,end.x,end.y,end.z);
   }c.needsUpdate=true;cords.geometry.setDrawRange(0,k);
@@ -171,7 +188,10 @@ export class FlareVisuals {
   const {head,smoke,sparks,canopy}=item,t=f.t,since=t-f.ignitedAt;
   const opened=Smooth(0,A.openingS,since),settle=f.landed?Smooth(0,A.settleS,t-f.landing.t):0;
   const fade=f.landed?1-Smooth(f.endAt-A.groundFadeS,f.endAt,t):1;
-  head.material.uniforms.clock.value=t;head.material.uniforms.power.value=since>=0?f.brightness:0;
+  head.material.uniforms.clock.value=t;
+  head.material.uniforms.power.value=since>=0?Math.min(A.radianceMax,f.intensity*(f.parachute?A.radiancePerCd:A.signalRadiancePerCd)):0;
+  const earlier=SampleFlarePosition(f,Math.max(0,t-.02)),axis=head.material.uniforms.flameAxis.value;
+  if(f.parachute)axis.set(0,-1,0);else axis.set(earlier.x-f.pos.x,earlier.y-f.pos.y,earlier.z-f.pos.z).normalize();
   Put(head,0,f.pos.x,f.pos.y,f.pos.z,A.glowSize,0);Flush(head);
   canopy.visible=f.parachute!==false&&!f.launchObstructed&&since>=0;
   canopy.position.set(f.pos.x,f.pos.y,f.pos.z);canopy.rotation.set(Math.sin(since*1.7)*.035*opened*(1-settle),0,Math.sin(since*2+f.swayPhase)*.055*opened*(1-settle));
@@ -196,9 +216,15 @@ export class FlareVisuals {
    if((born<f.ignitedAt&&!launch)||born>f.outAt||age>A.smokeLife){Put(smoke,i,0,0,0,0,-1);continue;}
    const p=launch?{x:f.from.x,y:f.groundY+A.launchHeight,z:f.from.z}:SampleFlarePosition(f,born);
    const seed=Math.sin(born*74.7+f.swayPhase)*.5+.5;
-   const spread=.04+age*.1+(f.parachute&&!launch ? .3*Smooth(.25,.9,age) : 0);
-   Put(smoke,i,p.x+Math.sin(f.driftDirRad)*f.driftMS*age+Math.sin(born*3.7+age)*spread,p.y+age*.55,
-    p.z+Math.cos(f.driftDirRad)*f.driftMS*age+Math.cos(born*4.1-age*.4)*spread,.18+age*.3,age/A.smokeLife,seed);
+   const spread=.025+age*.09+(f.parachute&&!launch ? .22*Smooth(.25,.9,age) : 0);
+   const prev=SampleFlarePosition(f,Math.max(0,born-.02)),drag=A.smokeDragS*(1-Math.exp(-age/A.smokeDragS));
+   const vx=(p.x-prev.x)/.02,vz=(p.z-prev.z)/.02;
+   // The descending canopy crosses its own buoyant wake. Deflect that wake
+   // around the leeward skirt instead of drawing a bright tube through silk.
+   const wake=f.parachute&&!launch?A.canopyRadius*1.2*Smooth(.25,.8,age):0;
+   Put(smoke,i,p.x+Math.sin(f.driftDirRad)*(f.driftMS*age+wake)+vx*drag+Math.sin(born*3.7+age)*spread,
+    p.y+age*A.smokeRiseMS-(f.parachute&&!launch?.16:0),
+    p.z+Math.cos(f.driftDirRad)*(f.driftMS*age+wake)+vz*drag+Math.cos(born*4.1-age*.4)*spread,.1+age*.32,age/A.smokeLife,seed);
   }Flush(smoke);
   for(let i=0;i<A.sparkCount;i++){
    const born=(Math.floor(t*A.sparkHz)-i)/A.sparkHz,age=t-born;

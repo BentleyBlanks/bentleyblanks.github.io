@@ -27,6 +27,7 @@
 // 不重编译。
 
 import * as THREE from "three";
+import {FLARE_PREVIEW_NIGHT} from './Data_Tuning_FlareEffects.mjs';
 import {
   Atmosphere, ATMOSPHERE_SAMPLE_GLSL, ATMOSPHERE_EARTH,
   MakeAtmospherePreset, PhysicalSunLight, SetActiveAtmosphere,
@@ -764,6 +765,11 @@ SKY_PRESETS.firstLevelNight = {
     scale: 1.0, coverage: 0.80, softness: 0.5, warp: 0.35, shade: [0.012, 0.014, 0.020] },
   exposure: 2.7,
   atmosphere: { ...SKY_PRESETS.night.atmosphere, skyTint: [0.90, 0.92, 1.14] },
+};
+
+SKY_PRESETS.flarePreviewNight={
+  ...SKY_PRESETS.firstLevelNight,...FLARE_PREVIEW_NIGHT,
+  atmosphere:{...SKY_PRESETS.firstLevelNight.atmosphere,...FLARE_PREVIEW_NIGHT.atmosphere},
 };
 
 // ---------------------------------------------------------------------------

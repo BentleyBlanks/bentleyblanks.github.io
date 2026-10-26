@@ -48,10 +48,16 @@ assert.deepEqual([...GRADE_DEFAULTS.gain], [1.02, 1.0, 0.965]);
 assert.deepEqual([...GRADE_DEFAULTS.shadowTint], [0.855, 0.975, 1.170]);
 assert.deepEqual([...GRADE_DEFAULTS.highlightTint], [1.105, 1.015, 0.880]);
 const graded = Object.entries(SKY_PRESETS).filter(([, p]) => p.fog?.grade).map(([name]) => name);
-assert.deepEqual(graded, ["firstLevelBattleDay"], "only the first-level day preset carries its own grade");
+assert.deepEqual(graded, ["testSceneDay","firstLevelBattleDay","weaponRangeDay","p012WhiteboxDay"], "only the authored first-level and shared material-review day carry a grade");
+for(const name of ['weaponRangeDay','p012WhiteboxDay'])assert.equal(SKY_PRESETS[name],SKY_PRESETS.testSceneDay,'Review-day aliases share the exact preset');
+assert.deepEqual(SKY_PRESETS.testSceneDay.fog.grade,{lift:[0,0,0],gain:[1,1,1],shadow:0,highlight:0,contrastCurve:'soft'},'Material review keeps its existing neutral grade');
 assert.ok(day.cloudDeck?.structure > 0 && night.cloudDeck?.structure > 0, "both first-level skies use the structured cloud deck");
 const decks = Object.entries(SKY_PRESETS).filter(([, p]) => p.cloudDeck).map(([name]) => name).sort();
-assert.deepEqual(decks, ["firstLevelBattleDay", "firstLevelNight"], "no other preset changes its clouds");
+assert.deepEqual(decks, ["firstLevelBattleDay", "firstLevelNight", "flarePreviewNight"], "structured clouds are limited to authored first-level skies and the isolated flare studio");
+const flareNight=SKY_PRESETS.flarePreviewNight;
+assert.notEqual(flareNight.fog,night.fog,'Flare studio fog cannot mutate the campaign night');
+assert.notEqual(flareNight.atmosphere,night.atmosphere,'Flare studio atmosphere cannot mutate the campaign night');
+assert.ok(flareNight.lightIntensity<night.lightIntensity&&flareNight.fog.density<night.fog.density,'Flare studio is a weak-moon, clearer night');
 assert.equal(night.stars, 0, "overcast night hides the stars");
 // 对比 S 曲线：中灰不动、暗部只压不裁（线性拉伸 1.10 把 sRGB 0.03 裁成 0）、高光不溢出
 const neutral = { lift: [0, 0, 0], gain: [1, 1, 1], shadowTint: [1, 1, 1], highlightTint: [1, 1, 1],
