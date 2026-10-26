@@ -1,6 +1,7 @@
 // 白盒关卡 FirstLevel1218 的占位配音：整段一次生成 → 母带 → 按逐字时间戳切句 → 写清单（只在 node 里跑）。
 // 完全照 Script_EditorBlockoutFirstLevel0610Voice.mjs（那份与 0105 的都不动），只换了台词表、路径与本关借嗓子的人设：
-// 同一个借来的嗓子在 12–18 里演两个人（zhou 演担架员和带路的兵），所以人设先按显示名查、再按 who 查（PersonaOf）。
+// 同一个借来的嗓子在 11–18 里演两个人（第三版 10-26：guard 演七二七团连长和守门的兵、bearer 演医官和门里有人、shouter 演哨兵和喊飞机的），
+// 所以人设先按显示名查、再按 who 查（PersonaOf）。
 //
 //   node Taierzhuang1938/Script_EditorBlockoutFirstLevel1218Voice.mjs [--dry-run] [--only=A,B] [--force=Scene[,Scene]]
 //        [--pick=Scene:n] [--no-judge] [--face]

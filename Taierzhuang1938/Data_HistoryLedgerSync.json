@@ -1,8 +1,8 @@
 {
   "schema": "tengxian-history-ledger-sync-v1",
   "about": "史实与创作对照的同步记号。Script_HistoryLedgerAudit.mjs 读它决定从哪里开始看改动、--check 读它拦已否决的链接；skill tengxian-fact-fiction-sync 核对完用 --mark-reviewed 写回。",
-  "reviewedAt": "2026-10-23T21:57:26.812Z",
-  "repoCommit": "8ad3a798572dd00299ee8226c103fee48bd51c61",
+  "reviewedAt": "2026-10-26T04:04:10.071Z",
+  "repoCommit": "9e04298c71f59f5d346efb52438817be3877fca3",
   "assetReviews": [
     {
       "asset": "FlareEffects",

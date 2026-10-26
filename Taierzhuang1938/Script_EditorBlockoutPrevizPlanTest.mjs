@@ -306,6 +306,23 @@ Test("站人取地：高度场 + 一步能踩上的实心块顶面（按 ry 判�
   Near(at(40, 0), -1.24, 1e-9, "坑沿炸了不算"); Near(at(50, 0), -0.74, 1e-9, "残骸出现后算");
 });
 
+// 2026-10-26：standOn 块（架空桥面）不受 1 m 台阶限制；没写的块逐位不变
+Test("站人取地：standOn 的块比地面高多少都站得上；随信号消失后不算；没写 standOn 的高块照旧不算", () => {
+  const base = () => -2.7;
+  const blocks = [
+    { id: "Walk", x: 0, z: 0, w: 2.4, d: 11, h: 0.04, y: 2.53, solid: true, standOn: true },   // 顶 2.55，比河床高 5.25
+    { id: "Girder", x: 5, z: 0, w: 0.4, d: 11, h: 1.2, y: 1.8, solid: true },                  // 顶 2.4：太高，不算
+    { id: "Ghost", x: 10, z: 0, w: 2, d: 2, h: 0.04, y: 2.53, solid: false, standOn: true },
+  ];
+  const gates = [{ id: "WalkBlown", x: 20, z: 0, w: 2.4, d: 11, h: 0.04, y: 2.53, solid: true, standOn: true, signal: "BridgeBlown" }];
+  let on = new Set();
+  const at = BlockStandSampler(blocks, gates, base, (n) => on.has(n));
+  Near(at(0.5, 3), 2.55, 1e-9, "架空走道上"); Near(at(1.5, 3), -2.7, 1e-9, "走道外是河床"); Near(at(5, 0), -2.7, 1e-9, "钢梁没 standOn 照旧不算");
+  Near(at(10, 0), -2.7, 1e-9, "非实心的 standOn 不算"); Near(at(20, 0), 2.55, 1e-9, "没炸前站在走道上");
+  on = new Set(["BridgeBlown"]);
+  Near(at(20, 0), -2.7, 1e-9, "炸了掉到河床");
+});
+
 // 2026-10-18：lie（倒地怎么躺）与 weapon（手里换武器）是阶跃键
 Test("lie / weapon 键：校验、阶跃、缺省", () => {
   const bad = ValidateBlockoutPreviz({ schema: BLOCKOUT_PREVIZ_SCHEMA, level: "Test", sequences: [{ keyframe: "01-1",

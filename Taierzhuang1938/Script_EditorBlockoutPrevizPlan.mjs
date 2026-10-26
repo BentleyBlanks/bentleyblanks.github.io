@@ -1037,6 +1037,8 @@ const STAND_SKIP_SEMANTICS = new Set(["water", "void", "foliage"]);
  * 块按 ry（弧度，与 three rotation.y 同号）判脚印；gates 只算此刻还在场上的（signal 未发生 / appearSignal 已发生）。
  * blocks / gates：布局里的块（x,z,w,d,h,ry?,y?(中心高),solid,semantic,tag?）；y 缺省时按中心高度场 + h/2 算。
  * baseAt(x,z) → 高度场；signalled(name) → bool。→ (x,z) => y
+ * 2026-10-26：块写了 standOn: true（架空的桥面：1218 铁路桥上那层看不见的走道）就不受 maxStepM 限制——脚印里一律站在它顶上
+ *（它底下的人也会被抬上去，所以这种块底下不摆人）。没写的块逐位不变（0105 / 0610 没有这种块）。
  */
 export function BlockStandSampler(blocks, gates, baseAt, signalled = () => false, { maxStepM = STAND_MAX_STEP_M } = {}) {
   const grid = new Map();
@@ -1046,7 +1048,7 @@ export function BlockStandSampler(blocks, gates, baseAt, signalled = () => false
     if (STAND_SKIP_SEMANTICS.has(b.semantic) || b.blockoutWater || b.tag === "airWall" || b.airWall) return;
     const ry = Finite(b.ry) ? b.ry : 0, c = Math.cos(ry), s = Math.sin(ry);
     const top = Finite(b.y) ? b.y + b.h / 2 : baseAt(b.x, b.z) + b.h;
-    const e = { x: b.x, z: b.z, hw: b.w / 2, hd: b.d / 2, c, s, top, gate };
+    const e = { x: b.x, z: b.z, hw: b.w / 2, hd: b.d / 2, c, s, top, gate, standOn: b.standOn === true };
     entries.push(e);
     const r = Math.hypot(e.hw, e.hd);
     for (let gx = Math.floor((b.x - r) / STAND_CELL_M); gx <= Math.floor((b.x + r) / STAND_CELL_M); gx++) {
@@ -1067,7 +1069,7 @@ export function BlockStandSampler(blocks, gates, baseAt, signalled = () => false
     if (!list) return base;
     let y = base;
     for (const e of list) {
-      if (e.top <= y || e.top - base > maxStepM) continue;
+      if (e.top <= y || (!e.standOn && e.top - base > maxStepM)) continue;
       const dx = x - e.x, dz = z - e.z;
       const lx = dx * e.c - dz * e.s, lz = dx * e.s + dz * e.c;
       if (Math.abs(lx) > e.hw || Math.abs(lz) > e.hd) continue;

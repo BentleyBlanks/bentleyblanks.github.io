@@ -115,13 +115,13 @@ try{
  console.log('ok optics and descent',JSON.stringify({optical,descent,landed}));
  if(process.argv.includes('--studio-only')){assert.deepEqual(errors,[]);console.log('FlareEffectsBrowserTest studio passed');}
  else {
- // Same renderer in real blockout playback (including whitebox effects disabled).
- await page.goto(url+'?editor=blockout&level=FirstLevel1218&kf=13-2&quality=whitebox&scale=small&audio=0',{waitUntil:'domcontentloaded',timeout:180000});
+ // Same renderer in real blockout playback (including whitebox effects disabled). FirstLevel1218 v3 (2026-10-26): the signal flare is at 13-3, t 0.8 s.
+ await page.goto(url+'?editor=blockout&level=FirstLevel1218&kf=13-3&quality=whitebox&scale=small&audio=0',{waitUntil:'domcontentloaded',timeout:180000});
  await page.waitForFunction(()=>window.Tengxian?.Debug?.Blockout?.State().ready,null,{timeout:300000});
  await page.evaluate(async()=>{await Tengxian.Debug.Blockout.Previz.Reload();await Tengxian.Debug.Blockout.Previz.Seek(5.35);});
  const previz=await page.evaluate(()=>{const objects=[];for(const root of Tengxian.post.debugOverlays)root.traverse(o=>{if(o.name?.startsWith('Flare/'))objects.push({name:o.name,visible:root.visible,children:o.children.length})});
   return {state:Tengxian.Debug.Blockout.Previz.State(),objects};});
- assert.ok(previz.state.active||previz.state.playing||previz.state.keyframe==='13-2',JSON.stringify(previz.state));
+ assert.ok(previz.state.active||previz.state.playing||previz.state.keyframe==='13-3',JSON.stringify(previz.state));
  assert.ok(previz.objects.some(o=>o.visible&&o.children===5),'Real flare must be attached to visible blockout render layer');
  await Capture('BlockoutSignal');await page.evaluate(()=>Tengxian.Debug.Blockout.Previz.Stop());
  // Actual campaign assembly launches the same signal at AirFirst, without editor state.
