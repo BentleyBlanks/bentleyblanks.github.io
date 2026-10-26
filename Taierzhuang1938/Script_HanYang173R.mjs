@@ -22,10 +22,12 @@ export function ConfigureHanYang173R(asset, library) {
     material.userData.whiteboxWeaponReflection = true;
     material.userData.hanYangAuthoredColor ||= material.color.toArray();
     material.userData.hanYangAuthoredRoughness ??= material.roughness;
+    material.userData.hanYangAuthoredMetalness ??= material.metalness;
     const wood=D.wood.includes(mesh.name);
     material.color.fromArray(material.userData.hanYangAuthoredColor)
-      .multiplyScalar(wood?D.woodReflectanceGain:D.metalReflectanceGains[mesh.name]||1);
+      .multiplyScalar(wood?D.woodReflectanceGain:(D.metalReflectanceGains[mesh.name]||1)*D.metalReflectanceScale);
     material.roughness=material.userData.hanYangAuthoredRoughness*(wood?1:D.metalRoughnessGain);
+    material.metalness=material.userData.hanYangAuthoredMetalness*(wood?1:D.metalMetalness);
     library.ConfigureExternalPbr(material,{mesh});
     // Bound the effective textured reflectance, rather than clipping the
     // authoring multiplier and leaving every dark conductor near black.

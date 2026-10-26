@@ -10,9 +10,19 @@ export const HANYANG_173R = Object.freeze({
   // Source wood is near-black (visible base texels ~41/29/20 sRGB). A linear
   // reflectance gain retains grain/roughness while fitting the game's filmic
   // exposure. This is an artistic runtime adaptation, not a source rebake.
-  woodReflectanceGain: 12,
+  // 2026-10-26 对标 COD 枪身亮度（用户：亮部过亮、暗部过暗）：12 → 10，压一点木纹高光；
+  // 不回到 6 —— 10-25 用户嫌木头太黑才从 6 提上来。
+  woodReflectanceGain: 10,
   metalReflectanceGains: HANYANG_METAL_GAINS,
-  metalRoughnessGain: 1.4,
+  // Per-part gains above normalise the near-black source; at full strength the
+  // steel read as chrome (sky reflection clipped white, ground reflection black).
+  // Blued steel: 0.4 of that reflectance, a broader lobe and 30% diffuse so the
+  // shaded side still takes ambient light. Whitebox cave view, visible steel
+  // display luma p05/p50/p99 13/94/162 -> 57/76/127; medium daylight ADS
+  // 31/134/247 -> 35/90/200.
+  metalReflectanceScale: .4,
+  metalRoughnessGain: 2.2,
+  metalMetalness: .7,
   maximumReflectance: .95,
   bolt: ['HandledCylinder', 'HandleRoot', 'HandleNeck', 'HandleSphere'],
   cocking: ['RearCockingExterior', 'RearOuterCover_RoundedSideReturn', 'RearSmallCover', 'RearSmallPin', 'RearTab', 'RearTopExternalLever'],

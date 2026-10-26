@@ -66,9 +66,9 @@ try{
   if(mode==='Day')assert(row.woodSamples.length>=2&&row.woodSamples.every(s=>s.rgb[0]>s.rgb[2]*1.2&&s.rgb[0]>16),'daylight wood must retain a readable warm albedo, not the old purple-black floor');
   if(mode==='Day'||mode==='Shadow'){
    assert(row.surfaces.metal.pixels>5000,'actual visible metal mask');
-   assert(row.surfaces.metal.p50>(mode==='Day'?18:10)&&row.surfaces.metal.blackFraction<(mode==='Day'?.45:.50),'metal must retain midtones in light and shade');
-   assert(row.surfaces.metal.p95<235,'broad metal highlights must retain headroom');
-   assert(row.surfaces.wood.p50>(mode==='Day'?30:25)&&row.surfaces.wood.p95<150,'wood grain must be readable in daylight and shadow with highlight headroom');
+   assert(row.surfaces.metal.p50>(mode==='Day'?18:10)&&row.surfaces.metal.blackFraction<(mode==='Day'?.45:.50),`metal must retain midtones in light and shade ${mode} ${JSON.stringify(row.surfaces.metal)}`);
+   assert(row.surfaces.metal.p95<235,`broad metal highlights must retain headroom ${mode} ${JSON.stringify(row.surfaces.metal)}`);
+   assert(row.surfaces.wood.p50>(mode==='Day'?30:25)&&row.surfaces.wood.p95<150,`wood grain must be readable in daylight and shadow with highlight headroom ${mode} ${JSON.stringify(row.surfaces.wood)}`);
   }
   if(mode==='Overcast'||mode==='Night')assert(row.surfaces.wood.p50>14&&row.surfaces.wood.blackFraction<.20,'wood must retain dark midtones in the overcast/night presets');
   evidence.lighting.push(row);await page.screenshot({path:path.join(out,`Scene_${mode}.png`)});
