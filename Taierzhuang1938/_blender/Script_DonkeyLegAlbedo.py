@@ -56,8 +56,11 @@ def BuildLegAlbedo(rgb,blur,returnRelief=False):
         padded=np.pad(clump,((12,12),(0,0)),mode='edge')
         summed=np.pad(np.cumsum(padded,axis=0,dtype=np.float64),((1,0),(0,0)))
         column=(summed[25:]-summed[:-25])/25
-        micro=np.clip(fine,.72,1.65)*np.clip(clump/np.maximum(.5,column),.90,1.13)
-        micro=np.clip(micro,.70,1.50);baseMicro=micro.copy()
+        # Preserve short curved clumps as pigment. The former narrow limits
+        # erased their contrast after source -> limb -> UV0 -> screen filtering.
+        # Long coherent tendon columns still divide out before this stage.
+        micro=np.clip(fine,.60,2.40)**1.25*np.clip(clump/np.maximum(.5,column),.65,1.90)**1.10
+        micro=np.clip(micro,.50,2.80);baseMicro=micro.copy()
         micro=np.clip(fine,.65,2.80)*np.clip(clump/np.maximum(.5,column),.75,1.60)
         micro=np.clip(micro,.65,2.50)
         sourceX=(lo+hi)*.5+np.clip(horizontal,-1,1)*width*.40
@@ -81,7 +84,7 @@ def BuildLegAlbedo(rgb,blur,returnRelief=False):
         active=(sourceY>460)&(sourceY<870)
         sourceChecks.append({'view':view,'donor':key,'samples':int(np.count_nonzero(active)),'sourceXRange':[float(sourceX[active].min()),float(sourceX[active].max())]})
         projected=np.clip(Fetch(micro,sourceX,sourceY)/np.maximum(.5,rowMean),.65,2.50)
-        baseProjected=np.clip(Fetch(baseMicro,sourceX,sourceY)/np.maximum(.5,hiddenMean),.70,1.50)
+        baseProjected=np.clip(Fetch(baseMicro,sourceX,sourceY)/np.maximum(.5,hiddenMean),.50,2.80)
         projectedChroma=Fetch(chroma,sourceX,sourceY)
         ca=Fetch(chroma,lo+width*(.20+.60*phase),sourceY)
         cb=Fetch(chroma,lo+width*(.20+.60*np.mod(phase+.5,1)),sourceY)
@@ -121,7 +124,7 @@ def BuildLegAlbedo(rgb,blur,returnRelief=False):
         hueLuminanceErrors.append(float(np.max(np.abs(color@np.array([.2126,.7152,.0722])-oldLuma))))
         atlas[:,index*tileWidth:(index+1)*tileWidth,:3]=np.where(color<=.0031308,color*12.92,1.055*color**(1/2.4)-.055)
         sampling.append({'leg':stem,'sideDonor':sideKey,'capDonor':capKey})
-    record={'revision':'20261026ShadowSeparatedLegV38','method':'silhouette-masked source-space pigment; same-limb charcoal/pale pigment with local RGB chroma; stronger photographic hair/clump residual reserved for surface relief; coherent tendon/row shadows removed before cylindrical correspondence; periodic detail only on hidden caps',
+    record={'revision':'20261026LegFlowPigmentV42','method':'silhouette-masked source-space pigment; same-limb charcoal/pale pigment with local RGB chroma; source-scale curved hair and clump pigment with filtering compensation; independent source relief retained; coherent tendon/row shadows removed before cylindrical correspondence; periodic detail only on hidden caps',
         'sourceBoundaryRows':BOUNDARIES,'sampling':sampling,'sourceChecks':sourceChecks,'paletteSourceBoxes':PALETTE_BOXES,'paletteCalibratedLinearRgb':{name:value.tolist() for name,value in palette.items()},
-        'sourcePigmentBlurRadiusPixels':6,'sourceMicroBlurRadiusPixels':8,'sourceFineBlurRadiusPixels':2,'sourceFineRatioRange':[.65,2.80],'sourceClumpRatioRange':[.75,1.60],'sourceVerticalCoherenceWindowPixels':25,'microRatioRange':[.70,1.50],'reliefDetailRatioRange':[.65,2.50],'microStrength':1.0,'darkMottlingRatioRange':[.90,1.10],'sourceChromaBlurRadiiPixels':[1,8],'sourceChromaRatioRange':[.65,1.40],'hueStagePreservesLuminance':True,'maximumHueLuminanceError':max(hueLuminanceErrors),'hiddenCapMicroRatioRange':[.70,1.50],'silhouetteMaskedFiltering':True,'hiddenCapRepeats':round(math.pi/.60),'visibleDetailIsPhotographic':True,'periodicDetailScope':'unphotographed cap only','detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
+        'sourcePigmentBlurRadiusPixels':6,'sourceMicroBlurRadiusPixels':8,'sourceFineBlurRadiusPixels':2,'sourceFineRatioRange':[.65,2.80],'sourceClumpRatioRange':[.75,1.60],'sourceVerticalCoherenceWindowPixels':25,'microRatioRange':[.50,2.80],'pigmentFineRatioRange':[.60,2.40],'pigmentFinePower':1.25,'pigmentClumpRatioRange':[.65,1.90],'pigmentClumpPower':1.10,'reliefDetailRatioRange':[.65,2.50],'microStrength':1.0,'darkMottlingRatioRange':[.90,1.10],'sourceChromaBlurRadiiPixels':[1,8],'sourceChromaRatioRange':[.65,1.40],'hueStagePreservesLuminance':True,'maximumHueLuminanceError':max(hueLuminanceErrors),'hiddenCapMicroRatioRange':[.70,1.50],'silhouetteMaskedFiltering':True,'hiddenCapRepeats':round(math.pi/.60),'visibleDetailIsPhotographic':True,'periodicDetailScope':'unphotographed cap only','detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
     return (atlas,reliefAtlas,record) if returnRelief else (atlas,record)

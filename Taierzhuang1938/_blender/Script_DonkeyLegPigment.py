@@ -69,4 +69,4 @@ def InstallLegPigment(scene,skin,rig,base):
         'relief':{'source':str(reliefPath),'sha256':hashlib.sha256(reliefPath.read_bytes()).hexdigest(),'strength':.65,'distanceM':.0008,'sourceHeightRange':[float(relief.min()),float(relief.max())],'runtime':'source-height only; baked together with existing coat relief into shared UV0 2K Normal'},
         'runtime':'UV0 2K Base retains bounded pigment/chroma; source-facing clump relief is baked into shared UV0 2K Normal; no view-dependent runtime projection'}
     scene['DonkeyReferenceBakedCoatRelief']=True
-    (base/'SourceTextures/Data_LegPigment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8');scene['DonkeyLegPigmentRevision']='20261026ShadowSeparatedV38';return record
+    (base/'SourceTextures/Data_LegPigment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8');scene['DonkeyLegPigmentRevision']='20261026LegFlowV42';return record

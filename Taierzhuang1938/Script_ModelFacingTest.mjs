@@ -318,7 +318,7 @@ Check(legAlbedo.detailUsesAtlasSpaceBlur===false&&legAlbedo.detailUsesSyntheticN
   &&legAlbedo.sourceSha256===bareSpec.derivation.referenceFit.photoDetail.originalSha256
   &&legAlbedo.sampling.length===4&&new Set(legAlbedo.sampling.map(row=>row.leg)).size===4,
   "独立驴腿部底色在原图尺度分离毛色与细毛，四腿具备摄影归属且不在拉伸图块上高通");
-Check(legAlbedo.revision==='20261026ShadowSeparatedLegV38'&&legAlbedo.hueStagePreservesLuminance===true
+Check(legAlbedo.revision==='20261026LegFlowPigmentV42'&&legAlbedo.hueStagePreservesLuminance===true
   &&legAlbedo.maximumHueLuminanceError<.000001&&legAlbedo.relief?.distanceM===.0008&&bareSpec.coat.normalMode==='bakedSourceCoatRelief',
   "独立驴腿部颜色与毛簇起伏分开烘焙，色度阶段不改变亮度，完整法线保留原图局部细节");
 Check(pectoral.chest.integrity.boundaryEdges===0&&pectoral.chest.integrity.nonmanifoldEdges===0&&pectoral.chest.integrity.chestCrossings===0
@@ -338,8 +338,12 @@ Check(pectoralMotion?.pass===true&&pectoralMotion.assetSha256===bareSpec.sha256
   &&foreSwing.leftMaximumDegrees===2.5&&foreSwing.rightMaximumDegrees===6&&foreSwing.onlyUnplanted===true
   &&bareSpec.verification.nativeLateralStanceDriftPerFrameM<.0001,
   "独立驴当前GLB具备加密胸区动作证据，保留离地回摆且着地蹄点不横滑");
+Check(legAlbedo.microRatioRange.join(',')==='0.5,2.8'&&legAlbedo.pigmentFinePower===1.25
+  &&legAlbedo.pigmentClumpPower===1.10&&legAlbedo.sourceVerticalCoherenceWindowPixels===25
+  &&legAlbedo.hiddenCapMicroRatioRange.join(',')==='0.7,1.5',
+  "独立驴可见腿面保留同腿短毛及弯曲毛簇，长条关节光影和隐藏面重复仍受限制");
 const jointFit=pectoral.jointFit,jointArcs=bareSpec.animations.DonkeyWalk.jointArcs;
-Check(bareSpec.version==='20261026ReferenceV41'&&jointFit?.version==='20261026JointFitV35'
+Check(bareSpec.version==='20261026ReferenceV42'&&jointFit?.version==='20261026JointFitV35'
   &&jointFit.maximumInfluences===4&&jointFit.boneCount===28&&jointFit.morphTargetsAdded===0
   &&jointFit.surfaceCorrectionSourcePixels<1&&jointFit.edges.maximumRestSurfaceBoundM<=.0005&&jointFit.edgesAfter.maximumRestSurfaceBoundM<=.0005
   &&jointArcs?.bakeFps===120&&jointArcs.maximumHoofTargetErrorM<.00001&&jointArcs.maximumReachCompressionM<=.006,
