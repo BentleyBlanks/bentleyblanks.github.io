@@ -711,7 +711,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261026ReferenceV38'
+    scene['DonkeyReferenceFitRevision']='20261026ReferenceV39'
     scene['DonkeyReferenceBodyTuftLimit']=288
     scene['DonkeyReferencePaleFringe']=True
     scene['DonkeyReferenceForeSwingClearanceDeg']=2.5
@@ -755,6 +755,9 @@ def ApplyReferenceFit(scene,base):
     headNamespace={};file=project/'_blender/Script_DonkeyHeadFit.py'
     exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),headNamespace)
     details['headFit']=headNamespace['ApplyReferenceHead'](scene,skin,rig,collection)
+    tipNamespace={};file=project/'_blender/Script_DonkeyEarTips.py'
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),tipNamespace)
+    details['earTips']=tipNamespace['RefineEarTips'](scene,rig)
     details['postHeadOrbitalIntegrity']=eyeNamespace['CheckOrbitalIntegrity'](skin)
     details['muzzle']['integrity']=muzzleNamespace['CheckMuzzleIntegrity'](skin)
     limbSurface={};file=project/'_blender/Script_DonkeyLimbSurface.py'
@@ -769,6 +772,10 @@ def ApplyReferenceFit(scene,base):
     jointNamespace={};file=project/'_blender/Script_DonkeyJointFit.py'
     exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),jointNamespace)
     details['jointFit']=jointNamespace['ApplyJointFit'](scene,skin,rig)
+    browNamespace={};file=project/'_blender/Script_DonkeyBrowFit.py'
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),browNamespace)
+    details['browHeight']=browNamespace['FitEyeHeight'](scene,skin,rig,collection)
+    details['postBrowOrbitalIntegrity']=eyeNamespace['CheckOrbitalIntegrity'](skin)
     lowerNamespace={};file=project/'_blender/Script_DonkeyLowerLimb.py'
     exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),lowerNamespace)
     details['lowerLimbRelief']=lowerNamespace['RefineLowerLimbRelief'](scene,skin)

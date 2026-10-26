@@ -1,9 +1,9 @@
 {
-  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261026\\ReferenceFitV38\\Model_DonkeyUnpacked.glb",
+  "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261026\\ReferenceFitV39\\Model_DonkeyUnpacked.glb",
   "output": "C:\\Users\\Bentl\\Documents\\bentleyblanks_Codex_DonkeyCart_20261020\\Taierzhuang1938\\Model\\Donkey\\Model_Donkey.glb",
-  "bytes": 18579364,
+  "bytes": 18487768,
   "geometrySkinActionsUnchanged": true,
-  "nonImageBufferSha256": "183664321619c00a1c4622fdc9bb22a23f4b97e0fbf2bba58aeb4993a05dc160",
+  "nonImageBufferSha256": "7fa8fc80872d210ab3df3684f9a4b8b1bca6dff84dba8e54f23a7ebdc534e836",
   "images": [
     {
       "name": "Texture_DonkeyShortCoatNormal",
@@ -45,8 +45,8 @@
         2048,
         2048
       ],
-      "bytes": 5307770,
-      "sha256": "4767fb617e99ebee4d0badfc29ec8f7200c1539ffb94c4f5711210cbbbc637c2",
+      "bytes": 5218234,
+      "sha256": "b5f68fb1c667143ea22d21f1add40485fb96830334f01922365f8b8fc4b6b471",
       "lossless": true
     },
     {
@@ -56,8 +56,8 @@
         2048,
         2048
       ],
-      "bytes": 3600604,
-      "sha256": "9a80c5d5ed630f447fc7af3212137de775e7d1d0443ab079f78abe1f33f727ea",
+      "bytes": 3576458,
+      "sha256": "41db9b62381002d678ec2ca04d1234970b69bdcd05faf3711859d2269a12f50e",
       "lossless": true
     },
     {
@@ -67,8 +67,8 @@
         512,
         512
       ],
-      "bytes": 23204,
-      "sha256": "9a45b719285073074d382cebf6971d46cbca8c883f092aca73c45519fe15d76b",
+      "bytes": 23994,
+      "sha256": "a40d28bb4ca8bc85091f8e25ef815c77b664d297f797d028e8ab7a7174774551",
       "lossless": true
     }
   ],

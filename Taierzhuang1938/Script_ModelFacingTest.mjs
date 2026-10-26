@@ -300,10 +300,10 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
 Check(bare.json.meshes.length===3 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===4 && bare.json.images.length===6 && bareTriangles===79782 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
-  "独立驴身体、短毛与鬃尾毛共用28骨，四材质/六图与79,782三角齐备");
+  && bare.json.materials.length===4 && bare.json.images.length===6 && bareTriangles===79910 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
+  "独立驴身体、短毛与鬃尾毛共用28骨，四材质/六图与79,910三角齐备");
 Check(bareSpec.verification.bakeUvOverlapTexels===0 && bareSpec.verification.bakeUvLegOverlapTexels===0
-  && bareSpec.triangles.sourceBeforeRuntimeTriangulationTotal===79782,
+  && bareSpec.triangles.sourceBeforeRuntimeTriangulationTotal===79910,
   "独立驴制作源登记零重叠烘焙图集与显式运行时三角化；最终GLB的UV覆盖另作独立验证");
 const pectoral=bareSpec.derivation.referenceFit.details;
 const forelegFit=pectoral.legFit;
@@ -339,12 +339,25 @@ Check(pectoralMotion?.pass===true&&pectoralMotion.assetSha256===bareSpec.sha256
   &&bareSpec.verification.nativeLateralStanceDriftPerFrameM<.0001,
   "独立驴当前GLB具备加密胸区动作证据，保留离地回摆且着地蹄点不横滑");
 const jointFit=pectoral.jointFit,jointArcs=bareSpec.animations.DonkeyWalk.jointArcs;
-Check(bareSpec.version==='20261026ReferenceV38'&&jointFit?.version==='20261026JointFitV35'
+Check(bareSpec.version==='20261026ReferenceV39'&&jointFit?.version==='20261026JointFitV35'
   &&jointFit.maximumInfluences===4&&jointFit.boneCount===28&&jointFit.morphTargetsAdded===0
   &&jointFit.surfaceCorrectionSourcePixels<1&&jointFit.edges.maximumRestSurfaceBoundM<=.0005&&jointFit.edgesAfter.maximumRestSurfaceBoundM<=.0005
   &&jointArcs?.bakeFps===120&&jointArcs.maximumHoofTargetErrorM<.00001&&jointArcs.maximumReachCompressionM<=.006,
   "独立驴V35关节配方保留28骨与四权重，局部顶点修正小于原图一像素；三维肘膝路径锁定请求蹄点");
 const lowerRelief=pectoral.lowerLimbRelief;
+const earTips=pectoral.earTips,browHeight=pectoral.browHeight;
+Check(earTips?.version==='20261026EarTipsV39'&&earTips.trianglesAdded===144
+  &&Object.values(earTips.ears).every(row=>row.maximumRootDisplacementM===0&&row.minimumSampledJacobian>.05&&Math.abs(row.afterTopPixel-row.referenceTopPixel)<.01),
+  "独立驴耳尖局部增加144三角，按原图窄顶轮廓补足高度并保护耳根与闭合体积");
+for(const side of ['Left','Right']){
+  const cloud=RiggedGlbPoints(bareFile,'DonkeyRuntime','DonkeyEar'+side+'Pivot');
+  const top=Math.max(...cloud.map(point=>point[1]));
+  Check(cloud.length>100&&Math.abs(925-(925-302)/1.10*top-30)<.2,`独立驴实际${side}耳实体顶点投影与原图顶部相差不足一像素`);
+}
+Check(browHeight?.version==='20261026BrowHeightV39'&&browHeight.maximumCentreDownshiftM===.005
+  &&browHeight.maximumProtectedDisplacementM===0&&browHeight.minimumSampledJacobian>.70
+  &&browHeight.bonesChanged===0&&browHeight.weightsChanged===false&&browHeight.trianglesAdded===0,
+  "独立驴眼眶、眼球及眉部共同下移至参考高度，闭合曲面与原骨架保留");
 Check(lowerRelief?.version==='20261026LowerLimbReliefV36'&&lowerRelief.maximumDisplacementM<=.0033
   &&lowerRelief.protectedHoofAndRootDisplacementM===0&&lowerRelief.bonesChanged===0&&lowerRelief.weightsChanged===false
   &&Object.keys(lowerRelief.byLeg).length===4&&Object.values(lowerRelief.byLeg).every(row=>row.vertices>500),

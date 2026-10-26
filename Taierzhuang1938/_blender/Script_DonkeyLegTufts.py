@@ -49,7 +49,8 @@ def ReuseLegTufts(skin,vertices,faces,normals,uvs,rows,colors,fringeTags,pigment
         photoNormal=np.array([-nx,abs(ny) if front else -abs(ny),0]) if cap else np.array([-abs(nx),ny,0]);irradiance=.55+.45*max(0,float(photoNormal@light))
         pigment=linear[v,u]*(.50/irradiance)*np.array([1,1.03,1.10])
         return flow,pigment,float(luma[v,u]/max(.008,local[v,u])),[u,v],coherence
-    for index in range(limit):
+    for index in range(limit*2):
+        if len(accepted)>=limit:break
         sample=None
         for attempt in range(28):
             triangle,stem=candidates[bisect.bisect_left(cdf,rng.random()*total)];a,b=rng.random(),rng.random()

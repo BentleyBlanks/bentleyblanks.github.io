@@ -8,9 +8,9 @@
 
 `Model/Donkey/Model_Donkey.glb` 是 2026-10-22 按用户要求追加的纯驴版。只从 V3 工程的 `DonkeyEditable` 集合保留身体、眼、耳、鬃尾和轮廓短毛，移除木车、车辕、颈垫、全部套具、笼头与牵绳；不能仅删除 `CartRuntime`，因为原动物运行时网格也合并了套具。原驴车文件与源工程不覆盖。
 
-当前纯驴 V38 为身体／短毛／鬃毛三个导出网格、四个材质，共用 28 根骨骼；在 Three.js 中形成四个绘制网格。当前为 79,782 三角，实际登记以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准，保持 80,000 上限。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。六张无损 WebP 内嵌并有镜像。V30 的 79,992 三角及更早结果保留作历史对照。
+当前纯驴 V39 为身体／短毛／鬃毛三个导出网格、四个材质，共用 28 根骨骼；在 Three.js 中形成四个绘制网格。当前为 79,910 三角，实际登记以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准，保持 80,000 上限。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。六张无损 WebP 内嵌并有镜像。V30 的 79,992 三角及更早结果保留作历史对照。
 
-当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261026/ReferenceFitV38/Scene_Donkey.blend`，其中打包图像、重建脚本及关节配方；`Data_Derivation.json` 记录父工程及冻结 V3 中间源的哈希、组件和拟合量测。原目录保留此前工程。重建命令：
+当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261026/ReferenceFitV39/Scene_Donkey.blend`，其中打包图像、重建脚本及关节配方；`Data_Derivation.json` 记录父工程及冻结 V3 中间源的哈希、组件和拟合量测。原目录保留此前工程。重建命令：
 
 ```powershell
 node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
@@ -19,6 +19,14 @@ node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
 此入口从 `ReferenceFitV4/Scene_DonkeyBeforeReferenceFit.blend` 的冻结纯驴 V3 中间源派生，经测量修形、重解动作、图集重烘、无损打包与实际 GLB 重导测蹄；结束时关闭自己的 Blender 实例。更早从驴车分离纯驴的配方仍在 `Script_DonkeyBake.py` / `Script_DonkeyRefine.py`。独立版的肩颈、头部、全身和行走实测留在外置 `Review/` 目录，本地交互页在 worktree 的 `tmp/Donkey/`。新增资产未布设到关卡。
 
 早期去掉笼头后的近景发现原装饰嘴缝离真实口鼻表面约 3–4 cm；当时将 30 顶点细管的五个截面贴回口鼻。V14 已以连续唇部与 21 截面嘴缝替换该旧做法，当前实际表面距离记录在派生契约；驴车版不改写。
+
+### 纯驴耳尖轮廓与眼部高度 V39（2026-10-26）
+
+对实际V38 GLB的耳骨归属顶点与原图前视轮廓逐行测量，双耳实体顶端分别低约8、9个原图像素。`Script_DonkeyEarTips.py` 只细分耳廓顶端的12条长边，每耳增加72三角，再用同一个单调曲面场校正耳廓和耳片的高度及窄顶轮廓。耳根不移动，不增加骨骼；最大局部位移约19毫米。闭合拓扑、正Jacobian及最终GLB投影单独检查，额外细分使原来的折线顶端能形成圆弧。
+
+原图与实际PBR近景的黑眼区域在多个阈值下比较，双眼垂直位置均高约3个原图像素。`Script_DonkeyBrowFit.py` 将眼球、眼睑、浅色眉圈和周边皮肤用共同紧支撑场下移5毫米；不重新切眼眶，保留骨架与蒙皮，局部法线按场Jacobian变换。原图眼区形状和整体表情仍按前/侧近景复核。
+
+新增曲面在唯一UV0重新烘焙，四材质六图、260束短毛及原动作/蹄点要求保留。当前身体40,260、短毛与立体鬃尾39,262、鬃额及尾刷388三角，共79,910，仍低于80,000。V38源与交付保留作比较；源工程、测量图和验收页仅留本地。
 
 ### 纯驴毛色、法线和局部短毛 V38（2026-10-26）
 
