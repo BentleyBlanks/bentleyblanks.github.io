@@ -29,6 +29,7 @@ def InstallLegPigment(scene,skin,rig,base):
     mask=skin.data.attributes.get('LegPigmentBlend') or skin.data.attributes.new('LegPigmentBlend','FLOAT','POINT')
     protection=skin.data.attributes.get('LegProjectionProtection') or skin.data.attributes.new('LegProjectionProtection','FLOAT','POINT')
     coordinates=[];paint=skin.data.color_attributes['CoatColor'];count=0
+    chestGuard=skin.data.attributes.get('ChestUndersideBlend')
     for vertex,row in zip(skin.data.vertices,masses):
         stem=max(stems,key=lambda s:row[s]);p=vertex.co
         if row[stem]<.40:stem='Donkey'+('Front' if p.y>.40 else 'Rear')+('Left' if p.x<0 else 'Right')
@@ -38,6 +39,7 @@ def InstallLegPigment(scene,skin,rig,base):
         coordinates.append((index,theta,p.z/.90))
         ownership=smooth(.45,.85,row[stem])
         amount=ownership*(1-smooth(.66,.74,p.z) if front else 1-smooth(.67,.86,p.z))
+        if chestGuard:amount*=1-smooth(.05,.35,chestGuard.data[vertex.index].value)
         mask.data[vertex.index].value=amount
         protected=amount;protection.data[vertex.index].value=protected
         if amount>0:
@@ -65,8 +67,8 @@ def InstallLegPigment(scene,skin,rig,base):
         bump=nodes.new('ShaderNodeBump');bump.inputs['Strength'].default_value=.65;bump.inputs['Distance'].default_value=.0008;links.new(heightMix.outputs[0],bump.inputs['Height'])
         if normalSource is not None:links.new(normalSource,bump.inputs['Normal'])
         links.new(bump.outputs['Normal'],shader.inputs['Normal'])
-    record={**sourceRecord,'source':str(source),'sourceSha256':hashlib.sha256(source.read_bytes()).hexdigest(),'atlas':str(path),'sha256':hashlib.sha256(content).hexdigest(),'vertices':count,'materials':materials,
+    record={**sourceRecord,'chestScope':{'attribute':'ChestUndersideBlend','protectionRange':[.05,.35],'maximumProtectedCoreLegBlend':max((mask.data[v.index].value for v in skin.data.vertices if chestGuard and chestGuard.data[v.index].value>.5),default=0)},'source':str(source),'sourceSha256':hashlib.sha256(source.read_bytes()).hexdigest(),'atlas':str(path),'sha256':hashlib.sha256(content).hexdigest(),'vertices':count,'materials':materials,
         'relief':{'source':str(reliefPath),'sha256':hashlib.sha256(reliefPath.read_bytes()).hexdigest(),'strength':.65,'distanceM':.0008,'sourceHeightRange':[float(relief.min()),float(relief.max())],'runtime':'source-height only; baked together with existing coat relief into shared UV0 2K Normal'},
-        'runtime':'UV0 2K Base retains bounded pigment/chroma; source-facing clump relief is baked into shared UV0 2K Normal; no view-dependent runtime projection'}
+        'runtime':'UV0 2K Base retains original visible same-limb RGB and restrained hidden-cap detail; clump relief is baked into shared UV0 2K Normal; no view-dependent runtime projection'}
     scene['DonkeyReferenceBakedCoatRelief']=True
-    (base/'SourceTextures/Data_LegPigment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8');scene['DonkeyLegPigmentRevision']='20261026LegFlowV42';return record
+    (base/'SourceTextures/Data_LegPigment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8');scene['DonkeyLegPigmentRevision']='20261026FullRgbV45';return record

@@ -23,6 +23,7 @@ def BuildLegAlbedo(rgb,blur,returnRelief=False):
     # Filtering is performed in original photo pixels, where x/y have the
     # same physical scale. The old atlas-space blur had unequal scales.
     luminance=linear@np.array([.2126,.7152,.0722])
+    directLinear=np.stack([np.clip(linear[:,:,c]+1.25*(linear[:,:,c]-blur(linear[:,:,c],1)),0,.80) for c in range(3)],axis=2)
     height=1024;tileWidth=384;bodyWidth=256;gutter=64
     yy=np.linspace(.90,0,height)[:,None];sourceY=np.broadcast_to(925-yy*(925-302)/1.10,(height,tileWidth))
     angle=(np.arange(tileWidth)-gutter)/(bodyWidth-1)*2*math.pi-math.pi
@@ -89,12 +90,13 @@ def BuildLegAlbedo(rgb,blur,returnRelief=False):
         ca=Fetch(chroma,lo+width*(.20+.60*phase),sourceY)
         cb=Fetch(chroma,lo+width*(.20+.60*np.mod(phase+.5,1)),sourceY)
         fallbackChroma=ca*wa[:,:,None]+cb*(1-wa[:,:,None])
-        return color,baseProjected,detail,projectedChroma,fallbackChroma,projected
+        directRgb=Fetch(directLinear,sourceX,sourceY)*(.50/irradiance)[:,:,None]*tint
+        return color,baseProjected,detail,projectedChroma,fallbackChroma,projected,directRgb
     dark=np.mean([palette['ForeSideDark'],palette['HindSideDark'],palette['ForeFrontDark']],axis=0)
     for index,stem in enumerate(['DonkeyFrontLeft','DonkeyFrontRight','DonkeyRearLeft','DonkeyRearRight']):
         front='Front' in stem;left=stem.endswith('Left');sideKey='SideFront' if front else 'SideRear';capKey=('Front' if front else 'Rear')+('Left' if left else 'Right')
-        side,sideProjected,sideFallback,sideChroma,hiddenChroma,sideRelief=Sample(sideKey,-ny,(-np.abs(nx),ny),'Side')
-        face,faceDetail,_,faceChroma,_,faceRelief=Sample(capKey,-nx if front else nx,(-nx,np.abs(ny) if front else -np.abs(ny)),'Front' if front else 'Rear')
+        side,sideProjected,sideFallback,sideChroma,hiddenChroma,sideRelief,sideFullRgb=Sample(sideKey,-ny,(-np.abs(nx),ny),'Side')
+        face,faceDetail,_,faceChroma,_,faceRelief,faceFullRgb=Sample(capKey,-nx if front else nx,(-nx,np.abs(ny) if front else -np.abs(ny)),'Front' if front else 'Rear')
         w=np.maximum(0,ny if front else -ny)**3;sideWeight=np.abs(nx)**3+np.maximum(0,-ny if front else ny)**3;w=w/np.maximum(.001,w+sideWeight)
         visibleSide=np.abs(nx)**3/np.maximum(.001,sideWeight)
         sideDetail=sideProjected*visibleSide+sideFallback*(1-visibleSide)
@@ -122,9 +124,12 @@ def BuildLegAlbedo(rgb,blur,returnRelief=False):
         oldLuma=color@np.array([.2126,.7152,.0722]);colored=color*hue
         color=colored*(oldLuma/np.maximum(.000001,colored@np.array([.2126,.7152,.0722])))[:,:,None]
         hueLuminanceErrors.append(float(np.max(np.abs(color@np.array([.2126,.7152,.0722])-oldLuma))))
+        visibleSideWeight=visibleSide*(1-w)
+        hiddenWeight=1-visibleSideWeight-w
+        color=np.clip(color*hiddenWeight[:,:,None]+sideFullRgb*visibleSideWeight[:,:,None]+faceFullRgb*w[:,:,None],.003,.55)
         atlas[:,index*tileWidth:(index+1)*tileWidth,:3]=np.where(color<=.0031308,color*12.92,1.055*color**(1/2.4)-.055)
         sampling.append({'leg':stem,'sideDonor':sideKey,'capDonor':capKey})
-    record={'revision':'20261026LegFlowPigmentV42','method':'silhouette-masked source-space pigment; same-limb charcoal/pale pigment with local RGB chroma; source-scale curved hair and clump pigment with filtering compensation; independent source relief retained; coherent tendon/row shadows removed before cylindrical correspondence; periodic detail only on hidden caps',
+    record={'revision':'20261026FullRgbLegV45','method':'silhouette-masked source-space pigment; original same-limb full RGB on source-visible faces with one-pixel filtering compensation; restrained palette and short detail only on hidden caps; source relief retained; coherent tendon/row shadows removed before cylindrical correspondence; periodic detail only on hidden caps',
         'sourceBoundaryRows':BOUNDARIES,'sampling':sampling,'sourceChecks':sourceChecks,'paletteSourceBoxes':PALETTE_BOXES,'paletteCalibratedLinearRgb':{name:value.tolist() for name,value in palette.items()},
-        'sourcePigmentBlurRadiusPixels':6,'sourceMicroBlurRadiusPixels':8,'sourceFineBlurRadiusPixels':2,'sourceFineRatioRange':[.65,2.80],'sourceClumpRatioRange':[.75,1.60],'sourceVerticalCoherenceWindowPixels':25,'microRatioRange':[.50,2.80],'pigmentFineRatioRange':[.60,2.40],'pigmentFinePower':1.25,'pigmentClumpRatioRange':[.65,1.90],'pigmentClumpPower':1.10,'reliefDetailRatioRange':[.65,2.50],'microStrength':1.0,'darkMottlingRatioRange':[.90,1.10],'sourceChromaBlurRadiiPixels':[1,8],'sourceChromaRatioRange':[.65,1.40],'hueStagePreservesLuminance':True,'maximumHueLuminanceError':max(hueLuminanceErrors),'hiddenCapMicroRatioRange':[.70,1.50],'silhouetteMaskedFiltering':True,'hiddenCapRepeats':round(math.pi/.60),'visibleDetailIsPhotographic':True,'periodicDetailScope':'unphotographed cap only','detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
+        'sourcePigmentBlurRadiusPixels':6,'visibleFullRgb':True,'visibleRgbPreEmphasisRadiusPixels':1,'visibleRgbPreEmphasisAmount':1.25,'visibleRgbMaximumLinear':.55,'microRatioScope':'hidden cap fallback; visible surfaces use original full RGB','sourceMicroBlurRadiusPixels':8,'sourceFineBlurRadiusPixels':2,'sourceFineRatioRange':[.65,2.80],'sourceClumpRatioRange':[.75,1.60],'sourceVerticalCoherenceWindowPixels':25,'microRatioRange':[.50,2.80],'pigmentFineRatioRange':[.60,2.40],'pigmentFinePower':1.25,'pigmentClumpRatioRange':[.65,1.90],'pigmentClumpPower':1.10,'reliefDetailRatioRange':[.65,2.50],'microStrength':1.0,'darkMottlingRatioRange':[.90,1.10],'sourceChromaBlurRadiiPixels':[1,8],'sourceChromaRatioRange':[.65,1.40],'hueStagePreservesLuminance':True,'maximumHueLuminanceError':max(hueLuminanceErrors),'hiddenCapMicroRatioRange':[.70,1.50],'silhouetteMaskedFiltering':True,'hiddenCapRepeats':round(math.pi/.60),'visibleDetailIsPhotographic':True,'periodicDetailScope':'unphotographed cap only','detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
     return (atlas,reliefAtlas,record) if returnRelief else (atlas,record)
