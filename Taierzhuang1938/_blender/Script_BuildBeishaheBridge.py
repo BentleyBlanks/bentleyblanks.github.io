@@ -122,7 +122,7 @@ class Geometry:
         return obj
 
 
-def Material(name, texture, roughness, metal=0, normal_strength=0.25):
+def Material(name, texture, roughness, metal=0, normalStrength=0.25):
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     nodes, links = mat.node_tree.nodes, mat.node_tree.links
@@ -132,19 +132,19 @@ def Material(name, texture, roughness, metal=0, normal_strength=0.25):
     base = nodes.new("ShaderNodeTexImage")
     base.image = bpy.data.images.load(str(PROJECT / "Texture" / f"Texture_{texture}Base.webp"), check_existing=True)
     links.new(base.outputs["Color"], shader.inputs["Base Color"])
-    normal_path = PROJECT / "Texture" / f"Texture_{texture}Normal.webp"
-    if normal_path.exists():
+    normalPath = PROJECT / "Texture" / f"Texture_{texture}Normal.webp"
+    if normalPath.exists():
         tex = nodes.new("ShaderNodeTexImage")
-        tex.image = bpy.data.images.load(str(normal_path), check_existing=True)
+        tex.image = bpy.data.images.load(str(normalPath), check_existing=True)
         tex.image.colorspace_settings.name = "Non-Color"
         normal = nodes.new("ShaderNodeNormalMap")
-        normal.inputs["Strength"].default_value = normal_strength
+        normal.inputs["Strength"].default_value = normalStrength
         links.new(tex.outputs["Color"], normal.inputs["Color"])
         links.new(normal.outputs["Normal"], shader.inputs["Normal"])
-    orm_path = PROJECT / "Texture" / f"Texture_{texture}Orm.webp"
-    if orm_path.exists():
+    ormPath = PROJECT / "Texture" / f"Texture_{texture}Orm.webp"
+    if ormPath.exists():
         tex = nodes.new("ShaderNodeTexImage")
-        tex.image = bpy.data.images.load(str(orm_path), check_existing=True)
+        tex.image = bpy.data.images.load(str(ormPath), check_existing=True)
         tex.image.colorspace_settings.name = "Non-Color"
         split = nodes.new("ShaderNodeSeparateColor")
         links.new(tex.outputs["Color"], split.inputs["Color"])
@@ -166,12 +166,12 @@ def BuildSpan():
     step = length / n
     zs = [-length / 2 + i * step for i in range(n + 1)]
     y0, y1 = SPEC["trussBottomY"], SPEC["trussTopY"]
-    half_w = SPEC["trussCenterOffsetM"]
+    halfW = SPEC["trussCenterOffsetM"]
     steel, fasteners, timber, west, east, shoes = [Geometry() for _ in range(6)]
     # Straight low upper chord, sloping end posts, alternating diagonals with verticals.
     # No portal or cross bracing above the open track (pony truss).
     for side in [-1, 1]:
-        x = side * half_w
+        x = side * halfW
         steel.Channel((x, y0, zs[0]), (x, y0, zs[-1]), 0.22, 0.28)
         steel.Channel((x, y1, zs[1]), (x, y1, zs[-2]), 0.24, 0.23)
         steel.Box((x, y1 + 0.13, 0), (0.29, 0.03, zs[-2] - zs[1]))
@@ -206,26 +206,26 @@ def BuildSpan():
                 fasteners.Rivet((x + side * 0.135, y1 - 0.055, z), (side, 0, 0), 0.018)
     # Floor beams, two rail stringers, below-deck X bracing.
     for z in zs:
-        steel.Channel((-half_w, -0.40, z), (half_w, -0.40, z), 0.16, 0.32)
+        steel.Channel((-halfW, -0.40, z), (halfW, -0.40, z), 0.16, 0.32)
     for side in [-1, 1]:
         steel.Channel((side * 0.75, -0.29, zs[0]), (side * 0.75, -0.29, zs[-1]), 0.14, 0.22)
         steel.Box((side * 0.75, -0.17, 0), (0.16, 0.02, length))
     for k in range(n):
         for s in [-1, 1]:
-            steel.Beam((s * half_w, -0.57, zs[k]), (-s * half_w, -0.57, zs[k + 1]), 0.055, 0.018)
+            steel.Beam((s * halfW, -0.57, zs[k]), (-s * halfW, -0.57, zs[k + 1]), 0.055, 0.018)
     # Open timber deck, exposed sleepers, two rails. Gauge is INNER head-face distance.
     count = math.ceil(length / SPEC["sleeperSpacingM"])
-    rail_x = (SPEC["gaugeM"] + SPEC["railHeadWidthM"]) / 2
+    railX = (SPEC["gaugeM"] + SPEC["railHeadWidthM"]) / 2
     for k in range(count):
         z = -length / 2 + (k + 0.5) * length / count
         timber.Box((0, -0.08, z), (SPEC["sleeperLengthM"], 0.16, SPEC["sleeperWidthM"]))
         for side in [-1, 1]:
-            x = side * rail_x
+            x = side * railX
             steel.Box((x, 0.008, z), (0.22, 0.016, 0.20))
             for dx in [-0.08, 0.08]:
                 fasteners.Box((x + dx, 0.025, z), (0.026, 0.033, 0.026))
     for rail, side in [(west, -1), (east, 1)]:
-        x = side * rail_x
+        x = side * railX
         rail.Box((x, 0.024, 0), (0.13, 0.028, length))
         rail.Box((x, 0.079, 0), (0.017, 0.082, length))
         rail.Box((x, 0.125, 0), (SPEC["railHeadWidthM"], 0.030, length))
@@ -233,10 +233,10 @@ def BuildSpan():
             for dx in [-0.026, 0.026]:
                 steel.Box((x + dx, 0.07, z), (0.018, 0.062, 0.38))
     # One fixed/one expansion bearing on each side; four load paths per span.
-    bearing_centers = []
+    bearingCenters = []
     for end in [-1, 1]:
         for side in [-1, 1]:
-            x, z = side * half_w, end * (length / 2 - 0.20)
+            x, z = side * halfW, end * (length / 2 - 0.20)
             shoes.Box((x, -0.995, z), (0.52, 0.05, 0.62))
             if end < 0:
                 # Fixed rocker's transverse pin; cast shoe bears on the top plate.
@@ -250,8 +250,8 @@ def BuildSpan():
             shoes.Box((x, -0.72, z), (0.30, 0.06, 0.44))
             for dx in [-0.20, 0.20]:
                 fasteners.Rivet((x + dx, -0.963, z + 0.22), (0, 1, 0), 0.026)
-            bearing_centers.append([x, SPEC["bearingTopY"], z])
-    return {"Trusses": steel, "Rivets": fasteners, "Sleepers": timber, "RailWest": west, "RailEast": east, "Bearings": shoes}, bearing_centers
+            bearingCenters.append([x, SPEC["bearingTopY"], z])
+    return {"Trusses": steel, "Rivets": fasteners, "Sleepers": timber, "RailWest": west, "RailEast": east, "Bearings": shoes}, bearingCenters
 
 
 def BuildPier():
@@ -323,7 +323,7 @@ def Rebuild():
     root = Empty("BeishaheBridge")
     root["reconstructionScope"] = SPEC["reconstructionScope"]
     root["assetVersion"] = SPEC["version"]
-    spans, bearing_template = BuildSpan()
+    spans, bearingTemplate = BuildSpan()
     templates = {}
     for role, geo in spans.items():
         mat = wood if role == "Sleepers" else steel
@@ -340,20 +340,20 @@ def Rebuild():
             bpy.context.collection.objects.link(obj)
             obj.parent = parent
             obj["role"], obj["spanIndex"] = role, i
-        assemblies.append({"id": parent.name, "spanIndex": i, "centerZ": z, "bearings": [[x, y, zz + z] for x, y, zz in bearing_template]})
+        assemblies.append({"id": parent.name, "spanIndex": i, "centerZ": z, "bearings": [[x, y, zz + z] for x, y, zz in bearingTemplate]})
     for obj in templates.values():
         bpy.data.objects.remove(obj, do_unlink=True)
     pier, cap = BuildPier()
-    pier_template, cap_template = pier.Object("Template_Pier", stone, tile=3.0), cap.Object("Template_Cap", stone, tile=3.0)
+    pierTemplate, capTemplate = pier.Object("Template_Pier", stone, tile=3.0), cap.Object("Template_Cap", stone, tile=3.0)
     for i in range(1, SPEC["spanCount"]):
         z = -SPEC["lengthM"] / 2 + i * SPEC["spanPitchM"]
-        for role, template in [("Pier", pier_template), ("Cap", cap_template)]:
+        for role, template in [("Pier", pierTemplate), ("Cap", capTemplate)]:
             obj = bpy.data.objects.new(f"Shared_{role}{i:02d}", template.data)
             bpy.context.collection.objects.link(obj)
             obj.parent = root
             obj.location = ToBlender((0, 0, z))
             obj["role"], obj["supportIndex"] = role, i
-    for obj in [pier_template, cap_template]:
+    for obj in [pierTemplate, capTemplate]:
         bpy.data.objects.remove(obj, do_unlink=True)
     abut = BuildAbutment()
     for label, side in [("North", -1), ("South", 1)]:
