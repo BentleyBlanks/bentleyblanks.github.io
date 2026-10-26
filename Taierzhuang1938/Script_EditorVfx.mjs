@@ -13,7 +13,7 @@ import {PARTICLE_SURFACE_ART} from './Data_Tuning_Particles.mjs';
 import {FlareDirector,MakeFlareHost} from './Script_Flare.mjs';
 import {FlareVisuals} from './Script_FlareVisual.mjs';
 import {FlareSurfaceIndex} from './Script_FlareSurfaces.mjs';
-import {FLARE_EFFECTS} from './Data_Tuning_FlareEffects.mjs';
+import {FLARE_EFFECTS,FLARE_PREVIEW} from './Data_Tuning_FlareEffects.mjs';
 import {FALLING_SOIL_PRESETS} from './Data_Tuning_FallingSoil.mjs';
 import {FallingSoilInspector} from './Script_EditorFallingSoil.mjs';
 import {NormalizeFallingSoil,NormalizeSoilPreview} from './Script_FallingSoilRules.mjs';
@@ -71,6 +71,7 @@ export class VfxEditor {
     this.panel = null;
     const requested=new URLSearchParams(location.search).get('effect');
     this.effectId = ALL_EFFECTS.some(effect=>effect.id===requested)?requested:"FireMedium";
+    this.flareCamera=FLARE_PREVIEW.camera;
     this.handle = 0;
     this.scale = 1;
     this.loop = true;
@@ -162,7 +163,7 @@ export class VfxEditor {
     };
     document.addEventListener('keydown',this.onPreviewKey,true);
     this.Play();
-    if(FALLING_SOIL_PRESETS[this.effectId])this.FrameEffect();
+    if(FALLING_SOIL_PRESETS[this.effectId]||FLARE_EFFECTS[this.effectId])this.FrameEffect();
     return this;
   }
 
@@ -270,7 +271,8 @@ export class VfxEditor {
     seed.addEventListener('change',()=>{const value=Number(seed.value);if(Number.isInteger(value)&&value>=0&&value<=4294967295){this.seed=value;this.Play();}});environment.appendChild(seed);
     Toggle(environment,'显示米格',true,on=>this.studio.SetGridVisible(on));
     ButtonRow(environment,[{label:'适配镜头',onClick:()=>this.FrameEffect()}]);Note(environment,'在画面空白处拖动旋转，滚轮缩放。');
-    Select(environment,'信号／照明弹镜头',[{value:'flight',label:'完整弹道'},{value:'follow',label:'跟随燃烧体近景'},{value:'ground',label:'地面照明检查'}],'flight',value=>{this.flareCamera=value;this.FrameEffect();});
+    const flareCamera=Select(environment,'信号／照明弹镜头',[{value:'follow',label:'跟随燃烧体近景'},{value:'flight',label:'完整弹道'},{value:'ground',label:'地面照明检查'}],this.flareCamera,value=>{this.flareCamera=value;this.FrameEffect();});
+    flareCamera.root.dataset.flareCamera='true';
     Toggle(environment,'夜间照明对照',false,on=>this.SetNightPreview(on));
     Note(environment,'弹药按米制预览，不受整体缩放影响；风与种子在重播时应用。照明弹熄灭后继续伞降、落地收拢；60 秒时间轴可查看完整过程。');
     const layers=Section(this.tabs.modules,'粒子层');
@@ -384,11 +386,17 @@ export class VfxEditor {
     this.loopTimer=this.previewTime;this.paused=true;this.host.post?.NotifyCameraCut();this.RefreshLayers(true);this.UpdateFacts();return this.Inspect();}
   QueueSeek(seconds){this.seekTarget=seconds;if(this.seekFrame)return;this.seekFrame=requestAnimationFrame(()=>{this.seekFrame=0;if(this.panel)this.Try(()=>this.Seek(this.seekTarget))});}
   FrameEffect(){
+    // The studio inherits a map's clip range. A 100 m flight viewed from up to
+    // 320 m needs its own range; ordinary previews and studio exit restore it.
+    const camera=this.host.camera,baseFar=this.studio.saved?.far??camera.far;
+    const far=FLARE_EFFECTS[this.effectId]?Math.max(baseFar,FLARE_PREVIEW.farM):baseFar;
+    if(camera.far!==far){camera.far=far;camera.updateProjectionMatrix();}
     if(FALLING_SOIL_PRESETS[this.effectId]){this.soil.Frame();return;}
     if(FLARE_EFFECTS[this.effectId]){
+      this.studio.maxDistance=FLARE_PREVIEW.maxDistanceM;
       if(this.flareCamera==='ground'){this.studio.Frame(1.8,14);this.studio.orbit.pitch=.45;this.studio.ApplyCamera();return;}
-      const near=this.flareCamera==='follow';this.studio.maxDistance=320;this.studio.Frame(near?4:110,near?9:160);
-      if(near)this.TrackFlare();else{this.studio.orbit.target.set(0,48,0);this.studio.ApplyCamera();}
+      const near=this.flareCamera==='follow';this.studio.Frame(near?4:FLARE_PREVIEW.overviewHeightM,near?FLARE_PREVIEW.followDistanceM:FLARE_PREVIEW.overviewDistanceM);
+      if(near)this.TrackFlare();else{this.studio.orbit.target.set(0,FLARE_PREVIEW.overviewTargetY,0);this.studio.ApplyCamera();}
       this.host.post?.NotifyCameraCut();return;
     }
     const id=this.effectId,small=/^(Muzzle|Impact|Blood|ShellCasings)/.test(id);

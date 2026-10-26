@@ -18,6 +18,12 @@ export const FLARE_EFFECTS = Object.freeze({
     exposeSight:2.4, adaptSight:.72, smokeRate:0}),
 });
 
+// Editor framing only; ammunition dimensions and flight are unchanged.
+export const FLARE_PREVIEW = Object.freeze({
+  camera:"follow",farM:600,maxDistanceM:320,followDistanceM:9,
+  overviewDistanceM:180,overviewHeightM:110,overviewTargetY:50,
+});
+
 export const FLARE_ART = Object.freeze({
   gravity:9.81, launchHeight:1.1, openingS:.65, dragS:.45,
   canopyRadius:.45, canopyHeight:.22, cordLength:1.25, leaderLength:.45, ventRadius:.022, ribs:8,
