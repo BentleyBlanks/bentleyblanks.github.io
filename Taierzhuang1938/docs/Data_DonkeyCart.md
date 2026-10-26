@@ -8,9 +8,9 @@
 
 `Model/Donkey/Model_Donkey.glb` 是 2026-10-22 按用户要求追加的纯驴版。只从 V3 工程的 `DonkeyEditable` 集合保留身体、眼、耳、鬃尾和轮廓短毛，移除木车、车辕、颈垫、全部套具、笼头与牵绳；不能仅删除 `CartRuntime`，因为原动物运行时网格也合并了套具。原驴车文件与源工程不覆盖。
 
-当前纯驴 V40 为身体／短毛／鬃毛三个导出网格、四个材质，共用 28 根骨骼；在 Three.js 中形成四个绘制网格。当前为 79,910 三角，实际登记以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准，保持 80,000 上限。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。六张无损 WebP 内嵌并有镜像。V30 的 79,992 三角及更早结果保留作历史对照。
+当前纯驴 V41 为身体／短毛／鬃毛三个导出网格、四个材质，共用 28 根骨骼；在 Three.js 中形成四个绘制网格。当前为 79,892 三角，实际登记以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准，保持 80,000 上限。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。六张无损 WebP 内嵌并有镜像。V30 的 79,992 三角及更早结果保留作历史对照。
 
-当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261026/ReferenceFitV40/Scene_Donkey.blend`，其中打包图像、重建脚本及关节配方；`Data_Derivation.json` 记录父工程及冻结 V3 中间源的哈希、组件和拟合量测。原目录保留此前工程。重建命令：
+当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261026/ReferenceFitV41/Scene_Donkey.blend`，其中打包图像、重建脚本及关节配方；`Data_Derivation.json` 记录父工程及冻结 V3 中间源的哈希、组件和拟合量测。原目录保留此前工程。重建命令：
 
 ```powershell
 node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
@@ -19,6 +19,14 @@ node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
 此入口从 `ReferenceFitV4/Scene_DonkeyBeforeReferenceFit.blend` 的冻结纯驴 V3 中间源派生，经测量修形、重解动作、图集重烘、无损打包与实际 GLB 重导测蹄；结束时关闭自己的 Blender 实例。更早从驴车分离纯驴的配方仍在 `Script_DonkeyBake.py` / `Script_DonkeyRefine.py`。独立版的肩颈、头部、全身和行走实测留在外置 `Review/` 目录，本地交互页在 worktree 的 `tmp/Donkey/`。新增资产未布设到关卡。
 
 早期去掉笼头后的近景发现原装饰嘴缝离真实口鼻表面约 3–4 cm；当时将 30 顶点细管的五个截面贴回口鼻。V14 已以连续唇部与 21 截面嘴缝替换该旧做法，当前实际表面距离记录在派生契约；驴车版不改写。
+
+### 纯驴眼周毛色与侧向眼裂 V41（2026-10-26）
+
+实际 GLB 的连通部件与无光照 ID 分色确认，眼球每侧 960 三角、湿睑每侧 480 三角；夸大的黑眼区域还包括被程序涂黑的眼眶毛皮。`Script_DonkeyEyes.py` 去掉毛皮内圈的额外 72% 压黑，真正的眼球、湿睑和闭合眼眶底继续独立着色。`Script_DonkeyReferencePigment.py` 对眼眶毛皮设置 0.025 线性亮度的局部炭灰下限，并保留原色度比例；椭球半径为 32/32/20 毫米，在 0.8–1.2 倍半径内平滑渐隐，离线烘入已有 UV0 底色。
+
+在分离颜色与几何问题后，`Script_DonkeyOrbitalFit.py` 对眼球、眼睑、眼眶及眉部使用同一连续曲面场，额外向侧面旋转 12°，按前／侧视眼位向内收 3/8 毫米并后移 2 毫米。32 毫米以内为共同刚性转动，90 毫米处完全消退；眼部高度沿用 V39。该步骤必须在 V35 关节配方与 V39 眉高修正之后执行，以保留配方坐标匹配和腿部曲面。源法线按 Jacobian 变换，单独检查眼周自交、受保护部位和完整实际 GLB 动作。
+
+V40 原图眼眉蒙版修复与此前腿形、毛束、骨架及动作继续保留。此次局部修正不代表毛流、尾刷和完整三视图已与参考一致；原图、试片、分色及正式渲染对照只留本地。
 
 ### 纯驴原图眼眉保留 V40（2026-10-26）
 

@@ -47,6 +47,7 @@ def InstallReferencePigment(scene,skin,rig,base):
             underside.data[vertex.index].value=weight;scope.data[vertex.index].value=1-weight
     eye=bpy.data.objects['DonkeyEyeLeft'];eyeMatrix=rig.matrix_world.inverted()@eye.matrix_world
     eyeCentre=sum((eyeMatrix@v.co for v in eye.data.vertices),Vector())/len(eye.data.vertices);eyeCentre.x=abs(eyeCentre.x)
+    orbitalFit=json.loads(scene['DonkeyOrbitalFitReport']) if scene.get('DonkeyOrbitalFitReport') else None
     ppm=(925-302)/1.10;anchor=scene['DonkeyReferenceFitAnchorY'];gain=.50;mixStrength=.95;materials=[]
     eyeProtection=(.028,.028,.012) if scene.get('DonkeyHeadFitReport') else (.040,.040,.020)
     for material in skin.data.materials:
@@ -105,10 +106,23 @@ def InstallReferencePigment(scene,skin,rig,base):
             leg=nodes.new('ShaderNodeAttribute');leg.attribute_name='LegProjectionProtection';amount=Math('MULTIPLY',amount,Math('SUBTRACT',1,Clamp(leg.outputs['Fac'])))
         if scene.get('DonkeyTailRootRevision'):
             repair=nodes.new('ShaderNodeAttribute');repair.attribute_name='TailRootRepairBlend';amount=Math('MULTIPLY',amount,Math('SUBTRACT',1,Clamp(repair.outputs['Fac'])))
-        mix=nodes.new('ShaderNodeMixRGB');links.new(amount,mix.inputs[0]);links.new(previous,mix.inputs[1]);links.new(pigment,mix.inputs[2]);links.new(mix.outputs[0],shader.inputs['Base Color']);materials.append(material.name)
+        mix=nodes.new('ShaderNodeMixRGB');links.new(amount,mix.inputs[0]);links.new(previous,mix.inputs[1]);links.new(pigment,mix.inputs[2]);result=mix.outputs[0]
+        if furry and orbitalFit:
+            left,right=orbitalFit['eyeCentresAfterM'];side=Math('GREATER_THAN',x,0)
+            centre=[Math('ADD',a,Math('MULTIPLY',side,b-a)) for a,b in zip(left,right)]
+            dx=Math('DIVIDE',Math('SUBTRACT',x,centre[0]),.032)
+            dy=Math('DIVIDE',Math('SUBTRACT',y,centre[1]),.032);dz=Math('DIVIDE',Math('SUBTRACT',z,centre[2]),.020)
+            radius=Math('SQRT',Math('ADD',Math('MULTIPLY',dx,dx),Math('ADD',Math('MULTIPLY',dy,dy),Math('MULTIPLY',dz,dz))))
+            t=Clamp(Math('DIVIDE',Math('SUBTRACT',radius,.80),.40));falloff=Math('SUBTRACT',1,Math('MULTIPLY',Math('MULTIPLY',t,t),Math('SUBTRACT',3,Math('MULTIPLY',2,t))))
+            luminance=nodes.new('ShaderNodeRGBToBW');links.new(result,luminance.inputs[0]);value=luminance.outputs[0]
+            lift=Math('MULTIPLY',falloff,Math('MAXIMUM',0,Math('SUBTRACT',.025,value)))
+            result=Scale(result,Math('DIVIDE',Math('ADD',value,lift),Math('MAXIMUM',.0001,value)))
+        links.new(result,shader.inputs['Base Color']);materials.append(material.name)
     record={'method':'full reference RGB with per-view normal-based illumination compensation for body, facial fur and the V14 nasal pad; the pad retains its independent skin normal; anatomical feature footprints and hidden/background pixels retain calibrated appearance',
         'linearGain':gain,'linearGainRgb':[.50,.515,.55],'mixStrength':mixStrength,'headTransitionY':[.88,.98],
         'headMixStrength':.88,'eyeProtectionRadiiM':list(eyeProtection),'nasalCavityProtection':'source cavity and oral crease/highlight footprints excluded from colour projection',
+        'orbitalFurPigment':{'version':'20261026OrbitalFurV41','minimumInnerRingVertexRgb':[.030,.0282,.0252],'floorLinearLuminance':.025,'radiiM':[.032,.032,.020],'smoothFalloff':[.80,1.20],
+            'scope':'furry skin only; separate corneas, wet lids, socket floors, normal and roughness are not colour graded','method':'restrained charcoal luminance floor with preserved chromatic ratios, baked into the existing UV0 base'},
         'fineCompensation':{'radiusPixels':1,'amount':1.25,'sourceSampling':'Closest during offline bake; ordinary filtered runtime sampler unchanged'},'images':records,'materials':materials,
         'visibleOriginalEyes':{'frontalEyePixels':[[103,259],[213,259]],'frontalBrowPixels':[[103,246],[213,246]],
             'eyeGuideWeights':[float(occlusion['Front'][259,103]),float(occlusion['Front'][259,213])],

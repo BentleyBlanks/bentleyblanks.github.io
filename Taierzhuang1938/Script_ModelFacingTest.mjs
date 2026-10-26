@@ -300,10 +300,10 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
 Check(bare.json.meshes.length===3 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===4 && bare.json.images.length===6 && bareTriangles===79910 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
-  "独立驴身体、短毛与鬃尾毛共用28骨，四材质/六图与79,910三角齐备");
+  && bare.json.materials.length===4 && bare.json.images.length===6 && bareTriangles===79892 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
+  "独立驴身体、短毛与鬃尾毛共用28骨，四材质/六图与79,892三角齐备");
 Check(bareSpec.verification.bakeUvOverlapTexels===0 && bareSpec.verification.bakeUvLegOverlapTexels===0
-  && bareSpec.triangles.sourceBeforeRuntimeTriangulationTotal===79910,
+  && bareSpec.triangles.sourceBeforeRuntimeTriangulationTotal===79892,
   "独立驴制作源登记零重叠烘焙图集与显式运行时三角化；最终GLB的UV覆盖另作独立验证");
 const pectoral=bareSpec.derivation.referenceFit.details;
 const forelegFit=pectoral.legFit;
@@ -339,7 +339,7 @@ Check(pectoralMotion?.pass===true&&pectoralMotion.assetSha256===bareSpec.sha256
   &&bareSpec.verification.nativeLateralStanceDriftPerFrameM<.0001,
   "独立驴当前GLB具备加密胸区动作证据，保留离地回摆且着地蹄点不横滑");
 const jointFit=pectoral.jointFit,jointArcs=bareSpec.animations.DonkeyWalk.jointArcs;
-Check(bareSpec.version==='20261026ReferenceV40'&&jointFit?.version==='20261026JointFitV35'
+Check(bareSpec.version==='20261026ReferenceV41'&&jointFit?.version==='20261026JointFitV35'
   &&jointFit.maximumInfluences===4&&jointFit.boneCount===28&&jointFit.morphTargetsAdded===0
   &&jointFit.surfaceCorrectionSourcePixels<1&&jointFit.edges.maximumRestSurfaceBoundM<=.0005&&jointFit.edgesAfter.maximumRestSurfaceBoundM<=.0005
   &&jointArcs?.bakeFps===120&&jointArcs.maximumHoofTargetErrorM<.00001&&jointArcs.maximumReachCompressionM<=.006,
@@ -349,6 +349,16 @@ const visibleEyes=bareSpec.derivation.referenceFit.photoDetail.pigmentProjection
 Check(visibleEyes?.eyeGuideWeights.every(value=>value===0)&&visibleEyes.browGuideWeights.every(value=>value===0)
   &&visibleEyes.apertureShadowExclusion.every(value=>value===1),
   "独立驴原图眼眉可见区域不再被套具补全蒙版覆盖，眼睛孔洞阴影单独排除");
+const orbitalOrientation=pectoral.orbitalOrientation,orbitalFur=bareSpec.derivation.referenceFit.photoDetail.pigmentProjection.orbitalFurPigment;
+Check(orbitalOrientation?.version==='20261026OrbitalFitV41'&&orbitalOrientation.outwardRotationDegrees===12
+  &&orbitalOrientation.minimumSampledJacobian>.85&&orbitalOrientation.maximumProtectedDisplacementM===0
+  &&orbitalOrientation.bonesChanged===0&&orbitalOrientation.weightsChanged===false&&orbitalOrientation.trianglesAdded===0
+  &&pectoral.postOrientationOrbitalIntegrity?.orbitalCrossings===0,
+  "独立驴闭合眼周共同向侧面拟合，保持正曲面映射并保护四肢、骨骼和蒙皮");
+Check(orbitalFur?.version==='20261026OrbitalFurV41'&&orbitalFur.floorLinearLuminance===.025
+  &&orbitalFur.minimumInnerRingVertexRgb.join(',')==='0.03,0.0282,0.0252'&&orbitalFur.radiiM.join(',')==='0.032,0.032,0.02'
+  &&orbitalFur.scope.includes('separate corneas'),
+  "独立驴毛皮眼眶使用克制的炭灰底色，眼球、湿睑和眼眶底保持独立");
 const earTips=pectoral.earTips,browHeight=pectoral.browHeight;
 Check(earTips?.version==='20261026EarTipsV39'&&earTips.trianglesAdded===144
   &&Object.values(earTips.ears).every(row=>row.maximumRootDisplacementM===0&&row.minimumSampledJacobian>.05&&Math.abs(row.afterTopPixel-row.referenceTopPixel)<.01),

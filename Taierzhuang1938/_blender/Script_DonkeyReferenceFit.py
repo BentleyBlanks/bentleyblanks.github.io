@@ -711,7 +711,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261026ReferenceV40'
+    scene['DonkeyReferenceFitRevision']='20261026ReferenceV41'
     scene['DonkeyReferenceBodyTuftLimit']=288
     scene['DonkeyReferencePaleFringe']=True
     scene['DonkeyReferenceForeSwingClearanceDeg']=2.5
@@ -776,6 +776,10 @@ def ApplyReferenceFit(scene,base):
     exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),browNamespace)
     details['browHeight']=browNamespace['FitEyeHeight'](scene,skin,rig,collection)
     details['postBrowOrbitalIntegrity']=eyeNamespace['CheckOrbitalIntegrity'](skin)
+    orbitalNamespace={};file=project/'_blender/Script_DonkeyOrbitalFit.py'
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),orbitalNamespace)
+    details['orbitalOrientation']=orbitalNamespace['FitOrbitalOrientation'](scene,skin,rig,collection)
+    details['postOrientationOrbitalIntegrity']=eyeNamespace['CheckOrbitalIntegrity'](skin)
     lowerNamespace={};file=project/'_blender/Script_DonkeyLowerLimb.py'
     exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),lowerNamespace)
     details['lowerLimbRelief']=lowerNamespace['RefineLowerLimbRelief'](scene,skin)

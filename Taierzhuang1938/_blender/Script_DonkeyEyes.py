@@ -68,8 +68,10 @@ def RebuildEyeSockets(skin,rig):
                 vertex=bm.verts.new(point);vertex[deform][head]=1
                 if color:
                     if radial is not None:
-                        inner=max(0,min(1,(radial-.72)/.28));inner=inner*inner*(3-2*inner)
-                        shade=(.030+.030*(1-radial))*(1-.72*inner)*(1+.35*max(0,math.sin(angle)))
+                        # This is fur-bearing skin. The separate wet lid and
+                        # closed floor supply the dark aperture, not a black
+                        # pigment ring painted across the orbital coat.
+                        shade=(.030+.030*(1-radial))*(1+.35*max(0,math.sin(angle)))
                     else:shade=0
                     vertex[color]=(shade,shade*.94,shade*.84,1) if radial is not None else pigment
                 ring.append(vertex)
