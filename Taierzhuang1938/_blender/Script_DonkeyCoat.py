@@ -263,7 +263,7 @@ def BuildGroom(skin,rig,collection,material,count=21000,pigmentSampler=None):
             if useFringe:
                 foreMass=sum(sum(appearance.data[i].color[:2])*w for i,w in zip(ids,bary)) if appearance else sum(w for name,w in row.items() if name.startswith('DonkeyFront'))
                 fringe,breastFringe=FringeAmounts(root,normal,foreMass) if belly<.01 else (0,0)
-                if fringe>0:flow=flow.lerp(Vector((.65*math.tanh(root.x/.035)*breastFringe/max(.0001,fringe),-.25,-1)).normalized(),fringe)
+                if fringe>0:flow=flow.lerp(Vector((.20*math.tanh(root.x/.035)*breastFringe/max(.0001,fringe),-.25,-1)).normalized(),fringe)
         elif root.y>.88:flow=Vector((0,.45,-1))
         elif root.z<.62:flow=Vector((0,-.12,-1))
         elif root.y>.58:flow=Vector((0,-.72,-.75))

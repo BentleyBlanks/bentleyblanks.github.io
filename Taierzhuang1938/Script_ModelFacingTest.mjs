@@ -300,10 +300,10 @@ Check(bareHead.length>500 && bareHead.reduce((sum,p)=>sum+p[2],0)/bareHead.lengt
 Check(bareMin.every((v,i)=>Math.abs(v-bareSpec.boundsM.min[i])<.00003) && bareMax.every((v,i)=>Math.abs(v-bareSpec.boundsM.max[i])<.00003),
   "独立驴实际绑定顶点云与外置工程包围盒一致");
 Check(bare.json.meshes.length===3 && bare.json.skins.length===1 && bare.json.skins[0].joints.length===28
-  && bare.json.materials.length===4 && bare.json.images.length===6 && bareTriangles===79916 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
-  "独立驴身体、短毛与鬃尾毛共用28骨，四材质/六图与79,916三角齐备");
+  && bare.json.materials.length===4 && bare.json.images.length===6 && bareTriangles===79918 && bareTriangles===bareSpec.triangles.total && bareTriangles<=80000,
+  "独立驴身体、短毛与鬃尾毛共用28骨，四材质/六图与79,918三角齐备");
 Check(bareSpec.verification.bakeUvOverlapTexels===0 && bareSpec.verification.bakeUvLegOverlapTexels===0
-  && bareSpec.triangles.sourceBeforeRuntimeTriangulationTotal===79916,
+  && bareSpec.triangles.sourceBeforeRuntimeTriangulationTotal===79918,
   "独立驴制作源登记零重叠烘焙图集与显式运行时三角化；最终GLB的UV覆盖另作独立验证");
 const pectoral=bareSpec.derivation.referenceFit.details;
 const forelegFit=pectoral.legFit;
@@ -343,7 +343,7 @@ Check(legAlbedo.microRatioRange.join(',')==='0.5,2.8'&&legAlbedo.pigmentFinePowe
   &&legAlbedo.hiddenCapMicroRatioRange.join(',')==='0.7,1.5',
   "独立驴可见腿面保留同腿短毛及弯曲毛簇，长条关节光影和隐藏面重复仍受限制");
 const jointFit=pectoral.jointFit,jointArcs=bareSpec.animations.DonkeyWalk.jointArcs;
-Check(bareSpec.version==='20261026ReferenceV45'&&jointFit?.version==='20261026JointFitV35'
+Check(bareSpec.version==='20261026ReferenceV46'&&jointFit?.version==='20261026JointFitV35'
   &&jointFit.maximumInfluences===4&&jointFit.boneCount===28&&jointFit.morphTargetsAdded===0
   &&jointFit.surfaceCorrectionSourcePixels<1&&jointFit.edges.maximumRestSurfaceBoundM<=.0005&&jointFit.edgesAfter.maximumRestSurfaceBoundM<=.0005
   &&jointArcs?.bakeFps===120&&jointArcs.maximumHoofTargetErrorM<.00001&&jointArcs.maximumReachCompressionM<=.006,
@@ -392,6 +392,12 @@ Check(jointPlanes?.version==='20261026JointPlanesV44'&&jointPlanes.maximumDispla
   &&jointPlanes.weightsChanged===false&&jointPlanes.trianglesAdded===0,
   "独立驴关节浅表转折保持闭合与正向映射，保护蹄壳、腿根及既有骨骼蒙皮");
 const hindArch=pectoral.hindArch;
+const chestVolume=pectoral.chestVolume;
+Check(chestVolume?.version==='20261026ChestVolumeV46'&&chestVolume.maximumDisplacementM<=.026
+  &&chestVolume.minimumSampledJacobian>.60&&chestVolume.maximumProtectedDisplacementM===0
+  &&chestVolume.integrity.boundaryEdges===0&&chestVolume.integrity.nonmanifoldEdges===0
+  &&chestVolume.integrity.chestCrossings===0&&chestVolume.bonesChanged===0&&chestVolume.weightsChanged===false,
+  "独立驴胸底体积修正保留闭合表面、正向局部映射与原骨架权重，完整动态另按当前GLB验证");
 Check(hindArch?.version==='20261026HindArchV37'&&hindArch.maximumDisplacementM<=.040
   &&hindArch.maximumProtectedDisplacementM===0&&hindArch.boundaryEdges===0&&hindArch.nonmanifoldEdges===0
   &&hindArch.bonesChanged===0&&hindArch.weightsChanged===false&&hindArch.trianglesAdded===0,
@@ -484,9 +490,9 @@ Check(tiled.attributes.COLOR_0===undefined && tiled.attributes.TEXCOORD_1===unde
   && (bare.json.materials[tiled.material].pbrMetallicRoughness.baseColorTexture.texCoord??0)===0 && (bare.json.materials[tiled.material].normalTexture.texCoord??0)===0,
   "独立驴参考毛色与完整毛簇法线共用唯一UV0，不复用方向错误的毛流法线或重复乘顶点色");
 const legTufts=bareSpec.coat.darkLegTufts;
-Check(legTufts?.wisps===715&&legTufts.reusedFineTriangles===2860&&legTufts.trianglesAdded===0
+Check(legTufts?.wisps===718&&legTufts.reusedFineTriangles===2872&&legTufts.trianglesAdded===0
   &&bareSpec.coat.rootSamples===21000&&legTufts.sourceSha256===legAlbedo.sourceSha256,
-  "独立驴从既有细毛槽位重分配715束参考毛流短毛，保留21,000取样及三角预算");
+  "独立驴从既有细毛槽位重分配718束参考毛流短毛，保留21,000取样及三角预算");
 Check(coatMaterial.alphaMode==="MASK" && Math.abs(coatMaterial.alphaCutoff-.45)<.000001 && coatMaterial.doubleSided===true
   && bareCoat.primitives.every(p=>p.attributes.COLOR_0!==undefined && p.attributes.JOINTS_0!==undefined && p.attributes.WEIGHTS_0!==undefined),
   "独立驴短毛实际带颜色和蒙皮，轮廓毛使用双面MASK 0.45");
