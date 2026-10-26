@@ -8,9 +8,9 @@
 
 `Model/Donkey/Model_Donkey.glb` 是 2026-10-22 按用户要求追加的纯驴版。只从 V3 工程的 `DonkeyEditable` 集合保留身体、眼、耳、鬃尾和轮廓短毛，移除木车、车辕、颈垫、全部套具、笼头与牵绳；不能仅删除 `CartRuntime`，因为原动物运行时网格也合并了套具。原驴车文件与源工程不覆盖。
 
-当前纯驴 V42 为身体／短毛／鬃毛三个导出网格、四个材质，共用 28 根骨骼；在 Three.js 中形成四个绘制网格。当前为 79,892 三角，实际登记以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准，保持 80,000 上限。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。六张无损 WebP 内嵌并有镜像。V30 的 79,992 三角及更早结果保留作历史对照。
+当前纯驴 V43 为身体／短毛／鬃毛三个导出网格、四个材质，共用 28 根骨骼；在 Three.js 中形成四个绘制网格。当前为 79,892 三角，实际登记以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准，保持 80,000 上限。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。六张无损 WebP 内嵌并有镜像。V30 的 79,992 三角及更早结果保留作历史对照。
 
-当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261026/ReferenceFitV42/Scene_Donkey.blend`，其中打包图像、重建脚本及关节配方；`Data_Derivation.json` 记录父工程及冻结 V3 中间源的哈希、组件和拟合量测。原目录保留此前工程。重建命令：
+当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261026/ReferenceFitV43/Scene_Donkey.blend`，其中打包图像、重建脚本及关节配方；`Data_Derivation.json` 记录父工程及冻结 V3 中间源的哈希、组件和拟合量测。原目录保留此前工程。重建命令：
 
 ```powershell
 node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
@@ -19,6 +19,16 @@ node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
 此入口从 `ReferenceFitV4/Scene_DonkeyBeforeReferenceFit.blend` 的冻结纯驴 V3 中间源派生，经测量修形、重解动作、图集重烘、无损打包与实际 GLB 重导测蹄；结束时关闭自己的 Blender 实例。更早从驴车分离纯驴的配方仍在 `Script_DonkeyBake.py` / `Script_DonkeyRefine.py`。独立版的肩颈、头部、全身和行走实测留在外置 `Review/` 目录，本地交互页在 worktree 的 `tmp/Donkey/`。新增资产未布设到关卡。
 
 早期去掉笼头后的近景发现原装饰嘴缝离真实口鼻表面约 3–4 cm；当时将 30 顶点细管的五个截面贴回口鼻。V14 已以连续唇部与 21 截面嘴缝替换该旧做法，当前实际表面距离记录在派生契约；驴车版不改写。
+
+### 纯驴尾刷双视底色与毛流 V43（2026-10-26）
+
+分层查看实际 V42 GLB，确认 480 条实体细丝遮住了照片毛层，且在参考尾刷已经变稀的位置仍形成密集深色块。旧前景公式又以同一亮度差推导透明度和前景色，在未截断区域会将前景亮度回算为固定的 0.018。`Script_DonkeyTailBrush.py` 分开处理内部覆盖率与边缘透明度，恢复原图灰色毛束；场景背景置信过滤和根部渐隐避免矩形薄雾与发片硬边。
+
+沿用 512×256 RGBA 图集，将尾刷原有区域分为侧视、后视两个 384×64 单元。后向发片使用原后视图，两片斜向发片使用原侧视图；主体鬃额毛像素及四材质、六图、三导出网格契约保留。尾刷宽／厚改为 0.132／0.082 m，108 三角及原骨架保留。
+
+`Script_DonkeyTailGroom.py` 按原图侧／后视暗毛覆盖率的单调衰减分配末端高度，沿实测侧向中心线布置每个曲线节点，较低末梢向前弯曲。480 条细丝仍各三段，四节点法线改为沿局部切线平行运输；半宽收为 0.04–0.12 mm。各节点从对应视图的可信毛发像素取色，并补偿既有中性毛纹乘色，避免细丝再次压黑照片毛层。四节点末段 7% 的渐细及原两条动作保留，没有增加三角形。
+
+正式模型按侧／后尾部、全身、头部、腿部及行走检查；实际身体／附属表面的 20,338 个位置、蒙皮、骨骼、逆绑定和 168 条动画轨道与 V42 一致。毛丝与照片毛层的静态试片用于选择配方，交付仍从冻结 V3 重建。该修正不代表关节、细毛与完整三视图已经一致。
 
 ### 纯驴腿部短毛层次 V42（2026-10-26）
 

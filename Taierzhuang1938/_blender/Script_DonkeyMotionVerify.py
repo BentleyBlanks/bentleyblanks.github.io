@@ -141,5 +141,5 @@ def VerifyCurrentDonkey(region='Pectoral'):
 
 if __name__=='__main__' or globals().get('DonkeyAssetName')=='Donkey':
     VerifyCurrentDonkey()
-    if bpy.context.scene.get('DonkeyReferenceFitRevision') in ['20261025ReferenceV32','20261025ReferenceV33','20261026ReferenceV35','20261026ReferenceV36','20261026ReferenceV37','20261026ReferenceV38','20261026ReferenceV39','20261026ReferenceV40','20261026ReferenceV41','20261026ReferenceV42']:VerifyCurrentDonkey('Hind')
-    if bpy.context.scene.get('DonkeyReferenceFitRevision') in ['20261025ReferenceV33','20261026ReferenceV35','20261026ReferenceV36','20261026ReferenceV37','20261026ReferenceV38','20261026ReferenceV39','20261026ReferenceV40','20261026ReferenceV41','20261026ReferenceV42']:VerifyCurrentDonkey('LowerBody')
+    if bpy.context.scene.get('DonkeyReferenceFitRevision') in ['20261025ReferenceV32','20261025ReferenceV33','20261026ReferenceV35','20261026ReferenceV36','20261026ReferenceV37','20261026ReferenceV38','20261026ReferenceV39','20261026ReferenceV40','20261026ReferenceV41','20261026ReferenceV42','20261026ReferenceV43']:VerifyCurrentDonkey('Hind')
+    if bpy.context.scene.get('DonkeyReferenceFitRevision') in ['20261025ReferenceV33','20261026ReferenceV35','20261026ReferenceV36','20261026ReferenceV37','20261026ReferenceV38','20261026ReferenceV39','20261026ReferenceV40','20261026ReferenceV41','20261026ReferenceV42','20261026ReferenceV43']:VerifyCurrentDonkey('LowerBody')

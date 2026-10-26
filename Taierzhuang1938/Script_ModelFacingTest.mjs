@@ -343,7 +343,7 @@ Check(legAlbedo.microRatioRange.join(',')==='0.5,2.8'&&legAlbedo.pigmentFinePowe
   &&legAlbedo.hiddenCapMicroRatioRange.join(',')==='0.7,1.5',
   "独立驴可见腿面保留同腿短毛及弯曲毛簇，长条关节光影和隐藏面重复仍受限制");
 const jointFit=pectoral.jointFit,jointArcs=bareSpec.animations.DonkeyWalk.jointArcs;
-Check(bareSpec.version==='20261026ReferenceV42'&&jointFit?.version==='20261026JointFitV35'
+Check(bareSpec.version==='20261026ReferenceV43'&&jointFit?.version==='20261026JointFitV35'
   &&jointFit.maximumInfluences===4&&jointFit.boneCount===28&&jointFit.morphTargetsAdded===0
   &&jointFit.surfaceCorrectionSourcePixels<1&&jointFit.edges.maximumRestSurfaceBoundM<=.0005&&jointFit.edgesAfter.maximumRestSurfaceBoundM<=.0005
   &&jointArcs?.bakeFps===120&&jointArcs.maximumHoofTargetErrorM<.00001&&jointArcs.maximumReachCompressionM<=.006,
@@ -522,6 +522,12 @@ for(const primitive of bareMane.primitives){
 Check(tailBrushTriangles===108&&tailBrushUvValid&&pectoral.tailGroom.referenceBrush.fibresRetained===480
   &&pectoral.mane.tailBrushAtlas.runtimeImagesAdded===0&&pectoral.mane.tailBrushAtlas.runtimeMaterialsAdded===0,
   "独立驴实际GLB的108三角尾刷使用既有鬃毛图集空区和尾骨，保留480条细毛且不新增图像或材质");
+const tailFlow=pectoral.tailGroom,tailPigment=pectoral.mane.tailBrushAtlas;
+Check(tailFlow.version==='20261026TailFlowV43'&&tailFlow.densityProfile.version==='20261026TailDensityV43'
+  &&tailFlow.halfWidthM.join(',')==='0.00004,0.00012'&&tailFlow.pigmentViews.join(',')==='Side,Rear'
+  &&tailPigment.sourceView==='Side+Rear'&&tailPigment.opaqueHairPreservesPhotoRgbVariation===true
+  &&tailPigment.sideAtlasPixelBox.join(',')==='128,128,512,192'&&tailPigment.rearAtlasPixelBox.join(',')==='128,192,512,256',
+  "独立驴尾丝按原图双视密度分配末端并沿曲线受光，既有图集分别保留侧向和后向毛束底色");
 Check(accessoryMaterial?.doubleSided===true,"独立驴眼、鼻与尾部附属材质保留双面绘制");
 Check(bare.json.animations.length===2 && ["DonkeyWalk","DonkeyIdle"].every(name=>bare.json.animations.some(a=>a.name===name))
   && !bare.json.nodes.some(n=>/^(Cart|Wheel|Harness|Halter)/.test(n.name||"")) && bareMax[2]<1.2,

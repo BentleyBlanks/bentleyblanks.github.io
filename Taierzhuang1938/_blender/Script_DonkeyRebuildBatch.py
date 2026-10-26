@@ -15,7 +15,7 @@ if args.resume:
     bpy.ops.wm.open_mainfile(filepath=str(source))
     if Path(bpy.context.scene.get('DonkeyCartProject','')).resolve()!=project.resolve():raise RuntimeError('Resume source belongs to another project/worktree')
     if not bpy.context.scene.get('DonkeyReferenceFitRevision'):raise RuntimeError('Resume source has not completed the reference fit')
-    if bpy.context.scene['DonkeyReferenceFitRevision']!='20261026ReferenceV42':raise RuntimeError('Resume requires the current V42 source; rebuild from the frozen input to migrate an older source')
+    if bpy.context.scene['DonkeyReferenceFitRevision']!='20261026ReferenceV43':raise RuntimeError('Resume requires the current V43 source; rebuild from the frozen input to migrate an older source')
 else:
     bpy.context.scene['DonkeyCartProject']=str(project);Run('Script_DonkeyReferenceBake.py');Run('Script_DonkeyReferenceRefine.py')
 base=Path(bpy.context.scene['DonkeySourceRoot']);python=os.environ.get('DONKEY_CART_PYTHON','python')
