@@ -8,7 +8,7 @@
 
 - **布料双面吸血（2026-10-25）**：`?cloth=1` 增加薄单被与毛巾织物样片、接触处注入/供血/停供、正反面与折叠检查、独立血迹时间回放。共用 `ClothBlood` 用静止坐标双层格场保留血色，湿润与干燥独立；材质沿用伤口色调、织纹与粗糙度逻辑，不改蒙皮和 MotionVector。仅测试场接入，原剧情、布料默认配置与三件 GLB 保留。相对容量与背渗未作物理实测标定，无流挂/接触转印。见[布料吸血](docs/Data_ClothBlood.md)，门禁 `ClothBloodTest` / `ClothBloodBrowserTest`。
 
-- **共用洞顶 / 板缝落土（2026-10-26 视觉重做）**：`Particles.FallingSoil` / `Vfx.FallingSoil` 共用细土流、有限碰撞实体土块、下落尘帘和贴地起尘；按公开实拍参考重做密度与尺度，并修复尘层继承烟预热而提前过期的问题。三情境参数预设进入现有特效预览，完整参数/曲线/预算可编辑、保存和 JSON 往返。宿主接共享地形/阻挡与运动源，原 01/05 剧情不变。口径 [共用落土](docs/Data_FallingSoil.md)、[参考对照与出图](docs/Data_FallingSoilReference.md)，门禁 `FallingSoilTest` / `FallingSoilBrowserTest`；像素通过不能替代参考画面对照。
+- **共用洞顶 / 板缝落土（2026-10-26 视觉续调）**：`Particles.FallingSoil` / `Vfx.FallingSoil` 共用细土流、有限碰撞实体土块、下落尘帘和贴地起尘；按公开实拍参考调整密度与尺度，七档覆盖轻漏灰、细土、明显落灰、板缝、震落、较重崩落与余土。异相漏点、偏细粒径和尺寸阻力区分过程，灰主导档用薄体积尘云；完整参数/曲线/预算可编辑、保存和 JSON 往返。宿主接共享地形/阻挡与运动源，原 01/05 剧情不变。口径 [共用落土](docs/Data_FallingSoil.md)、[参考对照与出图](docs/Data_FallingSoilReference.md)，门禁 `FallingSoilTest` / `FallingSoilBrowserTest`；像素通过不能替代参考画面对照。
 
 - **信号弹与照明弹（2026-10-25）**：正式 `FlareDirector` 共用可见燃烧体、烟迹、火星与伞降渲染；第一关 AirFirst 与白盒 13-2 接红色信号星，特效编辑器新增两项、弹道/近景/地面镜头及夜间对照。红星类型参考1944年日军手册，白光参考1945年情报所记九五式70毫米的燃烧时间与光强（原文注明未缴获实物）；具体滕县事件、颜色含义和其余参数仍属创作复原。现接实景屋顶碰撞、移动声源与簇光打包阴影。见[信号与照明效果](docs/Data_FlareEffects.md)，门禁 `FlareTest` / `FlareSurfaceTest` / `FlareEffectsBrowserTest` / `FlareCameraBrowserTest` / `FlareWorldBrowserTest` / `FlareShadowBrowserTest`，旧照明弹视距与节奏契约保留。
 

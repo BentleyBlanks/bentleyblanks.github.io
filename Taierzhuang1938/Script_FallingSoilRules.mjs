@@ -8,6 +8,17 @@ const Vec=a=>({x:a[0],y:a[1],z:a[2]});
 const Dot=(a,b)=>a.reduce((sum,n,i)=>sum+n*b[i],0);
 const Length=a=>Math.hypot(...a);
 const Normal=a=>{const n=Length(a);return n>1e-8?a.map(v=>v/n):[0,1,0]};
+// Seeded, continuous release variation. Evaluating at birth time keeps replay
+// independent of frame rate and avoids consuming the particle random stream.
+const FlowWeight=(time,seed,amount,frequency)=>{
+  const clock=time*frequency*Math.PI*2,phase=seed*37.17;
+  const wave=.5+.32*Math.sin(clock+phase)+.18*Math.sin(clock*.417+phase*1.73);
+  return 1-amount+amount*wave*wave*3.2;
+};
+const SizeDrag=(m,size,phase)=>{
+  const reference=Math.sqrt(EvaluateCurve(m.size,phase,0)*EvaluateCurve(m.size,phase,1));
+  return m.drag*Clamp(Math.pow(reference/Math.max(.0001,size),m.sizeDrag),.4,4);
+};
 export function NormalizeSoilPreview(data=FALLING_SOIL_STAGE){
   const result=Clone(FALLING_SOIL_STAGE),limits={groundY:[-3,3],y:[.1,6],x:[-4,4],z:[-4,4],width:[.1,6],depth:[.05,2],height:[.03,.6]};
   function Apply(target,patch){if(!patch||typeof patch!=='object'||Array.isArray(patch))throw new Error('Invalid falling soil preview');
@@ -70,7 +81,7 @@ export class FallingSoilSimulation{
     this.stats={emitted:{grains:0,clods:0,dust:0},dropped:{grains:0,clods:0,dust:0},impacts:0,grainImpacts:0,dustImpacts:0,deposited:0,fragments:0,rays:0,groundSamples:0,probeFallbacks:0,skippedClodChecks:0};
     this.intensityRandom=Mulberry32(this.config.emitter.seed^0x6a85)();
     const random=Mulberry32(this.config.emitter.seed^0x73524),count=this.config.emitter.streams;
-    this.streams=Array.from({length:count},(_,i)=>[(i+.2+random()*.6)/count-.5,random()-.5,random()]);
+    this.streams=Array.from({length:count},(_,i)=>[(i+.2+random()*.6)/count-.5,random()-.5,random()]);this.flowTime=null;
     this.host.onReset?.();return this;
   }
   Configure(patch){this.config=NormalizeFallingSoil({...this.config,...Object.fromEntries(Object.entries(patch).map(([key,value])=>[key,{...this.config[key],...value}]))},this.preset);if(patch.emitter){this.initialEmitter=Clone(this.config.emitter);this.moves=[];}return this.config;}
@@ -96,7 +107,10 @@ export class FallingSoilSimulation{
     if(e.distribution==='streams'||e.distribution==='segments'){
       let index;
       if(e.distribution==='segments')index=Math.floor(Math.max(0,time-this.config.timing.delay)/period)%e.streams;
-      else {const weights=this.streams.map(s=>1-e.densityVariation+s[2]*e.densityVariation*2),total=weights.reduce((sum,n)=>sum+n,0);let weight=random()*total;index=weights.length-1;for(let i=0;i<weights.length;i++){weight-=weights[i];if(weight<=0){index=i;break;}}}
+      else {
+        if(this.flowTime!==time){this.flowTime=time;this.flowWeights=this.streams.map(s=>(1-e.densityVariation+s[2]*e.densityVariation*2)*FlowWeight(time,s[2],e.flowVariation,e.flowFrequency));}
+        const weights=this.flowWeights,total=weights.reduce((sum,n)=>sum+n,0);let weight=random()*total;index=weights.length-1;for(let i=0;i<weights.length;i++){weight-=weights[i];if(weight<=0){index=i;break;}}
+      }
       const stream=this.streams[index%this.streams.length];
       x=e.distribution==='segments'?(index+.5)/e.streams-.5:stream[0];z=stream[1];
       x+=(random()-.5)*e.streamWidth/Math.max(.001,e.width);z+=(random()-.5)*e.streamWidth/Math.max(.001,e.length);
@@ -110,10 +124,10 @@ export class FallingSoilSimulation{
   }
   NewParticle(layer,birth,source=null,impact=false){
     const c=this.config,m=c[layer],random=this.random,phase=Clamp((birth-c.timing.delay)/c.timing.duration,0,1),seed=random();
-    source||=this.Source(birth,random,layer==='dust'?m.sourceSpread:0);const speed=EvaluateCurve(m.speed,phase,random()),size=EvaluateCurve(m.size,phase,random());
+    source||=this.Source(birth,random,layer==='dust'?m.sourceSpread:0);const speed=EvaluateCurve(m.speed,phase,random()),size=EvaluateCurve(m.size,phase,Math.pow(random(),m.sizeBias));
     let velocity=[(random()-.5)*m.spread,-speed,(random()-.5)*m.spread];
     velocity=RotateSoilVector(velocity,source.pose.rotation);if(source.pose.hostRotation)velocity=RotateSoilVector(velocity,source.pose.hostRotation);
-    const drift=layer==='dust'?m.drift:1,drag=m.drag;
+    const drift=layer==='dust'?m.drift:1,drag=SizeDrag(m,size,phase);
     let down=RotateSoilVector([0,-1,0],source.pose.rotation);if(source.pose.hostRotation)down=RotateSoilVector(down,source.pose.hostRotation);
     const p={id:++this.nextId,layer,birth,life:EvaluateCurve(m.life,phase,random()),size,seed,rotation:random()*Math.PI*2,
       origin:source.position.map((n,i)=>n+down[i]*(impact?0:c.emitter.clearance)),velocity,force:c.motion.wind.map((n,i)=>n*drag*drift-(i===1?c.motion.gravity*m.gravity:0)),drag,
@@ -152,7 +166,10 @@ export class FallingSoilSimulation{
   }
   PredictGrain(p){
     const b=this.config.budget;if(p.layer==='grains'?(!b.grainCollision||!this.config.grains.collision):!this.config.dust.collision)return;
-    const key=p.layer+'/'+[...p.origin,...p.velocity].map((n,i)=>Math.round(n/(i<3?b.contactCell:.5))).join(',');
+    // Grain size now changes drag: a coarse grain and a floating fine starting
+    // at the same point can reach different blockers. Keep trajectory families
+    // apart while retaining bounded spatial/temporal probe reuse.
+    const key=p.layer+'/'+[...p.origin,...p.velocity,p.drag,...p.force,p.life].map((n,i)=>Math.round(n/(i<3?b.contactCell:i===6?.25:.5))).join(',');
     const cached=this.cache.get(key);let hit=cached&&this.time-cached.time<=b.contactCacheS?cached.hit:undefined;
     if(hit===undefined){let previous=p.origin;hit=null;
       for(let i=1;i<=b.probeSegments;i++){const age=p.life*i/b.probeSegments,next=SoilTrajectory(p,age).position,h=this.Hit(previous,next,0,true);
@@ -212,6 +229,7 @@ export class FallingSoilSimulation{
         for(let i=0;i<m.fragmentCount;i++){
           const q=this.NewParticle('clods',this.time,{position:p.position,pose:{rotation:[0,0,0]}});
           q.size=p.size*m.fragmentScale;q.radius=q.size*Math.max(...m.aspect)*(this.host.clodRadiusScale??.55);q.generation=p.generation+1;
+          q.drag=SizeDrag(m,q.size,Clamp((this.time-this.config.timing.delay)/this.config.timing.duration,0,1));q.force=this.config.motion.wind.map((n,j)=>n*q.drag-(j===1?this.config.motion.gravity*m.gravity:0));
           q.position=q.position.map((n,j)=>n+hit.normal[j]*(q.radius+L.contactEpsilon));q.origin=[...q.position];
           q.velocity=hit.normal.map(n=>n*m.fragmentSpeed+(this.random()-.5)*m.fragmentSpeed);fragments.push(q);
         }
@@ -241,7 +259,7 @@ export class FallingSoilSimulation{
     const distanceScale=b.fadeDistance?Clamp((b.distance-distance)/b.fadeDistance,0,1):1;
     this.eventAccumulator+=t.frequency*dt;const events=Math.floor(this.eventAccumulator+1e-9);this.eventAccumulator-=events;
     if(!events)return;
-    const strength=EvaluateCurve(t.intensity,t.mode==='once'?phase:(age%t.duration)/t.duration,this.intensityRandom)*events*t.quantity*b.qualityScale*(this.host.qualityScale??1)*distanceScale;
+    const strength=EvaluateCurve(t.intensity,t.mode==='once'?phase:(age%t.duration)/t.duration,this.intensityRandom)*events*t.quantity*b.qualityScale*(this.host.qualityScale??1)*distanceScale*FlowWeight(age,this.intensityRandom,t.variation,t.variationFrequency);
     for(const layer of ['clods','grains','dust']){
       const m=c[layer];if(!m.enabled||!m.maxParticles)continue;
       this.accumulator[layer]+=strength*m.amount;const count=Math.min(4096,Math.floor(this.accumulator[layer]));this.accumulator[layer]-=count;

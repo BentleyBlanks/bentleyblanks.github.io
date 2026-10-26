@@ -486,17 +486,19 @@ void main() {
   mask=1.0-smoothstep(edge-.14,edge,length(p*vec2(1.0,.8)));
   color*=.72+.35*grit;
 #elif defined(SHAPE_SOILVEIL)
-  // A packet of descending fines: connected granular strands rather than
-  // independent smoke balls. Texture advection is downward, like the grains.
+  // Porous descending fines, with gaps through the body. A positive density
+  // floor here accumulates into opaque upright ribbons as packets overlap.
+  // Coarse breakup moves down with the granular detail; it never billows up.
   float y=p.y*.5+.5;
   float clock=y+vAgeS*uSoilArt.w;
-  float bend=(Vnoise(vec2(y*3.1+vSeed*17.,vAgeS*.35))-.5)*.28;
-  float width=.58+.18*Vnoise(vec2(y*4.+vSeed*29.,vAgeS*.2));
+  float bend=(Vnoise(vec2(clock*2.1+vSeed*17.,vAgeS*.23))-.5)*.48;
+  float width=.42+.38*Vnoise(vec2(clock*3.+vSeed*29.,p.x*.8));
   float across=1.-smoothstep(uSoilArt.z,1.,abs(p.x-bend)/width);
-  float drift=Vnoise(vec2(p.x*2.4+vSeed*31.,clock*uSoilArt.y));
-  float detail=Vnoise(vec2(p.x*8.1+vSeed*13.,clock*uSoilArt.y*3.7));
+  float breakup=Vnoise(vec2(p.x*3.6+vSeed*47.,clock*4.3+vSeed*7.));
+  float drift=Vnoise(vec2(p.x*uSoilArt.y+vSeed*31.,clock*2.4));
+  float detail=Vnoise(vec2(p.x*uSoilArt.y*3.7+vSeed*13.,clock*7.1));
   float ends=smoothstep(0.,.24,y)*(1.-smoothstep(.77,1.,y));
-  mask=across*ends*(.38+.62*drift)*(.78+.22*detail);
+  mask=across*ends*smoothstep(.14,.65,breakup)*(.35+.65*drift)*(.6+.4*detail);
   color*=.9+.1*detail;
 #elif defined(SHAPE_PUFF)
   // 烟/尘：两层不同尺度的噪声让每一片都是一团卷起来的絮，而不是一张

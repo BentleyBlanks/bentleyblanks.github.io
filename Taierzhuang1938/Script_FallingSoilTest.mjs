@@ -38,8 +38,9 @@ const layers=Run(new FallingSoilSimulation({grains:{enabled:false},clods:{enable
 assert.deepEqual(layers.stats.emitted,{grains:0,clods:0,dust:0});
 const continuous=Run(new FallingSoilSimulation({timing:{mode:'continuous',duration:.2}},host),1);
 assert.equal(continuous.emitting,true,'continuous source outlives its intensity-curve period');
-const packets=new FallingSoilSimulation({timing:{mode:'continuous',frequency:1,quantity:10,intensity:1},grains:{amount:1,collision:false},clods:{enabled:false},dust:{enabled:false}},{});
+const packets=new FallingSoilSimulation({timing:{mode:'continuous',frequency:1,quantity:10,intensity:1,variation:0},grains:{amount:1,collision:false},clods:{enabled:false},dust:{enabled:false}},{});
 Run(packets,.5);assert.equal(packets.stats.emitted.grains,0,'frequency controls packet cadence, independently of quantity');Run(packets,.5);assert.equal(packets.stats.emitted.grains,10);
+Run(packets,1);assert.equal(packets.stats.emitted.grains,20,'zero timing variation preserves exact authored packet quantities');
 const pulse=Run(new FallingSoilSimulation({timing:{mode:'pulse',pulseOn:.1,pulseOff:.9,intensity:1},clods:{enabled:false},dust:{enabled:false}},host),.3);
 const pulseCount=pulse.stats.emitted.grains;Run(pulse,.6);assert.equal(pulse.stats.emitted.grains,pulseCount,'pulse off interval emits nothing');
 const once=Run(new FallingSoilSimulation({},host),.4),firstCount=once.stats.emitted.grains;Run(once,2);const beforeTail=once.stats.emitted.grains;Run(once,.4);
@@ -66,4 +67,89 @@ assert.ok(deposited.stats.deposited>0&&deposited.settledCount>0,'falling fines l
 for(const p of deposited.grains.filter(p=>p.settled)){assert.deepEqual(p.velocity,[0,0,0]);assert.deepEqual(p.force,[0,0,0]);assert.ok(Math.abs(p.origin[1]-host.groundAt(p.origin[0],p.origin[2]))<.04);}
 assert.ok(deposited.settledCount<=deposited.config.grains.maxDeposits,'retention has its own bounded sub-budget');
 assert.ok(deposited.dust.filter(p=>!p.impact).every(p=>p.velocity[1]<0&&p.force[1]<0),'primary dust descends rather than receiving fire buoyancy');
-console.log('ok falling soil: complete schema, deterministic contacts/replay, moving sources/world space, point/line/area, sloped terrain, blockers, impact dust, finite fragments, layer switches, pulses, drain and budgets');
+
+// Isolate grain-size sampling from contacts, lifetime culling and emission
+// counts: changing the distribution must favour small grains, not just scale
+// every grain down or create a second population beyond the authored range.
+const SizeSamples=(sizeBias,sizeDrag=0)=>{
+  const sim=new FallingSoilSimulation({motion:{wind:[0,0,0],turbulence:0},grains:{size:{mode:'twoConstants',min:.001,max:.005},sizeBias,sizeDrag,drag:.7,speed:0,collision:false}},{});
+  return Array.from({length:2048},()=>sim.NewParticle('grains',0));
+};
+const uniformSizes=SizeSamples(1),fineSizes=SizeSamples(3),Mean=list=>list.reduce((sum,p)=>sum+p.size,0)/list.length;
+assert.ok(Mean(fineSizes)<Mean(uniformSizes)*.75,'size bias creates a fine-dominant distribution at the same size limits');
+assert.ok(fineSizes.every(p=>p.size>=.001&&p.size<=.005)&&fineSizes.some(p=>p.size>.0045),'rare coarse grains remain within the same authored range');
+assert.ok(uniformSizes.every(p=>p.drag===.7),'sizeDrag zero preserves the authored drag for every size');
+const sortedDrag=SizeSamples(1,1).sort((p,q)=>p.size-q.size),small=sortedDrag.slice(0,256),large=sortedDrag.slice(-256);
+const MeanDrag=list=>list.reduce((sum,p)=>sum+p.drag,0)/list.length;
+const MeanDrop=list=>list.reduce((sum,p)=>sum+p.origin[1]-SoilTrajectory(p,.8).position[1],0)/list.length;
+assert.ok(MeanDrag(small)>MeanDrag(large)*2,'small grains have materially stronger drag than large grains');
+assert.ok(MeanDrop(small)<MeanDrop(large)*.9,'size-dependent drag produces slower fine-grain descent under equal gravity');
+assert.deepEqual(SizeSamples(3,1),SizeSamples(3,1),'size distribution and aerodynamic variation remain seeded and repeatable');
+
+// Same origin and initial velocity, different aerodynamic drag: the coarse
+// trajectory reaches a narrow beam, while the strongly damped fine grain
+// remains near the source and falls past that beam to the floor. Reusing the
+// first contact plane for the second particle would create a floating impact.
+const narrowBeamY=1.5,dragContacts=new FallingSoilSimulation({budget:{probeSegments:8}}, {groundAt:()=>0,
+  raycast:(from,dir,distance)=>{if(dir.y>=0)return null;const t=(narrowBeamY-from.y)/dir.y,x=from.x+dir.x*t;
+    return t>=0&&t<=distance&&x>.7&&x<1.4?{t,normal:[0,1,0]}:null;}});
+dragContacts.checks=0;
+const ContactWithDrag=drag=>{
+  const p=Object.assign(dragContacts.NewParticle('grains',0),{origin:[0,3,0],velocity:[2,-.5,0],force:[0,-9.81,0],drag,life:3,noise:null});
+  dragContacts.PredictGrain(p);return p.contact;
+};
+const coarseContact=ContactWithDrag(.1),fineContact=ContactWithDrag(6);
+assert.ok(coarseContact&&Math.abs(coarseContact.position[1]-narrowBeamY)<.03,'low-drag grain reaches the actual narrow beam');
+assert.ok(fineContact&&Math.abs(fineContact.position[1])<.03,'high-drag grain misses the beam and reaches the actual floor, independent of the contact cache');
+
+// The temporal modulation changes density, not the frequency clock. Sample
+// whole fixed-cadence packets so packet-count differences cannot masquerade
+// as the intended changes in quantity.
+const PacketSizes=variation=>{
+  const sim=new FallingSoilSimulation({timing:{mode:'continuous',frequency:4,quantity:1,intensity:1,variation,variationFrequency:1.4},
+    grains:{amount:30,collision:false,deposit:false,maxParticles:4096},clods:{enabled:false},dust:{enabled:false}},{});
+  let previous=0;return Array.from({length:12},()=>{Run(sim,.25);const count=sim.stats.emitted.grains-previous;previous=sim.stats.emitted.grains;return count;});
+};
+assert.deepEqual(PacketSizes(0),Array(12).fill(30),'turning variation off restores the original cadence contract');
+const variedPackets=PacketSizes(.85);assert.ok(Math.max(...variedPackets)-Math.min(...variedPackets)>10,'strong variation produces visible sparse and dense intervals');
+assert.deepEqual(PacketSizes(.85),variedPackets,'temporal modulation replays deterministically');
+const StreamSamples=(flowVariation,time)=>{
+  const sim=new FallingSoilSimulation({emitter:{shape:'area',distribution:'streams',streams:5,streamWidth:0,flowVariation,flowFrequency:1.4}},{});
+  return Array.from({length:256},()=>sim.Source(time).position);
+};
+assert.deepEqual(StreamSamples(0,.25),StreamSamples(0,1.6),'zero flow variation keeps the original fixed stream weighting');
+const earlyStreams=StreamSamples(.95,.25),laterStreams=StreamSamples(.95,1.6);
+assert.ok(earlyStreams.filter((p,i)=>p[0]!==laterStreams[i][0]).length>40,'individual streams change density independently over time');
+assert.deepEqual([...new Set(earlyStreams.map(p=>p[0]))].sort(),[...new Set(laterStreams.map(p=>p[0]))].sort(),'flow modulation changes density while keeping the leak openings fixed');
+assert.deepEqual(laterStreams,StreamSamples(.95,1.6),'source-density modulation remains seeded and repeatable');
+
+const presetIds=['SoilDustSift','SoilDustFall','SoilFineTrickle','SoilPlankLeak','SoilCeilingShake','SoilHeavyCrumble','SoilBrokenEdge'];
+assert.ok(presetIds.every(id=>Object.hasOwn(FALLING_SOIL_PRESETS,id)),'all seven authored leak/dust degrees remain available');
+const presetStats={};
+for(const preset of presetIds){
+  const births={grains:0,clods:0,primaryDust:0,impactDust:0,solidVolume:0,grainSize:0};
+  const sim=new FallingSoilSimulation({}, {groundAt:()=>0,onEmit:(layer,p)=>{
+    if(layer==='dust')births[p.impact?'impactDust':'primaryDust']++;
+    else if(!p.settled){births[layer]++;if(!p.generation)births.solidVolume+=p.size**3;if(layer==='grains')births.grainSize+=p.size;}
+  }},preset);
+  for(let step=0;step<240;step++){
+    sim.Update(1/60);const state=sim.Inspect();
+    assert.equal(state.fallingDust+state.impactDust,state.live.dust,'falling and contact dust share one bounded layer: '+preset);
+    assert.ok(state.live.dust<=Math.min(sim.config.dust.maxParticles,FALLING_SOIL_LIMITS.dust),'combined primary/contact dust budget: '+preset);
+    assert.ok(state.live.grains<=sim.config.grains.maxParticles&&state.live.clods<=sim.config.clods.maxParticles,'solid budgets: '+preset);
+  }
+  assert.ok(births.grains+births.clods+births.primaryDust>0,'preset emits real material: '+preset);
+  assert.deepEqual(sim.stats.dropped,{grains:0,clods:0,dust:0},'authored degrees do not collapse into saturated budgets: '+preset);
+  assert.deepEqual(NormalizeFallingSoil(JSON.parse(JSON.stringify(sim.config)),preset),sim.config,'all preset art and dynamics fields survive JSON: '+preset);
+  presetStats[preset]={...births,meanGrainSize:births.grainSize/Math.max(1,births.grains),dropped:sim.stats.dropped};
+}
+assert.equal(presetStats.SoilDustSift.clods,0,'floating dust does not acquire coarse clods from shared defaults');
+assert.equal(presetStats.SoilDustFall.clods,0,'stronger falling dust is still dust-dominant, without inherited clods');
+assert.equal(presetStats.SoilFineTrickle.clods,0,'fine leakage stays free of coarse falling chunks');
+assert.ok(presetStats.SoilDustSift.primaryDust>0,'light dust still has an actual descending dust population');
+assert.ok(presetStats.SoilDustFall.primaryDust>presetStats.SoilDustSift.primaryDust*1.5,'stronger falling dust has more descending material than the light sift');
+assert.ok(presetStats.SoilDustSift.primaryDust/presetStats.SoilDustSift.grains>presetStats.SoilFineTrickle.primaryDust/presetStats.SoilFineTrickle.grains*5,'light dust and fine soil have distinct dust-to-grain ratios');
+assert.ok(presetStats.SoilFineTrickle.solidVolume>presetStats.SoilDustSift.solidVolume*2,'fine leakage contains more solid material than light dust');
+assert.ok(presetStats.SoilHeavyCrumble.solidVolume>presetStats.SoilCeilingShake.solidVolume*1.5,'heavy crumbling adds physical solid volume, not only opacity');
+assert.ok(presetStats.SoilFineTrickle.meanGrainSize<presetStats.SoilHeavyCrumble.meanGrainSize,'fine and heavy degrees retain distinct grain-size populations');
+console.log('ok falling soil: complete schema, deterministic contacts/replay, moving sources/world space, point/line/area, sloped terrain, blockers, impact dust, finite fragments, layer switches, pulses, drain, size-biased grains, aerodynamic separation, variable density and seven bounded degrees',JSON.stringify(presetStats));

@@ -18,6 +18,8 @@ export class FallingSoilInspector{
     const open=new Set([...this.parent.querySelectorAll('details[open]')].map(el=>el.dataset.soilGroup));
     this.parent.replaceChildren();if(!this.selected){Note(this.parent,'在效果库中选择任一“落土”预设。');return;}
     const config=this.Config(),top=Section(this.parent,'共用落土效果 · 三层可独立组合');
+    const preset=Select(top,'漏土 / 灰程度',Object.entries(PRESETS).map(([value,spec])=>({value,label:spec.label})),this.editor.effectId,id=>this.editor.SelectEffect(id));
+    preset.root.dataset.soilPreset='true';Note(top,PRESETS[this.editor.effectId].note);
     Note(top,'真实米制；本页来源、物理和美术数值均可保存。修改后按同一种子重建当前时刻，立即可见。常规效果的整体缩放不改变本页的米制参数。');
     ButtonRow(top,[{label:'停发 · 自然收尾',onClick:()=>{if(this.id){this.api.Stop(this.id);this.editor.paused=false;}}},
       {label:'近看土流 / 触地尘',onClick:()=>this.Frame('flow')},{label:'检查单个土块',onClick:()=>this.Frame(true)},{label:'看全程',onClick:()=>this.Frame(false)}]);

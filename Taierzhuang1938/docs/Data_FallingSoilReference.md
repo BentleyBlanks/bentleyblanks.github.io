@@ -24,7 +24,17 @@
 
 本轮将所有显式子层统一为零预热的同一时钟，独立检查下落尘与触地尘的实际像素。细粒改为密集、非发光的短运动拖痕；细尘以向下平流的连续尘帘表现，贴地尘用柔和的土尘体积密度场。烟火继续使用原烟团密度场。土块缩小、增加尺寸/明暗层级；细土可在采样接触面有限留存。来源参照改成有厚度的土层与板缝，复用项目地面/木料材质。
 
-所有新行为与美术项仍在 `Data_Tuning_FallingSoil`，由同一字段表进入界面和 JSON。原三层开关、三情境预设、固定种子、世界坐标、宿主地形/射线、暂停/回放、资源和画质预算保留。
+所有新行为与美术项仍在 `Data_Tuning_FallingSoil`，由同一字段表进入界面和 JSON。原三层开关、三情境预设 ID、固定种子、世界坐标、宿主地形/射线、暂停/回放、资源和画质预算保留。
+
+## 不同程度的续调
+
+用户要求继续接近现实、补足多种漏土与灰的程度。续调保留原三种 ID，新增轻微漏灰、少量细土、明显落灰和较重崩落，共七档；参数页顶部可直接切换，每档说明用途。详见[预设表](Data_FallingSoil.md#七种预设)。
+
+本轮定位到尘帘中心噪声有非零密度下限，叠加后变成固定竖带。新包络允许穿透空隙，细节沿下行方向拉开；各漏点按种子独立起伏，整源也有疏密变化。尺寸采样偏向小颗粒，较小粒受更多阻力，粗粒下落较快。首碰缓存把阻力、受力和寿命纳入轨迹分类，防止同起点的粗细粒误用不同阻挡面。
+
+轻漏灰与明显落灰使用低重力、高阻力的薄体积尘云，不沿用混砂流的纤维尘帘。细土档不混入实体土块；中重档才加入有限翻滚/碎裂和较明显的接触残留。细粒接触起尘量减少，避免二次尘挤满预算、把轻重档都糊成同一团。所有参数为依据可见结构的艺术近似，未作土质和流量实测标定。
+
+续调的本地验收检查各档的起落、峰值、触地与尾段；重档另录制正式渲染器的无声八秒视频。七档浏览器检查覆盖实际尘像素、原生程度选择、逐档 JSON 恢复、暂停/回放、碰撞与资源释放。参考仍是上述实拍静帧；不把本轮录制的游戏视频宣称为新增的真实录像参考。
 
 ## 复查方式
 
@@ -34,6 +44,7 @@
 node scripts/Script_LocalPreview.mjs 8116 --no-open
 node Taierzhuang1938/Script_FallingSoilReferenceShots.mjs --base=http://127.0.0.1:8116 --label=Review --effects=SoilCeilingShake --times=.35,.75,1.2,1.8,3.2 --views=all,grains,dust
 node Taierzhuang1938/Script_FallingSoilReferenceShots.mjs --base=http://127.0.0.1:8116 --label=Context --effects=SoilCeilingShake --times=1.2 --context=1 --record=8
+node Taierzhuang1938/Script_FallingSoilReferenceShots.mjs --base=http://127.0.0.1:8116 --label=Degrees --effects=SoilDustSift,SoilFineTrickle,SoilDustFall,SoilPlankLeak,SoilCeilingShake,SoilHeavyCrumble,SoilBrokenEdge --times=.6,1.8,4.2
 ```
 
 脚本始终驱动正式特效编辑器、材质和后处理。观察原视口为 1440×900，不靠改变响应式布局或渲染分辨率缩图。形态对照固定同一米制相机：距 5 m、目标高 1.52 m、偏航 π+0.15、俯仰 0.04；对照帧隐藏来源参照/中途横木，只看落土与地面。`context=1` 则保留正常编辑器来源参照和观察镜头。原图、长边不超过 640 的观察图、视频和报告仅在 `_shots/FallingSoilReference/`，不提交。

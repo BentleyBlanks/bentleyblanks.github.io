@@ -11,15 +11,17 @@ float ParticleDensity(vec3 p,float seed,float clock){
  float lobes=body*(.35+n.r*1.65)+(n.g-.53)*1.2-.2;
  return smoothstep(-.08,.58,lobes)*(1.-smoothstep(.48,1.,dot(p,p)));
 }
-// Fines dispersed through air have a continuous soft envelope and fine-scale
-// variation. Smoke's cut-out lobes and upward curling are the wrong silhouette.
+// Dust has porous, advected density rather than a solid spherical core or
+// smoke's rising lobes. Reuse the same two noise reads and sampler budget.
 float ParticleSoilDensity(vec3 p,float seed,float clock){
  vec3 flow=vec3(seed*7.7,seed*13.1+clock*.12,seed*3.7);
  p.xy+=sin(p.yx*2.7+seed*19.)*.025;
  vec2 coarse=texture(uParticleDensity,p*.85+flow).rg;
  float fine=texture(uParticleDensity,p*3.4+flow*1.7).b;
- float envelope=1.-smoothstep(.05,1.,dot(p,p));
- return envelope*(.55+.45*coarse.r)*(.82+.18*fine)*.75;
+ vec3 warped=p+vec3(coarse.g-.5,0.,coarse.r-.5)*.18;
+ float envelope=1.-smoothstep(.02,1.,dot(warped,warped));
+ float pores=smoothstep(.32,.68,coarse.r+(fine-.5)*.3);
+ return envelope*pores*(.45+.55*fine)*1.1;
 }
 `;
 export function AcquireParticleDensity(shared){

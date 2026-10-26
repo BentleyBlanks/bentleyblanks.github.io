@@ -4,6 +4,16 @@ import path from 'node:path';
 import sharp from 'sharp';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
+import {FALLING_SOIL_PRESETS} from './Data_Tuning_FallingSoil.mjs';
+const presetCases=[
+ {id:'SoilDustSift',time:1.2,clods:false,dustPixels:100},
+ {id:'SoilDustFall',time:1.2,clods:false,dustPixels:1000},
+ {id:'SoilFineTrickle',time:1.2,clods:false,dustPixels:100},
+ {id:'SoilPlankLeak',time:2.65,clods:true,dustPixels:1000,impacts:true},
+ {id:'SoilCeilingShake',time:1.2,clods:true,dustPixels:1000,impacts:true},
+ {id:'SoilHeavyCrumble',time:1.2,clods:true,dustPixels:1000,impacts:true},
+ {id:'SoilBrokenEdge',time:1.2,clods:true,dustPixels:1000,impacts:true,impactTime:2.65},
+];
 const root=path.resolve(import.meta.dirname,'..'),out=path.join(import.meta.dirname,'_shots','FallingSoil');
 const baseArg=process.argv.find(arg=>arg.startsWith('--base='))?.slice(7),online=process.argv.includes('--online');
 await fs.mkdir(out,{recursive:true});const server=baseArg?null:await ServeRoot(root,0),browser=await LaunchBrowser({extraArgs:['--mute-audio']});
@@ -16,7 +26,7 @@ try{
    await page.goto(base+'/Taierzhuang1938/?editor=tools&tool=vfx&effect=SoilCeilingShake&manual=1&menu=0&audio=0'+(quality?'&quality='+quality:''),{waitUntil:'domcontentloaded',timeout:300000});
    try{await page.waitForFunction(()=>!!window.Tengxian?.ParticleEditor?.panel,null,{timeout:300000});}
    catch(error){console.log('STARTUP',await page.locator('body').innerText());await Capture('StartupFailure');throw error;}
-   console.log('editor ready',quality||'whitebox');
+   console.log('editor ready',quality||'default');
    await page.evaluate(()=>{const e=Tengxian.ParticleEditor;e.loop=false;e.SelectEffect('SoilCeilingShake');});
  };
  const Capture=async label=>{const bytes=await page.screenshot();await fs.writeFile(path.join(out,label+'.png'),bytes);
@@ -42,15 +52,35 @@ try{
  const baseline=await page.evaluate(()=>JSON.stringify(Tengxian.ParticleEditor.savedParticleEffects.Inspect()));
  const baselineSolidRoots=await page.evaluate(()=>Tengxian.scene.children.filter(o=>o.name==='FallingSoilSolidRoot').length);
  report.presets=[];
- for(const preset of ['SoilCeilingShake','SoilPlankLeak','SoilBrokenEdge']){
-   await page.evaluate(preset=>{const e=Tengxian.ParticleEditor;e.SelectEffect(preset);e.Seek(preset==='SoilPlankLeak'?2.65:1.2);Tengxian.StepFrames(2,0,true);},preset);
+ for(const sample of presetCases){
+   const preset=sample.id;
+   await page.click('[data-vfx-tab="soil"]');
+   const selector=page.locator('select[data-soil-preset]');
+   assert.equal(await selector.locator('option[value="'+preset+'"]').textContent(),FALLING_SOIL_PRESETS[preset].label,'degree appears in the native picker');
+   await selector.selectOption(preset);
+   assert.equal(await page.evaluate(()=>Tengxian.ParticleEditor.effectId),preset,'native degree picker selects the true effect');
+   await page.evaluate(time=>{Tengxian.ParticleEditor.Seek(time);Tengxian.StepFrames(2,0,true);},sample.time);
    const result=await Pixels();assert.ok(result.changed>35,'real sand/clod/dust pixels: '+JSON.stringify(result));
    await Capture(preset);console.log('preset pixels',preset,JSON.stringify(result));
-   assert.ok(result.soil.live.grains>0&&result.soil.live.clods>0&&result.soil.live.dust>0,'all three layers are alive in '+preset+': '+JSON.stringify(result.soil));
+   assert.ok(result.soil.live.grains>0&&result.soil.live.dust>0,'authored fine material and dust are alive in '+preset+': '+JSON.stringify(result.soil));
+   if(sample.clods)assert.ok(result.soil.live.clods>0,'coarse-material degree has real clods: '+preset);
+   else assert.equal(result.soil.live.clods,0,'light dust/fine leakage does not inherit unwanted clods: '+preset);
    for(const layer of Object.values(result.soil.renderLayers))assert.ok(Math.abs(layer.time-result.soil.time)<1e-7,'explicit layer clocks match composite time, without inherited smoke prewarm');
-   const dustPixels=await Pixels('dust');assert.ok(dustPixels.changed>1000,'dust itself has visible GPU pixels in '+preset+': '+dustPixels.changed);
+   const dustPixels=await Pixels('dust');assert.ok(dustPixels.changed>sample.dustPixels,'dust itself has visible GPU pixels in '+preset+': '+dustPixels.changed);
    result.dustPixels=dustPixels.changed;
-   assert.ok(result.soil.impacts>0,'clods hit ground or beam');report.presets.push({preset,...result});
+   if(sample.impacts){
+     // A sparse edge release deliberately starts later than the initial
+     // shake; keep its early visual check, then inspect the contact phase.
+     const contact=sample.impactTime?await page.evaluate(time=>{Tengxian.ParticleEditor.Seek(time);return Tengxian.ParticleEditor.soil.Inspect();},sample.impactTime):result.soil;
+     assert.ok(contact.impacts>0,'clods hit ground or beam in '+preset);result.contactTime=contact.time;result.contactImpacts=contact.impacts;
+   }
+   await page.click('[data-vfx-tab="presets"]');await page.getByRole('button',{name:'生成 JSON',exact:true}).click();
+   const presetJson=JSON.parse(await page.locator('[data-vfx-preset]').inputValue());
+   assert.equal(presetJson.effect,preset);assert.equal(presetJson.soil.preset,preset);
+   await page.evaluate(()=>Tengxian.ParticleEditor.SelectEffect('MuzzleRifle'));
+   await page.click('[data-vfx-tab="presets"]');await page.getByRole('button',{name:'导入 JSON',exact:true}).click();
+   assert.deepEqual(await page.evaluate(()=>JSON.parse(JSON.stringify(Tengxian.ParticleEditor.Export()))),presetJson,'every degree restores through the native JSON workflow: '+preset);
+   result.jsonRestored=true;report.presets.push({preset,...result});
  }
  await page.evaluate(()=>{const e=Tengxian.ParticleEditor;e.SelectEffect('SoilCeilingShake');e.Seek(.2);Tengxian.StepFrames(2,0,true);});
  report.impactBefore=await Pixels('impact');assert.equal(report.impactBefore.changed,0,'no contact puff before any material reaches a surface');
@@ -90,12 +120,23 @@ try{
  const height=page.locator('[data-soil-field="emitter.position.1"]');await height.fill('4.25');await height.press('Tab');
  assert.equal(await page.evaluate(()=>Tengxian.ParticleEditor.soil.Config().emitter.position[1]),4.25);
  assert.equal(await page.evaluate(()=>Tengxian.ParticleEditor.soil.source.position.y),4.25,'numeric input moves the actual emission reference');
- await page.locator('[data-soil-group="grains"] > summary').click();
+ const NudgeSoilSlider=async field=>{
+   const group=page.locator('[data-soil-group="'+field.split('.')[0]+'"]');
+   if(!await group.evaluate(el=>el.open))await group.locator('summary').click();
+   const input=page.locator('[data-soil-field="'+field+'"]'),before=Number(await input.inputValue());
+   await input.press('ArrowRight');const after=Number(await input.inputValue());assert.ok(after>before,'native slider keyboard input changes '+field);return after;
+ };
+ const flowVariation=await NudgeSoilSlider('emitter.flowVariation'),timingVariation=await NudgeSoilSlider('timing.variation');
+ assert.equal(await page.locator('[data-soil-field="emitter.flowFrequency"]').count(),1);
+ assert.equal(await page.locator('[data-soil-field="timing.variationFrequency"]').count(),1);
+ const sizeBias=await NudgeSoilSlider('grains.sizeBias'),sizeDrag=await NudgeSoilSlider('grains.sizeDrag');
  await page.locator('[data-soil-field="grains.enabled"]').click();
  assert.equal(await page.evaluate(()=>Tengxian.ParticleEditor.soil.Inspect().live.grains),0,'layer switches affect the true simulation immediately');
  await page.locator('[data-soil-field="grains.enabled"]').click();
  await page.click('[data-vfx-tab="presets"]');await page.getByRole('button',{name:'生成 JSON',exact:true}).click();
  const exported=JSON.parse(await page.locator('[data-vfx-preset]').inputValue());assert.equal(exported.soil.config.emitter.position[1],4.25);
+ assert.equal(exported.soil.config.emitter.flowVariation,flowVariation);assert.equal(exported.soil.config.timing.variation,timingVariation);
+ assert.equal(exported.soil.config.grains.sizeBias,sizeBias);assert.equal(exported.soil.config.grains.sizeDrag,sizeDrag);
  await page.evaluate(()=>Tengxian.ParticleEditor.SelectEffect('MuzzleRifle'));
  await page.click('[data-vfx-tab="presets"]');await page.getByRole('button',{name:'导入 JSON',exact:true}).click();
  assert.deepEqual(await page.evaluate(()=>JSON.parse(JSON.stringify(Tengxian.ParticleEditor.Export()))),exported,'complete preset survives another effect and JSON import');
