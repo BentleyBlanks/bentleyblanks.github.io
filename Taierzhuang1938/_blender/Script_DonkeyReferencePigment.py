@@ -110,6 +110,11 @@ def InstallReferencePigment(scene,skin,rig,base):
         'linearGain':gain,'linearGainRgb':[.50,.515,.55],'mixStrength':mixStrength,'headTransitionY':[.88,.98],
         'headMixStrength':.88,'eyeProtectionRadiiM':list(eyeProtection),'nasalCavityProtection':'source cavity and oral crease/highlight footprints excluded from colour projection',
         'fineCompensation':{'radiusPixels':1,'amount':1.25,'sourceSampling':'Closest during offline bake; ordinary filtered runtime sampler unchanged'},'images':records,'materials':materials,
+        'visibleOriginalEyes':{'frontalEyePixels':[[103,259],[213,259]],'frontalBrowPixels':[[103,246],[213,246]],
+            'eyeGuideWeights':[float(occlusion['Front'][259,103]),float(occlusion['Front'][259,213])],
+            'browGuideWeights':[float(occlusion['Front'][246,103]),float(occlusion['Front'][246,213])],
+            'apertureShadowExclusion':[float(facialFeatures['Front'][259,103]),float(facialFeatures['Front'][258,213])],
+            'method':'visible original eye hoods/brows are not tack; only aperture shading is withheld from pigment projection'},
         'sources':[{'path':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()} for path in paths],
         'runtime':'offline UV0 bake into existing 2K base; no additional runtime image, material, camera projection or shader'}
     (base/'SourceTextures/Data_ReferencePigment.json').write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8');return record

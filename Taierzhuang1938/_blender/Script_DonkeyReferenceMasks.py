@@ -15,8 +15,11 @@ def BuildOcclusionMasks(width=1536,height=1024):
     Stroke(side,[(498,270),(480,294),(460,316),(438,337),(429,345)],14)
     Stroke(side,[(359,317),(396,328),(434,339),(463,344)],11)
     Stroke(side,[(463,344),(443,375),(429,411),(425,437)],13)
-    Stroke(front,[(110,175),(105,220),(100,270),(105,325)],13)
-    Stroke(front,[(212,170),(220,225),(225,270),(217,325)],13)
+    # The frontal brows and eyes are visible original coat. The old long
+    # strokes passed straight through them and replaced them with guide eyes.
+    # Keep only the actual cheek/halter junction below the visible eye hood.
+    Stroke(front,[(91,300),(103,325)],11)
+    Stroke(front,[(224,300),(217,325)],11)
     Stroke(front,[(96,338),(124,317),(160,318),(193,326),(221,346)],13)
     Stroke(front,[(103,315),(87,342),(80,361),(84,375)],13)
     Stroke(front,[(212,322),(228,345),(235,371)],13)
@@ -31,6 +34,8 @@ def BuildOcclusionMasks(width=1536,height=1024):
         if not front[min(height-1,int(v*height/1024)),min(width-1,int(u*width/1536))]:raise RuntimeError('Observed front-view tack pixel is not masked')
     for u,v in ((156,380),(134,402),(182,402)):
         if front[min(height-1,int(v*height/1024)),min(width-1,int(u*width/1536))]:raise RuntimeError('Visible front muzzle was masked as tack')
+    for u,v in ((103,246),(103,259),(213,246),(213,259)):
+        if front[min(height-1,int(v*height/1024)),min(width-1,int(u*width/1536))]:raise RuntimeError('Visible original eye/brow was masked as tack')
     return result
 
 def BuildOcclusionWeights(width=1536,height=1024):
@@ -51,7 +56,7 @@ def BuildFacialFeatureWeights(width=1536,height=1024):
     result={name:np.zeros((height,width),dtype=np.float32) for name in ('Side','Front','Rear')}
     def Fade(radius):
         t=np.clip((radius-1)/.30,0,1);return 1-t*t*(3-2*t)
-    for view,ellipses in {'Side':[(359.3,391.8,9,17)],'Front':[(131.8,402.5,9,17),(182.3,402.8,9,17),(156.5,439,44,16)],'Rear':[]}.items():
+    for view,ellipses in {'Side':[(359.3,391.8,9,17),(440,258,11,7)],'Front':[(131.8,402.5,9,17),(182.3,402.8,9,17),(156.5,439,44,16),(103,259,10,8),(213,258,9,7)],'Rear':[]}.items():
         for u,v,rx,ry in ellipses:result[view]=np.maximum(result[view],Fade(np.sqrt(((xx-u)/rx)**2+((yy-v)/ry)**2)))
     points=[(373,443),(397,437),(419,414)]
     for a,b in zip(points,points[1:]):

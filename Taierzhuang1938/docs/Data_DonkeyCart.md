@@ -8,9 +8,9 @@
 
 `Model/Donkey/Model_Donkey.glb` 是 2026-10-22 按用户要求追加的纯驴版。只从 V3 工程的 `DonkeyEditable` 集合保留身体、眼、耳、鬃尾和轮廓短毛，移除木车、车辕、颈垫、全部套具、笼头与牵绳；不能仅删除 `CartRuntime`，因为原动物运行时网格也合并了套具。原驴车文件与源工程不覆盖。
 
-当前纯驴 V39 为身体／短毛／鬃毛三个导出网格、四个材质，共用 28 根骨骼；在 Three.js 中形成四个绘制网格。当前为 79,910 三角，实际登记以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准，保持 80,000 上限。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。六张无损 WebP 内嵌并有镜像。V30 的 79,992 三角及更早结果保留作历史对照。
+当前纯驴 V40 为身体／短毛／鬃毛三个导出网格、四个材质，共用 28 根骨骼；在 Three.js 中形成四个绘制网格。当前为 79,910 三角，实际登记以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准，保持 80,000 上限。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。六张无损 WebP 内嵌并有镜像。V30 的 79,992 三角及更早结果保留作历史对照。
 
-当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261026/ReferenceFitV39/Scene_Donkey.blend`，其中打包图像、重建脚本及关节配方；`Data_Derivation.json` 记录父工程及冻结 V3 中间源的哈希、组件和拟合量测。原目录保留此前工程。重建命令：
+当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261026/ReferenceFitV40/Scene_Donkey.blend`，其中打包图像、重建脚本及关节配方；`Data_Derivation.json` 记录父工程及冻结 V3 中间源的哈希、组件和拟合量测。原目录保留此前工程。重建命令：
 
 ```powershell
 node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
@@ -19,6 +19,12 @@ node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
 此入口从 `ReferenceFitV4/Scene_DonkeyBeforeReferenceFit.blend` 的冻结纯驴 V3 中间源派生，经测量修形、重解动作、图集重烘、无损打包与实际 GLB 重导测蹄；结束时关闭自己的 Blender 实例。更早从驴车分离纯驴的配方仍在 `Script_DonkeyBake.py` / `Script_DonkeyRefine.py`。独立版的肩颈、头部、全身和行走实测留在外置 `Review/` 目录，本地交互页在 worktree 的 `tmp/Donkey/`。新增资产未布设到关卡。
 
 早期去掉笼头后的近景发现原装饰嘴缝离真实口鼻表面约 3–4 cm；当时将 30 顶点细管的五个截面贴回口鼻。V14 已以连续唇部与 21 截面嘴缝替换该旧做法，当前实际表面距离记录在派生契约；驴车版不改写。
+
+### 纯驴原图眼眉保留 V40（2026-10-26）
+
+源蒙版逐像素检查发现，前视笼头笔画误穿过可见眼眉：右眼/右眉的补全图权重为1，左眼约0.72、左眉约0.83，原图颜色被生成的裸驴导图大幅替换。当前移除眼睛以上的错误笔画，只保留真实脸颊与笼头相接区域；原图眼睛和眉部采样点的补全权重均为0。
+
+眼睛孔洞的摄影阴影另外进入面部特征保护，避免把孔洞光影重复画到底色；眉部原图浅毛保留。此修正同时用于基础取色、摄影细节和完整RGB投射，不再以几何移位代替颜色蒙版排障。V39耳尖曲线、眼部曲面和原骨架/动作/毛束预算保留，实际烘焙材质与近景重新对照。
 
 ### 纯驴耳尖轮廓与眼部高度 V39（2026-10-26）
 

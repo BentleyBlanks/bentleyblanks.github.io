@@ -339,12 +339,16 @@ Check(pectoralMotion?.pass===true&&pectoralMotion.assetSha256===bareSpec.sha256
   &&bareSpec.verification.nativeLateralStanceDriftPerFrameM<.0001,
   "独立驴当前GLB具备加密胸区动作证据，保留离地回摆且着地蹄点不横滑");
 const jointFit=pectoral.jointFit,jointArcs=bareSpec.animations.DonkeyWalk.jointArcs;
-Check(bareSpec.version==='20261026ReferenceV39'&&jointFit?.version==='20261026JointFitV35'
+Check(bareSpec.version==='20261026ReferenceV40'&&jointFit?.version==='20261026JointFitV35'
   &&jointFit.maximumInfluences===4&&jointFit.boneCount===28&&jointFit.morphTargetsAdded===0
   &&jointFit.surfaceCorrectionSourcePixels<1&&jointFit.edges.maximumRestSurfaceBoundM<=.0005&&jointFit.edgesAfter.maximumRestSurfaceBoundM<=.0005
   &&jointArcs?.bakeFps===120&&jointArcs.maximumHoofTargetErrorM<.00001&&jointArcs.maximumReachCompressionM<=.006,
   "独立驴V35关节配方保留28骨与四权重，局部顶点修正小于原图一像素；三维肘膝路径锁定请求蹄点");
 const lowerRelief=pectoral.lowerLimbRelief;
+const visibleEyes=bareSpec.derivation.referenceFit.photoDetail.pigmentProjection.visibleOriginalEyes;
+Check(visibleEyes?.eyeGuideWeights.every(value=>value===0)&&visibleEyes.browGuideWeights.every(value=>value===0)
+  &&visibleEyes.apertureShadowExclusion.every(value=>value===1),
+  "独立驴原图眼眉可见区域不再被套具补全蒙版覆盖，眼睛孔洞阴影单独排除");
 const earTips=pectoral.earTips,browHeight=pectoral.browHeight;
 Check(earTips?.version==='20261026EarTipsV39'&&earTips.trianglesAdded===144
   &&Object.values(earTips.ears).every(row=>row.maximumRootDisplacementM===0&&row.minimumSampledJacobian>.05&&Math.abs(row.afterTopPixel-row.referenceTopPixel)<.01),
