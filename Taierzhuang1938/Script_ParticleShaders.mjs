@@ -46,8 +46,12 @@ attribute vec3 iNormal;
 #endif
 
 uniform float uTime;
-#if defined(SHAPE_STREAK) || defined(SHAPE_BEAM)
+#if defined(SHAPE_STREAK) || defined(SHAPE_BEAM) || defined(SHAPE_SOILGRAIN)
 uniform vec2 uResolution;      // 渲染分辨率：拉伸池按它把「几个像素」换算成米
+#endif
+#ifdef SHAPE_SOILGRAIN
+uniform vec4 uSoilArt;
+varying vec2 vSoilMotion;
 #endif
 #ifdef SHAPE_BEAM
 // 光束不走弹道积分，iSpin / iAccel 空着，借来递光束参数：
@@ -214,10 +218,21 @@ void main() {
   // 泥浆：拖尾 = 瞬时速度 × 快门（iExtra.x 秒），越飞越慢拖尾越短；下限是一颗泥团自己的长度
   float streakLen = max(size * 1.5, length(instant) * iExtra.x);
   vec3 along = dir * ((corner.x - 1.0) * 0.5 * streakLen);
+#elif defined(SHAPE_SOILGRAIN)
+  // The practical reference is dense, short descending grain streaks. Use the
+  // actual damped trajectory over a small shutter, rather than fat bright dots.
+  float sampleAge=max(0.0,age-(1.0-corner.x)*.5*uSoilArt.y);
+  vec3 along=(iVelocity-iAccel/k)*(exp(-k*age)-exp(-k*sampleAge))/k+iAccel*((sampleAge-age)/k);
+  along+=dir*(corner.x-1.0)*size;
 #else
   vec3 along = dir * ((corner.x - 1.0) * 0.5 * iExtra.x);
 #endif
   float halfWidth = size;
+#ifdef SHAPE_SOILGRAIN
+  float metresPerPixel=length(cameraPosition-world)*2.0/(projectionMatrix[1][1]*uResolution.y);
+  halfWidth=max(size,metresPerPixel*uSoilArt.z);
+  vSoilMotion=vec2(sqrt(clamp(size/max(halfWidth,1e-6),0.0,1.0))*mix(1.0,uSoilArt.w,smoothstep(size*2.0,size*6.0,length(instant)*uSoilArt.y)),iSpin.x+moduleParameters.y*life);
+#endif
 #if defined(SHAPE_STREAK) || defined(SHAPE_BEAM)
   // 像素保底（iExtra.w > 0 才开；旧的曳光/火星写 0，行为不变）。按**这个顶点自己**
   // 离相机的距离换算：一条四十米的光束两端远近差得多，只按头部算的话尾巴会细成头发。
@@ -330,6 +345,12 @@ uniform float uSoftEnabled;
 uniform float uSoftRange;
 uniform float uNearFade;
 uniform sampler2D uSpriteMap;    // 序列帧贴图；非 SHAPE_SPRITE 池挂共享的 1×1 白图
+#if defined(SHAPE_SOILGRAIN) || defined(SHAPE_SOILDEPOSIT) || defined(SHAPE_SOILVEIL)
+uniform vec4 uSoilArt;
+#endif
+#ifdef SHAPE_SOILGRAIN
+varying vec2 vSoilMotion;
+#endif
 uniform vec2 uSpriteGrid;        // 帧网格（列×行）
 uniform float uSpriteFrames;     // 帧总数
 uniform float uSpriteEmission;   // 自带颜色的 CC0 flipbook：只把高亮火焰抬进 HDR，烟仍保留暗部
@@ -454,11 +475,29 @@ void main() {
   mask = max(head, tail) * (0.78 + 0.22 * grit);
   color = mix(vColor, vColorAlt, grit * 0.55);
 #elif defined(SHAPE_SOILGRAIN)
-  // Millimetre grains: irregular solid silhouette and a shaded face, no glow.
-  float face = Vnoise(p * 3.1 + vSeed * 41.0);
-  float edge = 0.66 + Vnoise(p * 2.2 + vSeed * 19.0) * 0.25;
-  mask = 1.0 - smoothstep(edge - 0.12, edge, length(p * vec2(1.0, 0.78)));
-  color *= 0.65 + face * 0.65 + p.y * 0.12;
+  float width=.46+.28*Vnoise(vec2(p.x*4.0+vSeed*31.0,vSoilMotion.y));
+  float edge=abs(p.y)/width,aa=max(fwidth(edge),.08);
+  mask=(1.0-smoothstep(1.0-aa,1.0+aa,edge))*smoothstep(-1.0,-.7,p.x)*(1.0-smoothstep(.7,1.0,p.x));
+  mask*=vSoilMotion.x*(.7+.3*Vnoise(p*vec2(5.0,2.0)+vSeed*41.0));
+  color*=.72+.28*Vnoise(p*3.0+vSoilMotion.y);
+#elif defined(SHAPE_SOILDEPOSIT)
+  float grit=Vnoise(p*4.0+vSeed*29.0);
+  float edge=.66+.22*Vnoise(p*2.1+vSeed*17.0);
+  mask=1.0-smoothstep(edge-.14,edge,length(p*vec2(1.0,.8)));
+  color*=.72+.35*grit;
+#elif defined(SHAPE_SOILVEIL)
+  // A packet of descending fines: connected granular strands rather than
+  // independent smoke balls. Texture advection is downward, like the grains.
+  float y=p.y*.5+.5;
+  float clock=y+vAgeS*uSoilArt.w;
+  float bend=(Vnoise(vec2(y*3.1+vSeed*17.,vAgeS*.35))-.5)*.28;
+  float width=.58+.18*Vnoise(vec2(y*4.+vSeed*29.,vAgeS*.2));
+  float across=1.-smoothstep(uSoilArt.z,1.,abs(p.x-bend)/width);
+  float drift=Vnoise(vec2(p.x*2.4+vSeed*31.,clock*uSoilArt.y));
+  float detail=Vnoise(vec2(p.x*8.1+vSeed*13.,clock*uSoilArt.y*3.7));
+  float ends=smoothstep(0.,.24,y)*(1.-smoothstep(.77,1.,y));
+  mask=across*ends*(.38+.62*drift)*(.78+.22*detail);
+  color*=.9+.1*detail;
 #elif defined(SHAPE_PUFF)
   // 烟/尘：两层不同尺度的噪声让每一片都是一团卷起来的絮，而不是一张
   // 单调的柔边圆盘。只啃外轮廓仍会读成“半透明云”；要让中心密度也有起伏，
@@ -630,11 +669,14 @@ void main() {
   vec3 lit = uSkyColor + uSunColor * (0.34 + 0.66 * wrapped);
   // 前向散射：视线越接近太阳方向，边缘越透亮（逆光的烟会"发光"）
   float forward = pow(max(dot(vViewDir, uSunDirection), 0.0), 4.0);
-#if !defined(SHAPE_MUD) && !defined(SHAPE_SOILGRAIN)
+#if !defined(SHAPE_MUD) && !defined(SHAPE_SOILGRAIN) && !defined(SHAPE_SOILVEIL)
   // 湿泥是实的，不透光：前向散射只给烟尘
   lit += uSunColor * forward * 0.55 * (1.0 - mask * 0.75);
 #endif
   color *= lit;
+#if defined(SHAPE_SOILGRAIN) || defined(SHAPE_SOILVEIL)
+  color*=uSoilArt.x;
+#endif
 #endif
 #ifdef SHAPE_DECAL
   // 与 MeshStandardMaterial 同口径的介质响应：AO 压环境光，粗糙度控制窄高光，
@@ -653,6 +695,9 @@ void main() {
   // 在太阳底下永远比墙暗 —— 考据要的"新弹痕断口比墙面亮 1—2 档"就永远做不出来。
   // 预警准星自己分层打光（尘/焦土受光、亮线自发光），不走这一乘。
   color *= uSkyColor + uSunColor * max(dot(normalize(vLitNormal), uSunDirection), 0.0);
+#ifdef SHAPE_SOILDEPOSIT
+  color*=uSoilArt.x;
+#endif
 #endif
 
   // rtNormalDepth 的 w 是线性视深度；清成 0 的像素代表"这一路没打到东西"（= 天空）。

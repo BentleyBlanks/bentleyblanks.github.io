@@ -95,6 +95,9 @@ export class ParticleBatch {
       uniforms: Object.assign({}, shared, modules, {
         uSoftRange: { value: config.softRange ?? 0.6 },
         uParticleAspect: {value:1},
+        // Used only by the soil grain/deposit variants. Art values are supplied
+        // per emitter, preserving the existing material/particle batching path.
+        uSoilArt: {value:new THREE.Vector4(.6,.012,.22,.45)},
         uParticleVolume: {value:new THREE.Vector2(PARTICLE_VOLUME.extinction,PARTICLE_VOLUME.shadow)},
         uFadeOutStart: { value: config.fadeOutStart ?? 0.45 },
         uSpriteMap: { value: config.sprite ? config.sprite.texture : shared.uSpriteMap.value },

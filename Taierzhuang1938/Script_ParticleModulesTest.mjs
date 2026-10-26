@@ -12,6 +12,8 @@ assert.throws(()=>NormalizeParticleModules({collision:{enabled:true}}),/Unsuppor
 assert.throws(()=>NormalizeParticleModules({main:{startLifetime:NaN}}));
 assert.throws(()=>NormalizeParticleModules({main:{simulationSpace:'screen'}}));
 assert.throws(()=>NormalizeParticleModules({renderer:{fakeGlow:3}}));
+assert.throws(()=>NormalizeParticleModules({renderer:{densityStyle:'unsupported'}}));
+assert.equal(NormalizeParticleModules({renderer:{densityStyle:'soil'}}).renderer.densityStyle,'soil');
 assert.throws(()=>NormalizeParticleModules({main:{toString:'invalid'}}));
 assert.throws(()=>new ParticleSystem({}).Configure({noise:null}));
 assert.throws(()=>new ParticleSystem({}).Configure(JSON.parse('{"__proto__":{"enabled":true}}')));

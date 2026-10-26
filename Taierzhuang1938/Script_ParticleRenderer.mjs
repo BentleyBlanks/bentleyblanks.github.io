@@ -28,7 +28,7 @@ varying vec3 vWorldPoint;
 varying vec3 vRight;
 varying vec3 vUp;
 varying vec3 vToward;
-varying vec3 vVolume;
+varying vec4 vVolume;
 #endif
 vec4 Curve(float row,float age){
  return ParticleCurve(iBirth.z,row,age);
@@ -62,7 +62,7 @@ void main(){
  vRight=vec3(viewMatrix[0][0],viewMatrix[1][0],viewMatrix[2][0]);
  vUp=vec3(viewMatrix[0][1],viewMatrix[1][1],viewMatrix[2][1]);
  vToward=normalize(cameraPosition-world+vec3(1e-6));
- vec4 look=ParticleAppearance(iBirth.z);vVolume=vec3(size,look.x,look.y);
+ vec4 look=ParticleAppearance(iBirth.z);vVolume=vec4(size,look.x,look.y,ParticleBounds(iBirth.z).w);
 #endif
  vec4 view=modelViewMatrix*vec4(world,1.);
 #ifdef PARTICLE_WINDOWMOTE
@@ -107,7 +107,7 @@ uniform vec3 uSunDirection;
 varying vec3 vRight;
 varying vec3 vUp;
 varying vec3 vToward;
-varying vec3 vVolume;
+varying vec4 vVolume;
 #endif
 uniform sampler2D uNormalDepth;
 uniform vec2 uResolution;
@@ -128,6 +128,9 @@ varying float vDistance;
 float Hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float Noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(Hash(i),Hash(i+vec2(1,0)),f.x),mix(Hash(i+vec2(0,1)),Hash(i+vec2(1,1)),f.x),f.y);}
 float Fbm(vec2 p){return Noise(p)*.57+Noise(p*2.03+7.1)*.29+Noise(p*4.07+13.2)*.14;}
+#ifdef PARTICLE_VOLUME
+float VolumeDensity(vec3 p){return vVolume.w>.5?ParticleSoilDensity(p,vShape.x,vShape.y):ParticleDensity(p,vShape.x,vShape.y);}
+#endif
 void main(){
  vec2 uv=vUv;float seed=vShape.x*23.,age=vShape.y;
  vec3 color=vColor.rgb;float mask=0.;
@@ -139,10 +142,10 @@ void main(){
  for(int j=0;j<PARTICLE_VOLUME_STEPS;j++){
    float z=span*(1.-2.*(float(j)+.5)/float(PARTICLE_VOLUME_STEPS));
    vec3 q=vRight*p.x+vUp*p.y+vToward*z;
-   float density=ParticleDensity(q,vShape.x,age);
+   float density=VolumeDensity(q);
    if(sceneDepth>0.)density*=smoothstep(0.,max(.05,vShape.w),sceneDepth-(vDepth-z*vVolume.x));
    float along=dot(q,light),path=max(0.,sqrt(max(0.,along*along+1.-dot(q,q)))-along);
-   float shadow=ParticleDensity(q+light*path*.45,vShape.x,age);
+   float shadow=VolumeDensity(q+light*path*.45);
    float transmittance=exp(-shadow*path*uSmokeLighting.z);
    vec3 lit=uSkyColor*uSmokeLighting.x+uSunColor*uSmokeLighting.y*(.16+.84*transmittance);
    float a=1.-exp(-density*span*vVolume.y*vColor.a*fade*2./float(PARTICLE_VOLUME_STEPS));
@@ -270,7 +273,7 @@ export class ParticleRenderer {
  Sync(system) {
    const slot=this.slots.get(system);if(slot===undefined)return;
    const m=system.modules;
-   this.systemData.set([system.time,...system.position,m.main.simulationSpace==='local'?1:0,m.noise.frequency,m.noise.scrollSpeed,m.renderer.enabled?1:0,...m.renderer.bounds,0,m.renderer.density,m.renderer.nearFade,m.renderer.aspect,m.renderer.softRange],slot*16);
+   this.systemData.set([system.time,...system.position,m.main.simulationSpace==='local'?1:0,m.noise.frequency,m.noise.scrollSpeed,m.renderer.enabled?1:0,...m.renderer.bounds,m.renderer.densityStyle==='soil'?1:0,m.renderer.density,m.renderer.nearFade,m.renderer.aspect,m.renderer.softRange],slot*16);
    this.systems.needsUpdate=true;
    const stream=this.streams.get(system);if(stream){stream.material.uniforms.uTime.value=system.time;stream.enabled=m.renderer.enabled;}
  }

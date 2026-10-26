@@ -116,7 +116,10 @@ export class ParticleInspector {
    else Select(renderer,'类型',['flame','smoke','ember','mote','windowMote','volume','bakedVolume'],m.renderer.mode,value=>{Patch('renderer','mode',value);this.Show();});
    Number(renderer,'renderer','aspect','纵横比',{min:.1,max:10});Number(renderer,'renderer','softRange','软交界 / 米',{min:0,max:5});
    if(['volume','bakedVolume'].includes(m.renderer.mode)||['smoke','sourceSmoke','bombSmoke'].includes(profile))Number(renderer,'renderer','density','体积密度',{min:.01,max:32});
-   if(m.renderer.mode==='volume')Number(renderer,'renderer','nearFade','近处渐隐 / 米',{min:0,max:30});
+   if(m.renderer.mode==='volume'){
+     Select(renderer,'密度场',[{value:'smoke',label:'卷曲烟团'},{value:'soil',label:'细土悬尘'}],m.renderer.densityStyle,value=>Patch('renderer','densityStyle',value));
+     Number(renderer,'renderer','nearFade','近处渐隐 / 米',{min:0,max:30});
+   }
    if(['mote','bakedVolume'].includes(m.renderer.mode))for(let i=0;i<3;i++)NumberField(renderer,'范围 '+['X','Y','Z'][i],m.renderer.bounds[i],value=>{const bounds=[...this.Read().modules.renderer.bounds];bounds[i]=value;Patch('renderer','bounds',bounds)},{min:.01,max:1000});
    if(m.renderer.mode==='bakedVolume'){
      Select(renderer,'三维模拟',Object.keys(PARTICLE_VOLUME_ASSETS),m.renderer.volumeAsset,value=>Patch('renderer','volumeAsset',value));

@@ -48,7 +48,7 @@ const DEFAULTS = {
   colorOverLifetime: {enabled:true, gradient:[[0,[1,1,1,0]],[.12,[1,1,1,1]],[.65,[1,1,1,.8]],[1,[1,1,1,0]]]},
   rotationOverLifetime: {enabled:false, angularVelocity:0},
   noise: {enabled:false, strength:0, frequency:1.5, scrollSpeed:1},
-  renderer: {enabled:true,mode:'flame', aspect:1.8, softRange:.35,bounds:[30,12,30],density:2.8,nearFade:.8,
+  renderer: {enabled:true,mode:'flame', aspect:1.8, softRange:.35,bounds:[30,12,30],density:2.8,densityStyle:'smoke',nearFade:.8,
     volumeAsset:'Campfire',volumeSpeed:1,volumeLoop:true,volumeYaw:0,emissionStrength:14,flameExtinction:12},
 };
 function NumberIn(value, path, low, high) {
@@ -121,6 +121,7 @@ export function NormalizeParticleModules(input={}) {
     color.forEach((n,i)=>NumberIn(n,'gradient.color',0,i===3?1:32));
   }
   if(!['flame','smoke','ember','mote','windowMote','volume','bakedVolume','material'].includes(modules.renderer.mode))throw new Error('renderer.mode: unsupported renderer');
+  if(!['smoke','soil'].includes(modules.renderer.densityStyle))throw new Error('renderer.densityStyle: unsupported density field');
   if(!Object.hasOwn(PARTICLE_VOLUME_ASSETS,modules.renderer.volumeAsset))throw new Error('renderer.volumeAsset: unsupported volume');
   if(typeof modules.renderer.volumeLoop!=='boolean')throw new Error('renderer.volumeLoop: boolean required');
   NumberIn(modules.renderer.volumeYaw,'renderer.volumeYaw',-100,100);

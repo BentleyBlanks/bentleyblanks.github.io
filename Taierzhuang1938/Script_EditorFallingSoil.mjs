@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {El,Section,Slider,Select,Toggle,ButtonRow,Note,Row} from './Script_EditorUi.mjs';
 import {CurveField,ColorField} from './Script_EditorParticleInspector.mjs';
 import {BuildSink} from './Script_World.mjs';
+import {CloneShadedMaterial} from './Script_Materials.mjs';
 import {NormalizeFallingSoil,NormalizeSoilPreview} from './Script_FallingSoilRules.mjs';
 import {FALLING_SOIL_SCHEMA as SCHEMA,FALLING_SOIL_STAGE as STAGE,FALLING_SOIL_PRESETS as PRESETS,FALLING_SOIL_LIMITS as LIMITS} from './Data_Tuning_FallingSoil.mjs';
 const Clone=value=>JSON.parse(JSON.stringify(value));
@@ -19,7 +20,8 @@ export class FallingSoilInspector{
     const config=this.Config(),top=Section(this.parent,'共用落土效果 · 三层可独立组合');
     Note(top,'真实米制；本页来源、物理和美术数值均可保存。修改后按同一种子重建当前时刻，立即可见。常规效果的整体缩放不改变本页的米制参数。');
     ButtonRow(top,[{label:'停发 · 自然收尾',onClick:()=>{if(this.id){this.api.Stop(this.id);this.editor.paused=false;}}},
-      {label:'近看土粒 / 土块',onClick:()=>this.Frame(true)},{label:'看全程',onClick:()=>this.Frame(false)}]);
+      {label:'近看土流 / 触地尘',onClick:()=>this.Frame('flow')},{label:'检查单个土块',onClick:()=>this.Frame(true)},{label:'看全程',onClick:()=>this.Frame(false)}]);
+    Note(top,'外观对照：FX Elements 的实拍 Falling Debris 008；细土帘是主体，少量土块为辅。参考与对照方法见项目的落土视觉说明。');
     for(const [group,{label,fields}]of Object.entries(SCHEMA)){
       const details=El('details'),summary=El('summary','',label);details.dataset.soilGroup=group;
       details.open=open.size?open.has(group):['emitter','timing'].includes(group);summary.style.cssText='cursor:pointer;padding:10px 0;color:#e5c78f;font-weight:600';
@@ -75,9 +77,13 @@ export class FallingSoilInspector{
   }
   BuildStage(c){
     this.root=new THREE.Group();this.root.name='FallingSoilPreviewReferences';this.editor.studio.stand.add(this.root);
-    const ground=new THREE.MeshStandardMaterial({color:0x5d5549,roughness:1}),wood=new THREE.MeshStandardMaterial({color:0x735638,roughness:.94}),backdrop=new THREE.MeshStandardMaterial({color:0x20241f,roughness:1});this.materials=[ground,wood,backdrop];
+    const library=this.editor.host.library;
+    const ground=CloneShadedMaterial(library.Get('Ground'));ground.color.setHex(0x9a8c76);ground.roughness=1;
+    const earth=CloneShadedMaterial(library.Get('Ground'));earth.color.setHex(0x947354);earth.roughness=1;
+    const wood=library.baked?.has('WoodBeam')?CloneShadedMaterial(library.Get('WoodBeam')):new THREE.MeshStandardMaterial({color:0x735638,roughness:.94});
+    const backdrop=new THREE.MeshStandardMaterial({color:0x20241f,roughness:1});this.materials=[ground,earth,wood,backdrop];
     const sink=new BuildSink();sink.SetSector('FallingSoilPreview');
-    const box=(target,key,w,h,d,x,y,z)=>{const geo=new THREE.BoxGeometry(w,h,d);geo.translate(x,y,z);target.Add(key,geo);};
+    const box=(target,key,w,h,d,x,y,z)=>{const geo=new THREE.BoxGeometry(w,h,d),uv=geo.attributes.uv;for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*Math.max(1,w),uv.getY(i)*Math.max(1,d));geo.translate(x,y,z);target.Add(key,geo);};
     box(sink,'ground',6,.035,5,0,this.stage.groundY-.0175,0);
     const b=this.stage.beam;if(b.enabled)box(sink,'wood',b.width,b.height,b.depth,b.x,b.y,b.z);
     if(this.stage.backdrop){const h=Math.max(2,c.emitter.position[1]-this.stage.groundY+1.2);box(sink,'backdrop',Math.max(6,c.emitter.width+2),h,.06,c.emitter.position[0],this.stage.groundY+h*.5,c.emitter.position[2]+c.emitter.length*.5+1.2);}
@@ -85,12 +91,15 @@ export class FallingSoilInspector{
     this.source=new THREE.Group();this.root.add(this.source);this.source.visible=this.stage.sourceReference;
     const source=new BuildSink();source.SetSector('SoilSource');const w=Math.max(.4,c.emitter.width),d=Math.max(.4,c.emitter.length);
     if(c.emitter.shape==='line'){
-      box(source,'wood',w+.25,.07,.32,0,.06,-.18);box(source,'wood',w+.25,.07,.32,0,.06,.18);
+      const seam=Math.max(.015,c.emitter.length);
+      box(source,'wood',w+.25,.08,.32,0,.04,-.16-seam*.5);box(source,'wood',w+.25,.08,.32,0,.04,.16+seam*.5);
+      box(source,'earth',w+.25,.22,.75,0,.19,0);
     }else{
-      box(source,'wood',w+.16,.09,.09,0,.065,-d*.5-.045);box(source,'wood',w+.16,.09,.09,0,.065,d*.5+.045);
-      box(source,'wood',.09,.09,d,-w*.5-.045,.065,0);box(source,'wood',.09,.09,d,w*.5+.045,.065,0);
+      const edge=c.emitter.distribution==='edge',extra=edge?.04:.6;
+      box(source,'earth',w+extra,.3,d+extra,0,.15,0);
+      box(source,'wood',w+.5,.12,.14,0,-.06,-d*.5-.12);box(source,'wood',w+.5,.12,.14,0,-.06,d*.5+.12);
     }
-    source.Flush(this.source,{Get:()=>wood},{castShadow:false});
+    source.Flush(this.source,{Get:key=>key==='earth'?earth:wood},{castShadow:false});
   }
   Raycast(from,dir,distance){const b=this.stage.beam;if(!b.enabled)return null;
     const box=new THREE.Box3(new THREE.Vector3(b.x-b.width*.5,b.y-b.height*.5,b.z-b.depth*.5),new THREE.Vector3(b.x+b.width*.5,b.y+b.height*.5,b.z+b.depth*.5));
@@ -103,12 +112,13 @@ export class FallingSoilInspector{
     this.source.position.fromArray(p.position);this.source.rotation.set(...p.rotation);
     if(p.hostRotation)this.source.quaternion.premultiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...p.hostRotation)));
   }
-  Frame(near=false){if(!this.selected)return;const c=this.Config(),p=c.emitter.position;
-    this.editor.studio.maxDistance=40;this.editor.studio.Frame(Math.max(3,c.emitter.position[1]+.5),near?.85:Math.max(6,p[1]*2));
+  Frame(near=false){if(!this.selected)return;const c=this.Config(),p=c.emitter.position,isClod=near===true,isFlow=near==='flow';
+    this.editor.studio.maxDistance=40;this.editor.studio.Frame(Math.max(3,c.emitter.position[1]+.5),isClod?.85:isFlow?2.8:Math.max(5.6,p[1]*1.75));
     const middle=(p[1]+this.stage.groundY)*.5;
-    const clod=near&&this.id?this.api.Samples(this.id,'clods',48).sort((a,b)=>Math.abs(a.position[1]-middle)-Math.abs(b.position[1]-middle))[0]:null;
-    if(clod)this.editor.studio.orbit.target.fromArray(clod.position);else this.editor.studio.orbit.target.set(p[0],Math.max(.4,p[1]*.5),p[2]);
-    const orbit=this.editor.studio.orbit;orbit.pitch=near?.22:.12;
+    const clod=isClod&&this.id?this.api.Samples(this.id,'clods',48).sort((a,b)=>Math.abs(a.position[1]-middle)-Math.abs(b.position[1]-middle))[0]:null;
+    if(clod)this.editor.studio.orbit.target.fromArray(clod.position);else this.editor.studio.orbit.target.set(p[0],isFlow?this.stage.groundY+.85:Math.max(.4,middle),p[2]);
+    const orbit=this.editor.studio.orbit;orbit.pitch=isClod?.22:.08;
+    if(!isClod)orbit.target.addScaledVector(new THREE.Vector3(Math.cos(orbit.yaw),0,-Math.sin(orbit.yaw)),orbit.dist*.1);
     if(clod){for(const yaw of [orbit.yaw,orbit.yaw+Math.PI,orbit.yaw+Math.PI*.5,orbit.yaw-Math.PI*.5]){
       const target=orbit.target,eye=new THREE.Vector3(target.x+Math.sin(yaw)*Math.cos(orbit.pitch)*orbit.dist,target.y+Math.sin(orbit.pitch)*orbit.dist,target.z+Math.cos(yaw)*Math.cos(orbit.pitch)*orbit.dist);
       const dir=target.clone().sub(eye).normalize(),hit=this.Raycast(eye,dir,orbit.dist);if(!hit||hit.t>orbit.dist-.05){orbit.yaw=yaw;break;}

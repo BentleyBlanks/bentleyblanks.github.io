@@ -9,7 +9,7 @@ await fs.mkdir(out,{recursive:true});const server=await ServeRoot(root,0),browse
 try{
  const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];
  page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push(m.text().slice(0,500))});
- const entry=whitebox?'editor=tools':'whitebox=p012&editor=vfx&quality=high';
+ const entry=whitebox?'editor=tools&quality=whitebox':'whitebox=p012&editor=vfx&quality=high';
  await page.goto('http://127.0.0.1:'+server.address().port+'/Taierzhuang1938/?'+entry+'&manual=1&menu=0',{waitUntil:'domcontentloaded',timeout:180000});
  if(whitebox){await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:300000});await page.click('#edRoot .edMenu[data-menu="media"] > .edMenuTitle');await page.click('#edRoot .edMenuItem[data-editor="vfx"]');}
  await page.waitForFunction(()=>window.Tengxian?.ParticleEditor?.panel,null,{timeout:300000});

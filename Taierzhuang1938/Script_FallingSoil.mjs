@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {FallingSoilSimulation,NormalizeFallingSoil} from './Script_FallingSoilRules.mjs';
+import {FallingSoilSimulation,NormalizeFallingSoil,RotateSoilVector} from './Script_FallingSoilRules.mjs';
 import {FALLING_SOIL_PRESETS as PRESETS,FALLING_SOIL_LIMITS as LIMITS} from './Data_Tuning_FallingSoil.mjs';
 
 // A composite production effect owned by the existing ParticleEffects instance.
@@ -24,23 +24,42 @@ export class FallingSoilEffects{
   Build(e){
     const api=this.particles,c=e.config,stem='FallingSoil/'+e.preset;
     if(!api.profiles.has('soilGrain'))api.profiles.set('soilGrain',{name:'soilGrain',capacity:LIMITS.grainsPerEmitter,
-      config:{shape:'soilgrain',orient:'billboard',lit:true,aerial:true,renderOrder:6,softRange:0,hideWhenIdle:true,quality:api.quality}});
-    const grains=api.Create({profile:'soilGrain',name:stem+'/细砂',modules:{main:{maxParticles:Math.max(1,c.grains.maxParticles),startSpeed:0},emission:{enabled:false},
+      config:{shape:'soilgrain',orient:'stretch',lit:true,aerial:true,renderOrder:6,softRange:0,fadeOutStart:.98,hideWhenIdle:true,quality:api.quality}});
+    if(!api.profiles.has('soilDeposit'))api.profiles.set('soilDeposit',{name:'soilDeposit',capacity:2048,
+      config:{shape:'soildeposit',orient:'normal',litSurface:true,aerial:true,renderOrder:4,softRange:0,polygonOffset:true,fadeOutStart:.85,hideWhenIdle:true,quality:api.quality}});
+    if(!api.profiles.has('soilVeil'))api.profiles.set('soilVeil',{name:'soilVeil',capacity:LIMITS.dust,
+      config:{shape:'soilveil',orient:'billboard',lit:true,aerial:true,renderOrder:5,softRange:.15,fadeOutStart:.95,hideWhenIdle:true,quality:api.quality}});
+    // Explicit composite births use the composite clock. Inheriting FireSmoke's
+    // prewarm advances the child by 4 s and kills short-lived dust at birth.
+    const main={duration:120,loop:true,prewarm:false,startDelay:0,startLifetime:1,startSize:1,startSpeed:0,gravityModifier:0,simulationSpace:'world',randomSeed:c.emitter.seed};
+    const Create=(key,definition)=>{const id=api.Create({...definition,play:false}).id;e.ids.push(id);api.Get(id).editorKey='soil:'+key;return id;};
+    e.ids=[];
+    const grains=Create('grains',{profile:'soilGrain',name:stem+'/细土流',modules:{main:{...main,maxParticles:Math.max(1,c.grains.maxParticles)},emission:{enabled:false},
       renderer:{aspect:c.grains.aspect},rotationOverLifetime:{enabled:true,angularVelocity:c.grains.spin},
-      noise:{enabled:true,strength:c.motion.turbulence,frequency:c.motion.frequency,scrollSpeed:1}},play:false}).id;
-    e.ids=[grains];
-    const dust=api.Create({preset:'FireSmoke',name:stem+'/薄尘',modules:{main:{maxParticles:Math.max(1,c.dust.maxParticles),gravityModifier:0},
-      emission:{enabled:false},renderer:{mode:'smoke',aspect:1,softRange:.12},
-      sizeOverLifetime:{enabled:true,curve:[[0,1],[1,c.dust.diffusion]]},
+      noise:{enabled:true,strength:c.motion.turbulence*c.grains.noiseScale,frequency:c.motion.frequency,scrollSpeed:1}}});
+    const deposits=Create('deposits',{profile:'soilDeposit',name:stem+'/留存细土',modules:{main:{...main,maxParticles:Math.max(1,Math.min(c.grains.maxDeposits,c.grains.maxParticles))},emission:{enabled:false},
+      renderer:{aspect:1},noise:{enabled:false},sizeOverLifetime:{enabled:false},colorOverLifetime:{enabled:false}}});
+    for(const id of [grains,deposits])api.renderer.streams.get(api.Get(id).system).material.uniforms.uSoilArt.value.set(c.grains.lightGain,c.grains.shutter,c.grains.minPixel,c.grains.trailOpacity);
+    const volumetric=c.dust.volumetric&&api.quality!=='low';
+    const DustModules=impact=>({main:{...main,maxParticles:Math.max(1,c.dust.maxParticles)},emission:{enabled:false},
+      renderer:{mode:volumetric?'volume':'smoke',densityStyle:c.dust.densityStyle,aspect:impact?c.dust.impactAspect:c.dust.aspect,softRange:.12,density:Math.max(.01,c.dust.density),nearFade:c.dust.nearFade},
+      sizeOverLifetime:{enabled:true,curve:[[0,impact?.5:.65],[.18,1],[1,impact?c.dust.impactDiffusion:c.dust.diffusion]]},
       colorOverLifetime:{enabled:true,gradient:[[0,[1,1,1,0]],[Math.max(.001,c.dust.fadeIn),[1,1,1,1]],[c.dust.fadeOut,[1,1,1,.72]],[1,[1,1,1,0]]]},
-      rotationOverLifetime:{enabled:true,angularVelocity:c.dust.spin},noise:{enabled:true,strength:c.motion.turbulence,frequency:c.motion.frequency,scrollSpeed:1}},play:false}).id;
-    e.ids=[grains,dust];for(const [i,id]of e.ids.entries())api.Get(id).editorKey='soil:'+(i?'dust':'grains');
+      rotationOverLifetime:{enabled:true,angularVelocity:c.dust.spin},noise:{enabled:true,strength:c.motion.turbulence*c.dust.noiseScale,frequency:c.motion.frequency,scrollSpeed:1}});
+    const fallModules=DustModules(false);if(c.dust.veil){fallModules.renderer.mode='material';fallModules.rotationOverLifetime.enabled=false;}
+    const dustFall=Create('dustFall',{...(c.dust.veil?{profile:'soilVeil'}:{preset:'FireSmoke'}),name:stem+'/下落尘体',modules:fallModules});
+    if(c.dust.veil)api.renderer.streams.get(api.Get(dustFall).system).material.uniforms.uSoilArt.value.set(c.dust.lightGain,c.dust.flowDetail,c.dust.flowSoftness,c.dust.flowSpeed);
+    const dustImpact=Create('dustImpact',{preset:'FireSmoke',name:stem+'/贴地起尘',modules:DustModules(true)});
+    e.layerIds={grains,deposits,dustFall,dustImpact};
     e.root=new THREE.Group();e.root.name=stem+'/实体土块';this.solidRoot.add(e.root);
     // Reuse production clod geometry rather than inventing a second rock asset.
     e.geometry=(api.profiles.get('clod')?.config.shape||new THREE.IcosahedronGeometry(.5,0)).clone();
+    const positions=e.geometry.attributes.position;e.supportVertices=Array.from({length:positions.count},(_,i)=>[positions.getX(i),positions.getY(i),positions.getZ(i)]);
     e.material=new THREE.MeshStandardMaterial({color:new THREE.Color().fromArray(c.clods.color),roughness:c.clods.roughness,metalness:0,flatShading:true,
       opacity:c.clods.color[3],transparent:c.clods.color[3]<1,depthWrite:c.clods.color[3]>=1});
     const host={...this.defaultHost,...e.host,
+      clodRadiusScale:Math.max(...e.supportVertices.map(v=>Math.hypot(...v))),
+      clodSupport:(p,normal)=>{let support=0;for(const vertex of e.supportVertices){const v=RotateSoilVector(vertex.map((n,i)=>n*c.clods.aspect[i]*p.size),p.angles);support=Math.max(support,-v.reduce((sum,n,i)=>sum+n*normal[i],0));}return support;},
       qualityScale:LIMITS.quality[api.quality]??1,
       distanceTo:p=>this.eye.distanceTo(new THREE.Vector3(...p)),
       allow:layer=>this.Count(layer)<LIMITS[layer]&&this.births<LIMITS.birthsPerStep,
@@ -48,8 +67,13 @@ export class FallingSoilEffects{
       onReset:()=>{for(const id of e.ids){const s=api.Get(id).system;s.onClear(s);s.Reset();s.Play();}for(const mesh of e.meshes.values()){mesh.visible=false;e.freeMeshes.push(mesh);}e.meshes.clear();},
       onEmit:(layer,p)=>{
         if(layer==='clods'){this.births++;return true;}
-        const id=layer==='grains'?grains:dust,s=api.Get(id).system;
-        const record={...p,color:[...p.color]};if(layer==='dust')record.color[3]*=c.dust.density;
+        const id=layer==='grains'?(p.settled?deposits:grains):(p.impact?dustImpact:dustFall),s=api.Get(id).system;
+        const record={...p,color:[...p.color]};
+        if(layer==='dust'&&!p.impact&&c.dust.veil)record.rotation=0;
+        if(layer==='dust')record.color[3]*=c.dust.density===0?0:(volumetric&&(p.impact||!c.dust.veil))?1:c.dust.density;
+        if(p.settled)record.packed={x:p.origin[0],y:p.origin[1],z:p.origin[2],vx:0,vy:0,vz:0,ax:0,ay:0,az:0,life:p.life,sizeStart:p.size,sizeEnd:p.size,
+          colorA:p.color.slice(0,3),colorB:p.color.slice(0,3),opacity:p.color[3],fadeIn:0,drag:.05,angle:p.rotation,spin:0,stretch:0,flicker:0,groundY:-9999,frame:0,minPx:0,seed:p.seed,
+          nx:p.normal[0],ny:p.normal[1],nz:p.normal[2]};
         const accepted=s.EmitRecord(record)!==-1;if(accepted)this.births++;return accepted;
       },
     };
@@ -81,7 +105,7 @@ export class FallingSoilEffects{
   Stop(id,options){const e=this.Get(id);e.simulation.Stop(options);e.simulation.paused=false;for(const particleId of e.ids)this.particles.Get(particleId).system.state='draining';this.SyncMeshes(e);return this.Inspect(id);}
   Samples(id,layer='clods',limit=16){if(!['clods','grains','dust'].includes(layer)||!Number.isInteger(limit)||limit<0||limit>256)throw new Error('Invalid soil sample request');return this.Get(id).simulation.Samples(layer,limit);}
   Inspect(id){if(!id)return {entries:[...this.entries.keys()].map(key=>this.Inspect(key)),limits:LIMITS,live:Object.fromEntries(['grains','clods','dust'].map(layer=>[layer,this.Count(layer)]))};
-    const e=this.Get(id);return {id,preset:e.preset,...e.simulation.Inspect(),particleIds:[...e.ids],meshes:e.meshes.size,allocatedMeshes:e.meshes.size+e.freeMeshes.length};}
+    const e=this.Get(id);return {id,preset:e.preset,...e.simulation.Inspect(),particleIds:[...e.ids],renderLayers:Object.fromEntries(Object.entries(e.layerIds||{}).map(([key,id])=>[key,{id,time:this.particles.Get(id).system.time,count:this.particles.Get(id).system.particles.length}])),meshes:e.meshes.size,allocatedMeshes:e.meshes.size+e.freeMeshes.length};}
   Export(id){const e=this.Get(id);return {version:1,kind:'TengxianFallingSoil',preset:e.preset,config:JSON.parse(JSON.stringify(e.config))};}
   Import(data,host={}){if(data?.version!==1||data.kind!=='TengxianFallingSoil')throw new Error('Unsupported falling soil data');return this.Create(data,host);}
   Remove(id){const e=this.Get(id);this.Release(e);this.entries.delete(id);return true;}

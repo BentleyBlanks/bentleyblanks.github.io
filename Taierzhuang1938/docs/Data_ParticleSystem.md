@@ -6,6 +6,8 @@
 
 ## 模块与数据
 
+`volume` 可选 `renderer.densityStyle:"smoke"|"soil"`：默认保留原卷曲烟团，土尘为柔和、细节更密的悬尘密度场。它使用现有三维噪声和体积实例批，不改变烟火预设的默认形态。下落尘帘与细粒拖痕仍通过原 `ParticleBatch` 材质 profile，触地体积尘复用 `volume`。
+
 共用组合特效 `Tengxian.Particles.FallingSoil` 将细砂/薄尘接入本系统，少量实体土块补有限表面扫掠碰撞、碎裂和接触起尘；未把通用粒子模块升级为任意碰撞/子发射器系统。接口、预算、编辑器和近似限制见 [共用落土](Data_FallingSoil.md)。
 
 | 模块 | 已实现参数 |

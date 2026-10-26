@@ -18,6 +18,8 @@ assert.equal(a.dust.length+a.grains.length+a.clods.length,0);
 const slope=Run(new FallingSoilSimulation({clods:{response:'stop',fragmentChance:0}},host),1.5);
 assert.ok(slope.clods.some(p=>p.resting),'real clods reach and stop on the injected terrain');
 for(const p of slope.clods.filter(p=>p.resting))assert.ok(Math.abs(p.position[1]-p.radius-host.groundAt(p.position[0],p.position[2]))<.03,'no fixed zero-height plane');
+const thinContact=Run(new FallingSoilSimulation({clods:{response:'stop',fragmentChance:0}},{groundAt:()=>0,clodSupport:()=>.004}),1.6);
+assert.ok(thinContact.clods.some(p=>p.resting));for(const p of thinContact.clods.filter(p=>p.resting))assert.ok(Math.abs(p.position[1]-.006)<.001,'actual support replaces the conservative sphere at contact');
 
 const beamY=1.35,beamHits=[];
 const Ray=(from,dir,distance)=>{if(dir.y>=0)return null;const t=(beamY-from.y)/dir.y,x=from.x+dir.x*t,z=from.z+dir.z*t;
@@ -43,7 +45,7 @@ const pulseCount=pulse.stats.emitted.grains;Run(pulse,.6);assert.equal(pulse.sta
 const once=Run(new FallingSoilSimulation({},host),.4),firstCount=once.stats.emitted.grains;Run(once,2);const beforeTail=once.stats.emitted.grains;Run(once,.4);
 assert.ok(firstCount>once.stats.emitted.grains-beforeTail,'ceiling release is initially dense, then sparse');
 for(const shape of ['point','line','area']){
-  const sim=Run(new FallingSoilSimulation({emitter:{shape,distribution:'uniform',width:2,length:1,position:[5,7,-4]},clods:{enabled:false},dust:{enabled:false}},{}),.5);
+  const sim=Run(new FallingSoilSimulation({emitter:{shape,distribution:'uniform',width:2,length:1,position:[5,7,-4],clearance:0},clods:{enabled:false},dust:{enabled:false}},{}),.5);
   assert.ok(sim.grains.every(p=>p.origin[1]===7&&p.velocity[1]<0));
   assert.ok(sim.grains.every(p=>Math.abs(p.origin[0]-5)<=1&&Math.abs(p.origin[2]+4)<=.5));
   if(shape==='point')assert.ok(sim.grains.every(p=>p.origin[0]===5&&p.origin[2]===-4));
@@ -59,4 +61,9 @@ assert.ok(moved.grains.some(p=>p.origin[0]===8));const movedReplay=Snapshot(move
 const rotated=RotateSoilVector([0,-1,0],[Math.PI/2,0,0]);assert.ok(Math.abs(rotated[2]+1)<1e-8);
 const gravity=SoilTrajectory({origin:[0,3,0],velocity:[0,0,0],force:[0,-9.81,0],drag:.1},.5);assert.ok(gravity.position[1]<3);
 const serial=NormalizeFallingSoil(JSON.parse(JSON.stringify(slope.config)));assert.deepEqual(serial,slope.config);
+const deposited=Run(new FallingSoilSimulation({},host),2.3);
+assert.ok(deposited.stats.deposited>0&&deposited.settledCount>0,'falling fines leave retained material on the injected surface');
+for(const p of deposited.grains.filter(p=>p.settled)){assert.deepEqual(p.velocity,[0,0,0]);assert.deepEqual(p.force,[0,0,0]);assert.ok(Math.abs(p.origin[1]-host.groundAt(p.origin[0],p.origin[2]))<.04);}
+assert.ok(deposited.settledCount<=deposited.config.grains.maxDeposits,'retention has its own bounded sub-budget');
+assert.ok(deposited.dust.filter(p=>!p.impact).every(p=>p.velocity[1]<0&&p.force[1]<0),'primary dust descends rather than receiving fire buoyancy');
 console.log('ok falling soil: complete schema, deterministic contacts/replay, moving sources/world space, point/line/area, sloped terrain, blockers, impact dust, finite fragments, layer switches, pulses, drain and budgets');

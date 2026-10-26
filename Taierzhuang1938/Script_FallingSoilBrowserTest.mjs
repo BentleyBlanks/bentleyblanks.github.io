@@ -27,10 +27,15 @@ try{
    // jitter or exposure changes being mistaken for particle pixels.
    const target=new THREE.WebGLRenderTarget(size.x,size.y),previous=r.getRenderTarget(),autoClear=r.autoClear;
    const Read=()=>{r.setRenderTarget(target);r.autoClear=true;r.clear();r.render(g.scene,g.camera);const data=new Uint8Array(size.x*size.y*4);r.readRenderTargetPixels(target,0,0,size.x,size.y,data);return data;};
-   const object=part==='clods'?g.Particles.FallingSoil.Get(e.soil.id).root:g.vfx.particles.root;
-   const solids=g.Particles.FallingSoil.Get(e.soil.id).root;
-   const on=Read();object.visible=false;if(part==='all')solids.visible=false;const off=Read();object.visible=true;solids.visible=true;r.setRenderTarget(previous);r.autoClear=autoClear;target.dispose();g.StepFrames(1,0,true);
-   let changed=0;for(let i=0;i<on.length;i+=4)if(Math.abs(on[i]-off[i])+Math.abs(on[i+1]-off[i+1])+Math.abs(on[i+2]-off[i+2])>15)changed++;
+   const entry=g.Particles.FallingSoil.Get(e.soil.id),solids=entry.root;
+   const object=part==='clods'?solids:g.vfx.particles.root;
+   const layerNames={dust:['dustFall','dustImpact'],impact:['dustImpact'],grains:['grains'],deposits:['deposits']}[part];
+   const on=Read();
+   if(layerNames){for(const key of layerNames)g.Particles.Configure(entry.layerIds[key],{renderer:{enabled:false}});}else{object.visible=false;if(part==='all')solids.visible=false;}
+   const off=Read();
+   if(layerNames){for(const key of layerNames)g.Particles.Configure(entry.layerIds[key],{renderer:{enabled:true}});}else{object.visible=true;solids.visible=true;}
+   r.setRenderTarget(previous);r.autoClear=autoClear;target.dispose();g.StepFrames(1,0,true);
+   const threshold=layerNames?4:15;let changed=0;for(let i=0;i<on.length;i+=4)if(Math.abs(on[i]-off[i])+Math.abs(on[i+1]-off[i+1])+Math.abs(on[i+2]-off[i+2])>threshold)changed++;
    return {changed,soil:e.soil.Inspect(),quality:g.GraphicsProfile.Inspect().profile};
  },part);
  await Open('high');
@@ -42,8 +47,25 @@ try{
    const result=await Pixels();assert.ok(result.changed>35,'real sand/clod/dust pixels: '+JSON.stringify(result));
    await Capture(preset);console.log('preset pixels',preset,JSON.stringify(result));
    assert.ok(result.soil.live.grains>0&&result.soil.live.clods>0&&result.soil.live.dust>0,'all three layers are alive in '+preset+': '+JSON.stringify(result.soil));
+   for(const layer of Object.values(result.soil.renderLayers))assert.ok(Math.abs(layer.time-result.soil.time)<1e-7,'explicit layer clocks match composite time, without inherited smoke prewarm');
+   const dustPixels=await Pixels('dust');assert.ok(dustPixels.changed>1000,'dust itself has visible GPU pixels in '+preset+': '+dustPixels.changed);
+   result.dustPixels=dustPixels.changed;
    assert.ok(result.soil.impacts>0,'clods hit ground or beam');report.presets.push({preset,...result});
  }
+ await page.evaluate(()=>{const e=Tengxian.ParticleEditor;e.SelectEffect('SoilCeilingShake');e.Seek(.2);Tengxian.StepFrames(2,0,true);});
+ report.impactBefore=await Pixels('impact');assert.equal(report.impactBefore.changed,0,'no contact puff before any material reaches a surface');
+ await page.evaluate(()=>{Tengxian.ParticleEditor.Seek(1.8);Tengxian.StepFrames(2,0,true);});
+ report.impactAfter=await Pixels('impact');assert.ok(report.impactAfter.changed>500,'secondary contact dust is actually rendered');
+ report.deposits=await Pixels('deposits');assert.ok(report.deposits.soil.settledGrains>0&&report.deposits.changed>10,'settled fines leave a visible contact footprint');
+ report.beamContact=await page.evaluate(()=>{const g=Tengxian,e=g.ParticleEditor;e.soil.stage.beam.enabled=true;e.soil.stage.beam.y=1.15;e.Seek(1.3);g.StepFrames(2,0,true);
+   const model=g.Particles.FallingSoil.Get(e.soil.id).simulation;
+   return {raisedPuffs:model.dust.filter(p=>p.impact&&p.origin[1]>1).length,sourceHeight:e.soil.Config().emitter.position[1],state:e.soil.Inspect()};});
+ assert.ok(report.beamContact.raisedPuffs>0,'actual beam casts cause secondary dust above the floor');await Capture('BeamContact');
+ await page.evaluate(()=>{Tengxian.ParticleEditor.soil.stage.beam.enabled=false;Tengxian.ParticleEditor.Seek(1.2);});
+ report.clodGroundContact=await page.evaluate(async()=>{const THREE=await import('three'),g=Tengxian,e=g.ParticleEditor;e.Seek(2.6);g.StepFrames(2,0,true);
+   const entry=g.Particles.FallingSoil.Get(e.soil.id);return entry.simulation.clods.filter(p=>p.resting&&p.birth+p.life-entry.simulation.time>.6)
+     .map(p=>({id:p.id,minY:new THREE.Box3().setFromObject(entry.meshes.get(p.id)).min.y,ground:e.soil.stage.groundY}));});
+ assert.ok(report.clodGroundContact.length>0&&report.clodGroundContact.every(p=>Math.abs(p.minY-p.ground)<.01),'settled rendered clods touch the real surface instead of floating on a bounding sphere');
  await page.evaluate(()=>{const e=Tengxian.ParticleEditor;e.SelectEffect('SoilCeilingShake');e.Seek(1.1);e.soil.Frame(true);Tengxian.StepFrames(3,0,true);});await Capture('NearGrainsClods');
  report.nearClods=await Pixels('clods');console.log('near clod pixels',JSON.stringify(report.nearClods));assert.ok(report.nearClods.changed>100,'close camera exposes real faceted clod geometry, clear of the beam');
  report.clodPrepass=await page.evaluate(()=>{const g=Tengxian,e=g.ParticleEditor,entry=g.Particles.FallingSoil.Get(e.soil.id);g.StepFrames(2,0,true);
@@ -97,15 +119,25 @@ try{
    return {millisecondsPerFrame:elapsed/36,renderer:{...g.renderer.info.render},soil:e.soil.Inspect()};
  });
  assert.ok(report.performance.soil.live.clods<=48&&report.performance.soil.live.grains<=6000);
+ report.shaderBudget=await page.evaluate(()=>{const gl=Tengxian.renderer.getContext(),types=new Set([gl.SAMPLER_2D,gl.SAMPLER_3D,gl.SAMPLER_CUBE,gl.SAMPLER_2D_SHADOW,gl.SAMPLER_2D_ARRAY,gl.SAMPLER_2D_ARRAY_SHADOW,gl.SAMPLER_CUBE_SHADOW,gl.INT_SAMPLER_2D,gl.INT_SAMPLER_3D,gl.INT_SAMPLER_CUBE,gl.INT_SAMPLER_2D_ARRAY,gl.UNSIGNED_INT_SAMPLER_2D,gl.UNSIGNED_INT_SAMPLER_3D,gl.UNSIGNED_INT_SAMPLER_CUBE,gl.UNSIGNED_INT_SAMPLER_2D_ARRAY]);
+   const rows=[];for(const entry of Tengxian.renderer.info.programs||[]){const program=entry.program;if(!program)continue;const linked=!!gl.getProgramParameter(program,gl.LINK_STATUS);let samplers=0;
+     if(linked)for(let i=0;i<gl.getProgramParameter(program,gl.ACTIVE_UNIFORMS);i++){const u=gl.getActiveUniform(program,i);if(u&&types.has(u.type))samplers+=u.size;}
+     rows.push({name:entry.name,linked,samplers});}return {maxUnits:gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),rows,glError:gl.getError()};});
+ assert.ok(report.shaderBudget.rows.every(row=>row.linked&&row.samplers<=report.shaderBudget.maxUnits),'all actual effect/studio shader variants link within the sampler budget');assert.equal(report.shaderBudget.glError,0);
  const originalUnchanged=await page.evaluate(baseline=>JSON.stringify(Tengxian.ParticleEditor.savedParticleEffects.Inspect())===baseline,baseline);assert.equal(originalUnchanged,true,'the gameplay particle manager is frozen during preview');
  report.restored=await page.evaluate(()=>{const g=Tengxian,original=g.ParticleEditor.savedParticleEffects;g.editor.Close();return {same:g.vfx.particles===original,soil:g.Particles.FallingSoil.entries.size,solidRoots:g.scene.children.filter(o=>o.name==='FallingSoilSolidRoot').length,references:g.scene.getObjectByName('FallingSoilPreviewReferences')!==undefined};});
  assert.ok(report.restored.same&&!report.restored.references);
  assert.equal(report.restored.solidRoots,baselineSolidRoots-1,'the preview solid root is released alongside its particle fork');
  if(!online){
-   await Open();await page.evaluate(()=>{Tengxian.ParticleEditor.Seek(1.2);Tengxian.StepFrames(2,0,true);});
+   await Open('whitebox');await page.evaluate(()=>{Tengxian.ParticleEditor.Seek(1.2);Tengxian.StepFrames(2,0,true);});
    report.whitebox=await Pixels();assert.equal(report.whitebox.quality,'whitebox');assert.ok(report.whitebox.changed>35,'default whitebox preview keeps falling soil visible');await Capture('DefaultWhitebox');
    const quality=await page.evaluate(()=>{Tengxian.editor.Close();return Tengxian.GraphicsProfile.Inspect();});assert.equal(quality.config.effects,false,'exit restores hidden-VFX preference');
  }
  assert.deepEqual(errors,[],'no runtime/WebGL errors');report.errors=errors;
- await fs.writeFile(path.join(out,online?'Report_Online.json':'Report.json'),JSON.stringify(report,null,2));console.log('ok falling soil browser:',JSON.stringify(report));
+ await fs.writeFile(path.join(out,online?'Report_Online.json':'Report.json'),JSON.stringify(report,null,2));
+ console.log('ok falling soil browser:',JSON.stringify({base,online,presets:report.presets.map(p=>({preset:p.preset,pixels:p.changed,dustPixels:p.dustPixels})),
+   clocks:true,replay:report.replay,framePartition:report.framePartition,groundedClods:report.clodGroundContact.length,
+   impactBefore:report.impactBefore.changed,impactAfter:report.impactAfter.changed,deposits:report.deposits.changed,
+   resources:report.lifecycle,shaderPrograms:report.shaderBudget.rows.length,maxSamplers:Math.max(...report.shaderBudget.rows.map(p=>p.samplers)),
+   samplerLimit:report.shaderBudget.maxUnits,errors}));
 }finally{await browser.close();if(server)await new Promise(resolve=>server.close(resolve));}
