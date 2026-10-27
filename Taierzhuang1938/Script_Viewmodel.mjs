@@ -1303,6 +1303,9 @@ function BuildFromModel(materials, weapon, key, doc, authoredAsset=null) {
     return null;
   }
   if (!built || !built.nodes.has("muzzle")) return null;
+  // 视模的枪永远不投世界影子（非等比压缩过的假枪，见 Script_FirstPersonSelfShadow 头注）。173R 的实例化给世界枪用，
+  // 默认 castShadow=true，2026-10-25 接进视模后地上就多了一支放大的假枪影。玩家的枪影由 Script_FirstPersonShadow 按真实尺寸投。
+  built.root.traverse((mesh) => { if (mesh.isMesh) mesh.castShadow = false; });
 
   const group = new THREE.Group();
   group.name = `VmModel_${key}`;
@@ -2408,6 +2411,8 @@ export class Viewmodel {
       console.warn(`[Viewmodel] ${meshId} 实例化失败：${String(error).slice(0, 160)}`);
       return null;
     }
+    // 同上：视模件不投世界影子（TZM 实例化默认会投）
+    built.root.traverse((mesh) => { if (mesh.isMesh) mesh.castShadow = false; });
     const group = new THREE.Group();
     group.name = `VmBayonet_${weaponId}`;
     group.add(built.root);

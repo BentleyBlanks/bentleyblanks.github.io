@@ -23,6 +23,18 @@
 
 const _roots = new Set();
 const _hidden = [];
+// 反过来的一张表（2026-10-28）：**只进阴影图**的根。平时 visible=false（主画面、预通道、SSR 都看不到），
+// 烘阴影那一刻露面、烘完藏回去。第一人称玩家的整身影子替身（Script_FirstPersonShadow）用它。
+// three r185 的阴影趟按主相机的图层判可见，所以不能用图层分（见 Script_Csm 头注）。
+const _shadowOnly = new Set();
+
+/** 登记 / 注销一个只进阴影图的根。两种情况下它平时都是 visible=false。 */
+export function SetShadowOnly(root, on) {
+  if (!root) return;
+  if (on) _shadowOnly.add(root); else _shadowOnly.delete(root);
+  root.visible = false;
+}
+export function ShadowOnlyCount() { return _shadowOnly.size; }
 let _enabled = true;
 
 /** 总开关（取证 A/B 用：同一页面里开/关交替量，别拿两次开机的墙钟比）。 */
@@ -44,7 +56,7 @@ export function SetShadowSkip(root, skip) {
 export function ShadowSkipCount() { return _roots.size; }
 
 /** 测试用：清空登记表。 */
-export function ResetShadowSkip() { _roots.clear(); _hidden.length = 0; }
+export function ResetShadowSkip() { _roots.clear(); _hidden.length = 0; _shadowOnly.clear(); }
 
 /**
  * 包一层 `renderer.shadowMap.render`：烘之前藏掉登记表里**当前可见**的根，烘完
@@ -57,6 +69,12 @@ export function InstallShadowSkip(renderer) {
   if (!shadowMap || typeof shadowMap.render !== "function" || shadowMap.render.shadowSkipInstalled) return false;
   const original = shadowMap.render;
   const wrapped = function ShadowSkipRender(lights, scene, camera) {
+    if (_shadowOnly.size === 0) return SkipRender.call(this, lights, scene, camera);
+    for (const root of _shadowOnly) root.visible = true;
+    try { return SkipRender.call(this, lights, scene, camera); }
+    finally { for (const root of _shadowOnly) root.visible = false; }
+  };
+  const SkipRender = function ShadowSkipInner(lights, scene, camera) {
     if (!_enabled || shadowMap.enabled === false || !lights || lights.length === 0
       || (shadowMap.autoUpdate === false && shadowMap.needsUpdate === false) || _roots.size === 0) {
       return original.call(this, lights, scene, camera);

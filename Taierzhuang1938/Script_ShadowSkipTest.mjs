@@ -4,11 +4,12 @@
 //   2. 三方的早退条件（总闸关 / 没灯 / 这帧不烘 / 表为空）下一次 visible 都不翻；
 //   3. 烘焙抛错也要还原；
 //   4. 重复安装幂等，注销后不再藏；
-//   5. 与「先装的别的包装」叠加：外层包装看到的还是完整烘焙。
+//   5. 与「先装的别的包装」叠加：外层包装看到的还是完整烘焙；
+//   6. 只进阴影图的根（SetShadowOnly，2026-10-28 第一人称影子替身）：平时不可见，烘那一刻可见，烘完藏回；抛错也藏回；注销后烘的时候也不露面。
 //
 // 用法：node Taierzhuang1938/Script_ShadowSkipTest.mjs
 
-import { InstallShadowSkip, SetShadowSkip, ShadowSkipCount, ResetShadowSkip } from "./Script_ShadowSkip.mjs";
+import { InstallShadowSkip, SetShadowSkip, ShadowSkipCount, ResetShadowSkip, SetShadowOnly, ShadowOnlyCount } from "./Script_ShadowSkip.mjs";
 
 let failed = 0;
 const Check = (label, ok, detail = "") => {
@@ -106,6 +107,26 @@ const Root = (visible = true) => ({ visible, children: [] });
   SetShadowSkip(far, true);
   renderer.shadowMap.render([{}], scene, null);
   Check("外层包装照常调到烘焙，烘那一刻仍然藏了", outerCalls === 1 && seen.at(-1)[0] === false && far.visible === true);
+}
+
+// --- 6. 只进阴影图的根 ---------------------------------------------------------
+{
+  ResetShadowSkip();
+  const { renderer, seen } = MakeRenderer();
+  InstallShadowSkip(renderer);
+  const proxy = Root(true), skipped = Root(true);
+  const scene = { children: [proxy, skipped] };
+  SetShadowOnly(proxy, true);
+  SetShadowSkip(skipped, true);
+  Check("登记后平时不可见", proxy.visible === false && ShadowOnlyCount() === 1);
+  renderer.shadowMap.render([{}], scene, null);
+  Check("烘那一刻露面（同时照常藏跳过表里的根），烘完藏回", seen.at(-1)[0] === true && seen.at(-1)[1] === false && proxy.visible === false && skipped.visible === true);
+  scene.throwOnce = true;
+  try { renderer.shadowMap.render([{}], scene, null); } catch (error) { /* 预期 */ }
+  Check("烘焙抛错也藏回", proxy.visible === false && skipped.visible === true);
+  SetShadowOnly(proxy, false);
+  renderer.shadowMap.render([{}], scene, null);
+  Check("注销后烘的时候也不露面", seen.at(-1)[0] === false && proxy.visible === false && ShadowOnlyCount() === 0);
 }
 
 console.log(failed ? `\n${failed} 条失败` : "\n全部通过");

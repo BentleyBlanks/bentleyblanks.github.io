@@ -31,6 +31,7 @@ import { NormalizeGraphicsDetails, LoadSavedGraphics, ApplySavedSettings } from 
 import { SettingsHost, SETTINGS_PAGE_IDS } from "./Script_SettingsHost.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { InstallShadowSkip, ShadowSkipCount, SetShadowSkipEnabled } from "./Script_ShadowSkip.mjs";
+import { FirstPersonShadow } from "./Script_FirstPersonShadow.mjs";
 import { BonePrune } from "./Script_BonePrune.mjs";
 import { ShadowCasterBatch, InstallShadowCasterBatch } from "./Script_ShadowCasterBatch.mjs";
 import { PrepassStaticBatch, InstallPrepassStaticBatch } from "./Script_PrepassStaticBatch.mjs";
@@ -923,6 +924,8 @@ const state = {
 
 let battlefield = null;
 const BodyGroundAt = (x, z) => battlefield ? battlefield.GroundHeight(x, z) : NaN;
+// 第一人称玩家的整身影子替身（Script_FirstPersonShadow）：人物素材到位后第一次出画时建，建不起来记 false 不再试。
+let firstPersonShadow = null;
 let explosionRange = null;
 /**
  * 物理世界（Rapier）。**与 battlefield 一一对应，换关一起换。**
@@ -9804,12 +9807,27 @@ function RenderScene(dt) {
   finally { if (capturing) frameDebugger.EndRender(failure); }
 }
 
+/** 玩家影子：第一人称身体这帧画就投整身影子（腿脚照抄身体、手握真实尺寸的枪），不画就停。 */
+function UpdateFirstPersonShadow() {
+  const body = viewmodel?.body;
+  if (!body) return;
+  if (firstPersonShadow === null) {
+    const nra = actorFactory?.characterAssets?.byFaction?.nra;
+    if (!nra?.length) return;
+    const asset = nra.find((entry) => /Nra02$/.test(entry.record?.id || "")) || nra[0];
+    try { firstPersonShadow = new FirstPersonShadow(asset, body); }
+    catch (error) { console.warn("[Main] 第一人称影子替身建不起来，玩家没有影子：", error); firstPersonShadow = false; }
+  }
+  if (firstPersonShadow) firstPersonShadow.Update(viewmodel, body.root.visible);
+}
+
 function RenderSceneContent(dt) {
   missionRuntime?.frontShow?.bunker.BeforeRender();
   // 白盒编辑器的预演播放中：相机不在玩家身上，枪模与第一人称身体一起藏（播完 / 中断由编辑器还原枪模）
   const openingBody=CLOTH_TEST || (player?.Alive && missionRuntime?.frontShow?.bunker.CameraActive) || BlockoutInputCaptured();
   if(openingBody&&viewmodel)viewmodel.root.visible=false;
   if (viewmodel?.body) viewmodel.body.root.visible = !openingBody && !!player?.Alive && !(player.meleeCameraDrop > 0.05) && !state.cutscene && !state.menu && !UiCapturing();
+  UpdateFirstPersonShadow();
   const phase = PHASE_TABLE[state.phaseIndex];
   // 剖析：GPU 帧从这里开到 post.Render 之后 —— GI 的几趟探针 pass、阴影烘焙、
   // 整条合成链都在这个窗口里按段计时（剖析器关着时这些调用是空转）。
