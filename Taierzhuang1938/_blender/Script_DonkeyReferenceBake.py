@@ -4,7 +4,7 @@ from pathlib import Path
 
 project=Path(bpy.context.scene['DonkeyCartProject'])
 parent=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261023')
-base=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261027/ReferenceFitV47ChestPigment')
+base=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261027/ReferenceFitV48ForeSilhouette')
 source=parent/'ReferenceFitV4/Scene_DonkeyBeforeReferenceFit.blend'
 if not source.is_file():raise RuntimeError('Missing preserved bare V3 intermediate: '+str(source))
 sourceSha=hashlib.sha256(source.read_bytes()).hexdigest()
