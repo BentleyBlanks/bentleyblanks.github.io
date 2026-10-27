@@ -1,0 +1,4 @@
+Use case: historical-scene
+Asset type: seamless PBR albedo source for each individual dressed masonry block of an early twentieth-century railway bridge pier.
+Subject: front-on macro surface of a single pale cool gray-beige weathered sandstone or limestone masonry block, densely fine mineral grains with small darker flecks, subtle irregular weathering, sparse shallow chisel scuffs and tiny pores, restrained earthy gray water staining, natural variation.
+Constraints: single continuous unbroken stone surface filling the entire square image, seamless edges, neutral diffuse albedo without illumination/shadows, no mortar, no joints, no brick pattern, no boundaries, no carved inscription, no objects, no obvious repeating spots, no plants, lettering or watermark. Photorealistic material; grout and stone outlines will be physical geometry, not drawn into the image.

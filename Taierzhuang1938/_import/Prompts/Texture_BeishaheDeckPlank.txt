@@ -1,0 +1,4 @@
+Use case: historical-scene
+Asset type: seamless flat PBR base color texture for longitudinal timber planks on a 1930s railway bridge deck, approximately one square metre.
+Subject: one uninterrupted flat surface of old grey-brown hardwood weathered by outdoor use, dense longitudinal fibers and fine hairline checks flowing strictly VERTICALLY top to bottom along the length of the boards, muted brown-grey color, subtle dust and rubbed wear, restrained dark fissures. A little lighter than heavily creosoted sleepers, not new yellow lumber and not burnt black.
+Constraints: front-on orthographic material scan with neutral uniform diffuse light, no cast shadows, lighting gradients, reflective glare, perspective, vignette, board edges or gaps, no rails, nails, objects, water, writing or watermark. Fill the frame with seamless material only. Physical seams and fastening hardware are separate geometry, not drawn onto the texture.

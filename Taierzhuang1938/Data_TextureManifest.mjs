@@ -97,9 +97,11 @@ const SINGLE_BLANKET_ASSET_BYTES = 1024 * 1024;
 // 2026-10-22 白盒关卡编辑器的河沟示意两张反照率（泥 ~300 KB、水 ~60 KB，tier=editor）：只有 ?editor=blockout 下载，
 // 不进 boot / level 预算；全目录原本就顶着上限（63.79 / 63.81 MB），按它们的体积单列 384 KB。
 const EDITOR_CREEK_SKETCH_BYTES = 384 * 1024;
-// One new 369,312-byte bridge steel PBR set, kept at 1024/512 px for metre-scale
-// corrosion detail. Embedded in the independent GLB, with no boot/level request.
+// The refined bridge steel set occupies 296,616 bytes; sleeper, end-grain,
+// stone, damp stone and deck-plank sets total 1,898,818 bytes. These are
+// embedded in the standalone bridge GLB; they add no boot or level requests.
 const BEISHAHE_METAL_ASSET_BYTES = 384 * 1024;
+const BEISHAHE_SURFACE_ASSET_BYTES = 1872 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -117,21 +119,57 @@ export const TEXTURE_BUDGETS = Object.freeze({
     // Loaded with the title menu, never promoted into the shared boot PBR_SETS.
     // 2026-10-05: seven campaign maps + three historical papers add about 4 MB.
     // Only the selected pair is requested (< 1 MB), not the whole campaign set.
-    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + BEISHAHE_METAL_ASSET_BYTES, // Also includes lossless command-room irradiance.
+    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES, // Also includes lossless command-room irradiance.
     // editor：2026-10-22 白盒编辑器河沟示意加两张 1024 反照率（泥 ~300 KB、水 ~60 KB），只在 ?editor=blockout 下载，玩家不碰；上限抬到 1 MB。
     editor: 1 * 1024 * 1024,
   }),
-  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES + BEISHAHE_METAL_ASSET_BYTES,
+  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES,
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
+  {
+    id: "BeishaheDeckPlank", kind: "material", tier: "lazy", toneClass: "weatheredWood", metersPerTile: 1,
+    bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_BeishaheDeckPlank.json",
+    source: { provider: "imagegen", date: "2026-10-28", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-26059755-f7d9-447f-90c3-b1b5208cdd43", prompt: "_import/Prompts/Texture_BeishaheDeckPlank.txt", note: "桥面旧木板长纹；图像V方向与每块板的长轴一致；源图留OneDrive。" },
+    consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishaheDeckPlank" }],
+    files: [["Texture_BeishaheDeckPlankBase.webp", "Base", 1024, 1024], ["Texture_BeishaheDeckPlankNormal.webp", "Normal", 512, 512], ["Texture_BeishaheDeckPlankOrm.webp", "Orm", 512, 512]],
+  },
+  {
+    id: "BeishahePierDamp", kind: "material", tier: "lazy", toneClass: "stone", metersPerTile: 1,
+    bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_BeishahePierDamp.json",
+    source: { provider: "imagegen", date: "2026-10-28", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-3e5949d2-b8a3-4cbd-91b7-e963dcd5ed74", prompt: "_import/Prompts/Texture_BeishahePierDamp.txt", note: "墩底单石受潮和矿物沉积的设计纹理，非1938年水位证据；源图留OneDrive。" },
+    consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishahePierDamp" }],
+    files: [["Texture_BeishahePierDampBase.webp", "Base", 1024, 1024], ["Texture_BeishahePierDampNormal.webp", "Normal", 512, 512], ["Texture_BeishahePierDampOrm.webp", "Orm", 512, 512]],
+  },
+  {
+    id: "BeishaheSleeper", kind: "material", tier: "lazy", toneClass: "weatheredWood", metersPerTile: 1,
+    bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_BeishaheSleeper.json",
+    source: { provider: "imagegen", date: "2026-10-27", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-dd4ef4dd-49dc-4409-b968-3569db9db864", prompt: "_import/Prompts/Texture_BeishaheSleeper.txt", note: "灰褐旧枕木长纹，纹理竖向对应木枕长轴；源图留OneDrive。" },
+    consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishaheSleeper" }],
+    files: [["Texture_BeishaheSleeperBase.webp", "Base", 1024, 1024], ["Texture_BeishaheSleeperNormal.webp", "Normal", 512, 512], ["Texture_BeishaheSleeperOrm.webp", "Orm", 512, 512]],
+  },
+  {
+    id: "BeishaheSleeperEnd", kind: "material", tier: "lazy", toneClass: null, metersPerTile: null,
+    toneReason: "Individual sleeper end grain, not a seamless whole-surface tile",
+    bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_BeishaheSleeperEnd.json",
+    source: { provider: "imagegen", date: "2026-10-27", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-10adc995-95d2-48ae-974c-a71d849f41e7", prompt: "_import/Prompts/Texture_BeishaheSleeperEnd.txt", note: "独立木枕端面年轮与细裂；0.25米端面以256像素贴图对应。源图留OneDrive。" },
+    consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishaheSleeperEnd" }],
+    files: [["Texture_BeishaheSleeperEndBase.webp", "Base", 256, 256], ["Texture_BeishaheSleeperEndNormal.webp", "Normal", 128, 128], ["Texture_BeishaheSleeperEndOrm.webp", "Orm", 128, 128]],
+  },
+  {
+    id: "BeishahePierStone", kind: "material", tier: "lazy", toneClass: "stone", metersPerTile: 1,
+    bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_BeishahePierStone.json",
+    source: { provider: "imagegen", date: "2026-10-27", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-66fa75c7-9c16-4882-ac23-e645f04365fe", prompt: "_import/Prompts/Texture_BeishahePierStone.txt", note: "无灰缝单块风化料石表面；砌缝由实体几何表达。源图留OneDrive。" },
+    consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishahePierStone" }],
+    files: [["Texture_BeishahePierStoneBase.webp", "Base", 1024, 1024], ["Texture_BeishahePierStoneNormal.webp", "Normal", 512, 512], ["Texture_BeishahePierStoneOrm.webp", "Orm", 512, 512]],
+  },
   {
     id: "BeishaheSteel", kind: "material", tier: "lazy", toneClass: "wornSteel",
     metersPerTile: 1,
     bake: "_import/Script_BakePbrTexture.py",
     bakeRecord: "_import/TextureBakes/Texture_BeishaheSteel.json",
-    source: { provider: "imagegen", date: "2026-10-26",
-      ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-ae319032-a472-4d8b-90bf-6d81dc0b344a",
+    source: { provider: "imagegen", date: "2026-10-27",
+      ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-7588ae36-2a97-466d-9d20-b20296e0b27b",
       prompt: "_import/Prompts/Texture_BeishaheSteel.txt",
       note: "内置 imagegen 生成无花纹旧钢面；按既有 baker 定色/法线/ORM，仅嵌入独立桥梁 GLB，未加入开机或第一关贴图集。源图与 .blend 留 OneDrive。" },
     consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishaheSteel" }],

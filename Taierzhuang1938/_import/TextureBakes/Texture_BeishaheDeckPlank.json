@@ -1,0 +1,122 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-10-28",
+  "name": "BeishaheDeckPlank",
+  "preset": "weatheredWood",
+  "source": {
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishaheDeckPlank.png",
+    "sha256": "5d0ec81b134d4a6a219316bb374410b4991b8899d9f8d92c5fb2a02a63d40d9d",
+    "metrics": {
+      "meanSrgb": [
+        0.4664,
+        0.4105,
+        0.355
+      ],
+      "luma": 0.4107,
+      "lumaStd": 0.0968,
+      "sat": 0.2388,
+      "clipLow": 0.0003,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0231
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.43,
+      0.4,
+      0.36
+    ],
+    "contrast": 0.065,
+    "lumaRange": [
+      0.26,
+      0.5
+    ],
+    "satRange": [
+      0.06,
+      0.3
+    ],
+    "stdRange": [
+      0.03,
+      0.11
+    ],
+    "reliefM": 0.0035,
+    "rough": 0.88,
+    "roughVar": 0.04,
+    "roughLumaK": 0.0,
+    "ao": 0.45,
+    "metal": 0.0,
+    "seamless": "weld",
+    "rowFlatten": false,
+    "flattenSigma": 0.15,
+    "isotropic": false,
+    "heightFromLuma": "direct",
+    "tileM": 1.0,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 0.8,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false,
+    "detailBalance": 0,
+    "heightFineWeight": 0.45,
+    "uvAtlasReason": null
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_BeishaheDeckPlankBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 273880,
+      "sha256": "640f15cd54e9685ba6d35f4401d1207b96a1a6d0251b308235d5a49b4762f8cc"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_BeishaheDeckPlankNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 81420,
+      "sha256": "bc160ab2c6add64f1e3fd0e26eef3475eecb036477e2fff191b6f295b7a67ed8"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_BeishaheDeckPlankOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 55648,
+      "sha256": "009dee645018c089b253c88f2b0dd796487f2ee287131320333ec5ce08d30fb5"
+    }
+  ],
+  "totalBytes": 410948,
+  "metrics": {
+    "meanSrgb": [
+      0.4297,
+      0.4007,
+      0.36
+    ],
+    "luma": 0.3968,
+    "lumaStd": 0.0656,
+    "sat": 0.1622,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0092,
+    "seam": 0.0093,
+    "interior": 0.0447,
+    "seamRatio": 0.207,
+    "border": 0.681,
+    "swing": 0.0797,
+    "aoMean": 0.905,
+    "roughMean": 0.876,
+    "texelsPerMeter": 1024.0
+  },
+  "gateProblems": []
+}

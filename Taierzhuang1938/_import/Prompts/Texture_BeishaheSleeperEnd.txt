@@ -1,0 +1,4 @@
+Use case: historical-scene
+Asset type: authentic PBR albedo source for exposed cross-cut ends of weathered 1930s heavy railroad sleepers.
+Subject: square-on close view of aged cut end grain of dense hardwood; desaturated dark gray-brown weathered creosoted timber, gentle irregular growth-ring arcs of varying spacing, small dark radial checks and fine wood pores, sun-aged abrasions. The image is a crop within one massive timber end, not a cut log on a background.
+Constraints: flat unlit base-color material, consistent diffuse neutral light, no drop shadows, perspective, board borders, separate planks, bark rim, surrounding objects, metal fasteners, giant central bullseye, text or watermark. Avoid overly dark, heavy orange rust, artificial stylization and exaggerated black fissures; preserve fine detail.

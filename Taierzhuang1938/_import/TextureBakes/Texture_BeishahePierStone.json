@@ -1,0 +1,122 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-10-27",
+  "name": "BeishahePierStone",
+  "preset": "stone",
+  "source": {
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishahePierStone.png",
+    "sha256": "87931161c756ec23597c7c32a15431b735dd8e99612e18e401357c9860a9c95d",
+    "metrics": {
+      "meanSrgb": [
+        0.7257,
+        0.6867,
+        0.6302
+      ],
+      "luma": 0.6809,
+      "lumaStd": 0.1006,
+      "sat": 0.1316,
+      "clipLow": 0.0,
+      "clipHigh": 0.0002,
+      "lowFreq": 0.0202
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.55,
+      0.52,
+      0.48
+    ],
+    "contrast": 0.07,
+    "lumaRange": [
+      0.38,
+      0.66
+    ],
+    "satRange": [
+      0.0,
+      0.16
+    ],
+    "stdRange": [
+      0.04,
+      0.13
+    ],
+    "reliefM": 0.0015,
+    "rough": 0.89,
+    "roughVar": 0.05,
+    "roughLumaK": 0.0,
+    "ao": 0.5,
+    "metal": 0.0,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.1,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 1.0,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 0.7,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false,
+    "detailBalance": 0,
+    "heightFineWeight": 0.45,
+    "uvAtlasReason": null
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_BeishahePierStoneBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 339988,
+      "sha256": "b0fc7e76a05de84107906dba9b0ed0292d0e98ea9faeb5fb5dca1b913bd50713"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_BeishahePierStoneNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 47096,
+      "sha256": "a6139a0a6ab6ce039e56c3dacba5172f5aabb413d1731ba2cb5014e0afa4250d"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_BeishahePierStoneOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 80844,
+      "sha256": "dac960388fd4bcdc74c03a00e56b7abb1e6b95adfb82139628a0b077c9733909"
+    }
+  ],
+  "totalBytes": 467928,
+  "metrics": {
+    "meanSrgb": [
+      0.5501,
+      0.5207,
+      0.4794
+    ],
+    "luma": 0.5167,
+    "lumaStd": 0.0705,
+    "sat": 0.1286,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0071,
+    "seam": 0.0479,
+    "interior": 0.0491,
+    "seamRatio": 0.976,
+    "border": 0.975,
+    "swing": 0.002,
+    "aoMean": 0.894,
+    "roughMean": 0.887,
+    "texelsPerMeter": 1024.0
+  },
+  "gateProblems": []
+}

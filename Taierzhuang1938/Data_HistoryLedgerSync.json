@@ -17,16 +17,18 @@
       "sourceReview": "Official PDF request returned 200/application/pdf; original complete scan pages and photo 6/12 crops were opened. Photo 12 is captioned Tengxian north 1 km / 567 km; photo 6 is 560 km Jiehe. Neither is identified as the Beishahe bridge. Metadata page returned 403 to the web reader; it was not treated as verified page text.",
       "scaleBoundary": "Modern OSM railway bridge segments and Esri imagery constrain a present-day floodplain crossing of about 280 m; the visible main channel is about 35-50 m. These are modern map estimates, not evidence of bridge length, pier positions or water level in March 1938. The candidate 14 x 20 m short spans and 1.435 m gauge are design choices, not Beishahe-specific archival measurements.",
       "generatedReferenceBoundary": "Imagegen studies supplement local construction detail and material design only; generated images are not historical photographs or evidence.",
+      "detailBoundary20261027": "Paired rivet rows, steel/wood/stone surface textures, individual masonry color variations and scattered lower-pier water or mud staining are reconstruction choices. They do not establish the original 1938 bridge surface, its waterline or local hydrological condition. The American 1908 road bridge is only a distant construction comparison, not evidence about Tengxian.",
+      "deckBoundary20261028": "The independent candidate's transverse solid timber deck, its layout and texture are reference-based design choices; no available photograph establishes the 1938 Beishahe bridge deck. The existing whitebox's sleeper-only deck description remains its own separate setting.",
       "notionSnapshots": [
         {
           "id": "3fd60335331c8194aa82f0b238084d34",
-          "lastEdited": "2026-10-26T08:54:25.763Z",
-          "scope": "Existing chapter-one railway-bridge creative row and dated status note enhanced; 111 rows retained and only the bridge row changed."
+          "lastEdited": "2026-10-27T16:27:14.645Z",
+          "scope": "Existing chapter-one railway-bridge creative row and dated status note enhanced with material, rivet, water/mud stain and candidate timber-deck boundaries; 111 rows retained and only the bridge row changed."
         },
         {
           "id": "3fd60335331c818fa24deadb6d72ca70",
-          "lastEdited": "2026-10-26T08:54:24.831Z",
-          "scope": "Existing creative road/bridge bullet minimally enhanced; no duplicate event added."
+          "lastEdited": "2026-10-27T16:27:16.624Z",
+          "scope": "Existing creative road/bridge bullet minimally enhanced with material, water/mud stain and candidate timber-deck boundaries; no duplicate event added."
         },
         {
           "id": "3eb60335331c81fda6dfe38153bcec45",

@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026102601",
+  "version": "2026102801",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026102601",
+    "version": "2026102801",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "X east, Y up, Z south; origin at bridge center, sleeper top Y=0",
@@ -25,7 +25,7 @@
     "bearingTopY": -0.69,
     "pierTopY": -1.02,
     "foundationY": -5.3,
-    "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, pier dimensions, deck elevation, weathering and colors are authored design. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
+    "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
     "historicalReferences": [
       {
         "id": "JacarPhoto12",
@@ -43,6 +43,11 @@
         "id": "NotionResearch",
         "url": "https://app.notion.com/p/3eb60335331c81fda6dfe38153bcec45",
         "supports": "User research archive; exact 1938 Beishahe bridge photograph still unconfirmed."
+      },
+      {
+        "id": "BullardCreek1908",
+        "url": "https://npgallery.nps.gov/GetAsset/81afac7b-65c7-4d59-9066-ff6c7991e861",
+        "supports": "1908 Minnesota road bridge: paired riveted members and gusset/floor-beam connections as an engineering analogy. Not a Chinese railway bridge, not evidence of Beishahe-specific details."
       }
     ],
     "mapMeasurement": {
@@ -471,27 +476,120 @@
   ],
   "bounds": {
     "min": [
-      -4.90000057220459,
+      -4.800313472747803,
       -5.559999942779541,
-      -144.0500030517578
+      -143.85736083984375
     ],
     "max": [
-      4.900000095367432,
+      4.8003129959106445,
       2.200000047683716,
-      144.0500030517578
+      143.85736083984375
     ],
     "size": [
-      9.800000667572021,
+      9.600626468658447,
       7.759999990463257,
-      288.1000061035156
+      287.7147216796875
     ]
   },
-  "triangles": 276828,
-  "meshObjects": 112,
+  "transitions": [
+    {
+      "supportIndex": 1,
+      "centerZ": -120.0,
+      "structuralGapM": 0.12,
+      "endClearanceM": 0.002,
+      "railHeightM": 0.14
+    },
+    {
+      "supportIndex": 2,
+      "centerZ": -100.0,
+      "structuralGapM": 0.12,
+      "endClearanceM": 0.002,
+      "railHeightM": 0.14
+    },
+    {
+      "supportIndex": 3,
+      "centerZ": -80.0,
+      "structuralGapM": 0.12,
+      "endClearanceM": 0.002,
+      "railHeightM": 0.14
+    },
+    {
+      "supportIndex": 4,
+      "centerZ": -60.0,
+      "structuralGapM": 0.12,
+      "endClearanceM": 0.002,
+      "railHeightM": 0.14
+    },
+    {
+      "supportIndex": 5,
+      "centerZ": -40.0,
+      "structuralGapM": 0.12,
+      "endClearanceM": 0.002,
+      "railHeightM": 0.14
+    },
+    {
+      "supportIndex": 6,
+      "centerZ": -20.0,
+      "structuralGapM": 0.12,
+      "endClearanceM": 0.002,
+      "railHeightM": 0.14
+    },
+    {
+      "supportIndex": 7,
+      "centerZ": 0.0,
+      "structuralGapM": 0.12,
+      "endClearanceM": 0.002,
+      "railHeightM": 0.14
+    },
+    {
+      "supportIndex": 8,
+      "centerZ": 20.0,
+      "structuralGapM": 0.12,
+      "endClearanceM": 0.002,
+      "railHeightM": 0.14
+    },
+    {
+      "supportIndex": 9,
+      "centerZ": 40.0,
+      "structuralGapM": 0.12,
+      "endClearanceM": 0.002,
+      "railHeightM": 0.14
+    },
+    {
+      "supportIndex": 10,
+      "centerZ": 60.0,
+      "structuralGapM": 0.12,
+      "endClearanceM": 0.002,
+      "railHeightM": 0.14
+    },
+    {
+      "supportIndex": 11,
+      "centerZ": 80.0,
+      "structuralGapM": 0.12,
+      "endClearanceM": 0.002,
+      "railHeightM": 0.14
+    },
+    {
+      "supportIndex": 12,
+      "centerZ": 100.0,
+      "structuralGapM": 0.12,
+      "endClearanceM": 0.002,
+      "railHeightM": 0.14
+    },
+    {
+      "supportIndex": 13,
+      "centerZ": 120.0,
+      "structuralGapM": 0.12,
+      "endClearanceM": 0.002,
+      "railHeightM": 0.14
+    }
+  ],
+  "triangles": 1065216,
+  "meshObjects": 298,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
-  "glbBytes": 3862944,
-  "glbSha256": "bacf6096a7d375a4b8b2ce55e433d75438114858422c3535eea6636cdc0d373c",
-  "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, pier dimensions, deck elevation, weathering and colors are authored design. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
+  "glbBytes": 15484992,
+  "glbSha256": "c800b97a72700570235bf97b6929e88bb311cf4bdf0f761b4bb2ee489e7fe25d",
+  "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
       "id": "JacarPhoto12",
@@ -509,21 +607,57 @@
       "id": "NotionResearch",
       "url": "https://app.notion.com/p/3eb60335331c81fda6dfe38153bcec45",
       "supports": "User research archive; exact 1938 Beishahe bridge photograph still unconfirmed."
+    },
+    {
+      "id": "BullardCreek1908",
+      "url": "https://npgallery.nps.gov/GetAsset/81afac7b-65c7-4d59-9066-ff6c7991e861",
+      "supports": "1908 Minnesota road bridge: paired riveted members and gusset/floor-beam connections as an engineering analogy. Not a Chinese railway bridge, not evidence of Beishahe-specific details."
     }
   ],
+  "materialInterpretation": {
+    "pierDamp": "A continuous pale brown-gray damp-to-dry transition on the lower pier courses is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
+    "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
+    "jointTransitions": "Rail and wooden deck splice details are authored to maintain a usable crossing; their exact construction is not established by a confirmed 1938 Beishahe bridge photograph."
+  },
+  "deck": {
+    "clearWidthM": 2.8,
+    "plankThicknessM": 0.045,
+    "topY": 0.075,
+    "railFootClearanceM": 0.001,
+    "jointWidthM": 0.006,
+    "jointEndClearanceM": 0.002,
+    "jointSpliceLengthM": 0.36,
+    "bearerBottomY": 0,
+    "bearerTopY": 0.03,
+    "grainAxis": "X"
+  },
   "materials": [
     "BeishaheSteel",
     "BeishaheTimber",
-    "BeishaheStone"
+    "BeishaheTimberEnd",
+    "BeishaheDeckTimber",
+    "BeishaheStone",
+    "BeishaheStoneDamp",
+    "BeishaheRailRunning"
   ],
   "bakeInputs": [
     "Texture_BeishaheSteelBase.webp",
     "Texture_BeishaheSteelNormal.webp",
     "Texture_BeishaheSteelOrm.webp",
-    "Texture_HandcartWoodBase.webp",
-    "Texture_HandcartWoodNormal.webp",
-    "Texture_CityWallStoneBase.webp",
-    "Texture_CityWallStoneNormal.webp",
-    "Texture_CityWallStoneOrm.webp"
+    "Texture_BeishaheSleeperBase.webp",
+    "Texture_BeishaheSleeperNormal.webp",
+    "Texture_BeishaheSleeperOrm.webp",
+    "Texture_BeishaheSleeperEndBase.webp",
+    "Texture_BeishaheSleeperEndNormal.webp",
+    "Texture_BeishaheSleeperEndOrm.webp",
+    "Texture_BeishaheDeckPlankBase.webp",
+    "Texture_BeishaheDeckPlankNormal.webp",
+    "Texture_BeishaheDeckPlankOrm.webp",
+    "Texture_BeishahePierStoneBase.webp",
+    "Texture_BeishahePierStoneNormal.webp",
+    "Texture_BeishahePierStoneOrm.webp",
+    "Texture_BeishahePierDampBase.webp",
+    "Texture_BeishahePierDampNormal.webp",
+    "Texture_BeishahePierDampOrm.webp"
   ]
 }

@@ -1,0 +1,122 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-10-27",
+  "name": "BeishahePierDamp",
+  "preset": "stone",
+  "source": {
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishahePierDamp.png",
+    "sha256": "178e7d57f8ea78f013187608b71343c8d379dede7142f02e53bbba705b36f819",
+    "metrics": {
+      "meanSrgb": [
+        0.2986,
+        0.2648,
+        0.2107
+      ],
+      "luma": 0.258,
+      "lumaStd": 0.121,
+      "sat": 0.2946,
+      "clipLow": 0.0,
+      "clipHigh": 0.0,
+      "lowFreq": 0.1639
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.43,
+      0.405,
+      0.375
+    ],
+    "contrast": 0.1,
+    "lumaRange": [
+      0.38,
+      0.66
+    ],
+    "satRange": [
+      0.0,
+      0.16
+    ],
+    "stdRange": [
+      0.04,
+      0.13
+    ],
+    "reliefM": 0.0025,
+    "rough": 0.93,
+    "roughVar": 0.08,
+    "roughLumaK": 0.0,
+    "ao": 0.5,
+    "metal": 0.0,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.1,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 1.0,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 0.75,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false,
+    "detailBalance": 0,
+    "heightFineWeight": 0.45,
+    "uvAtlasReason": null
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_BeishahePierDampBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 395030,
+      "sha256": "c422fe5015c4cd36a3c891c4950787f5834594349fbb08688fb23bd9c430ba1c"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_BeishahePierDampNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 76738,
+      "sha256": "825bfe9ddcba28cfcedfe7c3bb37b9a31e8022560ce8c3b2e21139502a54125d"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_BeishahePierDampOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 76678,
+      "sha256": "cd1ddd24e345823de838e8fb9f06d48fd5550527312d7e1c83d77a20baacf0bc"
+    }
+  ],
+  "totalBytes": 548446,
+  "metrics": {
+    "meanSrgb": [
+      0.4296,
+      0.4058,
+      0.3747
+    ],
+    "luma": 0.4034,
+    "lumaStd": 0.1016,
+    "sat": 0.1278,
+    "clipLow": 0.0,
+    "clipHigh": 0.0002,
+    "lowFreq": 0.018,
+    "seam": 0.0578,
+    "interior": 0.0643,
+    "seamRatio": 0.898,
+    "border": 0.921,
+    "swing": 0.0115,
+    "aoMean": 0.893,
+    "roughMean": 0.899,
+    "texelsPerMeter": 1024.0
+  },
+  "gateProblems": []
+}

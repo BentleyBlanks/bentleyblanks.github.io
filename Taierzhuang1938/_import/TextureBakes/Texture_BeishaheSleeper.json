@@ -1,0 +1,122 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-10-27",
+  "name": "BeishaheSleeper",
+  "preset": "weatheredWood",
+  "source": {
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishaheSleeper.png",
+    "sha256": "82478dc067d45ca91484e01c6cd30afb132e48f16ee18bd0537a506836e0e9a4",
+    "metrics": {
+      "meanSrgb": [
+        0.3558,
+        0.3158,
+        0.2779
+      ],
+      "luma": 0.3165,
+      "lumaStd": 0.1089,
+      "sat": 0.2189,
+      "clipLow": 0.0063,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0442
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.38,
+      0.36,
+      0.33
+    ],
+    "contrast": 0.065,
+    "lumaRange": [
+      0.26,
+      0.5
+    ],
+    "satRange": [
+      0.06,
+      0.3
+    ],
+    "stdRange": [
+      0.03,
+      0.11
+    ],
+    "reliefM": 0.004,
+    "rough": 0.9,
+    "roughVar": 0.05,
+    "roughLumaK": 0.0,
+    "ao": 0.45,
+    "metal": 0.0,
+    "seamless": "weld",
+    "rowFlatten": false,
+    "flattenSigma": 0.15,
+    "isotropic": false,
+    "heightFromLuma": "direct",
+    "tileM": 1.0,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 0.85,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false,
+    "detailBalance": 0,
+    "heightFineWeight": 0.45,
+    "uvAtlasReason": null
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_BeishaheSleeperBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 277406,
+      "sha256": "94c86a376f1086d0879fd692a8080212fba64503769d78e5033d003fa4010316"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_BeishaheSleeperNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 95446,
+      "sha256": "fa4e0a171f6e51fe39224fec5c7b550bb8faffe05001f6100df5fd14d070047f"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_BeishaheSleeperOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 61132,
+      "sha256": "95e2014d29d7c1b68623d41439bda06812ae923db74109fab9e964d9655b9b7f"
+    }
+  ],
+  "totalBytes": 433984,
+  "metrics": {
+    "meanSrgb": [
+      0.3797,
+      0.3607,
+      0.3298
+    ],
+    "luma": 0.3567,
+    "lumaStd": 0.0657,
+    "sat": 0.1314,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0179,
+    "seam": 0.0093,
+    "interior": 0.0411,
+    "seamRatio": 0.226,
+    "border": 0.67,
+    "swing": 0.0648,
+    "aoMean": 0.904,
+    "roughMean": 0.893,
+    "texelsPerMeter": 1024.0
+  },
+  "gateProblems": []
+}
