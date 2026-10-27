@@ -711,7 +711,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261026ReferenceV46'
+    scene['DonkeyReferenceFitRevision']='20261027ReferenceV47'
     scene['DonkeyReferenceBodyTuftLimit']=288
     scene['DonkeyReferencePaleFringe']=True
     scene['DonkeyReferenceForeSwingClearanceDeg']=2.5
@@ -803,6 +803,9 @@ def ApplyReferenceFit(scene,base):
     legPigmentNamespace={}
     exec(compile((project/'_blender/Script_DonkeyLegPigment.py').read_text(encoding='utf-8'),'Script_DonkeyLegPigment.py','exec'),legPigmentNamespace)
     photoDetail['legPigment']=legPigmentNamespace['InstallLegPigment'](scene,skin,rig,base)
+    chestPigmentNamespace={};file=project/'_blender/Script_DonkeyChestPigment.py'
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),chestPigmentNamespace)
+    photoDetail['chestPigment']=chestPigmentNamespace['InstallChestPigment'](scene,skin,base)
     earNamespace={};file=project/'_blender/Script_DonkeyEarCoat.py'
     exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),earNamespace)
     photoDetail['earCoat']=earNamespace['InstallEarCoat'](scene,rig,base)
