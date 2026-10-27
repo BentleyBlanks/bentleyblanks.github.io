@@ -161,8 +161,17 @@ export class FirstPersonGait {
       this.turning = false;
       const velYaw = Math.atan2(-this.vx, -this.vz);
       const rel = WrapAngle(velYaw - input.aimYaw);
-      // sin(2·rel)：前斜 / 后斜各偏向「让胯的正前或正后对着移动方向」那一侧，正横移与正前后为 0，处处连续。
-      const target = input.aimYaw + t.orientWarpDeg * DEG * Math.sin(2 * rel);
+      // 往前走那一半量 r = rel，让胯的正前对着移动方向；往后走那一半量 r = rel − 180°，让胯的正后对着。
+      // |r| ≤ 45°（前斜 / 后斜）：W·sin(2r)；45° 以外保持 ±W —— 正横移时胯往移动方向打开 W，腿斜着迈（真人侧跑也是这样）。
+      // 两半在 90° 处一正一负，用回差切换：正横移就停在进来时的那一半，不来回甩。
+      // 2026-10-28 改前 45°–135° 也用 sin(2·rel)，正横移为 0：步子沿胯的左右轴迈，后脚追上前脚就被「左右至少隔 minFootGapM」
+      // 卡在半空 8 帧上下，前脚一抬两只脚一起跳 0.4 m（用户：低头看横移跑，大腿抽搐、像拌脚）。
+      const absRel = Math.abs(rel), hyst = t.orientWarpHysteresisDeg * DEG;
+      if (!wasMoving) this.backward = absRel > Math.PI / 2 + hyst;   // 从站定直接横移：胯往移动方向打开（前半）
+      else if (this.backward ? absRel < Math.PI / 2 - hyst : absRel > Math.PI / 2 + hyst) this.backward = !this.backward;
+      const r = this.backward ? WrapAngle(rel - Math.PI) : rel;
+      const warp = Math.abs(r) <= Math.PI / 4 ? Math.sin(2 * r) : Math.sign(r);
+      const target = input.aimYaw + t.orientWarpDeg * DEG * warp;
       this.lowerYaw += WrapAngle(target - this.lowerYaw) * (1 - Math.exp(-dt * t.movingTurnRate));
     } else {
       const off = WrapAngle(input.aimYaw - this.lowerYaw);
@@ -180,7 +189,7 @@ export class FirstPersonGait {
     this.lowerYaw = WrapAngle(this.lowerYaw);
     this.twist = WrapAngle(input.aimYaw - this.lowerYaw);
     this._UpdateLegHeading();
-    this._KeepFeetUnderHips(input);
+    this._KeepFeetUnderHips(input, dt);
 
     // ---- 步态参数 ----
     const speed = Math.min(this.speed, 7);
@@ -281,7 +290,7 @@ export class FirstPersonGait {
       }
     }
 
-    this._SeparateFeet();
+    this._SeparateFeet(dt);
 
     // ---- 停着：脚离脚位太远、脚尖偏太多就挪一步（转身时门槛更低，一步接一步） ----
     if (!this.moving && !this.feet[0].swing && !this.feet[1].swing
@@ -307,7 +316,7 @@ export class FirstPersonGait {
    *      两只脚之间的相对摆放不变，所以不会因为胯甩过去而变成一只脚在另一只脚的外侧；
    *   2) 两只脚都着地时，左右方向上至少隔 minFootGapM：挤近了沿胯的左右轴各推开一半。
    */
-  _KeepFeetUnderHips(input) {
+  _KeepFeetUnderHips(input, dt) {
     const t = this.t, limit = t.footTwistLimitDeg * DEG;
     const ax = input.anchorX, az = input.anchorZ;
     for (let i = 0; i < 2; i++) {
@@ -323,7 +332,7 @@ export class FirstPersonGait {
       f.y = this._Ground(f.x, f.z, input);
       this.pivots++;
     }
-    this._SeparateFeet();
+    this._SeparateFeet(dt);
   }
 
   /**
@@ -348,13 +357,16 @@ export class FirstPersonGait {
     this.legHeading = heading;
   }
 
-  _SeparateFeet() {
+  _SeparateFeet(dt) {
     const [L, R] = this.feet;
     const yaw = this.legHeading ?? this.lowerYaw;
     const lx = -Math.cos(yaw), lz = Math.sin(yaw);   // 腿的左方
     const gap = (L.x - R.x) * lx + (L.z - R.z) * lz;
     if (gap >= this.t.minFootGapM) return;
-    const push = this.t.minFootGapM - gap;
+    let push = this.t.minFootGapM - gap;
+    // 走动中两只脚都着地：限速挪（2026-10-28）。横移往左时右脚在前、往右时左脚在前，急换向那一下前后次序要对调，
+    // 一帧推完就是着地的脚瞬移 0.2–0.3 m；限速后由下一步把它迈开。
+    if (this.moving && L.planted && R.planted && dt > 0) push = Math.min(push, this.t.plantedSeparateMps * dt);
     const kL = L.planted === R.planted ? 0.5 : L.planted ? 0 : 1;
     L.x += lx * push * kL; L.z += lz * push * kL;
     R.x -= lx * push * (1 - kL); R.z -= lz * push * (1 - kL);

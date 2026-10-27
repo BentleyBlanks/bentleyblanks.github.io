@@ -23,9 +23,12 @@ export const FIRST_PERSON_BODY = Object.freeze({
   maxTwistDeg: 85,
   twistSpine1: 0.45,
   twistSpine2: 0.55,
-  // 走动：胯朝向追视线的速率（1/s）；横移 / 斜走时胯往移动方向偏，最多 orientWarpDeg（Orientation Warping）。
+  // 走动：胯朝向追视线的速率（1/s）；横移 / 斜走时胯往移动方向偏，最多 orientWarpDeg（Orientation Warping，正横移时最大）。
+  // 正横移时胯偏 40° → 步子与胯差 50°，腿的左右次序沿移动方向量，不会卡住后脚（2026-10-28）。
+  // 移动方向过了正横移再多 orientWarpHysteresisDeg 度才从「胯正前对着走」切到「胯正后对着走」（反过来同理）。
   movingTurnRate: 9,
   orientWarpDeg: 40,
+  orientWarpHysteresisDeg: 20,
   // 算不算在走（m/s）：高于 startMps 开始迈步，低于 stopMps 停步（回差）。
   startMps: 0.3,
   stopMps: 0.15,
@@ -84,4 +87,6 @@ export const FIRST_PERSON_BODY = Object.freeze({
   footTwistLimitDeg: 35,
   // 两只脚在胯的左右方向上至少隔多远（米，踝到踝）：着地的脚被挤得更近就推开；摆动的脚绕着支撑腿走，不从它身上穿过去。
   minFootGapM: 0.13,
+  // 走动中两只脚都着地时，推开最快多少米/秒（横移急换向时脚的前后次序要对调，限速后不瞬移，等下一步迈开）。
+  plantedSeparateMps: 0.5,
 });

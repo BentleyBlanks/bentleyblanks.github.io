@@ -173,6 +173,39 @@ for (const [label, spec] of [
   });
 }
 
+// 2026-10-28 用户：低头看横移跑，大腿抽搐、像拌脚，前后走不会。改前（同一组输入）：后脚追上前脚被「左右至少隔 minFootGapM」
+// 卡在半空 66–86 帧，前脚一抬两只脚一帧跳 0.43–0.52 m。现在横移时胯往移动方向打开、腿斜着迈，摆动的脚一帧挪多远与往前跑同一量级。
+function SwingSmoothness({ speed, dirDeg }) {
+  const gait = new FirstPersonGait(T, RIG);
+  const s = { x: 0, z: 0, vx: 0, vz: 0 };
+  const Input = () => ({ playerX: s.x, playerY: 0, playerZ: s.z, anchorX: s.x, anchorZ: s.z + 0.18, aimYaw: 0,
+    grounded: true, crouch: 0, prone: 0, hipHeight: 0.873, legReach: 0.86, ankleHeight: 0.092 });
+  for (let i = 0; i < 30; i++) gait.Update(DT, Input());
+  let last = gait.feet.map((f) => ({ ...f })), worst = 0, frozen = 0;
+  for (let i = 0; i < 300; i++) {
+    const d = dirDeg * DEG, k = 1 - Math.exp(-DT * 12);   // 玩家速度按指数追到目标（起步有加速）
+    s.vx += (-Math.sin(d) * speed - s.vx) * k; s.vz += (-Math.cos(d) * speed - s.vz) * k;
+    s.x += s.vx * DT; s.z += s.vz * DT;
+    gait.Update(DT, Input());
+    gait.feet.forEach((f, j) => {
+      const move = Math.hypot(f.x - last[j].x, f.z - last[j].z);
+      if (f.swing && last[j].swing) { worst = Math.max(worst, move); if (gait.moving && move < 1e-4) frozen++; }
+      last[j] = { ...f };
+    });
+  }
+  return { worst, frozen };
+}
+for (const speed of [2.5, 3.05, 5.25]) {
+  Check(`横移 ${speed} m/s：摆动的脚不卡在半空、不一帧跳一大截（与往前跑比）`, () => {
+    const ahead = SwingSmoothness({ speed, dirDeg: 0 });
+    for (const dirDeg of [90, -90]) {
+      const r = SwingSmoothness({ speed, dirDeg });
+      assert.equal(r.frozen, 0, `swing foot frozen ${r.frozen} frames (dir ${dirDeg})`);
+      assert.ok(r.worst <= ahead.worst * 1.3 + 0.01, `swing moved ${r.worst.toFixed(3)} m in a frame vs ${ahead.worst.toFixed(3)} ahead (dir ${dirDeg})`);
+    }
+  });
+}
+
 Check("直走、慢转（死区内）时不触发脚跟着胯拧 / 推开", () => {
   const { gait, s, Step } = Sim();
   for (let i = 0; i < 20; i++) Step();
