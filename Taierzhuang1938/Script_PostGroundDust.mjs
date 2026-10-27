@@ -57,8 +57,10 @@ export class GroundDustPass {
     if (this.target && this.target.width === w && this.target.height === h) return this.target;
     this.target?.dispose();
     // 散射是 HDR（火光那一下几十），透过率要细 —— 半精度浮点；最近点取样，放大由全屏片自己按深度挑。
-    this.target = MakeRenderTarget(w, h, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
-    this.target.texture.name = "GroundDustHalf";
+    // 第二张是尘的前沿深度（Script_DustOcclusion）：之后画的粒子据此决定自己在尘前还是尘后。
+    this.target = MakeRenderTarget(w, h, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, count: 2 });
+    this.target.textures[0].name = "GroundDustHalf";
+    this.target.textures[1].name = "GroundDustFront";
     this.pipeline.targets.groundDust = this.target;
     this.scale = scale;
     return this.target;

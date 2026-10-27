@@ -46,6 +46,7 @@ import { BURNING_LIGHT, EXPLOSION_PARTICLE_ART, EXPLOSION_VOLUME_ART, PARTICLE_V
 import { BOMB_BLAST_VFX } from "./Data_AerialBombs.mjs";
 import { BlastScale, LinearDragAt } from "./Script_BombBallistics.mjs";
 import { DustFieldSystem } from "./Script_DustFieldRenderer.mjs";
+import { DustOcclusionUniforms } from "./Script_DustOcclusion.mjs";
 import { DustTuningFor } from "./Script_DustFlow.mjs";
 import { GROUND_IMPACT_BURSTS } from "./Data_Tuning_GroundImpact.mjs";
 import { EXPLOSIVES } from "./Data_Explosives.mjs";
@@ -542,6 +543,8 @@ export class VfxSystem {
       uNormalDepth: { value: this.fallbackDepth },
       uResolution: { value: new THREE.Vector2(1600, 900) },
       uSoftEnabled: { value: 0 },
+      // 落地扬尘的前沿深度与透过率（Script_DustOcclusion）：DustFieldSystem.RenderHalf 每帧填，粒子据此决定在尘前还是尘后
+      ...DustOcclusionUniforms(),
       uNearFade: { value: 0.45 },
       // 序列帧与淡出曲线：除火球池外全部用默认值（淡出起点 0.45、单帧白图）。
       uFadeOutStart: { value: 0.45 },
@@ -934,7 +937,7 @@ export class VfxSystem {
     if (step > 0) this.particles.Resume();
     this.particles.Update(step);
     this._UpdateSmokeSources(step);
-    this.dustFields?.Update(step, this.wind);
+    this.dustFields?.Update(step, this.wind, camera);
     this.battleSmoke?.Update();
     this.bloodEffects.Update(step,this.time,camera);
 

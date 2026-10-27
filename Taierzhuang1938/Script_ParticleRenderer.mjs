@@ -6,6 +6,7 @@ import { ParticleBatch, ParticleMeshBatch } from './Script_ParticleBatch.mjs';
 import {AcquireParticleDensity,PARTICLE_DENSITY_GLSL} from './Script_ParticleDensity.mjs';
 import {PARTICLE_GPU_MODULES} from './Script_ParticleGpuModules.mjs';
 import {ParticleVolumeRenderer} from './Script_ParticleVolumeRenderer.mjs';
+import {DUST_OCCLUSION_GLSL} from './Script_DustOcclusion.mjs';
 
 const VERTEX=/*glsl*/`
 ${PARTICLE_GPU_MODULES}
@@ -111,6 +112,7 @@ varying vec4 vVolume;
 #endif
 uniform sampler2D uNormalDepth;
 uniform vec2 uResolution;
+${DUST_OCCLUSION_GLSL}
 uniform float uDepthValid;
 uniform float uGlobalFade;
 uniform float uFogDensity;
@@ -204,6 +206,8 @@ void main(){
    }
    else color=mix(color,uFogColorSky,min(uFogMax,1.-exp(-uFogDensity*vDistance*.55)));
  }
+ // 落地扬尘的前后（Script_DustOcclusion）
+ alpha*=DustBehindTransmittance(vDepth);
  if(alpha<.002)discard;
  gl_FragColor=vec4(color,alpha);
 }`;

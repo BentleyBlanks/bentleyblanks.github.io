@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {PARTICLE_GPU_MODULES} from './Script_ParticleGpuModules.mjs';
 import {PARTICLE_VOLUME_PLUME,PARTICLE_VOLUME_LIGHTING} from './Data_Tuning_Particles.mjs';
+import {DUST_OCCLUSION_GLSL} from './Script_DustOcclusion.mjs';
 
 const textureCache=new WeakMap();
 
@@ -132,6 +133,7 @@ uniform float uPhaseG;
 uniform vec2 uMultipleScattering;
 uniform sampler2D uNormalDepth;
 uniform vec2 uResolution;
+${DUST_OCCLUSION_GLSL}
 uniform float uDepthValid;
 uniform float uGlobalFade;
 uniform float uFogDensity;
@@ -181,7 +183,7 @@ void main(){
  // ray points camera -> sample and light points sample -> sun. Looking toward
  // the sun is forward scattering (positive cosine), not back scattering.
  float scatteringPhase=Phase(dot(ray,light),uPhaseG);
- vec3 radiance=vec3(0.);float transmission=1.;
+ vec3 radiance=vec3(0.);float transmission=1.;float dustW=0.,dustZ=0.;
  for(int i=0;i<96;i++){
   if(float(i)>=steps||transmission<.005)break;
   vec3 p=ro+rd*(start+(float(i)+.5)*ds),uv=p+.5;
@@ -197,6 +199,7 @@ void main(){
   // without removing its extinction or replacing it with a solid grey shell.
   vec3 incident=uAmbientColor+uLightColor*(exp(-tau)*scatteringPhase+uMultipleScattering.x*exp(-tau*uMultipleScattering.y));
   float next=exp(-sigma*ds),alpha=1.-next;
+  dustW+=transmission*alpha;dustZ+=transmission*alpha*(start+(float(i)+.5)*ds);
   radiance+=transmission*tint*(uAlbedo*incident*alpha+FireRadiance(field.g,emission)*opacityScale*(sigma>.0001?alpha/sigma:ds));
   transmission*=next;
  }
@@ -204,6 +207,9 @@ void main(){
  // The scene composite already fogs opaque backgrounds. Supply the missing
  // atmospheric attenuation only where this depth-excluded effect faces sky.
  if(uDepthValid>.5&&sceneDepth<=0.)radiance=mix(radiance,uFogColorSky*opacity,min(uFogMax,1.-exp(-uFogDensity*(start+end)*.275)));
+ // 落地扬尘的前后（Script_DustOcclusion）：这团体积按挡光加权的深度和尘的前沿比
+ float dustOcc=DustBehindTransmittance((dustW>1e-5?dustZ/dustW:start)*max(.001,-(viewMatrix*vec4(ray,0.)).z));
+ radiance*=dustOcc;opacity*=dustOcc;
  if(opacity<.001&&max(radiance.r,max(radiance.g,radiance.b))<.001)discard;
  // Premultiplied radiance + transmittance, preserving the destination HDR alpha.
  gl_FragColor=vec4(radiance*uGlobalFade,opacity*uGlobalFade);

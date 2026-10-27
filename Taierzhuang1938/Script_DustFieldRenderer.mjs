@@ -16,6 +16,7 @@ import * as THREE from "three";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 import { DustFlowField } from "./Script_DustFlow.mjs";
 import { GROUND_IMPACT_RENDER as RENDER, GROUND_IMPACT_SURFACES } from "./Data_Tuning_GroundImpact.mjs";
+import { DUST_COMPOSITE_RENDER_ORDER } from "./Script_DustOcclusion.mjs";
 
 // ---------------------------------------------------------------------------
 // 可平铺三维噪声：R = Perlin-Worley 卷团（低频）、G = Worley 细节、B = 平滑值噪声。全模块共用一张。
@@ -143,6 +144,10 @@ void main(){
 const FRAGMENT = /* glsl */`
 precision highp float;
 precision highp sampler3D;
+// 第二个输出：尘的前沿视深度（Script_DustOcclusion）。降分辨率那一趟是两张靶（MRT）；没开降分辨率、直接画进主靶时只有一张，这一路自动丢掉。
+layout(location = 0) out highp vec4 pc_fragColor;
+layout(location = 1) out highp vec4 pc_dustFront;
+#define gl_FragColor pc_fragColor
 uniform sampler2D uSurge;
 uniform sampler2D uLoft;
 uniform sampler2D uSkin;
@@ -368,6 +373,7 @@ void main(){
   float shadowLen = min(10.0, (uBoxMax.y - uBoxMin.y) * 0.6 + 1.5);
   vec3 radiance = vec3(0.0);
   float transmission = 1.0;
+  float frontW = 0.0, frontZ = 0.0;     // 按这一段挡掉的光加权的射线距离（→ 尘的前沿深度）
   float tRay = start + jitter * ds;
   float refine = 0.0, refineStep = ds;   // 撞上很浓的一层时退半步、细步长走几步（先粗后细），表面才不随抖动跳格
   float dsFine = clamp(uSkinShape.x * 0.3, 0.06, ds);
@@ -426,6 +432,8 @@ void main(){
     vec3 skinAlbedo = mix(uSkinColor, uFreshColor, clamp(skinFresh, 0.0, 1.0));
     vec3 albedo = mix(mix(uDustColor, uFreshColor, smoothstep(0.05, 0.95, fresh)), skinAlbedo, skinShare);
     float next = exp(-sigma * stepLen);
+    float dw = transmission * (1.0 - next);
+    frontW += dw; frontZ += dw * tRay;
     radiance += transmission * albedo * incident * (1.0 - next);
     transmission *= next;
     tRay += stepLen;
@@ -434,7 +442,12 @@ void main(){
   if (uDepthValid > 0.5 && sceneDepth <= 0.0) radiance = mix(radiance, uFogColorSky * opacity, min(uFogMax, 1.0 - exp(-uFogDensity * (start + end) * 0.275)));
   float fade = uFade * uGlobalFade;
   if (opacity * fade < 0.002) discard;
-  gl_FragColor = vec4(radiance * fade, opacity * fade);
+  float alphaOut = opacity * fade;
+  gl_FragColor = vec4(radiance * fade, alphaOut);
+  // 射线距离换成视深度（粒子那边比的是视深度 vViewDepth）
+  float viewK = max(0.001, -(viewMatrix * vec4(rd, 0.0)).z);
+  float frontDepth = (frontW > 1e-5 ? frontZ / frontW : start) * viewK;
+  pc_dustFront = vec4(frontDepth * alphaOut, alphaOut, 0.0, alphaOut);
 }
 `;
 
@@ -467,7 +480,7 @@ function MakeMaterial(shared, noise, quality) {
   };
   for (const key of SHARED_KEYS) if (shared[key]) uniforms[key] = shared[key];
   const material = new THREE.ShaderMaterial({
-    vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms,
+    vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms, glslVersion: THREE.GLSL3,
     side: THREE.BackSide, transparent: true, depthTest: false, depthWrite: false,
     blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
     blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor,
@@ -607,7 +620,7 @@ export class DustFieldSystem {
     material.uniforms.uSeed.value = (this.nextSeed++ * 0.61803398875) % 1;
     const mesh = new THREE.Mesh(this.geometry, material);
     mesh.name = "GroundImpactDust";
-    mesh.frustumCulled = false; mesh.matrixAutoUpdate = false; mesh.renderOrder = 6;
+    mesh.frustumCulled = false; mesh.matrixAutoUpdate = false; mesh.renderOrder = DUST_COMPOSITE_RENDER_ORDER;
     mesh.userData.skipNormalDepth = true;
     mesh.visible = false;
     mesh.onBeforeRender = (renderer) => this._CheckFloatLinear(renderer);
@@ -643,7 +656,11 @@ export class DustFieldSystem {
    */
   SetHalfMode(on) {
     const half = !!on;
-    if (!half) this.resolution.value.copy(this.shared.uResolution.value);
+    if (!half) {
+      this.resolution.value.copy(this.shared.uResolution.value);
+      // 没有降分辨率尘：粒子不再按尘的前沿深度遮挡（全分辨率时没有那张前沿深度）
+      if (this.shared.uDustOcclusion) this.shared.uDustOcclusion.value = 0;
+    }
     if (half === this.halfMode) { if (this.upsample) this.upsample.visible = half && this.HasVisible(); return; }
     this.halfMode = half;
     for (const e of this.fields) { e.mesh.layers.set(half ? GROUND_DUST_LAYER : 0); this._ApplyMode(e.material); }
@@ -672,8 +689,8 @@ export class DustFieldSystem {
     MarkNoPrepass(material);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.name = "GroundImpactDustUpsample";
-    // 与原来尘团盒子同一个位置（排在枪口焰、火星、烟这些透明物之前），前后关系不变。
-    mesh.frustumCulled = false; mesh.matrixAutoUpdate = false; mesh.renderOrder = 6;
+    // 排在所有粒子之前（Script_DustOcclusion）：之后画的烟、火、溅射土按「尘的前沿深度」自己决定在尘前还是尘后。
+    mesh.frustumCulled = false; mesh.matrixAutoUpdate = false; mesh.renderOrder = DUST_COMPOSITE_RENDER_ORDER;
     mesh.userData.skipNormalDepth = true;
     mesh.visible = false;
     this.root.add(mesh);
@@ -687,6 +704,8 @@ export class DustFieldSystem {
    */
   RenderHalf(renderer, camera, target, fullWidth, fullHeight) {
     this.SetHalfMode(true);
+    // 按真正出图的相机再排一次（Update 时拿到的可能还是玩家相机：测试场自由相机、过场机位是之后才套上的）
+    this.SortForCamera(camera.position);
     this.resolution.value.set(target.width, target.height);
     const prevTarget = renderer.getRenderTarget(), prevAuto = renderer.autoClear, prevAlpha = renderer.getClearAlpha();
     const prevColor = renderer.getClearColor(this._clearColor ??= new THREE.Color()), prevLayers = camera.layers.mask;
@@ -705,13 +724,19 @@ export class DustFieldSystem {
     const quad = this._EnsureUpsample();
     const u = quad.material.uniforms;
     u.uDustHalf.value = target.texture;
+    // 粒子按尘的前沿深度与透过率决定前后（Script_DustOcclusion）：靶的第二张是前沿深度
+    if (this.shared.uDustOcclusion && target.textures?.length > 1) {
+      this.shared.uDustHalf.value = target.textures[0];
+      this.shared.uDustFront.value = target.textures[1];
+      this.shared.uDustOcclusion.value = 1;
+    }
     u.uFullRes.value.set(fullWidth, fullHeight);
     u.uHalfRes.value.set(target.width, target.height);
     quad.visible = true;
     this.halfFrames++;
   }
 
-  Update(dt, wind = null) {
+  Update(dt, wind = null, camera = null) {
     this.frame = (this.frame + 1) % 4096;
     // 不在降分辨率模式时，尘团取深度用的分辨率跟着共享的那份（主靶尺寸）。
     if (!this.halfMode) this.resolution.value.copy(this.shared.uResolution.value);
@@ -754,6 +779,27 @@ export class DustFieldSystem {
       u.uFrame.value = this.frame;
       e.mesh.visible = fade > 0.001;
     }
+    if (camera) this.SortForCamera(camera.position);
+  }
+
+  /**
+   * 尘团之间的前后（2026-10-28）：每团一只透明盒子、互不写深度，只能按画的先后叠。原来都是同一个 renderOrder、
+   * 网格位置又都在原点，three 只好按创建先后排 —— 后炸的那团哪怕更远也盖在先炸的那团上。
+   * 现在按相机到每团尘质心（尘柱层的网格中心、土柱三成高）的距离从远到近排：远的先画，人在里头的那团最后画。
+   */
+  SortForCamera(eye) {
+    const order = [];
+    for (const e of this.fields) {
+      const f = e.field;
+      if (!f.ready) continue;
+      const half = 0.5 * f.N * f.loftCell;
+      const cx = f.loftX + half, cz = f.loftZ + half;
+      const cy = (f.groundY ?? e.info?.baseY ?? 0) + 0.3 * (f.columnHeight || 0);
+      order.push({ e, d: Math.hypot(cx - eye.x, cy - eye.y, cz - eye.z) });
+    }
+    order.sort((a, b) => b.d - a.d);
+    order.forEach(({ e }, k) => { e.mesh.renderOrder = DUST_COMPOSITE_RENDER_ORDER + k * 1e-3; });
+    this.lastSort = order.map(({ e, d }) => ({ x: +e.field.cx.toFixed(1), z: +e.field.cz.toFixed(1), d: +d.toFixed(2) }));
   }
 
   /** 起爆火光与细尘近土柱新鲜度的每帧参数（GROUND_IMPACT_RENDER.fire / skinNear）。 */

@@ -3,6 +3,7 @@ import {PARTICLE_GPU_MODULES} from './Script_ParticleGpuModules.mjs';
 import {PARTICLE_DENSITY_GLSL} from './Script_ParticleDensity.mjs';
 import {BLOOD_LIQUID} from './Data_Tuning_Blood.mjs';
 import {PARTICLE_SURFACE_ART} from './Data_Tuning_Particles.mjs';
+import {DUST_OCCLUSION_GLSL} from './Script_DustOcclusion.mjs';
 export const GLSL_NOISE = /* glsl */`
 float Hash21(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
@@ -341,6 +342,7 @@ varying float vVolumeDepthRadius;
 uniform sampler2D uNormalDepth;
 uniform float uDepthValid;   // 1 = uNormalDepth 是真的预通道靶，不是 1x1 兜底
 uniform vec2 uResolution;
+${DUST_OCCLUSION_GLSL}
 uniform float uSoftEnabled;
 uniform float uSoftRange;
 uniform float uNearFade;
@@ -747,6 +749,8 @@ void main() {
 #endif
   // 贴脸淡出：拿不到深度图时这是唯一的保险，也防止一片烟糊满屏幕
   alpha *= clamp((vViewDepth - uNearFade * 0.4) / max(uNearFade, 0.001), 0.0, 1.0);
+  // 落地扬尘的前后（Script_DustOcclusion）：比尘的前沿远就藏在尘后面（乘尘的透过率），近就照常画在尘上
+  alpha *= DustBehindTransmittance(vViewDepth);
   if (alpha <= 0.002) discard;
 
   gl_FragColor = vec4(color, alpha);
