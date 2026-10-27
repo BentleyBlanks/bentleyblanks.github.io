@@ -2,92 +2,47 @@
   "schema": "tengxian-reference-aircraft-v1",
   "id": "KawasakiType88",
   "title": "Type 88-II reconnaissance reference reconstruction",
-  "status": "reviewed-reference-reconstruction",
-  "version": "BalancedRudder20-Surface11",
+  "status": "configured",
+  "version": "ReferenceGeometry86-Surface44",
+  "releaseVersion": "20261028Release86",
+  "acceptedForConfiguration": true,
+  "userAcceptedAt": "2026-10-28",
+  "referenceMatchApproved": false,
+  "acceptanceScope": "User approved wrapping up and configuring current86 if no major issues. This records release readiness,not exact museum-photograph or factory-dimension identity.",
   "runtime": {
     "file": "Model_KawasakiType88.glb",
-    "sha256": "84a5bd30b17ed728c18e8a48089af255e21f392700e0036f49571412092918fe",
-    "bytes": 12397704,
-    "triangles": 79649,
-    "meshes": 41,
-    "nodes": 57,
-    "materials": 17,
-    "images": 34,
+    "sha256": "c198fc645342a9aee26f43451e5b3d04f40a014fab75a32df07c56ee53bd2a98",
+    "bytes": 15108896,
+    "triangles": 79944,
+    "meshes": 52,
+    "renderPrimitiveMeshes": 65,
+    "nodes": 68,
+    "materials": 28,
+    "images": 53,
     "metresPerUnit": 1,
     "noseDir": {
       "x": 0,
       "z": -1
     },
     "dimensionsM": {
-      "wingspan": 15.0,
-      "height": 3.3804311752319336,
-      "length": 12.279999732971191
+      "wingspan": 15,
+      "height": 3.3794517517089844,
+      "length": 12.509999752044678
     },
     "campaignEnabled": false
   },
   "source": {
-    "directory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\KawasakiType88",
+    "directory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\KawasakiType88\\Release86",
     "highProject": "Scene_KawasakiType88High.blend",
     "gameProject": "Scene_KawasakiType88Game.blend",
     "highExport": "Exports/Model_KawasakiType88High.glb",
-    "highExportSha256": "84bd3c833038e052479fa47a4e8a202387a7af8c9a82ffacaead8f8d9dfbe043",
-    "projectsActuallyReopened": [
-      {
-        "project": "Scene_KawasakiType88High.blend",
-        "triangles": 237875,
-        "meshes": 290,
-        "usedFileImages": 34,
-        "packedImages": 34,
-        "controls": 10,
-        "metresPerUnit": 1.0,
-        "gltfSettingsInputs": [
-          "Dispersion",
-          "Iridescence Factor",
-          "Iridescence Thickness Minimum",
-          "Occlusion",
-          "Thickness"
-        ],
-        "surfaceVersion": "20261024Surface11",
-        "buildVersion": "20261024BalancedRudder20",
-        "packedImagesMatchGeneratedFiles": true,
-        "matchedGeneratedImages": 33,
-        "dimensionsM": {
-          "wingspan": 15.0,
-          "height": 3.3804311752319336,
-          "length": 12.279999732971191
-        },
-        "occlusionBakeSamples": 64,
-        "occlusionFilter": "Separable [0.2, 0.6, 0.2], one texel inside bake margin"
-      },
-      {
-        "project": "Scene_KawasakiType88Game.blend",
-        "triangles": 79649,
-        "meshes": 41,
-        "usedFileImages": 34,
-        "packedImages": 34,
-        "controls": 10,
-        "metresPerUnit": 1.0,
-        "gltfSettingsInputs": [
-          "Dispersion",
-          "Iridescence Factor",
-          "Iridescence Thickness Minimum",
-          "Occlusion",
-          "Thickness"
-        ],
-        "surfaceVersion": "20261024Surface11",
-        "buildVersion": "20261024BalancedRudder20",
-        "packedImagesMatchGeneratedFiles": true,
-        "matchedGeneratedImages": 33,
-        "dimensionsM": {
-          "wingspan": 15.0,
-          "height": 3.3804311752319336,
-          "length": 12.279999732971191
-        },
-        "occlusionBakeSamples": 64,
-        "occlusionFilter": "Separable [0.2, 0.6, 0.2], one texel inside bake margin"
-      }
-    ],
-    "highExportTriangles": 237875
+    "highExportSha256": "5f4b4d490fd3ae76a7c6ba9b7f6088a35aa1a72b53fb63e46fd4e205c7aa92f3",
+    "highExportTriangles": 266946,
+    "originalValidatedEditableDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\KawasakiType88\\Iterations\\Reference86",
+    "originalValidatedHighDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\KawasakiType88\\Iterations\\Reference86High",
+    "uvReconstructionData": "Rebuild/",
+    "generatedPbrInputs": 52,
+    "sourceProjectsOutsideRepository": true
   },
   "reconstructionScope": "Type 88-II scout. The museum model serial 12 and appearance are a reference choice, not a verified Uchida squadron aircraft. No light-bomber extra centre struts or bomb racks.",
   "historicalReferences": [
@@ -119,38 +74,46 @@
     "Lower-wing underside roundel placement is inferred; these surfaces are not visible in the primary museum photograph.",
     "Fixed tailplane yaw -2.0733553deg and height2.135m are a photographic installation fit, not an original-aircraft specification.",
     "Reference rudder pose13.55deg is explicitly shown by the real comparison control; the source and exports remain neutral.",
-    "Upper rudder and outer elevator forward balances are cross-checked with TypeII photographs; TypeI drawings only corroborate the mechanism, not TypeII dimensions."
+    "Upper rudder and outer elevator forward balances are cross-checked with TypeII photographs; TypeI drawings only corroborate the mechanism, not TypeII dimensions.",
+    "Runtime measured neutral extent is12.51m including current reference-fitted geometry;12.28m remains the historical nominal TypeII anchor,not a measured factory drawing.",
+    "Narrow reflection-band intensity and placement still differ from the selected museum photograph;user accepted this release for configuration."
   ],
   "pbr": {
     "baseUv": 0,
     "normalUv": 1,
     "assemblyAoUv": 2,
-    "metallicRoughness": "G roughness, B metallic",
+    "metallicRoughness": "G roughness,B metallic",
+    "images": 53,
+    "materials": 28,
+    "detailedMaterials": 24,
+    "opaqueOcclusionMaterials": 27,
+    "transparentGlassUsesOpaqueAo": false,
     "allEmbeddedImagesPixelExact": true,
-    "fabricDetailTileM": 0.0832,
-    "fabricYarnPitchM": 0.00065,
-    "metalDetailTileM": 0.2,
     "albedoContainsLighting": false,
+    "surfaceVersion": "20261027Surface44",
     "surfaceGenerator": "_blender/Script_KawasakiType88Surface.py",
-    "upperWingChordM": 2.047,
+    "fabricDetailTileM": 0.0832,
+    "metalDetailTileM": 0.2,
+    "upperWingChordM": 2.092026,
     "lowerWingChordM": 1.72,
     "paintContours": {
       "file": "Data_KawasakiType88Paint.json",
-      "sha256": "849636121fed3d174a99eb68ab2b897ab32a57d4cd2380c9bb479dd7329cacbd",
-      "scope": "Four legible wing numeral contours and seven visible tail-ink components; opposite tail side inferred. Constant authored paint, no source photographic illumination."
+      "sha256": "215e08e0eec67e78ec72718bfe95a4db4b14ce5e39eef794a1f39c45d488ff1e"
     },
-    "surfaceVersion": "20261024Surface11",
     "assemblyOcclusion": {
-      "samples": 64,
-      "highPixels": [
-        4096,
-        4096
-      ],
+      "sceneSamples": 64,
+      "nodeSamples": 16,
+      "distanceM": 0.3,
+      "strength": 0.75,
       "gamePixels": [
         2048,
         2048
       ],
-      "filter": "Separable one-texel [0.2,0.6,0.2], within bake margin; geometric AO without painted shadows"
+      "highPixels": [
+        4096,
+        4096
+      ],
+      "filter": "Separableone-texel[.2,.6,.2]withinbakemargin,physicalgeometryonly"
     }
   },
   "controls": [
@@ -166,46 +129,43 @@
     "AileronLowerRightPivot"
   ],
   "validation": {
-    "actualReimportSha256": "84a5bd30b17ed728c18e8a48089af255e21f392700e0036f49571412092918fe",
-    "actualReimportMissingImages": [],
-    "actualReimportMotionChecks": 301,
-    "actualReimportMotionIssues": [],
-    "actualReimportAxisChecks": 10,
-    "cameraWeightedRmsPixelsAt600": 2.4439466322128407,
-    "cameraFitIsNotWholeImageIdentityProof": true,
-    "sourceProjectsSelfContained": true,
-    "packingAudit": "Data_KawasakiType88Packing.json",
-    "fullPrepushStatus": "Stopped at existing SpeakerGestureTest: FrontObservation.02 consecutive Luo gestures; related source files unchanged by this model task.",
-    "localHighPreviewMatchesSource": true,
-    "cameraFitScalarResidualCount": 104,
-    "generatedInputImagesMatchPackedSource": true,
-    "actualExportedVBraceCount": 4,
-    "reproducibleSourceAndGlbAudit": "_blender/Script_AuditKawasakiType88.py",
-    "highActualReimportSha256": "84bd3c833038e052479fa47a4e8a202387a7af8c9a82ffacaead8f8d9dfbe043",
-    "highActualReimportMotionChecks": 301,
-    "highActualReimportMotionIssues": [],
-    "highAndGameNeutralExtentsAgree": true,
-    "tailOuterEdgeSamplesAt600": 22,
-    "tailOuterEdgeMaximumErrorPixelsAt600": 1,
-    "tailSamplesAreNotWholeImageIdentityProof": true,
-    "assetStructureChecks": 226,
-    "actualBrowserChecks": 3,
-    "freshRelatedGatesPassed": 16,
-    "visualReview": "Primary camera overview, native tail crop, neutral PBR exhaust/fabric/cockpit/tail/overall views reviewed against the available photographs. Uncalibrated lighting and unmeasured construction remain explicitly inferred; this is not a whole-image identity or factory-drawing claim.",
-    "builderDoesNotGrantReferenceApproval": true,
-    "samplerBudget": "Earlier 16-gate run passed SamplerBudgetTest; not repeated because material/sampler count and layout are unchanged."
+    "runtimeAssetChecks": 289,
+    "runtimeBrowserPassed": true,
+    "sourceAndPackedExportMotionChecksPerDetail": 301,
+    "completeReleaseAudit": {
+      "status": "passed",
+      "buildVersion": "20261027ReferenceGeometry86",
+      "surfaceVersion": "20261027Surface44",
+      "sourceProjects": 2,
+      "packedExports": 2,
+      "controlsPerVariant": 10,
+      "motionChecksPerSourceAndExport": 301,
+      "packedImagesPerVariant": 53,
+      "generatedInputsMatchedPerSource": 52,
+      "missingImages": 0,
+      "motionIssues": 0,
+      "rigidBatchOrientedTrianglesVerified": 79944,
+      "rigidBatchComparisonPrecision": 0.000001,
+      "rigidBatchChangedOrMissingTriangles": 0,
+      "browserRenderedPrimitiveMeshes": 65,
+      "browserWebGlErrors": 0,
+      "browserPageErrors": 0,
+      "localReport": "tmp/KawasakiType88/Data_AuditLatest.json"
+    },
+    "losslessPackingReport": "Data_KawasakiType88Packing.json",
+    "referenceIterationGame": "Data_Ui921.json",
+    "referenceIterationHigh": "Data_Ui914.json",
+    "wholeReferenceMatchApproved": false
   },
   "localReview": {
+    "directory": "tmp/KawasakiType88/",
     "url": "http://127.0.0.1:8118/tmp/KawasakiType88/index.html",
-    "pagesAndScreenshotsNotPublished": true
+    "releaseConfigured": true,
+    "exactPhotoMatchClaimed": false,
+    "studyEvidenceOutsideRepository": true
   },
   "tailProfile": {
     "file": "Data_KawasakiType88Tail.json",
-    "sha256": "0f4847b0bde92bc1b2420e98ca246c58cbe496e19bbc98089cbfc81390d7ac73",
-    "fixedReferenceYawDegrees": -2.0733553,
-    "fixedReferenceHeightM": 2.135,
-    "referenceRudderDegrees": 13.55,
-    "exportPose": "neutral",
-    "scope": "Installation, photograph pose, sections and joint hardware are image-derived inferences, not factory specifications. Real upper rudder and outer elevator forward balances are part of the moving meshes."
+    "sha256": "2dff84b9c3109154e72527c308e9cfbd1934712a2a83ffc12e80c8494e6c0056"
   }
 }

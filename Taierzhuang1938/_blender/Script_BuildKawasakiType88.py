@@ -12,19 +12,27 @@ import io
 import json
 import math
 import os
+import struct
 import sys
 import bpy
 from mathutils import Vector, Matrix, Quaternion
 
 
-VERSION = "20261024BalancedRudder20"
+VERSION = "20261027ReferenceGeometry86"
 PI = math.pi
 TAU = 2 * PI
-SOURCE_DEFAULT = Path(r"C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\KawasakiType88")
+SOURCE_DEFAULT = Path(r"C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\KawasakiType88\Release86")
 
 
 def P(p):
     return Vector((p[0], -p[2], p[1]))
+
+
+def StableSinCos(angle):
+    # Fractional powers amplify the floating-point residue at cardinal angles.
+    sine, cosine = math.sin(angle), math.cos(angle)
+    return (0. if abs(sine) < 1e-12 else sine,
+            0. if abs(cosine) < 1e-12 else cosine)
 
 
 def Lerp(a, b, t):
@@ -55,6 +63,11 @@ class Builder:
         self.detail = detail
         self.high = detail == "high"
         self.modelDir = self.repoRoot / "Taierzhuang1938/Model/KawasakiType88"
+        self.cowlingData = json.loads((self.modelDir / "Data_KawasakiType88Cowling.json").read_text(encoding="utf-8"))
+        self.wingData = json.loads((self.modelDir / "Data_KawasakiType88Wing.json").read_text(encoding="utf-8"))
+        self.cockpitData = json.loads((self.modelDir / "Data_KawasakiType88Cockpit.json").read_text(encoding="utf-8"))
+        bodyFile = self.modelDir / "Data_KawasakiType88Body.json"
+        self.bodyData = json.loads(bodyFile.read_text(encoding="utf-8")) if bodyFile.exists() else {}
         self.reviewDir = self.repoRoot / "tmp/KawasakiType88"
         self.meshes = []
         self.controls = {}
@@ -245,9 +258,13 @@ class Builder:
         self.root["variant"] = "Type 88-II reconnaissance; museum reference scheme 12"
         self.root["metresPerUnit"] = 1.0
         self.root["referenceMatchApproved"] = False
+        if self.stage == "pbr":
+            self.root["acceptedForConfiguration"] = True
+            self.root["releaseVersion"] = "20261028Release86"
         gray = (.42, .42, .42)
         palette = {
             "Fabric": ((.57, .59, .56), .12, .63),
+            "LowerWingFabric": ((.57, .59, .56), .12, .63),
             "Aluminum": ((.47, .50, .51), .72, .37),
             "Steel": ((.13, .15, .15), .78, .48),
             "Exhaust": ((.13, .105, .085), .6, .77),
@@ -255,6 +272,9 @@ class Builder:
             "Leather": ((.075, .039, .022), 0, .6),
             "Wood": ((.18, .055, .027), 0, .35),
             "Cockpit": ((.11, .14, .12), .25, .62),
+            "CockpitLining": ((.055, .065, .06), .03, .74),
+            "LowerHousing": ((.47, .50, .48), .09, .55),
+            "LowerPocket": ((.47, .50, .48), .09, .55),
             "Red": ((.34, .018, .02), 0, .64),
             "Ink": ((.016, .018, .018), 0, .67),
             "Glass": ((.55, .65, .67), 0, .15),
@@ -266,13 +286,21 @@ class Builder:
             "Tail": ((.57, .59, .56), .09, .65),
             "Fin": ((.57, .59, .56), .09, .65),
         }
+        for key, finish in self.cockpitData.get("finishes", {}).items():
+            palette[key] = (tuple(finish["baseSrgb"]), finish["metallic"], finish["roughness"])
+        if self.cowlingData.get("jointFinish"):
+            finish = self.cowlingData["jointFinish"]
+            palette["CowlingJoint"] = (tuple(finish["baseSrgb"]), finish["metallic"], finish["roughness"])
+        windscreen = self.cockpitData.get("windscreenFinish", {})
+        if windscreen:
+            palette["Glass"] = (tuple(windscreen["baseColorLinear"]), 0., windscreen["roughness"])
         for key, (color, metal, rough) in palette.items():
             self.materials[key] = Mat("Material_Type88" + key, gray if self.stage == "shape" else color,
                                       .0 if self.stage == "shape" else metal, .68 if self.stage == "shape" else rough)
         if self.stage != "shape":
             glass = self.materials["Glass"].node_tree.nodes.get("Principled BSDF")
-            glass.inputs["Transmission Weight"].default_value = .74
-            glass.inputs["IOR"].default_value = 1.46
+            glass.inputs["Transmission Weight"].default_value = windscreen.get("transmission", .74)
+            glass.inputs["IOR"].default_value = windscreen.get("ior", 1.46)
 
     # z, half-width, centre height, upper radius, lower radius. The aft fuselage
     # has flat facets; it is not modelled as a modern round tube.
@@ -288,33 +316,199 @@ class Builder:
     ]
 
     def Section(self, z):
-        for a, b in zip(self.sections, self.sections[1:]):
+        for sectionIndex, (a, b) in enumerate(zip(self.sections, self.sections[1:])):
             if a[0] <= z <= b[0]:
                 t = (z - a[0]) / (b[0] - a[0])
-                w, cy, up, low = (Lerp(a[i], b[i], t) for i in range(1, 5))
+                values = [Lerp(a[i], b[i], t) for i in range(1, 5)]
+                if z <= -3.65:
+                    before = self.sections[max(0, sectionIndex - 1)]
+                    after = self.sections[min(len(self.sections) - 1, sectionIndex + 2)]
+                    for i in range(1, 5):
+                        slopeA = (b[i] - before[i]) / (b[0] - before[0])
+                        slopeB = (after[i] - a[i]) / (after[0] - a[0])
+                        value = (2*t**3 - 3*t*t + 1)*a[i] + (t**3 - 2*t*t + t)*(b[0]-a[0])*slopeA
+                        value += (-2*t**3 + 3*t*t)*b[i] + (t**3-t*t)*(b[0]-a[0])*slopeB
+                        values[i-1] = max(min(a[i], b[i]), min(max(a[i], b[i]), value))
+                w, cy, up, low = values
                 strength = min(1, max(0, (z + 4.60) / .95)) * min(1, max(0, (5.60 - z) / 3.90))
-                return w * (1 + .40 * strength), cy - .15 * strength, up + .15 * strength, low + .25 * strength
+                w, cy = w * (1 + .40 * strength), cy - .15 * strength
+                # Both visible aft-body boundaries, with the camera held fixed.
+                # The image constrains projected shape, not factory sections.
+                photoStations = [(-.38, 1, 0), (.55, .94413, -.07194),
+                                 (1.70, .90650, -.02257), (3.20, 1.09307, -.02084),
+                                 (4.55, 1.40000, -.03495), (5.18, 1, 0)]
+                for beforePhoto, afterPhoto in zip(photoStations, photoStations[1:]):
+                    if beforePhoto[0] <= z <= afterPhoto[0]:
+                        photoT = (z - beforePhoto[0]) / (afterPhoto[0] - beforePhoto[0])
+                        w *= Lerp(beforePhoto[1], afterPhoto[1], photoT)
+                        cy += Lerp(beforePhoto[2], afterPhoto[2], photoT)
+                        break
+                return w, cy, up + .15 * strength, low + .25 * strength
         return tuple((self.sections[0] if z < self.sections[0][0] else self.sections[-1])[1:])
 
     def Top(self, x, z):
         w, cy, up, low = self.Section(z)
         q = min(.9999, abs(x) / w)
         if z >= -3.65:
-            return cy + up * (1 - .02 * q / .85 if q <= .85 else .98 - .18 * (q - .85) / .15)
-        return cy + up * (1 - q ** 3.25) ** (1 / 3.25)
+            roof = self.RoofShoulderFraction(z)
+            data = self.bodyData.get("secondaryShoulder", {})
+            profile = self.SecondaryShoulderProfile(z)
+            if profile and q > roof:
+                centreX = roof + (1 - roof) / 3
+                centreY = .92 * up + data["heightM"] * profile
+                if q <= centreX:
+                    return cy + Lerp(.98 * up, centreY, (q - roof) / (centreX - roof))
+                return cy + Lerp(centreY, .80 * up, (q - centreX) / (1 - centreX))
+            return cy + up * (1 - .02 * q / roof if q <= roof else .98 - .18 * (q - roof) / (1 - roof))
+        exponent = 2 / self.CowlingPower(z)
+        return cy + up * (1 - q ** exponent) ** (1 / exponent) + self.FrontCapOffset(x, z)
 
-    def RectangularSection(self, t, up, low):
+    def FrontCapOffset(self, x, z):
+        data = self.cowlingData.get("frontCapSurface")
+        if not data or not data.get("inwardDepthM"):
+            return 0.
+        halfWidth = self.Section(z)[0] * data["halfWidthFraction"]
+        radiusSquared = (x / halfWidth) ** 2 + ((z - data["centreAftM"]) / data["halfLengthM"]) ** 2
+        return -data["inwardDepthM"] * (1 - radiusSquared) ** 3 if radiusSquared < 1 else 0.
+
+    def RefineFrontCap(self, body):
+        data = self.cowlingData.get("frontCapSurface")
+        if not data or not data.get("inwardDepthM"):
+            return
+        import bmesh
+        mesh = bmesh.new()
+        mesh.from_mesh(body.data)
+        lowZ = data["centreAftM"] - data["halfLengthM"] - .08
+        highZ = data["centreAftM"] + data["halfLengthM"] + .08
+        selected = []
+        for edge in mesh.edges:
+            a, b = edge.verts
+            z = -(a.co.y + b.co.y) / 2
+            if not all(lowZ <= -vertex.co.y <= highZ for vertex in edge.verts):
+                continue
+            if not all(vertex.co.z > self.Section(-vertex.co.y)[1] + .12 for vertex in edge.verts):
+                continue
+            if abs((a.co.x + b.co.x) / 2) > self.Section(z)[0] * .93:
+                continue
+            selected.append(edge)
+        cuts = data["highRefinementCuts" if self.high else "gameRefinementCuts"]
+        bmesh.ops.subdivide_edges(mesh, edges=selected, cuts=cuts, use_grid_fill=True, smooth=0.)
+        changed = 0
+        maximum = 0.
+        for vertex in mesh.verts:
+            z = -vertex.co.y
+            if vertex.co.z <= self.Section(z)[1]:
+                continue
+            offset = self.FrontCapOffset(vertex.co.x, z)
+            if offset:
+                vertex.co.z += offset
+                changed += 1
+                maximum = max(maximum, abs(offset))
+        bmesh.ops.recalc_face_normals(mesh, faces=list(mesh.faces))
+        mesh.to_mesh(body.data)
+        mesh.free()
+        body.data.update()
+        body["frontCapRefinedVertices"] = changed
+        body["frontCapMaximumOffsetM"] = maximum
+        body["frontCapScope"] = data["scope"]
+
+    def CloseFuselageSeam(self, body):
+        # Geometry shares the seam vertex; the UV values remain per loop.
+        import bmesh
+        mesh = bmesh.new()
+        mesh.from_mesh(body.data)
+        before = len(mesh.verts)
+        bmesh.ops.remove_doubles(mesh, verts=list(mesh.verts), dist=1e-7)
+        bmesh.ops.recalc_face_normals(mesh, faces=list(mesh.faces))
+        welded = before - len(mesh.verts)
+        mesh.to_mesh(body.data)
+        mesh.free()
+        body.data.update()
+        body["fuselageSeamVerticesWelded"] = welded
+        body["cardinalTrigSnapped"] = True
+
+    def HoodHalfWidthFraction(self, z):
+        stations = self.cowlingData.get("hoodHalfWidthFractionStationsAftM")
+        if not stations:
+            return self.cowlingData["hoodHalfWidthFraction"]
+        for a, b in zip(stations, stations[1:]):
+            if a[0] <= z <= b[0]:
+                return Lerp(a[1], b[1], (z - a[0]) / (b[0] - a[0]))
+        return (stations[0] if z < stations[0][0] else stations[-1])[1]
+
+    def CowlingPower(self, z):
+        # Round nose transitioning into the photographed, nearly flat hood.
+        # Section extrema are unchanged; these corner radii are photo-inferred.
+        stations = self.cowlingData["powerStationsAftM"]
+        for a, b in zip(stations, stations[1:]):
+            if a[0] <= z <= b[0]:
+                return Lerp(a[1], b[1], (z - a[0]) / (b[0] - a[0]))
+        return .615
+
+    def BodySideBottomWidth(self, station):
+        data = self.bodyData.get("sideTaper")
+        if not data or station is None:
+            return .77
+        start, plateauStart, plateauEnd, end = map(float, data["profileAftM"])
+        width = float(data["lowerSideWidthFraction"])
+        assert start < plateauStart < plateauEnd < end and .60 < width <= 1.
+        if station <= start or station >= end:
+            return .77
+        profile = 1.
+        # Keep decimal metre blend lengths stable across source regeneration.
+        if station < plateauStart:
+            profile = Smooth((station - start) / round(plateauStart - start, 12))
+        elif station > plateauEnd:
+            profile = Smooth((end - station) / round(end - plateauEnd, 12))
+        return .77 + (width - .77) * profile
+
+    def RoofShoulderFraction(self, station):
+        data = self.bodyData.get("roofShoulder")
+        if not data or station is None:
+            return .85
+        start, end = map(float, data["transitionAftM"])
+        if station <= start:
+            return .85
+        profile = Smooth(min(1., max(0., (station - start) / round(end - start, 12))))
+        return .85 + (float(data["widthFraction"]) - .85) * profile
+
+    def SecondaryShoulderProfile(self, station):
+        data = self.bodyData.get("secondaryShoulder", {})
+        if not data.get("heightM") or station is None:
+            return 0.
+        start, full, fall, end = map(float, data["profileAftM"])
+        if station <= start or station >= end:
+            return 0.
+        return Smooth(min(1., (station - start) / round(full - start, 12))) * Smooth(min(1., (end - station) / round(end - fall, 12)))
+
+    def RectangularSection(self, t, up, low, station=None):
         """Flat fabric side panels on the rectangular steel-tube fuselage."""
-        knots = [(0, 0, 1), (.125, .85, .98), (.25, 1, .80), (.75, .77, -.80),
-                 (.875, .60, -.98), (1, 0, -1), (1.125, -.60, -.98), (1.25, -.77, -.80),
-                 (1.75, -1, .80), (1.875, -.85, .98), (2, 0, 1)]
+        roof = self.RoofShoulderFraction(station)
+        bottomSide = self.BodySideBottomWidth(station)
+        bottomChamfer = .60 + (bottomSide - .77) * (.60 / .77)
+        knots = [(0, 0, 1), (.125, roof, .98), (.25, 1, .80), (.75, bottomSide, -.80),
+                 (.875, bottomChamfer, -.98), (1, 0, -1), (1.125, -bottomChamfer, -.98), (1.25, -bottomSide, -.80),
+                 (1.75, -1, .80), (1.875, -roof, .98), (2, 0, 1)]
         q = t / PI
+        profile = self.SecondaryShoulderProfile(station)
+        if profile:
+            foldQ, side = q, 1.
+            if 1.75 <= foldQ <= 1.875:
+                foldQ, side = 2 - foldQ, -1.
+            if .125 <= foldQ <= .25:
+                centreX = roof + (1 - roof) / 3
+                centreY = .92 * up + self.bodyData["secondaryShoulder"]["heightM"] * profile
+                if foldQ <= 1 / 6:
+                    factor = (foldQ - .125) / (1 / 6 - .125)
+                    return side * Lerp(roof, centreX, factor), Lerp(.98 * up, centreY, factor)
+                factor = (foldQ - 1 / 6) / (.25 - 1 / 6)
+                return side * Lerp(centreX, 1, factor), Lerp(centreY, .80 * up, factor)
         if .25 <= q <= .75:
             f = (q - .25) / .50
-            return Lerp(1, .77, f), Lerp(.8 * up, -.8 * low, f)
+            return Lerp(1, bottomSide, f), Lerp(.8 * up, -.8 * low, f)
         if 1.25 <= q <= 1.75:
             f = (q - 1.25) / .50
-            return -Lerp(.77, 1, f), Lerp(-.8 * low, .8 * up, f)
+            return -Lerp(bottomSide, 1, f), Lerp(-.8 * low, .8 * up, f)
         for a, b in zip(knots, knots[1:]):
             if a[0] <= q <= b[0]:
                 f = (q - a[0]) / (b[0] - a[0])
@@ -325,137 +519,207 @@ class Builder:
     def Fuselage(self):
         zs = []
         for a, b in zip(self.sections, self.sections[1:]):
-            steps = max(2, math.ceil((b[0] - a[0]) / (.16 if self.high else .32)))
+            interval = (.04 if self.high else .075) if b[0] <= -3.65 else (.16 if self.high else .32)
+            steps = max(2, math.ceil((b[0] - a[0]) / interval))
             zs.extend(Lerp(a[0], b[0], j / steps) for j in range(steps))
         zs.append(self.sections[-1][0])
         verts, faces, uvs = [], [], []
         n = 48 if self.high else 32
         for z in zs:
             w, cy, up, low = self.Section(z)
-            exponent = .615 if z < -.5 else .78
+            exponent = self.CowlingPower(z) if z < -3.65 else .78
             for j in range(n + 1):
                 t = TAU * j / n
-                s, c = math.sin(t), math.cos(t)
+                if not self.high and self.bodyData.get("secondaryShoulder", {}).get("heightM", 0.):
+                    if j == 3:
+                        t = TAU / 12
+                    elif j == n - 3:
+                        t = TAU * 11 / 12
+                s, c = StableSinCos(t)
                 x = math.copysign(abs(s) ** exponent, s) * w
                 y = cy + math.copysign(abs(c) ** exponent, c) * (up if c >= 0 else low)
                 if z >= -3.65:
-                    xx, yy = self.RectangularSection(t, up, low)
+                    xx, yy = self.RectangularSection(t, up, low, z)
                     x, y = xx * w, cy + yy
                 verts.append((x, y, z))
-                uvs.append(((z + 5.88) / 11.9, j / n))
+                uvs.append(((z + 5.88) / 11.9, t / TAU))
         for i in range(len(zs) - 1):
             for j in range(n):
                 a = i * (n + 1) + j
                 faces.append((a, a + n + 1, a + n + 2, a + 1))
         faces.extend((tuple(range(n, -1, -1)), tuple((len(zs) - 1) * (n + 1) + j for j in range(n + 1))))
         body = self.Mesh("AirframeFacetedFuselage", verts, faces, "Fuselage", uvs=uvs)
+        sharp = body.data.attributes.new("sharp_edge", "BOOLEAN", "EDGE")
+        panelCorners = {2, 4, 12, 14, 18, 20, 28, 30} if n == 32 else {3, 6, 18, 21, 27, 30, 42, 45}
+        for edge in body.data.edges:
+            a, b = edge.vertices
+            if a % (n + 1) == b % (n + 1) and a % (n + 1) in panelCorners:
+                if min(-body.data.vertices[a].co.y, -body.data.vertices[b].co.y) >= -3.65 - .000001:
+                    sharp.data[edge.index].value = True
+        self.CloseFuselageSeam(body)
+        self.RefineFrontCap(body)
         body.data.materials.append(self.materials["FuselageMetal"])
+        body.data.materials.append(self.materials["CockpitLining"])
         for poly in body.data.polygons:
             if sum(-body.data.vertices[i].co.y for i in poly.vertices) / len(poly.vertices) < -3.65:
                 poly.material_index = 1
         # Actual holes, cut through the upper shell, not black painted ovals.
-        for label, z, rx, rz in (("Pilot", -1.32, .425, .51), ("Observer", -.143, .395, .445)):
+        for label, z, rx, rz in (("Pilot", -1.35, .40, .455), ("Observer", -.20, .36, .375)):
+            cockpit = self.cockpitData[label]
+            z = cockpit.get("centreAftM", z)
+            rx = cockpit.get("openingHalfSpanM", rx)
+            rz = cockpit.get("openingHalfAftM", rz)
             outline = self.OpeningOutline(label, z, rx, rz)
-            if label == "Pilot":
-                cutterVerts = [(x, y, zz) for y in (1.50, 3.40) for x, zz in outline]
-                n = len(outline)
-                cutterFaces = [tuple(range(n - 1, -1, -1)), tuple(range(n, n * 2))]
-                cutterFaces += [(i, (i + 1) % n, (i + 1) % n + n, i + n) for i in range(n)]
-                cutter = self.Mesh("ToolPilotOpening", cutterVerts, cutterFaces, None)
-                import bmesh
-                bm = bmesh.new(); bm.from_mesh(cutter.data); bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces)); bm.to_mesh(cutter.data); bm.free()
-            else:
-                cutter = self.Ellipsoid("Tool" + label + "Opening", (0, 2.60, z), (rx, 1.02, rz), None, 64, 32)
+            cutterVerts = [(x, y, zz) for y in (1.50, 3.40) for x, zz in outline]
+            n = len(outline)
+            cutterFaces = [tuple(range(n - 1, -1, -1)), tuple(range(n, n * 2))]
+            cutterFaces += [(i, (i + 1) % n, (i + 1) % n + n, i + n) for i in range(n)]
+            cutter = self.Mesh("Tool" + label + "Opening", cutterVerts, cutterFaces, None)
+            for material in body.data.materials:
+                cutter.data.materials.append(material)
+            for poly in cutter.data.polygons:
+                poly.material_index = 2
+            import bmesh
+            bm = bmesh.new(); bm.from_mesh(cutter.data); bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces)); bm.to_mesh(cutter.data); bm.free()
             mod = body.modifiers.new(label + "OpenCockpit", "BOOLEAN")
             mod.operation = "DIFFERENCE"
             mod.solver = "EXACT"
             mod.object = cutter
+            mod.material_mode = "INDEX"
             self.Apply(body, mod)
             self.meshes.remove(cutter)
             bpy.data.objects.remove(cutter, do_unlink=True)
+            for poly in body.data.polygons:
+                if poly.material_index == 2:
+                    poly.use_smooth = False
             rim = []
             for x, zz in outline:
                 rim.append((x, self.Top(x, zz) + .007, zz))
-            self.Tube(label + "PaddedLeatherCoaming", rim, .034, "Leather", 10, True)
+            self.Tube(label + "PaddedLeatherCoaming", rim, .028, cockpit.get("rimFinish", "Leather"), 10 if self.high else self.bodyData.get("secondaryShoulder", {}).get("gameCoamingRadialSamples", 9), True)
+            innerLip = [(x, self.Top(x, zz) - .033, zz)
+                        for x, zz in self.OpeningOutline(label, z, rx - .032, rz - .032)]
+            self.Tube(label + "RolledInteriorLip", innerLip, .012, "Aluminum", 8, True)
             linerVerts, linerFaces = [], []
             linerOutline = self.OpeningOutline(label, z, rx - .025, rz - .025)
             n = len(linerOutline)
-            for level in range(2):
+            linerDepths = self.cockpitData[label]["linerDepthsM"]
+            for depth in linerDepths:
                 for x, zz in linerOutline:
-                    linerVerts.append((x, self.Top(x, zz) - .025 - level * .55, zz))
-            for j in range(n):
-                linerFaces.append((j, (j + 1) % n, (j + 1) % n + n, j + n))
-            linerFaces.append(tuple(range(n, n * 2)))
-            self.Mesh(label + "InteriorTub", linerVerts, linerFaces, "Cockpit")
-            self.Box(label + "SeatPan", (0, 1.82, z + .04), (.48, .07, .40), "Leather", .035)
-            back = self.Box(label + "SeatBack", (0, 2.02, z + .29), (.48, .42, .075), "Leather", .045)
-            self.Beam(label + "ControlColumn", (0, 1.78, z - .08), (0, 2.09, z - .16), .024, "Steel")
-            self.Tube(label + "ControlGrip", [(-.10, 2.09, z - .16), (0, 2.14, z - .16), (.10, 2.09, z - .16)], .023, "Rubber")
-            self.Box(label + "InstrumentPanel", (0, 2.12, z - .40), (.63, .30, .045), "Cockpit", .02)
+                    linerVerts.append((x, self.Top(x, zz) - depth, zz))
+            for level in range(len(linerDepths) - 1):
+                for j in range(n):
+                    a = level * n + j
+                    b = level * n + (j + 1) % n
+                    linerFaces.append((a, b, b + n, a + n))
+            linerFaces.append(tuple(range(n * 2, n * 3)))
+            lining = self.Mesh(label + "InteriorTub", linerVerts, linerFaces, "CockpitLining")
+            wallFinish = cockpit.get("wallFinish", "Cockpit")
+            lining.data.materials.append(self.materials[wallFinish])
+            for face in lining.data.polygons:
+                if face.index < len(linerFaces) - 1:
+                    face.material_index = 1
+                elif face.index == len(linerFaces) - 1:
+                    face.use_smooth = False
+            lining["wallFinish"] = wallFinish
+            lining["darkFloorPreserved"] = True
+            self.CockpitSeat(label, z)
+            self.Beam(label + "ControlColumn", (0, 1.78, z - .14), (0, 2.20, z - .27), .020, "Steel")
+            self.Tube(label + "ControlGrip", [(-.08, 2.20, z - .27), (0, 2.24, z - .27), (.08, 2.20, z - .27)], .017, "Rubber")
+            self.Box(label + "InstrumentPanel", (0, 2.08, z - .34), (.55, .25, .035), "CockpitLining", .015)
             for j, x in enumerate((-.20, -.07, .075, .21)):
-                self.Beam(label + "GaugeBezel" + str(j), (x, 2.15, z - .368), (x, 2.15, z - .35), .054 if j in (1, 2) else .038, "Steel", 24)
-                self.Beam(label + "GaugeFace" + str(j), (x, 2.15, z - .347), (x, 2.15, z - .344), .046 if j in (1, 2) else .030, "Ink", 24)
-                self.Beam(label + "GaugeNeedle" + str(j), (x, 2.15, z - .341), (x + .019, 2.18, z - .341), .0025, "Ivory", 6)
-            for side in (-1, 1):
-                self.Box(label + "LapBelt" + str(side), (side * .13, 1.87, z + .06), (.075, .014, .31), "Ivory", .004)
-            self.Box(label + "BeltBuckle", (0, 1.89, z + .02), (.085, .016, .052), "Steel", .006)
+                self.Beam(label + "GaugeBezel" + str(j), (x, 2.11, z - .318), (x, 2.11, z - .302), .044 if j in (1, 2) else .030, "Steel", 20)
+                self.Beam(label + "GaugeFace" + str(j), (x, 2.11, z - .300), (x, 2.11, z - .297), .037 if j in (1, 2) else .023, "Ink", 20)
+                self.Beam(label + "GaugeNeedle" + str(j), (x, 2.11, z - .294), (x + .015, 2.13, z - .294), .002, "Ivory", 6)
         # Differently shaped aluminium engine panels, with real seams and latches.
-        for end in (-5.60, -4.66, -3.69):
+        for end in (-5.60, -3.69):
             pts = []
             w, cy, up, low = self.Section(end)
             count = 64 if self.high else 48
             for j in range(count):
                 t = TAU * j / count
-                s, c = math.sin(t), math.cos(t)
+                s, c = StableSinCos(t)
                 if end < -3.65:
-                    x = math.copysign(abs(s) ** .615, s) * (w + .0015)
-                    y = cy + math.copysign(abs(c) ** .615, c) * (up if c >= 0 else low) * 1.003
+                    power = self.CowlingPower(end)
+                    x = math.copysign(abs(s) ** power, s) * (w + .0015)
+                    y = cy + math.copysign(abs(c) ** power, c) * (up if c >= 0 else low) * 1.003
                 else:
-                    xx, yy = self.RectangularSection(t, up, low)
+                    xx, yy = self.RectangularSection(t, up, low, end)
                     x, y = xx * (w + .0015), cy + yy * 1.003
+                if c >= 0:
+                    y += self.FrontCapOffset(x, end)
                 pts.append((x, y, end))
-            self.Tube("CowlingPanelSeam" + str(end), pts, .0045, "Steel", 6, True)
-        for j in range(3):
-            z = -5.15 + j * .50
-            cutter = self.Box("ToolCowlingVent" + str(j), (0, 1.68, z), (1.6, .145, .34), None, .025)
-            mod = body.modifiers.new("ActualCowlingVentOpening" + str(j), "BOOLEAN")
-            mod.operation = "DIFFERENCE"
-            mod.solver = "EXACT"
-            mod.object = cutter
-            self.Apply(body, mod)
-            self.meshes.remove(cutter)
-            bpy.data.objects.remove(cutter, do_unlink=True)
+            jointMaterial = "CowlingJoint" if self.cowlingData.get("jointFinish") else "Steel"
+            self.Tube("CowlingPanelSeam" + str(end), pts, .0015, jointMaterial, 6, True)
+        # The photograph shows a faint joint across the upper hood. It is a
+        # thin top-panel joint, rather than a thick ring around the whole cowl.
+        crossZ = -4.66
+        width = self.Section(crossZ)[0] * self.HoodHalfWidthFraction(crossZ)
+        cross = [(Lerp(-width, width, i / 32), self.Top(Lerp(-width, width, i / 32), crossZ) + .0008, crossZ)
+                 for i in range(33)]
+        self.Tube("CowlingTopCrossJoint", cross, .0015, jointMaterial, 6)
+        crease = body.modifiers.new("AuthoredFabricPanelCreases", "EDGE_SPLIT")
+        crease.use_edge_angle = False
+        crease.use_edge_sharp = True
+        self.Apply(body, crease)
+        body["longitudinalPanelCreases"] = True
         for side in (-1, 1):
+            edge, seam = [], []
+            for j in range(33):
+                z = Lerp(-5.63, -3.69, j / 32)
+                w, cy, up, low = self.Section(z)
+                fraction = self.HoodHalfWidthFraction(z)
+                seamX, lipX = side * fraction * w, side * (fraction + .01) * w
+                seam.append((seamX, self.Top(seamX, z) + .001, z))
+                edge.append((lipX, self.Top(lipX, z) + .001, z))
+            self.Tube("CowlingTopPanelSeam" + str(side), seam, .005, jointMaterial, 8)
+            self.Tube("CowlingTopSideLip" + str(side), edge, .003, "Aluminum", 6)
             for z in (-5.10, -4.30, -3.78):
                 self.Box("CowlingQuarterTurnFastener" + str(side) + str(z), (side * .568, 1.92, z), (.011, .038, .061), "Steel", .006)
-            # These are separate metal louvres backed by a recessed dark cavity.
-            for j in range(3):
-                z = -5.15 + j * .50
-                x = side * (.52 if j == 0 else .57)
-                self.Box("EngineVentRecess" + str(side) + str(j), (side * .39, 1.68, z), (.012, .13, .32), "Ink", .025)
-                self.Beam("EngineVentLip" + str(side) + str(j), (x + side * .012, 1.77, z - .17), (x + side * .012, 1.77, z + .17), .013, "Aluminum", 8)
-            for j in range(6):
-                z = -5.39 + j * .235
+            bankStart, bankSpacing = -5.382895, .19801032
+            mountY, tipY = 2.13, 2.10
+            portLip = []
+            for j in range(25):
+                z = Lerp(bankStart - .05, bankStart + bankSpacing * 5 + .05, j / 24)
                 w, cy, up, low = self.Section(z)
-                mountY = cy + .04
-                mountX = w * (1 - min(.999, .04 / up) ** (2 / .615)) ** (.615 / 2)
+                power = self.CowlingPower(z)
+                q = min(.999, abs(mountY - cy) / up)
+                skinX = w * (1 - q ** (2 / power)) ** (power / 2)
+                portLip.append((side * (skinX + .003), mountY + .018, z))
+            trimFinish = self.cowlingData.get("exhaustPortTrimFinish", {}).get("material", "Steel")
+            self.Tube("ExhaustPortTrim" + str(side), portLip, .014, trimFinish, 8)
+            for j in range(6):
+                z = bankStart + j * bankSpacing
+                w, cy, up, low = self.Section(z)
+                power = self.CowlingPower(z)
+                mountX = w * (1 - min(.999, abs(mountY - cy) / up) ** (2 / power)) ** (power / 2)
+                tipX = .62709485 + j * .00822401
                 a = Vector((side * (mountX - .015), mountY, z))
-                b = Vector((side * (mountX + .115), mountY, z + .012))
-                c = Vector((side * (mountX + .125), cy - .06, z + .05))
-                d = Vector((side * (mountX + .125), cy - .155, z + .06))
+                b = Vector((side * Lerp(mountX, tipX, .70), mountY, z + .003))
+                c = Vector((side * tipX, (mountY + tipY) / 2, z + .011))
+                d = Vector((side * tipX, tipY, z + .012))
+                bendEnd = d + Vector((0, .012, 0))
                 steps = 11 if self.high else 6
-                points = [tuple((1-t)**3*a + 3*(1-t)**2*t*b + 3*(1-t)*t*t*c + t**3*d) for t in (k/steps for k in range(steps + 1))]
-                self.Tube("ExhaustStack" + str(side) + str(j), points, .035, "Exhaust", 20 if self.high else 16, innerRadius=.032)
+                points = [tuple((1-t)**3*a + 3*(1-t)**2*t*b + 3*(1-t)*t*t*c + t**3*bendEnd) for t in (k/steps for k in range(steps + 1))]
+                points.append(tuple(d))
+                pipe = self.Tube("ExhaustStack" + str(side) + str(j), points, .031, "Exhaust", 20 if self.high else 16, innerRadius=.028)
+                pipe["tipPointM"] = list(d)
+                pipe["tipDirectionM"] = list((d - Vector(points[-2])).normalized())
+                pipe["tipOuterRadiusM"] = .031
+                pipe["photoInferredBank"] = True
                 axis = (b-a).normalized()
                 self.Beam("ExhaustInnerShadow" + str(side) + str(j), tuple(a - axis * .006), tuple(a - axis * .003), .0315, "Ink", 16 if self.high else 12)
+        self.root["cowlingScope"] = "Boxier hood corners and one coherent six-port bank fitted to visible contours; section extrema retained, exit tips kept outside the skin. Exact factory construction is unverified."
+        self.root["hoodHalfWidthFraction"] = self.cowlingData["hoodHalfWidthFraction"]
+        if self.cowlingData.get("hoodHalfWidthFractionStationsAftM"):
+            self.root["hoodHalfWidthFractionStationsAftM"] = json.dumps(self.cowlingData["hoodHalfWidthFractionStationsAftM"])
         # Type II rounded suspended radiator, not the Type I frontal box.
-        self.Ellipsoid("TypeIIBellyRadiatorFairing", (0, 1.34, -4.79), (.34, .24, .70), "Aluminum", 40, 20)
+        self.LowerNoseHousing()
         self.Box("RadiatorCore", (0, 1.31, -5.33), (.47, .25, .07), "Steel", .025)
         for j in range(22):
             x = -.22 + j * .44 / 21
             self.Beam("RadiatorVerticalFin" + str(j), (x, 1.20, -5.374), (x, 1.43, -5.374), .003, "Exhaust", 4)
-        self.Beam("RadiatorPipeForward", (-.17, 1.49, -5.12), (-.17, 1.70, -5.12), .034, "Steel")
-        self.Beam("RadiatorPipeAft", (.17, 1.48, -4.34), (.17, 1.70, -4.34), .034, "Steel")
+        self.Beam("RadiatorPipeForward", (-.17, 1.28, -5.12), (-.17, 1.70, -5.12), .034, "Steel")
+        self.Beam("RadiatorPipeAft", (.17, 1.28, -4.34), (.17, 1.70, -4.34), .034, "Steel")
         # Rear longeron seams remain finer than the padded cockpit edges.
         for side in (-1, 1):
             for fraction in (-.60, .60):
@@ -463,21 +727,375 @@ class Builder:
                 for j in range(51):
                     z = -.5 + (self.sections[-1][0] + .44) * j / 50
                     w, cy, up, low = self.Section(z)
-                    xFraction = .77 + .23 * (fraction + .8) / 1.6
+                    xFraction = .77 + .23 * (fraction + .8) / 1.6 + (self.BodySideBottomWidth(z) - .77) * (1 - (fraction + .8) / 1.6)
                     pts.append((side * (w * xFraction + .002), cy + fraction * (up if fraction > 0 else low), z))
                 self.Tube("AftLongeronSeam" + str(side) + str(fraction), pts, .0035, "Fabric", 6)
         # Small curved windscreen, independent from the padded rim.
         verts, faces = [], []
+        pilot = self.cockpitData["Pilot"]
+        screenBaseZ = pilot.get("centreAftM", -1.35) - pilot.get("openingHalfAftM", .455) + .095
         for level in (0, 1):
             for j in range(17):
                 t = -PI / 2 + PI * j / 16
-                verts.append((.35 * math.sin(t), 2.39 + level * .23, -1.69 - .16 * math.cos(t)))
+                x = .34 * math.sin(t)
+                z = screenBaseZ - .10 * math.cos(t) + level * .08
+                baseY = self.Top(x, screenBaseZ - .10 * math.cos(t)) + .014
+                verts.append((x, baseY + level * .16 * (.35 + .65 * math.cos(t)), z))
         for j in range(16):
             faces.append((j, j + 1, j + 18, j + 17))
         self.Mesh("PilotCurvedWindscreen", verts, faces, "Glass")
+        screenFrameFinish = self.cockpitData.get("windscreenFrameFinish", {}).get("material", "Steel")
+        for side, index in ((-1, 0), (1, 16)):
+            self.Beam("WindscreenSideFrame" + str(side), verts[index], verts[index + 17], .009, screenFrameFinish)
+        self.Tube("WindscreenTopFrame", [(v[0], v[1], v[2]) for v in verts[17:]], .011, screenFrameFinish, 8)
+        self.root["cockpitScope"] = "Apertures, rolled inner lips, curved seat shells and visible frames reconstructed from the museum photograph; hidden equipment and exact dimensions remain inferred."
+        if self.bodyData.get("sideTaper"):
+            self.root["bodySideTaper"] = json.dumps(self.bodyData["sideTaper"])
+        self.CorrectObserverUpperDeck()
+        self.RoundRoofShoulder()
+        self.CanonicalizeBodyCentreline()
+        self.RoundSecondaryShoulder()
+
+    def CanonicalizeBodyCentreline(self):
+        # The analytic mirror plane is X=0; remove only floating trig residues.
+        body = bpy.data.objects["AirframeFacetedFuselage"]
+        for vertex in body.data.vertices:
+            if 0 < abs(vertex.co.x) < 1e-12:
+                vertex.co.x = 0.0
+        body.data.update()
+        self.root["bodyCentrelineCanonicalization"] = "Exact theoretical mirrorplane X=0 after body construction; floating trig residues below 1e-12m only."
+
+    def RoundRoofShoulder(self):
+        data = self.bodyData.get("roofShoulder")
+        if not data:
+            return
+        import bmesh
+        body = bpy.data.objects["AirframeFacetedFuselage"]
+        mesh = bmesh.new()
+        mesh.from_mesh(body.data)
+        bmesh.ops.remove_doubles(mesh, verts=list(mesh.verts), dist=1e-7)
+        bmesh.ops.recalc_face_normals(mesh, faces=list(mesh.faces))
+        assert all(edge.is_manifold for edge in mesh.edges)
+        mesh.to_mesh(body.data)
+        mesh.free()
+        body.data.update()
+        start, full, fall, end = map(float, data["radiusProfileAftM"])
+        shoulderStart = float(data["transitionAftM"][1])
+
+        def Corner(vertex):
+            station = -vertex.co.y
+            w, cy, up, low = self.Section(station)
+            return shoulderStart <= station <= end + .05 and abs(abs(vertex.co.x) - w * self.RoofShoulderFraction(station)) < 2e-5 and vertex.co.z > cy + .9 * up
+
+        def RadiusProfile(station):
+            if station <= start or station >= end:
+                return 0.
+            if station < full:
+                return Smooth((station - start) / round(full - start, 12))
+            if station > fall:
+                return Smooth((end - station) / round(end - fall, 12))
+            return 1.
+
+        weight = body.data.attributes.get("bevel_weight_edge") or body.data.attributes.new("bevel_weight_edge", "FLOAT", "EDGE")
+        selected = []
+        for edge in body.data.edges:
+            vertices = [body.data.vertices[i] for i in edge.vertices]
+            if all(Corner(vertex) for vertex in vertices):
+                value = RadiusProfile(-sum(vertex.co.y for vertex in vertices) / 2)
+                weight.data[edge.index].value = value
+                if value > 0:
+                    selected.append(edge.index)
+        assert len(selected) > 20, len(selected)
+        mod = body.modifiers.new("PhysicalSmoothRoofShoulder", "BEVEL")
+        mod.width = float(data["rollOffsetM"])
+        mod.segments = int(data["rollSegments"])
+        mod.profile = .5
+        mod.limit_method = "WEIGHT"
+        mod.affect = "EDGES"
+        mod.loop_slide = True
+        mod.use_clamp_overlap = True
+        if hasattr(mod, "edge_weight"):
+            mod.edge_weight = "bevel_weight_edge"
+        mod.harden_normals = True
+        self.Apply(body, mod)
+        mesh = bmesh.new()
+        mesh.from_mesh(body.data)
+        bmesh.ops.remove_doubles(mesh, verts=list(mesh.verts), dist=1e-7)
+        bmesh.ops.recalc_face_normals(mesh, faces=list(mesh.faces))
+        assert all(edge.is_manifold for edge in mesh.edges)
+        mesh.to_mesh(body.data)
+        mesh.free()
+        body.data.update()
+        crease = body.modifiers.new("RoofShoulderCreases", "EDGE_SPLIT")
+        crease.use_edge_angle = False
+        crease.use_edge_sharp = True
+        self.Apply(body, crease)
+        self.root["roofShoulder"] = json.dumps(data)
+
+    def RoundSecondaryShoulder(self):
+        data = self.bodyData.get('secondaryShoulder', {})
+        height = data.get('heightM', 0.0)
+        if not height:
+            return
+        import bmesh
+        ob = bpy.data.objects['AirframeFacetedFuselage']
+        bm = bmesh.new()
+        bm.from_mesh(ob.data)
+        bmesh.ops.remove_doubles(bm, verts=list(bm.verts), dist=1e-07)
+        bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+        assert all((e.is_manifold for e in bm.edges))
+        bm.to_mesh(ob.data)
+        bm.free()
+        ob.data.update()
+        weights = ob.data.attributes.get('bevel_weight_edge') or ob.data.attributes.new('bevel_weight_edge', 'FLOAT', 'EDGE')
+        for v in weights.data:
+            v.value = 0.0
+
+        def Corner(v):
+            z = -v.co.y
+            w, cy, up, low = self.Section(z)
+            roof = self.RoofShoulderFraction(z)
+            return 0.55 <= z <= 3.4 and abs(abs(v.co.x) - w * (roof + (1 - roof) / 3)) < 2e-05 and (abs(v.co.z - (cy + 0.92 * up + height * self.SecondaryShoulderProfile(z))) < 2e-05)
+        selected = []
+        for edge in ob.data.edges:
+            vertices = [ob.data.vertices[i] for i in edge.vertices]
+            if all((Corner(v) for v in vertices)):
+                weights.data[edge.index].value = self.SecondaryShoulderProfile(-sum((v.co.y for v in vertices)) / 2)
+                selected.append(edge.index)
+        assert len(selected) > 10, len(selected)
+        mod = ob.modifiers.new('PhysicalSecondaryShoulder', 'BEVEL')
+        mod.width = data['radiusM']
+        mod.segments = int(data["highBevelSegments"] if self.high else data["gameBevelSegments"])
+        mod.profile = 0.5
+        mod.limit_method = 'WEIGHT'
+        mod.affect = 'EDGES'
+        mod.loop_slide = True
+        mod.use_clamp_overlap = True
+        mod.harden_normals = True
+        if hasattr(mod, 'edge_weight'):
+            mod.edge_weight = 'bevel_weight_edge'
+        self.Apply(ob, mod)
+        bm = bmesh.new()
+        bm.from_mesh(ob.data)
+        bmesh.ops.remove_doubles(bm, verts=list(bm.verts), dist=1e-07)
+        bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+        assert all((e.is_manifold for e in bm.edges))
+        bm.to_mesh(ob.data)
+        bm.free()
+        ob.data.update()
+        split = ob.modifiers.new('SecondaryShoulderExistingCreases', 'EDGE_SPLIT')
+        split.use_edge_angle = False
+        split.use_edge_sharp = True
+        self.Apply(ob, split)
+        self.root['secondaryShoulder'] = json.dumps(data)
+
+    def CorrectObserverUpperDeck(self):
+        """Preserve topology while correcting the complete local upper station."""
+        data = self.cockpitData.get("Observer", {}).get("upperDeckCorrection", {})
+        rise = float(data.get("riseM", 0.))
+        if not rise:
+            return
+        assert math.isfinite(rise) and abs(rise) <= .20, rise
+        start, plateauStart, plateauEnd, end = map(float, data["profileAftM"])
+        assert start < plateauStart < plateauEnd < end
+
+        def Profile(station):
+            if station <= start or station >= end:
+                return 0.
+            if station < plateauStart:
+                return Smooth((station - start) / (plateauStart - start))
+            if station > plateauEnd:
+                return Smooth((end - station) / (end - plateauEnd))
+            return 1.
+
+        changed = []
+        for ob in self.meshes:
+            body = ob.name == "AirframeFacetedFuselage"
+            shell = any(ob.name.startswith(label + suffix)
+                        for label in ("Pilot", "Observer")
+                        for suffix in ("PaddedLeatherCoaming", "RolledInteriorLip", "InteriorTub"))
+            furniture = ob.name.startswith("Observer") and not shell
+            upperSeam = (ob.name.startswith("AftLongeronSeam") and ob.name.endswith("0.6")
+                         and not ob.name.endswith("-0.6"))
+            if not (body or shell or furniture or upperSeam):
+                continue
+            inverse = ob.matrix_world.inverted()
+            count = 0
+            for vertex in ob.data.vertices:
+                point = ob.matrix_world @ vertex.co
+                station = -point.y
+                w, cy, up, low = self.Section(station)
+                if furniture:
+                    delta = rise
+                elif body:
+                    delta = rise * Profile(station) * max(0., (point.z - cy) / up)
+                elif shell:
+                    delta = rise * Profile(station) * (self.Top(point.x, station) - cy) / up
+                else:
+                    delta = rise * Profile(station) * .60
+                if abs(delta) < 1e-12:
+                    continue
+                point.z += delta
+                vertex.co = inverse @ point
+                count += 1
+            ob.data.update()
+            if count:
+                changed.append(ob.name)
+        self.root["observerUpperDeckCorrectionRiseM"] = rise
+        self.root["observerUpperDeckCorrectionProfileAftM"] = [start, plateauStart, plateauEnd, end]
+        self.root["observerUpperDeckCorrectionScope"] = data["scope"]
+        self.Progress("CorrectedObserverUpperDeck", meshes=len(changed), riseM=rise)
+
+    def LowerNoseHousing(self):
+        data = self.cowlingData["lowerHousing"]
+        centre = data["centreM"]
+        profile = data["profileAftOffsetAndScale"]
+        rings = []
+        for a, b in zip(profile, profile[1:]):
+            steps = max(2, math.ceil((b[0] - a[0]) / (.04 if self.high else .08)))
+            for j in range(steps):
+                t = j / steps
+                rings.append((Lerp(a[0], b[0], t), Lerp(a[1], b[1], Smooth(t))))
+        rings.append(tuple(profile[-1]))
+        n = 48 if self.high else 32
+        verts, faces, uvs = [], [], []
+        for offset, scale in rings:
+            for j in range(n + 1):
+                t = TAU * j / n
+                # Preserve the validated pocket tessellation in this housing.
+                # Its .4-power endpoint residue is sub-micrometre; the cowl's
+                # much smaller exponent is handled by StableSinCos above.
+                s, c = math.sin(t), math.cos(t)
+                x = centre[0] + math.copysign(abs(s) ** data["crossSectionPower"], s) * data["halfWidthM"] * scale
+                y = centre[1] + math.copysign(abs(c) ** data["crossSectionPower"], c) * data["halfHeightM"] * scale
+                verts.append((x, y, centre[2] + offset))
+                uvs.append((j / n, (offset + .72) / 1.44))
+        for i in range(len(rings) - 1):
+            for j in range(n):
+                a = i * (n + 1) + j
+                faces.append((a, a + n + 1, a + n + 2, a + 1))
+        faces.extend((tuple(range(n, -1, -1)), tuple((len(rings) - 1) * (n + 1) + j for j in range(n + 1))))
+        ob = self.Mesh("TypeIIBellyRadiatorFairing", verts, faces, "LowerHousing", uvs=uvs)
+        ob["uvExtentM"] = (2.6, 1.44)
+        ob["lowerHousingScope"] = data["scope"]
+        if data.get("openings"):
+            self.LowerHousingOpenings(ob, data["openings"])
+        self.root["lowerHousingReconstructionPending"] = True
+        return ob
+
+    def LowerHousingOpenings(self, housing, openings):
+        """Real closed recesses; the camera sees inner walls, never background."""
+        data = self.cowlingData["lowerHousing"]
+        finish = data.get("openingFinish", {}).get("material", "CockpitLining")
+        if self.materials[finish] not in list(housing.data.materials):
+            housing.data.materials.append(self.materials[finish])
+        liningIndex = list(housing.data.materials).index(self.materials[finish])
+        for opening in openings:
+            for mirrored, suffix in ((False, "Near"), (True, "FarInferred")):
+                points, normals = [], []
+                for point, normal in zip(opening["surfacePolygonM"], opening["surfaceNormalsM"]):
+                    point, normal = Vector(point), Vector(normal)
+                    if mirrored:
+                        point.x, normal.x = -point.x, -normal.x
+                    points.append(point)
+                    normals.append(normal.normalized())
+                count = len(points)
+                verts = [tuple(point + normal * data["openingOuterMarginM"]) for point, normal in zip(points, normals)]
+                verts += [tuple(point - normal * data["openingPocketDepthM"]) for point, normal in zip(points, normals)]
+                faces = [tuple(range(count - 1, -1, -1)), tuple(range(count, count * 2))]
+                faces += [(i, (i + 1) % count, (i + 1) % count + count, i + count) for i in range(count)]
+                tool = self.Mesh("ToolLowerOpening" + opening["id"] + suffix, verts, faces, None, smooth=False)
+                for material in housing.data.materials:
+                    tool.data.materials.append(material)
+                for polygon in tool.data.polygons:
+                    polygon.material_index = liningIndex
+                import bmesh
+                mesh = bmesh.new(); mesh.from_mesh(tool.data); bmesh.ops.recalc_face_normals(mesh, faces=list(mesh.faces)); mesh.to_mesh(tool.data); mesh.free()
+                modifier = housing.modifiers.new("ActualLowerOpening" + opening["id"] + suffix, "BOOLEAN")
+                modifier.operation = "DIFFERENCE"
+                modifier.solver = "EXACT"
+                modifier.object = tool
+                modifier.material_mode = "INDEX"
+                self.Apply(housing, modifier)
+                self.meshes.remove(tool)
+                bpy.data.objects.remove(tool, do_unlink=True)
+        for polygon in housing.data.polygons:
+            if polygon.material_index == liningIndex:
+                polygon.use_smooth = False
+        housing["realRecessCount"] = len(openings) * 2
+        housing["openingScope"] = "Visible mouth boundaries traced to the actual lower enclosure. Recess depth and mirrored opposite-side mouths are inferred; no photographic colour or shadow is used."
+
+    def CockpitSeat(self, label, z):
+        """Rounded pan and a closed, leaning bucket back; no painted interior."""
+        pilot = label == "Pilot"
+        data = self.cockpitData[label]
+        panY = data.get("panHeightM", 2.13 if pilot else 1.99)
+        panAft = data.get("panAftOffsetM", .075 if pilot else .005)
+        halfWidth = data.get("seatHalfWidthM", .205 if pilot else .155)
+        pan = self.Box(label + "SeatPan", (0, panY, z + panAft),
+                       (halfWidth * 2, .055, data.get("panLengthM", .46 if pilot else .32)),
+                       data.get("panFinish", "Cockpit" if pilot else "CockpitLining"), .025)
+        panCentre = P((0, panY, z + panAft))
+        panTilt = Matrix.Rotation(math.radians(data.get("panTiltDegrees", -7 if pilot else -3)), 3, "X")
+        def TiltPanPart(ob):
+            for vertex in ob.data.vertices:
+                vertex.co = panCentre + panTilt @ (vertex.co - panCentre)
+        TiltPanPart(pan)
+        verts, faces = [], []
+        count = 16 if self.high else 10
+        levels = [(panY - .04, .22 if pilot else .11, .90),
+                  (panY + .14, .31 if pilot else .19, 1.00),
+                  (panY + .24, .36 if pilot else .23, .94)]
         for side in (-1, 1):
-            self.Beam("WindscreenSideFrame" + str(side), (side * .35, 2.39, -1.69), (side * .35, 2.62, -1.69), .009, "Aluminum")
-        self.Tube("WindscreenTopFrame", [(v[0], v[1], v[2]) for v in verts[17:]], .009, "Aluminum", 6)
+            for level, (height, aft, widthScale) in enumerate(levels):
+                for j in range(count + 1):
+                    u = -1 + 2 * j / count
+                    x = halfWidth * widthScale * u
+                    y = height - (.038 if level == 2 else .006) * u * u
+                    backCentre = data.get("backAftCentreM", 0)
+                    backAft = backCentre + (aft - .065 * u * u - backCentre) * data.get("backAftScale", 1)
+                    zz = z + backAft + data.get("backAftOffsetM", 0) + side * .013
+                    verts.append((x, y, zz))
+        layer = len(levels) * (count + 1)
+        for side in range(2):
+            for level in range(len(levels) - 1):
+                for j in range(count):
+                    a = side * layer + level * (count + 1) + j
+                    face = (a, a + 1, a + count + 2, a + count + 1)
+                    faces.append(face if side == 0 else tuple(reversed(face)))
+        for level in (0, len(levels) - 1):
+            for j in range(count):
+                a = level * (count + 1) + j
+                faces.append((a, a + layer, a + layer + 1, a + 1))
+        for j in (0, count):
+            for level in range(len(levels) - 1):
+                a = level * (count + 1) + j
+                faces.append((a, a + count + 1, a + count + 1 + layer, a + layer))
+        shell = self.Mesh(label + "SeatBack", verts, faces, "Cockpit")
+        skinFaces = 2 * (len(levels) - 1) * count
+        for face in shell.data.polygons:
+            if face.index >= skinFaces:
+                face.use_smooth = False
+        top = verts[(len(levels) - 1) * (count + 1):len(levels) * (count + 1)]
+        frameFinish = data.get("frameFinish", "Steel")
+        self.Tube(label + "SeatBackRolledEdge", top, .009, frameFinish, 8)
+        for side in (-1, 1):
+            sideRail = data.get("sideRailPointsRelativeM",
+                               [(1, .035, -.14), (1, .11, .09), (.94, .20, .29 if pilot else .17)])
+            self.Tube(label + "SeatSideRail" + str(side),
+                      [(side * halfWidth * widthScale, panY + height, z + aft)
+                       for widthScale, height, aft in sideRail],
+                      .012, frameFinish, 8)
+            # A lap belt crosses the seat laterally. The former long strips
+            # ran fore/aft and produced two conspicuous invented shoulder bars
+            # in the selected museum view.
+            belt = self.Box(label + "LapBelt" + str(side),
+                            (side * halfWidth * .55, panY + .042, z + panAft),
+                            (halfWidth * .90, .008, .032), data.get("beltFinish", "Leather"), .003)
+            TiltPanPart(belt)
+        buckle = self.Box(label + "BeltBuckle", (0, panY + .055, z + panAft),
+                          (.040, .012, .036), frameFinish, .004)
+        TiltPanPart(buckle)
 
     def OpeningOutline(self, label, z, rx, rz):
         if label != "Pilot":
@@ -495,22 +1113,31 @@ class Builder:
         out += [(-a + cornerX * math.cos(PI + PI / 2 * i / 8), z - rz + cornerZ + cornerZ * math.sin(PI + PI / 2 * i / 8)) for i in range(8)]
         return out
 
+    def LowerRootCutDepth(self, x):
+        data = self.wingData.get("lowerRootCutout")
+        if not data or abs(x) >= data["outerSpanM"]:
+            return 0.
+        t = max(0., (abs(x) - data["innerSpanM"]) / (data["outerSpanM"] - data["innerSpanM"]))
+        return data["maximumDepthM"] * max(0., 1 - t * t)
+
     def WingPoint(self, x, u, upper=True, top=True):
-        halfSpan = 7.5 if upper else 6.62
-        chord = 2.047 if upper else 1.72
-        lead = -3.684 if upper else -3.12
+        halfSpan = 7.5 if upper else 6.24
+        chord = 2.092026 if upper else 1.72
+        lead = -3.653094 if upper else -2.995
         tipStart = halfSpan - .50
         factor = 1.0
         if abs(x) > tipStart:
             t = min(.99999, (abs(x) - tipStart) / (halfSpan - tipStart))
             factor = math.sqrt(1 - t * t)
-        # Elliptic tip cap, constant chord centre. The central trailing cut-out
-        # is present only in the top wing.
+        # Elliptic tip cap, constant chord centre. The upper central cut-out
+        # and optional lower root aft notch are separate physical contours.
         localLead = lead + chord * (1 - factor) / 2
         localChord = chord * factor
         if upper and abs(x) < .80:
             cut = .43 * max(0, 1 - (abs(x) / .80) ** 2) ** .6
             localChord -= cut
+        if not upper:
+            localChord -= self.LowerRootCutDepth(x)
         z = localLead + localChord * u
         y = (3.106 if upper else 1.32) + .018 * abs(x)
         # Planform was fitted independently from the painted roundels. Retain
@@ -518,21 +1145,25 @@ class Builder:
         thickness = .115 * 1.88 / chord if upper else .11
         yt = 5 * thickness * localChord * (0.2969 * math.sqrt(max(u, .000001)) - .1260 * u - .3516 * u * u + .2843 * u ** 3 - .1036 * u ** 4)
         camber = .024 * (1.88 / chord if upper else 1) * localChord * math.sin(PI * u)
-        rib = math.exp(-((abs(x) / .275 - round(abs(x) / .275)) / .18) ** 2)
-        sag = .0065 * factor * (rib - .5) * math.sin(PI * u) ** .8
+        # Broad cloth deflection between ribs instead of narrow hard corrugations.
+        fabric = self.wingData["upperFabric" if upper else "lowerFabric"]
+        ribWave = .5 * math.cos(TAU * abs(x) / fabric["ribPitchM"])
+        if fabric.get("reliefZeroAtRibs", False):
+            ribWave -= .5
+        sag = fabric["ribReliefM"] * factor * ribWave * math.sin(PI * u) ** .8
         y += camber + (yt * (1 if top else -1)) + sag * (1 if top else -.35)
         return (x, y, z)
 
     def WingPatch(self, name, x0, x1, u0, u1, upper, parent=None):
-        step = .275 / (8 if self.high else 4)
+        step = self.wingData["upperFabric" if upper else "lowerFabric"]["ribPitchM"] / (8 if self.high else 4)
         low, high = min(x0, x1), max(x0, x1)
         xs = [x0, x1] + [i * step for i in range(math.ceil(low / step), math.floor(high / step) + 1) if low + 1e-7 < i * step < high - 1e-7]
         xs = sorted(set(xs), reverse=x1 < x0)
         nx = len(xs) - 1
-        nu = max(4, int((u1 - u0) * (44 if self.high else 20)))
+        nu = max(4, int((u1 - u0) * (44 if self.high else 15)))
         if name.startswith("Aileron"):
-            nu = max(nu, 24 if self.high else 12)
-        verts, uvs, faces = [], [], []
+            nu = max(nu, 24 if self.high else 10)
+        verts, uvs, faces, surfaceParams = [], [], [], []
         stride = nu + 1
         layerSize = (nx + 1) * stride
         for layer in (0, 1):
@@ -543,9 +1174,9 @@ class Builder:
                     point = self.WingPoint(x, u, upper, layer == 0)
                     if name.startswith("Aileron") and parent:
                         center = parent.matrix_world.translation
-                        axisY = center.z + .018 * (abs(x) - 2.35)
+                        axisY = center.z + .018 * (abs(x) - abs(center.x))
                         axisZ = -center.y
-                        radius = .070 if upper else .065
+                        radius = float(parent.get("noseRadiusM", .070 if upper else .065))
                         dz = point[2] - axisZ
                         if dz < 0:
                             yy = math.sqrt(max(0, radius * radius - dz * dz))
@@ -555,6 +1186,7 @@ class Builder:
                             point = (point[0], Lerp(roundY, point[1], Smooth(dz / .06)), point[2])
                     verts.append(point)
                     uvs.append(((x + 7.5) / 15, u if layer == 0 else 1 - u))
+                    surfaceParams.append((x, u, 1 if layer == 0 else -1))
         for layer in (0, 1):
             for i in range(nx):
                 for j in range(nu):
@@ -569,58 +1201,113 @@ class Builder:
             for j in range(nu):
                 a = i * stride + j
                 faces.append((a, a + 1, a + 1 + layerSize, a + layerSize))
-        ob = self.Mesh(name, verts, faces, "UpperWing" if upper else "Fabric", uvs=uvs, parent=parent)
+        ob = self.Mesh(name, verts, faces, "UpperWing" if upper else "LowerWingFabric", uvs=uvs, parent=parent)
         ob.data.materials.append(self.materials["Fabric" if upper else "LowerUnderside"])
         topFaceCount = nx * nu
+        analyticSkin = upper and not self.high and self.wingData["upperFabric"].get("gameAnalyticSkinNormals", False)
+        if analyticSkin:
+            params = ob.data.attributes.new("WingSurfaceParam", "FLOAT_VECTOR", "POINT")
+            for datum, values in zip(params.data, surfaceParams):
+                datum.vector = values
+            skin = ob.data.attributes.new("WingSurfaceSkin", "BOOLEAN", "FACE")
+            for poly in ob.data.polygons:
+                skin.data[poly.index].value = poly.index < topFaceCount * 2
+            ob["continuousWingSkinNormals"] = True
+            ob["continuousWingMovingNose"] = bool(parent and name.startswith("Aileron"))
+            ob["continuousWingNormalScope"] = "Game skin normals follow the same real WingPoint surface; cutout,nose,tip and caps retain geometric shading. Not photograph-derived normals."
         for poly in ob.data.polygons:
             if topFaceCount <= poly.index < 2 * topFaceCount:
                 poly.material_index = 1
+            if poly.index >= 2 * topFaceCount:
+                # Closed patch caps are structural boundaries, not part of the
+                # smooth airfoil skin. Averaging them into the skin creates
+                # false bright ribs and a broad shiny aileron seam.
+                poly.use_smooth = False
         return ob
 
     def Wings(self):
+        if self.wingData.get("lowerRootCutout"):
+            self.root["lowerRootCutout"] = json.dumps(self.wingData["lowerRootCutout"])
         self.WingPatch("UpperWingCentreWithPilotCutout", -.80, .80, 0, 1, True)
+        if self.wingData.get("centreFitting"):
+            self.CentreCutoutFitting()
+        # The upper aileron's visible split is much farther aft and its inner
+        # end farther outboard than the former generic layout. These values
+        # come from both visible halves of the selected museum photograph;
+        # they are not factory dimensions. Keep the outer wing/paint fixed.
+        upperData, lowerData = self.wingData["upperAileron"], self.wingData["lowerAileron"]
+        upperAileronStart, upperAileronEnd = upperData["spanStartM"], upperData["spanEndM"]
+        upperFixedEndU, upperMovingStartU = upperData["fixedEndU"], upperData["movingStartU"]
+        upperNoseRadius = upperData["noseRadiusM"]
+        lowerAileronStart, lowerAileronEnd = lowerData["spanStartM"], lowerData["spanEndM"]
+        lowerFixedEndU, lowerMovingStartU = lowerData["fixedEndU"], lowerData["movingStartU"]
+        lowerNoseRadius = lowerData["noseRadiusM"]
         for side, suffix in ((-1, "Left"), (1, "Right")):
-            self.WingPatch("UpperWingInner" + suffix, side * .80, side * 2.35, 0, 1, True)
-            self.WingPatch("UpperWingOuter" + suffix, side * 2.35, side * 7.00, 0, .735, True)
-            self.WingPatch("UpperWingFixedTip" + suffix, side * 7.00, side * 7.50, 0, 1, True)
-            hingeZ = -3.684 + 2.047 * .739 + .070
-            hingeY = sum(self.WingPoint(side * 2.35, .735, True, top)[1] for top in (True, False)) / 2
+            self.WingPatch("UpperWingInner" + suffix, side * .80, side * upperAileronStart, 0, 1, True)
+            self.WingPatch("UpperWingOuter" + suffix, side * upperAileronStart, side * upperAileronEnd, 0, upperFixedEndU, True)
+            self.WingPatch("UpperWingFixedTip" + suffix, side * upperAileronEnd, side * 7.50, 0, 1, True)
+            hingeZ = -3.653094 + 2.092026 * upperMovingStartU + upperNoseRadius
+            hingeY = sum(self.WingPoint(side * upperAileronStart, upperFixedEndU, True, top)[1] for top in (True, False)) / 2
             tilt = math.atan(side * .018)
-            pivot = self.Hinge("Aileron" + suffix, (side * 2.35, hingeY, hingeZ), tilt)
+            pivot = self.Hinge("Aileron" + suffix, (side * upperAileronStart, hingeY, hingeZ), tilt)
+            pivot["noseRadiusM"] = upperNoseRadius
             pivot["rangeDegrees"] = [-22.0, 18.0]
             self.controls["Aileron" + suffix] = pivot
-            # A 7 mm chord gap permits a real hinge, with no overlapping skins.
-            self.WingPatch("Aileron" + suffix, side * 2.36, side * 6.99, .739, 1, True, pivot)
+            # An 8.2 mm chord gap permits a real hinge, with no overlapping skins.
+            self.WingPatch("Aileron" + suffix, side * (upperAileronStart + .01), side * (upperAileronEnd - .01), upperMovingStartU, 1, True, pivot)
             for j in range(6):
-                x = side * (2.55 + j * .79)
-                y = hingeY + side * .018 * (x - side * 2.35)
+                x = side * Lerp(upperAileronStart + .15, 6.80, j / 5)
+                y = hingeY + .018 * (abs(x) - upperAileronStart)
                 self.Beam("AileronHinge" + suffix + str(j), (x - .024, y - side * .018 * .024, hingeZ),
                           (x + .024, y + side * .018 * .024, hingeZ), .012, "Steel", 12)
-            self.WingPatch("LowerWingInner" + suffix, side * .48, side * 2.35, 0, 1, False)
-            self.WingPatch("LowerWingOuter" + suffix, side * 2.35, side * 6.12, 0, .735, False)
-            self.WingPatch("LowerWingFixedTip" + suffix, side * 6.12, side * 6.62, 0, 1, False)
-            lowerHingeZ = -3.12 + 1.72 * .739 + .065
-            lowerHingeY = sum(self.WingPoint(side * 2.35, .735, False, top)[1] for top in (True, False)) / 2
-            lowerPivot = self.Hinge("AileronLower" + suffix, (side * 2.35, lowerHingeY, lowerHingeZ), tilt)
+            # Locate the lower seam independently. The old generic split and
+            # 65 mm rolled nose made a wide dark groove outside the photo seam.
+            self.WingPatch("LowerWingInner" + suffix, side * .48, side * lowerAileronStart, 0, 1, False)
+            self.WingPatch("LowerWingOuter" + suffix, side * lowerAileronStart, side * lowerAileronEnd, 0, lowerFixedEndU, False)
+            self.WingPatch("LowerWingFixedTip" + suffix, side * lowerAileronEnd, side * 6.24, 0, 1, False)
+            lowerHingeZ = -2.995 + 1.72 * lowerMovingStartU + lowerNoseRadius
+            lowerHingeY = sum(self.WingPoint(side * lowerAileronStart, lowerFixedEndU, False, top)[1] for top in (True, False)) / 2
+            lowerPivot = self.Hinge("AileronLower" + suffix, (side * lowerAileronStart, lowerHingeY, lowerHingeZ), tilt)
+            lowerPivot["noseRadiusM"] = lowerNoseRadius
             lowerPivot["rangeDegrees"] = [-22., 18.]
             lowerPivot["coupledTo"] = pivot.name
             self.controls["AileronLower" + suffix] = lowerPivot
-            self.WingPatch("AileronLower" + suffix, side * 2.36, side * 6.11, .739, 1, False, lowerPivot)
+            self.WingPatch("AileronLower" + suffix, side * (lowerAileronStart + .01), side * (lowerAileronEnd - .01), lowerMovingStartU, 1, False, lowerPivot)
             for j in range(5):
-                x = side * (2.55 + j * .79)
-                y = lowerHingeY + side * .018 * (x - side * 2.35)
+                x = side * Lerp(lowerAileronStart + .15, lowerAileronEnd - .20, j / 4)
+                y = lowerHingeY + .018 * (abs(x) - lowerAileronStart)
                 self.Beam("LowerAileronHinge" + suffix + str(j), (x - .024, y - side * .018 * .024, lowerHingeZ),
                           (x + .024, y + side * .018 * .024, lowerHingeZ), .012, "Steel", 12)
+            # The open gap previously showed the viewer's pale background as
+            # a bright line. A concealed stationary web closes that line below
+            # the rolled nose without replacing the actual movable surface.
+            webData = lowerData["gapWeb"]
+            webZ0 = -2.995 + 1.72 * lowerFixedEndU - webData["fixedUnderlapM"]
+            webZ1 = -2.995 + 1.72 * lowerMovingStartU - webData["movingClearanceM"]
+            webVerts = []
+            for depth in (webData["topBelowAxisM"], webData["topBelowAxisM"] + webData["thicknessM"]):
+                for x, zz in ((side * (lowerAileronStart + .01), webZ0),
+                              (side * (lowerAileronEnd - .01), webZ0),
+                              (side * (lowerAileronEnd - .01), webZ1),
+                              (side * (lowerAileronStart + .01), webZ1)):
+                    webVerts.append((x, lowerHingeY + .018 * (abs(x) - lowerAileronStart) - depth, zz))
+            web = self.Mesh("LowerAileronGapWeb" + suffix, webVerts,
+                            [(0, 1, 2, 3), (7, 6, 5, 4), (0, 4, 5, 1),
+                             (1, 5, 6, 2), (2, 6, 7, 3), (3, 7, 4, 0)],
+                            "CockpitLining", smooth=False)
+            web["aileronGapClosure"] = True
+            web["constructionScope"] = webData["scope"]
             # Equal horn offsets make the external pushrod translate at constant
             # length while the upper and lower ailerons rotate through one angle.
             hornX = side * 3.30
-            upperAxisPoint = (hornX, hingeY + .018 * .95, hingeZ)
-            lowerAxisPoint = (hornX, lowerHingeY + .018 * .95, lowerHingeZ)
+            upperAxisPoint = (hornX, hingeY + .018 * (abs(hornX) - upperAileronStart), hingeZ)
+            lowerAxisPoint = (hornX, lowerHingeY + .018 * (abs(hornX) - lowerAileronStart), lowerHingeZ)
             upperHorn = (hornX - math.sin(tilt) * .11, upperAxisPoint[1] + math.cos(tilt) * .11, hingeZ + .10)
             lowerHorn = (hornX - math.sin(tilt) * .11, lowerAxisPoint[1] + math.cos(tilt) * .11, lowerHingeZ + .10)
-            self.Beam("UpperAileronLinkHorn" + suffix, upperAxisPoint, upperHorn, .014, "Steel", 10, parent=pivot)
-            self.Beam("LowerAileronLinkHorn" + suffix, lowerAxisPoint, lowerHorn, .014, "Steel", 10, parent=lowerPivot)
-            rod = self.Beam("AileronExternalPushrod" + suffix, lowerHorn, upperHorn, .011, "Steel", 10)
+            linkageMaterial = self.wingData.get("exposedLinkageFinish", {}).get("material", "Steel")
+            self.Beam("UpperAileronLinkHorn" + suffix, upperAxisPoint, upperHorn, .014, linkageMaterial, 10, parent=pivot)
+            self.Beam("LowerAileronLinkHorn" + suffix, lowerAxisPoint, lowerHorn, .014, linkageMaterial, 10, parent=lowerPivot)
+            rod = self.Beam("AileronExternalPushrod" + suffix, lowerHorn, upperHorn, .011, linkageMaterial, 10)
             rod["coupledTo"] = pivot.name
             rod["retainedMovingNode"] = True
             rod["hornOffsetM"] = (.11, .10)
@@ -643,26 +1330,67 @@ class Builder:
             curve.driver.expression = "a"
             # Broad single outer I-strut and a long diagonal. No light-bomber
             # four-strut W-shaped centre section is added.
-            a = (side * 4.13, 1.39, -2.40)
+            a = (side * 4.13, 1.39, -2.275)
             b = self.WingPoint(side * 4.42, .383, True, False)
             self.Beam("InterplaneIBeam" + suffix, a, b, .07, "Aluminum", 12, 2.1)
-            self.Beam("LongDiagonalStrut" + suffix, (side * .55, 1.51, -2.13), b, .035, "Aluminum", 12)
+            self.Beam("LongDiagonalStrut" + suffix, (side * .55, 1.51, -2.005), b, .035, "Aluminum", 12)
             forwardCabane = self.WingPoint(side * .77, .13, True, False)
             aftCabane = self.WingPoint(side * .77, .80, True, False)
             self.Beam("CabaneForward" + suffix, (side * .52, 2.32, -3.67), forwardCabane, .031, "Aluminum")
             self.Beam("CabaneAft" + suffix, (side * .50, 2.34, -2.12), aftCabane, .031, "Aluminum")
             self.Beam("CabaneCrossBrace" + suffix, (side * .52, 2.32, -3.67), aftCabane, .004, "Steel", 6)
-            self.Beam("LandingWire" + suffix, forwardCabane, (side * 4.13, 1.40, -2.45), .008, "Steel", 6)
-            self.Beam("FlyingWire" + suffix, (side * .53, 1.50, -2.90), b, .008, "Steel", 6)
-            for x, y, z in (a, b, (side * .55, 1.51, -2.13)):
+            self.Beam("LandingWire" + suffix, forwardCabane, (side * 4.13, 1.40, -2.325), .008, "Steel", 6)
+            self.Beam("FlyingWire" + suffix, (side * .53, 1.50, -2.775), b, .008, "Steel", 6)
+            for x, y, z in (a, b, (side * .55, 1.51, -2.005)):
                 self.Ellipsoid("StrutClevis" + suffix + str(z), (x, y, z), (.065, .055, .055), "Steel", 16, 8)
         # Root fairings and centre-section fuel filler.
         for side in (-1, 1):
-            self.Tube("LowerWingRootFillet" + str(side), [(side * .53, 1.52, -3.12), (side * .61, 1.47, -2.75),
-                                                          (side * .62, 1.43, -2.25), (side * .52, 1.40, -1.40)], .055, "Aluminum", 10)
+            self.Tube("LowerWingRootFillet" + str(side), [(side * .53, 1.52, -2.995), (side * .61, 1.47, -2.625),
+                                                          (side * .62, 1.43, -2.125), (side * .52, 1.40, -1.275 - self.LowerRootCutDepth(.52))], .055, "Aluminum", 10)
         self.Beam("UpperWingFuelFiller", (0, 3.23, -3.383), (0, 3.29, -3.383), .065, "Aluminum", 24)
 
-    def Foil(self, name, outline, thickness=.055, vertical=False, parent=None, material="Fabric", height=2.04, hingeLeadingAft=None):
+    def CentreCutoutFitting(self):
+        """Visible raised fitting with three real, closed shallow depressions."""
+        data = self.wingData["centreFitting"]
+        centre = Vector(data["centreM"])
+        angle = math.radians(data["spanToAftDegrees"])
+        span = Vector((math.cos(angle), 0, math.sin(angle)))
+        aft = Vector((-math.sin(angle), 0, math.cos(angle)))
+        up = Vector((0, 1, 0))
+        halfLength, halfWidth, halfHeight = data["lengthSpanM"] / 2, data["widthAftM"] / 2, data["thicknessM"] / 2
+        vertices = [tuple(centre + span * x + aft * z + up * y)
+                    for y in (-halfHeight, halfHeight)
+                    for x, z in ((-halfLength, -halfWidth), (halfLength, -halfWidth),
+                                 (halfLength, halfWidth), (-halfLength, halfWidth))]
+        plate = self.Mesh("CentreCutoutRaisedFitting", vertices,
+                          [(3, 2, 1, 0), (4, 5, 6, 7), (0, 1, 5, 4),
+                           (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)], "Cockpit", smooth=False)
+        plate.data.materials.append(self.materials["CockpitLining"])
+        edge = plate.modifiers.new("SmallOuterEdgeRadius", "BEVEL")
+        edge.width, edge.segments = .0015, 2 if self.high else 1
+        self.Apply(plate, edge)
+        import bmesh
+        for index, offset in enumerate(data["recessSpanOffsetsM"]):
+            mouth = centre + span * offset + aft * data["recessAftOffsetM"] + up * halfHeight
+            cutter = self.Beam("ToolCentreFittingRecess" + str(index),
+                               tuple(mouth - up * data["recessDepthM"]), tuple(mouth + up * .02),
+                               data["recessRadiusM"], None, 24 if self.high else 16)
+            for material in plate.data.materials:
+                cutter.data.materials.append(material)
+            for polygon in cutter.data.polygons:
+                polygon.material_index = 1
+            mesh = bmesh.new(); mesh.from_mesh(cutter.data); bmesh.ops.recalc_face_normals(mesh, faces=list(mesh.faces)); mesh.to_mesh(cutter.data); mesh.free()
+            modifier = plate.modifiers.new("ClosedCentreDepression" + str(index), "BOOLEAN")
+            modifier.operation, modifier.solver, modifier.object = "DIFFERENCE", "EXACT", cutter
+            modifier.material_mode = "INDEX"
+            self.Apply(plate, modifier)
+            self.meshes.remove(cutter)
+            bpy.data.objects.remove(cutter, do_unlink=True)
+        plate["recessCount"] = len(data["recessSpanOffsetsM"])
+        plate["constructionScope"] = data["scope"]
+        self.root["centreFittingScope"] = data["scope"]
+
+    def Foil(self, name, outline, thickness=.055, vertical=False, parent=None, material="Fabric", height=2.04, hingeLeadingAft=None, matingAft=None, matingSpan=None, matingBevelM=None):
         # Outline is (span-or-height, aft). Real thin airfoils have closed sides.
         verts, faces, uvs = [], [], []
         n = len(outline)
@@ -679,16 +1407,27 @@ class Builder:
         mod = ob.modifiers.new("TailSurfaceEdgeRadius", "BEVEL")
         mod.width = thickness * .30
         mod.segments = 3 if self.high else (1 if name == "Rudder" else 2)
-        if hingeLeadingAft is not None:
+        if hingeLeadingAft is not None or matingAft is not None or matingSpan is not None:
             mod.limit_method = "WEIGHT"
             weights = ob.data.attributes.new("bevel_weight_edge", "FLOAT", "EDGE")
             for edge in ob.data.edges:
-                leading = all(abs(-ob.data.vertices[i].co.y - hingeLeadingAft) < .000001 for i in edge.vertices)
-                weights.data[edge.index].value = 0 if leading else 1
+                leading = hingeLeadingAft is not None and all(abs(-ob.data.vertices[i].co.y - hingeLeadingAft) < .000001 for i in edge.vertices)
+                mating = ((matingAft is not None and all(abs(-ob.data.vertices[i].co.y - matingAft) < .000001 for i in edge.vertices)) or
+                          (matingSpan is not None and all(abs(ob.data.vertices[i].co.x - matingSpan) < .000001 for i in edge.vertices)))
+                weight = min(1., max(0., matingBevelM / mod.width)) if mating and matingBevelM is not None else 1.
+                weights.data[edge.index].value = 0 if leading else weight
             for poly in ob.data.polygons:
-                if all(abs(-ob.data.vertices[i].co.y - hingeLeadingAft) < .000001 for i in poly.vertices):
+                if hingeLeadingAft is not None and all(abs(-ob.data.vertices[i].co.y - hingeLeadingAft) < .000001 for i in poly.vertices):
                     poly.use_smooth = False
+        if matingBevelM is not None:
+            ob["matingEdgeBevelM"] = matingBevelM
+            ob["matingEdgeScope"] = "Smaller radius only at the stationary elevator-mating edges. Nominal outline,thickness,hinge gaps and pivot remain; radius is photo-derived,not factory-verified."
         self.Apply(ob, mod)
+        for poly in ob.data.polygons:
+            normal = poly.normal.x if vertical else poly.normal.z
+            if abs(normal) > .999999:
+                poly.use_smooth = False
+        ob["planarSkinNormals"] = True
         return ob
 
     def TailMovingSurface(self, suffix, side, pivot, data):
@@ -707,7 +1446,7 @@ class Builder:
             q = min(1., max(0., (x - corner) / (span - corner)))
             return plan["leadingTipAftM"] - (plan["leadingTipAftM"] - plan["leadingHornAftM"]) * math.sqrt(max(0., 1 - q * q))
         def Loft(name, xs, front, back, frontKind):
-            chordSteps = 18 if self.high else 4
+            chordSteps = 18 if self.high else 10
             verts, faces, uvs = [], [], []
             stride = chordSteps + 1
             layerSize = len(xs) * stride
@@ -724,7 +1463,7 @@ class Builder:
                         u = (1 - math.cos(PI * j / chordSteps)) / 2
                         x, z = Lerp(xFront, xBack, u), Lerp(zFront, zBack, u)
                         if frontKind == "body":
-                            q = min(1., max(0., (zBack - z) / .08))
+                            q = Smooth(min(1., max(0., (zBack - z) / .08)))
                         else:
                             q = math.sqrt(Smooth(min(1., max(0., (z - zFront) / .05))))
                         half = mechanics["trailingEdgeThicknessM"] / 2 + (radius - mechanics["trailingEdgeThicknessM"] / 2) * q
@@ -747,8 +1486,9 @@ class Builder:
             ob = self.Mesh(name, verts, faces, "Tail", uvs=uvs, parent=pivot)
             skinFaces = (len(xs) - 1) * chordSteps * 2
             for poly in ob.data.polygons:
-                if poly.index >= skinFaces:
+                if poly.index >= skinFaces or abs(poly.normal.z) > .999999:
                     poly.use_smooth = False
+            ob["planarSkinNormals"] = True
             return ob
         bodySteps = 24 if self.high else 6
         bodyTs = sorted(set([i / bodySteps for i in range(bodySteps + 1)] + [(corner - innerBack) / (span - innerBack)]))
@@ -813,7 +1553,9 @@ class Builder:
             outline = [(side * plan["leadingRootSpanM"], plan["leadingRootAftM"]),
                        (side * fixedSpan, plan["leadingHornAftM"]), (side * fixedSpan, fixedRear),
                        (side * plan["leadingRootSpanM"], fixedRear)]
-            self.Foil("HorizontalStabilizer" + suffix, outline, mechanics["fixedThicknessM"], height=frame["midHeightM"])
+            self.Foil("HorizontalStabilizer" + suffix, outline, mechanics["fixedThicknessM"], height=frame["midHeightM"],
+                      matingAft=fixedRear, matingSpan=side * fixedSpan,
+                      matingBevelM=mechanics.get("matingEdgeBevelM", mechanics["fixedThicknessM"] * .30))
             pivot = self.Empty("Elevator" + suffix + "Pivot", (side * .15, frame["midHeightM"], frame["hingeAxisAftM"]), assembly)
             pivot["axisLocal"] = "+X"
             pivot["rangeDegrees"] = [-25., 25.]
@@ -964,24 +1706,30 @@ class Builder:
         pivot = self.Empty("PropellerPivot", (0, 1.95, -5.98), self.root)
         pivot["axisLocal"] = "+Z in glTF / -Y in Blender"
         pivot["rpmPreview"] = 480.0
-        pivot["referenceRestAngleDegrees"] = -45.53991560518907
+        pivot["referenceRestAngleDegrees"] = -49.57292126
+        pivot["pitchMultiplier"] = -1.89430685
+        pivot["bladeChordScale"] = .95882103
+        pivot["bladePlaneAftM"] = -6.00393925
+        pivot["pitchScope"] = "Both visible blades fitted together as a C2 loft; pitch, chord, axial plane and museum pose are photographic inferences, not factory propeller specifications."
         self.controls["Propeller"] = pivot
-        # Two opposite handed blade lofts, with chord twist and a thin trailing
-        # edge. The tip is rounded; no flat rectangle or intersecting oval.
+        # One blade loft repeated by a real 180-degree rotation about the shaft.
+        # A point inversion would also flip the axial coordinate and incorrectly
+        # reverse the pitch of the opposite blade.
         sections = [(.10, .055, 37), (.23, .105, 33), (.47, .165, 26), (.80, .169, 19),
-                    (1.10, .134, 13), (1.29, .089, 10), (1.41, .018, 8), (1.43, .001, 8)]
+                    (1.10, .134, 13), (1.29, .089, 10), (1.41, .042, 8),
+                    (1.425, .024, 8), (1.43, .001, 8)]
         for side, suffix in ((-1, "Lower"), (1, "Upper")):
             verts, faces, uvs = [], [], []
             n = 20 if self.high else 12
             for i, (r, halfChord, twistDeg) in enumerate(sections):
-                twist = math.radians(twistDeg)
+                twist = math.radians(twistDeg * pivot["pitchMultiplier"])
                 sweep = .055 * (r / 1.43) ** 2
                 for j in range(n):
                     t = TAU * j / n
-                    chord = math.cos(t) * halfChord
+                    chord = math.cos(t) * halfChord * pivot["bladeChordScale"]
                     thick = math.sin(t) * (.024 * (1 - r / 1.7))
                     x = side * (sweep + chord * math.cos(twist) - thick * math.sin(twist))
-                    z = -5.99 + side * (chord * math.sin(twist) + thick * math.cos(twist))
+                    z = pivot["bladePlaneAftM"] + chord * math.sin(twist) + thick * math.cos(twist)
                     verts.append((x, 1.95 + side * r, z))
                     uvs.append((j / n, r / 1.43))
             for i in range(len(sections) - 1):
@@ -992,7 +1740,15 @@ class Builder:
             self.Mesh("CarvedWoodPropellerBlade" + suffix, verts, faces, "Wood", uvs=uvs, parent=pivot)
         self.Beam("PropellerHub", (0, 1.95, -6.025), (0, 1.95, -5.88), .18, "Steel", 40, parent=pivot)
         verts, faces, uvs = [], [], []
-        profile = [(-6.14, .002), (-6.12, .037), (-6.08, .089), (-6.03, .133), (-5.98, .157), (-5.94, .165)]
+        # The photographed spinner tip is ahead of the former propeller-hub
+        # anchor. Preserve the other aircraft stations; do not compress the
+        # body to force the museum model into a conflicting nominal length.
+        # This makes the local museum candidate about12.51m long. The12.28m
+        # documentary figure remains a separate, unverified subtype anchor.
+        profile = [(-6.37, .002), (-6.33, .037), (-6.23, .089), (-6.11, .133), (-6.00, .157), (-5.94, .165)]
+        self.root["documentaryNominalLengthM"] = 12.28
+        self.root["museumSpinnerExtensionM"] = .23
+        self.root["lengthScope"] = "Spinner length inferred from the selected museum photograph; documentary12.28m and12.80m lengths conflict, and no factory drawing has been obtained."
         n = 48 if self.high else 32
         for i, (z, radius) in enumerate(profile):
             for j in range(n):
@@ -1008,8 +1764,42 @@ class Builder:
             t = TAU * j / 8
             self.Beam("PropellerHubBolt" + str(j), (.122 * math.cos(t), 1.95 + .122 * math.sin(t), -6.085),
                       (.122 * math.cos(t), 1.95 + .122 * math.sin(t), -6.11), .011, "Steel", 6, parent=pivot)
-        pivot.rotation_euler.y = math.radians(45.53991560518907)
+        pivot.rotation_euler.y = math.radians(-pivot["referenceRestAngleDegrees"])
         bpy.context.view_layer.update()
+
+    def ApplyWingSurfaceNormals(self, ob):
+        """Keep the coarse game's rib response close to the dense source."""
+        mesh = ob.data
+        params = mesh.attributes.get("WingSurfaceParam")
+        skin = mesh.attributes.get("WingSurfaceSkin")
+        assert params and skin and len(params.data) == len(mesh.vertices), ob.name
+        mesh.update()
+        normals = [Vector(item.vector) for item in mesh.corner_normals]
+        cache = {}
+        moving = bool(ob.get("continuousWingMovingNose"))
+        for poly in mesh.polygons:
+            if not skin.data[poly.index].value:
+                continue
+            for loopIndex in poly.loop_indices:
+                index = mesh.loops[loopIndex].vertex_index
+                x, u, sign = params.data[index].vector
+                spanWeight = Smooth(min(1., max(0., (abs(x) - .80) / .15))) * Smooth(min(1., max(0., (7.0 - abs(x)) / .15)))
+                start, ramp = (.88, .02) if moving else (.025, .035)
+                chordWeight = Smooth(min(1., max(0., (u - start) / ramp))) * Smooth(min(1., max(0., (.99 - u) / .02)))
+                weight = spanWeight * chordWeight
+                if weight <= 1e-8:
+                    continue
+                if index not in cache:
+                    top = sign > 0
+                    dx = Vector(self.WingPoint(x + .0005, u, True, top)) - Vector(self.WingPoint(x - .0005, u, True, top))
+                    du = Vector(self.WingPoint(x, min(1., u + .00005), True, top)) - Vector(self.WingPoint(x, max(0., u - .00005), True, top))
+                    normal = du.cross(dx)
+                    if not top:
+                        normal.negate()
+                    assert normal.length > 1e-10, (ob.name, index)
+                    cache[index] = P(normal.normalized()).normalized()
+                normals[loopIndex] = (normals[loopIndex] * (1 - weight) + cache[index] * weight).normalized()
+        mesh.normals_split_custom_set([tuple(normal) for normal in normals])
 
     def Recalculate(self):
         # Explicit outward normals, including the two mirrored wing halves.
@@ -1017,24 +1807,45 @@ class Builder:
         for ob in self.meshes:
             if ob.name not in bpy.data.objects:
                 continue
+            if ob.get("continuousWingSkinNormals"):
+                # Zero requests geometric auto normals before every rebuild,
+                # avoiding cumulative blending over repeated Save calls.
+                ob.data.normals_split_custom_set([(0., 0., 0.)] * len(ob.data.loops))
             bm = bmesh.new()
             bm.from_mesh(ob.data)
             bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
             bm.to_mesh(ob.data)
             bm.free()
+            if ob.get("continuousWingSkinNormals"):
+                self.ApplyWingSurfaceNormals(ob)
 
     def Surface(self):
         """Attach exportable UV PBR and physically scaled detail UVs."""
         textureRoot = self.sourceRoot / "Textures"
         surfaceManifest = json.loads((textureRoot / "Data_SurfaceSources.json").read_text(encoding="utf-8"))
         self.root["surfaceSourceVersion"] = surfaceManifest["version"]
-        family = {"Fabric": "Fabric", "Fuselage": "Fuselage", "FuselageMetal": "Fuselage",
+        factorsFile = self.modelDir / "Data_KawasakiType88SurfaceFactors.json"
+        surfaceFactors = json.loads(factorsFile.read_text(encoding="utf-8")) if factorsFile.exists() else {}
+        baseFactors = surfaceFactors.get("baseColourFactors", {})
+        opaqueFactor = float(surfaceFactors.get("opaqueGlobalBaseColourFactorLinear", 1.))
+        assert math.isfinite(opaqueFactor) and 0 < opaqueFactor <= 1, opaqueFactor
+        self.root["opaqueGlobalBaseColourFactorLinear"] = opaqueFactor
+        family = {"Fabric": "Fabric", "LowerWingFabric": "Fabric", "Fuselage": "Fuselage", "FuselageMetal": "Fuselage",
                   "UpperWing": "UpperWing", "LowerUnderside": "LowerUnderside", "Tail": "FabricPlain", "Fin": "Fin",
                   "Aluminum": "Aluminum", "Steel": "Steel", "Exhaust": "Exhaust", "Rubber": "Rubber",
-                  "Leather": "Leather", "Wood": "Wood", "Cockpit": "Cockpit"}
-        detail = {"FuselageMetal": "Aluminum", "Fuselage": "Fabric", "UpperWing": "Fabric",
-                  "LowerUnderside": "Fabric", "Tail": "Fabric", "Fin": "Fabric", "Cockpit": "Steel"}
-        uvMappedFamilies = {"Fabric", "Fuselage", "FuselageMetal", "UpperWing", "LowerUnderside", "Tail", "Fin", "Wood", "Rubber", "Leather"}
+                  "Leather": "Leather", "Wood": "Wood", "Cockpit": "Cockpit", "CockpitLining": "CockpitLining", "LowerHousing": "LowerHousing", "LowerPocket": "LowerHousing"}
+        detail = {"LowerWingFabric": "Fabric", "FuselageMetal": "Aluminum", "Fuselage": "Fabric", "UpperWing": "Fabric",
+                  "LowerUnderside": "Fabric", "Tail": "Fabric", "Fin": "Fabric", "Cockpit": "Steel", "CockpitLining": "Fabric", "LowerHousing": "Aluminum", "LowerPocket": "Aluminum"}
+        uvMappedFamilies = {"Fabric", "LowerWingFabric", "Fuselage", "FuselageMetal", "UpperWing", "LowerUnderside", "Tail", "Fin", "Wood", "Rubber", "Leather", "LowerHousing", "LowerPocket"}
+        finishes = self.cockpitData.get("finishes", {})
+        family.update({key: key for key in finishes})
+        detail.update({key: finish["detailKind"] for key, finish in finishes.items() if finish.get("detailKind")})
+        noDetailFamilies = {key for key, finish in finishes.items() if not finish.get("detailKind")}
+        uvMappedFamilies.update(finishes)
+        if self.cowlingData.get("jointFinish"):
+            family["CowlingJoint"] = "CowlingJoint"
+            detail["CowlingJoint"] = "Steel"
+            uvMappedFamilies.add("CowlingJoint")
         for key, source in family.items():
             mat = self.materials[key]
             nodes, links = mat.node_tree.nodes, mat.node_tree.links
@@ -1047,15 +1858,43 @@ class Builder:
             detailUv = nodes.new("ShaderNodeUVMap")
             detailUv.uv_map = "UvDetail"
             for channel in ("Base", "Orm", "Normal"):
+                if channel == "Normal" and key in noDetailFamilies:
+                    continue
                 texture = nodes.new("ShaderNodeTexImage")
-                filename = "Texture_Type88" + (detail.get(key, key) if channel == "Normal" else source) + channel + ".png"
+                channelSource = detail.get(key, key) if channel == "Normal" else ("LowerWingFabric" if key == "LowerWingFabric" and channel == "Base" else source)
+                filename = "Texture_Type88" + channelSource + channel + ".png"
                 texture.image = bpy.data.images.load(str(textureRoot / filename), check_existing=True)
                 texture.image.colorspace_settings.name = "sRGB" if channel == "Base" else "Non-Color"
-                texture.extension = "REPEAT" if channel == "Normal" or key not in uvMappedFamilies else "EXTEND"
+                # AO strength changes how the exporter groups the ORM image.
+                # Preserve the established runtime sampler for every MR role
+                # explicitly, independently of the base-color or AO sampler.
+                if channel == "Orm":
+                    clampMr = {"Fabric", "UpperWing", "LowerWingFabric", "LowerUnderside",
+                               "Fuselage", "FuselageMetal", "Fin"}
+                    texture.extension = "EXTEND" if key in clampMr else "REPEAT"
+                else:
+                    texture.extension = "REPEAT" if channel == "Normal" or key not in uvMappedFamilies else "EXTEND"
                 texture.label = "Actual-scale detail" if channel == "Normal" else "Authored " + channel
                 links.new((detailUv if channel == "Normal" else uv).outputs["UV"], texture.inputs["Vector"])
                 if channel == "Base":
-                    links.new(texture.outputs["Color"], shader.inputs["Base Color"])
+                    # Saved Blender role factors are float32. Compose the new
+                    # calibration in that same order so a fresh reconstruction
+                    # reproduces an edited source without double-rounding drift.
+                    roleFactor = struct.unpack("<f", struct.pack("<f", float(baseFactors.get(key, 1.))))[0]
+                    factor = roleFactor * opaqueFactor
+                    assert 0 < factor <= 1, (key, factor)
+                    if factor == 1.:
+                        links.new(texture.outputs["Color"], shader.inputs["Base Color"])
+                    else:
+                        multiply = nodes.new("ShaderNodeMix")
+                        multiply.name = "UniformBaseColourFactor"
+                        multiply.data_type = "RGBA"
+                        multiply.blend_type = "MULTIPLY"
+                        multiply.inputs[0].default_value = 1.
+                        multiply.inputs[7].default_value = (factor, factor, factor, 1.)
+                        links.new(texture.outputs["Color"], multiply.inputs[6])
+                        links.new(multiply.outputs[2], shader.inputs["Base Color"])
+                        mat["uniformBaseColourFactorLinear"] = factor
                 elif channel == "Normal":
                     normal = nodes.new("ShaderNodeNormalMap")
                     normal.uv_map = "UvDetail"
@@ -1069,6 +1908,20 @@ class Builder:
                     links.new(separate.outputs["Blue"], shader.inputs["Metallic"])
             mat["surfaceSource"] = source
             mat["detailMetersPerTile"] = .0832 if detail.get(key, key) in ("Fabric", "Leather") else .20
+            mat["opaqueCalibrationFactorLinear"] = opaqueFactor
+        # Plain exported roles (for example ink and gauge ivory) obey the same
+        # complete-asset calibration. Glass remains neutral and transmissive.
+        for key, mat in self.materials.items():
+            if key == "Glass" or key in family:
+                continue
+            shader = mat.node_tree.nodes.get("Principled BSDF")
+            socket = shader.inputs["Base Color"]
+            assert not socket.is_linked, key
+            rgba = list(socket.default_value)
+            socket.default_value = tuple(value * opaqueFactor if index < 3 else value
+                                         for index, value in enumerate(rgba))
+            mat["uniformBaseColourFactorLinear"] = opaqueFactor
+            mat["opaqueCalibrationFactorLinear"] = opaqueFactor
         for ob in self.meshes:
             mesh = ob.data
             sourceUv = mesh.uv_layers.get("UvSurface")
@@ -1082,7 +1935,10 @@ class Builder:
                         sourceUv.data[loopIndex].uv = (p[axes[0]] / .20, p[axes[1]] / .20)
             detailUv = mesh.uv_layers.new(name="UvDetail")
             key = next((key for key, mat in self.materials.items() if mesh.materials and mesh.materials[0] == mat), "Steel")
-            if key == "Exhaust":
+            # The port lips inherited their UVs before the reference finish
+            # changed from Steel to Exhaust. Keep that established mapping;
+            # only the individual stacks use the per-object exhaust offset.
+            if key == "Exhaust" and not ob.name.startswith("ExhaustPortTrim"):
                 seed = sum((i + 1) * ord(c) for i, c in enumerate(ob.name))
                 offset = ((seed % 29) / 29, (seed % 43) / 43)
                 for data in sourceUv.data:
@@ -1091,8 +1947,8 @@ class Builder:
             tile = .0832 if detail.get(key, key) in ("Fabric", "Leather") else .20
             if key in ("Fuselage", "FuselageMetal"):
                 extent = (11.90, 2.60)
-            elif key in ("UpperWing", "LowerUnderside") or (key == "Fabric" and ("Wing" in ob.name or "Aileron" in ob.name)):
-                extent = (15, 2.047 if key == "UpperWing" or "UpperWing" in ob.name or ("Aileron" in ob.name and "Lower" not in ob.name) else 1.72)
+            elif key in ("UpperWing", "LowerUnderside", "LowerWingFabric") or (key == "Fabric" and ("Wing" in ob.name or "Aileron" in ob.name)):
+                extent = (15, 2.092026 if key == "UpperWing" or "UpperWing" in ob.name or ("Aileron" in ob.name and "Lower" not in ob.name) else 1.72)
             elif key == "Fin":
                 extent = (4.4, 1.6)
             elif key == "Tail":
@@ -1115,8 +1971,79 @@ class Builder:
             mesh.uv_layers.active = sourceUv
             sourceUv.active_render = True
         bpy.context.scene["surfaceStage"] = "UV PBR attached; global occlusion bake pending"
+        self.RestoreAuthoredUvLayout()
 
-    def BakeOcclusion(self):
+    def RestoreAuthoredUvLayout(self):
+        """Keep approved modifier-generated UVs stable across rebuilds."""
+        file = self.sourceRoot / ("Data_KawasakiType88AuthoredUv" + self.detail.title() + ".json")
+        if not file.exists():
+            file = self.modelDir / "Rebuild" / file.name
+        if not file.exists():
+            raise FileNotFoundError("Missing authored UV reconstruction data: " + str(file))
+        import base64
+        import hashlib
+        import struct
+        import zlib
+        import numpy as np
+        layout = json.loads(file.read_text(encoding="utf-8"))
+        assert layout["schema"] == "KawasakiType88AuthoredUvV1" and layout["detail"] == self.detail
+        for name, record in layout["objects"].items():
+            ob = next(ob for ob in self.meshes if ob.name == name)
+            mesh = ob.data
+            signature = hashlib.sha256(struct.pack("<3I", len(mesh.vertices), len(mesh.polygons), len(mesh.loops)))
+            for loop in mesh.loops:
+                signature.update(struct.pack("<I", loop.vertex_index))
+            for polygon in mesh.polygons:
+                signature.update(struct.pack("<I", polygon.loop_total))
+            assert signature.hexdigest() == record["topologySha256"], ("Authored UV topology differs", name)
+            for layerName, encoded in record["layers"].items():
+                assert layerName != "UvOcclusion" and mesh.uv_layers.get(layerName), (name, layerName)
+                payload = zlib.decompress(base64.b64decode(encoded, validate=True))
+                assert len(payload) == len(mesh.loops) * 8, (name, layerName)
+                values = np.frombuffer(payload, dtype="<f4").reshape(-1, 2)
+                assert np.isfinite(values).all(), (name, layerName)
+                mesh.uv_layers[layerName].data.foreach_set("uv", values.ravel())
+        self.root["authoredUvLayoutSha256"] = hashlib.sha256(file.read_bytes()).hexdigest()
+        self.root["authoredUvLayoutScope"] = "Approved actual mesh UV layers restored only after exact object topology/corner validation."
+
+    def ApplyOcclusionUvLayout(self, mesh, ranges):
+        """Restore an authored external atlas when its corner topology matches."""
+        file = self.sourceRoot / ("Data_KawasakiType88OcclusionUv" + self.detail.title() + ".json")
+        if not file.exists():
+            file = self.modelDir / "Rebuild" / file.name
+        if not file.exists():
+            raise FileNotFoundError("Missing occlusion UV reconstruction data: " + str(file))
+        import base64
+        import hashlib
+        import struct
+        import zlib
+        import numpy as np
+        layout = json.loads(file.read_text(encoding="utf-8"))
+        assert layout["schema"] == "KawasakiType88OcclusionUvV1" and layout["detail"] == self.detail
+        records = layout["objects"]
+        assert set(records) == {ob.name for ob, _, _ in ranges}, "Occlusion atlas object set differs"
+        target = mesh.uv_layers.get("UvOcclusion")
+        for ob, offset, count in ranges:
+            record = records[ob.name]
+            source = ob.data
+            signature = hashlib.sha256(struct.pack("<3I", len(source.vertices), len(source.polygons), len(source.loops)))
+            for loop in source.loops:
+                signature.update(struct.pack("<I", loop.vertex_index))
+            for polygon in source.polygons:
+                signature.update(struct.pack("<I", polygon.loop_total))
+            assert signature.hexdigest() == record["topologySha256"], ("Occlusion atlas topology differs", ob.name)
+            payload = zlib.decompress(base64.b64decode(record["uvFloat32ZlibBase64"], validate=True))
+            assert len(payload) == count * 8, ("Occlusion atlas corner count differs", ob.name)
+            values = np.frombuffer(payload, dtype="<f4").reshape(count, 2)
+            assert np.isfinite(values).all() and values.min() >= -1e-6 and values.max() <= 1 + 1e-6, ob.name
+            for i, value in enumerate(values):
+                target.data[offset + i].uv = value
+        self.root["occlusionUvLayoutSha256"] = hashlib.sha256(file.read_bytes()).hexdigest()
+        self.root["occlusionUvLayoutScope"] = "Existing normalized atlas retained; geometric occlusion is freshly baked."
+        self.Progress("RestoredOcclusionUvLayout", objects=len(records), file=str(file))
+        return True
+
+    def BakeOcclusion(self, resolution=None, samples=16):
         """One temporary bake proxy; copy packed UV loops back to editable parts.
 
         Baking hundreds of separate selected objects repeats scene setup. A
@@ -1124,7 +2051,7 @@ class Builder:
         bake; no source mesh or movable node is merged in the saved project.
         """
         scene = bpy.context.scene
-        size = 4096 if self.high else 2048
+        size = resolution or (4096 if self.high else 2048)
         self.Progress("PreparingOcclusionProxy")
         image = bpy.data.images.new("Texture_Type88AssemblyAo", width=size, height=size, alpha=False)
         image.generated_color = (1, 1, 1, 1)
@@ -1132,16 +2059,19 @@ class Builder:
         bpy.ops.object.select_all(action="DESELECT")
         verts, faces, ranges = [], [], []
         loopOffset = 0
-        hidden = {}
+        hidden, transparent = {}, []
         bpy.context.view_layer.update()
         for ob in self.meshes:
+            hidden[ob.name] = ob.hide_render
+            ob.hide_render = True
+            if ob.data.materials and all(material == self.materials["Glass"] for material in ob.data.materials):
+                transparent.append(ob)
+                continue
             offset = len(verts)
             verts.extend(tuple(ob.matrix_world @ vertex.co) for vertex in ob.data.vertices)
             faces.extend(tuple(offset + i for i in poly.vertices) for poly in ob.data.polygons)
             ranges.append((ob, loopOffset, len(ob.data.loops)))
             loopOffset += len(ob.data.loops)
-            hidden[ob.name] = ob.hide_render
-            ob.hide_render = True
         mesh = bpy.data.meshes.new("ToolAssemblyOcclusionProxyMesh")
         mesh.from_pydata(verts, [], faces)
         mesh.update()
@@ -1151,19 +2081,28 @@ class Builder:
         proxy.select_set(True)
         bpy.context.view_layer.objects.active = proxy
         mesh.uv_layers.new(name="UvOcclusion")
-        self.Progress("PackingOcclusionUv", proxyCorners=loopOffset)
-        bpy.ops.object.mode_set(mode="EDIT")
-        bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.uv.smart_project(angle_limit=math.radians(70), island_margin=.0015, area_weight=.3,
-                                 correct_aspect=True, scale_to_bounds=False)
-        bpy.ops.object.mode_set(mode="OBJECT")
+        if not self.ApplyOcclusionUvLayout(mesh, ranges):
+            self.Progress("PackingOcclusionUv", proxyCorners=loopOffset)
+            bpy.ops.object.mode_set(mode="EDIT")
+            bpy.ops.mesh.select_all(action="SELECT")
+            bpy.ops.uv.smart_project(angle_limit=math.radians(70), island_margin=.0015, area_weight=.3,
+                                     correct_aspect=True, scale_to_bounds=False)
+            bpy.ops.object.mode_set(mode="OBJECT")
         bakeMat = Mat("ToolAssemblyOcclusionBakeMaterial", (.5, .5, .5))
         mesh.materials.append(bakeMat)
         target = bakeMat.node_tree.nodes.new("ShaderNodeTexImage")
         target.image = image
         bakeMat.node_tree.nodes.active = target
+        occlusion = bakeMat.node_tree.nodes.new("ShaderNodeAmbientOcclusion")
+        occlusion.inputs["Distance"].default_value = .30
+        occlusion.samples = 16
+        occlusion.only_local = False
+        emission = bakeMat.node_tree.nodes.new("ShaderNodeEmission")
+        bakeMat.node_tree.links.new(occlusion.outputs["AO"], emission.inputs["Color"])
+        outputNode = next(node for node in bakeMat.node_tree.nodes if node.type == "OUTPUT_MATERIAL")
+        bakeMat.node_tree.links.new(emission.outputs["Emission"], outputNode.inputs["Surface"])
         scene.render.engine = "CYCLES"
-        scene.cycles.samples = 64
+        scene.cycles.samples = samples
         scene.render.threads_mode = "FIXED"
         scene.render.threads = 4
         scene.render.bake.use_selected_to_active = False
@@ -1171,7 +2110,7 @@ class Builder:
         scene.render.bake.use_clear = True
         scene.world.color = (.8, .8, .8)
         self.Progress("BakingOcclusion", resolution=size)
-        bpy.ops.object.bake(type="AO")
+        bpy.ops.object.bake(type="EMIT")
         # Suppress Monte Carlo speckle without repainting geometric occlusion.
         # A one-texel separable filter stays inside the existing bake margin.
         import numpy as np
@@ -1201,6 +2140,8 @@ class Builder:
             for i in range(count):
                 uv.data[i].uv = packed.data[offset + i].uv
             ob.hide_render = hidden[ob.name]
+        for ob in transparent:
+            ob.hide_render = hidden[ob.name]
         bpy.data.objects.remove(proxy, do_unlink=True)
         bpy.data.meshes.remove(mesh)
         bpy.data.materials.remove(bakeMat)
@@ -1216,6 +2157,8 @@ class Builder:
                 socket = group.interface.new_socket(name=name, in_out="INPUT", socket_type="NodeSocketFloat")
                 socket.default_value = default
         for mat in self.materials.values():
+            if mat == self.materials["Glass"]:
+                continue
             nodes, links = mat.node_tree.nodes, mat.node_tree.links
             texture = nodes.new("ShaderNodeTexImage")
             texture.name = "AssemblyAoBaked"
@@ -1225,13 +2168,31 @@ class Builder:
             links.new(uv.outputs["UV"], texture.inputs["Vector"])
             occlusion = nodes.new("ShaderNodeGroup")
             occlusion.node_tree = group
-            links.new(texture.outputs["Color"], occlusion.inputs["Occlusion"])
+            factorsFile = self.modelDir / "Data_KawasakiType88SurfaceFactors.json"
+            factors = json.loads(factorsFile.read_text(encoding="utf-8")) if factorsFile.exists() else {}
+            strength = float(factors.get("assemblyOcclusionStrength", 1.))
+            assert 0. <= strength <= 1., strength
+            if strength < 1.:
+                mix = nodes.new("ShaderNodeMix")
+                mix.name = "AssemblyOcclusionStrength"
+                mix.data_type = "RGBA"
+                mix.blend_type = "MIX"
+                mix.inputs[0].default_value = strength
+                mix.inputs[6].default_value = (1., 1., 1., 1.)
+                links.new(texture.outputs["Color"], mix.inputs[7])
+                links.new(mix.outputs[2], occlusion.inputs["Occlusion"])
+            else:
+                links.new(texture.outputs["Color"], occlusion.inputs["Occlusion"])
+            self.root["assemblyOcclusionStrength"] = strength
         for ob in self.meshes:
             uv = ob.data.uv_layers.get("UvSurface")
             ob.data.uv_layers.active = uv
             uv.active_render = True
         scene["surfaceStage"] = "UV PBR plus baked assembly occlusion"
-        scene["occlusionBakeSamples"] = 64
+        scene["occlusionBakeSamples"] = samples
+        scene["occlusionNodeSamples"] = 16
+        scene["occlusionRadiusM"] = .30
+        scene["occlusionTransparentExcluded"] = True
         scene["occlusionFilter"] = "Separable [0.2, 0.6, 0.2], one texel inside bake margin"
         self.Progress("OcclusionComplete", image=str(output))
 
@@ -1316,13 +2277,16 @@ class Builder:
                 ob.rotation_euler = (quat.to_matrix().to_4x4() @ Matrix.Rotation(math.radians(roll), 4, "Z")).to_euler()
         scene.camera = bpy.data.objects["CameraReferenceHistoricII"]
 
-    def Save(self):
+    def Save(self, recalculate=True):
         for path in (self.sourceRoot, self.modelDir, self.reviewDir):
             path.mkdir(parents=True, exist_ok=True)
-        self.Recalculate()
+        if recalculate:
+            self.Recalculate()
         bpy.context.view_layer.update()
         self.root["buildVersion"] = VERSION
         self.root["buildStage"] = self.stage
+        if self.root.get("surfaceSourceVersion"):
+            self.root["surfaceVersion"] = self.root["surfaceSourceVersion"]
         suffix = "Shape" if self.stage == "shape" else ("High" if self.high else "Game")
         file = self.sourceRoot / ("Scene_KawasakiType88" + suffix + ".blend")
         for image in bpy.data.images:
@@ -1369,7 +2333,9 @@ class Builder:
             self.BakeOcclusion()
             if not self.high:
                 self.MergeGameParts()
-        self.Save()
+        # Joining rigid parts preserves their already-authored corner normals.
+        # Recalculating after the join would smooth unrelated part boundaries.
+        self.Save(recalculate=not (self.stage == "pbr" and not self.high))
 
 
 def Main():

@@ -20,7 +20,7 @@ from mathutils.bvhtree import BVHTree
 
 CONTROL_NAMES = ("Propeller", "WheelLeft", "WheelRight", "Rudder", "ElevatorLeft",
                  "ElevatorRight", "AileronLeft", "AileronRight", "AileronLowerLeft", "AileronLowerRight")
-SOURCE_DEFAULT = Path("C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/KawasakiType88")
+SOURCE_DEFAULT = Path("C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/KawasakiType88/Release86")
 
 
 def Sha(data):
@@ -48,7 +48,7 @@ def Dimensions(objects):
     points = [ob.matrix_world @ vertex.co for ob in objects for vertex in ob.data.vertices]
     extent = [max(point[i] for point in points) - min(point[i] for point in points) for i in range(3)]
     result = {"wingspan": extent[0], "height": extent[2], "length": extent[1]}
-    for key, expected in (("wingspan", 15), ("height", 3.38), ("length", 12.28)):
+    for key, expected in (("wingspan", 15), ("height", 3.37945), ("length", 12.51)):
         assert abs(result[key] - expected) < .004, (key, result)
     return result
 
@@ -99,7 +99,7 @@ def SourceAudit(sourceRoot, variant, buildVersion, surface):
             assert Sha(image.packed_file.data) == expected[basename], ("Stale packed image", variant, basename)
             assert Sha((sourceRoot / "Textures" / basename).read_bytes()) == expected[basename]
             matched.append(basename)
-    assert len(files) == 34 and len(matched) == len(expected) == 33
+    assert len(files) == 53 and len(matched) == len(expected) == 52
     controls = [bpy.data.objects.get(name + "Pivot") for name in CONTROL_NAMES]
     assert all(controls) and scene.unit_settings.scale_length == 1
     sockets = {item.name for item in bpy.data.node_groups["glTF Material Output"].interface.items_tree if item.item_type == "SOCKET"}
@@ -127,7 +127,7 @@ def ImportAudit(file, sourceRow, variant, sourceRoot, reportRoot, buildVersion, 
     triangleCount = sum(document["accessors"][primitive["indices"]]["count"] // 3
                         for mesh in document["meshes"] for primitive in mesh["primitives"])
     assert triangleCount == sourceRow["triangles"]
-    assert len(document["materials"]) == 17 and len(document["images"]) == 34
+    assert len(document["materials"]) == 28 and len(document["images"]) == 53
     assert all(image["mimeType"] == "image/webp" and "bufferView" in image for image in document["images"])
     assert not document.get("cameras") and not document.get("extensions", {}).get("KHR_lights_punctual")
     packingFile = file.with_name("Data_" + file.stem.removeprefix("Model_") + "Packing.json")
@@ -148,7 +148,7 @@ def ImportAudit(file, sourceRow, variant, sourceRoot, reportRoot, buildVersion, 
     root = bpy.data.objects["KawasakiType88Root"]
     assert root["buildVersion"] == buildVersion and root["surfaceSourceVersion"] == surface["version"]
     images = [image for image in bpy.data.images if image.users and image.source == "FILE"]
-    assert len(images) == 34 and all(image.packed_file for image in images)
+    assert len(images) == 53 and all(image.packed_file for image in images)
     objects = Meshes()
     assert Triangles(objects) == triangleCount and len(objects) == len(document["meshes"])
     assert triangleCount <= (80000 if variant == "Game" else 300000)
@@ -190,13 +190,13 @@ def BraceAudit(expected):
     return BVHTree.FromPolygons(vertices, faces, epsilon=.000001), {"braces": rows, "selectedTriangles": len(faces), "source": "Actual packed GLB compared with reopened authored high source"}
 
 
-def MotionAudit(tailData, braceTree):
+def MotionAudit(tailData, braceTree, editable=False):
     objects = bpy.data.objects
     rest = {name: objects[name + "Pivot"].rotation_quaternion.copy() for name in CONTROL_NAMES}
     axes, axisReport = {}, {}
     for name in CONTROL_NAMES:
         ob = objects[name + "Pivot"]
-        ob.rotation_mode = "QUATERNION"
+        ob.rotation_mode = "XYZ" if editable and name.startswith("Aileron") else "QUATERNION"
         if name == "Propeller":
             expected = P(0, 0, 1)
         elif name == "Rudder":
@@ -223,8 +223,13 @@ def MotionAudit(tailData, braceTree):
             angle = degrees * (-1 if name.startswith("Aileron") and name.endswith("Right") else 1)
             if name.startswith("Wheel") or name == "Propeller":
                 angle = 0
-            objects[name + "Pivot"].rotation_quaternion = rest[name] @ Quaternion(axes[name], math.radians(angle))
-        for side, sign in (("Left", 1), ("Right", -1)):
+            if editable and name.startswith("AileronLower"):
+                continue
+            if editable and name.startswith("Aileron"):
+                objects[name + "Pivot"].rotation_euler.x = math.radians(angle)
+            else:
+                objects[name + "Pivot"].rotation_quaternion = rest[name] @ Quaternion(axes[name], math.radians(angle))
+        for side, sign in (() if editable else (("Left", 1), ("Right", -1))):
             rod = objects["AileronExternalPushrod" + side]
             angle = math.radians(degrees * sign)
             tilt = float(rod.get("hingeTiltRadians", 0))
@@ -240,7 +245,7 @@ def MotionAudit(tailData, braceTree):
         return any(key in material.name for material in ob.data.materials)
 
     upper = Frozen("AllFixedUpperWing", [ob for ob in Meshes() if ob.parent and ob.parent.name == "KawasakiType88Root" and MaterialHas(ob, "UpperWing")])
-    lower = Frozen("AllFixedLowerWing", [ob for ob in Meshes() if ob.parent and ob.parent.name == "KawasakiType88Root" and MaterialHas(ob, "LowerUnderside")])
+    lower = Frozen("AllFixedLowerWing", [ob for ob in Meshes() if ob.parent and ob.parent.name == "KawasakiType88Root" and (MaterialHas(ob, "LowerUnderside") or ob.get("aileronGapClosure", False))])
     tail = Frozen("AllFixedHorizontalStabilizer", [ob for ob in Meshes() if ob.parent and ob.parent.name == "TailplaneReferenceAssembly" and MaterialHas(ob, "Tail")])
     fin, body = objects["TypeIITallFixedFin"], objects["AirframeFacetedFuselage"]
     records, rodLengths = [], {}
@@ -286,7 +291,7 @@ def MotionAudit(tailData, braceTree):
     issues = [row for row in records if row.get("surfaceIntersections", 0)
               or max(row.get("lowerGapM", 0), row.get("upperGapM", 0), row.get("lengthDeltaM", 0)) > .0001]
     assert len(records) == 301 and not issues, issues
-    return {"source": "Actual reimport of " + bpy.context.scene["KawasakiAuditVariant"] + " GLB",
+    return {"source": ("Actual editable source " if editable else "Actual reimport of ") + bpy.context.scene["KawasakiAuditVariant"],
             "sha256": bpy.context.scene["ImportedGlbSha256"], "axes": axisReport, "records": records, "issues": issues}
 
 
@@ -304,9 +309,28 @@ def Main():
     sources, imports, motionSummaries = [], [], []
     expectedBraces = None
     for variant in ("High", "Game"):
+        sourceFile = source / f"Scene_KawasakiType88{variant}.blend"
+        sourceSha = Sha(sourceFile.read_bytes())
         sourceRow, sourceBraces = SourceAudit(source, variant, buildVersion, surface)
         sources.append(sourceRow)
         expectedBraces = expectedBraces or sourceBraces
+        # The source has authored quads; temporarily triangulate only the brace
+        # carrier for the same geometric intersection audit as the export.
+        import bmesh
+        for name in {entry["name"] if bpy.data.objects.get(entry["name"]) else "Part_KawasakiType88Root_Steel" for entry in expectedBraces}:
+            ob = bpy.data.objects[name]
+            mesh = bmesh.new()
+            mesh.from_mesh(ob.data)
+            bmesh.ops.triangulate(mesh, faces=list(mesh.faces))
+            mesh.to_mesh(ob.data)
+            mesh.free()
+        sourceBraceTree, _ = BraceAudit(expectedBraces)
+        bpy.context.scene["KawasakiAuditVariant"] = variant + " source"
+        bpy.context.scene["ImportedGlbSha256"] = sourceSha
+        sourceMotion = MotionAudit(tailData, sourceBraceTree, editable=True)
+        sourceRow["editableMotionChecks"] = len(sourceMotion["records"])
+        sourceRow["editableMotionIssues"] = sourceMotion["issues"]
+        assert Sha(sourceFile.read_bytes()) == sourceSha
         file = source / "Exports/Model_KawasakiType88High.glb" if variant == "High" else repo / "Taierzhuang1938/Model/KawasakiType88/Model_KawasakiType88.glb"
         imports.append(ImportAudit(file, sourceRow, variant, source, reportRoot, buildVersion, surface))
         braceTree, braceReport = BraceAudit(expectedBraces)

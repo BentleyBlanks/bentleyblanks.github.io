@@ -1,0 +1,12 @@
+{
+  "schema": "KawasakiType88UniformSurfaceFactorsV2",
+  "colourSpace": "linear",
+  "opaqueGlobalBaseColourFactorLinear": 0.792,
+  "baseColourFactors": {
+    "Fin": 0.9,
+    "CockpitObserverWall": 0.65
+  },
+  "scope": "Constant complete-material albedo multipliers inferred from the selected museum photograph. The global0.792 factor applies to every opaque asset PBR role, including plain ink/ivory, and multiplies the retained relative Fin0.90/ObserverWall0.65 factors. Glass remains neutral. This is jointly calibrated with1.25global comparison illumination and a real neutral white shadow-receiving platform at landing-contact height; it is not an independently measured pigment or room. No spatial illumination, shadow, reference RGB field or image is copied. These values do not identify original service-aircraft pigments or prove complete shape/lighting agreement.",
+  "assemblyOcclusionStrength": 0.75,
+  "assemblyOcclusionStrengthScope": "One common physical assembled-AO visibility strength; same0.75onall27occlusionroles. RawAO remains a geometric bake,not brightened orphotopainted;exporterreads realsourceMix factor. Final2K/4K64sample maps,body/referenceagreement stillnotapproved."
+}

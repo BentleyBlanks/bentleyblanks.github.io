@@ -1,0 +1,126 @@
+{
+  "schema": "tengxian-type88-photo-wing-v2",
+  "source": "https://commons.wikimedia.org/wiki/File:Kawasaki_KDA-2_03_(1_20th_scale_model).png",
+  "sourceAuthor": "Motokoka",
+  "sourceImageLicense": "CC BY-SA 4.0",
+  "scope": "Visible museum-model control-surface reconstruction with the reference camera fixed. These are not verified factory dimensions. Opposite-side lower-wing placement is inferred by symmetry; the ambiguous lower outer cap retains its existing bound.",
+  "upperFabric": {
+    "ribPitchM": 0.26,
+    "ribReliefM": 0.0045,
+    "reliefZeroAtRibs": true,
+    "gameAnalyticSkinNormals": true,
+    "scope": "Unmarked leading-chord image bands imply approximately0.252m on the near half and0.264m on the far half with the fitted camera. A common0.26m reconstruction preserves structural symmetry. Rib crests retain the nominal airfoil and cloth deflects inward. Native full-source comparisons reduce the former11.25mm relief to4.5mm after the old grey-wing contrast exceeded the reference. Game skin normals derive from the same real continuous surface to compensate coarse sampling; boundary regions retain geometric normals. These are photographic reconstruction choices,not factory structural measurements."
+  },
+  "lowerFabric": {
+    "ribPitchM": 0.275,
+    "ribReliefM": 0.0045,
+    "scope": "Retained inference; lower-wing rib spacing has not been independently established from a clear orthographic source."
+  },
+  "exposedLinkageFinish": {
+    "material": "Aluminum",
+    "scope": "Six visible upper/lower horns and external pushrods reuse the existing neutral silver-metal PBR response. Both sides keep their exact geometry,pivots,drivers and connection points. This is a museum-reference appearance inference,not identification of an original-aircraft alloy or coating;other Steel roles remain unchanged."
+  },
+  "upperAileron": {
+    "spanStartM": 3.08,
+    "spanEndM": 7,
+    "fixedEndU": 0.83014176,
+    "movingStartU": 0.83405567,
+    "noseRadiusM": 0.027
+  },
+  "lowerAileron": {
+    "spanStartM": 2.7545,
+    "spanEndM": 5.74,
+    "fixedEndU": 0.81315,
+    "movingStartU": 0.8178011627906977,
+    "noseRadiusM": 0.018,
+    "gapWeb": {
+      "topBelowAxisM": 0.0095,
+      "thicknessM": 0.005,
+      "fixedUnderlapM": 0.01,
+      "movingClearanceM": 0.0005,
+      "scope": "Concealed stationary closure under the visible hinge gap, reconstructed to prevent a background slit while retaining the real moving nose. Its construction and dimensions are inferred."
+    },
+    "referenceSamples600": [
+      [
+        271.73101,
+        115
+      ],
+      [
+        270.73474,
+        125
+      ],
+      [
+        269.24035,
+        135
+      ],
+      [
+        268.49315,
+        145
+      ],
+      [
+        264.50809,
+        180
+      ],
+      [
+        263.51183,
+        185
+      ],
+      [
+        263.0137,
+        190
+      ],
+      [
+        262.01743,
+        195
+      ]
+    ],
+    "seamFitRmsAt600": 0.69855,
+    "innerCapTarget600": [
+      261,
+      204
+    ],
+    "innerCapScope": "Coarse visible intersection. No change to the wing envelope or inferred factory claim."
+  },
+  "centreFitting": {
+    "sourceHoleCentres600": [
+      [
+        227.27,
+        263.95
+      ],
+      [
+        226.95,
+        266.98
+      ],
+      [
+        227.2,
+        270.02
+      ]
+    ],
+    "centreM": [
+      -0.1992469,
+      3.129,
+      -2.0605851
+    ],
+    "spanToAftDegrees": -5.05027409195706,
+    "lengthSpanM": 0.27,
+    "widthAftM": 0.155,
+    "thicknessM": 0.022,
+    "recessDepthM": 0.014,
+    "recessRadiusM": 0.012,
+    "recessSpanOffsetsM": [
+      -0.0785,
+      0,
+      0.0785
+    ],
+    "recessAftOffsetM": 0.025,
+    "scope": "Raised centre-cutout fitting reconstructed from the visible silhouette and three dark depressions. Their mechanical identity, exact depth, orientation and concealed construction remain unverified."
+  },
+  "lowerRootCutout": {
+    "innerSpanM": 0.4072113678243177,
+    "outerSpanM": 1.3452554577938929,
+    "maximumDepthM": 0.3891993046330859,
+    "referenceVisibleSide": "Left",
+    "oppositeSideInferred": true,
+    "scope": "Lower-wing root aft notch from native reference edge positions projected onto the physical trailing-edge plane. Parabolic visible boundary fit; both real closed skins shorten coherently, root-fairing rear end follows. Opposite-side notch follows inferred structural symmetry. No photographic pigment, normals or lighting copied; not factory dimensions."
+  }
+}

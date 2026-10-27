@@ -16,9 +16,9 @@
   },
   "planform": {
     "leadingRootSpanM": 0.08,
-    "leadingRootAftM": 4.50,
-    "leadingHornAftM": 4.87,
-    "leadingTipAftM": 5.10,
+    "leadingRootAftM": 4.525,
+    "leadingHornAftM": 4.895,
+    "leadingTipAftM": 5.125,
     "trailingInnerAftM": 5.785,
     "trailingTipAftM": 5.48,
     "movingInnerLeadingSpanM": 0.12,
@@ -30,7 +30,8 @@
     "hingeNoseRadiusM": 0.03,
     "hingeGapM": 0.004,
     "hornSideGapM": 0.006,
-    "trailingEdgeThicknessM": 0.002
+    "trailingEdgeThicknessM": 0.002,
+    "matingEdgeBevelM": 0.002
   },
   "rudderMechanics": {
     "hingeAftM": 5.33,
@@ -46,10 +47,78 @@
     "balanceForeAftM": 4.84,
     "referenceRudderDegrees": 13.55,
     "neutralRearExtentM": 6.14,
-    "fixedLeadingYZ": [[1.85, 4.42], [2.16, 4.413], [2.62, 4.84]],
-    "balanceLeadingYZ": [[2.626, 4.84], [2.86, 4.94], [3.119478, 5.048757]],
-    "rearCurveYZ": [[3.119478, 5.048757], [2.998094, 5.256293], [2.627116, 5.606951], [1.799862, 6.045251], [1.545778, 6.145959], [1.405165, 6.088184]],
-    "lowerCurveYZ": [[1.405165, 6.088184], [1.43, 5.90], [1.65, 5.40], [1.70, 5.33]],
+    "fixedLeadingYZ": [
+      [
+        1.85,
+        4.42
+      ],
+      [
+        2.16,
+        4.413
+      ],
+      [
+        2.62,
+        4.84
+      ]
+    ],
+    "balanceLeadingYZ": [
+      [
+        2.626,
+        4.84
+      ],
+      [
+        2.86,
+        4.94
+      ],
+      [
+        3.119478,
+        5.048757
+      ]
+    ],
+    "rearCurveYZ": [
+      [
+        3.119478,
+        5.048757
+      ],
+      [
+        2.998094,
+        5.256293
+      ],
+      [
+        2.627116,
+        5.606951
+      ],
+      [
+        1.799862,
+        6.045251
+      ],
+      [
+        1.545778,
+        6.145959
+      ],
+      [
+        1.405165,
+        6.088184
+      ]
+    ],
+    "lowerCurveYZ": [
+      [
+        1.405165,
+        6.088184
+      ],
+      [
+        1.43,
+        5.9
+      ],
+      [
+        1.65,
+        5.4
+      ],
+      [
+        1.7,
+        5.33
+      ]
+    ],
     "scope": "Visible balanced-rudder layout, cross-checked with Type II side photographs. High/game curve and bevel detail are compensated about the hinge to retain the same 12.28m neutral length anchor. The non-neutral photograph pose and unmeasured section/joint dimensions are explicitly inferred."
   },
   "typeLabel": {
@@ -57,14 +126,27 @@
     "centreAftM": 5.24429,
     "widthM": 0.62,
     "heightM": 0.128,
-    "baselineSlopeHeightPerAft": -0.40,
+    "baselineSlopeHeightPerAft": -0.4,
     "scope": "Readable type designation placed on the moving upper balance; opposite side placement inferred."
   },
   "observations": {
-    "calibrationFramePixels": [600, 612],
+    "leadingEdgeRefinement": {
+      "uniformShiftAftM": 0.025,
+      "sourceMeasurement": "Native signed source-photo edge gradients, compared with non-AA tail masks at the fixed reference camera.",
+      "leadingMeanAbsoluteErrorPixels600HighBefore": 1.441865495843524,
+      "leadingMeanAbsoluteErrorPixels600HighAfter": 0.4626580853010978,
+      "scope": "Symmetric leading-only refinement on fixed stabilizers and elevator forward balances. Width, height, hinge axes, splits, pivots and trailing outline retained. Existing UV2 atlas held fixed while physically rebaking geometric AO; unchanged-shape high/game controls reproduce original AO pixels exactly. These are museum-photo inferences, not factory dimensions or whole-reference approval."
+    },
+    "calibrationFramePixels": [
+      600,
+      612
+    ],
     "visibleSplitLineRmsPixels": 0.1397588338,
     "upperSurfaceHeightAssumptionM": 2.165,
-    "hingeEndSpansAfterRectificationM": [1.8150067168, -1.8206829849],
+    "hingeEndSpansAfterRectificationM": [
+      1.8150067168,
+      -1.8206829849
+    ],
     "note": "The paired split endpoints constrain a common span in this photographic frame. This does not establish original-aircraft installation tolerances."
   }
 }

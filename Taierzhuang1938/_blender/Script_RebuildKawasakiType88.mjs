@@ -19,7 +19,7 @@ for (let i = 2; i < process.argv.length; i++) {
   if (!value || value.startsWith("--")) throw new Error(`Missing value for ${key}`);
   values.set(key.slice(2), value);
 }
-const sourceRoot = path.resolve(values.get("source-root") || "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/KawasakiType88");
+const sourceRoot = path.resolve(values.get("source-root") || "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/KawasakiType88/Release86");
 const sourceRelative = path.relative(repoRoot, sourceRoot);
 if (!sourceRelative.startsWith("..") && !path.isAbsolute(sourceRelative)) throw new Error("Editable Blender sources must be outside the repository");
 const bundledPython = path.join(os.homedir(), ".cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe");

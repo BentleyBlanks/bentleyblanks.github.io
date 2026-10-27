@@ -1,0 +1,62 @@
+{
+  "schema": "tengxian-type88-photo-cockpit-v1",
+  "source": "https://commons.wikimedia.org/wiki/File:Kawasaki_KDA-2_03_(1_20th_scale_model).png",
+  "sourceAuthor": "Motokoka",
+  "sourceImageLicense": "CC BY-SA 4.0",
+  "scope": "The selected museum photograph constrains the visible grey walls, distinct rim finishes and furniture projection. Coating identity, depths, hidden equipment and attachments remain reconstruction choices; no factory interior drawing has been obtained.",
+  "windscreenFinish": {
+    "baseColorLinear": [1, 1, 1],
+    "roughness": 0.05,
+    "transmission": 1,
+    "ior": 1.46,
+    "scope": "Neutral clear dielectric appearance inferred from the visible museum windscreen. Removes the previous blue absorption and partial diffuse contribution. Geometry, IOR, shadow exclusion and all other cockpit materials remain. This is not identification of an original glass/plastic composition or proof of the complete cockpit."
+  },
+  "windscreenFrameFinish": {
+    "material": "CockpitPilotFrame",
+    "scope": "All three complete windscreen frame pieces reuse the existing muted pilot-frame PBR. The previous near-black steel response is too dark in the selected museum view. Geometry and detail scale remain; this does not identify the original aircraft coating or alloy."
+  },
+  "finishes": {
+    "CockpitPilotWall": {"baseSrgb": [0.60, 0.625, 0.615], "roughness": 0.66, "metallic": 0.12, "kind": "steel", "detailKind": "Steel", "variationScale": 0.2},
+    "CockpitObserverWall": {"baseSrgb": [0.55, 0.575, 0.565], "roughness": 0.66, "metallic": 0.12, "kind": "steel", "detailKind": "Steel", "variationScale": 0.2},
+    "CockpitPilotRim": {"baseSrgb": [0.40, 0.425, 0.415], "roughness": 0.46, "metallic": 0.08, "kind": "leather", "detailKind": "Leather", "variationScale": 0.2},
+    "CockpitObserverRim": {"baseSrgb": [0.55, 0.575, 0.565], "roughness": 0.50, "metallic": 0.15, "kind": "aluminum", "detailKind": null, "variationScale": 0.2},
+    "CockpitPilotFrame": {"baseSrgb": [0.43, 0.46, 0.45], "roughness": 0.55, "metallic": 0.12, "kind": "steel", "detailKind": "Steel", "variationScale": 0.2},
+    "CockpitPilotBelt": {"baseSrgb": [0.62, 0.64, 0.59], "roughness": 0.78, "metallic": 0.0, "kind": "cloth", "detailKind": "Fabric", "variationScale": 0.2}
+  },
+  "finishScope": "Constant author coatings with physical microstructure; no photographic shading is copied. Grey wall coating continues to the lower wall rather than changing abruptly at an arbitrary depth. Floors and concealed recesses retain the dark lining. Pilot/observer rim identities and pilot belt fabric are museum-appearance reconstructions, not verified service-aircraft materials.",
+  "Pilot": {
+    "centreAftM": -1.29,
+    "openingHalfSpanM": 0.40,
+    "openingHalfAftM": 0.425,
+    "openingScope": "The actual coaming overlay was too far forward and slightly too long in the primary view. The centre shifts aft60mm and the fore/aft half-extent decreases30mm; these remain photographic, not factory, dimensions.",
+    "linerDepthsM": [0.025, 0.35, 0.575],
+    "panHeightM": 2.16,
+    "panAftOffsetM": 0.10,
+    "backAftOffsetM": 0.04,
+    "seatHalfWidthM": 0.17,
+    "panLengthM": 0.56,
+    "panTiltDegrees": -7,
+    "rimFinish": "CockpitPilotRim",
+    "wallFinish": "CockpitPilotWall",
+    "panFinish": "CockpitPilotWall",
+    "frameFinish": "CockpitPilotFrame",
+    "beltFinish": "CockpitPilotBelt",
+    "sideRailPointsRelativeM": [[1.0, -0.10, -0.35], [0.94, 0.20, 0.43]],
+    "seatScope": "The visible grey panel is longer fore/aft and narrower across the cockpit than the previous generic bucket. Side-frame attachments and dimensions are photograph-derived reconstruction choices."
+  },
+  "Observer": {
+    "upperDeckCorrection": {
+      "riseM": 0.04,
+      "profileAftM": [-0.82, -0.62, 0.22, 0.48],
+      "scope": "Local museum-reference upper-deck height inference, not factory dimensions. The existing upper fuselage section is deformed above its retained centre and lower hull. Opening, coaming, inner lip and tub follow the actual roof increment; the complete observer seat, controls and gauges rise together; upper longeron seams follow the hull and lower seams remain. Topology and normalized UV2 atlas are retained with strict checks; geometric AO is freshly baked."
+    },
+    "linerDepthsM": [0.025, 0.24, 0.575],
+    "rimFinish": "CockpitObserverRim",
+    "wallFinish": "CockpitObserverWall",
+    "backAftScale": 0.6,
+    "backAftCentreM": 0.17,
+    "backAftOffsetM": -0.06,
+    "sideRailPointsRelativeM": [[1.0, 0.035, -0.14], [1.0, 0.11, 0.04548387], [0.94, 0.20, 0.11]],
+    "seatScope": "The back projects as a narrower, more upright surface at the visible grey line. Fore/aft lean contracts about the side-frame attachment and the back moves forward60mm; the side frames follow. Shell thickness remains26mm. These are photographic reconstruction choices, not factory dimensions."
+  }
+}

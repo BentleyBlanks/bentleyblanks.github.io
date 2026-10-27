@@ -1,0 +1,356 @@
+{
+  "schema": "tengxian-type88-photo-cowling-v1",
+  "source": "https://commons.wikimedia.org/wiki/File:Kawasaki_KDA-2_03_(1_20th_scale_model).png",
+  "sourceAuthor": "Motokoka",
+  "sourceImageLicense": "CC BY-SA 4.0",
+  "powerStationsAftM": [
+    [
+      -5.88,
+      0.615
+    ],
+    [
+      -5.66,
+      0.161115
+    ],
+    [
+      -5.3,
+      0.100718
+    ],
+    [
+      -4.6,
+      0.257639
+    ],
+    [
+      -4,
+      0.615
+    ],
+    [
+      -3.65,
+      0.615
+    ]
+  ],
+  "hoodHalfWidthFraction": 0.85,
+  "exhaustPortTrimFinish": {
+    "material": "Exhaust",
+    "scope": "Both external exhaust-bank upper lips reuse the muted grey outer-exhaust finish. The previous near-black Steel response is not present at the same reference locations. Museum-model appearance inference, not an identified service-aircraft alloy or coating; all lip/port geometry retained."
+  },
+  "frontCapSurface": {
+    "centreAftM": -5.5,
+    "halfLengthM": 0.35,
+    "halfWidthFraction": 0.85,
+    "inwardDepthM": 0.12,
+    "gameRefinementCuts": 3,
+    "highRefinementCuts": 5,
+    "scope": "Smooth symmetric C2 radial front-cap curvature inferred from the museum image. The 120mm depth improves both high and game native comparisons against the 80mm control; 40mm worsens the cap and 160mm fails the front-shade guard. Lateral support and front/rear tangent boundaries remain fixed. This is a photograph-based hypothesis, not a factory dimension or identified damage."
+  },
+  "jointFinish": {
+    "baseSrgb": [
+      0.45,
+      0.47,
+      0.46
+    ],
+    "roughness": 0.6,
+    "metallic": 0.12,
+    "variationScale": 0.2,
+    "scope": "Muted grey joint response inferred from visible panel lines; existing seam geometry retained. No photographic shade is copied and no original coating identity is established."
+  },
+  "lowerHousing": {
+    "centreM": [
+      0,
+      1.06,
+      -4.79
+    ],
+    "halfWidthM": 0.52,
+    "halfHeightM": 0.28,
+    "crossSectionPower": 0.4,
+    "profileAftOffsetAndScale": [
+      [
+        -0.72,
+        0.6
+      ],
+      [
+        -0.66,
+        0.95
+      ],
+      [
+        -0.54,
+        1
+      ],
+      [
+        -0.36,
+        1
+      ],
+      [
+        0.3,
+        1
+      ],
+      [
+        0.56,
+        0.8
+      ],
+      [
+        0.7,
+        0.3
+      ],
+      [
+        0.72,
+        0.02
+      ]
+    ],
+    "openingPocketDepthM": 0.065,
+    "openingOuterMarginM": 0.08,
+    "openingFinish": {
+      "material": "LowerPocket",
+      "sourceSurface": "LowerHousing",
+      "detailMetersPerTile": 0.2,
+      "scope": "Separate pocket role reuses the exterior enclosure's muted grey PBR. The reference-visible walls are substantially brighter than generic dark cockpit lining. All six real closed recesses, mouth outlines and depth stay intact; opposite-side finish and hidden surfaces remain inferred. No emission or photographic illumination is copied."
+    },
+    "scope": "Provisional reconstruction of the visible lower nose enclosure. Its cross section and placement are photographic inferences; opening placement is to be verified on the actual surface before cutting.",
+    "openings": [
+      {
+        "id": "Forward",
+        "surfacePolygonM": [
+          [
+            -0.5088729858398438,
+            1.2228946685791016,
+            -5.340526580810547
+          ],
+          [
+            -0.4768857955932617,
+            1.2858543395996094,
+            -5.315872669219971
+          ],
+          [
+            -0.5040769577026367,
+            1.2496204376220703,
+            -5.067601680755615
+          ],
+          [
+            -0.514866828918457,
+            1.151132583618164,
+            -5.3420820236206055
+          ],
+          [
+            -0.5121364593505859,
+            1.145181655883789,
+            -5.355437755584717
+          ]
+        ],
+        "surfaceNormalsM": [
+          [
+            -0.9420599341392517,
+            0.2549446225166321,
+            -0.21800543367862701
+          ],
+          [
+            -0.5946645736694336,
+            0.8039739727973938,
+            0
+          ],
+          [
+            -0.9652772545814514,
+            0.2612278163433075,
+            0
+          ],
+          [
+            -0.9769678711891174,
+            0.026967721059918404,
+            -0.21167577803134918
+          ],
+          [
+            -0.9769675731658936,
+            0.026968151330947876,
+            -0.21167679131031036
+          ]
+        ],
+        "referenceContour600": [
+          [
+            91.15815691158157,
+            316.714983713355
+          ],
+          [
+            91.90535491905355,
+            314.2231270358306
+          ],
+          [
+            102.61519302615194,
+            316.4657980456026
+          ],
+          [
+            91.6562889165629,
+            318.4592833876222
+          ],
+          [
+            91.15815691158157,
+            318.4592833876222
+          ]
+        ],
+        "sourceMaximumRgbExclusive": 100,
+        "sourceAreaPixels": 329
+      },
+      {
+        "id": "Middle",
+        "surfacePolygonM": [
+          [
+            -0.5143804550170898,
+            1.2115325927734375,
+            -4.903803825378418
+          ],
+          [
+            -0.5170516967773438,
+            1.1667594909667969,
+            -4.660218715667725
+          ],
+          [
+            -0.5153093338012695,
+            0.9118900299072266,
+            -4.687042713165283
+          ],
+          [
+            -0.5161027908325195,
+            0.9188213348388672,
+            -4.8980536460876465
+          ],
+          [
+            -0.5191831588745117,
+            1.0895862579345703,
+            -4.9136152267456055
+          ]
+        ],
+        "surfaceNormalsM": [
+          [
+            -0.9652772545814514,
+            0.2612278163433075,
+            0
+          ],
+          [
+            -0.9996192455291748,
+            0.027592981234192848,
+            0
+          ],
+          [
+            -0.9652772545814514,
+            -0.26122748851776123,
+            0
+          ],
+          [
+            -0.9996192455291748,
+            -0.027593059465289116,
+            0
+          ],
+          [
+            -0.9996192455291748,
+            0.027592981234192848,
+            0
+          ]
+        ],
+        "referenceContour600": [
+          [
+            109.83810709838107,
+            317.9609120521173
+          ],
+          [
+            120.54794520547946,
+            319.45602605863195
+          ],
+          [
+            121.29514321295144,
+            324.68892508143324
+          ],
+          [
+            112.32876712328768,
+            324.19055374592836
+          ],
+          [
+            110.3362391033624,
+            320.70195439739416
+          ]
+        ],
+        "sourceMaximumRgbExclusive": 100,
+        "sourceAreaPixels": 898
+      },
+      {
+        "id": "Aft",
+        "surfacePolygonM": [
+          [
+            -0.4721031188964844,
+            1.0179767608642578,
+            -4.369568347930908
+          ],
+          [
+            -0.45776939392089844,
+            1.0067214965820312,
+            -4.34407377243042
+          ],
+          [
+            -0.47309303283691406,
+            0.9477958679199219,
+            -4.37489128112793
+          ]
+        ],
+        "surfaceNormalsM": [
+          [
+            -0.8759598135948181,
+            -0.024179736152291298,
+            0.48177769780158997
+          ],
+          [
+            -0.8759599328041077,
+            -0.02417975850403309,
+            0.481777548789978
+          ],
+          [
+            -0.8759598135948181,
+            -0.024179736152291298,
+            0.48177769780158997
+          ]
+        ],
+        "referenceContour600": [
+          [
+            134.24657534246577,
+            321.4495114006515
+          ],
+          [
+            135.49190535491906,
+            321.20032573289905
+          ],
+          [
+            134.49564134495643,
+            322.94462540716614
+          ]
+        ],
+        "sourceMaximumRgbExclusive": 100,
+        "sourceAreaPixels": 18
+      }
+    ],
+    "openingScope": "Primary-image mouth contours reconstructed on the actual source housing. Convex contour simplification removes camera noise; pocket depth and far-side geometry are inferred."
+  },
+  "scope": "Photograph-derived hood section and paint/physical seam boundary. A shared width fraction keeps the authored paint and model panel edge aligned when corner radii change. Factory sections and original finish are not established.",
+  "hoodHalfWidthFractionStationsAftM": [
+    [
+      -5.88,
+      0.85
+    ],
+    [
+      -5.66,
+      0.85
+    ],
+    [
+      -5.3,
+      0.8431155355070726
+    ],
+    [
+      -4.6,
+      0.7446164386180432
+    ],
+    [
+      -3.69,
+      0.47599186642566194
+    ],
+    [
+      -3.65,
+      0.47599186642566194
+    ]
+  ],
+  "hoodPanelScope": "One continuous symmetric upper-hood panel boundary with three longitudinal width-fraction controls. Its physical half-width remains approximately0.40-0.44m instead of expanding with the widened lower shell. Dark seam, adjacent silver lip, cross-joint end points and complete grey-paint coverage share the same profile. Native10-point reference seam fit24.22->0.82px;photograph-based museum reconstruction,not factory dimensions or identified original coating. Pigments,roughness,metallic,noise amplitudes,shell/normals and all other parts retain; no photograph RGB/lighting/normal field."
+}

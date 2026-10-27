@@ -137,7 +137,7 @@ Check(EXTERNAL_GLB_STANDARDS.length === 68
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Donkey" && record.actualTriangles === 79910 && record.sourceTriangles === 79910 && record.targetTriangles === record.actualTriangles)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "NakajimaKi4" && record.sourceTriangles === 244695 && record.actualTriangles === 177815 && record.targetTriangles === 180000)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Type89MediumTank" && record.sourceTriangles === type89Contract.sourceTrianglesBeforeExportCleanup && record.selectedGameSourceTriangles === type89Contract.selectedGameSourceTrianglesBeforeCleanup && record.actualTriangles === type89Contract.runtimeRenderedTriangles && record.targetTriangles === type89Contract.runtimeTriangleTarget)
-  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "KawasakiType88" && record.sourceTriangles === 237875 && record.actualTriangles === 79649 && record.targetTriangles === 80000)
+  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "KawasakiType88" && record.sourceTriangles === 266946 && record.actualTriangles === 79944 && record.targetTriangles === 80000)
   && EXTERNAL_GLB_STANDARDS.every((record) => record.actualTriangles > 0 && record.targetTriangles > 0),
   "外部 GLB 分类登记既有资产、独立布料测试三件、飞机战车及汉阳造173R，共 68 项");
 

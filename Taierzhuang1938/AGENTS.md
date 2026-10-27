@@ -20,7 +20,7 @@
 
 - **独立布料模拟测试场（2026-10-24）**：选章「测试场景」新增 `?cloth=1`，展示冬瓜厚棉被、进门棉门帘、川军出川锦旗与细棉/绸/帆/羊毛四样片；九档预设、同风力对比、十项参数、披覆/提角/松手/推帘/阵风、暂停单步与参数导出。`Data_Tuning_ClothRange` 只管本场，私有 `BlanketClothRig` / 几何 / 材质实例；旧布料默认配置和单被资产不变。三件新封闭壳 GLB 在 `Model/ClothLab/`，源工程在 OneDrive。没有自碰撞和棉絮体积压缩，不以厚壳代称完整厚织物求解。口径 [布料测试场](docs/Data_ClothRange.md)，门禁 `ClothRangeTest` / `ClothRangeBrowserTest`。
 
-- **八八式侦察机二型参考重建（2026-10-23）**：独立 `Model/KawasakiType88/`，可编辑高源、PBR 游戏派生、真实舵面与上下副翼推杆；原工程在 OneDrive，重建走 `_blender/Script_RebuildKawasakiType88.mjs`。`campaignEnabled:false`，登记资产不自动替换正片编队。馆藏模型的编号、外观与隐蔽结构按参考复原标注，内田中队八八／九四异记保留。来源、契约及验收见[八八式资产说明](Model/KawasakiType88/Data_KawasakiType88.md)。
+- **八八式侦察机二型 Release86（2026-10-28 获准配置收尾）**：独立 `Model/KawasakiType88/`，游戏版 79,944 三角、52 glTF 网格、28 材质、53 张无损内嵌 PBR 图；保留真实舵面与上下副翼推杆。266,946 三角高源和游戏源工程在 OneDrive 的 `KawasakiType88/Release86/`，重建走 `_blender/Script_RebuildKawasakiType88.mjs`，作者 UV 与 AO 图集记录随仓库交付。源与实际导出均通过十轴机构检查。`campaignEnabled:false`，登记资产不自动替换正片编队。馆藏模型的编号、外观与隐蔽结构按参考复原标注，内田中队八八／九四异记保留；窄反光带仍有差异。来源、契约及验收见[八八式资产说明](Model/KawasakiType88/Data_KawasakiType88.md)。
 
 - **第一人称下半身与持枪移动检查（2026-10-22/23）**：第一人称身体站着转视角腿不动（50° 死区后挪步转身）、走路按距离踩步、着地脚锁地 + 两节骨骼 IK（`Script_FirstPersonGait` + `Data_Tuning_FirstPersonBody`，见 [第一人称身体与持枪](docs/Data_FirstPersonEmbodiment.md)「下半身」）；高级工具 → 武器 → 「第一人称持枪移动检查」是玩法照跑的外部机位叠加层，看腿脚、胯 / 上身朝向、枪手真实位置并实测着地脚滑动（见 [编辑器套件](docs/Data_EditorSuite.md)）。10-28：快转视角脚尖与胯差 ≤ 35°、两脚不交叉；玩家影子由只进阴影图的整身替身投（`Script_FirstPersonShadow`），视模的枪不投世界影子；汉阳造 173R 开镜眼距 0.48 m（右手不再被近裁面切开）。
 

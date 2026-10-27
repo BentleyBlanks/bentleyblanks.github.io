@@ -1,74 +1,74 @@
 {
   "version": "20261023LosslessWebp01",
   "output": "Model_KawasakiType88.glb",
-  "inputSha256": "612c6f0d72fb0b5b57c2521ed8aa8ed6ef0ecb380123ff600c2ca78ee518c324",
-  "outputSha256": "84a5bd30b17ed728c18e8a48089af255e21f392700e0036f49571412092918fe",
-  "inputBytes": 17220680,
-  "outputBytes": 12397704,
+  "inputSha256": "9f595867afd71c28160d1072ba5c9aac18973d6ddbab8b09378787a095f6aa6c",
+  "outputSha256": "c198fc645342a9aee26f43451e5b3d04f40a014fab75a32df07c56ee53bd2a98",
+  "inputBytes": 20901456,
+  "outputBytes": 15108896,
   "nodesPreserved": true,
   "meshesPreserved": true,
   "accessorsPreserved": true,
-  "nonImageBufferViewsPreserved": 292,
-  "imageCount": 34,
+  "nonImageBufferViewsPreserved": 387,
+  "imageCount": 53,
   "images": [
     {
       "index": 0,
-      "name": "Texture_Type88SteelNormal",
+      "name": "Texture_Type88AluminumNormal",
       "size": [
         512,
         512
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "48557c7d022387c7d0fb891edab8f60a1b404935fc83eee83be281ab3551ad9f",
-      "decodedPixelsSha256": "48557c7d022387c7d0fb891edab8f60a1b404935fc83eee83be281ab3551ad9f",
-      "sourceBytes": 94437,
-      "webpBytes": 53626,
+      "sourcePixelsSha256": "7ab3dd59cb061798a9489df64dc52bb441bc18455498e43230ff6d62b2d75d3b",
+      "decodedPixelsSha256": "7ab3dd59cb061798a9489df64dc52bb441bc18455498e43230ff6d62b2d75d3b",
+      "sourceBytes": 21009,
+      "webpBytes": 11624,
       "pixelExact": true
     },
     {
       "index": 1,
-      "name": "Texture_Type88AssemblyAo",
+      "name": "Texture_Type88GameAssemblyAo",
       "size": [
         2048,
         2048
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "050d5614949a6831e38b9b640e774c80f0f24822324019b6daab7447ca9eb86f",
-      "decodedPixelsSha256": "050d5614949a6831e38b9b640e774c80f0f24822324019b6daab7447ca9eb86f",
-      "sourceBytes": 3021187,
-      "webpBytes": 1462428,
+      "sourcePixelsSha256": "8e4a5b1b2503706beb7696e4443a8d232982072c03d6e3e91653c70c1409687d",
+      "decodedPixelsSha256": "8e4a5b1b2503706beb7696e4443a8d232982072c03d6e3e91653c70c1409687d",
+      "sourceBytes": 2102037,
+      "webpBytes": 989976,
       "pixelExact": true
     },
     {
       "index": 2,
-      "name": "Texture_Type88SteelBase",
+      "name": "Texture_Type88AluminumBase",
       "size": [
         1024,
         1024
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "04207d093b8d07d748af6cc9e1f9db1769057914cf93301f1e893772088caa79",
-      "decodedPixelsSha256": "04207d093b8d07d748af6cc9e1f9db1769057914cf93301f1e893772088caa79",
-      "sourceBytes": 116716,
-      "webpBytes": 64190,
+      "sourcePixelsSha256": "9ced37bdfe5a77b431c1a79005b6a684aacc3650393c575d769f27cdb3059754",
+      "decodedPixelsSha256": "9ced37bdfe5a77b431c1a79005b6a684aacc3650393c575d769f27cdb3059754",
+      "sourceBytes": 384203,
+      "webpBytes": 294778,
       "pixelExact": true
     },
     {
       "index": 3,
-      "name": "Texture_Type88SteelOrm",
+      "name": "Texture_Type88AluminumOrm",
       "size": [
         1024,
         1024
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "699f8a5d141035f04bb2c3ecdfec6b4c7f3d3efba883a4991e4ca34b90bfed14",
-      "decodedPixelsSha256": "699f8a5d141035f04bb2c3ecdfec6b4c7f3d3efba883a4991e4ca34b90bfed14",
-      "sourceBytes": 296406,
-      "webpBytes": 204200,
+      "sourcePixelsSha256": "54bae0f9cea9fa402c8ff13c0a4641203d64f31efa228294c6058a2979ea709f",
+      "decodedPixelsSha256": "54bae0f9cea9fa402c8ff13c0a4641203d64f31efa228294c6058a2979ea709f",
+      "sourceBytes": 415798,
+      "webpBytes": 269364,
       "pixelExact": true
     },
     {
@@ -95,10 +95,10 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "b10013b3dc47bdb86bb3a1bb96d05c203794fa3aa8109fe4c2404933931d8b94",
-      "decodedPixelsSha256": "b10013b3dc47bdb86bb3a1bb96d05c203794fa3aa8109fe4c2404933931d8b94",
-      "sourceBytes": 512648,
-      "webpBytes": 362470,
+      "sourcePixelsSha256": "131d667b9f40c990f3114f9aebe3a9e1edfcb88db10dccfb818397d20b6198ad",
+      "decodedPixelsSha256": "131d667b9f40c990f3114f9aebe3a9e1edfcb88db10dccfb818397d20b6198ad",
+      "sourceBytes": 588375,
+      "webpBytes": 431028,
       "pixelExact": true
     },
     {
@@ -110,10 +110,10 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "5460fbb191e6dc5527b65bec4772a568ba13fa0427418b5801dab35b7c1f6883",
-      "decodedPixelsSha256": "5460fbb191e6dc5527b65bec4772a568ba13fa0427418b5801dab35b7c1f6883",
-      "sourceBytes": 488267,
-      "webpBytes": 330676,
+      "sourcePixelsSha256": "f33c8b865bfe67d455cab00861f22c49acfed68dd1241490f18ccabf52e7d1d9",
+      "decodedPixelsSha256": "f33c8b865bfe67d455cab00861f22c49acfed68dd1241490f18ccabf52e7d1d9",
+      "sourceBytes": 323248,
+      "webpBytes": 198824,
       "pixelExact": true
     },
     {
@@ -148,6 +148,21 @@
     },
     {
       "index": 9,
+      "name": "Texture_Type88LowerWingFabricBase",
+      "size": [
+        4096,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "865a5b86c9097833c50bae138f874ef27ed00226a672bd8752e44655a1df235a",
+      "decodedPixelsSha256": "865a5b86c9097833c50bae138f874ef27ed00226a672bd8752e44655a1df235a",
+      "sourceBytes": 475169,
+      "webpBytes": 322184,
+      "pixelExact": true
+    },
+    {
+      "index": 10,
       "name": "Texture_Type88LowerUndersideBase",
       "size": [
         4096,
@@ -155,14 +170,14 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "0e1d35562c06e4c25b1368b8fd5a295f151b64168cdd21fef7b9c0ce6f01230c",
-      "decodedPixelsSha256": "0e1d35562c06e4c25b1368b8fd5a295f151b64168cdd21fef7b9c0ce6f01230c",
-      "sourceBytes": 518246,
-      "webpBytes": 368578,
+      "sourcePixelsSha256": "6c2e45ec3cf1cc997a7f95d168662fe010c5d7f12198cf34cb8f562b788e5d9a",
+      "decodedPixelsSha256": "6c2e45ec3cf1cc997a7f95d168662fe010c5d7f12198cf34cb8f562b788e5d9a",
+      "sourceBytes": 516233,
+      "webpBytes": 369012,
       "pixelExact": true
     },
     {
-      "index": 10,
+      "index": 11,
       "name": "Texture_Type88LowerUndersideOrm",
       "size": [
         4096,
@@ -170,14 +185,14 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "b27a65934993b93943b35cb7b503f6722395fba043ddcd6894a9cd9eff33085d",
-      "decodedPixelsSha256": "b27a65934993b93943b35cb7b503f6722395fba043ddcd6894a9cd9eff33085d",
-      "sourceBytes": 488112,
-      "webpBytes": 330156,
+      "sourcePixelsSha256": "515f7f0a3cb0a185169d3a3ab212a9ad1ceb036d753301fe3d3d540517cc3c79",
+      "decodedPixelsSha256": "515f7f0a3cb0a185169d3a3ab212a9ad1ceb036d753301fe3d3d540517cc3c79",
+      "sourceBytes": 487770,
+      "webpBytes": 330664,
       "pixelExact": true
     },
     {
-      "index": 11,
+      "index": 12,
       "name": "Texture_Type88FuselageBase",
       "size": [
         4096,
@@ -185,14 +200,14 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "1dc4b5f81bf283d7d70908995c6aac186b641170775db56255841a9eafb59f64",
-      "decodedPixelsSha256": "1dc4b5f81bf283d7d70908995c6aac186b641170775db56255841a9eafb59f64",
-      "sourceBytes": 553969,
-      "webpBytes": 403370,
+      "sourcePixelsSha256": "37354a9f06a96d58124619a861ffa9c162ad7a4a45f1d87c938cc4eac070e387",
+      "decodedPixelsSha256": "37354a9f06a96d58124619a861ffa9c162ad7a4a45f1d87c938cc4eac070e387",
+      "sourceBytes": 522981,
+      "webpBytes": 352996,
       "pixelExact": true
     },
     {
-      "index": 12,
+      "index": 13,
       "name": "Texture_Type88FuselageOrm",
       "size": [
         4096,
@@ -200,59 +215,59 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "4740a08ce1cc51051861cc989d1e4105402ef8137027ec37fe74108df3bad0a8",
-      "decodedPixelsSha256": "4740a08ce1cc51051861cc989d1e4105402ef8137027ec37fe74108df3bad0a8",
-      "sourceBytes": 419442,
-      "webpBytes": 268904,
+      "sourcePixelsSha256": "7b74a61774e64d2d799146adf5c01ebcc5abdfbfe2a0c592f0ac3a61bcd59d57",
+      "decodedPixelsSha256": "7b74a61774e64d2d799146adf5c01ebcc5abdfbfe2a0c592f0ac3a61bcd59d57",
+      "sourceBytes": 421301,
+      "webpBytes": 270194,
       "pixelExact": true
     },
     {
-      "index": 13,
-      "name": "Texture_Type88AluminumNormal",
+      "index": 14,
+      "name": "Texture_Type88CockpitLiningBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "2012808af5df413e7e62c87355046bb292a60260163aa7b21e0a74a3c59008ce",
+      "decodedPixelsSha256": "2012808af5df413e7e62c87355046bb292a60260163aa7b21e0a74a3c59008ce",
+      "sourceBytes": 230199,
+      "webpBytes": 143470,
+      "pixelExact": true
+    },
+    {
+      "index": 15,
+      "name": "Texture_Type88CockpitLiningOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "878482555ccf11dfcf51a1c64abd5de4f7c18a94d18ef0aa29f59b697f2b826b",
+      "decodedPixelsSha256": "878482555ccf11dfcf51a1c64abd5de4f7c18a94d18ef0aa29f59b697f2b826b",
+      "sourceBytes": 286921,
+      "webpBytes": 194108,
+      "pixelExact": true
+    },
+    {
+      "index": 16,
+      "name": "Texture_Type88SteelNormal",
       "size": [
         512,
         512
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "7ab3dd59cb061798a9489df64dc52bb441bc18455498e43230ff6d62b2d75d3b",
-      "decodedPixelsSha256": "7ab3dd59cb061798a9489df64dc52bb441bc18455498e43230ff6d62b2d75d3b",
-      "sourceBytes": 21009,
-      "webpBytes": 11624,
+      "sourcePixelsSha256": "48557c7d022387c7d0fb891edab8f60a1b404935fc83eee83be281ab3551ad9f",
+      "decodedPixelsSha256": "48557c7d022387c7d0fb891edab8f60a1b404935fc83eee83be281ab3551ad9f",
+      "sourceBytes": 94437,
+      "webpBytes": 53626,
       "pixelExact": true
     },
     {
-      "index": 14,
-      "name": "Texture_Type88AluminumBase",
-      "size": [
-        1024,
-        1024
-      ],
-      "mode": "RGB",
-      "sourceMime": "image/png",
-      "sourcePixelsSha256": "9ced37bdfe5a77b431c1a79005b6a684aacc3650393c575d769f27cdb3059754",
-      "decodedPixelsSha256": "9ced37bdfe5a77b431c1a79005b6a684aacc3650393c575d769f27cdb3059754",
-      "sourceBytes": 384203,
-      "webpBytes": 294778,
-      "pixelExact": true
-    },
-    {
-      "index": 15,
-      "name": "Texture_Type88AluminumOrm",
-      "size": [
-        1024,
-        1024
-      ],
-      "mode": "RGB",
-      "sourceMime": "image/png",
-      "sourcePixelsSha256": "54bae0f9cea9fa402c8ff13c0a4641203d64f31efa228294c6058a2979ea709f",
-      "decodedPixelsSha256": "54bae0f9cea9fa402c8ff13c0a4641203d64f31efa228294c6058a2979ea709f",
-      "sourceBytes": 415798,
-      "webpBytes": 269364,
-      "pixelExact": true
-    },
-    {
-      "index": 16,
+      "index": 17,
       "name": "Texture_Type88CockpitBase",
       "size": [
         1024,
@@ -260,14 +275,14 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "7288024c1f126d5da8aa2b67904d8b8c09ab8e8139255a5448a2cb9183e162be",
-      "decodedPixelsSha256": "7288024c1f126d5da8aa2b67904d8b8c09ab8e8139255a5448a2cb9183e162be",
-      "sourceBytes": 189565,
-      "webpBytes": 135470,
+      "sourcePixelsSha256": "e8139feca060a0acd6375d7314b369fadcc92c56f44d25022fac7ed97586196f",
+      "decodedPixelsSha256": "e8139feca060a0acd6375d7314b369fadcc92c56f44d25022fac7ed97586196f",
+      "sourceBytes": 437498,
+      "webpBytes": 303278,
       "pixelExact": true
     },
     {
-      "index": 17,
+      "index": 18,
       "name": "Texture_Type88CockpitOrm",
       "size": [
         1024,
@@ -282,7 +297,157 @@
       "pixelExact": true
     },
     {
-      "index": 18,
+      "index": 19,
+      "name": "Texture_Type88CockpitObserverWallBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "c9285fc8578c2c764552de9b33cf36f1a6865533f1ea05befe8539f5359eb44a",
+      "decodedPixelsSha256": "c9285fc8578c2c764552de9b33cf36f1a6865533f1ea05befe8539f5359eb44a",
+      "sourceBytes": 137591,
+      "webpBytes": 95744,
+      "pixelExact": true
+    },
+    {
+      "index": 20,
+      "name": "Texture_Type88CockpitObserverWallOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "34a8618f5d2cebcd68c9288fc6c77e5323c3296e6d4925fc43f71e1f4b6a6c92",
+      "decodedPixelsSha256": "34a8618f5d2cebcd68c9288fc6c77e5323c3296e6d4925fc43f71e1f4b6a6c92",
+      "sourceBytes": 126932,
+      "webpBytes": 88478,
+      "pixelExact": true
+    },
+    {
+      "index": 21,
+      "name": "Texture_Type88CockpitObserverRimBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "530e374d36ea78e6bfd1ec44d648ddc9c88a69460115d52ff4eb4f2c8ef12acf",
+      "decodedPixelsSha256": "530e374d36ea78e6bfd1ec44d648ddc9c88a69460115d52ff4eb4f2c8ef12acf",
+      "sourceBytes": 309440,
+      "webpBytes": 247644,
+      "pixelExact": true
+    },
+    {
+      "index": 22,
+      "name": "Texture_Type88CockpitObserverRimOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "37f4370ee9ad6aa43636ed1e4719eb75993ee19acdd0a6eb880c8d21587cf4e9",
+      "decodedPixelsSha256": "37f4370ee9ad6aa43636ed1e4719eb75993ee19acdd0a6eb880c8d21587cf4e9",
+      "sourceBytes": 306013,
+      "webpBytes": 204784,
+      "pixelExact": true
+    },
+    {
+      "index": 23,
+      "name": "Texture_Type88CockpitPilotBeltBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "f19ae4ab67423f5154d35347905ab1c3c1f5509e7d641ba34a636e6b6a2b7925",
+      "decodedPixelsSha256": "f19ae4ab67423f5154d35347905ab1c3c1f5509e7d641ba34a636e6b6a2b7925",
+      "sourceBytes": 135453,
+      "webpBytes": 85164,
+      "pixelExact": true
+    },
+    {
+      "index": 24,
+      "name": "Texture_Type88CockpitPilotBeltOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "ff2896a0dbf70c06f9744f3cc8c52bded3f60505049cd3df55cb92df6ba2836d",
+      "decodedPixelsSha256": "ff2896a0dbf70c06f9744f3cc8c52bded3f60505049cd3df55cb92df6ba2836d",
+      "sourceBytes": 121760,
+      "webpBytes": 83270,
+      "pixelExact": true
+    },
+    {
+      "index": 25,
+      "name": "Texture_Type88CockpitPilotFrameBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "299b79c646883f146042787920d0f4f0f8a455303630bb2c587e9ce2917add3d",
+      "decodedPixelsSha256": "299b79c646883f146042787920d0f4f0f8a455303630bb2c587e9ce2917add3d",
+      "sourceBytes": 116433,
+      "webpBytes": 70848,
+      "pixelExact": true
+    },
+    {
+      "index": 26,
+      "name": "Texture_Type88CockpitPilotFrameOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "499fe49857da83796e1f531afe0b82de7d9a33e49c60ad16325b5be98f3d4b82",
+      "decodedPixelsSha256": "499fe49857da83796e1f531afe0b82de7d9a33e49c60ad16325b5be98f3d4b82",
+      "sourceBytes": 126862,
+      "webpBytes": 88024,
+      "pixelExact": true
+    },
+    {
+      "index": 27,
+      "name": "Texture_Type88CowlingJointBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "310448a959d3ab6d983a244b828bead0c892d1e2e9daa029adc74b89d97eda76",
+      "decodedPixelsSha256": "310448a959d3ab6d983a244b828bead0c892d1e2e9daa029adc74b89d97eda76",
+      "sourceBytes": 119520,
+      "webpBytes": 71798,
+      "pixelExact": true
+    },
+    {
+      "index": 28,
+      "name": "Texture_Type88CowlingJointOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "5b2e83e331876c7a79f98673e55decfaf32b2703392e2e33049782c890b20dc4",
+      "decodedPixelsSha256": "5b2e83e331876c7a79f98673e55decfaf32b2703392e2e33049782c890b20dc4",
+      "sourceBytes": 127833,
+      "webpBytes": 88724,
+      "pixelExact": true
+    },
+    {
+      "index": 29,
       "name": "Texture_Type88ExhaustNormal",
       "size": [
         512,
@@ -297,7 +462,7 @@
       "pixelExact": true
     },
     {
-      "index": 19,
+      "index": 30,
       "name": "Texture_Type88ExhaustBase",
       "size": [
         1024,
@@ -305,14 +470,14 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "f177935bd1331134e1e98ca0fb72998dbd3e87a6cdbb3aedd6edb6ecbd3908b6",
-      "decodedPixelsSha256": "f177935bd1331134e1e98ca0fb72998dbd3e87a6cdbb3aedd6edb6ecbd3908b6",
-      "sourceBytes": 240820,
-      "webpBytes": 165406,
+      "sourcePixelsSha256": "76a038d36d1741674cdf6acde9c1ab80a14a937f1c3f0223f24db5e51b4aa53a",
+      "decodedPixelsSha256": "76a038d36d1741674cdf6acde9c1ab80a14a937f1c3f0223f24db5e51b4aa53a",
+      "sourceBytes": 687900,
+      "webpBytes": 476882,
       "pixelExact": true
     },
     {
-      "index": 20,
+      "index": 31,
       "name": "Texture_Type88ExhaustOrm",
       "size": [
         1024,
@@ -320,14 +485,14 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "ced4f00d138016b23173aceaee41668d429f116db63dfca7469b1391d2b18ed2",
-      "decodedPixelsSha256": "ced4f00d138016b23173aceaee41668d429f116db63dfca7469b1391d2b18ed2",
-      "sourceBytes": 685941,
-      "webpBytes": 515668,
+      "sourcePixelsSha256": "6d64dc6d0a77b134f7704e14a7375fb2257168673aa5ddc486232277c4f49c37",
+      "decodedPixelsSha256": "6d64dc6d0a77b134f7704e14a7375fb2257168673aa5ddc486232277c4f49c37",
+      "sourceBytes": 606126,
+      "webpBytes": 470418,
       "pixelExact": true
     },
     {
-      "index": 21,
+      "index": 32,
       "name": "Texture_Type88LeatherNormal",
       "size": [
         512,
@@ -342,7 +507,7 @@
       "pixelExact": true
     },
     {
-      "index": 22,
+      "index": 33,
       "name": "Texture_Type88LeatherBase",
       "size": [
         1024,
@@ -357,7 +522,7 @@
       "pixelExact": true
     },
     {
-      "index": 23,
+      "index": 34,
       "name": "Texture_Type88LeatherOrm",
       "size": [
         1024,
@@ -372,7 +537,7 @@
       "pixelExact": true
     },
     {
-      "index": 24,
+      "index": 35,
       "name": "Texture_Type88RubberNormal",
       "size": [
         512,
@@ -387,7 +552,7 @@
       "pixelExact": true
     },
     {
-      "index": 25,
+      "index": 36,
       "name": "Texture_Type88RubberBase",
       "size": [
         1024,
@@ -402,7 +567,7 @@
       "pixelExact": true
     },
     {
-      "index": 26,
+      "index": 37,
       "name": "Texture_Type88RubberOrm",
       "size": [
         1024,
@@ -417,7 +582,97 @@
       "pixelExact": true
     },
     {
-      "index": 27,
+      "index": 38,
+      "name": "Texture_Type88SteelBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "04207d093b8d07d748af6cc9e1f9db1769057914cf93301f1e893772088caa79",
+      "decodedPixelsSha256": "04207d093b8d07d748af6cc9e1f9db1769057914cf93301f1e893772088caa79",
+      "sourceBytes": 116716,
+      "webpBytes": 64190,
+      "pixelExact": true
+    },
+    {
+      "index": 39,
+      "name": "Texture_Type88SteelOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "699f8a5d141035f04bb2c3ecdfec6b4c7f3d3efba883a4991e4ca34b90bfed14",
+      "decodedPixelsSha256": "699f8a5d141035f04bb2c3ecdfec6b4c7f3d3efba883a4991e4ca34b90bfed14",
+      "sourceBytes": 296406,
+      "webpBytes": 204200,
+      "pixelExact": true
+    },
+    {
+      "index": 40,
+      "name": "Texture_Type88CockpitPilotWallBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "fc1ec4db49a7acffb44dd49ae99751710dfc2040d5bd635bb1c5b48bca97a1b5",
+      "decodedPixelsSha256": "fc1ec4db49a7acffb44dd49ae99751710dfc2040d5bd635bb1c5b48bca97a1b5",
+      "sourceBytes": 144840,
+      "webpBytes": 101752,
+      "pixelExact": true
+    },
+    {
+      "index": 41,
+      "name": "Texture_Type88CockpitPilotWallOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "91028556642fb8bc3820f8b6f14ec4ef81d47840e3a96a288cbf5e30f4db2381",
+      "decodedPixelsSha256": "91028556642fb8bc3820f8b6f14ec4ef81d47840e3a96a288cbf5e30f4db2381",
+      "sourceBytes": 127678,
+      "webpBytes": 88394,
+      "pixelExact": true
+    },
+    {
+      "index": 42,
+      "name": "Texture_Type88CockpitPilotRimBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "f11118bb086520e66ea64af430a6ce8247cd34a04f626bc4fddfe5c8bacac835",
+      "decodedPixelsSha256": "f11118bb086520e66ea64af430a6ce8247cd34a04f626bc4fddfe5c8bacac835",
+      "sourceBytes": 424923,
+      "webpBytes": 277332,
+      "pixelExact": true
+    },
+    {
+      "index": 43,
+      "name": "Texture_Type88CockpitPilotRimOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "bc70d3b63e2677e3400b8dd6bc3d44e328520c03b4091cc2903a14b47c252934",
+      "decodedPixelsSha256": "bc70d3b63e2677e3400b8dd6bc3d44e328520c03b4091cc2903a14b47c252934",
+      "sourceBytes": 129188,
+      "webpBytes": 89574,
+      "pixelExact": true
+    },
+    {
+      "index": 44,
       "name": "Texture_Type88WoodNormal",
       "size": [
         512,
@@ -432,7 +687,7 @@
       "pixelExact": true
     },
     {
-      "index": 28,
+      "index": 45,
       "name": "Texture_Type88WoodBase",
       "size": [
         1024,
@@ -447,7 +702,7 @@
       "pixelExact": true
     },
     {
-      "index": 29,
+      "index": 46,
       "name": "Texture_Type88WoodOrm",
       "size": [
         1024,
@@ -462,7 +717,7 @@
       "pixelExact": true
     },
     {
-      "index": 30,
+      "index": 47,
       "name": "Texture_Type88FinBase",
       "size": [
         2048,
@@ -477,7 +732,7 @@
       "pixelExact": true
     },
     {
-      "index": 31,
+      "index": 48,
       "name": "Texture_Type88FinOrm",
       "size": [
         2048,
@@ -492,7 +747,7 @@
       "pixelExact": true
     },
     {
-      "index": 32,
+      "index": 49,
       "name": "Texture_Type88FabricPlainBase",
       "size": [
         1024,
@@ -500,14 +755,14 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "4c22a013eeb1adf4b9722d0307b47c1a62ba72479c1784fd0a244bcaff990738",
-      "decodedPixelsSha256": "4c22a013eeb1adf4b9722d0307b47c1a62ba72479c1784fd0a244bcaff990738",
-      "sourceBytes": 446968,
-      "webpBytes": 314736,
+      "sourcePixelsSha256": "4c0436d3559dda013ae2549c5faebd12c1bdaa6a17d4204add0937727bb29cbd",
+      "decodedPixelsSha256": "4c0436d3559dda013ae2549c5faebd12c1bdaa6a17d4204add0937727bb29cbd",
+      "sourceBytes": 151422,
+      "webpBytes": 99606,
       "pixelExact": true
     },
     {
-      "index": 33,
+      "index": 50,
       "name": "Texture_Type88FabricPlainOrm",
       "size": [
         1024,
@@ -515,10 +770,40 @@
       ],
       "mode": "RGB",
       "sourceMime": "image/png",
-      "sourcePixelsSha256": "094b5b6f84ff2679d0e0e9dfeb3e833440671c05dcd0148c060eecc682388139",
-      "decodedPixelsSha256": "094b5b6f84ff2679d0e0e9dfeb3e833440671c05dcd0148c060eecc682388139",
-      "sourceBytes": 287683,
-      "webpBytes": 193964,
+      "sourcePixelsSha256": "ff6e1dbf5e0486126ecbdc24c9def50d93ea7b72d880d83fee9462846860848f",
+      "decodedPixelsSha256": "ff6e1dbf5e0486126ecbdc24c9def50d93ea7b72d880d83fee9462846860848f",
+      "sourceBytes": 122506,
+      "webpBytes": 83962,
+      "pixelExact": true
+    },
+    {
+      "index": 51,
+      "name": "Texture_Type88LowerHousingBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "3f96dea54b2ffa541a0a0c5914344086960a18052c66ee923311d93baeba1dd8",
+      "decodedPixelsSha256": "3f96dea54b2ffa541a0a0c5914344086960a18052c66ee923311d93baeba1dd8",
+      "sourceBytes": 510296,
+      "webpBytes": 383944,
+      "pixelExact": true
+    },
+    {
+      "index": 52,
+      "name": "Texture_Type88LowerHousingOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB",
+      "sourceMime": "image/png",
+      "sourcePixelsSha256": "b22b891de804683cfac1e643112f9638b458dcc06569482ca4b411af6a29f1da",
+      "decodedPixelsSha256": "b22b891de804683cfac1e643112f9638b458dcc06569482ca4b411af6a29f1da",
+      "sourceBytes": 426609,
+      "webpBytes": 276898,
       "pixelExact": true
     }
   ]

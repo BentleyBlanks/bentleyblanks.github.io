@@ -128,7 +128,12 @@ for (const material of g.materials) {
     Check(material.normalTexture.texCoord === 1, `${material.name} lost actual-scale detail UV1`);
     Check(material.pbrMetallicRoughness.baseColorTexture && material.pbrMetallicRoughness.metallicRoughnessTexture, `${material.name} lost base or metallic/roughness`);
   }
-  Check(material.occlusionTexture?.texCoord === 2, `${material.name} lost baked assembly AO UV2`);
+  if (material.name === "Material_Type88Glass") {
+    Check(!material.occlusionTexture && material.extensions?.KHR_materials_transmission?.transmissionFactor > 0,
+      "Transparent glass must retain transmission without opaque assembly AO");
+  } else {
+    Check(material.occlusionTexture?.texCoord === 2, `${material.name} lost baked assembly AO UV2`);
+  }
 }
 Check(normalMaterials === Asset.pbr.detailedMaterials, "Main physical materials lost PBR normal detail");
 const packing = JSON.parse(fs.readFileSync(path.join(path.dirname(file), "Data_KawasakiType88Packing.json"), "utf8"));

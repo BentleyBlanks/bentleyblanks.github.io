@@ -3,17 +3,17 @@
 export const KAWASAKI_TYPE88_ASSET = Object.freeze({
   id: "KawasakiType88",
   label: "八八式侦察机二型（参考复原）",
-  url: "./Model/KawasakiType88/Model_KawasakiType88.glb?v=20261024BalancedRudder20Surface11",
-  version: "20261024BalancedRudder20Surface11",
+  url: "./Model/KawasakiType88/Model_KawasakiType88.glb?v=20261027ReferenceGeometry86Surface44",
+  version: "20261027ReferenceGeometry86Surface44",
   campaignEnabled: false,
   metresPerUnit: 1,
   noseDir: Object.freeze({ x: 0, z: -1 }),
   fuselageMesh: "AirframeFacetedFuselage",
-  sourceTriangles: 237875,
-  triangles: 79649,
+  sourceTriangles: 266946,
+  triangles: 79944,
   triangleBudget: 80000,
-  pbr: Object.freeze({ images: 34, materials: 17, detailedMaterials: 14 }),
-  dimensionsM: Object.freeze({ wingspan: 15, length: 12.28, height: 3.38 }),
+  pbr: Object.freeze({ images: 53, materials: 28, detailedMaterials: 24 }),
+  dimensionsM: Object.freeze({ wingspan: 15, length: 12.51, height: 3.37945 }),
   wheelRadiusM: .47,
   // Fixed museum-reference fit, not a demonstrated original-aircraft design
   // angle and not an additional animated control.

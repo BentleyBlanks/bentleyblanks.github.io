@@ -1,0 +1,52 @@
+{
+  "schema": "tengxian-type88-photo-body-v1",
+  "source": "https://commons.wikimedia.org/wiki/File:Kawasaki_KDA-2_03_(1_20th_scale_model).png",
+  "sourceAuthor": "Motokoka",
+  "sourceImageLicense": "CC BY-SA 4.0",
+  "sideTaper": {
+    "lowerSideWidthFraction": 0.9,
+    "profileAftM": [
+      -1.6,
+      -0.9,
+      -0.3,
+      1.3
+    ],
+    "legacyLowerSideWidthFraction": 0.77,
+    "scope": "The photographed middle side panel is less tapered toward its lower edge. Blend from the retained0.77 fraction to0.90, then back along the declared aft profile. Upper roof, maximum width, height, cockpit openings and furniture remain. Lower chamfer and all four longeron seams follow the real section. Opposite side follows structural symmetry. Museum-photo reconstruction, not factory cross-section measurements; no photographic RGB or normal field."
+  },
+  "roofShoulder": {
+    "widthFraction": 0.58,
+    "transitionAftM": [
+      -1.1,
+      -0.4
+    ],
+    "rollOffsetM": 0.025,
+    "rollSegments": 6,
+    "radiusProfileAftM": [
+      -0.25,
+      0.5,
+      4.5,
+      4.9
+    ],
+    "scope": "Photo-inferred symmetric roof/chamfer junction narrowed from0.74to0.58withthe retained real25mm6segmentrolledshoulder and smooth longitudinalprofile. Complete bodytop/maxwidth/height/dimensions retained;coaming/lip/tubfollowactualTop(max2.38mmadjustment). Changed topology requires its own strictly recorded/restored UV2atlas and authored bodyUV0/detail,withfreshphysicalAO. All52PBRinputs and364comparisonlightingretain. Narrowbrightreflectionstillunmatched;notfactorysection or photographnormal/highlightfield."
+  },
+  "secondaryShoulder": {
+    "heightM": -0.008,
+    "radiusM": 0.004,
+    "profileAftM": [
+      0.55,
+      0.85,
+      2.9,
+      3.4
+    ],
+    "surfaceParameter": 0.08333333333333333,
+    "highBevelSegments": 6,
+    "gameBevelSegments": 3,
+    "gameCoamingRadialSamples": 8,
+    "gameShoulderAnglesDegrees": [
+      30,
+      330
+    ],
+    "scope": "One continuous symmetric recessed upper-chamfer junction inferred from museum appearance, not a factory section measurement. Existing roof,maxwidth,lowerhull and nominalextents held; Top and shell generation agree. Real4mmroundededge and physicalAO. Game32ring3/29samples explicitlyrepresent30/330degjunction withmatchingauthorUV; coaming8keeps79944totaltri. No photographicRGB/normal/highlight/shadowfield or paintstripe."
+  }
+}
