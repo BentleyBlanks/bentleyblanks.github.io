@@ -16,6 +16,9 @@ export const FIRST_PERSON_BODY = Object.freeze({
   // 转胯的追随速率（1/s，指数追）和最低角速度（度/秒，保证大角度时不拖太久）。
   idleTurnRate: 6,
   idleTurnMinDegS: 110,
+  // 原地转胯最快多少度/秒（2026-10-28）：脚一步一步挪得过来的速度；视线转得更快时胯被上身最大拧角拖着走，
+  // 多出来的那部分由「脚尖偏角上限」让着地的脚跟着胯原地拧过去（见 footTwistLimitDeg）。
+  idleTurnMaxDegS: 260,
   // 上身最多拧多少度（超过就拖着胯一起转），两节脊柱各分一半。
   maxTwistDeg: 85,
   twistSpine1: 0.45,
@@ -52,6 +55,9 @@ export const FIRST_PERSON_BODY = Object.freeze({
   turningDistM: 0.07,
   turningYawDeg: 14,
   settleSwingS: 0.3,
+  // 转身中的挪步更快（秒），一只脚落地后另一只隔多久能抬（秒）。
+  turningSwingS: 0.2,
+  turningMinPlantS: 0.04,
   settleLiftM: 0.055,
   // 一只脚落地后至少站多久另一只才能抬（原地挪步时），秒。
   settleMinPlantS: 0.09,
@@ -72,4 +78,10 @@ export const FIRST_PERSON_BODY = Object.freeze({
   // 膝盖朝脚尖方向外撇多少（度），两脚尖各外八多少度。
   kneeOutDeg: 8,
   toeOutDeg: 6,
+  // 防内八 / 撇脚 / 两腿拧在一起（2026-10-28，用户：视角转快了会内八、撇脚，甚至两个腿转在一起）：
+  // 着地的脚尖与胯朝向最多差这么多度。胯转得比脚挪得快时，超出的部分让着地的脚绕胯中心跟着拧（人快速转身时
+  // 就是踮着前脚掌碾过去的），脚尖不会被甩到朝里 / 朝外，两只脚的左右次序也不会倒。
+  footTwistLimitDeg: 35,
+  // 两只脚在胯的左右方向上至少隔多远（米，踝到踝）：着地的脚被挤得更近就推开；摆动的脚绕着支撑腿走，不从它身上穿过去。
+  minFootGapM: 0.13,
 });

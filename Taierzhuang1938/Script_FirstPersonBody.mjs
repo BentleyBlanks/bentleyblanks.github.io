@@ -107,10 +107,15 @@ export class FirstPersonBody {
       restQ.push(leg.foot.getWorldQuaternion(new THREE.Quaternion()));
     }
     pose("Crouch");
+    // 膝盖铰链轴（小腿局部）+ 「膝盖朝前」= sign·(铰链轴 × 腿轴) 的符号：腿伸直时膝盖偏移几乎为零、方向是噪声，
+    // 拿它去转大腿会让大腿绕自己乱滚（裤腿拧成麻花，看着像两条腿拧在一起）；铰链轴在直腿时照样确定。
     const hinge = bones.legs.map((leg) => {
       leg.thigh.getWorldPosition(_hip); leg.calf.getWorldPosition(_knee); leg.foot.getWorldPosition(_ankle);
-      const n = _va.subVectors(_hip, _knee).cross(_vb.subVectors(_ankle, _knee)).normalize();
-      return n.applyQuaternion(leg.calf.getWorldQuaternion(_qa).invert()).clone();
+      const n = _va.subVectors(_hip, _knee).cross(_vb.subVectors(_ankle, _knee)).normalize().clone();
+      const legAxis = _vc.subVectors(_ankle, _hip).normalize();
+      const offset = _vd.subVectors(_knee, _hip); offset.addScaledVector(legAxis, -offset.dot(legAxis));
+      const sign = Math.sign(_pole.crossVectors(n, legAxis).dot(offset)) || 1;
+      return { local: n.applyQuaternion(leg.calf.getWorldQuaternion(_qa).invert()).clone(), sign };
     });
     this.root.scale.setScalar(savedScale);
     pose("Idle");
@@ -168,12 +173,42 @@ export class FirstPersonBody {
         action.time = Frac(gait.phase + 0.25) * action.getClip().duration;
       } else action.setEffectiveTimeScale(name === "Run" ? 1.6 : name === "Walk" ? 1.1 : 1);
     }
+    // three 的 mixer 对常量轨道只写一次（见 memory three-mixer-constant-track-stale）：上一帧降胯 / 拧腰 / 腿 IK 改过的骨头
+    // 在采样前还原成 mixer 上一帧的输出，否则 Idle 这类常量轨道上改动会一帧一帧累加（实测原地快转时胯沉下去 0.6 m、膝盖折成 120°）。
+    this._RestoreMixerPose();
     this.mixer.update(dt);
+    this._SnapshotMixerPose();
     this.root.updateWorldMatrix(true, true);
     if (gait && this.legs) {
       // 片段给的胯高（降胯之前），下一帧给规划器判腿够不够得着
       this.hipHeight = this.legs.bones.legs[0].thigh.getWorldPosition(_hip).y - input.playerPosition.y;
       this._ApplyLowerBody(dt, prone);
+    }
+  }
+
+  /** 下半身层改动的骨头：骨盆位置、两节脊柱、两腿三节的旋转。 */
+  _LayerBones() {
+    if (this._layerBones !== undefined) return this._layerBones;
+    if (!this.legs) return (this._layerBones = null);
+    const { pelvis, spine1, spine2, legs } = this.legs.bones;
+    const list = [pelvis, spine1, spine2, ...legs.flatMap((leg) => [leg.thigh, leg.calf, leg.foot])];
+    this._layerBones = list.map((bone) => ({ bone, position: bone.position.clone(), quaternion: bone.quaternion.clone(), saved: false }));
+    return this._layerBones;
+  }
+
+  _SnapshotMixerPose() {
+    for (const entry of this._LayerBones() || []) {
+      entry.position.copy(entry.bone.position);
+      entry.quaternion.copy(entry.bone.quaternion);
+      entry.saved = true;
+    }
+  }
+
+  _RestoreMixerPose() {
+    for (const entry of this._LayerBones() || []) {
+      if (!entry.saved) continue;
+      entry.bone.position.copy(entry.position);
+      entry.bone.quaternion.copy(entry.quaternion);
     }
   }
 
@@ -242,25 +277,25 @@ export class FirstPersonBody {
     }
   }
 
-  _SolveLeg(leg, hingeLocal, target, forward, side) {
+  _SolveLeg(leg, hinge, target, forward, side) {
     leg.thigh.getWorldPosition(_hip); leg.calf.getWorldPosition(_knee); leg.foot.getWorldPosition(_ankle);
     const l1 = _hip.distanceTo(_knee), l2 = _knee.distanceTo(_ankle);
     const d = THREE.MathUtils.clamp(_hip.distanceTo(target), Math.abs(l1 - l2) + 1e-3, (l1 + l2) * 0.9995);
     // 膝角：余弦定理求目标内角，绕蹲姿量出的铰链轴把小腿转过去。
     const now = _va.subVectors(_hip, _knee).angleTo(_vb.subVectors(_ankle, _knee));
     const want = Math.acos(THREE.MathUtils.clamp((l1 * l1 + l2 * l2 - d * d) / (2 * l1 * l2), -1, 1));
-    _axis.copy(hingeLocal).applyQuaternion(leg.calf.getWorldQuaternion(_qa)).normalize();
+    _axis.copy(hinge.local).applyQuaternion(leg.calf.getWorldQuaternion(_qa)).normalize();
     RotateBoneWorld(leg.calf, _delta.setFromAxisAngle(_axis, want - now));
     // 整条腿对准目标。
     leg.foot.getWorldPosition(_ankle);
     _va.subVectors(_ankle, _hip).normalize();
     _vb.subVectors(target, _hip).normalize();
     RotateBoneWorld(leg.thigh, _delta.setFromUnitVectors(_va, _vb));
-    // 膝盖转向脚尖方向（略外撇）。
+    // 膝盖转向脚尖方向（略外撇）。膝盖现在朝哪由铰链轴算（直腿也确定），不读膝盖点的偏移。
     _pole.copy(forward).applyAxisAngle(UP, (side === 0 ? 1 : -1) * FIRST_PERSON_BODY.kneeOutDeg * Math.PI / 180);
-    leg.calf.getWorldPosition(_knee);
     const axis = _vb;
-    const kv = _vc.subVectors(_knee, _hip); kv.addScaledVector(axis, -kv.dot(axis));
+    _axis.copy(hinge.local).applyQuaternion(leg.calf.getWorldQuaternion(_qa)).normalize();
+    const kv = _vc.crossVectors(_axis, axis).multiplyScalar(hinge.sign); kv.addScaledVector(axis, -kv.dot(axis));
     _pole.addScaledVector(axis, -_pole.dot(axis));
     if (kv.lengthSq() < 1e-8 || _pole.lengthSq() < 1e-8) return;
     kv.normalize(); _pole.normalize();

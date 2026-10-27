@@ -131,6 +131,55 @@ Check("从坑底起步上陡坡（03-1 沟里实测的情形）：锁住的后�
   assert.ok(worst < leg.legReach + 0.08, `planted foot ${worst.toFixed(3)} m from the lowered hips (reach ${leg.legReach.toFixed(3)})`);
 });
 
+// 2026-10-28 用户：视角转快了会内八、撇脚，甚至两个腿转在一起。改前（同一组输入）：脚尖与胯差到 179°，两脚左右次序倒过来 0.3–1.1 m。
+function FastTurn({ yawRate, speed = 0, seconds, osc = 0 }) {
+  const gait = new FirstPersonGait(T, RIG);
+  const s = { x: 0, z: 0, yaw: 0 };
+  const Input = () => ({ playerX: s.x, playerY: 0, playerZ: s.z, anchorX: s.x + Math.sin(s.yaw) * 0.18, anchorZ: s.z + Math.cos(s.yaw) * 0.18,
+    aimYaw: s.yaw, grounded: true, crouch: 0, prone: 0, hipHeight: 0.873, legReach: 0.86, ankleHeight: 0.092 });
+  for (let i = 0; i < 30; i++) gait.Update(DT, Input());
+  let toe = 0, gap = Infinity, t = 0;
+  const frames = Math.round(seconds / DT);
+  for (let i = 0; i < frames + 90; i++) {
+    t += DT;
+    if (i < frames) {
+      s.yaw += (osc ? Math.cos(t * osc * 2 * Math.PI) : 1) * yawRate * DEG * DT;
+      s.x += -Math.sin(s.yaw) * speed * DT; s.z += -Math.cos(s.yaw) * speed * DT;
+    }
+    gait.Update(DT, Input());
+    // 左右次序沿「腿的朝向」量：站着 = 胯朝向，走动中 = 移动方向（见 FirstPersonGait._UpdateLegHeading）
+    const lx = -Math.cos(gait.legHeading), lz = Math.sin(gait.legHeading);
+    const [L, R] = gait.feet;
+    gap = Math.min(gap, (L.x - R.x) * lx + (L.z - R.z) * lz);
+    gait.feet.forEach((f, k) => {
+      if (f.planted) toe = Math.max(toe, Math.abs(WrapAngle(f.yaw - gait.lowerYaw - (k === 0 ? 1 : -1) * T.toeOutDeg * DEG)));
+    });
+  }
+  return { toe: toe / DEG, gap, settled: gait.feet.every((f) => f.planted) && Math.abs(gait.twist) < T.idleDeadzoneDeg * DEG };
+}
+for (const [label, spec] of [
+  ["站着 720°/s 甩半圈", { yawRate: 720, seconds: 0.5 }],
+  ["站着 360°/s 转一整圈", { yawRate: 360, seconds: 1 }],
+  ["站着左右来回甩 ±400°/s", { yawRate: 400, seconds: 2, osc: 2 }],
+  ["3.05 m/s 走着 300°/s 转", { yawRate: 300, speed: 3.05, seconds: 1.2 }],
+  ["5.25 m/s 冲刺 400°/s 转", { yawRate: 400, speed: 5.25, seconds: 1 }],
+  ["2.5 m/s 走着来回甩", { yawRate: 300, speed: 2.5, seconds: 2, osc: 1.5 }],
+]) {
+  Check(`快速转视角：${label}——着地脚尖与胯差 ≤ ${T.footTwistLimitDeg}°、两脚不交叉（左右至少隔 ${T.minFootGapM} m）、停下后站稳`, () => {
+    const r = FastTurn(spec);
+    assert.ok(r.toe <= T.footTwistLimitDeg + 0.5, `toe ${r.toe.toFixed(1)}°`);
+    assert.ok(r.gap >= T.minFootGapM - 1e-3, `gap ${r.gap.toFixed(3)} m`);
+    assert.ok(r.settled, "feet settle after the turn");
+  });
+}
+
+Check("直走、慢转（死区内）时不触发脚跟着胯拧 / 推开", () => {
+  const { gait, s, Step } = Sim();
+  for (let i = 0; i < 20; i++) Step();
+  for (let i = 0; i < 240; i++) { s.z -= 3.05 * DT; if (i < 40) s.yaw += 0.5 * DEG; Step(); }
+  assert.equal(gait.pivots, 0, `pivots ${gait.pivots}`);
+});
+
 Check("瞬移：脚直接落到新位置", () => {
   const { gait, s, Step } = Sim();
   for (let i = 0; i < 10; i++) Step();
