@@ -1,4 +1,4 @@
-// Fit the bare V48 donkey from its frozen V3 intermediate; preserve prior sources.
+// Fit the bare V49 donkey from its frozen V3 intermediate; preserve prior sources.
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';

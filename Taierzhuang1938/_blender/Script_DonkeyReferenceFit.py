@@ -711,7 +711,7 @@ def ApplyReferenceFit(scene,base):
     # The reference shows a staggered standing pose. Walk targets are centred
     # between the left/right feet instead of perpetuating that standing offset.
     scene['DonkeyReferenceFootCenters']=True
-    scene['DonkeyReferenceFitRevision']='20261027ReferenceV48'
+    scene['DonkeyReferenceFitRevision']='20261027ReferenceV49'
     scene['DonkeyReferenceBodyTuftLimit']=288
     scene['DonkeyReferencePaleFringe']=True
     scene['DonkeyReferenceForeSwingClearanceDeg']=2.5
@@ -796,6 +796,9 @@ def ApplyReferenceFit(scene,base):
     foreSilhouetteNamespace={};file=project/'_blender/Script_DonkeyForeSilhouette.py'
     exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),foreSilhouetteNamespace)
     details['foreSilhouette']=foreSilhouetteNamespace['FitForeSilhouette'](scene,skin)
+    hoofColumnsNamespace={};file=project/'_blender/Script_DonkeyHoofColumns.py'
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),hoofColumnsNamespace)
+    details['hoofColumns']=hoofColumnsNamespace['RoundHoofColumns'](scene,skin)
     details['nasalPad']=InstallNasalPad(skin);flowReport=RefreshFlow(skin,rig,collection)
     photoNamespace={}
     exec(compile((project/'_blender/Script_DonkeyPhotoDetail.py').read_text(encoding='utf-8'),'Script_DonkeyPhotoDetail.py','exec'),photoNamespace)
@@ -809,6 +812,9 @@ def ApplyReferenceFit(scene,base):
     chestPigmentNamespace={};file=project/'_blender/Script_DonkeyChestPigment.py'
     exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),chestPigmentNamespace)
     photoDetail['chestPigment']=chestPigmentNamespace['InstallChestPigment'](scene,skin,base)
+    hoofPigmentNamespace={};file=project/'_blender/Script_DonkeyHoofPigment.py'
+    exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),hoofPigmentNamespace)
+    photoDetail['hoofPigment']=hoofPigmentNamespace['InstallHoofPigment'](scene,skin,base)
     earNamespace={};file=project/'_blender/Script_DonkeyEarCoat.py'
     exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),earNamespace)
     photoDetail['earCoat']=earNamespace['InstallEarCoat'](scene,rig,base)

@@ -52,7 +52,8 @@ def AuthorGameUv(obj,label):
         if any(value.value==5 for value in groups.data):raise RuntimeError('Horn atlas reserve is occupied by legacy silhouette cards')
         # The obsolete silhouette reserve is unused by the independent groom.
         # Four continuous wall charts retain the original leg atlas allocation.
-        for foot in range(4):rectangles[12+foot]=(.809+(foot%2)*.095,.801+(foot//2)*.094,.086,.085)
+        for foot in range(4):
+            rectangles[12+foot]=(.809,.801+foot*.047,.180,.041) if bpy.context.scene.get('DonkeyReferenceBalancedHornCharts') else (.809+(foot%2)*.095,.801+(foot//2)*.094,.086,.085)
     if label=='Animal' and bpy.context.scene.get('DonkeyMuzzleRevision'):
         if any(value.value in (2,3) for value in groups.data):raise RuntimeError('Bare muzzle atlas reserve overlaps tack charts')
         rectangles[6]=(.805,.203,.190,.386)
