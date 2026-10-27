@@ -133,6 +133,14 @@ Check(missionChange.domains.includes("cutscene") && missionChange.domains.includ
 const bundleThrowDriverChange = InferDomains(["Taierzhuang1938/Script_FirstLevelBundleThrowDriver.mjs"]);
 Check(bundleThrowDriverChange.domains.includes("firstLevel"), "05 投弹驾驶模块映射 firstLevel");
 assert.deepEqual(bundleThrowDriverChange.unmatchedProjectFiles, []);
+// The full-body player shadow shares the first-person body and the shadow pass.
+const firstPersonShadowChange = InferDomains(["Taierzhuang1938/Script_FirstPersonShadow.mjs"]);
+Check(firstPersonShadowChange.domains.includes("combat") && firstPersonShadowChange.domains.includes("render"), "全身影子同时映射第一人称与渲染领域");
+Check(!firstPersonShadowChange.unmatchedProjectFiles.length && !firstPersonShadowChange.ignoredProjectFiles.length, "全身影子参与领域选测而不是忽略");
+const firstPersonShadowPrepush = ResolveSelection(ParseArgs(["--changed=origin/master", "--profile=prepush"]), firstPersonShadowChange.domains, firstPersonShadowChange);
+for (const gate of ["FirstPersonEmbodimentTest", "ShadowSkipTest", "MotionVectorContractTest"]) {
+  Check(firstPersonShadowPrepush.includes(gate), `全身影子改动推送前选中 ${gate}`);
+}
 const missionQuick = ResolveSelection(ParseArgs(["--changed=origin/master"]), missionChange.domains, missionChange);
 Check(missionQuick.includes("MissionSetpiecesTest"), "任务摆点编辑循环跑纯 Node 专项");
 const missionPrepush = ResolveSelection(ParseArgs(["--changed=origin/master", "--profile=prepush"]), missionChange.domains, missionChange);

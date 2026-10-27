@@ -950,6 +950,10 @@ const changedDomainRules = [
   {domain:"type89MediumTank",pattern:/Type89(?:MediumTank|Pbr|GlbCleanup|References|ImportAudit|SourceAudit|Package)/},
   {domain:"menu",pattern:/ToolsHome|Icon_TabSeal/},
   {domain:"combat",pattern:/FirstPersonGait/},
+  // The full-body player shadow follows the first-person body and participates
+  // in shadow rendering; changing it requires both domain suites.
+  {domain:"combat",pattern:/Script_FirstPersonShadow\.mjs$/},
+  {domain:"render",pattern:/Script_FirstPersonShadow\.mjs$/},
   { domain: "nakajimaKi4", pattern: /NakajimaKi4/ },
   { domain: "kawasakiType88", pattern: /KawasakiType88/ },
   { domain: "editor", pattern: /(?:Data_ToolsHome|Script_ToolsHomeField)\.mjs/ },

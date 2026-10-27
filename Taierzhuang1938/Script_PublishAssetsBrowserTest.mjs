@@ -25,7 +25,19 @@ if(!reportPath){
  await fs.cp(path.join(import.meta.dirname,'vendor'),path.join(fixtureStage,'vendor'),{recursive:true});
  const models=['Model/Model_MitsubishiKi30.glb','Model/Model_MitsubishiKi21Ia.glb','Model/Model_BreakableDeadTree.glb','Model/Model_Cigarette.glb','Model/HanYang173R/Model_HanYang173R.glb'];
  for(const file of models){await fs.mkdir(path.dirname(path.join(fixtureStage,file)),{recursive:true});await fs.copyFile(path.join(import.meta.dirname,file),path.join(fixtureStage,file));}
- await BuildPublishAssets(import.meta.dirname,fixtureStage,{cacheDir:path.join(root,'tmp/GpuPublish/Cache'),textureFiles:[],modelFiles:models,log:()=>{}});
+ // The stage contains only the five copied models. Limit both desktop and
+ // mobile conversion to that same fixture while still exercising ASTC output.
+ const fixtureReport=await BuildPublishAssets(import.meta.dirname,fixtureStage,{cacheDir:path.join(root,'tmp/GpuPublish/Cache'),textureFiles:[],modelFiles:models,mobileModelFiles:models,log:()=>{}});
+ assert.ok(fixtureReport.mobile,'fixture must run the mobile publishing pipeline');
+ assert.deepEqual(fixtureReport.mobile.models.map(row=>row.file).sort(),[...models].sort(),'mobile report contains exactly the copied fixture models');
+ assert.ok(fixtureReport.mobile.models.every(row=>row.images.length>0),'every fixture model converts at least one embedded mobile texture');
+ assert.ok(fixtureReport.mobile.skipped.every(row=>models.includes(row.file)),'mobile report does not scan models outside the fixture');
+ const mobileRuntime=JSON.parse((await fs.readFile(path.join(fixtureStage,'Data_MobileAssetRuntime.mjs'),'utf8')).match(/=\s*([\s\S]*);\s*$/)[1]);
+ assert.deepEqual(Object.keys(mobileRuntime.models).sort(),[...models].sort(),'mobile runtime matches the copied fixture models');
+ for(const row of fixtureReport.mobile.models){
+  assert.equal(mobileRuntime.models[row.file],row.output,'mobile runtime points to the reported output');
+  await fs.access(Within(fixtureStage,row.output));
+ }
  reportPath=path.join(fixtureStage,'Data_AssetPublishReport.json');
 }
 const report=JSON.parse(await fs.readFile(reportPath,'utf8')),stage=path.dirname(reportPath);
