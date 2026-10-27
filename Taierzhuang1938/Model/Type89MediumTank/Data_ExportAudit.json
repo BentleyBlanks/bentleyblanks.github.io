@@ -1,1897 +1,358 @@
 {
-  "schema": "Type89MediumTankExportAuditV5",
-  "reviewedAt": "2026-10-24T18:08:01.081025+00:00",
+  "schema": "Type89OptionalAssetReleaseV12",
   "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
-  "userApproved": false,
-  "geometryVersion": "20261024GeometryV32",
-  "materialRevision": "SurfaceV5",
-  "referenceReview": "Data_GeometryReviewV3.json",
+  "reviewedAt": "2026-10-27T20:41:50.254Z",
+  "geometryVersion": "20261027GeometryV54",
+  "materialRevision": "SurfaceV12",
   "runtime": {
     "file": "Model_Type89MediumTank.glb",
-    "sha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
-    "bytes": 30155884,
-    "sceneExpandedTriangles": 240278,
-    "meshNodes": 222,
-    "loadedPrimitiveMeshes": 276,
-    "materials": 8,
-    "images": 21,
-    "dimensionsXyzM": [
-      2.186000108718872,
-      2.5639407277669655,
-      5.701738713542861
-    ],
-    "nose": "-Z",
+    "sha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
+    "bytes": 88193864,
+    "triangles": 417130,
+    "images": 25,
+    "materials": 9,
     "up": "+Y",
-    "metres": true,
-    "groundAtZero": true
-  },
-  "highExport": {
-    "file": "Exports/Model_Type89MediumTankHighPbr.glb",
-    "sha256": "2670640b69c23e4d7f5fa01fddf38a31c6ee30740e14d3e33e8142110d10ef70",
-    "bytes": 58475908,
-    "sceneExpandedTriangles": 1123316
+    "nose": "-Z",
+    "metres": true
   },
   "sourceProjects": [
     {
-      "quality": "High",
-      "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankHighPbr.blend",
-      "sha256": "94395aaaaa51d99cebaf6ce88d1420fb24b2c4c63ca8a55e9670673e1ac3e8fb",
-      "geometryVersion": "20261024GeometryV32",
-      "geometryRecipeSha256": "96ff8a0c7d36e2f022c0c567248d3d905866d231b58ec59b9f782e80302bc8cc",
-      "rawTriangles": 1130810,
-      "meshObjects": 222,
-      "materials": 8,
-      "activePackedImages": 21,
-      "editableAuthoringMaterials": 8,
-      "unitScale": 1.0,
-      "pass": true
+      "quality": "Game",
+      "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54ReleaseSurfaceV12\\Finished\\Scene_Type89MediumTankGamePbr.blend",
+      "glb": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\GeometryV54ReleaseSurfaceV12\\Model_Type89MediumTankGamePbr.glb",
+      "sha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
+      "sourceSha256": "05e7aaaf3c2ed1be246e487d16d6ecc022411f92bd5453227ee63e7603b62421"
     },
     {
-      "quality": "Game",
-      "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankGamePbr.blend",
-      "sha256": "010390f63a0044b1da09dbdeec702973ee232e39434e6c79b249e8423b128fcf",
-      "geometryVersion": "20261024GeometryV32",
-      "geometryRecipeSha256": "96ff8a0c7d36e2f022c0c567248d3d905866d231b58ec59b9f782e80302bc8cc",
-      "rawTriangles": 240278,
-      "meshObjects": 222,
-      "materials": 8,
-      "activePackedImages": 21,
-      "editableAuthoringMaterials": 8,
-      "unitScale": 1.0,
-      "pass": true
+      "quality": "High",
+      "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54ReleaseSurfaceV12\\Finished\\Scene_Type89MediumTankHighPbr.blend",
+      "glb": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\GeometryV54ReleaseSurfaceV12\\Model_Type89MediumTankHighPbr.glb",
+      "sha256": "3ff008c6989b2df3e7a726c7939b95bf02dbcc777aa5d9a6cd07d640db2b3642",
+      "sourceSha256": "b9c38251b36cf2a7aaf86526beb039cd140549dc19dc2f31fda1a086479a0131"
     }
   ],
-  "bakeInputs": {
-    "geometryRecipeSha256": "96ff8a0c7d36e2f022c0c567248d3d905866d231b58ec59b9f782e80302bc8cc",
-    "geometrySourceSha256": "60af60bcd2d20ab3815cbbb9c44522db7788ae326d77292c20e1ac397d29aad4",
-    "gameGeometrySourceSha256": "efeae3a57ddecb0887a94813713740553e1b5ec213796588850b9c537f26a368",
-    "materialAuthoringScriptSha256": "2821ecc1f73dbced277fff0d99a0fb14de5f5d017698a1d9d0d29ab800bc1b7f",
-    "bakeScriptSha256": "c29775dcd04eb421792da38a69d7829cc0a116ef07b8913fc0ff89f915636ec9"
-  },
-  "gameDataProjection": "BakedHighBaseAndScalarChannels; Armor target retains actual HighRubber contact surfaces; geometric/bump normals projected independently",
-  "processingSteps": {
-    "projectionRefinement": {
-      "method": "Independent projected hit coverage plus opaque-black albedo/invalid-normal detection; missing texels sampled from actual frozen high triangles and converted to the low tangent frame. No invented colour, unchanged35mm nearest-source limit.",
-      "scriptSha256": "14538d9676f510c29c0cac3d4b2ed38de4fe8319b92a67a3e888a9b38a17d6d4",
-      "currentBakerSha256": "a507a1169bcf375476a404dc44e928e7a243b6d33926ca5686acfba1fb3db168",
-      "originalBakerSha256": "c29775dcd04eb421792da38a69d7829cc0a116ef07b8913fc0ff89f915636ec9",
-      "gameSourceSha256": "90f06a2863196ee1a9ed78d1da48db95f316669322ef93b96c48ab8ed20bc813",
-      "unpackedRuntimeSha256": "d75e134727f2b434f997f351722934d3f0986b0f5027749727dd5d76b9314ac2",
-      "repairs": {
-        "Armor": {
-          "Base": {
-            "repairedTexels": 62015,
-            "maximumNearestHighDistanceM": 0.006600759923458099,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Normal": {
-            "repairedTexels": 61972,
-            "maximumNearestHighDistanceM": 0.006600759923458099,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Roughness": {
-            "repairedTexels": 29630,
-            "maximumNearestHighDistanceM": 0.0209999680519104,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Metallic": {
-            "repairedTexels": 29630,
-            "maximumNearestHighDistanceM": 0.0209999680519104,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Ao": {
-            "repairedTexels": 29630,
-            "maximumNearestHighDistanceM": 0.0209999680519104,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          }
-        },
-        "Steel": {
-          "Base": {
-            "repairedTexels": 4,
-            "maximumNearestHighDistanceM": 0.0017652410315349698,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Normal": {
-            "repairedTexels": 4,
-            "maximumNearestHighDistanceM": 0.0017652410315349698,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Roughness": {
-            "repairedTexels": 1,
-            "maximumNearestHighDistanceM": 0.0004470811691135168,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Metallic": {
-            "repairedTexels": 1,
-            "maximumNearestHighDistanceM": 0.0004470811691135168,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Ao": {
-            "repairedTexels": 1,
-            "maximumNearestHighDistanceM": 0.0004470811691135168,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          }
-        },
-        "Track": {
-          "Base": {
-            "repairedTexels": 168,
-            "maximumNearestHighDistanceM": 0.00011453737533884123,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Normal": {
-            "repairedTexels": 168,
-            "maximumNearestHighDistanceM": 0.00011453737533884123,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Roughness": {
-            "repairedTexels": 56,
-            "maximumNearestHighDistanceM": 0.0001366201468044892,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Metallic": {
-            "repairedTexels": 56,
-            "maximumNearestHighDistanceM": 0.0001366201468044892,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Ao": {
-            "repairedTexels": 56,
-            "maximumNearestHighDistanceM": 0.0001366201468044892,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          }
-        },
-        "Rubber": {
-          "Base": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Normal": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Roughness": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Metallic": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Ao": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          }
-        },
-        "Exhaust": {
-          "Base": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Normal": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Roughness": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Metallic": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Ao": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          }
-        },
-        "Glass": {
-          "Base": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Normal": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Roughness": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Metallic": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Ao": {
-            "repairedTexels": 0,
-            "maximumNearestHighDistanceM": 0.0,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          }
-        }
-      },
-      "hardwareFields": {
-        "components": 862,
-        "triangles": 19332,
-        "channels": {
-          "Base": {
-            "repairedTexels": 22977,
-            "maximumNearestHighDistanceM": 0.006600759923458099,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Normal": {
-            "repairedTexels": 22977,
-            "maximumNearestHighDistanceM": 0.006600759923458099,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Roughness": {
-            "repairedTexels": 12927,
-            "maximumNearestHighDistanceM": 0.0209999680519104,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Metallic": {
-            "repairedTexels": 12927,
-            "maximumNearestHighDistanceM": 0.0209999680519104,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Ao": {
-            "repairedTexels": 12927,
-            "maximumNearestHighDistanceM": 0.0209999680519104,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          }
-        },
-        "source": "Nearest actual high fields for complete small connected rivet/hex components; no fabricated colour or normal;35mm limit retained"
-      },
-      "highTangentCorrection": {
-        "correctedStoredVertices": 2,
-        "rows": [
-          {
-            "mesh": "BowMgBarrel.002",
-            "material": "Material_Type89HighSteel",
-            "correctedStoredVertices": 2
-          }
-        ]
-      }
-    },
-    "detailNormalTransfer": {
-      "repairedTexels": 8241,
-      "maximumNearestHighDistanceM": 0.0033003538846969604,
-      "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal",
-      "parts": [
-        "Mesh_BowMgMount"
-      ],
-      "triangles": 504,
-      "scope": "All mapped detail normal texels; nearest actual retained-high surface, unchanged35mm gate"
-    },
-    "normalRefinement": {
-      "scope": "Only armor normals rebaked. Actual planar wheel annuli use true surface normals under the existing micro relief; all geometry,UVs and original material fields preserved.",
-      "currentMaterialScriptSha256": "6c5078f3c1d5dfb9a1efbf591f89cd27607d75c6e20fa3caff28c68e1f6e92e1",
-      "scriptSha256": "5eacb4132706a9c399419f6fe00502f69312b11f4328f220786005fecbfc7095",
-      "hardwareFields": {
-        "components": 862,
-        "triangles": 19332,
-        "channels": {
-          "Base": {
-            "repairedTexels": 22977,
-            "maximumNearestHighDistanceM": 0.006600759923458099,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Normal": {
-            "repairedTexels": 22977,
-            "maximumNearestHighDistanceM": 0.006600759923458099,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Roughness": {
-            "repairedTexels": 12927,
-            "maximumNearestHighDistanceM": 0.0209999680519104,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Metallic": {
-            "repairedTexels": 12927,
-            "maximumNearestHighDistanceM": 0.0209999680519104,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          },
-          "Ao": {
-            "repairedTexels": 12927,
-            "maximumNearestHighDistanceM": 0.0209999680519104,
-            "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-          }
-        },
-        "source": "Nearest actual high fields for complete small connected rivet/hex components; no fabricated colour or normal;35mm limit retained"
-      },
-      "sources": [
-        {
-          "quality": "Game",
-          "sourceSha256": "4a174216d55f353e79ccfa963aa358b79132bc77f44f57cfb777962c135e6dfc",
-          "unpackedExportSha256": "a5b36f9b377371be566ad2508ed0b968b5e1b9d7b8400cc69e2d7a861639f5ab"
-        },
-        {
-          "quality": "High",
-          "sourceSha256": "f14ce67bab61ccc2bcf8aa2a6bae42a7acf349f29adc7ae588eb2ebba471389e",
-          "unpackedExportSha256": "3996334a8aaba28599a9328b76f252fe78c73849c78ef52aa947ff842041900b"
-        }
-      ]
-    },
-    "sourceReviewStamp": {
-      "method": "Only acceptance/reference metadata stamped after actual final-file review; geometry,UVs and textures retained",
-      "sourceProjects": [
-        {
-          "quality": "High",
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankHighPbr.blend",
-          "sha256": "94395aaaaa51d99cebaf6ce88d1420fb24b2c4c63ca8a55e9670673e1ac3e8fb",
-          "geometryVersion": "20261024GeometryV32",
-          "geometryRecipeSha256": "96ff8a0c7d36e2f022c0c567248d3d905866d231b58ec59b9f782e80302bc8cc",
-          "rawTriangles": 1130810,
-          "meshObjects": 222,
-          "materials": 8,
-          "activePackedImages": 21,
-          "editableAuthoringMaterials": 8,
-          "unitScale": 1.0,
-          "pass": true
-        },
-        {
-          "quality": "Game",
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankGamePbr.blend",
-          "sha256": "010390f63a0044b1da09dbdeec702973ee232e39434e6c79b249e8423b128fcf",
-          "geometryVersion": "20261024GeometryV32",
-          "geometryRecipeSha256": "96ff8a0c7d36e2f022c0c567248d3d905866d231b58ec59b9f782e80302bc8cc",
-          "rawTriangles": 240278,
-          "meshObjects": 222,
-          "materials": 8,
-          "activePackedImages": 21,
-          "editableAuthoringMaterials": 8,
-          "unitScale": 1.0,
-          "pass": true
-        }
-      ]
-    }
-  },
+  "sourceArchive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV12Release_b24618b4",
+  "scriptArchive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scripts\\GeometryV54SurfaceV12Release_b24618b4",
+  "sourceRecipe": "72e44ce429a524873848ec9d9772ac5c46e2b866221baf3d9ec177bc0ae715fa",
   "texturePacking": {
-    "rgbExact": true,
-    "opacityRgbaExact": true,
-    "geometryBuffersExact": true,
-    "geometrySha256": "69d3616bfd61483f1c6b2a7fd70c961e4c691b8141fd2c5937e485201d4ac2f4",
-    "audit": "Data_TexturePacking.json"
-  },
-  "importAudit": {
-    "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\Type89MediumTank\\Model_Type89MediumTank.glb",
-    "sha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
-    "imported": {
-      "objects": 447,
-      "meshes": 75,
-      "images": 21,
-      "materials": 8,
-      "roots": [
-        "Model_Type89MediumTank"
-      ]
-    },
-    "links": 148,
-    "wheelGroups": 30,
-    "phaseSamples": 36,
-    "testedNearbyPairs": 4716,
-    "contacts": {
-      "Node_RearSprocketLeft": {
-        "frames": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23,
-          24,
-          25,
-          26,
-          27,
-          28,
-          29,
-          30,
-          31,
-          32,
-          33,
-          34,
-          35
-        ],
-        "trianglePairs": 10244,
-        "maximumVertexPenetrationM": 0.0009344220161437988,
-        "deepestContact": {
-          "frame": 0,
-          "link": "Node_TrackLinkLeft000",
-          "pointWorld": [
-            -0.9830656051635742,
-            0.7869434952735901,
-            2.5927650928497314
-          ],
-          "pointRelativeWheel": [
-            -0.07606559991836548,
-            0.02000260353088379,
-            0.4127650260925293
-          ],
-          "nearestWorld": [
-            -0.984000027179718,
-            0.7869434952735901,
-            2.5927650928497314
-          ],
-          "surfaceNormal": [
-            -1.0,
-            0.0,
-            0.0
-          ]
-        }
+    "version": 2,
+    "method": "Opaque image RGB remains exact; alpha-bearing base images retain exact RGBA and resolution; lossless WebP or PNG",
+    "losslessWebpEffort": 1,
+    "beforeBytes": 146830368,
+    "afterBytes": 88193864,
+    "sourceSha256": "9356b1e494e3cadd37aba4ec20f41bed6bde1ea11f2221268b29a3a233b03693",
+    "runtimeSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
+    "geometrySha256": "8fdbc2841f1d7d98205d05deb8f2965f8ddee78059831227495ddcaa93e3bf2d",
+    "images": [
+      {
+        "index": 0,
+        "width": 4096,
+        "height": 4096,
+        "sourceBytes": 11498336,
+        "runtimeBytes": 6396592,
+        "mime": "image/webp",
+        "pixelSha256": "a5c7d85fa7e273df21d949e9d18d360a96e65701e866f28a42ab60207bb3390d",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
       },
-      "Node_RearSprocketRight": {
-        "frames": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23,
-          24,
-          25,
-          26,
-          27,
-          28,
-          29,
-          30,
-          31,
-          32,
-          33,
-          34,
-          35
-        ],
-        "trianglePairs": 10244,
-        "maximumVertexPenetrationM": 0.0009344220161437988,
-        "deepestContact": {
-          "frame": 0,
-          "link": "Node_TrackLinkRight000",
-          "pointWorld": [
-            0.8309344053268433,
-            0.7869434952735901,
-            2.5927650928497314
-          ],
-          "pointRelativeWheel": [
-            -0.07606559991836548,
-            0.02000260353088379,
-            0.4127650260925293
-          ],
-          "nearestWorld": [
-            0.8299999833106995,
-            0.7869434952735901,
-            2.5927650928497314
-          ],
-          "surfaceNormal": [
-            -1.0,
-            0.0,
-            0.0
-          ]
-        }
+      {
+        "index": 1,
+        "width": 2048,
+        "height": 2048,
+        "sourceBytes": 6215818,
+        "runtimeBytes": 4408136,
+        "mime": "image/webp",
+        "pixelSha256": "4f42966f59163a89061e3cb66bc1c2f4dc8f27a1ac0ad0128e0c98bf42b0ccbc",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
       },
-      "Node_RoadWheelLeft08": {
-        "frames": [
-          1,
-          35
-        ],
-        "trianglePairs": 16,
-        "maximumVertexPenetrationM": 0.0
+      {
+        "index": 2,
+        "width": 8192,
+        "height": 8192,
+        "sourceBytes": 53428120,
+        "runtimeBytes": 28422160,
+        "mime": "image/webp",
+        "pixelSha256": "6282ed9cf23077e0b409804eaa49c258c21baeb20609ba2f0ec16d26e527ddb2",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
       },
-      "Node_RoadWheelRight08": {
-        "frames": [
-          1,
-          35
-        ],
-        "trianglePairs": 16,
-        "maximumVertexPenetrationM": 0.0
+      {
+        "index": 3,
+        "width": 4096,
+        "height": 4096,
+        "sourceBytes": 17680316,
+        "runtimeBytes": 10508990,
+        "mime": "image/webp",
+        "pixelSha256": "8a05a698146b5befc5042c673d546911ba4bd1a351da91e7369374497a046916",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
       },
-      "Node_LeadingWheelLeft": {
-        "frames": [
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19
-        ],
-        "trianglePairs": 88,
-        "maximumVertexPenetrationM": 0.0
+      {
+        "index": 4,
+        "width": 4096,
+        "height": 4096,
+        "sourceBytes": 9715978,
+        "runtimeBytes": 4790178,
+        "mime": "image/webp",
+        "pixelSha256": "39efd58b0595c8bb767c0512336ea2a516ae1f4a89e13013108459a718823d4d",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
       },
-      "Node_LeadingWheelRight": {
-        "frames": [
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19
-        ],
-        "trianglePairs": 88,
-        "maximumVertexPenetrationM": 0.0
+      {
+        "index": 5,
+        "width": 2048,
+        "height": 2048,
+        "sourceBytes": 4934056,
+        "runtimeBytes": 2603872,
+        "mime": "image/webp",
+        "pixelSha256": "819869d5cc9eaa304c934a7320dec94ed165107b61a92e8fad56ba0d9d980b38",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 6,
+        "width": 1024,
+        "height": 1024,
+        "sourceBytes": 1417546,
+        "runtimeBytes": 815752,
+        "mime": "image/webp",
+        "pixelSha256": "8e47992fbd520e77ae22ec71d178eb50b979326f1913ac59435215437599ef06",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 7,
+        "width": 1024,
+        "height": 1024,
+        "sourceBytes": 721284,
+        "runtimeBytes": 338574,
+        "mime": "image/webp",
+        "pixelSha256": "d39e2034866b3f64aab096912cc99495a4bcd02cc94dd481b0c7acc8180cbc7d",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 8,
+        "width": 2048,
+        "height": 2048,
+        "sourceBytes": 5175839,
+        "runtimeBytes": 3321488,
+        "mime": "image/webp",
+        "pixelSha256": "d0ff70b536c2cc594b9322ea59a600ba45dbf24d51ec9483de522be8c6c85ae7",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 9,
+        "width": 1024,
+        "height": 1024,
+        "sourceBytes": 2013308,
+        "runtimeBytes": 1255430,
+        "mime": "image/webp",
+        "pixelSha256": "cf24dd68d36750e9e4e789af24bdfd697cbc2e370d7513aba7aede4039bacdb0",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 10,
+        "width": 512,
+        "height": 512,
+        "sourceBytes": 319170,
+        "runtimeBytes": 169134,
+        "mime": "image/webp",
+        "pixelSha256": "4ccf8b2fcf8abe98700177f7677f34cb71ef4756765eda98ec84039b7ea985e5",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 11,
+        "width": 1024,
+        "height": 1024,
+        "sourceBytes": 1135160,
+        "runtimeBytes": 591894,
+        "mime": "image/webp",
+        "pixelSha256": "319be1568d858a5d85662578a40a17ed9ebb7fc1ce9d144596a76e7299df179a",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 12,
+        "width": 1024,
+        "height": 1024,
+        "sourceBytes": 750517,
+        "runtimeBytes": 392910,
+        "mime": "image/webp",
+        "pixelSha256": "4dd05404cb601c4fa1bc44ef85489cfd95f407e58660031df46f59b7aaa717e5",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 13,
+        "width": 2048,
+        "height": 2048,
+        "sourceBytes": 5493952,
+        "runtimeBytes": 3338712,
+        "mime": "image/webp",
+        "pixelSha256": "af7086a7ad6d2a6741408e9f4e5803f93dc29a0e2610196357814d8721a4914b",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 14,
+        "width": 1024,
+        "height": 1024,
+        "sourceBytes": 1041170,
+        "runtimeBytes": 592284,
+        "mime": "image/webp",
+        "pixelSha256": "278cd610d40b5570131ce96853f8ba9da1a50b0edca46dda5da3d68ff0a5e51a",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 15,
+        "width": 2048,
+        "height": 2048,
+        "sourceBytes": 3743667,
+        "runtimeBytes": 3687128,
+        "mime": "image/png",
+        "pixelSha256": "47fd639236b9637ad1415b133ec6252449ed091360be16f7336e05614415196d",
+        "channels": 4,
+        "unusedAlphaRemoved": false,
+        "opacityPreserved": true
+      },
+      {
+        "index": 16,
+        "width": 512,
+        "height": 512,
+        "sourceBytes": 318249,
+        "runtimeBytes": 170454,
+        "mime": "image/webp",
+        "pixelSha256": "5030f33ff34427b5db7d408d3fb4c3101032e5b931edf24a5f5b22548b820d90",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 17,
+        "width": 256,
+        "height": 256,
+        "sourceBytes": 26023,
+        "runtimeBytes": 10192,
+        "mime": "image/webp",
+        "pixelSha256": "82572c3f83d3cedd69cebb646e15abe3ffe876eb7085c1bb45b341d96088ebac",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 18,
+        "width": 256,
+        "height": 256,
+        "sourceBytes": 4430,
+        "runtimeBytes": 862,
+        "mime": "image/webp",
+        "pixelSha256": "4fe3658fa2fd479a281fe2e968c611c16a0b125b20a19cd82307fc78d75351b4",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 19,
+        "width": 512,
+        "height": 512,
+        "sourceBytes": 274591,
+        "runtimeBytes": 142644,
+        "mime": "image/webp",
+        "pixelSha256": "140e44d047732589080ba542d3fc0cf961c5e488df12a066e21829c0a512cc07",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 20,
+        "width": 512,
+        "height": 512,
+        "sourceBytes": 232125,
+        "runtimeBytes": 106030,
+        "mime": "image/webp",
+        "pixelSha256": "da582f5c693a3e7103c20bd386b76fca24677803f3e1413e6e8d28842f3d2871",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 21,
+        "width": 512,
+        "height": 512,
+        "sourceBytes": 136319,
+        "runtimeBytes": 51268,
+        "mime": "image/webp",
+        "pixelSha256": "c85db83d0e0020fc375590ebc27932ac1f04cd1a5ec6f204b3cb87038484aea7",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 22,
+        "width": 2048,
+        "height": 2048,
+        "sourceBytes": 7737476,
+        "runtimeBytes": 5164822,
+        "mime": "image/webp",
+        "pixelSha256": "924014dd0cb49d4d33c53fab4eb9094b6bd449e1e0de6b1785a90be7cd78d0fb",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 23,
+        "width": 1024,
+        "height": 1024,
+        "sourceBytes": 1258267,
+        "runtimeBytes": 760074,
+        "mime": "image/webp",
+        "pixelSha256": "b81856be89ae32710ca3f2610b713cfac16b7ca34ba4732cdd53b51489545eba",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
+      },
+      {
+        "index": 24,
+        "width": 2048,
+        "height": 2048,
+        "sourceBytes": 2637538,
+        "runtimeBytes": 1232850,
+        "mime": "image/webp",
+        "pixelSha256": "983f671a080deeaadd85b06808445a3fc87a898959ce1e80b1556612f565bb78",
+        "channels": 3,
+        "unusedAlphaRemoved": true,
+        "opacityPreserved": false
       }
-    },
-    "maximumVertexPenetrationM": 0.0009344220161437988,
-    "fixedCoverGroups": 10,
-    "fixedPairs": 5378,
-    "fixedContacts": {},
-    "maximumFixedCoverPenetrationM": 0.0,
-    "pass": true,
-    "note": "Actual exported triangles; wheel rolling contact allowed below1mm; fixed hull/fender/cover intersections above1mm block acceptance",
-    "hardwareSweep": [
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 0,
-        "trianglePairs": 4,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 0,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 0,
-        "trianglePairs": 657,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 2,
-        "trianglePairs": 4,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 2,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 2,
-        "trianglePairs": 654,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 5,
-        "trianglePairs": 4,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 5,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 5,
-        "trianglePairs": 654,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 15,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 15,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 15,
-        "trianglePairs": 630,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 30,
-        "trianglePairs": 10,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 30,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 30,
-        "trianglePairs": 647,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 45,
-        "trianglePairs": 2,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 45,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 45,
-        "trianglePairs": 619,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 55,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 55,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 55,
-        "trianglePairs": 593,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 65,
-        "trianglePairs": 10,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 65,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 65,
-        "trianglePairs": 624,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 0,
-        "trianglePairs": 18,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 0,
-        "trianglePairs": 321,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 2,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 2,
-        "trianglePairs": 317,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 5,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 5,
-        "trianglePairs": 309,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 15,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 15,
-        "trianglePairs": 306,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 30,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 30,
-        "trianglePairs": 314,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 60,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 60,
-        "trianglePairs": 272,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 90,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 90,
-        "trianglePairs": 281,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 135,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 135,
-        "trianglePairs": 284,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 165,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 165,
-        "trianglePairs": 284,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 175,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 175,
-        "trianglePairs": 291,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 0,
-        "trianglePairs": 18,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 0,
-        "trianglePairs": 323,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 2,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 2,
-        "trianglePairs": 320,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 5,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 5,
-        "trianglePairs": 312,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 15,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 15,
-        "trianglePairs": 313,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 30,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 30,
-        "trianglePairs": 312,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 60,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 60,
-        "trianglePairs": 278,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 90,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 90,
-        "trianglePairs": 277,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 135,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 135,
-        "trianglePairs": 291,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 165,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 165,
-        "trianglePairs": 285,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 175,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 175,
-        "trianglePairs": 284,
-        "maximumPenetrationM": 0.0
-      }
-    ],
-    "maximumHardwarePenetrationM": 0.0
-  },
-  "highImportAudit": {
-    "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\Model_Type89MediumTankHighPbr.glb",
-    "sha256": "2670640b69c23e4d7f5fa01fddf38a31c6ee30740e14d3e33e8142110d10ef70",
-    "imported": {
-      "objects": 447,
-      "meshes": 75,
-      "images": 21,
-      "materials": 8,
-      "roots": [
-        "Model_Type89MediumTank"
-      ]
-    },
-    "links": 148,
-    "wheelGroups": 30,
-    "phaseSamples": 36,
-    "testedNearbyPairs": 4716,
-    "contacts": {
-      "Node_RearSprocketLeft": {
-        "frames": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23,
-          24,
-          25,
-          26,
-          27,
-          28,
-          29,
-          30,
-          31,
-          32,
-          33,
-          34,
-          35
-        ],
-        "trianglePairs": 19030,
-        "maximumVertexPenetrationM": 0.0009344220161437988,
-        "deepestContact": {
-          "frame": 0,
-          "link": "Node_TrackLinkLeft000",
-          "pointWorld": [
-            -0.9830656051635742,
-            0.7869434952735901,
-            2.5927650928497314
-          ],
-          "pointRelativeWheel": [
-            -0.07606559991836548,
-            0.02000260353088379,
-            0.4127650260925293
-          ],
-          "nearestWorld": [
-            -0.984000027179718,
-            0.7869434952735901,
-            2.5927650928497314
-          ],
-          "surfaceNormal": [
-            -1.0,
-            0.0,
-            0.0
-          ]
-        }
-      },
-      "Node_RoadWheelLeft08": {
-        "frames": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          33,
-          34,
-          35
-        ],
-        "trianglePairs": 706,
-        "maximumVertexPenetrationM": 0.0007579327248095069,
-        "deepestContact": {
-          "frame": 35,
-          "link": "Node_TrackLinkLeft009",
-          "pointWorld": [
-            -0.830386221408844,
-            0.06234976649284363,
-            1.745557188987732
-          ],
-          "pointRelativeWheel": [
-            0.07661378383636475,
-            -0.13459107279777527,
-            0.03555727005004883
-          ],
-          "nearestWorld": [
-            -0.830386221408844,
-            0.06160180643200874,
-            1.7456797361373901
-          ],
-          "surfaceNormal": [
-            0.0,
-            -0.9868583679199219,
-            0.1615874022245407
-          ]
-        }
-      },
-      "Node_RearSprocketRight": {
-        "frames": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23,
-          24,
-          25,
-          26,
-          27,
-          28,
-          29,
-          30,
-          31,
-          32,
-          33,
-          34,
-          35
-        ],
-        "trianglePairs": 19030,
-        "maximumVertexPenetrationM": 0.0009344220161437988,
-        "deepestContact": {
-          "frame": 0,
-          "link": "Node_TrackLinkRight000",
-          "pointWorld": [
-            0.8309344053268433,
-            0.7869434952735901,
-            2.5927650928497314
-          ],
-          "pointRelativeWheel": [
-            -0.07606559991836548,
-            0.02000260353088379,
-            0.4127650260925293
-          ],
-          "nearestWorld": [
-            0.8299999833106995,
-            0.7869434952735901,
-            2.5927650928497314
-          ],
-          "surfaceNormal": [
-            -1.0,
-            0.0,
-            0.0
-          ]
-        }
-      },
-      "Node_RoadWheelRight08": {
-        "frames": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          33,
-          34,
-          35
-        ],
-        "trianglePairs": 706,
-        "maximumVertexPenetrationM": 0.0007579327248095069,
-        "deepestContact": {
-          "frame": 35,
-          "link": "Node_TrackLinkRight009",
-          "pointWorld": [
-            0.9836137890815735,
-            0.06234976649284363,
-            1.745557188987732
-          ],
-          "pointRelativeWheel": [
-            0.07661378383636475,
-            -0.13459107279777527,
-            0.03555727005004883
-          ],
-          "nearestWorld": [
-            0.9836137890815735,
-            0.06160180643200874,
-            1.7456797361373901
-          ],
-          "surfaceNormal": [
-            0.0,
-            -0.9868583679199219,
-            0.1615874022245407
-          ]
-        }
-      },
-      "Node_LeadingWheelLeft": {
-        "frames": [
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23,
-          24,
-          25
-        ],
-        "trianglePairs": 862,
-        "maximumVertexPenetrationM": 0.0009184064983855933,
-        "deepestContact": {
-          "frame": 16,
-          "link": "Node_TrackLinkLeft030",
-          "pointWorld": [
-            -0.9836158752441406,
-            0.06926452368497849,
-            -1.4828205108642578
-          ],
-          "pointRelativeWheel": [
-            -0.07661586999893188,
-            -0.14367637038230896,
-            -0.03282046318054199
-          ],
-          "nearestWorld": [
-            -0.9836158752441406,
-            0.06837199628353119,
-            -1.483036994934082
-          ],
-          "surfaceNormal": [
-            -0.0,
-            -0.9718139171600342,
-            -0.23574909567832947
-          ]
-        }
-      },
-      "Node_LeadingWheelRight": {
-        "frames": [
-          11,
-          12,
-          13,
-          14,
-          15,
-          16,
-          17,
-          18,
-          19,
-          20,
-          21,
-          22,
-          23,
-          24,
-          25
-        ],
-        "trianglePairs": 862,
-        "maximumVertexPenetrationM": 0.0009184064983855933,
-        "deepestContact": {
-          "frame": 16,
-          "link": "Node_TrackLinkRight030",
-          "pointWorld": [
-            0.8303841352462769,
-            0.06926452368497849,
-            -1.4828205108642578
-          ],
-          "pointRelativeWheel": [
-            -0.07661586999893188,
-            -0.14367637038230896,
-            -0.03282046318054199
-          ],
-          "nearestWorld": [
-            0.8303841352462769,
-            0.06837199628353119,
-            -1.483036994934082
-          ],
-          "surfaceNormal": [
-            -0.0,
-            -0.9718139171600342,
-            -0.23574909567832947
-          ]
-        }
-      }
-    },
-    "maximumVertexPenetrationM": 0.0009344220161437988,
-    "fixedCoverGroups": 10,
-    "fixedPairs": 5368,
-    "fixedContacts": {},
-    "maximumFixedCoverPenetrationM": 0.0,
-    "pass": true,
-    "note": "Actual exported triangles; wheel rolling contact allowed below1mm; fixed hull/fender/cover intersections above1mm block acceptance",
-    "hardwareSweep": [
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 0,
-        "trianglePairs": 14,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 0,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 0,
-        "trianglePairs": 1008,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 2,
-        "trianglePairs": 14,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 2,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 2,
-        "trianglePairs": 1028,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 5,
-        "trianglePairs": 14,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 5,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 5,
-        "trianglePairs": 1050,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 15,
-        "trianglePairs": 14,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 15,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 15,
-        "trianglePairs": 1045,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 30,
-        "trianglePairs": 14,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 30,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 30,
-        "trianglePairs": 1049,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 45,
-        "trianglePairs": 14,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 45,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 45,
-        "trianglePairs": 1030,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 55,
-        "trianglePairs": 14,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 55,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 55,
-        "trianglePairs": 1048,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowPlate",
-        "angleDegrees": 65,
-        "trianglePairs": 14,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_Hull",
-        "angleDegrees": 65,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_BowHatch",
-        "target": "Node_BowDoorFixedHinge",
-        "angleDegrees": 65,
-        "trianglePairs": 1019,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 0,
-        "trianglePairs": 44,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 0,
-        "trianglePairs": 534,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 2,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 2,
-        "trianglePairs": 528,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 5,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 5,
-        "trianglePairs": 512,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 15,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 15,
-        "trianglePairs": 501,
-        "maximumPenetrationM": 7.21818651072681e-07
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 30,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 30,
-        "trianglePairs": 492,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 60,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 60,
-        "trianglePairs": 464,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 90,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 90,
-        "trianglePairs": 443,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 135,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 135,
-        "trianglePairs": 461,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 165,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 165,
-        "trianglePairs": 459,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_Hull",
-        "angleDegrees": 175,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapLeft",
-        "target": "Node_SideVisionFrameLeft",
-        "angleDegrees": 175,
-        "trianglePairs": 447,
-        "maximumPenetrationM": 8.214483386836946e-07
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 0,
-        "trianglePairs": 42,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 0,
-        "trianglePairs": 526,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 2,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 2,
-        "trianglePairs": 527,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 5,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 5,
-        "trianglePairs": 509,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 15,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 15,
-        "trianglePairs": 509,
-        "maximumPenetrationM": 1.8688806449063122e-06
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 30,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 30,
-        "trianglePairs": 494,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 60,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 60,
-        "trianglePairs": 453,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 90,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 90,
-        "trianglePairs": 439,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 135,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 135,
-        "trianglePairs": 459,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 165,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 165,
-        "trianglePairs": 442,
-        "maximumPenetrationM": 1.7389538697898388e-09
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_Hull",
-        "angleDegrees": 175,
-        "trianglePairs": 0,
-        "maximumPenetrationM": 0.0
-      },
-      {
-        "moving": "Node_SideVisionFlapRight",
-        "target": "Node_SideVisionFrameRight",
-        "angleDegrees": 175,
-        "trianglePairs": 442,
-        "maximumPenetrationM": 8.04328010417521e-07
-      }
-    ],
-    "maximumHardwarePenetrationM": 1.8688806449063122e-06
-  },
-  "motionAudit": {
-    "pass": true,
-    "geometryVersion": "20261024GeometryV32",
-    "assertions": [
-      {
-        "name": "Left tread responds independently",
-        "pass": true
-      },
-      {
-        "name": "Right tread stays still",
-        "pass": true
-      },
-      {
-        "name": "Full belt closure",
-        "pass": true,
-        "detail": {
-          "closurePosition": 1.1890403620186994e-07,
-          "closureRotation": 1.5780873718895805e-08
-        }
-      },
-      {
-        "name": "All 30 wheel groups roll at the commanded distance",
-        "pass": true,
-        "detail": {
-          "count": 30,
-          "maxArcErrorM": 1.0408340855860843e-15
-        }
-      },
-      {
-        "name": "Sprocket tooth passage equals shoe passage",
-        "pass": true
-      },
-      {
-        "name": "Turret uses the runtime Y axis",
-        "pass": true
-      },
-      {
-        "name": "Recoil translates along the bore",
-        "pass": true
-      },
-      {
-        "name": "Front and rear cupola hatches have independent hinges",
-        "pass": true
-      },
-      {
-        "name": "All posed transforms are finite and rigid",
-        "pass": true
-      },
-      {
-        "name": "Shoe sweep remains above the ground without scaling",
-        "pass": true,
-        "detail": {
-          "minimumGroundM": -7.316470160223187e-09,
-          "maximumGroundM": -7.316470160223187e-09
-        }
-      }
-    ],
-    "dimensions": [
-      2.186000108718872,
-      2.5639407277669655,
-      5.701738713542861
-    ],
-    "linksPerSide": 74,
-    "meshNodes": 276,
-    "browserErrors": [],
-    "assetSha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57"
+    ]
   },
   "runtimeBrowserAudit": {
     "pass": true,
     "checks": [
+      {
+        "name": "Configured vehicle is selectable and never implicitly placed in a campaign",
+        "pass": true
+      },
       {
         "name": "Left/right distance clocks are independent",
         "pass": true
@@ -1900,8 +361,8 @@
         "name": "Full articulated belt loop closes",
         "pass": true,
         "detail": {
-          "positionError": 1.1890403620186995e-07,
-          "rotationError": 1.5780873718895805e-08
+          "positionError": 1.2575485182163106e-7,
+          "rotationError": 2.212979988147623e-8
         }
       },
       {
@@ -1933,6 +394,42 @@
         "pass": true
       },
       {
+        "name": "Opening the door resolves its collision-cleared gun stow pose",
+        "pass": true
+      },
+      {
+        "name": "Closing the door restores independent gun aiming",
+        "pass": true
+      },
+      {
+        "name": "Hull machine gun also elevates independently",
+        "pass": true
+      },
+      {
+        "name": "Rear machine gun also traverses independently",
+        "pass": true
+      },
+      {
+        "name": "Rear gun mounting flange stays fixed while the gun aims",
+        "pass": true
+      },
+      {
+        "name": "Open observation cover deploys its real latch pivot",
+        "pass": true
+      },
+      {
+        "name": "Other observation latch remains independently folded",
+        "pass": true
+      },
+      {
+        "name": "Latch folds clear before the cover reaches the hull",
+        "pass": true
+      },
+      {
+        "name": "Reset restores the authored folded latch",
+        "pass": true
+      },
+      {
         "name": "Poses preserve rigid finite transforms",
         "pass": true
       },
@@ -1942,6 +439,10 @@
       },
       {
         "name": "Real mapped PBR and correct colour spaces: Material_Type89GameSteel",
+        "pass": true
+      },
+      {
+        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameCastArmor",
         "pass": true
       },
       {
@@ -1969,756 +470,278 @@
         "pass": true
       }
     ],
-    "meshCount": 276,
-    "materials": 8,
-    "rendererTriangles": 480556,
-    "errors": []
+    "meshCount": 310,
+    "materials": 9,
+    "rendererTriangles": 834260,
+    "errors": [],
+    "modelUrl": "/Taierzhuang1938/Model/Type89MediumTank/Model_Type89MediumTank.glb",
+    "trackPathUrl": "/Taierzhuang1938/Model/Type89MediumTank/Data_TrackPath.json",
+    "assetSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a"
   },
-  "articulationDiagnostic": {
-    "diagnosticOnly": true,
-    "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\Type89MediumTank\\Model_Type89MediumTank.glb",
-    "sha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
-    "maxDepth": 0.0009953394765034318,
-    "rows": [
-      {
-        "part": "FrontCap",
-        "angle": 0,
-        "target": "Node_CommanderCupola",
-        "pairs": 126,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "FrontCap",
-        "angle": 0,
-        "target": "Node_CommanderHatchRear",
-        "pairs": 79,
-        "maxDepth": 1.4901161193847656e-08,
-        "deepest": {
-          "point": [
-            -0.29100000858306885,
-            2.5089406967163086,
-            -0.06999999284744263
-          ],
-          "nearest": [
-            -0.29100000858306885,
-            2.5089406967163086,
-            -0.07000000774860382
-          ]
-        }
-      },
-      {
-        "part": "RearCap",
-        "angle": 0,
-        "target": "Node_CommanderCupola",
-        "pairs": 225,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 0,
-        "target": "Node_CommanderHatchFront",
-        "pairs": 79,
-        "maxDepth": 1.4901161193847656e-08,
-        "deepest": {
-          "point": [
-            0.000999998301267624,
-            2.5279407501220703,
-            -0.07000000774860382
-          ],
-          "nearest": [
-            0.000999998301267624,
-            2.5279407501220703,
-            -0.06999999284744263
-          ]
-        }
-      },
-      {
-        "part": "FrontCap",
-        "angle": 30,
-        "target": "Node_CommanderCupola",
-        "pairs": 96,
-        "maxDepth": 0.0009953394765034318,
-        "deepest": {
-          "point": [
-            -0.09208706766366959,
-            2.515974998474121,
-            -0.3571753203868866
-          ],
-          "nearest": [
-            -0.09179814159870148,
-            2.515974998474121,
-            -0.35622283816337585
-          ]
-        }
-      },
-      {
-        "part": "FrontCap",
-        "angle": 30,
-        "target": "Node_CommanderHatchRear",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 30,
-        "target": "Node_CommanderCupola",
-        "pairs": 126,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 30,
-        "target": "Node_CommanderHatchFront",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "FrontCap",
-        "angle": 60,
-        "target": "Node_CommanderCupola",
-        "pairs": 60,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "FrontCap",
-        "angle": 60,
-        "target": "Node_CommanderHatchRear",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 60,
-        "target": "Node_CommanderCupola",
-        "pairs": 137,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 60,
-        "target": "Node_CommanderHatchFront",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "FrontCap",
-        "angle": 90,
-        "target": "Node_CommanderCupola",
-        "pairs": 54,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "FrontCap",
-        "angle": 90,
-        "target": "Node_CommanderHatchRear",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 90,
-        "target": "Node_CommanderCupola",
-        "pairs": 127,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 90,
-        "target": "Node_CommanderHatchFront",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "FrontCap",
-        "angle": 120,
-        "target": "Node_CommanderCupola",
-        "pairs": 56,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "FrontCap",
-        "angle": 120,
-        "target": "Node_CommanderHatchRear",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 120,
-        "target": "Node_CommanderCupola",
-        "pairs": 122,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 120,
-        "target": "Node_CommanderHatchFront",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "FrontCap",
-        "angle": 160,
-        "target": "Node_CommanderCupola",
-        "pairs": 76,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "FrontCap",
-        "angle": 160,
-        "target": "Node_CommanderHatchRear",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 160,
-        "target": "Node_CommanderCupola",
-        "pairs": 117,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 160,
-        "target": "Node_CommanderHatchFront",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "FrontCap",
-        "angle": 175,
-        "target": "Node_CommanderCupola",
-        "pairs": 80,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "FrontCap",
-        "angle": 175,
-        "target": "Node_CommanderHatchRear",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 175,
-        "target": "Node_CommanderCupola",
-        "pairs": 114,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 175,
-        "target": "Node_CommanderHatchFront",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "FrontCap",
-        "angle": 180,
-        "target": "Node_CommanderCupola",
-        "pairs": 92,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "FrontCap",
-        "angle": 180,
-        "target": "Node_CommanderHatchRear",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 180,
-        "target": "Node_CommanderCupola",
-        "pairs": 129,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RearCap",
-        "angle": 180,
-        "target": "Node_CommanderHatchFront",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "GunPitch",
-        "angle": -10,
-        "target": "Node_TurretYaw",
-        "pairs": 73,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "GunPitch",
-        "angle": 0,
-        "target": "Node_TurretYaw",
-        "pairs": 78,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "GunPitch",
-        "angle": 7,
-        "target": "Node_TurretYaw",
-        "pairs": 70,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "GunPitch",
-        "angle": 15,
-        "target": "Node_TurretYaw",
-        "pairs": 75,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchLeft",
-        "angle": 0,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchLeft",
-        "angle": 0,
-        "target": "Node_TurretYaw",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchLeft",
-        "angle": 15,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchLeft",
-        "angle": 15,
-        "target": "Node_TurretYaw",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchLeft",
-        "angle": 30,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchLeft",
-        "angle": 30,
-        "target": "Node_TurretYaw",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchLeft",
-        "angle": 50,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchLeft",
-        "angle": 50,
-        "target": "Node_TurretYaw",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchRight",
-        "angle": 0,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchRight",
-        "angle": 0,
-        "target": "Node_TurretYaw",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchRight",
-        "angle": 15,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchRight",
-        "angle": 15,
-        "target": "Node_TurretYaw",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchRight",
-        "angle": 30,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchRight",
-        "angle": 30,
-        "target": "Node_TurretYaw",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchRight",
-        "angle": 50,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "Node_EngineHatchRight",
-        "angle": 50,
-        "target": "Node_TurretYaw",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 0,
-        "target": "Node_BowPlate",
-        "pairs": 79,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 0,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 0,
-        "target": "Node_BowMgMount",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 30,
-        "target": "Node_BowPlate",
-        "pairs": 90,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 30,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 30,
-        "target": "Node_BowMgMount",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 60,
-        "target": "Node_BowPlate",
-        "pairs": 116,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 60,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 60,
-        "target": "Node_BowMgMount",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 90,
-        "target": "Node_BowPlate",
-        "pairs": 111,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 90,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 90,
-        "target": "Node_BowMgMount",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 120,
-        "target": "Node_BowPlate",
-        "pairs": 94,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 120,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 120,
-        "target": "Node_BowMgMount",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 150,
-        "target": "Node_BowPlate",
-        "pairs": 44,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 150,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 150,
-        "target": "Node_BowMgMount",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 180,
-        "target": "Node_BowPlate",
-        "pairs": 69,
-        "maxDepth": 4.577450454235077e-07,
-        "deepest": {
-          "point": [
-            -0.16599999368190765,
-            1.6194353103637695,
-            -1.352551817893982
-          ],
-          "nearest": [
-            -0.16349999606609344,
-            1.611240029335022,
-            -1.3591158390045166
-          ]
-        }
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 180,
-        "target": "Node_Hull",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      },
-      {
-        "part": "RoundBowCover",
-        "angle": 180,
-        "target": "Node_BowMgMount",
-        "pairs": 0,
-        "maxDepth": 0,
-        "deepest": null
-      }
-    ],
-    "note": "Actual exported meshes; hinge bearing neighborhoods excluded. Nearest-normal depth is diagnostic and needs local visual interpretation at edges."
-  },
-  "performance": {
-    "scope": "One isolated asset, same neutral review page,1600x1000 layout, browser audio muted. Local measurements are not full-game scene guarantees.",
-    "rows": [
-      {
-        "label": "RejectedV31",
-        "loadMs": 2875,
-        "frame": {
-          "samples": 90,
-          "medianMs": 9.800000011920929,
-          "p95Ms": 15
-        },
-        "cpuSubmission": {
-          "samples": 30,
-          "medianMs": 7.700000002980232,
-          "p95Ms": 10.200000002980232
-        },
-        "gpu": {
-          "samples": 8,
-          "medianMs": 4.802816,
-          "p95Ms": 6.35008
-        },
-        "triangles": 250352,
-        "drawCalls": 804,
-        "textures": 26,
-        "geometries": 125,
-        "gpuRenderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 Ti (0x00002182) Direct3D11 vs_5_0 ps_5_0, D3D11)",
-        "viewport": [
-          1600,
-          1000
-        ],
-        "errors": []
-      },
-      {
-        "label": "V32",
-        "loadMs": 1409,
-        "frame": {
-          "samples": 90,
-          "medianMs": 10.099999994039536,
-          "p95Ms": 12.399999991059303
-        },
-        "cpuSubmission": {
-          "samples": 30,
-          "medianMs": 6.299999997019768,
-          "p95Ms": 8.799999997019768
-        },
-        "gpu": {
-          "samples": 8,
-          "medianMs": 5.328896,
-          "p95Ms": 6.31552
-        },
-        "triangles": 714662,
-        "drawCalls": 822,
-        "textures": 26,
-        "geometries": 131,
-        "gpuRenderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1660 Ti (0x00002182) Direct3D11 vs_5_0 ps_5_0, D3D11)",
-        "viewport": [
-          1600,
-          1000
-        ],
-        "errors": []
-      }
-    ]
-  },
-  "rawFileChecks": {
-    "passed": 532,
-    "total": 532
+  "optionalConfiguration": {
+    "catalogId": "type89MediumTank",
+    "campaignEnabled": false,
+    "lazyLoaded": true
   },
   "localEvidenceOnly": true,
-  "visualAcceptance": "Final packed game/high whole-car and component views author-compared with recovered same-car references after V31 rejection; declared inferred paint, microscopic wear and hidden structures are retained.",
-  "previousRejection": "V31 rejected for exposed turret faces, insufficient tracks/rivets/joints, plastic response and interpolated colour; its old author visual sign-off is withdrawn.",
-  "currentRebuildScripts": {
-    "Script_Type89MediumTank.py": "4da68e0b6f20c126c45c0bc743ab7928a2f7c2842e2c06f541e6dcca28935dfc",
-    "Script_Type89DetailedParts.py": "fa9e7373a2cdb07bd9131108e157fc9527d7e580e66a352d26526fa5e8e3d8c3",
-    "Script_Type89PbrMaterials.py": "6c5078f3c1d5dfb9a1efbf591f89cd27607d75c6e20fa3caff28c68e1f6e92e1",
-    "Script_Type89PbrBake.py": "a507a1169bcf375476a404dc44e928e7a243b6d33926ca5686acfba1fb3db168",
-    "Script_Type89ExportBasis.py": "afbac761df1518118e2133c82084b6af5c0aca1943ce115aadb633b15dd6d52e",
-    "Script_Type89ProjectionRepair.py": "14538d9676f510c29c0cac3d4b2ed38de4fe8319b92a67a3e888a9b38a17d6d4"
-  },
-  "repositoryRegression": {
-    "profile": "quick",
-    "total": 137,
-    "passedAfterCacheStampFix": 133,
-    "knownBaselineFailures": 4,
-    "newRelatedFailures": 0,
-    "baselineCommit": "d6fd24b6d16fdbd3d4be2e636f96b2d50a05e73d",
-    "baselineSnapshotFiles": 241,
-    "baselineAssertions": [
+  "scopeLimitations": [
+    "Museum appearance and inferred microtexture; no original paint, factory motion-stop or hidden-construction certification.",
+    "Photographic perspective and local form matching retain uncertainty; this is not a scan-identical replica.",
+    "Door/gun stow linkage is a collision-cleared display reconstruction, not a verified original operating procedure."
+  ],
+  "canonicalSourceAudit": {
+    "pass": true,
+    "sourceProjects": [
       {
-        "test": "SpeakerGestureTest",
-        "exitCode": 1,
-        "assertion": "AssertionError [ERR_ASSERTION]: FrontObservation.02: luo gestured on his previous line too\r"
+        "quality": "High",
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankHighPbr.blend",
+        "sha256": "ee41fe19d20433ed0fd4ae7000c2c96839c6eb1eb998dbfabfc62d0a4038f5b9",
+        "geometryVersion": "20261027GeometryV54",
+        "geometryRecipeSha256": "72e44ce429a524873848ec9d9772ac5c46e2b866221baf3d9ec177bc0ae715fa",
+        "rawTriangles": 1462012,
+        "meshObjects": 256,
+        "materials": 9,
+        "activePackedImages": 25,
+        "editableAuthoringMaterials": 8,
+        "unitScale": 1,
+        "pass": true
       },
       {
-        "test": "RiggedModelTest",
-        "exitCode": 1,
-        "assertion": "AssertionError [ERR_ASSERTION]: FPS arm materials enter the shared PBR/debug chain as non-metals\r"
-      },
-      {
-        "test": "IjaAlertGaitTest",
-        "exitCode": 1,
-        "assertion": "AssertionError [ERR_ASSERTION]: WalkIn: alert gait at a trot\r"
-      },
-      {
-        "test": "MissionOrchestrationFilterTest",
-        "exitCode": 1,
-        "assertion": "AssertionError [ERR_ASSERTION]: 这一关十八组（实际 24）\r"
+        "quality": "Game",
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankGamePbr.blend",
+        "sha256": "8b5db160b0d023448fcb8ad41a0d3a6586d60aed47b37538d39e21e75349254b",
+        "geometryVersion": "20261027GeometryV54",
+        "geometryRecipeSha256": "72e44ce429a524873848ec9d9772ac5c46e2b866221baf3d9ec177bc0ae715fa",
+        "rawTriangles": 419856,
+        "meshObjects": 256,
+        "materials": 9,
+        "activePackedImages": 25,
+        "editableAuthoringMaterials": 8,
+        "unitScale": 1,
+        "pass": true
       }
     ],
-    "scope": "Four failures reproduced on the exact pre-change HEAD. The new numeric cache stamp was fixed and ModuleGraph rerun successfully; unrelated assertions were not changed."
+    "note": "Counts include every repeated track instance. Game export separately removes zero-area triangles without changing the editable source."
+  },
+  "sourceRecipeReproduction": {
+    "recipe": "72e44ce429a524873848ec9d9772ac5c46e2b866221baf3d9ec177bc0ae715fa",
+    "expected": "72e44ce429a524873848ec9d9772ac5c46e2b866221baf3d9ec177bc0ae715fa",
+    "pass": true,
+    "scope": "Stable LF checkout bytes for source scripts and JSON inputs; no parameter values changed"
+  },
+  "libraryHighQualityAudit": {
+    "pass": true,
+    "checks": [
+      {
+        "name": "Lazy load uses the configured release URL",
+        "pass": true,
+        "detail": [
+          "http://127.0.0.1:5390/Taierzhuang1938/Model/Type89MediumTank/Model_Type89MediumTank.glb?v=20261028GeometryV54SurfaceV12"
+        ]
+      },
+      {
+        "name": "Complete final tank loads with physical PBR and all moving parts",
+        "pass": true,
+        "detail": {
+          "meshes": 310,
+          "materials": 9,
+          "links": 162,
+          "wheels": 30,
+          "physical": 4,
+          "normalSize": [
+            8192
+          ]
+        }
+      },
+      {
+        "name": "履带与轮组",
+        "pass": true,
+        "detail": {
+          "before": {
+            "left": 0.026775,
+            "right": 0.026775,
+            "turret": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bow": [
+              -0.33130037784576416,
+              0,
+              0,
+              0.9435254335403442
+            ]
+          },
+          "after": {
+            "mode": "tracks",
+            "left": 0.22351000000000193,
+            "right": 0.22351000000000193,
+            "turret": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bow": [
+              -0.33130037784576416,
+              0,
+              0,
+              0.9435254335403442
+            ]
+          }
+        }
+      },
+      {
+        "name": "炮塔与主炮",
+        "pass": true,
+        "detail": {
+          "before": {
+            "left": 0,
+            "right": 0,
+            "turret": [
+              0,
+              0.007511929349656573,
+              0,
+              0.9999717850606815
+            ],
+            "bow": [
+              -0.33130037784576416,
+              0,
+              0,
+              0.9435254335403442
+            ]
+          },
+          "after": {
+            "mode": "turret",
+            "left": 0,
+            "right": 0,
+            "turret": [
+              0,
+              0.07242852468256486,
+              0,
+              0.99737360543194
+            ],
+            "bow": [
+              -0.33130037784576416,
+              0,
+              0,
+              0.9435254335403442
+            ]
+          }
+        }
+      },
+      {
+        "name": "两挺机枪",
+        "pass": true,
+        "detail": {
+          "before": {
+            "left": 0,
+            "right": 0,
+            "turret": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bow": [
+              -0.33067892761026385,
+              0.0011039949654610586,
+              -0.00038846268553439147,
+              0.9437426880377007
+            ]
+          },
+          "after": {
+            "mode": "machineGuns",
+            "left": 0,
+            "right": 0,
+            "turret": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bow": [
+              -0.31552977691381545,
+              0.027231876944249205,
+              -0.010070463822702068,
+              0.9484714832905876
+            ]
+          }
+        }
+      },
+      {
+        "name": "全部联动",
+        "pass": true,
+        "detail": {
+          "before": {
+            "left": 0,
+            "right": 0,
+            "turret": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "bow": [
+              -0.33130037784576416,
+              0,
+              0,
+              0.9435254335403442
+            ]
+          },
+          "after": {
+            "mode": "all",
+            "left": 0.1895949999999938,
+            "right": 0.13542499999999563,
+            "turret": [
+              0,
+              0.06495823038723593,
+              0,
+              0.9978879838463628
+            ],
+            "bow": [
+              -0.31532925664710054,
+              0.02756372280536552,
+              -0.010199697942705298,
+              0.9485272011637907
+            ]
+          }
+        }
+      },
+      {
+        "name": "Stop restores the authored rest pose",
+        "pass": true,
+        "detail": {
+          "Left": 0,
+          "Right": 0
+        }
+      },
+      {
+        "name": "Full high-quality renderer emits no errors",
+        "pass": true,
+        "detail": []
+      }
+    ],
+    "requests": [
+      "http://127.0.0.1:5390/Taierzhuang1938/Model/Type89MediumTank/Model_Type89MediumTank.glb?v=20261028GeometryV54SurfaceV12"
+    ],
+    "errors": []
+  },
+  "sharedRegression": {
+    "vehicleDomain": {
+      "passed": 5,
+      "failed": 0
+    },
+    "libraryAndPublication": {
+      "passed": 6,
+      "samplerCaseTimeout": true
+    },
+    "fullPrepush": {
+      "stoppedAt": "SpeakerGestureTest",
+      "assertion": "FrontObservation.02: luo gestured on his previous line too",
+      "testAndInputTablesEqualToOriginMaster": true
+    },
+    "samplerUltraRetry": "240000ms scene-ready timeout; no sampler-overflow assertion was reported. Whole-suite green is not claimed."
   }
 }

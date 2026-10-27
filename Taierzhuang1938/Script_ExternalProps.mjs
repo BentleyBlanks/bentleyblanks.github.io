@@ -39,6 +39,7 @@ import * as THREE from "three";
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { STRAW_SLEEPING_MAT_ASSETS } from "./Data_StrawSleepingMat.mjs";
 import { NAKAJIMA_KI4_ASSET } from "./Data_NakajimaKi4.mjs";
+import { OPTIONAL_VEHICLE_ASSETS } from "./Data_VehicleAssets.mjs";
 import {
   BuildSink, EXTERNAL_SANDBAG_ASSET_IDS, EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
 } from "./Script_World.mjs";
@@ -240,6 +241,11 @@ const ASSETS = Object.freeze({
     sourceLabel: "本项目参考复原 · 1937说明书 / Photo02 141 · 原生PBR与10个枢轴",
     preciseBounds: true,
   },
+  ...Object.fromEntries(OPTIONAL_VEHICLE_ASSETS.map((asset) => [asset.catalogId, {
+    label: asset.label, url: asset.url, tag: "prop", solid: false,
+    category: "模型", projectUvs: false,
+    sourceLabel: "本项目 GLB · 馆藏外形与推定材质复原",
+  }])),
   // Library-only until explicitly placed. Keep native PBR and the complete
   // hierarchy: wheel pivots and rods are consumed by Script_TrainRig.mjs.
   trainReferenceLocomotive: {

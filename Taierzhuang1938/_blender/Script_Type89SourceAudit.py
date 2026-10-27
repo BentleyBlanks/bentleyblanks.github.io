@@ -6,10 +6,12 @@ import sys
 from pathlib import Path
 
 repoDir=Path(__file__).resolve().parents[2]
-sourceDir=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank')
+sourceDir=Path(next((v.split('=',1)[1]for v in sys.argv if v.startswith('--source-dir=')),'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank'))
 report=[]
 markReviewed='--mark-reviewed' in sys.argv
-contract=json.loads((repoDir/'Taierzhuang1938/Model/Type89MediumTank/Data_ReferenceContract.json').read_text(encoding='utf8'))
+contractArgument=next((value.split('=',1)[1] for value in sys.argv if value.startswith('--contract=')),None)
+contractFile=Path(contractArgument).resolve() if contractArgument else repoDir/'Taierzhuang1938/Model/Type89MediumTank/Data_ReferenceContract.json'
+contract=json.loads(contractFile.read_text(encoding='utf8'))
 if markReviewed:
     assert contract['status']=='TechnicallyAndVisuallyReviewedWithDeclaredInferences','Finish reference review before stamping source files'
 recipe=None
@@ -47,9 +49,15 @@ for quality,expected in [('High',contract['sourceTrianglesBeforeExportCleanup'])
     assert scene['Type89Stage']=='Pbr' and scene['Type89Quality']==quality
     assert scene.unit_settings.system=='METRIC' and scene.unit_settings.scale_length==1
     assert triangles==expected,(quality,triangles,expected)
-    assert len(images)==21 and len(materials)==8,(len(images),len(materials),[mat.name for mat in authoring])
+    assert len(images)==contract.get('activePackedImages',21) and len(materials)==contract.get('materialCount',8),(len(images),len(materials),[mat.name for mat in authoring])
+    if contract.get('materialCount',8)==9:
+        assert root['surfaceRevision']==contract['materialRevision']and not root['pbrProbe']
+        cast=next(mat for mat in materials if mat.get('Type89Role')=='CastArmor')
+        shader=next(node for node in cast.node_tree.nodes if node.type=='BSDF_PRINCIPLED')
+        assert shader.inputs['Normal'].links[0].from_node.label=='MicroFilmNormal'
+        assert shader.inputs['Coat Normal'].links[0].from_node.inputs['Color'].links[0].from_node.label=='Normal'
     assert all(bpy.data.materials.get('Material_Type89'+role+'Authoring') for role in ['Armor','Steel','Track','Rubber','Exhaust','Glass','Guard'])
-    assert len([obj for obj in objects if obj.name.startswith('Node_TrackLink')])==148
+    assert len([obj for obj in objects if obj.name.startswith('Node_TrackLink')])==2*contract['linksPerSide']
     assert all(bpy.data.objects.get(name) for name in ['Node_MainGunPitch','Node_MainGunRecoil','Node_CommanderHatchFront','Node_CommanderHatchRear'])
     if markReviewed:
         root['acceptance']='TECHNICALLY_AND_VISUALLY_REVIEWED_WITH_DECLARED_INFERENCES'

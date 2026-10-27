@@ -20,10 +20,14 @@ from mathutils.bvhtree import BVHTree
 
 here=Path(__file__).resolve().parent
 repoDir=here.parents[1]
-sourceDir=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank')
-reviewDir=repoDir/'Taierzhuang1938/_shots/Type89MediumTank'
+sourceRoot=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank')
+reviewRoot=repoDir/'Taierzhuang1938/_shots/Type89MediumTank'
+sourceDir=sourceRoot/os.environ.get('TYPE89_SOURCE_SUBDIR','')
+reviewDir=reviewRoot/os.environ.get('TYPE89_REVIEW_SUBDIR','')
+assert sourceDir.resolve().is_relative_to(sourceRoot.resolve()) and reviewDir.resolve().is_relative_to(reviewRoot.resolve())
 assetDir=repoDir/'Taierzhuang1938/Model/Type89MediumTank'
 probe=os.environ.get('TYPE89_PBR_PROBE','0')=='1'
+stageOnly=os.environ.get('TYPE89_PBR_STAGE_ONLY','0')=='1'
 revision=os.environ.get('TYPE89_PBR_REVISION','')
 workName=(revision+'Probe' if probe else revision) if revision else ('Probe' if probe else 'Final')
 probeSize=int(os.environ.get('TYPE89_PBR_PROBE_SIZE','256'))
@@ -34,9 +38,11 @@ sys.path.insert(0,str(here))
 import Script_Type89PbrMaterials as pbr
 importlib.reload(pbr)
 from Script_Type89GlbCleanup import CleanGlb
+from Script_Type89ShoeHiddenSurface import CleanEnclosedShoeSurfaces
 from Script_Type89ExportBasis import RepairExportTangents
+from Script_Type89TriangulationAccounting import Audit as AuditTriangulation,Write as WriteTriangulationAccounting
 roles=pbr.roles
-sizes={'Armor':(4096,4096,2048),'Steel':(1024,1024,512),'Track':(2048,2048,1024),'Rubber':(512,512,512),'Exhaust':(1024,1024,512),'Glass':(256,512,256),'Guard':(2048,2048,1024)}
+sizes={'Armor':(4096,8192,4096),'Steel':(1024,2048,1024),'Track':(2048,2048,1024),'Rubber':(512,512,512),'Exhaust':(1024,1024,512),'Glass':(256,512,256),'Guard':(2048,2048,1024)}
 started=time.time()
 progress={'phase':'prepare','probe':probe,'completed':[],'startedUnix':started}
 reports={}
@@ -95,8 +101,20 @@ def Unwrap(objects,label):
             bmesh.update_edit_mesh(obj.data,loop_triangles=False,destructive=False)
         bpy.ops.uv.smart_project(angle_limit=math.radians(66),island_margin=.001,area_weight=.1,scale_to_bounds=False)
         bpy.ops.uv.average_islands_scale()
-        bpy.ops.uv.pack_islands(rotate=True,scale=True,margin=.004)
+        # Armor's least-dense channel is4K. A four-texel gutter there is
+        # eight texels in the8K normal atlas; the old16/32-texel margin spent
+        # most of that atlas between thousands of tiny hardware islands.
+        margin=.001 if role=='Armor' else .004
+        bpy.ops.uv.pack_islands(rotate=True,scale=True,margin=margin)
         bpy.ops.object.mode_set(mode='OBJECT')
+        area=uvArea=0.0
+        for obj in candidates:
+            mesh=obj.data;mesh.calc_loop_triangles();uv=mesh.uv_layers.active.data
+            for triangle in mesh.loop_triangles:
+                if RoleOf(mesh.materials[triangle.material_index])!=role:continue
+                a,b,c=[uv[index].uv for index in triangle.loops];e=b-a;f=c-a
+                area+=triangle.area;uvArea+=abs(e.x*f.y-e.y*f.x)/2
+        reports.setdefault('UvLayout',{})[label+'/'+role]={'geometryAreaM2':area,'mappedUvArea':uvArea,'normalPixelsPerM':math.sqrt(uvArea/area)*sizes[role][1] if area else 0,'paddingAtSmallestMapPx':margin*min(sizes[role]),'objects':len(candidates)}
         for obj in candidates:obj.select_set(False)
     for obj in objects:Visible(obj,False)
 
@@ -203,6 +221,7 @@ class ProjectionRepair:
         self.lowTriangles=[triangle for triangle in self.low.loop_triangles if RoleOf(self.low.materials[triangle.material_index])==role]
         self.bvh=BVHTree.FromPolygons([vertex.co for vertex in self.high.vertices],[tuple(triangle.vertices) for triangle in self.highTriangles],all_triangles=True)
         self.uvHigh=self.high.uv_layers.active.data;self.uvLow=self.low.uv_layers.active.data
+        self.orientationRejected=0
 
     def Basis(self,mesh,triangle,weights):
         normal=Vector((0,0,0));tangent=Vector((0,0,0));sign=0
@@ -216,7 +235,7 @@ class ProjectionRepair:
         tangent.normalize();bitangent=normal.cross(tangent)*(1 if sign>=0 else -1)
         return tangent,bitangent,normal
 
-    def SampleHigh(self,point,highImage):
+    def SampleHigh(self,point,highImage,normalHint=None):
         def Candidates():
             yield self.bvh.find_nearest(point)
             yield from sorted(self.bvh.find_nearest_range(point,.035),key=lambda row:row[3])
@@ -227,6 +246,12 @@ class ProjectionRepair:
             triangle=self.highTriangles[index]
             points=[self.high.vertices[i].co for i in triangle.vertices]
             weights=Barycentric(hit,*points)
+            if normalHint is not None and self.Basis(self.high,triangle,weights)[2].dot(normalHint)<=0:
+                # Thin lids have equally close opposite faces. Keep the real
+                # source surface on the receiver's hemisphere; never flip a
+                # sampled normal or widen the existing35mm distance bound.
+                self.orientationRejected+=1
+                continue
             uv=sum((self.uvHigh[loop].uv*weight for loop,weight in zip(triangle.loops,weights)),Vector((0,0)))
             x=min(highImage.shape[1]-1,max(0,int(uv.x*highImage.shape[1])));y=min(highImage.shape[0]-1,max(0,int(uv.y*highImage.shape[0])))
             if highImage[y,x,3]>.5:return highImage[y,x].copy(),triangle,weights,float(distance)
@@ -247,7 +272,7 @@ class ProjectionRepair:
             return highImage[minY+nearest[0],minX+nearest[1]].copy(),triangle,weights,float(distance)
         raise RuntimeError('No valid baked high surface within35mm for '+self.role+' at '+str(tuple(point)))
 
-    def Repair(self,image,channel,force=False):
+    def Repair(self,image,channel,force=False,pointFilter=None):
         size=image.size[0]
         buffer=np.empty(size*size*4,dtype=np.float32);image.pixels.foreach_get(buffer);pixels=buffer.reshape(size,size,4)
         missing=pixels[:,:,3]<.5
@@ -306,10 +331,16 @@ class ProjectionRepair:
                 if not missing[y,x]:continue
                 weights=(float(wa),float(wb),float(wc))
                 point=sum((self.low.vertices[index].co*weight for index,weight in zip(triangle.vertices,weights)),Vector((0,0,0)))
-                color,sourceTriangle,sourceWeights,distance=self.SampleHigh(point,highImage)
+                if pointFilter is not None and not pointFilter(point):
+                    # Spatial diagnostics may isolate a thin rim without
+                    # changing the rest of the same large wall triangle.
+                    missing[y,x]=False
+                    continue
+                lowBasis=self.Basis(self.low,triangle,weights)
+                color,sourceTriangle,sourceWeights,distance=self.SampleHigh(point,highImage,lowBasis[2])
                 if channel=='Normal':
                     ht,hb,hn=self.Basis(self.high,sourceTriangle,sourceWeights)
-                    lt,lb,ln=self.Basis(self.low,triangle,weights)
+                    lt,lb,ln=lowBasis
                     encoded=Vector(tuple(color[:3]*2-1));worldNormal=(ht*encoded.x+hb*encoded.y+hn*encoded.z).normalized()
                     color[:3]=[(worldNormal.dot(axis)+1)*.5 for axis in [lt,lb,ln]]
                 color[3]=1;pixels[y,x]=color;missing[y,x]=False
@@ -329,7 +360,7 @@ class ProjectionRepair:
                 take=shifted&pending;pixels[take]=shiftedPixels[take];pending[take]=False;filled+=int(take.sum())
             if not filled:break
         image.pixels.foreach_set(pixels.reshape(-1));image.update()
-        return {'repairedTexels':count,'maximumNearestHighDistanceM':maximumDistance,'source':'nearest actual high triangle / high baked surface, tangent frames converted for normal'}
+        return {'repairedTexels':count,'maximumNearestHighDistanceM':maximumDistance,'rejectedOppositeFacingCandidates':self.orientationRejected,'source':'nearest compatible-facing actual high triangle / high baked surface, tangent frames converted for normal'}
 
 
 def Image(name,size,colorSpace,default):
@@ -342,7 +373,7 @@ def SaveImage(image,path):
     image.file_format='PNG';image.filepath_raw=str(path);image.save()
 
 
-def TransferDetailNormals(highProxy,gameProxy,gameMeshes,gameMaps,partNames=('Mesh_BowMgMount',)):
+def DetailProjectionRepair(highProxy,gameProxy,gameMeshes,partNames):
     def UvKey(uv):return (round(uv[0],7),round(uv[1],7))
     keys=set()
     for obj in gameMeshes:
@@ -351,11 +382,32 @@ def TransferDetailNormals(highProxy,gameProxy,gameMeshes,gameMaps,partNames=('Me
     repair=ProjectionRepair(highProxy,gameProxy,'Armor')
     repair.lowTriangles=[triangle for triangle in repair.lowTriangles if all(UvKey(repair.uvLow[loop].uv)in keys for loop in triangle.loops)]
     assert repair.lowTriangles,'No requested detail UV triangles'
+    return repair
+
+
+def TransferDetailNormals(highProxy,gameProxy,gameMeshes,gameMaps,partNames=('Mesh_BowMgMount','Mesh_BowRoundPortCover')):
+    repair=DetailProjectionRepair(highProxy,gameProxy,gameMeshes,partNames)
     file=Path(gameMaps['Armor']['Normal']);image=bpy.data.images.load(str(file),check_existing=False);image.colorspace_settings.name='Non-Color'
     Progress('nearestDetailNormals',triangles=len(repair.lowTriangles),parts=list(partNames))
     result=repair.Repair(image,'Normal',force=True);SaveImage(image,file);bpy.data.images.remove(image)
     result.update(parts=list(partNames),triangles=len(repair.lowTriangles),scope='All mapped detail normal texels; nearest actual retained-high surface, unchanged35mm gate')
     reports['Game/DetailNormals']=result
+    return result
+
+
+def TransferDetailOcclusion(highProxy,gameProxy,gameMeshes,gameMaps,partNames=('Mesh_BowRoundPortCover',)):
+    repair=DetailProjectionRepair(highProxy,gameProxy,gameMeshes,partNames)
+    file=mapDir/'Texture_Type89GameArmorAo.png';image=bpy.data.images.load(str(file),check_existing=False);image.colorspace_settings.name='Non-Color'
+    Progress('nearestDetailOcclusion',triangles=len(repair.lowTriangles),parts=list(partNames))
+    result=repair.Repair(image,'Ao',force=True);SaveImage(image,file);bpy.data.images.remove(image)
+    # Change only the real occlusion field. Retain the packed roughness and
+    # metallic channels byte-for-byte after decoding, not reconstructed values.
+    packed=ReadRawImage(Path(gameMaps['Armor']['Orm']));occlusion=ReadRawImage(file)
+    assert packed.shape==occlusion.shape
+    packed[:,:,0]=occlusion[:,:,0]
+    image=Image('DetailOcclusionArmorOrm',packed.shape[1],'Non-Color',(1,.7,0,1));image.pixels.foreach_set(packed.reshape(-1));image.update();SaveImage(image,Path(gameMaps['Armor']['Orm']));bpy.data.images.remove(image)
+    result.update(parts=list(partNames),triangles=len(repair.lowTriangles),scope='Actual compatible-facing high AO for the thin cover; only ORM red changed;35mm limit retained')
+    reports['Game/DetailOcclusion']=result
     return result
 
 
@@ -591,16 +643,23 @@ def Export(root,path):
     groups={}
     for obj in root.children_recursive:
         if obj.type=='MESH':groups.setdefault(obj.data,[]).append(obj)
-    replacements=[]
+    replacements=[];triangulationRows=[];sourceTriangleCount=0;explicitTriangleCount=0
     try:
         for original,objects in groups.items():
             temporary=bpy.data.objects.new('Type89ExportTriangulation',original.copy())
             bpy.context.scene.collection.objects.link(temporary)
+            witness=temporary.data.attributes.new('Type89SourcePolygon','INT','FACE')
+            for index,value in enumerate(witness.data):value.value=index
             modifier=temporary.modifiers.new('ExportOnlyTriangulation','TRIANGULATE')
             if hasattr(modifier,'keep_custom_normals'):modifier.keep_custom_normals=True
             bpy.context.view_layer.objects.active=temporary
             bpy.ops.object.modifier_apply(modifier=modifier.name)
             triangulated=temporary.data;bpy.data.objects.remove(temporary,do_unlink=True)
+            original.calc_loop_triangles();triangulated.calc_loop_triangles()
+            sourceTriangleCount+=len(original.loop_triangles)*len(objects);explicitTriangleCount+=len(triangulated.loop_triangles)*len(objects)
+            row=AuditTriangulation(original,triangulated,len(objects),objects[0].name,bpy.context.scene['Type89Quality']=='Game')
+            if row:triangulationRows.append(row)
+            triangulated.attributes.remove(triangulated.attributes['Type89SourcePolygon'])
             for obj in objects:obj.data=triangulated
             replacements.append((original,triangulated,objects))
         SelectRoot(root)
@@ -609,8 +668,10 @@ def Export(root,path):
         for original,triangulated,objects in replacements:
             for obj in objects:obj.data=original
             if triangulated.users==0:bpy.data.meshes.remove(triangulated)
-    CleanGlb(path)
+    CleanGlb(path,includeEnclosed=False)
     RepairExportTangents(path)
+    CleanEnclosedShoeSurfaces(path)
+    WriteTriangulationAccounting(path,{'sourceRenderedTriangles':sourceTriangleCount,'explicitRenderedTrianglesBeforeCleanup':explicitTriangleCount,'removedRenderedZeroAreaTriangles':sourceTriangleCount-explicitTriangleCount,'rows':triangulationRows,'scope':'Only zero-area fan count differences; changed Game fans preserve every positive triangle exactly. High may retessellate the same polygon with equal positive-triangle count and area.'})
 
 
 def Main():
@@ -634,6 +695,9 @@ def Main():
     highRoot=highObjects['Model_Type89MediumTank']
     assert gameRoot['geometryVersion']==highRoot['geometryVersion'],'High/game geometry versions differ'
     assert gameRoot.get('geometryRecipeSha256') and gameRoot['geometryRecipeSha256']==highRoot.get('geometryRecipeSha256'),'Rebuild both gray sources from the same geometry recipe before baking'
+    for root in [gameRoot,highRoot]:
+        root['surfaceRevision']=revision or workName
+        root['pbrProbe']=probe
     bpy.context.view_layer.update()
     gameMeshes=UniqueMeshes(gameRoot);highMeshes=UniqueMeshes(highRoot)
     for obj in gameMeshes:
@@ -644,7 +708,7 @@ def Main():
                 shader.inputs['Alpha'].default_value=1.0
     for obj in [gameRoot]+list(gameRoot.children_recursive):Visible(obj,False)
     for obj in highObjects.values():Visible(obj,False)
-    bpy.context.scene.render.engine='CYCLES';bpy.context.scene.cycles.samples=4 if probe else 16
+    bpy.context.scene.render.engine='CYCLES';bpy.context.scene.cycles.device='CPU';bpy.context.scene.cycles.samples=4 if probe else 16
     for obj in bpy.context.scene.objects:
         if obj.get('ReviewOnly') or obj.name.startswith(('Studio','Light_')):obj.hide_render=True
     graphs=pbr.BuildAuthoringMaterials()
@@ -672,8 +736,10 @@ def Main():
     highMaps=BakeAtlases('High',highProxy,None,graphs,scratch)
     for obj in highObjects.values():Visible(obj,False)
     gameMaps=BakeAtlases('Game',gameProxy,highProxy,graphs,scratch)
-    TransferDetailNormals(highProxy,gameProxy,gameMeshes,gameMaps)
     reports['Game/HardwarePbr']=TransferHardwarePbr(highProxy,gameProxy,gameMaps)
+    # Protect the thin cover and mount field after small-hardware gutter work.
+    TransferDetailNormals(highProxy,gameProxy,gameMeshes,gameMaps)
+    TransferDetailOcclusion(highProxy,gameProxy,gameMeshes,gameMaps)
     highMats={role:BakedMaterial(role,highMaps.get(role),'High') for role in roles+['Shadow']}
     gameMats={role:BakedMaterial(role,gameMaps.get(role),'Game') for role in roles+['Shadow']}
     Assign(highRoot,highMats);Assign(gameRoot,gameMats)
@@ -683,7 +749,7 @@ def Main():
     for proxy in [gameProxy,highProxy]:bpy.data.objects.remove(proxy,do_unlink=True)
     for obj in highObjects.values():Visible(obj,False)
     for obj in [gameRoot]+list(gameRoot.children_recursive):Visible(obj,True)
-    scene=bpy.context.scene;scene['Type89Stage']='PbrProbe' if probe else 'Pbr';scene['Type89Quality']='Game'
+    scene=bpy.context.scene;scene['Type89Stage']='PbrProbe' if probe else 'Pbr';scene['Type89Quality']='Game';scene.cycles.device='CPU'
     gameRoot['acceptance']='PBR_PROBE' if probe else 'PBR_PENDING_VISUAL_REVIEW'
     for obj in scene.objects:
         if obj.get('ReviewOnly') or obj.name.startswith(('Studio','Light_')):obj.hide_render=False
@@ -706,11 +772,16 @@ def Main():
     assert all(hashlib.sha256(Path(file).read_bytes()).hexdigest()==digest for file,digest in sourceHashes.items()),'Gray source changed during the bake; do not promote this candidate'
     assert hashlib.sha256((here/'Script_Type89PbrMaterials.py').read_bytes()).hexdigest()==authoringHash,'Authoring material script changed during the bake'
     assert hashlib.sha256(Path(__file__).read_bytes()).hexdigest()==bakeScriptHash,'PBR bake script changed during the bake'
-    if not probe:
+    if not probe and not stageOnly:
         assetDir.mkdir(parents=True,exist_ok=True)
+        pathArtifact=reviewDir/'Data_TrackPath.json'
+        pathData=json.loads(pathArtifact.read_text(encoding='utf8'))
+        assert 2*pathData['linksPerSide']==len([obj for obj in highRoot.children_recursive if obj.name.startswith('Node_TrackLink')]),'Runtime path does not match the exported track count'
+        (assetDir/'Data_TrackPath.json').write_bytes(pathArtifact.read_bytes())
         (assetDir/'Model_Type89MediumTank.glb').write_bytes(gameOutput.read_bytes())
         (exportedDir/gameOutput.name).write_bytes(gameOutput.read_bytes())
     report={'probe':probe,'elapsedSeconds':time.time()-started,'highBlend':str(highBlend),'gameBlend':str(gameBlend),'highGlb':str(highOutput),'gameGlb':str(gameOutput),'highMaps':highMaps,'gameMaps':gameMaps,'gameDataProjection':'BakedHighBaseAndScalarChannels; Armor target retains actual HighRubber contact surfaces; geometric/bump normals projected independently','exportBasis':'ExplicitMikkTangents_TemporarySharedTriangulationCopies','projectionRepairs':reports,'detailNormalTransfer':reports.get('Game/DetailNormals'),'geometryVersion':highRoot['geometryVersion'],'geometryRecipeSha256':highRoot['geometryRecipeSha256'],'geometrySourceSha256':sourceHashes[str(highFile)],'gameGeometrySourceSha256':sourceHashes[str(gameFile)],'materialAuthoringScriptSha256':authoringHash,'bakeScriptSha256':bakeScriptHash,'materialAccepted':False,'scope':'restored Tsuchiura car; micro-wear and unobserved interiors are explicitly inferred'}
+    report['stagedOnly']=stageOnly
     (reviewDir/('Data_Pbr'+workName+'Build.json')).write_text(json.dumps(report,indent=2),encoding='utf8')
     Progress('complete',report=str(reviewDir/('Data_Pbr'+workName+'Build.json')))
 

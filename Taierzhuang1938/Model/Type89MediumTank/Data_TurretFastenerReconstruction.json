@@ -1,0 +1,176 @@
+{
+  "status": "WorkingVisibleGroupsAndLeftAperture_IntegratedAuthoring",
+  "referenceIds": [
+    2,
+    19,
+    20
+  ],
+  "geometryVersion": "20261027GeometryV54",
+  "leftGroups": [
+    {
+      "name": "FrontBodySingle",
+      "angleRadians": 1.95,
+      "angularOffsets": [
+        0
+      ],
+      "rowZ": [
+        0.178,
+        0.268,
+        0.358,
+        0.448,
+        0.538
+      ],
+      "evidence": "2007 native front panel has one body column of five, separate from the adjacent mantlet-frame column; its2025cross-view identity is not accepted"
+    },
+    {
+      "name": "MiddleStiffenerPair",
+      "angleRadians": 2.49,
+      "angularOffsets": [
+        -0.02,
+        0.02
+      ],
+      "rowZ": [
+        0.166,
+        0.266,
+        0.366,
+        0.466,
+        0.566
+      ],
+      "evidence": "Five paired rows independently visible in2007and2025, excluding the upper circumference and lower wide mounting group"
+    },
+    {
+      "name": "RearStiffenerPair",
+      "angleRadians": 3.045,
+      "angularOffsets": [
+        -0.02,
+        0.02
+      ],
+      "rowZ": [
+        0.166,
+        0.266,
+        0.366,
+        0.466,
+        0.566
+      ],
+      "evidence": "Five paired rows independently visible in2007and2025; the faint2025upper heads are not assigned exact circle centres"
+    }
+  ],
+  "coordinates": "Original pre-compression turret coordinates; existing BodyZ transformation remains unchanged",
+  "observedRowBasis": "Ratios of first-row gap and row interval to the separate upper circumference, using native crops; angular stations retain the baseline while global pose/camera effects remain open",
+  "leftObservedHeadsBefore": 36,
+  "leftObservedHeadsAfter": 25,
+  "rowCountAndSinglePairedDistinctionObserved": true,
+  "metricPositionsCertified": false,
+  "rightPatternChanged": "Only independently visible front and middle groups",
+  "sourceIntegrated": true,
+  "canonicalReplaced": false,
+  "goalComplete": false,
+  "limits": [
+    "Only the visible left ladder topology is corrected in this isolated study; no opposite pattern is copied without its own check",
+    "Five-row heights are camera-conditioned relative-layout reconstruction, not factory dimensions",
+    "The unaccepted joint pose fit is not used to move the turret, change the shell or alter camera files",
+    "Upper and lower circumference rows, lower mounting groups, mantlet frame and all functional pivots remain unchanged"
+  ],
+  "groups": [
+    {
+      "name": "FrontBodySingle",
+      "angleRadians": 1.95,
+      "angularOffsets": [
+        0
+      ],
+      "rowZ": [
+        0.178,
+        0.268,
+        0.358,
+        0.448,
+        0.538
+      ],
+      "evidence": "2007 native front panel has one body column of five, separate from the adjacent mantlet-frame column; its2025cross-view identity is not accepted"
+    },
+    {
+      "name": "MiddleStiffenerPair",
+      "angleRadians": 2.49,
+      "angularOffsets": [
+        -0.02,
+        0.02
+      ],
+      "rowZ": [
+        0.166,
+        0.266,
+        0.366,
+        0.466,
+        0.566
+      ],
+      "evidence": "Five paired rows independently visible in2007and2025, excluding the upper circumference and lower wide mounting group"
+    },
+    {
+      "name": "RearStiffenerPair",
+      "angleRadians": 3.045,
+      "angularOffsets": [
+        -0.02,
+        0.02
+      ],
+      "rowZ": [
+        0.166,
+        0.266,
+        0.366,
+        0.466,
+        0.566
+      ],
+      "evidence": "Five paired rows independently visible in2007and2025; the faint2025upper heads are not assigned exact circle centres"
+    },
+    {
+      "name": "RightFrontBodySingle",
+      "angleRadians": 1.1915926535897932,
+      "angularOffsets": [
+        0
+      ],
+      "rowZ": [
+        0.178,
+        0.268,
+        0.358,
+        0.448,
+        0.538
+      ],
+      "evidence": "Independent native2025right-front20 has five body heads beside the separate mantlet-frame column"
+    },
+    {
+      "name": "RightMiddleStiffenerPair",
+      "angleRadians": 0.6515926535897929,
+      "angularOffsets": [
+        -0.02,
+        0.02
+      ],
+      "rowZ": [
+        0.166,
+        0.266,
+        0.366,
+        0.466,
+        0.566
+      ],
+      "evidence": "Independent native2025right-front20 shows the visible mid-side paired ladder with five rows; projected baseline identifies this group, rear remains occluded"
+    }
+  ],
+  "observedHeadsBefore": 60,
+  "observedHeadsAfter": 40,
+  "rightRearPatternChanged": false,
+  "headRadiusChanged": false,
+  "headSizeStudy": "Relative source/frame circle ratios vary0.74..1.07; median0.81versus current0.75 does not establish a needed metric increase, so radius stays9mm",
+  "leftSmallAperture": {
+    "references": [
+      2,
+      19
+    ],
+    "angleOffsetFromRearGroup": 0.09,
+    "rowIndexFromBottom": 1,
+    "widthYM": 0.025,
+    "heightSourceZM": 0.046,
+    "boreDepthXM": 0.16,
+    "interiorBackOffsetXM": 0.045,
+    "functionVerified": false,
+    "metricCertified": false,
+    "observedRelation": "Immediately aft of the left rear paired ladder, approximately at its fourth row from top; opening is vertically oval in both dates",
+    "sizeBasis": "Approximately0.45of a vertical head-row interval in height,0.30in side-view width; source Z is compressed by the unchanged BodyZ transform",
+    "limits": "Location/depth are camera-conditioned reconstruction. Nearby thin horizontal feature and fasteners are recorded separately and are not invented here."
+  }
+}

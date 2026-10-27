@@ -8,6 +8,8 @@ import {ReadGlb,GeometryHash} from '../_import/Script_CompressEmbeddedTextures.m
 
 const project=path.resolve(import.meta.dirname,'..');
 const fileArgument=process.argv.find(value=>value.startsWith('--file='))?.slice(7);
+const webpEffort=Number(process.argv.find(value=>value.startsWith('--effort='))?.slice(9)??6);
+if(!Number.isInteger(webpEffort)||webpEffort<0||webpEffort>6)throw Error('Lossless encoder effort must be an integer from0to6');
 const target=fileArgument?path.resolve(fileArgument):path.join(project,'Model/Type89MediumTank/Model_Type89MediumTank.glb');
 if(!target.includes('Type89MediumTank')||!target.toLowerCase().endsWith('.glb'))throw Error('Type89 packer target must be this asset GLB');
 const auditFile=fileArgument?path.join(path.dirname(target),'Data_TexturePackingProbe.json'):path.join(project,'Model/Type89MediumTank/Data_TexturePacking.json');
@@ -29,7 +31,7 @@ for(const [index,image]of doc.images.entries()){
   const keepAlpha=alphaImages.has(index);
   const source=await (keepAlpha?sharp(encoded).ensureAlpha():sharp(encoded).removeAlpha()).raw().toBuffer({resolveWithObject:true});
   const png=await sharp(source.data,{raw:{width:source.info.width,height:source.info.height,channels:source.info.channels}}).png({compressionLevel:9}).toBuffer();
-  const webp=await sharp(source.data,{raw:{width:source.info.width,height:source.info.height,channels:source.info.channels}}).webp({lossless:true,effort:6}).toBuffer();
+  const webp=await sharp(source.data,{raw:{width:source.info.width,height:source.info.height,channels:source.info.channels}}).webp({lossless:true,effort:webpEffort}).toBuffer();
   let output;
   for(const candidate of [webp,png].sort((a,b)=>a.length-b.length)){
     const decoded=await (keepAlpha?sharp(candidate).ensureAlpha():sharp(candidate).removeAlpha()).raw().toBuffer({resolveWithObject:true});
@@ -51,7 +53,7 @@ const output=Pack(doc,Buffer.concat(buffers));
 if(GeometryHash(ReadGlb(output))!==GeometryHash(original))throw Error('Non-image buffers changed');
 for(const key of ['nodes','meshes','skins','animations','scenes','accessors'])if(JSON.stringify(doc[key])!==JSON.stringify(original.doc[key]))throw Error('Articulation/geometry changed: '+key);
 await fs.writeFile(target,output);
-const report={version:2,method:'Opaque image RGB remains exact; alpha-bearing base images retain exact RGBA and resolution; lossless WebP or PNG',beforeBytes:bytes.length,afterBytes:output.length,sourceSha256:Hash(bytes),runtimeSha256:Hash(output),geometrySha256:GeometryHash(ReadGlb(output)),images:rows};
+const report={version:2,method:'Opaque image RGB remains exact; alpha-bearing base images retain exact RGBA and resolution; lossless WebP or PNG',losslessWebpEffort:webpEffort,beforeBytes:bytes.length,afterBytes:output.length,sourceSha256:Hash(bytes),runtimeSha256:Hash(output),geometrySha256:GeometryHash(ReadGlb(output)),images:rows};
 await fs.writeFile(auditFile,JSON.stringify(report,null,2)+'\n');
 if(!fileArgument){
   const sourceExports='C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/Exports';

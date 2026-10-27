@@ -1,0 +1,139 @@
+{
+  "revision": "RearMachineGunShroudFollowup20261027",
+  "status": "Same2007ShroudConfirmed_DimensionsAndParentFitOpen",
+  "primaryAppearance": "Restored Tsuchiura Otsu, 2007 unveiling; do not apply the bow-gun accessory decision to the rear gun",
+  "references": [
+    {
+      "id": 34,
+      "sourceUrl": "https://trafficnews.jp/photo/82388",
+      "imageUrl": "https://trafficnews.jp/wp-content/uploads/2018/12/82388_ph21.jpg",
+      "sourceCaptionRead": "Gallery identifies this as the 2007 restoration unveiling",
+      "nativeSize": [
+        600,
+        400
+      ],
+      "sha256": "75ff42a2bb13dc765f885b9be7fe6eedbd14fe86921f010366a63cca9b624ef6",
+      "observation": "A dark tapered rear-gun sheath is visible beyond the turret rear silhouette; the bow gun in the same photo retains the exposed cylindrical jacket."
+    },
+    {
+      "id": 19,
+      "sourceUrl": "https://commons.wikimedia.org/wiki/File:Imperial_Japanese_Army_Type_89_Medium_Tank_Otsu_left_side_view_at_JGSDF_Camp_Tsuchiura_September_28,_2025.jpg",
+      "nativeCrop": [
+        2750,
+        650,
+        3400,
+        1100
+      ],
+      "observation": "The native side view resolves a broad-base, tapering dark sheath with a small end. It contradicts the current narrow, near-parallel open pipe."
+    }
+  ],
+  "currentAuthoring": {
+    "version": "20261027GeometryV43",
+    "mountNode": "Node_TurretMgMount",
+    "movingNode": "Node_TurretMachineGun",
+    "outerFlangeRadiusM": 0.135,
+    "ballMaximumRadiusM": 0.107,
+    "pipeProfileRadiusAxisM": [
+      [
+        0.037,
+        0.08
+      ],
+      [
+        0.034,
+        0.3
+      ],
+      [
+        0.028,
+        0.36
+      ],
+      [
+        0.017,
+        0.36
+      ],
+      [
+        0.017,
+        0.29
+      ]
+    ]
+  },
+  "localShapeStudy": {
+    "profileRadiusAxisM": [
+      [
+        0.056,
+        0.08
+      ],
+      [
+        0.055,
+        0.14
+      ],
+      [
+        0.046,
+        0.24
+      ],
+      [
+        0.03,
+        0.35
+      ],
+      [
+        0.016,
+        0.415
+      ],
+      [
+        0.012,
+        0.43
+      ]
+    ],
+    "dimensionsVerifiedFromFactory": false,
+    "parentPivotUnchanged": true,
+    "productionIntegrated": false,
+    "evidence": "tmp/Type89FollowupV43/Data_RearMgShroudStudy.json"
+  },
+  "requiredNextWork": [
+    "Preserve the photo-visible lower mounting lobe/elongated features when integrating the reusable exterior builder; retain the established fixed/moving hierarchy.",
+    "Replace the pipe envelope with the confirmed tapered sheath while preserving independent ball-seat yaw/pitch.",
+    "Validate the parent flange/ball proportions and turret/reference pose before assigning the apparent global displacement to one mount coordinate.",
+    "Check end-cap/opening visibility and real yaw/pitch clearance; do not infer firing capability or exact factory stops from the museum cover."
+  ],
+  "limits": [
+    "The sheath type is corroborated in2007 and2025; its metric profile and exact mounting depth remain study parameters.",
+    "An approximately aligned local silhouette is not proof of the global turret/camera/pose fit.",
+    "No new gun pivot, factory firing arc, hidden breech or functional weapon mechanism is certified."
+  ],
+  "userApproved": false,
+  "goalComplete": false,
+  "editableLocalStudy": {
+    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\RearMachineGunStudy20261027\\Scene_Type89RearMachineGunStudy.blend",
+    "sha256": "90900339cbea7f245b78b65fc10c8d845fa00898375056629916c924c04a78d4",
+    "sourceScriptSha256": "85b8b96c89e90bca4eed7ac7b061d45c64d0645bafb3a47c2df3106263fbb99d",
+    "geometryBuilder": "_blender/Script_Type89RearGunExterior.py",
+    "geometryBuilderSha256": "8c649014e6cce798775015694b49db107df2d226a8b35e3f83426bffb4969136",
+    "geometryData": "Data_RearGunExterior.json",
+    "geometryDataSha256": "ff47b4a855685d2bd8547f20818aa599f497ede5861aab95a81fc34cf694aabf",
+    "footVsBallAndSheathPoses": 25,
+    "pass": true,
+    "productionIntegrated": false
+  },
+  "lowerMountObservation": {
+    "reference": 19,
+    "nativeContextCrop": [
+      2700,
+      750,
+      3280,
+      1390
+    ],
+    "visible": "Lower mounting lobe and two elongated dark features",
+    "reconstructed": "Fixed foot with two elongated openings; exact fastener identity, thickness and occupancy inferred"
+  },
+  "productionGeometry": {
+    "version": "20261027GeometryV44",
+    "builder": "_blender/Script_Type89RearGunExterior.py",
+    "data": "Data_RearGunExterior.json",
+    "fullPbrComplete": true,
+    "sourcePreservation": "All old geometry/normal/UV/pivot data except the removed rear Steel pipe retained exactly",
+    "actualImportedGunSweepPosesPerQuality": 25,
+    "pass": true,
+    "globalFitVerified": false,
+    "currentPbrSha256": "b46acbd47300ed0ac921b22522f5135ac46dcbc8a431e7fe151913c428ac379c",
+    "surfaceRevision": "SurfaceV11PoseOcclusionWorking"
+  }
+}

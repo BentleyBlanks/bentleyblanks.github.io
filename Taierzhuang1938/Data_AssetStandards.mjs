@@ -123,9 +123,9 @@ export const EXTERNAL_GLB_STANDARDS = Object.freeze([
     runtimeTexture:'44独立部件、132张原字节PBR图；Base sRGB、线性ORM及16-bit OpenGL法线',
     note:'按用户2026-10-25指定的6万三角目标。原高源留OneDrive；未改部件双向顶点/表面误差≤0.463mm；照门缺口为游戏瞄准补件。第一人称、角色和掉落枪共用米制-Z朝向；这是唯一运行时汉阳造模型。'}),
   Object.freeze({ id: "Type89MediumTank", name: "八九式中战车乙型（馆藏外形复原）", pack: "Type89MediumTank/Model_Type89MediumTank.glb",
-    sourceTriangles: 1130810, selectedGameSourceTriangles: 240278, actualTriangles: 240278, exportRemovedZeroAreaTriangles: 0, targetTriangles: 240000, policy: "target",
-    sourceTexture: "土浦保存车多机位图证；高源保留、按物理表面分区程序烘焙", runtimeTexture: "SurfaceV5：7套21张内嵌Base / OpenGL Normal / ORM；4K逐点遮蔽与细漆层、2K实孔排气罩MASK；铸钢/磨亮接触带/排气/玻璃PBR",
-    note: "独立资产，不替换既有Type89Tank。按用户细节返工采用240k目标；真实铸件倒角、销孔、圆头铆钉与压制轮缘保留，实际性能另行验证。米制Y-up、-Z车头；74节/侧独立履带、30轮组及各可动轴心保留。轮缘按同车原片比例复原；微细旧损、接触带材质和未见内装标推定，不凭馆藏照认定滕县参战。" }),
+    sourceTriangles: 1462012, selectedGameSourceTriangles: 419856, selectedGameVisibleSourceTriangles: 417264, actualTriangles: 417130, exportRemovedZeroAreaTriangles: 132, exportTriangulationZeroAreaTriangles: 2, exportRemovedWhollyEnclosedTriangles: 2592, targetTriangles: 400000, policy: "target",
+    sourceTexture: "土浦保存车同车多机位图证；高源保留、按物理表面分区程序烘焙", runtimeTexture: "SurfaceV12：9材质25张内嵌图；4K底色/8K法线/4K ORM装甲，2K细漆膜与浅铸纹、独立反射层及实孔排气罩MASK",
+    note: "可选资产，选择后加载。米制Y-up、-Z车头；每侧81节独立履带及15轮组、整周炮塔、主炮与两挺机枪可动。400k目标/420k上限，零面积扇形与封闭内表面分别证明和记账。外形为馆藏参考；微观漆面、隐藏构造、限位、速度及门枪避让为推定，不据此认定滕县参战。" }),
   Object.freeze({ id: "NakajimaKi4", name: "九四式侦察机（同型参考复原）", pack: "NakajimaKi4/Model_NakajimaKi4.glb",
     sourceTriangles: 358399, actualTriangles: 179679, targetTriangles: 180000, policy: "target",
     sourceTexture: "同型原图与1937原始说明书；可编辑高源外置，材质和未标结构为推定", runtimeTexture: "V48：43张内嵌Base / OpenGL Normal / ORM与装配AO；原4K机身、布翼和机罩，独立金属、轮胎、尾橇与桨叶AO",
@@ -302,11 +302,14 @@ export function ReductionPercent(sourceTriangles, actualTriangles) {
 
 export function ExternalComplianceFor(record) {
   const selected = record.selectedGameSourceTriangles;
-  const removed = record.exportRemovedZeroAreaTriangles ?? 0;
-  const retained = Number.isFinite(selected) && selected > record.targetTriangles
-    && ThresholdTriangleTarget(selected, record.targetTriangles) === selected
-    && Number.isInteger(removed) && removed >= 0
-    && record.actualTriangles === selected - removed;
+  const zero = record.exportRemovedZeroAreaTriangles ?? 0;
+  const triangulationZero = record.exportTriangulationZeroAreaTriangles ?? 0;
+  const enclosed = record.exportRemovedWhollyEnclosedTriangles ?? 0;
+  const visible = record.selectedGameVisibleSourceTriangles ?? selected - enclosed;
+  const retained = Number.isFinite(selected) && visible === selected - enclosed && visible > record.targetTriangles
+    && ThresholdTriangleTarget(visible, record.targetTriangles) === visible
+    && [zero, triangulationZero, enclosed].every(value => Number.isInteger(value) && value >= 0)
+    && record.actualTriangles === selected - zero - triangulationZero - enclosed;
   const close = record.actualTriangles <= record.targetTriangles * 1.001
     && record.actualTriangles >= record.targetTriangles * .97;
   return { label: retained ? "5% 免减面" : close

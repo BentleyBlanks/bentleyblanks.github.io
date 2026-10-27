@@ -12,6 +12,8 @@ import {
   BUILDING_DAMAGE_STATES, BUILDING_DAMAGE_STATE_OPTIONS, SupportsBuildingDamageStates,
 } from "./Script_EditorScene.mjs";
 import { MESHES, MeshUrl } from "./Data_Meshes.mjs";
+import { OPTIONAL_VEHICLE_ASSETS } from "./Data_VehicleAssets.mjs";
+import { Type89Motion } from "./Model/Type89MediumTank/Script_Type89Motion.mjs";
 import { LoadDocument } from "./Script_MeshLoad.mjs";
 import {
   ExternalPropCatalog, InstantiateExternalProp, LoadExternalWorldModels,
@@ -46,6 +48,9 @@ export class PropLibraryEditor {
     this.preview = null;
     this.previewToken = 0;
     this.disposed = false;
+    this.vehicleMotion = null;
+    this.vehicleDemo = "stopped";
+    this.vehicleTime = 0;
   }
 
   Enter(root) {
@@ -83,6 +88,17 @@ export class PropLibraryEditor {
     this.damageSection = Section(body, "建模状态");
     this.damageChips = Chips(this.damageSection, BUILDING_DAMAGE_STATE_OPTIONS, this.damageState,
       (value) => this.SetDamageState(value));
+
+    this.vehicleSection = Section(body, "战车可动件演示");
+    this.vehicleSection.parentElement.hidden = true;
+    this.vehicleChips = Chips(this.vehicleSection, [
+      { value: "all", label: "全部联动" },
+      { value: "tracks", label: "履带与轮组" },
+      { value: "turret", label: "炮塔与主炮" },
+      { value: "machineGuns", label: "两挺机枪" },
+      { value: "stopped", label: "停止复位" },
+    ], "stopped", (mode) => this.SetVehicleDemo(mode));
+    Note(this.vehicleSection, "左右履带独立行程；炮塔整周回转。演示速度和机枪限位为复原参数。");
 
     const camera = Section(body, "预览相机");
     this.gridToggle = Toggle(camera, "米格与地台", true,
@@ -167,6 +183,11 @@ export class PropLibraryEditor {
   }
 
   ClearPreview() {
+    this.vehicleMotion = null;
+    this.vehicleDemo = "stopped";
+    this.vehicleTime = 0;
+    this.vehicleChips?.Set("stopped");
+    if (this.vehicleSection) this.vehicleSection.parentElement.hidden = true;
     for (const geometry of this.ownedGeometries) geometry.dispose();
     this.ownedGeometries.length = 0;
     if (this.previewRoot && this.previewRoot.parent) this.previewRoot.parent.remove(this.previewRoot);
@@ -201,6 +222,20 @@ export class PropLibraryEditor {
       externalRoot.traverse((node) => { if (node.isMesh) meshes += 1; });
       built = { loaded: true, colliders: [], meshes };
       this.status.textContent = "仅视觉，无碰撞";
+      const vehicle = OPTIONAL_VEHICLE_ASSETS.find((asset) => asset.catalogId === entry.external);
+      if (vehicle?.id === "Type89MediumTank") {
+        try {
+          const response = await fetch(vehicle.trackPathUrl);
+          if (!response.ok) throw new Error(`Track path HTTP ${response.status}`);
+          const trackPath = await response.json();
+          if (this.disposed || token !== this.previewToken) return;
+          this.vehicleMotion = new Type89Motion(externalRoot, trackPath);
+          this.vehicleSection.parentElement.hidden = false;
+          this.SetVehicleDemo("all");
+        } catch (error) {
+          if (!this.disposed && token === this.previewToken) this.status.textContent = `可动件载入失败：${error.message}`;
+        }
+      }
     } else {
       built = BuildPlaceableVisual(root, entry, item, {
         library: this.host.library,
@@ -304,7 +339,29 @@ export class PropLibraryEditor {
     this.facts.Set("库覆盖", `${this.entries.length} / ${this.entries.length}`, "good");
   }
 
-  Update() {
+  SetVehicleDemo(mode) {
+    this.vehicleDemo = mode;
+    this.vehicleTime = 0;
+    this.vehicleMotion?.Reset();
+    this.vehicleChips?.Set(mode);
+  }
+
+  Update(dt = 0) {
+    const motion = this.vehicleMotion, mode = this.vehicleDemo;
+    if (motion && mode !== "stopped") {
+      const delta = Math.max(0, Math.min(dt, .1));
+      this.vehicleTime += delta;
+      const t = this.vehicleTime, all = mode === "all";
+      if (all || mode === "tracks") motion.Update(delta, .35, all ? .25 : .35);
+      motion.SetPose({
+        turretYaw: all || mode === "turret" ? t * .24 : 0,
+        mainGunPitch: all || mode === "turret" ? .08 * Math.sin(t * .7) : 0,
+        bowMachineGunYaw: all || mode === "machineGuns" ? .14 * Math.sin(t * .8) : 0,
+        bowMachineGunPitch: all || mode === "machineGuns" ? .10 * Math.sin(t * .63) : 0,
+        turretMachineGunYaw: all || mode === "machineGuns" ? .14 * Math.sin(t * .72 + .4) : 0,
+        turretMachineGunPitch: all || mode === "machineGuns" ? .12 * Math.sin(t * .67) : 0,
+      });
+    }
     this.host.studio.ApplyCamera();
   }
 }

@@ -50,12 +50,15 @@ export const testDefs = {
   HanYang173RAssetTest: {file:'Script_HanYang173RAssetTest.mjs',desc:'HanYang 60k actual GLB, all 44 parts, source PBR payload identity, tangent frames and packed material decoding'},
   HanYang173RBrowserTest: {file:'Script_HanYang173RBrowserTest.mjs',timeoutMs:600000,desc:'Actual HanYang 173R FPS/world identity, high wood/metal lighting and whitebox weapon-only reflections'},
   HanYang173RDefaultTest: {file:'Script_HanYang173RDefaultTest.mjs',timeoutMs:720000,desc:'Default blockout rifle, both arm paths, retired model absence and explicit GLB failure'},
-  Type89MediumTankTest: {file:"Script_Type89MediumTankTest.mjs",timeoutMs:120000,desc:"Type89 actual GLB: explicit240k close-detail budget, rigid hinges, metre bounds, PBR, mapped hit coverage and finite tangent bases"},
+  Type89MediumTankTest: {file:"Script_Type89MediumTankTest.mjs",timeoutMs:120000,desc:"Type89 actual GLB: declared400k target/420k ceiling, wheel profiles, cast openings, texel density, rigid hinges and finite tangent bases"},
   Type89MediumTankBrowserTest: {file:"Script_Type89MediumTankBrowserTest.mjs",timeoutMs:180000,desc:"Type89 real renderer: independent treads/all wheels, turret/recoil/hatches, physical PBR colour spaces and reloaded model views"},
   HistoryCodexBrowserTest: {file:"Script_HistoryCodexBrowserTest.mjs",timeoutMs:300000,desc:"Archive: sourced records, soft book folds/cancel/back, 17 pages, zoom, disposal and mobile"},
   TracerLifetimeTest: {file:"Script_TracerLifetimeTest.mjs",desc:"Production tracer short-hit boundary, lifetime, endpoint and strict particle validation"},
   AircraftGeometryTest: { file: "Script_AircraftGeometryTest.mjs", desc: "Reviewed Ki21/Ki30 geometry: triangle reduction, source bounds, protected parts and byte-identical images" },
   NakajimaKi4AssetTest: { file: "Script_NakajimaKi4AssetTest.mjs", desc: "Ki4 actual GLB: primary dimensions, live hinge hierarchy, UV/PBR, finite normals and noncollapsed triangles" },
+  NakajimaKi4ReleaseAssetTest: {file:"Script_NakajimaKi4ReleaseAssetTest.mjs",timeoutMs:120000,desc:"Ki4 release: actual game bytes, retained service apertures, pivots and mapped PBR"},
+  NakajimaKi4AoFieldTest: {file:"Script_NakajimaKi4AoFieldTest.mjs",timeoutMs:300000,desc:"Manual Ki4 AO comparison against the retained local high GLB"},
+  NakajimaKi4ReleaseBrowserTest: {file:"Script_NakajimaKi4ReleaseBrowserTest.mjs",timeoutMs:300000,desc:"Manual Ki4 release/library viewer; requires a local preview server"},
   PublishAssetsTest: {file:"Script_PublishAssetsTest.mjs",timeoutMs:120000,desc:"GPU publish pipeline: source/dimension/color contracts, cache validation and overrides"},
   PublishMobileAssetsTest: {file:"Script_PublishMobileAssetsTest.mjs",timeoutMs:600000,desc:"手机版贴图（2026-10-26）：1024 + ASTC 6×6 / 法线 4×4 的尺寸、格式、mip、解回像素与原图一致（抓逐通道缩放错）、翻转、模型只换图，SwiftShader 里 ?mobileAssets=1/0 加载器拿到 ASTC / 电脑版"},
   PublishAssetsBrowserTest: {file:"Script_PublishAssetsBrowserTest.mjs",timeoutMs:600000,desc:"Published GPU loaders: BC7/DXT formats, RGBA fallback, both UV directions and model pixel comparisons"},
@@ -566,6 +569,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "NakajimaKi4ReleaseBrowserTest",
   "WeaponRangeStartupBrowserTest",
   "FallingSoilBrowserTest",
   "Type89MediumTankBrowserTest",
@@ -792,6 +796,8 @@ export const tier0Browser = ["BootTest", "BootStallTest", "GeoTest"];
 export const tier0 = [...tier0Browser, ...tier0Fast];
 
 export const tier2 = [
+  "NakajimaKi4AoFieldTest",
+  "NakajimaKi4ReleaseBrowserTest",
   "FpsReloadClearanceTest",
   "HanYangReloadClearanceTest",
   "OpeningActorPerformanceBrowserTest",
@@ -810,8 +816,8 @@ export const tier2 = [
 
 export const domains = {
   flareEffects:{label:'Signal and illumination flares',tests:['FlareTest','FlareSurfaceTest','FlareFlickerTest','FlareParticlesTest','FlareFlickerBrowserTest','FlareEffectsBrowserTest','FlareCameraBrowserTest','FlareNightBrowserTest','FlarePhotometryBrowserTest','FlareOpticalScaleBrowserTest','FlareTemporalResponseBrowserTest','FlareTemporalResponse30BrowserTest','FlareWorldBrowserTest','FlareShadowBrowserTest','ModuleGraphTest','ParticleEditorControlsTest','ParticleEditorWhiteboxTest']},
-  type89MediumTank: {label:"Type89 standalone articulated reference tank",tests:["Type89MediumTankTest","Type89MediumTankBrowserTest","ModelFacingTest","AssetStandardsTest"]},
-  nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "AssetStandardsTest"] },
+  type89MediumTank: {label:"Type89 optional articulated reference tank",tests:["Type89MediumTankTest","Type89MediumTankBrowserTest","ModelFacingTest","AssetStandardsTest","ModuleGraphTest"]},
+  nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "NakajimaKi4ReleaseAssetTest", "AssetStandardsTest"],tier2Tests:["NakajimaKi4AoFieldTest","NakajimaKi4ReleaseBrowserTest"] },
   kawasakiType88: { label: "八八式侦察机二型独立资产", tests: ["KawasakiType88AssetTest", "KawasakiType88BrowserTest", "ModelFacingTest", "AssetStandardsTest", "ModuleGraphTest"] },
   singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "TextureStandardsTest", "AssetStandardsTest"] },
   clothRange: { label: "独立布料测试场与双面吸血", tests: ["ClothRangeTest", "ClothBloodTest", "ClothRangeBrowserTest", "ClothBloodBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
@@ -947,7 +953,7 @@ const changedDomainRules = [
   {domain:'particles',pattern:/FallingSoil/},
   {domain:'flareEffects',pattern:/Flare(?:Visual|Optics|Particles|OpticalScale|Flicker|Photometry|TemporalResponse|Camera|Night|Field|Shadow|Surface|World|Track|Effects|Test|\.mjs)|Tuning_Flare/},
   {domain:'combat',pattern:/HanYang173R/},
-  {domain:"type89MediumTank",pattern:/Type89(?:MediumTank|Pbr|GlbCleanup|References|ImportAudit|SourceAudit|Package)/},
+  {domain:"type89MediumTank",pattern:/Type89|Data_VehicleAssets|Script_EditorPropLibrary/},
   {domain:"menu",pattern:/ToolsHome|Icon_TabSeal/},
   {domain:"combat",pattern:/FirstPersonGait/},
   // The full-body player shadow follows the first-person body and participates

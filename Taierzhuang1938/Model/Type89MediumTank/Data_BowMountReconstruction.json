@@ -1,0 +1,81 @@
+{
+  "references": [
+    2,
+    16,
+    20
+  ],
+  "observed": "Fixed annular cast hood has a lower opening; spherical inner mount is distinct from the outer hood. Existing closed disk/convex dome conflated the two layers.",
+  "neutralRootForwardM": 0.1,
+  "neutralRootUpM": -0.015,
+  "jacketAxisOffsetM": 0.091,
+  "ballRadiusM": 0.11,
+  "ballBarrelBoreRadiusM": 0.041,
+  "boreRadiusM": 0.122,
+  "hoodRearOuterRadiusM": 0.158,
+  "hoodRearInnerRadiusM": 0.145,
+  "hoodFrontInnerRadiusM": 0.102,
+  "hoodLowerFlareM": 0.03,
+  "hoodLipWidthM": 0.013,
+  "hoodFrontYM": 0.047,
+  "hoodFrontZM": -0.023,
+  "metricCertified": false,
+  "neutralPoseCertified": false,
+  "limits": "The visible two-layer structure is photo-supported. All metric depths, ball centre and neutral root offsets are provisional. The concealed board bore and dark cabin back are functional reconstruction, not a verified internal mechanism. The 2007 perforated jacket is retained; the 2025 pointed protective cover is not copied into that accessory state. The sphere interior is a simple bore, not a thin-wall manufacturing claim. The cabin back is a nonphysical occlusion helper. Native16camera-crop comparison motivated a smaller ball/mouth. The neutral perforated-jacket position stays unchanged while its spherical aiming centre moves. Exact metre values remain provisional.",
+  "ballInterior": "Simplified axial bore through the visual sphere; concealed internal mechanism is unverified",
+  "flangeBoreRadiusM": 0.158,
+  "hoodRearOuterYM": 0.007,
+  "hoodRearInnerYM": -0.013,
+  "boreBackOffsetM": 0.14,
+  "boreFrontOffsetM": 0.12,
+  "status": "WorkingOpenHoodAndMovingBall_IntegratedAuthoring",
+  "mountPositionM": [
+    -0.3484975643466792,
+    0.028,
+    0.36234546134378925
+  ],
+  "assemblyScale": 1.062131654086188,
+  "flangeBoltAnglesDegrees": [
+    0,
+    45,
+    90,
+    135,
+    180,
+    225,
+    315
+  ],
+  "cabinBackOffsetM": 0.13,
+  "placementBasis": {
+    "references": [
+      16,
+      20
+    ],
+    "plate16CoordinateRmsNativePx": 8.261054338305625,
+    "held20CoordinateRmsNativePx": 7.6220457261337895,
+    "depthBasis": "Back of the authored20mmflange seats at the painted bow-plate front; independent oblique20also favours this shallow plane",
+    "metricCertified": false,
+    "limits": "Manual bolt centres, inherited bow-plane camera calibration and contact-based depth; not factory metrology. The whole bow-MG assembly is uniformly scaled in its own coordinates, not distorted."
+  },
+  "jacketOuterProfileM": [
+    [
+      0.047,
+      0.012
+    ],
+    [
+      0.046,
+      0.03
+    ],
+    [
+      0.015,
+      0.36
+    ],
+    [
+      0.011,
+      0.39
+    ]
+  ],
+  "jacketWallThicknessM": 0.0025,
+  "barrelOutsideRadiusM": 0.0075,
+  "nominalBarrelBoreRadiusM": 0.00325,
+  "jacketEvidence": "Native2007wide crop: broad sleeve root and narrow perforated muzzle. Exact wall/vent counts and the restored bore remain reconstruction parameters. The nominal6.5mmbore follows the Type91identification, not a measurement of this preserved dummy.",
+  "legacyLowerMuzzleSupport": "Kept for separate component/contact investigation; source context may belong to the lamp below."
+}

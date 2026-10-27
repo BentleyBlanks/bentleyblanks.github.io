@@ -634,6 +634,9 @@ for(const front of ["Front","Rear"]){
   Check(heights.every(height=>Math.abs(height-expected)<.00001),`独立驴 ${front} 关节实际高度符合参考图修订`,heights.map(v=>v.toFixed(3)).join(" / "));
 }
 const type89ReferenceFile=path.join(projectDir,"Model/Type89MediumTank/Model_Type89MediumTank.glb");
+const {OPTIONAL_VEHICLE_ASSETS}=await import('./Data_VehicleAssets.mjs');
+const type89Optional=OPTIONAL_VEHICLE_ASSETS.find(asset=>asset.id==='Type89MediumTank');
+Check(type89Optional?.sourceNose.x===0&&type89Optional.sourceNose.z===-1,"可选八九式配置的源朝向与炮管顶点云同为 -Z");
 const type89Reference=LoadGlb(type89ReferenceFile),type89Cannon=GlbPoints(type89ReferenceFile,"Mesh_MainGunRecoil"),type89Cloud=GlbPoints(type89ReferenceFile);
 const type89Low=[0,1,2].map(axis=>type89Cloud.reduce((value,point)=>Math.min(value,point[axis]),Infinity)),type89High=[0,1,2].map(axis=>type89Cloud.reduce((value,point)=>Math.max(value,point[axis]),-Infinity));
 Check(type89Cannon.length>100&&type89Cannon.reduce((sum,point)=>sum+point[2],0)/type89Cannon.length<-.9,

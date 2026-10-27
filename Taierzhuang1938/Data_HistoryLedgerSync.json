@@ -198,32 +198,29 @@
           "lastEdited": "2026-10-23T13:00:58.270Z"
         }
       ],
-      "materialRevision": "SurfaceV5",
-      "materialReviewedAt": "2026-10-25",
+      "materialRevision": "SurfaceV12",
+      "materialReviewedAt": "2026-10-28",
       "materialReview": "Model/Type89MediumTank/Data_MaterialReview.json",
-      "materialScope": "V32 same-car geometry/detail and physical surface repair. Exact wear,paint and concealed hinge structures remain inferred; no participation claim changes.",
-      "historicalBoundaryCheckedAt": "2026-10-25",
-      "historicalBoundaryCheck": "Re-read the current Type89 source page and its existing Notion ledger row/bullet. They already cover museum appearance, inferred micro wear/hidden hardware and no March16-18 Tengxian participation; no new historical assertion required an external content edit. Preserve global cursor and unrelated page stamps.",
+      "materialScope": "Optional asset: fine coating grain, shallow cast texture and bounded metal/paint response remain inferred; no participation claim changes.",
+      "historicalBoundaryCheckedAt": "2026-10-28",
+      "historicalBoundaryCheck": "Updated and re-fetched only the existing Type89 ledger row and parent bullet, keeping invented classification; separately reopened1944 US tank manual pages for articulation evidence. Global review cursor and unrelated page stamps are preserved.",
       "appearanceReviewStatus": "V32ActualPackedAuthorReview_DeclaredInferences",
       "notionRowSnapshots": [
         {
-          "id": "40260335331c81a18a18e63b0cc14bce",
-          "lastEdited": "2026-10-23T06:14:29.417Z",
-          "scope": "asset reference page"
-        },
-        {
           "id": "3fd60335331c8194aa82f0b238084d34",
-          "lastEdited": "2026-10-23T20:35:06.301Z",
-          "scope": "Type89 appearance row only"
+          "lastEdited": "2026-10-27T18:41:39.975Z",
+          "scope": "Type89 appearance row and dated status only",
+          "verified": true
         },
         {
           "id": "3fd60335331c818fa24deadb6d72ca70",
-          "lastEdited": "2026-10-23T20:42:29.668Z",
-          "scope": "Type89 appearance bullet only"
+          "lastEdited": "2026-10-27T18:41:19.670Z",
+          "scope": "Type89 creative-boundary bullet only",
+          "verified": true
         }
       ],
-      "geometryRevision": "GeometryV32",
-      "runtimeSha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57"
+      "geometryRevision": "GeometryV54",
+      "runtimeSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a"
     },
     {
       "asset": "KawasakiType88",

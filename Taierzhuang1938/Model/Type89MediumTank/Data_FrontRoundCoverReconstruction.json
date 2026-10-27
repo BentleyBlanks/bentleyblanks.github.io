@@ -1,0 +1,15 @@
+{
+  "status": "WorkingTwoViewRoundCoverPlacement",
+  "references": [
+    2,
+    16,
+    20
+  ],
+  "centreXM": -0.09925,
+  "centreZM": 0.19128,
+  "outerRadiusM": 0.07768,
+  "faceFrontYM": 0.044,
+  "metricCertified": false,
+  "source": "Native16lower/side circle fit;20corroborates the lower centre. Face depth is a seating/clearance reconstruction within image uncertainty. The44mmfront-face plane keeps the photographed closed depth and clears the MG fixing heads when open; cross-view centre uncertainty remains stated.",
+  "limits": "The prior centreZ.300 andX-.130overlapped the corrected MG plate. The photographed circular edge, upper hinge and inner badge are retained; concealed interior stays simplified and the bearing-foot thickness is inferred."
+}

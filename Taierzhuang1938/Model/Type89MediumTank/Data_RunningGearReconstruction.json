@@ -1,0 +1,246 @@
+{
+  "revision": "GeometryV48RunningGearIntegration",
+  "geometryVersion": "20261027GeometryV48",
+  "studyName": "IntegratedGeometryV48",
+  "referenceIds": [
+    2,
+    35,
+    36,
+    40
+  ],
+  "bogieUnits": {
+    "unitCenterY": [
+      0.275,
+      -1.185
+    ],
+    "shieldAbsX": 0.7,
+    "shieldThicknessM": 0.012,
+    "shieldOutlineOffsetYZ": [
+      [
+        0.48,
+        0.31
+      ],
+      [
+        0.45,
+        0.38
+      ],
+      [
+        0.24,
+        0.445
+      ],
+      [
+        0,
+        0.465
+      ],
+      [
+        -0.24,
+        0.445
+      ],
+      [
+        -0.45,
+        0.38
+      ],
+      [
+        -0.48,
+        0.31
+      ],
+      [
+        -0.45,
+        0.255
+      ],
+      [
+        -0.37,
+        0.235
+      ],
+      [
+        -0.25,
+        0.29
+      ],
+      [
+        -0.11,
+        0.29
+      ],
+      [
+        0,
+        0.245
+      ],
+      [
+        0.11,
+        0.29
+      ],
+      [
+        0.25,
+        0.29
+      ],
+      [
+        0.37,
+        0.235
+      ],
+      [
+        0.45,
+        0.255
+      ]
+    ],
+    "leafCountWorking": 5,
+    "leafCountFactoryVerified": false,
+    "leafAbsX": 0.74,
+    "leafLengthM": 0.78,
+    "leafLengthStepM": 0.08,
+    "leafCenterZ": 0.58,
+    "leafRiseM": 0.06,
+    "leafWidthM": 0.065,
+    "leafThicknessM": 0.006,
+    "leafSpacingM": 0.006,
+    "contactLeafOuterSkin": true
+  },
+  "underfloor": {
+    "strapCenterY": -0.08,
+    "strapLengthM": 3.2,
+    "strapWidthM": 0.054,
+    "strapDepthM": 0.006,
+    "transverseJointY": [
+      -0.85,
+      0.65
+    ],
+    "jointWidthM": 0.024,
+    "jointDepthM": 0.003,
+    "accessCovers": [
+      [
+        -0.33,
+        -1.28,
+        0.28,
+        0.34
+      ],
+      [
+        -0.33,
+        0.05,
+        0.28,
+        0.34
+      ],
+      [
+        0.33,
+        -1.28,
+        0.28,
+        0.34
+      ]
+    ],
+    "coverDepthM": 0.004,
+    "boltRadiusM": 0.0075,
+    "boltDepthM": 0.004,
+    "perimeterBoltY": [
+      -1.52,
+      -1.27,
+      -1.02,
+      -0.77,
+      -0.52,
+      -0.27,
+      -0.02,
+      0.23,
+      0.48,
+      0.73,
+      0.98,
+      1.23,
+      1.48
+    ],
+    "crossJointBoltX": [
+      -0.59,
+      -0.47,
+      -0.35,
+      -0.23,
+      -0.11,
+      0.11,
+      0.23,
+      0.35,
+      0.47,
+      0.59
+    ],
+    "fastenerCountFactoryVerified": false,
+    "layoutMetricCertified": false,
+    "scope": "Photographs directly establish the longitudinal joining line, cross-panel rows and external covers. The metre spacing/number of small bolts, exact plate extents and occluded portions are working reconstruction. High small fasteners are intended for actual geometry projection to Game PBR; gray Game alone does not yet show them."
+  },
+  "productionIntegrated": false,
+  "goalComplete": false,
+  "runtimeEnclosedShoeCleanup": true,
+  "outerBogieCheeks": {
+    "absX": 1.01,
+    "oppositeExteriorReconstructed": true,
+    "scope": "Left native2007 and Right Aoba7500 independently establish two three-lobe outer cheeks per side. Each side has its own camera-conditioned fixing coordinates. Metre depth/top outline and tiny head count remain reconstruction; no wheel position is altered.",
+    "thicknessM": 0.012,
+    "smallHeadCountFactoryVerified": false,
+    "leftFixingCentresYZ": [
+      [
+        [
+          0.6865471822,
+          0.2618958145
+        ],
+        [
+          0.305430856,
+          0.275315306
+        ],
+        [
+          -0.0692657213,
+          0.2740526803
+        ]
+      ],
+      [
+        [
+          -0.7800106096,
+          0.2901395184
+        ],
+        [
+          -1.1464029437,
+          0.2999782327
+        ],
+        [
+          -1.5152790776,
+          0.3125229071
+        ]
+      ]
+    ],
+    "hiddenTopZ": 0.55,
+    "smallHeadsPerFieldWorking": 8,
+    "rightAbsX": 1.02,
+    "rightFixingCentresYZ": [
+      [
+        [
+          0.678856985735119,
+          0.24863244686470787
+        ],
+        [
+          0.3122109552059422,
+          0.2512177083003846
+        ],
+        [
+          -0.04985568734962076,
+          0.24341348511053296
+        ]
+      ],
+      [
+        [
+          -0.7872785253223507,
+          0.26450886324541667
+        ],
+        [
+          -1.1534745266166189,
+          0.2640474260687218
+        ],
+        [
+          -1.5359287945930835,
+          0.2557125128604505
+        ]
+      ]
+    ],
+    "metricCoordinatesCertified": false,
+    "rightEvidence": {
+      "referenceId": 40,
+      "planeAbsXWorking": 1.026,
+      "cameraControlRmseNativePx": 2.1085222032742896,
+      "smallHeadCountFactoryVerified": false,
+      "scope": "All six right outer round fixing fields are directly identified in the unmirrored primary photo. Recovered metre coordinates depend on the explicit camera/plane draft; hidden depth/top and small head count are unverified. No original wheel frame or station changes.",
+      "depthAdoption": "Working12mm cheek lies behind the existing X1.030 skirt face and outboard of the original X1.012 nut tips. The layered attachment/depth is inferred; the actual complete wheel sweep must still pass."
+    },
+    "bridgeHandleM": 0.012,
+    "bridgeProfileModel": "TangentCubicBetween120DegreeLobes"
+  },
+  "authoringSourceIntegrated": true
+}

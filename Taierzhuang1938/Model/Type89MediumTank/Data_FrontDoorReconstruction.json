@@ -1,0 +1,67 @@
+{
+  "status": "WorkingPhotoDoorReconstruction_NotMetricCertified",
+  "references": [
+    2,
+    16,
+    20
+  ],
+  "observedHingeGroups": 3,
+  "hingeAxisPointM": [
+    -0.5422229188674509,
+    0.032,
+    -0.211975824380521
+  ],
+  "hingeAxisTiltYRadians": -0.03819280197632511,
+  "hingeStationsSourceZM": [
+    0.0332800712535052,
+    -0.21855041887688453,
+    -0.4506571255181837
+  ],
+  "hingeToLeafEdgeM": 0.019,
+  "inboardEdgeXM": -0.0476,
+  "topZM": 0.116,
+  "bottomZM": -0.53,
+  "inboardChamferStartZM": -0.353,
+  "inboardChamferEndXM": -0.136,
+  "cornerRadiiM": [
+    0.043,
+    0.043,
+    0.025,
+    0.012,
+    0.015
+  ],
+  "faceFrontYM": 0.027,
+  "plateThicknessM": 0.01,
+  "backFaceClearanceScope": "Concealed leaf thickness places its back face2mm ahead of the bow plate while preserving the photographed front face and outline; inferred construction, not a factory thickness measurement.",
+  "hingeMovingLeafWidthM": 0.15,
+  "hingeMovingLeafHeightM": 0.04,
+  "hingeMovingLeafDepthM": 0.008,
+  "hingeMovingLeafCentreXM": 0.07,
+  "hingeMovingHeadXM": [
+    0.027,
+    0.12
+  ],
+  "hingeMovingHeadRadiusM": 0.014,
+  "hingeBarrelRadiusM": 0.021,
+  "hingeFixedHeadRadiusM": 0.011,
+  "latchPositionM": [
+    -0.091,
+    0.0385,
+    -0.217
+  ],
+  "latchLoopMajorRadiusM": 0.064,
+  "latchLoopMinorRadiusM": 0.01,
+  "latchLoopTubeRadiusM": 0.0085,
+  "latchLoopTiltRadians": -0.215,
+  "latchLoopCentreOffsetZM": 0.025,
+  "metricCertified": false,
+  "openingSequenceCertified": false,
+  "limits": "Outline/stations are inherited-camera and manual native-photo reconstruction, not factory dimensions. Three hinge groups, a closed elongated oval handle, five visible base heads and a separate three-head body catch are photographed. Hidden rebate, pin/fixing depths and the operating limits remain inferred; the extra 2025 lock is not copied into the2007appearance.",
+  "bowGunDoorStow": {
+    "yawDegrees": 10,
+    "pitchDegrees": 8,
+    "startDoorDegrees": 10,
+    "completeDoorDegrees": 30,
+    "scope": "Collision-cleared model display linkage; not a verified original operating sequence"
+  }
+}

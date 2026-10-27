@@ -113,6 +113,8 @@ class SurfaceGraph:
         self.nodes.clear()
         self.output=self.nodes.new('ShaderNodeOutputMaterial')
         self.shader=self.nodes.new('ShaderNodeBsdfPrincipled')
+        self.normalShader=self.nodes.new('ShaderNodeBsdfPrincipled')
+        self.normalShader.label='NormalBakeOnly_NoColourAoEvaluation'
         self.emission=self.nodes.new('ShaderNodeEmission')
         self.emission.inputs['Strength'].default_value=1
         self.links.new(self.shader.outputs['BSDF'],self.output.inputs['Surface'])
@@ -176,9 +178,10 @@ class SurfaceGraph:
         part=self.Attr('SurfacePart')
         wear=self.Attr('SurfaceWear')
         wheel=self.Attr('SurfaceWheel')
+        castWheel=self.Attr('SurfaceCastWheel')
         # Paint texture is fine spray/rolled film, not millimetre-deep gravel.
         # Keep its normal energy below the cast-steel shoe's physical relief.
-        grain=self.Noise(coordinate,190 if role in ['Armor','Guard'] else 650,3)
+        grain=self.Noise(coordinate,320 if role in ['Armor','Guard'] else 650,3)
         macro=self.Noise(world,5.5,5)
         breakup=self.Noise(coordinate,135,3)
         meso=self.Noise(coordinate,75,4)
@@ -228,11 +231,32 @@ class SurfaceGraph:
             # putting metre-wide shading or vertex gradients into the albedo.
             filmPores=self.Ramp(self.Noise(coordinate,245,3),.61,.79)
             pressedGrain=self.Noise(self.Scale(coordinate,(95,18,120)),1,3)
-            relief=self.Math('ADD',self.Math('MULTIPLY',grain,.70),self.Math('ADD',self.Math('MULTIPLY',pressedGrain,.14),self.Math('MULTIPLY',filmPores,.16)))
-            base=self.Mix(base,self.Color((.071,.052,.024)),self.Math('MULTIPLY',filmPores,.075))
+            # The runtime armor atlas resolves about 0.5 texel/mm. Submillimetre
+            # film alone disappears in the normal bake. Retain a shallow
+            # 6-12mm coating/rolled-surface field as well as the fine pores;
+            # unresolved pores contribute to roughness instead of dark freckles.
+            coating=self.Noise(coordinate,125,4)
+            filmFlow=self.Noise(self.Scale(coordinate,(85,85,22)),1,3)
+            chalk=self.Ramp(self.Noise(coordinate,34,4),.42,.72)
+            relief=self.Math('ADD',self.Math('MULTIPLY',grain,.20),self.Math('ADD',self.Math('MULTIPLY',coating,.52),self.Math('ADD',self.Math('MULTIPLY',pressedGrain,.18),self.Math('MULTIPLY',filmPores,.10))))
+            # Sparse fine scuffs break a highlight at handled plate edges;
+            # broad untouched panels keep their pigment and coating intact.
+            scuffs=self.Ramp(self.Noise(self.Scale(coordinate,(18,170,240)),1,2),.69,.80)
+            scuffs=self.Math('MULTIPLY',scuffs,self.Math('ADD',.12,self.Math('MULTIPLY',restrainedEdge,.55)),True)
+            relief=self.Math('SUBTRACT',relief,self.Math('MULTIPLY',scuffs,.09))
+            # Coated cast webs retain a broader foundry skin beneath their
+            # paint. Pressed/rolled plates keep their finer film response.
+            castSkin=self.Noise(coordinate,110,4)
+            castPores=self.Ramp(self.Noise(coordinate,210,3),.66,.80)
+            castRelief=self.Math('SUBTRACT',self.Math('MULTIPLY',castSkin,1.9),self.Math('MULTIPLY',castPores,.30))
+            relief=self.Mix(relief,castRelief,castWheel)
+            base=self.Mix(base,self.Color((.071,.052,.024)),self.Math('MULTIPLY',filmPores,.055))
+            base=self.Mix(base,self.Color((.136,.108,.050)),self.Math('MULTIPLY',chalk,.065))
             metallic=self.Math('MULTIPLY',chip,.96)
-            rough=self.Math('ADD',.37,self.Math('ADD',self.Math('MULTIPLY',meso,.16),self.Math('ADD',self.Math('MULTIPLY',filmPores,.15),self.Math('MULTIPLY',drips,.045))),True)
+            rough=self.Math('ADD',.28,self.Math('ADD',self.Math('MULTIPLY',coating,.20),self.Math('ADD',self.Math('MULTIPLY',chalk,.14),self.Math('ADD',self.Math('MULTIPLY',filmPores,.17),self.Math('MULTIPLY',filmFlow,.085)))),True)
+            rough=self.Math('SUBTRACT',rough,self.Math('MULTIPLY',scuffs,.07),True)
             rough=self.Math('SUBTRACT',rough,self.Math('MULTIPLY',wheel,.025),True)
+            rough=self.Math('ADD',rough,self.Math('MULTIPLY',castWheel,.065),True)
             rough=self.Mix(rough,.255,self.Math('MULTIPLY',chip,.90))
             badge=self.Attr('MuseumBadge')
             base=self.Mix(base,self.Color((.55,.34,.055)),badge)
@@ -241,7 +265,7 @@ class SurfaceGraph:
             ambient=self.Mix(ambient,1.0,badge)
             # Noise's useful height range is much less than one. This distance
             # yields about0.1mm film relief, not a literal1mm displacement.
-            bumpDistance=.0010
+            bumpDistance=.00125
         elif role=='Steel':
             base=self.Mix(self.Color((.020,.026,.031)),self.Color((.19,.21,.21)),finish)
             base=self.Mix(base,steelColor,self.Math('MULTIPLY',chip,.75))
@@ -249,8 +273,9 @@ class SurfaceGraph:
             base=self.Mix(base,oxideColor,oxide);base=self.Mix(base,dustColor,dust)
             metallic=self.Math('MULTIPLY',.96,self.Math('SUBTRACT',1,self.Math('MAXIMUM',oxide,dust)),True)
             brushed=self.Noise(self.Scale(coordinate,(150,8,180)),1,3)
-            rough=self.Math('ADD',.25,self.Math('ADD',self.Math('MULTIPLY',macro,.14),self.Math('MULTIPLY',brushed,.08)),True)
-            relief=self.Math('ADD',self.Math('MULTIPLY',grain,.70),self.Math('MULTIPLY',brushed,.30))
+            scratches=self.Ramp(self.Noise(self.Scale(coordinate,(260,12,300)),1,2),.64,.78)
+            rough=self.Math('ADD',.23,self.Math('ADD',self.Math('MULTIPLY',macro,.15),self.Math('ADD',self.Math('MULTIPLY',brushed,.14),self.Math('MULTIPLY',scratches,.06))),True)
+            relief=self.Math('SUBTRACT',self.Math('ADD',self.Math('MULTIPLY',grain,.46),self.Math('MULTIPLY',brushed,.54)),self.Math('MULTIPLY',scratches,.18))
             bumpDistance=.00038
         elif role=='Track':
             outward=self.Ramp(split.outputs['Z'],-.010,.012)
@@ -264,6 +289,13 @@ class SurfaceGraph:
             oxide=self.Math('MULTIPLY',self.Math('MULTIPLY',recess,self.Ramp(meso,.40,.68)),.30)
             base=self.Mix(base,oxideColor,oxide)
             dust=self.Math('MULTIPLY',self.Math('SUBTRACT',1,running),self.Math('ADD',.06,self.Math('MULTIPLY',meso,.10)),True)
+            # Native2007 and same-car close-ups show broken directional wear
+            # across the outer web, not a uniformly dusty grey casting. Keep
+            # oxide in protected recesses while exposing satin steel patches;
+            # the stronger blue/white2025 reflections are not copied as paint.
+            wearStreak=self.Noise(self.Scale(coordinate,(155,11,180)),1,3)
+            polished=self.Math('MULTIPLY',outward,self.Ramp(wearStreak,.43,.69))
+            dust=self.Math('MULTIPLY',dust,self.Math('SUBTRACT',1,self.Math('MULTIPLY',polished,.86)),True)
             base=self.Mix(base,dustColor,dust)
             # The photographed 2007 outer shoe is light abraded cast steel with
             # ingrained film; the later orange-rust shoe is not copied wholesale.
@@ -274,7 +306,14 @@ class SurfaceGraph:
             abrasion=self.Math('MULTIPLY',abrasion,outward)
             base=self.Mix(base,self.Color((.37,.39,.38)),self.Math('MULTIPLY',abrasion,.55))
             rough=self.Mix(rough,.33,self.Math('MULTIPLY',abrasion,.65))
-            relief=self.Math('SUBTRACT',self.Math('ADD',self.Math('MULTIPLY',grain,.70),self.Math('MULTIPLY',meso,.16)),self.Math('MULTIPLY',castPits,.30))
+            rough=self.Mix(rough,.27,self.Math('MULTIPLY',polished,.82))
+            castBody=self.Noise(coordinate,190,4)
+            casting=self.Math('SUBTRACT',self.Math('ADD',self.Math('MULTIPLY',castBody,.63),self.Math('MULTIPLY',grain,.37)),self.Math('MULTIPLY',castPits,.38))
+            # Contact ridges lose the rough foundry skin where they run on
+            # ground/metal. Protected webs retain pits and cast texture.
+            contactFinish=self.Math('MAXIMUM',running,self.Math('MULTIPLY',polished,.55))
+            burnished=self.Math('SUBTRACT',self.Math('MULTIPLY',wearStreak,.28),self.Math('MULTIPLY',abrasion,.07))
+            relief=self.Mix(casting,burnished,contactFinish)
             bumpDistance=.0014
         elif role=='Rubber':
             base=self.Mix(self.Color((.034,.029,.020)),dustColor,self.Math('ADD',.16,self.Math('MULTIPLY',meso,.25),True))
@@ -301,15 +340,16 @@ class SurfaceGraph:
         bump=self.nodes.new('ShaderNodeBump');bump.inputs['Strength'].default_value=.62;bump.inputs['Distance'].default_value=bumpDistance
         self.Link(relief,bump.inputs['Height'])
         if role=='Armor':
-            # Flat wheel annuli are real pressed/cast planes. Smooth vertex
-            # normals inherited from the scalloped rim made these broad steel
-            # faces look oil-canned. Retain micro relief over the actual plane.
-            trueAxes=self.nodes.new('ShaderNodeSeparateXYZ');self.Link(geometry.outputs['True Normal'],trueAxes.inputs[0])
-            plane=self.Math('MULTIPLY',wheel,self.Math('GREATER_THAN',self.Math('ABSOLUTE',trueAxes.outputs['X']),.97))
+            # Preserve actual pressed-wheel planes without flattening the
+            # smoothly fused relief of the continuous cast wheel webs.
+            localNormal=self.nodes.new('ShaderNodeVectorTransform');localNormal.vector_type='NORMAL';localNormal.convert_from='WORLD';localNormal.convert_to='OBJECT';self.Link(geometry.outputs['True Normal'],localNormal.inputs[0])
+            trueAxes=self.nodes.new('ShaderNodeSeparateXYZ');self.Link(localNormal.outputs['Vector'],trueAxes.inputs[0])
+            pressed=self.Math('MULTIPLY',wheel,self.Math('SUBTRACT',1,castWheel,True))
+            plane=self.Math('MULTIPLY',pressed,self.Math('GREATER_THAN',self.Math('ABSOLUTE',trueAxes.outputs['X']),.97))
             flat=self.nodes.new('ShaderNodeVectorMath');flat.operation='SCALE';self.Link(geometry.outputs['True Normal'],flat.inputs[0]);self.Link(plane,flat.inputs['Scale'])
             curved=self.nodes.new('ShaderNodeVectorMath');curved.operation='SCALE';self.Link(geometry.outputs['Normal'],curved.inputs[0]);self.Link(self.Math('SUBTRACT',1,plane),curved.inputs['Scale'])
             combined=self.nodes.new('ShaderNodeVectorMath');combined.operation='ADD';self.links.new(flat.outputs['Vector'],combined.inputs[0]);self.links.new(curved.outputs['Vector'],combined.inputs[1]);self.links.new(combined.outputs['Vector'],bump.inputs['Normal'])
-        self.Link(base,self.shader.inputs['Base Color']);self.Link(rough,self.shader.inputs['Roughness']);self.Link(metallic,self.shader.inputs['Metallic']);self.links.new(bump.outputs['Normal'],self.shader.inputs['Normal'])
+        self.Link(base,self.shader.inputs['Base Color']);self.Link(rough,self.shader.inputs['Roughness']);self.Link(metallic,self.shader.inputs['Metallic']);self.links.new(bump.outputs['Normal'],self.shader.inputs['Normal']);self.links.new(bump.outputs['Normal'],self.normalShader.inputs['Normal'])
         microAo=self.Math('SUBTRACT',1,self.Math('MULTIPLY',self.Math('GREATER_THAN',grain,.70),.07)) if role not in ['Glass','Shadow'] else 1.0
         ambient=self.Math('MULTIPLY',ambient,microAo,True)
         # High-source guard holes are geometry. An emitted coverage/opacity pass
@@ -319,7 +359,9 @@ class SurfaceGraph:
 
     def SetBakeChannel(self,channel):
         if channel=='Normal':
-            self.links.new(self.shader.outputs['BSDF'],self.output.inputs['Surface'])
+            # The normal field is identical; colour AO/oxide/bevel masks do
+            # not belong to this pass and need not cast millions of extra rays.
+            self.links.new(self.normalShader.outputs['BSDF'],self.output.inputs['Surface'])
         else:
             self.Link(1.0 if channel=='Coverage' else self.channels[channel],self.emission.inputs['Color'])
             self.links.new(self.emission.outputs['Emission'],self.output.inputs['Surface'])

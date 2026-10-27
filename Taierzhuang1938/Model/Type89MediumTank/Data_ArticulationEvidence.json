@@ -1,0 +1,61 @@
+{
+  "asset": "Type89MediumTank",
+  "reviewedAt": "2026-10-27T20:41:50.254Z",
+  "sources": [
+    {
+      "title": "U.S. War Department, TM-E30-480,1October1944, ChapterIX, SectionIV",
+      "url": "https://www.lonesentry.com/manuals/handbook-japanese-military/japanese-tanks.html",
+      "kind": "Primary wartime intelligence manual, modern transcription",
+      "openedAndRead": true,
+      "supports": [
+        "The Model89A description states a360-degree turret traverse.",
+        "The section's general armament description identifies ball-mounted machine guns on Japanese light/medium tanks, including hull and rear-turret positions.",
+        "The Type89 running gear description identifies rear-sprocket drive."
+      ],
+      "limits": "The manual contains wartime identification and measurement uncertainties. Its variant names and approximate dimensions are not used as factory drawings or proof of this museum vehicle's exact machine-gun stops."
+    },
+    {
+      "title": "U.S. Military Intelligence Service, Japanese Tanks and Tank Tactics, Special Series26,15November1944, Medium Tanks",
+      "url": "https://www.lonesentry.com/manuals/japanese-tanks/medium-tanks.html",
+      "kind": "Primary wartime intelligence publication, modern transcription",
+      "openedAndRead": true,
+      "supports": [
+        "The89A entry identifies a turret capable of360-degree traverse, a hull machine gun and a rear-turret machine gun.",
+        "The publication describes rear-sprocket drive and the Diesel89B development."
+      ],
+      "limits": "Model94 terminology and inconsistent gun data in later entries are not imported into the selected Otsu reconstruction."
+    }
+  ],
+  "displayBehavior": {
+    "tracks": "Left/right distance clocks independently move the real track-link nodes; all30 wheel groups rotate by their effective radius.",
+    "turret": "Continuous full-circle rotation about its vertical pivot; main gun pitch/recoil remain independent.",
+    "machineGuns": "Two independent finite yaw/pitch controls within each mounting frame. The rear mounting flange remains fixed while its gun carrier moves.",
+    "hullGunYawDegrees": [
+      -10,
+      10
+    ],
+    "hullGunPitchDegrees": [
+      -8,
+      8
+    ],
+    "rearGunYawDegrees": [
+      -10,
+      10
+    ],
+    "rearGunPitchDegrees": [
+      -10,
+      10
+    ],
+    "rangeClassification": "Model display/clearance limits; exact factory firing arcs and traverse rates remain unverified.",
+    "bowDoorGunStow": "Opening the door blends the hull gun to+10deg yaw/+8deg pitch before the swept door reaches the jacket; inferred display linkage, not a sourced original procedure"
+  },
+  "historicalBoundary": "This validates plausible articulated display of the reconstructed museum appearance. It does not establish this vehicle or type participating in the16-18March1938 Tengxian city assault.",
+  "userApproved": false,
+  "actualFileValidation": {
+    "runtimeSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
+    "rendererChecks": 28,
+    "phaseSamples": 36,
+    "pass": true,
+    "exactFactoryArcsVerified": false
+  }
+}

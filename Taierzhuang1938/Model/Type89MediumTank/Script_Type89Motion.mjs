@@ -35,6 +35,24 @@ function MultiplyQuaternion(a, b) {
   ];
 }
 
+// A collision-cleared display linkage, not a sourced factory procedure.
+// It is opt-in metadata on the new reconstruction; legacy assets retain
+// their original independent controls.
+export function ResolveBowDoorPose(pose, linkage = null) {
+  const door = Clamp(pose.bowHatch ?? 0, 0, 1.134464);
+  let yaw = Clamp(pose.bowMachineGunYaw ?? 0, -.174533, .174533);
+  let pitch = Clamp(pose.bowMachineGunPitch ?? 0, -.139626, .139626);
+  let blend = 0;
+  if (linkage) {
+    const radians = Math.PI / 180;
+    blend = Clamp((door / radians - linkage.startDoorDegrees) / (linkage.completeDoorDegrees - linkage.startDoorDegrees), 0, 1);
+    blend = blend * blend * (3 - 2 * blend);
+    yaw += (linkage.yawDegrees * radians - yaw) * blend;
+    pitch += (linkage.pitchDegrees * radians - pitch) * blend;
+  }
+  return { bowHatch: door, bowMachineGunYaw: yaw, bowMachineGunPitch: pitch, stowBlend: blend };
+}
+
 export class Type89Motion {
   constructor(root, path) {
     this.root = root;
@@ -59,6 +77,7 @@ export class Type89Motion {
     for (const name of ["Node_TurretYaw", "Node_MainGunPitch", "Node_MainGunRecoil", "Node_BowMachineGun", "Node_TurretMachineGun", "Node_CommanderHatchFront", "Node_CommanderHatchRear", "Node_DriverVisionFlap", "Node_BowHatch", "Node_EngineHatchLeft", "Node_EngineHatchRight"]) {
       if (!this.nodes.has(name)) throw new Error(`Missing articulated node: ${name}`);
     }
+    this.bowDoorLinkage = this.nodes.get("Node_BowHatch")?.userData?.bowGunDoorStow ?? null;
   }
 
   Rotate(name, axis, angle) {
@@ -71,27 +90,52 @@ export class Type89Motion {
   }
 
   SetPose(pose = {}) {
+    const bow = ResolveBowDoorPose(pose, this.bowDoorLinkage);
     this.Rotate("Node_TurretYaw", [0, 1, 0], Mod((pose.turretYaw ?? 0) + Math.PI, tau) - Math.PI);
     this.Rotate("Node_MainGunPitch", [1, 0, 0], Clamp(pose.mainGunPitch ?? 0, -.174533, .261799));
     const recoil = this.nodes.get("Node_MainGunRecoil");
     recoil.position.fromArray(this.rest.get(recoil.name).position);
     recoil.position.z += Clamp(pose.recoilM ?? 0, 0, .10);
-    this.Rotate("Node_BowMachineGun", [0, 1, 0], Clamp(pose.bowMachineGunYaw ?? 0, -.174533, .174533));
-    this.Rotate("Node_TurretMachineGun", [1, 0, 0], Clamp(pose.turretMachineGunPitch ?? 0, -.174533, .174533));
+    this.RotateAim("Node_BowMachineGun", bow.bowMachineGunYaw, bow.bowMachineGunPitch);
+    this.RotateAim("Node_TurretMachineGun", Clamp(pose.turretMachineGunYaw ?? 0, -.174533, .174533), Clamp(pose.turretMachineGunPitch ?? 0, -.174533, .174533));
     const commander = Clamp(pose.commanderHatches ?? 0, 0, Math.PI);
     this.Rotate("Node_CommanderHatchFront", [1, 0, 0], -Clamp(pose.commanderHatchFront ?? commander, 0, Math.PI));
     this.Rotate("Node_CommanderHatchRear", [1, 0, 0], Clamp(pose.commanderHatchRear ?? commander, 0, Math.PI));
     this.Rotate("Node_SideVisionFlapLeft", [0, 1, 0], -Clamp(pose.leftSideVisionFlap ?? 0, 0, 3.054326));
     this.Rotate("Node_SideVisionFlapRight", [0, 1, 0], Clamp(pose.rightSideVisionFlap ?? 0, 0, 3.054326));
+    this.SetSideVisionLatch("Left", pose.leftSideVisionFlap ?? 0);
+    this.SetSideVisionLatch("Right", pose.rightSideVisionFlap ?? 0);
     this.Rotate("Node_DriverVisionFlap", [1, 0, 0], Clamp(pose.driverVisionFlap ?? 0, 0, 1.745329));
     this.Rotate("Node_DriverPortShutter", [0, 0, -1], Clamp(pose.driverPortShutter ?? 0, 0, Math.PI));
     this.Rotate("Node_BowRoundPortCover", [1, 0, 0], Clamp(pose.bowRoundPortCover ?? 0, 0, Math.PI));
-    this.Rotate("Node_BowHatch", [0, 1, 0], Clamp(pose.bowHatch ?? 0, 0, 1.134464));
+    this.Rotate("Node_BowHatch", [0, 1, 0], bow.bowHatch);
     this.Rotate("Node_BowDoorLatch", [0, 0, -1], Clamp(pose.bowDoorLatch ?? 0, -.610865, .610865));
     const engine = Clamp(pose.engineHatches ?? 0, 0, .872665);
     this.Rotate("Node_EngineHatchLeft", [0, 0, -1], Clamp(pose.engineHatchLeft ?? engine, 0, .872665));
     this.Rotate("Node_EngineHatchRight", [0, 0, -1], -Clamp(pose.engineHatchRight ?? engine, 0, .872665));
     this.root.updateMatrixWorld?.(true);
+    return bow;
+  }
+
+  RotateAim(name, yaw, pitch) {
+    const node = this.nodes.get(name);
+    if (!node) return;
+    const yawRotation = [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)];
+    const pitchRotation = [Math.sin(pitch / 2), 0, 0, Math.cos(pitch / 2)];
+    node.quaternion.fromArray(MultiplyQuaternion(this.rest.get(name).quaternion, MultiplyQuaternion(yawRotation, pitchRotation)));
+  }
+
+  SetSideVisionLatch(side, openingRadians) {
+    const name = `Node_SideVisionLatch${side}`;
+    const node = this.nodes.get(name);
+    if (!node) return;
+    // Photo-visible deployed bars; the folded pose/timing is a declared
+    // clearance reconstruction, stored with this particular authored pivot.
+    const { latchFoldDegrees, latchDeployStartDegrees, latchDeployEndDegrees } = node.userData;
+    const openingDegrees = openingRadians * 180 / Math.PI;
+    const t = Clamp((openingDegrees - latchDeployStartDegrees) / (latchDeployEndDegrees - latchDeployStartDegrees), 0, 1);
+    const deployed = t * t * (3 - 2 * t);
+    this.Rotate(name, [1, 0, 0], -latchFoldDegrees * Math.PI / 180 * deployed);
   }
 
   SetTravel(leftM, rightM) {

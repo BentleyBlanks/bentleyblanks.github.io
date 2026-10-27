@@ -25,6 +25,7 @@ const UI_MODULES = [
   "Data_Menu.mjs",           // 主菜单机位说明
   "Data_History.mjs",        // 史实注记页
   "Data_HistoryCodex.mjs",   // 资料馆的史料原稿
+  "Data_VehicleAssets.mjs",  // 可选战车构件库名称
   "Data_Levels.mjs",         // 关卡名与目标
   "Data_ClothRange.mjs",
   "Data_Range.mjs",          // 靶场工位说明

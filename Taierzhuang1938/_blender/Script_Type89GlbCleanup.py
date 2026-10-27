@@ -10,7 +10,7 @@ from pathlib import Path
 import struct
 
 
-def CleanGlb(file):
+def CleanGlb(file,includeEnclosed=True):
     file=Path(file)
     data=file.read_bytes()
     magic,version,total=struct.unpack_from('<III',data)
@@ -58,7 +58,11 @@ def CleanGlb(file):
         while len(encoded)%4:encoded+=b' '
         total=12+8+len(encoded)+8+len(binary)
         file.write_bytes(struct.pack('<III',magic,version,total)+struct.pack('<II',len(encoded),jsonType)+encoded+struct.pack('<II',len(binary),binType)+binary)
-    return {'file':str(file),'removed':removed,'removedRenderedTriangles':sum(row['removedRenderedTriangles'] for row in removed)}
+    result={'file':str(file),'removed':removed,'removedRenderedTriangles':sum(row['removedRenderedTriangles'] for row in removed)}
+    if includeEnclosed:
+        from Script_Type89ShoeHiddenSurface import CleanEnclosedShoeSurfaces
+        result['enclosedShoeCleanup']=CleanEnclosedShoeSurfaces(file)
+    return result
 
 
 if __name__=='__main__':

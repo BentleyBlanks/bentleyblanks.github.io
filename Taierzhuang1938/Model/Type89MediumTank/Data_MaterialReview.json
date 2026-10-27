@@ -1,7 +1,7 @@
 {
-  "revision": "SurfaceV5",
-  "status": "V32AuthorComparedActualPackedSurfaceV5",
-  "previousRevision": "V31/SurfaceV4 rejected for exposed faces, insufficient geometry detail, plastic appearance and colour interpolation. Its old author sign-off cannot certify this candidate.",
+  "revision": "SurfaceV12",
+  "status": "AuthorReviewedForOptionalAssetIntegration",
+  "reviewedAt": "2026-10-27T20:41:50.254Z",
   "primary": {
     "source": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
     "file": "Reference_Primary2007Original.jpg",
@@ -59,291 +59,468 @@
       "status": "downloaded"
     }
   ],
-  "scope": "Tsuchiura Otsu 2007 appearance; later close-ups support surface construction and wear placement, not wholesale adoption of later orange rust",
-  "changes": [
-    "Per-shading-point assembled AO/cavity replaces broad-face interpolation of sparse vertex rays; only flipping lids keep local self-occlusion. Bake proxy supplies unique surfaces; extra high instances supply the remaining articulated tread occluders.",
-    "Paint uses millimetre-scale film pores, directional pressed texture and varied satin roughness; bare edge steel remains a separate metallic mask. Film height controls are authoring ranges, not measured coating thickness.",
-    "Cast tracks retain real chamfered edges, flange bores and hollow knuckles, pitted cast relief, directional running-face abrasion, separate oxide/dust and metallic worn metal.",
-    "Complete native-resolution high/game rebake. Existing packed pixels, authored tangents and strict actual-triangle clearance checks are validated again after export."
-  ],
-  "pending": [],
-  "imagegen": {
-    "used": false,
-    "reason": "The original 2007 photograph and same-vehicle close-ups are now available; continue from these references first"
-  },
-  "requiredViews": [
-    "same-camera 2007 overall",
-    "paint film near view",
-    "track cast web and grouser near view",
-    "rear exhaust near view",
-    "second neutral lighting check",
-    "actual packed GLB reload and independent source reopen"
-  ],
-  "reviewedAt": "2026-10-24T18:08:01.081025+00:00",
-  "userApproved": false,
-  "materialScriptSha256": "6c5078f3c1d5dfb9a1efbf591f89cd27607d75c6e20fa3caff28c68e1f6e92e1",
-  "fullBake": {
-    "geometryVersion": "20261024GeometryV32",
-    "bakeScriptSha256": "c29775dcd04eb421792da38a69d7829cc0a116ef07b8913fc0ff89f915636ec9",
-    "materialAuthoringScriptSha256": "2821ecc1f73dbced277fff0d99a0fb14de5f5d017698a1d9d0d29ab800bc1b7f",
-    "gameDataProjection": "BakedHighBaseAndScalarChannels; Armor target retains actual HighRubber contact surfaces; geometric/bump normals projected independently",
-    "report": "Data_PbrSurfaceV5GeometryV32Build.json"
-  },
-  "referenceLighting": {
-    "hemisphere": {
-      "sky": "#e1e8df",
-      "ground": "#756650",
-      "intensity": 2.1
-    },
-    "key": {
-      "color": "#fff5e6",
-      "intensity": 7.4,
-      "position": [
-        -1.8,
-        12,
-        -3
-      ]
-    },
-    "environmentIntensity": 0.65,
-    "acesExposure": 1.09,
-    "note": "Approximate image-matching illumination, not a recovered original HDRI or a claim about solar position"
-  },
-  "neutralLighting": {
-    "hemisphere": {
-      "sky": "#ffffff",
-      "ground": "#777777",
-      "intensity": 2
-    },
-    "key": {
-      "color": "#ffffff",
-      "intensity": 3.8,
-      "position": [
-        -4,
-        7,
-        -4
-      ]
-    },
-    "environmentIntensity": 0.65,
-    "acesExposure": 1
-  },
-  "consideredButNotUsed": [
-    {
-      "url": "https://polyhaven.com/a/blue_metal_plate",
-      "reason": "Donor seam lines, blue coating and industrial wear pattern do not match this vehicle; no pixels or maps used"
-    }
-  ],
-  "limits": [
-    "Paint chemistry, coating micro-height, tiny damage and contact-band composition are inferred from photographs.",
-    "Game macro rim/facet lighting differs slightly from the retained high source; no normal/AO/shadow-disable diagnostic is represented as final appearance.",
-    "Primary crop and telephoto camera fits remain provisional; color averages and numeric checks do not certify exact photographic equality."
-  ],
-  "runtimeSha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
-  "runtimeBytes": 20797132,
-  "packedRgbExact": true,
-  "workingGeometry": "20261024GeometryV32",
-  "candidateSha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
-  "historicalSurfaceV2ColorDiagnostic": {
-    "note": "Historical SurfaceV2 diagnostic, rejected by user. These values do not describe the V23/V25 candidate and are not used for current acceptance.",
-    "turret": {
-      "photo": [
-        132.4,
-        115.2,
-        80.4
-      ],
-      "probe": [
-        135.3,
-        115.4,
-        79.6
-      ]
-    },
-    "upperSide": {
-      "photo": [
-        103.9,
-        86.9,
-        51.7
-      ],
-      "probe": [
-        104.4,
-        87.2,
-        56.3
-      ]
-    },
-    "lowerSkirt": {
-      "photo": [
-        89.8,
-        74.3,
-        43.1
-      ],
-      "probe": [
-        101,
-        85.4,
-        57.7
-      ]
-    }
-  },
-  "paintCorrection": {
-    "priorProblem": "Actual V23 SurfaceV3 GLB was too grey-green in the same unchanged reference illumination; prior recorded colour values were stale V2 data.",
-    "authoringBaseLinearRgb": [
-      0.12,
-      0.092,
-      0.0403
+  "physicalSurface": {
+    "sets": [
+      "Armor",
+      "Steel",
+      "Track",
+      "Rubber",
+      "Exhaust",
+      "Glass",
+      "Guard",
+      "CastArmor"
     ],
-    "evidence": "Scene_PaintDiagnosticWarmOliveA_640.jpg; diagnostic only, full actual bake still required.",
-    "referenceState": "2007 restoration appearance; 2025 structural photos do not prescribe paint colour."
-  },
-  "projectionCorrection": {
-    "cageExtrusionM": 0.003,
-    "maxRayDistanceM": 0.012,
-    "scope": "Game Armor only; the22mm cage selected neighbouring/back faces around thin lids. V25 targeted rebake verified a substantial reduction of false dark edge chips. V26 uses this in the complete bake.",
-    "sameGeometryAndUv": true
-  },
-  "newMuseumAppearance": "2007 cylindrical perforated MG jacket and inner gold five-point badge on an independently flipping round cover. Badge colour is a museum-photo reconstruction, not original1938 paint proof.",
-  "reopenedScope": "User accepts broad shape, rejects exposed missing faces, insufficient track/rivet/joint detail, plastic material response and false colour interpolation. V31 author sign-off and numeric tests do not prove completion.",
-  "historicalV26Evidence": [
-    {
-      "aspect": "paint and coating",
-      "reference": "Recovered2007 primary; structural2025 photos are not a paint prescription",
-      "result": "Warm olive-brown pigment, reduced macro mottling/lower film and fine metre-scaled coating compared on both actual exports. Source pigment corrected after the too-grey-green V23 render.",
-      "game": "Scene_FinalSurfaceV3V26GameArmor_640.jpg",
-      "high": "Scene_FinalSurfaceV3V26HighArmor_640.jpg"
+    "channels": "sRGB Base; linear OpenGL Normal; ORM R=AO G=roughness B=metallic",
+    "armor": "4096Base/8192Normal/4096ORM",
+    "method": "Complete paired high/game bake, periodic fine film/cast normals and separately verified side-cover AO",
+    "microSurface": {
+      "tileRmsSlope": 0.11,
+      "filmTileM": 0.168,
+      "castTileM": 0.224,
+      "appearanceInference": true
     },
-    {
-      "aspect": "cast shoes and wear",
-      "reference": "Native16/20 construction;2007 primary and32 wear partition",
-      "result": "Light abraded outer web, protected dark recesses, cast relief and separate contact abrasion retained. Later orange rust was not copied wholesale.",
-      "game": "Scene_FinalSurfaceV3V26GameTrack_640.jpg",
-      "high": "Scene_FinalSurfaceV3V26HighTrack_640.jpg"
-    },
-    {
-      "aspect": "guard, exhaust and glass",
-      "reference": "2/19/24/34",
-      "result": "Painted punched sheet remains distinct from oxidised exhaust and dielectric glazed lamp; actual near/far MASK holes checked.",
-      "game": "Scene_V26GameRearDeck_640.jpg",
-      "high": "Scene_V26HighRearDeck_640.jpg"
-    },
-    {
-      "aspect": "projection and articulation",
-      "result": "Game Armor3mm cage/12mm rays remove the large false edge-chip projection; independent round cover exposes mapped gold inner badge. Geometry, real normals and AO retained; no shader-disable diagnostic used as final output.",
-      "game": "Scene_V26GameBowOpenCover_640.jpg",
-      "high": "Scene_V26HighBowOpenCover_640.jpg"
-    },
-    {
-      "aspect": "lighting independence",
-      "result": "Same actual packed game file inspected under unchanged reference-approximation and neutral profiles. Grazing shadow-map hatching was isolated by a shadow-only diagnostic; it was not baked into or painted out of the maps.",
-      "referenceProfile": "Scene_FinalSurfaceV3V26GameMain_640.jpg",
-      "neutralProfile": "Scene_FinalSurfaceV3V26NeutralMain_640.jpg"
-    }
-  ],
-  "historicalV26ColorDiagnostic": {
-    "note": "Flat-region RGB averages at matched 640px camera, for colour/exposure diagnosis only. These do not prove microtexture fidelity or factory pigment chemistry.",
-    "turret": {
-      "photo": [
-        132.4,
-        115.2,
-        80.4
-      ],
-      "model": [
-        136,
-        116.4,
-        79.3
-      ]
-    },
-    "upperSide": {
-      "photo": [
-        103.9,
-        86.9,
-        51.7
-      ],
-      "model": [
-        103.5,
-        86.5,
-        53.7
-      ]
-    },
-    "lowerSkirt": {
-      "photo": [
-        89.8,
-        74.3,
-        43.1
-      ],
-      "model": [
-        91,
-        76.7,
-        46.8
-      ]
-    }
-  },
-  "reopenedAt": "2026-10-24T13:46:08.418685+00:00",
-  "historicalV31Evidence": [],
-  "normalRefinement": {
-    "scope": "Only armor normals rebaked. Actual planar wheel annuli use true surface normals under the existing micro relief; all geometry,UVs and original material fields preserved.",
-    "currentMaterialScriptSha256": "6c5078f3c1d5dfb9a1efbf591f89cd27607d75c6e20fa3caff28c68e1f6e92e1",
-    "scriptSha256": "5eacb4132706a9c399419f6fe00502f69312b11f4328f220786005fecbfc7095",
-    "hardwareFields": {
-      "components": 862,
-      "triangles": 19332,
-      "channels": {
-        "Base": {
-          "repairedTexels": 22977,
-          "maximumNearestHighDistanceM": 0.006600759923458099,
-          "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-        },
-        "Normal": {
-          "repairedTexels": 22977,
-          "maximumNearestHighDistanceM": 0.006600759923458099,
-          "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-        },
-        "Roughness": {
-          "repairedTexels": 12927,
-          "maximumNearestHighDistanceM": 0.0209999680519104,
-          "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-        },
-        "Metallic": {
-          "repairedTexels": 12927,
-          "maximumNearestHighDistanceM": 0.0209999680519104,
-          "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-        },
-        "Ao": {
-          "repairedTexels": 12927,
-          "maximumNearestHighDistanceM": 0.0209999680519104,
-          "source": "nearest actual high triangle / high baked surface, tangent frames converted for normal"
-        }
-      },
-      "source": "Nearest actual high fields for complete small connected rivet/hex components; no fabricated colour or normal;35mm limit retained"
-    },
-    "sources": [
-      {
-        "quality": "Game",
-        "sourceSha256": "4a174216d55f353e79ccfa963aa358b79132bc77f44f57cfb777962c135e6dfc",
-        "unpackedExportSha256": "a5b36f9b377371be566ad2508ed0b968b5e1b9d7b8400cc69e2d7a861639f5ab"
-      },
-      {
-        "quality": "High",
-        "sourceSha256": "f14ce67bab61ccc2bcf8aa2a6bae42a7acf349f29adc7ae588eb2ebba471389e",
-        "unpackedExportSha256": "3996334a8aaba28599a9328b76f252fe78c73849c78ef52aa947ff842041900b"
-      }
+    "extensions": [
+      "KHR_materials_clearcoat",
+      "KHR_materials_specular",
+      "KHR_texture_transform"
     ]
   },
-  "evidence": [
-    "Scene_FinalV32PackedReferenceMain_640.jpg",
-    "Scene_FinalV32PackedReferenceFront_640.jpg",
-    "Scene_FinalV32PackedReferenceTrack_640.jpg",
-    "Scene_FinalV32PackedReferenceRear_640.jpg",
-    "Scene_FinalV32PackedNeutralMain_640.jpg",
-    "Scene_FinalV32PackedNeutralArmor_640.jpg",
-    "Scene_FinalV32PackedNeutralTrack_640.jpg",
-    "Scene_FinalV32PackedNeutralRear_640.jpg",
-    "Scene_V32PackedGameSideCoverClosed_640.jpg",
-    "Scene_V32PackedGameBowHardware_640.jpg",
-    "Scene_V32PackedGameRoadWheels_640.jpg",
-    "Scene_V32PackedGameRearBearing_640.jpg",
-    "Scene_V32PackedHighRoadWheels_640.jpg"
-  ],
-  "highSha256": "2670640b69c23e4d7f5fa01fddf38a31c6ee30740e14d3e33e8142110d10ef70",
-  "observations": [
-    "Mapped albedo and normal ray-miss fractions are zero in the independent UV-surface probes, including small hardware facets.",
-    "Paint remains a dielectric coating with fine pores/pressed texture; cast tread metal, polished contact surfaces, oxide and dust have distinct normal/roughness/metallic fields.",
-    "Reference and neutral profiles show the same material partitions. No lighting change was used as a substitute for geometry or texture correction.",
-    "Exact microscopic wear and museum repaint colour remain photographic reconstruction, not a claim about the1938 factory finish."
+  "gameFine": {
+    "status": "PortableMicroSurfaceStudy_ActualRenderRequired",
+    "quality": "Game",
+    "input": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54IntegratedFrontDoor\\Scene_Type89MediumTankGamePbr.blend",
+    "inputSha256": "a1415ffaf38e0e79461c079269419c5ec1ae4c99af5d80d0f8274db09934a57a",
+    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54ReleaseSurfaceV12\\Fine\\Scene_Type89MediumTankGameFine.blend",
+    "glb": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\GeometryV54ReleaseSurfaceV12\\Model_Type89MediumTankGameFine.glb",
+    "glbSha256": "48b21509d8983e40f92b1d922660d8b0a5aa18f139cf09c57407354a0c84c5e9",
+    "revision": "SurfaceV12",
+    "geometryVersion": "20261027GeometryV54",
+    "sourceTrianglesBeforeAndAfter": 419856,
+    "castFaces": 13666,
+    "periodicTiles": {
+      "Film": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54ReleaseSurfaceV12\\Fine\\Maps\\Texture_Type89FineFilmNormal.png",
+      "Cast": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54ReleaseSurfaceV12\\Fine\\Maps\\Texture_Type89FineCastNormal.png"
+    },
+    "tileRmsSlope": 0.11,
+    "coatingFiles": {
+      "Armor": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54ReleaseSurfaceV12\\Fine\\Maps\\Texture_Type89GameArmorMicroCoat.png",
+      "Guard": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54ReleaseSurfaceV12\\Fine\\Maps\\Texture_Type89GameGuardMicroCoat.png"
+    },
+    "uvDensities": {
+      "Armor": {
+        "areaM2": 105.38929742912882,
+        "uvArea": 0.32333727820334557,
+        "uvUnitsPerM": 0.05538977926415999
+      },
+      "Guard": {
+        "areaM2": 0.46105652395635843,
+        "uvArea": 0.7607389433395664,
+        "uvUnitsPerM": 1.2845196096745573
+      }
+    },
+    "layerSettings": {
+      "Armor": {
+        "tileM": 0.168,
+        "uvRepeat": 107.46352542755926,
+        "normalScale": 1.2,
+        "dielectricSpecularFactor": 0.2,
+        "maximumCoatWeight": 0.8,
+        "coatRoughness": "Existing roughness field, unchanged",
+        "normalField": "Film"
+      },
+      "Guard": {
+        "tileM": 0.168,
+        "uvRepeat": 4.633935447578751,
+        "normalScale": 1.2,
+        "dielectricSpecularFactor": 0.2,
+        "maximumCoatWeight": 0.8,
+        "coatRoughness": "Existing roughness field, unchanged",
+        "normalField": "Film"
+      },
+      "CastArmor": {
+        "tileM": 0.224,
+        "uvRepeat": 80.59764407066945,
+        "normalScale": 0.85,
+        "dielectricSpecularFactor": 0.2,
+        "maximumCoatWeight": 0.8,
+        "coatRoughness": "Existing roughness field, unchanged",
+        "normalField": "Cast",
+        "normalMode": "FineDiffuse_OriginalMacroReflection",
+        "macroNormalRetainedOn": "Coat Normal"
+      }
+    },
+    "scope": "Fine surface-normal study using portable glTF layers; macro maps/geometry retained. No factory coating chemistry claim; not accepted/published.",
+    "goalComplete": false
+  },
+  "highFine": {
+    "status": "PortableMicroSurfaceStudy_ActualRenderRequired",
+    "quality": "High",
+    "input": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54IntegratedFrontDoor\\Scene_Type89MediumTankHighPbr.blend",
+    "inputSha256": "2fd9b74a6b0f01d4e9208a533cc0feea3e508dca5659fc1eca39845f15b499ef",
+    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54ReleaseSurfaceV12\\Fine\\Scene_Type89MediumTankHighFine.blend",
+    "glb": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\GeometryV54ReleaseSurfaceV12\\Model_Type89MediumTankHighFine.glb",
+    "glbSha256": "1dc65afafaa755f365dbf6d6d94a3185a10804c68d57d2ea9ef28ed2c941f881",
+    "revision": "SurfaceV12",
+    "geometryVersion": "20261027GeometryV54",
+    "sourceTrianglesBeforeAndAfter": 1462012,
+    "castFaces": 27874,
+    "periodicTiles": {
+      "Film": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54ReleaseSurfaceV12\\Fine\\Maps\\Texture_Type89FineFilmNormal.png",
+      "Cast": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54ReleaseSurfaceV12\\Fine\\Maps\\Texture_Type89FineCastNormal.png"
+    },
+    "tileRmsSlope": 0.11,
+    "coatingFiles": {
+      "Armor": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54ReleaseSurfaceV12\\Fine\\Maps\\Texture_Type89HighArmorMicroCoat.png",
+      "Guard": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54ReleaseSurfaceV12\\Fine\\Maps\\Texture_Type89HighGuardMicroCoat.png"
+    },
+    "uvDensities": {
+      "Armor": {
+        "areaM2": 107.25825054082605,
+        "uvArea": 0.28800004998177026,
+        "uvUnitsPerM": 0.0518180334535225
+      },
+      "Guard": {
+        "areaM2": 0.7334666613602234,
+        "uvArea": 0.15507677754718333,
+        "uvUnitsPerM": 0.45981506363985475
+      }
+    },
+    "layerSettings": {
+      "Armor": {
+        "tileM": 0.168,
+        "uvRepeat": 114.87083850296753,
+        "normalScale": 1.2,
+        "dielectricSpecularFactor": 0.2,
+        "maximumCoatWeight": 0.8,
+        "coatRoughness": "Existing roughness field, unchanged",
+        "normalField": "Film"
+      },
+      "Guard": {
+        "tileM": 0.168,
+        "uvRepeat": 12.94516300806337,
+        "normalScale": 1.2,
+        "dielectricSpecularFactor": 0.2,
+        "maximumCoatWeight": 0.8,
+        "coatRoughness": "Existing roughness field, unchanged",
+        "normalField": "Film"
+      },
+      "CastArmor": {
+        "tileM": 0.224,
+        "uvRepeat": 86.15312887722565,
+        "normalScale": 0.85,
+        "dielectricSpecularFactor": 0.2,
+        "maximumCoatWeight": 0.8,
+        "coatRoughness": "Existing roughness field, unchanged",
+        "normalField": "Cast",
+        "normalMode": "FineDiffuse_OriginalMacroReflection",
+        "macroNormalRetainedOn": "Coat Normal"
+      }
+    },
+    "scope": "Fine surface-normal study using portable glTF layers; macro maps/geometry retained. No factory coating chemistry claim; not accepted/published.",
+    "goalComplete": false
+  },
+  "ao": {
+    "Game": {
+      "pass": true,
+      "baseline": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\GeometryV54ReleaseSurfaceV12\\Model_Type89MediumTankGameFine.glb",
+      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\GeometryV54ReleaseSurfaceV12\\Model_Type89MediumTankGamePbr.glb",
+      "baselineSha256": "48b21509d8983e40f92b1d922660d8b0a5aa18f139cf09c57407354a0c84c5e9",
+      "sha256": "9356b1e494e3cadd37aba4ec20f41bed6bde1ea11f2221268b29a3a233b03693",
+      "geometryCornerDataExact": true,
+      "materialParametersTransformsAndSamplingExact": true,
+      "allOtherDecodedImagesExact": true,
+      "ormGreenBlueAlphaExact": true,
+      "changedAoTexels": 45465,
+      "outsideScope": 0,
+      "maxAoDelta": 255,
+      "scopeParts": [
+        "Mesh_SideVisionFrameLeft",
+        "Mesh_SideVisionFrameRight",
+        "Mesh_SideVisionFlapLeft",
+        "Mesh_SideVisionFlapRight"
+      ],
+      "images": [
+        {
+          "name": "Texture_Type89GameArmorMicroCoat",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89FineFilmNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameArmorNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameArmorOrm",
+          "otherChannelsExact": false,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameArmorBase",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameSteelNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameSteelOrm",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameSteelBase",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89FineCastNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameExhaustNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameExhaustOrm",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameExhaustBase",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameGuardMicroCoat",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameGuardNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameGuardOrm",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameGuardBase",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameGlassNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameGlassOrm",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameGlassBase",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameRubberNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameRubberOrm",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameRubberBase",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameTrackNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameTrackOrm",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89GameTrackBase",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        }
+      ],
+      "goalComplete": false
+    },
+    "High": {
+      "pass": true,
+      "baseline": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\GeometryV54ReleaseSurfaceV12\\Model_Type89MediumTankHighFine.glb",
+      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\GeometryV54ReleaseSurfaceV12\\Model_Type89MediumTankHighPbr.glb",
+      "baselineSha256": "da18a791e642f7c883ff35bd5514ab9c58a500667b85931cb1e7b557f9d9814c",
+      "sha256": "3ff008c6989b2df3e7a726c7939b95bf02dbcc777aa5d9a6cd07d640db2b3642",
+      "geometryCornerDataExact": true,
+      "materialParametersTransformsAndSamplingExact": true,
+      "allOtherDecodedImagesExact": true,
+      "ormGreenBlueAlphaExact": true,
+      "changedAoTexels": 40145,
+      "outsideScope": 0,
+      "maxAoDelta": 255,
+      "scopeParts": [
+        "Mesh_SideVisionFrameLeft",
+        "Mesh_SideVisionFrameRight",
+        "Mesh_SideVisionFlapLeft",
+        "Mesh_SideVisionFlapRight"
+      ],
+      "images": [
+        {
+          "name": "Texture_Type89HighArmorMicroCoat",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89FineFilmNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighArmorNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighArmorOrm",
+          "otherChannelsExact": false,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighArmorBase",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighSteelNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighSteelOrm",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighSteelBase",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89FineCastNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighExhaustNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighExhaustOrm",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighExhaustBase",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighGuardMicroCoat",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighGuardNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighGuardOrm",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighGuardBase",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighGlassNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighGlassOrm",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighGlassBase",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighRubberNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighRubberOrm",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighRubberBase",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighTrackNormal",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighTrackOrm",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        },
+        {
+          "name": "Texture_Type89HighTrackBase",
+          "otherChannelsExact": true,
+          "unusedAlphaDifferences": 0
+        }
+      ],
+      "goalComplete": false
+    }
+  },
+  "runtimeSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
+  "scopeLimitations": [
+    "Museum appearance and inferred microtexture; no original paint, factory motion-stop or hidden-construction certification.",
+    "Photographic perspective and local form matching retain uncertainty; this is not a scan-identical replica.",
+    "Door/gun stow linkage is a collision-cleared display reconstruction, not a verified original operating procedure."
   ]
 }

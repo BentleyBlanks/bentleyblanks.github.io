@@ -1,0 +1,21 @@
+{
+  "revision": "RearGunExteriorStudy20261027",
+  "status": "LocalStudyParameters_GlobalFitOpen",
+  "sourceReferences": [34, 19],
+  "sheathProfileRadiusAxisM": [[0.056, 0.080], [0.055, 0.140], [0.046, 0.240], [0.030, 0.350], [0.016, 0.415], [0.012, 0.430], [0.004, 0.430], [0.004, 0.415]],
+  "footOutlineLocalXzM": [[-0.038, -0.115], [0.038, -0.115], [0.045, -0.139], [0.033, -0.153], [-0.033, -0.153], [-0.045, -0.139]],
+  "footCentreLocalY": 0.023,
+  "footThicknessM": 0.014,
+  "slotCentresLocalX": [-0.017, 0.017],
+  "slotCentreLocalZ": -0.133,
+  "slotRadiusM": 0.003,
+  "slotStraightHalfLengthM": 0.004,
+  "preserve": "Existing fixed mounting frame, ball geometry and aiming-carrier axes",
+  "limits": [
+    "Dark tapered sheath and lower mounting lobe are visible in the referenced preserved-car photographs.",
+    "Profile, foot thickness, exact end opening and elongated-feature occupancy remain reconstruction parameters.",
+    "The local clearance result does not certify global turret/camera fit or factory dimensions."
+  ],
+  "userApproved": false,
+  "goalComplete": false
+}

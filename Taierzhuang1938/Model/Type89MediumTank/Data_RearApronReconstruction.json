@@ -1,0 +1,304 @@
+{
+  "revision": "RearApronPhotoV43",
+  "referenceIds": [
+    2,
+    19
+  ],
+  "reference19ImageSize": [
+    5408,
+    3600
+  ],
+  "cameraParameters": [
+    -6.057458613790093,
+    0.2081576518409094,
+    1.5323361950356766,
+    1.6484386962322632,
+    -0.06856708882672975,
+    0.00025700976787262735,
+    604.4444444444445
+  ],
+  "principalPoint": [
+    320,
+    213.01775147928993
+  ],
+  "annotationUncertaintyNativePx": 4,
+  "anchor": {
+    "sourceRearAxleY": -2.12,
+    "sourceRearAxleZ": 0.777,
+    "runtimeRearAxleWorldZ": 0.7533834036439657
+  },
+  "leftOnly": true,
+  "apron": {
+    "frontX": -1.046,
+    "backX": -1.04,
+    "outlineNative": [
+      [
+        4288,
+        2344
+      ],
+      [
+        4404,
+        2344
+      ],
+      [
+        4457,
+        2356
+      ],
+      [
+        4497,
+        2385
+      ],
+      [
+        4522,
+        2418
+      ],
+      [
+        4362,
+        2484
+      ]
+    ],
+    "outlineOffsetsYZ": [
+      [
+        0.319874267,
+        -0.129848114
+      ],
+      [
+        0.198184331,
+        -0.131482337
+      ],
+      [
+        0.142132854,
+        -0.144611741
+      ],
+      [
+        0.099238791,
+        -0.175141919
+      ],
+      [
+        0.071993603,
+        -0.209644364
+      ],
+      [
+        0.238951478,
+        -0.275369893
+      ]
+    ]
+  },
+  "flange": {
+    "frontX": -1.052,
+    "backX": -1.048,
+    "upperNative": [
+      [
+        4274,
+        2290
+      ],
+      [
+        4385,
+        2288
+      ],
+      [
+        4460,
+        2302
+      ],
+      [
+        4505,
+        2332
+      ],
+      [
+        4545,
+        2393
+      ]
+    ],
+    "lowerNative": [
+      [
+        4288,
+        2344
+      ],
+      [
+        4404,
+        2344
+      ],
+      [
+        4457,
+        2356
+      ],
+      [
+        4497,
+        2385
+      ],
+      [
+        4522,
+        2418
+      ]
+    ],
+    "outlineOffsetsYZ": [
+      [
+        0.338131968,
+        -0.073130056
+      ],
+      [
+        0.222024842,
+        -0.072537801
+      ],
+      [
+        0.142959716,
+        -0.087932189
+      ],
+      [
+        0.094855442,
+        -0.119447107
+      ],
+      [
+        0.051091872,
+        -0.182975874
+      ],
+      [
+        0.07469481,
+        -0.20846076
+      ],
+      [
+        0.101907378,
+        -0.173999623
+      ],
+      [
+        0.144750086,
+        -0.143505998
+      ],
+      [
+        0.200734455,
+        -0.130392313
+      ],
+      [
+        0.322278697,
+        -0.128760047
+      ]
+    ]
+  },
+  "apronCrowns": {
+    "baseX": -1.046,
+    "radiusM": 0.007,
+    "native": [
+      [
+        4395,
+        2370
+      ],
+      [
+        4469,
+        2384
+      ],
+      [
+        4492,
+        2415
+      ],
+      [
+        4341,
+        2399
+      ],
+      [
+        4371,
+        2462
+      ]
+    ],
+    "offsetsYZ": [
+      [
+        0.208701792,
+        -0.157410932
+      ],
+      [
+        0.130537858,
+        -0.17293347
+      ],
+      [
+        0.105512171,
+        -0.205293915
+      ],
+      [
+        0.264683083,
+        -0.186496664
+      ],
+      [
+        0.231689084,
+        -0.251949502
+      ]
+    ]
+  },
+  "flangeCrowns": {
+    "baseX": -1.052,
+    "radiusM": 0.007,
+    "native": [
+      [
+        4296,
+        2308
+      ],
+      [
+        4393,
+        2311
+      ],
+      [
+        4492,
+        2339
+      ],
+      [
+        4525,
+        2383
+      ]
+    ],
+    "offsetsYZ": [
+      [
+        0.316341029,
+        -0.091198711
+      ],
+      [
+        0.214770325,
+        -0.095587609
+      ],
+      [
+        0.110133779,
+        -0.125756891
+      ],
+      [
+        0.074253655,
+        -0.171589249
+      ]
+    ]
+  },
+  "lowerRoundFeatures": {
+    "frontX": -1.052,
+    "radiusM": 0.0045,
+    "blindDepthM": 0.0015,
+    "native": [
+      [
+        4300,
+        2333
+      ],
+      [
+        4390,
+        2333
+      ]
+    ],
+    "offsetsYZ": [
+      [
+        0.309977506,
+        -0.117625211
+      ],
+      [
+        0.215693729,
+        -0.118875333
+      ]
+    ],
+    "interpretation": "Shallow circular recesses; screw/slot identity and period-specific occupancy are not certified"
+  },
+  "frontTransition": {
+    "frontX": -1.04,
+    "backX": -1.034,
+    "longitudinalClearanceM": 0.003,
+    "interpretation": "Inferred fixed transition to the final removable skirt; concealed attachment and factory motion relationship unverified"
+  },
+  "limits": [
+    "Single-plane photo reconstruction with 2007 cross-view corroboration; metric thickness and hidden attachment are inferred.",
+    "The five visible lower crowns, broad curved flange and circular lower features are separated; do not invent screw slots or copy the left arrangement to the opposite side.",
+    "Source geometry is not accepted until assembled coverage and all relevant motion sweeps pass."
+  ],
+  "userApproved": false,
+  "goalComplete": false
+}

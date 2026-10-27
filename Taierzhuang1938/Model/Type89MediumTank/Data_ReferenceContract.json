@@ -1,11 +1,5 @@
 {
   "asset": "Type89MediumTank",
-  "geometryVersion": "20261024GeometryV32",
-  "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
-  "materialRevision": "SurfaceV5",
-  "materialReview": "Data_MaterialReview.json",
-  "reviewedAt": "2026-10-25",
-  "reviewScope": "Exact final V32 packed game/high files compared against the recovered same-car photographs, neutral component close-ups and reference-approximation whole/front/track/rear views. Technical tests and source observations remain separate; V31 rejection remains recorded.",
   "selectedConfiguration": "Type89 I-Go Otsu, restored running vehicle at JGSDF Tsuchiura. Primary appearance state is the 2007 Megapixie photograph; 2025 Hunini views corroborate the same preserved car's closed hatches and geometry. Early Ko nose/cupola features are excluded.",
   "notion": "https://app.notion.com/p/40260335331c81a18a18e63b0cc14bce",
   "nominalDimensionsM": {
@@ -26,11 +20,6 @@
   },
   "sourceAxes": "Blender X right, +Y nose, +Z up; metres; ground datum under hull center",
   "runtimeAxes": "glTF X right, +Y up, -Z nose; metres; measured vertex cloud and bore direction are validated",
-  "runtimeTriangleCeiling": 252000,
-  "runtimeRenderedTriangles": 240278,
-  "sourceTrianglesBeforeExportCleanup": 1130810,
-  "linksPerSide": 74,
-  "wheelGroupsPerSide": 15,
   "requiredPivots": [
     "Node_TrackLeft",
     "Node_TrackRight",
@@ -51,6 +40,52 @@
     "Node_BowDoorLatch",
     "Node_BowRoundPortCover"
   ],
+  "inferred": [
+    "Original1938 paint cannot be established from a restored2007/2025 museum finish. The chosen hue describes photographic restoration appearance, not a factory paint specification.",
+    "Hidden engine/turret interiors are dark simplified recesses. Bracket backs, concealed fasteners and small hinge construction not resolved in photographs remain reconstruction.",
+    "Contact-band composition is not proven by the available pictures; the dark matte band is a declared material inference.",
+    "Micro paint texture, oxide pits and settled dust are physically zoned authoring details calibrated to visible condition, not measured historical damage.",
+    "Internal guide depth and wheel running clearance were refined against actual re-imported triangle motion. They are functional visual reconstruction rather than manufacturing dimensions.",
+    "The primary 2007 original was recovered during material review (3275x2399). Some other Commons originals remain unavailable and their explicitly labeled standard 1280px thumbnails are retained.",
+    "The2007 primary shows an exposed cylindrical perforated bow-MG jacket and an open round cover with an inner five-point badge. The pointed removable cover in2025 photos is a different accessory state and is not substituted into the2007 appearance.",
+    "Fine coating grain, shallow cast texture, demonstration speeds and the bow-door gun-stow linkage are explicitly inferred appearance/function choices."
+  ],
+  "historicalBoundary": "Museum/same-type appearance references do not establish participation in the16-18March Tengxian city assault. This independent asset does not replace the legacy Type89Tank or change mission history.",
+  "primaryPhoto": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
+  "accessoryState": "2007 exposed cylindrical perforated bow-MG jacket and opening round cover with inner star; pointed removable2025 cover excluded. Rest joints are closed; the2007 review pose opens them with Type89Motion.",
+  "geometryVersion": "20261027GeometryV54",
+  "materialRevision": "SurfaceV12",
+  "runtimeTriangleTarget": 400000,
+  "runtimeTriangleCeiling": 420000,
+  "runtimeRenderedTriangles": 417130,
+  "sourceTrianglesBeforeExportCleanup": 1462012,
+  "selectedGameSourceTrianglesBeforeCleanup": 419856,
+  "selectedGameVisibleSourceTrianglesBeforeZeroAreaCleanup": 417264,
+  "exportRemovedZeroAreaTriangles": 132,
+  "exportRemovedWhollyEnclosedTriangles": 2592,
+  "budgetPolicy": "PreserveSelectedVisibleGameTopologyWithinFivePercentWithCertifiedEnclosure",
+  "linksPerSide": 81,
+  "castingPitchM": 0.13075591189150385,
+  "materialCount": 9,
+  "activePackedImages": 25,
+  "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
+  "reviewedAt": "2026-10-27T20:41:50.254Z",
+  "reviewScope": "Author-reviewed optional asset integration under the user instruction; not a factory-dimensional or full photo-fidelity certification",
+  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank",
+  "highProject": "Scene_Type89MediumTankHighPbr.blend",
+  "gameProject": "Scene_Type89MediumTankGamePbr.blend",
+  "wheelGroupsPerSide": 15,
+  "geometryRecipeSha256": "72e44ce429a524873848ec9d9772ac5c46e2b866221baf3d9ec177bc0ae715fa",
+  "materialReview": "Data_MaterialReview.json",
+  "geometryReview": "Data_GeometryReviewV3.json",
+  "articulationEvidence": "Data_ArticulationEvidence.json",
+  "runtimeSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
+  "userApproved": false,
+  "authorization": {
+    "optionalAssetIntegration": true,
+    "legacyCampaignReplacement": false,
+    "source": "User: first integrate as optional asset after no-major-issue review"
+  },
   "surfaceContract": {
     "sets": [
       "Armor",
@@ -59,162 +94,28 @@
       "Rubber",
       "Exhaust",
       "Glass",
-      "Guard"
+      "Guard",
+      "CastArmor"
     ],
-    "channels": "sRGB Base; linear OpenGL tangent Normal; linear ORM R=AO,G=roughness,B=metallic",
-    "armor": "4096Base/4096Normal/2048ORM",
-    "glass": "dielectric, roughness approximately0.15, transmission0.88, IOR1.5",
-    "shadowMaterial": "constant dark dielectric cavity, no invented interior machinery",
-    "method": "Complete V32 high/game Base/Normal/ORM bake; per-shading-point assembled AO/cavity, no sparse assembly vertex-AO interpolation; native-resolution high sampling,3mm Armor cage/12mm projection and unchanged35mm nearest-source repair limit",
-    "guard": "2048Base RGBA MASK/2048Normal/1024ORM, double-sided; mapped-surface hole coverage tested",
-    "normalRefinement": "Planar and shallow conical wheel faces use actual face normals under the existing micro relief; geometry and Base/ORM fields are retained."
-  },
-  "inferred": [
-    "Original1938 paint cannot be established from a restored2007/2025 museum finish. The chosen hue describes photographic restoration appearance, not a factory paint specification.",
-    "Hidden engine/turret interiors are dark simplified recesses. Bracket backs, concealed fasteners and small hinge construction not resolved in photographs remain reconstruction.",
-    "Contact-band composition is not proven by the available pictures; the dark matte band is a declared material inference.",
-    "Micro paint texture, oxide pits and settled dust are physically zoned authoring details calibrated to visible condition, not measured historical damage.",
-    "Internal guide depth and wheel running clearance were refined against actual re-imported triangle motion. They are functional visual reconstruction rather than manufacturing dimensions.",
-    "The primary 2007 original was recovered during material review (3275x2399). Some other Commons originals remain unavailable and their explicitly labeled standard 1280px thumbnails are retained.",
-    "The2007 primary shows an exposed cylindrical perforated bow-MG jacket and an open round cover with an inner five-point badge. The pointed removable cover in2025 photos is a different accessory state and is not substituted into the2007 appearance."
-  ],
-  "historicalBoundary": "Museum/same-type appearance references do not establish participation in the16-18March Tengxian city assault. This independent asset does not replace the legacy Type89Tank or change mission history.",
-  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank",
-  "highProject": "Scene_Type89MediumTankHighPbr.blend",
-  "gameProject": "Scene_Type89MediumTankGamePbr.blend",
-  "primaryPhoto": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
-  "functionalClearanceReview": {
-    "phaseSamples": 36,
-    "testedNearbyPairs": 4716,
-    "fixedGroups": 10,
-    "fixedPairs": 5378,
-    "maximumWheelPenetrationM": 0.0009344220161437988,
-    "maximumFixedPenetrationM": 0.0,
-    "maximumHardwarePenetrationM": 0.0,
-    "hardwareSweepPairs": 64,
-    "runtimeSha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
-    "highMaximumWheelPenetrationM": 0.0009344220161437988,
-    "highMaximumHardwarePenetrationM": 1.8688806449063122e-06
-  },
-  "geometryReview": "Data_GeometryReviewV3.json",
-  "workingGeometryNote": "V32 final files checked after opaque-hit/subpixel repair, valid tangent export and wheel-plane normal refinement. Museum/photo reconstruction and concealed details remain explicitly inferred.",
-  "workingSourceTriangles": {
-    "High": 1130810,
-    "Game": 240278
-  },
-  "workingBudget": {
-    "target": 240000,
-    "proposedCeiling": 252000,
-    "policy": "PreserveSelectedGameTopologyWithinFivePercent",
-    "requiredReductionFraction": 0.0011569931496017113
-  },
-  "runtimeTriangleTarget": 240000,
-  "selectedGameSourceTrianglesBeforeCleanup": 240278,
-  "budgetPolicy": "PreserveSelectedGameTopologyWithinFivePercent",
-  "candidateIdentity": {
-    "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\Type89MediumTank\\Model_Type89MediumTank.glb",
-    "sha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
-    "bytes": 30155884,
-    "triangles": 240278,
-    "images": 21,
-    "materials": 8,
-    "meshNodes": 222,
-    "geometryVersions": [
-      "20261024GeometryV32"
-    ],
-    "cleanup": []
-  },
-  "candidateHighIdentity": {
-    "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\Model_Type89MediumTankHighPbr.glb",
-    "sha256": "2670640b69c23e4d7f5fa01fddf38a31c6ee30740e14d3e33e8142110d10ef70",
-    "bytes": 58475908,
-    "triangles": 1123316,
-    "images": 21,
-    "materials": 8,
-    "meshNodes": 222,
-    "geometryVersions": [
-      "20261024GeometryV32"
-    ],
-    "cleanup": [
-      {
-        "mesh": "BowMgBarrel.002",
-        "removedStorageTriangles": 7286,
-        "instances": 1,
-        "removedRenderedTriangles": 7286
-      },
-      {
-        "mesh": "ExhaustExit.002",
-        "removedStorageTriangles": 52,
-        "instances": 1,
-        "removedRenderedTriangles": 52
-      },
-      {
-        "mesh": "CastShoePlate.002",
-        "removedStorageTriangles": 1,
-        "instances": 148,
-        "removedRenderedTriangles": 148
-      },
-      {
-        "mesh": "GunTrunnion.002",
-        "removedStorageTriangles": 8,
-        "instances": 1,
-        "removedRenderedTriangles": 8
-      }
+    "channels": "sRGB Base; linear OpenGL Normal; ORM R=AO G=roughness B=metallic",
+    "armor": "4096Base/8192Normal/4096ORM",
+    "method": "Complete paired high/game bake, periodic fine film/cast normals and separately verified side-cover AO",
+    "microSurface": {
+      "tileRmsSlope": 0.11,
+      "filmTileM": 0.168,
+      "castTileM": 0.224,
+      "appearanceInference": true
+    },
+    "extensions": [
+      "KHR_materials_clearcoat",
+      "KHR_materials_specular",
+      "KHR_texture_transform"
     ]
   },
-  "geometryRecipeSha256": "96ff8a0c7d36e2f022c0c567248d3d905866d231b58ec59b9f782e80302bc8cc",
-  "exportRemovedZeroAreaTriangles": 0,
-  "accessoryState": "2007 exposed cylindrical perforated bow-MG jacket and opening round cover with inner star; pointed removable2025 cover excluded. Rest joints are closed; the2007 review pose opens them with Type89Motion.",
-  "userApproved": false,
-  "reopenedScope": "User accepts broad shape, rejects exposed missing faces, insufficient track/rivet/joint detail, plastic material response and false colour interpolation. V31 author sign-off and numeric tests do not prove completion.",
-  "geometryRevisionInProgress": "20261024GeometryV32",
-  "materialRevisionInProgress": "SurfaceV5",
-  "measuredRunningGear": {
-    "kind": "PhotographProportionedReconstruction_NotFactoryDimensions",
-    "referenceIds": [
-      2,
-      19
-    ],
-    "returnOuterRingRadiusFitM": [
-      0.06891445288954763,
-      0.06772513528863394
-    ],
-    "adoptedReturnRadiusM": 0.07,
-    "radiusToFirstStationPitchRange": [
-      0.086,
-      0.1
-    ],
-    "sourceAssumptions": "Native visible rim contours, fixed nominal envelope, same-car axle stations and explicitly provisional camera fits. Axial rim feature/edge uncertainty retained.",
-    "leadingSupport": "Between paired discs;2007 shows an unobstructed outer dish on both sides",
-    "clearanceAdjustment": "Inner suspension-cover fold lowered20mm; outer fold and skirt bottom retained; unchanged1mm actual-triangle gate",
-    "adoptedTrackCastingWidthM": 0.32,
-    "trackCentreXPreservedM": 0.907,
-    "widthReferenceId": 16,
-    "widthProjectionAt640": {
-      "old366mmApprox": [
-        476.4,
-        552.0
-      ],
-      "adopted320mmApprox": [
-        481.1,
-        547.3
-      ],
-      "visiblePhotoEdgeApprox": [
-        481,
-        547
-      ]
-    },
-    "widthEvidenceLimit": "Photographic reconstruction;1944USapprox12inch table only corroborates narrower direction, not exact museum or factory dimensions",
-    "pinEndClearance": "Outer pin-eye inner ends stop at abs localX81mm, leaving space outside the paired wheel faces",
-    "highContactBand": "Exact nominal radius; only the buried coincident painted cylinder was removed"
-  },
-  "reopenedAt": "2026-10-24T13:46:08.413665+00:00",
-  "detailBudgetRevision": {
-    "previousTarget": 80000,
-    "previousCeiling": 84000,
-    "target": 240000,
-    "ceiling": 252000,
-    "reason": "User rejected visible low-detail cast links, rivets, wheel transitions and joints. Preserve actual cast-edge chamfers, pin-eye/knuckle bores,32-sided pressed wheel profiles and rounded rivets in the game derivative. Independent asset only; legacy gameplay Type89Tank is unchanged. Final browser costs recorded separately.",
-    "userApproved": false
-  }
+  "scopeLimitations": [
+    "Museum appearance and inferred microtexture; no original paint, factory motion-stop or hidden-construction certification.",
+    "Photographic perspective and local form matching retain uncertainty; this is not a scan-identical replica.",
+    "Door/gun stow linkage is a collision-cleared display reconstruction, not a verified original operating procedure."
+  ],
+  "exportTriangulationZeroAreaTriangles": 2
 }

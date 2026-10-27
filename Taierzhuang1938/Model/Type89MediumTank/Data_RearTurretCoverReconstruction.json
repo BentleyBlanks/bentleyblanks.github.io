@@ -1,0 +1,41 @@
+{
+  "references": [
+    40,
+    41
+  ],
+  "observed": "Two closed rounded rectangular leaves, narrow raised centre strip, four outer hinge straps and barrels",
+  "widthM": 0.246,
+  "heightM": 0.218,
+  "centreGapM": 0.002,
+  "plateThicknessM": 0.01,
+  "cornerRadiusM": 0.014,
+  "surfaceTiltRadians": -0.222,
+  "surfaceYawRadians": 0.103,
+  "metricCertified": false,
+  "smallFastenerCountCertified": false,
+  "functionCertified": false,
+  "openingMotionAdded": false,
+  "limits": "Relative hinge/strip/corner proportions refined from native41; approximate due to oblique perspective. The new oval is a true perforation in the left cover only; the closed retained turret shell remains behind it, with no invented dark inner mechanism. Absolute position, metric dimensions, hidden attachments and small fixing counts remain unverified.",
+  "hingeStationsZM": [
+    -0.056,
+    0.067
+  ],
+  "hingeStrapWidthM": 0.058,
+  "hingeStrapHeightM": 0.04,
+  "hingeStrapInreachM": 0.027,
+  "hingeKnuckleRadiusM": 0.0065,
+  "hingeKnuckleLengthM": 0.0135,
+  "hingeKnuckleStepM": 0.0145,
+  "hingeFixingRadiusM": 0.0042,
+  "hingeFixingDxM": 0.0105,
+  "hingeFixingDzM": 0.009,
+  "centreStripWidthM": 0.028,
+  "leftLeafSmallOval": {
+    "xM": -0.035,
+    "zM": -0.04,
+    "widthM": 0.009,
+    "heightM": 0.016,
+    "functionCertified": false
+  },
+  "status": "WorkingPhotoProportionedRearCover_IntegratedAuthoring"
+}

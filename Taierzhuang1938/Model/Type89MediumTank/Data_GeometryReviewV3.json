@@ -1,16 +1,8 @@
 {
-  "revision": "GeometryV32_SurfaceV5",
-  "status": "V32TechnicallyAndVisuallyReviewedWithDeclaredInferences",
-  "userApproved": false,
+  "revision": "GeometryV54",
+  "status": "AuthorReviewedForOptionalAssetIntegration",
+  "reviewedAt": "2026-10-27T20:41:50.254Z",
   "scope": "Same Tsuchiura preserved Otsu: 2007 appearance, 2025 geometry corroboration and same-car walkaround; early Ko and different museum variants remain excluded",
-  "referencesRecovered": [
-    16,
-    17,
-    18,
-    19,
-    20
-  ],
-  "sourceFolder": "References/GeometryV3",
   "requirements": [
     {
       "id": "commanderLids",
@@ -24,41 +16,7 @@
         23,
         24
       ],
-      "observedGap": "Flat half-disc lids lack the photographed turned skirt, dish and oval opening",
-      "action": "Turned skirts, shallow dishes, oval hand openings and outreach bearings compared in closed2025 and open2007 states; raised cupola riser remains visible above the shorter shell. The160/175degree comparison pose is independent of rest geometry.",
-      "status": "AuthorComparedExactPackedExports",
-      "limits": "Exact manufacturing dimensions and structures hidden by the photographs remain inferred. Camera/illumination calibration is approximate; no scan-level equality or1938 original paint claim is made.",
-      "previousV26ReviewResult": "Turned skirts, shallow dishes, oval hand openings and outreach bearings compared in closed2025 and open2007 states; raised cupola riser remains visible above the shorter shell. The160/175degree comparison pose is independent of rest geometry.",
-      "historicalV26Evidence": {
-        "Game": [
-          "Scene_V26GameCupolaOpen_640.jpg",
-          "Scene_V26GameCupolaClosed_640.jpg"
-        ],
-        "High": [
-          "Scene_V26HighCupolaOpen_640.jpg",
-          "Scene_V26HighCupolaClosed_640.jpg"
-        ]
-      },
-      "historicalV31ReviewResult": "Turned thin caps, shallow dishes, oval hand openings and separate fore/aft outreach hinges compared in open2007 and closed2025 states. The actual packed game and high cap/riser shapes were inspected.",
-      "historicalV31Evidence": {
-        "Game": [
-          "Scene_V31PackedGameCupolaOpen_640.jpg",
-          "Scene_V31PackedGameCupolaClosed_640.jpg"
-        ],
-        "High": [
-          "Scene_V31PackedHighCupolaOpen_640.jpg"
-        ]
-      },
-      "reviewResult": "Thin turned lids, hand openings, outreach hinges and the cupola collar compared in the2007 open and2025 closed states.",
-      "localEvidence": {
-        "Game": [
-          "Scene_V32PackedGameCupolaOpen_640.jpg",
-          "Scene_V32PackedGameCupolaClosed_640.jpg"
-        ],
-        "High": [
-          "Scene_V32PackedHighCupolaOpen_640.jpg"
-        ]
-      }
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
     },
     {
       "id": "leftWheelFaces",
@@ -69,41 +27,7 @@
         20,
         31
       ],
-      "observedGap": "Both pressed profiles faced +X; main left view showed a flat back",
-      "action": "Broad planar pressed lip and shallow dish, rounded high-source transition,24segment leading wheels. Forged arms sit between paired discs. The same eight low rings now reproduce the high central boss volume instead of a missing flat section; high contact ring follows nominal radius.",
-      "status": "AuthorComparedExactPackedExports",
-      "limits": "Exact manufacturing dimensions and structures hidden by the photographs remain inferred. Camera/illumination calibration is approximate; no scan-level equality or1938 original paint claim is made.",
-      "previousV26ReviewResult": "Both banks now expose the correctly oriented pressed face, with the curved recessed dish, hub shoulder and fasteners. Primary2007/left-front17/18 and opposite20 views checked.",
-      "historicalV26Evidence": {
-        "Game": [
-          "Scene_V26GameRearBearing_640.jpg",
-          "Scene_FinalSurfaceV3V26GameArmor_640.jpg"
-        ],
-        "High": [
-          "Scene_V26HighRearBearing_640.jpg",
-          "Scene_FinalSurfaceV3V26HighArmor_640.jpg"
-        ]
-      },
-      "historicalV31ReviewResult": "Wheel fronts have a broad planar pressed lip, shallow dish and real central boss. The same eight low rings now follow the high boss volume; forged supports sit between the paired discs rather than covering the visible front. Actual final game/high wheel faces checked.",
-      "historicalV31Evidence": {
-        "Game": [
-          "Scene_V31PackedGameLeadingWheel_640.jpg",
-          "Scene_V31PackedGameRoadWheels_640.jpg"
-        ],
-        "High": [
-          "Scene_V31PackedHighRoadWheels_640.jpg"
-        ]
-      },
-      "reviewResult": "Both banks retain pressed lips, shoulder transitions, shallow dishes and real hub hardware. Supports remain between paired wheels. Flat/shallow cast faces now use actual surface normals under paint micro relief.",
-      "localEvidence": {
-        "Game": [
-          "Scene_V32PackedGameRoadWheels_640.jpg",
-          "Scene_V32PackedGameLeadingWheel_640.jpg"
-        ],
-        "High": [
-          "Scene_V32PackedHighRoadWheels_640.jpg"
-        ]
-      }
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
     },
     {
       "id": "largeCastWheelRims",
@@ -115,40 +39,7 @@
         20,
         31
       ],
-      "observedGap": "Plain discs and generic box teeth omit the visible cast rim and ribs",
-      "action": "Scalloped outer flanges, eight cast ribs and distinct recessed wheel faces checked against the primary idler and19/31 drive close-ups. Dark cast recesses were not invented as unsupported through-openings.",
-      "status": "AuthorComparedExactPackedExports",
-      "limits": "Exact manufacturing dimensions and structures hidden by the photographs remain inferred. Camera/illumination calibration is approximate; no scan-level equality or1938 original paint claim is made.",
-      "previousV26ReviewResult": "Scalloped outer flanges, eight cast ribs and distinct recessed wheel faces checked against the primary idler and19/31 drive close-ups. Dark cast recesses were not invented as unsupported through-openings.",
-      "historicalV26Evidence": {
-        "Game": [
-          "Scene_V26GameRearBearing_640.jpg",
-          "Scene_FinalSurfaceV3V26GameTrack_640.jpg",
-          "Scene_FinalSurfaceV3V26GameRear_640.jpg"
-        ],
-        "High": [
-          "Scene_V26HighRearBearing_640.jpg",
-          "Scene_FinalSurfaceV3V26HighTrack_640.jpg",
-          "Scene_FinalSurfaceV3V26HighRear_640.jpg"
-        ]
-      },
-      "historicalV31ReviewResult": "Scalloped large-wheel flanges and eight cast ribs retain the photographed solid backing; no unsupported through openings or box sprocket teeth were added. Current front/rear wheel views compared to the native idler and drive close-ups.",
-      "historicalV31Evidence": {
-        "Game": [
-          "Scene_V31PackedGameRearBearing_640.jpg",
-          "Scene_V31PackedGameLeadingWheel_640.jpg"
-        ],
-        "High": []
-      },
-      "reviewResult": "Scalloped cast rims and radial ribs compared with same-car wheel photographs. False broad smoothing across pressed/cast faces was reduced by the normal-only refinement; solid backing is retained.",
-      "localEvidence": {
-        "Game": [
-          "Scene_V32PackedGameRearBearing_640.jpg"
-        ],
-        "High": [
-          "Scene_V32PackedHighRearBearing_640.jpg"
-        ]
-      }
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
     },
     {
       "id": "frontTensioner",
@@ -158,38 +49,7 @@
         18,
         20
       ],
-      "observedGap": "Cylinder and plate omit clamp rails, hex heads, end collar and lock detail",
-      "action": "Axle-height grease cylinder, two clamp rails, collars, hex hardware, lock detail and pressed housing reinforcement now follow the original close-ups; front housing outline checked in the primary and both front quarters.",
-      "status": "AuthorComparedExactPackedExports",
-      "limits": "Exact manufacturing dimensions and structures hidden by the photographs remain inferred. Camera/illumination calibration is approximate; no scan-level equality or1938 original paint claim is made.",
-      "previousV26ReviewResult": "Axle-height grease cylinder, two clamp rails, collars, hex hardware, lock detail and pressed housing reinforcement now follow the original close-ups; front housing outline checked in the primary and both front quarters.",
-      "historicalV26Evidence": {
-        "Game": [
-          "Scene_FinalSurfaceV3V26GameArmor_640.jpg",
-          "Scene_FinalSurfaceV3V26GameTrack_640.jpg"
-        ],
-        "High": [
-          "Scene_FinalSurfaceV3V26HighArmor_640.jpg",
-          "Scene_FinalSurfaceV3V26HighTrack_640.jpg"
-        ]
-      },
-      "historicalV31ReviewResult": "Grease cylinder follows axle height with clamp rails, collars, lock detail and stamped flange. Current whole-front and track close-up retain the reference layout and separate painted/steel finishes.",
-      "historicalV31Evidence": {
-        "Game": [
-          "Scene_FinalV31PackedReferenceTrack_640.jpg",
-          "Scene_FinalV31PackedReferenceFront_640.jpg"
-        ],
-        "High": []
-      },
-      "reviewResult": "Cylinder, paired clamp rails, collars, hex heads and the curved reinforcement are connected; the rear cheek/skirt lap follows the native17 close-up.",
-      "localEvidence": {
-        "Game": [
-          "Scene_V32PackedGameSkirtJunction_640.jpg"
-        ],
-        "High": [
-          "Scene_V32PackedHighSkirtJunction_640.jpg"
-        ]
-      }
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
     },
     {
       "id": "rearAxleCover",
@@ -199,37 +59,7 @@
         24,
         31
       ],
-      "observedGap": "Exposed generic wheel hub misses the fixed bearing shield and large hex nut",
-      "action": "Fixed bearing shield has the smaller rounded end, correct relation to the rotating wheel, raised boss and large hex nut;19/24/31 views checked.",
-      "status": "AuthorComparedExactPackedExports",
-      "limits": "Exact manufacturing dimensions and structures hidden by the photographs remain inferred. Camera/illumination calibration is approximate; no scan-level equality or1938 original paint claim is made.",
-      "previousV26ReviewResult": "Fixed bearing shield has the smaller rounded end, correct relation to the rotating wheel, raised boss and large hex nut;19/24/31 views checked.",
-      "historicalV26Evidence": {
-        "Game": [
-          "Scene_V26GameRearBearing_640.jpg",
-          "Scene_FinalSurfaceV3V26GameRear_640.jpg"
-        ],
-        "High": [
-          "Scene_V26HighRearBearing_640.jpg",
-          "Scene_FinalSurfaceV3V26HighRear_640.jpg"
-        ]
-      },
-      "historicalV31ReviewResult": "Fixed bearing shield, recessed wheel behind it, central boss and large hex head checked in the actual packed rear-bearing view against same-car19/31.",
-      "historicalV31Evidence": {
-        "Game": [
-          "Scene_V31PackedGameRearBearing_640.jpg"
-        ],
-        "High": []
-      },
-      "reviewResult": "Fixed rounded bearing cover, separate rotating wheel, raised boss and retained large hex fastener compared with19/31 photographs.",
-      "localEvidence": {
-        "Game": [
-          "Scene_V32PackedGameRearBearing_640.jpg"
-        ],
-        "High": [
-          "Scene_V32PackedHighRearBearing_640.jpg"
-        ]
-      }
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
     },
     {
       "id": "bowHardware",
@@ -239,45 +69,7 @@
         17,
         20
       ],
-      "observedGap": "Squared driver flap and simple lever miss rounded cover, loop and port lip; latch did not move with door",
-      "action": "Original2007 inspection resolved the cylindrical perforated MG jacket, flanged lower mounting foot with nine hex bolts, and round port opened180degrees with an inner five-point badge. Driver visor/half-round shutter, door-mounted D-loop, transverse tow bores and staggered lower bow rivets checked against16/20.",
-      "status": "AuthorComparedExactPackedExports",
-      "limits": "Exact manufacturing dimensions and structures hidden by the photographs remain inferred. Camera/illumination calibration is approximate; no scan-level equality or1938 original paint claim is made.",
-      "previousV26ReviewResult": "Original2007 inspection resolved the cylindrical perforated MG jacket, flanged lower mounting foot with nine hex bolts, and round port opened180degrees with an inner five-point badge. Driver visor/half-round shutter, door-mounted D-loop, transverse tow bores and staggered lower bow rivets checked against16/20.",
-      "historicalV26Evidence": {
-        "Game": [
-          "Scene_V26GameBowHardware_640.jpg",
-          "Scene_V26GameBowOpenCover_640.jpg"
-        ],
-        "High": [
-          "Scene_V26HighBowHardware_640.jpg",
-          "Scene_V26HighBowOpenCover_640.jpg"
-        ]
-      },
-      "historicalV31ReviewResult": "Current closed/open port, star-bearing inner cover, visor/shutter, tow clevis and door hardware inspected. The exposed cylindrical2007 MG jacket remains the appearance target; later pointed removable cover is not mixed into it.",
-      "historicalV31Evidence": {
-        "Game": [
-          "Scene_V31PackedGameBowHardware_640.jpg",
-          "Scene_V31PackedGameBowOpenCover_640.jpg"
-        ],
-        "High": [
-          "Scene_V31PackedHighBowOpenCover_640.jpg"
-        ]
-      },
-      "reviewResult": "Bow door has an overlapping rebate, seated latch and interleaved coaxial fixed/moving hinges. Side observation covers have the photographed tall outline, true slit, open frame and working hinges; closed lids clear the frame.",
-      "localEvidence": {
-        "Game": [
-          "Scene_V32PackedGameBowHardware_640.jpg",
-          "Scene_V32PackedGameBowOpenCover_640.jpg",
-          "Scene_V32PackedGameBowDoorOpen_640.jpg",
-          "Scene_V32PackedGameSideCoverClosed_640.jpg",
-          "Scene_V32PackedGameSideCoverOpen_640.jpg"
-        ],
-        "High": [
-          "Scene_V32PackedHighBowHardware_640.jpg",
-          "Scene_V32PackedHighSideCoverClosed_640.jpg"
-        ]
-      }
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
     },
     {
       "id": "perforatedExhaustGuard",
@@ -287,39 +79,7 @@
         24,
         34
       ],
-      "observedGap": "Wire grid is not the perforated sheet with small rounded holes, broad bands and ends",
-      "action": "Three panels/51columns over0.88m, broad bands, ends and lower shelf position checked against2/19/24/34. Actual high holes and1.6mm sheet thickness correspond to the game UV0 MASK pattern; near/far game and high views checked.",
-      "status": "AuthorComparedExactPackedExports",
-      "limits": "Exact manufacturing dimensions and structures hidden by the photographs remain inferred. Camera/illumination calibration is approximate; no scan-level equality or1938 original paint claim is made.",
-      "previousV26ReviewResult": "Three panels/51columns over0.88m, broad bands, ends and lower shelf position checked against2/19/24/34. Actual high holes and1.6mm sheet thickness correspond to the game UV0 MASK pattern; near/far game and high views checked.",
-      "historicalV26Evidence": {
-        "Game": [
-          "Scene_V26GameRearDeck_640.jpg",
-          "Scene_FinalSurfaceV3V26GameRear_640.jpg"
-        ],
-        "High": [
-          "Scene_V26HighRearDeck_640.jpg",
-          "Scene_FinalSurfaceV3V26HighRear_640.jpg"
-        ]
-      },
-      "historicalV31ReviewResult": "Actual high holes and mapped game MASK holes retain three panels, pressed bands and51columns. Painted guard, oxide exhaust and lamp glass remain separate under neutral and reference-approximation lights.",
-      "historicalV31Evidence": {
-        "Game": [
-          "Scene_V31PackedGameRearDeck_640.jpg"
-        ],
-        "High": [
-          "Scene_V31PackedHighRearDeck_640.jpg"
-        ]
-      },
-      "reviewResult": "Perforated sheet, broad straps and end curvature remain visible. The game mask retains actual hole coverage; physical high-source punches are preserved.",
-      "localEvidence": {
-        "Game": [
-          "Scene_V32PackedGameRearDeck_640.jpg"
-        ],
-        "High": [
-          "Scene_V32PackedHighRearDeck_640.jpg"
-        ]
-      }
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
     },
     {
       "id": "turretShellAndRivetPattern",
@@ -331,42 +91,7 @@
         19,
         20
       ],
-      "observedGap": "Overall tapered shell, side planform, plate junctions and individual rivet groups have not been verified against every view",
-      "action": "Shorter0.500m tapered body, flat front, extended rear planform, raised cupola riser, paired six-station seam groups and wider lower attachment groups checked across the primary, frontal, both quarters and side originals.",
-      "status": "AuthorComparedExactPackedExports",
-      "limits": "Exact manufacturing dimensions and structures hidden by the photographs remain inferred. Camera/illumination calibration is approximate; no scan-level equality or1938 original paint claim is made.",
-      "previousV26ReviewResult": "Shorter0.500m tapered body, flat front, extended rear planform, raised cupola riser, paired six-station seam groups and wider lower attachment groups checked across the primary, frontal, both quarters and side originals.",
-      "historicalV26Evidence": {
-        "Game": [
-          "Scene_V26GameTurretLeft_640.jpg",
-          "Scene_V26GameTurretRight_640.jpg",
-          "Scene_FinalSurfaceV3V26GameMain_640.jpg",
-          "Scene_FinalSurfaceV3V26GameFront_640.jpg"
-        ],
-        "High": [
-          "Scene_V26HighTurretLeft_640.jpg",
-          "Scene_V26HighTurretRight_640.jpg",
-          "Scene_FinalSurfaceV3V26HighMain_640.jpg",
-          "Scene_FinalSurfaceV3V26HighFront_640.jpg"
-        ]
-      },
-      "historicalV31ReviewResult": "Flat front and extended rounded rear, cupola riser, side rivet groups and observation fittings compared in actual current left/right and whole views with primary2007 and recovered2025 references.",
-      "historicalV31Evidence": {
-        "Game": [
-          "Scene_V31PackedGameTurretLeft_640.jpg",
-          "Scene_V31PackedGameTurretRight_640.jpg"
-        ],
-        "High": []
-      },
-      "reviewResult": "Upper and lower turret shell metal now closes around only the real mantlet opening. Rounded head volume and rivet groups compared in both quarters; no open full-height strip remains.",
-      "localEvidence": {
-        "Game": [
-          "Scene_V32PackedGameTurretLeft_640.jpg",
-          "Scene_V32PackedGameTurretRight_640.jpg",
-          "Scene_V32PackedGameMantletUpper_640.jpg"
-        ],
-        "High": []
-      }
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
     },
     {
       "id": "mantletAndGun",
@@ -376,40 +101,7 @@
         17,
         20
       ],
-      "observedGap": "Sight aperture, yoke edges, barrel collars/recoil hardware and mounting bolts need individual comparison",
-      "action": "Native16/20 comparison confirms the open inner C-notch, separate vertical backing slit, flat D-section lower front, twin thin rods/retainers, seated collar, mixed hex/round frame heads and exposed57mm flat metal muzzle annulus. Actual close-up and deep-bore checks show no false liner stripes.",
-      "status": "AuthorComparedExactPackedExports",
-      "limits": "Exact manufacturing dimensions and structures hidden by the photographs remain inferred. Camera/illumination calibration is approximate; no scan-level equality or1938 original paint claim is made.",
-      "previousV26ReviewResult": "Native16/20 comparison confirms the open inner C-notch, separate vertical backing slit, flat D-section lower front, twin thin rods/retainers, seated collar, mixed hex/round frame heads and exposed57mm flat metal muzzle annulus. Actual close-up and deep-bore checks show no false liner stripes.",
-      "historicalV26Evidence": {
-        "Game": [
-          "Scene_FinalSurfaceV3V26GameFront_640.jpg",
-          "Scene_FrontGunV26GamePbrModel_640.jpg"
-        ],
-        "High": [
-          "Scene_FinalSurfaceV3V26HighFront_640.jpg"
-        ]
-      },
-      "historicalV31ReviewResult": "True mantlet aperture, C-shaped sight shield, separate rear slit, yoke and open57mm muzzle remain visible. Actual front and bow views preserve the pose-independent gun/recoil axes.",
-      "historicalV31Evidence": {
-        "Game": [
-          "Scene_V31PackedGameBowHardware_640.jpg",
-          "Scene_V31PackedGameBowOpenCover_640.jpg"
-        ],
-        "High": [
-          "Scene_V31PackedHighBowOpenCover_640.jpg"
-        ]
-      },
-      "reviewResult": "Actual gun aperture, solid surround, sight notch/backing slit, barrel collars and recoil yoke are retained. Bore and liner remain physically open and mutually clear.",
-      "localEvidence": {
-        "Game": [
-          "Scene_V32PackedGameMantletUpper_640.jpg",
-          "Scene_V32PackedGameBowHardware_640.jpg"
-        ],
-        "High": [
-          "Scene_V32PackedHighBowHardware_640.jpg"
-        ]
-      }
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
     },
     {
       "id": "skirtAndFender",
@@ -421,43 +113,7 @@
         20,
         31
       ],
-      "observedGap": "Fold line, panel joins, hinge stations and rolled lip must be individually matched",
-      "action": "Three middle and three fold hinges per cover, upright paired seam rivets, three-panel joins, pressed front contours and rolled shelf checked against the primary and17/18/19/20/31. Rounded rear tip now continues beyond the belt toY-2.825/Z1.150 and rolls down rather than ending over the wheel.",
-      "status": "AuthorComparedExactPackedExports",
-      "limits": "Exact manufacturing dimensions and structures hidden by the photographs remain inferred. Camera/illumination calibration is approximate; no scan-level equality or1938 original paint claim is made.",
-      "previousV26ReviewResult": "Three middle and three fold hinges per cover, upright paired seam rivets, three-panel joins, pressed front contours and rolled shelf checked against the primary and17/18/19/20/31. Rounded rear tip now continues beyond the belt toY-2.825/Z1.150 and rolls down rather than ending over the wheel.",
-      "historicalV26Evidence": {
-        "Game": [
-          "Scene_V26GameSkirt_640.jpg",
-          "Scene_V26GameRearBearing_640.jpg",
-          "Scene_FinalSurfaceV3V26GameArmor_640.jpg",
-          "Scene_FinalSurfaceV3V26GameRear_640.jpg"
-        ],
-        "High": [
-          "Scene_V26HighSkirt_640.jpg",
-          "Scene_V26HighRearBearing_640.jpg",
-          "Scene_FinalSurfaceV3V26HighArmor_640.jpg",
-          "Scene_FinalSurfaceV3V26HighRear_640.jpg"
-        ]
-      },
-      "historicalV31ReviewResult": "Two hinge rows, panel seams, rivet attachments and rear rolled fender checked. Inner cover fold was lowered20mm for the measured belt while outer fold and skirt bottom were retained; all hardware follows the revised slope.",
-      "historicalV31Evidence": {
-        "Game": [
-          "Scene_V31PackedGameSkirt_640.jpg"
-        ],
-        "High": []
-      },
-      "reviewResult": "Folded sheet boundaries, hinge stations, slanted cheek lap and rolled rear fender edge inspected; the lap follows the underlying fold instead of floating above it.",
-      "localEvidence": {
-        "Game": [
-          "Scene_V32PackedGameSkirtJunction_640.jpg",
-          "Scene_V32PackedGameRearDeck_640.jpg"
-        ],
-        "High": [
-          "Scene_V32PackedHighSkirtJunction_640.jpg",
-          "Scene_V32PackedHighRearDeck_640.jpg"
-        ]
-      }
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
     },
     {
       "id": "trackCastShoe",
@@ -468,39 +124,7 @@
         20,
         32
       ],
-      "observedGap": "Window curvature, pin-knuckle structure and edge cast relief need per-shoe comparison",
-      "action": "Asymmetric cast windows, rounded high edges and shaped pin eyes. Casting narrowed366->320mm against nativefront16 without moving axles; inner pin ends clear the paired wheel faces. Return rollers reduced82->70mm from two native-photo rim fits; upper belt support follows them. Inner cover fold clears the corrected run with outer skirt contour retained.",
-      "status": "AuthorComparedExactPackedExports",
-      "limits": "Exact manufacturing dimensions and structures hidden by the photographs remain inferred. Camera/illumination calibration is approximate; no scan-level equality or1938 original paint claim is made.",
-      "previousV26ReviewResult": "Four real windows, shorter angled outer windows, three leading flange keyways, central trailing relief, three pin barrels and high-source pin-eye bores compared against native16/20 and32. False solid end buttons removed. Falling return rollers and sagged upper run checked against primary/19.",
-      "historicalV26Evidence": {
-        "Game": [
-          "Scene_FinalSurfaceV3V26GameTrack_640.jpg",
-          "Scene_FinalSurfaceV3V26GameMain_640.jpg"
-        ],
-        "High": [
-          "Scene_FinalSurfaceV3V26HighTrack_640.jpg",
-          "Scene_FinalSurfaceV3V26HighMain_640.jpg"
-        ]
-      },
-      "historicalV31ReviewResult": "Actual casting is320mm wide against nativefront16, with four open windows, asymmetric web, leading keyways and trailing relief.74links per side,70mm return rims and corresponding upper run retained. Pin-eye inner ends clear the wheel faces; worn cast steel is distinct from paint.",
-      "historicalV31Evidence": {
-        "Game": [
-          "Scene_FinalV31PackedReferenceTrack_640.jpg",
-          "Scene_FinalV31PackedReferenceFront_640.jpg"
-        ],
-        "High": []
-      },
-      "reviewResult": "320mm photo-proportioned casting retains asymmetric windows, real4mm cast-edge chamfers, small flange bores and hollow pin knuckles. Pitted cast steel and abraded contact faces read separately in both lighting profiles.",
-      "localEvidence": {
-        "Game": [
-          "Scene_V32PackedGameRoadWheels_640.jpg",
-          "Scene_V32PackedGameRearBearing_640.jpg"
-        ],
-        "High": [
-          "Scene_V32PackedHighRearBearing_640.jpg"
-        ]
-      }
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
     },
     {
       "id": "rearDeckTailAndLamp",
@@ -511,62 +135,84 @@
         24,
         34
       ],
-      "observedGap": "Deck panel shapes, louvre locations, rear lamp and tail joints have not all been proven in each rear reference",
-      "action": "Falling engine deck, visible panel/louvre placement, separate hatch handles, shorter guard, rear-facing glazed lamp and curved channel tail with flat ties/riveted gussets checked against2/18/19/24/34.",
-      "status": "AuthorComparedExactPackedExports",
-      "limits": "Exact manufacturing dimensions and structures hidden by the photographs remain inferred. Camera/illumination calibration is approximate; no scan-level equality or1938 original paint claim is made.",
-      "previousV26ReviewResult": "Falling engine deck, visible panel/louvre placement, separate hatch handles, shorter guard, rear-facing glazed lamp and curved channel tail with flat ties/riveted gussets checked against2/18/19/24/34.",
-      "historicalV26Evidence": {
-        "Game": [
-          "Scene_V26GameRearDeck_640.jpg",
-          "Scene_FinalSurfaceV3V26GameRear_640.jpg"
-        ],
-        "High": [
-          "Scene_V26HighRearDeck_640.jpg",
-          "Scene_FinalSurfaceV3V26HighRear_640.jpg"
-        ]
-      },
-      "historicalV31ReviewResult": "Deck hatches/louvre bands, punched guard, separate lamp and riveted channel tail inspected in current packed rear and maintenance views against same-car rear references.",
-      "historicalV31Evidence": {
-        "Game": [
-          "Scene_V31PackedGameRearDeck_640.jpg"
-        ],
-        "High": [
-          "Scene_V31PackedHighRearDeck_640.jpg"
-        ]
-      },
-      "reviewResult": "Separate deck lids, local louvre bands, tail channels/joints and glazed rear lamp checked in the rear-quarter view and native rear references.",
-      "localEvidence": {
-        "Game": [
-          "Scene_V32PackedGameRearDeck_640.jpg"
-        ],
-        "High": [
-          "Scene_V32PackedHighRearDeck_640.jpg"
-        ]
-      }
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
+    },
+    {
+      "id": "rearSkirtTermination",
+      "references": [
+        2,
+        19
+      ],
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
+    },
+    {
+      "id": "rearMachineGunEnvelope",
+      "references": [
+        34,
+        19,
+        24
+      ],
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
+    },
+    {
+      "id": "bogieFramesAndBearingPlates",
+      "references": [
+        2,
+        17,
+        19,
+        35,
+        36
+      ],
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
+    },
+    {
+      "id": "hullUndersidePanelsAndFasteners",
+      "references": [
+        35,
+        36
+      ],
+      "status": "IncludedInIntegratedAuthorReview_NotFactoryCertified"
     }
   ],
-  "acceptance": "Each visible component must be checked in its relevant photos and actual game/high exports; unresolved rows prevent completion. Whole-envelope dimensions, a small camera landmark residual or a passing PBR channel test cannot stand in for this review.",
-  "progressNote": "All12 components compared against their relevant native photographs and actual V26 game/high views. Numeric gates and camera residuals were not substituted for the visual review.",
-  "latestCandidate": {
-    "runtimeSha256": "d1ba836c7a24fb963bc26d39a2353234adaebd75eb3c8e458c02c4ddf2dfab57",
-    "highSha256": "2670640b69c23e4d7f5fa01fddf38a31c6ee30740e14d3e33e8142110d10ef70",
-    "technicalChecksPassed": true,
-    "photographicFidelity": "AuthorComparedWithRecoveredNativePhotographs"
+  "sourceTriangles": {
+    "High": 1462012,
+    "Game": 419856
   },
-  "reviewedAt": "2026-10-24T18:08:01.059398+00:00",
-  "evidenceLocalOnly": true,
-  "reopenedScope": "User accepts broad shape, rejects exposed missing faces, insufficient track/rivet/joint detail, plastic material response and false colour interpolation. V31 author sign-off and numeric tests do not prove completion.",
-  "reviewScope": "Current packed V31 exports inspected in neutral close-ups and reference-approximation whole/front/track/rear views against the recovered same-car photograph corpus. Source/reference observations are separate from numeric gates. V26 rejection remains part of the record; user approval and scan-level equality are not claimed.",
-  "reopenedAt": "2026-10-24T13:46:08.415174+00:00",
-  "wholeVehicleEvidence": [
-    "Scene_FinalV32PackedReferenceMain_640.jpg",
-    "Scene_FinalV32PackedReferenceFront_640.jpg",
-    "Scene_FinalV32PackedReferenceTrack_640.jpg",
-    "Scene_FinalV32PackedReferenceRear_640.jpg",
-    "Scene_FinalV32PackedNeutralMain_640.jpg",
-    "Scene_FinalV32PackedNeutralArmor_640.jpg",
-    "Scene_FinalV32PackedNeutralTrack_640.jpg",
-    "Scene_FinalV32PackedNeutralRear_640.jpg"
-  ]
+  "runtimeTriangles": 417130,
+  "cleanup": {
+    "triangles": 417130,
+    "triangulation": 2,
+    "zero": 132,
+    "enclosed": 2592
+  },
+  "motionSummary": {
+    "Game": {
+      "pass": true,
+      "links": 162,
+      "wheelGroups": 30,
+      "phaseSamples": 36,
+      "maximumWheelTrackPenetrationM": 0,
+      "maximumFixedPenetrationM": 0,
+      "maximumHardwarePenetrationM": 0.000001344829797744751,
+      "continuousWheelUnitPairs": 210,
+      "bowGunAndDoor": true
+    },
+    "High": {
+      "pass": true,
+      "links": 162,
+      "wheelGroups": 30,
+      "phaseSamples": 36,
+      "maximumWheelTrackPenetrationM": 0.000694572925567627,
+      "maximumFixedPenetrationM": 0,
+      "maximumHardwarePenetrationM": 0.000004097284545423463,
+      "continuousWheelUnitPairs": 210,
+      "bowGunAndDoor": true
+    }
+  },
+  "scopeLimitations": [
+    "Museum appearance and inferred microtexture; no original paint, factory motion-stop or hidden-construction certification.",
+    "Photographic perspective and local form matching retain uncertainty; this is not a scan-identical replica.",
+    "Door/gun stow linkage is a collision-cleared display reconstruction, not a verified original operating procedure."
+  ],
+  "evidenceLocalOnly": true
 }
