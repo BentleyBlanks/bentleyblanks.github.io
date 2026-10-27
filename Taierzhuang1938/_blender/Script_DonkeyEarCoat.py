@@ -18,20 +18,27 @@ def ReferenceEarConfidence(rgb):
 
 def InstallEarCoat(scene,rig,base):
     import bpy
+    from mathutils import Vector
     source=Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/DonkeyCart/20261020/References/Image_DonkeyOriginalThreeView.png')
     original=bpy.data.images.load(str(source),check_existing=False);rgb=np.array(original.pixels[:],dtype=np.float32).reshape(1024,1536,4)[::-1,:,:3];bpy.data.images.remove(original)
     confidence,profiles=ReferenceEarConfidence(rgb)
-    pixels=np.ones((1024,1536,4),dtype=np.float32);pixels[:,:,:3]=rgb;pixels[:,:,3]=confidence
+    namespace={};file=Path(scene['DonkeyCartProject'])/'_blender/Script_DonkeyPhotoDetail.py';exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),namespace);blur=namespace['BoxBlur'];linear=np.where(rgb<=.04045,rgb/12.92,((rgb+.055)/1.055)**2.4);prepared=np.stack([np.clip(linear[:,:,i]+1.25*(linear[:,:,i]-blur(linear[:,:,i],1)),0,1) for i in range(3)],axis=2)
+    pixels=np.ones((1024,1536,4),dtype=np.float32);pixels[:,:,:3]=np.where(prepared<=.0031308,prepared*12.92,1.055*prepared**(1/2.4)-.055);pixels[:,:,3]=confidence
     image=bpy.data.images.get('Texture_DonkeyEarReferenceBase') or bpy.data.images.new('Texture_DonkeyEarReferenceBase',width=1536,height=1024,alpha=True)
     image.colorspace_settings.name='sRGB';image.alpha_mode='CHANNEL_PACKED';image.pixels.foreach_set(pixels[::-1].copy().ravel());path=base/'SourceTextures/Texture_DonkeyEarReferenceBase.png';image.filepath_raw=str(path);image.file_format='PNG';image.save();content=path.read_bytes();image.pack(data=content,data_len=len(content))
+    probe=bpy.data.images.load(str(path),check_existing=False);decoded=np.array(probe.pixels[:],dtype=np.float32).reshape(1024,1536,4)[::-1];bpy.data.images.remove(probe);pixelError=float(np.max(abs(decoded-pixels)))
+    if pixelError>1.1/255:raise RuntimeError('Saved ear pigment differs from the prepared source buffer')
     inverse=rig.matrix_world.inverted();ppm=(925-302)/1.10;objects=[];materials={}
+    frontLight=Vector((-.3,.5,.81)).normalized();rearLight=Vector((.3,-.5,.81)).normalized()
     for side in ['Left','Right']:
         for prefix in ['DonkeyPinna','DonkeyRolledEarRim']:
             obj=bpy.data.objects[prefix+side];matrix=inverse@obj.matrix_world;normalMatrix=matrix.to_3x3().inverted().transposed();points=[matrix@v.co for v in obj.data.vertices]
             blend=obj.data.attributes.get('EarFrontBlend') or obj.data.attributes.new('EarFrontBlend','FLOAT','POINT')
+            irradiance=obj.data.attributes.get('EarSourceIrradiance') or obj.data.attributes.new('EarSourceIrradiance','FLOAT_VECTOR','POINT')
             front=obj.data.uv_layers.get('ReferenceEarFrontUV') or obj.data.uv_layers.new(name='ReferenceEarFrontUV');rear=obj.data.uv_layers.get('ReferenceEarRearUV') or obj.data.uv_layers.new(name='ReferenceEarRearUV')
             for vertex in obj.data.vertices:
                 normal=(normalMatrix@vertex.normal).normalized();t=max(0,min(1,(normal.y+.20)/.40));blend.data[vertex.index].value=t*t*(3-2*t)
+                frontNormal=Vector((-normal.x,abs(normal.y),normal.z));rearNormal=Vector((-normal.x,-abs(normal.y),normal.z));irradiance.data[vertex.index].vector=(.55+.45*max(0,frontNormal.dot(frontLight)),.55+.45*max(0,rearNormal.dot(rearLight)),1)
             for loop in obj.data.loops:
                 p=points[loop.vertex_index];v=925-ppm*p.z
                 front.data[loop.index].uv=((156.5-ppm*p.x)/1536,1-v/1024)
@@ -42,16 +49,19 @@ def InstallEarCoat(scene,rig,base):
                 if old.name not in materials:
                     material=old.copy();material.name=old.name+'EarReference';material['DonkeyEarReferenceCoat']=True;nodes,links=material.node_tree.nodes,material.node_tree.links;shader=next(n for n in nodes if n.type=='BSDF_PRINCIPLED')
                     previous=shader.inputs['Base Color'].links[0].from_socket if shader.inputs['Base Color'].links else None;fallback=tuple(shader.inputs['Base Color'].default_value)
-                    paint=nodes.new('ShaderNodeAttribute');paint.attribute_name='EarFrontBlend';textures=[]
+                    paint=nodes.new('ShaderNodeAttribute');paint.attribute_name='EarFrontBlend';textures=[];alphas=[];light=nodes.new('ShaderNodeAttribute');light.attribute_name='EarSourceIrradiance';components=nodes.new('ShaderNodeSeparateXYZ');links.new(light.outputs['Vector'],components.inputs[0])
                     for uvName in ['ReferenceEarRearUV','ReferenceEarFrontUV']:
-                        uv=nodes.new('ShaderNodeUVMap');uv.uv_map=uvName;texture=nodes.new('ShaderNodeTexImage');texture.image=image;texture.extension='EXTEND';links.new(uv.outputs[0],texture.inputs[0]);textures.append(texture)
-                    color=nodes.new('ShaderNodeMixRGB');links.new(paint.outputs['Fac'],color.inputs[0]);links.new(textures[0].outputs['Color'],color.inputs[1]);links.new(textures[1].outputs['Color'],color.inputs[2])
-                    alpha=nodes.new('ShaderNodeMixRGB');links.new(paint.outputs['Fac'],alpha.inputs[0]);links.new(textures[0].outputs['Alpha'],alpha.inputs[1]);links.new(textures[1].outputs['Alpha'],alpha.inputs[2])
+                        uv=nodes.new('ShaderNodeUVMap');uv.uv_map=uvName;texture=nodes.new('ShaderNodeTexImage');texture.image=image;texture.extension='EXTEND';texture.interpolation='Closest';links.new(uv.outputs[0],texture.inputs[0]);alphaTexture=nodes.new('ShaderNodeTexImage');alphaTexture.image=image;alphaTexture.extension='EXTEND';alphaTexture.interpolation='Linear';links.new(uv.outputs[0],alphaTexture.inputs[0]);alphas.append(alphaTexture)
+                        divide=nodes.new('ShaderNodeMath');divide.operation='DIVIDE';divide.inputs[0].default_value=1;links.new(components.outputs[1 if uvName.endswith('RearUV') else 0],divide.inputs[1]);scale=nodes.new('ShaderNodeVectorMath');scale.operation='SCALE';links.new(texture.outputs['Color'],scale.inputs[0]);links.new(divide.outputs[0],scale.inputs['Scale']);textures.append(scale.outputs['Vector'])
+                    color=nodes.new('ShaderNodeMixRGB');links.new(paint.outputs['Fac'],color.inputs[0]);links.new(textures[0],color.inputs[1]);links.new(textures[1],color.inputs[2])
+                    alpha=nodes.new('ShaderNodeMixRGB');links.new(paint.outputs['Fac'],alpha.inputs[0]);links.new(alphas[0].outputs['Alpha'],alpha.inputs[1]);links.new(alphas[1].outputs['Alpha'],alpha.inputs[2])
                     gain=nodes.new('ShaderNodeMixRGB');gain.blend_type='MULTIPLY';gain.inputs[0].default_value=1;links.new(color.outputs[0],gain.inputs[1]);gain.inputs[2].default_value=(.50,.515,.55,1)
                     final=nodes.new('ShaderNodeMixRGB');links.new(alpha.outputs[0],final.inputs[0]);final.inputs[1].default_value=fallback
                     if previous:links.new(previous,final.inputs[1])
                     links.new(gain.outputs[0],final.inputs[2]);links.new(final.outputs[0],shader.inputs['Base Color']);materials[old.name]=material
                 obj.data.materials[slot]=materials[old.name]
             objects.append(obj.name)
-    report={'version':'20261025EarCoatV32','source':str(source),'sourceSha256':hashlib.sha256(source.read_bytes()).hexdigest(),'image':str(path),'imageSha256':hashlib.sha256(content).hexdigest(),'objects':objects,'sourceSize':[1536,1024],'rearVerticalRegistration':[1.12,10],'linearGain':[.50,.515,.55],'sourceSilhouetteRows':profiles,'paleForegroundPixelsRetained':int(np.count_nonzero((rgb.mean(axis=2)>.68)&(confidence>.95))),'method':'fixed frontal inner-pinna/rear coat correspondence with silhouette-filled confidence that retains bright inner-ear hairs; smooth normal-facing blend; source RGB baked into existing UV0; no view-dependent runtime material'}
+    report={'version':'20261028EarCoatV52','source':str(source),'sourceSha256':hashlib.sha256(source.read_bytes()).hexdigest(),'image':str(path),'imageSha256':hashlib.sha256(content).hexdigest(),'objects':objects,'sourceSize':[1536,1024],'rearVerticalRegistration':[1.12,10],'linearGain':[.50,.515,.55],'sourceSilhouetteRows':profiles,'paleForegroundPixelsRetained':int(np.count_nonzero((rgb.mean(axis=2)>.68)&(confidence>.95))),'savedPixelMaximumError':pixelError,
+        'fineCompensation':{'radiusPixels':1,'amount':1.25,'colorSampling':'Closest','confidenceSampling':'Linear'},'illumination':{'ambient':.55,'directional':.45,'frontDirection':list(frontLight),'rearDirection':list(rearLight),'attribute':'EarSourceIrradiance'},
+        'method':'fixed frontal inner-pinna/rear RGB with unchanged silhouette confidence; source-pixel filtering compensation retains individual hair contrast; per-view macro illumination compensation avoids double shading; smooth normal-facing blend; baked into existing UV0 without extra runtime image/material/UV'}
     (base/'SourceTextures/Data_EarCoat.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8');scene['DonkeyEarCoatRevision']=report['version'];return report

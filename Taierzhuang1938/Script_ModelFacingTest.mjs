@@ -343,7 +343,7 @@ Check(legAlbedo.microRatioRange.join(',')==='0.5,2.8'&&legAlbedo.pigmentFinePowe
   &&legAlbedo.hiddenCapMicroRatioRange.join(',')==='0.7,1.5',
   "独立驴可见腿面保留同腿短毛及弯曲毛簇，长条关节光影和隐藏面重复仍受限制");
 const jointFit=pectoral.jointFit,jointArcs=bareSpec.animations.DonkeyWalk.jointArcs;
-Check(bareSpec.version==='20261027ReferenceV51'&&jointFit?.version==='20261026JointFitV35'
+Check(bareSpec.version==='20261028ReferenceV52'&&jointFit?.version==='20261026JointFitV35'
   &&jointFit.maximumInfluences===4&&jointFit.boneCount===28&&jointFit.morphTargetsAdded===0
   &&jointFit.surfaceCorrectionSourcePixels<1&&jointFit.edges.maximumRestSurfaceBoundM<=.0005&&jointFit.edgesAfter.maximumRestSurfaceBoundM<=.0005
   &&jointArcs?.bakeFps===120&&jointArcs.maximumHoofTargetErrorM<.00001&&jointArcs.maximumReachCompressionM<=.006,
@@ -376,6 +376,13 @@ Check(orbitalFur?.version==='20261026OrbitalFurV41'&&orbitalFur.floorLinearLumin
   &&orbitalFur.scope.includes('separate corneas'),
   "独立驴毛皮眼眶使用克制的炭灰底色，眼球、湿睑和眼眶底保持独立");
 const earTips=pectoral.earTips,browHeight=pectoral.browHeight;
+const earCoat=bareSpec.derivation.referenceFit.photoDetail.earCoat;
+Check(earCoat?.version==='20261028EarCoatV52'&&earCoat.sourceSha256===legAlbedo.sourceSha256
+  &&earCoat.fineCompensation?.radiusPixels===1&&earCoat.fineCompensation.amount===1.25
+  &&earCoat.fineCompensation.colorSampling==='Closest'&&earCoat.fineCompensation.confidenceSampling==='Linear'
+  &&earCoat.illumination?.ambient===.55&&earCoat.illumination.directional===.45
+  &&earCoat.savedPixelMaximumError<=1.1/255&&earCoat.rearVerticalRegistration.join(',')==='1.12,10',
+  "独立驴耳内细毛按原图作离线滤波及受光补偿，既有轮廓置信度和正背面对应保留");
 Check(earTips?.version==='20261026EarTipsV39'&&earTips.trianglesAdded===144
   &&Object.values(earTips.ears).every(row=>row.maximumRootDisplacementM===0&&row.minimumSampledJacobian>.05&&Math.abs(row.afterTopPixel-row.referenceTopPixel)<.01),
   "独立驴耳尖局部增加144三角，按原图窄顶轮廓补足高度并保护耳根与闭合体积");
