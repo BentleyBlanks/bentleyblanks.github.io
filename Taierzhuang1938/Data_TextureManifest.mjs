@@ -98,10 +98,10 @@ const SINGLE_BLANKET_ASSET_BYTES = 1024 * 1024;
 // 不进 boot / level 预算；全目录原本就顶着上限（63.79 / 63.81 MB），按它们的体积单列 384 KB。
 const EDITOR_CREEK_SKETCH_BYTES = 384 * 1024;
 // The refined bridge steel set occupies 296,616 bytes; sleeper, end-grain,
-// stone, damp stone and deck-plank sets total 1,898,818 bytes. These are
+// stone, damp stone and deck-plank sets total 1,945,226 bytes. These are
 // embedded in the standalone bridge GLB; they add no boot or level requests.
 const BEISHAHE_METAL_ASSET_BYTES = 384 * 1024;
-const BEISHAHE_SURFACE_ASSET_BYTES = 1872 * 1024;
+const BEISHAHE_SURFACE_ASSET_BYTES = 1904 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -130,7 +130,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
   {
     id: "BeishaheDeckPlank", kind: "material", tier: "lazy", toneClass: "weatheredWood", metersPerTile: 1,
     bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_BeishaheDeckPlank.json",
-    source: { provider: "imagegen", date: "2026-10-28", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-26059755-f7d9-447f-90c3-b1b5208cdd43", prompt: "_import/Prompts/Texture_BeishaheDeckPlank.txt", note: "桥面旧木板长纹；图像V方向与每块板的长轴一致；源图留OneDrive。" },
+    source: { provider: "imagegen", date: "2026-10-28", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-2daca0c9-8c0e-4139-bf79-e494db95ba28", prompt: "_import/Prompts/Texture_BeishaheDeckPlank.txt", note: "以生成的桥面辅助图修整旧木板表面；图像V方向与每块板的长轴一致；原稿及修订源图留OneDrive。第二次修订因纹理不自然未采用。" },
     consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishaheDeckPlank" }],
     files: [["Texture_BeishaheDeckPlankBase.webp", "Base", 1024, 1024], ["Texture_BeishaheDeckPlankNormal.webp", "Normal", 512, 512], ["Texture_BeishaheDeckPlankOrm.webp", "Orm", 512, 512]],
   },

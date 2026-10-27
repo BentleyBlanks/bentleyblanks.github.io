@@ -6,6 +6,7 @@ The exported GLB uses standard glTF Y-up, X east and Z south.
 Raw .blend and original imagegen inputs stay in the task's OneDrive source folder.
 """
 import bpy
+import bisect
 import hashlib
 import json
 import math
@@ -129,7 +130,7 @@ class Geometry:
                     Face([(sx*x, sy*(y-b), sz*(z-b)), (sx*(x-b), sy*y, sz*(z-b)),
                           (sx*(x-b), sy*(y-b), sz*z)])
 
-    def TopBeveledBox(self, center, size, bevel, uvOffset=None, grain=None, tint=None):
+    def TopBeveledBox(self, center, size, bevel, uvOffset=None, grain=None, tint=None, edgeProfile=None):
         """Solid plank with a four-sided top chamfer and a flat bearing base."""
         c = Vector(center)
         x, y, z = [v / 2 for v in size]
@@ -137,20 +138,49 @@ class Geometry:
         bottom = [(-x,-y,-z),(x,-y,-z),(x,-y,z),(-x,-y,z)]
         shoulder = [(-x,y-b,-z),(x,y-b,-z),(x,y-b,z),(-x,y-b,z)]
         top = [(-x+b,y,-z+b),(x-b,y,-z+b),(x-b,y,z-b),(-x+b,y,z-b)]
-        def Face(local, shade=1.0):
+        edge0, edge1 = -z + b, z - b
+        edgeProfile = edgeProfile or (.66, .66, .014, .014)
+        lowTone, highTone, lowWidth, highWidth = edgeProfile
+        lowWidth = min(lowWidth, (edge1 - edge0) * .22)
+        highWidth = min(highWidth, (edge1 - edge0) * .22)
+        def TopShade(point):
+            """Vertex-interpolated wear at a real board edge, not a painted line."""
+            along = point[2] - c.z
+            lowDistance, highDistance = along - edge0, edge1 - along
+            distance = max(0, min(lowDistance, highDistance))
+            edgeTone, transition = (lowTone, lowWidth) if lowDistance <= highDistance else (highTone, highWidth)
+            mid = transition * .5
+            middleTone = edgeTone + .55 * (1 - edgeTone)
+            if distance < mid:
+                return edgeTone + (middleTone - edgeTone) * distance / mid
+            if distance < transition:
+                return middleTone + (1 - middleTone) * (distance - mid) / (transition - mid)
+            return 1.0
+        def Face(local, shade=1.0, varying=None):
             points = [tuple(c + Vector(p)) for p in local]
             a, d, e = map(Vector, points[:3])
             faceCenter = sum((Vector(p) for p in points), Vector()) / len(points)
             if (d - a).cross(e - a).dot(faceCenter - c) < 0:
                 points.reverse()
-            faceTint = tuple(tint[i] * shade for i in range(3)) + (tint[3],) if tint is not None else None
+            if tint is None:
+                faceTint = None
+            elif varying:
+                faceTint = lambda point: tuple(tint[i] * varying(point) for i in range(3)) + (tint[3],)
+            else:
+                faceTint = tuple(tint[i] * shade for i in range(3)) + (tint[3],)
             self.Polygon(points, uvOffset=uvOffset, grain=grain, tint=faceTint)
-        Face(bottom, .86)
-        Face(top)
+        Face(bottom, varying=lambda p: .86 * TopShade(p))
+        # Five coplanar bands describe the same solid top. COLOR_0 smoothly
+        # darkens only the two actual Z edges, returning to the row's full tint
+        # over 10–18 mm; geometry, UV scale, seams and contact remain unchanged.
+        cuts = [edge0, edge0 + lowWidth * .5, edge0 + lowWidth,
+                edge1 - highWidth, edge1 - highWidth * .5, edge1]
+        for z0, z1 in zip(cuts, cuts[1:]):
+            Face([(-x+b,y,z0),(x-b,y,z0),(x-b,y,z1),(-x+b,y,z1)], varying=TopShade)
         for i in range(4):
             j = (i + 1) % 4
-            Face([bottom[i], bottom[j], shoulder[j], shoulder[i]], .86)
-            Face([shoulder[i], shoulder[j], top[j], top[i]], .91)
+            Face([bottom[i],bottom[j],shoulder[j],shoulder[i]], varying=lambda p: .86 * TopShade(p))
+            Face([shoulder[i],shoulder[j],top[j],top[i]], varying=lambda p: TopShade(p) * (.86 + .14 * max(0, min(1, (p[1] - (c.y + y - b)) / b))))
 
     def ExtrudedProfile(self, profile, z0, z1, uvOffset=None):
         """Solid X/Y section extruded along track Z, including real caps."""
@@ -282,7 +312,7 @@ class Geometry:
         return obj
 
 
-def Material(name, texture, roughness, metal=0, normalStrength=0.25, colorLayer=None):
+def Material(name, texture, roughness, metal=0, normalStrength=0.25, colorLayer=None, baseFactor=None):
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     mat.use_backface_culling = True
@@ -305,6 +335,14 @@ def Material(name, texture, roughness, metal=0, normalStrength=0.25, colorLayer=
         multiply.inputs[0].default_value = 1
         links.new(base.outputs["Color"], multiply.inputs[6])
         links.new(attribute.outputs["Color"], multiply.inputs[7])
+        links.new(multiply.outputs[2], shader.inputs["Base Color"])
+    elif baseFactor:
+        multiply = nodes.new("ShaderNodeMix")
+        multiply.data_type = "RGBA"
+        multiply.blend_type = "MULTIPLY"
+        multiply.inputs[0].default_value = 1
+        multiply.inputs[7].default_value = (*baseFactor, 1)
+        links.new(base.outputs["Color"], multiply.inputs[6])
         links.new(multiply.outputs[2], shader.inputs["Base Color"])
     else:
         links.new(base.outputs["Color"], shader.inputs["Base Color"])
@@ -345,9 +383,9 @@ def PolishedRailMaterial():
     mat.use_nodes = True
     mat.use_backface_culling = True
     shader = mat.node_tree.nodes.get("Principled BSDF")
-    shader.inputs["Base Color"].default_value = (0.36, 0.37, 0.37, 1)
-    shader.inputs["Metallic"].default_value = 0.9
-    shader.inputs["Roughness"].default_value = 0.3
+    shader.inputs["Base Color"].default_value = (0.24, 0.25, 0.26, 1)
+    shader.inputs["Metallic"].default_value = 0.93
+    shader.inputs["Roughness"].default_value = 0.26
     return mat
 
 
@@ -370,6 +408,15 @@ def BuildSleepers(length, count, seed):
     return timber, endTimber
 
 
+def DeckEdgeProfile(rng):
+    """Natural edge-to-edge variation, shared by the three pieces of a row."""
+    low = rng.uniform(.55, .78)
+    high = max(.55, min(.78, low + rng.uniform(-.035, .035)))
+    lowWidth = rng.uniform(.010, .018)
+    highWidth = max(.010, min(.018, lowWidth + rng.uniform(-.0015, .0015)))
+    return (low, high, lowWidth, highWidth)
+
+
 def BuildDeck(length, count, seed):
     """Transverse solid planks on lengthwise bearers, with rail-foot relief.
 
@@ -383,6 +430,7 @@ def BuildDeck(length, count, seed):
     planks, bearers = Geometry(), Geometry()
     rng = random.Random(seed + 61973)
     tintRng = random.Random(seed + 39113)
+    edgeRng = random.Random(seed + 88421)
     sleeperZ = [-length / 2 + (k + .5) * length / count for k in range(count)]
     railX = (SPEC["gaugeM"] + SPEC["railHeadWidthM"]) / 2
     # Rails have 130 mm feet, wider than the 65 mm heads. The small additional
@@ -391,26 +439,34 @@ def BuildDeck(length, count, seed):
     zones = [(-SPEC["sleeperLengthM"] / 2, -railX - bufferOuter),
              (-railX + bufferOuter, railX - bufferOuter),
              (railX + bufferOuter, SPEC["sleeperLengthM"] / 2)]
-    boardCount = math.ceil(length / .185)
+    boardCount = math.ceil(length / .225)
+    widthRng = random.Random(seed + 34129)
+    weights = [widthRng.uniform(.92, 1.08) for _ in range(boardCount)]
+    scale = length / sum(weights)
+    rowBoundaries = [-length / 2]
+    for weight in weights:
+        rowBoundaries.append(rowBoundaries[-1] + weight * scale)
+    rowBoundaries[-1] = length / 2
     rowTints = []
     for row in range(boardCount):
-        z0 = -length / 2 + row * length / boardCount + (.003 if row else 0)
-        z1 = -length / 2 + (row + 1) * length / boardCount - (.003 if row < boardCount - 1 else 0)
+        z0 = rowBoundaries[row] + (.003 if row else 0)
+        z1 = rowBoundaries[row + 1] - (.003 if row < boardCount - 1 else 0)
         # The three pieces are one board visually: same tint and the same
         # spatial texture phase across the two track slots.
-        value = tintRng.uniform(.72, .99)
+        value = tintRng.uniform(.64, .99)
         warmth = tintRng.uniform(.008, .035)
-        rowTint = (min(1.0, value * (1 + warmth)), value, value * (1 - warmth * .8), 1)
+        rowTint = (min(1.0, value * .96 * (1 + warmth)), value * .91, value * .83 * (1 - warmth * .8), 1)
         rowTints.append(rowTint)
         rowOffset = (rng.uniform(0, 7), rng.uniform(0, 7))
+        rowEdges = DeckEdgeProfile(edgeRng)
         for x0, x1 in zones:
             # The generated material's V axis follows each board's actual X
             # length; its top chamfer catches light while the base stays flat.
             planks.TopBeveledBox(((x0 + x1) / 2, .0525, (z0 + z1) / 2),
                                  (x1 - x0, .045, z1 - z0), .003,
-                                 uvOffset=rowOffset, grain="sleeper", tint=rowTint)
+                                 uvOffset=rowOffset, grain="sleeper", tint=rowTint, edgeProfile=rowEdges)
     def TintAt(z):
-        row = max(0, min(boardCount - 1, int((z + length / 2) * boardCount / length)))
+        row = max(0, min(boardCount - 1, bisect.bisect_right(rowBoundaries, z) - 1))
         return rowTints[row]
     # Along each foot, retain enough wood for a walking surface without ever
     # crossing the foot. At tie plates the underside rises to Y=.042 and
@@ -500,15 +556,16 @@ def BuildPierTransition(seed):
     # One short transverse deck board with two rail slots, aligned with the
     # visible deck above each span. No spike lies within this central strip.
     value, warmth = rng.uniform(.86, .99), rng.uniform(.008, .035)
-    tint = (min(1.0, value * (1 + warmth)), value, value * (1 - warmth * .8), 1)
+    tint = (min(1.0, value * .96 * (1 + warmth)), value * .91, value * .83 * (1 - warmth * .8), 1)
     uvOffset = (rng.uniform(0, 7), rng.uniform(0, 7))
+    edgeProfile = DeckEdgeProfile(rng)
     bufferOuter, footEdge = .115, .066
     zones = [(-SPEC["sleeperLengthM"] / 2, -railX - bufferOuter),
              (-railX + bufferOuter, railX - bufferOuter),
              (railX + bufferOuter, SPEC["sleeperLengthM"] / 2)]
     for x0, x1 in zones:
         deck.TopBeveledBox(((x0 + x1) / 2, .0525, 0), (x1 - x0, .045, 2 * half), .003,
-                           uvOffset=uvOffset, grain="sleeper", tint=tint)
+                           uvOffset=uvOffset, grain="sleeper", tint=tint, edgeProfile=edgeProfile)
     for rail in [-railX, railX]:
         for sign in [-1, 1]:
             xa, xb = sorted((rail + sign * footEdge, rail + sign * bufferOuter))
@@ -825,6 +882,7 @@ def Rebuild():
     scene.unit_settings.system = "METRIC"
     scene.unit_settings.scale_length = 1
     steel = Material("BeishaheSteel", "BeishaheSteel", 0.82, 0.25, 0.58)
+    railBody = Material("BeishaheRailBody", "BeishaheSteel", 0.82, 0.25, 0.58, baseFactor=(.58, .58, .58))
     wood = Material("BeishaheTimber", "BeishaheSleeper", 0.91, 0, 0.90)
     endWood = Material("BeishaheTimberEnd", "BeishaheSleeperEnd", 0.91, 0, 0.90)
     deckWood = Material("BeishaheDeckTimber", "BeishaheDeckPlank", 0.90, 0, 0.90, colorLayer="DeckTint")
@@ -838,6 +896,7 @@ def Rebuild():
     templates = {}
     for role, geo in spans.items():
         mat = {"Sleepers": wood, "SleeperEnds": endWood, "DeckPlanks": deckWood,
+               "RailWest": railBody, "RailEast": railBody,
                "DeckBearers": deckWood, "RailWear": railRunning}.get(role, steel)
         colorLayer = "DeckTint" if role in ("DeckPlanks", "DeckBearers") else None
         templates[role] = geo.Object("Template_" + role, mat, tile=1, colorLayer=colorLayer)
@@ -895,7 +954,8 @@ def Rebuild():
     transitionGeometry = BuildPierTransition(1938)
     transitionTemplates = {}
     for role, geo in transitionGeometry.items():
-        mat = {"RailJointWear": railRunning, "DeckJoint": deckWood,
+        mat = {"RailJointWear": railRunning, "RailJointWest": railBody, "RailJointEast": railBody,
+               "RailJointSplice": railBody, "DeckJoint": deckWood,
                "DeckJointSupport": deckWood}.get(role, steel)
         layer = "DeckTint" if role in ("DeckJoint", "DeckJointSupport") else None
         transitionTemplates[role] = geo.Object("Template_" + role, mat, tile=1, colorLayer=layer)
@@ -965,7 +1025,7 @@ def Rebuild():
                      "railFootClearanceM": .001, "jointWidthM": .006,
                      "jointEndClearanceM": .002, "jointSpliceLengthM": .36,
                      "bearerBottomY": 0, "bearerTopY": .03, "grainAxis": "X"},
-            "materials": ["BeishaheSteel", "BeishaheTimber", "BeishaheTimberEnd", "BeishaheDeckTimber", "BeishaheStone", "BeishaheStoneDamp", "BeishaheRailRunning"],
+            "materials": ["BeishaheSteel", "BeishaheRailBody", "BeishaheTimber", "BeishaheTimberEnd", "BeishaheDeckTimber", "BeishaheStone", "BeishaheStoneDamp", "BeishaheRailRunning"],
             "bakeInputs": [f"Texture_{texture}{channel}.webp" for texture in
                            ["BeishaheSteel", "BeishaheSleeper", "BeishaheSleeperEnd", "BeishaheDeckPlank", "BeishahePierStone", "BeishahePierDamp"]
                            for channel in ["Base", "Normal", "Orm"]]}

@@ -31,13 +31,13 @@
 - `Model/Data_BeishaheBridge.json`：实际GLB哈希／字节数、包围盒、实例三角数、每跨4个支座坐标、来源和创作边界。`_blender/Data_BeishaheBridgeSpec.json` 为设计尺寸输入。
 - 14个跨组共享主钢结构；木枕与13座中间石墩各有三组确定性UV及砌块差异，两端桥台独立。低矮半穿钢桁的轨道上方敞开，无高门架／顶横联、道路铺装或另加人行栏杆。
 - 两轨头内缘净距1.435米。节点 `Intact_Span01…14` 含 `Trusses / Rivets / Sleepers / SleeperEnds / DeckPlanks / DeckBearers / RailWest / RailEast / RailWear / Bearings`；`Shared_Pier / PierDamp / Cap / Abutment` 独立。连续横铺木板架在纵向托梁上，轨脚和犬钉周围留出窄槽；轨头高出板面约65毫米。13处跨墩的木面与钢轨由独立实体接段、鱼尾板、托片及螺栓接续，接段两端各留2毫米缝，钢桁自身保持120毫米结构缝。两片桁架内外均有双排铆钉，节点板为实体；桥墩和桥台有内缩实心核心。桥板铺法、铆钉间距、连接、配色、块色及墩底污迹为设计推定，不代表1938年实测水位。
-- `BeishaheSteel`、`BeishaheSleeper`、`BeishaheSleeperEnd`、`BeishaheDeckPlank`、`BeishahePierStone`、`BeishahePierDamp` 六套PBR共18张图嵌入GLB；另有轨顶磨亮窄条的金属材质。木纹顺各构件长轴，端纹两轴物理比例一致；石面不含图绘砌缝，灰缝由实体构件表达。ORM遮蔽与法线使用真实贴图；不增加boot或关卡贴图请求。
-- 2026-10-28桥面候选为1,065,216实例三角、298个网格图元和15,484,992字节；尚无LOD或游戏装配，整桥进入正式关卡前须评估可见范围、合批与性能。此前版本另留OneDrive `Archive/`。
+- `BeishaheSteel`、`BeishaheSleeper`、`BeishaheSleeperEnd`、`BeishaheDeckPlank`、`BeishahePierStone`、`BeishahePierDamp` 六套PBR共18张图嵌入GLB；轨身另用较暗的钢材，轨顶采用磨亮窄条金属材质。木纹顺各构件长轴，端纹两轴物理比例一致；石面不含图绘砌缝，灰缝由实体构件表达。ORM遮蔽与法线使用真实贴图；不增加boot或关卡贴图请求。
+- 版本 `2026102804` 的桥面候选为1,079,472实例三角、298个网格对象和15,800,428字节；尚无LOD或游戏装配，整桥进入正式关卡前须评估可见范围、合批与性能。此前版本另留OneDrive `Archive/`。
 - 最新44米四孔白盒、旧浮桥、旧钢桁桥及剧情／碰撞／爆破时间线均未替换。未来接入整桥须同步处理河漫滩与关卡空间，不用非均匀缩放硬塞进局部白盒。
 
 ## 重建与源工程
 
-源文件与备份：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/Scene_BeishaheBridge.blend`。原图、生成输入和参考在同目录 `References/`；生成提示词包括 `_blender/Prompts/Reference_BeishaheConstruction.txt`、`_blender/Prompts/Reference_BeishaheDeckStudy.txt` 及 `_import/Prompts/Texture_Beishahe*.txt`，均走内置imagegen。
+源文件与备份：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/Scene_BeishaheBridge.blend`。原图、生成输入和参考在同目录 `References/`；其中 `Reference_BeishaheDeckStudy.png` 为桥面构造推演，`Source_BeishaheDeckPlankV2.png` 为采用的生成木纹源图，均非历史照片。生成提示词包括 `_blender/Prompts/Reference_BeishaheConstruction.txt`、`_blender/Prompts/Reference_BeishaheDeckStudy.txt` 及 `_import/Prompts/Texture_Beishahe*.txt`，均走内置imagegen。
 
 ```powershell
 node scripts/Script_BlenderMcp.mjs start --task BeishaheBridge

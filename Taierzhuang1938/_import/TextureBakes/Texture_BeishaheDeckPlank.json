@@ -4,30 +4,30 @@
   "name": "BeishaheDeckPlank",
   "preset": "weatheredWood",
   "source": {
-    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishaheDeckPlank.png",
-    "sha256": "5d0ec81b134d4a6a219316bb374410b4991b8899d9f8d92c5fb2a02a63d40d9d",
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishaheDeckPlankV2.png",
+    "sha256": "c2bb803ca6be7e0b21543e4412cd7a9fc4e43f3ced12a2b568604cbe2d12811d",
     "metrics": {
       "meanSrgb": [
-        0.4664,
-        0.4105,
-        0.355
+        0.4855,
+        0.4303,
+        0.3759
       ],
-      "luma": 0.4107,
-      "lumaStd": 0.0968,
-      "sat": 0.2388,
-      "clipLow": 0.0003,
+      "luma": 0.4306,
+      "lumaStd": 0.0977,
+      "sat": 0.2257,
+      "clipLow": 0.0002,
       "clipHigh": 0.0,
-      "lowFreq": 0.0231
+      "lowFreq": 0.024
     }
   },
   "heightSource": null,
   "params": {
     "mean": [
+      0.45,
       0.43,
-      0.4,
-      0.36
+      0.41
     ],
-    "contrast": 0.065,
+    "contrast": 0.095,
     "lumaRange": [
       0.26,
       0.5
@@ -48,7 +48,7 @@
     "metal": 0.0,
     "seamless": "weld",
     "rowFlatten": false,
-    "flattenSigma": 0.15,
+    "flattenSigma": 0.21,
     "isotropic": false,
     "heightFromLuma": "direct",
     "tileM": 1.0,
@@ -76,46 +76,46 @@
       "file": "Texture_BeishaheDeckPlankBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 273880,
-      "sha256": "640f15cd54e9685ba6d35f4401d1207b96a1a6d0251b308235d5a49b4762f8cc"
+      "bytes": 327968,
+      "sha256": "7ca856be792feef7b4019c96b86d6fd7634ec74e6d58c215eaa36cd50283f554"
     },
     {
       "channel": "Normal",
       "file": "Texture_BeishaheDeckPlankNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 81420,
-      "sha256": "bc160ab2c6add64f1e3fd0e26eef3475eecb036477e2fff191b6f295b7a67ed8"
+      "bytes": 76310,
+      "sha256": "7a0c0f096403e0aed9587af12f79d244b05e62d55f708e9ad627ef878ca23912"
     },
     {
       "channel": "Orm",
       "file": "Texture_BeishaheDeckPlankOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 55648,
-      "sha256": "009dee645018c089b253c88f2b0dd796487f2ee287131320333ec5ce08d30fb5"
+      "bytes": 53078,
+      "sha256": "6d70783af37b7479f02abed3e915757ee69a3b30f1ed263232eecf8fa31c9efb"
     }
   ],
-  "totalBytes": 410948,
+  "totalBytes": 457356,
   "metrics": {
     "meanSrgb": [
-      0.4297,
-      0.4007,
-      0.36
+      0.4499,
+      0.4307,
+      0.4099
     ],
-    "luma": 0.3968,
-    "lumaStd": 0.0656,
-    "sat": 0.1622,
-    "clipLow": 0.0,
+    "luma": 0.4302,
+    "lumaStd": 0.0955,
+    "sat": 0.0889,
+    "clipLow": 0.0002,
     "clipHigh": 0.0,
-    "lowFreq": 0.0092,
-    "seam": 0.0093,
-    "interior": 0.0447,
-    "seamRatio": 0.207,
-    "border": 0.681,
-    "swing": 0.0797,
-    "aoMean": 0.905,
-    "roughMean": 0.876,
+    "lowFreq": 0.018,
+    "seam": 0.0102,
+    "interior": 0.0559,
+    "seamRatio": 0.182,
+    "border": 0.727,
+    "swing": 0.1303,
+    "aoMean": 0.911,
+    "roughMean": 0.874,
     "texelsPerMeter": 1024.0
   },
   "gateProblems": []

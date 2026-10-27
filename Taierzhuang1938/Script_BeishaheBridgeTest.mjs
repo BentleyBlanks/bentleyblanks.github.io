@@ -74,10 +74,11 @@ Check(bounds.max.y>=1.8&&bounds.max.y<=2.4&&bounds.min.y>=-8&&bounds.min.y<=-4.5
 
 // Material records and decoded pixels are checked independently of screenshots.
 // The running surface is intentionally a textureless polished metal, while all
-// six weathered materials must keep their independent Base/Normal/ORM maps.
-const materialSources={BeishaheSteel:'BeishaheSteel',BeishaheTimber:'BeishaheSleeper',BeishaheTimberEnd:'BeishaheSleeperEnd',BeishaheDeckTimber:'BeishaheDeckPlank',BeishaheStone:'BeishahePierStone',BeishaheStoneDamp:'BeishahePierDamp'};
+// weathered materials keep their Base/Normal/ORM maps; dark rail body and
+// bridge steel deliberately share the same three steel texture images.
+const materialSources={BeishaheSteel:'BeishaheSteel',BeishaheRailBody:'BeishaheSteel',BeishaheTimber:'BeishaheSleeper',BeishaheTimberEnd:'BeishaheSleeperEnd',BeishaheDeckTimber:'BeishaheDeckPlank',BeishaheStone:'BeishahePierStone',BeishaheStoneDamp:'BeishahePierDamp'};
 const expectedMaterials=[...Object.keys(materialSources),'BeishaheRailRunning'];
-Check(g.materials?.length===expectedMaterials.length&&expectedMaterials.every(name=>g.materials.some(m=>m.name===name)),'Six distinct PBR materials and the single polished rail material exist');
+Check(g.materials?.length===expectedMaterials.length&&expectedMaterials.every(name=>g.materials.some(m=>m.name===name)),'Seven weathered PBR materials and the single polished rail material exist');
 Check(g.images?.length===18,'Six independent three-channel PBR texture sets are embedded',g.images?.length);
 const imageStats=[];
 const decodedImages=new Map();
@@ -124,9 +125,9 @@ for(const m of g.materials){
   const normal=await CheckTexturePixels(m.name,'Normal',m.normalTexture.index,source,[0,1,2]);
   // Blender repacks unused B to 255 for nonmetallic materials; their zero
   // metallicFactor makes that channel irrelevant. Steel uses the original B.
-  const orm=await CheckTexturePixels(m.name,'Orm',p.metallicRoughnessTexture.index,source,m.name==='BeishaheSteel'?[0,1,2]:[0,1]);
+  const orm=await CheckTexturePixels(m.name,'Orm',p.metallicRoughnessTexture.index,source,source==='BeishaheSteel'?[0,1,2]:[0,1]);
   await CheckTexturePixels(m.name,'Orm',m.occlusionTexture.index,source,[0]);
-  if(m.name!=='BeishaheSteel')Check((p.metallicFactor??1)===0,'Wood and masonry do not become metallic after ORM repacking',m.name);
+  if(source!=='BeishaheSteel')Check((p.metallicFactor??1)===0,'Wood and masonry do not become metallic after ORM repacking',m.name);
   baseImages.add(base.source);normalImages.add(normal.source);ormImages.add(orm.source);
   let sum=0,sum2=0;const pixels=normal.info.width*normal.info.height;
   for(let i=0;i<pixels;i++){const v=normal.data[i*3];sum+=v;sum2+=v*v;}
@@ -134,6 +135,18 @@ for(const m of g.materials){
   Check(effectiveRms>2,'Effective normal map relief remains visibly non-flat',{material:m.name,effectiveRms});
 }
 Check(baseImages.size===6&&normalImages.size===6&&ormImages.size===6,'Steel, sleepers, end grain, decking, dry and damp stone use distinct image data');
+{
+  const bridge=g.materials.find(m=>m.name==='BeishaheSteel'),rail=g.materials.find(m=>m.name==='BeishaheRailBody'),wear=g.materials.find(m=>m.name==='BeishaheRailRunning');
+  const bp=bridge.pbrMetallicRoughness,rp=rail.pbrMetallicRoughness,rf=rp.baseColorFactor??[1,1,1,1];
+  Check(rf.slice(0,3).every(v=>v>=.45&&v<=.65)&&Math.abs(rf[3]-1)<.001,'Rail body has a moderately darker, opaque physical base factor',rf);
+  for(const [a,b] of [[bp.baseColorTexture,rp.baseColorTexture],[bridge.normalTexture,rail.normalTexture],[bp.metallicRoughnessTexture,rp.metallicRoughnessTexture],[bridge.occlusionTexture,rail.occlusionTexture]])
+    Check(ImageForTexture(a.index).source===ImageForTexture(b.index).source,'Rail body reuses the original steel PBR images, without new textures');
+  const im=ImageForTexture(rp.baseColorTexture.index),sum=[0,0,0],n=im.info.width*im.info.height;
+  for(let i=0;i<n;i++)for(let c=0;c<3;c++){const x=im.data[i*3+c]/255;sum[c]+=x<=.04045?x/12.92:((x+.055)/1.055)**2.4;}
+  const body=(sum[0]*rf[0]*.2126+sum[1]*rf[1]*.7152+sum[2]*rf[2]*.0722)/n,wr=wear.pbrMetallicRoughness.baseColorFactor;
+  const running=wr[0]*.2126+wr[1]*.7152+wr[2]*.0722;
+  Check(running>body*1.5&&(wear.pbrMetallicRoughness.roughnessFactor??1)<=.4,'Polished running strip has a real physical reflectance contrast to the darker rail body',{body,running});
+}
 
 Check(spec.schemaVersion===1&&data.schemaVersion===1&&data.version===spec.version,'Spec and sidecar schema/version agree');
 Check(spec.units==='m'&&spec.lengthM===280&&spec.spanCount===14&&spec.spanPitchM===20&&spec.gaugeM===1.435,'Authorized metric design: fourteen 20 m spans and standard inner rail gauge');
@@ -150,6 +163,8 @@ const ByRole=(role,index)=>parts.filter(p=>Role(p)===role&&(index==null||p.node.
 for(const part of parts){
   const name=g.materials[part.primitive.material]?.name,role=Role(part);
   if(name==='BeishaheRailRunning'||role==='RailWear'||role==='RailJointWear')Check(name==='BeishaheRailRunning'&&(role==='RailWear'||role==='RailJointWear'),'Polished steel is restricted to dedicated rail-wear geometry',{name,role});
+  const railBodyRoles=['RailWest','RailEast','RailJointWest','RailJointEast','RailJointSplice'];
+  if(name==='BeishaheRailBody'||railBodyRoles.includes(role))Check(name==='BeishaheRailBody'&&railBodyRoles.includes(role),'Dark reused-steel material is restricted to actual rails and their fishplates',{name,role});
 }
 const pointCache=new Map();
 function Points(part){if(pointCache.has(part))return pointCache.get(part);const out=[];for(let i=0;i<part.geo.positions.length;i+=3)out.push(new THREE.Vector3(part.geo.positions[i],part.geo.positions[i+1],part.geo.positions[i+2]).applyMatrix4(part.matrix));pointCache.set(part,out);return out;}
@@ -342,46 +357,152 @@ for(const part of [...new Map(ByRole('Sleepers').map(p=>[p.node.mesh,p])).values
 // Transverse deck texture uses image V along world X. Independently examine
 // actual top-face triangle edges and verify no triangle intrudes into either
 // 130 mm rail-foot footprint.
+function PrepareBoardProfiles(rows,label){
+  for(const [row,entry] of rows){
+    const samples=[...new Map(entry.samples.map(s=>[Math.round(s.x*100000),s])).values()].sort((a,b)=>a.x-b.x);
+    Check(samples.length>=6,'Each actual board has color samples across all three pieces',{label,row,count:samples.length});
+    entry.rgb=samples[0].rgb;
+    entry.colorAt=()=>entry.rgb;
+    Check(samples.every(s=>s.rgb.every((v,c)=>Math.abs(v-entry.rgb[c])<.001)),
+      'All three pieces of a physical board share its wood tint',{label,row});
+  }
+}
+function CheckBoardEdgeProfiles(part,topFaces,rows,sideFaces,label,requireVariation){
+  const {positions,color,colorWidth}=part.geo;
+  const samples=new Map();
+  for(const {ids,row,edge0,edge1} of topFaces){
+    const entry=rows.get(row);if(!entry)continue;
+    if(!samples.has(row))samples.set(row,{low:[],high:[]});
+    for(const i of ids){
+      const z=positions[i*3+2],ratio=color[i*colorWidth]/entry.colorAt(positions[i*3])[0];
+      if(Math.abs(z-edge0)<.0005)samples.get(row).low.push(ratio);
+      if(Math.abs(z-edge1)<.0005)samples.get(row).high.push(ratio);
+    }
+  }
+  let invalidProfiles=0;const edgeTones=[],edgeWidths=[];
+  for(const [row,entry] of rows){
+    const a=samples.get(row),low=a?.low??[],high=a?.high??[];
+    if(!low.length||!high.length){invalidProfiles++;continue;}
+    entry.lowTone=low.reduce((s,v)=>s+v,0)/low.length;
+    entry.highTone=high.reduce((s,v)=>s+v,0)/high.length;
+    if(Math.max(...low)-Math.min(...low)>.01||Math.max(...high)-Math.min(...high)>.01||
+       entry.lowTone<.54||entry.lowTone>.79||entry.highTone<.54||entry.highTone>.79||
+       Math.abs(entry.lowTone-entry.highTone)>.04||
+       entry.lowWidth<.0095||entry.lowWidth>.0185||entry.highWidth<.0095||entry.highWidth>.0185)invalidProfiles++;
+    edgeTones.push(entry.lowTone,entry.highTone);edgeWidths.push(entry.lowWidth,entry.highWidth);
+  }
+  Check(invalidProfiles===0&&samples.size===rows.size,'Both real board edges have consistent moderate tones and physical transition widths',{label,invalidProfiles,rows:rows.size,sampled:samples.size});
+  if(requireVariation){
+    const mean=edgeTones.reduce((a,b)=>a+b,0)/edgeTones.length;
+    Check(Math.max(...edgeTones)-Math.min(...edgeTones)>.12&&Math.max(...edgeWidths)-Math.min(...edgeWidths)>.004&&mean>.62,'Real edge shades and widths vary across rows and remain softer than the prior design',{label,mean});
+  }
+  let darkEdges=0,midEdges=0,centers=0,badGradient=0,discontinuities=0;const shared=new Map();
+  for(const {ids,row,edge0,edge1} of topFaces){
+    const entry=rows.get(row);if(!entry||entry.lowTone==null||entry.highTone==null){badGradient++;continue;}
+    for(const i of ids){
+      const z=positions[i*3+2],dl=z-edge0,dh=edge1-z,low=dl<=dh,distance=Math.max(0,Math.min(dl,dh));
+      const width=low?entry.lowWidth:entry.highWidth,tone=low?entry.lowTone:entry.highTone,half=width*.5,mid=tone+.55*(1-tone);
+      const expected=distance<half?tone+(mid-tone)*distance/half:distance<width?mid+(1-mid)*(distance-half)/(width-half):1;
+      const base=entry.colorAt(positions[i*3]);
+      for(let c=0;c<3;c++)if(Math.abs(color[i*colorWidth+c]/base[c]-expected)>.025)badGradient++;
+      if(distance<.001)darkEdges++;else if(Math.abs(distance-half)<.001)midEdges++;else if(distance>=width-.001)centers++;
+      const key=`${row}:${Math.round(positions[i*3]*10000)}:${Math.round(z*10000)}`,rgb=[0,1,2].map(c=>color[i*colorWidth+c]);
+      if(shared.has(key)&&rgb.some((v,c)=>Math.abs(v-shared.get(key)[c])>.002))discontinuities++;else shared.set(key,rgb);
+    }
+  }
+  Check(badGradient===0&&discontinuities===0&&darkEdges>=rows.size*6&&midEdges>=rows.size*6&&centers>=rows.size*6,'Actual coplanar board colors transition smoothly from each physical edge to its full center tint',{label,badGradient,discontinuities,darkEdges,midEdges,centers});
+  if(sideFaces.length){
+    Check(sideFaces.length>rows.size*3&&sideFaces.every(({row,rgb,x,z})=>{
+      const r=rows.get(row);if(!r)return false;
+      const tone=z<(r.edge0+r.edge1)/2?r.lowTone:r.highTone;
+      const base=r.colorAt(x);
+      return rgb.every((v,c)=>Math.abs(v/base[c]-.86*tone)<.025);
+    }),'Physical side faces meet their corresponding darkened top edge without a color jump',{label,faces:sideFaces.length});
+  }
+}
+const deckRowsByMesh=new Map(),deckWidthSignatures=[];
 for(const part of [...new Map(ByRole('DeckPlanks').map(p=>[p.node.mesh,p])).values()]){
   const {positions,indices,uv,color,colorWidth}=part.geo;let edges=0,footIntrusions=0;
   Check(g.materials[part.primitive.material]?.name==='BeishaheDeckTimber','Deck boards use the separate authored deck PBR texture');
   Check(color&&colorWidth>=3,'Actual deck board mesh contains exported COLOR_0 tint');
   const railCenter=(spec.gaugeM+spec.railHeadWidthM)/2;
-  const length=spec.spanPitchM-spec.expansionGapM,boardCount=Math.ceil(length/.185),rows=new Map(),sideFaces=[];
+  const length=spec.spanPitchM-spec.expansionGapM,boardCount=Math.ceil(length/.225),rows=new Map(),sideFaces=[],topFaces=[];
+  // Derive row boundaries from the exported triangles themselves. The top
+  // bevel adds 3 mm on each side, in addition to the physical 6 mm seam.
+  const intervals=[];
+  for(let k=0;k<(indices?.length??positions.length/3);k+=3){
+    const ids=[0,1,2].map(j=>indices?indices[k+j]:k+j),xs=ids.map(i=>positions[i*3]);
+    if(Math.max(...xs)-Math.min(...xs)>.15&&ids.every(i=>Math.abs(positions[i*3+1]-.075)<.0001)){
+      const zs=ids.map(i=>positions[i*3+2]);intervals.push([Math.min(...zs),Math.max(...zs)]);
+    }
+  }
+  intervals.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+  const extents=[];
+  for(const [lo,hi] of intervals){
+    const last=extents.at(-1);
+    if(!last||lo>last.edge1+.0001)extents.push({edge0:lo,edge1:hi});
+    else last.edge1=Math.max(last.edge1,hi);
+  }
+  Check(extents.length===boardCount,'Actual top triangles identify all transverse board rows',extents.length);
+  const physicalWidths=extents.map(r=>r.edge1-r.edge0+.006);
+  Check(physicalWidths.every((w,i)=>w>(length/boardCount)*.90-(i===0||i===boardCount-1?.003:.006)&&w<(length/boardCount)*1.10)&&
+    Math.max(...physicalWidths)-Math.min(...physicalWidths)>.015&&new Set(physicalWidths.map(w=>Math.round(w*1000))).size>=16,
+    'Real board widths show restrained variation across the span',{min:Math.min(...physicalWidths),max:Math.max(...physicalWidths)});
+  Check(extents.length===boardCount&&Math.abs(extents[0].edge0-.003+length/2)<.0002&&Math.abs(extents.at(-1).edge1+.003-length/2)<.0002&&
+    extents.slice(1).every((r,i)=>Math.abs(r.edge0-extents[i].edge1-.012)<.0002),
+    'All actual top edges imply 6 mm physical gaps and close exactly at both span ends');
+  deckRowsByMesh.set(part.node.mesh,extents);
+  deckWidthSignatures.push(physicalWidths.map(w=>Math.round(w*10000)).join(','));
   for(let k=0;k<(indices?.length??positions.length/3);k+=3){
     const ids=[0,1,2].map(j=>indices?indices[k+j]:k+j);
     const xs=ids.map(i=>positions[i*3]),xmin=Math.min(...xs),xmax=Math.max(...xs);
     for(const rail of [-railCenter,railCenter])if(xmin<rail+.0649&&xmax>rail-.0649)footIntrusions++;
-    if(xmax-xmin>.3&&ids.every(i=>Math.abs(positions[i*3+1]-.075)<.0001)){
-      const z=ids.reduce((sum,i)=>sum+positions[i*3+2],0)/3,row=Math.max(0,Math.min(boardCount-1,Math.floor((z+length/2)*boardCount/length)));
+    if(xmax-xmin>.15&&ids.every(i=>Math.abs(positions[i*3+1]-.075)<.0001)){
+      const z=ids.reduce((sum,i)=>sum+positions[i*3+2],0)/3,row=extents.findIndex(r=>z>=r.edge0-.0001&&z<=r.edge1+.0001);
       const x=ids.reduce((sum,i)=>sum+positions[i*3],0)/3,zone=x<-.65?'left':x>.65?'right':'center';
-      const rgb=ids.slice(0,1).map(i=>[color[i*colorWidth],color[i*colorWidth+1],color[i*colorWidth+2]])[0];
-      Check(ids.every(i=>rgb.every((v,c)=>Math.abs(v-color[i*colorWidth+c])<.001)),'Each transverse board has a uniform tint over its physical surface',{row,zone});
-      const phase=[uv[ids[0]*2]-positions[ids[0]*3+2],uv[ids[0]*2+1]+positions[ids[0]*3]];
-      if(!rows.has(row))rows.set(row,{rgb,phase,zones:new Set()});
-      const previous=rows.get(row);
-      Check(rgb.every((v,c)=>Math.abs(v-previous.rgb[c])<.001)&&phase.every((v,c)=>Math.abs(v-previous.phase[c])<.001),'Three rail-separated pieces of one row share tint and texture phase',{row,zone});
-      previous.zones.add(zone);
+      Check(row>=0,'Each top triangle belongs to a measured board row',z);
+      if(row<0)continue;
+      const {edge0,edge1}=extents[row];
+      topFaces.push({ids,row,zone,edge0,edge1});
+      const zValues=ids.map(i=>positions[i*3+2]);
+      if(Math.max(...zValues)-Math.min(...zValues)>.08){
+        const phase=[uv[ids[0]*2]-positions[ids[0]*3+2],uv[ids[0]*2+1]+positions[ids[0]*3]];
+        const lowWidth=Math.min(...zValues)-edge0,highWidth=edge1-Math.max(...zValues);
+        if(!rows.has(row))rows.set(row,{samples:[],phase,zones:new Set(),zoneExtents:new Map(),lowWidth,highWidth,edge0,edge1});
+        const previous=rows.get(row);
+        Check(phase.every((v,c)=>Math.abs(v-previous.phase[c])<.001)&&Math.abs(lowWidth-previous.lowWidth)<.001&&Math.abs(highWidth-previous.highWidth)<.001,'Three rail-separated pieces of one row share texture phase and edge widths',{row,zone});
+        for(const i of ids)previous.samples.push({x:positions[i*3],rgb:[0,1,2].map(c=>color[i*colorWidth+c])});
+        previous.zones.add(zone);
+      }
     }
     const ys=ids.map(i=>positions[i*3+1]),zs=ids.map(i=>positions[i*3+2]);
-    if(xmax-xmin>.3&&Math.max(...ys)-Math.min(...ys)>.02&&Math.max(...zs)-Math.min(...zs)<.0001){
-      const z=zs.reduce((a,b)=>a+b,0)/3,row=Math.max(0,Math.min(boardCount-1,Math.floor((z+length/2)*boardCount/length)));
-      sideFaces.push({row,rgb:[color[ids[0]*colorWidth],color[ids[0]*colorWidth+1],color[ids[0]*colorWidth+2]]});
+    if(xmax-xmin>.15&&Math.max(...ys)-Math.min(...ys)>.02&&Math.max(...zs)-Math.min(...zs)<.0001){
+      const z=zs.reduce((a,b)=>a+b,0)/3,row=extents.findIndex(r=>Math.abs(z-(r.edge0-.003))<.0002||Math.abs(z-(r.edge1+.003))<.0002);
+      sideFaces.push({row,z,x:positions[ids[0]*3],rgb:[color[ids[0]*colorWidth],color[ids[0]*colorWidth+1],color[ids[0]*colorWidth+2]]});
     }
     for(const [a,b] of [[ids[0],ids[1]],[ids[1],ids[2]],[ids[2],ids[0]]]){
       const dx=Math.abs(positions[a*3]-positions[b*3]),dz=Math.abs(positions[a*3+2]-positions[b*3+2]);
-      if(dx<.3||dz>.0001||Math.abs(positions[a*3+1]-.075)>.0001||Math.abs(positions[b*3+1]-.075)>.0001)continue;
+      if(dx<.15||dz>.0001||Math.abs(positions[a*3+1]-.075)>.0001||Math.abs(positions[b*3+1]-.075)>.0001)continue;
       const du=Math.abs(uv[a*2]-uv[b*2]),dv=Math.abs(uv[a*2+1]-uv[b*2+1]);
       Check(du<.001&&Math.abs(dv-dx)<.001,'Deck top-face grain follows each transverse plank X axis',{du,dv,dx});edges++;
     }
   }
   Check(footIntrusions===0,'No physical deck triangle intrudes into either steel rail foot',footIntrusions);
   Check(edges>=20,'Each deck variant has enough real grain-aligned transverse plank tops',edges);
+  for(const {ids,row,zone} of topFaces){
+    const entry=rows.get(row);if(!entry)continue;
+    const zs=ids.map(i=>positions[i*3+2]),range=entry.zoneExtents.get(zone)??[Infinity,-Infinity];
+    range[0]=Math.min(range[0],...zs);range[1]=Math.max(range[1],...zs);entry.zoneExtents.set(zone,range);
+  }
   Check(rows.size===boardCount&&[...rows.values()].every(r=>r.zones.size===3),'Every transverse row contains all three visible pieces',rows.size);
+  Check([...rows.values()].every(r=>r.zoneExtents.size===3&&[...r.zoneExtents.values()].every(([lo,hi])=>Math.abs(lo-r.edge0)<.0002&&Math.abs(hi-r.edge1)<.0002)),
+    'Each actual row has identical outer boundaries across its three rail-separated pieces');
+  PrepareBoardProfiles(rows,'span deck');
   const tones=[...rows.values()].map(r=>r.rgb),values=tones.map(rgb=>(rgb[0]+rgb[1]+rgb[2])/3);
-  Check(new Set(tones.map(rgb=>rgb.map(x=>Math.round(x*10000)).join(','))).size>boardCount*.8&&Math.max(...values)-Math.min(...values)>.13&&Math.max(...values)-Math.min(...values)<.31&&tones.every(rgb=>rgb[0]>=rgb[2]&&rgb.every(v=>v>=.70&&v<=1.001)),'Different rows show visible but restrained deterministic warm-gray timber variation');
-  Check(sideFaces.length>boardCount*3&&sideFaces.every(({row,rgb})=>rows.has(row)&&rgb.every((v,c)=>v<rows.get(row).rgb[c]*.90&&v>rows.get(row).rgb[c]*.82)),'Real board side faces are moderately darker than their own top faces',sideFaces.length);
+  Check(new Set(tones.map(rgb=>rgb.map(x=>Math.round(x*10000)).join(','))).size>boardCount*.8&&Math.max(...values)-Math.min(...values)>.12&&Math.max(...values)-Math.min(...values)<.38&&tones.every(rgb=>rgb[0]>=rgb[2]&&rgb.every(v=>v>=.48&&v<=1.001)),'Different rows show visible but restrained deterministic warm-gray timber variation');
+  CheckBoardEdgeProfiles(part,topFaces,rows,sideFaces,'span deck',true);
 }
+Check(new Set(deckWidthSignatures).size===3,'All three exported deck templates have different real board width sequences');
 for(const part of [...new Map(ByRole('DeckBearers').map(p=>[p.node.mesh,p])).values()]){
   const {color,colorWidth}=part.geo;
   Check(color&&colorWidth>=3&&color.every(v=>Math.abs(v-1)<.001),'Actual supporting bearers export neutral white vertex tint');
@@ -442,7 +563,7 @@ for(const rivets of [...new Map(ByRole('Rivets').map(p=>[p.node.mesh,p])).values
     Check(grouped[0].length===grouped[1].length&&grouped[0].every((a,i)=>a.length===grouped[1][i].length&&a.every((z,j)=>Math.abs(z-grouped[1][i][j])<.001)),'Both actual rivet rows remain paired along each chord bay',{span,trussSide,faceSign,chord:chord.name});
   }
 }
-let bearingCount=0;
+let bearingCount=0;const coverageGaps=[];
 for(let i=0;i<spec.spanCount;i++){
   const center=-spec.lengthM/2+spec.spanPitchM*(i+.5),length=spec.spanPitchM-spec.expansionGapM;
   const trusses=ByRole('Trusses',i),sleepers=ByRole('Sleepers',i),ends=ByRole('SleeperEnds',i),planks=ByRole('DeckPlanks',i),bearers=ByRole('DeckBearers',i),west=ByRole('RailWest',i),east=ByRole('RailEast',i),wear=ByRole('RailWear',i),bearings=ByRole('Bearings',i);
@@ -463,16 +584,38 @@ for(let i=0;i<spec.spanCount;i++){
   const up=new THREE.Vector3(0,1,0),down=new THREE.Vector3(0,-1,0);
   // Sample every span: the steel rail occupies its foot area; all remaining
   // walking regions must be wood, with only small physical joints allowed.
-  let covered=0,samples=0,innerCovered=0,innerSamples=0,outerCovered=0,outerSamples=0;
+  let covered=0,samples=0,innerCovered=0,innerSamples=0,outerCovered=0,outerSamples=0;const misses=[];
   for(let zi=0;zi<12;zi++)for(let xi=0;xi<19;xi++){
     const z=center-length/2+(zi+.37)*length/12,x=-1.35+xi*.15;
     const hit=Hits([...planks,...west,...east],new THREE.Vector3(x,.25,z),down,.27).length>0;
     covered+=Number(hit);samples++;
+    if(!hit)misses.push({x,z});
     if(Math.abs(x)<=.6){innerCovered+=Number(hit);innerSamples++;}
     if(Math.abs(x)>=.9){outerCovered+=Number(hit);outerSamples++;}
   }
-  Check(covered/samples>=.97&&innerCovered/innerSamples>=.97&&outerCovered/outerSamples>=.97,'Real visible wood and rail geometry cover the full inside/outside walking width',{span:i+1,covered,samples,innerCovered,innerSamples,outerCovered,outerSamples});
-  const boardCount=Math.ceil(length/.185),seamZ=center-length/2+20*length/boardCount;
+  const gaps=[];
+  for(const {x,z} of misses){
+    const woodAt=(zz)=>Hits(planks,new THREE.Vector3(x,.25,zz),down,.27).length>0;
+    const edge=[];
+    for(const sign of [-1,1]){
+      let hitDistance=0;
+      for(let d=.0005;d<=.03001;d+=.0005)if(woodAt(z+sign*d)){hitDistance=d;break;}
+      Check(hitDistance>0,'Every uncovered sample has nearby real wood on both sides',{span:i+1,x,z,sign});
+      let emptyDistance=0,solidDistance=hitDistance;
+      for(let n=0;n<14;n++){
+        const mid=(emptyDistance+solidDistance)/2;
+        if(woodAt(z+sign*mid))solidDistance=mid;else emptyDistance=mid;
+      }
+      edge.push(z+sign*solidDistance);
+    }
+    const width=edge[1]-edge[0];
+    Check(width>0&&width<=.0061&&woodAt(edge[0]-.0001)&&woodAt(edge[1]+.0001),'Every uncovered sample lies in a real at-most 6.1 mm joint with wood on both sides',{span:i+1,x,z,width,edge});
+    gaps.push(width);
+  }
+  coverageGaps.push(...gaps);
+  const measuredRows=deckRowsByMesh.get(planks[0].node.mesh);
+  Check(measuredRows?.length>20,'Span has measured deck rows for physical seam ray tests',i+1);
+  const seamZ=center+(measuredRows[19].edge1+measuredRows[20].edge0)/2;
   const seam=Hits(planks,new THREE.Vector3(.4,.20,seamZ),down,.21);
   const before=Hits(planks,new THREE.Vector3(.4,.20,seamZ-.008),down,.21);
   const after=Hits(planks,new THREE.Vector3(.4,.20,seamZ+.008),down,.21);
@@ -531,7 +674,8 @@ for(let i=0;i<spec.spanCount;i++){
     Check(!strip.isEmpty()&&Math.abs(strip.max.x-strip.min.x-.044)<.001&&Math.abs(strip.max.z-strip.min.z-length)<.001&&Math.abs(strip.min.y-spec.railHeightM)<.001,'Both full-length wheel-contact strips touch their rail heads',{span:i+1,side});
   }
   rayMaterial.side=THREE.FrontSide;
-  const deckZ=center+.05,deckTop=Hits(planks,new THREE.Vector3(0,.20,deckZ),down,.21),deckUnder=Hits(planks,new THREE.Vector3(0,.02,deckZ),up,.10);
+  const nearDeckRow=deckRowsByMesh.get(planks[0].node.mesh).reduce((best,row)=>Math.abs((row.edge0+row.edge1)/2-.05)<Math.abs((best.edge0+best.edge1)/2-.05)?row:best);
+  const deckZ=center+(nearDeckRow.edge0+nearDeckRow.edge1)/2,deckTop=Hits(planks,new THREE.Vector3(0,.20,deckZ),down,.21),deckUnder=Hits(planks,new THREE.Vector3(0,.02,deckZ),up,.10);
   Check(deckTop.length>0&&deckUnder.length>0&&Math.abs(deckTop[0].point.y-.075)<.001&&Math.abs(deckUnder[0].point.y-.03)<.001,'Deck has visible outward-facing top and underside, not a one-sided collision sheet',i+1);
   const firstSleeperZ=center-length/2+length/(2*Math.ceil(length/spec.sleeperSpacingM));
   for(const side of [-1,1]){
@@ -621,19 +765,35 @@ for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
   Check(g.materials[deck[0].primitive.material]?.name==='BeishaheDeckTimber'&&g.materials[support[0].primitive.material]?.name==='BeishaheDeckTimber'&&g.materials[splice[0].primitive.material]?.name==='BeishaheSteel','Physical wood and steel support roles use their correct materials',supportIndex);
   {
     const {positions,indices,uv,color,colorWidth}=deck[0].geo,railCenter=(spec.gaugeM+spec.railHeadWidthM)/2;
-    let intrusions=0,edges=0;
+    let intrusions=0,edges=0;const jointRows=new Map(),jointTop=[];
     Check(color&&colorWidth>=3,'Joint deck retains real wood tint data',supportIndex);
     for(let k=0;k<(indices?.length??positions.length/3);k+=3){
       const ids=[0,1,2].map(j=>indices?indices[k+j]:k+j),xs=ids.map(i=>positions[i*3]),xmin=Math.min(...xs),xmax=Math.max(...xs);
       for(const rail of [-railCenter,railCenter])if(xmin<rail+.0649&&xmax>rail-.0649)intrusions++;
+      if(xmax-xmin>.15&&ids.every(i=>Math.abs(positions[i*3+1]-.075)<.0001)){
+        const edge0=-.055,edge1=.055,row=0;
+        jointTop.push({ids,row,edge0,edge1});
+        const zValues=ids.map(i=>positions[i*3+2]);
+        if(Math.max(...zValues)-Math.min(...zValues)>.05){
+          const lowWidth=Math.min(...zValues)-edge0,highWidth=edge1-Math.max(...zValues);
+          const phase=[uv[ids[0]*2]-positions[ids[0]*3+2],uv[ids[0]*2+1]+positions[ids[0]*3]];
+          if(!jointRows.has(row))jointRows.set(row,{samples:[],phase,lowWidth,highWidth,edge0,edge1});
+          const entry=jointRows.get(row);
+          Check(phase.every((v,c)=>Math.abs(v-entry.phase[c])<.001)&&Math.abs(lowWidth-entry.lowWidth)<.0001&&Math.abs(highWidth-entry.highWidth)<.0001,'Joint board phase and edge widths remain consistent across its three pieces',supportIndex);
+          for(const i of ids)entry.samples.push({x:positions[i*3],rgb:[0,1,2].map(c=>color[i*colorWidth+c])});
+        }
+      }
       for(const [a,b] of [[ids[0],ids[1]],[ids[1],ids[2]],[ids[2],ids[0]]]){
         const dx=Math.abs(positions[a*3]-positions[b*3]),dz=Math.abs(positions[a*3+2]-positions[b*3+2]);
-        if(dx<.3||dz>.0001||Math.abs(positions[a*3+1]-.075)>.0001||Math.abs(positions[b*3+1]-.075)>.0001)continue;
+        if(dx<.15||dz>.0001||Math.abs(positions[a*3+1]-.075)>.0001||Math.abs(positions[b*3+1]-.075)>.0001)continue;
         const du=Math.abs(uv[a*2]-uv[b*2]),dv=Math.abs(uv[a*2+1]-uv[b*2+1]);
         Check(du<.001&&Math.abs(dv-dx)<.001,'Joint board texture grain remains transverse across the pier',{supportIndex,du,dv,dx});edges++;
       }
     }
     Check(intrusions===0&&edges>=3,'Joint wood avoids both rail-foot channels and contains real transverse board surfaces',{supportIndex,intrusions,edges});
+    Check(jointRows.size===1,'Joint deck has one coherent board profile',supportIndex);
+    PrepareBoardProfiles(jointRows,'joint deck');
+    CheckBoardEdgeProfiles(deck[0],jointTop,jointRows,[],'joint deck',false);
   }
   let covered=0,samples=0;
   for(const dz of [-.05,-.03,0,.03,.05])for(let xi=0;xi<19;xi++){
@@ -659,4 +819,4 @@ for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
   }
 }
 for(const mesh of rayCache.values())mesh.geometry.dispose();rayMaterial.dispose();
-console.log(`PASS BeishaheBridgeTest: ${checks} checks; ${triangles} triangles, ${parts.length} mesh primitives, ${g.materials.length} materials / ${imageStats.length} decoded images; ${size.toArray().map(v=>v.toFixed(3)).join(' x ')} m`);
+console.log(`PASS BeishaheBridgeTest: ${checks} checks; ${triangles} triangles, ${parts.length} mesh primitives, ${g.materials.length} materials / ${imageStats.length} decoded images; ${size.toArray().map(v=>v.toFixed(3)).join(' x ')} m; ${coverageGaps.length} uncovered samples bounded by joints ${coverageGaps.length?Math.min(...coverageGaps).toFixed(6):'n/a'}–${coverageGaps.length?Math.max(...coverageGaps).toFixed(6):'n/a'} m`);
