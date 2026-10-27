@@ -47,6 +47,7 @@
 
 import * as THREE from "three";
 import { FLARE_SHADOW } from "./Data_Tuning_FlareEffects.mjs";
+import {FLARE_ANGULAR_GLSL} from './Script_FlareOptics.mjs';
 import {
   ClusterGrid, ConeBoundingSphere, LIGHT_TYPE, LIGHT_DECAY,
   CLUSTER_NEAR, CLUSTER_DATA_TEX_WIDTH, MakeClusterTier,
@@ -108,6 +109,7 @@ uniform vec2 uClusterScreen;
 uniform vec2 uClusterBands;
 uniform mat4 uFlareShadowMatrix[${FLARE_SHADOW.slots}];
 uniform vec4 uFlareShadowInfo[${FLARE_SHADOW.slots}];
+${FLARE_ANGULAR_GLSL}
 
 // 分量寻址：一张 RGBA32F 里的第 n 个 32 位格。簇表与索引存的是整数，
 // 贴着 float 的位型放进去（floatBitsToUint 取回）—— 因为三张表合并成一张是
@@ -198,8 +200,11 @@ if (uClusterParams.w > 0.5) {
     clusterLight.direction = clusterVector / max(clusterDist, 1e-4);
     clusterLight.color = clusterT1.rgb
       * getDistanceAttenuation(clusterDist, clusterRange, ${LIGHT_DECAY.toFixed(1)});
-    if (clusterKind < -0.5) clusterLight.color *= ClusterFlareShadow(
-      int(-clusterKind - 1.0), geometryPosition, geometryNormal);
+    if (clusterKind < -0.5) {
+      vec4 clusterT2=ClusterTexel(clusterTexel0+2),clusterT3=ClusterTexel(clusterTexel0+3);
+      if(clusterT3.w>0.5)clusterLight.color*=FlareEmissionGain(clusterT2.xyz,clusterLight.direction,clusterT2.w,clusterT3.x);
+      if(clusterKind>-2.5)clusterLight.color*=ClusterFlareShadow(int(-clusterKind-1.0),geometryPosition,geometryNormal);
+    }
     if (clusterKind > 0.5 && clusterKind < 1.5) {
       vec4 clusterT2 = ClusterTexel(clusterTexel0 + 2);
       vec4 clusterT3 = ClusterTexel(clusterTexel0 + 3);
@@ -264,6 +269,7 @@ export class ClusteredLights {
     this.sourceOrder = new Int32Array(MAX_SOURCES);
     this.sourceCount = 0;
     this.sourceShadow = new Array(MAX_SOURCES).fill(null);
+    this.sourceEmission = new Array(MAX_SOURCES).fill(null);
 
     // --- 送进 GPU 的那一批 -------------------------------------------------
     this.spheres = new Float64Array(this.maxLights * 4);   // 视空间 x,y,深度,半径
@@ -378,14 +384,15 @@ export class ClusteredLights {
     this.sourceShape[s + 2] = halfLength;
     this.sourceScore[i] = score;
     this.sourceShadow[i] = null;
+    this.sourceEmission[i] = null;
     this.sourceCount = i + 1;
     return i;
   }
 
   /** 点光。`color` 是线性 rgb **已乘强度**（与 three 的 uniforms.color 同口径）。 */
-  AddPoint(x, y, z, r, g, b, radius, score = 0, shadowSource = null) {
+  AddPoint(x, y, z, r, g, b, radius, score = 0, shadowSource = null, emission = null) {
     const i = this._PushSource(x, y, z, r, g, b, radius, LIGHT_TYPE.POINT, 0, 0, 1, -1, -1, 0, score);
-    if(i>=0)this.sourceShadow[i]=shadowSource;
+    if(i>=0){this.sourceShadow[i]=shadowSource;this.sourceEmission[i]=emission;}
     return i;
   }
 
@@ -492,6 +499,17 @@ export class ClusteredLights {
       out[slot + 4] = cr; out[slot + 5] = cg; out[slot + 6] = cb; out[slot + 7] = type;
       out[slot + 8] = vdx; out[slot + 9] = vdy; out[slot + 10] = vdz; out[slot + 11] = shape[s];
       out[slot + 12] = shape[s + 1]; out[slot + 13] = 0; out[slot + 14] = shape[s + 2]; out[slot + 15] = 0;
+      const emission=this.sourceEmission[src];
+      if(emission){
+        const d=emission.direction;
+        // -3 denotes a directional flare with no shadow slot. The shadow pass
+        // can replace it with -1/-2; unused point-light texels retain the lobe.
+        out[slot+7]=-3;
+        out[slot+8]=-(e[0]*d.x+e[4]*d.y+e[8]*d.z);
+        out[slot+9]=-(e[1]*d.x+e[5]*d.y+e[9]*d.z);
+        out[slot+10]=-(e[2]*d.x+e[6]*d.y+e[10]*d.z);
+        out[slot+11]=emission.floor;out[slot+12]=emission.power;out[slot+15]=1;
+      }
 
       const so = active * 4;
       spheres[so] = bx; spheres[so + 1] = by; spheres[so + 2] = -bz;
@@ -573,6 +591,7 @@ export class ClusteredLights {
         halfLength: type === LIGHT_TYPE.TUBE ? shape[s + 2] : 0,
         score: this.sourceScore[src],
         decay: LIGHT_DECAY,
+        emission:this.sourceEmission[src]?{...this.sourceEmission[src],direction:{...this.sourceEmission[src].direction}}:null,
       });
     }
     return {

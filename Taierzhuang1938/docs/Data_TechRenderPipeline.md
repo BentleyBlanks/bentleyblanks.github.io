@@ -6761,4 +6761,6 @@ CSM 已实装（三级 + PCSS + 接触阴影，§6）、3D LUT 与镜头脏污�
 
 ### 2026-10-26：伞降照明弹阴影
 
+2026-10-27补充：白光伞降预设的摆动方向与光强由`Script_FlareOptics`统一求值。仍用点光的保守包围球和四纹素布局；方向性照明使用`t1.w=-3`（无阴影槽），打包阴影可改写为`-1/-2`。`t2.xyz`存视空间的反向出光轴，`t2.w`为侧向底值，`t3.x`为宽瓣指数、`t3.w=1`为启用标志。普通点/聚/管光布局不变，无新增sampler；负类型才读取附加纹素。体积雾的现有光色uniform之w存指数，另加一个vec4数组存世界出光轴/底值；可见热芯和烟也用同一个角度函数。旧low点光降级仍只兑现总强度。门禁`FlareFlickerBrowserTest`覆盖最终像素变化、固定强度下的方向分布与关闭阴影时的方向性。
+
 `Script_FlareShadows` 的 `flareShadows` pass 位于 main 前；`SetSunShadowSource` 同时提供 LightRig。中档以上按 `preset.flareShadows` 启用，白盒不进入。原生深度相机不加入场景灯，保持蒙皮/镂空/破坏深度契约；线性深度打包进 `uClusterData` 的GPU保留行，CPU只更新元数据行，不增加PBR采样器。最多两槽、每帧一张更新，上一张图保存自己的世界矩阵。具体预算、有限视锥与体积雾边界见 [信号与照明效果](Data_FlareEffects.md)。门禁 `FlareShadowBrowserTest` 覆盖真实HDR遮挡、移动屋顶、双灯交替、相机移动与退出；共享簇光和帧图仍跑原门禁。

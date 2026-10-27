@@ -11,11 +11,21 @@ export const FLARE_EFFECTS = Object.freeze({
     descendMS:0, driftMS:1.2, swayM:0, lightColor:0xff2110, groundLux:0,
     candleCd:600, maxIntensity:600, lightRadiusM:110, exposeSight:1, adaptSight:1, smokeRate:0}),
   Illumination: Object.freeze({label:"白光伞降照明弹", kind:"illumination", physical:true, parachute:true,
+    opticalMotion:true,
     previewFromXM:-90,
     apexM:100, ascendS:4.515, igniteS:.25, burnS:20, fadeS:.7, adaptS:6,
     descendMS:2.4, driftMS:1.2, swayM:.16, swayPeriodS:3.2, lightColor:0xfff4df,
     groundLux:0, candleCd:90000, maxIntensity:90000, lightRadiusM:600,
     exposeSight:2.4, adaptSight:.72, smokeRate:0}),
+});
+
+// US Navy US3478687A (1969), background §1: descent oscillation causes
+// apparent flicker. The mechanism is sourced; these waveform/angle values are
+// a bounded visual reconstruction, NOT measured Type 95 specifications.
+export const FLARE_OPTICS=Object.freeze({
+  floor:.46,noiseHz:[.67,3.1,9.7],noiseWeight:[.22,.63,.15],dipHz:1.13,dipDepth:.18,settleBurnS:.18,
+  tiltXRad:.27,tiltZRad:.23,gustRad:.075,secondaryPeriodRatio:.81,
+  angularFloor:.35,angularPower:1.5,
 });
 
 // Editor framing only; ammunition dimensions and flight are unchanged.

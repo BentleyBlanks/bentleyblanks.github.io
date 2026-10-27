@@ -73,7 +73,8 @@
 import { Mulberry32, Clamp, Clamp01, SmoothStep } from "./Script_Noise.mjs";
 import { T } from "./Script_Text.mjs";
 import { FLARE_SFX, FLARE_DEFAULTS, FLARE_PRESETS } from "./Data_Flares.mjs";
-import { FLARE_EFFECTS, FLARE_ART } from "./Data_Tuning_FlareEffects.mjs";
+import { FLARE_EFFECTS, FLARE_ART, FLARE_OPTICS } from "./Data_Tuning_FlareEffects.mjs";
+import {FlareBurnModulation,SampleFlareAttitude} from './Script_FlareOptics.mjs';
 
 /** Absolute flight path: launch-relative altitude, never draped over terrain. */
 export function SampleFlarePosition(f,t) {
@@ -98,10 +99,11 @@ export function SampleFlarePosition(f,t) {
     y:f.groundY+FLARE_ART.launchHeight+f.apexM*(2*u-u*u)};
   const drag=f.parachute!==false?FLARE_ART.dragS:2.5,coast=drag*(1-Math.exp(-s/drag));
   const fall=f.parachute!==false?f.descendMS*(s-FLARE_ART.dragS*(1-Math.exp(-s/FLARE_ART.dragS))):.5*FLARE_ART.gravity*s*s;
-  const sway=f.parachute!==false?Math.sin(f.swayPhase+s*2*Math.PI/f.swayPeriodS)*f.swayM*SmoothStep(0,1,s):0;
-  return {x:f.at.x+(f.at.x-f.from.x)/f.ascendS*coast+Math.sin(f.driftDirRad)*f.driftMS*(s-coast)+sway,
-    z:f.at.z+(f.at.z-f.from.z)/f.ascendS*coast+Math.cos(f.driftDirRad)*f.driftMS*(s-coast),
-    y:f.groundY+FLARE_ART.launchHeight+f.apexM-fall};
+  const sway=f.parachute!==false&&!f.opticalMotion?Math.sin(f.swayPhase+s*2*Math.PI/f.swayPeriodS)*f.swayM*SmoothStep(0,1,s):0;
+  const offset=f.opticalMotion?SampleFlareAttitude(f,t).offset:{x:0,y:0,z:0};
+  return {x:f.at.x+(f.at.x-f.from.x)/f.ascendS*coast+Math.sin(f.driftDirRad)*f.driftMS*(s-coast)+sway+offset.x,
+    z:f.at.z+(f.at.z-f.from.z)/f.ascendS*coast+Math.cos(f.driftDirRad)*f.driftMS*(s-coast)+offset.z,
+    y:f.groundY+FLARE_ART.launchHeight+f.apexM-fall+offset.y};
 }
 
 /** First terrain intersection, solved once so realtime and absolute seeks agree. */
@@ -280,6 +282,7 @@ export class FlareDirector {
       label: String(cfg.label || T(cfg.labelKey || FLARE_DEFAULTS.labelKey)),
       from, at, groundY,
       physical:cfg.physical===true,parachute:cfg.parachute!==false,kind:cfg.kind||"illumination",
+      opticalMotion:cfg.opticalMotion===true,
       candleCd:Number.isFinite(cfg.candleCd)?Math.max(0,cfg.candleCd):null,
       apexM: Math.max(4, Num(cfg.apexM, FLARE_DEFAULTS.apexM)),
       ascendS, igniteS, burnS, fadeS, adaptS,
@@ -555,6 +558,7 @@ export class FlareDirector {
       flicker = this.Flicker(flare, t);
     }
     if(flare.launchObstructed)level=0;
+    flare.emission=flare.opticalMotion?{direction:SampleFlareAttitude(flare,t).direction,floor:FLARE_OPTICS.angularFloor,power:FLARE_OPTICS.angularPower}:null;
     flare.level = level;
     flare.brightness = level * flicker;
     flare.intensity = Math.min(flare.maxIntensity,
@@ -566,11 +570,13 @@ export class FlareDirector {
       intensity: flare.intensity,
       radius: flare.lightRadiusM,
       color: flare.lightColor,
+      emission:flare.emission,
     });
   }
 
   /** 两个频率叠出来的抖动。单频率是「呼吸」，两个才像在烧。 */
   Flicker(flare, t) {
+    if(flare.opticalMotion)return FlareBurnModulation(flare,t);
     const d = flare.flickerDepth;
     const a = Math.sin(t * flare.flickerLow + flare.flickerPhase);
     const c = Math.sin(t * flare.flickerHigh + flare.flickerPhase * 1.7);

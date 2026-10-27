@@ -373,13 +373,14 @@ export class LightRig {
    * 每帧 Remove+Add 会让 `seed`（抖动相位）与灯槽排序每帧重掷。
    * @returns {boolean} 这个句柄还在不在
    */
-  UpdateFire(handle, { position = null, intensity = null, radius = null, color = null } = {}) {
+  UpdateFire(handle, { position = null, intensity = null, radius = null, color = null, emission = undefined } = {}) {
     const state = this.fireSources.get(handle);
     if (!state) return false;
     if (position) state.position.set(position.x, position.y, position.z);
     if (intensity != null) state.base = Math.max(0, Number(intensity) || 0);
     if (radius != null) state.radius = Math.max(1, Number(radius) || state.radius);
     if (color != null) state.color.setHex(color);
+    if (emission !== undefined) state.emission=emission;
     return true;
   }
 
@@ -657,7 +658,7 @@ export class LightRig {
       cluster.AddPoint(
         state.position.x, state.position.y, state.position.z,
         color.r * k, color.g * k, color.b * k,
-        state.currentRadius, state.score, state.flareShadow ? state : null);
+        state.currentRadius, state.score, state.flareShadow ? state : null,state.emission);
     }
     if (this.clusterTier.spots) {
       for (const state of this.spotSources.values()) {

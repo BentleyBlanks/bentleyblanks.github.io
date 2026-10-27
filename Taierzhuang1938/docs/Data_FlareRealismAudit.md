@@ -71,3 +71,15 @@
 扩展门禁如实记录：`FirstLevelSkyGradeTest`旧版先在白天预设名单失败，在HEAD基线复现；本轮按已有清晰测试场契约更新名单、加入独立夜景隔离断言后，后续“ward's north bay is dim”仍失败，旧Sky+旧测试（仅修名单以到达该断言）同样复现。未更改房屋遮蔽实现或放宽其断言。`TextTest`缺13字，在干净主检出a1c0dc9a同样复现；本轮没有新增这些文案或改字体。两项不记全绿。`TextGatherCheck`与`HistoryLedgerCheck`通过。
 
 最终图与数据位于本地`tmp/FlareNight`，过程和基线日志位于`tmp/FlareRevision`；最终发布身份以部署核验为准。
+
+## 白光明暗起伏复核（2026-10-27）
+
+用户再次指出“特别稳定”。旧模型的87%–100%双正弦只有轻微全局变化，未把悬挂摆动与出光分布联动。已核美国海军US3478687A的摆动/可见闪烁记载；频带、幅度、宽瓣形状仍为视觉复原，不标成九五式实测。
+
+- 新绝对时间曲线与悬挂姿态共用固定种子；新纯规则门禁验证连续、有下限、不同弹不齐闪、往返回放、开燃衔接及无伞外壳隔离。
+- 实际渲染连续6秒：燃烧系数跨度约0.362；固定地面采样点的最终显示亮度跨度约53/255，0.2秒窗口内明暗变化均超过6/255，排除仅由逐渐下降变亮造成的假象。
+- 固定位置/光强、只反转摆角：左侧HDR由0.1566到0.2471，右侧由0.2042到0.3218（分别向该侧摆时增加）。关闭阴影仍保留方向性，证明不是整屏曝光或只抖动可见光芯。HDR/PBR、烟、热芯、空气使用共用角度函数；没有新增纹理采样器。
+- 已检查实际明/暗截图并录制6秒实机序列；DVIDS参考3–7秒另作连续帧亮度取样，但保留多光源、曝光未知、饱和与点亮过程的限制，不用其像素曲线冒充弹药物理测量。
+- `FlareTest`、`FlareFlickerTest`、`FlareSurfaceTest`、`FlareNightBrowserTest`、`FlareFlickerBrowserTest`、`FlareCameraBrowserTest`、完整`FlareEffectsBrowserTest`、`FlareShadowBrowserTest`、`FlareWorldBrowserTest`、`ClusteredLightsTest`、`VolumetricsTest`、`MotionVectorContractTest`通过；模块图、测试登记及史料链接检查通过。
+
+仅新白光预设启用此光学复原；信号星、旧导演和AI视距包络保留。low沿用点光降级，有强度变化但不承诺相同空间方向性。证据与视频只留本地`tmp/FlareFlicker`，此轮没有新增剧情、弹型或已确认滕县使用的断言。

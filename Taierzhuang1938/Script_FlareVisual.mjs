@@ -1,6 +1,7 @@
 // Shared absolute-time flare optics. Cloth is a reconstruction, not a measured cartridge.
 import * as THREE from 'three';
-import {FLARE_ART as A} from './Data_Tuning_FlareEffects.mjs';
+import {FLARE_ART as A,FLARE_OPTICS as O} from './Data_Tuning_FlareEffects.mjs';
+import {SampleFlareAttitude,FLARE_ANGULAR_GLSL} from './Script_FlareOptics.mjs';
 import {SampleFlarePosition} from './Script_Flare.mjs';
 
 const VERTEX=`varying vec2 vUv;varying float vAge;varying float vSeed;varying vec3 vWorld;
@@ -18,6 +19,8 @@ varying vec2 vUv;varying float vAge;varying float vSeed;varying vec3 vWorld;
 uniform vec3 tint;uniform vec3 ambient;uniform vec3 lightPosition;
 uniform float mode;uniform float clock;uniform float power;uniform float candle;uniform float scatter;
 uniform float opacityScale;
+uniform vec3 flameAxis;uniform float directional;
+${FLARE_ANGULAR_GLSL}
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1)),f.x),f.y);}
@@ -34,7 +37,8 @@ void main(){vec2 p=(vUv-.5)*2.;float r2=dot(p,p);if(r2>1.||vAge<0.)discard;
   float core=exp(-r2/radius2)*.0025/radius2*(.85+.15*n);
   float colored=1.-smoothstep(.05,.3,tint.g);
   vec3 flame=mix(tint,vec3(1),mix(.9,.006,colored));
-  gl_FragColor=vec4((flame*core+tint*tongue*.07)*power,1.);
+  float emission=directional>.5?FlareEmissionGain(flameAxis,normalize(cameraPosition-vWorld),${O.angularFloor},${O.angularPower}):1.;
+  gl_FragColor=vec4((flame*core+tint*tongue*.07)*power*emission,1.);
  }else if(mode>1.5){
   float heat=pow(max(0.,1.-vAge),1.8);
   gl_FragColor=vec4(mix(vec3(1.,.14,.01),vec3(1.,.8,.35),heat)*exp(-r2*12.)*heat*7.,1.);
@@ -43,7 +47,8 @@ void main(){vec2 p=(vUv-.5)*2.;float r2=dot(p,p);if(r2>1.||vAge<0.)discard;
   float n=fbm(q*3.5),edge=pow(max(0.,1.-r2),1.5);
   float density=edge*smoothstep(.18,.72,n)*smoothstep(0.,.08,vAge)*pow(1.-vAge,1.2);
   vec3 delta=vWorld-lightPosition;
-  vec3 incident=ambient+tint*candle*scatter/(dot(delta,delta)+4.);
+  float emission=directional>.5?FlareEmissionGain(flameAxis,normalize(delta),${O.angularFloor},${O.angularPower}):1.;
+  vec3 incident=ambient+tint*candle*scatter*emission/(dot(delta,delta)+4.);
   gl_FragColor=vec4(vec3(.46,.45,.42)*incident,1.-exp(-density*opacityScale));
  }
  #include <tonemapping_fragment>
@@ -70,7 +75,7 @@ function Cards(count,mode,color){
  const material=new THREE.ShaderMaterial({vertexShader:VERTEX,fragmentShader:FRAGMENT,
   uniforms:{tint:{value:new THREE.Color(color)},ambient:{value:new THREE.Color()},lightPosition:{value:new THREE.Vector3()},
     mode:{value:mode},clock:{value:0},power:{value:1},candle:{value:0},scatter:{value:A.smokeScatter},
-    flameAxis:{value:new THREE.Vector3(0,-1,0)},opacityScale:{value:A.smokeOpacity}},
+    flameAxis:{value:new THREE.Vector3(0,-1,0)},directional:{value:0},opacityScale:{value:A.smokeOpacity}},
   transparent:true,depthWrite:false,depthTest:true,blending:mode===1?THREE.NormalBlending:THREE.AdditiveBlending});
  const mesh=new THREE.InstancedMesh(geometry,material,count);mesh.frustumCulled=false;
  mesh.name=mode===0?'FlareRadiance':mode===1?'FlareSmoke':'FlareEmbers';return mesh;
@@ -191,10 +196,13 @@ export class FlareVisuals {
   head.material.uniforms.clock.value=t;
   head.material.uniforms.power.value=since>=0?Math.min(A.radianceMax,f.intensity*(f.parachute?A.radiancePerCd:A.signalRadiancePerCd)):0;
   const earlier=SampleFlarePosition(f,Math.max(0,t-.02)),axis=head.material.uniforms.flameAxis.value;
-  if(f.parachute)axis.set(0,-1,0);else axis.set(earlier.x-f.pos.x,earlier.y-f.pos.y,earlier.z-f.pos.z).normalize();
+  const attitude=SampleFlareAttitude(f,t);
+  if(f.opticalMotion)axis.copy(attitude.direction);else if(f.parachute)axis.set(0,-1,0);else axis.set(earlier.x-f.pos.x,earlier.y-f.pos.y,earlier.z-f.pos.z).normalize();
+  head.material.uniforms.directional.value=f.opticalMotion?1:0;
   Put(head,0,f.pos.x,f.pos.y,f.pos.z,A.glowSize,0);Flush(head);
   canopy.visible=f.parachute!==false&&!f.launchObstructed&&since>=0;
   canopy.position.set(f.pos.x,f.pos.y,f.pos.z);canopy.rotation.set(Math.sin(since*1.7)*.035*opened*(1-settle),0,Math.sin(since*2+f.swayPhase)*.055*opened*(1-settle));
+  if(f.opticalMotion)canopy.rotation.set(attitude.x,0,attitude.z);
   if(settle>0){normal.fromArray(f.landing.normal||[0,1,0]).normalize();landRotation.setFromUnitVectors(up,normal);canopy.quaternion.slerp(landRotation,settle);}
   if(canopy.visible)this.Cloth(item,f,opened,settle,fade);
   item.carrier.visible=f.physical&&f.parachute&&t<(f.carrierLanding?.t??0)+3;
@@ -210,6 +218,7 @@ export class FlareVisuals {
     item.carrier.material.opacity=1-Smooth((f.carrierLanding?.t??0)+2,(f.carrierLanding?.t??0)+3,t);
   }
   const u=smoke.material.uniforms;u.ambient.value.copy(this.ambient).add(this.sun.clone().multiplyScalar(.65));u.lightPosition.value.set(f.pos.x,f.pos.y,f.pos.z);u.candle.value=f.intensity;
+  u.flameAxis.value.copy(axis);u.directional.value=f.opticalMotion?1:0;
   for(let i=0;i<A.smokeCount;i++){
    const born=(Math.floor(t*A.smokeHz)-i)/A.smokeHz,age=t-born;
    const launch=born>=0&&born<.16;

@@ -54,6 +54,7 @@
 //     用 `sampler2D` 绑是未定义行为，多数驱动返回 0 → 全屏黑雾。
 
 import * as THREE from "three";
+import {FLARE_ANGULAR_GLSL} from './Script_FlareOptics.mjs';
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
 import { SUN_SHADOW_GLSL, BindSunShadowUniforms } from "./Script_Light.mjs";
 import { CSM_RAW_DEPTH } from "./Script_Csm.mjs";
@@ -266,6 +267,8 @@ uniform vec4 uFogVolumeTint[VOL_MAX_VOLUMES];   // rgb = 反照率色, w = 边�
 
 uniform vec4 uLightPos[VOL_MAX_LIGHTS];         // xyz = 世界位置, w = 半径（0 = 空槽）
 uniform vec4 uLightColor[VOL_MAX_LIGHTS];       // rgb = 色×强度, w = 保留
+uniform vec4 uLightEmission[VOL_MAX_LIGHTS];    // xyz = outward axis, w = angular floor
+${FLARE_ANGULAR_GLSL}
 
 uniform sampler2D uHistory;
 uniform mat4 uPrevViewProjection;
@@ -345,7 +348,8 @@ void main() {
     if (dist > range) continue;
     float window = clamp(1.0 - pow(dist / range, 4.0), 0.0, 1.0);
     float atten = window * window / dist2;
-    lightSum += uLightColor[i].rgb * (atten * VolPhase(dot(rayDir, toLight / dist)) * uMedium.w);
+    float emission=uLightColor[i].w>0.?FlareEmissionGain(uLightEmission[i].xyz,-toLight/dist,uLightEmission[i].w,uLightColor[i].w):1.;
+    lightSum += uLightColor[i].rgb * (atten * emission * VolPhase(dot(rayDir, toLight / dist)) * uMedium.w);
   }
 
   vec4 current = vec4(scatterAlbedo * lightSum, sigma);
@@ -762,6 +766,7 @@ export class VolumetricsPass {
       uFogVolumeTint: { value: new Float32Array(volumeSlots * 4) },
       uLightPos: { value: new Float32Array(lightSlots * 4) },
       uLightColor: { value: new Float32Array(lightSlots * 4) },
+      uLightEmission: { value: new Float32Array(lightSlots * 4) },
       uHistory: { value: null },
       uPrevViewProjection: { value: new THREE.Matrix4() },
       uHistoryWeight: { value: 0 },
@@ -1129,6 +1134,7 @@ export class VolumetricsPass {
     const U = this.uniformsInject;
     const pos = U.uLightPos.value;
     const color = U.uLightColor.value;
+    const emission=U.uLightEmission.value;emission.fill(0);
     pos.fill(0); color.fill(0);
     const rig = this.sunShadowRig;
     // 本帧的局部光取自哪一条路。**取证用，别当装饰**：三条退化路径长得都「有灯」，
@@ -1169,6 +1175,8 @@ export class VolumetricsPass {
         color[slot * 4] = c[0];
         color[slot * 4 + 1] = c[1];
         color[slot * 4 + 2] = c[2];
+        if(light.emission){const e=light.emission,d=e.direction;
+          emission[slot*4]=d.x;emission[slot*4+1]=d.y;emission[slot*4+2]=d.z;emission[slot*4+3]=e.floor;color[slot*4+3]=e.power;}
         slot += 1;
       }
       this.lightCount = slot;
