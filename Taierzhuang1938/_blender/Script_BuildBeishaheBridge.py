@@ -924,10 +924,15 @@ def Rebuild():
         obj.location = ToBlender((0, 0, side * SPEC["lengthM"] / 2))
         if side < 0:
             obj.rotation_euler[2] = math.pi
-    # Save source with packed images, then export only the actual bridge.
+    # Pack every used file image, including lazily loaded images where
+    # has_data is still false. Image.pack() reads the original bytes directly.
+    # Otherwise the exported GLB works but the saved .blend silently relies on
+    # paths in this worktree and loses its materials when moved.
     for im in bpy.data.images:
-        if im.source == "FILE" and im.has_data:
+        if im.source == "FILE" and im.users > 0:
             im.pack()
+            if not im.packed_file:
+                raise RuntimeError("Failed to pack source image: " + im.name)
     bpy.context.view_layer.objects.active = root
     bpy.ops.object.select_all(action="DESELECT")
     def SelectChildren(obj):

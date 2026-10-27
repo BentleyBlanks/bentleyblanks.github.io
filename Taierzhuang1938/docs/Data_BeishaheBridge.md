@@ -46,7 +46,7 @@ node scripts/Script_BlenderMcp.mjs stop --save
 node scripts/Script_BlenderMcp.mjs status --scan
 ```
 
-在任务独占worktree运行。脚本拒绝覆盖源目录以外的已打开工程，重新生成GLB及sidecar。钢面PBR重烘用 `_import/TextureBakes/Texture_BeishaheSteel.json`；换电脑先映射到保留的源图路径。
+在任务独占worktree运行。脚本拒绝覆盖源目录以外的已打开工程，重新生成GLB及sidecar；使用中的文件贴图即使尚未解码也会打包进 `.blend`。最终工程实际重开后核对18张贴图均已内嵌，14跨桥面均在；重烘GLB与已验收版本哈希一致。钢面PBR重烘用 `_import/TextureBakes/Texture_BeishaheSteel.json`；换电脑重新烘焙贴图时先映射到保留的源图路径。
 
 ## 验收
 
