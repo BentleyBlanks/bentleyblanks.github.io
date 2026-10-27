@@ -8,9 +8,9 @@
 
 `Model/Donkey/Model_Donkey.glb` 是 2026-10-22 按用户要求追加的纯驴版。只从 V3 工程的 `DonkeyEditable` 集合保留身体、眼、耳、鬃尾和轮廓短毛，移除木车、车辕、颈垫、全部套具、笼头与牵绳；不能仅删除 `CartRuntime`，因为原动物运行时网格也合并了套具。原驴车文件与源工程不覆盖。
 
-当前纯驴 V49 为身体／短毛／鬃毛三个导出网格、四个材质，共用 28 根骨骼；在 Three.js 中形成四个绘制网格。当前为 79,892 三角，实际登记以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准，保持 80,000 上限。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。六张无损 WebP 内嵌并有镜像。V30 的 79,992 三角及更早结果保留作历史对照。
+当前纯驴 V50 为身体／短毛／鬃毛三个导出网格、四个材质，共用 28 根骨骼；在 Three.js 中形成四个绘制网格。当前为 79,850 三角，实际登记以 [独立驴契约](../Model/Donkey/Data_Donkey.json) 为准，保持 80,000 上限。骨骼名称与层级保持兼容（未使用的 `DonkeyHitchPivot` 保留），仅带 `DonkeyWalk`（1.2 秒、步幅 0.68 m）和 `DonkeyIdle`（3 秒）。仍为米制 Y-up、-Z 朝前；行走按路程推进根节点。六张无损 WebP 内嵌并有镜像。V30 的 79,992 三角及更早结果保留作历史对照。
 
-当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261027/ReferenceFitV49HoofPigment/Scene_Donkey.blend`，其中打包图像、重建脚本及关节配方；`Data_Derivation.json` 记录父工程及冻结 V3 中间源的哈希、组件和拟合量测。原目录保留此前工程。重建命令：
+当前外置源为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Donkey/20261027/ReferenceFitV50ForearmBound/Scene_Donkey.blend`，其中打包图像、重建脚本及关节配方；`Data_Derivation.json` 记录父工程及冻结 V3 中间源的哈希、组件和拟合量测。原目录保留此前工程。重建命令：
 
 ```powershell
 node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
@@ -19,6 +19,14 @@ node Taierzhuang1938/_blender/Script_DonkeyRebuild.mjs
 此入口从 `ReferenceFitV4/Scene_DonkeyBeforeReferenceFit.blend` 的冻结纯驴 V3 中间源派生，经测量修形、重解动作、图集重烘、无损打包与实际 GLB 重导测蹄；结束时关闭自己的 Blender 实例。更早从驴车分离纯驴的配方仍在 `Script_DonkeyBake.py` / `Script_DonkeyRefine.py`。独立版的肩颈、头部、全身和行走实测留在外置 `Review/` 目录，本地交互页在 worktree 的 `tmp/Donkey/`。新增资产未布设到关卡。
 
 早期去掉笼头后的近景发现原装饰嘴缝离真实口鼻表面约 3–4 cm；当时将 30 顶点细管的五个截面贴回口鼻。V14 已以连续唇部与 21 截面嘴缝替换该旧做法，当前实际表面距离记录在派生契约；驴车版不改写。
+
+### 纯驴上前臂侧面厚度 V50（2026-10-27）
+
+实际侧向截面量测显示，约 0.574 m 高的上前臂厚度为原图约 129%，中下段则已接近参考。`Data_DonkeyForearmDepthV50.json` 保留当前截面及原图目标；`Script_DonkeyForearmDepth.py` 在既有关节和蹄部拟合后，按 75% 强度局部收薄，原图目标内缩 1.5 像素以留出毛缘。0.505–0.545 m 进入、0.605–0.645 m 消退，并按前腿归属平滑限定，保留原中心路径、正面宽度、高度、腿根和蹄点。
+
+首个静态修形在完整步态中暴露左上前臂同一片皮肤折回。`Script_DonkeyForearmBinding.py` 按新曲面边长对原边界权重作正值调和插值，保护原刚性锚点与外部绑定，再以紧凑平滑场渐回原权重，避免形成新的边界折痕；最多四权重，骨骼与动作不变。直接合并关节影响及无平滑过渡的试片均未采用。
+
+法线按局部映射逆转置更新，源表面核对闭合、位移与映射方向，实际 GLB 再验胸部、后腿及完整下半身动作。原图同尺度的正侧面对照与完整步态用于视觉验收；局部截面改善不代表整体造型已完全一致。
 
 ### 纯驴蹄形、原图底色与 UV 像素密度 V49（2026-10-27）
 
