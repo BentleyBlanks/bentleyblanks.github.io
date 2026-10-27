@@ -1,5 +1,5 @@
 // Absolute-time optical reconstruction: replay/seek never draws fresh randomness.
-import {FLARE_OPTICS as O,FLARE_ART as A} from './Data_Tuning_FlareEffects.mjs';
+import {FLARE_OPTICS as O,FLARE_ART as A,FLARE_PHOTOMETRY as P} from './Data_Tuning_FlareEffects.mjs';
 const Clamp=x=>Math.max(0,Math.min(1,x));
 const Smooth=x=>{x=Clamp(x);return x*x*x*(x*(x*6-15)+10);};
 function Hash(n,seed){const a=Math.sin(n*127.1+seed*311.7)*43758.5453123;return a-Math.floor(a);}
@@ -35,6 +35,13 @@ export function FlarePhotometricScale(hex){
  // source must not silently lose ~78% of its stated intensity to RGB tinting.
  const y=.2126*Linear((hex>>16)&255)+.7152*Linear((hex>>8)&255)+.0722*Linear(hex&255);
  const scale=y>1e-6?1/y:0;colorScale.set(hex,scale);return scale;
+}
+export function FlareCoreRadiance(f){
+ // Integral of exp(-r²/s²) over the billboard's emitting area. Candela is
+ // intensity, not surface luminance: L = I / projected emitting area (NIST).
+ // The shader applies pixel filtering first, then a half-float safety cap.
+ const area=Math.PI*P.coreRadiusSquared*A.glowSize*A.glowSize*.25;
+ return Math.max(0,f.intensity)*(f.photometricScale??1)*(f.sceneScale??1)/area;
 }
 export function SampleFlareAttitude(f,t){
  const s=Math.max(0,t-f.ignitedAt),open=Smooth(s/A.openingS);

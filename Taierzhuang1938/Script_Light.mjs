@@ -292,6 +292,7 @@ export class LightRig {
 
   /** 套用 SKY_PRESETS 里那一份光照参数。 */
   ApplyPreset(preset, sunDirection) {
+    this.flareSceneScale = preset.flareSceneScale ?? 1;
     this.sun.color.setHex(preset.lightColor);
     this.sun.intensity = preset.lightIntensity;
     // 全局 Probe 本身固定来源于通用 HDR；只按时段缩放，避免夜战仍吃正午亮度。

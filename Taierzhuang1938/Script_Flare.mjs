@@ -566,12 +566,14 @@ export class FlareDirector {
     flare.brightness = level * flicker;
     flare.intensity = Math.min(flare.maxIntensity,
       (flare.candleCd??flare.groundLux * flare.agl * flare.agl) * flare.brightness);
+    flare.sceneScale=flare.physical?(this.host.FlareSceneScale?.()??1):1;
     if(flare.visualHandle!==null)this.host.MoveVisual?.(flare.visualHandle,flare);
     if (flare.lightHandle === null) return;
     this.host.MoveLight?.(flare.lightHandle, {
       position: { ...flare.pos },
       intensity: flare.intensity,
       photometricScale:flare.photometricScale,
+      sceneScale:flare.sceneScale,
       temporalFlutter:flare.burnFlutter,
       temporalTime:flare.t,
       radius: flare.lightRadiusM,
@@ -832,6 +834,7 @@ export function MakeFlareHost(deps = {}) {
     return hit&&hit.fraction>1e-6?hit.point.y:floor;
   };
   return {
+    FlareSceneScale:()=>deps.lights?.flareSceneScale??1,
     BeginFlight:()=>deps.vfx?.flareSurfaces?.Refresh(),
     AddVisual:(flare)=>deps.vfx?.flareVisuals?.Add(flare,SurfaceHeight),
     MoveVisual:(handle,flare)=>deps.vfx?.flareVisuals?.Update(handle,flare),
@@ -852,7 +855,7 @@ export function MakeFlareHost(deps = {}) {
       intensity: spec.intensity, radius: spec.radius, color: spec.color,
       flicker: false, priority: spec.priority ?? 1.6, flareShadow:spec.flareShadow, autoSmoke:false,
     }) ?? null,
-    MoveLight: (handle, spec) => deps.lights?.UpdateFire(handle, {...spec,intensity:spec.intensity*(spec.photometricScale??1)}),
+    MoveLight: (handle, spec) => deps.lights?.UpdateFire(handle, {...spec,intensity:spec.intensity*(spec.photometricScale??1)*(spec.sceneScale??1)}),
     RemoveLight: (handle) => deps.lights?.RemoveFire(handle),
     // 烟：一条**很淡**的微烟迹。照明弹的烟在夜里几乎看不见，它的作用是给光球
     // 一条拖尾，让「它在往下飘」这件事读得出来 —— 所以 opacity 压得很低。

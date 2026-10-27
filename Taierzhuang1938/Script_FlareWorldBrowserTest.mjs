@@ -96,7 +96,31 @@ try{
  await Capture('RoofContact');console.log('ok real roof contact',JSON.stringify(roof));
  await page.evaluate(()=>{const g=Tengxian,f=g.flare.flares[0];g.Debug.ApplySky('overcast');g.post.exposurePass.transientWeight=0;g.post.exposurePass.RequestReset();g.flare.Update(0);FlareWorldPose([f.pos.x+1.3,f.pos.y+1.2,f.pos.z+1.5],[f.pos.x,f.pos.y,f.pos.z]);});
  await Capture('RoofContactDay');
+ // Actual street receivers, including a weak red source and simultaneous
+ // sources. Keep nominal cd separate from environment renderer units.
+ const signals=await page.evaluate(async()=>{
+  const g=Tengxian,T=await import('three');g.flare.Reset();g.Debug.ApplySky('firstLevelNight');g.post.SetTaaEnabled(false);
+  FlareWorldPose([210,1.8,-62],[235,3,-65]);
+  g.flare.LaunchFlare({preset:'SignalRed',from:{x:210,z:-62},at:{x:235,z:-65},driftMS:0});
+  for(let i=0;i<25;i++)g.flare.Update(.1);
+  const f=g.flare.flares[0],rt=g.post.targets.hdr;
+  const Read=()=>{g.StepFrames(4,0,true);const a=new Uint16Array(rt.width*Math.floor(rt.height/2)*4);g.renderer.readRenderTargetPixels(rt,0,0,rt.width,Math.floor(rt.height/2),a);return a;};
+  const on=Read(),move=g.flare.host.MoveLight;g.flare.host.MoveLight=()=>{};g.lights.UpdateFire(f.lightHandle,{intensity:0});g.lights.Update(0,0,g.camera.position);const off=Read();g.flare.host.MoveLight=move;g.flare.StepLight(f);
+  let redReceivers=0,redSum=0;for(let i=0;i<on.length;i+=4){const r=T.DataUtils.fromHalfFloat(on[i])-T.DataUtils.fromHalfFloat(off[i]),green=T.DataUtils.fromHalfFloat(on[i+1])-T.DataUtils.fromHalfFloat(off[i+1]);if(r>.001&&r>green*4){redReceivers++;redSum+=r;}}
+  const signalHeight=f.pos.y;
+  g.flare.LaunchFlare({preset:'Illumination',from:{x:210,z:-62},at:{x:245,z:-65},driftMS:0});
+  const excess=g.flare.LaunchFlare({preset:'SignalRed',from:{x:210,z:-62},at:{x:225,z:-74},driftMS:0});
+  for(const [i,flare] of g.flare.flares.entries()){flare.t=[3,7,5][i];g.flare.StepPhase(flare);g.flare.Place(flare,0);g.flare.StepLight(flare);}
+  g.post.SetTaaEnabled(true);g.StepFrames(30,0,true);
+  return {redReceivers,redSum,signalHeight,active:g.flare.flares.length,visuals:g.vfx.flareVisuals.items.size,excess,
+   phases:g.flare.flares.map(f=>f.flickerPhase),maps:g.post.flareShadowsPass.stats.maps,gl:g.renderer.getContext().getError()};
+ });
+ assert.ok(signals.redReceivers>100&&signals.redSum>1,'A high red signal must illuminate actual street surfaces: '+JSON.stringify(signals));
+ assert.equal(signals.active,2);assert.equal(signals.visuals,2);assert.equal(new Set(signals.phases).size,2);
+ assert.equal(signals.excess,null,'The existing two-active-flare budget must reject a third launch');
+ assert.ok(signals.maps<=2,'Multiple sources stay inside the bounded shadow atlas');assert.equal(signals.gl,0);
+ await Capture('StreetMultiple');console.log('ok street red and simultaneous sources',JSON.stringify(signals));
  const cleared=await page.evaluate(()=>{const g=Tengxian;g.flare.Reset();g.audio.Play=flareWorldData.originalPlay;return {visuals:g.vfx.flareVisuals.items.size,voices:flareWorldVoices.filter(v=>v.nodes.length>0).length,sight:g.flare.SightScale};});
  assert.deepEqual(cleared,{visuals:0,voices:0,sight:1});assert.deepEqual(errors,[]);
- await fs.writeFile(path.join(out,'Data_WorldReport.json'),JSON.stringify({setup,sound,roof,occlusion,cleared,errors},null,2));console.log('FlareWorldBrowserTest passed');
+ await fs.writeFile(path.join(out,'Data_WorldReport.json'),JSON.stringify({setup,sound,roof,occlusion,signals,cleared,errors},null,2));console.log('FlareWorldBrowserTest passed');
 }finally{await browser.close();server.close();}

@@ -31,6 +31,14 @@ export const FLARE_OPTICS=Object.freeze({
   angularFloor:.70,angularPower:1.2,
 });
 
+// Scene-unit calibration, not measured weather at Tengxian. Existing daylight
+// is authored in single-digit HDR units, while night is much closer to lux.
+// A common 1:10000 daylight conversion keeps cd, emitting luminance and smoke
+// in the same scene units without changing the authored sky or legacy lights.
+export const FLARE_PHOTOMETRY=Object.freeze({dayScale:.0001,nightScale:1,
+  // Two coincident active emitters must also fit the 65504 half-float target.
+  coreRadiusSquared:.0025,coreFraction:.9,radianceMax:28000});
+
 // Editor framing only; ammunition dimensions and flight are unchanged.
 export const FLARE_PREVIEW = Object.freeze({
   camera:"follow",farM:600,maxDistanceM:320,followDistanceM:9,
@@ -56,6 +64,8 @@ export const FLARE_ART = Object.freeze({
   candleRadius:.022, candleHeight:.16, candleLift:.045,
   glowSize:1.3, smokeCount:128, smokeHz:20, smokeLife:6,
   sparkCount:18, sparkHz:30, sparkLife:.55,
+  sparkLifeMin:.18,sparkSizeMin:.003,sparkSizeMax:.012,
+  sparkDragS:.22,sparkEjectMS:.7,sparkRadiance:18000,
   groundClearance:.006, surfaceRecheckM:.004, settleS:.9, groundHoldS:7, groundFadeS:2,
   clothContactProbeM:.35,
   foldedClothBaseM:.003,foldedClothWrinkleM:.006,
@@ -63,9 +73,6 @@ export const FLARE_ART = Object.freeze({
   maxFlightS:120, maxSpent:4,
   // Photometric approximations for smoke scattering and the housing-shielded cloth.
   smokeScatter:.00015, canopySelfLight:.000004, ambientFloor:.001,
-  // Renderer calibration, not ammunition measurements. Keep the hot core well
-  // above its lit surroundings; half-float-safe radiance, shared by game/editor.
-  radiancePerCd:.02,radianceMax:42000,signalRadiancePerCd:.2,
   smokeOpacity:.26,smokeRiseMS:.7,smokeDragS:.18,
 });
 
