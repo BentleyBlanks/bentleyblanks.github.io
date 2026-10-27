@@ -1,7 +1,7 @@
 {
   "asset": "NakajimaKi4",
-  "version": "20261023SurfaceV2",
-  "status": "SurfaceV2ReviewedAgainstSelectedTargets",
+  "version": "20261028ReferenceV48GameRelease",
+  "status": "Current iteration configured after technical acceptance; original photograph residuals retained",
   "selectedConfiguration": "Photo02's 141（中島製） Army Type94 landplane: bare wheels, two open cockpits, lateral exhaust collectors. Other photos provide shape corroboration only; this is not a claim of a proven production subtype or Tengxian deployment",
   "notion": "https://app.notion.com/p/40260335331c81ce8b26eb0e1cd6f9cb",
   "primaryManual": "https://dl.ndl.go.jp/pid/8815746",
@@ -34,7 +34,7 @@
     "gapAndStagger": "NDL canvas6, printed p.2: 翼間隔 approx1.595m, 喰違 approx0.4725m, 後退角0deg, 上反角4deg, 翼取付角 upper2deg/lower4deg, vertical fin left3deg40min. Canvas5 1580 mm is aerodynamic mean chord, 1240 mm is lower-wing chord, 2250 mm is wheel track. These separate columns were rechecked as full labeled crops before final geometry review.",
     "fuselage": "NDL canvases 64 and 68: frame stations, oval sections and aluminum monocoque skin",
     "tail": "NDL canvases 83 and 84: horizontal and vertical tail drawings",
-    "gear": "NDL canvas 96: divided landing gear and wheel drawing"
+    "gear": "NDL canvas86: main landing-gear structure and860mm wheel; canvases89–90: tail-skid installation. Canvas96 is the rudder-control mechanism."
   },
   "references": [
     {
@@ -45,7 +45,12 @@
     {
       "id": "Photo02",
       "url": "https://commons.wikimedia.org/wiki/File:Nakajima_Ki-4.jpg",
-      "role": "Primary three-quarter side silhouette, cowl vents, side paneling, cockpit shoulders, tail and undercarriage"
+      "role": "Primary three-quarter side silhouette, cowl vents, side paneling, cockpit shoulders, tail and undercarriage",
+      "sourceArchive": {
+        "url": "https://www.flickr.com/photos/sdasmarchives/7586032330",
+        "catalog": "01_00086146",
+        "relationship": "Same photographic scan, selected image is vertically cropped; does not independently establish weapon loading."
+      }
     },
     {
       "id": "Photo03",
@@ -67,7 +72,11 @@
     "Photos are same-type appearance references, not Tengxian field photographs. This asset does not establish Ki-4 participation in the Tengxian city assault.",
     "SurfaceV2 texture characterization uses explicitly inferred imagegen references and CC0 material analogues; it does not establish exact historical colors, wear or upholstery."
   ],
-  "sourceProject": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NakajimaKi4/SurfaceV2/Scene_NakajimaKi4.blend",
+  "sourceProject": {
+    "high": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ReferenceV48_GameRelease\\Scene_NakajimaKi4.blend",
+    "game": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ReferenceV48_GameRelease\\Game\\Scene_NakajimaKi4.blend",
+    "highExport": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ReferenceV48_GameRelease\\Exports\\Model_NakajimaKi4High.glb"
+  },
   "referenceArchive": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NakajimaKi4/References",
   "axes": "Source Blender X right, +Y nose, +Z up. Export glTF X right, Y up, -Z nose. Meters. Origin on centerline at ground datum.",
   "requiredPivots": [
@@ -78,7 +87,9 @@
     "Pivot_ElevatorLeft",
     "Pivot_ElevatorRight",
     "Pivot_AileronLeft",
-    "Pivot_AileronRight"
+    "Pivot_AileronRight",
+    "Pivot_ObserverYaw",
+    "Pivot_ObserverGunElevation"
   ],
   "surfaceEvidence": {
     "sameType": "SDASM 01_00086146 and original three monochrome photographs",
@@ -111,5 +122,1219 @@
       "url": "https://polyhaven.com/a/brown_leather",
       "role": "Rob Tuytel, CC0, 0.4m material sample; not Ki4 upholstery evidence"
     }
-  ]
+  ],
+  "workingReferenceCandidate": {
+    "version": "20261028ReferenceV48GameRelease",
+    "canonicalPromoted": true,
+    "referenceFidelityPassed": false,
+    "technicalAcceptancePassed": true,
+    "sourceSha256": "06868516a6fdfff77b4a69fd4be997e7a8d552e67ea022a2a4965ac5eb79af6b",
+    "runtimeSha256": "016a97cf37cfdd8505ab54180e06650ac69963351faf40e74fe3187d74750d91",
+    "review": "Data_ReferenceReview.json"
+  },
+  "previousWorkingReferenceCandidate": {
+    "version": "20261026ReferenceV30",
+    "status": "FreeCamber4AndActualMechanicalLoadStudy_WholeFidelityAndPbrPending",
+    "canonicalPromoted": false,
+    "stage": "gray",
+    "source": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NakajimaKi4/ReferenceV30/Scene_NakajimaKi4.blend",
+    "sourceSha256": "c8c55aa82304f5a7a3a69a1ac260fd0e9d9258629dfb8cc82ca3c3ff7c607532",
+    "grayRuntimeSha256": "ec318c6ca505426ab00e7c3d9e8e43eaf28a7972ad6ddd91785f1ca5afe796e0",
+    "triangles": 188792,
+    "meshes": 39,
+    "images": 37,
+    "hinges": 10,
+    "mainGearPrintedDatums": {
+      "obliqueSideBodyEyeSeparationM": 1.2,
+      "foreAxisDropM": 0.791,
+      "aftAxisDropM": 0.645,
+      "source": "NDL8815746 Canvas86; rigid streamlined V-leg and fittings inCanvas87",
+      "flightCamberDegrees": 4,
+      "flightCamberSource": "NDL8815746 Canvas86; explicitly flight state, not an approved photographed loaded pose"
+    },
+    "reconstructed": [
+      "Leg section width/thickness and lower web",
+      "Pin/plate sizes and attachment from the printed eyes to the inferred exterior skin"
+    ],
+    "remaining": [
+      "Photographed physical loading/park state and unresolved1194mm datum/140mm profile offset; source4deg free camber now authored",
+      "Whole primary shadows, remaining wing contour stations and supporting photographic cameras",
+      "New geometry material/UV/AO and all final source/runtime motion/integration checks",
+      "Canonical source/default/catalog/cache-bust and master/Pages delivery"
+    ],
+    "scope": "Local free-flight-camber4deg/nominal-length gray study. Actual mechanical load rig uses real body pins, V-frame, wheel, oleo and tire/shoe contact. All load/camera/sun trials unadopted; original source observations/tolerances retained. New material/AO and whole fidelity pending.",
+    "oleoPrintedComponentDimensions": {
+      "freeEyeSpanM": 1.0205,
+      "springFreeEnvelopeM": 0.2388,
+      "externalTubeLengthM": 0.4362,
+      "source": "NDL8815746 Canvas88, long tube shown with a drafting break"
+    },
+    "oleoReconstruction": {
+      "upperReferenceLineDegrees": 33,
+      "derivedFrontAxisDegrees": 57,
+      "fixedCarrierHalfspanM": 0.925,
+      "scope": "Axis direction interpreted perpendicular to the reference line. Carrier station, spring turns/radii, fork, shaft and concealed axle bores reconstructed for coherent assembly. Free component dimensions do not prove the photographed loaded/camber/park state."
+    },
+    "rivetGameDerivation": {
+      "heads": 1512,
+      "heightRings": 3,
+      "radialSides": 5,
+      "sourceRadialSides": 8,
+      "maxSurfaceErrorM": 0.0005349756102077663,
+      "perHeadAoUvRetained": true
+    },
+    "loadStudy": {
+      "script": "_blender/Script_NakajimaKi4LoadRig.mjs",
+      "loadedPoseAdopted": false,
+      "trueBodyEyeAxis": true,
+      "actualTireAndShoeGroundSupports": true,
+      "rigidExternalTube": true,
+      "springWireRadiusConserved": true,
+      "scope": "Mechanical QA rig only. A local forward-shadow improvement cannot approve failed tire/wing/body-shadow/clear-ground groups."
+    },
+    "hardwareMaterialStudy": {
+      "version": "20261027ReferenceV37",
+      "status": "HardwareAndTireOwnAoRepaired_SoleThicknessUvAndSeamsRepaired_WholeFidelityPending",
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ReferenceV37_Repacked\\Scene_NakajimaKi4.blend",
+      "sourceSha256": "563e95699bfa9b027608167cfe920a149332eec5e354a2bba803fb6e2bcd2e88",
+      "runtimeSha256": "c20cf7f8435afeadf3efce845a468f9749bfd97c509706069f937bfaf8a18f70",
+      "triangles": 188792,
+      "meshes": 43,
+      "images": 40,
+      "controls": 10,
+      "ownAoUvOverlapTexels": {
+        "high": 0,
+        "low": 0
+      },
+      "scope": "V34 hardware and V35 tyre repairs retained. Existing6mm sole evaluated geometry held, original editable plane/modifier guide retained;18 AO charts and physical-edge field filtering. Exact original geometry/primaryUV/normals; remaining legacy lowUV overlap/sampling, receiver AO and whole reference/motion pending.",
+      "tireAoRepair": {
+        "resolution": [
+          2048,
+          1024
+        ],
+        "parts": 2,
+        "actualTriangles": 1792,
+        "sourceReopenedRayProbes": 192,
+        "rms": [
+          0.007559639982350077,
+          0.007555085126219778
+        ],
+        "maxAbsolute": [
+          0.027908672887578145,
+          0.025260178226744756
+        ],
+        "overlapTexels": 0,
+        "coveredTexels": 1999872,
+        "cyclicSeamMaxAbs": 0.019944374234068696,
+        "geometryAndPrimaryUvUnchanged": true,
+        "originalImagePayloadsExact": 38
+      },
+      "soleAoRepair": {
+        "resolution": [
+          512,
+          512
+        ],
+        "evaluatedTriangles": 36,
+        "originalEditableGuide": true,
+        "sourceReopenedRays": 256,
+        "rms": 0.012427597778320995,
+        "maxAbsolute": 0.026356062572290284,
+        "oldRms": 0.3394822499876911,
+        "smoothEdgePairs": 36,
+        "actualPngSeamMax": 0.0030052739505964654,
+        "denseBoundaryMax": 0.0031753585569005427,
+        "packedPngSha256": "9d2591e9d690820f2e3fb6abcb8a08f99458f500c123cbf25e75fab49f404c1a",
+        "packedSourceReopened": true,
+        "allOpaqueHighAoImagesInteriorOverlap": 0,
+        "remainingLegacyGameAoOverlapTexels": 383
+      }
+    },
+    "mainGearPrintedMaterials": {
+      "mainVFrame": "No1 aluminium alloy",
+      "shockStrutTube": "Steel tube housing the shock absorber",
+      "source": "NDL8815746 Canvas10 paragraph53",
+      "finishScope": "Modern alloy grade, paint/coating, albedo and roughness unconfirmed"
+    },
+    "oleoConnectionEvidence": {
+      "bothEnds": "Universal joints",
+      "source": "Canvas10 paragraph54",
+      "axisScope": "57deg remains inferred;33deg reference is not a printed flight-axis angle"
+    },
+    "wingAngleReferenceEvidence": {
+      "upperDegrees": 2,
+      "lowerDegrees": 4,
+      "reference": "Thrust line; Canvas6 explicitly contrasts vertical-tail setting relative to body axis",
+      "bodyThrustParallelism": "Current inference, not newly confirmed"
+    },
+    "supportingViewRecheck": {
+      "sourceGeometry": "Actual V34; V35 geometry unchanged",
+      "freshRealContactRig": true,
+      "sourceObservationsUnchanged": true,
+      "photo03NativeWingMaxPx": 19.6468827043885,
+      "cameraOrLoadAdopted": false,
+      "thrustOrExteriorDiagnosticAdopted": false,
+      "scope": "Physical pinhole/current actual tyres and shoe contact still fail original independent groups. No inferred exterior depth or body/thrust change adopted."
+    },
+    "tailGeometryStudy": {
+      "version": "20261027ReferenceV38",
+      "status": "Printed307And330TailDatumGrayCandidate_WholeFidelityPending",
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ReferenceV38\\Scene_NakajimaKi4.blend",
+      "sourceSha256": "039d08ab88076bfae50301b12bb04aebb5b44de7b20153e6d225ef281554a529",
+      "runtimeGraySha256": "7cdcfba9090bd8008d71ec88a31cbe12f351184051b40459d8cb1a9f9774b625",
+      "highGraySha256": "d187d0b62b593fb57eb14045544e65ddbf84fd89956ef0b13d620908648bc3f0",
+      "printed": {
+        "eyeAboveBodyAxisM": 0.307,
+        "bodyPinSpanM": 0.33,
+        "sourceCanvas": 89,
+        "sourceUrl": "https://dl.ndl.go.jp/api/iiif/8815746/R0000089/full/full/0/default.jpg"
+      },
+      "parameters": {
+        "printedUpperEyeAboveAxisM": 0.307,
+        "printedBodyPinSpanM": 0.33,
+        "inferredAxisDegrees": 14.5,
+        "inferredUpperAftOffsetM": 0.07,
+        "inferredLowerBodyPinDropM": 0.36,
+        "inferredLinkAlongAxisM": 0.925,
+        "inferredLinkPinForeOffsetM": 0.04,
+        "nominalUpperEyeToMountEndM": 1.0,
+        "upperEyeBlenderM": [
+          0.0,
+          -3.115000009536743,
+          2.117000102996826
+        ],
+        "lowerMountBlenderM": [
+          0.0,
+          -3.365380048751831,
+          1.1488524675369263
+        ],
+        "lowerPinBlenderM": [
+          0.0,
+          -3.307875633239746,
+          1.2114481925964355
+        ],
+        "bodyAxisHeightM": 1.81,
+        "frame5BlenderYM": -3.045
+      },
+      "inferredScope": "Nominal14.5deg axis/70mm aft offset/360mm lower pin drop/40mm fore pin offset/925mm link station remain scan/assembly reconstruction;170mm study range is not a confirmed factory stroke.26deg30 is not confirmed free flight.",
+      "mechanicalNinePoseNativeChecked": true,
+      "newParts": 13,
+      "actualChangedTriangles": 960,
+      "unaffectedHighGameTriangles": 537892,
+      "old40ImagesExact": true,
+      "grayOnly": true,
+      "newPbrAoPending": true,
+      "defaultLoadOrCameraAdopted": false
+    },
+    "calibrationAudit20261027": {
+      "status": "CalibrationDiagnosticsCompleted_WholeModelNotAccepted_NoModelPromoted",
+      "canonicalPromoted": false,
+      "record": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\AnalysisV39\\Data_CameraCalibrationAudit.json",
+      "sourceObservationSha256": {
+        "ReferenceV25/Evidence/Data_Photo02VisibleWingArc.json": "8d73e6de154a655a73cf107a81ac72425289ac122c993078387f53965a8a7f0e",
+        "ReferenceV25/Evidence/Data_Photo02WheelArc.json": "e7b4983e1d7d1acddf33b4e72fbbd84a2427cd1ac17a11a34de0dc997cc7e51d",
+        "ReferenceV25/Evidence/Data_Photo02VisibleCowlArc.json": "4abf03c7c039af91448271333db319c3b56ff61a61f310c7ba321d92e02b10f0",
+        "ReferenceV25/Evidence/Data_Photo02BodyUpperContour.json": "a2b429d78e86248888bd9a49af4cbac39d51822ba634df313954b52cfb4592aa",
+        "ReferenceV25/Evidence/Data_Photo02BodyLowerContour.json": "fe9a3b0e1ac9b56676ed0df68728a2330ea94fc7f8a613da611fcf900a38c7a4",
+        "ReferenceV25/Evidence/Data_ObservedGroundShadowBoundary.json": "dc0a4d5205d48231d5dc779983a0107f8b8cddaba617805989d1ab7aae29ef27",
+        "ReferenceV19/Evidence/Data_HangarVerticalDiagnostic.json": "c047f25ec227dd643907de52bd7fac4b45f4c0e4486d3a4d6a0498b38001b7a4",
+        "ReferenceV25/Evidence/Data_Photo03SourceWingArc.json": "50725fd37a858c7354a4a25357819d36c1d6e2a8a0fbb43f1c47eb2074ec84f8",
+        "ReferenceV21/Evidence/Data_Photo03BodyEnvelopeReview.json": "9a706f66d6d4a93768965dcc98750566acc5689809b55c2fc379a65125b7f9e0",
+        "ReferenceV22/Evidence/Data_Photo03FreshConstraints.json": "1f77f50c1c1a385c386633809c62899181e4d7631f299f0f5024e7413aafcec5"
+      },
+      "baselineWingMaxPx": 18.551848288775886,
+      "twoPhotoSharedGeometryWingMaxPx": 8.51108000959806,
+      "twoPhotoPlusGroundWingMaxPx": 8.299504918525656,
+      "allGeometryGroupsWithinOriginalBounds": false,
+      "allGroundBoundaryGroupsWithinOriginalBounds": false,
+      "missingPrintedManualPages": [
+        10,
+        11,
+        12,
+        13
+      ],
+      "scope": "Every new shared-parameter result is a numerical reconstruction diagnostic. No source mesh, actual GLB, camera/load default or material was updated. No image warp or source uncertainty increase. Exact coherent source rebuild/reimport/native casters and held-out checks remain mandatory before model adoption."
+    },
+    "latestSourceBackedHighGray": {
+      "version": "20261028ReferenceV47AirframeJoint",
+      "stage": "WholeAirframeJointSource_ReferenceStillIncomplete",
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ReferenceV47_AirframeJoint\\Scene_NakajimaKi4.blend",
+      "sourceSha256": "a201fe342341ccd198f41e53b0bea3eb89c43979a83de3bac36d0f462a48b97c",
+      "pbrDiagnostic": "C:\\Users\\Bentl\\.codex\\worktrees\\0378\\bentleyblanks.github.io\\tmp\\NakajimaKi4\\ReferenceV47_AirframeJoint\\Model_NakajimaKi4HighPbr.glb",
+      "pbrDiagnosticSha256": "bbd1937b9d7f4a3919c42ec3ba920beafe7798ee5110484c272e217bfb4b9d41",
+      "highGray": "C:\\Users\\Bentl\\.codex\\worktrees\\0378\\bentleyblanks.github.io\\tmp\\NakajimaKi4\\ReferenceV47_AirframeJoint\\Model_NakajimaKi4HighGray.glb",
+      "highGraySha256": "deee27275e93e9664e560b620d76ecc4df01ad3e032006f15dbf906d3ac538a1",
+      "sourceMeshes": 928,
+      "sourcePackedImages": 42,
+      "retainedInputImages": 41,
+      "changedMeshesFromV46": 792,
+      "protectedOtherMeshes": 128,
+      "triangles": 354832,
+      "sourceReopenedChecked": true,
+      "actualHighGlb80MotionSamplesPassed": true,
+      "motionScope": "62 single-pivot and18 coupled finite samples; wheel static contacts excluded. Not a continuous sweep or low-model result.",
+      "sourceAndActualGlb9TailCombinationAnd24PropellerPhasesPassed": true,
+      "actualCowl252EngineComponentsIntersections": 0,
+      "newBladePbrCheckPassed": true,
+      "nativeReferenceMetrics": {
+        "Photo02": {
+          "wing": {
+            "maximumPx": 8.155612420856292,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "wheel": {
+            "maximumPx": 6.126524797851953,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 5,
+            "withinOriginalUncertainty": false
+          },
+          "cowl": {
+            "maximumPx": 11.333108787331872,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 12,
+            "withinOriginalUncertainty": true
+          },
+          "upper": {
+            "maximumPx": 2.6906202530745986,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": true
+          },
+          "lower": {
+            "maximumPx": 6.5084148662164125,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "finApex": {
+            "maximumPx": 4.233009579397958,
+            "pointNormPx": 4.949909362157444,
+            "originalUncertaintyPx": 5,
+            "withinOriginalUncertainty": true
+          },
+          "finLeft": {
+            "maximumPx": 6.053647152837868,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "tailUpper": {
+            "maximumPx": 9.501739725195534,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          },
+          "upperWingInteriorCoverage": {
+            "maximumPx": 1.877400540554594,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 2,
+            "withinOriginalUncertainty": true
+          }
+        },
+        "Photo03": {
+          "wing": {
+            "maximumPx": 9.145544204033797,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          },
+          "bodyLower": {
+            "maximumPx": 6.259088637698369,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "finLeft": {
+            "maximumPx": 6.104620290618811,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "farTyre": {
+            "maximumPx": 5.277875596551351,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 5,
+            "withinOriginalUncertainty": false
+          },
+          "frontCap": {
+            "maximumPx": 7.4029077397076435,
+            "pointNormPx": 10.41544761723991,
+            "originalUncertaintyPx": 10,
+            "withinOriginalUncertainty": false
+          },
+          "nearRim": {
+            "maximumPx": 4.700763453022773,
+            "pointNormPx": 4.956237019390647,
+            "originalUncertaintyPx": 5,
+            "withinOriginalUncertainty": true
+          },
+          "tailUpper": {
+            "maximumPx": 8.915717613598758,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          }
+        },
+        "Photo01": {
+          "wingUpper": {
+            "maximumPx": 7.082371981838833,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          },
+          "wingLower": {
+            "maximumPx": 6.871462302783527,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": true
+          },
+          "nearTyre": {
+            "maximumPx": 10.077640751267465,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 10,
+            "withinOriginalUncertainty": false
+          },
+          "farTyre": {
+            "maximumPx": 9.959707298435633,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 10,
+            "withinOriginalUncertainty": true
+          },
+          "nearRim": {
+            "maximumPx": 9.581891201609778,
+            "pointNormPx": 9.661501779836108,
+            "originalUncertaintyPx": 10,
+            "withinOriginalUncertainty": true
+          },
+          "opaqueWing": {
+            "maximumPx": 0,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 2,
+            "withinOriginalUncertainty": true
+          },
+          "tailArc": {
+            "maximumPx": 7.065215741800582,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          }
+        }
+      },
+      "full30PropellerMetrics": [
+        {
+          "reference": "Photo02",
+          "group": "visibleOuterBlade",
+          "maxPx": 4.874907482551467,
+          "rmsPx": 3.440768189939799,
+          "residualsPx": [
+            4.515212131346462,
+            1.1009620878462039,
+            3.4121398753219876,
+            3.472237957220376,
+            0.08395664858230957,
+            4.813692549768265,
+            3.761441378332866,
+            0.39966194871490107,
+            4.874907482551467
+          ],
+          "within5Px": true,
+          "numericParityMaximumDifference": 2.0936265174853474e-05
+        },
+        {
+          "reference": "Photo02",
+          "group": "visibleBladeLeftArc",
+          "maxPx": 4.792043331616526,
+          "rmsPx": 4.04110035255041,
+          "residualsPx": [
+            3.7777776501047615,
+            4.792043331616526,
+            4.397168803097585,
+            3.0646459091631177,
+            3.961064124665102
+          ],
+          "within5Px": true,
+          "numericParityMaximumDifference": 5.595856596585236e-05
+        },
+        {
+          "reference": "Photo03",
+          "group": "leftBlade",
+          "maxPx": 5.135228591729293,
+          "rmsPx": 3.1821820922512063,
+          "residualsPx": [
+            5.135228591729293,
+            2.5744290112723665,
+            0.397196291573349,
+            1.077168259497667,
+            5.133134903579774,
+            4.040678237502661,
+            1.1763789615686202,
+            1.6229378147830016
+          ],
+          "within5Px": false,
+          "numericParityMaximumDifference": 5.385539239899373e-05
+        },
+        {
+          "reference": "Photo03",
+          "group": "rightBlade",
+          "maxPx": 5.563048846853778,
+          "rmsPx": 4.013104237671703,
+          "residualsPx": [
+            3.8131508847005566,
+            1.2752181976375003,
+            5.018021390732804,
+            5.563048846853778,
+            3.1626169701188105,
+            1.7656129834014975,
+            5.2269639159534105
+          ],
+          "within5Px": false,
+          "numericParityMaximumDifference": 4.181696957061831e-05
+        },
+        {
+          "reference": "Photo03",
+          "group": "leftBladeTip",
+          "maxPx": 4.837171082337598,
+          "rmsPx": 4.837171082337598,
+          "residualsPx": [
+            4.837171082337598
+          ],
+          "within5Px": true,
+          "numericParityMaximumDifference": 2.7164350305142193e-05
+        }
+      ],
+      "fullTailLowerMeasured": [
+        {
+          "reference": "Photo02",
+          "elevatorDegrees": 16.913566789498912,
+          "lowerResidualsPx": [
+            6.29634107270499,
+            4.963775715410975,
+            6.849552338206649
+          ],
+          "lowerMaxPx": 6.849552338206649,
+          "lowerWithinOriginal7Px": true,
+          "numericParityPx": 1.018235116134747e-05
+        },
+        {
+          "reference": "Photo03",
+          "elevatorDegrees": 20.222670830530806,
+          "lowerResidualsPx": [
+            6.438806684858378,
+            2.969180582434433,
+            4.429576069183554
+          ],
+          "lowerMaxPx": 6.438806684858378,
+          "lowerWithinOriginal7Px": true,
+          "numericParityPx": 1.0140003041669843e-06
+        },
+        {
+          "reference": "Photo01",
+          "elevatorDegrees": 24.999999942711806,
+          "lowerResidualsPx": [
+            -2.625139591667562,
+            -7.123495793444363,
+            -2.1673709839532194,
+            0.9426301145720117
+          ],
+          "lowerMaxPx": 7.123495793444363,
+          "lowerWithinOriginal7Px": false,
+          "numericParityPx": 5.5820852367105545e-06
+        }
+      ],
+      "allReferenceGatesPassed": false,
+      "referenceFidelityPassed": false,
+      "canonicalPromoted": false,
+      "gameDerivativeReady": false,
+      "otherGeometryAoPending": true,
+      "referenceParametersSha256": "f40aef2a05f488d160fb3381770c84f2ab0c20c3d5e81aad93fbaab3fb192a04",
+      "reviewUrl": "http://127.0.0.1:8115/tmp/NakajimaKi4/ReferenceV47_AirframeJoint/index.html",
+      "rebuildScripts": [
+        "Script_NakajimaKi4AirframeUpdate.py",
+        "Script_NakajimaKi4PropellerBake.py",
+        "Script_NakajimaKi4PropellerSection.py",
+        "Script_NakajimaKi4PropellerAoCompose.py",
+        "Script_NakajimaKi4AirframeCheck.py",
+        "Script_NakajimaKi4AirframeMotion.py"
+      ],
+      "serviceApertureStatus": {
+        "state": "ActualSourceServiceAuditFailed",
+        "V46BlockedRays": 3,
+        "V47BlockedRays": 6,
+        "backingTriangleSamples": 952,
+        "blockingSkin": "Fuselage_Monocoque",
+        "diagnostic": "C:\\Users\\Bentl\\.codex\\worktrees\\0378\\bentleyblanks.github.io\\tmp\\NakajimaKi4\\ReferenceV47_AirframeJoint\\Evidence\\Data_ServiceBlockerDiagnostic.json",
+        "sourceNeverModifiedByDiagnostic": true,
+        "runtimeApertureAuditReached": false
+      },
+      "nativeShadowStatus": "CurrentFullTriangleGroundAndBodyShadowGatesFailed;SunTrialUnadopted"
+    },
+    "latestPbrAppearanceDiagnostic": {
+      "version": "20261028ReferenceV47AirframeJoint",
+      "sourceSha256": "a201fe342341ccd198f41e53b0bea3eb89c43979a83de3bac36d0f462a48b97c",
+      "exportSha256": "bbd1937b9d7f4a3919c42ec3ba920beafe7798ee5110484c272e217bfb4b9d41",
+      "freshPropellerAoOnly": true,
+      "otherGeometryAoNeutralizedForDiagnostic": true,
+      "referenceApproved": false,
+      "reviewUrl": "http://127.0.0.1:8115/tmp/NakajimaKi4/ReferenceV47_AirframeJoint/index.html"
+    },
+    "latestRubberEditableSource": {
+      "version": "20261027ReferenceV43RubberReflectance",
+      "geometryVersion": "20261027ReferenceV42ThreePhotoShapeGray",
+      "state": "IndependentV43RubberOnlyEditableSourceSaved_NotAircraftApproval",
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ReferenceV43_RubberReflectance\\Scene_NakajimaKi4.blend",
+      "sourceSha256": "352d0be61571ce955a4655239c681a73e1d006b2ab8209c445713da54100b8a9",
+      "diagnosticExportSha256": "34a730dd30c3b6564a0322652de56cc1a300aa4849cfa8c5b84483e2a47e116b",
+      "sourceMeshes": 928,
+      "sourcePackedImages": 41,
+      "retainedOriginalImages": 40,
+      "allSourceGeometryUvNormalsTransformsUnchangedFromV42": true,
+      "sourceReopenedChecked": true,
+      "exportGeometryAccessorsByteCompared": 5173,
+      "onlyMaterialChange": "Material_Ki4TireWeatheredRubber.baseColorTexture",
+      "meanLinearReflectance": 0.020041002693917,
+      "reflectanceHistoricallyInferred": true,
+      "actualThreePhotoDiagnosticRenderedWithoutErrors": true,
+      "sourceOriginalAoNodesRetained": true,
+      "revisedGeometryAoPending": true,
+      "referenceFidelityPassed": false,
+      "canonicalPromoted": false,
+      "reviewUrl": "http://127.0.0.1:8115/tmp/NakajimaKi4/ReferenceV42_ThreePhotoShape/index.html?appearance=rubbersource",
+      "rebuildScripts": [
+        "Taierzhuang1938/_blender/Script_NakajimaKi4RubberReflectance.py",
+        "Taierzhuang1938/_blender/Script_NakajimaKi4RubberExportStable.py",
+        "Taierzhuang1938/_blender/Script_NakajimaKi4RubberReflectanceCheck.py"
+      ]
+    },
+    "latestSourceBackedPropellerCandidate": {
+      "version": "20261028ReferenceV47AirframeJoint",
+      "stage": "WholeAirframeJointSource_ReferenceStillIncomplete",
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ReferenceV47_AirframeJoint\\Scene_NakajimaKi4.blend",
+      "sourceSha256": "a201fe342341ccd198f41e53b0bea3eb89c43979a83de3bac36d0f462a48b97c",
+      "pbrDiagnostic": "C:\\Users\\Bentl\\.codex\\worktrees\\0378\\bentleyblanks.github.io\\tmp\\NakajimaKi4\\ReferenceV47_AirframeJoint\\Model_NakajimaKi4HighPbr.glb",
+      "pbrDiagnosticSha256": "bbd1937b9d7f4a3919c42ec3ba920beafe7798ee5110484c272e217bfb4b9d41",
+      "highGray": "C:\\Users\\Bentl\\.codex\\worktrees\\0378\\bentleyblanks.github.io\\tmp\\NakajimaKi4\\ReferenceV47_AirframeJoint\\Model_NakajimaKi4HighGray.glb",
+      "highGraySha256": "deee27275e93e9664e560b620d76ecc4df01ad3e032006f15dbf906d3ac538a1",
+      "sourceMeshes": 928,
+      "sourcePackedImages": 42,
+      "retainedInputImages": 41,
+      "changedMeshesFromV46": 792,
+      "protectedOtherMeshes": 128,
+      "triangles": 354832,
+      "sourceReopenedChecked": true,
+      "actualHighGlb80MotionSamplesPassed": true,
+      "motionScope": "62 single-pivot and18 coupled finite samples; wheel static contacts excluded. Not a continuous sweep or low-model result.",
+      "sourceAndActualGlb9TailCombinationAnd24PropellerPhasesPassed": true,
+      "actualCowl252EngineComponentsIntersections": 0,
+      "newBladePbrCheckPassed": true,
+      "nativeReferenceMetrics": {
+        "Photo02": {
+          "wing": {
+            "maximumPx": 8.155612420856292,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "wheel": {
+            "maximumPx": 6.126524797851953,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 5,
+            "withinOriginalUncertainty": false
+          },
+          "cowl": {
+            "maximumPx": 11.333108787331872,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 12,
+            "withinOriginalUncertainty": true
+          },
+          "upper": {
+            "maximumPx": 2.6906202530745986,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": true
+          },
+          "lower": {
+            "maximumPx": 6.5084148662164125,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "finApex": {
+            "maximumPx": 4.233009579397958,
+            "pointNormPx": 4.949909362157444,
+            "originalUncertaintyPx": 5,
+            "withinOriginalUncertainty": true
+          },
+          "finLeft": {
+            "maximumPx": 6.053647152837868,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "tailUpper": {
+            "maximumPx": 9.501739725195534,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          },
+          "upperWingInteriorCoverage": {
+            "maximumPx": 1.877400540554594,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 2,
+            "withinOriginalUncertainty": true
+          }
+        },
+        "Photo03": {
+          "wing": {
+            "maximumPx": 9.145544204033797,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          },
+          "bodyLower": {
+            "maximumPx": 6.259088637698369,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "finLeft": {
+            "maximumPx": 6.104620290618811,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "farTyre": {
+            "maximumPx": 5.277875596551351,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 5,
+            "withinOriginalUncertainty": false
+          },
+          "frontCap": {
+            "maximumPx": 7.4029077397076435,
+            "pointNormPx": 10.41544761723991,
+            "originalUncertaintyPx": 10,
+            "withinOriginalUncertainty": false
+          },
+          "nearRim": {
+            "maximumPx": 4.700763453022773,
+            "pointNormPx": 4.956237019390647,
+            "originalUncertaintyPx": 5,
+            "withinOriginalUncertainty": true
+          },
+          "tailUpper": {
+            "maximumPx": 8.915717613598758,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          }
+        },
+        "Photo01": {
+          "wingUpper": {
+            "maximumPx": 7.082371981838833,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          },
+          "wingLower": {
+            "maximumPx": 6.871462302783527,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": true
+          },
+          "nearTyre": {
+            "maximumPx": 10.077640751267465,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 10,
+            "withinOriginalUncertainty": false
+          },
+          "farTyre": {
+            "maximumPx": 9.959707298435633,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 10,
+            "withinOriginalUncertainty": true
+          },
+          "nearRim": {
+            "maximumPx": 9.581891201609778,
+            "pointNormPx": 9.661501779836108,
+            "originalUncertaintyPx": 10,
+            "withinOriginalUncertainty": true
+          },
+          "opaqueWing": {
+            "maximumPx": 0,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 2,
+            "withinOriginalUncertainty": true
+          },
+          "tailArc": {
+            "maximumPx": 7.065215741800582,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          }
+        }
+      },
+      "full30PropellerMetrics": [
+        {
+          "reference": "Photo02",
+          "group": "visibleOuterBlade",
+          "maxPx": 4.874907482551467,
+          "rmsPx": 3.440768189939799,
+          "residualsPx": [
+            4.515212131346462,
+            1.1009620878462039,
+            3.4121398753219876,
+            3.472237957220376,
+            0.08395664858230957,
+            4.813692549768265,
+            3.761441378332866,
+            0.39966194871490107,
+            4.874907482551467
+          ],
+          "within5Px": true,
+          "numericParityMaximumDifference": 2.0936265174853474e-05
+        },
+        {
+          "reference": "Photo02",
+          "group": "visibleBladeLeftArc",
+          "maxPx": 4.792043331616526,
+          "rmsPx": 4.04110035255041,
+          "residualsPx": [
+            3.7777776501047615,
+            4.792043331616526,
+            4.397168803097585,
+            3.0646459091631177,
+            3.961064124665102
+          ],
+          "within5Px": true,
+          "numericParityMaximumDifference": 5.595856596585236e-05
+        },
+        {
+          "reference": "Photo03",
+          "group": "leftBlade",
+          "maxPx": 5.135228591729293,
+          "rmsPx": 3.1821820922512063,
+          "residualsPx": [
+            5.135228591729293,
+            2.5744290112723665,
+            0.397196291573349,
+            1.077168259497667,
+            5.133134903579774,
+            4.040678237502661,
+            1.1763789615686202,
+            1.6229378147830016
+          ],
+          "within5Px": false,
+          "numericParityMaximumDifference": 5.385539239899373e-05
+        },
+        {
+          "reference": "Photo03",
+          "group": "rightBlade",
+          "maxPx": 5.563048846853778,
+          "rmsPx": 4.013104237671703,
+          "residualsPx": [
+            3.8131508847005566,
+            1.2752181976375003,
+            5.018021390732804,
+            5.563048846853778,
+            3.1626169701188105,
+            1.7656129834014975,
+            5.2269639159534105
+          ],
+          "within5Px": false,
+          "numericParityMaximumDifference": 4.181696957061831e-05
+        },
+        {
+          "reference": "Photo03",
+          "group": "leftBladeTip",
+          "maxPx": 4.837171082337598,
+          "rmsPx": 4.837171082337598,
+          "residualsPx": [
+            4.837171082337598
+          ],
+          "within5Px": true,
+          "numericParityMaximumDifference": 2.7164350305142193e-05
+        }
+      ],
+      "fullTailLowerMeasured": [
+        {
+          "reference": "Photo02",
+          "elevatorDegrees": 16.913566789498912,
+          "lowerResidualsPx": [
+            6.29634107270499,
+            4.963775715410975,
+            6.849552338206649
+          ],
+          "lowerMaxPx": 6.849552338206649,
+          "lowerWithinOriginal7Px": true,
+          "numericParityPx": 1.018235116134747e-05
+        },
+        {
+          "reference": "Photo03",
+          "elevatorDegrees": 20.222670830530806,
+          "lowerResidualsPx": [
+            6.438806684858378,
+            2.969180582434433,
+            4.429576069183554
+          ],
+          "lowerMaxPx": 6.438806684858378,
+          "lowerWithinOriginal7Px": true,
+          "numericParityPx": 1.0140003041669843e-06
+        },
+        {
+          "reference": "Photo01",
+          "elevatorDegrees": 24.999999942711806,
+          "lowerResidualsPx": [
+            -2.625139591667562,
+            -7.123495793444363,
+            -2.1673709839532194,
+            0.9426301145720117
+          ],
+          "lowerMaxPx": 7.123495793444363,
+          "lowerWithinOriginal7Px": false,
+          "numericParityPx": 5.5820852367105545e-06
+        }
+      ],
+      "allReferenceGatesPassed": false,
+      "referenceFidelityPassed": false,
+      "canonicalPromoted": false,
+      "gameDerivativeReady": false,
+      "otherGeometryAoPending": true,
+      "referenceParametersSha256": "f40aef2a05f488d160fb3381770c84f2ab0c20c3d5e81aad93fbaab3fb192a04",
+      "reviewUrl": "http://127.0.0.1:8115/tmp/NakajimaKi4/ReferenceV47_AirframeJoint/index.html",
+      "rebuildScripts": [
+        "Script_NakajimaKi4AirframeUpdate.py",
+        "Script_NakajimaKi4PropellerBake.py",
+        "Script_NakajimaKi4PropellerSection.py",
+        "Script_NakajimaKi4PropellerAoCompose.py",
+        "Script_NakajimaKi4AirframeCheck.py",
+        "Script_NakajimaKi4AirframeMotion.py"
+      ],
+      "serviceApertureStatus": {
+        "state": "ActualSourceServiceAuditFailed",
+        "V46BlockedRays": 3,
+        "V47BlockedRays": 6,
+        "backingTriangleSamples": 952,
+        "blockingSkin": "Fuselage_Monocoque",
+        "diagnostic": "C:\\Users\\Bentl\\.codex\\worktrees\\0378\\bentleyblanks.github.io\\tmp\\NakajimaKi4\\ReferenceV47_AirframeJoint\\Evidence\\Data_ServiceBlockerDiagnostic.json",
+        "sourceNeverModifiedByDiagnostic": true,
+        "runtimeApertureAuditReached": false
+      },
+      "nativeShadowStatus": "CurrentFullTriangleGroundAndBodyShadowGatesFailed;SunTrialUnadopted"
+    },
+    "latestWholeAirframeCandidate": {
+      "version": "20261028ReferenceV47AirframeJoint",
+      "stage": "WholeAirframeJointSource_ReferenceStillIncomplete",
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ReferenceV47_AirframeJoint\\Scene_NakajimaKi4.blend",
+      "sourceSha256": "a201fe342341ccd198f41e53b0bea3eb89c43979a83de3bac36d0f462a48b97c",
+      "pbrDiagnostic": "C:\\Users\\Bentl\\.codex\\worktrees\\0378\\bentleyblanks.github.io\\tmp\\NakajimaKi4\\ReferenceV47_AirframeJoint\\Model_NakajimaKi4HighPbr.glb",
+      "pbrDiagnosticSha256": "bbd1937b9d7f4a3919c42ec3ba920beafe7798ee5110484c272e217bfb4b9d41",
+      "highGray": "C:\\Users\\Bentl\\.codex\\worktrees\\0378\\bentleyblanks.github.io\\tmp\\NakajimaKi4\\ReferenceV47_AirframeJoint\\Model_NakajimaKi4HighGray.glb",
+      "highGraySha256": "deee27275e93e9664e560b620d76ecc4df01ad3e032006f15dbf906d3ac538a1",
+      "sourceMeshes": 928,
+      "sourcePackedImages": 42,
+      "retainedInputImages": 41,
+      "changedMeshesFromV46": 792,
+      "protectedOtherMeshes": 128,
+      "triangles": 354832,
+      "sourceReopenedChecked": true,
+      "actualHighGlb80MotionSamplesPassed": true,
+      "motionScope": "62 single-pivot and18 coupled finite samples; wheel static contacts excluded. Not a continuous sweep or low-model result.",
+      "sourceAndActualGlb9TailCombinationAnd24PropellerPhasesPassed": true,
+      "actualCowl252EngineComponentsIntersections": 0,
+      "newBladePbrCheckPassed": true,
+      "nativeReferenceMetrics": {
+        "Photo02": {
+          "wing": {
+            "maximumPx": 8.155612420856292,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "wheel": {
+            "maximumPx": 6.126524797851953,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 5,
+            "withinOriginalUncertainty": false
+          },
+          "cowl": {
+            "maximumPx": 11.333108787331872,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 12,
+            "withinOriginalUncertainty": true
+          },
+          "upper": {
+            "maximumPx": 2.6906202530745986,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": true
+          },
+          "lower": {
+            "maximumPx": 6.5084148662164125,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "finApex": {
+            "maximumPx": 4.233009579397958,
+            "pointNormPx": 4.949909362157444,
+            "originalUncertaintyPx": 5,
+            "withinOriginalUncertainty": true
+          },
+          "finLeft": {
+            "maximumPx": 6.053647152837868,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "tailUpper": {
+            "maximumPx": 9.501739725195534,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          },
+          "upperWingInteriorCoverage": {
+            "maximumPx": 1.877400540554594,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 2,
+            "withinOriginalUncertainty": true
+          }
+        },
+        "Photo03": {
+          "wing": {
+            "maximumPx": 9.145544204033797,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          },
+          "bodyLower": {
+            "maximumPx": 6.259088637698369,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "finLeft": {
+            "maximumPx": 6.104620290618811,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 6,
+            "withinOriginalUncertainty": false
+          },
+          "farTyre": {
+            "maximumPx": 5.277875596551351,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 5,
+            "withinOriginalUncertainty": false
+          },
+          "frontCap": {
+            "maximumPx": 7.4029077397076435,
+            "pointNormPx": 10.41544761723991,
+            "originalUncertaintyPx": 10,
+            "withinOriginalUncertainty": false
+          },
+          "nearRim": {
+            "maximumPx": 4.700763453022773,
+            "pointNormPx": 4.956237019390647,
+            "originalUncertaintyPx": 5,
+            "withinOriginalUncertainty": true
+          },
+          "tailUpper": {
+            "maximumPx": 8.915717613598758,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          }
+        },
+        "Photo01": {
+          "wingUpper": {
+            "maximumPx": 7.082371981838833,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          },
+          "wingLower": {
+            "maximumPx": 6.871462302783527,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": true
+          },
+          "nearTyre": {
+            "maximumPx": 10.077640751267465,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 10,
+            "withinOriginalUncertainty": false
+          },
+          "farTyre": {
+            "maximumPx": 9.959707298435633,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 10,
+            "withinOriginalUncertainty": true
+          },
+          "nearRim": {
+            "maximumPx": 9.581891201609778,
+            "pointNormPx": 9.661501779836108,
+            "originalUncertaintyPx": 10,
+            "withinOriginalUncertainty": true
+          },
+          "opaqueWing": {
+            "maximumPx": 0,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 2,
+            "withinOriginalUncertainty": true
+          },
+          "tailArc": {
+            "maximumPx": 7.065215741800582,
+            "pointNormPx": null,
+            "originalUncertaintyPx": 7,
+            "withinOriginalUncertainty": false
+          }
+        }
+      },
+      "full30PropellerMetrics": [
+        {
+          "reference": "Photo02",
+          "group": "visibleOuterBlade",
+          "maxPx": 4.874907482551467,
+          "rmsPx": 3.440768189939799,
+          "residualsPx": [
+            4.515212131346462,
+            1.1009620878462039,
+            3.4121398753219876,
+            3.472237957220376,
+            0.08395664858230957,
+            4.813692549768265,
+            3.761441378332866,
+            0.39966194871490107,
+            4.874907482551467
+          ],
+          "within5Px": true,
+          "numericParityMaximumDifference": 2.0936265174853474e-05
+        },
+        {
+          "reference": "Photo02",
+          "group": "visibleBladeLeftArc",
+          "maxPx": 4.792043331616526,
+          "rmsPx": 4.04110035255041,
+          "residualsPx": [
+            3.7777776501047615,
+            4.792043331616526,
+            4.397168803097585,
+            3.0646459091631177,
+            3.961064124665102
+          ],
+          "within5Px": true,
+          "numericParityMaximumDifference": 5.595856596585236e-05
+        },
+        {
+          "reference": "Photo03",
+          "group": "leftBlade",
+          "maxPx": 5.135228591729293,
+          "rmsPx": 3.1821820922512063,
+          "residualsPx": [
+            5.135228591729293,
+            2.5744290112723665,
+            0.397196291573349,
+            1.077168259497667,
+            5.133134903579774,
+            4.040678237502661,
+            1.1763789615686202,
+            1.6229378147830016
+          ],
+          "within5Px": false,
+          "numericParityMaximumDifference": 5.385539239899373e-05
+        },
+        {
+          "reference": "Photo03",
+          "group": "rightBlade",
+          "maxPx": 5.563048846853778,
+          "rmsPx": 4.013104237671703,
+          "residualsPx": [
+            3.8131508847005566,
+            1.2752181976375003,
+            5.018021390732804,
+            5.563048846853778,
+            3.1626169701188105,
+            1.7656129834014975,
+            5.2269639159534105
+          ],
+          "within5Px": false,
+          "numericParityMaximumDifference": 4.181696957061831e-05
+        },
+        {
+          "reference": "Photo03",
+          "group": "leftBladeTip",
+          "maxPx": 4.837171082337598,
+          "rmsPx": 4.837171082337598,
+          "residualsPx": [
+            4.837171082337598
+          ],
+          "within5Px": true,
+          "numericParityMaximumDifference": 2.7164350305142193e-05
+        }
+      ],
+      "fullTailLowerMeasured": [
+        {
+          "reference": "Photo02",
+          "elevatorDegrees": 16.913566789498912,
+          "lowerResidualsPx": [
+            6.29634107270499,
+            4.963775715410975,
+            6.849552338206649
+          ],
+          "lowerMaxPx": 6.849552338206649,
+          "lowerWithinOriginal7Px": true,
+          "numericParityPx": 1.018235116134747e-05
+        },
+        {
+          "reference": "Photo03",
+          "elevatorDegrees": 20.222670830530806,
+          "lowerResidualsPx": [
+            6.438806684858378,
+            2.969180582434433,
+            4.429576069183554
+          ],
+          "lowerMaxPx": 6.438806684858378,
+          "lowerWithinOriginal7Px": true,
+          "numericParityPx": 1.0140003041669843e-06
+        },
+        {
+          "reference": "Photo01",
+          "elevatorDegrees": 24.999999942711806,
+          "lowerResidualsPx": [
+            -2.625139591667562,
+            -7.123495793444363,
+            -2.1673709839532194,
+            0.9426301145720117
+          ],
+          "lowerMaxPx": 7.123495793444363,
+          "lowerWithinOriginal7Px": false,
+          "numericParityPx": 5.5820852367105545e-06
+        }
+      ],
+      "allReferenceGatesPassed": false,
+      "referenceFidelityPassed": false,
+      "canonicalPromoted": false,
+      "gameDerivativeReady": false,
+      "otherGeometryAoPending": true,
+      "referenceParametersSha256": "f40aef2a05f488d160fb3381770c84f2ab0c20c3d5e81aad93fbaab3fb192a04",
+      "reviewUrl": "http://127.0.0.1:8115/tmp/NakajimaKi4/ReferenceV47_AirframeJoint/index.html",
+      "rebuildScripts": [
+        "Script_NakajimaKi4AirframeUpdate.py",
+        "Script_NakajimaKi4PropellerBake.py",
+        "Script_NakajimaKi4PropellerSection.py",
+        "Script_NakajimaKi4PropellerAoCompose.py",
+        "Script_NakajimaKi4AirframeCheck.py",
+        "Script_NakajimaKi4AirframeMotion.py"
+      ],
+      "serviceApertureStatus": {
+        "state": "ActualSourceServiceAuditFailed",
+        "V46BlockedRays": 3,
+        "V47BlockedRays": 6,
+        "backingTriangleSamples": 952,
+        "blockingSkin": "Fuselage_Monocoque",
+        "diagnostic": "C:\\Users\\Bentl\\.codex\\worktrees\\0378\\bentleyblanks.github.io\\tmp\\NakajimaKi4\\ReferenceV47_AirframeJoint\\Evidence\\Data_ServiceBlockerDiagnostic.json",
+        "sourceNeverModifiedByDiagnostic": true,
+        "runtimeApertureAuditReached": false
+      },
+      "nativeShadowStatus": "CurrentFullTriangleGroundAndBodyShadowGatesFailed;SunTrialUnadopted"
+    }
+  }
 }

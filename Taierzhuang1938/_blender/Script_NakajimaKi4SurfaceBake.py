@@ -3,12 +3,23 @@ The generated atlas supplies material grain, not baked illumination or geometry.
 Uniform grunge is deliberately avoided: each material has its own wear mechanism.
 Ordinary Python/NumPy/Pillow; run serially to respect the shared workstation RAM.
 """
-import os,pathlib,json,hashlib,math,gc
+import os,pathlib,json,hashlib,math,gc,ast,sys
 import numpy as np
 from PIL import Image,ImageDraw,ImageFilter,ImageFont
 
 repoRoot=pathlib.Path(__file__).resolve().parents[2]
 sourceRoot=pathlib.Path(os.environ.get('KI4_SOURCE_ROOT',r'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/NakajimaKi4/SurfaceV2'))
+geometryProfile=os.environ.get('KI4_GEOMETRY_PROFILE','ManualV3')
+assert geometryProfile in ['ManualV3','PhotoMountCandidateV4'], 'Unknown Ki4 geometry profile'
+observerFinish=os.environ.get('KI4_OBSERVER_FINISH','DarkSteel')
+assert observerFinish in ['DarkSteel','PaintedGray'], 'Unknown observer finish profile'
+fuselageSurfaceProfile=os.environ.get('KI4_FUSELAGE_SURFACE_PROFILE','LegacySurfaceV2')
+assert fuselageSurfaceProfile in ['LegacySurfaceV2','Photo02QuietRoughness']
+if fuselageSurfaceProfile=='Photo02QuietRoughness':assert geometryProfile=='ManualV3','The reviewed body map belongs to the retained full-length ManualV3 surface domain'
+quietRoughnessReviewedRgbSha256='64111b2ce75cca5803731a0e9dc5b2d7c5018ad0f3df72b70f50fbf8317a5726'
+bodyStartY=-3.82;bodyEndY=2.25-.548 if geometryProfile=='PhotoMountCandidateV4' else 2.58
+bodyLength=bodyEndY-bodyStartY
+sourceVersion='20261024PhotoMountCandidateV4' if geometryProfile=='PhotoMountCandidateV4' else os.environ.get('KI4_CANDIDATE_VERSION','20261025ReferenceV11')
 textureRoot=sourceRoot/'Textures';textureRoot.mkdir(parents=True,exist_ok=True)
 atlasPath=repoRoot/'Taierzhuang1938/_import/Source/NakajimaKi4/Texture_NakajimaKi4SurfaceAtlasV2.png'
 leatherRoot=atlasPath.parent/'Leather'
@@ -63,17 +74,21 @@ def Scratches(w,h,seed,count,domain,region=None,heading=0):
 def Marking(w,h):
     font=ImageFont.truetype(str(sourceRoot/'Fonts/NotoSansSC-Bold.otf'),60)
     g=Image.new('L',(1100,130));ImageDraw.Draw(g).text((8,8),'機番141（中島製）',font=font,fill=255)
-    g=g.crop(g.getbbox()).resize((int(w*.55/7.14),int(h*.055/(.34*.95)*1/(2*np.pi))),Image.Resampling.LANCZOS).transpose(Image.Transpose.FLIP_TOP_BOTTOM)
-    mask=Image.new('L',(w,h));cx=int(((-2.85+4.56)/7.14)*w);cy=int((1-1.9/(2*np.pi))*h);mask.paste(g,(cx-g.width//2,cy-g.height//2))
+    g=g.crop(g.getbbox()).resize((int(w*.55/bodyLength),int(h*.055/(.34*.95)*1/(2*np.pi))),Image.Resampling.LANCZOS).transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+    mask=Image.new('L',(w,h));cx=int(((-2.85-bodyStartY)/bodyLength)*w);cy=int((1-1.9/(2*np.pi))*h);mask.paste(g,(cx-g.width//2,cy-g.height//2))
     return np.asarray(mask,dtype=F)/255
 
 def Body(w,h,domain):
-    u=np.arange(w,dtype=F)[None,:]/w;v=1-np.arange(h,dtype=F)[:,None]/h;y=-4.56+u*7.14;theta=v*F(2*np.pi)
-    sample=SourceSample('Aluminum',w,h,domain,rollingAlongU=True);color=Recolor(sample,(.62,.635,.63),1.05);lum=Luma(sample);del sample
+    u=np.arange(w,dtype=F)[None,:]/w;v=1-np.arange(h,dtype=F)[:,None]/h;y=bodyStartY+u*bodyLength;theta=v*F(2*np.pi)
+    # Conductor base color is its normal-incidence reflectance, not a lit gray
+    # photograph. Filament's measured aluminum reference is sRGB .91,.92,.92.
+    # The lower rolled-skin target allows inferred oxide/handling patina; its
+    # condition is reconstruction, not measured historical Ki-4 reflectance.
+    sample=SourceSample('Aluminum',w,h,domain,rollingAlongU=True);color=Recolor(sample,(.86,.87,.86),.35);lum=Luma(sample);del sample
     broad=Noise(w,h,94,180);meso=Noise(w,h,95,22);fine=Noise(w,h,96,2)
-    height=meso*F(.000028)+fine*F(.000012);rough=np.full((h,w),.46,dtype=F)+meso*.10;metal=np.full((h,w),.88,dtype=F);ao=np.ones((h,w),dtype=F)
+    height=meso*F(.000028)+fine*F(.000012);rough=np.full((h,w),.46,dtype=F)+meso*.10;metal=np.full((h,w),.98,dtype=F);ao=np.ones((h,w),dtype=F)
     # Adjacent metal sheets: restrained variation, coherent rolling direction.
-    stations=[-4.56,-3.70,-3.05,-2.35,-1.55,-.70,.10,.90,1.65,2.30,2.58]
+    stations=sorted(set([bodyStartY,bodyEndY]+[v for v in [-3.605,-3.045,-2.430,-1.810,-1.295,-.165,.780,1.65,2.30] if bodyStartY<v<bodyEndY]))
     sectors=[0,.95,2.10,3.14,4.18,5.33,2*np.pi]
     panelTone=np.zeros((h,w),dtype=F);rng=np.random.default_rng(194)
     for k,(ya,yb) in enumerate(zip(stations,stations[1:])):
@@ -145,7 +160,7 @@ def Cowl(w,h,domain):
     sample=SourceSample('Cowl',w,h,domain);color=Recolor(sample,(.050,.056,.058),1.8);lum=Luma(sample);del sample
     meso=Noise(w,h,720,20);fine=Noise(w,h,721,2)
     grain=(lum-np.mean(lum))/max(F(.005),F(np.percentile(lum,95)-np.percentile(lum,5)))
-    height=grain*F(.000050)+fine*F(.000012);rough=np.full((h,w),.44,dtype=F)+grain*.10+meso*.06;metal=np.full((h,w),.025,dtype=F);ao=np.ones((h,w),dtype=F)
+    height=grain*F(.000030)+fine*F(.000008);rough=np.full((h,w),.32,dtype=F)+grain*.06+meso*.035;metal=np.full((h,w),.025,dtype=F);ao=np.ones((h,w),dtype=F)
     v=1-np.arange(h,dtype=F)[:,None]/h
     lips=np.exp(-((v-.480)/.0040)**2)+np.exp(-((v-.520)/.0035)**2)+np.exp(-((v-.024)/.0035)**2)
     breakup=Noise(w,h,722,3)+Noise(w,h,723,12)*.5
@@ -168,19 +183,20 @@ def Cowl(w,h,domain):
 
 def Other(name,w,h,domain):
     u=np.arange(w,dtype=F)[None,:]/w;v=1-np.arange(h,dtype=F)[:,None]/h
-    fine=Noise(w,h,800+len(recipes),2);meso=Noise(w,h,900+len(recipes),25)
+    materialIndex={'Aluminum':4,'EngineCast':5,'Steel':6,'Rubber':7,'Exhaust':8,'Leather':9}[name]
+    fine=Noise(w,h,800+materialIndex,2);meso=Noise(w,h,900+materialIndex,25)
     height=np.zeros((h,w),dtype=F);rough=np.full((h,w),.6,dtype=F);metal=np.zeros((h,w),dtype=F);ao=np.ones((h,w),dtype=F)
     if name=='Aluminum':
-        sample=SourceSample('Aluminum',w,h,domain);color=Recolor(sample,(.66,.68,.67),.55);del sample
-        metal[:]=.94;rough[:]=.34;height+=fine*F(.000020)+meso*F(.000035);rough+=meso*.035
+        sample=SourceSample('Aluminum',w,h,domain);color=Recolor(sample,(.91,.92,.92),.35);del sample
+        metal[:]=.98;rough[:]=.34;height+=fine*F(.000020)+meso*F(.000035);rough+=meso*.035
     elif name=='EngineCast':
         # Hikari museum close-ups show isotropic casting pores, not rolled-sheet
         # striations. Keep the cast grain separate from machined aluminum.
         cast=Noise(w,h,1006,1.2);patches=Noise(w,h,1007,90)
         pores=np.clip((-cast-.22)*3.2,0,1)
-        color=np.empty((h,w,3),dtype=F);color[:]=(.48,.485,.46)
+        color=np.empty((h,w,3),dtype=F);color[:]=(.78,.79,.76)
         color*=1+patches[:,:,None]*.10-pores[:,:,None]*.07
-        height+=cast*F(.000035)-pores*F(.000025);metal[:]=.82;rough[:]=.55
+        height+=cast*F(.000035)-pores*F(.000025);metal[:]=.96;rough[:]=.55
         rough+=meso*.13+pores*.14
         edge=np.exp(-((v-.05)/.08)**2)+np.exp(-((v-.95)/.08)**2)
         oil=np.clip((.45+Noise(w,h,1008,18))*edge*.24,0,.30)
@@ -207,16 +223,39 @@ def Other(name,w,h,domain):
         height+=meso*F(.000025)
     return color,height,rough,metal,ao
 
+def PaintedFrame(w,h,domain):
+    # Generic sprayed coating, selected for the photographed bright members.
+    # The monochrome photograph is not a historical color/coating measurement.
+    fine=Noise(w,h,1801,2.5);meso=Noise(w,h,1802,28)
+    color=np.empty((h,w,3),dtype=F);color[:]=(170/255,170/255,165/255);color+=meso[:,:,None]*F(.006)
+    height=fine*F(.000006)+meso*F(.000004)
+    rough=np.full((h,w),.48,dtype=F)+fine*F(.015)
+    return color,height,rough,np.zeros((h,w),dtype=F),np.ones((h,w),dtype=F)
+
 def Save(name,w,h,domain,kind):
     if kind=='Body':fields=Body(w,h,domain)
     elif kind=='Linen':fields=Fabric(w,h,domain)
     elif kind=='RibTape':fields=Fabric(w,h,domain,True)
     elif kind=='Cowl':fields=Cowl(w,h,domain)
+    elif kind=='PaintedFrame':fields=PaintedFrame(w,h,domain)
     else:fields=Other(kind,w,h,domain)
     color,height,rough,metal,ao=fields;del fields
-    record={'version':'20261023SurfaceV2','kind':kind,'size':[w,h],'uvDomainM':list(domain),'sourceAtlasSha256':hashlib.sha256(atlasPath.read_bytes()).hexdigest(),'channels':{}}
+    record={'version':sourceVersion,'kind':kind,'size':[w,h],'uvDomainM':list(domain),'sourceAtlasSha256':hashlib.sha256(atlasPath.read_bytes()).hexdigest(),'channels':{}}
+    if kind=='Body':record['fuselageSurfaceProfile']=fuselageSurfaceProfile
+    if kind=='PaintedFrame':
+        record['sourceAtlasSha256']=None
+        record['paintCalibration']={'method':'Procedural neutral coating fields','baseSrgb':[170/255,170/255,165/255],'roughness':.48,'metallic':0,'heightMicrometers':10,'scope':'Inferred Photo02 carriage finish; no historical paint or exact color measurement. No generated albedo atlas used for this set.'}
+    if kind in ['Body','Aluminum','EngineCast']:
+        record['conductorCalibration']={'source':'https://google.github.io/filament/Filament.md.html','table':'fNormalMetals','measuredAluminumReferenceSrgb':[.91,.92,.92],'targetSrgb':{'Body':[.86,.87,.86],'Aluminum':[.91,.92,.92],'EngineCast':[.78,.79,.76]}[kind],'scope':'Measured generic aluminum reference; inferred Ki-4 alloy condition, oxide and wear. No historical color measurement claimed.'}
     def Write(channel,a):
-        p=textureRoot/f'Texture_Ki4{name}{channel}.png';im=Image.fromarray((np.clip(a,0,1)*255+.5).astype('uint8'),'RGB');im.save(p,optimize=True)
+        p=textureRoot/f'Texture_Ki4{name}{channel}.png';rgb=(np.clip(a,0,1)*255+.5).astype('uint8')
+        if kind=='Body' and channel=='Orm' and fuselageSurfaceProfile=='Photo02QuietRoughness':
+            green=rgb[:,:,1].astype(np.float64);mean=float(green.mean());beforeStd=float(green.std())
+            rgb[:,:,1]=np.clip(np.rint(mean+(green-mean)*.25),0,255).astype('uint8')
+            fingerprint=hashlib.sha256(rgb.tobytes()).hexdigest()
+            assert fingerprint==quietRoughnessReviewedRgbSha256,'The actual body ORM must reproduce the two-light-reviewed numeric map'
+            record['roughnessContrast']={'factor':.25,'baselineMeanByte':mean,'resultMeanByte':float(rgb[:,:,1].mean()),'baselineStdByte':beforeStd,'resultStdByte':float(rgb[:,:,1].std()),'changedChannels':['G'],'reviewedDecodedRgbSha256':fingerprint,'scope':'Photo02 appearance reconstruction only. Preserve mean roughness and original AO/metallic bytes, all base/normal pixels and markings. Not a measured historical finish.'}
+        im=Image.fromarray(rgb,'RGB');im.save(p,optimize=True)
         record['channels'][channel]={'path':str(p),'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'bytes':p.stat().st_size}
     Write('Base',color);del color;gc.collect()
     gy,gx=np.gradient(height);nx=-gx/F(domain[0]/w);ny=gy/F(domain[1]/h);length=np.sqrt(nx*nx+ny*ny+1)
@@ -230,9 +269,65 @@ def Save(name,w,h,domain,kind):
     orm=np.empty((h,w,3),dtype=F);orm[:,:,0]=np.clip(ao,.55,1);orm[:,:,1]=np.clip(rough,.18,.98);orm[:,:,2]=np.clip(metal,0,1)
     Write('Orm',orm);del orm,rough,metal,ao;gc.collect();recipes[name]=record;print(name,w,h,flush=True)
 
-def Run():
+def TailFields(w,h,domain,ribs,seed):
+    sample=SourceSample('Linen',w,h,domain);lum=Luma(sample);color=Recolor(sample,(.53,.52,.475),.42);del sample
+    meso=Noise(w,h,seed,24);fine=Noise(w,h,seed+1,2)
+    height=(lum-np.mean(lum))*F(.00007)+fine*F(.000005)
+    rough=np.full((h,w),.64,dtype=F)+meso*.05;metal=np.full((h,w),.02,dtype=F);ao=np.ones((h,w),dtype=F)
+    u=np.arange(w,dtype=F)[None,:]/w*F(domain[0]);v=(1-np.arange(h,dtype=F)[:,None]/h)*F(domain[1])
+    distance=np.min(np.abs(u-np.asarray(ribs,dtype=F)[:,None,None]),axis=0)
+    tape=np.exp(-(distance/.0064)**8);edge=np.exp(-((distance-.0068)/.0010)**2)
+    rows=np.exp(-((distance-.0035)/.0012)**2);phase=np.sin(v*F(np.pi/.025))
+    thread=rows*np.exp(-(phase/.23)**2);puncture=rows*np.exp(-(phase/.11)**2)
+    height+=tape*F(.00055)-edge*F(.00004)+thread*F(.00012)-puncture*F(.00006)
+    color*=1-tape[:,:,None]*.045-edge[:,:,None]*.075-puncture[:,:,None]*.20
+    rough+=tape*.03+puncture*.06;ao-=edge*.08+puncture*.10
+    return color,height,rough,metal,ao
+
+def SaveTailAtlas():
+    # Two physical domains share one atlas; 16px edge gutters prevent either
+    # component's weave/rib pattern bleeding into the other through mipmapping.
+    w,h=4064,992;blocks={'Base':[],'Normal':[],'Orm':[]}
+    horizontalRibs=sorted([2.18+side*(.25+.14*k) for side in [-1,1] for k in range(14)])
+    parts=[('HorizontalTail',(4.36,1.60),horizontalRibs,1210),('VerticalTail',(1.8085,1.85),[.08,.28,.48,.68,.88,1.08,1.28,1.48,1.68],1220)]
+    for name,domain,ribs,seed in parts:
+        color,height,rough,metal,ao=TailFields(w,h,domain,ribs,seed)
+        gy,gx=np.gradient(height);nx=-gx/F(domain[0]/w);ny=gy/F(domain[1]/h);length=np.sqrt(nx*nx+ny*ny+1)
+        normal=np.stack([nx/length*.5+.5,ny/length*.5+.5,1/length*.5+.5],axis=2)
+        orm=np.stack([np.clip(ao,.55,1),np.clip(rough,.18,.98),metal],axis=2)
+        for channel,value in [('Base',color),('Normal',normal),('Orm',orm)]:
+            rgb=(np.clip(value,0,1)*255+.5).astype('uint8');blocks[channel].append(np.pad(rgb,((16,16),(16,16),(0,0)),mode='edge'))
+        del color,height,rough,metal,ao,normal,orm,gy,gx,nx,ny,length;gc.collect()
+    record={'version':sourceVersion,'kind':'TailFabricAtlas','size':[4096,2048],'uvDomainM':None,'sourceAtlasSha256':hashlib.sha256(atlasPath.read_bytes()).hexdigest(),'atlasParts':[{'name':name,'physicalDomainM':list(domain),'ribPositionsM':ribs,'innerPixelRect':[16,16+index*1024,4080,1008+index*1024]} for index,(name,domain,ribs,_) in enumerate(parts)],'channels':{}}
+    for channel,images in blocks.items():
+        path=textureRoot/f'Texture_Ki4TailFabric{channel}.png';Image.fromarray(np.concatenate(images,axis=0),'RGB').save(path,optimize=True)
+        record['channels'][channel]={'path':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'bytes':path.stat().st_size}
+    recipes['TailFabric']=record;print('TailFabric',4096,2048,flush=True)
+
+def RubberDomain():
+    profile=[(-.13,.22),(-.15,.30),(-.11,.39),(-.055,.43),(.055,.43),(.11,.39),(.15,.30),(.13,.22)]
+    return (2*math.pi*.43,sum(math.dist(first,last) for first,last in zip(profile,profile[1:])))
+
+def CowlDomain():
+    # Read the exact authoring section without importing bpy or executing it.
+    buildPath=repoRoot/'Taierzhuang1938/_blender/Script_NakajimaKi4Build.py'
+    tree=ast.parse(buildPath.read_text(encoding='utf8'))
+    node=next(n for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='cowlProfile' for t in n.targets))
+    profile=ast.literal_eval(node.value)
+    assert profile[0]==profile[-1] and min(r for _,r in profile)>0
+    return (2*math.pi*max(r for _,r in profile),sum(math.dist(a,b) for a,b in zip(profile,profile[1:])))
+
+def Run(fuselageOnly=False):
     assert atlasPath.exists(), 'Archive the generated albedo atlas before baking'
-    for args in [('Fuselage',4096,2048,(7.14,3.6),'Body'),('Linen',4096,2048,(6,2),'Linen'),('RibTape',512,1024,(.014,.20),'RibTape'),('Cowl',4096,2048,(4.5553,1.4256),'Cowl'),('Aluminum',1024,1024,(1.5,1.5),'Aluminum'),('EngineCast',1024,1024,(.5,.5),'EngineCast'),('Steel',1024,1024,(.5,.5),'Steel'),('Rubber',1024,1024,(2.70,.29),'Rubber'),('Exhaust',1024,1024,(1.5,.34),'Exhaust'),('Leather',1024,1024,(.4,.4),'Leather')]:Save(*args)
+    if fuselageOnly:
+        recipeFile=textureRoot/'Data_TextureRecipes.json';assert recipeFile.exists(),'A body-only update must retain the other existing material recipes'
+        recipes.update(json.loads(recipeFile.read_text(encoding='utf8')))
+        Save('Fuselage',4096,2048,(bodyLength,3.9),'Body')
+        recipeFile.write_text(json.dumps(recipes,indent=2),encoding='utf8')
+        return
+    for args in [('Fuselage',4096,2048,(bodyLength,3.9),'Body'),('Linen',4096,2048,(6,2),'Linen'),('RibTape',512,1024,(.014,.20),'RibTape'),('Cowl',4096,2048,CowlDomain(),'Cowl'),('Aluminum',1024,1024,(1.5,1.5),'Aluminum'),('EngineCast',1024,1024,(.5,.5),'EngineCast'),('Steel',1024,1024,(.5,.5),'Steel'),('Rubber',1024,1024,RubberDomain(),'Rubber'),('Exhaust',1024,1024,(1.5,.34),'Exhaust'),('Leather',1024,1024,(.4,.4),'Leather')]:Save(*args)
+    SaveTailAtlas()
+    if observerFinish=='PaintedGray':Save('PaintedFrame',1024,1024,(.5,.5),'PaintedFrame')
     (textureRoot/'Data_TextureRecipes.json').write_text(json.dumps(recipes,indent=2),encoding='utf8')
 
-if __name__=='__main__':Run()
+if __name__=='__main__':Run('--fuselage-only' in sys.argv)

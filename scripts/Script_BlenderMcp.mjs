@@ -216,6 +216,31 @@ function IsLiveBlender(pid) {
   return ProcessImageName(pid).toLowerCase() === "blender.exe";
 }
 
+// SO_REUSEADDR and concurrent worktree startups can let a recorded port belong
+// to a different Blender. A successful ping does not establish process identity.
+function ListenerPids(port) {
+  if (process.platform !== "win32") return null;
+  const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
+    `@(Get-NetTCPConnection -State Listen -LocalPort ${Number(port)} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique) -join ','`],
+  { encoding: "utf8", windowsHide: true });
+  if (result.status !== 0) return [];
+  return [...new Set((result.stdout || "").trim().split(",").map(Number).filter((pid) => Number.isInteger(pid) && pid > 0))];
+}
+
+function ListenerOwned(record) {
+  const owners = ListenerPids(record.port);
+  return owners === null || (owners.length === 1 && owners[0] === record.pid);
+}
+
+function RequireOwnedListener(record) {
+  if (!ListenerOwned(record)) throw new Error(`端口 ${record.port} 的监听 PID 与本任务记录 ${record.pid} 不匹配；没有发送命令。先 stop 本任务实例，再用独立 --port start`);
+}
+
+function GuardedCode(record, code) {
+  const encoded = Buffer.from(code, "utf8").toString("base64");
+  return `import os as _blenderOwnerOs, base64 as _blenderOwnerBase64\nassert _blenderOwnerOs.getpid() == ${record.pid}, 'Blender PID changed before command execution'\nexec(compile(_blenderOwnerBase64.b64decode('${encoded}').decode('utf8'), '<owned-blender-command>', 'exec'), globals())`;
+}
+
 function ListMachineBlenders() {
   const result = spawnSync(
     "tasklist",
@@ -562,7 +587,7 @@ async function CommandStart(opts) {
       const sameBlend = !blendPath || path.resolve(record.blend || "") === blendPath;
       const samePort = opts.flags.port === undefined || Number(opts.flags.port) === record.port;
       if (record.mode === "batch" || !sameBlend || !samePort) continue;
-      if (!(await Ping(record.port))) continue;
+      if (!ListenerOwned(record) || !(await Ping(record.port))) continue;
       return Report(opts, { action: "reused", ...record });
     }
   }
@@ -572,6 +597,7 @@ async function CommandStart(opts) {
     ? await PickPort(taken)
     : NumberFlag(opts.flags, "port", PORT_MIN);
   if (taken.has(port)) throw new Error(`端口 ${port} 已经被本 worktree 的另一个实例占着`);
+  if (!(await PortFree(port))) throw new Error(`端口 ${port} 已被其它进程占用；没有启动 Blender，请选其它 --port`);
 
   const exe = FindBlenderExe(opts.flags.blender);
   const bootstrap = WriteBootstrap();
@@ -616,7 +642,7 @@ async function CommandStart(opts) {
       DropInstance(record);
       throw new Error(`Blender（pid ${record.pid}）起来后又退出了；手动跑一次 "${exe}" --python "${bootstrap}" 看报错`);
     }
-    if (await Ping(port, 2000)) {
+    if (ListenerOwned(record) && await Ping(port, 2000)) {
       return Report(opts, { action: "started", ...record, readyMs: Date.now() - Date.parse(record.startedAt) });
     }
     await Sleep(1000);
@@ -631,7 +657,7 @@ async function CommandStatus(opts) {
   const rows = [];
   for (const record of records) {
     const alive = IsLiveBlender(record.pid);
-    const responsive = alive && record.mode !== "batch" ? await Ping(record.port) : false;
+    const responsive = alive && record.mode !== "batch" && ListenerOwned(record) ? await Ping(record.port) : false;
     rows.push({ ...record, alive, responsive });
   }
   const payload = { worktree: REPO_ROOT, stateDir: STATE_DIR, instances: rows };
@@ -660,10 +686,17 @@ async function CommandStatus(opts) {
 // ---------------------------------------------------------------- exec / call
 
 async function ResolveTargetPort(opts) {
-  if (opts.flags.port !== undefined) return NumberFlag(opts.flags, "port", PORT_MIN);
   const live = (await LiveInstances()).filter((record) => record.mode !== "batch");
+  if (opts.flags.port !== undefined) {
+    const port = NumberFlag(opts.flags, "port", PORT_MIN);
+    const record = live.find((item) => item.port === port);
+    if (!record) throw new Error(`端口 ${port} 没有本 worktree 的活实例记录`);
+    RequireOwnedListener(record);
+    return port;
+  }
   if (!live.length) throw new Error("本 worktree 没有活着的实例；先 start");
   if (live.length > 1) throw new Error(`本 worktree 有 ${live.length} 个实例（端口 ${live.map((r) => r.port).join(", ")}），用 --port 指定`);
+  RequireOwnedListener(live[0]);
   return live[0].port;
 }
 
@@ -715,8 +748,10 @@ async function CommandExec(opts) {
   if (!code.trim()) throw new Error("给过来的 Python 是空的");
 
   const port = await ResolveTargetPort(opts);
+  const record = (await LiveInstances()).find((item) => item.port === port && item.mode !== "batch");
+  if (!record) throw new Error(`端口 ${port} 的本任务实例记录已改变`);
   const timeoutMs = NumberFlag(opts.flags, "timeout", DEFAULT_CALL_TIMEOUT_SEC) * 1000;
-  const reply = await SendCompatibleCommand(port, { type: "execute_code", params: { code } }, timeoutMs);
+  const reply = await SendCompatibleCommand(port, { type: "execute_code", params: { code: GuardedCode(record, code) } }, timeoutMs);
   if (opts.flags.json) { console.log(JSON.stringify(reply, null, 2)); return reply.status === "success" ? 0 : 1; }
   if (reply.status !== "success") {
     console.error(`Blender 那头报错：${reply.message || JSON.stringify(reply)}`);
@@ -802,9 +837,21 @@ async function StopOne(record, opts) {
     return outcome;
   }
 
+  if (!ListenerOwned(record)) {
+    // Never send save/quit to a foreign listener. Only the recorded, verified
+    // blender.exe PID belongs to this task and may be terminated here.
+    KillTree(record.pid);
+    await Sleep(500);
+    const stillThere = IsLiveBlender(record.pid);
+    if (!stillThere) DropInstance(record);
+    outcome.steps.push("端口归属不匹配；未发送保存或退出 RPC，只终止本任务记录的进程树");
+    outcome.result = stillThere ? "stubborn" : "killed";
+    return outcome;
+  }
+
   if (opts.flags.save) {
     try {
-      await SendCompatibleCommand(record.port, { type: "execute_code", params: { code: SAVE_CODE } }, 120000);
+      await SendCompatibleCommand(record.port, { type: "execute_code", params: { code: GuardedCode(record, SAVE_CODE) } }, 120000);
       outcome.steps.push("已保存");
     } catch (error) {
       outcome.steps.push(`保存失败：${error.message}`);
@@ -816,7 +863,7 @@ async function StopOne(record, opts) {
   // 注意必须带窗口 temp_override：wm.quit_blender 的 exec 路径要在一个真实窗口上
   // 排退出事件，插件的定时器上下文里直接调有时候不落地（实测过一次 8s 没退）。
   try {
-    await SendCompatibleCommand(record.port, { type: "execute_code", params: { code: QUIT_CODE } }, 5000);
+    await SendCompatibleCommand(record.port, { type: "execute_code", params: { code: GuardedCode(record, QUIT_CODE) } }, 5000);
     outcome.steps.push("已请求退出");
   } catch {
     outcome.steps.push("已请求退出（无应答，符合预期）");

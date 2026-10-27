@@ -1,0 +1,48 @@
+{
+  "version": "20261028ReferenceV48GameRelease",
+  "highSource": {
+    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ReferenceV48_GameRelease\\Scene_NakajimaKi4.blend",
+    "sha256": "06868516a6fdfff77b4a69fd4be997e7a8d552e67ea022a2a4965ac5eb79af6b",
+    "packedImages": 42,
+    "reopened": true
+  },
+  "highExport": {
+    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ReferenceV48_GameRelease\\Exports\\Model_NakajimaKi4High.glb",
+    "sha256": "d9d28e92c798d4d99b47ed37b0355af3a098c51c94bcd5103fead36e292dbe45",
+    "bytes": 99046528,
+    "triangles": 358399,
+    "meshes": 928,
+    "images": 42
+  },
+  "gameSource": {
+    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ReferenceV48_GameRelease\\Game\\Scene_NakajimaKi4.blend",
+    "sha256": "75c53c9e3a5f7f66a2647e7c6b5bbbc0a80bbdfaad20d232d8ded20278362a2f",
+    "reopened": true,
+    "triangles": 179679,
+    "meshes": 40,
+    "packedImages": 43,
+    "pivots": 10
+  },
+  "runtime": {
+    "path": "Taierzhuang1938/Model/NakajimaKi4/Model_NakajimaKi4.glb",
+    "sha256": "016a97cf37cfdd8505ab54180e06650ac69963351faf40e74fe3187d74750d91",
+    "bytes": 96019756,
+    "triangles": 179679,
+    "meshes": 40,
+    "images": 43
+  },
+  "rebuildEntry": "node Taierzhuang1938/_blender/Script_RebuildNakajimaKi4.mjs",
+  "rebuildScope": "Game derivative from the finished editable high author. Each run creates isolated external source and ignored runtime directories; never automatically promotes canonical files.",
+  "steps": [
+    "Protected high source copy",
+    "Exact-cap low derivation within original error limits",
+    "Evaluated high fabric normal transfer",
+    "Current per-rigid-group metal AO",
+    "Static datum baking with exact face/corner normal provenance",
+    "Exact decoded image binding and PNG storage optimization",
+    "Saved source reopen and actual game 80-pose/aperture/cowl/normal checks",
+    "Independent high/game AO field check"
+  ],
+  "historicalScopeUnchanged": true,
+  "referenceFidelityPassed": false
+}

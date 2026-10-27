@@ -38,6 +38,7 @@
 import * as THREE from "three";
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { STRAW_SLEEPING_MAT_ASSETS } from "./Data_StrawSleepingMat.mjs";
+import { NAKAJIMA_KI4_ASSET } from "./Data_NakajimaKi4.mjs";
 import {
   BuildSink, EXTERNAL_SANDBAG_ASSET_IDS, EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
 } from "./Script_World.mjs";
@@ -233,6 +234,12 @@ function PackAssets(pack, table) {
 
 const ASSETS = Object.freeze({
   ...STRAW_SLEEPING_MAT_ASSETS,
+  [NAKAJIMA_KI4_ASSET.catalogId]: {
+    label: NAKAJIMA_KI4_ASSET.label, url: NAKAJIMA_KI4_ASSET.url,
+    tag: "prop", solid: false, category: "模型", projectUvs: false,
+    sourceLabel: "本项目参考复原 · 1937说明书 / Photo02 141 · 原生PBR与10个枢轴",
+    preciseBounds: true,
+  },
   // Library-only until explicitly placed. Keep native PBR and the complete
   // hierarchy: wheel pivots and rods are consumed by Script_TrainRig.mjs.
   trainReferenceLocomotive: {
@@ -583,7 +590,7 @@ function PrepareAsset(id, gltf) {
   node.scale.copy(source.scale);
   PrepareRuntimeUvs(node, spec);
   node.updateMatrixWorld(true);
-  const raw = new THREE.Box3().setFromObject(node);
+  const raw = new THREE.Box3().setFromObject(node, spec.preciseBounds === true);
   const shell = new THREE.Group();
   shell.name = `${id}_Grounded`;
   node.position.set(
@@ -593,7 +600,7 @@ function PrepareAsset(id, gltf) {
   );
   shell.add(node);
   shell.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(shell);
+  const box = new THREE.Box3().setFromObject(shell, spec.preciseBounds === true);
   const entry = {
     shell,
     // 归一化之后：底面贴 y=0、XZ 关于原点对称。半长与中心高度就是碰撞盒的全部参数。

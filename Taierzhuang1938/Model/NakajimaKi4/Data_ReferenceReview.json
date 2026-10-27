@@ -1,96 +1,116 @@
 {
-  "state": "ReviewedAgainstSelectedSurfaceTargetsWithDeclaredInference",
-  "version": "20261023SurfaceV2",
-  "runtimeSha256": "89d41a1d511fca777e142811b868cfdc992903555fc975ce868007b4a93bb5d1",
-  "mainReference": "Photo02 / Nakajima_Ki-4.jpg / 141（中島製）",
-  "camera": {
-    "azimuthRadians": 1.45,
-    "elevationRadians": -0.04,
-    "radiusM": 14.6,
-    "targetGltfM": [
-      0,
-      2,
-      0.4
-    ],
-    "lensRecovery": "Estimated alignment; original photographic lens parameters are not known",
-    "parkedPitchDegrees": 7.2
-  },
-  "reviewed": [
-    "All three original photographs actually viewed, including localized stencil and structure crops",
-    "Gray silhouette before UV/PBR; front/side/top and primary oblique comparison",
-    "Original manual dimensions and labels rechecked as paired labeled crops",
-    "Staggered sesquiplane, NACA M6 section, original incidence/dihedral/fin setting",
-    "Two open cockpit apertures, windscreen frames, ring mount and nine-cylinder radial",
-    "Bare divided gear, 2.25m wheel track, correctly independent wheel hubs",
-    "Upper38/lower23 rib numbering and denser outer rib sequence",
-    "Photo02 factory marking only; Photo01 alternative markings excluded",
-    "PBR material separation, localized wear/oxidation, no light baked into BaseColor",
-    "Actual GLB reopened; rigid hinge and combined surface tests; all real UI controls",
-    "Final exported V2 under broad studio lights and a separate grazing key; front/side/top, reference oblique and seven material macros",
-    "Decoded RGB equality for every pixel of all 30 current embedded PBR images, and material Base/Normal/ORM slot correspondence",
-    "V1 source and exact runtime preserved in ArchiveV1 before promotion"
-  ],
-  "knownUnaddressedVisibleDefects": [],
-  "inferenceIsNotProof": [
-    "Exact paint hue, micro-weathering and hidden cockpit/engine details",
-    "Prefix and letterform reconstruction of the small factory stencil",
-    "Exact unreadable inner rib intervals and hidden control-hinge recess hardware"
-  ],
-  "evidenceLocal": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\SurfaceV2\\Evidence",
-  "reviewedAt": "2026-10-24",
-  "reviewedBy": "Codex self-review; no user approval is asserted",
-  "surfaceComparisons": [
+  "state": "CurrentIterationConfiguredAfterTechnicalAcceptance_ReferenceResidualsRetained",
+  "version": "20261028ReferenceV48GameRelease",
+  "runtimeSha256": "016a97cf37cfdd8505ab54180e06650ac69963351faf40e74fe3187d74750d91",
+  "date": "2026-10-28",
+  "userDirection": "这一版做完了没有大问题 就差不多可以收尾提交 先配置进去了",
+  "scope": "Configure the current iteration after major technical checks. This is not a claim that every original photograph/shadow gate passed.",
+  "referenceFidelityPassed": false,
+  "originalThresholdsUnchanged": true,
+  "residualMetricsFromV47HighReferenceChecks": [
     {
-      "surface": "Aluminum skin",
-      "target": "Generated ALUMINUM SKIN macro, historical photo panel placement",
-      "observed": "Longitudinal rolling grain, crossed hairline contact scratches, restrained sheet reflectance differences, recessed seams and shallow flush heads; removed periodic barrel banding",
-      "views": [
-        "MetalMacro",
-        "MetalMacroRake"
-      ]
+      "photo": "Photo02",
+      "feature": "wing edge",
+      "maximumPx": 8.156,
+      "originalLimitPx": 6,
+      "passed": false
     },
     {
-      "surface": "Silver-doped linen and rib tape",
-      "target": "Generated DOPED LINEN macro, original manual rib layout",
-      "observed": "Sealed fine weave, warm silver dope, irregular shallow tension creases confined to rib bays, raised tape and paired 25mm-pitch stitch/puncture relief. Relief is visibly tested under a key above the wing plane",
-      "views": [
-        "StitchMacro",
-        "StitchMacroRake",
-        "StitchClose"
-      ]
+      "photo": "Photo02",
+      "feature": "wheel edge",
+      "maximumPx": 6.127,
+      "originalLimitPx": 5,
+      "passed": false
     },
     {
-      "surface": "Dark cowl enamel",
-      "target": "Generated COWL / ENGINE macro",
-      "observed": "Satin enamel specular response, fine orange peel, sparse small chips, coherent rolled-lip wear and service-fastener rubbing; color/roughness/metal/relief masks aligned",
-      "views": [
-        "CowlMacro",
-        "CowlMacroRake"
-      ]
+      "photo": "Photo02",
+      "feature": "lower body",
+      "maximumPx": 6.508,
+      "originalLimitPx": 6,
+      "passed": false
     },
     {
-      "surface": "Engine metal and exhaust",
-      "target": "TTTNIS Hikari3 photos and generated COWL / ENGINE macro",
-      "observed": "Isotropic cast grain separate from machined metal, 24 cooling fins per cylinder, localized oil/oxide; exhaust unfolds by arc length with granular heat oxidation and outlet soot",
-      "views": [
-        "EngineMacro",
-        "EngineMacroRake",
-        "ExhaustMacro",
-        "ExhaustMacroRake"
-      ]
+      "photo": "Photo02",
+      "feature": "upper tail",
+      "maximumPx": 9.502,
+      "originalLimitPx": 7,
+      "passed": false
     },
     {
-      "surface": "Leather and rubber",
-      "target": "CC0 brown_leather at 0.4m, historical photo tire character",
-      "observed": "Measured leather pores and creases on physical coaming/seat UVs; fine matte rubber, molding lines and restrained dust",
-      "views": [
-        "LeatherMacro",
-        "RubberMacro"
-      ]
+      "photo": "Photo03",
+      "feature": "wing edge",
+      "maximumPx": 9.146,
+      "originalLimitPx": 7,
+      "passed": false
+    },
+    {
+      "photo": "Photo03",
+      "feature": "lower body",
+      "maximumPx": 6.259,
+      "originalLimitPx": 6,
+      "passed": false
+    },
+    {
+      "photo": "Photo03",
+      "feature": "upper tail",
+      "maximumPx": 8.916,
+      "originalLimitPx": 7,
+      "passed": false
+    },
+    {
+      "photo": "Photo03",
+      "feature": "propeller arc",
+      "maximumPx": 5.563,
+      "originalLimitPx": 5,
+      "passed": false
+    },
+    {
+      "photo": "Photo01",
+      "feature": "upper tail",
+      "maximumPx": 7.065,
+      "originalLimitPx": 7,
+      "passed": false
+    },
+    {
+      "photo": "Photo01",
+      "feature": "lower tail",
+      "maximumPx": 7.123,
+      "originalLimitPx": 7,
+      "passed": false
+    },
+    {
+      "photo": "Photo02",
+      "feature": "independent body shadow boundary",
+      "maximumPx": 10.393,
+      "originalLimitPx": 6,
+      "passed": false
     }
   ],
-  "comparisonLimits": [
-    "Generated sheet is a declared material reconstruction. Original manual and monochrome photos remain geometric authority.",
-    "Lighting response and feature scale are compared across views; this is not a claim of exact historical color, wear location or photographic pixel equality."
-  ]
+  "technicalAcceptance": {
+    "triangles": 179679,
+    "triangleCeiling": 180000,
+    "meshes": 40,
+    "images": 43,
+    "realPivots": 10,
+    "actualGameMotionSamples": 80,
+    "trueMotionTriangleIntersections": 0,
+    "serviceApertures": 10,
+    "sourceClearExitRaysRetained": 642,
+    "smoothHingeNormalSamples": 176,
+    "smoothHingeNormalMaxDegrees": 1.9732537443315832,
+    "savedLowToRuntimeNormalMaxDegrees": 0.035663122863758445,
+    "decodedImagesMatchBake": true,
+    "browser": {
+      "pageErrors": [],
+      "actualLoaderAndControlsChecked": true
+    }
+  },
+  "inferenceIsNotProof": [
+    "Unprinted curves and installation details",
+    "Exact paint, alloy condition, wear and hidden structure",
+    "Factory control travel limits",
+    "Ki-4 participation in the Tengxian assault"
+  ],
+  "localEvidence": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ReferenceV48_GameRelease\\Evidence",
+  "previousCanonicalArchive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\NakajimaKi4\\ArchiveSurfaceV2BeforeV48"
 }

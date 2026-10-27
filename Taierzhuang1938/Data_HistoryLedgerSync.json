@@ -111,8 +111,33 @@
           "lastEdited": "2026-10-23T18:17:02.127Z"
         }
       ],
-      "runtimeSha256": "89d41a1d511fca777e142811b868cfdc992903555fc975ce868007b4a93bb5d1",
-      "reviewScopeNote": "Ki4 material-related rows and source page only. Global review anchor and unrelated Notion/page-source stamps are unchanged."
+      "runtimeSha256": "016a97cf37cfdd8505ab54180e06650ac69963351faf40e74fe3187d74750d91",
+      "reviewScopeNote": "Ki4 material-related rows and source page only. Global review anchor and unrelated Notion/page-source stamps are unchanged.",
+      "latestReferenceIteration": {
+        "date": "2026-10-26",
+        "version": "ReferenceV30",
+        "status": "FreeCamber4MechanicalLoadGrayOnly_NotCanonicalOrFidelityApproved",
+        "sourcePage": "40260335331c81ce8b26eb0e1cd6f9cb",
+        "lastEdited": "2026-10-26T18:29:51.504Z",
+        "scope": "Canvas86 flight4deg camber and actual body-eye mechanical load rig. No loaded stance/camera/light adopted; component reconstruction remains inferred. Existing same-type/inferred appearance and unconfirmed Tengxian participation unchanged.",
+        "hardwareMaterialStudy": {
+          "version": "ReferenceV37",
+          "status": "Hardware_TireAndSoleAoRepaired_WholePending",
+          "scope": "Local appearance/AO workflow only; technical thickness remains inferred. Saved packed40-image source and actual high/game fields checked. Historical categories and unconfirmed Tengxian participation unchanged."
+        },
+        "tailGeometryStudy": {
+          "version": "ReferenceV38",
+          "status": "307And330DrawingDatumGrayCandidate_NotWholeApproved",
+          "scope": "Technical dimensions/assembly reconstruction only. Same-type appearance and unconfirmed Tengxian participation categories unchanged."
+        }
+      },
+      "currentTechnicalDelivery": {
+        "date": "2026-10-28",
+        "version": "20261028ReferenceV48GameRelease",
+        "status": "ConfiguredAfterTechnicalAcceptance_OriginalPhotoResidualsRetained",
+        "historicalClaimsChanged": false,
+        "scope": "Geometry, UV/PBR, finite mechanical motion and lazy component-library configuration only. Existing same-type reconstruction and unconfirmed Tengxian participation categories retained."
+      }
     },
     {
       "asset": "StrawSleepingMat",
@@ -241,7 +266,7 @@
       "id": "40260335331c81ce8b26eb0e1cd6f9cb",
       "title": "九四式侦察机｜航空兵团记载候选",
       "role": "assetReference",
-      "lastEdited": "2026-10-23T10:13:41.111Z"
+      "lastEdited": "2026-10-26T10:58:16.684Z"
     },
     {
       "id": "3fd60335331c818fa24deadb6d72ca70",
