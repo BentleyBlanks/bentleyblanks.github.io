@@ -1,11 +1,11 @@
 {
   "schema": "tengxian-independent-rigged-prop-v1",
   "id": "Donkey",
-  "version": "20261027ReferenceV50",
+  "version": "20261027ReferenceV51",
   "asset": "Model_Donkey.glb",
   "textureManifest": "Data_DonkeyTextures.json",
-  "sha256": "d92729ad4133627fa7cdce7e7a54b7d3c6816b697259059a97f48e712717cf7c",
-  "bytes": 18749964,
+  "sha256": "bc85c3f9a94c880aa235faf926ad128f35d45678d244e75dca07e3dcb1d341f1",
+  "bytes": 18727312,
   "units": "metres",
   "upAxis": "+Y",
   "facingAxis": "-Z",
@@ -18,17 +18,17 @@
   "nominalWithersHeightM": 1.1,
   "boundsM": {
     "min": [
-      -0.20162811875343323,
+      -0.20156952738761902,
       0.00039999998989515007,
       -1.121999979019165
     ],
     "max": [
-      0.2034306526184082,
+      0.20465970039367676,
       1.5841730833053589,
       0.43019163608551025
     ],
     "dimensions": [
-      0.40505877137184143,
+      0.4062292277812958,
       1.5837730833154637,
       1.5521916151046753
     ]
@@ -72,18 +72,18 @@
     }
   },
   "coat": {
-    "fibres": 13260,
-    "cards": 4511,
-    "triangles": 22282,
+    "fibres": 13356,
+    "cards": 4489,
+    "triangles": 22334,
     "regionCards": {
-      "0": 251,
-      "1": 27,
-      "2": 2403,
+      "0": 262,
+      "1": 38,
+      "2": 2407,
       "3": 360
     },
-    "sampledSurfaceM2": 2.2592929927125636,
+    "sampledSurfaceM2": 2.2586938342192524,
     "maxInfluences": 4,
-    "version": "20261027ReferenceV50",
+    "version": "20261027ReferenceV51",
     "method": "individual skinned short fibres, limited alpha-cutout edge tufts and tiled fibre normal detail on UV1",
     "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\SourceTextures\\Texture_DonkeyShortFurCardsSource.png",
     "sourceSha256": "03db7521e9987a20f405e647c3c37237ad3006193f993babd2d2a424496e6d09",
@@ -97,7 +97,7 @@
     "detailNormalUv": "UV0; 2048 complete baked coat/accessory normal, including reference-local limb clumps",
     "detailTexelsPerMetre": 2275.5555555555557,
     "rootSamples": 21000,
-    "bodyTufts": 233,
+    "bodyTufts": 259,
     "bodyTuftLimit": 288,
     "coronetFibres": 480,
     "coronetAreaM2": 0.02089279626420648,
@@ -111,8 +111,8 @@
     ],
     "darkLegTufts": {
       "version": "20261026LegTuftsV44",
-      "wisps": 735,
-      "reusedFineTriangles": 2940,
+      "wisps": 711,
+      "reusedFineTriangles": 2844,
       "trianglesAdded": 0,
       "segments": 2,
       "widthM": [
@@ -131,23 +131,23 @@
       "tipStudioExposureGain": 1.1,
       "counts": {
         "DonkeyFrontLeft": {
-          "Fetlock": 130,
-          "Carpal": 54
+          "Fetlock": 126,
+          "Carpal": 52
         },
         "DonkeyFrontRight": {
-          "Fetlock": 130,
-          "Carpal": 54
+          "Fetlock": 126,
+          "Carpal": 52
         },
         "DonkeyRearLeft": {
-          "Fetlock": 130,
-          "Carpal": 54
+          "Fetlock": 126,
+          "Carpal": 52
         },
         "DonkeyRearRight": {
-          "Fetlock": 129,
-          "Carpal": 54
+          "Fetlock": 126,
+          "Carpal": 51
         }
       },
-      "availableDonorTriangles": 2940,
+      "availableDonorTriangles": 2846,
       "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
       "sourceSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
       "method": "fixed existing fine-fibre slots reassigned evenly across four legs, mostly to tapered fetlock feathering; photographic flow, restrained tip pigment, local curve normals and identical shared-corner skin weights",
@@ -156,334 +156,334 @@
           "leg": "DonkeyFrontLeft",
           "zone": "Fetlock",
           "pixel": [
-            196,
-            830
+            719,
+            834
           ],
           "root": [
-            -0.06437960267066956,
-            0.6771755814552307,
-            0.16705407202243805
+            -0.054386772215366364,
+            0.6602972745895386,
+            0.16043609380722046
           ],
           "tipLinearRgb": [
-            0.05472142286598683,
-            0.044185912981629376,
-            0.04078507944941521
+            0.038603752851486206,
+            0.03325395751744509,
+            0.03364190831780434
           ],
-          "flowCoherence": 0.6705198082262347
+          "flowCoherence": 0.5435504392486142
         },
         {
           "leg": "DonkeyFrontRight",
           "zone": "Fetlock",
           "pixel": [
-            735,
-            811
+            721,
+            818
           ],
           "root": [
-            0.06823180615901947,
-            0.7112762928009033,
-            0.20167741179466248
+            0.1251905858516693,
+            0.7397758960723877,
+            0.18969175219535828
           ],
           "tipLinearRgb": [
-            0.07227186262607575,
-            0.06129657817259431,
-            0.06174134470522405
+            0.06900161430239678,
+            0.05117658786475659,
+            0.046253484115004545
           ],
-          "flowCoherence": 0.22613228320880424
+          "flowCoherence": 0.2459036945263456
         },
         {
           "leg": "DonkeyRearLeft",
           "zone": "Fetlock",
           "pixel": [
-            1133,
-            848
+            1329,
+            828
           ],
           "root": [
-            -0.12186310440301895,
-            -0.056973010301589966,
-            0.13531705737113953
+            -0.11625929921865463,
+            -0.10820215940475464,
+            0.17148669064044952
           ],
           "tipLinearRgb": [
-            0.043506133928895,
-            0.03668773956596852,
-            0.03607398867607117
+            0.063929882645607,
+            0.04663031958043576,
+            0.044806785881519325
           ],
-          "flowCoherence": 0.45166372784096404
+          "flowCoherence": 0.6389263612855139
         },
         {
           "leg": "DonkeyRearRight",
           "zone": "Fetlock",
           "pixel": [
-            1143,
-            831
+            1139,
+            841
           ],
           "root": [
-            0.12867552042007446,
-            0.048098545521497726,
-            0.1657150238752365
+            0.06618849188089371,
+            0.05544789880514145,
+            0.14910206198692322
           ],
           "tipLinearRgb": [
-            0.06504231356084347,
-            0.05089765340089798,
-            0.053698807954788215
+            0.05460958518087864,
+            0.04063124731183052,
+            0.03829056061804295
           ],
-          "flowCoherence": 0.22664614528021773
+          "flowCoherence": 0.1681527424794431
         },
         {
           "leg": "DonkeyFrontLeft",
           "zone": "Fetlock",
           "pixel": [
-            725,
-            837
+            723,
+            850
           ],
           "root": [
-            -0.1315416693687439,
-            0.6443312168121338,
-            0.15626001358032227
+            -0.13094282150268555,
+            0.6541867256164551,
+            0.13180223107337952
           ],
           "tipLinearRgb": [
-            0.09865874573588372,
-            0.0752479448914528,
-            0.06697361581027508
+            0.0384595301002264,
+            0.031939743831753735,
+            0.029301039129495624
           ],
-          "flowCoherence": 0.2005216078995766
+          "flowCoherence": 0.23291693203419764
         },
         {
           "leg": "DonkeyFrontRight",
           "zone": "Fetlock",
           "pixel": [
-            91,
-            840
+            719,
+            830
           ],
           "root": [
-            0.12323275208473206,
-            0.7581532597541809,
-            0.14922970533370972
+            0.12980413436889648,
+            0.7440574169158936,
+            0.1672961711883545
           ],
           "tipLinearRgb": [
-            0.037113732472062115,
-            0.03418127559125424,
-            0.03478279858827591
+            0.06921965926885605,
+            0.058132160827517515,
+            0.053530817851424224
           ],
-          "flowCoherence": 0.18945934271755613
+          "flowCoherence": 0.5022738802534916
         },
         {
           "leg": "DonkeyRearLeft",
           "zone": "Fetlock",
           "pixel": [
-            1148,
-            827
+            1137,
+            818
           ],
           "root": [
-            -0.06283733248710632,
-            -0.08682429045438766,
-            0.17222750186920166
+            -0.11645403504371643,
+            -0.06328247487545013,
+            0.18976649641990662
           ],
           "tipLinearRgb": [
-            0.046958091855049136,
-            0.04050469025969505,
-            0.03702587522566319
+            0.03836854621767998,
+            0.034380659088492395,
+            0.03580347523093224
           ],
-          "flowCoherence": 0.5934542592250085
+          "flowCoherence": 0.04892955242538103
+        },
+        {
+          "leg": "DonkeyRearRight",
+          "zone": "Fetlock",
+          "pixel": [
+            1134,
+            809
+          ],
+          "root": [
+            0.10036756098270416,
+            0.06672592461109161,
+            0.204860657453537
+          ],
+          "tipLinearRgb": [
+            0.04757732562720776,
+            0.039726125076413155,
+            0.03826018758118153
+          ],
+          "flowCoherence": 0.13137622530667212
+        },
+        {
+          "leg": "DonkeyFrontLeft",
+          "zone": "Fetlock",
+          "pixel": [
+            732,
+            843
+          ],
+          "root": [
+            -0.05487725883722305,
+            0.6285973787307739,
+            0.14424248039722443
+          ],
+          "tipLinearRgb": [
+            0.06635329201817514,
+            0.059912032261490826,
+            0.05677012763917447
+          ],
+          "flowCoherence": 0.39128037782885966
+        },
+        {
+          "leg": "DonkeyFrontRight",
+          "zone": "Fetlock",
+          "pixel": [
+            716,
+            845
+          ],
+          "root": [
+            0.12611240148544312,
+            0.7535013556480408,
+            0.14180712401866913
+          ],
+          "tipLinearRgb": [
+            0.023069337755441666,
+            0.018867364153265953,
+            0.019964286871254445
+          ],
+          "flowCoherence": 0.428366700550282
+        },
+        {
+          "leg": "DonkeyRearLeft",
+          "zone": "Fetlock",
+          "pixel": [
+            1149,
+            836
+          ],
+          "root": [
+            -0.062748484313488,
+            -0.08997496962547302,
+            0.15664860606193542
+          ],
+          "tipLinearRgb": [
+            0.10276591628789902,
+            0.07885931208729745,
+            0.06751131936907769
+          ],
+          "flowCoherence": 0.21745300400182946
         },
         {
           "leg": "DonkeyRearRight",
           "zone": "Fetlock",
           "pixel": [
             1147,
-            824
+            829
           ],
           "root": [
-            0.12661410868167877,
-            0.0390496589243412,
-            0.17764215171337128
+            0.12838587164878845,
+            0.03868193179368973,
+            0.17027144134044647
           ],
           "tipLinearRgb": [
-            0.055779324099421504,
-            0.046249890327453615,
-            0.04426219798624516
+            0.04801794365048409,
+            0.037932066991925244,
+            0.04085954502224923
           ],
-          "flowCoherence": 0.35067500962179365
+          "flowCoherence": 0.3445403212485554
         },
         {
           "leg": "DonkeyFrontLeft",
           "zone": "Fetlock",
           "pixel": [
-            715,
-            835
+            206,
+            822
           ],
           "root": [
-            -0.12336257100105286,
-            0.672584593296051,
-            0.15977692604064941
+            -0.08931998908519745,
+            0.6871055364608765,
+            0.18213006854057312
           ],
           "tipLinearRgb": [
-            0.04968040026724339,
-            0.04709674566984177,
-            0.04905751533806325
+            0.03411096930503846,
+            0.02600423488765955,
+            0.02383497636765242
           ],
-          "flowCoherence": 0.5981042040675522
+          "flowCoherence": 0.4972338503279107
         },
         {
           "leg": "DonkeyFrontRight",
           "zone": "Fetlock",
           "pixel": [
-            92,
-            837
-          ],
-          "root": [
-            0.12316808849573135,
-            0.7587873935699463,
-            0.15450012683868408
-          ],
-          "tipLinearRgb": [
-            0.0451606571674347,
-            0.04189128987491131,
-            0.04078507944941521
-          ],
-          "flowCoherence": 0.04412717479442567
-        },
-        {
-          "leg": "DonkeyRearLeft",
-          "zone": "Fetlock",
-          "pixel": [
-            1141,
-            835
-          ],
-          "root": [
-            -0.06435640156269073,
-            -0.07160814851522446,
-            0.15952077507972717
-          ],
-          "tipLinearRgb": [
-            0.07353718727827073,
-            0.05740602314472199,
-            0.049894634261727334
-          ],
-          "flowCoherence": 0.4497978319075589
-        },
-        {
-          "leg": "DonkeyRearRight",
-          "zone": "Fetlock",
-          "pixel": [
-            1135,
-            826
-          ],
-          "root": [
-            0.1150006651878357,
-            0.06563011556863785,
-            0.17466169595718384
-          ],
-          "tipLinearRgb": [
-            0.1268959254026413,
-            0.10246786549687387,
-            0.09674099907279016
-          ],
-          "flowCoherence": 0.2735833744145461
-        },
-        {
-          "leg": "DonkeyFrontLeft",
-          "zone": "Fetlock",
-          "pixel": [
-            734,
-            806
-          ],
-          "root": [
-            -0.07299245893955231,
-            0.632773756980896,
-            0.2108425348997116
-          ],
-          "tipLinearRgb": [
-            0.13563336953520777,
-            0.11687843725085259,
-            0.10988862045109274
-          ],
-          "flowCoherence": 0.38871895075697566
-        },
-        {
-          "leg": "DonkeyFrontRight",
-          "zone": "Fetlock",
-          "pixel": [
-            737,
-            825
-          ],
-          "root": [
-            0.11238373070955276,
-            0.698398232460022,
-            0.17586183547973633
-          ],
-          "tipLinearRgb": [
-            0.1175850734114647,
-            0.10381183549761773,
-            0.09855578392744065
-          ],
-          "flowCoherence": 0.37270767922141795
-        },
-        {
-          "leg": "DonkeyRearLeft",
-          "zone": "Fetlock",
-          "pixel": [
-            1136,
-            835
-          ],
-          "root": [
-            -0.12448424845933914,
-            -0.062284186482429504,
-            0.15842768549919128
-          ],
-          "tipLinearRgb": [
-            0.057047939300537115,
-            0.0414613712579012,
-            0.03834835462272168
-          ],
-          "flowCoherence": 0.19892492087406358
-        },
-        {
-          "leg": "DonkeyRearRight",
-          "zone": "Fetlock",
-          "pixel": [
-            1138,
+            726,
             840
           ],
           "root": [
-            0.12841252982616425,
-            0.057959478348493576,
-            0.15074913203716278
+            0.13455863296985626,
+            0.726110577583313,
+            0.15061023831367493
           ],
           "tipLinearRgb": [
-            0.08480328917503357,
-            0.06624005287885666,
-            0.05595687031745911
+            0.06007040888071061,
+            0.05418924644589425,
+            0.04743508826941253
           ],
-          "flowCoherence": 0.2768551153343321
+          "flowCoherence": 0.31150203890094813
+        },
+        {
+          "leg": "DonkeyRearLeft",
+          "zone": "Fetlock",
+          "pixel": [
+            1138,
+            839
+          ],
+          "root": [
+            -0.1279923915863037,
+            -0.06562487781047821,
+            0.15136019885540009
+          ],
+          "tipLinearRgb": [
+            0.08502371907234192,
+            0.06684679239988328,
+            0.058982995152473454
+          ],
+          "flowCoherence": 0.348538278832366
+        },
+        {
+          "leg": "DonkeyRearRight",
+          "zone": "Fetlock",
+          "pixel": [
+            1456,
+            829
+          ],
+          "root": [
+            0.11679592728614807,
+            0.015810832381248474,
+            0.16919058561325073
+          ],
+          "tipLinearRgb": [
+            0.06752943173050881,
+            0.056022078916430476,
+            0.049377366527915
+          ],
+          "flowCoherence": 0.45874723950992197
         }
       ]
     },
     "lowerLimbFur": {
-      "sampleFibres": 3004,
+      "sampleFibres": 3068,
       "jointDensityGain": 2.4,
       "maximumLengthGain": 2.25,
       "maximumLiftGain": 3,
       "lengthRangeM": [
-        0.004550558556918157,
-        0.051146139650236136
+        0.004648098646430228,
+        0.05124125465050583
       ],
       "liftRangeM": [
-        0.0009086649380870915,
+        0.0008651143982106427,
         0.006585587623341665
       ],
       "method": "redistribute the fixed fine-fibre sample budget toward carpal/fetlock coats; longer, splayed tips follow their shallow joint relief"
     },
     "paleFringe": {
-      "sampleFibres": 4861,
+      "sampleFibres": 4824,
       "redistributedBodySamples": 4000,
       "curvedWisps": 1000,
       "lengthRangeM": [
-        0.004691403858041196,
-        0.0506997188039024
+        0.004276044454308143,
+        0.05068023479307923
       ],
       "liftRangeM": [
-        0.0007902915227300661,
-        0.017597276110182487
+        0.0008129268290121024,
+        0.017599862677591494
       ],
       "wispLengthRangeM": [
         0.03,
@@ -501,16 +501,16 @@
       "method": "pale medial foreleg and breast fibres lengthened and lifted; body fine-fibre slots reallocated to the pale fringe with an independent deterministic stream; four existing triangles reused per curved strand; root sample and triangle budgets retained"
     },
     "bellyCoat": {
-      "sampleFibres": 1883,
-      "fineFibres": 1083,
+      "sampleFibres": 1973,
+      "fineFibres": 1173,
       "pairedStrips": 400,
       "sampleLengthRangeM": [
-        0.005303872770030249,
-        0.020149028991976143
+        0.005689923729442073,
+        0.020147609184017652
       ],
       "sampleLiftRangeM": [
-        0.0007551579873282263,
-        0.006598535469933411
+        0.0007399944341879296,
+        0.00659641631721059
       ],
       "stripLengthRangeM": [
         0.0199,
@@ -524,17 +524,17 @@
     },
     "pigmentTransfer": {
       "method": "new fringe tints sampled from actual baked body UV0 at stored surface roots; atlas pigment normalized per vertex",
-      "vertices": 15081,
-      "maximumTintChange": 0.5566704571247101,
+      "vertices": 15042,
+      "maximumTintChange": 0.6074826121330261,
       "hairImage": "Texture_DonkeyShortCoatBase",
       "existingGroomOutsideFringeChanged": false
     },
     "pigmentSampler": {
       "sourceSpace": "DonkeyContinuousSkin",
       "bodyImage": "Texture_DonkeyAnimalBase",
-      "bodyPath": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Baked\\Texture_DonkeyAnimalBase.png",
-      "roots": 8999,
-      "maximumSurfaceDistanceM": 0.001575371134094894,
+      "bodyPath": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Baked\\Texture_DonkeyAnimalBase.png",
+      "roots": 8807,
+      "maximumSurfaceDistanceM": 0.0011642443714663386,
       "samples": [
         {
           "root": [
@@ -555,19 +555,19 @@
         },
         {
           "root": [
-            0.058995191007852554,
-            0.666672945022583,
-            0.5115208029747009
+            0.048095058649778366,
+            0.6774435639381409,
+            0.5121850371360779
           ],
-          "distanceM": 5.227349538472481e-05,
+          "distanceM": 3.5628450859803706e-05,
           "uv": [
-            0.25093013048171997,
-            0.9096187353134155
+            0.25507834553718567,
+            0.910683274269104
           ],
           "linearRgb": [
-            0.07944196462631226,
-            0.060004398226737976,
-            0.05172693729400635
+            0.06371911615133286,
+            0.0504077672958374,
+            0.048333458602428436
           ]
         },
         {
@@ -578,13 +578,13 @@
           ],
           "distanceM": 5.960464477539063e-08,
           "uv": [
-            0.17942269146442413,
-            0.11807093024253845
+            0.2573949992656708,
+            0.2611158788204193
           ],
           "linearRgb": [
-            0.23680037260055542,
-            0.19903960824012756,
-            0.1755496710538864
+            0.23801016807556152,
+            0.19924171268939972,
+            0.17556053400039673
           ]
         },
         {
@@ -629,13 +629,13 @@
           ],
           "distanceM": 0.0,
           "uv": [
-            0.35924553871154785,
-            0.36443883180618286
+            0.27527862787246704,
+            0.01704067550599575
           ],
           "linearRgb": [
-            0.17733672261238098,
-            0.1426057368516922,
-            0.12699469923973083
+            0.18331202864646912,
+            0.1500040888786316,
+            0.1319427639245987
           ]
         },
         {
@@ -657,53 +657,36 @@
         },
         {
           "root": [
-            -0.08517283201217651,
-            0.7120864987373352,
-            0.6228870153427124
+            -0.09205204993486404,
+            0.6725400686264038,
+            0.6324288845062256
           ],
-          "distanceM": 0.0,
+          "distanceM": 7.450580596923828e-09,
           "uv": [
-            0.13504230976104736,
-            0.9169795513153076
+            0.05631648376584053,
+            0.9199748039245605
           ],
           "linearRgb": [
-            0.07102246582508087,
-            0.05600793659687042,
-            0.05068463459610939
+            0.06960607320070267,
+            0.06362615525722504,
+            0.05201995000243187
           ]
         },
         {
           "root": [
-            -0.1023315042257309,
-            0.6768180727958679,
-            0.6408455967903137
+            -0.04398912563920021,
+            0.667465090751648,
+            0.5865693688392639
           ],
-          "distanceM": 6.006850128414953e-08,
+          "distanceM": 7.450580596923828e-09,
           "uv": [
-            0.042512934654951096,
-            0.9867896437644958
+            0.15740077197551727,
+            0.6669451594352722
           ],
           "linearRgb": [
-            0.09031855314970016,
-            0.07383254170417786,
-            0.06281572580337524
-          ]
-        },
-        {
-          "root": [
-            -0.04445783793926239,
-            0.6840494275093079,
-            0.5758695602416992
-          ],
-          "distanceM": 3.725290298461914e-09,
-          "uv": [
-            0.15287558734416962,
-            0.6713275909423828
-          ],
-          "linearRgb": [
-            0.021174605935811996,
-            0.01744489185512066,
-            0.01760253682732582
+            0.0680169016122818,
+            0.04781787469983101,
+            0.04531656205654144
           ]
         },
         {
@@ -725,39 +708,56 @@
         },
         {
           "root": [
-            -0.051914505660533905,
-            0.6697797179222107,
-            0.6575278043746948
+            0.1205911785364151,
+            0.6653186082839966,
+            0.6584101319313049
           ],
-          "distanceM": 6.064333035737945e-08,
+          "distanceM": 6.664001972467304e-08,
           "uv": [
-            0.02315846085548401,
-            0.8644201755523682
+            0.3680495619773865,
+            0.81670081615448
           ],
           "linearRgb": [
-            0.2642784118652344,
-            0.2183818817138672,
-            0.19557857513427734
+            0.05178123712539673,
+            0.042132191359996796,
+            0.03682974725961685
+          ]
+        },
+        {
+          "root": [
+            0.052063778042793274,
+            0.6629830002784729,
+            0.571145236492157
+          ],
+          "distanceM": 6.838723720647977e-08,
+          "uv": [
+            0.25442272424697876,
+            0.8819151520729065
+          ],
+          "linearRgb": [
+            0.061448171734809875,
+            0.0494261160492897,
+            0.04224800318479538
           ]
         }
       ]
     },
-    "exteriorVerticesPreserved": 41663,
+    "exteriorVerticesPreserved": 42094,
     "detailNormalTexelsPerMetre": "unique UV0 atlas; original 0.45 m fibre frequency is an authoring input",
     "normalMode": "bakedSourceCoatRelief",
     "sourceScript": "_blender/Script_DonkeyReferenceFit.py",
     "shadow": "groomCastShadow=false; body and accessories cast shadows, micro-fibre layer receives them"
   },
   "triangles": {
-    "total": 79850,
+    "total": 79902,
     "limit": 80000,
     "byBatch": {
       "Animal": 40260,
-      "Coat": 39202,
+      "Coat": 39254,
       "Mane": 388
     },
     "decimated": false,
-    "sourceBeforeRuntimeTriangulationTotal": 79850
+    "sourceBeforeRuntimeTriangulationTotal": 79902
   },
   "runtime": {
     "meshes": [
@@ -775,12 +775,12 @@
     "maxInfluences": 4,
     "morphTargets": 0,
     "uvAtlasCoverage": {
-      "Animal": 0.45667614104303844,
+      "Animal": 0.459964216840457,
       "Coat": null,
       "Mane": null
     },
     "averageTexelsPerMetre": {
-      "Animal": 841.7539063280311,
+      "Animal": 845.1131925739929,
       "Coat": null,
       "Mane": null
     },
@@ -989,18 +989,18 @@
       "shape": "more upright neck/poll, extended muzzle, rounded abdomen, locally smoothed shoulder/hamstring, fuller short mane and narrower ear splay"
     },
     "coat": {
-      "fibres": 13260,
-      "cards": 4511,
-      "triangles": 22282,
+      "fibres": 13356,
+      "cards": 4489,
+      "triangles": 22334,
       "regionCards": {
-        "0": 251,
-        "1": 27,
-        "2": 2403,
+        "0": 262,
+        "1": 38,
+        "2": 2407,
         "3": 360
       },
-      "sampledSurfaceM2": 2.2592929927125636,
+      "sampledSurfaceM2": 2.2586938342192524,
       "maxInfluences": 4,
-      "version": "20261027ReferenceV50",
+      "version": "20261027ReferenceV51",
       "method": "individual skinned short fibres, limited alpha-cutout edge tufts and tiled fibre normal detail on UV1",
       "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261023\\SourceTextures\\Texture_DonkeyShortFurCardsSource.png",
       "sourceSha256": "03db7521e9987a20f405e647c3c37237ad3006193f993babd2d2a424496e6d09",
@@ -1014,7 +1014,7 @@
       "detailNormalUv": "UV0; 2048 complete baked coat/accessory normal, including reference-local limb clumps",
       "detailTexelsPerMetre": 2275.5555555555557,
       "rootSamples": 21000,
-      "bodyTufts": 233,
+      "bodyTufts": 259,
       "bodyTuftLimit": 288,
       "coronetFibres": 480,
       "coronetAreaM2": 0.02089279626420648,
@@ -1028,8 +1028,8 @@
       ],
       "darkLegTufts": {
         "version": "20261026LegTuftsV44",
-        "wisps": 735,
-        "reusedFineTriangles": 2940,
+        "wisps": 711,
+        "reusedFineTriangles": 2844,
         "trianglesAdded": 0,
         "segments": 2,
         "widthM": [
@@ -1048,23 +1048,23 @@
         "tipStudioExposureGain": 1.1,
         "counts": {
           "DonkeyFrontLeft": {
-            "Fetlock": 130,
-            "Carpal": 54
+            "Fetlock": 126,
+            "Carpal": 52
           },
           "DonkeyFrontRight": {
-            "Fetlock": 130,
-            "Carpal": 54
+            "Fetlock": 126,
+            "Carpal": 52
           },
           "DonkeyRearLeft": {
-            "Fetlock": 130,
-            "Carpal": 54
+            "Fetlock": 126,
+            "Carpal": 52
           },
           "DonkeyRearRight": {
-            "Fetlock": 129,
-            "Carpal": 54
+            "Fetlock": 126,
+            "Carpal": 51
           }
         },
-        "availableDonorTriangles": 2940,
+        "availableDonorTriangles": 2846,
         "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
         "sourceSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
         "method": "fixed existing fine-fibre slots reassigned evenly across four legs, mostly to tapered fetlock feathering; photographic flow, restrained tip pigment, local curve normals and identical shared-corner skin weights",
@@ -1073,334 +1073,334 @@
             "leg": "DonkeyFrontLeft",
             "zone": "Fetlock",
             "pixel": [
-              196,
-              830
+              719,
+              834
             ],
             "root": [
-              -0.06437960267066956,
-              0.6771755814552307,
-              0.16705407202243805
+              -0.054386772215366364,
+              0.6602972745895386,
+              0.16043609380722046
             ],
             "tipLinearRgb": [
-              0.05472142286598683,
-              0.044185912981629376,
-              0.04078507944941521
+              0.038603752851486206,
+              0.03325395751744509,
+              0.03364190831780434
             ],
-            "flowCoherence": 0.6705198082262347
+            "flowCoherence": 0.5435504392486142
           },
           {
             "leg": "DonkeyFrontRight",
             "zone": "Fetlock",
             "pixel": [
-              735,
-              811
+              721,
+              818
             ],
             "root": [
-              0.06823180615901947,
-              0.7112762928009033,
-              0.20167741179466248
+              0.1251905858516693,
+              0.7397758960723877,
+              0.18969175219535828
             ],
             "tipLinearRgb": [
-              0.07227186262607575,
-              0.06129657817259431,
-              0.06174134470522405
+              0.06900161430239678,
+              0.05117658786475659,
+              0.046253484115004545
             ],
-            "flowCoherence": 0.22613228320880424
+            "flowCoherence": 0.2459036945263456
           },
           {
             "leg": "DonkeyRearLeft",
             "zone": "Fetlock",
             "pixel": [
-              1133,
-              848
+              1329,
+              828
             ],
             "root": [
-              -0.12186310440301895,
-              -0.056973010301589966,
-              0.13531705737113953
+              -0.11625929921865463,
+              -0.10820215940475464,
+              0.17148669064044952
             ],
             "tipLinearRgb": [
-              0.043506133928895,
-              0.03668773956596852,
-              0.03607398867607117
+              0.063929882645607,
+              0.04663031958043576,
+              0.044806785881519325
             ],
-            "flowCoherence": 0.45166372784096404
+            "flowCoherence": 0.6389263612855139
           },
           {
             "leg": "DonkeyRearRight",
             "zone": "Fetlock",
             "pixel": [
-              1143,
-              831
+              1139,
+              841
             ],
             "root": [
-              0.12867552042007446,
-              0.048098545521497726,
-              0.1657150238752365
+              0.06618849188089371,
+              0.05544789880514145,
+              0.14910206198692322
             ],
             "tipLinearRgb": [
-              0.06504231356084347,
-              0.05089765340089798,
-              0.053698807954788215
+              0.05460958518087864,
+              0.04063124731183052,
+              0.03829056061804295
             ],
-            "flowCoherence": 0.22664614528021773
+            "flowCoherence": 0.1681527424794431
           },
           {
             "leg": "DonkeyFrontLeft",
             "zone": "Fetlock",
             "pixel": [
-              725,
-              837
+              723,
+              850
             ],
             "root": [
-              -0.1315416693687439,
-              0.6443312168121338,
-              0.15626001358032227
+              -0.13094282150268555,
+              0.6541867256164551,
+              0.13180223107337952
             ],
             "tipLinearRgb": [
-              0.09865874573588372,
-              0.0752479448914528,
-              0.06697361581027508
+              0.0384595301002264,
+              0.031939743831753735,
+              0.029301039129495624
             ],
-            "flowCoherence": 0.2005216078995766
+            "flowCoherence": 0.23291693203419764
           },
           {
             "leg": "DonkeyFrontRight",
             "zone": "Fetlock",
             "pixel": [
-              91,
-              840
+              719,
+              830
             ],
             "root": [
-              0.12323275208473206,
-              0.7581532597541809,
-              0.14922970533370972
+              0.12980413436889648,
+              0.7440574169158936,
+              0.1672961711883545
             ],
             "tipLinearRgb": [
-              0.037113732472062115,
-              0.03418127559125424,
-              0.03478279858827591
+              0.06921965926885605,
+              0.058132160827517515,
+              0.053530817851424224
             ],
-            "flowCoherence": 0.18945934271755613
+            "flowCoherence": 0.5022738802534916
           },
           {
             "leg": "DonkeyRearLeft",
             "zone": "Fetlock",
             "pixel": [
-              1148,
-              827
+              1137,
+              818
             ],
             "root": [
-              -0.06283733248710632,
-              -0.08682429045438766,
-              0.17222750186920166
+              -0.11645403504371643,
+              -0.06328247487545013,
+              0.18976649641990662
             ],
             "tipLinearRgb": [
-              0.046958091855049136,
-              0.04050469025969505,
-              0.03702587522566319
+              0.03836854621767998,
+              0.034380659088492395,
+              0.03580347523093224
             ],
-            "flowCoherence": 0.5934542592250085
+            "flowCoherence": 0.04892955242538103
+          },
+          {
+            "leg": "DonkeyRearRight",
+            "zone": "Fetlock",
+            "pixel": [
+              1134,
+              809
+            ],
+            "root": [
+              0.10036756098270416,
+              0.06672592461109161,
+              0.204860657453537
+            ],
+            "tipLinearRgb": [
+              0.04757732562720776,
+              0.039726125076413155,
+              0.03826018758118153
+            ],
+            "flowCoherence": 0.13137622530667212
+          },
+          {
+            "leg": "DonkeyFrontLeft",
+            "zone": "Fetlock",
+            "pixel": [
+              732,
+              843
+            ],
+            "root": [
+              -0.05487725883722305,
+              0.6285973787307739,
+              0.14424248039722443
+            ],
+            "tipLinearRgb": [
+              0.06635329201817514,
+              0.059912032261490826,
+              0.05677012763917447
+            ],
+            "flowCoherence": 0.39128037782885966
+          },
+          {
+            "leg": "DonkeyFrontRight",
+            "zone": "Fetlock",
+            "pixel": [
+              716,
+              845
+            ],
+            "root": [
+              0.12611240148544312,
+              0.7535013556480408,
+              0.14180712401866913
+            ],
+            "tipLinearRgb": [
+              0.023069337755441666,
+              0.018867364153265953,
+              0.019964286871254445
+            ],
+            "flowCoherence": 0.428366700550282
+          },
+          {
+            "leg": "DonkeyRearLeft",
+            "zone": "Fetlock",
+            "pixel": [
+              1149,
+              836
+            ],
+            "root": [
+              -0.062748484313488,
+              -0.08997496962547302,
+              0.15664860606193542
+            ],
+            "tipLinearRgb": [
+              0.10276591628789902,
+              0.07885931208729745,
+              0.06751131936907769
+            ],
+            "flowCoherence": 0.21745300400182946
           },
           {
             "leg": "DonkeyRearRight",
             "zone": "Fetlock",
             "pixel": [
               1147,
-              824
+              829
             ],
             "root": [
-              0.12661410868167877,
-              0.0390496589243412,
-              0.17764215171337128
+              0.12838587164878845,
+              0.03868193179368973,
+              0.17027144134044647
             ],
             "tipLinearRgb": [
-              0.055779324099421504,
-              0.046249890327453615,
-              0.04426219798624516
+              0.04801794365048409,
+              0.037932066991925244,
+              0.04085954502224923
             ],
-            "flowCoherence": 0.35067500962179365
+            "flowCoherence": 0.3445403212485554
           },
           {
             "leg": "DonkeyFrontLeft",
             "zone": "Fetlock",
             "pixel": [
-              715,
-              835
+              206,
+              822
             ],
             "root": [
-              -0.12336257100105286,
-              0.672584593296051,
-              0.15977692604064941
+              -0.08931998908519745,
+              0.6871055364608765,
+              0.18213006854057312
             ],
             "tipLinearRgb": [
-              0.04968040026724339,
-              0.04709674566984177,
-              0.04905751533806325
+              0.03411096930503846,
+              0.02600423488765955,
+              0.02383497636765242
             ],
-            "flowCoherence": 0.5981042040675522
+            "flowCoherence": 0.4972338503279107
           },
           {
             "leg": "DonkeyFrontRight",
             "zone": "Fetlock",
             "pixel": [
-              92,
-              837
-            ],
-            "root": [
-              0.12316808849573135,
-              0.7587873935699463,
-              0.15450012683868408
-            ],
-            "tipLinearRgb": [
-              0.0451606571674347,
-              0.04189128987491131,
-              0.04078507944941521
-            ],
-            "flowCoherence": 0.04412717479442567
-          },
-          {
-            "leg": "DonkeyRearLeft",
-            "zone": "Fetlock",
-            "pixel": [
-              1141,
-              835
-            ],
-            "root": [
-              -0.06435640156269073,
-              -0.07160814851522446,
-              0.15952077507972717
-            ],
-            "tipLinearRgb": [
-              0.07353718727827073,
-              0.05740602314472199,
-              0.049894634261727334
-            ],
-            "flowCoherence": 0.4497978319075589
-          },
-          {
-            "leg": "DonkeyRearRight",
-            "zone": "Fetlock",
-            "pixel": [
-              1135,
-              826
-            ],
-            "root": [
-              0.1150006651878357,
-              0.06563011556863785,
-              0.17466169595718384
-            ],
-            "tipLinearRgb": [
-              0.1268959254026413,
-              0.10246786549687387,
-              0.09674099907279016
-            ],
-            "flowCoherence": 0.2735833744145461
-          },
-          {
-            "leg": "DonkeyFrontLeft",
-            "zone": "Fetlock",
-            "pixel": [
-              734,
-              806
-            ],
-            "root": [
-              -0.07299245893955231,
-              0.632773756980896,
-              0.2108425348997116
-            ],
-            "tipLinearRgb": [
-              0.13563336953520777,
-              0.11687843725085259,
-              0.10988862045109274
-            ],
-            "flowCoherence": 0.38871895075697566
-          },
-          {
-            "leg": "DonkeyFrontRight",
-            "zone": "Fetlock",
-            "pixel": [
-              737,
-              825
-            ],
-            "root": [
-              0.11238373070955276,
-              0.698398232460022,
-              0.17586183547973633
-            ],
-            "tipLinearRgb": [
-              0.1175850734114647,
-              0.10381183549761773,
-              0.09855578392744065
-            ],
-            "flowCoherence": 0.37270767922141795
-          },
-          {
-            "leg": "DonkeyRearLeft",
-            "zone": "Fetlock",
-            "pixel": [
-              1136,
-              835
-            ],
-            "root": [
-              -0.12448424845933914,
-              -0.062284186482429504,
-              0.15842768549919128
-            ],
-            "tipLinearRgb": [
-              0.057047939300537115,
-              0.0414613712579012,
-              0.03834835462272168
-            ],
-            "flowCoherence": 0.19892492087406358
-          },
-          {
-            "leg": "DonkeyRearRight",
-            "zone": "Fetlock",
-            "pixel": [
-              1138,
+              726,
               840
             ],
             "root": [
-              0.12841252982616425,
-              0.057959478348493576,
-              0.15074913203716278
+              0.13455863296985626,
+              0.726110577583313,
+              0.15061023831367493
             ],
             "tipLinearRgb": [
-              0.08480328917503357,
-              0.06624005287885666,
-              0.05595687031745911
+              0.06007040888071061,
+              0.05418924644589425,
+              0.04743508826941253
             ],
-            "flowCoherence": 0.2768551153343321
+            "flowCoherence": 0.31150203890094813
+          },
+          {
+            "leg": "DonkeyRearLeft",
+            "zone": "Fetlock",
+            "pixel": [
+              1138,
+              839
+            ],
+            "root": [
+              -0.1279923915863037,
+              -0.06562487781047821,
+              0.15136019885540009
+            ],
+            "tipLinearRgb": [
+              0.08502371907234192,
+              0.06684679239988328,
+              0.058982995152473454
+            ],
+            "flowCoherence": 0.348538278832366
+          },
+          {
+            "leg": "DonkeyRearRight",
+            "zone": "Fetlock",
+            "pixel": [
+              1456,
+              829
+            ],
+            "root": [
+              0.11679592728614807,
+              0.015810832381248474,
+              0.16919058561325073
+            ],
+            "tipLinearRgb": [
+              0.06752943173050881,
+              0.056022078916430476,
+              0.049377366527915
+            ],
+            "flowCoherence": 0.45874723950992197
           }
         ]
       },
       "lowerLimbFur": {
-        "sampleFibres": 3004,
+        "sampleFibres": 3068,
         "jointDensityGain": 2.4,
         "maximumLengthGain": 2.25,
         "maximumLiftGain": 3,
         "lengthRangeM": [
-          0.004550558556918157,
-          0.051146139650236136
+          0.004648098646430228,
+          0.05124125465050583
         ],
         "liftRangeM": [
-          0.0009086649380870915,
+          0.0008651143982106427,
           0.006585587623341665
         ],
         "method": "redistribute the fixed fine-fibre sample budget toward carpal/fetlock coats; longer, splayed tips follow their shallow joint relief"
       },
       "paleFringe": {
-        "sampleFibres": 4861,
+        "sampleFibres": 4824,
         "redistributedBodySamples": 4000,
         "curvedWisps": 1000,
         "lengthRangeM": [
-          0.004691403858041196,
-          0.0506997188039024
+          0.004276044454308143,
+          0.05068023479307923
         ],
         "liftRangeM": [
-          0.0007902915227300661,
-          0.017597276110182487
+          0.0008129268290121024,
+          0.017599862677591494
         ],
         "wispLengthRangeM": [
           0.03,
@@ -1418,16 +1418,16 @@
         "method": "pale medial foreleg and breast fibres lengthened and lifted; body fine-fibre slots reallocated to the pale fringe with an independent deterministic stream; four existing triangles reused per curved strand; root sample and triangle budgets retained"
       },
       "bellyCoat": {
-        "sampleFibres": 1883,
-        "fineFibres": 1083,
+        "sampleFibres": 1973,
+        "fineFibres": 1173,
         "pairedStrips": 400,
         "sampleLengthRangeM": [
-          0.005303872770030249,
-          0.020149028991976143
+          0.005689923729442073,
+          0.020147609184017652
         ],
         "sampleLiftRangeM": [
-          0.0007551579873282263,
-          0.006598535469933411
+          0.0007399944341879296,
+          0.00659641631721059
         ],
         "stripLengthRangeM": [
           0.0199,
@@ -1441,17 +1441,17 @@
       },
       "pigmentTransfer": {
         "method": "new fringe tints sampled from actual baked body UV0 at stored surface roots; atlas pigment normalized per vertex",
-        "vertices": 15081,
-        "maximumTintChange": 0.5566704571247101,
+        "vertices": 15042,
+        "maximumTintChange": 0.6074826121330261,
         "hairImage": "Texture_DonkeyShortCoatBase",
         "existingGroomOutsideFringeChanged": false
       },
       "pigmentSampler": {
         "sourceSpace": "DonkeyContinuousSkin",
         "bodyImage": "Texture_DonkeyAnimalBase",
-        "bodyPath": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Baked\\Texture_DonkeyAnimalBase.png",
-        "roots": 8999,
-        "maximumSurfaceDistanceM": 0.001575371134094894,
+        "bodyPath": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Baked\\Texture_DonkeyAnimalBase.png",
+        "roots": 8807,
+        "maximumSurfaceDistanceM": 0.0011642443714663386,
         "samples": [
           {
             "root": [
@@ -1472,19 +1472,19 @@
           },
           {
             "root": [
-              0.058995191007852554,
-              0.666672945022583,
-              0.5115208029747009
+              0.048095058649778366,
+              0.6774435639381409,
+              0.5121850371360779
             ],
-            "distanceM": 5.227349538472481e-05,
+            "distanceM": 3.5628450859803706e-05,
             "uv": [
-              0.25093013048171997,
-              0.9096187353134155
+              0.25507834553718567,
+              0.910683274269104
             ],
             "linearRgb": [
-              0.07944196462631226,
-              0.060004398226737976,
-              0.05172693729400635
+              0.06371911615133286,
+              0.0504077672958374,
+              0.048333458602428436
             ]
           },
           {
@@ -1495,13 +1495,13 @@
             ],
             "distanceM": 5.960464477539063e-08,
             "uv": [
-              0.17942269146442413,
-              0.11807093024253845
+              0.2573949992656708,
+              0.2611158788204193
             ],
             "linearRgb": [
-              0.23680037260055542,
-              0.19903960824012756,
-              0.1755496710538864
+              0.23801016807556152,
+              0.19924171268939972,
+              0.17556053400039673
             ]
           },
           {
@@ -1546,13 +1546,13 @@
             ],
             "distanceM": 0.0,
             "uv": [
-              0.35924553871154785,
-              0.36443883180618286
+              0.27527862787246704,
+              0.01704067550599575
             ],
             "linearRgb": [
-              0.17733672261238098,
-              0.1426057368516922,
-              0.12699469923973083
+              0.18331202864646912,
+              0.1500040888786316,
+              0.1319427639245987
             ]
           },
           {
@@ -1574,53 +1574,36 @@
           },
           {
             "root": [
-              -0.08517283201217651,
-              0.7120864987373352,
-              0.6228870153427124
+              -0.09205204993486404,
+              0.6725400686264038,
+              0.6324288845062256
             ],
-            "distanceM": 0.0,
+            "distanceM": 7.450580596923828e-09,
             "uv": [
-              0.13504230976104736,
-              0.9169795513153076
+              0.05631648376584053,
+              0.9199748039245605
             ],
             "linearRgb": [
-              0.07102246582508087,
-              0.05600793659687042,
-              0.05068463459610939
+              0.06960607320070267,
+              0.06362615525722504,
+              0.05201995000243187
             ]
           },
           {
             "root": [
-              -0.1023315042257309,
-              0.6768180727958679,
-              0.6408455967903137
+              -0.04398912563920021,
+              0.667465090751648,
+              0.5865693688392639
             ],
-            "distanceM": 6.006850128414953e-08,
+            "distanceM": 7.450580596923828e-09,
             "uv": [
-              0.042512934654951096,
-              0.9867896437644958
+              0.15740077197551727,
+              0.6669451594352722
             ],
             "linearRgb": [
-              0.09031855314970016,
-              0.07383254170417786,
-              0.06281572580337524
-            ]
-          },
-          {
-            "root": [
-              -0.04445783793926239,
-              0.6840494275093079,
-              0.5758695602416992
-            ],
-            "distanceM": 3.725290298461914e-09,
-            "uv": [
-              0.15287558734416962,
-              0.6713275909423828
-            ],
-            "linearRgb": [
-              0.021174605935811996,
-              0.01744489185512066,
-              0.01760253682732582
+              0.0680169016122818,
+              0.04781787469983101,
+              0.04531656205654144
             ]
           },
           {
@@ -1642,29 +1625,46 @@
           },
           {
             "root": [
-              -0.051914505660533905,
-              0.6697797179222107,
-              0.6575278043746948
+              0.1205911785364151,
+              0.6653186082839966,
+              0.6584101319313049
             ],
-            "distanceM": 6.064333035737945e-08,
+            "distanceM": 6.664001972467304e-08,
             "uv": [
-              0.02315846085548401,
-              0.8644201755523682
+              0.3680495619773865,
+              0.81670081615448
             ],
             "linearRgb": [
-              0.2642784118652344,
-              0.2183818817138672,
-              0.19557857513427734
+              0.05178123712539673,
+              0.042132191359996796,
+              0.03682974725961685
+            ]
+          },
+          {
+            "root": [
+              0.052063778042793274,
+              0.6629830002784729,
+              0.571145236492157
+            ],
+            "distanceM": 6.838723720647977e-08,
+            "uv": [
+              0.25442272424697876,
+              0.8819151520729065
+            ],
+            "linearRgb": [
+              0.061448171734809875,
+              0.0494261160492897,
+              0.04224800318479538
             ]
           }
         ]
       },
-      "exteriorVerticesPreserved": 41663,
+      "exteriorVerticesPreserved": 42094,
       "detailNormalTexelsPerMetre": "unique UV0 atlas; original 0.45 m fibre frequency is an authoring input",
       "normalMode": "bakedSourceCoatRelief"
     },
     "referenceFit": {
-      "version": "20261027ReferenceV50",
+      "version": "20261027ReferenceV51",
       "referenceImage": "Image_DonkeyOriginalThreeView.png",
       "calibration": {
         "groundPixelY": 925,
@@ -5584,7 +5584,7 @@
             "opaqueHairPreservesPhotoRgbVariation": true
           },
           "method": "reference-alpha side ribbon, curved triangular-tube main mane and fine curved forelock strips rooted to actual skin",
-          "texture": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Texture_DonkeyManeBase.png",
+          "texture": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Texture_DonkeyManeBase.png",
           "textureSha256": "8fab9106b10ad10e105770a2884460a76d16a154a3256a1256f6b74fa2e94f82",
           "sourceSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b"
         },
@@ -7193,6 +7193,100 @@
           "testedNonAdjacentPairs": 0,
           "scope": "proper crossings in both orbital skin regions, excluding shared edges and point-only contact"
         },
+        "eyeAspect": {
+          "version": "20261027EyeAspectV51",
+          "method": "common compact map rotates closed orbital skin, globe and wet lids eight degrees toward the front, shortens the aperture axis ten percent and adds twelve degrees of shared eye-corner roll; original eye centres retained; front/side aperture balance checked together",
+          "frames": [
+            {
+              "side": "Left",
+              "centre": [
+                -0.09645333886146545,
+                1.1615302562713623,
+                1.1774097681045532
+              ],
+              "axis": [
+                -0.3428893530363671,
+                -0.9229564706809349,
+                0.17486636269590042
+              ],
+              "normal": [
+                -0.9332665514245456,
+                0.35590074024818247,
+                0.04845830251806034
+              ],
+              "up": [
+                0.1069599717952362,
+                0.14658109127369842,
+                0.983398977076229
+              ]
+            },
+            {
+              "side": "Right",
+              "centre": [
+                0.09138310700654984,
+                1.1616401672363281,
+                1.1774146556854248
+              ],
+              "axis": [
+                -0.34288871548546873,
+                0.9229561345208586,
+                -0.17486938709516978
+              ],
+              "normal": [
+                0.9332671819843965,
+                0.3558997271176313,
+                0.048453599128435144
+              ],
+              "up": [
+                -0.10695651370360215,
+                0.1465856677438507,
+                0.9833986710324867
+              ]
+            }
+          ],
+          "forwardRotationDegrees": 8,
+          "apertureAxisScale": 0.9,
+          "rollDegrees": 12,
+          "coreRadiusM": 0.035,
+          "supportRadiusM": 0.08,
+          "minimumSampledJacobian": 0.8999999999780195,
+          "maximumProtectedDisplacementM": 0.0,
+          "objects": {
+            "DonkeyContinuousSkin": {
+              "verticesChanged": 1476,
+              "maximumDisplacementM": 0.011619945896717748
+            },
+            "DonkeyEyeLeft": {
+              "verticesChanged": 482,
+              "maximumDisplacementM": 0.006511021764201038
+            },
+            "DonkeyEyelidMarginLeft": {
+              "verticesChanged": 240,
+              "maximumDisplacementM": 0.006709441234157919
+            },
+            "DonkeyEyeRight": {
+              "verticesChanged": 482,
+              "maximumDisplacementM": 0.0065109851151277
+            },
+            "DonkeyEyelidMarginRight": {
+              "verticesChanged": 240,
+              "maximumDisplacementM": 0.006709457900836639
+            },
+            "DonkeyShortCoatCards": {
+              "verticesChanged": 1159,
+              "maximumDisplacementM": 0.01161294735347245
+            }
+          },
+          "bonesChanged": 0,
+          "weightsChanged": false,
+          "trianglesAdded": 0,
+          "normalTransform": "inverse-transpose local field Jacobian"
+        },
+        "postAspectOrbitalIntegrity": {
+          "orbitalCrossings": 0,
+          "testedNonAdjacentPairs": 0,
+          "scope": "proper crossings in both orbital skin regions, excluding shared edges and point-only contact"
+        },
         "lowerLimbRelief": {
           "version": "20261026LowerLimbReliefV36",
           "method": "shallow offset carpal and fetlock bosses, dorsal crest and paired palmar tendons; no circumferential joint ring",
@@ -7310,7 +7404,7 @@
           "verticesChanged": 2090,
           "boundaryEdges": 0,
           "nonmanifoldEdges": 0,
-          "signedVolumeM3": 0.15271798801182415,
+          "signedVolumeM3": 0.15271035633350508,
           "bonesChanged": 0,
           "weightsChanged": false,
           "trianglesAdded": 0,
@@ -7327,7 +7421,7 @@
           "integrity": {
             "boundaryEdges": 0,
             "nonmanifoldEdges": 0,
-            "volumeM3": 0.15362984180440822,
+            "volumeM3": 0.15362221012608915,
             "testedPairs": 0,
             "chestCrossings": 0,
             "examples": []
@@ -7369,7 +7463,7 @@
           "maximumProtectedDisplacementM": 0.0,
           "boundaryEdges": 0,
           "nonmanifoldEdges": 0,
-          "signedVolumeM3": 0.15369012739355353,
+          "signedVolumeM3": 0.15368249571523435,
           "sideDepthAndHeightChanged": false,
           "bonesChanged": 0,
           "weightsChanged": false,
@@ -7400,7 +7494,7 @@
           "verticesChanged": 1613,
           "boundaryEdges": 0,
           "nonmanifoldEdges": 0,
-          "signedVolumeM3": 0.15393260046317025,
+          "signedVolumeM3": 0.15392496878485107,
           "bonesChanged": 0,
           "weightsChanged": false,
           "trianglesAdded": 0,
@@ -7434,7 +7528,7 @@
           "maximumProtectedDisplacementM": 0.0,
           "boundaryEdges": 0,
           "nonmanifoldEdges": 0,
-          "signedVolumeM3": 0.15372685137045553,
+          "signedVolumeM3": 0.15371921969213645,
           "bonesChanged": 0,
           "weightsChanged": false,
           "trianglesAdded": 0,
@@ -7464,7 +7558,7 @@
             0.05,
             0.18
           ],
-          "authoringWeights": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\Review\\Data_ForearmBinding.json"
+          "authoringWeights": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\Review\\Data_ForearmBinding.json"
         },
         "nasalPad": {
           "material": "DonkeyNasalPad",
@@ -7764,9 +7858,9 @@
       "standingPose": "far forefoot forward, far hindfoot forward; centred foot targets during walk",
       "shape": "broader muzzle/skull and barrel, shorter axial silhouette, corrected eye height, back/belly profile and sternum",
       "groom": {
-        "fibres": 13260,
+        "fibres": 13356,
         "rootSamples": 21000,
-        "bodyTufts": 233,
+        "bodyTufts": 259,
         "bodyTuftLimit": 288,
         "coronetFibres": 480,
         "coronetAreaM2": 0.02089279626420648,
@@ -7778,20 +7872,20 @@
           0.0007,
           0.0012
         ],
-        "cards": 4511,
-        "triangles": 22282,
+        "cards": 4489,
+        "triangles": 22334,
         "regionCards": {
-          "0": 251,
-          "1": 27,
-          "2": 2403,
+          "0": 262,
+          "1": 38,
+          "2": 2407,
           "3": 360
         },
-        "sampledSurfaceM2": 2.2592929927125636,
+        "sampledSurfaceM2": 2.2586938342192524,
         "maxInfluences": 4,
         "darkLegTufts": {
           "version": "20261026LegTuftsV44",
-          "wisps": 735,
-          "reusedFineTriangles": 2940,
+          "wisps": 711,
+          "reusedFineTriangles": 2844,
           "trianglesAdded": 0,
           "segments": 2,
           "widthM": [
@@ -7810,23 +7904,23 @@
           "tipStudioExposureGain": 1.1,
           "counts": {
             "DonkeyFrontLeft": {
-              "Fetlock": 130,
-              "Carpal": 54
+              "Fetlock": 126,
+              "Carpal": 52
             },
             "DonkeyFrontRight": {
-              "Fetlock": 130,
-              "Carpal": 54
+              "Fetlock": 126,
+              "Carpal": 52
             },
             "DonkeyRearLeft": {
-              "Fetlock": 130,
-              "Carpal": 54
+              "Fetlock": 126,
+              "Carpal": 52
             },
             "DonkeyRearRight": {
-              "Fetlock": 129,
-              "Carpal": 54
+              "Fetlock": 126,
+              "Carpal": 51
             }
           },
-          "availableDonorTriangles": 2940,
+          "availableDonorTriangles": 2846,
           "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
           "sourceSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
           "method": "fixed existing fine-fibre slots reassigned evenly across four legs, mostly to tapered fetlock feathering; photographic flow, restrained tip pigment, local curve normals and identical shared-corner skin weights",
@@ -7835,334 +7929,334 @@
               "leg": "DonkeyFrontLeft",
               "zone": "Fetlock",
               "pixel": [
-                196,
-                830
+                719,
+                834
               ],
               "root": [
-                -0.06437960267066956,
-                0.6771755814552307,
-                0.16705407202243805
+                -0.054386772215366364,
+                0.6602972745895386,
+                0.16043609380722046
               ],
               "tipLinearRgb": [
-                0.05472142286598683,
-                0.044185912981629376,
-                0.04078507944941521
+                0.038603752851486206,
+                0.03325395751744509,
+                0.03364190831780434
               ],
-              "flowCoherence": 0.6705198082262347
+              "flowCoherence": 0.5435504392486142
             },
             {
               "leg": "DonkeyFrontRight",
               "zone": "Fetlock",
               "pixel": [
-                735,
-                811
+                721,
+                818
               ],
               "root": [
-                0.06823180615901947,
-                0.7112762928009033,
-                0.20167741179466248
+                0.1251905858516693,
+                0.7397758960723877,
+                0.18969175219535828
               ],
               "tipLinearRgb": [
-                0.07227186262607575,
-                0.06129657817259431,
-                0.06174134470522405
+                0.06900161430239678,
+                0.05117658786475659,
+                0.046253484115004545
               ],
-              "flowCoherence": 0.22613228320880424
+              "flowCoherence": 0.2459036945263456
             },
             {
               "leg": "DonkeyRearLeft",
               "zone": "Fetlock",
               "pixel": [
-                1133,
-                848
+                1329,
+                828
               ],
               "root": [
-                -0.12186310440301895,
-                -0.056973010301589966,
-                0.13531705737113953
+                -0.11625929921865463,
+                -0.10820215940475464,
+                0.17148669064044952
               ],
               "tipLinearRgb": [
-                0.043506133928895,
-                0.03668773956596852,
-                0.03607398867607117
+                0.063929882645607,
+                0.04663031958043576,
+                0.044806785881519325
               ],
-              "flowCoherence": 0.45166372784096404
+              "flowCoherence": 0.6389263612855139
             },
             {
               "leg": "DonkeyRearRight",
               "zone": "Fetlock",
               "pixel": [
-                1143,
-                831
+                1139,
+                841
               ],
               "root": [
-                0.12867552042007446,
-                0.048098545521497726,
-                0.1657150238752365
+                0.06618849188089371,
+                0.05544789880514145,
+                0.14910206198692322
               ],
               "tipLinearRgb": [
-                0.06504231356084347,
-                0.05089765340089798,
-                0.053698807954788215
+                0.05460958518087864,
+                0.04063124731183052,
+                0.03829056061804295
               ],
-              "flowCoherence": 0.22664614528021773
+              "flowCoherence": 0.1681527424794431
             },
             {
               "leg": "DonkeyFrontLeft",
               "zone": "Fetlock",
               "pixel": [
-                725,
-                837
+                723,
+                850
               ],
               "root": [
-                -0.1315416693687439,
-                0.6443312168121338,
-                0.15626001358032227
+                -0.13094282150268555,
+                0.6541867256164551,
+                0.13180223107337952
               ],
               "tipLinearRgb": [
-                0.09865874573588372,
-                0.0752479448914528,
-                0.06697361581027508
+                0.0384595301002264,
+                0.031939743831753735,
+                0.029301039129495624
               ],
-              "flowCoherence": 0.2005216078995766
+              "flowCoherence": 0.23291693203419764
             },
             {
               "leg": "DonkeyFrontRight",
               "zone": "Fetlock",
               "pixel": [
-                91,
-                840
+                719,
+                830
               ],
               "root": [
-                0.12323275208473206,
-                0.7581532597541809,
-                0.14922970533370972
+                0.12980413436889648,
+                0.7440574169158936,
+                0.1672961711883545
               ],
               "tipLinearRgb": [
-                0.037113732472062115,
-                0.03418127559125424,
-                0.03478279858827591
+                0.06921965926885605,
+                0.058132160827517515,
+                0.053530817851424224
               ],
-              "flowCoherence": 0.18945934271755613
+              "flowCoherence": 0.5022738802534916
             },
             {
               "leg": "DonkeyRearLeft",
               "zone": "Fetlock",
               "pixel": [
-                1148,
-                827
+                1137,
+                818
               ],
               "root": [
-                -0.06283733248710632,
-                -0.08682429045438766,
-                0.17222750186920166
+                -0.11645403504371643,
+                -0.06328247487545013,
+                0.18976649641990662
               ],
               "tipLinearRgb": [
-                0.046958091855049136,
-                0.04050469025969505,
-                0.03702587522566319
+                0.03836854621767998,
+                0.034380659088492395,
+                0.03580347523093224
               ],
-              "flowCoherence": 0.5934542592250085
+              "flowCoherence": 0.04892955242538103
+            },
+            {
+              "leg": "DonkeyRearRight",
+              "zone": "Fetlock",
+              "pixel": [
+                1134,
+                809
+              ],
+              "root": [
+                0.10036756098270416,
+                0.06672592461109161,
+                0.204860657453537
+              ],
+              "tipLinearRgb": [
+                0.04757732562720776,
+                0.039726125076413155,
+                0.03826018758118153
+              ],
+              "flowCoherence": 0.13137622530667212
+            },
+            {
+              "leg": "DonkeyFrontLeft",
+              "zone": "Fetlock",
+              "pixel": [
+                732,
+                843
+              ],
+              "root": [
+                -0.05487725883722305,
+                0.6285973787307739,
+                0.14424248039722443
+              ],
+              "tipLinearRgb": [
+                0.06635329201817514,
+                0.059912032261490826,
+                0.05677012763917447
+              ],
+              "flowCoherence": 0.39128037782885966
+            },
+            {
+              "leg": "DonkeyFrontRight",
+              "zone": "Fetlock",
+              "pixel": [
+                716,
+                845
+              ],
+              "root": [
+                0.12611240148544312,
+                0.7535013556480408,
+                0.14180712401866913
+              ],
+              "tipLinearRgb": [
+                0.023069337755441666,
+                0.018867364153265953,
+                0.019964286871254445
+              ],
+              "flowCoherence": 0.428366700550282
+            },
+            {
+              "leg": "DonkeyRearLeft",
+              "zone": "Fetlock",
+              "pixel": [
+                1149,
+                836
+              ],
+              "root": [
+                -0.062748484313488,
+                -0.08997496962547302,
+                0.15664860606193542
+              ],
+              "tipLinearRgb": [
+                0.10276591628789902,
+                0.07885931208729745,
+                0.06751131936907769
+              ],
+              "flowCoherence": 0.21745300400182946
             },
             {
               "leg": "DonkeyRearRight",
               "zone": "Fetlock",
               "pixel": [
                 1147,
-                824
+                829
               ],
               "root": [
-                0.12661410868167877,
-                0.0390496589243412,
-                0.17764215171337128
+                0.12838587164878845,
+                0.03868193179368973,
+                0.17027144134044647
               ],
               "tipLinearRgb": [
-                0.055779324099421504,
-                0.046249890327453615,
-                0.04426219798624516
+                0.04801794365048409,
+                0.037932066991925244,
+                0.04085954502224923
               ],
-              "flowCoherence": 0.35067500962179365
+              "flowCoherence": 0.3445403212485554
             },
             {
               "leg": "DonkeyFrontLeft",
               "zone": "Fetlock",
               "pixel": [
-                715,
-                835
+                206,
+                822
               ],
               "root": [
-                -0.12336257100105286,
-                0.672584593296051,
-                0.15977692604064941
+                -0.08931998908519745,
+                0.6871055364608765,
+                0.18213006854057312
               ],
               "tipLinearRgb": [
-                0.04968040026724339,
-                0.04709674566984177,
-                0.04905751533806325
+                0.03411096930503846,
+                0.02600423488765955,
+                0.02383497636765242
               ],
-              "flowCoherence": 0.5981042040675522
+              "flowCoherence": 0.4972338503279107
             },
             {
               "leg": "DonkeyFrontRight",
               "zone": "Fetlock",
               "pixel": [
-                92,
-                837
-              ],
-              "root": [
-                0.12316808849573135,
-                0.7587873935699463,
-                0.15450012683868408
-              ],
-              "tipLinearRgb": [
-                0.0451606571674347,
-                0.04189128987491131,
-                0.04078507944941521
-              ],
-              "flowCoherence": 0.04412717479442567
-            },
-            {
-              "leg": "DonkeyRearLeft",
-              "zone": "Fetlock",
-              "pixel": [
-                1141,
-                835
-              ],
-              "root": [
-                -0.06435640156269073,
-                -0.07160814851522446,
-                0.15952077507972717
-              ],
-              "tipLinearRgb": [
-                0.07353718727827073,
-                0.05740602314472199,
-                0.049894634261727334
-              ],
-              "flowCoherence": 0.4497978319075589
-            },
-            {
-              "leg": "DonkeyRearRight",
-              "zone": "Fetlock",
-              "pixel": [
-                1135,
-                826
-              ],
-              "root": [
-                0.1150006651878357,
-                0.06563011556863785,
-                0.17466169595718384
-              ],
-              "tipLinearRgb": [
-                0.1268959254026413,
-                0.10246786549687387,
-                0.09674099907279016
-              ],
-              "flowCoherence": 0.2735833744145461
-            },
-            {
-              "leg": "DonkeyFrontLeft",
-              "zone": "Fetlock",
-              "pixel": [
-                734,
-                806
-              ],
-              "root": [
-                -0.07299245893955231,
-                0.632773756980896,
-                0.2108425348997116
-              ],
-              "tipLinearRgb": [
-                0.13563336953520777,
-                0.11687843725085259,
-                0.10988862045109274
-              ],
-              "flowCoherence": 0.38871895075697566
-            },
-            {
-              "leg": "DonkeyFrontRight",
-              "zone": "Fetlock",
-              "pixel": [
-                737,
-                825
-              ],
-              "root": [
-                0.11238373070955276,
-                0.698398232460022,
-                0.17586183547973633
-              ],
-              "tipLinearRgb": [
-                0.1175850734114647,
-                0.10381183549761773,
-                0.09855578392744065
-              ],
-              "flowCoherence": 0.37270767922141795
-            },
-            {
-              "leg": "DonkeyRearLeft",
-              "zone": "Fetlock",
-              "pixel": [
-                1136,
-                835
-              ],
-              "root": [
-                -0.12448424845933914,
-                -0.062284186482429504,
-                0.15842768549919128
-              ],
-              "tipLinearRgb": [
-                0.057047939300537115,
-                0.0414613712579012,
-                0.03834835462272168
-              ],
-              "flowCoherence": 0.19892492087406358
-            },
-            {
-              "leg": "DonkeyRearRight",
-              "zone": "Fetlock",
-              "pixel": [
-                1138,
+                726,
                 840
               ],
               "root": [
-                0.12841252982616425,
-                0.057959478348493576,
-                0.15074913203716278
+                0.13455863296985626,
+                0.726110577583313,
+                0.15061023831367493
               ],
               "tipLinearRgb": [
-                0.08480328917503357,
-                0.06624005287885666,
-                0.05595687031745911
+                0.06007040888071061,
+                0.05418924644589425,
+                0.04743508826941253
               ],
-              "flowCoherence": 0.2768551153343321
+              "flowCoherence": 0.31150203890094813
+            },
+            {
+              "leg": "DonkeyRearLeft",
+              "zone": "Fetlock",
+              "pixel": [
+                1138,
+                839
+              ],
+              "root": [
+                -0.1279923915863037,
+                -0.06562487781047821,
+                0.15136019885540009
+              ],
+              "tipLinearRgb": [
+                0.08502371907234192,
+                0.06684679239988328,
+                0.058982995152473454
+              ],
+              "flowCoherence": 0.348538278832366
+            },
+            {
+              "leg": "DonkeyRearRight",
+              "zone": "Fetlock",
+              "pixel": [
+                1456,
+                829
+              ],
+              "root": [
+                0.11679592728614807,
+                0.015810832381248474,
+                0.16919058561325073
+              ],
+              "tipLinearRgb": [
+                0.06752943173050881,
+                0.056022078916430476,
+                0.049377366527915
+              ],
+              "flowCoherence": 0.45874723950992197
             }
           ]
         },
         "lowerLimbFur": {
-          "sampleFibres": 3004,
+          "sampleFibres": 3068,
           "jointDensityGain": 2.4,
           "maximumLengthGain": 2.25,
           "maximumLiftGain": 3,
           "lengthRangeM": [
-            0.004550558556918157,
-            0.051146139650236136
+            0.004648098646430228,
+            0.05124125465050583
           ],
           "liftRangeM": [
-            0.0009086649380870915,
+            0.0008651143982106427,
             0.006585587623341665
           ],
           "method": "redistribute the fixed fine-fibre sample budget toward carpal/fetlock coats; longer, splayed tips follow their shallow joint relief"
         },
         "paleFringe": {
-          "sampleFibres": 4861,
+          "sampleFibres": 4824,
           "redistributedBodySamples": 4000,
           "curvedWisps": 1000,
           "lengthRangeM": [
-            0.004691403858041196,
-            0.0506997188039024
+            0.004276044454308143,
+            0.05068023479307923
           ],
           "liftRangeM": [
-            0.0007902915227300661,
-            0.017597276110182487
+            0.0008129268290121024,
+            0.017599862677591494
           ],
           "wispLengthRangeM": [
             0.03,
@@ -8180,16 +8274,16 @@
           "method": "pale medial foreleg and breast fibres lengthened and lifted; body fine-fibre slots reallocated to the pale fringe with an independent deterministic stream; four existing triangles reused per curved strand; root sample and triangle budgets retained"
         },
         "bellyCoat": {
-          "sampleFibres": 1883,
-          "fineFibres": 1083,
+          "sampleFibres": 1973,
+          "fineFibres": 1173,
           "pairedStrips": 400,
           "sampleLengthRangeM": [
-            0.005303872770030249,
-            0.020149028991976143
+            0.005689923729442073,
+            0.020147609184017652
           ],
           "sampleLiftRangeM": [
-            0.0007551579873282263,
-            0.006598535469933411
+            0.0007399944341879296,
+            0.00659641631721059
           ],
           "stripLengthRangeM": [
             0.0199,
@@ -8203,17 +8297,17 @@
         },
         "pigmentTransfer": {
           "method": "new fringe tints sampled from actual baked body UV0 at stored surface roots; atlas pigment normalized per vertex",
-          "vertices": 15081,
-          "maximumTintChange": 0.5566704571247101,
+          "vertices": 15042,
+          "maximumTintChange": 0.6074826121330261,
           "hairImage": "Texture_DonkeyShortCoatBase",
           "existingGroomOutsideFringeChanged": false
         },
         "pigmentSampler": {
           "sourceSpace": "DonkeyContinuousSkin",
           "bodyImage": "Texture_DonkeyAnimalBase",
-          "bodyPath": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Baked\\Texture_DonkeyAnimalBase.png",
-          "roots": 8999,
-          "maximumSurfaceDistanceM": 0.001575371134094894,
+          "bodyPath": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Baked\\Texture_DonkeyAnimalBase.png",
+          "roots": 8807,
+          "maximumSurfaceDistanceM": 0.0011642443714663386,
           "samples": [
             {
               "root": [
@@ -8234,19 +8328,19 @@
             },
             {
               "root": [
-                0.058995191007852554,
-                0.666672945022583,
-                0.5115208029747009
+                0.048095058649778366,
+                0.6774435639381409,
+                0.5121850371360779
               ],
-              "distanceM": 5.227349538472481e-05,
+              "distanceM": 3.5628450859803706e-05,
               "uv": [
-                0.25093013048171997,
-                0.9096187353134155
+                0.25507834553718567,
+                0.910683274269104
               ],
               "linearRgb": [
-                0.07944196462631226,
-                0.060004398226737976,
-                0.05172693729400635
+                0.06371911615133286,
+                0.0504077672958374,
+                0.048333458602428436
               ]
             },
             {
@@ -8257,13 +8351,13 @@
               ],
               "distanceM": 5.960464477539063e-08,
               "uv": [
-                0.17942269146442413,
-                0.11807093024253845
+                0.2573949992656708,
+                0.2611158788204193
               ],
               "linearRgb": [
-                0.23680037260055542,
-                0.19903960824012756,
-                0.1755496710538864
+                0.23801016807556152,
+                0.19924171268939972,
+                0.17556053400039673
               ]
             },
             {
@@ -8308,13 +8402,13 @@
               ],
               "distanceM": 0.0,
               "uv": [
-                0.35924553871154785,
-                0.36443883180618286
+                0.27527862787246704,
+                0.01704067550599575
               ],
               "linearRgb": [
-                0.17733672261238098,
-                0.1426057368516922,
-                0.12699469923973083
+                0.18331202864646912,
+                0.1500040888786316,
+                0.1319427639245987
               ]
             },
             {
@@ -8336,53 +8430,36 @@
             },
             {
               "root": [
-                -0.08517283201217651,
-                0.7120864987373352,
-                0.6228870153427124
+                -0.09205204993486404,
+                0.6725400686264038,
+                0.6324288845062256
               ],
-              "distanceM": 0.0,
+              "distanceM": 7.450580596923828e-09,
               "uv": [
-                0.13504230976104736,
-                0.9169795513153076
+                0.05631648376584053,
+                0.9199748039245605
               ],
               "linearRgb": [
-                0.07102246582508087,
-                0.05600793659687042,
-                0.05068463459610939
+                0.06960607320070267,
+                0.06362615525722504,
+                0.05201995000243187
               ]
             },
             {
               "root": [
-                -0.1023315042257309,
-                0.6768180727958679,
-                0.6408455967903137
+                -0.04398912563920021,
+                0.667465090751648,
+                0.5865693688392639
               ],
-              "distanceM": 6.006850128414953e-08,
+              "distanceM": 7.450580596923828e-09,
               "uv": [
-                0.042512934654951096,
-                0.9867896437644958
+                0.15740077197551727,
+                0.6669451594352722
               ],
               "linearRgb": [
-                0.09031855314970016,
-                0.07383254170417786,
-                0.06281572580337524
-              ]
-            },
-            {
-              "root": [
-                -0.04445783793926239,
-                0.6840494275093079,
-                0.5758695602416992
-              ],
-              "distanceM": 3.725290298461914e-09,
-              "uv": [
-                0.15287558734416962,
-                0.6713275909423828
-              ],
-              "linearRgb": [
-                0.021174605935811996,
-                0.01744489185512066,
-                0.01760253682732582
+                0.0680169016122818,
+                0.04781787469983101,
+                0.04531656205654144
               ]
             },
             {
@@ -8404,24 +8481,41 @@
             },
             {
               "root": [
-                -0.051914505660533905,
-                0.6697797179222107,
-                0.6575278043746948
+                0.1205911785364151,
+                0.6653186082839966,
+                0.6584101319313049
               ],
-              "distanceM": 6.064333035737945e-08,
+              "distanceM": 6.664001972467304e-08,
               "uv": [
-                0.02315846085548401,
-                0.8644201755523682
+                0.3680495619773865,
+                0.81670081615448
               ],
               "linearRgb": [
-                0.2642784118652344,
-                0.2183818817138672,
-                0.19557857513427734
+                0.05178123712539673,
+                0.042132191359996796,
+                0.03682974725961685
+              ]
+            },
+            {
+              "root": [
+                0.052063778042793274,
+                0.6629830002784729,
+                0.571145236492157
+              ],
+              "distanceM": 6.838723720647977e-08,
+              "uv": [
+                0.25442272424697876,
+                0.8819151520729065
+              ],
+              "linearRgb": [
+                0.061448171734809875,
+                0.0494261160492897,
+                0.04224800318479538
               ]
             }
           ]
         },
-        "exteriorVerticesPreserved": 41663
+        "exteriorVerticesPreserved": 42094
       },
       "material": "visible full-RGB reference coat/face pigment with illumination compensation; anatomical apertures and hidden pixels retain calibrated fallback; independent 0.45 m fibre-normal repeat",
       "colorCalibration": {
@@ -8472,7 +8566,7 @@
           "boundaryEdges": 0,
           "nonmanifoldEdges": 0,
           "windingConflicts": 0,
-          "mainVolumeM3": 0.1537591020532238
+          "mainVolumeM3": 0.15375096519017506
         }
       },
       "photoDetail": {
@@ -8482,12 +8576,12 @@
         "cavityProtection": "feathered source nostril shadows and oral crease/highlight footprints excluded from pigment-like detail; anatomical creases remain geometry",
         "original": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
         "originalSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
-        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\Image_NakedAnatomyGuide.png",
+        "occludedGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\Image_NakedAnatomyGuide.png",
         "guideSha256": "8130715142837beed8957c59ffc775500d4b6ff96bf99a61b51f8759dc9d0c4a",
         "images": [
           {
             "view": "Side",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Texture_DonkeyReferenceSideDetail.png",
             "sha256": "5ffbf31624e279dd2bc0e0e5d981dbd19a3769397629da770a2ca5f56d01046c",
             "size": [
               1536,
@@ -8496,7 +8590,7 @@
           },
           {
             "view": "Front",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Texture_DonkeyReferenceFrontDetail.png",
             "sha256": "dfb5315c672d9fdb069604e7c6c7d1f20968909819a78acdfb57b4ee4587fffb",
             "size": [
               1536,
@@ -8505,7 +8599,7 @@
           },
           {
             "view": "Rear",
-            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
+            "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Texture_DonkeyReferenceRearDetail.png",
             "sha256": "ef5d8b1ac83cec630467e8244236c71b80238d05199fbf89f99d87c7b1a7aff4",
             "size": [
               1536,
@@ -8516,11 +8610,11 @@
         "occlusionMasks": "_blender/Script_DonkeyReferenceMasks.py; geometric rope footprints including shaded edges; feathered normalized-detail blending",
         "visibility": "fitted-skin BVH depth test from axial source cameras; 4 mm surface tolerance; source-vertex weights baked into UV0; anterior muzzle uses horizontal normal azimuth; the pectoral region prioritizes its frontal source to prevent side-view collar-fill streaks on downward-facing breast skin",
         "materials": [
-          "DonkeyLowerLegShortFur",
+          "DonkeyNasalPad",
           "DonkeyCartGreyCoat",
           "DonkeyCartEarInterior",
-          "DonkeyNasalPad",
-          "DonkeyCartFaceFur"
+          "DonkeyCartFaceFur",
+          "DonkeyLowerLegShortFur"
         ],
         "runtime": "baked UV0 base colour; independent tiled UV1 fibre normal; no camera projection in GLB",
         "pigmentProjection": {
@@ -8571,7 +8665,7 @@
           "images": [
             {
               "view": "Side",
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Texture_DonkeyReferenceSidePigment.png",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Texture_DonkeyReferenceSidePigment.png",
               "sha256": "86986d764742a6b4d0411882439d9133aa7585d12044e1e824a87877d842cab3",
               "size": [
                 1536,
@@ -8580,7 +8674,7 @@
             },
             {
               "view": "Front",
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Texture_DonkeyReferenceFrontPigment.png",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Texture_DonkeyReferenceFrontPigment.png",
               "sha256": "1be12d77ef75b0974bf85c1671486afbc7edc30c7f9d83edc7c1ef95193437bc",
               "size": [
                 1536,
@@ -8589,7 +8683,7 @@
             },
             {
               "view": "Rear",
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Texture_DonkeyReferenceRearPigment.png",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Texture_DonkeyReferenceRearPigment.png",
               "sha256": "3401153c133468803d39ae6a78971151ae8ec700231da93af6b604f745c0e224",
               "size": [
                 1536,
@@ -8643,7 +8737,7 @@
               "sha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b"
             },
             {
-              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\Image_NakedAnatomyGuide.png",
+              "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\Image_NakedAnatomyGuide.png",
               "sha256": "8130715142837beed8957c59ffc775500d4b6ff96bf99a61b51f8759dc9d0c4a"
             }
           ],
@@ -9232,7 +9326,7 @@
           },
           "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
           "sourceSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
-          "atlas": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Texture_DonkeyLegPigment.png",
+          "atlas": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Texture_DonkeyLegPigment.png",
           "sha256": "403ced69959c245ceb241d7a541e5d42ea4c87b55011eb208ea448174373a2e3",
           "vertices": 5204,
           "materials": [
@@ -9240,7 +9334,7 @@
             "DonkeyLowerLegShortFur"
           ],
           "relief": {
-            "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Texture_DonkeyLegRelief.png",
+            "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Texture_DonkeyLegRelief.png",
             "sha256": "f3f1052247cad7d642588fc2d7817d9e400c9737fff9bf55a0aab0dccb7a187f",
             "strength": 0.65,
             "distanceM": 0.0008,
@@ -9262,7 +9356,7 @@
             "DonkeyCartGreyCoat",
             "DonkeyLowerLegShortFur"
           ],
-          "sourceImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Texture_DonkeyChestPigment.png",
+          "sourceImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Texture_DonkeyChestPigment.png",
           "savedPixelMaximumError": 0.0019606947898864746,
           "method": "visible original frontal RGB and local horizontal interpolation over known rope footprints; protected chest underside only; existing frontal illumination compensation, no synthetic pigment or guide fill"
         },
@@ -9472,7 +9566,7 @@
               0.0031461422331631184
             ]
           ],
-          "sourceAtlas": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Texture_DonkeyHoofPigment.png",
+          "sourceAtlas": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Texture_DonkeyHoofPigment.png",
           "sourceAtlasSize": [
             1024,
             1024
@@ -9519,7 +9613,7 @@
           "version": "20261025EarCoatV32",
           "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\DonkeyCart\\20261020\\References\\Image_DonkeyOriginalThreeView.png",
           "sourceSha256": "2def777119ae32c6cef6f87501c3211d0c65452d549378b190ac8f5ff7ef8b4b",
-          "image": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\SourceTextures\\Texture_DonkeyEarReferenceBase.png",
+          "image": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\SourceTextures\\Texture_DonkeyEarReferenceBase.png",
           "imageSha256": "75f01abcce8c5408d3113f2812c8af781883ec4150dd9ad9930d244ea6ba471b",
           "objects": [
             "DonkeyPinnaLeft",
@@ -13448,7 +13542,7 @@
     "sourceAnatomyEvidence": "Measured three-view silhouette, closed manifold neck/skin, orbital relief, rebuilt eyes and swept nasal cavities; compatible rest joints and four-influence skin. Native clips and the packed GLB are independently sampled.",
     "nativeLateralStanceDriftPerFrameM": 1.4843849033274736e-07,
     "pectoralMotionIntegrity": {
-      "assetSha256": "d92729ad4133627fa7cdce7e7a54b7d3c6816b697259059a97f48e712717cf7c",
+      "assetSha256": "bc85c3f9a94c880aa235faf926ad128f35d45678d244e75dca07e3dcb1d341f1",
       "region": "Pectoral",
       "walkSamples": 145,
       "idleSamples": 37,
@@ -13460,7 +13554,7 @@
       "pass": true
     },
     "hindMotionIntegrity": {
-      "assetSha256": "d92729ad4133627fa7cdce7e7a54b7d3c6816b697259059a97f48e712717cf7c",
+      "assetSha256": "bc85c3f9a94c880aa235faf926ad128f35d45678d244e75dca07e3dcb1d341f1",
       "region": "Hind",
       "walkSamples": 145,
       "idleSamples": 37,
@@ -13599,7 +13693,7 @@
       "restTailAttachmentContacts": 43
     },
     "lowerBodyMotionIntegrity": {
-      "assetSha256": "d92729ad4133627fa7cdce7e7a54b7d3c6816b697259059a97f48e712717cf7c",
+      "assetSha256": "bc85c3f9a94c880aa235faf926ad128f35d45678d244e75dca07e3dcb1d341f1",
       "region": "LowerBody",
       "walkSamples": 145,
       "idleSamples": 37,
@@ -13741,7 +13835,7 @@
     "bakeUvLegOverlapTexels": 0,
     "runtimeTriangulation": "explicit source-derived triangles shared by bake and glTF export; editable source polygons retained"
   },
-  "editableSource": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV50ForearmBound\\Scene_Donkey.blend",
+  "editableSource": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Donkey\\20261027\\ReferenceFitV51EyeAspectRoll\\Scene_Donkey.blend",
   "credits": [
     {
       "name": "Lyndon Daniels / ChadM Rigged Horse",
