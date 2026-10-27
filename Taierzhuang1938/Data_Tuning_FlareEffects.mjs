@@ -6,26 +6,29 @@
 // Height, descent, wind and dimensions remain reconstruction, not measured data.
 export const FLARE_EFFECTS = Object.freeze({
   SignalRed: Object.freeze({label:"红色信号弹", kind:"signal", physical:true, parachute:false,
+    burnFlutter:true,photometric:true,
     previewFromXM:-12,
     apexM:100, ascendS:4.515, ignitionS:.08, igniteS:.12, burnS:7, fadeS:.4, adaptS:6,
     descendMS:0, driftMS:1.2, swayM:0, lightColor:0xff2110, groundLux:0,
-    candleCd:600, maxIntensity:600, lightRadiusM:110, exposeSight:1, adaptSight:1, smokeRate:0}),
+    candleCd:600, maxIntensity:660, lightRadiusM:350, exposeSight:1, adaptSight:1, smokeRate:0}),
   Illumination: Object.freeze({label:"白光伞降照明弹", kind:"illumination", physical:true, parachute:true,
-    opticalMotion:true,
+    opticalMotion:true,burnFlutter:true,photometric:true,
     previewFromXM:-90,
     apexM:100, ascendS:4.515, igniteS:.25, burnS:20, fadeS:.7, adaptS:6,
     descendMS:2.4, driftMS:1.2, swayM:.16, swayPeriodS:3.2, lightColor:0xfff4df,
-    groundLux:0, candleCd:90000, maxIntensity:90000, lightRadiusM:600,
+    groundLux:0, candleCd:90000, maxIntensity:99000, lightRadiusM:600,
     exposeSight:2.4, adaptSight:.72, smokeRate:0}),
 });
 
-// US Navy US3478687A (1969), background §1: descent oscillation causes
-// apparent flicker. The mechanism is sourced; these waveform/angle values are
-// a bounded visual reconstruction, NOT measured Type 95 specifications.
+// Small fast flutter around nominal candlepower, not a slow dimmer envelope.
+// Cohen, RSI 60 (1989), 653-656 supports rapid luminous-particle fluctuations;
+// its laboratory plume is NOT a measured Type 95 waveform. Frequencies and
+// amplitudes below are explicit perceptual reconstruction bands. See audit.
 export const FLARE_OPTICS=Object.freeze({
-  floor:.46,noiseHz:[.67,3.1,9.7],noiseWeight:[.22,.63,.15],dipHz:1.13,dipDepth:.18,settleBurnS:.18,
-  tiltXRad:.27,tiltZRad:.23,gustRad:.075,secondaryPeriodRatio:.81,
-  angularFloor:.35,angularPower:1.5,
+  flutterBandHz:[6,22],flutterRms:.022,flutterModes:24,flutterLimit:.09,
+  phaseWander:.45,phaseWanderHz:.73,settleBurnS:.12,
+  tiltXRad:.10,tiltZRad:.08,gustRad:.02,secondaryPeriodRatio:.81,
+  angularFloor:.70,angularPower:1.2,
 });
 
 // Editor framing only; ammunition dimensions and flight are unchanged.
@@ -35,6 +38,7 @@ export const FLARE_PREVIEW = Object.freeze({
   environment:"night",dayPreset:"testSceneDay",nightPreset:"flarePreviewNight",
   fieldTarget:[0,48,0],fieldDistanceM:190,fieldPitch:.04,fieldYaw:Math.PI+.18,
   groundTarget:[0,1.7,0],groundDistanceM:75,groundPitch:.07,
+  observerDistanceM:95,observerEyeM:1.7,observerTargetYM:40,observerFov:70,
 });
 
 // Clear, weak-moon studio night. Campaign night grading remains unchanged.

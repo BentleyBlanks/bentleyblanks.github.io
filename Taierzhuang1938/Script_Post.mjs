@@ -632,6 +632,7 @@ export class PostPipeline {
   SetSunShadowSource(lightRig) {
     this.flareShadowsPass.SetSource(lightRig);
     this.exposurePass.flareSource=lightRig;
+    this.taaPass.flareSource=lightRig;
     this.debugPass.SetSunShadowSource(lightRig);
     this.volumetricsPass.SetSunShadowSource(lightRig);
   }

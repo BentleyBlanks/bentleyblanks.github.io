@@ -40,4 +40,18 @@ for(const options of [{},{ruined:'partial'},{burnt:true}]){
  const f=director.flares[0];Check(f.landing.surface==='solid'&&f.landing.position.y>3,'Production host lands on a visible roof even without a gameplay roof collider');
  for(let t=0;t<60;t+=1/60)director.Update(1/60);Check(!director.Active,'Roof arrival still has finite cleanup');rig.Dispose();
 }
+{
+ const scene=new THREE.Scene(),g=new THREE.BufferGeometry();
+ // Upper downward-facing triangle is invisible from above with FrontSide;
+ // lower upward-facing triangle is the actual visible support surface.
+ g.setAttribute('position',new THREE.Float32BufferAttribute([-1,3.4,-1,1,3.4,-1,0,3.4,1,-1,3.3,-1,0,3.3,1,1,3.3,-1],3));
+ g.userData.effectSurfaceRanges=[[0,6]];const mat=new THREE.MeshBasicMaterial(),mesh=new THREE.Mesh(g,mat);scene.add(mesh);
+ const index=new FlareSurfaceIndex(scene,null),ray=new THREE.Raycaster(new THREE.Vector3(0,5,0),new THREE.Vector3(0,-1,0),0,5);
+ for(const scale of [1,-1])for(const side of [THREE.FrontSide,THREE.BackSide,THREE.DoubleSide]){
+  mesh.scale.x=scale;
+  mat.side=side;index.Refresh();const native=ray.intersectObject(mesh)[0],hit=index.TraceSegment({x:0,y:5,z:0},{x:0,y:0,z:0});
+  Check(Math.abs(native.point.y-hit.point.y)<1e-6,'Material sidedness matches native visible roof selection');
+ }
+ index.Clear();g.dispose();mat.dispose();
+}
 console.log('FlareSurfaceTest passed:',checks,'checks');

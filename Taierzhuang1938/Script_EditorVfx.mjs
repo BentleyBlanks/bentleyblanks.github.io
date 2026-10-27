@@ -73,7 +73,7 @@ export class VfxEditor {
     const requested=new URLSearchParams(location.search).get('effect');
     this.effectId = ALL_EFFECTS.some(effect=>effect.id===requested)?requested:"FireMedium";
     const requestedCamera=new URLSearchParams(location.search).get('flareCamera');
-    this.flareCamera=['follow','field','flight','ground'].includes(requestedCamera)?requestedCamera:FLARE_PREVIEW.camera;
+    this.flareCamera=['follow','field','flight','ground','observer'].includes(requestedCamera)?requestedCamera:FLARE_PREVIEW.camera;
     this.previewEnvironment=null;
     this.handle = 0;
     this.scale = 1;
@@ -138,6 +138,7 @@ export class VfxEditor {
     vfx.dust=null;
     this.studio.Open(this.host.hideInStudio);
     this.savedStudioMaxDistance=this.studio.maxDistance;
+    this.savedStudioFov=this.host.camera.fov;
     this.savedPadGeometry=this.studio.pad.geometry;
     this.flareField=new FlarePreviewField(this.studio,this.host.library);
     this.flarePadGeometry=this.flareField.groundGeometry;
@@ -145,7 +146,12 @@ export class VfxEditor {
     // materials without changing the game's whitebox config or saved preferences.
     const whitebox=this.host.post?.whiteboxScene;
     this.savedWhiteboxConfig=whitebox?.config??null;
-    if(whitebox){whitebox.config={...whitebox.config,effects:true,assetTextures:true};whitebox.Invalidate();}
+    this.savedClusteredEnabled=this.host.lights?.clustered?.enabled;
+    if(whitebox){
+      this.previewWhiteboxConfig={...whitebox.config,effects:true,assetTextures:true};
+      this.flareWhiteboxConfig={...this.previewWhiteboxConfig,sceneLighting:true,clusteredLights:true,sky:true,environment:true};
+      whitebox.config=this.previewWhiteboxConfig;whitebox.Invalidate();
+    }
     // WorldMask 会把场景直属的 VfxRoot 一起藏掉；预览器明确把它列为展品。
     vfx.root.visible = true;
     this.studio.SetGridVisible(true);
@@ -202,6 +208,7 @@ export class VfxEditor {
     if (this.panel) this.panel.root.remove();
     this.panel = null;
     if(this.savedWhiteboxConfig){const whitebox=this.host.post.whiteboxScene;whitebox.config=this.savedWhiteboxConfig;whitebox.Invalidate();this.savedWhiteboxConfig=null;}
+    if(this.savedClusteredEnabled!==undefined)this.host.lights.SetClusteredEnabled(this.savedClusteredEnabled);
     this.studio.Close();
     this.studio.maxDistance=this.savedStudioMaxDistance;
     this.studio.pad.geometry=this.savedPadGeometry;this.flarePadGeometry.dispose();
@@ -260,7 +267,7 @@ export class VfxEditor {
     Note(playback,'空格暂停/继续 · → 单帧 · Shift+→ 十帧 · Home 归零');
     this.environmentSelect=Select(playback,'预览昼夜',[{value:'original',label:'进入时环境'},{value:'day',label:'白天 · 看结构'},{value:'night',label:'夜晚 · 看照明'}],this.previewEnvironment||'original',value=>this.SetPreviewEnvironment(value));
     this.environmentSelect.root.dataset.vfxEnvironment='true';
-    this.flareCameraSelect=Select(playback,'弹药镜头',[{value:'follow',label:'燃烧体近景'},{value:'field',label:'夜间照明全景'},{value:'flight',label:'完整弹道'},{value:'ground',label:'地面与阴影'}],this.flareCamera,value=>{this.flareCamera=value;this.FrameEffect();});
+    this.flareCameraSelect=Select(playback,'弹药镜头',[{value:'follow',label:'燃烧体近景'},{value:'observer',label:'人眼高度 · 夜间观察'},{value:'field',label:'夜间照明全景'},{value:'flight',label:'完整弹道'},{value:'ground',label:'地面与阴影'}],this.flareCamera,value=>{this.flareCamera=value;this.FrameEffect();});
     this.flareCameraSelect.root.dataset.flareCamera='true';
     this.message=Note(transport,'');this.message.setAttribute('role','status');this.message.dataset.vfxStatus='true';
     const tabs=ButtonRow(transport,[{label:'效果库',onClick:()=>this.ShowTab('library')},{label:'粒子模块',onClick:()=>this.ShowTab('modules')},{label:'落土参数',onClick:()=>this.ShowTab('soil')},{label:'预设',onClick:()=>this.ShowTab('presets')}]);
@@ -353,6 +360,11 @@ export class VfxEditor {
   }
   Play(){
     this.Stop();const vfx=this.host.vfx,api=vfx.particles;this.layerRecords.clear();
+    if(this.savedWhiteboxConfig){
+      const whitebox=this.host.post.whiteboxScene,flare=!!FLARE_EFFECTS[this.effectId],config=flare?this.flareWhiteboxConfig:this.previewWhiteboxConfig;
+      if(whitebox.config!==config){whitebox.config=config;whitebox.Invalidate();}
+      if(this.savedClusteredEnabled!==undefined)this.host.lights.SetClusteredEnabled(flare?true:this.savedClusteredEnabled);
+    }
     this.studio.pad.geometry=FLARE_EFFECTS[this.effectId]?this.flarePadGeometry:this.savedPadGeometry;
     this.flareField.SetVisible(!!FLARE_EFFECTS[this.effectId]);
     this.flareCameraSelect.root.closest('.edRow').hidden=!FLARE_EFFECTS[this.effectId];
@@ -381,7 +393,7 @@ export class VfxEditor {
   }
   Advance(dt){
     let remaining=Math.max(0,dt);do{const step=Math.min(1/60,remaining);this.previewTime+=step;
-      this.flarePreview?.Update(step);
+      this.flarePreview?.Update(step,dt);
       if(FLARE_EFFECTS[this.effectId]&&this.flareCamera==='follow')this.TrackFlare();
       this.host.vfx.Update(step,this.host.camera,this.previewTime);if(this.savedLighting)this.host.lights.Update(step,this.previewTime,this.host.camera.position);
       this.soil?.Update(this.previewTime);
@@ -399,11 +411,18 @@ export class VfxEditor {
     // The studio inherits a map's clip range. A 100 m flight viewed from up to
     // 320 m needs its own range; ordinary previews and studio exit restore it.
     const camera=this.host.camera,baseFar=this.studio.saved?.far??camera.far;
+    camera.fov=FLARE_EFFECTS[this.effectId]&&this.flareCamera==='observer'?FLARE_PREVIEW.observerFov:this.savedStudioFov;
+    camera.updateProjectionMatrix();
     const far=FLARE_EFFECTS[this.effectId]?Math.max(baseFar,FLARE_PREVIEW.farM):baseFar;
     if(camera.far!==far){camera.far=far;camera.updateProjectionMatrix();}
     if(FALLING_SOIL_PRESETS[this.effectId]){this.soil.Frame();return;}
     if(FLARE_EFFECTS[this.effectId]){
       this.studio.maxDistance=FLARE_PREVIEW.maxDistanceM;
+      if(this.flareCamera==='observer'){
+        const o=this.studio.orbit,dy=FLARE_PREVIEW.observerEyeM-FLARE_PREVIEW.observerTargetYM;
+        o.target.set(0,FLARE_PREVIEW.observerTargetYM,0);o.dist=Math.hypot(FLARE_PREVIEW.observerDistanceM,dy);
+        o.pitch=Math.atan2(dy,FLARE_PREVIEW.observerDistanceM);o.yaw=Math.PI;this.studio.ApplyCamera();this.host.post?.NotifyCameraCut();return;
+      }
       if(this.flareCamera==='ground'||this.flareCamera==='field'){
         const field=this.flareCamera==='field',o=this.studio.orbit;
         o.target.fromArray(field?FLARE_PREVIEW.fieldTarget:FLARE_PREVIEW.groundTarget);

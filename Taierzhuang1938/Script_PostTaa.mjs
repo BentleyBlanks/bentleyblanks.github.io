@@ -39,6 +39,8 @@
 import * as THREE from "three";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
 import { TAAU } from "./Data_Tuning_TemporalDof.mjs";
+import {CLUSTER_COMMON_GLSL,BindClusterUniforms} from './Script_ClusteredLights.mjs';
+import {FLARE_SHADOW} from './Data_Tuning_FlareEffects.mjs';
 
 export const TAA_SAMPLES = 8;
 export const TAA_CURRENT_FRAME_WEIGHT = TAAU.currentFrameWeight;
@@ -75,6 +77,10 @@ uniform float uVarianceGamma;      // 方差裁剪 γ（0 = 只用 min/max 盒�
 uniform float uAntiFlicker;
 uniform float uAntiFlickerFloor;
 uniform float uResponsiveWeight;
+uniform vec4 uFlareWorld[${TAAU.flareResponsiveSlots}]; // xyz world, w affected radius
+uniform vec4 uFlareScreen[${TAAU.flareResponsiveSlots}]; // uv, radius in pixels, response
+uniform float uFlareSlot[${TAAU.flareResponsiveSlots}];
+${CLUSTER_COMMON_GLSL}
 uniform float uForegroundDepth;    // 预通道的前景标签（0 = 不做 responsive）
 uniform float uForegroundEps;
 uniform float uMinWeight;
@@ -241,6 +247,18 @@ void main() {
     w = max(w, uResponsiveWeight);
   }
   w = clamp(max(w, uMinWeight), 0.0, 1.0);
+  // Genuine changing illumination must not be classified as sampling flicker.
+  // Only changing flare footprints / tiny emitter cores get responsive history;
+  // steady lights, paused previews and pixels outside those footprints retain AA.
+  for(int i=0;i<${TAAU.flareResponsiveSlots};i++){
+    if(uFlareScreen[i].w<=0.)continue;
+    float surface=pow(max(0.,1.-distance(world.xyz,uFlareWorld[i].xyz)/max(uFlareWorld[i].w,.001)),.5);
+    if(surface>0.&&uFlareSlot[i]>=0.)surface*=ClusterFlareShadow(int(uFlareSlot[i]),viewPos,normalize(texture2D(uNormalDepth,closestUv).xyz));
+    float emitter=1.-smoothstep(uFlareScreen[i].z*.6,uFlareScreen[i].z,
+      length((vUv-uFlareScreen[i].xy)*uHistoryResolution));
+    emitter*=step(distance(uFlareWorld[i].xyz,uInvView[3].xyz)-${TAAU.flareSourceRadiusM},distance(world.xyz,uInvView[3].xyz));
+    w=max(w,max(surface,emitter)*uFlareScreen[i].w);
+  }
 
   if (uDebugMode > 0.5) {
     gl_FragColor = vec4(w, clipAmount, responsive, 1.0);
@@ -276,6 +294,12 @@ export class TaaPass {
       uAntiFlicker: { value: TAAU.antiFlicker },
       uAntiFlickerFloor: { value: TAAU.antiFlickerFloor },
       uResponsiveWeight: { value: TAAU.responsiveWeight },
+      uFlareWorld:{value:Array.from({length:TAAU.flareResponsiveSlots},()=>new THREE.Vector4())},
+      uFlareScreen:{value:Array.from({length:TAAU.flareResponsiveSlots},()=>new THREE.Vector4())},
+      uFlareSlot:{value:new Float32Array(TAAU.flareResponsiveSlots).fill(-1)},
+      uClusterData:{value:null},
+      uFlareShadowMatrix:{value:Array.from({length:FLARE_SHADOW.slots},()=>new THREE.Matrix4())},
+      uFlareShadowInfo:{value:Array.from({length:FLARE_SHADOW.slots},()=>new THREE.Vector4(0,0,0,0))},
       uForegroundDepth: { value: 0 },
       uForegroundEps: { value: TAAU.responsiveDepthEps },
       uMinWeight: { value: TAAU.historyClampMinWeight },
@@ -291,6 +315,32 @@ export class TaaPass {
      * 出厂 false —— 速度靶在就用速度靶。
      */
     this.forceDepthReprojection = false;
+    this.flarePrevious=new Map();this.flarePoint=new THREE.Vector3();
+  }
+
+  UpdateFlareResponse(ctx){
+    const U=this.uniforms,seen=new Set();let slot=0;
+    BindClusterUniforms(U,this.flareSource?.clustered);
+    for(const s of this.flareSource?.fireSources?.values()||[]){
+      if(!s.temporalFlutter||!(s.currentIntensity>0))continue;
+      seen.add(s.handle);const before=this.flarePrevious.get(s.handle),value=s.currentIntensity;
+      this.flarePrevious.set(s.handle,{value,time:s.temporalTime});
+      const delta=before===undefined?0:Math.abs(value-before.value)/Math.max(value,before.value,1);
+      const advancing=before!==undefined&&Number.isFinite(s.temporalTime)&&s.temporalTime!==before.time;
+      if(slot>=TAAU.flareResponsiveSlots||(!advancing&&delta<1e-5))continue;
+      const photopic=value*(s.color.r*.2126+s.color.g*.7152+s.color.b*.0722);
+      const radius=Math.min(s.currentRadius||s.radius,Math.sqrt(photopic/TAAU.flareResponsiveLux));
+      const p=this.flarePoint.copy(s.position),depth=-p.clone().applyMatrix4(ctx.camera.matrixWorldInverse).z;p.project(ctx.camera);
+      const screenRadius=depth>0?Math.max(2,TAAU.flareSourceRadiusM*ctx.projScale.y*(this.pipeline.resolveHeight||this.pipeline.height)/Math.max(depth,.1)*.5):0;
+      // Keep real flutter responsive through its extrema as well as slopes.
+      // Magnitude-only gating froze small changes and distorted the waveform.
+      const response=TAAU.flareResponsiveWeight*(advancing?1:Math.min(1,delta/TAAU.flareResponsiveDelta));
+      U.uFlareWorld.value[slot].set(s.position.x,s.position.y,s.position.z,radius);
+      U.uFlareSlot.value[slot]=this.pipeline.flareShadowsPass.slots.findIndex(item=>item.source===s&&item.valid);
+      U.uFlareScreen.value[slot].set(depth>0?p.x*.5+.5:-10,p.y*.5+.5,screenRadius,response);slot++;
+    }
+    for(const key of this.flarePrevious.keys())if(!seen.has(key))this.flarePrevious.delete(key);
+    for(;slot<TAAU.flareResponsiveSlots;slot++)U.uFlareScreen.value[slot].w=0;
   }
 
   /**
@@ -377,6 +427,7 @@ export class TaaPass {
     const read = P.taaFlip ? T.taaB : T.taaA;
     const write = P.taaFlip ? T.taaA : T.taaB;
     const U = this.uniforms;
+    this.UpdateFlareResponse(ctx);
     U.uCurrent.value = T.hdr.texture;
     U.uHistory.value = read.texture;
     U.uNormalDepth.value = ctx.normalDepthTexture;

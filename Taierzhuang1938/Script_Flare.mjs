@@ -74,7 +74,7 @@ import { Mulberry32, Clamp, Clamp01, SmoothStep } from "./Script_Noise.mjs";
 import { T } from "./Script_Text.mjs";
 import { FLARE_SFX, FLARE_DEFAULTS, FLARE_PRESETS } from "./Data_Flares.mjs";
 import { FLARE_EFFECTS, FLARE_ART, FLARE_OPTICS } from "./Data_Tuning_FlareEffects.mjs";
-import {FlareBurnModulation,SampleFlareAttitude} from './Script_FlareOptics.mjs';
+import {FlareBurnModulation,SampleFlareAttitude,FlarePhotometricScale} from './Script_FlareOptics.mjs';
 
 /** Absolute flight path: launch-relative altitude, never draped over terrain. */
 export function SampleFlarePosition(f,t) {
@@ -283,6 +283,8 @@ export class FlareDirector {
       from, at, groundY,
       physical:cfg.physical===true,parachute:cfg.parachute!==false,kind:cfg.kind||"illumination",
       opticalMotion:cfg.opticalMotion===true,
+      burnFlutter:cfg.burnFlutter===true,photometricScale:cfg.photometric?FlarePhotometricScale(Num(cfg.lightColor,FLARE_DEFAULTS.lightColor)):1,
+      lightExposureS:1/60,
       candleCd:Number.isFinite(cfg.candleCd)?Math.max(0,cfg.candleCd):null,
       apexM: Math.max(4, Num(cfg.apexM, FLARE_DEFAULTS.apexM)),
       ascendS, igniteS, burnS, fadeS, adaptS,
@@ -345,7 +347,7 @@ export class FlareDirector {
       position: { ...flare.pos },
       intensity: 0, radius: flare.lightRadiusM, color: flare.lightColor,
       flicker: false, priority: 1.6, label: flare.label,
-      flareShadow: flare.parachute,
+      flareShadow: flare.parachute||flare.physical,
     }) ?? null;
     flare.smokeHandle = flare.smokeRate > 0
       ? (this.host.AddSmoke?.({ position: { ...flare.pos }, rate: flare.smokeRate }) ?? null)
@@ -427,7 +429,7 @@ export class FlareDirector {
    * 写进去，写晚一帧就会出现「亮了但这一帧还没人看见」。排在过场/暂停分支**之后**
    * （照明弹是玩法，不是天上的环境）。
    */
-  Update(dt) {
+  Update(dt,exposureS=dt) {
     const step = Clamp(Num(dt, 0), 0, 0.1);
     this.clock += step;
 
@@ -440,6 +442,7 @@ export class FlareDirector {
 
     for (let i = this.flares.length - 1; i >= 0; i -= 1) {
       const flare = this.flares[i];
+      if(exposureS>0)flare.lightExposureS=exposureS;
       flare.t += step;
       this.StepPhase(flare);
       this.Place(flare, step);
@@ -568,6 +571,9 @@ export class FlareDirector {
     this.host.MoveLight?.(flare.lightHandle, {
       position: { ...flare.pos },
       intensity: flare.intensity,
+      photometricScale:flare.photometricScale,
+      temporalFlutter:flare.burnFlutter,
+      temporalTime:flare.t,
       radius: flare.lightRadiusM,
       color: flare.lightColor,
       emission:flare.emission,
@@ -576,7 +582,7 @@ export class FlareDirector {
 
   /** 两个频率叠出来的抖动。单频率是「呼吸」，两个才像在烧。 */
   Flicker(flare, t) {
-    if(flare.opticalMotion)return FlareBurnModulation(flare,t);
+    if(flare.burnFlutter)return FlareBurnModulation(flare,t,flare.lightExposureS);
     const d = flare.flickerDepth;
     const a = Math.sin(t * flare.flickerLow + flare.flickerPhase);
     const c = Math.sin(t * flare.flickerHigh + flare.flickerPhase * 1.7);
@@ -840,12 +846,13 @@ export function MakeFlareHost(deps = {}) {
     Say: (who, text, seconds) => deps.hud?.Say(who, text, seconds),
     Signal: (name) => deps.Story?.()?.Signal(name),
     GroundHeight,TraceSegment,SurfaceHeight,
-    // Fixed cluster light budget; parachute flares receive the dedicated packed shadow.
+    // Fixed cluster light budget; physical signal/illumination sources share
+    // the existing bounded shadow atlas, so high stars do not light through roofs.
     AddLight: (spec) => deps.lights?.AddFire(spec.position, {
       intensity: spec.intensity, radius: spec.radius, color: spec.color,
       flicker: false, priority: spec.priority ?? 1.6, flareShadow:spec.flareShadow, autoSmoke:false,
     }) ?? null,
-    MoveLight: (handle, spec) => deps.lights?.UpdateFire(handle, spec),
+    MoveLight: (handle, spec) => deps.lights?.UpdateFire(handle, {...spec,intensity:spec.intensity*(spec.photometricScale??1)}),
     RemoveLight: (handle) => deps.lights?.RemoveFire(handle),
     // 烟：一条**很淡**的微烟迹。照明弹的烟在夜里几乎看不见，它的作用是给光球
     // 一条拖尾，让「它在往下飘」这件事读得出来 —— 所以 opacity 压得很低。

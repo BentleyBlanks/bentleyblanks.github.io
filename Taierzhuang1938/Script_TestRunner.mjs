@@ -288,6 +288,9 @@ export const testDefs = {
   FlareTest: { file: "Script_FlareTest.mjs", desc: "照明弹：五相位时间线、光强包络、敌我暴露倍率与暗适应、姿态比例不变、定时序列、音效降级（纯 Node，毫秒级）" },
   FlareCameraBrowserTest: {file:"Script_FlareCameraBrowserTest.mjs",timeoutMs:600000,desc:"Flare editor default/direct cameras: visible pixels, full-flight clipping and camera restoration"},
   FlareNightBrowserTest: {file:"Script_FlareNightBrowserTest.mjs",timeoutMs:600000,desc:"Flare night/day UI, wide illumination footprint, reference shadows and smoke isolation"},
+  FlarePhotometryBrowserTest: {file:"Script_FlarePhotometryBrowserTest.mjs",timeoutMs:600000,desc:"Actual signal near/apex illumination and equal-candela RGB photometry"},
+  FlareTemporalResponseBrowserTest: {file:"Script_FlareTemporalResponseBrowserTest.mjs",timeoutMs:600000,desc:"Default TAA preserves fine fast combustion while keeping ordinary AA outside the footprint"},
+  FlareTemporalResponse30BrowserTest: {file:"Script_FlareTemporalResponseBrowserTest.mjs",args:["--fps=30"],timeoutMs:600000,desc:"30fps exposure-integrated flare flutter and responsive TAA"},
   FlareFlickerTest: {file:"Script_FlareFlickerTest.mjs",desc:"Bounded aperiodic flare combustion and replayable suspension attitude"},
   FlareFlickerBrowserTest: {file:"Script_FlareFlickerBrowserTest.mjs",timeoutMs:600000,desc:"Actual HDR/display fluctuations and directional light redistribution"},
   FlareEffectsBrowserTest: {file:"Script_FlareEffectsBrowserTest.mjs",timeoutMs:600000,desc:"Signal and illumination: actual rendering, deterministic seek, ground lighting, cleanup and blockout playback"},
@@ -584,6 +587,9 @@ export const browserTests = new Set([
   "FlareEffectsBrowserTest",
   "FlareCameraBrowserTest",
   "FlareNightBrowserTest",
+  "FlarePhotometryBrowserTest",
+  "FlareTemporalResponseBrowserTest",
+  "FlareTemporalResponse30BrowserTest",
   "FlareFlickerBrowserTest",
   "FlareWorldBrowserTest",
   "FlareShadowBrowserTest",
@@ -798,7 +804,7 @@ export const tier2 = [
 ];
 
 export const domains = {
-  flareEffects:{label:'Signal and illumination flares',tests:['FlareTest','FlareSurfaceTest','FlareFlickerTest','FlareFlickerBrowserTest','FlareEffectsBrowserTest','FlareCameraBrowserTest','FlareNightBrowserTest','FlareWorldBrowserTest','FlareShadowBrowserTest','ModuleGraphTest','ParticleEditorControlsTest','ParticleEditorWhiteboxTest']},
+  flareEffects:{label:'Signal and illumination flares',tests:['FlareTest','FlareSurfaceTest','FlareFlickerTest','FlareFlickerBrowserTest','FlareEffectsBrowserTest','FlareCameraBrowserTest','FlareNightBrowserTest','FlarePhotometryBrowserTest','FlareTemporalResponseBrowserTest','FlareTemporalResponse30BrowserTest','FlareWorldBrowserTest','FlareShadowBrowserTest','ModuleGraphTest','ParticleEditorControlsTest','ParticleEditorWhiteboxTest']},
   type89MediumTank: {label:"Type89 standalone articulated reference tank",tests:["Type89MediumTankTest","Type89MediumTankBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "AssetStandardsTest"] },
   kawasakiType88: { label: "八八式侦察机二型独立资产", tests: ["KawasakiType88AssetTest", "KawasakiType88BrowserTest", "ModelFacingTest", "AssetStandardsTest", "ModuleGraphTest"] },
@@ -934,7 +940,7 @@ export const domains = {
 
 const changedDomainRules = [
   {domain:'particles',pattern:/FallingSoil/},
-  {domain:'flareEffects',pattern:/Flare(?:Visual|Optics|Flicker|Camera|Night|Field|Shadow|Surface|World|Track|Effects|Test|\.mjs)|Tuning_Flare/},
+  {domain:'flareEffects',pattern:/Flare(?:Visual|Optics|Flicker|Photometry|TemporalResponse|Camera|Night|Field|Shadow|Surface|World|Track|Effects|Test|\.mjs)|Tuning_Flare/},
   {domain:'combat',pattern:/HanYang173R/},
   {domain:"type89MediumTank",pattern:/Type89(?:MediumTank|Pbr|GlbCleanup|References|ImportAudit|SourceAudit|Package)/},
   {domain:"menu",pattern:/ToolsHome|Icon_TabSeal/},

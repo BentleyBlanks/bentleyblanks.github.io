@@ -60,6 +60,11 @@ export const TAAU = {
   responsiveWeight: 0.5,
   responsiveDepthEps: 0.002,
   historyClampMinWeight: 0.015,
+  flareResponsiveWeight:.85,
+  flareResponsiveLux:.025,
+  flareResponsiveDelta:.006,
+  flareResponsiveSlots:5,
+  flareSourceRadiusM:.7,
 };
 
 /**

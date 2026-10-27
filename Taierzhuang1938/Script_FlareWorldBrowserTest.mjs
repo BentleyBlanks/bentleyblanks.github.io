@@ -67,7 +67,7 @@ try{
  assert.equal(occlusion.gl,0);console.log('ok real city light occlusion',JSON.stringify(occlusion));
  // Wait for the real audio automation target to settle, then inspect its panner.
  await new Promise(r=>setTimeout(r,400));
- const sound=await page.evaluate(()=>{const g=Tengxian,f=g.flare.flares[0],v=flareWorldVoices.find(v=>v.name==='flareBurn');
+ const sound=await page.evaluate(()=>{const g=Tengxian;g.flare.Update(0);const f=g.flare.flares[0],v=[...flareWorldVoices].reverse().find(v=>v.name==='flareBurn'&&v.nodes.length);
   return {ready:g.audio.sfxReady,state:g.audio.ctx.state,voices:flareWorldVoices.map(v=>({name:v.name,nodes:v.nodes.length})),
    position:v?.panner?{x:v.panner.positionX.value,y:v.panner.positionY.value,z:v.panner.positionZ.value}:null,target:{...f.pos},sampled:!!v?.nodes.some(n=>n.buffer?.duration>0)};});
  assert.ok(sound.sampled&&sound.state==='running'&&sound.position,'Actual recorded burn voice and spatial panner must exist');
@@ -89,8 +89,9 @@ try{
   for(let i=0;i<p.count;i+=Math.max(1,Math.floor(p.count/24))){const q=new T.Vector3().fromBufferAttribute(p,i).applyMatrix4(v.cloth.matrixWorld),y=Height(q);if(y!=null)gaps.push(q.y-y);}
   return {landed:f.landed,position:{...f.pos},visibleRoof:hit?.point,nativeRoofY:Height(f.pos),clothGaps:gaps,normal:n,canopyVisible:v.canopy.visible};});
  assert.ok(roof.landed&&roof.visibleRoof&&roof.canopyVisible);
+ await fs.writeFile(path.join(out,'Data_ContactProbe.json'),JSON.stringify(roof,null,2));
  assert.ok(roof.position.y-roof.visibleRoof.y>=0&&roof.position.y-roof.visibleRoof.y<.02,'Candle is within 2 cm of the rendered roof, not only an approximate collider');
- assert.ok(Math.abs(roof.position.y-roof.nativeRoofY)<.02,'Full rendered roof, including raised tiles, agrees with candle contact');
+ assert.ok(Math.abs(roof.position.y-roof.nativeRoofY)<.02,'Full rendered roof, including raised tiles, agrees with candle contact: '+JSON.stringify(roof));
  assert.ok(roof.clothGaps.length>12&&Math.min(...roof.clothGaps)>-.005,'Collapsed cloth vertices must remain above the actual tile rows: '+JSON.stringify(roof.clothGaps));
  await Capture('RoofContact');console.log('ok real roof contact',JSON.stringify(roof));
  await page.evaluate(()=>{const g=Tengxian,f=g.flare.flares[0];g.Debug.ApplySky('overcast');g.post.exposurePass.transientWeight=0;g.post.exposurePass.RequestReset();g.flare.Update(0);FlareWorldPose([f.pos.x+1.3,f.pos.y+1.2,f.pos.z+1.5],[f.pos.x,f.pos.y,f.pos.z]);});

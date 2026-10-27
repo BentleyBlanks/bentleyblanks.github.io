@@ -15,7 +15,7 @@ try{
  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?editor=vfx&effect=Illumination&flareCamera=ground&quality=high&manual=1&menu=0&audio=0`,{waitUntil:'domcontentloaded',timeout:180000});
  await page.waitForFunction(()=>!!window.Tengxian?.ParticleEditor?.panel,null,{timeout:300000});
  const report=await page.evaluate(async()=>{
-  const T=await import('three'),g=Tengxian,e=g.ParticleEditor;e.Seek(6);g.post.SetTaaEnabled(false);
+  const T=await import('three'),g=Tengxian,e=g.ParticleEditor;e.Seek(6);g.post.SetTaaEnabled(true);
   // Wide oblique ground view for unobstructed points on opposite sides.
   const o=e.studio.orbit;o.target.set(0,0,10);o.dist=190;o.pitch=.4;o.yaw=Math.PI;e.studio.ApplyCamera();g.StepFrames(4,0,true);
   const points=[[-55,.005,15],[55,.005,15],[0,.005,15]],gl=g.renderer.getContext(),frame=g.post.frame;
@@ -27,8 +27,8 @@ try{
    return {hdr:T.DataUtils.fromHalfFloat(a[0])*.2126+T.DataUtils.fromHalfFloat(a[1])*.7152+T.DataUtils.fromHalfFloat(a[2])*.0722,display:b[0]*.2126+b[1]*.7152+b[2]*.0722};
   });
   const series=[];
-  for(let i=0;i<181;i++){
-   e.Advance(1/30);g.post.frame=frame;g.StepFrames(1,1/30,true);
+  for(let i=0;i<361;i++){
+   e.Advance(1/60);g.StepFrames(1,1/60,true);
    const f=e.flarePreview.flares[0];series.push({t:e.previewTime,intensity:f.intensity,brightness:f.brightness,direction:f.emission.direction,pixels:Read()});
   }
   const f=e.flarePreview.flares[0],source=g.lights.fireSources.get(f.lightHandle),position=source.position.clone(),power=source.base,emission=source.emission;
@@ -46,11 +46,10 @@ try{
   return {series,left,right,dark,noShadow,deterministic:first===replay,gl:gl.getError()};
  });
  const Span=a=>Math.max(...a)-Math.min(...a),center=report.series.map(s=>s.pixels[2]);
- assert.ok(Span(report.series.map(s=>s.brightness))>.25,'Visible-scale irregular modulation');
- assert.ok(Span(center.map(p=>p.hdr))>Math.max(...center.map(p=>p.hdr))*.18,'Ground HDR really fluctuates');
- assert.ok(Span(center.map(p=>p.display))>7,'The final tone-mapped image must retain perceivable fluctuations');
- const shortChanges=center.slice(6).map((p,i)=>p.display-center[i].display);
- assert.ok(Math.min(...shortChanges)<-6&&Math.max(...shortChanges)>6,'Subsecond dimming and brightening cannot be explained by a slowly descending source');
+ const brightnessSpan=Span(report.series.map(s=>s.brightness));
+ assert.ok(brightnessSpan>.035&&brightnessSpan<.16,'Small combustion flutter; reject the previous deep dimmer envelope');
+ assert.ok(Span(center.map(p=>p.hdr))>Math.max(...center.map(p=>p.hdr))*.025,'Ground HDR responds to the source');
+ assert.ok(Span(center.map(p=>p.display))>2&&Span(center.map(p=>p.display))<40,'Default TAA-on display retains fine flutter without exaggerated scene pumping');
  await fs.writeFile(path.join(out,'Data_FlickerReport.json'),JSON.stringify(report,null,2));
  assert.ok(report.left[0].hdr>report.right[0].hdr*1.2&&report.right[1].hdr>report.left[1].hdr*1.2,'Swing must redistribute light across the ground, not simply dim the entire image: '+JSON.stringify({left:report.left,right:report.right}));
  assert.ok(report.noShadow[1].hdr>report.left[1].hdr*1.2,'Angular emission survives disabled/unavailable shadow maps');
@@ -62,8 +61,8 @@ try{
  }
  if(process.argv.includes('--record')){
   const frames=path.join(out,'Frames');await fs.mkdir(frames,{recursive:true});
-  await page.evaluate(()=>{const g=Tengxian,e=g.ParticleEditor;e.flareCamera='field';e.Seek(6);e.FrameEffect();g.post.SetTaaEnabled(true);g.StepFrames(30,1/60,true);});
-  for(let i=0;i<144;i++){await page.evaluate(()=>{Tengxian.ParticleEditor.Advance(1/24);Tengxian.StepFrames(1,1/24,true);});await page.screenshot({path:path.join(frames,String(i).padStart(4,'0')+'.png')});}
+  await page.evaluate(()=>{const g=Tengxian,e=g.ParticleEditor;e.flareCamera='observer';e.Seek(6);e.FrameEffect();g.post.SetTaaEnabled(true);g.StepFrames(30,1/60,true);});
+  for(let i=0;i<360;i++){await page.evaluate(()=>{Tengxian.ParticleEditor.Advance(1/60);Tengxian.StepFrames(1,1/60,true);});await page.screenshot({path:path.join(frames,String(i).padStart(4,'0')+'.png')});}
  }
  await fs.writeFile(path.join(out,'Data_FlickerReport.json'),JSON.stringify(report,null,2));
  console.log('FlareFlickerBrowserTest passed',JSON.stringify({brightnessSpan:Span(report.series.map(s=>s.brightness)),displaySpan:Span(center.map(p=>p.display)),left:report.left,right:report.right,deterministic:report.deterministic,gl:report.gl}));

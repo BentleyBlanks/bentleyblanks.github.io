@@ -53,10 +53,14 @@ try{
   return result;
  });
  assert.ok(overview.every(p=>p.depth>0&&p.depth<p.far&&Math.abs(p.ndc[0])<1&&Math.abs(p.ndc[1])<1),JSON.stringify(overview));
- const restored=await page.evaluate(()=>{const g=Tengxian;g.ParticleEditor.SelectEffect('FireMedium');const ordinary=g.camera.far;g.editor.Close();return {ordinary,exit:g.camera.far};});
- assert.deepEqual(restored,{ordinary:60,exit:60});
+ await page.locator('select[data-flare-camera]').selectOption('observer');
+ const observer=await page.evaluate(async()=>{const T=await import('three'),g=Tengxian,e=g.ParticleEditor;e.Seek(6);g.StepFrames(3,0,true);const f=e.flarePreview.flares[0],p=new T.Vector3(f.pos.x,f.pos.y,f.pos.z).project(g.camera);return {height:g.camera.position.y,fov:g.camera.fov,ndc:p.toArray(),studioFov:e.savedStudioFov,gameFov:e.studio.saved.fov};});
+ assert.ok(Math.abs(observer.height-1.7)<1e-6&&observer.fov===70&&Math.abs(observer.ndc[0])<.8&&Math.abs(observer.ndc[1])<.8,'Human-height observer must show the overhead flare: '+JSON.stringify(observer));
+ const restored=await page.evaluate(()=>{const g=Tengxian;g.ParticleEditor.SelectEffect('FireMedium');const ordinary=g.camera.far,ordinaryFov=g.camera.fov;g.editor.Close();return {ordinary,exit:g.camera.far,ordinaryFov,exitFov:g.camera.fov};});
+ assert.deepEqual({ordinary:restored.ordinary,exit:restored.exit},{ordinary:60,exit:60});
+ assert.equal(restored.ordinaryFov,observer.studioFov);assert.equal(restored.exitFov,observer.gameFov);
  await Open('quality=high&effect=SignalRed');await Visible('DirectSignalRed');
  await Open('quality=whitebox&effect=Illumination');await Visible('DirectIlluminationWhitebox');
- assert.deepEqual(errors,[]);await fs.writeFile(path.join(out,'Data_CameraReport.json'),JSON.stringify({reports,overview,restored,errors},null,2));
+ assert.deepEqual(errors,[]);await fs.writeFile(path.join(out,'Data_CameraReport.json'),JSON.stringify({reports,overview,observer,restored,errors},null,2));
  console.log('FlareCameraBrowserTest passed');
 }finally{await browser.close();server.close();}

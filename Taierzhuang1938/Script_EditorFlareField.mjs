@@ -7,6 +7,7 @@ export class FlarePreviewField {
  constructor(studio,library){
   this.root=new THREE.Group();this.root.name='FlarePreviewField';studio.root.add(this.root);
   this.groundGeometry=new THREE.PlaneGeometry(1200,1200,80,80).rotateX(-Math.PI/2);
+  this.groundGeometry.userData.effectSurfaceRanges=[[0,this.groundGeometry.index.count]];
   const positions=this.groundGeometry.attributes.position,uv=this.groundGeometry.attributes.uv;
   for(let i=0;i<positions.count;i++){
    const x=positions.getX(i),z=positions.getZ(i),edge=THREE.MathUtils.smoothstep(Math.max(Math.abs(x),Math.abs(z)),120,220);
@@ -17,7 +18,7 @@ export class FlarePreviewField {
   const wall=CloneShadedMaterial(library.Get('BrickWall'));wall.color.setHex(0x736b5f);wall.roughness=.95;
   const wood=CloneShadedMaterial(library.Get('WoodBeam'));wood.color.setHex(0x62533c);wood.roughness=.94;
   this.materials=[ground,wall,wood];const mats={ground,wall,wood},sink=new BuildSink();
-  const Box=(mat,x,y,z,w,h,d)=>{const g=new THREE.BoxGeometry(w,h,d);g.translate(x,y,z);sink.Add(mat,g);};
+  const Box=(mat,x,y,z,w,h,d)=>{const g=new THREE.BoxGeometry(w,h,d);g.translate(x,y,z);g.userData.effectSurface=true;sink.Add(mat,g);};
   // Low walls, roofed shelters and 1.7 m posts make the light's reach and the
   // moving shadows visible, without emissive rings or a painted light disc.
   for(const z of [-50,0,50,100]){

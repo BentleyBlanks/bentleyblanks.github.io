@@ -69,10 +69,17 @@ try{
   e.SetPreviewEnvironment('night');e.Seek(28);return {samePose,restored,light:e.flarePreview.flares[0].intensity};
  });assert.ok(restore.samePose&&restore.restored);assert.equal(restore.light,0);
  await page.locator('[data-flare-camera]').selectOption('field');await page.evaluate(()=>Tengxian.StepFrames(120,1/60,true));await Capture('Extinguished');
+ const stageContact=await page.evaluate(async()=>{
+  const T=await import('three'),g=Tengxian,e=g.ParticleEditor;e.Play();e.flarePreview.Reset();e.previewTime=0;
+  e.flarePreview.LaunchFlare({preset:'Illumination',from:{x:-90,z:0},at:{x:14,z:0},driftMS:0,opticalMotion:false});
+  const f=e.flarePreview.flares[0];e.Advance(f.landing.t+1);e.paused=true;g.StepFrames(3,0,true);
+  const ray=new T.Raycaster(new T.Vector3(f.pos.x,f.pos.y+1,f.pos.z),new T.Vector3(0,-1,0),0,3),hit=ray.intersectObject(e.flareField.root,true)[0];
+  return {landed:f.landed,position:{...f.pos},surface:f.landing.surface,renderedHeight:hit?.point.y};
+ });assert.ok(stageContact.landed&&stageContact.position.y>3&&Math.abs(stageContact.position.y-stageContact.renderedHeight)<.02,'Editor reference shelters are physical receiving surfaces too: '+JSON.stringify(stageContact));
  const cleanup=await page.evaluate(()=>{const g=Tengxian,e=g.ParticleEditor,field=e.flareField.root,original=e.nightSnapshot.environment;e.SelectEffect('SignalRed');e.Seek(3);g.StepFrames(10,1/60,true);return {field:field.name,original};});
  await page.locator('[data-flare-camera]').selectOption('follow');await page.evaluate(()=>Tengxian.StepFrames(20,1/60,true));await Capture('SignalNight');
  const exit=await page.evaluate(()=>{const g=Tengxian,e=g.ParticleEditor,host=e.host.game;g.editor.Close();return {field:g.scene.getObjectByName('FlarePreviewField')?.name??null,environment:host.GetEnvironmentState()};});
  assert.equal(exit.field,null);assert.deepEqual(exit.environment,cleanup.original);assert.deepEqual(errors,[]);
- await fs.writeFile(path.join(out,'Data_NightReport.json'),JSON.stringify({deployment,field,lighting,restore,exit,errors},null,2));
+ await fs.writeFile(path.join(out,'Data_NightReport.json'),JSON.stringify({deployment,field,lighting,restore,stageContact,exit,errors},null,2));
  console.log('FlareNightBrowserTest passed',JSON.stringify({field,lighting,restore,exit}));
 }finally{await browser.close();server.close();}

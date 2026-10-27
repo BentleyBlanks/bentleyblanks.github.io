@@ -373,7 +373,7 @@ export class LightRig {
    * 每帧 Remove+Add 会让 `seed`（抖动相位）与灯槽排序每帧重掷。
    * @returns {boolean} 这个句柄还在不在
    */
-  UpdateFire(handle, { position = null, intensity = null, radius = null, color = null, emission = undefined } = {}) {
+  UpdateFire(handle, { position = null, intensity = null, radius = null, color = null, emission = undefined, temporalFlutter = undefined, temporalTime = undefined } = {}) {
     const state = this.fireSources.get(handle);
     if (!state) return false;
     if (position) state.position.set(position.x, position.y, position.z);
@@ -381,6 +381,8 @@ export class LightRig {
     if (radius != null) state.radius = Math.max(1, Number(radius) || state.radius);
     if (color != null) state.color.setHex(color);
     if (emission !== undefined) state.emission=emission;
+    if (temporalFlutter !== undefined) state.temporalFlutter=temporalFlutter;
+    if (temporalTime !== undefined) state.temporalTime=temporalTime;
     return true;
   }
 

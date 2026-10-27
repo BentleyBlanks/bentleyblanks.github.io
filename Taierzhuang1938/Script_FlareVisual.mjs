@@ -194,7 +194,7 @@ export class FlareVisuals {
   const opened=Smooth(0,A.openingS,since),settle=f.landed?Smooth(0,A.settleS,t-f.landing.t):0;
   const fade=f.landed?1-Smooth(f.endAt-A.groundFadeS,f.endAt,t):1;
   head.material.uniforms.clock.value=t;
-  head.material.uniforms.power.value=since>=0?Math.min(A.radianceMax,f.intensity*(f.parachute?A.radiancePerCd:A.signalRadiancePerCd)):0;
+  head.material.uniforms.power.value=since>=0?Math.min(A.radianceMax,f.intensity*(f.photometricScale??1)*(f.parachute?A.radiancePerCd:A.signalRadiancePerCd)):0;
   const earlier=SampleFlarePosition(f,Math.max(0,t-.02)),axis=head.material.uniforms.flameAxis.value;
   const attitude=SampleFlareAttitude(f,t);
   if(f.opticalMotion)axis.copy(attitude.direction);else if(f.parachute)axis.set(0,-1,0);else axis.set(earlier.x-f.pos.x,earlier.y-f.pos.y,earlier.z-f.pos.z).normalize();
@@ -217,7 +217,7 @@ export class FlareVisuals {
     }
     item.carrier.material.opacity=1-Smooth((f.carrierLanding?.t??0)+2,(f.carrierLanding?.t??0)+3,t);
   }
-  const u=smoke.material.uniforms;u.ambient.value.copy(this.ambient).add(this.sun.clone().multiplyScalar(.65));u.lightPosition.value.set(f.pos.x,f.pos.y,f.pos.z);u.candle.value=f.intensity;
+  const u=smoke.material.uniforms;u.ambient.value.copy(this.ambient).add(this.sun.clone().multiplyScalar(.65));u.lightPosition.value.set(f.pos.x,f.pos.y,f.pos.z);u.candle.value=f.intensity*(f.photometricScale??1);
   u.flameAxis.value.copy(axis);u.directional.value=f.opticalMotion?1:0;
   for(let i=0;i<A.smokeCount;i++){
    const born=(Math.floor(t*A.smokeHz)-i)/A.smokeHz,age=t-born;
