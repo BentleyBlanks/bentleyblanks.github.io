@@ -40,8 +40,9 @@ export class GroundDustPass {
   }
 
   /** 跳过的帧（没尘 / 关了）：尘团退回主场景全分辨率画（还有尘的话），全屏片收起。 */
-  Idle() {
+  Idle(ctx) {
     this.stats.idle += 1;
+    this.source?.SetReference?.(ctx?.preset?.groundDustReference === true);
     this.source?.SetHalfMode?.(false);
   }
 
@@ -68,6 +69,8 @@ export class GroundDustPass {
 
   Render(ctx) {
     const target = this._EnsureTarget(ctx);
+    // 参考版（原来逐像素全算，最贵）：Data_Tuning_Graphics 的 groundDustReference，默认各档都关
+    this.source.SetReference?.(ctx.preset?.groundDustReference === true);
     this.source.RenderHalf(ctx.renderer, ctx.camera, target, ctx.width, ctx.height);
     this.stats.frames += 1;
   }

@@ -6,14 +6,16 @@
 //   three 只好按创建先后排：排在它前面画的烟一律被尘盖住（哪怕烟更近），排在它后面画的透明物一律盖在尘上（哪怕更远）。
 //
 // 做法：
-//   1. 尘那一趟多写一张「尘的前沿深度」：沿视线按不透明度加权的平均视深度，r = Σ z·α、g = Σ α
+//   1. 尘那一趟多写一张「尘的前沿深度」：沿视线按不透明度加权的平均视深度，r = Σ z·α、g = Σ α、b = Σ z²·α × 1e-4
 //     （与颜色同一次绘制，MRT 的第二张；按同一个「前面盖后面」的混合叠，前面那团的权重大）。
 //   2. 全屏片挪到所有粒子之前画（DUST_COMPOSITE_RENDER_ORDER）。
 //   3. 之后画的粒子片元比尘的前沿远，就乘上尘的透过率（等于藏在尘后面）；比前沿近，照常画在尘上面。
-//      前沿前后 ±0.6 m 平滑过渡（粒子本身是软的，硬切会在尘边上描出一圈）。
+//      过渡宽度 = max(0.6 m, 1.5 × 尘沿视线的标准差)：远处一层薄尘照样干脆地前后分开；人站在尘里时尘从眼前一直铺到远处，
+//      标准差大，粒子随距离渐渐被吞掉 —— 只用一个平均深度的话，五米外飞起来的土块会整个消失（2026-10-28 对照图）。
 // 没有降分辨率尘的帧 uDustOcclusion = 0，粒子着色器走原路，逐位不变。
 //
-// 近似在哪：透过率用的是整条视线上的尘（到场景深度为止），粒子若正好埋在一团很厚的尘中间，后半截尘也算在它前面了。
+// 近似在哪：尘沿视线的分布只记了平均与散开程度（两阶矩），按「平滑的一个台阶」还原；粒子埋在一团很厚的尘中间时，
+// 被吞掉的比例按它在台阶上的位置算，不是精确的「它前面那一截尘」的透过率。
 // 尘与尘之间的前后由 DustFieldSystem.SortForCamera 按到尘团质心的距离排（远的先画）。
 
 /** 尘的合成片（以及没开降分辨率时尘团本身）的 renderOrder：排在贴地尘环（5）、体积烟（5）、烟池（6）之前。 */
@@ -22,7 +24,7 @@ export const DUST_COMPOSITE_RENDER_ORDER = 4.5;
 /** 粒子着色器共用：放在 uResolution 声明之后。DustBehindTransmittance(视深度) → 1 = 不被尘挡，T = 整个在尘后面。 */
 export const DUST_OCCLUSION_GLSL = /* glsl */ `
 uniform sampler2D uDustHalf;    // 降分辨率尘：rgb 预乘散射，a 累积透过率
-uniform sampler2D uDustFront;   // 尘的前沿视深度：r = Σ z·α，g = Σ α
+uniform sampler2D uDustFront;   // 尘的前沿视深度：r = Σ z·α，g = Σ α，b = Σ z²·α × 1e-4
 uniform float uDustOcclusion;   // 1 = 本帧有降分辨率尘
 float DustBehindTransmittance(float viewDepth){
   if (uDustOcclusion < 0.5) return 1.0;
@@ -30,8 +32,9 @@ float DustBehindTransmittance(float viewDepth){
   vec4 front = texture2D(uDustFront, dustUv);
   if (front.g < 0.004) return 1.0;
   float dustDepth = front.r / front.g;
+  float spread = max(0.6, 1.5 * sqrt(max(0.0, front.b / front.g * 1.0e4 - dustDepth * dustDepth)));
   float dustT = texture2D(uDustHalf, dustUv).a;
-  return mix(1.0, dustT, smoothstep(dustDepth - 0.6, dustDepth + 0.6, viewDepth));
+  return mix(1.0, dustT, smoothstep(dustDepth - spread, dustDepth + spread, viewDepth));
 }
 `;
 

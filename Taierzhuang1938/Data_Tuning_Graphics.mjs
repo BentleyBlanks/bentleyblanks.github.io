@@ -201,7 +201,11 @@ export const QUALITY_PRESETS = {
     // 级联阴影四档全开（low 是 2 级）；接触阴影 low 不跑。
     csm: true, contactShadows: false, flareShadows: false,
     // 落地扬尘（Script_PostGroundDust）按这个比例渲染体积再按深度放大（2026-10-22 帧取证：镜头被尘包住时全分辨率一团要 15–27 ms GPU）。
+    // 2026-10-28 预烘焙之后同样分辨率便宜 3–4 倍（Data_Tuning_GroundImpact.bake）：high 提到 0.75（比原来 0.5 的原版还省），ultra 全分辨率。
     groundDustScale: 0.5,
+    // 参考版落地扬尘（原来逐像素全算：扭曲、两层网格、朝太阳遮光每一步现算，最贵）。各档默认关，走预烘焙版（GROUND_IMPACT_RENDER.bake）；
+    // 留给以后桌面版对照 / 重做（用户 2026-10-28）。?dustRef=1 强制打开。
+    groundDustReference: false,
     // low 的定位是「能跑」：POM 与细节法线整个不编（省的是采样数与寄存器，
     // 不是一两个 uniform）。微阴影与地平线遮蔽留着 —— 它们各只有几条算术，
     // 却是「表面不像塑料贴纸」里最便宜的两条。
@@ -223,6 +227,7 @@ export const QUALITY_PRESETS = {
     volumetrics: true,
     csm: true, contactShadows: true, flareShadows: true,
     groundDustScale: 0.5,
+    groundDustReference: false,
     pom: 8, pomRefine: 4, pomSelfShadow: false, detailNormal: true,
     microShadow: true, horizonOcclusion: true, skinSss: true,
     materialTexture: 512,
@@ -249,7 +254,8 @@ export const QUALITY_PRESETS = {
     ssr: true, ssrScale: 0.5, ssrSteps: 48, ssrResolveTaps: 4,
     volumetrics: true,
     csm: true, contactShadows: true, flareShadows: true,
-    groundDustScale: 0.5,
+    groundDustScale: 0.75,
+    groundDustReference: false,
     pom: 16, pomRefine: 5, pomSelfShadow: false, detailNormal: true,
     microShadow: true, horizonOcclusion: true, skinSss: true,
     materialTexture: 512,
@@ -270,6 +276,7 @@ export const QUALITY_PRESETS = {
     volumetrics: true,
     csm: true, contactShadows: true, flareShadows: true,
     groundDustScale: 1.0,
+    groundDustReference: false,
     // ultra 才开 POM 自阴影：那是每像素再走 8 步高度图，砖缝里投出的细影
     // 在 1440p 上是三四个像素的事，只有主动选 ultra 的人值得为它付这一笔。
     pom: 32, pomRefine: 6, pomSelfShadow: true, detailNormal: true,

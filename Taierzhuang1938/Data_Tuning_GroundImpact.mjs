@@ -222,4 +222,23 @@ export const GROUND_IMPACT_RENDER = Object.freeze({
    *（各团错开）。尘一两秒后变化很慢，降频看不出来；漂移、淡出、火光这些逐帧量照常每帧更新。
    */
   upload: Object.freeze({ fullS: 1.2, halfS: 5, slowEvery: 4 }),
+  /**
+   * 预烘焙（2026-10-28，用户：「降分辨率以后效果差了很多，不大影响性能的前提下优化」）：
+   * 逐像素每一步原来要取约 74 次贴图：扭曲 3、两层尘网格 10（两次 B 样条各 4 + 地面 + 顶面起伏）、朝太阳遮光 3 步 × 14、
+   * 头顶有多少尘 10、细尘层与细节噪声若干。片元着色器当计算用（WebGL2 没有 compute shader），每团尘先烘：
+   *   · 网格 B 样条：两层网格的 B 样条与时间无关，按 splineScale 倍精度预先算成两张二维图（网格上传那一帧才烘）——
+   *     逐像素一次双线性顶替四次取样，竖直剖面照旧逐像素算（竖直方向一点不丢；试过三维体积，贴地尘浪那一薄层会糊）。
+   *   · 受光远段：遮光的加权是 t = L·u²、u 均匀取点（越近权重越大）。u ∈ [1/3, 1] 那一段平滑，烘进低分辨率「切片拼图」
+   *     （每帧烘，shadowSteps 步）；u ∈ [0, 1/3] 那一步与头顶的尘逐像素算 —— 团顶受光发亮的立体感就靠这层近处的自遮挡。
+   *   light   受光格子 [水平格数, 竖直层数]；竖直方向跟着地面走（离当地地面的高，按平方分布，贴地最细）
+   *   splineScale  网格 B 样条预烘图的边长倍数（相对网格 N）
+   *   hMinM   受光格子竖直范围的下沿（离地面，米；尘浪下沿伸到网格地面以下 0.6 m，见着色器 Field）
+   * 画质开关 `groundDustReference`（Data_Tuning_Graphics，默认关）或 `?dustRef=1`：走原来逐像素全算的参考版（最贵、最细，留给桌面版对照）。
+   */
+  bake: Object.freeze({
+    light: Object.freeze({ low: Object.freeze([32, 16]), medium: Object.freeze([40, 20]), high: Object.freeze([48, 24]), ultra: Object.freeze([64, 32]) }),
+    splineScale: Object.freeze({ low: 1.5, medium: 2, high: 2, ultra: 3 }),
+    shadowSteps: Object.freeze({ low: 2, medium: 2, high: 2, ultra: 3 }),
+    hMinM: -0.8,
+  }),
 });

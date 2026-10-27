@@ -141,13 +141,10 @@ void main(){
 }
 `;
 
-const FRAGMENT = /* glsl */`
+// 主着色器与两个预烘焙着色器（GROUND_IMPACT_RENDER.bake）共用的 uniform 与函数。
+const FRAGMENT_COMMON = /* glsl */`
 precision highp float;
 precision highp sampler3D;
-// 第二个输出：尘的前沿视深度（Script_DustOcclusion）。降分辨率那一趟是两张靶（MRT）；没开降分辨率、直接画进主靶时只有一张，这一路自动丢掉。
-layout(location = 0) out highp vec4 pc_fragColor;
-layout(location = 1) out highp vec4 pc_dustFront;
-#define gl_FragColor pc_fragColor
 uniform sampler2D uSurge;
 uniform sampler2D uLoft;
 uniform sampler2D uSkin;
@@ -206,7 +203,18 @@ uniform float uGlobalFade;
 uniform float uFogDensity;
 uniform float uFogMax;
 uniform vec3 uFogColorSky;
-varying vec3 vWorld;
+// 预烘焙（GROUND_IMPACT_RENDER.bake）
+uniform sampler2D uSurgeB;     // 贴地尘浪网格的 B 样条（按 splineScale 倍精度预先算好）：x 地面（普通双线性）、yzw 同 uSurge
+uniform sampler2D uLoftB;      // 悬浮尘云网格的 B 样条（同上）
+uniform float uSplineLoft;     // 烘焙 B 样条那一趟：0 = 贴地层，1 = 悬浮层
+uniform sampler2D uLight;      // 受光「切片拼图」（一层切片一张小图铺成一张二维贴图；WebGL2 渲染三维贴图要一层画一次）：
+                               // r 朝太阳远段透过率、g 二阶散射远段透过率、b 天光系数
+uniform vec3 uLightDims;       // 受光：水平格数 X、Z，竖直层数
+uniform vec2 uLightTiles;
+uniform vec3 uVolMin;          // 受光烘焙那一刻的盒子（与 uBoxMin / uBoxMax 同一份，烘焙时写）
+uniform vec3 uVolExt;
+uniform vec2 uVolH;            // 竖直：离当地地面的下沿、跨度（层按平方分布，贴地最细）
+uniform float uBakeShadowSteps;
 
 vec2 BoxHit(vec3 ro, vec3 rd){
   vec3 inv = 1.0 / (sign(rd + 1e-12) * max(abs(rd), vec3(1e-7)));
@@ -243,16 +251,33 @@ vec4 BSpline(sampler2D tex, vec2 uv){
 }
 
 // 两层尘的「平均」消光系数（不含噪声）。fresh 输出按消光加权的新鲜度。
+// 网格那一半（两次 B 样条，8 次取样）只跟水平位置有关：烘焙版预先按 splineScale 倍精度算进 uSurgeB / uLoftB，这里一次双线性；
+// 竖直剖面（贴地实、顶上虚，尘浪顶面起伏）两版都逐像素算，竖直方向一点不丢。
 float gNearSurge = 0.0;   // Field 顺手报：采样点在贴地尘浪那一层里（主循环据此加密步长）
+vec4 SurgeAt(vec2 su){
+#ifdef DUST_BAKED
+  return texture(uSurgeB, su);
+#else
+  vec4 s = BSpline(uSurge, su);
+  // 地面高用普通双线性：smoothstep 插值在格心处是平的，坡上会变成一级级台阶（沟壁上一道道横纹）
+  s.x = texture(uSurge, su).x;
+  return s;
+#endif
+}
+vec4 LoftAt(vec2 lu){
+#ifdef DUST_BAKED
+  return texture(uLoftB, lu);
+#else
+  return BSpline(uLoft, lu);
+#endif
+}
 float Field(vec3 p, out float fresh){
   float d = 0.0, fw = 0.0;
   gNearSurge = 0.0;
   vec2 su = (p.xz - uSurgeRect.xy) * uSurgeRect.zw;
   float groundHere = uBaseY;
   if (su.x > 0.0 && su.y > 0.0 && su.x < 1.0 && su.y < 1.0) {
-    vec4 s = BSpline(uSurge, su);
-    // 地面高用普通双线性：smoothstep 插值在格心处是平的，坡上会变成一级级台阶（沟壁上一道道横纹）
-    s.x = texture(uSurge, su).x;
+    vec4 s = SurgeAt(su);
     groundHere = uBaseY + s.x;
     float h = s.y;
     if (h > 0.006 && s.z > 1e-4) {
@@ -269,7 +294,7 @@ float Field(vec3 p, out float fresh){
   }
   vec2 lu = (p.xz - uLoftRect.xy) * uLoftRect.zw;
   if (lu.x > 0.0 && lu.y > 0.0 && lu.x < 1.0 && lu.y < 1.0) {
-    vec4 l = BSpline(uLoft, lu);
+    vec4 l = LoftAt(lu);
     if (l.x > 1e-4) {
       float zb = uBaseY + l.y / l.x, zt = uBaseY + l.z / l.x, th = max(0.4, zt - zb);
       float u = (p.y - zb) / th;
@@ -357,6 +382,44 @@ float ShadowShape(vec3 p, float d){
   return smoothstep(uEdge - uEdgeSoft * 2.0, uEdge + uEdgeSoft * 2.0, c + (n - 0.5) * uErosion) * (d + uSolid * c);
 }
 
+// 当地地面高（与 Skin 同一个取法：网格外按边上的值延伸）
+float GroundAt(vec2 xz){ return uBaseY + texture(uSurge, clamp((xz - uSurgeRect.xy) * uSurgeRect.zw, 0.0, 1.0)).x; }
+
+// 世界坐标 → 受光格子坐标：水平按盒子，竖直按离当地地面的高（平方分布的反函数）
+vec3 VolCoord(vec3 p, float ground){
+  return vec3((p.xz - uVolMin.xz) / uVolExt.xz, sqrt(clamp((p.y - ground - uVolH.x) / uVolH.y, 0.0, 1.0)));
+}
+
+// 切片拼图取样：层内硬件双线性（夹在格心以内，不串到隔壁那张），层间手动插值
+vec4 Atlas(sampler2D tex, vec3 uvw, vec3 dims, vec2 tiles){
+  float L = clamp(uvw.z * dims.z - 0.5, 0.0, dims.z - 1.0);
+  float i0 = floor(L), i1 = min(i0 + 1.0, dims.z - 1.0);
+  vec2 st = clamp(uvw.xy, 0.5 / dims.xy, 1.0 - 0.5 / dims.xy) * dims.xy;
+  float r0 = floor((i0 + 0.5) / tiles.x), r1 = floor((i1 + 0.5) / tiles.x);
+  vec2 o0 = vec2(i0 - r0 * tiles.x, r0) * dims.xy, o1 = vec2(i1 - r1 * tiles.x, r1) * dims.xy;
+  vec2 inv = 1.0 / (tiles * dims.xy);
+  return mix(texture(tex, (o0 + st) * inv), texture(tex, (o1 + st) * inv), L - i0);
+}
+
+// 遮光的加权与原来逐像素那一版相同：t = L·u²、u 均匀取点、每点同权 —— 即 ∫σ(t)·½√(L/t) dt，越近权重越大。
+// 拆成两段：u ∈ [0, 1/3]（t ≤ L/9，约 1 m 以内）逐像素 1 步（NearShadow：u = 1/6，t = L/36，正是原来 3 步里的第一步），
+// u ∈ [1/3, 1] 烘进受光格子（BAKE_LIGHT_FRAGMENT，步数更多）。
+// 近段这一步照原来精确算 Field(Warp(q))：大炸弹的扭曲在三十公分内就能差出一米，拿「扭曲点 + 偏移」近似会总落在同一团浓尘里、偏暗。
+float NearShadow(vec3 p, vec3 light, float L){
+  vec3 q = p + light * (L / 36.0);
+  float f;
+  return ShadowShape(q, Field(Warp(q), f)) * L / 3.0;
+}
+`;
+
+const FRAGMENT = /* glsl */`
+// 第二个输出：尘的前沿视深度（Script_DustOcclusion）。降分辨率那一趟是两张靶（MRT）；没开降分辨率、直接画进主靶时只有一张，这一路自动丢掉。
+layout(location = 0) out highp vec4 pc_fragColor;
+layout(location = 1) out highp vec4 pc_dustFront;
+#define gl_FragColor pc_fragColor
+${FRAGMENT_COMMON}
+varying vec3 vWorld;
+
 void main(){
   vec3 ro = cameraPosition, rd = normalize(vWorld - cameraPosition);
   vec2 hit = BoxHit(ro, rd);
@@ -373,7 +436,7 @@ void main(){
   float shadowLen = min(10.0, (uBoxMax.y - uBoxMin.y) * 0.6 + 1.5);
   vec3 radiance = vec3(0.0);
   float transmission = 1.0;
-  float frontW = 0.0, frontZ = 0.0;     // 按这一段挡掉的光加权的射线距离（→ 尘的前沿深度）
+  float frontW = 0.0, frontZ = 0.0, frontZ2 = 0.0;   // 按这一段挡掉的光加权的射线距离与其平方（→ 尘沿视线的位置与散开程度）
   float tRay = start + jitter * ds;
   float refine = 0.0, refineStep = ds;   // 撞上很浓的一层时退半步、细步长走几步（先粗后细），表面才不随抖动跳格
   float dsFine = clamp(uSkinShape.x * 0.3, 0.06, ds);
@@ -381,8 +444,9 @@ void main(){
   for (int i = 0; i < 160; i++) {
     if (tRay >= end || transmission < 0.01) break;
     vec3 p = ro + rd * tRay;
-    vec3 w = Warp(p);
     float fresh, near;
+    // 扭曲逐像素现算（团块轮廓靠它，烘进格子再插值会被抹平）
+    vec3 w = Warp(p);
     float d = Field(w, fresh);
     float surgeH = gNearSurge;
     float skin = Skin(p, near);
@@ -410,8 +474,19 @@ void main(){
       continue;
     }
     float skinShare = skin / max(mainS + skin, 1e-5);
+    // 朝太阳的透过率（单次散射用 exp(−τ)、二阶散射用 exp(−τ·k)）与天光系数 exp(−上方的尘 × 0.9)
+    float sunT, msT, skyK;
+#ifdef DUST_BAKED
+    // 受光（原来每步约 52 次取样）：远段与天光系数查烘焙好的受光格子（按没扭曲的坐标查）；近段那一步逐像素算。
+    // 格子里存的是透过率不是光学深度：τ 在扭曲很陡的地方变化剧烈，先平均 τ 再取指数会系统性偏暗（大炸弹里暗一成半）
+    vec3 lit = Atlas(uLight, VolCoord(p, GroundAt(p.xz)), uLightDims, uLightTiles).rgb;
+    float tauNear = NearShadow(p, light, shadowLen);
+    sunT = lit.r * exp(-tauNear);
+    msT = lit.g * exp(-tauNear * uMultipleScattering.y);
+    skyK = lit.b;
+#else
+    float tau = 0.0, above;
     // 朝太阳的遮光（步长逐步拉长）
-    float tau = 0.0;
     for (int j = 0; j < 6; j++) {
       if (float(j) >= uShadowSteps) break;
       float t = (float(j) + 0.5) / uShadowSteps;
@@ -422,18 +497,20 @@ void main(){
     }
     // 天光：上方 1.4 m 还有多少尘，压一压底部（尘团下半截比顶上暗）
     float fu;
-    float above = Field(w + vec3(0.0, 1.4, 0.0), fu);
+    above = Field(w + vec3(0.0, 1.4, 0.0), fu);
+    sunT = exp(-tau); msT = exp(-tau * uMultipleScattering.y); skyK = exp(-above * 0.9);
+#endif
     // 天光 + 暖色地面反光（黄土地把阳光反上来，尘团背光面偏暖灰，不是蓝灰）
-    vec3 ambient = (uSkyColor * uAmbientScale + uSunColor * uGroundBounce * vec3(1.0, 0.84, 0.6)) * mix(uAmbientFloor, 1.0, exp(-above * 0.9));
+    vec3 ambient = (uSkyColor * uAmbientScale + uSunColor * uGroundBounce * vec3(1.0, 0.84, 0.6)) * mix(uAmbientFloor, 1.0, skyK);
     float ph = mix(phase, phaseSkin, skinShare);
-    vec3 incident = ambient + uSunColor * (exp(-tau) * ph + uMultipleScattering.x * exp(-tau * uMultipleScattering.y));
+    vec3 incident = ambient + uSunColor * (sunT * ph + uMultipleScattering.x * msT);
     // 火光把周围的尘从里面照亮（橙红，按离火球的距离衰减）
     if (uFireColor.a > 0.0) incident += uFireColor.rgb / max(1.0, length(uFireColor.rgb)) * uFireColor.a * exp(-fireD * fireD * 0.35);
     vec3 skinAlbedo = mix(uSkinColor, uFreshColor, clamp(skinFresh, 0.0, 1.0));
     vec3 albedo = mix(mix(uDustColor, uFreshColor, smoothstep(0.05, 0.95, fresh)), skinAlbedo, skinShare);
     float next = exp(-sigma * stepLen);
     float dw = transmission * (1.0 - next);
-    frontW += dw; frontZ += dw * tRay;
+    frontW += dw; frontZ += dw * tRay; frontZ2 += dw * tRay * tRay;
     radiance += transmission * albedo * incident * (1.0 - next);
     transmission *= next;
     tRay += stepLen;
@@ -447,14 +524,93 @@ void main(){
   // 射线距离换成视深度（粒子那边比的是视深度 vViewDepth）
   float viewK = max(0.001, -(viewMatrix * vec4(rd, 0.0)).z);
   float frontDepth = (frontW > 1e-5 ? frontZ / frontW : start) * viewK;
-  pc_dustFront = vec4(frontDepth * alphaOut, alphaOut, 0.0, alphaOut);
+  float frontDepth2 = (frontW > 1e-5 ? frontZ2 / frontW : start * start) * viewK * viewK;
+  // b：深度平方（× 1e-4，半精度够到两公里）——粒子那边由它算尘沿视线散得多开（Script_DustOcclusion）
+  pc_dustFront = vec4(frontDepth * alphaOut, alphaOut, frontDepth2 * 1e-4 * alphaOut, alphaOut);
+}
+`;
+
+// 预烘焙（GROUND_IMPACT_RENDER.bake）：片元着色器当计算用。全屏一个三角形：网格上传那一帧烘两张 B 样条，每帧烘一次受光。
+const BAKE_VERTEX = /* glsl */`
+void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }
+`;
+
+const BAKE_HEAD = /* glsl */`
+layout(location = 0) out highp vec4 pc_fragColor;
+${FRAGMENT_COMMON}
+`;
+
+// 网格的 B 样条：输出像素中心 = 预烘焙图的格心，与主着色器 texture(uSurgeB, su) 的双线性一一对上
+const BAKE_SPLINE_FRAGMENT = /* glsl */`
+${BAKE_HEAD}
+uniform vec2 uSplineSize;
+void main(){
+  vec2 uv = gl_FragCoord.xy / uSplineSize;
+  if (uSplineLoft > 0.5) { pc_fragColor = BSpline(uLoft, uv); return; }
+  vec4 s = BSpline(uSurge, uv);
+  s.x = texture(uSurge, uv).x;
+  pc_fragColor = s;
+}
+`;
+
+const BAKE_VOXEL = /* glsl */`
+${BAKE_HEAD}
+// 这个像素是拼图里哪一个体素：水平 st∈(0,1)（格心）、竖直 r∈(0,1)；拼图末尾多出来的空格返回 false
+bool Voxel(vec3 dims, vec2 tiles, out vec3 p, out float ground){
+  vec2 px = floor(gl_FragCoord.xy);
+  vec2 tile = floor((px + 0.5) / dims.xy);
+  float layer = tile.y * tiles.x + tile.x;
+  vec2 st = (px - tile * dims.xy + 0.5) / dims.xy;
+  float r = (layer + 0.5) / dims.z;
+  p.xz = uVolMin.xz + st * uVolExt.xz;
+  ground = GroundAt(p.xz);
+  p.y = ground + uVolH.x + uVolH.y * r * r;
+  return layer < dims.z - 0.5;
+}
+`;
+
+// 受光：朝太阳走远段 u ∈ [1/3, 1]（加权同原来，步数更多；每步同原来 ShadowShape(q, Field(Warp(q)))，Field 用预烘焙网格），
+// 存透过率 exp(−τ)、exp(−τ·k) 与天光系数 exp(−上方的尘 × 0.9)（插值透过率，不插值 τ，见主着色器）
+const BAKE_LIGHT_FRAGMENT = /* glsl */`
+#define DUST_BAKED 1
+${BAKE_VOXEL}
+void main(){
+  vec3 p; float ground;
+  if (!Voxel(uLightDims, uLightTiles, p, ground)) { pc_fragColor = vec4(0.0); return; }
+  vec3 light = normalize(uSunDirection);
+  float shadowLen = min(10.0, (uBoxMax.y - uBoxMin.y) * 0.6 + 1.5);
+  float tau = 0.0;
+  for (int j = 0; j < 16; j++) {
+    if (float(j) >= uBakeShadowSteps) break;
+    float u = 1.0 / 3.0 + (float(j) + 0.5) / uBakeShadowSteps * (2.0 / 3.0);
+    vec3 q = p + light * (u * u * shadowLen);
+    float f;
+    tau += ShadowShape(q, Field(Warp(q), f));
+  }
+  tau *= shadowLen * (2.0 / 3.0) / uBakeShadowSteps;
+  float f;
+  float above = Field(Warp(p) + vec3(0.0, 1.4, 0.0), f);
+  pc_fragColor = vec4(exp(-tau), exp(-tau * uMultipleScattering.y), exp(-above * 0.9), 1.0);
 }
 `;
 
 const SHARED_KEYS = ["uSunDirection", "uSunColor", "uSkyColor", "uNormalDepth", "uResolution", "uDepthValid",
   "uGlobalFade", "uFogDensity", "uFogMax", "uFogColorSky"];
 
-function MakeMaterial(shared, noise, quality) {
+/** 预烘焙的尺寸（按画质）：受光格子的 [X, Z, 层数] 与拼图排布 [一行几张, 几行]；网格 B 样条的倍数；受光烘焙的步数。 */
+export function BakeLayout(quality) {
+  const B = RENDER.bake;
+  const [xz, layers] = B.light[quality] ?? B.light.high;
+  const across = Math.ceil(Math.sqrt(layers)), rows = Math.ceil(layers / across);
+  return {
+    light: { dims: [xz, xz, layers], tiles: [across, rows], width: across * xz, height: rows * xz },
+    splineScale: B.splineScale[quality] ?? B.splineScale.high,
+    shadowSteps: B.shadowSteps[quality] ?? B.shadowSteps.high,
+  };
+}
+
+function MakeMaterial(shared, noise, quality, reference = false) {
+  const layout = BakeLayout(quality);
   const uniforms = {
     uSurge: { value: null }, uLoft: { value: null }, uSkin: { value: null }, uNoise: { value: noise },
     uSkinRect: { value: new THREE.Vector4() }, uSkinShape: { value: new THREE.Vector4(0.3, 0, 0, 160) },
@@ -477,10 +633,17 @@ function MakeMaterial(shared, noise, quality) {
     uPhaseG: { value: RENDER.phaseG },
     uMultipleScattering: { value: new THREE.Vector2(...RENDER.multipleScattering) },
     uAmbientFloor: { value: RENDER.ambientFloor },
+    uSurgeB: { value: null }, uLoftB: { value: null }, uSplineLoft: { value: 0 }, uSplineSize: { value: new THREE.Vector2(1, 1) },
+    uLight: { value: null },
+    uLightDims: { value: new THREE.Vector3(...layout.light.dims) }, uLightTiles: { value: new THREE.Vector2(...layout.light.tiles) },
+    uVolMin: { value: new THREE.Vector3() }, uVolExt: { value: new THREE.Vector3(1, 1, 1) }, uVolH: { value: new THREE.Vector2(RENDER.bake.hMinM, 1) },
+    uBakeShadowSteps: { value: layout.shadowSteps },
   };
   for (const key of SHARED_KEYS) if (shared[key]) uniforms[key] = shared[key];
   const material = new THREE.ShaderMaterial({
     vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms, glslVersion: THREE.GLSL3,
+    // 默认走预烘焙版；参考版（groundDustReference / ?dustRef=1）是原来逐像素全算的那一条
+    defines: reference ? {} : { DUST_BAKED: 1 },
     side: THREE.BackSide, transparent: true, depthTest: false, depthWrite: false,
     blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
     blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor,
@@ -489,8 +652,45 @@ function MakeMaterial(shared, noise, quality) {
   material.name = "GroundImpactDust";
   material.userData.preserveTargetAlpha = true;
   MarkNoPrepass(material);
+  // 两只烘焙材质与主材质共用同一个 uniforms 对象：网格贴图、盒子、种子、漂移这些每帧量自动是同一份
+  //（B 样条那一只不带 DUST_BAKED：它读的就是原始网格；受光那一只着色器里自己定义了 DUST_BAKED，读预烘焙网格）
+  const Bake = (fragmentShader, name) => {
+    const m = new THREE.ShaderMaterial({
+      vertexShader: BAKE_VERTEX, fragmentShader, uniforms, glslVersion: THREE.GLSL3,
+      depthTest: false, depthWrite: false, blending: THREE.NoBlending,
+    });
+    m.name = name;
+    MarkNoPrepass(m);
+    return m;
+  };
+  material.userData.bakeSpline = Bake(BAKE_SPLINE_FRAGMENT, "GroundImpactDustBakeSpline");
+  material.userData.bakeLight = Bake(BAKE_LIGHT_FRAGMENT, "GroundImpactDustBakeLight");
   return material;
 }
+
+function DisposeMaterial(material) {
+  material.userData.bakeSpline?.dispose(); material.userData.bakeLight?.dispose();
+  material.dispose();
+}
+
+function MakeBakeTarget(width, height) {
+  const target = new THREE.WebGLRenderTarget(width, height, {
+    type: THREE.HalfFloatType, format: THREE.RGBAFormat, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter,
+    generateMipmaps: false, depthBuffer: false, stencilBuffer: false,
+  });
+  target.texture.colorSpace = THREE.NoColorSpace;
+  target.texture.wrapS = target.texture.wrapT = THREE.ClampToEdgeWrapping;
+  return target;
+}
+
+/** 一团尘的预烘焙靶：两张网格 B 样条（N × splineScale 见方）+ 一张受光拼图。按网格边长 N 回收复用。 */
+function MakeBake(N, layout) {
+  const size = Math.max(2, Math.round(N * layout.splineScale));
+  return { N, size, surge: MakeBakeTarget(size, size), loft: MakeBakeTarget(size, size),
+    light: MakeBakeTarget(layout.light.width, layout.light.height) };
+}
+
+function DisposeBake(bake) { bake.surge.dispose(); bake.loft.dispose(); bake.light.dispose(); }
 
 function MakeTexture(N) {
   const texture = new THREE.DataTexture(new Float32Array(N * N * 4), N, N, THREE.RGBAFormat, THREE.FloatType);
@@ -570,6 +770,30 @@ export class DustFieldSystem {
     this.floatLinear = null;
     this.materialPool = [];   // 用完的材质（不销毁：程序要一直留着，见文件头）
     this.uploads = 0;         // 取证：一共传了几次网格
+    // 预烘焙（GROUND_IMPACT_RENDER.bake）：每团尘绘制前先烘两张拼图（体积、受光），一帧一次
+    this.bakeLayout = BakeLayout(quality);
+    this.bakePool = [];       // 用完的预烘焙靶（按网格边长 N 复用）
+    this.bakes = 0;           // 取证：一共烘了几次受光
+    this.splineBakes = 0;     // 取证：一共烘了几次网格 B 样条（只在网格上传那一帧）
+    this.bakeScene = null; this.bakeQuad = null; this.bakeCamera = null;
+    // 参考版（原来逐像素全算）：画质预设 groundDustReference 或 ?dustRef=1（referenceForced）
+    this.reference = false;
+    this.referenceForced = false;
+    this.profiler = null;     // Script_Profiler（Vfx 每帧交进来）：烘焙单独记一段 GPU
+  }
+
+  /**
+   * 参考版开 / 关（Script_PostGroundDust 每帧按画质预设调；referenceForced 压过预设）。
+   * 两条路是同一份着色器的两个变体（DUST_BAKED），切换时现有材质重编一次。
+   */
+  SetReference(on) {
+    const reference = !!on || this.referenceForced;
+    if (reference === this.reference) return;
+    this.reference = reference;
+    for (const material of [...this.fields.map((e) => e.material), ...this.materialPool]) {
+      material.defines = reference ? {} : { DUST_BAKED: 1 };
+      material.needsUpdate = true;
+    }
   }
 
   /** 第一次用之前把噪声算好（开扬尘的那一刻调，免得第一发炮弹那一帧卡 100 ms）。 */
@@ -592,7 +816,7 @@ export class DustFieldSystem {
     }
     const N = field.N;
     // 每个随团写的统一变量下面与 Update 都会重写，回收来的材质直接用。
-    const material = this.materialPool.pop() || MakeMaterial(this.shared, this.noise.texture, this.quality);
+    const material = this.materialPool.pop() || MakeMaterial(this.shared, this.noise.texture, this.quality, this.reference);
     material.uniforms.uResolution = this.resolution;
     this._ApplyMode(material);
     const sets = [0, 1].map(() => ({ surge: MakeTexture(N), loft: MakeTexture(N), skin: MakeTexture(N) }));
@@ -623,14 +847,83 @@ export class DustFieldSystem {
     mesh.frustumCulled = false; mesh.matrixAutoUpdate = false; mesh.renderOrder = DUST_COMPOSITE_RENDER_ORDER;
     mesh.userData.skipNormalDepth = true;
     mesh.visible = false;
-    mesh.onBeforeRender = (renderer) => this._CheckFloatLinear(renderer);
     mesh.layers.set(this.halfMode ? GROUND_DUST_LAYER : 0);
     this.group.add(mesh);
     const entry = { field, mesh, material, sets, back: 0, packed: false, slot: this.created % 4, info: null,
-      origin: { x: field.minX, z: field.minZ }, retiring: false };
+      origin: { x: field.minX, z: field.minZ }, retiring: false, bake: null, bakedFrame: -1, splineDirty: true };
+    // 绘制前一刻烘焙（降分辨率那一趟、全分辨率画在主场景里都走这里）：渲染里套一次渲染，three 的反射镜同一个做法
+    mesh.onBeforeRender = (renderer) => { this._CheckFloatLinear(renderer); this._Bake(renderer, entry); };
     this.fields.push(entry);
     this.created++;
     return entry;
+  }
+
+  /**
+   * 一团尘的预烘焙（参考版不烘）：
+   *   · 网格这一帧刚上传（splineDirty）：两层网格的 B 样条按 splineScale 倍精度算进 uSurgeB / uLoftB（与时间无关，传了才烘）；
+   *   · 受光拼图 ← 朝太阳走远段（噪声、漂移、扭曲都随时间动）：刚炸的 upload.fullS 秒内每帧烘，之后隔帧烘（各团错开）——
+   *     受光变化慢，隔帧看不出来，四团同屏时省一半烘焙。盒子按烘受光那一刻的 uBoxMin / uBoxMax 记进 uVolMin / uVolExt。
+   */
+  _Bake(renderer, e) {
+    if (this.reference || e.bakedFrame === this.frame) return;
+    e.bakedFrame = this.frame;
+    const u = e.material.uniforms;
+    if (!u.uSurge.value) return;
+    const lightDue = !u.uLight.value || e.field.time < RENDER.upload.fullS || (this.frame + e.slot) % 2 === 0;
+    if (!lightDue && !e.splineDirty) return;
+    const N = e.field.N;
+    if (!e.bake) {
+      const k = this.bakePool.findIndex((b) => b.N === N);
+      e.bake = k >= 0 ? this.bakePool.splice(k, 1)[0] : MakeBake(N, this.bakeLayout);
+      e.splineDirty = true;
+    }
+    if (!this.bakeScene) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3));
+      this.bakeQuad = new THREE.Mesh(geometry, e.material.userData.bakeLight);
+      this.bakeQuad.frustumCulled = false; this.bakeQuad.matrixAutoUpdate = false;
+      this.bakeScene = new THREE.Scene();
+      this.bakeScene.add(this.bakeQuad);
+      this.bakeScene.matrixWorldAutoUpdate = false;
+      this.bakeCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    }
+    if (lightDue) {
+      const min = u.uBoxMin.value, max = u.uBoxMax.value;
+      u.uVolMin.value.copy(min);
+      u.uVolExt.value.set(Math.max(0.1, max.x - min.x), Math.max(0.1, max.y - min.y), Math.max(0.1, max.z - min.z));
+      // 竖直：离当地地面 hMinM 到盒顶（按盒底那么低的地面算，沟底、坑底也够得着）
+      u.uVolH.value.set(RENDER.bake.hMinM, Math.max(1, max.y - min.y - RENDER.bake.hMinM + 0.5));
+    }
+    const P = this.profiler?.on ? this.profiler : null;
+    const prevTarget = renderer.getRenderTarget(), prevFace = renderer.getActiveCubeFace(), prevLevel = renderer.getActiveMipmapLevel();
+    const prevAuto = renderer.autoClear, infoAuto = renderer.info.autoReset;
+    renderer.autoClear = false; renderer.info.autoReset = false;
+    P?.GpuPush("groundDust/bake");
+    try {
+      if (e.splineDirty) {
+        e.splineDirty = false;
+        this.bakeQuad.material = e.material.userData.bakeSpline;
+        u.uSplineSize.value.set(e.bake.size, e.bake.size);
+        for (const [loft, target] of [[0, e.bake.surge], [1, e.bake.loft]]) {
+          u.uSplineLoft.value = loft;
+          renderer.setRenderTarget(target);
+          renderer.render(this.bakeScene, this.bakeCamera);
+        }
+        u.uSurgeB.value = e.bake.surge.texture; u.uLoftB.value = e.bake.loft.texture;
+        this.splineBakes++;
+      }
+      if (lightDue) {
+        this.bakeQuad.material = e.material.userData.bakeLight;
+        renderer.setRenderTarget(e.bake.light);
+        renderer.render(this.bakeScene, this.bakeCamera);
+        u.uLight.value = e.bake.light.texture;
+        this.bakes++;
+      }
+    } finally {
+      P?.GpuPop();
+      renderer.setRenderTarget(prevTarget, prevFace, prevLevel);
+      renderer.autoClear = prevAuto; renderer.info.autoReset = infoAuto;
+    }
   }
 
   /** 极少数机器不支持浮点贴图线性过滤：退回最近点，块感重一点但不会黑。 */
@@ -760,6 +1053,7 @@ export class DustFieldSystem {
         }
         u.uSurge.value = set.surge; u.uLoft.value = set.loft; u.uSkin.value = set.skin;
         e.back ^= 1; e.packed = true; e.info = info; this.uploads++;
+        e.splineDirty = true;
         u.uSurgeRect.value.set(info.surgeRect[0], info.surgeRect[1], 1 / info.surgeRect[2], 1 / info.surgeRect[3]);
         u.uLoftRect.value.set(info.loftRect[0], info.loftRect[1], 1 / info.loftRect[2], 1 / info.loftRect[3]);
         u.uBaseY.value = info.baseY;
@@ -825,7 +1119,12 @@ export class DustFieldSystem {
     for (const set of e.sets) { set.surge.dispose(); set.loft.dispose(); set.skin.dispose(); }
     // 材质回收（不 dispose：最后一只一销毁，着色器程序跟着删，下一发重编）。池子封顶，多出来的才销毁。
     e.material.uniforms.uSurge.value = e.material.uniforms.uLoft.value = e.material.uniforms.uSkin.value = null;
-    if (this.materialPool.length < RENDER.maxFields + 2) this.materialPool.push(e.material); else e.material.dispose();
+    e.material.uniforms.uSurgeB.value = e.material.uniforms.uLoftB.value = e.material.uniforms.uLight.value = null;
+    if (this.materialPool.length < RENDER.maxFields + 2) this.materialPool.push(e.material); else DisposeMaterial(e.material);
+    if (e.bake) {
+      if (this.bakePool.length < 4) this.bakePool.push(e.bake); else DisposeBake(e.bake);
+      e.bake = null;
+    }
     this.fields.splice(k, 1);
   }
 
@@ -834,15 +1133,19 @@ export class DustFieldSystem {
   Inspect() {
     return {
       live: this.fields.length, created: this.created, floatLinear: this.floatLinear, uploads: this.uploads, pooled: this.materialPool.length,
-      halfMode: this.halfMode, halfFrames: this.halfFrames,
+      halfMode: this.halfMode, halfFrames: this.halfFrames, reference: this.reference, bakes: this.bakes, splineBakes: this.splineBakes,
+      bakeLayout: { light: this.bakeLayout.light.dims, splineScale: this.bakeLayout.splineScale },
       fields: this.fields.map((e) => e.field.Inspect()),
     };
   }
 
   Dispose() {
     this.Clear();
-    for (const material of this.materialPool) material.dispose();
+    for (const material of this.materialPool) DisposeMaterial(material);
     this.materialPool.length = 0;
+    for (const bake of this.bakePool) DisposeBake(bake);
+    this.bakePool.length = 0;
+    if (this.bakeQuad) { this.bakeQuad.geometry.dispose(); this.bakeQuad = null; this.bakeScene = null; }
     if (this.upsample) { this.upsample.removeFromParent(); this.upsample.geometry.dispose(); this.upsample.material.dispose(); this.upsample = null; }
     this.group.removeFromParent();
     this.geometry.dispose();

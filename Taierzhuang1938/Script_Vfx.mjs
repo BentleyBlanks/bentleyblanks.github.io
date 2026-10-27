@@ -937,6 +937,7 @@ export class VfxSystem {
     if (step > 0) this.particles.Resume();
     this.particles.Update(step);
     this._UpdateSmokeSources(step);
+    if (this.dustFields) { this.dustFields.profiler = this.profiler || null; this.dustFields.referenceForced = !!this.dustReferenceForced; }
     this.dustFields?.Update(step, this.wind, camera);
     this.battleSmoke?.Update();
     this.bloodEffects.Update(step,this.time,camera);

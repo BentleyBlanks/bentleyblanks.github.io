@@ -1474,6 +1474,9 @@ async function Boot() {
   vfx = new VfxSystem(scene, library, {
     quality: QUALITY, maxParticles: SCALE.vfxBudget, lights,
   });
+  // 落地扬尘：烘焙那一段单独记一段 GPU（Script_DustFieldRenderer._Bake）；?dustRef=1 强制走原来逐像素全算的参考版
+  vfx.profiler = profiler;
+  vfx.dustReferenceForced = params.get("dustRef") === "1";
   vfx.SetBloodSurface((from,direction,distance)=>battlefield?.Raycast(from,direction,distance,{terrain:true}));
   vfx.SetFallingSoilSurface({groundAt:(x,z)=>battlefield?.GroundHeight(x,z),
     raycast:(from,direction,distance)=>battlefield?.Raycast(from,direction,distance,{terrain:true})});
