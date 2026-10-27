@@ -396,7 +396,8 @@ assert.ok(openingStoryBeats.every(cue=>!/hubSupply/i.test(JSON.stringify(cue))),
  const {MOVE,JUMP}=await import("./Data_Tuning_Player.mjs");
  const Step=vm.runInNewContext(`(function(dt,input,target){${movement}})`,{UP:new Vector3(0,1,0),MOVE,JUMP,Clamp:(n,a,b)=>Math.max(a,Math.min(b,n)),Clamp01:n=>Math.max(0,Math.min(1,n))});
  function Travel(diveSpeedMps,forward,wall=false){
-  const p={stance:"prone",health:20.267,suppression:1,ads:1,sprint:0,carrySpeedScale:1,debug:{},yaw:0,grounded:true,velocity:new Vector3(),position:new Vector3(),_forward:new Vector3(),_right:new Vector3(),_tmp:new Vector3(),LegPenalty:()=>.72*.72,MoveWithCollision(dt){if(!wall)this.position.addScaledVector(this.velocity,dt);this.position.y=0;this.velocity.y=0;}};
+  // knock：冲击波推一把之后移动输入按 ControlScale 交还（Script_PlayerKnockback）；这里没挨炸，满额
+  const p={stance:"prone",health:20.267,suppression:1,ads:1,sprint:0,carrySpeedScale:1,debug:{},yaw:0,grounded:true,knock:{ControlScale:1},velocity:new Vector3(),position:new Vector3(),_forward:new Vector3(),_right:new Vector3(),_tmp:new Vector3(),LegPenalty:()=>.72*.72,MoveWithCollision(dt){if(!wall)this.position.addScaledVector(this.velocity,dt);this.position.y=0;this.velocity.y=0;}};
   for(let i=0;i<132;i++)Step.call(p,1/60,{forward,diveSpeedMps},{speed:.72});
   return Math.hypot(p.position.x,p.position.z);
  }

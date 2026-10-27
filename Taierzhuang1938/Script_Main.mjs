@@ -1528,6 +1528,11 @@ async function Boot() {
   player.onBulletWound = (part, direction, info) => viewmodel.AddBulletWound(part, direction, info);
   player.onWoundReset = () => viewmodel.ClearWounds();
   player.cameraMount = (cam) => MountedCameraEye(cam);
+  // 冲击波推人（Script_PlayerKnockback / docs/Data_BlastKnockback.md）。原来这里是「挨炸掉 24 血以上就走白刃倒地」，
+  // 而且只在手里握着白刃时才倒得下去；现在推不推得倒按冲量算（Combat.Blast → player.BlastKnockback）。
+  // 过场、白刃缠斗、抬着东西时只晃不倒（那几套系统各自管着身体）；在固定机枪上被掀倒，先把人从枪上放下来。
+  player.knockGate = () => !state.cutscene && !meleeCombat?.Active && !carry?.Active;
+  player.onKnockDown = () => { if (emplacement?.Mounted) emplacement.Vacate("blast"); };
 
   // 导航网格：一张 2 m 一格的"走不走得过去"位图 + 按目标算的下坡场。
   // 没有它，AI 在这座四合院城里就是直奔一堵院墙（见 Script_Navigation 的账）。
@@ -4122,7 +4127,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
         crouch:Math.max(player.stanceBlend.crouch||0,bodyCrouch||0),alive:player.Alive,
         moveSpeed:Clamp01(Math.hypot(player.velocity.x,player.velocity.z)/3.2),
         grounded:player.grounded,sprint:player.sprint,
-      },camera,visible&&player.Alive&&!state.cutscene&&!state.menu&&player.meleeCameraDrop<=.05),
+      },camera,visible&&player.Alive&&!state.cutscene&&!state.menu&&player.meleeCameraDrop<=.05&&!player.knock?.BodyHidden),
     }) : null;
   p012StageZero?.Dispose(); p012StageZero = null;
   p012Binoculars?.Dispose();
@@ -6315,13 +6320,15 @@ function PlayHurtCues() {
   let grunted = false;
   for (const e of events) {
     if (e.kind === "hurt") {
-      if (e.blast && e.damage >= 24 && player.Alive) meleeCombat?.KnockDown(player, null, "blastImbalance");
       // 一帧只哼一声：一发霰射的弹片能同帧结算好几下，全播出来是一片噪音。
       if (grunted) continue;
       grunted = true;
       audio.Play("hurt", { volume: Clamp(0.55 + e.severity * 0.5, 0.55, 1.0), priority: true });
     } else if (e.kind === "heartbeat") {
       audio.Play("heartbeat", { volume: Clamp(0.5 + e.severity * 0.55, 0.5, 1.0) });
+    } else if (e.kind === "knockImpact") {
+      // 被冲击波掀倒：身体砸在地上 / 撞上墙（Script_PlayerKnockback 的撞击）
+      audio.Play("bodyFall", { volume: Clamp(0.45 + e.severity * 0.5, 0.45, 1.0), priority: true });
     }
   }
 }
@@ -9336,14 +9343,16 @@ function Frame(dt, render = true) {
   else {
   if (mountView.active) MountedViewPose();
   viewmodel.Update(dt, {
-    wallLower: mountView.active ? 0 : player.gunClearance.lower,
+    // 被冲击波掀倒时枪跟着放下去（借贴墙收枪那一层；Script_PlayerKnockback.GunLower）
+    wallLower: mountView.active ? 0 : Math.max(player.gunClearance.lower, player.knock?.GunLower ?? 0),
     playerPosition: player.position, playerYaw: player.yaw,
     // 第一人称身体的落脚点跟地形起伏（Script_FirstPersonGait：只取相对玩家脚下的高差）。
     bodyGroundAt: BodyGroundAt,
     carryBodyVisible: !!p012CarryView?.rig.root.visible && !state.cutscene && !state.menu && player.Alive,
     carryBodyYaw: p012CarryView?.bodyYaw,
     carryBodyCrouch: p012CarryView?.BodyCrouch || 0,
-    meleeCameraDrop: player.meleeCameraDrop,
+    // 第一人称的腿和身子：白刃倒地、被冲击波掀倒横在地上时都藏起来（那套站姿身体对不上）
+    meleeCameraDrop: Math.max(player.meleeCameraDrop, player.knock?.BodyHidden ? 1 : 0),
     prone: player.stanceBlend.prone, alive: player.Alive,
     dt, moveSpeed: Clamp01(Math.hypot(player.velocity.x, player.velocity.z) / 3.2),
     strafe: input.strafe, grounded: player.grounded, sprint: player.sprint,
@@ -9826,7 +9835,7 @@ function RenderSceneContent(dt) {
   // 白盒编辑器的预演播放中：相机不在玩家身上，枪模与第一人称身体一起藏（播完 / 中断由编辑器还原枪模）
   const openingBody=CLOTH_TEST || (player?.Alive && missionRuntime?.frontShow?.bunker.CameraActive) || BlockoutInputCaptured();
   if(openingBody&&viewmodel)viewmodel.root.visible=false;
-  if (viewmodel?.body) viewmodel.body.root.visible = !openingBody && !!player?.Alive && !(player.meleeCameraDrop > 0.05) && !state.cutscene && !state.menu && !UiCapturing();
+  if (viewmodel?.body) viewmodel.body.root.visible = !openingBody && !!player?.Alive && !(player.meleeCameraDrop > 0.05) && !player.knock?.BodyHidden && !state.cutscene && !state.menu && !UiCapturing();
   UpdateFirstPersonShadow();
   const phase = PHASE_TABLE[state.phaseIndex];
   // 剖析：GPU 帧从这里开到 post.Render 之后 —— GI 的几趟探针 pass、阴影烘焙、

@@ -85,6 +85,8 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 - 人头上有多响 / 第一人称身体反应 / 耳朵受损（2026-10-21，`phase.blastReaction` 开关）：`Script_BlastExposure`（装药量 + 距离 → 峰值超压 / dB / 各反应强度，纯规则）、
   `Script_BlastFlinch`（扭头 / 低头 / 歪头 / 缩身 / 眨眼闭眼 / 收枪 / 手抖 / 恍惚 / 喘与心跳，`Player.flinch`）、`Script_AudioEarTrauma`（左右耳分开的听力损失 + 稳定耳鸣，`Audio.SetEarModel("trauma")`），
   数在 `Data_Tuning_BlastReaction`；回归 `Script_BlastReactionTest` / `Script_BattleReactionRangeBrowserTest`。
+- 冲击波推人（2026-10-28）：`Script_BlastKnockback`（Δv、分档、撞击钝伤，纯规则）+ `Script_PlayerKnockback`（推一把 / 倒地 / 掀飞 / 滑 / 躺 / 爬起来，`Player.knock`），
+  入口 `Combat.Blast` → `Player.BlastKnockback`，数在 `Data_Tuning_BlastKnockback`；回归 `Script_BlastKnockbackTest`；见 [冲击波推人](Data_BlastKnockback.md)。
 - 说明与验收：[通用近爆反馈](Data_BlastFeedback.md)、[人物战场反应测试场](Data_BattleReactionRange.md)。
 
 ### 引导 / 主循环
@@ -810,6 +812,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
   `Data_TestRange.md`（?range=1）、`Data_ExplosionRange.md`（爆炸测试场、通用炮坑与返掷现状）、
   `Data_ShellImpactRange.md`（?impacts=1，炮击扬尘测试场：壕沟地形、弹种投送、面板与 Debug 接口）、
   `Data_BattleReactionRange.md`（?reactions=1，人物战场反应测试场：第一人称近爆反应、耳朵受损、面板与 Debug 接口）、
+  `Data_BlastKnockback.md`（冲击波推人：Δv 模型、分档、倒地状态机、撞击钝伤、闸）、
   `Data_MeleeQte.md`（?melee=1）、`Data_RoadSpline.md`、
   `Data_WallSpline.md`（样条道路/围墙 + 未迁移例外清单）。
 

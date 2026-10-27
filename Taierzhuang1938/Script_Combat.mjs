@@ -851,6 +851,18 @@ export class CombatSystem {
             { from: position.clone(), blast: true });
         }
       });
+      // 冲击波推人（Script_BlastKnockback / docs/Data_BlastKnockback.md）：与伤害分开算 —— 冲量按装药量与爆点到质心的距离走物理，
+      // 不受玩法的杀伤半径管（250 公斤炸弹 20 m 外照样推人一个趔趄）；墙后按绕射扣成四成，不像弹片那样整个挡掉。
+      // 只认真打人的那一发（damage > 0）：剧本里纯放烟火、不伤人的爆炸不推人。伤害在前：被这一下炸死的人照样被掀出去
+      // （deadTime 还是 0），死亡镜头跟着身体走 —— 大炸弹的致死圈比推倒的距离大，不这样的话「被震飞」玩家永远看不到。
+      if (damage > 0 && (player.Alive || player.deadTime === 0) && player.BlastKnockback) {
+        const center = player.KnockCenter(this.tmpKnock ??= new THREE.Vector3());
+        const dist = center.distanceTo(from);
+        const dir = this.tmpB.subVectors(center, from).divideScalar(dist || 1);
+        const hit = bf.Raycast(from, dir, dist, {terrain:true});
+        const occluded = !!hit && hit.t < dist - BLAST.wallMarginM;
+        this.lastKnockback = player.BlastKnockback({ burst: position, chargeKg: ChargeKgFor(explosiveId, radius), occluded });
+      }
     }
   }
 

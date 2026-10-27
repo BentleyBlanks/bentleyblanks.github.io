@@ -35,6 +35,9 @@ import { BlockPlayerByLitters } from "./Script_LitterBlock.mjs";
 import { CROWD } from "./Data_Tuning_Ai.mjs";
 import { MELEE_RULES } from "./Data_MeleeCombat.mjs";
 import { CapturePlayerDeath, SyncPlayerDeathCamera } from "./Script_PlayerDeath.mjs";
+import { PlayerKnockback } from "./Script_PlayerKnockback.mjs";
+import { BlastPush } from "./Script_BlastKnockback.mjs";
+import { BLAST_KNOCKBACK } from "./Data_Tuning_BlastKnockback.mjs";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -176,6 +179,13 @@ export class PlayerController {
     // 默认关（enabled = false 时 Blast 什么都不做）；开了 phase.blastReaction 的关卡由装配层打开。
     // 相机那几项叠在震屏之后，同样不改 yaw/pitch 本体。
     this.flinch = new BlastFlinch();
+    // 冲击波推人（Script_PlayerKnockback，2026-10-28）：推一把 / 倒地 / 掀飞 / 滑 / 躺 / 爬起来。
+    // 推力由 Combat.Blast 经 BlastKnockback 交进来（Script_BlastKnockback 算 Δv 与分档）。
+    // knockGate：装配层的闸，返回 false 时只晃不倒（过场、白刃、抬东西）；onKnockDown：真要倒下的那一刻（机枪位先把人放下来）。
+    this.knock = new PlayerKnockback();
+    this.knockGate = null;
+    this.onKnockDown = null;
+    this._knockVel = { x: 0, y: 0, z: 0 };
     this.stamina = 1;
     this.sprintSpent = false;               // 冲刺跑空、还没回到 STAMINA.sprintResume
     // 只由 Script_DebugOptions 经装配层写入。默认全关，保持正式玩法完全不变。
@@ -298,13 +308,16 @@ export class PlayerController {
     this.jump.runK = 0;
     this.shake.Reset();
     this.flinch.Reset();
+    // 被冲击波掀倒时眼高跟着身体矮到贴地；重生直接站好，不从躺着的高度慢慢升起来
+    if (this.knock.Active) { this.eyeHeight = STANCE.stand.eye; this.radius = STANCE.stand.radius; }
+    this.knock.Reset();
     this.waterDepth = 0;
   }
 
   get Alive() { return this.alive; }
   get Protected() { return this.spawnGrace > 0; }
-  /** 翻越/下水期间不许开火。装配层的 TryFire 读这一条。 */
-  get Busy() { return this.vault.active; }
+  /** 翻越 / 被冲击波掀倒期间不许开火。装配层的 TryFire 读这一条。 */
+  get Busy() { return this.vault.active || this.knock.Active; }
   get InWater() { return this.waterDepth > 0.35; }
 
   SetDebugOptions(options = {}) {
@@ -654,11 +667,17 @@ export class PlayerController {
     this.moveWishX = 0; this.moveWishZ = 0;
     if (!this.alive) {
       this.deadTime += dt;
-      this.SyncDeathCamera();
+      // 被炸死的那一下照样把人掀出去：身体还在飞 / 滑 / 躺时镜头跟着身体走，不切普通的侧倒死亡镜头
+      if (this.knock.Active) this._StepKnockDead(dt);
+      else this.SyncDeathCamera();
       return;
     }
     // 翻越期间接管整帧：不读输入、不走碰撞、不开火（Busy 为真）
     if (this.vault.active) { this.ResetLean(); return this._StepVault(dt, input); }
+    // 被冲击波推倒 / 掀飞期间同样接管整帧（Script_PlayerKnockback）：不读移动、姿态、开镜，只在躺着、爬起来时许转头
+    if (this.knock.Active) return this._StepKnock(dt, input);
+    // 推一把（站得住）只走表：移动输入按 ControlScale 慢慢交还
+    this.knock.Step(dt, null);
 
     this.jump.cooldown = Math.max(0, this.jump.cooldown - dt);
     if (this.jump.buffer > 0) {
@@ -873,15 +892,17 @@ export class PlayerController {
     // Absent in normal play; the host only enables it during a live, intentional ditch dive.
     if (this.stance !== "stand" && !this.InWater && Number.isFinite(input.diveSpeedMps)) speed = Math.max(speed, Math.min(MOVE.diveSpeedCapMps, input.diveSpeedMps));
 
-    const desired = wish.multiplyScalar(speed);
+    // 刚被冲击波推了一把：加上去的那份速度要靠脚一步步收住，手上的移动输入这时只剩一部分（ControlScale）
+    const control = this.knock.ControlScale;
+    const desired = wish.multiplyScalar(speed * control);
     // 空中不许**加速**到助跑之上（accel 3 只够小幅修正方向），但也不能把蹬地那一下
     // 的动量当阻力擦掉 —— 半空里比目标速度快的时候收敛慢一档，否则 0.5 s 的滞空
     // 会把 16% 的助跑加成磨掉近八成，加了等于没加。
     const overRun = !this.grounded
       && Math.hypot(this.velocity.x, this.velocity.z)
         > Math.hypot(desired.x, desired.z) + MOVE.overrunMarginMps;
-    const accel = this.grounded ? MOVE.accelGround
-      : (overRun ? MOVE.accelAirOverrun : MOVE.accelAir);
+    const accel = (this.grounded ? MOVE.accelGround
+      : (overRun ? MOVE.accelAirOverrun : MOVE.accelAir)) * control;
     this.velocity.x += (desired.x - this.velocity.x) * Clamp01(dt * accel);
     this.velocity.z += (desired.z - this.velocity.z) * Clamp01(dt * accel);
     const wasGrounded = this.grounded;
@@ -906,11 +927,23 @@ export class PlayerController {
       }
     }
 
+    const planar = this._UpdateVitals(dt);
+
+    this.SyncCamera(dt);
+    return { planarSpeed: planar, stanceBlockReason };
+  }
+
+  /**
+   * 每帧都要走的身体账：震屏 / 身体反应走表、步伐、流血、受击反馈的寿命、濒死心跳、出生保护、压制衰减。
+   * 正常走路与被冲击波掀倒（_StepKnock）两条路共用。返回水平速度。
+   */
+  _UpdateVitals(dt) {
     // --- 脚步 / 晃动 --------------------------------------------------------
     this.shake.Update(dt);
     this.flinch.Update(dt);
     const planar = Math.hypot(this.velocity.x, this.velocity.z);
-    this.stepDistance += planar * dt;
+    // 被掀倒在地上滑的那一段不是在走路：不攒步距（不然滑出去一路都是脚步声）
+    if (!this.knock.Active) this.stepDistance += planar * dt;
     this.headBob = Math.sin(this.stepDistance
       * (this.stance === "prone" ? CAMERA.strideProne : CAMERA.strideStand)) * 0.5 + 0.5;
 
@@ -965,9 +998,96 @@ export class PlayerController {
 
     // --- 压制自然衰减 -------------------------------------------------------
     this.suppression = Math.max(0, this.suppression - dt * SUPPRESSION.decayPerS);
+    return planar;
+  }
 
+  /**
+   * 被冲击波推倒 / 掀飞那一段的整帧（Script_PlayerKnockback 管身体怎么动，这里管胶囊、相机输入与撞击伤害）。
+   */
+  _StepKnock(dt, input) {
+    const K = this.knock;
+    this.ResetLean();
+    this.ads = 0; this.sprint = 0; this.wantAds = false; this.breathHold = false; this.bipod = false; this.fastCrawl = false;
+    this.jump.buffer = 0;
+    // 自由瞄准那一点偏移并回视线（人倒着谈不上据枪微调），躺着、爬起来时鼠标直接转头
+    this.yaw += this.aimYaw; this.pitch += this.aimPitch; this.aimYaw = 0; this.aimPitch = 0;
+    if (K.LookAllowed && input) {
+      const sens = (input.sensitivity ?? 1) * FREE_AIM.sensitivityScale;
+      this.yaw -= (input.lookX || 0) * sens;
+      this.pitch -= (input.lookY || 0) * sens;
+    }
+    this.pitch = Clamp(this.pitch, -FREE_AIM.pitchLimitRad, FREE_AIM.pitchLimitRad);
+    K.Step(dt, (dx, dy, dz) => this._KnockMove(dx, dy, dz));
+    K.Track(this.position.x, this.position.z);
+    const v = K.Velocity(this._knockVel);
+    this.velocity.set(v.x, v.y, v.z);
+    this.grounded = K.Active ? K.grounded : true;
+    // 胶囊跟着人矮下去（MoveWithCollision / _KnockMove 按 eyeHeight 定胶囊高）；爬起来最后一帧正好回到原姿态的眼高
+    this.eyeHeight = K.EyeHeight(STANCE[this.stance].eye);
+    const impacts = K.ConsumeImpacts();
+    if (impacts) for (const e of impacts) {
+      this.shake.Landing(Clamp01(e.speed / 8));
+      // 摔在地上 / 撞墙那一声（装配层 PlayHurtCues 播 bodyFall）
+      this.PushHitEvent({ kind: "knockImpact", surface: e.surface, speed: e.speed, severity: Clamp01(e.speed / 10) });
+      // 钝伤：摔在地上、撞在墙上，不开口子不流血（Glasstone 表 12.49 的速度判据，数在 BLAST_KNOCKBACK_DAMAGE）
+      if (e.damage > 0) this.TakeHit(e.damage, "torso", null, { blunt: true, knock: true, surface: e.surface });
+    }
+    if (!K.Active) this.velocity.set(0, 0, 0);
+    const planar = this._UpdateVitals(dt);
+    if (!this.alive) return { planarSpeed: 0, stanceBlockReason: null };
     this.SyncCamera(dt);
-    return { planarSpeed: planar, stanceBlockReason };
+    return { planarSpeed: planar, stanceBlockReason: null };
+  }
+
+  /** 被炸死以后身体还在被冲击波带着走：只推身体与镜头，不扣血、不许转头，躺下就不起来。 */
+  _StepKnockDead(dt) {
+    const K = this.knock;
+    K.Step(dt, (dx, dy, dz) => this._KnockMove(dx, dy, dz));
+    const v = K.Velocity(this._knockVel);
+    this.velocity.set(v.x, v.y, v.z);
+    this.eyeHeight = K.EyeHeight(STANCE[this.stance].eye);
+    const impacts = K.ConsumeImpacts();
+    if (impacts) for (const e of impacts) {
+      this.shake.Landing(Clamp01(e.speed / 8));
+      this.PushHitEvent({ kind: "knockImpact", surface: e.surface, speed: e.speed, severity: Clamp01(e.speed / 10) });
+    }
+    this.shake.Update(dt);
+    this.SyncCamera(dt);
+  }
+
+  /** 倒地那一段推胶囊：与 MoveWithCollision 同一套碰撞（引擎、调试无碰撞、地图边界、世界约束），但不吃行走那几条规矩。 */
+  _KnockMove(dx, dy, dz) {
+    const body = this.body;
+    const height = Math.max(0.62, this.eyeHeight + 0.16);
+    if (!body || this.debug.noCollision) {
+      this.position.x += dx; this.position.y += dy; this.position.z += dz;
+      const ground = this.world.GroundHeight(this.position.x, this.position.z);
+      let grounded = false;
+      if (this.position.y <= ground) { this.position.y = ground; grounded = true; }
+      const bounds = this.world.bounds;
+      if (bounds) {
+        this.position.x = Clamp(this.position.x, bounds.minX + 1, bounds.maxX - 1);
+        this.position.z = Clamp(this.position.z, bounds.minZ + 1, bounds.maxZ - 1);
+      }
+      this.ApplyWorldConstraint(body);
+      if (body) body.Teleport(this.position.x, this.position.y, this.position.z);
+      return { x: this.position.x, y: this.position.y, z: this.position.z, grounded, blocked: false };
+    }
+    body.ReconcileTo(this.position.x, this.position.y, this.position.z);
+    body.SetSize(this.radius, height);
+    const moved = body.Move(dx, dy, dz);
+    this.position.set(moved.x, moved.y, moved.z);
+    const b = this.world.bounds;
+    if (b) {
+      const cx = Clamp(this.position.x, b.minX + 1, b.maxX - 1);
+      const cz = Clamp(this.position.z, b.minZ + 1, b.maxZ - 1);
+      if (cx !== this.position.x || cz !== this.position.z) {
+        this.position.x = cx; this.position.z = cz;
+        body.Teleport(cx, this.position.y, cz);
+      }
+    }
+    this.ApplyWorldConstraint(body);
+    return { x: this.position.x, y: this.position.y, z: this.position.z, grounded: !!moved.grounded, blocked: !!moved.blocked };
   }
 
   LegPenalty() {
@@ -1115,7 +1235,7 @@ export class PlayerController {
     const damp = (1 - this.ads * CAMERA.bobAdsDamp) * (1 - this.stanceBlend.prone * CAMERA.bobProneDamp);
     const bobAmp = CAMERA.bobAmp * damp
       * Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / CAMERA.bobRefMps)
-      * (this.grounded ? 1 : 0);
+      * (this.grounded && !this.knock.Active ? 1 : 0);
     const bobY = Math.sin(this.stepDistance * CAMERA.bobYFreq) * bobAmp;
     const bobX = Math.sin(this.stepDistance * CAMERA.bobXFreq) * bobAmp * CAMERA.bobXScale;
     // 侧身：身体横移 + 相机滚转，探头出去看的那一下必须有位移，不然只是画面歪了
@@ -1155,6 +1275,18 @@ export class PlayerController {
       + (shake > 0 ? Math.sin(this.stepDistance * 41 + this.suppression * 90) * shake : 0)
       + (focusing ? Math.sin(melee.t * 39) * (1 - melee.progress) * .013 : 0);
 
+    // 冲击波推歪 / 推倒（Script_PlayerKnockback.CameraPose）：身子往被推的方向歪多少，相机跟着俯仰 / 滚转多少；
+    // 倒着时眼睛离胶囊底的高度已经在 eyeHeight 里，这里只加往外伸的那一点头。不改 yaw/pitch 本体。
+    const knockPose = this.knock.CameraPose(this.yaw, this.eyeHeight);
+    if (knockPose) {
+      cam.position.x += knockPose.x;
+      cam.position.y += knockPose.y - this.eyeHeight;
+      cam.position.z += knockPose.z;
+      const limit = BLAST_KNOCKBACK.camera.pitchLimitRad;
+      cam.rotation.x = Clamp(cam.rotation.x + knockPose.pitch, -limit, limit);
+      cam.rotation.z += knockPose.roll;
+    }
+
     // 接管机枪：装配层把眼睛挪到枪后头（Script_Main.MountedCameraEye）。排在震屏之前，
     // 近爆的抖动照样叠在贴枪的眼位上。没接管时它是空的。
     this.cameraMount?.(cam);
@@ -1189,6 +1321,46 @@ export class PlayerController {
 
   /** 开 / 关近爆身体反应（phase.blastReaction 或测试场面板）。 */
   SetBlastReaction(on) { return this.flinch.SetEnabled(on); }
+
+  /** 冲击波吃在身上的那一点（质心；倒在地上时按贴地的身体）：Combat.Blast 拿它做遮挡射线。 */
+  KnockCenter(target) {
+    const lying = this.knock.Active && this.knock.phase !== "tumble";
+    const key = lying ? "prone" : this.stance;
+    return target.set(this.position.x, this.position.y + BLAST_KNOCKBACK.body.comHeightM[key], this.position.z);
+  }
+
+  /**
+   * 一发爆炸的冲击波推人（Combat.Blast 调，在伤害之后）。burst = 爆点，chargeKg = 装药（kg），occluded = 爆点到质心被挡住。
+   * Δv 与分档见 Script_BlastKnockback；之后的身体由 Script_PlayerKnockback 接管。人死了返回 null，否则返回这一下的推力（取证用）。
+   */
+  BlastKnockback({ burst, chargeKg, occluded = false } = {}) {
+    if (!burst || !(chargeKg > 0)) return null;
+    // 被这一发炸死的人（Kill 就在这一帧，deadTime 还是 0）照样被推出去，死亡镜头跟着身体走；早就死了的不再推
+    const dead = !this.alive;
+    if (dead && (this.deadTime > 0 || this.knock.Active)) return null;
+    // 已经倒在地上（滑、躺、爬起来）：贴地的身体，按趴姿的迎波面积重算
+    const lying = this.knock.Active && this.knock.phase !== "tumble";
+    const stance = lying ? "prone" : this.stance;
+    const push = BlastPush({ burst, feet: this.position, stance, chargeKg, occluded });
+    if (push.regime === "none" && !this.knock.Active) return { ...push, applied: "none" };
+    const allow = !this.knockGate || this.knockGate(push) !== false;
+    const down = !this.knock.Active && (push.regime === "fall" || push.regime === "thrown" || push.regime === "slide");
+    if (allow && down && !dead) this.onKnockDown?.(push);
+    const r = this.knock.Push(push, {
+      stance, eyeM: STANCE[this.stance].eye, baseY: this.position.y,
+      x: this.position.x, z: this.position.z, allowKnockdown: allow, dead,
+    });
+    // 死后被掀出去：砸地那一声由撞击事件播，普通死亡镜头那一声 bodyFall 不再补
+    if (dead && this.knock.Active) this.deathImpactPlayed = true;
+    if (r.addVx || r.addVz) { this.velocity.x += r.addVx; this.velocity.z += r.addVz; }
+    if (this.knock.Active && r.regime !== "add") {
+      // 人被掀倒：翻到一半的墙、开着的镜、架着的两脚架、侧着的身子全部作废
+      this.vault.active = false;
+      this.ads = 0; this.sprint = 0; this.bipod = false; this.wantAds = false;
+      this.ResetLean();
+    }
+    return { ...push, applied: r.regime };
+  }
 
   /**
    * 第一人称倒地：视点留在刚才那个人身上，而不是切黑或升到尸体上方。
@@ -1253,10 +1425,13 @@ export class PlayerController {
     if (info?.bullet) this.onBulletWound?.(part, direction, info);
     this.health -= applied;
     this.bandageRegenTo = 0;                // 新伤口打断包扎后的回血，要再包一次
-    const bleed =(part === "head" ? WOUNDS.bleedHead
-      : part === "torso" ? WOUNDS.bleedTorso : WOUNDS.bleedLimb) * (P.bleedScale ?? 0.6);
-    this.wounds.push({ part, bleed, since: 0 });
-    this.bleeding += bleed;
+    // 钝伤（被冲击波摔在地上、撞在墙上：info.blunt）只掉血，不开口子、不流血
+    if (!info?.blunt) {
+      const bleed = (part === "head" ? WOUNDS.bleedHead
+        : part === "torso" ? WOUNDS.bleedTorso : WOUNDS.bleedLimb) * (P.bleedScale ?? 0.6);
+      this.wounds.push({ part, bleed, since: 0 });
+      this.bleeding += bleed;
+    }
     this.suppression = Clamp01(this.suppression + SUPPRESSION.onHit);
 
     // --- 让"我中弹了"这件事看得见、听得见 -----------------------------------
@@ -1396,6 +1571,7 @@ export class PlayerController {
     // Direct lethal callers must obey the same debug protection as TakeHit/bleeding.
     if (!this.alive || this.debug.invincible) return;
     CapturePlayerDeath(this);
+    this.knock.Die();
     this.alive = false;
     this.health = 0;
     this.deadTime = 0;
