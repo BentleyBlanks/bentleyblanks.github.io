@@ -439,15 +439,18 @@ def BuildBodyPigmentSampler(animal,sourceSpace):
     image=next(n.image for m in animal.data.materials for n in m.node_tree.nodes if n.type=='TEX_IMAGE' and n.image and n.image.name.startswith('Texture_DonkeyAnimalBase'))
     pixels=FringeLinearPixels(image);animal.data.calc_loop_triangles();triangles=list(animal.data.loop_triangles)
     tree=BVHTree.FromPolygons([v.co for v in animal.data.vertices],[tuple(t.vertices) for t in triangles],all_triangles=True);transform=animal.matrix_world.inverted()@sourceSpace.matrix_world;uvMap=animal.data.uv_layers['UVMap'];cache={}
-    report={'sourceSpace':sourceSpace.name,'bodyImage':image.name,'bodyPath':bpy.path.abspath(image.filepath_raw),'roots':0,'maximumSurfaceDistanceM':0,'samples':[]}
-    def SampleRoot(root):
+    report={'sourceSpace':sourceSpace.name,'bodyImage':image.name,'bodyPath':bpy.path.abspath(image.filepath_raw),'roots':0,'maximumSurfaceDistanceM':0,'projectedMicroRoots':0,'maximumMicroProjectionM':0,'samples':[]}
+    def SampleRoot(root,projectMicroRoot=False):
         point=transform@root;key=tuple(round(c,7) for c in point)
         if key not in cache:
             hit,_,index,distance=tree.find_nearest(point)
-            if distance>.002:raise RuntimeError('Fringe pigment root is outside the corresponding body surface: '+str(distance))
+            if projectMicroRoot:
+                report['projectedMicroRoots']+=1;report['maximumMicroProjectionM']=max(report['maximumMicroProjectionM'],distance)
+            elif distance>.002:raise RuntimeError('Fringe pigment root is outside the corresponding body surface: '+str(distance))
             triangle=triangles[index];points=[animal.data.vertices[i].co for i in triangle.vertices];bary=barycentric_transform(hit,*points,Vector((1,0,0)),Vector((0,1,0)),Vector((0,0,1)))
             uv=sum((uvMap.data[loop].uv*w for loop,w in zip(triangle.loops,bary)),Vector((0,0)));cache[key]=FringeSamplePixels(pixels,uv)
-            report['roots']=len(cache);report['maximumSurfaceDistanceM']=max(report['maximumSurfaceDistanceM'],distance)
+            report['roots']=len(cache)
+            if not projectMicroRoot:report['maximumSurfaceDistanceM']=max(report['maximumSurfaceDistanceM'],distance)
             if len(report['samples'])<12:report['samples'].append({'root':list(root),'distanceM':distance,'uv':list(uv),'linearRgb':cache[key].tolist()})
         return cache[key]
     return SampleRoot,report
@@ -484,5 +487,30 @@ def RebuildPaleFringeAfterBake(skin,rig,collection,original,animal):
         if mask.data[b.vertex_index].value<=0 and not (darkMask and darkMask.data[b.vertex_index].value):candidate.data.uv_layers.active.data[b.index].uv=original.data.uv_layers.active.data[a.index].uv
     candidate.data.normals_split_custom_set_from_vertices(newNormals);candidate.data.update()
     report['pigmentTransfer']=MatchPaleFringePigment(candidate,animal,sampler);report['pigmentSampler']=samplerReport;report['exteriorVerticesPreserved']=preserved
+    report['microPigmentTransfer']=MatchMicroCoatPigment(candidate,animal,sampler)
     name=original.name;bpy.data.objects.remove(original,do_unlink=True);candidate.name=name
     return candidate,report
+
+
+def MatchMicroCoatPigment(coat,animal,bodySampler):
+    """Ordinary short hairs inherit the final baked pigment at their roots."""
+    image=next(n.image for n in coat.data.materials[0].node_tree.nodes if n.type=='TEX_IMAGE' and n.image and n.image.name.startswith('Texture_DonkeyShortCoatBase'))
+    pixels=FringeLinearPixels(image);uv=coat.data.uv_layers.active;paint=coat.data.color_attributes['HairTint']
+    pale=coat.data.attributes.get('PaleFringeBlend');dark=coat.data.attributes.get('DarkLegTuft');changed=[];fibres=0
+    for face in coat.data.polygons:
+        if len(face.vertices)!=3 or any((pale and pale.data[i].value>0) or (dark and dark.data[i].value) for i in face.vertices):continue
+        coordinates=[uv.data[i].uv for i in face.loop_indices];levels=[p.y for p in coordinates]
+        rootIndices=[i for i,v in enumerate(levels) if abs(v-min(levels))<1e-7]
+        if len(rootIndices)!=2 or abs(max(levels)-min(levels)-.0004)>1e-6:continue
+        root=sum((coat.data.vertices[face.vertices[i]].co for i in rootIndices),Vector())/2
+        # Unlike the explicitly seated pale wisps, old fine roots can lie on
+        # a non-planar source quad. Sample its nearest final baked triangle;
+        # keep the existing pale-fringe seating check unchanged.
+        target=bodySampler(root,projectMicroRoot=True);fibres+=1
+        for index,(i,coordinate) in enumerate(zip(face.vertices,coordinates)):
+            tint=np.clip(target*(1 if index in rootIndices else 1.04)/np.maximum(.01,FringeSamplePixels(pixels,coordinate)),.003,1)
+            changed.append(float(np.max(np.abs(tint-np.array(paint.data[i].color[:3])))))
+            paint.data[i].color=(*tint,1)
+    return {'method':'final baked UV0 pigment sampled at the actual short-hair root, normalized by its atlas RGB; old coarse CoatColor palette replaced',
+            'fibres':fibres,'vertices':len(changed),'maximumTintChange':max(changed,default=0),'projection':'nearest final baked triangle at each existing root',
+            'tipGain':1.04,'geometryChanged':False,'skinWeightsChanged':False,'paleAndDarkWispsChanged':False}

@@ -18,7 +18,10 @@ def InstallLegPigment(scene,skin,rig,base):
     rgb=np.array(original.pixels[:],dtype=np.float32).reshape(1024,1536,4)[::-1,:,:3];bpy.data.images.remove(original)
     detailNamespace={};detailFile=project/'_blender/Script_DonkeyPhotoDetail.py';exec(compile(detailFile.read_text(encoding='utf-8'),detailFile.name,'exec'),detailNamespace)
     albedoNamespace={};albedoFile=project/'_blender/Script_DonkeyLegAlbedo.py';exec(compile(albedoFile.read_text(encoding='utf-8'),albedoFile.name,'exec'),albedoNamespace)
-    atlas,relief,sourceRecord=albedoNamespace['BuildLegAlbedo'](rgb,detailNamespace['BoxBlur'],True)
+    normalNamespace={};file=project/'_blender/Script_DonkeyLegNormals.py';exec(compile(file.read_text(encoding='utf-8'),file.name,'exec'),normalNamespace)
+    surfaceNormals,normalReport=normalNamespace['MeasureLegNormals'](skin,stems,masses,profiles)
+    atlas,relief,sourceRecord=albedoNamespace['BuildLegAlbedo'](rgb,detailNamespace['BoxBlur'],True,surfaceNormals)
+    sourceRecord['surfaceNormalSampling']=normalReport
     height,tileWidth,bodyWidth,gutter=1024,384,256,64
     image=bpy.data.images.get('Texture_DonkeyLegPigment') or bpy.data.images.new('Texture_DonkeyLegPigment',width=tileWidth*4,height=height,alpha=False);image.colorspace_settings.name='sRGB'
     image.pixels.foreach_set(atlas[::-1].copy().ravel());path=base/'SourceTextures/Texture_DonkeyLegPigment.png';image.filepath_raw=str(path);image.file_format='PNG';image.save();content=path.read_bytes();image.pack(data=content,data_len=len(content))

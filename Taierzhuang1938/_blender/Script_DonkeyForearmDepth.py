@@ -2,6 +2,13 @@
 import json,hashlib
 from pathlib import Path
 import numpy as np
+_sectionNamespace={}
+if '__file__' in globals():_sectionFile=Path(__file__).with_name('Script_DonkeySectionCurve.py')
+else:
+    import bpy
+    _sectionFile=Path(bpy.context.scene['DonkeyCartProject'])/'_blender/Script_DonkeySectionCurve.py'
+exec(compile(_sectionFile.read_text(encoding='utf-8'),_sectionFile.name,'exec'),_sectionNamespace)
+SampleSectionCurve=_sectionNamespace['SampleSectionCurve']
 
 def Smooth(a,b,v):
     t=np.clip((v-a)/(b-a),0,1);return t*t*(3-2*t)
@@ -9,7 +16,7 @@ def Smooth(a,b,v):
 def DepthField(points,masses,recipe):
     result=np.array(points,dtype=float,copy=True);height=points[:,2];support=Smooth(*recipe['lowerFadeM'],height)*(1-Smooth(*recipe['upperFadeM'],height))
     for label,side in enumerate(['Left','Right']):
-        rows=np.array(recipe['profiles'][side]);centre,width,target=[np.interp(height,rows[:,0],rows[:,i]) for i in [1,2,3]];amount=recipe['strength']*support*Smooth(*recipe['ownershipFade'],masses[:,label]);result[:,1]+=(points[:,1]-centre)*(target/np.maximum(.03,width)-1)*amount
+        rows=np.array(recipe['profiles'][side]);centre,width,target=[SampleSectionCurve(height,rows,i) for i in [1,2,3]];amount=recipe['strength']*support*Smooth(*recipe['ownershipFade'],masses[:,label]);result[:,1]+=(points[:,1]-centre)*(target/np.maximum(.03,width)-1)*amount
     return result
 
 def DepthJacobian(points,masses,recipe):
@@ -33,6 +40,6 @@ def FitForearmDepth(scene,skin):
     skin.data.update();bm=bmesh.new();bm.from_mesh(skin.data);boundary=sum(e.is_boundary for e in bm.edges);nonmanifold=sum(not e.is_manifold for e in bm.edges);volume=bm.calc_volume(signed=True);bm.free()
     if boundary or nonmanifold or volume<=0:raise RuntimeError('Forearm depth damaged the closed skin')
     report={'version':'20261027ForearmDepthV50','recipe':str(path),'recipeSha256':hashlib.sha256(path.read_bytes()).hexdigest(),'sourceBaselineGlbSha256':recipe['sourceBaselineGlbSha256'],'sourceImageSha256':recipe['sourceImageSha256'],'method':'partial side-depth correspondence to the visible original forearm with fur allowance; current centre paths and frontal widths retained; compact height and ownership fades protect the axillary roots, lower limbs and hooves',
-        'referenceBoundaryInsetPixels':recipe['referenceBoundaryInsetPixels'],'strength':recipe['strength'],'lowerFadeM':recipe['lowerFadeM'],'upperFadeM':recipe['upperFadeM'],'ownershipFade':recipe['ownershipFade'],'verticesChanged':int(len(ids)),'maximumDisplacementM':float(distance.max()),'minimumSampledJacobian':minimum,'maximumProtectedDisplacementM':protected,
+        'sectionInterpolation':'C1 monotone cubic; measured section landmarks retained','referenceBoundaryInsetPixels':recipe['referenceBoundaryInsetPixels'],'strength':recipe['strength'],'lowerFadeM':recipe['lowerFadeM'],'upperFadeM':recipe['upperFadeM'],'ownershipFade':recipe['ownershipFade'],'verticesChanged':int(len(ids)),'maximumDisplacementM':float(distance.max()),'minimumSampledJacobian':minimum,'maximumProtectedDisplacementM':protected,
         'boundaryEdges':boundary,'nonmanifoldEdges':nonmanifold,'signedVolumeM3':volume,'bonesChanged':0,'weightsChanged':False,'trianglesAdded':0,'frontalWidthAndHeightChanged':False,'normalTransform':'inverse-transpose local field Jacobian'}
     scene['DonkeyForearmDepthReport']=json.dumps(report);(Path(scene['DonkeySourceRoot'])/'Review/Data_ForearmDepth.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8');return report

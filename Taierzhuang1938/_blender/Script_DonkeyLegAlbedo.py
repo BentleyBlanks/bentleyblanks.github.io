@@ -16,7 +16,7 @@ BOUNDARIES={
  'RearRight':[(450,1417,1514),(500,1415,1512),(550,1420,1495),(600,1425,1481),(650,1426,1471),(700,1418,1469),(750,1422,1464),(800,1427,1461),(850,1426,1470),(900,1431,1480),(925,1434,1484)]}
 PALETTE_BOXES={'ForeSideDark':[707,750,732,830],'HindSideDark':[1136,760,1159,825],'ForeFrontDark':[207,765,220,825],'ForeMedialPale':[185,565,198,610],'RearMedialLeft':[1339,577,1354,610],'RearMedialRight':[1430,577,1445,610]}
 
-def BuildLegAlbedo(rgb,blur,returnRelief=False):
+def BuildLegAlbedo(rgb,blur,returnRelief=False,surfaceNormals=None):
     linear=np.where(rgb<=.04045,rgb/12.92,((rgb+.055)/1.055)**2.4)
     tint=np.array([1,1.03,1.10]);gain=.50/.75
     palette={name:np.median(linear[top:bottom,left:right].reshape(-1,3),axis=0)*gain*tint for name,(left,top,right,bottom) in PALETTE_BOXES.items()}
@@ -67,7 +67,7 @@ def BuildLegAlbedo(rgb,blur,returnRelief=False):
         sourceX=(lo+hi)*.5+np.clip(horizontal,-1,1)*width*.40
         color=Fetch(low,sourceX,sourceY)
         light=np.array((-.4,.5,.76) if view=='Side' else (-.3,.5,.81) if view=='Front' else (.3,-.5,.81));light/=np.linalg.norm(light)
-        irradiance=.55+.45*np.maximum(0,normal[0]*light[0]+normal[1]*light[1])
+        irradiance=.55+.45*np.maximum(0,sum(component*value for component,value in zip(normal,light)))
         color=np.clip(color*(.50/irradiance)[:,:,None]*tint,.004,.45)
         # Circumference is pi times the photographed diameter. Use that
         # arc length for detail instead of stretching one projection over
@@ -95,8 +95,10 @@ def BuildLegAlbedo(rgb,blur,returnRelief=False):
     dark=np.mean([palette['ForeSideDark'],palette['HindSideDark'],palette['ForeFrontDark']],axis=0)
     for index,stem in enumerate(['DonkeyFrontLeft','DonkeyFrontRight','DonkeyRearLeft','DonkeyRearRight']):
         front='Front' in stem;left=stem.endswith('Left');sideKey='SideFront' if front else 'SideRear';capKey=('Front' if front else 'Rear')+('Left' if left else 'Right')
-        side,sideProjected,sideFallback,sideChroma,hiddenChroma,sideRelief,sideFullRgb=Sample(sideKey,-ny,(-np.abs(nx),ny),'Side')
-        face,faceDetail,_,faceChroma,_,faceRelief,faceFullRgb=Sample(capKey,-nx if front else nx,(-nx,np.abs(ny) if front else -np.abs(ny)),'Front' if front else 'Rear')
+        actual=surfaceNormals[index] if surfaceNormals is not None else np.stack((nx,ny,np.zeros_like(nx)),axis=2)
+        ax,ay,az=actual[:,:,0],actual[:,:,1],actual[:,:,2]
+        side,sideProjected,sideFallback,sideChroma,hiddenChroma,sideRelief,sideFullRgb=Sample(sideKey,-ny,(-np.abs(ax),ay,az),'Side')
+        face,faceDetail,_,faceChroma,_,faceRelief,faceFullRgb=Sample(capKey,-nx if front else nx,(-ax,np.abs(ay) if front else -np.abs(ay),az),'Front' if front else 'Rear')
         w=np.maximum(0,ny if front else -ny)**3;sideWeight=np.abs(nx)**3+np.maximum(0,-ny if front else ny)**3;w=w/np.maximum(.001,w+sideWeight)
         visibleSide=np.abs(nx)**3/np.maximum(.001,sideWeight)
         sideDetail=sideProjected*visibleSide+sideFallback*(1-visibleSide)
@@ -132,4 +134,5 @@ def BuildLegAlbedo(rgb,blur,returnRelief=False):
     record={'revision':'20261026FullRgbLegV45','method':'silhouette-masked source-space pigment; original same-limb full RGB on source-visible faces with one-pixel filtering compensation; restrained palette and short detail only on hidden caps; source relief retained; coherent tendon/row shadows removed before cylindrical correspondence; periodic detail only on hidden caps',
         'sourceBoundaryRows':BOUNDARIES,'sampling':sampling,'sourceChecks':sourceChecks,'paletteSourceBoxes':PALETTE_BOXES,'paletteCalibratedLinearRgb':{name:value.tolist() for name,value in palette.items()},
         'sourcePigmentBlurRadiusPixels':6,'visibleFullRgb':True,'visibleRgbPreEmphasisRadiusPixels':1,'visibleRgbPreEmphasisAmount':1.25,'visibleRgbMaximumLinear':.55,'microRatioScope':'hidden cap fallback; visible surfaces use original full RGB','sourceMicroBlurRadiusPixels':8,'sourceFineBlurRadiusPixels':2,'sourceFineRatioRange':[.65,2.80],'sourceClumpRatioRange':[.75,1.60],'sourceVerticalCoherenceWindowPixels':25,'microRatioRange':[.50,2.80],'pigmentFineRatioRange':[.60,2.40],'pigmentFinePower':1.25,'pigmentClumpRatioRange':[.65,1.90],'pigmentClumpPower':1.10,'reliefDetailRatioRange':[.65,2.50],'microStrength':1.0,'darkMottlingRatioRange':[.90,1.10],'sourceChromaBlurRadiiPixels':[1,8],'sourceChromaRatioRange':[.65,1.40],'hueStagePreservesLuminance':True,'maximumHueLuminanceError':max(hueLuminanceErrors),'hiddenCapMicroRatioRange':[.70,1.50],'silhouetteMaskedFiltering':True,'hiddenCapRepeats':round(math.pi/.60),'visibleDetailIsPhotographic':True,'periodicDetailScope':'unphotographed cap only','detailUsesAtlasSpaceBlur':False,'detailUsesSyntheticNoise':False}
+    record['illuminationNormals']='fitted three-dimensional limb surface' if surfaceNormals is not None else 'vertical circular cylinder'
     return (atlas,reliefAtlas,record) if returnRelief else (atlas,record)
