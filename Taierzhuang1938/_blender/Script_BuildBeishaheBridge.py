@@ -38,7 +38,7 @@ class Geometry:
         self.smoothFaces = []
         self.colors = []
 
-    def Polygon(self, points, uv=None, normals=None, uvOffset=None, grain=None, tint=None):
+    def Polygon(self, points, uv=None, normals=None, uvOffset=None, grain=None, tint=None, uvTurn=0):
         start = len(self.vertices)
         self.vertices.extend(points)
         self.faces.append(tuple(range(start, start + len(points))))
@@ -57,6 +57,10 @@ class Geometry:
                 uv = [(p[1], p[2]) for p in points]
             else:
                 uv = [(p[axes[0]], p[axes[1]]) for p in points]
+        # A quarter-turn changes the material direction without changing its
+        # metre scale. Used only for stone blocks, never directional wood.
+        for _ in range(uvTurn % 4):
+            uv = [(-v, u) for u, v in uv]
         if uvOffset:
             uv = [(u + uvOffset[0], v + uvOffset[1]) for u, v in uv]
         self.uvs.extend(uv)
@@ -67,15 +71,15 @@ class Geometry:
         else:
             self.colors.extend([tint if tint is not None else (1, 1, 1, 1)] * len(points))
 
-    def Box(self, center, size, basis=None, uvOffset=None, grain=None, tint=None):
+    def Box(self, center, size, basis=None, uvOffset=None, grain=None, tint=None, uvTurn=0):
         c = Vector(center)
         axes = list(map(Vector, basis or [(1, 0, 0), (0, 1, 0), (0, 0, 1)]))
         points = [tuple(c + axes[0] * (sx * size[0] / 2) + axes[1] * (sy * size[1] / 2) + axes[2] * (sz * size[2] / 2))
                   for sx, sy, sz in [(-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1), (-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1)]]
         for face in [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (3, 7, 6, 2), (0, 4, 7, 3), (1, 2, 6, 5)]:
-            self.Polygon([points[i] for i in face], uvOffset=uvOffset, grain=grain, tint=tint)
+            self.Polygon([points[i] for i in face], uvOffset=uvOffset, grain=grain, tint=tint, uvTurn=uvTurn)
 
-    def BeveledBox(self, center, size, bevel, uvOffset=None, grain=None, endGeometry=None, tint=None):
+    def BeveledBox(self, center, size, bevel, uvOffset=None, grain=None, endGeometry=None, tint=None, uvTurn=0):
         """Six inset faces, 12 edge chamfers and 8 corners, in game metres.
 
         A distinct end-grain mesh is used on each sleeper's X end. UVs on
@@ -104,7 +108,7 @@ class Geometry:
                        (p[1] - c.y) / size[2] + 0.5 + jitterV) for p in points]
                 (target or self).Polygon(points, uv=uv, tint=tint)
             else:
-                (target or self).Polygon(points, uvOffset=uvOffset, grain=grain, tint=tint)
+                (target or self).Polygon(points, uvOffset=uvOffset, grain=grain, tint=tint, uvTurn=uvTurn)
 
         x, y, z = h
         for sign in [-1, 1]:
@@ -774,6 +778,7 @@ def BuildPier(seed=1938):
     stone, dampStone, cap = Geometry(), Geometry(), Geometry()
     rng = random.Random(seed)
     tintRng = random.Random(seed + 70241)
+    turnRng = random.Random(seed + 21817)
     floor, top = SPEC["foundationY"], SPEC["pierTopY"]
     courses = 9
     ch = (top - floor - 0.25) / courses
@@ -801,7 +806,7 @@ def BuildPier(seed=1938):
                     target.BeveledBox(((left + right) / 2, y + rng.uniform(-0.005, 0.005), side * (halfz - 0.135)),
                         (right - left - 0.014, ch - 0.014, 0.29 + rng.uniform(-0.010, 0.010)),
                         rng.uniform(0.006, 0.014), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)),
-                        tint=PierTint(StoneTint(tintRng), floor, ch, seed, damp))
+                        tint=PierTint(StoneTint(tintRng), floor, ch, seed, damp), uvTurn=turnRng.randrange(4))
             # Stagger the shorter faces as well. End blocks are clipped at
             # the corners, as on the longer face, and the inset core is kept.
             for k in range(-1, countz + 1):
@@ -814,7 +819,7 @@ def BuildPier(seed=1938):
                 target = dampStone if damp else stone
                 target.BeveledBox((side * (halfx - 0.20), y, (left + right) / 2), (0.42, ch - 0.014, right - left - 0.014),
                                  rng.uniform(0.006, 0.014), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)),
-                                 tint=PierTint(StoneTint(tintRng), floor, ch, seed, damp))
+                                 tint=PierTint(StoneTint(tintRng), floor, ch, seed, damp), uvTurn=turnRng.randrange(4))
     cap.BeveledBox((0, top - 0.125, 0), (4.55, 0.25, 2.25), 0.018,
                    uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)), tint=StoneTint(tintRng))
     stone.BeveledBox((0, floor - 0.13, 0), (4.7, 0.26, 2.7), 0.018,
@@ -827,6 +832,7 @@ def BuildAbutment():
     top, floor = SPEC["pierTopY"], SPEC["foundationY"]
     rng = random.Random(193807)
     tintRng = random.Random(193807 + 70241)
+    turnRng = random.Random(193807 + 21817)
     rows = 10
     # Solid backing is recessed behind both masonry faces and their joints.
     # The joints remain visible while small gaps between individual facing
@@ -837,7 +843,8 @@ def BuildAbutment():
         h = (top - floor) / rows
         for col in range(8):
             geo.BeveledBox((-3 + (col + 0.5) * 0.75, floor + (row + 0.5) * h, 0.45), (0.735, h - 0.014, 1.5),
-                           rng.uniform(0.006, 0.014), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)), tint=StoneTint(tintRng))
+                           rng.uniform(0.006, 0.014), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)), tint=StoneTint(tintRng),
+                           uvTurn=turnRng.randrange(4))
     geo.BeveledBox((0, top - 0.11, 0.45), (6.25, 0.22, 1.65), 0.018,
                    uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)), tint=StoneTint(tintRng))
     # Continuous sloping wing walls, with small separately spaced stone faces.
@@ -868,7 +875,7 @@ def BuildAbutment():
                     point = Vector((start[0], y0 + h / 2, start[1])) + axis * (wallLength * t) + normal * (faceSign * 0.31)
                     geo.Box(point, (0.035, h, wallLength * (t1 - t0) - 0.014),
                             basis=(normal, (0, 1, 0), axis), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)),
-                            tint=StoneTint(tintRng))
+                            tint=StoneTint(tintRng), uvTurn=turnRng.randrange(4))
     return geo
 
 

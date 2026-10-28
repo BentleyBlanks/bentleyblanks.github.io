@@ -1,23 +1,23 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-10-27",
+  "date": "2026-10-28",
   "name": "BeishahePierDamp",
   "preset": "stone",
   "source": {
-    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishahePierDamp.png",
-    "sha256": "178e7d57f8ea78f013187608b71343c8d379dede7142f02e53bbba705b36f819",
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishahePierStoneBlend40.png",
+    "sha256": "07b6f5401f493ace8cc482474cbbcefc73b978d5672ca630782b5ac4b1da4758",
     "metrics": {
       "meanSrgb": [
-        0.2986,
-        0.2648,
-        0.2107
+        0.6886,
+        0.6483,
+        0.5905
       ],
-      "luma": 0.258,
-      "lumaStd": 0.121,
-      "sat": 0.2946,
+      "luma": 0.6425,
+      "lumaStd": 0.08,
+      "sat": 0.1425,
       "clipLow": 0.0,
       "clipHigh": 0.0,
-      "lowFreq": 0.1639
+      "lowFreq": 0.0164
     }
   },
   "heightSource": null,
@@ -40,7 +40,7 @@
       0.04,
       0.13
     ],
-    "reliefM": 0.0025,
+    "reliefM": 0.002,
     "rough": 0.93,
     "roughVar": 0.08,
     "roughLumaK": 0.0,
@@ -76,46 +76,46 @@
       "file": "Texture_BeishahePierDampBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 395030,
-      "sha256": "c422fe5015c4cd36a3c891c4950787f5834594349fbb08688fb23bd9c430ba1c"
+      "bytes": 405018,
+      "sha256": "18873a4b30aa2920fa54b9b5f5dbba850ead8112872a2ed40550059a905050d1"
     },
     {
       "channel": "Normal",
       "file": "Texture_BeishahePierDampNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 76738,
-      "sha256": "825bfe9ddcba28cfcedfe7c3bb37b9a31e8022560ce8c3b2e21139502a54125d"
+      "bytes": 68338,
+      "sha256": "5b36cb0504c82ac4a72ca1bd5f62b1d8ee4f963a1ed0824185115f38d346484f"
     },
     {
       "channel": "Orm",
       "file": "Texture_BeishahePierDampOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 76678,
-      "sha256": "cd1ddd24e345823de838e8fb9f06d48fd5550527312d7e1c83d77a20baacf0bc"
+      "bytes": 84880,
+      "sha256": "3c5228577dd53cc0aeb1805ee7a2401b91fa5a40348835377e3d771b2c5049db"
     }
   ],
-  "totalBytes": 548446,
+  "totalBytes": 558236,
   "metrics": {
     "meanSrgb": [
-      0.4296,
+      0.4297,
       0.4058,
-      0.3747
+      0.3746
     ],
     "luma": 0.4034,
-    "lumaStd": 0.1016,
-    "sat": 0.1278,
-    "clipLow": 0.0,
-    "clipHigh": 0.0002,
-    "lowFreq": 0.018,
-    "seam": 0.0578,
-    "interior": 0.0643,
-    "seamRatio": 0.898,
-    "border": 0.921,
-    "swing": 0.0115,
-    "aoMean": 0.893,
-    "roughMean": 0.899,
+    "lumaStd": 0.1008,
+    "sat": 0.1282,
+    "clipLow": 0.0006,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0131,
+    "seam": 0.0641,
+    "interior": 0.0703,
+    "seamRatio": 0.912,
+    "border": 0.988,
+    "swing": 0.0032,
+    "aoMean": 0.886,
+    "roughMean": 0.916,
     "texelsPerMeter": 1024.0
   },
   "gateProblems": []

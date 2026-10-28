@@ -312,6 +312,28 @@ for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
 Check(new Set(ByRole('Sleepers').map(p=>p.node.mesh)).size===3&&new Set(ByRole('DeckPlanks').map(p=>p.node.mesh)).size===3&&new Set(ByRole('Pier').map(p=>p.node.mesh)).size===3&&new Set(ByRole('PierDamp').map(p=>p.node.mesh)).size===3,'Three real geometry/UV variants break sleeper, deck and dry/damp pier repetition');
 function UniqueUvCount(role){return new Set(ByRole(role).map(part=>Hash(Buffer.from(part.geo.uv.buffer,part.geo.uv.byteOffset,part.geo.uv.byteLength)))).size;}
 Check(UniqueUvCount('Sleepers')===3&&UniqueUvCount('DeckPlanks')===3&&UniqueUvCount('Pier')===3&&UniqueUvCount('PierDamp')===3,'Three mesh variants contain genuinely different UV coordinates');
+// Derive each UV direction from measured metre-space edges on the exported
+// stone geometry. Quarter turns should break directional repetition without
+// stretching the material or changing the authored one-metre texture scale.
+for(const role of ['Pier','PierDamp']){
+  const bins=[0,0,0,0];let scaleBad=0;
+  for(const part of [...new Map(ByRole(role).map(p=>[p.node.mesh,p])).values()]){
+    const {positions,indices,uv}=part.geo;
+    for(let k=0;k<(indices?.length??positions.length/3);k+=3){
+      const ids=[0,1,2].map(j=>indices?indices[k+j]:k+j);
+      for(const [a,b] of [[ids[0],ids[1]],[ids[1],ids[2]],[ids[2],ids[0]]]){
+        const dx=positions[3*b]-positions[3*a],dy=positions[3*b+1]-positions[3*a+1],dz=positions[3*b+2]-positions[3*a+2];
+        if(dx<.05||Math.abs(dy)>.00001||Math.abs(dz)>.00001)continue;
+        const du=uv[2*b]-uv[2*a],dv=uv[2*b+1]-uv[2*a+1];
+        if(Math.abs(Math.hypot(du,dv)-dx)>.0002){scaleBad++;continue;}
+        const bin=Math.abs(du)>Math.abs(dv)?(du>0?0:2):(dv>0?1:3);
+        if(Math.min(Math.abs(du),Math.abs(dv))>.0002){scaleBad++;continue;}
+        bins[bin]++;
+      }
+    }
+  }
+  Check(scaleBad===0&&bins.every(n=>n>=20),'Stone block UVs use all four quarter-turn directions at unchanged metre scale',{role,bins,scaleBad});
+}
 for(const role of ['Pier','PierDamp','Cap','abutment']){
   const meshes=[...new Map(ByRole(role).map(p=>[p.node.mesh,p])).values()];
   const tints=new Set();let min=1,max=0,invalid=0,alphaBad=0,mixedFaces=0;

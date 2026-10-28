@@ -98,10 +98,10 @@ const SINGLE_BLANKET_ASSET_BYTES = 1024 * 1024;
 // 不进 boot / level 预算；全目录原本就顶着上限（63.79 / 63.81 MB），按它们的体积单列 384 KB。
 const EDITOR_CREEK_SKETCH_BYTES = 384 * 1024;
 // The refined bridge steel set occupies 322,774 bytes; sleeper, end-grain,
-// stone, damp stone and deck-plank sets total 2,012,312 bytes. These are
+// stone, damp stone and deck-plank sets total 2,028,590 bytes. These are
 // embedded in the standalone bridge GLB; they add no boot or level requests.
 const BEISHAHE_METAL_ASSET_BYTES = 384 * 1024;
-const BEISHAHE_SURFACE_ASSET_BYTES = 1966 * 1024;
+const BEISHAHE_SURFACE_ASSET_BYTES = 1982 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -137,7 +137,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
   {
     id: "BeishahePierDamp", kind: "material", tier: "lazy", toneClass: "stone", metersPerTile: 1,
     bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_BeishahePierDamp.json",
-    source: { provider: "imagegen", date: "2026-10-28", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-3e5949d2-b8a3-4cbd-91b7-e963dcd5ed74", prompt: "_import/Prompts/Texture_BeishahePierDamp.txt", note: "墩底单石受潮和矿物沉积的设计纹理，非1938年水位证据；源图留OneDrive。" },
+    source: { provider: "imagegen", date: "2026-10-28", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-66fa75c7-9c16-4882-ac23-e645f04365fe; exec-948910cc-5972-4a8a-a61f-6681e3ecbea4", prompt: "_import/Prompts/Texture_BeishahePierDamp.txt", note: "湿石与干石使用同一混合源烘焙，色调独立；墩底受潮为设计推定，非1938年水位证据。源图留OneDrive。" },
     consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishahePierDamp" }],
     files: [["Texture_BeishahePierDampBase.webp", "Base", 1024, 1024], ["Texture_BeishahePierDampNormal.webp", "Normal", 512, 512], ["Texture_BeishahePierDampOrm.webp", "Orm", 512, 512]],
   },
@@ -159,7 +159,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
   {
     id: "BeishahePierStone", kind: "material", tier: "lazy", toneClass: "stone", metersPerTile: 1,
     bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_BeishahePierStone.json",
-    source: { provider: "imagegen", date: "2026-10-27", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-66fa75c7-9c16-4882-ac23-e645f04365fe", prompt: "_import/Prompts/Texture_BeishahePierStone.txt", note: "无灰缝单块风化料石表面；砌缝由实体几何表达。源图留OneDrive。" },
+    source: { provider: "imagegen", date: "2026-10-28", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-66fa75c7-9c16-4882-ac23-e645f04365fe; exec-948910cc-5972-4a8a-a61f-6681e3ecbea4", prompt: "_import/Prompts/Texture_BeishahePierStone.txt", note: "两张无灰缝单块石面源图按60/40混合，逐块旋转UV；砌缝由实体几何表达。源图留OneDrive。" },
     consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishahePierStone" }],
     files: [["Texture_BeishahePierStoneBase.webp", "Base", 1024, 1024], ["Texture_BeishahePierStoneNormal.webp", "Normal", 512, 512], ["Texture_BeishahePierStoneOrm.webp", "Orm", 512, 512]],
   },
