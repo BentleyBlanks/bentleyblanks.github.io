@@ -158,12 +158,14 @@ Check(data.historicalReferences?.length>=3&&data.historicalReferences.every(r=>/
 Check(/creative weathering choice, not evidence of the 1938 waterline/i.test(data.materialInterpretation?.pierDamp??''),'Lower pier damp color remains explicitly an artistic choice, not a historical water-level claim');
 Check(/not established by a confirmed 1938 Beishahe bridge photograph/i.test(data.materialInterpretation?.deckPlanks??''),'Continuous wooden decking is identified as an authored reconstruction');
 Check(data.deck?.clearWidthM===spec.sleeperLengthM&&data.deck.plankThicknessM===.045&&data.deck.topY===.075&&data.deck.jointWidthM===.006&&data.deck.grainAxis==='X','Decking dimensions, real 6 mm board gaps and transverse timber grain are recorded');
+Check(spec.railNominalLengthM===10&&spec.railJointGapM===.006&&data.railJoints?.nominalRailLengthM===10&&data.railJoints.gapM===.006&&!data.railJoints.holesModeled,'Rail joint record distinguishes nominal historical spacing and unbored represented fasteners');
+Check(/unverified design assumptions/i.test(data.railJoints.interpretation)&&/overlap solid undrilled/i.test(data.materialInterpretation?.railJoints??''),'Rail joints disclose unconfirmed locations and represented bolt/web overlap');
 const Role=p=>p.node.extras?.role;
 const ByRole=(role,index)=>parts.filter(p=>Role(p)===role&&(index==null||p.node.extras?.spanIndex===index));
 for(const part of parts){
   const name=g.materials[part.primitive.material]?.name,role=Role(part);
-  if(name==='BeishaheRailRunning'||role==='RailWear'||role==='RailJointWear')Check(name==='BeishaheRailRunning'&&(role==='RailWear'||role==='RailJointWear'),'Polished steel is restricted to dedicated rail-wear geometry',{name,role});
-  const railBodyRoles=['RailWest','RailEast','RailJointWest','RailJointEast','RailJointSplice'];
+  if(name==='BeishaheRailRunning'||role==='RailWear')Check(name==='BeishaheRailRunning'&&role==='RailWear','Polished steel is restricted to dedicated rail-wear geometry',{name,role});
+  const railBodyRoles=['RailWest','RailEast','RailMidSplice','RailJointSplice'];
   if(name==='BeishaheRailBody'||railBodyRoles.includes(role))Check(name==='BeishaheRailBody'&&railBodyRoles.includes(role),'Dark reused-steel material is restricted to actual rails and their fishplates',{name,role});
 }
 const pointCache=new Map();
@@ -643,17 +645,97 @@ for(const rivets of [...new Map(ByRole('Rivets').map(p=>[p.node.mesh,p])).values
     Check(grouped[0].length===grouped[1].length&&grouped[0].every((a,i)=>a.length===grouped[1][i].length&&a.every((z,j)=>Math.abs(z-grouped[1][i][j])<.001)),'Both actual rivet rows remain paired along each chord bay',{span,trussSide,faceSign,chord:chord.name});
   }
 }
+// Outside guard timbers are a labelled design inference, not evidence of the
+// 1938 bridge. Probe the exported geometry, fixings and crossings themselves.
+Check(/not evidence for Beishahe/i.test(data.guardTimbers?.interpretation??''),'Guard dimensions remain an authored interpretation');
+const guardDown=new THREE.Vector3(0,-1,0),guardUp=new THREE.Vector3(0,1,0);
+for(let i=0;i<spec.spanCount;i++){
+  const length=spec.spanPitchM-spec.expansionGapM,center=-spec.lengthM/2+spec.spanPitchM*(i+.5),tieCount=Math.ceil(length/spec.sleeperSpacingM);
+  const guards=ByRole('GuardTimbers',i),fixings=ByRole('GuardFasteners',i),deck=ByRole('DeckPlanks',i),bearers=ByRole('DeckBearers',i),ties=ByRole('Sleepers',i);
+  Check(guards.length===1&&fixings.length===1,'Every span contains both outside guard timbers and their fixings',i+1);
+  for(const side of [-1,1]){
+    const x=side*1.25;
+    for(let k=0;k<tieCount;k++){
+      const z=center-length/2+(k+.5)*length/tieCount,origin=new THREE.Vector3(x,.20,z);
+      const wood=Hits(guards,origin,guardDown,.20),bolt=Hits(fixings,origin,guardDown,.39),tie=Hits(ties,origin,guardDown,.39),bearer=Hits(bearers,origin,guardDown,.39);
+      // Small samples can land on a real 6 mm plank joint; require support
+      // at two out of three nearby positions on each side of the bolt.
+      const support=direction=>[.012,.024,.036].filter(d=>Hits(deck,new THREE.Vector3(x,.20,z+direction*d),guardDown,.20).length>0).length;
+      const left=support(-1),right=support(1);
+      Check(wood.length>=2&&Math.abs(wood[0].point.y-.135)<.001&&Math.abs(wood[wood.length-1].point.y-.075)<.001,'Guard has a real top and a bottom resting on the deck',{span:i+1,side,k});
+      Check(bolt.length>=2&&bolt[0].point.y<=spec.railHeightM+.0001&&bolt[bolt.length-1].point.y<=-.16,'Actual fixing reaches below sleeper and stays under rail running height',{span:i+1,side,k});
+      Check(tie.length>=2&&bearer.length>=2&&left>=2&&right>=2,'Actual fixing crosses a sleeper and bearer with deck support on both sides',{span:i+1,side,k,tie:tie.length,bearer:bearer.length,left,right});
+    }
+    for(let k=1;k<5;k++){
+      const z=center-length/2+k*length/5;
+      Check(Hits(guards,new THREE.Vector3(x,.20,z),guardDown,.20).length===0&&Hits(guards,new THREE.Vector3(x,.20,z-.008),guardDown,.20).length>0&&Hits(guards,new THREE.Vector3(x,.20,z+.008),guardDown,.20).length>0,'Guard timber pieces have real separated ends on both sides',{span:i+1,side,k});
+    }
+    const inner=side*(1.25-.07),outer=side*(1.25+.07),railOutside=side*((spec.gaugeM+spec.railHeadWidthM)/2+.065);
+    Check(Math.abs(inner)-Math.abs(railOutside)>.30&&Math.abs(outer)<spec.sleeperLengthM/2,'Guard remains outside rail hardware and within sleeper width',{span:i+1,side});
+  }
+}
+for(let i=1;i<spec.spanCount;i++){
+  const z=-spec.lengthM/2+i*spec.spanPitchM,role=name=>parts.filter(p=>Role(p)===name&&p.node.extras?.supportIndex===i);
+  const guard=role('GuardJoint'),plates=role('GuardJointSplice'),bolts=role('GuardJointBolts'),deck=role('DeckJoint');
+  Check(guard.length===1&&plates.length===1&&bolts.length===1,'Each pier has physical guard insert, side plates and bolts',i);
+  for(const side of [-1,1]){
+    const x=side*1.25,hit=Hits(guard,new THREE.Vector3(x,.20,z),guardDown,.20),wood=Hits(deck,new THREE.Vector3(x,.20,z),guardDown,.20);
+    Check(hit.length>=2&&wood.length>=2&&Math.abs(hit[hit.length-1].point.y-wood[0].point.y)<.001,'Guard insert bears on the actual wooden deck',{pier:i,side});
+    for(const dz of [-.13,0,.13]){
+      const bolt=Hits(bolts,new THREE.Vector3(x-0.12,.105,z+dz),new THREE.Vector3(1,0,0),.24);
+      const span=Hits(dz===0?guard:ByRole('GuardTimbers',dz<0?i-1:i),new THREE.Vector3(x-0.12,.105,z+dz),new THREE.Vector3(1,0,0),.24);
+      const plate=Hits(plates,new THREE.Vector3(x-0.12,.105,z+dz),new THREE.Vector3(1,0,0),.24);
+      Check(bolt.length>=2&&span.length>=2&&plate.length>=2,'Real bolts pass through both splice plates and wood on each side of the joint',{pier:i,side,dz});
+    }
+  }
+}
+function CheckRailJoint(centerZ,rails,wear,splice,fasteners,label){
+  const railCenter=(spec.gaugeM+spec.railHeadWidthM)/2,halfGap=spec.railJointGapM/2;
+  Check(rails.length>=2&&wear.length>=1&&splice.length===1&&fasteners.length===1,'Actual rail joint and hardware meshes exist',label);
+  const plateBounds=PartBounds(splice);
+  Check(Math.abs(plateBounds.min.z-(centerZ-.18))<.001&&Math.abs(plateBounds.max.z-(centerZ+.18))<.001,'Both physical splice plates straddle the rail joint',label);
+  const hardwarePoints=[...Points(splice[0]),...Points(fasteners[0])];
+  Check(hardwarePoints.every(p=>Math.min(Math.abs(p.x-railCenter),Math.abs(p.x+railCenter))<.065&&p.y>=.047&&p.y<.100),'Joint hardware stays within the open rail-foot channels and below the rail head',label);
+  for(const side of [-1,1]){
+    const x=side*railCenter,up=new THREE.Vector3(0,1,0),down=new THREE.Vector3(0,-1,0);
+    for(const dz of [-.004,0,.004]){
+      const railHit=Hits(rails,new THREE.Vector3(x,.20,centerZ+dz),down,.22),wearHit=Hits(wear,new THREE.Vector3(x,.20,centerZ+dz),down,.22);
+      Check(dz===0?railHit.length===0&&wearHit.length===0:railHit.some(h=>Math.abs(h.point.y-.14)<.0002)&&wearHit.some(h=>Math.abs(h.point.y-.1408)<.0002),'Rail and running surfaces have an actual open gap and matching heights on both sides',{label,side,dz});
+    }
+    for(const direction of [-1,1]){
+      const cap=Hits(rails,new THREE.Vector3(x,.12,centerZ),new THREE.Vector3(0,0,direction),.02);
+      Check(cap.length>0&&Math.abs(cap[0].distance-halfGap)<.0002,'Both actual rail end faces bound the six-millimetre joint',{label,side,direction,distance:cap[0]?.distance});
+    }
+    for(const dz of [-.13,-.055,.055,.13])for(const face of [-1,1]){
+      const z=centerZ+dz,y=.072,inside=new THREE.Vector3(x,y,z),outward=new THREE.Vector3(face,0,0);
+      const rail=Hits(rails,inside,outward,.05),plate=Hits(splice,inside,outward,.05);
+      Check(rail.length>0&&plate.length>0&&Math.abs(rail[0].distance-plate[0].distance)<.001,'Real fishplate inner surface contacts the appropriate rail web',{label,side,face,dz});
+      const origin=new THREE.Vector3(x+face*.05,y,z),inward=new THREE.Vector3(-face,0,0),head=Hits(fasteners,origin,inward,.05),outer=Hits(splice,origin,inward,.05);
+      Check(head.length>0&&outer.length>0&&face*(head[0].point.x-outer[0].point.x)>.0058&&face*(head[0].point.x-outer[0].point.x)<.0062,'Four represented bolt heads or nuts touch each splice plate',{label,side,face,dz});
+    }
+    // Sample the represented shaft through the web. This is deliberately an
+    // overlapping visual model; the rail and plates are not drilled meshes.
+    const shaft=Hits(fasteners,new THREE.Vector3(x-.05,.072,centerZ-.13),new THREE.Vector3(1,0,0),.10);
+    Check(shaft.length>=4,'Represented through-bolt shaft and heads exist across both plates',label);
+    rayMaterial.side=THREE.FrontSide;
+    for(const face of [-1,1]){
+      const origin=new THREE.Vector3(x+face*.05,.072,centerZ-.13),direction=new THREE.Vector3(-face,0,0);
+      Check(Hits(splice,origin,direction,.05).length>0&&Hits(fasteners,origin,direction,.05).length>0,'Fishplates and bolt heads remain outward-visible with backface culling',{label,side,face});
+    }
+    rayMaterial.side=THREE.DoubleSide;
+  }
+}
 let bearingCount=0;const coverageGaps=[];
 for(let i=0;i<spec.spanCount;i++){
   const center=-spec.lengthM/2+spec.spanPitchM*(i+.5),length=spec.spanPitchM-spec.expansionGapM;
-  const trusses=ByRole('Trusses',i),sleepers=ByRole('Sleepers',i),ends=ByRole('SleeperEnds',i),planks=ByRole('DeckPlanks',i),bearers=ByRole('DeckBearers',i),west=ByRole('RailWest',i),east=ByRole('RailEast',i),wear=ByRole('RailWear',i),bearings=ByRole('Bearings',i);
-  Check(trusses.length===1&&sleepers.length===1&&ends.length===1&&planks.length===1&&bearers.length===1&&west.length===1&&east.length===1&&wear.length===1&&bearings.length===1,'Span has independent truss, sleepers, actual wooden decking, its bearers, rails, wear and bearings',i+1);
+  const trusses=ByRole('Trusses',i),sleepers=ByRole('Sleepers',i),ends=ByRole('SleeperEnds',i),planks=ByRole('DeckPlanks',i),bearers=ByRole('DeckBearers',i),west=ByRole('RailWest',i),east=ByRole('RailEast',i),wear=ByRole('RailWear',i),bearings=ByRole('Bearings',i),midSplice=ByRole('RailMidSplice',i),midFasteners=ByRole('RailMidFasteners',i);
+  Check(trusses.length===1&&sleepers.length===1&&ends.length===1&&planks.length===1&&bearers.length===1&&west.length===1&&east.length===1&&wear.length===1&&bearings.length===1&&midSplice.length===1&&midFasteners.length===1,'Span has independent truss, decking, rails, midspan joint hardware and bearings',i+1);
   Check(data.assemblies[i].spanIndex===i&&Math.abs(data.assemblies[i].centerZ-center)<.0001&&data.assemblies[i].bearings.length===4,'Sidecar span location and four bearing inventory agree with metric layout',i+1);
   const w=Points(west[0]),e=Points(east[0]);
   const railCenter=(spec.gaugeM+spec.railHeadWidthM)/2;
   const wHead=SubBounds(w,p=>p.y>spec.railHeightM-.035),eHead=SubBounds(e,p=>p.y>spec.railHeightM-.035);
   Check(Math.abs(eHead.min.x-wHead.max.x-spec.gaugeM)<.0001,'Gauge is measured between the actual inner rail-head faces',i+1);
-  for(const box of [wHead,eHead])Check(Math.abs(box.max.z-box.min.z-length)<.001&&Math.abs(box.max.x-box.min.x-spec.railHeadWidthM)<.001,'Actual rail head has full span length and section width',i+1);
+  for(const box of [wHead,eHead])Check(Math.abs(box.max.z-box.min.z-(spec.spanPitchM-spec.railJointGapM))<.001&&Math.abs(box.max.x-box.min.x-spec.railHeadWidthM)<.001,'Rail heads reach the support joints with the correct section width',i+1);
   const sb=PartBounds(sleepers);Check(Math.abs(sb.max.y)<.0001&&Math.abs(sb.max.x-sb.min.x-spec.sleeperLengthM)<.001,'Sleeper top is the zero-height datum and retains physical width',i+1);
   const deckBounds=PartBounds(planks),bearerBounds=PartBounds(bearers);
   Check(Math.abs(deckBounds.min.y-.03)<.0001&&Math.abs(deckBounds.max.y-.075)<.0001&&Math.abs(deckBounds.max.x-deckBounds.min.x-spec.sleeperLengthM)<.001&&Math.abs(deckBounds.max.z-deckBounds.min.z-length)<.001,'Actual wooden deck covers the full 2.8 m bridge width, resting above sleeper-top bearers',i+1);
@@ -662,6 +744,11 @@ for(let i=0;i<spec.spanCount;i++){
   const deckRivets=ByRole('Rivets',i),tieCount=Math.ceil(length/spec.sleeperSpacingM);
   const tieZ=k=>center-length/2+(k+.5)*length/tieCount;
   const up=new THREE.Vector3(0,1,0),down=new THREE.Vector3(0,-1,0);
+  for(const side of [-1,1])for(const k of [tieCount/2-1,tieCount/2]){
+    const x=side*railCenter,z=tieZ(k),tie=Hits(sleepers,new THREE.Vector3(x,-.10,z),up,.12),plate=Hits(trusses,new THREE.Vector3(x,-.01,z),up,.04),rail=Hits(side<0?west:east,new THREE.Vector3(x,.20,z),down,.22);
+    Check(tie.some(h=>Math.abs(h.point.y)<.0002)&&plate.some(h=>Math.abs(h.point.y-.010)<.0002)&&rail.some(h=>Math.abs(h.point.y-.010)<.0002),'Both sleepers and tie plates support the suspended midspan joint without overlap',{span:i+1,side,k});
+  }
+  CheckRailJoint(center,[...west,...east],wear,midSplice,midFasteners,`span ${i+1} midpoint`);
   // Sample every span: the steel rail occupies its foot area; all remaining
   // walking regions must be wood, with only small physical joints allowed.
   let covered=0,samples=0,innerCovered=0,innerSamples=0,outerCovered=0,outerSamples=0;const misses=[];
@@ -751,7 +838,7 @@ for(let i=0;i<spec.spanCount;i++){
   Check(wearPoints.every(p=>Math.abs(Math.abs(p.x)-railCenter)<=.0225&&p.y>=spec.railHeightM-.001&&p.y<=spec.railHeightM+.002),'Every polished point lies in a narrow strip directly on a rail head',i+1);
   for(const side of [-1,1]){
     const strip=SubBounds(wearPoints,p=>side*p.x>0);
-    Check(!strip.isEmpty()&&Math.abs(strip.max.x-strip.min.x-.044)<.001&&Math.abs(strip.max.z-strip.min.z-length)<.001&&Math.abs(strip.min.y-spec.railHeightM)<.001,'Both full-length wheel-contact strips touch their rail heads',{span:i+1,side});
+    Check(!strip.isEmpty()&&Math.abs(strip.max.x-strip.min.x-.044)<.001&&Math.abs(strip.max.z-strip.min.z-(spec.spanPitchM-spec.railJointGapM))<.001&&Math.abs(strip.min.y-spec.railHeightM)<.001,'Wheel-contact strips reach the actual support joints',{span:i+1,side});
   }
   rayMaterial.side=THREE.FrontSide;
   const nearDeckRow=deckRowsByMesh.get(planks[0].node.mesh).reduce((best,row)=>Math.abs((row.edge0+row.edge1)/2-.05)<Math.abs((best.edge0+best.edge1)/2-.05)?row:best);
@@ -763,7 +850,7 @@ for(let i=0;i<spec.spanCount;i++){
     const nodeZ=center-length/2+length*2/spec.panelsPerSpan;
     Check(Hits(trusses,new THREE.Vector3(side*(spec.trussCenterOffsetM+.7),spec.trussTopY,nodeZ),new THREE.Vector3(-side,0,0),1.2).length>0,'Node plate is visible from the exterior with backface culling',{span:i+1,side});
     Check(Hits(trusses,new THREE.Vector3(0,spec.trussTopY,nodeZ),new THREE.Vector3(side,0,0),3).length>0,'Node plate is visible from inside the bridge with backface culling',{span:i+1,side});
-    Check(Hits(wear,new THREE.Vector3(side*railCenter,.5,center),new THREE.Vector3(0,-1,0),1).length>0,'Polished rail top remains visible with backface culling',{span:i+1,side});
+    Check(Hits(wear,new THREE.Vector3(side*railCenter,.5,center+.01),new THREE.Vector3(0,-1,0),1).length>0,'Polished rail top remains visible with backface culling beside the actual joint',{span:i+1,side});
   }
   Check(Hits(trusses,new THREE.Vector3(.75,-1.5,center),new THREE.Vector3(0,1,0),2).length>0,'Floor members remain visible from beneath with backface culling',i+1);
   rayMaterial.side=THREE.DoubleSide;
@@ -794,49 +881,32 @@ for(let i=0;i<spec.spanCount;i++){
 }
 Check(bearingCount===56,'All fifty-six span-end bearing load paths are inspected');
 // Truss members still stop at each structural expansion joint. Separate real
-// rail, wooden deck and bolted support meshes bridge those joints, with just
-// 2 mm clearances at each end rather than a 120 mm walking/track discontinuity.
-const transitionRoles=['RailJointWest','RailJointEast','RailJointWear','RailJointSplice','RailJointFasteners','DeckJoint','DeckJointSupport','DeckJointSplice','DeckJointBolts'];
+// rail ends, wooden deck and bolted support bridge the structural gap; there
+// is a single rail joint rather than an unphysical 116 mm rail insert.
+const transitionRoles=['RailJointSplice','RailJointFasteners','DeckJoint','DeckJointSupport','DeckJointSplice','DeckJointBolts'];
 for(const role of transitionRoles)Check(ByRole(role).length===spec.spanCount-1,'A real transition mesh exists at each intermediate pier',role);
 Check(data.transitions?.length===spec.spanCount-1&&Math.abs(data.deck?.jointEndClearanceM-.002)<1e-9,'All 13 metric deck/track transitions are recorded');
 Check(/not established by a confirmed 1938 Beishahe bridge photograph/i.test(data.materialInterpretation?.jointTransitions??''),'Pier transition details remain explicitly authored construction');
 for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
   const centerZ=-spec.lengthM/2+supportIndex*spec.spanPitchM;
   const one=role=>ByRole(role).filter(p=>p.node.extras?.supportIndex===supportIndex);
-  const railWest=one('RailJointWest'),railEast=one('RailJointEast'),railWear=one('RailJointWear'),railSplice=one('RailJointSplice'),railFasteners=one('RailJointFasteners'),deck=one('DeckJoint'),support=one('DeckJointSupport'),splice=one('DeckJointSplice'),bolts=one('DeckJointBolts');
-  Check([railWest,railEast,railWear,railSplice,railFasteners,deck,support,splice,bolts].every(p=>p.length===1),'Pier has exactly one mesh per physical connection role',supportIndex);
+  const railSplice=one('RailJointSplice'),railFasteners=one('RailJointFasteners'),deck=one('DeckJoint'),support=one('DeckJointSupport'),splice=one('DeckJointSplice'),bolts=one('DeckJointBolts');
+  const railWest=[...ByRole('RailWest',supportIndex-1),...ByRole('RailWest',supportIndex)],railEast=[...ByRole('RailEast',supportIndex-1),...ByRole('RailEast',supportIndex)],railWear=[...ByRole('RailWear',supportIndex-1),...ByRole('RailWear',supportIndex)];
+  Check([railSplice,railFasteners,deck,support,splice,bolts].every(p=>p.length===1)&&railWest.length===2&&railEast.length===2&&railWear.length===2,'Pier joins two actual span rails and exactly one mesh per hardware role',supportIndex);
   const info=data.transitions.find(t=>t.supportIndex===supportIndex);
-  Check(info&&Math.abs(info.centerZ-centerZ)<.0001&&Math.abs(info.structuralGapM-.12)<.0001&&Math.abs(info.endClearanceM-.002)<.0001,'Transition record agrees with the metric bridge layout',supportIndex);
+  Check(info&&Math.abs(info.centerZ-centerZ)<.0001&&Math.abs(info.structuralGapM-.12)<.0001&&Math.abs(info.deckEndClearanceM-.002)<.0001&&Math.abs(info.railJointGapM-.006)<.0001,'Transition record distinguishes structural, deck and rail gaps',supportIndex);
   const priorTruss=PartBounds(ByRole('Trusses',supportIndex-1)),nextTruss=PartBounds(ByRole('Trusses',supportIndex));
   Check(Math.abs((nextTruss.min.z-priorTruss.max.z)-spec.expansionGapM)<.001,'Actual steel trusses retain their 120 mm expansion gap without overlapping',{supportIndex,prior:priorTruss.max.z,next:nextTruss.min.z});
-  for(const [role,joint] of [['RailWest',railWest],['RailEast',railEast],['DeckPlanks',deck]]){
-    const prior=PartBounds(ByRole(role,supportIndex-1)),current=PartBounds(joint),next=PartBounds(ByRole(role,supportIndex));
-    const northGap=current.min.z-prior.max.z,southGap=next.min.z-current.max.z;
-    Check(northGap>.0015&&northGap<.0025&&southGap>.0015&&southGap<.0025,'Physical rail/deck transition leaves only millimetre end clearances',{supportIndex,role,northGap,southGap});
+  const priorDeck=PartBounds(ByRole('DeckPlanks',supportIndex-1)),jointDeck=PartBounds(deck),nextDeck=PartBounds(ByRole('DeckPlanks',supportIndex));
+  Check(Math.abs(jointDeck.min.z-priorDeck.max.z-.002)<.0005&&Math.abs(nextDeck.min.z-jointDeck.max.z-.002)<.0005,'Deck insert retains both real two-millimetre clearances',supportIndex);
+  CheckRailJoint(centerZ,[...railWest,...railEast],railWear,railSplice,railFasteners,`pier ${supportIndex}`);
+  const railCenter=(spec.gaugeM+spec.railHeadWidthM)/2,spanLength=spec.spanPitchM-spec.expansionGapM,tieCount=Math.ceil(spanLength/spec.sleeperSpacingM);
+  for(const direction of [-1,1])for(const side of [-1,1]){
+    const spanIndex=direction<0?supportIndex-1:supportIndex,z=centerZ+direction*(spec.expansionGapM/2+spanLength/(2*tieCount)),x=side*railCenter;
+    const ties=ByRole('Sleepers',spanIndex),trusses=ByRole('Trusses',spanIndex),rails=ByRole(side<0?'RailWest':'RailEast',spanIndex),up=new THREE.Vector3(0,1,0),down=new THREE.Vector3(0,-1,0);
+    const tie=Hits(ties,new THREE.Vector3(x,-.10,z),up,.12),plate=Hits(trusses,new THREE.Vector3(x,-.01,z),up,.04),rail=Hits(rails,new THREE.Vector3(x,.20,z),down,.22);
+    Check(tie.some(h=>Math.abs(h.point.y)<.0002)&&plate.some(h=>Math.abs(h.point.y-.010)<.0002)&&rail.some(h=>Math.abs(h.point.y-.010)<.0002),'Both adjacent sleepers and plates bear the rail joint without overlap',{supportIndex,side,direction,z});
   }
-  const westHead=SubBounds(Points(railWest[0]),p=>p.y>spec.railHeightM-.035),eastHead=SubBounds(Points(railEast[0]),p=>p.y>spec.railHeightM-.035);
-  Check(Math.abs(eastHead.min.x-westHead.max.x-spec.gaugeM)<.0001&&Math.abs(westHead.max.y-spec.railHeightM)<.0001&&Math.abs(eastHead.max.y-spec.railHeightM)<.0001,'Pier rail inserts retain actual 1.435 m gauge and rail-head height',supportIndex);
-  const wearBox=PartBounds(railWear);
-  Check(Math.abs(wearBox.min.z-(centerZ-.058))<.001&&Math.abs(wearBox.max.z-(centerZ+.058))<.001&&Math.abs(wearBox.min.y-.14)<.001&&Math.abs(wearBox.max.y-.1408)<.001,'Polished rail running strips continue over the pier at the original rail height',supportIndex);
-  const fishplateBounds=PartBounds(railSplice),fishHeadPoints=Points(railFasteners[0]);
-  Check(Math.abs(fishplateBounds.min.z-(centerZ-.18))<.001&&Math.abs(fishplateBounds.max.z-(centerZ+.18))<.001,'Rail fishplates span the insert and overlap each neighbouring rail',supportIndex);
-  for(const [rail,railName,joint] of [[-(spec.gaugeM+spec.railHeadWidthM)/2,'RailWest',railWest],[(spec.gaugeM+spec.railHeadWidthM)/2,'RailEast',railEast]])for(const face of [-1,1])for(const dz of [-.12,0,.12])for(const y of [.058,.086]){
-    const z=centerZ+dz,selected=dz<0?ByRole(railName,supportIndex-1):dz>0?ByRole(railName,supportIndex):joint;
-    const inside=new THREE.Vector3(rail,y,z),outward=new THREE.Vector3(face,0,0);
-    const web=Hits(selected,inside,outward,.05),plate=Hits(railSplice,inside,outward,.05);
-    Check(web.length>0&&plate.length>0&&Math.abs(web[0].distance-plate[0].distance)<.001,'Tapered fishplate inner face physically touches each rail web without a gap',{supportIndex,rail,face,dz,y,web:web[0]?.distance,plate:plate[0]?.distance});
-    const outside=new THREE.Vector3(rail+face*.05,y,z),inward=new THREE.Vector3(-face,0,0);
-    const head=Hits(railFasteners,outside,inward,.05),outerPlate=Hits(railSplice,outside,inward,.05);
-    Check(head.length>0&&outerPlate.length>0&&face*(head[0].point.x-outerPlate[0].point.x)>.006&&face*(head[0].point.x-outerPlate[0].point.x)<.009,'Real rounded rivet head projects from the outer fishplate',{supportIndex,rail,face,dz,y});
-    const foot=fishHeadPoints.some(p=>Math.abs(p.x-outerPlate[0].point.x)<.001&&Math.abs(p.y-y)<.0085&&Math.abs(p.z-z)<.0085);
-    Check(foot,'Fishplate rivet foot actually contacts its plate',{supportIndex,rail,face,dz,y});
-  }
-  rayMaterial.side=THREE.FrontSide;
-  for(const rail of [-(spec.gaugeM+spec.railHeadWidthM)/2,(spec.gaugeM+spec.railHeadWidthM)/2])for(const face of [-1,1]){
-    const origin=new THREE.Vector3(rail+face*.05,.058,centerZ),direction=new THREE.Vector3(-face,0,0);
-    Check(Hits(railSplice,origin,direction,.05).length>0&&Hits(railFasteners,origin,direction,.05).length>0,'Fishplates and their rivets remain outward-visible with backface culling',{supportIndex,rail,face});
-  }
-  rayMaterial.side=THREE.DoubleSide;
   const deckBox=PartBounds(deck),supportBox=PartBounds(support),spliceBox=PartBounds(splice),boltBox=PartBounds(bolts);
   Check(Math.abs(deckBox.max.x-deckBox.min.x-spec.sleeperLengthM)<.001&&Math.abs(deckBox.min.y-.03)<.001&&Math.abs(deckBox.max.y-.075)<.001,'Joint deck retains full width and matching physical top/bottom elevations',supportIndex);
   Check(Math.abs(supportBox.min.z-(centerZ-.06))<.001&&Math.abs(supportBox.max.z-(centerZ+.06))<.001&&Math.abs(supportBox.min.y)<.001&&Math.abs(supportBox.max.y-.03)<.001,'Wooden joint supports occupy exactly the truss gap',supportIndex);

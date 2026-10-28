@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026102812",
+  "version": "2026102815",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026102812",
+    "version": "2026102815",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "X east, Y up, Z south; origin at bridge center, sleeper top Y=0",
@@ -18,6 +18,8 @@
     "gaugeM": 1.435,
     "railHeadWidthM": 0.065,
     "railHeightM": 0.14,
+    "railNominalLengthM": 10,
+    "railJointGapM": 0.006,
     "sleeperLengthM": 2.8,
     "sleeperWidthM": 0.24,
     "sleeperDepthM": 0.16,
@@ -45,9 +47,19 @@
         "supports": "User research archive; exact 1938 Beishahe bridge photograph still unconfirmed."
       },
       {
+        "id": "JinpuRail1937",
+        "url": "https://www.jacar.archives.go.jp/das/meta/C13032619100",
+        "supports": "1937 route description lists 1.435 m gauge and nominal 10 m, 41 kg/m rails for Tianjin-Xuzhou. Exact joint positions, rail section and bridge-specific fittings are not established."
+      },
+      {
         "id": "BullardCreek1908",
         "url": "https://npgallery.nps.gov/GetAsset/81afac7b-65c7-4d59-9066-ff6c7991e861",
         "supports": "1908 Minnesota road bridge: paired riveted members and gusset/floor-beam connections as an engineering analogy. Not a Chinese railway bridge, not evidence of Beishahe-specific details."
+      },
+      {
+        "id": "Jinpu1941GuardTimbers",
+        "url": "https://codh.rois.ac.jp/north-china-railway/photograph/3804-035394-0.html",
+        "supports": "1941 Jinpu railway bridge at an unknown location: outside longitudinal timbers and a visible timber joint provide an engineering reference. Neither the dimensions nor their presence at Beishahe is established."
       }
     ],
     "mapMeasurement": {
@@ -496,99 +508,112 @@
       "supportIndex": 1,
       "centerZ": -120.0,
       "structuralGapM": 0.12,
-      "endClearanceM": 0.002,
+      "deckEndClearanceM": 0.002,
+      "railJointGapM": 0.006,
       "railHeightM": 0.14
     },
     {
       "supportIndex": 2,
       "centerZ": -100.0,
       "structuralGapM": 0.12,
-      "endClearanceM": 0.002,
+      "deckEndClearanceM": 0.002,
+      "railJointGapM": 0.006,
       "railHeightM": 0.14
     },
     {
       "supportIndex": 3,
       "centerZ": -80.0,
       "structuralGapM": 0.12,
-      "endClearanceM": 0.002,
+      "deckEndClearanceM": 0.002,
+      "railJointGapM": 0.006,
       "railHeightM": 0.14
     },
     {
       "supportIndex": 4,
       "centerZ": -60.0,
       "structuralGapM": 0.12,
-      "endClearanceM": 0.002,
+      "deckEndClearanceM": 0.002,
+      "railJointGapM": 0.006,
       "railHeightM": 0.14
     },
     {
       "supportIndex": 5,
       "centerZ": -40.0,
       "structuralGapM": 0.12,
-      "endClearanceM": 0.002,
+      "deckEndClearanceM": 0.002,
+      "railJointGapM": 0.006,
       "railHeightM": 0.14
     },
     {
       "supportIndex": 6,
       "centerZ": -20.0,
       "structuralGapM": 0.12,
-      "endClearanceM": 0.002,
+      "deckEndClearanceM": 0.002,
+      "railJointGapM": 0.006,
       "railHeightM": 0.14
     },
     {
       "supportIndex": 7,
       "centerZ": 0.0,
       "structuralGapM": 0.12,
-      "endClearanceM": 0.002,
+      "deckEndClearanceM": 0.002,
+      "railJointGapM": 0.006,
       "railHeightM": 0.14
     },
     {
       "supportIndex": 8,
       "centerZ": 20.0,
       "structuralGapM": 0.12,
-      "endClearanceM": 0.002,
+      "deckEndClearanceM": 0.002,
+      "railJointGapM": 0.006,
       "railHeightM": 0.14
     },
     {
       "supportIndex": 9,
       "centerZ": 40.0,
       "structuralGapM": 0.12,
-      "endClearanceM": 0.002,
+      "deckEndClearanceM": 0.002,
+      "railJointGapM": 0.006,
       "railHeightM": 0.14
     },
     {
       "supportIndex": 10,
       "centerZ": 60.0,
       "structuralGapM": 0.12,
-      "endClearanceM": 0.002,
+      "deckEndClearanceM": 0.002,
+      "railJointGapM": 0.006,
       "railHeightM": 0.14
     },
     {
       "supportIndex": 11,
       "centerZ": 80.0,
       "structuralGapM": 0.12,
-      "endClearanceM": 0.002,
+      "deckEndClearanceM": 0.002,
+      "railJointGapM": 0.006,
       "railHeightM": 0.14
     },
     {
       "supportIndex": 12,
       "centerZ": 100.0,
       "structuralGapM": 0.12,
-      "endClearanceM": 0.002,
+      "deckEndClearanceM": 0.002,
+      "railJointGapM": 0.006,
       "railHeightM": 0.14
     },
     {
       "supportIndex": 13,
       "centerZ": 120.0,
       "structuralGapM": 0.12,
-      "endClearanceM": 0.002,
+      "deckEndClearanceM": 0.002,
+      "railJointGapM": 0.006,
       "railHeightM": 0.14
     }
   ],
-  "triangles": 1084048,
-  "meshObjects": 298,
+  "triangles": 1186496,
+  "meshObjects": 354,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
-  "glbBytes": 16041672,
-  "glbSha256": "370063ea1b66e840a83c3b1caa2c3b8fe36ce0b63905cbb2e6c840bd65305655",
+  "glbBytes": 16493460,
+  "glbSha256": "186c3343c177f19a5c87b56eb05229f902e2faec5f44789a0c386411f56f67ac",
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
@@ -609,15 +634,27 @@
       "supports": "User research archive; exact 1938 Beishahe bridge photograph still unconfirmed."
     },
     {
+      "id": "JinpuRail1937",
+      "url": "https://www.jacar.archives.go.jp/das/meta/C13032619100",
+      "supports": "1937 route description lists 1.435 m gauge and nominal 10 m, 41 kg/m rails for Tianjin-Xuzhou. Exact joint positions, rail section and bridge-specific fittings are not established."
+    },
+    {
       "id": "BullardCreek1908",
       "url": "https://npgallery.nps.gov/GetAsset/81afac7b-65c7-4d59-9066-ff6c7991e861",
       "supports": "1908 Minnesota road bridge: paired riveted members and gusset/floor-beam connections as an engineering analogy. Not a Chinese railway bridge, not evidence of Beishahe-specific details."
+    },
+    {
+      "id": "Jinpu1941GuardTimbers",
+      "url": "https://codh.rois.ac.jp/north-china-railway/photograph/3804-035394-0.html",
+      "supports": "1941 Jinpu railway bridge at an unknown location: outside longitudinal timbers and a visible timber joint provide an engineering reference. Neither the dimensions nor their presence at Beishahe is established."
     }
   ],
   "materialInterpretation": {
     "pierDamp": "A continuous pale brown-gray damp-to-dry transition on the lower pier courses is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
     "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
-    "jointTransitions": "Rail and wooden deck splice details are authored to maintain a usable crossing; their exact construction is not established by a confirmed 1938 Beishahe bridge photograph."
+    "jointTransitions": "Rail and wooden deck splice details are authored to maintain a usable crossing; their exact construction is not established by a confirmed 1938 Beishahe bridge photograph.",
+    "railJoints": "The 1937 route record gives nominal 10 m rails, while joint positions at midspan and supports, the 6 mm gaps, section dimensions and hardware are authored design assumptions. Represented through-bolt shafts overlap solid undrilled rail webs and plates.",
+    "guardTimbers": "Two low outer longitudinal timbers are an authored interpretation of a 1941 Jinpu railway bridge photograph at an unknown location; their use and dimensions at Beishahe are unconfirmed."
   },
   "deck": {
     "clearWidthM": 2.8,
@@ -630,6 +667,32 @@
     "bearerBottomY": 0,
     "bearerTopY": 0.03,
     "grainAxis": "X"
+  },
+  "railJoints": {
+    "nominalRailLengthM": 10,
+    "gapM": 0.006,
+    "jointCentersPerSpan": [
+      0
+    ],
+    "supportAxisJointCount": 13,
+    "fishplateLengthM": 0.36,
+    "boltStationsM": [
+      -0.13,
+      -0.055,
+      0.055,
+      0.13
+    ],
+    "holesModeled": false,
+    "interpretation": "Spacing follows the 1937 Tianjin-Xuzhou line description; locations, joint gap, joint and rail sections are unverified design assumptions."
+  },
+  "guardTimbers": {
+    "centerOffsetM": 1.25,
+    "widthM": 0.14,
+    "bottomY": 0.075,
+    "topY": 0.135,
+    "segmentsPerSpan": 5,
+    "spanJointClearanceM": 0.002,
+    "interpretation": "Design inferred from an unidentified 1941 Jinpu railway bridge; not evidence for Beishahe's exact construction."
   },
   "materials": [
     "BeishaheSteel",

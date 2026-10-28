@@ -512,6 +512,33 @@ def BuildDeck(length, count, seed):
     return planks, bearers
 
 
+def BuildGuardTimbers(length, count):
+    """Authored outside longitudinal timbers on the continuous wooden deck.
+
+    A 1941 photograph records outside timbers on an unidentified Jinpu
+    railway bridge, but cannot establish the Beishahe bridge's exact details.
+    The low top stays below the rail head; through-bolts reach the sleepers.
+    """
+    timber, bolts = Geometry(), Geometry()
+    half = length / 2
+    segments = 5
+    for side in [-1, 1]:
+        x = side * 1.25
+        for k in range(segments):
+            start = -half + k * length / segments + (.001 if k else 0)
+            end = -half + (k + 1) * length / segments - (.001 if k < segments - 1 else 0)
+            timber.BeveledBox((x, .105, (start + end) / 2), (.14, .06, end - start), .004,
+                              uvOffset=(side * 2.37, k * 1.13), grain="deck")
+        for k in range(count):
+            z = -half + (k + .5) * length / count
+            # The 8 mm shaft passes through guard, deck, bearer and sleeper.
+            # A flush top washer stays below the running rail head at .14 m.
+            bolts.Cylinder((x, -.014, z), (0, 1, 0), .008, .298, sides=8)
+            bolts.Cylinder((x, .134, z), (0, 1, 0), .017, .002, sides=8)
+            bolts.Cylinder((x, -.166, z), (0, 1, 0), .018, .006, sides=8)
+    return timber, bolts
+
+
 def RailProfile(x):
     """Shared flat-bottom profile: both span rails and pier joints match."""
     return [(x + px, py) for px, py in [(-0.065, 0.010), (0.065, 0.010),
@@ -521,42 +548,49 @@ def RailProfile(x):
             (-0.009, 0.100), (-0.012, 0.037), (-0.065, 0.025)]]
 
 
-def BuildPierTransition(seed):
-    """Physical deck/rail connection over one 120 mm truss expansion gap.
+def BuildRailJointHardware(railSplice, railFasteners, x, centerZ):
+    """Two web-contacting splice plates with four represented through bolts.
 
-    The trusses stay separate. Two 116 mm rail inserts and wood deck pieces
-    leave a 2 mm expansion clearance at each span end. The deck bearers meet
-    the existing bearers end-to-end; bolted steel plates support those joints.
-    These small construction details are an authored visual reconstruction.
+    The bolt shafts are represented as solid overlapping geometry through the
+    solid rail web and plates; drilled holes are not modeled. Locations and
+    plate dimensions are authored rather than evidence for this bridge.
     """
-    west, east, wear, railSplice, railFasteners, deck, support, splice, bolts = [Geometry() for _ in range(9)]
+    webSlope = .003 / .063
+    lowY, highY = .048, .096
+    lowHalf = .012 - (lowY - .037) * webSlope
+    highHalf = .012 - (highY - .037) * webSlope
+    for face in [-1, 1]:
+        profile = [(x + face * lowHalf, lowY), (x + face * (lowHalf + .012), lowY),
+                   (x + face * (highHalf + .012), highY), (x + face * highHalf, highY)]
+        if face < 0:
+            profile.reverse()
+        railSplice.ExtrudedProfile(profile, centerZ - .18, centerZ + .18)
+    boltY = .072
+    outerHalf = .012 - (boltY - .037) * webSlope + .012
+    for dz in [-.13, -.055, .055, .13]:
+        z = centerZ + dz
+        # The shaft and web overlap intentionally: this visual asset has no
+        # cut-out holes. Six-sided heads/nuts touch the outer plate faces.
+        railFasteners.Cylinder((x, boltY, z), (1, 0, 0), .006, 2 * outerHalf, sides=8)
+        for face in [-1, 1]:
+            railFasteners.Cylinder((x + face * (outerHalf + .003), boltY, z), (1, 0, 0), .009, .006, sides=6)
+
+
+def BuildPierTransition(seed):
+    """Physical deck and rail-joint connection over a 120 mm truss gap.
+
+    The wood insert still leaves 2 mm clearance at each span end. Rail ends
+    extend from their spans to a single 6 mm joint at the support axis; there
+    is no artificial 116 mm rail insert. This alignment is a design inference.
+    """
+    railSplice, railFasteners, deck, support, splice, bolts, guard, guardSplice, guardBolts = [Geometry() for _ in range(9)]
     rng = random.Random(seed + 71783)
     gapHalf = SPEC["expansionGapM"] / 2
     clearance = .002
     half = gapHalf - clearance
     railX = (SPEC["gaugeM"] + SPEC["railHeadWidthM"]) / 2
-    for rail, side in [(west, -1), (east, 1)]:
-        x = side * railX
-        rail.ExtrudedProfile(RailProfile(x), -half, half)
-        wear.Box((x, .1404, 0), (.044, .0008, 2 * half))
-        # Two fishplates touch the rail web, covering the insert and extending
-        # 120 mm into each adjoining rail. Three rivet stations also secure the
-        # little centre rail rather than leaving it mechanically unsupported.
-        webSlope = .003 / .063
-        lowY, highY = .048, .096
-        lowHalf = .012 - (lowY - .037) * webSlope
-        highHalf = .012 - (highY - .037) * webSlope
-        for face in [-1, 1]:
-            profile = [(x + face * lowHalf, lowY), (x + face * (lowHalf + .012), lowY),
-                       (x + face * (highHalf + .012), highY), (x + face * highHalf, highY)]
-            if face < 0:
-                profile.reverse()
-            railSplice.ExtrudedProfile(profile, -.18, .18)
-            outward = Vector((face, webSlope, 0)).normalized()
-            for z in [-.12, 0, .12]:
-                for y in [.058, .086]:
-                    webHalf = .012 - (y - .037) * webSlope
-                    railFasteners.Rivet((x + face * (webHalf + .012), y, z), outward, .008)
+    for side in [-1, 1]:
+        BuildRailJointHardware(railSplice, railFasteners, side * railX, 0)
     # One short transverse deck board with two rail slots, aligned with the
     # visible deck above each span. No spike lies within this central strip.
     value, warmth = rng.uniform(.86, .99), rng.uniform(.008, .035)
@@ -575,6 +609,18 @@ def BuildPierTransition(seed):
             xa, xb = sorted((rail + sign * footEdge, rail + sign * bufferOuter))
             deck.Box(((xa + xb) / 2, .0525, 0), (xb - xa, .045, 2 * half),
                      uvOffset=uvOffset, grain="sleeper", tint=tint)
+    for side in [-1, 1]:
+        x = side * 1.25
+        guard.BeveledBox((x, .105, 0), (.14, .06, 2 * half), .004,
+                         uvOffset=(side * 2.37, 0), grain="deck")
+        # Side plates bridge both 2 mm end clearances and transfer load into
+        # the guard timber on each neighbouring span.
+        for face in [-1, 1]:
+            guardSplice.Box((x + face * .075, .105, 0), (.01, .03, .36))
+        for z in [-.13, 0, .13]:
+            guardBolts.Cylinder((x, .105, z), (1, 0, 0), .006, .16, sides=8)
+            for face in [-1, 1]:
+                guardBolts.Cylinder((x + face * .083, .105, z), (1, 0, 0), .012, .006, sides=8)
     # A separate support occupies only the structural opening, touching the
     # existing wooden bearers at both ends; its bolted steel plate extends
     # 120 mm under each neighbour and stops before the nearest sleepers.
@@ -586,10 +632,10 @@ def BuildPierTransition(seed):
         for z in [-.115, .115]:
             bolts.Cylinder((x, .006, z), (0, 1, 0), .005, .042, sides=8)
             bolts.Cylinder((x, -.018, z), (0, 1, 0), .009, .006, sides=8)
-    return {"RailJointWest": west, "RailJointEast": east, "RailJointWear": wear,
-            "RailJointSplice": railSplice, "RailJointFasteners": railFasteners,
+    return {"RailJointSplice": railSplice, "RailJointFasteners": railFasteners,
             "DeckJoint": deck, "DeckJointSupport": support, "DeckJointSplice": splice,
-            "DeckJointBolts": bolts}
+            "DeckJointBolts": bolts, "GuardJoint": guard,
+            "GuardJointSplice": guardSplice, "GuardJointBolts": guardBolts}
 
 
 def BuildSpan():
@@ -599,10 +645,11 @@ def BuildSpan():
     zs = [-length / 2 + i * step for i in range(n + 1)]
     y0, y1 = SPEC["trussBottomY"], SPEC["trussTopY"]
     halfW = SPEC["trussCenterOffsetM"]
-    steel, fasteners, west, east, shoes, railWear = [Geometry() for _ in range(6)]
+    steel, fasteners, west, east, shoes, railWear, railMidSplice, railMidFasteners = [Geometry() for _ in range(8)]
     count = math.ceil(length / SPEC["sleeperSpacingM"])
     timber, endTimber = BuildSleepers(length, count, 1938)
     deck, deckBearers = BuildDeck(length, count, 1938)
+    guards, guardFasteners = BuildGuardTimbers(length, count)
 
     def BuiltMember(a, b, width, depth):
         """Paired open channels joined at intervals by small riveted lacing plates."""
@@ -684,7 +731,9 @@ def BuildSpan():
         z = -length / 2 + (k + 0.5) * length / count
         for side in [-1, 1]:
             x = side * railX
-            steel.Box((x, 0.008, z), (0.22, 0.016, 0.20))
+            # Rail-foot lower face is Y=.010; the steel tie plate rests on
+            # the sleeper and touches that face without a solid overlap.
+            steel.Box((x, 0.005, z), (0.22, 0.010, 0.20))
             # Dog spikes: the head overlaps the rail foot, the shaft enters timber.
             for dx in [-1, 1]:
                 for dz in [-0.055, 0.055]:
@@ -698,10 +747,16 @@ def BuildSpan():
         x = side * railX
         # Flat-bottom rail, with tapered web and rounded-head facets. The
         # broadest head points retain the exact 1.435 m inner-face gauge.
-        rail.ExtrudedProfile(RailProfile(x), -length / 2, length / 2)
+        railHalfGap = SPEC["railJointGapM"] / 2
+        # Each half spans roughly ten metres. Ends extend 57 mm beyond the
+        # truss end; neighbouring rails meet at a 6 mm gap on the support axis.
+        railEnd = SPEC["spanPitchM"] / 2 - railHalfGap
+        for z0, z1 in [(-railEnd, -railHalfGap), (railHalfGap, railEnd)]:
+            rail.ExtrudedProfile(RailProfile(x), z0, z1)
+            railWear.Box((x, 0.1404, (z0 + z1) / 2), (0.044, 0.0008, z1 - z0))
+        BuildRailJointHardware(railMidSplice, railMidFasteners, x, 0)
         # The wheel contact patch is bare polished steel; the head sides retain
         # weathered steel texture. Thin geometry, no baked highlight in albedo.
-        railWear.Box((x, 0.1404, 0), (0.044, 0.0008, length))
     # One fixed/one expansion bearing on each side; four load paths per span.
     bearingCenters = []
     for end in [-1, 1]:
@@ -722,8 +777,9 @@ def BuildSpan():
                 fasteners.Rivet((x + dx, -0.963, z + 0.22), (0, 1, 0), 0.026)
             bearingCenters.append([x, SPEC["bearingTopY"], z])
     return {"Trusses": steel, "Rivets": fasteners, "Sleepers": timber, "SleeperEnds": endTimber,
-            "DeckPlanks": deck, "DeckBearers": deckBearers,
-            "RailWest": west, "RailEast": east, "RailWear": railWear, "Bearings": shoes}, bearingCenters
+            "DeckPlanks": deck, "DeckBearers": deckBearers, "GuardTimbers": guards, "GuardFasteners": guardFasteners,
+            "RailWest": west, "RailEast": east, "RailWear": railWear,
+            "RailMidSplice": railMidSplice, "RailMidFasteners": railMidFasteners, "Bearings": shoes}, bearingCenters
 
 
 def StoneTint(rng, damp=0):
@@ -916,8 +972,8 @@ def Rebuild():
     spans, bearingTemplate = BuildSpan()
     templates = {}
     for role, geo in spans.items():
-        mat = {"Sleepers": wood, "SleeperEnds": endWood, "DeckPlanks": deckWood,
-               "RailWest": railBody, "RailEast": railBody,
+        mat = {"Sleepers": wood, "SleeperEnds": endWood, "DeckPlanks": deckWood, "GuardTimbers": wood,
+               "RailWest": railBody, "RailEast": railBody, "RailMidSplice": railBody,
                "DeckBearers": deckWood, "RailWear": railRunning}.get(role, steel)
         colorLayer = "DeckTint" if role in ("DeckPlanks", "DeckBearers") else None
         templates[role] = geo.Object("Template_" + role, mat, tile=1, colorLayer=colorLayer)
@@ -975,7 +1031,7 @@ def Rebuild():
     transitionGeometry = BuildPierTransition(1938)
     transitionTemplates = {}
     for role, geo in transitionGeometry.items():
-        mat = {"RailJointWear": railRunning, "RailJointWest": railBody, "RailJointEast": railBody,
+        mat = {"GuardJoint": wood,
                "RailJointSplice": railBody, "DeckJoint": deckWood,
                "DeckJointSupport": deckWood}.get(role, steel)
         layer = "DeckTint" if role in ("DeckJoint", "DeckJointSupport") else None
@@ -996,7 +1052,8 @@ def Rebuild():
             obj.location = ToBlender((0, 0, z))
             obj["role"], obj["supportIndex"] = role, i
         transitions.append({"supportIndex": i, "centerZ": z, "structuralGapM": SPEC["expansionGapM"],
-                            "endClearanceM": .002, "railHeightM": SPEC["railHeightM"]})
+                            "deckEndClearanceM": .002, "railJointGapM": SPEC["railJointGapM"],
+                            "railHeightM": SPEC["railHeightM"]})
     for obj in list(transitionTemplates.values()) + transitionDecks[1:]:
         bpy.data.objects.remove(obj, do_unlink=True)
     abut = BuildAbutment()
@@ -1040,12 +1097,22 @@ def Rebuild():
             "materialInterpretation": {
                 "pierDamp": "A continuous pale brown-gray damp-to-dry transition on the lower pier courses is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
                 "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
-                "jointTransitions": "Rail and wooden deck splice details are authored to maintain a usable crossing; their exact construction is not established by a confirmed 1938 Beishahe bridge photograph."
+                "jointTransitions": "Rail and wooden deck splice details are authored to maintain a usable crossing; their exact construction is not established by a confirmed 1938 Beishahe bridge photograph.",
+                "railJoints": "The 1937 route record gives nominal 10 m rails, while joint positions at midspan and supports, the 6 mm gaps, section dimensions and hardware are authored design assumptions. Represented through-bolt shafts overlap solid undrilled rail webs and plates.",
+                "guardTimbers": "Two low outer longitudinal timbers are an authored interpretation of a 1941 Jinpu railway bridge photograph at an unknown location; their use and dimensions at Beishahe are unconfirmed."
             },
             "deck": {"clearWidthM": SPEC["sleeperLengthM"], "plankThicknessM": .045, "topY": .075,
                      "railFootClearanceM": .001, "jointWidthM": .006,
                      "jointEndClearanceM": .002, "jointSpliceLengthM": .36,
                      "bearerBottomY": 0, "bearerTopY": .03, "grainAxis": "X"},
+            "railJoints": {"nominalRailLengthM": SPEC["railNominalLengthM"], "gapM": SPEC["railJointGapM"],
+                           "jointCentersPerSpan": [0], "supportAxisJointCount": SPEC["spanCount"] - 1,
+                           "fishplateLengthM": .36, "boltStationsM": [-.13, -.055, .055, .13],
+                           "holesModeled": False,
+                           "interpretation": "Spacing follows the 1937 Tianjin-Xuzhou line description; locations, joint gap, joint and rail sections are unverified design assumptions."},
+            "guardTimbers": {"centerOffsetM": 1.25, "widthM": .14, "bottomY": .075,
+                             "topY": .135, "segmentsPerSpan": 5, "spanJointClearanceM": .002,
+                             "interpretation": "Design inferred from an unidentified 1941 Jinpu railway bridge; not evidence for Beishahe's exact construction."},
             "materials": ["BeishaheSteel", "BeishaheRailBody", "BeishaheTimber", "BeishaheTimberEnd", "BeishaheDeckTimber", "BeishaheStone", "BeishaheStoneDamp", "BeishaheRailRunning"],
             "bakeInputs": [f"Texture_{texture}{channel}.webp" for texture in
                            ["BeishaheSteel", "BeishaheSleeper", "BeishaheSleeperEnd", "BeishaheDeckPlank", "BeishahePierStone", "BeishahePierDamp"]

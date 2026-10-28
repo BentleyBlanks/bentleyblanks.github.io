@@ -11,6 +11,7 @@
 | 1934《铁展》粤汉咸宁76号钢桥，资料汇编第三轮 | 完整多跨低桁侧轮廓 | 异地异桥，不是北沙河原照 |
 | [《枣庄年鉴2006》南沙河桥](https://shandong-chorography.org/database/b4/section/2-newsite-4186/article/682/) | 后世志书记述同线南沙河原桥1911年建成，前两孔为31.5米“半穿桥梁”，后六孔为11.6米混凝土包工字钢板梁 | 南沙河位于滕县南，非北沙河；后世记述不是原桥工程图，“半穿”一词不能证明具体桁式，也不证明北沙河混用孔型 |
 | [华北交通档案 3804-035392-0](https://codh.rois.ac.jp/north-china-railway/photograph/3804-035392-0.html) | 馆藏记录为1941年2月津浦线；照片可对照钢轨、横枕、外侧纵梁及轨间通行板 | 地点未明确，非北沙河原照；该图部分枕间可见空隙，现模型的连续横铺木面是应用户要求所做的设计推定 |
+| [1937年《津浦铁道线路图》](https://www.jacar.archives.go.jp/das/meta/C13032619100)；[《济南铁路分局志》工程与设备](https://shandong-chorography.org/database/jinan-railway/section/5/article/41/) | 前者记天津—徐州段单线1.435米轨距、41公斤／米及10米轨条；后者回述早期德制干线轨配垫板和螺纹道钉 | 线路一般配置，不证明1938年北沙河桥具体轨节接头位置、扣件及维护状态；桥上枕木间距亦不能直接由一般线路推定 |
 | 现代京沪铁路跨北沙河，35.14496N、117.10696E；OSM＋Esri影像 | 跨越河漫滩的整桥尺度，采用约280米 | 现代堤岸、复线桥与水情不能反推1938原桥尺寸 |
 | 内置imagegen局部构造图、无花纹旧钢底图 | 铆接、支座、木石、旧钢细节 | 仅设计参考；局部图实腹梁外形未用作主桥型 |
 | 用户指出原模型桥面镂空后的截图，以及据此生成的桥面构造图 | 横向木板、承托、轨槽和木材表面方向 | 新桥面是用户要求下的设计推定，生成图不是1938年原桥照片 |
@@ -32,9 +33,10 @@
 - `Model/Model_BeishaheBridge.glb`：一座完好桥，标准glTF Y-up，X东、Z南，单位米；原点在桥中心枕木顶。支承轴总长280米，含翼墙外包长度约287.7米。
 - `Model/Data_BeishaheBridge.json`：实际GLB哈希／字节数、包围盒、实例三角数、每跨4个支座坐标、来源和创作边界。`_blender/Data_BeishaheBridgeSpec.json` 为设计尺寸输入。
 - 14个跨组共享主钢结构；木枕与13座中间石墩各有三组确定性UV及砌块差异，两端桥台独立。低矮半穿钢桁的轨道上方敞开，无高门架／顶横联、道路铺装或另加人行栏杆。
-- 两轨头内缘净距1.435米。节点 `Intact_Span01…14` 含 `Trusses / Rivets / Sleepers / SleeperEnds / DeckPlanks / DeckBearers / RailWest / RailEast / RailWear / Bearings`；`Shared_Pier / PierDamp / Cap / Abutment` 独立。连续横铺木板架在纵向托梁上，轨脚和犬钉周围留出窄槽；轨头高出板面约65毫米。13处跨墩的木面与钢轨由独立实体接段、鱼尾板、托片及螺栓接续，接段两端各留2毫米缝，钢桁自身保持120毫米结构缝。两片桁架内外均有双排铆钉，节点板为实体；桥墩和桥台有内缩实心核心。桥板铺法、铆钉间距、连接、配色、块色及墩底污迹为设计推定，不代表1938年实测水位。
+- 两轨头内缘净距1.435米。节点 `Intact_Span01…14` 含 `Trusses / Rivets / Sleepers / SleeperEnds / DeckPlanks / DeckBearers / GuardTimbers / GuardFasteners / RailWest / RailEast / RailWear / RailMidSplice / RailMidFasteners / Bearings`；`Shared_Pier / PierDamp / Cap / Abutment` 独立。连续横铺木板架在纵向托梁上，轨脚和犬钉周围留出窄槽；轨头高出板面约65毫米。两轨外侧的低矮纵木、分段与固定方式参照地点未知的1941年同线照片推定，其跨墩短木、侧板和穿栓用于连接相邻跨。13处跨墩木面设独立实体接段、托片及螺栓，接段两端各留2毫米缝，钢桁自身保持120毫米结构缝。
+- 钢轨按1937年线路资料取名义10米轨节，跨中及墩轴处设6毫米缝、双侧夹板及四组螺栓；接头落点、缝宽、夹板及轨道截面均为设计推定。模型的螺杆与未钻孔的实体轨腹和夹板交叠，未模拟钻孔。两片桁架内外均有双排铆钉，节点板为实体；桥墩和桥台有内缩实心核心。桥板铺法、护木、铆钉间距、连接、配色、块色及墩底污迹均非原桥实测，不代表1938年实测水位。
 - `BeishaheSteel`、`BeishaheSleeper`、`BeishaheSleeperEnd`、`BeishaheDeckPlank`、`BeishahePierStone`、`BeishahePierDamp` 六套PBR共18张图嵌入GLB；轨身另用较暗的钢材，轨顶采用磨亮窄条金属材质。木纹顺各构件长轴，端纹两轴物理比例一致；干湿石面共用粗凿源图，块间纹理方向变化，灰缝由实体构件表达。ORM遮蔽与法线使用真实贴图；不增加boot或关卡贴图请求。
-- 版本 `2026102812` 的桥梁候选为1,084,048实例三角、298个网格对象和16,041,672字节；尚无LOD或游戏装配，整桥进入正式关卡前须评估可见范围、合批与性能。此前版本另留OneDrive `Archive/`。
+- 版本 `2026102815` 的桥梁候选为1,186,496实例三角、354个网格对象和16,493,460字节；尚无LOD或游戏装配，整桥进入正式关卡前须评估可见范围、合批与性能。此前版本另留OneDrive `Archive/`。
 - 最新44米四孔白盒、旧浮桥、旧钢桁桥及剧情／碰撞／爆破时间线均未替换。未来接入整桥须同步处理河漫滩与关卡空间，不用非均匀缩放硬塞进局部白盒。
 
 ## 重建与源工程
@@ -52,7 +54,7 @@ node scripts/Script_BlenderMcp.mjs status --scan
 
 ## 验收
 
-`node Taierzhuang1938/Script_BeishaheBridgeTest.mjs` 检查真GLB米制尺寸、分孔、桥面覆盖与托梁接触、13处跨墩过渡、轨槽扣件、轨距、双排铆钉、墩台实心、背面剔除、木纹方向与端纹比例、逐石颜色、贴图解码像素与哈希；`Script_TextureStandardsTest`检查纹理和预算。数值测试不能替代视觉对照。
+`node Taierzhuang1938/Script_BeishaheBridgeTest.mjs` 检查真GLB米制尺寸、分孔、桥面覆盖与托梁接触、护木支承、跨中及13处墩轴轨缝、夹板、轨座、轨槽扣件、轨距、双排铆钉、墩台实心、背面剔除、木纹方向与端纹比例、逐石颜色、贴图解码像素与哈希；`Script_TextureStandardsTest`检查纹理和预算。机车和敞车各401个离散姿态在两个代表接头的附属构件处通过净空检查，不等于所有车辆的通用限界或连续运动验证。数值测试不能替代视觉对照。
 
 本地页 `tmp/BeishaheBridge/QualityReview/index.html` 支持旧版／新版切换、整桥侧视、节点、枕木、端纹、桥墩与桥底机位、原照片及局部推演图对照。仓库LocalPreview静默预览；`Script_QualityReview.mjs` 复用静音浏览器，保持1440×960实际视口，观察图长边640，检查JSON与截图只留本地。Blender渲染留源目录 `Review/`。
 
