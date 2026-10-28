@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026102815",
+  "version": "2026102818",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026102815",
+    "version": "2026102818",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "X east, Y up, Z south; origin at bridge center, sleeper top Y=0",
@@ -20,6 +20,7 @@
     "railHeightM": 0.14,
     "railNominalLengthM": 10,
     "railJointGapM": 0.006,
+    "spikeEmbedDepthM": 0.12,
     "sleeperLengthM": 2.8,
     "sleeperWidthM": 0.24,
     "sleeperDepthM": 0.16,
@@ -50,6 +51,11 @@
         "id": "JinpuRail1937",
         "url": "https://www.jacar.archives.go.jp/das/meta/C13032619100",
         "supports": "1937 route description lists 1.435 m gauge and nominal 10 m, 41 kg/m rails for Tianjin-Xuzhou. Exact joint positions, rail section and bridge-specific fittings are not established."
+      },
+      {
+        "id": "GermanRailScrew1913",
+        "url": "https://archive.org/details/steelrailstheirh01sell/page/145/mode/1",
+        "supports": "1913 reference shows square-headed screw spikes with circular flanges for Prussian and Alsace-Lorraine railway track; an engineering analogy, not a photograph or specification of Beishahe."
       },
       {
         "id": "BullardCreek1908",
@@ -609,11 +615,11 @@
       "railHeightM": 0.14
     }
   ],
-  "triangles": 1186496,
+  "triangles": 1300736,
   "meshObjects": 354,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
-  "glbBytes": 16493460,
-  "glbSha256": "186c3343c177f19a5c87b56eb05229f902e2faec5f44789a0c386411f56f67ac",
+  "glbBytes": 16850876,
+  "glbSha256": "2ae464d01d9ac41ba2c8415812bfb13634eb40efd306090ff929dff3edd693c9",
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
@@ -639,6 +645,11 @@
       "supports": "1937 route description lists 1.435 m gauge and nominal 10 m, 41 kg/m rails for Tianjin-Xuzhou. Exact joint positions, rail section and bridge-specific fittings are not established."
     },
     {
+      "id": "GermanRailScrew1913",
+      "url": "https://archive.org/details/steelrailstheirh01sell/page/145/mode/1",
+      "supports": "1913 reference shows square-headed screw spikes with circular flanges for Prussian and Alsace-Lorraine railway track; an engineering analogy, not a photograph or specification of Beishahe."
+    },
+    {
       "id": "BullardCreek1908",
       "url": "https://npgallery.nps.gov/GetAsset/81afac7b-65c7-4d59-9066-ff6c7991e861",
       "supports": "1908 Minnesota road bridge: paired riveted members and gusset/floor-beam connections as an engineering analogy. Not a Chinese railway bridge, not evidence of Beishahe-specific details."
@@ -654,6 +665,7 @@
     "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
     "jointTransitions": "Rail and wooden deck splice details are authored to maintain a usable crossing; their exact construction is not established by a confirmed 1938 Beishahe bridge photograph.",
     "railJoints": "The 1937 route record gives nominal 10 m rails, while joint positions at midspan and supports, the 6 mm gaps, section dimensions and hardware are authored design assumptions. Represented through-bolt shafts overlap solid undrilled rail webs and plates.",
+    "railFasteners": "Square-head screw-spike shape, 120 mm sleeper embed, two outside and one inside, and outside hook plates are authored interpretations of early German railway references, not established for the 1938 Beishahe bridge. Solid spike shafts intentionally overlap undrilled sleeper and tie-plate geometry; holes and threads are not modeled.",
     "guardTimbers": "Two low outer longitudinal timbers are an authored interpretation of a 1941 Jinpu railway bridge photograph at an unknown location; their use and dimensions at Beishahe are unconfirmed."
   },
   "deck": {
@@ -684,6 +696,18 @@
     ],
     "holesModeled": false,
     "interpretation": "Spacing follows the 1937 Tianjin-Xuzhou line description; locations, joint gap, joint and rail sections are unverified design assumptions."
+  },
+  "railFasteners": {
+    "spikeEmbedDepthM": 0.12,
+    "shaftDiameterM": 0.022,
+    "flangeDiameterM": 0.044,
+    "squareHeadWidthM": 0.019,
+    "outsideCountPerRailSeat": 2,
+    "insideCountPerRailSeat": 1,
+    "toolSquareEnvelopeM": 0.025,
+    "holesModeled": false,
+    "threadsModeled": false,
+    "interpretation": "Prussian-style screw-spike form, sleeper embed and axial tool envelope are authored analogies, not confirmed bridge-specific details."
   },
   "guardTimbers": {
     "centerOffsetM": 1.25,

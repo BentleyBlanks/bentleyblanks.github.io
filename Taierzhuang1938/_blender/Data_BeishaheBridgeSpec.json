@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "2026102815",
+  "version": "2026102818",
   "name": "BeishaheBridge",
   "units": "m",
   "coordinateSystem": "X east, Y up, Z south; origin at bridge center, sleeper top Y=0",
@@ -17,6 +17,7 @@
   "railHeightM": 0.14,
   "railNominalLengthM": 10,
   "railJointGapM": 0.006,
+  "spikeEmbedDepthM": 0.12,
   "sleeperLengthM": 2.8,
   "sleeperWidthM": 0.24,
   "sleeperDepthM": 0.16,
@@ -30,6 +31,7 @@
     {"id":"JacarPhoto6", "url":"https://www.jacar.archives.go.jp/content/item/aj12/C200008287100/raw/C11111424100.c0947120012.sinasinajihenhokushi_055.1370_01.pdf", "image":"Appendix photo 6, 560 km Jiehe bridge", "supports":"Nearby short steel trusses, masonry support and demolition appearance. Not the Beishahe bridge."},
     {"id":"NotionResearch", "url":"https://app.notion.com/p/3eb60335331c81fda6dfe38153bcec45", "supports":"User research archive; exact 1938 Beishahe bridge photograph still unconfirmed."},
     {"id":"JinpuRail1937", "url":"https://www.jacar.archives.go.jp/das/meta/C13032619100", "supports":"1937 route description lists 1.435 m gauge and nominal 10 m, 41 kg/m rails for Tianjin-Xuzhou. Exact joint positions, rail section and bridge-specific fittings are not established."},
+    {"id":"GermanRailScrew1913", "url":"https://archive.org/details/steelrailstheirh01sell/page/145/mode/1", "supports":"1913 reference shows square-headed screw spikes with circular flanges for Prussian and Alsace-Lorraine railway track; an engineering analogy, not a photograph or specification of Beishahe."},
     {"id":"BullardCreek1908", "url":"https://npgallery.nps.gov/GetAsset/81afac7b-65c7-4d59-9066-ff6c7991e861", "supports":"1908 Minnesota road bridge: paired riveted members and gusset/floor-beam connections as an engineering analogy. Not a Chinese railway bridge, not evidence of Beishahe-specific details."},
     {"id":"Jinpu1941GuardTimbers", "url":"https://codh.rois.ac.jp/north-china-railway/photograph/3804-035394-0.html", "supports":"1941 Jinpu railway bridge at an unknown location: outside longitudinal timbers and a visible timber joint provide an engineering reference. Neither the dimensions nor their presence at Beishahe is established."}
   ],

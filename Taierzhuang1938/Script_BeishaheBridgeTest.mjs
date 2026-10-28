@@ -160,6 +160,9 @@ Check(/not established by a confirmed 1938 Beishahe bridge photograph/i.test(dat
 Check(data.deck?.clearWidthM===spec.sleeperLengthM&&data.deck.plankThicknessM===.045&&data.deck.topY===.075&&data.deck.jointWidthM===.006&&data.deck.grainAxis==='X','Decking dimensions, real 6 mm board gaps and transverse timber grain are recorded');
 Check(spec.railNominalLengthM===10&&spec.railJointGapM===.006&&data.railJoints?.nominalRailLengthM===10&&data.railJoints.gapM===.006&&!data.railJoints.holesModeled,'Rail joint record distinguishes nominal historical spacing and unbored represented fasteners');
 Check(/unverified design assumptions/i.test(data.railJoints.interpretation)&&/overlap solid undrilled/i.test(data.materialInterpretation?.railJoints??''),'Rail joints disclose unconfirmed locations and represented bolt/web overlap');
+Check(spec.spikeEmbedDepthM===.12&&data.railFasteners?.spikeEmbedDepthM===spec.spikeEmbedDepthM&&!data.railFasteners.holesModeled&&!data.railFasteners.threadsModeled,'Spike record describes embedded smooth solids without claiming modeled holes or threads');
+Check(data.railFasteners?.outsideCountPerRailSeat===2&&data.railFasteners.insideCountPerRailSeat===1&&data.railFasteners.flangeDiameterM===.044&&data.railFasteners.squareHeadWidthM===.019&&data.railFasteners.toolSquareEnvelopeM===.025,'The inferred three-spike layout, head proportions and assumed axial tool envelope are recorded');
+Check(/authored interpretations/i.test(data.materialInterpretation?.railFasteners??'')&&/overlap undrilled sleeper and tie-plate/i.test(data.materialInterpretation.railFasteners),'Spike form and overlapping unbored solids remain explicit design assumptions');
 const Role=p=>p.node.extras?.role;
 const ByRole=(role,index)=>parts.filter(p=>Role(p)===role&&(index==null||p.node.extras?.spanIndex===index));
 for(const part of parts){
@@ -170,6 +173,23 @@ for(const part of parts){
 }
 const pointCache=new Map();
 function Points(part){if(pointCache.has(part))return pointCache.get(part);const out=[];for(let i=0;i<part.geo.positions.length;i+=3)out.push(new THREE.Vector3(part.geo.positions[i],part.geo.positions[i+1],part.geo.positions[i+2]).applyMatrix4(part.matrix));pointCache.set(part,out);return out;}
+const triangleBoundsCache=new Map();
+function TriangleBounds(part){
+  if(triangleBoundsCache.has(part))return triangleBoundsCache.get(part);
+  const points=Points(part),indices=part.geo.indices,n=indices?.length??points.length,bounds=new Float64Array(n*2);
+  for(let i=0;i<n;i+=3){
+    const a=points[indices?indices[i]:i],b=points[indices?indices[i+1]:i+1],c=points[indices?indices[i+2]:i+2],j=i*2;
+    bounds[j]=Math.min(a.x,b.x,c.x);bounds[j+1]=Math.max(a.x,b.x,c.x);
+    bounds[j+2]=Math.min(a.y,b.y,c.y);bounds[j+3]=Math.max(a.y,b.y,c.y);
+    bounds[j+4]=Math.min(a.z,b.z,c.z);bounds[j+5]=Math.max(a.z,b.z,c.z);
+  }
+  triangleBoundsCache.set(part,bounds);return bounds;
+}
+function IntersectingTriangleBounds(part,min,max){
+  const b=TriangleBounds(part);let count=0;
+  for(let i=0;i<b.length;i+=6)if(b[i]<=max.x&&b[i+1]>=min.x&&b[i+2]<=max.y&&b[i+3]>=min.y&&b[i+4]<=max.z&&b[i+5]>=min.z)count++;
+  return count;
+}
 function PartBounds(list){const box=new THREE.Box3();for(const p of list)box.union(p.bounds);return box;}
 function SubBounds(points,predicate){const box=new THREE.Box3();for(const p of points)if(predicate(p))box.expandByPoint(p);return box;}
 const rayMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),rayCache=new Map();
@@ -744,6 +764,30 @@ for(let i=0;i<spec.spanCount;i++){
   const deckRivets=ByRole('Rivets',i),tieCount=Math.ceil(length/spec.sleeperSpacingM);
   const tieZ=k=>center-length/2+(k+.5)*length/tieCount;
   const up=new THREE.Vector3(0,1,0),down=new THREE.Vector3(0,-1,0);
+  // Measure actual embedded shafts, flange and contact on representative
+  // ties in every span. Modeled solids intentionally overlap where a drilled
+  // hole would be; the metal threads and holes are not claimed as geometry.
+  for(const railSide of [-1,1])for(const footSide of [-1,1]){
+    const outside=footSide===railSide,offsets=outside?[-.055,.055]:[0];
+    for(const dz of offsets)for(const k of [0,Math.floor(tieCount/2)-1,Math.floor(tieCount/2),tieCount-1]){
+      const rail=railSide*railCenter,x=rail+footSide*.085,z=tieZ(k)+dz,origin=new THREE.Vector3(x,.09,z);
+      const shaft=Hits(deckRivets,origin,down,.22),tie=Hits(sleepers,origin,down,.26),plate=Hits(trusses,origin,down,.10);
+      Check(shaft.length>=2&&tie.length>=2&&shaft.some(h=>Math.abs(h.point.y+spec.spikeEmbedDepthM)<.0005)&&tie.some(h=>Math.abs(h.point.y)<.0002)&&tie.some(h=>Math.abs(h.point.y+spec.sleeperDepthM)<.0002),'Each represented shaft enters its actual sleeper by 120 mm',{span:i+1,railSide,footSide,dz,k,shaftY:shaft.map(h=>h.point.y),tieY:tie.map(h=>h.point.y)});
+      const headTop=outside?.061:.05823;
+      Check(plate.some(h=>Math.abs(h.point.y-.010)<.0002)&&shaft.some(h=>Math.abs(h.point.y-headTop)<.0002),'Screw shaft crosses its tie plate and reaches its square head',{span:i+1,railSide,footSide,dz,k});
+      const flangeY=(outside?.028:.02523)+.0055;
+      for(const dir of [-1,1]){
+        const edge=Hits(deckRivets,new THREE.Vector3(x,flangeY,z),new THREE.Vector3(dir,0,0),.03);
+        Check(edge.length>0&&Math.abs(edge[0].distance-.022)<.0002,'Real circular flange has 44 mm diameter',{span:i+1,railSide,footSide,dz,k,dir,distance:edge[0]?.distance});
+      }
+      const rel=outside?.060:.064,cx=rail+footSide*rel,base=new THREE.Vector3(cx,.09,z),fastener=Hits(deckRivets,base,down,.09),railHit=Hits(railSide<0?west:east,base,down,.09);
+      Check(fastener.length>=2&&railHit.length>0&&Math.abs(fastener[fastener.length-1].point.y-railHit[0].point.y)<.00025,'Outer hook plate or inner flange reaches the real rail foot',{span:i+1,railSide,footSide,dz,k,fastenerY:fastener.map(h=>h.point.y),railY:railHit.map(h=>h.point.y)});
+      rayMaterial.side=THREE.FrontSide;
+      const visibleHead=Hits(deckRivets,origin,down,.09),visibleContact=Hits(deckRivets,base,down,.09);
+      Check(visibleHead.some(h=>Math.abs(h.point.y-headTop)<.0002)&&visibleContact.length>0,'Square head and rail-foot contact are outward visible with backface culling',{span:i+1,railSide,footSide,dz,k});
+      rayMaterial.side=THREE.DoubleSide;
+    }
+  }
   for(const side of [-1,1])for(const k of [tieCount/2-1,tieCount/2]){
     const x=side*railCenter,z=tieZ(k),tie=Hits(sleepers,new THREE.Vector3(x,-.10,z),up,.12),plate=Hits(trusses,new THREE.Vector3(x,-.01,z),up,.04),rail=Hits(side<0?west:east,new THREE.Vector3(x,.20,z),down,.22);
     Check(tie.some(h=>Math.abs(h.point.y)<.0002)&&plate.some(h=>Math.abs(h.point.y-.010)<.0002)&&rail.some(h=>Math.abs(h.point.y-.010)<.0002),'Both sleepers and tie plates support the suspended midspan joint without overlap',{span:i+1,side,k});
@@ -788,33 +832,49 @@ for(let i=0;i<spec.spanCount;i++){
   const after=Hits(planks,new THREE.Vector3(.4,.20,seamZ+.008),down,.21);
   const innerBefore=Hits(planks,new THREE.Vector3(.4,.20,seamZ-.0025),down,.21),innerAfter=Hits(planks,new THREE.Vector3(.4,.20,seamZ+.0025),down,.21);
   Check(seam.length===0&&innerBefore.length===0&&innerAfter.length===0&&before.length>0&&after.length>0,'Deck has a genuine 6 mm transverse joint with wood on both sides',{span:i+1,z:seamZ});
-  // Rail feet remain free of wood, and physical 1.5 mm clearance cutouts keep
-  // both dog-spike heads visible from above. The back strip still joins the
-  // neighbouring full-height edge boards rather than floating on its own.
+  // Rail feet remain free of wood. Physical local cutouts expose each square
+  // screw head while the back strip still joins its neighbouring boards.
   for(const rail of [-railCenter,railCenter]){
     Check(Hits(planks,new THREE.Vector3(rail,.20,center),down,.21).length===0,'Deck does not occupy the steel rail-foot channel',{span:i+1,rail});
-    for(const sign of [-1,1])for(const k of [2,Math.floor(tieCount/2),tieCount-3])for(const dz of [-.055,.055]){
-      const z=tieZ(k)+dz;
-      for(const offset of [.060,.080]){
-        const x=rail+sign*offset,origin=new THREE.Vector3(x,.20,z);
-        const spike=Hits(deckRivets,origin,down,.20),all=Hits([...planks,...deckRivets,...west,...east],origin,down,.20);
-        Check(spike.length>0&&all.length>0&&Math.abs(spike[0].point.y-.042)<.001&&Math.abs(all[0].distance-spike[0].distance)<.001,'Each real dog-spike head is the first visible surface from above',{span:i+1,rail,sign,k,dz,offset,spike:spike[0]?.point.y,first:all[0]?.point.y});
-      }
-      for(const offset of [.090,.105]){
-        const wood=Hits(planks,new THREE.Vector3(rail+sign*offset,.20,z),down,.20);
-        Check(wood.length>0&&Math.abs(wood[0].point.y-.075)<.001,'Narrow track-edge back strip remains covered by actual wood beside each spike',{span:i+1,rail,sign,k,dz,offset});
-      }
-    }
     for(const sign of [-1,1]){
-      const z=tieZ(Math.floor(tieCount/2))+.055;
-      const xInside=rail+sign*.0885,xOutside=rail+sign*.0900;
-      Check(Hits(planks,new THREE.Vector3(xInside,.20,z),down,.20).length===0&&Hits(planks,new THREE.Vector3(xOutside,.20,z),down,.20).length>0,'Spike opening leaves 1–2 mm lateral clearance and a real adjacent board',{span:i+1,rail,sign});
-      const x=rail+sign*.080,zInside=z+.0135,zOutside=z+.015;
-      Check(Hits(planks,new THREE.Vector3(x,.20,zInside),down,.20).length===0&&Hits(planks,new THREE.Vector3(x,.20,zOutside),down,.20).length>0,'Spike opening leaves 1–2 mm lengthwise clearance and a real adjacent board',{span:i+1,rail,sign});
+      const outside=sign*rail>0,offsets=outside?[-.055,.055]:[0],headTop=outside?.061:.05823;
+      for(const k of [2,Math.floor(tieCount/2),tieCount-3])for(const dz of offsets){
+        const z=tieZ(k)+dz,x=rail+sign*.085,origin=new THREE.Vector3(x,.20,z);
+        const spike=Hits(deckRivets,origin,down,.20),all=Hits([...planks,...deckRivets,...west,...east],origin,down,.20);
+        Check(spike.length>0&&all.length>0&&Math.abs(spike[0].point.y-headTop)<.0003&&Math.abs(all[0].distance-spike[0].distance)<.0003,'Each screw head is the first visible surface through its actual local opening',{span:i+1,rail,sign,k,dz,spike:spike[0]?.point.y,first:all[0]?.point.y});
+        for(const dx of [-.0085,.0085])for(const dzCorner of [-.0085,.0085]){
+          const p=new THREE.Vector3(x+dx,.20,z+dzCorner),head=Hits(deckRivets,p,down,.20),woodAtHead=Hits(planks,p,down,.20);
+          Check(head.some(h=>Math.abs(h.point.y-headTop)<.0003)&&woodAtHead.length===0,'All four corners of each square head fit the physical wood opening',{span:i+1,rail,sign,k,dz,dx,dzCorner});
+        }
+        // A 25 mm square, vertical tool envelope is a test fixture, not a
+        // historical tool claim. Nine sampled lines must remain free of wood
+        // down to Y=.040 around every represented screw on these ties.
+        for(const dx of [-.0125,0,.0125])for(const dzTool of [-.0125,0,.0125]){
+          const woodInTool=Hits(planks,new THREE.Vector3(x+dx,.20,z+dzTool),down,.16);
+          Check(woodInTool.length===0,'Local opening clears a 25 mm square axial tool envelope',{span:i+1,rail,sign,k,dz,dx,dzTool,woodY:woodInTool.map(h=>h.point.y)});
+        }
+        const toolMin=new THREE.Vector3(x-.0125,.040,z-.0125),toolMax=new THREE.Vector3(x+.0125,.080,z+.0125);
+        const woodCandidates=planks.reduce((sum,part)=>sum+IntersectingTriangleBounds(part,toolMin,toolMax),0);
+        Check(woodCandidates===0,'No actual deck triangle bounding box intersects the full 25 mm axial tool prism',{span:i+1,rail,sign,k,dz,woodCandidates});
+        const wood=Hits(planks,new THREE.Vector3(rail+sign*.105,.20,z),down,.20);
+        Check(wood.length>0&&Math.abs(wood[0].point.y-.075)<.001,'Actual back strip remains solid beside each screw head',{span:i+1,rail,sign,k,dz});
+      }
+      if(!outside)for(const k of [2,Math.floor(tieCount/2),tieCount-3])for(const dz of [-.055,.055]){
+        const absent=Hits(deckRivets,new THREE.Vector3(rail+sign*.085,.09,tieZ(k)+dz),down,.09);
+        Check(absent.length===0,'No extra outer-pattern screws appear on the single-spike inside of this rail seat',{span:i+1,rail,sign,k,dz});
+      }
+      const z=tieZ(Math.floor(tieCount/2))+offsets[0];
+      const xInside=rail+sign*.098,xOutside=rail+sign*.100;
+      Check(Hits(planks,new THREE.Vector3(xInside,.20,z),down,.20).length===0&&Hits(planks,new THREE.Vector3(xOutside,.20,z),down,.20).length>0,'Square-head opening has a narrow lateral clearance and adjacent wood',{span:i+1,rail,sign});
+      const x=rail+sign*.085,zInside=z+.0135,zOutside=z+.0145;
+      Check(Hits(planks,new THREE.Vector3(x,.20,zInside),down,.20).length===0&&Hits(planks,new THREE.Vector3(x,.20,zOutside),down,.20).length>0,'Square-head opening has a narrow lengthwise clearance and adjacent wood',{span:i+1,rail,sign});
       const backX=rail+sign*.102,tie=tieZ(Math.floor(tieCount/2));
       for(const along of [-1,1]){
         const joins=Hits(planks,new THREE.Vector3(backX,.055,tie),new THREE.Vector3(0,0,along),.12);
         Check(joins.filter(hit=>Math.abs(hit.distance-.1005)<.001).length>=2,'Narrow backing strip physically butts against its neighbouring supported boards',{span:i+1,rail,sign,along,distances:joins.slice(0,3).map(h=>h.distance)});
+        const bearingX=rail+sign*.112,bearingZ=tie+along*.105,bearingOrigin=new THREE.Vector3(bearingX,.08,bearingZ);
+        const endWood=Hits(planks,bearingOrigin,down,.08),endBearer=Hits(bearers,bearingOrigin,down,.08);
+        Check(endWood.length>=2&&endBearer.length>=2&&Math.abs(endWood[endWood.length-1].point.y-.03)<.0003&&Math.abs(endBearer[0].point.y-.03)<.0003,'Backing strip joins a deck portion that bears directly on its longitudinal support at both ends',{span:i+1,rail,sign,along,wood:endWood.map(h=>h.point.y),bearer:endBearer.map(h=>h.point.y)});
       }
     }
   }

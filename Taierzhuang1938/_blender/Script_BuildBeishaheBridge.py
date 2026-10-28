@@ -473,8 +473,9 @@ def BuildDeck(length, count, seed):
         row = max(0, min(boardCount - 1, bisect.bisect_right(rowBoundaries, z) - 1))
         return rowTints[row]
     # Along each foot, retain enough wood for a walking surface without ever
-    # crossing the foot. At tie plates the underside rises to Y=.042 and
-    # openings expose both spike heads; the back strip joins adjacent boards.
+    # crossing the foot. At tie plates the underside rises to Y=.042; local
+    # openings expose the inferred screw-spike square heads. Each back strip
+    # remains a continuous connection to its adjacent supported boards.
     for rail in [-railX, railX]:
         for face in [-1, 1]:
             xa, xb = sorted((rail + face * footEdge, rail + face * bufferOuter))
@@ -485,17 +486,28 @@ def BuildDeck(length, count, seed):
                 if a > cursor:
                     planks.Box(((xa + xb) / 2, .0525, (cursor + a) / 2),
                                (xb - xa, .045, a - cursor), uvOffset=uvOffset, grain="deck", tint=TintAt((cursor + a) / 2))
-                # Expose both dog-spike heads by cutting their projection out
-                # of the rail-facing 23 mm strip, with 1.5 mm extra clearance.
-                # The remaining 26 mm back strip still bridges to its neighbours.
-                frontA, frontB = sorted((rail + face * footEdge, rail + face * .089))
-                backA, backB = sorted((rail + face * .089, rail + face * bufferOuter))
+                # A local 28 mm long opening clears a 25 mm square axial tool
+                # envelope around the head. The round flange lies below this
+                # wood's Y=.042 underside; a 16 mm back strip still connects
+                # to neighbouring supported deck. The envelope is an authored
+                # access assumption, not a specified historic wrench.
+                frontA, frontB = sorted((rail + face * footEdge, rail + face * .099))
+                backA, backB = sorted((rail + face * .099, rail + face * bufferOuter))
                 capTint = TintAt(z)
                 planks.Box(((backA + backB) / 2, .0585, (a + b) / 2),
                            (backB - backA, .033, b - a), uvOffset=uvOffset, grain="deck", tint=capTint)
-                for za, zb in [(a, z - .069), (z - .041, z + .041), (z + .069, b)]:
-                    planks.Box(((frontA + frontB) / 2, .0585, (za + zb) / 2),
-                               (frontB - frontA, .033, zb - za), uvOffset=uvOffset, grain="deck", tint=capTint)
+                outside = face * rail > 0
+                positions = [z - .055, z + .055] if outside else [z]
+                nextStart = a
+                for spikeZ in positions:
+                    nextEnd = spikeZ - .014
+                    if nextEnd > nextStart:
+                        planks.Box(((frontA + frontB) / 2, .0585, (nextStart + nextEnd) / 2),
+                                   (frontB - frontA, .033, nextEnd - nextStart), uvOffset=uvOffset, grain="deck", tint=capTint)
+                    nextStart = spikeZ + .014
+                if b > nextStart:
+                    planks.Box(((frontA + frontB) / 2, .0585, (nextStart + b) / 2),
+                               (frontB - frontA, .033, b - nextStart), uvOffset=uvOffset, grain="deck", tint=capTint)
                 cursor = b
             if cursor < length / 2:
                 planks.Box(((xa + xb) / 2, .0525, (cursor + length / 2) / 2),
@@ -734,15 +746,30 @@ def BuildSpan():
             # Rail-foot lower face is Y=.010; the steel tie plate rests on
             # the sleeper and touches that face without a solid overlap.
             steel.Box((x, 0.005, z), (0.22, 0.010, 0.20))
-            # Dog spikes: the head overlaps the rail foot, the shaft enters timber.
-            for dx in [-1, 1]:
-                for dz in [-0.055, 0.055]:
-                    fasteners.Box((x + dx * 0.086, 0.02, z + dz), (0.014, 0.04, 0.014))
-                    headX = x + dx * 0.069
-                    headProfile = [(headX - 0.0185, 0.024), (headX + 0.0185, 0.024),
-                                   (headX + 0.0185, 0.036), (headX + 0.015, 0.042),
-                                   (headX - 0.015, 0.042), (headX - 0.0185, 0.036)]
-                    fasteners.ExtrudedProfile(headProfile, z + dz - 0.0125, z + dz + 0.0125)
+            # Inferred Prussian-style square-head screw spikes: two outside,
+            # one inside, with circular flanges and an outside hook plate.
+            # The 1913 German illustration is an engineering analogy, not a
+            # Beishahe-specific drawing. Hidden shafts are smooth solids;
+            # threads/holes are not modeled and deliberate overlap with the
+            # unbored wood/steel plate represents their embedment.
+            for face in [-1, 1]:
+                outside = face == side
+                for dz in ([-.055, .055] if outside else [0]):
+                    sz = z + dz
+                    sx = x + face * .085
+                    embed = SPEC["spikeEmbedDepthM"]
+                    fasteners.Cylinder((sx, (.03 - embed) / 2, sz), (0, 1, 0), .011, .03 + embed, sides=8)
+                    if outside:
+                        railTop = .025 + (.065 - .055) * (.012 / .053)
+                        local = [(.055, railTop), (.065, .025), (.068, .020), (.107, .020),
+                                 (.107, .028), (.070, .028), (.065, .031), (.055, railTop + .006)]
+                        profile = [(x + face * px, py) for px, py in local]
+                        if face < 0:
+                            profile.reverse()
+                        fasteners.ExtrudedProfile(profile, sz - .024, sz + .024)
+                    flangeBottom = .028 if outside else .02523
+                    fasteners.Cylinder((sx, flangeBottom + .0055, sz), (0, 1, 0), .022, .011, sides=8)
+                    fasteners.Box((sx, flangeBottom + .022, sz), (.019, .022, .019))
     for rail, side in [(west, -1), (east, 1)]:
         x = side * railX
         # Flat-bottom rail, with tapered web and rounded-head facets. The
@@ -1099,6 +1126,7 @@ def Rebuild():
                 "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
                 "jointTransitions": "Rail and wooden deck splice details are authored to maintain a usable crossing; their exact construction is not established by a confirmed 1938 Beishahe bridge photograph.",
                 "railJoints": "The 1937 route record gives nominal 10 m rails, while joint positions at midspan and supports, the 6 mm gaps, section dimensions and hardware are authored design assumptions. Represented through-bolt shafts overlap solid undrilled rail webs and plates.",
+                "railFasteners": "Square-head screw-spike shape, 120 mm sleeper embed, two outside and one inside, and outside hook plates are authored interpretations of early German railway references, not established for the 1938 Beishahe bridge. Solid spike shafts intentionally overlap undrilled sleeper and tie-plate geometry; holes and threads are not modeled.",
                 "guardTimbers": "Two low outer longitudinal timbers are an authored interpretation of a 1941 Jinpu railway bridge photograph at an unknown location; their use and dimensions at Beishahe are unconfirmed."
             },
             "deck": {"clearWidthM": SPEC["sleeperLengthM"], "plankThicknessM": .045, "topY": .075,
@@ -1110,6 +1138,12 @@ def Rebuild():
                            "fishplateLengthM": .36, "boltStationsM": [-.13, -.055, .055, .13],
                            "holesModeled": False,
                            "interpretation": "Spacing follows the 1937 Tianjin-Xuzhou line description; locations, joint gap, joint and rail sections are unverified design assumptions."},
+            "railFasteners": {"spikeEmbedDepthM": SPEC["spikeEmbedDepthM"], "shaftDiameterM": .022,
+                              "flangeDiameterM": .044, "squareHeadWidthM": .019,
+                              "outsideCountPerRailSeat": 2, "insideCountPerRailSeat": 1,
+                              "toolSquareEnvelopeM": .025,
+                              "holesModeled": False, "threadsModeled": False,
+                              "interpretation": "Prussian-style screw-spike form, sleeper embed and axial tool envelope are authored analogies, not confirmed bridge-specific details."},
             "guardTimbers": {"centerOffsetM": 1.25, "widthM": .14, "bottomY": .075,
                              "topY": .135, "segmentsPerSpan": 5, "spanJointClearanceM": .002,
                              "interpretation": "Design inferred from an unidentified 1941 Jinpu railway bridge; not evidence for Beishahe's exact construction."},
