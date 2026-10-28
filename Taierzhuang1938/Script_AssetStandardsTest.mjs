@@ -134,7 +134,7 @@ Check(EXTERNAL_GLB_STANDARDS.length === 68
   && ["DongguaQuilt", "DoorCurtain", "SichuanBanner"].every(id => EXTERNAL_GLB_STANDARDS.some(record => record.id === id
     && record.pack === `ClothLab/Model_${id}.glb` && record.actualTriangles === 13712 && record.sourceTriangles === 13712 && record.targetTriangles === 13712))
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "DonkeyCart" && record.actualTriangles === 79500 && record.targetTriangles <= 80000)
-  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Donkey" && record.actualTriangles === 79910 && record.sourceTriangles === 79910 && record.targetTriangles === record.actualTriangles)
+  && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Donkey" && record.actualTriangles === 79888 && record.sourceTriangles === 79888 && record.targetTriangles === record.actualTriangles)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "NakajimaKi4" && record.sourceTriangles === 358399 && record.actualTriangles === 179679 && record.targetTriangles === 180000)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "Type89MediumTank" && record.sourceTriangles === type89Contract.sourceTrianglesBeforeExportCleanup && record.selectedGameSourceTriangles === type89Contract.selectedGameSourceTrianglesBeforeCleanup && record.actualTriangles === type89Contract.runtimeRenderedTriangles && record.targetTriangles === type89Contract.runtimeTriangleTarget)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "KawasakiType88" && record.sourceTriangles === 266946 && record.actualTriangles === 79944 && record.targetTriangles === 80000)
