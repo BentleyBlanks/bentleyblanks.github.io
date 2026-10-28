@@ -903,8 +903,24 @@ def BuildPier(seed=1938):
                 target.BeveledBox((side * (halfx - 0.20), y, (left + right) / 2), (0.42, ch - 0.014, right - left - 0.014),
                                  rng.uniform(0.006, 0.014), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)),
                                  tint=PierTint(StoneTint(tintRng), floor, ch, seed, damp), uvTurn=turnRng.randrange(4))
-    cap.BeveledBox((0, top - 0.125, 0), (4.55, 0.25, 2.25), 0.018,
-                   uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)), tint=StoneTint(tintRng))
+    # Preserve the original pier/foundation RNG sequence while giving the
+    # capstone study independent random phases, tints and rotations.
+    originalCapOffset = (rng.uniform(0, 8), rng.uniform(0, 8))
+    originalCapTint = StoneTint(tintRng)
+    capRng = random.Random(seed + 32819)
+    capTintRng = random.Random(seed + 32820)
+    # The cap is an authored four-stone interpretation of the detail study,
+    # not an observation of the lost Beishahe bridge. A 25 mm inset solid
+    # base closes the physical joints and rests on the continuous pier core.
+    # Top joints are kept clear of the bearing footprints at x=+/-1.85 m.
+    cap.Box((0, top - .2375, 0), (4.55, .025, 2.25), tint=originalCapTint)
+    capWidth, capCount, joint = 4.55, 4, .014
+    for k in range(capCount):
+        left = -capWidth / 2 + k * capWidth / capCount + (joint / 2 if k else 0)
+        right = -capWidth / 2 + (k + 1) * capWidth / capCount - (joint / 2 if k < capCount - 1 else 0)
+        offset = originalCapOffset if k == 0 else (capRng.uniform(0, 8), capRng.uniform(0, 8))
+        cap.BeveledBox(((left + right) / 2, top - .1125, 0), (right - left, .225, 2.25), .012,
+                       uvOffset=offset, tint=StoneTint(capTintRng), uvTurn=capRng.randrange(4))
     stone.BeveledBox((0, floor - 0.13, 0), (4.7, 0.26, 2.7), 0.018,
                      uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)), tint=StoneTint(tintRng))
     return stone, dampStone, cap
@@ -1123,6 +1139,7 @@ def Rebuild():
             "reconstructionScope": SPEC["reconstructionScope"], "historicalReferences": SPEC["historicalReferences"],
             "materialInterpretation": {
                 "pierDamp": "A continuous pale brown-gray damp-to-dry transition on the lower pier courses is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
+                "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
                 "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
                 "jointTransitions": "Rail and wooden deck splice details are authored to maintain a usable crossing; their exact construction is not established by a confirmed 1938 Beishahe bridge photograph.",
                 "railJoints": "The 1937 route record gives nominal 10 m rails, while joint positions at midspan and supports, the 6 mm gaps, section dimensions and hardware are authored design assumptions. Represented through-bolt shafts overlap solid undrilled rail webs and plates.",
@@ -1133,6 +1150,8 @@ def Rebuild():
                      "railFootClearanceM": .001, "jointWidthM": .006,
                      "jointEndClearanceM": .002, "jointSpliceLengthM": .36,
                      "bearerBottomY": 0, "bearerTopY": .03, "grainAxis": "X"},
+            "pierCap": {"stoneCount": 4, "jointWidthM": .014, "baseThicknessM": .025,
+                        "interpretation": "Authored construction; original Beishahe capstones are unconfirmed."},
             "railJoints": {"nominalRailLengthM": SPEC["railNominalLengthM"], "gapM": SPEC["railJointGapM"],
                            "jointCentersPerSpan": [0], "supportAxisJointCount": SPEC["spanCount"] - 1,
                            "fishplateLengthM": .36, "boltStationsM": [-.13, -.055, .055, .13],

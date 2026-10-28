@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026102818",
+  "version": "2026102819",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026102818",
+    "version": "2026102819",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "X east, Y up, Z south; origin at bridge center, sleeper top Y=0",
@@ -615,11 +615,11 @@
       "railHeightM": 0.14
     }
   ],
-  "triangles": 1300736,
+  "triangles": 1302608,
   "meshObjects": 354,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
-  "glbBytes": 16850876,
-  "glbSha256": "2ae464d01d9ac41ba2c8415812bfb13634eb40efd306090ff929dff3edd693c9",
+  "glbBytes": 16892940,
+  "glbSha256": "ebdcd1e370ea3f0343fc74f10163a3ada911705f3565384e64c1b8a08e163c9c",
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
@@ -662,6 +662,7 @@
   ],
   "materialInterpretation": {
     "pierDamp": "A continuous pale brown-gray damp-to-dry transition on the lower pier courses is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
+    "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
     "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
     "jointTransitions": "Rail and wooden deck splice details are authored to maintain a usable crossing; their exact construction is not established by a confirmed 1938 Beishahe bridge photograph.",
     "railJoints": "The 1937 route record gives nominal 10 m rails, while joint positions at midspan and supports, the 6 mm gaps, section dimensions and hardware are authored design assumptions. Represented through-bolt shafts overlap solid undrilled rail webs and plates.",
@@ -679,6 +680,12 @@
     "bearerBottomY": 0,
     "bearerTopY": 0.03,
     "grainAxis": "X"
+  },
+  "pierCap": {
+    "stoneCount": 4,
+    "jointWidthM": 0.014,
+    "baseThicknessM": 0.025,
+    "interpretation": "Authored construction; original Beishahe capstones are unconfirmed."
   },
   "railJoints": {
     "nominalRailLengthM": 10,

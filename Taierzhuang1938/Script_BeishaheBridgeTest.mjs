@@ -940,6 +940,48 @@ for(let i=0;i<spec.spanCount;i++){
   }
 }
 Check(bearingCount===56,'All fifty-six span-end bearing load paths are inspected');
+// Capstones are a visual construction inference, not established history.
+// Inspect the exported faces rather than accepting the sidecar description:
+// the 52 interior bearing feet must sit on stone across their footprints,
+// real open joints must separate the capstones, and a solid base must close
+// each joint beneath the visible depth and connect to the pier core.
+Check(data.pierCap?.stoneCount===4&&/unconfirmed/i.test(data.pierCap?.interpretation??''),'Pier cap detail remains an authored design');
+for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
+  const centerZ=-spec.lengthM/2+supportIndex*spec.spanPitchM;
+  const caps=ByRole('Cap').filter(p=>p.node.extras?.supportIndex===supportIndex);
+  const dry=ByRole('Pier').filter(p=>p.node.extras?.supportIndex===supportIndex);
+  const down=new THREE.Vector3(0,-1,0),top=spec.pierTopY;
+  Check(caps.length===1&&dry.length===1,'Interior support has an actual cap and pier core',supportIndex);
+  for(const side of [-1,1])for(const direction of [-1,1]){
+    const spanIndex=direction<0?supportIndex-1:supportIndex;
+    const feet=ByRole('Bearings',spanIndex),bearingZ=centerZ+direction*.26,bearingX=side*spec.trussCenterOffsetM;
+    for(const dx of [-.24,0,.24])for(const dz of [-.29,0,.29]){
+      const origin=new THREE.Vector3(bearingX+dx,top+.20,bearingZ+dz);
+      const shoe=Hits(feet,origin,down,.40),cap=Hits(caps,origin,down,.40);
+      Check(shoe.some(h=>Math.abs(h.point.y-top)<.0005)&&cap.some(h=>Math.abs(h.point.y-top)<.0005),
+        'The actual bearing foot and cap touch over their sampled footprint',{supportIndex,side,direction,dx,dz});
+    }
+  }
+  for(const seamX of [-1.1375,0,1.1375])for(const dz of [-.9,0,.9]){
+    const z=centerZ+dz,origin=new THREE.Vector3(seamX,top+.05,z);
+    const seam=Hits(caps,origin,down,.32);
+    const left=Hits(caps,new THREE.Vector3(seamX-.03,top+.05,z),down,.32);
+    const right=Hits(caps,new THREE.Vector3(seamX+.03,top+.05,z),down,.32);
+    Check(seam.length>=2&&Math.abs(seam[0].point.y-(top-.225))<.001&&Math.abs(seam[seam.length-1].point.y-(top-.25))<.001,
+      'A real recessed cap joint is closed below by solid base material',{supportIndex,seamX,dz,heights:seam.map(h=>h.point.y)});
+    Check(left.some(h=>Math.abs(h.point.y-top)<.001)&&right.some(h=>Math.abs(h.point.y-top)<.001),
+      'Solid capstone tops flank each physical joint',{supportIndex,seamX,dz});
+    for(const direction of [-1,1]){
+      const edge=Hits(caps,new THREE.Vector3(seamX,top-.10,z),new THREE.Vector3(direction,0,0),.05);
+      Check(edge.length>0&&Math.abs(edge[0].distance-.007)<.001,'Capstone joint has two real separated vertical faces',{supportIndex,seamX,dz,direction,distance:edge[0]?.distance});
+    }
+    if(dz===0){
+      const capBase=Hits(caps,new THREE.Vector3(seamX,top-.20,z),down,.10),core=Hits(dry,new THREE.Vector3(seamX,top-.20,z),down,.30);
+      Check(capBase.some(h=>Math.abs(h.point.y-(top-.25))<.001)&&core.some(h=>Math.abs(h.point.y-(top-.25))<.001),
+        'Cap base meets the actual pier core beneath each seam',{supportIndex,seamX,dz});
+    }
+  }
+}
 // Truss members still stop at each structural expansion joint. Separate real
 // rail ends, wooden deck and bolted support bridge the structural gap; there
 // is a single rail joint rather than an unphysical 116 mm rail insert.
