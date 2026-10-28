@@ -11,6 +11,7 @@ import { T } from "./Script_Text.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";
 import { ShellImpactRange } from "./Script_ShellImpactRange.mjs";
 import { BattleReactionLab } from "./Script_BattleReactionLab.mjs";
+import { BattleReactionPavedYard } from "./Script_BattleReactionPavedYard.mjs";
 import {
   BATTLE_REACTION_STANDS, BATTLE_REACTION_DEFAULT_STAND, BATTLE_REACTION_DISTANCES, BATTLE_REACTION_DEFAULT_DISTANCE,
   BATTLE_REACTION_BEARINGS, BATTLE_REACTION_DEFAULT_BEARING, BATTLE_REACTION_MUNITION_SPECS, BATTLE_REACTION_DEFAULT_MUNITION,
@@ -44,6 +45,8 @@ export class BattleReactionRange {
     this.last = null;
     this.peak = null;
     this.impact.SelectMunition(this.munitionId);
+    // 砖铺场院（站位 paved）：炸在砖地上尘少、不挖坑，看得清人被冲击波推倒
+    this.pavedYard = new BattleReactionPavedYard(host);
     this.ApplyToggles();
     this.lab = new BattleReactionLab(this);
     this.api = {
@@ -64,6 +67,7 @@ export class BattleReactionRange {
       State: () => this.State(),
       Flinch: () => this.host.player?.flinch?.State?.() || null,
       Ears: () => this.host.audio?.EarState?.() || null,
+      PavedYard: () => this.pavedYard?.State() || null,
     };
     this.UpdateMarker();
     this.Paint();
@@ -331,6 +335,7 @@ export class BattleReactionRange {
   Dispose() {
     this.queue.length = 0;
     this.lab?.Dispose(); this.lab = null;
+    this.pavedYard?.Dispose(); this.pavedYard = null;
     this.impact?.Dispose(); this.impact = null;
     this.host.player?.SetBlastReaction?.(false);
     this.host.audio?.SetEarModel?.("legacy");

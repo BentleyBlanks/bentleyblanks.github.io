@@ -43,6 +43,7 @@ export const TEXT = Object.freeze({
   "battleReaction.stand.trench": "沟里",
   "battleReaction.stand.rear": "沟后空地",
   "battleReaction.stand.open": "沟前开阔地",
+  "battleReaction.stand.paved": "砖铺场院（尘少）",
 
   // ── 开关 ────────────────────────────────────────────────────────────────
   "battleReaction.switch.reaction": "人物反应（眨眼、扭头、低头、收枪、手抖）",

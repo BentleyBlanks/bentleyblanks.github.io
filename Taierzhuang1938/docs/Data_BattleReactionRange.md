@@ -25,6 +25,14 @@
 | `trench` | 沟里 | (−15, −19) | 射击壕直段沟底（约 −2.0 m），眼睛在沟沿以下：沟外的爆炸被沟壁挡住，算遮挡 |
 | `rear` | 沟后空地 | (−15, −6) | 平地，没遮没挡 |
 | `open` | 沟前开阔地 | (−2, −45) | 平地，四面空旷 |
+| `paved` | 砖铺场院（尘少） | (0, 65) | 60 × 60 m 青砖地的正中（2026-10-28），看被冲击波推倒用 |
+
+**砖铺场院**（2026-10-28，用户：「新增一块扬尘不大的地面，比如湿润一点或者砖块地，现在有扬尘不方便看到被推倒的效果」）：
+`Script_BattleReactionPavedYard` 在沟后南边铺一块贴地形的青砖面（数据 `Data_BattleReactionRange.BATTLE_REACTION_PAVED`，离壕沟和布景都在 45 m 以外）。
+落在砖地里的爆炸按 `GROUND_IMPACT_SURFACES.brick` 出尘（掀起来的尘是黄土地的 8%、抛射土柱 12%，碎块是砖色；`Vfx.SetGroundSurfaceResolver`），
+而且**不挖弹坑**（`TerrainDeformationView.noCraterAt`；砖面是一整片，挖下去会悬空，简化）。实测同一发：150 榴弹 5 m 掀起的尘约为黄土地的 1/15，
+250 kg 炸弹 12 m 约 1/15；人倒下后仰面看得见天、脸朝下看得见砖面。炸点在砖地外（比如 35 m、60 m 档）仍按黄土地出尘。
+曲射炮弹的发射点原来固定在落点北侧 120 m，落点在场院时正好压在碉堡里、一出膛就撞上；现在北侧被压着就依次换西、东、南侧（`ShellImpactRange.DeliverLob`）。
 
 ## 面板与引爆
 
@@ -87,7 +95,8 @@
 | `Fire(munitionId?, { distanceM?, bearing?, quiet? })` | 在人身边引爆一发（bearing 是方位 id 或相对朝向的度数，右为正）；返回记录，命中后 `State().records` 里补 `exposure` |
 | `Barrage({ count?, munitionId? })` | 连续炮击 |
 | `Clear()` | 清在途弹 / 排队 / 弹坑 / 扬尘，人的反应与耳朵复位 |
-| `Stand(id)` | `trench` / `rear` / `open` |
+| `Stand(id)` | `trench` / `rear` / `open` / `paved` |
+| `PavedYard()` | 砖铺场院的位置、尺寸、地面类型 |
 | `SetMunition(id)` / `SetDistance(m)` / `SetBearing(id)` | 面板所选 |
 | `SetReaction(on)` / `SetEarModel("trauma"|"legacy")` / `SetDust(on)` / `ShowMarker(on)` / `ShowPanel(on)` | 开关 |
 | `SetTimeScale(s)` | 0.25 / 0.5 / 1 |

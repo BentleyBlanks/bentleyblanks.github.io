@@ -5,7 +5,9 @@ import assert from "node:assert/strict";
 import { BlastExposure, BlastBearing, ChargeKgFor, PeakOverpressureKPa, PeakSplDb, WindowStrength } from "./Script_BlastExposure.mjs";
 import { BlastFlinch } from "./Script_BlastFlinch.mjs";
 import { BLAST_EXPOSURE, BLAST_FLINCH, EAR_TRAUMA } from "./Data_Tuning_BlastReaction.mjs";
-import { BATTLE_REACTION_STANDS, BATTLE_REACTION_MUNITION_SPECS, ReactionPoint, BATTLE_REACTION_RANGE_PHASE } from "./Data_BattleReactionRange.mjs";
+import { BATTLE_REACTION_STANDS, BATTLE_REACTION_MUNITION_SPECS, ReactionPoint, BATTLE_REACTION_RANGE_PHASE, BATTLE_REACTION_PAVED, InPavedYard } from "./Data_BattleReactionRange.mjs";
+import { SHELL_IMPACT_TRENCH_SEGMENTS, SHELL_IMPACT_TREES, SHELL_IMPACT_DRUMS, SHELL_IMPACT_PROPS, SHELL_IMPACT_WORLD } from "./Data_ShellImpactRange.mjs";
+import { GROUND_IMPACT_SURFACES } from "./Data_Tuning_GroundImpact.mjs";
 
 let groups = 0;
 const Group = (name, fn) => { fn(); groups += 1; console.log(`ok  ${name}`); };
@@ -204,6 +206,18 @@ Group("测试场数据：站位、弹种、落点换算、开关", () => {
   const front = ReactionPoint({ x: 0, z: 0 }, Math.PI / 2, 0, 10);
   assert.ok(Math.abs(front.x + 10) < 1e-9, "朝西时正前 10 m 在西");
   assert.equal(EAR_TRAUMA.ringNodes, 14, "一条鸣响 14 个节点（Script_AudioEarTrauma.BuildRing）");
+});
+
+Group("砖铺场院：站位在砖地正中、离壕沟和布景够远、砖地出尘不到黄土地一成", () => {
+  const pad = BATTLE_REACTION_PAVED, stand = BATTLE_REACTION_STANDS.find((s) => s.id === "paved");
+  assert.ok(stand && stand.x === pad.x && stand.z === pad.z, "站位在场院正中");
+  assert.ok(InPavedYard(pad.x + pad.halfX - 0.1, pad.z) && !InPavedYard(pad.x + pad.halfX + 0.1, pad.z), "边界");
+  const near = (x, z) => Math.abs(x - pad.x) < pad.halfX + 3 && Math.abs(z - pad.z) < pad.halfZ + 3;
+  for (const seg of SHELL_IMPACT_TRENCH_SEGMENTS) for (const p of seg.points) assert.ok(!near(p.x, p.z), `壕沟 ${seg.id} 不进场院`);
+  for (const e of [...SHELL_IMPACT_TREES, ...SHELL_IMPACT_DRUMS, ...SHELL_IMPACT_PROPS]) assert.ok(!near(e.x, e.z), `布景 ${e.id} 不进场院`);
+  assert.ok(pad.x - pad.halfX > SHELL_IMPACT_WORLD.minX && pad.z + pad.halfZ < SHELL_IMPACT_WORLD.maxZ, "在地皮里");
+  const brick = GROUND_IMPACT_SURFACES[pad.surface];
+  assert.ok(brick && brick.massScale < 0.1 * GROUND_IMPACT_SURFACES.loess.massScale && brick.ejecta < 0.2, "砖地出尘少");
 });
 
 console.log(`BlastReactionTest: ${groups} groups passed`);

@@ -14,11 +14,29 @@ export const BATTLE_REACTION_RANGE_ID = "BattleReactionRange";
  *   trench 射击壕直段沟底（沟深约 2 m，眼睛在沟沿以下：沟外的爆炸被沟壁挡住，算遮挡）
  *   rear   沟后空地（站在地面上，没遮没挡）
  *   open   沟前开阔地（同上，四面空旷）
+ *   paved  沟后南边的砖铺场院（BATTLE_REACTION_PAVED）：砖地上炸起来的尘少得多，看得清人被冲击波推倒
  */
+/**
+ * 砖铺场院（2026-10-28，用户：「新增一块扬尘不大的地面，比如湿润一点、或者砖块地，现在有扬尘不方便看到被推倒的效果」）。
+ * 局部坐标中心 (0, 65)、60 × 60 m，离最近的壕沟 45 m 以上、四周没有布景。
+ * 落在这块砖地里的爆炸：扬尘按 GROUND_IMPACT_SURFACES.brick（掀起来的土只有黄土地的一成多），不挖弹坑（砖面不重算，简化）。
+ */
+export const BATTLE_REACTION_PAVED = Object.freeze({
+  id: "paved", ...L(0, 65), local: Object.freeze({ x: 0, z: 65 }), halfX: 30, halfZ: 30, surface: "brick",
+  /** 一块砖的长 × 宽（米，青砖平铺、错缝），贴图一张铺几块。 */
+  brickM: Object.freeze([0.26, 0.125]), lift: 0.025,
+});
+
+/** 一个世界坐标点在不在砖铺场院里（Vfx 的地面类型、弹坑闸共用）。 */
+export function InPavedYard(x, z, pad = BATTLE_REACTION_PAVED) {
+  return Math.abs(x - pad.x) <= pad.halfX && Math.abs(z - pad.z) <= pad.halfZ;
+}
+
 export const BATTLE_REACTION_STANDS = Object.freeze([
   Object.freeze({ id: "trench", ...L(-15, -19), local: Object.freeze({ x: -15, z: -19 }), ry: 0 }),
   Object.freeze({ id: "rear", ...L(-15, -6), local: Object.freeze({ x: -15, z: -6 }), ry: 0 }),
   Object.freeze({ id: "open", ...L(-2, -45), local: Object.freeze({ x: -2, z: -45 }), ry: 0 }),
+  Object.freeze({ id: "paved", ...L(0, 65), local: Object.freeze({ x: 0, z: 65 }), ry: 0 }),
 ]);
 export const BATTLE_REACTION_DEFAULT_STAND = "trench";
 

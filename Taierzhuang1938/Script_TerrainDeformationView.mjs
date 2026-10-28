@@ -641,6 +641,8 @@ export class TerrainDeformationView {
     }
   }
   ApplyBlast(position, kind) {
+    // 不挖坑的局部地面（人物战场反应测试场的砖铺场院）：关卡交进来的闸，离开本关清掉
+    if (this.noCraterAt?.(position.x, position.z)) return null;
     const colliders = this.field.colliders?.length ?? 0;
     if (colliders !== this.maskColliders) this.InvalidateDeformMask();
     const start = performance.now();

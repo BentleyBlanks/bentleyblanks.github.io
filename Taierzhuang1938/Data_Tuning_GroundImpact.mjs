@@ -160,6 +160,10 @@ export const GROUND_IMPACT_SURFACES = Object.freeze({
   // skin：震起来的地表浮土，和地面同一种土色（偏浅、偏灰一点），不是炸出来的黑土
   // 2026-10-21 用户：「两个尘土之间的颜色应该接近一些，现在看起来像两个组合起来的」—— 土柱的黑褐调亮、细尘调暗，往中间靠
   loess: Object.freeze({ fresh: Object.freeze([0.2, 0.165, 0.13]), dust: Object.freeze([0.33, 0.29, 0.24]), skin: Object.freeze([0.275, 0.24, 0.19]), massScale: 1 }),
+  // 砖铺地（2026-10-28，人物战场反应测试场的砖铺场院）：表面是砖，没有浮土可掀，起来的只有砖缝灰浆、碎砖末与炸药烟；
+  // 量取黄土地的不到一成，颜色偏青灰带一点砖红。ejecta = 抛射土柱的条数比例（砖面上几乎没有土可甩）。
+  brick: Object.freeze({ fresh: Object.freeze([0.16, 0.14, 0.13]), dust: Object.freeze([0.3, 0.28, 0.26]), skin: Object.freeze([0.27, 0.24, 0.22]),
+    massScale: 0.08, ejecta: 0.12 }),
 });
 
 /**

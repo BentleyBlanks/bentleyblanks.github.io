@@ -236,12 +236,29 @@ export class ShellImpactRange {
     record.impact = [point.x, point.y + BLAST_LIFT_M, point.z]; record.impactedAt = this.clock;
   }
 
-  /** 高抛 / 野炮：从落点北侧 rangeM 远的地方，按落角反推的弹道进来。 */
+  /**
+   * 高抛 / 野炮：从落点北侧 rangeM 远的地方，按落角反推的弹道进来。
+   * 北侧那个起点被东西压着（落点在场地南边时正好压在碉堡、土垄里，炮弹一出来就撞上）就依次换西、东、南侧。
+   */
   DeliverLob(spec, point, record) {
     const range = spec.rangeM, flight = LobFlightS(range, spec.angleDeg);
-    const from = new THREE.Vector3(point.x, point.y + ORIGIN_RISE_M, point.z - range);
+    const from = new THREE.Vector3();
+    for (const [dx, dz] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
+      from.set(point.x + dx * range, point.y + ORIGIN_RISE_M, point.z + dz * range);
+      if (this.LaunchClear(from)) break;
+    }
     record.flightS = flight; record.from = from.toArray();
     this.LaunchShell(spec, from, point, flight, record);
+  }
+
+  /** 起点上方（含起点）没有地面、布景压着：从上往下打一条射线，打到的东西不能高过起点。 */
+  LaunchClear(from) {
+    const bf = this.host.battlefield;
+    if (this.Ground(from.x, from.z) > from.y - 0.5) return false;
+    if (!bf?.Raycast) return true;
+    const top = from.clone(); top.y += 40;
+    const hit = bf.Raycast(top, new THREE.Vector3(0, -1, 0), 40, { terrain: true });
+    return !hit || hit.t >= 40 - 0.05;
   }
 
   /** 战车炮平射：从场地东侧阵地的炮口低伸飞来。 */

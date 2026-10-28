@@ -48,7 +48,7 @@ import { BlastScale, LinearDragAt } from "./Script_BombBallistics.mjs";
 import { DustFieldSystem } from "./Script_DustFieldRenderer.mjs";
 import { DustOcclusionUniforms } from "./Script_DustOcclusion.mjs";
 import { DustTuningFor } from "./Script_DustFlow.mjs";
-import { GROUND_IMPACT_BURSTS } from "./Data_Tuning_GroundImpact.mjs";
+import { GROUND_IMPACT_BURSTS, GROUND_IMPACT_SURFACES } from "./Data_Tuning_GroundImpact.mjs";
 import { EXPLOSIVES } from "./Data_Explosives.mjs";
 import { FlareVisuals } from "./Script_FlareVisual.mjs";
 import { FlareSurfaceIndex } from "./Script_FlareSurfaces.mjs";
@@ -905,6 +905,8 @@ export class VfxSystem {
 
   /** 地面高度采样（含弹坑形变）：(x, z) => y。落地扬尘靠它知道沟在哪。 */
   SetGroundSampler(fn) { this.groundSampler = typeof fn === "function" ? fn : null; }
+  /** 落点的地面类型（GROUND_IMPACT_SURFACES 的键；返回空 = 黄土地）。测试场的砖铺场院这类局部地面由关卡交进来，离开本关清掉。 */
+  SetGroundSurfaceResolver(fn) { this.surfaceResolver = typeof fn === "function" ? fn : null; }
 
   /** Shared terrain + static-world casts. No fixed-plane fallback for falling soil. */
   SetFallingSoilSurface(host) { this.particles.FallingSoil.SetSurface(host); }
@@ -1398,6 +1400,9 @@ export class VfxSystem {
     const scale = Math.max(0.35, radius / 6);
     // 落地扬尘开着、而且确实炸在地上（离地不超过这种弹能挖到地的距离）：尘土交给 GroundImpact。
     const impact = this._GroundBurst(position, kind, explosiveId, chargeKg);
+    // 落点是什么地面（砖地没有浮土可掀：尘、抛射土、土块都少，碎块是砖色）
+    const surfaceId = (impact && this.surfaceResolver?.(position.x, position.z)) || "loess";
+    const brick = surfaceId === "brick";
     // 空炸（打在墙上、屋顶上）时爆点比地面高，碎块得继续往下掉
     const sampled = this.groundSampler ? this.groundSampler(position.x, position.z) : NaN;
     const ground = groundY ?? impact?.ground
@@ -1467,7 +1472,7 @@ export class VfxSystem {
 
     // 4) 抛射碎块。落在地上的炸点甩的是土块（湿黄土 + 熏黑），大小按装药立方根：
     //    75 mm 一发甩出拳头到脸盆大的土块，旧的砖色小碎块在土地上读不出来。
-    const chunkCount = Math.round((impact ? 10 + 12 * Math.cbrt(impact.charge) : profile.chunks) * this.spawnScale);
+    const chunkCount = Math.round((impact ? (brick ? 6 + 6 * Math.cbrt(impact.charge) : 10 + 12 * Math.cbrt(impact.charge)) : profile.chunks) * this.spawnScale);
     const clodScale = impact ? Math.cbrt(impact.charge) : scale;
     for (let i = 0; i < chunkCount; i += 1) {
       const a = this.random() * 6.2831853;
@@ -1478,7 +1483,7 @@ export class VfxSystem {
         position.x, position.y + 0.1, position.z,
         Math.cos(a) * speed, up * speed * 0.8, Math.sin(a) * speed,
         size, size * this._Range(0.5, 1.0), size * this._Range(0.8, 2.2),
-        impact ? (this.random() < 0.45 ? VFX_PALETTE.blackCore : VFX_PALETTE.soil)
+        impact ? (this.random() < 0.45 ? VFX_PALETTE.blackCore : brick ? VFX_PALETTE.brick : VFX_PALETTE.soil)
           : this.random() < profile.sooty ? VFX_PALETTE.woodBurnt : VFX_PALETTE.brick,
         this._Range(0.9, 1.8), ground, 0.3, this._Range(1.6, 3.2));
     }
@@ -1507,7 +1512,7 @@ export class VfxSystem {
     // walls, and repeated blasts stack those slices at successive heights.
     // Impact() still uses small surface decals for ordinary bullet holes.
     if (impact) this.lastExplosionSprite.groundImpact = this.GroundImpact(position, {
-      chargeKg: impact.charge, incoming, groundY: impact.ground, massScale: impact.coupling, burst: impact.burst });
+      chargeKg: impact.charge, incoming, groundY: impact.ground, massScale: impact.coupling, burst: impact.burst, surface: surfaceId });
   }
 
   /**
@@ -1538,7 +1543,7 @@ export class VfxSystem {
     this.dustFields ??= new DustFieldSystem(this.root, this.shared, this.quality);
     const ground = Number.isFinite(groundY) ? groundY : this.groundSampler(position.x, position.z);
     const tuning = DustTuningFor(burst);
-    const ejectaScale = GROUND_IMPACT_BURSTS[burst]?.ejecta ?? 1;
+    const ejectaScale = (GROUND_IMPACT_BURSTS[burst]?.ejecta ?? 1) * (GROUND_IMPACT_SURFACES[surface]?.ejecta ?? 1);
     const entry = this.dustFields.Add({ x: position.x, y: position.y, z: position.z, chargeKg,
       groundAt: this.groundSampler, incoming, wind: this.wind, surface, massScale, tuning });
     const h = incoming ? Math.hypot(incoming.x || 0, incoming.z || 0) : 0;
