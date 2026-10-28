@@ -4,20 +4,20 @@
   "name": "BeishaheDeckPlank",
   "preset": "weatheredWood",
   "source": {
-    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishaheDeckPlankV2.png",
-    "sha256": "c2bb803ca6be7e0b21543e4412cd7a9fc4e43f3ced12a2b568604cbe2d12811d",
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishaheDeckPlankV4.png",
+    "sha256": "b95c6ffa2e1f251bd069835cba331c9b385e6aeb10972db895e29a2e3fee65e5",
     "metrics": {
       "meanSrgb": [
-        0.4855,
-        0.4303,
-        0.3759
+        0.4495,
+        0.3948,
+        0.3498
       ],
-      "luma": 0.4306,
-      "lumaStd": 0.0977,
-      "sat": 0.2257,
-      "clipLow": 0.0002,
+      "luma": 0.398,
+      "lumaStd": 0.0906,
+      "sat": 0.2218,
+      "clipLow": 0.0003,
       "clipHigh": 0.0,
-      "lowFreq": 0.024
+      "lowFreq": 0.0288
     }
   },
   "heightSource": null,
@@ -76,46 +76,46 @@
       "file": "Texture_BeishaheDeckPlankBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 327968,
-      "sha256": "7ca856be792feef7b4019c96b86d6fd7634ec74e6d58c215eaa36cd50283f554"
+      "bytes": 373356,
+      "sha256": "471f7efb7ec5b5221f84d3e7445609576d47b71432d4b0010cfd8cea72145eb3"
     },
     {
       "channel": "Normal",
       "file": "Texture_BeishaheDeckPlankNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 76310,
-      "sha256": "7a0c0f096403e0aed9587af12f79d244b05e62d55f708e9ad627ef878ca23912"
+      "bytes": 89586,
+      "sha256": "ab48eed08b7bad1bd2078a21af07ea0a974416d170c5c17ab398b964ad01b558"
     },
     {
       "channel": "Orm",
       "file": "Texture_BeishaheDeckPlankOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 53078,
-      "sha256": "6d70783af37b7479f02abed3e915757ee69a3b30f1ed263232eecf8fa31c9efb"
+      "bytes": 61500,
+      "sha256": "f414a6127916aac50a15cdebe73d49672c48ba45b54c34fae6f80a1daf8660dd"
     }
   ],
-  "totalBytes": 457356,
+  "totalBytes": 524442,
   "metrics": {
     "meanSrgb": [
-      0.4499,
-      0.4307,
-      0.4099
+      0.4498,
+      0.4308,
+      0.4097
     ],
-    "luma": 0.4302,
-    "lumaStd": 0.0955,
-    "sat": 0.0889,
-    "clipLow": 0.0002,
+    "luma": 0.4301,
+    "lumaStd": 0.0959,
+    "sat": 0.0892,
+    "clipLow": 0.0003,
     "clipHigh": 0.0,
-    "lowFreq": 0.018,
-    "seam": 0.0102,
-    "interior": 0.0559,
-    "seamRatio": 0.182,
-    "border": 0.727,
-    "swing": 0.1303,
-    "aoMean": 0.911,
-    "roughMean": 0.874,
+    "lowFreq": 0.0267,
+    "seam": 0.0099,
+    "interior": 0.0606,
+    "seamRatio": 0.163,
+    "border": 0.733,
+    "swing": 0.0686,
+    "aoMean": 0.904,
+    "roughMean": 0.866,
     "texelsPerMeter": 1024.0
   },
   "gateProblems": []

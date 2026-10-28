@@ -171,7 +171,7 @@ function Points(part){if(pointCache.has(part))return pointCache.get(part);const 
 function PartBounds(list){const box=new THREE.Box3();for(const p of list)box.union(p.bounds);return box;}
 function SubBounds(points,predicate){const box=new THREE.Box3();for(const p of points)if(predicate(p))box.expandByPoint(p);return box;}
 const rayMaterial=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}),rayCache=new Map();
-function RayMesh(part){if(rayCache.has(part))return rayCache.get(part);const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(part.geo.positions,3));if(part.geo.indices)geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(part.geo.indices),1));geometry.computeBoundingBox();geometry.computeBoundingSphere();const mesh=new THREE.Mesh(geometry,rayMaterial);mesh.matrixAutoUpdate=false;mesh.matrix.copy(part.matrix);mesh.updateMatrixWorld(true);rayCache.set(part,mesh);return mesh;}
+function RayMesh(part){if(rayCache.has(part))return rayCache.get(part);const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(part.geo.positions,3));if(part.geo.color)geometry.setAttribute('color',new THREE.BufferAttribute(part.geo.color,part.geo.colorWidth));if(part.geo.indices)geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(part.geo.indices),1));geometry.computeBoundingBox();geometry.computeBoundingSphere();const mesh=new THREE.Mesh(geometry,rayMaterial);mesh.matrixAutoUpdate=false;mesh.matrix.copy(part.matrix);mesh.updateMatrixWorld(true);rayCache.set(part,mesh);return mesh;}
 function Hits(list,origin,direction,far){const ray=new THREE.Raycaster(origin,direction,0,far);const hits=[];for(const part of list)if(ray.ray.intersectsBox(part.bounds))RayMesh(part).raycast(ray,hits);return hits.sort((a,b)=>a.distance-b.distance);}
 Check(ByRole('Pier').length===spec.spanCount-1&&ByRole('PierDamp').length===spec.spanCount-1&&ByRole('Cap').length===spec.spanCount-1&&ByRole('abutment').length===2,'Thirteen piers each contain solid masonry, damp stones and a cap, plus two abutments');
 Check(data.assemblies?.length===14,'Sidecar inventories exactly fourteen intact spans');
@@ -251,6 +251,64 @@ for(const supportIndex of [1,2,3]){
   Check(dampBox.min.y>=spec.foundationY-.02&&dampBox.max.y<=spec.foundationY+3*course+.02,'Distinct damp-material stones occur only in the lowest three courses',{supportIndex,min:dampBox.min.y,max:dampBox.max.y});
 }
 rayMaterial.side=THREE.DoubleSide;
+// Inspect the actual short faces, including both corners. Infer recessed joint
+// locations by scanning the exported mesh rather than replaying the builder's
+// row-width formula; consecutive courses must not share vertical through-joints.
+// Every pier is probed through the inset core, including at bed joints.
+function HitTint(hit){
+  const mesh=hit.object,geometry=mesh.geometry,position=geometry.attributes.position,color=geometry.attributes.color,face=hit.face;
+  if(!color||!face)return null;
+  const a=new THREE.Vector3().fromBufferAttribute(position,face.a),b=new THREE.Vector3().fromBufferAttribute(position,face.b),c=new THREE.Vector3().fromBufferAttribute(position,face.c);
+  const weights=THREE.Triangle.getBarycoord(mesh.worldToLocal(hit.point.clone()),a,b,c,new THREE.Vector3());
+  if(!weights)return null;
+  return [0,1,2].map(channel=>[face.a,face.b,face.c].reduce((sum,index,i)=>sum+color.array[index*color.itemSize+channel]*weights.getComponent(i),0));
+}
+for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
+  const dry=ByRole('Pier').filter(p=>p.node.extras?.supportIndex===supportIndex),wet=ByRole('PierDamp').filter(p=>p.node.extras?.supportIndex===supportIndex),all=[...dry,...wet];
+  const centerZ=-spec.lengthM/2+supportIndex*spec.spanPitchM,course=(spec.pierTopY-spec.foundationY-.25)/9;
+  for(const faceSide of [-1,1]){
+    const direction=new THREE.Vector3(-faceSide,0,0);
+    for(let row=0;row<=9;row++){
+      // Avoid the cap at the upper boundary; check all actual bed joints and
+      // centers, including short-face end areas near the inset core's corners.
+      if(row<9)for(const dz of [-.80,-.60,-.30,0,.30,.60,.80]){
+        const y=spec.foundationY+(row+.5)*course,hits=Hits(dry,new THREE.Vector3(faceSide*3,y,centerZ+dz),direction,6);
+        Check(hits.length>=2&&hits[hits.length-1].distance-hits[0].distance>3.65,'Short-face masonry retains solid backing from either direction',{supportIndex,row,faceSide,dz});
+      }
+      if(row>0&&row<9)for(const delta of [-.002,0,.002])for(const dz of [-.80,0,.80]){
+        const y=spec.foundationY+row*course+delta,hits=Hits(dry,new THREE.Vector3(faceSide*3,y,centerZ+dz),direction,6);
+        Check(hits.length>=2&&hits[hits.length-1].distance-hits[0].distance>3.65,'Inset core closes short-face bed joints and corner regions',{supportIndex,row,faceSide,dz,delta});
+      }
+    }
+    // Three distinct template geometries are shared across 13 supports.
+    if(supportIndex>3)continue;
+    let previous=null;
+    for(let row=0;row<9;row++){
+      const y=spec.foundationY+(row+.5)*course,scan=[];
+      for(let k=0;k<=280;k++){
+        const dz=-.84+k*.006,hits=Hits(all,new THREE.Vector3(faceSide*3,y,centerZ+dz),direction,6);
+        Check(hits.length>0,'Short-face scan hits actual masonry',{supportIndex,row,faceSide,dz});
+        scan.push({dz,distance:hits[0].distance});
+      }
+      const surface=Math.min(...scan.map(s=>s.distance)),gaps=[];let group=[];
+      function CloseGap(){if(group.length){gaps.push({z:group.reduce((a,s)=>a+s.dz,0)/group.length,min:group[0].dz,max:group[group.length-1].dz});group=[];}}
+      for(const sample of scan){if(sample.distance>surface+.07)group.push(sample);else CloseGap();}CloseGap();
+      Check(gaps.length>=2&&gaps.length<=4,'Actual short face has recessed joints across its width including near corners',{supportIndex,row,faceSide,gaps});
+      if(previous)Check(gaps.every(g=>previous.every(p=>Math.abs(g.z-p.z)>.09)),'Consecutive short-face courses do not form aligned vertical seams',{supportIndex,row,faceSide,gaps,previous});
+      previous=gaps;
+      if(row<2){
+        // Pick the centers of actual visible blocks from measured gap groups.
+        const edges=[-.84,...gaps.map(g=>g.z),.84],colors=[];
+        for(let j=0;j<edges.length-1;j++){
+          const dz=(edges[j]+edges[j+1])/2,hits=Hits(wet,new THREE.Vector3(faceSide*3,y,centerZ+dz),direction,6);
+          if(hits.length){const rgb=HitTint(hits[0]);if(rgb)colors.push(rgb);}
+        }
+        const luma=colors.map(c=>.2126*c[0]+.7152*c[1]+.0722*c[2]),range=luma.length?Math.max(...luma)-Math.min(...luma):0;
+        Check(colors.length===edges.length-1&&range>.0085&&range<.16,'Same-height damp blocks retain controlled independent color, beyond the height gradient',{supportIndex,row,faceSide,range,colors:colors.length});
+      }
+    }
+  }
+}
 Check(new Set(ByRole('Sleepers').map(p=>p.node.mesh)).size===3&&new Set(ByRole('DeckPlanks').map(p=>p.node.mesh)).size===3&&new Set(ByRole('Pier').map(p=>p.node.mesh)).size===3&&new Set(ByRole('PierDamp').map(p=>p.node.mesh)).size===3,'Three real geometry/UV variants break sleeper, deck and dry/damp pier repetition');
 function UniqueUvCount(role){return new Set(ByRole(role).map(part=>Hash(Buffer.from(part.geo.uv.buffer,part.geo.uv.byteOffset,part.geo.uv.byteLength)))).size;}
 Check(UniqueUvCount('Sleepers')===3&&UniqueUvCount('DeckPlanks')===3&&UniqueUvCount('Pier')===3&&UniqueUvCount('PierDamp')===3,'Three mesh variants contain genuinely different UV coordinates');

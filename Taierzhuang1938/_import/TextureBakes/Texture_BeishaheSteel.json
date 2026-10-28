@@ -1,23 +1,23 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-10-27",
+  "date": "2026-10-28",
   "name": "BeishaheSteel",
   "preset": "wornSteel",
   "source": {
-    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishaheSteelV2.png",
-    "sha256": "fb409ff753924d06ea9b69ff2d00994902c4454ab87f3b79ce6b9a018a2617bc",
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishaheSteelV2V3Blend40.png",
+    "sha256": "18592624f6811914700767b38851996e69def6ee48824a62c7f6381bb9a4408c",
     "metrics": {
       "meanSrgb": [
-        0.3035,
-        0.3029,
-        0.307
+        0.2845,
+        0.2812,
+        0.2799
       ],
-      "luma": 0.3045,
-      "lumaStd": 0.025,
-      "sat": 0.0131,
+      "luma": 0.2818,
+      "lumaStd": 0.0211,
+      "sat": 0.0163,
       "clipLow": 0.0,
       "clipHigh": 0.0,
-      "lowFreq": 0.01
+      "lowFreq": 0.0082
     }
   },
   "heightSource": null,
@@ -40,7 +40,7 @@
       0.01,
       0.1
     ],
-    "reliefM": 0.0012,
+    "reliefM": 0.001,
     "rough": 0.72,
     "roughVar": 0.06,
     "roughLumaK": 0.0,
@@ -48,7 +48,7 @@
     "metal": 0.3,
     "seamless": "blend",
     "rowFlatten": true,
-    "flattenSigma": 0.088,
+    "flattenSigma": 0.13,
     "isotropic": true,
     "heightFromLuma": "direct",
     "tileM": 1.0,
@@ -57,7 +57,7 @@
     "pack": "orm",
     "normalConvention": "gl",
     "normalStrength": 0.8,
-    "toneStrength": 1.0,
+    "toneStrength": 0.85,
     "keepTone": false,
     "noFlatten": false,
     "invertHeight": false,
@@ -66,7 +66,7 @@
     "baseQuality": 86,
     "dataQuality": 90,
     "dataLossless": false,
-    "detailBalance": 0,
+    "detailBalance": 0.0,
     "heightFineWeight": 0.45,
     "uvAtlasReason": null
   },
@@ -76,46 +76,46 @@
       "file": "Texture_BeishaheSteelBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 205428,
-      "sha256": "bc71de26727fbf1ac4b4d50b6aa923de301d26dccf80cb351d0be1e8a9e34e69"
+      "bytes": 227116,
+      "sha256": "2c9f7ad0b2572b02c2d2a37efb71c749f8973fbf9f12b71cbb5b25e86d771188"
     },
     {
       "channel": "Normal",
       "file": "Texture_BeishaheSteelNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 38762,
-      "sha256": "b9ce00e7a8710c52ceec8b81eb9cf58b579656a8bc663bdab1a5004980f5e45f"
+      "bytes": 34098,
+      "sha256": "b4886c4cd064962ec209bcd16ab592615c78c6dfde6e92f013a0f3778701758d"
     },
     {
       "channel": "Orm",
       "file": "Texture_BeishaheSteelOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 52426,
-      "sha256": "a36f84dfb59070b75793d8a93e7d6a4764a1f30ee7d4149b923ed2ace6dc7f23"
+      "bytes": 61560,
+      "sha256": "ea725b482f96c70a3d6be7a284f694c8b749418fe50457230cc521a68b33c544"
     }
   ],
-  "totalBytes": 296616,
+  "totalBytes": 322774,
   "metrics": {
     "meanSrgb": [
-      0.34,
-      0.3356,
-      0.3295
+      0.3313,
+      0.3277,
+      0.3218
     ],
-    "luma": 0.335,
-    "lumaStd": 0.0352,
-    "sat": 0.0308,
+    "luma": 0.327,
+    "lumaStd": 0.0332,
+    "sat": 0.0286,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0022,
-    "seam": 0.0267,
-    "interior": 0.0266,
-    "seamRatio": 1.004,
-    "border": 0.9,
-    "swing": 0.0036,
-    "aoMean": 0.945,
-    "roughMean": 0.699,
+    "lowFreq": 0.0052,
+    "seam": 0.028,
+    "interior": 0.0276,
+    "seamRatio": 1.015,
+    "border": 0.933,
+    "swing": 0.0018,
+    "aoMean": 0.937,
+    "roughMean": 0.706,
     "texelsPerMeter": 1024.0
   },
   "gateProblems": []

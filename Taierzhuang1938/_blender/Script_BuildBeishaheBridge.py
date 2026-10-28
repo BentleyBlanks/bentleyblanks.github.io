@@ -755,11 +755,17 @@ def PierTint(baseTint, floor, course, seed, damp):
             t = Smooth((y - floor) / (3 * course))
             value = .82 + .18 * t + wobble
             warm = .012 * (1 - t)
-            rgb = (value + warm, value - warm * .3, value - warm)
+            # Per-block stone color fades out at the wet/dry transition so
+            # the continuous damp gradient does not acquire a hard stripe.
+            # baseTint is shared by each solid block; no joints are painted.
+            tintStrength = .70 * (1 - Smooth((t - .55) / .45))
+            rgb = tuple(channel + (baseTint[i] - .93) * tintStrength
+                        for i, channel in enumerate(
+                            (value + warm, value - warm * .3, value - warm)))
         else:
             t = Smooth((y - (floor + 3 * course)) / (1.1 * course))
             rgb = tuple(.72 + t * (baseTint[c] - .72) + wobble * t for c in range(3))
-        lower = .70 if not damp else .78
+        lower = .70 if not damp else .781
         return tuple(max(lower, min(1.0, channel)) for channel in rgb) + (1,)
     return Color
 
@@ -790,15 +796,23 @@ def BuildPier(seed=1938):
                 if right - left > 0.04:
                     damp = row < 3
                     target = dampStone if damp else stone
-                    target.BeveledBox(((left + right) / 2, y + rng.uniform(-0.005, 0.005), side * (halfz - 0.16)),
-                        (right - left - 0.014, ch - 0.014, 0.34 + rng.uniform(-0.016, 0.016)),
+                    # Keep a real overlap with the inset core while stopping
+                    # short of the staggered end-face joints at each corner.
+                    target.BeveledBox(((left + right) / 2, y + rng.uniform(-0.005, 0.005), side * (halfz - 0.135)),
+                        (right - left - 0.014, ch - 0.014, 0.29 + rng.uniform(-0.010, 0.010)),
                         rng.uniform(0.006, 0.014), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)),
                         tint=PierTint(StoneTint(tintRng), floor, ch, seed, damp))
-            for k in range(countz):
-                z = -halfz + (k + 0.5) * 2 * halfz / countz
+            # Stagger the shorter faces as well. End blocks are clipped at
+            # the corners, as on the longer face, and the inset core is kept.
+            for k in range(-1, countz + 1):
+                cell = 2 * halfz / countz
+                left = max(-halfz, -halfz + (k + (row % 2) * 0.5) * cell)
+                right = min(halfz, -halfz + (k + 1 + (row % 2) * 0.5) * cell)
+                if right - left <= 0.04:
+                    continue
                 damp = row < 3
                 target = dampStone if damp else stone
-                target.BeveledBox((side * (halfx - 0.20), y, z), (0.42, ch - 0.014, 2 * halfz / countz - 0.014),
+                target.BeveledBox((side * (halfx - 0.20), y, (left + right) / 2), (0.42, ch - 0.014, right - left - 0.014),
                                  rng.uniform(0.006, 0.014), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)),
                                  tint=PierTint(StoneTint(tintRng), floor, ch, seed, damp))
     cap.BeveledBox((0, top - 0.125, 0), (4.55, 0.25, 2.25), 0.018,

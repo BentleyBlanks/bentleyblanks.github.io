@@ -97,11 +97,11 @@ const SINGLE_BLANKET_ASSET_BYTES = 1024 * 1024;
 // 2026-10-22 白盒关卡编辑器的河沟示意两张反照率（泥 ~300 KB、水 ~60 KB，tier=editor）：只有 ?editor=blockout 下载，
 // 不进 boot / level 预算；全目录原本就顶着上限（63.79 / 63.81 MB），按它们的体积单列 384 KB。
 const EDITOR_CREEK_SKETCH_BYTES = 384 * 1024;
-// The refined bridge steel set occupies 296,616 bytes; sleeper, end-grain,
-// stone, damp stone and deck-plank sets total 1,945,226 bytes. These are
+// The refined bridge steel set occupies 322,774 bytes; sleeper, end-grain,
+// stone, damp stone and deck-plank sets total 2,012,312 bytes. These are
 // embedded in the standalone bridge GLB; they add no boot or level requests.
 const BEISHAHE_METAL_ASSET_BYTES = 384 * 1024;
-const BEISHAHE_SURFACE_ASSET_BYTES = 1904 * 1024;
+const BEISHAHE_SURFACE_ASSET_BYTES = 1966 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -130,7 +130,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
   {
     id: "BeishaheDeckPlank", kind: "material", tier: "lazy", toneClass: "weatheredWood", metersPerTile: 1,
     bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_BeishaheDeckPlank.json",
-    source: { provider: "imagegen", date: "2026-10-28", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-2daca0c9-8c0e-4139-bf79-e494db95ba28", prompt: "_import/Prompts/Texture_BeishaheDeckPlank.txt", note: "以生成的桥面辅助图修整旧木板表面；图像V方向与每块板的长轴一致；原稿及修订源图留OneDrive。第二次修订因纹理不自然未采用。" },
+    source: { provider: "imagegen", date: "2026-10-28", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-7b00098a-f1f4-45a0-9c58-6ca80e9753cf", prompt: "_import/Prompts/Texture_BeishaheDeckPlank.txt", note: "采用V4单块旧木纹生成图；图像V方向与每块板的长轴一致，实物板缝由几何表示。原图、提示及先前试验源图留OneDrive。" },
     consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishaheDeckPlank" }],
     files: [["Texture_BeishaheDeckPlankBase.webp", "Base", 1024, 1024], ["Texture_BeishaheDeckPlankNormal.webp", "Normal", 512, 512], ["Texture_BeishaheDeckPlankOrm.webp", "Orm", 512, 512]],
   },
@@ -169,9 +169,9 @@ export const TEXTURE_MANIFEST = Object.freeze([
     bake: "_import/Script_BakePbrTexture.py",
     bakeRecord: "_import/TextureBakes/Texture_BeishaheSteel.json",
     source: { provider: "imagegen", date: "2026-10-27",
-      ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-7588ae36-2a97-466d-9d20-b20296e0b27b",
+      ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-7588ae36-2a97-466d-9d20-b20296e0b27b; exec-9f89a6c8-3c62-4def-a82d-56558531bba7",
       prompt: "_import/Prompts/Texture_BeishaheSteel.txt",
-      note: "内置 imagegen 生成无花纹旧钢面；按既有 baker 定色/法线/ORM，仅嵌入独立桥梁 GLB，未加入开机或第一关贴图集。源图与 .blend 留 OneDrive。" },
+      note: "内置 imagegen 的 V2 平整漆面与 V3 局部锈蚀源图按 60/40 混合后烘焙；仅嵌入独立桥梁 GLB，未加入开机或第一关贴图集。源图与 .blend 留 OneDrive。" },
     consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishaheSteel" }],
     files: [
       ["Texture_BeishaheSteelBase.webp", "Base", 1024, 1024],
