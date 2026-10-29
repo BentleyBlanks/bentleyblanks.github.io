@@ -10,7 +10,7 @@ import {MergeParticleModules,NormalizeParticleModules,EvaluateCurve,IntegrateCur
 import {Mulberry32} from './Script_Noise.mjs';
 import {FIRST_LEVEL_DISTANT_SMOKE} from './Data_FirstLevelDistantSmoke.mjs';
 import {PARTICLE_SURFACE_ART} from './Data_Tuning_Particles.mjs';
-import {FlareDirector,MakeFlareHost} from './Script_Flare.mjs';
+import {FlareDirector,MakeFlareHost,SampleFlarePosition} from './Script_Flare.mjs';
 import {FlareVisuals} from './Script_FlareVisual.mjs';
 import {FlareSurfaceIndex} from './Script_FlareSurfaces.mjs';
 import {FLARE_EFFECTS,FLARE_PREVIEW} from './Data_Tuning_FlareEffects.mjs';
@@ -267,7 +267,7 @@ export class VfxEditor {
     Note(playback,'空格暂停/继续 · → 单帧 · Shift+→ 十帧 · Home 归零');
     this.environmentSelect=Select(playback,'预览昼夜',[{value:'original',label:'进入时环境'},{value:'day',label:'白天 · 看结构'},{value:'night',label:'夜晚 · 看照明'}],this.previewEnvironment||'original',value=>this.SetPreviewEnvironment(value));
     this.environmentSelect.root.dataset.vfxEnvironment='true';
-    this.flareCameraSelect=Select(playback,'弹药镜头',[{value:'follow',label:'燃烧体近景'},{value:'observer',label:'人眼高度 · 夜间观察'},{value:'field',label:'夜间照明全景'},{value:'flight',label:'完整弹道'},{value:'ground',label:'地面与阴影'}],this.flareCamera,value=>{this.flareCamera=value;this.FrameEffect();});
+    this.flareCameraSelect=Select(playback,'弹药镜头',[{value:'observer',label:'人眼高度 · 夜间观察'},{value:'follow',label:'燃烧体近景'},{value:'field',label:'夜间照明全景'},{value:'flight',label:'完整弹道'},{value:'ground',label:'地面与阴影'}],this.flareCamera,value=>{this.flareCamera=value;this.FrameEffect();});
     this.flareCameraSelect.root.dataset.flareCamera='true';
     this.message=Note(transport,'');this.message.setAttribute('role','status');this.message.dataset.vfxStatus='true';
     const tabs=ButtonRow(transport,[{label:'效果库',onClick:()=>this.ShowTab('library')},{label:'粒子模块',onClick:()=>this.ShowTab('modules')},{label:'落土参数',onClick:()=>this.ShowTab('soil')},{label:'预设',onClick:()=>this.ShowTab('presets')}]);
@@ -419,9 +419,7 @@ export class VfxEditor {
     if(FLARE_EFFECTS[this.effectId]){
       this.studio.maxDistance=FLARE_PREVIEW.maxDistanceM;
       if(this.flareCamera==='observer'){
-        const o=this.studio.orbit,dy=FLARE_PREVIEW.observerEyeM-FLARE_PREVIEW.observerTargetYM;
-        o.target.set(0,FLARE_PREVIEW.observerTargetYM,0);o.dist=Math.hypot(FLARE_PREVIEW.observerDistanceM,dy);
-        o.pitch=Math.atan2(dy,FLARE_PREVIEW.observerDistanceM);o.yaw=Math.PI;this.studio.ApplyCamera();this.host.post?.NotifyCameraCut();return;
+        this.FrameFlareView(FLARE_PREVIEW.observerEyeM,FLARE_PREVIEW.observerTargetYM,FLARE_PREVIEW.observerDistanceM);this.host.post?.NotifyCameraCut();return;
       }
       if(this.flareCamera==='ground'||this.flareCamera==='field'){
         const field=this.flareCamera==='field',o=this.studio.orbit;
@@ -430,8 +428,8 @@ export class VfxEditor {
         o.pitch=field?FLARE_PREVIEW.fieldPitch:FLARE_PREVIEW.groundPitch;o.yaw=FLARE_PREVIEW.fieldYaw;
         this.studio.ApplyCamera();this.host.post?.NotifyCameraCut();return;
       }
-      const near=this.flareCamera==='follow';this.studio.Frame(near?4:FLARE_PREVIEW.overviewHeightM,near?FLARE_PREVIEW.followDistanceM:FLARE_PREVIEW.overviewDistanceM);
-      if(near)this.TrackFlare();else{this.studio.orbit.target.set(0,FLARE_PREVIEW.overviewTargetY,0);this.studio.ApplyCamera();}
+      if(this.flareCamera==='follow'){this.studio.Frame(4,FLARE_PREVIEW.followDistanceM);this.TrackFlare();}
+      else this.FrameFlareView(FLARE_PREVIEW.overviewHeightM,FLARE_PREVIEW.overviewTargetY,FLARE_PREVIEW.overviewDistanceM);
       this.host.post?.NotifyCameraCut();return;
     }
     const id=this.effectId,small=/^(Muzzle|Impact|Blood|ShellCasings)/.test(id);
@@ -478,7 +476,52 @@ export class VfxEditor {
     if(center){this.studio.orbit.target.copy(center);this.studio.ApplyCamera();}
     this.host.post?.NotifyCameraCut();
   }
-  TrackFlare(){const f=this.flarePreview?.flares[0];if(f){this.studio.orbit.target.set(f.pos.x,f.pos.y+.8,f.pos.z);this.studio.ApplyCamera();}}
+  FrameFlareView(eyeY,targetY,baseDistance){
+    const f=this.flarePreview?.flares[0],camera=this.host.camera,o=this.studio.orbit;
+    const canvas=this.host.renderer.domElement.getBoundingClientRect(),panel=this.panel?.root.getBoundingClientRect();
+    const availableRight=panel?.width>0&&panel.right>canvas.left?Math.min(canvas.right,panel.left):canvas.right;
+    const width=Math.max(1,availableRight-canvas.left),padding=Math.min(FLARE_PREVIEW.observerPaddingPx,width*.1);
+    const left=padding,right=Math.max(left+1,width-padding),center=canvas.width*.5;
+    const focal=canvas.height/(2*Math.tan(camera.fov*Math.PI/360)),poses=[];
+    if(f){
+      const end=f.landing?.t??f.outAt;
+      for(let i=0;i<=FLARE_PREVIEW.observerPathSamples;i++)poses.push(SampleFlarePosition(f,end*i/FLARE_PREVIEW.observerPathSamples));
+      for(const time of [0,f.ignitedAt,f.outAt,end])poses.push(SampleFlarePosition(f,time));
+    }else poses.push({x:0,y:targetY,z:0});
+    const height=targetY-eyeY;
+    const maxDistance=Math.sqrt(Math.max(0,FLARE_PREVIEW.maxDistanceM**2-height**2));
+    const Fit=distance=>{
+      const orbitDistance=Math.hypot(distance,height),cosine=distance/orbitDistance,sine=height/orbitDistance;
+      let minimum=-Infinity,maximum=Infinity;
+      for(const p of poses){
+        const depth=cosine*(p.z+distance)+sine*(p.y-eyeY);
+        if(depth<=camera.near)return {minimum:Infinity,maximum:-Infinity};
+        // Facing+Z gives screen-right in world-X. Fit the true perspective
+        // positions into the uncovered canvas, without changing its projection.
+        minimum=Math.max(minimum,p.x-(center-left)*depth/focal);
+        maximum=Math.min(maximum,p.x-(center-right)*depth/focal);
+      }
+      return {minimum,maximum};
+    };
+    let distance=Math.min(baseDistance,maxDistance),fit=Fit(distance);
+    if(fit.minimum>fit.maximum){
+      let low=distance,high=maxDistance;
+      for(let i=0;i<24;i++){const mid=(low+high)*.5,trial=Fit(mid);if(trial.minimum<=trial.maximum)high=mid;else low=mid;}
+      distance=high;fit=Fit(distance);
+    }
+    const x=Number.isFinite(fit.minimum+fit.maximum)?(fit.minimum+fit.maximum)*.5:0;
+    o.target.set(x,targetY,0);o.dist=Math.hypot(distance,height);
+    o.pitch=Math.atan2(-height,distance);o.yaw=Math.PI;this.studio.ApplyCamera();
+  }
+  TrackFlare(){
+    const f=this.flarePreview?.flares[0];if(!f)return;
+    const camera=this.host.camera,target=this.studio.orbit.target;
+    target.set(f.pos.x,f.pos.y+.8,f.pos.z);this.studio.ApplyCamera();
+    // Keep a low follow orbit above the preview floor during descent/landing.
+    // Preserve the requested pitch so seeking back aloft restores that orbit.
+    const minimumY=this.flarePreview.Ground(camera.position.x,camera.position.z)+FLARE_PREVIEW.observerEyeM;
+    if(camera.position.y<minimumY){camera.position.y=minimumY;camera.lookAt(target);}
+  }
   SetNightPreview(on){
     return this.SetPreviewEnvironment(on?'night':'original');
   }

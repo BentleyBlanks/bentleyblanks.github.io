@@ -4632,11 +4632,20 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   // 关卡预热（2026-09-08）：人物对象池 + 进关后才首见的着色器。人物预热只盖住通用人物；
   // 第一关实测名册人物的布料在车厢头几秒现编（960 ms 一帧）、第一人称枪模与自阴影在进阵地时
   // （766 ms）、手榴弹在第一次投掷时（391 ms）。全部挪到加载画面后面付掉。
+  state.shadowBatchWarm = null;
   if (!cutsceneOnly && !PREVIEW && phase.whitebox?.fullMission) {
     try {
       await WarmLevel(phase);
     } catch (error) {
       console.warn("[Main] 关卡预热失败（退回用到时现编）", error);
+    }
+  } else if (!cutsceneOnly && !PREVIEW) {
+    // Legacy world chapters do not run the first-level weapon/actor warmup.
+    // Their static shadow batches still need real depth programs before joining.
+    try {
+      await WarmStaticShadowBatch(phase);
+    } catch (error) {
+      console.warn("[Main] 静态阴影合批预热失败（保留独立投影）", error);
     }
   }
 
@@ -5100,6 +5109,155 @@ async function WarmActorShaders(phase, onStep = null) {
  */
 /** WarmLevel 的收尾真帧里为 true：RenderScene 给一点景深，把 DoF 的 program 编掉（见 deathDof）。 */
 let warmLevelDof = false;
+
+/** Warm only static caster batches for legacy world routes, behind the boot UI. */
+async function WarmStaticShadowBatch(phase) {
+  if (!shadowCasterBatch.enabled || !renderer.shadowMap.enabled) return null;
+  const started = performance.now(), csm = lights.csm;
+  const report = { phase: phase.id ?? state.phaseIndex, proxyMeshes: 0, depthDraws: 0, primed: 0,
+    elapsedBefore: state.elapsed, phaseTimeBefore: state.phaseTime,
+    csmEnabledBefore: csm.enabled, csmUserEnabledBefore: csm.userEnabled };
+  const saved = { warming: state.warming, menu: state.menu, csmEnabled: csm.enabled,
+    csmUserEnabled: csm.userEnabled, bypass: shadowCasterBatch.bypass };
+  const temporary = !csm.active ? { scene: new THREE.Scene(), target: new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false }),
+    light: new THREE.SpotLight(0xffffff, 0, 6, Math.PI / 4), casters: null, rendering: false,
+    renderTarget: renderer.getRenderTarget(), face: renderer.getActiveCubeFace(), level: renderer.getActiveMipmapLevel(),
+    shadowAuto: renderer.shadowMap.autoUpdate, shadowNeeded: renderer.shadowMap.needsUpdate } : null;
+  report.temporaryShadow = !!temporary;
+  report.csmMapsBefore = csm.lights.map(light => light.shadow.map?.uuid ?? null);
+  const warmedBefore = new Set(shadowCasterBatch.warmedDepth), rendered = new Set(), depths = new Map();
+  const proxy = shadowCasterBatch.WarmProxy([library.StaticDepth()].filter(Boolean));
+  proxy.name = "ShadowBatchBootWarmProxy";
+  proxy.position.set(player.position.x, player.position.y + 1, player.position.z);
+  const meshes = new Set();
+  proxy.traverse(object => {
+    if (!object.isBatchedMesh) return;
+    meshes.add(object);
+    const beforeShadow = object.onBeforeShadow;
+    object.onBeforeShadow = function (...args) {
+      beforeShadow.apply(this, args);
+      depths.set(this, args[5]);
+      // This own hook retains WithShadowDepthRekey's per-side depth variants.
+      if (args[5]) args[5].needsUpdate = true;
+    };
+  });
+  report.proxyMeshes = meshes.size;
+  if (temporary) {
+    temporary.scene.add(proxy); temporary.casters = temporary.scene;
+    const light = temporary.light;
+    light.castShadow = true; light.shadow.autoUpdate = false;
+    light.shadow.mapSize.set(16, 16); light.shadow.camera.near = 0.1;
+    light.position.copy(proxy.position).add(new THREE.Vector3(0, 3, 0));
+    light.target.position.copy(proxy.position); light.updateMatrixWorld(); light.target.updateMatrixWorld();
+    const first = meshes.values().next().value, beforeRender = first.onBeforeRender;
+    first.onBeforeRender = function (...args) {
+      beforeRender.apply(this, args);
+      if (temporary.rendering) return;
+      temporary.rendering = true;
+      try {
+        renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
+        light.shadow.needsUpdate = true;
+        renderer.shadowMap.render([light], temporary.casters, camera);
+      } finally { temporary.rendering = false; }
+    };
+  }
+  const direct = renderer.renderBufferDirect;
+  renderer.renderBufferDirect = function (camera, scene, geometry, material, object, group) {
+    const triangles = renderer.info.render.triangles;
+    const result = direct.call(this, camera, scene, geometry, material, object, group);
+    if (meshes.has(object) && depths.get(object) === material && renderer.info.render.triangles > triangles) {
+      rendered.add(object); report.depthDraws += 1;
+    }
+    return result;
+  };
+  const WaitReady = async () => {
+    const start = performance.now();
+    while (renderer.info.programs.some(program => typeof program.isReady === "function" && !program.isReady())) {
+      if (performance.now() - start > 20000) break;
+      await NextFrame();
+    }
+  };
+  const DrawShadowFrame = () => {
+    if (temporary) {
+      renderer.setRenderTarget(temporary.target);
+      temporary.scene.updateMatrixWorld(true);
+      WithShadowDepthRekey(renderer, () => renderer.render(temporary.scene, camera));
+    } else {
+      lights.UpdateShadowFrustum(camera.position, camera.getWorldDirection(new THREE.Vector3()));
+      WithShadowDepthRekey(renderer, () => RenderScene(0));
+    }
+  };
+  let verified = false;
+  try {
+    state.warming = true; state.menu = false;
+    // Inactive solar shadows use a tiny temporary native spotlight. Do not
+    // allocate normal CSM maps/atlases solely to compile batch depth programs.
+    if (!temporary) csm.ForceUpdate();
+    shadowCasterBatch.bypass = true;
+    if (!temporary) scene.add(proxy);
+    proxy.updateMatrixWorld(true);
+    SetBootStep(T("boot.step.warmLevel"), BOOT.progress.warmLevel.from);
+    CompileAsRendered(proxy, "staticShadowBatch");
+    await WaitReady();
+    DrawShadowFrame();
+    await WaitReady();
+    renderer.getContext().finish();
+    report.renderedProxyMeshes = rendered.size;
+    if (rendered.size !== meshes.size) throw new Error("Static shadow proxy depth was not rendered");
+    verified = true;
+    shadowCasterBatch.bypass = saved.bypass;
+    scene.updateMatrixWorld();
+    report.primed = shadowCasterBatch.Prime({ exclude: proxy });
+    if (temporary) {
+      // Upload real batch buffers in the same native spotlight context, still
+      // behind boot and without adding a gameplay light or advancing time.
+      temporary.casters = scene;
+      DrawShadowFrame();
+      renderer.getContext().finish();
+    }
+  } finally {
+    renderer.renderBufferDirect = direct;
+    shadowCasterBatch.bypass = saved.bypass;
+    shadowCasterBatch.DisposeWarmProxy(proxy);
+    if (!verified) {
+      shadowCasterBatch.warmedDepth.clear();
+      for (const depth of warmedBefore) shadowCasterBatch.warmedDepth.add(depth);
+    }
+    try {
+      if (temporary) {
+        const gl = renderer.getContext(), textures = [...(temporary.light.shadow.map?.textures || []), temporary.light.shadow.map?.depthTexture, temporary.target.texture].filter(Boolean);
+        const handles = textures.map(texture => renderer.properties.get(texture).__webglTexture).filter(Boolean);
+        report.temporaryTextureHandles = handles.length;
+        temporary.light.shadow.dispose(); temporary.target.dispose(); temporary.scene.clear();
+        report.temporaryTexturesReleased = handles.length > 0 && handles.every(handle => !gl.isTexture(handle));
+        renderer.setRenderTarget(temporary.renderTarget, temporary.face, temporary.level);
+        renderer.shadowMap.autoUpdate = temporary.shadowAuto; renderer.shadowMap.needsUpdate = temporary.shadowNeeded;
+      } else {
+        // Remove proxy depths from every cascade before the boot UI can close.
+        // These renders upload real batches without advancing gameplay time.
+        csm.ForceUpdate();
+        for (let i = 0; i < csm.preset.bakeOrder.length; i += 1) DrawShadowFrame();
+        renderer.getContext().finish();
+      }
+    } finally {
+      csm.SetCastShadow(saved.csmEnabled); csm.SetUserEnabled(saved.csmUserEnabled);
+      try {
+        post?.NotifyCameraCut();
+        RenderScene(0);
+      } finally {
+        state.warming = saved.warming; state.menu = saved.menu;
+      }
+    }
+  }
+  report.elapsedAfter = state.elapsed; report.phaseTimeAfter = state.phaseTime;
+  report.csmEnabledAfter = csm.enabled; report.csmUserEnabledAfter = csm.userEnabled;
+  report.csmMapsAfter = csm.lights.map(light => light.shadow.map?.uuid ?? null);
+  report.members = shadowCasterBatch.stats.members;
+  report.ms = Math.round(performance.now() - started);
+  state.shadowBatchWarm = report;
+  return report;
+}
+
 async function WarmLevel(phase) {
   const started = performance.now();
   const report = { pool: {}, viewmodel: 0, picks: 0, ms: 0, stepMs: {} };

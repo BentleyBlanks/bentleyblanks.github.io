@@ -39,14 +39,30 @@ export const FLARE_PHOTOMETRY=Object.freeze({dayScale:.0001,nightScale:1,
   // Two coincident active emitters must also fit the 65504 half-float target.
   coreRadiusSquared:.0025,coreFraction:.9,radianceMax:28000});
 
+// Visible combustion shape, separate from the observer's optical glare. The
+// directed, broken tails are constrained by normal-color footage (DVIDS16304,
+// Orion Pyrotechnic Signals); these dimensions/cooling times are reconstruction.
+export const FLARE_COMBUSTION=Object.freeze({
+  whiteAspect:.58,signalAspect:.8,minWidth:.22,minLength:.16,
+  tongueFraction:.008,emberLifeS:.24,emberRadiance:7000,
+  emberWidth:.085,emberLength:.14,emberCooling:5,
+  // A brief propellant flash (DVIDS993533 firing close-up), not a motor trail.
+  // Timing/size/output are visual reconstruction, not that cartridge's test data.
+  launchS:.07,signalLaunchSizeM:.16,whiteLaunchSizeM:.3,
+  launchRadiance:15000,launchCd:150,launchColor:0xffb060,launchLightRadiusM:9,
+  // Raster support only; the filtered jet retains its physical projected area.
+  launchRasterSupportRad:Math.PI/180,
+});
+
 // Editor framing only; ammunition dimensions and flight are unchanged.
 export const FLARE_PREVIEW = Object.freeze({
-  camera:"follow",farM:600,maxDistanceM:320,followDistanceM:9,
+  camera:"observer",farM:600,maxDistanceM:320,followDistanceM:9,
   overviewDistanceM:180,overviewHeightM:110,overviewTargetY:50,
   environment:"night",dayPreset:"testSceneDay",nightPreset:"flarePreviewNight",
   fieldTarget:[0,48,0],fieldDistanceM:190,fieldPitch:.04,fieldYaw:Math.PI+.18,
   groundTarget:[0,1.7,0],groundDistanceM:75,groundPitch:.07,
   observerDistanceM:95,observerEyeM:1.7,observerTargetYM:40,observerFov:70,
+  observerPaddingPx:64,observerPathSamples:96,
 });
 
 // Clear, weak-moon studio night. Campaign night grading remains unchanged.
@@ -62,10 +78,13 @@ export const FLARE_ART = Object.freeze({
   gravity:9.81, launchHeight:1.1, openingS:.65, dragS:.45,
   canopyRadius:.45, canopyHeight:.38, cordLength:1.25, leaderLength:.45, ventRadius:.022, ribs:8,
   candleRadius:.022, candleHeight:.16, candleLift:.045,
-  glowSize:1.3, smokeCount:128, smokeHz:20, smokeLife:6,
+  glowSize:1.3, smokeCount:128, smokeHz:20, smokeLife:6,smokeLightSlots:2,
   sparkCount:18, sparkHz:30, sparkLife:.55,
   sparkLifeMin:.18,sparkSizeMin:.003,sparkSizeMax:.012,
   sparkDragS:.22,sparkEjectMS:.7,sparkRadiance:18000,
+  // Raster carrier only: the fragment conserves the physical particle's
+  // Gaussian area and applies the pixel footprint. This is not spark size.
+  sparkRasterSupportRad:Math.PI/180,
   groundClearance:.006, surfaceRecheckM:.004, settleS:.9, groundHoldS:7, groundFadeS:2,
   clothContactProbeM:.35,
   foldedClothBaseM:.003,foldedClothWrinkleM:.006,
@@ -76,10 +95,18 @@ export const FLARE_ART = Object.freeze({
   smokeOpacity:.26,smokeRiseMS:.7,smokeDragS:.18,
 });
 
-// Two persistent maps, one update per frame. Stored in the existing RGBA32F
-// cluster texture (four linear depths per texel), so PBR uses no extra sampler.
+// Two point-shadow sources. Normal views use local512 + fitted far1024;
+// incompatible receiver directions use up to six512 cube views. Every source
+// fits within six512 areas of the existing RGBA32F cluster texture (four linear
+// depths/texel), with no extra PBR sampler. Targets are persistent; storage is
+// allocated only when an enabled shadow source is first selected.
 export const FLARE_SHADOW = Object.freeze({
-  slots:2, size:512, nearM:.25, angle:1.35, receiverRadiusM:110, depthMarginM:30,
+  slots:2, faces:6, size:512, nearM:.25, angle:Math.PI/4,
+  farSize:1024,maxConeAngle:85*Math.PI/180,coneGuardRad:.015,coneCoverageMargin:.02,coneCheckMargin:.004,
+  nearReceiverRadiusM:110,nearDepthMarginM:30,
+  receiverGuard:.08,depthGuardM:2,
+  receiverCellM:64,receiverPartitionMinM:192,
+  receiverInstanceCellM:16,receiverInstanceGroupMinCount:8,
   biasM:.055, normalBiasM:.045,
 });
 
@@ -87,3 +114,16 @@ export const FLARE_SHADOW = Object.freeze({
 // measured scene luminance to reduce exposure, then recover without brightening
 // the night above its authored baseline. No gameplay visibility is derived here.
 export const FLARE_EXPOSURE = Object.freeze({maxDarkEv:3,recoveryS:1.8,cutoff:.001});
+
+// Observer-space scattering from a directly visible point source, independent
+// of the clipped physical emitter and the general bloom bright-pass. Angular
+// Gaussian mixture is an explicit rendering approximation, not a measured
+// ammunition signature or a simulation of the anatomy in Ritschel et al. 2009
+// (https://people.compute.dtu.dk/jerf/papers/TemporalGlare.pdf).
+export const FLARE_GLARE=Object.freeze({
+  slots:2,byQuality:Object.freeze({low:0,medium:1,high:1,ultra:1,whitebox:0}),
+  scatterFraction:.00015,narrowSigmaDeg:.16,wideSigmaDeg:.65,narrowWeight:.8,
+  supportDeg:3,sourceRadiusM:.035,depthBiasM:.035,minDistanceM:.25,
+  // Per-pixel HDR storage safety; the un-clipped outer halo still follows I/r².
+  radianceMax:20000,
+});

@@ -27,6 +27,8 @@
 import * as THREE from "three";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
 import { LENS_FLARE } from "./Data_Tuning_Camera.mjs";
+import {FLARE_GLARE as G} from './Data_Tuning_FlareEffects.mjs';
+import {FlareGlareIncident,FLARE_GLARE_GLSL} from './Script_FlareGlare.mjs';
 
 const F = LENS_FLARE;
 
@@ -39,8 +41,10 @@ uniform float uGlare;           // 星芒总强度（0 = 不画）
 uniform float uAspect;
 uniform float uThreshold;
 uniform float uFrame;
+uniform float uLegacyScale;
 varying vec2 vUv;
 ${GLSL_COMMON}
+${FLARE_GLARE_GLSL}
 
 /**
  * 亮部再抬一道门槛：光晕只吃真正的光源，不吃被泛光提起来的中间调。
@@ -163,7 +167,9 @@ void main() {
   // 时间抖动只加在极弱的一层上：鬼影是低频的，不抖也不会有色带，
   // 但完全静止的光晕在推镜头时会显得"贴在屏幕上"。
   float jitter = 0.985 + 0.015 * Ign(gl_FragCoord.xy + uFrame * 5.31);
-  gl_FragColor = vec4(max(result * jitter, vec3(0.0)), 1.0);
+  // The source-driven angular halo bypasses clipped bloom and its unrelated
+  // cosmetic jitter. Only the existing solar layer receives that old jitter.
+  gl_FragColor = vec4(max(result * jitter * uLegacyScale + FlareGlareRadiance(vUv), vec3(0.0)), 1.0);
 }
 `;
 
@@ -279,10 +285,12 @@ export class LensFlarePass {
     this.blackPixel = MakeBlackPixel();
     this.dirtTexture = null;          // 惰性烘：关着的档一个字节都不占
     this.active = false;
-    this.strength = 0;                // 本帧总强度（档位 × 面板倍率）
+    this.strength = 0;                // Composite multiplier; dynamic sources use unity.
     this.dirtStrength = F.dirt.strength;
     this.userScale = 1;
     this.userDirtScale = 1;
+    this.source = null;
+    this.emitterActive = false;
     this.uniforms = {
       uBright: { value: null },
       uNormalDepth: { value: null },
@@ -292,10 +300,55 @@ export class LensFlarePass {
       uAspect: { value: 1 },
       uThreshold: { value: F.threshold },
       uFrame: { value: 0 },
+      uLegacyScale: { value: 1 },
+      uEmitterSource: { value: Array.from({length:G.slots},()=>new THREE.Vector4()) },
+      uEmitterIncident: { value: Array.from({length:G.slots},()=>new THREE.Vector3()) },
+      uEmitterProjScale: { value: new THREE.Vector2(1,1) },
+      uEmitterDepthOffset: { value: new THREE.Vector2() },
+      uEmitterDepthTexel: { value: new THREE.Vector2() },
+      uEmitterResolution: { value: new THREE.Vector2(2,2) },
     };
     this.material = MakeFullscreenMaterial(FRAG_LENS_FLARE, this.uniforms);
     this.target = null;
     this._sunWorld = new THREE.Vector3();
+    this._sourceView = new THREE.Vector3();
+    this._sourceNdc = new THREE.Vector3();
+  }
+
+  SetSource(lightRig) { this.source=lightRig; }
+
+  UpdateEmitters(ctx) {
+    const U=this.uniforms;
+    for(const slot of U.uEmitterSource.value)slot.w=0;
+    this.emitterActive=false;
+    const quality=this.pipeline.whiteboxConfig?0:(G.byQuality[this.pipeline.quality]??0);
+    if(!(quality>0)||!ctx.normalDepthTexture)return;
+    const candidates=[];
+    for(const source of this.source?.fireSources?.values()||[]){
+      // The real director marks both optical flare presets; ordinary fires and
+      // legacy authored illumination do not acquire a synthetic optical source.
+      if(source.emitterVisible===false||!source.opticalEmitter||!(source.currentIntensity>0))continue;
+      const view=this._sourceView.copy(source.position).applyMatrix4(ctx.view);
+      if(-view.z<=ctx.camera.near||-view.z>=ctx.camera.far)continue;
+      const ndc=this._sourceNdc.copy(source.position).project(ctx.camera);
+      if(Math.max(Math.abs(ndc.x),Math.abs(ndc.y))>1.05)continue;
+      const incident=FlareGlareIncident(source,ctx.camera.position);
+      candidates.push({uv:[ndc.x*.5+.5,ndc.y*.5+.5],depth:-view.z,incident,
+        score:incident[0]*.2126+incident[1]*.7152+incident[2]*.0722,handle:source.handle});
+    }
+    candidates.sort((a,b)=>b.score-a.score||a.handle-b.handle);
+    for(let i=0;i<Math.min(G.slots,candidates.length);i++){
+      const source=candidates[i];
+      U.uEmitterSource.value[i].set(...source.uv,source.depth,1);
+      U.uEmitterIncident.value[i].fromArray(source.incident).multiplyScalar(G.scatterFraction*quality);
+      this.emitterActive=true;
+    }
+    U.uEmitterProjScale.value.copy(ctx.projScale);
+    // Prepass is jittered while this post-TAA projection is clean. Adding to
+    // projection[8/9] moves the depth image's source UV in the negative direction.
+    U.uEmitterDepthOffset.value.set(-ctx.jitterX/ctx.width,-ctx.jitterY/ctx.height);
+    U.uEmitterDepthTexel.value.set(1/ctx.width,1/ctx.height);
+    U.uEmitterResolution.value.set(this.target?.width||2,this.target?.height||2);
   }
 
   /** 合成 pass 绑的那张：没在跑就是 1×1 全黑。 */
@@ -322,7 +375,7 @@ export class LensFlarePass {
     }));
   }
 
-  /** 画质面板的两根倍率（0 = 关）。 */
+  /** Solar lens-artifact/dirt multipliers. Source optics use FLARE_GLARE tiers. */
   SetUserScale(flare, dirt) {
     if (Number.isFinite(flare)) this.userScale = Math.max(0, flare);
     if (Number.isFinite(dirt)) this.userDirtScale = Math.max(0, dirt);
@@ -352,9 +405,15 @@ export class LensFlarePass {
    */
   Prepare(ctx) {
     const byQuality = F.byQuality[this.pipeline.quality] ?? 0;
-    this.strength = byQuality * this.userScale * (ctx.options.lensFlare ?? 1);
-    this.dirtStrength = F.dirt.strength * this.userDirtScale * (ctx.options.lensDirt ?? 1);
-    this.active = !!ctx.preset.lensFlare && this.strength > 0.0001;
+    const solarStrength = byQuality * this.userScale * (ctx.options.lensFlare ?? 1);
+    const solarActive = !!ctx.preset.lensFlare && solarStrength > 0.0001;
+    this.UpdateEmitters(ctx);
+    // Preserve the original no-emitter path. With emitters, bake only the solar
+    // multiplier into its layer and composite the combined texture at unity.
+    this.strength = this.emitterActive ? 1 : solarStrength;
+    this.uniforms.uLegacyScale.value = this.emitterActive ? (solarActive?solarStrength:0) : 1;
+    this.dirtStrength = solarActive ? F.dirt.strength * this.userDirtScale * (ctx.options.lensDirt ?? 1) : 0;
+    this.active = solarActive || this.emitterActive;
     if (!this.active) return;
 
     const U = this.uniforms;
@@ -362,7 +421,7 @@ export class LensFlarePass {
     // 而泛光跟着 TAA 之后的 sceneColor 走）。TAAU 开着时两组分辨率不同。
     U.uAspect.value = ctx.outputWidth / Math.max(1, ctx.outputHeight);
     U.uFrame.value = ctx.frame;
-    if (ctx.options.sunDirection) {
+    if (solarActive && ctx.options.sunDirection) {
       // 太阳只是方向；取相机前方一个仍在远裁面以内的点做屏幕投影
       const distance = Math.min(600, ctx.camera.far * 0.9);
       const ndc = this._sunWorld.copy(ctx.options.sunDirection).multiplyScalar(distance)

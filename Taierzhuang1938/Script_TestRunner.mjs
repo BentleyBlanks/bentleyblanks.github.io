@@ -297,11 +297,19 @@ export const testDefs = {
   FlareTemporalResponse30BrowserTest: {file:"Script_FlareTemporalResponseBrowserTest.mjs",args:["--fps=30"],timeoutMs:600000,desc:"30fps exposure-integrated flare flutter and responsive TAA"},
   FlareFlickerTest: {file:"Script_FlareFlickerTest.mjs",desc:"Bounded aperiodic flare combustion and replayable suspension attitude"},
   FlareParticlesTest: {file:"Script_FlareParticlesTest.mjs",desc:"Replayable ejecta inertia, cooling and common photometric scene units"},
+  FlareGlareTest: {file:"Script_FlareGlareTest.mjs",desc:"Point-source angular glare, photometry, filtering and quality policy"},
+  FlareShadowBoundsTest: {file:"Script_FlareShadowBoundsTest.mjs",desc:"Conservative receiver cone fitting, interior coverage, moving origins and cube fallback"},
+  ShadowBatchWarmBrowserTest: {file:"Script_ShadowBatchWarmBrowserTest.mjs",timeoutMs:900000,desc:"Normal legacy boot warms real caster depth and preserves batched shadow pixels"},
+  FlareGlareBrowserTest: {file:"Script_FlareGlareBrowserTest.mjs",timeoutMs:600000,desc:"Actual HDR glare time response, occlusion and medium quality"},
+  FlareLifecycleBrowserTest: {file:"Script_FlareLifecycleBrowserTest.mjs",timeoutMs:600000,desc:"Actual combustion shape, cooling residual, blocked launch and shared smoke lighting"},
+  FlareBloomBrowserTest: {file:"Script_FlareBloomBrowserTest.mjs",timeoutMs:600000,desc:"Emitter-only bloom hue preservation, exact background baseline and depth validity"},
+  FlareSparkBrowserTest: {file:"Script_FlareSparkBrowserTest.mjs",timeoutMs:600000,desc:"Subpixel physical sparks: filtered energy, jitter coverage and actual high Post replay"},
   FlareOpticalScaleBrowserTest: {file:"Script_FlareOpticalScaleBrowserTest.mjs",timeoutMs:600000,desc:"Actual day/night HDR receiver and emitter scale, saturation and occlusion"},
   FlareFlickerBrowserTest: {file:"Script_FlareFlickerBrowserTest.mjs",timeoutMs:600000,desc:"Actual HDR/display fluctuations and directional light redistribution"},
   FlareEffectsBrowserTest: {file:"Script_FlareEffectsBrowserTest.mjs",timeoutMs:600000,desc:"Signal and illumination: actual rendering, deterministic seek, ground lighting, cleanup and blockout playback"},
   FlareSurfaceTest: {file:"Script_FlareSurfaceTest.mjs",desc:"Authored roof triangles, holes, visibility, transforms and real flare landing"},
   FlareShadowBrowserTest: {file:"Script_FlareShadowBrowserTest.mjs",timeoutMs:600000,desc:"Packed flare depth shadows: blocked/unblocked pixels, moving casters, two slots and sampler budget"},
+  FlareShadowCoverageBrowserTest: {file:"Script_FlareShadowCoverageBrowserTest.mjs",timeoutMs:600000,desc:"Full-sphere flare shadows: simultaneous distant roof receivers, cube seams and projected-depth validity"},
   FlareWorldBrowserTest: {file:"Script_FlareWorldBrowserTest.mjs",timeoutMs:900000,desc:"Real night city roof contact and recorded spatial flare audio lifecycle"},
   TelegraphTest: { file: "Script_TelegraphTest.mjs", desc: "发报：码组推进、接头松脱与重连、报码纸勾选、走开进度保留、两个交互点预制、音效降级（纯 Node，毫秒级）" },
   RiggedModelTest: { file: "Script_RiggedModelTest.mjs", desc: "第一人称手臂 GLB 的二进制契约（纯 Node，秒级）" },
@@ -592,15 +600,21 @@ export const browserTests = new Set([
   "ParticleChannelsTest",
   "ParticleEditorControlsTest",
   "FlareEffectsBrowserTest",
+  "ShadowBatchWarmBrowserTest",
   "FlareCameraBrowserTest",
   "FlareNightBrowserTest",
   "FlarePhotometryBrowserTest",
   "FlareOpticalScaleBrowserTest",
+  "FlareGlareBrowserTest",
+  "FlareLifecycleBrowserTest",
+  "FlareBloomBrowserTest",
+  "FlareSparkBrowserTest",
   "FlareTemporalResponseBrowserTest",
   "FlareTemporalResponse30BrowserTest",
   "FlareFlickerBrowserTest",
   "FlareWorldBrowserTest",
   "FlareShadowBrowserTest",
+  "FlareShadowCoverageBrowserTest",
   "ParticleEditorWhiteboxTest",
   "ParticleEditorTest",
   "FirstLevelDistantSmokeBrowserTest",
@@ -690,6 +704,7 @@ export const browserTests = new Set([
 
 export const tier0Fast = [
   "FlareSurfaceTest",
+  "FlareShadowBoundsTest",
   "DustFlowTest",
   "ShellImpactRangeTest",
   "BlastReactionTest",
@@ -815,7 +830,7 @@ export const tier2 = [
 ];
 
 export const domains = {
-  flareEffects:{label:'Signal and illumination flares',tests:['FlareTest','FlareSurfaceTest','FlareFlickerTest','FlareParticlesTest','FlareFlickerBrowserTest','FlareEffectsBrowserTest','FlareCameraBrowserTest','FlareNightBrowserTest','FlarePhotometryBrowserTest','FlareOpticalScaleBrowserTest','FlareTemporalResponseBrowserTest','FlareTemporalResponse30BrowserTest','FlareWorldBrowserTest','FlareShadowBrowserTest','ModuleGraphTest','ParticleEditorControlsTest','ParticleEditorWhiteboxTest']},
+  flareEffects:{label:'Signal and illumination flares',tests:['FlareTest','FlareSurfaceTest','FlareShadowBoundsTest','FlareFlickerTest','FlareParticlesTest','FlareGlareTest','FlareGlareBrowserTest','FlareLifecycleBrowserTest','FlareBloomBrowserTest','FlareSparkBrowserTest','FlareFlickerBrowserTest','FlareEffectsBrowserTest','FlareCameraBrowserTest','FlareNightBrowserTest','FlarePhotometryBrowserTest','FlareOpticalScaleBrowserTest','FlareTemporalResponseBrowserTest','FlareTemporalResponse30BrowserTest','FlareWorldBrowserTest','FlareShadowBrowserTest','FlareShadowCoverageBrowserTest','ModuleGraphTest','ParticleEditorControlsTest','ParticleEditorWhiteboxTest']},
   type89MediumTank: {label:"Type89 optional articulated reference tank",tests:["Type89MediumTankTest","Type89MediumTankBrowserTest","ModelFacingTest","AssetStandardsTest","ModuleGraphTest"]},
   nakajimaKi4: { label: "Ki4 standalone reference aircraft", tests: ["NakajimaKi4AssetTest", "NakajimaKi4ReleaseAssetTest", "AssetStandardsTest"],tier2Tests:["NakajimaKi4AoFieldTest","NakajimaKi4ReleaseBrowserTest"] },
   kawasakiType88: { label: "八八式侦察机二型独立资产", tests: ["KawasakiType88AssetTest", "KawasakiType88BrowserTest", "ModelFacingTest", "AssetStandardsTest", "ModuleGraphTest"] },
@@ -925,7 +940,7 @@ export const domains = {
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
     // 开机顺序（存档画质何时套上）与关卡预热的改动连着 SavedGraphicsWarmTest 跑（约一分半）；
     // 预热按白盒档（出厂默认）编对没有，看 WhiteboxShaderWarmTest（约一分半）。
-    tests: ["MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "TerrainTrailsTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "PrepassStaticBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest", "WhiteboxShaderWarmTest"],
+    tests: ["MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "TerrainBlendTest", "TerrainTrailsTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "ShadowBatchWarmBrowserTest", "PrepassStaticBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest", "WhiteboxShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -951,7 +966,7 @@ export const domains = {
 
 const changedDomainRules = [
   {domain:'particles',pattern:/FallingSoil/},
-  {domain:'flareEffects',pattern:/Flare(?:Visual|Optics|Particles|OpticalScale|Flicker|Photometry|TemporalResponse|Camera|Night|Field|Shadow|Surface|World|Track|Effects|Test|\.mjs)|Tuning_Flare/},
+  {domain:'flareEffects',pattern:/Flare(?:Visual|Optics|Particles|Glare|Lifecycle|Bloom|Spark|OpticalScale|Flicker|Photometry|TemporalResponse|Camera|Night|Field|Shadow(?:Coverage|Bounds)?|Surface|World|Track|Effects|Test|\.mjs)|Tuning_Flare/},
   {domain:'combat',pattern:/HanYang173R/},
   {domain:"type89MediumTank",pattern:/Type89|Data_VehicleAssets|Script_EditorPropLibrary/},
   {domain:"menu",pattern:/ToolsHome|Icon_TabSeal/},
@@ -1047,7 +1062,7 @@ const changedDomainRules = [
   // Script_SkinnedClone 还被 /Skinn/ 那条拉进 motionVector（骨骼历史按 Skeleton 记）。
   // Script_ShadowSkip 是阴影烘焙那一趟的子树跳过包装（ShadowSkipTest 是它的纯 Node 门禁）。
   // 预通道藏出分类按顶层子树增量重建（PrepassSkipTest 是它的纯 Node 门禁）。
-  { domain: "render", pattern: /Script_SkinnedClone|Script_ShadowDepth|Script_OverrideVariants|Script_ShadowSkip|Script_BonePrune|Script_ShadowCasterBatch|Script_PostPrepass|Script_PrepassSkip|Script_PrepassStaticBatch/ },
+  { domain: "render", pattern: /Script_SkinnedClone|Script_ShadowDepth|Script_OverrideVariants|Script_ShadowSkip|Script_BonePrune|Script_ShadowCasterBatch|Script_ShadowBatchWarm|Script_PostPrepass|Script_PrepassSkip|Script_PrepassStaticBatch/ },
   // 2026.09.19 第二波：被测对象从军列车厢里的腊肉/背包换成 12/13 牛马车上老周的担架与车上近景件
   // （军列开场已下线）。改牛马车的那两个模块也要拉进这个域。
   {domain:"firstLevel",pattern:/CartCorpseBump/},

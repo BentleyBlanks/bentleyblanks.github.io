@@ -11,6 +11,7 @@
 import * as THREE from "three";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
 import { BLOOM } from "./Data_Tuning_Camera.mjs";
+import {FLARE_ART as FLARE_ART,FLARE_GLARE as FLARE_GLARE} from './Data_Tuning_FlareEffects.mjs';
 
 // --- 泛光：亮部提取 + 13 抽样降采样 + 3x3 tent 升采样 -----------------------
 //
@@ -29,15 +30,44 @@ uniform float uThreshold;
 uniform float uKnee;
 uniform float uClamp;
 uniform float uPackSky;
+uniform vec4 uFlareClampSource[${FLARE_GLARE.slots}]; // uv, linear view depth, physical radius
+uniform vec2 uFlareClampProjScale;
+uniform vec2 uFlareClampDepthOffset;
+uniform vec2 uFlareClampPixelFootprint;
 varying vec2 vUv;
 ${GLSL_COMMON}
+bool FlareClampRegion(vec2 uv){
+ for(int i=0;i<${FLARE_GLARE.slots};i++){
+  vec4 source=uFlareClampSource[i];if(source.w<=0.)continue;
+  vec2 radius=source.w*uFlareClampProjScale/(2.*source.z)+uFlareClampPixelFootprint;
+  vec2 local=(uv-source.xy)/radius;if(dot(local,local)>1.)continue;
+  vec2 center=source.xy+uFlareClampDepthOffset;
+  if(any(lessThan(center,vec2(0.)))||any(greaterThan(center,vec2(1.))))continue;
+  float centreDepth=texture2D(uNormalDepth,center).w;
+  if(centreDepth>.0001&&centreDepth+${FLARE_GLARE.depthBiasM.toFixed(6)}<source.z)continue;
+  // The source may be visible beside an edge; unrelated foreground in its
+  // small support must still retain the original bright-pass clamp.
+  vec2 depthUv=uv+uFlareClampDepthOffset;
+  if(any(lessThan(depthUv,vec2(0.)))||any(greaterThan(depthUv,vec2(1.))))continue;
+  float fragmentDepth=texture2D(uNormalDepth,depthUv).w;
+  if(fragmentDepth>.0001&&fragmentDepth+${FLARE_GLARE.depthBiasM.toFixed(6)}<source.z)continue;
+  return true;
+ }
+ return false;
+}
 void main() {
   vec3 c = texture2D(uSource, vUv).rgb;
   // 增益 1.0（自动曝光关着 = 纯白 1×1）时下面三行精确等于旧版
   float invGain = 1.0 / max(texture2D(uExposureTex, vec2(0.5)).r, 1e-4);
   float threshold = uThreshold * invGain;
   float knee = uKnee * invGain;
-  c = min(c, vec3(uClamp * invGain));       // 防单个超亮像素把整屏糊成白饼
+  if(FlareClampRegion(vUv)) {
+    // A channel-wise cap turns a very bright red star into white. Preserve
+    // chromaticity only at the visible optical emitter, with the same peak cap.
+    c *= min(1.,uClamp*invGain/max(max(c.r,max(c.g,c.b)),1e-4));
+  } else {
+    c = min(c, vec3(uClamp * invGain));       // 防单个超亮像素把整屏糊成白饼
+  }
   float br = max(c.r, max(c.g, c.b));
   // 软膝：硬阈值会在爆点边缘切出一圈生硬的轮廓
   float soft = clamp(br - threshold + knee, 0.0, 2.0 * knee);
@@ -163,6 +193,10 @@ export class BloomPass {
       uExposureTex: { value: null },
       uThreshold: { value: 1.18 }, uKnee: { value: 0.55 }, uClamp: { value: 40 },
       uPackSky: { value: 0 },
+      uFlareClampSource: { value: Array.from({length:FLARE_GLARE.slots},()=>new THREE.Vector4()) },
+      uFlareClampProjScale: { value: new THREE.Vector2(1,1) },
+      uFlareClampDepthOffset: { value: new THREE.Vector2() },
+      uFlareClampPixelFootprint: { value: new THREE.Vector2() },
     };
     this.matBright = MakeFullscreenMaterial(FRAG_BRIGHT, this.uniformsBright);
     this.uniformsDown = {
@@ -179,6 +213,39 @@ export class BloomPass {
     this.matUp = MakeFullscreenMaterial(FRAG_UPSAMPLE, this.uniformsUp);
     this.bright = null;
     this.mips = [];
+    this.flareHuePreserving=true; // Diagnostic A/B override; ordinary pixels keep the old path.
+    this.flareClampPoint=new THREE.Vector3();
+    this.flareClampView=new THREE.Vector3();
+  }
+
+  UpdateFlareClamp(ctx) {
+    const U=this.uniformsBright;
+    for(const source of U.uFlareClampSource.value)source.w=0;
+    // FrameContext retains normalDepthTexture across frames. An allocated or
+    // stale texture is not proof that the prepass ran (whitebox can gate it).
+    const depth=this.pipeline.prepassPass?.normalDepthTexture;
+    if(!this.flareHuePreserving||!this.pipeline.lastRenderedPasses?.includes('prepass')
+      ||!depth||ctx.normalDepthTexture!==depth)return;
+    const sources=[];
+    for(const source of this.pipeline.lensFlarePass?.source?.fireSources?.values()||[]){
+      if(!source.opticalEmitter||source.emitterVisible===false||!(source.currentIntensity>0))continue;
+      const view=this.flareClampView.copy(source.position).applyMatrix4(ctx.view),depth=-view.z;
+      if(depth<=ctx.camera.near||depth>=ctx.camera.far)continue;
+      const point=this.flareClampPoint.copy(source.position).project(ctx.camera);
+      if(Math.max(Math.abs(point.x),Math.abs(point.y))>1.05)continue;
+      const color=source.currentColor||source.color,distance2=source.position.distanceToSquared(ctx.camera.position);
+      sources.push({x:point.x*.5+.5,y:point.y*.5+.5,depth,
+        score:source.currentIntensity*(color.r*.2126+color.g*.7152+color.b*.0722)/Math.max(1,distance2),handle:source.handle});
+    }
+    sources.sort((a,b)=>b.score-a.score||a.handle-b.handle);
+    for(let i=0;i<Math.min(FLARE_GLARE.slots,sources.length);i++){
+      const source=sources[i];U.uFlareClampSource.value[i].set(source.x,source.y,source.depth,FLARE_ART.glowSize*.5);
+    }
+    U.uFlareClampProjScale.value.copy(ctx.projScale);
+    U.uFlareClampDepthOffset.value.set(-ctx.jitterX/ctx.width,-ctx.jitterY/ctx.height);
+    // Two bright-buffer pixels cover the sub-pixel core reconstruction and the
+    // source-color sampling footprint without changing unrelated bloom regions.
+    U.uFlareClampPixelFootprint.value.set(2/this.bright.width,2/this.bright.height);
   }
 
   Enabled() { return true; }
@@ -205,6 +272,7 @@ export class BloomPass {
   }
 
   Render(ctx) {
+    this.UpdateFlareClamp(ctx);
     this.uniformsBright.uSource.value = ctx.sceneColor.texture;
     this.uniformsBright.uNormalDepth.value = ctx.normalDepthTexture;
     // 阈值跟随曝光：自动曝光关着时这张是纯白 1×1，除出来精确等于旧版

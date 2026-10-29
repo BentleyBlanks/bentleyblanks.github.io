@@ -1,25 +1,42 @@
 // Shared absolute-time flare optics. Cloth is a reconstruction, not a measured cartridge.
 import * as THREE from 'three';
-import {FLARE_ART as A,FLARE_OPTICS as O,FLARE_PHOTOMETRY as P} from './Data_Tuning_FlareEffects.mjs';
-import {SampleFlareAttitude,FlareCoreRadiance,FLARE_ANGULAR_GLSL} from './Script_FlareOptics.mjs';
-import {SampleFlareRelease,SampleFlareSpark} from './Script_FlareParticles.mjs';
+import {FLARE_ART as A,FLARE_OPTICS as O,FLARE_PHOTOMETRY as P,FLARE_COMBUSTION as C} from './Data_Tuning_FlareEffects.mjs';
+import {SampleFlareAttitude,FlareCoreRadiance,SampleFlareCombustion,FlareLaunchEmission,FlarePhotometricScale,FLARE_ANGULAR_GLSL} from './Script_FlareOptics.mjs';
+import {SampleFlareSmoke,SampleFlareSpark,SampleFlareFlowDirection} from './Script_FlareParticles.mjs';
 import {SampleFlarePosition} from './Script_Flare.mjs';
 
-const VERTEX=`varying vec2 vUv;varying float vAge;varying float vSeed;varying vec3 vWorld;
+const VERTEX=`varying vec2 vUv;varying float vAge;varying float vSeed;varying vec3 vWorld;varying vec2 vParticleRatio;
 attribute float age;attribute float seed;
-uniform vec3 flameAxis;uniform float mode;
+uniform vec3 flameAxis;uniform vec3 launchAxis;uniform float mode;
 void main(){vUv=uv;vAge=age;vSeed=seed;
  vec4 world=modelMatrix*instanceMatrix*vec4(0.,0.,0.,1.);vWorld=world.xyz;
  vec4 center=viewMatrix*world;
- vec2 up=(viewMatrix*vec4(mode<.5?flameAxis:vec3(0.,1.,0.),0.)).xy;up=length(up)>.01?normalize(up):vec2(0.,1.);
+ vec2 physicalSize=vec2(length(instanceMatrix[0].xyz),length(instanceMatrix[1].xyz));
+ vec2 rasterSize=physicalSize;vParticleRatio=vec2(1.);
+ if((mode>1.5&&age>=0.)||(mode<.5&&age>.5)){
+  // A millimetre particle at 100 m is much smaller than one sample. Enlarge
+  // only its raster carrier, then preserve its actual projected area below.
+  float support=mode>1.5?${A.sparkRasterSupportRad}:${C.launchRasterSupportRad};
+  rasterSize=max(physicalSize,vec2(max(0.,-center.z)*support));
+  vParticleRatio=physicalSize/max(rasterSize,vec2(.000001));
+ }
+ vec2 up=(viewMatrix*vec4(mode<.5?(age>.5?launchAxis:flameAxis):vec3(0.,1.,0.),0.)).xy;up=length(up)>.01?normalize(up):vec2(0.,1.);
  vec2 right=vec2(up.y,-up.x);
- center.xy+=right*position.x*length(instanceMatrix[0].xyz)+up*position.y*length(instanceMatrix[1].xyz);
+ center.xy+=right*position.x*rasterSize.x+up*position.y*rasterSize.y;
  gl_Position=projectionMatrix*center;}`;
 const FRAGMENT=`precision highp float;
-varying vec2 vUv;varying float vAge;varying float vSeed;varying vec3 vWorld;
+varying vec2 vUv;varying float vAge;varying float vSeed;varying vec3 vWorld;varying vec2 vParticleRatio;
 uniform vec3 tint;uniform vec3 ambient;uniform vec3 lightPosition;
 uniform float mode;uniform float clock;uniform float power;uniform float candle;uniform float scatter;
 uniform float opacityScale;
+uniform vec4 combustion; // width, length, aspect, cold residual
+uniform vec2 ember; // independent residual radiance and shrinking extent
+uniform float launchPower;
+uniform vec3 launchTint;
+uniform vec4 otherLight[${A.smokeLightSlots}];
+uniform vec3 otherTint[${A.smokeLightSlots}];
+uniform vec3 otherAxis[${A.smokeLightSlots}];
+uniform vec2 otherLobe[${A.smokeLightSlots}];
 uniform vec3 flameAxis;uniform float directional;
 ${FLARE_ANGULAR_GLSL}
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
@@ -28,25 +45,52 @@ float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
 float fbm(vec2 p){return .57*noise(p)+.28*noise(p*2.03+11.)+.15*noise(p*4.11-7.);}
 void main(){vec2 p=(vUv-.5)*2.;float r2=dot(p,p);if(r2>1.||vAge<0.)discard;
  if(mode<.5){
-  float n=fbm(p*9.+vec2(clock*1.4,-clock*9.));
-  float width=.045+.025*n;
-  float tongue=exp(-pow((p.x+.022*sin(clock*13.+p.y*20.))/width,2.))*smoothstep(-.04,.02,p.y)*(1.-smoothstep(.04,.35,p.y))*(.25+.75*n);
+  if(vAge>.5){
+   vec2 physical=p/max(vParticleRatio,vec2(.000001));
+   // Each horizontal strip has a normalized Gaussian integral. Let its bend
+   // and width change along the jet, while its unresolved total flux stays
+   // independent of whichever subpixel happens to sample that shape.
+   float n=fbm(vec2(physical.y*11.+clock*31.,-clock*47.));
+   float width=.11+.13*n;
+   float footprint=max(length(dFdx(p)),length(dFdy(p)));
+   vec2 radius2=vec2(width*width,.48*.48)*vParticleRatio*vParticleRatio+footprint*footprint*.35;
+   vec2 offset=vec2(-.05*(n-.5),.1)*vParticleRatio;
+   float area=(.11+.13*.5)*.48*vParticleRatio.x*vParticleRatio.y/sqrt(radius2.x*radius2.y);
+   float jet=exp(-dot((p-offset)*(p-offset),1./radius2))*area;
+   vec3 launchRadiance=launchTint*jet*launchPower;
+   launchRadiance*=min(1.,${P.radianceMax.toFixed(1)}/max(max(launchRadiance.r,max(launchRadiance.g,launchRadiance.b)),.0001));
+   gl_FragColor=vec4(launchRadiance,1.);
+  }else{
+  vec2 local=p/max(combustion.xy,vec2(.001));
+  float n=fbm(local*9.+vec2(clock*2.7,-clock*17.));
+  float bend=.014*(noise(vec2(local.y*28.-clock*11.,clock*2.3))-.5);
+  float width=.024+.022*n;
+  float tongue=exp(-pow((local.x+bend+.01*sin(clock*29.+local.y*24.))/width,2.))*smoothstep(-.025,.02,local.y)*(1.-smoothstep(.04,.35,local.y))*(.2+.8*n);
   // Pixel-area filtering prevents a physically small star disappearing between
   // samples in the full-flight view. Integral stays constant as its radius grows.
   float footprint=max(length(dFdx(p)),length(dFdy(p)));
-  float radius2=${P.coreRadiusSquared}+footprint*footprint*.35;
-  float core=exp(-r2/radius2)*${P.coreRadiusSquared}/radius2;
+  vec2 physical=vec2(combustion.x*combustion.z,combustion.y/combustion.z);
+  vec2 radius2=${P.coreRadiusSquared}*physical*physical+footprint*footprint*.35;
+  vec2 offset=vec2(bend*combustion.x,0.);
+  float core=exp(-dot((p-offset)*(p-offset),1./radius2))*${P.coreRadiusSquared}*combustion.x*combustion.y/sqrt(radius2.x*radius2.y);
   float emission=directional>.5?FlareEmissionGain(flameAxis,normalize(cameraPosition-vWorld),${O.angularFloor},${O.angularPower}):1.;
-  vec3 radiance=tint*(core*${P.coreFraction}+tongue*.07)*power*emission;
+  vec3 radiance=tint*(core*${P.coreFraction}+tongue*${C.tongueFraction})*power*emission;
+  vec2 emberSize=vec2(${C.emberWidth},${C.emberLength})*ember.y;
+  vec2 emberRadius=${P.coreRadiusSquared}*emberSize*emberSize+footprint*footprint*.35;
+  float emberCore=exp(-dot(p*p,1./emberRadius))*${P.coreRadiusSquared}*emberSize.x*emberSize.y/sqrt(emberRadius.x*emberRadius.y);
+  radiance+=vec3(1.,.12,.008)*emberCore*ember.x;
   // Do not clamp candlepower before area filtering: that made red and white
   // sources converge to the same intensity. Preserve color at half-float limit.
   radiance*=min(1.,${P.radianceMax.toFixed(1)}/max(max(radiance.r,max(radiance.g,radiance.b)),.0001));
   gl_FragColor=vec4(radiance,1.);
+  }
  }else if(mode>1.5){
   float heat=pow(max(0.,1.-vAge),1.8);
   float footprint=max(length(dFdx(p)),length(dFdy(p)));
-  float radius2=1./12.+footprint*footprint*.35;
-  gl_FragColor=vec4(mix(vec3(1.,.14,.01),vec3(1.,.8,.35),heat)*exp(-r2/radius2)/(12.*radius2)*heat*power,1.);
+  vec2 radius2=vParticleRatio*vParticleRatio/12.+footprint*footprint*.35;
+  float area=vParticleRatio.x*vParticleRatio.y/(12.*sqrt(radius2.x*radius2.y));
+  float filtered=exp(-dot(p*p,1./radius2))*area;
+  gl_FragColor=vec4(mix(vec3(1.,.14,.01),vec3(1.,.8,.35),heat)*filtered*heat*power,1.);
  }else{
   vec2 q=p+vec2(vSeed*17.,vSeed*9.)+vec2(vAge*.3,-vAge*.5);
   float n=fbm(q*3.5),edge=pow(max(0.,1.-r2),1.5);
@@ -54,6 +98,12 @@ void main(){vec2 p=(vUv-.5)*2.;float r2=dot(p,p);if(r2>1.||vAge<0.)discard;
   vec3 delta=vWorld-lightPosition;
   float emission=directional>.5?FlareEmissionGain(flameAxis,normalize(delta),${O.angularFloor},${O.angularPower}):1.;
   vec3 incident=ambient+tint*candle*scatter*emission/(dot(delta,delta)+4.);
+  for(int i=0;i<${A.smokeLightSlots};i++){
+   if(otherLight[i].w<=0.)continue;
+   vec3 offset=vWorld-otherLight[i].xyz;
+   float gain=otherLobe[i].x<0.?1.:FlareEmissionGain(otherAxis[i],offset*inversesqrt(max(dot(offset,offset),.000001)),otherLobe[i].x,otherLobe[i].y);
+   incident+=otherTint[i]*otherLight[i].w*scatter*gain/(dot(offset,offset)+4.);
+  }
   gl_FragColor=vec4(vec3(.46,.45,.42)*incident,1.-exp(-density*opacityScale));
  }
  #include <tonemapping_fragment>
@@ -80,7 +130,12 @@ function Cards(count,mode,color){
  const material=new THREE.ShaderMaterial({vertexShader:VERTEX,fragmentShader:FRAGMENT,
   uniforms:{tint:{value:new THREE.Color(color)},ambient:{value:new THREE.Color()},lightPosition:{value:new THREE.Vector3()},
     mode:{value:mode},clock:{value:0},power:{value:1},candle:{value:0},scatter:{value:A.smokeScatter},
-    flameAxis:{value:new THREE.Vector3(0,-1,0)},directional:{value:0},opacityScale:{value:A.smokeOpacity}},
+    flameAxis:{value:new THREE.Vector3(0,-1,0)},directional:{value:0},opacityScale:{value:A.smokeOpacity},combustion:{value:new THREE.Vector4(1,1,1,0)},ember:{value:new THREE.Vector2()},
+    otherLight:{value:Array.from({length:A.smokeLightSlots},()=>new THREE.Vector4())},
+    otherTint:{value:Array.from({length:A.smokeLightSlots},()=>new THREE.Color())},
+    otherAxis:{value:Array.from({length:A.smokeLightSlots},()=>new THREE.Vector3(0,-1,0))},
+    otherLobe:{value:Array.from({length:A.smokeLightSlots},()=>new THREE.Vector2(-1,1))},
+    launchPower:{value:0},launchTint:{value:new THREE.Color(C.launchColor)},launchAxis:{value:new THREE.Vector3(0,1,0)}},
   transparent:true,depthWrite:false,depthTest:true,blending:mode===1?THREE.NormalBlending:THREE.AdditiveBlending});
  const mesh=new THREE.InstancedMesh(geometry,material,count);mesh.frustumCulled=false;
  mesh.name=mode===0?'FlareRadiance':mode===1?'FlareSmoke':'FlareEmbers';return mesh;
@@ -127,7 +182,7 @@ const FoldedHeight=(a,r)=>A.foldedClothBaseM+A.foldedClothWrinkleM*(Math.sin(a*3
 export class FlareVisuals {
  constructor(parent,lights=null){this.root=new THREE.Group();this.root.name='FlareEffects';parent.add(this.root);this.items=new Set();this.lights=lights;this.ambient=new THREE.Color();this.sun=new THREE.Color();}
  Add(flare,surfaceHeight=null){
-  const root=new THREE.Group(),head=Cards(1,0,flare.lightColor),smoke=Cards(A.smokeCount,1,flare.lightColor),sparks=Cards(A.sparkCount,2,0xffac50),suspension=MakeSuspension(),candle=Candle();
+  const root=new THREE.Group(),head=Cards(2,0,flare.lightColor),smoke=Cards(A.smokeCount,1,flare.lightColor),sparks=Cards(A.sparkCount,2,0xffac50),suspension=MakeSuspension(),candle=Candle();
   const canopy=suspension.group;canopy.add(candle);
   const carrier=Candle();carrier.name='FlareDiscardedCarrier';carrier.scale.set(1.18,1.35,1.18);
   root.name='Flare/'+flare.id;root.add(head,smoke,sparks,canopy,carrier);this.root.add(root);
@@ -199,14 +254,21 @@ export class FlareVisuals {
   const {head,smoke,sparks,canopy}=item,t=f.t,since=t-f.ignitedAt;
   const opened=Smooth(0,A.openingS,since),settle=f.landed?Smooth(0,A.settleS,t-f.landing.t):0;
   const fade=f.landed?1-Smooth(f.endAt-A.groundFadeS,f.endAt,t):1;
-  head.material.uniforms.clock.value=t;
-  head.material.uniforms.power.value=since>=0?FlareCoreRadiance(f):0;
+  head.material.uniforms.clock.value=t+f.flickerPhase*.743;
+  const combustion=SampleFlareCombustion(f,t);
+  head.material.uniforms.combustion.value.set(combustion.width,combustion.length,combustion.aspect,0);
+  head.material.uniforms.ember.value.set(C.emberRadiance*combustion.ember*(f.sceneScale??1),combustion.emberScale);
+  head.material.uniforms.power.value=combustion.active?FlareCoreRadiance(f,combustion.width*combustion.length):0;
+  const launch=FlareLaunchEmission(f,t),launchScale=(f.sceneScale??1)*FlarePhotometricScale(C.launchColor);
+  head.material.uniforms.launchPower.value=C.launchRadiance*launch*launchScale;
+  head.material.uniforms.launchAxis.value.set(f.at.x-f.from.x,2*f.apexM,f.at.z-f.from.z).normalize();
   sparks.material.uniforms.power.value=A.sparkRadiance*(f.sceneScale??1);
-  const earlier=SampleFlarePosition(f,Math.max(0,t-.02)),axis=head.material.uniforms.flameAxis.value;
+  const flow=SampleFlareFlowDirection(f,t),axis=head.material.uniforms.flameAxis.value;
   const attitude=SampleFlareAttitude(f,t);
-  if(f.opticalMotion)axis.copy(attitude.direction);else if(f.parachute)axis.set(0,-1,0);else axis.set(earlier.x-f.pos.x,earlier.y-f.pos.y,earlier.z-f.pos.z).normalize();
+  axis.set(flow.x,flow.y,flow.z);
   head.material.uniforms.directional.value=f.opticalMotion?1:0;
-  Put(head,0,f.pos.x,f.pos.y,f.pos.z,A.glowSize,0);Flush(head);
+  Put(head,0,f.pos.x,f.pos.y,f.pos.z,A.glowSize,0);
+  Put(head,1,f.from.x,f.groundY+A.launchHeight,f.from.z,f.parachute?C.whiteLaunchSizeM:C.signalLaunchSizeM,launch>0?1:-1);Flush(head);
   canopy.visible=f.parachute!==false&&!f.launchObstructed&&since>=0;
   canopy.position.set(f.pos.x,f.pos.y,f.pos.z);canopy.rotation.set(Math.sin(since*1.7)*.035*opened*(1-settle),0,Math.sin(since*2+f.swayPhase)*.055*opened*(1-settle));
   if(f.opticalMotion)canopy.rotation.set(attitude.x,0,attitude.z);
@@ -225,22 +287,28 @@ export class FlareVisuals {
     item.carrier.material.opacity=1-Smooth((f.carrierLanding?.t??0)+2,(f.carrierLanding?.t??0)+3,t);
   }
   const u=smoke.material.uniforms;u.ambient.value.copy(this.ambient).add(this.sun.clone().multiplyScalar(.65));u.lightPosition.value.set(f.pos.x,f.pos.y,f.pos.z);u.candle.value=f.intensity*(f.photometricScale??1)*(f.sceneScale??1);
-  u.flameAxis.value.copy(axis);u.directional.value=f.opticalMotion?1:0;
+  u.tint.value.setHex(launch>0?C.launchColor:f.lightColor);
+  if(launch>0){u.lightPosition.value.set(f.from.x,f.groundY+A.launchHeight,f.from.z);u.candle.value=C.launchCd*launch*launchScale;}
+  u.flameAxis.value.copy(axis);u.directional.value=launch>0?0:f.opticalMotion?1:0;
+  const neighbors=[];
+  for(const source of this.lights?.fireSources?.values()||[]){
+   if(source.handle===f.lightHandle||!(source.currentIntensity>0))continue;
+   const intensity=source.currentIntensity,distance=(source.position.x-f.pos.x)**2+(source.position.y-f.pos.y)**2+(source.position.z-f.pos.z)**2;
+   neighbors.push({source,score:intensity/(distance+4)});
+  }
+  neighbors.sort((a,b)=>b.score-a.score);
+  for(let i=0;i<A.smokeLightSlots;i++){
+   const source=neighbors[i]?.source;
+   if(!source){u.otherLight.value[i].w=0;continue;}
+   u.otherLight.value[i].set(source.position.x,source.position.y,source.position.z,source.currentIntensity);
+   u.otherTint.value[i].copy(source.currentColor||source.color);
+   u.otherAxis.value[i].copy(source.emission?.direction||up);
+   u.otherLobe.value[i].set(source.emission?.floor??-1,source.emission?.power??1);
+  }
   for(let i=0;i<A.smokeCount;i++){
-   const born=(Math.floor(t*A.smokeHz)-i)/A.smokeHz,age=t-born;
-   const launch=born>=0&&born<.16;
-   if((born<f.ignitedAt&&!launch)||born>f.outAt||age>A.smokeLife){Put(smoke,i,0,0,0,0,-1);continue;}
-   const release=SampleFlareRelease(f,born),p=launch?{x:f.from.x,y:f.groundY+A.launchHeight,z:f.from.z}:release.position;
-   const seed=Math.sin(born*74.7+f.swayPhase)*.5+.5;
-   const spread=.025+age*.09+(f.parachute&&!launch ? .22*Smooth(.25,.9,age) : 0);
-   const drag=A.smokeDragS*(1-Math.exp(-age/A.smokeDragS));
-   const {x:vx,y:vy,z:vz}=launch?{x:0,y:0,z:0}:release.velocity;
-   // The descending canopy crosses its own buoyant wake. Deflect that wake
-   // around the leeward skirt instead of drawing a bright tube through silk.
-   const wake=f.parachute&&!launch?A.canopyRadius*1.2*Smooth(.25,.8,age):0;
-   Put(smoke,i,p.x+Math.sin(f.driftDirRad)*(f.driftMS*age+wake)+vx*drag+Math.sin(born*3.7+age)*spread,
-    p.y+vy*drag+age*A.smokeRiseMS-(f.parachute&&!launch?.16:0),
-    p.z+Math.cos(f.driftDirRad)*(f.driftMS*age+wake)+vz*drag+Math.cos(born*4.1-age*.4)*spread,.1+age*.32,age/A.smokeLife,seed);
+   const p=SampleFlareSmoke(f,t,i);
+   if(!p){Put(smoke,i,0,0,0,0,-1);continue;}
+   Put(smoke,i,p.x,p.y,p.z,p.size,p.age/p.life,p.seed);
   }Flush(smoke);
   for(let i=0;i<A.sparkCount;i++){
    const p=SampleFlareSpark(f,t,i);

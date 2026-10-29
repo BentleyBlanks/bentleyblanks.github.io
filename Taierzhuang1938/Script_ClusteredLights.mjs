@@ -33,8 +33,9 @@
 //
 // ## 已知近似（都是有意的）
 //   · 簇用 AABB 而不是精确棱台（多算进来的灯被逆平方压成 0，画面无差别）；
-//   · 局部光**不投影**。只有「英雄光」那一盏可以退回三方 `PointLight`
-//     走立方体阴影（`Data_Tuning_Lights.heroShadow`，出厂关，账见 docs）；
+//   · 普通局部光不投影；「英雄光」可退回三方 `PointLight` 立方阴影
+//     （`Data_Tuning_Lights.heroShadow`，出厂关）。照明/信号弹另用最多两个
+//     打包点影源：近/远接收锥，必要时立方视图，仍复用同一份簇纹理；
 //   · 簇网格用 `camera.projectionMatrix` 现取，TAA 抖动逐帧对齐；但簇分配
 //     用的是**上一次 Update 的相机**，同一帧里预通道与主场景共用一份表。
 //
@@ -107,8 +108,10 @@ uniform vec4 uClusterDepth;
 uniform vec2 uClusterScreen;
 // x = 索引带的起始**分量号** y = 光源数据带的起始**纹素号**
 uniform vec2 uClusterBands;
-uniform mat4 uFlareShadowMatrix[${FLARE_SHADOW.slots}];
-uniform vec4 uFlareShadowInfo[${FLARE_SHADOW.slots}];
+uniform mat4 uFlareShadowMatrix[${FLARE_SHADOW.slots*FLARE_SHADOW.faces}];
+uniform vec4 uFlareShadowInfo[${FLARE_SHADOW.slots*FLARE_SHADOW.faces}];
+uniform vec4 uFlareShadowPosition[${FLARE_SHADOW.slots}]; // xyz view, w adaptive layout
+uniform mat3 uFlareShadowViewRotation;
 ${FLARE_ANGULAR_GLSL}
 
 // 分量寻址：一张 RGBA32F 里的第 n 个 32 位格。簇表与索引存的是整数，
@@ -127,24 +130,49 @@ vec4 ClusterTexel(int clusterTexel) {
 }
 // Matrix maps current view space to the LAST rendered shadow camera. Keeping
 // that matrix with its map prevents alternating slots from swimming as we move.
-float ClusterFlareShadow(int slot, vec3 position, vec3 normal) {
-  vec4 info = uFlareShadowInfo[slot];
+float ClusterFlareMapShadow(int map, vec3 receiver) {
+  vec4 info = uFlareShadowInfo[map];
   if (info.w < 0.5) return 1.0;
-  vec4 p = uFlareShadowMatrix[slot] * vec4(position + normal * ${FLARE_SHADOW.normalBiasM}, 1.0);
+  vec4 p = uFlareShadowMatrix[map] * vec4(receiver, 1.0);
   vec2 uv = p.xy / p.w * 0.5 + 0.5;
-  if (p.w <= 0.0 || any(lessThan(uv,vec2(0.0))) || any(greaterThan(uv,vec2(1.0)))) return 1.0;
-  vec2 pixel = uv * ${FLARE_SHADOW.size}.0 - 0.5;
+  if (p.w <= 0.0 || p.z < -p.w || p.z > p.w
+    || any(lessThan(uv,vec2(-0.00001))) || any(greaterThan(uv,vec2(1.00001)))) return 1.0;
+  int size = int(max(info.z,${FLARE_SHADOW.size}.0));
+  vec2 pixel = uv * float(size) - 0.5;
   ivec2 base = ivec2(floor(pixel));
   vec2 f = fract(pixel);
   float visibility = 0.0;
   for(int y=0;y<2;y++) for(int x=0;x<2;x++) {
-    ivec2 q = clamp(base+ivec2(x,y),ivec2(0),ivec2(${FLARE_SHADOW.size-1}));
-    int index = q.y * ${FLARE_SHADOW.size} + q.x;
+    ivec2 q = clamp(base+ivec2(x,y),ivec2(0),ivec2(size-1));
+    int index = q.y * size + q.x;
     float depth = ClusterTexel(int(info.x) + (index >> 2))[index & 3];
     vec2 weight = mix(vec2(1.0)-f, f, vec2(float(x),float(y)));
     visibility += step(p.w - info.y, depth) * weight.x * weight.y;
   }
   return visibility;
+}
+float ClusterFlareShadow(int slot, vec3 position, vec3 normal) {
+  vec3 receiver = position + normal * ${FLARE_SHADOW.normalBiasM};
+  int base = slot * ${FLARE_SHADOW.faces};
+  if(uFlareShadowPosition[slot].w>0.5){
+    // Adaptive far1024 uses the first four512 areas; the local512 view starts
+    // at area4. Blend only near its edge so the resolution change has no seam.
+    vec4 p=uFlareShadowMatrix[base+4]*vec4(receiver,1.0);
+    vec3 q=p.xyz/max(p.w,1e-6);
+    float edge=max(abs(q.x),abs(q.y));
+    if(p.w>0.0&&abs(q.z)<=1.0&&edge<1.0&&uFlareShadowInfo[base+4].w>.5){
+      float nearVisibility=ClusterFlareMapShadow(base+4,receiver);
+      if(edge<.94)return nearVisibility;
+      return mix(ClusterFlareMapShadow(base,receiver),nearVisibility,1.0-smoothstep(.94,1.0,edge));
+    }
+    return ClusterFlareMapShadow(base,receiver);
+  }
+  // Cube fallback retains the last WORLD origin as the main view changes.
+  vec3 direction=uFlareShadowViewRotation*(receiver-uFlareShadowPosition[slot].xyz);
+  vec3 magnitude=abs(direction);
+  int face=magnitude.x>=magnitude.y&&magnitude.x>=magnitude.z?(direction.x>=0.0?0:1)
+    :magnitude.y>=magnitude.z?(direction.y>=0.0?2:3):(direction.z>=0.0?4:5);
+  return ClusterFlareMapShadow(base+face,receiver);
 }`;
 
 /**
@@ -236,6 +264,8 @@ export function BindClusterUniforms(uniforms, cluster) {
   uniforms.uClusterScreen = u.uClusterScreen;
   uniforms.uFlareShadowMatrix = u.uFlareShadowMatrix;
   uniforms.uFlareShadowInfo = u.uFlareShadowInfo;
+  uniforms.uFlareShadowPosition = u.uFlareShadowPosition;
+  uniforms.uFlareShadowViewRotation = u.uFlareShadowViewRotation;
   return uniforms;
 }
 
@@ -297,7 +327,9 @@ export class ClusteredLights {
     const rowUnits = CLUSTER_DATA_TEX_WIDTH * 4;
     this.metadataUnits = Math.ceil((lightBase + lightUnits) / rowUnits) * rowUnits;
     this.shadowBase = this.metadataUnits / 4;
-    const totalUnits = this.metadataUnits + FLARE_SHADOW.slots * FLARE_SHADOW.size ** 2;
+    // The packed depth band is created only when a shadow-casting flare is
+    // actually selected. Ordinary/low-quality scenes retain metadata only.
+    const totalUnits = this.metadataUnits;
     this.dataUnits = totalUnits;
     this.indexBase = indexBase;
     this.lightBase = lightBase;
@@ -323,8 +355,10 @@ export class ClusteredLights {
     this.dataTexture.needsUpdate = true;
 
     this.uniforms = {
-      uFlareShadowMatrix: {value:Array.from({length:FLARE_SHADOW.slots},()=>new THREE.Matrix4())},
-      uFlareShadowInfo: {value:Array.from({length:FLARE_SHADOW.slots},()=>new THREE.Vector4())},
+      uFlareShadowMatrix: {value:Array.from({length:FLARE_SHADOW.slots*FLARE_SHADOW.faces},()=>new THREE.Matrix4())},
+      uFlareShadowInfo: {value:Array.from({length:FLARE_SHADOW.slots*FLARE_SHADOW.faces},()=>new THREE.Vector4())},
+      uFlareShadowPosition: {value:Array.from({length:FLARE_SHADOW.slots},()=>new THREE.Vector4())},
+      uFlareShadowViewRotation: {value:new THREE.Matrix3()},
       uClusterData: { value: this.dataTexture },
       // x = 索引带起始分量号 y = 光源数据带起始**纹素**号
       uClusterBands: { value: new THREE.Vector2(indexBase, lightBase >> 2) },
@@ -550,6 +584,23 @@ export class ClusteredLights {
     stats.clusters = this.grid.clusterCount;
     this.buildMs = gridStats.buildMs;
     return stats;
+  }
+
+  EnsureFlareShadowStorage() {
+    const totalUnits=this.metadataUnits+FLARE_SHADOW.slots*FLARE_SHADOW.faces*FLARE_SHADOW.size**2;
+    if(this.dataUnits>=totalUnits)return;
+    const buffer=new ArrayBuffer(totalUnits*4),dataArray=new Float32Array(buffer);
+    dataArray.set(this.dataArray);
+    this.grid.table=new Uint32Array(buffer,0,this.grid.clusterCount);
+    this.grid.indices=new Uint16Array(buffer,this.indexBase*4,this.grid.maxIndices);
+    this.lightData=new Float32Array(buffer,this.lightBase*4,this.maxLights*TEXELS_PER_LIGHT*4);
+    this.dataArray=dataArray;this.dataUnits=totalUnits;
+    // Texture identity is shared by compiled PBR and TAA uniforms. Dispose
+    // the old immutable GL storage, then reuse that identity with larger data.
+    this.dataTexture.dispose();
+    this.dataTexture.image.data=dataArray;
+    this.dataTexture.image.height=totalUnits/(CLUSTER_DATA_TEX_WIDTH*4);
+    this.dataTexture.clearUpdateRanges();this.dataTexture.needsUpdate=true;
   }
 
   UploadMetadata() {

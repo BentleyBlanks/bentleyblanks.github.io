@@ -142,7 +142,7 @@ function generateShadowMapTypeDefine( parameters ) {
  5a interiorSky           装了屋子表的关卡才跑：室内天光可见度乘进 AO 图的 R（§5.11）
  5b contactShadows        屏幕空间接触阴影（只压直射太阳）→ 合进 SSIL 靶的 alpha（§6）
  5c groundDust            落地扬尘降分辨率体积（Script_PostGroundDust，groundDustScale；只在有尘时跑，每团先预烘焙 groundDust/bake，main 里那张全屏片按深度放大叠上、排在所有粒子之前，粒子按尘的前沿深度定前后，见 Data_ShellImpactDust「性能」）
- 5d flareShadows          伞降照明的有限深度投影 → 簇光纹理GPU保留行（中档以上，见 Data_FlareEffects）
+ 5d flareShadows          照明/信号光的可见接收体近远投影或六面回退 → 簇光纹理GPU保留行（中档以上，见 Data_FlareEffects）
  6  main                  HDR 主场景（AO / SSIL / SSR / 簇状局部光由材质补丁注入；ultra 才 4×MSAA）
  7  wireframe             着色模式非 shaded 时叠一层三角形边线
  8  debugOverlay          Rapier 碰撞体线框等（同一张 hdr 靶与深度）
@@ -3133,7 +3133,7 @@ node Taierzhuang1938/Script_FlareTest.mjs           # 照明弹（走火源池 =
 | `ssr` / `ssrColor` | 内部 | 追踪靶 `ssrScale×` + 颜色 mip 链 | ssr 按内部纹素；**`ssrColor` 读的是输出域的 sceneColor**，2×2 盒式的纹素偏移改成问靶自己（`ctx.sceneColor.width/height`） |
 | `gtao` / `ssilHistory` | 内部 | `aoScale×` 靶 + 颜色历史 | gtao 按内部纹素（`uFullResolution = ctx.width/height`）；`ssilHistory` 只按 uv blit，没有纹素偏移 |
 | `contactShadows` | 内部 | 半分辨率 | 按内部纹素 |
-| `flareShadows` | 固定 | 两张512²深度；一张1024×64 RGBA32F打包靶 | 每帧一张，复制至簇光纹理保留行；不支持浮点颜色靶时降级 |
+| `flareShadows` | 固定 | 两源按需12MiB打包深度；每源512²/1024²原生目标，1024×64/256 RGBA32F临时打包靶 | 普通每帧刷新一源近/远图，认证失败时六面512²；复制到原簇光纹理，无新增PBR sampler；不支持浮点颜色靶时降级 |
 | `main` | 内部 | `hdr` | — |
 | 体积雾三趟 | 内部 | froxel 图集 + 全（内部）分辨率 apply | 按 uv；**`uFogScatter` 是内部分辨率而 composite 在输出分辨率采它** —— 双线性放大，散射本来就是低频量（froxel 网格 x/y 才 160–240 格），可接受，见 §8.6 已知近似 |
 | `taa` | **输出**（解算靶） | `taaA/taaB` | 权重核以**输入像素**度量（见 17.2），历史与输出在输出网格 |
@@ -6765,4 +6765,6 @@ CSM 已实装（三级 + PCSS + 接触阴影，§6）、3D LUT 与镜头脏污�
 
 2026-10-27补充：白光伞降预设的摆动方向与光强由`Script_FlareOptics`统一求值。仍用点光的保守包围球和四纹素布局；方向性照明使用`t1.w=-3`（无阴影槽），打包阴影可改写为`-1/-2`。`t2.xyz`存视空间的反向出光轴，`t2.w`为侧向底值，`t3.x`为宽瓣指数、`t3.w=1`为启用标志。普通点/聚/管光布局不变，无新增sampler；负类型才读取附加纹素。体积雾的现有光色uniform之w存指数，另加一个vec4数组存世界出光轴/底值；可见热芯和烟也用同一个角度函数。旧low点光降级仍只兑现总强度。门禁`FlareFlickerBrowserTest`覆盖最终像素变化、固定强度下的方向分布与关闭阴影时的方向性。
 
-`Script_FlareShadows` 的 `flareShadows` pass 位于 main 前；`SetSunShadowSource` 同时提供 LightRig。中档以上按 `preset.flareShadows` 启用，白盒不进入。原生深度相机不加入场景灯，保持蒙皮/镂空/破坏深度契约；线性深度打包进 `uClusterData` 的GPU保留行，CPU只更新元数据行，不增加PBR采样器。最多两槽、每帧一张更新，上一张图保存自己的世界矩阵。具体预算、有限视锥与体积雾边界见 [信号与照明效果](Data_FlareEffects.md)。门禁 `FlareShadowBrowserTest` 覆盖真实HDR遮挡、移动屋顶、双灯交替、相机移动与退出；共享簇光和帧图仍跑原门禁。
+`Script_FlareShadows` 的 `flareShadows` pass 位于 main 前；`SetSunShadowSource` 同时提供 LightRig。中档以上按 `preset.flareShadows` 启用，白盒保留降级。原生深度相机不加入场景灯，保持蒙皮/镂空/破坏契约。实际可见PBR接收体逐顶点认证1024²远景投影，近处512²细节，不能安全容纳时六面512²回退；离屏遮挡体仍沿源到接收体路径投影。线性深度打包进 `uClusterData` 的GPU保留行，CPU只更新元数据行，PBR不增加采样器。两槽普通每帧更新一源所需地图，保留各图世界矩阵；转向、尺寸和移动源新露出的区域首帧补刷。拟合缓存须重新认证当前几何，阴影仍重新绘制。`FlareShadowBoundsTest`、`FlareShadowCoverageBrowserTest`及原`FlareShadowBrowserTest`覆盖纯数学内部点、真实远屋顶、两种布局、缓存失效、移动源和清理。详见[信号与照明效果](Data_FlareEffects.md)；城市性能以最终候选实测为准，体积雾尚不采这组点阴影。
+
+2026-10-29另修旧关卡入口合批未初始化：`WarmLevel`仍负责原fullMission；其他正常世界入口在加载画面后调用`WarmStaticShadowBatch`，真实绘制批次深度代理后才`Prime`，不伪造已预热标记。CSM原先关闭时使用临时16²灯影/1²靶，不激活或遗留大太阳图；代理与临时纹理释放，游戏时钟、用户开关恢复。`ShadowBatchWarmBrowserTest`验证普通CH4、关闭CSM及原fullMission路径，批次/独立投影像素一致。簇光片元ABI改变同步更新材质补丁key后缀`flareShadow2`。

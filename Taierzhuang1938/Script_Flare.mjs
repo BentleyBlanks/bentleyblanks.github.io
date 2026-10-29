@@ -73,8 +73,8 @@
 import { Mulberry32, Clamp, Clamp01, SmoothStep } from "./Script_Noise.mjs";
 import { T } from "./Script_Text.mjs";
 import { FLARE_SFX, FLARE_DEFAULTS, FLARE_PRESETS } from "./Data_Flares.mjs";
-import { FLARE_EFFECTS, FLARE_ART, FLARE_OPTICS } from "./Data_Tuning_FlareEffects.mjs";
-import {FlareBurnModulation,SampleFlareAttitude,FlarePhotometricScale} from './Script_FlareOptics.mjs';
+import { FLARE_EFFECTS, FLARE_ART, FLARE_OPTICS, FLARE_COMBUSTION } from "./Data_Tuning_FlareEffects.mjs";
+import {FlareBurnModulation,SampleFlareAttitude,FlarePhotometricScale,FlareLaunchEmission} from './Script_FlareOptics.mjs';
 
 /** Absolute flight path: launch-relative altitude, never draped over terrain. */
 export function SampleFlarePosition(f,t) {
@@ -569,16 +569,21 @@ export class FlareDirector {
     flare.sceneScale=flare.physical?(this.host.FlareSceneScale?.()??1):1;
     if(flare.visualHandle!==null)this.host.MoveVisual?.(flare.visualHandle,flare);
     if (flare.lightHandle === null) return;
+    let emitterVisible=flare.visualHandle?.head?.visible!==false;
+    for(let node=flare.visualHandle?.root;node;node=node.parent)if(node.visible===false){emitterVisible=false;break;}
+    const launch=FlareLaunchEmission(flare,t),launching=FLARE_COMBUSTION.launchCd*launch>flare.intensity;
     this.host.MoveLight?.(flare.lightHandle, {
-      position: { ...flare.pos },
-      intensity: flare.intensity,
-      photometricScale:flare.photometricScale,
+      position: launching?{x:flare.from.x,y:flare.groundY+FLARE_ART.launchHeight,z:flare.from.z}:{ ...flare.pos },
+      intensity: launching?FLARE_COMBUSTION.launchCd*launch:flare.intensity,
+      photometricScale:launching?FlarePhotometricScale(FLARE_COMBUSTION.launchColor):flare.photometricScale,
       sceneScale:flare.sceneScale,
       temporalFlutter:flare.burnFlutter,
+      opticalEmitter:flare.physical,
       temporalTime:flare.t,
-      radius: flare.lightRadiusM,
-      color: flare.lightColor,
-      emission:flare.emission,
+      emitterVisible,
+      radius: launching?FLARE_COMBUSTION.launchLightRadiusM:flare.lightRadiusM,
+      color: launching?FLARE_COMBUSTION.launchColor:flare.lightColor,
+      emission:launching?null:flare.emission,
     });
   }
 

@@ -630,6 +630,7 @@ export class PostPipeline {
   SetGroundDustSource(system) { this.groundDustPass?.SetSource(system); }
 
   SetSunShadowSource(lightRig) {
+    this.lensFlarePass.SetSource?.(lightRig);
     this.flareShadowsPass.SetSource(lightRig);
     this.exposurePass.flareSource=lightRig;
     this.taaPass.flareSource=lightRig;

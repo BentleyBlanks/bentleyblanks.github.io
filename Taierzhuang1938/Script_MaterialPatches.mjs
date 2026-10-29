@@ -834,7 +834,7 @@ export function MakeClusteredLightsPatch() {
   if (!cluster) return null;
   const grid = cluster.grid;
   return MakePatch({
-    key: () => `clust${cluster.maxLights}_${grid.tilesX}x${grid.tilesY}x${grid.slices}`,
+    key: () => `clust${cluster.maxLights}_${grid.tilesX}x${grid.tilesY}x${grid.slices}_flareShadow2`,
     uniforms: (uniforms) => { BindClusterUniforms(uniforms, cluster); },
     fragment: [
       ["#include <common>", CLUSTER_COMMON_GLSL],
