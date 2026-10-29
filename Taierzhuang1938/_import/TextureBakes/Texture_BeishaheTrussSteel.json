@@ -1,0 +1,122 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-10-30",
+  "name": "BeishaheTrussSteel",
+  "preset": "weatheredBridgeSteel",
+  "source": {
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishaheSteelModernStudyV1.png",
+    "sha256": "4fe40fb2be092fd82f8e5c2b25c50239e531211952211ebb0415600c97829543",
+    "metrics": {
+      "meanSrgb": [
+        0.381,
+        0.2917,
+        0.2475
+      ],
+      "luma": 0.3067,
+      "lumaStd": 0.0522,
+      "sat": 0.3506,
+      "clipLow": 0.0,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0221
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.5,
+      0.43,
+      0.42
+    ],
+    "contrast": 0.035,
+    "lumaRange": [
+      0.36,
+      0.48
+    ],
+    "satRange": [
+      0.12,
+      0.23
+    ],
+    "stdRange": [
+      0.025,
+      0.07
+    ],
+    "reliefM": 0.0012,
+    "rough": 0.74,
+    "roughVar": 0.06,
+    "roughLumaK": 0.0,
+    "ao": 0.25,
+    "metal": 0.08,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.13,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 1.0,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 0.8,
+    "toneStrength": 0.9,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false,
+    "detailBalance": 0,
+    "heightFineWeight": 0.45,
+    "uvAtlasReason": null
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_BeishaheTrussSteelBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 270708,
+      "sha256": "def807bad0bef37077160f4e6a517415d64ce877fec8b5b540e0d104f8ed3f5c"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_BeishaheTrussSteelNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 43410,
+      "sha256": "c9107c529e2314bdebde4f555988dc57f193eb2716e5af976c78125c3f13e436"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_BeishaheTrussSteelOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 51764,
+      "sha256": "59febd5a91417f65c2ac63814ae79de828e5f36d25201935d96a3930a3fcdeca"
+    }
+  ],
+  "totalBytes": 365882,
+  "metrics": {
+    "meanSrgb": [
+      0.488,
+      0.4169,
+      0.4024
+    ],
+    "luma": 0.4358,
+    "lumaStd": 0.0378,
+    "sat": 0.1754,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0039,
+    "seam": 0.0328,
+    "interior": 0.0332,
+    "seamRatio": 0.988,
+    "border": 0.96,
+    "swing": 0.0018,
+    "aoMean": 0.951,
+    "roughMean": 0.725,
+    "texelsPerMeter": 1024.0
+  },
+  "gateProblems": []
+}

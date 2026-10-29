@@ -16,7 +16,7 @@
 | [《济南铁路分局志》桥梁记述](https://shandong-chorography.org/database/jinan-railway/section/5/article/41/)；[山东省铁路库·线路初建](https://shandong-chorography.org/database/a/section/41/article/12/) | 早期津浦北段包括滕县所在的天津至韩庄段；志书记20米等跨径钢梁多为简支“华式桁梁”，晏城至宿县间多石砌墩台 | 同线一般构造旁证，不能确定北沙河桥的孔数、杆件或支座；“华式”不在此处推译成具体桁式 |
 | [1913年《Steel Rails》图113](https://archive.org/details/steelrailstheirh01sell/page/145/mode/1) | 普鲁士及阿尔萨斯－洛林铁路螺纹道钉的方头、圆形压缘和螺杆；同书表XXIX载有普鲁士式外二内一的布置 | 德国铁路的一般工程类比，非北沙河原桥图，不能证明本桥具体型号、钉数或钩板尺寸 |
 | 现代京沪铁路跨北沙河，35.14496N、117.10696E；OSM＋Esri影像 | 跨越河漫滩的整桥尺度，采用约280米 | 现代堤岸、复线桥与水情不能反推1938原桥尺寸 |
-| 内置imagegen局部构造图、无花纹旧钢底图 | 铆接、支座、木石、旧钢细节 | 仅设计参考；局部图实腹梁外形未用作主桥型 |
+| 内置imagegen局部构造图、旧钢底图 | 铆接、支座、木石、旧钢细节；桁架褐灰钢面以用户资料页中的现代咸宁桥照片作视觉类比 | 仅设计参考；生成图不是历史照片，现代锈色不能证明1938年北沙河原桥状态；局部图实腹梁外形未用作主桥型 |
 | 用户指出原模型桥面镂空后的截图，以及据此生成的桥面构造图 | 横向木板、承托、轨槽和木材表面方向 | 新桥面是用户要求下的设计推定，生成图不是1938年原桥照片 |
 | [美国国家公园局 Bullard Creek Bridge 登记](https://npgallery.nps.gov/GetAsset/81afac7b-65c7-4d59-9066-ff6c7991e861) | 1908年美国短跨公路低桁：成对铆接构件、节点板与横梁连接的工程类比 | 非中国铁路、非北沙河；不证明本桥截面、节点或桥面形式 |
 
@@ -42,13 +42,13 @@
 - 14个跨组共享主钢结构；每跨按咸宁现代照片的视觉类比做成9格、跨中3格带交叉杆，两端斜杆向跨中汇聚。该排布、断面、节点以及杆件位于桁架内外哪一面均为设计推定，不能据异地照片认定北沙河原桥桁式。交叉杆端部与节点板接触，杆件穿过视觉交叉处时位于不同的横向平面；连接铆钉为实体。桥面有七组由同一构造脚本和同一材质生成的确定性木板变化，沿桥循环使用；木枕与13座中间石墩各有三组确定性UV及砌块差异，两端桥台独立。低矮半穿钢桁的轨道上方敞开，无高门架／顶横联、道路铺装或另加人行栏杆。
 - 两轨头内缘净距1.435米。节点 `Intact_Span01…14` 含 `Trusses / Rivets / Sleepers / SleeperEnds / DeckPlanks / DeckBearers / GuardTimbers / GuardFasteners / RailWest / RailEast / RailWear / RailMidSplice / RailMidFasteners / Bearings`；`Shared_Pier / PierDamp / Cap / Abutment` 独立。连续横铺木板架在纵向托梁上，名义板宽约0.34米并有逐板变化、板缝约6毫米；板宽依据生成式构造图作设计推定。轨脚和扣件周围留出局部窄槽，轨头高出板面约65毫米。扣件参照早期德国铁路资料推定为每轨座外侧两颗、内侧一颗的方头螺纹道钉及外侧钩板，杆体伸入木枕120毫米；螺纹与钻孔未建模，实体杆与未钻孔的木枕、垫板有意交叠。钉型、数量及尺寸不能认定为北沙河原桥实测。两轨外侧的低矮纵木、分段与固定方式参照地点未知的1941年同线照片推定，其跨墩短木、侧板和穿栓用于连接相邻跨。13处跨墩木面设独立实体接段、托片及螺栓，接段两端各留2毫米缝，钢桁自身保持120毫米结构缝。
 - 钢轨按1937年线路资料取名义10米轨节，跨中及墩轴处设6毫米缝、双侧夹板及四组螺栓；接头落点、缝宽、夹板及轨道截面均为设计推定。模型的螺杆与未钻孔的实体轨腹和夹板交叠，未模拟钻孔。两片桁架内外均有双排铆钉，节点板为实体；桥墩和桥台有内缩实心核心。墩帽采用四块实体帽石和下方承托核，块缝避开支座足面，形制参考生成辅助图而非原桥实测。桥板铺法、护木、铆钉间距、连接、配色、块色及墩底污迹均非原桥实测，不代表1938年实测水位。
-- `BeishaheSteel`、`BeishaheSleeper`、`BeishaheSleeperEnd`、`BeishaheDeckPlank`、`BeishahePierStone`、`BeishahePierDamp` 六套PBR共18张图嵌入GLB；轨身另用较暗的钢材，轨顶采用磨亮窄条金属材质。木纹顺各构件长轴，端纹两轴物理比例一致；桥面纹理色调及逐板色差依据生成图作创作推定，同一板的三段共用色调。干湿石面共用粗凿源图，块间纹理方向变化，灰缝由实体构件表达。ORM遮蔽与法线使用真实贴图；不增加boot或关卡贴图请求。
-- 版本 `2026103001` 的桥梁候选为1,306,136实例三角、354个网格对象和20,790,028字节；较上一版增加38,808三角和227,644字节。七组木板变化保留，尚无LOD或游戏装配，整桥进入正式关卡前须评估可见范围、合批与性能。此前版本另留OneDrive `Archive/`。
+- `BeishaheTrussSteel`、`BeishaheSteel`、`BeishaheSleeper`、`BeishaheSleeperEnd`、`BeishaheDeckPlank`、`BeishahePierStone`、`BeishahePierDamp` 七套PBR共21张图嵌入GLB。桁架和支座使用新生成的褐灰旧钢面，轨身保留原有中性深色钢材，轨顶采用磨亮窄条金属材质；所选现代异地照片的颜色与生成纹理均非1938年本桥漆色证据。木纹顺各构件长轴，端纹两轴物理比例一致；桥面纹理色调及逐板色差依据生成图作创作推定，同一板的三段共用色调。干湿石面共用粗凿源图，块间纹理方向变化，灰缝由实体构件表达。ORM遮蔽与法线使用真实贴图；不增加boot或关卡贴图请求。
+- 版本 `2026103002` 的桥梁候选为1,306,136实例三角、354个网格对象和21,156,336字节；新钢面三张图共365,882字节，GLB较上一版增加366,308字节。新图的1024反照率与两张512数据图按RGBA展开约6 MiB，实际游戏显存与性能尚未测量。512反照率的实景近景对照更模糊，因此单独登记384 KiB纹理额度，未增加开机／关卡请求。七组木板变化保留，尚无LOD或游戏装配，整桥进入正式关卡前须评估可见范围、合批与性能。此前版本另留OneDrive `Archive/`。
 - 最新44米四孔白盒、旧浮桥、旧钢桁桥及剧情／碰撞／爆破时间线均未替换。未来接入整桥须同步处理河漫滩与关卡空间，不用非均匀缩放硬塞进局部白盒。
 
 ## 重建与源工程
 
-源文件与备份：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/Scene_BeishaheBridge.blend`。原图、生成输入和参考在同目录 `References/`；其中 `Reference_BeishaheDeckStudy.png` 为桥面构造推演，`Source_BeishaheDeckPlankV4.png` 为采用的生成木纹源图，均非历史照片。钢材源图由 `Source_BeishaheSteelV2.png` 与 `Source_BeishaheSteelV3.png` 混合而成。生成提示词包括 `_blender/Prompts/Reference_BeishaheConstruction.txt`、`_blender/Prompts/Reference_BeishaheDeckStudy.txt` 及 `_import/Prompts/Texture_Beishahe*.txt`，均走内置imagegen。
+源文件与备份：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/Scene_BeishaheBridge.blend`。原图、生成输入和参考在同目录 `References/`；其中 `Reference_BeishaheDeckStudy.png` 为桥面构造推演，`Source_BeishaheDeckPlankV4.png` 为采用的生成木纹源图，均非历史照片。轨身钢材源图由 `Source_BeishaheSteelV2.png` 与 `Source_BeishaheSteelV3.png` 混合而成；桁架新钢面源图为 `Source_BeishaheSteelModernStudyV1.png`，以现代异地照片作生成参考。生成提示词包括 `_blender/Prompts/Reference_BeishaheConstruction.txt`、`_blender/Prompts/Reference_BeishaheDeckStudy.txt` 及 `_import/Prompts/Texture_Beishahe*.txt`，均走内置imagegen。
 
 ```powershell
 node scripts/Script_BlenderMcp.mjs start --task BeishaheBridge
@@ -57,7 +57,7 @@ node scripts/Script_BlenderMcp.mjs stop --save
 node scripts/Script_BlenderMcp.mjs status --scan
 ```
 
-在任务独占worktree运行。脚本拒绝覆盖源目录以外的已打开工程，重新生成GLB及sidecar；使用中的文件贴图即使尚未解码也会打包进 `.blend`。最终工程实际重开后核对18张贴图均已内嵌，14跨桥面均在；重烘GLB与已验收版本哈希一致。钢面混合源可用 `_import/Script_PrepareBeishaheSteelSource.py --input-dir <References> --output <References>/Source_BeishaheSteelV2V3Blend40.png` 重建；石面混合源对应 `_import/Script_PrepareBeishahePierStoneSource.py --input-dir <References> --output <References>/Source_BeishahePierStoneBlend40.png`。PBR重烘记录位于 `_import/TextureBakes/`；换电脑重新烘焙贴图时先映射到保留的源图路径。
+在任务独占worktree运行。脚本拒绝覆盖源目录以外的已打开工程，重新生成GLB及sidecar；使用中的文件贴图即使尚未解码也会打包进 `.blend`。当前工程实际重开后核对21张贴图均已内嵌、14跨桥面均在；重烘的GLB与sidecar与验收版本逐字节一致。轨身钢面混合源可用 `_import/Script_PrepareBeishaheSteelSource.py --input-dir <References> --output <References>/Source_BeishaheSteelV2V3Blend40.png` 重建；石面混合源对应 `_import/Script_PrepareBeishahePierStoneSource.py --input-dir <References> --output <References>/Source_BeishahePierStoneBlend40.png`。PBR重烘记录位于 `_import/TextureBakes/`；换电脑重新烘焙贴图时先映射到保留的源图路径。
 
 ## 验收
 

@@ -74,12 +74,13 @@ Check(bounds.max.y>=1.8&&bounds.max.y<=2.4&&bounds.min.y>=-8&&bounds.min.y<=-4.5
 
 // Material records and decoded pixels are checked independently of screenshots.
 // The running surface is intentionally a textureless polished metal, while all
-// weathered materials keep their Base/Normal/ORM maps; dark rail body and
-// bridge steel deliberately share the same three steel texture images.
-const materialSources={BeishaheSteel:'BeishaheSteel',BeishaheRailBody:'BeishaheSteel',BeishaheTimber:'BeishaheSleeper',BeishaheTimberEnd:'BeishaheSleeperEnd',BeishaheDeckTimber:'BeishaheDeckPlank',BeishaheStone:'BeishahePierStone',BeishaheStoneDamp:'BeishahePierDamp'};
+// weathered materials keep their Base/Normal/ORM maps. The rail body keeps
+// its neutral steel set while the truss uses the reference-led finish.
+const materialSources={BeishaheSteel:'BeishaheTrussSteel',BeishaheRailBody:'BeishaheSteel',BeishaheTimber:'BeishaheSleeper',BeishaheTimberEnd:'BeishaheSleeperEnd',BeishaheDeckTimber:'BeishaheDeckPlank',BeishaheStone:'BeishahePierStone',BeishaheStoneDamp:'BeishahePierDamp'};
+const steelSources=new Set(['BeishaheSteel','BeishaheTrussSteel']);
 const expectedMaterials=[...Object.keys(materialSources),'BeishaheRailRunning'];
 Check(g.materials?.length===expectedMaterials.length&&expectedMaterials.every(name=>g.materials.some(m=>m.name===name)),'Seven weathered PBR materials and the single polished rail material exist');
-Check(g.images?.length===18,'Six independent three-channel PBR texture sets are embedded',g.images?.length);
+Check(g.images?.length===21,'Seven independent three-channel PBR texture sets are embedded',g.images?.length);
 const imageStats=[];
 const decodedImages=new Map();
 for(const [i,image] of g.images.entries()){
@@ -125,22 +126,26 @@ for(const m of g.materials){
   const normal=await CheckTexturePixels(m.name,'Normal',m.normalTexture.index,source,[0,1,2]);
   // Blender repacks unused B to 255 for nonmetallic materials; their zero
   // metallicFactor makes that channel irrelevant. Steel uses the original B.
-  const orm=await CheckTexturePixels(m.name,'Orm',p.metallicRoughnessTexture.index,source,source==='BeishaheSteel'?[0,1,2]:[0,1]);
+  const orm=await CheckTexturePixels(m.name,'Orm',p.metallicRoughnessTexture.index,source,steelSources.has(source)?[0,1,2]:[0,1]);
   await CheckTexturePixels(m.name,'Orm',m.occlusionTexture.index,source,[0]);
-  if(source!=='BeishaheSteel')Check((p.metallicFactor??1)===0,'Wood and masonry do not become metallic after ORM repacking',m.name);
+  if(!steelSources.has(source))Check((p.metallicFactor??1)===0,'Wood and masonry do not become metallic after ORM repacking',m.name);
   baseImages.add(base.source);normalImages.add(normal.source);ormImages.add(orm.source);
   let sum=0,sum2=0;const pixels=normal.info.width*normal.info.height;
   for(let i=0;i<pixels;i++){const v=normal.data[i*3];sum+=v;sum2+=v*v;}
   const effectiveRms=Math.sqrt(Math.max(0,sum2/pixels-(sum/pixels)**2))*(m.normalTexture.scale??1);
   Check(effectiveRms>2,'Effective normal map relief remains visibly non-flat',{material:m.name,effectiveRms});
 }
-Check(baseImages.size===6&&normalImages.size===6&&ormImages.size===6,'Steel, sleepers, end grain, decking, dry and damp stone use distinct image data');
+Check(baseImages.size===7&&normalImages.size===7&&ormImages.size===7,'Truss steel, rail steel, sleepers, end grain, decking, dry and damp stone use distinct image data');
 {
   const bridge=g.materials.find(m=>m.name==='BeishaheSteel'),rail=g.materials.find(m=>m.name==='BeishaheRailBody'),wear=g.materials.find(m=>m.name==='BeishaheRailRunning');
   const bp=bridge.pbrMetallicRoughness,rp=rail.pbrMetallicRoughness,rf=rp.baseColorFactor??[1,1,1,1];
   Check(rf.slice(0,3).every(v=>v>=.45&&v<=.65)&&Math.abs(rf[3]-1)<.001,'Rail body has a moderately darker, opaque physical base factor',rf);
   for(const [a,b] of [[bp.baseColorTexture,rp.baseColorTexture],[bridge.normalTexture,rail.normalTexture],[bp.metallicRoughnessTexture,rp.metallicRoughnessTexture],[bridge.occlusionTexture,rail.occlusionTexture]])
-    Check(ImageForTexture(a.index).source===ImageForTexture(b.index).source,'Rail body reuses the original steel PBR images, without new textures');
+    Check(ImageForTexture(a.index).source!==ImageForTexture(b.index).source,'Truss and rail body use independent steel texture images');
+  const bridgeImage=ImageForTexture(bp.baseColorTexture.index),bridgeSum=[0,0,0],bridgePixels=bridgeImage.info.width*bridgeImage.info.height;
+  for(let i=0;i<bridgePixels;i++)for(let c=0;c<3;c++)bridgeSum[c]+=bridgeImage.data[i*3+c]/255;
+  const bridgeMean=bridgeSum.map(v=>v/bridgePixels);
+  Check(bridgeMean[0]-bridgeMean[1]>.04&&bridgeMean[1]>=bridgeMean[2],'Reference-led truss finish has a muted warm brown-gray base',bridgeMean);
   const im=ImageForTexture(rp.baseColorTexture.index),sum=[0,0,0],n=im.info.width*im.info.height;
   for(let i=0;i<n;i++)for(let c=0;c<3;c++){const x=im.data[i*3+c]/255;sum[c]+=x<=.04045?x/12.92:((x+.055)/1.055)**2.4;}
   const body=(sum[0]*rf[0]*.2126+sum[1]*rf[1]*.7152+sum[2]*rf[2]*.0722)/n,wr=wear.pbrMetallicRoughness.baseColorFactor;

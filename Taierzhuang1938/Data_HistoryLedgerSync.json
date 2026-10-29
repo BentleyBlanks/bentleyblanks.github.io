@@ -44,6 +44,15 @@
         "researchPageLastEdited": "2026-10-25T10:22:31.491Z",
         "scope": "Only the existing bridge creative row, parent bullet and player-facing creative entry were updated. Preserve global review anchors and unrelated page cursors."
       },
+      "steelFinishReview20261030": {
+        "version": "2026103002",
+        "decision": "A separate brown-gray truss finish is generated from the modern Xianning comparison image. The source image's date and original photographer remain unverified; neither its rust nor the generated material establishes the 1938 Beishahe bridge's paint or condition. The rail keeps a separate neutral steel texture.",
+        "source": "Source_BeishaheSteelModernStudyV1.png; imagegen exec-c9980838-7f5f-4bab-b003-8168c38fb108",
+        "notionReview": "The existing bridge creative row and parent bullet were reread. Their explicit creative boundaries for color, weathering and steel textures already cover this material-only iteration; no category or historical claim changes. Global review anchors and unrelated page cursors remain unchanged.",
+        "notionLedgerLastEdited": "2026-10-29T18:18:48.478Z",
+        "notionParentLastEdited": "2026-10-29T18:18:59.976Z",
+        "researchPageLastEdited": "2026-10-25T10:22:31.491Z"
+      },
       "acceptanceScope": "Historical-boundary synchronization only; no claim that the model has completed visual matching or runtime acceptance."
     },
     {

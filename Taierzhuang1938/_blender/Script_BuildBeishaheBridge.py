@@ -368,7 +368,7 @@ def Material(name, texture, roughness, metal=0, normalStrength=0.25, colorLayer=
         split = nodes.new("ShaderNodeSeparateColor")
         links.new(tex.outputs["Color"], split.inputs["Color"])
         links.new(split.outputs["Green"], shader.inputs["Roughness"])
-        if texture == "BeishaheSteel":
+        if texture in ("BeishaheSteel", "BeishaheTrussSteel"):
             links.new(split.outputs["Blue"], shader.inputs["Metallic"])
         # glTF's occlusion channel is intentionally an independent input: it
         # affects indirect light, rather than baking darkness into albedo.
@@ -1044,7 +1044,7 @@ def Rebuild():
     scene["BlenderMcpTask"] = "BeishaheBridge"
     scene.unit_settings.system = "METRIC"
     scene.unit_settings.scale_length = 1
-    steel = Material("BeishaheSteel", "BeishaheSteel", 0.82, 0.25, 0.58)
+    steel = Material("BeishaheSteel", "BeishaheTrussSteel", 0.82, 0.25, 0.58)
     railBody = Material("BeishaheRailBody", "BeishaheSteel", 0.82, 0.25, 0.58, baseFactor=(.58, .58, .58))
     wood = Material("BeishaheTimber", "BeishaheSleeper", 0.91, 0, 0.90)
     endWood = Material("BeishaheTimberEnd", "BeishaheSleeperEnd", 0.91, 0, 0.90)
@@ -1185,6 +1185,7 @@ def Rebuild():
             "reconstructionScope": SPEC["reconstructionScope"], "historicalReferences": SPEC["historicalReferences"],
             "materialInterpretation": {
                 "trussBracing": "Nine panels and three central counterbraced bays are an authored visual analogy to the modern Xianning bridge photograph in the user's archive, not evidence of the 1938 Beishahe truss. Bar sections, fasteners and face assignments are designed details.",
+                "trussFinish": "Muted brown-gray weathered truss steel is an imagegen material study guided by a modern out-of-region bridge photograph. Its paint color and corrosion are creative choices, not verified 1938 Beishahe conditions. The rail body keeps a separate neutral steel texture.",
                 "pierDamp": "A continuous pale brown-gray damp-to-dry transition on the lower pier courses is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
                 "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
                 "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
@@ -1215,7 +1216,7 @@ def Rebuild():
                              "interpretation": "Design inferred from an unidentified 1941 Jinpu railway bridge; not evidence for Beishahe's exact construction."},
             "materials": ["BeishaheSteel", "BeishaheRailBody", "BeishaheTimber", "BeishaheTimberEnd", "BeishaheDeckTimber", "BeishaheStone", "BeishaheStoneDamp", "BeishaheRailRunning"],
             "bakeInputs": [f"Texture_{texture}{channel}.webp" for texture in
-                           ["BeishaheSteel", "BeishaheSleeper", "BeishaheSleeperEnd", "BeishaheDeckPlank", "BeishahePierStone", "BeishahePierDamp"]
+                           ["BeishaheSteel", "BeishaheTrussSteel", "BeishaheSleeper", "BeishaheSleeperEnd", "BeishaheDeckPlank", "BeishahePierStone", "BeishahePierDamp"]
                            for channel in ["Base", "Normal", "Orm"]]}
     (MODEL / "Data_BeishaheBridge.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     # Source-only review scene. Camera sees genuine geometry and PBR, no generated model image.

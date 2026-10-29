@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026103001",
+  "version": "2026103002",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026103001",
+    "version": "2026103002",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -708,8 +708,8 @@
   "triangles": 1306136,
   "meshObjects": 354,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
-  "glbBytes": 20790028,
-  "glbSha256": "399f7913c913ef2f6f32fb91834bf10961cf6c2a67997f6751887508993d4b57",
+  "glbBytes": 21156336,
+  "glbSha256": "e7385d465a2c4067eed305c8c8f5e7f97856cc62bf75abfd9ec1decf03c7f85c",
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
@@ -757,6 +757,7 @@
   ],
   "materialInterpretation": {
     "trussBracing": "Nine panels and three central counterbraced bays are an authored visual analogy to the modern Xianning bridge photograph in the user's archive, not evidence of the 1938 Beishahe truss. Bar sections, fasteners and face assignments are designed details.",
+    "trussFinish": "Muted brown-gray weathered truss steel is an imagegen material study guided by a modern out-of-region bridge photograph. Its paint color and corrosion are creative choices, not verified 1938 Beishahe conditions. The rail body keeps a separate neutral steel texture.",
     "pierDamp": "A continuous pale brown-gray damp-to-dry transition on the lower pier courses is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
     "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
     "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
@@ -838,6 +839,9 @@
     "Texture_BeishaheSteelBase.webp",
     "Texture_BeishaheSteelNormal.webp",
     "Texture_BeishaheSteelOrm.webp",
+    "Texture_BeishaheTrussSteelBase.webp",
+    "Texture_BeishaheTrussSteelNormal.webp",
+    "Texture_BeishaheTrussSteelOrm.webp",
     "Texture_BeishaheSleeperBase.webp",
     "Texture_BeishaheSleeperNormal.webp",
     "Texture_BeishaheSleeperOrm.webp",

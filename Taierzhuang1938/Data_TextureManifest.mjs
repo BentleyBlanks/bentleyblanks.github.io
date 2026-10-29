@@ -19,6 +19,7 @@
 //   source      { provider, date, ref, prompt, license, note }；provider 见 TEXTURE_PROVIDERS
 //   consumers   [{ file, token }]：file 里必须真的出现 token（门禁逐条核对）
 //   sizeReason / budgetReason  超尺寸 / 超体积的登记理由
+//   assetBudgetBytes  某套已单列额度的更严格上限；门禁同时检查该套与全局预算
 //   legacy      字符串 = 历史遗留、暂不满足规范的理由。**legacy 名单只许变短**（门禁里有冻结名单）
 //   note        备注
 
@@ -102,6 +103,10 @@ const EDITOR_CREEK_SKETCH_BYTES = 384 * 1024;
 // embedded in the standalone bridge GLB; they add no boot or level requests.
 const BEISHAHE_METAL_ASSET_BYTES = 384 * 1024;
 const BEISHAHE_SURFACE_ASSET_BYTES = 1982 * 1024;
+// Separate 1024 truss-steel set: 365,882 bytes. A 512 comparison visibly
+// softened close rivet/paint detail. This bounded allowance is for the
+// standalone bridge's embedded material, not an added boot or level request.
+const BEISHAHE_TRUSS_FINISH_BYTES = 384 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -119,11 +124,11 @@ export const TEXTURE_BUDGETS = Object.freeze({
     // Loaded with the title menu, never promoted into the shared boot PBR_SETS.
     // 2026-10-05: seven campaign maps + three historical papers add about 4 MB.
     // Only the selected pair is requested (< 1 MB), not the whole campaign set.
-    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES, // Also includes lossless command-room irradiance.
+    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES, // Also includes lossless command-room irradiance.
     // editor：2026-10-22 白盒编辑器河沟示意加两张 1024 反照率（泥 ~300 KB、水 ~60 KB），只在 ?editor=blockout 下载，玩家不碰；上限抬到 1 MB。
     editor: 1 * 1024 * 1024,
   }),
-  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES,
+  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES,
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -171,13 +176,26 @@ export const TEXTURE_MANIFEST = Object.freeze([
     source: { provider: "imagegen", date: "2026-10-27",
       ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-7588ae36-2a97-466d-9d20-b20296e0b27b; exec-9f89a6c8-3c62-4def-a82d-56558531bba7",
       prompt: "_import/Prompts/Texture_BeishaheSteel.txt",
-      note: "内置 imagegen 的 V2 平整漆面与 V3 局部锈蚀源图按 60/40 混合后烘焙；仅嵌入独立桥梁 GLB，未加入开机或第一关贴图集。源图与 .blend 留 OneDrive。" },
+      note: "内置 imagegen 的 V2 平整漆面与 V3 局部锈蚀源图按 60/40 混合后烘焙；用于独立桥梁的轨身，未加入开机或第一关贴图集。源图与 .blend 留 OneDrive。" },
     consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishaheSteel" }],
     files: [
       ["Texture_BeishaheSteelBase.webp", "Base", 1024, 1024],
       ["Texture_BeishaheSteelNormal.webp", "Normal", 512, 512],
       ["Texture_BeishaheSteelOrm.webp", "Orm", 512, 512],
     ],
+  },
+  {
+    id: "BeishaheTrussSteel", kind: "material", tier: "lazy", toneClass: "weatheredBridgeSteel",
+    metersPerTile: 1,
+    assetBudgetBytes: BEISHAHE_TRUSS_FINISH_BYTES,
+    bake: "_import/Script_BakePbrTexture.py",
+    bakeRecord: "_import/TextureBakes/Texture_BeishaheTrussSteel.json",
+    source: { provider: "imagegen", date: "2026-10-30",
+      ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-c9980838-7f5f-4bab-b003-8168c38fb108",
+      prompt: "_import/Prompts/Texture_BeishaheTrussSteel.txt",
+      note: "参照资料页现代异地桥照片生成的褐灰色旧钢面，供独立桥桁架和支座使用；不是北沙河原桥漆色证据。轨身沿用独立的中性钢材。源图与 .blend 留 OneDrive。" },
+    consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishaheTrussSteel" }],
+    files: [["Texture_BeishaheTrussSteelBase.webp", "Base", 1024, 1024], ["Texture_BeishaheTrussSteelNormal.webp", "Normal", 512, 512], ["Texture_BeishaheTrussSteelOrm.webp", "Orm", 512, 512]],
   },
   {
     id: "SingleBlanket", kind: "material", tier: "offline",

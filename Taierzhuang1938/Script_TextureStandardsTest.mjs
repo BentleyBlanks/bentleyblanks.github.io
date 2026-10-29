@@ -352,6 +352,11 @@ for (const entry of TEXTURE_MANIFEST) {
   }
   if (!entry.legacy && !entry.budgetReason && PBR_KINDS.has(entry.kind))
     Check(setBytes <= TEXTURE_BUDGETS.setBytes, `${entry.id}: 整套 ${KB(setBytes)} ≤ ${KB(TEXTURE_BUDGETS.setBytes)}`);
+  if (entry.assetBudgetBytes != null) {
+    Check(Number.isInteger(entry.assetBudgetBytes) && entry.assetBudgetBytes > 0 && entry.assetBudgetBytes <= TEXTURE_BUDGETS.setBytes,
+      `${entry.id}: 单列额度为有效的严格套预算`);
+    Check(setBytes <= entry.assetBudgetBytes, `${entry.id}: 单列额度 ${KB(setBytes)} ≤ ${KB(entry.assetBudgetBytes)}`);
+  }
 }
 for (const [tier, limit] of Object.entries(TEXTURE_BUDGETS.tierBytes)) {
   Check((tierBytes[tier] || 0) <= limit, `tier ${tier} 合计 ${MB(tierBytes[tier] || 0)} ≤ ${MB(limit)}`);
