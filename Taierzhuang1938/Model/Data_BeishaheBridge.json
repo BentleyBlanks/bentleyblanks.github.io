@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026102902",
+  "version": "2026103001",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026102902",
+    "version": "2026103001",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -11,7 +11,12 @@
     "spanCount": 14,
     "spanPitchM": 20,
     "expansionGapM": 0.12,
-    "panelsPerSpan": 8,
+    "panelsPerSpan": 9,
+    "trussCounterPanelIndices": [
+      3,
+      4,
+      5
+    ],
     "trussCenterOffsetM": 1.85,
     "trussTopY": 2,
     "trussBottomY": -0.55,
@@ -49,6 +54,11 @@
         "id": "NotionResearch",
         "url": "https://app.notion.com/p/3eb60335331c81fda6dfe38153bcec45",
         "supports": "User research archive; exact 1938 Beishahe bridge photograph still unconfirmed."
+      },
+      {
+        "id": "Xianning76Modern",
+        "url": "https://app.notion.com/p/3eb60335331c81fda6dfe38153bcec45",
+        "supports": "The modern Xianning bridge photograph in the user's archive is an out-of-region visual analogy for the central crossed braces and end-bay diagonals. The photograph's original attribution and date remain unverified; its members do not establish the Beishahe bridge's historical truss pattern."
       },
       {
         "id": "JinpuRail1937",
@@ -695,11 +705,11 @@
       "railHeightM": 0.14
     }
   ],
-  "triangles": 1267328,
+  "triangles": 1306136,
   "meshObjects": 354,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
-  "glbBytes": 20562384,
-  "glbSha256": "4958e6ff09a371f6d2186a29606ccb91fc1c329b194fdd3925f6d19ab5b71586",
+  "glbBytes": 20790028,
+  "glbSha256": "399f7913c913ef2f6f32fb91834bf10961cf6c2a67997f6751887508993d4b57",
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
@@ -718,6 +728,11 @@
       "id": "NotionResearch",
       "url": "https://app.notion.com/p/3eb60335331c81fda6dfe38153bcec45",
       "supports": "User research archive; exact 1938 Beishahe bridge photograph still unconfirmed."
+    },
+    {
+      "id": "Xianning76Modern",
+      "url": "https://app.notion.com/p/3eb60335331c81fda6dfe38153bcec45",
+      "supports": "The modern Xianning bridge photograph in the user's archive is an out-of-region visual analogy for the central crossed braces and end-bay diagonals. The photograph's original attribution and date remain unverified; its members do not establish the Beishahe bridge's historical truss pattern."
     },
     {
       "id": "JinpuRail1937",
@@ -741,6 +756,7 @@
     }
   ],
   "materialInterpretation": {
+    "trussBracing": "Nine panels and three central counterbraced bays are an authored visual analogy to the modern Xianning bridge photograph in the user's archive, not evidence of the 1938 Beishahe truss. Bar sections, fasteners and face assignments are designed details.",
     "pierDamp": "A continuous pale brown-gray damp-to-dry transition on the lower pier courses is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
     "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
     "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",

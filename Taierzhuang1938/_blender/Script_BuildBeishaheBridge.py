@@ -684,10 +684,13 @@ def BuildSpan():
         for step in range(1, 6):
             p = a.lerp(b, step / 6)
             steel.Beam((p.x - 0.105, p.y, p.z), (p.x + 0.105, p.y, p.z), 0.035, 0.018)
-    # Straight low upper chord, sloping end posts, alternating diagonals with verticals.
+    # Low, open-top truss. The chosen Xianning comparison photograph shows
+    # matching diagonals toward the ends and crossed central bays. Its exact
+    # members are an analogy, not evidence of the unphotographed bridge.
     # No portal or cross bracing above the open track (pony truss).
     for side in [-1, 1]:
         x = side * halfW
+        counterAxes = []
         steel.Channel((x, y0, zs[0]), (x, y0, zs[-1]), 0.22, 0.28)
         steel.Channel((x, y1, zs[1]), (x, y1, zs[-2]), 0.24, 0.23)
         steel.Box((x, y1 + 0.13, 0), (0.29, 0.03, zs[-2] - zs[1]))
@@ -700,11 +703,26 @@ def BuildSpan():
                 a, b = (x, y0, zs[0] + .06), (x, y1, zs[1])
             elif k == n - 1:
                 a, b = (x, y1, zs[-2]), (x, y0, zs[-1] - .06)
-            elif k % 2:
+            elif k <= n // 2:
                 a, b = (x, y1, zs[k]), (x, y0, zs[k + 1])
             else:
                 a, b = (x, y0, zs[k]), (x, y1, zs[k + 1])
             BuiltMember(a, b, 0.11, 0.15)
+            if k in SPEC["trussCounterPanelIndices"]:
+                # The counterbars meet the outside faces of the two node
+                # plates. At the shared upper node, the last bar is on the
+                # opposite face so both bars do not occupy the same plane.
+                face = -side if k > n // 2 else side
+                lowerX, upperX = x + face * .1495, x + face * .1645
+                if k <= n // 2:
+                    c, d = Vector((lowerX, y0, zs[k])), Vector((upperX, y1, zs[k + 1]))
+                else:
+                    c, d = Vector((upperX, y1, zs[k])), Vector((lowerX, y0, zs[k + 1]))
+                steel.Beam(c, d, .025, .08)
+                counterAxes.append((face, c, d))
+                for t in (.045, .955):
+                    p = c.lerp(d, t)
+                    fasteners.Rivet((p.x + face * .0125, p.y, p.z), (face, 0, 0), .010)
         for k in range(1, n):
             BuiltMember((x, y0, zs[k]), (x, y1, zs[k]), 0.09, 0.12)
         # Paired, 12 mm thick gusset plates and regular groups of real rivets.
@@ -720,10 +738,23 @@ def BuildSpan():
                     steel.Plate(p, (outward, 0, 0), 0.012)
                     for dz in [-0.10, 0, 0.10]:
                         for dy in [-0.07, 0.07]:
-                            fasteners.Rivet((xx + outward * 0.006, yy + dy, z + dz), (outward, 0, 0), 0.014)
+                            # A counterbar owns its own heads: do not leave
+                            # a node-plate head buried beneath the new bar.
+                            blocked = False
+                            for braceFace, braceA, braceB in counterAxes:
+                                if braceFace != outward:
+                                    continue
+                                vec = Vector((0, braceB.y - braceA.y, braceB.z - braceA.z))
+                                delta = Vector((0, yy + dy - braceA.y, z + dz - braceA.z))
+                                along = max(0, min(1, delta.dot(vec) / vec.length_squared))
+                                if (delta - along * vec).length < .057:
+                                    blocked = True
+                                    break
+                            if not blocked:
+                                fasteners.Rivet((xx + outward * 0.006, yy + dy, z + dz), (outward, 0, 0), 0.014)
         # Paired rows on both exposed faces, at roughly 0.21 m. The feet are
         # seated exactly on the cheek plates and skip each gusset's footprint.
-        rivetCount = int(length / 0.21)
+        rivetCount = int(length / 0.205)
         for k in range(rivetCount):
             z = -length / 2 + (k + 0.5) * length / rivetCount
             if any(abs(z - nodeZ) < 0.22 for nodeZ in nodeCenters):
@@ -1153,6 +1184,7 @@ def Rebuild():
             "glbBytes": glb.stat().st_size, "glbSha256": hashlib.sha256(glb.read_bytes()).hexdigest(),
             "reconstructionScope": SPEC["reconstructionScope"], "historicalReferences": SPEC["historicalReferences"],
             "materialInterpretation": {
+                "trussBracing": "Nine panels and three central counterbraced bays are an authored visual analogy to the modern Xianning bridge photograph in the user's archive, not evidence of the 1938 Beishahe truss. Bar sections, fasteners and face assignments are designed details.",
                 "pierDamp": "A continuous pale brown-gray damp-to-dry transition on the lower pier courses is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
                 "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
                 "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",

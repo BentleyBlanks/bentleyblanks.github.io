@@ -973,6 +973,37 @@ for(let i=0;i<spec.spanCount;i++){
     Check(Hits(superstructure,new THREE.Vector3(x,.35,z),new THREE.Vector3(0,1,0),4).length===0,'Track corridor has no high portal or roof cross brace',{span:i+1,x,k});
   }
 }
+// The selected visual analogy uses three crossed bays. Probe the exported
+// triangles themselves: both faces of each counterbar, the nearby gusset,
+// its clearance at the diagonal crossing, and its domed end rivets.
+const allTrusses=ByRole('Trusses');
+Check(allTrusses.length===spec.spanCount&&new Set(allTrusses.map(p=>p.node.mesh)).size===1,'All spans reuse the same truss mesh');
+Check(spec.panelsPerSpan===9&&Array.isArray(spec.trussCounterPanelIndices)&&spec.trussCounterPanelIndices.join(',')==='3,4,5','The chosen nine-panel comparison design identifies its three counterbraced bays');
+{
+  const span=spec.spanCount-1,center=-spec.lengthM/2+spec.spanPitchM*(span+.5),length=spec.spanPitchM-spec.expansionGapM,step=length/spec.panelsPerSpan;
+  const trusses=ByRole('Trusses',span),rivets=ByRole('Rivets',span);
+  for(const side of [-1,1])for(const panel of spec.trussCounterPanelIndices){
+    const face=panel>Math.floor(spec.panelsPerSpan/2)?-side:side,x=side*spec.trussCenterOffsetM;
+    const sample=t=>{const fraction=panel<=Math.floor(spec.panelsPerSpan/2)?t:1-t;return {fraction,y:spec.trussBottomY+(spec.trussTopY-spec.trussBottomY)*fraction,z:center-length/2+(panel+t)*step,offset:.1495+.015*fraction};};
+    for(const t of [.02,.5,.98]){
+      const p=sample(t),hits=Hits(trusses,new THREE.Vector3(x+face*.3,p.y,p.z),new THREE.Vector3(-face,0,0),.4);
+      const offsets=hits.map(h=>face*(h.point.x-x)),outer=p.offset+.0125,inner=p.offset-.0125;
+      Check(offsets.some(v=>Math.abs(v-outer)<.001)&&offsets.some(v=>Math.abs(v-inner)<.001),'Counterbar has two actual faces along its full length',{side,panel,t});
+      if(t===.5){
+        const next=offsets.filter(v=>v<inner-.001);
+        Check(next.length>0&&inner-Math.max(...next)>.01,'Counterbar clears the crossing diagonal in the transverse direction',{side,panel});
+      }else{
+        const plateFace=p.fraction<.5?.137:.152;
+        Check(offsets.some(v=>Math.abs(v-plateFace)<.001)&&Math.abs(inner-plateFace)<.001,'Counterbar end meets the actual node plate',{side,panel,t});
+      }
+    }
+    for(const t of [.045,.955]){
+      const p=sample(t),apex=p.offset+.0125+.010;
+      const hits=Hits(rivets,new THREE.Vector3(x+face*.3,p.y,p.z),new THREE.Vector3(-face,0,0),.4);
+      Check(hits.some(h=>Math.abs(face*(h.point.x-x)-apex)<.001),'Counterbar end has an actual domed rivet',{side,panel,t});
+    }
+  }
+}
 Check(bearingCount===56,'All fifty-six span-end bearing load paths are inspected');
 // Capstones are a visual construction inference, not established history.
 // Inspect the exported faces rather than accepting the sidecar description:
