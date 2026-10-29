@@ -21,7 +21,7 @@ try{
  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?editor=vfx&effect=Illumination&quality=high&manual=1&menu=0&audio=0`,{waitUntil:'domcontentloaded',timeout:180000});
  await page.waitForFunction(()=>!!window.Tengxian?.ParticleEditor?.panel,null,{timeout:300000});
  const report=await page.evaluate(async()=>{
-  const T=await import('three'),{FLARE_ART:A}=await import('./Data_Tuning_FlareEffects.mjs');
+  const T=await import('three'),{FLARE_ART:A,FLARE_COMBUSTION:C}=await import('./Data_Tuning_FlareEffects.mjs');
   const g=Tengxian,e=g.ParticleEditor,r=g.renderer,gl=r.getContext(),images=[];
   const target=new T.WebGLRenderTarget(512,512,{type:T.HalfFloatType,format:T.RGBAFormat,minFilter:T.NearestFilter,magFilter:T.NearestFilter});
   target.texture.colorSpace=T.LinearSRGBColorSpace;
@@ -58,10 +58,10 @@ try{
    mesh.position.set(-f.pos.x,-f.pos.y,-f.pos.z);mesh.updateMatrixWorld(true);
    const stats=WithMesh(mesh,()=>Read(mesh,{preview:!!label}));
    if(label){images.push({name:effect+'_'+label,png:stats.preview});delete stats.preview;}
-   return {time,phase:f.phase,intensity:f.intensity,...stats};
+   return {time,phase:f.phase,intensity:f.intensity,lightRadius:f.lightRadiusM,smokeRadius:visual.smoke.material.uniforms.lightRadius.value,...stats};
   };
   const shapes=[];
-  let blocked,neighbor,launches;
+  let blocked,neighbor,launches,smokeRange;
   try{
    for(const effect of ['Illumination','SignalRed']){
     e.SelectEffect(effect);e.SetPreviewEnvironment('night');
@@ -83,7 +83,8 @@ try{
     clone.position.set(-flare.from.x,-flare.groundY-A.launchHeight,-flare.from.z);clone.updateMatrixWorld(true);
     const stats=WithMesh(clone,()=>Read(clone));
     return {time:flare.t,phase:flare.phase,intensity:flare.intensity,birth:[flare.from.x,flare.groundY+A.launchHeight,flare.from.z],
-     instancePosition:new T.Vector3().setFromMatrixPosition(matrix).toArray(),instances:visual.head.count,...stats};
+     instancePosition:new T.Vector3().setFromMatrixPosition(matrix).toArray(),instances:visual.head.count,
+     smokeRadius:visual.smoke.material.uniforms.lightRadius.value,expectedRadius:time<C.launchS?C.launchLightRadiusM:flare.lightRadiusM,...stats};
    };
    launches={initial:LaunchAt(.03),darkAscent:LaunchAt(.2),raster:[]};
    const sourceFar=camera.far;camera.far=500;camera.updateProjectionMatrix();
@@ -149,12 +150,33 @@ try{
    const sameGeometry=geometry.every((value,i)=>value===smoke.instanceMatrix.array[i])&&ageBytes.every((value,i)=>value===smoke.geometry.attributes.age.array[i]);
    neighbor={ownIntensity:a.intensity,ownLightHandle:a.lightHandle,ownSmokeLight:ownLight,otherIntensity:b.intensity,
     distance:Math.hypot(a.pos.x-b.pos.x,a.pos.y-b.pos.y,a.pos.z-b.pos.z),liveSmoke:ageBytes.filter(age=>age>=0).length,
-    sameGeometry,on,off,again};
+    sameGeometry,on,off,again,otherRadius:aVisual.smoke.material.uniforms.otherRadius.value[0],expectedRadius:g.lights.fireSources.get(b.lightHandle).currentRadius};
    smoke.removeFromParent();smoke.dispose();
+   // One unchanged real smoke card isolates the production shader's light
+   // radius from changing density, position, ambient, exposure or other lights.
+   const rangeSmoke=aVisual.smoke.clone();rangeSmoke.geometry=rangeSmoke.geometry.clone();rangeSmoke.material=rangeSmoke.material.clone();rangeSmoke.count=1;
+   rangeSmoke.setMatrixAt(0,new T.Matrix4());rangeSmoke.instanceMatrix.needsUpdate=true;
+   rangeSmoke.geometry.attributes.age.setX(0,.5);rangeSmoke.geometry.attributes.seed.setX(0,.5);
+   rangeSmoke.geometry.attributes.age.needsUpdate=true;rangeSmoke.geometry.attributes.seed.needsUpdate=true;
+   const rangeUniforms=rangeSmoke.material.uniforms;rangeUniforms.ambient.value.setRGB(0,0,0);rangeUniforms.tint.value.setRGB(1,1,1);
+   rangeUniforms.directional.value=0;
+   for(let i=0;i<A.smokeLightSlots;i++){rangeUniforms.otherLight.value[i].set(0,0,0,0);rangeUniforms.otherTint.value[i].setRGB(1,1,1);rangeUniforms.otherLobe.value[i].set(-1,1);}
+   camera.position.set(0,0,3);camera.lookAt(0,0,0);camera.updateMatrixWorld(true);
+   smokeRange=[];
+   try{WithMesh(rangeSmoke,()=>{
+    for(const kind of ['self','neighbor'])for(const distance of [0,.5,5,9,10,11]){
+     const radius=10;
+     rangeUniforms.candle.value=kind==='self'?10000:0;rangeUniforms.lightPosition.value.set(0,0,distance);
+     rangeUniforms.otherLight.value[0].set(0,0,distance,kind==='neighbor'?10000:0);
+     rangeUniforms.lightRadius.value=0;rangeUniforms.otherRadius.value[0]=0;const unbounded=Read(rangeSmoke);
+     rangeUniforms.lightRadius.value=radius;rangeUniforms.otherRadius.value[0]=radius;const bounded=Read(rangeSmoke);
+     smokeRange.push({kind,distance,radius,expected:Math.max(0,1-(distance/radius)**4)**2,unbounded:unbounded.sum,bounded:bounded.sum,ratio:bounded.sum/unbounded.sum});
+    }
+   });}finally{rangeSmoke.geometry.dispose();rangeSmoke.material.dispose();}
   }finally{
    r.setRenderTarget(previousTarget);r.setClearColor(previousColor,previousAlpha);r.toneMapping=previousTone;target.dispose();scene.clear();
   }
-  return {shapes,launches,blocked,neighbor,images,gl:gl.getError()};
+  return {shapes,launches,blocked,neighbor,smokeRange,images,gl:gl.getError()};
  });
  const images=report.images;delete report.images;
  await fs.writeFile(path.join(out,'Data_Report.json'),JSON.stringify({...report,errors},null,2));
@@ -173,10 +195,12 @@ try{
   assert.ok(shape.late.support<shape.steady.support*.65,'Actual burnout pixels must contract before extinction: '+JSON.stringify(shape));
   assert.ok(shape.beforeOut.sum>0&&shape.afterOut.sum>0&&Math.abs(shape.beforeOut.sum-shape.afterOut.sum)/Math.max(shape.beforeOut.sum,shape.afterOut.sum)<.06,'Residual GPU light must cross extinction continuously: '+JSON.stringify(shape));
   assert.ok(shape.ember.sum>0,'Short-lived hot remnant remains visible');assert.equal(shape.cold.sum,0,'Actual head pixels are zero after the residual cools');
+  assert.equal(shape.steady.smokeRadius,shape.steady.lightRadius,'Steady self smoke receives the actual flare light radius');
  }
  assert.ok(report.launches.initial.finite&&report.launches.initial.sum>0&&report.launches.initial.peak<65504,'Actual GPU launch flash is visible at 0.03 seconds');
  assert.ok(report.launches.initial.instancePosition.every((value,i)=>Math.abs(value-report.launches.initial.birth[i])<1e-5),'The flash belongs to the birth position within float32 matrix precision, not the moving carrier');
  assert.equal(report.launches.initial.instances,2,'The launch and main emitter share the same instanced head');
+ assert.equal(report.launches.initial.smokeRadius,report.launches.initial.expectedRadius,'Launch smoke receives the short launch-light radius');
  assert.ok(report.launches.initial.intensity===0&&report.launches.darkAscent.phase==='ascend'&&report.launches.darkAscent.intensity===0,'The launch flash never starts the white illuminating candle early');
  assert.equal(report.launches.darkAscent.sum,0,'Actual white head pixels are zero at 0.2 seconds after the launch flash');
  for(const sample of report.launches.raster){
@@ -193,13 +217,19 @@ try{
  assert.ok(report.blocked.smokeBirths.every(born=>born>=-.00001&&born<.16001),'Only original launch smoke may survive a blocked unignited carrier: '+JSON.stringify(report.blocked));
  const n=report.neighbor,red=n.on.rgb[0]-n.off.rgb[0],green=n.on.rgb[1]-n.off.rgb[1];
  assert.ok(n.ownIntensity===0&&n.ownLightHandle===null&&n.ownSmokeLight===0&&n.liveSmoke>0&&n.sameGeometry,'The same extinguished source smoke is the only rendered geometry: '+JSON.stringify(n));
+ assert.equal(n.otherRadius,n.expectedRadius,'Cold smoke receives the actual neighboring light radius');
  assert.ok(red>1&&red>green*5&&n.on.rgb[0]>n.off.rgb[0]*2&&n.on.sum>n.off.sum*1.1,'A neighboring actual red signal must visibly tint and illuminate the cold white-flare smoke on the GPU: '+JSON.stringify(n));
  assert.ok(Math.abs(n.on.sum-n.again.sum)<Math.max(.001,n.on.sum*.001),'Neighbor on/off/on is stable with the same geometry');
+ for(const sample of report.smokeRange){
+  assert.ok(sample.unbounded>0&&Number.isFinite(sample.ratio),'Each smoke radius test must measure an actually lit production-shader card: '+JSON.stringify(sample));
+  if(sample.distance>=sample.radius)assert.equal(sample.bounded,0,'Self and neighbor light must stop at the same PBR cutoff radius: '+JSON.stringify(sample));
+  else assert.ok(Math.abs(sample.ratio-sample.expected)<.003,'Smoke cutoff must match the PBR smooth window while preserving near-source energy: '+JSON.stringify(sample));
+ }
  assert.equal(report.gl,0);assert.deepEqual(errors,[]);
  console.log('FlareLifecycleBrowserTest passed',JSON.stringify({
   shapes:report.shapes.map(s=>({effect:s.effect,support:[s.early.support,s.steady.support,s.late.support,s.cold.support],
    extinctionDifference:Math.abs(s.beforeOut.sum-s.afterOut.sum)/Math.max(s.beforeOut.sum,s.afterOut.sum)})),
   blocked:{phase:report.blocked.phase,sparks:report.blocked.sparks,smokeBirths:report.blocked.smokeBirths},
   launches:{initialEnergy:report.launches.initial.sum,darkAscentEnergy:report.launches.darkAscent.sum,blockedInitialEnergy:report.blocked.initialFlash.sum},
-  neighbor:{redOn:n.on.rgb[0],redOff:n.off.rgb[0],redAgain:n.again.rgb[0],sameGeometry:n.sameGeometry},gl:report.gl}));
+  neighbor:{redOn:n.on.rgb[0],redOff:n.off.rgb[0],redAgain:n.again.rgb[0],sameGeometry:n.sameGeometry},smokeRange:report.smokeRange,gl:report.gl}));
 }finally{await browser.close();server.close();}

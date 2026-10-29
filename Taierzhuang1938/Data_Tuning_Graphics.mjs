@@ -335,6 +335,9 @@ export const PREPASS_STATIC_BATCH = {
   reserveScale: 1.5,
 };
 
+// Preserve static source buckets; compact expensive offscreen instances only for normal geometry draws.
+export const STATIC_INSTANCE_CULLING = { enabled: true, minTriangles: 20000, maxInstances: 256, maxObjects: 128 };
+
 /**
  * 自动降档（`Script_AutoQuality.mjs`）。docs §17.5 的那一条落地：
  * 滑动窗口的帧间隔中位数 >20 ms 持续 2 s 降一级、<13 ms 持续 8 s 升一级、

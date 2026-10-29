@@ -83,6 +83,7 @@ import {
 import { TerrainBlendPass } from './Script_TerrainBlend.mjs';
 import { TerrainTrailsPass } from './Script_TerrainTrails.mjs';
 import { FlareShadowsPass } from './Script_FlareShadows.mjs';
+import { StaticInstanceCulling, StaticInstanceOpaqueSort } from './Script_StaticInstanceCulling.mjs';
 import { GtaoPass } from "./Script_PostGtao.mjs";
 import { InteriorSkyPass } from "./Script_InteriorSkyOcclusion.mjs";
 import { SsrPass, SsrColorPass } from "./Script_PostSsr.mjs";
@@ -229,6 +230,8 @@ export class PostPipeline {
     this.terrainTrailsPass = new TerrainTrailsPass(this);
     this.flareShadowsPass = new FlareShadowsPass(this);
     this.prepassPass = new PrepassPass(this, { destruction });
+    this.staticInstances = new StaticInstanceCulling(renderer);
+    this.prepassPass.instanceCulling = this.staticInstances;
     this.ssrPass = new SsrPass(this);
     this.ssrColorPass = new SsrColorPass(this, this.ssrPass);
     // GTAO + 弯曲法线 + SSIL（子系统 B2）。替掉了旧的 Script_PostSsao。
@@ -699,7 +702,9 @@ export class PostPipeline {
     } else {
       renderer.setClearColor(0x000000, 1);
       renderer.clear(true, true, false);
-      renderer.render(ctx.scene, ctx.camera);
+      const restoreInstances = this.staticInstances.Begin(ctx.scene, ctx.camera);
+      renderer.setOpaqueSort(StaticInstanceOpaqueSort);
+      try { renderer.render(ctx.scene, ctx.camera); } finally { renderer.setOpaqueSort(null);restoreInstances(); }
     }
     ctx.sceneColor = this.targets.hdr;
   }
@@ -764,6 +769,7 @@ export class PostPipeline {
   }
 
   Dispose() {
+    this.staticInstances?.Dispose();
     this.whiteboxScene?.Dispose();
     for (const pass of this.passes) pass.Dispose?.();
     this.shadowDebugViews?.Dispose?.();

@@ -115,6 +115,7 @@ export function MakePatch(spec) {
     vertex: spec.vertex ?? null,
     fragment: spec.fragment ?? null,
     defines: spec.defines ?? null,
+    preservesPosition: spec.preservesPosition === true,
   };
 }
 
@@ -153,6 +154,7 @@ function ApplyAnchors(source, byAnchor) {
 // （函数 key 全丢），钩子里的 SyncDefines 闭包又只认原材质 —— 克隆体必须按同一份
 // 列表重新 ApplyPatches。放 WeakMap 不挂 userData：列表里有闭包和 Texture。
 const PATCH_LISTS = new WeakMap();
+const PATCH_HOOKS = new WeakMap();
 
 /**
  * 把一组补丁装到材质上。**一个 onBeforeCompile 做完全部替换**。
@@ -220,7 +222,15 @@ export function ApplyPatches(material, patches) {
       .join("|");
   };
   material.userData.materialPatchKeys = list.map((patch) => patch.key);
+  PATCH_HOOKS.set(material, material.onBeforeCompile);
   return material;
+}
+
+/** Conservative admission for geometry-bound culling; unknown vertex patches stay on the original path. */
+export function MaterialPreservesPosition(material) {
+  const list = PATCH_LISTS.get(material);
+  return !!list && PATCH_HOOKS.get(material) === material.onBeforeCompile
+    && list.every(patch => !patch.vertex || patch.preservesPosition === true);
 }
 
 /** 某份材质经 ApplyPatches 装上的补丁列表（原数组，不拷贝）；没装过返回 null。 */
@@ -525,6 +535,7 @@ export function MakeGiPatch(gi) {
   if (!gi) return null;
   return MakePatch({
     key: () => `gi${gi.sampling !== false ? 2 : 1}`,
+    preservesPosition: true,
     uniforms: (uniforms) => {
       if (gi.sampling !== false) BindGiUniforms(uniforms, gi);
       else uniforms.uGiDebugView = gi.debugView;
@@ -748,6 +759,7 @@ export function MakeDestructionPatch(destruction, { key = "destruction1" } = {})
   if (!destruction) return null;
   return MakePatch({
     key,
+    preservesPosition: true,
     uniforms: (uniforms) => { BindDestructionUniforms(uniforms, destruction); },
     vertex: [
       ["#include <common>", /* glsl */`
@@ -786,6 +798,7 @@ export function MakeUvScrollPatch(state, { key = "uvScroll1" } = {}) {
   if (!state) return null;
   return MakePatch({
     key,
+    preservesPosition: true,
     uniforms: (uniforms) => { uniforms.uUvScroll = state; },
     vertex: [
       ["#include <common>", /* glsl */`
@@ -895,6 +908,7 @@ export function MakeWhiteboxWeatherPatch(shared, strength = 1, peel = null) {
   const peelUniform = { value: [peel?.flatten ?? 0, peel?.amount ?? 0, peel?.substrate ?? 0, 0] };
   return MakePatch({
     key: "wbWeather2",
+    preservesPosition: true,
     uniforms: (uniforms) => {
       Object.assign(uniforms, shared);
       uniforms.uWbStrength = strengthUniform;

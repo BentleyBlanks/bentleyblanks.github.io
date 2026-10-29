@@ -145,6 +145,7 @@ export class PropBatcher {
     const capacity = Math.max(1, bucket.capacity, bucket.live.size);
     const mesh = new THREE.InstancedMesh(bucket.geometry, bucket.material, capacity);
     mesh.name = `PropBatch_${bucket.key}`;
+    mesh.userData.staticPropBatch = true;
     mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
     // 与 CloneLoadedAsset 给每个克隆子网格定的口径一致（所以不必进桶 key）。
     mesh.castShadow = true;

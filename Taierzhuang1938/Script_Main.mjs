@@ -34,6 +34,7 @@ import { InstallShadowSkip, ShadowSkipCount, SetShadowSkipEnabled } from "./Scri
 import { FirstPersonShadow } from "./Script_FirstPersonShadow.mjs";
 import { BonePrune } from "./Script_BonePrune.mjs";
 import { ShadowCasterBatch, InstallShadowCasterBatch } from "./Script_ShadowCasterBatch.mjs";
+import { ShadowInstanceCulling, InstallShadowInstanceCulling } from "./Script_ShadowInstanceCulling.mjs";
 import { PrepassStaticBatch, InstallPrepassStaticBatch } from "./Script_PrepassStaticBatch.mjs";
 import { WithShadowDepthRekey } from "./Script_ShadowDepth.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
@@ -512,6 +513,9 @@ renderer.shadowMap.enabled = true;
 // 都从场景根递归走完全部节点，castShadow=false 只省 draw 不省遍历。**必须排在 Script_Csm 的
 // BakeMeter 与 Script_Profiler 的分段包装之前装**，它们各自再包一层，本模块在最里层。
 InstallShadowSkip(renderer);
+// 太阳每级按自己的真实正交阴影相机收紧实例；放在计量/剖析包装里面，整趟计数照常累加。
+const shadowInstanceCulling = new ShadowInstanceCulling();
+InstallShadowInstanceCulling(renderer, shadowInstanceCulling);
 // 渲染遍历跳过「下面什么都不画」的骨头子树（Script_BonePrune 头注）：骨矩阵照算，
 // 各渲染趟不再挨个走一关里上千根骨头。出画前接线里每帧 Update 一次，结构不变是空操作。
 const bonePrune = new BonePrune();
@@ -2332,6 +2336,7 @@ async function Boot() {
     bonePrune,
     // 阴影趟静态投影体合批（Script_ShadowCasterBatch）：同页 A/B 开关、成员数与组数
     shadowCasterBatch,
+    shadowInstanceCulling,
     // 预通道静态合批（Script_PrepassStaticBatch）：同页 A/B 开关、成员数与组数
     prepassStaticBatch,
     // 材质着色升级那一包（POM / 细节法线 / 微阴影 / 地平线 / 皮肤）：

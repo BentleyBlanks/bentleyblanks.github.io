@@ -66,6 +66,7 @@ import { TerrainBlendUniforms, TERRAIN_BLEND_GLSL } from './Script_TerrainBlend.
 import { TRENCH_SURFACE } from './Data_TrenchSurface.mjs';
 import { HZB, VELOCITY } from "./Data_Tuning_Graphics.mjs";
 import { OverrideKind, OverrideVariants } from "./Script_OverrideVariants.mjs";
+import { InstanceSortId } from './Script_InstanceFrustumScope.mjs';
 
 /**
  * 前景（第一人称手 / 枪）在预通道里的**常数近景深度**。
@@ -102,7 +103,7 @@ export function PrepassOpaqueSort(a, b) {
   if (kind !== 0) return kind;
   if (a.material.id !== b.material.id) return a.material.id - b.material.id;
   if (a.z !== b.z) return a.z - b.z;
-  return a.id - b.id;
+  return InstanceSortId(a) - InstanceSortId(b);
 }
 
 /**
@@ -837,6 +838,11 @@ export class PrepassPass {
   }
 
   Render(ctx) {
+    const restoreInstances = this.instanceCulling?.Begin(ctx.scene, ctx.camera);
+    try { return this._RenderGeometry(ctx); } finally { restoreInstances?.(); }
+  }
+
+  _RenderGeometry(ctx) {
     const renderer = ctx.renderer;
     const scene = ctx.scene;
     const camera = ctx.camera;

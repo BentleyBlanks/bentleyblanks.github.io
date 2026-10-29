@@ -28,6 +28,7 @@ const FRAGMENT=`precision highp float;
 varying vec2 vUv;varying float vAge;varying float vSeed;varying vec3 vWorld;varying vec2 vParticleRatio;
 uniform vec3 tint;uniform vec3 ambient;uniform vec3 lightPosition;
 uniform float mode;uniform float clock;uniform float power;uniform float candle;uniform float scatter;
+uniform float lightRadius;
 uniform float opacityScale;
 uniform vec4 combustion; // width, length, aspect, cold residual
 uniform vec2 ember; // independent residual radiance and shrinking extent
@@ -37,12 +38,20 @@ uniform vec4 otherLight[${A.smokeLightSlots}];
 uniform vec3 otherTint[${A.smokeLightSlots}];
 uniform vec3 otherAxis[${A.smokeLightSlots}];
 uniform vec2 otherLobe[${A.smokeLightSlots}];
+uniform float otherRadius[${A.smokeLightSlots}];
 uniform vec3 flameAxis;uniform float directional;
 ${FLARE_ANGULAR_GLSL}
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1)),f.x),f.y);}
 float fbm(vec2 p){return .57*noise(p)+.28*noise(p*2.03+11.)+.15*noise(p*4.11-7.);}
+float SmokeRangeGain(vec3 delta,float radius){
+ // Match the PBR point-light cutoff window. Keep the smoke approximation's
+ // existing softened near-source inverse square term separately below.
+ if(radius<=0.)return 1.;
+ float ratio2=dot(delta,delta)/(radius*radius);
+ float window=clamp(1.-ratio2*ratio2,0.,1.);return window*window;
+}
 void main(){vec2 p=(vUv-.5)*2.;float r2=dot(p,p);if(r2>1.||vAge<0.)discard;
  if(mode<.5){
   if(vAge>.5){
@@ -97,12 +106,12 @@ void main(){vec2 p=(vUv-.5)*2.;float r2=dot(p,p);if(r2>1.||vAge<0.)discard;
   float density=edge*smoothstep(.18,.72,n)*smoothstep(0.,.08,vAge)*pow(1.-vAge,1.2);
   vec3 delta=vWorld-lightPosition;
   float emission=directional>.5?FlareEmissionGain(flameAxis,normalize(delta),${O.angularFloor},${O.angularPower}):1.;
-  vec3 incident=ambient+tint*candle*scatter*emission/(dot(delta,delta)+4.);
+  vec3 incident=ambient+tint*candle*scatter*emission*SmokeRangeGain(delta,lightRadius)/(dot(delta,delta)+4.);
   for(int i=0;i<${A.smokeLightSlots};i++){
    if(otherLight[i].w<=0.)continue;
    vec3 offset=vWorld-otherLight[i].xyz;
    float gain=otherLobe[i].x<0.?1.:FlareEmissionGain(otherAxis[i],offset*inversesqrt(max(dot(offset,offset),.000001)),otherLobe[i].x,otherLobe[i].y);
-   incident+=otherTint[i]*otherLight[i].w*scatter*gain/(dot(offset,offset)+4.);
+   incident+=otherTint[i]*otherLight[i].w*scatter*gain*SmokeRangeGain(offset,otherRadius[i])/(dot(offset,offset)+4.);
   }
   gl_FragColor=vec4(vec3(.46,.45,.42)*incident,1.-exp(-density*opacityScale));
  }
@@ -129,12 +138,13 @@ function Cards(count,mode,color){
  geometry.setAttribute('seed',new THREE.InstancedBufferAttribute(new Float32Array(count),1));
  const material=new THREE.ShaderMaterial({vertexShader:VERTEX,fragmentShader:FRAGMENT,
   uniforms:{tint:{value:new THREE.Color(color)},ambient:{value:new THREE.Color()},lightPosition:{value:new THREE.Vector3()},
-    mode:{value:mode},clock:{value:0},power:{value:1},candle:{value:0},scatter:{value:A.smokeScatter},
+    mode:{value:mode},clock:{value:0},power:{value:1},candle:{value:0},scatter:{value:A.smokeScatter},lightRadius:{value:0},
     flameAxis:{value:new THREE.Vector3(0,-1,0)},directional:{value:0},opacityScale:{value:A.smokeOpacity},combustion:{value:new THREE.Vector4(1,1,1,0)},ember:{value:new THREE.Vector2()},
     otherLight:{value:Array.from({length:A.smokeLightSlots},()=>new THREE.Vector4())},
     otherTint:{value:Array.from({length:A.smokeLightSlots},()=>new THREE.Color())},
     otherAxis:{value:Array.from({length:A.smokeLightSlots},()=>new THREE.Vector3(0,-1,0))},
     otherLobe:{value:Array.from({length:A.smokeLightSlots},()=>new THREE.Vector2(-1,1))},
+    otherRadius:{value:Array(A.smokeLightSlots).fill(0)},
     launchPower:{value:0},launchTint:{value:new THREE.Color(C.launchColor)},launchAxis:{value:new THREE.Vector3(0,1,0)}},
   transparent:true,depthWrite:false,depthTest:true,blending:mode===1?THREE.NormalBlending:THREE.AdditiveBlending});
  const mesh=new THREE.InstancedMesh(geometry,material,count);mesh.frustumCulled=false;
@@ -288,6 +298,7 @@ export class FlareVisuals {
   }
   const u=smoke.material.uniforms;u.ambient.value.copy(this.ambient).add(this.sun.clone().multiplyScalar(.65));u.lightPosition.value.set(f.pos.x,f.pos.y,f.pos.z);u.candle.value=f.intensity*(f.photometricScale??1)*(f.sceneScale??1);
   u.tint.value.setHex(launch>0?C.launchColor:f.lightColor);
+  u.lightRadius.value=launch>0?C.launchLightRadiusM:f.lightRadiusM;
   if(launch>0){u.lightPosition.value.set(f.from.x,f.groundY+A.launchHeight,f.from.z);u.candle.value=C.launchCd*launch*launchScale;}
   u.flameAxis.value.copy(axis);u.directional.value=launch>0?0:f.opticalMotion?1:0;
   const neighbors=[];
@@ -301,6 +312,7 @@ export class FlareVisuals {
    const source=neighbors[i]?.source;
    if(!source){u.otherLight.value[i].w=0;continue;}
    u.otherLight.value[i].set(source.position.x,source.position.y,source.position.z,source.currentIntensity);
+   u.otherRadius.value[i]=source.currentRadius??source.radius??0;
    u.otherTint.value[i].copy(source.currentColor||source.color);
    u.otherAxis.value[i].copy(source.emission?.direction||up);
    u.otherLobe.value[i].set(source.emission?.floor??-1,source.emission?.power??1);

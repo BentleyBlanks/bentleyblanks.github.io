@@ -172,5 +172,160 @@ batch.SetEnabled(true);
   Check("Prime 不动成员属性", a.castShadow && a.visible && b.castShadow && b.visible);
 }
 
+// 9. 大几何只重排完整三角：每个有向三角的 Float32 位模式、次数都不变。
+{
+  const fresh = new THREE.Scene();
+  const geometry = new THREE.PlaneGeometry(160, 160, 32, 32);
+  geometry.rotateX(-Math.PI / 2);
+  const primed = new ShadowCasterBatch(fresh, { tuning: { ...TUNING, localChunkSize: 48, localChunkMinTriangles: 1024 } });
+  const Triangles = (parts) => parts.flatMap((part) => {
+    const position = part.attributes.position, index = part.index;
+    const count = index ? index.count : position.count, result = [];
+    const point = new Float32Array(3), bits = new Uint32Array(point.buffer);
+    for (let i = 0; i < count; i += 3) {
+      const corners = [];
+      for (let corner = 0; corner < 3; corner += 1) {
+        const vertex = index ? index.getX(i + corner) : i + corner;
+        point[0] = position.getX(vertex); point[1] = position.getY(vertex); point[2] = position.getZ(vertex);
+        corners.push(Array.from(bits).join(","));
+      }
+      result.push(corners.join(";"));
+    }
+    return result;
+  }).sort();
+  const sameTriangles = (a, b) => JSON.stringify(Triangles(a)) === JSON.stringify(Triangles(b));
+  const prepared = primed._Geometry(geometry);
+  Check("局部分块：大件分成多块、只带紧凑位置与索引", prepared.parts.length > 1 && prepared.parts.every((part) =>
+    Object.keys(part.attributes).join() === "position" && new Set(part.index.array).size === part.attributes.position.count));
+  Check("局部分块：索引三角的坐标位模式/绕序/次数完全一致", sameTriangles([geometry], prepared.parts));
+  Check("局部分块：缓存重复使用、不再复制顶点", primed._Geometry(geometry) === prepared);
+  const flat = geometry.toNonIndexed(), flatPrepared = primed._Geometry(flat);
+  Check("局部分块：非索引三角完全一致", flatPrepared.parts.length > 1 && sameTriangles([flat], flatPrepared.parts));
+  const points = geometry.attributes.position, interleaved = new THREE.BufferGeometry(), data = new Float32Array(points.count * 5);
+  for (let i = 0; i < points.count; i += 1) { data[i * 5 + 1] = points.getX(i); data[i * 5 + 2] = points.getY(i); data[i * 5 + 3] = points.getZ(i); }
+  interleaved.setAttribute("position", new THREE.InterleavedBufferAttribute(new THREE.InterleavedBuffer(data, 5), 3, 1));
+  interleaved.setIndex(geometry.index.clone());
+  const interleavedPrepared = primed._Geometry(interleaved);
+  Check("局部分块：交错属性三角完全一致", interleavedPrepared.parts.length > 1 && sameTriangles([interleaved], interleavedPrepared.parts));
+  interleaved.attributes.position.data.needsUpdate = true;
+  Check("局部分块：交错底层缓冲版本变化也重建缓存", primed._Geometry(interleaved) !== interleavedPrepared);
+  const smallDense = new THREE.PlaneGeometry(10, 10, 32, 32);
+  Check("局部分块：小件/低三角件保持一实例", primed._Geometry(smallDense).parts.length === 1 && primed._Geometry(boxGeometry).parts.length === 1);
+  const disabled = new ShadowCasterBatch(fresh, { tuning: { ...TUNING, localChunkSize: 0 } });
+  Check("局部分块：0 可恢复整件合批 A/B", disabled._Geometry(geometry).parts.length === 1);
+  const a = new THREE.Mesh(geometry, plain), b = new THREE.Mesh(geometry, plain);
+  a.castShadow = true; b.castShadow = true; b.position.set(4, 2, -3); b.rotation.y = .2; b.scale.set(1.5, 1.2, .9); fresh.add(a, b);
+  const customMaterial = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide }); customMaterial.shadowSide = THREE.BackSide;
+  const c = new THREE.Mesh(geometry, customMaterial); c.customDepthMaterial = staticDepth; c.castShadow = true; fresh.add(c);
+  primed.DisposeWarmProxy(primed.WarmProxy()); fresh.updateMatrixWorld();
+  let resized = 0;
+  const prototype = THREE.BatchedMesh.prototype;
+  const originals = Object.fromEntries(["setGeometrySize", "setInstanceCount", "optimize"].map((name) => [name, prototype[name]]));
+  try {
+    for (const name of Object.keys(originals)) prototype[name] = function(...args) { resized += 1; return originals[name].apply(this, args); };
+    primed.Prime();
+  } finally { for (const name of Object.keys(originals)) prototype[name] = originals[name]; }
+  const recA = primed.records.get(a), recB = primed.records.get(b), recC = primed.records.get(c), group = recA.group, entry = recA.geometryEntry;
+  Check("局部分块：Prime 预留全部块的实例和真实顶点量、没有中途扩容/整理", resized === 0
+    && group.mesh.instanceCount === 2 * prepared.parts.length && group.mesh.maxInstanceCount >= group.mesh.instanceCount);
+  Check("局部分块：一源一登记、同源跨组复用缓存、每块矩阵一致", group.objects.length === 2 && group.geometries.size === 1
+    && entry.refs === 2 && recA.instanceIds.length === prepared.parts.length && recC.geometryEntry.prepared === prepared
+    && recB.instanceIds.every((id) => { const matrix = new THREE.Matrix4(); group.mesh.getMatrixAt(id, matrix); return matrix.elements.every((n, i) => Math.abs(n - b.matrixWorld.elements[i]) < 1e-6); }));
+  Check("局部分块：自定义深度/面向保持一源一组", recC.group.mesh.customDepthMaterial === primed.depthClones.get(staticDepth)
+    && recC.group.mesh.material.side === THREE.DoubleSide && recC.group.mesh.material.shadowSide === THREE.BackSide);
+  // 同一顶点被跨块引用时，逐块包围球必须罩住它；这里直接跑 three 的原生阴影视锥登记。
+  const camera = new THREE.OrthographicCamera(-12, 12, 12, -12, .1, 200); camera.position.set(70, 100, 70); camera.lookAt(70, 0, 70); camera.updateMatrixWorld();
+  group.mesh.onBeforeShadow(null, null, null, camera, group.mesh.geometry, group.mesh.customDepthMaterial);
+  const submitted = Array.from(group.mesh._multiDrawCounts).slice(0, group.mesh._multiDrawCount).reduce((sum, count) => sum + count, 0);
+  Check("局部分块：原生逐块视锥减少画面外三角", submitted > 0 && submitted < geometry.index.count * 2, `${submitted}/${geometry.index.count * 2}`);
+  const oldIds = recB.instanceIds.slice(); b.position.y += 1; fresh.updateMatrixWorld(); primed.Update();
+  Check("局部分块：移动当帧踢出整源全部实例、共享几何仍留", recB.instanceIds.length === 0 && group.mesh.instanceCount === prepared.parts.length
+    && oldIds.every((id) => !group.mesh._instanceInfo[id].active) && entry.refs === 1 && group.geometries.get(geometry) === entry);
+  a.visible = false; fresh.updateMatrixWorld(); primed.Update();
+  Check("局部分块：最后一个共享源离开后全部几何 ID 释放", group.mesh.instanceCount === 0 && !group.geometries.has(geometry)
+    && entry.ids.every((id) => !group.mesh._geometryInfo[id].active));
+  const oldCustomIds = recC.instanceIds.slice(), customGroup = recC.group; geometry.attributes.position.needsUpdate = true; fresh.updateMatrixWorld(); primed.Update();
+  const replaced = primed._Geometry(geometry);
+  Check("局部分块：源版本变化当帧踢出全部实例并重建缓存", recC.group === null && oldCustomIds.every((id) => !customGroup.mesh._instanceInfo[id].active)
+    && replaced !== prepared && sameTriangles([geometry], replaced.parts));
+  const attribute = geometry.attributes.position.clone(); geometry.setAttribute("position", attribute);
+  Check("局部分块：替换同版本属性也重建缓存", primed._Geometry(geometry) !== replaced);
+  a.visible = true; for (let i = 0; i < 20; i += 1) { fresh.updateMatrixWorld(); primed.Update(); }
+  Check("局部分块：冷却重收复用新版本、无孤儿实例", primed.stats.members === 3 && [...primed.groups.values()].reduce((sum, g) => sum + g.mesh.instanceCount, 0)
+    === [...primed.records.values()].filter((rec) => rec.group).reduce((sum, rec) => sum + rec.instanceIds.length, 0));
+  primed.SetEnabled(false);
+  Check("局部分块：关闭后所有分块与源登记一起撤下", primed.records.size === 0 && primed.groups.size === 0 && primed.root.children.length === 0);
+  primed.Dispose(); disabled.Dispose();
+  for (const owned of [geometry, flat, interleaved, smallDense]) owned.dispose(); customMaterial.dispose();
+}
+
+// 10. 面向区间只剔除硬件 side 本来就不画的整块；逐三角符号 oracle 独立核对。
+{
+  const fresh = new THREE.Scene(), tuning = { ...TUNING, localChunkSize: 48, localChunkMinTriangles: 1024, localFacingCull: true };
+  const geometry = new THREE.BoxGeometry(160, 8, 160, 32, 1, 32);
+  const index = Array.from(geometry.index.array); index.push(0, 0, 0); geometry.setIndex(index);
+  const object = new THREE.Mesh(geometry, plain); object.castShadow = true;
+  object.position.set(420, 12, -110); object.rotation.set(.03, .173, -.021); object.scale.set(1.03, 1.2, .97); fresh.add(object);
+  const primed = new ShadowCasterBatch(fresh, { tuning }); primed.DisposeWarmProxy(primed.WarmProxy()); fresh.updateMatrixWorld(); primed.Prime();
+  const rec = primed.records.get(object), group = rec.group, mesh = group.mesh, prepared = rec.geometryEntry.prepared;
+  const fakeDepth = new THREE.MeshDepthMaterial(), light = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3();
+  const Submitted = (camera, enabled, side) => {
+    tuning.localFacingCull = enabled; fakeDepth.side = side;
+    mesh.onBeforeShadow(null, mesh, null, camera, mesh.geometry, fakeDepth);
+    return new Set(Array.from(mesh._indirectTexture.image.data).slice(0, mesh._multiDrawCount));
+  };
+  let rejected = 0, invalid = 0, doubleChanged = 0, leaked = 0, degenerateRejected = 0;
+  for (const perspective of [true, false]) for (const offset of [[0, 300, 0], [0, -300, 0], [300, 10, 0], [0, 0.00001, 300]]) {
+    const camera = perspective ? new THREE.PerspectiveCamera(150, 1, .001, 20000) : new THREE.OrthographicCamera(-10000, 10000, 10000, -10000, .001, 20000);
+    camera.position.copy(object.position).add(new THREE.Vector3(...offset)); camera.lookAt(object.position); camera.updateMatrixWorld();
+    if (perspective) light.copy(camera.position).applyMatrix4(rec.inverse);
+    else light.set(0, 0, 1).transformDirection(camera.matrixWorld).transformDirection(rec.inverse);
+    for (const side of [THREE.FrontSide, THREE.BackSide, THREE.DoubleSide]) {
+      const original = Submitted(camera, false, side), visible = Submitted(camera, true, side);
+      if (side === THREE.DoubleSide && [...original].some((id) => !visible.has(id))) doubleChanged += 1;
+      for (let partId = 0; partId < rec.instanceIds.length; partId += 1) {
+        const id = rec.instanceIds[partId];
+        if (!original.has(id) || visible.has(id)) continue;
+        rejected += 1;
+        if (!prepared.facing[partId]) degenerateRejected += 1;
+        const part = prepared.parts[partId], points = part.attributes.position, indices = part.index.array;
+        for (let i = 0; i < indices.length; i += 3) {
+          a.fromBufferAttribute(points, indices[i]); b.fromBufferAttribute(points, indices[i + 1]); c.fromBufferAttribute(points, indices[i + 2]);
+          b.sub(a); c.sub(a); n.crossVectors(b, c);
+          const sign = perspective ? n.dot(c.copy(light).sub(a)) : n.dot(light);
+          if (side === THREE.FrontSide ? !(sign < 0) : !(sign > 0)) invalid += 1;
+        }
+      }
+      if (rec.instanceIds.some((id) => !mesh.getVisibleAt(id))) leaked += 1;
+    }
+  }
+  Check("面向剔除：透视/正交、非均匀缩放/旋转均无逐三角错误拒绝", rejected > 0 && invalid === 0, `reject ${rejected}, invalid ${invalid}`);
+  Check("面向剔除：DoubleSide 完全不剔、所有实例可见性立即还原", doubleChanged === 0 && leaked === 0);
+  Check("面向剔除：含退化三角的块保守保留", prepared.facing.some((bounds) => bounds === null) && degenerateRejected === 0);
+  // 共面观察者、极近切线面都不能被 epsilon 边界误判；Front/Back 两面都保留这个平面。
+  const flat = new THREE.PlaneGeometry(160, 160, 32, 32), plane = new THREE.Mesh(flat, plain); plane.castShadow = true; fresh.add(plane);
+  fresh.updateMatrixWorld(); primed.Prime();
+  const planeRec = primed.records.get(plane), camera = new THREE.PerspectiveCamera(150, 1, .001, 20000);
+  camera.position.set(0, 0, 0.000001); camera.lookAt(0, 0, -1); camera.updateMatrixWorld();
+  let ambiguousRejected = false;
+  for (const side of [THREE.FrontSide, THREE.BackSide]) {
+    const original = Submitted(camera, false, side), visible = Submitted(camera, true, side);
+    ambiguousRejected ||= planeRec.instanceIds.some((id) => original.has(id) && !visible.has(id));
+  }
+  Check("面向剔除：近切线符号在保守误差区时两面都保留", !ambiguousRejected);
+  const failureCamera = new THREE.PerspectiveCamera(150, 1, .001, 20000); failureCamera.position.copy(object.position).add(new THREE.Vector3(0, 300, 0)); failureCamera.lookAt(object.position); failureCamera.updateMatrixWorld();
+  const originalSphere = mesh.getBoundingSphereAt; let threw = false;
+  try {
+    mesh.getBoundingSphereAt = () => { throw new Error("FacingHookOracle"); };
+    Submitted(failureCamera, true, THREE.BackSide);
+  } catch (error) { threw = error.message === "FacingHookOracle"; }
+  finally { mesh.getBoundingSphereAt = originalSphere; }
+  Check("面向剔除：原生钩子抛错后也立即还原实例", threw && [...primed.records.values()].every((record) => !record.group || record.instanceIds.every((id) => record.group.mesh.getVisibleAt(id))));
+  const singular = new THREE.Mesh(geometry, plain); singular.castShadow = true; singular.scale.y = 1e-8; fresh.add(singular); fresh.updateMatrixWorld(); primed.Prime();
+  const singularRec = primed.records.get(singular), singularBefore = Submitted(failureCamera, false, THREE.BackSide), singularAfter = Submitted(failureCamera, true, THREE.BackSide);
+  Check("面向剔除：近奇异矩阵保守绕过", !singularRec.facingSafe && singularRec.instanceIds.every((id) => !singularBefore.has(id) || singularAfter.has(id)));
+  primed.Dispose(); geometry.dispose(); flat.dispose(); fakeDepth.dispose();
+}
+
 console.log(failed ? `FAIL ${failed} 项` : "PASS ShadowCasterBatch：只收稳定叶子、烘焙那一刻换人并原样还原、变化当帧踢出、不改成员属性、关掉全还原、预热复用克隆、进关一次收满");
 process.exit(failed ? 1 : 0);

@@ -274,6 +274,12 @@ export const STATIC_CASTER_BATCH = {
   /** BatchedMesh 的起始容量；不够时先整理碎片，再按两倍扩。 */
   minInstanceCapacity: 256,
   minVertexCapacity: 65536,
+  /** 大静态几何按局部米制网格归整三角，逐块保守剔除；0 关闭，原三角与世界坐标不变。 */
+  localChunkSize: 48,
+  /** 小件维持一份几何 / 一个实例，避免日常道具多出分块登记。 */
+  localChunkMinTriangles: 1024,
+  /** 分块再按法线主轴归组；按原生深度材质的实际 side 保守跳过整块背向面，双面/近切线不剔。 */
+  localFacingCull: true,
   /**
    * 建组时按当时登记的同组投影体总量乘这个数一次留够（下限仍是上面两项）。中途扩容 / 整理是
    * 整批拷贝整块重传，05 战车段录到一帧 199 ms（2026-09-28）；会反复变形的地形块已不收。

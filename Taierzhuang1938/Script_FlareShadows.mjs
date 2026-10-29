@@ -3,7 +3,8 @@
 import * as THREE from "three";
 import { FLARE_SHADOW as CFG } from "./Data_Tuning_FlareEffects.mjs";
 import { MakeFullscreenMaterial, QUAD_GEOMETRY, QUAD_CAMERA } from "./Script_PostCommon.mjs";
-import {FitReceiverCone,ReceiverConeCovered} from './Script_FlareShadowBounds.mjs';
+import {FitReceiverCone,FitReceiverProjection,ReceiverConeCovered} from './Script_FlareShadowBounds.mjs';
+import {FlareShadowInstances} from './Script_FlareShadowInstances.mjs';
 
 const ConeConfig={...CFG,coneMaxHalfAngleRad:CFG.maxConeAngle,coneAngleGuardRad:CFG.coneGuardRad,coneDepthCoverageMargin:0};
 
@@ -258,6 +259,7 @@ function Covers(previous,current) {
 export class FlareShadowsPass {
   constructor(pipeline) {
     this.name="flareShadows";this.pipeline=pipeline;this.slots=[];this.pending=null;
+    this.instanceCasters=new FlareShadowInstances({minTriangles:CFG.instanceCullMinTriangles,maxInstances:CFG.instanceCullMaxInstances,maxObjects:CFG.instanceCullMaxObjects});
     this.serial=0;this.stats={maps:0,updates:0,faces:0,calls:0,triangles:0};
     this.frustum=new THREE.Frustum();this.viewProjection=new THREE.Matrix4();
     this.receiverBounds=new THREE.Box3();this.receiverBoxes=[];this.scratchBounds=new THREE.Box3();this.extraPending=[];
@@ -304,9 +306,9 @@ export class FlareShadowsPass {
         // that world projection to the current emitter and certify all current
         // receiver vertices before drawing BOTH fresh maps at this position.
         for(let row=0;row<4;row++)e[12+row]-=e[row]*dx+e[4+row]*dy+e[8+row]*dz;
-        if(ReceiverConeCovered(slot.recenteredMatrix,slot.source.position,Math.max(CFG.nearM*2,slot.source.currentRadius),this.receiverBoxes,this.frustum.planes[5],ConeConfig)){cone=slot.cone;this.stats.fitReuse++;}
+        if(ReceiverConeCovered(slot.recenteredMatrix,slot.source.position,Math.max(CFG.nearM*2,slot.source.currentRadius),this.receiverBoxes,this.frustum,ConeConfig)){cone=slot.cone;this.stats.fitReuse++;}
       }
-      slot.nextCone=cone||FitReceiverCone(slot.source.position,Math.max(CFG.nearM*2,slot.source.currentRadius),this.receiverBoxes,this.frustum.planes[5],ConeConfig);
+      slot.nextCone=cone||FitReceiverCone(slot.source.position,Math.max(CFG.nearM*2,slot.source.currentRadius),this.receiverBoxes,this.frustum,ConeConfig);
       slot.nextFits=slot.nextCone?null:FitFaces(slot.source.position,Math.max(CFG.nearM*2,slot.source.currentRadius),this.receiverBoxes);
       if(!this.pending||slot.last<this.pending.last)this.pending=slot;
     }
@@ -318,7 +320,7 @@ export class FlareShadowsPass {
       const radius=Math.max(CFG.nearM*2,slot.source.currentRadius);
       // Coverage must be measured in the LAST map's source frame. Comparing
       // two angular intervals relative to different moving origins is unsafe.
-      const covered=slot.valid&&(slot.cone?ReceiverConeCovered(slot.matrices[0],slot.source.position,radius,this.receiverBoxes,this.frustum.planes[5],ConeConfig)
+      const covered=slot.valid&&(slot.cone?ReceiverConeCovered(slot.matrices[0],slot.source.position,radius,this.receiverBoxes,this.frustum,ConeConfig)
         :Covers(slot.fits,FitFaces(slot.position,radius+slot.position.distanceTo(slot.source.position),this.receiverBoxes,slot.source.position,radius)));
       if(!covered)this.extraPending.push(slot);
     }
@@ -395,7 +397,11 @@ export class FlareShadowsPass {
       if(slot.nextCone){
         const height=Math.max(4,slot.source.position.y-ctx.camera.position.y),nearAngle=Math.min(CFG.maxConeAngle,Math.atan2(CFG.nearReceiverRadiusM,height));
         const nearFar=Math.min(slot.source.currentRadius,Math.hypot(height,CFG.nearReceiverRadiusM)+CFG.nearDepthMarginM);
-        maps.push({face:0,light:slot.farLight,size:CFG.farSize,cone:slot.nextCone},{face:4,light:slot.light,size:CFG.size,cone:{direction:[0,-1,0],angle:nearAngle,far:nearFar}});
+        maps.push({face:0,light:slot.farLight,size:CFG.farSize,cone:slot.nextCone});
+        // The far map covers every visible receiver. Preserve local detail only
+        // over the observer-visible part of the original downward near pyramid.
+        const nearCone=FitReceiverProjection(slot.source.position,slot.source.currentRadius,this.receiverBoxes,this.frustum,[0,-1,0],nearAngle,{...ConeConfig,projectionFarM:nearFar});
+        if(nearCone)maps.push({face:4,light:slot.light,size:CFG.size,cone:nearCone});
       }else for(let face=0;face<CFG.faces;face++)if(slot.nextFits[face])maps.push({face,light:slot.light,size:CFG.size,fit:slot.nextFits[face]});
       for(const entry of maps){
         const {face,light,size,fit,cone}=entry,direction=cone?cone.direction:FaceDirections[face];
@@ -407,7 +413,12 @@ export class FlareShadowsPass {
         else if(cone)light.shadow.camera.clearViewOffset();
         else light.shadow.camera.setViewOffset(2,2,fit.minU+1,1-fit.maxV,Math.max(.00001,fit.maxU-fit.minU),Math.max(.00001,fit.maxV-fit.minV));
         light.target.updateMatrixWorld();light.shadow.needsUpdate=true;
-        this.dummyMesh.onBeforeRender=()=>{renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;renderer.shadowMap.render([light],ctx.scene,ctx.camera);};
+        this.dummyMesh.onBeforeRender=()=>{
+          renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;
+          light.shadow.updateMatrices(light);
+          const restore=this.instanceCasters.Begin(ctx.scene,light.shadow.camera,ctx.camera);
+          try{renderer.shadowMap.render([light],ctx.scene,ctx.camera);}finally{restore();}
+        };
         renderer.setRenderTarget(this.dummyTarget);renderer.render(this.dummyScene,QUAD_CAMERA);
         this.packUniforms.uDepth.value=light.shadow.map.depthTexture;
         this.packUniforms.uNearFar.value.set(light.shadow.camera.near,light.shadow.camera.far);
@@ -422,7 +433,7 @@ export class FlareShadowsPass {
       }
       slot.position.copy(slot.source.position);slot.cone=slot.nextCone;
       slot.fits=slot.cone?new Array(CFG.faces).fill(null):slot.nextFits;
-      if(slot.cone){slot.fits[0]=slot.cone;slot.fits[4]=true;}
+      if(slot.cone){slot.fits[0]=slot.cone;slot.fits[4]=maps.some(entry=>entry.face===4);}
       slot.valid=true;slot.last=this.serial++;
       this.Publish(slot,ctx);
       this.cluster.UploadMetadata();
@@ -442,6 +453,7 @@ export class FlareShadowsPass {
   }
   Dispose() {
     this.Idle();
+    this.instanceCasters.Dispose();
     for(const slot of this.slots){slot.light.shadow.dispose();slot.farLight.shadow.dispose();}
     this.slots.length=0;
     this.dummyMaterial?.dispose();this.dummyTarget?.dispose();this.packedTarget?.dispose();this.packedFarTarget?.dispose();this.packMaterial?.dispose();

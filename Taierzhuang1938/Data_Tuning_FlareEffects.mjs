@@ -107,6 +107,7 @@ export const FLARE_SHADOW = Object.freeze({
   receiverGuard:.08,depthGuardM:2,
   receiverCellM:64,receiverPartitionMinM:192,
   receiverInstanceCellM:16,receiverInstanceGroupMinCount:8,
+  instanceCullMinTriangles:20000,instanceCullMaxInstances:256,instanceCullMaxObjects:128,
   biasM:.055, normalBiasM:.045,
 });
 
