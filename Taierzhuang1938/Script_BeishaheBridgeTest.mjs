@@ -365,7 +365,7 @@ for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
           if(hits.length){const rgb=HitTint(hits[0]);if(rgb)colors.push(rgb);}
         }
         const luma=colors.map(c=>.2126*c[0]+.7152*c[1]+.0722*c[2]),range=luma.length?Math.max(...luma)-Math.min(...luma):0;
-        Check(colors.length===edges.length-1&&range>.0085&&range<.16,'Same-height damp blocks retain controlled independent color, beyond the height gradient',{supportIndex,row,faceSide,range,colors:colors.length});
+        Check(colors.length===edges.length-1&&range>.20&&range<.42,'Same-height lower blocks retain bounded, visibly mottled color',{supportIndex,row,faceSide,range,colors:colors.length});
       }
     }
   }
@@ -397,7 +397,7 @@ for(const role of ['Pier','PierDamp']){
 }
 for(const role of ['Pier','PierDamp','Cap','abutment']){
   const meshes=[...new Map(ByRole(role).map(p=>[p.node.mesh,p])).values()];
-  const tints=new Set();let min=1,max=0,invalid=0,alphaBad=0,mixedFaces=0;
+  const tints=new Set(),dampSlopes=[];let min=1,max=0,invalid=0,alphaBad=0,mixedFaces=0;
   for(const part of meshes){
     const {color,colorWidth,indices,positions}=part.geo;
     const expectedMaterial=role==='PierDamp'?'BeishaheStoneDamp':'BeishaheStone';
@@ -405,26 +405,56 @@ for(const role of ['Pier','PierDamp','Cap','abutment']){
     for(let i=0;i<color.length;i+=colorWidth){
       const rgb=[color[i],color[i+1],color[i+2]];
       const y=positions[(i/colorWidth)*3+1],course=(spec.pierTopY-spec.foundationY-.25)/9;
-      const lowerBound=(role==='Pier'&&y<spec.foundationY+4.2*course) ? .70 : role==='PierDamp' ? .78 : .80;
+      const lowerBound=(role==='Pier'&&y<spec.foundationY+4.2*course) ? .70 : role==='PierDamp' ? .24 : .80;
       if(!rgb.every(v=>Number.isFinite(v)&&v>=lowerBound&&v<=1.001))invalid++;
       min=Math.min(min,...rgb);max=Math.max(max,...rgb);tints.add(rgb.map(v=>Math.round(v*10000)).join(','));
       if(colorWidth===4&&Math.abs(color[i+3]-1)>=.001)alphaBad++;
     }
-    // Cap/abutment tint stays constant per actual triangle. Pier stone uses
-    // a bounded height-based gradient; reject artificial lateral tint jumps.
+    // Cap/abutment tint stays constant per actual triangle. Damp stone has a
+    // bounded spatial stain field; dry stone keeps its gentler height gradient.
     for(let k=0;k<(indices?.length??positions.length/3);k+=3){
       const ids=[0,1,2].map(j=>indices?indices[k+j]:k+j);
       for(const [a,b] of [[ids[0],ids[1]],[ids[1],ids[2]],[ids[2],ids[0]]])for(let c=0;c<3;c++){
         const delta=Math.abs(color[a*colorWidth+c]-color[b*colorWidth+c]);
-        const permitted=(role==='Pier'||role==='PierDamp') ? .90*Math.abs(positions[a*3+1]-positions[b*3+1])+.03 : .001;
+        const distance=Math.hypot(positions[a*3]-positions[b*3],positions[a*3+1]-positions[b*3+1],positions[a*3+2]-positions[b*3+2]);
+        if(role==='PierDamp'&&distance>.0001)dampSlopes.push(delta/distance);
+        const permitted=role==='PierDamp' ? 8.5*distance+.001 : role==='Pier' ? .90*Math.abs(positions[a*3+1]-positions[b*3+1])+.03 : .001;
         if(delta>permitted)mixedFaces++;
       }
     }
   }
-  Check(invalid===0&&alphaBad===0,'Masonry tint is mild, finite and opaque',{role,invalid,alphaBad});
+  Check(invalid===0&&alphaBad===0,'Masonry tint remains bounded, finite and opaque',{role,invalid,alphaBad});
   Check(mixedFaces===0,'Masonry color varies smoothly without fake lateral seams',{role,mixedFaces});
-  const maxRange=role==='Pier' ? .31 : role==='PierDamp' ? .25 : .21;
-  Check(tints.size>=(role==='Cap'?3:12)&&max-min>.04&&max-min<maxRange,'Masonry has visible but restrained deterministic color variation',{role,unique:tints.size,min,max});
+  if(role==='PierDamp'){
+    dampSlopes.sort((a,b)=>a-b);
+    const p99=dampSlopes[Math.floor(dampSlopes.length*.99)];
+    Check(dampSlopes.length>10000&&p99<3.2,'Damp-stone color transitions are generally gradual',{samples:dampSlopes.length,p99});
+  }
+  const maxRange=role==='Pier' ? .31 : role==='PierDamp' ? .78 : .21;
+  const minRange=role==='PierDamp' ? .60 : .04, minUnique=role==='PierDamp' ? 5000 : role==='Cap' ? 3 : 12;
+  Check(tints.size>=minUnique&&max-min>minRange&&max-min<maxRange,'Masonry has bounded deterministic color variation',{role,unique:tints.size,min,max});
+}
+// Matching physical positions on subdivided damp faces must carry the same
+// tint, including where face cells meet bevels, to avoid artificial seams.
+for(const part of [...new Map(ByRole('PierDamp').map(p=>[p.node.mesh,p])).values()]){
+  const {positions,color,colorWidth,indices}=part.geo,seen=new Map(),edges=new Map();let mismatch=0;
+  const pointKey=i=>[positions[i*3],positions[i*3+1],positions[i*3+2]].map(v=>v.toFixed(5)).join(',');
+  for(let i=0;i<positions.length/3;i++){
+    const key=pointKey(i);
+    const rgb=[color[i*colorWidth],color[i*colorWidth+1],color[i*colorWidth+2]],other=seen.get(key);
+    if(other&&rgb.some((v,c)=>Math.abs(v-other[c])>.001))mismatch++;
+    else if(!other)seen.set(key,rgb);
+  }
+  Check(mismatch===0,'Coincident damp-surface vertices have continuous color',{mesh:part.name,mismatch});
+  for(let k=0;k<(indices?.length??positions.length/3);k+=3){
+    const ids=[0,1,2].map(j=>indices?indices[k+j]:k+j);
+    for(const [a,b] of [[ids[0],ids[1]],[ids[1],ids[2]],[ids[2],ids[0]]]){
+      const ka=pointKey(a),kb=pointKey(b),edge=ka<kb?`${ka}|${kb}`:`${kb}|${ka}`;
+      edges.set(edge,(edges.get(edge)||0)+1);
+    }
+  }
+  const unpaired=[...edges.values()].filter(count=>count!==2).length;
+  Check(unpaired===0,'Subdivided damp stones remain closed without T-junctions',{mesh:part.name,unpaired});
 }
 {
   let bottomWarmth=0,upperWarmth=0,bottomCount=0,upperCount=0,warm=0,cool=0;

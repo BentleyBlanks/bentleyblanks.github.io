@@ -80,7 +80,7 @@ class Geometry:
         for face in [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (3, 7, 6, 2), (0, 4, 7, 3), (1, 2, 6, 5)]:
             self.Polygon([points[i] for i in face], uvOffset=uvOffset, grain=grain, tint=tint, uvTurn=uvTurn)
 
-    def BeveledBox(self, center, size, bevel, uvOffset=None, grain=None, endGeometry=None, tint=None, uvTurn=0):
+    def BeveledBox(self, center, size, bevel, uvOffset=None, grain=None, endGeometry=None, tint=None, uvTurn=0, surfaceGrid=None):
         """Six inset faces, 12 edge chamfers and 8 corners, in game metres.
 
         A distinct end-grain mesh is used on each sleeper's X end. UVs on
@@ -111,26 +111,101 @@ class Geometry:
             else:
                 (target or self).Polygon(points, uvOffset=uvOffset, grain=grain, tint=tint, uvTurn=uvTurn)
 
+        def EdgeSample(a, b, t):
+            # Use the same order and fraction for a face and its bevel edge,
+            # even when their winding is opposite. This keeps shared vertices
+            # bit-identical instead of leaving tiny interpolation cracks.
+            if tuple(a) > tuple(b):
+                a, b, t = b, a, 1-t
+            return a.lerp(b, round(t, 10))
+
+        def GridFace(local, divisions, vDivisions=None):
+            """Subdivide a face or its bevel strip for continuous stain color."""
+            vDivisions = divisions if vDivisions is None else vDivisions
+            points = [c + Vector(p) for p in local]
+            a, d, e = points[:3]
+            faceCenter = sum(points, Vector()) / len(points)
+            if (d - a).cross(e - a).dot(faceCenter - c) < 0:
+                points.reverse()
+
+            def Sample(u, v):
+                p0, p1, p2, p3 = points
+                if v == 0:
+                    return tuple(EdgeSample(p0, p1, u))
+                if v == 1:
+                    return tuple(EdgeSample(p3, p2, u))
+                if u == 0:
+                    return tuple(EdgeSample(p0, p3, v))
+                if u == 1:
+                    return tuple(EdgeSample(p1, p2, v))
+                return tuple(p0*(1-u)*(1-v) + p1*u*(1-v) + p2*u*v + p3*(1-u)*v)
+
+            for i in range(divisions):
+                for j in range(vDivisions):
+                    u0, u1, v0, v1 = i/divisions, (i+1)/divisions, j/vDivisions, (j+1)/vDivisions
+                    self.Polygon([Sample(u0,v0), Sample(u1,v0), Sample(u1,v1), Sample(u0,v1)],
+                                 uvOffset=uvOffset, grain=grain, tint=tint, uvTurn=uvTurn)
+
+        def StripFace(local, divisions, outerEdge):
+            """Match the subdivided face edge while keeping the inner edge whole."""
+            points = [c + Vector(p) for p in local]
+            a, d, e = points[:3]
+            faceCenter = sum(points, Vector()) / len(points)
+            if (d - a).cross(e - a).dot(faceCenter - c) < 0:
+                points.reverse()
+                outerEdge = 2 if outerEdge == 0 else 0
+            if outerEdge == 0:
+                points = points[2:] + points[:2]
+            inner0, inner1, outer1, outer0 = points
+            self.Polygon([tuple(inner0), tuple(inner1), tuple(outer1)],
+                         uvOffset=uvOffset, grain=grain, tint=tint, uvTurn=uvTurn)
+            for i in range(divisions):
+                a = EdgeSample(outer1, outer0, i/divisions)
+                b = EdgeSample(outer1, outer0, (i+1)/divisions)
+                self.Polygon([tuple(inner0), tuple(a), tuple(b)],
+                             uvOffset=uvOffset, grain=grain, tint=tint, uvTurn=uvTurn)
+
         x, y, z = h
         for sign in [-1, 1]:
-            Face([(sign*x, -y+b, -z+b), (sign*x, y-b, -z+b),
-                  (sign*x, y-b, z-b), (sign*x, -y+b, z-b)], endGeometry, endGeometry is not None)
+            fx = [(sign*x, -y+b, -z+b), (sign*x, y-b, -z+b),
+                  (sign*x, y-b, z-b), (sign*x, -y+b, z-b)]
+            if surfaceGrid and surfaceGrid[0] == "x" and surfaceGrid[1] == sign:
+                GridFace(fx, surfaceGrid[2])
+            else:
+                Face(fx, endGeometry, endGeometry is not None)
             Face([(-x+b, sign*y, -z+b), (x-b, sign*y, -z+b),
                   (x-b, sign*y, z-b), (-x+b, sign*y, z-b)])
-            Face([(-x+b, -y+b, sign*z), (x-b, -y+b, sign*z),
-                  (x-b, y-b, sign*z), (-x+b, y-b, sign*z)])
+            fz = [(-x+b, -y+b, sign*z), (x-b, -y+b, sign*z),
+                  (x-b, y-b, sign*z), (-x+b, y-b, sign*z)]
+            if surfaceGrid and surfaceGrid[0] == "z" and surfaceGrid[1] == sign:
+                GridFace(fz, surfaceGrid[2])
+            else:
+                Face(fz)
         for sy in [-1, 1]:
             for sz in [-1, 1]:
-                Face([(-x+b, sy*y, sz*(z-b)), (x-b, sy*y, sz*(z-b)),
-                      (x-b, sy*(y-b), sz*z), (-x+b, sy*(y-b), sz*z)])
+                strip = [(-x+b, sy*y, sz*(z-b)), (x-b, sy*y, sz*(z-b)),
+                         (x-b, sy*(y-b), sz*z), (-x+b, sy*(y-b), sz*z)]
+                if surfaceGrid and surfaceGrid[0] == "z" and surfaceGrid[1] == sz:
+                    StripFace(strip, surfaceGrid[2], 2)
+                else:
+                    Face(strip)
         for sx in [-1, 1]:
             for sz in [-1, 1]:
-                Face([(sx*x, -y+b, sz*(z-b)), (sx*x, y-b, sz*(z-b)),
-                      (sx*(x-b), y-b, sz*z), (sx*(x-b), -y+b, sz*z)])
+                strip = [(sx*x, -y+b, sz*(z-b)), (sx*x, y-b, sz*(z-b)),
+                         (sx*(x-b), y-b, sz*z), (sx*(x-b), -y+b, sz*z)]
+                if surfaceGrid and ((surfaceGrid[0] == "x" and surfaceGrid[1] == sx)
+                                    or (surfaceGrid[0] == "z" and surfaceGrid[1] == sz)):
+                    StripFace(strip, surfaceGrid[2], 0 if surfaceGrid[0] == "x" else 2)
+                else:
+                    Face(strip)
         for sx in [-1, 1]:
             for sy in [-1, 1]:
-                Face([(sx*x, sy*(y-b), -z+b), (sx*x, sy*(y-b), z-b),
-                      (sx*(x-b), sy*y, z-b), (sx*(x-b), sy*y, -z+b)])
+                strip = [(sx*x, sy*(y-b), -z+b), (sx*x, sy*(y-b), z-b),
+                         (sx*(x-b), sy*y, z-b), (sx*(x-b), sy*y, -z+b)]
+                if surfaceGrid and surfaceGrid[0] == "x" and surfaceGrid[1] == sx:
+                    StripFace(strip, surfaceGrid[2], 0)
+                else:
+                    Face(strip)
                 for sz in [-1, 1]:
                     Face([(sx*x, sy*(y-b), sz*(z-b)), (sx*(x-b), sy*y, sz*(z-b)),
                           (sx*(x-b), sy*(y-b), sz*z)])
@@ -869,10 +944,9 @@ def StoneTint(rng, damp=0):
 def PierTint(baseTint, floor, course, seed, damp):
     """Continuous spatial transition; no inferred historical water level.
 
-    Two lower courses read as continuous damp stone; the third fades up into
-    the dry material. The first dry course similarly fades from a darker lower
-    edge to its natural per-block variation. A smooth low-amplitude world-space
-    perturbation prevents a perfectly straight manufactured stain line.
+    Two lower courses read as damp stone; the third fades up into the dry
+    material. A smooth, seeded spatial field adds mottled olive-brown weather
+    to the lower faces. This is a visual study, not a historic waterline.
     """
     def Smooth(value):
         t = max(0.0, min(1.0, value))
@@ -895,7 +969,18 @@ def PierTint(baseTint, floor, course, seed, damp):
         else:
             t = Smooth((y - (floor + 3 * course)) / (1.1 * course))
             rgb = tuple(.72 + t * (baseTint[c] - .72) + wobble * t for c in range(3))
-        lower = .70 if not damp else .781
+        if damp:
+            h = (y - floor) / (3 * course)
+            fade = 1 - Smooth((h - .20) / .90)
+            n = (math.sin(x*3.8 + z*2.2 + y*1.2 + seed*.017)
+                 + math.cos(x*1.8 - z*3.1 - y*2.0 + seed*.011)
+                 + math.sin(x*7.3 + z*4.2 - y*.9 + seed*.021)) / 3
+            stain = fade * (.12 + .88 * Smooth((n + .12) / .35))
+            rgb = tuple(channel * factor for channel, factor in zip(rgb,
+                        (1-.58*stain, 1-.50*stain, 1-.66*stain)))
+            lower = .18
+        else:
+            lower = .70
         return tuple(max(lower, min(1.0, channel)) for channel in rgb) + (1,)
     return Color
 
@@ -932,7 +1017,8 @@ def BuildPier(seed=1938):
                     target.BeveledBox(((left + right) / 2, y + rng.uniform(-0.005, 0.005), side * (halfz - 0.135)),
                         (right - left - 0.014, ch - 0.014, 0.29 + rng.uniform(-0.010, 0.010)),
                         rng.uniform(0.006, 0.014), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)),
-                        tint=PierTint(StoneTint(tintRng), floor, ch, seed, damp), uvTurn=turnRng.randrange(4))
+                        tint=PierTint(StoneTint(tintRng), floor, ch, seed, damp), uvTurn=turnRng.randrange(4),
+                        surfaceGrid=("z", side, 3) if damp else None)
             # Stagger the shorter faces as well. End blocks are clipped at
             # the corners, as on the longer face, and the inset core is kept.
             for k in range(-1, countz + 1):
@@ -945,7 +1031,8 @@ def BuildPier(seed=1938):
                 target = dampStone if damp else stone
                 target.BeveledBox((side * (halfx - 0.20), y, (left + right) / 2), (0.42, ch - 0.014, right - left - 0.014),
                                  rng.uniform(0.006, 0.014), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)),
-                                 tint=PierTint(StoneTint(tintRng), floor, ch, seed, damp), uvTurn=turnRng.randrange(4))
+                                 tint=PierTint(StoneTint(tintRng), floor, ch, seed, damp), uvTurn=turnRng.randrange(4),
+                                 surfaceGrid=("x", side, 3) if damp else None)
     # Preserve the original pier/foundation RNG sequence while giving the
     # capstone study independent random phases, tints and rotations.
     originalCapOffset = (rng.uniform(0, 8), rng.uniform(0, 8))
@@ -1186,7 +1273,7 @@ def Rebuild():
             "materialInterpretation": {
                 "trussBracing": "Nine panels and three central counterbraced bays are an authored visual analogy to the modern Xianning bridge photograph in the user's archive, not evidence of the 1938 Beishahe truss. Bar sections, fasteners and face assignments are designed details.",
                 "trussFinish": "Muted brown-gray weathered truss steel is an imagegen material study guided by a modern out-of-region bridge photograph. Its paint color and corrosion are creative choices, not verified 1938 Beishahe conditions. The rail body keeps a separate neutral steel texture.",
-                "pierDamp": "A continuous pale brown-gray damp-to-dry transition on the lower pier courses is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
+                "pierDamp": "Irregular brown-gray and muted olive staining that fades into the dry pier is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
                 "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
                 "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
                 "jointTransitions": "Rail and wooden deck splice details are authored to maintain a usable crossing; their exact construction is not established by a confirmed 1938 Beishahe bridge photograph.",

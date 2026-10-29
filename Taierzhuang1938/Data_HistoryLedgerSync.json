@@ -53,6 +53,14 @@
         "notionParentLastEdited": "2026-10-29T18:18:59.976Z",
         "researchPageLastEdited": "2026-10-25T10:22:31.491Z"
       },
+      "pierWeatherReview20261030": {
+        "version": "2026103003",
+        "decision": "The candidate's mottled lower-pier staining and weathered-stone texture are authored from an AI construction study and an additional generated texture. They do not establish the 1938 waterline, vegetation, or original masonry condition.",
+        "source": "Source_BeishahePierDampWeatherV1.png; imagegen exec-089849f8-c5f5-4dfa-9e46-c98595de6f25",
+        "notionReview": "The existing bridge creative row and parent bullet were reread; both already identify lower-pier water and mud marks and steel/wood/stone textures as design inferences. No historical claim or category changes. Global review anchors and unrelated page cursors remain unchanged.",
+        "notionLedgerLastEdited": "2026-10-29T18:18:48.478Z",
+        "notionParentLastEdited": "2026-10-29T18:18:59.976Z"
+      },
       "acceptanceScope": "Historical-boundary synchronization only; no claim that the model has completed visual matching or runtime acceptance."
     },
     {

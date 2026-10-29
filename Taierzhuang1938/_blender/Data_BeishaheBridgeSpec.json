@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "2026103002",
+  "version": "2026103003",
   "name": "BeishaheBridge",
   "units": "m",
   "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",

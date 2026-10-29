@@ -1,23 +1,23 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-10-28",
+  "date": "2026-10-30",
   "name": "BeishahePierDamp",
   "preset": "stone",
   "source": {
-    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishahePierStoneBlend40.png",
-    "sha256": "07b6f5401f493ace8cc482474cbbcefc73b978d5672ca630782b5ac4b1da4758",
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishahePierDampBlend20.png",
+    "sha256": "df20f4fd7d7925634f7880f03f60988ff3a90fee23b244afe7055a3c76fea6c3",
     "metrics": {
       "meanSrgb": [
-        0.6886,
-        0.6483,
-        0.5905
+        0.6671,
+        0.6217,
+        0.5585
       ],
-      "luma": 0.6425,
-      "lumaStd": 0.08,
-      "sat": 0.1425,
+      "luma": 0.6158,
+      "lumaStd": 0.0726,
+      "sat": 0.1629,
       "clipLow": 0.0,
       "clipHigh": 0.0,
-      "lowFreq": 0.0164
+      "lowFreq": 0.0217
     }
   },
   "heightSource": null,
@@ -76,27 +76,27 @@
       "file": "Texture_BeishahePierDampBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 405018,
-      "sha256": "18873a4b30aa2920fa54b9b5f5dbba850ead8112872a2ed40550059a905050d1"
+      "bytes": 403964,
+      "sha256": "f65581ad2e9f501946ae180124d6bfbcad45e973953b3fe02ff6a37c13050dd6"
     },
     {
       "channel": "Normal",
       "file": "Texture_BeishahePierDampNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 68338,
-      "sha256": "5b36cb0504c82ac4a72ca1bd5f62b1d8ee4f963a1ed0824185115f38d346484f"
+      "bytes": 67648,
+      "sha256": "008c9db628ba2633388baf2df4b503d6d850f4a27b390b05ccb33499c8956cd7"
     },
     {
       "channel": "Orm",
       "file": "Texture_BeishahePierDampOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 84880,
-      "sha256": "3c5228577dd53cc0aeb1805ee7a2401b91fa5a40348835377e3d771b2c5049db"
+      "bytes": 84404,
+      "sha256": "8be73d06ac5fb8baae34cf45baf2ca2cf340440743c5b312a78da8eb2c573dbe"
     }
   ],
-  "totalBytes": 558236,
+  "totalBytes": 556016,
   "metrics": {
     "meanSrgb": [
       0.4297,
@@ -104,18 +104,18 @@
       0.3746
     ],
     "luma": 0.4034,
-    "lumaStd": 0.1008,
+    "lumaStd": 0.1006,
     "sat": 0.1282,
-    "clipLow": 0.0006,
+    "clipLow": 0.0005,
     "clipHigh": 0.0,
-    "lowFreq": 0.0131,
-    "seam": 0.0641,
-    "interior": 0.0703,
-    "seamRatio": 0.912,
-    "border": 0.988,
-    "swing": 0.0032,
+    "lowFreq": 0.0144,
+    "seam": 0.061,
+    "interior": 0.066,
+    "seamRatio": 0.925,
+    "border": 0.986,
+    "swing": 0.0038,
     "aoMean": 0.886,
-    "roughMean": 0.916,
+    "roughMean": 0.915,
     "texelsPerMeter": 1024.0
   },
   "gateProblems": []
