@@ -37,7 +37,7 @@ try{
     legacyDocument:g.actorFactory.meshDocs.has('HanYang'),glError:g.renderer.getContext().getError()};
   });rows.push({arms,...row,errors,requests,expectedMissing});
   assert.equal(row.primary,'HanYang');assert.equal(row.identity,'HanYang');assert.equal(row.weapon,'HanYang');
-  assert.equal(row.version,'173R-20261025');assert.equal(row.parts,44);assert.equal(row.triangles,59901);assert.equal(row.worldTriangles,59901);
+  assert.equal(row.version,'173R-20261029');assert.equal(row.parts,44);assert.equal(row.triangles,59901);assert.equal(row.worldTriangles,59901);
   assert(row.surfaces.metal.pixels>1000&&row.surfaces.wood.pixels>1000,'authored gun is actually visible in the editor, not just loaded');
   assert.equal(row.legacyDocument,false);assert.equal(row.riggedArms,arms==='rigged');assert.equal(row.glError,0);assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);
   await page.screenshot({path:path.join(out,`Scene_${arms}.png`)});await page.close();

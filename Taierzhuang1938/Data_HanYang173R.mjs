@@ -1,29 +1,21 @@
 // Dots 173R author-space metres, +Y up, muzzle -Z. Values are measured in the
 // delivered GLB; weapon operation remains driven by the existing game timeline.
-import {HANYANG_METAL_GAINS} from './Data_HanYang173RMaterials.mjs';
 export const HANYANG_173R = Object.freeze({
-  version: '173R-20261025',
-  url: './Model/HanYang173R/Model_HanYang173R.glb?v=173r-20261025',
+  version: '173R-20261029',
+  url: './Model/HanYang173R/Model_HanYang173R.glb?v=173r-20261029',
   sourceSha256: '3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c',
   // SideWoodButton is metal in the source ORM despite its object name.
   wood: ['MainWood_ContinuousLowerShoulder', 'FrontWood_ContinuousOval', 'UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront'],
-  // Source wood is near-black (visible base texels ~41/29/20 sRGB). A linear
-  // reflectance gain retains grain/roughness while fitting the game's filmic
-  // exposure. This is an artistic runtime adaptation, not a source rebake.
-  // 2026-10-26 对标 COD 枪身亮度（用户：亮部过亮、暗部过暗）：12 → 10，压一点木纹高光；
-  // 不回到 6 —— 10-25 用户嫌木头太黑才从 6 提上来。
-  woodReflectanceGain: 10,
-  metalReflectanceGains: HANYANG_METAL_GAINS,
-  // Per-part gains above normalise the near-black source; at full strength the
-  // steel read as chrome (sky reflection clipped white, ground reflection black).
-  // Blued steel: 0.4 of that reflectance, a broader lobe and 30% diffuse so the
-  // shaded side still takes ambient light. Whitebox cave view, visible steel
-  // display luma p05/p50/p99 13/94/162 -> 57/76/127; medium daylight ADS
-  // 31/134/247 -> 35/90/200.
-  metalReflectanceScale: .4,
-  metalRoughnessGain: 2.2,
-  metalMetalness: .7,
-  maximumReflectance: .95,
+  // 2026-10-29 user: 要原版的那种质感. Dots' base colours are 5-10x darker than
+  // real walnut/steel (wood ~41/29/20 sRGB); their Blender validation renders
+  // expose for the rifle. One shared gain stands in for that exposure on every
+  // part: roughness, metalness and the parts' relative values stay as authored.
+  // Retired: per-part steel gains x2.5-18 (equalised the parts into grey paint),
+  // wood x6-12 (light oak), roughness x1.4-2.2 and metalness 0.7 (lost the sheen).
+  // Visible display luma p50 wood/steel at 2.5: whitebox 71/60, medium daylight
+  // 36/31; the Blender overview's wood is 51.
+  exposureGain: 2.5,
+  textureAnisotropy: 16,
   bolt: ['HandledCylinder', 'HandleRoot', 'HandleNeck', 'HandleSphere'],
   cocking: ['RearCockingExterior', 'RearOuterCover_RoundedSideReturn', 'RearSmallCover', 'RearSmallPin', 'RearTab', 'RearTopExternalLever'],
   frontSight: ['HY150_RoundedUpperExterior', 'HY150_ExteriorSideRelief_Neg', 'HY150_ExteriorSideRelief_Pos', 'HY151_LowRearShoulder'],

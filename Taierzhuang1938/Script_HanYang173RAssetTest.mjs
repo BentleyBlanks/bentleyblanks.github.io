@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {HANYANG_173R as D} from './Data_HanYang173R.mjs';
 import {MaterialLibrary} from './Script_Materials.mjs';
 import {PatchesOf} from './Script_MaterialPatches.mjs';
-import {ConfigureHanYang173R,InstantiateHanYang173R} from './Script_HanYang173R.mjs';
+import {ConfigureHanYang173R,InstantiateHanYang173R,RepairHanYangWinding} from './Script_HanYang173R.mjs';
 import {MESHES,AllMeshUrls} from './Data_Meshes.mjs';
 import {DEFAULT_PLAYER_WEAPON,LOADOUTS} from './Data_Weapons.mjs';
 import * as THREE from 'three';
@@ -48,19 +48,20 @@ for(const p of report.parts.filter(p=>!p.gameplayAdaptation))assert(Math.max(p.g
 const library=new MaterialLibrary(null),orm=new THREE.Texture(),mat=new THREE.MeshStandardMaterial({roughnessMap:orm,metalnessMap:orm});
 library.ConfigureExternalPbr(mat);assert.equal(mat.metalnessMap,null);
 assert(PatchesOf(mat).some(p=>String(p.key).includes('orm')),'folded ORM must keep its shader patch without post effects');
-const calibration=JSON.parse(fs.readFileSync(path.join(dir,'Data_MaterialCalibration.json'),'utf8'));
-assert.equal(calibration.gameSha256,report.gameSha256);assert.equal(calibration.parts.length,41);
-assert(!D.wood.includes('SideWoodButton')&&D.metalReflectanceGains.SideWoodButton>0,'source ORM defines the side button as metal');
-// Loading another level reuses the source material. Calibration must not
-// accumulate, and its energy bound must survive alongside packed ORM decoding.
-const mesh=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial({metalness:1,roughness:1,roughnessMap:orm,metalnessMap:orm}));
+assert(!D.wood.includes('SideWoodButton'),'source ORM defines the side button as metal');
+// Island texels are the delivered bytes; only empty texels outside the islands are filled.
+assert(report.texturePayloads.every(t=>/^[0-9a-f]{64}$/.test(t.sourceSha256)&&t.sourceSha256!==t.sha256&&t.islandCoverage>0));
+// One shared exposure gain; roughness and metalness stay authored.
+const mesh=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial({metalness:1,roughness:1,map:new THREE.Texture(),roughnessMap:orm,metalnessMap:orm}));
 mesh.name='ReceiverOuterCollar';const scene=new THREE.Group();scene.add(mesh);
-const asset={gltf:{scene},materials:new Map()};ConfigureHanYang173R(asset,library);
-const once={color:mesh.material.color.toArray(),roughness:mesh.material.roughness};ConfigureHanYang173R(asset,library);
-assert.deepEqual({color:mesh.material.color.toArray(),roughness:mesh.material.roughness},once);
-assert.equal(PatchesOf(mesh.material).filter(p=>p.key==='hanYangReflectance1').length,1);
+const asset={gltf:{scene},materials:new Map()};library.anisotropy=16;ConfigureHanYang173R(asset,library);ConfigureHanYang173R(asset,library);
+assert.deepEqual([mesh.material.color.toArray(),mesh.material.roughness,mesh.material.metalness],[[D.exposureGain,D.exposureGain,D.exposureGain],1,1]);
+assert.equal(mesh.material.map.anisotropy,16);assert.equal(mesh.material.roughnessMap.anisotropy,16);
 assert(PatchesOf(mesh.material).some(p=>String(p.key).includes('orm')));
-const shader={uniforms:{},vertexShader:THREE.ShaderLib.standard.vertexShader,fragmentShader:THREE.ShaderLib.standard.fragmentShader};
-mesh.material.onBeforeCompile(shader,{});assert(shader.fragmentShader.includes('min(diffuseColor.rgb, vec3(0.950))'));
+assert(!PatchesOf(mesh.material).some(p=>/hanYang/.test(String(p.key))),'retired reflectance clamp must not return');
+// A triangle wound against its authored normals is re-wound; a consistent one is untouched.
+const tri=new THREE.BufferGeometry();tri.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,1,0,0],3));
+tri.setAttribute('normal',new THREE.Float32BufferAttribute(Array(6).fill([0,0,1]).flat(),3));tri.setIndex([0,1,2,3,4,5]);
+RepairHanYangWinding(tri);assert.deepEqual(Array.from(tri.index.array),[0,1,2,3,5,4]);
 mesh.geometry.dispose();mesh.material.dispose();
-console.log(`ok HanYang173R: ${triangles} triangles, ${vertices} vertices, 44 parts, 132 byte-exact source PBR images, finite tangent frames and ORM decoding`);
+console.log(`ok HanYang173R: ${triangles} triangles, ${vertices} vertices, 44 parts, 132 island-exact PBR images with filled margins, authored materials, finite tangent frames and ORM decoding`);

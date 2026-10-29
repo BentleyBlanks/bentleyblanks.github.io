@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import {ManagedGLTFLoader} from './Script_ModelImports.mjs';
 import {HANYANG_173R as D} from './Data_HanYang173R.mjs';
-import {ApplyPatches,MakePatch,PatchesOf} from './Script_MaterialPatches.mjs';
 
 let loading;
 export function LoadHanYang173R() {
@@ -9,33 +8,41 @@ export function LoadHanYang173R() {
     const names = new Set(); gltf.scene.traverse(o => {if(o.isMesh) names.add(o.name);});
     for(const name of [...D.wood,...D.bolt,...D.cocking,D.trigger])
       if(!names.has(name)) throw new Error(`173R missing part: ${name}`);
+    gltf.scene.traverse(o => {if(o.isMesh) RepairHanYangWinding(o.geometry);});
     return {gltf, materials: new Map()};
   }).catch(error=>{loading=null;throw new Error(`汉阳造 173R 模型载入失败，请刷新重试：${error.message}`,{cause:error});});
 }
 
+// The delivery's materials are double-sided, so three picks the shading side from
+// winding. 0.2-7.8% of the triangles in 12 parts (RearOuterCover 21/287, rear
+// sight leaf 6/77) wind against their authored normals and shade as back faces.
+// Re-wind those to the normals; positions, normals, UVs and tangents are unchanged.
+export function RepairHanYangWinding(geometry) {
+  const p=geometry.attributes.position,n=geometry.attributes.normal,index=geometry.index;
+  if(!p||!n||!index||geometry.userData.hanYangWinding) return;
+  geometry.userData.hanYangWinding=true;
+  const a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),sum=new THREE.Vector3(),t=new THREE.Vector3();
+  for(let i=0;i<index.count;i+=3) {
+    const ia=index.getX(i),ib=index.getX(i+1),ic=index.getX(i+2);
+    a.fromBufferAttribute(p,ia);b.fromBufferAttribute(p,ib).sub(a);c.fromBufferAttribute(p,ic).sub(a);
+    sum.fromBufferAttribute(n,ia).add(t.fromBufferAttribute(n,ib)).add(t.fromBufferAttribute(n,ic));
+    if(b.cross(c).dot(sum)<0) {index.setX(i+1,ic);index.setX(i+2,ib);}
+  }
+  index.needsUpdate=true;
+}
+
 export function ConfigureHanYang173R(asset, library) {
   if(!asset) return;
+  const anisotropy=Math.min(D.textureAnisotropy,library?.anisotropy||1);
   asset.gltf.scene.traverse(mesh => {
     if(!mesh.isMesh) return;
     const material = mesh.material;
     material.name = `HanYang173R_${mesh.name}`;
     material.userData.whiteboxWeaponReflection = true;
-    material.userData.hanYangAuthoredColor ||= material.color.toArray();
-    material.userData.hanYangAuthoredRoughness ??= material.roughness;
-    material.userData.hanYangAuthoredMetalness ??= material.metalness;
-    const wood=D.wood.includes(mesh.name);
-    material.color.fromArray(material.userData.hanYangAuthoredColor)
-      .multiplyScalar(wood?D.woodReflectanceGain:(D.metalReflectanceGains[mesh.name]||1)*D.metalReflectanceScale);
-    material.roughness=material.userData.hanYangAuthoredRoughness*(wood?1:D.metalRoughnessGain);
-    material.metalness=material.userData.hanYangAuthoredMetalness*(wood?1:D.metalMetalness);
+    material.color.setScalar(D.exposureGain);
+    for(const slot of ['map','normalMap','roughnessMap','metalnessMap'])
+      if(material[slot]&&material[slot].anisotropy!==anisotropy) {material[slot].anisotropy=anisotropy;material[slot].needsUpdate=true;}
     library.ConfigureExternalPbr(material,{mesh});
-    // Bound the effective textured reflectance, rather than clipping the
-    // authoring multiplier and leaving every dark conductor near black.
-    const key='hanYangReflectance1';
-    ApplyPatches(mesh.material,[MakePatch({key,fragment:[
-      ['#include <color_fragment>',`diffuseColor.rgb = min(diffuseColor.rgb, vec3(${D.maximumReflectance.toFixed(3)}));`],
-      ['#include <roughnessmap_fragment>','roughnessFactor = clamp(roughnessFactor, 0.0, 1.0);'],
-    ]}),...(PatchesOf(mesh.material)||[]).filter(p=>p.key!==key)]);
     asset.materials.set(material.name,mesh.material);
   });
 }
