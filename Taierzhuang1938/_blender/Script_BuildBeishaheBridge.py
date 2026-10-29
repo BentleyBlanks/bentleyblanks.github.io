@@ -741,6 +741,8 @@ def BuildSpan():
     length = SPEC["spanPitchM"] - SPEC["expansionGapM"]
     n = SPEC["panelsPerSpan"]
     step = length / n
+    gussetDepth = SPEC["trussUpperGussetDepthM"]
+    gussetHalfWidth = SPEC["trussUpperGussetMaxHalfWidthM"]
     zs = [-length / 2 + i * step for i in range(n + 1)]
     y0, y1 = SPEC["trussBottomY"], SPEC["trussTopY"]
     halfW = SPEC["trussCenterOffsetM"]
@@ -766,6 +768,7 @@ def BuildSpan():
     for side in [-1, 1]:
         x = side * halfW
         counterAxes = []
+        upperMainPaths = {i: [] for i in range(1, n)}
         steel.Channel((x, y0, zs[0]), (x, y0, zs[-1]), 0.22, 0.28)
         steel.Channel((x, y1, zs[1]), (x, y1, zs[-2]), 0.24, 0.23)
         steel.Box((x, y1 + 0.13, 0), (0.29, 0.03, zs[-2] - zs[1]))
@@ -783,6 +786,10 @@ def BuildSpan():
             else:
                 a, b = (x, y0, zs[k]), (x, y1, zs[k + 1])
             BuiltMember(a, b, 0.11, 0.15)
+            va, vb = Vector(a), Vector(b)
+            top, bottom = (va, vb) if abs(va.y-y1)<.001 else (vb, va)
+            topIndex = round((top.z + length/2) / step)
+            upperMainPaths[topIndex].append((top, bottom))
             if k in SPEC["trussCounterPanelIndices"]:
                 # The counterbars meet the outside faces of the two node
                 # plates. At the shared upper node, the last bar is on the
@@ -793,40 +800,81 @@ def BuildSpan():
                     c, d = Vector((lowerX, y0, zs[k])), Vector((upperX, y1, zs[k + 1]))
                 else:
                     c, d = Vector((upperX, y1, zs[k])), Vector((lowerX, y0, zs[k + 1]))
-                steel.Beam(c, d, .025, .08)
+                # The upper portion stays flush against the enlarged node
+                # plate; below it the bar tapers to the lower plate offset.
+                topCounter, bottomCounter = (c, d) if abs(c.y-y1)<.001 else (d, c)
+                bend = topCounter.lerp(bottomCounter, gussetDepth/(y1-y0))
+                bend.x = upperX
+                steel.Beam(topCounter, bend, .025, .08)
+                steel.Beam(bend, bottomCounter, .025, .08)
                 counterAxes.append((face, c, d))
                 for t in (.045, .955):
                     p = c.lerp(d, t)
+                    ratio = max(0, min(1, (p.y-y0)/(y1-y0-gussetDepth)))
+                    p.x = lowerX + (upperX-lowerX)*ratio
                     fasteners.Rivet((p.x + face * .0125, p.y, p.z), (face, 0, 0), .010)
         for k in range(1, n):
             BuiltMember((x, y0, zs[k]), (x, y1, zs[k]), 0.09, 0.12)
-        # Paired, 12 mm thick gusset plates and regular groups of real rivets.
+        # Shaped upper gussets follow a 1936 American road-bridge analogy.
+        # They do not establish the unphotographed Beishahe connection.
+        def CoveredByCounter(outward, yy, zz):
+            for braceFace, braceA, braceB in counterAxes:
+                if braceFace != outward:
+                    continue
+                vec = Vector((0, braceB.y-braceA.y, braceB.z-braceA.z))
+                delta = Vector((0, yy-braceA.y, zz-braceA.z))
+                along = max(0, min(1, delta.dot(vec)/vec.length_squared))
+                if (delta-along*vec).length < .057:
+                    return True
+            return False
         nodeCenters = [z + (.20 if k == 0 else -.20 if k == n else 0) for k, z in enumerate(zs)]
         for k, z in enumerate(nodeCenters):
             for yy in ([y0, y1] if 0 < k < n else [y0]):
+                attached = list(upperMainPaths[k]) if yy == y1 else []
+                if yy == y1:
+                    for braceFace, ca, cb in counterAxes:
+                        ct, cl = (ca, cb) if abs(ca.y-y1)<.001 else (cb, ca)
+                        if abs(ct.z-z)<.001:
+                            attached.append((ct, cl))
+                left = gussetHalfWidth if any(lo.z < hi.z for hi,lo in attached) else .20
+                right = gussetHalfWidth if any(lo.z > hi.z for hi,lo in attached) else .20
                 for outward in [-1, 1]:
                     contact = 0.125 if yy == y0 else 0.140
                     xx = x + outward * (contact + 0.006)
-                    p = [(xx, yy - 0.13, z - 0.20), (xx, yy + 0.18, z - 0.13), (xx, yy + 0.20, z + 0.13), (xx, yy - 0.13, z + 0.20)]
+                    if yy == y1:
+                        p = [(xx, yy-gussetDepth, z-left), (xx, yy-.13, z-.20),
+                             (xx, yy+.18, z-.13), (xx, yy+.20, z+.13),
+                             (xx, yy-.13, z+.20), (xx, yy-gussetDepth, z+right)]
+                    else:
+                        p = [(xx, yy-.13, z-.20), (xx, yy+.18, z-.13),
+                             (xx, yy+.20, z+.13), (xx, yy-.13, z+.20)]
                     if outward < 0:
                         p.reverse()
-                    steel.Plate(p, (outward, 0, 0), 0.012)
-                    for dz in [-0.10, 0, 0.10]:
-                        for dy in [-0.07, 0.07]:
-                            # A counterbar owns its own heads: do not leave
-                            # a node-plate head buried beneath the new bar.
-                            blocked = False
-                            for braceFace, braceA, braceB in counterAxes:
-                                if braceFace != outward:
-                                    continue
-                                vec = Vector((0, braceB.y - braceA.y, braceB.z - braceA.z))
-                                delta = Vector((0, yy + dy - braceA.y, z + dz - braceA.z))
-                                along = max(0, min(1, delta.dot(vec) / vec.length_squared))
-                                if (delta - along * vec).length < .057:
-                                    blocked = True
-                                    break
-                            if not blocked:
-                                fasteners.Rivet((xx + outward * 0.006, yy + dy, z + dz), (outward, 0, 0), 0.014)
+                    steel.Plate(p, (outward, 0, 0), .012)
+                    for dz in [-.10, 0, .10]:
+                        for dy in [-.07, .07]:
+                            if not CoveredByCounter(outward, yy+dy, z+dz):
+                                fasteners.Rivet((xx+outward*.006, yy+dy, z+dz), (outward, 0, 0), .014)
+                    if yy == y1:
+                        # Add a middle row on the upper node plate; skip the
+                        # footprint of a counterbar on this side.
+                        for dz in [-.10, 0, .10]:
+                            if not CoveredByCounter(outward, yy, z+dz):
+                                fasteners.Rivet((xx+outward*.006, yy, z+dz), (outward, 0, 0), .013)
+                        # Packers bridge the plate to the vertical channel and
+                        # the actual primary diagonals, rather than floating.
+                        steel.Box((x+outward*.1275, y1-.22, z), (.025, .16, .12))
+                        for top, bottom in upperMainPaths[k]:
+                            aa, bb = top.lerp(bottom, .14/(y1-y0)), top.lerp(bottom, .31/(y1-y0))
+                            steel.Beam((x+outward*.1325, aa.y, aa.z), (x+outward*.1325, bb.y, bb.z), .015, .15)
+                            for depth in [.20, .29]:
+                                q = top.lerp(bottom, depth/(y1-y0))
+                                for dz in [-.04, .04]:
+                                    if not CoveredByCounter(outward, q.y, q.z+dz):
+                                        fasteners.Rivet((xx+outward*.006, q.y, q.z+dz), (outward, 0, 0), .013)
+                        for depth in [.20, .29]:
+                            if not CoveredByCounter(outward, y1-depth, z):
+                                fasteners.Rivet((xx+outward*.006, y1-depth, z), (outward, 0, 0), .013)
         # Paired rows on both exposed faces, at roughly 0.21 m. The feet are
         # seated exactly on the cheek plates and skip each gusset's footprint.
         rivetCount = int(length / 0.205)
@@ -1272,6 +1320,7 @@ def Rebuild():
             "reconstructionScope": SPEC["reconstructionScope"], "historicalReferences": SPEC["historicalReferences"],
             "materialInterpretation": {
                 "trussBracing": "Nine panels and three central counterbraced bays are an authored visual analogy to the modern Xianning bridge photograph in the user's archive, not evidence of the 1938 Beishahe truss. Bar sections, fasteners and face assignments are designed details.",
+                "trussConnections": "Extended upper gusset plates, packers and domed rivet groups are a design analogy to the 1936 Easley road bridge; their exact form and dimensions are not established for Beishahe. The rivet heads are modeled without shanks or holes.",
                 "trussFinish": "Muted brown-gray weathered truss steel is an imagegen material study guided by a modern out-of-region bridge photograph. Its paint color and corrosion are creative choices, not verified 1938 Beishahe conditions. The rail body keeps a separate neutral steel texture.",
                 "pierDamp": "Irregular brown-gray and muted olive staining that fades into the dry pier is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
                 "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",

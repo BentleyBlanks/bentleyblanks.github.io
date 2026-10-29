@@ -194,6 +194,7 @@ Check(data.glbSha256===Hash(bytes)&&data.glbBytes===bytes.length&&data.triangles
 for(const [key,actual] of [['min',bounds.min.toArray()],['max',bounds.max.toArray()],['size',size.toArray()]])Check(Array.isArray(data.bounds?.[key])&&actual.every((v,i)=>Math.abs(v-data.bounds[key][i])<.002),'Baker bounds independently match world-space exported vertices',key);
 Check(typeof data.reconstructionScope==='string'&&/not a proven 1938 bridge length/i.test(data.reconstructionScope)&&/44 m/.test(data.reconstructionScope),'Asset explicitly distinguishes modern-scale reconstruction from proven 1938 bridge geometry');
 Check(data.historicalReferences?.length>=3&&data.historicalReferences.every(r=>/^https:\/\//.test(r.url)&&r.supports),'Historical reference scope remains attached to the asset');
+Check(spec.trussUpperGussetDepthM===.34&&spec.trussUpperGussetMaxHalfWidthM===.36&&/not established for Beishahe/i.test(data.materialInterpretation?.trussConnections??'')&&/without shanks or holes/i.test(data.materialInterpretation?.trussConnections??''),'Upper-node dimensions and unverified, head-only rivet interpretation are recorded');
 Check(/creative weathering choice, not evidence of the 1938 waterline/i.test(data.materialInterpretation?.pierDamp??''),'Lower pier damp color remains explicitly an artistic choice, not a historical water-level claim');
 Check(/not established by a confirmed 1938 Beishahe bridge photograph/i.test(data.materialInterpretation?.deckPlanks??''),'Continuous wooden decking is identified as an authored reconstruction');
 Check(data.deck?.clearWidthM===spec.sleeperLengthM&&data.deck.nominalBoardWidthM===spec.deckBoardNominalWidthM&&data.deck.rowToneContrast===spec.deckRowToneContrast&&data.deck.variantCount===spec.deckVariantCount&&data.deck.plankThicknessM===.045&&data.deck.topY===.075&&data.deck.jointWidthM===.006&&data.deck.grainAxis==='X','Decking dimensions, variant count, row tone, real 6 mm board gaps and transverse timber grain are recorded');
@@ -1019,7 +1020,7 @@ Check(spec.panelsPerSpan===9&&Array.isArray(spec.trussCounterPanelIndices)&&spec
   const trusses=ByRole('Trusses',span),rivets=ByRole('Rivets',span);
   for(const side of [-1,1])for(const panel of spec.trussCounterPanelIndices){
     const face=panel>Math.floor(spec.panelsPerSpan/2)?-side:side,x=side*spec.trussCenterOffsetM;
-    const sample=t=>{const fraction=panel<=Math.floor(spec.panelsPerSpan/2)?t:1-t;return {fraction,y:spec.trussBottomY+(spec.trussTopY-spec.trussBottomY)*fraction,z:center-length/2+(panel+t)*step,offset:.1495+.015*fraction};};
+    const sample=t=>{const fraction=panel<=Math.floor(spec.panelsPerSpan/2)?t:1-t,y=spec.trussBottomY+(spec.trussTopY-spec.trussBottomY)*fraction;return {fraction,y,z:center-length/2+(panel+t)*step,offset:.1495+.015*Math.min(1,(y-spec.trussBottomY)/(spec.trussTopY-spec.trussBottomY-spec.trussUpperGussetDepthM))};};
     for(const t of [.02,.5,.98]){
       const p=sample(t),hits=Hits(trusses,new THREE.Vector3(x+face*.3,p.y,p.z),new THREE.Vector3(-face,0,0),.4);
       const offsets=hits.map(h=>face*(h.point.x-x)),outer=p.offset+.0125,inner=p.offset-.0125;
@@ -1036,6 +1037,35 @@ Check(spec.panelsPerSpan===9&&Array.isArray(spec.trussCounterPanelIndices)&&spec
       const p=sample(t),apex=p.offset+.0125+.010;
       const hits=Hits(rivets,new THREE.Vector3(x+face*.3,p.y,p.z),new THREE.Vector3(-face,0,0),.4);
       Check(hits.some(h=>Math.abs(face*(h.point.x-x)-apex)<.001),'Counterbar end has an actual domed rivet',{side,panel,t});
+    }
+  }
+}
+// Inspect a representative upper node on both trusses and both faces. Rays
+// must see actual gusset, packer and member surfaces touching, and the new
+// domed heads must be seated on the plate rather than floating over it.
+{
+  const span=spec.spanCount-1,length=spec.spanPitchM-spec.expansionGapM,step=length/spec.panelsPerSpan;
+  const center=-spec.lengthM/2+spec.spanPitchM*(span+.5),zNode=center-length/2+4*step;
+  const y1=spec.trussTopY,height=y1-spec.trussBottomY,diagonal=Math.hypot(step,height);
+  const trusses=ByRole('Trusses',span),rivets=ByRole('Rivets',span);
+  for(const side of [-1,1])for(const face of [-1,1]){
+    const x=side*spec.trussCenterOffsetM;
+    const ray=(list,y,z)=>Hits(list,new THREE.Vector3(x+face*.35,y,z),new THREE.Vector3(-face,0,0),.5);
+    const has=(hits,value)=>hits.some(hit=>Math.abs(face*(hit.point.x-x)-value)<.001);
+    const vertical=ray(trusses,y1-.22,zNode+.05);
+    Check([.152,.14,.115].every(value=>has(vertical,value)),'Upper gusset, vertical packer and channel meet',{side,face});
+    const depth=.22,py=y1-depth+.06*step/diagonal,pz=zNode+depth*step/height+.06*height/diagonal;
+    const primary=ray(trusses,py,pz);
+    Check([.152,.14,.125].every(value=>has(primary,value)),'Upper gusset, diagonal packer and channel meet',{side,face});
+    for(const dz of [-.04,.04]){
+      const y=y1-.20,z=zNode+.20*step/height+dz;
+      Check(has(ray(rivets,y,z),.165)&&has(ray(trusses,y,z),.152),'New diagonal gusset rivet is seated on the plate',{side,face,dz});
+    }
+    for(const dz of [-.10,.10])
+      Check(has(ray(rivets,y1,zNode+dz),.165)&&has(ray(trusses,y1,zNode+dz),.152),'New upper-node rivet is seated on the plate',{side,face,dz});
+    if(face===side){
+      const counter=ray(trusses,y1-.22,zNode-.22*step/height);
+      Check([.177,.152,.14].every(value=>has(counter,value)),'Counterbar lies flush against the enlarged gusset',{side,face});
     }
   }
 }

@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026103003",
+  "version": "2026103004",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026103003",
+    "version": "2026103004",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -17,6 +17,8 @@
       4,
       5
     ],
+    "trussUpperGussetDepthM": 0.34,
+    "trussUpperGussetMaxHalfWidthM": 0.36,
     "trussCenterOffsetM": 1.85,
     "trussTopY": 2,
     "trussBottomY": -0.55,
@@ -74,6 +76,12 @@
         "id": "BullardCreek1908",
         "url": "https://npgallery.nps.gov/GetAsset/81afac7b-65c7-4d59-9066-ff6c7991e861",
         "supports": "1908 Minnesota road bridge: paired riveted members and gusset/floor-beam connections as an engineering analogy. Not a Chinese railway bridge, not evidence of Beishahe-specific details."
+      },
+      {
+        "id": "EasleyBridgeNode",
+        "url": "https://www.loc.gov/resource/hhh.wv0440.photos/?sp=14&st=image",
+        "imageSource": "https://commons.wikimedia.org/wiki/File:DETAIL_VIEW,_PONY_STEEL_TRUSS,_SHOWING_RIVETED_UPPER_BRIDGE_CHORD,_DIAGONALS_AND_GUSSET_PLATE._FACING_WEST._-_Easley_Bridge,_Spanning_Norfolk_Southern_Corporation_railroad_HAER_WVA,28-BLUFD,1-14.tif",
+        "supports": "HAER WV-64 photograph 14 records the riveted upper chord and gusset of a 1936 American road bridge; the photograph is dated 1997 by Wikimedia Commons. This is a construction analogy, not a railway bridge or evidence of Beishahe-specific dimensions and rivet layout."
       },
       {
         "id": "Jinpu1941GuardTimbers",
@@ -705,11 +713,11 @@
       "railHeightM": 0.14
     }
   ],
-  "triangles": 1324232,
+  "triangles": 1440376,
   "meshObjects": 354,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
-  "glbBytes": 21652448,
-  "glbSha256": "75b892533315c29457dd2f835df03b80873abc1630a594ea27b61a4dfeaa6c42",
+  "glbBytes": 22348272,
+  "glbSha256": "f9f8d3246c9f4bae15633ea06197a50574542fbe5f8ce31fdb4dd3a2607f58fc",
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
@@ -750,6 +758,12 @@
       "supports": "1908 Minnesota road bridge: paired riveted members and gusset/floor-beam connections as an engineering analogy. Not a Chinese railway bridge, not evidence of Beishahe-specific details."
     },
     {
+      "id": "EasleyBridgeNode",
+      "url": "https://www.loc.gov/resource/hhh.wv0440.photos/?sp=14&st=image",
+      "imageSource": "https://commons.wikimedia.org/wiki/File:DETAIL_VIEW,_PONY_STEEL_TRUSS,_SHOWING_RIVETED_UPPER_BRIDGE_CHORD,_DIAGONALS_AND_GUSSET_PLATE._FACING_WEST._-_Easley_Bridge,_Spanning_Norfolk_Southern_Corporation_railroad_HAER_WVA,28-BLUFD,1-14.tif",
+      "supports": "HAER WV-64 photograph 14 records the riveted upper chord and gusset of a 1936 American road bridge; the photograph is dated 1997 by Wikimedia Commons. This is a construction analogy, not a railway bridge or evidence of Beishahe-specific dimensions and rivet layout."
+    },
+    {
       "id": "Jinpu1941GuardTimbers",
       "url": "https://codh.rois.ac.jp/north-china-railway/photograph/3804-035394-0.html",
       "supports": "1941 Jinpu railway bridge at an unknown location: outside longitudinal timbers and a visible timber joint provide an engineering reference. Neither the dimensions nor their presence at Beishahe is established."
@@ -757,6 +771,7 @@
   ],
   "materialInterpretation": {
     "trussBracing": "Nine panels and three central counterbraced bays are an authored visual analogy to the modern Xianning bridge photograph in the user's archive, not evidence of the 1938 Beishahe truss. Bar sections, fasteners and face assignments are designed details.",
+    "trussConnections": "Extended upper gusset plates, packers and domed rivet groups are a design analogy to the 1936 Easley road bridge; their exact form and dimensions are not established for Beishahe. The rivet heads are modeled without shanks or holes.",
     "trussFinish": "Muted brown-gray weathered truss steel is an imagegen material study guided by a modern out-of-region bridge photograph. Its paint color and corrosion are creative choices, not verified 1938 Beishahe conditions. The rail body keeps a separate neutral steel texture.",
     "pierDamp": "Irregular brown-gray and muted olive staining that fades into the dry pier is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
     "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",

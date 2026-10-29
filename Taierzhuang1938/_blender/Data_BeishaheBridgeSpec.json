@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "2026103003",
+  "version": "2026103004",
   "name": "BeishaheBridge",
   "units": "m",
   "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -10,6 +10,8 @@
   "expansionGapM": 0.12,
   "panelsPerSpan": 9,
   "trussCounterPanelIndices": [3, 4, 5],
+  "trussUpperGussetDepthM": 0.34,
+  "trussUpperGussetMaxHalfWidthM": 0.36,
   "trussCenterOffsetM": 1.85,
   "trussTopY": 2,
   "trussBottomY": -0.55,
@@ -38,6 +40,7 @@
     {"id":"JinpuRail1937", "url":"https://www.jacar.archives.go.jp/das/meta/C13032619100", "supports":"1937 route description lists 1.435 m gauge and nominal 10 m, 41 kg/m rails for Tianjin-Xuzhou. Exact joint positions, rail section and bridge-specific fittings are not established."},
     {"id":"GermanRailScrew1913", "url":"https://archive.org/details/steelrailstheirh01sell/page/145/mode/1", "supports":"1913 reference shows square-headed screw spikes with circular flanges for Prussian and Alsace-Lorraine railway track; an engineering analogy, not a photograph or specification of Beishahe."},
     {"id":"BullardCreek1908", "url":"https://npgallery.nps.gov/GetAsset/81afac7b-65c7-4d59-9066-ff6c7991e861", "supports":"1908 Minnesota road bridge: paired riveted members and gusset/floor-beam connections as an engineering analogy. Not a Chinese railway bridge, not evidence of Beishahe-specific details."},
+    {"id":"EasleyBridgeNode", "url":"https://www.loc.gov/resource/hhh.wv0440.photos/?sp=14&st=image", "imageSource":"https://commons.wikimedia.org/wiki/File:DETAIL_VIEW,_PONY_STEEL_TRUSS,_SHOWING_RIVETED_UPPER_BRIDGE_CHORD,_DIAGONALS_AND_GUSSET_PLATE._FACING_WEST._-_Easley_Bridge,_Spanning_Norfolk_Southern_Corporation_railroad_HAER_WVA,28-BLUFD,1-14.tif", "supports":"HAER WV-64 photograph 14 records the riveted upper chord and gusset of a 1936 American road bridge; the photograph is dated 1997 by Wikimedia Commons. This is a construction analogy, not a railway bridge or evidence of Beishahe-specific dimensions and rivet layout."},
     {"id":"Jinpu1941GuardTimbers", "url":"https://codh.rois.ac.jp/north-china-railway/photograph/3804-035394-0.html", "supports":"1941 Jinpu railway bridge at an unknown location: outside longitudinal timbers and a visible timber joint provide an engineering reference. Neither the dimensions nor their presence at Beishahe is established."}
   ],
   "mapMeasurement": {
