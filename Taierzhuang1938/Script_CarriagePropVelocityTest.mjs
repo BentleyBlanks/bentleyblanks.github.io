@@ -29,7 +29,9 @@ page.on('console',m=>{if(m.type()==='error'&&!/fonts\.(googleapis|gstatic)/.test
 let result;
 try{
   await page.goto(`http://127.0.0.1:${local?19119:server.address().port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=high&scale=small`,{timeout:180000});
-  await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:180000});
+  // Real high-profile mission shader warmup can exceed 180 s (247 s measured).
+  // This only bounds loading; every geometry/velocity assertion below stays active.
+  await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:600000});
   await page.evaluate(()=>window.Tengxian.StepFrames(48,1/60,true));
   // 跳到 12（掩护装载与离开）：车位上真的停着牛车与马车，老周的担架也真的在场。
   await page.evaluate(async()=>{await window.Tengxian.Debug.FirstLevelJump(12);window.Tengxian.StepFrames(30,1/60,true);});

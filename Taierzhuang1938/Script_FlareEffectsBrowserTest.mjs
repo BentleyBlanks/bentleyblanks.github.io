@@ -14,6 +14,7 @@ try{
  page.on('response',r=>{if(r.status()>=400)console.log('HTTP',r.status(),r.url());});
  await page.addInitScript(()=>{localStorage.setItem('tengxian1938_audio_v1',JSON.stringify({master:0}));localStorage.setItem('tengxian1938_tools_volume_v1',JSON.stringify({volume:0,muted:true}));});
  const url=`http://127.0.0.1:${server.address().port}/Taierzhuang1938/`;
+ console.log('FlareEffectsBrowserTest loading studio');
  await page.goto(url+'?editor=vfx&quality=high&manual=1&menu=0&audio=0',{waitUntil:'domcontentloaded',timeout:180000});
  await page.waitForFunction(()=>!!window.Tengxian?.ParticleEditor?.panel,null,{timeout:300000});
  const Capture=async name=>{const bytes=await page.screenshot();await fs.writeFile(path.join(out,name+'.png'),bytes);
@@ -116,6 +117,7 @@ try{
  if(process.argv.includes('--studio-only')){assert.deepEqual(errors,[]);console.log('FlareEffectsBrowserTest studio passed');}
  else {
  // Same renderer in real blockout playback (including whitebox effects disabled). FirstLevel1218 v3 (2026-10-26): the signal flare is at 13-3, t 0.8 s.
+ console.log('FlareEffectsBrowserTest loading blockout');
  await page.goto(url+'?editor=blockout&level=FirstLevel1218&kf=13-3&quality=whitebox&scale=small&audio=0',{waitUntil:'domcontentloaded',timeout:180000});
  await page.waitForFunction(()=>window.Tengxian?.Debug?.Blockout?.State().ready,null,{timeout:300000});
  await page.evaluate(async()=>{await Tengxian.Debug.Blockout.Previz.Reload();await Tengxian.Debug.Blockout.Previz.Seek(5.35);});
@@ -125,6 +127,7 @@ try{
  assert.ok(previz.objects.some(o=>o.visible&&o.children===5),'Real flare must be attached to visible blockout render layer');
  await Capture('BlockoutSignal');await page.evaluate(()=>Tengxian.Debug.Blockout.Previz.Stop());
  // Actual campaign assembly launches the same signal at AirFirst, without editor state.
+ console.log('FlareEffectsBrowserTest loading campaign');
  await page.goto(url+'?whitebox=p012&missionStage=13&manual=1&menu=0&quality=high&audio=0',{waitUntil:'domcontentloaded',timeout:180000});
  await page.waitForFunction(()=>!!(window.Tengxian?.state?.ready&&window.Tengxian?.Debug?.FirstLevelMissionRuntime?.()),null,{timeout:300000});
  const campaign=await page.evaluate(async()=>{const g=Tengxian;g.StepFrames(330,1/60,false);const state=g.Debug.Flare.State();
