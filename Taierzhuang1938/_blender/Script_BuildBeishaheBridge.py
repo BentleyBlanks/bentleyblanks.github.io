@@ -2,7 +2,8 @@
 
 Independent asset, not a replacement for the compressed 44 m campaign blockout.
 Geometry is authored in game metres and converted to Blender Z-up before export.
-The exported GLB uses standard glTF Y-up, X east and Z south.
+The exported GLB uses standard glTF Y-up and bridge-local X/Z axes; modern
+geographic alignment is an optional map-derived placement, not baked geometry.
 Raw .blend and original imagegen inputs stay in the task's OneDrive source folder.
 """
 import bpy

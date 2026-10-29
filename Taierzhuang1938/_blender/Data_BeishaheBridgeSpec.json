@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026102819",
+  "version": "2026102820",
   "name": "BeishaheBridge",
   "units": "m",
-  "coordinateSystem": "X east, Y up, Z south; origin at bridge center, sleeper top Y=0",
+  "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
   "lengthM": 280,
   "spanCount": 14,
   "spanPitchM": 20,
@@ -37,11 +37,41 @@
   ],
   "mapMeasurement": {
     "centerWgs84":[117.10696,35.14496],
+    "centerWgs84Role":"Original map-query center, retained for compatibility; not the computed center of either mapped bridge.",
     "osmApi":"https://api.openstreetmap.org/api/0.6/map?bbox=117.102,35.140,117.112,35.150",
     "modernBridgeWays":[
       {"id":1052215401,"endpoints":[[117.1058401,35.1460436],[117.1078470,35.1441111]],"lengthM":281.802},
       {"id":1052215402,"endpoints":[[117.1057539,35.1459361],[117.1077463,35.1440263]],"lengthM":279.029}
     ],
+    "illustrativeModernPlacement": {
+      "originWgs84LonLat": [117.106796825,35.145029275],
+      "originDefinition": "Arithmetic mean of the four mapped endpoints; midway between two modern bridge axes, not the center of either individual bridge.",
+      "northEndWgs84LonLat": [117.105797,35.14598985],
+      "southEndWgs84LonLat": [117.10779665,35.1440687],
+      "axisAzimuthClockwiseFromTrueNorthDeg": 139.471386,
+      "axisLengthM": 280.415431,
+      "method": "WGS84 ellipsoid ECEF projected to an east-north-up tangent plane at origin; average paired north endpoints and south endpoints before computing horizontal bearing.",
+      "localXInEnu": [0.760081535,0.649827716,0],
+      "localYInEnu": [0,0,1],
+      "localZInEnu": [0.649827716,-0.760081535,0],
+      "conversion": "east=0.760081535*x+0.649827716*z; north=0.649827716*x-0.760081535*z; up=y (all metres relative to the chosen origin and bridge-local vertical datum).",
+      "individualMappedAxes": [
+        {"wayId":1052215401,"midpointWgs84LonLat":[117.10684355,35.14507735],"azimuthClockwiseFromTrueNorthDeg":139.535646},
+        {"wayId":1052215402,"midpointWgs84LonLat":[117.1067501,35.1449812],"azimuthClockwiseFromTrueNorthDeg":139.406488}
+      ],
+      "verticalDatum": "Relative model Y=0 is sleeper top. Absolute elevation, bridge-deck height, and WGS84 ellipsoidal height are unknown.",
+      "limitations": "Illustrative alignment to the midpoint between the modern twin bridges only; 280 m model support-axis length is not scaled to fit the 280.415 m mean axis. No 1938 bridge location, orientation, elevation, or original size is established."
+    },
+    "modernWaterwaySketch": {
+      "osmWayId":359819649,
+      "source":"https://www.openstreetmap.org/way/359819649",
+      "segmentNodeIds":[3644543200,3644543205],
+      "segmentEndpointsWgs84LonLat":[[117.1072881,35.1453867],[117.1041231,35.1412458]],
+      "segmentAzimuthClockwiseFromTrueNorthDegApprox":212.1,
+      "acuteAngleToBridgeAxisDegApprox":72.6,
+      "crossingLocalZFromModernMidpointMApprox":18,
+      "limitations":"Coarse straight interpolation of adjacent modern OSM river-centerline nodes, not a surveyed channel or bank; angle and crossing are rough illustration only, with unquantified generalization error. They do not establish 1938 river alignment or conditions."
+    },
     "imagery":"Esri World Imagery; OSM bridge endpoints checked against visible modern bridge ends",
     "mainWaterChannelEstimateM":[35,50],
     "uncertainty":"Modern mapped crossing includes floodplain. Water-channel estimate is image interpretation, approximately +/-5 to 10 m. Neither establishes the 1938 bank position or original bridge length. Model is deliberately rounded to 280 m."

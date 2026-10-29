@@ -152,6 +152,40 @@ Check(spec.schemaVersion===1&&data.schemaVersion===1&&data.version===spec.versio
 Check(spec.units==='m'&&spec.lengthM===280&&spec.spanCount===14&&spec.spanPitchM===20&&spec.gaugeM===1.435,'Authorized metric design: fourteen 20 m spans and standard inner rail gauge');
 Check(JSON.stringify(data.spec)===JSON.stringify(spec),'Shipped sidecar embeds the current source spec');
 Check(data.glbSha256===Hash(bytes)&&data.glbBytes===bytes.length&&data.triangles===triangles,'Sidecar identifies these actual GLB bytes and rendered triangles');
+// The bridge is a local asset. Independently derive the optional modern
+// placement from its two mapped bridge axes using WGS84 ECEF -> local ENU,
+// rather than interpreting the asset's local X/Z as geographic east/south.
+{
+  const map=spec.mapMeasurement,geo=map?.illustrativeModernPlacement,river=map?.modernWaterwaySketch;
+  Check(map?.centerWgs84?.[0]===117.10696&&map.centerWgs84[1]===35.14496&&/map-query center/i.test(map.centerWgs84Role??''),'Original map-query center remains unchanged and is labelled as such');
+  const ways=map?.modernBridgeWays;
+  Check(ways?.length===2&&ways.every(w=>w.endpoints?.length===2&&w.endpoints[0][1]>w.endpoints[1][1]),'Both modern mapped axes have north and south endpoints');
+  const mean=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2],close2=(a,b,t)=>a?.length===2&&b.every((v,i)=>Math.abs(a[i]-v)<t);
+  const north=mean(ways[0].endpoints[0],ways[1].endpoints[0]),south=mean(ways[0].endpoints[1],ways[1].endpoints[1]),origin=mean(north,south);
+  Check(close2(geo?.originWgs84LonLat,origin,1e-9)&&close2(geo?.northEndWgs84LonLat,north,1e-9)&&close2(geo?.southEndWgs84LonLat,south,1e-9),'Modern placement uses the paired OSM endpoint means, not the historic map-query point');
+  const rad=Math.PI/180,a=6378137,f=1/298.257223563,e2=f*(2-f),lon0=origin[0]*rad,lat0=origin[1]*rad;
+  function Ecef([lon,lat]){lon*=rad;lat*=rad;const s=Math.sin(lat),c=Math.cos(lat),n=a/Math.sqrt(1-e2*s*s);return [n*c*Math.cos(lon),n*c*Math.sin(lon),n*(1-e2)*s];}
+  const base=Ecef(origin);
+  function Enu(point){const d=Ecef(point).map((v,i)=>v-base[i]);return [-Math.sin(lon0)*d[0]+Math.cos(lon0)*d[1],-Math.sin(lat0)*Math.cos(lon0)*d[0]-Math.sin(lat0)*Math.sin(lon0)*d[1]+Math.cos(lat0)*d[2]];}
+  const n=Enu(north),s=Enu(south),de=s[0]-n[0],dn=s[1]-n[1],length=Math.hypot(de,dn),az=(Math.atan2(de,dn)/rad+360)%360;
+  const zAxis=[de/length,dn/length,0],xAxis=[-dn/length,de/length,0],near3=(a,b,t)=>a?.length===3&&b.every((v,i)=>Math.abs(a[i]-v)<t);
+  Check(Math.abs(geo.axisAzimuthClockwiseFromTrueNorthDeg-az)<1e-5&&Math.abs(geo.axisLengthM-length)<.001,'Modern placement azimuth and mean length are independently derived from mapped endpoints',{az,length});
+  Check(near3(geo.localXInEnu,xAxis,1e-8)&&near3(geo.localZInEnu,zAxis,1e-8)&&near3(geo.localYInEnu,[0,0,1],1e-12),'Local X/Y/Z transform has the correct ENU axes, metre scale and handedness');
+  Check(Math.abs(xAxis[0]*zAxis[0]+xAxis[1]*zAxis[1])<1e-12&&zAxis[0]>0&&zAxis[1]<0&&xAxis[0]>0&&xAxis[1]>0,'Transverse and north-to-south axes are orthogonal and not mirrored');
+  const originNorm=Math.hypot(n[0],n[1]);
+  Check(Math.abs(originNorm-spec.lengthM/2)<.25&&Math.abs(Math.hypot(s[0],s[1])-spec.lengthM/2)<.25,'Unscaled 280 m support axis lands within 0.25 m of the two modern mean endpoints, without claiming historic length',{north:n,south:s});
+  Check(geo.individualMappedAxes?.length===2,'Individual modern bridge axes are included');
+  for(const way of ways){
+    const item=geo.individualMappedAxes.find(v=>v.wayId===way.id),p=Enu(way.endpoints[0]),q=Enu(way.endpoints[1]),bearing=(Math.atan2(q[0]-p[0],q[1]-p[1])/rad+360)%360;
+    Check(item&&close2(item.midpointWgs84LonLat,mean(...way.endpoints),1e-9)&&Math.abs(item.azimuthClockwiseFromTrueNorthDeg-bearing)<1e-5,'Individual modern axis midpoint and bearing match that way',{id:way.id,bearing});
+  }
+  Check(/X transverse/i.test(spec.coordinateSystem)&&/not geographic east and south/i.test(spec.coordinateSystem)&&/Absolute elevation.+unknown/i.test(geo.verticalDatum)&&/No 1938/i.test(geo.limitations),'Local axes, unknown vertical datum and the modern-only scope are explicit');
+  Check(river?.osmWayId===359819649&&river.segmentEndpointsWgs84LonLat?.length===2,'Modern river sketch cites its OSM source and adjacent nodes');
+  const p=Enu(river.segmentEndpointsWgs84LonLat[0]),q=Enu(river.segmentEndpointsWgs84LonLat[1]),d=[q[0]-p[0],q[1]-p[1]],cross=(u,v)=>u[0]*v[1]-u[1]*v[0];
+  const riverAz=(Math.atan2(d[0],d[1])/rad+360)%360,delta=Math.abs(riverAz-az)%180,acute=Math.min(delta,180-delta),offset=cross(p,d)/cross(zAxis,d);
+  Check(Math.abs(river.segmentAzimuthClockwiseFromTrueNorthDegApprox-riverAz)<.06&&Math.abs(river.acuteAngleToBridgeAxisDegApprox-acute)<.06&&Math.abs(river.crossingLocalZFromModernMidpointMApprox-offset)<.5,'Coarse river angle and intersection follow the cited line segment',{riverAz,acute,offset});
+  Check(/unquantified generalization error/i.test(river.limitations??'')&&/do not establish 1938/i.test(river.limitations??''),'Coarse river interpolation is not presented as surveyed or historic geometry');
+}
 for(const [key,actual] of [['min',bounds.min.toArray()],['max',bounds.max.toArray()],['size',size.toArray()]])Check(Array.isArray(data.bounds?.[key])&&actual.every((v,i)=>Math.abs(v-data.bounds[key][i])<.002),'Baker bounds independently match world-space exported vertices',key);
 Check(typeof data.reconstructionScope==='string'&&/not a proven 1938 bridge length/i.test(data.reconstructionScope)&&/44 m/.test(data.reconstructionScope),'Asset explicitly distinguishes modern-scale reconstruction from proven 1938 bridge geometry');
 Check(data.historicalReferences?.length>=3&&data.historicalReferences.every(r=>/^https:\/\//.test(r.url)&&r.supports),'Historical reference scope remains attached to the asset');
