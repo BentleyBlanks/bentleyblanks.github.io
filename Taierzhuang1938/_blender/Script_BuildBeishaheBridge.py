@@ -1033,16 +1033,19 @@ def Rebuild():
         colorLayer = "DeckTint" if role in ("DeckPlanks", "DeckBearers") else None
         templates[role] = geo.Object("Template_" + role, mat, tile=1, colorLayer=colorLayer)
     sleeperTemplates = [(templates["Sleepers"], templates["SleeperEnds"])]
-    deckTemplates = [(templates["DeckPlanks"], templates["DeckBearers"])]
+    deckTemplates = [templates["DeckPlanks"]]
+    bearerTemplates = [templates["DeckBearers"]]
     sleeperLength = SPEC["spanPitchM"] - SPEC["expansionGapM"]
     sleeperCount = math.ceil(sleeperLength / SPEC["sleeperSpacingM"])
-    for variant in range(1, 3):
-        body, ends = BuildSleepers(sleeperLength, sleeperCount, 1938 + variant * 971)
-        sleeperTemplates.append((body.Object(f"Template_Sleepers_{variant}", wood),
-                                 ends.Object(f"Template_SleeperEnds_{variant}", endWood)))
+    for variant in range(1, SPEC["deckVariantCount"]):
+        if variant < 3:
+            body, ends = BuildSleepers(sleeperLength, sleeperCount, 1938 + variant * 971)
+            sleeperTemplates.append((body.Object(f"Template_Sleepers_{variant}", wood),
+                                     ends.Object(f"Template_SleeperEnds_{variant}", endWood)))
         boards, bearers = BuildDeck(sleeperLength, sleeperCount, 1938 + variant * 971)
-        deckTemplates.append((boards.Object(f"Template_DeckPlanks_{variant}", deckWood, colorLayer="DeckTint"),
-                              bearers.Object(f"Template_DeckBearers_{variant}", deckWood, colorLayer="DeckTint")))
+        deckTemplates.append(boards.Object(f"Template_DeckPlanks_{variant}", deckWood, colorLayer="DeckTint"))
+        if variant < 3:
+            bearerTemplates.append(bearers.Object(f"Template_DeckBearers_{variant}", deckWood, colorLayer="DeckTint"))
     assemblies = []
     for i in range(SPEC["spanCount"]):
         z = -SPEC["lengthM"] / 2 + SPEC["spanPitchM"] * (i + 0.5)
@@ -1056,15 +1059,15 @@ def Rebuild():
             elif role == "SleeperEnds":
                 template = sleeperTemplates[i % len(sleeperTemplates)][1]
             elif role == "DeckPlanks":
-                template = deckTemplates[i % len(deckTemplates)][0]
+                template = deckTemplates[i % len(deckTemplates)]
             elif role == "DeckBearers":
-                template = deckTemplates[i % len(deckTemplates)][1]
+                template = bearerTemplates[i % len(bearerTemplates)]
             obj = bpy.data.objects.new(f"Intact_Span{i + 1:02d}_{role}", template.data)
             bpy.context.collection.objects.link(obj)
             obj.parent = parent
             obj["role"], obj["spanIndex"] = role, i
         assemblies.append({"id": parent.name, "spanIndex": i, "centerZ": z, "bearings": [[x, y, zz + z] for x, y, zz in bearingTemplate]})
-    for obj in list(templates.values()) + [obj for pair in sleeperTemplates[1:] for obj in pair] + [obj for pair in deckTemplates[1:] for obj in pair]:
+    for obj in list(templates.values()) + [obj for pair in sleeperTemplates[1:] for obj in pair] + deckTemplates[1:] + bearerTemplates[1:]:
         bpy.data.objects.remove(obj, do_unlink=True)
     pierTemplates = []
     for variant in range(3):
@@ -1158,7 +1161,7 @@ def Rebuild():
                 "railFasteners": "Square-head screw-spike shape, 120 mm sleeper embed, two outside and one inside, and outside hook plates are authored interpretations of early German railway references, not established for the 1938 Beishahe bridge. Solid spike shafts intentionally overlap undrilled sleeper and tie-plate geometry; holes and threads are not modeled.",
                 "guardTimbers": "Two low outer longitudinal timbers are an authored interpretation of a 1941 Jinpu railway bridge photograph at an unknown location; their use and dimensions at Beishahe are unconfirmed."
             },
-            "deck": {"clearWidthM": SPEC["sleeperLengthM"], "nominalBoardWidthM": SPEC["deckBoardNominalWidthM"], "rowToneContrast": SPEC["deckRowToneContrast"], "plankThicknessM": .045, "topY": .075,
+            "deck": {"clearWidthM": SPEC["sleeperLengthM"], "nominalBoardWidthM": SPEC["deckBoardNominalWidthM"], "rowToneContrast": SPEC["deckRowToneContrast"], "variantCount": SPEC["deckVariantCount"], "plankThicknessM": .045, "topY": .075,
                      "railFootClearanceM": .001, "jointWidthM": .006,
                      "jointEndClearanceM": .002, "jointSpliceLengthM": .36,
                      "bearerBottomY": 0, "bearerTopY": .03, "grainAxis": "X"},

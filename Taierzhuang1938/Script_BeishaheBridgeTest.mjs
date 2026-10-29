@@ -191,7 +191,7 @@ Check(typeof data.reconstructionScope==='string'&&/not a proven 1938 bridge leng
 Check(data.historicalReferences?.length>=3&&data.historicalReferences.every(r=>/^https:\/\//.test(r.url)&&r.supports),'Historical reference scope remains attached to the asset');
 Check(/creative weathering choice, not evidence of the 1938 waterline/i.test(data.materialInterpretation?.pierDamp??''),'Lower pier damp color remains explicitly an artistic choice, not a historical water-level claim');
 Check(/not established by a confirmed 1938 Beishahe bridge photograph/i.test(data.materialInterpretation?.deckPlanks??''),'Continuous wooden decking is identified as an authored reconstruction');
-Check(data.deck?.clearWidthM===spec.sleeperLengthM&&data.deck.nominalBoardWidthM===spec.deckBoardNominalWidthM&&data.deck.rowToneContrast===spec.deckRowToneContrast&&data.deck.plankThicknessM===.045&&data.deck.topY===.075&&data.deck.jointWidthM===.006&&data.deck.grainAxis==='X','Decking dimensions, row tone, real 6 mm board gaps and transverse timber grain are recorded');
+Check(data.deck?.clearWidthM===spec.sleeperLengthM&&data.deck.nominalBoardWidthM===spec.deckBoardNominalWidthM&&data.deck.rowToneContrast===spec.deckRowToneContrast&&data.deck.variantCount===spec.deckVariantCount&&data.deck.plankThicknessM===.045&&data.deck.topY===.075&&data.deck.jointWidthM===.006&&data.deck.grainAxis==='X','Decking dimensions, variant count, row tone, real 6 mm board gaps and transverse timber grain are recorded');
 Check(spec.railNominalLengthM===10&&spec.railJointGapM===.006&&data.railJoints?.nominalRailLengthM===10&&data.railJoints.gapM===.006&&!data.railJoints.holesModeled,'Rail joint record distinguishes nominal historical spacing and unbored represented fasteners');
 Check(/unverified design assumptions/i.test(data.railJoints.interpretation)&&/overlap solid undrilled/i.test(data.materialInterpretation?.railJoints??''),'Rail joints disclose unconfirmed locations and represented bolt/web overlap');
 Check(spec.spikeEmbedDepthM===.12&&data.railFasteners?.spikeEmbedDepthM===spec.spikeEmbedDepthM&&!data.railFasteners.holesModeled&&!data.railFasteners.threadsModeled,'Spike record describes embedded smooth solids without claiming modeled holes or threads');
@@ -365,9 +365,9 @@ for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
     }
   }
 }
-Check(new Set(ByRole('Sleepers').map(p=>p.node.mesh)).size===3&&new Set(ByRole('DeckPlanks').map(p=>p.node.mesh)).size===3&&new Set(ByRole('Pier').map(p=>p.node.mesh)).size===3&&new Set(ByRole('PierDamp').map(p=>p.node.mesh)).size===3,'Three real geometry/UV variants break sleeper, deck and dry/damp pier repetition');
+Check(new Set(ByRole('Sleepers').map(p=>p.node.mesh)).size===3&&new Set(ByRole('DeckPlanks').map(p=>p.node.mesh)).size===spec.deckVariantCount&&new Set(ByRole('Pier').map(p=>p.node.mesh)).size===3&&new Set(ByRole('PierDamp').map(p=>p.node.mesh)).size===3,'Actual sleeper, deck and dry/damp pier variants break repetition');
 function UniqueUvCount(role){return new Set(ByRole(role).map(part=>Hash(Buffer.from(part.geo.uv.buffer,part.geo.uv.byteOffset,part.geo.uv.byteLength)))).size;}
-Check(UniqueUvCount('Sleepers')===3&&UniqueUvCount('DeckPlanks')===3&&UniqueUvCount('Pier')===3&&UniqueUvCount('PierDamp')===3,'Three mesh variants contain genuinely different UV coordinates');
+Check(UniqueUvCount('Sleepers')===3&&UniqueUvCount('DeckPlanks')===spec.deckVariantCount&&UniqueUvCount('Pier')===3&&UniqueUvCount('PierDamp')===3,'Actual mesh variants contain genuinely different UV coordinates');
 // Derive each UV direction from measured metre-space edges on the exported
 // stone geometry. Quarter turns should break directional repetition without
 // stretching the material or changing the authored one-metre texture scale.
@@ -638,7 +638,7 @@ for(const part of [...new Map(ByRole('DeckPlanks').map(p=>[p.node.mesh,p])).valu
   Check(new Set(tones.map(rgb=>rgb.map(x=>Math.round(x*10000)).join(','))).size>boardCount*.8&&Math.max(...values)-Math.min(...values)>.25&&Math.max(...values)-Math.min(...values)<.60&&tones.every(rgb=>rgb[0]>=rgb[2]&&rgb.every(v=>v>=.36&&v<=1.001)),'Actual board colors retain bounded, visible warm-gray variation');
   CheckBoardEdgeProfiles(part,topFaces,rows,sideFaces,'span deck',true);
 }
-Check(new Set(deckWidthSignatures).size===3,'All three exported deck templates have different real board width sequences');
+Check(new Set(deckWidthSignatures).size===spec.deckVariantCount,'All exported deck templates have different real board width sequences');
 for(const part of [...new Map(ByRole('DeckBearers').map(p=>[p.node.mesh,p])).values()]){
   const {color,colorWidth}=part.geo;
   Check(color&&colorWidth>=3&&color.every(v=>Math.abs(v-1)<.001),'Actual supporting bearers export neutral white vertex tint');
