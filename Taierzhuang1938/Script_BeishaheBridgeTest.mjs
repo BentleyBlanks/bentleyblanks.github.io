@@ -191,7 +191,7 @@ Check(typeof data.reconstructionScope==='string'&&/not a proven 1938 bridge leng
 Check(data.historicalReferences?.length>=3&&data.historicalReferences.every(r=>/^https:\/\//.test(r.url)&&r.supports),'Historical reference scope remains attached to the asset');
 Check(/creative weathering choice, not evidence of the 1938 waterline/i.test(data.materialInterpretation?.pierDamp??''),'Lower pier damp color remains explicitly an artistic choice, not a historical water-level claim');
 Check(/not established by a confirmed 1938 Beishahe bridge photograph/i.test(data.materialInterpretation?.deckPlanks??''),'Continuous wooden decking is identified as an authored reconstruction');
-Check(data.deck?.clearWidthM===spec.sleeperLengthM&&data.deck.plankThicknessM===.045&&data.deck.topY===.075&&data.deck.jointWidthM===.006&&data.deck.grainAxis==='X','Decking dimensions, real 6 mm board gaps and transverse timber grain are recorded');
+Check(data.deck?.clearWidthM===spec.sleeperLengthM&&data.deck.nominalBoardWidthM===spec.deckBoardNominalWidthM&&data.deck.plankThicknessM===.045&&data.deck.topY===.075&&data.deck.jointWidthM===.006&&data.deck.grainAxis==='X','Decking dimensions, real 6 mm board gaps and transverse timber grain are recorded');
 Check(spec.railNominalLengthM===10&&spec.railJointGapM===.006&&data.railJoints?.nominalRailLengthM===10&&data.railJoints.gapM===.006&&!data.railJoints.holesModeled,'Rail joint record distinguishes nominal historical spacing and unbored represented fasteners');
 Check(/unverified design assumptions/i.test(data.railJoints.interpretation)&&/overlap solid undrilled/i.test(data.materialInterpretation?.railJoints??''),'Rail joints disclose unconfirmed locations and represented bolt/web overlap');
 Check(spec.spikeEmbedDepthM===.12&&data.railFasteners?.spikeEmbedDepthM===spec.spikeEmbedDepthM&&!data.railFasteners.holesModeled&&!data.railFasteners.threadsModeled,'Spike record describes embedded smooth solids without claiming modeled holes or threads');
@@ -562,7 +562,7 @@ for(const part of [...new Map(ByRole('DeckPlanks').map(p=>[p.node.mesh,p])).valu
   Check(g.materials[part.primitive.material]?.name==='BeishaheDeckTimber','Deck boards use the separate authored deck PBR texture');
   Check(color&&colorWidth>=3,'Actual deck board mesh contains exported COLOR_0 tint');
   const railCenter=(spec.gaugeM+spec.railHeadWidthM)/2;
-  const length=spec.spanPitchM-spec.expansionGapM,boardCount=Math.ceil(length/.225),rows=new Map(),sideFaces=[],topFaces=[];
+  const length=spec.spanPitchM-spec.expansionGapM,boardCount=Math.ceil(length/spec.deckBoardNominalWidthM),rows=new Map(),sideFaces=[],topFaces=[];
   // Derive row boundaries from the exported triangles themselves. The top
   // bevel adds 3 mm on each side, in addition to the physical 6 mm seam.
   const intervals=[];

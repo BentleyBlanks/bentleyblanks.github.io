@@ -433,7 +433,12 @@ def BuildDeck(length, count, seed):
     This remains an authored deck design, not a claim about the 1938 original.
     """
     planks, bearers = Geometry(), Geometry()
+    rowRng = random.Random(seed + 61973)
     rng = random.Random(seed + 61973)
+    # Preserve the previous rail-edge and bearer texture offsets when the
+    # authored board width changes: the old .225 m rows each drew two values.
+    for _ in range(2 * math.ceil(length / .225)):
+        rng.random()
     tintRng = random.Random(seed + 39113)
     edgeRng = random.Random(seed + 88421)
     sleeperZ = [-length / 2 + (k + .5) * length / count for k in range(count)]
@@ -444,7 +449,7 @@ def BuildDeck(length, count, seed):
     zones = [(-SPEC["sleeperLengthM"] / 2, -railX - bufferOuter),
              (-railX + bufferOuter, railX - bufferOuter),
              (railX + bufferOuter, SPEC["sleeperLengthM"] / 2)]
-    boardCount = math.ceil(length / .225)
+    boardCount = math.ceil(length / SPEC["deckBoardNominalWidthM"])
     widthRng = random.Random(seed + 34129)
     weights = [widthRng.uniform(.92, 1.08) for _ in range(boardCount)]
     scale = length / sum(weights)
@@ -462,7 +467,7 @@ def BuildDeck(length, count, seed):
         warmth = tintRng.uniform(.008, .035)
         rowTint = (min(1.0, value * .96 * (1 + warmth)), value * .91, value * .83 * (1 - warmth * .8), 1)
         rowTints.append(rowTint)
-        rowOffset = (rng.uniform(0, 7), rng.uniform(0, 7))
+        rowOffset = (rowRng.uniform(0, 7), rowRng.uniform(0, 7))
         rowEdges = DeckEdgeProfile(edgeRng)
         for x0, x1 in zones:
             # The generated material's V axis follows each board's actual X
@@ -1147,7 +1152,7 @@ def Rebuild():
                 "railFasteners": "Square-head screw-spike shape, 120 mm sleeper embed, two outside and one inside, and outside hook plates are authored interpretations of early German railway references, not established for the 1938 Beishahe bridge. Solid spike shafts intentionally overlap undrilled sleeper and tie-plate geometry; holes and threads are not modeled.",
                 "guardTimbers": "Two low outer longitudinal timbers are an authored interpretation of a 1941 Jinpu railway bridge photograph at an unknown location; their use and dimensions at Beishahe are unconfirmed."
             },
-            "deck": {"clearWidthM": SPEC["sleeperLengthM"], "plankThicknessM": .045, "topY": .075,
+            "deck": {"clearWidthM": SPEC["sleeperLengthM"], "nominalBoardWidthM": SPEC["deckBoardNominalWidthM"], "plankThicknessM": .045, "topY": .075,
                      "railFootClearanceM": .001, "jointWidthM": .006,
                      "jointEndClearanceM": .002, "jointSpliceLengthM": .36,
                      "bearerBottomY": 0, "bearerTopY": .03, "grainAxis": "X"},

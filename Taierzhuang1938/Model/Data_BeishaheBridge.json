@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026102820",
+  "version": "2026102821",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026102820",
+    "version": "2026102821",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -25,6 +25,7 @@
     "sleeperWidthM": 0.24,
     "sleeperDepthM": 0.16,
     "sleeperSpacingM": 0.6,
+    "deckBoardNominalWidthM": 0.34,
     "bearingTopY": -0.69,
     "pierTopY": -1.02,
     "foundationY": -5.3,
@@ -692,11 +693,11 @@
       "railHeightM": 0.14
     }
   ],
-  "triangles": 1302608,
+  "triangles": 1267328,
   "meshObjects": 354,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
-  "glbBytes": 16892940,
-  "glbSha256": "15b4db5db608867039885bdd3b76a3009462e9ac8ef1884099a9599f0ce19740",
+  "glbBytes": 16212540,
+  "glbSha256": "610230071509f1cd520a3cde13d94621ea3a2d10927097670adb6e9eca700ceb",
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
@@ -748,6 +749,7 @@
   },
   "deck": {
     "clearWidthM": 2.8,
+    "nominalBoardWidthM": 0.34,
     "plankThicknessM": 0.045,
     "topY": 0.075,
     "railFootClearanceM": 0.001,
