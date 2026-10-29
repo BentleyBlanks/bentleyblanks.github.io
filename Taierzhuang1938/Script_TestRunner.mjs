@@ -1187,8 +1187,8 @@ const changedDomainRules = [
   { domain: "cutscene", pattern: /MachineGunCaptives|CutscenePerformance|Animation\/MachineGunCaptives/i },
   { domain: "ai", pattern: /FirstLevelP012(ShellShot|BackRifle|TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },
   // 近爆的人物反应与耳朵模型（BlastExposure / BlastFlinch / AudioEarTrauma / BattleReaction*）、冲击波推人（BlastKnockback / PlayerKnockback）、
-  // 眨眼的眼皮遮罩（EyelidMask，合成与白盒输出共用）：同挂 explosives。
-  { domain: "explosives", pattern: /(BlastExposure|BlastFlinch|BlastReaction|BattleReaction|EarTrauma|BlastKnockback|PlayerKnockback|EyelidMask)/i },
+  // 眨眼的眼皮遮罩（EyelidMask，合成与白盒输出共用）、被推倒时枪脱手（LooseGun）：同挂 explosives。
+  { domain: "explosives", pattern: /(BlastExposure|BlastFlinch|BlastReaction|BattleReaction|EarTrauma|BlastKnockback|PlayerKnockback|EyelidMask|LooseGun)/i },
   { domain: "explosives", pattern: /(Explosion|Explosives|ShellImpact|DustFlow|DustField|DustOcclusion|GroundImpact|CraterSurface|CraterDebris|CraterScorched|BakeCraterSoil|GrenadeReturn|TerrainDeformation|ShellVisual|Script_Combat|Script_Physics|Script_Vfx)/i },
   // Trench：壕沟样条管线（Script_TrenchPlan / Script_TrenchSpline /
   // Data_FirstLevelMissionTrenches）改的是烘进共享高度场的那张开挖场，

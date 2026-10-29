@@ -114,6 +114,37 @@ export const BLAST_KNOCKBACK_DAMAGE = Object.freeze({
   repeatS: 0.35,
 });
 
+/**
+ * 被推倒时枪脱手（Script_LooseGun，2026-10-29 用户：「试试主角的枪也被震掉，再从地上捡起来」）。
+ * 只在倒地 / 掀飞（regimes）时有，推一把不脱手；手里是枪才脱（大刀、手榴弹、架着的机枪不算）。
+ * 人往后倒、往前扑时手会本能地伸出去撑地，枪就是这时候甩出去的：
+ *   releaseDelayS   被推倒后多久撒手（身子开始转、手伸出去）
+ *   hand            出手点：相对相机，前 / 下 / 右（米）
+ *   kick            甩出去那一下：身体速度 × bodyScale（手离脚比质心远，转起来比质心快）+ 沿推的方向 alongShare × Δv
+ *                   + 往人前方 forwardMps + 往上 upMinMps..+upSpanMps + 左右 ±sideMps（按序号确定，不用 Math.random）
+ *   spin            翻滚（绕横轴，rad/s）、绕枪管滚（roll）的转速范围，外加 ±yawRadS 绕竖轴打转（落地不总顺着飞的方向）
+ * 飞出去以后当一根两头带质量的杆（枪长取模型的包围盒，半径 = 侧躺时的半厚）：
+ *   contact         落地反弹系数、低于 bounceMps 不弹、库仑摩擦、贴地滑的阻力、贴地时绕枪管转的阻尼、侧躺回正的速率
+ *   sleep           两头都慢于 mps 持续 s 秒就停住（最多飞 maxFlightS 秒，到点直接放平）
+ * 汉阳造全长约 1.25 m、重约 4 kg；摩擦按木头 / 钢对干土取 0.5 上下。
+ * pickup：捡起来那一下 —— 低头看向枪（俯仰补 lookShare、左右补 yawShare 且不超过 maxTurnRad）、弯腰（站姿眼位降 dipM，
+ *         蹲 crouchDipM，趴着不弯）、右手伸过去，reachS 时抓到（地上那把 liftS 秒内收到身前 liftForwardM、右 liftRightM、眼睛以下 liftDownM 的胸口处，跟手里那把从下面端上来接上），
+ *         holdS 后开始直起身，returnS 回到原样；抓到那一刻地上那把消失、手里那把端上来。
+ */
+export const BLAST_LOOSE_GUN = Object.freeze({
+  regimes: Object.freeze(["fall", "thrown"]),
+  releaseDelayS: 0.12,
+  hand: Object.freeze({ forwardM: 0.42, downM: 0.34, rightM: 0.1 }),
+  kick: Object.freeze({ bodyScale: 1.15, alongShare: 0.3, forwardMps: 0.7, upMinMps: 1.5, upSpanMps: 1.1, sideMps: 1.3 }),
+  spin: Object.freeze({ minRadS: 4, spanRadS: 6, rollMinRadS: 2, rollSpanRadS: 5, yawRadS: 3 }),
+  gravityMps2: 9.81,
+  maxSubstepS: 1 / 120,
+  contact: Object.freeze({ restitution: 0.3, bounceMps: 0.7, friction: 0.5, slideDragPerS: 3.5, rollDampPerS: 7, settleRate: 8 }),
+  sleep: Object.freeze({ mps: 0.12, s: 0.25, maxFlightS: 6 }),
+  pickup: Object.freeze({ reachS: 0.32, holdS: 0.06, returnS: 0.42, dipM: 0.5, crouchDipM: 0.2, proneDipM: 0,
+    lookShare: 0.85, yawShare: 0.6, maxTurnRad: 0.8, maxLookDownRad: 1.1, liftS: 0.18, liftForwardM: 0.3, liftRightM: 0.18, liftDownM: 0.55 }),
+});
+
 export const BLAST_KNOCKBACK = Object.freeze({
   impulse: BLAST_KNOCKBACK_IMPULSE,
   body: BLAST_KNOCKBACK_BODY,
@@ -122,6 +153,7 @@ export const BLAST_KNOCKBACK = Object.freeze({
   fall: BLAST_KNOCKBACK_FALL,
   camera: BLAST_KNOCKBACK_CAMERA,
   damage: BLAST_KNOCKBACK_DAMAGE,
+  looseGun: BLAST_LOOSE_GUN,
 });
 
 export default BLAST_KNOCKBACK;

@@ -3,7 +3,7 @@ import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs
 import { MakeFullscreenMaterial } from "./Script_PostCommon.mjs";
 import { WHITEBOX_CARDS, WHITEBOX_LIGHTING, WHITEBOX_WATER, WhiteboxPassPlan } from "./Data_Tuning_Whitebox.mjs";
 import { OPENING_PERCEPTION } from "./Data_Tuning_FirstLevel.mjs";
-import { EYELID_GLSL, LidShapeArray, LidSoftArray } from "./Script_EyelidMask.mjs";
+import { EYELID_GLSL, LidShapeArray, LidSoftArray, LidLightArray, AfterimageArrays } from "./Script_EyelidMask.mjs";
 
 // Physical ground and replacement crater tiles, never a material-name whitelist.
 export function IsWhiteboxTerrain(object) {
@@ -521,20 +521,25 @@ export class WhiteboxOutputPass {
   constructor(pipeline) {
     this.name = "whiteboxOutput";
     this.pipeline = pipeline;
-    this.uniforms = { uSource: { value: null }, uFade: { value: 0 }, uEyeClosure: { value: 0 },
+    this.uniforms = { uSource: { value: null }, uFade: { value: 0 }, uEyeClosure: { value: 0 }, uEyeAdapt: { value: 1 },
       uLidShape: { value: new THREE.Vector4(...LidShapeArray(OPENING_PERCEPTION)) }, uLidSoft: { value: new THREE.Vector2() },
-      uLidGlow: { value: new THREE.Vector3() } };
+      uLidGlow: { value: new THREE.Vector3() }, uLidLight: { value: new THREE.Vector3(0, 0, 1) },
+      uAfterimage: { value: new THREE.Vector4(0.5, 0.5, 0, 1) }, uAfterimageAmp: { value: new THREE.Vector4() } };
     this.material = MakeFullscreenMaterial(`
       uniform sampler2D uSource;
       uniform float uFade;
       uniform float uEyeClosure;
+      uniform float uEyeAdapt;
       uniform vec3 uLidGlow;
       ${EYELID_GLSL}
       varying vec2 vUv;
+      // 输入已经是显示线性：透光取点直接取亮度（睁眼后亮一下 uEyeAdapt 一并乘上）。
+      float LidSceneLuma(vec2 uv) {
+        return dot(max(texture2D(uSource, uv).rgb, vec3(0.0)), vec3(0.2126, 0.7152, 0.0722)) * uEyeAdapt;
+      }
       void main() {
-        vec3 c = max(texture2D(uSource, vUv).rgb, vec3(0.0));
-        float aperture = EyelidAperture(vUv, uEyeClosure);
-        c = c * aperture + uLidGlow * (1.0 - aperture);
+        vec3 c = max(texture2D(uSource, vUv).rgb, vec3(0.0)) * uEyeAdapt;
+        c = EyeView(c, vUv, uEyeClosure, uLidGlow);
         c = mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
         gl_FragColor = vec4(c * (1.0 - clamp(uFade, 0.0, 1.0)), 1.0);
       }`, this.uniforms);
@@ -549,6 +554,11 @@ export class WhiteboxOutputPass {
     this.uniforms.uEyeClosure.value = ctx.options.eyeClosure || 0;
     if (ctx.options.lidGlow) this.uniforms.uLidGlow.value.fromArray(ctx.options.lidGlow); else this.uniforms.uLidGlow.value.set(0, 0, 0);
     this.uniforms.uLidSoft.value.fromArray(LidSoftArray(ctx.options.lidEdge));
+    this.uniforms.uEyeAdapt.value = ctx.options.eyeAdapt ?? 1;
+    this.uniforms.uLidLight.value.fromArray(LidLightArray(ctx.options.lidLight));
+    const afterimage = AfterimageArrays(ctx.options.afterimage);
+    this.uniforms.uAfterimage.value.fromArray(afterimage.shape);
+    this.uniforms.uAfterimageAmp.value.fromArray(afterimage.amp);
     ctx.blitter.Blit(this.material, this.pipeline.whiteboxConfig.fxaa ? this.pipeline.targets.ldr : null);
   }
   Dispose() { this.material.dispose(); }

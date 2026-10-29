@@ -41,7 +41,7 @@
 
 import { HIT_DISORIENTATION } from "./Data_Tuning_Player.mjs";
 import { OPENING_PERCEPTION } from "./Data_Tuning_FirstLevel.mjs";
-import { EYELID_GLSL, LidShapeArray, LidSoftArray } from "./Script_EyelidMask.mjs";
+import { EYELID_GLSL, LidShapeArray, LidSoftArray, LidLightArray, AfterimageArrays } from "./Script_EyelidMask.mjs";
 import * as THREE from "three";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
 // 物理大气（子系统 B4）：ApplyFog 段里的大气透视那几行用它。
@@ -438,6 +438,11 @@ vec3 ApplyExposureTonemap(vec3 color) {
   return ApplyTonemap(color, uTonemap);
 }
 
+// 近爆闭眼时眼皮透光跟着画面亮度走（Script_EyelidMask.LidLightScale 取点用）：这一点过曝光与色调映射之后的亮度。
+float LidSceneLuma(vec2 uv) {
+  return Luma(ApplyTonemap(texture2D(uHdr, uv).rgb * uExposure * texture2D(uExposureTex, vec2(0.5)).r, uTonemap));
+}
+
 // ===========================================================================
 // SEGMENT color-grade —— lift/gain + 分离调色 + 对比（→ 3D LUT）+ 饱和
 //
@@ -564,8 +569,8 @@ vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
   float grain = (Hash12(gl_FragCoord.xy + uFrame * 13.71) - 0.5);
   color += grain * uGrain * (0.35 + 0.65 * (1.0 - abs(Luma(color) * 2.0 - 1.0)));
 
-  float aperture=EyelidAperture(uv,uEyeClosure);
-  return (max(color, vec3(0.0)) * aperture + uLidGlow * (1.0 - aperture)) * (1.0 - uFade);
+  // 眼皮、透光、火光残影（Script_EyelidMask.EyeView）；都没有时就是原样。
+  return EyeView(color, uv, uEyeClosure, uLidGlow) * (1.0 - uFade);
 }
 
 // ===========================================================================
@@ -658,6 +663,7 @@ export class CompositePass {
       uRadialBlur:{value:0}, uSideDaze:{value:new THREE.Vector2()},uCheekCut:{value:new THREE.Vector3()}, uBloodEdge:{value:new THREE.Vector4()}, uBloodCorners:{value:new THREE.Vector4(1,1,1,1)},
       uConcussionGrade:{value:new THREE.Vector3(OPENING_PERCEPTION.ghostMix,OPENING_PERCEPTION.desaturation,OPENING_PERCEPTION.vignette)},
       uLidShape:{value:new THREE.Vector4(...LidShapeArray(OPENING_PERCEPTION))}, uLidSoft:{value:new THREE.Vector2()},
+      uLidLight:{value:new THREE.Vector3(0,0,1)}, uAfterimage:{value:new THREE.Vector4(0.5,0.5,0,1)}, uAfterimageAmp:{value:new THREE.Vector4()},
       uDofStrength: { value: 0 }, uDofFocus: { value: 1.5 },
       uDofRange: { value: 2.8 }, uDofMaxPx: { value: 11.0 },
       uNearDofStrength: { value: 0 }, uNearDofFocus: { value: 1.6 },
@@ -763,7 +769,8 @@ export class CompositePass {
     // Internal resolution also serves the Motion Vector debug view. Concussion
     // radii scale with this same height so changing render scale preserves FOV.
     U.uResolution.value.set(ctx.width, ctx.height);
-    U.uExposure.value = options.exposure ?? 1.0;
+    // eyeAdapt：近爆闭过眼、睁开那一下偏亮（Script_BlastFlinch.adapt，Script_Main.BlastEyeAdapt）；平时是 1。
+    U.uExposure.value = (options.exposure ?? 1.0) * (options.eyeAdapt ?? 1);
     U.uBloomStrength.value = options.bloom ?? 0.5;
     U.uGodStrength.value = ctx.godStrength;
     U.uVignette.value = options.vignette ?? 0.42;
@@ -813,6 +820,11 @@ export class CompositePass {
     if (options.lidGlow) U.uLidGlow.value.fromArray(options.lidGlow); else U.uLidGlow.value.set(0, 0, 0);
     // 近爆眨眼的软边与整体变暗（Script_Main.BlastLidEdge）：不给就是开场那套画出来的眼皮。
     U.uLidSoft.value.fromArray(LidSoftArray(options.lidEdge));
+    // 透光跟着画面亮度走（Script_Main.BlastLidLight）与火光残影（Script_Main.BlastAfterimage）：不给就是固定颜色 / 不画。
+    U.uLidLight.value.fromArray(LidLightArray(options.lidLight));
+    const afterimage = AfterimageArrays(options.afterimage);
+    U.uAfterimage.value.fromArray(afterimage.shape);
+    U.uAfterimageAmp.value.fromArray(afterimage.amp);
     const concussion=options.concussion,perception=OPENING_PERCEPTION;
     const pixelScale=ctx.height/perception.referenceHeight;
     U.uConcussion.value.set(Math.max(0,Math.min(1,concussion?.amount||0)),

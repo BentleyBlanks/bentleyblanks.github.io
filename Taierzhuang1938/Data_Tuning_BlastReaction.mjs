@@ -131,9 +131,42 @@ export const BLAST_FLINCH = Object.freeze({
   stackCap: 1.25,
   /**
    * 眼皮透光：白天闭紧眼看到的是一片暗红（血管透光），不是全黑。后期合成里眼皮合上的那部分换成这个颜色
-   *（显示线性值，调色之后），夜里乘 nightScale。开场导演的闭眼不用它（仍是全黑）。
+   *（显示线性值，调色之后），夜里乘 nightScale（暗处是杆细胞在看，杆细胞看不见红光）。开场导演的闭眼不用它（仍是全黑）。
+   * 2026-10-29 起跟着画面亮度走（用户：「透光颜色跟着亮度走」）：眼皮是一层散光的皮肉，透进来的是外面整片光的平均，
+   * 对着天、对着火光就亮，对着沟壁就暗。合成里在画面上取 4×3 个点（曝光、色调映射之后的亮度）：
+   *   rgb       画面平均亮度等于 referenceLuma 时的颜色（= 原来那个固定值，白天测试场的观感不变）
+   *   referenceLuma  rgb 对应的画面平均亮度（显示线性；测试场白天开眼一帧量的）
+   *   spatial   散光以后还剩多少明暗分布（0 = 整片一个亮度，1 = 照 4×3 的格子分布；上面是天就上面亮）
+   *   maxGain   最多亮到 rgb 的几倍（火光正对着脸时）
    */
-  lidGlow: Object.freeze({ rgb: Object.freeze([0.052, 0.011, 0.006]), nightScale: 0.12 }),
+  lidGlow: Object.freeze({ rgb: Object.freeze([0.052, 0.011, 0.006]), nightScale: 0.12,
+    referenceLuma: 0.16, spatial: 0.55, maxGain: 4 }),
+  /**
+   * 睁眼后亮一下（用户 2026-10-29 选的）：闭着眼时进眼的光只剩眼皮透的那点，瞳孔开始放大、视网膜的感光往回涨；
+   * 一睁开，画面先偏亮，瞳孔收回去（缩瞳潜伏约 0.2–0.3 s、主要收缩约 1 s）才回到原来的亮度。
+   * adapt 是这份「暗适应」（0..1）：眼皮闭合先过一段 latencyS 的滞后（瞳孔有潜伏期，一刹那的眨眼来不及放大），
+   * 滞后那份过了 floor 才算，闭着时按 riseS 涨，睁开后按 fallS 退；曝光 ×(1 + gain·adapt)。
+   * 远处一声眨眼（约 0.15 s）几乎不变；单发闭紧约 0.25 s 亮一成多；连续炮击闭得久才明显。
+   */
+  adapt: Object.freeze({ gain: 0.7, riseS: 0.55, fallS: 0.75, latencyS: 0.15, floor: 0.35 }),
+  /**
+   * 睁眼后短暂发糊：闭紧眼时泪膜被挤乱、眼睛对焦也松了，睁开那半秒看东西是糊的、略有重影，中心先清楚。
+   * 走后期合成里恍惚的「发糊」通道（与恍惚取大）。只有闭紧过（squeeze ≥ from）才有；
+   * 睁眼开始后 riseS 涨到 amount × 闭紧强度，再按 decayS 退。
+   */
+  reopenBlur: Object.freeze({ from: 0.25, amount: 0.6, riseS: 0.1, decayS: 0.42 }),
+  /**
+   * 火光残影（用户 2026-10-29 选的）：炸点的火球正对着眼睛时，视网膜那一块被强光漂白，眼睛跟着闪光留一块印子。
+   * 印子钉在视网膜上（画面上的位置不随扭头动）：先是亮的、暖色的「正残像」（闭着眼时最清楚，像火球烙在眼皮上），
+   * 一秒内变成暗的、偏青的「负残像」，看亮处时是一块发暗的斑，几秒内退掉。
+   *   火球半径 ≈ fireballK × 装药^(1/3) 米（手榴弹约 0.5 m、150 榴弹约 1.5 m、250 kg 炸弹约 4 m）；
+   *   印子半径 = 火球的视半径 × blurScale（眼内散射，印子比火球大一圈）。
+   *   强度按视角大小在 [minAngleRad, fullAngleRad] 之间从 0 涨到 1（远处一个小点几乎不留印子），夜里 × nightGain；
+   *   隔着墙（爆点到眼睛被挡）不留。
+   *   正残像 positive × exp(−t / posTauS)；负残像 negative × 在 negRiseS 里涨起来、过了 negHoldS 后按 negTauS 退。
+   */
+  afterimage: Object.freeze({ fireballK: 0.9, blurScale: 1.35, minAngleRad: 0.012, fullAngleRad: 0.07, nightGain: 1.4,
+    positive: 1.0, posTauS: 0.35, negative: 1.0, negRiseS: 0.8, negHoldS: 0.6, negTauS: 2.4, maxRadius: 0.45 }),
   /**
    * 眼皮的边（Script_EyelidMask，2026-10-29 用户：「炸飞时眨眼的 mask 边缘过于锐利，应该模糊一点」）。
    * 眼皮贴着眼球、在瞳孔前面两三毫米，视网膜上成不了边：过渡宽度 ≈ 瞳孔直径 / 距离 ≈ 4 mm / 3 mm ≈ 75°，比竖直视野还宽，

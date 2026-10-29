@@ -10,6 +10,8 @@
 | `Script_Player.mjs` | `BlastKnockback()` 入口、`KnockCenter()`、`_StepKnock` / `_StepKnockDead`（胶囊、撞击扣血、镜头）、`Busy` |
 | `Script_Combat.mjs` `Blast()` | 伤害之后算推力：爆点到质心的遮挡射线、装药量 `ChargeKgFor` |
 | `Script_Main.mjs` | `player.knockGate`（过场 / 白刃 / 抬东西只晃不倒）、`player.onKnockDown`（机枪位先下枪）、视图模型收枪与藏腿、撞击声 `bodyFall` |
+| `Script_LooseGun.mjs` | 纯规则：被推倒时枪脱手的初速（`LooseGunLaunch`）、飞出去的枪当一根两头带质量的杆（`LooseGunRod`）、捡起来那一下的时间曲线（`GunReachPose`） |
+| `Script_Main.mjs` 的 `LooseGun*` 一组 | 撒手（这一槽空出来、空手）、模型、落地后登记成地上的枪、按 F 弯腰去拿、开关 |
 
 回归：`node Taierzhuang1938/Script_BlastKnockbackTest.mjs`（explosives 域、tier0）。
 
@@ -88,8 +90,29 @@ Glasstone & Dolan《The Effects of Nuclear Weapons》(1977) 表 12.49，人被�
 - 原来「挨炸掉 24 血以上就走白刃倒地 `blastImbalance`」那一行删了（它只在手握白刃时才倒得下去）。
 - 只做玩家；AI 士兵的受击反应另有 `Script_HitReaction` 一套。
 
-## 7. 验收
+## 7. 枪脱手（2026-10-29）
 
+用户原话：「我还想试试你做一个主角的枪也被震掉，再从地上捡起来的效果」。数在 `Data_Tuning_BlastKnockback.BLAST_LOOSE_GUN`。
+
+- **什么时候脱**：倒地 / 掀飞（推一把不脱、趴着被推着滑不脱），手里是枪（大刀、手榴弹、架着的机枪不算），被推倒 0.12 s 后撒手 ——
+  人往后倒、往前扑时手会本能地伸出去撑地，枪就是这时候甩出去的。
+- **怎么飞**：从相机前下方（手的位置）出手，初速 = 身体速度 × 1.15 + 沿推的方向 0.3 × Δv + 往人前方 0.7 m/s + 往上 1.5–2.6 m/s + 左右 ±1.3 m/s，
+  外加 4–10 rad/s 的翻滚、绕枪管与绕竖轴的打转（按序号定，不用 `Math.random`）。飞出去的枪是一根两头带质量的杆（长 = 模型包围盒，
+  两端小球半径 = 侧躺时的半厚）：落地按 0.3 反弹、库仑摩擦 0.5，贴地时绕枪管的转动被磨掉、慢慢侧躺（枪的横截面是竖着的扁条，只能侧着躺），
+  墙与实体走射线、地表是解析地表（加上测试场砖面那 2.5 cm，`battlefield.overlayLiftAt`）。两头都慢于 0.12 m/s 持续 0.25 s 就停住，一般 1.5 s 左右。
+  实测（人物战场反应测试场砖地，105 榴弹 3.5 m）：炸点在前，枪从眼前往上翻出去，落在人脚边；炸点在后，枪落在人前方约 1.7 m。
+- **之后**：这一槽空着（弹仓、刺刀、外观跟着枪走），手里是空手，能切大刀 / 手榴弹。停稳后登记成地上的枪（`interact.DropGroundWeapon`，`loose` 标记），
+  走过去就是平常的「拾起 汉阳造」，单击 F。
+- **捡起来**：账当场换回来，但手里那把等抓到才端上来：低头看向枪（俯仰补 85%、左右补 60% 且不超过 0.8 rad）、弯腰（站姿眼位降 0.5 m，蹲 0.2 m，趴着不弯）、
+  空着的右手伸过去（`Viewmodel.ReachWorld`），0.32 s 抓到 —— 地上那把 0.18 s 内往身前胸口提起来，手里那把从下面端上来，0.42 s 直起身。
+  这期间 `player.Busy`（不能开火、翻越、换枪、换弹），走路只剩 35%。刺刀照原样回来。
+- **开关**：`phase.blastReaction` 的关（人物战场反应测试场）开；URL `?looseGun=1` / `?looseGun=0` 强制开 / 关。正片还没开。
+- **清掉**：换关时连飞着的一起拆；换人时飞着的落地照样留在地上，正在弯腰的那一下作废。
+- 取证口 `Debug.LooseGun.State()` / `Release()`；探针 `tmp/LooseGunProbe.mjs`。
+
+## 8. 验收
+
+- `Script_BlastKnockbackTest` 另有枪脱手一组：六个序号都在 2 s 内停住、侧躺、离出手点 0.3–4 m、两头从不钻地；斜坡停得住；撞墙弹回；同序号同落点；捡起来的时间曲线。
 - `Script_BlastKnockbackTest`：超压同源、正压持续、Δv 参考表、站得住 / 脚离地门槛、分档、伤害表、状态机全流程（翻倒约 0.7 s、普通摔倒不扣血、250 kg 8 m 飞 0.35–0.9 s 砸地 10–30 血、4 m 外的墙撞墙 > 40 血、趴着只滑）、叠加、闸、确定性、死后掀飞。
 - 实机（2026-10-28，`?impacts=1` 玩家视角，`tmp/KnockbackProbe.mjs` 在玩家身边直接走 `Combat.Blast`）：
   手榴弹 2 m 晃一下、4 m 没反应；75 野炮 3 m 晃一下（扣 49 血）；105 榴弹 3–4 m 被推倒、扣 70–80 血还活着、自己爬起来；

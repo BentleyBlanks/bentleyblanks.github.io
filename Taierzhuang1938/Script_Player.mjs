@@ -39,6 +39,8 @@ import { PlayerKnockback } from "./Script_PlayerKnockback.mjs";
 import { BlastPush } from "./Script_BlastKnockback.mjs";
 import { BLAST_KNOCKBACK } from "./Data_Tuning_BlastKnockback.mjs";
 
+const _flashPoint = new THREE.Vector3();
+
 const UP = new THREE.Vector3(0, 1, 0);
 
 /**
@@ -185,6 +187,9 @@ export class PlayerController {
     this.knock = new PlayerKnockback();
     this.knockGate = null;
     this.onKnockDown = null;
+    // 弯腰捡东西（震脱手的枪，Script_LooseGun.GunReachPose）：装配层每帧给 { dropM, pitch, yaw } 或 null。
+    // SyncCamera 把它叠在相机上（不改 yaw / pitch 本体），这期间 Busy（不能开火、翻越），走路只剩 reachMoveScale。
+    this.reach = null;
     this._knockVel = { x: 0, y: 0, z: 0 };
     this.stamina = 1;
     this.sprintSpent = false;               // 冲刺跑空、还没回到 STAMINA.sprintResume
@@ -317,7 +322,7 @@ export class PlayerController {
   get Alive() { return this.alive; }
   get Protected() { return this.spawnGrace > 0; }
   /** 翻越 / 被冲击波掀倒期间不许开火。装配层的 TryFire 读这一条。 */
-  get Busy() { return this.vault.active || this.knock.Active; }
+  get Busy() { return this.vault.active || this.knock.Active || !!this.reach; }
   get InWater() { return this.waterDepth > 0.35; }
 
   SetDebugOptions(options = {}) {
@@ -893,7 +898,7 @@ export class PlayerController {
     if (this.stance !== "stand" && !this.InWater && Number.isFinite(input.diveSpeedMps)) speed = Math.max(speed, Math.min(MOVE.diveSpeedCapMps, input.diveSpeedMps));
 
     // 刚被冲击波推了一把：加上去的那份速度要靠脚一步步收住，手上的移动输入这时只剩一部分（ControlScale）
-    const control = this.knock.ControlScale;
+    const control = this.knock.ControlScale * (this.reach ? 0.35 : 1);
     const desired = wish.multiplyScalar(speed * control);
     // 空中不许**加速**到助跑之上（accel 3 只够小幅修正方向），但也不能把蹬地那一下
     // 的动量当阻力擦掉 —— 半空里比目标速度快的时候收敛慢一档，否则 0.5 s 的滞空
@@ -1287,6 +1292,14 @@ export class PlayerController {
       cam.rotation.z += knockPose.roll;
     }
 
+    // 弯腰捡枪：眼位降、低头看向枪、头往枪那边偏（装配层给的 this.reach）。
+    const reach = this.reach;
+    if (reach) {
+      cam.position.y -= reach.dropM;
+      cam.rotation.x += reach.pitch;
+      cam.rotation.y += reach.yaw;
+    }
+
     // 接管机枪：装配层把眼睛挪到枪后头（Script_Main.MountedCameraEye）。排在震屏之前，
     // 近爆的抖动照样叠在贴枪的眼位上。没接管时它是空的。
     this.cameraMount?.(cam);
@@ -1316,7 +1329,30 @@ export class PlayerController {
    */
   BlastReaction(exposure, bearing) {
     if (!this.alive) return null;
-    return this.flinch.Blast(exposure, bearing);
+    const flash = bearing?.at && this.flinch.enabled ? this._FlashOnScreen(bearing.at, exposure) : null;
+    return this.flinch.Blast(exposure, flash ? { ...bearing, flash } : bearing);
+  }
+
+  /**
+   * 炸点的火球此刻在画面上的哪儿、多大（火光残影，Script_BlastFlinch.afterimage）：
+   * 火球中心取爆点往上半个火球半径，按这一帧的相机投到屏幕上。在身后、整块在画面外、隔着墙时返回 null。
+   */
+  _FlashOnScreen(at, exposure) {
+    const cam = this.camera;
+    if (!cam?.isPerspectiveCamera || exposure?.occluded) return null;
+    const R = this.flinch.FlashRadiusM(exposure.chargeKg);
+    cam.updateMatrixWorld();
+    const p = _flashPoint.set(at.x, at.y + R * 0.5, at.z);
+    const d = p.distanceTo(cam.position);
+    p.applyMatrix4(cam.matrixWorldInverse);
+    if (p.z > -0.1) return null;
+    const angleRad = Math.atan2(R, Math.max(0.1, d));
+    const tanHalf = Math.tan(THREE.MathUtils.degToRad(cam.fov) * 0.5) / (cam.zoom || 1);
+    const radius = Math.tan(angleRad) / tanHalf * 0.5;
+    p.applyMatrix4(cam.projectionMatrix);
+    const u = p.x * 0.5 + 0.5, v = p.y * 0.5 + 0.5, aspect = cam.aspect || 1;
+    if (u < -radius / aspect || u > 1 + radius / aspect || v < -radius || v > 1 + radius) return null;
+    return { u, v, radius, aspect, angleRad };
   }
 
   /** 开 / 关近爆身体反应（phase.blastReaction 或测试场面板）。 */

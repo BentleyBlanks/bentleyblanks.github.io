@@ -8,6 +8,7 @@ import {
   BlastWave, BodyImpulse, BlastPush, BalanceLimitMps, LiftoffMps, KnockRegime, ImpactDamage, ToppleSpinRadS,
 } from "./Script_BlastKnockback.mjs";
 import { PlayerKnockback } from "./Script_PlayerKnockback.mjs";
+import { LooseGunLaunch, LooseGunRod, GunReachPose } from "./Script_LooseGun.mjs";
 
 let groups = 0;
 const Group = (name, fn) => { fn(); groups += 1; console.log(`ok  ${name}`); };
@@ -199,6 +200,51 @@ Group("状态机：被这一下炸死的人照样被掀出去，躺下不再起�
   alive.Die();
   for (let i = 0; i < 60 * 8; i += 1) alive.Step(1 / 60, mover);
   assert.equal(alive.phase, "lie", "倒着的时候人没了：同样不再起来");
+});
+
+Group("枪脱手（Script_LooseGun）：飞出去、落地弹几下、侧躺停稳、离人一两米；斜坡、墙、确定性", () => {
+  const L = BLAST_KNOCKBACK.looseGun;
+  assert.deepEqual([...L.regimes], ["fall", "thrown"], "推倒 / 掀飞才脱手，推一把不脱");
+  const Run = (serial, ground, sweep = null) => {
+    const launch = LooseGunLaunch({ hand: { x: 0, y: ground(0, 0) + 1.25, z: 0 }, facing: { x: 0, z: -1 }, body: { x: 0, y: -0.4, z: 1.6 },
+      push: { dirX: 0, dirZ: 1, horizontalMps: 2.2 }, serial });
+    const rod = new LooseGunRod();
+    rod.Launch(launch, { halfLengthM: 0.62, radiusM: 0.04 });
+    let t = 0, minAbove = Infinity;
+    const world = { Ground: ground, Sweep: sweep };
+    while (!rod.asleep && t < 10) {
+      rod.Step(1 / 60, world); t += 1 / 60;
+      for (const p of [rod.a, rod.b]) minAbove = Math.min(minAbove, p.y - ground(p.x, p.z));
+    }
+    const c = rod.Center, pose = rod.Pose();
+    return { t, c, pose, minAbove, rod, bounces: rod.stats.bounces, walls: rod.stats.walls };
+  };
+  const flat = () => 0;
+  for (const serial of [1, 2, 3, 4, 5, 6]) {
+    const r = Run(serial, flat);
+    assert.ok(r.rod.asleep && r.t < L.sleep.maxFlightS, `第 ${serial} 次停住了（${r.t.toFixed(2)} s）`);
+    assert.ok(r.bounces >= 1, "落地至少弹一下");
+    Near(r.c.y, 0.04, 0.005, "停稳后中心离地 = 半厚");
+    assert.ok(Math.abs(r.pose.up.y) < 0.05, `侧躺：枪的「上」水平（${r.pose.up.y.toFixed(3)}）`);
+    assert.ok(Math.abs(r.pose.axis.y) < 0.05, "枪管放平");
+    const d = Math.hypot(r.c.x, r.c.z);
+    assert.ok(d > 0.3 && d < 4, `离出手点 ${d.toFixed(2)} m`);
+    assert.ok(r.minAbove > -0.002, "两头从不钻进地里");
+  }
+  const slope = (x, z) => 0.3 * x + 0.08 * Math.sin(z * 3);
+  const s = Run(2, slope);
+  assert.ok(s.rod.asleep && s.minAbove > -0.002, "斜坡上也停得住、不钻地");
+  // 一堵墙（z = 0.8 的竖面）：飞出去被挡回来，不穿过去
+  const wallZ = 0.8;
+  const sweep = (from, to) => (from.z < wallZ && to.z >= wallZ - 0.04 ? { dist: Math.max(0, Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z) * Math.max(0, (wallZ - from.z) / Math.max(1e-6, to.z - from.z))), normal: { x: 0, y: 0, z: -1 } } : null);
+  const w = Run(1, flat, sweep);
+  assert.ok(w.walls >= 1 && w.c.z < wallZ, `撞墙弹回来（停在 z = ${w.c.z.toFixed(2)}）`);
+  assert.deepEqual(Run(3, flat).c, Run(3, flat).c, "同样的序号同样的落点");
+  // 捡起来：先低头伸手、reachS 时抓到、直起身后结束
+  const P = L.pickup;
+  assert.ok(GunReachPose(P.reachS * 0.7).reach > 0.3 && !GunReachPose(P.reachS * 0.7).grabbed, "伸手中");
+  assert.ok(GunReachPose(P.reachS).grabbed && GunReachPose(P.reachS + 0.01).dip > 0.95, "抓到时弯到底");
+  assert.ok(GunReachPose(P.reachS + P.holdS + P.returnS).done && GunReachPose(P.reachS + P.holdS + P.returnS).dip === 0, "直起身");
 });
 
 console.log(`PASS BlastKnockbackTest: ${groups} groups`);

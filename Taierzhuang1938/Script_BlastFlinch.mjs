@@ -10,6 +10,11 @@
 // 没有 Math.random：正前方爆炸往哪边转按一个交替序列挑，抖动用确定性的值噪声（出图可复现）。
 //
 // enabled = false 时 Blast 什么都不做（正片默认关；测试场与开了 phase.blastReaction 的关卡打开）。
+//
+// 眼睛另有三样跨帧的状态（2026-10-29 用户：「都加上」）：
+//   adapt         暗适应：闭着眼时往上涨、睁开后退，Script_Main 拿 exposureGain 乘曝光（睁眼那一下偏亮）；
+//   after         火光残影：火球在画面上的位置、大小、强度（Player 投到屏幕上交进来），正残像 / 负残像按时间走；
+//   睁眼后发糊    并进 daze.focus（闭紧过的那一发，睁眼时糊一下）。
 import { Clamp, Clamp01, ValueNoise2 } from "./Script_Noise.mjs";
 import { BLAST_FLINCH } from "./Data_Tuning_BlastReaction.mjs";
 
@@ -52,6 +57,10 @@ export class BlastFlinch {
     this.serial = 0;
     this.load = 0;            // 连续炮击的累积（BLAST_FLINCH.load）：按时间漏，每发按缩身强度加
     this.loadAt = 0;
+    this.adapt = 0;           // 暗适应 0..1（BLAST_FLINCH.adapt）
+    this.lidLag = 0;          // 眼皮闭合的滞后一份（瞳孔反应有潜伏期：一刹那的眨眼来不及放大）
+    this.exposureGain = 1;    // 1 + gain·adapt
+    this.after = null;        // 火光残影（BLAST_FLINCH.afterimage）：{ u, v, radius, aspect, strength, age, seed, positive, negative }
     this.Zero();
     this.stats = { blasts: 0, ignored: 0 };
   }
@@ -119,6 +128,7 @@ export class BlastFlinch {
     };
     this.events.push(event);
     if (this.events.length > T.maxEvents) this.events.shift();
+    this._Afterimage(bearing.flash, exposure);
     this.stats.blasts += 1;
     return { ...event };
   }
@@ -142,7 +152,12 @@ export class BlastFlinch {
     for (const e of this.events) e.u += step;
     this.events = this.events.filter((e) => !this.Done(e));
     this.Zero();
-    if (!this.events.length) return;
+    if (this.events.length) this._Channels();
+    this._Eyes(step);
+  }
+
+  /** 各通道按事件合成（Update 里有事件时调）。 */
+  _Channels() {
     const T = this.T, H = T.head, A = T.arms, B = T.blink, S = T.squeeze, D = T.daze, R = T.tremor;
     let yaw = 0, pitch = 0, roll = 0, drop = 0, side = 0;
     let armYaw = 0, armRoll = 0, armDrop = 0, armPull = 0, armPitch = 0;
@@ -175,6 +190,13 @@ export class BlastFlinch {
         const hold = (S.holdMinS + S.holdSpanS * e.squeeze) * (1 + T.load.holdGain * e.load);
         const open = S.openS * (1 + 0.6 * e.squeeze);
         lid = Math.max(lid, LidPulse(u, T.blinkLatencyS, S.closeS, hold, open));
+        // 睁眼后短暂发糊：泪膜被挤乱、对焦松了，睁眼开始后涨上来再退。
+        const RB = T.reopenBlur;
+        if (RB && e.squeeze >= RB.from) {
+          const a = u - (T.blinkLatencyS + S.closeS + hold);
+          if (a > 0) dazeFocus = Math.max(dazeFocus, RB.amount * e.squeeze
+            * (a < RB.riseS ? Smooth(a / RB.riseS) : Math.exp(-(a - RB.riseS) / RB.decayS)));
+        }
         const squintAmp = e.squeeze >= S.squintFrom || e.load > 0.5
           ? S.squint * Math.max(e.squeeze, 0.5) * (1 + T.load.squintGain * e.load) : 0;
         const squintFrom = T.blinkLatencyS + S.closeS + hold + open * 0.6;
@@ -237,12 +259,57 @@ export class BlastFlinch {
     this.breathless = breath;
   }
 
+  /**
+   * 一发的火光残影：flash 来自 Player（火球此刻在画面上的 uv、印子半径、宽高比、视半径）。隔着墙不留；
+   * 新的比眼下剩的那块强才换掉（一次只记一块，连着几发时留最亮的那块）。
+   */
+  _Afterimage(flash, exposure) {
+    const P = this.T.afterimage;
+    if (!P || !flash || exposure.occluded || !(flash.radius > 0)) return;
+    const strength = Math.min(1.2, Clamp01((flash.angleRad - P.minAngleRad) / (P.fullAngleRad - P.minAngleRad)));
+    if (strength < 0.02) return;
+    const now = this.after ? Math.max(this.after.positive / P.positive, this.after.negative / P.negative) : 0;
+    if (strength < now) return;
+    this.after = { u: flash.u, v: flash.v, radius: Math.min(P.maxRadius, flash.radius * P.blurScale), aspect: flash.aspect || 1,
+      strength, age: 0, seed: (this.serial * 2.399) % 6.283, positive: strength * P.positive, negative: 0 };
+  }
+
+  /** 火球的半径（米）：fireballK × 装药^(1/3)。Player 拿它算火球在画面上多大。 */
+  FlashRadiusM(chargeKg) {
+    return (this.T.afterimage?.fireballK ?? 0.9) * Math.cbrt(Math.max(0.005, Number(chargeKg) || 0));
+  }
+
+  /** 眼睛的跨帧状态：暗适应跟着这一帧的眼皮走，火光残影按年纪出正 / 负两份。 */
+  _Eyes(step) {
+    const A = this.T.adapt;
+    if (A) {
+      // 先过一段潜伏（latencyS 的一阶滞后），只有闭得够久、滞后那份过了 floor 才开始暗适应
+      this.lidLag += (this.eyeClosure - this.lidLag) * (1 - Math.exp(-step / Math.max(1e-3, A.latencyS)));
+      const target = Clamp01((this.lidLag - A.floor) / (1 - A.floor));
+      const tau = target > this.adapt ? A.riseS : A.fallS;
+      this.adapt += (target - this.adapt) * (1 - Math.exp(-step / Math.max(1e-3, tau)));
+      if (this.adapt < 1e-4) this.adapt = 0;
+    }
+    this.exposureGain = 1 + (A?.gain || 0) * this.adapt;
+    const im = this.after, P = this.T.afterimage;
+    if (!im || !P) return;
+    im.age += step;
+    im.positive = im.strength * P.positive * Math.exp(-im.age / P.posTauS);
+    const fadeAt = P.negRiseS + P.negHoldS;
+    im.negative = im.strength * P.negative * Smooth(im.age / P.negRiseS)
+      * (im.age > fadeAt ? Math.exp(-(im.age - fadeAt) / P.negTauS) : 1);
+    if (im.age > fadeAt + P.negTauS * 5) this.after = null;
+  }
+
   /** 还有没有在动的反应。 */
   get Active() { return this.events.length > 0; }
+  /** 眼睛还有没有余下的（暗适应没退完、残影还在）—— 事件都结束了也可能还有。 */
+  get EyesActive() { return this.adapt > 0.001 || !!this.after; }
 
   Reset() {
     this.events.length = 0;
     this.load = 0;
+    this.adapt = 0; this.lidLag = 0; this.exposureGain = 1; this.after = null;
     this.Zero();
   }
 
@@ -251,7 +318,8 @@ export class BlastFlinch {
     return {
       enabled: this.enabled, active: this.Active, events: this.events.length,
       yaw: this.yaw, pitch: this.pitch, roll: this.roll, dropM: this.dropM, sideM: this.sideM,
-      eyeClosure: this.eyeClosure, daze: { ...this.daze }, arms: { ...this.arms }, tremor: this.tremor,
+      eyeClosure: this.eyeClosure, daze: { ...this.daze },
+      adapt: this.adapt, exposureGain: this.exposureGain, afterimage: this.after ? { ...this.after } : null, arms: { ...this.arms }, tremor: this.tremor,
       heart: this.heart, heartBpm: this.heartBpm, breathless: this.breathless, headLevel: this.headLevel,
       load: this.load * Math.exp(-Math.max(0, this.time - this.loadAt) / this.T.load.tauS),
       stats: { ...this.stats },

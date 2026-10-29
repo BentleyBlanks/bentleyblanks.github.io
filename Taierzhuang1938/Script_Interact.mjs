@@ -79,8 +79,8 @@ export class InteractSystem {
    * @param {object} ctx { ai, audio, hud }
    * @param {object} hooks
    *   TakeWeapon(weaponId, clips, soldier, weaponVariant, extra) -> boolean
-   *       捡起一件武器（装配层改槽位与弹仓）。extra = { ammo, at, yaw }：
-   *       ammo 枪里剩几发（缺省 = 满仓）；at/yaw 换下来的那把放回哪儿。
+   *       捡起一件武器（装配层改槽位与弹仓）。extra = { ammo, at, yaw, ground }：
+   *       ammo 枪里剩几发（缺省 = 满仓）；at/yaw 换下来的那把放回哪儿；ground = 地上那一条（尸体上的为空）。
    *   HasWeapon(weaponId) -> boolean                    捡它要不要换掉身上的一件（枪：主副两个枪槽都满；决定“拾起/换上”）
    *   SameWeapon(weaponId) -> boolean                   主 / 副武器里已经有这一型（决定“换上/拿弹药”）
    *   TakeAmmo(weaponId, clips, ammo) -> object         { rounds, remainingAmmo }; 旧 number 返回值按桥夹兼容
@@ -469,7 +469,7 @@ export class InteractSystem {
       // 这一帧里不许出现「新放下的那把」与「刚捡走的这把」同时可捡。
       drop.taken = true;
       if (!this.hooks.TakeWeapon?.(drop.weaponId, drop.clips, candidate.soldier || null,
-        drop.weaponVariant ?? 0, { ammo: drop.ammo, at: candidate.at || null, yaw: ground?.yaw })) {
+        drop.weaponVariant ?? 0, { ammo: drop.ammo, at: candidate.at || null, yaw: ground?.yaw, ground })) {
         drop.taken = false;
         return false;
       }

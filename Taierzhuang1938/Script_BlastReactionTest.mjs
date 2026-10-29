@@ -8,6 +8,7 @@ import { BLAST_EXPOSURE, BLAST_FLINCH, EAR_TRAUMA } from "./Data_Tuning_BlastRea
 import { BATTLE_REACTION_STANDS, BATTLE_REACTION_MUNITION_SPECS, ReactionPoint, BATTLE_REACTION_RANGE_PHASE, BATTLE_REACTION_PAVED, InPavedYard } from "./Data_BattleReactionRange.mjs";
 import { SHELL_IMPACT_TRENCH_SEGMENTS, SHELL_IMPACT_TREES, SHELL_IMPACT_DRUMS, SHELL_IMPACT_PROPS, SHELL_IMPACT_WORLD } from "./Data_ShellImpactRange.mjs";
 import { GROUND_IMPACT_SURFACES } from "./Data_Tuning_GroundImpact.mjs";
+import { LidLightArray, AfterimageArrays } from "./Script_EyelidMask.mjs";
 
 let groups = 0;
 const Group = (name, fn) => { fn(); groups += 1; console.log(`ok  ${name}`); };
@@ -218,6 +219,55 @@ Group("砖铺场院：站位在砖地正中、离壕沟和布景够远、砖地�
   assert.ok(pad.x - pad.halfX > SHELL_IMPACT_WORLD.minX && pad.z + pad.halfZ < SHELL_IMPACT_WORLD.maxZ, "在地皮里");
   const brick = GROUND_IMPACT_SURFACES[pad.surface];
   assert.ok(brick && brick.massScale < 0.1 * GROUND_IMPACT_SURFACES.loess.massScale && brick.ejecta < 0.2, "砖地出尘少");
+});
+
+Group("眨眼四样：睁眼后亮一下、睁眼后发糊、火光残影（正→负、钉在画面上）、透光跟着亮度走", () => {
+  const near = Exposure("Shell150", 6, { lateral: 0 });
+  const bearing = { lateral: 0, forward: 1, up: 0 };
+  const flash = { u: 0.48, v: 0.4, radius: 0.1, aspect: 16 / 9, angleRad: 0.12 };
+  const f = new BlastFlinch(); f.SetEnabled(true);
+  f.Blast(near, { ...bearing, flash });
+  assert.ok(f.after && f.after.positive > 0.9 && f.after.negative === 0, "刚炸：只有正残像");
+  let closedAt = null, openAt = null, peakGain = 1, peakBlur = 0, pos03 = 0, neg15 = 0, maxNeg = 0;
+  Run(f, 6, 1 / 60, (fl, t) => {
+    if (fl.eyeClosure > 0.9 && closedAt == null) closedAt = t;
+    if (closedAt != null && openAt == null && fl.eyeClosure < 0.3) openAt = t;
+    peakGain = Math.max(peakGain, fl.exposureGain);
+    if (openAt != null && t < openAt + 1) peakBlur = Math.max(peakBlur, fl.daze.focus);
+    if (Math.abs(t - 0.3) < 0.009) pos03 = fl.after.positive;
+    if (Math.abs(t - 1.5) < 0.009) neg15 = fl.after.negative;
+    if (fl.after) { maxNeg = Math.max(maxNeg, fl.after.negative); assert.equal(fl.after.u, flash.u, "残影钉在画面上的同一个位置"); }
+  });
+  assert.ok(peakGain > 1.12 && peakGain < 1 + BLAST_FLINCH.adapt.gain, `闭过眼睁开偏亮（峰值 ×${peakGain.toFixed(2)}）`);
+  assert.ok(peakBlur > 0.2, `睁眼后发糊（${peakBlur.toFixed(2)}）`);
+  assert.ok(pos03 > 0.3 && neg15 > 0.5 && neg15 > pos03 * 0.5, `正残像先、负残像后（0.3 s 正 ${pos03.toFixed(2)}，1.5 s 负 ${neg15.toFixed(2)}）`);
+  assert.ok(maxNeg <= BLAST_FLINCH.afterimage.negative * 1.2 + 1e-9);
+  Run(f, 14);
+  assert.ok(f.after === null && f.adapt < 0.01 && Math.abs(f.exposureGain - 1) < 0.01, "十几秒后残影退完、亮度回原样");
+  // 隔着墙不留；远处的小火光几乎不留；正后方（没投到屏幕上）不留
+  const g = new BlastFlinch(); g.SetEnabled(true);
+  g.Blast({ ...near, occluded: true }, { ...bearing, flash });
+  assert.equal(g.after, null, "隔着墙看不见火光");
+  g.Blast(near, { ...bearing, flash: { ...flash, angleRad: 0.008 } });
+  assert.equal(g.after, null, "远处一个小点不留印子");
+  g.Blast(near, bearing);
+  assert.equal(g.after, null, "没投到屏幕上（身后）不留");
+  // 只记最亮的一块：弱的不顶掉强的
+  const h = new BlastFlinch(); h.SetEnabled(true);
+  h.Blast(near, { ...bearing, flash });
+  h.Blast(near, { ...bearing, flash: { ...flash, u: 0.9, angleRad: 0.03 } });
+  assert.equal(h.after.u, flash.u, "弱的不顶掉强的");
+  // 远处一声眨眼：没闭紧就不发糊、亮度几乎不变
+  const far = new BlastFlinch(); far.SetEnabled(true);
+  far.Blast(Exposure("Grenade", 25), bearing);
+  let farGain = 1, farBlur = 0;
+  Run(far, 3, 1 / 60, (fl) => { farGain = Math.max(farGain, fl.exposureGain); farBlur = Math.max(farBlur, fl.daze.focus); });
+  assert.ok(farGain < 1.08 && farBlur < 0.05, `远处只眨一下（×${farGain.toFixed(2)}，糊 ${farBlur.toFixed(2)}）`);
+  // 交给后期的数：没给就是关
+  assert.deepEqual(LidLightArray(null), [0, 0, 1]);
+  assert.deepEqual(LidLightArray([BLAST_FLINCH.lidGlow.referenceLuma, 2, 0.5]), [BLAST_FLINCH.lidGlow.referenceLuma, 1, 1], "夹到合法范围");
+  assert.deepEqual(AfterimageArrays(null).amp, [0, 0, 0, 0]);
+  assert.deepEqual(AfterimageArrays([0.4, 0.6, 0.1, 1.5, 0.8, 0.2, 1.1]), { shape: [0.4, 0.6, 0.1, 1.5], amp: [0.8, 0.2, 1.1, 0] });
 });
 
 console.log(`BlastReactionTest: ${groups} groups passed`);

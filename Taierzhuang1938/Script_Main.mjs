@@ -70,6 +70,8 @@ import { CLOTH_RANGE_PHASE, CLOTH_RANGE_ID } from "./Data_ClothRange.mjs";
 import { ClothRangeField } from "./Script_ClothRangeField.mjs";
 import { ClothRange } from "./Script_ClothRange.mjs";
 import { BLAST_FLINCH } from "./Data_Tuning_BlastReaction.mjs";
+import { BLAST_LOOSE_GUN } from "./Data_Tuning_BlastKnockback.mjs";
+import { LooseGunLaunch, LooseGunRod, GunReachPose } from "./Script_LooseGun.mjs";
 import { TOOLS_HOME_PHASE, TOOLS_HOME_ID } from "./Data_ToolsHome.mjs";
 import { ToolsHomeField } from "./Script_ToolsHomeField.mjs";
 import { DEV_TOOLS_ENABLED } from "./Data_DevTools.mjs";
@@ -1539,7 +1541,7 @@ async function Boot() {
   // 而且只在手里握着白刃时才倒得下去；现在推不推得倒按冲量算（Combat.Blast → player.BlastKnockback）。
   // 过场、白刃缠斗、抬着东西时只晃不倒（那几套系统各自管着身体）；在固定机枪上被掀倒，先把人从枪上放下来。
   player.knockGate = () => !state.cutscene && !meleeCombat?.Active && !carry?.Active;
-  player.onKnockDown = () => { if (emplacement?.Mounted) emplacement.Vacate("blast"); };
+  player.onKnockDown = (push) => { if (emplacement?.Mounted) emplacement.Vacate("blast"); QueueLooseGun(push); };
 
   // 导航网格：一张 2 m 一格的"走不走得过去"位图 + 按目标算的下坡场。
   // 没有它，AI 在这座四合院城里就是直奔一堵院墙（见 Script_Navigation 的账）。
@@ -2476,6 +2478,13 @@ async function Boot() {
        * 往地上放一把枪（与换枪丢下的那把同一条路：InteractSystem 记账 + BuildGroundWeaponView 摆模型）。
        * 拾枪测试用它摆靶，不必去杀一个人再等尸体摔稳。返回登记条目的 id。
        */
+      /** 被冲击波震脱手的枪（Script_LooseGun）：State 取证；Enable 开关；Release 立刻撒手（不等倒地，探针用）。 */
+      LooseGun: {
+        State: () => LooseGunState(),
+        Enable: (on = true) => { looseGun.enabled = !!on; return looseGun.enabled; },
+        Release: (push = { regime: "fall", dirX: 0, dirZ: 1, horizontalMps: 2 }) => (IsGunSlot(state.activeSlot) && WEAPONS[currentWeapon]
+          ? !!ReleaseLooseGun(push) : false),
+      },
       DropWeapon: (weaponId, { x, z, yaw = 0, ammo = null, clips = 0 } = {}) => {
         if (!interact || !WEAPONS[weaponId]) return null;
         const item = interact.DropGroundWeapon({
@@ -3948,6 +3957,8 @@ function ClearRuntime() {
   interact?.Clear();
   // 换枪丢在地上的枪也是按关的：不拆的话会连模型一起出现在下一关的同一坐标上。
   interact?.ClearGroundWeapons();
+  // 被冲击波震脱手、还在飞 / 正在捡的那把同理（停稳的那把已经在上面那一条里）。
+  ClearLooseGuns();
   // 机枪位同理：它的世界模型也要拆，不然下一关的同一坐标上会多出一挺枪。
   emplacement?.Clear();
   for (const view of emplacementViews.values()) {
@@ -4526,6 +4537,8 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   // 通用开关：本关要近爆的第一人称身体反应与耳朵模型 trauma（phase.blastReaction）就开；离开本关在 BuildField 里关。
   player.SetBlastReaction(!!phase.blastReaction);
   audio?.SetEarModel?.(phase.blastReaction ? "trauma" : "legacy");
+  // 被推倒时枪脱手（Script_LooseGun）：同一个开关，?looseGun=1 / 0 强制。
+  SetLooseGunEnabled(phase);
   if (CLOTH_TEST) {
     state.pinned = true;
     clothRange?.Dispose();
@@ -6228,6 +6241,8 @@ function RespawnPlayer(initial = false) {
   carry?.Reset("respawn");
   // 换人上来的也没在机枪位上：上一个人是趴在枪上死的，枪留在原地等下一个人。
   emplacement?.Reset("respawn");
+  // 上一个人被震脱手、还在飞的枪落地就留在地上（停稳的那把照样能捡），正在弯腰捡的那一下作废。
+  ClearLooseGuns({ keepFlying: true });
   carryHidGun = false;
   const seed = 7919 * (state.fallen.length + 1) + state.phaseIndex * 131;
   state.identity = phase.whitebox?.p012 ? {name:CAST.shunzi.short,fullName:CAST.shunzi.name,castId:"shunzi",weapon:DEFAULT_PLAYER_WEAPON}
@@ -6368,6 +6383,7 @@ function SyncMissionHands({ instant = false } = {}) {
 /** 换槽。主/副武器各记各的弹仓与刺刀 —— 切回来不该是满的，刺刀也不该跑到另一支枪上。 */
 function SwitchSlot(slot) {
   if(missionRuntime?.EmptyHands)return false;
+  if (looseGun.recover) return false;               // 正弯腰捡枪
   if (emplacement?.Mounted) return false;
   if (meleeCombat && !meleeCombat.CanChangeWeapon()) return false;
   if (!player?.Alive || !SlotWeaponId(slot)) return false;
@@ -6409,7 +6425,7 @@ function StashActiveSlot() {
 }
 
 /** 把某个槽端到手上：弹仓、刺刀从它的账上取，视图模型与武器名跟着换。 */
-function ActivateSlot(slot) {
+function ActivateSlot(slot, { equip = true } = {}) {
   ClearFirearmRequests();
   fireCadence.Reset();
   state.activeSlot = slot;
@@ -6425,8 +6441,11 @@ function ActivateSlot(slot) {
   player.bipod = false;                            // 换枪就把两脚架收了
   state.fireMode = "auto";
   state.meleeCharge = null;                        // 换手就把蓄着的那一下松掉
-  viewmodel.Equip(currentWeapon, SlotWeaponVariant(slot));
-  SyncBayonet();                                   // 切回原来那支时刺刀还在枪上
+  // equip = false：账先换过来、手里那把等一会儿再端（弯腰捡震脱手的枪，抓到那一刻才 Equip，见 StepLooseGuns）。
+  if (equip) {
+    viewmodel.Equip(currentWeapon, SlotWeaponVariant(slot));
+    SyncBayonet();                                 // 切回原来那支时刺刀还在枪上
+  }
   hud.SetWeaponName(WeaponName(currentWeapon));
 }
 
@@ -7613,6 +7632,7 @@ function OnReloadEvent(event, action) {
 /** R during a bolt cycle is retained for that cycle; ammo enters on insertion. */
 function Reload() {
   if(missionRuntime?.EmptyHands)return false;
+  if (looseGun.recover) return false;
   if (meleeCombat && !meleeCombat.CanChangeWeapon()) return false;
   if (!player.Alive || emplacement?.Mounted) return false;
   const w = WEAPONS[currentWeapon];
@@ -7958,6 +7978,8 @@ function PickUpWeapon(weaponId, clips, variant = 0, extra = {}) {
   const weapon = WEAPONS[weaponId];
   const gun = weapon.kind !== "melee";
   const fromGround = !!extra?.at;
+  // 自己被冲击波震脱手的那把（StepLooseGuns 登记的地上的枪）：刺刀照原样、弯腰去拿（抓到才端上来）。
+  const loose = gun && fromGround && extra.ground?.loose ? extra.ground : null;
   const slot = !gun ? "melee" : fromGround ? PickupGunSlot() : "primary";
   const hadNoWeapon = !state.slots[slot];
   // 先把手里那支的活账记回去：下面丢到地上的若正是它，弹数要是这一刻的。
@@ -7978,15 +8000,16 @@ function PickUpWeapon(weaponId, clips, variant = 0, extra = {}) {
     const full = weapon.magazine ?? 5;
     const ammo = extra?.ammo == null ? full : Math.max(0, Math.min(full, extra.ammo));
     state.mags[slot] = { ammo, clips };
-    // 捡来的枪上没有装着的刺刀（阵亡者的刺刀在鞘里/丢了；想上再按 X）
-    state.bayonets[slot] = false;
+    // 捡来的枪上没有装着的刺刀（阵亡者的刺刀在鞘里/丢了；想上再按 X）；自己震脱手的那把照原样。
+    state.bayonets[slot] = !!loose?.bayonet;
   }
   state.pickedUp = weaponId;
   state.pickedUpVariant = state.weaponVariants[slot];
   // 地上捡的枪直接到手（COD：捡起来就是端着的）。第一关的目标之一就是
   // 「找一支枪（从倒下的人身上捡）」—— 捡完还得自己按数字键才拿得出来，目标在玩家眼里就是没生效。
   // 大刀照旧：空着大刀槽时捡到就到手，手里正拿着刀则换成新的这把。
-  if ((gun && fromGround) || hadNoWeapon || state.activeSlot === slot) ActivateSlot(slot);
+  if ((gun && fromGround) || hadNoWeapon || state.activeSlot === slot) ActivateSlot(slot, { equip: !loose });
+  if (loose) BeginLooseGunRecover(loose);
   return true;
 }
 
@@ -8048,13 +8071,10 @@ function CorpseWeaponPoint(soldier) {
 }
 
 let groundWeaponMaterials = null;
-/** 地上那把枪的模型：与人物手里的是同一份几何（WeaponGeometry），横放贴地。 */
-function BuildGroundWeaponView(item) {
-  if (!scene || !actorFactory) return null;
+/** 一把枪的网格（枪自己的坐标：枪管沿 Z、枪口在 −Z）。地上的枪与震脱手飞出去的枪共用。 */
+function WeaponMeshGroup(weaponId, variant = 0, includeBayonet = false) {
   groundWeaponMaterials ||= actorFactory.ActorMaterials("nra", () => 0.5);
-  const built = actorFactory.WeaponGeometry(item.weaponId, item.weaponVariant, { includeBayonet: false });
-  const root = new THREE.Group();
-  root.name = `GroundWeapon_${item.weaponId}`;
+  const built = actorFactory.WeaponGeometry(weaponId, variant, { includeBayonet });
   const holder = new THREE.Group();
   for (const [key, geometry] of built.geometries) {
     const mesh = new THREE.Mesh(geometry, groundWeaponMaterials[key] || groundWeaponMaterials.steel);
@@ -8062,6 +8082,15 @@ function BuildGroundWeaponView(item) {
     mesh.receiveShadow = true;
     holder.add(mesh);
   }
+  return { holder, built };
+}
+
+/** 地上那把枪的模型：与人物手里的是同一份几何（WeaponGeometry），横放贴地。 */
+function BuildGroundWeaponView(item) {
+  if (!scene || !actorFactory) return null;
+  const root = new THREE.Group();
+  root.name = `GroundWeapon_${item.weaponId}`;
+  const { holder } = WeaponMeshGroup(item.weaponId, item.weaponVariant);
   // 与尸体倒地时的枪同一种摆法：绕枪管轴侧躺（Z 转 90°），再按 yaw 转在地面上。
   holder.quaternion.setFromEuler(new THREE.Euler(0, item.yaw || 0, Math.PI / 2, "YXZ"));
   root.add(holder);
@@ -8079,6 +8108,230 @@ function DisposeGroundWeaponView(item) {
   if (!root) return;
   root.removeFromParent();
   item.view = null;
+}
+
+// ---------------------------------------------------------------------------
+// 枪被冲击波震脱手（Script_LooseGun；2026-10-29 用户：「试试主角的枪也被震掉，再从地上捡起来」）
+//   推倒 / 掀飞（BLAST_LOOSE_GUN.regimes）后 releaseDelayS 撒手：这一槽空出来、手里变空手，
+//   枪当一根杆飞出去（LooseGunRod），停稳后登记成地上的枪（interact.DropGroundWeapon，loose 标记），
+//   F 捡起来时走 PickUpWeapon → BeginLooseGunRecover：低头、弯腰、空手伸过去，抓到那一刻地上那把消失、手里端上来。
+// 开关：phase.blastReaction 的关（人物战场反应测试场）开；?looseGun=1 / 0 强制开 / 关。
+// ---------------------------------------------------------------------------
+const looseGun = { enabled: false, pending: null, flying: [], recover: null, serial: 0, released: 0, recovered: 0 };
+const LOOSE_GUN_PARAM = params.get("looseGun");
+const _looseFrom = new THREE.Vector3(), _looseDir = new THREE.Vector3();
+const _looseX = new THREE.Vector3(), _looseY = new THREE.Vector3(), _looseZ = new THREE.Vector3(), _looseM = new THREE.Matrix4();
+
+/** 这一关开不开（BuildField 里按 phase 设）。 */
+function SetLooseGunEnabled(phase) {
+  looseGun.enabled = LOOSE_GUN_PARAM === "1" || (LOOSE_GUN_PARAM !== "0" && !!phase?.blastReaction);
+}
+
+/** player.onKnockDown：真要倒下的那一刻。倒地 / 掀飞才脱手，记下来 releaseDelayS 后撒手。 */
+function QueueLooseGun(push) {
+  if (!looseGun.enabled || !push || !BLAST_LOOSE_GUN.regimes.includes(push.regime)) return;
+  looseGun.pending = { t: 0, push: { regime: push.regime, dirX: push.dirX, dirZ: push.dirZ, horizontalMps: push.horizontalMps } };
+}
+
+/** 现在手里那把能不能脱手：手里是枪、人还倒着、不在机枪上 / 剧情空手里。 */
+function LooseGunReleasable() {
+  return player?.Alive && player.knock?.Active && IsGunSlot(state.activeSlot) && !!WEAPONS[currentWeapon]
+    && WEAPONS[currentWeapon].kind !== "melee" && !emplacement?.Mounted && !missionRuntime?.EmptyHands && !state.cutscene;
+}
+
+/** 飞出去那把的模型：网格居中在杆的中心上（holder 按杆的姿态转）。 */
+function BuildLooseGunView(entry) {
+  const { holder: meshes, built } = WeaponMeshGroup(entry.weaponId, entry.variant, entry.bayonet && !!WEAPONS[entry.weaponId]?.bayonet);
+  meshes.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(meshes), center = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+  meshes.position.copy(center).negate();
+  const holder = new THREE.Group();
+  holder.add(meshes);
+  const root = new THREE.Group();
+  root.name = "LooseGun_" + entry.weaponId;
+  root.add(holder);
+  scene.add(root);
+  const muzzleZ = built.muzzle?.z ?? -1;
+  return { root, holder, halfLengthM: Math.max(0.2, size.z / 2), radiusM: Math.max(0.018, size.x / 2),
+    muzzleSign: muzzleZ - center.z >= 0 ? 1 : -1 };
+}
+
+/** 杆的姿态 → 模型：位置 = 杆中心，枪自己的 Z 对到枪口方向（× muzzleSign）、Y 对到枪的「上」。 */
+function SyncLooseGunView(entry) {
+  const pose = entry.rod.Pose(), v = entry.view;
+  v.root.position.set(pose.center.x, pose.center.y, pose.center.z);
+  _looseZ.set(pose.axis.x, pose.axis.y, pose.axis.z).multiplyScalar(v.muzzleSign);
+  _looseY.set(pose.up.x, pose.up.y, pose.up.z);
+  _looseX.crossVectors(_looseY, _looseZ).normalize();
+  v.holder.quaternion.setFromRotationMatrix(_looseM.makeBasis(_looseX, _looseY, _looseZ));
+}
+
+/** 杆碰的世界：解析地表（加上铺在地上的那一层，比如测试场的砖面 overlayLiftAt）+ 静态实体（射线）。 */
+const LOOSE_GUN_WORLD = {
+  Ground: (x, z) => battlefield.GroundHeight(x, z) + (battlefield.overlayLiftAt?.(x, z) || 0),
+  Sweep: (from, to) => {
+    _looseFrom.set(from.x, from.y, from.z);
+    _looseDir.set(to.x - from.x, to.y - from.y, to.z - from.z);
+    const len = _looseDir.length();
+    if (len < 1e-6) return null;
+    _looseDir.divideScalar(len);
+    const hit = battlefield.Raycast(_looseFrom, _looseDir, len + 0.1);
+    return hit ? { dist: hit.t, normal: hit.normal ? { x: hit.normal[0], y: hit.normal[1], z: hit.normal[2] } : null } : null;
+  },
+};
+
+/** 撒手：这一槽空出来（弹仓、刺刀、外观跟着枪走），手里变空手，枪从手的位置飞出去。 */
+function ReleaseLooseGun(push) {
+  const slot = state.activeSlot;
+  if (viewmodel.action?.kind === "reload") CancelReload();
+  StashActiveSlot();
+  const mag = state.mags[slot] || { ammo: 0, clips: 0 };
+  const entry = { weaponId: currentWeapon, variant: state.weaponVariants[slot] ?? 0, ammo: mag.ammo, clips: mag.clips,
+    bayonet: !!state.bayonets[slot], slot, item: null };
+  state.slots[slot] = null;
+  state.mags[slot] = { ammo: 0, clips: 0 };
+  state.bayonets[slot] = false;
+  ActivateSlot(slot);
+  entry.view = BuildLooseGunView(entry);
+  // 出手点：相机前下方（手的位置）；中间隔着墙就从眼睛那儿出手，不把枪塞进墙里
+  const P = BLAST_LOOSE_GUN.hand, yaw = player.yaw;
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+  const eye = camera.position;
+  let hand = { x: eye.x + fx * P.forwardM + rx * P.rightM, y: eye.y - P.downM, z: eye.z + fz * P.forwardM + rz * P.rightM };
+  const ground = battlefield.GroundHeight(hand.x, hand.z);
+  if (hand.y < ground + 0.12) hand.y = ground + 0.12;
+  if (LOOSE_GUN_WORLD.Sweep(eye, hand)) hand = { x: eye.x, y: Math.max(eye.y - 0.1, ground + 0.12), z: eye.z };
+  const launch = LooseGunLaunch({ hand, facing: { x: fx, z: fz }, body: { x: player.velocity.x, y: player.velocity.y, z: player.velocity.z },
+    push, serial: ++looseGun.serial });
+  entry.rod = new LooseGunRod();
+  entry.rod.Launch(launch, { halfLengthM: entry.view.halfLengthM, radiusM: entry.view.radiusM });
+  SyncLooseGunView(entry);
+  looseGun.flying.push(entry);
+  looseGun.released += 1;
+  return entry;
+}
+
+/** 停稳了：登记成地上的枪（模型就是飞着的这一个），F 能捡。 */
+function LandLooseGun(entry) {
+  const pose = entry.rod.Pose();
+  const dir = { x: pose.axis.x * entry.view.muzzleSign, z: pose.axis.z * entry.view.muzzleSign };
+  const item = interact?.DropGroundWeapon({
+    weaponId: entry.weaponId, weaponVariant: entry.variant, ammo: entry.ammo, clips: entry.clips,
+    position: { x: pose.center.x, y: pose.center.y - entry.view.radiusM, z: pose.center.z }, yaw: Math.atan2(dir.x, dir.z),
+  });
+  if (!item) { entry.view.root.removeFromParent(); return null; }
+  item.loose = true;
+  item.bayonet = entry.bayonet;
+  item.view = entry.view.root;
+  entry.item = item;
+  return item;
+}
+
+/** F 捡起震脱手的那把（PickUpWeapon 里账已经换好）：接管地上那个模型，开始弯腰。 */
+function BeginLooseGunRecover(item) {
+  const view = item.view;
+  item.view = null;                       // interact 随后拆模型时不拆它：抓到那一刻才收
+  const at = item.position;
+  looseGun.recover = { t: 0, view, at: { x: at.x, y: at.y, z: at.z },
+    atV: new THREE.Vector3(at.x, at.y + 0.03, at.z), reach: 0, grabbed: false, liftT: 0, slot: state.activeSlot };
+}
+
+/**
+ * 抓到以后地上那把往身前胸口收（BLAST_LOOSE_GUN.pickup.liftS 秒，低着头看就是往画面下沿走），到了才收掉 ——
+ * 与此同时手里那把从下面端上来，看上去是同一把枪被拿起来，而不是地上那把原地消失。只平移不转（转起来看着乱）。
+ */
+function LiftLooseGunView(r, dt) {
+  const P = BLAST_LOOSE_GUN.pickup;
+  r.liftFrom ||= r.view.position.clone();
+  r.liftT += dt;
+  const k = Clamp01(r.liftT / P.liftS), e = k * k * (3 - 2 * k);
+  // 收到身前、胸口高度（按人的朝向算，不按相机 —— 低着头时相机的「下」指到地底下去了）
+  const yaw = player.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+  _looseFrom.set(player.position.x + fx * P.liftForwardM + rx * P.liftRightM, camera.position.y - P.liftDownM,
+    player.position.z + fz * P.liftForwardM + rz * P.liftRightM);
+  r.view.position.lerpVectors(r.liftFrom, _looseFrom, e);
+  if (k >= 1) { r.view.removeFromParent(); r.view = null; }
+}
+
+/** 弯腰那一下的相机偏移（交给 player.reach，SyncCamera 叠上去）：低头看向枪、头往枪那边偏、眼位降。 */
+function LooseGunReachCamera(r, pose) {
+  const P = BLAST_LOOSE_GUN.pickup;
+  const dip = player.stance === "prone" ? P.proneDipM : player.stance === "crouch" ? P.crouchDipM : P.dipM;
+  const dropM = dip * pose.dip;
+  const dx = r.at.x - player.position.x, dz = r.at.z - player.position.z, dist = Math.hypot(dx, dz);
+  const want = Math.atan2(-dx, -dz);
+  const yawErr = Math.atan2(Math.sin(want - player.yaw), Math.cos(want - player.yaw));
+  const eyeY = player.position.y + player.eyeHeight - dropM;
+  const wantPitch = Math.max(-P.maxLookDownRad, Math.atan2(r.at.y - eyeY, Math.max(0.2, dist)));
+  const yaw = dist > 0.15 ? Clamp(yawErr * P.yawShare, -P.maxTurnRad, P.maxTurnRad) * pose.dip : 0;
+  return { dropM, pitch: (wantPitch - player.pitch) * P.lookShare * pose.dip, yaw };
+}
+
+function StepLooseGuns(dt) {
+  const pend = looseGun.pending;
+  if (pend) {
+    pend.t += dt;
+    if (!player?.Alive || !player.knock?.Active) looseGun.pending = null;
+    else if (pend.t >= BLAST_LOOSE_GUN.releaseDelayS) {
+      looseGun.pending = null;
+      if (LooseGunReleasable()) ReleaseLooseGun(pend.push);
+    }
+  }
+  for (let i = looseGun.flying.length - 1; i >= 0; i -= 1) {
+    const e = looseGun.flying[i];
+    e.rod.Step(dt, LOOSE_GUN_WORLD);
+    SyncLooseGunView(e);
+    const hits = e.rod.ConsumeImpacts();
+    if (hits) for (const h of hits) {
+      if (h.speed < 1.2) continue;
+      audio?.Play(h.speed > 3 ? "impactDirt" : "grenadeBounce",
+        { position: new THREE.Vector3(h.x, h.y, h.z), volume: Clamp(0.25 + h.speed * 0.08, 0.25, 0.7) });
+    }
+    if (e.rod.asleep) { LandLooseGun(e); looseGun.flying.splice(i, 1); }
+  }
+  const r = looseGun.recover;
+  if (!r) { if (player) player.reach = null; return; }
+  if (!player?.Alive) { ClearLooseGuns({ keepFlying: true }); return; }
+  r.t += dt;
+  const pose = GunReachPose(r.t);
+  r.reach = pose.reach;
+  if (pose.grabbed && !r.grabbed) {
+    r.grabbed = true;
+    if (state.activeSlot === r.slot && currentWeapon) { viewmodel.Equip(currentWeapon, SlotWeaponVariant(r.slot)); SyncBayonet(); }
+    looseGun.recovered += 1;
+  }
+  if (r.grabbed && r.view) LiftLooseGunView(r, dt);
+  player.reach = pose.done ? null : LooseGunReachCamera(r, pose);
+  if (pose.done) { r.view?.removeFromParent(); looseGun.recover = null; }
+}
+
+/** 清掉：还没撒手的、正在弯腰捡的（模型收掉、手里那把直接端上来）；keepFlying 为假时连飞着的也拆。 */
+function ClearLooseGuns({ keepFlying = false } = {}) {
+  looseGun.pending = null;
+  const r = looseGun.recover;
+  if (r) {
+    r.view?.removeFromParent();
+    if (!r.grabbed && state.activeSlot === r.slot && currentWeapon && player?.Alive) { viewmodel.Equip(currentWeapon, SlotWeaponVariant(r.slot)); SyncBayonet(); }
+    looseGun.recover = null;
+  }
+  if (player) player.reach = null;
+  if (!keepFlying) {
+    for (const e of looseGun.flying) e.view?.root.removeFromParent();
+    looseGun.flying.length = 0;
+  }
+}
+
+/** 取证快照。 */
+function LooseGunState() {
+  return {
+    enabled: looseGun.enabled, pending: !!looseGun.pending, released: looseGun.released, recovered: looseGun.recovered,
+    flying: looseGun.flying.map((e) => ({ weaponId: e.weaponId, ammo: e.ammo, clips: e.clips, bayonet: e.bayonet, rod: e.rod.Inspect() })),
+    ground: (interact?.groundWeapons || []).filter((g) => g.loose).map((g) => ({ id: g.id, weaponId: g.weaponId, ammo: g.ammo, clips: g.clips,
+      position: [+g.position.x.toFixed(2), +g.position.y.toFixed(2), +g.position.z.toFixed(2)], visible: !!g.view?.parent })),
+    recover: looseGun.recover ? { t: +looseGun.recover.t.toFixed(2), grabbed: looseGun.recover.grabbed, reach: +looseGun.recover.reach.toFixed(2) } : null,
+    reach: player?.reach ? { dropM: +player.reach.dropM.toFixed(3), pitch: +player.reach.pitch.toFixed(3), yaw: +player.reach.yaw.toFixed(3) } : null,
+    activeSlot: state.activeSlot, weapon: currentWeapon, slots: { ...state.slots }, viewmodelWeapon: viewmodel?.weaponId ?? null,
+  };
 }
 
 /** 呼叫迫击炮。全集团军的迫击炮数得过来，一局两发 —— 这条稀缺本身就是史实。 */
@@ -8418,7 +8671,7 @@ function TryFire(dt, returningGrenade = false) {
   }
   // 翻墙翻到一半、或者人泡在水里：枪都不在手上/在水里，打不出去。
   // 这两条是"翻越"与"下水软墙"各自的代价，不写在这里就等于没有代价
-  if (player.Busy || player.InWater) return;
+  if (player.Busy || player.InWater || looseGun.recover) return;
   // 大刀槽按左键 = 挥刀，投掷物槽按左键 = 攥弹（松手才扔，走 ReleaseCook）
   //
   // 【2026-08-25】白刃这一支**必须**排在下面两道冲刺闸的前面。
@@ -9361,6 +9614,8 @@ function Frame(dt, render = true) {
   // 按住型交互反过来要排在 player.Update **之后**：够不够得着要用这一帧的位置，
   // 玩家走开一步进度就该断，而不是在后台接着读条。
   interact?.Update(dt, player);
+  // 被冲击波震脱手的枪：撒手、飞、落地停稳后交给 interact 当地上的枪；弯腰捡的那一下（Script_LooseGun）。
+  StepLooseGuns(dt);
   // 发报：码组推进与底噪。排在 interact **之后** —— 那一层这一帧刚可能
   // 把一组发出去。**什么都不封**：玩家可以边发边走开，进度留着（§7 不夺控制权）。
   telegraph?.Update(dt, player);
@@ -9537,6 +9792,8 @@ function Frame(dt, render = true) {
     // 近爆的身体反应：收枪、缩肩、手臂慢半拍、之后手抖（Script_BlastFlinch.arms；没在反应时是 null）。
     blastFlinch: player.flinch?.Active ? player.flinch.arms : null,
   });
+  // 弯腰捡震脱手的枪：抓到之前右手（空手）伸向地上那把（Script_LooseGun.GunReachPose）。
+  if (looseGun.recover && !viewmodel.weapon && looseGun.recover.reach > 0) viewmodel.ReachWorld(looseGun.recover.atV, looseGun.recover.reach);
   }
   profiler.E("viewmodel");
 
@@ -10187,6 +10444,9 @@ function RenderSceneContent(dt) {
     eyeClosure: player?.Alive ? Math.max(missionRuntime?.Perception().eyeClosure || 0, BlastEyeClosure()) : 0,
     lidGlow: BlastLidGlow(skyName),
     lidEdge: BlastLidEdge(),
+    lidLight: BlastLidLight(),
+    eyeAdapt: BlastEyeAdapt(),
+    afterimage: BlastAfterimage(skyName),
     concussion: MergeBlastDaze(missionRuntime?.Perception().concussion),
     vignette: (0.42 + suppression * 0.22) * graphics.vignette,
     damage: Clamp01(1 - health / 62) * 0.55,
@@ -10246,6 +10506,31 @@ function BlastLidEdge() {
   if (!BlastLidsLead()) return null;
   const E = BLAST_FLINCH.lidEdge;
   return [E.feather, E.pupilDim];
+}
+
+/** 近爆闭眼的透光跟着画面亮度走（Script_EyelidMask.LidLightScale）：[参考亮度, 明暗分布, 最多几倍]。剧情的闭眼不给。 */
+function BlastLidLight() {
+  if (!BlastLidsLead()) return null;
+  const G = BLAST_FLINCH.lidGlow;
+  return G.referenceLuma > 0 ? [G.referenceLuma, G.spatial, G.maxGain] : null;
+}
+
+/** 近爆闭过眼、睁开那一下偏亮（Script_BlastFlinch.adapt）：乘在曝光上，平时 / 菜单 / 过场是 1。 */
+function BlastEyeAdapt() {
+  const flinch = player?.flinch;
+  if (!flinch?.EyesActive || !player.Alive || state.menu || state.cutscene) return 1;
+  return flinch.exposureGain || 1;
+}
+
+/**
+ * 火光残影（Script_BlastFlinch.after，钉在画面上的位置）：[u, v, 半径, 宽高比, 正, 负, 种子]，夜里正残像 × nightGain。
+ * 没有、菜单、过场时 null。
+ */
+function BlastAfterimage(skyName) {
+  const im = player?.flinch?.after;
+  if (!im || !player.Alive || state.menu || state.cutscene || im.positive + im.negative < 0.003) return null;
+  const k = /night/i.test(skyName || "") ? BLAST_FLINCH.afterimage.nightGain : 1;
+  return [im.u, im.v, im.radius, im.aspect, im.positive * k, im.negative, im.seed];
 }
 
 /**

@@ -55,6 +55,8 @@ export class BattleReactionPavedYard {
     host.vfx?.SetGroundSurfaceResolver?.((x, z) => (InPavedYard(x, z, pad) ? pad.surface : null));
     this.deformation = host.battlefield?.deformation || null;
     if (this.deformation) this.deformation.noCraterAt = (x, z) => InPavedYard(x, z, pad);
+    // 砖面比地表高 lift：落在上面的东西（震脱手的枪，Script_Main.LOOSE_GUN_WORLD）按砖面停，不埋进砖里
+    if (host.battlefield) host.battlefield.overlayLiftAt = (x, z) => (InPavedYard(x, z, pad) ? pad.lift : 0);
   }
 
   Build() {
@@ -95,6 +97,7 @@ export class BattleReactionPavedYard {
   Dispose() {
     this.host.vfx?.SetGroundSurfaceResolver?.(null);
     if (this.deformation) this.deformation.noCraterAt = null;
+    if (this.host.battlefield?.overlayLiftAt) this.host.battlefield.overlayLiftAt = null;
     if (this.mesh) {
       this.mesh.removeFromParent();
       this.mesh.geometry.dispose(); this.mesh.material.dispose();

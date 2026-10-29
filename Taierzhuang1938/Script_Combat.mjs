@@ -730,7 +730,8 @@ export class CombatSystem {
       // 最近十几发留底（测试场按落点把读数对回每一发）。
       (this.exposureLog ||= []).push(this.lastExposure);
       if (this.exposureLog.length > 16) this.exposureLog.shift();
-      shaken.BlastReaction?.(exposure, bearing);
+      // at：爆点（火光残影要把火球投到屏幕上，Player._FlashOnScreen）。
+      shaken.BlastReaction?.(exposure, { ...bearing, at: position });
       earExposure = { left: exposure.tinnitusLeft, right: exposure.tinnitusRight };
     }
     // 距离分档、落屑与按威力/距离/遮挡分级的耳鸣，
