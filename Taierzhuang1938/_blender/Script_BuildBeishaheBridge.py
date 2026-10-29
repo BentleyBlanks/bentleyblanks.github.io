@@ -457,14 +457,20 @@ def BuildDeck(length, count, seed):
     for weight in weights:
         rowBoundaries.append(rowBoundaries[-1] + weight * scale)
     rowBoundaries[-1] = length / 2
+    # Increase the variation between actual boards around each template's
+    # mean, while keeping all pieces of a board on one shared color. This is
+    # an authored weathering choice, not a claim about the historical bridge.
+    rowChoices = [(tintRng.uniform(.64, .99), tintRng.uniform(.008, .035)) for _ in range(boardCount)]
+    meanGreen = sum(value * .91 for value, _ in rowChoices) / boardCount
     rowTints = []
     for row in range(boardCount):
         z0 = rowBoundaries[row] + (.003 if row else 0)
         z1 = rowBoundaries[row + 1] - (.003 if row < boardCount - 1 else 0)
         # The three pieces are one board visually: same tint and the same
         # spatial texture phase across the two track slots.
-        value = tintRng.uniform(.64, .99)
-        warmth = tintRng.uniform(.008, .035)
+        value, warmth = rowChoices[row]
+        green = max(.40, min(.98, meanGreen + (value * .91 - meanGreen) * SPEC["deckRowToneContrast"]))
+        value = green / .91
         rowTint = (min(1.0, value * .96 * (1 + warmth)), value * .91, value * .83 * (1 - warmth * .8), 1)
         rowTints.append(rowTint)
         rowOffset = (rowRng.uniform(0, 7), rowRng.uniform(0, 7))
@@ -1152,7 +1158,7 @@ def Rebuild():
                 "railFasteners": "Square-head screw-spike shape, 120 mm sleeper embed, two outside and one inside, and outside hook plates are authored interpretations of early German railway references, not established for the 1938 Beishahe bridge. Solid spike shafts intentionally overlap undrilled sleeper and tie-plate geometry; holes and threads are not modeled.",
                 "guardTimbers": "Two low outer longitudinal timbers are an authored interpretation of a 1941 Jinpu railway bridge photograph at an unknown location; their use and dimensions at Beishahe are unconfirmed."
             },
-            "deck": {"clearWidthM": SPEC["sleeperLengthM"], "nominalBoardWidthM": SPEC["deckBoardNominalWidthM"], "plankThicknessM": .045, "topY": .075,
+            "deck": {"clearWidthM": SPEC["sleeperLengthM"], "nominalBoardWidthM": SPEC["deckBoardNominalWidthM"], "rowToneContrast": SPEC["deckRowToneContrast"], "plankThicknessM": .045, "topY": .075,
                      "railFootClearanceM": .001, "jointWidthM": .006,
                      "jointEndClearanceM": .002, "jointSpliceLengthM": .36,
                      "bearerBottomY": 0, "bearerTopY": .03, "grainAxis": "X"},
