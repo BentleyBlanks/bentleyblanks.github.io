@@ -98,7 +98,7 @@ const SINGLE_BLANKET_ASSET_BYTES = 1024 * 1024;
 // 不进 boot / level 预算；全目录原本就顶着上限（63.79 / 63.81 MB），按它们的体积单列 384 KB。
 const EDITOR_CREEK_SKETCH_BYTES = 384 * 1024;
 // The refined bridge steel set occupies 322,774 bytes; sleeper, end-grain,
-// stone, damp stone and deck-plank sets total 2,028,590 bytes. These are
+// stone, damp stone and deck-plank sets total 2,028,738 bytes. These are
 // embedded in the standalone bridge GLB; they add no boot or level requests.
 const BEISHAHE_METAL_ASSET_BYTES = 384 * 1024;
 const BEISHAHE_SURFACE_ASSET_BYTES = 1982 * 1024;

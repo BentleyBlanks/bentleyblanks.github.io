@@ -1,6 +1,6 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-10-28",
+  "date": "2026-10-29",
   "name": "BeishaheDeckPlank",
   "preset": "weatheredWood",
   "source": {
@@ -23,9 +23,9 @@
   "heightSource": null,
   "params": {
     "mean": [
-      0.45,
+      0.46,
       0.43,
-      0.41
+      0.42
     ],
     "contrast": 0.095,
     "lumaRange": [
@@ -66,7 +66,7 @@
     "baseQuality": 86,
     "dataQuality": 90,
     "dataLossless": false,
-    "detailBalance": 0,
+    "detailBalance": 0.0,
     "heightFineWeight": 0.45,
     "uvAtlasReason": null
   },
@@ -76,44 +76,44 @@
       "file": "Texture_BeishaheDeckPlankBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 373356,
-      "sha256": "471f7efb7ec5b5221f84d3e7445609576d47b71432d4b0010cfd8cea72145eb3"
+      "bytes": 373272,
+      "sha256": "9ba052e0de40db15981b1df480d70a4a223d786ecff6ed9382615a6104448379"
     },
     {
       "channel": "Normal",
       "file": "Texture_BeishaheDeckPlankNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 89586,
-      "sha256": "ab48eed08b7bad1bd2078a21af07ea0a974416d170c5c17ab398b964ad01b558"
+      "bytes": 89568,
+      "sha256": "6f796e513d7ef227b63feeb08f50818235f575bb513dee97b90330dfb796f146"
     },
     {
       "channel": "Orm",
       "file": "Texture_BeishaheDeckPlankOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 61500,
-      "sha256": "f414a6127916aac50a15cdebe73d49672c48ba45b54c34fae6f80a1daf8660dd"
+      "bytes": 61750,
+      "sha256": "e7b57fb41a5bb2fd00184d4f973d85212e8d75b714bc89e33828479f035d0159"
     }
   ],
-  "totalBytes": 524442,
+  "totalBytes": 524590,
   "metrics": {
     "meanSrgb": [
-      0.4498,
+      0.4598,
       0.4308,
-      0.4097
+      0.4196
     ],
-    "luma": 0.4301,
+    "luma": 0.4367,
     "lumaStd": 0.0959,
-    "sat": 0.0892,
-    "clipLow": 0.0003,
+    "sat": 0.0874,
+    "clipLow": 0.0002,
     "clipHigh": 0.0,
-    "lowFreq": 0.0267,
-    "seam": 0.0099,
+    "lowFreq": 0.0263,
+    "seam": 0.0097,
     "interior": 0.0606,
-    "seamRatio": 0.163,
-    "border": 0.733,
-    "swing": 0.0686,
+    "seamRatio": 0.161,
+    "border": 0.734,
+    "swing": 0.0674,
     "aoMean": 0.904,
     "roughMean": 0.866,
     "texelsPerMeter": 1024.0
