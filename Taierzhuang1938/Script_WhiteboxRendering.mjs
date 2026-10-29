@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
 import { MakeFullscreenMaterial } from "./Script_PostCommon.mjs";
 import { WHITEBOX_CARDS, WHITEBOX_LIGHTING, WHITEBOX_WATER, WhiteboxPassPlan } from "./Data_Tuning_Whitebox.mjs";
+import { OPENING_PERCEPTION } from "./Data_Tuning_FirstLevel.mjs";
+import { EYELID_GLSL, LidShapeArray, LidSoftArray } from "./Script_EyelidMask.mjs";
 
 // Physical ground and replacement crater tiles, never a material-name whitelist.
 export function IsWhiteboxTerrain(object) {
@@ -514,25 +516,27 @@ export class WhiteboxSceneRenderer {
 
 // Minimum output conversion only. Story blackouts/eyelids are retained because
 // they hide scene transitions; cosmetic camera effects are intentionally absent.
+// 眼皮与完整画质的合成共用一份（Script_EyelidMask）：原来这里是上下对称的一条缝、过渡只有屏高 2.5%，炸飞时眨眼是两道硬边。
 export class WhiteboxOutputPass {
   constructor(pipeline) {
     this.name = "whiteboxOutput";
     this.pipeline = pipeline;
-    this.uniforms = { uSource: { value: null }, uFade: { value: 0 }, uEyeClosure: { value: 0 } };
+    this.uniforms = { uSource: { value: null }, uFade: { value: 0 }, uEyeClosure: { value: 0 },
+      uLidShape: { value: new THREE.Vector4(...LidShapeArray(OPENING_PERCEPTION)) }, uLidSoft: { value: new THREE.Vector2() },
+      uLidGlow: { value: new THREE.Vector3() } };
     this.material = MakeFullscreenMaterial(`
       uniform sampler2D uSource;
       uniform float uFade;
       uniform float uEyeClosure;
+      uniform vec3 uLidGlow;
+      ${EYELID_GLSL}
       varying vec2 vUv;
       void main() {
         vec3 c = max(texture2D(uSource, vUv).rgb, vec3(0.0));
+        float aperture = EyelidAperture(vUv, uEyeClosure);
+        c = c * aperture + uLidGlow * (1.0 - aperture);
         c = mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
-        float aperture = 1.0;
-        if (uEyeClosure > 0.0) {
-          float gap = (1.0 - clamp(uEyeClosure, 0.0, 1.0)) * 0.55;
-          aperture = 1.0 - smoothstep(max(0.0, gap - 0.025), gap + 0.001, abs(vUv.y - 0.5));
-        }
-        gl_FragColor = vec4(c * (1.0 - clamp(uFade, 0.0, 1.0)) * aperture, 1.0);
+        gl_FragColor = vec4(c * (1.0 - clamp(uFade, 0.0, 1.0)), 1.0);
       }`, this.uniforms);
   }
   Enabled() { return !!this.pipeline.whiteboxConfig && this.pipeline.whiteboxPasses.has(this.name); }
@@ -543,6 +547,8 @@ export class WhiteboxOutputPass {
     this.uniforms.uSource.value = ctx.sceneColor.texture;
     this.uniforms.uFade.value = ctx.options.fade || 0;
     this.uniforms.uEyeClosure.value = ctx.options.eyeClosure || 0;
+    if (ctx.options.lidGlow) this.uniforms.uLidGlow.value.fromArray(ctx.options.lidGlow); else this.uniforms.uLidGlow.value.set(0, 0, 0);
+    this.uniforms.uLidSoft.value.fromArray(LidSoftArray(ctx.options.lidEdge));
     ctx.blitter.Blit(this.material, this.pipeline.whiteboxConfig.fxaa ? this.pipeline.targets.ldr : null);
   }
   Dispose() { this.material.dispose(); }

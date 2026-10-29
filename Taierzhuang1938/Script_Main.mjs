@@ -10023,6 +10023,7 @@ function RenderSceneContent(dt) {
     fade: player?.Alive ? missionRuntime?.Perception().blackout || 0 : 0,
     eyeClosure: player?.Alive ? Math.max(missionRuntime?.Perception().eyeClosure || 0, BlastEyeClosure()) : 0,
     lidGlow: BlastLidGlow(skyName),
+    lidEdge: BlastLidEdge(),
     concussion: MergeBlastDaze(missionRuntime?.Perception().concussion),
     vignette: (0.42 + suppression * 0.22) * graphics.vignette,
     damage: Clamp01(1 - health / 62) * 0.55,
@@ -10063,10 +10064,25 @@ function BlastEyeClosure() {
  * 开场导演的闭眼仍是全黑；夜里几乎不透。颜色与亮度在 Data_Tuning_BlastReaction.BLAST_FLINCH.lidGlow。
  */
 function BlastLidGlow(skyName) {
-  const closure = BlastEyeClosure();
-  if (!(closure > 0.01) || closure <= (missionRuntime?.Perception().eyeClosure || 0)) return null;
+  if (!BlastLidsLead()) return null;
   const G = BLAST_FLINCH.lidGlow, k = /night/i.test(skyName || "") ? G.nightScale : 1;
   return [G.rgb[0] * k, G.rgb[1] * k, G.rgb[2] * k];
+}
+
+/** 近爆的眼皮比剧情那份合得更紧（这一帧的眼皮是近爆在管）。 */
+function BlastLidsLead() {
+  const closure = BlastEyeClosure();
+  return closure > 0.01 && closure > (missionRuntime?.Perception().eyeClosure || 0);
+}
+
+/**
+ * 近爆眨眼的眼皮边（Script_EyelidMask）：眼皮贴着瞳孔，在视网膜上是一大片渐暗、不是一条边 ——
+ * 过渡放宽到屏高的大半、整片跟着变暗。开场剧情的闭眼不给（仍是画出来的两片眼皮）。数在 BLAST_FLINCH.lidEdge。
+ */
+function BlastLidEdge() {
+  if (!BlastLidsLead()) return null;
+  const E = BLAST_FLINCH.lidEdge;
+  return [E.feather, E.pupilDim];
 }
 
 /**

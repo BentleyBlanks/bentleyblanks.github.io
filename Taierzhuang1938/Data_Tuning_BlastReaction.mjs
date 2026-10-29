@@ -134,6 +134,14 @@ export const BLAST_FLINCH = Object.freeze({
    *（显示线性值，调色之后），夜里乘 nightScale。开场导演的闭眼不用它（仍是全黑）。
    */
   lidGlow: Object.freeze({ rgb: Object.freeze([0.052, 0.011, 0.006]), nightScale: 0.12 }),
+  /**
+   * 眼皮的边（Script_EyelidMask，2026-10-29 用户：「炸飞时眨眼的 mask 边缘过于锐利，应该模糊一点」）。
+   * 眼皮贴着眼球、在瞳孔前面两三毫米，视网膜上成不了边：过渡宽度 ≈ 瞳孔直径 / 距离 ≈ 4 mm / 3 mm ≈ 75°，比竖直视野还宽，
+   * 眨眼看到的是整片暗下去、上面先暗一点。
+   *   feather   上下眼皮各自的过渡半宽（屏高的比例；开场剧情那套是 0.065，看到的是画出来的两片眼皮）
+   *   pupilDim  眼皮盖住瞳孔、进眼的光整体少了多少（× 闭合程度）
+   */
+  lidEdge: Object.freeze({ feather: 0.36, pupilDim: 0.55 }),
 });
 
 /**

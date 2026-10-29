@@ -41,6 +41,7 @@
 
 import { HIT_DISORIENTATION } from "./Data_Tuning_Player.mjs";
 import { OPENING_PERCEPTION } from "./Data_Tuning_FirstLevel.mjs";
+import { EYELID_GLSL, LidShapeArray, LidSoftArray } from "./Script_EyelidMask.mjs";
 import * as THREE from "three";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
 // 物理大气（子系统 B4）：ApplyFog 段里的大气透视那几行用它。
@@ -167,7 +168,8 @@ uniform vec2 uSideDaze;      // 01-02 slap (2026-09-27): x = struck side (+1 lef
 uniform vec3 uCheekCut;      // 02 cheek cut (2026-10-11): x = white sting on the left, y = streak seeped in (0..1), z = streak strength
 uniform vec4 uBloodEdge;     // rgb multiplicative tint, a strength (SB03 blood-red corners)
 uniform vec4 uBloodCorners;  // weights top-left, top-right, bottom-left, bottom-right
-uniform vec4 uLidShape;      // feather, curvature, tilt, upper lid share
+// 眼皮（Script_EyelidMask：形状 uLidShape、近爆眨眼的软边与整体变暗 uLidSoft）
+${EYELID_GLSL}
 uniform vec3 uLidGlow;       // light through closed lids (blast flinch in daylight); zero = black lids as before
 
 // --- SEGMENT encode ---------------------------------------------------------
@@ -562,17 +564,7 @@ vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
   float grain = (Hash12(gl_FragCoord.xy + uFrame * 13.71) - 0.5);
   color += grain * uGrain * (0.35 + 0.65 * (1.0 - abs(Luma(color) * 2.0 - 1.0)));
 
-  float aperture=1.0;
-  if(uEyeClosure>0.0){
-    float closure=clamp(uEyeClosure,0.0,1.0);
-    float x=uv.x*2.0-1.0;
-    float arc=uLidShape.y*x*x*closure,tilt=uLidShape.z*x*closure;
-    float upper=1.0+uLidShape.x-closure*(uLidShape.w+uLidShape.x)-arc+tilt;
-    float lower=-uLidShape.x+closure*(1.0-uLidShape.w+uLidShape.x)+arc+tilt;
-    aperture=smoothstep(lower-uLidShape.x,lower+uLidShape.x,uv.y)
-      *(1.0-smoothstep(upper-uLidShape.x,upper+uLidShape.x,uv.y));
-    aperture*=1.0-smoothstep(.90,1.0,closure);
-  }
+  float aperture=EyelidAperture(uv,uEyeClosure);
   return (max(color, vec3(0.0)) * aperture + uLidGlow * (1.0 - aperture)) * (1.0 - uFade);
 }
 
@@ -665,7 +657,7 @@ export class CompositePass {
       uConcussion:{value:new THREE.Vector4()},
       uRadialBlur:{value:0}, uSideDaze:{value:new THREE.Vector2()},uCheekCut:{value:new THREE.Vector3()}, uBloodEdge:{value:new THREE.Vector4()}, uBloodCorners:{value:new THREE.Vector4(1,1,1,1)},
       uConcussionGrade:{value:new THREE.Vector3(OPENING_PERCEPTION.ghostMix,OPENING_PERCEPTION.desaturation,OPENING_PERCEPTION.vignette)},
-      uLidShape:{value:new THREE.Vector4(OPENING_PERCEPTION.lidFeather,OPENING_PERCEPTION.lidCurve,OPENING_PERCEPTION.lidTilt,OPENING_PERCEPTION.lidUpperShare)},
+      uLidShape:{value:new THREE.Vector4(...LidShapeArray(OPENING_PERCEPTION))}, uLidSoft:{value:new THREE.Vector2()},
       uDofStrength: { value: 0 }, uDofFocus: { value: 1.5 },
       uDofRange: { value: 2.8 }, uDofMaxPx: { value: 11.0 },
       uNearDofStrength: { value: 0 }, uNearDofFocus: { value: 1.6 },
@@ -819,6 +811,8 @@ export class CompositePass {
     U.uEyeClosure.value = options.eyeClosure ?? 0;
     // 眼皮透光（近爆的闭眼，Script_Main.BlastLidGlow）：不给就是 0，闭眼仍是全黑（开场那套不变）。
     if (options.lidGlow) U.uLidGlow.value.fromArray(options.lidGlow); else U.uLidGlow.value.set(0, 0, 0);
+    // 近爆眨眼的软边与整体变暗（Script_Main.BlastLidEdge）：不给就是开场那套画出来的眼皮。
+    U.uLidSoft.value.fromArray(LidSoftArray(options.lidEdge));
     const concussion=options.concussion,perception=OPENING_PERCEPTION;
     const pixelScale=ctx.height/perception.referenceHeight;
     U.uConcussion.value.set(Math.max(0,Math.min(1,concussion?.amount||0)),

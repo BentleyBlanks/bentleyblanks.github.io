@@ -980,7 +980,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /Data_DevTools(?:Stub)?\.mjs|Script_SettingsHost\.mjs/ },
   { domain: "textureAssets", pattern: /CommandRoom/ },
   {domain:"textureAssets",pattern:/TextureImport|TextureManager|EditorTextures/},
-  { domain: "whiteboxQuality", pattern: /WhiteboxQuality|WhiteboxRendering|GraphicsProfile|Tuning_Whitebox|EditorSettings|Script_Post\.mjs|Script_Main\.mjs/ },
+  { domain: "whiteboxQuality", pattern: /WhiteboxQuality|WhiteboxRendering|EyelidMask|GraphicsProfile|Tuning_Whitebox|EditorSettings|Script_Post\.mjs|Script_Main\.mjs/ },
   // 贴图资产规范：Texture/ 下任何文件、清单、通用烘焙脚本与预设、烘焙记录、关卡按需集。
   {domain:"textureAssets",pattern:/\/Texture\/|Data_TextureManifest|Script_BakePbrTexture|Data_TextureBakePresets|\/TextureBakes\/|Script_TextureStandards|Data_LevelTextureSets|Script_LevelTextureSets/},
   {domain:"allyGait",pattern:/AllyGait|Script_FirstLevelP012CastAppearance/},
@@ -1157,8 +1157,9 @@ const changedDomainRules = [
   // 关中过场的作者动作库、它的运行时表演层与烘焙脚本：都归 cutscene 域。
   { domain: "cutscene", pattern: /MachineGunCaptives|CutscenePerformance|Animation\/MachineGunCaptives/i },
   { domain: "ai", pattern: /FirstLevelP012(ShellShot|BackRifle|TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },
-  // 近爆的人物反应与耳朵模型（BlastExposure / BlastFlinch / AudioEarTrauma / BattleReaction*）、冲击波推人（BlastKnockback / PlayerKnockback）：同挂 explosives。
-  { domain: "explosives", pattern: /(BlastExposure|BlastFlinch|BlastReaction|BattleReaction|EarTrauma|BlastKnockback|PlayerKnockback)/i },
+  // 近爆的人物反应与耳朵模型（BlastExposure / BlastFlinch / AudioEarTrauma / BattleReaction*）、冲击波推人（BlastKnockback / PlayerKnockback）、
+  // 眨眼的眼皮遮罩（EyelidMask，合成与白盒输出共用）：同挂 explosives。
+  { domain: "explosives", pattern: /(BlastExposure|BlastFlinch|BlastReaction|BattleReaction|EarTrauma|BlastKnockback|PlayerKnockback|EyelidMask)/i },
   { domain: "explosives", pattern: /(Explosion|Explosives|ShellImpact|DustFlow|DustField|DustOcclusion|GroundImpact|CraterSurface|CraterDebris|CraterScorched|BakeCraterSoil|GrenadeReturn|TerrainDeformation|ShellVisual|Script_Combat|Script_Physics|Script_Vfx)/i },
   // Trench：壕沟样条管线（Script_TrenchPlan / Script_TrenchSpline /
   // Data_FirstLevelMissionTrenches）改的是烘进共享高度场的那张开挖场，
