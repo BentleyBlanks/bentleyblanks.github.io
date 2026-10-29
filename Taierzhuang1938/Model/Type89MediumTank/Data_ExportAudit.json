@@ -1,13 +1,13 @@
 {
-  "schema": "Type89OptionalAssetReleaseV12",
+  "schema": "Type89OptionalMaterialReleaseV13",
   "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
-  "reviewedAt": "2026-10-27T20:41:50.254Z",
+  "reviewedAt": "2026-10-29T17:52:16.473Z",
   "geometryVersion": "20261027GeometryV54",
-  "materialRevision": "SurfaceV12",
+  "materialRevision": "SurfaceV13",
   "runtime": {
     "file": "Model_Type89MediumTank.glb",
-    "sha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
-    "bytes": 88193864,
+    "sha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f",
+    "bytes": 88407696,
     "triangles": 417130,
     "images": 25,
     "materials": 9,
@@ -18,333 +18,230 @@
   "sourceProjects": [
     {
       "quality": "Game",
-      "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54ReleaseSurfaceV12\\Finished\\Scene_Type89MediumTankGamePbr.blend",
-      "glb": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\GeometryV54ReleaseSurfaceV12\\Model_Type89MediumTankGamePbr.glb",
-      "sha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
-      "sourceSha256": "05e7aaaf3c2ed1be246e487d16d6ecc022411f92bd5453227ee63e7603b62421"
+      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankGamePbr.glb",
+      "sha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f",
+      "bytes": 88407696,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Scene_Type89MediumTankGamePbr.blend",
+      "sourceSha256": "2dca8600177316b96326831407fecee0dded595e9cde2e72e38b9b24a99e4297",
+      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankGameSourceExport.glb",
+      "baseline": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV12Release_b24618b4\\Model_Type89MediumTankGamePbr.glb",
+      "baselineSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
+      "geometryBufferViewsExact": true,
+      "removedUnusedImagePayloads": 6,
+      "imageRows": [
+        {
+          "role": "Armor",
+          "label": "Base",
+          "image": 4,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameArmorBase.png",
+          "sha256": "bd82bca0d79a0335d992275c5dcf45fa423ce261555edc033c8ebf39a0cf64f9",
+          "bytes": 4788488,
+          "mime": "image/webp",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Armor",
+          "label": "Orm",
+          "image": 3,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameArmorPoseOrm.png",
+          "sha256": "a41c6a3b3f0aab290bd572010a492e7bb9310aa9e2a425f8bcd5f12da2b04c02",
+          "bytes": 10536868,
+          "mime": "image/webp",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Armor",
+          "label": "MicroCoatData",
+          "image": 0,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameArmorMicroCoat.png",
+          "sha256": "e18de5576b28fc584d7397ace06dc80cfcccaa654fbf367beda52a92dc1445f8",
+          "bytes": 6410794,
+          "mime": "image/webp",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Guard",
+          "label": "Base",
+          "image": 15,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameGuardBase.png",
+          "sha256": "ad09ce6f89e7e4424c7ca1a22e4056da7be438aa54648de0b567daf96d54acf1",
+          "bytes": 3845172,
+          "mime": "image/png",
+          "opacityPreserved": true
+        },
+        {
+          "role": "Guard",
+          "label": "Orm",
+          "image": 14,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameGuardOrm.png",
+          "sha256": "56ffcb1cb1a34555d15d3349e4cd4434c1ae6e91e709f7abc6a953e93476edab",
+          "bytes": 603010,
+          "mime": "image/webp",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Guard",
+          "label": "MicroCoatData",
+          "image": 12,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameGuardMicroCoat.png",
+          "sha256": "2b9329c52d2a4fba63edda36e4201ecc2d50160156b83afb4ad6acef4182ad4b",
+          "bytes": 397046,
+          "mime": "image/webp",
+          "opacityPreserved": false
+        }
+      ]
     },
     {
       "quality": "High",
-      "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Prototypes\\GeometryV54ReleaseSurfaceV12\\Finished\\Scene_Type89MediumTankHighPbr.blend",
-      "glb": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\GeometryV54ReleaseSurfaceV12\\Model_Type89MediumTankHighPbr.glb",
-      "sha256": "3ff008c6989b2df3e7a726c7939b95bf02dbcc777aa5d9a6cd07d640db2b3642",
-      "sourceSha256": "b9c38251b36cf2a7aaf86526beb039cd140549dc19dc2f31fda1a086479a0131"
+      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankHighPbr.glb",
+      "sha256": "d25dda97f5a92149fa80d3bf0404adf682049ae9f64300ed0b0c27ce91483a25",
+      "bytes": 185734760,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Scene_Type89MediumTankHighPbr.blend",
+      "sourceSha256": "5fb01da1146581447cb2adc53e8e52636eec3a45f7884b4f5e90e8e9e9d7d2dc",
+      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankHighSourceExport.glb",
+      "baseline": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV12Release_b24618b4\\Model_Type89MediumTankHighPbr.glb",
+      "baselineSha256": "3ff008c6989b2df3e7a726c7939b95bf02dbcc777aa5d9a6cd07d640db2b3642",
+      "geometryBufferViewsExact": true,
+      "removedUnusedImagePayloads": 6,
+      "imageRows": [
+        {
+          "role": "Armor",
+          "label": "Base",
+          "image": 4,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighArmorBase.png",
+          "sha256": "6603f1fcdc295d67c2492d06196c974e7bf1c6fa00fad8534e75950ba12742fd",
+          "bytes": 6832941,
+          "mime": "image/png",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Armor",
+          "label": "Orm",
+          "image": 3,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighArmorPoseOrm.png",
+          "sha256": "161579c2c90f77aad5ea44d79052467439376b6511e8502f4dcbe958d8d5f485",
+          "bytes": 19332442,
+          "mime": "image/png",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Armor",
+          "label": "MicroCoatData",
+          "image": 0,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighArmorMicroCoat.png",
+          "sha256": "8a94dde9a9d13bcccc40181f3b718a8a9476d4180771f7641dfb7597c1b5bc2b",
+          "bytes": 10956341,
+          "mime": "image/png",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Guard",
+          "label": "Base",
+          "image": 15,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighGuardBase.png",
+          "sha256": "dce0bfe223124c850e2b9f9411c1597862e37482b2ad37a867710ec36e77f7ef",
+          "bytes": 2552411,
+          "mime": "image/png",
+          "opacityPreserved": true
+        },
+        {
+          "role": "Guard",
+          "label": "Orm",
+          "image": 14,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighGuardOrm.png",
+          "sha256": "c710844c16a9ee65c636967b7e084eeb62f874e6717b4cc06c39fb2ea6e2fc1c",
+          "bytes": 1461193,
+          "mime": "image/png",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Guard",
+          "label": "MicroCoatData",
+          "image": 12,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighGuardMicroCoat.png",
+          "sha256": "2c0162a4939d66b05e271ee366e1524c9d16fe1a751bde244329e8669b1412c7",
+          "bytes": 962618,
+          "mime": "image/png",
+          "opacityPreserved": false
+        }
+      ]
     }
   ],
-  "sourceArchive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV12Release_b24618b4",
-  "scriptArchive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scripts\\GeometryV54SurfaceV12Release_b24618b4",
+  "sourceArchive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV13Release_9a9e1160",
+  "scriptArchive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scripts\\GeometryV54SurfaceV13Release_9a9e1160",
   "sourceRecipe": "72e44ce429a524873848ec9d9772ac5c46e2b866221baf3d9ec177bc0ae715fa",
+  "materialProfileSha256": "990e1eef4e6678e8299c53b08a7e2fe4ea34fec8fb954d9524cf33d08df2d951",
   "texturePacking": {
-    "version": 2,
-    "method": "Opaque image RGB remains exact; alpha-bearing base images retain exact RGBA and resolution; lossless WebP or PNG",
-    "losslessWebpEffort": 1,
-    "beforeBytes": 146830368,
-    "afterBytes": 88193864,
-    "sourceSha256": "9356b1e494e3cadd37aba4ec20f41bed6bde1ea11f2221268b29a3a233b03693",
-    "runtimeSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
-    "geometrySha256": "8fdbc2841f1d7d98205d05deb8f2965f8ddee78059831227495ddcaa93e3bf2d",
+    "version": 3,
+    "method": "Material subset replacement with exact RGB/RGBA encoding and removal of unreachable old image payloads; all geometry/source-index buffer views retained exactly",
+    "sourceSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
+    "runtimeSha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f",
+    "beforeBytes": 88193864,
+    "afterBytes": 88407696,
     "images": [
       {
-        "index": 0,
-        "width": 4096,
-        "height": 4096,
-        "sourceBytes": 11498336,
-        "runtimeBytes": 6396592,
+        "role": "Armor",
+        "label": "Base",
+        "image": 4,
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameArmorBase.png",
+        "sha256": "bd82bca0d79a0335d992275c5dcf45fa423ce261555edc033c8ebf39a0cf64f9",
+        "bytes": 4788488,
         "mime": "image/webp",
-        "pixelSha256": "a5c7d85fa7e273df21d949e9d18d360a96e65701e866f28a42ab60207bb3390d",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
         "opacityPreserved": false
       },
       {
-        "index": 1,
-        "width": 2048,
-        "height": 2048,
-        "sourceBytes": 6215818,
-        "runtimeBytes": 4408136,
+        "role": "Armor",
+        "label": "Orm",
+        "image": 3,
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameArmorPoseOrm.png",
+        "sha256": "a41c6a3b3f0aab290bd572010a492e7bb9310aa9e2a425f8bcd5f12da2b04c02",
+        "bytes": 10536868,
         "mime": "image/webp",
-        "pixelSha256": "4f42966f59163a89061e3cb66bc1c2f4dc8f27a1ac0ad0128e0c98bf42b0ccbc",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
         "opacityPreserved": false
       },
       {
-        "index": 2,
-        "width": 8192,
-        "height": 8192,
-        "sourceBytes": 53428120,
-        "runtimeBytes": 28422160,
+        "role": "Armor",
+        "label": "MicroCoatData",
+        "image": 0,
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameArmorMicroCoat.png",
+        "sha256": "e18de5576b28fc584d7397ace06dc80cfcccaa654fbf367beda52a92dc1445f8",
+        "bytes": 6410794,
         "mime": "image/webp",
-        "pixelSha256": "6282ed9cf23077e0b409804eaa49c258c21baeb20609ba2f0ec16d26e527ddb2",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
         "opacityPreserved": false
       },
       {
-        "index": 3,
-        "width": 4096,
-        "height": 4096,
-        "sourceBytes": 17680316,
-        "runtimeBytes": 10508990,
-        "mime": "image/webp",
-        "pixelSha256": "8a05a698146b5befc5042c673d546911ba4bd1a351da91e7369374497a046916",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 4,
-        "width": 4096,
-        "height": 4096,
-        "sourceBytes": 9715978,
-        "runtimeBytes": 4790178,
-        "mime": "image/webp",
-        "pixelSha256": "39efd58b0595c8bb767c0512336ea2a516ae1f4a89e13013108459a718823d4d",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 5,
-        "width": 2048,
-        "height": 2048,
-        "sourceBytes": 4934056,
-        "runtimeBytes": 2603872,
-        "mime": "image/webp",
-        "pixelSha256": "819869d5cc9eaa304c934a7320dec94ed165107b61a92e8fad56ba0d9d980b38",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 6,
-        "width": 1024,
-        "height": 1024,
-        "sourceBytes": 1417546,
-        "runtimeBytes": 815752,
-        "mime": "image/webp",
-        "pixelSha256": "8e47992fbd520e77ae22ec71d178eb50b979326f1913ac59435215437599ef06",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 7,
-        "width": 1024,
-        "height": 1024,
-        "sourceBytes": 721284,
-        "runtimeBytes": 338574,
-        "mime": "image/webp",
-        "pixelSha256": "d39e2034866b3f64aab096912cc99495a4bcd02cc94dd481b0c7acc8180cbc7d",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 8,
-        "width": 2048,
-        "height": 2048,
-        "sourceBytes": 5175839,
-        "runtimeBytes": 3321488,
-        "mime": "image/webp",
-        "pixelSha256": "d0ff70b536c2cc594b9322ea59a600ba45dbf24d51ec9483de522be8c6c85ae7",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 9,
-        "width": 1024,
-        "height": 1024,
-        "sourceBytes": 2013308,
-        "runtimeBytes": 1255430,
-        "mime": "image/webp",
-        "pixelSha256": "cf24dd68d36750e9e4e789af24bdfd697cbc2e370d7513aba7aede4039bacdb0",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 10,
-        "width": 512,
-        "height": 512,
-        "sourceBytes": 319170,
-        "runtimeBytes": 169134,
-        "mime": "image/webp",
-        "pixelSha256": "4ccf8b2fcf8abe98700177f7677f34cb71ef4756765eda98ec84039b7ea985e5",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 11,
-        "width": 1024,
-        "height": 1024,
-        "sourceBytes": 1135160,
-        "runtimeBytes": 591894,
-        "mime": "image/webp",
-        "pixelSha256": "319be1568d858a5d85662578a40a17ed9ebb7fc1ce9d144596a76e7299df179a",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 12,
-        "width": 1024,
-        "height": 1024,
-        "sourceBytes": 750517,
-        "runtimeBytes": 392910,
-        "mime": "image/webp",
-        "pixelSha256": "4dd05404cb601c4fa1bc44ef85489cfd95f407e58660031df46f59b7aaa717e5",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 13,
-        "width": 2048,
-        "height": 2048,
-        "sourceBytes": 5493952,
-        "runtimeBytes": 3338712,
-        "mime": "image/webp",
-        "pixelSha256": "af7086a7ad6d2a6741408e9f4e5803f93dc29a0e2610196357814d8721a4914b",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 14,
-        "width": 1024,
-        "height": 1024,
-        "sourceBytes": 1041170,
-        "runtimeBytes": 592284,
-        "mime": "image/webp",
-        "pixelSha256": "278cd610d40b5570131ce96853f8ba9da1a50b0edca46dda5da3d68ff0a5e51a",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 15,
-        "width": 2048,
-        "height": 2048,
-        "sourceBytes": 3743667,
-        "runtimeBytes": 3687128,
+        "role": "Guard",
+        "label": "Base",
+        "image": 15,
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameGuardBase.png",
+        "sha256": "ad09ce6f89e7e4424c7ca1a22e4056da7be438aa54648de0b567daf96d54acf1",
+        "bytes": 3845172,
         "mime": "image/png",
-        "pixelSha256": "47fd639236b9637ad1415b133ec6252449ed091360be16f7336e05614415196d",
-        "channels": 4,
-        "unusedAlphaRemoved": false,
         "opacityPreserved": true
       },
       {
-        "index": 16,
-        "width": 512,
-        "height": 512,
-        "sourceBytes": 318249,
-        "runtimeBytes": 170454,
+        "role": "Guard",
+        "label": "Orm",
+        "image": 14,
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameGuardOrm.png",
+        "sha256": "56ffcb1cb1a34555d15d3349e4cd4434c1ae6e91e709f7abc6a953e93476edab",
+        "bytes": 603010,
         "mime": "image/webp",
-        "pixelSha256": "5030f33ff34427b5db7d408d3fb4c3101032e5b931edf24a5f5b22548b820d90",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
         "opacityPreserved": false
       },
       {
-        "index": 17,
-        "width": 256,
-        "height": 256,
-        "sourceBytes": 26023,
-        "runtimeBytes": 10192,
+        "role": "Guard",
+        "label": "MicroCoatData",
+        "image": 12,
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameGuardMicroCoat.png",
+        "sha256": "2b9329c52d2a4fba63edda36e4201ecc2d50160156b83afb4ad6acef4182ad4b",
+        "bytes": 397046,
         "mime": "image/webp",
-        "pixelSha256": "82572c3f83d3cedd69cebb646e15abe3ffe876eb7085c1bb45b341d96088ebac",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 18,
-        "width": 256,
-        "height": 256,
-        "sourceBytes": 4430,
-        "runtimeBytes": 862,
-        "mime": "image/webp",
-        "pixelSha256": "4fe3658fa2fd479a281fe2e968c611c16a0b125b20a19cd82307fc78d75351b4",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 19,
-        "width": 512,
-        "height": 512,
-        "sourceBytes": 274591,
-        "runtimeBytes": 142644,
-        "mime": "image/webp",
-        "pixelSha256": "140e44d047732589080ba542d3fc0cf961c5e488df12a066e21829c0a512cc07",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 20,
-        "width": 512,
-        "height": 512,
-        "sourceBytes": 232125,
-        "runtimeBytes": 106030,
-        "mime": "image/webp",
-        "pixelSha256": "da582f5c693a3e7103c20bd386b76fca24677803f3e1413e6e8d28842f3d2871",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 21,
-        "width": 512,
-        "height": 512,
-        "sourceBytes": 136319,
-        "runtimeBytes": 51268,
-        "mime": "image/webp",
-        "pixelSha256": "c85db83d0e0020fc375590ebc27932ac1f04cd1a5ec6f204b3cb87038484aea7",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 22,
-        "width": 2048,
-        "height": 2048,
-        "sourceBytes": 7737476,
-        "runtimeBytes": 5164822,
-        "mime": "image/webp",
-        "pixelSha256": "924014dd0cb49d4d33c53fab4eb9094b6bd449e1e0de6b1785a90be7cd78d0fb",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 23,
-        "width": 1024,
-        "height": 1024,
-        "sourceBytes": 1258267,
-        "runtimeBytes": 760074,
-        "mime": "image/webp",
-        "pixelSha256": "b81856be89ae32710ca3f2610b713cfac16b7ca34ba4732cdd53b51489545eba",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
-        "opacityPreserved": false
-      },
-      {
-        "index": 24,
-        "width": 2048,
-        "height": 2048,
-        "sourceBytes": 2637538,
-        "runtimeBytes": 1232850,
-        "mime": "image/webp",
-        "pixelSha256": "983f671a080deeaadd85b06808445a3fc87a898959ce1e80b1556612f565bb78",
-        "channels": 3,
-        "unusedAlphaRemoved": true,
         "opacityPreserved": false
       }
-    ]
+    ],
+    "geometryExact": true,
+    "otherImagePayloadsExact": true
   },
   "runtimeBrowserAudit": {
     "pass": true,
@@ -474,28 +371,87 @@
     "materials": 9,
     "rendererTriangles": 834260,
     "errors": [],
-    "modelUrl": "/Taierzhuang1938/Model/Type89MediumTank/Model_Type89MediumTank.glb",
-    "trackPathUrl": "/Taierzhuang1938/Model/Type89MediumTank/Data_TrackPath.json",
-    "assetSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a"
+    "modelUrl": "/Taierzhuang1938/_shots/Type89MediumTank/SurfaceV13Study/Model_Type89MediumTankGamePbr.glb",
+    "trackPathUrl": "/Taierzhuang1938/_shots/Type89MediumTank/SurfaceV13Study/Data_TrackPath.json",
+    "assetSha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f"
+  },
+  "paintFinishAudits": {
+    "Game": {
+      "pass": true,
+      "sha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f",
+      "baselineSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
+      "checks": 163,
+      "geometryAndRigExact": true,
+      "allOtherImagePayloadsExact": true,
+      "imageChecks": [
+        {
+          "role": "Armor",
+          "ormChanges": 158588,
+          "baseChanges": 42247,
+          "maxColourDelta": 19,
+          "aoChanged": 0,
+          "opacityChanged": 0
+        },
+        {
+          "role": "Guard",
+          "ormChanges": 29222,
+          "baseChanges": 41558,
+          "maxColourDelta": 5,
+          "aoChanged": 0,
+          "opacityChanged": 0
+        }
+      ]
+    },
+    "High": {
+      "pass": true,
+      "sha256": "d25dda97f5a92149fa80d3bf0404adf682049ae9f64300ed0b0c27ce91483a25",
+      "baselineSha256": "3ff008c6989b2df3e7a726c7939b95bf02dbcc777aa5d9a6cd07d640db2b3642",
+      "checks": 163,
+      "geometryAndRigExact": true,
+      "allOtherImagePayloadsExact": true,
+      "imageChecks": [
+        {
+          "role": "Armor",
+          "ormChanges": 286931,
+          "baseChanges": 94547,
+          "maxColourDelta": 19,
+          "aoChanged": 0,
+          "opacityChanged": 0
+        },
+        {
+          "role": "Guard",
+          "ormChanges": 144191,
+          "baseChanges": 325205,
+          "maxColourDelta": 11,
+          "aoChanged": 0,
+          "opacityChanged": 0
+        }
+      ]
+    }
+  },
+  "geometryAndArticulationBaseline": {
+    "sha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
+    "geometryAndRigExact": true,
+    "previousTriangleSweepsRetainedByExactGeometry": true
   },
   "optionalConfiguration": {
     "catalogId": "type89MediumTank",
     "campaignEnabled": false,
     "lazyLoaded": true
   },
-  "localEvidenceOnly": true,
   "scopeLimitations": [
     "Museum appearance and inferred microtexture; no original paint, factory motion-stop or hidden-construction certification.",
     "Photographic perspective and local form matching retain uncertainty; this is not a scan-identical replica.",
     "Door/gun stow linkage is a collision-cleared display reconstruction, not a verified original operating procedure."
   ],
+  "localEvidenceOnly": true,
   "canonicalSourceAudit": {
     "pass": true,
     "sourceProjects": [
       {
         "quality": "High",
         "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankHighPbr.blend",
-        "sha256": "ee41fe19d20433ed0fd4ae7000c2c96839c6eb1eb998dbfabfc62d0a4038f5b9",
+        "sha256": "a87d954dc12542515227ad528fcbb199a985b7fedfe358231d843f50299d060f",
         "geometryVersion": "20261027GeometryV54",
         "geometryRecipeSha256": "72e44ce429a524873848ec9d9772ac5c46e2b866221baf3d9ec177bc0ae715fa",
         "rawTriangles": 1462012,
@@ -509,7 +465,7 @@
       {
         "quality": "Game",
         "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankGamePbr.blend",
-        "sha256": "8b5db160b0d023448fcb8ad41a0d3a6586d60aed47b37538d39e21e75349254b",
+        "sha256": "a7222a63f5b1c4d737e7a63fad5bbf9f7144e4d612fddaeaf04992f3034e7701",
         "geometryVersion": "20261027GeometryV54",
         "geometryRecipeSha256": "72e44ce429a524873848ec9d9772ac5c46e2b866221baf3d9ec177bc0ae715fa",
         "rawTriangles": 419856,
@@ -523,12 +479,6 @@
     ],
     "note": "Counts include every repeated track instance. Game export separately removes zero-area triangles without changing the editable source."
   },
-  "sourceRecipeReproduction": {
-    "recipe": "72e44ce429a524873848ec9d9772ac5c46e2b866221baf3d9ec177bc0ae715fa",
-    "expected": "72e44ce429a524873848ec9d9772ac5c46e2b866221baf3d9ec177bc0ae715fa",
-    "pass": true,
-    "scope": "Stable LF checkout bytes for source scripts and JSON inputs; no parameter values changed"
-  },
   "libraryHighQualityAudit": {
     "pass": true,
     "checks": [
@@ -536,7 +486,7 @@
         "name": "Lazy load uses the configured release URL",
         "pass": true,
         "detail": [
-          "http://127.0.0.1:5390/Taierzhuang1938/Model/Type89MediumTank/Model_Type89MediumTank.glb?v=20261028GeometryV54SurfaceV12"
+          "http://127.0.0.1:1222/Taierzhuang1938/Model/Type89MediumTank/Model_Type89MediumTank.glb?v=20261030GeometryV54SurfaceV13"
         ]
       },
       {
@@ -558,8 +508,8 @@
         "pass": true,
         "detail": {
           "before": {
-            "left": 0.026775,
-            "right": 0.026775,
+            "left": 0.02429000000000815,
+            "right": 0.02429000000000815,
             "turret": [
               0,
               0,
@@ -575,8 +525,8 @@
           },
           "after": {
             "mode": "tracks",
-            "left": 0.22351000000000193,
-            "right": 0.22351000000000193,
+            "left": 0.213955000000006,
+            "right": 0.213955000000006,
             "turret": [
               0,
               0,
@@ -601,9 +551,9 @@
             "right": 0,
             "turret": [
               0,
-              0.007511929349656573,
+              0.0050039791166541425,
               0,
-              0.9999717850606815
+              0.9999874800181251
             ],
             "bow": [
               -0.33130037784576416,
@@ -618,9 +568,9 @@
             "right": 0,
             "turret": [
               0,
-              0.07242852468256486,
+              0.06914877466673353,
               0,
-              0.99737360543194
+              0.9976063587217602
             ],
             "bow": [
               -0.33130037784576416,
@@ -645,10 +595,10 @@
               1
             ],
             "bow": [
-              -0.33067892761026385,
-              0.0011039949654610586,
-              -0.00038846268553439147,
-              0.9437426880377007
+              -0.330265342322348,
+              0.001837794982030854,
+              -0.0006475691871619303,
+              0.9438862171483885
             ]
           },
           "after": {
@@ -662,10 +612,10 @@
               1
             ],
             "bow": [
-              -0.31552977691381545,
-              0.027231876944249205,
-              -0.010070463822702068,
-              0.9484714832905876
+              -0.31513758091806426,
+              0.027880488139635548,
+              -0.010323213804310128,
+              0.9485803070005182
             ]
           }
         }
@@ -675,36 +625,36 @@
         "pass": true,
         "detail": {
           "before": {
-            "left": 0,
-            "right": 0,
+            "left": 0.014735000000002038,
+            "right": 0.010525000000001455,
             "turret": [
               0,
+              0.005051978509911601,
               0,
-              0,
-              1
+              0.9999872386751419
             ],
             "bow": [
-              -0.33130037784576416,
-              0,
-              0,
-              0.9435254335403442
+              -0.3300480604959359,
+              0.0022229955197033673,
+              -0.0007838737566512378,
+              0.9439612840016082
             ]
           },
           "after": {
             "mode": "all",
-            "left": 0.1895949999999938,
-            "right": 0.13542499999999563,
+            "left": 0.196805000000006,
+            "right": 0.1405750000000044,
             "turret": [
               0,
-              0.06495823038723593,
+              0.06742480849822638,
               0,
-              0.9978879838463628
+              0.9977243583269767
             ],
             "bow": [
-              -0.31532925664710054,
-              0.02756372280536552,
-              -0.010199697942705298,
-              0.9485272011637907
+              -0.3147407244825928,
+              0.02853494083712298,
+              -0.010578884001663411,
+              0.9486897832353389
             ]
           }
         }
@@ -724,24 +674,22 @@
       }
     ],
     "requests": [
-      "http://127.0.0.1:5390/Taierzhuang1938/Model/Type89MediumTank/Model_Type89MediumTank.glb?v=20261028GeometryV54SurfaceV12"
+      "http://127.0.0.1:1222/Taierzhuang1938/Model/Type89MediumTank/Model_Type89MediumTank.glb?v=20261030GeometryV54SurfaceV13"
     ],
     "errors": []
   },
-  "sharedRegression": {
-    "vehicleDomain": {
-      "passed": 5,
-      "failed": 0
-    },
-    "libraryAndPublication": {
-      "passed": 6,
-      "samplerCaseTimeout": true
-    },
-    "fullPrepush": {
-      "stoppedAt": "SpeakerGestureTest",
-      "assertion": "FrontObservation.02: luo gestured on his previous line too",
-      "testAndInputTablesEqualToOriginMaster": true
-    },
-    "samplerUltraRetry": "240000ms scene-ready timeout; no sampler-overflow assertion was reported. Whole-suite green is not claimed."
-  }
+  "assetCheckCount": 667,
+  "domainChecks": {
+    "passed": 5,
+    "failed": 0
+  },
+  "historicalLedgerReview": {
+    "notionRowsUnchanged": true,
+    "existingInferredAppearanceBoundaryCoversRefinement": true
+  },
+  "blenderCleanup": {
+    "ownedRunningInstances": 0,
+    "method": "Controlled batch process exits after each source operation"
+  },
+  "paintFinishDetailedReview": "Data_PaintFinishReview.json"
 }

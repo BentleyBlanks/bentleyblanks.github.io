@@ -54,7 +54,7 @@
   "primaryPhoto": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
   "accessoryState": "2007 exposed cylindrical perforated bow-MG jacket and opening round cover with inner star; pointed removable2025 cover excluded. Rest joints are closed; the2007 review pose opens them with Type89Motion.",
   "geometryVersion": "20261027GeometryV54",
-  "materialRevision": "SurfaceV12",
+  "materialRevision": "SurfaceV13",
   "runtimeTriangleTarget": 400000,
   "runtimeTriangleCeiling": 420000,
   "runtimeRenderedTriangles": 417130,
@@ -69,8 +69,8 @@
   "materialCount": 9,
   "activePackedImages": 25,
   "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
-  "reviewedAt": "2026-10-27T20:41:50.254Z",
-  "reviewScope": "Author-reviewed optional asset integration under the user instruction; not a factory-dimensional or full photo-fidelity certification",
+  "reviewedAt": "2026-10-29T17:52:16.473Z",
+  "reviewScope": "Metal-paint finish refinement using the retained exposure masks; exact geometry/rig/UV/macro-normal/AO continuity; restored-car pigment retained",
   "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank",
   "highProject": "Scene_Type89MediumTankHighPbr.blend",
   "gameProject": "Scene_Type89MediumTankGamePbr.blend",
@@ -79,7 +79,7 @@
   "materialReview": "Data_MaterialReview.json",
   "geometryReview": "Data_GeometryReviewV3.json",
   "articulationEvidence": "Data_ArticulationEvidence.json",
-  "runtimeSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
+  "runtimeSha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f",
   "userApproved": false,
   "authorization": {
     "optionalAssetIntegration": true,
@@ -99,12 +99,14 @@
     ],
     "channels": "sRGB Base; linear OpenGL Normal; ORM R=AO G=roughness B=metallic",
     "armor": "4096Base/8192Normal/4096ORM",
-    "method": "Complete paired high/game bake, periodic fine film/cast normals and separately verified side-cover AO",
+    "method": "Complete SurfaceV12 substrate plus SourceV13 coherent satin coating, finer low-relief normal repetition and selective existing-contact steel refinement",
     "microSurface": {
       "tileRmsSlope": 0.11,
-      "filmTileM": 0.168,
-      "castTileM": 0.224,
-      "appearanceInference": true
+      "filmTileM": 0.126,
+      "castTileM": 0.16,
+      "appearanceInference": true,
+      "rolledNormalScale": 0.55,
+      "castNormalScale": 0.45
     },
     "extensions": [
       "KHR_materials_clearcoat",
@@ -117,5 +119,7 @@
     "Photographic perspective and local form matching retain uncertainty; this is not a scan-identical replica.",
     "Door/gun stow linkage is a collision-cleared display reconstruction, not a verified original operating procedure."
   ],
-  "exportTriangulationZeroAreaTriangles": 2
+  "exportTriangulationZeroAreaTriangles": 2,
+  "paintFinishProfile": "Data_PaintFinishProfile.json",
+  "paintFinishReview": "Data_PaintFinishReview.json"
 }

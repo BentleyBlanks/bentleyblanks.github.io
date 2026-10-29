@@ -57,5 +57,13 @@
     "phaseSamples": 36,
     "pass": true,
     "exactFactoryArcsVerified": false
+  },
+  "materialOnlyContinuation": {
+    "revision": "SurfaceV13",
+    "runtimeSha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f",
+    "baselineRuntimeSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
+    "geometryAndRigExact": true,
+    "currentBrowserChecks": 28,
+    "scope": "Previous triangle-motion proofs retained by exact geometry; current actual artifact motion API rechecked"
   }
 }

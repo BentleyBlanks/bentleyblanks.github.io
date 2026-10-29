@@ -1,0 +1,22 @@
+{
+  "revision": "SurfaceV13",
+  "scope": "Metal paint finish only; same geometry, pivots, UVs, macro normals, AO and restored-car pigment",
+  "referenceApproach": "Type94 local material studies: coherent satin coating and selective contact abrasion. These are material-layer references, not evidence of identical historic pigment or damage.",
+  "roles": {
+    "Armor": {"coatRoughnessScale": 0.78, "fineNormalScale": 0.55, "fineTileM": 0.126},
+    "Guard": {"coatRoughnessScale": 0.84, "fineNormalScale": 0.55, "fineTileM": 0.126},
+    "CastArmor": {"coatRoughnessScale": 0.88, "fineNormalScale": 0.45, "fineTileM": 0.16}
+  },
+  "contactWear": {
+    "metallicGain": 1.25,
+    "maximumMetallic": 0.96,
+    "minimumExistingMetallic": 0.08,
+    "steelRoughness": 0.24,
+    "roughnessBlend": 0.55,
+    "neutralSteelBlend": 0.28,
+    "neutralSteelGain": 1.04,
+    "protectMuseumBadge": true,
+    "newDamageMask": false
+  },
+  "historicalClassification": "Inferred appearance refinement; no factory coating, damage-location or participation claim"
+}

@@ -7,7 +7,7 @@
 ## 当前入口与任务范围
 
 - **九四式侦察机 V48 游戏接入（2026-10-28）**：`Model/NakajimaKi4/` 当前为 179679 三角／40 网格／43 张内嵌图，保留 10 个真实枢轴、216 片散热片和 1512 颗实体铆钉。构件库按需加载，`campaignEnabled:false`；原照轮廓与阴影残差保留，不宣称逐点完全一致。可编辑高／低源留 OneDrive，重建走 `_blender/Script_RebuildNakajimaKi4.mjs`；来源、接线、原门槛和收据见[资产说明](Model/NakajimaKi4/README.md)。
-- **八九式乙型可选资产（2026-10-28）**：`Model/Type89MediumTank/` 的 GeometryV54／SurfaceV12 已接入构件库「模型」，按需加载；左右履带／轮组、整周炮塔、主炮及两挺机枪保留真实轴心和演示控件。`Data_VehicleAssets` 保持 `campaignEnabled:false`。高低源、细漆膜／浅铸纹、薄盖AO及独立三角化记账均有重建和验收；原厂限位、微观材质与隐藏结构仍属复原，不改变任务参战认定。入口与证据见[资产说明](Model/Type89MediumTank/README.md)，重建 `_blender/Script_RebuildType89MediumTank.mjs`。
+- **八九式乙型可选资产（2026-10-28）**：`Model/Type89MediumTank/` 的 GeometryV54／SurfaceV13 已接入构件库「模型」，按需加载；左右履带／轮组、整周炮塔、主炮及两挺机枪保留真实轴心和演示控件。`Data_VehicleAssets` 保持 `campaignEnabled:false`。高低源、细漆膜／浅铸纹、薄盖AO及独立三角化记账均有重建和验收；原厂限位、微观材质与隐藏结构仍属复原，不改变任务参战认定。入口与证据见[资产说明](Model/Type89MediumTank/README.md)，重建 `_blender/Script_RebuildType89MediumTank.mjs`。
 
 - **冲击波推人：推一把 / 推倒 / 掀飞（2026-10-28）**：`Combat.Blast` 在伤害之后按装药量与爆点到质心的距离算人身上的 Δv（Kinney–Graham 超压与正压持续 + Rankine–Hugoniot，绕射段 + 拖曳段，`Script_BlastKnockback`），站得住的上限按外推质心（站 1.2 / 蹲 2.0 m/s），超过就绕脚翻倒，脚撑不住就被掀飞，趴着只滑；倒地、飞、砸地、撞墙、滑、躺、爬起来由 `Script_PlayerKnockback` 管，撞击按 Glasstone 表 12.49 扣钝伤（不流血）。手榴弹 2 m 只晃，150 榴弹 5 m 倒地，250 kg 炸弹 8 m 掀飞；被这一下炸死的人照样被掀出去、镜头跟着身体走。原来 `blastImbalance`（挨炸 ≥24 血走白刃倒地）删了。数在 `Data_Tuning_BlastKnockback`，见 [冲击波推人](docs/Data_BlastKnockback.md)；回归 `Script_BlastKnockbackTest`。
 

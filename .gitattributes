@@ -8,3 +8,5 @@ Taierzhuang1938/Model/Type89MediumTank/Data_*.json text eol=lf
 
 # Preserve this existing input's original fingerprint alongside the LF inputs.
 Taierzhuang1938/Model/Type89MediumTank/Data_RunningGearReconstruction.json text eol=crlf
+Taierzhuang1938/_blender/Script_RebuildType89PaintFinish.mjs text eol=lf
+Taierzhuang1938/_blender/Script_Type89PaintFinishAudit.mjs text eol=lf

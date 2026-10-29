@@ -7,6 +7,7 @@ import {LoadGlb,ReadAccessor} from './_import/Script_LugouGlbPose.mjs';
 import {AuditEnclosedShoeCleanup,VerifyRejectsExternalRemoval} from './_blender/Script_Type89EnclosedSurfaceAudit.mjs';
 import {OPTIONAL_VEHICLE_ASSETS} from './Data_VehicleAssets.mjs';
 import {MESHES} from './Data_Meshes.mjs';
+import {createHash} from 'node:crypto';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const fileArgument=process.argv.find(value=>value.startsWith('--file='))?.slice(7);
@@ -465,5 +466,14 @@ for(const [index,material] of g.materials.entries()){
 }
 const layeredSurface=g.nodes.some(node=>node.extras?.microSurface);
 Check(imageCache.size===(layeredSurface?25:21)&&g.materials.length===(layeredSurface?9:8),'Every physical set and optional film/cast layer is actually decoded',String(imageCache.size));
+const paintFinish=g.nodes.find(node=>node.name==='Model_Type89MediumTank')?.extras?.paintFinish;
+if(paintFinish){
+  const bytes=fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_PaintFinishProfile.json')),profile=JSON.parse(bytes);
+  Check(paintFinish.profileSha256===createHash('sha256').update(bytes).digest('hex')&&paintFinish.newDamageMask===false,'The delivered paint refinement matches its reproducible profile and retained exposure masks');
+  for(const[role,settings]of Object.entries(profile.roles)){
+    const material=g.materials.find(m=>m.name==='Material_Type89Game'+role),coat=material?.extensions?.KHR_materials_clearcoat,fine=role==='CastArmor'?material?.normalTexture:coat?.clearcoatNormalTexture;
+    Check(Math.abs(coat?.clearcoatRoughnessFactor-settings.coatRoughnessScale)<1e-6&&Math.abs(fine?.scale-settings.fineNormalScale)<1e-6,'Actual paint/cast finish is the declared refined physical material: '+role);
+  }
+}
 console.log(`Type89MediumTank: ${checks-failures}/${checks} passed`);
 process.exitCode=failures?1:0;

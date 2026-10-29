@@ -1,0 +1,1858 @@
+{
+  "revision": "SurfaceV13",
+  "reviewedAt": "2026-10-29T17:52:16.473Z",
+  "status": "AuthorReviewedForOptionalAssetIntegration",
+  "profile": "Data_PaintFinishProfile.json",
+  "profileSha256": "990e1eef4e6678e8299c53b08a7e2fe4ea34fec8fb954d9524cf33d08df2d951",
+  "baselineSurface": "SurfaceV12",
+  "referenceApproach": "Type94 local material studies: coherent satin coating and selective contact abrasion. These are material-layer references, not evidence of identical historic pigment or damage.",
+  "geometryAndRigExact": true,
+  "newDamageMask": false,
+  "aoAndEffectiveOpacityExact": true,
+  "unwornPigmentAndMuseumBadgeProtected": true,
+  "audits": {
+    "Game": {
+      "pass": true,
+      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankGamePbr.glb",
+      "sha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f",
+      "baseline": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV12Release_b24618b4\\Model_Type89MediumTankGamePbr.glb",
+      "baselineSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
+      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankGameSourceExport.glb",
+      "quality": "Game",
+      "checks": [
+        {
+          "name": "Actual geometry, normals, signed tangents, UVs, material roles and pivot transforms are exact",
+          "pass": true
+        },
+        {
+          "name": "Material and image counts stay at9/25",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Armor",
+          "pass": true
+        },
+        {
+          "name": "Declared coherent-paint response exported: Armor",
+          "pass": true
+        },
+        {
+          "name": "Only fine normal repetition changes: Armor",
+          "pass": true
+        },
+        {
+          "name": "All remaining shader factors and bindings are exact: Armor",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Shadow",
+          "pass": true
+        },
+        {
+          "name": "Other physical material is unchanged: Shadow",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Steel",
+          "pass": true
+        },
+        {
+          "name": "Other physical material is unchanged: Steel",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: CastArmor",
+          "pass": true
+        },
+        {
+          "name": "Declared coherent-paint response exported: CastArmor",
+          "pass": true
+        },
+        {
+          "name": "Only fine normal repetition changes: CastArmor",
+          "pass": true
+        },
+        {
+          "name": "All remaining shader factors and bindings are exact: CastArmor",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Exhaust",
+          "pass": true
+        },
+        {
+          "name": "Other physical material is unchanged: Exhaust",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Guard",
+          "pass": true
+        },
+        {
+          "name": "Declared coherent-paint response exported: Guard",
+          "pass": true
+        },
+        {
+          "name": "Only fine normal repetition changes: Guard",
+          "pass": true
+        },
+        {
+          "name": "All remaining shader factors and bindings are exact: Guard",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Glass",
+          "pass": true
+        },
+        {
+          "name": "Other physical material is unchanged: Glass",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Rubber",
+          "pass": true
+        },
+        {
+          "name": "Other physical material is unchanged: Rubber",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Track",
+          "pass": true
+        },
+        {
+          "name": "Other physical material is unchanged: Track",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameArmorMicroCoat",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89FineFilmNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89FineFilmNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameArmorNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameArmorNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameArmorPoseOrm",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameArmorBase",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameSteelNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameSteelNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameSteelOrm",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameSteelOrm",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameSteelBase",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameSteelBase",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89FineCastNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89FineCastNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameExhaustNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameExhaustNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameExhaustOrm",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameExhaustOrm",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameExhaustBase",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameExhaustBase",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameGuardMicroCoat",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameGuardNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameGuardNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameGuardOrm",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameGuardBase",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameGlassNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameGlassNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameGlassOrm",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameGlassOrm",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameGlassBase",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameGlassBase",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameRubberNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameRubberNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameRubberOrm",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameRubberOrm",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameRubberBase",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameRubberBase",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameTrackNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameTrackNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameTrackOrm",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameTrackOrm",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89GameTrackBase",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89GameTrackBase",
+          "pass": true
+        },
+        {
+          "name": "Image dimensions are unchanged: ArmorBase",
+          "pass": true
+        },
+        {
+          "name": "Image dimensions are unchanged: ArmorOrm",
+          "pass": true
+        },
+        {
+          "name": "Image dimensions are unchanged: ArmorCoat",
+          "pass": true
+        },
+        {
+          "name": "AO and effective transparency are untouched: Armor",
+          "pass": true,
+          "detail": {
+            "ao": 0,
+            "opacity": 0
+          }
+        },
+        {
+          "name": "Roughness/metal changes remain inside pre-existing exposure: Armor",
+          "pass": true,
+          "detail": {
+            "outside": 0,
+            "metalBounds": 0,
+            "ormChanges": 158588
+          }
+        },
+        {
+          "name": "Unworn pigment stays exact; conductor colour change is bounded: Armor",
+          "pass": true,
+          "detail": {
+            "colourOutside": 0,
+            "maxColourDelta": 19,
+            "baseChanges": 42247
+          }
+        },
+        {
+          "name": "Coating mask follows changed conductor classification only: Armor",
+          "pass": true,
+          "detail": {
+            "coatOutside": 0,
+            "coatOther": 0
+          }
+        },
+        {
+          "name": "Image dimensions are unchanged: GuardBase",
+          "pass": true
+        },
+        {
+          "name": "Image dimensions are unchanged: GuardOrm",
+          "pass": true
+        },
+        {
+          "name": "Image dimensions are unchanged: GuardCoat",
+          "pass": true
+        },
+        {
+          "name": "AO and effective transparency are untouched: Guard",
+          "pass": true,
+          "detail": {
+            "ao": 0,
+            "opacity": 0
+          }
+        },
+        {
+          "name": "Roughness/metal changes remain inside pre-existing exposure: Guard",
+          "pass": true,
+          "detail": {
+            "outside": 0,
+            "metalBounds": 0,
+            "ormChanges": 29222
+          }
+        },
+        {
+          "name": "Unworn pigment stays exact; conductor colour change is bounded: Guard",
+          "pass": true,
+          "detail": {
+            "colourOutside": 0,
+            "maxColourDelta": 5,
+            "baseChanges": 41558
+          }
+        },
+        {
+          "name": "Coating mask follows changed conductor classification only: Guard",
+          "pass": true,
+          "detail": {
+            "coatOutside": 0,
+            "coatOther": 0
+          }
+        },
+        {
+          "name": "Editable-source re-export preserves all actual geometry and rig data",
+          "pass": true
+        },
+        {
+          "name": "Editable-source exported shader matches refinement: Armor",
+          "pass": true
+        },
+        {
+          "name": "Editable-source exported shader matches refinement: Guard",
+          "pass": true
+        },
+        {
+          "name": "Editable-source exported shader matches refinement: CastArmor",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameArmorMicroCoat",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameArmorMicroCoat",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameArmorMicroCoat",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89FineFilmNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89FineFilmNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89FineFilmNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameArmorNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameArmorNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameArmorNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 8160630
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameArmorPoseOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameArmorPoseOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameArmorPoseOrm",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameArmorBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameArmorBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameArmorBase",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameSteelNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameSteelNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameSteelNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 297337
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameSteelOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameSteelOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameSteelOrm",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameSteelBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameSteelBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameSteelBase",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 88955
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89FineCastNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89FineCastNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89FineCastNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameExhaustNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameExhaustNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameExhaustNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 137137
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameExhaustOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameExhaustOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameExhaustOrm",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameExhaustBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameExhaustBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameExhaustBase",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 181343
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameGuardMicroCoat",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameGuardMicroCoat",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameGuardMicroCoat",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameGuardNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameGuardNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameGuardNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 907401
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameGuardOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameGuardOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameGuardOrm",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameGuardBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameGuardBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameGuardBase",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameGlassNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameGlassNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameGlassNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 44715
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameGlassOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameGlassOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameGlassOrm",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameGlassBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameGlassBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameGlassBase",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 16353
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameRubberNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameRubberNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameRubberNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 8444
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameRubberOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameRubberOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameRubberOrm",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameRubberBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameRubberBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameRubberBase",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 15185
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameTrackNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameTrackNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameTrackNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 333343
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameTrackOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameTrackOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameTrackOrm",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89GameTrackBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89GameTrackBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89GameTrackBase",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 837421
+          }
+        }
+      ],
+      "imageChecks": [
+        {
+          "role": "Armor",
+          "ormChanges": 158588,
+          "baseChanges": 42247,
+          "maxColourDelta": 19,
+          "aoChanged": 0,
+          "opacityChanged": 0
+        },
+        {
+          "role": "Guard",
+          "ormChanges": 29222,
+          "baseChanges": 41558,
+          "maxColourDelta": 5,
+          "aoChanged": 0,
+          "opacityChanged": 0
+        }
+      ],
+      "geometryAndRigExact": true,
+      "allOtherImagePayloadsExact": true,
+      "newDamageMask": false
+    },
+    "High": {
+      "pass": true,
+      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankHighPbr.glb",
+      "sha256": "d25dda97f5a92149fa80d3bf0404adf682049ae9f64300ed0b0c27ce91483a25",
+      "baseline": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV12Release_b24618b4\\Model_Type89MediumTankHighPbr.glb",
+      "baselineSha256": "3ff008c6989b2df3e7a726c7939b95bf02dbcc777aa5d9a6cd07d640db2b3642",
+      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankHighSourceExport.glb",
+      "quality": "High",
+      "checks": [
+        {
+          "name": "Actual geometry, normals, signed tangents, UVs, material roles and pivot transforms are exact",
+          "pass": true
+        },
+        {
+          "name": "Material and image counts stay at9/25",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Armor",
+          "pass": true
+        },
+        {
+          "name": "Declared coherent-paint response exported: Armor",
+          "pass": true
+        },
+        {
+          "name": "Only fine normal repetition changes: Armor",
+          "pass": true
+        },
+        {
+          "name": "All remaining shader factors and bindings are exact: Armor",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Shadow",
+          "pass": true
+        },
+        {
+          "name": "Other physical material is unchanged: Shadow",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Steel",
+          "pass": true
+        },
+        {
+          "name": "Other physical material is unchanged: Steel",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: CastArmor",
+          "pass": true
+        },
+        {
+          "name": "Declared coherent-paint response exported: CastArmor",
+          "pass": true
+        },
+        {
+          "name": "Only fine normal repetition changes: CastArmor",
+          "pass": true
+        },
+        {
+          "name": "All remaining shader factors and bindings are exact: CastArmor",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Exhaust",
+          "pass": true
+        },
+        {
+          "name": "Other physical material is unchanged: Exhaust",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Guard",
+          "pass": true
+        },
+        {
+          "name": "Declared coherent-paint response exported: Guard",
+          "pass": true
+        },
+        {
+          "name": "Only fine normal repetition changes: Guard",
+          "pass": true
+        },
+        {
+          "name": "All remaining shader factors and bindings are exact: Guard",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Glass",
+          "pass": true
+        },
+        {
+          "name": "Other physical material is unchanged: Glass",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Rubber",
+          "pass": true
+        },
+        {
+          "name": "Other physical material is unchanged: Rubber",
+          "pass": true
+        },
+        {
+          "name": "Material identity retained: Track",
+          "pass": true
+        },
+        {
+          "name": "Other physical material is unchanged: Track",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighArmorMicroCoat",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89FineFilmNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89FineFilmNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighArmorNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighArmorNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighArmorPoseOrm",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighArmorBase",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighSteelNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighSteelNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighSteelOrm",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighSteelOrm",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighSteelBase",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighSteelBase",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89FineCastNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89FineCastNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighExhaustNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighExhaustNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighExhaustOrm",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighExhaustOrm",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighExhaustBase",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighExhaustBase",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighGuardMicroCoat",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighGuardNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighGuardNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighGuardOrm",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighGuardBase",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighGlassNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighGlassNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighGlassOrm",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighGlassOrm",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighGlassBase",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighGlassBase",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighRubberNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighRubberNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighRubberOrm",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighRubberOrm",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighRubberBase",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighRubberBase",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighTrackNormal",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighTrackNormal",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighTrackOrm",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighTrackOrm",
+          "pass": true
+        },
+        {
+          "name": "Retained image identity: Texture_Type89HighTrackBase",
+          "pass": true
+        },
+        {
+          "name": "Other embedded image payload is byte-exact: Texture_Type89HighTrackBase",
+          "pass": true
+        },
+        {
+          "name": "Image dimensions are unchanged: ArmorBase",
+          "pass": true
+        },
+        {
+          "name": "Image dimensions are unchanged: ArmorOrm",
+          "pass": true
+        },
+        {
+          "name": "Image dimensions are unchanged: ArmorCoat",
+          "pass": true
+        },
+        {
+          "name": "AO and effective transparency are untouched: Armor",
+          "pass": true,
+          "detail": {
+            "ao": 0,
+            "opacity": 0
+          }
+        },
+        {
+          "name": "Roughness/metal changes remain inside pre-existing exposure: Armor",
+          "pass": true,
+          "detail": {
+            "outside": 0,
+            "metalBounds": 0,
+            "ormChanges": 286931
+          }
+        },
+        {
+          "name": "Unworn pigment stays exact; conductor colour change is bounded: Armor",
+          "pass": true,
+          "detail": {
+            "colourOutside": 0,
+            "maxColourDelta": 19,
+            "baseChanges": 94547
+          }
+        },
+        {
+          "name": "Coating mask follows changed conductor classification only: Armor",
+          "pass": true,
+          "detail": {
+            "coatOutside": 0,
+            "coatOther": 0
+          }
+        },
+        {
+          "name": "Image dimensions are unchanged: GuardBase",
+          "pass": true
+        },
+        {
+          "name": "Image dimensions are unchanged: GuardOrm",
+          "pass": true
+        },
+        {
+          "name": "Image dimensions are unchanged: GuardCoat",
+          "pass": true
+        },
+        {
+          "name": "AO and effective transparency are untouched: Guard",
+          "pass": true,
+          "detail": {
+            "ao": 0,
+            "opacity": 0
+          }
+        },
+        {
+          "name": "Roughness/metal changes remain inside pre-existing exposure: Guard",
+          "pass": true,
+          "detail": {
+            "outside": 0,
+            "metalBounds": 0,
+            "ormChanges": 144191
+          }
+        },
+        {
+          "name": "Unworn pigment stays exact; conductor colour change is bounded: Guard",
+          "pass": true,
+          "detail": {
+            "colourOutside": 0,
+            "maxColourDelta": 11,
+            "baseChanges": 325205
+          }
+        },
+        {
+          "name": "Coating mask follows changed conductor classification only: Guard",
+          "pass": true,
+          "detail": {
+            "coatOutside": 0,
+            "coatOther": 0
+          }
+        },
+        {
+          "name": "Editable-source re-export preserves all actual geometry and rig data",
+          "pass": true
+        },
+        {
+          "name": "Editable-source exported shader matches refinement: Armor",
+          "pass": true
+        },
+        {
+          "name": "Editable-source exported shader matches refinement: Guard",
+          "pass": true
+        },
+        {
+          "name": "Editable-source exported shader matches refinement: CastArmor",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighArmorMicroCoat",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighArmorMicroCoat",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighArmorMicroCoat",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89FineFilmNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89FineFilmNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89FineFilmNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighArmorNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighArmorNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighArmorNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighArmorPoseOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighArmorPoseOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighArmorPoseOrm",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighArmorBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighArmorBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighArmorBase",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 3637658
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighSteelNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighSteelNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighSteelNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighSteelOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighSteelOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighSteelOrm",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighSteelBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighSteelBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighSteelBase",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89FineCastNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89FineCastNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89FineCastNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighExhaustNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighExhaustNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighExhaustNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighExhaustOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighExhaustOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighExhaustOrm",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighExhaustBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighExhaustBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighExhaustBase",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighGuardMicroCoat",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighGuardMicroCoat",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighGuardMicroCoat",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighGuardNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighGuardNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighGuardNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighGuardOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighGuardOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighGuardOrm",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighGuardBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighGuardBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighGuardBase",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighGlassNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighGlassNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighGlassNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighGlassOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighGlassOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighGlassOrm",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighGlassBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighGlassBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighGlassBase",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighRubberNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighRubberNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighRubberNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighRubberOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighRubberOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighRubberOrm",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighRubberBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighRubberBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighRubberBase",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighTrackNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighTrackNormal",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighTrackNormal",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighTrackOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighTrackOrm",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighTrackOrm",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        },
+        {
+          "name": "Editable-source image retained: Texture_Type89HighTrackBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source image dimensions match: Texture_Type89HighTrackBase",
+          "pass": true
+        },
+        {
+          "name": "Editable-source decoded pixels match: Texture_Type89HighTrackBase",
+          "pass": true,
+          "detail": {
+            "rgbDifferences": 0,
+            "effectiveAlphaDifferences": 0,
+            "unusedAlphaDifferences": 0
+          }
+        }
+      ],
+      "imageChecks": [
+        {
+          "role": "Armor",
+          "ormChanges": 286931,
+          "baseChanges": 94547,
+          "maxColourDelta": 19,
+          "aoChanged": 0,
+          "opacityChanged": 0
+        },
+        {
+          "role": "Guard",
+          "ormChanges": 144191,
+          "baseChanges": 325205,
+          "maxColourDelta": 11,
+          "aoChanged": 0,
+          "opacityChanged": 0
+        }
+      ],
+      "geometryAndRigExact": true,
+      "allOtherImagePayloadsExact": true,
+      "newDamageMask": false
+    }
+  },
+  "comparison": "Same geometry/camera/projection/exposure/light; final viewport and detail images retained locally",
+  "rows": [
+    {
+      "quality": "Game",
+      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankGamePbr.glb",
+      "sha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f",
+      "bytes": 88407696,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Scene_Type89MediumTankGamePbr.blend",
+      "sourceSha256": "2dca8600177316b96326831407fecee0dded595e9cde2e72e38b9b24a99e4297",
+      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankGameSourceExport.glb",
+      "baseline": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV12Release_b24618b4\\Model_Type89MediumTankGamePbr.glb",
+      "baselineSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
+      "geometryBufferViewsExact": true,
+      "removedUnusedImagePayloads": 6,
+      "imageRows": [
+        {
+          "role": "Armor",
+          "label": "Base",
+          "image": 4,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameArmorBase.png",
+          "sha256": "bd82bca0d79a0335d992275c5dcf45fa423ce261555edc033c8ebf39a0cf64f9",
+          "bytes": 4788488,
+          "mime": "image/webp",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Armor",
+          "label": "Orm",
+          "image": 3,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameArmorPoseOrm.png",
+          "sha256": "a41c6a3b3f0aab290bd572010a492e7bb9310aa9e2a425f8bcd5f12da2b04c02",
+          "bytes": 10536868,
+          "mime": "image/webp",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Armor",
+          "label": "MicroCoatData",
+          "image": 0,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameArmorMicroCoat.png",
+          "sha256": "e18de5576b28fc584d7397ace06dc80cfcccaa654fbf367beda52a92dc1445f8",
+          "bytes": 6410794,
+          "mime": "image/webp",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Guard",
+          "label": "Base",
+          "image": 15,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameGuardBase.png",
+          "sha256": "ad09ce6f89e7e4424c7ca1a22e4056da7be438aa54648de0b567daf96d54acf1",
+          "bytes": 3845172,
+          "mime": "image/png",
+          "opacityPreserved": true
+        },
+        {
+          "role": "Guard",
+          "label": "Orm",
+          "image": 14,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameGuardOrm.png",
+          "sha256": "56ffcb1cb1a34555d15d3349e4cd4434c1ae6e91e709f7abc6a953e93476edab",
+          "bytes": 603010,
+          "mime": "image/webp",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Guard",
+          "label": "MicroCoatData",
+          "image": 12,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameGuardMicroCoat.png",
+          "sha256": "2b9329c52d2a4fba63edda36e4201ecc2d50160156b83afb4ad6acef4182ad4b",
+          "bytes": 397046,
+          "mime": "image/webp",
+          "opacityPreserved": false
+        }
+      ]
+    },
+    {
+      "quality": "High",
+      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankHighPbr.glb",
+      "sha256": "d25dda97f5a92149fa80d3bf0404adf682049ae9f64300ed0b0c27ce91483a25",
+      "bytes": 185734760,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Scene_Type89MediumTankHighPbr.blend",
+      "sourceSha256": "5fb01da1146581447cb2adc53e8e52636eec3a45f7884b4f5e90e8e9e9d7d2dc",
+      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankHighSourceExport.glb",
+      "baseline": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV12Release_b24618b4\\Model_Type89MediumTankHighPbr.glb",
+      "baselineSha256": "3ff008c6989b2df3e7a726c7939b95bf02dbcc777aa5d9a6cd07d640db2b3642",
+      "geometryBufferViewsExact": true,
+      "removedUnusedImagePayloads": 6,
+      "imageRows": [
+        {
+          "role": "Armor",
+          "label": "Base",
+          "image": 4,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighArmorBase.png",
+          "sha256": "6603f1fcdc295d67c2492d06196c974e7bf1c6fa00fad8534e75950ba12742fd",
+          "bytes": 6832941,
+          "mime": "image/png",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Armor",
+          "label": "Orm",
+          "image": 3,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighArmorPoseOrm.png",
+          "sha256": "161579c2c90f77aad5ea44d79052467439376b6511e8502f4dcbe958d8d5f485",
+          "bytes": 19332442,
+          "mime": "image/png",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Armor",
+          "label": "MicroCoatData",
+          "image": 0,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighArmorMicroCoat.png",
+          "sha256": "8a94dde9a9d13bcccc40181f3b718a8a9476d4180771f7641dfb7597c1b5bc2b",
+          "bytes": 10956341,
+          "mime": "image/png",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Guard",
+          "label": "Base",
+          "image": 15,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighGuardBase.png",
+          "sha256": "dce0bfe223124c850e2b9f9411c1597862e37482b2ad37a867710ec36e77f7ef",
+          "bytes": 2552411,
+          "mime": "image/png",
+          "opacityPreserved": true
+        },
+        {
+          "role": "Guard",
+          "label": "Orm",
+          "image": 14,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighGuardOrm.png",
+          "sha256": "c710844c16a9ee65c636967b7e084eeb62f874e6717b4cc06c39fb2ea6e2fc1c",
+          "bytes": 1461193,
+          "mime": "image/png",
+          "opacityPreserved": false
+        },
+        {
+          "role": "Guard",
+          "label": "MicroCoatData",
+          "image": 12,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighGuardMicroCoat.png",
+          "sha256": "2c0162a4939d66b05e271ee366e1524c9d16fe1a751bde244329e8669b1412c7",
+          "bytes": 962618,
+          "mime": "image/png",
+          "opacityPreserved": false
+        }
+      ]
+    }
+  ]
+}
