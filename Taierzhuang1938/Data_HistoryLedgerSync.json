@@ -1,8 +1,8 @@
 {
   "schema": "tengxian-history-ledger-sync-v1",
   "about": "史实与创作对照的同步记号。Script_HistoryLedgerAudit.mjs 读它决定从哪里开始看改动、--check 读它拦已否决的链接；skill tengxian-fact-fiction-sync 核对完用 --mark-reviewed 写回。",
-  "reviewedAt": "2026-10-26T04:04:10.071Z",
-  "repoCommit": "9e04298c71f59f5d346efb52438817be3877fca3",
+  "reviewedAt": "2026-10-30T08:24:19.498Z",
+  "repoCommit": "1da487b2e0f8a7a3552ff5d1af672ade332f4bc0",
   "assetReviews": [
     {
       "asset": "BeishaheBridge",
@@ -382,7 +382,7 @@
       "id": "3fd60335331c8194aa82f0b238084d34",
       "title": "史实与创作对照表",
       "role": "ledgerTable",
-      "lastEdited": "2026-10-23T20:35:06.301Z"
+      "lastEdited": "2026-10-30T06:21:16.375Z"
     },
     {
       "id": "3c360335331c81be876fcf4cb0928e1b",
@@ -407,13 +407,13 @@
       "id": "3fb60335331c81faa38dfe84c25d29f0",
       "title": "第一关｜往南的路 · 剧本",
       "role": "source",
-      "lastEdited": "2026-10-23T18:51:10.858Z"
+      "lastEdited": "2026-10-30T08:14:24.711Z"
     },
     {
       "id": "3fc60335331c814f8be8e23d43500eb5",
       "title": "空间拓扑关系（第一关 01–05）",
       "role": "source",
-      "lastEdited": "2026-10-23T18:56:58.484Z"
+      "lastEdited": "2026-10-30T08:18:31.072Z"
     },
     {
       "id": "3c360335331c80988907c6e9b5ee9aca",
