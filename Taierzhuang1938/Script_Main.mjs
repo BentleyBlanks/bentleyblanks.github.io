@@ -10317,7 +10317,9 @@ function RenderSceneContent(dt) {
   // 两百米外的黑烟柱会在天上留一个越长越大的纯黑洞。这三行是把那一半补回来：
   // 预通道靶（判断背景是不是天空 + 软粒子）、雾参数、太阳方向（雾的朝阳增益）。
   // SetSize 会重建靶，纹理引用每帧都可能换，所以每帧重接，不能只在初始化接一次。
-  vfx.SetDepthSource(post.NormalDepthTexture, post.width, post.height, post.SceneDepthTexture);
+  // 白盒默认不跑预通道（WhiteboxPassPlan）：那张靶是空的，交出去会让弹孔逐像素「后面没有表面」全裁掉。
+  const prepassLive = !post.whiteboxConfig || post.whiteboxPasses?.has("prepass");
+  vfx.SetDepthSource(prepassLive ? post.NormalDepthTexture : null, post.width, post.height, post.SceneDepthTexture);
   // 落地扬尘按画质档降分辨率算体积（Script_PostGroundDust）：尘团系统是懒建的，每帧交一次。
   post.SetGroundDustSource?.(vfx.dustFields || null);
   // 粒子那份解析雾照常接（BootTest 的「粒子层的雾接上了」就是看它）。froxel 体积雾

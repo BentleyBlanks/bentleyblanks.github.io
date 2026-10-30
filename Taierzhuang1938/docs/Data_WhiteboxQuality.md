@@ -26,6 +26,8 @@
 
 **地形、角色、敌军、第一人称身体/手和手持装备默认保留原材质与贴图。** 人物与装备由独立 `characterTextures` 开关控制，不依赖场景的 `assetTextures`。地形以对象上的 `deformableTerrain`、`terrainTile` 或 `whiteboxTerrain` 标记识别；弹坑替换地块也保留贴图，不能用「材质名字带泥土」放行场景道具。透明粒子/贴花和天空默认不画；HUD 与任务系统继续工作。
 
+**弹孔例外（2026-10-31）：** 弹孔是射击命中反馈，单独一个开关 `bulletHoles`（默认开）：`effects` 关着时也照画（Script_Vfx 把弹孔池挂在单独的 `VfxBulletHoles` 组上，网格标 `userData.whiteboxBulletHole`）。特效网格出画时一律保留原材质，不再换成灰网格材质。白盒不跑预通道时，粒子层拿不到深度图（`uDepthValid = 0`），弹孔不做「后面是不是原表面」的逐像素裁切——之前交出去的是一张空靶，弹孔被整片裁掉。
+
 默认每帧只运行 **main → whiteboxOutput**：中性基础灯光、几何深度测试、太阳级联阴影（烘焙在 main 那一次出画里）、线性色转 sRGB 和剧情黑场/眼皮。高级效果与预通道/HZB、GTAO/SSIL、SSR、室内遮蔽、自阴影、GI、簇光、大气、体积雾、TAA/FXAA、Bloom、景深、运动模糊、自动曝光、调色均关闭。调试工具主动打开时仍允许线框/调试叠加。
 
 **枪械环境反射（2026-10-25，用户确认）**：`weaponReflections` 默认开，`environment` 仍默认关。目前汉阳造 173R 的材质通过 `userData.whiteboxWeaponReflection` 登记；只在保留原贴图时临时绑定关卡已有的天空 PMREM，强度和旋转沿用关卡环境。皮肤、地形及灰盒场景不因此得到环境贴图。预热与逐帧出画共用该规则，出画后恢复材质；沿用天空系统在启动／换天光时的 PMREM 烘焙，不增加逐帧反射捕获或屏幕 pass。旧存档缺少此新字段时取默认 true，明确保存的 false 保留。可在现有编辑区关闭「保留枪械环境反射」；开启整个「环境贴图 / IBL」时改走正常全场景 IBL，避免重复叠加。

@@ -145,6 +145,10 @@ function IsWhiteboxEffectMesh(object, sources) {
     && (m.isShaderMaterial || !m.depthTest || m.blending === THREE.AdditiveBlending))
     && !/water/i.test(object.name);
 }
+// 特效网格出画就保留原材质（换成灰网格材质的实例化粒子什么也画不出）；弹孔（Script_Vfx 标 userData.whiteboxBulletHole）单独一个开关。
+function ShowWhiteboxEffect(object, c) {
+  return c.effects || (c.bulletHoles && !!object.userData?.whiteboxBulletHole);
+}
 
 // 多材质网格的数组被原地改了某一格（引用没换）也算换了源材质。
 function SameSources(entry) {
@@ -164,7 +168,7 @@ function ChainVisible(object, top) {
 }
 
 // 缓存清单要重建的配置位：分类（保留贴图 / 特效）与灯光规则都只看这几位。
-const PLAN_CONFIG_KEYS = ["terrainTextures", "characterTextures", "assetTextures", "effects",
+const PLAN_CONFIG_KEYS = ["terrainTextures", "characterTextures", "assetTextures", "effects", "bulletHoles",
   "sceneLighting", "shadows", "firstPersonShadow", "contactShadows", "gi", "clusteredLights"];
 const MESH_KEEP = 0, MESH_HIDE = 1, MESH_WHITE = 2;
 
@@ -306,6 +310,7 @@ export class WhiteboxSceneRenderer {
     if (!c.environment) Set(scene, "environment", null);
     if (!c.fog) Set(scene, "fog", null);
     Set(scene.userData, "whiteboxEffects", c.effects);
+    Set(scene.userData, "whiteboxBulletHoles", c.bulletHoles);
     if (this.sky && !c.sky) Set(this.sky, "visible", false);
   }
 
@@ -350,8 +355,9 @@ export class WhiteboxSceneRenderer {
       const sources = Array.isArray(object.material) ? object.material : [object.material];
       // 只写深度的遮挡片（浮桥船舱里挡水面的那片）原样留着：换成白盒材质就成了一块看得见的灰板。
       if (IsWhiteboxDepthOnly(sources)) return;
-      if (!c.effects && IsWhiteboxEffectMesh(object, sources)) {
-        HideEffect(object); return;
+      if (IsWhiteboxEffectMesh(object, sources)) {
+        if (!ShowWhiteboxEffect(object, c)) HideEffect(object);
+        return;
       }
       const terrain = IsWhiteboxTerrain(object);
       const character = IsWhiteboxCharacter(object);
@@ -496,7 +502,7 @@ export class WhiteboxSceneRenderer {
     if (!material) return;
     const sources = entry.sources || [material];
     if (IsWhiteboxDepthOnly(sources)) return;
-    if (!c.effects && IsWhiteboxEffectMesh(object, sources)) { entry.mode = MESH_HIDE; return; }
+    if (IsWhiteboxEffectMesh(object, sources)) { entry.mode = ShowWhiteboxEffect(object, c) ? MESH_KEEP : MESH_HIDE; return; }
     entry.mode = MESH_WHITE;
     entry.terrain = IsWhiteboxTerrain(object);
     entry.character = IsWhiteboxCharacter(object);

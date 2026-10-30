@@ -702,6 +702,13 @@ export class VfxSystem {
     };
 
     for (const pool of Object.values(this.pools)) if(!pool.particleId)this.root.add(pool.mesh);
+    // 弹孔单独挂一层：白盒「特效」关着时 VfxRoot 整棵藏掉，弹孔这条命中反馈要留着（白盒开关 bulletHoles）。
+    this.bulletHoleRoot = new THREE.Group();
+    this.bulletHoleRoot.name = "VfxBulletHoles";
+    this.bulletHoleRoot.matrixAutoUpdate = false;
+    scene.add(this.bulletHoleRoot);
+    this.bulletHoleRoot.add(this.pools.decal.mesh);
+    this.pools.decal.mesh.userData.whiteboxBulletHole = true;
     // All emitted mesh fragments live under the same ParticleEffects root.
 
     this.dust = null;
@@ -804,6 +811,8 @@ export class VfxSystem {
         this.previousSceneHook.call(hookScene, renderer, hookScene, camera, target);
       }
       this.root.visible = !hookScene.overrideMaterial && hookScene.userData.whiteboxEffects !== false;
+      this.bulletHoleRoot.visible = !hookScene.overrideMaterial
+        && (hookScene.userData.whiteboxEffects !== false || hookScene.userData.whiteboxBulletHoles !== false);
       // Opaque falling clods participate in prepass and real object velocity;
       // they still obey the same game/preview whitebox effect visibility.
       this.particles.FallingSoil.SetVisible(hookScene.userData.whiteboxEffects!==false);
@@ -2005,6 +2014,7 @@ export class VfxSystem {
     }
     this.bloodEffects.Dispose();
     this.scene.remove(this.root);
+    this.scene.remove(this.bulletHoleRoot);
     for (const pool of Object.values(this.pools)) pool.Dispose();
     this.debris.Dispose();
     for (const pool of Object.values(this.chunks)) pool.Dispose();
