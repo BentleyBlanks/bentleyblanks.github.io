@@ -1,0 +1,70 @@
+{
+  "schema": "Type94MotionReferenceV2",
+  "status": "Broad mechanical movement corroborated; exact early-vehicle stops and speeds remain unmeasured",
+  "checkedDate": "2026-10-26",
+  "sources": [
+    {
+      "id": "AwmType94",
+      "url": "https://www.awm.gov.au/visit/exhibitions/bigthingsinstore/tankette",
+      "checked": true,
+      "supports": "Museum identifies the 6.5mm Type91 in a ball mount; two-axis aiming is a mechanical interpretation of that mount. Exact stops are not provided."
+    },
+    {
+      "id": "AwmCatalogue",
+      "url": "https://www.awm.gov.au/collection/C110503",
+      "checked": true,
+      "supports": "Steel/rubber construction, front drive sprockets, four rubber-tyred road wheels and two return rollers on each side; independent suspension layout",
+      "limit": "Different museum vehicle; its paint, exact hardware and dimensions do not override the selected Kubinka2017 reference"
+    },
+    {
+      "id": "UsSpecialSeries26",
+      "url": "https://ww1.lonesentry.com/manuals/japanese-tanks/tankettes.html",
+      "publication": "US War Department, Japanese Tanks and Tank Tactics,15November1944, tankettes section",
+      "checked": true,
+      "supports": "Early front sprocket drive, linked tracks and ball-mounted turret machine gun; full360degree turret traverse in its Model94 table",
+      "limit": "Wartime intelligence mixes early Type94 under Model92 with a later trailing-idler Model94. Exact calibre, dimensions and operating limits are not transferred between them"
+    },
+    {
+      "id": "JapaneseProvisionalSpecification",
+      "url": "https://www.jacar.archives.go.jp/das/meta/C01001361800",
+      "localPdfSha256": "ddcd38e130b04197d5d05de0bdbf11c417daab4328b9ed7271ae47cf0a41cc37",
+      "localPagesRechecked": [
+        19,
+        20,
+        21
+      ],
+      "limit": "These inspected specification tables do not establish the retained gun elevation stops or traverse speed. Current web viewer was unavailable; the previously acquired original PDF was read locally"
+    }
+  ],
+  "implementedMovement": {
+    "tracks": "Individual shoe links circulate along the retained closed path. Each side and its sprocket/road/idler wheels follow its own travelled distance",
+    "turret": "Separate turret root rotates relative to the fixed hull; no powered-drive mechanism or real rotation rate is claimed",
+    "machineGun": "The inner gun/ball has independent horizontal and elevation controls around the retained common ball centre; bolted external socket remains fixed to the turret",
+    "gunElevationDegrees": [
+      -10,
+      20
+    ],
+    "gunElevationStopsAreInferred": true,
+    "independentGunHorizontalTravelMeasured": false,
+    "demoTravelSpeedMps": 0.16,
+    "demoTurretSpeedDegreesPerSecond": 18,
+    "demoSpeedsAreHistoricalMeasurements": false,
+    "scope": "Local fixed-position movement demonstration, not a complete driving simulation or proof of internal historical mechanisms",
+    "gunTraverseDegrees": [
+      -8,
+      8
+    ],
+    "gunTraverseStopsAreInferred": true
+  },
+  "historicalAppearanceAccepted": false,
+  "gameplayIntegrationChanged": false,
+  "validation": {
+    "glbSha256": "783450ac2d243163b8a412197108aa3d523e6f8b5f6a8b2befbc59e6bd4376bb",
+    "actualReimport": true,
+    "combinedGunFixedSurfaceSamples": 63,
+    "combinedTurretCabinSamples": 144,
+    "contactExclusionM": 0,
+    "browserChecks": 943,
+    "uiChecks": 11
+  }
+}

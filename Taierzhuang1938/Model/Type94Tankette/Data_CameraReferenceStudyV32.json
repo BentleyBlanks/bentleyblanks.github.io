@@ -1,0 +1,171 @@
+{
+  "schema": "Type94ReferenceCameraStudyV1",
+  "revision": "ReferenceStudyV32",
+  "status": "Conditional local geometry evidence; no accepted global camera or metric scale",
+  "activeGrayStudy": "Data_GrayStudyV32.json",
+  "activeGraySha256": "fecabb3c4e730d7e38b9c54fffa5774a1f051a2e110aa08b1b8af073490bf568",
+  "physicalControls": "Five primary and four old fixed flange head seeds in dimensionless radius units. Old fourth/faint candidate centres carry about5native-pixel uncertainty; an unsupported fifth old head was excluded.",
+  "fixedTurretBundle": "Twelve photographed fixed features: ten paired rivets and two roof-pin ends. No authored model markers or moving gun features enter reconstruction.",
+  "unconstrainedSensitivity": {
+    "report": "Data_TurretSensitivityV32.json",
+    "validPerturbedTrials": 100,
+    "ratioPercentiles5_50_95": [
+      0.8493,
+      0.9519,
+      1.3853
+    ],
+    "ratioPercentiles2p5_97p5": [
+      0.8297,
+      3.2162
+    ],
+    "includesPriorSpan": true
+  },
+  "structuralSensitivity": {
+    "report": "Data_StructuredTurretV32.json",
+    "validPerturbedTrials": 80,
+    "assumptions": [
+      "Five rivets per column share an approximately straight equally spaced generator; middle-row fractions perturbed by1percent.",
+      "The roof hinge axis is approximately parallel to the fixed-flange plane;3degree soft uncertainty plus3degree mean perturbation.",
+      "These are construction-class assumptions, not an unconditional calibration result."
+    ],
+    "ratioPercentiles5_50_95": [
+      0.8579358336442955,
+      0.9541347852386117,
+      1.0079690140256545
+    ],
+    "ratioPercentiles2p5_97p5": [
+      0.8086865107684142,
+      1.0115115305423845
+    ],
+    "scope": "Construction-class assumptions support the relative correction; not an unconditional dimensional survey."
+  },
+  "roundApertureRatio": {
+    "report": "Data_MgOpeningRatioV32.json",
+    "nominalMinMedianMax": [
+      0.05050800447950018,
+      0.05627812028351299,
+      0.062433785659027866
+    ],
+    "adoptedRatio": 0.059259259259259255,
+    "oldRatio": 0.08148148148148147,
+    "limits": [
+      "Head centres are manual/local-contrast candidates, with about3px primary and5px old uncertainty.",
+      "Hole and flange are on different surfaces. A6percent magnification sensitivity is illustrative, not a guaranteed confidence interval.",
+      "Moving-ball pose, depth, repaint edge and primary crop remain uncertain; no moving-ball pose or global camera is accepted."
+    ]
+  },
+  "rejectedMovingBallBackprojection": {
+    "report": "Data_MgFrontPlaneV32.json",
+    "reason": "Common plane with pitch only failed cross-date consistency and hit depth limits. Its inferred roughlyminus25degree old pitch is not a measured travel limit or evidence of inner yaw."
+  },
+  "adoptedLocalLayout": "Data_TurretFrontLayoutV32.json",
+  "observedRaisedFitting": "Both native crops show a leaning raised web and base tab. Depth, exact outline, root and function remain inferred; lower dark region is not classified as a through-opening.",
+  "adoptedCamera": false,
+  "metricScaleAccepted": false,
+  "globalCalibrationAccepted": false,
+  "wholeGrayAccepted": false,
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\CameraStudyV32",
+  "researchFiles": [
+    {
+      "file": "Data_FlangeGaugeV32.json",
+      "sha256": "35507369d336ed9532ab73677926f5e03452f9065e5e3bf74ca2af0cbb9e0d2a"
+    },
+    {
+      "file": "Data_MgAxisLinesV32.json",
+      "sha256": "0a26cb8fed62c4d38f18a3e5da15c70d02ea4a49588daf65d43988a72ad69d3e"
+    },
+    {
+      "file": "Data_MgBoltSeedV32.json",
+      "sha256": "47d967920cbae6be7a5524ffe5804132de6be060f6629387c0d4d5bb2fdaa29f"
+    },
+    {
+      "file": "Data_MgDarkContoursV32.json",
+      "sha256": "9b4e37983314d3f6d873d27526b1065e60e555ba7fd558b780a27b47083c9b32"
+    },
+    {
+      "file": "Data_MgFrontObservationsV32.json",
+      "sha256": "d61c18b1bc999050b7a4301aa0a3ef32b010d3ed4676c81f37f7e2a05c30a6f7"
+    },
+    {
+      "file": "Data_MgFrontPlaneV32.json",
+      "sha256": "8ae7f8b364195076e61028e4425d721b0642cc6be62b620d800a59e608c584d1"
+    },
+    {
+      "file": "Data_MgHoleEllipseV32.json",
+      "sha256": "80941df8c318931613f5f0469d660026bebb5500340edaa8648bbe7944938a59"
+    },
+    {
+      "file": "Data_MgOpeningRatioV32.json",
+      "sha256": "cf829243952d1393ac45bf3d0fd8f998e9162e29855d928c0c813694c44eabe7"
+    },
+    {
+      "file": "Data_OldMgBoltCentersV32.json",
+      "sha256": "65577ea18b9fbc874a1901b34b1fe01cb2bb2ad4502bb48d27a82140acebf946"
+    },
+    {
+      "file": "Data_StructuredTurretV32.json",
+      "sha256": "3651c67cb6110facb248982758b16e90ea37507f2798ea14d75fd62a7307307a"
+    },
+    {
+      "file": "Data_TurretBundleV32.json",
+      "sha256": "471bc34bccb1c6c65057114c4c500907d6db82cf39cc5d0747cabe85620f9892"
+    },
+    {
+      "file": "Data_TurretSensitivityV32.json",
+      "sha256": "505fba56f862d29dd422a9a62673947f0091573bdf4f86897e7d6ffa7e45a276"
+    },
+    {
+      "file": "Preview_MgAxisLines2014V32.png",
+      "sha256": "6fac7708e186c76885cec4eaed924e7c8eb1720892e530dc2df5d61f48e24ac9"
+    },
+    {
+      "file": "Preview_MgAxisLines2017V32.png",
+      "sha256": "a9b102473cb72db31e956f068e297ee4c772a01edb5baf3f146402b4a9369a9a"
+    },
+    {
+      "file": "Preview_MgBoltSitesV32.png",
+      "sha256": "6311a3cd936731232931fe556b1c05a48e862c8fbf9fcc5ca49696b68067d08c"
+    },
+    {
+      "file": "Preview_MgDarkContours2014V32.png",
+      "sha256": "681e82e8546028f93ab4bf083d52d031a791d93a2d9b14b1cbdc0b9ae35ac736"
+    },
+    {
+      "file": "Preview_MgDarkContours2017V32.png",
+      "sha256": "1c0f26099ba60f4cde73e52105a85fd7affb76d86d6f8615fd98b02fed94d907"
+    },
+    {
+      "file": "Preview_MgFrontGrid2014V32.png",
+      "sha256": "a150c2e5154185fa097732a5813e1f61e248e9da740c4976fa26bf3dae6b374c"
+    },
+    {
+      "file": "Preview_MgFrontGrid2017V32.png",
+      "sha256": "d1f0dc8bfb7eab8fc3789b1c59f904d98d0bd6e046a765b5d49d769413edd70e"
+    },
+    {
+      "file": "Preview_MgFrontMarkers2014V32.png",
+      "sha256": "0f131ae202ae202f55482f1bc3e7751227cd20dac08afb638c9d8e78c52b2b52"
+    },
+    {
+      "file": "Preview_MgFrontMarkers2017V32.png",
+      "sha256": "3815bab72d70201c9a4d79a4ca6aa302307130c85d0a1baa6cd066af01e98796"
+    },
+    {
+      "file": "Preview_MgFrontNative2014V32.png",
+      "sha256": "e8b03d76f29f7f0bab821b5d067ad9b199b3cb3c7d049e2a6b6bfab31cfb6985"
+    },
+    {
+      "file": "Preview_MgFrontNative2017V32.png",
+      "sha256": "c5543302dea3ad97e665e54c0cfc28169316f2972241e4e0daa5db0fd0721c7e"
+    },
+    {
+      "file": "Preview_OldFlangeGridV32.png",
+      "sha256": "4a6ce0f505bce7201d74c4e86c59f09452f1eba94374a8472e425e7cf0adcd83"
+    }
+  ],
+  "next": [
+    "Resolve global camera/focal/crop and common scale jointly with full body/cabin/turret proportions; authored marker dimensions remain hypotheses.",
+    "Review ball/barrel proportions, lower dark-notch classification, side-port angular stations and remaining visible silhouettes.",
+    "After whole-gray acceptance, complete olive PBR and fresh full geometry/texture replay, then a below80000-triangle derivative with3mm bidirectional, aperture and mechanism gates."
+  ]
+}

@@ -1,0 +1,129 @@
+{
+  "schema": "Type94FrontTowHookTrialV1",
+  "revision": "ShapeV94FrontTowHookTrial",
+  "status": "local-photo-identity-corrected-hook-and-separate-gate-trial",
+  "reference": "Data_GrayTrialV89.json",
+  "referenceAudit": "Data_ReferenceAuditV93.json",
+  "producer": "Taierzhuang1938/_blender/Script_Type94TowHookTrialV94.py",
+  "nativeVerifier": "Taierzhuang1938/_blender/Script_VerifyType94TowHookV94.py",
+  "geometryVerifier": "Taierzhuang1938/_import/Script_VerifyType94TowGeometryV94.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\TowHookV94\\Scene_Type94TanketteHighShapeV94TowHookTrial.blend",
+  "sourceBlendSha256": "c473a2f0e49cf4fc8bab7b42292f354735f0fa9086392b793c4c00750195d166",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\TowHookV94\\Exports\\Model_Type94TanketteHighShapeV94TowHookTrial.glb",
+  "sha256": "1afeec57d9bb0414858e567e2cf95f05bfcf0ad0973218e5d0cd59449169a6d1",
+  "layoutFile": "C:\\Users\\Bentl\\.codex\\worktrees\\6126\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\Type94Tankette\\Data_TowHookLayoutV94.json",
+  "layoutSha256": "94b10394b60e2a495b5d2ded914f7dae2a43d9f3f2517edc6a0292bf8e24c620",
+  "triangles": 628592,
+  "meshOwners": 239,
+  "poseNodes": 295,
+  "linksPerSide": 80,
+  "unchangedMeshOwners": 236,
+  "unchangedPoseNodes": 291,
+  "removedHullPolygons": 484,
+  "retainedHullTriangles": 37068,
+  "removedHullTriangles": 952,
+  "newOwners": [
+    "TowHookFrontFixed",
+    "TowLatchFront"
+  ],
+  "newMeshes": [
+    "Geometry_TowHookFrontFixed_Paint",
+    "Geometry_TowLatchFront_Paint"
+  ],
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "validation": {
+    "binaryGeometry": {
+      "passed": true,
+      "checks": 482,
+      "report": "Data_TowGeometryV94.json"
+    },
+    "sourceReopen": {
+      "passed": true,
+      "reexportContainerExact": true,
+      "actualGlbImport": true,
+      "report": "Data_TowNativeV94.json"
+    },
+    "gateFullSurfaceSweep": {
+      "passed": true,
+      "samples": 56,
+      "contactExclusionM": 0,
+      "report": "Data_TowGateSweepV94.json"
+    },
+    "retainedVehicleMotion": {
+      "passed": true,
+      "checks": 38,
+      "retiredIncorrectShackleCheck": true,
+      "report": "Data_TowVehicleMotionV94.json"
+    },
+    "coldShapeReplay": {
+      "passed": true,
+      "containerBytesExact": true,
+      "startsFromImmutableV89Source": true,
+      "fullHighConstructionFromEmpty": false,
+      "report": "Data_TowColdReplayV94.json"
+    },
+    "browser": {
+      "passed": true,
+      "checks": 6,
+      "actualRenderCases": 4,
+      "legacyApiCompatibilityChecked": true,
+      "report": "Data_TowBrowserV94.json"
+    }
+  },
+  "actualViewsInspected": [
+    "2017Tow",
+    "TourGuideTow"
+  ],
+  "gateTravelDegrees": 55,
+  "gateRestIsPhotographicPose": true,
+  "gateStopsMeasured": false,
+  "sourcePartVertexGroups": {
+    "Geometry_TowHookFrontFixed_Paint": [
+      "Tow_BaseBolt",
+      "Tow_BaseBolt.001",
+      "Tow_BaseBolt.002",
+      "Tow_BaseBolt.003",
+      "Tow_BasePlate",
+      "Tow_GateSpringCoil",
+      "Tow_HookForgedCore",
+      "Tow_Pin",
+      "Tow_PinEnd",
+      "Tow_PinHead",
+      "Tow_PinSupport",
+      "Tow_PinSupport.001",
+      "Tow_PinSupportFoot",
+      "Tow_PinSupportFoot.001"
+    ],
+    "Geometry_TowLatchFront_Paint": [
+      "Tow_GateHingeSleeve",
+      "Tow_GatePlate"
+    ]
+  },
+  "hookSectionAttachmentAndSpringWindingInferred": true,
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94TowHookReviewV94/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\TowHookV94\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\TowHookV94\\Rebuild",
+  "newUvProvisional": true,
+  "newPbrBaked": false,
+  "retainedMaterialPreview": "http://127.0.0.1:8114/tmp/Type94WearReviewV92/",
+  "wholeReferenceAccepted": false,
+  "canonicalGameReplaced": false,
+  "published": false,
+  "goalComplete": false,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV94.json",
+  "remaining": [
+    "Refine the visible hook-root blend and gate shoulder against the source before accepting exact towing-hardware shape; hidden dimensions and operating stops remain inferred",
+    "Complete remaining fixed-body and running-gear reference checks, particularly front casing/near-corner/track envelopes and unresolved camera correspondences",
+    "Integrate accepted V94/new geometry into complete PBR and produce a verified current game derivative",
+    "Complete full source/rebuild/runtime/reference acceptance before canonical replacement"
+  ],
+  "exactTowShapeAccepted": false,
+  "remainingVisibleTowIssues": [
+    "Hook-root transition and gate shoulder remain simplified and require source comparison; identity correction is not exact-shape acceptance"
+  ]
+}

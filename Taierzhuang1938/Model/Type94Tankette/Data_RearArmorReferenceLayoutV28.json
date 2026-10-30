@@ -1,0 +1,69 @@
+{
+  "schema": "Type94RearArmorReferenceLayoutV28",
+  "scope": "Photo-derived relative rear-door/armor slope in the selected Kubinka exhibit. The prior vertical rear face is inconsistent with the observed plane relative to the vent longitudinal line. Exact museum dimensions and whole-vehicle calibration remain unaccepted.",
+  "references": [
+    {
+      "file": "References/PatriotOfficial/Reference_PatriotOfficial4.jpg",
+      "page": "https://parkpatriot.ru/o-parke/tekhnika-parka/malyy-tank-tekey-tip-94/",
+      "scope": "Selected exhibit rear-right view, paired with photo6; main cargo-door plane is the measured surface.",
+      "sha256": "fd538683bc72f5f2e6686909c84a7b6d49b92a7918eb2a206b2a6086a55822ba"
+    },
+    {
+      "file": "References/PatriotOfficial/Reference_PatriotOfficial6.jpg",
+      "page": "https://parkpatriot.ru/o-parke/tekhnika-parka/malyy-tank-tekey-tip-94/",
+      "scope": "Selected exhibit rear-left view; body/trailer correspondences estimate relative cameras, independent turret rear-hatch points check that pose.",
+      "sha256": "309602423310491cc49dcf61e9881e5d43744901e5bf9e53182db4554a978bf0"
+    },
+    {
+      "file": "References/Source_JacarType94ProvisionalSpec.pdf",
+      "sha256": "ddcd38e130b04197d5d05de0bdbf11c417daab4328b9ed7271ae47cf0a41cc37",
+      "page": "https://www.jacar.archives.go.jp/das/meta/C01001361800",
+      "pdfPages": [
+        23,
+        24
+      ],
+      "scope": "Period annotated early-vehicle photographs corroborate the sloped rear armor and cargo door. They do not give a measured Kubinka rear angle or concealed hinge dimensions."
+    }
+  ],
+  "measurement": {
+    "centralRelativeSlopeDegrees": 18.71698306175247,
+    "conditionalPercentiles5_50_95Degrees": [
+      17.61419486436239,
+      18.683888595062456,
+      20.167924532661
+    ],
+    "conditionalMinimumMaximumDegrees": [
+      16.656285250317605,
+      21.528303499451045
+    ],
+    "trials": 81,
+    "independentSpatialControls": 63,
+    "turretDetectionsHeldOutOfRearPoseFit": 85,
+    "heldoutMedianNativePixels": 0.38051507771152987,
+    "heldoutMaximumNativePixels": 1.4459209282775956,
+    "evidence": "Acceptance/CameraStudyV28/Data_RearSlopeSensitivityV28.json",
+    "limits": "Conditional on the retained left camera group and moderate intrinsic/point perturbations, not a complete uncertainty bound. Rear group metric scale and the primary 2017 camera are still unaccepted."
+  },
+  "geometryEstimate": {
+    "rearSlopeDegrees": 19.0,
+    "fixedTopAnchorBeforeGroundM": [
+      0.0,
+      -1.12,
+      1.075
+    ],
+    "preserveDoorRigidDimensions": true,
+    "preserveDoorSealAndLatchLocalInterfaces": true,
+    "rearShellConstruction": "Solidify the checked legacy bathtub first, then rigidly pose only the outer/inner rear-ring corners; preserve forward shell coordinates.",
+    "closeRearSideCornerGaps": true,
+    "hingeContactExclusionM": 0.0
+  },
+  "inferred": [
+    "The 19 degree slope is an estimate from relative photo geometry, not an archival or museum survey value.",
+    "The existing roof rear edge is retained as the angular anchor; absolute rear position, door height and width remain estimates.",
+    "Applying the measured door-plane slope to its surrounding rear armor is corroborated by the period photograph, while precise seams and plate transitions remain inferred.",
+    "Existing hidden hinge, latch, backing and drawbar sections retain their inferred status.",
+    "Thin triangular closure between the tapered lower rear shell and upper side sheets prevents a real open corner; its exact manufactured joint is inferred."
+  ],
+  "globalCalibrationAccepted": false,
+  "strictReferenceMatched": false
+}

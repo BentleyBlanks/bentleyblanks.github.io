@@ -1,0 +1,24 @@
+{
+  "schema": "Type94BodyLayoutV1",
+  "revision": "ShapeV50DriverTrial",
+  "status": "Explicit V49 turret plus reconstructed cabin trial; no whole-vehicle acceptance",
+  "turretLayout": "Data_TurretTrialV49.json",
+  "driverRoofGunMinElevationDegrees": 0,
+  "driver": {
+    "centerXM": 0.2891598174617797,
+    "widthM": 0.5119466492133,
+    "topZM": 1.1920799605098187,
+    "bottomZM": 0.9867238777566698,
+    "topForwardM": 0.3227150393352468,
+    "bottomForwardM": 0.3885776935035243
+  },
+  "sourceHypothesis": "Data_PhysicalProfilesV47.json / PreviousProfile",
+  "inferred": [
+    "Camera and absolute scale remain conditional; these are not surveyed museum dimensions",
+    "Roof depth, roof hatch, side covers, pin and bearing sizes retain V37 estimates",
+    "Small lower cabin skirts connect the fitted frame to the retained flat glacis; their section is inferred",
+    "The front armour, fenders and lower running gear remain V37 and still require independent reconciliation"
+  ],
+  "strictReferenceMatched": false,
+  "complete": false
+}

@@ -1,0 +1,752 @@
+{
+  "schema": "Type94CowlRearEdgeReferenceV1",
+  "revision": "ReferenceV86",
+  "status": "rear-edge-and-junction-constraints-frozen-cross-view-conflict-retained",
+  "reference": "Data_ReferenceAuditV84.json",
+  "lineObservations": {
+    "schema": "Type94CowlRearEdgeObservationsV1",
+    "rows": [
+      {
+        "camera": "2017",
+        "pointsNative": [
+          [
+            1950,
+            1258
+          ],
+          [
+            2850,
+            1328
+          ]
+        ],
+        "sigmaNative": 5,
+        "selection": "Manually reviewed straight rear transition; painted/beveled footprint"
+      },
+      {
+        "camera": "2014",
+        "pointsNative": [
+          [
+            1900,
+            1374
+          ],
+          [
+            2600,
+            1431
+          ]
+        ],
+        "sigmaNative": 5,
+        "selection": "Manually reviewed rear transition under camouflage"
+      },
+      {
+        "camera": "TourGuide",
+        "pointsNative": [
+          [
+            1098.1997680664062,
+            813.7610092163086
+          ],
+          [
+            1347.0848693847656,
+            843.9314422607422
+          ]
+        ],
+        "sigmaNative": 3,
+        "selection": "Two reviewed native LSD segments on the same rear edge; detector precision is not metrological accuracy"
+      }
+    ],
+    "wholeUntouchedImageHoldout": false,
+    "roiWasGuidedByPriorReview": true,
+    "rawImagePointsAdjustedToTrial": false,
+    "straightPhysicalEdgeIsHypothesis": true,
+    "cameraFamilySha256": "e46e69bbff97bed69d48b9ab53650df94f4c4396ea711509f1f4cc7ab861ea7b"
+  },
+  "junctionObservations": {
+    "rows": [
+      {
+        "camera": "2017",
+        "farNative": [
+          1930,
+          1255
+        ],
+        "nearNative": [
+          2920,
+          1335
+        ],
+        "sigmaNative": 10
+      },
+      {
+        "camera": "2014",
+        "farNative": [
+          1890,
+          1373
+        ],
+        "nearNative": [
+          2660,
+          1438
+        ],
+        "sigmaNative": 12
+      },
+      {
+        "camera": "TourGuide",
+        "farNative": [
+          1024,
+          806
+        ],
+        "nearNative": [
+          1435,
+          854
+        ],
+        "sigmaNative": 8
+      }
+    ],
+    "kind": "Approximate apparent rear-edge/side-edge junctions, not surveyed sharp vertices",
+    "backCornerRadiusM": 0.008,
+    "centresAreNotMechanicalAxes": true,
+    "selectionGuidedByPriorReview": true
+  },
+  "lineFit": {
+    "report": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV86\\Acceptance\\Data_RearEdgeFitV86.json",
+    "solutions": [
+      {
+        "mode": "PrimaryOnly",
+        "parameters": [
+          0.7029620095736685,
+          0.004000000000000001
+        ],
+        "nearBounds": true,
+        "condition": 3550.9005012372672,
+        "metrics": [
+          {
+            "camera": "2017",
+            "predictedRearLineNative": [
+              [
+                2975.536269625641,
+                1340.2572444218456
+              ],
+              [
+                2402.759417214958,
+                1293.0305791297303
+              ],
+              [
+                1888.5682468432246,
+                1250.634427474678
+              ]
+            ],
+            "signedLineResidualNative": [
+              2.4858048840498874,
+              -0.18348805130245552,
+              -2.5797560790992398
+            ],
+            "rmsNative": 2.0710734104312936,
+            "sigmaNative": 5
+          },
+          {
+            "camera": "2014",
+            "predictedRearLineNative": [
+              [
+                2727.1419971180717,
+                1457.9651240967676
+              ],
+              [
+                2217.07023684151,
+                1424.5378341316282
+              ],
+              [
+                1759.2739833737626,
+                1394.5363925671638
+              ]
+            ],
+            "signedLineResidualNative": [
+              16.557330974611723,
+              24.637711101287085,
+              31.88996075843656
+            ],
+            "rmsNative": 25.15373805545904,
+            "sigmaNative": 5
+          },
+          {
+            "camera": "TourGuide",
+            "predictedRearLineNative": [
+              [
+                1477.624235949812,
+                848.084170952965
+              ],
+              [
+                1230.4783627303875,
+                819.8846872182471
+              ],
+              [
+                1023.2327814028931,
+                796.6470671137524
+              ]
+            ],
+            "signedLineResidualNative": [
+              -11.58673586583859,
+              -9.839411365369806,
+              -7.967938615092613
+            ],
+            "rmsNative": 9.90882619714301,
+            "sigmaNative": 3
+          }
+        ]
+      },
+      {
+        "mode": "Primary2014",
+        "parameters": [
+          0.9659455696204263,
+          0.14008295441262575
+        ],
+        "nearBounds": false,
+        "condition": 43.876389076722766,
+        "metrics": [
+          {
+            "camera": "2017",
+            "predictedRearLineNative": [
+              [
+                2766.422696984527,
+                1324.0256087081693
+              ],
+              [
+                2158.3559518956567,
+                1273.8302528103375
+              ],
+              [
+                1617.3573532176674,
+                1229.1713113040046
+              ]
+            ],
+            "signedLineResidualNative": [
+              2.5184595322637433,
+              -0.3740803433275157,
+              -2.9475807558299003
+            ],
+            "rmsNative": 2.2487631290002446,
+            "sigmaNative": 5
+          },
+          {
+            "camera": "2014",
+            "predictedRearLineNative": [
+              [
+                2497.1423159730844,
+                1413.408722861172
+              ],
+              [
+                1966.7163407572425,
+                1380.3448448864194
+              ],
+              [
+                1494.0374271778617,
+                1350.8806054824806
+              ]
+            ],
+            "signedLineResidualNative": [
+              -9.1853210294573,
+              0.9092192078415685,
+              9.90477473377176
+            ],
+            "rmsNative": 7.816677992362697,
+            "sigmaNative": 5
+          },
+          {
+            "camera": "TourGuide",
+            "predictedRearLineNative": [
+              [
+                1344.20072278435,
+                852.7791725515483
+              ],
+              [
+                1085.7073965298339,
+                821.6670271341819
+              ],
+              [
+                873.9241973025419,
+                796.5567796058373
+              ]
+            ],
+            "signedLineResidualNative": [
+              9.130512161295233,
+              9.351910471662086,
+              9.910428094227111
+            ],
+            "rmsNative": 9.469971256703813,
+            "sigmaNative": 3
+          }
+        ]
+      },
+      {
+        "mode": "AllThree",
+        "parameters": [
+          0.8894056403566657,
+          0.10301902131925242
+        ],
+        "nearBounds": false,
+        "condition": 22.62144955064969,
+        "metrics": [
+          {
+            "camera": "2017",
+            "predictedRearLineNative": [
+              [
+                2830.964735635416,
+                1324.211783037492
+              ],
+              [
+                2233.4632485673837,
+                1275.1816586236894
+              ],
+              [
+                1700.4040431218682,
+                1231.4395764220756
+              ]
+            ],
+            "signedLineResidualNative": [
+              -2.300747841483851,
+              -4.850832782239233,
+              -7.125883609322434
+            ],
+            "rmsNative": 5.1511240367176026,
+            "sigmaNative": 5
+          },
+          {
+            "camera": "2014",
+            "predictedRearLineNative": [
+              [
+                2567.3062219169865,
+                1422.5233130301235
+              ],
+              [
+                2042.846900320012,
+                1389.5635447645395
+              ],
+              [
+                1574.473273798219,
+                1360.1284950740078
+              ]
+            ],
+            "signedLineResidualNative": [
+              -5.795297883065356,
+              3.918755329858904,
+              12.593987410220947
+            ],
+            "rmsNative": 8.317664731913702,
+            "sigmaNative": 5
+          },
+          {
+            "camera": "TourGuide",
+            "predictedRearLineNative": [
+              [
+                1385.856911885974,
+                848.983916912229
+              ],
+              [
+                1130.4562247232127,
+                818.9876059988048
+              ],
+              [
+                919.6957035921239,
+                794.6320252938208
+              ]
+            ],
+            "signedLineResidualNative": [
+              0.34987582790299676,
+              1.3068269998755573,
+              2.4914564852162417
+            ],
+            "rmsNative": 1.6368226660495455,
+            "sigmaNative": 3
+          }
+        ]
+      }
+    ]
+  },
+  "junctionFit": {
+    "report": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV86\\Acceptance\\Data_RearJunctionFitV86.json",
+    "sha256": "850a2dab6df15624f0925196cad6465c0ebc561672db7242246a643e30b4a0c4",
+    "solutions": [
+      {
+        "mode": "Primary2014",
+        "parameters": [
+          0.691562885189653,
+          0.004000000000000001,
+          -0.13849543344804632,
+          0.6469938347275199
+        ],
+        "success": true,
+        "nearBounds": true,
+        "condition": 27.284781875374403,
+        "metrics": [
+          {
+            "camera": "2017",
+            "predictedNative": [
+              [
+                1966.8585003266069,
+                1247.5441391108634
+              ],
+              [
+                2912.5626209642915,
+                1324.5809054988993
+              ]
+            ],
+            "observedNative": [
+              [
+                1930,
+                1255
+              ],
+              [
+                2920,
+                1335
+              ]
+            ],
+            "residualNative": [
+              [
+                36.85850032660687,
+                -7.455860889136602
+              ],
+              [
+                -7.437379035708545,
+                -10.419094501100744
+              ]
+            ],
+            "rmsNative": 28.089242113915255,
+            "sigmaNative": 10
+          },
+          {
+            "camera": "2014",
+            "predictedNative": [
+              [
+                1830.2169787771886,
+                1391.32556793003
+              ],
+              [
+                2672.885334652287,
+                1445.774458639046
+              ]
+            ],
+            "observedNative": [
+              [
+                1890,
+                1373
+              ],
+              [
+                2660,
+                1438
+              ]
+            ],
+            "residualNative": [
+              [
+                -59.783021222811385,
+                18.325567930030047
+              ],
+              [
+                12.885334652286929,
+                7.774458639046088
+              ]
+            ],
+            "rmsNative": 45.476972869337544,
+            "sigmaNative": 12
+          },
+          {
+            "camera": "TourGuide",
+            "predictedNative": [
+              [
+                1055.330612804195,
+                795.3487386734394
+              ],
+              [
+                1451.0028765288077,
+                839.3454749577745
+              ]
+            ],
+            "observedNative": [
+              [
+                1024,
+                806
+              ],
+              [
+                1435,
+                854
+              ]
+            ],
+            "residualNative": [
+              [
+                31.33061280419497,
+                -10.651261326560643
+              ],
+              [
+                16.002876528807747,
+                -14.654525042225487
+              ]
+            ],
+            "rmsNative": 27.981277918838448,
+            "sigmaNative": 8
+          }
+        ],
+        "cost": 22.252243151441945
+      },
+      {
+        "mode": "PrimaryTourGuide",
+        "parameters": [
+          0.8181530085061836,
+          0.06298948257681594,
+          -0.19995600770422345,
+          0.6457937954238178
+        ],
+        "success": true,
+        "nearBounds": false,
+        "condition": 16.90508055092777,
+        "metrics": [
+          {
+            "camera": "2017",
+            "predictedNative": [
+              [
+                1931.514717109836,
+                1255.598855596716
+              ],
+              [
+                2919.0528522196682,
+                1337.1701508244703
+              ]
+            ],
+            "observedNative": [
+              [
+                1930,
+                1255
+              ],
+              [
+                2920,
+                1335
+              ]
+            ],
+            "residualNative": [
+              [
+                1.514717109836056,
+                0.598855596716021
+              ],
+              [
+                -0.9471477803317612,
+                2.1701508244702836
+              ]
+            ],
+            "rmsNative": 2.03219579116834,
+            "sigmaNative": 10
+          },
+          {
+            "camera": "2014",
+            "predictedNative": [
+              [
+                1785.4677930078335,
+                1385.9208575366038
+              ],
+              [
+                2657.3826924322234,
+                1442.00177079001
+              ]
+            ],
+            "observedNative": [
+              [
+                1890,
+                1373
+              ],
+              [
+                2660,
+                1438
+              ]
+            ],
+            "residualNative": [
+              [
+                -104.5322069921665,
+                12.920857536603762
+              ],
+              [
+                -2.6173075677766064,
+                4.001770790009914
+              ]
+            ],
+            "rmsNative": 74.55466225023915,
+            "sigmaNative": 12
+          },
+          {
+            "camera": "TourGuide",
+            "predictedNative": [
+              [
+                1021.6809238908029,
+                803.9883417825247
+              ],
+              [
+                1436.3161846625276,
+                852.1694557181049
+              ]
+            ],
+            "observedNative": [
+              [
+                1024,
+                806
+              ],
+              [
+                1435,
+                854
+              ]
+            ],
+            "residualNative": [
+              [
+                -2.3190761091971126,
+                -2.011658217475315
+              ],
+              [
+                1.3161846625275757,
+                -1.8305442818950723
+              ]
+            ],
+            "rmsNative": 2.693335962894005,
+            "sigmaNative": 8
+          }
+        ],
+        "cost": 0.15464286310233216
+      },
+      {
+        "mode": "AllThree",
+        "parameters": [
+          0.8079640103512881,
+          0.06025165694440941,
+          -0.2064366749030957,
+          0.623741092363645
+        ],
+        "success": true,
+        "nearBounds": false,
+        "condition": 17.194376854289214,
+        "metrics": [
+          {
+            "camera": "2017",
+            "predictedNative": [
+              [
+                1966.3563522122433,
+                1254.1661020412478
+              ],
+              [
+                2919.106151812118,
+                1332.436836772209
+              ]
+            ],
+            "observedNative": [
+              [
+                1930,
+                1255
+              ],
+              [
+                2920,
+                1335
+              ]
+            ],
+            "residualNative": [
+              [
+                36.35635221224334,
+                -0.8338979587522317
+              ],
+              [
+                -0.8938481878822131,
+                -2.5631632277909375
+              ]
+            ],
+            "rmsNative": 25.786125167438225,
+            "sigmaNative": 10
+          },
+          {
+            "camera": "2014",
+            "predictedNative": [
+              [
+                1817.4018418286678,
+                1385.0217635180302
+              ],
+              [
+                2659.20150988295,
+                1438.8743987750772
+              ]
+            ],
+            "observedNative": [
+              [
+                1890,
+                1373
+              ],
+              [
+                2660,
+                1438
+              ]
+            ],
+            "residualNative": [
+              [
+                -72.59815817133222,
+                12.021763518030184
+              ],
+              [
+                -0.7984901170498233,
+                0.8743987750772249
+              ]
+            ],
+            "rmsNative": 52.04045314771046,
+            "sigmaNative": 12
+          },
+          {
+            "camera": "TourGuide",
+            "predictedNative": [
+              [
+                1036.977068473617,
+                803.1633975005101
+              ],
+              [
+                1437.782101204707,
+                849.3304337123654
+              ]
+            ],
+            "observedNative": [
+              [
+                1024,
+                806
+              ],
+              [
+                1435,
+                854
+              ]
+            ],
+            "residualNative": [
+              [
+                12.97706847361701,
+                -2.8366024994899135
+              ],
+              [
+                2.7821012047070326,
+                -4.669566287634552
+              ]
+            ],
+            "rmsNative": 10.148782102718098,
+            "sigmaNative": 8
+          }
+        ],
+        "cost": 27.065588099688902
+      }
+    ]
+  },
+  "selectedTrialTrainingCameras": [
+    "2017",
+    "TourGuide"
+  ],
+  "selectedTrialUnusedCameras": [
+    "2014",
+    "7"
+  ],
+  "selectedTrialParameters": [
+    0.8181530085061836,
+    0.06298948257681594,
+    -0.19995600770422345,
+    0.6457937954238178
+  ],
+  "interpretation": "One-view edge depth is weak and hits a rise bound. Adding finite junction extent constrains width and lateral placement. Primary/TourGuide fits are mutually close under the retained cameras, while2014still conflicts; correspondence, calibration and structural-state causes remain unresolved.",
+  "cameraAdopted": false,
+  "sourceConfigurationDifferenceEstablished": false,
+  "resultingTrial": "Data_GrayTrialV87.json",
+  "wholeReferenceAccepted": false,
+  "goalComplete": false,
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV86\\Acceptance",
+  "remaining": [
+    "Resolve the2014rear-junction conflict without claiming a configuration change or moving cameras solely to fit this part",
+    "Verify precise rear connection/section and source-image junction identities; dimensions remain conditional",
+    "Continue casing/near-corner/track-envelope and whole-body reference acceptance",
+    "Rebuild complete PBR and game derivative from accepted geometry, then perform final end-to-end acceptance"
+  ]
+}

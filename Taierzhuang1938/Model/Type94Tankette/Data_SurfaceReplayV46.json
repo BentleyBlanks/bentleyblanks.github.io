@@ -1,0 +1,268 @@
+{
+  "schema": "Type94FreshSurfaceReplayV1",
+  "revision": "SurfaceV46Replay",
+  "status": "technical-fresh-replay-verified",
+  "geometryReference": "Data_GrayStudyV37.json",
+  "geometryReferenceSha256": "9504477d4b850fcf8a987a0e12d5aea24cf66be318355b471586b4e21070e7de",
+  "materialStyle": "SurfaceV44",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReplayV46\\Scene_Type94TanketteHighSurfaceV46Replay.blend",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReplayV46\\Exports\\Model_Type94TanketteHighSurfaceV46Replay.glb",
+  "sha256": "ca979e731450894bce25957cb58fa057e5221f654cb0d137f79900e9c27c6f66",
+  "sourceBlendSha256": "fe07f4a4d610605092d3fb93b736050bc2b663d6fa1aa74860bc74af5c4f1c5c",
+  "triangles": 500670,
+  "meshNodes": 247,
+  "embeddedImages": [
+    {
+      "name": "Texture_Type94PaintNormal",
+      "size": [
+        4096,
+        4096
+      ],
+      "bytes": 4819699
+    },
+    {
+      "name": "Texture_Type94PaintOrmWear",
+      "size": [
+        4096,
+        4096
+      ],
+      "bytes": 5996103
+    },
+    {
+      "name": "Texture_Type94PaintBaseWear",
+      "size": [
+        4096,
+        4096
+      ],
+      "bytes": 3788544
+    },
+    {
+      "name": "Texture_Type94SteelNormal",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 1391856
+    },
+    {
+      "name": "Texture_Type94SteelOrm",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 3037443
+    },
+    {
+      "name": "Texture_Type94SteelBase",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 1937282
+    },
+    {
+      "name": "Texture_Type94RubberNormal",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 180469
+    },
+    {
+      "name": "Texture_Type94RubberOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 780021
+    },
+    {
+      "name": "Texture_Type94RubberBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 514886
+    },
+    {
+      "name": "Texture_Type94TrackNormal",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 4622869
+    },
+    {
+      "name": "Texture_Type94TrackOrm",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 2865582
+    },
+    {
+      "name": "Texture_Type94TrackBase",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 1628994
+    }
+  ],
+  "normalStrengths": {
+    "Paint": 1.65,
+    "Track": 1.25,
+    "Rubber": 1.0,
+    "Steel": 1.15
+  },
+  "edgeWear": {
+    "method": "Metric-width strokes on the exact UVs of verified convex edges; deterministic local3D breakup. Albedo mixed in linear light; no albedo lighting or AO modification.",
+    "inputHashes": {
+      "Texture_Type94PaintBase.png": "8f92a0e6722aa15134402ac91f00f55737e6f9bde8272ba4f166d5dd16a154a8",
+      "Texture_Type94PaintOrm.png": "62f488c82d9a1a558d51437b57680b94c925b900c19841219f84a0bee40f8833"
+    },
+    "physicalEdgeCount": 84343,
+    "affectedAtlasFraction": 0.024960219860076904,
+    "meanNonzeroOpacity": 0.1102520003914833,
+    "aoBytesUnchanged": true,
+    "mask": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReplayV46\\Textures\\HighSurfaceV46Replay\\Texture_Type94PaintEdgeWearMask.png",
+    "outputs": {
+      "BaseWear": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReplayV46\\Textures\\HighSurfaceV46Replay\\Texture_Type94PaintBaseWear.png",
+        "sha256": "0d1708054331e4ace70b3ac044599f66fbd2d4f33caa0e3e0a4ba2006ca4590a"
+      },
+      "OrmWear": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReplayV46\\Textures\\HighSurfaceV46Replay\\Texture_Type94PaintOrmWear.png",
+        "sha256": "59d4c0f78ae4de1dfab10d17e1c4f6dfcd0be5e255ab261b98acbb48f0d47161"
+      }
+    },
+    "placementHistoricallyAccepted": false,
+    "paintPigmentCompression": {
+      "factor": 0.38,
+      "towardsLinearRgb": [
+        0.092,
+        0.102,
+        0.067
+      ],
+      "purpose": "Keep the olive repaint restrained while preserving the physical normal and roughness detail"
+    },
+    "chipRasterization": "Unequal tapered physical-edge chips, 2x supersampled then LANCZOS reduced to the original 4096px atlas"
+  },
+  "sourceRoot": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReplayV46",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94ReplayReviewV46/",
+  "factoryStartup": true,
+  "geometryImported": false,
+  "sourceGrayBlendRead": false,
+  "uvGenerationMode": "Fresh",
+  "uvCheckpointUsed": false,
+  "uvCheckpointTransfers": [],
+  "preparationReport": "Data_FreshSurfacePreparationV46.json",
+  "completePbrChannelsBaked": 12,
+  "retainedGeometryReplayPassed": true,
+  "geometryReport": "Data_V46ReplayGeometryAudit.json",
+  "mechanicalEstimates": {
+    "sprocketTeeth": 22,
+    "sprocketToothCountMeasured": false,
+    "pitchM": 0.07654880625611338,
+    "pitchIsMuseumSurvey": false,
+    "linkCount": 85,
+    "linkCountIsMuseumSurvey": false
+  },
+  "retainedCanonicalGameCheckpoint": {
+    "revision": "V12",
+    "sha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+    "recipeCommit": "bd0852e1"
+  },
+  "complete": false,
+  "strictReferenceMatched": false,
+  "wholeReferenceAccepted": false,
+  "gameBudgetAccepted": false,
+  "validation": {
+    "reports": {
+      "raw": "Data_V46ReplaySurfaceRawAudit.json",
+      "geometry": "Data_V46ReplayGeometryAudit.json",
+      "browser": "Data_V46ReplaySurfaceBrowserAudit.json",
+      "source": "Data_V46ReplaySurfaceEditableSourceAudit.json",
+      "native": "Data_V46ReplaySurfaceMotionAudit.json",
+      "ui": "Data_V46ReplayMotionUiFinal.json",
+      "maps": "Data_V46ReplayActualMapBindings.json"
+    },
+    "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReplayV46\\Acceptance",
+    "checks": {
+      "raw": 1188,
+      "browser": 943,
+      "source": 112,
+      "native": 39,
+      "ui": 11,
+      "maps": 20,
+      "geometry": 247
+    },
+    "maximumGroupedVertexDiameterM": 4.563718777528857e-08,
+    "actualPbrImportPackedImages": 12,
+    "actualPbrImportBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReplayV46\\Acceptance\\Scene_SurfaceV46ReplayActualReimport.blend",
+    "actualPbrRenderReport": "Data_V46ReplayActualPbrRender.json",
+    "coldChannelComparison": "Data_ColdBakeChannelComparisonV46.json",
+    "byteIdenticalRetainedChannels": 9,
+    "castContactPreparationComparison": "Data_ColdAttributeComparisonV46.json",
+    "samePreparedOwners": 78,
+    "geometryNegativeControl": "Data_GeometryReplayNegativeControlV46.json",
+    "browserNormalMapEffect": "Data_V46ReplayPbrNormalEffect.json",
+    "ownedBlenderStopped": true,
+    "cleanupReport": "Data_ReplayOwnedBlenderCleanupV46.json",
+    "viewerHtmlSha256": "cb1df08a3322e156114beb66955d54712ab015ed3d0176d450d393e1af2980c5",
+    "repositoryChecks": {
+      "passed": true,
+      "checks": [
+        "AssetStandardsTest",
+        "ModelFacingTest",
+        "HistoryLedgerCheck",
+        "ModuleGraphTest"
+      ]
+    }
+  },
+  "scope": "Full factory geometry/fresh UV/PBR recipe replay on retained V37 geometry with V44 gun yaw; not newly accepted reference shape or final game derivative",
+  "technicalReplayChecksPassed": true,
+  "recipeSnapshot": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReplayV46\\RecipeSnapshot",
+  "recipeSnapshotFiles": 38,
+  "recipeFilesSha256": {
+    "Taierzhuang1938/_blender/Script_Type94Articulation.py": "88c705973a2f4b92e9ac30174aeb6f080e641bb58a6381c2110b73086a4460af",
+    "Taierzhuang1938/_blender/Script_Type94DetailCorrect.py": "aad345902267afcf2d4fb51960428c66e75078a53a50dd8cca2894a241f99691",
+    "Taierzhuang1938/_blender/Script_Type94Export.py": "168f799dc53887fbabded5f98953d8eb2a18df8fcfd57ee1ce119aa9b7764c8b",
+    "Taierzhuang1938/_blender/Script_Type94FreshSurfaceReplay.py": "396de29788fb9e3daeb66fee7f995dd904c44aad7e213e6109c46804234355bc",
+    "Taierzhuang1938/_blender/Script_Type94GrayStudy.py": "828af68f0a608230e09646c1cfd5a84df86a6d90274893ce10d093d1f916090a",
+    "Taierzhuang1938/_blender/Script_Type94GunTraverse.py": "6b774067cde393b69776fc50ea6b5dabec72e0e64277e21e8adb1f593d921729",
+    "Taierzhuang1938/_blender/Script_Type94MechanismCorrect.py": "43506cc01a7cc5b79135fca08cace596672fdd81f3287862d739137561980341",
+    "Taierzhuang1938/_blender/Script_Type94MetalFinish.py": "7398d3bfbf2fbeed6a675d03ce71c15a449db714fcbe63390532481f2f5b3c94",
+    "Taierzhuang1938/_blender/Script_Type94MetalStudy.py": "73fe4ccfa7f25244941167092bc6a443d7df8e10e1a7d6cd4c8555e568b41a9f",
+    "Taierzhuang1938/_blender/Script_Type94RearArmor.py": "42b9497e9f4e3f4a9138a82325dc834a55db91bdda35672542363fee9039b4fa",
+    "Taierzhuang1938/_blender/Script_Type94RearDoor.py": "234d4feb11536c2dfff6da0483365a2613216f42ca5ec48ee90c4da4a616ebb2",
+    "Taierzhuang1938/_blender/Script_Type94RecipeReplay.py": "90eab60b900c4b51ff2c69efde0acf4baa5db7eb2372d83debafa8e46e97ae8f",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceAttributes.py": "c2d7f8ecf341726da0c31b53f235fec3ea93f28bf06a70627ef0b9f3c59ca01d",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceStudy.py": "4035ab350df096d16abd3aab578908e0877b1819556ec64195ee1dc368ab0a2c",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearApply.py": "9023d34c6fb3ff4d3c861c7c31228a4a6989c169d1d942131a6c89ac8acdb5c6",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearBake.py": "d2f580113e3f7d8e0d20495424fbff672ad98fe2efcb3cf973f13f75435f2dc3",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearExtract.py": "6c6f5daf8e955ff6617050272781aaed8ef4dfe26e8c515f8ba0863aaa88acd8",
+    "Taierzhuang1938/_blender/Script_Type94TangentRepair.py": "1d76f211ddeb6a491da6b2b5685b34adb0cfea46f11cdf674523203d123e572f",
+    "Taierzhuang1938/_blender/Script_Type94TanketteBuild.py": "bd88ebd68e1f02503297880f6daa18a044cc3fbab6ae529fb9116cbbfddf6bab",
+    "Taierzhuang1938/_blender/Script_Type94TanketteGame.py": "5700c3329b69016a02cf63fcea3bb3b3aade2dc9df3956524c81722582114f18",
+    "Taierzhuang1938/_blender/Script_Type94TankettePbr.py": "9437248d294a7776917cae2accaeaa00cb2ab74577e5626c5d139d8007e83e41",
+    "Taierzhuang1938/_blender/Script_Type94TurretRear.py": "840653a33aafc9c4506c979dd9084eb5ae53d73d6ea71afc9177ddc7af908a13"
+  },
+  "visualReview": {
+    "browserDeckInspected": true,
+    "actualImportedCyclesInspected": [
+      "Hinges",
+      "Track",
+      "Gun"
+    ],
+    "brokenUvObserved": false,
+    "referenceShapeAccepted": false,
+    "exactReferenceWearAccepted": false
+  },
+  "remaining": [
+    "Whole neutral-gray reference alignment and reliable whole-body scale/cameras",
+    "Rebuild and verify any accepted forebody/gauge changes with all physical consumers",
+    "Run this fresh recipe chain on the eventual accepted geometry and verify exact reference surface appearance",
+    "Create and verify a new below80000 triangle game derivative within3mmbidirectional surface distance"
+  ]
+}

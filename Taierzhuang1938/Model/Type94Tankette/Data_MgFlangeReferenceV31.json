@@ -1,0 +1,58 @@
+{
+  "schema": "Type94MgFlangeReferenceV1",
+  "status": "Observed selected-vehicle six-site hexagonal-head pattern; section dimensions remain inferred",
+  "primary": {
+    "file": "Reference_Kubinka.jpg",
+    "sha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+    "url": "https://commons.wikimedia.org/wiki/File:Type_94_TK_–_Patriot_Museum,_Kubinka_(26474921729).jpg",
+    "nativeCrop": [2415, 165, 3015, 825]
+  },
+  "supplement": {
+    "file": "Reference_KubinkaOld.jpg",
+    "sha256": "a2842cfe2394259a70ab2bc7d5835696c944da040518b2c8870f9428f76ca136",
+    "nativeCrop": [2200, 460, 2850, 1120],
+    "scope": "Same exhibit in2014; front hardware pattern only, not its camouflage finish"
+  },
+  "observed": [
+    "Two upper heads, one at either side, and a lower pair form a six-site pattern on the fixed circular flange",
+    "The lower-left region is partly occluded by the gun and adjacent armor; its exact visible outline is uncertain",
+    "Top-midpoint and bottom-midpoint sites of the old eight-head recipe have no corresponding visible fastener",
+    "Visible head outlines are hexagonal rather than domed rivet caps"
+  ],
+  "geometryEstimate": {
+    "fastenerCount": 6,
+    "angleStepDegrees": 60,
+    "angleOffsetDegrees": 0,
+    "boltCircleRadiusM": 0.135,
+    "headCircumradiusM": 0.0085,
+    "headDepthM": 0.007,
+    "headBevelM": 0.0006,
+    "axialCenterBeforeDetailCorrectionM": 0.027,
+    "retainedAxialDetailCorrectionM": 0.006,
+    "sectionSides": 6,
+    "axisLocal": "Y",
+    "owner": "Geometry_MachineGunFixedMount_Paint"
+  },
+  "roundFrontOpening": {
+    "observed": "Dark round opening beside the gun barrel on the moving front ball; function and concealed continuation unverified",
+    "radiusM": 0.011,
+    "centerBeforeGunReanchorM": [0.042, 0.1, 0.041],
+    "centerAfterGunReanchorM": [0.042, 0.036, 0.041],
+    "axisLocal": "Y",
+    "modeledBallDepthM": 0.072,
+    "scope": "Real bore through the retained modeled ball replaces the black disk. Diameter, hidden depth and backing remain inferred; no optical function or complete line through the turret is claimed."
+  },
+  "turretSocketOpening": {
+    "centerLocalTurretM": [0, 0.36, 0.3],
+    "radiusM": 0.116,
+    "scope": "Inferred opening through retained front armor layers, required by the actual moving ball. A prior full-fixed sweep found contact at minus10degrees; no contact exclusion is added. Not a measured historical socket diameter."
+  },
+  "limits": [
+    "Absolute bolt circle, head dimensions and tightness orientation are author estimates, not a museum survey",
+    "Threads, hidden shanks, attachment backing and original fastener specification are not established",
+    "The partly occluded sixth site follows the observed six-site pattern; it is not a newly revealed internal measurement",
+    "Flange diameter, gun/turret proportions and global camera/scale remain unaccepted",
+    "The other triangular front feature has not been established as an opening or a sight and remains unaccepted",
+    "This museum hardware pattern does not establish the wartime equipment of an individual vehicle at Tengxian"
+  ]
+}

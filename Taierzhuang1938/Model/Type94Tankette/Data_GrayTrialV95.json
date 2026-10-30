@@ -1,0 +1,110 @@
+{
+  "schema": "Type94TowShoulderTrialV1",
+  "revision": "ShapeV95TowRootShoulderTrial",
+  "status": "local-root-union-window-and-bearing-refinement-verified",
+  "reference": "Data_GrayTrialV94.json",
+  "producer": "Taierzhuang1938/_blender/Script_Type94TowShoulderV95.py",
+  "nativeVerifier": "Taierzhuang1938/_blender/Script_VerifyType94TowShoulderV95.py",
+  "geometryVerifier": "Taierzhuang1938/_import/Script_VerifyType94TowGeometryV95.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\TowShoulderV95\\Scene_Type94TanketteHighShapeV95TowShoulderTrial.blend",
+  "sourceBlendSha256": "722c1adafc0c0ee385910439c5df292f03dfee7d634d90b6fcf9d8ae7f2ec8bd",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\TowShoulderV95\\Exports\\Model_Type94TanketteHighShapeV95TowShoulderTrial.glb",
+  "sha256": "113185db1fbe14cc92b46646c3919850bd8a56d573bfafdcee891c86a05cfd96",
+  "layoutFile": "C:\\Users\\Bentl\\.codex\\worktrees\\6126\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\Type94Tankette\\Data_TowShoulderLayoutV95.json",
+  "layoutSha256": "f13b1bd1de1e180667c6f5d19c29f7f69efab236a7c9101ace6129dc1e3d26d3",
+  "triangles": 694288,
+  "meshOwners": 239,
+  "poseNodes": 295,
+  "linksPerSide": 80,
+  "changedMeshes": [
+    "Geometry_TowHookFrontFixed_Paint",
+    "Geometry_TowLatchFront_Paint"
+  ],
+  "unchangedMeshOwners": 237,
+  "preservedPoseNodes": 295,
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "rootQuality": {
+    "passed": true,
+    "connectedComponents": 1,
+    "nonmanifoldEdges": 0,
+    "euler": 2,
+    "signedVolumeM3": 0.00027615398358424314,
+    "nonAdjacentTriangleIntersections": 0,
+    "scope": "Actual saved root/base union is one closed genus-zero surface with positive volume and no nonadjacent triangle intersection"
+  },
+  "referenceSupplement2014": {
+    "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_KubinkaOld.jpg",
+    "sha256": "a2842cfe2394259a70ab2bc7d5835696c944da040518b2c8870f9428f76ca136",
+    "nativeRoi": [
+      1085,
+      1855,
+      650,
+      750
+    ],
+    "usedForStructureOnly": true,
+    "lowerHookOccludedByRail": true,
+    "untouchedHoldout": false
+  },
+  "validation": {
+    "geometryChecks": 775,
+    "actualSourceReopenAndGlbImport": true,
+    "sourceReexportContainerExact": true,
+    "actualWindowRayChecks": [
+      {
+        "name": "WindowCentre",
+        "actualOpen": true,
+        "expectedOpen": true,
+        "passed": true
+      },
+      {
+        "name": "WindowLeftBar",
+        "actualOpen": false,
+        "expectedOpen": false,
+        "passed": true
+      },
+      {
+        "name": "WindowRightBar",
+        "actualOpen": false,
+        "expectedOpen": false,
+        "passed": true
+      }
+    ],
+    "gateSweepSamples": 56,
+    "gateContactExclusionM": 0,
+    "vehicleMotionChecks": 38,
+    "browserChecks": 5,
+    "actualRenderCases": 6,
+    "coldShapeReplayContainerExact": true,
+    "coldShapeStartsFromImmutableV94": true,
+    "completeHighBuildFromEmptyClaimed": false
+  },
+  "actualViewsInspected": [
+    "2017Tow",
+    "2014UpperTow",
+    "TourGuideTow"
+  ],
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94TowShoulderReviewV95/?view=tow",
+  "newUvProvisional": true,
+  "newPbrBaked": false,
+  "pbrIntegration": "Data_SurfaceStudyV96.json",
+  "exactTowShapeAccepted": false,
+  "hiddenSectionsAndGateTravelInferred": true,
+  "wholeReferenceAccepted": false,
+  "canonicalGameReplaced": false,
+  "published": false,
+  "goalComplete": false,
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\TowShoulderV95\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\TowShoulderV95\\Rebuild",
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV95.json",
+  "remaining": [
+    "Complete fixed-body and running-gear reference acceptance, especially front casing/near-corner/track envelopes and unresolved camera correspondence",
+    "Retain hidden hook/bearing sections and operating stops as inferred; visible topology evidence is not an exact metric survey",
+    "Build the current game derivative below80000triangles with its continuous3mm surface gate and full source/PBR/motion replay",
+    "Complete end-to-end reference/source/runtime acceptance before canonical replacement"
+  ]
+}

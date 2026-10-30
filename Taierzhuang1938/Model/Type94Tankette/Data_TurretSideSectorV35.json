@@ -1,0 +1,38 @@
+{
+  "schema": "Type94TurretSideSectorV1",
+  "status": "Front-side hardware sector study; exact cone and dimensions remain unaccepted",
+  "primary": "Reference_Kubinka.jpg",
+  "supplement": "Reference_KubinkaOld.jpg",
+  "visibleSide": "Left",
+  "oppositeSideInferred": true,
+  "observed": [
+    "The side cover sits ahead of the five-row paired strip, close to the front ball mount",
+    "The visible cover front is a compact rounded rectangle, rather than a long narrow rectangle",
+    "Two lower cover fasteners and the partly occluded upper hinges remain in their observed relative pattern"
+  ],
+  "retained": [
+    "Current cone profile and overall turret scale",
+    "Fixed MG flange, real ball bore, socket and commander hinge geometry",
+    "Five rivets in each column, retained upper/lower row heights"
+  ],
+  "geometryEstimate": {
+    "pairedColumnYLocalTurretM": [0.151, 0.184],
+    "portAngleFromSideRad": 0.85,
+    "portMountZLocalTurretM": 0.36,
+    "coverWidthM": 0.115,
+    "coverHeightM": 0.084,
+    "openingWidthM": 0.080,
+    "openingHeightM": 0.048,
+    "scope": "Model-relative estimates from the visible sector and cover/rivet proportions. Absolute metres, hidden opening and bearing details are inferred. The current cone is not validated by fitting these features."
+  },
+  "diagnostics": {
+    "fixedFlangeGauge": "Data_FlangeGaugeV32.json",
+    "currentConeConditionalFit": "Data_StripConditionalV35.json",
+    "primaryCropNative": [2750, 200, 3500, 700],
+    "oldCropNative": [2650, 450, 3400, 950],
+    "scope": "Only local fixed-turret features; no global camera, body scale or moving-gun pose acceptance"
+  },
+  "exactPhotoLayoutAccepted": false,
+  "globalCalibrationAccepted": false,
+  "metricScaleAccepted": false
+}

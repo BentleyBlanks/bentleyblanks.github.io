@@ -1,0 +1,127 @@
+{
+  "status": "Photo-derived relative cover/fitting estimates; no whole-camera or absolute-dimension acceptance",
+  "primary": "Kubinka",
+  "supplement": "KubinkaOld",
+  "visibleSide": "Left",
+  "oppositeSideInferred": true,
+  "observations": {
+    "2017": {
+      "nativeCoverCrop": [
+        2960,
+        350,
+        3280,
+        595
+      ],
+      "coverHeightNativeRange": [
+        118,
+        138
+      ],
+      "rivetRowSpanNative": 401.8,
+      "coverHeightToRivetSpanRange": [
+        0.2936784469885515,
+        0.34345445495271276
+      ],
+      "coverCenterDownFractionApprox": 0.565,
+      "hingeAxisYNativeRange": [
+        405,
+        418
+      ],
+      "movingLeafCapYNativeRange": [
+        431,
+        442
+      ],
+      "lowerCapCentresNative": [
+        [
+          3080,
+          525
+        ],
+        [
+          3114,
+          526
+        ]
+      ],
+      "edgeCollarCentresNative": [
+        [
+          3155,
+          484
+        ],
+        [
+          3155,
+          513
+        ]
+      ]
+    },
+    "2014": {
+      "nativeCoverCrop": [
+        2800,
+        570,
+        3120,
+        815
+      ],
+      "coverHeightNativeRange": [
+        102,
+        122
+      ],
+      "rivetRowSpanNative": 387,
+      "coverHeightToRivetSpanRange": [
+        0.2636,
+        0.3153
+      ],
+      "coverCenterDownFractionApprox": 0.561,
+      "hingeAxisYNativeRange": [
+        637,
+        659
+      ],
+      "individualFittingsNotPreciselyLocalized": true
+    }
+  },
+  "geometryEstimate": {
+    "coverWidthM": 0.163,
+    "coverHeightM": 0.076,
+    "coverCenterZInMountM": -0.0615,
+    "openingWidthM": 0.115,
+    "openingHeightM": 0.045,
+    "hingeAxisZInMountM": -0.007,
+    "fixedFootAxisOffsetM": 0.016,
+    "movingLeafLowerInsetM": 0.006,
+    "movingLeafBoltFraction": 0.5,
+    "scope": "Width and outer mount retained; cover height/centre, hinge and leaf estimated from adjacent-row image ratios; hidden aperture section inferred"
+  },
+  "localFittings": {
+    "hingeCrossFractions": [
+      -0.32,
+      0.32
+    ],
+    "coverFasteners": {
+      "crossFractions": [
+        -0.025,
+        0.17
+      ],
+      "downFraction": 0.72
+    },
+    "edgeFitting": {
+      "crossFraction": -0.265,
+      "topDownFraction": 0.4,
+      "bottomDownFraction": 0.63
+    }
+  },
+  "limits": [
+    "The upper cover edge is partly hidden by hinge leaves; the measurements are ranges",
+    "Adjacent curved shell and raised cover have some parallax difference",
+    "Coarse four-corner homographies did not establish a reliable rectangular-plane aspect and were rejected",
+    "The 2014 finish obscures individual small fittings; their positions follow the primary photograph",
+    "Absolute local dimensions, hidden aperture, bearing sections and demonstration travel remain inferred",
+    "The opposite turret cover uses the visible-side estimate by inference; driver covers retain their previous layout",
+    "The edge rod/collar function remains unverified"
+  ],
+  "referenceImageBindings": [
+    {
+      "id": "Kubinka",
+      "sha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28"
+    },
+    {
+      "id": "KubinkaOld",
+      "sha256": "a2842cfe2394259a70ab2bc7d5835696c944da040518b2c8870f9428f76ca136"
+    }
+  ]
+}

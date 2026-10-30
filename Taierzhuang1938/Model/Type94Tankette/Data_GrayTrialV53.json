@@ -1,0 +1,173 @@
+{
+  "schema": "Type94GrayEnvelopeTrialV1",
+  "revision": "ShapeV53EnvelopeTrial",
+  "status": "local-construction-trial-metric-and-mechanisms-verified",
+  "sourceNumericalStudy": "Data_CameraReferenceStudyV52.json",
+  "numericalInputSha256": "e46e69bbff97bed69d48b9ab53650df94f4c4396ea711509f1f4cc7ab861ea7b",
+  "numericalSolverConverged": false,
+  "layout": "Data_BodyTrialV53.json",
+  "turretLayout": "Data_TurretTrialV53.json",
+  "runningAssembly": "Data_RunningAssemblyV53.json",
+  "trackShoeLayout": "Data_TrackShoeTrialV48.json",
+  "sourceProducer": "Taierzhuang1938/_blender/Script_Type94EnvelopeTrial.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\EnvelopeV53\\Scene_Type94TanketteHighShapeV53EnvelopeTrial.blend",
+  "sourceBlendSha256": "90a4b20498712359eaa556280734c65f87a533f8e97008a92e866115eef3bc7a",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\EnvelopeV53\\Exports\\Model_Type94TanketteHighShapeV53EnvelopeTrial.glb",
+  "sha256": "2670d8f6fb56eb5bc7126977949c3e8583b3e0e09aac9cc79e9744d9c8dac1e7",
+  "triangles": 616460,
+  "meshNodes": 237,
+  "linksPerSide": 80,
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "metricEnvelopeAccepted": true,
+  "driveRadiusConvention": {
+    "workingRadiusTargetM": 0.27343716784851746,
+    "bareMetalRimRadiusM": 0.26143716784851745,
+    "museumRadiusMeasured": false
+  },
+  "frontFenderConstruction": {
+    "innerRiseM": 0.0035,
+    "frontRaiseFromNumericalOpticalCandidateM": 0.0115,
+    "precedingActualCornerPenetrationM": 0.00841623322365459,
+    "minimumActualSampledVertexUndersideGapM": 0.0030837667763453647,
+    "triangleContactExclusionM": 0,
+    "sectionInferred": true,
+    "tipPositionIsUnreconciledOpticalConstraint": true
+  },
+  "sourceReopen": true,
+  "actualGlbReimport": true,
+  "coldReplayByteIdentical": true,
+  "validation": {
+    "reports": {
+      "raw": "Data_EnvelopeRawV53.json",
+      "source": "Data_EnvelopeSourceReopenV53.json",
+      "native": "Data_EnvelopeMotionV53.json",
+      "wheelContact": "Data_FullWheelContactV53.json",
+      "webRays": "Data_DriveWebRaysV53.json",
+      "clearance": "Data_FrontFenderClearanceV53.json",
+      "browser": "Data_EnvelopeGeometryBrowserV53.json",
+      "ui": "Data_EnvelopeUiV53.json",
+      "renders": "Data_EnvelopeRendersV53.json",
+      "defaultGuard": "Data_DefaultV37V53.json",
+      "previousGuard": "Data_PreviousV51V53.json",
+      "coldReplay": "Data_ColdV53V53.json"
+    },
+    "rawChecks": 685,
+    "nativeChecks": 41,
+    "allWheelBeltPosePairs": 256,
+    "actualWindowAndSolidRays": 176,
+    "browserGeometryChecks": 255,
+    "uiChecks": 22,
+    "defaultV37Surfaces": 247,
+    "previousV51Surfaces": 249,
+    "geometryGateM": 1e-07,
+    "actualDriverEnvelopeUsed": true,
+    "sourceAndReportsMatchCurrentGlb": true
+  },
+  "sourceFilesSha256": {
+    "Taierzhuang1938/Model/Type94Tankette/Data_TrackShoeTrialV48.json": "2d5e9707fe1270c103ce25a7316a3098792dcb3e2f37dc03cb2efb06509f2cca",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RunningAssemblyV53.json": "74213ec8e7c45d88de3e9926f61ee395bed239a6d7b422bd5aadfb3aeafbef68",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretTrialV53.json": "cbc15bf835c2c7ca153dedaa74cf42d861f3e3f3c56b99baacad606368195042",
+    "Taierzhuang1938/Model/Type94Tankette/Data_BodyTrialV53.json": "58695766491e8a95c493e9443f8d85f7df466b4450b2d4e290759bbb7ea39055",
+    "Taierzhuang1938/_blender/Script_VerifyType94Sweep.py": "fc0ec068a2f8e595368b63914fae5a4da9fa569d4ed57eab75dd5257537f79b4",
+    "Taierzhuang1938/_blender/Script_Type94Export.py": "b5e0abdcd073cc0cb84eaf77534626f7b9b24166a87bd88e1c0395840e340486",
+    "Taierzhuang1938/_blender/Script_Type94TangentRepair.py": "1d76f211ddeb6a491da6b2b5685b34adb0cfea46f11cdf674523203d123e572f",
+    "Taierzhuang1938/_blender/Script_Type94TrackShoe.py": "4c25137fd149e93f8ee4c3f9f739276f8af70945063b9160154ad50e3eb6d019",
+    "Taierzhuang1938/_blender/Script_Type94RunningAssembly.py": "40263cf96c614ef0488ffe2155c6cbfce159e313d6d99c0fea211adf7d07ba0b",
+    "Taierzhuang1938/_blender/Script_Type94GunTraverse.py": "6b774067cde393b69776fc50ea6b5dabec72e0e64277e21e8adb1f593d921729",
+    "Taierzhuang1938/_blender/Script_Type94MechanismCorrect.py": "1941339bbabfaef0ca4290eb20a2b92d15992ae2548badebf6db671ca0086fe3",
+    "Taierzhuang1938/_blender/Script_Type94TanketteBuild.py": "9b2c2ade0e876bd7e26dc44882529760433b0637f13e23ef09b97f40a297cac8",
+    "Taierzhuang1938/_blender/Script_Type94DetailCorrect.py": "aad345902267afcf2d4fb51960428c66e75078a53a50dd8cca2894a241f99691",
+    "Taierzhuang1938/Model/Type94Tankette/Data_MgFlangeReferenceV31.json": "736fcde53a6cfdc68651a1943d1c604c91511728761b8a9d47de8f8faa17ea09",
+    "Taierzhuang1938/_blender/Script_Type94Articulation.py": "326b9fd068ddcacff24be5f9eb8e39617d3d56a6b1b02a5a0b91ba3449c25b88",
+    "Taierzhuang1938/_blender/Script_Type94RearDoor.py": "234d4feb11536c2dfff6da0483365a2613216f42ca5ec48ee90c4da4a616ebb2",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearDoorFaceLayoutV29.json": "76e41e865100cef9c5d14dd58b352c5caf3713b9d5c6338b154352eb690af276",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearMechanismLayoutV22.json": "f13872695aebf431e2c9b69555ac2744a986b9c93d0f1c992098e7a990cc2638",
+    "Taierzhuang1938/Model/Type94Tankette/Data_VentTopLapV37.json": "0987c835fb994c0cdc25661e32d5da11792cd258764acb62a5fbce701b27a340",
+    "Taierzhuang1938/_blender/Script_Type94TurretRear.py": "1ecae7a90ecd0b68c1d59f829f57f349d2cc26e0852b03e9607d794cff89c896",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretRearLayoutV27.json": "11c0833fcca99be04cb1e550878b283ab0898f9b80d02a999f1a691bb3a7af67",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretFrontLayoutV32.json": "d6a588209eb43c6ae97575be24253bab4b66c78775a50f8e7a281217e8c65cd1",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretSideSectorV35.json": "cf5d4d8a0d76ad6ea971937c5ffd9dccbac57d8a0b5c29f5daa05384c52eb9aa",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretRivetLayoutV25.json": "39472a67ef4fe69040d1de24879d6883805dc987e119e715dd31ea60c591fca8",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretPortReferenceLayoutV26.json": "7a4db2c5a7332b873d12e8f85aff9ae31de05de175a6da203632e0d64ae32b47",
+    "Taierzhuang1938/Model/Type94Tankette/Data_DriverReferenceLayoutV19.json": "7698100dcb27f7866548a5251eec588474e1f28cf30de3632d550d096e7a3239",
+    "Taierzhuang1938/Model/Type94Tankette/Data_SidePortReferenceLayoutV21.json": "0c881c50153cfb5b753b0266866a407c152582742da590891125b06963a49143",
+    "Taierzhuang1938/_blender/Script_Type94RearArmor.py": "42b9497e9f4e3f4a9138a82325dc834a55db91bdda35672542363fee9039b4fa",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearArmorReferenceLayoutV28.json": "7c840ae8b3034aa418f3f6297f24da3cbb0a71d921881509c10b0b6999ce1bda",
+    "Taierzhuang1938/_blender/Script_Type94GrayStudy.py": "828af68f0a608230e09646c1cfd5a84df86a6d90274893ce10d093d1f916090a",
+    "Taierzhuang1938/_blender/Script_Type94EnvelopeTrial.py": "e0f0f813fb3e1523cc4bc685d79407fb29ea42ce8d89b328fd7f07a0878f76b1"
+  },
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\EnvelopeV53\\Acceptance",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94EnvelopeReviewV53/",
+  "motionHistoricalBoundary": {
+    "checkedDate": "2026-10-27",
+    "sources": [
+      {
+        "url": "https://www.awm.gov.au/visit/exhibitions/bigthingsinstore/tankette",
+        "supports": "Museum identifies a ball-mounted6.5mmType91; independent two-axis aiming is a mechanical interpretation, not surveyed stops"
+      },
+      {
+        "url": "https://www.lonesentry.com/manuals/japanese-tanks/tankettes.html",
+        "supports": "Front sprocket and circumferential turret movement",
+        "limit": "Wartime early/late naming and specifications are mixed; precise limits and speeds are not transferred"
+      }
+    ],
+    "inferredGunElevationDegrees": [
+      -10,
+      20
+    ],
+    "inferredIndependentGunTraverseDegrees": [
+      -8,
+      8
+    ],
+    "inferredOpenDriverRoofFloorDegrees": 12,
+    "fixedPositionArticulationOnly": true,
+    "historicalRatesMeasured": false
+  },
+  "visualReview": {
+    "completeReferencesRetained": true,
+    "matchingConditionalCameras": [
+      "2017",
+      "2",
+      "3",
+      "6"
+    ],
+    "observedPreviewsAtMost640Pixels": true,
+    "mainViewImproved": true,
+    "strictReferenceMatched": false,
+    "remainingVisibleIssues": [
+      "Vent housing and attachment alignment",
+      "Road-wheel/cap profiles and stance",
+      "Front fender optical position versus actual moving-shoe clearance",
+      "Forebody deck-break construction and surrounding fittings",
+      "Forebody side-cheek faceting under directional browser lighting; inspect the inferred nonplanar transition before acceptance"
+    ],
+    "rearTrailerOcclusionModeled": false
+  },
+  "failedVariantsRetained": [
+    "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\EnvelopeV53\\Versions\\BracketAcuteTipFailure",
+    "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\EnvelopeV53\\Versions\\InitialContactAndSkirtFailure",
+    "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\EnvelopeV53\\Versions\\InnerLipClearButBracketAndSkirtFailure",
+    "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\EnvelopeV53\\Versions\\RawPassButFrontCornerContact"
+  ],
+  "strictReferenceMatched": false,
+  "globalCalibrationAccepted": false,
+  "pbrAccepted": false,
+  "gameBudgetAccepted": false,
+  "complete": false,
+  "goalComplete": false,
+  "retainedGray": "Data_GrayStudyV37.json",
+  "retainedSurface": "Data_SurfaceStudyV44.json",
+  "canonicalGameReplaced": false,
+  "published": false,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV53.json",
+  "remaining": [
+    "Reconcile actual complete geometry with all usable reference views, including the forebody optical/contact conflict",
+    "After whole shape settles, make a fresh UV/PBR bake and verify its actual reimported appearance",
+    "Build a new below80000triangle game derivative with at most3mm bidirectional surface distance"
+  ]
+}

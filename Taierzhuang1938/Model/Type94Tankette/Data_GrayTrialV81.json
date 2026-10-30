@@ -1,0 +1,124 @@
+{
+  "schema": "Type94EarPairGrayTrialV1",
+  "revision": "ShapeV81FrontCornerPairTrial",
+  "status": "local-ear-pair-and-profile-gray-trial-depth-unaccepted",
+  "reference": "Data_GrayTrialV79.json",
+  "referenceAudit": "Data_ReferenceAuditV80.json",
+  "producer": "Taierzhuang1938/_blender/Script_Type94EarPairTrialV81.py",
+  "nativeVerifier": "Taierzhuang1938/_blender/Script_VerifyType94EarPairV81.py",
+  "geometryVerifier": "Taierzhuang1938/_import/Script_VerifyType94EarPairGeometryV81.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontCornerV81\\Scene_Type94TanketteHighShapeV81FrontCornerPairTrial.blend",
+  "sourceBlendSha256": "1a49f8e67267326fec9b76c2175a1af03282f9811b498f38b9631315d1394f5b",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontCornerV81\\Exports\\Model_Type94TanketteHighShapeV81FrontCornerPairTrial.glb",
+  "sha256": "6322b72bde0ae1555b37e25d25c951b944dbd47e94564daf06bc5bb26d54b2d0",
+  "baseSha256": "789a3b2b494db0525d7a8c0af3f172e3351fdcbed8f05b7ff55dea7acc14c392",
+  "triangles": 622112,
+  "meshOwners": 238,
+  "poseNodes": 293,
+  "changedMeshOwners": [
+    "Geometry_FrontCornerEarRight_Paint"
+  ],
+  "preservedOtherMeshOwners": 237,
+  "preservedRigidPosesAndParents": 293,
+  "upperHeadSurfaceExact": true,
+  "addedTriangles": 32,
+  "earTriangles": 92,
+  "headCount": 2,
+  "profile": {
+    "widthM": 0.055,
+    "heightM": 0.09,
+    "thicknessM": 0.004,
+    "lateralCentreShiftM": 0.01,
+    "headRadiusM": 0.01,
+    "headHeightM": 0.006
+  },
+  "profileAndDepthInferred": true,
+  "lowerFeatureFunctionAndSectionInferred": true,
+  "headCentresAreNotMechanicalAxes": true,
+  "secondaryControls": [
+    {
+      "name": "UpperHead",
+      "observed2014": [
+        747,
+        1871
+      ],
+      "predicted2014": [
+        742.7016944068787,
+        1866.348105490485
+      ],
+      "residualNative": 6.333684038497116,
+      "sigmaNative": 6
+    },
+    {
+      "name": "LowerRaisedHeadCandidate",
+      "observed2014": [
+        749,
+        1924
+      ],
+      "predicted2014": [
+        746.4586600856844,
+        1913.7990740414011
+      ],
+      "residualNative": 10.512720816844224,
+      "sigmaNative": 6
+    }
+  ],
+  "primaryPointsAreTraining": true,
+  "secondaryReferenceAccepted": false,
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "validation": {
+    "geometry": {
+      "passed": true,
+      "checks": 1066,
+      "report": "Data_EarPairGeometryV81.json"
+    },
+    "nativeMotion": {
+      "passed": true,
+      "checks": 39,
+      "report": "Data_FrontCornerMotionV81.json"
+    },
+    "sourceReopen": {
+      "passed": true,
+      "byteIdenticalReexport": true,
+      "report": "Data_FrontCornerNativeV81.json"
+    },
+    "crownRays": {
+      "passed": true,
+      "checks": 2,
+      "report": "Data_FrontCornerNativeV81.json"
+    },
+    "browser": {
+      "passed": true,
+      "comparedRenders": 4,
+      "cameraControls": 7,
+      "report": "Data_EarPairBrowserV81.json"
+    }
+  },
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94EarPairReviewV81/",
+  "actualViewsInspected": [
+    "2017FarNativeCrop",
+    "2014FarNativeCrop"
+  ],
+  "sourceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontCornerV81",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontCornerV81\\Rebuild",
+  "newUvsProvisional": true,
+  "newPbrBaked": false,
+  "wholeReferenceAccepted": false,
+  "canonicalGameReplaced": false,
+  "retainedMaterialPreview": "http://127.0.0.1:8114/tmp/Type94WearReviewV77/",
+  "goalComplete": false,
+  "published": false,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontCornerV81\\Acceptance\\Data_OwnedBlenderCleanupV81.json",
+  "remaining": [
+    "Verify precise pad section/connection and lower raised-feature function; the head footprints are not mechanical axes",
+    "Resolve near-side front-corner fasteners and actual casing/track envelope",
+    "Review casing retaining-seam/joint-head layout instead of assuming the current generic angular pattern",
+    "Retain third-camera/correspondence uncertainty until independently resolved",
+    "Complete whole body/running-gear reference acceptance, then final high PBR and game derivative"
+  ]
+}

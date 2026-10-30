@@ -1,0 +1,1558 @@
+{
+  "schema": "Type94CurrentFixedControlReviewV1",
+  "revision": "ReferenceV105",
+  "producer": [
+    "Taierzhuang1938/_import/Script_Type94FixedBodyExtractV105.py",
+    "Taierzhuang1938/_import/Script_Type94JointBodyCameraV105.py",
+    "Taierzhuang1938/_import/Script_Type94CornerRaysV105.py"
+  ],
+  "sourceGlbSha256": "acf7627f610d9b1cf009f9b479753a0aa2c497658c13ecf86fd37886b8904f92",
+  "actualReadoutFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV105\\Acceptance\\Data_ActualFixedBodyV105.json",
+  "actualReadoutSha256": "a3baf4a28e93b6ee732bd9e9dc82625dee1b75b1308054df8e392de496f140f1",
+  "currentCrownBindings": [
+    {
+      "name": "FarUpperEdge",
+      "owner": "Geometry_FrontCornerEarRight_Paint",
+      "bindingKind": "V81 actual ear head replaces obsolete V73 conditional plane point",
+      "component": "UpperHead",
+      "sourceVertexCount": 18,
+      "actualCrownFitFrameM": [
+        0.5156391859054565,
+        1.3289637565612793,
+        0.7013917050361633
+      ],
+      "conditionalDatumDifferenceM": 0.02492348674092292,
+      "feature": "Actual angular crown face mean along front-plane normal; not mechanical axis"
+    },
+    {
+      "name": "FarInnerLow",
+      "owner": "Geometry_Hull_Paint",
+      "bindingKind": "Actual retained V74 angular crown",
+      "component": 101,
+      "sourceVertexCount": 18,
+      "actualCrownFitFrameM": [
+        0.30120354890823364,
+        1.3412598371505737,
+        0.5708230814933777
+      ],
+      "conditionalDatumDifferenceM": 2.005201208853555e-08,
+      "feature": "Actual angular crown face mean along front-plane normal; not mechanical axis"
+    },
+    {
+      "name": "FarInnerHigh",
+      "owner": "Geometry_Hull_Paint",
+      "bindingKind": "Actual retained V74 angular crown",
+      "component": 100,
+      "sourceVertexCount": 18,
+      "actualCrownFitFrameM": [
+        0.2475187728802363,
+        1.3318932056427002,
+        0.6112973771095276
+      ],
+      "conditionalDatumDifferenceM": 5.144844929190135e-08,
+      "feature": "Actual angular crown face mean along front-plane normal; not mechanical axis"
+    },
+    {
+      "name": "NearHitchUpper",
+      "owner": "Geometry_Hull_Paint",
+      "bindingKind": "Actual retained V74 angular crown",
+      "component": 90,
+      "sourceVertexCount": 18,
+      "actualCrownFitFrameM": [
+        -0.13254542648792267,
+        1.3069990873336792,
+        0.7188684425354004
+      ],
+      "conditionalDatumDifferenceM": 1.35974915234625e-08,
+      "feature": "Actual angular crown face mean along front-plane normal; not mechanical axis"
+    },
+    {
+      "name": "NearHitchMiddle",
+      "owner": "Geometry_Hull_Paint",
+      "bindingKind": "Actual retained V74 angular crown",
+      "component": 89,
+      "sourceVertexCount": 18,
+      "actualCrownFitFrameM": [
+        -0.14104169607162476,
+        1.3308595418930054,
+        0.6157642087936401
+      ],
+      "conditionalDatumDifferenceM": 3.6849455537646425e-09,
+      "feature": "Actual angular crown face mean along front-plane normal; not mechanical axis"
+    },
+    {
+      "name": "MarkingUpperInner",
+      "owner": "Geometry_Hull_Paint",
+      "bindingKind": "Actual retained V74 angular crown",
+      "component": 87,
+      "sourceVertexCount": 18,
+      "actualCrownFitFrameM": [
+        -0.2641773819923401,
+        1.3058133125305176,
+        0.7239921770095825
+      ],
+      "conditionalDatumDifferenceM": 3.630362271461204e-08,
+      "feature": "Actual angular crown face mean along front-plane normal; not mechanical axis"
+    },
+    {
+      "name": "MarkingUpperOuter",
+      "owner": "Geometry_Hull_Paint",
+      "bindingKind": "Actual retained V74 angular crown",
+      "component": 86,
+      "sourceVertexCount": 18,
+      "actualCrownFitFrameM": [
+        -0.3947049677371979,
+        1.3056951761245728,
+        0.7245025715827942
+      ],
+      "conditionalDatumDifferenceM": 6.03204871190524e-08,
+      "feature": "Actual angular crown face mean along front-plane normal; not mechanical axis"
+    },
+    {
+      "name": "MarkingLowerOuter",
+      "owner": "Geometry_Hull_Paint",
+      "bindingKind": "Actual retained V74 angular crown",
+      "component": 83,
+      "sourceVertexCount": 18,
+      "actualCrownFitFrameM": [
+        -0.4411282539367676,
+        1.3299391269683838,
+        0.6197415671348572
+      ],
+      "conditionalDatumDifferenceM": 2.9811924143212385e-08,
+      "feature": "Actual angular crown face mean along front-plane normal; not mechanical axis"
+    }
+  ],
+  "currentCowlSkinBindings": [
+    {
+      "name": "CowlRearNear",
+      "owner": "Geometry_NoseHousing_Paint",
+      "actualVertexFitFrameM": [
+        -0.5163433252140941,
+        0.8199632862887476,
+        0.9603794646181967
+      ],
+      "oldReadoutDifferenceM": 1.42381078382318e-07
+    },
+    {
+      "name": "CowlRearFar",
+      "owner": "Geometry_NoseHousing_Paint",
+      "actualVertexFitFrameM": [
+        0.1086105895176461,
+        0.8199633334715569,
+        0.9603786798279083
+      ],
+      "oldReadoutDifferenceM": 1.0066501238481812e-07
+    }
+  ],
+  "observationRows": 22,
+  "obsoletePlanePointReplacedByCurrentEarCrown": true,
+  "driverMidSurfaceDatumsExcluded": true,
+  "scopeIsFrontArmourAndNoseCowlRearEdge": true,
+  "wholeVehicleRearDepthNotValidated": true,
+  "separateTrailerExcluded": true,
+  "cameraCases": [
+    {
+      "name": "Baseline",
+      "metrics": {
+        "rows": [
+          {
+            "name": "FarUpperEdge",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              742.7016999369625,
+              1866.348229054498
+            ],
+            "observedNative": [
+              744.921875,
+              1868.28125
+            ],
+            "errorNative": 2.943764135640423,
+            "sigmaNative": 6
+          },
+          {
+            "name": "FarInnerLow",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              992.5540200849296,
+              2126.033321906968
+            ],
+            "observedNative": [
+              997.265625,
+              2131.015625
+            ],
+            "errorNative": 6.857300123704082,
+            "sigmaNative": 6
+          },
+          {
+            "name": "FarInnerHigh",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1068.4566877825193,
+              2065.235345308801
+            ],
+            "observedNative": [
+              1068.515625,
+              2068.671875
+            ],
+            "errorNative": 3.437035046969715,
+            "sigmaNative": 6
+          },
+          {
+            "name": "NearHitchUpper",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1601.5002083902732,
+              1942.0822341514806
+            ],
+            "observedNative": [
+              1603.28125,
+              1943.4375
+            ],
+            "errorNative": 2.238047080769559,
+            "sigmaNative": 6
+          },
+          {
+            "name": "NearHitchMiddle",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1590.3050514866877,
+              2138.7943873620397
+            ],
+            "observedNative": [
+              1594.84375,
+              2140.3125
+            ],
+            "errorNative": 4.785859397880153,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingUpperInner",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1794.7966315069884,
+              1957.6759174874448
+            ],
+            "observedNative": [
+              1797.34375,
+              1956.09375
+            ],
+            "errorNative": 2.9985107263054878,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingUpperOuter",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1994.4096362422902,
+              1982.8865948938328
+            ],
+            "observedNative": [
+              1991.40625,
+              1982.109375
+            ],
+            "errorNative": 3.1023216602646637,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingLowerOuter",
+            "group": "Front",
+            "training": false,
+            "predictedNative": [
+              2043.7561925664825,
+              2201.6393552305603
+            ],
+            "observedNative": [
+              2050.46875,
+              2212.03125
+            ],
+            "errorNative": 12.371333970004157,
+            "sigmaNative": 6
+          },
+          {
+            "name": "CowlRearNear",
+            "group": "Rear",
+            "training": true,
+            "predictedNative": [
+              2658.104470813405,
+              1443.4291821203813
+            ],
+            "observedNative": [
+              2660,
+              1438
+            ],
+            "errorNative": 5.75056948427728,
+            "sigmaNative": 12
+          },
+          {
+            "name": "CowlRearFar",
+            "group": "Rear",
+            "training": true,
+            "predictedNative": [
+              1791.6748162678955,
+              1387.5746906153727
+            ],
+            "observedNative": [
+              1805.7766378584704,
+              1380.116831467571
+            ],
+            "errorNative": 15.952461729803737,
+            "sigmaNative": 12
+          }
+        ],
+        "frontTrainingRmsNative": 4.036092405824302,
+        "frontHeldErrorNative": 12.371333970004157,
+        "cowlRmsNative": 11.99062309962151,
+        "normalizedAllPointRms": 0.9703489044817784
+      }
+    },
+    {
+      "name": "FrontOnlyActual",
+      "metrics": {
+        "rows": [
+          {
+            "name": "FarUpperEdge",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              744.6608909818624,
+              1869.9235027047835
+            ],
+            "observedNative": [
+              744.921875,
+              1868.28125
+            ],
+            "errorNative": 1.6628609695617482,
+            "sigmaNative": 6
+          },
+          {
+            "name": "FarInnerLow",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              996.4308706191487,
+              2129.5756588295553
+            ],
+            "observedNative": [
+              997.265625,
+              2131.015625
+            ],
+            "errorNative": 1.6644270630987732,
+            "sigmaNative": 6
+          },
+          {
+            "name": "FarInnerHigh",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1071.421466324471,
+              2068.232617873812
+            ],
+            "observedNative": [
+              1068.515625,
+              2068.671875
+            ],
+            "errorNative": 2.9388536244445427,
+            "sigmaNative": 6
+          },
+          {
+            "name": "NearHitchUpper",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1601.9713821295938,
+              1942.4280192358674
+            ],
+            "observedNative": [
+              1603.28125,
+              1943.4375
+            ],
+            "errorNative": 1.6537246599951554,
+            "sigmaNative": 6
+          },
+          {
+            "name": "NearHitchMiddle",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1592.6430623979572,
+              2140.3720598214973
+            ],
+            "observedNative": [
+              1594.84375,
+              2140.3125
+            ],
+            "errorNative": 2.20149342359261,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingUpperInner",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1795.2743658687577,
+              1957.3848691057096
+            ],
+            "observedNative": [
+              1797.34375,
+              1956.09375
+            ],
+            "errorNative": 2.4391267346666803,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingUpperOuter",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1995.1457726829608,
+              1982.0159899483585
+            ],
+            "observedNative": [
+              1991.40625,
+              1982.109375
+            ],
+            "errorNative": 3.7406885280985898,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingLowerOuter",
+            "group": "Front",
+            "training": false,
+            "predictedNative": [
+              2046.4657516406303,
+              2202.104447200805
+            ],
+            "observedNative": [
+              2050.46875,
+              2212.03125
+            ],
+            "errorNative": 10.703523236729943,
+            "sigmaNative": 6
+          },
+          {
+            "name": "CowlRearNear",
+            "group": "Rear",
+            "training": true,
+            "predictedNative": [
+              2662.981647626113,
+              1428.5114915827805
+            ],
+            "observedNative": [
+              2660,
+              1438
+            ],
+            "errorNative": 9.945954682681304,
+            "sigmaNative": 12
+          },
+          {
+            "name": "CowlRearFar",
+            "group": "Rear",
+            "training": true,
+            "predictedNative": [
+              1794.326341405261,
+              1377.203412739535
+            ],
+            "observedNative": [
+              1805.7766378584704,
+              1380.116831467571
+            ],
+            "errorNative": 11.815130026844834,
+            "sigmaNative": 12
+          }
+        ],
+        "frontTrainingRmsNative": 2.4406015978381235,
+        "frontHeldErrorNative": 10.703523236729943,
+        "cowlRmsNative": 10.920606945156495,
+        "normalizedAllPointRms": 0.7744011858994808
+      },
+      "scaledParameters": [
+        0.4223091749982519,
+        0.400350240297372,
+        -0.48439676155392447,
+        0.3557963347850729,
+        -0.3585045980034136,
+        -0.38154873490105184
+      ],
+      "rotationDeltaDegrees": 0.867622008885195,
+      "translationDeltaM": [
+        0.017789816739253644,
+        -0.017925229900170682,
+        -0.019077436745052592
+      ],
+      "focalRatio": 1.0,
+      "principalPointDeltaNative": [
+        0.0,
+        0.0
+      ],
+      "dataJacobianSingularValues": [
+        47.00649244498791,
+        43.88301278818979,
+        4.9804334532494385,
+        4.946311325540877,
+        0.5113273897674487,
+        0.37288071676220474
+      ],
+      "dataJacobianCondition": 126.06308219195233,
+      "parameterAtStudyBound": false,
+      "priorWeight": 0.08,
+      "priorIsMeasured": false,
+      "trainingPointNames": [
+        "FarUpperEdge",
+        "FarInnerLow",
+        "FarInnerHigh",
+        "NearHitchUpper",
+        "NearHitchMiddle",
+        "MarkingUpperInner",
+        "MarkingUpperOuter"
+      ],
+      "iterations": 15
+    },
+    {
+      "name": "JointPose",
+      "metrics": {
+        "rows": [
+          {
+            "name": "FarUpperEdge",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              746.1253817561883,
+              1869.5683814566112
+            ],
+            "observedNative": [
+              744.921875,
+              1868.28125
+            ],
+            "errorNative": 1.7621395798258637,
+            "sigmaNative": 6
+          },
+          {
+            "name": "FarInnerLow",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              996.0763080349129,
+              2129.4084605007956
+            ],
+            "observedNative": [
+              997.265625,
+              2131.015625
+            ],
+            "errorNative": 1.9993630413075985,
+            "sigmaNative": 6
+          },
+          {
+            "name": "FarInnerHigh",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1071.389848321894,
+              2068.1063798788864
+            ],
+            "observedNative": [
+              1068.515625,
+              2068.671875
+            ],
+            "errorNative": 2.929324911327372,
+            "sigmaNative": 6
+          },
+          {
+            "name": "NearHitchUpper",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1602.278012760621,
+              1942.5320649952937
+            ],
+            "observedNative": [
+              1603.28125,
+              1943.4375
+            ],
+            "errorNative": 1.3514057518836127,
+            "sigmaNative": 6
+          },
+          {
+            "name": "NearHitchMiddle",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1591.877577649484,
+              2140.4073079440045
+            ],
+            "observedNative": [
+              1594.84375,
+              2140.3125
+            ],
+            "errorNative": 2.967687139711987,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingUpperInner",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1795.3621469672103,
+              1957.5437817753077
+            ],
+            "observedNative": [
+              1797.34375,
+              1956.09375
+            ],
+            "errorNative": 2.4554719971857746,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingUpperOuter",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1994.9757530381594,
+              1982.2287042492717
+            ],
+            "observedNative": [
+              1991.40625,
+              1982.109375
+            ],
+            "errorNative": 3.571497082339674,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingLowerOuter",
+            "group": "Front",
+            "training": false,
+            "predictedNative": [
+              2045.1775844328322,
+              2202.295629847038
+            ],
+            "observedNative": [
+              2050.46875,
+              2212.03125
+            ],
+            "errorNative": 11.080556521309779,
+            "sigmaNative": 6
+          },
+          {
+            "name": "CowlRearNear",
+            "group": "Rear",
+            "training": true,
+            "predictedNative": [
+              2665.3960808467996,
+              1435.365272412649
+            ],
+            "observedNative": [
+              2660,
+              1438
+            ],
+            "errorNative": 6.004954451513036,
+            "sigmaNative": 12
+          },
+          {
+            "name": "CowlRearFar",
+            "group": "Rear",
+            "training": true,
+            "predictedNative": [
+              1797.9118807736465,
+              1383.3496448955507
+            ],
+            "observedNative": [
+              1805.7766378584704,
+              1380.116831467571
+            ],
+            "errorNative": 8.503263294959906,
+            "sigmaNative": 12
+          }
+        ],
+        "frontTrainingRmsNative": 2.5383327348427263,
+        "frontHeldErrorNative": 11.080556521309779,
+        "cowlRmsNative": 7.360875105181401,
+        "normalizedAllPointRms": 0.7359270523337655
+      },
+      "scaledParameters": [
+        0.08346658665787073,
+        0.4513767536791047,
+        -0.25671004366410394,
+        0.3322496797271226,
+        -0.1307607464744526,
+        -0.4534465171957034
+      ],
+      "rotationDeltaDegrees": 0.6026771891106253,
+      "translationDeltaM": [
+        0.01661248398635613,
+        -0.00653803732372263,
+        -0.02267232585978517
+      ],
+      "focalRatio": 1.0,
+      "principalPointDeltaNative": [
+        0.0,
+        0.0
+      ],
+      "dataJacobianSingularValues": [
+        48.20913257436445,
+        45.11042710556342,
+        5.358354509916314,
+        5.179225496658949,
+        1.7181484827113027,
+        1.4321744161244605
+      ],
+      "dataJacobianCondition": 33.66149543770018,
+      "parameterAtStudyBound": false,
+      "priorWeight": 0.08,
+      "priorIsMeasured": false,
+      "trainingPointNames": [
+        "FarUpperEdge",
+        "FarInnerLow",
+        "FarInnerHigh",
+        "NearHitchUpper",
+        "NearHitchMiddle",
+        "MarkingUpperInner",
+        "MarkingUpperOuter",
+        "CowlRearNear",
+        "CowlRearFar"
+      ],
+      "iterations": 6
+    },
+    {
+      "name": "RearNearHeld",
+      "metrics": {
+        "rows": [
+          {
+            "name": "FarUpperEdge",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              746.0369857459207,
+              1869.152153159245
+            ],
+            "observedNative": [
+              744.921875,
+              1868.28125
+            ],
+            "errorNative": 1.4149008051629324,
+            "sigmaNative": 6
+          },
+          {
+            "name": "FarInnerLow",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              995.8780012463174,
+              2130.2232354465036
+            ],
+            "observedNative": [
+              997.265625,
+              2131.015625
+            ],
+            "errorNative": 1.597930188172971,
+            "sigmaNative": 6
+          },
+          {
+            "name": "FarInnerHigh",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1071.1230405300182,
+              2068.571050433152
+            ],
+            "observedNative": [
+              1068.515625,
+              2068.671875
+            ],
+            "errorNative": 2.6093641638261773,
+            "sigmaNative": 6
+          },
+          {
+            "name": "NearHitchUpper",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1602.1404714819287,
+              1942.0340541344776
+            ],
+            "observedNative": [
+              1603.28125,
+              1943.4375
+            ],
+            "errorNative": 1.8086005431672456,
+            "sigmaNative": 6
+          },
+          {
+            "name": "NearHitchMiddle",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1591.7465143071058,
+              2141.2059097596475
+            ],
+            "observedNative": [
+              1594.84375,
+              2140.3125
+            ],
+            "errorNative": 3.2235151521236993,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingUpperInner",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1795.5455548767427,
+              1957.0501318655645
+            ],
+            "observedNative": [
+              1797.34375,
+              1956.09375
+            ],
+            "errorNative": 2.0367061580127204,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingUpperOuter",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1995.6458535349766,
+              1981.8183109550814
+            ],
+            "observedNative": [
+              1991.40625,
+              1982.109375
+            ],
+            "errorNative": 4.249583086848686,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingLowerOuter",
+            "group": "Front",
+            "training": false,
+            "predictedNative": [
+              2046.0315760874676,
+              2203.497961607616
+            ],
+            "observedNative": [
+              2050.46875,
+              2212.03125
+            ],
+            "errorNative": 9.617979159763824,
+            "sigmaNative": 6
+          },
+          {
+            "name": "CowlRearNear",
+            "group": "Rear",
+            "training": true,
+            "predictedNative": [
+              2673.5646637217233,
+              1430.6284913211227
+            ],
+            "observedNative": [
+              2660,
+              1438
+            ],
+            "errorNative": 15.438239604507958,
+            "sigmaNative": 12
+          },
+          {
+            "name": "CowlRearFar",
+            "group": "Rear",
+            "training": true,
+            "predictedNative": [
+              1803.3749359249532,
+              1379.565047157973
+            ],
+            "observedNative": [
+              1805.7766378584704,
+              1380.116831467571
+            ],
+            "errorNative": 2.464272327032645,
+            "sigmaNative": 12
+          }
+        ],
+        "frontTrainingRmsNative": 2.597617610729899,
+        "frontHeldErrorNative": 9.617979159763824,
+        "cowlRmsNative": 11.054679556368356,
+        "normalizedAllPointRms": 0.7469229729840217
+      },
+      "scaledParameters": [
+        0.08889010061813758,
+        0.7626425174382581,
+        -0.30817388965105935,
+        0.5437475534864405,
+        -0.18669926758388367,
+        -0.9390339306285685
+      ],
+      "rotationDeltaDegrees": 0.948065080146633,
+      "translationDeltaM": [
+        0.027187377674322027,
+        -0.009334963379194183,
+        -0.04695169653142843
+      ],
+      "focalRatio": 1.0,
+      "principalPointDeltaNative": [
+        0.0,
+        0.0
+      ],
+      "dataJacobianSingularValues": [
+        47.85335049498523,
+        44.62960959977716,
+        5.090788440078551,
+        5.080817114282081,
+        1.2857408395204946,
+        0.9750560837123716
+      ],
+      "dataJacobianCondition": 49.077536455945356,
+      "parameterAtStudyBound": false,
+      "priorWeight": 0.08,
+      "priorIsMeasured": false,
+      "trainingPointNames": [
+        "FarUpperEdge",
+        "FarInnerLow",
+        "FarInnerHigh",
+        "NearHitchUpper",
+        "NearHitchMiddle",
+        "MarkingUpperInner",
+        "MarkingUpperOuter",
+        "CowlRearFar"
+      ],
+      "iterations": 11
+    },
+    {
+      "name": "JointFocal",
+      "metrics": {
+        "rows": [
+          {
+            "name": "FarUpperEdge",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              744.926771382246,
+              1869.6250671621538
+            ],
+            "observedNative": [
+              744.921875,
+              1868.28125
+            ],
+            "errorNative": 1.343826082444477,
+            "sigmaNative": 6
+          },
+          {
+            "name": "FarInnerLow",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              996.3621448433007,
+              2129.586550742486
+            ],
+            "observedNative": [
+              997.265625,
+              2131.015625
+            ],
+            "errorNative": 1.6907186717601983,
+            "sigmaNative": 6
+          },
+          {
+            "name": "FarInnerHigh",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1071.9177998267953,
+              2068.24627997461
+            ],
+            "observedNative": [
+              1068.515625,
+              2068.671875
+            ],
+            "errorNative": 3.428691394353904,
+            "sigmaNative": 6
+          },
+          {
+            "name": "NearHitchUpper",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1602.9807833265418,
+              1942.696442101489
+            ],
+            "observedNative": [
+              1603.28125,
+              1943.4375
+            ],
+            "errorNative": 0.7996543195684445,
+            "sigmaNative": 6
+          },
+          {
+            "name": "NearHitchMiddle",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1592.5737762899698,
+              2139.8111543146133
+            ],
+            "observedNative": [
+              1594.84375,
+              2140.3125
+            ],
+            "errorNative": 2.3246780724401384,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingUpperInner",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1795.302130060043,
+              1957.6221787228415
+            ],
+            "observedNative": [
+              1797.34375,
+              1956.09375
+            ],
+            "errorNative": 2.5503541597269503,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingUpperOuter",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1993.6295967378976,
+              1982.1247530936416
+            ],
+            "observedNative": [
+              1991.40625,
+              1982.109375
+            ],
+            "errorNative": 2.2233999196464747,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingLowerOuter",
+            "group": "Front",
+            "training": false,
+            "predictedNative": [
+              2043.2066741333756,
+              2200.679340743997
+            ],
+            "observedNative": [
+              2050.46875,
+              2212.03125
+            ],
+            "errorNative": 13.476037609369426,
+            "sigmaNative": 6
+          },
+          {
+            "name": "CowlRearNear",
+            "group": "Rear",
+            "training": true,
+            "predictedNative": [
+              2666.297617236007,
+              1436.8762155085228
+            ],
+            "observedNative": [
+              2660,
+              1438
+            ],
+            "errorNative": 6.397098907672128,
+            "sigmaNative": 12
+          },
+          {
+            "name": "CowlRearFar",
+            "group": "Rear",
+            "training": true,
+            "predictedNative": [
+              1798.7353649832376,
+              1382.204827123177
+            ],
+            "observedNative": [
+              1805.7766378584704,
+              1380.116831467571
+            ],
+            "errorNative": 7.344334521338127,
+            "sigmaNative": 12
+          }
+        ],
+        "frontTrainingRmsNative": 2.201029355247291,
+        "frontHeldErrorNative": 13.476037609369426,
+        "cowlRmsNative": 6.887021271778492,
+        "normalizedAllPointRms": 0.8151871499619753
+      },
+      "scaledParameters": [
+        0.22619888034315713,
+        0.7167997659844961,
+        -0.22100785608950135,
+        0.44116385015632337,
+        -0.17496512803511372,
+        3.4780020349808876,
+        1.9336236973410947
+      ],
+      "rotationDeltaDegrees": 0.897781031302986,
+      "translationDeltaM": [
+        0.02205819250781617,
+        -0.008748256401755685,
+        0.17390010174904438
+      ],
+      "focalRatio": 1.0597242268432905,
+      "principalPointDeltaNative": [
+        0.0,
+        0.0
+      ],
+      "dataJacobianSingularValues": [
+        49.64190873045546,
+        45.25043887929467,
+        8.671797675703953,
+        5.3501110843863655,
+        1.848585079144259,
+        1.6798500589950294,
+        0.09048866754749693
+      ],
+      "dataJacobianCondition": 548.5980739455439,
+      "parameterAtStudyBound": false,
+      "priorWeight": 0.08,
+      "priorIsMeasured": false,
+      "trainingPointNames": [
+        "FarUpperEdge",
+        "FarInnerLow",
+        "FarInnerHigh",
+        "NearHitchUpper",
+        "NearHitchMiddle",
+        "MarkingUpperInner",
+        "MarkingUpperOuter",
+        "CowlRearNear",
+        "CowlRearFar"
+      ],
+      "iterations": 23
+    },
+    {
+      "name": "JointCentre",
+      "metrics": {
+        "rows": [
+          {
+            "name": "FarUpperEdge",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              744.6635898221227,
+              1869.560096952118
+            ],
+            "observedNative": [
+              744.921875,
+              1868.28125
+            ],
+            "errorNative": 1.3046688315633397,
+            "sigmaNative": 6
+          },
+          {
+            "name": "FarInnerLow",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              995.889892070662,
+              2129.7417858333984
+            ],
+            "observedNative": [
+              997.265625,
+              2131.015625
+            ],
+            "errorNative": 1.8749152821483348,
+            "sigmaNative": 6
+          },
+          {
+            "name": "FarInnerHigh",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1071.7651958246934,
+              2068.281412858308
+            ],
+            "observedNative": [
+              1068.515625,
+              2068.671875
+            ],
+            "errorNative": 3.272945344608262,
+            "sigmaNative": 6
+          },
+          {
+            "name": "NearHitchUpper",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1603.3755532537386,
+              1942.6547146995354
+            ],
+            "observedNative": [
+              1603.28125,
+              1943.4375
+            ],
+            "errorNative": 0.7884452614412808,
+            "sigmaNative": 6
+          },
+          {
+            "name": "NearHitchMiddle",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1592.5989068040583,
+              2139.9723047790267
+            ],
+            "observedNative": [
+              1594.84375,
+              2140.3125
+            ],
+            "errorNative": 2.2704743475183533,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingUpperInner",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1795.57199311974,
+              1957.6190611749657
+            ],
+            "observedNative": [
+              1797.34375,
+              1956.09375
+            ],
+            "errorNative": 2.337882936167678,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingUpperOuter",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1993.701039185663,
+              1982.1586304457587
+            ],
+            "observedNative": [
+              1991.40625,
+              1982.109375
+            ],
+            "errorNative": 2.295317735210614,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingLowerOuter",
+            "group": "Front",
+            "training": false,
+            "predictedNative": [
+              2043.106556719374,
+              2200.9094278879093
+            ],
+            "observedNative": [
+              2050.46875,
+              2212.03125
+            ],
+            "errorNative": 13.337796556938613,
+            "sigmaNative": 6
+          },
+          {
+            "name": "CowlRearNear",
+            "group": "Rear",
+            "training": true,
+            "predictedNative": [
+              2662.0258173133375,
+              1436.2132130380546
+            ],
+            "observedNative": [
+              2660,
+              1438
+            ],
+            "errorNative": 2.701211475319159,
+            "sigmaNative": 12
+          },
+          {
+            "name": "CowlRearFar",
+            "group": "Rear",
+            "training": true,
+            "predictedNative": [
+              1803.7189938265283,
+              1381.655714512074
+            ],
+            "observedNative": [
+              1805.7766378584704,
+              1380.116831467571
+            ],
+            "errorNative": 2.5694474088499017,
+            "sigmaNative": 12
+          }
+        ],
+        "frontTrainingRmsNative": 2.1527563436508754,
+        "frontHeldErrorNative": 13.337796556938613,
+        "cowlRmsNative": 2.6361528238364125,
+        "normalizedAllPointRms": 0.7706634713304171
+      },
+      "scaledParameters": [
+        -0.29958533571676055,
+        -1.3087667107288494,
+        -0.2445477285506201,
+        -3.173559694463583,
+        0.8968617750470262,
+        0.16750938027503517,
+        3.0,
+        -0.9283859284368112
+      ],
+      "rotationDeltaDegrees": 1.5638390577427077,
+      "translationDeltaM": [
+        -0.15867798472317918,
+        0.044843088752351316,
+        0.008375469013751758
+      ],
+      "focalRatio": 1.0,
+      "principalPointDeltaNative": [
+        240.0,
+        -74.27087427494484
+      ],
+      "dataJacobianSingularValues": [
+        60.51181820869585,
+        57.923961648746946,
+        5.629793048373943,
+        5.422454502434432,
+        2.2310739038753744,
+        1.7256766745403436,
+        0.13948355540173793,
+        0.08603704664425864
+      ],
+      "dataJacobianCondition": 703.3228192838471,
+      "parameterAtStudyBound": true,
+      "priorWeight": 0.08,
+      "priorIsMeasured": false,
+      "trainingPointNames": [
+        "FarUpperEdge",
+        "FarInnerLow",
+        "FarInnerHigh",
+        "NearHitchUpper",
+        "NearHitchMiddle",
+        "MarkingUpperInner",
+        "MarkingUpperOuter",
+        "CowlRearNear",
+        "CowlRearFar"
+      ],
+      "iterations": 160
+    },
+    {
+      "name": "JointAll",
+      "metrics": {
+        "rows": [
+          {
+            "name": "FarUpperEdge",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              744.5137794450216,
+              1869.4872364517641
+            ],
+            "observedNative": [
+              744.921875,
+              1868.28125
+            ],
+            "errorNative": 1.2731635023954475,
+            "sigmaNative": 6
+          },
+          {
+            "name": "FarInnerLow",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              995.7550336853619,
+              2129.905279931765
+            ],
+            "observedNative": [
+              997.265625,
+              2131.015625
+            ],
+            "errorNative": 1.874767262999208,
+            "sigmaNative": 6
+          },
+          {
+            "name": "FarInnerHigh",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1071.849699345942,
+              2068.37138509368
+            ],
+            "observedNative": [
+              1068.515625,
+              2068.671875
+            ],
+            "errorNative": 3.3475880762228427,
+            "sigmaNative": 6
+          },
+          {
+            "name": "NearHitchUpper",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1603.7420836746,
+              1942.6712886873056
+            ],
+            "observedNative": [
+              1603.28125,
+              1943.4375
+            ],
+            "errorNative": 0.8941182535583623,
+            "sigmaNative": 6
+          },
+          {
+            "name": "NearHitchMiddle",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1592.7533953066484,
+              2139.8611889358763
+            ],
+            "observedNative": [
+              1594.84375,
+              2140.3125
+            ],
+            "errorNative": 2.1385192121226484,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingUpperInner",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1795.634861568824,
+              1957.6146796550788
+            ],
+            "observedNative": [
+              1797.34375,
+              1956.09375
+            ],
+            "errorNative": 2.2876902513027533,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingUpperOuter",
+            "group": "Front",
+            "training": true,
+            "predictedNative": [
+              1993.2659782912517,
+              1982.103760712247
+            ],
+            "observedNative": [
+              1991.40625,
+              1982.109375
+            ],
+            "errorNative": 1.8597367656496413,
+            "sigmaNative": 6
+          },
+          {
+            "name": "MarkingLowerOuter",
+            "group": "Front",
+            "training": false,
+            "predictedNative": [
+              2042.3360672017257,
+              2200.490616524721
+            ],
+            "observedNative": [
+              2050.46875,
+              2212.03125
+            ],
+            "errorNative": 14.118312594218663,
+            "sigmaNative": 6
+          },
+          {
+            "name": "CowlRearNear",
+            "group": "Rear",
+            "training": true,
+            "predictedNative": [
+              2661.989262616599,
+              1436.65151417281
+            ],
+            "observedNative": [
+              2660,
+              1438
+            ],
+            "errorNative": 2.4032435964607766,
+            "sigmaNative": 12
+          },
+          {
+            "name": "CowlRearFar",
+            "group": "Rear",
+            "training": true,
+            "predictedNative": [
+              1804.006296198526,
+              1381.112036045733
+            ],
+            "observedNative": [
+              1805.7766378584704,
+              1380.116831467571
+            ],
+            "errorNative": 2.030896783524368,
+            "sigmaNative": 12
+          }
+        ],
+        "frontTrainingRmsNative": 2.0841888767470635,
+        "frontHeldErrorNative": 14.118312594218663,
+        "cowlRmsNative": 2.2248732019217803,
+        "normalizedAllPointRms": 0.8031339375777339
+      },
+      "scaledParameters": [
+        -0.6747595642611254,
+        -1.1657454862195626,
+        -0.23098847026444472,
+        -3.0903761806924455,
+        1.6844618810068324,
+        1.6517456972725897,
+        0.7864554356770136,
+        2.9734181040480716,
+        -1.6056081359242185
+      ],
+      "rotationDeltaDegrees": 1.5660179395334293,
+      "translationDeltaM": [
+        -0.15451880903462228,
+        0.08422309405034162,
+        0.08258728486362948
+      ],
+      "focalRatio": 1.0238741954564208,
+      "principalPointDeltaNative": [
+        237.87344832384588,
+        -128.44865087393737
+      ],
+      "dataJacobianSingularValues": [
+        62.631186093374055,
+        58.116171028673214,
+        8.775271263510389,
+        5.465330732442274,
+        2.368028053948839,
+        2.1534664198110707,
+        0.141067340828385,
+        0.09570427249107376,
+        0.044290702141016554
+      ],
+      "dataJacobianCondition": 1414.093321301692,
+      "parameterAtStudyBound": false,
+      "priorWeight": 0.08,
+      "priorIsMeasured": false,
+      "trainingPointNames": [
+        "FarUpperEdge",
+        "FarInnerLow",
+        "FarInnerHigh",
+        "NearHitchUpper",
+        "NearHitchMiddle",
+        "MarkingUpperInner",
+        "MarkingUpperOuter",
+        "CowlRearNear",
+        "CowlRearFar"
+      ],
+      "iterations": 32
+    }
+  ],
+  "cameraAdopted": false,
+  "geometryChanged": false,
+  "wholeReferenceAccepted": false,
+  "browserChecks": 9,
+  "browserRenders": 7,
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94ReferenceReviewV105/",
+  "userRequestedCheckpointRelease": true,
+  "goalComplete": false
+}

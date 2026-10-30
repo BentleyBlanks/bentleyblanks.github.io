@@ -1,0 +1,440 @@
+{
+  "schema": "Type94DimensionReferenceAuditV1",
+  "revision": "DimensionAuditV52",
+  "status": "new-reference-and-envelope-audit-no-candidate-adopted",
+  "sourceModel": "Data_GrayTrialV51.json",
+  "sourceModelSha256": "d49c502b569ce35303b01e73b63c125fa1dda88642e0785bda91a79ed1a2c358",
+  "modelGeometryChanged": false,
+  "originalSpecification": {
+    "path": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Source_JacarType94ProvisionalSpec.pdf",
+    "sha256": "ddcd38e130b04197d5d05de0bdbf11c417daab4328b9ed7271ae47cf0a41cc37",
+    "url": "https://www.jacar.archives.go.jp/das/meta/C01001361800",
+    "pdfPagesRechecked": [
+      19,
+      20
+    ],
+    "nominalEarlyDimensionsM": {
+      "length": 3.084,
+      "width": 1.62,
+      "height": 1.62
+    },
+    "museumSurvey": false,
+    "lengthDefinition": "Full length column; no alternative2.956mdefinition identified in these pages"
+  },
+  "currentActualEnvelope": {
+    "lengthM": 2.955993890762329,
+    "heightM": 1.6380998721521018,
+    "widthM": 1.6203395128250122,
+    "metricGatePassed": false,
+    "minimumBeforeGroundM": -0.013084743748199814,
+    "maximumBeforeGroundM": 1.625015128403902,
+    "measuredAuthoredHardwareAboveRoofM": 0.04875560867157347,
+    "analyticMinimumErrorM": 2.4744647140056975e-06,
+    "extremaEvidence": "Data_AuthoredBoundsAuditV52.json"
+  },
+  "newImage6Observations": {
+    "capCandidates": [
+      {
+        "name": "RoadCap0",
+        "pixel": [
+          103.0,
+          605.0
+        ],
+        "sigma": 4.0,
+        "heldout": false
+      },
+      {
+        "name": "RoadCap1",
+        "pixel": [
+          148.0,
+          617.0
+        ],
+        "sigma": 4.0,
+        "heldout": true
+      },
+      {
+        "name": "RoadCap2",
+        "pixel": [
+          196.0,
+          633.0
+        ],
+        "sigma": 4.0,
+        "heldout": false
+      },
+      {
+        "name": "RoadCap3",
+        "pixel": [
+          244.0,
+          646.0
+        ],
+        "sigma": 4.0,
+        "heldout": false
+      },
+      {
+        "name": "DriveHub",
+        "pixel": [
+          65.0,
+          529.0
+        ],
+        "sigma": 5.0,
+        "heldout": true
+      },
+      {
+        "name": "RearIdler",
+        "pixel": [
+          308.0,
+          572.0
+        ],
+        "sigma": 4.0,
+        "heldout": false
+      }
+    ],
+    "roofRimCandidates": [
+      [
+        335.0,
+        258.0
+      ],
+      [
+        355.0,
+        254.0
+      ],
+      [
+        377.0,
+        254.0
+      ],
+      [
+        400.0,
+        254.0
+      ],
+      [
+        426.0,
+        256.0
+      ],
+      [
+        448.0,
+        261.0
+      ]
+    ],
+    "nativeManualEstimates": true,
+    "measuredMechanicalAxes": false
+  },
+  "registrationAttempts": {
+    "strictThreeViewCycles": 0,
+    "strictCyclePoseAccepted": false,
+    "modelSurfacePairMatches": 15,
+    "modelAssistedMeanHeldoutNative": [
+      12.539384702307775,
+      12.528946481486017
+    ],
+    "cameraHeightScreenCorrected": true,
+    "heightScreenCorrection": "A visible rim highlight alone does not prove an above-roof camera. Low-view candidates are retained, not rejected by that unsupported assumption.",
+    "aboveRoofCandidate": [
+      -3.0061383384024745,
+      -5.571475950821728,
+      1.5922595197323288
+    ],
+    "belowRoofCandidate": [
+      -2.800243873284853,
+      -5.41497244733588,
+      0.8326948694010592
+    ],
+    "aboveRoofCost": 23.12038976968075,
+    "belowRoofCost": 11.924011471592191,
+    "rearCameraSurveyed": false
+  },
+  "rearStereoDiagnostic": {
+    "relativeTrainingMedianNative": 0.22407065709774038,
+    "coneAnchoredBaselineM": 5.092575658750435,
+    "conditionalBaselineRangeM": [
+      5.062545721814834,
+      5.1338913390922345
+    ],
+    "camera4": {
+      "rotationCameraFromBlender": [
+        [
+          0.7760119055891097,
+          0.6278084642377805,
+          -0.06051491233868059
+        ],
+        [
+          -0.08077925996144923,
+          0.003773362834509253,
+          -0.996724873218783
+        ],
+        [
+          -0.6255239672019282,
+          0.7783587180499224,
+          0.053642077622348676
+        ]
+      ],
+      "translationCameraFromBlender": [
+        1.8834385003697096,
+        0.9281447771708318,
+        5.8620171434573365
+      ],
+      "cameraCenterBlenderM": [
+        2.280236367886298,
+        -5.748693008378757,
+        0.7246303224665648
+      ],
+      "k": [
+        [
+          1360.0,
+          0.0,
+          720.0
+        ],
+        [
+          0.0,
+          1360.0,
+          480.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "distortion": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "rearPlane": {
+      "points": 79,
+      "centreBlenderGroundM": [
+        -0.16438075384612097,
+        -1.2351552070127723,
+        0.8007576350577901
+      ],
+      "normal": [
+        -0.035772355146673464,
+        -0.9397130557700578,
+        0.3400877995791095
+      ],
+      "slopeDegrees": 19.895494403259992,
+      "centrelineForwardAtSourceTopHeightM": -1.143610406169397,
+      "retainedSourceAnchorForwardM": -1.12,
+      "planeRmsM": 0.0037420211824070898
+    },
+    "scaleAnchorIsDeclaredCone": true,
+    "globalRegistrationAccepted": false,
+    "scope": "Conditional scale from19 spatially separated cone hypotheses, with79 rear-plane points; not79 independent scale anchors"
+  },
+  "endpointObservation": {
+    "twoProjectedEndpointHypothesesOccludedByTrailer": true,
+    "actualHitchEndpointMeasured": false,
+    "hiddenFrameExtended": false,
+    "projectionEvidence": "Data_CouplingHypothesisProjectionV52.json"
+  },
+  "numericalCases": [
+    {
+      "label": "RearImageOnly",
+      "success": true,
+      "cost": 186.2044099871914,
+      "nfev": 39,
+      "declaredLengthM": 2.955,
+      "geometryBuilt": false
+    },
+    {
+      "label": "RearImageWithNominalLength",
+      "success": true,
+      "cost": 207.93505972970442,
+      "nfev": 38,
+      "declaredLengthM": 2.955,
+      "geometryBuilt": false
+    },
+    {
+      "label": "Hard length only",
+      "success": true,
+      "cost": 203.98641892486435,
+      "nfev": 85,
+      "declaredLengthM": 3.084,
+      "estimatedAuthoredHeightM": 1.7080891301646097,
+      "rejectedForHeightDatum": true,
+      "geometryBuilt": false
+    },
+    {
+      "label": "Physical length/height at min tie",
+      "success": false,
+      "cost": 375.6709290620731,
+      "nfev": 400,
+      "geometryBuilt": false
+    },
+    {
+      "label": "Smooth physical envelope",
+      "success": false,
+      "cost": 218.04655599180012,
+      "nfev": 160,
+      "geometryBuilt": false
+    },
+    {
+      "label": "Generator-aligned envelope",
+      "success": false,
+      "cost": 222.76279720691934,
+      "nfev": 80,
+      "declaredLengthM": 3.084,
+      "declaredSoftAnalyticHeightM": 1.62,
+      "geometryBuilt": false
+    }
+  ],
+  "generatorConvention": {
+    "fittedDriveRadiusScope": "Effective radius used by far-belt projection as d+14mm",
+    "constructionHypothesis": "Map d to working-radius target; nominal wheel constructor uses bare rim d-12mm and tooth tip d+2mm",
+    "newDefinitionIsMuseumMeasurement": false,
+    "actualIntegerPathRadiusMustBeChecked": true
+  },
+  "candidate": {
+    "sourceFile": "Data_GeneratorEnvelopeAuditV52.json",
+    "sourceSha256": "e46e69bbff97bed69d48b9ab53650df94f4c4396ea711509f1f4cc7ab861ea7b",
+    "solverConverged": false,
+    "solverMessage": "The maximum number of function evaluations is exceeded.",
+    "shapeParameters": {
+      "TurretCenterX": 0.08317875634957889,
+      "TurretCenterY": -0.5380173638834761,
+      "RearDeckZ": 1.0613109303281956,
+      "TurretRadialScale": 1.0,
+      "TurretVerticalScale": 1.0,
+      "CabinCenterX": 0.33455116369503235,
+      "CabinWidth": 0.5469348066964426,
+      "CabinTopZ": 1.2371310027123632,
+      "CabinTopForward": 0.32999999999999996,
+      "CabinBottomForward": 0.4165116286154536,
+      "CabinYaw": 9.999999999999999e-11,
+      "RoadFrontForward": 0.7093522472327868,
+      "RoadSpacing01": 0.522586069879792,
+      "RoadSpacing12": 0.40345994564852017,
+      "RoadSpacing23": 0.5139143389822034,
+      "TrackCenterX": 0.6686210943793939,
+      "CapDepth0": 0.0849385422747444,
+      "CapDepth1": 0.07695742698269259,
+      "CapDepth2": 0.0833461833433244,
+      "CapDepth3": 0.08214371554164457,
+      "FrontPivotY": 0.4765267226166193,
+      "RearPivotY": -0.45517809505110723,
+      "FrontPivotZ": 0.27405496083898045,
+      "RearPivotZ": 0.26153727713781405
+    },
+    "circularParameters": {
+      "RoofRadius": 0.3563302311144514,
+      "RoofZBeforeGround": 1.5748800238800047,
+      "RoofHighestOffset": 0.04875560867157347,
+      "ConeSlope": 0.13798030336348027,
+      "TyreShoulderRadius": 0.16826619366200934,
+      "TyreShoulderAxialOffset": 0.0525,
+      "TyreAxisMinusShoulderRadius": 0.04111693816018775,
+      "CabinBottomZBeforeGround": 1.0227639607407077
+    },
+    "driveParameters": {
+      "centerForwardM": 1.1895628321514826,
+      "centerHeightM": 0.564741464733387,
+      "outerMetalRadiusM": 0.27343716784851746,
+      "opticalDomeOutwardDepthM": 0.08293908695583552
+    },
+    "idlerParameters": {
+      "centerForwardM": -1.115933707809598,
+      "centerHeightM": 0.4102962173382532,
+      "leftOpticalDepthM": 0.07493657102069706,
+      "rightOpticalDepthM": 0.03500000000000001
+    },
+    "declaredNominalLengthM": 3.084,
+    "declaredSoftAnalyticHeightM": 1.62,
+    "maximumSoftMinimumBiasM": 0.00034657359027997266,
+    "accepted": false,
+    "geometryBuilt": false,
+    "rawMeshMetricsVerified": false
+  },
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94DimensionReviewV52/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\DimensionAuditV52\\Acceptance",
+  "complete": false,
+  "strictReferenceMatched": false,
+  "globalCalibrationAccepted": false,
+  "metricSurveyAccepted": false,
+  "pbrAccepted": false,
+  "gameBudgetAccepted": false,
+  "remaining": [
+    "Build the complete generator-aligned candidate with circular sections and actual-root normalization; verify actual width/height/length and all interfaces",
+    "Use the matching conditional camera family for whole-model neutral-gray comparisons; numerical cost and solver flags do not establish reference acceptance",
+    "Reconcile forebody/glacis/fenders, rear boundaries, rivets and attachments; unrevealed construction remains explicit inference",
+    "After accepted full geometry, fresh PBR and a new below80000triangle/3mmgame derivative"
+  ],
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV52.json",
+  "sourceFilesSha256": {
+    "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Source_JacarType94ProvisionalSpec.pdf": "ddcd38e130b04197d5d05de0bdbf11c417daab4328b9ed7271ae47cf0a41cc37",
+    "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_Kubinka.jpg": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+    "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial2.jpg": "71227a67ba14c9434c598a375789a835da055f4d784c8c82f13f225561ae78e4",
+    "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial4.jpg": "fd538683bc72f5f2e6686909c84a7b6d49b92a7918eb2a206b2a6086a55822ba",
+    "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial6.jpg": "309602423310491cc49dcf61e9881e5d43744901e5bf9e53182db4554a978bf0",
+    "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial7.jpg": "f8d11457481fbdd4435ffb184aee2f178a5843ddb0336d88fb91590cf470bf34"
+  },
+  "researchSnapshotFilesSha256": {
+    "Taierzhuang1938/Model/Type94Tankette/Data_ReferenceEnvelopeV47.json": "af6fc879929f6ddc2f9bbdc9d815a661770663e5e8263bf8a267b66ac4219a22",
+    "Taierzhuang1938/_import/Script_VerifyType94GeometryReplay.py": "fd15c1cf18de868ff35291b704f780e111c1db3866feb0eec507d3d2082cc6cb",
+    "tmp/Script_Type94PhysicalProfilesV47.py": "d0574b39c7ab59a3f74375e4e96903ee4fefb2019d33cce55ecb38cdd336d437",
+    "tmp/Type94Vision/Data_PhysicalProfilesV47.json": "f5d932611c0fe187bc67b9ac43eb90ca26e77d859d3f37641a2bb50750b1f45e",
+    "tmp/Type94Vision/Data_CircleCandidatesV47Expanded.json": "e7f9b43ad43c36349e55d241ac1386deda517d2567413ea2ca953ad879366385",
+    "tmp/Type94Vision/Data_ProfiledBundleV47.json": "38a6af6de7f3b063e8fafaa061f61d8176af671c6b8591979e455bd6e849b839",
+    "tmp/Script_Type94CircularBundleV47.py": "3ca065b9d0c8f731133f29c5a5debe4cb1dea2652bc7ea28cf9a470bf6a7c943",
+    "tmp/Type94Vision/Data_CircularBundleV47.json": "411ced158edcbfcf9724f06ee6abc46e79f6cee799d9cd733f3b0a3794b36257",
+    "tmp/Type94Vision/Data_CircleCandidatesV47.json": "f67280606a60fce66b3de679655028eaab1c3b9ab321cbde7c5ea900a50e86df",
+    "tmp/Type94Vision/Data_IdlerJointV46.json": "141e47fd0c85c4f202d771f8cd4c85edade604f3adc005e04e58c6950622ff8f",
+    "tmp/Script_Type94IdlerJointV46.py": "eda86088966aa7402769247c8e07d8d3dee4cad43562036982a8df8485cd4bbb",
+    "tmp/Type94Vision/Data_RearIdlerReviewV46.json": "5c3a96eb2f66614053124eecca1830e19b57c1b547b16fe9c49fc394dead7d2e",
+    "tmp/Type94Vision/Data_FenderSpanGuardV45.json": "0310950328c6ee8887a393d8bdd635e91ed5b352c1984996c665198ccb6ab2a0",
+    "tmp/Script_Type94SixViewJointV45.py": "1e4a25b970c7a62da3edbb27091b62e886b827ee81f5e291c402dc6e85cd49df",
+    "tmp/Type94Vision/Data_SixViewJointV45.json": "163b7f2e53f612843afed01c68317d723bae765d9fb963f6e15f7aea22d94266",
+    "tmp/Type94Vision/Data_RightPhysicalReviewV45.json": "d1ccdfb265cdcd69e174bc2557970b58b806e3b32efaf094d9a034dcc7bc6507",
+    "tmp/Type94Vision/Data_ForebodyDepthV45.json": "c3cce755c4229db8512f3d37d5bbc690c3e10801b75f936b6a4968d78c53cad2",
+    "tmp/Script_Type94ForebodyDepthV45.py": "a445a66c5336f4609a485dae0cf6bea7f61057089d5fefb27867dd15213efd1c",
+    "tmp/Type94Vision/Data_ForebodyJointV43.json": "2addc60171e7a4f3a55824ad43864a9cf8b287b724a30a7c7f8f01c2d5819af4",
+    "tmp/Script_Type94ForebodyJointV43.py": "20be2b9c68b38e21fc33c93669f9e247300898c3b65e4d7a80c499bccd93b175",
+    "tmp/Type94Vision/Data_FarTrackEnvelopeV43.json": "a5da2837fdf6e4dc48dfff7812f80e793e07c538ae0a3dc363ae9783abe3a927",
+    "tmp/Type94Vision/Data_TourGuidePhysicalReviewedV40.json": "a548e5a1152de3c3b81887a8ad1c663a4c7b5c96af1eb64510f411342b08656f",
+    "tmp/Type94Vision/Data_DriveCapReviewV43.json": "1c691643a1007ed74cdaedf1abb97c3652a8a5f58d5d7fe033fe4830452baf80",
+    "tmp/Type94Vision/Data_MetricSkeletonV41.json": "fa323057f6b6b6798cbca3760ef655b27735d3267fbad384159e7a5566aad7b9",
+    "tmp/Type94Vision/Data_ForebodyTriangulationV43.json": "8248aae567f9ab806fdd012b3d65610fc26ccc71c647dd2c78f8f9cc6ebb86ae",
+    "tmp/Script_Type94MetricModelV41.py": "75b4de64c3148da099306be69d6e1ecebc2de1b7e4dea010a52dc22abe4dd0d6",
+    "tmp/Type94Vision/Data_RivetPhysicalSitesV33.json": "813ea80f81b69edf01b74105ad0244129197d7ae3f427b42fe77d72ce1ccb763",
+    "tmp/Type94Vision/Data_WheelIdentityReviewV38.json": "fdfa4faffd21d0e309a8ce28fc584b4e81b170c5b70c91e189bb1128f4fd96f2",
+    "tmp/Type94Vision/Data_BogiePivotDiagnosticV41.json": "a7dd1027b9b072bd7fb07c273acdb74c94b5bfe8845c39d130b133fc9e05f2d8",
+    "tmp/Type94Vision/Data_VentFaceReviewV41.json": "3501dbf5c452d3a12bf7c098e382770233944db9db4e4085b8bcde1191feb205",
+    "tmp/Type94Vision/Data_RoadCapIdentityReviewV41.json": "e8e35f1f0df67ab08300f2807b7d57ae0918e94c5a091ec694a3cf2383fb35df",
+    "tmp/Type94Vision/Data_PrimaryCameraCurrentV37.json": "f8f30316b8071ed1127591426554712ea1b7c6e24c371b23c7873e4e53cfb6cd",
+    "tmp/Type94Vision/Data_FiveViewPhysicalBundleV41.json": "d3235f663f3aceec48d7405b967c6c76794435d30c3483e0a7635ab58ce95a9a",
+    "tmp/Script_Type94ProfiledBundleV47.py": "07939ecc25a058c7b2d4ba3ea4dc2251d514ddf76b98d2cf593f8512db16df5e",
+    "tmp/Type94Vision/Data_CapDatumBundleV47.json": "e9c7b7106e4fbea7126e6e7b377c00b1a8b649cc94e33ad6d5edea7cf983b1e8",
+    "tmp/Script_Type94CapDatumBundleV47.py": "937782aa167f386a13642a66b2e6f7f04542417eb15db143bf29a870ae0df4ed",
+    "tmp/Script_Type94RefinePhysicalEnvelopeV52.py": "51dd5c2109a694d2e9b809a37d2e936d8df7d681e2fff06fbb0f1d3247ea4925",
+    "tmp/Script_Type94JointRearAuditV52.py": "8f7fe64fd453b547e237035796e4a10cb672bd5a4cdb41352a6a5bb36badd02b",
+    "tmp/Script_Type94RearStereoAuditV52.py": "12806f743f6ede3c500dd80dde0a374dfb70fc6504704ca999fea4f4af2ab0c6",
+    "tmp/Type94Vision/Data_RearPoseV28.json": "2a9b64ec12c84a4f613315a41dfd76a4eb020dcbdf0ca92184a1e8fc024eff81",
+    "tmp/Type94Vision/Data_RearBalancedV28.json": "baaa4d1ed73ff2f73f7bdcbac206053330e2d02e99108f748e1af0de3f210e60",
+    "tmp/Type94Vision/Data_RearBridgeV28.json": "76eddb9847cb002d4b4ee29f6780f8d5bef73e68328c608eef77315988bcf668",
+    "tmp/Script_Type94RearRenderV52.py": "5fda13ac2d6cd7a781b19e6dc9f76e92d1b06b197eade925794a50ae9a19cb9f",
+    "tmp/Script_Type94RearPreviewV52.py": "bcb5f2f8e1249fd0529f1c8a23cdc77f2d5ca69639eacf7d66e3102cac7f4b79",
+    "tmp/Script_Type94RearModelPoseV52.py": "24c945b225485baff31f09dc6adf509335ed0720db174033ef8957ba9f415569",
+    "tmp/Script_Type94RearMetricBridgeV52.py": "cb52279eaed8c3ecc7bcf80f8a9705404e8e4a2c097687dd336f1647aeadab22",
+    "tmp/Script_Type94RearHitchProjectionV52.py": "d3999f1d93378279a5d5b3172ec25b2e8bd8aa86691756c883e06278e106c9f0",
+    "tmp/Script_Type94RearCirclePoseV52.py": "30f0cf504bcac5cd5d5ec38d4f02216306623bafb37865d2b62c89b7ab5ed9f3",
+    "tmp/Script_Type94RearCircleLowPoseV52.py": "afd6031d90202aecc89fe20e05666a201d405ce40d98e15fc31f14fb526e7ae9",
+    "tmp/Script_Type94PrepareLowRearV52.py": "617243f66e6c7ef2e1f01e280a62e98e3f4d6c6fb5720f1e8a47c13e006e02c2",
+    "tmp/Script_Type94PhysicalEnvelopeAuditV52.py": "45cd0afe2ceeec2e8d9a862a05dcbfee1160eb8fcc8647b161927b82d5669c07",
+    "tmp/Script_Type94HardLengthAuditV52.py": "bac64d31d0bd43bd73960d5406844de33acffc1ecd4c3da337defb8f86fcc3d8",
+    "tmp/Script_Type94GeneratorEnvelopeV52.py": "fd657e0cf7c825d1749ccbd9c11c8d2add22ddd1ad0bfbb9c38875be4b69b3e4",
+    "tmp/Script_Type94GeneratorEnvelopeRunV52.py": "531ea45747476d018ec5cffda3d47c87576ca72fb6627fb25bf42b3655e9801e",
+    "tmp/Script_Type94FinalizeDimensionAuditV52.py": "7a04e4d218e06b90f1e9859ff3ce4bec7ae5c97d911f65c254ed84f2f4c112c2",
+    "tmp/Type94Vision/Data_DimensionCleanupV52.json": "2118f7b64109eea2027aac6c4f4e89451d4f540be235d788d68c850e8e2720c6",
+    "tmp/Script_Type94DimensionPageV52.py": "5f30c3a170abc6bbcdc91d851cf34a7084aae0eec31f7449b37fbd382b66d326",
+    "Taierzhuang1938/Model/Type94Tankette/Data_GrayTrialV51.json": "919f18a39821a9eb4266d99a211e9521cd1b9cac5b1282b2c02958e56014ad86",
+    "tmp/Script_Type94BoundsAuditV52.py": "f7b1cb20d46feb60a77a33a40030e6b2557e32c9de6f99136630627ea84829b3"
+  },
+  "browserValidation": {
+    "report": "Data_DimensionBrowserV52.json",
+    "passed": true,
+    "checks": 9,
+    "previewInspected": true
+  }
+}

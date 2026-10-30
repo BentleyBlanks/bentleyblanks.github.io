@@ -1,0 +1,80 @@
+{
+  "schema": "Type94TurretEnvelopeLayoutV1",
+  "revision": "ShapeV53EnvelopeTrial",
+  "status": "Generator-aligned full envelope hypothesis; no strict reference acceptance",
+  "sourceGray": "Data_GrayStudyV37.json",
+  "sourceHypothesis": "Data_GeneratorEnvelopeAuditV52.json",
+  "pivotBlenderM": [
+    0.08317875634957889,
+    -0.5380173638834761,
+    1.0609109303281956
+  ],
+  "roofRadiusM": 0.3563302311144514,
+  "roofZLocalM": 0.5139690935518091,
+  "coneSlope": 0.13798030336348027,
+  "pairedRivetSites": [
+    {
+      "name": "SidePairRow0Rear",
+      "yM": 0.12903714854492707,
+      "zM": 0.46587286556461494
+    },
+    {
+      "name": "SidePairRow0Front",
+      "yM": 0.16715734617393804,
+      "zM": 0.4670256854703554
+    },
+    {
+      "name": "SidePairRow1Rear",
+      "yM": 0.13368105531984248,
+      "zM": 0.39406182085674035
+    },
+    {
+      "name": "SidePairRow1Front",
+      "yM": 0.17154929571171107,
+      "zM": 0.3953443854519718
+    },
+    {
+      "name": "SidePairRow2Rear",
+      "yM": 0.13751772178428004,
+      "zM": 0.32023374236380775
+    },
+    {
+      "name": "SidePairRow2Front",
+      "yM": 0.1760735800433146,
+      "zM": 0.32236836435875404
+    },
+    {
+      "name": "SidePairRow3Rear",
+      "yM": 0.14248119302441226,
+      "zM": 0.24772121695046478
+    },
+    {
+      "name": "SidePairRow3Front",
+      "yM": 0.18094686868143756,
+      "zM": 0.25010255290964967
+    },
+    {
+      "name": "SidePairRow4Rear",
+      "yM": 0.14634123313694117,
+      "zM": 0.17529072995322426
+    },
+    {
+      "name": "SidePairRow4Front",
+      "yM": 0.18545251586316974,
+      "zM": 0.17763864030522014
+    }
+  ],
+  "retainCommanderLidRadiusM": 0.286,
+  "retainSocketRadiusM": 0.116,
+  "driverRoofGunMinElevationDegrees": 12,
+  "driverRoofGunPoseInferred": true,
+  "complete": false,
+  "strictReferenceMatched": false,
+  "metricSurveyAccepted": false,
+  "limits": [
+    "V52 numerical solver reached its evaluation limit; this is a generated hypothesis, not convergence or reference acceptance",
+    "Circular pivots, pins and bores are reconstructed without anisotropic scaling",
+    "Observed rivet points are expressed in the new deck frame; all concealed sections and exact aiming stops remain inferred"
+  ],
+  "sourceHypothesisSha256": "e46e69bbff97bed69d48b9ab53650df94f4c4396ea711509f1f4cc7ab861ea7b"
+}

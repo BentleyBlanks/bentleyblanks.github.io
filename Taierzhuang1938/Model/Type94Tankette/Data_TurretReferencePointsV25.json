@@ -1,0 +1,285 @@
+{
+  "status": "Remeasured physical turret features; not a camera calibration or museum dimensional survey",
+  "references": [
+    {
+      "id": "Kubinka",
+      "sha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28"
+    },
+    {
+      "id": "KubinkaOld",
+      "sha256": "a2842cfe2394259a70ab2bc7d5835696c944da040518b2c8870f9428f76ca136"
+    }
+  ],
+  "rows": [
+    {
+      "name": "SidePairRow0Front",
+      "aNative": [
+        3247.5,
+        270.0
+      ],
+      "bNative": [
+        3116.0,
+        511.0
+      ],
+      "a640": [
+        428.18294190358466,
+        35.59950556242274
+      ],
+      "b640": [
+        406.49001222992257,
+        66.66123114553608
+      ],
+      "sigmaNativePixels": 3.0,
+      "feature": "Rivet head centre, not adjacent shadow or highlight edge",
+      "pairLevel": 0
+    },
+    {
+      "name": "SidePairRow0Rear",
+      "aNative": [
+        3285.5,
+        271.5
+      ],
+      "bNative": [
+        3162.0,
+        513.0
+      ],
+      "a640": [
+        433.1932426864442,
+        35.79728059332509
+      ],
+      "b640": [
+        412.4908275580921,
+        66.92213615980432
+      ],
+      "sigmaNativePixels": 3.0,
+      "feature": "Rivet head centre, not adjacent shadow or highlight edge",
+      "pairLevel": 0
+    },
+    {
+      "name": "SidePairRow1Front",
+      "aNative": [
+        3255.5,
+        368.3
+      ],
+      "bNative": [
+        3125.0,
+        607.0
+      ],
+      "a640": [
+        429.2377420683972,
+        48.560362587556654
+      ],
+      "b640": [
+        407.6640847941296,
+        79.18467183041174
+      ],
+      "sigmaNativePixels": 3.0,
+      "feature": "Rivet head centre, not adjacent shadow or highlight edge",
+      "pairLevel": 1
+    },
+    {
+      "name": "SidePairRow1Rear",
+      "aNative": [
+        3295.3,
+        370.0
+      ],
+      "bNative": [
+        3170.0,
+        609.0
+      ],
+      "a640": [
+        434.4853728883395,
+        48.78450762257932
+      ],
+      "b640": [
+        413.5344476151651,
+        79.44557684467998
+      ],
+      "sigmaNativePixels": 3.0,
+      "feature": "Rivet head centre, not adjacent shadow or highlight edge",
+      "pairLevel": 1
+    },
+    {
+      "name": "SidePairRow2Front",
+      "aNative": [
+        3265.5,
+        470.0
+      ],
+      "bNative": [
+        3133.0,
+        705.0
+      ],
+      "a640": [
+        430.55624227441285,
+        61.96950968273589
+      ],
+      "b640": [
+        408.7077048512026,
+        91.96901752955564
+      ],
+      "sigmaNativePixels": 3.0,
+      "feature": "Rivet head centre, not adjacent shadow or highlight edge",
+      "pairLevel": 2
+    },
+    {
+      "name": "SidePairRow2Rear",
+      "aNative": [
+        3305.6,
+        471.4
+      ],
+      "bNative": [
+        3180.0,
+        707.0
+      ],
+      "a640": [
+        435.8434281005356,
+        62.15409971157808
+      ],
+      "b640": [
+        414.83897268650634,
+        92.22992254382389
+      ],
+      "sigmaNativePixels": 3.0,
+      "feature": "Rivet head centre, not adjacent shadow or highlight edge",
+      "pairLevel": 2
+    },
+    {
+      "name": "SidePairRow3Front",
+      "aNative": [
+        3274.7,
+        570.0
+      ],
+      "bNative": [
+        3141.0,
+        802.0
+      ],
+      "a640": [
+        431.76926246394726,
+        75.15451174289245
+      ],
+      "b640": [
+        409.7513249082756,
+        104.62291072156543
+      ],
+      "sigmaNativePixels": 3.0,
+      "feature": "Rivet head centre, not adjacent shadow or highlight edge",
+      "pairLevel": 3
+    },
+    {
+      "name": "SidePairRow3Rear",
+      "aNative": [
+        3315.4,
+        572.3
+      ],
+      "bNative": [
+        3188.0,
+        804.0
+      ],
+      "a640": [
+        437.135558302431,
+        75.45776679027607
+      ],
+      "b640": [
+        415.88259274357927,
+        104.88381573583368
+      ],
+      "sigmaNativePixels": 3.0,
+      "feature": "Rivet head centre, not adjacent shadow or highlight edge",
+      "pairLevel": 3
+    },
+    {
+      "name": "SidePairRow4Front",
+      "aNative": [
+        3284.5,
+        672.2
+      ],
+      "bNative": [
+        3149.0,
+        898.0
+      ],
+      "a640": [
+        433.0613926658426,
+        88.62958384837248
+      ],
+      "b640": [
+        410.7949449653486,
+        117.1463514064411
+      ],
+      "sigmaNativePixels": 3.0,
+      "feature": "Rivet head centre, not adjacent shadow or highlight edge",
+      "pairLevel": 4
+    },
+    {
+      "name": "SidePairRow4Rear",
+      "aNative": [
+        3325.0,
+        672.9
+      ],
+      "bNative": [
+        3197.0,
+        900.0
+      ],
+      "a640": [
+        438.401318500206,
+        88.72187886279357
+      ],
+      "b640": [
+        417.0566653077864,
+        117.40725642070933
+      ],
+      "sigmaNativePixels": 3.0,
+      "feature": "Rivet head centre, not adjacent shadow or highlight edge",
+      "pairLevel": 4
+    },
+    {
+      "name": "RoofFarPinEnd",
+      "aNative": [
+        2690.3203125,
+        194.7296875
+      ],
+      "bNative": [
+        2601.0859375,
+        449.5390625
+      ],
+      "a640": [
+        354.71878862793574,
+        25.675113308611454
+      ],
+      "b640": [
+        339.3181818181818,
+        58.643497757847534
+      ],
+      "sigmaNativePixels": 4.0,
+      "feature": "Visible right end of roof hinge pin; contrast/occlusion uncertainty remains"
+    },
+    {
+      "name": "RoofNearPinEnd",
+      "aNative": [
+        3037.903125,
+        199.24374999999998
+      ],
+      "bNative": [
+        2920.734375,
+        456.0625
+      ],
+      "a640": [
+        400.54758961681085,
+        26.270292542233207
+      ],
+      "b640": [
+        381.0171218915614,
+        59.49449653485528
+      ],
+      "sigmaNativePixels": 4.0,
+      "feature": "Visible right end of roof hinge pin; contrast/occlusion uncertainty remains"
+    }
+  ],
+  "superseded": "Coarse side-feature guesses in Data_UpperTurretGaugeTrialV20.json include blank paint locations; do not infer yaw from those guesses",
+  "limits": [
+    "Rivet head centre can shift slightly with lighting and paint",
+    "Roof pin-end centre remains partly occluded",
+    "Turret rotation between dates must be tested rather than assumed"
+  ],
+  "calibrationAccepted": false,
+  "physicalDimensionsSurveyed": false
+}

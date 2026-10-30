@@ -1,0 +1,140 @@
+{
+  "schema": "Type94FullGameRebuildAuditV1",
+  "revision": "GameReplayV72",
+  "status": "complete-cold-game-rebuild-and-exact-render-data-parity-verified-whole-reference-pending",
+  "referenceManifest": "Data_GameTrialV70.json",
+  "referenceSha256": "bc2980baf6b173969152208965b247e10cc9e89aa084189e16359fa34f14d42a",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameReplayV72Canonical\\Scene_Type94TanketteGamePbrV70.blend",
+  "sourceBlendSha256": "a26f26970d0e3ed3c6d18ea707e24305a0792c856a5e58d97f10995d07b1839d",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameReplayV72Canonical\\Exports\\Model_Type94TanketteGamePbrV70.glb",
+  "sha256": "eac20dbfbfa0729272de7abb3d19b6b43de53eac6033984ec346606fc687990b",
+  "triangles": 79580,
+  "meshOwners": 237,
+  "rigNodes": 292,
+  "independentLinks": [
+    80,
+    80
+  ],
+  "renderedCornerAttributesExact": true,
+  "orientedSurfacesExact": true,
+  "decodedTwelveImagesExact": true,
+  "materialBindingsAndSemanticsExact": true,
+  "fullColdPipelineVerified": true,
+  "normalEncodingSequence": "Geometry -> saved-source Planes -> fresh UV/projection; the explicit Planes stage preserves the original saved normal-encoding sequence",
+  "outputRootVariable": "TYPE94_GAME_ROOT",
+  "canonicalGameReplaced": false,
+  "originalReviewedCandidateReplaced": false,
+  "localReplayPreview": "http://127.0.0.1:8114/tmp/Type94GameReplayV72/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameReplayV72Canonical\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameReplayV72Canonical\\Rebuild",
+  "frozenScripts": [
+    {
+      "file": "Taierzhuang1938/_blender/Script_BuildType94GameV70.mjs",
+      "sha256": "09ddd1d21a1777286c5b4cbf1605c0319c9a2a5999728b19d0cd7359c9fed547"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameDeltaV70.py",
+      "sha256": "df1a80de6d680e57fd0176664ad9ca2045b02ac99b37ad5273ef98b256cb2423"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameGeometryV70.py",
+      "sha256": "7a2bc5ac6e1bd3f77e613d78ef151305d7cda8111b98924f6017da46507ec0c0"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GamePlanePatchV70.py",
+      "sha256": "7fe0189c82ff27adbb3f9de53e3364c40df5022baaef76c09f0d45c8c8999741"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameProjectionPixelsV70.py",
+      "sha256": "19828bd19c03d2d72e0a5246e8ec60c442606e0cfa48ca1f99c464a630ae3466"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameProjectionRepairV70.py",
+      "sha256": "a3e11036a6b1359a6ea7df2136a21ec28e4d492416968c48b20707fdf1106fff"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameProjectionV70.py",
+      "sha256": "b920831ea897a42dbfae2b570defec5e74b181467291ddc728be974c281b98d6"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameRunningV70.py",
+      "sha256": "fd899cb69336aeaf1d60418fada3a6ed3a67d2d02f735d7bb63689bc6d5381bd"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameSourceAuditV70.py",
+      "sha256": "14af189d7c293e219694d61bcba1155463cf14df4bfbd658f59cec4250b8f615"
+    },
+    {
+      "file": "Taierzhuang1938/_import/Script_VerifyType94GameSectionsV70.py",
+      "sha256": "efb4580df6e75be3576c8fbacd1b46fa3e236707b2858e79f4bee85a49dcfe3d"
+    },
+    {
+      "file": "Taierzhuang1938/_import/Script_VerifyType94GameV70.py",
+      "sha256": "389c7016546c5b20e0f907c8a60aa475b7f8314e735b47eeb3a52e60e19d7088"
+    },
+    {
+      "file": "Taierzhuang1938/_import/Script_VerifyType94GameRebuildV72.py",
+      "sha256": "ff31c1cf669af1df0d6aa8dad19b2196b65f2eddb3df320d337f7ab92f76ea67"
+    }
+  ],
+  "validation": {
+    "Data_RawGameExportV70.json": {
+      "passed": true,
+      "reportSha256": "1ec8a026dde3d36df985423bdbca4ff4b97ddfde04142290a10c4100194e48da",
+      "checks": 1159
+    },
+    "Data_ComposedActualSurfaceCertificateV70.json": {
+      "passed": true,
+      "reportSha256": "b6da33fbe615ed42c970c884604117229c93c114bf4680801389f9ee9964b3f5",
+      "checks": 15
+    },
+    "Data_GameSourceReopenV70.json": {
+      "passed": true,
+      "reportSha256": "cccec8afd324b9c92a28031d6ecad939175404e1de3b911bc1c46f2df7b0cc40",
+      "checks": 22
+    },
+    "Data_ReopenedHullCertificateV70.json": {
+      "passed": true,
+      "reportSha256": "f15c1e9914930151d0eb150380a92e29e60ea003acc4b49d29f36689a604cbc9",
+      "checks": 202
+    },
+    "Data_ActualGameMotionV70.json": {
+      "passed": true,
+      "reportSha256": "73ad0df17db36a998fb6addf6ef41d12049dfd81ee5c6c1d20aa1f1d21e66baf",
+      "checks": 39
+    },
+    "Data_GameRunningV70.json": {
+      "passed": true,
+      "reportSha256": "b419560293843833445c76b488333e6cd5179f2d350d829402e86057ef415085",
+      "checks": 0
+    },
+    "Data_GameSectionsV70.json": {
+      "passed": true,
+      "reportSha256": "10886383be1544ccac91134d9e2bd380b84ac0e6ca1f038b9db752e2307805c7",
+      "checks": 56
+    },
+    "Data_ReplayMechanismBrowserV72.json": {
+      "passed": true,
+      "reportSha256": "dbade64143fd94292f2b2405805c983c5a3311093dd4b78d8e1e23697876c529",
+      "checks": 937
+    },
+    "Data_GameProjectionRepairV70.json": {
+      "passed": true,
+      "reportSha256": "96112d96af81106cd62e9ff86eaa3c2829086d6673bc0afe46c508e7b34996dc",
+      "checks": 0
+    }
+  },
+  "parityReport": "Data_CompleteRebuildParityV72.json",
+  "parityReportSha256": "e6d2c133559239dfe121e7443a59749c92a3849597c706faa492a07ec34753b5",
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameReplayV72Canonical\\Acceptance\\Data_OwnedBlenderCleanupV72.json",
+  "wholeReferenceAccepted": false,
+  "finalGameAccepted": false,
+  "goalComplete": false,
+  "published": false,
+  "remaining": [
+    "Whole-reference body/running-gear/camera physical correspondence and final high/PBR acceptance",
+    "Final accepted revision game derivative if the high geometry changes",
+    "Final whole-objective acceptance audit"
+  ]
+}

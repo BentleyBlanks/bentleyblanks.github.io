@@ -1,0 +1,380 @@
+{
+  "schema": "Type94ReferenceProjectionAuditV1",
+  "revision": "ReferenceV71",
+  "status": "local-full-and-crop-lens-parity-verified-no-geometry-or-calibration-adoption",
+  "sourceGeometry": "Data_GrayTrialV64.json",
+  "sha256": "d46ca757f4210827c0ea957e978db466138282913251a9ce9acab8f26b77137a",
+  "sourcePrimarySha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+  "retainedCameraFamilySha256": "e46e69bbff97bed69d48b9ab53650df94f4c4396ea711509f1f4cc7ab861ea7b",
+  "cameraChecks": [
+    {
+      "camera": "2017",
+      "passed": true
+    },
+    {
+      "camera": "2014",
+      "passed": true
+    },
+    {
+      "camera": "TourGuide",
+      "passed": true
+    },
+    {
+      "camera": "2",
+      "passed": true
+    },
+    {
+      "camera": "7",
+      "passed": true
+    },
+    {
+      "camera": "3",
+      "passed": true
+    },
+    {
+      "camera": "6",
+      "passed": true
+    }
+  ],
+  "modelGeometryChanged": false,
+  "modelAxesChanged": false,
+  "modelDimensionsChanged": false,
+  "cameraParametersChanged": false,
+  "fullAndCropUseSameLensMapping": true,
+  "referenceMarkersUseNativeCropViewBox": true,
+  "staleMarkersCleared": true,
+  "gpuCases": 49,
+  "gpuMarkerSamples": 441,
+  "maximumGpuCentroidErrorScreenPixels": 0.23643950758584706,
+  "maximumForwardInverseErrorNative": 7.330462267418638e-07,
+  "maximumCropSourceTargetDimension": 794,
+  "rawControlCases": [
+    {
+      "camera": "2017",
+      "crop": [
+        0,
+        2756,
+        640,
+        480
+      ],
+      "rows": [
+        {
+          "samples": 27.498039215686276,
+          "errorScreenPixels": 1.4210854715202004e-14
+        },
+        {
+          "samples": 27.498039215686276,
+          "errorScreenPixels": 1.4210854715202004e-14
+        },
+        {
+          "samples": 27.498039215686276,
+          "errorScreenPixels": 1.4210854715202004e-14
+        },
+        {
+          "samples": 28,
+          "errorScreenPixels": 0
+        },
+        {
+          "samples": 28,
+          "errorScreenPixels": 0
+        },
+        {
+          "samples": 27.498039215686276,
+          "errorScreenPixels": 2.842170943040401e-14
+        },
+        {
+          "samples": 28,
+          "errorScreenPixels": 0
+        },
+        {
+          "samples": 28,
+          "errorScreenPixels": 0
+        },
+        {
+          "samples": 28,
+          "errorScreenPixels": 0
+        }
+      ],
+      "maximumErrorScreenPixels": 2.842170943040401e-14,
+      "missingMarkers": 0
+    },
+    {
+      "camera": "TourGuide",
+      "crop": [
+        0,
+        1464,
+        640,
+        480
+      ],
+      "rows": [
+        {
+          "samples": 0,
+          "errorScreenPixels": null
+        },
+        {
+          "samples": 29.74509803921569,
+          "errorScreenPixels": 47.83769201455245
+        },
+        {
+          "samples": 27.247058823529414,
+          "errorScreenPixels": 26.577419067596807
+        },
+        {
+          "samples": 0,
+          "errorScreenPixels": null
+        },
+        {
+          "samples": 30.247058823529414,
+          "errorScreenPixels": 62.05714022330031
+        },
+        {
+          "samples": 26.996078431372553,
+          "errorScreenPixels": 37.85918133711816
+        },
+        {
+          "samples": 0,
+          "errorScreenPixels": null
+        },
+        {
+          "samples": 29.247058823529414,
+          "errorScreenPixels": 82.68249851098209
+        },
+        {
+          "samples": 28.498039215686276,
+          "errorScreenPixels": 54.62119059912786
+        }
+      ],
+      "maximumErrorScreenPixels": 82.68249851098209,
+      "missingMarkers": 3
+    },
+    {
+      "camera": "2",
+      "crop": [
+        0,
+        480,
+        640,
+        480
+      ],
+      "rows": [
+        {
+          "samples": 28.99607843137255,
+          "errorScreenPixels": 7.702681594145145
+        },
+        {
+          "samples": 25.749019607843138,
+          "errorScreenPixels": 2.0828858458753166
+        },
+        {
+          "samples": 25.745098039215687,
+          "errorScreenPixels": 0.28952515185256933
+        },
+        {
+          "samples": 29.74509803921569,
+          "errorScreenPixels": 9.262717109360423
+        },
+        {
+          "samples": 25.498039215686276,
+          "errorScreenPixels": 3.3767705181317775
+        },
+        {
+          "samples": 24.24705882352941,
+          "errorScreenPixels": 0.9962496726538868
+        },
+        {
+          "samples": 31.498039215686276,
+          "errorScreenPixels": 12.747858952627698
+        },
+        {
+          "samples": 27.749019607843138,
+          "errorScreenPixels": 5.682440004574621
+        },
+        {
+          "samples": 26.74509803921569,
+          "errorScreenPixels": 2.7100701274377776
+        }
+      ],
+      "maximumErrorScreenPixels": 12.747858952627698,
+      "missingMarkers": 0
+    },
+    {
+      "camera": "7",
+      "crop": [
+        0,
+        480,
+        640,
+        480
+      ],
+      "rows": [
+        {
+          "samples": 25.996078431372553,
+          "errorScreenPixels": 6.976248961339106
+        },
+        {
+          "samples": 24.996078431372553,
+          "errorScreenPixels": 1.9024163628412418
+        },
+        {
+          "samples": 25.494117647058825,
+          "errorScreenPixels": 0.26400387103718964
+        },
+        {
+          "samples": 27.99607843137255,
+          "errorScreenPixels": 8.469948119726155
+        },
+        {
+          "samples": 22.498039215686276,
+          "errorScreenPixels": 2.915475947422616
+        },
+        {
+          "samples": 23.24705882352941,
+          "errorScreenPixels": 0.8811401803582731
+        },
+        {
+          "samples": 28.247058823529414,
+          "errorScreenPixels": 11.669506943909711
+        },
+        {
+          "samples": 25.99607843137255,
+          "errorScreenPixels": 5.365231211873734
+        },
+        {
+          "samples": 25.996078431372553,
+          "errorScreenPixels": 2.589047940209904
+        }
+      ],
+      "maximumErrorScreenPixels": 11.669506943909711,
+      "missingMarkers": 0
+    }
+  ],
+  "primaryZeroDistortionCropsUnaffectedByOldLensBranch": true,
+  "legacyPhotoModeCouldRetainWrongCameraSvgMarkers": true,
+  "capReview": {
+    "schema": "Type94DriveCapSurfaceReviewV1",
+    "modelChanged": false,
+    "axisChanged": false,
+    "radiusChanged": false,
+    "depthAdopted": false,
+    "qualitativeDomedSurfaceSupported": true,
+    "polygonalProtrusionEstablished": false,
+    "exactProfileAccepted": false,
+    "fastenerCountAndSectionInferred": true,
+    "oldOpticalEstimatesAreAxisMeasurements": false,
+    "oldOpticalPicksIndependentCalibrationHoldouts": false,
+    "oldOpticalReview": "tmp/Type94Vision/Data_DriveCapReviewV43.json",
+    "oldOpticalReviewSha256": "1c691643a1007ed74cdaedf1abb97c3652a8a5f58d5d7fe033fe4830452baf80",
+    "observations": [
+      "Selected exhibit views2and7support a rounded external cover; the dark region in2017does not establish polygonal geometry",
+      "Actual front-plane depth.065m is a generator parameter, not a museum measurement",
+      "Increasing only the cover depth toward.08m improves the old2017/2014optical estimates but worsens views2and7; no such change adopted",
+      "The visible silhouette is partly occluded by tracks; an estimated centre of a visible domed patch cannot be promoted to the physical rotation axis"
+    ],
+    "cleanCrops": [
+      {
+        "camera": "2017",
+        "crop": [
+          2742,
+          2127,
+          640,
+          480
+        ]
+      },
+      {
+        "camera": "2014",
+        "crop": [
+          2381,
+          2094,
+          640,
+          480
+        ]
+      },
+      {
+        "camera": "TourGuide",
+        "crop": [
+          1135,
+          1152,
+          640,
+          480
+        ]
+      },
+      {
+        "camera": "2",
+        "crop": [
+          0,
+          398,
+          640,
+          480
+        ]
+      },
+      {
+        "camera": "7",
+        "crop": [
+          138,
+          310,
+          640,
+          480
+        ]
+      }
+    ],
+    "sensitivityReport": "Data_CapProjectionSensitivityV71.json"
+  },
+  "validation": {
+    "browser": {
+      "passed": true,
+      "report": "Data_ReferenceCropBrowserV71.json",
+      "sha256": "0db99d72d8b6cc928be01d028aa7642f132d86ce62bf476d550b1565e643d9d2"
+    },
+    "capSensitivity": {
+      "passed": true,
+      "report": "Data_CapProjectionSensitivityV71.json",
+      "sha256": "4131c8681bf8785b8f1083a67e61cb745489898e1b75adc0baadd5045d7b9d81"
+    }
+  },
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV71\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV71\\Rebuild",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94ReferenceReviewV71/",
+  "frozenScripts": [
+    {
+      "file": "Taierzhuang1938/_import/Script_Type94ReferenceTile.mjs",
+      "sha256": "5f7fea45cee4a708d1c363cf150a3cfd8fe13c38c27cabe2f7a5f27111399876"
+    },
+    {
+      "file": "Taierzhuang1938/_import/Script_VerifyType94ReferenceCropV71.mjs",
+      "sha256": "39be6dbc4eddf22a06f7d97b935ace6ce29aac7baf9577bf5b0a5e650c873f23"
+    },
+    {
+      "file": "tmp/Script_Type94ReferencePageV71.py",
+      "sha256": "0937e2d2968af6a5ddc6001d6a30364e81c729886aeff796f7db36bbb8d238e2"
+    },
+    {
+      "file": "tmp/Script_Type94CapCaptureV71.mjs",
+      "sha256": "6b5da71b75ef9cc117a58acf9edb5af9e24d818ae33c56efc20ad0e1ebcad953"
+    },
+    {
+      "file": "tmp/Script_Type94LensRoundTripV71.mjs",
+      "sha256": "205f7918308a059bcd665c17f29a74e7317c33606ce919f32aa0a7c901f6baed"
+    },
+    {
+      "file": "tmp/Script_Type94WholeCaptureV71.mjs",
+      "sha256": "489d7b0dd3972acfb56d19c9d0061ad5ced328a78b4d58e1f09f4e86481d284c"
+    },
+    {
+      "file": "tmp/Script_Type94PrimaryBodyV71.mjs",
+      "sha256": "0c2bc111c0f3169831496e44b9f9c81b60d8ea3aeb9f2d29ac0c93cad82adff7"
+    },
+    {
+      "file": "tmp/Script_Type94FinalizeReferenceV71.py",
+      "sha256": "15af49b30c78fabbad138d397de61ea7ff57e92aa9800366e522be67e815d8c1"
+    }
+  ],
+  "wholeReferenceAccepted": false,
+  "physicalCameraCalibrationAccepted": false,
+  "gameOrHighAssetReplaced": false,
+  "published": false,
+  "complete": false,
+  "goalComplete": false,
+  "remaining": [
+    "Whole-reference visible body/running-gear correspondences and shape acceptance",
+    "Visible rim/profile observations accounting for true surface depth and occlusion; no optical-centre axis fitting",
+    "Final accepted high/PBR/game derivative and whole-objective audit"
+  ]
+}

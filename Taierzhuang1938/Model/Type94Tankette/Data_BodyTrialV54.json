@@ -1,0 +1,100 @@
+{
+  "schema": "Type94BodyLayoutV1",
+  "revision": "ShapeV54ForebodyTrial",
+  "status": "Planar connected forebody panel trial; full reference still unaccepted",
+  "turretLayout": "Data_TurretTrialV53.json",
+  "driverRoofGunMinElevationDegrees": 12,
+  "driver": {
+    "centerXM": 0.33455116369503235,
+    "widthM": 0.5469348066964426,
+    "topZM": 1.2371310027123632,
+    "bottomZM": 1.0227639607407077,
+    "topForwardM": 0.32999999999999996,
+    "bottomForwardM": 0.4165116286154536
+  },
+  "sourceHypothesis": "Data_GeneratorEnvelopeAuditV52.json",
+  "inferred": [
+    "Explicit unaccepted piecewise-deck construction: upper front fastener sites establish a panel-height candidate; the cabin junction and fender crest are inferred. The five front control points are not forced onto one plane.",
+    "No concealed coupling extension is used to close length",
+    "The numerical candidate did not converge; all actual bounds, interfaces, motion and references remain pending",
+    "Two planar side sections share one closed fold and meet the actual front armor top corner; seam construction and8mmgauge remain inferred",
+    "The planar side panel lower edge rises above the actual upper belt at the deck knuckle; the lower hull remains behind this armor overlap"
+  ],
+  "strictReferenceMatched": false,
+  "complete": false,
+  "runningAssembly": "Data_RunningAssemblyV53.json",
+  "trackShoeLayout": "Data_TrackShoeTrialV48.json",
+  "sourceHypothesisSha256": "e46e69bbff97bed69d48b9ab53650df94f4c4396ea711509f1f4cc7ab861ea7b",
+  "forebody": {
+    "frontArmorTopYZM": [
+      1.2951509488489534,
+      0.7470099965251721
+    ],
+    "frontArmorBottomYZM": [
+      1.35,
+      0.51
+    ],
+    "rearDeckHeightM": 1.0613109303281956,
+    "glacisProfileYZM": [
+      [
+        1.2951509488489534,
+        0.7470099965251721
+      ],
+      [
+        0.4215116286154536,
+        1.0197639607407079
+      ],
+      [
+        -0.18,
+        1.0613109303281956
+      ]
+    ],
+    "fenderProfileYZM": [
+      [
+        1.3702715462608792,
+        0.794923622579461
+      ],
+      [
+        1.32,
+        0.8574999999999999
+      ],
+      [
+        1.19,
+        0.884
+      ],
+      [
+        1.05,
+        0.878
+      ],
+      [
+        0.35,
+        0.84
+      ],
+      [
+        -0.69,
+        0.79
+      ],
+      [
+        -1.22,
+        0.79
+      ],
+      [
+        -1.48,
+        0.73
+      ]
+    ],
+    "scope": "Explicit unaccepted piecewise-deck construction: upper front fastener sites establish a panel-height candidate; the cabin junction and fender crest are inferred. The five front control points are not forced onto one plane. Front inner lip uses the observed approximately3.5mmupward crossfall candidate, with its root at550mmhalf-width rather than the legacy600mm. The firsttwofenderknots are raised11.5mm above the numerical optical candidate after actual circulating shoe corners penetrated8.416mm. This is an inferred construction correction, not an observed museum offset.",
+    "inferredKnuckle": true,
+    "inferredFrontArmorBottom": true,
+    "inferredFenderCrest": true,
+    "referenceAccepted": false,
+    "frontFenderInnerRiseM": 0.0035,
+    "frontFenderClearanceRaiseM": 0.0115,
+    "planarGlacisCheeks": true,
+    "sideCheekRearBottomZM": 0.69,
+    "sideCheekThicknessM": 0.008,
+    "sideCheekBevelM": 0.001,
+    "sideCheekLowerKnuckleZM": 0.75
+  },
+  "numericalSolverConverged": false
+}

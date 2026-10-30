@@ -1,0 +1,80 @@
+{
+  "schema": "type94-gray-study-v1",
+  "id": "Type94Tankette",
+  "revision": "ShapeV14",
+  "status": "gray-in-progress",
+  "complete": false,
+  "pbrAccepted": false,
+  "gameBudgetAccepted": false,
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Scene_Type94TanketteHighShapeV14.blend",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Exports\\Model_Type94TanketteHighShapeV14.glb",
+  "sha256": "bb66310b2b14b4b9567b92bc984eac2934c0d4a92013e6a2c367880ef1da31ac",
+  "triangles": 459428,
+  "meshNodes": 231,
+  "measuredWidthHeightLengthM": [
+    1.628000020980835,
+    1.6303554982592794,
+    3.0802378090605957
+  ],
+  "primaryScaleAnchorM": {
+    "length": 3.084,
+    "width": 1.62,
+    "height": 1.62,
+    "minimumBellyClearance": 0.3,
+    "trackWidth": 0.164
+  },
+  "primaryRecord": "https://www.jacar.archives.go.jp/das/meta/C01001361800",
+  "primaryScope": "1934-1936 provisional specification, not a survey of the restored museum individual",
+  "validation": {
+    "rawGeometryChecks": 540,
+    "browserGeometryChecks": 34,
+    "nativeGrayMovement": true,
+    "scope": "Gray geometry and mechanisms only; no PBR, game-budget or strict reference acceptance",
+    "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance",
+    "nativeGeometryMotionChecks": 21,
+    "strictPbrDefaultsRejectUntexturedStudy": true,
+    "roadWheelPoses": 128,
+    "roadAxleContactRadiusM": 0.075,
+    "ownedBlenderStopped": true
+  },
+  "remaining": [
+    "Primary camera and whole-body proportions using reliable same-vehicle photo correspondences",
+    "Visible local details, markings and surface seating",
+    "PBR authoring and complete recipe replay after gray acceptance",
+    "New game derivative under unchanged budget/error limits and complete export verification"
+  ],
+  "inferred": [
+    "Rear profile dimensions and concealed drawbar section",
+    "Curved rear-side fitting function / hidden mounting",
+    "Front tow-shackle demonstration travel stops",
+    "Early high sprocket local height / nose / fender dimensions",
+    "Front fender root flange and cantilever support construction",
+    "Engine inspection assembly 60 mm forward clearance placement"
+  ],
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94ShapeReview/",
+  "retainedGameCheckpoint": {
+    "revision": "V12",
+    "sha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+    "recipeCommit": "bd0852e1"
+  },
+  "authoredFrontParametersM": {
+    "driveCenterHeightBeforeGroundCompensation": 0.605,
+    "frontArmorBottomBeforeGroundCompensation": 0.56,
+    "frontArmorTopBeforeGroundCompensation": 0.86,
+    "trackCenterPlanes": [
+      -0.684,
+      0.684
+    ],
+    "trackWidth": 0.164,
+    "scope": "Local photo-derived dimensions; overall 1.620 m width does not determine track centre spacing"
+  },
+  "rejectedTrial": {
+    "trackCenterPlanes": [
+      -0.728,
+      0.728
+    ],
+    "reason": "All eight road wheels intersected fixed suspension arms in the expanded native sweep",
+    "report": "Data_V14RejectedWideTrackMotionAudit.json"
+  },
+  "mechanismManifest": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Data_MechanismShapeV14.json"
+}

@@ -1,0 +1,48 @@
+{
+  "schema": "Type94MaterialPreviewV1",
+  "revision": "StableWearV102",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV102\\Scene_Type94TanketteStableWearV102.blend",
+  "sourceBlendSha256": "f2cd1706fc83fdf9ac29be10f7ffbfa09ca0be372866374701c07d78edf39458",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV102\\Exports\\Model_Type94TanketteStableWearPrimaryV102.glb",
+  "sha256": "acf7627f610d9b1cf009f9b479753a0aa2c497658c13ecf86fd37886b8904f92",
+  "reference": "Data_SurfaceStudyV101.json",
+  "authorTangentReferenceSha256": "0f7209794171018971f5a9b24aa3a14f9b6db4c14e25c04189b0dc8cb0a717ea",
+  "triangles": 694476,
+  "meshOwners": 240,
+  "poseNodes": 296,
+  "runtimePbrImages": 12,
+  "embeddedAuthorFrames": {
+    "mappedOwners": 230,
+    "uniqueFrameArrays": 71,
+    "embeddedBytes": 2477408
+  },
+  "wholeReferenceAccepted": false,
+  "gameDerivativeAccepted": false,
+  "canonicalGameReplaced": false,
+  "published": false,
+  "goalComplete": false,
+  "status": "Local current high with exact authored-frame source/rebuild parity",
+  "producer": "Taierzhuang1938/_blender/Script_Type94StableHighV102.py",
+  "nativeVerifier": "Taierzhuang1938/_blender/Script_VerifyType94StableV102.py",
+  "stableExport": "Taierzhuang1938/_blender/Script_Type94StableExportV102.py",
+  "sourceSelfContainsAuthorFrames": true,
+  "authorFramesBoundBy": "Exact material and canonical oriented position/normal/UV triangles; edits reject cached frames",
+  "textureSizes": {
+    "Paint": 4096,
+    "Track": 2048,
+    "Steel": 2048,
+    "Rubber": 1024
+  },
+  "validation": {
+    "nativeSourceChecks": 20,
+    "nativeSourcePassed": true,
+    "actualGlbImport": true,
+    "positionNormalUvEditProbesRejected": true,
+    "genericExportPassed": true,
+    "referenceCornerAttributesAndTwelveMapPixelsExact": true,
+    "sourceReopenCornerAttributesAndTwelveMapPixelsExact": true,
+    "coldCornerAttributesAndTwelveMapPixelsExact": true,
+    "coldRoot": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceReplayV102"
+  },
+  "blenderOwnedInstancesAfterCleanup": 0
+}

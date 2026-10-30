@@ -1,0 +1,230 @@
+{
+  "schema": "Type94ReleasePackagingV1",
+  "revision": "ReleaseV106",
+  "sourceRevision": "Data_GameTrialV103.json",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameWearV103\\Exports\\Model_Type94TanketteGamePbrV103.glb",
+  "sourceSha256": "93e3dc2f4e6a5328d08dc0865ed385cd3aabedeb8c17042764efc05857dc27bb",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameWearV103\\Scene_Type94TanketteGamePbrV103.blend",
+  "sourceBlendSha256": "a38828ff90e746894c7120d529002ac62b9ec1a98014504c24753fa66a13d526",
+  "output": {
+    "file": "Model/Type94Tankette/Model_Type94Tankette.glb",
+    "bytes": 41734776,
+    "sha256": "43969e24dfd670ce1ea6a57b12076618cc821c034d5580ebf22cf7cd2c9f964f",
+    "geometry": "b2802c5b56899f8eb5f61634c2b5d5f8c57ceca102408da64a442776f0924fa5",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/webp",
+        "width": 4096,
+        "height": 4096,
+        "bytes": 3756680,
+        "pixels": "b55533b1598d8d5a29cac275fc11e16ae98463ff6f69e9c8641e9819d94c2cb2"
+      },
+      {
+        "index": 1,
+        "mime": "image/webp",
+        "width": 4096,
+        "height": 4096,
+        "bytes": 11648486,
+        "pixels": "cce638e97dd34c8b7c612e09b8d73c17f5d0d5dd2ea187b38ce4004bc211ea3d"
+      },
+      {
+        "index": 2,
+        "mime": "image/webp",
+        "width": 4096,
+        "height": 4096,
+        "bytes": 7006560,
+        "pixels": "fbec247263e5b58bcdb8a0f0ca300eb0a3ca0422a5e9751c1f7e55f2907c7031"
+      },
+      {
+        "index": 3,
+        "mime": "image/webp",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 1212070,
+        "pixels": "28ec36f1377d5733882e63b702bf1c8a333a7272da763ef89b237ea40e709431"
+      },
+      {
+        "index": 4,
+        "mime": "image/webp",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 1526636,
+        "pixels": "9f8ff5d39fa32948fd70fe40f5978d8e4ce7c08afd990f1d7c55814027025850"
+      },
+      {
+        "index": 5,
+        "mime": "image/webp",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 1038576,
+        "pixels": "b058b15191aaad4bc72e57f8d8f7987175a6cf68a51ed5104906560b7d0dc135"
+      },
+      {
+        "index": 6,
+        "mime": "image/webp",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 135312,
+        "pixels": "0251df50b5af9920796049ffeac8e1803f1062b9020388d1716ecea6c746da1b"
+      },
+      {
+        "index": 7,
+        "mime": "image/webp",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 401000,
+        "pixels": "4c007d24a46b43ebed3edf822e4564319678588e138e61cf095780d783a5a214"
+      },
+      {
+        "index": 8,
+        "mime": "image/webp",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 229690,
+        "pixels": "477e6ed2c6fcfcd69584227d720589abc63f100e98abd2e4a71c1d3fa3856941"
+      },
+      {
+        "index": 9,
+        "mime": "image/webp",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 3107224,
+        "pixels": "6a5d718b7a4f4f5b5734276721e196d9693697d1d2feda51d9878751eb2f383a"
+      },
+      {
+        "index": 10,
+        "mime": "image/webp",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 3154764,
+        "pixels": "b1a4e17cde40734e6a1ef958eacdbb4a63a7b4cef781a60169b2a6036853f2e1"
+      },
+      {
+        "index": 11,
+        "mime": "image/webp",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 1761890,
+        "pixels": "864574d9d5accb0a124f2263499e8d9cdf12b4c39f6ec575ad8e0655b248c4a2"
+      }
+    ]
+  },
+  "before": {
+    "bytes": 52525852,
+    "sha256": "93e3dc2f4e6a5328d08dc0865ed385cd3aabedeb8c17042764efc05857dc27bb",
+    "geometry": "b2802c5b56899f8eb5f61634c2b5d5f8c57ceca102408da64a442776f0924fa5",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/png",
+        "width": 4096,
+        "height": 4096,
+        "bytes": 4947131,
+        "pixels": "b55533b1598d8d5a29cac275fc11e16ae98463ff6f69e9c8641e9819d94c2cb2"
+      },
+      {
+        "index": 1,
+        "mime": "image/png",
+        "width": 4096,
+        "height": 4096,
+        "bytes": 14043089,
+        "pixels": "cce638e97dd34c8b7c612e09b8d73c17f5d0d5dd2ea187b38ce4004bc211ea3d"
+      },
+      {
+        "index": 2,
+        "mime": "image/png",
+        "width": 4096,
+        "height": 4096,
+        "bytes": 9961110,
+        "pixels": "fbec247263e5b58bcdb8a0f0ca300eb0a3ca0422a5e9751c1f7e55f2907c7031"
+      },
+      {
+        "index": 3,
+        "mime": "image/png",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 1586926,
+        "pixels": "28ec36f1377d5733882e63b702bf1c8a333a7272da763ef89b237ea40e709431"
+      },
+      {
+        "index": 4,
+        "mime": "image/png",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 2246514,
+        "pixels": "9f8ff5d39fa32948fd70fe40f5978d8e4ce7c08afd990f1d7c55814027025850"
+      },
+      {
+        "index": 5,
+        "mime": "image/png",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 1387671,
+        "pixels": "b058b15191aaad4bc72e57f8d8f7987175a6cf68a51ed5104906560b7d0dc135"
+      },
+      {
+        "index": 6,
+        "mime": "image/png",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 199386,
+        "pixels": "0251df50b5af9920796049ffeac8e1803f1062b9020388d1716ecea6c746da1b"
+      },
+      {
+        "index": 7,
+        "mime": "image/png",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 589241,
+        "pixels": "4c007d24a46b43ebed3edf822e4564319678588e138e61cf095780d783a5a214"
+      },
+      {
+        "index": 8,
+        "mime": "image/png",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 393390,
+        "pixels": "477e6ed2c6fcfcd69584227d720589abc63f100e98abd2e4a71c1d3fa3856941"
+      },
+      {
+        "index": 9,
+        "mime": "image/png",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 3801172,
+        "pixels": "6a5d718b7a4f4f5b5734276721e196d9693697d1d2feda51d9878751eb2f383a"
+      },
+      {
+        "index": 10,
+        "mime": "image/png",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 4020086,
+        "pixels": "b1a4e17cde40734e6a1ef958eacdbb4a63a7b4cef781a60169b2a6036853f2e1"
+      },
+      {
+        "index": 11,
+        "mime": "image/png",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 2594673,
+        "pixels": "864574d9d5accb0a124f2263499e8d9cdf12b4c39f6ec575ad8e0655b248c4a2"
+      }
+    ]
+  },
+  "losslessPixelsAndOriginalResolution": true,
+  "nonImageBufferViewsExact": true,
+  "sceneGeometryMaterialAndControlsExact": true,
+  "wholeReferenceAccepted": false,
+  "userAuthorizedCheckpointRelease": true,
+  "scope": "Verified current game geometry and PBR, repackaged with lossless same-resolution WebP only where smaller. Strict full photographic acceptance remains pending.",
+  "validation": {
+    "independentPackagingChecks": 498,
+    "fullBrowserChecks": 943,
+    "uiChecks": 17,
+    "actualPublishedPathLoaded": true,
+    "passed": true,
+    "wholePhotographicAcceptance": false
+  }
+}

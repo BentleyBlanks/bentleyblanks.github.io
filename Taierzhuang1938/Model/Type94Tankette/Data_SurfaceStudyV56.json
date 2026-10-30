@@ -1,0 +1,200 @@
+{
+  "schema": "Type94MaterialPreviewV1",
+  "revision": "SurfaceV56Preview",
+  "status": "local-textured-preview-source-reopen-and-construction-replay-verified",
+  "baseGray": "Data_GrayTrialV55.json",
+  "baseGraySha256": "bf2743a1c439a531b0c3911d6828b5fcab9677874ac7adb39b12abc5d8869c71",
+  "materialStyle": "SurfaceV44",
+  "sourceProducer": "Taierzhuang1938/_blender/Script_Type94MaterialPreview.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV56\\Scene_Type94TanketteHighSurfaceV56Preview.blend",
+  "sourceBlendSha256": "f86a1ecdc197f43c2e08a58e7d1ae7edf9a20d267f3ab86c17f90e4da64bc815",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV56\\Exports\\Model_Type94TanketteHighSurfaceV56Preview.glb",
+  "sha256": "283822f415509a17cd5dff598c030da251476d24321177e4a1de03a6d635e569",
+  "triangles": 617808,
+  "meshNodes": 237,
+  "linksPerSide": 80,
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "completePbrChannelsBaked": 12,
+  "uvGenerationMode": "Fresh",
+  "uvCheckpointUsed": false,
+  "textureSizes": {
+    "Paint": 4096,
+    "Track": 2048,
+    "Steel": 2048,
+    "Rubber": 1024
+  },
+  "actualEmbeddedImages": [
+    {
+      "name": "Texture_Type94PaintNormal",
+      "bytes": 4827788,
+      "sha256": "f1c8475be3f2cf708ff9dbe6a68b0c6ce743c8089e40499163902af3cc02058d"
+    },
+    {
+      "name": "Texture_Type94PaintOrmWear",
+      "bytes": 6013945,
+      "sha256": "13bd6ca0bffdeaa14157372a7faa0bbb27146e03f023a924d23ba0f624ca40cf"
+    },
+    {
+      "name": "Texture_Type94PaintBaseWear",
+      "bytes": 3773433,
+      "sha256": "5b745135106c9c3ca6ab268c510d7c3451130e348889708ea6809842994e98fd"
+    },
+    {
+      "name": "Texture_Type94SteelNormal",
+      "bytes": 1392302,
+      "sha256": "dbe3c9080b62dec88b94798ee3939a04183c4738f58a6a7f3750a96c02df8bfb"
+    },
+    {
+      "name": "Texture_Type94SteelOrm",
+      "bytes": 3049385,
+      "sha256": "3f5c739d894181eef78df67d6f0eaa1a1f995228ced0fb04b0cba6beb96a5d41"
+    },
+    {
+      "name": "Texture_Type94SteelBase",
+      "bytes": 1948949,
+      "sha256": "0860d6538fdfea9f960987b95c3250f6df2a71dea5018a31026a1668fa1659d0"
+    },
+    {
+      "name": "Texture_Type94RubberNormal",
+      "bytes": 177392,
+      "sha256": "be13b8ad179a8d59624beeb301f98a1ebc8332cf25b4db99a240bd505e5512f9"
+    },
+    {
+      "name": "Texture_Type94RubberOrm",
+      "bytes": 819662,
+      "sha256": "6b66e2f28d35108c1b6f4e57a2c4de1aba010e2d3afd90bcf6862d02a90890f6"
+    },
+    {
+      "name": "Texture_Type94RubberBase",
+      "bytes": 533626,
+      "sha256": "e4629fe25a9c3d66f6a22ae85742af0645cac8e2f5741a15e3876d859304b4e6"
+    },
+    {
+      "name": "Texture_Type94TrackNormal",
+      "bytes": 4592773,
+      "sha256": "a9a7c38c4b1c324e31ca0fdc8353d56e81bab8c98c74541ec7cf6d8746dd1524"
+    },
+    {
+      "name": "Texture_Type94TrackOrm",
+      "bytes": 2676959,
+      "sha256": "2fdccf3ff67e891a2e375a8c4cb0b06880f02a9994c2865c4f94896d96dd193d"
+    },
+    {
+      "name": "Texture_Type94TrackBase",
+      "bytes": 1318455,
+      "sha256": "bc6bb516995d9aaa7685717ad04c2c410f526981d7674a8fc1c62b6370babbf0"
+    }
+  ],
+  "normalStrengths": {
+    "Paint": 1.65,
+    "Track": 1.25,
+    "Steel": 1.15,
+    "Rubber": 1
+  },
+  "physicalEdgeWear": {
+    "convexEdges": 84578,
+    "affectedAtlasPixelFraction": 0.02402597665786743,
+    "aoBytesUnchanged": true,
+    "placementHistoricallyAccepted": false
+  },
+  "validation": {
+    "reports": {
+      "raw": "Data_MaterialRawV56.json",
+      "geometry": "Data_MaterialGeometryV56.json",
+      "browser": "Data_MaterialGeometryBrowserV56.json",
+      "ui": "Data_MaterialUiV56.json",
+      "preparation": "Data_MaterialPreviewPreparationV56.json",
+      "wear": "Data_SurfaceWearBakeV56Preview.json"
+    },
+    "rawChecks": 1148,
+    "exactNamedSurfaceChecks": 237,
+    "exactPoseHierarchyChecks": 292,
+    "rootMatrixIdentical": true,
+    "browserChecks": 937,
+    "uiChecks": 29,
+    "visibleNormalMapEffect": {
+      "meanAbsoluteChannelDifference": 0.702698087431694,
+      "channelFractionAbove2": 0.05857654412982282
+    },
+    "actualPbrViewsInspected": [
+      "full",
+      "vent",
+      "track",
+      "weapon"
+    ],
+    "sourceFinalReopenVerified": true,
+    "coldRecipeReplayVerified": false,
+    "independentActualPbrReimportVerified": true,
+    "sourceReexportPixelsBindingsAndSurfacesVerified": true,
+    "coldGeometryRecipeReplayVerified": true,
+    "sourceVerification": "Data_SourceVerificationV57.json"
+  },
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94MaterialReviewV56/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV56\\Acceptance",
+  "sourceFilesSha256": {
+    "Taierzhuang1938/Model/Type94Tankette/Data_TrackShoeTrialV48.json": "2d5e9707fe1270c103ce25a7316a3098792dcb3e2f37dc03cb2efb06509f2cca",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RunningAssemblyV53.json": "74213ec8e7c45d88de3e9926f61ee395bed239a6d7b422bd5aadfb3aeafbef68",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretTrialV53.json": "cbc15bf835c2c7ca153dedaa74cf42d861f3e3f3c56b99baacad606368195042",
+    "Taierzhuang1938/Model/Type94Tankette/Data_VentTrialV55.json": "8542de65736193d512f84e8b6c7353d15e1dbe8723196c8f84a73cc39db69591",
+    "Taierzhuang1938/Model/Type94Tankette/Data_BodyTrialV55.json": "a6dbdfd910d4e4a2be7120ba19cfc03ef6e8ee446db6f9b904fe23667bfbf77c",
+    "Taierzhuang1938/_blender/Script_Type94Export.py": "b5e0abdcd073cc0cb84eaf77534626f7b9b24166a87bd88e1c0395840e340486",
+    "Taierzhuang1938/_blender/Script_Type94TangentRepair.py": "1d76f211ddeb6a491da6b2b5685b34adb0cfea46f11cdf674523203d123e572f",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearApply.py": "c967eccf10839d8f428208535fdd4accd4b5f5817d7e5b4cacebf89ed865dd35",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearBake.py": "f834b93546b0d948e5115f8a4df4e53e8c9411f5cfc712c430551cd6add9beed",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearExtract.py": "7d981be055c8fcb1a2a8a4e9227dec8009cd80c80b3bacc6ed745517ceab8f3a",
+    "Taierzhuang1938/_blender/Script_Type94MetalFinish.py": "7398d3bfbf2fbeed6a675d03ce71c15a449db714fcbe63390532481f2f5b3c94",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceAttributes.py": "c2d7f8ecf341726da0c31b53f235fec3ea93f28bf06a70627ef0b9f3c59ca01d",
+    "Taierzhuang1938/_blender/Script_Type94TankettePbr.py": "9437248d294a7776917cae2accaeaa00cb2ab74577e5626c5d139d8007e83e41",
+    "Taierzhuang1938/_blender/Script_Type94MechanismCorrect.py": "1941339bbabfaef0ca4290eb20a2b92d15992ae2548badebf6db671ca0086fe3",
+    "Taierzhuang1938/_blender/Script_Type94TanketteBuild.py": "b02d96d06f7abc319226f1a13063b06ed2a7cda78dd731c6cbe2d455eb49460f",
+    "Taierzhuang1938/_blender/Script_Type94DetailCorrect.py": "aad345902267afcf2d4fb51960428c66e75078a53a50dd8cca2894a241f99691",
+    "Taierzhuang1938/Model/Type94Tankette/Data_MgFlangeReferenceV31.json": "736fcde53a6cfdc68651a1943d1c604c91511728761b8a9d47de8f8faa17ea09",
+    "Taierzhuang1938/_blender/Script_Type94Articulation.py": "326b9fd068ddcacff24be5f9eb8e39617d3d56a6b1b02a5a0b91ba3449c25b88",
+    "Taierzhuang1938/_blender/Script_Type94TrackShoe.py": "4c25137fd149e93f8ee4c3f9f739276f8af70945063b9160154ad50e3eb6d019",
+    "Taierzhuang1938/_blender/Script_Type94RunningAssembly.py": "40263cf96c614ef0488ffe2155c6cbfce159e313d6d99c0fea211adf7d07ba0b",
+    "Taierzhuang1938/_blender/Script_Type94RearDoor.py": "234d4feb11536c2dfff6da0483365a2613216f42ca5ec48ee90c4da4a616ebb2",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearDoorFaceLayoutV29.json": "76e41e865100cef9c5d14dd58b352c5caf3713b9d5c6338b154352eb690af276",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearMechanismLayoutV22.json": "f13872695aebf431e2c9b69555ac2744a986b9c93d0f1c992098e7a990cc2638",
+    "Taierzhuang1938/Model/Type94Tankette/Data_VentTopLapV37.json": "0987c835fb994c0cdc25661e32d5da11792cd258764acb62a5fbce701b27a340",
+    "Taierzhuang1938/_blender/Script_Type94VentHousing.py": "05eab3a7c4bd6bd7daa32bf2c2409e5c3272dd6325164c96431acfdc603a88f0",
+    "Taierzhuang1938/_blender/Script_Type94TurretRear.py": "1ecae7a90ecd0b68c1d59f829f57f349d2cc26e0852b03e9607d794cff89c896",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretRearLayoutV27.json": "11c0833fcca99be04cb1e550878b283ab0898f9b80d02a999f1a691bb3a7af67",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretFrontLayoutV32.json": "d6a588209eb43c6ae97575be24253bab4b66c78775a50f8e7a281217e8c65cd1",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretSideSectorV35.json": "cf5d4d8a0d76ad6ea971937c5ffd9dccbac57d8a0b5c29f5daa05384c52eb9aa",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretRivetLayoutV25.json": "39472a67ef4fe69040d1de24879d6883805dc987e119e715dd31ea60c591fca8",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretPortReferenceLayoutV26.json": "7a4db2c5a7332b873d12e8f85aff9ae31de05de175a6da203632e0d64ae32b47",
+    "Taierzhuang1938/Model/Type94Tankette/Data_DriverReferenceLayoutV19.json": "7698100dcb27f7866548a5251eec588474e1f28cf30de3632d550d096e7a3239",
+    "Taierzhuang1938/_blender/Script_Type94ForebodyPanels.py": "d2cdea22b793a059a14055d2555d5fdf72216747c10aa624d266b72c4227bf41",
+    "Taierzhuang1938/Model/Type94Tankette/Data_SidePortReferenceLayoutV21.json": "0c881c50153cfb5b753b0266866a407c152582742da590891125b06963a49143",
+    "Taierzhuang1938/_blender/Script_Type94RearArmor.py": "42b9497e9f4e3f4a9138a82325dc834a55db91bdda35672542363fee9039b4fa",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearArmorReferenceLayoutV28.json": "7c840ae8b3034aa418f3f6297f24da3cbb0a71d921881509c10b0b6999ce1bda",
+    "Taierzhuang1938/Model/Type94Tankette/Data_SurfaceStudyV34.json": "3c51285233ad7d8f8e7a8737ed33e91bf3e07bd78f23393b5c53d895ebe705d0",
+    "Taierzhuang1938/_blender/Script_Type94MaterialPreview.py": "407d9a6f7e733d82ed98b9d551fceba56c24853879f5c305f0cfd4e0aeb3e1b6",
+    "Taierzhuang1938/_blender/Script_Type94GunTraverse.py": "6b774067cde393b69776fc50ea6b5dabec72e0e64277e21e8adb1f593d921729",
+    "Taierzhuang1938/_blender/Script_Type94GrayStudy.py": "828af68f0a608230e09646c1cfd5a84df86a6d90274893ce10d093d1f916090a",
+    "Taierzhuang1938/_blender/Script_Type94EnvelopeTrial.py": "9a375920af34eb268978a392beb265e9fc67b577873dfd96258c68fec5dc49f4",
+    "Taierzhuang1938/Model/Type94Tankette/Data_BodyTrialV53.json": "58695766491e8a95c493e9443f8d85f7df466b4450b2d4e290759bbb7ea39055",
+    "Taierzhuang1938/_blender/Script_Type94VentTrial.py": "b4f37dceac92f2dcbecf3df345235879cfdef5026c135061793799f7db4172eb"
+  },
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV56.json",
+  "scope": "High-precision textured preview on the current construction candidate; complete packed PBR and independent movement are verified, full reference and game derivative remain unaccepted",
+  "wholeReferenceAccepted": false,
+  "strictReferenceMatched": false,
+  "globalCalibrationAccepted": false,
+  "gameBudgetAccepted": false,
+  "complete": false,
+  "goalComplete": false,
+  "canonicalGameReplaced": false,
+  "published": false,
+  "remaining": [
+    "Continue whole-reference shape/surface alignment, including running gear",
+    "Build the new below80000triangle/3mm bidirectional-distance game derivative",
+    "Full fresh UV/PBR recipe replay remains separate from the verified construction/source re-export chain"
+  ],
+  "userRunControl": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette/Acceptance/Data_UserGoalRunControl20261028.json"
+}

@@ -1,0 +1,963 @@
+{
+  "schema": "Type94CameraReferenceStudyV5",
+  "revision": "CameraStudyV47",
+  "status": "circular-feature-and-profile-identity-study-with-provisional-gray-envelope",
+  "previousStudy": "Data_CameraReferenceStudyV46.json",
+  "activeGray": "Data_GrayStudyV37.json",
+  "retainedSurface": "Data_SurfaceStudyV44.json",
+  "technicalFreshReplay": "Data_SurfaceReplayV46.json",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\CameraStudyV47",
+  "nativeFeatureGroups": 13,
+  "nativeFeaturePoints": 118,
+  "observedFromModelProjection": false,
+  "observationsMovedToFit": false,
+  "nativeFeatures": [
+    {
+      "group": "TyreShoulder",
+      "camera": "2",
+      "wheel": 0,
+      "pointsNative": [
+        [
+          373.74984311612803,
+          697.7385984615222
+        ],
+        [
+          415.0,
+          699.0
+        ],
+        [
+          443.0,
+          728.0
+        ],
+        [
+          440.2861866385021,
+          765.555346158281
+        ],
+        [
+          407.6229487231649,
+          802.7822626721935
+        ],
+        [
+          354.0,
+          813.0
+        ],
+        [
+          310.5683400921527,
+          799.7589079988387
+        ],
+        [
+          290.0,
+          769.0
+        ],
+        [
+          306.0,
+          727.0
+        ],
+        [
+          331.42126367754,
+          700.7483136043966
+        ]
+      ],
+      "sigmaNative": 3.0,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial2.jpg",
+      "physicalIdentity": "Visible circular-edge candidates; exact section identity is uncertain"
+    },
+    {
+      "group": "TyreShoulder",
+      "camera": "7",
+      "wheel": 0,
+      "pointsNative": [
+        [
+          647.6852661095901,
+          625.7319301927809
+        ],
+        [
+          687.3522137517324,
+          632.7618221423373
+        ],
+        [
+          706.3422902312199,
+          665.5608015000789
+        ],
+        [
+          701.0,
+          708.0
+        ],
+        [
+          669.5731512073604,
+          744.1108544879962
+        ],
+        [
+          625.1764225692392,
+          751.2710452160367
+        ],
+        [
+          587.0,
+          735.0
+        ],
+        [
+          569.0,
+          703.0
+        ],
+        [
+          583.3224107841368,
+          660.6784835081278
+        ],
+        [
+          614.7737378423461,
+          635.5696591194657
+        ]
+      ],
+      "sigmaNative": 3.0,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial7.jpg",
+      "physicalIdentity": "Visible circular-edge candidates; exact section identity is uncertain"
+    },
+    {
+      "group": "TyreShoulder",
+      "camera": "3",
+      "wheel": 0,
+      "pointsNative": [
+        [
+          877.981677704969,
+          691.2502238377324
+        ],
+        [
+          914.9148016229065,
+          700.6799834768096
+        ],
+        [
+          947.6983112546483,
+          728.7263919013781
+        ],
+        [
+          954.7309509279712,
+          764.3231207653696
+        ],
+        [
+          926.3610796127194,
+          799.4584293839865
+        ],
+        [
+          888.0,
+          821.0
+        ],
+        [
+          845.4965070666548,
+          813.8639993437911
+        ],
+        [
+          814.4986105670722,
+          785.1426070649342
+        ],
+        [
+          807.7282698860515,
+          746.345026707465
+        ],
+        [
+          830.5472920785389,
+          709.5128073524908
+        ]
+      ],
+      "sigmaNative": 3.0,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial3.jpg",
+      "physicalIdentity": "Visible circular-edge candidates; exact section identity is uncertain"
+    },
+    {
+      "group": "TyreShoulder",
+      "camera": "3",
+      "wheel": 1,
+      "pointsNative": [
+        [
+          706.0976359669457,
+          663.2563823442396
+        ],
+        [
+          734.4932657922091,
+          681.6710032995397
+        ],
+        [
+          749.7338501733639,
+          710.8451971477853
+        ],
+        [
+          740.5330961536808,
+          744.8438697669482
+        ],
+        [
+          710.827922358743,
+          774.2700073388181
+        ],
+        [
+          680.5529733055013,
+          775.3396625272545
+        ],
+        [
+          657.4489903290687,
+          759.5088107138615
+        ],
+        [
+          646.2734091188898,
+          730.2852786870193
+        ],
+        [
+          659.0,
+          695.0
+        ],
+        [
+          681.4504470542402,
+          670.3385272918863
+        ]
+      ],
+      "sigmaNative": 3.0,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial3.jpg",
+      "physicalIdentity": "Visible circular-edge candidates; exact section identity is uncertain"
+    },
+    {
+      "group": "TyreShoulder",
+      "camera": "2",
+      "wheel": 1,
+      "pointsNative": [
+        [
+          563.0,
+          670.0
+        ],
+        [
+          598.0,
+          675.0
+        ],
+        [
+          620.6084358738547,
+          699.3104827488037
+        ],
+        [
+          621.0,
+          731.0
+        ],
+        [
+          598.3282106668855,
+          760.494137979201
+        ],
+        [
+          566.0889669474984,
+          780.7447045603814
+        ],
+        [
+          531.3577841198271,
+          777.340841048305
+        ],
+        [
+          504.1550292390754,
+          760.5348125028293
+        ],
+        [
+          491.2596082747313,
+          731.2296806306135
+        ],
+        [
+          513.5003784508041,
+          697.9007577389968
+        ],
+        [
+          535.8153409040136,
+          680.5484570417814
+        ]
+      ],
+      "sigmaNative": 3.0,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial2.jpg",
+      "physicalIdentity": "Visible circular-edge candidates; exact section identity is uncertain"
+    },
+    {
+      "group": "TyreShoulder",
+      "camera": "2",
+      "wheel": 2,
+      "pointsNative": [
+        [
+          692.1746622571422,
+          661.2706214316763
+        ],
+        [
+          716.5568568975422,
+          673.4975953865063
+        ],
+        [
+          728.2525746824225,
+          701.0620918242943
+        ],
+        [
+          714.7897579433773,
+          730.6134186098192
+        ],
+        [
+          685.9258430024987,
+          747.2536751781419
+        ],
+        [
+          658.5287968668252,
+          742.1512515840158
+        ],
+        [
+          638.3151510109391,
+          724.3057480370863
+        ],
+        [
+          637.0,
+          695.0
+        ],
+        [
+          657.561622415625,
+          671.3914565804172
+        ]
+      ],
+      "sigmaNative": 3.0,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial2.jpg",
+      "physicalIdentity": "Visible circular-edge candidates; exact section identity is uncertain"
+    },
+    {
+      "group": "TyreShoulder",
+      "camera": "2",
+      "wheel": 3,
+      "pointsNative": [
+        [
+          833.3562723026566,
+          642.2866494677504
+        ],
+        [
+          855.0,
+          653.0
+        ],
+        [
+          866.2713471848011,
+          677.3419851080197
+        ],
+        [
+          858.349235555869,
+          701.6271654009419
+        ],
+        [
+          836.7711774335413,
+          719.2857589811
+        ],
+        [
+          811.5979293050057,
+          719.3553174937954
+        ],
+        [
+          790.0,
+          703.0
+        ],
+        [
+          781.0,
+          678.0
+        ],
+        [
+          797.0,
+          654.0
+        ],
+        [
+          814.4721788187118,
+          644.07090570459
+        ]
+      ],
+      "sigmaNative": 3.0,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial2.jpg",
+      "physicalIdentity": "Visible circular-edge candidates; exact section identity is uncertain"
+    },
+    {
+      "group": "TyreShoulder",
+      "camera": "3",
+      "wheel": 2,
+      "pointsNative": [
+        [
+          584.0264957889232,
+          649.2504681640055
+        ],
+        [
+          614.5110031560736,
+          660.0082998563198
+        ],
+        [
+          628.0770110621942,
+          689.5496485650635
+        ],
+        [
+          626.635467176665,
+          719.6226934350478
+        ],
+        [
+          604.6499410452615,
+          745.3367061524427
+        ],
+        [
+          574.0,
+          753.0
+        ],
+        [
+          547.493785378316,
+          740.5533956602588
+        ],
+        [
+          535.6912906137462,
+          712.4347966451252
+        ],
+        [
+          539.0,
+          684.0
+        ],
+        [
+          560.0,
+          663.0
+        ]
+      ],
+      "sigmaNative": 3.0,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial3.jpg",
+      "physicalIdentity": "Visible circular-edge candidates; exact section identity is uncertain"
+    },
+    {
+      "group": "TyreShoulder",
+      "camera": "3",
+      "wheel": 3,
+      "pointsNative": [
+        [
+          466.21512653926436,
+          635.2584273542172
+        ],
+        [
+          487.353146395881,
+          650.2023562851183
+        ],
+        [
+          504.3082902840878,
+          672.4479042722371
+        ],
+        [
+          499.6839030041097,
+          700.307858215693
+        ],
+        [
+          478.275306555216,
+          723.6976433907486
+        ],
+        [
+          450.49146760298424,
+          728.9342685442268
+        ],
+        [
+          428.0,
+          713.0
+        ],
+        [
+          416.26441086149134,
+          688.2811619911608
+        ],
+        [
+          427.3641661736541,
+          661.6022370740324
+        ],
+        [
+          448.2629524155811,
+          645.7023930716772
+        ]
+      ],
+      "sigmaNative": 3.0,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial3.jpg",
+      "physicalIdentity": "Visible circular-edge candidates; exact section identity is uncertain"
+    },
+    {
+      "group": "RoofRim",
+      "camera": "2",
+      "wheel": null,
+      "pointsNative": [
+        [
+          640,
+          298
+        ],
+        [
+          655,
+          298
+        ],
+        [
+          670,
+          302
+        ],
+        [
+          685,
+          301
+        ],
+        [
+          700,
+          305
+        ],
+        [
+          715,
+          305
+        ],
+        [
+          725,
+          307
+        ]
+      ],
+      "sigmaNative": 3.0,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial2.jpg",
+      "physicalIdentity": "Visible circular-edge candidates; exact section identity is uncertain"
+    },
+    {
+      "group": "RoofRim",
+      "camera": "7",
+      "wheel": null,
+      "pointsNative": [
+        [
+          750,
+          186
+        ],
+        [
+          765,
+          185
+        ],
+        [
+          780,
+          183
+        ],
+        [
+          795,
+          188
+        ],
+        [
+          810,
+          196
+        ],
+        [
+          825,
+          199
+        ],
+        [
+          840,
+          195
+        ]
+      ],
+      "sigmaNative": 3.0,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial7.jpg",
+      "physicalIdentity": "Visible circular-edge candidates; exact section identity is uncertain"
+    },
+    {
+      "group": "RoofRim",
+      "camera": "3",
+      "wheel": null,
+      "pointsNative": [
+        [
+          600,
+          253
+        ],
+        [
+          620,
+          254
+        ],
+        [
+          640,
+          251
+        ],
+        [
+          660,
+          244
+        ],
+        [
+          680,
+          243
+        ],
+        [
+          700,
+          241
+        ],
+        [
+          720,
+          244
+        ]
+      ],
+      "sigmaNative": 3.0,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial3.jpg",
+      "physicalIdentity": "Visible circular-edge candidates; exact section identity is uncertain"
+    },
+    {
+      "group": "RoofRim",
+      "camera": "2017",
+      "wheel": null,
+      "pointsNative": [
+        [
+          3000,
+          231
+        ],
+        [
+          3060,
+          225
+        ],
+        [
+          3120,
+          226
+        ],
+        [
+          3180,
+          240
+        ],
+        [
+          3240,
+          243
+        ],
+        [
+          3300,
+          246
+        ],
+        [
+          3360,
+          248
+        ]
+      ],
+      "sigmaNative": 6.0,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_Kubinka.jpg",
+      "physicalIdentity": "Visible circular-edge candidates; exact section identity is uncertain"
+    }
+  ],
+  "modelChanges": [
+    "Rivet local XYZ sites are reconstructed instead of being fixed to V37 coordinates",
+    "Observed roof/rim and tyre circles constrain orthogonal physical planes",
+    "Optical cap Y/Z biases and bounded wheel stance offsets separate surface observations from true axle centres",
+    "Explicit inner-bead/shoulder/tread and rim-section alternatives keep the observed pixel points unchanged",
+    "A3mmcone-surfaceprior with5mmcrown offset prevents arbitrary off-surface rivet points"
+  ],
+  "fittedHypotheses": [
+    {
+      "initialization": "PreviousProfile",
+      "cost": 167.05803580430438,
+      "nfev": 32,
+      "circularParameters": {
+        "RoofRadius": 0.3085883745121677,
+        "RoofZBeforeGround": 1.5762595197323286,
+        "RoofHighestOffset": 0.049093778872321706,
+        "ConeSlope": 0.15943669706127908,
+        "TyreShoulderRadius": 0.16700721740508864,
+        "TyreShoulderAxialOffset": 0.08199999999999999,
+        "TyreAxisMinusShoulderRadius": 0.039011032964956,
+        "CabinBottomZBeforeGround": 0.9867238777566698
+      },
+      "driveParameters": {
+        "centerForwardM": 1.0757194070691103,
+        "centerHeightM": 0.5167455557203814,
+        "outerMetalRadiusM": 0.23894755700373174,
+        "opticalDomeOutwardDepthM": 0.07617572550026595
+      },
+      "meanProfileResidualNative": 2.593734143194992,
+      "maximumRivetConeErrorM": 0.0004560025715369953,
+      "nearShapeBounds": [],
+      "nearDriveBounds": [],
+      "nearCircularBounds": [
+        "TyreShoulderAxialOffset"
+      ],
+      "accepted": false
+    },
+    {
+      "initialization": "NominalShoulder",
+      "cost": 168.17132069867685,
+      "nfev": 31,
+      "circularParameters": {
+        "RoofRadius": 0.3074316225624685,
+        "RoofZBeforeGround": 1.5750188701194212,
+        "RoofHighestOffset": 0.050103201001207125,
+        "ConeSlope": 0.15874848691279914,
+        "TyreShoulderRadius": 0.16740002194809353,
+        "TyreShoulderAxialOffset": 0.08199986755352481,
+        "TyreAxisMinusShoulderRadius": 0.03916874628997873,
+        "CabinBottomZBeforeGround": 0.986542863014426
+      },
+      "driveParameters": {
+        "centerForwardM": 1.0666014105628723,
+        "centerHeightM": 0.5151871684627762,
+        "outerMetalRadiusM": 0.24237250910073538,
+        "opticalDomeOutwardDepthM": 0.0743536717545517
+      },
+      "meanProfileResidualNative": 2.7248629967138362,
+      "maximumRivetConeErrorM": 0.0004862198149096497,
+      "nearShapeBounds": [],
+      "nearDriveBounds": [],
+      "nearCircularBounds": [
+        "TyreShoulderAxialOffset"
+      ],
+      "accepted": false
+    }
+  ],
+  "envelope": {
+    "layout": "Data_ReferenceEnvelopeV47.json",
+    "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\EnvelopeV47\\Scene_Type94ReferenceEnvelopeV47.blend",
+    "sourceBlendSha256": "fe2de0bf5f0fa87b74116fa12700b0cac8612f9fee9e73a81e1a1dadd3f99a0b",
+    "glb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\EnvelopeV47\\Exports\\Model_Type94ReferenceEnvelopeV47.glb",
+    "glbSha256": "d23563e38c91522ec9ca0c9a9d08ec45caf9bef5229971f70c78ad5c25ea0e9d",
+    "actualSourceReopen": true,
+    "editableCurves": 26,
+    "sourceMeshes": 21,
+    "actualGlbReimport": true,
+    "importedMeshes": 47,
+    "completeVehicle": false,
+    "gameDerivative": false,
+    "referenceAccepted": false,
+    "localPreview": "http://127.0.0.1:8114/tmp/Type94EnvelopeReviewV47/",
+    "browserChecks": 9,
+    "cameraProjectionConversionMaximumErrorPx": 0.0001207018932222029,
+    "cameraProjectionErrorMeans": "Agreement between CV and Blender projection only; not reference calibration accuracy",
+    "comparisonsUseDerivedUndistortedReferences": true,
+    "originalPhotosModified": false,
+    "nearSideRingsOnlyInRenders": true,
+    "reasonFarSideHidden": "The complete occluding hull is absent from this diagnostic",
+    "visualComparisonsInspected": [
+      "2017",
+      "2",
+      "3"
+    ],
+    "wholeSilhouetteAccepted": false
+  },
+  "geometryAdopted": false,
+  "wholeReferenceAccepted": false,
+  "strictReferenceMatched": false,
+  "complete": false,
+  "ownedBlenderStopped": true,
+  "limits": [
+    "Shoulder axial datum is on its bound in both physical-profile starts; track gauge and wheel/guide spacing cannot be adopted",
+    "Narrow profile families and discrete edge choices are inferred from the retained section, not museum section measurements",
+    "Nominal height with an uncertain roof-to-highest offset supplies conditional metric scale",
+    "All118newpixelsitesentertraining; image-level conic checks and fitted gray overlays do not provide independent whole-vehicle validation",
+    "Cab front, main cone and visible edge rings omit the lower shell, all real hinges/bores, drive/idler geometry, full body and tracks",
+    "The47meshenvelopeisnotalow-polyvehiclederivative, regardless of its triangle count"
+  ],
+  "nextActions": [
+    "Resolve observed tyre-plane position versus track centre/section using native shoe/pin width endpoints and guide/tyre relationships",
+    "Review unused primary and frontal-view silhouette regions before adopting reconstructed cabin/cone geometry",
+    "Apply only supported parameter changes through the full builder, rebuilding all mechanical consumers and repeating native sweeps",
+    "Keep V46 fresh UV/PBR replay available; final whole-shape, exact surface and below80000/3mm game derivative remain required"
+  ],
+  "files": [
+    {
+      "name": "Data_CapDatumBundleV47.json",
+      "sha256": "e9c7b7106e4fbea7126e6e7b377c00b1a8b649cc94e33ad6d5edea7cf983b1e8"
+    },
+    {
+      "name": "Data_CircleCandidatesV47.json",
+      "sha256": "f67280606a60fce66b3de679655028eaab1c3b9ab321cbde7c5ea900a50e86df"
+    },
+    {
+      "name": "Data_CircleCandidatesV47Expanded.json",
+      "sha256": "e7f9b43ad43c36349e55d241ac1386deda517d2567413ea2ca953ad879366385"
+    },
+    {
+      "name": "Data_CircularBundleV47.json",
+      "sha256": "411ced158edcbfcf9724f06ee6abc46e79f6cee799d9cd733f3b0a3794b36257"
+    },
+    {
+      "name": "Data_EnvelopeCleanupV47.json",
+      "sha256": "41219f0aff439343f30983e048bfce47e28960a0d86fceb52c0562d1433ec612"
+    },
+    {
+      "name": "Data_PhysicalProfilesV47.json",
+      "sha256": "f5d932611c0fe187bc67b9ac43eb90ca26e77d859d3f37641a2bb50750b1f45e"
+    },
+    {
+      "name": "Data_ProfiledBundleV47.json",
+      "sha256": "38a6af6de7f3b063e8fafaa061f61d8176af671c6b8591979e455bd6e849b839"
+    },
+    {
+      "name": "Data_TyreImageConicsV47.json",
+      "sha256": "8ddfded5a4caceac5ef3945d611320af36935ffecb189ba9061304c1d4c471a5"
+    },
+    {
+      "name": "Log_CapDatumBundleV47.txt",
+      "sha256": "54339f3576e57f1055486d25c8b0e493f0c291a12fe7fb6ced666b679fee1880"
+    },
+    {
+      "name": "Log_CircularBundleV47.txt",
+      "sha256": "b3c8ffff2f5684f6788f66bcf0a4413c95c4704fcc1ed9488b855fc262cac346"
+    },
+    {
+      "name": "Log_PhysicalProfilesV47.txt",
+      "sha256": "bee3714c5529f29d35c4ffcfce9d04692745f4be6b838fcf37154fcae3f05927"
+    },
+    {
+      "name": "Log_ProfiledBundleV47.txt",
+      "sha256": "9bed511a662dd6842b6043d8b3315298173fffe5e9b6fb5e4dd628b2281a4b39"
+    },
+    {
+      "name": "Preview_ExpandedTyresReviewV47.jpg",
+      "sha256": "8b0956f6216a9d8a3fcdee7fee79bd5d270eed41785156b888e631d9913d9d29"
+    },
+    {
+      "name": "Preview_RoofCircle2017V47.jpg",
+      "sha256": "0157ccf275e575d81a51a011d5718fd664b6436466209912ba23896427ba0fa5"
+    },
+    {
+      "name": "Preview_RoofCircle2017V47Expanded.jpg",
+      "sha256": "0157ccf275e575d81a51a011d5718fd664b6436466209912ba23896427ba0fa5"
+    },
+    {
+      "name": "Preview_RoofCircle2V47.jpg",
+      "sha256": "6c8c96f14df963a9a86e3f33ee1e7375ab84b74296d9b29b3911356f2b553f3b"
+    },
+    {
+      "name": "Preview_RoofCircle2V47Expanded.jpg",
+      "sha256": "6c8c96f14df963a9a86e3f33ee1e7375ab84b74296d9b29b3911356f2b553f3b"
+    },
+    {
+      "name": "Preview_RoofCircle3V47.jpg",
+      "sha256": "bf590d8e043c00fc557521abc6e02147825072e0d21d687c809604f1bab746f2"
+    },
+    {
+      "name": "Preview_RoofCircle3V47Expanded.jpg",
+      "sha256": "bf590d8e043c00fc557521abc6e02147825072e0d21d687c809604f1bab746f2"
+    },
+    {
+      "name": "Preview_RoofCircle7V47.jpg",
+      "sha256": "e2ad4832399f62fd77ea7f98a774423af08ad315bb99f6796fa6bdc6d071cc18"
+    },
+    {
+      "name": "Preview_RoofCircle7V47Expanded.jpg",
+      "sha256": "e2ad4832399f62fd77ea7f98a774423af08ad315bb99f6796fa6bdc6d071cc18"
+    },
+    {
+      "name": "Preview_RoofCirclesReviewV47.jpg",
+      "sha256": "9254380307e197a6ec9d13aaeb5d28e1495189a10acd44e67599264d0f443d8e"
+    },
+    {
+      "name": "Preview_RoofFullCircle2017V47.jpg",
+      "sha256": "881f468f0f5e9dfbbd40e1abb13c5f304485c3e26f843d96fc5e734394cfe7b9"
+    },
+    {
+      "name": "Preview_RoofFullCircle2V47.jpg",
+      "sha256": "d97f8d2553bfab6162bf73bd8723c56698ca0e23de53ba8caedadd38e4289d91"
+    },
+    {
+      "name": "Preview_RoofFullCircle3V47.jpg",
+      "sha256": "0cbb36284996e52de192dbdee4083ece4595d2f83cdc842417ad534b731d5890"
+    },
+    {
+      "name": "Preview_RoofFullCircle7V47.jpg",
+      "sha256": "9e637edcc261e1c20f83555b5c0a8caf071339c09ae321536d568840a37ad3c4"
+    },
+    {
+      "name": "Preview_TyreCircle2Wheel0V47.jpg",
+      "sha256": "839578163dad63665cbfcec731780588074774b5d5d86fb89f96064fa7fa627f"
+    },
+    {
+      "name": "Preview_TyreCircle2Wheel0V47Expanded.jpg",
+      "sha256": "839578163dad63665cbfcec731780588074774b5d5d86fb89f96064fa7fa627f"
+    },
+    {
+      "name": "Preview_TyreCircle2Wheel1V47Expanded.jpg",
+      "sha256": "8a294e17d2c2cf4037bff740455529ba3f934e846ee8c2a890cafd2ce02b6f28"
+    },
+    {
+      "name": "Preview_TyreCircle2Wheel2V47Expanded.jpg",
+      "sha256": "c3159dc2f6d5cb85c9eaf0a9fe9639c5793d5bd517f6e5c1877161262718607b"
+    },
+    {
+      "name": "Preview_TyreCircle2Wheel3V47Expanded.jpg",
+      "sha256": "cc09d0ad148c04aa3be900dc9f310f4e91b43d4687fa67cdf0a34f2f8f04bb45"
+    },
+    {
+      "name": "Preview_TyreCircle3Wheel0V47.jpg",
+      "sha256": "8d9675250042fb92779f612ebf77e561f8e2e63929a11bba359d9bb58183eb3c"
+    },
+    {
+      "name": "Preview_TyreCircle3Wheel0V47Expanded.jpg",
+      "sha256": "8d9675250042fb92779f612ebf77e561f8e2e63929a11bba359d9bb58183eb3c"
+    },
+    {
+      "name": "Preview_TyreCircle3Wheel1V47.jpg",
+      "sha256": "5f935aff62a15d63a072ee8f2a29857e8e67b301679f249397b7e7caef8931bb"
+    },
+    {
+      "name": "Preview_TyreCircle3Wheel1V47Expanded.jpg",
+      "sha256": "5f935aff62a15d63a072ee8f2a29857e8e67b301679f249397b7e7caef8931bb"
+    },
+    {
+      "name": "Preview_TyreCircle3Wheel2V47Expanded.jpg",
+      "sha256": "103d81d913a668eb08d51e7868eaf7096d2f94e075aa05860e1008074ca5e8fc"
+    },
+    {
+      "name": "Preview_TyreCircle3Wheel3V47Expanded.jpg",
+      "sha256": "0d8a80afd34b4e9d5ad256c3941453f9a4ba9ae85bf15291ddeeb6b3f1ae079f"
+    },
+    {
+      "name": "Preview_TyreCircle7Wheel0V47.jpg",
+      "sha256": "044c8785408390937eddd40f56f903fb637fab39f6ddb3dba6fe9e1039a7797f"
+    },
+    {
+      "name": "Preview_TyreCircle7Wheel0V47Expanded.jpg",
+      "sha256": "044c8785408390937eddd40f56f903fb637fab39f6ddb3dba6fe9e1039a7797f"
+    },
+    {
+      "name": "Preview_TyreCirclesReviewV47.jpg",
+      "sha256": "e0ee2376859abe46248b68d35828ee5009c7ff88e19fc6473c6573668e36c2bb"
+    },
+    {
+      "name": "Preview_WheelShoulder2FrontNativeV47.jpg",
+      "sha256": "5a17b62b4f7f5ee6f2db7467f895e9b576c0e319b23a61f1d497402d212d955c"
+    },
+    {
+      "name": "Preview_WheelShoulder2RearNativeV47.jpg",
+      "sha256": "0a931750c332abec8f68caf70587c9f0065425a5a97eb4585316b3609d8b90b4"
+    },
+    {
+      "name": "Preview_WheelShoulder3FrontNativeV47.jpg",
+      "sha256": "c9d63916f95e22436b9148e3db8513dbd996f6cfc0a4ff516149bd333f685f81"
+    },
+    {
+      "name": "Preview_WheelShoulder3RearNativeV47.jpg",
+      "sha256": "0bd183fbd5090490ea5e99544b04fb578b2d1aebb5f096147d3d25a8fc3b35d7"
+    },
+    {
+      "name": "Preview_WheelShoulder7FrontNativeV47.jpg",
+      "sha256": "3b614e4901163a7855e718eefc4e10c59c8f230b2186922097e0a1edb5e367ba"
+    },
+    {
+      "name": "Script_Type94ArchiveCircularStudyV47.py",
+      "sha256": "5bfe0ec2af48391b64f9272370fb2dcbca49e383d1fc1ec1dd945f089ae00219"
+    },
+    {
+      "name": "Script_Type94CapDatumBundleV47.py",
+      "sha256": "937782aa167f386a13642a66b2e6f7f04542417eb15db143bf29a870ae0df4ed"
+    },
+    {
+      "name": "Script_Type94CircleCandidatesV47.py",
+      "sha256": "8c98533930608813f18a36427cf89a60b24d8ce160bb2c57dfca6870f95df974"
+    },
+    {
+      "name": "Script_Type94CircleOverlayV47.py",
+      "sha256": "a2f746b293bd791c4f71ca966c5943e30940d610c9a32cbcd65bbd861dbfd9a3"
+    },
+    {
+      "name": "Script_Type94CircularBundleV47.py",
+      "sha256": "3ca065b9d0c8f731133f29c5a5debe4cb1dea2652bc7ea28cf9a470bf6a7c943"
+    },
+    {
+      "name": "Script_Type94EnvelopeBrowserV47.mjs",
+      "sha256": "4f81e27f15cfc1bf2b3a487cf917b277e1a0f7cf71e5bb26f3dfd8f28360931a"
+    },
+    {
+      "name": "Script_Type94EnvelopeReviewV47.py",
+      "sha256": "de3384306c1b955831213112abf252015500f703f136548ff730d66be945515d"
+    },
+    {
+      "name": "Script_Type94ExpandedCirclesV47.py",
+      "sha256": "68153563ceed88a651298a11bf07fbbdd5b1d1ced263f2252f8d72befd6d7f54"
+    },
+    {
+      "name": "Script_Type94PhysicalProfilesV47.py",
+      "sha256": "d0574b39c7ab59a3f74375e4e96903ee4fefb2019d33cce55ecb38cdd336d437"
+    },
+    {
+      "name": "Script_Type94ProfiledBundleV47.py",
+      "sha256": "07939ecc25a058c7b2d4ba3ea4dc2251d514ddf76b98d2cf593f8512db16df5e"
+    },
+    {
+      "name": "Script_Type94VerifyEnvelopeV47.py",
+      "sha256": "bc50728f9f19e6ac543720a825fba8cc66ed129f58a3e48f5ae66748bfbe8686"
+    },
+    {
+      "name": "Script_Type94WheelShoulderCropsV47.py",
+      "sha256": "039a893894bfab1652be940752e1eae8da705e4f464681d3e5411446cb7f5118"
+    }
+  ]
+}

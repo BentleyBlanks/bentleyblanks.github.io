@@ -1,0 +1,115 @@
+{
+  "schema": "Type94CasingAndFrontPlaneAuditV1",
+  "revision": "ReferenceV82",
+  "status": "actual-model-casing-heads-extracted-new2014front-controls-oppose-plane-move",
+  "sourceManifest": "Data_GrayTrialV81.json",
+  "sourceGlbSha256": "6322b72bde0ae1555b37e25d25c951b944dbd47e94564daf06bc5bb26d54b2d0",
+  "extractor": "Taierzhuang1938/_blender/Script_Type94CasingDatumsV82.py",
+  "evaluator": "Taierzhuang1938/_import/Script_Type94Front2014AuditV82.py",
+  "actualCasingData": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV82\\Inputs\\Data_ActualCasingCrownsV82.json",
+  "actualCasingDataSha256": "6a92ff2065dcb7ce569b2bf880e6d8c7e35d5c96ab9aa4b263b8a960bd838c7e",
+  "actualCasingHeadCount": 10,
+  "currentModelVisibilityCounts": {
+    "Left": {
+      "2017": 0,
+      "2014": 0
+    },
+    "Right": {
+      "2017": 3,
+      "2014": 3
+    }
+  },
+  "photographicIdentityEstablished": false,
+  "mechanicalAxesEstablished": false,
+  "front2014Observations": {
+    "schema": "Type94Front2014ImageObservationsV1",
+    "camera": "2014",
+    "imageSha256": "a2842cfe2394259a70ab2bc7d5835696c944da040518b2c8870f9428f76ca136",
+    "samples": [
+      {
+        "index": 6,
+        "observedNative": [
+          1604,
+          1941
+        ],
+        "sigmaNative": 4,
+        "scope": "Visible cap footprint; not a mechanical-axis datum"
+      },
+      {
+        "index": 7,
+        "observedNative": [
+          1594,
+          2143
+        ],
+        "sigmaNative": 5,
+        "scope": "Visible cap footprint; not a mechanical-axis datum"
+      },
+      {
+        "index": 9,
+        "observedNative": [
+          1799,
+          1964
+        ],
+        "sigmaNative": 4,
+        "scope": "Visible cap footprint; not a mechanical-axis datum"
+      },
+      {
+        "index": 10,
+        "observedNative": [
+          1998,
+          1989
+        ],
+        "sigmaNative": 4,
+        "scope": "Visible cap footprint; not a mechanical-axis datum"
+      },
+      {
+        "index": 11,
+        "observedNative": [
+          2050,
+          2216
+        ],
+        "sigmaNative": 6,
+        "scope": "Visible cap footprint; not a mechanical-axis datum"
+      }
+    ],
+    "roiWasPredictionGuided": true,
+    "observationsAdjustedToPredictions": false,
+    "barrierOccludesLowerRows": true,
+    "cameraAlreadyUsedForOtherBodyCalibration": true,
+    "wholeUntouchedHoldout": false,
+    "physicalAxesEstablished": false
+  },
+  "front2014CaseSummary": [
+    {
+      "mode": "Baseline",
+      "rmsNative": 8.85323896482714
+    },
+    {
+      "mode": "PlaneOnly",
+      "rmsNative": 30.308882035645578
+    },
+    {
+      "mode": "CameraOnly",
+      "rmsNative": 8.85323896482714
+    },
+    {
+      "mode": "Joint",
+      "rmsNative": 51.56684398156916
+    }
+  ],
+  "oldHypothesesReestimated": false,
+  "frontPlaneAdopted": false,
+  "interpretation": "Under retained2014camera, the five new coarse front-face controls favour the retained plane over the previously fitted forward/joint alternatives. This does not certify the retained physical plane or camera.",
+  "geometryChanged": false,
+  "wholeReferenceAccepted": false,
+  "goalComplete": false,
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV82\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV82\\Rebuild",
+  "remaining": [
+    "Establish named fixed-body photographic controls before adopting a camera/turret-pose change",
+    "Resolve actual casing retaining seam, joint fittings and near-side corner/track envelopes; do not equate model crowns with photo identities",
+    "Keep ear profile/depth/function and third-camera correspondence uncertainty explicit",
+    "Complete whole body/running-gear reference acceptance",
+    "Bake final accepted high PBR and game derivative and perform final source/rebuild/motion acceptance"
+  ]
+}

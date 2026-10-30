@@ -1,0 +1,84 @@
+{
+  "schema": "Type94TowHardwareIdentityAuditV1",
+  "sources": [
+    {
+      "camera": "2017",
+      "sourceFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_Kubinka.jpg",
+      "sha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+      "size": [
+        4854,
+        3236
+      ],
+      "reviewedNativeRoi": [
+        1300,
+        1800,
+        750,
+        750
+      ],
+      "observations": [
+        "Forward-facing open hook mouth and thick curved lower body",
+        "A separate upper gate below a transverse pin",
+        "Visible coil around the pin; hidden spring legs and exact mounting unproved"
+      ],
+      "notSupported": [
+        "Closed two-eye U shackle parallel to front armor",
+        "A swinging whole hook at the old0to80degree demonstration travel"
+      ]
+    },
+    {
+      "camera": "TourGuide",
+      "sourceFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\AdditionalV38\\Reference_TourGuideType94.jpg",
+      "sha256": "65da09c9dd6f2d81e86d5e46fdba26afd418f8d7ffb8ad5547b01adedd7e64c2",
+      "size": [
+        2592,
+        1944
+      ],
+      "reviewedNativeRoi": [
+        660,
+        1050,
+        450,
+        500
+      ],
+      "observations": [
+        "Forward-facing open hook mouth and thick curved lower body",
+        "A separate upper gate below a transverse pin",
+        "Visible coil around the pin; hidden spring legs and exact mounting unproved"
+      ],
+      "notSupported": [
+        "Closed two-eye U shackle parallel to front armor",
+        "A swinging whole hook at the old0to80degree demonstration travel"
+      ]
+    }
+  ],
+  "inputFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV93\\Inputs\\Data_TowObservationsV93.json",
+  "inputSha256": "a41a5070eca49f63c64d57ede2f3bac29775e142a739c512fa6dfe17e68e646b",
+  "legacyDescriptionRejected": "Closed transverse U-shackle with two side eyes and whole-loop80degree motion",
+  "retainedIdentity": "Open forward-facing towing hook, independent upper gate and visible coil spring",
+  "legacyPinPredictionNative": [
+    1497.592051622864,
+    2083.8724748606696
+  ],
+  "primaryCoarsePinNative": [
+    1527,
+    1983
+  ],
+  "legacyPinOffsetNativePx": 105.07180217484007,
+  "cameraInputFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV93\\Inputs\\Data_ReferenceCamerasV93.json",
+  "cameraInputSha256": "b5d8d55eaf600edda50aaf7217c216243da10cfeae77c2479b9ab9037d52968b",
+  "conditionalPinOnAssumedCentrePlaneWorldM": [
+    2.220446049250313e-16,
+    1.3506901062967311,
+    0.6866721102316068
+  ],
+  "centrePlaneXEqualsZeroAssumed": true,
+  "retainedCameraPhysicallyCalibrated": false,
+  "silhouettePointsNotUsedAsCentrelineDatums": true,
+  "newGateTravelAndSpringWindingInferred": true,
+  "hiddenAttachmentAndSectionInferred": true,
+  "nextAction": "Replace the incorrect old loop, preserve the rest of the vehicle, and independently sweep the separate gate against the full fixed mesh",
+  "wholeReferenceAccepted": false,
+  "geometryChangedByThisAudit": false,
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV93",
+  "resultingTrial": "Data_GrayTrialV94.json",
+  "goalComplete": false
+}

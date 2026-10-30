@@ -1,0 +1,1158 @@
+{
+  "schema": "Type94CameraReferenceStudyV2",
+  "revision": "CameraStudyV41",
+  "status": "five-view-physical-study-with-local-component-trial",
+  "previousStudy": "Data_CameraReferenceStudyV40.json",
+  "activeGray": "Data_GrayStudyV37.json",
+  "retainedSurface": "Data_SurfaceStudyV39.json",
+  "componentTrial": "Data_GrayTrialV42.json",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\CameraStudyV41",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94RunningReviewV42/",
+  "newPhysicalLowerObservations": {
+    "schema": "Type94PrimaryTourGuideAxleIdentityReviewV1",
+    "status": "Four matched end-cover identities reviewed; optical face centres remain broad estimates",
+    "records": [
+      {
+        "wheel": 0,
+        "component": "Road wheel axle-end cover on the outboard end of the suspension arm",
+        "observationsNative": {
+          "2017": [
+            3390.5,
+            2720.0
+          ],
+          "TourGuide": [
+            1672.0,
+            1471.5
+          ]
+        },
+        "faceBoundsNative": {
+          "2017": [
+            3371,
+            2675,
+            3410,
+            2765
+          ],
+          "TourGuide": [
+            1658,
+            1445,
+            1686,
+            1498
+          ]
+        },
+        "sigmaNative": {
+          "2017": 10.0,
+          "TourGuide": 6.0
+        },
+        "physicalComponentIdentityReviewed": true,
+        "exactAxisCentreMeasured": false,
+        "capAxialOffsetsKnown": false
+      },
+      {
+        "wheel": 1,
+        "component": "Road wheel axle-end cover on the outboard end of the suspension arm",
+        "observationsNative": {
+          "2017": [
+            3652.5,
+            2412.5
+          ],
+          "TourGuide": [
+            1828.0,
+            1317.5
+          ]
+        },
+        "faceBoundsNative": {
+          "2017": [
+            3640,
+            2385,
+            3665,
+            2440
+          ],
+          "TourGuide": [
+            1818,
+            1299,
+            1838,
+            1336
+          ]
+        },
+        "sigmaNative": {
+          "2017": 10.0,
+          "TourGuide": 6.0
+        },
+        "physicalComponentIdentityReviewed": true,
+        "exactAxisCentreMeasured": false,
+        "capAxialOffsetsKnown": false
+      },
+      {
+        "wheel": 2,
+        "component": "Road wheel axle-end cover on the outboard end of the suspension arm",
+        "observationsNative": {
+          "2017": [
+            3836.0,
+            2210.0
+          ],
+          "TourGuide": [
+            1928.0,
+            1228.5
+          ]
+        },
+        "faceBoundsNative": {
+          "2017": [
+            3818,
+            2165,
+            3854,
+            2255
+          ],
+          "TourGuide": [
+            1918,
+            1207,
+            1938,
+            1250
+          ]
+        },
+        "sigmaNative": {
+          "2017": 10.0,
+          "TourGuide": 6.0
+        },
+        "physicalComponentIdentityReviewed": true,
+        "exactAxisCentreMeasured": false,
+        "capAxialOffsetsKnown": false
+      },
+      {
+        "wheel": 3,
+        "component": "Road wheel axle-end cover on the outboard end of the suspension arm",
+        "observationsNative": {
+          "2017": [
+            3993.0,
+            2013.0
+          ],
+          "TourGuide": [
+            2013.5,
+            1122.5
+          ]
+        },
+        "faceBoundsNative": {
+          "2017": [
+            3980,
+            1982,
+            4006,
+            2044
+          ],
+          "TourGuide": [
+            2005,
+            1107,
+            2022,
+            1138
+          ]
+        },
+        "sigmaNative": {
+          "2017": 10.0,
+          "TourGuide": 6.0
+        },
+        "physicalComponentIdentityReviewed": true,
+        "exactAxisCentreMeasured": false,
+        "capAxialOffsetsKnown": false
+      }
+    ],
+    "method": "Native source views and museum2022 arm/wheel topology. Separate end faces from upper bell-crank joints, green spoke webs and perspective ellipse centres.",
+    "sourceImages": {
+      "2017": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_Kubinka.jpg",
+      "TourGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\AdditionalV38\\Reference_TourGuideType94.jpg"
+    },
+    "sourcePredictionNote": "Old V33 primary projections only located the crops; they are not promoted as observations. Odd-numbered primary covers are substantially displaced from those predictions.",
+    "exact3DPointAccepted": false,
+    "equalCapProtrusionAssumed": false,
+    "commonCapPlaneAssumed": false,
+    "metricScaleAccepted": false,
+    "wholeReferenceAccepted": false,
+    "limits": [
+      "Face bounds are manual visible-section estimates; a projected oval centre is not an exact 3D axis intersection",
+      "End-face partial occlusion, bevels and strong highlights justify broad10px/6px native uncertainties",
+      "Candidate bounds and part identities are recorded before the new lower-control bundle fit; do not tune them to its residuals"
+    ]
+  },
+  "ventIdentityReview": {
+    "schema": "Type94VentFacePhysicalReviewV1",
+    "status": "Same panel crease identities reviewed on four source images; bevel/corner estimates retained",
+    "rows": [
+      {
+        "name": "VentFaceA",
+        "component": "Fixed three-slot panel corner crease",
+        "observations": {
+          "2017": [
+            3358.0,
+            1262.0
+          ],
+          "TourGuide": [
+            1675.0,
+            801.0
+          ],
+          "2": [
+            443.0,
+            465.0
+          ],
+          "7": [
+            691.0,
+            382.0
+          ]
+        },
+        "sigmaNative": {
+          "2017": 6.0,
+          "TourGuide": 4.0,
+          "2": 3.0,
+          "7": 3.0
+        },
+        "physicalIdentityReviewed": true,
+        "exactCornerSectionMeasured": false
+      },
+      {
+        "name": "VentFaceB",
+        "component": "Fixed three-slot panel corner crease",
+        "observations": {
+          "2017": [
+            3620.0,
+            1170.0
+          ],
+          "TourGuide": [
+            1838.0,
+            744.0
+          ],
+          "2": [
+            624.0,
+            474.0
+          ],
+          "7": [
+            814.0,
+            392.0
+          ]
+        },
+        "sigmaNative": {
+          "2017": 6.0,
+          "TourGuide": 4.0,
+          "2": 3.0,
+          "7": 3.0
+        },
+        "physicalIdentityReviewed": true,
+        "exactCornerSectionMeasured": false
+      },
+      {
+        "name": "VentFaceC",
+        "component": "Fixed three-slot panel corner crease",
+        "observations": {
+          "2017": [
+            3622.0,
+            1250.0
+          ],
+          "TourGuide": [
+            1838.0,
+            785.0
+          ],
+          "2": [
+            630.0,
+            495.0
+          ],
+          "7": [
+            819.0,
+            410.0
+          ]
+        },
+        "sigmaNative": {
+          "2017": 6.0,
+          "TourGuide": 4.0,
+          "2": 3.0,
+          "7": 3.0
+        },
+        "physicalIdentityReviewed": true,
+        "exactCornerSectionMeasured": false
+      },
+      {
+        "name": "VentFaceD",
+        "component": "Fixed three-slot panel corner crease",
+        "observations": {
+          "2017": [
+            3358.0,
+            1358.0
+          ],
+          "TourGuide": [
+            1677.0,
+            845.0
+          ],
+          "2": [
+            445.0,
+            491.0
+          ],
+          "7": [
+            696.0,
+            405.0
+          ]
+        },
+        "sigmaNative": {
+          "2017": 6.0,
+          "TourGuide": 4.0,
+          "2": 3.0,
+          "7": 3.0
+        },
+        "physicalIdentityReviewed": true,
+        "exactCornerSectionMeasured": false
+      }
+    ],
+    "sourceFiles": {
+      "2017": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_Kubinka.jpg",
+      "TourGuide": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\AdditionalV38\\Reference_TourGuideType94.jpg",
+      "2": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial2.jpg",
+      "7": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial7.jpg"
+    },
+    "draftRejected": {
+      "primary": [
+        "Draft C/D extended onto the lower sloping panel instead of the slot-panel crease"
+      ],
+      "official7": [
+        "Draft A/D selected the rear side wall rather than the slotted front face"
+      ]
+    },
+    "scope": "Physical panel crease estimates, not a new slot count, pose measurement or accepted metric plane",
+    "geometryChanged": false,
+    "globalCalibrationAccepted": false
+  },
+  "fiveViewSolutions": [
+    {
+      "stanceClass": "RigidAllEpochs",
+      "success": true,
+      "cost": 31.104206929363144,
+      "nearIntrinsicBounds": [],
+      "positiveDepth": {
+        "2017": 1.0,
+        "2014": 1.0,
+        "TourGuide": 1.0,
+        "2": 1.0,
+        "7": 1.0
+      },
+      "unfittedRoadDiagnostics": {
+        "capLineDistancesOverSpan": [
+          0.00189633518189913,
+          0.002587950857348854,
+          0.008075559812742668,
+          0.004105135411616494
+        ],
+        "adjacentCapDistancesOverMiddle": [
+          1.2191683960266861,
+          1.0,
+          1.4868325186526399
+        ],
+        "equalOffsetOrCollinearityConstrained": false
+      },
+      "medianTrainingNative": {
+        "2017": 1.755461046557436,
+        "2014": 1.588509183748911,
+        "TourGuide": 1.7023405097289808,
+        "2": 1.0140454239554781,
+        "7": 0.8703401388018355
+      },
+      "diagnosticControlsUnusedForFit": [
+        {
+          "name": "NativeFront_Upper2",
+          "predictedNative": [
+            980.8845713386045,
+            1161.0847902935666
+          ],
+          "observedNative": [
+            982.0,
+            1160.0
+          ],
+          "errorNative": 1.5559405771683226,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "NativeFront_LowerFar1",
+          "predictedNative": [
+            643.0281374645871,
+            1197.0302013054657
+          ],
+          "observedNative": [
+            647.0,
+            1196.0
+          ],
+          "errorNative": 4.103292181894914,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            366.87531485747115,
+            976.9367086729153
+          ],
+          "observedNative": [
+            364.0,
+            980.0
+          ],
+          "errorNative": 4.201331846472817,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarInner",
+          "predictedNative": [
+            460.6204246888518,
+            1013.1407335201246
+          ],
+          "observedNative": [
+            466.0,
+            1009.0
+          ],
+          "errorNative": 6.788630540322459,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": true
+        },
+        {
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            1373.278420619633,
+            1233.4869791479434
+          ],
+          "observedNative": [
+            1385.0,
+            1235.0
+          ],
+          "errorNative": 11.81882630674487,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        }
+      ]
+    },
+    {
+      "stanceClass": "Epoch2022LowerTranslation",
+      "success": true,
+      "cost": 30.85045371144878,
+      "nearIntrinsicBounds": [],
+      "positiveDepth": {
+        "2017": 1.0,
+        "2014": 1.0,
+        "TourGuide": 1.0,
+        "2": 1.0,
+        "7": 1.0
+      },
+      "unfittedRoadDiagnostics": {
+        "capLineDistancesOverSpan": [
+          0.0020453222641073575,
+          0.0023383795698504965,
+          0.00817953082743211,
+          0.0042116410952832296
+        ],
+        "adjacentCapDistancesOverMiddle": [
+          1.2112884870758072,
+          1.0,
+          1.5004753166312477
+        ],
+        "equalOffsetOrCollinearityConstrained": false
+      },
+      "medianTrainingNative": {
+        "2017": 1.7183344022830547,
+        "2014": 1.5929228381064164,
+        "TourGuide": 1.7796847420561646,
+        "2": 0.9986963464193079,
+        "7": 0.9031158364682367
+      },
+      "diagnosticControlsUnusedForFit": [
+        {
+          "name": "NativeFront_Upper2",
+          "predictedNative": [
+            980.8709320756495,
+            1161.0731032969143
+          ],
+          "observedNative": [
+            982.0,
+            1160.0
+          ],
+          "errorNative": 1.5576729642788765,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "NativeFront_LowerFar1",
+          "predictedNative": [
+            643.0408826213434,
+            1196.9324534464135
+          ],
+          "observedNative": [
+            647.0,
+            1196.0
+          ],
+          "errorNative": 4.067441437526721,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            367.2626273674173,
+            976.6304459418795
+          ],
+          "observedNative": [
+            364.0,
+            980.0
+          ],
+          "errorNative": 4.690269916456435,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarInner",
+          "predictedNative": [
+            460.76094019099924,
+            1012.8251323340586
+          ],
+          "observedNative": [
+            466.0,
+            1009.0
+          ],
+          "errorNative": 6.486862497027949,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": true
+        },
+        {
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            1373.9180382933373,
+            1233.7588278367743
+          ],
+          "observedNative": [
+            1385.0,
+            1235.0
+          ],
+          "errorNative": 11.151250315848202,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        }
+      ]
+    }
+  ],
+  "pixelSensitivity": {
+    "runs": 8,
+    "seed": 9411941,
+    "observedRatiosRange": {
+      "minimum": [
+        1.106665923502964,
+        1.0,
+        1.2835898242540826
+      ],
+      "maximum": [
+        1.4301246090553614,
+        1.0,
+        1.6168123996900692
+      ]
+    },
+    "confidenceIntervalClaimed": false
+  },
+  "additionalLensSensitivity": {
+    "success": true,
+    "cost": 31.038588117998167,
+    "adjacentCapDistancesOverMiddle": [
+      1.2194820365649817,
+      1.0,
+      1.4859447495627092
+    ],
+    "primaryRadialK1": 0.0014455336948847178,
+    "officialPrincipalOffsetsNative": {
+      "2": [
+        2.088079947063893,
+        2.131218348809108
+      ],
+      "7": [
+        -2.131544737377113,
+        -1.834926270424716
+      ]
+    }
+  },
+  "metricSkeletonHypotheses": [
+    {
+      "shapeClass": "OriginalSkeleton",
+      "success": true,
+      "cost": 264.639556689099,
+      "shapeParameters": {
+        "TurretCenterX": 0.0,
+        "TurretCenterY": -0.578,
+        "RearDeckZ": 1.075,
+        "TurretRadialScale": 1.0,
+        "TurretVerticalScale": 1.0,
+        "CabinCenterX": 0.305,
+        "CabinWidth": 0.55,
+        "CabinTopZ": 1.23,
+        "CabinTopForward": 0.183,
+        "CabinBottomForward": 0.315,
+        "CabinYaw": 0.0,
+        "RoadFrontForward": 0.69,
+        "RoadSpacing01": 0.49,
+        "RoadSpacing12": 0.59,
+        "RoadSpacing23": 0.49,
+        "TrackCenterX": 0.684,
+        "CapDepth0": 0.098,
+        "CapDepth1": 0.098,
+        "CapDepth2": 0.098,
+        "CapDepth3": 0.098,
+        "FrontPivotY": 0.445,
+        "RearPivotY": -0.635,
+        "FrontPivotZ": 0.34,
+        "RearPivotZ": 0.34
+      },
+      "nearShapeBounds": [],
+      "nearLensBounds": [],
+      "diagnosticControlsUnusedForFit": [
+        {
+          "name": "FenderFarOuter",
+          "camera": "2017",
+          "predictedNative": [
+            128.88739811843607,
+            1396.5759826945712
+          ],
+          "observedNative": [
+            323.834375,
+            1651.7001733102252
+          ],
+          "errorNative": 321.0804827960641,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderFarInner",
+          "camera": "2017",
+          "predictedNative": [
+            409.3395889148924,
+            1463.6203216313725
+          ],
+          "observedNative": [
+            659.0125,
+            1704.9670710571922
+          ],
+          "errorNative": 347.25324474815426,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderNearOuter",
+          "camera": "2017",
+          "predictedNative": [
+            2991.9018325260427,
+            1690.5243122280785
+          ],
+          "observedNative": [
+            3019.6875,
+            2008.1416490486258
+          ],
+          "errorNative": 318.8303874569523,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderFarOuter",
+          "camera": "2014",
+          "predictedNative": [
+            152.49731999936557,
+            1445.5136960893688
+          ],
+          "observedNative": [
+            339.3625,
+            1716.7005545286506
+          ],
+          "errorNative": 329.33403663580935,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderFarInner",
+          "camera": "2014",
+          "predictedNative": [
+            401.6937517130714,
+            1507.3444358983074
+          ],
+          "observedNative": [
+            619.5250000000001,
+            1746.9297597042514
+          ],
+          "errorNative": 323.8079370760399,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderNearOuter",
+          "camera": "2014",
+          "predictedNative": [
+            2592.729804856217,
+            1708.9625506346756
+          ],
+          "observedNative": [
+            2632.8078125,
+            1960.3488372093022
+          ],
+          "errorNative": 254.56101778252585,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "NativeFront_Upper2",
+          "camera": "TourGuide",
+          "predictedNative": [
+            979.8398923105036,
+            1161.403773605889
+          ],
+          "observedNative": [
+            982.0,
+            1160.0
+          ],
+          "errorNative": 2.5761687768490673,
+          "sigmaNative": 4.0
+        },
+        {
+          "name": "NativeFront_LowerFar1",
+          "camera": "TourGuide",
+          "predictedNative": [
+            641.0334765674274,
+            1197.1846937423134
+          ],
+          "observedNative": [
+            647.0,
+            1196.0
+          ],
+          "errorNative": 6.083000997411873,
+          "sigmaNative": 4.0
+        },
+        {
+          "name": "FenderFarOuter",
+          "camera": "TourGuide",
+          "predictedNative": [
+            194.08833855393732,
+            868.2516152551021
+          ],
+          "observedNative": [
+            364.0,
+            980.0
+          ],
+          "errorNative": 203.36586288867449,
+          "sigmaNative": 5.0
+        },
+        {
+          "name": "FenderFarInner",
+          "camera": "TourGuide",
+          "predictedNative": [
+            303.5586124692969,
+            903.1269306637255
+          ],
+          "observedNative": [
+            466.0,
+            1009.0
+          ],
+          "errorNative": 193.89768228007173,
+          "sigmaNative": 5.0
+        },
+        {
+          "name": "FenderNearOuter",
+          "camera": "TourGuide",
+          "predictedNative": [
+            1386.235474188837,
+            1064.2449208337143
+          ],
+          "observedNative": [
+            1385.0,
+            1235.0
+          ],
+          "errorNative": 170.7595486570393,
+          "sigmaNative": 5.0
+        }
+      ]
+    },
+    {
+      "shapeClass": "MetricCabYawFixed",
+      "success": true,
+      "cost": 55.798830866373564,
+      "shapeParameters": {
+        "TurretCenterX": 0.08949201253896817,
+        "TurretCenterY": -0.7555901439342408,
+        "RearDeckZ": 1.0309805289143144,
+        "TurretRadialScale": 0.9708201278446154,
+        "TurretVerticalScale": 1.0594314685935808,
+        "CabinCenterX": 0.24494129800189854,
+        "CabinWidth": 0.48635773556314554,
+        "CabinTopZ": 1.153690408561429,
+        "CabinTopForward": 0.25973214245564413,
+        "CabinBottomForward": 0.3160711608841375,
+        "CabinYaw": 9.999999999999902e-11,
+        "RoadFrontForward": 0.6695535409791347,
+        "RoadSpacing01": 0.5262847584719216,
+        "RoadSpacing12": 0.4577341772242593,
+        "RoadSpacing23": 0.6335181912130998,
+        "TrackCenterX": 0.6901594225051979,
+        "CapDepth0": 0.10511919649478288,
+        "CapDepth1": 0.09772128097208471,
+        "CapDepth2": 0.09737255571676369,
+        "CapDepth3": 0.07464041182204897,
+        "FrontPivotY": 0.4215056707304835,
+        "RearPivotY": -0.6129026448418091,
+        "FrontPivotZ": 0.28266677768098175,
+        "RearPivotZ": 0.28700453213243615
+      },
+      "nearShapeBounds": [],
+      "nearLensBounds": [],
+      "diagnosticControlsUnusedForFit": [
+        {
+          "name": "FenderFarOuter",
+          "camera": "2017",
+          "predictedNative": [
+            -195.27573094431136,
+            1242.1652531668306
+          ],
+          "observedNative": [
+            323.834375,
+            1651.7001733102252
+          ],
+          "errorNative": 661.2065886773746,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderFarInner",
+          "camera": "2017",
+          "predictedNative": [
+            123.60207246608343,
+            1320.6092698112818
+          ],
+          "observedNative": [
+            659.0125,
+            1704.9670710571922
+          ],
+          "errorNative": 659.0866750971697,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderNearOuter",
+          "camera": "2017",
+          "predictedNative": [
+            2942.562196596575,
+            1591.7781033399745
+          ],
+          "observedNative": [
+            3019.6875,
+            2008.1416490486258
+          ],
+          "errorNative": 423.4464719656435,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderFarOuter",
+          "camera": "2014",
+          "predictedNative": [
+            -62.780398146051084,
+            1323.8144128784154
+          ],
+          "observedNative": [
+            339.3625,
+            1716.7005545286506
+          ],
+          "errorNative": 562.2085296668079,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderFarInner",
+          "camera": "2014",
+          "predictedNative": [
+            199.49687221280192,
+            1390.6544410689414
+          ],
+          "observedNative": [
+            619.5250000000001,
+            1746.9297597042514
+          ],
+          "errorNative": 550.7773876995228,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderNearOuter",
+          "camera": "2014",
+          "predictedNative": [
+            2595.6460716157335,
+            1613.4245628200374
+          ],
+          "observedNative": [
+            2632.8078125,
+            1960.3488372093022
+          ],
+          "errorNative": 348.90893818597897,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "NativeFront_Upper2",
+          "camera": "TourGuide",
+          "predictedNative": [
+            980.6239742692924,
+            1161.2940929535994
+          ],
+          "observedNative": [
+            982.0,
+            1160.0
+          ],
+          "errorNative": 1.8889476922681063,
+          "sigmaNative": 4.0
+        },
+        {
+          "name": "NativeFront_LowerFar1",
+          "camera": "TourGuide",
+          "predictedNative": [
+            647.012481878028,
+            1194.300811486006
+          ],
+          "observedNative": [
+            647.0,
+            1196.0
+          ],
+          "errorNative": 1.6992343579883293,
+          "sigmaNative": 4.0
+        },
+        {
+          "name": "FenderFarOuter",
+          "camera": "TourGuide",
+          "predictedNative": [
+            144.192961088522,
+            808.3753375271815
+          ],
+          "observedNative": [
+            364.0,
+            980.0
+          ],
+          "errorNative": 278.87301612730636,
+          "sigmaNative": 5.0
+        },
+        {
+          "name": "FenderFarInner",
+          "camera": "TourGuide",
+          "predictedNative": [
+            251.76193589713102,
+            844.4574264661161
+          ],
+          "observedNative": [
+            466.0,
+            1009.0
+          ],
+          "errorNative": 270.1336828603545,
+          "sigmaNative": 5.0
+        },
+        {
+          "name": "FenderNearOuter",
+          "camera": "TourGuide",
+          "predictedNative": [
+            1367.1457863756323,
+            1014.5242630724988
+          ],
+          "observedNative": [
+            1385.0,
+            1235.0
+          ],
+          "errorNative": 221.19747629181774,
+          "sigmaNative": 5.0
+        }
+      ]
+    },
+    {
+      "shapeClass": "MetricCabYawFree",
+      "success": true,
+      "cost": 55.79315738778368,
+      "shapeParameters": {
+        "TurretCenterX": 0.09016622974839839,
+        "TurretCenterY": -0.7557960589874312,
+        "RearDeckZ": 1.0310148031125317,
+        "TurretRadialScale": 0.971652312022115,
+        "TurretVerticalScale": 1.0593892478975537,
+        "CabinCenterX": 0.24531659646595796,
+        "CabinWidth": 0.4833453109228176,
+        "CabinTopZ": 1.153844309545281,
+        "CabinTopForward": 0.2584079619660507,
+        "CabinBottomForward": 0.31562402747160195,
+        "CabinYaw": 0.010625965037132534,
+        "RoadFrontForward": 0.6679281004409889,
+        "RoadSpacing01": 0.526062010130592,
+        "RoadSpacing12": 0.4572824011754187,
+        "RoadSpacing23": 0.6325473962642951,
+        "TrackCenterX": 0.6903712057611482,
+        "CapDepth0": 0.10519856549169734,
+        "CapDepth1": 0.09773177800988248,
+        "CapDepth2": 0.097344490153496,
+        "CapDepth3": 0.07452897297561906,
+        "FrontPivotY": 0.41990183080620624,
+        "RearPivotY": -0.6134178816626225,
+        "FrontPivotZ": 0.282725579681298,
+        "RearPivotZ": 0.28705271615070066
+      },
+      "nearShapeBounds": [],
+      "nearLensBounds": [],
+      "diagnosticControlsUnusedForFit": [
+        {
+          "name": "FenderFarOuter",
+          "camera": "2017",
+          "predictedNative": [
+            -195.33461487318618,
+            1242.7346503644485
+          ],
+          "observedNative": [
+            323.834375,
+            1651.7001733102252
+          ],
+          "errorNative": 660.9003245605627,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderFarInner",
+          "camera": "2017",
+          "predictedNative": [
+            123.32123605931065,
+            1321.4131597560147
+          ],
+          "observedNative": [
+            659.0125,
+            1704.9670710571922
+          ],
+          "errorNative": 658.8465171318772,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderNearOuter",
+          "camera": "2017",
+          "predictedNative": [
+            2940.193339921886,
+            1594.8367640228798
+          ],
+          "observedNative": [
+            3019.6875,
+            2008.1416490486258
+          ],
+          "errorNative": 420.8803267826496,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderFarOuter",
+          "camera": "2014",
+          "predictedNative": [
+            -62.52649018907641,
+            1324.4277823792925
+          ],
+          "observedNative": [
+            339.3625,
+            1716.7005545286506
+          ],
+          "errorNative": 561.5983335133196,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderFarInner",
+          "camera": "2014",
+          "predictedNative": [
+            199.44590162007853,
+            1391.4058754115879
+          ],
+          "observedNative": [
+            619.5250000000001,
+            1746.9297597042514
+          ],
+          "errorNative": 550.330519958898,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "FenderNearOuter",
+          "camera": "2014",
+          "predictedNative": [
+            2593.1587679253294,
+            1615.6709758692252
+          ],
+          "observedNative": [
+            2632.8078125,
+            1960.3488372093022
+          ],
+          "errorNative": 346.9508248061295,
+          "sigmaNative": 3.6
+        },
+        {
+          "name": "NativeFront_Upper2",
+          "camera": "TourGuide",
+          "predictedNative": [
+            980.6212988097798,
+            1161.298386174135
+          ],
+          "observedNative": [
+            982.0,
+            1160.0
+          ],
+          "errorNative": 1.8938383323556234,
+          "sigmaNative": 4.0
+        },
+        {
+          "name": "NativeFront_LowerFar1",
+          "camera": "TourGuide",
+          "predictedNative": [
+            647.0343039864275,
+            1194.2730740406068
+          ],
+          "observedNative": [
+            647.0,
+            1196.0
+          ],
+          "errorNative": 1.7272666362524327,
+          "sigmaNative": 4.0
+        },
+        {
+          "name": "FenderFarOuter",
+          "camera": "TourGuide",
+          "predictedNative": [
+            144.36214224520404,
+            808.6378881143403
+          ],
+          "observedNative": [
+            364.0,
+            980.0
+          ],
+          "errorNative": 278.5781074474973,
+          "sigmaNative": 5.0
+        },
+        {
+          "name": "FenderFarInner",
+          "camera": "TourGuide",
+          "predictedNative": [
+            251.74480698713978,
+            844.8286245974984
+          ],
+          "observedNative": [
+            466.0,
+            1009.0
+          ],
+          "errorNative": 269.92133712347953,
+          "sigmaNative": 5.0
+        },
+        {
+          "name": "FenderNearOuter",
+          "camera": "TourGuide",
+          "predictedNative": [
+            1365.5882023550816,
+            1016.2728848800161
+          ],
+          "observedNative": [
+            1385.0,
+            1235.0
+          ],
+          "errorNative": 219.58681375829,
+          "sigmaNative": 5.0
+        }
+      ]
+    }
+  ],
+  "rejectedInferences": [
+    "Low image residual alone does not establish Euclidean vehicle axes: the free cloud gives a cab/road acute angle near72degrees",
+    "A freestanding18degree cab-yaw interpretation is not adopted; metric-model free-yaw and fixed-yaw costs are nearly identical",
+    "Cap bounds do not establish exact axle centres or equal protrusion; no common cap plane or exact collinearity was imposed in the free solve",
+    "The running-gear-only trial improves several marker comparisons but the new-photo rearmost cap proxy worsens; no whole-photo component acceptance",
+    "The source military handbook gives no measured cab angle, wheel spacing or individual museum dimensions"
+  ],
+  "complete": false,
+  "globalCalibrationAccepted": false,
+  "overallMuseumScaleAccepted": false,
+  "wholeReferenceAccepted": false,
+  "strictReferenceMatched": false,
+  "activeGeometryChanged": false,
+  "unacceptedTrialGeometryBuilt": true,
+  "nextAction": "Use the conditional metric skeleton and direct forebody crease/contour observations to solve fender, glacis and nose as one envelope. Keep running-gear trial separate until full five-view surfaces/tyres and axis/scale checks agree.",
+  "remaining": [
+    "Whole five-view gray body/cabin/turret/fender/nose alignment and defensible vehicle axes/scale",
+    "Visible track-shoe end-connector/casting and paint-wear reference checks",
+    "Fresh complete geometry/UV/PBR replay for the accepted final shape",
+    "Below80000-triangle final game derivative with3mm bidirectional checks"
+  ],
+  "publication": "Local only; no chapter vehicle replacement"
+}

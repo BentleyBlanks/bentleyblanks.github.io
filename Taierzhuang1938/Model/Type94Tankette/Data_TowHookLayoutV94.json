@@ -1,0 +1,23 @@
+{
+  "schema": "Type94FrontTowHookLayoutV1",
+  "basis": "Reviewed 2017 and TourGuide originals: a forward-facing open J hook, upper transverse pin, coil spring and separate gate; legacy side-by-side shackle eyes are rejected",
+  "primaryReference": "Reference_Kubinka.jpg",
+  "secondaryReference": "AdditionalV38/Reference_TourGuideType94.jpg",
+  "pinWorldM": [0.0, 1.3504245675848487, 0.6866938715355266],
+  "pinRadiusM": 0.0075,
+  "pinLengthM": 0.102,
+  "hookCentrelineLocalYZM": [[-0.036,-0.060],[-0.020,-0.083],[-0.006,-0.108],[0.014,-0.128],[0.040,-0.127],[0.075,-0.100],[0.090,-0.0475]],
+  "hookHalfWidthM": [0.022,0.023,0.023,0.020,0.015,0.010,0.006],
+  "hookInPlaneRadiusM": [0.021,0.022,0.022,0.020,0.017,0.011,0.0065],
+  "gateCentrelineLocalYZM": [[0.006,-0.009],[0.021,-0.025],[0.034,-0.037],[0.047,-0.046]],
+  "gateHalfWidthM": [0.013,0.015,0.016,0.012],
+  "gateThicknessM": 0.006,
+  "gateDemoTravelDegrees": 55,
+  "dimensionsAndHiddenSectionInferred": true,
+  "gateRestIsPhotographicPoseNotCertifiedClosed": true,
+  "mechanicalStopsMeasured": false,
+  "springDeformationReconstructed": false,
+  "primaryPinCentreNative": [1527.34,1982.81],
+  "pinConstraint": "Primary retained camera ray intersected with the assumed centre plane X=0; conditional placement, not a metric survey",
+  "scope": "Conditional local geometric reconstruction. Exact section, fastener count behind hook, spring winding and operating stops are inferred. No towing-load or vehicle-wide calibration claim."
+}

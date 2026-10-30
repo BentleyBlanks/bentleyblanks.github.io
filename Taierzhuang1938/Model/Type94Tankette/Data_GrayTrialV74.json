@@ -1,0 +1,178 @@
+{
+  "schema": "Type94PhotoFrontFastenerTrialV1",
+  "revision": "ShapeV74FrontFastenerTrial",
+  "status": "local-gray-primary-photo-front-head-layout-trial-secondary-plane-acceptance-pending",
+  "reference": "Data_GrayTrialV64.json",
+  "baseSha256": "d46ca757f4210827c0ea957e978db466138282913251a9ce9acab8f26b77137a",
+  "referencePrimarySha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontFastenersV74\\Scene_Type94TanketteHighShapeV74FrontFastenersTrial.blend",
+  "sourceBlendSha256": "6bc31aeffb0402eab4eeb164d365a00d22b79e16236d3e88b68d0bb1f4de2ad4",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontFastenersV74\\Exports\\Model_Type94TanketteHighShapeV74FrontFastenersTrial.glb",
+  "sha256": "d405f506eb43191048e19f7e9b472711a17a7cbb4d8fb1488136223f599e43be",
+  "triangles": 622020,
+  "meshOwners": 237,
+  "poseNodes": 292,
+  "independentLinks": [
+    80,
+    80
+  ],
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "removedPrimaryVisibleGenericHeads": 25,
+  "photoDerivedFrontHeads": 12,
+  "retainedPrimaryHiddenGenericHeads": 3,
+  "unplacedPhotoObservations": [
+    {
+      "name": "FarUpperEdge",
+      "observedNative": [
+        797,
+        1824
+      ],
+      "reason": "Candidate lands behind a casing/track in the existing construction; separate surface identity/placement must be established",
+      "currentModelVisibilityOnlyIsNotPhotoIdentityProof": true
+    },
+    {
+      "name": "NearMiddleEdge",
+      "observedNative": [
+        2501,
+        2224
+      ],
+      "reason": "Candidate lands behind a casing/track in the existing construction; separate surface identity/placement must be established",
+      "currentModelVisibilityOnlyIsNotPhotoIdentityProof": true
+    },
+    {
+      "name": "NearBottomEdge",
+      "observedNative": [
+        2498,
+        2404
+      ],
+      "reason": "Candidate lands behind a casing/track in the existing construction; separate surface identity/placement must be established",
+      "currentModelVisibilityOnlyIsNotPhotoIdentityProof": true
+    }
+  ],
+  "primaryPhotoPositionsAreTrainingData": true,
+  "primaryCameraAndFrontPlaneConditional": true,
+  "secondaryPhotoAccepted": false,
+  "frontPlaneAccepted": false,
+  "headProfileAndDimensionsInferred": true,
+  "headRadiusM": 0.01,
+  "headHeightM": 0.006,
+  "headSectionSides": 6,
+  "totalPhysicalFrontHeadCountEstablished": false,
+  "unaffected236MeshSurfacesExact": true,
+  "allExisting292RigPosesAndPropertiesPreserved": true,
+  "all237SourceExportSurfacesExact": true,
+  "otherHullComponentsExact": true,
+  "validation": {
+    "raw": {
+      "passed": true,
+      "report": "Data_FrontRawV74.json",
+      "reportSha256": "de456eda9675569b0c378abe83d22760d6edbd09bb4c6597322ead40f9d90256",
+      "checks": 685
+    },
+    "source": {
+      "passed": true,
+      "report": "Data_FrontSourceConservationV74.json",
+      "reportSha256": "a187832971de4cd0afdb09ac4d5eb9982150b10a27b04cc4de0fdcb409f48b4e",
+      "checks": 0
+    },
+    "buffers": {
+      "passed": true,
+      "report": "Data_FrontActualConservationV74.json",
+      "reportSha256": "d9dcf3cabdbf245b17fa0b9c94498c90583fb91429dcef4de38e7bcd87a1de04",
+      "checks": 5
+    },
+    "rays": {
+      "passed": true,
+      "report": "Data_FrontCrownRaysV74.json",
+      "reportSha256": "8c6d46f799386140d7308b37b8e2b45080ceffd87a6e7f7398e9efb89d2cfd11",
+      "checks": 12
+    },
+    "motion": {
+      "passed": true,
+      "report": "Data_FrontActualMotionV74.json",
+      "reportSha256": "b34b4f182b6aad605da0a2a50182c4fc8f958596ffa3f7b2932916b4eaa911f3",
+      "checks": 39
+    },
+    "browser": {
+      "passed": true,
+      "report": "Data_FrontBrowserV74.json",
+      "reportSha256": "1042311c07f1d6c487c70cae70c01e99b07ddfaaa72c3ca4f734a9f2289bd33f",
+      "checks": 6
+    }
+  },
+  "secondaryEpipolarDiagnostic": {
+    "report": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV73\\Acceptance\\Data_FrontEpipolarV73.json",
+    "maximumDistanceUndistortedNative": 9.522559716464297,
+    "cameraOrPlaneAdopted": false,
+    "independentHoldoutIsProvisional": true
+  },
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94FrontReviewV74/",
+  "retainedMaterialPreview": "http://127.0.0.1:8114/tmp/Type94WearReviewV68/",
+  "retainedGamePreview": "http://127.0.0.1:8114/tmp/Type94GameReviewV70/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontFastenersV74\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontFastenersV74\\Rebuild",
+  "frozenScripts": [
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94FrontFastenerTrialV74.py",
+      "sha256": "508be625c0fa1e2cc55309d3c5cc941ddf138b577e9630e6d4b21a821cc06205"
+    },
+    {
+      "file": "Taierzhuang1938/_import/Script_VerifyType94FrontFastenersV74.py",
+      "sha256": "43bf8821a5a19251576d4313076b03358ad400e04507fe1c77e136aee417b584"
+    },
+    {
+      "file": "tmp/Script_Type94FrontDatumsV73.py",
+      "sha256": "56ae5d3eba03e146042794b5ffd907b09b3398c83e22fa7cb09a11aeddf6bae0"
+    },
+    {
+      "file": "tmp/Script_Type94FrontOverlayV73.py",
+      "sha256": "830b777c5f03ff990bc02535369891a7443cb1465f38411d056327484f0d573e"
+    },
+    {
+      "file": "tmp/Script_Type94FrontObservationsV73.py",
+      "sha256": "07810600dbebe16fb48ea192dd9fd41491d632380aa5e3b8ecedc78233e59411"
+    },
+    {
+      "file": "tmp/Script_Type94FrontEpipolarV73.py",
+      "sha256": "cda7321bb038cd7979201533bf6c7c281740e387293363e10189a01d79297d16"
+    },
+    {
+      "file": "tmp/Script_Type94FrontSourceAuditV74.py",
+      "sha256": "939f6d1f4515952db5b6e71c66efef06e95f933b6e13265e8d18c0c929352197"
+    },
+    {
+      "file": "tmp/Script_Type94FrontMotionV74.py",
+      "sha256": "e361395b27a03a63fba350a22a6cd66e57d775a847f05b9d7dca067317126f90"
+    },
+    {
+      "file": "tmp/Script_Type94FrontPageV74.py",
+      "sha256": "f1cd7c4fde5a432784203c1b1dd894b9b27792ac02810556d855f4e6e85c2ff5"
+    },
+    {
+      "file": "tmp/Script_Type94FrontBrowserV74.mjs",
+      "sha256": "bf1cfae4ef25fc842998d8852c17f936ee1e2fbb8b860c7d462d49d7f41a5bc4"
+    },
+    {
+      "file": "tmp/Script_Type94FinalizeFrontV74.py",
+      "sha256": "42f6d78bd2287f953e0e826fbbeb0f5586b795b68e7cd73b1d417a433a9ee984"
+    }
+  ],
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontFastenersV74\\Acceptance\\Data_OwnedBlenderCleanupV74.json",
+  "newUvProvisional": true,
+  "newPbrBaked": false,
+  "wholeReferenceAccepted": false,
+  "canonicalGameReplaced": false,
+  "goalComplete": false,
+  "published": false,
+  "remaining": [
+    "Review the front-plane depth/tilt and camera consistency against independent views",
+    "Assign the three casing/track-adjacent head observations to actual physical surfaces",
+    "Verify the complete front layout and precise angular-head profiles before promoting this gray trial",
+    "Rebake final high PBR and game derivative after whole-reference geometry acceptance"
+  ]
+}

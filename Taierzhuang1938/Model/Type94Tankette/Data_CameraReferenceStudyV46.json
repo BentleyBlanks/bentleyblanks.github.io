@@ -1,0 +1,375 @@
+{
+  "schema": "Type94CameraReferenceStudyV4",
+  "revision": "CameraStudyV46",
+  "status": "rear-idler-anchored-trial-with-unresolved-scale-and-template-sensitivity",
+  "previousStudy": "Data_CameraReferenceStudyV45.json",
+  "activeGray": "Data_GrayStudyV37.json",
+  "retainedSurface": "Data_SurfaceStudyV44.json",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\CameraStudyV46",
+  "newIdlerObservations": {
+    "schema": "Type94RearIdlerSurfaceReviewV1",
+    "records": [
+      {
+        "camera": "2",
+        "pointNative": [
+          925.0,
+          620.0
+        ],
+        "faceBoundsNative": [
+          911,
+          605,
+          940,
+          636
+        ],
+        "sigmaNative": 4.0,
+        "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial2.jpg",
+        "physicalComponent": "Small raised rear idler on the tankette, immediately behind road wheel3",
+        "opticalSurfaceEstimate": true,
+        "exactAxisMeasured": false,
+        "observedFromModelProjection": false
+      },
+      {
+        "camera": "7",
+        "pointNative": [
+          1061.0,
+          543.0
+        ],
+        "faceBoundsNative": [
+          1049,
+          529,
+          1073,
+          556
+        ],
+        "sigmaNative": 4.0,
+        "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial7.jpg",
+        "physicalComponent": "Small raised rear idler on the tankette, immediately behind road wheel3",
+        "opticalSurfaceEstimate": true,
+        "exactAxisMeasured": false,
+        "observedFromModelProjection": false
+      },
+      {
+        "camera": "3",
+        "pointNative": [
+          401.0,
+          615.0
+        ],
+        "faceBoundsNative": [
+          389,
+          602,
+          413,
+          628
+        ],
+        "sigmaNative": 4.0,
+        "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial3.jpg",
+        "physicalComponent": "Small raised rear idler on the tankette, immediately behind road wheel3",
+        "opticalSurfaceEstimate": true,
+        "exactAxisMeasured": false,
+        "observedFromModelProjection": false
+      }
+    ],
+    "primary2017Used": false,
+    "primary2017Reason": "End face is too occluded to assign a reliable native point",
+    "scope": "Manual native face-centre estimates, not surveyed wheel axes. Both sides share nominal Y/Z only as a mechanical hypothesis."
+  },
+  "idlerAnchoredTrial": {
+    "shapeParameters": {
+      "TurretCenterX": 0.20910195612717788,
+      "TurretCenterY": -0.8180179729217738,
+      "RearDeckZ": 1.0301017342873147,
+      "TurretRadialScale": 0.9615888878894804,
+      "TurretVerticalScale": 1.051024309769913,
+      "CabinCenterX": 0.30240668149008537,
+      "CabinWidth": 0.4784728064018017,
+      "CabinTopZ": 1.1468036201332343,
+      "CabinTopForward": 0.27989882419103446,
+      "CabinBottomForward": 0.33115550691121004,
+      "CabinYaw": 9.999999999999999e-11,
+      "RoadFrontForward": 0.5500000000000002,
+      "RoadSpacing01": 0.5109495562171482,
+      "RoadSpacing12": 0.43666178497429187,
+      "RoadSpacing23": 0.5913972081614005,
+      "TrackCenterX": 0.5618900010964586,
+      "CapDepth0": 0.10884028527736717,
+      "CapDepth1": 0.09913007220328154,
+      "CapDepth2": 0.09860319898940925,
+      "CapDepth3": 0.07845033662752691,
+      "FrontPivotY": 0.29712032337048616,
+      "RearPivotY": -0.6690880504847617,
+      "FrontPivotZ": 0.27445284334888725,
+      "RearPivotZ": 0.2885739376031941
+    },
+    "driveParameters": {
+      "centerForwardM": 0.9941829183840638,
+      "centerHeightM": 0.5073990204014585,
+      "outerMetalRadiusM": 0.23000000925656208,
+      "opticalDomeOutwardDepthM": 0.09036832935314522
+    },
+    "idlerParameters": {
+      "centerForwardM": -1.376325415524001,
+      "centerHeightM": 0.4455523608240988,
+      "leftOpticalDepthM": 0.10092145385433829,
+      "rightOpticalDepthM": 0.04824064821289494
+    },
+    "nativeIdlerResiduals": [
+      {
+        "camera": "2",
+        "predictedNative": [
+          917.1325135902349,
+          617.7280005417045
+        ],
+        "observedNative": [
+          925.0,
+          620.0
+        ],
+        "errorNative": 8.188975756853434,
+        "residualNative": [
+          -7.8674864097650925,
+          -2.271999458295454
+        ],
+        "sigmaNative": 4.0
+      },
+      {
+        "camera": "7",
+        "predictedNative": [
+          1063.71102945621,
+          552.3052319554689
+        ],
+        "observedNative": [
+          1061.0,
+          543.0
+        ],
+        "errorNative": 9.692111351894313,
+        "residualNative": [
+          2.711029456210099,
+          9.305231955468912
+        ],
+        "sigmaNative": 4.0
+      },
+      {
+        "camera": "3",
+        "predictedNative": [
+          398.01415015085155,
+          608.8966602904673
+        ],
+        "observedNative": [
+          401.0,
+          615.0
+        ],
+        "errorNative": 6.794560687168753,
+        "residualNative": [
+          -2.985849849148451,
+          -6.103339709532747
+        ],
+        "sigmaNative": 4.0
+      }
+    ],
+    "fenderGate": {
+      "passed": true,
+      "fullAxialTrackSpanCovered": true,
+      "minimumRadialClearanceM": 0.005722181405507676,
+      "minimumPointBlenderM": [
+        0.6436548244963032,
+        1.1834287847630216,
+        0.6663320574674285
+      ],
+      "requiredFenderCentreClearanceM": 0.004,
+      "samplesWithinTrackWidth": 181,
+      "intersectingSamples": 0,
+      "endpointsBlenderM": [
+        [
+          0.45588008210499614,
+          1.1931330040621255,
+          0.6709778763550122
+        ],
+        [
+          0.6881039181058397,
+          1.1811316507260357,
+          0.665232322561672
+        ]
+      ],
+      "driveCenterBlenderM": [
+        0.5618900010964586,
+        0.9941829183840638,
+        0.5033990204014585
+      ],
+      "trackWidthM": 0.164,
+      "estimatedWorkingTrackRadiusM": 0.2440000092565621,
+      "radialAllowanceM": 0.014,
+      "fenderThicknessM": 0.006,
+      "gapM": 0.001,
+      "groundOffsetM": -0.004,
+      "schema": "Type94FrontCrossEdgeEnvelopeAuditV1",
+      "input": "C:\\Users\\Bentl\\.codex\\worktrees\\6126\\bentleyblanks.github.io\\tmp\\Type94Vision\\Data_IdlerJointV46.json",
+      "inputSha256": "141e47fd0c85c4f202d771f8cd4c85edade604f3adc005e04e58c6950622ff8f",
+      "hypothesisWasModified": false,
+      "actualMeshCollisionChecked": false,
+      "scope": "Straight front cross-edge against a smooth inferred track envelope; actual cast-lug sweep and reference comparison remain required",
+      "radiusParameterNote": "Input outerMetalRadiusM is the historical fitter parameter name; it is not a surveyed tooth-root radius"
+    },
+    "nearShapeBounds": [
+      "RoadFrontForward"
+    ],
+    "nearDriveBounds": [
+      2
+    ],
+    "accepted": false,
+    "reason": "Conditional front-edge clearance passes, but drive radius and first road-wheel station remain on authored bounds"
+  },
+  "turretTemplateAblation": {
+    "diagnosticOnly": true,
+    "removedPhotoObservations": 50,
+    "driveParameters": {
+      "centerForwardM": 1.0535622922806542,
+      "centerHeightM": 0.5722234103185333,
+      "outerMetalRadiusM": 0.2418544401388913,
+      "opticalDomeOutwardDepthM": 0.09521496192091883
+    },
+    "nearShapeBounds": [
+      "RearDeckZ"
+    ],
+    "nearDriveBounds": [],
+    "metricSolutionAccepted": false,
+    "limitation": "Removing turret photo controls also removes their link to nominal1.62mheight; remaining geometry priors can supply arbitrary scale. This diagnoses template sensitivity, never proves a replacement metric model."
+  },
+  "geometryChanged": false,
+  "wholeReferenceAccepted": false,
+  "strictReferenceMatched": false,
+  "sourceRadiusBoundLowered": false,
+  "newTrialGeometryAdopted": false,
+  "limitations": [
+    "Reviewed optical end faces are not surveyed axle centres or exact cover-depth observations",
+    "Left/right idler common Y/Z and retained190.5mmradius are unmeasured mechanical assumptions",
+    "The passing straight fender envelope gate does not prove actual cast-link/plate mesh clearance",
+    "Nominal3.084mlength caps the running-gear envelope but does not establish unknown nose/tow overhangs",
+    "Turret roof crops are observational preparation only; no new roof/rim trace is fitted",
+    "Tooth-root draft, sprocket tooth count and approximate wartime pitch figures are not promoted to museum measurements"
+  ],
+  "nextActions": [
+    "Obtain independent native upper-turret rim and tyre-outline controls to connect nominal height/road radius to camera scale without locking the unaccepted V37 rivet template",
+    "Review right-side cap centres and near drive-rim/tooth identities before adopting any gauge or radius",
+    "Use the newly prepared fresh-UV replay pipeline for final accepted geometry; keep V44 gun yaw and V42 belt-solver repair",
+    "Whole gray shape, exact reference wear and a new below80000/3mm game derivative remain required"
+  ],
+  "files": [
+    {
+      "name": "Data_IdlerCropOriginsV46.json",
+      "sha256": "5f8fcf7c130b54d59598177847d829130b2f2b1b533f31dd1d3fc0db61938184"
+    },
+    {
+      "name": "Data_IdlerFrontEnvelopeAuditV46.json",
+      "sha256": "3d0ac4fe34e90406b3a3422724987b3a669d9d0f74c2b629fa2a0ac703eacf23"
+    },
+    {
+      "name": "Data_IdlerJointV46.json",
+      "sha256": "141e47fd0c85c4f202d771f8cd4c85edade604f3adc005e04e58c6950622ff8f"
+    },
+    {
+      "name": "Data_RearIdlerReviewV46.json",
+      "sha256": "5c3a96eb2f66614053124eecca1830e19b57c1b547b16fe9c49fc394dead7d2e"
+    },
+    {
+      "name": "Data_RetainedGeometryControlV46.json",
+      "sha256": "d422811e38b38c2870556bdc878b67870ef06a1d992f967e1822fc6cf81ada58"
+    },
+    {
+      "name": "Data_TurretAblationV46.json",
+      "sha256": "d7bcd159798e661128e40088abee60e45729ad52175bba456f6edd775df28336"
+    },
+    {
+      "name": "Log_IdlerJointV46.txt",
+      "sha256": "873c3cd8faccb4539146d734d620daded801119ee1a23cea92fa7c68fcfb8747"
+    },
+    {
+      "name": "Log_TurretAblationV46.txt",
+      "sha256": "7d13acb363d687645a856209335d048e51f5ad11f17613c1916258b49c0cefd7"
+    },
+    {
+      "name": "Preview_PrimaryDriveMetalNativeV46.jpg",
+      "sha256": "201027c030a7c1d439179cd34ceded24c12006bb5e542d551f6421c8fe3a2f82"
+    },
+    {
+      "name": "Preview_RearIdlerNative2017V46.jpg",
+      "sha256": "cd57c4c48f7e77eeb7a3b4d71930645b270fe50033ff8c0091541d7d1d3a972a"
+    },
+    {
+      "name": "Preview_RearIdlerNative2V46.jpg",
+      "sha256": "a839b2f20da410831e12dc1889c35bc8b518eea9c5b9b9f08dc293d25e6553f5"
+    },
+    {
+      "name": "Preview_RearIdlerNative3V46.jpg",
+      "sha256": "f8120191dfa585c7e59be3ec95f8cbd7081294e39074ec7ed72743ecde4282c5"
+    },
+    {
+      "name": "Preview_RearIdlerNative7V46.jpg",
+      "sha256": "75706a0be0685f854ed03d42e1a8a2bc5fc13adef38f30f7d92ff627a0933c66"
+    },
+    {
+      "name": "Preview_RearIdlerReviewed2V46.jpg",
+      "sha256": "f984bc1c2ee895a7c2f0c6c977da02ed1e38386458ba95e2f01a20d69b9d76ca"
+    },
+    {
+      "name": "Preview_RearIdlerReviewed3V46.jpg",
+      "sha256": "ff2152ff28935ef6f8f063f53b5cd0edcfeb98db0bc676558935be51983450f1"
+    },
+    {
+      "name": "Preview_RearIdlerReviewed7V46.jpg",
+      "sha256": "913847a04e81c35d6058cb9f619275cf616c3d06ebc31c002e4b3239aec32390"
+    },
+    {
+      "name": "Preview_Roof7UpperNativeV46.jpg",
+      "sha256": "c8b3d9132d1e1317521b8a55dad34ab98380c3db79fe5cce1976d2523cb2a2f9"
+    },
+    {
+      "name": "Preview_TurretRoofNative2017V46.jpg",
+      "sha256": "a5618918c40e218c2dfd1494188114a772fe613d9bc0f02af1beaac691def1f9"
+    },
+    {
+      "name": "Preview_TurretRoofNative2V46.jpg",
+      "sha256": "04b7e94d6d7fc8233e4d6d97608410b0c12df904276dfee5b925caf7a17955f2"
+    },
+    {
+      "name": "Preview_TurretRoofNative3V46.jpg",
+      "sha256": "1f46831d62d11240b954b9e5d7fe508b098449b38e02992b7a68b1a383713a50"
+    },
+    {
+      "name": "Preview_TurretRoofNative7V46.jpg",
+      "sha256": "bbe179c245d04d9ae97b302c47ae52d0e143e5b6810cc361d4de5c5061e428a4"
+    },
+    {
+      "name": "Preview_TurretRoofNativeTourGuideV46.jpg",
+      "sha256": "0777a979a56578d91a00ddd206f41620c94c6f51623a17be0d907cca8d9b9a05"
+    },
+    {
+      "name": "Script_Type94ArchiveCameraV46.py",
+      "sha256": "068e0eb038817a52741f52dc181e6c28ec090996ca6d25f7792e237c3510dd21"
+    },
+    {
+      "name": "Script_Type94FullReplayCheckV46.py",
+      "sha256": "b9399b356459d656cb388082aa32360b380363d152e12689e13710afcff91487"
+    },
+    {
+      "name": "Script_Type94IdlerCropsV46.py",
+      "sha256": "2237c226006b5e5b862f81ce577df2252de4228556cf4df3edca81b35fc3404c"
+    },
+    {
+      "name": "Script_Type94IdlerJointV46.py",
+      "sha256": "eda86088966aa7402769247c8e07d8d3dee4cad43562036982a8df8485cd4bbb"
+    },
+    {
+      "name": "Script_Type94IdlerReviewV46.py",
+      "sha256": "94f781ec7966c1001e4c62a69310e86a076ada48728f039f4421397a6e89beca"
+    },
+    {
+      "name": "Script_Type94PrepareReplayChecksV46.py",
+      "sha256": "06545e7ef515531c69bf474d319c2c79eb45a0a4fa53814bc8d72adf5a4702f1"
+    },
+    {
+      "name": "Script_Type94RoofCropsV46.py",
+      "sha256": "cd9d0b16e21942181c476f3ea9ed3ee81c47d681f5ee4cf42c42247660cfb617"
+    },
+    {
+      "name": "Script_Type94TurretAblationV46.py",
+      "sha256": "4738eff360527e125661efec08eae4df41b466d814044ac15e4eb8d862aa1a11"
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+{
+  "schema": "Type94NoseRearTaperGrayTrialV1",
+  "revision": "ShapeV85NoseRearTaperTrial",
+  "status": "local-rear-cowl-taper-trial-inferred-dimension-retained-for-reference-review",
+  "reference": "Data_GrayTrialV81.json",
+  "referenceAudit": "Data_ReferenceAuditV84.json",
+  "producer": "Taierzhuang1938/_blender/Script_Type94NoseTaperTrialV85.py",
+  "nativeVerifier": "Taierzhuang1938/_blender/Script_VerifyType94NoseTaperV85.py",
+  "geometryVerifier": "Taierzhuang1938/_import/Script_VerifyType94NoseGeometryV85.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV85\\Scene_Type94TanketteHighShapeV85NoseTaperTrial.blend",
+  "sourceBlendSha256": "07f75bd158294d8f63b6e98c490364315a70c88663dc7bb977e31e555c5e6f45",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV85\\Exports\\Model_Type94TanketteHighShapeV85NoseTaperTrial.glb",
+  "sha256": "d2e3d3bb3bbb085b2b9472eb429234c74345de1c821627bf570035ae8812b7c8",
+  "baseSha256": "6322b72bde0ae1555b37e25d25c951b944dbd47e94564daf06bc5bb26d54b2d0",
+  "triangles": 622112,
+  "meshOwners": 238,
+  "poseNodes": 293,
+  "changedMeshOwners": [
+    "Geometry_NoseHousing_Paint"
+  ],
+  "unchangedOtherMeshOwners": 237,
+  "rigidPosesAndParentsPreserved": 293,
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "oldRearRiseM": 0.12,
+  "newRearRiseM": 0.012,
+  "retainedFrontRiseM": 0.14,
+  "cowlWidthM": 0.74,
+  "cowlCentreXM": -0.135,
+  "rearYM": 0.62,
+  "rearDimensionsAndHiddenConnectionInferred": true,
+  "dependencyFile": "Taierzhuang1938/_blender/Script_Type94TanketteBuild.py",
+  "dependencySha256": "abae17af2709943460c3f85fc2394155fb0a554654d68dfd2bac5fc3bb8493cf",
+  "sourceBeforeAfter7": {
+    "before": [
+      {
+        "camera": "7",
+        "name": "NearBottom",
+        "firstOwner": "Geometry_NoseHousing_Paint",
+        "distanceBeforeDatumM": 0.7061686796414515,
+        "authoredDatumNotGuaranteedSkinVertex": true
+      },
+      {
+        "camera": "7",
+        "name": "FarBottom",
+        "firstOwner": "Geometry_NoseHousing_Paint",
+        "distanceBeforeDatumM": 1.169252826127444,
+        "authoredDatumNotGuaranteedSkinVertex": true
+      }
+    ],
+    "after": [
+      {
+        "camera": "7",
+        "name": "NearBottom",
+        "firstOwner": "Geometry_Hull_Paint",
+        "distanceBeforeDatumM": 0.03716876928683721,
+        "authoredDatumNotGuaranteedSkinVertex": true
+      },
+      {
+        "camera": "7",
+        "name": "FarBottom",
+        "firstOwner": "Geometry_Hull_Paint",
+        "distanceBeforeDatumM": 0.04134459629956311,
+        "authoredDatumNotGuaranteedSkinVertex": true
+      }
+    ]
+  },
+  "validation": {
+    "geometry": {
+      "passed": true,
+      "checks": 1065,
+      "report": "Data_NoseGeometryV85.json"
+    },
+    "sourceReopen": {
+      "passed": true,
+      "byteIdenticalReexport": true,
+      "report": "Data_NoseTaperNativeV85.json"
+    },
+    "nativeMotion": {
+      "passed": true,
+      "checks": 39,
+      "report": "Data_NoseTaperMotionV85.json"
+    },
+    "browser": {
+      "passed": true,
+      "cameraCount": 4,
+      "actualGlbRenders": 8,
+      "actualBytesVerified": true,
+      "report": "Data_NoseBrowserV85.json"
+    }
+  },
+  "actualReferenceViewsInspected": [
+    "2017",
+    "2014",
+    "TourGuide",
+    "7"
+  ],
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94NoseReviewV85/",
+  "sourceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV85",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV85\\Rebuild",
+  "newUvsProvisional": true,
+  "newPbrBaked": false,
+  "cameraChanged": false,
+  "wholeReferenceAccepted": false,
+  "canonicalGameReplaced": false,
+  "retainedMaterialPreview": "http://127.0.0.1:8114/tmp/Type94WearReviewV77/",
+  "goalComplete": false,
+  "published": false,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV85\\Acceptance\\Data_OwnedBlenderCleanupV85.json",
+  "remaining": [
+    "Verify actual fixed-body photographic edges separately from authored midplane/corner data",
+    "Refine the cowl rear position, height and hidden connection against native photographs;12mmis an inferred trial value",
+    "Resolve casing joint/profile and near-corner/track envelopes; retain ear/camera uncertainties",
+    "Complete whole-reference body/running-gear acceptance",
+    "Bake final high PBR and game derivative from accepted geometry and complete end-to-end acceptance"
+  ]
+}

@@ -1,0 +1,414 @@
+{
+  "schema": "Type94CameraReferenceStudyV3",
+  "revision": "CameraStudyV45",
+  "status": "rejected-forebody-hypotheses-with-full-span-gate",
+  "previousStudy": "Data_CameraReferenceStudyV41.json",
+  "activeGray": "Data_GrayStudyV37.json",
+  "retainedSurface": "Data_SurfaceStudyV44.json",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\CameraStudyV45",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94Review/",
+  "depthHypothesis": {
+    "cost": 92.33005904217211,
+    "drive": {
+      "centerForwardM": 1.054413410777538,
+      "centerHeightM": 0.5269346018896958,
+      "outerMetalRadiusM": 0.23237298680507348,
+      "opticalDomeOutwardDepthM": 0.09593686073786933
+    },
+    "nearDriveBounds": [],
+    "accepted": false,
+    "reason": "An interior radius after freeing one optical-depth parameter is not metric or whole-reference acceptance"
+  },
+  "oppositeSideReview": {
+    "camera": "3",
+    "points": {
+      "CabinFarTop": [
+        826,
+        339
+      ],
+      "CabinNearTop": [
+        930,
+        357
+      ],
+      "CabinNearBottom": [
+        953,
+        432
+      ],
+      "CabinFarBottom": [
+        845,
+        417
+      ],
+      "RightRoadCap0": [
+        873,
+        761
+      ],
+      "RightRoadCap1": [
+        699,
+        735
+      ],
+      "RightRoadCap2": [
+        580,
+        706
+      ],
+      "RightRoadCap3": [
+        455,
+        683
+      ],
+      "RightDriveHubFace": [
+        1062,
+        621
+      ]
+    },
+    "sigmaNative": {
+      "CabinFarTop": 5.0,
+      "CabinNearTop": 5.0,
+      "CabinNearBottom": 5.0,
+      "CabinFarBottom": 5.0,
+      "RightRoadCap0": 6.0,
+      "RightRoadCap1": 6.0,
+      "RightRoadCap2": 6.0,
+      "RightRoadCap3": 6.0,
+      "RightDriveHubFace": 5.0
+    },
+    "status": "Manual physical-site review; bevel intersections and optical dome centres remain uncertain",
+    "observedFromProjection": false,
+    "metricAxlesMeasured": false,
+    "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial3.jpg",
+    "warning": "Official6 foreground running gear belongs to the attached tracked trailer, not the tankette. Do not identify those axles as vehicle controls."
+  },
+  "sixViewTrials": [
+    {
+      "initialization": "NarrowWarm",
+      "cost": 104.90541606634699,
+      "nfev": 32,
+      "trackCenterX": 0.5609142022142934,
+      "drive": {
+        "centerForwardM": 0.9936281376880145,
+        "centerHeightM": 0.5104569981880128,
+        "outerMetalRadiusM": 0.23473651043205318,
+        "opticalDomeOutwardDepthM": 0.0918321878506742
+      },
+      "photo3MeanNative": 6.429359248375271,
+      "nearShapeBounds": [
+        "TurretCenterY",
+        "RoadFrontForward"
+      ],
+      "nearDriveBounds": []
+    },
+    {
+      "initialization": "WiderWarm",
+      "cost": 104.90541606820418,
+      "nfev": 18,
+      "trackCenterX": 0.5609139787633819,
+      "drive": {
+        "centerForwardM": 0.9936281628565902,
+        "centerHeightM": 0.5104569400870551,
+        "outerMetalRadiusM": 0.23473650143191271,
+        "opticalDomeOutwardDepthM": 0.09183228026661638
+      },
+      "photo3MeanNative": 6.429355375560579,
+      "nearShapeBounds": [
+        "TurretCenterY",
+        "RoadFrontForward"
+      ],
+      "nearDriveBounds": []
+    }
+  ],
+  "fullSpanConsistency": {
+    "before": {
+      "passed": false,
+      "fullAxialTrackSpanCovered": true,
+      "minimumRadialClearanceM": -0.01640306757546653,
+      "minimumPointBlenderM": [
+        0.642858312909759,
+        1.1675437035807381,
+        0.6605096015733777
+      ],
+      "requiredFenderCentreClearanceM": 0.004,
+      "samplesWithinTrackWidth": 172,
+      "intersectingSamples": 172,
+      "endpointsBlenderM": [
+        [
+          0.4734925510587447,
+          1.1803663175163723,
+          0.6663872654944213
+        ],
+        [
+          0.7184509410805507,
+          1.1618206160049465,
+          0.657886237450426
+        ]
+      ],
+      "driveCenterBlenderM": [
+        0.5609142022142934,
+        0.9936281376880145,
+        0.5064569981880128
+      ],
+      "trackWidthM": 0.164,
+      "estimatedWorkingTrackRadiusM": 0.2487365104320532,
+      "radialAllowanceM": 0.014,
+      "fenderThicknessM": 0.006,
+      "gapM": 0.001,
+      "groundOffsetM": -0.004,
+      "schema": "Type94FrontCrossEdgeEnvelopeAuditV1",
+      "input": "C:\\Users\\Bentl\\.codex\\worktrees\\6126\\bentleyblanks.github.io\\tmp\\Type94Vision\\Data_SixViewJointV45.json",
+      "inputSha256": "163b7f2e53f612843afed01c68317d723bae765d9fb963f6e15f7aea22d94266",
+      "hypothesisWasModified": false,
+      "actualMeshCollisionChecked": false,
+      "scope": "Straight front cross-edge against a smooth inferred track envelope; actual cast-lug sweep and reference comparison remain required",
+      "radiusParameterNote": "Input outerMetalRadiusM is the historical fitter parameter name; it is not a surveyed tooth-root radius"
+    },
+    "after": {
+      "passed": false,
+      "fullAxialTrackSpanCovered": true,
+      "minimumRadialClearanceM": -0.0033256509444777316,
+      "minimumPointBlenderM": [
+        0.642559577442726,
+        1.1746546617034213,
+        0.664026498054839
+      ],
+      "requiredFenderCentreClearanceM": 0.004,
+      "samplesWithinTrackWidth": 174,
+      "intersectingSamples": 48,
+      "endpointsBlenderM": [
+        [
+          0.46007004323319944,
+          1.1875328110282355,
+          0.6697289011543782
+        ],
+        [
+          0.7008809749736056,
+          1.1705389644965218,
+          0.6622040805694194
+        ]
+      ],
+      "driveCenterBlenderM": [
+        0.5614598232212502,
+        0.9927523511484566,
+        0.5051388989540025
+      ],
+      "trackWidthM": 0.164,
+      "estimatedWorkingTrackRadiusM": 0.2448493966368277,
+      "radialAllowanceM": 0.014,
+      "fenderThicknessM": 0.006,
+      "gapM": 0.001,
+      "groundOffsetM": -0.004,
+      "schema": "Type94FrontCrossEdgeEnvelopeAuditV1",
+      "input": "C:\\Users\\Bentl\\.codex\\worktrees\\6126\\bentleyblanks.github.io\\tmp\\Type94Vision\\Data_FenderSpanGuardV45.json",
+      "inputSha256": "0310950328c6ee8887a393d8bdd635e91ed5b352c1984996c665198ccb6ab2a0",
+      "hypothesisWasModified": false,
+      "actualMeshCollisionChecked": false,
+      "scope": "Straight front cross-edge against a smooth inferred track envelope; actual cast-lug sweep and reference comparison remain required",
+      "radiusParameterNote": "Input outerMetalRadiusM is the historical fitter parameter name; it is not a surveyed tooth-root radius"
+    },
+    "retainedV37AuthoredPositiveControl": {
+      "passed": true,
+      "fullAxialTrackSpanCovered": true,
+      "minimumRadialClearanceM": 0.009411872700240631,
+      "minimumPointBlenderM": [
+        0.6024609375,
+        1.35,
+        0.846234375
+      ],
+      "requiredFenderCentreClearanceM": 0.004,
+      "samplesWithinTrackWidth": 200,
+      "intersectingSamples": 0,
+      "endpointsBlenderM": [
+        [
+          0.6,
+          1.35,
+          0.846
+        ],
+        [
+          0.81,
+          1.35,
+          0.866
+        ]
+      ],
+      "driveCenterBlenderM": [
+        0.684,
+        1.195,
+        0.601
+      ],
+      "trackWidthM": 0.164,
+      "estimatedWorkingTrackRadiusM": 0.2807,
+      "radialAllowanceM": 0.014,
+      "fenderThicknessM": 0.006,
+      "gapM": 0.001,
+      "groundOffsetM": -0.004
+    },
+    "verifier": "Taierzhuang1938/_import/Script_VerifyType94ForebodyEnvelope.py",
+    "accepted": false,
+    "reason": "Both trial cross-edges still intersect the conditional working-track envelope"
+  },
+  "sourceCorrections": {
+    "official6Foreground": "Separate attached tracked trailer; its axles are not Type94 tankette controls",
+    "official7ExifFocalLengthMm": 34,
+    "official3ExifFocalLengthMm": 35,
+    "previous7NominalFocalPixels": 1400,
+    "correctNominal7FocalPixelsAt36mmSensorWidth": 1360,
+    "previousFitMetadataRewritten": false,
+    "scope": "The2.9percentnominal discrepancy lies within old free focal scaling; EXIF does not prove uncropped/unwarped pixels"
+  },
+  "geometryChanged": false,
+  "strictReferenceMatched": false,
+  "wholeReferenceAccepted": false,
+  "newMeshAdopted": false,
+  "ownedBlenderStartedThisTurn": false,
+  "limitations": [
+    "Photo3 reviewed corners/covers now enter joint training and are no longer independent holdouts",
+    "Road and drive face observations are optical surface estimates; mirrored protrusion is not measured",
+    "Six-view fits converge from two lateral starts, but TurretCenterY and RoadFrontForward hit authored bounds",
+    "The full-span gate assumes a straight edge and smooth radial envelope; exact cast-lug mesh sweeps remain required",
+    "Old near-rim root draft remains unapproved and is never used in fitting",
+    "No native camera or whole metric survey is established"
+  ],
+  "nextActions": [
+    "Review right cover-centre candidates and rear-idler identities, then add reliable whole length/width constraints to resolve longitudinal/gauge ambiguity",
+    "Validate actual front cross-edge curvature and near-side tooth-root/rim geometry against native photo crops",
+    "Rebuild fender/glacis/nose and all gauge consumers together only after a coherent envelope clears the full-span and actual mesh checks",
+    "Preserve V44 gun yaw and V42 solver repair in any final merged source; fresh UV/PBR and below80000/3mm game derivative remain required"
+  ],
+  "files": [
+    {
+      "name": "Data_FenderSpanAfterAuditV45.json",
+      "sha256": "092f71f277133a2e19ad1b426bef90b497f45b6a59fb1063cece5ca014b415da"
+    },
+    {
+      "name": "Data_FenderSpanBeforeAuditV45.json",
+      "sha256": "8c74eb4a73c5c72bfad1d252c1ba37514b5dd601de710193f55c5f7990060713"
+    },
+    {
+      "name": "Data_FenderSpanGuardV45.json",
+      "sha256": "0310950328c6ee8887a393d8bdd635e91ed5b352c1984996c665198ccb6ab2a0"
+    },
+    {
+      "name": "Data_ForebodyDepthV45.json",
+      "sha256": "c3cce755c4229db8512f3d37d5bbc690c3e10801b75f936b6a4968d78c53cad2"
+    },
+    {
+      "name": "Data_ForebodyFitVectorUnmeasuredGaugeHubDepthV45.npy",
+      "sha256": "7f1d93431b3943df9a893f24d510636dc25617e604458b8f9429f7de06c0d6b0"
+    },
+    {
+      "name": "Data_RetainedFrontEdgeV37AuditV45.json",
+      "sha256": "e614bcc6ee2ec73c7aa48fe220c2bd328053397fe8bca25e69eb5f586ce595f6"
+    },
+    {
+      "name": "Data_RetainedFrontEdgeV37ControlV45.json",
+      "sha256": "51637a294b96ddd69e939544ec69aacc0abf306db3148ca3600ddc50e6d5b4ec"
+    },
+    {
+      "name": "Data_RightPhysicalReviewV45.json",
+      "sha256": "d1ccdfb265cdcd69e174bc2557970b58b806e3b32efaf094d9a034dcc7bc6507"
+    },
+    {
+      "name": "Data_RightPnpV45.json",
+      "sha256": "d8948a3cc02ec0cb0c7514d6414d3e545735d41e8b67f8e880c55d61c8d2ef86"
+    },
+    {
+      "name": "Data_RightPointsDraftV45.json",
+      "sha256": "3f6b22d9b4894390f3df6dd983a82b2065b679ce2b8f567fb3b3f150816ea879"
+    },
+    {
+      "name": "Data_SixViewJointV45.json",
+      "sha256": "163b7f2e53f612843afed01c68317d723bae765d9fb963f6e15f7aea22d94266"
+    },
+    {
+      "name": "Log_FenderSpanGuardV45.txt",
+      "sha256": "153d1e1fd5c381783aab95d70f8ca8510d3e07c3d170eac26f2c37b9b0e5a670"
+    },
+    {
+      "name": "Log_ForebodyDepthV45.txt",
+      "sha256": "4dbcfb6a61b026e1b6c1223a56874c71fd1dcdf1d78415389a475e12a7f9cbde"
+    },
+    {
+      "name": "Log_RightPnpV45.txt",
+      "sha256": "451bcfe860ef8f2d9b6d581e0af01f66c3333dbca9b122374cced745027294f9"
+    },
+    {
+      "name": "Log_SixViewJointV45.txt",
+      "sha256": "a4fb4f63caaa4e4f13b73904b8c3a224e37b9d58a8c19bf8a7357771654466de"
+    },
+    {
+      "name": "Preview_Official1CabNativeV45.jpg",
+      "sha256": "dd51a251ec29bcbd52462bd85ce17e5e18782b712a427eb513e48a0029ff0f4e"
+    },
+    {
+      "name": "Preview_Official1FrontNativeV45.jpg",
+      "sha256": "4e05c9e9db9cd6bb4d20df74a134b812005b431839f5f19be15ad0160c324a65"
+    },
+    {
+      "name": "Preview_Official3CabNativeV45.jpg",
+      "sha256": "636060b27b22d3c31d749ccd45baf9eb1762ea331647d79a47c3d70d0ea196bb"
+    },
+    {
+      "name": "Preview_Official3FrontDriveNativeV45.jpg",
+      "sha256": "d34e56eeb7c2efb671f59af9f25f5334cce547b555b927dcfbafdfb67ed99e99"
+    },
+    {
+      "name": "Preview_Official3RoadNativeV45.jpg",
+      "sha256": "4744093ce5801ad84b3466d2dbe190fe47a514d49c571e12de2b3dff9d7c4cb7"
+    },
+    {
+      "name": "Preview_Official6RoadNativeV45.jpg",
+      "sha256": "e0969fdfce11d347415db341c6e541a0b0b3eba58300c2c0d08ad5bd0c876b1e"
+    },
+    {
+      "name": "Preview_RightCabPointsDraftV45.jpg",
+      "sha256": "2a425a77ba102c291da2805809bb9db01809dd88d3dc580fe28b6f70d49d7780"
+    },
+    {
+      "name": "Preview_RightCabPointsReviewedV45.jpg",
+      "sha256": "04bcc457dca12a07d9c9c002a7a01bdb2c66cd33e0d91517e32a20afeb6a0090"
+    },
+    {
+      "name": "Preview_RightDrivePointsDraftV45.jpg",
+      "sha256": "2c9f5d5dac4c7f3affe34a51b898a1c88e5b4e7af8c17c0efde8ec9a2a7ed67e"
+    },
+    {
+      "name": "Preview_RightDrivePointsReviewedV45.jpg",
+      "sha256": "1dbd07ae8964ee8876a749d72b9c42038e94a0bc9b6b1f1398723921be83140e"
+    },
+    {
+      "name": "Preview_RightJointOverlayV45.jpg",
+      "sha256": "40bd6acfa8f3924b7d3a2122b26dc5f672bfb5c92bf3c58aff99c139312f15a2"
+    },
+    {
+      "name": "Preview_RightRoadPointsDraftV45.jpg",
+      "sha256": "c92bf5706a0bf8bfcbef9f63b301634f3aeabd15d53094b893ea50dc73daeba0"
+    },
+    {
+      "name": "Preview_RightRoadPointsReviewedV45.jpg",
+      "sha256": "9192458e976c37293d533d6860fd195896144df1c57157b3ba690180094bcce1"
+    },
+    {
+      "name": "Script_Type94ArchiveStudyV45.py",
+      "sha256": "6f0db91ae5c32ed974e14c344cde98d166070193af68e6ed16ded0edd0473424"
+    },
+    {
+      "name": "Script_Type94CrossViewCropsV45.py",
+      "sha256": "7b769351a962ea14a745563dc01e23411eaf0efe809bd5ccfebfa9241325ea75"
+    },
+    {
+      "name": "Script_Type94FenderSpanGuardV45.py",
+      "sha256": "23c0eca142e75b43ed7b2d6ca3a2404809da7e9d1bf5d7e1148f5fa2a58acd0a"
+    },
+    {
+      "name": "Script_Type94ForebodyDepthV45.py",
+      "sha256": "a445a66c5336f4609a485dae0cf6bea7f61057089d5fefb27867dd15213efd1c"
+    },
+    {
+      "name": "Script_Type94RightPnpV45.py",
+      "sha256": "ff02dba6edd8767aebcd46b1c3cbcffd8046cd798078694acd4c7f99b0ed3799"
+    },
+    {
+      "name": "Script_Type94RightPointsV45.py",
+      "sha256": "6d3fcf59333aa0460f325ea3502e2bae03df0c2535f9a002d1724dabb0924a5f"
+    },
+    {
+      "name": "Script_Type94SixViewJointV45.py",
+      "sha256": "1e4a25b970c7a62da3edbb27091b62e886b827ee81f5e291c402dc6e85cd49df"
+    }
+  ]
+}

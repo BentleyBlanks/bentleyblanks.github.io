@@ -1,0 +1,70 @@
+{
+  "schema": "Type94MaterialPreviewV1",
+  "revision": "SurfaceV91Preview",
+  "status": "local-current-geometry-PBR-integration-verified",
+  "geometryReference": "Data_GrayTrialV89.json",
+  "materialReference": "Data_SurfaceStudyV77.json",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV91\\Scene_Type94TanketteHighSurfaceV91Preview.blend",
+  "sourceBlendSha256": "3d21f78cd3582b2b828726db4eae3369f7e853a25a9d13c9e07284ab51ae9341",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV91\\Exports\\Model_Type94TanketteHighSurfaceV91Preview.glb",
+  "sha256": "48d9c2666cbb72b131d648eb0b580194b11b3812b1690a3521d6cd3afc0e11e0",
+  "triangles": 622112,
+  "meshOwners": 238,
+  "poseNodes": 293,
+  "linksPerSide": 80,
+  "runtimePbrImages": 12,
+  "textureSizes": {
+    "Paint": 4096,
+    "Track": 2048,
+    "Steel": 2048,
+    "Rubber": 1024
+  },
+  "producer": "Taierzhuang1938/_blender/Script_BuildType94PbrPatchV91.mjs",
+  "verifier": "Taierzhuang1938/_import/Script_VerifyType94PbrPatchV91.py",
+  "newDetailBakePolygons": 801,
+  "newHullPatchTriangles": 384,
+  "retainedHullUvPolygons": 19418,
+  "retainedOtherMeshOwners": 235,
+  "newDetailPatchPixels": [
+    608,
+    512,
+    1280,
+    448
+  ],
+  "currentPaintAoRefreshed": true,
+  "retainedPaintBaseNormalRoughnessMetalnessExactOutsidePatch": true,
+  "otherMaterialFamiliesExact": true,
+  "geometryAndRigExactToV89": true,
+  "sourceReexportByteIdentical": false,
+  "sourceTangentPrecision": {
+    "digits": 4,
+    "changedCorners": 9,
+    "maxComponentDifference": 0.00010001659393310547,
+    "maximumAngleDegrees": 0.005408715215113279,
+    "handednessExact": true
+  },
+  "validation": {
+    "binaryChecks": 996,
+    "browserChecks": 12,
+    "actualSourceReopenAndGlbImport": true,
+    "nativeMotion": "V89 result inherited through exact geometry/rig proof; no new native sweep"
+  },
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94PbrReviewV91/",
+  "actualViewsInspected": [
+    "Full",
+    "DriverHatch",
+    "NoseHousing",
+    "MountingEar"
+  ],
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV91\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV91\\Rebuild",
+  "wearPlacementInferred": true,
+  "wholeReferenceAccepted": false,
+  "finalPbrReferenceAccepted": false,
+  "gameDerivativeForThisRevisionProduced": false,
+  "canonicalGameReplaced": false,
+  "published": false,
+  "goalComplete": false,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV91.json"
+}

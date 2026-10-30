@@ -1,0 +1,385 @@
+{
+  "schema": "Type94MaterialPreviewV1",
+  "revision": "SurfaceV77Preview",
+  "status": "local-selective-wear-preview-verified",
+  "sourceReference": "Data_SurfaceStudyV68.json",
+  "referenceSha256": "1b792411d2e8aa6012c1542b0b9d1f986d9c565901e99989c5b3066041aabb83",
+  "sourceProducer": "Taierzhuang1938/_blender/Script_BuildType94WearPreviewV77.mjs",
+  "blenderProducer": "Taierzhuang1938/_blender/Script_Type94WearPreviewV77.py",
+  "rasterProducer": "Taierzhuang1938/_blender/Script_Type94WearRasterV77.py",
+  "atlasProducer": "Taierzhuang1938/_blender/Script_Type94WearAtlasV77.py",
+  "verifier": "Taierzhuang1938/_import/Script_VerifyType94WearV77.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Scene_Type94TanketteHighSurfaceV77Preview.blend",
+  "sourceBlendSha256": "b7a58aa6d8c30da539a38b70061d1d24f158b29b49cd2c8a7ab0edc0a55746d5",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Exports\\Model_Type94TanketteHighSurfaceV77Preview.glb",
+  "sha256": "21d4b0247b9b0f7db98ae4709de615f82f96b492311cf6620abd0f1a5532b7a6",
+  "triangles": 624036,
+  "meshNodes": 237,
+  "poseNodes": 292,
+  "linksPerSide": 80,
+  "geometryVertexNormalsAndRigExactToV68": true,
+  "paintUvRepacked": true,
+  "uvPacking": {
+    "rotated": false,
+    "distorted": false,
+    "maxNormalizedSliverUvMatrixError": 0.6524258610122697,
+    "maxForwardUniformScaleFitErrorUv": 4.0912380162252377e-07,
+    "maxForwardUniformScaleFitErrorPixels": 0.0016757710914458573,
+    "densities": {
+      "Geometry_Hull_Paint": {
+        "min": 350.9979077897396,
+        "median": 437.2008062735754,
+        "max": 441.12552561984484
+      },
+      "Geometry_FinalDriveHousingLeft_Paint": {
+        "min": 92.48631524251465,
+        "median": 244.55828977284602,
+        "max": 247.02381439861045
+      },
+      "Geometry_FinalDriveHousingRight_Paint": {
+        "min": 92.48771861105702,
+        "median": 244.5470868799779,
+        "max": 247.02292286237733
+      },
+      "Geometry_NoseHousing_Paint": {
+        "min": 197.16567383868667,
+        "median": 242.4121827538442,
+        "max": 247.00644008913872
+      },
+      "Geometry_Hatch_DriverVisor_Paint": {
+        "min": 716.5217179571464,
+        "median": 758.3237910567248,
+        "max": 758.6385175240076
+      },
+      "Geometry_DriverVisorHingeFixed_Paint": {
+        "min": 247.01130089716708,
+        "median": 247.01891096235656,
+        "max": 247.03162016908354
+      },
+      "Geometry_DriverRoofHingeFixed_Paint": {
+        "min": 246.07137506869657,
+        "median": 246.67746880668176,
+        "max": 247.02610586186879
+      },
+      "Geometry_Hatch_DriverPortLeft_Paint": {
+        "min": 635.5367340943403,
+        "median": 741.6052373903697,
+        "max": 758.2328903419957
+      },
+      "Geometry_DriverPortHingeFixed_Paint": {
+        "min": 246.38028327731487,
+        "median": 246.67135416485928,
+        "max": 246.9622230673473
+      },
+      "Geometry_Hatch_DriverPortRight_Paint": {
+        "min": 635.8848401565725,
+        "median": 741.6427587106359,
+        "max": 757.1343706654651
+      },
+      "Geometry_DriverPortHingeFixedRight_Paint": {
+        "min": 246.73255165728185,
+        "median": 246.7673959119282,
+        "max": 246.791141828542
+      },
+      "Geometry_Hatch_DriverRoof_Paint": {
+        "min": 636.41919682242,
+        "median": 758.5998676395245,
+        "max": 758.8927868238712
+      },
+      "Geometry_TurretYaw_Paint": {
+        "min": 334.8262827981579,
+        "median": 393.9779954207895,
+        "max": 441.100208629004
+      },
+      "Geometry_MachineGunPitch_Paint": {
+        "min": 196.66372809844452,
+        "median": 246.91506654805005,
+        "max": 246.99313710707585
+      },
+      "Geometry_Hatch_TurretPortLeft_Paint": {
+        "min": 651.8945936947699,
+        "median": 734.2796602055134,
+        "max": 757.2878563082452
+      },
+      "Geometry_TurretPortHingeFixedLeft_Paint": {
+        "min": 245.8879322865218,
+        "median": 246.48674941578224,
+        "max": 246.84908113436566
+      },
+      "Geometry_Hatch_TurretPortRight_Paint": {
+        "min": 651.6007426320721,
+        "median": 734.2074244564774,
+        "max": 757.2958136972001
+      },
+      "Geometry_TurretPortHingeFixedRight_Paint": {
+        "min": 246.15572259019487,
+        "median": 246.6740313115532,
+        "max": 246.73439266801807
+      },
+      "Geometry_CommanderHingeFixed_Paint": {
+        "min": 247.00965295538052,
+        "median": 247.02242688828764,
+        "max": 247.02881359861325
+      },
+      "Geometry_Hatch_Commander_Paint": {
+        "min": 617.8916893550372,
+        "median": 750.2655619955751,
+        "max": 758.7092142953386
+      },
+      "Geometry_Hatch_TurretRear_Paint": {
+        "min": 737.1533877734151,
+        "median": 741.2595875536799,
+        "max": 744.934354054031
+      },
+      "Geometry_TurretRearHingeFixed_Paint": {
+        "min": 246.74465665436773,
+        "median": 246.98180298708007,
+        "max": 247.01653551749817
+      },
+      "Geometry_VentHousing_Paint": {
+        "min": 529.9069436507219,
+        "median": 632.3065949553536,
+        "max": 635.2647917837793
+      },
+      "Geometry_Hatch_RearCargo_Paint": {
+        "min": 633.6672874089801,
+        "median": 758.6351431092111,
+        "max": 758.8301906225995
+      },
+      "Geometry_RearDoorHingeFixed_Paint": {
+        "min": 206.03462462862188,
+        "median": 246.99007368462316,
+        "max": 247.02976781829128
+      },
+      "Rear_InferredInteriorCam": {
+        "min": 220.01625956382674,
+        "median": 246.99613454679474,
+        "max": 247.02603081358498
+      },
+      "Geometry_RearDoorLatchKeeperFixed_Paint": {
+        "min": 242.3005671426175,
+        "median": 242.35545669870243,
+        "max": 247.01556452175046
+      },
+      "Geometry_Wheel_Left_Road0_Paint": {
+        "min": 199.13668615285673,
+        "median": 233.86937624399573,
+        "max": 247.04708735938996
+      },
+      "Geometry_Wheel_Left_Road1_Paint": {
+        "min": 199.1389654892929,
+        "median": 233.8682410807354,
+        "max": 247.04437081483627
+      },
+      "Geometry_Wheel_Left_Road2_Paint": {
+        "min": 199.13710011630337,
+        "median": 233.86951230305743,
+        "max": 247.0447995132747
+      },
+      "Geometry_Wheel_Left_Road3_Paint": {
+        "min": 199.13721606196236,
+        "median": 233.8676913080596,
+        "max": 247.04287265299115
+      },
+      "Geometry_Wheel_Left_Drive_Paint": {
+        "min": 206.88921625544975,
+        "median": 246.93547754835538,
+        "max": 247.13831587841585
+      },
+      "Geometry_Wheel_Left_Idler_Paint": {
+        "min": 207.6521071519545,
+        "median": 246.34039205198414,
+        "max": 247.0562986420635
+      },
+      "Geometry_Wheel_Left_Return0_Paint": {
+        "min": 209.43192624988956,
+        "median": 238.1743952230791,
+        "max": 247.03898421089986
+      },
+      "Geometry_Wheel_Left_Return1_Paint": {
+        "min": 209.43192624988956,
+        "median": 238.1733211299209,
+        "max": 247.03838945692226
+      },
+      "Geometry_Wheel_Right_Road0_Paint": {
+        "min": 199.14115474622864,
+        "median": 233.86961088778054,
+        "max": 247.05595590537533
+      },
+      "Geometry_Wheel_Right_Road1_Paint": {
+        "min": 199.13832304692878,
+        "median": 233.86879729366694,
+        "max": 247.05371194077557
+      },
+      "Geometry_Wheel_Right_Road2_Paint": {
+        "min": 199.13379232332912,
+        "median": 233.86916111565836,
+        "max": 247.05382396697013
+      },
+      "Geometry_Wheel_Right_Road3_Paint": {
+        "min": 199.13713608648035,
+        "median": 233.8670036681159,
+        "max": 247.0577261232498
+      },
+      "Geometry_Wheel_Right_Drive_Paint": {
+        "min": 208.35857517773167,
+        "median": 246.86688315260665,
+        "max": 247.1431698425178
+      },
+      "Geometry_Wheel_Right_Idler_Paint": {
+        "min": 207.6538925294269,
+        "median": 246.3299196962932,
+        "max": 247.04654063406116
+      },
+      "Geometry_Wheel_Right_Return0_Paint": {
+        "min": 209.43176756297848,
+        "median": 238.18687550551942,
+        "max": 247.03255844203477
+      },
+      "Geometry_Wheel_Right_Return1_Paint": {
+        "min": 205.69860523646048,
+        "median": 238.18811376560313,
+        "max": 247.04007642549226
+      },
+      "Geometry_MachineGunFixedMount_Paint": {
+        "min": 186.51681782621253,
+        "median": 237.99036066639673,
+        "max": 247.0274003835318
+      },
+      "Geometry_EngineHingeFixed_Paint": {
+        "min": 219.10413379034466,
+        "median": 221.43958285493085,
+        "max": 246.95664735656442
+      },
+      "Geometry_Hatch_Engine_Paint": {
+        "min": 637.2712643105119,
+        "median": 753.2725636939188,
+        "max": 758.724303995586
+      }
+    },
+    "marginPixels": 2.5,
+    "handlingUvAreaWeighted": true
+  },
+  "atlasRaster": {
+    "occupiedFraction": 0.4623674750328064,
+    "gutterPixels": 8,
+    "gutterFraction": 0.6483392119407654,
+    "preservedIslandDirections": true,
+    "maps": {
+      "Base": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Textures\\HighSurfaceV77Preview\\Texture_Type94PaintBaseInput.png",
+        "sha256": "e0bdc827fb192d73783b678fd89fe9af28bd44c2d12c2ea41f3308a04d5e3113"
+      },
+      "Orm": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Textures\\HighSurfaceV77Preview\\Texture_Type94PaintOrmInput.png",
+        "sha256": "5ac99f3f28ef4fa7820a82e88e7b095081b5b053f947ba96e767f1c99b8268db"
+      },
+      "Normal": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Textures\\HighSurfaceV77Preview\\Texture_Type94PaintNormalInput.png",
+        "sha256": "36c143ef02dd65b809a51c94956fafd8609c0665f61e3a8e646e3dbc0f1edeec"
+      }
+    },
+    "baseInterpolation": "linear-light bilinear",
+    "dataInterpolation": "bilinear",
+    "changedGeometry": false
+  },
+  "runtimePbrImages": 12,
+  "textureSizes": {
+    "Paint": 4096,
+    "Track": 2048,
+    "Steel": 2048,
+    "Rubber": 1024
+  },
+  "wear": {
+    "outputs": {
+      "PaintBase": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Textures\\HighSurfaceV77Preview\\Texture_Type94PaintBaseWear77.png",
+        "sha256": "d66e468bdc87a9e816ebaf1afb0f0111bdc1df102f1f8b927cc17cfa7df52f86"
+      },
+      "PaintOrm": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Textures\\HighSurfaceV77Preview\\Texture_Type94PaintOrmWear77.png",
+        "sha256": "299e0cf70719255283a3084592bcc8e110b004f169cada26c068f5380b35181f"
+      },
+      "PaintNormal": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Textures\\HighSurfaceV77Preview\\Texture_Type94PaintNormalWear77.png",
+        "sha256": "0a4006e6ef0c11002cd0145ffdb9cb8cfd510af7eb04ece1512ee1361a705922"
+      }
+    },
+    "masks": {
+      "Core": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Textures\\HighSurfaceV77Preview\\Texture_Type94PaintWear77Core.png",
+      "Scuff": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Textures\\HighSurfaceV77Preview\\Texture_Type94PaintWear77Scuff.png",
+      "Scratch": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Textures\\HighSurfaceV77Preview\\Texture_Type94PaintWear77Scratch.png",
+      "Height": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Textures\\HighSurfaceV77Preview\\Texture_Type94PaintWear77Height.png",
+      "Primer": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Textures\\HighSurfaceV77Preview\\Texture_Type94PaintWear77Primer.png"
+    },
+    "edgeChipSegments": 59052,
+    "handlingScuffs": 3329,
+    "handlingScratches": 8318,
+    "addedOpaqueCoreAtlasFraction": 0.004988908767700195,
+    "coreNonzeroAtlasFraction": 0.039503276348114014,
+    "scuffAtlasFraction": 0.06259751319885254,
+    "paintAoExact": true,
+    "otherThreeMaterialFamiliesExact": true,
+    "paintLossHeightM": 4e-05,
+    "scratchHeightM": 5e-06,
+    "edgesClippedToActualAdjacentFaces": true,
+    "dilatedPrimer": false,
+    "scope": "Inferred irregular metric wear at true convex edges and clipped physical handling faces. Dark dielectric primer borders, conducting worn steel, independent coating abrasion. No historical damage-position or shape-acceptance claim."
+  },
+  "underlyingV68NormalStrength": 0.85,
+  "validation": {
+    "exportAndSourceParity": {
+      "passed": true,
+      "checks": 754,
+      "report": "Data_WearVerificationV77.json"
+    },
+    "sourceReopen": {
+      "passed": true,
+      "actualImportedMeshes": 237,
+      "actualImportedImages": 12,
+      "report": "Data_SourceReopenV77.json"
+    },
+    "browser": {
+      "passed": true,
+      "checks": 10,
+      "report": "Data_WearBrowserV77.json"
+    }
+  },
+  "sourceTangentPrecision": {
+    "exporterRoundingDigits": 4,
+    "changedCorners": 12,
+    "maximumComponentDifference": 0.00010001659393310547,
+    "maximumAngleDegrees": 0.005553995621995945,
+    "handednessExact": true,
+    "byteExact": false
+  },
+  "actualRenderedViewsInspected": [
+    "Full",
+    "Vent",
+    "DriverHatch",
+    "RakingLight"
+  ],
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94WearReviewV77/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV77\\Rebuild",
+  "rejectedFirstBroadRelief": "Versions/RejectedBroadRelief",
+  "rejectionReason": "Broad unclipped edge masks and dilated primer created blurred highlights and thick artificial paint rims in the actual near view.",
+  "allOtherThreeMaterialFamiliesExact": true,
+  "reprojectedPaintAoUnchangedByWear": true,
+  "wearPlacementHistoricallyAccepted": false,
+  "wholeReferenceAccepted": false,
+  "finalPbrReferenceAccepted": false,
+  "gameDerivativeForThisRevisionProduced": false,
+  "canonicalGameReplaced": false,
+  "canonicalSha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+  "published": false,
+  "complete": false,
+  "goalComplete": false,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV77.json",
+  "remaining": [
+    "Resolve independent reference/camera and front-fastener constraints before geometry promotion",
+    "Complete whole-reference body and running-gear acceptance",
+    "Bake final accepted high-source PBR and accepted game derivative, then complete full acceptance"
+  ]
+}

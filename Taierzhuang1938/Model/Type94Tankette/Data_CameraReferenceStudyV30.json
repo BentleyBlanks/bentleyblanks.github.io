@@ -1,0 +1,135 @@
+{
+  "schema": "Type94ReferenceCameraStudyV1",
+  "revision": "ReferenceStudyV30",
+  "status": "Research candidates and rejections; global calibration unaccepted",
+  "activeGrayStudy": "Data_GrayStudyV29.json",
+  "activeGraySha256": "fed09697b1ef318ad63201dfda0501ea79ddec4a201f327a1a68474b8e5539e4",
+  "sourceBlendSha256": "b3acc19b71ca0f0e3f689a282b2710d2efc8c45837f038c2ecc79342254d4af8",
+  "geometryChanged": false,
+  "defaultViewerCameraChanged": false,
+  "sources": {
+    "Primary2017": {
+      "file": "Reference_Kubinka.jpg",
+      "sha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28"
+    },
+    "Official2": {
+      "file": "PatriotOfficial/Reference_PatriotOfficial2.jpg",
+      "sha256": "71227a67ba14c9434c598a375789a835da055f4d784c8c82f13f225561ae78e4"
+    },
+    "Official7": {
+      "file": "PatriotOfficial/Reference_PatriotOfficial7.jpg",
+      "sha256": "f8d11457481fbdd4435ffb184aee2f178a5843ddb0336d88fb91590cf470bf34"
+    },
+    "UncalibratedFront1": {
+      "file": "PatriotOfficial/Reference_PatriotOfficial1.jpg",
+      "sha256": "6dec2f24b09943e5853b9e2081f02f20c5ff0cd0e6b08e5acfd88319b3a57509"
+    }
+  },
+  "upperBodyPair": {
+    "images": [
+      2,
+      7
+    ],
+    "candidateCorrespondences": 195,
+    "spatialTrainingPoints": 90,
+    "withheldTurretDetections": 41,
+    "withheldTurretMedianNative": 0.5971212032806659,
+    "withheldTurretMaxNative": 2.321131258033887,
+    "previewedBodyPointIndices": [
+      59,
+      47,
+      129,
+      4,
+      173,
+      27,
+      23,
+      162,
+      52,
+      88,
+      9,
+      165,
+      124,
+      25,
+      184,
+      145,
+      17,
+      67,
+      15,
+      194,
+      26,
+      5
+    ],
+    "scope": "Conditional relative-pose evidence. Detector counts, spacing and low epipolar error are not a metric survey or whole-reference acceptance."
+  },
+  "primaryJointBundle": {
+    "images": [
+      2,
+      7,
+      2017
+    ],
+    "allCandidateTracks": 304,
+    "rigidBodyTrainingTracks": 229,
+    "trainingTracksByViewCount": {
+      "2": 179,
+      "3": 50
+    },
+    "conflictingCycleComponentsRejected": 13,
+    "primaryTrainingObservations": 129,
+    "primaryMedianTrainingResidualNative": 1.489511541561874,
+    "withheldTurretThreeViewTracks": 17,
+    "withheldTurretMedianNative": 10.210164558050344,
+    "withheldTurretMaxNative": 31.846898217959517,
+    "primaryPrincipalYHitsCropBoundary": true,
+    "accepted": false,
+    "reason": "Crop-boundary solution and independent turret residuals remain unresolved. No turret motion is inferred from these residuals."
+  },
+  "frontImage1": {
+    "accepted": false,
+    "reason": "Its unknown focal length changes substantially between training subsets; unconverged bundle trials and a radial-bound rigid fit are not calibration evidence.",
+    "rigidFitRadialK1": -0.19999999999999987
+  },
+  "trackWidthGauge": {
+    "nominalWidthM": 0.164,
+    "lowerFeaturesDidNotRefitCameras": true,
+    "rawLowerMatches": 212,
+    "epipolarCompatibleLowerCandidates": 18,
+    "actualFullWidthEndpointsAccepted": false,
+    "reason": "The lower crop includes repeated spokes and tread features. Physical endpoint identities and the full-width section remain unverified; detector rejection is not proof that every lower feature contradicts the pose."
+  },
+  "ventGaugeRegistration": {
+    "accepted": false,
+    "authoredSpanM": 0.428,
+    "registeredSideWallXConditionalM": -0.725632310181383,
+    "modelSideWallXM": -0.598,
+    "axisNonorthogonalityDegrees": 1.3292178066774094,
+    "reason": "Authored vent length is not an independent museum measurement. The chosen side-wall normal is not established as the vehicle transverse axis. Registered plane offset and clipped actual-model render are inconsistent; do not adopt this camera or use it to deform the vehicle."
+  },
+  "lineCandidates": {
+    "acceptedForCalibration": false,
+    "reason": "Coarse frame corners, bent cast-tread edges and distinct vent hood/louver edges must not be silently treated as one exact parallel/orthogonal line system."
+  },
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\CameraStudyV30",
+  "reportsSha256": {
+    "Data_FrontTrackGaugeV30.json": "99db527c9d256b9afe6da2724072577369435f6c0dbfaec4e6a453eb8f9cdc79",
+    "Data_PrimaryBundleV30.json": "f6e1a7e5510c327ecccff0f5a2f6a25674eb4721d29313a07a41db7dac4af994",
+    "Data_PrimaryDriverLinesV30.json": "556185ae91f51c096068798673bf2b2dc52315c1487def579dd0757b1c86bfcc",
+    "Data_PrimaryFrontLinesV30.json": "6a85187138e4f0543f3cf9ef25f98d39c078c1fc6a46b995c4b0c25409b74531",
+    "Data_PrimaryGaugeV30.json": "f5ed4d954d5632c20dfa37cefe591187a24a88b12af98fe36311a14a8af3521b",
+    "Data_PrimaryJoinV30.json": "eca6a371030b3f049f4798bc4c00e737faee9063c8d180d5d4d951232887373b",
+    "Data_PrimaryTrackFarLinesV30.json": "b6bd0d6c8f78661eb519c3abedb9d533209b07ab47e7665084780624d2d974bd",
+    "Data_PrimaryTrackNearLinesV30.json": "3420f480d5ad9385f4b935104e32965cbe3579f40d65838e74f9978e016809de",
+    "Data_PrimaryVentLinesV30.json": "0ba406946ad0debc02e909c40aab52071c090a21320e49513cb5d92dd7e6bfc9",
+    "Data_UpperBundleV30.json": "ed386cee450495512fec8616f980f9bcb6a893bf64bcd45982e33010e78df4c4",
+    "Data_UpperFrontJoinV30.json": "fe4b99cc7f8a778c75fa1333ee218e4159c1f74ec7750f7928c47d0bd0882e77",
+    "Data_UpperTripletV30.json": "a10e7cffe65825d5f22866796ab82987b14e8abd6b046de62039436107d64162"
+  },
+  "reviewPage": "http://127.0.0.1:8114/tmp/Type94ShapeReview/CameraStudyV30.html",
+  "globalCalibrationAccepted": false,
+  "metricScaleAccepted": false,
+  "next": [
+    "Establish a physical transverse direction or an independently checked turret axis; do not equate a side armor plane normal with an axle direction without evidence.",
+    "Audit the remaining primary/2022 physical identities and test stereo intrinsic/crop sensitivity before accepting the three-view pose.",
+    "Establish a genuine164mm full-track-width gauge with identified endpoints and section uncertainty; reject authored vent-length or front-fender-tip scale substitutions.",
+    "Only then revise the global comparison camera and whole-body geometry; final PBR/replay and the game derivative still follow gray acceptance."
+  ]
+}

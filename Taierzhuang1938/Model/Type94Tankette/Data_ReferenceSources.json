@@ -1,0 +1,1438 @@
+{
+  "notionPage": "https://app.notion.com/p/40260335331c8122be94e41acca07698",
+  "references": [
+    {
+      "id": "ArmorSchool",
+      "title": "IJA TK Tankette Display at Armor School History Museum 20130302a.JPG",
+      "page": "https://commons.wikimedia.org/wiki/File:IJA_TK_Tankette_Display_at_Armor_School_History_Museum_20130302a.JPG",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/7/75/IJA_TK_Tankette_Display_at_Armor_School_History_Museum_20130302a.JPG",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_ArmorSchool.jpg",
+      "originalRetrieved": true,
+      "size": [
+        4000,
+        3000
+      ],
+      "sha256": "1cea4e4079b4791a64c1d6e0b2e98c5576ed1e1402d991eab19651a986dfb66d",
+      "metadata": {
+        "DateTime": {
+          "value": "2013-03-11 15:49:21",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "IJA TK Tankette Display at Armor School History Museum 20130302a",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Taken with Kodak EasyShare Z990|CC-Zero|Type 94 tankette|Self-published work|2013 photographs of Hsinchu County|玄史生写真文庫|Tanks in Armor Training Command and Armor School|Military vehicles at the Armor School Museum",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "​裝甲兵學校校史館一樓展示的日本陸軍九四式輕裝甲車。",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2013-03-02 12:20:31",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:%E7%8E%84%E5%8F%B2%E7%94%9F\" title=\"User:玄史生\">玄史生</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": "Column",
+      "title": "Type 94 tankette column.png",
+      "page": "https://commons.wikimedia.org/wiki/File:Type_94_tankette_column.png",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Type_94_tankette_column.png",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_Column.png",
+      "originalRetrieved": true,
+      "size": [
+        920,
+        1280
+      ],
+      "sha256": "1298f39bb7e2207dca8ff1f0eaec73cd09ef7072906fd895b656d811d28af8f7",
+      "metadata": {
+        "DateTime": {
+          "value": "2021-08-28 19:20:47",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Type 94 tankette column",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Type 94 tankette|PD-Art (PD-old-70)|Template Unknown (author)|CC-PD-Mark|World War II armored fighting vehicles of Japan",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Type 94 tankette column in operational service of the Imperial Japanese Army. They were designed for reconnaissance, and not for direct combat.",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "circa 1935<div style=\"display: none;\">date QS:P,+1935-00-00T00:00:00Z/9,P1480,Q5727902</div>",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<a rel=\"nofollow\" class=\"external free\" href=\"https://sibnarkomat.livejournal.com/3692863.html\">https://sibnarkomat.livejournal.com/3692863.html</a>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "Unknown author<span style=\"display: none;\">Unknown author</span>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "Public domain",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Public domain",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Copyrighted": {
+          "value": "False",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "pd",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": "EarlyProfile",
+      "title": "Type 94 TK tankette.jpg",
+      "page": "https://commons.wikimedia.org/wiki/File:Type_94_TK_tankette.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/4/47/Type_94_TK_tankette.jpg",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_EarlyProfile.jpg",
+      "originalRetrieved": true,
+      "size": [
+        749,
+        476
+      ],
+      "sha256": "02455722479e4f6fd57e0383aced8158b68568296f86f236b9439e7bb60d073f",
+      "metadata": {
+        "DateTime": {
+          "value": "2008-08-16 10:01:09",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Type 94 TK tankette",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Soldiers of the United States|PD US Military|Type 94 tankette|Template Unknown (author)|Abandoned tanks|Military people of the Battle of Okinawa|Equipment of the Battle of Okinawa",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Type 94 TK tankette captured at Battle of Okinawa",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "circa 1945<div style=\"display: none;\">date QS:P,+1945-00-00T00:00:00Z/9,P1480,Q5727902</div>",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<p><a rel=\"nofollow\" class=\"external autonumber\" href=\"http://www.geocities.jp/torikai007/pearlharbor/okinawa-army.html\">[1]</a>\n</p>\nTORIKAI Yukihiro, Toka University",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "Unknown author<span style=\"display: none;\">Unknown author</span>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "Public domain",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Public domain",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Copyrighted": {
+          "value": "False",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "pd",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": "HongKong",
+      "title": "Two Japanese Type 94 tankettes were running on a street in Hong Kong Island.jpg",
+      "page": "https://commons.wikimedia.org/wiki/File:Two_Japanese_Type_94_tankettes_were_running_on_a_street_in_Hong_Kong_Island.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/8/89/Two_Japanese_Type_94_tankettes_were_running_on_a_street_in_Hong_Kong_Island.jpg",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_HongKong.jpg",
+      "originalRetrieved": true,
+      "size": [
+        1657,
+        1000
+      ],
+      "sha256": "0602ed070c01c7495df22adebe54f811fc40358ff21a27c1dddc8bf77741295b",
+      "metadata": {
+        "DateTime": {
+          "value": "2022-11-25 18:49:44",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Two Japanese Type 94 tankettes were running on a street in Hong Kong Island",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Battle of Hong Kong|Type 94 tankette|1941 in Hong Kong|PD Hong Kong 1996",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Two Japanese Type 94 tankettes were running on a street in Hong Kong Island after the  Imperial Japanese occupation of Hong Kong.",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "After 26 Dec 1941",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<a rel=\"nofollow\" class=\"external free\" href=\"https://www.grs.gov.hk/ws/hip/en/occupation.html\">https://www.grs.gov.hk/ws/hip/en/occupation.html</a>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "Unknown",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "Public domain",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Public domain",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Copyrighted": {
+          "value": "False",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "pd",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": "Kubinka",
+      "title": "Type 94 TK – Patriot Museum, Kubinka (26474921729).jpg",
+      "page": "https://commons.wikimedia.org/wiki/File:Type_94_TK_%E2%80%93_Patriot_Museum,_Kubinka_(26474921729).jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f2/Type_94_TK_%E2%80%93_Patriot_Museum%2C_Kubinka_%2826474921729%29.jpg",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_Kubinka.jpg",
+      "originalRetrieved": true,
+      "size": [
+        4854,
+        3236
+      ],
+      "sha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+      "metadata": {
+        "DateTime": {
+          "value": "2017-11-10 02:06:17",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Type 94 TK – Patriot Museum, Kubinka (26474921729)",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Photographs by Alan Wilson|Files with coordinates missing SDC location of creation|Flickr images reviewed by FlickreviewR 2|Type 94 tankette in the Patriot Museum Complex, Kubinka",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "GPSLatitude": {
+          "value": "55.563604",
+          "source": "commons-desc-page"
+        },
+        "GPSLongitude": {
+          "value": "36.817846",
+          "source": "commons-desc-page"
+        },
+        "GPSMapDatum": {
+          "value": "WGS-84",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "<p>Japanese WW2 era Tankette\nManufacturer:- Hiro Motor Co\nBuilt:- 1934 to 1937\nTotal Production:- 596\nMain Armament:- 6.5mm Type 91 machine gun\nIn service from 1934 until August 1945 when Soviet forces invaded Manchukuo. This example is one recovered from that last action and is now on display in Hall 12 of the Patriot Museum Complex.\nPark Patriot, Kubinka, Moscow Oblast, Russia.\n</p>\n25th August 2017",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2017-08-25 11:33",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<a rel=\"nofollow\" class=\"external text\" href=\"https://www.flickr.com/photos/ajw1970/26474921729/\">Type 94 TK – Patriot Museum, Kubinka</a>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a rel=\"nofollow\" class=\"external text\" href=\"https://www.flickr.com/people/65001151@N03\">Alan Wilson</a> from Stilton, Peterborough, Cambs, UK",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 2.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 2.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/2.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-2.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": "KubinkaOld",
+      "title": "Type 94 in the Kubinka Museum.jpg",
+      "page": "https://commons.wikimedia.org/wiki/File:Type_94_in_the_Kubinka_Museum.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Type_94_in_the_Kubinka_Museum.jpg",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_KubinkaOld.jpg",
+      "originalRetrieved": true,
+      "size": [
+        4906,
+        3271
+      ],
+      "sha256": "a2842cfe2394259a70ab2bc7d5835696c944da040518b2c8870f9428f76ca136",
+      "metadata": {
+        "DateTime": {
+          "value": "2014-10-29 09:11:54",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Type 94 in the Kubinka Museum",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Taken with Canon EOS 70D|Self-published work|Uploaded with Commonist|Type 94 tankette in the Kubinka Tank Museum|Moscow Oblast photographs taken on 2014-04-12",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "<div style=\"display:table;width:;vertical-align:middle;direction:ltr;float:left;line-height:22px;height:24px;font-size:.96em;margin:0px;padding:2px 4px 2px 6px;color:var(--color-base,#000);background:var(--background-color-neutral-subtle,#F8F9FA);border:1px solid #BAB;border-collapse:separate;border-spacing:0px;\"><span typeof=\"mw:File\"><a href=\"//commons.wikimedia.org/wiki/File:Commonist.svg\" class=\"mw-file-description\"><img src=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1a/Commonist.svg/40px-Commonist.svg.png?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail\" decoding=\"async\" loading=\"lazy\" width=\"22\" height=\"22\" class=\"mw-file-element\" srcset=\"https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1a/Commonist.svg/60px-Commonist.svg.png?utm_source=commons.wikimedia.org&amp;utm_campaign=parser&amp;utm_content=thumbnail 2x\" data-file-width=\"512\" data-file-height=\"512\"></a></span> This   file was uploaded  with <a href=\"//commons.wikimedia.org/wiki/Commons:Commonist\" title=\"Commons:Commonist\">Commonist</a>.</div>",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2014-04-12 12:29:57",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Mike1979_Russia\" title=\"User:Mike1979 Russia\">Mike1979 Russia</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 3.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 3.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/3.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-3.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": "Kwangtung",
+      "title": "Type 94 tankettes in Kwangtung, 1939.jpg",
+      "page": "https://commons.wikimedia.org/wiki/File:Type_94_tankettes_in_Kwangtung,_1939.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/8/8a/Type_94_tankettes_in_Kwangtung%2C_1939.jpg",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_Kwangtung.jpg",
+      "originalRetrieved": true,
+      "size": [
+        512,
+        308
+      ],
+      "sha256": "b0331cd66017e26bbaf6c02cfab67682d3d7fb19b7f29f3163485885f4936de6",
+      "metadata": {
+        "DateTime": {
+          "value": "2009-09-06 04:15:55",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Type 94 tankettes in Kwangtung, 1939",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Xi River|Foshan|Type 94 tankette|PD-1996 (with a reason)|PD-Japan-oldphoto|Second Sino-Japanese War in 1939",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "According to original caption, Japanese tanks in west Kwangtung. Published in April 1939.",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "1939",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<a rel=\"nofollow\" class=\"external free\" href=\"http://bbs.tiexue.net/post_3393096_1.html\">http://bbs.tiexue.net/post_3393096_1.html</a>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "Japan military reporter",
+          "source": "commons-desc-page"
+        },
+        "Permission": {
+          "value": "To uploader: <b>Please provide the source and <u>publication date</u>.</b>\n<ul><li>If the photograph was also published in the United States within 30 days after publication in Japan, it might be copyrighted. If the copyright has not expired in the U.S, this file will be deleted. See <a href=\"//commons.wikimedia.org/wiki/Commons:Hirtle_chart\" title=\"Commons:Hirtle chart\">Commons:Hirtle chart</a>.</li>\n<li>This template should not be used for a faithful photographic reproduction of an artwork. Under Article 23 of the former Copyright Act, its protection will be consistent with the artwork. See also <a href=\"//commons.wikimedia.org/wiki/Commons:When_to_use_the_PD-Art_tag\" title=\"Commons:When to use the PD-Art tag\">Commons:When to use the PD-Art tag</a>.</li></ul>",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseShortName": {
+          "value": "Public domain",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Public domain",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Copyrighted": {
+          "value": "False",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "pd",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": "LatePlate",
+      "title": "Model94.jpg",
+      "page": "https://commons.wikimedia.org/wiki/File:Model94.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/d/db/Model94.jpg",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_LatePlate.jpg",
+      "originalRetrieved": true,
+      "size": [
+        750,
+        409
+      ],
+      "sha256": "cc8042d28154ed066e20aa1eb23017eefa9757ee5824e98b10f4e25673eef09e",
+      "metadata": {
+        "DateTime": {
+          "value": "2007-09-13 03:54:19",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Model94",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Type 94 tankette|PD-1996 (with a reason)|PD-Japan-oldphoto",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Late model Japanese Type 94 tankette",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2007-09-13",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<a rel=\"nofollow\" class=\"external free\" href=\"http://mailer.fsu.edu/~akirk/tanks/\">http://mailer.fsu.edu/~akirk/tanks/</a>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "Imperial Japanese Army",
+          "source": "commons-desc-page"
+        },
+        "Permission": {
+          "value": "Feel free to copy anything on this site as it is \"open\" to the public. In other words... I don't worry about or even care about plagiarism of my writings! I can always write more. Lets face it, if you have a report to hand in or such",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseShortName": {
+          "value": "Public domain",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Public domain",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Copyrighted": {
+          "value": "False",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "pd",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": "LateProfile",
+      "title": "Type 94 tankette late model.jpg",
+      "page": "https://commons.wikimedia.org/wiki/File:Type_94_tankette_late_model.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/2/2c/Type_94_tankette_late_model.jpg",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_LateProfile.jpg",
+      "originalRetrieved": true,
+      "size": [
+        1500,
+        1033
+      ],
+      "sha256": "f5e33578108af2d48e07b8fda985d2a4b7b1df53115df10b06c4c0401cc521ad",
+      "metadata": {
+        "DateTime": {
+          "value": "2023-01-13 14:55:33",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Type 94 tankette late model",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Type 94 tankette|PD-1996 (with a reason)|PD-Japan-oldphoto",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Imperial Japanese Army Type 94 tankette late model.",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "between 1938 and 1942<div style=\"display: none;\">date QS:P,+1950-00-00T00:00:00Z/7,P1319,+1938-00-00T00:00:00Z/9,P1326,+1942-00-00T00:00:00Z/9</div>",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "Jiro Sayama \"Kiko nyumon : kikaika butai tettei kenkyu\" p242, Kojinsha, 2002.",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "Imperial Japanese Army",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "Public domain",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Public domain",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Copyrighted": {
+          "value": "False",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "pd",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": "Nanjing",
+      "title": "Nanjing Government Army Type 94 tankettes.png",
+      "page": "https://commons.wikimedia.org/wiki/File:Nanjing_Government_Army_Type_94_tankettes.png",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/3/3c/Nanjing_Government_Army_Type_94_tankettes.png",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_Nanjing.png",
+      "originalRetrieved": true,
+      "size": [
+        606,
+        792
+      ],
+      "sha256": "d58abc3992d2ad1b6f5679610b40d4b7fd29064334df015f18c9ffe0b2462499",
+      "metadata": {
+        "DateTime": {
+          "value": "2016-12-29 19:52:36",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Nanjing Government Army Type 94 tankettes",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Type 94 tankette|Peace National Foundation Army|PD China 1996",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Type 94 tankettes of the Reorganized National Government of China Army on parade.",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "1943-01-30",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<p><b>Original publication</b>: <style data-mw-deduplicate=\"TemplateStyles:r1174497904\">.mw-parser-output cite.citation{font-style:inherit;word-wrap:break-word}.mw-parser-output .citation q{quotes:\"\\\"\"\"\\\"\"\"'\"\"'\"}.mw-parser-output .citation:target{background-color:rgba(0,127,255,0.133)}.mw-parser-output .id-lock-free.id-lock-free a{background:url(\"//upload.wikimedia.org/wikipedia/commons/6/65/Lock-green.svg\")right 0.1em center/9px no-repeat}.mw-parser-output .id-lock-limited.id-lock-limited a,.mw-parser-output .id-lock-registration.id-lock-registration a{background:url(\"//upload.wikimedia.org/wikipedia/commons/d/d6/Lock-gray-alt-2.svg\")right 0.1em center/9px no-repeat}.mw-parser-output .id-lock-subscription.id-lock-subscription a{background:url(\"//upload.wikimedia.org/wikipedia/commons/a/aa/Lock-red-alt-2.svg\")right 0.1em center/9px no-repeat}.mw-parser-output .cs1-ws-icon a{background:url(\"//upload.wikimedia.org/wikipedia/commons/4/4c/Wikisource-logo.svg\")right 0.1em center/12px no-repeat}body:not(.skin-timeless):not(.skin-minerva) .mw-parser-output .id-lock-free a,body:not(.skin-timeless):not(.skin-minerva) .mw-parser-output .id-lock-limited a,body:not(.skin-timeless):not(.skin-minerva) .mw-parser-output .id-lock-registration a,body:not(.skin-timeless):not(.skin-minerva) .mw-parser-output .id-lock-subscription a,body:not(.skin-timeless):not(.skin-minerva) .mw-parser-output .cs1-ws-icon a{background-size:contain;padding:0 1em 0 0}.mw-parser-output .cs1-code{color:inherit;background:inherit;border:none;padding:inherit}.mw-parser-output .cs1-hidden-error{display:none;color:var(--color-error,#bf3c2c)}.mw-parser-output .cs1-visible-error{color:var(--color-error,#bf3c2c)}.mw-parser-output .cs1-maint{display:none;color:#085;margin-left:0.3em}.mw-parser-output .cs1-kern-left{padding-left:0.2em}.mw-parser-output .cs1-kern-right{padding-right:0.2em}.mw-parser-output .citation .mw-selflink{font-weight:inherit}@media screen{.mw-parser-output .cs1-format{font-size:95%}html.skin-theme-clientpref-night .mw-parser-output .cs1-maint{color:#18911f}}@media screen and (prefers-color-scheme:dark){html.skin-theme-clientpref-os .mw-parser-output .cs1-maint{color:#18911f}}</style><cite id=\"CITEREF情報局編輯\" class=\"citation magazine cs1 cs1-prop-script\">情報局編輯 (ed.). <a href=\"https://ja.wikipedia.org/wiki/%E5%86%99%E7%9C%9F%E9%80%B1%E5%A0%B1\" class=\"extiw\" title=\"ja:写真週報\"> <bdi lang=\"ja\">写真週報</bdi></a> [Photo Weekly]. <i>Photo Weekly</i>. No. 第254号.</cite><span title=\"ctx_ver=Z39.88-2004&amp;rft_val_fmt=info%3Aofi%2Ffmt%3Akev%3Amtx%3Ajournal&amp;rft.genre=article&amp;rft.jtitle=Photo+Weekly&amp;rft.atitle=%E5%86%99%E7%9C%9F%E9%80%B1%E5%A0%B1&amp;rft.issue=%E7%AC%AC254%E5%8F%B7&amp;rfr_id=info%3Asid%2Fcommons.wikimedia.org%3AFile%3ANanjing+Government+Army+Type+94+tankettes.png\" class=\"Z3988\"></span>\n</p>\n<b>Immediate source</b>: Rays of the Rising Sun: Armed Forces of Japan's Asian Allies 1931-45, Volume 1",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "Unknown",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "Public domain",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Public domain",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Copyrighted": {
+          "value": "False",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "pd",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": "Shuri",
+      "title": "SC 211480 - Jap tankette knocked out in battle for Shuri. (52517299858).jpg",
+      "page": "https://commons.wikimedia.org/wiki/File:SC_211480_-_Jap_tankette_knocked_out_in_battle_for_Shuri._(52517299858).jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/0/02/SC_211480_-_Jap_tankette_knocked_out_in_battle_for_Shuri._%2852517299858%29.jpg",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_Shuri.jpg",
+      "originalRetrieved": true,
+      "size": [
+        5216,
+        4045
+      ],
+      "sha256": "140342f33fa0b8ad942385dae98741087aa8c62ec5d23a7250badeeb1be50894",
+      "metadata": {
+        "DateTime": {
+          "value": "2022-11-24 23:12:26",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "SC 211480 - Jap tankette knocked out in battle for Shuri. (52517299858)",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "PD US Army|United States in World War II|Type 94 tankette|Flickr images reviewed by FlickreviewR 2|United States Army Signal Corps photographs",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "<p>Tank is about 10 ft. by four and about five feet in height, and carries two men. Relative size is shown by Lt. M. A. Miller of 94 Parkway Rd., Bronxville, New York. 30 June, 1945.\n</p>\nPhotographer: Henderson, 3240th Signal Photo Det.",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2022-11-22 15:00",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<a rel=\"nofollow\" class=\"external text\" href=\"https://www.flickr.com/photos/signalcorpsarchive/52517299858/\">SC 211480 - Jap tankette knocked out in battle for Shuri.</a>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a rel=\"nofollow\" class=\"external text\" href=\"https://www.flickr.com/people/186360156@N02\">Signal Corps Archive</a> from United States",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "Public domain",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Public domain",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Copyrighted": {
+          "value": "False",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "pd",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": "Treloar",
+      "title": "Type 94 Tankette at the Treloar Technology Centre September 2016.jpg",
+      "page": "https://commons.wikimedia.org/wiki/File:Type_94_Tankette_at_the_Treloar_Technology_Centre_September_2016.jpg",
+      "originalUrl": "https://upload.wikimedia.org/wikipedia/commons/0/0c/Type_94_Tankette_at_the_Treloar_Technology_Centre_September_2016.jpg",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_Treloar.jpg",
+      "originalRetrieved": true,
+      "size": [
+        2867,
+        3833
+      ],
+      "sha256": "f2e9329379fa81e6bc699ae261d561b2102caba7e9327c27988abf6c59dbc2f1",
+      "metadata": {
+        "DateTime": {
+          "value": "2016-09-10 06:26:20",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Type 94 Tankette at the Treloar Technology Centre September 2016",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Type 94 tankette|Self-published work|September 2016 in Canberra|Files with coordinates missing SDC location of creation (36° S, 149° E)|Photographs by Nick-D|Military equipment at the Treloar Technology Centre|Photographs by Nick-D sponsored by Wikimedia Australia (small grant)",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "GPSLatitude": {
+          "value": "-35.215279",
+          "source": "commons-desc-page"
+        },
+        "GPSLongitude": {
+          "value": "149.140839",
+          "source": "commons-desc-page"
+        },
+        "GPSMapDatum": {
+          "value": "WGS-84",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "An Imperial Japanese Army Type 94 Tankette at the Treloar Technology Centre",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2016-09-10 13:34:59",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Nick-D\" title=\"User:Nick-D\">Nick-D</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC BY-SA 4.0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Attribution-Share Alike 4.0",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "true",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "https://creativecommons.org/licenses/by-sa/4.0",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc-by-sa-4.0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    },
+    {
+      "id": "PatriotReport2017A",
+      "title": "Game*Spark Patriot Museum report, June 2017, A",
+      "page": "https://www.gamespark.jp/article/2017/06/02/73766_2.html",
+      "originalUrl": "https://www.gamespark.jp/imgs/zoom/189438.jpg",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_PatriotReport2017A.jpg",
+      "originalRetrieved": false,
+      "publisherZoomRetrieved": true,
+      "cameraOriginalEstablished": false,
+      "size": [
+        670,
+        446
+      ],
+      "sha256": "300cfd9c2b3d48db54dc8fcf1a1a9d9086a3cc63504083fce88c78b1074d8560",
+      "rights": "Game*Spark / IID, reference study only; no repository redistribution",
+      "exif": {},
+      "referenceScope": "Independent opposite-front cover-presence corroboration; exact hidden and mirrored layout inferred"
+    },
+    {
+      "id": "PatriotReport2017B",
+      "title": "Game*Spark Patriot Museum report, June 2017, B",
+      "page": "https://www.gamespark.jp/article/2017/06/02/73766_2.html",
+      "originalUrl": "https://www.gamespark.jp/imgs/zoom/189439.jpg",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_PatriotReport2017B.jpg",
+      "originalRetrieved": false,
+      "publisherZoomRetrieved": true,
+      "cameraOriginalEstablished": false,
+      "size": [
+        670,
+        446
+      ],
+      "sha256": "76f71c5dc2f6e6de34949da4b3127bee8713ce558aace37f7ac2efd9ab32dbd8",
+      "rights": "Game*Spark / IID, reference study only; no repository redistribution",
+      "exif": {},
+      "referenceScope": "Separate trailer only; excluded from main vehicle shape"
+    },
+    {
+      "id": "PatriotOfficial1",
+      "title": "Patriot Museum Type94 catalogue photograph 1",
+      "page": "https://parkpatriot.ru/o-parke/tekhnika-parka/malyy-tank-tekey-tip-94/",
+      "originalUrl": "https://parkpatriot.ru/upload/iblock/59e/ku8uczyqsl0s1jmx1wvk52v8nn4bdp22/anons-_2_.jpg",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial1.jpg",
+      "originalRetrieved": false,
+      "publisherImageRetrieved": true,
+      "cameraOriginalEstablished": false,
+      "size": [
+        1200,
+        780
+      ],
+      "sha256": "6dec2f24b09943e5853b9e2081f02f20c5ff0cd0e6b08e5acfd88319b3a57509",
+      "rights": "Museum publisher photographs, reference study; license not established",
+      "exif": {},
+      "referenceScope": "Catalogue banner/crop, not a seventh timed independent photograph"
+    },
+    {
+      "id": "PatriotOfficial2",
+      "title": "Patriot Museum Type94 catalogue photograph 2",
+      "page": "https://parkpatriot.ru/o-parke/tekhnika-parka/malyy-tank-tekey-tip-94/",
+      "originalUrl": "https://parkpatriot.ru/upload/iblock/713/dnqig4dc3sabutsl3keupds4w9l31a0z/2.JPG",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial2.jpg",
+      "originalRetrieved": false,
+      "publisherImageRetrieved": true,
+      "cameraOriginalEstablished": false,
+      "size": [
+        1440,
+        960
+      ],
+      "sha256": "71227a67ba14c9434c598a375789a835da055f4d784c8c82f13f225561ae78e4",
+      "rights": "Museum publisher photographs, reference study; license not established",
+      "exif": {
+        "DateTimeOriginal": "2022:09:25 14:00:01",
+        "FocalLength": "25.0",
+        "ExifImageWidth": "1440",
+        "FocalPlaneXResolution": "3942.5051334702257",
+        "FocalPlaneYResolution": "3950.617283950617",
+        "ExifImageHeight": "960",
+        "FocalPlaneResolutionUnit": "2",
+        "ExposureTime": "0.03333333333333333",
+        "FNumber": "2.8",
+        "ISOSpeedRatings": "1600",
+        "LensModel": "EF24-70mm f/2.8L USM"
+      },
+      "referenceScope": "2022 photographed structure/camera study only; neighboring long barrel and separate trailer excluded from Type94, blue light not paint"
+    },
+    {
+      "id": "PatriotOfficial3",
+      "title": "Patriot Museum Type94 catalogue photograph 3",
+      "page": "https://parkpatriot.ru/o-parke/tekhnika-parka/malyy-tank-tekey-tip-94/",
+      "originalUrl": "https://parkpatriot.ru/upload/iblock/490/zwidfwup7mxcbmvkfe7zd2mi4gxhic3t/3.JPG",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial3.jpg",
+      "originalRetrieved": false,
+      "publisherImageRetrieved": true,
+      "cameraOriginalEstablished": false,
+      "size": [
+        1440,
+        960
+      ],
+      "sha256": "9d22a0c8024f6ca901e2c4c8d7de82de139efda81b9c6c06c320423e4f17ab3b",
+      "rights": "Museum publisher photographs, reference study; license not established",
+      "exif": {
+        "DateTimeOriginal": "2022:09:25 14:00:16",
+        "FocalLength": "35.0",
+        "ExifImageWidth": "1440",
+        "FocalPlaneXResolution": "3942.5051334702257",
+        "FocalPlaneYResolution": "3950.617283950617",
+        "ExifImageHeight": "960",
+        "FocalPlaneResolutionUnit": "2",
+        "ExposureTime": "0.03333333333333333",
+        "FNumber": "2.8",
+        "ISOSpeedRatings": "1600",
+        "LensModel": "EF24-70mm f/2.8L USM"
+      },
+      "referenceScope": "2022 photographed structure/camera study only; neighboring long barrel and separate trailer excluded from Type94, blue light not paint"
+    },
+    {
+      "id": "PatriotOfficial4",
+      "title": "Patriot Museum Type94 catalogue photograph 4",
+      "page": "https://parkpatriot.ru/o-parke/tekhnika-parka/malyy-tank-tekey-tip-94/",
+      "originalUrl": "https://parkpatriot.ru/upload/iblock/ae4/33vw9gi4w9mogq7q8zrgfl60sto0nwp4/4.JPG",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial4.jpg",
+      "originalRetrieved": false,
+      "publisherImageRetrieved": true,
+      "cameraOriginalEstablished": false,
+      "size": [
+        1440,
+        960
+      ],
+      "sha256": "fd538683bc72f5f2e6686909c84a7b6d49b92a7918eb2a206b2a6086a55822ba",
+      "rights": "Museum publisher photographs, reference study; license not established",
+      "exif": {
+        "DateTimeOriginal": "2022:09:25 14:00:47",
+        "FocalLength": "34.0",
+        "ExifImageWidth": "1440",
+        "FocalPlaneXResolution": "3942.5051334702257",
+        "FocalPlaneYResolution": "3950.617283950617",
+        "ExifImageHeight": "960",
+        "FocalPlaneResolutionUnit": "2",
+        "ExposureTime": "0.03333333333333333",
+        "FNumber": "2.8",
+        "ISOSpeedRatings": "1600",
+        "LensModel": "EF24-70mm f/2.8L USM"
+      },
+      "referenceScope": "2022 photographed structure/camera study only; neighboring long barrel and separate trailer excluded from Type94, blue light not paint"
+    },
+    {
+      "id": "PatriotOfficial5",
+      "title": "Patriot Museum Type94 catalogue photograph 5",
+      "page": "https://parkpatriot.ru/o-parke/tekhnika-parka/malyy-tank-tekey-tip-94/",
+      "originalUrl": "https://parkpatriot.ru/upload/iblock/311/wnaxffdbzuuwioktpshjlhvd10qocdi9/5.JPG",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial5.jpg",
+      "originalRetrieved": false,
+      "publisherImageRetrieved": true,
+      "cameraOriginalEstablished": false,
+      "size": [
+        1440,
+        960
+      ],
+      "sha256": "17252acad0fd8b924c83a7fb919af18ed1226964728ba3e2a7904ce539706bc9",
+      "rights": "Museum publisher photographs, reference study; license not established",
+      "exif": {
+        "DateTimeOriginal": "2022:09:25 14:01:09",
+        "FocalLength": "48.0",
+        "ExifImageWidth": "1440",
+        "FocalPlaneXResolution": "3942.5051334702257",
+        "FocalPlaneYResolution": "3950.617283950617",
+        "ExifImageHeight": "960",
+        "FocalPlaneResolutionUnit": "2",
+        "ExposureTime": "0.03333333333333333",
+        "FNumber": "2.8",
+        "ISOSpeedRatings": "1600",
+        "LensModel": "EF24-70mm f/2.8L USM"
+      },
+      "referenceScope": "2022 photographed structure/camera study only; neighboring long barrel and separate trailer excluded from Type94, blue light not paint"
+    },
+    {
+      "id": "PatriotOfficial6",
+      "title": "Patriot Museum Type94 catalogue photograph 6",
+      "page": "https://parkpatriot.ru/o-parke/tekhnika-parka/malyy-tank-tekey-tip-94/",
+      "originalUrl": "https://parkpatriot.ru/upload/iblock/0a4/cqvbv84njapo7rsffvemaufhu00vte53/6.JPG",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial6.jpg",
+      "originalRetrieved": false,
+      "publisherImageRetrieved": true,
+      "cameraOriginalEstablished": false,
+      "size": [
+        1440,
+        960
+      ],
+      "sha256": "309602423310491cc49dcf61e9881e5d43744901e5bf9e53182db4554a978bf0",
+      "rights": "Museum publisher photographs, reference study; license not established",
+      "exif": {
+        "DateTimeOriginal": "2022:09:25 14:01:24",
+        "FocalLength": "35.0",
+        "ExifImageWidth": "1440",
+        "FocalPlaneXResolution": "3942.5051334702257",
+        "FocalPlaneYResolution": "3950.617283950617",
+        "ExifImageHeight": "960",
+        "FocalPlaneResolutionUnit": "2",
+        "ExposureTime": "0.03333333333333333",
+        "FNumber": "2.8",
+        "ISOSpeedRatings": "1600",
+        "LensModel": "EF24-70mm f/2.8L USM"
+      },
+      "referenceScope": "2022 photographed structure/camera study only; neighboring long barrel and separate trailer excluded from Type94, blue light not paint"
+    },
+    {
+      "id": "PatriotOfficial7",
+      "title": "Patriot Museum Type94 catalogue photograph 7",
+      "page": "https://parkpatriot.ru/o-parke/tekhnika-parka/malyy-tank-tekey-tip-94/",
+      "originalUrl": "https://parkpatriot.ru/upload/iblock/ef3/suu0lrgryhxie1luiw0vaetin4bts874/1.JPG",
+      "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial7.jpg",
+      "originalRetrieved": false,
+      "publisherImageRetrieved": true,
+      "cameraOriginalEstablished": false,
+      "size": [
+        1440,
+        960
+      ],
+      "sha256": "f8d11457481fbdd4435ffb184aee2f178a5843ddb0336d88fb91590cf470bf34",
+      "rights": "Museum publisher photographs, reference study; license not established",
+      "exif": {
+        "DateTimeOriginal": "2022:09:25 13:59:46",
+        "FocalLength": "34.0",
+        "ExifImageWidth": "1440",
+        "FocalPlaneXResolution": "3942.5051334702257",
+        "FocalPlaneYResolution": "3950.617283950617",
+        "ExifImageHeight": "960",
+        "FocalPlaneResolutionUnit": "2",
+        "ExposureTime": "0.03333333333333333",
+        "FNumber": "2.8",
+        "ISOSpeedRatings": "1600",
+        "LensModel": "EF24-70mm f/2.8L USM"
+      },
+      "referenceScope": "2022 photographed structure/camera study only; neighboring long barrel and separate trailer excluded from Type94, blue light not paint"
+    }
+  ],
+  "researchSources": [
+    {
+      "id": "Jiang2015",
+      "url": "https://ousar.lib.okayama-u.ac.jp/files/public/5/53301/20160528122710481090/scs_014_047_070.pdf",
+      "kind": "Secondary historical research; not a museum survey",
+      "localFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Source_Jiang2015Tengxian.pdf",
+      "sha256": "94c8740e1d97a60034f68b22e678ab2d39342a795979fc0931060ee2216d534e",
+      "printedPagesInspected": [
+        50,
+        51
+      ],
+      "scope": "Distinguishes fighting around Tengxian from the city assault; generic 3.36 m figure conflicts with the selected short vehicle",
+      "originalJacarScansChecked": false,
+      "originalBattleArchivesChecked": false
+    },
+    {
+      "id": "Jiang2016",
+      "url": "https://ousar.lib.okayama-u.ac.jp/files/public/5/54216/20160528124052424269/scs_015_053_068.pdf",
+      "kind": "Secondary historical research; not a museum survey",
+      "localFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Source_Jiang2016Taierzhuang.pdf",
+      "sha256": "ee8d9ed134af7139205da699673d25c43fc39080305008f6de20c11d16e55148",
+      "printedPagesInspected": [
+        55
+      ],
+      "scope": "Quotes 3.08 m length and 1.62 m height; cited provisional specification C01001361800 now inspected separately; battle archives remain unchecked",
+      "originalBattleArchivesChecked": false,
+      "originalReferencedSpecificationChecked": true
+    }
+  ],
+  "primaryTechnicalSources": [
+    {
+      "source": "https://www.jacar.archives.go.jp/das/meta/C01001361800",
+      "viewer": "https://www.jacar.archives.go.jp/das/image/C01001361800",
+      "pdf": "https://www.jacar.archives.go.jp/content/item/aj12/C200021105700/raw/C01001361800.c0010500019.daikou_130.2051_01.pdf",
+      "title": "九四式軽装甲自動車九四式装甲牽引自動車仮制式制定の件",
+      "recordDates": "1934-07-18 to 1936-11-25",
+      "pages": 25,
+      "sha256": "ddcd38e130b04197d5d05de0bdbf11c417daab4328b9ed7271ae47cf0a41cc37",
+      "inspectedPages": [
+        4,
+        5,
+        19,
+        20,
+        23,
+        24
+      ],
+      "dimensionsPage": 19,
+      "transcribedDimensionsM": {
+        "length": 3.084,
+        "width": 1.62,
+        "height": 1.62,
+        "minimumBellyClearance": 0.3,
+        "trackWidth": 0.164
+      },
+      "scope": "Original provisional specification and period annotated photographs; supports early configuration, not a survey of the selected museum individual",
+      "distributionPages": [
+        4,
+        5
+      ],
+      "photoScope": "Basic hull / equipment corroboration; museum finish and visible alterations remain governed by Kubinka 2017 original",
+      "id": "JacarType94Provisional",
+      "kind": "Original Japanese Army provisional specification and period annotated photographs"
+    },
+    {
+      "id": "UsWarDepartmentSS26",
+      "source": "https://ww1.lonesentry.com/manuals/japanese-tanks/tankettes.html",
+      "title": "Japanese Tanks and Tank Tactics, Special Series No. 26, 15 November 1944, section 2: Tankettes",
+      "kind": "Wartime US intelligence; approximate identification and dimensions",
+      "tableScope": "Model 92 table describes the early small-idler configuration; Model 94 prose describes later trailing idler and lowered drive sprocket",
+      "approximateEarlyDimensionsM": {
+        "driveCenterHeight": 0.635,
+        "driveDiameter": 0.5334,
+        "roadWheelDiameter": 0.381,
+        "rearIdlerDiameter": 0.381,
+        "trackPitch": 0.0762
+      },
+      "limitations": "Not a survey of the Kubinka individual; track-width figure conflicts with the original Japanese provisional specification; museum photo-derived dimensions remain estimates",
+      "useInV14": "Corroborates early high sprocket configuration; authored 0.605 m centre is a photo-derived estimate, not an exact transcription"
+    },
+    {
+      "id": "AlliedSeAsiaRecognitionHandbook",
+      "source": "https://cgsc.contentdm.oclc.org/digital/api/collection/p4013coll8/id/4431/download",
+      "title": "Japanese Military Forces No16, Japanese Weapons and Equipment PartI; Allied Land Forces SEAsia, GHQ India Intelligence Directorate",
+      "kind": "Contemporary Allied recognition handbook, not an engineering survey",
+      "localFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\AdditionalV41\\Source_AlliedJapaneseMilitary.pdf",
+      "sha256": "1cbed46ff9f3644887b02973ef119996aa0fea133024c9f741ee412c34624d6e",
+      "pages": 114,
+      "inspectedPages": [
+        14,
+        15
+      ],
+      "publicationDateEstablished": false,
+      "supports": "Early small-idler description under Type92 nomenclature; four road wheels in two bogies, bell cranks and protected horizontal helical spring",
+      "limits": "Its later Type94 paragraph describes the trailing-idler form. No measured wheel spacing, cab yaw or museum dimensions are supplied; Japanese provisional nominal dimensions retain precedence"
+    }
+  ],
+  "contextSources": [
+    {
+      "url": "https://preservedtanks.com/Profile.aspx?UniqueID=22",
+      "kind": "Museum-vehicle catalogue / observer description",
+      "supports": "Kubinka early small-idler vehicle displayed with a separate payload trailer; confirmed visually in the selected 2014 and 2017 originals",
+      "doesNotProve": "Precise museum dimensions or Tengxian use"
+    }
+  ],
+  "additionalReferenceAcquisitionV23": {
+    "cameraAcceptance": false,
+    "cameraSensorSource": "https://sg.canon/en/support/6200124200",
+    "scope": "Approximate 36x24mm sensor supports focal initialization only; resized EXIF focal-plane density cannot be used directly",
+    "archive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\CameraStudyV23"
+  },
+  "additionalReferenceAcquisitionV38": {
+    "id": "TourGuideKubinkaAdditionalV38",
+    "page": "https://paris33.org/guide/soviet-japanese-war",
+    "originalUrl": "https://paris33.org/wp-content/uploads/japan-tank-tk.jpg",
+    "localImage": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\AdditionalV38\\Reference_TourGuideType94.jpg",
+    "size": [
+      2592,
+      1944
+    ],
+    "sha256": "65da09c9dd6f2d81e86d5e46fdba26afd418f8d7ffb8ad5547b01adedd7e64c2",
+    "exifPresent": false,
+    "photographDateKnown": false,
+    "licenseEstablished": false,
+    "publicImageReuseAuthorized": false,
+    "scope": "Higher-angle image of the selected early museum vehicle; use photograph for structure only. Article captions Type 95 incorrectly; no historical assertions or dimensions taken from it.",
+    "fitStatus": "Used in V40/V41 physical three/five-view studies with explicit per-feature diagnostics; no accepted whole-image calibration.",
+    "cameraStudy": "Data_CameraReferenceStudyV41.json"
+  },
+  "officialCrossViewAuditV45": {
+    "study": "Data_CameraReferenceStudyV45.json",
+    "official3RightPhysicalSites": 9,
+    "official3SitesAreNowFitted": true,
+    "official6ForegroundIsTrackedTrailer": true,
+    "focalExifMm": {
+      "Official3": 35,
+      "Official7": 34
+    },
+    "sourceMetadata": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Data_ExifDetailsV23.json"
+  }
+}

@@ -1,0 +1,512 @@
+{
+  "schema": "Type94ProjectedGameTrialV1",
+  "revision": "GamePbrV70",
+  "status": "local-current-high-to-low-PBR-and-articulation-verified-whole-reference-pending",
+  "reference": "Data_SurfaceStudyV68.json",
+  "referenceSha256": "1b792411d2e8aa6012c1542b0b9d1f986d9c565901e99989c5b3066041aabb83",
+  "referenceSourceBlendSha256": "4881aaf77fa1a01b8cc4a49caee2dfe7fc5c667ad9648d7cd92fc218a5add99e",
+  "geometryReference": "Data_GrayTrialV64.json",
+  "previousTrial": "Data_GameTrialV59.json",
+  "producer": "Taierzhuang1938/_blender/Script_BuildType94GameV70.mjs",
+  "producerSha256": "349c196617bd56f3aa973401fd6e85af89e91ed30da2e6dd496b3647feb4cd31",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV70\\Scene_Type94TanketteGamePbrV70.blend",
+  "sourceBlendSha256": "fcccad0b6a3f2e32e9602ea0471a457f5d1d2703565ab0e0317f925911f0e272",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV70\\Exports\\Model_Type94TanketteGamePbrV70.glb",
+  "sha256": "bc2980baf6b173969152208965b247e10cc9e89aa084189e16359fa34f14d42a",
+  "bytes": 44583304,
+  "triangles": 79580,
+  "triangleLimitExclusive": 80000,
+  "strictBudgetPassed": true,
+  "meshOwners": 237,
+  "poseNodes": 292,
+  "independentLinks": [
+    80,
+    80
+  ],
+  "dimensionsWidthHeightLengthM": [
+    1.6198139190673828,
+    1.616717595333129,
+    3.0824818020260327
+  ],
+  "maximumWorldSurfaceUpperBoundM": 0.0029979944774195764,
+  "maximumAllowedDistanceM": 0.003,
+  "numericSafetyMarginM": 2e-06,
+  "continuousSurfaceParts": 960,
+  "freshUv": true,
+  "highToLowProjectionVerified": true,
+  "runtimeImages": 12,
+  "textureSizes": {
+    "Paint": 4096,
+    "Track": 2048,
+    "Steel": 2048,
+    "Rubber": 1024
+  },
+  "normalStrengths": {
+    "Paint": 1,
+    "Track": 1,
+    "Steel": 1,
+    "Rubber": 1
+  },
+  "normalStrengthIncludesHighShaderResponse": true,
+  "projectionDonorsUseExactExportTriangulation": true,
+  "atlasUsedFractions": {
+    "Paint": 0.5492938160896301,
+    "Track": 0.7577619552612305,
+    "Steel": 0.6959695816040039,
+    "Rubber": 0.3747215270996094
+  },
+  "actualSurfaceSupplementaryTexels": 9648,
+  "actualSurfaceRepair": {
+    "preparationSha256": "008570d8b7d4a75b864d18bff64ccb6d1f3d6db341e9855e71436c2c0441c22d",
+    "reports": [
+      {
+        "role": "Paint",
+        "primaryMissingPixels": 4886,
+        "repairedPixels": 4886,
+        "missingAfter": 0,
+        "paddingPixels": 58237,
+        "nearestHighSurfaceMaximumDistanceM": 0.002697124145925045,
+        "maximumInsetAlongSameHighTriangleM": 0.00016461489136950956,
+        "maximumFootprintHalfWidthM": 1.2e-05,
+        "allActualShaderSamplesValid": true,
+        "passed": true,
+        "method": "Nearest actual high triangle, conservative interior point, Cycles unlit base/ORM/world-normal evaluation, inverse low Mikk tangent frame",
+        "pixelApplicationPassed": true,
+        "maximumNormalRoundTripDegrees": 0.35267997050422634,
+        "percentile95NormalRoundTripDegrees": 0.26844831431902316,
+        "channels": [
+          {
+            "channel": "Base",
+            "primarySha256": "f8f543004dcc8788f8f9cf61743cfd4e5add27516347c350a51091daf79a6d54",
+            "sha256": "388b5e32e8b552c7b829229d6698114e438b4b286b3d2f82b273578488ef9497",
+            "unchangedOutsideExplicitSites": true,
+            "exactRasterReplay": true
+          },
+          {
+            "channel": "Orm",
+            "primarySha256": "cef5aa2de4106c2013eb66fab8abca0c700f36622d6a28bff7ec3728b4b513af",
+            "sha256": "e52e46d041ada71a42c93bce8aab37ee2dc6ae6cd45369c3d9060172c86cdc86",
+            "unchangedOutsideExplicitSites": true,
+            "exactRasterReplay": true
+          },
+          {
+            "channel": "Normal",
+            "primarySha256": "61fac089d29e680b49f5d5dd86b1da0e80c1d5f3b03bf1cdd404496923ba2424",
+            "sha256": "9705a3636d9faa12074e0743e6303c3313c53f09c948c60d71dd95fb63a5ac05",
+            "unchangedOutsideExplicitSites": true,
+            "exactRasterReplay": true
+          }
+        ]
+      },
+      {
+        "role": "Track",
+        "primaryMissingPixels": 4351,
+        "repairedPixels": 4351,
+        "missingAfter": 0,
+        "paddingPixels": 8550,
+        "nearestHighSurfaceMaximumDistanceM": 0.0018895318498834968,
+        "maximumInsetAlongSameHighTriangleM": 0.00017722200528179404,
+        "maximumFootprintHalfWidthM": 1.2e-05,
+        "allActualShaderSamplesValid": true,
+        "passed": true,
+        "method": "Nearest actual high triangle, conservative interior point, Cycles unlit base/ORM/world-normal evaluation, inverse low Mikk tangent frame",
+        "pixelApplicationPassed": true,
+        "maximumNormalRoundTripDegrees": 0.36256262695103286,
+        "percentile95NormalRoundTripDegrees": 0.2726412536300042,
+        "channels": [
+          {
+            "channel": "Base",
+            "primarySha256": "251d8c626d9bee49bad36652e5637485f9fc3bcb55d07058dcab105c6ea9b548",
+            "sha256": "b85e5a6cf7c0ecf60aa3f10ccb6666909b8e5171a97926c8944acc483d48ce2d",
+            "unchangedOutsideExplicitSites": true,
+            "exactRasterReplay": true
+          },
+          {
+            "channel": "Orm",
+            "primarySha256": "37df664ea117a9b7bc6c36c6470d565d2088401600caccdacc7ade3b989d2adc",
+            "sha256": "ca9d3ec09071d3daf9984e3b14f6242f7c5ad058eef91a86fb89aeb68f768790",
+            "unchangedOutsideExplicitSites": true,
+            "exactRasterReplay": true
+          },
+          {
+            "channel": "Normal",
+            "primarySha256": "28de86041210bbc5cc8534a90902b5b6e7ed3088a9693b8a1b8eeb0753c69f9f",
+            "sha256": "5be037e502375b4e571e2f541659c48c0fbe126d0bc371fe494d816db63e4028",
+            "unchangedOutsideExplicitSites": true,
+            "exactRasterReplay": true
+          }
+        ]
+      },
+      {
+        "role": "Steel",
+        "primaryMissingPixels": 382,
+        "repairedPixels": 382,
+        "missingAfter": 0,
+        "paddingPixels": 6750,
+        "nearestHighSurfaceMaximumDistanceM": 0.0007488074479624629,
+        "maximumInsetAlongSameHighTriangleM": 0.00025559406460251924,
+        "maximumFootprintHalfWidthM": 1.2e-05,
+        "allActualShaderSamplesValid": true,
+        "passed": true,
+        "method": "Nearest actual high triangle, conservative interior point, Cycles unlit base/ORM/world-normal evaluation, inverse low Mikk tangent frame",
+        "pixelApplicationPassed": true,
+        "maximumNormalRoundTripDegrees": 0.3164486857322357,
+        "percentile95NormalRoundTripDegrees": 0.2717958445881703,
+        "channels": [
+          {
+            "channel": "Base",
+            "primarySha256": "34b703420966e9c707e28914c8a988b6ae495a6167f4428ef2b41c021b440258",
+            "sha256": "48b7f2bcbc8c32c4c8426f41f94e729e9533db490fe469b2284a184bb1be908c",
+            "unchangedOutsideExplicitSites": true,
+            "exactRasterReplay": true
+          },
+          {
+            "channel": "Orm",
+            "primarySha256": "25aac42d5bdcf7eb0d95b24fb95d6ceb33c661b816cf7af45f8ad168e0c7f4e2",
+            "sha256": "d6edb57258df3a514b0dc32ae29eaf965a6f005dcc4ba931947627a7ef7f5e5c",
+            "unchangedOutsideExplicitSites": true,
+            "exactRasterReplay": true
+          },
+          {
+            "channel": "Normal",
+            "primarySha256": "6645db0dd8cf2c6fbcf10b5de5a7532ccc83dbad7f8b3a6123a863e6aaee249b",
+            "sha256": "bfaa77c578c09fc54f353d4f6be17c5adf0cb0a0f1888de45cf96ae7264577bf",
+            "unchangedOutsideExplicitSites": true,
+            "exactRasterReplay": true
+          }
+        ]
+      },
+      {
+        "role": "Rubber",
+        "primaryMissingPixels": 29,
+        "repairedPixels": 29,
+        "missingAfter": 0,
+        "paddingPixels": 1166,
+        "nearestHighSurfaceMaximumDistanceM": 0.0010398278245702386,
+        "maximumInsetAlongSameHighTriangleM": 3.822687625727359e-05,
+        "maximumFootprintHalfWidthM": 1.2e-05,
+        "allActualShaderSamplesValid": true,
+        "passed": true,
+        "method": "Nearest actual high triangle, conservative interior point, Cycles unlit base/ORM/world-normal evaluation, inverse low Mikk tangent frame",
+        "pixelApplicationPassed": true,
+        "maximumNormalRoundTripDegrees": 0.29054698675032653,
+        "percentile95NormalRoundTripDegrees": 0.23420139555311778,
+        "channels": [
+          {
+            "channel": "Base",
+            "primarySha256": "1f8e8df5840b76f4c6c84d36a9506462b39f6000b2d4a1ba6cbffd811621e6e4",
+            "sha256": "82caebb3b8935011fdf7f5ee85954c65b95570910ec6ffd390e2cac056643ada",
+            "unchangedOutsideExplicitSites": true,
+            "exactRasterReplay": true
+          },
+          {
+            "channel": "Orm",
+            "primarySha256": "fbe6662b0919465cf97cec929ede8f46200fa4840342a11e4a3e0f98a01a5744",
+            "sha256": "ea766063607d6de1249049c6adad9148be779bc6c2e36016b15534410bfa34ab",
+            "unchangedOutsideExplicitSites": true,
+            "exactRasterReplay": true
+          },
+          {
+            "channel": "Normal",
+            "primarySha256": "243d9c078d1068dfe207c5ef449219d3a31b664f21195dca8b99c2ec959e2d64",
+            "sha256": "1acfd6ddcf48ab8800b5715a7a8e8421101bbf6b4d057b3ab4ad1b1509301730",
+            "unchangedOutsideExplicitSites": true,
+            "exactRasterReplay": true
+          }
+        ]
+      }
+    ],
+    "passed": true,
+    "pixelApplicationPending": false,
+    "method": "Immutable primary PNGs, explicit linear-to-sRGB base encoding, inverse low tangent frames, actual-sample gutter propagation, byte-exact decoded raster replay"
+  },
+  "channelPlanesLocked": 8,
+  "flatSectionToleranceM": 2e-06,
+  "wholeBodyRoadWheelSamples": 128,
+  "completeBeltPhases": 32,
+  "allAngleArmCoverChecks": 24,
+  "validation": {
+    "raw": {
+      "passed": true,
+      "report": "Data_RawGameExportV70.json",
+      "reportSha256": "2637f2bde8e6b21c1d7a47999ee2a478a1f9f6b1ccb7e87b1994a944c3f2575c",
+      "checks": 1159
+    },
+    "certificate": {
+      "passed": true,
+      "report": "Data_ComposedActualSurfaceCertificateV70.json",
+      "reportSha256": "57d8c4226f9780a97cd45ff9d727d2b1c63a379f3789c08208cc45e9dc0ddba9",
+      "checks": 15
+    },
+    "source": {
+      "passed": true,
+      "report": "Data_GameSourceReopenV70.json",
+      "reportSha256": "ab151388a2a594ef8ab960d42f17f31c7a64bfc13adabc65b9b369c66e9ffa48",
+      "checks": 22
+    },
+    "hull": {
+      "passed": true,
+      "report": "Data_ReopenedHullCertificateV70.json",
+      "reportSha256": "fce92cf8f34d926b6e2fe6afe0bf7b9378fc017205906f6bb41e5f573835a057",
+      "checks": 202
+    },
+    "motion": {
+      "passed": true,
+      "report": "Data_ActualGameMotionV70.json",
+      "reportSha256": "ec96890c7b5610999098e976c0ecd5bfefd318f672663b28d845069e6488728a",
+      "checks": 39
+    },
+    "running": {
+      "passed": true,
+      "report": "Data_GameRunningV70.json",
+      "reportSha256": "5cb663e0359e66128c8a811a7dfe6c3f2c312b9b798b7717f9db7a36d5bb0f61",
+      "checks": 0
+    },
+    "sections": {
+      "passed": true,
+      "report": "Data_GameSectionsV70.json",
+      "reportSha256": "5853a691480826df6b1c1da5ef4999ac0d47025206da33151326340efbb215c5",
+      "checks": 56
+    },
+    "repair": {
+      "passed": true,
+      "report": "Data_GameProjectionRepairV70.json",
+      "reportSha256": "98df9618880147b69d23d04256328e9f3d00d1509402420fa294dc0d21cdc029",
+      "checks": 0
+    },
+    "ui": {
+      "passed": true,
+      "report": "Data_GameUiV70.json",
+      "reportSha256": "cf1540ab0d29842eea1b0a65053baeb9f2826164ec1937a60813c092b55e5ec2",
+      "checks": 29
+    },
+    "mechanisms": {
+      "passed": true,
+      "report": "Data_GameMechanismBrowserV70.json",
+      "reportSha256": "46cc313947b528c115c40b379fcae4c907a993279f086307529b0e8454e32558",
+      "checks": 937
+    },
+    "comparison": {
+      "passed": true,
+      "report": "Data_GameCompareV70.json",
+      "reportSha256": "eb6b22bd37f4bcc440c2b408ee69b47df625dbcb3e3c1e4607a78d1b466b4c02",
+      "checks": 6
+    },
+    "channelRecipe": {
+      "passed": true,
+      "report": "Data_ChannelRecipeReplayV70.json",
+      "reportSha256": "1e893a5cbacd5a2816942de8d5d1d0e4891bcf4620de95ed195fc9a039afa8f0",
+      "checks": 8
+    }
+  },
+  "sourceExportMeshes": [
+    237,
+    237
+  ],
+  "packedImagePixelsAndBindingsSurviveSourceReexport": true,
+  "matchedRuntimeViews": [
+    {
+      "view": "full",
+      "meanChannelDifference": 0.6226161892145499,
+      "fractionAbove12": 0.011737594524479771,
+      "cameraAndLightingIdentical": true
+    },
+    {
+      "view": "vent",
+      "meanChannelDifference": 2.153536388474913,
+      "fractionAbove12": 0.036557860020974775,
+      "cameraAndLightingIdentical": true
+    },
+    {
+      "view": "track",
+      "meanChannelDifference": 1.7398924352817795,
+      "fractionAbove12": 0.033595173041894355,
+      "cameraAndLightingIdentical": true
+    },
+    {
+      "view": "weapon",
+      "meanChannelDifference": 1.3903578131037146,
+      "fractionAbove12": 0.021502594248495887,
+      "cameraAndLightingIdentical": true
+    },
+    {
+      "view": "wheel",
+      "meanChannelDifference": 2.314284235800629,
+      "fractionAbove12": 0.041901597946679914,
+      "cameraAndLightingIdentical": true
+    },
+    {
+      "view": "wearDetail",
+      "meanChannelDifference": 1.350674090633107,
+      "fractionAbove12": 0.02159297897002815,
+      "cameraAndLightingIdentical": true
+    }
+  ],
+  "authorVisualReview": {
+    "views": [
+      "vent",
+      "track"
+    ],
+    "scope": "Current640pixel previews plus same-camera six-view diagnostics; retains whole-reference and final appearance acceptance as open"
+  },
+  "coldCurrentChannelReplayVerified": true,
+  "completeColdTwelveMapPipelineReplayVerified": true,
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94GameReviewV70/",
+  "retainedHighPreview": "http://127.0.0.1:8114/tmp/Type94WearReviewV68/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV70\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV70\\Rebuild",
+  "frozenDependencies": [
+    {
+      "file": "Taierzhuang1938/_blender/Script_BuildType94GameV70.mjs",
+      "sha256": "349c196617bd56f3aa973401fd6e85af89e91ed30da2e6dd496b3647feb4cd31",
+      "sha256Lf": "349c196617bd56f3aa973401fd6e85af89e91ed30da2e6dd496b3647feb4cd31"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameDeltaV70.py",
+      "sha256": "db32446e2a3a513004879e1ddd79e9bddea55f69ea1df1185d5724a1faab781f",
+      "sha256Lf": "db32446e2a3a513004879e1ddd79e9bddea55f69ea1df1185d5724a1faab781f"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameGeometryV70.py",
+      "sha256": "f46bb7664653c993251caf537ea126c95b0c3a353cc0ccdea1959db585962864",
+      "sha256Lf": "f46bb7664653c993251caf537ea126c95b0c3a353cc0ccdea1959db585962864"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GamePlanePatchV70.py",
+      "sha256": "f00e6f0749c1a8ed2671aaf46cf916e75d9c41c49db8cfbf4f9fad2d50f22270",
+      "sha256Lf": "f00e6f0749c1a8ed2671aaf46cf916e75d9c41c49db8cfbf4f9fad2d50f22270"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameProjectionPixelsV70.py",
+      "sha256": "9c38248d709e439f5e237db1a18904050278ca159a393fcc40529e29eab275e4",
+      "sha256Lf": "9c38248d709e439f5e237db1a18904050278ca159a393fcc40529e29eab275e4"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameProjectionRepairV70.py",
+      "sha256": "74b0519c07f26abe5e2b44fb3f62c6d3966daeda3f65127693b938e311d6ae3d",
+      "sha256Lf": "74b0519c07f26abe5e2b44fb3f62c6d3966daeda3f65127693b938e311d6ae3d"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameProjectionV70.py",
+      "sha256": "a242364af3bf4252e14c3b6a86a9457c2dbcd33c9d2fef597a388111e856cf27",
+      "sha256Lf": "a242364af3bf4252e14c3b6a86a9457c2dbcd33c9d2fef597a388111e856cf27"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameRunningV70.py",
+      "sha256": "a5ba875ff81bae0f2765b944aedd093fa253372c24b93baf42606cf3b514ff8b",
+      "sha256Lf": "a5ba875ff81bae0f2765b944aedd093fa253372c24b93baf42606cf3b514ff8b"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameSourceAuditV70.py",
+      "sha256": "8c77d19088cd871534042e7ee9779bc8d2b07e15a2646144bbf109047e533b1b",
+      "sha256Lf": "8c77d19088cd871534042e7ee9779bc8d2b07e15a2646144bbf109047e533b1b"
+    },
+    {
+      "file": "Taierzhuang1938/_import/Script_VerifyType94GameSectionsV70.py",
+      "sha256": "0ef0a7dc9467d0b574aec387111f5b0a6f9be1f6dc8cff6915cf8a64d5f7e925",
+      "sha256Lf": "0ef0a7dc9467d0b574aec387111f5b0a6f9be1f6dc8cff6915cf8a64d5f7e925"
+    },
+    {
+      "file": "Taierzhuang1938/_import/Script_VerifyType94GameV70.py",
+      "sha256": "18b488507e029ee9b2f74410f53080dc0673ebc7d3589039a03d5787843503d1",
+      "sha256Lf": "18b488507e029ee9b2f74410f53080dc0673ebc7d3589039a03d5787843503d1"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameTrial.py",
+      "sha256": "1b618f94cc6f28f7854f338aa32266bbca608b48e2cc5234fff51bb4b5f0668f",
+      "sha256Lf": "1b618f94cc6f28f7854f338aa32266bbca608b48e2cc5234fff51bb4b5f0668f"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94GameFeatures.py",
+      "sha256": "fdd5de0e0b59bbc3fed0a9259118380736cf6a4eea1457745a192fa87571ef46",
+      "sha256Lf": "fdd5de0e0b59bbc3fed0a9259118380736cf6a4eea1457745a192fa87571ef46"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94Export.py",
+      "sha256": "b5e0abdcd073cc0cb84eaf77534626f7b9b24166a87bd88e1c0395840e340486",
+      "sha256Lf": "223418521cac900adb9add45dead9a5f36b68835a10902431397c4ef49ec2847"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_Type94TangentRepair.py",
+      "sha256": "1d76f211ddeb6a491da6b2b5685b34adb0cfea46f11cdf674523203d123e572f",
+      "sha256Lf": "10a34f6d09beb0228182024232475403f41f978414bfb2e1b3bc9e3a3f626e41"
+    },
+    {
+      "file": "Taierzhuang1938/_blender/Script_VerifyType94Sweep.py",
+      "sha256": "fc0ec068a2f8e595368b63914fae5a4da9fa569d4ed57eab75dd5257537f79b4",
+      "sha256Lf": "f864fa990ca12a93a72cbd552977a67db07ce14db153e567bdfd61c264629310"
+    },
+    {
+      "file": "Taierzhuang1938/_import/Script_VerifyType94Export.py",
+      "sha256": "8dd5ff39536299f9ffdd4f22662c8d4968fb923db168a026802773fafe1dc152",
+      "sha256Lf": "446fb75f31c6c4684551b12d3f88bcbaae2b53e11f649b9e3b06a26c74b6ee93"
+    },
+    {
+      "file": "Taierzhuang1938/_import/Script_VerifyType94GeometryReplay.py",
+      "sha256": "fd15c1cf18de868ff35291b704f780e111c1db3866feb0eec507d3d2082cc6cb",
+      "sha256Lf": "fd15c1cf18de868ff35291b704f780e111c1db3866feb0eec507d3d2082cc6cb"
+    },
+    {
+      "file": "Taierzhuang1938/Model/Type94Tankette/Script_Type94Mechanism.mjs",
+      "sha256": "f53f42e2f1eb22756b46b50a69ab813ed079d50013289434aa1862d12ccd9b04",
+      "sha256Lf": "46ab63224564b8db4f9a4c65505ad0e3be50c3af26a9076c94ecd3b0065e7287"
+    },
+    {
+      "file": "Taierzhuang1938/Model/Type94Tankette/Script_VerifyType94Browser.mjs",
+      "sha256": "86c281ee02728f410199575197938cf47fea351c70f981d3ece39c161f9dd722",
+      "sha256Lf": "3678df8c33e6932e43a0041e85458f2b08368605b31367f06505fba7b9a7d341"
+    }
+  ],
+  "canonicalSha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+  "canonicalGameReplaced": false,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV70\\Acceptance\\Data_OwnedBlenderCleanupV70.json",
+  "wholeReferenceAccepted": false,
+  "finalPbrReferenceAccepted": false,
+  "gameDerivativeAccepted": false,
+  "complete": false,
+  "goalComplete": false,
+  "published": false,
+  "remaining": [
+    "Whole-reference body/running-gear/camera acceptance from actual visible surface identities",
+    "Final high-surface/reference finish acceptance; preserve museum repaint and inferred finish/section labels",
+    "Final accepted-revision game derivative and whole-objective audit"
+  ],
+  "inputCheckpoints": [
+    {
+      "manifest": "Data_SurfaceStudyV68.json",
+      "manifestSha256": "858cf9c067a3ba05c8014c1b8d855636d9db3450aed35088126b4806d5182ed2",
+      "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV68\\Scene_Type94TanketteHighSurfaceV68Preview.blend",
+      "sourceBlendSha256": "4881aaf77fa1a01b8cc4a49caee2dfe7fc5c667ad9648d7cd92fc218a5add99e",
+      "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV68\\Exports\\Model_Type94TanketteHighSurfaceV68Preview.glb",
+      "sha256": "1b792411d2e8aa6012c1542b0b9d1f986d9c565901e99989c5b3066041aabb83"
+    },
+    {
+      "manifest": "Data_SurfaceStudyV56.json",
+      "manifestSha256": "e2df1c62142c974260c46de3d2ca9f6d10fa871a7a5dd389cfbc8301cc8dddf7",
+      "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV56\\Scene_Type94TanketteHighSurfaceV56Preview.blend",
+      "sourceBlendSha256": "f86a1ecdc197f43c2e08a58e7d1ae7edf9a20d267f3ab86c17f90e4da64bc815",
+      "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV56\\Exports\\Model_Type94TanketteHighSurfaceV56Preview.glb",
+      "sha256": "283822f415509a17cd5dff598c030da251476d24321177e4a1de03a6d635e569"
+    },
+    {
+      "manifest": "Data_GameTrialV59.json",
+      "manifestSha256": "1c6d25d3f9e8fdad3419fac0a8dcb8e69c4279a8c106105dea632d19b438f54a",
+      "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV59\\Scene_Type94TanketteGameTrialV59.blend",
+      "sourceBlendSha256": "e229a7bef32b69744b03b4ca73e83a08920ff7e75bef5b3ae0bdb57427387531",
+      "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV59\\Exports\\Model_Type94TanketteGameTrialV59.glb",
+      "sha256": "23b6a7c289ee686d953c0bfd2216f70cdd582bf177ca7b07ae09e62a87a2a690"
+    }
+  ],
+  "inputCertificates": [
+    {
+      "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV59\\Acceptance\\Data_GameTrialReductionV59.json",
+      "sha256": "503258a6e091ba2fa49ba9eb4f266c40aa7cd1a262e8fb08b2da667508a0874f"
+    },
+    {
+      "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV59\\Acceptance\\Data_ComposedActualSurfaceCertificateV59.json",
+      "sha256": "f9a007c7467f53414a9c57231ae1c1899cecc8b4708a3fdda09aeb756042bdf7"
+    }
+  ],
+  "completeColdReplayAudit": "Data_GameRebuildV72.json"
+}

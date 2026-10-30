@@ -1,0 +1,53 @@
+{
+  "schema": "type94-gray-study-v1",
+  "id": "Type94Tankette",
+  "revision": "ShapeV13",
+  "status": "gray-in-progress",
+  "complete": false,
+  "pbrAccepted": false,
+  "gameBudgetAccepted": false,
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Scene_Type94TanketteHighShapeV13.blend",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Exports\\Model_Type94TanketteHighShapeV13.glb",
+  "sha256": "850eb253c6142005efb35a48676856bc63675721b8d343518462ec1527ba5099",
+  "triangles": 453506,
+  "meshNodes": 229,
+  "measuredWidthHeightLengthM": [
+    1.628000020980835,
+    1.6303554982592794,
+    3.080587014002363
+  ],
+  "primaryScaleAnchorM": {
+    "length": 3.084,
+    "width": 1.62,
+    "height": 1.62,
+    "minimumBellyClearance": 0.3,
+    "trackWidth": 0.164
+  },
+  "primaryRecord": "https://www.jacar.archives.go.jp/das/meta/C01001361800",
+  "primaryScope": "1934-1936 provisional specification, not a survey of the restored museum individual",
+  "validation": {
+    "rawGeometryChecks": 536,
+    "browserGeometryChecks": 32,
+    "nativeGrayMovement": true,
+    "scope": "Gray geometry and mechanisms only; no PBR, game-budget or strict reference acceptance",
+    "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance",
+    "strictPbrDefaultsRejectUntexturedStudy": true
+  },
+  "remaining": [
+    "Primary view / whole-body proportion matching",
+    "Visible local detail and marking refinement",
+    "PBR authoring and complete recipe replay after gray acceptance",
+    "New game derivative and complete export verification"
+  ],
+  "inferred": [
+    "Rear profile dimensions and concealed drawbar section",
+    "Curved rear-side fitting function / hidden mounting",
+    "Front tow-shackle demonstration travel stops"
+  ],
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94ShapeReview/",
+  "retainedGameCheckpoint": {
+    "revision": "V12",
+    "sha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+    "recipeCommit": "bd0852e1"
+  }
+}

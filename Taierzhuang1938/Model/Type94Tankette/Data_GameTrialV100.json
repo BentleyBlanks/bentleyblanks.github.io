@@ -1,0 +1,136 @@
+{
+  "schema": "Type94GameTrialV1",
+  "revision": "GamePbrV100",
+  "status": "Local current-shape technical candidate; strict cold normal-pixel parity remains open",
+  "geometryReference": "Data_GrayTrialV98.json",
+  "materialReference": "Data_SurfaceStudyV99.json",
+  "producer": "Taierzhuang1938/_blender/Script_BuildType94GameV100.mjs",
+  "verifier": "Taierzhuang1938/_import/Script_VerifyType94GameV100.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV100\\Scene_Type94TanketteGamePbrV100.blend",
+  "sourceBlendSha256": "67663fa3620b206d03e7e06551c852aaaf8d93c8084d6c891fabf922c009d226",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV100\\Exports\\Model_Type94TanketteGamePbrV100.glb",
+  "sha256": "58ebca190f56d04d9ed4c190cd8a1e7e8f9033b32b04ee43307670826c4638fa",
+  "triangles": 78716,
+  "meshOwners": 240,
+  "poseNodes": 296,
+  "linksPerSide": 80,
+  "runtimePbrImages": 12,
+  "textureSizes": {
+    "Paint": 4096,
+    "Track": 2048,
+    "Steel": 2048,
+    "Rubber": 1024
+  },
+  "maximumContinuousWorldBoundM": 0.0029979687999456923,
+  "unusedAuthorVertices": {
+    "High:Geometry_Hull_Paint": 484
+  },
+  "projectionRepairedPixels": 16116,
+  "validation": {
+    "binaryChecks": 994,
+    "sourceProofPassed": true,
+    "sectionChecks": 56,
+    "vehicleChecks": 38,
+    "gatePoses": 56,
+    "gateContactExclusionM": 0,
+    "roadWheelPoses": 128,
+    "beltPhases": 32,
+    "allAngleArmCoverChecks": 24,
+    "browserChecks": 17,
+    "browserRenders": 10,
+    "genericExportPassed": true
+  },
+  "coldRebuild": {
+    "root": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameReplayV100",
+    "allRecipeStagesCompleted": true,
+    "independentSourceBoundsAndMotionPassed": true,
+    "strictParityPassed": false,
+    "all240RenderedMeshCornerAttributesExact": true,
+    "rigAndControlsExact": true,
+    "decodedTwelveImagesExact": false,
+    "mapDifferences": [
+      {
+        "materialMap": "PaintBase",
+        "changedPixels": 0,
+        "maximumByteDifference": 0,
+        "exact": true
+      },
+      {
+        "materialMap": "PaintOrm",
+        "changedPixels": 0,
+        "maximumByteDifference": 0,
+        "exact": true
+      },
+      {
+        "materialMap": "PaintNormal",
+        "changedPixels": 5,
+        "maximumByteDifference": 1,
+        "exact": false,
+        "maximumDecodedDirectionDifferenceDeg": 0.39614205354582693
+      },
+      {
+        "materialMap": "SteelBase",
+        "changedPixels": 0,
+        "maximumByteDifference": 0,
+        "exact": true
+      },
+      {
+        "materialMap": "SteelOrm",
+        "changedPixels": 0,
+        "maximumByteDifference": 0,
+        "exact": true
+      },
+      {
+        "materialMap": "SteelNormal",
+        "changedPixels": 0,
+        "maximumByteDifference": 0,
+        "exact": true
+      },
+      {
+        "materialMap": "RubberBase",
+        "changedPixels": 0,
+        "maximumByteDifference": 0,
+        "exact": true
+      },
+      {
+        "materialMap": "RubberOrm",
+        "changedPixels": 0,
+        "maximumByteDifference": 0,
+        "exact": true
+      },
+      {
+        "materialMap": "RubberNormal",
+        "changedPixels": 0,
+        "maximumByteDifference": 0,
+        "exact": true
+      },
+      {
+        "materialMap": "TrackBase",
+        "changedPixels": 0,
+        "maximumByteDifference": 0,
+        "exact": true
+      },
+      {
+        "materialMap": "TrackOrm",
+        "changedPixels": 0,
+        "maximumByteDifference": 0,
+        "exact": true
+      },
+      {
+        "materialMap": "TrackNormal",
+        "changedPixels": 0,
+        "maximumByteDifference": 0,
+        "exact": true
+      }
+    ],
+    "report": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameReplayV100\\Acceptance\\Data_CompleteRebuildParityV100.json"
+  },
+  "previewUrl": "http://127.0.0.1:8114/tmp/Type94GameReviewV100/",
+  "wearV101Integrated": false,
+  "wholeReferenceAccepted": false,
+  "gameDerivativeAccepted": false,
+  "canonicalGameReplaced": false,
+  "published": false,
+  "goalComplete": false,
+  "blenderOwnedInstancesAfterCleanup": 0
+}

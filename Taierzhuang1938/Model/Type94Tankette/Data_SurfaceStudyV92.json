@@ -1,0 +1,111 @@
+{
+  "schema": "Type94MaterialPreviewV1",
+  "revision": "SurfaceV92Preview",
+  "status": "local-selective-metal-wear-preview-verified",
+  "reference": "Data_SurfaceStudyV91.json",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV92\\Scene_Type94TanketteHighSurfaceV92Preview.blend",
+  "sourceBlendSha256": "2a00a6b93fdc4eb9927f85f69eac2825309575ff8999945dc24c6cca0ba22849",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV92\\Exports\\Model_Type94TanketteHighSurfaceV92Preview.glb",
+  "sha256": "b4ac994e9afd79ffc377f86b2ba1320510e1874c5a3c67ebb7d37fa72a118516",
+  "producer": "Taierzhuang1938/_blender/Script_BuildType94WearFinishV92.mjs",
+  "verifier": "Taierzhuang1938/_import/Script_VerifyType94WearFinishV92.py",
+  "triangles": 622112,
+  "meshOwners": 238,
+  "poseNodes": 293,
+  "linksPerSide": 80,
+  "runtimePbrImages": 12,
+  "textureSizes": {
+    "Paint": 4096,
+    "Track": 2048,
+    "Steel": 2048,
+    "Rubber": 1024
+  },
+  "geometryNormalsUvsAndRigExactToV91": true,
+  "paintAoExactToV91": true,
+  "otherMaterialFamiliesExactToV91": true,
+  "editableWearMasks": 6,
+  "wear": {
+    "outputs": {
+      "Base": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV92\\Textures\\HighSurfaceV92Preview\\Texture_Type94PaintBaseFinishV92.png",
+        "sha256": "a9033f99b9f17174dff7817e2e6a58212903fed772060bc92102336e78c48ffe"
+      },
+      "Orm": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV92\\Textures\\HighSurfaceV92Preview\\Texture_Type94PaintOrmFinishV92.png",
+        "sha256": "be7c0f049f4d4a149ffbafd40b2c009e095c98cd5e9a4bb0d15ce00b68a70d85"
+      },
+      "Normal": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV92\\Textures\\HighSurfaceV92Preview\\Texture_Type94PaintNormalFinishV92.png",
+        "sha256": "006b9859d116099aa7ae6351deb972096b452bea8b7961b7481a1fdcfd13ad57"
+      }
+    },
+    "masks": {
+      "Core": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV92\\Textures\\HighSurfaceV92Preview\\Texture_Type94PaintCoreV92.png",
+      "Scuff": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV92\\Textures\\HighSurfaceV92Preview\\Texture_Type94PaintScuffV92.png",
+      "Scratch": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV92\\Textures\\HighSurfaceV92Preview\\Texture_Type94PaintScratchV92.png",
+      "Loss": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV92\\Textures\\HighSurfaceV92Preview\\Texture_Type94PaintLossV92.png",
+      "Primer": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV92\\Textures\\HighSurfaceV92Preview\\Texture_Type94PaintPrimerV92.png",
+      "Height": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV92\\Textures\\HighSurfaceV92Preview\\Texture_Type94PaintHeightV92.png"
+    },
+    "physicalEdgeMarks": 8048,
+    "handlingScuffClusters": 121,
+    "opaqueSteelAtlasFraction": 0.005447566509246826,
+    "nonzeroSteelAtlasFraction": 0.019424259662628174,
+    "touchedAtlasFraction": 0.08315294981002808,
+    "fullyExposedSteelRoughness": [
+      0.16,
+      0.29
+    ],
+    "fullyExposedSteelMetallic": 0.99,
+    "paintLossHeightM": 2e-05,
+    "coreNormalSmoothing": 0.96,
+    "oxidizedSubstrateSeparated": true,
+    "lossAtlasFraction": 0.010374605655670166,
+    "paintAoUnchanged": true,
+    "geometryUvAndRigUnchanged": true,
+    "newMarksClippedToSourceFaces": true,
+    "scope": "Inferred selective paint loss and handling scratches; polished steel has a flatter normal and separate conducting response. Damage positions/amount are art direction, not historical evidence."
+  },
+  "validation": {
+    "binaryChecks": 1458,
+    "browserChecks": 12,
+    "actualSourceReopenAndGlbImport": true,
+    "actualRenderedViewsInspected": [
+      "Full",
+      "DriverHatch",
+      "VentHousing"
+    ],
+    "nativeMotion": "V89 native result inherited through exact V91/V92 geometry and rigid-control proof; browser controls freshly tested"
+  },
+  "sourceReexportContainerExact": false,
+  "sourceTangentPrecision": {
+    "digits": 4,
+    "maxComponentDifference": 0.00010001659393310547,
+    "handednessExact": true
+  },
+  "actualExposedSteelPixels": 85704,
+  "actualExposedNormalSlope": {
+    "before": 3.0164677432407827,
+    "after": 0.7432373593719818
+  },
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94WearReviewV92/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV92\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV92\\Rebuild",
+  "retainedTrials": [
+    "Versions/InitialSubtle",
+    "Versions/PaleBreakthrough"
+  ],
+  "wearPlacementHistoricallyAccepted": false,
+  "wholeReferenceAccepted": false,
+  "finalPbrReferenceAccepted": false,
+  "gameDerivativeForThisRevisionProduced": false,
+  "canonicalGameReplaced": false,
+  "published": false,
+  "goalComplete": false,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV92.json",
+  "remaining": [
+    "Complete whole-reference body/running-gear and unresolved camera/correspondence checks",
+    "Rebuild game derivative from the accepted final high shape/finish and complete final source/runtime acceptance"
+  ]
+}

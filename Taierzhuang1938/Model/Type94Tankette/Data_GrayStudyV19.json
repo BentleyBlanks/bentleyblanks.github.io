@@ -1,0 +1,205 @@
+{
+  "schema": "type94-gray-study-v1",
+  "id": "Type94Tankette",
+  "revision": "ShapeV19",
+  "status": "gray-in-progress",
+  "complete": false,
+  "pbrAccepted": false,
+  "gameBudgetAccepted": false,
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Scene_Type94TanketteHighShapeV19.blend",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Exports\\Model_Type94TanketteHighShapeV19.glb",
+  "sha256": "d005a14590cc84654b3924a26914387106db6b3d8e689c53c801d9bfba14cc0e",
+  "triangles": 461334,
+  "meshNodes": 235,
+  "measuredWidthHeightLengthM": [
+    1.628000020980835,
+    1.6303554982592794,
+    3.0802378090605957
+  ],
+  "primaryScaleAnchorM": {
+    "length": 3.084,
+    "width": 1.62,
+    "height": 1.62,
+    "minimumBellyClearance": 0.3,
+    "trackWidth": 0.164
+  },
+  "primaryRecord": "https://www.jacar.archives.go.jp/das/meta/C01001361800",
+  "primaryScope": "1934-1936 provisional specification, not a survey of the restored museum individual",
+  "validation": {
+    "rawGeometryChecks": 553,
+    "browserGeometryChecks": 44,
+    "nativeGeometryMotionChecks": 25,
+    "editableSourceReopenChecks": 16,
+    "viewerUiChecks": 9,
+    "noseExportChecks": 8,
+    "driverExportChecks": 12,
+    "legacyRawVerifierChecks": 979,
+    "legacyBrowserVerifierChecks": 689,
+    "scope": "Exact V19 gray geometry, local nose/front-plane layout and rigid mechanisms only; no whole-reference/PBR/game acceptance",
+    "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance",
+    "nativeGrayMovement": true,
+    "actualGrayReimportBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Scene_ShapeV19ActualGrayReimport.blend",
+    "nativeGrayVerifier": "Taierzhuang1938/_blender/Script_VerifyType94Gray.py",
+    "driverHingeContactExclusionM": 0,
+    "driverRoofHingeContactExclusionM": 0,
+    "driverRoofVisorCombinedPoses": 25,
+    "engineHingeContactExclusionM": 0,
+    "engineBodyContactExclusionM": 0,
+    "strictPbrDefaultsRejectUntexturedStudy": true,
+    "priorWheelTrackMeshesUnchanged": 200,
+    "closedSightNormalHorizontalReferenceRays": true,
+    "ownedBlenderStopped": true
+  },
+  "remaining": [
+    "Whole-vehicle camera, front/body outline and upper-body/cabin/turret placement",
+    "Remaining visible detail, markings and surface seating",
+    "Audit remaining generic cover hinges and concealed mechanism assumptions",
+    "PBR authoring and complete geometry/texture recipe replay after gray acceptance",
+    "New actual game derivative under unchanged 80000 triangle/3mm bidirectional limits and final exact-file verification",
+    "History/creation scope reconciliation before release"
+  ],
+  "inferred": [
+    "Rear profile dimensions and concealed drawbar section",
+    "Curved rear-side fitting function / hidden mounting",
+    "Front tow-shackle demonstration travel stops",
+    "Early high sprocket local height / nose / fender dimensions",
+    "Front fender root flange and cantilever support construction",
+    "Engine inspection assembly 60 mm forward clearance placement",
+    "Visor local dimensions, internal hinge fork and nominal bearing clearance",
+    "Driver roof hidden fork/leaf/bearing construction and demonstration limit",
+    "Engine lid hidden fork, annular bearings, nominal clearance and side-opening demonstration limit",
+    "Engine lift handle exact rod size, mounting offset and small skew photo-estimated from same-vehicle originals",
+    "Engine front flange exact fastener positions and head sections photo-estimated",
+    "Nose rear skirt and exact raised-roof/radius dimensions from conditional same-vehicle corner comparison",
+    "Equal-width driver frame absolute width, hidden seal and expanded sight channel",
+    "Side-port mounting offset on the vertical side wall"
+  ],
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94ShapeReview/",
+  "retainedGameCheckpoint": {
+    "revision": "V12",
+    "sha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+    "recipeCommit": "bd0852e1"
+  },
+  "authoredFrontParametersM": {
+    "driveCenterHeightBeforeGroundCompensation": 0.605,
+    "frontArmorBottomBeforeGroundCompensation": 0.51,
+    "frontArmorTopBeforeGroundCompensation": 0.81,
+    "trackCenterPlanes": [
+      -0.684,
+      0.684
+    ],
+    "trackWidth": 0.164,
+    "scope": "V19 candidate estimates in conditional reference views, not archival local dimensions; wheel stations unchanged",
+    "frontArmorTopForwardBeforeGroundCompensation": 1.2,
+    "frontArmorBottomForwardBeforeGroundCompensation": 1.26,
+    "noseHousingWidth": 0.74,
+    "noseHousingCenterX": -0.135,
+    "noseFastenerCrossSeparation": 0.285,
+    "noseRearRise": 0.12,
+    "noseFrontCornerRadius": 0.2,
+    "noseRearForward": 0.62,
+    "glacisSlope": 0.1920289855072464
+  },
+  "rejectedTrial": {
+    "trackCenterPlanes": [
+      -0.728,
+      0.728
+    ],
+    "reason": "All eight road wheels intersected fixed suspension arms in the expanded native sweep",
+    "report": "Data_V14RejectedWideTrackMotionAudit.json"
+  },
+  "mechanismManifest": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Data_MechanismShapeV19.json",
+  "localDetailComparison": {
+    "scope": "Current actual driver plane, with primary photo normalized by its four frame corners; only coplanar relative details reviewed",
+    "referenceObservation": "Data_DriverReferenceLayoutV19.json",
+    "framePlaneEvidence": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Data_DriverPlaneViewV19.json",
+    "viewerControl": "Driver front plate comparison",
+    "acceptedAbsoluteDimensions": false,
+    "relativePanelShapeReviewed": true,
+    "relativePanelShapeReviewedAtRevision": "ShapeV19",
+    "normalizationDoesNotAcceptWholeVehicleCamera": true,
+    "comparisonPreview": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Preview_V19DriverFrame.jpg",
+    "referenceNormalization": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Reference_DriverPlaneV19.jpg",
+    "excludedFromPlaneComparison": [
+      "Roof and projecting hinge foreshortening",
+      "Absolute cabin dimensions and whole-vehicle pose"
+    ]
+  },
+  "strictReferenceMatched": false,
+  "roofMotion": {
+    "hingeBeforeGroundCompensationM": [
+      0.305,
+      0.202,
+      1.25
+    ],
+    "openSignLocal": -1,
+    "scope": "Forward opening corroborated by open-roof photo; closed lid and handle world geometry preserved"
+  },
+  "diagnosticCamera": {
+    "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Data_CameraStructuredPoseV16.json",
+    "acceptedCalibration": false,
+    "mainReferenceCameraChanged": true,
+    "scope": "Local viewer reset uses the two-photo estimate; native authoring reference camera not finally calibrated",
+    "localViewerDefault": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\CameraStudyV19\\Data_ViewerDefaultCameraV19.json",
+    "nativeSourceReferenceCameraChanged": false
+  },
+  "sourceBlendSha256": "c939f39d5243c11c97e3f080dc8157d61afd6e84505159ef939026ded1586ca2",
+  "engineMotion": {
+    "hingeBeforeGroundCompensationM": [
+      -0.535,
+      0.08,
+      1.065072463768116
+    ],
+    "hingeAxisLocal": "Y",
+    "openSignLocal": -1,
+    "scope": "Longitudinal hinge and rear lift retained in local coordinates on the revised deck plane; current export movement checked",
+    "evidence": "Data_FrontLayoutEvidenceV19.json",
+    "handleRelativeLayoutReviewed": true,
+    "acceptedAbsoluteDimensions": false,
+    "frontFlangeFixedOwner": "EngineFrontFlangeFixed",
+    "frontFlangeFasteners": 3,
+    "currentLidLocalDimensionsM": [
+      0.39800000190734863,
+      0.4380000829696655,
+      0.00900018960237503
+    ],
+    "handleRelativeLayoutLastReviewedAtRevision": "ShapeV18"
+  },
+  "twoPhotoDiagnostic": {
+    "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\CameraStudyV17",
+    "selectedStudy": "Data_ExtendedRivetBundleV17.json",
+    "acceptedCalibration": false,
+    "mainReferenceCameraChanged": true,
+    "globalBodyShapeChanged": true,
+    "uiViews": [
+      "2017",
+      "2014"
+    ],
+    "scope": "Local default uses the current estimated 2017 comparison view; native source camera remains a legacy diagnostic; no final optical calibration",
+    "additionalEngineStudyDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\CameraStudyV18",
+    "enginePlaneAccepted": false,
+    "additionalStudyDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\CameraStudyV19",
+    "localViewerDefaultCameraChanged": true,
+    "nativeSourceReferenceCameraChanged": false
+  },
+  "priorLocalDetailComparison": {
+    "scope": "Front-cabin plane normalized by four frame corners; does not validate whole-vehicle camera or absolute cabin dimensions",
+    "referenceObservation": "Data_DriverVisorReferenceV15.json",
+    "viewerControl": "Driver front plate fixed comparison",
+    "acceptedAbsoluteDimensions": false,
+    "relativePanelShapeReviewed": true,
+    "comparisonPreview": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Preview_DriverPlaneV15.jpg",
+    "normalizationDoesNotAcceptWholeVehicleCamera": true,
+    "relativePanelShapeReviewedAtRevision": "ShapeV15"
+  },
+  "driverLayout": {
+    "data": "Data_DriverReferenceLayoutV19.json",
+    "frameWidthM": 0.55,
+    "outerFrontFrameEqualWidth": true,
+    "coverFasteners": 4,
+    "observedFarFrameFasteners": 4,
+    "sightChannelHiddenSplayInferred": true,
+    "normalHorizontalReferenceSightRaysPassed": true,
+    "sidePortVerticalWallInterfaceUpdated": true
+  }
+}

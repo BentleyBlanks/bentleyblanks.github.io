@@ -1,0 +1,78 @@
+{
+  "schema": "Type94TurretRearLayoutV27",
+  "scope": "The selected Kubinka vehicle has a tall curved rear turret hatch in two museum views. Relative shape and visible hinge ownership are observed; exact dimensions, concealed bearing/seal sections and demonstration travel are inferred. This is not a vehicle survey or a Tengxian deployment claim.",
+  "references": [
+    {
+      "file": "References/PatriotOfficial/Reference_PatriotOfficial4.jpg",
+      "page": "https://parkpatriot.ru/o-parke/tekhnika-parka/malyy-tank-tekey-tip-94/",
+      "scope": "Kubinka rear-right view: curved rectangular rear hatch, rounded lower corners, two hinges on the vehicle-left edge and one visible free-edge fitting. Publisher gallery, photographed 2022-09-25; supplements the rear not visible in the primary 2017 photograph.",
+      "sha256": "fd538683bc72f5f2e6686909c84a7b6d49b92a7918eb2a206b2a6086a55822ba",
+      "size": [
+        1440,
+        960
+      ],
+      "observedCropNative": [
+        940,
+        320,
+        1120,
+        460
+      ]
+    },
+    {
+      "file": "References/PatriotOfficial/Reference_PatriotOfficial6.jpg",
+      "page": "https://parkpatriot.ru/o-parke/tekhnika-parka/malyy-tank-tekey-tip-94/",
+      "scope": "Same exhibit rear-left view confirms the tall rear hatch is separate from the low side vision covers.",
+      "sha256": "309602423310491cc49dcf61e9881e5d43744901e5bf9e53182db4554a978bf0",
+      "size": [
+        1440,
+        960
+      ],
+      "observedCropNative": [
+        280,
+        270,
+        470,
+        410
+      ]
+    },
+    {
+      "page": "https://www.awm.gov.au/collection/REL:16287",
+      "scope": "Museum catalogue explicitly identifies a back hatch of the turret on a different preserved Type94. Corroborates the component; does not supply Kubinka dimensions or operating limits.",
+      "opened": "2026-10-25"
+    }
+  ],
+  "geometryEstimate": {
+    "centerAngleRad": -1.5707963267948966,
+    "widthAlongConeMidHeightM": 0.255,
+    "bottomZInTurretM": 0.15,
+    "topZInTurretM": 0.455,
+    "cornerRadiusM": 0.018,
+    "openingInsetM": 0.01,
+    "closedRadialGapM": 0.0008,
+    "panelThicknessM": 0.008,
+    "hingePinRadialOffsetM": 0.026,
+    "hingeOutsideEdgeM": 0.008,
+    "hingeHeightsInTurretM": [
+      0.215,
+      0.397
+    ],
+    "hingePinRadiusM": 0.004,
+    "hingeBearingInnerRadiusM": 0.0044,
+    "hingeBearingOuterRadiusM": 0.009,
+    "hingePinLengthM": 0.07,
+    "demonstrationOpenDegrees": 100.8
+  },
+  "inferred": [
+    "The rear hatch is centered on the retained cone; its absolute size follows the current uncalibrated turret size.",
+    "Radial panel clearance, armor thickness, hidden backing/seal, hinge barrel sections, pin tilt and exact hinge stations are modeled mechanical estimates.",
+    "The visible free-edge fitting is represented closed. Its internal latch construction and release motion have not been established.",
+    "The retained 100.8 degree demonstration range is a verified modeling range, not a measured stop on the exhibit.",
+    "2022 rear views supplement the 2017 primary appearance; no photograph establishes an unchanged concealed interior between those dates."
+  ],
+  "runtimeClearance": {
+    "rearHatchOpenTurretYaw": "Forward zero yaw only in the modeled demonstration",
+    "basis": "Actual native mesh diagnostic found 14 triangle pairs with the closed driver roof at 180 degree turret yaw / 75 degree rear opening. The interlock preserves the tested forward opening pose; it is not a claimed historical operating rule.",
+    "diagnostic": "Acceptance/Data_V27TurretRearYawDiagnostic.json"
+  },
+  "wholeCameraAccepted": false,
+  "strictReferenceMatched": false
+}

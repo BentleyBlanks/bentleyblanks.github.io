@@ -1,0 +1,48 @@
+{
+  "schema": "Type94RunningGearLayoutV1",
+  "id": "RunningGearTrialV42",
+  "revision": "ShapeV42Trial",
+  "status": "Unaccepted component geometry trial, not a museum survey or whole model completion",
+  "sourceGray": "Data_GrayStudyV37.json",
+  "sourceStudy": "Data_MetricSkeletonV41.json / MetricCabYawFixed",
+  "roadForwardM": [
+    0.6695535409791347,
+    0.1432687825072131,
+    -0.3144653947170462,
+    -0.947983585930146
+  ],
+  "roadRadiusM": 0.1905,
+  "roadAxisHeightM": 0.215,
+  "bogies": [
+    {
+      "pivotForwardM": 0.4215056707304835,
+      "pivotHeightM": 0.28266677768098175,
+      "roadIndices": [
+        0,
+        1
+      ],
+      "springEndForwardM": 0.35
+    },
+    {
+      "pivotForwardM": -0.6129026448418091,
+      "pivotHeightM": 0.28700453213243615,
+      "roadIndices": [
+        2,
+        3
+      ],
+      "springEndForwardM": -0.54
+    }
+  ],
+  "trackCenterXM": 0.684,
+  "wheelRadiusAndAxialSectionsChanged": false,
+  "metricDimensionsInferred": true,
+  "physicalSourceGeometryAccepted": false,
+  "strictReferenceMatched": false,
+  "complete": false,
+  "limits": [
+    "Only longitudinal road positions and lower bell-crank rest centres follow the regularized metric hypothesis",
+    "Wheel radius, axial sections, hull/cabin/turret and drive/idler locations retain V37 authoring values",
+    "Nominal physical coordinate scale is not a measurement of the museum individual",
+    "This trial must pass actual-file wheel/track/contact sweeps and local source reopening before any component acceptance; whole-reference acceptance is separate"
+  ]
+}

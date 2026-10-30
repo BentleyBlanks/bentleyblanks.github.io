@@ -1,0 +1,13 @@
+{
+  "status": "Shared rear-door mechanism corroboration; selected Kubinka rear remains partly hidden",
+  "references": ["Reference_Treloar.jpg", "Reference_Shuri.jpg"],
+  "observed": ["Two vertical hinge stations", "Fixed outer leaf with two fasteners and moving door leaf", "Opposite-edge handle and keeper"],
+  "hingeOffsetsZFromDoorCenterM": [-0.14, 0.14],
+  "latchReleaseFraction": 0.12,
+  "latchReleaseAngleDeg": 90,
+  "limits": [
+    "Exact hinge positions, concealed sections, gaps and dimensions remain inferred",
+    "Release travel and sequencing are an inferred mechanical demonstration, not measured museum motion",
+    "Supplementary door aperture and marking patterns do not establish the selected early Kubinka layout"
+  ]
+}

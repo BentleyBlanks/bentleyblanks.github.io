@@ -1,0 +1,501 @@
+{
+  "schema": "Type94ReferenceEnvelopeLayoutV1",
+  "revision": "ReferenceEnvelopeV47",
+  "status": "Calibration envelope only; incomplete vehicle, not an accepted gray model",
+  "hypothesisSource": "Data_PhysicalProfilesV47.json / PreviousProfile",
+  "hypothesisSha256": "f5d932611c0fe187bc67b9ac43eb90ca26e77d859d3f37641a2bb50750b1f45e",
+  "shapeParameters": {
+    "TurretCenterX": 0.05647128392430486,
+    "TurretCenterY": -0.6038281020378944,
+    "RearDeckZ": 1.0530890809399738,
+    "TurretRadialScale": 1.0,
+    "TurretVerticalScale": 1.0,
+    "CabinCenterX": 0.2891598174617797,
+    "CabinWidth": 0.5119466492133,
+    "CabinTopZ": 1.1920799605098187,
+    "CabinTopForward": 0.3227150393352468,
+    "CabinBottomForward": 0.3885776935035243,
+    "CabinYaw": -9.999999992939549e-11,
+    "RoadFrontForward": 0.6128493313893268,
+    "RoadSpacing01": 0.5138548129448954,
+    "RoadSpacing12": 0.40880043772276214,
+    "RoadSpacing23": 0.5317662482696115,
+    "TrackCenterX": 0.6340986646748332,
+    "CapDepth0": 0.08783275812432835,
+    "CapDepth1": 0.08407605244973931,
+    "CapDepth2": 0.09643097195244117,
+    "CapDepth3": 0.08687260625455329,
+    "FrontPivotY": 0.38144625612780825,
+    "RearPivotY": -0.5616583626860263,
+    "FrontPivotZ": 0.2595189683799226,
+    "RearPivotZ": 0.2676793836289018
+  },
+  "circularParameters": {
+    "RoofRadius": 0.3085883745121677,
+    "RoofZBeforeGround": 1.5762595197323286,
+    "RoofHighestOffset": 0.049093778872321706,
+    "ConeSlope": 0.15943669706127908,
+    "TyreShoulderRadius": 0.16700721740508864,
+    "TyreShoulderAxialOffset": 0.08199999999999999,
+    "TyreAxisMinusShoulderRadius": 0.039011032964956,
+    "CabinBottomZBeforeGround": 0.9867238777566698
+  },
+  "rivetLocalSites": {
+    "SidePairRow0Rear": [
+      -0.2928218462176914,
+      0.1377639942211957,
+      0.4574527396482684
+    ],
+    "SidePairRow0Front": [
+      -0.2746012081077182,
+      0.1717975136568552,
+      0.4568249824114263
+    ],
+    "SidePairRow1Rear": [
+      -0.30347034171056436,
+      0.1416592941514733,
+      0.3875697013050721
+    ],
+    "SidePairRow1Front": [
+      -0.2853297626766765,
+      0.17571310993075742,
+      0.38702238067493305
+    ],
+    "SidePairRow2Rear": [
+      -0.3146871646315481,
+      0.14479500030958606,
+      0.3158183016769392
+    ],
+    "SidePairRow2Front": [
+      -0.29622325829433727,
+      0.17978760286554785,
+      0.3159931788598652
+    ],
+    "SidePairRow3Rear": [
+      -0.3254496651506701,
+      0.14900860129082752,
+      0.24535261265944203
+    ],
+    "SidePairRow3Front": [
+      -0.30687609346222144,
+      0.18413752733468594,
+      0.24572607652540318
+    ],
+    "SidePairRow4Rear": [
+      -0.3364678551728723,
+      0.15223387030935054,
+      0.17510065173800118
+    ],
+    "SidePairRow4Front": [
+      -0.31766721072079174,
+      0.1881730319111977,
+      0.17535400652567865
+    ]
+  },
+  "wheelHeightOffsetsM": [
+    -0.015593302248441805,
+    -0.001396894153135607,
+    0.006395610149820482,
+    0.01078258812383641
+  ],
+  "freeSites": {
+    "NativeFront_Upper1": [
+      -0.13136260191423754,
+      1.196416656471274,
+      0.6557111039295098
+    ],
+    "NativeFront_Upper2": [
+      -0.24971933699578602,
+      1.189402678292085,
+      0.6572184997547879
+    ],
+    "NativeFront_Upper3": [
+      -0.36503277299740444,
+      1.178114518557256,
+      0.6565097382911828
+    ],
+    "NativeFront_LowerFar1": [
+      0.2834342988952599,
+      1.208789411179116,
+      0.5094182362944741
+    ],
+    "NativeFront_LowerFar2": [
+      0.23173956486481484,
+      1.205539151114069,
+      0.5492435979891246
+    ],
+    "VentFaceA": [
+      -0.605603851871464,
+      0.40280737841677666,
+      0.9171237963834283
+    ],
+    "VentFaceB": [
+      -0.5979348380683291,
+      -0.1371926724475849,
+      0.9150526602565751
+    ],
+    "VentFaceC": [
+      -0.5950048425083697,
+      -0.15857023652638197,
+      0.8585803471601218
+    ],
+    "VentFaceD": [
+      -0.6038764311011212,
+      0.39132911003533033,
+      0.8613268638098829
+    ],
+    "FenderFarOuter": [
+      0.7771147102008324,
+      1.2481984632735812,
+      0.7015308335955829
+    ],
+    "FenderFarInner": [
+      0.5130373084312932,
+      1.2681564958871812,
+      0.7073506557759477
+    ],
+    "FenderNearOuter": [
+      -0.7610699181586316,
+      1.2546569842566635,
+      0.7234674361811706
+    ]
+  },
+  "cameras": {
+    "2017": {
+      "rotationCameraFromBlender": [
+        [
+          -0.8946958827011174,
+          -0.4464287111163268,
+          0.014855415466535404
+        ],
+        [
+          -0.07243816922396534,
+          0.11219661046998419,
+          -0.9910421949839107
+        ],
+        [
+          0.4407629625060939,
+          -0.8877574705346402,
+          -0.13272032396279654
+        ]
+      ],
+      "translationCameraFromBlender": [
+        0.01665561572654933,
+        0.8095857274586786,
+        3.5929972948291247
+      ],
+      "k": [
+        [
+          5179.924041710349,
+          0.0,
+          2645.1808548891654
+        ],
+        [
+          0.0,
+          5179.924041710349,
+          1277.8080968049744
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "distortion": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "turretYawRadians": 0.0
+    },
+    "2014": {
+      "rotationCameraFromBlender": [
+        [
+          -0.8434276908967585,
+          -0.5368915710714772,
+          0.019420894442914005
+        ],
+        [
+          -0.05962477494694757,
+          0.05761902137862651,
+          -0.9965565385806745
+        ],
+        [
+          0.5339237927280331,
+          -0.841681346643592,
+          -0.08060951724915577
+        ]
+      ],
+      "translationCameraFromBlender": [
+        0.17250854572965912,
+        0.830589041969972,
+        4.063666467268588
+      ],
+      "k": [
+        [
+          5747.826269334912,
+          0.0,
+          2281.5410406579717
+        ],
+        [
+          0.0,
+          5747.826269334912,
+          1446.9275508653323
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "distortion": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "turretYawRadians": -0.02877596784853675
+    },
+    "TourGuide": {
+      "rotationCameraFromBlender": [
+        [
+          -0.8112144279031959,
+          -0.5844276054339809,
+          -0.019378492417974402
+        ],
+        [
+          -0.13715718568257637,
+          0.2223872044866052,
+          -0.965262574482336
+        ],
+        [
+          0.5684356237757496,
+          -0.7803770276522337,
+          -0.26056215445712516
+        ]
+      ],
+      "translationCameraFromBlender": [
+        0.20047873663982532,
+        0.5182730067181079,
+        3.0253830476686008
+      ],
+      "k": [
+        [
+          1851.9240612930819,
+          0.0,
+          1296.0
+        ],
+        [
+          0.0,
+          1851.9240612930819,
+          972.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "distortion": [
+        -0.04603245777644551,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "turretYawRadians": -0.0078029692078753566
+    },
+    "2": {
+      "rotationCameraFromBlender": [
+        [
+          -0.4978791086227319,
+          -0.8672446201030671,
+          0.0017782292655183496
+        ],
+        [
+          0.011213356723329682,
+          -0.008487743003713244,
+          -0.9999011045346926
+        ],
+        [
+          0.8671739466958341,
+          -0.49780993071752766,
+          0.013950593212511797
+        ]
+      ],
+      "translationCameraFromBlender": [
+        -0.7221995809588224,
+        0.9047991573200359,
+        3.1871822096622635
+      ],
+      "k": [
+        [
+          881.1495694470897,
+          0.0,
+          720.0
+        ],
+        [
+          0.0,
+          881.1495694470897,
+          480.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "distortion": [
+        -0.010155120227115722,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "turretYawRadians": 0.015178452501571411
+    },
+    "7": {
+      "rotationCameraFromBlender": [
+        [
+          -0.7165490690490917,
+          -0.6975364956992489,
+          0.0005184713028973942
+        ],
+        [
+          -0.005563422944325713,
+          0.004971795285160452,
+          -0.9999721644009822
+        ],
+        [
+          0.697514501619875,
+          -0.7165320079516715,
+          -0.007443225827762023
+        ]
+      ],
+      "translationCameraFromBlender": [
+        -0.25325373623827946,
+        0.6614217898164347,
+        3.9340378301898244
+      ],
+      "k": [
+        [
+          1310.6207221080315,
+          0.0,
+          720.0
+        ],
+        [
+          0.0,
+          1310.6207221080315,
+          480.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "distortion": [
+        0.018899356064951817,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "turretYawRadians": 0.015178452501571411
+    },
+    "3": {
+      "rotationCameraFromBlender": [
+        [
+          -0.6428229462400983,
+          0.7647611341885985,
+          0.043807161763439406
+        ],
+        [
+          -0.08084637466718353,
+          -0.010864485808090185,
+          -0.9966673600812355
+        ],
+        [
+          -0.7617365184172102,
+          -0.6442222990417936,
+          0.06881210596205178
+        ]
+      ],
+      "translationCameraFromBlender": [
+        0.31970699803053343,
+        0.8631219481962746,
+        3.8132987476044655
+      ],
+      "k": [
+        [
+          1297.7980521644704,
+          0.0,
+          720.0
+        ],
+        [
+          0.0,
+          1297.7980521644704,
+          480.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "distortion": [
+        -0.04083130684910508,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "turretYawRadians": 0.0
+    }
+  },
+  "groundOffsetM": -0.004,
+  "referenceImages": {
+    "2017": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette/References/Reference_Kubinka.jpg",
+    "2": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette/References/PatriotOfficial/Reference_PatriotOfficial2.jpg",
+    "3": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette/References/PatriotOfficial/Reference_PatriotOfficial3.jpg"
+  },
+  "imageSizes": {
+    "2017": [
+      4854,
+      3236
+    ],
+    "2": [
+      1440,
+      960
+    ],
+    "3": [
+      1440,
+      960
+    ]
+  },
+  "renderViews": [
+    "2017",
+    "2",
+    "3"
+  ],
+  "reconstructedVisibleSurfaces": [
+    "Main turret cone and rim profile",
+    "Cabin front quadrilateral",
+    "Tyre edge circles",
+    "Rivet crown markers",
+    "Front fender diagnostic span"
+  ],
+  "completeVehicle": false,
+  "referenceAccepted": false,
+  "gameDerivative": false,
+  "limits": [
+    "No track-centre or tyre-width adoption: effective shoulder axial offset remains on its bound",
+    "Shoulder/bead/tread edge identity and the inherited profile section are hypotheses",
+    "Nominal height and an inferred roof-to-highest offset provide conditional scale",
+    "Rivet markers are reconstructed optical crown candidates; lower shell and all hardware are not reconstructed here",
+    "Cameras and training feature fits are provisional; compare unused silhouette regions before accepting changes"
+  ]
+}

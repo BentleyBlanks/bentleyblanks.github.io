@@ -1,0 +1,124 @@
+{
+  "schema": "Type94DriverReferenceLayoutV19",
+  "scope": "Photo-plane relative layout only; frame width is an authored estimate, not a survey. Hidden opening and seal sections inferred.",
+  "reference": {
+    "image": "Reference_Kubinka.jpg",
+    "sha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+    "source": "https://commons.wikimedia.org/wiki/File:Type_94_TK_\u2013_Patriot_Museum,_Kubinka_(26474921729).jpg",
+    "license": "Alan Wilson, CC BY-SA 2.0",
+    "frameCorners640": [
+      [
+        227.8359375,
+        93.1781234741211
+      ],
+      [
+        318.3812561035156,
+        97.875
+      ],
+      [
+        311.59686279296875,
+        141.45156860351562
+      ],
+      [
+        220.79061889648438,
+        135.9718780517578
+      ]
+    ]
+  },
+  "frameWidthM": 0.55,
+  "cover": {
+    "widthRatio": 0.5334277374782934,
+    "centerCross": 0.027866527066815805,
+    "topDown": 0.14772848545832495,
+    "bottomDown": 0.9075236208727353,
+    "normalStandOffM": 0.013
+  },
+  "sight": {
+    "centerCross": 0.020148794649617628,
+    "centerDown": 0.6996035890707802,
+    "widthRatio": 0.23775550028131853,
+    "heightM": 0.004
+  },
+  "coverFasteners": [
+    {
+      "name": "CoverFarUpperBolt",
+      "a640": [
+        250.015625,
+        120.0546875
+      ],
+      "cross": 0.2057492148562396,
+      "down": 0.5940160885570553
+    },
+    {
+      "name": "CoverFarLowerBolt",
+      "a640": [
+        248.1890625,
+        127.3609375
+      ],
+      "cross": 0.2128179062591036,
+      "down": 0.7644521243487031
+    },
+    {
+      "name": "CoverNearUpperBolt",
+      "a640": [
+        283.1546875,
+        120.5765625
+      ],
+      "cross": -0.15758731569758982,
+      "down": 0.5628318377826544
+    },
+    {
+      "name": "CoverNearLowerBolt",
+      "a640": [
+        281.85,
+        129.4484375
+      ],
+      "cross": -0.15871712623237408,
+      "down": 0.7672757564846275
+    }
+  ],
+  "frameFasteners": [
+    {
+      "name": "FrameFarMiddleBolt",
+      "a640": [
+        230.4453125,
+        114.053125
+      ],
+      "cross": 0.43283015424759735,
+      "down": 0.4810186725223861
+    },
+    {
+      "name": "FrameFarLowerBolt",
+      "a640": [
+        227.575,
+        129.9703125
+      ],
+      "cross": 0.4357022547133619,
+      "down": 0.8523572383477384
+    },
+    {
+      "name": "FarStripMiddleBolt",
+      "a640": [
+        238.534375,
+        125.7953125
+      ],
+      "cross": 0.3220280894596883,
+      "down": 0.7413729313036147
+    },
+    {
+      "name": "FarStripLowerBolt",
+      "a640": [
+        237.2296875,
+        130.23125
+      ],
+      "cross": 0.3284454639009957,
+      "down": 0.8452359386829597
+    }
+  ],
+  "inferred": [
+    "Exact frame/rod/fastener dimensions",
+    "Hidden opening bounds and compressed seal section",
+    "Small source point/paint-edge uncertainty",
+    "Hidden inward splay of the sight channel; only the fine outside mouth is observed"
+  ]
+}

@@ -1,0 +1,230 @@
+{
+  "schema": "Type94GrayComponentTrialV1",
+  "revision": "ShapeV42Trial",
+  "status": "local-running-gear-component-trial",
+  "basedOnGray": "Data_GrayStudyV37.json",
+  "retainedSurface": "Data_SurfaceStudyV39.json",
+  "layout": "Data_RunningGearTrialV42.json",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Scene_Type94TanketteHighShapeV42Trial.blend",
+  "sourceBlendSha256": "8a93205540ebc355d206538fab7bb9c3cf0f28da2e6e6187285fd4e065340184",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Exports\\Model_Type94TanketteHighShapeV42Trial.glb",
+  "sha256": "b6c885c195a7184f50c1e7ee195b2972f2703a8c4470a826d9ba4fa317b52d9b",
+  "bytes": 23729884,
+  "triangles": 505206,
+  "meshNodes": 249,
+  "independentLinks": [
+    86,
+    86
+  ],
+  "measuredWidthHeightLengthM": [
+    1.628000020980835,
+    1.6303555355121824,
+    3.079119797098354
+  ],
+  "pathManifest": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Data_MechanismShapeV42Trial.json",
+  "recipeFilesSha256": {
+    "Taierzhuang1938/_blender/Script_Type94TanketteBuild.py": "bd88ebd68e1f02503297880f6daa18a044cc3fbab6ae529fb9116cbbfddf6bab",
+    "Taierzhuang1938/_blender/Script_Type94GrayStudy.py": "828af68f0a608230e09646c1cfd5a84df86a6d90274893ce10d093d1f916090a",
+    "Taierzhuang1938/_blender/Script_Type94MechanismCorrect.py": "43506cc01a7cc5b79135fca08cace596672fdd81f3287862d739137561980341",
+    "Taierzhuang1938/_blender/Script_Type94Articulation.py": "88c705973a2f4b92e9ac30174aeb6f080e641bb58a6381c2110b73086a4460af",
+    "Taierzhuang1938/_blender/Script_Type94DetailCorrect.py": "aad345902267afcf2d4fb51960428c66e75078a53a50dd8cca2894a241f99691",
+    "Taierzhuang1938/_blender/Script_Type94Export.py": "168f799dc53887fbabded5f98953d8eb2a18df8fcfd57ee1ce119aa9b7764c8b",
+    "Taierzhuang1938/_blender/Script_Type94TangentRepair.py": "1d76f211ddeb6a491da6b2b5685b34adb0cfea46f11cdf674523203d123e572f"
+  },
+  "layoutSha256": "f45d8054abc26a288a74109af04b15feb603667e188981e19f8be01d8484da8c",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94RunningReviewV42/",
+  "validation": {
+    "rawGeometryChecks": 705,
+    "editableSourceReopenChecks": 18,
+    "actualImportedMovementChecks": 37,
+    "geometryConservationAndPitchChecks": 4,
+    "browserChecks": 14,
+    "unrelatedMeshOwnersRetained": 56,
+    "hullOutsideLowerGearEnvelopeRetained": true,
+    "rootAlignmentRowMajor": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "driveCircularArcSamples": [
+      {
+        "side": "Left",
+        "samples": 9,
+        "maximumRadiusErrorM": 5.0987098430266276e-05
+      },
+      {
+        "side": "Right",
+        "samples": 9,
+        "maximumRadiusErrorM": 5.0987098430266276e-05
+      }
+    ],
+    "legacyDefaultPathExactlyMatchesLockedBaseline": true,
+    "ownedBlenderStopped": true,
+    "viewerHtmlSha256": "262485e1138b5d1a72d21bcd6ffe18ff7975855b292747d5c2b9d9eb0e865902",
+    "viewerDataSha256": "f149965774901871aa1e67251c6042b48c3832cbb23282cac2ea1c76468a8dd6",
+    "reports": [
+      "Data_V42TrialRawAudit.json",
+      "Data_V42TrialSourceAudit.json",
+      "Data_V42TrialActualSweep.json",
+      "Data_V42TrialGeometryConservation.json",
+      "Data_V42TrialBrowserAudit.json"
+    ],
+    "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\RunningGearTrialV42",
+    "scope": "Exact component trial files and default-path compatibility. No whole-photo, physical survey, final PBR/UV or game-budget acceptance"
+  },
+  "componentProjectionComparison": [
+    {
+      "camera": "2017",
+      "roadAxleCoverProxyErrorsNative": {
+        "V37": [
+          42.81160019683551,
+          44.70865759805853,
+          21.96692243161655,
+          25.947831994157653
+        ],
+        "V42Trial": [
+          33.97679372747805,
+          11.421768511137419,
+          15.947555656266616,
+          22.417437823432795
+        ]
+      },
+      "scope": "Same conditional metric camera for both files; fitting/component diagnostic, not independent photo acceptance"
+    },
+    {
+      "camera": "TourGuide",
+      "roadAxleCoverProxyErrorsNative": {
+        "V37": [
+          24.70437983499595,
+          26.46616836861179,
+          26.64588979144455,
+          11.785625590430437
+        ],
+        "V42Trial": [
+          14.394430125851525,
+          5.832426226417875,
+          8.670120402998304,
+          22.125241040207502
+        ]
+      },
+      "scope": "Same conditional metric camera for both files; fitting/component diagnostic, not independent photo acceptance"
+    },
+    {
+      "camera": "2",
+      "roadAxleCoverProxyErrorsNative": {
+        "V37": [
+          12.747686922276369,
+          22.729180774030137,
+          20.24530140176301,
+          12.444112790634593
+        ],
+        "V42Trial": [
+          4.880311790794308,
+          6.319319311091297,
+          1.0174730180875844,
+          5.951587679034376
+        ]
+      },
+      "scope": "Same conditional metric camera for both files; fitting/component diagnostic, not independent photo acceptance"
+    },
+    {
+      "camera": "7",
+      "roadAxleCoverProxyErrorsNative": {
+        "V37": [
+          3.9284028480058724,
+          10.336117288303125,
+          12.03166561225749,
+          12.793436467076729
+        ],
+        "V42Trial": [
+          2.5330783667755825,
+          4.273718127809162,
+          3.3581086054939395,
+          4.946331640791619
+        ]
+      },
+      "scope": "Same conditional metric camera for both files; fitting/component diagnostic, not independent photo acceptance"
+    }
+  ],
+  "solverRepair": {
+    "firstAttemptDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\RunningGearTrialV42FirstFailure",
+    "problem": "Rounding count during radius iteration produced a discrete85/86cycle and mismatched exported pitch circles",
+    "fix": "Solve fixed integer candidates separately and propagate the chosen count to construction/correction",
+    "selectedLinkCount": 86,
+    "maximumCandidateRadiusResidualM": 7.103969079658157e-10,
+    "existingClearanceAssertionsRelaxed": false
+  },
+  "complete": false,
+  "strictReferenceMatched": false,
+  "wholeVehicleReferenceAccepted": false,
+  "metricDimensionsInferred": true,
+  "metricSurveyAccepted": false,
+  "pbrAccepted": false,
+  "gameBudgetAccepted": false,
+  "activeGrayReplaced": false,
+  "scope": "Only lower running-gear geometry and its closed belt path changed; V37 body/cabin/turret and V39 material checkpoint retained",
+  "remaining": [
+    "Whole five-view gray body/cabin/turret/fender/nose alignment and defensible vehicle axes/scale",
+    "Visible track-shoe end-connector/casting and paint-wear reference checks",
+    "Fresh complete geometry/UV/PBR replay for the accepted final shape",
+    "Below80000-triangle final game derivative with3mm bidirectional checks"
+  ],
+  "pathSummary": {
+    "lengthM": 6.513035224883273,
+    "linkCount": 86,
+    "pitchM": 0.07573296773120085,
+    "sprocketTeeth": 22,
+    "drivePitchRadiusM": 0.2651720757276716,
+    "idlerWrapRadiusM": 0.197,
+    "returnWrapRadiusM": 0.0725,
+    "solver": {
+      "method": "Fixed integer counts solved independently; choose closest nominal3in pitch",
+      "linkCount": 86,
+      "lengthM": 6.513035224883273,
+      "candidates": [
+        {
+          "linkCount": 85,
+          "iterations": 8,
+          "pitchM": 0.0767438359760152,
+          "drivePitchRadiusM": 0.2687115386431619,
+          "radiusResidualM": 7.103969079658157e-10
+        },
+        {
+          "linkCount": 86,
+          "iterations": 8,
+          "pitchM": 0.07573296773120085,
+          "drivePitchRadiusM": 0.2651720757276716,
+          "radiusResidualM": 3.8634923038571856e-10
+        },
+        {
+          "linkCount": 87,
+          "iterations": 9,
+          "pitchM": 0.07474881855901443,
+          "drivePitchRadiusM": 0.26172616720681974,
+          "radiusResidualM": 2.2126805943045724e-10
+        }
+      ]
+    }
+  }
+}

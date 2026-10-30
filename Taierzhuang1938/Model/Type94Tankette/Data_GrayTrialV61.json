@@ -1,0 +1,128 @@
+{
+  "schema": "Type94GraySuspensionTrialV1",
+  "revision": "ShapeV61SuspensionTrial",
+  "status": "local-recessed-arm-and-rounded-pivot-trial-verified",
+  "sourceProducer": "Taierzhuang1938/_blender/Script_Type94SuspensionTrial.py",
+  "layout": "Data_BodyTrialV61.json",
+  "runningAssembly": "Data_RunningAssemblyV61.json",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SuspensionV61\\Scene_Type94TanketteHighShapeV61SuspensionTrial.blend",
+  "sourceBlendSha256": "bb7a393fc178604d600e0be7f347fb279e9e70eade9d8841ee11ead09be5a2b8",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SuspensionV61\\Exports\\Model_Type94TanketteHighShapeV61SuspensionTrial.glb",
+  "sha256": "731a3763a04077dfe8958fe8cd0159a4d7a1e3d2c2c9e9bba3560269cf8235d9",
+  "triangles": 623360,
+  "meshNodes": 237,
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "complete": false,
+  "wholeReferenceAccepted": false,
+  "pbrAccepted": false,
+  "gameBudgetAccepted": false,
+  "published": false,
+  "sourceReference": "Data_GrayTrialV55.json",
+  "referenceSha256": "bf2743a1c439a531b0c3911d6828b5fcab9677874ac7adb39b12abc5d8869c71",
+  "metricEnvelopeAccepted": true,
+  "validation": {
+    "raw": {
+      "passed": true,
+      "checks": 685,
+      "report": "Data_SuspensionRawV61.json"
+    },
+    "conservation": {
+      "passed": true,
+      "checks": 236,
+      "report": "Data_SuspensionConservationV61.json",
+      "unmodifiedMeshes": 236,
+      "unchangedPoseNodes": 292,
+      "removedComponents": 20,
+      "addedComponents": 12
+    },
+    "section": {
+      "passed": true,
+      "checks": 56,
+      "report": "Data_SuspensionSectionV61.json"
+    },
+    "allAngleChangedParts": {
+      "passed": true,
+      "checks": 24,
+      "report": "Data_ArmWheelEnvelopeV61.json"
+    },
+    "native": {
+      "passed": true,
+      "checks": 41,
+      "report": "Data_SuspensionMotionV61.json"
+    },
+    "bodyBelt": {
+      "passed": true,
+      "checks": 32,
+      "report": "Data_SuspensionBeltV61.json"
+    },
+    "roadBody": {
+      "passed": true,
+      "checks": 8,
+      "report": "Data_RoadBodyV61.json",
+      "sampledPoses": 128
+    },
+    "sourceExport": {
+      "passed": true,
+      "checks": 237,
+      "report": "Data_SourceExportV61.json"
+    },
+    "browser": {
+      "passed": true,
+      "checks": 36,
+      "report": "Data_SuspensionUiV61.json"
+    }
+  },
+  "sourceAndExportMeshesExact": 237,
+  "independentLinksPerSide": 80,
+  "rootAndPathExact": true,
+  "changedMeshOwners": [
+    "Geometry_Hull_Paint"
+  ],
+  "changedComponents": {
+    "oldRods": 8,
+    "oldPlates": 8,
+    "oldPivotCylinders": 4,
+    "newClosedChannels": 8,
+    "newRoundedPivotCovers": 4
+  },
+  "observedProfileEvidence": "Native official museum photographs2and7 show recessed arm webs, raised borders, round journal ends and rounded pivot covers",
+  "sectionDimensionsInferred": true,
+  "backConstructionInferred": true,
+  "manufacturingMethodUnverified": true,
+  "recessDepthM": 0.004,
+  "sectionThicknessM": 0.018,
+  "minimumAllAngleChangedPartWheelGapM": 0.002899959683418274,
+  "allAngleProofScope": "Actual arm axial bounds and actual rounded-pivot radial bounds remain separated from every road wheel during parallel X-axis rotation. This proves all-angle clearance against the twelve changed components; the complete stationary body is also sampled separately.",
+  "legacyV55ColdReplayByteIdentical": true,
+  "legacyReplayReport": "Data_LegacyRegressionV61.json",
+  "visualReview": {
+    "actualBrowserVariantsInspected": true,
+    "savedSourceCyclesInspected": true,
+    "preview": "Preview_ArmCyclesV61.jpg",
+    "cyclesScope": "Actual saved source with neutral material and physical GI/shadows; camera2pinhole crop only, no lens warp and no photo-alignment acceptance",
+    "localVisibleFeatureConstructionReviewed": true,
+    "wholeReferenceAccepted": false
+  },
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94SuspensionReviewV61/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SuspensionV61\\Acceptance",
+  "verificationSnapshots": "Data_VerificationSnapshotsV61.json",
+  "retainedHighAndGameFilesUnchanged": true,
+  "canonicalGameReplaced": false,
+  "canonicalSha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV61.json",
+  "rejectedInitialSection": "Versions/InitialBackSection",
+  "retainedChannelOnlyVariant": "Versions/ChannelOnly18mm",
+  "globalCalibrationAccepted": false,
+  "gameDerivativeForThisRevisionProduced": false,
+  "goalComplete": false,
+  "remaining": [
+    "Continue complete body/running-gear/camera reference alignment from visible contours and established surface identities",
+    "Generate final fresh high/low PBR and accept source/import appearance",
+    "Rebuild the game derivative for the final accepted high revision and verify the complete objective"
+  ]
+}

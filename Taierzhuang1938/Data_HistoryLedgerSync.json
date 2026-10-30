@@ -86,13 +86,6 @@
         "notionLedgerLastEdited": "2026-10-29T18:18:48.478Z",
         "notionParentLastEdited": "2026-10-29T18:18:59.976Z"
       },
-      "pierMasonryReview20261030": {
-        "version": "2026103007",
-        "decision": "Variable stone lengths, staggered course joints and corner seam positions are authored visual analogies to the AI construction study. They do not establish the original Beishahe masonry bond or block dimensions. A newly generated stone texture was compared and not adopted.",
-        "notionReview": "The existing bridge creative row and parent bullet were reread. Their explicit boundaries for piers, stone textures, dimensions and unseen details cover this iteration; no historical claim or category changes. Global review anchors and unrelated page cursors remain unchanged.",
-        "notionLedgerLastEdited": "2026-10-30T04:42:27.833Z",
-        "notionParentLastEdited": "2026-10-30T04:42:29.462Z"
-      },
       "acceptanceScope": "Historical-boundary synchronization only; no claim that the model has completed visual matching or runtime acceptance."
     },
     {
@@ -313,6 +306,27 @@
       ],
       "appearanceRevision": "Cod14Metal20261025",
       "appearanceReview": "The existing creative-appearance boundary also covers the COD14 display comparison and runtime conductor/roughness calibration. Reference game screenshots are not historical evidence or texture inputs. No new historical claim or unrelated Notion cursor is marked reviewed."
+    },
+    {
+      "asset": "Type94Tankette",
+      "date": "2026-10-24",
+      "scope": "Only Kubinka 2017 early-tankette appearance and minimal corresponding ledger additions; global repository cursor and unrelated source-page stamps preserved",
+      "contract": "Model/Type94Tankette/Data_Type94Tankette.json",
+      "decision": "Museum appearance and unseen details inferred; strict reference acceptance remains pending; participation claims follow the current upstream history ledger",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-10-23T16:22:08.548Z"
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-10-23T16:21:19.748Z"
+        }
+      ],
+      "publication": "User-authorized current model checkpoint release 2026-10-30; full photographic acceptance remains pending",
+      "currentRelease": "20261030CurrentWearV106-43969e24",
+      "currentReleaseContract": "Model/Type94Tankette/Data_ReleaseV106.json",
+      "externalNotionCursorsAdvanced": false
     }
   ],
   "notionPages": [

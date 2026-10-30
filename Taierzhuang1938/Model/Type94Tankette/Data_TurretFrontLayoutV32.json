@@ -1,0 +1,156 @@
+{
+  "schema": "Type94TurretFrontLayoutV1",
+  "status": "Local relative-layout correction; whole gray shape and cameras remain unaccepted",
+  "primary": {
+    "file": "Reference_Kubinka.jpg",
+    "sha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+    "nativeFrontCrop": [
+      2530,
+      385,
+      2820,
+      755
+    ],
+    "scope": "2017 selected vehicle and olive repaint"
+  },
+  "supplement": {
+    "file": "Reference_KubinkaOld.jpg",
+    "sha256": "a2842cfe2394259a70ab2bc7d5835696c944da040518b2c8870f9428f76ca136",
+    "nativeFrontCrop": [
+      2390,
+      570,
+      2735,
+      980
+    ],
+    "scope": "2014 same exhibit; geometry supplement only"
+  },
+  "roundOpening": {
+    "observed": "Small circular dark aperture beside the short gun barrel",
+    "nominalNativeRadiusToBoltCircleRadiusRange": [
+      0.050508,
+      0.062434
+    ],
+    "retainedAuthoredBoltCircleRadiusM": 0.135,
+    "adoptedRadiusM": 0.008,
+    "adoptedRatio": 0.0592592593,
+    "previousRatio": 0.0814814815,
+    "centerBeforeGunReanchorM": [
+      0.042,
+      0.1,
+      0.041
+    ],
+    "modeledBallDepthM": 0.072,
+    "limits": "Threshold-sensitive native footprint divided by local major magnification of an unsurveyed flange gauge. Different planes, gun pose, depth, paint and head-centre uncertainty remain. This is not an8mm museum measurement."
+  },
+  "raisedFitting": {
+    "observed": "Leaning raised upright/web and short base tab visible in both dates",
+    "outlineXZBeforeGunReanchorM": [
+      [
+        0.035,
+        0.022
+      ],
+      [
+        0.035,
+        0.029
+      ],
+      [
+        0.023,
+        0.059
+      ],
+      [
+        0.019,
+        0.063
+      ],
+      [
+        0.012,
+        0.061
+      ],
+      [
+        0.012,
+        0.057
+      ],
+      [
+        0.025,
+        0.03
+      ],
+      [
+        0.004,
+        0.03
+      ],
+      [
+        0.003,
+        0.025
+      ],
+      [
+        0.004,
+        0.023
+      ]
+    ],
+    "centerYBeforeGunReanchorM": 0.103,
+    "thicknessM": 0.008,
+    "edgeBevelM": 0.0006,
+    "owner": "MachineGunPitch",
+    "surfaceRole": "Paint",
+    "frontProbePointsAfterGunReanchorM": [
+      [
+        0.02,
+        0.043,
+        0.052
+      ],
+      [
+        0.012,
+        0.043,
+        0.026
+      ]
+    ],
+    "rootYAfterGunReanchorM": 0.035,
+    "ballFrontYAfterGunReanchorM": 0.036,
+    "functionAccepted": false,
+    "depthAndAttachmentInferred": true,
+    "independentMotion": false,
+    "lowerDarkNotchClassification": "Unresolved shadow/recess/receiver region; no additional Boolean opening is asserted"
+  },
+  "commanderHinge": {
+    "observed": "Two transverse roof hinge stations, cross-checked against the ten paired-rivet centres and roof-pin ends",
+    "pinStationsXLocalTurretM": [
+      -0.1305,
+      0.1305
+    ],
+    "retainedAxisYZLocalTurretM": [
+      0.245,
+      0.525
+    ],
+    "referenceGeneratorSpanM": 0.27161017,
+    "adoptedSpanToRivetGeneratorRatio": 0.9609360356425536,
+    "oldSpanToRivetGeneratorRatio": 1.3254290146793841,
+    "structuralRatioPercentiles5_50_95": [
+      0.857936,
+      0.954135,
+      1.007969
+    ],
+    "unconstrainedRatioPercentiles5_50_95": [
+      0.8493,
+      0.9519,
+      1.3853
+    ],
+    "unconstrainedRatioPercentiles2p5_97p5": [
+      0.8297,
+      3.2162
+    ],
+    "assumptions": [
+      "Five rivets in each column lie on approximately straight equally spaced generators; middle fractions perturbed by1percent",
+      "Roof hinge axis approximately parallel to the fixed-flange plane, with3degree soft uncertainty plus3degree mean perturbation"
+    ],
+    "scope": "Relative station estimate under these construction-class assumptions. The unconstrained sensitivity includes the prior span. Common axis, closed lid, roof, Y/Z stations and turret scale are retained. Absolute metres are inferred."
+  },
+  "researchReportsExternal": [
+    "Data_FlangeGaugeV32.json",
+    "Data_MgHoleEllipseV32.json",
+    "Data_MgOpeningRatioV32.json",
+    "Data_TurretBundleV32.json",
+    "Data_TurretSensitivityV32.json",
+    "Data_StructuredTurretV32.json"
+  ],
+  "globalCalibrationAccepted": false,
+  "metricScaleAccepted": false,
+  "wholeGrayAccepted": false
+}

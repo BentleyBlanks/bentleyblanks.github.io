@@ -1,0 +1,77 @@
+{
+  "schema": "Type94FarCasingRaisedEarLayoutV1",
+  "reference": "Data_GrayTrialV95.json",
+  "side": "Right",
+  "owner": "FinalDriveHousingRight",
+  "mesh": "Geometry_FinalDriveHousingRight_Paint",
+  "visibleFaceCentreWorldM": [
+    0.5128357572555542,
+    1.3791246064183589,
+    0.6054081329051922
+  ],
+  "faceExposureM": 0.008,
+  "totalThicknessXM": 0.015,
+  "widthYM": 0.024,
+  "heightZM": 0.006,
+  "edgeRadiusM": 0.0012,
+  "photographicSources": [
+    "2017",
+    "2014"
+  ],
+  "featureIdentity": "Small raised horizontal lug on the visible inner casing face; exact function unproved",
+  "observations": [
+    {
+      "camera": "2017",
+      "pixel": [
+        750,
+        2012
+      ],
+      "sigmaNative": 8
+    },
+    {
+      "camera": "2014",
+      "pixel": [
+        679,
+        2043
+      ],
+      "sigmaNative": 8
+    }
+  ],
+  "projectionMetrics": [
+    {
+      "camera": "2017",
+      "pixel": [
+        750,
+        2012
+      ],
+      "sigmaNative": 8,
+      "predictedNative": [
+        742.0872480151536,
+        2017.8272552208743
+      ],
+      "errorNative": 9.826929702755493
+    },
+    {
+      "camera": "2014",
+      "pixel": [
+        679,
+        2043
+      ],
+      "sigmaNative": 8,
+      "predictedNative": [
+        688.4996952501,
+        2036.8470308440048
+      ],
+      "errorNative": 11.318270154020887
+    }
+  ],
+  "maximumErrorNative": 11.318270154020887,
+  "conditionalFit": true,
+  "roiPredictionGuided": true,
+  "unknownSectionInferred": true,
+  "nearSideSymmetryAssumed": false,
+  "existingGenericCasingHeadsRetainedAsUnconfirmed": true,
+  "driveAxesAndCameraUnchanged": true,
+  "wholeReferenceAccepted": false,
+  "scope": "Coarse two-image local construction on the retained casing. Apparent footprint is not a surveyed mechanical datum; this does not accept the old casing section or cameras."
+}

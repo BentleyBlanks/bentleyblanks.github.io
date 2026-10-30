@@ -1,0 +1,102 @@
+{
+  "schema": "Type94FrontCornerGrayTrialV1",
+  "revision": "ShapeV79FrontCornerEarTrial",
+  "status": "local-far-front-ear-gray-trial-profile-and-depth-inferred",
+  "reference": "Data_GrayTrialV74.json",
+  "referenceAudit": "Data_ReferenceAuditV78.json",
+  "producer": "Taierzhuang1938/_blender/Script_Type94FrontCornerTrialV79.py",
+  "nativeVerifier": "Taierzhuang1938/_blender/Script_VerifyType94FrontCornerV79.py",
+  "geometryVerifier": "Taierzhuang1938/_import/Script_VerifyType94FrontCornerGeometryV79.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontCornerV79\\Scene_Type94TanketteHighShapeV79FrontCornerTrial.blend",
+  "sourceBlendSha256": "b0f9101ee4dbf4379efbed3fb8b81cc020e5792636bae87db4412d3b41bfb84a",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontCornerV79\\Exports\\Model_Type94TanketteHighShapeV79FrontCornerTrial.glb",
+  "sha256": "789a3b2b494db0525d7a8c0af3f172e3351fdcbed8f05b7ff55dea7acc14c392",
+  "baseSha256": "d405f506eb43191048e19f7e9b472711a17a7cbb4d8fb1488136223f599e43be",
+  "triangles": 622080,
+  "meshOwners": 238,
+  "poseNodes": 293,
+  "addedTriangles": 60,
+  "preservedMeshOwners": 237,
+  "preservedExistingNodePosesAndProperties": 292,
+  "addedOwner": "Geometry_FrontCornerEarRight_Paint",
+  "attachmentOwnershipInferred": true,
+  "profileAndDepthInferred": true,
+  "profile": {
+    "widthM": 0.045,
+    "heightM": 0.1,
+    "thicknessM": 0.004,
+    "headRadiusM": 0.01,
+    "headHeightM": 0.006
+  },
+  "primaryObservation": [
+    797,
+    1824
+  ],
+  "primaryIsTraining": true,
+  "conditional2014Prediction": [
+    742.7016987763277,
+    1866.34820312131
+  ],
+  "tentative2014Observation": [
+    747,
+    1871
+  ],
+  "conditional2014ResidualNative": 6.333609366704954,
+  "lowerEarHeadNotYetIdentified": true,
+  "secondaryReferenceAccepted": false,
+  "validation": {
+    "geometry": {
+      "passed": true,
+      "checks": 774,
+      "report": "Data_FrontCornerGeometryV79.json"
+    },
+    "nativeMotion": {
+      "passed": true,
+      "checks": 39,
+      "report": "Data_FrontCornerMotionV79.json"
+    },
+    "sourceReopen": {
+      "passed": true,
+      "byteIdenticalReexport": true,
+      "report": "Data_FrontCornerNativeV79.json"
+    },
+    "fixedEar": {
+      "passed": true,
+      "checks": 2,
+      "report": "Data_FrontCornerNativeV79.json"
+    },
+    "browser": {
+      "passed": true,
+      "comparedRenders": 4,
+      "cameraControls": 7,
+      "report": "Data_FrontCornerBrowserV79.json"
+    }
+  },
+  "actualViewsInspected": [
+    "2017FarNativeCrop",
+    "2014FarNativeCrop"
+  ],
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94FrontCornerReviewV79/",
+  "sourceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontCornerV79",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontCornerV79\\Rebuild",
+  "newUvsProvisional": true,
+  "newPbrBaked": false,
+  "wholeReferenceAccepted": false,
+  "canonicalGameReplaced": false,
+  "retainedMaterialPreview": "http://127.0.0.1:8114/tmp/Type94WearReviewV77/",
+  "goalComplete": false,
+  "published": false,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\FrontCornerV79\\Acceptance\\Data_OwnedBlenderCleanupV79.json",
+  "remaining": [
+    "Confirm the lower ear head and exact fitting/plate outline from native references",
+    "Resolve the two near-edge observations against actual corner casing and track envelopes",
+    "Audit third-view camera/correspondence consistency before using it as a geometry holdout",
+    "Complete body/running-gear reference acceptance before final PBR and game rebuild"
+  ],
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ]
+}

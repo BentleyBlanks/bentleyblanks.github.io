@@ -1,0 +1,169 @@
+{
+  "schema": "Type94ActualReferenceAuditV1",
+  "revision": "ReferenceV60",
+  "status": "projection-and-visibility-audit-complete-shape-acceptance-still-pending",
+  "geometryReference": "Data_GrayTrialV55.json",
+  "sha256": "bf2743a1c439a531b0c3911d6828b5fcab9677874ac7adb39b12abc5d8869c71",
+  "sourceProducer": "Taierzhuang1938/_blender/Script_Type94ProjectionAuditV60.py",
+  "producerSha256": "4974b0bdaf5e30d5539a7f81e0a4ef844b9999c6b4ac6566a2f3a19d0832ebcb",
+  "cameraInputSha256": "e46e69bbff97bed69d48b9ab53650df94f4c4396ea711509f1f4cc7ab861ea7b",
+  "observationInputSha256": "d3235f663f3aceec48d7405b967c6c76794435d30c3483e0a7635ab58ce95a9a",
+  "cameraParametersChanged": false,
+  "observationsMoved": false,
+  "geometryChanged": false,
+  "newDimensionsAccepted": false,
+  "actualRivetCrownSurfaceRays": 50,
+  "actualHubTargets": 16,
+  "occludedHubTargets": 16,
+  "hubSeparationIsVisibleShapeResidual": false,
+  "visibilityRayReprojectionChecks": 16,
+  "maximumVisibilityRayReprojectionNativePixels": 0.00012505281895293954,
+  "datumConclusion": "The existing axle-cover optical picks must not be equated with occluded rotating-hub front centres or used to move mechanical axes",
+  "maximumBlenderMathParityNativePixels": 0.0011459934531115883,
+  "browserChecks": 33,
+  "gpuCalibrationTargets": 45,
+  "maximumGpuCalibrationErrorScreenPixels": 0.18497493952676972,
+  "projectionPipelineVerified": true,
+  "sourceImagesByteIdentical": true,
+  "nativeImageSizes": {
+    "2017": [
+      4854,
+      3236
+    ],
+    "TourGuide": [
+      2592,
+      1944
+    ],
+    "2": [
+      1440,
+      960
+    ],
+    "7": [
+      1440,
+      960
+    ],
+    "2014": [
+      4906,
+      3271
+    ]
+  },
+  "lensOmissionMaximumOnCheckedPointsNativePixels": {
+    "2017": 0,
+    "TourGuide": 13.816673530464291,
+    "2": 2.736564945921287,
+    "7": 0.8520309347847015,
+    "2014": 0.0
+  },
+  "statistics": {
+    "2017": {
+      "ActualCrown": {
+        "meanNativePixels": 2.409572015003274,
+        "maximumNativePixels": 4.932241071334431,
+        "count": 10,
+        "interpretation": "Reused training-feature diagnostic, not an independent acceptance result"
+      },
+      "ActualDriverFrameDatum": {
+        "meanNativePixels": 8.221298071224235,
+        "maximumNativePixels": 12.005780453715174,
+        "count": 4,
+        "interpretation": "Reused training-feature diagnostic, not an independent acceptance result"
+      },
+      "ActualHubFrontCentre": {
+        "meanNativePixels": 47.220296666684305,
+        "maximumNativePixels": 52.40525812557317,
+        "count": 4,
+        "interpretation": "Hidden-hub separation only, not a visible-shape residual"
+      }
+    },
+    "TourGuide": {
+      "ActualCrown": {
+        "meanNativePixels": 1.2435031214567058,
+        "maximumNativePixels": 2.2109449120272884,
+        "count": 10,
+        "interpretation": "Reused training-feature diagnostic, not an independent acceptance result"
+      },
+      "ActualDriverFrameDatum": {
+        "meanNativePixels": 5.078801926930266,
+        "maximumNativePixels": 11.75839718128074,
+        "count": 4,
+        "interpretation": "Reused training-feature diagnostic, not an independent acceptance result"
+      },
+      "ActualHubFrontCentre": {
+        "meanNativePixels": 29.253732892335044,
+        "maximumNativePixels": 39.41982605755619,
+        "count": 4,
+        "interpretation": "Hidden-hub separation only, not a visible-shape residual"
+      }
+    },
+    "2": {
+      "ActualCrown": {
+        "meanNativePixels": 2.3765616004390937,
+        "maximumNativePixels": 3.2006872072069337,
+        "count": 10,
+        "interpretation": "Reused training-feature diagnostic, not an independent acceptance result"
+      },
+      "ActualHubFrontCentre": {
+        "meanNativePixels": 6.568150206172478,
+        "maximumNativePixels": 10.587519937567919,
+        "count": 4,
+        "interpretation": "Hidden-hub separation only, not a visible-shape residual"
+      }
+    },
+    "7": {
+      "ActualCrown": {
+        "meanNativePixels": 2.2401746514211296,
+        "maximumNativePixels": 3.2481387329260816,
+        "count": 10,
+        "interpretation": "Reused training-feature diagnostic, not an independent acceptance result"
+      },
+      "ActualHubFrontCentre": {
+        "meanNativePixels": 8.186007760032355,
+        "maximumNativePixels": 13.552073965276886,
+        "count": 4,
+        "interpretation": "Hidden-hub separation only, not a visible-shape residual"
+      }
+    },
+    "2014": {
+      "ActualCrown": {
+        "meanNativePixels": 2.7342277937862383,
+        "maximumNativePixels": 5.074661795520582,
+        "count": 10,
+        "interpretation": "Reused training-feature diagnostic, not an independent acceptance result"
+      },
+      "ActualDriverFrameDatum": {
+        "meanNativePixels": 9.519869751649367,
+        "maximumNativePixels": 14.552707000629216,
+        "count": 4,
+        "interpretation": "Reused training-feature diagnostic, not an independent acceptance result"
+      }
+    }
+  },
+  "reports": {
+    "actualProjection": "Data_ActualProjectionV60.json",
+    "visibility": "Data_VisibilityReprojectionV60.json",
+    "browser": "Data_ReferenceUiV60.json",
+    "cleanup": "Data_OwnedBlenderCleanupV60.json"
+  },
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV60\\Acceptance",
+  "verificationSnapshots": "Data_VerificationSnapshotsV60.json",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94ReferenceReviewV60/",
+  "physicalCameraCalibrationAccepted": false,
+  "pointIdentitiesFullyResolved": false,
+  "wholeReferenceAccepted": false,
+  "complete": false,
+  "goalComplete": false,
+  "published": false,
+  "canonicalGameReplaced": false,
+  "canonicalSha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+  "retainedHighAndGameFilesUnchanged": true,
+  "retainedGlbSha256": [
+    "283822f415509a17cd5dff598c030da251476d24321177e4a1de03a6d635e569",
+    "23b6a7c289ee686d953c0bfd2216f70cdd582bf177ca7b07ae09e62a87a2a690"
+  ],
+  "ownedBlenderStopped": true,
+  "nextConcreteWork": [
+    "Refine the visibly recessed/flanged cast suspension arm profile from official photos2and7 while preserving all mechanical axes and track path",
+    "Use defensible visible tyre arcs and actual stationary cover surfaces for joint camera/shape review; never treat the hidden-hub separations as mechanical-axis errors",
+    "Continue complete silhouette/details/reference alignment, final PBR and final game derivative acceptance"
+  ]
+}

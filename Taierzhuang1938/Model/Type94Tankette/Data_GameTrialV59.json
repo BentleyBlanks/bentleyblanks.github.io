@@ -1,0 +1,122 @@
+{
+  "schema": "Type94FeatureGameTrialV1",
+  "revision": "GameTrialV59",
+  "status": "local-game-geometry-and-articulation-verified-final-reference-and-pbr-pending",
+  "reference": "Data_SurfaceStudyV56.json",
+  "referenceSha256": "283822f415509a17cd5dff598c030da251476d24321177e4a1de03a6d635e569",
+  "previousTrial": "Data_GameTrialV58.json",
+  "previousSha256": "6f684dd8838e21451555e8d587e9abddf27fee09480aae7b18f8328e84e6d8dc",
+  "producer": "Taierzhuang1938/_blender/Script_Type94GameFeatures.py",
+  "producerSha256": "fdd5de0e0b59bbc3fed0a9259118380736cf6a4eea1457745a192fa87571ef46",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV59\\Scene_Type94TanketteGameTrialV59.blend",
+  "sourceBlendSha256": "e229a7bef32b69744b03b4ca73e83a08920ff7e75bef5b3ae0bdb57427387531",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV59\\Exports\\Model_Type94TanketteGameTrialV59.glb",
+  "sha256": "23b6a7c289ee686d953c0bfd2216f70cdd582bf177ca7b07ae09e62a87a2a690",
+  "bytes": 36197544,
+  "triangles": 77112,
+  "triangleLimitExclusive": 80000,
+  "strictBudgetPassed": true,
+  "meshOwners": 237,
+  "independentLinks": [
+    80,
+    80
+  ],
+  "dimensionsWidthHeightLengthM": [
+    1.6198139190673828,
+    1.616717595333129,
+    3.0824818020260327
+  ],
+  "maximumWorldSurfaceUpperBoundM": 0.0029979944774195764,
+  "maximumAllowedDistanceM": 0.003,
+  "numericSafetyMarginM": 2e-06,
+  "continuousSurfaceParts": 969,
+  "exactHighSourceExportMeshes": 237,
+  "exactLowSourceExportMeshes": 237,
+  "identicalRigNodes": 292,
+  "inheritedActualSurfaceGroups": 49,
+  "inheritedActualSurfaceOwners": 208,
+  "strategy": [
+    "Retain actual V58 surfaces and proof only where independently confirmed identical",
+    "Keep gun aperture, fixed six-head flange and rear observation-hole details exact",
+    "Coherent small lathe profiles with conservatively enlarged inner opening",
+    "Source-vertex hull candidates and planar patch dissolution; unchanged actual motion gates remain authoritative"
+  ],
+  "validation": {
+    "raw": {
+      "passed": true,
+      "checks": 1148,
+      "report": "Data_GameRawV59.json"
+    },
+    "surfaceDistance": {
+      "passed": true,
+      "checks": 969,
+      "report": "Data_ComposedActualSurfaceCertificateV59.json"
+    },
+    "inheritance": {
+      "passed": true,
+      "checks": 49,
+      "report": "Data_GameInheritanceV59.json"
+    },
+    "nativeMotion": {
+      "passed": true,
+      "checks": 39,
+      "report": "Data_ActualGameMotionV59.json"
+    },
+    "bodyBeltPhases": {
+      "passed": true,
+      "checks": 32,
+      "report": "Data_GameBeltV59.json"
+    },
+    "browser": {
+      "passed": true,
+      "checks": 937,
+      "report": "Data_GameBrowserV59.json"
+    },
+    "materialUi": {
+      "passed": true,
+      "checks": 29,
+      "report": "Data_GameUiV59.json"
+    },
+    "retainedMaterialPixels": {
+      "passed": true,
+      "checks": 20,
+      "report": "Data_GameMaterialsV59.json"
+    }
+  },
+  "geometryAndArticulationVerified": true,
+  "allTechnicalReportsPassed": true,
+  "sourceGeometryReopened": true,
+  "sourceMaterialReopenAccepted": false,
+  "lowNormalProjectionAccepted": false,
+  "wholeReferenceAccepted": false,
+  "gameDerivativeAccepted": false,
+  "complete": false,
+  "goalComplete": false,
+  "visualReview": {
+    "inspected": true,
+    "preview": "Preview_GameContactV59.jpg",
+    "finalSurfaceAccepted": false
+  },
+  "textureScope": "Twelve unchanged high-source image pixels and material bindings; inherited/projected UVs remain provisional, not a freshly accepted low tangent-space bake",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94GameReviewV59/",
+  "retainedMaterialPreview": "http://127.0.0.1:8114/tmp/Type94MaterialReviewV56/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV59\\Acceptance",
+  "verificationSnapshots": "Data_VerificationSnapshotsV59.json",
+  "overBudgetVariant": "Versions/OverBudget89040",
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV59.json",
+  "unrelatedBlenderPidsUntouched": [
+    33848,
+    42200
+  ],
+  "retainedHighSourceUnchanged": true,
+  "canonicalGameReplaced": false,
+  "canonicalSha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+  "published": false,
+  "remaining": [
+    "Joint camera/shape review of whole-reference running gear and wheel-cap proportions",
+    "Complete whole-reference shape and surface alignment",
+    "Fresh low tangent-space PBR projection and source/import appearance acceptance",
+    "Final full-objective acceptance audit; no completion claim yet"
+  ]
+}

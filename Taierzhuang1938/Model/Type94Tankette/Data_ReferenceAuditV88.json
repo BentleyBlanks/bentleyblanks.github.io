@@ -1,0 +1,287 @@
+{
+  "schema": "Type94CowlJunctionCorrectionAuditV1",
+  "revision": "ReferenceV88",
+  "status": "incorrect2014point-retracted-corrected-three-view-fit-retained",
+  "reference": "Data_ReferenceAuditV86.json",
+  "retractedObservation": {
+    "camera": "2014",
+    "farNative": [
+      1890,
+      1373
+    ],
+    "reason": "The earlier point was on the rear-edge interior, not the rear/side junction"
+  },
+  "correctedObservation": {
+    "camera": "2014",
+    "feature": "far rear-side junction",
+    "previousNative": [
+      1890,
+      1373
+    ],
+    "correctedNative": [
+      1805.7766378584704,
+      1380.116831467571
+    ],
+    "method": "Intersection of reviewed native side-edge pair0/1and rear-edge2; no model point or camera enters computation",
+    "sideCandidateIds": [
+      0,
+      1
+    ],
+    "rearCandidateId": 2,
+    "previousPointWasRearLineInterior": true,
+    "originalObservationFileSha256": "aade200db3d3cbff44d13e43d1ce5368a0bba20dd0b564b19f9d017d8c055b00",
+    "modelPredictionWasAlreadyInspected": true,
+    "untouchedHoldout": false
+  },
+  "imageSha2562014": "a2842cfe2394259a70ab2bc7d5835696c944da040518b2c8870f9428f76ca136",
+  "correctionSource": "Reviewed native edge segments0/1and2",
+  "correctionUsesModelOrCamera": false,
+  "lineSelectionWasPostHoc": true,
+  "untouchedHoldout": false,
+  "originalObservationFileRetained": true,
+  "previousGeometryWithCorrectedData": [
+    {
+      "camera": "2017",
+      "predictedNative": [
+        [
+          1931.514717109836,
+          1255.598855596716
+        ],
+        [
+          2919.0528522196682,
+          1337.1701508244703
+        ]
+      ],
+      "observedNative": [
+        [
+          1930,
+          1255
+        ],
+        [
+          2920,
+          1335
+        ]
+      ],
+      "residualNative": [
+        [
+          1.514717109836056,
+          0.598855596716021
+        ],
+        [
+          -0.9471477803317612,
+          2.1701508244702836
+        ]
+      ],
+      "rmsNative": 2.03219579116834,
+      "sigmaNative": 10
+    },
+    {
+      "camera": "2014",
+      "predictedNative": [
+        [
+          1785.4677930078335,
+          1385.9208575366038
+        ],
+        [
+          2657.3826924322234,
+          1442.00177079001
+        ]
+      ],
+      "observedNative": [
+        [
+          1805.7766378584704,
+          1380.116831467571
+        ],
+        [
+          2660.0,
+          1438.0
+        ]
+      ],
+      "residualNative": [
+        [
+          -20.308844850636888,
+          5.804026069032716
+        ],
+        [
+          -2.6173075677766064,
+          4.001770790009914
+        ]
+      ],
+      "rmsNative": 15.313398808516824,
+      "sigmaNative": 12
+    },
+    {
+      "camera": "TourGuide",
+      "predictedNative": [
+        [
+          1021.6809238908029,
+          803.9883417825247
+        ],
+        [
+          1436.3161846625276,
+          852.1694557181049
+        ]
+      ],
+      "observedNative": [
+        [
+          1024,
+          806
+        ],
+        [
+          1435,
+          854
+        ]
+      ],
+      "residualNative": [
+        [
+          -2.3190761091971126,
+          -2.011658217475315
+        ],
+        [
+          1.3161846625275757,
+          -1.8305442818950723
+        ]
+      ],
+      "rmsNative": 2.693335962894005,
+      "sigmaNative": 8
+    }
+  ],
+  "allThreeFit": {
+    "mode": "AllThree",
+    "parameters": [
+      0.8199633318891381,
+      0.06502361212969728,
+      -0.20386635373604065,
+      0.6409537249015802
+    ],
+    "success": true,
+    "nearBounds": false,
+    "condition": 17.110923524354234,
+    "metrics": [
+      {
+        "camera": "2017",
+        "predictedNative": [
+          [
+            1938.6676263886043,
+            1254.3442893930462
+          ],
+          [
+            2920.218755576839,
+            1335.2321770073463
+          ]
+        ],
+        "observedNative": [
+          [
+            1930,
+            1255
+          ],
+          [
+            2920,
+            1335
+          ]
+        ],
+        "residualNative": [
+          [
+            8.667626388604276,
+            -0.6557106069537895
+          ],
+          [
+            0.21875557683915758,
+            0.23217700734630853
+          ]
+        ],
+        "rmsNative": 6.150587930338019,
+        "sigmaNative": 10
+      },
+      {
+        "camera": "2014",
+        "predictedNative": [
+          [
+            1791.604279116899,
+            1384.4018119395694
+          ],
+          [
+            2658.0900818938762,
+            1439.9386347073973
+          ]
+        ],
+        "observedNative": [
+          [
+            1805.7766378584704,
+            1380.116831467571
+          ],
+          [
+            2660.0,
+            1438.0
+          ]
+        ],
+        "residualNative": [
+          [
+            -14.172358741571315,
+            4.284980471998324
+          ],
+          [
+            -1.9099181061237687,
+            1.9386347073973411
+          ]
+        ],
+        "rmsNative": 10.644785146869449,
+        "sigmaNative": 12
+      },
+      {
+        "camera": "TourGuide",
+        "predictedNative": [
+          [
+            1024.1323537184053,
+            803.5602297185818
+          ],
+          [
+            1436.536765978048,
+            851.3628306849947
+          ]
+        ],
+        "observedNative": [
+          [
+            1024,
+            806
+          ],
+          [
+            1435,
+            854
+          ]
+        ],
+        "residualNative": [
+          [
+            0.13235371840528387,
+            -2.439770281418191
+          ],
+          [
+            1.5367659780479244,
+            -2.6371693150052806
+          ]
+        ],
+        "rmsNative": 2.7646254900219414,
+        "sigmaNative": 8
+      }
+    ],
+    "cost": 1.284606676861741
+  },
+  "actualV87SkinEdgeFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV88\\Acceptance\\Data_ActualRearSkinEdgeV88.json",
+  "actualV89SkinEdgeFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV88\\Acceptance\\Data_ActualRearSkinEdgeV89.json",
+  "old2014RmsClaimSuperseded": true,
+  "oldRmsNative": 74.55466225023915,
+  "v87Corrected2014RmsNative": 15.313398808516824,
+  "sourceConfigurationDifferenceEstablished": false,
+  "cameraAdopted": false,
+  "interpretation": "Most of the alleged older-view conflict came from a misidentified junction. Corrected observations permit a local three-view candidate within coarse point uncertainty; physical calibration and a precise survey are not established.",
+  "resultingTrial": "Data_GrayTrialV89.json",
+  "wholeReferenceAccepted": false,
+  "goalComplete": false,
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV88\\Acceptance",
+  "remaining": [
+    "Confirm remaining cowl front outline, hardware and exact section; dimensions stay conditional",
+    "Continue fixed-body camera checks, casing/near-corner/track-envelope and whole-reference body/running-gear acceptance",
+    "Keep unconfirmed ear and hidden attachment details explicitly inferred",
+    "Integrate the accepted geometry with complete PBR and rebuild the game derivative, then final end-to-end acceptance"
+  ]
+}

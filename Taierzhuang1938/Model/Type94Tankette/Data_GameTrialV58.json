@@ -1,0 +1,272 @@
+{
+  "schema": "Type94GameTrialV1",
+  "revision": "GameTrialV58",
+  "status": "local-reduction-trial-failed-detail-and-clearance-gates",
+  "reference": "Data_SurfaceStudyV56.json",
+  "referenceSha256": "283822f415509a17cd5dff598c030da251476d24321177e4a1de03a6d635e569",
+  "producer": "Taierzhuang1938/_blender/Script_Type94GameTrial.py",
+  "producerSha256": "1b618f94cc6f28f7854f338aa32266bbca608b48e2cc5234fff51bb4b5f0668f",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV58\\Scene_Type94TanketteGameTrialV58.blend",
+  "sourceBlendSha256": "62ae51dd4cfd1a2db1f47a9887ad24dc113d179fb12dd07c19728753c7c97187",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV58\\Exports\\Model_Type94TanketteGameTrialV58.glb",
+  "sha256": "6f684dd8838e21451555e8d587e9abddf27fee09480aae7b18f8328e84e6d8dc",
+  "bytes": 34844612,
+  "triangles": 66830,
+  "triangleLimitExclusive": 80000,
+  "strictBudgetPassed": true,
+  "meshOwners": 237,
+  "independentLinks": [
+    80,
+    80
+  ],
+  "dimensionsWidthHeightLengthM": [
+    1.6198139190673828,
+    1.6166192886474429,
+    3.0824818020260327
+  ],
+  "pbrImages": [
+    {
+      "name": "Texture_Type94PaintNormal",
+      "size": [
+        4096,
+        4096
+      ],
+      "bytes": 4827788
+    },
+    {
+      "name": "Texture_Type94PaintOrmWear",
+      "size": [
+        4096,
+        4096
+      ],
+      "bytes": 6013945
+    },
+    {
+      "name": "Texture_Type94PaintBaseWear",
+      "size": [
+        4096,
+        4096
+      ],
+      "bytes": 3773433
+    },
+    {
+      "name": "Texture_Type94SteelNormal",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 1392302
+    },
+    {
+      "name": "Texture_Type94SteelOrm",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 3049385
+    },
+    {
+      "name": "Texture_Type94SteelBase",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 1948949
+    },
+    {
+      "name": "Texture_Type94RubberNormal",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 177392
+    },
+    {
+      "name": "Texture_Type94RubberOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 819662
+    },
+    {
+      "name": "Texture_Type94RubberBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 533626
+    },
+    {
+      "name": "Texture_Type94TrackNormal",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 4592773
+    },
+    {
+      "name": "Texture_Type94TrackOrm",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 2676959
+    },
+    {
+      "name": "Texture_Type94TrackBase",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 1318455
+    }
+  ],
+  "reports": {
+    "raw": {
+      "passed": false,
+      "checks": 1148,
+      "failedCount": 25,
+      "failed": [
+        "actual 14mm door plate surrounds the hole at left",
+        "actual 14mm door plate surrounds the hole at right",
+        "actual 14mm door plate surrounds the hole at top",
+        "observed circular mounting has actual flat front-cap normals, without a shaded bulb",
+        "fixed flange head 0 retains six real flat side facets",
+        "fixed flange head 0 retains its actual declared section depth and seat",
+        "fixed flange head 1 retains six real flat side facets",
+        "fixed flange head 1 retains its actual declared section depth and seat",
+        "fixed flange head 2 retains six real flat side facets",
+        "fixed flange head 2 retains its actual declared section depth and seat",
+        "fixed flange head 3 retains six real flat side facets",
+        "fixed flange head 3 retains its actual declared section depth and seat",
+        "fixed flange head 4 retains six real flat side facets",
+        "fixed flange head 4 retains its actual declared section depth and seat",
+        "fixed flange head 5 retains six real flat side facets",
+        "fixed flange head 5 retains its actual declared section depth and seat",
+        "actual round aperture retains its full declared inner rim at 0",
+        "actual round aperture retains its full declared inner rim at 5",
+        "actual round aperture retains its full declared inner rim at 6",
+        "actual round aperture retains its full declared inner rim at 8",
+        "actual round aperture retains its full declared inner rim at 11",
+        "actual round aperture retains its full declared inner rim at 12",
+        "actual round aperture retains its full declared inner rim at 15",
+        "actual raised front fitting has physical depth at probe 0",
+        "actual raised front fitting has physical depth at probe 1"
+      ],
+      "report": "Data_GameRawV58.json"
+    },
+    "surfaceDistance": {
+      "passed": true,
+      "parts": 969,
+      "maximumWorldSurfaceUpperBoundM": 0.002997995288873505,
+      "sourceExportChecks": [
+        237,
+        237
+      ],
+      "report": "Data_ComposedActualSurfaceCertificateV58.json"
+    },
+    "nativeMotion": {
+      "passed": false,
+      "checks": 39,
+      "failedCount": 21,
+      "failed": [
+        "DriverVisor against its actual fixed pins and bearing eyes",
+        "DriverRoof against its actual fixed pins and bearing eyes",
+        "Engine against its actual fixed pins and bearing eyes",
+        "Commander against its actual fixed pins and bearing eyes",
+        "RearCargo against its actual fixed pins and bearing eyes",
+        "TurretRear against its actual fixed pins and bearing eyes",
+        "DriverPortLeft against its actual fixed pins and bearing eyes",
+        "DriverPortRight against its actual fixed pins and bearing eyes",
+        "TurretPortLeft against its actual fixed pins and bearing eyes",
+        "TurretPortRight against its actual fixed pins and bearing eyes",
+        "rear latch spindle/cam release against actual door, bearing and keeper",
+        "Commander cover sweep",
+        "DriverRoof cover sweep",
+        "DriverVisor cover sweep",
+        "Engine cover sweep",
+        "RearCargo cover sweep",
+        "DriverPortLeft cover sweep",
+        "TurretPortLeft cover sweep",
+        "TurretPortRight cover sweep",
+        "DriverPortRight cover sweep",
+        "TurretRear cover sweep"
+      ],
+      "report": "Data_ActualGameMotionV58.json"
+    },
+    "browser": {
+      "passed": false,
+      "checks": 937,
+      "failedCount": 15,
+      "failed": [
+        "actual hex head face is visible at 0",
+        "actual hex head face is visible at 60",
+        "actual hex head face is visible at 120",
+        "actual hex head face is visible at 180",
+        "actual hex head face is visible at 240",
+        "actual hex head face is visible at 300",
+        "declared round aperture inner rim is open at 0",
+        "declared round aperture inner rim is open at 5",
+        "declared round aperture inner rim is open at 6",
+        "declared round aperture inner rim is open at 8",
+        "declared round aperture inner rim is open at 11",
+        "declared round aperture inner rim is open at 12",
+        "declared round aperture inner rim is open at 15",
+        "actual raised fitting front surface at probe 0",
+        "actual raised fitting front surface at probe 1"
+      ],
+      "report": "Data_GameBrowserV58.json"
+    },
+    "materialUi": {
+      "passed": true,
+      "checks": 29,
+      "failedCount": 0,
+      "failed": [],
+      "report": "Data_GameUiV58.json"
+    },
+    "retainedMaterials": {
+      "passed": true,
+      "checks": 20,
+      "failedCount": 0,
+      "failed": [],
+      "report": "Data_GameMaterialsV58.json"
+    }
+  },
+  "allTechnicalReportsPassed": false,
+  "nativeMotionScope": "Main VerifyScene checks on the actual low import; extra dense full-body belt phase tests were not repeated",
+  "failedSummary": [
+    "Door plate/rim thickness, six-head flange details and raised front fittings fail the unchanged geometry gates",
+    "Ten hinge bearing interfaces, rear latch and cover sweeps have intersections after reduction"
+  ],
+  "visualReview": {
+    "inspected": true,
+    "preview": "Preview_GameContactV58.jpg",
+    "accepted": false,
+    "scope": "Four actual low-PBR views; faceting and softened small fittings remain visible"
+  },
+  "textureScope": "Original high-source PBR pixels and inherited UVs; no low tangent-space normal reprojection acceptance",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94GameReviewV58/",
+  "retainedMaterialPreview": "http://127.0.0.1:8114/tmp/Type94MaterialReviewV56/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameTrialV58\\Acceptance",
+  "wholeReferenceAccepted": false,
+  "lowNormalProjectionAccepted": false,
+  "gameDerivativeAccepted": false,
+  "canonicalGameReplaced": false,
+  "published": false,
+  "complete": false,
+  "goalComplete": false,
+  "userGoalRound": 3,
+  "pauseAfterUserGoalRound": 3,
+  "remaining": [
+    "Resolve every failed technical report without weakening its gates",
+    "Finish whole-reference geometry and camera alignment",
+    "Create and accept the low-surface tangent-space PBR projection",
+    "Complete final end-to-end game derivative acceptance"
+  ],
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV58.json",
+  "ownedBlenderStopped": true,
+  "retainedHighSourceUnchanged": true,
+  "canonicalSha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+  "verificationSnapshots": "Data_VerificationSnapshotsV58.json"
+}

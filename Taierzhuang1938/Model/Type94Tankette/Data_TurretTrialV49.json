@@ -1,0 +1,81 @@
+{
+  "schema": "Type94TurretEnvelopeLayoutV1",
+  "revision": "ShapeV49TurretTrial",
+  "status": "Whole turret shape/interface trial; no whole vehicle or metric survey acceptance",
+  "sourceGray": "Data_GrayStudyV37.json",
+  "sourceHypothesis": "Data_PhysicalProfilesV47.json / PreviousProfile",
+  "pivotBlenderM": [
+    0.05647128392430486,
+    -0.6038281020378944,
+    1.0746
+  ],
+  "roofRadiusM": 0.3085883745121677,
+  "roofZLocalM": 0.5016595197323286,
+  "coneSlope": 0.15943669706127908,
+  "pairedRivetSites": [
+    {
+      "name": "SidePairRow0Rear",
+      "yM": 0.1377639942211957,
+      "zM": 0.43594182058824216
+    },
+    {
+      "name": "SidePairRow0Front",
+      "yM": 0.1717975136568552,
+      "zM": 0.4353140633514001
+    },
+    {
+      "name": "SidePairRow1Rear",
+      "yM": 0.1416592941514733,
+      "zM": 0.36605878224504584
+    },
+    {
+      "name": "SidePairRow1Front",
+      "yM": 0.17571310993075742,
+      "zM": 0.3655114616149069
+    },
+    {
+      "name": "SidePairRow2Rear",
+      "yM": 0.14479500030958606,
+      "zM": 0.2943073826169129
+    },
+    {
+      "name": "SidePairRow2Front",
+      "yM": 0.17978760286554785,
+      "zM": 0.2944822597998391
+    },
+    {
+      "name": "SidePairRow3Rear",
+      "yM": 0.14900860129082752,
+      "zM": 0.22384169359941586
+    },
+    {
+      "name": "SidePairRow3Front",
+      "yM": 0.18413752733468594,
+      "zM": 0.224215157465377
+    },
+    {
+      "name": "SidePairRow4Rear",
+      "yM": 0.15223387030935054,
+      "zM": 0.15358973267797493
+    },
+    {
+      "name": "SidePairRow4Front",
+      "yM": 0.1881730319111977,
+      "zM": 0.15384308746565245
+    }
+  ],
+  "retainCommanderLidRadiusM": 0.286,
+  "retainSocketRadiusM": 0.116,
+  "driverRoofGunMinElevationDegrees": 6,
+  "driverRoofGunPoseInferred": true,
+  "complete": false,
+  "strictReferenceMatched": false,
+  "metricSurveyAccepted": false,
+  "limits": [
+    "Roof/cone parameters are conditional on V47camera,profileidentityandnominalheightassumptions",
+    "Pivot deck height is retained from V37; fitted rivet sites are expressed in that unchanged deck frame",
+    "The cylinder, plates and surface-mounted interfaces are rebuilt; shaft and bearing sections are not anisotropically scaled",
+    "Commander lid, gun-ball/socket and side/rear cover dimensions retain inferred values and need native sweeps",
+    "Unchanged hull and lower gear remain V37; no mixed-geometry whole-reference acceptance is claimed"
+  ]
+}

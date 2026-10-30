@@ -1,0 +1,127 @@
+{
+  "schema": "Type94EarFeatureReviewV1",
+  "revision": "ReferenceV80",
+  "reference": "Data_ReferenceAuditV78.json",
+  "status": "two-native-photo-raised-features-reviewed-exact-profile-remains-inferred",
+  "observationsFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV80\\Inputs\\Data_EarFeaturesV80.json",
+  "observationsSha256": "62e278b02540e67aaf38071ed490823338b51c65d8db132b4324ad2af3008433",
+  "observations": {
+    "schema": "Type94EarImageFeaturesV1",
+    "revision": "ReferenceV80",
+    "images": {
+      "2017": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_Kubinka.jpg",
+        "sha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28"
+      },
+      "2014": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_KubinkaOld.jpg",
+        "sha256": "a2842cfe2394259a70ab2bc7d5835696c944da040518b2c8870f9428f76ca136"
+      }
+    },
+    "sourceCameraFamilySha256": "e46e69bbff97bed69d48b9ab53650df94f4c4396ea711509f1f4cc7ab861ea7b",
+    "rows": [
+      {
+        "name": "UpperHead",
+        "observed": {
+          "2017": [
+            797,
+            1824
+          ],
+          "2014": [
+            747,
+            1871
+          ]
+        },
+        "sigmaNative": {
+          "2017": 4,
+          "2014": 6
+        },
+        "scope": "Retained V79 image locations; no mechanical-axis or calibrated-camera claim"
+      },
+      {
+        "name": "LowerRaisedHeadCandidate",
+        "observed": {
+          "2017": [
+            803,
+            1877
+          ],
+          "2014": [
+            749,
+            1924
+          ]
+        },
+        "sigmaNative": {
+          "2017": 6,
+          "2014": 6
+        },
+        "scope": "Manually reviewed raised footprint in both native photographs; exact head section and function inferred"
+      }
+    ],
+    "apparentEarBoundaryRanges2017": {
+      "leftX": [
+        740,
+        760
+      ],
+      "rightX": [
+        817,
+        837
+      ],
+      "topY": [
+        1733,
+        1757
+      ],
+      "bottomY": [
+        1898,
+        1922
+      ],
+      "scope": "Coarse apparent transition ranges under paint/partial occlusion, not a measured planar rectangle"
+    },
+    "headCentresAreNotMechanicalAxes": true,
+    "placementDepthInferred": true,
+    "wholeReferenceAccepted": false
+  },
+  "secondaryControls": [
+    {
+      "name": "UpperHead",
+      "observed2014": [
+        747,
+        1871
+      ],
+      "predicted2014": [
+        742.7016944068787,
+        1866.348105490485
+      ],
+      "residualNative": 6.333684038497116,
+      "sigmaNative": 6
+    },
+    {
+      "name": "LowerRaisedHeadCandidate",
+      "observed2014": [
+        749,
+        1924
+      ],
+      "predicted2014": [
+        746.4586600856844,
+        1913.7990740414011
+      ],
+      "residualNative": 10.512720816844224,
+      "sigmaNative": 6
+    }
+  ],
+  "primaryPointsAreTraining": true,
+  "secondaryPointsTentative": true,
+  "cameraFamilyPhysicallyCalibrated": false,
+  "geometryTrial": "Data_GrayTrialV81.json",
+  "cameraAdopted": false,
+  "frontPlaneAdopted": false,
+  "wholeReferenceAccepted": false,
+  "goalComplete": false,
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV80\\Acceptance",
+  "remaining": [
+    "Verify precise pad section/connection and lower raised-feature function; the head footprints are not mechanical axes",
+    "Resolve near-side front-corner fasteners and actual casing/track envelope",
+    "Review casing retaining-seam/joint-head layout instead of assuming the current generic angular pattern",
+    "Retain third-camera/correspondence uncertainty until independently resolved",
+    "Complete whole body/running-gear reference acceptance, then final high PBR and game derivative"
+  ]
+}

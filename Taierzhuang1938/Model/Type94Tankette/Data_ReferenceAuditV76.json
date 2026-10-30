@@ -1,0 +1,55 @@
+{
+  "schema": "Type94ThirdFrontCorrespondenceAuditV1",
+  "revision": "ReferenceV76",
+  "status": "tentative-third-head-correspondences-conflict-with-retained-camera-pair",
+  "reference": "Data_ReferenceAuditV75.json",
+  "sourceObservations": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV76\\Inputs\\Data_ThirdFrontCandidatesV76.json",
+  "sourceObservationsSha256": "a1dc58cb11d312d9def8659cacf0c254f179269eac6b67908660e406f086f7c0",
+  "rows": [
+    {
+      "index": 9,
+      "name": "MarkingUpperInner",
+      "observedNative": [
+        1294,
+        538
+      ],
+      "sigmaNative": 3,
+      "correspondenceConfidence": "Tentative visible head above the marking; not confirmed solely by proximity",
+      "epipolarDistanceUndistortedNative": 51.48821015372993,
+      "lineUndistortedNative": [
+        -0.00046462632079604684,
+        -0.0026004746593657514,
+        2.1382761373880648
+      ]
+    },
+    {
+      "index": 10,
+      "name": "MarkingUpperOuter",
+      "observedNative": [
+        1320,
+        540
+      ],
+      "sigmaNative": 3,
+      "correspondenceConfidence": "Tentative visible head above the marking; not confirmed solely by proximity",
+      "epipolarDistanceUndistortedNative": 52.23121908476513,
+      "lineUndistortedNative": [
+        -0.0005002658768305577,
+        -0.0026934347504552125,
+        2.2602886919481735
+      ]
+    }
+  ],
+  "geometryChanged": false,
+  "cameraAdopted": false,
+  "planeAdopted": false,
+  "wholeReferenceAccepted": false,
+  "goalComplete": false,
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV76\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV76\\Rebuild",
+  "interpretation": "Two visible angular-head candidates above the marking have approximately51to52native-pixel epipolar residuals under the retained primary/third camera pair. Their identity and the third camera require review; no front-plane deformation is justified by these observations. The third view must not be used as a certified front-plane holdout in its present state.",
+  "remaining": [
+    "Verify additional unambiguous noncoplanar third-view correspondences",
+    "Audit third camera calibration and source image identity",
+    "Reassess front-plane hypotheses without using uncertain points as proof"
+  ]
+}

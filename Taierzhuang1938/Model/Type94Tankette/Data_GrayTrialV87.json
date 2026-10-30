@@ -1,0 +1,209 @@
+{
+  "schema": "Type94CowlRearJunctionGrayTrialV1",
+  "revision": "ShapeV87RearJunctionTrial",
+  "status": "superseded-by-corrected2014-observation-review-V88",
+  "reference": "Data_GrayTrialV85.json",
+  "referenceAudit": "Data_ReferenceAuditV86.json",
+  "producer": "Taierzhuang1938/_blender/Script_Type94RearEdgeTrialV87.py",
+  "nativeVerifier": "Taierzhuang1938/_blender/Script_VerifyType94RearEdgeV87.py",
+  "geometryVerifier": "Taierzhuang1938/_import/Script_VerifyType94RearEdgeGeometryV87.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV87\\Scene_Type94TanketteHighShapeV87RearEdgeTrial.blend",
+  "sourceBlendSha256": "6b545fbc647eb0b45007b385053da92fbaed824898d242a9e211c3ca8a73951a",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV87\\Exports\\Model_Type94TanketteHighShapeV87RearEdgeTrial.glb",
+  "sha256": "08215f23f9cc073b5cedc3aaf9e033b307a3cb3ea22278d2bc00d7ebb80403cb",
+  "baseSha256": "d2e3d3bb3bbb085b2b9472eb429234c74345de1c821627bf570035ae8812b7c8",
+  "triangles": 622080,
+  "meshOwners": 238,
+  "poseNodes": 293,
+  "changedMeshOwners": [
+    "Geometry_NoseHousing_Paint"
+  ],
+  "unchangedOtherMeshOwners": 237,
+  "rigidPosesAndParentsPreserved": 293,
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "cowlParameters": {
+    "rearYM": 0.8181530085061836,
+    "rearRiseM": 0.06298948257681594,
+    "centreXM": -0.19995600770422345,
+    "widthM": 0.6457937954238178,
+    "frontRiseM": 0.14,
+    "frontYM": 1.2951509488489534
+  },
+  "fitInputFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV86\\Acceptance\\Data_RearJunctionFitV86.json",
+  "fitInputSha256": "850a2dab6df15624f0925196cad6465c0ebc561672db7242246a643e30b4a0c4",
+  "selectedTrainingCameras": [
+    "2017",
+    "TourGuide"
+  ],
+  "selectedJunctionMetrics": [
+    {
+      "camera": "2017",
+      "predictedNative": [
+        [
+          1931.514717109836,
+          1255.598855596716
+        ],
+        [
+          2919.0528522196682,
+          1337.1701508244703
+        ]
+      ],
+      "observedNative": [
+        [
+          1930,
+          1255
+        ],
+        [
+          2920,
+          1335
+        ]
+      ],
+      "residualNative": [
+        [
+          1.514717109836056,
+          0.598855596716021
+        ],
+        [
+          -0.9471477803317612,
+          2.1701508244702836
+        ]
+      ],
+      "rmsNative": 2.03219579116834,
+      "sigmaNative": 10
+    },
+    {
+      "camera": "2014",
+      "predictedNative": [
+        [
+          1785.4677930078335,
+          1385.9208575366038
+        ],
+        [
+          2657.3826924322234,
+          1442.00177079001
+        ]
+      ],
+      "observedNative": [
+        [
+          1890,
+          1373
+        ],
+        [
+          2660,
+          1438
+        ]
+      ],
+      "residualNative": [
+        [
+          -104.5322069921665,
+          12.920857536603762
+        ],
+        [
+          -2.6173075677766064,
+          4.001770790009914
+        ]
+      ],
+      "rmsNative": 74.55466225023915,
+      "sigmaNative": 12
+    },
+    {
+      "camera": "TourGuide",
+      "predictedNative": [
+        [
+          1021.6809238908029,
+          803.9883417825247
+        ],
+        [
+          1436.3161846625276,
+          852.1694557181049
+        ]
+      ],
+      "observedNative": [
+        [
+          1024,
+          806
+        ],
+        [
+          1435,
+          854
+        ]
+      ],
+      "residualNative": [
+        [
+          -2.3190761091971126,
+          -2.011658217475315
+        ],
+        [
+          1.3161846625275757,
+          -1.8305442818950723
+        ]
+      ],
+      "rmsNative": 2.693335962894005,
+      "sigmaNative": 8
+    }
+  ],
+  "exactMetricSurveyEstablished": false,
+  "rearConnectionAndSectionInferred": true,
+  "configurationDifferenceFrom2014Established": false,
+  "validation": {
+    "geometry": {
+      "passed": true,
+      "checks": 1065,
+      "report": "Data_RearEdgeGeometryV87.json"
+    },
+    "sourceReopen": {
+      "passed": true,
+      "byteIdenticalReexport": true,
+      "report": "Data_RearEdgeNativeV87.json"
+    },
+    "nativeMotion": {
+      "passed": true,
+      "checks": 39,
+      "report": "Data_RearEdgeMotionV87.json"
+    },
+    "browser": {
+      "passed": true,
+      "cameraCount": 4,
+      "actualGlbRenders": 8,
+      "actualBytesVerified": true,
+      "report": "Data_RearBrowserV87.json"
+    }
+  },
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94RearEdgeReviewV87/",
+  "actualViewsInspected": [
+    "2017",
+    "2014",
+    "TourGuide",
+    "7"
+  ],
+  "sourceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV87",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV87\\Rebuild",
+  "unacceptedPrecursor": "Versions/LineOnlyUnaccepted",
+  "newUvsProvisional": true,
+  "newPbrBaked": false,
+  "cameraChanged": false,
+  "wholeReferenceAccepted": false,
+  "canonicalGameReplaced": false,
+  "retainedMaterialPreview": "http://127.0.0.1:8114/tmp/Type94WearReviewV77/",
+  "goalComplete": false,
+  "published": false,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV87\\Acceptance\\Data_OwnedBlenderCleanupV87.json",
+  "remaining": [
+    "Resolve the2014rear-junction conflict without claiming a configuration change or moving cameras solely to fit this part",
+    "Verify precise rear connection/section and source-image junction identities; dimensions remain conditional",
+    "Continue casing/near-corner/track-envelope and whole-body reference acceptance",
+    "Rebuild complete PBR and game derivative from accepted geometry, then perform final end-to-end acceptance"
+  ],
+  "originalStatusBeforeV88": "local-primary-tourguide-junction-trial-2014conflict-unresolved",
+  "reassessmentV88": {
+    "reference": "Data_ReferenceAuditV88.json",
+    "old2014PointRetracted": true,
+    "corrected2014RmsNative": 15.313398808516824,
+    "geometryChanged": false
+  }
+}

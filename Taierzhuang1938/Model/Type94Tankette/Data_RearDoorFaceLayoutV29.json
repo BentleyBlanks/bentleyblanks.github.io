@@ -1,0 +1,71 @@
+{
+  "status": "Selected Kubinka rear-door face study; whole-reference and absolute dimensions unaccepted",
+  "sources": [
+    {
+      "file": "PatriotOfficial/Reference_PatriotOfficial4.jpg",
+      "url": "https://parkpatriot.ru/upload/iblock/ae4/33vw9gi4w9mogq7q8zrgfl60sto0nwp4/4.JPG",
+      "scope": "2022 same-exhibit rear geometry only; does not establish 2017 paint or unchanged internals"
+    },
+    {
+      "file": "PatriotOfficial/Reference_PatriotOfficial6.jpg",
+      "url": "https://parkpatriot.ru/upload/iblock/0a4/cqvbv84njapo7rsffvemaufhu00vte53/6.JPG",
+      "scope": "Independent view of the open hole, circular mounting and bottom-edge assembly"
+    },
+    {
+      "file": "Reference_Treloar.jpg",
+      "scope": "Other vehicle only: protruding handle at the corresponding mounting; not selected-vehicle geometry"
+    }
+  ],
+  "nativeObservations": {
+    "imageSize": [1440, 960],
+    "hole": {"photo4": [956, 495.5], "photo6": [433, 437]},
+    "circularMount": {"photo4": [942.3, 521], "photo6": [426, 464]},
+    "bottomAssembly": {"photo4": [978, 567], "photo6PlaneTransferEstimate": [482.4, 515.4]},
+    "limits": "Manual centers and a door-plane correspondence aid; photograph 4's rough left outline was not reliably identified and is not a rectangle-calibration control. Small hardware profiles are only a few native pixels."
+  },
+  "coordinates": "u left-to-right, v top-to-bottom on the retained 0.60 x 0.48 m door; normalized estimates do not accept that door's absolute dimensions",
+  "hole": {
+    "centerUv": [0.25, 0.29],
+    "widthHeightUv": [0.040, 0.070],
+    "centerUncertaintyUv": [0.035, 0.045],
+    "scope": "Open vertically rounded dark aperture; exact profile, intended use and closure unknown"
+  },
+  "circularMount": {
+    "centerUv": [0.17, 0.48],
+    "diameterUvWidth": 0.0867,
+    "centerUncertaintyUv": [0.04, 0.05],
+    "scope": "Static observed circular mounting; three small heads, depth and central section estimated. No external spherical grip is added. Its function is unverified."
+  },
+  "faceHeads": [
+    {"id": "UpperLeft", "centerUv": [0.22, 0.14]},
+    {"id": "UpperInner", "centerUv": [0.52, 0.24]},
+    {"id": "UpperOuter", "centerUv": [0.63, 0.15]},
+    {"id": "MiddleInner", "centerUv": [0.66, 0.51]},
+    {"id": "MiddleOuter", "centerUv": [0.94, 0.50]}
+  ],
+  "bottomAssembly": {
+    "centerUv": [0.55, 0.91],
+    "widthHeightUv": [0.15, 0.17],
+    "scope": "Static plate with narrow raised fitting and small transverse eye, carried by the door. Hidden profile and purpose unverified; not animated as a latch."
+  },
+  "concealedLatch": {
+    "status": "Explicit engineering demonstration, not identified historical hardware",
+    "scope": "Interior spindle, bearing, cam and keeper retain physical release/blocking behavior without the rejected exterior grip/keeper. Not evidence for the observed circular mounting's function.",
+    "spindleXM": -0.198,
+    "spindleOffsetZFromDoorCenterM": 0.0096,
+    "spindleRadiusM": 0.0045,
+    "boreRadiusM": 0.0053,
+    "keeperXM": -0.328,
+    "releaseFraction": 0.12,
+    "releaseAngleDeg": 90
+  },
+  "unchangedScope": "V28 exterior rear armor, door outer outline/thickness, two hinges, seals, all forward vehicle and running-gear surfaces",
+  "rearInnerArmorCorrection": "Rear-only inner miter is returned to the declared inferred 8mm plate; prior even-offset corners created up to about 74mm at the latch height. This intentionally changes the rear inner shell, not the outer plate or forward shell.",
+  "notAccepted": [
+    "Exact hole aspect and manufacturing section",
+    "Hardware functions, concealed historical lock and original missing parts",
+    "Complete rear fastener layout",
+    "Global cameras, metric scale, absolute door dimensions and whole-vehicle shape",
+    "Final PBR, full recipe replay and new game derivative"
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "schema": "Type94RunningAssemblyV1",
+  "revision": "ShapeV51RunningTrial",
+  "sourceHypothesis": "Data_PhysicalProfilesV47.json / PreviousProfile",
+  "sourceSha256": "f5d932611c0fe187bc67b9ac43eb90ca26e77d859d3f37641a2bb50750b1f45e",
+  "outerShoulderPlaneXM": 0.7160986646748332,
+  "tyreHalfWidthM": 0.0525,
+  "trackCenterXM": 0.6635986646748332,
+  "roadTreadRadiusM": 0.17500721740508865,
+  "roadCentersYZM": [
+    [
+      0.6128493313893268,
+      0.19042494812160285
+    ],
+    [
+      0.09899451844443141,
+      0.20462135621690905
+    ],
+    [
+      -0.30980591927833073,
+      0.21241386051986513
+    ],
+    [
+      -0.8415721675479422,
+      0.21680083849388107
+    ]
+  ],
+  "driveCenterYZM": [
+    1.0757194070691103,
+    0.5167455557203814
+  ],
+  "driveMetalRadiusM": 0.23894755700373174,
+  "drivePitchRadiusTargetM": 0.2504475570037317,
+  "idlerCenterYZM": [
+    -1.2260606974770767,
+    0.4189610279901682
+  ],
+  "idlerRadiusM": 0.1905,
+  "returnCentersYZM": [
+    [
+      0.35,
+      0.601
+    ],
+    [
+      -0.69,
+      0.601
+    ]
+  ],
+  "returnRadiusM": 0.066,
+  "beltCentreOffsetM": 0.0125,
+  "sprocketTeeth": 22,
+  "frontArmorHalfWidthM": 0.55,
+  "spring": {
+    "endForwardM": [
+      -0.54,
+      0.35
+    ],
+    "heightM": 0.493
+  },
+  "driveWeb": {
+    "depthM": 0.05,
+    "holeInnerRadiusRatio": 0.57,
+    "holeOuterRadiusRatio": 0.88,
+    "holeInnerWidthRatio": 0.12,
+    "holeOuterWidthRatio": 0.26,
+    "holeCornerRadiusM": 0.008
+  },
+  "bogies": [
+    {
+      "pivotYZM": [
+        0.38144625612780825,
+        0.2595189683799226
+      ],
+      "roadIndices": [
+        0,
+        1
+      ],
+      "springEndYZM": [
+        0.35,
+        0.493
+      ]
+    },
+    {
+      "pivotYZM": [
+        -0.5616583626860263,
+        0.2676793836289018
+      ],
+      "roadIndices": [
+        2,
+        3
+      ],
+      "springEndYZM": [
+        -0.54,
+        0.493
+      ]
+    }
+  ],
+  "inferred": [
+    "The observed shoulder plane is decomposed using the retained105mmtyre width; wheel gauge remains a physical section hypothesis",
+    "Road cap optical offsets and parked axle heights are conditional estimates, not surveyed axes or a suspension simulation",
+    "Idler radius, return-roller position, tooth count,22-tooth working-radius offset and shoe/pin width remain unmeasured",
+    "A new integer link count and pitch are solved against the declared working radius; the old3inch intelligence-table pitch is not forced onto this vehicle",
+    "V48 cast shoes are explicitly combined; full forebody/fender dimensions and strict full reference remain unaccepted"
+  ],
+  "strictReferenceMatched": false,
+  "physicalSourceGeometryAccepted": false,
+  "complete": false
+}

@@ -1,0 +1,254 @@
+{
+  "schema": "Type94MaterialPreviewV1",
+  "revision": "SurfaceV66Preview",
+  "status": "local-latest-geometry-complete-pbr-preview-verified",
+  "baseGray": "Data_GrayTrialV64.json",
+  "baseGraySha256": "d46ca757f4210827c0ea957e978db466138282913251a9ce9acab8f26b77137a",
+  "sourceProducer": "Taierzhuang1938/_blender/Script_BuildType94MaterialPreviewV66.mjs",
+  "blenderProducer": "Taierzhuang1938/_blender/Script_Type94MaterialPreviewV66.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV66\\Scene_Type94TanketteHighSurfaceV66Preview.blend",
+  "sourceBlendSha256": "f9fc0cccca86ad920884809676c42215961b602277c45023aca0a6b0bd23fd59",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV66\\Exports\\Model_Type94TanketteHighSurfaceV66Preview.glb",
+  "sha256": "938b8e4976fe276e24daaf907aa9f7c3a6dd6d9d9a93f99677505961ac262c4c",
+  "triangles": 624036,
+  "meshNodes": 237,
+  "poseNodes": 292,
+  "linksPerSide": 80,
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "uvGenerationMode": "Fresh",
+  "uvCheckpointUsed": false,
+  "completePbrChannelsBaked": 12,
+  "actualEmbeddedImages": [
+    {
+      "name": "Texture_Type94PaintNormal",
+      "bytes": 4860022,
+      "sha256": "6af3e03b3d61fd67dc5bf06a043544558d5fab5bdaa3d8be64ec76325b78e91a"
+    },
+    {
+      "name": "Texture_Type94PaintOrmWear",
+      "bytes": 6012917,
+      "sha256": "ed524032710632a6d2ecdc9034c36ae9d4cd8cf18efaa5ab140402c134a7bc9c"
+    },
+    {
+      "name": "Texture_Type94PaintBaseWear",
+      "bytes": 3772615,
+      "sha256": "358a36c86c6696ff68467eee7f31453d5b7673ec71264edbe457f09f60388534"
+    },
+    {
+      "name": "Texture_Type94SteelNormal",
+      "bytes": 1394415,
+      "sha256": "2dc3bce5b8e9d0568a8b19b0039530078990e2d4c9e5f99dce94e082f476c487"
+    },
+    {
+      "name": "Texture_Type94SteelOrm",
+      "bytes": 3027643,
+      "sha256": "fa759945cfd01c66376d4d634edb4ea510f8a9cd22e86a91fa4e85c9b2652939"
+    },
+    {
+      "name": "Texture_Type94SteelBase",
+      "bytes": 1944247,
+      "sha256": "7fad02ff9ff80ce0e3c8de1fdc8626d15c681c0cce720672d3c2afe0ba4d20ea"
+    },
+    {
+      "name": "Texture_Type94RubberNormal",
+      "bytes": 177392,
+      "sha256": "be13b8ad179a8d59624beeb301f98a1ebc8332cf25b4db99a240bd505e5512f9"
+    },
+    {
+      "name": "Texture_Type94RubberOrmFaceCoated",
+      "bytes": 690165,
+      "sha256": "c5c3c17484ea8d20b8813c0d4f8fd723ce7d48fd9ce7f22168d6dbaabdf197a6"
+    },
+    {
+      "name": "Texture_Type94RubberBaseFaceCoated",
+      "bytes": 432318,
+      "sha256": "88e82eb32e9277b753a68a094a8b2d5da434298c0f87cc77f4890451cfa211b2"
+    },
+    {
+      "name": "Texture_Type94TrackNormal",
+      "bytes": 4592773,
+      "sha256": "a9a7c38c4b1c324e31ca0fdc8353d56e81bab8c98c74541ec7cf6d8746dd1524"
+    },
+    {
+      "name": "Texture_Type94TrackOrm",
+      "bytes": 2676959,
+      "sha256": "2fdccf3ff67e891a2e375a8c4cb0b06880f02a9994c2865c4f94896d96dd193d"
+    },
+    {
+      "name": "Texture_Type94TrackBase",
+      "bytes": 1318455,
+      "sha256": "bc6bb516995d9aaa7685717ad04c2c410f526981d7674a8fc1c62b6370babbf0"
+    }
+  ],
+  "textureSizes": {
+    "Paint": 4096,
+    "Track": 2048,
+    "Steel": 2048,
+    "Rubber": 1024
+  },
+  "normalStrengths": {
+    "Paint": 1.65,
+    "Track": 1.25,
+    "Steel": 1.15,
+    "Rubber": 1
+  },
+  "allRenderedMaterialsAudited": true,
+  "canonicalMaterials": 7,
+  "allowedSolidAuxiliaries": [
+    "Dark",
+    "White",
+    "Red"
+  ],
+  "normalizedConstructionAliases": [
+    {
+      "owner": "Geometry_MachineGunPitch_Paint",
+      "slot": 0,
+      "previous": "Material_Type94Paint.002",
+      "canonical": "Material_Type94Paint"
+    }
+  ],
+  "actualSourceMaterialBindingsVerified": true,
+  "tyreFrontFinish": {
+    "owners": 8,
+    "faces": 384,
+    "tintLinearRgb": [
+      0.092,
+      0.102,
+      0.067
+    ],
+    "roughness": 0.48,
+    "scope": "Only outward planar road-wheel annuli receive an inferred opaque olive finish matching selected museum photos. Black tread/crown retained. No rubber-overpaint versus metal-retainer substrate identification or wartime finish claim.",
+    "substrateEstablished": false,
+    "wartimeFinishClaim": false,
+    "primaryEvidenceSha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+    "actualEmbeddedFaceSamples": 384,
+    "actualUncoatedFaceSamples": 2688,
+    "aoEntireAtlasExact": true,
+    "normalEntireAtlasExact": true,
+    "uncoatedAtlasPixelsExact": true
+  },
+  "physicalEdgeWear": {
+    "convexEdges": 84262,
+    "affectedAtlasFraction": 0.02381664514541626,
+    "aoBytesUnchanged": true,
+    "placementHistoricallyAccepted": false
+  },
+  "validation": {
+    "raw": {
+      "passed": true,
+      "checks": 1159,
+      "report": "Data_MaterialRawV66.json"
+    },
+    "geometry": {
+      "passed": true,
+      "checks": 237,
+      "report": "Data_MaterialGeometryV66.json"
+    },
+    "tyrePixels": {
+      "passed": true,
+      "checks": 6,
+      "report": "Data_TyreFinishVerifyV66.json"
+    },
+    "ui": {
+      "passed": true,
+      "checks": 494,
+      "report": "Data_MaterialUiV66.json"
+    },
+    "mechanisms": {
+      "passed": true,
+      "checks": 937,
+      "report": "Data_MaterialMechanismBrowserV66.json"
+    },
+    "referenceViewer": {
+      "passed": true,
+      "checks": 5,
+      "report": "Data_MaterialReferenceBrowserV66.json"
+    },
+    "rasterReplay": {
+      "passed": true,
+      "checks": 6,
+      "report": "Data_RasterReplayV66.json"
+    },
+    "legacyWear": {
+      "passed": true,
+      "checks": 3,
+      "report": "Data_WearRegressionV66.json"
+    },
+    "aliasPreflight": {
+      "passed": true,
+      "checks": 5,
+      "report": "Data_AliasPreflightV66.json"
+    },
+    "legacyPbr": {
+      "passed": true,
+      "checks": 1159,
+      "report": "Data_LegacyPbrRawV66.json"
+    },
+    "sourceReopen": {
+      "passed": true,
+      "checks": 260,
+      "report": "Verification/Acceptance/Data_FinalSourceReopenV66.json"
+    },
+    "sourceReexport": {
+      "passed": true,
+      "checks": 237,
+      "report": "Verification/Acceptance/Data_FinalSourceReexportV66.json"
+    },
+    "sourceMaterialPixels": {
+      "passed": true,
+      "checks": 12,
+      "materialJsonIdentical": true,
+      "report": "Verification/Acceptance/Data_SourceReexportMaterialsV66.json"
+    }
+  },
+  "sourceAndExportMeshesExact": 237,
+  "rigAndHierarchyExact": 292,
+  "rootMatrixExact": true,
+  "sourcePackedImages": 13,
+  "sourceReadOnlyReopenVerified": true,
+  "sourceReexportPixelsAndBindingsExact": true,
+  "matchedSourceImportRendersInspected": [
+    "Full",
+    "Wheel"
+  ],
+  "actualRuntimeViewsInspected": [
+    "full",
+    "vent",
+    "track",
+    "weapon",
+    "wheel"
+  ],
+  "normalMapRenderEffect": {
+    "meanAbsoluteChannelDifference": 0.7102724650880389,
+    "channelFractionAbove2": 0.05844407186620301
+  },
+  "legacyV56WearPngsByteIdentical": true,
+  "rejectedInitialArtifact": "Versions/InitialUnboundGun",
+  "rejectedArtifactReason": "Appended paint alias was gray/untextured; material-family presence checks were insufficient. Actual source/runtime material coverage is now required.",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94MaterialReviewV66/",
+  "localReferencePreview": "http://127.0.0.1:8114/tmp/Type94MaterialReferenceV66/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV66\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV66\\RecipeSnapshot",
+  "canonicalSha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+  "canonicalGameReplaced": false,
+  "retainedV56AndV59Unchanged": true,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV66.json",
+  "wholeReferenceAccepted": false,
+  "globalCalibrationAccepted": false,
+  "finalPbrReferenceAccepted": false,
+  "gameBudgetAccepted": false,
+  "gameDerivativeForThisRevisionProduced": false,
+  "complete": false,
+  "goalComplete": false,
+  "published": false,
+  "remaining": [
+    "Continue native primary/multi-view body and tyre profile alignment without fitting unverified optical/occluded features",
+    "Accept the final geometry and its high-surface reference appearance, then project final low tangent-space PBR",
+    "Rebuild the accepted-revision game derivative below80000triangles/within3mm and complete the whole end-to-end acceptance"
+  ]
+}

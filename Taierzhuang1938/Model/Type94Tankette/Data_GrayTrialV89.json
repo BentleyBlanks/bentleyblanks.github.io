@@ -1,0 +1,204 @@
+{
+  "schema": "Type94CorrectedCowlRearTrialV1",
+  "revision": "ShapeV89CorrectedRearJunctionTrial",
+  "status": "local-cowl-candidate-supported-by-corrected-three-view-junctions",
+  "reference": "Data_GrayTrialV87.json",
+  "referenceAudit": "Data_ReferenceAuditV88.json",
+  "producer": "Taierzhuang1938/_blender/Script_Type94CorrectedRearTrialV89.py",
+  "nativeVerifier": "Taierzhuang1938/_blender/Script_VerifyType94CorrectedRearV89.py",
+  "geometryVerifier": "Taierzhuang1938/_import/Script_VerifyType94CorrectedRearGeometryV89.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV89\\Scene_Type94TanketteHighShapeV89RearEdgeTrial.blend",
+  "sourceBlendSha256": "ba5286dfdf7ed02fd6e6adf7acc4062be85426c2f259843005e61ea19b1b3047",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV89\\Exports\\Model_Type94TanketteHighShapeV89RearEdgeTrial.glb",
+  "sha256": "b8b6ac0ee4499a3ca978336b8c15d91f8e4fc09c18a6d655829fe6e415a40575",
+  "baseSha256": "08215f23f9cc073b5cedc3aaf9e033b307a3cb3ea22278d2bc00d7ebb80403cb",
+  "triangles": 622112,
+  "meshOwners": 238,
+  "poseNodes": 293,
+  "changedMeshOwners": [
+    "Geometry_NoseHousing_Paint"
+  ],
+  "unchangedOtherMeshOwners": 237,
+  "rigidPosesAndParentsPreserved": 293,
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "cowlParameters": {
+    "rearYM": 0.8199633318891381,
+    "rearRiseM": 0.06502361212969728,
+    "centreXM": -0.20386635373604065,
+    "widthM": 0.6409537249015802,
+    "frontRiseM": 0.14,
+    "frontYM": 1.2951509488489534
+  },
+  "fitInputFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV88\\Acceptance\\Data_RearJunctionFitV88.json",
+  "fitInputSha256": "74041e41a6bbde9545fa04deae6efa18e06975a81e4828c3e8d8351aa9dcb98e",
+  "trainingCameras": [
+    "2017",
+    "2014",
+    "TourGuide"
+  ],
+  "junctionMetrics": [
+    {
+      "camera": "2017",
+      "predictedNative": [
+        [
+          1938.6676263886043,
+          1254.3442893930462
+        ],
+        [
+          2920.218755576839,
+          1335.2321770073463
+        ]
+      ],
+      "observedNative": [
+        [
+          1930,
+          1255
+        ],
+        [
+          2920,
+          1335
+        ]
+      ],
+      "residualNative": [
+        [
+          8.667626388604276,
+          -0.6557106069537895
+        ],
+        [
+          0.21875557683915758,
+          0.23217700734630853
+        ]
+      ],
+      "rmsNative": 6.150587930338019,
+      "sigmaNative": 10
+    },
+    {
+      "camera": "2014",
+      "predictedNative": [
+        [
+          1791.604279116899,
+          1384.4018119395694
+        ],
+        [
+          2658.0900818938762,
+          1439.9386347073973
+        ]
+      ],
+      "observedNative": [
+        [
+          1805.7766378584704,
+          1380.116831467571
+        ],
+        [
+          2660.0,
+          1438.0
+        ]
+      ],
+      "residualNative": [
+        [
+          -14.172358741571315,
+          4.284980471998324
+        ],
+        [
+          -1.9099181061237687,
+          1.9386347073973411
+        ]
+      ],
+      "rmsNative": 10.644785146869449,
+      "sigmaNative": 12
+    },
+    {
+      "camera": "TourGuide",
+      "predictedNative": [
+        [
+          1024.1323537184053,
+          803.5602297185818
+        ],
+        [
+          1436.536765978048,
+          851.3628306849947
+        ]
+      ],
+      "observedNative": [
+        [
+          1024,
+          806
+        ],
+        [
+          1435,
+          854
+        ]
+      ],
+      "residualNative": [
+        [
+          0.13235371840528387,
+          -2.439770281418191
+        ],
+        [
+          1.5367659780479244,
+          -2.6371693150052806
+        ]
+      ],
+      "rmsNative": 2.7646254900219414,
+      "sigmaNative": 8
+    }
+  ],
+  "coarseLocalJunctionConsistency": true,
+  "physicalCalibrationEstablished": false,
+  "exactMetricSurveyEstablished": false,
+  "rearConnectionAndSectionInferred": true,
+  "sourceConfigurationDifferenceEstablished": false,
+  "validation": {
+    "geometry": {
+      "passed": true,
+      "checks": 1065,
+      "report": "Data_RearEdgeGeometryV89.json"
+    },
+    "sourceReopen": {
+      "passed": true,
+      "byteIdenticalReexport": true,
+      "report": "Data_RearEdgeNativeV89.json"
+    },
+    "nativeMotion": {
+      "passed": true,
+      "checks": 39,
+      "report": "Data_RearEdgeMotionV89.json"
+    },
+    "browser": {
+      "passed": true,
+      "cameraCount": 4,
+      "actualGlbRenders": 8,
+      "actualBytesVerified": true,
+      "report": "Data_RearBrowserV89.json"
+    }
+  },
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94RearEdgeReviewV89/",
+  "actualViewsInspected": [
+    "2017",
+    "2014",
+    "TourGuide",
+    "7"
+  ],
+  "sourceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV89",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV89\\Rebuild",
+  "newUvsProvisional": true,
+  "newPbrBaked": false,
+  "cameraChanged": false,
+  "wholeReferenceAccepted": false,
+  "canonicalGameReplaced": false,
+  "retainedMaterialPreview": "http://127.0.0.1:8114/tmp/Type94WearReviewV77/",
+  "goalComplete": false,
+  "published": false,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\NoseV89\\Acceptance\\Data_OwnedBlenderCleanupV89.json",
+  "remaining": [
+    "Confirm remaining cowl front outline, hardware and exact section; dimensions stay conditional",
+    "Continue fixed-body camera checks, casing/near-corner/track-envelope and whole-reference body/running-gear acceptance",
+    "Keep unconfirmed ear and hidden attachment details explicitly inferred",
+    "Integrate the accepted geometry with complete PBR and rebuild the game derivative, then final end-to-end acceptance"
+  ]
+}

@@ -1,0 +1,110 @@
+{
+  "schema": "Type94VentHousingLayoutV1",
+  "filename": "Data_VentTrialV55.json",
+  "revision": "ShapeV55VentTrial",
+  "pointsBeforeGroundM": {
+    "FaceA": [
+      -0.6373634214144951,
+      0.4752544789356085,
+      0.9601420787658945
+    ],
+    "FaceB": [
+      -0.6263189658697699,
+      -0.06621257486414725,
+      0.9334542046496851
+    ],
+    "FaceC": [
+      -0.6229818376802887,
+      -0.08446433364246078,
+      0.8744471096297687
+    ],
+    "FaceD": [
+      -0.634150539098998,
+      0.46450128383346123,
+      0.9009419995930618
+    ],
+    "RootFront": [
+      -0.5675706554290879,
+      0.49088941215581605,
+      1.0318839268272029
+    ],
+    "RootRear": [
+      -0.5662971871223197,
+      -0.05276653229476877,
+      0.9951521939824103
+    ],
+    "BendFront": [
+      -0.676057166928914,
+      0.45542828234914945,
+      0.8595805583820141
+    ],
+    "BendRear": [
+      -0.6586710765017393,
+      -0.10053453474169255,
+      0.8112239712742888
+    ],
+    "FootFront": [
+      -0.6950787028465719,
+      0.44920924871506274,
+      0.8293618231194811
+    ],
+    "FootRear": [
+      -0.6840355214056396,
+      -0.10750000140033655,
+      0.7809337515055932
+    ],
+    "InnerFootFront": [
+      -0.6,
+      0.4526232733895584,
+      0.8296588087208409
+    ],
+    "InnerFootRear": [
+      -0.6,
+      -0.11516290016142952,
+      0.78026715685157
+    ]
+  },
+  "sheetGaugeM": 0.003,
+  "railDepthM": 0.009,
+  "recessDepthM": 0.035,
+  "railIntervals": [
+    [
+      0,
+      0.115
+    ],
+    [
+      0.295,
+      0.41
+    ],
+    [
+      0.59,
+      0.705
+    ],
+    [
+      0.885,
+      1
+    ]
+  ],
+  "longitudinalSegments": 16,
+  "lapOffsetM": 0.0045,
+  "lapGaugeM": 0.003,
+  "lapEndFraction": 0.53,
+  "catchFractions": [
+    0.17,
+    0.85
+  ],
+  "sourceStudies": [
+    "Data_VentProjectionStudyV54.json",
+    "Data_VentAttachmentFitV55.json",
+    "Data_VentApronLinesV55.json"
+  ],
+  "accepted": false,
+  "globalCalibrationAccepted": false,
+  "geometryGenerated": false,
+  "inferred": [
+    "Conditional camera family and free slat corners",
+    "Rear root depth at86percent of the front root vector; no surveyed rear root",
+    "Three-millimetre sheet gauge, nine-millimetre rail depth, backing, lap and catch sections",
+    "Inner foot attachment and coupled engine-side/fender transition"
+  ]
+}

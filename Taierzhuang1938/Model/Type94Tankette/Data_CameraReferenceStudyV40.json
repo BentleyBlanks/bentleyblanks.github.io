@@ -1,0 +1,1280 @@
+{
+  "schema": "Type94CameraReferenceStudyV2",
+  "revision": "CameraStudyV40",
+  "status": "rejected-global-calibration-and-unchanged-gray",
+  "complete": false,
+  "sourceGrayManifest": "Data_GrayStudyV37.json",
+  "sourceGraySha256": "9504477d4b850fcf8a987a0e12d5aea24cf66be318355b471586b4e21070e7de",
+  "retainedSurfaceManifest": "Data_SurfaceStudyV39.json",
+  "retainedSurfaceSha256": "a021070fb8523208baf2ffaed5cd4555f5cd6586dd79fa1b7a2e8f243919bbac",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94CameraReviewV40/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\CameraStudyV40",
+  "previousStudyManifest": "Data_CameraReferenceStudyV37.json",
+  "newEvidence": [
+    "Added the higher-angle 2592x1944 same-museum TourGuide image; exact original 4:3 aspect retained in the actual GLB comparison",
+    "Raw SIFT search gave 140 fixed-body F inliers, but native review exposes repeated hinge/stud and tow-fitting mismatches; these do not establish physical correspondence",
+    "Reviewed named cab corners, five paired turret rows and front caps; rejected a flag-corner cap candidate. FarInner was corrected after prediction review and remains a post-hoc diagnostic",
+    "All 3D points were freed in three-view fits; no source point-position or nominal dimension residual was used. Planarity/near-rectangle and independent rigid turret cases were separate explicit hypotheses",
+    "The processed-image virtual camera removes the chosen crop-bound hit, but does not accept camera intrinsics or whole proportions. Raw XMP shows Photoshop saves without proving lens/perspective correction",
+    "Actual V37 cab/turret marker fitting leaves large fender/drive discrepancies. Cab-only analytic changes can lower upper residuals while worsening whole-vehicle controls; no shape dimensions adopted"
+  ],
+  "physicalObservationReview": {
+    "file": "Data_TourGuidePhysicalReviewedV40.json",
+    "namedPhysicalPoints": 22,
+    "newThirdViewTraining": 17,
+    "newThirdViewHoldoutNames": [
+      "NativeFront_Upper2",
+      "NativeFront_LowerFar1",
+      "FenderFarOuter",
+      "FenderNearOuter"
+    ],
+    "postHocDiagnosticNames": [
+      "FenderFarInner"
+    ],
+    "exactCapAxesAccepted": false,
+    "wholeNewPhotographUntouchedHoldout": false
+  },
+  "physicalCameraClasses": [
+    {
+      "quadClass": "FreeQuad",
+      "motionClass": "StaticTurret",
+      "success": true,
+      "cost": 4.690098271281286,
+      "nearIntrinsicBounds": [
+        11,
+        13
+      ],
+      "conditionalShapeRatios": {
+        "cabinWidthOverSlopedFrontHeight": 2.5944534596672617,
+        "cabinWidthOverFourRivetIntervals": 1.969285508254885
+      },
+      "thirdViewPhysicalHoldouts": [
+        {
+          "name": "NativeFront_Upper2",
+          "predictedNative": [
+            980.2363369855593,
+            1163.1013181527894
+          ],
+          "observedNative": [
+            982.0,
+            1160.0
+          ],
+          "errorNative": 3.567727780160246,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "NativeFront_LowerFar1",
+          "predictedNative": [
+            646.1295019929485,
+            1195.563071539949
+          ],
+          "observedNative": [
+            647.0,
+            1196.0
+          ],
+          "errorNative": 0.9739985931628283,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            366.52883949951433,
+            978.8742435312535
+          ],
+          "observedNative": [
+            364.0,
+            980.0
+          ],
+          "errorNative": 2.7680962485485567,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarInner",
+          "predictedNative": [
+            458.7291431559195,
+            1015.9522815767453
+          ],
+          "observedNative": [
+            466.0,
+            1009.0
+          ],
+          "errorNative": 10.0598001157809,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": true
+        },
+        {
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            1371.2838297088413,
+            1242.249031786409
+          ],
+          "observedNative": [
+            1385.0,
+            1235.0
+          ],
+          "errorNative": 15.513922434266364,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        }
+      ]
+    },
+    {
+      "quadClass": "FreeQuad",
+      "motionClass": "IndependentRigidTurret",
+      "success": true,
+      "cost": 3.994595344437718,
+      "nearIntrinsicBounds": [
+        13
+      ],
+      "conditionalShapeRatios": {
+        "cabinWidthOverSlopedFrontHeight": 2.513293483817184,
+        "cabinWidthOverFourRivetIntervals": 1.8954428722040029
+      },
+      "thirdViewPhysicalHoldouts": [
+        {
+          "name": "NativeFront_Upper2",
+          "predictedNative": [
+            980.4295585512488,
+            1163.1810377853458
+          ],
+          "observedNative": [
+            982.0,
+            1160.0
+          ],
+          "errorNative": 3.547574909110937,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "NativeFront_LowerFar1",
+          "predictedNative": [
+            645.8808032809502,
+            1195.177565147353
+          ],
+          "observedNative": [
+            647.0,
+            1196.0
+          ],
+          "errorNative": 1.3888845822386195,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            364.51925753636306,
+            979.3964113990943
+          ],
+          "observedNative": [
+            364.0,
+            980.0
+          ],
+          "errorNative": 0.7962082568104546,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarInner",
+          "predictedNative": [
+            457.5458094581179,
+            1016.5940499508465
+          ],
+          "observedNative": [
+            466.0,
+            1009.0
+          ],
+          "errorNative": 11.36410719653773,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": true
+        },
+        {
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            1371.5779227300952,
+            1243.3426220860342
+          ],
+          "observedNative": [
+            1385.0,
+            1235.0
+          ],
+          "errorNative": 15.803528134871671,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        }
+      ]
+    },
+    {
+      "quadClass": "PlanarQuad",
+      "motionClass": "StaticTurret",
+      "success": true,
+      "cost": 5.028195261123856,
+      "nearIntrinsicBounds": [
+        11,
+        13
+      ],
+      "conditionalShapeRatios": {
+        "cabinWidthOverSlopedFrontHeight": 2.5080875252242287,
+        "cabinWidthOverFourRivetIntervals": 1.8691810167133025
+      },
+      "thirdViewPhysicalHoldouts": [
+        {
+          "name": "NativeFront_Upper2",
+          "predictedNative": [
+            980.3179228681615,
+            1163.0478256341526
+          ],
+          "observedNative": [
+            982.0,
+            1160.0
+          ],
+          "errorNative": 3.4811814910531997,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "NativeFront_LowerFar1",
+          "predictedNative": [
+            646.0300265591,
+            1195.6626145829955
+          ],
+          "observedNative": [
+            647.0,
+            1196.0
+          ],
+          "errorNative": 1.0269748758654123,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            366.1199169114419,
+            979.0523015201745
+          ],
+          "observedNative": [
+            364.0,
+            980.0
+          ],
+          "errorNative": 2.3221068278787187,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarInner",
+          "predictedNative": [
+            458.7942398566687,
+            1016.1421111854131
+          ],
+          "observedNative": [
+            466.0,
+            1009.0
+          ],
+          "errorNative": 10.145576939140774,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": true
+        },
+        {
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            1370.3376883193994,
+            1241.6625965268029
+          ],
+          "observedNative": [
+            1385.0,
+            1235.0
+          ],
+          "errorNative": 16.105079208064865,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        }
+      ]
+    },
+    {
+      "quadClass": "PlanarQuad",
+      "motionClass": "IndependentRigidTurret",
+      "success": true,
+      "cost": 4.317237678251591,
+      "nearIntrinsicBounds": [
+        11,
+        13
+      ],
+      "conditionalShapeRatios": {
+        "cabinWidthOverSlopedFrontHeight": 2.441677345296619,
+        "cabinWidthOverFourRivetIntervals": 1.8075841650694122
+      },
+      "thirdViewPhysicalHoldouts": [
+        {
+          "name": "NativeFront_Upper2",
+          "predictedNative": [
+            980.5228946667052,
+            1163.1085110073914
+          ],
+          "observedNative": [
+            982.0,
+            1160.0
+          ],
+          "errorNative": 3.441610211619176,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "NativeFront_LowerFar1",
+          "predictedNative": [
+            645.7216793953547,
+            1195.3678116800038
+          ],
+          "observedNative": [
+            647.0,
+            1196.0
+          ],
+          "errorNative": 1.4261015532563868,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            364.16094362295644,
+            979.5809167984953
+          ],
+          "observedNative": [
+            364.0,
+            980.0
+          ],
+          "errorNative": 0.448924915273997,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarInner",
+          "predictedNative": [
+            457.72197872141805,
+            1016.7758428073219
+          ],
+          "observedNative": [
+            466.0,
+            1009.0
+          ],
+          "errorNative": 11.357348618970647,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": true
+        },
+        {
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            1370.4492460490421,
+            1242.5785711206609
+          ],
+          "observedNative": [
+            1385.0,
+            1235.0
+          ],
+          "errorNative": 16.40607146065842,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        }
+      ]
+    },
+    {
+      "quadClass": "NearRectangle",
+      "motionClass": "StaticTurret",
+      "success": true,
+      "cost": 6.030112779492986,
+      "nearIntrinsicBounds": [
+        11,
+        13
+      ],
+      "conditionalShapeRatios": {
+        "cabinWidthOverSlopedFrontHeight": 2.3492084813342884,
+        "cabinWidthOverFourRivetIntervals": 1.7415028721439083
+      },
+      "thirdViewPhysicalHoldouts": [
+        {
+          "name": "NativeFront_Upper2",
+          "predictedNative": [
+            980.0054931592258,
+            1163.2943451321573
+          ],
+          "observedNative": [
+            982.0,
+            1160.0
+          ],
+          "errorNative": 3.8510735370366223,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "NativeFront_LowerFar1",
+          "predictedNative": [
+            647.2364586903493,
+            1194.4821823324953
+          ],
+          "observedNative": [
+            647.0,
+            1196.0
+          ],
+          "errorNative": 1.5361260312979137,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            366.85330398708584,
+            979.4243300810352
+          ],
+          "observedNative": [
+            364.0,
+            980.0
+          ],
+          "errorNative": 2.9107970555022957,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarInner",
+          "predictedNative": [
+            459.0238473723938,
+            1016.5578567910709
+          ],
+          "observedNative": [
+            466.0,
+            1009.0
+          ],
+          "errorNative": 10.285324727882607,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": true
+        },
+        {
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            1370.1166570231876,
+            1244.2689079928323
+          ],
+          "observedNative": [
+            1385.0,
+            1235.0
+          ],
+          "errorNative": 17.533583591069487,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        }
+      ]
+    },
+    {
+      "quadClass": "NearRectangle",
+      "motionClass": "IndependentRigidTurret",
+      "success": true,
+      "cost": 5.067587067887331,
+      "nearIntrinsicBounds": [
+        13
+      ],
+      "conditionalShapeRatios": {
+        "cabinWidthOverSlopedFrontHeight": 2.1639951614764357,
+        "cabinWidthOverFourRivetIntervals": 1.62858256037758
+      },
+      "thirdViewPhysicalHoldouts": [
+        {
+          "name": "NativeFront_Upper2",
+          "predictedNative": [
+            980.2709321277653,
+            1163.5272650565425
+          ],
+          "observedNative": [
+            982.0,
+            1160.0
+          ],
+          "errorNative": 3.9282660915345913,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "NativeFront_LowerFar1",
+          "predictedNative": [
+            647.1155300071317,
+            1193.427304745778
+          ],
+          "observedNative": [
+            647.0,
+            1196.0
+          ],
+          "errorNative": 2.5752879554807833,
+          "sigmaNative": 4.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            361.0818828263881,
+            982.443716533753
+          ],
+          "observedNative": [
+            364.0,
+            980.0
+          ],
+          "errorNative": 3.806199986373083,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        },
+        {
+          "name": "FenderFarInner",
+          "predictedNative": [
+            454.5228499966496,
+            1019.7552998239134
+          ],
+          "observedNative": [
+            466.0,
+            1009.0
+          ],
+          "errorNative": 15.729000174889654,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": true
+        },
+        {
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            1372.1783542084704,
+            1246.033979504927
+          ],
+          "observedNative": [
+            1385.0,
+            1235.0
+          ],
+          "errorNative": 16.915770881594383,
+          "sigmaNative": 5.0,
+          "postHocIdentityCorrection": false
+        }
+      ]
+    }
+  ],
+  "processedCameraDiagnostic": {
+    "file": "Data_TourGuideVirtualCameraV40.json",
+    "success": true,
+    "virtual2017": {
+      "focalNative": 5203.5990117375095,
+      "principalNative": [
+        2494.9324205090634,
+        1354.3696808078994
+      ],
+      "nearBounds": []
+    },
+    "thirdViewPhysicalHoldouts": [
+      {
+        "name": "NativeFront_Upper2",
+        "predictedNative": [
+          980.3509371141316,
+          1163.5650952622034
+        ],
+        "observedNative": [
+          982.0,
+          1160.0
+        ],
+        "errorNative": 3.9280163734553804,
+        "sigmaNative": 4.0,
+        "postHocIdentityCorrection": false
+      },
+      {
+        "name": "NativeFront_LowerFar1",
+        "predictedNative": [
+          647.5187932217898,
+          1192.8731525002008
+        ],
+        "observedNative": [
+          647.0,
+          1196.0
+        ],
+        "errorNative": 3.1695933010364823,
+        "sigmaNative": 4.0,
+        "postHocIdentityCorrection": false
+      },
+      {
+        "name": "FenderFarOuter",
+        "predictedNative": [
+          357.317130772527,
+          986.0026691813891
+        ],
+        "observedNative": [
+          364.0,
+          980.0
+        ],
+        "errorNative": 8.982915919271692,
+        "sigmaNative": 5.0,
+        "postHocIdentityCorrection": false
+      },
+      {
+        "name": "FenderFarInner",
+        "predictedNative": [
+          450.26204500762424,
+          1023.3506787625244
+        ],
+        "observedNative": [
+          466.0,
+          1009.0
+        ],
+        "errorNative": 21.29847901346978,
+        "sigmaNative": 5.0,
+        "postHocIdentityCorrection": true
+      },
+      {
+        "name": "FenderNearOuter",
+        "predictedNative": [
+          1376.3589147082728,
+          1244.6882436311103
+        ],
+        "observedNative": [
+          1385.0,
+          1235.0
+        ],
+        "errorNative": 12.98192665495584,
+        "sigmaNative": 5.0,
+        "postHocIdentityCorrection": false
+      }
+    ],
+    "calibrationAccepted": false
+  },
+  "actualModelTrials": [
+    {
+      "shapeClass": "CurrentV37",
+      "shapeParameterNames": [],
+      "shapeParameters": [],
+      "cameraFittingCost": 136.11774339727538,
+      "nearShapeBounds": [],
+      "wholeVehicleControlsUnusedForFit": [
+        {
+          "camera": "2017",
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            170.15840828527553,
+            1453.5296320297768
+          ],
+          "observedNative": [
+            323.834375,
+            1651.7001733102252
+          ],
+          "errorNative": 250.77453255283118,
+          "residualNative": [
+            -153.6759667147245,
+            -198.17054128044833
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2017",
+          "name": "FenderFarInner",
+          "predictedNative": [
+            451.0303683826469,
+            1539.582102068658
+          ],
+          "observedNative": [
+            659.0125,
+            1704.9670710571922
+          ],
+          "errorNative": 265.7230796137897,
+          "residualNative": [
+            -207.98213161735316,
+            -165.38496898853418
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2017",
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            2938.9152888172357,
+            1943.0625629804863
+          ],
+          "observedNative": [
+            3019.6875,
+            2008.1416490486258
+          ],
+          "errorNative": 103.72770865500398,
+          "residualNative": [
+            -80.7722111827643,
+            -65.07908606813953
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2017",
+          "name": "DriveHubFaceCenterCandidate",
+          "predictedNative": [
+            2918.3924636942183,
+            2384.6894267243383
+          ],
+          "observedNative": [
+            3062.570625,
+            2367.8418749999996
+          ],
+          "errorNative": 145.15916160070717,
+          "sigmaNative": 11.376562499999999
+        },
+        {
+          "camera": "2014",
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            100.97774968413387,
+            1457.4428935424673
+          ],
+          "observedNative": [
+            339.3625,
+            1716.7005545286506
+          ],
+          "errorNative": 352.1957182635595,
+          "residualNative": [
+            -238.38475031586614,
+            -259.2576609861833
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2014",
+          "name": "FenderFarInner",
+          "predictedNative": [
+            328.2320394663441,
+            1520.8804879687618
+          ],
+          "observedNative": [
+            619.5250000000001,
+            1746.9297597042514
+          ],
+          "errorNative": 368.71379430204036,
+          "residualNative": [
+            -291.292960533656,
+            -226.04927173548958
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2014",
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            2391.7153806094325,
+            1746.6268444028433
+          ],
+          "observedNative": [
+            2632.8078125,
+            1960.3488372093022
+          ],
+          "errorNative": 322.1841878864823,
+          "residualNative": [
+            -241.0924318905677,
+            -213.72199280645896
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2014",
+          "name": "DriveHubFaceCenterCandidate",
+          "predictedNative": [
+            2446.786131602005,
+            2257.141052546835
+          ],
+          "observedNative": [
+            2701.36625,
+            2334.1828125
+          ],
+          "errorNative": 265.9820848482438,
+          "sigmaNative": 11.498437500000001
+        },
+        {
+          "camera": "TourGuide",
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            249.66205469216925,
+            909.6724651528043
+          ],
+          "observedNative": [
+            364.0,
+            980.0
+          ],
+          "errorNative": 134.23534517741598,
+          "residualNative": [
+            -114.33794530783075,
+            -70.3275348471957
+          ],
+          "sigmaNative": 5.0
+        },
+        {
+          "camera": "TourGuide",
+          "name": "FenderFarInner",
+          "predictedNative": [
+            333.06600515626974,
+            954.8833364024481
+          ],
+          "observedNative": [
+            466.0,
+            1009.0
+          ],
+          "errorNative": 143.52721088366312,
+          "residualNative": [
+            -132.93399484373026,
+            -54.116663597551906
+          ],
+          "sigmaNative": 5.0
+        },
+        {
+          "camera": "TourGuide",
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            1256.9777860922684,
+            1282.5938626357224
+          ],
+          "observedNative": [
+            1385.0,
+            1235.0
+          ],
+          "errorNative": 136.58280643779804,
+          "residualNative": [
+            -128.0222139077316,
+            47.59386263572242
+          ],
+          "sigmaNative": 5.0
+        }
+      ]
+    },
+    {
+      "shapeClass": "CabTopOnly",
+      "shapeParameterNames": [
+        "CabTopZDelta"
+      ],
+      "shapeParameters": [
+        -0.0360310931555759
+      ],
+      "cameraFittingCost": 90.73695126146347,
+      "nearShapeBounds": [],
+      "wholeVehicleControlsUnusedForFit": [
+        {
+          "camera": "2017",
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            121.51544499533838,
+            1354.981376056464
+          ],
+          "observedNative": [
+            323.834375,
+            1651.7001733102252
+          ],
+          "errorNative": 359.13088711770513,
+          "residualNative": [
+            -202.31893000466164,
+            -296.7187972537613
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2017",
+          "name": "FenderFarInner",
+          "predictedNative": [
+            421.6283366722628,
+            1432.8596890803751
+          ],
+          "observedNative": [
+            659.0125,
+            1704.9670710571922
+          ],
+          "errorNative": 361.10063462293624,
+          "residualNative": [
+            -237.38416332773727,
+            -272.1073819768171
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2017",
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            3080.6220609498923,
+            1740.0699686418448
+          ],
+          "observedNative": [
+            3019.6875,
+            2008.1416490486258
+          ],
+          "errorNative": 274.90988806201847,
+          "residualNative": [
+            60.93456094989233,
+            -268.07168040678107
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2017",
+          "name": "DriveHubFaceCenterCandidate",
+          "predictedNative": [
+            3031.9198411470734,
+            2248.704978743849
+          ],
+          "observedNative": [
+            3062.570625,
+            2367.8418749999996
+          ],
+          "errorNative": 123.01654604299208,
+          "sigmaNative": 11.376562499999999
+        },
+        {
+          "camera": "2014",
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            35.828523966045395,
+            1349.866684585411
+          ],
+          "observedNative": [
+            339.3625,
+            1716.7005545286506
+          ],
+          "errorNative": 476.1301951614863,
+          "residualNative": [
+            -303.5339760339546,
+            -366.83386994323973
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2014",
+          "name": "FenderFarInner",
+          "predictedNative": [
+            280.9483787152549,
+            1407.9248422551896
+          ],
+          "observedNative": [
+            619.5250000000001,
+            1746.9297597042514
+          ],
+          "errorNative": 479.12259656087923,
+          "residualNative": [
+            -338.5766212847452,
+            -339.00491744906185
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2014",
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            2519.3720173468755,
+            1566.3878098353662
+          ],
+          "observedNative": [
+            2632.8078125,
+            1960.3488372093022
+          ],
+          "errorNative": 409.96703612796586,
+          "residualNative": [
+            -113.43579515312467,
+            -393.9610273739361
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2014",
+          "name": "DriveHubFaceCenterCandidate",
+          "predictedNative": [
+            2545.265009595302,
+            2135.887325001568
+          ],
+          "observedNative": [
+            2701.36625,
+            2334.1828125
+          ],
+          "errorNative": 252.3661974554558,
+          "sigmaNative": 11.498437500000001
+        },
+        {
+          "camera": "TourGuide",
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            204.4435422435845,
+            865.4688704510411
+          ],
+          "observedNative": [
+            364.0,
+            980.0
+          ],
+          "errorNative": 196.40682994115866,
+          "residualNative": [
+            -159.5564577564155,
+            -114.53112954895892
+          ],
+          "sigmaNative": 5.0
+        },
+        {
+          "camera": "TourGuide",
+          "name": "FenderFarInner",
+          "predictedNative": [
+            294.0283327334329,
+            906.2347243356883
+          ],
+          "observedNative": [
+            466.0,
+            1009.0
+          ],
+          "errorNative": 200.33710646009854,
+          "residualNative": [
+            -171.97166726656712,
+            -102.76527566431173
+          ],
+          "sigmaNative": 5.0
+        },
+        {
+          "camera": "TourGuide",
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            1322.3861577833081,
+            1171.116640166019
+          ],
+          "observedNative": [
+            1385.0,
+            1235.0
+          ],
+          "errorNative": 89.45153380917901,
+          "residualNative": [
+            -62.613842216691864,
+            -63.8833598339811
+          ],
+          "sigmaNative": 5.0
+        }
+      ]
+    },
+    {
+      "shapeClass": "CabFrame",
+      "shapeParameterNames": [
+        "CabWidthDelta",
+        "CabTopZDelta",
+        "CabTopForwardDelta",
+        "CabBottomForwardDelta"
+      ],
+      "shapeParameters": [
+        -0.08224258081642834,
+        -0.036218133100534844,
+        0.006812298680392939,
+        -0.05885723046271132
+      ],
+      "cameraFittingCost": 19.697129621273845,
+      "nearShapeBounds": [],
+      "wholeVehicleControlsUnusedForFit": [
+        {
+          "camera": "2017",
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            17.857741532060572,
+            1427.7576964958482
+          ],
+          "observedNative": [
+            323.834375,
+            1651.7001733102252
+          ],
+          "errorNative": 379.1726956811784,
+          "residualNative": [
+            -305.97663346793945,
+            -223.94247681437696
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2017",
+          "name": "FenderFarInner",
+          "predictedNative": [
+            394.92037889865287,
+            1516.864240836882
+          ],
+          "observedNative": [
+            659.0125,
+            1704.9670710571922
+          ],
+          "errorNative": 324.233439306774,
+          "residualNative": [
+            -264.0921211013472,
+            -188.10283022031035
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2017",
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            3594.944481022697,
+            1856.1682237253642
+          ],
+          "observedNative": [
+            3019.6875,
+            2008.1416490486258
+          ],
+          "errorNative": 594.9928707302571,
+          "residualNative": [
+            575.2569810226969,
+            -151.9734253232616
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2017",
+          "name": "DriveHubFaceCenterCandidate",
+          "predictedNative": [
+            3437.6300833577566,
+            2392.471630760302
+          ],
+          "observedNative": [
+            3062.570625,
+            2367.8418749999996
+          ],
+          "errorNative": 375.86729329967784,
+          "sigmaNative": 11.376562499999999
+        },
+        {
+          "camera": "2014",
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            -60.883770615667345,
+            1371.443252168894
+          ],
+          "observedNative": [
+            339.3625,
+            1716.7005545286506
+          ],
+          "errorNative": 528.5827106276616,
+          "residualNative": [
+            -400.24627061566736,
+            -345.2573023597565
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2014",
+          "name": "FenderFarInner",
+          "predictedNative": [
+            231.85790592466583,
+            1435.6516431229718
+          ],
+          "observedNative": [
+            619.5250000000001,
+            1746.9297597042514
+          ],
+          "errorNative": 497.17184322043295,
+          "residualNative": [
+            -387.66709407533426,
+            -311.2781165812796
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2014",
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            2854.3630482575395,
+            1612.601672713197
+          ],
+          "observedNative": [
+            2632.8078125,
+            1960.3488372093022
+          ],
+          "errorNative": 412.32852545835345,
+          "residualNative": [
+            221.55523575753932,
+            -347.74716449610514
+          ],
+          "sigmaNative": 3.6
+        },
+        {
+          "camera": "2014",
+          "name": "DriveHubFaceCenterCandidate",
+          "predictedNative": [
+            2823.063705727453,
+            2216.5072026348353
+          ],
+          "observedNative": [
+            2701.36625,
+            2334.1828125
+          ],
+          "errorNative": 169.28620702134558,
+          "sigmaNative": 11.498437500000001
+        },
+        {
+          "camera": "TourGuide",
+          "name": "FenderFarOuter",
+          "predictedNative": [
+            109.75096988077598,
+            904.3965505000946
+          ],
+          "observedNative": [
+            364.0,
+            980.0
+          ],
+          "errorNative": 265.2516746277973,
+          "residualNative": [
+            -254.24903011922402,
+            -75.60344949990542
+          ],
+          "sigmaNative": 5.0
+        },
+        {
+          "camera": "TourGuide",
+          "name": "FenderFarInner",
+          "predictedNative": [
+            227.50156206297993,
+            951.0454947494079
+          ],
+          "observedNative": [
+            466.0,
+            1009.0
+          ],
+          "errorNative": 245.4388509939686,
+          "residualNative": [
+            -238.49843793702007,
+            -57.95450525059209
+          ],
+          "sigmaNative": 5.0
+        },
+        {
+          "camera": "TourGuide",
+          "name": "FenderNearOuter",
+          "predictedNative": [
+            1560.6527791725453,
+            1250.6929763929495
+          ],
+          "observedNative": [
+            1385.0,
+            1235.0
+          ],
+          "errorNative": 176.3523981665932,
+          "residualNative": [
+            175.65277917254525,
+            15.692976392949504
+          ],
+          "sigmaNative": 5.0
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "actualGlbBrowserPassed": true,
+    "checks": 10,
+    "browserReport": "Data_CameraPageBrowserV40.json",
+    "viewerHtmlSha256": "3dda28beabae3a06d83c215ef1f12058431a5e76bb6de7414bccdc48961486cd",
+    "viewerDataSha256": "420d544c66420a3224c73e808074b607f6dc9bad688c2d6fc7e425ac8a93b87a",
+    "actualModelSha256": "9504477d4b850fcf8a987a0e12d5aea24cf66be318355b471586b4e21070e7de",
+    "visualInspectionYears": [
+      "TourGuide",
+      "2017",
+      "2014"
+    ],
+    "onlyType94MeshesLoaded": true,
+    "allImageAspectsPreserved": true,
+    "scope": "Actual gray GLB, independent camera projection arithmetic and source image aspect; not photo-shape acceptance"
+  },
+  "modelGeometryChanged": false,
+  "globalCalibrationAccepted": false,
+  "overallMuseumScaleAccepted": false,
+  "wholeReferenceAccepted": false,
+  "strictReferenceMatched": false,
+  "remaining": [
+    "Establish native primary/TourGuide lower wheel-axis identities or defensible tyre arcs, separating cap ends from arm pivots and perspective ellipse centres",
+    "Jointly constrain whole body and running gear before adopting cabin, fender, turret or nose dimensions",
+    "Whole neutral-gray surface/silhouette and common-scale acceptance across the selected consistent museum version",
+    "Exact final paint/wear, fresh full UV/PBR replay and the below80000-triangle 3mm game derivative"
+  ],
+  "nextAction": "Review raw lower-wheel features in the primary and TourGuide originals. The located V33 primary cap crops match source pixels exactly, but their original centres were predictions; identify actual axle end faces before using them as observations. Add lower controls to the whole-vehicle solve, retaining the existing upper and outline diagnostics.",
+  "publication": "Local only; no chapter vehicle replacement"
+}

@@ -1,0 +1,62 @@
+{
+  "schema": "Type94CabinDatumVisibilityAuditV1",
+  "revision": "ReferenceV84",
+  "status": "authored-box-corners-separated-from-visible-photographic-boundaries",
+  "sourceManifest": "Data_GrayTrialV81.json",
+  "sourceGlbSha256": "6322b72bde0ae1555b37e25d25c951b944dbd47e94564daf06bc5bb26d54b2d0",
+  "actualVisibilityFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV84\\Acceptance\\Data_CabinCornerVisibilityV84.json",
+  "actualVisibilitySha256": "f708b14f312248e76c653deebcf3b51f0ac1b8ea557f2e1556aeb37e0a5163d3",
+  "cornerCount": 4,
+  "cornerKind": "Authored cabin midplane box data, not guaranteed visible outer-skin vertices",
+  "photographicCornerIdentitiesAccepted": false,
+  "automaticEdgeCandidatesAccepted": false,
+  "baseline7LowerCorners": [
+    {
+      "camera": "7",
+      "name": "NearBottom",
+      "firstOwner": "Geometry_NoseHousing_Paint",
+      "distanceBeforeDatumM": 0.7061686796414515,
+      "authoredDatumNotGuaranteedSkinVertex": true
+    },
+    {
+      "camera": "7",
+      "name": "FarBottom",
+      "firstOwner": "Geometry_NoseHousing_Paint",
+      "distanceBeforeDatumM": 1.169252826127444,
+      "authoredDatumNotGuaranteedSkinVertex": true
+    }
+  ],
+  "trial7LowerCorners": [
+    {
+      "camera": "7",
+      "name": "NearBottom",
+      "firstOwner": "Geometry_Hull_Paint",
+      "distanceBeforeDatumM": 0.03716876928683721,
+      "authoredDatumNotGuaranteedSkinVertex": true
+    },
+    {
+      "camera": "7",
+      "name": "FarBottom",
+      "firstOwner": "Geometry_Hull_Paint",
+      "distanceBeforeDatumM": 0.04134459629956311,
+      "authoredDatumNotGuaranteedSkinVertex": true
+    }
+  ],
+  "actualProjectedMarkerModesInspected": [
+    "Gray",
+    "Photograph"
+  ],
+  "resultingGrayTrial": "Data_GrayTrialV85.json",
+  "cameraAdopted": false,
+  "wholeReferenceAccepted": false,
+  "goalComplete": false,
+  "interpretation": "The original cowl is the actual first occluder for both lower cabin data under camera7. This is a model visibility fact, not proof of photographic corner identity or a survey. A separate cowl rear-taper trial tests that shape cause without changing cameras.",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV84\\Acceptance",
+  "remaining": [
+    "Verify actual fixed-body photographic edges separately from authored midplane/corner data",
+    "Refine the cowl rear position, height and hidden connection against native photographs;12mmis an inferred trial value",
+    "Resolve casing joint/profile and near-corner/track envelopes; retain ear/camera uncertainties",
+    "Complete whole-reference body/running-gear acceptance",
+    "Bake final high PBR and game derivative from accepted geometry and complete end-to-end acceptance"
+  ]
+}

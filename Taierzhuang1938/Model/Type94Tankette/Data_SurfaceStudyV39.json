@@ -1,0 +1,373 @@
+{
+  "schema": "Type94SurfaceStudyV1",
+  "revision": "SurfaceV39",
+  "baseGrayManifest": "Data_GrayStudyV37.json",
+  "baseGraySha256": "9504477d4b850fcf8a987a0e12d5aea24cf66be318355b471586b4e21070e7de",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Scene_Type94TanketteHighSurfaceV39.blend",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Exports\\Model_Type94TanketteHighSurfaceV39.glb",
+  "sha256": "a021070fb8523208baf2ffaed5cd4555f5cd6586dd79fa1b7a2e8f243919bbac",
+  "sourceBlendSha256": "ce894968e000f74b76353e5de00fafb4a6856135a1e11cf6a13d91de9093409b",
+  "triangles": 500670,
+  "meshNodes": 247,
+  "embeddedImages": [
+    {
+      "name": "Texture_Type94PaintNormal.001",
+      "size": [
+        4096,
+        4096
+      ],
+      "bytes": 6105842
+    },
+    {
+      "name": "Texture_Type94PaintOrmWear",
+      "size": [
+        4096,
+        4096
+      ],
+      "bytes": 7579302
+    },
+    {
+      "name": "Texture_Type94PaintBaseWear",
+      "size": [
+        4096,
+        4096
+      ],
+      "bytes": 4718723
+    },
+    {
+      "name": "Texture_Type94SteelNormal.004",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 1426238
+    },
+    {
+      "name": "Texture_Type94SteelOrm.004",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 3532579
+    },
+    {
+      "name": "Texture_Type94SteelBase.004",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 1937282
+    },
+    {
+      "name": "Texture_Type94RubberNormal.003",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 180469
+    },
+    {
+      "name": "Texture_Type94RubberOrm.003",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 780021
+    },
+    {
+      "name": "Texture_Type94RubberBase.003",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 514886
+    },
+    {
+      "name": "Texture_Type94TrackNormal.002",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 4323864
+    },
+    {
+      "name": "Texture_Type94TrackOrm.002",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 2298040
+    },
+    {
+      "name": "Texture_Type94TrackBase.002",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 959763
+    }
+  ],
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94Review/",
+  "stagedPreview": "http://127.0.0.1:8114/tmp/Type94ReviewV39/",
+  "grayPreview": "http://127.0.0.1:8114/tmp/Type94ShapeReview/",
+  "retainedGameCheckpoint": {
+    "revision": "V12",
+    "sha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+    "recipeCommit": "bd0852e1"
+  },
+  "previousSurfaceManifest": "Data_SurfaceStudyV36.json",
+  "uvCheckpoint": {
+    "manifest": "Data_SurfaceStudyV34.json",
+    "sourceBlendSha256": "e8e13255c92c8c81eba3f99677c705138fcd6cab5c097fc27ced01793901a876",
+    "transfers": [
+      {
+        "role": "Paint",
+        "retainedOwners": [
+          "Geometry_CommanderHingeFixed_Paint",
+          "Geometry_DriverPortHingeFixed_Paint",
+          "Geometry_DriverPortHingeFixedRight_Paint",
+          "Geometry_DriverRoofHingeFixed_Paint",
+          "Geometry_DriverVisorHingeFixed_Paint",
+          "Geometry_EngineFrontFlangeFixed_Paint",
+          "Geometry_EngineHingeFixed_Paint",
+          "Geometry_FinalDriveHousingLeft_Paint",
+          "Geometry_FinalDriveHousingRight_Paint",
+          "Geometry_Hatch_Commander_Paint",
+          "Geometry_Hatch_DriverPortLeft_Paint",
+          "Geometry_Hatch_DriverPortRight_Paint",
+          "Geometry_Hatch_DriverRoof_Paint",
+          "Geometry_Hatch_DriverVisor_Paint",
+          "Geometry_Hatch_Engine_Paint",
+          "Geometry_Hatch_RearCargo_Paint",
+          "Geometry_Hatch_TurretRear_Paint",
+          "Geometry_Hull_Paint",
+          "Geometry_MachineGunFixedMount_Paint",
+          "Geometry_MachineGunPitch_Paint",
+          "Geometry_NoseHousing_Paint",
+          "Geometry_RearDoorHingeFixed_Paint",
+          "Geometry_RearDoorLatchKeeperFixed_Paint",
+          "Geometry_TowShackleFront_Paint",
+          "Geometry_TurretRearHingeFixed_Paint",
+          "Geometry_Wheel_Left_Drive_Paint",
+          "Geometry_Wheel_Left_Idler_Paint",
+          "Geometry_Wheel_Left_Return0_Paint",
+          "Geometry_Wheel_Left_Return1_Paint",
+          "Geometry_Wheel_Left_Road0_Paint",
+          "Geometry_Wheel_Left_Road1_Paint",
+          "Geometry_Wheel_Left_Road2_Paint",
+          "Geometry_Wheel_Left_Road3_Paint",
+          "Geometry_Wheel_Right_Drive_Paint",
+          "Geometry_Wheel_Right_Idler_Paint",
+          "Geometry_Wheel_Right_Return0_Paint",
+          "Geometry_Wheel_Right_Return1_Paint",
+          "Geometry_Wheel_Right_Road0_Paint",
+          "Geometry_Wheel_Right_Road1_Paint",
+          "Geometry_Wheel_Right_Road2_Paint",
+          "Geometry_Wheel_Right_Road3_Paint",
+          "Rear_InferredInteriorCam"
+        ],
+        "repackedOwners": [
+          "Geometry_Hatch_TurretPortLeft_Paint",
+          "Geometry_Hatch_TurretPortRight_Paint",
+          "Geometry_TurretPortHingeFixedLeft_Paint",
+          "Geometry_TurretPortHingeFixedRight_Paint",
+          "Geometry_TurretYaw_Paint",
+          "Geometry_VentHousing_Paint",
+          "TurretPortLeft_ConformingFrame",
+          "TurretPortRight_ConformingFrame"
+        ],
+        "checkpoint": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Scene_Type94TanketteHighSurfaceV34.blend",
+        "sha256": "e8e13255c92c8c81eba3f99677c705138fcd6cab5c097fc27ced01793901a876"
+      },
+      {
+        "role": "Track",
+        "retainedOwners": [
+          "TrackLink_Left_000"
+        ],
+        "repackedOwners": [],
+        "checkpoint": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Scene_Type94TanketteHighSurfaceV34.blend",
+        "sha256": "e8e13255c92c8c81eba3f99677c705138fcd6cab5c097fc27ced01793901a876"
+      },
+      {
+        "role": "Rubber",
+        "retainedOwners": [
+          "Wheel_Left_Return0_Tyre",
+          "Wheel_Left_Return1_Tyre",
+          "Wheel_Left_Road0_Tyre",
+          "Wheel_Left_Road1_Tyre",
+          "Wheel_Left_Road2_Tyre",
+          "Wheel_Left_Road3_Tyre",
+          "Wheel_Right_Return0_Tyre",
+          "Wheel_Right_Return1_Tyre",
+          "Wheel_Right_Road0_Tyre",
+          "Wheel_Right_Road1_Tyre",
+          "Wheel_Right_Road2_Tyre",
+          "Wheel_Right_Road3_Tyre"
+        ],
+        "repackedOwners": [],
+        "checkpoint": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Scene_Type94TanketteHighSurfaceV34.blend",
+        "sha256": "e8e13255c92c8c81eba3f99677c705138fcd6cab5c097fc27ced01793901a876"
+      },
+      {
+        "role": "Steel",
+        "retainedOwners": [
+          "Geometry_Hull_Steel",
+          "Geometry_MachineGunPitch_Steel",
+          "Geometry_Wheel_Left_Drive_Steel",
+          "Geometry_Wheel_Right_Drive_Steel",
+          "Rear_InferredInteriorSpindle"
+        ],
+        "repackedOwners": [],
+        "checkpoint": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Scene_Type94TanketteHighSurfaceV34.blend",
+        "sha256": "e8e13255c92c8c81eba3f99677c705138fcd6cab5c097fc27ced01793901a876"
+      }
+    ],
+    "freshAtlasReplay": false
+  },
+  "motionReference": "Data_MotionReferenceV39.json",
+  "surfaceChanges": [
+    "Fine orange peel, sparse micro-pits and uneven enamel roughness",
+    "Separate coarser cast finish under museum paint",
+    "More legible blued steel tooling and neutral highlights",
+    "Polished track contact faces against rough dark shoe cavities",
+    "Selective physical edge chips, preserving original baked AO",
+    "V37 vent top lap included",
+    "Independent gun horizontal/elevation axes sharing the retained ball centre"
+  ],
+  "edgeWear": {
+    "method": "Metric-width strokes on the exact UVs of verified convex edges; deterministic local3D breakup. Albedo mixed in linear light; no albedo lighting or AO modification.",
+    "inputHashes": {
+      "Texture_Type94PaintBase.png": "3a713ae8c45c1d8685d4febe5e05109ec607c718644394c9d255435a45c8ebe7",
+      "Texture_Type94PaintOrm.png": "916c3baaa908d2366e6ed085ddcf3e2eeb58150521fdd21bdd42c178b752893c"
+    },
+    "physicalEdgeCount": 84343,
+    "affectedAtlasFraction": 0.030429422855377197,
+    "meanNonzeroOpacity": 0.1227056086063385,
+    "aoBytesUnchanged": true,
+    "mask": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Textures\\HighSurfaceV39\\Texture_Type94PaintEdgeWearMask.png",
+    "outputs": {
+      "BaseWear": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Textures\\HighSurfaceV39\\Texture_Type94PaintBaseWear.png",
+        "sha256": "91930a8c647cb50a0a2471f72ad111975c10b4f83ec69cfe883f080e8a85bc11"
+      },
+      "OrmWear": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Textures\\HighSurfaceV39\\Texture_Type94PaintOrmWear.png",
+        "sha256": "b040d928e80ed4a4c291b73171f86233554dd06b340e8272252252eda735aed4"
+      }
+    },
+    "placementHistoricallyAccepted": false,
+    "paintPigmentCompression": {
+      "factor": 0.38,
+      "towardsLinearRgb": [
+        0.092,
+        0.102,
+        0.067
+      ],
+      "purpose": "Keep the olive repaint restrained while preserving the physical normal and roughness detail"
+    },
+    "chipRasterization": "Unequal tapered physical-edge chips, 2x supersampled then LANCZOS reduced to the original 4096px atlas"
+  },
+  "validation": {
+    "reports": {
+      "raw": "Data_V39SurfaceRawAudit.json",
+      "browser": "Data_V39SurfaceBrowserAudit.json",
+      "source": "Data_V39SurfaceEditableSourceAudit.json",
+      "native": "Data_V39SurfaceMotionAudit.json",
+      "ui": "Data_V39MotionUiFinal.json",
+      "geometry": "Data_V39SurfaceGeometryConservation.json",
+      "maps": "Data_V39ActualMapBindings.json"
+    },
+    "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance",
+    "rawChecks": 1188,
+    "browserChecks": 943,
+    "editableSourceReopenChecks": 109,
+    "actualImportedMotionChecks": 39,
+    "motionAndSurfaceUiChecks": 11,
+    "materialPixelAndBindingChecks": 20,
+    "all247MeshSurfacesConserved": true,
+    "maximumUnnormalizedWorldVertexErrorM": 4.656612873077393e-10,
+    "rootAlignmentRowMajor": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        4.656612873077393e-10
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "actualPbrImportPackedImages": 12,
+    "actualImportedBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Scene_SurfaceV39ActualReimport.blend",
+    "actualPbrRenderReport": "Data_V39ActualPbrRender.json",
+    "ownedBlenderStopped": true,
+    "cleanupReport": "Data_V39OwnedBlenderCleanup.json",
+    "viewerHtmlSha256": "7b503135d149b160b03688e1ff286356991cef9815ba017e6245169cceaac8ac",
+    "demoControlsSha256": "4f1e9f6d78a3b6cc33eff054b2a56961e39f5be6784f902cb85589d131118eed",
+    "normalMapEffectReport": "Data_V39PbrNormalEffect.json",
+    "repositorySelectedChecks": {
+      "passed": true,
+      "checks": [
+        "AssetStandardsTest",
+        "ModelFacingTest",
+        "HistoryLedgerCheck",
+        "ModuleGraphTest"
+      ]
+    },
+    "legacyBrowserCompatibilityChecks": 689,
+    "neutralViewerLighting": "Unchanged V36 environment and studio lights; live hard shadows disabled",
+    "scope": "Exact final surface files, actual source/import, all movement checks and local UI; no whole-reference, measured stop or game-budget acceptance"
+  },
+  "complete": false,
+  "strictReferenceMatched": false,
+  "exactWearPlacementAccepted": false,
+  "fullTextureReplayAccepted": false,
+  "gameBudgetAccepted": false,
+  "scope": "Local surface and articulation iteration on V37; whole reference and final below80000 game derivative remain unaccepted",
+  "status": "local-surface-study",
+  "normalStrengths": {
+    "Paint": 1.65,
+    "Track": 1.25,
+    "Rubber": 1,
+    "Steel": 1.15
+  },
+  "materialRecipeFilesSha256": {
+    "Taierzhuang1938/_blender/Script_Type94SurfaceStudy.py": "9e5b8f8ebc25f728e769761944661d929607cec0226f97f3239a768209360505",
+    "Taierzhuang1938/_blender/Script_Type94TankettePbr.py": "70ce20d32c14afa65b95375653da288f35227c28f4dcbd2ceb7fd85c8a92a568",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearExtract.py": "01a50708d8d493346c6b840b01c765ab86a0903d8457a89f7daf1839a5e98ece",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearBake.py": "6705a83f2fc9ee7bbdaca53c4e773a0b71a3710066e05b38cb4c11f1ea0b728d",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearApply.py": "767f533074e3e45331bb8cd71959b65328ba91847f52c713a3edb1b85f9b7d72",
+    "Taierzhuang1938/_blender/Script_Type94GunTraverse.py": "6b774067cde393b69776fc50ea6b5dabec72e0e64277e21e8adb1f593d921729",
+    "Taierzhuang1938/_blender/Script_Type94Export.py": "168f799dc53887fbabded5f98953d8eb2a18df8fcfd57ee1ce119aa9b7764c8b",
+    "Taierzhuang1938/_blender/Script_Type94TangentRepair.py": "1d76f211ddeb6a491da6b2b5685b34adb0cfea46f11cdf674523203d123e572f"
+  },
+  "runtimeMechanismSha256": "cce1b6e4a6a162439eefb3e2732082a03bf67453a0b1e6d89b05f131ae3c246e",
+  "pbrChannelsVerified": true,
+  "remaining": [
+    "Whole-vehicle reference cameras, common scale and body/cabin/turret shape acceptance",
+    "Exact reference paint wear, unresolved fittings and marking placement",
+    "Fresh geometry/PBR/UV replay without the retained V34 checkpoint",
+    "New below80000 triangle game derivative with 3mm bidirectional checks"
+  ],
+  "visualReview": {
+    "finish": "Locally inspected at neutral and close-up views; restrained enamel, tapered edge chips, cast steel and contact steel",
+    "referenceWearPlacementAccepted": false,
+    "firstPassDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\SurfaceV39FirstPass",
+    "wholeVehicleAccepted": false
+  }
+}

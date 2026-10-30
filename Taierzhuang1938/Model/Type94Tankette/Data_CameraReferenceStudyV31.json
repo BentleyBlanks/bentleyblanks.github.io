@@ -1,0 +1,140 @@
+{
+  "schema": "Type94ReferenceCameraStudyV1",
+  "revision": "ReferenceStudyV31",
+  "status": "Unaccepted model-conditioned diagnostics plus direct MG reference correction",
+  "inputGrayForCameraDiagnostics": "ShapeV29",
+  "inputGraySha256": "fed09697b1ef318ad63201dfda0501ea79ddec4a201f327a1a68474b8e5539e4",
+  "activeGrayStudy": "Data_GrayStudyV31.json",
+  "activeGraySha256": "e6a4216fdadbe1fb3253e2ccb74533bde1c30a8670fdae02c60f8b6a567312bb",
+  "sharedKeypointIndices": [
+    {
+      "sharedImage": 7,
+      "keypointsCompared": 1024,
+      "maximumTensorPixelDifference": 0.0,
+      "allIndicesStable": true
+    },
+    {
+      "sharedImage": 2,
+      "keypointsCompared": 1024,
+      "maximumTensorPixelDifference": 0.0,
+      "allIndicesStable": true
+    }
+  ],
+  "physicalHeldoutReview": "Some detections lie on cap edges or highlights; nearest-rivet seeds, including missing top-row detections, are not new physical-center measurements.",
+  "modelConditionedFits": [
+    {
+      "year": "2017",
+      "scope": "AllAnatomy",
+      "freeFocal": false,
+      "bodyMedianPixels640": 6.961426021813164,
+      "turretMedianPixels640": 4.9370178292425875,
+      "principalPixels640": [
+        395.5500618046971,
+        263.7000412031314
+      ],
+      "focalScale": 0.9999999990000001
+    },
+    {
+      "year": "2017",
+      "scope": "AllAnatomy",
+      "freeFocal": true,
+      "bodyMedianPixels640": 6.593475271044388,
+      "turretMedianPixels640": 4.957454170846986,
+      "principalPixels640": [
+        395.5500618046971,
+        263.7000412031314
+      ],
+      "focalScale": 0.973281537074857
+    },
+    {
+      "year": "2017",
+      "scope": "BodyWithheldTurret",
+      "freeFocal": false,
+      "bodyMedianPixels640": 1.229095216087163,
+      "turretMedianPixels640": 24.146694638660023,
+      "principalPixels640": [
+        395.5500618046971,
+        162.96662546353528
+      ],
+      "focalScale": 0.9999999990000001
+    },
+    {
+      "year": "2017",
+      "scope": "BodyWithheldTurret",
+      "freeFocal": true,
+      "bodyMedianPixels640": 1.2301070317615383,
+      "turretMedianPixels640": 24.129164470854274,
+      "principalPixels640": [
+        395.5500618046971,
+        162.96662546353525
+      ],
+      "focalScale": 0.9992624223072637
+    },
+    {
+      "year": "2014",
+      "scope": "AllAnatomy",
+      "freeFocal": false,
+      "bodyMedianPixels640": 2.781014716596409,
+      "turretMedianPixels640": 5.300799978740927,
+      "principalPixels640": [
+        297.3703400349197,
+        188.85269411866813
+      ],
+      "focalScale": 0.9999999990000001
+    },
+    {
+      "year": "2014",
+      "scope": "AllAnatomy",
+      "freeFocal": true,
+      "bodyMedianPixels640": 2.777339547760123,
+      "turretMedianPixels640": 5.298955388983922,
+      "principalPixels640": [
+        297.3678426112138,
+        188.85829076981585
+      ],
+      "focalScale": 0.9895521362687796
+    },
+    {
+      "year": "2014",
+      "scope": "BodyWithheldTurret",
+      "freeFocal": false,
+      "bodyMedianPixels640": 0.7573567130468183,
+      "turretMedianPixels640": 15.20918218598801,
+      "principalPixels640": [
+        297.6089452150954,
+        188.62718765122872
+      ],
+      "focalScale": 0.9999999990000001
+    },
+    {
+      "year": "2014",
+      "scope": "BodyWithheldTurret",
+      "freeFocal": true,
+      "bodyMedianPixels640": 0.7569026838229499,
+      "turretMedianPixels640": 15.180819777713175,
+      "principalPixels640": [
+        297.6091245169726,
+        188.62728997539546
+      ],
+      "focalScale": 0.9992674145477903
+    }
+  ],
+  "diagnosticScope": "Current authored corners, cap stations, hub position and section dimensions are inputs, not independent museum measurements. Their refit cannot validate those same dimensions or establish a global camera. No turret motion is inferred.",
+  "adoptedCamera": false,
+  "directMgPatternEvidence": "Data_MgFlangeReferenceV31.json",
+  "observedCorrection": "Eight rounded heads replaced by a six-site hexagonal-head pattern; partial occlusion and dimensions remain explicitly limited.",
+  "realGeometryCorrection": "Black circular disk replaced by real ball bore; inferred turret socket clears all fixed geometry. Flat front-cap normals remove the rejected false dent.",
+  "rejectedCandidates": [
+    "ShapeV31SixHeadsOnly",
+    "ShapeV31UncutSocket"
+  ],
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\CameraStudyV31",
+  "globalCalibrationAccepted": false,
+  "metricScaleAccepted": false,
+  "next": [
+    "Continue correcting independently visible geometry while cross-checking global camera and shape together; unverified authored marker stations are not independent calibration controls.",
+    "Review the side-port and paired-rivet angular stations, turret/gun proportions, and remaining triangular front feature against physical source identities.",
+    "Establish true transverse/axial directions and an independent scale gauge; do not substitute a side-wall normal or authored vent length.",
+    "Complete whole-gray acceptance, final PBR and fresh recipe replay, then the new below80000-triangle derivative with3mm bidirectional/aperture/mechanism gates."
+  ]
+}

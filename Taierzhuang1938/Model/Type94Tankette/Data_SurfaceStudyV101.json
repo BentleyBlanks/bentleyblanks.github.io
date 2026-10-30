@@ -1,0 +1,115 @@
+{
+  "schema": "Type94MaterialPreviewV1",
+  "revision": "WearV101",
+  "status": "Local layered metal wear preview verified",
+  "reference": "Data_SurfaceStudyV99.json",
+  "producer": "Taierzhuang1938/_blender/Script_BuildType94WearV101.mjs",
+  "verifier": "Taierzhuang1938/_import/Script_VerifyType94WearV101.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV101\\Scene_Type94TanketteHighWearV101.blend",
+  "sourceBlendSha256": "4cc02d8393a4a57e1c92ae84e1659357f26e57d94a56967a316a7c9e787aa755",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV101\\Exports\\Model_Type94TanketteHighWearV101.glb",
+  "sha256": "0f7209794171018971f5a9b24aa3a14f9b6db4c14e25c04189b0dc8cb0a717ea",
+  "triangles": 694476,
+  "meshOwners": 240,
+  "poseNodes": 296,
+  "linksPerSide": 80,
+  "runtimePbrImages": 12,
+  "textureSizes": {
+    "Paint": 4096,
+    "Track": 2048,
+    "Steel": 2048,
+    "Rubber": 1024
+  },
+  "geometryNormalsUvsAndRigExactToV99": true,
+  "allAoPixelsExactToV99": true,
+  "rubberPixelsExactToV99": true,
+  "untouchedTexelsExact": true,
+  "editableWearMasks": true,
+  "wearPlacementInferred": true,
+  "paintLossHeightM": 3.5e-05,
+  "wearStatistics": {
+    "Paint": {
+      "touchedPixels": 1609603,
+      "polishedPixels": 2306,
+      "medianPolishedRoughness": 0.25098039215686274,
+      "medianPolishedMetallic": 0.9882352941176471,
+      "darkSubstratePixels": 165456,
+      "polishedToSubstrateBaseRatio": 3.011098999016144
+    },
+    "Track": {
+      "touchedPixels": 2287363,
+      "polishedPixels": 20394,
+      "medianPolishedRoughness": 0.29411764705882354,
+      "medianPolishedMetallic": 0.9882352941176471
+    },
+    "Steel": {
+      "touchedPixels": 146305,
+      "polishedPixels": 41,
+      "medianPolishedRoughness": 0.2627450980392157,
+      "medianPolishedMetallic": 0.984313725490196
+    }
+  },
+  "wearMarkCounts": {
+    "Paint": {
+      "physicalEdgeMarks": 4103,
+      "handlingClusters": 210,
+      "touchedPixels": 1609603
+    },
+    "Track": {
+      "physicalEdgeMarks": 94,
+      "handlingClusters": 11,
+      "touchedPixels": 2287363
+    },
+    "Steel": {
+      "physicalEdgeMarks": 398,
+      "handlingClusters": 16,
+      "touchedPixels": 146305
+    }
+  },
+  "validation": {
+    "binaryChecks": 1494,
+    "actualGlbImport": true,
+    "browserChecks": 17,
+    "browserRenders": 8,
+    "rakingComparisonRenders": 2,
+    "genericExportPassed": true,
+    "sourceReexportContainerExact": false,
+    "maximumSourceTangentComponentDifference": 0.00010001659393310547
+  },
+  "coldRebuild": {
+    "root": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceReplayV101",
+    "allRecipeStagesCompleted": true,
+    "independentBinaryChecks": 1494,
+    "independentBinaryPassed": true,
+    "decodedTwelveImagesExact": true,
+    "all240MeshGeometryExact": true,
+    "rigAndControlsExact": true,
+    "strictAllCornerAttributeParityPassed": false,
+    "strictFailedMeshes": [
+      {
+        "name": "Geometry_TowHookFrontFixed_Paint",
+        "geometryExact": true,
+        "renderedCornerAttributesExact": false,
+        "maximumAlignedAttributeDifference": 0.00010001659393310547,
+        "passed": false
+      },
+      {
+        "name": "Geometry_TurretYaw_Paint",
+        "geometryExact": true,
+        "renderedCornerAttributesExact": false,
+        "maximumAlignedAttributeDifference": 0.00010001659393310547,
+        "passed": false
+      }
+    ],
+    "report": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceReplayV101\\Acceptance\\Data_CompleteWearRebuildParityV101.json"
+  },
+  "previewUrl": "http://127.0.0.1:8114/tmp/Type94WearReviewV101/?view=weapon",
+  "rakingPreviewUrl": "http://127.0.0.1:8114/tmp/Type94WearReviewV101/?view=weapon&light=raking",
+  "trackPreviewUrl": "http://127.0.0.1:8114/tmp/Type94WearReviewV101/?view=shoeDetail",
+  "wholeReferenceAccepted": false,
+  "gameDerivativeAccepted": false,
+  "canonicalGameReplaced": false,
+  "published": false,
+  "goalComplete": false,
+  "blenderOwnedInstancesAfterCleanup": 0
+}

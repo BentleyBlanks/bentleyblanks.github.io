@@ -1,0 +1,37 @@
+{
+  "status": "Visible fitting layout only; no whole-camera or absolute-dimension acceptance",
+  "primary": "Reference_Kubinka.jpg",
+  "supplement": "Reference_KubinkaOld.jpg",
+  "evidence": "Native source crops confirm two columns of five turret-side rivets, with nearly equal vertical intervals; no third overlapping generic column",
+  "rowsPerColumn": 5,
+  "downFractions": [
+    0,
+    0.25,
+    0.5,
+    0.75,
+    1
+  ],
+  "conditionalObservedDownFractions": [
+    0,
+    0.2459,
+    0.4994,
+    0.7502,
+    1
+  ],
+  "retainedTopLocalM": 0.447,
+  "retainedBottomLocalM": 0.18,
+  "retainedColumnYLocalM": [
+    -0.17,
+    -0.135
+  ],
+  "visibleSide": "Left",
+  "oppositeSidePatternInferred": true,
+  "surfaceMounting": "Each new cap seats on a ray hit against the actual faceted cone; nominal head section remains inferred",
+  "limits": [
+    "The conditional triangulation depends on camera/crop assumptions and an unsurveyed fender-tip span",
+    "Absolute endpoint heights and column stations are retained author estimates, not museum measurements",
+    "Cap-head centres carry lighting and paint uncertainty",
+    "The opposite side shares this layout by explicit inference"
+  ],
+  "referenceMeasurements": "Data_TurretReferencePointsV25.json"
+}

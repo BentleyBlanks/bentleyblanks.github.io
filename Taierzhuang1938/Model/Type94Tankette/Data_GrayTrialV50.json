@@ -1,0 +1,256 @@
+{
+  "schema": "Type94GrayBodyTrialV1",
+  "revision": "ShapeV50DriverTrial",
+  "status": "local-complete-cabin-interface-trial",
+  "sourceGray": "Data_GrayStudyV37.json",
+  "sourceTurret": "Data_GrayTrialV49.json",
+  "layout": "Data_BodyTrialV50.json",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\DriverV50\\Scene_Type94TanketteHighShapeV50DriverTrial.blend",
+  "sourceBlendSha256": "26806fd2a90b7a92594857100db133ca6fdc0f9cdabe182d13210e7cd6a0dae9",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\DriverV50\\Exports\\Model_Type94TanketteHighShapeV50DriverTrial.glb",
+  "sha256": "6efbfc6ffcfedbc85fc39ac2ac9bf325dbde02651b43d81a8956660bd00155a3",
+  "triangles": 501134,
+  "meshNodes": 247,
+  "linksPerSide": 85,
+  "sourceProducer": "Taierzhuang1938/_blender/Script_Type94BodyTrial.py",
+  "coldBuilderOption": "TYPE94_BODY_LAYOUT=Data_BodyTrialV50.json",
+  "preservedOutsideDriverAndMergedHullOwners": 235,
+  "permittedModifiedOwners": [
+    "DriverPortLeft_Seal",
+    "DriverPortRight_Seal",
+    "Geometry_DriverPortHingeFixedRight_Paint",
+    "Geometry_DriverPortHingeFixed_Paint",
+    "Geometry_DriverRoofHingeFixed_Paint",
+    "Geometry_DriverVisorHingeFixed_Paint",
+    "Geometry_Hatch_DriverPortLeft_Paint",
+    "Geometry_Hatch_DriverPortRight_Paint",
+    "Geometry_Hatch_DriverRoof_Paint",
+    "Geometry_Hatch_DriverVisor_Paint",
+    "Geometry_Hull_Dark",
+    "Geometry_Hull_Paint"
+  ],
+  "maximumPreservedGroupedVertexDiameterM": 4.563718777528857e-08,
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94DriverReviewV50/",
+  "runtimePreview": "http://127.0.0.1:8114/tmp/Type94DriverReviewV50/Runtime.html",
+  "changes": [
+    "Rebuild the cabin front, side walls, visor, side ports and roof at the conditional V47 frame",
+    "Reposition circular pins and bearings without scaling their sections",
+    "Update actual glacis opening and infer small connecting base skirts",
+    "Reseat roof fixed hinge leaves on the new frame to clear the visor"
+  ],
+  "inferredSkirtHeightM": 0.022279428252700906,
+  "motion": {
+    "driverRoofGunMinimumDegrees": 0,
+    "historicalStopsMeasured": false,
+    "roofHorizontalGunSamples": 102,
+    "visorSamples": 132,
+    "visorFirst10DegreeStep": 0.25,
+    "contactExclusionM": 0,
+    "retainedV49FloorDegrees": 6,
+    "initialFailureDirectory": "Versions/InitialDriver",
+    "initialFailedVisorRangeDegrees": [
+      0.5,
+      7
+    ]
+  },
+  "validation": {
+    "rawChecks": 705,
+    "nativeMotionChecks": 41,
+    "browserGeometryChecks": 255,
+    "uiAndLegacyCompatibilityChecks": 23,
+    "defaultV37GeometryChecks": 247,
+    "coldReplayGeometryChecks": 247,
+    "coldReplayByteIdentical": true,
+    "reports": {
+      "raw": "Data_DriverRawV50.json",
+      "geometry": "Data_NonDriverConservationV50.json",
+      "source": "Data_DriverSourceReopenV50.json",
+      "native": "Data_DriverMotionV50.json",
+      "browser": "Data_DriverGeometryBrowserV50.json",
+      "ui": "Data_DriverUiV50.json",
+      "defaultGuard": "Data_DefaultV37GuardV50.json",
+      "coldReplay": "Data_DriverColdReplayV50.json",
+      "projection": "Data_DriverFrameProjectionV50.json"
+    },
+    "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\DriverV50\\Acceptance",
+    "ownedBlenderStopped": true,
+    "cleanup": "Data_OwnedBlenderCleanupV50.json",
+    "repositoryChecks": {
+      "passed": true,
+      "checks": [
+        "AssetStandardsTest",
+        "ModelFacingTest",
+        "ModuleGraphTest",
+        "HistoryLedgerCheck"
+      ]
+    }
+  },
+  "visualReview": {
+    "actualThreeCameraFullOcclusionAndCabinCropsInspected": true,
+    "actualRuntimeRoofInspected": true,
+    "trainingProjectionErrors": [
+      {
+        "model": "V49",
+        "camera": "2017",
+        "errorNativePixels": [
+          102.45444536986226,
+          136.91833578030077,
+          61.14937315117025,
+          24.25957581394707
+        ],
+        "meanNativePixels": 81.19543252882009,
+        "meanPixelsAt640": 10.705619451677968
+      },
+      {
+        "model": "V49",
+        "camera": "2014",
+        "errorNativePixels": [
+          88.8384468493488,
+          131.0971564992508,
+          66.01155457150158,
+          33.06055881925577
+        ],
+        "meanNativePixels": 79.75192918483924,
+        "meanPixelsAt640": 10.403839110945192
+      },
+      {
+        "model": "V49",
+        "camera": "TourGuide",
+        "errorNativePixels": [
+          48.378022880965894,
+          74.83279129343798,
+          31.480711330101503,
+          20.9182853451028
+        ],
+        "meanNativePixels": 43.902452712402045,
+        "meanPixelsAt640": 10.840111780840012
+      },
+      {
+        "model": "V49",
+        "camera": "3",
+        "errorNativePixels": [
+          54.26328949396031,
+          39.57780840301199,
+          26.76333851277304,
+          32.587951281202635
+        ],
+        "meanNativePixels": 38.298096922736995,
+        "meanPixelsAt640": 17.02137641010533
+      },
+      {
+        "model": "V50",
+        "camera": "2017",
+        "errorNativePixels": [
+          5.546396744434761,
+          11.684464821369348,
+          2.7332437374276832,
+          1.3015868501643626
+        ],
+        "meanNativePixels": 5.316423038349038,
+        "meanPixelsAt640": 0.7009704871329593
+      },
+      {
+        "model": "V50",
+        "camera": "2014",
+        "errorNativePixels": [
+          12.306231840241104,
+          1.6095176682948524,
+          8.87873734472863,
+          11.780056489616495
+        ],
+        "meanNativePixels": 8.643635835720271,
+        "meanPixelsAt640": 1.127583965524047
+      },
+      {
+        "model": "V50",
+        "camera": "TourGuide",
+        "errorNativePixels": [
+          6.015186357782689,
+          6.774484921175568,
+          3.0726252392641586,
+          2.3556435772440834
+        ],
+        "meanNativePixels": 4.554485023866625,
+        "meanPixelsAt640": 1.124564203423858
+      },
+      {
+        "model": "V50",
+        "camera": "3",
+        "errorNativePixels": [
+          5.086896803620865,
+          7.333110000482041,
+          5.046310727613334,
+          3.4157513021312274
+        ],
+        "meanNativePixels": 5.2205172084618665,
+        "meanPixelsAt640": 2.320229870427496
+      }
+    ],
+    "independentReferenceAccepted": false,
+    "roofFittingStudy": "Data_RoofFittingStudyV50.json",
+    "roofFeatureIdentityEstablished": false
+  },
+  "complete": false,
+  "strictReferenceMatched": false,
+  "physicalSourceGeometryAccepted": false,
+  "pbrAccepted": false,
+  "gameBudgetAccepted": false,
+  "retainedCanonicalGameCheckpoint": {
+    "revision": "V12",
+    "sha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+    "recipeCommit": "bd0852e1"
+  },
+  "limits": [
+    "Camera and absolute scale remain conditional; these are not surveyed museum dimensions",
+    "Roof depth, roof hatch, side covers, pin and bearing sizes retain V37 estimates",
+    "Small lower cabin skirts connect the fitted frame to the retained flat glacis; their section is inferred",
+    "The front armour, fenders and lower running gear remain V37 and still require independent reconciliation"
+  ],
+  "scope": "Explicit V49 turret and rebuilt cabin, with V37 lower gear and forebody retained; no full reference, final PBR or game acceptance",
+  "recipeFilesSha256": {
+    "Taierzhuang1938/_blender/Script_Type94Articulation.py": "326b9fd068ddcacff24be5f9eb8e39617d3d56a6b1b02a5a0b91ba3449c25b88",
+    "Taierzhuang1938/_blender/Script_Type94BodyTrial.py": "81a7e95e9a7e6ea27128508839d68a17a439c4f3697649b3ff982e3826fbfdcb",
+    "Taierzhuang1938/_blender/Script_Type94DetailCorrect.py": "aad345902267afcf2d4fb51960428c66e75078a53a50dd8cca2894a241f99691",
+    "Taierzhuang1938/_blender/Script_Type94Export.py": "b5e0abdcd073cc0cb84eaf77534626f7b9b24166a87bd88e1c0395840e340486",
+    "Taierzhuang1938/_blender/Script_Type94FreshSurfaceReplay.py": "fdb2564840e53d3a322dcc940a9aa9f3c457273494025ccb6f386189774ce77f",
+    "Taierzhuang1938/_blender/Script_Type94GrayStudy.py": "828af68f0a608230e09646c1cfd5a84df86a6d90274893ce10d093d1f916090a",
+    "Taierzhuang1938/_blender/Script_Type94GunTraverse.py": "6b774067cde393b69776fc50ea6b5dabec72e0e64277e21e8adb1f593d921729",
+    "Taierzhuang1938/_blender/Script_Type94MechanismCorrect.py": "43506cc01a7cc5b79135fca08cace596672fdd81f3287862d739137561980341",
+    "Taierzhuang1938/_blender/Script_Type94MetalFinish.py": "7398d3bfbf2fbeed6a675d03ce71c15a449db714fcbe63390532481f2f5b3c94",
+    "Taierzhuang1938/_blender/Script_Type94MetalStudy.py": "73fe4ccfa7f25244941167092bc6a443d7df8e10e1a7d6cd4c8555e568b41a9f",
+    "Taierzhuang1938/_blender/Script_Type94RearArmor.py": "42b9497e9f4e3f4a9138a82325dc834a55db91bdda35672542363fee9039b4fa",
+    "Taierzhuang1938/_blender/Script_Type94RearDoor.py": "234d4feb11536c2dfff6da0483365a2613216f42ca5ec48ee90c4da4a616ebb2",
+    "Taierzhuang1938/_blender/Script_Type94RecipeReplay.py": "90eab60b900c4b51ff2c69efde0acf4baa5db7eb2372d83debafa8e46e97ae8f",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceAttributes.py": "c2d7f8ecf341726da0c31b53f235fec3ea93f28bf06a70627ef0b9f3c59ca01d",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceStudy.py": "4035ab350df096d16abd3aab578908e0877b1819556ec64195ee1dc368ab0a2c",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearApply.py": "9023d34c6fb3ff4d3c861c7c31228a4a6989c169d1d942131a6c89ac8acdb5c6",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearBake.py": "d2f580113e3f7d8e0d20495424fbff672ad98fe2efcb3cf973f13f75435f2dc3",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearExtract.py": "6c6f5daf8e955ff6617050272781aaed8ef4dfe26e8c515f8ba0863aaa88acd8",
+    "Taierzhuang1938/_blender/Script_Type94TangentRepair.py": "1d76f211ddeb6a491da6b2b5685b34adb0cfea46f11cdf674523203d123e572f",
+    "Taierzhuang1938/_blender/Script_Type94TanketteBuild.py": "c3e1edeea330b6d3f790278c5929a418ad6ef968094d07e44ae70c8ebc0c7baa",
+    "Taierzhuang1938/_blender/Script_Type94TanketteGame.py": "5700c3329b69016a02cf63fcea3bb3b3aade2dc9df3956524c81722582114f18",
+    "Taierzhuang1938/_blender/Script_Type94TankettePbr.py": "9437248d294a7776917cae2accaeaa00cb2ab74577e5626c5d139d8007e83e41",
+    "Taierzhuang1938/_blender/Script_Type94TurretRear.py": "1ecae7a90ecd0b68c1d59f829f57f349d2cc26e0852b03e9607d794cff89c896",
+    "Taierzhuang1938/_blender/Script_Type94TurretTrial.py": "ab11fccecb9d68e9b5269991b064a9792ecd33e67453dde8049ae3d935a315f9",
+    "Taierzhuang1938/Model/Type94Tankette/Data_BodyTrialV50.json": "0b12619f198321b56ef38c3df384e76b95b551d6bfe5c5e9ac9d460fb9fb9025",
+    "Taierzhuang1938/Model/Type94Tankette/Data_DriverReferenceLayoutV19.json": "7698100dcb27f7866548a5251eec588474e1f28cf30de3632d550d096e7a3239",
+    "Taierzhuang1938/Model/Type94Tankette/Data_MgFlangeReferenceV31.json": "736fcde53a6cfdc68651a1943d1c604c91511728761b8a9d47de8f8faa17ea09",
+    "Taierzhuang1938/Model/Type94Tankette/Data_MotionReferenceV34.json": "c1421844163d4f382abbe0c048157564fa2e197af697c69f417cefa9ebc66a6f",
+    "Taierzhuang1938/Model/Type94Tankette/Data_MotionReferenceV39.json": "c7ce4137e9e921229ec1dacb133cb91e47efb8f72edaa6843fbcb8bf7bb11426",
+    "Taierzhuang1938/Model/Type94Tankette/Data_MotionReferenceV44.json": "5341cbbd7b45c6a866dbd80fa9fc21a9cd5f8f623fbfb0e7ad92aad40ccae676",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearArmorReferenceLayoutV28.json": "7c840ae8b3034aa418f3f6297f24da3cbb0a71d921881509c10b0b6999ce1bda",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearDoorFaceLayoutV29.json": "76e41e865100cef9c5d14dd58b352c5caf3713b9d5c6338b154352eb690af276",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearMechanismLayoutV22.json": "f13872695aebf431e2c9b69555ac2744a986b9c93d0f1c992098e7a990cc2638",
+    "Taierzhuang1938/Model/Type94Tankette/Data_SidePortReferenceLayoutV21.json": "0c881c50153cfb5b753b0266866a407c152582742da590891125b06963a49143",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretFrontLayoutV32.json": "d6a588209eb43c6ae97575be24253bab4b66c78775a50f8e7a281217e8c65cd1",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretPortReferenceLayoutV26.json": "7a4db2c5a7332b873d12e8f85aff9ae31de05de175a6da203632e0d64ae32b47",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretRearLayoutV27.json": "11c0833fcca99be04cb1e550878b283ab0898f9b80d02a999f1a691bb3a7af67",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretReferencePointsV25.json": "b4955e52abb6bb788e0caa8433714d4ccb1a0efb766cc41a5529eb4850f558ca",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretRivetLayoutV25.json": "39472a67ef4fe69040d1de24879d6883805dc987e119e715dd31ea60c591fca8",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretSideSectorV35.json": "cf5d4d8a0d76ad6ea971937c5ffd9dccbac57d8a0b5c29f5daa05384c52eb9aa",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretTrialV49.json": "248630fe5c530e7d177a3128bfe25afdd2829230f516fb1cf672a654d47a0811",
+    "Taierzhuang1938/Model/Type94Tankette/Data_VentTopLapV37.json": "0987c835fb994c0cdc25661e32d5da11792cd258764acb62a5fbce701b27a340",
+    "Taierzhuang1938/Model/Type94Tankette/Script_Type94Mechanism.mjs": "f53f42e2f1eb22756b46b50a69ab813ed079d50013289434aa1862d12ccd9b04",
+    "Taierzhuang1938/Model/Type94Tankette/Script_VerifyType94Browser.mjs": "5487129d26c37aa66470ef728e89a7ca6cc88675d22054a61ba0ecdaaf023e6f"
+  }
+}

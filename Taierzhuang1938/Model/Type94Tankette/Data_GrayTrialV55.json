@@ -1,0 +1,71 @@
+{
+  "schema": "Type94GrayVentTrialV1",
+  "revision": "ShapeV55VentTrial",
+  "status": "local-coupled-vent-engine-side-trial-verified",
+  "sourceBody": "Data_GrayTrialV54.json",
+  "layout": "Data_BodyTrialV55.json",
+  "ventLayout": "Data_VentTrialV55.json",
+  "sourceProducer": "Taierzhuang1938/_blender/Script_Type94VentTrial.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\VentV55\\Scene_Type94TanketteHighShapeV55VentTrial.blend",
+  "sourceBlendSha256": "94b8caac38e965b948bb1e13c33413b3c15d510c79fd588d49b14e4198b01823",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\VentV55\\Exports\\Model_Type94TanketteHighShapeV55VentTrial.glb",
+  "sha256": "bf2743a1c439a531b0c3911d6828b5fcab9677874ac7adb39b12abc5d8869c71",
+  "triangles": 617808,
+  "meshNodes": 237,
+  "linksPerSide": 80,
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "metricEnvelopeAccepted": true,
+  "validation": {
+    "reports": {
+      "raw": "Data_VentRawV55.json",
+      "source": "Data_VentSourceReopenV55.json",
+      "native": "Data_VentMotionV55.json",
+      "bodyBelt": "Data_VentBeltV55.json",
+      "conservation": "Data_VentConservationV55.json",
+      "browser": "Data_VentGeometryBrowserV55.json",
+      "projection": "Data_VentProjectionV55.json",
+      "renders": "Data_VentRendersV55.json"
+    },
+    "rawChecks": 685,
+    "nativeChecks": 41,
+    "allBodyBeltPhases": 32,
+    "browserChecks": 255,
+    "exactUnchangedMeshes": 234,
+    "rebuiltMeshOwners": [
+      "Geometry_Hull_Paint",
+      "Geometry_VentHousing_Paint",
+      "Vent_RecessedInterior"
+    ],
+    "rebuiltVentMeshOriginAndDarkLabelAllowed": true,
+    "unchangedRigAndTrackPath": true
+  },
+  "actualVentCornerMeanNativePixelErrors": {
+    "2017": 1.7503052132668575,
+    "TourGuide": 3.169958706293423,
+    "2": 4.375444378169371,
+    "7": 9.172212572055889
+  },
+  "constructionInferred": [
+    "Conditional slat-face and apron support-line reconstruction",
+    "Rear hood-root depth",
+    "Sheet/rail/backing gauge and closed catch sections",
+    "Narrower sloped left engine armor, hinge ledges and fender seating"
+  ],
+  "rejectedDraftPointEvidence": "Data_VentAttachmentFitV55.json",
+  "apronLineEvidence": "Data_VentApronLinesV55.json",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94VentReviewV55/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\VentV55\\Acceptance",
+  "fullReferenceAccepted": false,
+  "strictReferenceMatched": false,
+  "globalCalibrationAccepted": false,
+  "pbrAccepted": false,
+  "coldReplayVerified": true,
+  "gameBudgetAccepted": false,
+  "complete": false,
+  "published": false,
+  "coldReplayReport": "Data_SourceVerificationV57.json"
+}

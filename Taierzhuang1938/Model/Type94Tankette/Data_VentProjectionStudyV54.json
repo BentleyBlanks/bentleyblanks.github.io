@@ -1,0 +1,114 @@
+{
+  "schema": "Type94VentProjectionStudyV1",
+  "revision": "VentProjectionAuditV54",
+  "status": "conditional-camera-geometry-diagnostic-no-vent-change",
+  "authoredVentSource": "Data_GrayTrialV53.json",
+  "authoredVentSha256": "2670d8f6fb56eb5bc7126977949c3e8583b3e0e09aac9cc79e9744d9c8dac1e7",
+  "currentVentGeometryExactlyConserved": true,
+  "cameraSource": "Data_CameraReferenceStudyV52.json",
+  "cameraFamilyConverged": false,
+  "globalCalibrationAccepted": false,
+  "actualNearestVertexCornerDistancesM": [
+    0.001632639227659031,
+    0.0016326496324792178,
+    0.0016208029303737175,
+    0.001620764868317074
+  ],
+  "actualMeanNativePixelErrors": {
+    "2017": 257.417457575946,
+    "TourGuide": 125.69329203906284,
+    "2": 54.17442055923696,
+    "7": 64.0861190710921
+  },
+  "unacceptedFreeCornerMeanNativePixelErrors": {
+    "2017": 1.8258083235025868,
+    "TourGuide": 3.229575000927886,
+    "2": 4.4105004409441175,
+    "7": 9.059700924299886
+  },
+  "freeCornerPlaneDistancesM": [
+    -9.408207149031584e-05,
+    9.498020613141623e-05,
+    -9.366523681887836e-05,
+    9.276710217755463e-05
+  ],
+  "draftHoodRoot": {
+    "pointFitFrameM": [
+      -0.5675706554290879,
+      0.49088941215581605,
+      1.0278839268272029
+    ],
+    "observations": [
+      {
+        "camera": "2017",
+        "pixel": [
+          3238.0,
+          1138.0
+        ],
+        "sigmaNative": 6.0,
+        "heldout": false,
+        "predictedNative": [
+          3236.274105631572,
+          1132.9189962837831
+        ],
+        "errorNative": 5.366126175853522
+      },
+      {
+        "camera": "TourGuide",
+        "pixel": [
+          1616.0,
+          738.0
+        ],
+        "sigmaNative": 4.0,
+        "heldout": false,
+        "predictedNative": [
+          1617.6238198239553,
+          742.7050812322807
+        ],
+        "errorNative": 4.97740697783797
+      },
+      {
+        "camera": "2",
+        "pixel": [
+          436.0,
+          452.0
+        ],
+        "sigmaNative": 4.0,
+        "heldout": true,
+        "predictedNative": [
+          436.25064282910694,
+          447.3891635615053
+        ],
+        "errorNative": 4.617643824542242
+      },
+      {
+        "camera": "7",
+        "pixel": [
+          651.0,
+          347.0
+        ],
+        "sigmaNative": 5.0,
+        "heldout": true,
+        "predictedNative": [
+          657.767111576086,
+          349.53423204737146
+        ],
+        "errorNative": 7.22607301050312
+      }
+    ],
+    "identityAccepted": false,
+    "scope": "Two-image diagnostic of the hood/end-wall top corner; all four picks remain a draft and the camera family remains conditional"
+  },
+  "sourceImagesSha256": {
+    "2017": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+    "TourGuide": "65da09c9dd6f2d81e86d5e46fdba26afd418f8d7ffb8ad5547b01adedd7e64c2",
+    "2": "71227a67ba14c9434c598a375789a835da055f4d784c8c82f13f225561ae78e4",
+    "7": "f8d11457481fbdd4435ffb184aee2f178a5843ddb0336d88fb91590cf470bf34"
+  },
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ForebodyV54\\Acceptance",
+  "detailedReport": "Data_VentProjectionAuditV54.json",
+  "ventGeometryChanged": false,
+  "ventShapeAccepted": false,
+  "complete": false,
+  "next": "Review additional hood-root and apron-foot landmarks before reconstructing the true slotted face, hood depth and hull/fender attachments; retain real openings and round catch pins"
+}

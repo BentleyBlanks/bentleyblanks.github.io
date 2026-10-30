@@ -1,0 +1,40 @@
+{
+  "schema": "Type94VentTopLapV1",
+  "status": "Visible overlapping upper sheet corroborated in both same-vehicle originals; hidden construction and absolute dimensions inferred",
+  "references": [
+    {
+      "image": "Reference_Kubinka.jpg",
+      "sha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+      "cropIn640Image": [415, 118, 510, 207],
+      "supports": "Dark transverse edge behind the lower top panel; two catches terminate on the upper overlapping sheet"
+    },
+    {
+      "image": "Reference_KubinkaOld.jpg",
+      "sha256": "a2842cfe2394259a70ab2bc7d5835696c944da040518b2c8870f9428f76ca136",
+      "cropIn640Image": [392, 140, 488, 232],
+      "supports": "Upper rear sheet overlaps the forward sheet; the photographed line is not treated as an independently proven fourth through-vent"
+    }
+  ],
+  "geometryEstimate": {
+    "lapEndFractionAlongTopSlope": 0.53,
+    "lapNormalOffsetM": 0.0064,
+    "sheetThicknessM": 0.006,
+    "closedNormalGapM": 0.0004,
+    "catchRootFractionAlongTopSlope": 0.055,
+    "catchTipFractionAlongTopSlope": 0.47,
+    "catchFootBoltFractionAlongTopSlope": 0.43,
+    "catchStrapThicknessM": 0.005,
+    "catchClosedGapM": 0.0003
+  },
+  "retained": [
+    "Three real frontal slots and recessed interior",
+    "Hood side profile, span and lower apron",
+    "Two closed catches; no invented independent opening animation"
+  ],
+  "inferred": [
+    "Absolute overlap height, plate sections and clearances",
+    "Hidden sheet continuation and exact attachment",
+    "Catch construction, purpose and operating travel"
+  ],
+  "wholeReferenceAccepted": false
+}

@@ -1,0 +1,147 @@
+{
+  "schema": "Type94ReferenceCameraStudyV1",
+  "revision": "ReferenceStudyV37",
+  "status": "Global hypotheses remain rejected; one independently visible vent lap corrected",
+  "activeGrayStudy": "Data_GrayStudyV37.json",
+  "activeGraySha256": "9504477d4b850fcf8a987a0e12d5aea24cf66be318355b471586b4e21070e7de",
+  "comparisonSourceSha256": "2686f13a38cea29d2b4a924b4aaca9a25ec749a0a6dc75e83bcc4ef5bb425a8e",
+  "comparisonReuseScope": "All body, turret and wheel surfaces/markers used by the camera fits are retained exactly from V35; only fixed vent paint changed",
+  "currentModelFit": {
+    "report": "Data_PrimaryCameraCurrentV37.json",
+    "principalPointAtCropBoundary": true,
+    "wheelPlaneNormalDifferenceDegrees": 1.9570774016408636,
+    "scope": "A low upper-point residual cannot validate the same authored dimensions"
+  },
+  "independentWheelHoldout": {
+    "report": "Data_WheelHoldoutV37.json",
+    "centreErrorsPixels640": [
+      15.235761584093611,
+      18.358667267630253,
+      20.24058653961001,
+      18.82516060862849
+    ],
+    "axisDiameterRatios": [
+      [
+        0.8092072037165651,
+        1.0241868591594396
+      ],
+      [
+        0.7775116978957421,
+        0.9822317354639769
+      ],
+      [
+        0.7092978963948812,
+        1.1531729782265359
+      ],
+      [
+        0.8573706944544378,
+        1.0287942226117188
+      ]
+    ],
+    "scope": "Visible front shoulder contours remain hypotheses, especially wheel2. The systematic displacement is not accepted as whole reference agreement."
+  },
+  "rejectedCabRectangleShortcut": {
+    "report": "Data_CabAspectV37.json",
+    "reason": "Existing2014corner observations, crop/lens calibration and a perfect rectangle do not yield a consistent orthogonal plane under the sampled class. Do not infer a physical height change from the selected2017subset alone.",
+    "old2014RetainedTrials": 0
+  },
+  "originalSpecificationReview": {
+    "pdf": "References/Source_JacarType94ProvisionalSpec.pdf",
+    "sha256": "ddcd38e130b04197d5d05de0bdbf11c417daab4328b9ed7271ae47cf0a41cc37",
+    "pagesRead": [
+      19,
+      20,
+      21
+    ],
+    "finding": "These tables supply prior overall dimensions and mechanical/performance data, but no road-wheel diameter or wheel-station spacing to replace the uncertain measurements"
+  },
+  "adoptedLocalLayout": "Data_VentTopLapV37.json",
+  "adoptedGlobalCamera": false,
+  "metricScaleAccepted": false,
+  "wholeGrayAccepted": false,
+  "pbrAccepted": false,
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\CameraStudyV37",
+  "researchFiles": [
+    {
+      "file": "Data_CabAspectV37.json",
+      "sha256": "a68404da2a863c8c1864e54ba7a4230bf1e0bf206425c1e01083ba21731ee647"
+    },
+    {
+      "file": "Data_PrimaryCameraCurrentV37.json",
+      "sha256": "f8f30316b8071ed1127591426554712ea1b7c6e24c371b23c7873e4e53cfb6cd"
+    },
+    {
+      "file": "Data_WheelHoldoutV37.json",
+      "sha256": "06dc563c7eb98d0c3a0cd65e341da35713fca650ce40d908c186e68011fb5cc4"
+    },
+    {
+      "file": "Preview_CabCorners2014V37.jpg",
+      "sha256": "71a5f68ef0963256071d8b986759d9e05f1f5f2e9d7e1a4c1320fc14c149c2ab"
+    },
+    {
+      "file": "Preview_CabCorners2017V37.jpg",
+      "sha256": "8d2fb479d8eb13829b9d9d4d2c22bebf6b53be8ac5d87fa5ffb225be80b2697b"
+    },
+    {
+      "file": "Preview_CurrentFitGrayV37.jpg",
+      "sha256": "d760316f7cdd27effbd8c509c6d7abaa296c4fe32bacd648cc7be8fbb785e3fd"
+    },
+    {
+      "file": "Preview_DefaultGrayV37.jpg",
+      "sha256": "9c324030715a99c3e5d3f06a4ef66e75d172e6574288adeb2d36a863d760b475"
+    },
+    {
+      "file": "Preview_Jacar20LowerV37.png",
+      "sha256": "c9c7a56664019949d665cb7672d09494c83172c8a9f16f6c0efb3ee4976952f0"
+    },
+    {
+      "file": "Preview_Jacar20UpperV37.png",
+      "sha256": "721f7017af4f0e5f95094002c7a47cbd663bdef70dc438e6292123de29e68981"
+    },
+    {
+      "file": "Preview_JacarSpecV37-19.jpg",
+      "sha256": "28679916df95cb612234375c23e4be30c829d5dce680f8db43a1e325e6dfe584"
+    },
+    {
+      "file": "Preview_JacarSpecV37-20.jpg",
+      "sha256": "a5dd7df67460c16c3948a007bfd1774c9a8f25956ba668f09666698aad78a50a"
+    },
+    {
+      "file": "Preview_JacarSpecV37-21.jpg",
+      "sha256": "678cf5903c2c8c6d993e2735e8d2518421a811c23c5b97c20999713e15b4ee91"
+    },
+    {
+      "file": "Preview_Official2V37.jpg",
+      "sha256": "fd31b6280844297b1a2932c86666f2accbf66dcaf89663aef98e69210118f2cb"
+    },
+    {
+      "file": "Preview_Official7V37.jpg",
+      "sha256": "f126ea3824168d261f97f79b0187789ab50baab16a1e0072f44eefb011df42f2"
+    },
+    {
+      "file": "Preview_TyrePlaneGrayV37.jpg",
+      "sha256": "16e9dc5912386e691e2dfb774483c9f1e7fb5e6f36f009e5140d774170fa93c7"
+    },
+    {
+      "file": "Preview_VentOldV37.jpg",
+      "sha256": "ea52a1cc21101823b60600a67acc5416143e3c012227d10f9bd33df6a5de0090"
+    },
+    {
+      "file": "Preview_VentPrimaryV37.jpg",
+      "sha256": "9d5742dc8a2cfe155ecd5ebef6b57aa9be92f5d33535535c085aeaa8f06554bf"
+    },
+    {
+      "file": "Preview_WheelHoldoutV37.jpg",
+      "sha256": "8486c56bad05ce6374406c58886d50cfa9bc59478c0583aad6444e9f2b0f811b"
+    },
+    {
+      "file": "Source_JacarPage20V37.png",
+      "sha256": "10102a8bcea057c3d61e059093d373a2a0ae5e9d3c6f24cc2f8253fc1c19fa1b"
+    }
+  ],
+  "next": [
+    "Jointly solve credible body/running-gear geometry and both camera classes using independently verified native controls; do not promote either current camera fit",
+    "Keep same-vehicle unique fittings and real plane/circle observations separate from author markers and ambiguous silhouette extrema",
+    "After whole-gray acceptance: fresh complete PBR/source replay and a below80000triangle3mm derivative preserving real apertures and articulated hierarchy"
+  ]
+}

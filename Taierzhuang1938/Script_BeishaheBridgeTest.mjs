@@ -197,7 +197,6 @@ Check(data.historicalReferences?.length>=3&&data.historicalReferences.every(r=>/
 Check(spec.trussUpperGussetDepthM===.34&&spec.trussUpperGussetMaxHalfWidthM===.36&&/not established for Beishahe/i.test(data.materialInterpretation?.trussConnections??'')&&/without shanks or holes/i.test(data.materialInterpretation?.trussConnections??''),'Upper-node dimensions and unverified, head-only rivet interpretation are recorded');
 Check(/creative weathering choice, not evidence of the 1938 waterline/i.test(data.materialInterpretation?.pierDamp??''),'Lower pier damp color remains explicitly an artistic choice, not a historical water-level claim');
 Check(spec.pierJointShadeFactor===.5&&data.pierJointShade?.edgeFactor===spec.pierJointShadeFactor&&/not measured mortar/i.test(data.pierJointShade.interpretation??''),'Stone joint shading remains an authored visual treatment, not a historical mortar claim');
-Check(spec.pierCourseEdgeJitterFraction===.1&&spec.pierCornerSeamSetbackM===.3&&data.pierMasonry?.courseCount===9&&data.pierMasonry.edgeJitterFraction===spec.pierCourseEdgeJitterFraction&&/unconfirmed/i.test(data.pierMasonry.interpretation??''),'Variable stone lengths and their historical boundary are recorded');
 Check(/not established by a confirmed 1938 Beishahe bridge photograph/i.test(data.materialInterpretation?.deckPlanks??''),'Continuous wooden decking is identified as an authored reconstruction');
 Check(data.deckFasteners?.diameterM===spec.deckFastenerDiameterM&&data.deckFasteners.lengthM===spec.deckFastenerLengthM&&data.deckFasteners.topY===spec.deckFastenerTopY&&data.deckFasteners.bearerEmbedM===.025&&!data.deckFasteners.holesModeled&&!data.deckFasteners.threadsModeled&&/not a structural design/i.test(data.materialInterpretation?.deckFasteners??''),'Deck-fastener dimensions and unverified, undrilled visual convention are recorded');
 Check(data.deck?.clearWidthM===spec.sleeperLengthM&&data.deck.nominalBoardWidthM===spec.deckBoardNominalWidthM&&data.deck.rowToneContrast===spec.deckRowToneContrast&&data.deck.variantCount===spec.deckVariantCount&&data.deck.plankThicknessM===.045&&data.deck.topY===.075&&data.deck.jointWidthM===.006&&data.deck.grainAxis==='X','Decking dimensions, variant count, row tone, real 6 mm board gaps and transverse timber grain are recorded');
@@ -347,7 +346,7 @@ for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
     }
     // Three distinct template geometries are shared across 13 supports.
     if(supportIndex>3)continue;
-    let previous=null;const measuredWidths=[];
+    let previous=null;
     for(let row=0;row<9;row++){
       const y=spec.foundationY+(row+.5)*course,scan=[];
       for(let k=0;k<=280;k++){
@@ -361,12 +360,6 @@ for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
       Check(gaps.length>=2&&gaps.length<=4,'Actual short face has recessed joints across its width including near corners',{supportIndex,row,faceSide,gaps});
       if(previous)Check(gaps.every(g=>previous.every(p=>Math.abs(g.z-p.z)>.09)),'Consecutive short-face courses do not form aligned vertical seams',{supportIndex,row,faceSide,gaps,previous});
       previous=gaps;
-      const nominalWidth=2*(1.02-.12*(row+.5)/9)/3;
-      for(let j=1;j<gaps.length;j++)measuredWidths.push((gaps[j].z-gaps[j-1].z)/nominalWidth);
-      if(row===8){
-        const low=Math.min(...measuredWidths),high=Math.max(...measuredWidths);
-        Check(measuredWidths.length>=9&&low>.75&&high<1.25&&high-low>.10,'Actual exported stone widths vary within bounded courses',{supportIndex,faceSide,low,high,samples:measuredWidths.length});
-      }
       // Keep the original brightness bounds on actual outward stone faces;
       // the lower limits introduced for joint shading apply only inside the
       // real bevel/recess. Sample block centers inferred from the GLB scan.

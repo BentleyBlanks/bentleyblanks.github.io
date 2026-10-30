@@ -1,0 +1,193 @@
+{
+  "schema": "type94-gray-study-v1",
+  "id": "Type94Tankette",
+  "primaryScaleAnchorM": {
+    "length": 3.084,
+    "width": 1.62,
+    "height": 1.62,
+    "minimumBellyClearance": 0.3,
+    "trackWidth": 0.164
+  },
+  "primaryRecord": "https://www.jacar.archives.go.jp/das/meta/C01001361800",
+  "primaryScope": "1934-1936 provisional specification, not a survey of the restored museum individual",
+  "retainedGameCheckpoint": {
+    "revision": "V12",
+    "sha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+    "recipeCommit": "bd0852e1"
+  },
+  "revision": "ShapeV32",
+  "status": "gray-in-progress",
+  "complete": false,
+  "strictReferenceMatched": false,
+  "pbrAccepted": false,
+  "gameBudgetAccepted": false,
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Scene_Type94TanketteHighShapeV32.blend",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Exports\\Model_Type94TanketteHighShapeV32.glb",
+  "sha256": "fecabb3c4e730d7e38b9c54fffa5774a1f051a2e110aa08b1b8af073490bf568",
+  "sourceBlendSha256": "a9e17d4cf18307a3821885edff2544da487827959069ea44726a15e9963d9226",
+  "triangles": 501442,
+  "meshNodes": 247,
+  "measuredWidthHeightLengthM": [
+    1.628000020980835,
+    1.6303555355121824,
+    3.0802378090605957
+  ],
+  "previousStudyManifest": "Data_GrayStudyV31.json",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94ShapeReview/",
+  "localRearFacePreview": "http://127.0.0.1:8114/tmp/Type94ShapeReview/?view=rear-face",
+  "runtimeMechanismFile": "Taierzhuang1938/Model/Type94Tankette/Script_Type94Mechanism.mjs",
+  "runtimeMechanismSha256": "b25b394e18fe988dc00dabfab1d74a92607528263e7dcabd55d2e628a3051e7b",
+  "geometryRecipeEntryFilesSha256": {
+    "Taierzhuang1938/_blender/Script_Type94TanketteBuild.py": "4709b5b86e0749364eb27053cfd2e9535b07849c5d1a1e2275e4652e9791dc76",
+    "Taierzhuang1938/_blender/Script_Type94Articulation.py": "88c705973a2f4b92e9ac30174aeb6f080e641bb58a6381c2110b73086a4460af",
+    "Taierzhuang1938/_blender/Script_Type94GrayStudy.py": "828af68f0a608230e09646c1cfd5a84df86a6d90274893ce10d093d1f916090a",
+    "Taierzhuang1938/_blender/Script_Type94MechanismCorrect.py": "2d61b08a01a13dab65a6d2895f2d16474bcbf420f8eb642d1ae133e793021b46",
+    "Taierzhuang1938/_blender/Script_Type94Export.py": "168f799dc53887fbabded5f98953d8eb2a18df8fcfd57ee1ce119aa9b7764c8b",
+    "Taierzhuang1938/_blender/Script_Type94DetailCorrect.py": "aad345902267afcf2d4fb51960428c66e75078a53a50dd8cca2894a241f99691",
+    "Taierzhuang1938/_blender/Script_Type94TangentRepair.py": "1d76f211ddeb6a491da6b2b5685b34adb0cfea46f11cdf674523203d123e572f",
+    "Taierzhuang1938/Model/Type94Tankette/Data_DriverReferenceLayoutV19.json": "7698100dcb27f7866548a5251eec588474e1f28cf30de3632d550d096e7a3239",
+    "Taierzhuang1938/Model/Type94Tankette/Data_SidePortReferenceLayoutV21.json": "0c881c50153cfb5b753b0266866a407c152582742da590891125b06963a49143",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearMechanismLayoutV22.json": "f13872695aebf431e2c9b69555ac2744a986b9c93d0f1c992098e7a990cc2638",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretRivetLayoutV25.json": "39472a67ef4fe69040d1de24879d6883805dc987e119e715dd31ea60c591fca8",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretReferencePointsV25.json": "b4955e52abb6bb788e0caa8433714d4ccb1a0efb766cc41a5529eb4850f558ca",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretPortReferenceLayoutV26.json": "7a4db2c5a7332b873d12e8f85aff9ae31de05de175a6da203632e0d64ae32b47",
+    "Taierzhuang1938/_blender/Script_Type94TurretRear.py": "840653a33aafc9c4506c979dd9084eb5ae53d73d6ea71afc9177ddc7af908a13",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretRearLayoutV27.json": "11c0833fcca99be04cb1e550878b283ab0898f9b80d02a999f1a691bb3a7af67",
+    "Taierzhuang1938/_blender/Script_Type94RearArmor.py": "42b9497e9f4e3f4a9138a82325dc834a55db91bdda35672542363fee9039b4fa",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearArmorReferenceLayoutV28.json": "7c840ae8b3034aa418f3f6297f24da3cbb0a71d921881509c10b0b6999ce1bda",
+    "Taierzhuang1938/_blender/Script_Type94RearDoor.py": "234d4feb11536c2dfff6da0483365a2613216f42ca5ec48ee90c4da4a616ebb2",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearDoorFaceLayoutV29.json": "76e41e865100cef9c5d14dd58b352c5caf3713b9d5c6338b154352eb690af276",
+    "Taierzhuang1938/Model/Type94Tankette/Data_MgFlangeReferenceV31.json": "736fcde53a6cfdc68651a1943d1c604c91511728761b8a9d47de8f8faa17ea09",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretFrontLayoutV32.json": "d6a588209eb43c6ae97575be24253bab4b66c78775a50f8e7a281217e8c65cd1"
+  },
+  "validation": {
+    "scope": "Exact V32 local geometry, conditional commander stations, smaller real aperture and raised fitting; global camera/scale/shape, PBR/replay and game derivative remain unaccepted",
+    "reports": {
+      "raw": "Data_V32GrayRawAudit.json",
+      "browser": "Data_V32GrayBrowserAudit.json",
+      "native": "Data_V32GrayMotionAudit.json",
+      "source": "Data_V32EditableSourceAudit.json",
+      "export": "Data_V32TurretFrontExportAudit.json",
+      "ui": "Data_V32MgFlangeUiAudit.json",
+      "detailUi": "Data_V32DetailUiAudit.json",
+      "sourceSweeps": "Data_V32GunSourceSweep.json",
+      "legacyRaw": "Data_V12RawVerifierCompatV32.json",
+      "legacyBrowser": "Data_V12BrowserVerifierCompatV32.json",
+      "negativeRaw": "Data_V32UntexturedRejectedByFullAudit.json",
+      "negativeBrowser": "Data_V32UntexturedRejectedByBrowser.json"
+    },
+    "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance",
+    "rawGeometryChecks": 701,
+    "browserGeometryChecks": 189,
+    "nativeGeometryMotionChecks": 37,
+    "editableSourceReopenChecks": 82,
+    "localExportChecks": 10,
+    "localUiChecks": 13,
+    "legacyRawVerifierChecks": 979,
+    "legacyBrowserVerifierChecks": 689,
+    "priorUnchangedMeshSurfaces": 242,
+    "priorWheelTrackMeshesUnchanged": 200,
+    "protectedSurfaceThresholdM": 2e-06,
+    "fullFixedGunSourceSweepPoses": 7,
+    "fullFixedCommanderSourceSweepPoses": 22,
+    "sourceFullFixedContactExclusionM": 0,
+    "oldUncutArmorCounterfactualCollisionPairs": 20,
+    "editableSourceActualFreshReopen": true,
+    "actualGrayReimportBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Scene_ShapeV32ActualGrayReimport.blend",
+    "actualGrayRender": "Data_V32DetailsRender.json",
+    "strictPbrDefaultsRejectUntexturedStudy": true,
+    "ownedBlenderStopped": true,
+    "ownedBlenderCleanupProof": "Data_V32OwnedBlenderCleanup.json",
+    "verifierFilesSha256": {
+      "Taierzhuang1938/_import/Script_VerifyType94Export.py": "e7b461f83dd60c97a10ae146dcac365a51b6951a98d27b34d7a2a940314afd3e",
+      "Taierzhuang1938/_blender/Script_VerifyType94Sweep.py": "92fc6d8a670f87ae900798816dded1ecf14d1f174059baa41fd44a5f0b73d30e",
+      "Taierzhuang1938/Model/Type94Tankette/Script_VerifyType94Browser.mjs": "8753a7cb0c8beb69cd4af1fcddf510db107c818b7a5b35b31520c8047877134a"
+    },
+    "repositorySelectedChecks": {
+      "command": "node Taierzhuang1938/Script_TestRunner.mjs --only=AssetStandardsTest,ModelFacingTest,HistoryLedgerCheck,ModuleGraphTest",
+      "passed": true,
+      "checks": [
+        "AssetStandardsTest",
+        "ModelFacingTest",
+        "HistoryLedgerCheck",
+        "ModuleGraphTest"
+      ],
+      "exitCode": 0,
+      "scope": "Four related checks run; whole quick not rerun"
+    },
+    "priorQuick": {
+      "revision": "ShapeV27",
+      "passes": 107,
+      "failures": [
+        "SpeakerGestureTest",
+        "RiggedModelTest",
+        "IjaAlertGaitTest"
+      ],
+      "preexistingFailuresReproducedAtPriorUnmodifiedHead": true,
+      "notRerunInV31": true,
+      "notRerunInV32": true
+    }
+  },
+  "rearDoorFace": {
+    "layout": "Data_RearDoorFaceLayoutV29.json",
+    "scope": "Selected museum open aperture, static circular mount and bottom attachment; a protruding grip from another vehicle is removed",
+    "exactPhotoLayoutAccepted": false,
+    "observedFittingFunctionsAccepted": false,
+    "bottomAssemblyIndependentlyAnimated": false,
+    "concealedLatch": "Inferred engineering demonstration, not an identified historical lock"
+  },
+  "rearArmorInner": {
+    "thicknessM": 0.008,
+    "inferred": true,
+    "scope": "Rear inner miter only; outside rear plate and forward shell retained. Prior even-offset inner face was about74mm deep at lock height."
+  },
+  "inferred": [
+    "Absolute rear-door dimensions and feature placement/profile estimates",
+    "Circular mounting function and small fastener arrangement",
+    "Static bottom-edge hardware function and hidden construction",
+    "Concealed interior lock, release travel, spindle, bearing and keeper",
+    "Rear armor8mm normal thickness, all hidden sections and tolerances",
+    "All prior unaccepted reference/camera/shape assumptions in Data_GrayStudyV28.json",
+    "MG flange retained bolt-circle radius, hex-head dimensions and hidden attachment section",
+    "Round gun-opening hidden depth, front socket diameter and bearing clearance",
+    "Raised leaning front fitting outline/depth/attachment and unknown function; lower dark notch unresolved",
+    "Commander hinge station span under explicit construction-class assumptions; unconstrained sensitivity includes prior span"
+  ],
+  "remaining": [
+    "Global primary camera/focal/crop/metric-scale alignment and front/body/cabin/turret proportions",
+    "Turret/ball/barrel proportions, side-fitting angular stations, lower dark-notch classification and other visible details",
+    "Selected rear-face dimensions, exact aperture profile, hinge/fastener pattern and attachment function review",
+    "Whole-vehicle neutral-gray reference acceptance",
+    "Final olive PBR, markings and localized wear from the selected2017 appearance",
+    "Complete fresh geometry/texture recipe replay and final exact-file import/motion checks",
+    "New game derivative below80000 triangles with3mm bidirectional distance and preserved apertures/mechanisms",
+    "History/creation reconciliation before external release"
+  ],
+  "activeReferenceStudy": "Data_CameraReferenceStudyV32.json",
+  "fixedMgFlange": {
+    "layout": "Data_MgFlangeReferenceV31.json",
+    "fastenerCount": 6,
+    "headSectionSides": 6,
+    "sectionDimensionsInferred": true,
+    "scope": "Observed six-site front pattern and hexagonal heads; fixed collar casting unchanged, lower-left outline partly occluded",
+    "roundFrontOpening": "Real bore with revised relative radius; absolute8mm radius and concealed continuation remain inferred",
+    "socketOpening": "Inferred front-armor opening clears the actual moving ball; full-fixed contact exclusion remains zero",
+    "triangularFrontFeatureAccepted": false
+  },
+  "localMgFlangePreview": "http://127.0.0.1:8114/tmp/Type94ShapeReview/?view=mg-flange",
+  "referenceStudyScope": "Only local relative corrections; structural sensitivity and unconstrained tails both retained. No global camera or metric scale accepted.",
+  "localTurretFrontPreview": "http://127.0.0.1:8114/tmp/Type94ShapeReview/?view=mg-flange",
+  "turretFrontLayout": "Data_TurretFrontLayoutV32.json",
+  "localCommanderHingePreview": "http://127.0.0.1:8114/tmp/Type94ShapeReview/?view=commander-hinge",
+  "localFrontFittingPreview": "http://127.0.0.1:8114/tmp/Type94ShapeReview/?view=front-fitting",
+  "commanderHingeStations": {
+    "layout": "Data_TurretFrontLayoutV32.json",
+    "stationsM": [
+      -0.1305,
+      0.1305
+    ],
+    "conditionalOnStructuralAssumptions": true,
+    "unconstrainedSensitivityIncludesPriorSpan": true,
+    "absoluteDimensionsInferred": true
+  }
+}

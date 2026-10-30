@@ -1072,36 +1072,17 @@ def BuildPier(seed=1938):
     # A single core avoids coplanar/overlapping per-course internal surfaces.
     stone.Box((0, (floor + top - 0.25) / 2, 0), (3.70, top - floor - 0.25, 1.65),
               tint=(0.88, 0.875, 0.86, 1))
-    # Vary stone lengths within each course while keeping opposing faces
-    # aligned and adjacent courses staggered. This bond is an authored visual
-    # analogy to the construction study, not an original bridge measurement.
-    def CourseEdges(half, count, row, salt, cornerSetback=0):
-        cell = 2 * half / count
-        phase = (row % 2) * .5
-        seamRng = random.Random(seed + salt + row * 1543)
-        interior = []
-        for k in range(count + 1):
-            nominal = -half + (k + phase) * cell
-            if -half + .04 < nominal < half - .04:
-                jitter = SPEC["pierCourseEdgeJitterFraction"]
-                edge = nominal + seamRng.uniform(-jitter, jitter) * cell
-                if cornerSetback:
-                    # Keep the short-face joint inside the corner overlap;
-                    # otherwise the long-face stone can conceal that joint.
-                    limit = half - cornerSetback
-                    edge = max(-limit, min(limit, edge))
-                interior.append(edge)
-        return [-half, *interior, half]
     # Real masonry courses with small joints; flow direction is X.
     for row in range(courses):
         y = floor + (row + 0.5) * ch
         taper = (row + 0.5) / courses
         halfx, halfz = 2.18 - 0.23 * taper, 1.02 - 0.12 * taper
         countx, countz = 6, 3
-        longEdges = CourseEdges(halfx, countx, row, 31253)
-        shortEdges = CourseEdges(halfz, countz, row, 69019, SPEC["pierCornerSeamSetbackM"])
         for side in [-1, 1]:
-            for left, right in zip(longEdges, longEdges[1:]):
+            for k in range(-1, countx + 1):
+                cell = 2 * halfx / countx
+                left = max(-halfx, -halfx + (k + (row % 2) * 0.5) * cell)
+                right = min(halfx, -halfx + (k + 1 + (row % 2) * 0.5) * cell)
                 if right - left > 0.04:
                     damp = row < 3
                     target = dampStone if damp else stone
@@ -1114,7 +1095,10 @@ def BuildPier(seed=1938):
                         surfaceGrid=("z", side, 3) if damp else None, jointShadeAxis="z", jointShadeSign=side)
             # Stagger the shorter faces as well. End blocks are clipped at
             # the corners, as on the longer face, and the inset core is kept.
-            for left, right in zip(shortEdges, shortEdges[1:]):
+            for k in range(-1, countz + 1):
+                cell = 2 * halfz / countz
+                left = max(-halfz, -halfz + (k + (row % 2) * 0.5) * cell)
+                right = min(halfz, -halfz + (k + 1 + (row % 2) * 0.5) * cell)
                 if right - left <= 0.04:
                     continue
                 damp = row < 3
@@ -1371,7 +1355,6 @@ def Rebuild():
                 "trussFinish": "Muted brown-gray weathered truss steel is an imagegen material study guided by a modern out-of-region bridge photograph. Its paint color and corrosion are creative choices, not verified 1938 Beishahe conditions. The rail body keeps a separate neutral steel texture.",
                 "pierDamp": "Irregular brown-gray and muted olive staining that fades into the dry pier is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
                 "pierJointShade": "Continuous darkening over each real stone bevel and recessed side is an authored occlusion-style visual treatment. It is not a measured mortar color, a lightmap, or evidence of the 1938 bridge's masonry.",
-                "pierMasonry": "Varying stone lengths and staggered joints are an authored visual analogy to the AI construction study, not a measured masonry bond of the 1938 Beishahe bridge.",
                 "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
                 "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
                 "deckFasteners": "Paired cylinder fasteners at the two inner bearers are an authored analogy to general timber-deck connections, not a documented 1938 Beishahe detail. The simplified 71 mm solids overlap undrilled wood, have no threads or distinct head, and are not a structural design or a claim of compliance with vehicular-deck guidance.",
@@ -1393,9 +1376,6 @@ def Rebuild():
                         "interpretation": "Authored construction; original Beishahe capstones are unconfirmed."},
             "pierJointShade": {"edgeFactor": SPEC["pierJointShadeFactor"], "transition": "continuous over real bevel depth",
                                "interpretation": "Authored occlusion-style color; not measured mortar or an original-bridge claim."},
-            "pierMasonry": {"courseCount": 9, "edgeJitterFraction": SPEC["pierCourseEdgeJitterFraction"],
-                            "cornerSeamSetbackM": SPEC["pierCornerSeamSetbackM"],
-                            "interpretation": "Authored varying stone lengths; original Beishahe masonry bond is unconfirmed."},
             "railJoints": {"nominalRailLengthM": SPEC["railNominalLengthM"], "gapM": SPEC["railJointGapM"],
                            "jointCentersPerSpan": [0], "supportAxisJointCount": SPEC["spanCount"] - 1,
                            "fishplateLengthM": .36, "boltStationsM": [-.13, -.055, .055, .13],

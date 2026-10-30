@@ -1,0 +1,179 @@
+{
+  "schema": "Type94GrayForebodyTrialV1",
+  "revision": "ShapeV54ForebodyTrial",
+  "status": "local-planar-side-construction-verified-whole-reference-unaccepted",
+  "sourceBody": "Data_GrayTrialV53.json",
+  "layout": "Data_BodyTrialV54.json",
+  "sourceProducer": "Taierzhuang1938/_blender/Script_Type94ForebodyTrial.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ForebodyV54\\Scene_Type94TanketteHighShapeV54ForebodyTrial.blend",
+  "sourceBlendSha256": "6af92f7a7c1fba2a12064cd3c29b1671d992560c10a158e65b6f929c1ab9c19b",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ForebodyV54\\Exports\\Model_Type94TanketteHighShapeV54ForebodyTrial.glb",
+  "sha256": "690c5aeb872cefcb542546aeeb6fe0864c31b24eed7e7ce94498e09d4e886aa5",
+  "triangles": 616492,
+  "meshNodes": 237,
+  "linksPerSide": 80,
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "metricEnvelopeAccepted": true,
+  "geometryChange": {
+    "onlyChangedMeshOwner": "Geometry_Hull_Paint",
+    "oldOuterQuadBestPlaneMaximumDistanceM": 0.01981458790162402,
+    "addedOrientedTriangles": 344,
+    "removedOrientedTriangles": 312,
+    "unchangedNamedMeshes": 236,
+    "unchangedPoseHierarchyNodes": 292,
+    "maximumActualPlaneErrorM": 4.194471320649842e-17,
+    "actualPairedNormalThicknessesM": [
+      0.008000010576580245,
+      0.008000016212463379,
+      0.00799999074082458,
+      0.008000016212463379
+    ],
+    "sourceUsesSingleClosedSharedFold": true,
+    "actualClosedShellComponents": [
+      {
+        "vertices": 88,
+        "edges": 258,
+        "triangles": 172,
+        "eulerCharacteristic": 2
+      },
+      {
+        "vertices": 88,
+        "edges": 258,
+        "triangles": 172,
+        "eulerCharacteristic": 2
+      }
+    ],
+    "lowerEdgeAtKnuckleBeforeGroundM": 0.75,
+    "armorGaugeAndSeamInferred": true
+  },
+  "validation": {
+    "reports": {
+      "raw": "Data_ForebodyRawV54.json",
+      "source": "Data_ForebodySourceReopenV54.json",
+      "native": "Data_ForebodyMotionV54.json",
+      "allBodyBelt": "Data_ForebodyBeltV54.json",
+      "actualPlanes": "Data_ForebodyPlanesV54.json",
+      "conservation": "Data_ForebodyConservationV54.json",
+      "browser": "Data_ForebodyGeometryBrowserV54.json",
+      "ui": "Data_ForebodyUiV54.json",
+      "renders": "Data_ForebodyRendersV54.json",
+      "detailCrops": "Data_ForebodyDetailCropsV54.json",
+      "defaultGuard": "Data_DefaultV37V54.json",
+      "previousGuard": "Data_PreviousV53V54.json",
+      "coldReplay": "Data_ColdV54V54.json"
+    },
+    "rawChecks": 685,
+    "nativeChecks": 41,
+    "allBodyBeltPhases": 32,
+    "actualPlaneAndGaugeChecks": 6,
+    "actualClosedTopologyChecks": 4,
+    "browserGeometryChecks": 255,
+    "uiChecks": 36,
+    "geometryGateM": 1e-07,
+    "exactOrderedUnchangedGeometry": true,
+    "allNodePosesAndControlMetadataIdentical": true,
+    "trackPathIdentical": true,
+    "sourceReopened": true,
+    "actualGlbReimport": true,
+    "coldReplayByteIdentical": true,
+    "defaultV37ByteIdentical": true,
+    "previousV53ByteIdentical": true
+  },
+  "inheritedUnchangedWheelEvidence": {
+    "source": "Data_GrayTrialV53.json",
+    "sourceGlbSha256": "2670d8f6fb56eb5bc7126977949c3e8583b3e0e09aac9cc79e9744d9c8dac1e7",
+    "reports": [
+      "Data_FullWheelContactV53.json",
+      "Data_DriveWebRaysV53.json"
+    ],
+    "wheelBeltPosePairs": 256,
+    "actualWindowAndSolidRays": 176,
+    "currentEvidence": "Data_ForebodyConservationV54.json",
+    "basis": "Exact unchanged wheel/link vertices, triangles, all node poses/control metadata and track path; all body-vs-belt contacts retested in V54",
+    "freshlyRerun": false
+  },
+  "ventStudy": "Data_VentProjectionStudyV54.json",
+  "ventGeometryChanged": false,
+  "sourceFilesSha256": {
+    "Taierzhuang1938/Model/Type94Tankette/Data_TrackShoeTrialV48.json": "2d5e9707fe1270c103ce25a7316a3098792dcb3e2f37dc03cb2efb06509f2cca",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RunningAssemblyV53.json": "74213ec8e7c45d88de3e9926f61ee395bed239a6d7b422bd5aadfb3aeafbef68",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretTrialV53.json": "cbc15bf835c2c7ca153dedaa74cf42d861f3e3f3c56b99baacad606368195042",
+    "Taierzhuang1938/Model/Type94Tankette/Data_BodyTrialV54.json": "7502cbce27e19f5049d1623e2f93addd3f9f63033410ab181fc339b8e69027f9",
+    "Taierzhuang1938/_blender/Script_VerifyType94Sweep.py": "fc0ec068a2f8e595368b63914fae5a4da9fa569d4ed57eab75dd5257537f79b4",
+    "Taierzhuang1938/_blender/Script_Type94Export.py": "b5e0abdcd073cc0cb84eaf77534626f7b9b24166a87bd88e1c0395840e340486",
+    "Taierzhuang1938/_blender/Script_Type94TangentRepair.py": "1d76f211ddeb6a491da6b2b5685b34adb0cfea46f11cdf674523203d123e572f",
+    "Taierzhuang1938/_blender/Script_Type94GunTraverse.py": "6b774067cde393b69776fc50ea6b5dabec72e0e64277e21e8adb1f593d921729",
+    "Taierzhuang1938/_blender/Script_Type94MechanismCorrect.py": "1941339bbabfaef0ca4290eb20a2b92d15992ae2548badebf6db671ca0086fe3",
+    "Taierzhuang1938/_blender/Script_Type94TanketteBuild.py": "9566da7b8fb053d504f50bc11c3fb601e2b4b1f73d0474fb8a7da88a463b9f32",
+    "Taierzhuang1938/_blender/Script_Type94DetailCorrect.py": "aad345902267afcf2d4fb51960428c66e75078a53a50dd8cca2894a241f99691",
+    "Taierzhuang1938/Model/Type94Tankette/Data_MgFlangeReferenceV31.json": "736fcde53a6cfdc68651a1943d1c604c91511728761b8a9d47de8f8faa17ea09",
+    "Taierzhuang1938/_blender/Script_Type94Articulation.py": "326b9fd068ddcacff24be5f9eb8e39617d3d56a6b1b02a5a0b91ba3449c25b88",
+    "Taierzhuang1938/_blender/Script_Type94TrackShoe.py": "4c25137fd149e93f8ee4c3f9f739276f8af70945063b9160154ad50e3eb6d019",
+    "Taierzhuang1938/_blender/Script_Type94RunningAssembly.py": "40263cf96c614ef0488ffe2155c6cbfce159e313d6d99c0fea211adf7d07ba0b",
+    "Taierzhuang1938/_blender/Script_Type94RearDoor.py": "234d4feb11536c2dfff6da0483365a2613216f42ca5ec48ee90c4da4a616ebb2",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearDoorFaceLayoutV29.json": "76e41e865100cef9c5d14dd58b352c5caf3713b9d5c6338b154352eb690af276",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearMechanismLayoutV22.json": "f13872695aebf431e2c9b69555ac2744a986b9c93d0f1c992098e7a990cc2638",
+    "Taierzhuang1938/Model/Type94Tankette/Data_VentTopLapV37.json": "0987c835fb994c0cdc25661e32d5da11792cd258764acb62a5fbce701b27a340",
+    "Taierzhuang1938/_blender/Script_Type94TurretRear.py": "1ecae7a90ecd0b68c1d59f829f57f349d2cc26e0852b03e9607d794cff89c896",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretRearLayoutV27.json": "11c0833fcca99be04cb1e550878b283ab0898f9b80d02a999f1a691bb3a7af67",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretFrontLayoutV32.json": "d6a588209eb43c6ae97575be24253bab4b66c78775a50f8e7a281217e8c65cd1",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretSideSectorV35.json": "cf5d4d8a0d76ad6ea971937c5ffd9dccbac57d8a0b5c29f5daa05384c52eb9aa",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretRivetLayoutV25.json": "39472a67ef4fe69040d1de24879d6883805dc987e119e715dd31ea60c591fca8",
+    "Taierzhuang1938/Model/Type94Tankette/Data_TurretPortReferenceLayoutV26.json": "7a4db2c5a7332b873d12e8f85aff9ae31de05de175a6da203632e0d64ae32b47",
+    "Taierzhuang1938/Model/Type94Tankette/Data_DriverReferenceLayoutV19.json": "7698100dcb27f7866548a5251eec588474e1f28cf30de3632d550d096e7a3239",
+    "Taierzhuang1938/_blender/Script_Type94ForebodyPanels.py": "0a5a494be336082effccee83e73565fe147d1f5afd625d2af21eb901ded9178f",
+    "Taierzhuang1938/Model/Type94Tankette/Data_SidePortReferenceLayoutV21.json": "0c881c50153cfb5b753b0266866a407c152582742da590891125b06963a49143",
+    "Taierzhuang1938/_blender/Script_Type94RearArmor.py": "42b9497e9f4e3f4a9138a82325dc834a55db91bdda35672542363fee9039b4fa",
+    "Taierzhuang1938/Model/Type94Tankette/Data_RearArmorReferenceLayoutV28.json": "7c840ae8b3034aa418f3f6297f24da3cbb0a71d921881509c10b0b6999ce1bda",
+    "Taierzhuang1938/_blender/Script_Type94GrayStudy.py": "828af68f0a608230e09646c1cfd5a84df86a6d90274893ce10d093d1f916090a",
+    "Taierzhuang1938/_blender/Script_Type94EnvelopeTrial.py": "6f69340ab27334cbf1819f78cf78a90482d4d7d06d3f684b5d06d7d76c71a45e",
+    "Taierzhuang1938/Model/Type94Tankette/Data_BodyTrialV53.json": "58695766491e8a95c493e9443f8d85f7df466b4450b2d4e290759bbb7ea39055",
+    "Taierzhuang1938/_blender/Script_Type94ForebodyTrial.py": "486172ca74c34cbd3a2e225d330b1a9162cd162e81d186b4a64fcdfd86a854d7"
+  },
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ForebodyV54\\Acceptance",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94ForebodyReviewV54/",
+  "visualReview": {
+    "beforeAfterSameCameras": true,
+    "fullReferenceRetained": true,
+    "nativeDetailCropsAvailable": true,
+    "previewsAtMost640Pixels": true,
+    "nonplanarFanReplacedByConnectedFlatWall": true,
+    "wholeReferenceAccepted": false,
+    "remaining": [
+      "Vent placement/span/hood section and hull/fender attachment",
+      "Wheel/cap profiles and stance",
+      "Whole forebody geometry and optical fender/contact conflict"
+    ],
+    "conditionalCameraFamilyOnly": true,
+    "rearTrailerOcclusionModeled": false
+  },
+  "failedVariantsRetained": [
+    "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ForebodyV54\\Versions\\PlanarSideLowEdgeCollision"
+  ],
+  "initialContactDiagnostic": {
+    "actualHullContactsFound": true,
+    "factoryCubeAlsoPresentInInitialDiagnostic": true,
+    "currentCheckUsesOnlyActualModelSubtree": true,
+    "currentBodyBeltIntersections": 0
+  },
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV54.json",
+  "strictReferenceMatched": false,
+  "globalCalibrationAccepted": false,
+  "pbrAccepted": false,
+  "gameBudgetAccepted": false,
+  "complete": false,
+  "goalComplete": false,
+  "canonicalGameReplaced": false,
+  "published": false,
+  "remaining": [
+    "Rebuild the vent from reviewed multi-view creases and corroborated root/foot geometry, with real slots and round pins",
+    "Continue whole-model neutral-gray alignment, including road wheels, forebody and the fender optical/contact conflict",
+    "After whole shape settles, fresh UV/PBR authoring and actual reimported appearance checks",
+    "Create the new below80000triangle game derivative with at most3mm bidirectional surface distance"
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "schema": "type94-gray-study-v1",
+  "id": "Type94Tankette",
+  "revision": "ShapeV16",
+  "status": "gray-in-progress",
+  "complete": false,
+  "pbrAccepted": false,
+  "gameBudgetAccepted": false,
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Scene_Type94TanketteHighShapeV16.blend",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Exports\\Model_Type94TanketteHighShapeV16.glb",
+  "sha256": "4a57f6b3d6965637ed269b4453d25c0b6edc987af807782bb0396dbaea7f3579",
+  "triangles": 460746,
+  "meshNodes": 233,
+  "measuredWidthHeightLengthM": [
+    1.628000020980835,
+    1.6303554982592794,
+    3.0802378090605957
+  ],
+  "primaryScaleAnchorM": {
+    "length": 3.084,
+    "width": 1.62,
+    "height": 1.62,
+    "minimumBellyClearance": 0.3,
+    "trackWidth": 0.164
+  },
+  "primaryRecord": "https://www.jacar.archives.go.jp/das/meta/C01001361800",
+  "primaryScope": "1934-1936 provisional specification, not a survey of the restored museum individual",
+  "validation": {
+    "rawGeometryChecks": 546,
+    "browserGeometryChecks": 36,
+    "nativeGrayMovement": true,
+    "scope": "Gray geometry and mechanisms only; no PBR, game-budget or strict reference acceptance",
+    "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance",
+    "nativeGeometryMotionChecks": 24,
+    "strictPbrDefaultsRejectUntexturedStudy": true,
+    "roadWheelPoses": 128,
+    "roadAxleContactRadiusM": 0.075,
+    "ownedBlenderStopped": true,
+    "editableSourceReopenChecks": 7,
+    "driverHingeContactExclusionM": 0,
+    "actualGrayReimportBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Scene_ShapeV16ActualGrayReimport.blend",
+    "nativeGrayVerifier": "Taierzhuang1938/_blender/Script_VerifyType94Gray.py",
+    "viewerUiChecks": 5,
+    "driverRoofHingeContactExclusionM": 0,
+    "driverRoofVisorCombinedPoses": 25,
+    "closedRoofMaximumVertexErrorM": 9.001998715674081e-08
+  },
+  "remaining": [
+    "Primary camera and whole-body proportions using reliable same-vehicle photo correspondences",
+    "Visible local details, markings and surface seating",
+    "PBR authoring and complete recipe replay after gray acceptance",
+    "New game derivative under unchanged budget/error limits and complete export verification",
+    "History/creation scope reconciliation before final delivery"
+  ],
+  "inferred": [
+    "Rear profile dimensions and concealed drawbar section",
+    "Curved rear-side fitting function / hidden mounting",
+    "Front tow-shackle demonstration travel stops",
+    "Early high sprocket local height / nose / fender dimensions",
+    "Front fender root flange and cantilever support construction",
+    "Engine inspection assembly 60 mm forward clearance placement",
+    "Visor local dimensions, internal hinge fork and nominal bearing clearance",
+    "Driver roof hidden fork/leaf/bearing construction and demonstration limit"
+  ],
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94ShapeReview/",
+  "retainedGameCheckpoint": {
+    "revision": "V12",
+    "sha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+    "recipeCommit": "bd0852e1"
+  },
+  "authoredFrontParametersM": {
+    "driveCenterHeightBeforeGroundCompensation": 0.605,
+    "frontArmorBottomBeforeGroundCompensation": 0.56,
+    "frontArmorTopBeforeGroundCompensation": 0.86,
+    "trackCenterPlanes": [
+      -0.684,
+      0.684
+    ],
+    "trackWidth": 0.164,
+    "scope": "Local photo-derived dimensions; overall 1.620 m width does not determine track centre spacing"
+  },
+  "rejectedTrial": {
+    "trackCenterPlanes": [
+      -0.728,
+      0.728
+    ],
+    "reason": "All eight road wheels intersected fixed suspension arms in the expanded native sweep",
+    "report": "Data_V14RejectedWideTrackMotionAudit.json"
+  },
+  "mechanismManifest": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Data_MechanismShapeV16.json",
+  "localDetailComparison": {
+    "scope": "Front-cabin plane normalized by four frame corners; does not validate whole-vehicle camera or absolute cabin dimensions",
+    "referenceObservation": "Data_DriverVisorReferenceV15.json",
+    "viewerControl": "Driver front plate fixed comparison",
+    "acceptedAbsoluteDimensions": false,
+    "relativePanelShapeReviewed": true,
+    "comparisonPreview": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Preview_DriverPlaneV15.jpg",
+    "normalizationDoesNotAcceptWholeVehicleCamera": true,
+    "relativePanelShapeReviewedAtRevision": "ShapeV15"
+  },
+  "strictReferenceMatched": false,
+  "roofMotion": {
+    "hingeBeforeGroundCompensationM": [
+      0.305,
+      0.202,
+      1.25
+    ],
+    "openSignLocal": -1,
+    "scope": "Forward opening corroborated by open-roof photo; closed lid and handle world geometry preserved"
+  },
+  "diagnosticCamera": {
+    "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Data_CameraStructuredPoseV16.json",
+    "acceptedCalibration": false,
+    "mainReferenceCameraChanged": false,
+    "scope": "Pose-aware diagnostic only; estimated dimensions and uncertain corner observations"
+  },
+  "sourceBlendSha256": "5d14802cfebff4fd6de9b950adf48b79e289e3935b3b1caeeb31b533ee1cfc30"
+}

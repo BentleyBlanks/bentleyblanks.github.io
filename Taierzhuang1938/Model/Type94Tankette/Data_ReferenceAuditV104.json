@@ -1,0 +1,266 @@
+{
+  "schema": "Type94FixedBodyReferenceReviewV1",
+  "revision": "ReferenceV104",
+  "status": "Additional 2014 fixed-front correspondences and rejected conditional camera-only trial",
+  "producer": "Taierzhuang1938/_import/Script_Type94FixedFrontReviewV104.py",
+  "observationFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV104\\Inputs\\Data_FixedFrontObservationsV104.json",
+  "observationFileSha256": "7ceddd295fdefe3dd360fa6a31780ae4016e610139729aa419efaf0267e66344",
+  "reportFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV104\\Acceptance\\Data_FixedFrontCameraStudyV104.json",
+  "reportFileSha256": "8b76800963d54eb1f51c5f19a0a1c7afc1032dbe977878b8acc88b7290f1482a",
+  "observationCount": 8,
+  "observations": [
+    {
+      "index": 0,
+      "name": "FarUpperEdge",
+      "primaryNative": [
+        797,
+        1824
+      ],
+      "secondaryNative": [
+        744.921875,
+        1868.28125
+      ],
+      "crop": "Far",
+      "cropPixel": [
+        165,
+        46
+      ],
+      "sigmaNative": 6,
+      "fitFrameConditionalPointM": [
+        0.5332488741855088,
+        1.3125190565202445,
+        0.6950158983762387
+      ],
+      "training": true,
+      "identity": "Candidate same fixed front fastener crown; no axis-centre interpretation"
+    },
+    {
+      "index": 3,
+      "name": "FarInnerLow",
+      "primaryNative": [
+        1094,
+        2118
+      ],
+      "secondaryNative": [
+        997.265625,
+        2131.015625
+      ],
+      "crop": "Far",
+      "cropPixel": [
+        335,
+        223
+      ],
+      "sigmaNative": 6,
+      "fitFrameConditionalPointM": [
+        0.3012035535539126,
+        1.3412598521960057,
+        0.5708230690782324
+      ],
+      "training": true,
+      "identity": "Candidate same fixed front fastener crown; no axis-centre interpretation"
+    },
+    {
+      "index": 4,
+      "name": "FarInnerHigh",
+      "primaryNative": [
+        1180,
+        2053
+      ],
+      "secondaryNative": [
+        1068.515625,
+        2068.671875
+      ],
+      "crop": "Far",
+      "cropPixel": [
+        383,
+        181
+      ],
+      "sigmaNative": 6,
+      "fitFrameConditionalPointM": [
+        0.24751877668262456,
+        1.331893254536288,
+        0.6112973926627217
+      ],
+      "training": true,
+      "identity": "Candidate same fixed front fastener crown; no axis-centre interpretation"
+    },
+    {
+      "index": 6,
+      "name": "NearHitchUpper",
+      "primaryNative": [
+        1796,
+        1934
+      ],
+      "secondaryNative": [
+        1603.28125,
+        1943.4375
+      ],
+      "crop": "Near",
+      "cropPixel": [
+        109,
+        102
+      ],
+      "sigmaNative": 6,
+      "fitFrameConditionalPointM": [
+        -0.13254542243760858,
+        1.306999080672285,
+        0.7188684536759821
+      ],
+      "training": true,
+      "identity": "Candidate same fixed front fastener crown; no axis-centre interpretation"
+    },
+    {
+      "index": 7,
+      "name": "NearHitchMiddle",
+      "primaryNative": [
+        1789,
+        2153
+      ],
+      "secondaryNative": [
+        1594.84375,
+        2140.3125
+      ],
+      "crop": "Near",
+      "cropPixel": [
+        103,
+        242
+      ],
+      "sigmaNative": 6,
+      "fitFrameConditionalPointM": [
+        -0.14104169364017372,
+        1.330859540168635,
+        0.6157642109600695
+      ],
+      "training": true,
+      "identity": "Candidate same fixed front fastener crown; no axis-centre interpretation"
+    },
+    {
+      "index": 9,
+      "name": "MarkingUpperInner",
+      "primaryNative": [
+        2022,
+        1958
+      ],
+      "secondaryNative": [
+        1797.34375,
+        1956.09375
+      ],
+      "crop": "Near",
+      "cropPixel": [
+        247,
+        111
+      ],
+      "sigmaNative": 6,
+      "fitFrameConditionalPointM": [
+        -0.26417738320876194,
+        1.3058133472769993,
+        0.7239921665618387
+      ],
+      "training": true,
+      "identity": "Candidate same fixed front fastener crown; no axis-centre interpretation"
+    },
+    {
+      "index": 10,
+      "name": "MarkingUpperOuter",
+      "primaryNative": [
+        2256,
+        1993
+      ],
+      "secondaryNative": [
+        1991.40625,
+        1982.109375
+      ],
+      "crop": "Near",
+      "cropPixel": [
+        385,
+        129.5
+      ],
+      "sigmaNative": 6,
+      "fitFrameConditionalPointM": [
+        -0.3947049596365717,
+        1.3056952331321816,
+        0.7245025536085472
+      ],
+      "training": true,
+      "identity": "Candidate same fixed front fastener crown; no axis-centre interpretation"
+    },
+    {
+      "index": 11,
+      "name": "MarkingLowerOuter",
+      "primaryNative": [
+        2320,
+        2239
+      ],
+      "secondaryNative": [
+        2050.46875,
+        2212.03125
+      ],
+      "crop": "Near",
+      "cropPixel": [
+        427,
+        293
+      ],
+      "sigmaNative": 6,
+      "fitFrameConditionalPointM": [
+        -0.4411282619087553,
+        1.3299390990501818,
+        0.6197415603693394
+      ],
+      "training": false,
+      "identity": "Candidate same fixed front fastener crown; no axis-centre interpretation"
+    }
+  ],
+  "imageIdentities": {
+    "2017": {
+      "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_Kubinka.jpg",
+      "sha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+      "size": [
+        4854,
+        3236
+      ]
+    },
+    "2014": {
+      "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_KubinkaOld.jpg",
+      "sha256": "a2842cfe2394259a70ab2bc7d5835696c944da040518b2c8870f9428f76ca136",
+      "size": [
+        4906,
+        3271
+      ]
+    }
+  },
+  "manualCrops": {
+    "Far": {
+      "box": [
+        500,
+        1800,
+        1450,
+        2350
+      ],
+      "width": 640,
+      "height": 370
+    },
+    "Near": {
+      "box": [
+        1450,
+        1800,
+        2350,
+        2250
+      ],
+      "width": 640,
+      "height": 320
+    }
+  },
+  "notBlindHoldout": true,
+  "conditionalPlaneSurveyed": false,
+  "trainingRmsBeforeNative": 3.9268413738374353,
+  "trainingRmsTrialNative": 2.706375428723248,
+  "heldFrontErrorBeforeNative": 12.371307262009678,
+  "heldFrontErrorTrialNative": 8.425887767200859,
+  "retainedRearSkinRmsBeforeNative": 11.990638228868406,
+  "retainedRearSkinRmsTrialNative": 20.091928709472267,
+  "trialRotationDeltaDegrees": 1.5149842565999774,
+  "cameraAdopted": false,
+  "geometryChanged": false,
+  "wholeReferenceAccepted": false,
+  "goalComplete": false
+}

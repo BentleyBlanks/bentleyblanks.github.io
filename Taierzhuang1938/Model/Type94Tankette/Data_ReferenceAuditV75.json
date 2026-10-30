@@ -1,0 +1,618 @@
+{
+  "schema": "Type94FrontPlaneSensitivityV1",
+  "revision": "ReferenceV75",
+  "status": "conditional-front-plane-camera-hypotheses-not-adopted",
+  "reference": "Data_GrayTrialV74.json",
+  "cases": [
+    {
+      "mode": "Baseline",
+      "planeYAtReferenceZM": 1.3229366687503983,
+      "planeDyDz": -0.23142073369466812,
+      "metrics": {
+        "front": [
+          {
+            "index": 6,
+            "name": "NearHitchUpper",
+            "observedNative": [
+              257,
+              467
+            ],
+            "predictedNative": [
+              280.0661651895219,
+              482.490153985701
+            ],
+            "errorNative": 27.784759258468295
+          },
+          {
+            "index": 7,
+            "name": "NearHitchMiddle",
+            "observedNative": [
+              252,
+              516
+            ],
+            "predictedNative": [
+              273.6508890194332,
+              526.8391214266985
+            ],
+            "errorNative": 24.212549403863424
+          },
+          {
+            "index": 8,
+            "name": "NearHitchBottom",
+            "observedNative": [
+              256,
+              561
+            ],
+            "predictedNative": [
+              269.34820377307085,
+              567.4410515202409
+            ],
+            "errorNative": 14.82098811327437
+          },
+          {
+            "index": 9,
+            "name": "MarkingUpperInner",
+            "observedNative": [
+              284,
+              467
+            ],
+            "predictedNative": [
+              307.5710604309054,
+              480.54151915336246
+            ],
+            "errorNative": 27.183959071818
+          },
+          {
+            "index": 10,
+            "name": "MarkingUpperOuter",
+            "observedNative": [
+              313,
+              468
+            ],
+            "predictedNative": [
+              336.1026844650264,
+              480.5626657195447
+            ],
+            "errorNative": 26.297425719480547
+          },
+          {
+            "index": 11,
+            "name": "MarkingLowerOuter",
+            "observedNative": [
+              322,
+              531
+            ],
+            "predictedNative": [
+              338.151681999519,
+              528.8566444648428
+            ],
+            "errorNative": 16.29327482011135
+          },
+          {
+            "index": 12,
+            "name": "MarkingBottomOuter",
+            "observedNative": [
+              320,
+              552
+            ],
+            "predictedNative": [
+              334.91272275770353,
+              554.5720133156927
+            ],
+            "errorNative": 15.132896369969288
+          }
+        ],
+        "upper": [
+          {
+            "name": "SidePairRow0Rear",
+            "errorNative": 3.2481387329261384
+          },
+          {
+            "name": "SidePairRow0Front",
+            "errorNative": 3.234824076890506
+          },
+          {
+            "name": "SidePairRow1Rear",
+            "errorNative": 2.6374010597554154
+          },
+          {
+            "name": "SidePairRow1Front",
+            "errorNative": 2.661522116145481
+          },
+          {
+            "name": "SidePairRow2Rear",
+            "errorNative": 2.4707402645904057
+          },
+          {
+            "name": "SidePairRow2Front",
+            "errorNative": 2.2722393722189884
+          },
+          {
+            "name": "SidePairRow3Rear",
+            "errorNative": 1.58014837953146
+          },
+          {
+            "name": "SidePairRow3Front",
+            "errorNative": 1.7023650621552489
+          },
+          {
+            "name": "SidePairRow4Rear",
+            "errorNative": 1.2585266899450975
+          },
+          {
+            "name": "SidePairRow4Front",
+            "errorNative": 1.3358407600527054
+          }
+        ],
+        "frontTrainingRmsNative": 24.529265437959044,
+        "frontHeldRmsNative": 15.723793386265035,
+        "upperRmsNative": 2.3470189869903386
+      },
+      "adopted": false
+    },
+    {
+      "mode": "PlaneOnly",
+      "planeYAtReferenceZM": 1.3986819112383142,
+      "planeDyDz": -0.05658030850829503,
+      "metrics": {
+        "front": [
+          {
+            "index": 6,
+            "name": "NearHitchUpper",
+            "observedNative": [
+              257,
+              467
+            ],
+            "predictedNative": [
+              256.92215233706577,
+              470.0657349530229
+            ],
+            "errorNative": 3.06672317968393
+          },
+          {
+            "index": 7,
+            "name": "NearHitchMiddle",
+            "observedNative": [
+              252,
+              516
+            ],
+            "predictedNative": [
+              255.16469065516026,
+              516.5890261676047
+            ],
+            "errorNative": 3.2190400384247764
+          },
+          {
+            "index": 8,
+            "name": "NearHitchBottom",
+            "observedNative": [
+              256,
+              561
+            ],
+            "predictedNative": [
+              255.0647347866706,
+              559.2918497361593
+            ],
+            "errorNative": 1.9474337840150413
+          },
+          {
+            "index": 9,
+            "name": "MarkingUpperInner",
+            "observedNative": [
+              284,
+              467
+            ],
+            "predictedNative": [
+              283.28921521089865,
+              467.6437967003314
+            ],
+            "errorNative": 0.959004279331143
+          },
+          {
+            "index": 10,
+            "name": "MarkingUpperOuter",
+            "observedNative": [
+              313,
+              468
+            ],
+            "predictedNative": [
+              310.8283216237281,
+              467.26577714918415
+            ],
+            "errorNative": 2.292437603213495
+          },
+          {
+            "index": 11,
+            "name": "MarkingLowerOuter",
+            "observedNative": [
+              322,
+              531
+            ],
+            "predictedNative": [
+              317.7392693579748,
+              517.7644725009134
+            ],
+            "errorNative": 13.904424252121
+          },
+          {
+            "index": 12,
+            "name": "MarkingBottomOuter",
+            "observedNative": [
+              320,
+              552
+            ],
+            "predictedNative": [
+              317.23641828042963,
+              544.7884378534656
+            ],
+            "errorNative": 7.722953613357524
+          }
+        ],
+        "upper": [
+          {
+            "name": "SidePairRow0Rear",
+            "errorNative": 3.2481387329261384
+          },
+          {
+            "name": "SidePairRow0Front",
+            "errorNative": 3.234824076890506
+          },
+          {
+            "name": "SidePairRow1Rear",
+            "errorNative": 2.6374010597554154
+          },
+          {
+            "name": "SidePairRow1Front",
+            "errorNative": 2.661522116145481
+          },
+          {
+            "name": "SidePairRow2Rear",
+            "errorNative": 2.4707402645904057
+          },
+          {
+            "name": "SidePairRow2Front",
+            "errorNative": 2.2722393722189884
+          },
+          {
+            "name": "SidePairRow3Rear",
+            "errorNative": 1.58014837953146
+          },
+          {
+            "name": "SidePairRow3Front",
+            "errorNative": 1.7023650621552489
+          },
+          {
+            "name": "SidePairRow4Rear",
+            "errorNative": 1.2585266899450975
+          },
+          {
+            "name": "SidePairRow4Front",
+            "errorNative": 1.3358407600527054
+          }
+        ],
+        "frontTrainingRmsNative": 2.4386253318342415,
+        "frontHeldRmsNative": 11.246711214773914,
+        "upperRmsNative": 2.3470189869903386
+      },
+      "adopted": false
+    },
+    {
+      "mode": "CameraOnly",
+      "planeYAtReferenceZM": 1.3229366687503983,
+      "planeDyDz": -0.23142073369466812,
+      "metrics": {
+        "front": [
+          {
+            "index": 6,
+            "name": "NearHitchUpper",
+            "observedNative": [
+              257,
+              467
+            ],
+            "predictedNative": [
+              261.21148260589564,
+              472.04627277243856
+            ],
+            "errorNative": 6.572781346858895
+          },
+          {
+            "index": 7,
+            "name": "NearHitchMiddle",
+            "observedNative": [
+              252,
+              516
+            ],
+            "predictedNative": [
+              253.8486947282248,
+              516.3320123678469
+            ],
+            "errorNative": 1.8782716551578829
+          },
+          {
+            "index": 8,
+            "name": "NearHitchBottom",
+            "observedNative": [
+              256,
+              561
+            ],
+            "predictedNative": [
+              248.5250951717942,
+              556.8559083562092
+            ],
+            "errorNative": 8.546794588784236
+          },
+          {
+            "index": 9,
+            "name": "MarkingUpperInner",
+            "observedNative": [
+              284,
+              467
+            ],
+            "predictedNative": [
+              286.447789336135,
+              468.1291154234144
+            ],
+            "errorNative": 2.6956584118705433
+          },
+          {
+            "index": 10,
+            "name": "MarkingUpperOuter",
+            "observedNative": [
+              313,
+              468
+            ],
+            "predictedNative": [
+              312.6244520644874,
+              466.0745779131511
+            ],
+            "errorNative": 1.961704989134056
+          },
+          {
+            "index": 11,
+            "name": "MarkingLowerOuter",
+            "observedNative": [
+              322,
+              531
+            ],
+            "predictedNative": [
+              312.9704094997522,
+              513.7769755386298
+            ],
+            "errorNative": 19.4464926451821
+          },
+          {
+            "index": 12,
+            "name": "MarkingBottomOuter",
+            "observedNative": [
+              320,
+              552
+            ],
+            "predictedNative": [
+              309.16448239851303,
+              539.5425423759269
+            ],
+            "errorNative": 16.51050248017032
+          }
+        ],
+        "upper": [
+          {
+            "name": "SidePairRow0Rear",
+            "errorNative": 1.1845911237595168
+          },
+          {
+            "name": "SidePairRow0Front",
+            "errorNative": 1.5096047790407392
+          },
+          {
+            "name": "SidePairRow1Rear",
+            "errorNative": 0.9661737963143112
+          },
+          {
+            "name": "SidePairRow1Front",
+            "errorNative": 1.016328171754849
+          },
+          {
+            "name": "SidePairRow2Rear",
+            "errorNative": 0.9500550097727312
+          },
+          {
+            "name": "SidePairRow2Front",
+            "errorNative": 0.9664868625426916
+          },
+          {
+            "name": "SidePairRow3Rear",
+            "errorNative": 1.0203846391650369
+          },
+          {
+            "name": "SidePairRow3Front",
+            "errorNative": 0.984271861255019
+          },
+          {
+            "name": "SidePairRow4Rear",
+            "errorNative": 1.6368751772885577
+          },
+          {
+            "name": "SidePairRow4Front",
+            "errorNative": 1.1153879173707135
+          }
+        ],
+        "frontTrainingRmsNative": 5.11648155522795,
+        "frontHeldRmsNative": 18.038330969727102,
+        "upperRmsNative": 1.1583913550602716
+      },
+      "adopted": false
+    },
+    {
+      "mode": "Joint",
+      "planeYAtReferenceZM": 1.4665333022088758,
+      "planeDyDz": -0.012252421666509517,
+      "metrics": {
+        "front": [
+          {
+            "index": 6,
+            "name": "NearHitchUpper",
+            "observedNative": [
+              257,
+              467
+            ],
+            "predictedNative": [
+              255.20579211977224,
+              468.70368194926965
+            ],
+            "errorNative": 2.474209793396394
+          },
+          {
+            "index": 7,
+            "name": "NearHitchMiddle",
+            "observedNative": [
+              252,
+              516
+            ],
+            "predictedNative": [
+              254.65339092230403,
+              515.799128248911
+            ],
+            "errorNative": 2.660983436053481
+          },
+          {
+            "index": 8,
+            "name": "NearHitchBottom",
+            "observedNative": [
+              256,
+              561
+            ],
+            "predictedNative": [
+              255.78134225795566,
+              559.0651187544909
+            ],
+            "errorNative": 1.9471971246843245
+          },
+          {
+            "index": 9,
+            "name": "MarkingUpperInner",
+            "observedNative": [
+              284,
+              467
+            ],
+            "predictedNative": [
+              283.5519412943782,
+              467.18734455326046
+            ],
+            "errorNative": 0.48564862330685915
+          },
+          {
+            "index": 10,
+            "name": "MarkingUpperOuter",
+            "observedNative": [
+              313,
+              468
+            ],
+            "predictedNative": [
+              313.1415953766086,
+              467.7837753481646
+            ],
+            "errorNative": 0.25846150726610406
+          },
+          {
+            "index": 11,
+            "name": "MarkingLowerOuter",
+            "observedNative": [
+              322,
+              531
+            ],
+            "predictedNative": [
+              321.99160521349035,
+              519.0623877853949
+            ],
+            "errorNative": 11.937615166302256
+          },
+          {
+            "index": 12,
+            "name": "MarkingBottomOuter",
+            "observedNative": [
+              320,
+              552
+            ],
+            "predictedNative": [
+              322.22119523132073,
+              546.3480601614688
+            ],
+            "errorNative": 6.0727367960433165
+          }
+        ],
+        "upper": [
+          {
+            "name": "SidePairRow0Rear",
+            "errorNative": 1.307133387049826
+          },
+          {
+            "name": "SidePairRow0Front",
+            "errorNative": 1.3091295969902887
+          },
+          {
+            "name": "SidePairRow1Rear",
+            "errorNative": 0.83399264637377
+          },
+          {
+            "name": "SidePairRow1Front",
+            "errorNative": 0.7193630840240386
+          },
+          {
+            "name": "SidePairRow2Rear",
+            "errorNative": 0.6723480297339519
+          },
+          {
+            "name": "SidePairRow2Front",
+            "errorNative": 0.6775098506809664
+          },
+          {
+            "name": "SidePairRow3Rear",
+            "errorNative": 0.856653957676475
+          },
+          {
+            "name": "SidePairRow3Front",
+            "errorNative": 0.9233505702685625
+          },
+          {
+            "name": "SidePairRow4Rear",
+            "errorNative": 1.4731447571353422
+          },
+          {
+            "name": "SidePairRow4Front",
+            "errorNative": 1.2031143491444087
+          }
+        ],
+        "frontTrainingRmsNative": 1.859934435786737,
+        "frontHeldRmsNative": 9.470606845729266,
+        "upperRmsNative": 1.0368504393781124
+      },
+      "adopted": false
+    }
+  ],
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV75\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV75\\Rebuild",
+  "primaryCameraFixed": true,
+  "secondaryIntrinsicsFixed": true,
+  "trainingFrontIds": [
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "heldFrontIds": [
+    11,
+    12
+  ],
+  "upperTrainingCrownCount": 10,
+  "geometryChanged": false,
+  "cameraAdopted": false,
+  "planeAdopted": false,
+  "wholeReferenceAccepted": false,
+  "goalComplete": false,
+  "remaining": [
+    "Independently review front-head correspondences in a third source image",
+    "Resolve front-plane depth/tilt against noncoplanar rigid body anchors",
+    "Promote geometry and rebake PBR/game only after multi-view acceptance"
+  ]
+}

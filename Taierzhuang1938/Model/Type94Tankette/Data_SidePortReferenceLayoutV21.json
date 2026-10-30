@@ -1,0 +1,21 @@
+{
+  "status": "Photo-derived local layout estimates; no whole-camera or absolute-dimension acceptance",
+  "primary": "Reference_Kubinka.jpg",
+  "supplement": "Reference_KubinkaOld.jpg",
+  "evidence": "Native crops show two lower cover fasteners, two moving hinge leaves and paired fixed mounting caps; the edge fitting's function is unverified",
+  "hingeCrossFractions": [-0.32, 0.32],
+  "coverFasteners": {
+    "crossFractions": [-0.11, 0.11],
+    "downFraction": 0.78
+  },
+  "edgeFitting": {
+    "crossFraction": -0.41,
+    "topDownFraction": 0.27,
+    "bottomDownFraction": 0.49
+  },
+  "limits": [
+    "Hinges project from the cover and are not accepted by a coplanar photo warp",
+    "Exact cross positions, local dimensions and concealed sections are estimates",
+    "The opposite turret port is a shared-layout inference, not a visible primary-photo measurement"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "schema": "Type94ProjectionStabilitySitesV1",
+  "geometrySha256": "6d47adf83ccd67739e332b9baa0007ba45389160b4a2c367b38d9343505d4c39",
+  "referenceSha256": "acf7627f610d9b1cf009f9b479753a0aa2c497658c13ecf86fd37886b8904f92",
+  "roles": {
+    "Paint": {
+      "uvSha256": "218d88196dbe3e549bc6996558deec99af557d2f32900233955bcbc8a5715b70",
+      "sites": [
+        {
+          "pixelBottomLeft": [
+            2984,
+            1092
+          ],
+          "observedPngPixel": [
+            2984,
+            3003
+          ],
+          "reason": "Independent direct bakes differ by one blue byte at this actual used sample; four gutter copies follow it",
+          "method": "Re-evaluate the nearest actual high triangle using the same float shader replay as genuine projection misses; never copy a prior output color"
+        }
+      ]
+    }
+  },
+  "scope": "Explicit stable-UV/source binding and actual geometric resampling; no synthesized values and no relaxation of strict replay equality."
+}

@@ -1,0 +1,90 @@
+{
+  "schema": "Type94SourceVerificationV1",
+  "revision": "VerificationV57",
+  "status": "final-source-reopen-reexport-independent-import-and-cold-construction-verified",
+  "materialReference": "Data_SurfaceStudyV56.json",
+  "materialSha256": "283822f415509a17cd5dff598c030da251476d24321177e4a1de03a6d635e569",
+  "sourceBlendSha256": "f86a1ecdc197f43c2e08a58e7d1ae7edf9a20d267f3ab86c17f90e4da64bc815",
+  "geometryReference": "Data_GrayTrialV55.json",
+  "geometrySha256": "bf2743a1c439a531b0c3911d6828b5fcab9677874ac7adb39b12abc5d8869c71",
+  "sourceChecks": 29,
+  "sourcePackedImageCount": 13,
+  "sourceAuthoringGraphsRetained": true,
+  "sourceFileUnmodified": true,
+  "sourceReexport": {
+    "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\VerificationV57\\Exports\\Model_Type94TanketteFinalSourceReexportV57.glb",
+    "sha256": "6e243c464efe05d98651b5747fcaae66a199976641b9a8dec81ad1c2fc5d2c55",
+    "wholeFileByteIdentical": false,
+    "decodedJsonIdentical": true,
+    "exactNamedSurfaces": 237,
+    "allNonTangentBufferViewsIdentical": true,
+    "exactUvNormalPositionAndIndexBuffers": true,
+    "imagePixelsAndBindingsIdentical": true,
+    "tangentEntriesWithExportRounding": 2,
+    "maximumTangentComponentDifference": 0.00010001659393310547,
+    "maximumTangentDirectionDifferenceDegrees": 0.0048520598572430315,
+    "handednessUnchanged": true
+  },
+  "actualImport": {
+    "meshOwners": 237,
+    "images": 12,
+    "matchedViews": [
+      "Full",
+      "Vent"
+    ],
+    "sourceAndImportPreviewsInspected": true,
+    "renderDifference": [
+      {
+        "view": "Full",
+        "meanAbsoluteChannelError": 0.044082771590465024,
+        "channelFractionAbove2": 0.0019248852090660415,
+        "maximumChannelError": 35.0
+      },
+      {
+        "view": "Vent",
+        "meanAbsoluteChannelError": 0.0880318239546698,
+        "channelFractionAbove2": 0.005605522176631497,
+        "maximumChannelError": 50.0
+      }
+    ],
+    "diagnosticBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\VerificationV57\\Scene_Type94ActualPbrReimportV57.blend",
+    "groundAndCameraAreDiagnosticOnly": true
+  },
+  "coldConstruction": {
+    "defaultV37ByteIdentical": true,
+    "previousV54ByteIdentical": true,
+    "currentV55ByteIdentical": true,
+    "currentNamedSurfaces": 237,
+    "scope": "Factory-started geometry and mechanism recipe; full fresh UV/PBR shader baking was not rerun"
+  },
+  "reports": {
+    "source": "Data_FinalSourceReopenV57.json",
+    "sourceExport": "Data_FinalSourceExportIdentityV57.json",
+    "sourceGeometry": "Data_FinalSourceReexportV57.json",
+    "materials": "Data_SourceReexportMaterialsV57.json",
+    "actualImport": "Data_ActualPbrReimportV57.json",
+    "renderDifference": "Data_MatchedRenderDifferenceV57.json",
+    "container": "Data_ReexportContainerIdentityV57.json",
+    "bufferDifference": "Data_ReexportBufferDifferenceV57.json",
+    "tangentDelta": "Data_ReexportTangentDeltaV57.json",
+    "default": "Data_DefaultV37V57.json",
+    "previous": "Data_PreviousV54V57.json",
+    "cold": "Data_ColdV55V57.json"
+  },
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\VerificationV57\\Acceptance",
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV57.json",
+  "published": false,
+  "canonicalGameReplaced": false,
+  "strictReferenceMatched": false,
+  "gameBudgetAccepted": false,
+  "complete": false,
+  "goalComplete": false,
+  "userGoalRound": 2,
+  "pauseAfterUserGoalRound": 3,
+  "remaining": [
+    "Continue whole-reference geometry/surface alignment",
+    "Produce the new below80000triangle/3mm bidirectional-distance game derivative",
+    "Complete final end-to-end acceptance before any completion claim"
+  ]
+}

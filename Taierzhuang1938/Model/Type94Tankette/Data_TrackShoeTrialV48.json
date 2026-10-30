@@ -1,0 +1,41 @@
+{
+  "schema": "Type94TrackShoeLayoutV1",
+  "revision": "ShapeV48TrackTrial",
+  "status": "Local cast-shoe shape trial; not a measured track section",
+  "sourceGray": "Data_GrayStudyV37.json",
+  "sourceSurface": "Data_SurfaceStudyV44.json",
+  "overallWidthM": 0.164,
+  "sideWebCenterXM": 0.05166,
+  "sideWebWidthM": 0.03526,
+  "centerWebWidthM": 0.03362,
+  "crossBeamWidthM": 0.145,
+  "crossBeamDepthM": 0.018,
+  "frontBeamInsetFromHalfPitchM": 0.011,
+  "outerEyeRadiusM": 0.0105,
+  "innerEyeRadiusM": 0.004,
+  "contactPadBevelM": 0.0055,
+  "rearCrossWebHeightM": 0.008,
+  "eyeCenterYInsetM": 0.001,
+  "eyeBottomZM": -0.003,
+  "eyeTopZM": 0.0115,
+  "contactTopZM": 0.014,
+  "references": [
+    "References/Reference_Kubinka.jpg: near front-facing shoe rows around native y=2150..2460",
+    "References/AdditionalV38/Reference_TourGuideType94.jpg: near front track segment",
+    "References/PatriotOfficial/Reference_PatriotOfficial1.jpg: frontal shoe structure"
+  ],
+  "inferred": [
+    "Visible two-window cast frame, segmented raised cross-member and end-eye outlines guide this trial",
+    "Exact eye section, whether the dark end feature is fully open, and its historical function are unverified",
+    "164mm is retained as the authored overall envelope for comparison; the provisional specification's width definition and museum pin span are not resolved",
+    "Pad dimensions, cast fillets, hidden pin/eye construction and section thickness remain modeling estimates"
+  ],
+  "preserved": [
+    "Retained V37 track path, link count, pitch and sprocket solver",
+    "All wheel positions, axial sections and hull/cabin/turret geometry",
+    "Retained inner guide stations and hinge-pin nominal section"
+  ],
+  "complete": false,
+  "strictReferenceMatched": false,
+  "physicalSourceGeometryAccepted": false
+}

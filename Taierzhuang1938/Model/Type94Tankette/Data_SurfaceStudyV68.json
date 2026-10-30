@@ -1,0 +1,158 @@
+{
+  "schema": "Type94MaterialPreviewV1",
+  "revision": "SurfaceV68Preview",
+  "status": "local-layered-metal-wear-preview-verified",
+  "sourceReference": "Data_SurfaceStudyV66.json",
+  "referenceSha256": "938b8e4976fe276e24daaf907aa9f7c3a6dd6d9d9a93f99677505961ac262c4c",
+  "referenceSourceBlendSha256": "f9fc0cccca86ad920884809676c42215961b602277c45023aca0a6b0bd23fd59",
+  "sourceProducer": "Taierzhuang1938/_blender/Script_BuildType94WearPreviewV68.mjs",
+  "blenderProducer": "Taierzhuang1938/_blender/Script_Type94WearPreviewV68.py",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV68\\Scene_Type94TanketteHighSurfaceV68Preview.blend",
+  "sourceBlendSha256": "4881aaf77fa1a01b8cc4a49caee2dfe7fc5c667ad9648d7cd92fc218a5add99e",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV68\\Exports\\Model_Type94TanketteHighSurfaceV68Preview.glb",
+  "sha256": "1b792411d2e8aa6012c1542b0b9d1f986d9c565901e99989c5b3066041aabb83",
+  "triangles": 624036,
+  "meshNodes": 237,
+  "poseNodes": 292,
+  "linksPerSide": 80,
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "uvGenerationMode": "Checkpoint",
+  "uvCheckpoint": "Data_SurfaceStudyV66.json",
+  "all237PositionUvCornerSetsExact": true,
+  "geometryAndRigUnchanged": true,
+  "runtimePbrImages": 12,
+  "textureSizes": {
+    "Paint": 4096,
+    "Track": 2048,
+    "Steel": 2048,
+    "Rubber": 1024
+  },
+  "normalStrengths": {
+    "Paint": 1,
+    "Track": 1.25,
+    "Steel": 1.15,
+    "Rubber": 1
+  },
+  "underlyingPaintNormalStrength": 0.65,
+  "layeredWear": {
+    "scope": "Art-directed inferred wear on actual convex edges, coplanar metric handling marks and authored track contact lands. Paint loss height200micrometres, no geometric displacement or historical damage-position claim.",
+    "chipSegments": 83664,
+    "scuffSegments": 129102,
+    "scratchSegments": 6726,
+    "opaqueCoreAtlasFraction": 0.0035393238067626953,
+    "baselineOpaqueAtlasFraction": 0.0008755922317504883,
+    "opaqueCoverageRatio": 4.042205582028591,
+    "bareSteelMetalness": 0.98,
+    "bareSteelRoughness": 0.24,
+    "scuffedCoatingRoughness": 0.63,
+    "paintLossHeightM": 0.0002,
+    "flatScratchHeightM": 8e-06,
+    "flatScratchPigmentApplied": false,
+    "trackPolishLimitedToActualContactFaces": true,
+    "paintAndTrackAoExact": true,
+    "rubberAndGunSteelPixelsExact": true,
+    "trackNormalPixelsExact": true,
+    "placementHistoricallyAccepted": false
+  },
+  "validation": {
+    "raw": {
+      "passed": true,
+      "checks": 1159,
+      "report": "Data_MaterialRawV68.json"
+    },
+    "geometry": {
+      "passed": true,
+      "checks": 237,
+      "report": "Data_MaterialGeometryV68.json"
+    },
+    "uv": {
+      "passed": true,
+      "checks": 237,
+      "report": "Data_WearUvV68.json"
+    },
+    "pixels": {
+      "passed": true,
+      "checks": 9,
+      "report": "Data_WearPixelsV68.json"
+    },
+    "ui": {
+      "passed": true,
+      "checks": 494,
+      "report": "Data_MaterialUiV68.json"
+    },
+    "mechanisms": {
+      "passed": true,
+      "checks": 937,
+      "report": "Data_WearMechanismBrowserV68.json"
+    },
+    "comparison": {
+      "passed": true,
+      "checks": 6,
+      "report": "Data_WearCompareV68.json"
+    },
+    "comparisonControls": {
+      "passed": true,
+      "checks": 5,
+      "report": "Data_WearControlsV68.json"
+    },
+    "rasterReplay": {
+      "passed": true,
+      "checks": 8,
+      "report": "Data_WearRasterReplayV68.json"
+    },
+    "sourceReopen": {
+      "passed": true,
+      "checks": 261,
+      "report": "Verification/Acceptance/Data_FinalSourceReopenV68.json"
+    },
+    "sourceReexport": {
+      "passed": true,
+      "checks": 237,
+      "report": "Verification/Acceptance/Data_FinalSourceReexportV68.json"
+    },
+    "sourceMaterialPixels": {
+      "passed": true,
+      "checks": 12,
+      "report": "Verification/Acceptance/Data_SourceReexportMaterialsV68.json"
+    }
+  },
+  "matchedSourceImportRendersInspected": [
+    "Full",
+    "Wheel"
+  ],
+  "runtimeComparisonViews": [
+    "full",
+    "vent",
+    "track",
+    "weapon",
+    "wheel",
+    "wearDetail"
+  ],
+  "comparisonUsesSameLiveGeometryUvCameraLighting": true,
+  "comparisonBaseline": "V66",
+  "editableUnderlyingNormalAndMasksArchived": true,
+  "rejectedRegularScratchVersion": "Versions/RegularScratchRejected",
+  "retainedFirstColourPass": "Versions/FirstColourPass",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94WearReviewV68/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV68\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV68\\RecipeSnapshot",
+  "canonicalSha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+  "canonicalGameReplaced": false,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV68.json",
+  "wholeReferenceAccepted": false,
+  "finalPbrReferenceAccepted": false,
+  "gameDerivativeForThisRevisionProduced": false,
+  "complete": false,
+  "goalComplete": false,
+  "published": false,
+  "remaining": [
+    "Continue full primary/multi-view body/running-gear alignment; do not treat this wear study as shape acceptance",
+    "Accept final reference appearance and project final low tangent-space PBR",
+    "Produce final accepted-revision game derivative below80000triangles/within3mm and complete end-to-end acceptance"
+  ]
+}

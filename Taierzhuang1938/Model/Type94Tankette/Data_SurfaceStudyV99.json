@@ -1,0 +1,44 @@
+{
+  "schema": "Type94MaterialPreviewV1",
+  "revision": "SurfaceV99Current",
+  "status": "local-complete-current-PBR-game-input",
+  "geometryReference": "Data_GrayTrialV98.json",
+  "materialReference": "Data_SurfaceStudyV96.json",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV99\\Scene_Type94TanketteHighSurfaceV99Current.blend",
+  "sourceBlendSha256": "b309ee0d8c77ec55e921c43164f954b80d0a53f16602f03d9ae700baff57c34b",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV99\\Exports\\Model_Type94TanketteHighSurfaceV99Current.glb",
+  "sha256": "b5949f3f09aafb0850cd278cc0627d96e0ddd7ea141f5df897c8afcc126e4dac",
+  "triangles": 694476,
+  "meshOwners": 240,
+  "poseNodes": 296,
+  "runtimePbrImages": 12,
+  "textureSizes": {
+    "Paint": 4096,
+    "Track": 2048,
+    "Steel": 2048,
+    "Rubber": 1024
+  },
+  "patchPixels": [
+    96,
+    96,
+    128,
+    128
+  ],
+  "allOld239MeshesAndUvPreserved": true,
+  "oldPixelMapsExactOutsideNewTile": true,
+  "validation": {
+    "binaryChecks": 992,
+    "actualGlbImport": true,
+    "sourceReexportContainerExact": false,
+    "maximumTangentComponentDifference": 0.00010001659393310547
+  },
+  "wholeReferenceAccepted": false,
+  "gameDerivativeAccepted": false,
+  "canonicalGameReplaced": false,
+  "published": false,
+  "goalComplete": false,
+  "producer": "Taierzhuang1938/_blender/Script_BuildType94HighV99.mjs",
+  "verifier": "Taierzhuang1938/_import/Script_VerifyType94LugPbrV99.py",
+  "recipeInputStatus": "Retained immutable input for V100 and V101; use TYPE94_HIGH_ROOT for isolated replay",
+  "blenderOwnedInstancesAfterCleanup": 0
+}

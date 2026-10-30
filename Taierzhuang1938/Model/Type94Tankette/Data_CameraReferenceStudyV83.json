@@ -1,0 +1,138 @@
+{
+  "schema": "Type94CameraTurretPoseReviewV1",
+  "revision": "ReferenceV83",
+  "status": "unadopted-camera-turret-pose-sensitivity-fixed-body-controls-unresolved",
+  "reference": "Data_ReferenceAuditV82.json",
+  "sourceManifest": "Data_GrayTrialV81.json",
+  "sourceGlbSha256": "6322b72bde0ae1555b37e25d25c951b944dbd47e94564daf06bc5bb26d54b2d0",
+  "producer": "Taierzhuang1938/_import/Script_Type94CameraTurretStudyV83.py",
+  "upperControlCount": 10,
+  "upperControlsAllOnMovableTurret": true,
+  "fixedFrontPlane": true,
+  "fixedIntrinsicsAndDistortion": true,
+  "newParameters": "Six camera pose parameters plus independent turret-yaw delta",
+  "residualWeightsNativePixels": {
+    "front": 3,
+    "turret": 2
+  },
+  "weightingScope": "Retained V75 sensitivity weights for a controlled added-DOF comparison; not a statistical uncertainty estimate",
+  "bestTrial": {
+    "turretYawDeltaDegrees": 6.461257631864087,
+    "frontTrainingRmsNative": 5.113353618134668,
+    "frontHeldRmsNative": 16.36824732753606,
+    "turretTrainingRmsNative": 0.797981139934488,
+    "jacobianCondition": 100.98337514067627,
+    "boundsReached": false,
+    "camera": {
+      "rotationCameraFromBlender": [
+        [
+          -0.6899380434279793,
+          -0.7234615945612012,
+          -0.024265560486745844
+        ],
+        [
+          0.011881527900943947,
+          0.0221993113849296,
+          -0.999682959677104
+        ],
+        [
+          0.7237709067968338,
+          -0.6900076171818678,
+          -0.0067203203413263805
+        ]
+      ],
+      "translationCameraFromBlender": [
+        -0.21874676064930565,
+        0.671794955538112,
+        4.227098987392476
+      ],
+      "k": [
+        [
+          1351.1864129006854,
+          0.0,
+          720.0
+        ],
+        [
+          0.0,
+          1351.1864129006854,
+          480.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "distortion": [
+        0.053587974899040075,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "turretYawRadians": 0.09790804711527376
+    }
+  },
+  "multiStartSeeds": 3,
+  "allSeedsConverged": true,
+  "rawHomographyDiagnostic": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV83\\Acceptance\\Data_FrontHomographyV83.json",
+  "rimDiagnostic": {
+    "validForAcceptance": false,
+    "reason": "Native overlay does not reliably separate front outer rim, cast-web edge and tooth/track contours. Neither score validates a camera.",
+    "report": "Data_DriveRimCameraCompareV83.json"
+  },
+  "actualFullViewsInspected": [
+    "7Base",
+    "7Pose"
+  ],
+  "browser": {
+    "passed": true,
+    "actualGlbRenders": 4,
+    "report": "Data_CameraBrowserV83.json"
+  },
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94CameraReviewV83/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV83\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV83\\Rebuild",
+  "cameraAdopted": false,
+  "turretPoseAdopted": false,
+  "geometryChanged": false,
+  "physicalCalibrationAccepted": false,
+  "wholeReferenceAccepted": false,
+  "goalComplete": false,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV83\\Acceptance\\Data_OwnedBlenderCleanupV83.json",
+  "published": false,
+  "remaining": [
+    "Establish named fixed-body photographic controls before adopting a camera/turret-pose change",
+    "Resolve actual casing retaining seam, joint fittings and near-side corner/track envelopes; do not equate model crowns with photo identities",
+    "Keep ear profile/depth/function and third-camera correspondence uncertainty explicit",
+    "Complete whole body/running-gear reference acceptance",
+    "Bake final accepted high PBR and game derivative and perform final source/rebuild/motion acceptance"
+  ],
+  "inputIdentity": [
+    {
+      "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV60\\Inputs\\Data_GeneratorEnvelopeAuditV52.json",
+      "sha256": "e46e69bbff97bed69d48b9ab53650df94f4c4396ea711509f1f4cc7ab861ea7b"
+    },
+    {
+      "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV60\\Acceptance\\Data_ActualProjectionV60.json",
+      "sha256": "130a65c0a452d46b79668ef237e04c0eb1ddaaadb5971482ab74bc0333d13c82"
+    },
+    {
+      "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV73\\Inputs\\Data_FrontFastenerObservationsV73.json",
+      "sha256": "798a16a5c8fbdc00def259c0520e8cc379babc657f4ed5909c63636d855bfa71"
+    },
+    {
+      "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV73\\Inputs\\Data_FrontSecondaryObservationsV73.json",
+      "sha256": "87862bea21ae74d1b0ddce4eb2a947b6294c502b5b44c752165c91bb2046578d"
+    },
+    {
+      "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV75\\Acceptance\\Data_FrontPlaneSensitivityV75.json",
+      "sha256": "1357c728ac332010c4ac65ca4af0d3080a87d046a62d3ecf0f8ce590e1a37104"
+    },
+    {
+      "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial7.jpg",
+      "sha256": "f8d11457481fbdd4435ffb184aee2f178a5843ddb0336d88fb91590cf470bf34"
+    }
+  ]
+}

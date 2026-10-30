@@ -1,0 +1,87 @@
+{
+  "schema": "Type94MaterialPreviewV1",
+  "revision": "SurfaceV96Preview",
+  "status": "local-current-structure-PBR-preview-verified",
+  "geometryReference": "Data_GrayTrialV95.json",
+  "materialReference": "Data_SurfaceStudyV92.json",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV96\\Scene_Type94TanketteHighSurfaceV96Preview.blend",
+  "sourceBlendSha256": "84a43826c62f91c7f16f4a983096bc41e0583c4a230280b509ebcab052927725",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV96\\Exports\\Model_Type94TanketteHighSurfaceV96Preview.glb",
+  "sha256": "1cea6467635b37be5d8132aa0b231d3d703fe115e66d0d6ae9a5a6ba0ae1fe46",
+  "producer": "Taierzhuang1938/_blender/Script_BuildType94TowPbrV96.mjs",
+  "verifier": "Taierzhuang1938/_import/Script_VerifyType94TowPbrV96.py",
+  "triangles": 694288,
+  "meshOwners": 239,
+  "poseNodes": 295,
+  "linksPerSide": 80,
+  "runtimePbrImages": 12,
+  "textureSizes": {
+    "Paint": 4096,
+    "Track": 2048,
+    "Steel": 2048,
+    "Rubber": 1024
+  },
+  "geometryNormalsAndRigExactToV95": true,
+  "retainedOtherMeshOwners": 236,
+  "retainedHullUvTriangles": 37068,
+  "patchPixels": [
+    1792,
+    96,
+    768,
+    320
+  ],
+  "sourcePaintFootprintGuardPixels": 12,
+  "oldPaintBaseNormalRoughnessMetalnessExactOutsidePatch": true,
+  "otherThreeMaterialFamiliesExact": true,
+  "currentPaintAoRefreshed": true,
+  "editableTileMastersPacked": 3,
+  "sourceAuthoringTextsArchived": true,
+  "contactWearScope": [
+    "Hook mouth",
+    "Pin ends",
+    "Spring",
+    "Gate edges"
+  ],
+  "contactWearPlacementInferred": true,
+  "validation": {
+    "binaryChecks": 999,
+    "sourceReopenAndActualGlbImport": true,
+    "browserChecks": 22,
+    "allTenHatchControlsMoveActualExportedGeometry": true,
+    "driverFinishPixelExactWithAoIsolated": true,
+    "referenceGpuCases": 3,
+    "referenceGpuMarkers": 27,
+    "maximumProjectionErrorScreenPixels": 0.23527472691797555,
+    "nativeMotion": "V95full native proofs inherited through exact geometry/rig parity; actual browser controls freshly checked"
+  },
+  "sourceReexportContainerExact": false,
+  "sourceTangentPrecision": {
+    "digits": 4,
+    "changedCorners": 34,
+    "maxComponentDifference": 0.00010001659393310547,
+    "handednessExact": true
+  },
+  "actualViewsInspected": [
+    "TowStudio",
+    "TowPrimaryReference"
+  ],
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94TowPbrReviewV96/?view=tow",
+  "localMaterialReferencePreview": "http://127.0.0.1:8114/tmp/Type94TowMaterialReferenceV96/?view=tow",
+  "referenceLightingPhotometricallyCalibrated": false,
+  "wholeReferenceAccepted": false,
+  "finalPbrReferenceAccepted": false,
+  "currentGameDerivativeProduced": false,
+  "canonicalGameReplaced": false,
+  "published": false,
+  "goalComplete": false,
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV96\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV96\\Rebuild",
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV96.json",
+  "remaining": [
+    "Complete fixed-body and running-gear reference acceptance, especially front casing/near-corner/track envelopes and unresolved camera correspondence",
+    "Retain hidden hook/bearing sections and operating stops as inferred; visible topology evidence is not an exact metric survey",
+    "Build the current game derivative below80000triangles with its continuous3mm surface gate and full source/PBR/motion replay",
+    "Complete end-to-end reference/source/runtime acceptance before canonical replacement"
+  ]
+}

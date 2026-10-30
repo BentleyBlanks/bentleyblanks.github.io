@@ -1,0 +1,28 @@
+"""Compose the proven unchanged surfaces with actual new twelve-map PBR."""
+import ast,hashlib,importlib.util,io,json,os,struct,numpy as np
+from pathlib import Path
+from PIL import Image
+repo=Path(__file__).resolve().parents[2];base=Path(r'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette');root=Path(os.environ.get('TYPE94_GAME_ROOT',str(base/'GameWearV103')));acc=root/'Acceptance';checks=[]
+def Check(value,label):checks.append(dict(passed=bool(value),check=label))
+def Module(name):
+    p=Path(__file__).with_name(name);s=importlib.util.spec_from_file_location(p.stem,p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
+prior=Module('Script_VerifyType94GameV100.py');Read=prior.Read;Same=prior.Same;Mesh=prior.Mesh;canonical=Module('Script_VerifyType94GeometryReplay.py');path=Path(__file__).with_name('Script_VerifyType94WearV77.py');syntax=ast.parse(path.read_text());scope=dict(Path=Path,hashlib=hashlib,struct=struct,json=json,np=np,Image=Image,io=io,Check=Check);exec(compile(ast.Module(body=[n for n in syntax.body if isinstance(n,ast.FunctionDef)and n.name in ['Read','Arrays']],type_ignores=[]),str(path),'exec'),scope)
+def Main():
+    checks.clear();transfer=json.loads((acc/'Data_SurfaceTransferV103.json').read_text());m=json.loads((acc/'Data_GamePbrV103.json').read_text());source=json.loads((acc/'Data_GameSourceReopenV103.json').read_text());high=Read(transfer['high']['sourceGlb']);low=Read(m['sourceGlb']);old=Read(transfer['low']['sourceGlb']);Check(transfer['passed']and hashlib.sha256(Path(transfer['proofFile']).read_bytes()).hexdigest()==transfer['proofFileSha256'],'Exact high-pair proof transfer identity');Check(low['sha256']==m['sha256']==source['sha256']and high['sha256']==transfer['high']['sha256']and old['sha256']==transfer['low']['sha256'],'Actual high/new low/proven low identities');Check(high['nodes'].keys()==low['nodes'].keys()==old['nodes'].keys()and len(low['nodes'])==296 and all(high['nodes'][n][1]==low['nodes'][n][1]==old['nodes'][n][1]for n in low['nodes']),'All296poses and controls exactly equal the proven pair')
+    original=scope['Read'](transfer['low']['sourceGlb']);current=scope['Read'](m['sourceGlb']);reexport=scope['Read'](source['sourceReexport']);Check(current['nodes']==reexport['nodes'],'Actual saved-source reexport hierarchy exact')
+    for label,target in [('ProvenV100',original),('SavedSource',reexport)]:
+        for name,parts in current['meshes'].items():
+            other=target['meshes'][name];attrs=sorted(parts[0]['attributes']);x,fx=scope['Arrays'](parts,attrs);y,fy=scope['Arrays'](other,attrs);_,ids=np.unique(np.vstack((x,y)),axis=0,return_inverse=True);i,j=ids[:len(x)],ids[len(x):];Check(np.array_equal(np.unique(i),np.unique(j))and np.array_equal(canonical.CanonicalFaces(fx,i),canonical.CanonicalFaces(fy,j)),label+' exact geometry/normal/UV/authored tangent: '+name)
+    native=json.loads((acc/'Data_LowSourceArraysV103.json').read_text());arrays=np.load(acc/'Data_LowSourceArraysV103.npz');Check(native['sourceBlendSha256']==m['sourceBlendSha256']==source['sourceBlendSha256']and len(native['rows'])==240,'Actual saved native source identity')
+    for row in native['rows']:
+        i=str(row['index']);points,faces=arrays['points'+i],arrays['triangles'+i];used,inverse=np.unique(faces,return_inverse=True);Check(Same(Mesh(low,row['name']),(points[used],inverse.reshape(faces.shape))),'Actual saved-source indexed triangles: '+row['name'])
+    repair=json.loads((acc/'Data_GameProjectionRepairV103.json').read_text());Check(repair['passed']and not repair['pixelApplicationPending'],'Actual source projection repairs fully applied and replayed')
+    for role in ['Paint','Track','Steel','Rubber']:
+        projection=json.loads((acc/('Data_GameProjection'+role+'V103.json')).read_text());Check(projection['referenceSha256']==high['sha256']and projection['coverage']['allPixelsProjected'],role+' projection tied to actual current high')
+        for channel in ['Base','Orm','Normal']:
+            key=role+channel;record=next(r for r in projection['channels']if r['channel']==channel);pixels=np.asarray(Image.open(record['file']).convert('RGB'));Check(np.array_equal(current['maps'][key],pixels),key+' actual projected master pixels exact');Check(np.array_equal(current['maps'][key],reexport['maps'][key]),key+' actual saved-source pixels exact')
+        if role!='Rubber':Check(any(not np.array_equal(current['maps'][role+c],original['maps'][role+c])for c in ['Base','Orm','Normal']),role+' current wear actually replaces older material pixels')
+    bound=transfer['maximumContinuousWorldBoundM'];triangles=sum(len(Mesh(low,n)[1])for n,(i,_)in low['nodes'].items()if i is not None);Check(bound<=.003,'Inherited actual two-direction world surface bound remains below3mm');Check(triangles==78716<80000,'Actual instance-weighted triangle budget');Check(len(current['maps'])==12,'All twelve referenced runtime maps retained')
+    report=dict(passed=all(c['passed']for c in checks),checks=checks,sha256=low['sha256'],referenceSha256=high['sha256'],provenLowSha256=old['sha256'],triangles=triangles,maximumContinuousWorldBoundM=bound,sourceBlendSha256=m['sourceBlendSha256'],wholeReferenceAccepted=False,scope='Exact actual high and low pair inheritance, all rigid poses and source arrays, exact authored tangent reexport and new actual projected twelve-map masters. Whole reference and full cold PBR recipe parity remain separate.')
+    (acc/'Data_ComposedActualSurfaceCertificateV103.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(dict(passed=report['passed'],checks=len(checks),failed=[c for c in checks if not c['passed']])));assert report['passed']
+if __name__=='__main__':Main()

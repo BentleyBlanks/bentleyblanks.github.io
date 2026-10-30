@@ -1,0 +1,238 @@
+{
+  "schema": "Type94SurfaceStudyV1",
+  "revision": "SurfaceV34",
+  "baseGrayManifest": "Data_GrayStudyV32.json",
+  "baseGraySha256": "fecabb3c4e730d7e38b9c54fffa5774a1f051a2e110aa08b1b8af073490bf568",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Scene_Type94TanketteHighSurfaceV34.blend",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Exports\\Model_Type94TanketteHighSurfaceV34.glb",
+  "sha256": "9d8b9abd35e511aa54dd11b753237dfa919db6b03a100f50f4714efdcb967583",
+  "sourceBlendSha256": "e8e13255c92c8c81eba3f99677c705138fcd6cab5c097fc27ced01793901a876",
+  "triangles": 501442,
+  "meshNodes": 247,
+  "embeddedImages": [
+    {
+      "name": "Texture_Type94PaintNormal",
+      "size": [
+        4096,
+        4096
+      ],
+      "bytes": 1729884
+    },
+    {
+      "name": "Texture_Type94PaintOrmWear",
+      "size": [
+        4096,
+        4096
+      ],
+      "bytes": 4734579
+    },
+    {
+      "name": "Texture_Type94PaintBaseWear",
+      "size": [
+        4096,
+        4096
+      ],
+      "bytes": 3015575
+    },
+    {
+      "name": "Texture_Type94SteelNormal",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 206019
+    },
+    {
+      "name": "Texture_Type94SteelOrm",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 2977108
+    },
+    {
+      "name": "Texture_Type94SteelBase",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 1713234
+    },
+    {
+      "name": "Texture_Type94RubberNormal",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 167856
+    },
+    {
+      "name": "Texture_Type94RubberOrm",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 780021
+    },
+    {
+      "name": "Texture_Type94RubberBase",
+      "size": [
+        1024,
+        1024
+      ],
+      "bytes": 514886
+    },
+    {
+      "name": "Texture_Type94TrackNormal",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 1315731
+    },
+    {
+      "name": "Texture_Type94TrackOrm",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 2261303
+    },
+    {
+      "name": "Texture_Type94TrackBase",
+      "size": [
+        2048,
+        2048
+      ],
+      "bytes": 865395
+    }
+  ],
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94Review/",
+  "grayPreview": "http://127.0.0.1:8114/tmp/Type94ShapeReview/",
+  "retainedGameCheckpoint": {
+    "revision": "V12",
+    "sha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+    "recipeCommit": "bd0852e1"
+  },
+  "materialRecipeFilesSha256": {
+    "Taierzhuang1938/_blender/Script_Type94TankettePbr.py": "008ddec96cce378a3fc202cac990819d8007d35de64748774608f2ecf3b787ab",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceStudy.py": "9b9e7a4bc66c1b078137aa00a9e063cf1137edb602aca0cfda562fc256c34e49",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearExtract.py": "024871f88d14700b70aa8fe1d8944e27fe0970c89464b2b9128534330f12aa3a",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearBake.py": "7fde6e8d4759cacaf5c1a40eca05f352c9f8570aaaac9b3675b39b3abbcc790c",
+    "Taierzhuang1938/_blender/Script_Type94SurfaceWearApply.py": "db000436fe752c394b204b8776ac7ed9ab75770fdf9fe614875b25ba9c643a54",
+    "Taierzhuang1938/_blender/Script_Type94Export.py": "168f799dc53887fbabded5f98953d8eb2a18df8fcfd57ee1ce119aa9b7764c8b",
+    "Taierzhuang1938/_blender/Script_Type94TangentRepair.py": "1d76f211ddeb6a491da6b2b5685b34adb0cfea46f11cdf674523203d123e572f"
+  },
+  "motionReference": "Data_MotionReferenceV34.json",
+  "validation": {
+    "reports": {
+      "raw": "Data_V34SurfaceRawAudit.json",
+      "browser": "Data_V34SurfaceBrowserAudit.json",
+      "source": "Data_V34SurfaceEditableSourceAudit.json",
+      "native": "Data_V34SurfaceMotionAudit.json",
+      "ui": "Data_V34MotionUiFinal.json",
+      "geometry": "Data_V34SurfaceGeometryConservation.json",
+      "edgeReplay": "Data_V34EdgeTextureReplay.json"
+    },
+    "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance",
+    "rawChecks": 1184,
+    "browserChecks": 901,
+    "editableSourceReopenChecks": 99,
+    "actualImportedMotionChecks": 37,
+    "motionAndSurfaceUiChecks": 11,
+    "all247MeshSurfacesConserved": true,
+    "maximumUnnormalizedWorldVertexErrorM": 4.656612873077393e-10,
+    "rootGroundingRoundoffAlignment": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        4.656612873077393e-10
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "actualPbrImportPackedImages": 12,
+    "actualImportedBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Acceptance\\Scene_SurfaceV34ActualReimport.blend",
+    "actualPbrRenderReport": "Data_V34ActualPbrRender.json",
+    "edgeTextureStageReplayPassed": true,
+    "fullGeometryAndPbrReplayPassed": false,
+    "ownedBlenderStopped": true,
+    "cleanupReport": "Data_V34OwnedBlenderCleanup.json",
+    "viewerHtmlSha256": "16dc5eb794128b7828cd99b305c2ff9cc04938ff5a73497439cbb119e61bf466",
+    "demoControlsSha256": "47830fe397f7d50f7169fba7287a8f1cdf4dc95a644ef496a12e3e43ebcf2c91",
+    "repositorySelectedChecks": {
+      "command": "node Taierzhuang1938/Script_TestRunner.mjs --only=AssetStandardsTest,ModelFacingTest,HistoryLedgerCheck,ModuleGraphTest",
+      "passed": true,
+      "checks": [
+        "AssetStandardsTest",
+        "ModelFacingTest",
+        "HistoryLedgerCheck",
+        "ModuleGraphTest"
+      ],
+      "wholeQuickRerun": false
+    },
+    "scope": "Exact local surface files and demonstrated movement; no photographic identity, historical exact stops/speeds, full replay or game-budget acceptance"
+  },
+  "complete": false,
+  "strictReferenceMatched": false,
+  "exactWearPlacementAccepted": false,
+  "fullTextureReplayAccepted": false,
+  "gameBudgetAccepted": false,
+  "scope": "First new surface study on current gray geometry; material-family differentiation and contact polish are inferred estimates. This is not final whole-reference or game-budget acceptance.",
+  "status": "local-surface-study",
+  "pbrChannelsVerified": true,
+  "surfaceChanges": [
+    "Rolled enamel and cast-fitting roughness/microrelief separated",
+    "Blued gun-steel directional finish; rubber kept dielectric",
+    "Actual shoe outer lands, rolling lands and guide faces have separate contact-polish attributes",
+    "Convex-edge wear follows the actual UVs at metric width, with local3D breakup; albedo mixed in linear light",
+    "AO channel preserved during the additional edge-wear stage"
+  ],
+  "edgeWear": {
+    "data": "Data_SurfaceWearBakeV34.json",
+    "edgeCount": 84959,
+    "affectedAtlasFraction": 0.005602359771728516,
+    "meanNonzeroOpacity": 0.11196526885032654,
+    "aoChannelUnchangedAtEdgeStage": true,
+    "inputs": {
+      "Texture_Type94PaintBase.png": "4fe518292836e83d16c5e7e1b30dad143812dd75c8660baec63dd6393ec8a444",
+      "Texture_Type94PaintOrm.png": "ac2c8d42850632fcd127c9efee025d75902355557b920fb53b3c85c94d0eab8a"
+    },
+    "finalPaintOutputs": {
+      "BaseWear": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Textures\\HighSurfaceV34\\Texture_Type94PaintBaseWear.png",
+        "sha256": "9c5db8c22ca3eae911226b2b091bbba443a14995f11fa5f5ff5fae141797a23f"
+      },
+      "OrmWear": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Textures\\HighSurfaceV34\\Texture_Type94PaintOrmWear.png",
+        "sha256": "24512d27cca3dea405c1603cb4cc0bc040720fa76bb80b3b2dac0063e3d0e542"
+      }
+    },
+    "maskFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\Textures\\HighSurfaceV34\\Texture_Type94PaintEdgeWearMask.png",
+    "placementInferred": true
+  },
+  "remaining": [
+    "Whole-gray primary camera, metric/common scale and body/cabin/turret proportion acceptance",
+    "Reference-localized paint, wear and markings; current microfinish and edge wear remain inferred",
+    "Complete fresh geometry and texture recipe replay",
+    "New below80000-triangle game derivative with3mm bidirectional distance and retained apertures/mechanisms",
+    "History/creation reconciliation before external release"
+  ]
+}

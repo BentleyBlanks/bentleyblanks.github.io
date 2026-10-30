@@ -1,0 +1,230 @@
+{
+  "schema": "Type94TurretFrontLayoutV1",
+  "status": "Local V63 moving front-face and barrel-axis candidate; precise dimensions, shoulder section and whole reference remain unaccepted",
+  "primary": {
+    "file": "Reference_Kubinka.jpg",
+    "sha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+    "nativeFrontCrop": [
+      2530,
+      385,
+      2820,
+      755
+    ],
+    "scope": "2017 selected vehicle and olive repaint"
+  },
+  "supplement": {
+    "file": "Reference_KubinkaOld.jpg",
+    "sha256": "a2842cfe2394259a70ab2bc7d5835696c944da040518b2c8870f9428f76ca136",
+    "nativeFrontCrop": [
+      2390,
+      570,
+      2735,
+      980
+    ],
+    "scope": "2014 same exhibit; geometry supplement only"
+  },
+  "roundOpening": {
+    "observed": "Small circular dark aperture beside the short gun barrel",
+    "nominalNativeRadiusToBoltCircleRadiusRange": [
+      0.050508,
+      0.062434
+    ],
+    "retainedAuthoredBoltCircleRadiusM": 0.135,
+    "adoptedRadiusM": 0.008,
+    "adoptedRatio": 0.0592592593,
+    "previousRatio": 0.0814814815,
+    "centerBeforeGunReanchorM": [
+      0.042,
+      0.1,
+      0.041
+    ],
+    "modeledBallDepthM": 0.072,
+    "limits": "Threshold-sensitive native footprint divided by local major magnification of an unsurveyed flange gauge. Different planes, gun pose, depth, paint and head-centre uncertainty remain. This is not an8mm museum measurement."
+  },
+  "raisedFitting": {
+    "observed": "Leaning raised upright/web and short base tab visible in both dates",
+    "outlineXZBeforeGunReanchorM": [
+      [
+        0.035,
+        0.022
+      ],
+      [
+        0.035,
+        0.029
+      ],
+      [
+        0.023,
+        0.059
+      ],
+      [
+        0.019,
+        0.063
+      ],
+      [
+        0.012,
+        0.061
+      ],
+      [
+        0.012,
+        0.057
+      ],
+      [
+        0.025,
+        0.03
+      ],
+      [
+        0.004,
+        0.03
+      ],
+      [
+        0.003,
+        0.025
+      ],
+      [
+        0.004,
+        0.023
+      ]
+    ],
+    "centerYBeforeGunReanchorM": 0.103,
+    "thicknessM": 0.008,
+    "edgeBevelM": 0.0006,
+    "owner": "MachineGunPitch",
+    "surfaceRole": "Paint",
+    "frontProbePointsAfterGunReanchorM": [
+      [
+        0.02,
+        0.043,
+        0.052
+      ],
+      [
+        0.012,
+        0.043,
+        0.026
+      ]
+    ],
+    "rootYAfterGunReanchorM": 0.035,
+    "ballFrontYAfterGunReanchorM": 0.036,
+    "functionAccepted": false,
+    "depthAndAttachmentInferred": true,
+    "independentMotion": false,
+    "lowerDarkNotchClassification": "Unresolved shadow/recess/receiver region; no additional Boolean opening is asserted"
+  },
+  "commanderHinge": {
+    "observed": "Two transverse roof hinge stations, cross-checked against the ten paired-rivet centres and roof-pin ends",
+    "pinStationsXLocalTurretM": [
+      -0.1305,
+      0.1305
+    ],
+    "retainedAxisYZLocalTurretM": [
+      0.245,
+      0.525
+    ],
+    "referenceGeneratorSpanM": 0.27161017,
+    "adoptedSpanToRivetGeneratorRatio": 0.9609360356425536,
+    "oldSpanToRivetGeneratorRatio": 1.3254290146793841,
+    "structuralRatioPercentiles5_50_95": [
+      0.857936,
+      0.954135,
+      1.007969
+    ],
+    "unconstrainedRatioPercentiles5_50_95": [
+      0.8493,
+      0.9519,
+      1.3853
+    ],
+    "unconstrainedRatioPercentiles2p5_97p5": [
+      0.8297,
+      3.2162
+    ],
+    "assumptions": [
+      "Five rivets in each column lie on approximately straight equally spaced generators; middle fractions perturbed by1percent",
+      "Roof hinge axis approximately parallel to the fixed-flange plane, with3degree soft uncertainty plus3degree mean perturbation"
+    ],
+    "scope": "Relative station estimate under these construction-class assumptions. The unconstrained sensitivity includes the prior span. Common axis, closed lid, roof, Y/Z stations and turret scale are retained. Absolute metres are inferred."
+  },
+  "researchReportsExternal": [
+    "Data_FlangeGaugeV32.json",
+    "Data_MgHoleEllipseV32.json",
+    "Data_MgOpeningRatioV32.json",
+    "Data_TurretBundleV32.json",
+    "Data_TurretSensitivityV32.json",
+    "Data_StructuredTurretV32.json",
+    "Data_WeaponFrontRimObservationsV62.json",
+    "Data_WeaponFrontRimFitV62.json",
+    "Data_WeaponPoseFitV62.json"
+  ],
+  "globalCalibrationAccepted": false,
+  "metricScaleAccepted": false,
+  "wholeGrayAccepted": false,
+  "revision": "ShapeV63GunFrontTrial",
+  "movingFrontBall": {
+    "frontFaceRadiusM": 0.076,
+    "previousFrontFaceRadiusM": 0.101,
+    "latheProfileRYBeforeReanchorM": [
+      [
+        0,
+        0.028
+      ],
+      [
+        0.103,
+        0.028
+      ],
+      [
+        0.112,
+        0.055
+      ],
+      [
+        0.11169744849368764,
+        0.0595
+      ],
+      [
+        0.11078483650752931,
+        0.064
+      ],
+      [
+        0.10924687638555164,
+        0.0685
+      ],
+      [
+        0.10705662053324867,
+        0.07300000000000001
+      ],
+      [
+        0.10417293314484334,
+        0.0775
+      ],
+      [
+        0.10053616264807405,
+        0.082
+      ],
+      [
+        0.09606081407108728,
+        0.08650000000000001
+      ],
+      [
+        0.0906227344544403,
+        0.091
+      ],
+      [
+        0.08403523070712665,
+        0.0955
+      ],
+      [
+        0.076,
+        0.1
+      ],
+      [
+        0,
+        0.1
+      ]
+    ],
+    "scope": "Primary native dark face boundary is visibly smaller than the reflective shoulder. The retained conditional camera gives75.51mmwith free image translation,2.07pxRMS over21manual contour picks; rounded76mmcandidate. Elliptic shoulder depth/profile is inferred; no physical spherical section or metric survey is claimed.",
+    "axialSectionInferred": true
+  },
+  "barrel": {
+    "axisZBeforeReanchorM": -0.021,
+    "previousAxisZBeforeReanchorM": -0.005,
+    "scope": "Barrel visibly below front-face centre in selected2017photo and same-exhibit2014structure supplement.16mmadditional downward offset is a reconstruction candidate under retained primary pose/camera, not a museum measurement. Jacket, collars, muzzle, dark bore backing and front sight move together; length and existing aim stops retained.",
+    "independentFinalHoldout": false
+  }
+}

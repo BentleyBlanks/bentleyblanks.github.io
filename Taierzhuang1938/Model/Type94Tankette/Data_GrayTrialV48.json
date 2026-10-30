@@ -1,0 +1,82 @@
+{
+  "schema": "Type94GrayComponentTrialV1",
+  "revision": "ShapeV48TrackTrial",
+  "status": "local-cast-shoe-geometry-trial",
+  "sourceGray": "Data_GrayStudyV37.json",
+  "sourceGraySha256": "9504477d4b850fcf8a987a0e12d5aea24cf66be318355b471586b4e21070e7de",
+  "layout": "Data_TrackShoeTrialV48.json",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\TrackShoeV48\\Scene_Type94TanketteHighShapeV48TrackTrial.blend",
+  "sourceBlendSha256": "cba5efe9e3c8d5fc9184471643ed3574405f0d5de03a8aec4fc5f4de74d99821",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\TrackShoeV48\\Exports\\Model_Type94TanketteHighShapeV48TrackTrial.glb",
+  "sha256": "6845e145cbcf9965aa95b364af868e6dd6c8ebc18616794b281062a5f285f600",
+  "triangles": 640750,
+  "meshNodes": 247,
+  "linksPerSide": 85,
+  "changedTrackOwners": 170,
+  "preservedNonTrackOwners": 77,
+  "groundNormalizationDeltaM": 0.00040602218359708786,
+  "geometryComparisonFrame": "Vehicle root; separate explicit whole-asset ground normalization",
+  "maximumPreservedGroupedVertexDiameterM": 4.563718777528857e-08,
+  "sourceProducer": "Taierzhuang1938/_blender/Script_Type94TrackShoeTrial.py",
+  "coldBuilderOption": "TYPE94_TRACK_SHOE_LAYOUT=Data_TrackShoeTrialV48.json",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94TrackReviewV48/",
+  "changes": [
+    "Two uninterrupted primary windows instead of the extra central straight grouser",
+    "Rounded segmented raised front cross-member",
+    "Visible end-eye/recess outlines with planar cast faces",
+    "Retained inner guide stations and nominal pin section; new eye circles built in physical local axes"
+  ],
+  "visualReview": {
+    "actualImportedTrackAndSingleShoeInspected": true,
+    "pairedBrowserComparisonInspected": true,
+    "firstVisualIteration": "FirstVisual",
+    "exactReferenceCastingAccepted": false
+  },
+  "validation": {
+    "rawChecks": 705,
+    "sourceReopenAndActualImportedMotionChecks": 41,
+    "preservedMeshChecks": 77,
+    "browserChecks": 8,
+    "reports": {
+      "raw": "Data_TrackTrialRawV48.json",
+      "geometry": "Data_NonTrackConservationV48.json",
+      "native": "Data_TrackTrialMotionV48.json",
+      "browser": "Data_TrackBrowserV48.json"
+    },
+    "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\TrackShoeV48\\Acceptance",
+    "ownedBlenderStopped": true,
+    "cleanup": "Data_OwnedBlenderCleanupV48.json",
+    "repositoryChecks": {
+      "passed": true,
+      "checks": [
+        "AssetStandardsTest",
+        "ModelFacingTest",
+        "ModuleGraphTest",
+        "HistoryLedgerCheck"
+      ]
+    }
+  },
+  "complete": false,
+  "strictReferenceMatched": false,
+  "physicalSourceGeometryAccepted": false,
+  "pbrAccepted": false,
+  "gameBudgetAccepted": false,
+  "retainedCanonicalGameCheckpoint": {
+    "revision": "V12",
+    "sha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+    "recipeCommit": "bd0852e1"
+  },
+  "limits": [
+    "Visible two-window cast frame, segmented raised cross-member and end-eye outlines guide this trial",
+    "Exact eye section, whether the dark end feature is fully open, and its historical function are unverified",
+    "164mm is retained as the authored overall envelope for comparison; the provisional specification's width definition and museum pin span are not resolved",
+    "Pad dimensions, cast fillets, hidden pin/eye construction and section thickness remain modeling estimates"
+  ],
+  "scope": "Independent complete-vehicle gray file with only shoe geometry changed; no whole-body/reference, exact casting section, PBR or final game acceptance",
+  "recipeFilesSha256": {
+    "Taierzhuang1938/_blender/Script_Type94TrackShoe.py": "4c25137fd149e93f8ee4c3f9f739276f8af70945063b9160154ad50e3eb6d019",
+    "Taierzhuang1938/_blender/Script_Type94TrackShoeTrial.py": "b4ea8d337eb17f7f30f05219ca5b49421f73e45394980a49ca34a18771deed49",
+    "Taierzhuang1938/_blender/Script_Type94TanketteBuild.py": "fbc566e39be97fbfc3b018f8e0b1c955ae3f63c0d741ee5d31a2d0bb425ed079",
+    "Taierzhuang1938/_blender/Script_Type94Export.py": "b5e0abdcd073cc0cb84eaf77534626f7b9b24166a87bd88e1c0395840e340486"
+  }
+}

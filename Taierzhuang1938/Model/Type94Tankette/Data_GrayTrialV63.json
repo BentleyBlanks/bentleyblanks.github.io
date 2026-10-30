@@ -1,0 +1,121 @@
+{
+  "schema": "Type94GrayTrialV1",
+  "revision": "ShapeV63GunFrontTrial",
+  "status": "local-moving-front-and-barrel-candidate-verified",
+  "sourceReference": "Data_GrayTrialV61.json",
+  "referenceSha256": "731a3763a04077dfe8958fe8cd0159a4d7a1e3d2c2c9e9bba3560269cf8235d9",
+  "sourceProducer": "Taierzhuang1938/_blender/Script_Type94GunFrontTrial.py",
+  "bodyLayout": "Data_BodyTrialV63.json",
+  "frontLayout": "Data_TurretFrontLayoutV63.json",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GunFrontV63\\Scene_Type94TanketteHighShapeV63GunFrontTrial.blend",
+  "sourceBlendSha256": "c8e2eaf8d0470a9c4e0c4039bd2f1b1c37b8b1fa6b72d6c87939584f10f1b381",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GunFrontV63\\Exports\\Model_Type94TanketteHighShapeV63GunFrontTrial.glb",
+  "sha256": "5b0d2b281d1dc44948dfd4639ee91bfa40123f4e2060e362ced2a6b6614ec8b3",
+  "triangles": 624224,
+  "meshNodes": 237,
+  "poseNodes": 292,
+  "independentLinksPerSide": 80,
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "changedMeshOwners": [
+    "Geometry_MachineGunPitch_Paint",
+    "Geometry_MachineGunPitch_Steel",
+    "Geometry_MachineGunPitch_Dark"
+  ],
+  "preservedSourceV61Sha256": "bb7a393fc178604d600e0be7f347fb279e9e70eade9d8841ee11ead09be5a2b8",
+  "unchangedMeshSurfacesExact": 234,
+  "unchangedFrontFittingComponentExact": true,
+  "rootAndPathExact": true,
+  "frontFaceRadiusM": 0.076,
+  "barrelAxisZLocalM": -0.021,
+  "additionalBarrelOffsetM": -0.016,
+  "axialShoulderSectionInferred": true,
+  "metricFrontDimensionsSurveyed": false,
+  "poseStopsInferred": true,
+  "motionLimitsEnlarged": false,
+  "muzzleDiagnosticNativePixelsBefore": 22.9905305137786,
+  "muzzleDiagnosticNativePixelsAfter": 4.512103531867316,
+  "diagnosticsAreIndependentHoldouts": false,
+  "validation": {
+    "raw": {
+      "passed": true,
+      "report": "Data_GunFrontRawV63.json",
+      "checks": 685
+    },
+    "conservation": {
+      "passed": true,
+      "report": "Data_GunFrontConservationV63.json",
+      "checks": 234,
+      "unchangedMeshes": 234,
+      "exactPoseControls": 292,
+      "changedPaintComponents": 1,
+      "barrelTranslationM": [
+        0,
+        -0.016,
+        0
+      ]
+    },
+    "native": {
+      "passed": true,
+      "report": "Data_GunFrontMotionV63.json",
+      "checks": 41
+    },
+    "bodyBelt": {
+      "passed": true,
+      "report": "Data_GunFrontBeltV63.json",
+      "checks": 32
+    },
+    "sourceExport": {
+      "passed": true,
+      "report": "Data_SourceExportV63.json",
+      "checks": 237
+    },
+    "browser": {
+      "passed": true,
+      "report": "Data_GunFrontBrowserV63.json",
+      "checks": 8
+    },
+    "coldReplay": {
+      "passed": true,
+      "report": "Data_ColdReplayV63.json",
+      "checks": 2
+    }
+  },
+  "sourceAndExportMeshesExact": 237,
+  "coldReplayByteIdentical": true,
+  "legacyV55ColdReplayByteIdentical": true,
+  "visualReview": {
+    "actualExportCompared": true,
+    "nativeCropPixels": [
+      640,
+      640
+    ],
+    "primaryReferenceUnchanged": true,
+    "cameraAndAimUnchanged": true,
+    "wholeReferenceAccepted": false
+  },
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94GunFrontReviewV63/",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GunFrontV63\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GunFrontV63\\Rebuild",
+  "canonicalSha256": "462763ad94604bc5ea84c64c12b987ec99e210d400d8cfc0fcbead23447436f3",
+  "canonicalGameReplaced": false,
+  "retainedV56AndV59Unchanged": true,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV63.json",
+  "rejectedInitialConservation": "Versions/InitialColdTrial",
+  "wholeReferenceAccepted": false,
+  "globalCalibrationAccepted": false,
+  "pbrAccepted": false,
+  "gameDerivativeForThisRevisionProduced": false,
+  "complete": false,
+  "goalComplete": false,
+  "published": false,
+  "remaining": [
+    "Review front aperture/raised fitting/front sight, other reference views and whole body contours",
+    "Generate final high PBR and fresh final-revision low tangent-space projection",
+    "Produce final accepted-revision game derivative below80000triangles/within3mm and complete end-to-end acceptance"
+  ]
+}

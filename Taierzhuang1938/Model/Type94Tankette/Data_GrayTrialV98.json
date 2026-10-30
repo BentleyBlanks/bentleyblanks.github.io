@@ -1,0 +1,96 @@
+{
+  "schema": "Type94CasingRaisedEarTrialV1",
+  "revision": "ShapeV98FarCasingRaisedEarTrial",
+  "status": "local-photo-supported-lug-prototype-verified",
+  "reference": "Data_GrayTrialV95.json",
+  "referenceAudit": "Data_ReferenceAuditV97.json",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\CasingLugV98\\Scene_Type94TanketteHighShapeV98CasingLugTrial.blend",
+  "sourceBlendSha256": "ac1563c71ea4823d1a057620f8f7851a85ee9c79a1322c5db5bdf9beea2eff62",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\CasingLugV98\\Exports\\Model_Type94TanketteHighShapeV98CasingLugTrial.glb",
+  "sha256": "40f227ca116abc60c8bed97c688b652a0576f7809ed2327a7deba04cffa22b24",
+  "producer": "Taierzhuang1938/_blender/Script_Type94CasingLugV98.py",
+  "nativeVerifier": "Taierzhuang1938/_blender/Script_VerifyType94CasingLugV98.py",
+  "geometryVerifier": "Taierzhuang1938/_import/Script_VerifyType94CasingGeometryV98.py",
+  "layoutFile": "C:\\Users\\Bentl\\.codex\\worktrees\\6126\\bentleyblanks.github.io\\Taierzhuang1938\\Model\\Type94Tankette\\Data_CasingLugLayoutV98.json",
+  "layoutSha256": "7d4223639cda7c4388f48daab704ccbc4200335ef1fff2fd53cd5390254b169f",
+  "triangles": 694476,
+  "meshOwners": 240,
+  "poseNodes": 296,
+  "unchangedOriginalMeshes": 239,
+  "preservedOriginalPoseNodes": 295,
+  "newMesh": "Geometry_FinalDriveRaisedEarRight_Paint",
+  "addedTriangles": 188,
+  "actualCentreRootOverlapM": 0.0040000081062316895,
+  "actualAttachmentThicknessXM": 0.021367064952850342,
+  "dimensionsWidthHeightLengthM": [
+    1.620053768157959,
+    1.6179470753176821,
+    3.0839178307393347
+  ],
+  "projectionMetrics": [
+    {
+      "camera": "2017",
+      "pixel": [
+        750,
+        2012
+      ],
+      "sigmaNative": 8,
+      "predictedNative": [
+        742.0872480151536,
+        2017.8272552208743
+      ],
+      "errorNative": 9.826929702755493
+    },
+    {
+      "camera": "2014",
+      "pixel": [
+        679,
+        2043
+      ],
+      "sigmaNative": 8,
+      "predictedNative": [
+        688.4996952501,
+        2036.8470308440048
+      ],
+      "errorNative": 11.318270154020887
+    }
+  ],
+  "validation": {
+    "binaryChecks": 484,
+    "savedSourceReopened": true,
+    "actualGlbImported": true,
+    "reexportContainerExact": true,
+    "vehicleMotionChecks": 38,
+    "gateSweepSamples": 56,
+    "gateContactExclusionM": 0,
+    "actualBrowserRenders": 4,
+    "coldShapeReplayContainerExact": true
+  },
+  "actualViewsInspected": [
+    "2017Far",
+    "2014Far"
+  ],
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94CasingReviewV98/?view=casing",
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\CasingLugV98\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\CasingLugV98\\Rebuild",
+  "cameraAndAxesChanged": false,
+  "nearSideChanged": false,
+  "sectionAndFunctionInferred": true,
+  "exactLugPlacementAccepted": false,
+  "genericCasingHeadIdentityAccepted": false,
+  "wholeReferenceAccepted": false,
+  "newPbrBaked": false,
+  "retainedMaterialPreview": "http://127.0.0.1:8114/tmp/Type94TowPbrReviewV96/?view=tow",
+  "currentGameDerivativeProduced": false,
+  "canonicalGameReplaced": false,
+  "published": false,
+  "goalComplete": false,
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV98.json",
+  "remaining": [
+    "Resolve whole fixed-body/casing/near-corner/track-envelope correspondence with camera/crop uncertainty explicit; current local residual is not exact acceptance",
+    "Integrate accepted new geometry into current complete PBR without overwriting V96finish",
+    "Produce a current below80000triangle game derivative with continuous3mm/source/PBR/motion rebuild proof",
+    "Complete full reference and end-to-end acceptance before canonical replacement"
+  ]
+}

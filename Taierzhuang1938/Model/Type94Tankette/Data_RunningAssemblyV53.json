@@ -1,0 +1,108 @@
+{
+  "schema": "Type94RunningAssemblyV1",
+  "revision": "ShapeV53EnvelopeTrial",
+  "sourceHypothesis": "Data_GeneratorEnvelopeAuditV52.json",
+  "sourceSha256": "e46e69bbff97bed69d48b9ab53650df94f4c4396ea711509f1f4cc7ab861ea7b",
+  "outerShoulderPlaneXM": 0.7211210943793939,
+  "tyreHalfWidthM": 0.0525,
+  "trackCenterXM": 0.6686210943793939,
+  "roadTreadRadiusM": 0.17626619366200935,
+  "roadCentersYZM": [
+    [
+      0.7093522472327868,
+      0.20881982296073615
+    ],
+    [
+      0.18676617735299483,
+      0.21042123846972569
+    ],
+    [
+      -0.21669376829552534,
+      0.21008993812428794
+    ],
+    [
+      -0.7306081072777287,
+      0.20845430649258825
+    ]
+  ],
+  "driveCenterYZM": [
+    1.1895628321514826,
+    0.564741464733387
+  ],
+  "driveMetalRadiusM": 0.26143716784851745,
+  "drivePitchRadiusTargetM": 0.27343716784851746,
+  "idlerCenterYZM": [
+    -1.115933707809598,
+    0.4102962173382532
+  ],
+  "idlerRadiusM": 0.1905,
+  "returnCentersYZM": [
+    [
+      0.35,
+      0.601
+    ],
+    [
+      -0.69,
+      0.601
+    ]
+  ],
+  "returnRadiusM": 0.066,
+  "beltCentreOffsetM": 0.0125,
+  "sprocketTeeth": 22,
+  "frontArmorHalfWidthM": 0.55,
+  "spring": {
+    "endForwardM": [
+      -0.54,
+      0.35
+    ],
+    "heightM": 0.493
+  },
+  "driveWeb": {
+    "depthM": 0.05,
+    "holeInnerRadiusRatio": 0.57,
+    "holeOuterRadiusRatio": 0.88,
+    "holeInnerWidthRatio": 0.12,
+    "holeOuterWidthRatio": 0.26,
+    "holeCornerRadiusM": 0.008
+  },
+  "bogies": [
+    {
+      "pivotYZM": [
+        0.4765267226166193,
+        0.27405496083898045
+      ],
+      "roadIndices": [
+        0,
+        1
+      ],
+      "springEndYZM": [
+        0.35,
+        0.493
+      ]
+    },
+    {
+      "pivotYZM": [
+        -0.45517809505110723,
+        0.26153727713781405
+      ],
+      "roadIndices": [
+        2,
+        3
+      ],
+      "springEndYZM": [
+        -0.54,
+        0.493
+      ]
+    }
+  ],
+  "inferred": [
+    "V52 effective drive radius maps to the working-radius target; the retained Wheel constructor receives bare rim radius plus12mm",
+    "Actual integer path, tooth phase and all solid-contact envelopes require new validation",
+    "Wheel heights are mechanical axes; optical cap offsets are not added to the axle positions",
+    "Idler radius, rollers, axial sections, spring sections,22teeth and cast-shoe pitch are unmeasured construction inputs",
+    "Nominal metric-envelope agreement does not establish the photographed vehicle shape"
+  ],
+  "strictReferenceMatched": false,
+  "physicalSourceGeometryAccepted": false,
+  "complete": false
+}

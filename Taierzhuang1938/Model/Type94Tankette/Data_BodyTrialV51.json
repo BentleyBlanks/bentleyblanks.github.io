@@ -1,0 +1,29 @@
+{
+  "schema": "Type94BodyLayoutV1",
+  "revision": "ShapeV51RunningTrial",
+  "status": "Explicit V50 cabin / V49 turret / V48 shoe / new running assembly trial",
+  "turretLayout": "Data_TurretTrialV49.json",
+  "driverRoofGunMinElevationDegrees": 0,
+  "driver": {
+    "centerXM": 0.2891598174617797,
+    "widthM": 0.5119466492133,
+    "topZM": 1.1920799605098187,
+    "bottomZM": 0.9867238777566698,
+    "topForwardM": 0.3227150393352468,
+    "bottomForwardM": 0.3885776935035243
+  },
+  "sourceHypothesis": "Data_PhysicalProfilesV47.json / PreviousProfile",
+  "inferred": [
+    "Camera and absolute scale remain conditional; these are not surveyed museum dimensions",
+    "Roof depth, roof hatch, side covers, pin and bearing sizes retain V37 estimates",
+    "Small lower cabin skirts connect the fitted frame to the retained flat glacis; their section is inferred",
+    "Front armour and glacis widths are reduced for the actual belt clearance; longitudinal forebody, heights and fenders retain V37",
+    "Belt-centre offset clears the declared10.5mm inward pin envelope with2mm modeled margin; these sections are not surveyed museum tolerances"
+  ],
+  "strictReferenceMatched": false,
+  "complete": false,
+  "runningAssembly": "Data_RunningAssemblyV51.json",
+  "trackShoeLayout": "Data_TrackShoeTrialV48.json",
+  "exportBasisRootZM": -0.003999997861683369,
+  "exportBasisSourceSha256": "6efbfc6ffcfedbc85fc39ac2ac9bf325dbde02651b43d81a8956660bd00155a3"
+}

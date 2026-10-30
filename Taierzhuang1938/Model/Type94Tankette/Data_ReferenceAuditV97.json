@@ -1,0 +1,280 @@
+{
+  "schema": "Type94CasingAndLensReviewV1",
+  "revision": "ReferenceV97",
+  "status": "photo-lug-reviewed-camera-crop-assumptions-recorded",
+  "sourceManifest": "Data_SurfaceStudyV96.json",
+  "rays": {
+    "sourceManifest": "Data_GrayTrialV95.json",
+    "sourceBlendSha256": "722c1adafc0c0ee385910439c5df292f03dfee7d634d90b6fcf9d8ae7f2ec8bd",
+    "sourceGlbSha256": "113185db1fbe14cc92b46646c3919850bd8a56d573bfafdcee891c86a05cfd96",
+    "observations": [
+      {
+        "camera": "2017",
+        "pixel": [
+          750,
+          2012
+        ],
+        "sigmaNative": 8
+      },
+      {
+        "camera": "2014",
+        "pixel": [
+          679,
+          2043
+        ],
+        "sigmaNative": 8
+      }
+    ],
+    "rayRows": [
+      {
+        "camera": "2017",
+        "pixel": [
+          750,
+          2012
+        ],
+        "sigmaNative": 8,
+        "firstOwner": "Geometry_FinalDriveHousingRight_Paint",
+        "firstHitWorldM": [
+          0.5208357572555542,
+          1.3661001920700073,
+          0.6037586331367493
+        ],
+        "casingHits": [
+          {
+            "side": "Left",
+            "hitWorldM": null,
+            "distanceM": null
+          },
+          {
+            "side": "Right",
+            "hitWorldM": [
+              0.5208357572555542,
+              1.3661001920700073,
+              0.6037586331367493
+            ],
+            "distanceM": 3.0807459354400635
+          }
+        ]
+      },
+      {
+        "camera": "2014",
+        "pixel": [
+          679,
+          2043
+        ],
+        "sigmaNative": 8,
+        "firstOwner": "Geometry_FinalDriveHousingRight_Paint",
+        "firstHitWorldM": [
+          0.5263106822967529,
+          1.3747963905334473,
+          0.5992756485939026
+        ],
+        "casingHits": [
+          {
+            "side": "Left",
+            "hitWorldM": null,
+            "distanceM": null
+          },
+          {
+            "side": "Right",
+            "hitWorldM": [
+              0.5263106822967529,
+              1.3747963905334473,
+              0.5992756485939026
+            ],
+            "distanceM": 3.629739761352539
+          }
+        ]
+      }
+    ],
+    "conditionalTriangulation": {
+      "worldM": [
+        0.5397050438526152,
+        1.3560380800998988,
+        0.5959661032958822
+      ],
+      "raysGapM": 0.011051253336194165,
+      "rayDistancesM": [
+        3.1028254315389194,
+        3.652360829403647
+      ],
+      "projections": {
+        "2017": [
+          739.9057066006183,
+          2015.963696826982
+        ],
+        "2014": [
+          688.0479242922266,
+          2039.8607688423065
+        ]
+      },
+      "scope": "Coarse apparent lug footprint, not a surveyed attachment or mechanical axis; retained cameras are conditional"
+    },
+    "sourceReadOnly": true,
+    "geometryChanged": false,
+    "cameraChanged": false,
+    "photographicLugIdentityReviewed": true,
+    "exactLugSectionInferred": true,
+    "wholeReferenceAccepted": false
+  },
+  "lensMetadata": {
+    "schema": "Type94LensMetadataAuditV1",
+    "rows": [
+      {
+        "camera": "2017",
+        "sourceFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_Kubinka.jpg",
+        "sha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+        "outputSize": [
+          4854,
+          3236
+        ],
+        "exif": {
+          "ImageWidth": "6000",
+          "ImageLength": "4000",
+          "Make": "NIKON CORPORATION",
+          "Model": "NIKON D5500",
+          "Software": "Adobe Photoshop Elements 14.0 (Windows)",
+          "FocalLength": "22.0",
+          "ExifImageWidth": "4854",
+          "ExifImageHeight": "3236",
+          "DigitalZoomRatio": "1.0",
+          "FocalLengthIn35mmFilm": "33"
+        },
+        "retainedIntrinsicMatrix": [
+          [
+            5350.920026649222,
+            0.0,
+            2571.6017281152776
+          ],
+          [
+            0.0,
+            5350.920026649222,
+            1227.570446278659
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "sourceEdited": true,
+        "metadataDoesNotCalibrateLens": true,
+        "nominalCentredCropHypothesis": {
+          "originalCanvas": [
+            6000,
+            4000
+          ],
+          "reported35mmEquivalent": 33.0,
+          "nominalOriginalFocalPixels": 5500.0,
+          "retainedUniformScale": 0.9728945502998585,
+          "impliedCropOriginalPixels": [
+            356.75184189008223,
+            738.2286745256142,
+            4989.235471104176,
+            3326.1569807361175
+          ],
+          "outsideBottomPixels": 64.3856552617317,
+          "insideCanvas": false,
+          "assumptions": [
+            "Reported equivalent treated nominally as horizontal35mm focal",
+            "Optical centre assumed to be original canvas midpoint",
+            "Uniform scale and axis-aligned crop only"
+          ],
+          "interpretation": "This narrow nominal hypothesis is inconsistent; rounded EXIF, optical-centre offset, rotation or other editing remain possible. It does not prove lens warp or justify changing geometry."
+        }
+      },
+      {
+        "camera": "2014",
+        "sourceFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\Reference_KubinkaOld.jpg",
+        "sha256": "a2842cfe2394259a70ab2bc7d5835696c944da040518b2c8870f9428f76ca136",
+        "outputSize": [
+          4906,
+          3271
+        ],
+        "exif": {
+          "Make": "Canon",
+          "Model": "Canon EOS 70D",
+          "Software": "Adobe Photoshop CS6 (Windows)",
+          "FocalLength": "24.0",
+          "ExifImageWidth": "4906",
+          "ExifImageHeight": "3271",
+          "FocalPlaneXResolution": "2452.11865234375",
+          "FocalPlaneYResolution": "2452.11865234375",
+          "FocalPlaneResolutionUnit": "3"
+        },
+        "retainedIntrinsicMatrix": [
+          [
+            5834.197149603049,
+            0.0,
+            2277.687103184914
+          ],
+          [
+            0.0,
+            5834.197149603049,
+            1446.6189943530067
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "sourceEdited": true,
+        "metadataDoesNotCalibrateLens": true,
+        "nominalFocalPlaneEstimate": {
+          "originalFocalPixels": 5885.084765625,
+          "retainedFocalPixels": 5834.197149603049,
+          "impliedUniformScale": 0.9913531209747076,
+          "originalRawCanvasEstablished": false
+        }
+      }
+    ],
+    "cameraAdopted": false,
+    "geometryChanged": false,
+    "physicalCalibrationAccepted": false,
+    "wholeReferenceAccepted": false,
+    "nextAction": "Use verified fixed-body correspondences and source crop/pose uncertainty together; do not interpret casing or tyre optical mismatch as a measured axle displacement"
+  },
+  "coarseLugFit": [
+    {
+      "camera": "2017",
+      "pixel": [
+        750,
+        2012
+      ],
+      "sigmaNative": 8,
+      "predictedNative": [
+        742.0872480151536,
+        2017.8272552208743
+      ],
+      "errorNative": 9.826929702755493
+    },
+    {
+      "camera": "2014",
+      "pixel": [
+        679,
+        2043
+      ],
+      "sigmaNative": 8,
+      "predictedNative": [
+        688.4996952501,
+        2036.8470308440048
+      ],
+      "errorNative": 11.318270154020887
+    }
+  ],
+  "genericCasingHeadsStillUnconfirmed": true,
+  "physicalCameraCalibrationAccepted": false,
+  "cameraAdopted": false,
+  "driveAxisChanged": false,
+  "wholeReferenceAccepted": false,
+  "goalComplete": false,
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV97",
+  "resultingTrial": "Data_GrayTrialV98.json",
+  "remaining": [
+    "Resolve whole fixed-body/casing/near-corner/track-envelope correspondence with camera/crop uncertainty explicit; current local residual is not exact acceptance",
+    "Integrate accepted new geometry into current complete PBR without overwriting V96finish",
+    "Produce a current below80000triangle game derivative with continuous3mm/source/PBR/motion rebuild proof",
+    "Complete full reference and end-to-end acceptance before canonical replacement"
+  ]
+}

@@ -1,0 +1,184 @@
+{
+  "schema": "Type94ReferenceDiagnosticV1",
+  "revision": "ReferenceV65",
+  "status": "local-visibility-filtered-camera-and-geometry-diagnostics-verified-no-adoption",
+  "sourceGeometry": "Data_GrayTrialV64.json",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\DetailV64\\Exports\\Model_Type94TanketteHighShapeV64FrontDetailTrial.glb",
+  "sha256": "d46ca757f4210827c0ea957e978db466138282913251a9ce9acab8f26b77137a",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\DetailV64\\Scene_Type94TanketteHighShapeV64FrontDetailTrial.blend",
+  "sourceBlendSha256": "ba2cf5bf231b5c3fa733c7486951ec0025b2ba8d9ace9fe6a55d4180876a6ff0",
+  "retainedCameraFamilySha256": "e46e69bbff97bed69d48b9ab53650df94f4c4396ea711509f1f4cc7ab861ea7b",
+  "modelGeometryChanged": false,
+  "modelAxesChanged": false,
+  "modelDimensionsChanged": false,
+  "retainedCameraFamilyChanged": false,
+  "cameraAdopted": false,
+  "geometryAdopted": false,
+  "actualMeshOwners": 237,
+  "actualTriangles": 624036,
+  "observations": {
+    "initialRightSeeds": 24,
+    "photoReviewedRightPoints": 20,
+    "modelVisibilityFilteredSensitivityPoints": 19,
+    "filterIsConditionalOnCurrentModel": true,
+    "filteredPointPhotoIdentityProven": false,
+    "originalTwentyPointsPreserved": true,
+    "leftTrainingPoints": 20,
+    "thirdViewHeldOutPoints": 20,
+    "turretFlankHeldOutPoints": 3,
+    "manualContourSigmaNative": 5,
+    "independentWholeCalibrationHoldouts": false,
+    "profileCorrespondenceFullyEstablished": false
+  },
+  "actualTyreSectionM": {
+    "outerTreadRadius": 0.176266,
+    "frontShoulderRadius": 0.168266,
+    "innerSidewallRadius": 0.151266,
+    "halfWidth": 0.0525,
+    "metricSurveyed": false
+  },
+  "actualVisibility": {
+    "report": "Data_VisibilityV65.json",
+    "cameraCases": 4,
+    "tyreProbeSamples": 80,
+    "bodyProbeSamples": 16,
+    "rejectedTyrePoint": {
+      "tyre": "RightRoad3",
+      "index": 4,
+      "nearestPredictedNative": [
+        518.7932827466083,
+        645.5483983753057
+      ],
+      "sampleInsideNative": [
+        517.8782825934878,
+        646.2633664295511
+      ],
+      "expectedOwner": "Wheel_Right_Road3_Tyre",
+      "firstOwnerInside": "Geometry_Hull_Paint",
+      "expectedTyreVisible": false,
+      "firstOwnerAtObserved": "Geometry_Hull_Paint"
+    },
+    "baselineBodyDatums": [
+      {
+        "name": "CabinFarTop",
+        "firstOwner": null,
+        "distanceBeforeTargetM": null,
+        "targetAdmissible": false,
+        "correspondenceConfirmed": true
+      },
+      {
+        "name": "CabinNearTop",
+        "firstOwner": "Geometry_Hull_Paint",
+        "distanceBeforeTargetM": 0.010677518536435393,
+        "targetAdmissible": false,
+        "correspondenceConfirmed": false
+      },
+      {
+        "name": "CabinNearBottom",
+        "firstOwner": "Geometry_Hull_Paint",
+        "distanceBeforeTargetM": 0.20262860653495895,
+        "targetAdmissible": false,
+        "correspondenceConfirmed": false
+      },
+      {
+        "name": "CabinFarBottom",
+        "firstOwner": "Geometry_Hull_Paint",
+        "distanceBeforeTargetM": 2.1039764552810425e-07,
+        "targetAdmissible": true,
+        "correspondenceConfirmed": true
+      }
+    ],
+    "upperNearCornerKind": "Unbeveled construction vertex; direct ray misses the bevel/edge, so not a proven surface holdout",
+    "farCornerCorrespondenceRejected": true,
+    "lowerNearCornerIsActualVisibleSurface": true
+  },
+  "retainedBaselineDiagnostics": {
+    "tyreRmsNative": 10.59860299674579,
+    "lowerDriverCornerErrorNative": 8.009642238140477,
+    "turretFlankRmsNative": 0.38923979073143944
+  },
+  "rejectedFilteredCameraCases": [
+    {
+      "name": "TyresOnly",
+      "tyreRmsNative": 3.238513310502735,
+      "lowerDriverCornerErrorNative": 23.883527013143137,
+      "heldOutTurretFlankRmsNative": 38.88085109718764,
+      "reason": "Improved tyre fit displaces independent turret/body contours"
+    },
+    {
+      "name": "AnchoredNear",
+      "tyreRmsNative": 3.538451487486672,
+      "lowerDriverCornerErrorNative": 3.1168407523633648,
+      "heldOutTurretFlankRmsNative": 23.017574147516594,
+      "reason": "Improved tyre fit displaces independent turret/body contours"
+    }
+  ],
+  "unbuiltGeometryExperiment": {
+    "report": "Data_VisibilityFilteredFitV65.json",
+    "radiusAndForwardDeltasM": [
+      -0.011533429244373658,
+      -0.006993515680989651,
+      0.039777537664485316,
+      -0.022836970091162957,
+      0.019697401698485197
+    ],
+    "rightRmsNative": 4.524910925759727,
+    "leftRmsNative": 4.5176423245654895,
+    "thirdHeldOutRmsNative": 10.87349589871597,
+    "thirdBaselineRmsNative": 7.515421874609999,
+    "actualModelBuilt": false,
+    "adopted": false,
+    "reason": "Third-view validation worsens under retained conditional camera family; observations/profile identities and coupled geometry/camera constraints need further work"
+  },
+  "validation": {
+    "browserReport": "Data_ReferenceBrowserV65.json",
+    "browserChecks": 6,
+    "actualProjectionChecks": 108,
+    "lensShaderCases": 3,
+    "maximumProjectionErrorNative": 8.824471647278656e-13,
+    "sourceFilesUnchanged": true,
+    "canonicalGameUnchanged": true,
+    "retainedV56AndV59Unchanged": true,
+    "actualScreenshotsInspected": [
+      "Baseline",
+      "TyresOnly",
+      "AnchoredNear"
+    ]
+  },
+  "runtime": {
+    "python": "3.12.10",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1"
+  },
+  "inputHashes": {
+    "Data_ActualFrontTyreProfilesV65.json": "a96f1ac4ef36b96e795ad230cc30f9a0b986d12d9f5b0fa4dd4eb0c24f518d03",
+    "Data_ActualReferenceGeometryV65.json": "6d580dd7084c5f7aedbcb37d523aff09b19c04f80bb320466d97cfebc91cf9e1",
+    "Data_LeftTyreObservationsV65.json": "0828010866b55ed538dc6f55ffe3ca2949f801c4658f2f9571121a1d828d6384",
+    "Data_ProjectionExpectedV65.json": "8b118543ab7bfcce021f5b25b6e2bfc2355b940abae08ff9678225b1cb7f35f4",
+    "Data_ReferenceObservationsInitialV65.json": "04a7c653e89e847a2062a30b9876000526bcf84dd1b5cee1d556e785a2f2b937",
+    "Data_ReferenceObservationsV65.json": "99f11e0788c13e690721eaf996217ba8e165f44a1bcff38aef5597e21fb633a6",
+    "Data_RetainedCameraFamilyV65.json": "e46e69bbff97bed69d48b9ab53650df94f4c4396ea711509f1f4cc7ab861ea7b",
+    "Data_ThirdTyreHoldoutsV65.json": "cc8483dee791a968f10271c3429ecd323ecd84635ecf4ea53d1a133ad14829c5",
+    "Data_TurretFlankHoldoutsV65.json": "764cc5b7fd4b5a47fe716f0e86fa44cf56c111be175b69f5746fa4e9d92490ed",
+    "Data_VisibilityCasesV65.json": "5a72aa2fe33eb0e8798a79af0f6b7de8d64f4d9b0972fa87c3047a1b4c3623fe",
+    "Data_VisibleReferenceObservationsV65.json": "ab21e0cb9270fb8f2258678c057acc176e7a2614deb491ff5f8fe7052dbf0c15",
+    "Data_ActualReferenceGeometryV65.npz": "3d0c331c1a533b2a6271bb8272cc6985e94bfcda3f932c81ad71ef2a6bcf7ac3"
+  },
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV65\\Acceptance",
+  "rebuildDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\ReferenceV65\\Rebuild",
+  "localPreview": "http://127.0.0.1:8114/tmp/Type94ReferenceReviewV65/",
+  "ownedBlenderStopped": true,
+  "cleanupEvidence": "Data_OwnedBlenderCleanupV65.json",
+  "physicalCalibrationAccepted": false,
+  "wholeReferenceAccepted": false,
+  "finalPbrAccepted": false,
+  "finalGameDerivativeAccepted": false,
+  "complete": false,
+  "goalComplete": false,
+  "published": false,
+  "nextActions": [
+    "Review native primary2017tyre contours in clearer lighting; distinguish actual front/crown/external profiles and reject occluded points",
+    "Couple multi-view camera/body constraints with the running-gear layout, keeping independent body/third-view checks before any geometry adoption",
+    "Refresh the latest high textured preview while continuing shape review; then final high/low PBR and accepted-revision game derivative"
+  ]
+}
