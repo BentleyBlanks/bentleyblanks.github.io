@@ -100,6 +100,13 @@
         "notionLedgerLastEdited": "2026-10-30T04:42:27.833Z",
         "notionParentLastEdited": "2026-10-30T04:42:29.462Z"
       },
+      "pierMacroSurfaceReview20261030": {
+        "version": "2026103009",
+        "decision": "The retained V2 imagegen hewn-stone source and its 20 percent generated weathering blend replace the earlier fine-grain blend. Broad marks, grading and the inferred normal relief are authored material choices, not original-bridge surface measurements.",
+        "notionReview": "The bridge creative row and parent bullet were reread; their explicit boundaries for steel/wood/stone textures, pier wear and unseen details cover this material iteration. No historical claim or category changes. Global review anchors and unrelated page cursors remain unchanged.",
+        "notionLedgerLastEdited": "2026-10-30T06:21:16.375Z",
+        "notionParentLastEdited": "2026-10-30T04:42:29.462Z"
+      },
       "acceptanceScope": "Historical-boundary synchronization only; no claim that the model has completed visual matching or runtime acceptance."
     },
     {

@@ -11,10 +11,10 @@ from pathlib import Path
 from PIL import Image
 
 SOURCES = (
-    ("Source_BeishahePierStoneBlend40.png", "07b6f5401f493ace8cc482474cbbcefc73b978d5672ca630782b5ac4b1da4758"),
+    ("Source_BeishahePierStoneV2.png", "910b71f49d328620647fdcc3be739bef917f52e50a24e61f927fc9cef8c01a89"),
     ("Source_BeishahePierDampWeatherV1.png", "353362ff95c1e1b6151aaddef24d1643b4a18140bbc815d3c971316b98d571af"),
 )
-EXPECTED_OUTPUT_SHA256 = "df20f4fd7d7925634f7880f03f60988ff3a90fee23b244afe7055a3c76fea6c3"
+EXPECTED_OUTPUT_SHA256 = "dbf30ded7f6dc633cf54d06679cf17c001746cb7bbe153cb80e8357f8f104cd6"
 
 
 def Sha256(path):
