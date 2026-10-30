@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026103009",
+  "version": "2026103010",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026103009",
+    "version": "2026103010",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -51,6 +51,16 @@
       0.025
     ],
     "bearingTopY": -0.69,
+    "bearingBaseLengthM": 0.48,
+    "bearingAnchorOffsetXM": 0.215,
+    "bearingAnchorOffsetZM": 0.19,
+    "bearingAnchorEmbedM": 0.1,
+    "bearingCastBaseFactor": [
+      0.45,
+      0.52,
+      0.54
+    ],
+    "abutmentForwardExtensionM": 0.25,
     "pierTopY": -1.02,
     "pierJointShadeFactor": 0.5,
     "pierCourseEdgeJitterFraction": 0.1,
@@ -741,11 +751,11 @@
       "railHeightM": 0.14
     }
   ],
-  "triangles": 1507496,
-  "meshObjects": 381,
+  "triangles": 1533144,
+  "meshObjects": 409,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
-  "glbBytes": 24385812,
-  "glbSha256": "8b786ffb6e7f5c4bff6a5b08dea1a9bee49e14dc6b9695a5828171fb331459fc",
+  "glbBytes": 24500752,
+  "glbSha256": "47e476d4f7b1b713c8f46f87814e645905b8e0796078a6e67fd6ced8cfa82385",
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
@@ -811,6 +821,7 @@
     "pierMasonry": "Varying stone lengths and staggered joints are an authored visual analogy to the AI construction study, not a measured masonry bond of the 1938 Beishahe bridge.",
     "pierStoneEdges": "Unequal corner bevels and their occlusion-style shading are authored visual analogies to the rough stone edges in the AI construction study, not measured original stone damage.",
     "pierStoneSurface": "The retained V2 imagegen stone source and a 20 percent generated weathering blend provide broad hewn marks. The PBR calibration and inferred relief are authored material choices, not measurements of the 1938 bridge.",
+    "bearings": "Fixed cast shoes, expansion rollers, baseplates, four-corner anchors and abutment support extensions are authored construction interpretations. The AI detail guides the fixed shoe's visible form; no original Beishahe bearing type, anchor dimensions or structural rating is established. Anchor shafts intentionally overlap undrilled plate and stone; threads and holes are not modeled.",
     "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
     "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
     "deckFasteners": "Paired cylinder fasteners at the two inner bearers are an authored analogy to general timber-deck connections, not a documented 1938 Beishahe detail. The simplified 71 mm solids overlap undrilled wood, have no threads or distinct head, and are not a structural design or a claim of compliance with vehicular-deck guidance.",
@@ -877,6 +888,33 @@
     "minimumCornerBevelM": 0.0045,
     "interpretation": "Authored varying stone lengths; original Beishahe masonry bond is unconfirmed."
   },
+  "bearings": {
+    "basePlateSizeM": [
+      0.52,
+      0.05,
+      0.48
+    ],
+    "fixedType": "authored curved cast shoe with transverse pin",
+    "expansionType": "three rollers below casting",
+    "anchorCount": 224,
+    "anchorsPerFoot": 4,
+    "anchorOffsetsM": [
+      0.215,
+      0.19
+    ],
+    "anchorShaftDiameterM": 0.026,
+    "anchorEmbedM": 0.1,
+    "castBaseFactor": [
+      0.45,
+      0.52,
+      0.54
+    ],
+    "abutmentForwardExtensionM": 0.25,
+    "holesModeled": false,
+    "threadsModeled": false,
+    "structuralDesign": false,
+    "interpretation": "Authored support construction; original bearing form and anchorage are unconfirmed."
+  },
   "railJoints": {
     "nominalRailLengthM": 10,
     "gapM": 0.006,
@@ -919,6 +957,7 @@
     "BeishaheSteel",
     "BeishaheRailBody",
     "BeishaheDeckNail",
+    "BeishaheBearingCast",
     "BeishaheTimber",
     "BeishaheTimberEnd",
     "BeishaheDeckTimber",

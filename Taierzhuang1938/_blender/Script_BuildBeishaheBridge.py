@@ -308,6 +308,16 @@ class Geometry:
             j = (i + 1) % len(profile)
             self.Polygon([front[i], front[j], back[j], back[i]], uvOffset=uvOffset)
 
+    def TransverseProfile(self, profile, x0, x1, centerZ=0):
+        # Counter-clockwise profile in local Z/Y, extruded across bridge X.
+        left = [(x0, y, centerZ + z) for z, y in profile]
+        right = [(x1, y, centerZ + z) for z, y in profile]
+        self.Polygon(left)
+        self.Polygon(list(reversed(right)))
+        for i in range(len(profile)):
+            j = (i + 1) % len(profile)
+            self.Polygon([left[i], right[i], right[j], left[j]])
+
     def Plate(self, points, outward, thickness):
         """Physical, two-sided connection plate, not an infinitely thin quad."""
         n = Vector(outward).normalized()
@@ -998,28 +1008,39 @@ def BuildSpan():
         # The wheel contact patch is bare polished steel; the head sides retain
         # weathered steel texture. Thin geometry, no baked highlight in albedo.
     # One fixed/one expansion bearing on each side; four load paths per span.
+    anchors, castings = Geometry(), Geometry()
     bearingCenters = []
     for end in [-1, 1]:
         for side in [-1, 1]:
             x, z = side * halfW, end * (length / 2 - 0.20)
-            shoes.Box((x, -0.995, z), (0.52, 0.05, 0.62))
+            shoes.BeveledBox((x, -0.995, z), (0.52, 0.05, SPEC["bearingBaseLengthM"]), .003)
             if end < 0:
-                # Fixed rocker's transverse pin; cast shoe bears on the top plate.
-                shoes.Cylinder((x, -0.90, z), (1, 0, 0), 0.070, 0.36)
-                shoes.Box((x, -0.80, z), (0.32, 0.14, 0.34))
+                # Authored fixed cast shoe, guided by the AI construction detail.
+                castings.BeveledBox((x, -.963, z), (.36, .014, .44), .002)
+                rightProfile = []
+                for k in range(13):
+                    t = k / 12
+                    rightProfile.append((.06 + .14*(1-t)**2, -.956 + .166*t))
+                profile = [(-.20, -.956), *rightProfile, *[(-zz, yy) for zz, yy in reversed(rightProfile[1:])]]
+                castings.TransverseProfile(profile, x-.16, x+.16, z)
+                castings.Cylinder((x, -.79, z), (1, 0, 0), .04, .32, sides=16)
             else:
                 # Expansion-end rollers, transverse to the bridge, not modern rubber pads.
                 for dz in [-0.15, 0, 0.15]:
                     shoes.Cylinder((x, -0.91, z + dz), (1, 0, 0), 0.060, 0.35)
-                shoes.Box((x, -0.79, z), (0.40, 0.16, 0.52))
-            shoes.Box((x, -0.72, z), (0.30, 0.06, 0.44))
-            for dx in [-0.20, 0.20]:
-                fasteners.Rivet((x + dx, -0.963, z + 0.22), (0, 1, 0), 0.026)
+                castings.Box((x, -0.79, z), (0.40, 0.16, 0.52))
+            shoes.BeveledBox((x, -0.72, z), (0.30, 0.06, 0.44), .0025)
+            for dx in [-SPEC["bearingAnchorOffsetXM"], SPEC["bearingAnchorOffsetXM"]]:
+                for dz in [-SPEC["bearingAnchorOffsetZM"], SPEC["bearingAnchorOffsetZM"]]:
+                    anchorBottom, anchorTop = SPEC["pierTopY"] - SPEC["bearingAnchorEmbedM"], -.936
+                    anchors.Cylinder((x+dx, (anchorBottom+anchorTop)/2, z+dz), (0,1,0), .013, anchorTop-anchorBottom, sides=8)
+                    anchors.Cylinder((x+dx, -.967, z+dz), (0,1,0), .027, .006, sides=12)
+                    anchors.Cylinder((x+dx, -.954, z+dz), (0,1,0), .022, .020, sides=6)
             bearingCenters.append([x, SPEC["bearingTopY"], z])
     return {"Trusses": steel, "Rivets": fasteners, "Sleepers": timber, "SleeperEnds": endTimber,
             "DeckPlanks": deck, "DeckBearers": deckBearers, "DeckFasteners": deckFasteners, "GuardTimbers": guards, "GuardFasteners": guardFasteners,
             "RailWest": west, "RailEast": east, "RailWear": railWear,
-            "RailMidSplice": railMidSplice, "RailMidFasteners": railMidFasteners, "Bearings": shoes}, bearingCenters
+            "RailMidSplice": railMidSplice, "RailMidFasteners": railMidFasteners, "Bearings": shoes, "BearingAnchors": anchors, "BearingCastings": castings}, bearingCenters
 
 
 def StoneTint(rng, damp=0):
@@ -1174,18 +1195,19 @@ def BuildAbutment():
     tintRng = random.Random(193807 + 70241)
     turnRng = random.Random(193807 + 21817)
     rows = 10
+    forward = SPEC["abutmentForwardExtensionM"]
     # Solid backing is recessed behind both masonry faces and their joints.
     # The joints remain visible while small gaps between individual facing
     # blocks cannot create holes through the load-bearing abutment.
-    geo.Box((0, (floor + top) / 2, 0.45), (5.95, top - floor - 0.02, 1.35),
+    geo.Box((0, (floor + top) / 2, .45-forward/2), (5.95, top - floor - .02, 1.35+forward),
             uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)), tint=(0.88, 0.875, 0.86, 1))
     for row in range(rows):
         h = (top - floor) / rows
         for col in range(8):
-            geo.BeveledBox((-3 + (col + 0.5) * 0.75, floor + (row + 0.5) * h, 0.45), (0.735, h - 0.014, 1.5),
+            geo.BeveledBox((-3 + (col + 0.5) * 0.75, floor + (row + 0.5) * h, .45-forward/2), (0.735, h - .014, 1.5+forward),
                            rng.uniform(0.006, 0.014), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)), tint=StoneTint(tintRng),
                            uvTurn=turnRng.randrange(4))
-    geo.BeveledBox((0, top - 0.11, 0.45), (6.25, 0.22, 1.65), 0.018,
+    geo.BeveledBox((0, top - .11, .45-forward/2), (6.25, .22, 1.65+forward), .018,
                    uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)), tint=StoneTint(tintRng))
     # Continuous sloping wing walls, with small separately spaced stone faces.
     for side in [-1, 1]:
@@ -1245,6 +1267,7 @@ def Rebuild():
     steel = Material("BeishaheSteel", "BeishaheTrussSteel", 0.82, 0.25, 0.58)
     railBody = Material("BeishaheRailBody", "BeishaheSteel", 0.82, 0.25, 0.58, baseFactor=(.58, .58, .58))
     deckNail = Material("BeishaheDeckNail", "BeishaheSteel", 0.82, 0.25, 0.58, baseFactor=(.25, .25, .25))
+    bearingCast = Material("BeishaheBearingCast", "BeishaheTrussSteel", .90, .08, .85, baseFactor=tuple(SPEC["bearingCastBaseFactor"]))
     wood = Material("BeishaheTimber", "BeishaheSleeper", 0.91, 0, 0.90)
     endWood = Material("BeishaheTimberEnd", "BeishaheSleeperEnd", 0.91, 0, 0.90)
     deckWood = Material("BeishaheDeckTimber", "BeishaheDeckPlank", 0.90, 0, 0.90, colorLayer="DeckTint")
@@ -1259,7 +1282,7 @@ def Rebuild():
     for role, geo in spans.items():
         mat = {"Sleepers": wood, "SleeperEnds": endWood, "DeckPlanks": deckWood, "GuardTimbers": wood,
                "RailWest": railBody, "RailEast": railBody, "RailMidSplice": railBody,
-               "DeckBearers": deckWood, "DeckFasteners": deckNail, "RailWear": railRunning}.get(role, steel)
+               "DeckBearers": deckWood, "DeckFasteners": deckNail, "BearingCastings": bearingCast, "BearingAnchors": bearingCast, "RailWear": railRunning}.get(role, steel)
         colorLayer = "DeckTint" if role in ("DeckPlanks", "DeckBearers") else None
         templates[role] = geo.Object("Template_" + role, mat, tile=1, colorLayer=colorLayer)
     sleeperTemplates = [(templates["Sleepers"], templates["SleeperEnds"])]
@@ -1395,6 +1418,7 @@ def Rebuild():
                 "pierMasonry": "Varying stone lengths and staggered joints are an authored visual analogy to the AI construction study, not a measured masonry bond of the 1938 Beishahe bridge.",
                 "pierStoneEdges": "Unequal corner bevels and their occlusion-style shading are authored visual analogies to the rough stone edges in the AI construction study, not measured original stone damage.",
                 "pierStoneSurface": "The retained V2 imagegen stone source and a 20 percent generated weathering blend provide broad hewn marks. The PBR calibration and inferred relief are authored material choices, not measurements of the 1938 bridge.",
+                "bearings": "Fixed cast shoes, expansion rollers, baseplates, four-corner anchors and abutment support extensions are authored construction interpretations. The AI detail guides the fixed shoe's visible form; no original Beishahe bearing type, anchor dimensions or structural rating is established. Anchor shafts intentionally overlap undrilled plate and stone; threads and holes are not modeled.",
                 "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
                 "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
                 "deckFasteners": "Paired cylinder fasteners at the two inner bearers are an authored analogy to general timber-deck connections, not a documented 1938 Beishahe detail. The simplified 71 mm solids overlap undrilled wood, have no threads or distinct head, and are not a structural design or a claim of compliance with vehicular-deck guidance.",
@@ -1420,6 +1444,14 @@ def Rebuild():
                             "cornerSeamSetbackM": SPEC["pierCornerSeamSetbackM"],
                             "cornerBevelFactors": SPEC["pierStoneBevelFactors"], "minimumCornerBevelM": SPEC["pierStoneBevelMinimumM"],
                             "interpretation": "Authored varying stone lengths; original Beishahe masonry bond is unconfirmed."},
+            "bearings": {"basePlateSizeM": [.52, .05, SPEC["bearingBaseLengthM"]],
+                         "fixedType": "authored curved cast shoe with transverse pin", "expansionType": "three rollers below casting",
+                         "anchorCount": SPEC["spanCount"] * 16, "anchorsPerFoot": 4,
+                         "anchorOffsetsM": [SPEC["bearingAnchorOffsetXM"], SPEC["bearingAnchorOffsetZM"]],
+                         "anchorShaftDiameterM": .026, "anchorEmbedM": SPEC["bearingAnchorEmbedM"],
+                         "castBaseFactor": SPEC["bearingCastBaseFactor"], "abutmentForwardExtensionM": SPEC["abutmentForwardExtensionM"],
+                         "holesModeled": False, "threadsModeled": False, "structuralDesign": False,
+                         "interpretation": "Authored support construction; original bearing form and anchorage are unconfirmed."},
             "railJoints": {"nominalRailLengthM": SPEC["railNominalLengthM"], "gapM": SPEC["railJointGapM"],
                            "jointCentersPerSpan": [0], "supportAxisJointCount": SPEC["spanCount"] - 1,
                            "fishplateLengthM": .36, "boltStationsM": [-.13, -.055, .055, .13],
@@ -1434,7 +1466,7 @@ def Rebuild():
             "guardTimbers": {"centerOffsetM": 1.25, "widthM": .14, "bottomY": .075,
                              "topY": .135, "segmentsPerSpan": 5, "spanJointClearanceM": .002,
                              "interpretation": "Design inferred from an unidentified 1941 Jinpu railway bridge; not evidence for Beishahe's exact construction."},
-            "materials": ["BeishaheSteel", "BeishaheRailBody", "BeishaheDeckNail", "BeishaheTimber", "BeishaheTimberEnd", "BeishaheDeckTimber", "BeishaheStone", "BeishaheStoneDamp", "BeishaheRailRunning"],
+            "materials": ["BeishaheSteel", "BeishaheRailBody", "BeishaheDeckNail", "BeishaheBearingCast", "BeishaheTimber", "BeishaheTimberEnd", "BeishaheDeckTimber", "BeishaheStone", "BeishaheStoneDamp", "BeishaheRailRunning"],
             "bakeInputs": [f"Texture_{texture}{channel}.webp" for texture in
                            ["BeishaheSteel", "BeishaheTrussSteel", "BeishaheSleeper", "BeishaheSleeperEnd", "BeishaheDeckPlank", "BeishahePierStone", "BeishahePierDamp"]
                            for channel in ["Base", "Normal", "Orm"]]}

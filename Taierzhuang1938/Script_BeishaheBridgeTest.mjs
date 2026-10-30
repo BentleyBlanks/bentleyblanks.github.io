@@ -76,10 +76,10 @@ Check(bounds.max.y>=1.8&&bounds.max.y<=2.4&&bounds.min.y>=-8&&bounds.min.y<=-4.5
 // The running surface is intentionally a textureless polished metal, while all
 // weathered materials keep their Base/Normal/ORM maps. The rail body keeps
 // its neutral steel set while the truss uses the reference-led finish.
-const materialSources={BeishaheSteel:'BeishaheTrussSteel',BeishaheRailBody:'BeishaheSteel',BeishaheDeckNail:'BeishaheSteel',BeishaheTimber:'BeishaheSleeper',BeishaheTimberEnd:'BeishaheSleeperEnd',BeishaheDeckTimber:'BeishaheDeckPlank',BeishaheStone:'BeishahePierStone',BeishaheStoneDamp:'BeishahePierDamp'};
+const materialSources={BeishaheSteel:'BeishaheTrussSteel',BeishaheRailBody:'BeishaheSteel',BeishaheDeckNail:'BeishaheSteel',BeishaheBearingCast:'BeishaheTrussSteel',BeishaheTimber:'BeishaheSleeper',BeishaheTimberEnd:'BeishaheSleeperEnd',BeishaheDeckTimber:'BeishaheDeckPlank',BeishaheStone:'BeishahePierStone',BeishaheStoneDamp:'BeishahePierDamp'};
 const steelSources=new Set(['BeishaheSteel','BeishaheTrussSteel']);
 const expectedMaterials=[...Object.keys(materialSources),'BeishaheRailRunning'];
-Check(g.materials?.length===expectedMaterials.length&&expectedMaterials.every(name=>g.materials.some(m=>m.name===name)),'Eight weathered PBR materials and the single polished rail material exist');
+Check(g.materials?.length===expectedMaterials.length&&expectedMaterials.every(name=>g.materials.some(m=>m.name===name)),'Nine weathered PBR materials and the single polished rail material exist');
 Check(g.images?.length===21,'Seven independent three-channel PBR texture sets are embedded',g.images?.length);
 const imageStats=[];
 const decodedImages=new Map();
@@ -199,6 +199,7 @@ Check(/creative weathering choice, not evidence of the 1938 waterline/i.test(dat
 Check(spec.pierJointShadeFactor===.5&&data.pierJointShade?.edgeFactor===spec.pierJointShadeFactor&&/not measured mortar/i.test(data.pierJointShade.interpretation??''),'Stone joint shading remains an authored visual treatment, not a historical mortar claim');
 Check(spec.pierCourseEdgeJitterFraction===.1&&spec.pierCornerSeamSetbackM===.3&&data.pierMasonry?.courseCount===9&&data.pierMasonry.edgeJitterFraction===spec.pierCourseEdgeJitterFraction&&/unconfirmed/i.test(data.pierMasonry.interpretation??''),'Variable stone lengths and their historical boundary are recorded');
 Check(spec.pierStoneBevelFactors.join(',')==='0.35,2.5'&&spec.pierStoneBevelMinimumM===.0045&&data.pierMasonry.minimumCornerBevelM===spec.pierStoneBevelMinimumM&&/not measured original/i.test(data.materialInterpretation?.pierStoneEdges??''),'Irregular stone corners retain their bounded authored dimensions and historical boundary');
+Check(spec.bearingBaseLengthM===.48&&spec.bearingAnchorEmbedM===.1&&spec.abutmentForwardExtensionM===.25&&data.bearings?.anchorCount===224&&!data.bearings.holesModeled&&!data.bearings.threadsModeled&&!data.bearings.structuralDesign&&/unconfirmed/i.test(data.bearings.interpretation??''),'Bearing construction and represented undrilled anchors remain authored, unverified dimensions');
 Check(/not established by a confirmed 1938 Beishahe bridge photograph/i.test(data.materialInterpretation?.deckPlanks??''),'Continuous wooden decking is identified as an authored reconstruction');
 Check(data.deckFasteners?.diameterM===spec.deckFastenerDiameterM&&data.deckFasteners.lengthM===spec.deckFastenerLengthM&&data.deckFasteners.topY===spec.deckFastenerTopY&&data.deckFasteners.bearerEmbedM===.025&&!data.deckFasteners.holesModeled&&!data.deckFasteners.threadsModeled&&/not a structural design/i.test(data.materialInterpretation?.deckFasteners??''),'Deck-fastener dimensions and unverified, undrilled visual convention are recorded');
 Check(data.deck?.clearWidthM===spec.sleeperLengthM&&data.deck.nominalBoardWidthM===spec.deckBoardNominalWidthM&&data.deck.rowToneContrast===spec.deckRowToneContrast&&data.deck.variantCount===spec.deckVariantCount&&data.deck.plankThicknessM===.045&&data.deck.topY===.075&&data.deck.jointWidthM===.006&&data.deck.grainAxis==='X','Decking dimensions, variant count, row tone, real 6 mm board gaps and transverse timber grain are recorded');
@@ -1145,6 +1146,60 @@ Check(spec.panelsPerSpan===9&&Array.isArray(spec.trussCounterPanelIndices)&&spec
     for(const x of spec.deckFastenerBearersX)for(const dz of spec.deckJointFastenerOffsetsM){const origin=new THREE.Vector3(x,.12,center+dz),down=new THREE.Vector3(0,-1,0),nh=Hits(nails,origin,down,.15),ph=Hits(planks,origin,down,.15),bh=Hits(bearers,origin,down,.15);Check(nh.some(h=>Math.abs(h.point.y-.076)<.0002)&&nh.some(h=>Math.abs(h.point.y-.005)<.0002)&&ph.some(h=>Math.abs(h.point.y-.075)<.0002)&&bh.some(h=>Math.abs(h.point.y-.03)<.0002),'Transition fastener connects the wood insert to its bearer',{index,x,dz});}
   }
 }
+// Inspect actual represented support contacts, anchor seating and separation.
+// These are visual-solid checks, not an engineering bearing/anchor design.
+{
+  const anchors=ByRole('BearingAnchors'),castings=ByRole('BearingCastings');
+  Check(anchors.length===spec.spanCount&&new Set(anchors.map(p=>p.node.mesh)).size===1,'Every span has the shared real anchor assembly');
+  Check(castings.length===spec.spanCount&&new Set(castings.map(p=>p.node.mesh)).size===1,'Every span has shared fixed and expansion castings');
+  const castMaterial=g.materials.find(m=>m.name==='BeishaheBearingCast'),trussMaterial=g.materials.find(m=>m.name==='BeishaheSteel');
+  Check(castMaterial?.pbrMetallicRoughness.baseColorFactor?.slice(0,3).every((v,i)=>Math.abs(v-spec.bearingCastBaseFactor[i])<.001)&&Math.abs(castMaterial.normalTexture.scale-.85)<.001,'Castings retain their independently graded physical finish');
+  Check((trussMaterial.pbrMetallicRoughness.baseColorFactor??[1,1,1,1]).slice(0,3).every(v=>v>.99),'Bearing finish does not darken the main truss material');
+  for(const role of ['BearingAnchors','BearingCastings'])for(const part of [...new Map(ByRole(role).map(p=>[p.node.mesh,p])).values()]){
+    const {positions,indices}=part.geo,edges=new Map(),key=i=>[positions[i*3],positions[i*3+1],positions[i*3+2]].map(v=>v.toFixed(5)).join(',');
+    for(let k=0;k<indices.length;k+=3){const ids=[indices[k],indices[k+1],indices[k+2]];for(const [a,b] of [[ids[0],ids[1]],[ids[1],ids[2]],[ids[2],ids[0]]]){const x=key(a),y=key(b),e=x<y?`${x}|${y}`:`${y}|${x}`;edges.set(e,(edges.get(e)||0)+1);}}
+    Check([...edges.values()].every(n=>n===2),'Anchor and cast-shoe solids are closed',{role});
+    Check(g.materials[part.primitive.material].name==='BeishaheBearingCast','Castings and anchors use their own dark physical finish',role);
+  }
+  const down=new THREE.Vector3(0,-1,0),spanLength=spec.spanPitchM-spec.expansionGapM;
+  let actualAnchors=0;
+  for(let i=0;i<spec.spanCount;i++){
+    const center=-spec.lengthM/2+spec.spanPitchM*(i+.5),shoe=ByRole('Bearings',i),body=ByRole('BearingCastings',i),hardware=ByRole('BearingAnchors',i);
+    for(const end of [-1,1])for(const side of [-1,1]){
+      const x=side*spec.trussCenterOffsetM,z=center+end*(spanLength/2-.20),support=i+(end>0?1:0);
+      const stone=support===0?ByRole('abutment').filter(p=>p.node.name.endsWith('North')):support===spec.spanCount?ByRole('abutment').filter(p=>p.node.name.endsWith('South')):ByRole('Cap').filter(p=>p.node.extras?.supportIndex===support);
+      const events=new Map();
+      for(const hit of Hits([...shoe,...body],new THREE.Vector3(x,spec.bearingTopY+.05,z),down,.43)){
+        const ny=hit.face.normal.clone().transformDirection(hit.object.matrixWorld).y;if(Math.abs(ny)<1e-6)continue;
+        const key=hit.point.y.toFixed(6);if(!events.has(key))events.set(key,{y:hit.point.y,enter:false,exit:false});events.get(key)[ny>0?'enter':'exit']=true;
+      }
+      const ordered=[...events.values()].sort((a,b)=>b.y-a.y);let active=0,last=null,gaps=0;
+      for(const e of ordered){if(last!=null&&active<=0&&last-e.y>.0005&&last<=spec.bearingTopY+.001&&e.y>=spec.pierTopY-.001)gaps++;active+=(e.enter?1:0)-(e.exit?1:0);Check(active>=0,'Bearing contact ray has consistent outward-facing closed surfaces',{span:i+1,end,side,y:e.y});last=e.y;}
+      Check(ordered.length>=4&&Math.abs(ordered[0].y-spec.bearingTopY)<.0005&&Math.abs(ordered.at(-1).y-spec.pierTopY)<.0005&&active===0&&gaps===0,'Represented solids form an uninterrupted vertical support stack',{span:i+1,end,side,gaps});
+      if(end<0){
+        const widths=[-.95,-.87,-.80].map(y=>{const h=Hits(body,new THREE.Vector3(x,y,z+.4),new THREE.Vector3(0,0,-1),.8);Check(h.length>=2,'Fixed cast shoe has solid transverse profile',{span:i+1,side,y});return h[0].point.z-z;});
+        Check(widths[0]>.17&&widths[0]<.22&&widths[1]>.08&&widths[1]<.13&&widths[2]>.05&&widths[2]<.08&&widths[0]>widths[1]&&widths[1]>widths[2],'The fixed casting has a real flared curved profile',{span:i+1,side,widths});
+      }
+      for(const dx of [-spec.bearingAnchorOffsetXM,spec.bearingAnchorOffsetXM])for(const dz of [-spec.bearingAnchorOffsetZM,spec.bearingAnchorOffsetZM]){
+        const origin=new THREE.Vector3(x+dx,-.91,z+dz),h=Hits(hardware,origin,down,.24),b=Hits(shoe,origin,down,.24),cap=Hits(stone,origin,down,.4);
+        Check(h.some(v=>Math.abs(v.point.y+.936)<.0005)&&h.some(v=>Math.abs(v.point.y+1.12)<.0005)&&h.some(v=>Math.abs(v.point.y+.964)<.0005)&&h.some(v=>Math.abs(v.point.y+.970)<.0005),'Each actual anchor has a stud, nut, washer and represented embed',{span:i+1,end,side,dx,dz});
+        Check(b.some(v=>Math.abs(v.point.y+.970)<.0005)&&cap.some(v=>Math.abs(v.point.y-spec.pierTopY)<.0005)&&cap.some(v=>v.point.y<=-1.12),'Anchor washers seat on a real plate above supported cap stone',{span:i+1,end,side,dx,dz});actualAnchors++;
+      }
+      for(const dx of [-.24,0,.24])for(const dz of [-.22,0,.22]){
+        const h=Hits(stone,new THREE.Vector3(x+dx,spec.pierTopY+.05,z+dz),down,.3);
+        Check(h.some(v=>Math.abs(v.point.y-spec.pierTopY)<.0005),'All pier and abutment bearing-foot samples have stone support',{span:i+1,end,side,dx,dz});
+      }
+    }
+  }
+  Check(actualAnchors===224,'All 224 represented bearing anchors are inspected');
+  for(let support=1;support<spec.spanCount;support++)for(const side of [-1,1]){
+    const axis=-spec.lengthM/2+support*spec.spanPitchM,x=side*spec.trussCenterOffsetM;
+    const base=(span,z)=>SubBounds(Points(ByRole('Bearings',span)[0]),p=>Math.abs(p.x-x)<.3&&Math.abs(p.z-z)<.4&&p.y<spec.pierTopY+.04);
+    const a=base(support-1,axis-.26),b=base(support,axis+.26),gap=b.min.z-a.max.z;
+    Check(Math.abs(a.max.z-a.min.z-.48)<.0005&&Math.abs(b.max.z-b.min.z-.48)<.0005&&gap>.035&&gap<.045,'Adjacent real baseplates leave a gap across each pier',{support,side,gap});
+  }
+}
+
 Check(bearingCount===56,'All fifty-six span-end bearing load paths are inspected');
 // Capstones are a visual construction inference, not established history.
 // Inspect the exported faces rather than accepting the sidecar description:
@@ -1161,7 +1216,7 @@ for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
   for(const side of [-1,1])for(const direction of [-1,1]){
     const spanIndex=direction<0?supportIndex-1:supportIndex;
     const feet=ByRole('Bearings',spanIndex),bearingZ=centerZ+direction*.26,bearingX=side*spec.trussCenterOffsetM;
-    for(const dx of [-.24,0,.24])for(const dz of [-.29,0,.29]){
+    for(const dx of [-.24,0,.24])for(const dz of [-spec.bearingBaseLengthM/2+.02,0,spec.bearingBaseLengthM/2-.02]){
       const origin=new THREE.Vector3(bearingX+dx,top+.20,bearingZ+dz);
       const shoe=Hits(feet,origin,down,.40),cap=Hits(caps,origin,down,.40);
       Check(shoe.some(h=>Math.abs(h.point.y-top)<.0005)&&cap.some(h=>Math.abs(h.point.y-top)<.0005),
