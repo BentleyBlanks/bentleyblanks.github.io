@@ -44,7 +44,7 @@
     "rough": 0.93,
     "roughVar": 0.08,
     "roughLumaK": 0.0,
-    "ao": 0.5,
+    "ao": 0.15,
     "metal": 0.0,
     "seamless": "blend",
     "rowFlatten": true,
@@ -92,11 +92,11 @@
       "file": "Texture_BeishahePierDampOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 86190,
-      "sha256": "6513ae24a6e334458dc207203d34e358bebd78661dd6b30240ef46045e501c65"
+      "bytes": 48976,
+      "sha256": "44e182b3b94666da4c2a268e2f625701d042ef797f5ce81cbf4bfc833824001f"
     }
   ],
-  "totalBytes": 588900,
+  "totalBytes": 551686,
   "metrics": {
     "meanSrgb": [
       0.4298,
@@ -114,8 +114,8 @@
     "seamRatio": 0.864,
     "border": 0.982,
     "swing": 0.0036,
-    "aoMean": 0.883,
-    "roughMean": 0.915,
+    "aoMean": 0.965,
+    "roughMean": 0.919,
     "texelsPerMeter": 1024.0
   },
   "gateProblems": []

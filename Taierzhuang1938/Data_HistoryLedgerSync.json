@@ -123,6 +123,23 @@
         "notionReview": "Only the existing creative bridge row and dated status note changed; 115 rows retained, bridge row index 84 only. Parent bullet and player-facing HistoryAndCreation text name the inferred section. Categories, source indices, global review anchors and unrelated page cursors stay unchanged.",
         "notionLedgerLastEdited": "2026-10-30T14:04:53.779Z",
         "notionParentLastEdited": "2026-10-30T14:04:55.686Z"
+      },
+      "stoneOcclusionReview20261030": {
+        "version": "2026103012",
+        "decision": "Retain V2 stone albedo, existing normal maps, geometry and per-stone colors. Recalibrate fine-surface AO bake factor from 0.5 to 0.15 for both dry and damp masonry; roughness follows the existing small AO coupling. This is authored rendering calibration, not measured 1938 surface condition or a structural change.",
+        "imagegenStudies": {
+          "files": [
+            "Source_BeishahePierStoneV4.png",
+            "Source_BeishahePierStoneV5.png"
+          ],
+          "provider": "built-in imagegen",
+          "adopted": false,
+          "reason": "In-model source, contrast and channel-isolation trials identified excessive fine-surface AO as the dominant dark-groove cause. The retained V2 base/normal set with restrained occlusion gave the closer local appearance."
+        },
+        "scope": "Two ORM images changed; all 58 meshes, 409 mesh-node placements, 10 material definitions and other 19 embedded images are byte-identical to V50. Existing creative classification and reference indices preserved.",
+        "notionReview": "Only existing bridge row 84 of 115 and the dated status note changed; parent creative bullet and player-facing HistoryAndCreation text name fine surface light/dark treatment. Global audit anchors and unrelated page cursors stay unchanged.",
+        "notionLedgerLastEdited": "2026-10-30T15:10:16.178Z",
+        "notionParentLastEdited": "2026-10-30T15:10:17.459Z"
       }
     },
     {

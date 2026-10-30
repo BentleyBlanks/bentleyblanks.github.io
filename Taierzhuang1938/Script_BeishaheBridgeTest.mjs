@@ -127,7 +127,14 @@ for(const m of g.materials){
   // Blender repacks unused B to 255 for nonmetallic materials; their zero
   // metallicFactor makes that channel irrelevant. Steel uses the original B.
   const orm=await CheckTexturePixels(m.name,'Orm',p.metallicRoughnessTexture.index,source,steelSources.has(source)?[0,1,2]:[0,1]);
-  await CheckTexturePixels(m.name,'Orm',m.occlusionTexture.index,source,[0]);
+  const occlusion=await CheckTexturePixels(m.name,'Orm',m.occlusionTexture.index,source,[0]);
+  if(source==='BeishahePierStone'||source==='BeishahePierDamp'){
+    let sum=0,sum2=0;const count=occlusion.info.width*occlusion.info.height;
+    for(let i=0;i<count;i++){const value=occlusion.data[i*3]/255;sum+=value;sum2+=value*value;}
+    const mean=sum/count,std=Math.sqrt(Math.max(0,sum2/count-mean*mean));
+    Check(mean>.94&&mean<.99,'Fine stone occlusion stays restrained instead of turning shallow marks into dark grooves',{material:m.name,mean});
+    Check(std>.005&&std<.06,'Stone occlusion retains local cavities without a flat white or excessive-contrast map',{material:m.name,std});
+  }
   if(!steelSources.has(source))Check((p.metallicFactor??1)===0,'Wood and masonry do not become metallic after ORM repacking',m.name);
   baseImages.add(base.source);normalImages.add(normal.source);ormImages.add(orm.source);
   let sum=0,sum2=0;const pixels=normal.info.width*normal.info.height;

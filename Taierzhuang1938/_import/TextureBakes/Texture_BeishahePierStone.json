@@ -44,7 +44,7 @@
     "rough": 0.89,
     "roughVar": 0.05,
     "roughLumaK": 0.0,
-    "ao": 0.5,
+    "ao": 0.15,
     "metal": 0.0,
     "seamless": "blend",
     "rowFlatten": true,
@@ -92,11 +92,11 @@
       "file": "Texture_BeishahePierStoneOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 82368,
-      "sha256": "b234e828c5415ec1ae8ca7d8f7f343f134e5183dd34797aab9c0c23efcbd18fd"
+      "bytes": 41190,
+      "sha256": "cd54589956fce24d2b87b2b0dcb39b169fd0275bfbd51a00efdc19148d6c7718"
     }
   ],
-  "totalBytes": 532472,
+  "totalBytes": 491294,
   "metrics": {
     "meanSrgb": [
       0.5499,
@@ -114,8 +114,8 @@
     "seamRatio": 0.88,
     "border": 0.985,
     "swing": 0.0033,
-    "aoMean": 0.883,
-    "roughMean": 0.882,
+    "aoMean": 0.964,
+    "roughMean": 0.886,
     "texelsPerMeter": 1024.0
   },
   "gateProblems": []

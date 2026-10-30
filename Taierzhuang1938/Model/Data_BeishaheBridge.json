@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026103011",
+  "version": "2026103012",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026103011",
+    "version": "2026103012",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -761,8 +761,8 @@
   "triangles": 1533144,
   "meshObjects": 409,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
-  "glbBytes": 24500752,
-  "glbSha256": "0990292b791594f7f7c011298ca77296c580768574e8b960526ffb75b3355789",
+  "glbBytes": 24312032,
+  "glbSha256": "82243720193a5cea7f91b7d5ad2ddb5bc8dfa0e28511340002b4fa5563962d94",
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
@@ -833,7 +833,7 @@
     "pierJointShade": "Continuous darkening over each real stone bevel and recessed side is an authored occlusion-style visual treatment. It is not a measured mortar color, a lightmap, or evidence of the 1938 bridge's masonry.",
     "pierMasonry": "Varying stone lengths and staggered joints are an authored visual analogy to the AI construction study, not a measured masonry bond of the 1938 Beishahe bridge.",
     "pierStoneEdges": "Unequal corner bevels and their occlusion-style shading are authored visual analogies to the rough stone edges in the AI construction study, not measured original stone damage.",
-    "pierStoneSurface": "The retained V2 imagegen stone source and a 20 percent generated weathering blend provide broad hewn marks. The PBR calibration and inferred relief are authored material choices, not measurements of the 1938 bridge.",
+    "pierStoneSurface": "The retained V2 imagegen stone source and a 20 percent generated weathering blend provide broad hewn marks. Fine surface occlusion is restrained with a 0.15 bake factor, preserving the existing albedo, normal maps and geometric joint shading. The PBR calibration and inferred relief are authored material choices, not measurements of the 1938 bridge.",
     "bearings": "Fixed cast shoes, expansion rollers, baseplates, four-corner anchors and abutment support extensions are authored construction interpretations. The AI detail guides the fixed shoe's visible form; no original Beishahe bearing type, anchor dimensions or structural rating is established. Anchor shafts intentionally overlap undrilled plate and stone; threads and holes are not modeled.",
     "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
     "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
