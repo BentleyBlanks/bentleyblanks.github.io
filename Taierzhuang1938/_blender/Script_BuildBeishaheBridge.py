@@ -507,7 +507,7 @@ def BuildDeck(length, count, seed):
     pieces are relieved at spike heads and butt against their adjacent pieces.
     This remains an authored deck design, not a claim about the 1938 original.
     """
-    planks, bearers = Geometry(), Geometry()
+    planks, bearers, nails = Geometry(), Geometry(), Geometry()
     rowRng = random.Random(seed + 61973)
     rng = random.Random(seed + 61973)
     # Preserve the previous rail-edge and bearer texture offsets when the
@@ -556,6 +556,14 @@ def BuildDeck(length, count, seed):
             planks.TopBeveledBox(((x0 + x1) / 2, .0525, (z0 + z1) / 2),
                                  (x1 - x0, .045, z1 - z0), .003,
                                  uvOffset=rowOffset, grain="sleeper", tint=rowTint, edgeProfile=rowEdges)
+        # Authored deck fasteners: two nails at each of the inner wooden
+        # bearers. The shank overlaps undrilled wood, as an explicit visual
+        # convention; no historic Beishahe fixing type is claimed.
+        for x in SPEC["deckFastenerBearersX"]:
+            for fraction in SPEC["deckFastenerRowFractions"]:
+                z = z0 + (z1-z0)*fraction
+                nails.Cylinder((x, SPEC["deckFastenerTopY"]-SPEC["deckFastenerLengthM"]/2, z),
+                               (0, 1, 0), SPEC["deckFastenerDiameterM"]/2, SPEC["deckFastenerLengthM"], sides=6)
     def TintAt(z):
         row = max(0, min(boardCount - 1, bisect.bisect_right(rowBoundaries, z) - 1))
         return rowTints[row]
@@ -608,7 +616,7 @@ def BuildDeck(length, count, seed):
         for face in [-1, 1]:
             bearers.Box((rail + face * .12, .015, 0), (.02, .03, length),
                         uvOffset=(rng.uniform(0, 7), rng.uniform(0, 7)), grain="deck")
-    return planks, bearers
+    return planks, bearers, nails
 
 
 def BuildGuardTimbers(length, count):
@@ -682,7 +690,7 @@ def BuildPierTransition(seed):
     extend from their spans to a single 6 mm joint at the support axis; there
     is no artificial 116 mm rail insert. This alignment is a design inference.
     """
-    railSplice, railFasteners, deck, support, splice, bolts, guard, guardSplice, guardBolts = [Geometry() for _ in range(9)]
+    railSplice, railFasteners, deck, support, splice, bolts, guard, guardSplice, guardBolts, deckFasteners = [Geometry() for _ in range(10)]
     rng = random.Random(seed + 71783)
     gapHalf = SPEC["expansionGapM"] / 2
     clearance = .002
@@ -703,6 +711,10 @@ def BuildPierTransition(seed):
     for x0, x1 in zones:
         deck.TopBeveledBox(((x0 + x1) / 2, .0525, 0), (x1 - x0, .045, 2 * half), .003,
                            uvOffset=uvOffset, grain="sleeper", tint=tint, edgeProfile=edgeProfile)
+    for x in SPEC["deckFastenerBearersX"]:
+        for z in SPEC["deckJointFastenerOffsetsM"]:
+            deckFasteners.Cylinder((x, SPEC["deckFastenerTopY"]-SPEC["deckFastenerLengthM"]/2, z),
+                                   (0, 1, 0), SPEC["deckFastenerDiameterM"]/2, SPEC["deckFastenerLengthM"], sides=6)
     for rail in [-railX, railX]:
         for sign in [-1, 1]:
             xa, xb = sorted((rail + sign * footEdge, rail + sign * bufferOuter))
@@ -733,7 +745,7 @@ def BuildPierTransition(seed):
             bolts.Cylinder((x, -.018, z), (0, 1, 0), .009, .006, sides=8)
     return {"RailJointSplice": railSplice, "RailJointFasteners": railFasteners,
             "DeckJoint": deck, "DeckJointSupport": support, "DeckJointSplice": splice,
-            "DeckJointBolts": bolts, "GuardJoint": guard,
+            "DeckJointBolts": bolts, "DeckJointFasteners": deckFasteners, "GuardJoint": guard,
             "GuardJointSplice": guardSplice, "GuardJointBolts": guardBolts}
 
 
@@ -749,7 +761,7 @@ def BuildSpan():
     steel, fasteners, west, east, shoes, railWear, railMidSplice, railMidFasteners = [Geometry() for _ in range(8)]
     count = math.ceil(length / SPEC["sleeperSpacingM"])
     timber, endTimber = BuildSleepers(length, count, 1938)
-    deck, deckBearers = BuildDeck(length, count, 1938)
+    deck, deckBearers, deckFasteners = BuildDeck(length, count, 1938)
     guards, guardFasteners = BuildGuardTimbers(length, count)
 
     def BuiltMember(a, b, width, depth):
@@ -970,7 +982,7 @@ def BuildSpan():
                 fasteners.Rivet((x + dx, -0.963, z + 0.22), (0, 1, 0), 0.026)
             bearingCenters.append([x, SPEC["bearingTopY"], z])
     return {"Trusses": steel, "Rivets": fasteners, "Sleepers": timber, "SleeperEnds": endTimber,
-            "DeckPlanks": deck, "DeckBearers": deckBearers, "GuardTimbers": guards, "GuardFasteners": guardFasteners,
+            "DeckPlanks": deck, "DeckBearers": deckBearers, "DeckFasteners": deckFasteners, "GuardTimbers": guards, "GuardFasteners": guardFasteners,
             "RailWest": west, "RailEast": east, "RailWear": railWear,
             "RailMidSplice": railMidSplice, "RailMidFasteners": railMidFasteners, "Bearings": shoes}, bearingCenters
 
@@ -1181,6 +1193,7 @@ def Rebuild():
     scene.unit_settings.scale_length = 1
     steel = Material("BeishaheSteel", "BeishaheTrussSteel", 0.82, 0.25, 0.58)
     railBody = Material("BeishaheRailBody", "BeishaheSteel", 0.82, 0.25, 0.58, baseFactor=(.58, .58, .58))
+    deckNail = Material("BeishaheDeckNail", "BeishaheSteel", 0.82, 0.25, 0.58, baseFactor=(.25, .25, .25))
     wood = Material("BeishaheTimber", "BeishaheSleeper", 0.91, 0, 0.90)
     endWood = Material("BeishaheTimberEnd", "BeishaheSleeperEnd", 0.91, 0, 0.90)
     deckWood = Material("BeishaheDeckTimber", "BeishaheDeckPlank", 0.90, 0, 0.90, colorLayer="DeckTint")
@@ -1195,11 +1208,12 @@ def Rebuild():
     for role, geo in spans.items():
         mat = {"Sleepers": wood, "SleeperEnds": endWood, "DeckPlanks": deckWood, "GuardTimbers": wood,
                "RailWest": railBody, "RailEast": railBody, "RailMidSplice": railBody,
-               "DeckBearers": deckWood, "RailWear": railRunning}.get(role, steel)
+               "DeckBearers": deckWood, "DeckFasteners": deckNail, "RailWear": railRunning}.get(role, steel)
         colorLayer = "DeckTint" if role in ("DeckPlanks", "DeckBearers") else None
         templates[role] = geo.Object("Template_" + role, mat, tile=1, colorLayer=colorLayer)
     sleeperTemplates = [(templates["Sleepers"], templates["SleeperEnds"])]
     deckTemplates = [templates["DeckPlanks"]]
+    nailTemplates = [templates["DeckFasteners"]]
     bearerTemplates = [templates["DeckBearers"]]
     sleeperLength = SPEC["spanPitchM"] - SPEC["expansionGapM"]
     sleeperCount = math.ceil(sleeperLength / SPEC["sleeperSpacingM"])
@@ -1208,8 +1222,9 @@ def Rebuild():
             body, ends = BuildSleepers(sleeperLength, sleeperCount, 1938 + variant * 971)
             sleeperTemplates.append((body.Object(f"Template_Sleepers_{variant}", wood),
                                      ends.Object(f"Template_SleeperEnds_{variant}", endWood)))
-        boards, bearers = BuildDeck(sleeperLength, sleeperCount, 1938 + variant * 971)
+        boards, bearers, nails = BuildDeck(sleeperLength, sleeperCount, 1938 + variant * 971)
         deckTemplates.append(boards.Object(f"Template_DeckPlanks_{variant}", deckWood, colorLayer="DeckTint"))
+        nailTemplates.append(nails.Object(f"Template_DeckFasteners_{variant}", deckNail))
         if variant < 3:
             bearerTemplates.append(bearers.Object(f"Template_DeckBearers_{variant}", deckWood, colorLayer="DeckTint"))
     assemblies = []
@@ -1228,12 +1243,14 @@ def Rebuild():
                 template = deckTemplates[i % len(deckTemplates)]
             elif role == "DeckBearers":
                 template = bearerTemplates[i % len(bearerTemplates)]
+            elif role == "DeckFasteners":
+                template = nailTemplates[i % len(nailTemplates)]
             obj = bpy.data.objects.new(f"Intact_Span{i + 1:02d}_{role}", template.data)
             bpy.context.collection.objects.link(obj)
             obj.parent = parent
             obj["role"], obj["spanIndex"] = role, i
         assemblies.append({"id": parent.name, "spanIndex": i, "centerZ": z, "bearings": [[x, y, zz + z] for x, y, zz in bearingTemplate]})
-    for obj in list(templates.values()) + [obj for pair in sleeperTemplates[1:] for obj in pair] + deckTemplates[1:] + bearerTemplates[1:]:
+    for obj in list(templates.values()) + [obj for pair in sleeperTemplates[1:] for obj in pair] + deckTemplates[1:] + bearerTemplates[1:] + nailTemplates[1:]:
         bpy.data.objects.remove(obj, do_unlink=True)
     pierTemplates = []
     for variant in range(3):
@@ -1257,7 +1274,7 @@ def Rebuild():
     for role, geo in transitionGeometry.items():
         mat = {"GuardJoint": wood,
                "RailJointSplice": railBody, "DeckJoint": deckWood,
-               "DeckJointSupport": deckWood}.get(role, steel)
+               "DeckJointSupport": deckWood, "DeckJointFasteners": deckNail}.get(role, steel)
         layer = "DeckTint" if role in ("DeckJoint", "DeckJointSupport") else None
         transitionTemplates[role] = geo.Object("Template_" + role, mat, tile=1, colorLayer=layer)
     transitionDecks = [transitionTemplates["DeckJoint"]]
@@ -1325,6 +1342,7 @@ def Rebuild():
                 "pierDamp": "Irregular brown-gray and muted olive staining that fades into the dry pier is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
                 "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
                 "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
+                "deckFasteners": "Paired cylinder fasteners at the two inner bearers are an authored analogy to general timber-deck connections, not a documented 1938 Beishahe detail. The simplified 71 mm solids overlap undrilled wood, have no threads or distinct head, and are not a structural design or a claim of compliance with vehicular-deck guidance.",
                 "jointTransitions": "Rail and wooden deck splice details are authored to maintain a usable crossing; their exact construction is not established by a confirmed 1938 Beishahe bridge photograph.",
                 "railJoints": "The 1937 route record gives nominal 10 m rails, while joint positions at midspan and supports, the 6 mm gaps, section dimensions and hardware are authored design assumptions. Represented through-bolt shafts overlap solid undrilled rail webs and plates.",
                 "railFasteners": "Square-head screw-spike shape, 120 mm sleeper embed, two outside and one inside, and outside hook plates are authored interpretations of early German railway references, not established for the 1938 Beishahe bridge. Solid spike shafts intentionally overlap undrilled sleeper and tie-plate geometry; holes and threads are not modeled.",
@@ -1334,6 +1352,11 @@ def Rebuild():
                      "railFootClearanceM": .001, "jointWidthM": .006,
                      "jointEndClearanceM": .002, "jointSpliceLengthM": .36,
                      "bearerBottomY": 0, "bearerTopY": .03, "grainAxis": "X"},
+            "deckFasteners": {"diameterM": SPEC["deckFastenerDiameterM"], "lengthM": SPEC["deckFastenerLengthM"],
+                              "topY": SPEC["deckFastenerTopY"], "bearersX": SPEC["deckFastenerBearersX"],
+                              "rowFractions": SPEC["deckFastenerRowFractions"], "jointOffsetsM": SPEC["deckJointFastenerOffsetsM"],
+                              "bearerEmbedM": .025, "holesModeled": False, "threadsModeled": False,
+                              "interpretation": "Authored visual analogy; no original Beishahe fixing or structural compliance is established."},
             "pierCap": {"stoneCount": 4, "jointWidthM": .014, "baseThicknessM": .025,
                         "interpretation": "Authored construction; original Beishahe capstones are unconfirmed."},
             "railJoints": {"nominalRailLengthM": SPEC["railNominalLengthM"], "gapM": SPEC["railJointGapM"],
@@ -1350,7 +1373,7 @@ def Rebuild():
             "guardTimbers": {"centerOffsetM": 1.25, "widthM": .14, "bottomY": .075,
                              "topY": .135, "segmentsPerSpan": 5, "spanJointClearanceM": .002,
                              "interpretation": "Design inferred from an unidentified 1941 Jinpu railway bridge; not evidence for Beishahe's exact construction."},
-            "materials": ["BeishaheSteel", "BeishaheRailBody", "BeishaheTimber", "BeishaheTimberEnd", "BeishaheDeckTimber", "BeishaheStone", "BeishaheStoneDamp", "BeishaheRailRunning"],
+            "materials": ["BeishaheSteel", "BeishaheRailBody", "BeishaheDeckNail", "BeishaheTimber", "BeishaheTimberEnd", "BeishaheDeckTimber", "BeishaheStone", "BeishaheStoneDamp", "BeishaheRailRunning"],
             "bakeInputs": [f"Texture_{texture}{channel}.webp" for texture in
                            ["BeishaheSteel", "BeishaheTrussSteel", "BeishaheSleeper", "BeishaheSleeperEnd", "BeishaheDeckPlank", "BeishahePierStone", "BeishahePierDamp"]
                            for channel in ["Base", "Normal", "Orm"]]}

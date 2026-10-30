@@ -76,10 +76,10 @@ Check(bounds.max.y>=1.8&&bounds.max.y<=2.4&&bounds.min.y>=-8&&bounds.min.y<=-4.5
 // The running surface is intentionally a textureless polished metal, while all
 // weathered materials keep their Base/Normal/ORM maps. The rail body keeps
 // its neutral steel set while the truss uses the reference-led finish.
-const materialSources={BeishaheSteel:'BeishaheTrussSteel',BeishaheRailBody:'BeishaheSteel',BeishaheTimber:'BeishaheSleeper',BeishaheTimberEnd:'BeishaheSleeperEnd',BeishaheDeckTimber:'BeishaheDeckPlank',BeishaheStone:'BeishahePierStone',BeishaheStoneDamp:'BeishahePierDamp'};
+const materialSources={BeishaheSteel:'BeishaheTrussSteel',BeishaheRailBody:'BeishaheSteel',BeishaheDeckNail:'BeishaheSteel',BeishaheTimber:'BeishaheSleeper',BeishaheTimberEnd:'BeishaheSleeperEnd',BeishaheDeckTimber:'BeishaheDeckPlank',BeishaheStone:'BeishahePierStone',BeishaheStoneDamp:'BeishahePierDamp'};
 const steelSources=new Set(['BeishaheSteel','BeishaheTrussSteel']);
 const expectedMaterials=[...Object.keys(materialSources),'BeishaheRailRunning'];
-Check(g.materials?.length===expectedMaterials.length&&expectedMaterials.every(name=>g.materials.some(m=>m.name===name)),'Seven weathered PBR materials and the single polished rail material exist');
+Check(g.materials?.length===expectedMaterials.length&&expectedMaterials.every(name=>g.materials.some(m=>m.name===name)),'Eight weathered PBR materials and the single polished rail material exist');
 Check(g.images?.length===21,'Seven independent three-channel PBR texture sets are embedded',g.images?.length);
 const imageStats=[];
 const decodedImages=new Map();
@@ -197,6 +197,7 @@ Check(data.historicalReferences?.length>=3&&data.historicalReferences.every(r=>/
 Check(spec.trussUpperGussetDepthM===.34&&spec.trussUpperGussetMaxHalfWidthM===.36&&/not established for Beishahe/i.test(data.materialInterpretation?.trussConnections??'')&&/without shanks or holes/i.test(data.materialInterpretation?.trussConnections??''),'Upper-node dimensions and unverified, head-only rivet interpretation are recorded');
 Check(/creative weathering choice, not evidence of the 1938 waterline/i.test(data.materialInterpretation?.pierDamp??''),'Lower pier damp color remains explicitly an artistic choice, not a historical water-level claim');
 Check(/not established by a confirmed 1938 Beishahe bridge photograph/i.test(data.materialInterpretation?.deckPlanks??''),'Continuous wooden decking is identified as an authored reconstruction');
+Check(data.deckFasteners?.diameterM===spec.deckFastenerDiameterM&&data.deckFasteners.lengthM===spec.deckFastenerLengthM&&data.deckFasteners.topY===spec.deckFastenerTopY&&data.deckFasteners.bearerEmbedM===.025&&!data.deckFasteners.holesModeled&&!data.deckFasteners.threadsModeled&&/not a structural design/i.test(data.materialInterpretation?.deckFasteners??''),'Deck-fastener dimensions and unverified, undrilled visual convention are recorded');
 Check(data.deck?.clearWidthM===spec.sleeperLengthM&&data.deck.nominalBoardWidthM===spec.deckBoardNominalWidthM&&data.deck.rowToneContrast===spec.deckRowToneContrast&&data.deck.variantCount===spec.deckVariantCount&&data.deck.plankThicknessM===.045&&data.deck.topY===.075&&data.deck.jointWidthM===.006&&data.deck.grainAxis==='X','Decking dimensions, variant count, row tone, real 6 mm board gaps and transverse timber grain are recorded');
 Check(spec.railNominalLengthM===10&&spec.railJointGapM===.006&&data.railJoints?.nominalRailLengthM===10&&data.railJoints.gapM===.006&&!data.railJoints.holesModeled,'Rail joint record distinguishes nominal historical spacing and unbored represented fasteners');
 Check(/unverified design assumptions/i.test(data.railJoints.interpretation)&&/overlap solid undrilled/i.test(data.materialInterpretation?.railJoints??''),'Rail joints disclose unconfirmed locations and represented bolt/web overlap');
@@ -1067,6 +1068,50 @@ Check(spec.panelsPerSpan===9&&Array.isArray(spec.trussCounterPanelIndices)&&spec
       const counter=ray(trusses,y1-.22,zNode-.22*step/height);
       Check([.177,.152,.14].every(value=>has(counter,value)),'Counterbar lies flush against the enlarged gusset',{side,face});
     }
+  }
+}
+// Every deck variant has paired solid fasteners at the two inner bearers.
+// Measure the exported board rows and actual cylinder geometry rather than
+// replaying the builder's random sequence. The undrilled wood overlap is an
+// explicitly recorded visual convention, not a claim about historical nails.
+{
+  const all=ByRole('DeckFasteners'),joint=ByRole('DeckJointFasteners');
+  Check(spec.deckFastenerDiameterM===.012&&spec.deckFastenerLengthM===.071&&spec.deckFastenerTopY===.076&&spec.deckFastenerBearersX.join(',')==='-0.4,0.4'&&spec.deckFastenerRowFractions.join(',')==='0.28,0.72','The authored fastener layout has explicit metric dimensions');
+  Check(all.length===spec.spanCount&&new Set(all.map(p=>p.node.mesh)).size===spec.deckVariantCount,'Every span has the corresponding deck-fastener variant');
+  Check(joint.length===spec.spanCount-1&&new Set(joint.map(p=>p.node.mesh)).size===1,'Every pier transition has a shared real deck-fastener mesh');
+  const nailMaterial=g.materials.find(m=>m.name==='BeishaheDeckNail'),railMaterial=g.materials.find(m=>m.name==='BeishaheRailBody');
+  const factor=nailMaterial.pbrMetallicRoughness.baseColorFactor;
+  Check(factor?.slice(0,3).every(v=>Math.abs(v-.25)<.001)&&Math.abs(factor[3]-1)<.001,'Deck fasteners use a dark opaque physical finish');
+  for(const [a,b] of [[nailMaterial.pbrMetallicRoughness.baseColorTexture,railMaterial.pbrMetallicRoughness.baseColorTexture],[nailMaterial.normalTexture,railMaterial.normalTexture],[nailMaterial.pbrMetallicRoughness.metallicRoughnessTexture,railMaterial.pbrMetallicRoughness.metallicRoughnessTexture]])
+    Check(ImageForTexture(a.index).source===ImageForTexture(b.index).source,'Deck fasteners reuse the neutral rail texture set');
+  function Closed(part){
+    const {positions,indices}=part.geo,edges=new Map(),key=i=>[positions[i*3],positions[i*3+1],positions[i*3+2]].map(v=>v.toFixed(5)).join(',');
+    for(let k=0;k<(indices?.length??positions.length/3);k+=3){const ids=[0,1,2].map(j=>indices?indices[k+j]:k+j);for(const [a,b] of [[ids[0],ids[1]],[ids[1],ids[2]],[ids[2],ids[0]]]){const ka=key(a),kb=key(b),edge=ka<kb?`${ka}|${kb}`:`${kb}|${ka}`;edges.set(edge,(edges.get(edge)||0)+1);}}
+    const unpaired=[...edges.values()].filter(v=>v!==2).length;Check(unpaired===0,'Deck fastener cylinders are closed',{mesh:part.name,unpaired});
+  }
+  const seen=new Set();for(const part of [...all,...joint])if(!seen.has(part.node.mesh)){seen.add(part.node.mesh);Closed(part);}
+  for(let i=0;i<spec.deckVariantCount;i++){
+    const nails=ByRole('DeckFasteners',i),planks=ByRole('DeckPlanks',i),bearers=ByRole('DeckBearers',i),rows=deckRowsByMesh.get(planks[0].node.mesh),center=-spec.lengthM/2+spec.spanPitchM*(i+.5);
+    Check(nails.length===1&&rows?.length>0&&nails[0].node.mesh===ByRole('DeckFasteners',i+spec.deckVariantCount)[0]?.node.mesh,'Paired spans reuse the correct deck-fastener mesh',{span:i+1});
+    Check(nails[0].geo.triangles===rows.length*spec.deckFastenerBearersX.length*spec.deckFastenerRowFractions.length*20,'Each board has exactly the intended closed fasteners',{span:i+1,triangles:nails[0].geo.triangles});
+    for(const x of spec.deckFastenerBearersX){
+      const p=nails[0].geo.positions,zs=[];for(let j=0;j<p.length/3;j++)if(Math.abs(p[j*3]-x)<.0065&&Math.abs(p[j*3+1]-.076)<.0001)zs.push(p[j*3+2]);zs.sort((a,b)=>a-b);
+      const groups=[];for(const z of zs){const last=groups.at(-1);if(!last||z-last.at(-1)>.015)groups.push([z]);else last.push(z);}
+      const centers=groups.map(group=>(group[0]+group.at(-1))/2),expected=[];
+      for(const row of rows){const z0=row.edge0-.003,z1=row.edge1+.003;for(const fraction of spec.deckFastenerRowFractions)expected.push(z0+(z1-z0)*fraction);}
+      Check(centers.length===expected.length&&centers.every((z,j)=>Math.abs(z-expected[j])<.0002),'Two actual fasteners per board align with each inner bearer',{span:i+1,x,actual:centers.length,expected:expected.length});
+      for(const j of [0,Math.floor(expected.length/2),expected.length-1]){
+        const z=center+expected[j],origin=new THREE.Vector3(x,.12,z),down=new THREE.Vector3(0,-1,0),nh=Hits(nails,origin,down,.15),ph=Hits(planks,origin,down,.15),bh=Hits(bearers,origin,down,.15);
+        Check(nh.some(h=>Math.abs(h.point.y-.076)<.0002)&&nh.some(h=>Math.abs(h.point.y-.005)<.0002)&&ph.some(h=>Math.abs(h.point.y-.075)<.0002)&&ph.some(h=>Math.abs(h.point.y-.03)<.0002)&&bh.some(h=>Math.abs(h.point.y-.03)<.0002)&&bh.some(h=>Math.abs(h.point.y)<.0002),'Actual fastener crosses the plank and enters the bearer by 25 mm',{span:i+1,x,j,z});
+        const edge=Hits(nails,new THREE.Vector3(x+.02,.05,z),new THREE.Vector3(-1,0,0),.04);
+        Check(edge.length>0&&Math.abs(edge[0].point.x-(x+.006))<.0002,'Fastener has a real 12 mm diameter',{span:i+1,x,j});
+      }
+    }
+  }
+  Check(joint[0].geo.triangles===spec.deckFastenerBearersX.length*spec.deckJointFastenerOffsetsM.length*20,'Each transition has exactly four closed fasteners');
+  for(const index of [1,Math.floor(spec.spanCount/2),spec.spanCount-1]){
+    const center=-spec.lengthM/2+index*spec.spanPitchM,role=name=>ByRole(name).filter(p=>p.node.extras?.supportIndex===index),nails=role('DeckJointFasteners'),planks=role('DeckJoint'),bearers=role('DeckJointSupport');
+    for(const x of spec.deckFastenerBearersX)for(const dz of spec.deckJointFastenerOffsetsM){const origin=new THREE.Vector3(x,.12,center+dz),down=new THREE.Vector3(0,-1,0),nh=Hits(nails,origin,down,.15),ph=Hits(planks,origin,down,.15),bh=Hits(bearers,origin,down,.15);Check(nh.some(h=>Math.abs(h.point.y-.076)<.0002)&&nh.some(h=>Math.abs(h.point.y-.005)<.0002)&&ph.some(h=>Math.abs(h.point.y-.075)<.0002)&&bh.some(h=>Math.abs(h.point.y-.03)<.0002),'Transition fastener connects the wood insert to its bearer',{index,x,dz});}
   }
 }
 Check(bearingCount===56,'All fifty-six span-end bearing load paths are inspected');

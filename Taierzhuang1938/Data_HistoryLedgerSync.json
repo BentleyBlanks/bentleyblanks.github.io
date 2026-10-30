@@ -70,6 +70,15 @@
         "notionLedgerLastEdited": "2026-10-29T18:18:48.478Z",
         "notionParentLastEdited": "2026-10-29T18:18:59.976Z"
       },
+      "deckFixingReview20261030": {
+        "version": "2026103005",
+        "decision": "Paired fasteners on the authored transverse wood deck are a visual analogy to general timber-bridge plank connections, not documented 1938 Beishahe fasteners. Their 71 mm simplified cylinders and 25 mm bearer embed are design choices, not an engineering-compliance claim.",
+        "source": "https://www.fhwa.dot.gov/publications/research/infrastructure/structures/04098/14.cfm",
+        "sourceReview": "The 2005 FHWA covered-bridge manual was opened: it discusses deck planks spiked to supporting stringers or floor beams and commonly two spikes per connection. It is an American highway-bridge analogy; its vehicular-deck minimum dimensions are not claimed for this model.",
+        "notionReview": "The existing creative bridge row and parent bullet were reread. Both state that the transverse deck and unseen details are design inferences, so no historical claim or category changes. Global review anchors and unrelated page cursors remain unchanged.",
+        "notionLedgerLastEdited": "2026-10-29T18:18:48.478Z",
+        "notionParentLastEdited": "2026-10-29T18:18:59.976Z"
+      },
       "acceptanceScope": "Historical-boundary synchronization only; no claim that the model has completed visual matching or runtime acceptance."
     },
     {

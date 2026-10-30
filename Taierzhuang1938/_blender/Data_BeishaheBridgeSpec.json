@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "2026103004",
+  "version": "2026103005",
   "name": "BeishaheBridge",
   "units": "m",
   "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -28,6 +28,12 @@
   "deckBoardNominalWidthM": 0.34,
   "deckRowToneContrast": 1.8,
   "deckVariantCount": 7,
+  "deckFastenerDiameterM": 0.012,
+  "deckFastenerLengthM": 0.071,
+  "deckFastenerTopY": 0.076,
+  "deckFastenerBearersX": [-0.40, 0.40],
+  "deckFastenerRowFractions": [0.28, 0.72],
+  "deckJointFastenerOffsetsM": [-0.025, 0.025],
   "bearingTopY": -0.69,
   "pierTopY": -1.02,
   "foundationY": -5.3,
@@ -41,6 +47,7 @@
     {"id":"GermanRailScrew1913", "url":"https://archive.org/details/steelrailstheirh01sell/page/145/mode/1", "supports":"1913 reference shows square-headed screw spikes with circular flanges for Prussian and Alsace-Lorraine railway track; an engineering analogy, not a photograph or specification of Beishahe."},
     {"id":"BullardCreek1908", "url":"https://npgallery.nps.gov/GetAsset/81afac7b-65c7-4d59-9066-ff6c7991e861", "supports":"1908 Minnesota road bridge: paired riveted members and gusset/floor-beam connections as an engineering analogy. Not a Chinese railway bridge, not evidence of Beishahe-specific details."},
     {"id":"EasleyBridgeNode", "url":"https://www.loc.gov/resource/hhh.wv0440.photos/?sp=14&st=image", "imageSource":"https://commons.wikimedia.org/wiki/File:DETAIL_VIEW,_PONY_STEEL_TRUSS,_SHOWING_RIVETED_UPPER_BRIDGE_CHORD,_DIAGONALS_AND_GUSSET_PLATE._FACING_WEST._-_Easley_Bridge,_Spanning_Norfolk_Southern_Corporation_railroad_HAER_WVA,28-BLUFD,1-14.tif", "supports":"HAER WV-64 photograph 14 records the riveted upper chord and gusset of a 1936 American road bridge; the photograph is dated 1997 by Wikimedia Commons. This is a construction analogy, not a railway bridge or evidence of Beishahe-specific dimensions and rivet layout."},
+    {"id":"FhwaTimberDeckConnections", "url":"https://www.fhwa.dot.gov/publications/research/infrastructure/structures/04098/14.cfm", "supports":"A 2005 covered-bridge manual describes deck planks spiked to supporting stringers, commonly two at each connection. This general highway-bridge analogy does not establish the original Beishahe deck, nail type, size, placement or structural adequacy; the model's short fasteners are not claimed to meet the manual's vehicular-deck recommendations."},
     {"id":"Jinpu1941GuardTimbers", "url":"https://codh.rois.ac.jp/north-china-railway/photograph/3804-035394-0.html", "supports":"1941 Jinpu railway bridge at an unknown location: outside longitudinal timbers and a visible timber joint provide an engineering reference. Neither the dimensions nor their presence at Beishahe is established."}
   ],
   "mapMeasurement": {

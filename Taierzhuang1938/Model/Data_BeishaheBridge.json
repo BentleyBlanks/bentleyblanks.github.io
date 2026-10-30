@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026103004",
+  "version": "2026103005",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026103004",
+    "version": "2026103005",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -35,6 +35,21 @@
     "deckBoardNominalWidthM": 0.34,
     "deckRowToneContrast": 1.8,
     "deckVariantCount": 7,
+    "deckFastenerDiameterM": 0.012,
+    "deckFastenerLengthM": 0.071,
+    "deckFastenerTopY": 0.076,
+    "deckFastenerBearersX": [
+      -0.4,
+      0.4
+    ],
+    "deckFastenerRowFractions": [
+      0.28,
+      0.72
+    ],
+    "deckJointFastenerOffsetsM": [
+      -0.025,
+      0.025
+    ],
     "bearingTopY": -0.69,
     "pierTopY": -1.02,
     "foundationY": -5.3,
@@ -82,6 +97,11 @@
         "url": "https://www.loc.gov/resource/hhh.wv0440.photos/?sp=14&st=image",
         "imageSource": "https://commons.wikimedia.org/wiki/File:DETAIL_VIEW,_PONY_STEEL_TRUSS,_SHOWING_RIVETED_UPPER_BRIDGE_CHORD,_DIAGONALS_AND_GUSSET_PLATE._FACING_WEST._-_Easley_Bridge,_Spanning_Norfolk_Southern_Corporation_railroad_HAER_WVA,28-BLUFD,1-14.tif",
         "supports": "HAER WV-64 photograph 14 records the riveted upper chord and gusset of a 1936 American road bridge; the photograph is dated 1997 by Wikimedia Commons. This is a construction analogy, not a railway bridge or evidence of Beishahe-specific dimensions and rivet layout."
+      },
+      {
+        "id": "FhwaTimberDeckConnections",
+        "url": "https://www.fhwa.dot.gov/publications/research/infrastructure/structures/04098/14.cfm",
+        "supports": "A 2005 covered-bridge manual describes deck planks spiked to supporting stringers, commonly two at each connection. This general highway-bridge analogy does not establish the original Beishahe deck, nail type, size, placement or structural adequacy; the model's short fasteners are not claimed to meet the manual's vehicular-deck recommendations."
       },
       {
         "id": "Jinpu1941GuardTimbers",
@@ -713,11 +733,11 @@
       "railHeightM": 0.14
     }
   ],
-  "triangles": 1440376,
-  "meshObjects": 354,
+  "triangles": 1507496,
+  "meshObjects": 381,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
-  "glbBytes": 22348272,
-  "glbSha256": "f9f8d3246c9f4bae15633ea06197a50574542fbe5f8ce31fdb4dd3a2607f58fc",
+  "glbBytes": 24294064,
+  "glbSha256": "dd8c687f202e6249387ccb1238e09dc05295ff717a8d7ed448d3e00c2b2507bc",
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
@@ -764,6 +784,11 @@
       "supports": "HAER WV-64 photograph 14 records the riveted upper chord and gusset of a 1936 American road bridge; the photograph is dated 1997 by Wikimedia Commons. This is a construction analogy, not a railway bridge or evidence of Beishahe-specific dimensions and rivet layout."
     },
     {
+      "id": "FhwaTimberDeckConnections",
+      "url": "https://www.fhwa.dot.gov/publications/research/infrastructure/structures/04098/14.cfm",
+      "supports": "A 2005 covered-bridge manual describes deck planks spiked to supporting stringers, commonly two at each connection. This general highway-bridge analogy does not establish the original Beishahe deck, nail type, size, placement or structural adequacy; the model's short fasteners are not claimed to meet the manual's vehicular-deck recommendations."
+    },
+    {
       "id": "Jinpu1941GuardTimbers",
       "url": "https://codh.rois.ac.jp/north-china-railway/photograph/3804-035394-0.html",
       "supports": "1941 Jinpu railway bridge at an unknown location: outside longitudinal timbers and a visible timber joint provide an engineering reference. Neither the dimensions nor their presence at Beishahe is established."
@@ -776,6 +801,7 @@
     "pierDamp": "Irregular brown-gray and muted olive staining that fades into the dry pier is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
     "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
     "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
+    "deckFasteners": "Paired cylinder fasteners at the two inner bearers are an authored analogy to general timber-deck connections, not a documented 1938 Beishahe detail. The simplified 71 mm solids overlap undrilled wood, have no threads or distinct head, and are not a structural design or a claim of compliance with vehicular-deck guidance.",
     "jointTransitions": "Rail and wooden deck splice details are authored to maintain a usable crossing; their exact construction is not established by a confirmed 1938 Beishahe bridge photograph.",
     "railJoints": "The 1937 route record gives nominal 10 m rails, while joint positions at midspan and supports, the 6 mm gaps, section dimensions and hardware are authored design assumptions. Represented through-bolt shafts overlap solid undrilled rail webs and plates.",
     "railFasteners": "Square-head screw-spike shape, 120 mm sleeper embed, two outside and one inside, and outside hook plates are authored interpretations of early German railway references, not established for the 1938 Beishahe bridge. Solid spike shafts intentionally overlap undrilled sleeper and tie-plate geometry; holes and threads are not modeled.",
@@ -795,6 +821,27 @@
     "bearerBottomY": 0,
     "bearerTopY": 0.03,
     "grainAxis": "X"
+  },
+  "deckFasteners": {
+    "diameterM": 0.012,
+    "lengthM": 0.071,
+    "topY": 0.076,
+    "bearersX": [
+      -0.4,
+      0.4
+    ],
+    "rowFractions": [
+      0.28,
+      0.72
+    ],
+    "jointOffsetsM": [
+      -0.025,
+      0.025
+    ],
+    "bearerEmbedM": 0.025,
+    "holesModeled": false,
+    "threadsModeled": false,
+    "interpretation": "Authored visual analogy; no original Beishahe fixing or structural compliance is established."
   },
   "pierCap": {
     "stoneCount": 4,
@@ -843,6 +890,7 @@
   "materials": [
     "BeishaheSteel",
     "BeishaheRailBody",
+    "BeishaheDeckNail",
     "BeishaheTimber",
     "BeishaheTimberEnd",
     "BeishaheDeckTimber",
