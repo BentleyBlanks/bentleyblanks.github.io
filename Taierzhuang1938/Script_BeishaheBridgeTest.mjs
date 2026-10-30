@@ -50,7 +50,7 @@ function PrimitiveGeometry(primitive){
   if(uv)Check([...uv.data].every(Number.isFinite),'UV coordinates are finite');
   const at=(i)=>new THREE.Vector3(positions.data[i*3],positions.data[i*3+1],positions.data[i*3+2]);
   for(let i=0;i<(indices?.length??positions.count);i+=3){const a=at(indices?indices[i]:i),b=at(indices?indices[i+1]:i+1),c=at(indices?indices[i+2]:i+2);if(b.sub(a).cross(c.sub(a)).lengthSq()<1e-18)degenerate++;}
-  const result={positions:positions.data,indices,uv:uv?.data,color:color?.data,colorWidth:color?.width,localBounds,triangles:(indices?.length??positions.count)/3};geometryCache.set(primitive,result);return result;
+  const result={positions:positions.data,normals:normals?.data,indices,uv:uv?.data,color:color?.data,colorWidth:color?.width,localBounds,triangles:(indices?.length??positions.count)/3};geometryCache.set(primitive,result);return result;
 }
 for(let i=0;i<g.nodes.length;i++){
   const node=g.nodes[i];if(node.mesh==null)continue;
@@ -196,6 +196,7 @@ Check(typeof data.reconstructionScope==='string'&&/not a proven 1938 bridge leng
 Check(data.historicalReferences?.length>=3&&data.historicalReferences.every(r=>/^https:\/\//.test(r.url)&&r.supports),'Historical reference scope remains attached to the asset');
 Check(spec.trussUpperGussetDepthM===.34&&spec.trussUpperGussetMaxHalfWidthM===.36&&/not established for Beishahe/i.test(data.materialInterpretation?.trussConnections??'')&&/without shanks or holes/i.test(data.materialInterpretation?.trussConnections??''),'Upper-node dimensions and unverified, head-only rivet interpretation are recorded');
 Check(/creative weathering choice, not evidence of the 1938 waterline/i.test(data.materialInterpretation?.pierDamp??''),'Lower pier damp color remains explicitly an artistic choice, not a historical water-level claim');
+Check(spec.pierJointShadeFactor===.5&&data.pierJointShade?.edgeFactor===spec.pierJointShadeFactor&&/not measured mortar/i.test(data.pierJointShade.interpretation??''),'Stone joint shading remains an authored visual treatment, not a historical mortar claim');
 Check(/not established by a confirmed 1938 Beishahe bridge photograph/i.test(data.materialInterpretation?.deckPlanks??''),'Continuous wooden decking is identified as an authored reconstruction');
 Check(data.deckFasteners?.diameterM===spec.deckFastenerDiameterM&&data.deckFasteners.lengthM===spec.deckFastenerLengthM&&data.deckFasteners.topY===spec.deckFastenerTopY&&data.deckFasteners.bearerEmbedM===.025&&!data.deckFasteners.holesModeled&&!data.deckFasteners.threadsModeled&&/not a structural design/i.test(data.materialInterpretation?.deckFasteners??''),'Deck-fastener dimensions and unverified, undrilled visual convention are recorded');
 Check(data.deck?.clearWidthM===spec.sleeperLengthM&&data.deck.nominalBoardWidthM===spec.deckBoardNominalWidthM&&data.deck.rowToneContrast===spec.deckRowToneContrast&&data.deck.variantCount===spec.deckVariantCount&&data.deck.plankThicknessM===.045&&data.deck.topY===.075&&data.deck.jointWidthM===.006&&data.deck.grainAxis==='X','Decking dimensions, variant count, row tone, real 6 mm board gaps and transverse timber grain are recorded');
@@ -359,9 +360,18 @@ for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
       Check(gaps.length>=2&&gaps.length<=4,'Actual short face has recessed joints across its width including near corners',{supportIndex,row,faceSide,gaps});
       if(previous)Check(gaps.every(g=>previous.every(p=>Math.abs(g.z-p.z)>.09)),'Consecutive short-face courses do not form aligned vertical seams',{supportIndex,row,faceSide,gaps,previous});
       previous=gaps;
+      // Keep the original brightness bounds on actual outward stone faces;
+      // the lower limits introduced for joint shading apply only inside the
+      // real bevel/recess. Sample block centers inferred from the GLB scan.
+      const edges=[-.84,...gaps.map(g=>g.z),.84];
+      for(let j=0;j<edges.length-1;j++){
+        const dz=(edges[j]+edges[j+1])/2,hits=Hits(all,new THREE.Vector3(faceSide*3,y,centerZ+dz),direction,6);
+        const rgb=hits.length?HitTint(hits[0]):null,lower=row<3?.24:row===3?.70:.80;
+        Check(hits.length>0&&hits[0].distance<=surface+.012&&rgb?.every(v=>v>=lower-.001&&v<=1.001),'Actual visible stone faces retain their original tint bounds',{supportIndex,row,faceSide,dz,rgb});
+      }
       if(row<2){
         // Pick the centers of actual visible blocks from measured gap groups.
-        const edges=[-.84,...gaps.map(g=>g.z),.84],colors=[];
+        const colors=[];
         for(let j=0;j<edges.length-1;j++){
           const dz=(edges[j]+edges[j+1])/2,hits=Hits(wet,new THREE.Vector3(faceSide*3,y,centerZ+dz),direction,6);
           if(hits.length){const rgb=HitTint(hits[0]);if(rgb)colors.push(rgb);}
@@ -399,34 +409,45 @@ for(const role of ['Pier','PierDamp']){
 }
 for(const role of ['Pier','PierDamp','Cap','abutment']){
   const meshes=[...new Map(ByRole(role).map(p=>[p.node.mesh,p])).values()];
-  const tints=new Set(),dampSlopes=[];let min=1,max=0,invalid=0,alphaBad=0,mixedFaces=0;
+  const tints=new Set(),dampSlopes=[];let min=1,max=0,invalid=0,alphaBad=0,mixedFaces=0,surfaceSamples=0,bevelContrast=0;
   for(const part of meshes){
-    const {color,colorWidth,indices,positions}=part.geo;
+    const {color,colorWidth,indices,positions,normals}=part.geo;
     const expectedMaterial=role==='PierDamp'?'BeishaheStoneDamp':'BeishaheStone';
     Check(color&&colorWidth>=3&&g.materials[part.primitive.material]?.name===expectedMaterial,'Each masonry mesh exports its specific dry/damp PBR material with vertex tint',role);
     for(let i=0;i<color.length;i+=colorWidth){
       const rgb=[color[i],color[i+1],color[i+2]];
       const y=positions[(i/colorWidth)*3+1],course=(spec.pierTopY-spec.foundationY-.25)/9;
-      const lowerBound=(role==='Pier'&&y<spec.foundationY+4.2*course) ? .70 : role==='PierDamp' ? .24 : .80;
+      const vi=i/colorWidth,x=positions[vi*3],z=positions[vi*3+2],nx=normals[vi*3],nz=normals[vi*3+2];
+      const pierFace=(Math.abs(x)<1.45&&Math.abs(z)>.87&&Math.abs(nz)>.99&&z*nz>0)||(Math.abs(z)<.55&&Math.abs(x)>1.90&&Math.abs(nx)>.99&&x*nx>0);
+      const isPier=role==='Pier'||role==='PierDamp',measured=!isPier||pierFace;
+      const originalLower=(role==='Pier'&&y<spec.foundationY+4.2*course) ? .70 : role==='PierDamp' ? .24 : .80;
+      const lowerBound=isPier&&!pierFace ? (role==='PierDamp'?.24*spec.pierJointShadeFactor-.001:.70*spec.pierJointShadeFactor-.001) : originalLower;
       if(!rgb.every(v=>Number.isFinite(v)&&v>=lowerBound&&v<=1.001))invalid++;
-      min=Math.min(min,...rgb);max=Math.max(max,...rgb);tints.add(rgb.map(v=>Math.round(v*10000)).join(','));
+      tints.add(rgb.map(v=>Math.round(v*10000)).join(','));
+      if(measured){min=Math.min(min,...rgb);max=Math.max(max,...rgb);surfaceSamples++;}
       if(colorWidth===4&&Math.abs(color[i+3]-1)>=.001)alphaBad++;
     }
-    // Cap/abutment tint stays constant per actual triangle. Damp stone has a
-    // bounded spatial stain field; dry stone keeps its gentler height gradient.
+    // Facing-stone tint remains bounded. Actual bevel facets may carry a
+    // continuous, depth-related joint shade; other faces retain the prior
+    // smooth stone/stain bounds. Cap and abutment tint stays per triangle.
     for(let k=0;k<(indices?.length??positions.length/3);k+=3){
       const ids=[0,1,2].map(j=>indices?indices[k+j]:k+j);
+      const tri=ids.map(i=>new THREE.Vector3(positions[i*3],positions[i*3+1],positions[i*3+2]));
+      const normal=tri[1].clone().sub(tri[0]).cross(tri[2].clone().sub(tri[0])).normalize();
+      const bevel=(role==='Pier'||role==='PierDamp')&&[normal.x,normal.y,normal.z].filter(v=>Math.abs(v)>.1).length>1;
       for(const [a,b] of [[ids[0],ids[1]],[ids[1],ids[2]],[ids[2],ids[0]]])for(let c=0;c<3;c++){
         const delta=Math.abs(color[a*colorWidth+c]-color[b*colorWidth+c]);
         const distance=Math.hypot(positions[a*3]-positions[b*3],positions[a*3+1]-positions[b*3+1],positions[a*3+2]-positions[b*3+2]);
-        if(role==='PierDamp'&&distance>.0001)dampSlopes.push(delta/distance);
+        if(role==='PierDamp'&&!bevel&&distance>.0001)dampSlopes.push(delta/distance);
+        if(bevel&&distance<.035&&delta>.08)bevelContrast++;
         const permitted=role==='PierDamp' ? 8.5*distance+.001 : role==='Pier' ? .90*Math.abs(positions[a*3+1]-positions[b*3+1])+.03 : .001;
-        if(delta>permitted)mixedFaces++;
+        if(delta>permitted+(bevel?Math.min(.5,80*distance):0))mixedFaces++;
       }
     }
   }
   Check(invalid===0&&alphaBad===0,'Masonry tint remains bounded, finite and opaque',{role,invalid,alphaBad});
   Check(mixedFaces===0,'Masonry color varies smoothly without fake lateral seams',{role,mixedFaces});
+  if(role==='Pier'||role==='PierDamp')Check(surfaceSamples>100&&bevelContrast>100,'The visible faces retain bounded tint and real bevel edges have contrast',{role,surfaceSamples,bevelContrast});
   if(role==='PierDamp'){
     dampSlopes.sort((a,b)=>a-b);
     const p99=dampSlopes[Math.floor(dampSlopes.length*.99)];
@@ -436,9 +457,9 @@ for(const role of ['Pier','PierDamp','Cap','abutment']){
   const minRange=role==='PierDamp' ? .60 : .04, minUnique=role==='PierDamp' ? 5000 : role==='Cap' ? 3 : 12;
   Check(tints.size>=minUnique&&max-min>minRange&&max-min<maxRange,'Masonry has bounded deterministic color variation',{role,unique:tints.size,min,max});
 }
-// Matching physical positions on subdivided damp faces must carry the same
-// tint, including where face cells meet bevels, to avoid artificial seams.
-for(const part of [...new Map(ByRole('PierDamp').map(p=>[p.node.mesh,p])).values()]){
+// Matching physical positions on all pier faces must carry the same tint,
+// including where subdivided damp faces meet bevels, to avoid color cracks.
+for(const part of [...new Map([...ByRole('Pier'),...ByRole('PierDamp')].map(p=>[p.node.mesh,p])).values()]){
   const {positions,color,colorWidth,indices}=part.geo,seen=new Map(),edges=new Map();let mismatch=0;
   const pointKey=i=>[positions[i*3],positions[i*3+1],positions[i*3+2]].map(v=>v.toFixed(5)).join(',');
   for(let i=0;i<positions.length/3;i++){
@@ -447,7 +468,8 @@ for(const part of [...new Map(ByRole('PierDamp').map(p=>[p.node.mesh,p])).values
     if(other&&rgb.some((v,c)=>Math.abs(v-other[c])>.001))mismatch++;
     else if(!other)seen.set(key,rgb);
   }
-  Check(mismatch===0,'Coincident damp-surface vertices have continuous color',{mesh:part.name,mismatch});
+  Check(mismatch===0,'Coincident masonry vertices have continuous color',{mesh:part.name,mismatch});
+  if(Role(part)!=='PierDamp')continue;
   for(let k=0;k<(indices?.length??positions.length/3);k+=3){
     const ids=[0,1,2].map(j=>indices?indices[k+j]:k+j);
     for(const [a,b] of [[ids[0],ids[1]],[ids[1],ids[2]],[ids[2],ids[0]]]){

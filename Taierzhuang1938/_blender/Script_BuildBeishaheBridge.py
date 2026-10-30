@@ -80,7 +80,7 @@ class Geometry:
         for face in [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (3, 7, 6, 2), (0, 4, 7, 3), (1, 2, 6, 5)]:
             self.Polygon([points[i] for i in face], uvOffset=uvOffset, grain=grain, tint=tint, uvTurn=uvTurn)
 
-    def BeveledBox(self, center, size, bevel, uvOffset=None, grain=None, endGeometry=None, tint=None, uvTurn=0, surfaceGrid=None):
+    def BeveledBox(self, center, size, bevel, uvOffset=None, grain=None, endGeometry=None, tint=None, uvTurn=0, surfaceGrid=None, jointShadeAxis=None, jointShadeSign=0):
         """Six inset faces, 12 edge chamfers and 8 corners, in game metres.
 
         A distinct end-grain mesh is used on each sleeper's X end. UVs on
@@ -89,6 +89,20 @@ class Geometry:
         c = Vector(center)
         h = [v / 2 for v in size]
         b = min(bevel, min(h) * 0.45)
+        if jointShadeAxis is not None:
+            # Approximate occlusion inside masonry joints using each stone's
+            # real outward face and bevel. The same position always gets the
+            # same factor, including where subdivided wet faces meet bevels.
+            # This is an authored visual treatment, not a measured mortar or
+            # historically documented bridge finish.
+            baseTint = tint
+            axis = {"x": 0, "z": 2}[jointShadeAxis]
+            def tint(point):
+                color = baseTint(point) if callable(baseTint) else (baseTint or (1, 1, 1, 1))
+                depth = h[axis] - jointShadeSign * (point[axis] - c[axis])
+                t = max(0.0, min(1.0, depth / b))
+                factor = 1 - (1 - SPEC["pierJointShadeFactor"]) * t * t * (3 - 2 * t)
+                return tuple(v * factor if i < 3 else v for i, v in enumerate(color))
 
         def Face(local, target=None, end=False):
             points = [tuple(c + Vector(p)) for p in local]
@@ -1078,7 +1092,7 @@ def BuildPier(seed=1938):
                         (right - left - 0.014, ch - 0.014, 0.29 + rng.uniform(-0.010, 0.010)),
                         rng.uniform(0.006, 0.014), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)),
                         tint=PierTint(StoneTint(tintRng), floor, ch, seed, damp), uvTurn=turnRng.randrange(4),
-                        surfaceGrid=("z", side, 3) if damp else None)
+                        surfaceGrid=("z", side, 3) if damp else None, jointShadeAxis="z", jointShadeSign=side)
             # Stagger the shorter faces as well. End blocks are clipped at
             # the corners, as on the longer face, and the inset core is kept.
             for k in range(-1, countz + 1):
@@ -1092,7 +1106,7 @@ def BuildPier(seed=1938):
                 target.BeveledBox((side * (halfx - 0.20), y, (left + right) / 2), (0.42, ch - 0.014, right - left - 0.014),
                                  rng.uniform(0.006, 0.014), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)),
                                  tint=PierTint(StoneTint(tintRng), floor, ch, seed, damp), uvTurn=turnRng.randrange(4),
-                                 surfaceGrid=("x", side, 3) if damp else None)
+                                 surfaceGrid=("x", side, 3) if damp else None, jointShadeAxis="x", jointShadeSign=side)
     # Preserve the original pier/foundation RNG sequence while giving the
     # capstone study independent random phases, tints and rotations.
     originalCapOffset = (rng.uniform(0, 8), rng.uniform(0, 8))
@@ -1340,6 +1354,7 @@ def Rebuild():
                 "trussConnections": "Extended upper gusset plates, packers and domed rivet groups are a design analogy to the 1936 Easley road bridge; their exact form and dimensions are not established for Beishahe. The rivet heads are modeled without shanks or holes.",
                 "trussFinish": "Muted brown-gray weathered truss steel is an imagegen material study guided by a modern out-of-region bridge photograph. Its paint color and corrosion are creative choices, not verified 1938 Beishahe conditions. The rail body keeps a separate neutral steel texture.",
                 "pierDamp": "Irregular brown-gray and muted olive staining that fades into the dry pier is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
+                "pierJointShade": "Continuous darkening over each real stone bevel and recessed side is an authored occlusion-style visual treatment. It is not a measured mortar color, a lightmap, or evidence of the 1938 bridge's masonry.",
                 "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
                 "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
                 "deckFasteners": "Paired cylinder fasteners at the two inner bearers are an authored analogy to general timber-deck connections, not a documented 1938 Beishahe detail. The simplified 71 mm solids overlap undrilled wood, have no threads or distinct head, and are not a structural design or a claim of compliance with vehicular-deck guidance.",
@@ -1359,6 +1374,8 @@ def Rebuild():
                               "interpretation": "Authored visual analogy; no original Beishahe fixing or structural compliance is established."},
             "pierCap": {"stoneCount": 4, "jointWidthM": .014, "baseThicknessM": .025,
                         "interpretation": "Authored construction; original Beishahe capstones are unconfirmed."},
+            "pierJointShade": {"edgeFactor": SPEC["pierJointShadeFactor"], "transition": "continuous over real bevel depth",
+                               "interpretation": "Authored occlusion-style color; not measured mortar or an original-bridge claim."},
             "railJoints": {"nominalRailLengthM": SPEC["railNominalLengthM"], "gapM": SPEC["railJointGapM"],
                            "jointCentersPerSpan": [0], "supportAxisJointCount": SPEC["spanCount"] - 1,
                            "fishplateLengthM": .36, "boltStationsM": [-.13, -.055, .055, .13],
