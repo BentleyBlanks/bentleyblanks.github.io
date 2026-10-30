@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026103007",
+  "version": "2026103008",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026103007",
+    "version": "2026103008",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -55,6 +55,11 @@
     "pierJointShadeFactor": 0.5,
     "pierCourseEdgeJitterFraction": 0.1,
     "pierCornerSeamSetbackM": 0.3,
+    "pierStoneBevelFactors": [
+      0.35,
+      2.5
+    ],
+    "pierStoneBevelMinimumM": 0.0045,
     "foundationY": -5.3,
     "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
     "historicalReferences": [
@@ -740,7 +745,7 @@
   "meshObjects": 381,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
   "glbBytes": 24294064,
-  "glbSha256": "e8d4c80bd92d0700b11972e65c6e562ec7dc3c8f9f2147f0e4d0d03ab64d3f53",
+  "glbSha256": "548d0431394d672c6e1f821efc51128d49bd2c0fea5cdc2ae548df400fc2897b",
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
@@ -804,6 +809,7 @@
     "pierDamp": "Irregular brown-gray and muted olive staining that fades into the dry pier is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
     "pierJointShade": "Continuous darkening over each real stone bevel and recessed side is an authored occlusion-style visual treatment. It is not a measured mortar color, a lightmap, or evidence of the 1938 bridge's masonry.",
     "pierMasonry": "Varying stone lengths and staggered joints are an authored visual analogy to the AI construction study, not a measured masonry bond of the 1938 Beishahe bridge.",
+    "pierStoneEdges": "Unequal corner bevels and their occlusion-style shading are authored visual analogies to the rough stone edges in the AI construction study, not measured original stone damage.",
     "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
     "deckPlanks": "In response to the user's request for a complete deck, transverse planks were selected from the generated design study; presence and details are not established by a confirmed 1938 Beishahe bridge photograph.",
     "deckFasteners": "Paired cylinder fasteners at the two inner bearers are an authored analogy to general timber-deck connections, not a documented 1938 Beishahe detail. The simplified 71 mm solids overlap undrilled wood, have no threads or distinct head, and are not a structural design or a claim of compliance with vehicular-deck guidance.",
@@ -863,6 +869,11 @@
     "courseCount": 9,
     "edgeJitterFraction": 0.1,
     "cornerSeamSetbackM": 0.3,
+    "cornerBevelFactors": [
+      0.35,
+      2.5
+    ],
+    "minimumCornerBevelM": 0.0045,
     "interpretation": "Authored varying stone lengths; original Beishahe masonry bond is unconfirmed."
   },
   "railJoints": {

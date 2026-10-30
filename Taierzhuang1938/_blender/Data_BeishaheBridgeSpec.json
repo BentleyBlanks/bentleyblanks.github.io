@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "2026103007",
+  "version": "2026103008",
   "name": "BeishaheBridge",
   "units": "m",
   "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -39,6 +39,8 @@
   "pierJointShadeFactor": 0.5,
   "pierCourseEdgeJitterFraction": 0.1,
   "pierCornerSeamSetbackM": 0.3,
+  "pierStoneBevelFactors": [0.35, 2.5],
+  "pierStoneBevelMinimumM": 0.0045,
   "foundationY": -5.3,
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [

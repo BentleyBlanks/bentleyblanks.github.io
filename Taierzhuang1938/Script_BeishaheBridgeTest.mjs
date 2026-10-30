@@ -198,6 +198,7 @@ Check(spec.trussUpperGussetDepthM===.34&&spec.trussUpperGussetMaxHalfWidthM===.3
 Check(/creative weathering choice, not evidence of the 1938 waterline/i.test(data.materialInterpretation?.pierDamp??''),'Lower pier damp color remains explicitly an artistic choice, not a historical water-level claim');
 Check(spec.pierJointShadeFactor===.5&&data.pierJointShade?.edgeFactor===spec.pierJointShadeFactor&&/not measured mortar/i.test(data.pierJointShade.interpretation??''),'Stone joint shading remains an authored visual treatment, not a historical mortar claim');
 Check(spec.pierCourseEdgeJitterFraction===.1&&spec.pierCornerSeamSetbackM===.3&&data.pierMasonry?.courseCount===9&&data.pierMasonry.edgeJitterFraction===spec.pierCourseEdgeJitterFraction&&/unconfirmed/i.test(data.pierMasonry.interpretation??''),'Variable stone lengths and their historical boundary are recorded');
+Check(spec.pierStoneBevelFactors.join(',')==='0.35,2.5'&&spec.pierStoneBevelMinimumM===.0045&&data.pierMasonry.minimumCornerBevelM===spec.pierStoneBevelMinimumM&&/not measured original/i.test(data.materialInterpretation?.pierStoneEdges??''),'Irregular stone corners retain their bounded authored dimensions and historical boundary');
 Check(/not established by a confirmed 1938 Beishahe bridge photograph/i.test(data.materialInterpretation?.deckPlanks??''),'Continuous wooden decking is identified as an authored reconstruction');
 Check(data.deckFasteners?.diameterM===spec.deckFastenerDiameterM&&data.deckFasteners.lengthM===spec.deckFastenerLengthM&&data.deckFasteners.topY===spec.deckFastenerTopY&&data.deckFasteners.bearerEmbedM===.025&&!data.deckFasteners.holesModeled&&!data.deckFasteners.threadsModeled&&/not a structural design/i.test(data.materialInterpretation?.deckFasteners??''),'Deck-fastener dimensions and unverified, undrilled visual convention are recorded');
 Check(data.deck?.clearWidthM===spec.sleeperLengthM&&data.deck.nominalBoardWidthM===spec.deckBoardNominalWidthM&&data.deck.rowToneContrast===spec.deckRowToneContrast&&data.deck.variantCount===spec.deckVariantCount&&data.deck.plankThicknessM===.045&&data.deck.topY===.075&&data.deck.jointWidthM===.006&&data.deck.grainAxis==='X','Decking dimensions, variant count, row tone, real 6 mm board gaps and transverse timber grain are recorded');
@@ -392,27 +393,28 @@ for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
 Check(new Set(ByRole('Sleepers').map(p=>p.node.mesh)).size===3&&new Set(ByRole('DeckPlanks').map(p=>p.node.mesh)).size===spec.deckVariantCount&&new Set(ByRole('Pier').map(p=>p.node.mesh)).size===3&&new Set(ByRole('PierDamp').map(p=>p.node.mesh)).size===3,'Actual sleeper, deck and dry/damp pier variants break repetition');
 function UniqueUvCount(role){return new Set(ByRole(role).map(part=>Hash(Buffer.from(part.geo.uv.buffer,part.geo.uv.byteOffset,part.geo.uv.byteLength)))).size;}
 Check(UniqueUvCount('Sleepers')===3&&UniqueUvCount('DeckPlanks')===spec.deckVariantCount&&UniqueUvCount('Pier')===3&&UniqueUvCount('PierDamp')===3,'Actual mesh variants contain genuinely different UV coordinates');
-// Derive each UV direction from measured metre-space edges on the exported
-// stone geometry. Quarter turns should break directional repetition without
-// stretching the material or changing the authored one-metre texture scale.
+// Derive the UV transform on actual planar stone triangles. This measures
+// metric scale and quarter-turn rotation even when bevels make their edges
+// oblique rather than perfectly parallel to the world axes.
 for(const role of ['Pier','PierDamp']){
-  const bins=[0,0,0,0];let scaleBad=0;
+  // Blender's glTF export flips V after the authored quarter-turn.
+  const bins=[0,0,0,0],rotations=[[1,0,0,-1],[0,-1,-1,0],[-1,0,0,1],[0,1,1,0]];let scaleBad=0;
   for(const part of [...new Map(ByRole(role).map(p=>[p.node.mesh,p])).values()]){
     const {positions,indices,uv}=part.geo;
     for(let k=0;k<(indices?.length??positions.length/3);k+=3){
-      const ids=[0,1,2].map(j=>indices?indices[k+j]:k+j);
-      for(const [a,b] of [[ids[0],ids[1]],[ids[1],ids[2]],[ids[2],ids[0]]]){
-        const dx=positions[3*b]-positions[3*a],dy=positions[3*b+1]-positions[3*a+1],dz=positions[3*b+2]-positions[3*a+2];
-        if(dx<.05||Math.abs(dy)>.00001||Math.abs(dz)>.00001)continue;
-        const du=uv[2*b]-uv[2*a],dv=uv[2*b+1]-uv[2*a+1];
-        if(Math.abs(Math.hypot(du,dv)-dx)>.0002){scaleBad++;continue;}
-        const bin=Math.abs(du)>Math.abs(dv)?(du>0?0:2):(dv>0?1:3);
-        if(Math.min(Math.abs(du),Math.abs(dv))>.0002){scaleBad++;continue;}
-        bins[bin]++;
-      }
+      const ids=[0,1,2].map(j=>indices?indices[k+j]:k+j),p=ids.map(i=>new THREE.Vector3(positions[i*3],positions[i*3+1],positions[i*3+2]));
+      const normal=p[1].clone().sub(p[0]).cross(p[2].clone().sub(p[0])).normalize(),components=normal.toArray();
+      const axis=components.map(Math.abs).indexOf(Math.max(...components.map(Math.abs)));
+      if(components.some((v,i)=>i!==axis&&Math.abs(v)>.0001))continue;
+      const axes=[0,1,2].filter(i=>i!==axis),e1=p[1].clone().sub(p[0]).toArray(),e2=p[2].clone().sub(p[0]).toArray();
+      const a=e1[axes[0]],b=e2[axes[0]],c=e1[axes[1]],d=e2[axes[1]],det=a*d-b*c;if(Math.abs(det)<1e-6)continue;
+      const du1=uv[ids[1]*2]-uv[ids[0]*2],du2=uv[ids[2]*2]-uv[ids[0]*2],dv1=uv[ids[1]*2+1]-uv[ids[0]*2+1],dv2=uv[ids[2]*2+1]-uv[ids[0]*2+1];
+      const matrix=[(du1*d-du2*c)/det,(-du1*b+du2*a)/det,(dv1*d-dv2*c)/det,(-dv1*b+dv2*a)/det];
+      const bin=rotations.findIndex(r=>r.every((v,i)=>Math.abs(v-matrix[i])<.002));
+      if(bin<0)scaleBad++;else bins[bin]++;
     }
   }
-  Check(scaleBad===0&&bins.every(n=>n>=20),'Stone block UVs use all four quarter-turn directions at unchanged metre scale',{role,bins,scaleBad});
+  Check(scaleBad===0&&bins.every(n=>n>=20),'Actual stone planes keep four quarter-turn UV directions and one-metre scale',{role,bins,scaleBad});
 }
 for(const role of ['Pier','PierDamp','Cap','abutment']){
   const meshes=[...new Map(ByRole(role).map(p=>[p.node.mesh,p])).values()];
@@ -476,7 +478,7 @@ for(const part of [...new Map([...ByRole('Pier'),...ByRole('PierDamp')].map(p=>[
     else if(!other)seen.set(key,rgb);
   }
   Check(mismatch===0,'Coincident masonry vertices have continuous color',{mesh:part.name,mismatch});
-  if(Role(part)!=='PierDamp')continue;
+
   for(let k=0;k<(indices?.length??positions.length/3);k+=3){
     const ids=[0,1,2].map(j=>indices?indices[k+j]:k+j);
     for(const [a,b] of [[ids[0],ids[1]],[ids[1],ids[2]],[ids[2],ids[0]]]){
@@ -485,7 +487,7 @@ for(const part of [...new Map([...ByRole('Pier'),...ByRole('PierDamp')].map(p=>[
     }
   }
   const unpaired=[...edges.values()].filter(count=>count!==2).length;
-  Check(unpaired===0,'Subdivided damp stones remain closed without T-junctions',{mesh:part.name,unpaired});
+  Check(unpaired===0,'Masonry stones remain closed without T-junctions',{mesh:part.name,unpaired});
 }
 {
   let bottomWarmth=0,upperWarmth=0,bottomCount=0,upperCount=0,warm=0,cool=0;
