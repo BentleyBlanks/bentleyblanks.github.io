@@ -95,6 +95,7 @@ import { PREVIZ_WEAPON_HIDDEN } from "./Data_BlockoutPrevizClips.mjs";
 import { LoadDraftCartAssets, CreateDraftCartInstance } from "./Script_DraftCartModel.mjs";
 import { LoadStretcherAsset, StretcherAssetGeometry, CreateStretcherMaterial } from "./Script_StretcherAsset.mjs";
 import { LoadBlockoutBlanket, CreateBlockoutBlanket } from "./Script_EditorBlockoutBlanket.mjs";
+import { WantsWoundTowel, CreateWoundTowel } from "./Script_EditorBlockoutWoundTowel.mjs";
 
 /** 不拿枪的定妆角色（开场导演 Spawn 时给 unarmed:true 的那几个）。 */
 const UNARMED_CASTS = new Set(["interpreter"]);
@@ -484,6 +485,7 @@ export class BlockoutPuppets {
 
   _DisposeHumans(puppet) {
     for (const human of puppet.humans) {
+      human.towel?.Dispose(); human.towel = null;
       try { human.actor.Dispose(); } catch (error) { /* already gone */ }
     }
     this.actorCount -= puppet.humans.length;
@@ -766,6 +768,7 @@ export class BlockoutPuppets {
     this.elapsed += dt * rate;
     for (const puppet of this.puppets.values()) this._Pose(puppet, dt * rate, false, cameraPosition);
     this._StepBlankets();
+    this._StepTowels(dt * rate);
   }
 
   // -------------------------------------------------------------------------
@@ -980,6 +983,29 @@ export class BlockoutPuppets {
     }
     for (const key of ["headL", "headR"]) if (gripAsset[key]) grips[key] = blanket.AssetPoint(gripAsset[key].x, gripAsset[key].y, gripAsset[key].z, new THREE.Vector3());
     return { groundAt: this.groundAt, grips, colliders, wounds };
+  }
+
+  /**
+   * 冬瓜肚子上塞的毛巾（2026-10-31，Script_EditorBlockoutWoundTowel）：倒着、要塞（WantsWoundTowel）的人造一条，每帧摆到肚子正面、
+   * 推吸血；站起来 / 不看见就藏（站起来拿掉）。毛巾跟人走（_DisposeHumans 一起拆）。
+   */
+  _StepTowels(dt) {
+    for (const puppet of this.puppets.values()) {
+      const want = puppet.down && WantsWoundTowel(puppet.unit);
+      for (const human of puppet.humans) {
+        if (!want) { if (human.towel) { human.towel.Dispose(); human.towel = null; } continue; }
+        if (!human.towel) {
+          try { human.towel = CreateWoundTowel(); this.root.add(human.towel.mesh); }
+          catch (error) { console.warn("[BlockoutPuppets] wound towel failed", error); human.towel = false; }
+        }
+        if (!human.towel) continue;
+        const actor = human.actor;
+        let shown = puppet.visible && actor.root.visible;
+        if (shown) { actor.root.updateMatrixWorld(true); this.root.updateMatrixWorld(); shown = human.towel.Pose(actor.characterRig); }
+        human.towel.mesh.visible = shown;
+        if (shown) human.towel.Advance(dt);
+      }
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -1292,7 +1318,7 @@ export class BlockoutPuppets {
       }
       // 被子：等人物收敛了（最后一步）再重新铺平、按那时的手空推（大跳之后头一两步人物模型还没跟上，手在上一个时刻的地方）；
       // 之前的步只攒时间不推
-      if (i === steps - 1) this._StepBlankets(true);
+      if (i === steps - 1) { this._StepBlankets(true); this._StepTowels(0); }
     }
   }
 
@@ -1351,6 +1377,8 @@ export class BlockoutPuppets {
       blanketDragSolo: puppet.body?.userData.model?.blanket ? (puppet.drive && puppet.drive.dragSolo !== undefined ? !!puppet.drive.dragSolo : !!puppet.unit.dragSolo) : null,
       // 2026-10-21：单被的布料（两角离手多远、最高点、最大拉长、贴地 / 被压住的点数，见 Script_EditorBlockoutBlanket Probe）
       blanketCloth: puppet.body?.userData.model?.blanket ? puppet.body.userData.model.blanket.Probe() : null,
+      // 2026-10-31：肚子上塞的毛巾（Script_EditorBlockoutWoundTowel；看不见 / 没塞 = null）
+      woundTowel: human?.towel ? { shown: human.towel.mesh.visible, ...human.towel.Probe() } : null,
       draftAnimalVisible: puppet.body?.userData.model?.draft ? puppet.body.userData.model.draft.animalRoot.visible : null,
       draftTravelM: puppet.body?.userData.model?.draft ? puppet.body.userData.model.travelM : null,
       rootAboveCarrierGround: puppet.seat && (human || puppet.body) ? (human ? human.actor.root.position.y : puppet.body.position.y) - puppet.seat.carrierY : null,
