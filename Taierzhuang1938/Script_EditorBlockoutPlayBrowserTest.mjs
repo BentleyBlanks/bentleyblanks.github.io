@@ -84,18 +84,21 @@ try {
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?editor=blockout&level=${LEVEL}&kf=02-4&quality=whitebox&scale=small&audio=0`,
     { waitUntil: "load", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.Blockout?.State().ready, null, { timeout: 300000 });
-  await page.waitForFunction(() => window.Tengxian.Debug.Blockout.Play.State().present, null, { timeout: 15000 }).catch(() => {});
   await Step(4);
   const p0 = await PlayState();
   const r0 = await Rules();
-  Check("读到试玩编排且校验通过；编辑状态下照旧无敌、无限子弹", p0.present && p0.valid && r0.invincible && r0.infiniteAmmo, J({ present: p0.present, valid: p0.valid, r0 }));
+  const asked0 = await B(() => performance.getEntriesByType("resource").filter(e => /\.play\.json/.test(e.name)).length);
+  Check("进关不读试玩编排（大多数关卡没有这份文件，404 会进控制台）；编辑状态下照旧无敌、无限子弹", !p0.present && asked0 === 0 && r0.invincible && r0.infiniteAmmo, J({ present: p0.present, asked0, r0 }));
 
   // 1) 面板
   console.log("--- panel");
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => !document.querySelector(".boRoot").classList.contains("inert"), null, { timeout: 5000 }).catch(() => {});
   await page.click(".boPlayBtn");
+  await page.waitForFunction(() => window.Tengxian.Debug.Blockout.Play.State().present, null, { timeout: 15000 }).catch(() => {});
   await Step(1);
+  const p0b = await PlayState();
+  Check("打开面板才读这一关的试玩编排，校验通过", p0b.present && p0b.valid, J({ present: p0b.present, valid: p0b.valid }));
   const panel = await B(() => {
     const el = document.querySelector(".boPlayPanel");
     return { shown: !el.hidden, presets: [...el.querySelectorAll(".boPlayPreset")].map(b => b.textContent), from: el.querySelectorAll(".boPlaySelect")[0]?.value,

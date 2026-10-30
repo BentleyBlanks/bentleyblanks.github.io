@@ -408,12 +408,12 @@ export class EditorBlockout {
     };
     // 试玩（§17）：Start({from, to, settings}) 开打；Stop() 中止（出小结）；State() 现状；Close() 关小结回到编辑；Reload() 重读编排
     this.api.Play = {
-      Start: (options) => this.play.Start(options || {}),
+      Start: async (options) => { await this.play.Want(); return this.play.Start(options || {}); },
       Stop: () => { this.play.Finish("abort"); return this.play.State(); },
       State: () => this.play.State(),
       Close: () => { this.play.CloseSummary(); this.play.ClosePanel(); return this.play.State(); },
       Open: () => { this.play.OpenPanel(); return this.play.State(); },
-      Reload: () => this.play.Load({ force: true }),
+      Reload: () => { this.play.wanted = true; return this.play.Load({ force: true }); },
       Retry: (options) => { this.play.Retry(options || {}); return this.play.State(); },
     };
   }
@@ -434,7 +434,7 @@ export class EditorBlockout {
     await this.LoadConfig();
     this.SetupLevel();
     await this.previz.Load({ force: true });
-    await this.play.Load({ force: true });
+    this.play.Reset();
     // 没写 kf 时，?level= 给的是菜单行（如 FirstLevel1218_15）就从那一段第一帧开始
     const kf = this.params.get("kf") ?? BlockoutMenuRow(this.params.get("level"))?.from ?? null;
     // 「重现」链接带来的机位：落到关键帧之后再摆（地址栏里的 pose 由 ReplaceUrl 去掉，之后翻关键帧不再套用）
@@ -759,7 +759,7 @@ export class EditorBlockout {
       this.ReplaceUrl();
       this.SetupLevel();
       await this.previz.Load({ force: true });
-      await this.play.Load({ force: true });
+      this.play.Reset();
       const start = startKf != null ? KeyframeIndex(this.doc, startKf) : 0;
       await this.GoTo(Math.max(0, start), { animate: false });
       this.PushLevels();

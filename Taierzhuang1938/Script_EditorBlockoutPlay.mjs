@@ -1,7 +1,9 @@
 // 白盒试玩（docs/Data_EditorBlockout.md §17，2026-10-31）：编辑器里选一段关键帧，按下就从这一帧开打。
 //
 // 规则（哪一步怎么打、谁变 AI、什么算过关）全在 Script_EditorBlockoutPlayPlan（纯函数）；这里只管跑：
-//   · 读 Blockout/<Level>.play.json（可选，404 = 全按推断）；编辑器每 2 s 轮询时顺手查一次，试玩中改的下一次开打生效。
+//   · 读 Blockout/<Level>.play.json（可选，404 = 全按推断）。这一关第一次打开试玩面板（或开打）时才读，之后编辑器每 2 s 轮询时
+//     顺手查一次，试玩中改的下一次开打生效。不在进关时就读：大多数关卡没有这份文件，浏览器会把每次 404 记成控制台错误，
+//     别的浏览器门禁（「全程没有未捕获错误」）会因此红。
 //   · 开打：玩家按本关的携行重新领一遍装备、回满血（宿主 ResetPlayer），摆到第一步的机位；无敌 / 无限子弹按面板开关
 //     （宿主读 PlayOverrides，不写调试存档）。
 //   · 每一步：fight —— 先走到这一步的玩家站位（第一步直接摆过去），到了把这一帧的日军按数据放成真 AI
@@ -73,6 +75,8 @@ export class BlockoutPlay {
     this.validation = null;
     this.lastCheckMs = -Infinity;
     this.loading = false;
+    // 这一关有没有人用过试玩（打开过面板 / 开打过）：用过才读文件、才轮询（见文件头）
+    this.wanted = false;
     this.settings = { invincible: false, infiniteAmmo: false, previz: true, from: null, to: null };
     this.settingsLevel = "";
     this.run = null;            // 正在打的那一段（见 Start）
@@ -124,9 +128,25 @@ export class BlockoutPlay {
     if (this.panelOpen) this.RenderPanel();
   }
 
-  /** 总控每 2 s 轮询时调；配置变了要重新核对点名。 */
+  /** 换关（或进关）：忘掉上一关的编排，等这一关有人用试玩时再读。 */
+  Reset() {
+    this.wanted = false;
+    this.levelKey = this.editor.levelKey;
+    this.doc = null; this.text = null; this.present = false; this.validation = null;
+    this.lastCheckMs = -Infinity;
+    if (this.panelOpen) this.RenderPanel();
+  }
+
+  /** 要用试玩了：这一关还没读过就读一次（→ Promise<有没有编排>）。 */
+  Want() {
+    this.wanted = true;
+    if (this.levelKey !== this.editor.levelKey || this.lastCheckMs === -Infinity) return this.Load({ force: true });
+    return Promise.resolve(this.present);
+  }
+
+  /** 总控每 2 s 轮询时调；配置变了要重新核对点名。这一关没人用过试玩就不读。 */
   Poll({ configChanged = false } = {}) {
-    if (this.loading) return;
+    if (this.loading || !this.wanted) return;
     const due = this.present || configChanged || performance.now() - this.lastCheckMs >= PLAY_ABSENT_RECHECK_S * 1000;
     if (!due) return;
     this.loading = true;
@@ -534,6 +554,8 @@ export class BlockoutPlay {
     this.editor.ExitFly?.({ quiet: true });
     this.panelOpen = true;
     this.editor.ReleasePointerLock?.();
+    // 第一次打开：读这一关的编排（读到后 Swap 会重画面板）
+    this.Want();
     this.RenderPanel();
     this.panel.hidden = false;
     this.btn.classList.add("on");
