@@ -923,7 +923,7 @@ export class BlockoutPuppets {
     const B = BLOCKOUT_PUPPETS.blanketCloth;
     const head = blanket.AssetPoint(0, 0, B.headZ, new THREE.Vector3());
     const grips = { headL: null, headR: null }, gripAsset = { headL: null, headR: null };
-    const colliders = [];
+    const colliders = [], wounds = [];
     for (const other of this.puppets.values()) {
       if (other === puppet || !other.visible || !other.humans.length) continue;
       const human = other.humans[0], actor = human.actor, rig = actor.characterRig;
@@ -955,6 +955,9 @@ export class BlockoutPuppets {
         const carry = last && dt > 0 && last.distanceTo(pelvis) < 1 ? [(pelvis.x - last.x) / dt, (pelvis.z - last.z) / dt] : [0, 0];
         (human.clothPelvis ||= new THREE.Vector3()).copy(pelvis);
         colliders.push(...BodyCapsules(rig, actor.root.scale.x || 1, { press: true, carry }));
+        // 吸血（2026-10-31，Script_EditorBlockoutBlanket.Bleed）：伤口取骨盆到胸口 0.6 处
+        const chest = rig.bones.chest ? new THREE.Vector3().setFromMatrixPosition(rig.bones.chest.matrixWorld) : null;
+        wounds.push(chest ? pelvis.clone().lerp(chest, 0.6) : pelvis.clone());
       }
     }
     // 只有一边有人：另一边镜像（另一角是玩家镜头攥着）；都没人但被子在走：两角贴地跟着被子走。
@@ -976,7 +979,7 @@ export class BlockoutPuppets {
       }
     }
     for (const key of ["headL", "headR"]) if (gripAsset[key]) grips[key] = blanket.AssetPoint(gripAsset[key].x, gripAsset[key].y, gripAsset[key].z, new THREE.Vector3());
-    return { groundAt: this.groundAt, grips, colliders };
+    return { groundAt: this.groundAt, grips, colliders, wounds };
   }
 
   // -------------------------------------------------------------------------

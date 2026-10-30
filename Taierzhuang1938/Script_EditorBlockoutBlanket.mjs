@@ -9,11 +9,20 @@
 // 与拖的人的腿（身体胶囊）、地面高度。被子一帧跳太远（预演跳时间、关键帧切换）或要求确定性取样（Seek）时重新铺平再空推一会儿。
 // BLOCKOUT_BLANKET.cloth = false 退回原来的两条静态姿势：Blanket_Flat（平铺）与 Blanket_DragPose（头端两角抬到 0.70 m）。
 // 静态片段 glTF 时长 0，不交给 AnimationMixer（0 时长循环会除零），读每条轨道的第一帧按权重插值直接写骨头。
+//
+// 2026-10-31（用户：吸血的布弄到白盒里，看基本效果和位置）：被子挂上布料测试场那套双面吸血（Script_ClothBlood，docs/Data_ClothBlood.md）。
+// 出血点 = 躺在被子上的伤员（_BlanketEnv 的 wounds，骨盆到胸口 0.6 处）此刻正下方是布上的哪一点（ClothUv：在布料质点格子
+// 此刻的世界位置里找包住它的三角形，按静止位置插值回资产坐标）—— 拖着走时人身下那块布跟着人滑，不能按被子根的平铺坐标算。
+// 正面渗、慢慢透到背面。
+// 重新铺平（Apply / 关键帧跳转 / 预演 Seek）时出血点挪了 keepM 以上（或之前没血）就清掉重来：在出血点倒 soakMl、当场空推 soakS 秒
+// 让它晕开（约 0.2 s，挪动不大就不重算，拖预演时间条不卡），之后按 feedMlS 往外渗，总量到 capMl 停。
+// 白盒只看位置和大概的样子，不跟预演时间线逐帧对齐（同一处 Seek 回去不会把血擦掉重算）。
 
 import * as THREE from "three";
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
 import { BlanketClothRig } from "./Script_BlanketCloth.mjs";
+import { ClothBlood } from "./Script_ClothBlood.mjs";
 
 export const BLOCKOUT_BLANKET = Object.freeze({
   url: "./Model/Model_SingleBlanket.glb?v=20261023SingleBlanketShell",
@@ -23,6 +32,8 @@ export const BLOCKOUT_BLANKET = Object.freeze({
   blendRate: 5,
   /** 布料模拟（false = 两条静态姿势插值）。 */
   cloth: true,
+  /** 吸血（文件头 2026-10-31）：资产宽长（米，被面坐标归一化用）、织物档、重铺时先铺的量与「已渗了多久」、之后每秒渗多少、总量封顶、出血点挪多远才换位置。 */
+  blood: Object.freeze({ enabled: true, widthM: 1.4, lengthM: 1.9, profile: "thin", soakMl: 220, soakS: 50, feedMlS: 1, capMl: 300, moveM: 0.06, keepM: 0.15 }),
 });
 
 let pending = null;
@@ -99,8 +110,15 @@ export function CreateBlockoutBlanket(asset) {
     try { rig = new BlanketClothRig(root); }
     catch (error) { console.warn("[BlockoutBlanket] cloth rig failed; static poses", error); }
   }
+  let blood = null;
+  const W = BLOCKOUT_BLANKET.blood;
+  if (rig && W.enabled) {
+    // 和布料测试场一样：骨架 / 布料先建，再复制几何、挂血迹材质补丁（几何与材质都是这副被子私有的克隆）
+    try { blood = new ClothBlood(root, { width: W.widthM, length: W.lengthM, profile: W.profile }); }
+    catch (error) { console.warn("[BlockoutBlanket] cloth blood failed; plain blanket", error); }
+  }
   const inst = {
-    root, cloth: rig, drag: -1, last: null, steps: 0, resets: 0,
+    root, cloth: rig, blood, drag: -1, last: null, steps: 0, resets: 0,
     SetDrag(target, dt = 0) {
       const t = Math.min(1, Math.max(0, target));
       const next = this.drag < 0 || dt <= 0 ? t : this.drag + (t - this.drag) * (1 - Math.exp(-dt * BLOCKOUT_BLANKET.blendRate));
@@ -133,7 +151,8 @@ export function CreateBlockoutBlanket(asset) {
         const g = groundAt(grip.x, grip.z);
         if (Number.isFinite(g)) grip.y = Math.max(grip.y, g + cloth.cfg.groundOffsetM);
       }
-      if (!cloth.ready || jumped || env.reset) {
+      const reset = !cloth.ready || jumped || env.reset;
+      if (reset) {
         // 重新铺平：静止平铺放在被子此刻的位姿上，再按此刻的手和身体空推 settleS（被角挪到手上、布落定）
         cloth.Reset(world);
         cloth.SampleGround(groundAt, true);
@@ -151,7 +170,48 @@ export function CreateBlockoutBlanket(asset) {
       }
       rig.Apply();
       this.drag = cloth.pins.size ? 1 : 0;
+      this.Bleed(dt, env.wounds, reset);
       this.lastMs = performance.now() - t0;
+    },
+    /**
+     * 世界里一点正下方（XZ）是布上的哪一点：质点格子每格拆两个三角形，按此刻世界位置找包住它的（叠了几层取高度最接近的），
+     * 用重心坐标插值静止位置 → 被面 u/v。不在布上 → null。
+     */
+    ClothUv(point) {
+      const cloth = rig.cloth, x = cloth.x, rest = cloth.rest, cols = rig.cols;
+      let best = null, bestDy = Infinity;
+      for (let r = 0; r + 1 < rig.rows; r++) for (let c = 0; c + 1 < cols; c++) {
+        const i00 = r * cols + c, i01 = i00 + 1, i10 = i00 + cols, i11 = i10 + 1;
+        for (const [a, b, d] of [[i00, i01, i11], [i00, i11, i10]]) {
+          const ax = x[a * 3], az = x[a * 3 + 2], bx = x[b * 3] - ax, bz = x[b * 3 + 2] - az, dx = x[d * 3] - ax, dz = x[d * 3 + 2] - az;
+          const det = bx * dz - bz * dx;
+          if (Math.abs(det) < 1e-9) continue;
+          const px = point.x - ax, pz = point.z - az;
+          const wb = (px * dz - pz * dx) / det, wd = (bx * pz - bz * px) / det, wa = 1 - wb - wd;
+          if (wa < -1e-6 || wb < -1e-6 || wd < -1e-6) continue;
+          const y = wa * x[a * 3 + 1] + wb * x[b * 3 + 1] + wd * x[d * 3 + 1], dy = Math.abs(point.y - y);
+          if (dy >= bestDy) continue;
+          bestDy = dy;
+          best = { u: (wa * rest[a * 3] + wb * rest[b * 3] + wd * rest[d * 3]) / W.widthM + 0.5,
+            v: (wa * rest[a * 3 + 2] + wb * rest[b * 3 + 2] + wd * rest[d * 3 + 2]) / W.lengthM + 0.5 };
+        }
+      }
+      return best && blood.Point({ ...best, side: 1 });
+    },
+    /** 吸血：wounds = 伤员出血处（世界坐标），取第一处、落在布上的那点（ClothUv），正面。reset = 刚重新铺平（文件头）。 */
+    Bleed(dt, wounds, reset) {
+      if (!blood) return;
+      const src = wounds?.length ? this.ClothUv(wounds[0]) : null;
+      const Gap = (a, b) => Math.hypot((a.u - b.u) * W.widthM, (a.v - b.v) * W.lengthM);
+      if (reset && !(src && this.soakAt && Gap(src, this.soakAt) <= W.keepM)) {
+        blood.Clear(); this.bleedAt = null; this.soakAt = null;
+        if (src) { blood.Inject({ ...src, amountMl: W.soakMl, ageS: 0 }); blood.Advance(W.soakS); this.soakAt = src; }
+      }
+      if (!src || blood.injectedMl >= W.capMl) { if (blood.feed) blood.StopFeed(); }
+      else if (!blood.feed || !this.bleedAt || Gap(src, this.bleedAt) > W.moveM) {
+        blood.StartFeed({ ...src, rateMlS: W.feedMlS }); this.bleedAt = src;
+      }
+      if (dt > 0) blood.Advance(dt);
     },
     /** 取证：模拟开没开、两角有没有人拽、离手多远、最高点、拉长、贴地 / 被压住的点数、重铺次数。 */
     Probe() {
@@ -168,9 +228,11 @@ export function CreateBlockoutBlanket(asset) {
         root: at.toArray().map(v => +v.toFixed(3)), lastReset: this.lastReset || null,
         headL: corner("headL"), headR: corner("headR"), tailL: corner("tailL"), tailR: corner("tailR"),
         topM: +s.topM.toFixed(3), lowM: +s.lowM.toFixed(3), maxStretch: +s.maxStretch.toFixed(3), minRatio: +s.minRatio.toFixed(3),
-        contact: s.contact, pressed: s.pressed, colliders: cloth.colliders.length };
+        contact: s.contact, pressed: s.pressed, colliders: cloth.colliders.length,
+        blood: blood ? (() => { const b = blood.State(); return { feeding: b.feeding, at: this.bleedAt ? { u: +this.bleedAt.u.toFixed(3), v: +this.bleedAt.v.toFixed(3) } : null,
+          injectedMl: +b.injectedMl.toFixed(1), frontM2: +b.front.areaM2.toFixed(3), backM2: +b.back.areaM2.toFixed(3), timeS: +b.timeS.toFixed(1) }; })() : null };
     },
-    Dispose() { root.removeFromParent(); },
+    Dispose() { blood?.Dispose(); root.removeFromParent(); },
   };
   if (!rig) inst.SetDrag(0);
   return inst;
