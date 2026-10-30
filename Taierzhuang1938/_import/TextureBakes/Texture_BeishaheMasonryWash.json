@@ -1,0 +1,122 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-10-31",
+  "name": "BeishaheMasonryWash",
+  "preset": "agedMasonryWash",
+  "source": {
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishahePierStoneV5.png",
+    "sha256": "c3e512207b3d57433204d482e96692a4b8d83a4c225f0b2b3eaa5fe7b3b822b2",
+    "metrics": {
+      "meanSrgb": [
+        0.6795,
+        0.6311,
+        0.577
+      ],
+      "luma": 0.6292,
+      "lumaStd": 0.0949,
+      "sat": 0.1508,
+      "clipLow": 0.0,
+      "clipHigh": 0.0001,
+      "lowFreq": 0.0077
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.65,
+      0.625,
+      0.58
+    ],
+    "contrast": 0.045,
+    "lumaRange": [
+      0.55,
+      0.72
+    ],
+    "satRange": [
+      0.0,
+      0.18
+    ],
+    "stdRange": [
+      0.02,
+      0.08
+    ],
+    "reliefM": 0.002,
+    "rough": 0.93,
+    "roughVar": 0.04,
+    "roughLumaK": 0.0,
+    "ao": 0.12,
+    "metal": 0.0,
+    "seamless": "blend",
+    "rowFlatten": true,
+    "flattenSigma": 0.25,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 1.0,
+    "size": 1024,
+    "dataSize": 512,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": false,
+    "noFlatten": false,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false,
+    "detailBalance": 0,
+    "heightFineWeight": 0.3,
+    "uvAtlasReason": null
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_BeishaheMasonryWashBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 241822,
+      "sha256": "2fcaf7fe07951a99471b5854490a30a3e745d86fb89174f2ae3565fb4c5f38c2"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_BeishaheMasonryWashNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 63118,
+      "sha256": "742edb1834d0cef44f5c6a5e90b21f83bd9092ed3c398c588ca3ddf3b1084bdb"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_BeishaheMasonryWashOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 29144,
+      "sha256": "f3f89e97ef7d75975645680daeae6dfbc8993525ead17071c6b6ddb84ec229a4"
+    }
+  ],
+  "totalBytes": 334084,
+  "metrics": {
+    "meanSrgb": [
+      0.6499,
+      0.6259,
+      0.58
+    ],
+    "luma": 0.6186,
+    "lumaStd": 0.045,
+    "sat": 0.1075,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0031,
+    "seam": 0.0293,
+    "interior": 0.032,
+    "seamRatio": 0.915,
+    "border": 0.97,
+    "swing": 0.0012,
+    "aoMean": 0.973,
+    "roughMean": 0.93,
+    "texelsPerMeter": 1024.0
+  },
+  "gateProblems": []
+}

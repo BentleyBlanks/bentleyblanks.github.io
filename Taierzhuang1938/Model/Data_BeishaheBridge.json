@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026103012",
+  "version": "2026103101",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026103012",
+    "version": "2026103101",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -72,6 +72,28 @@
       2.5
     ],
     "pierStoneBevelMinimumM": 0.0045,
+    "pierWearCornerProbability": 0.1,
+    "pierWearCornerCutRangeM": [
+      0.026,
+      0.048
+    ],
+    "masonryCoatingThicknessM": 0.0015,
+    "masonryCoatingCellM": 0.09,
+    "masonryOldWashTintGain": [
+      1.08,
+      1.05,
+      0.98
+    ],
+    "masonryRewashTintGain": [
+      0.62,
+      0.61,
+      0.58
+    ],
+    "masonrySubstrateCompensation": [
+      0.7,
+      0.67,
+      0.66
+    ],
     "foundationY": -5.3,
     "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
     "historicalReferences": [
@@ -100,7 +122,8 @@
         "license": "CC BY-SA 4.0",
         "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
         "fileSha1": "1f84a11c07cb46a9542ab2818bf0c5a3f0eb7abc",
-        "supports": "The author's Wikimedia Commons upload is byte-identical to the photograph in the user's archive (SHA-1 verified). Its nine-panel layout, central crossed braces and visible main-member widths are a modern out-of-region visual analogy. The catalogue date is not independently established by EXIF or field records; the photograph does not establish the Beishahe bridge's historical truss pattern, dimensions, finish or condition."
+        "supports": "Retained as an earlier geometric diagnostic only. Its modern red-brown finish has been rejected as a color source; it does not establish the historical Beishahe pattern, member sections, coating color or condition.",
+        "status": "EarlierDiagnosticOnly"
       },
       {
         "id": "JinpuRail1937",
@@ -132,6 +155,11 @@
         "id": "Jinpu1941GuardTimbers",
         "url": "https://codh.rois.ac.jp/north-china-railway/photograph/3804-035394-0.html",
         "supports": "1941 Jinpu railway bridge at an unknown location: outside longitudinal timbers and a visible timber joint provide an engineering reference. Neither the dimensions nor their presence at Beishahe is established."
+      },
+      {
+        "id": "BridgeCoatings1916",
+        "url": "https://fraser.stlouisfed.org/title/report-british-departmental-committee-danger-use-lead-painting-buildings-3837/fulltext",
+        "supports": "US Bureau of Labor Statistics Bulletin 188, March 1916, pp.77-78, reproduces British railway-engineer evidence describing black coal-tar protective paint on railway river bridges. This is a foreign period process analogy only; it does not establish the coating type, color or condition of the Beishahe bridge."
       }
     ],
     "mapMeasurement": {
@@ -635,21 +663,133 @@
       ]
     }
   ],
+  "masonryMaintenance": {
+    "coatingThicknessM": 0.0015,
+    "cellM": 0.09,
+    "supports": [
+      {
+        "oldWashAreaM2": 5.75589069366265,
+        "rewashAreaM2": 1.096921105216552,
+        "seed": 4237,
+        "supportIndex": 1,
+        "centerZ": -120.0
+      },
+      {
+        "oldWashAreaM2": 5.754315012294455,
+        "rewashAreaM2": 1.0934060197405415,
+        "seed": 6536,
+        "supportIndex": 2,
+        "centerZ": -100.0
+      },
+      {
+        "oldWashAreaM2": 6.001446858177587,
+        "rewashAreaM2": 1.0508796007006822,
+        "seed": 8835,
+        "supportIndex": 3,
+        "centerZ": -80.0
+      },
+      {
+        "oldWashAreaM2": 5.936430224098558,
+        "rewashAreaM2": 1.1023361846295074,
+        "seed": 11134,
+        "supportIndex": 4,
+        "centerZ": -60.0
+      },
+      {
+        "oldWashAreaM2": 5.634860743504078,
+        "rewashAreaM2": 1.075163016755937,
+        "seed": 13433,
+        "supportIndex": 5,
+        "centerZ": -40.0
+      },
+      {
+        "oldWashAreaM2": 5.838041678373202,
+        "rewashAreaM2": 1.0999145740634049,
+        "seed": 15732,
+        "supportIndex": 6,
+        "centerZ": -20.0
+      },
+      {
+        "oldWashAreaM2": 5.668096493417693,
+        "rewashAreaM2": 1.1067633743856504,
+        "seed": 18031,
+        "supportIndex": 7,
+        "centerZ": 0.0
+      },
+      {
+        "oldWashAreaM2": 5.854541434120961,
+        "rewashAreaM2": 1.048563532274784,
+        "seed": 20330,
+        "supportIndex": 8,
+        "centerZ": 20.0
+      },
+      {
+        "oldWashAreaM2": 5.925027260002594,
+        "rewashAreaM2": 1.1062729675084029,
+        "seed": 22629,
+        "supportIndex": 9,
+        "centerZ": 40.0
+      },
+      {
+        "oldWashAreaM2": 5.894805493802664,
+        "rewashAreaM2": 1.0726291188624373,
+        "seed": 24928,
+        "supportIndex": 10,
+        "centerZ": 60.0
+      },
+      {
+        "oldWashAreaM2": 5.8003634412963265,
+        "rewashAreaM2": 1.065611233056984,
+        "seed": 27227,
+        "supportIndex": 11,
+        "centerZ": 80.0
+      },
+      {
+        "oldWashAreaM2": 5.957238994071304,
+        "rewashAreaM2": 1.092137575883271,
+        "seed": 29526,
+        "supportIndex": 12,
+        "centerZ": 100.0
+      },
+      {
+        "oldWashAreaM2": 5.765889904483174,
+        "rewashAreaM2": 1.113457120246835,
+        "seed": 31825,
+        "supportIndex": 13,
+        "centerZ": 120.0
+      },
+      {
+        "oldWashAreaM2": 8.879602759664778,
+        "rewashAreaM2": 1.8447631792306822,
+        "seed": 185888,
+        "abutment": "North",
+        "centerZ": -140.0
+      },
+      {
+        "oldWashAreaM2": 8.068774047906288,
+        "rewashAreaM2": 1.6669193117811005,
+        "seed": 201726,
+        "abutment": "South",
+        "centerZ": 140.0
+      }
+    ],
+    "interpretation": "Unique authored old mineral-wash remnants, partial gray rebrushing, runoff and worn stone corners. These do not establish the original bridge's maintenance history, coating type, color or water level."
+  },
   "bounds": {
     "min": [
-      -4.800313472747803,
+      -4.801600456237793,
       -5.559999942779541,
-      -143.85736083984375
+      -143.858154296875
     ],
     "max": [
-      4.8003129959106445,
+      4.801599979400635,
       2.200000047683716,
-      143.85736083984375
+      143.858154296875
     ],
     "size": [
-      9.600626468658447,
+      9.603200435638428,
       7.759999990463257,
-      287.7147216796875
+      287.71630859375
     ]
   },
   "transitions": [
@@ -758,11 +898,11 @@
       "railHeightM": 0.14
     }
   ],
-  "triangles": 1533144,
-  "meshObjects": 409,
+  "triangles": 1942708,
+  "meshObjects": 439,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
-  "glbBytes": 24312032,
-  "glbSha256": "82243720193a5cea7f91b7d5ad2ddb5bc8dfa0e28511340002b4fa5563962d94",
+  "glbBytes": 52590464,
+  "glbSha256": "2f178f463e46e5eb03951d8c92fc481a1000e9afa3c764cfe9dfac92537e2340",
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
@@ -790,7 +930,8 @@
       "license": "CC BY-SA 4.0",
       "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
       "fileSha1": "1f84a11c07cb46a9542ab2818bf0c5a3f0eb7abc",
-      "supports": "The author's Wikimedia Commons upload is byte-identical to the photograph in the user's archive (SHA-1 verified). Its nine-panel layout, central crossed braces and visible main-member widths are a modern out-of-region visual analogy. The catalogue date is not independently established by EXIF or field records; the photograph does not establish the Beishahe bridge's historical truss pattern, dimensions, finish or condition."
+      "supports": "Retained as an earlier geometric diagnostic only. Its modern red-brown finish has been rejected as a color source; it does not establish the historical Beishahe pattern, member sections, coating color or condition.",
+      "status": "EarlierDiagnosticOnly"
     },
     {
       "id": "JinpuRail1937",
@@ -822,17 +963,23 @@
       "id": "Jinpu1941GuardTimbers",
       "url": "https://codh.rois.ac.jp/north-china-railway/photograph/3804-035394-0.html",
       "supports": "1941 Jinpu railway bridge at an unknown location: outside longitudinal timbers and a visible timber joint provide an engineering reference. Neither the dimensions nor their presence at Beishahe is established."
+    },
+    {
+      "id": "BridgeCoatings1916",
+      "url": "https://fraser.stlouisfed.org/title/report-british-departmental-committee-danger-use-lead-painting-buildings-3837/fulltext",
+      "supports": "US Bureau of Labor Statistics Bulletin 188, March 1916, pp.77-78, reproduces British railway-engineer evidence describing black coal-tar protective paint on railway river bridges. This is a foreign period process analogy only; it does not establish the coating type, color or condition of the Beishahe bridge."
     }
   ],
   "materialInterpretation": {
-    "trussBracing": "Nine panels and three central counterbraced bays are an authored visual analogy to the modern Xianning bridge photograph in the user's archive, not evidence of the 1938 Beishahe truss. Bar sections, fasteners and face assignments are designed details.",
+    "trussBracing": "Nine panels and three central counterbraced bays are authored geometry decisions. The 1934 printed Xianning image and nearby 1938 JACAR bridges support only the broad low, open-top silhouette; exact sections, nodes, fasteners and face assignments are not established for Beishahe. The modern photograph is retained only as an earlier geometric diagnostic.",
     "trussMainMembers": "The 0.21 m in-plane main-member depth is an authored apparent-width match to isolated near-side faces in the modern Xianning photograph, checked with full 3D projection. It is not a measured historical section; the 0.09 m end-post setback preserves the structural span gap. Paired-channel transverse width, vertical members, chords, counterbars and material images remain unchanged.",
     "trussConnections": "Extended upper gusset plates, packers and domed rivet groups are a design analogy to the 1936 Easley road bridge; their exact form and dimensions are not established for Beishahe. The rivet heads are modeled without shanks or holes.",
-    "trussFinish": "Muted brown-gray weathered truss steel is an imagegen material study guided by a modern out-of-region bridge photograph. Its paint color and corrosion are creative choices, not verified 1938 Beishahe conditions. The rail body keeps a separate neutral steel texture.",
+    "trussFinish": "Dark charcoal-gray aged protective coating is an imagegen design study selected per user direction. The modern red-brown finish is no longer used. A 1916 foreign railway-bridge coating record is a period process analogy only; the original Beishahe coating type, color and wear remain unverified. The rail body keeps its separate neutral steel texture.",
     "pierDamp": "Irregular brown-gray and muted olive staining that fades into the dry pier is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
     "pierJointShade": "Continuous darkening over each real stone bevel and recessed side is an authored occlusion-style visual treatment. It is not a measured mortar color, a lightmap, or evidence of the 1938 bridge's masonry.",
     "pierMasonry": "Varying stone lengths and staggered joints are an authored visual analogy to the AI construction study, not a measured masonry bond of the 1938 Beishahe bridge.",
     "pierStoneEdges": "Unequal corner bevels and their occlusion-style shading are authored visual analogies to the rough stone edges in the AI construction study, not measured original stone damage.",
+    "masonryMaintenance": "Selected stone corners and cap edges are worn back, with unique per-support old mineral-wash remnants, partial gray rebrushing and downward runoff. Thin closed coating meshes share an authored mineral-wash PBR set derived from the retained V5 imagegen study; no original repair campaign, coating type or maintenance date is established.",
     "pierStoneSurface": "The retained V2 imagegen stone source and a 20 percent generated weathering blend provide broad hewn marks. Fine surface occlusion is restrained with a 0.15 bake factor, preserving the existing albedo, normal maps and geometric joint shading. The PBR calibration and inferred relief are authored material choices, not measurements of the 1938 bridge.",
     "bearings": "Fixed cast shoes, expansion rollers, baseplates, four-corner anchors and abutment support extensions are authored construction interpretations. The AI detail guides the fixed shoe's visible form; no original Beishahe bearing type, anchor dimensions or structural rating is established. Anchor shafts intentionally overlap undrilled plate and stone; threads and holes are not modeled.",
     "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
@@ -999,6 +1146,9 @@
     "Texture_BeishahePierStoneOrm.webp",
     "Texture_BeishahePierDampBase.webp",
     "Texture_BeishahePierDampNormal.webp",
-    "Texture_BeishahePierDampOrm.webp"
+    "Texture_BeishahePierDampOrm.webp",
+    "Texture_BeishaheMasonryWashBase.webp",
+    "Texture_BeishaheMasonryWashNormal.webp",
+    "Texture_BeishaheMasonryWashOrm.webp"
   ]
 }

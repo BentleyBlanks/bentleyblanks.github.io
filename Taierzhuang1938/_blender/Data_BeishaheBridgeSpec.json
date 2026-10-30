@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "2026103012",
+  "version": "2026103101",
   "name": "BeishaheBridge",
   "units": "m",
   "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -49,19 +49,27 @@
   "pierCornerSeamSetbackM": 0.3,
   "pierStoneBevelFactors": [0.35, 2.5],
   "pierStoneBevelMinimumM": 0.0045,
+  "pierWearCornerProbability": 0.10,
+  "pierWearCornerCutRangeM": [0.026, 0.048],
+  "masonryCoatingThicknessM": 0.0015,
+  "masonryCoatingCellM": 0.09,
+  "masonryOldWashTintGain": [1.08, 1.05, 0.98],
+  "masonryRewashTintGain": [0.62, 0.61, 0.58],
+  "masonrySubstrateCompensation": [0.70, 0.67, 0.66],
   "foundationY": -5.3,
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {"id":"JacarPhoto12", "url":"https://www.jacar.archives.go.jp/das/meta-en/C11111424100", "image":"JACAR C11111424100 appendix photo 12, 567 km bridge north of Tengxian", "supports":"Nearby 1938 low pony truss silhouette, straight upper chord, inclined end posts, open above the track. Not identified as Beishahe itself."},
     {"id":"JacarPhoto6", "url":"https://www.jacar.archives.go.jp/content/item/aj12/C200008287100/raw/C11111424100.c0947120012.sinasinajihenhokushi_055.1370_01.pdf", "image":"Appendix photo 6, 560 km Jiehe bridge", "supports":"Nearby short steel trusses, masonry support and demolition appearance. Not the Beishahe bridge."},
     {"id":"NotionResearch", "url":"https://app.notion.com/p/3eb60335331c81fda6dfe38153bcec45", "supports":"User research archive; exact 1938 Beishahe bridge photograph still unconfirmed."},
-    {"id":"Xianning76Modern", "url":"https://commons.wikimedia.org/wiki/File:20241228-粤汉铁路湘鄂段咸宁第七十六号钢桥.jpg", "author":"Saigyouji-Noriko", "dateAsCatalogued":"2024-12-28", "license":"CC BY-SA 4.0", "licenseUrl":"https://creativecommons.org/licenses/by-sa/4.0/", "fileSha1":"1f84a11c07cb46a9542ab2818bf0c5a3f0eb7abc", "supports":"The author's Wikimedia Commons upload is byte-identical to the photograph in the user's archive (SHA-1 verified). Its nine-panel layout, central crossed braces and visible main-member widths are a modern out-of-region visual analogy. The catalogue date is not independently established by EXIF or field records; the photograph does not establish the Beishahe bridge's historical truss pattern, dimensions, finish or condition."},
+    {"id":"Xianning76Modern","url":"https://commons.wikimedia.org/wiki/File:20241228-粤汉铁路湘鄂段咸宁第七十六号钢桥.jpg","author":"Saigyouji-Noriko","dateAsCatalogued":"2024-12-28","license":"CC BY-SA 4.0","licenseUrl":"https://creativecommons.org/licenses/by-sa/4.0/","fileSha1":"1f84a11c07cb46a9542ab2818bf0c5a3f0eb7abc","supports":"Retained as an earlier geometric diagnostic only. Its modern red-brown finish has been rejected as a color source; it does not establish the historical Beishahe pattern, member sections, coating color or condition.","status":"EarlierDiagnosticOnly"},
     {"id":"JinpuRail1937", "url":"https://www.jacar.archives.go.jp/das/meta/C13032619100", "supports":"1937 route description lists 1.435 m gauge and nominal 10 m, 41 kg/m rails for Tianjin-Xuzhou. Exact joint positions, rail section and bridge-specific fittings are not established."},
     {"id":"GermanRailScrew1913", "url":"https://archive.org/details/steelrailstheirh01sell/page/145/mode/1", "supports":"1913 reference shows square-headed screw spikes with circular flanges for Prussian and Alsace-Lorraine railway track; an engineering analogy, not a photograph or specification of Beishahe."},
     {"id":"BullardCreek1908", "url":"https://npgallery.nps.gov/GetAsset/81afac7b-65c7-4d59-9066-ff6c7991e861", "supports":"1908 Minnesota road bridge: paired riveted members and gusset/floor-beam connections as an engineering analogy. Not a Chinese railway bridge, not evidence of Beishahe-specific details."},
     {"id":"EasleyBridgeNode", "url":"https://www.loc.gov/resource/hhh.wv0440.photos/?sp=14&st=image", "imageSource":"https://commons.wikimedia.org/wiki/File:DETAIL_VIEW,_PONY_STEEL_TRUSS,_SHOWING_RIVETED_UPPER_BRIDGE_CHORD,_DIAGONALS_AND_GUSSET_PLATE._FACING_WEST._-_Easley_Bridge,_Spanning_Norfolk_Southern_Corporation_railroad_HAER_WVA,28-BLUFD,1-14.tif", "supports":"HAER WV-64 photograph 14 records the riveted upper chord and gusset of a 1936 American road bridge; the photograph is dated 1997 by Wikimedia Commons. This is a construction analogy, not a railway bridge or evidence of Beishahe-specific dimensions and rivet layout."},
     {"id":"FhwaTimberDeckConnections", "url":"https://www.fhwa.dot.gov/publications/research/infrastructure/structures/04098/14.cfm", "supports":"A 2005 covered-bridge manual describes deck planks spiked to supporting stringers, commonly two at each connection. This general highway-bridge analogy does not establish the original Beishahe deck, nail type, size, placement or structural adequacy; the model's short fasteners are not claimed to meet the manual's vehicular-deck recommendations."},
-    {"id":"Jinpu1941GuardTimbers", "url":"https://codh.rois.ac.jp/north-china-railway/photograph/3804-035394-0.html", "supports":"1941 Jinpu railway bridge at an unknown location: outside longitudinal timbers and a visible timber joint provide an engineering reference. Neither the dimensions nor their presence at Beishahe is established."}
+    {"id":"Jinpu1941GuardTimbers", "url":"https://codh.rois.ac.jp/north-china-railway/photograph/3804-035394-0.html", "supports":"1941 Jinpu railway bridge at an unknown location: outside longitudinal timbers and a visible timber joint provide an engineering reference. Neither the dimensions nor their presence at Beishahe is established."},
+    {"id":"BridgeCoatings1916","url":"https://fraser.stlouisfed.org/title/report-british-departmental-committee-danger-use-lead-painting-buildings-3837/fulltext","supports":"US Bureau of Labor Statistics Bulletin 188, March 1916, pp.77-78, reproduces British railway-engineer evidence describing black coal-tar protective paint on railway river bridges. This is a foreign period process analogy only; it does not establish the coating type, color or condition of the Beishahe bridge."}
   ],
   "mapMeasurement": {
     "centerWgs84":[117.10696,35.14496],

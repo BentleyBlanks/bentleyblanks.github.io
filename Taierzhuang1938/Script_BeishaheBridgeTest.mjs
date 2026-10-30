@@ -76,11 +76,11 @@ Check(bounds.max.y>=1.8&&bounds.max.y<=2.4&&bounds.min.y>=-8&&bounds.min.y<=-4.5
 // The running surface is intentionally a textureless polished metal, while all
 // weathered materials keep their Base/Normal/ORM maps. The rail body keeps
 // its neutral steel set while the truss uses the reference-led finish.
-const materialSources={BeishaheSteel:'BeishaheTrussSteel',BeishaheRailBody:'BeishaheSteel',BeishaheDeckNail:'BeishaheSteel',BeishaheBearingCast:'BeishaheTrussSteel',BeishaheTimber:'BeishaheSleeper',BeishaheTimberEnd:'BeishaheSleeperEnd',BeishaheDeckTimber:'BeishaheDeckPlank',BeishaheStone:'BeishahePierStone',BeishaheStoneDamp:'BeishahePierDamp'};
+const materialSources={BeishaheSteel:'BeishaheTrussSteel',BeishaheRailBody:'BeishaheSteel',BeishaheDeckNail:'BeishaheSteel',BeishaheBearingCast:'BeishaheTrussSteel',BeishaheTimber:'BeishaheSleeper',BeishaheTimberEnd:'BeishaheSleeperEnd',BeishaheDeckTimber:'BeishaheDeckPlank',BeishaheStone:'BeishahePierStone',BeishaheStoneDamp:'BeishahePierDamp',BeishaheMasonryOldWash:'BeishaheMasonryWash',BeishaheMasonryRewash:'BeishaheMasonryWash'};
 const steelSources=new Set(['BeishaheSteel','BeishaheTrussSteel']);
 const expectedMaterials=[...Object.keys(materialSources),'BeishaheRailRunning'];
-Check(g.materials?.length===expectedMaterials.length&&expectedMaterials.every(name=>g.materials.some(m=>m.name===name)),'Nine weathered PBR materials and the single polished rail material exist');
-Check(g.images?.length===21,'Seven independent three-channel PBR texture sets are embedded',g.images?.length);
+Check(g.materials?.length===expectedMaterials.length&&expectedMaterials.every(name=>g.materials.some(m=>m.name===name)),'Weathered bridge, maintenance-layer and polished-rail PBR materials exist');
+Check(g.images?.length===24,'Eight independent three-channel PBR texture sets are embedded',g.images?.length);
 const imageStats=[];
 const decodedImages=new Map();
 for(const [i,image] of g.images.entries()){
@@ -128,7 +128,7 @@ for(const m of g.materials){
   // metallicFactor makes that channel irrelevant. Steel uses the original B.
   const orm=await CheckTexturePixels(m.name,'Orm',p.metallicRoughnessTexture.index,source,steelSources.has(source)?[0,1,2]:[0,1]);
   const occlusion=await CheckTexturePixels(m.name,'Orm',m.occlusionTexture.index,source,[0]);
-  if(source==='BeishahePierStone'||source==='BeishahePierDamp'){
+  if(source==='BeishahePierStone'||source==='BeishahePierDamp'||source==='BeishaheMasonryWash'){
     let sum=0,sum2=0;const count=occlusion.info.width*occlusion.info.height;
     for(let i=0;i<count;i++){const value=occlusion.data[i*3]/255;sum+=value;sum2+=value*value;}
     const mean=sum/count,std=Math.sqrt(Math.max(0,sum2/count-mean*mean));
@@ -142,7 +142,7 @@ for(const m of g.materials){
   const effectiveRms=Math.sqrt(Math.max(0,sum2/pixels-(sum/pixels)**2))*(m.normalTexture.scale??1);
   Check(effectiveRms>2,'Effective normal map relief remains visibly non-flat',{material:m.name,effectiveRms});
 }
-Check(baseImages.size===7&&normalImages.size===7&&ormImages.size===7,'Truss steel, rail steel, sleepers, end grain, decking, dry and damp stone use distinct image data');
+Check(baseImages.size===8&&normalImages.size===8&&ormImages.size===8,'Truss and rail steel, timber, dry/damp masonry and maintenance wash use their intended distinct image data');
 {
   const bridge=g.materials.find(m=>m.name==='BeishaheSteel'),rail=g.materials.find(m=>m.name==='BeishaheRailBody'),wear=g.materials.find(m=>m.name==='BeishaheRailRunning');
   const bp=bridge.pbrMetallicRoughness,rp=rail.pbrMetallicRoughness,rf=rp.baseColorFactor??[1,1,1,1];
@@ -152,7 +152,9 @@ Check(baseImages.size===7&&normalImages.size===7&&ormImages.size===7,'Truss stee
   const bridgeImage=ImageForTexture(bp.baseColorTexture.index),bridgeSum=[0,0,0],bridgePixels=bridgeImage.info.width*bridgeImage.info.height;
   for(let i=0;i<bridgePixels;i++)for(let c=0;c<3;c++)bridgeSum[c]+=bridgeImage.data[i*3+c]/255;
   const bridgeMean=bridgeSum.map(v=>v/bridgePixels);
-  Check(bridgeMean[0]-bridgeMean[1]>.04&&bridgeMean[1]>=bridgeMean[2],'Reference-led truss finish has a muted warm brown-gray base',bridgeMean);
+  const bridgeLuma=(bridgeMean[0]+bridgeMean[1]+bridgeMean[2])/3;
+  Check(bridgeLuma>=.12&&bridgeLuma<=.28&&Math.max(...bridgeMean)-Math.min(...bridgeMean)<.04,'User-selected bridge finish is dark charcoal with a restrained neutral hue',bridgeMean);
+  Check(bridgeMean[0]<=bridgeMean[2]+.015,'Modern red-brown overall cast is removed from the bridge finish',bridgeMean);
   const im=ImageForTexture(rp.baseColorTexture.index),sum=[0,0,0],n=im.info.width*im.info.height;
   for(let i=0;i<n;i++)for(let c=0;c<3;c++){const x=im.data[i*3+c]/255;sum[c]+=x<=.04045?x/12.92:((x+.055)/1.055)**2.4;}
   const body=(sum[0]*rf[0]*.2126+sum[1]*rf[1]*.7152+sum[2]*rf[2]*.0722)/n,wr=wear.pbrMetallicRoughness.baseColorFactor;
@@ -1349,6 +1351,31 @@ for(let supportIndex=1;supportIndex<spec.spanCount;supportIndex++){
       Check(hits.some(h=>h.point.y<=-.020)&&hits.some(h=>h.point.y>=.026),'A real fastener connects the splice plate and wooden bearer',{supportIndex,x,dz});
     }
   }
+}
+// Maintenance layers are closed thin solids, with a different layout at
+// every support. They remain below the load-bearing cap surface.
+{
+  Check(data.masonryMaintenance?.supports?.length===spec.spanCount+1&&/do not establish/i.test(data.masonryMaintenance.interpretation),'Maintenance is recorded as authored appearance rather than original repair history');
+  let thicknessPairs=0;
+  for(const role of ['MasonryOldWash','MasonryRewash']){
+    const layers=ByRole(role),shapes=new Set();
+    Check(layers.length===spec.spanCount+1,'Each pier and abutment has the intended maintenance layer',role);
+    for(const part of layers){
+      const {positions,normals,indices,color,colorWidth}=part.geo,edges=new Map(),columns=new Map();let invalid=0,maxY=-Infinity;
+      const key=i=>[0,1,2].map(k=>Math.round(positions[i*3+k]*1e5)).join(',');
+      shapes.add(Hash(Buffer.from(positions.buffer,positions.byteOffset,positions.byteLength)));
+      for(let i=0;i<positions.length/3;i++){
+        maxY=Math.max(maxY,positions[i*3+1]);for(let c=0;c<colorWidth;c++){const v=color[i*colorWidth+c];if(!Number.isFinite(v)||v<.075||v>1.001||c===3&&Math.abs(v-1)>.001)invalid++;}
+        if(Math.abs(normals[i*3])>.999){const column=Math.round(positions[i*3+1]*1e5)+','+Math.round(positions[i*3+2]*1e5),xs=columns.get(column)||new Set();xs.add(positions[i*3]);columns.set(column,xs);}
+      }
+      for(let k=0;k<indices.length;k+=3)for(const [a,b]of [[indices[k],indices[k+1]],[indices[k+1],indices[k+2]],[indices[k+2],indices[k]]]){const edge=[key(a),key(b)].sort().join('|');edges.set(edge,(edges.get(edge)||0)+1);}
+      Check([...edges.values()].every(count=>count===2),'Maintenance layer has closed edges without open or non-manifold paint seams',part.node.name);
+      Check(invalid===0&&maxY<spec.pierTopY-.18&&part.geo.triangles>100,'Maintenance colors stay opaque and bounded, with clear space below support seats',{name:part.node.name,invalid,maxY});
+      for(const xs of columns.values()){const a=[...xs].sort((x,y)=>x-y);for(let i=1;i<a.length;i++)if(Math.abs((a[i]-a[i-1])-spec.masonryCoatingThicknessM)<.00004)thicknessPairs++;}
+    }
+    Check(shapes.size===layers.length,'Support maintenance layouts are not identically copied',role);
+  }
+  Check(thicknessPairs>1000,'Actual exported coating surfaces retain their authored thin thickness',thicknessPairs);
 }
 for(const mesh of rayCache.values())mesh.geometry.dispose();rayMaterial.dispose();
 console.log(`PASS BeishaheBridgeTest: ${checks} checks; ${triangles} triangles, ${parts.length} mesh primitives, ${g.materials.length} materials / ${imageStats.length} decoded images; ${size.toArray().map(v=>v.toFixed(3)).join(' x ')} m; ${coverageGaps.length} uncovered samples bounded by joints ${coverageGaps.length?Math.min(...coverageGaps).toFixed(6):'n/a'}–${coverageGaps.length?Math.max(...coverageGaps).toFixed(6):'n/a'} m`);

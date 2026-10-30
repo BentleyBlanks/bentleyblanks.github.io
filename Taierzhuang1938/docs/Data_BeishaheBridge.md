@@ -9,18 +9,19 @@
 | [JACAR C11111424100](https://www.jacar.archives.go.jp/das/meta-en/C11111424100)，照片12，567公里、滕县北方1公里 | 低矮钢桁、平直上弦、斜端柱、轨上敞开 | 邻桥，未确认是北沙河；不能量出本桥截面与跨径 |
 | 同档照片6，560公里界河桥 | 圬工支承与分孔钢桁的关系 | 不证明北沙河墩数或断口 |
 | 1934《铁展》粤汉咸宁76号钢桥，资料汇编第三轮 | 完整多跨低桁侧轮廓 | 异地异桥，不是北沙河原照 |
-| [咸宁76号桥现代照片：摄影者原件](https://commons.wikimedia.org/wiki/File:20241228-粤汉铁路湘鄂段咸宁第七十六号钢桥.jpg) | 可对照多跨低桁、端部同向斜杆、跨中交叉杆和节点层次 | Saigyouji-Noriko原作，档案标注2024年12月28日，CC BY-SA 4.0；本地原图SHA-1与Commons原件一致。日期为摄影者著录，未作独立实地或EXIF核验；照片中两侧桁架存在透视重叠，现代杆件、锈色、墩台及改造状态不能证明1938年北沙河原貌 |
+| [归档：咸宁76号桥现代照片](https://commons.wikimedia.org/wiki/File:20241228-粤汉铁路湘鄂段咸宁第七十六号钢桥.jpg) | 只保留此前杆件几何诊断，当前不作年代外观或配色依据 | Saigyouji-Noriko原作，档案标注2024年12月28日，CC BY-SA 4.0；本地原图SHA-1与Commons原件一致。日期为摄影者著录，未作独立实地或EXIF核验；照片中两侧桁架存在透视重叠，现代杆件、锈色、墩台及改造状态不能证明1938年北沙河原貌 |
 | [《枣庄年鉴2006》南沙河桥](https://shandong-chorography.org/database/b4/section/2-newsite-4186/article/682/) | 后世志书记述同线南沙河原桥1911年建成，前两孔为31.5米“半穿桥梁”，后六孔为11.6米混凝土包工字钢板梁 | 南沙河位于滕县南，非北沙河；后世记述不是原桥工程图，“半穿”一词不能证明具体桁式，也不证明北沙河混用孔型 |
 | [华北交通档案 3804-035392-0](https://codh.rois.ac.jp/north-china-railway/photograph/3804-035392-0.html) | 馆藏记录为1941年2月津浦线；照片可对照钢轨、横枕、外侧纵梁及轨间通行板 | 地点未明确，非北沙河原照；该图部分枕间可见空隙，现模型的连续横铺木面是应用户要求所做的设计推定 |
 | [1937年《津浦铁道线路图》](https://www.jacar.archives.go.jp/das/meta/C13032619100)；[《济南铁路分局志》工程与设备](https://shandong-chorography.org/database/jinan-railway/section/5/article/41/) | 前者记天津—徐州段单线1.435米轨距、41公斤／米及10米轨条；后者回述早期德制干线轨配垫板和螺纹道钉 | 线路一般配置，不证明1938年北沙河桥具体轨节接头位置、扣件及维护状态；桥上枕木间距亦不能直接由一般线路推定 |
 | [《济南铁路分局志》桥梁记述](https://shandong-chorography.org/database/jinan-railway/section/5/article/41/)；[山东省铁路库·线路初建](https://shandong-chorography.org/database/a/section/41/article/12/) | 早期津浦北段包括滕县所在的天津至韩庄段；志书记20米等跨径钢梁多为简支“华式桁梁”，晏城至宿县间多石砌墩台 | 同线一般构造旁证，不能确定北沙河桥的孔数、杆件或支座；“华式”不在此处推译成具体桁式 |
 | [1913年《Steel Rails》图113](https://archive.org/details/steelrailstheirh01sell/page/145/mode/1) | 普鲁士及阿尔萨斯－洛林铁路螺纹道钉的方头、圆形压缘和螺杆；同书表XXIX载有普鲁士式外二内一的布置 | 德国铁路的一般工程类比，非北沙河原桥图，不能证明本桥具体型号、钉数或钩板尺寸 |
 | 现代京沪铁路跨北沙河，35.14496N、117.10696E；OSM＋Esri影像 | 跨越河漫滩的整桥尺度，采用约280米 | 现代堤岸、复线桥与水情不能反推1938原桥尺寸 |
-| 内置imagegen局部构造图、旧钢底图 | 铆接、支座、木石、旧钢细节；桁架褐灰钢面以用户资料页中的现代咸宁桥照片作视觉类比 | 仅设计参考；生成图不是历史照片，现代锈色不能证明1938年北沙河原桥状态；局部图实腹梁外形未用作主桥型 |
+| 内置imagegen局部构造图、旧钢底图 | 铆接、支座、木石、旧钢细节；当前深灰黑旧钢面及矿物刷层是本轮设计，已停止采用现代桥的红褐锈色 | 仅设计参考；生成图不是历史照片，现代锈色不能证明1938年北沙河原桥状态；局部图实腹梁外形未用作主桥型 |
 | 用户指出原模型桥面镂空后的截图，以及据此生成的桥面构造图 | 横向木板、承托、轨槽和木材表面方向 | 新桥面是用户要求下的设计推定，生成图不是1938年原桥照片 |
 | [美国国家公园局 Bullard Creek Bridge 登记](https://npgallery.nps.gov/GetAsset/81afac7b-65c7-4d59-9066-ff6c7991e861) | 1908年美国短跨公路低桁：成对铆接构件、节点板与横梁连接的工程类比 | 非中国铁路、非北沙河；不证明本桥截面、节点或桥面形式 |
 | [美国国会图书馆 Easley 桥 HAER WV-64 第14张](https://www.loc.gov/resource/hhh.wv0440.photos/?sp=14&st=image)；[Wikimedia Commons 图像](https://commons.wikimedia.org/wiki/File:DETAIL_VIEW,_PONY_STEEL_TRUSS,_SHOWING_RIVETED_UPPER_BRIDGE_CHORD,_DIAGONALS_AND_GUSSET_PLATE._FACING_WEST._-_Easley_Bridge,_Spanning_Norfolk_Southern_Corporation_railroad_HAER_WVA,28-BLUFD,1-14.tif) | 1936年建成的低矮桁架桥上弦、斜杆及铆接节点板的实拍细节；Commons记摄于1997年 | 美国公路桥，非铁路桥、非北沙河原照；仅作连接板与铆接层次的工程类比，不能确定本桥节点尺寸或排列。国会图书馆原页本次访问返回403，实图由Commons馆藏副本核对 |
 | [美国联邦公路局《Covered Bridge Manual》第14章](https://www.fhwa.dot.gov/publications/research/infrastructure/structures/04098/14.cfm) | 2005年公路廊桥手册说明木桥面板通常钉在纵梁或横梁上，常用每个连接两颗 | 仅作一般木桥连接类比，不证明1938年北沙河桥面或钉型；本模型短固定件不宣称符合该手册的车辆桥面尺寸建议 |
+| [1916年政府报告：铁路桥涂装证言](https://fraser.stlouisfed.org/title/report-british-departmental-committee-danger-use-lead-painting-buildings-3837/fulltext) | 美国劳工统计局Bulletin 188所载英国铁路工程师证言，第77—78页提到铁路桥黑色煤焦油防护涂层 | 只支持同期国外工艺存在，不能证明北沙河原桥涂料、漆色、维护状况或所有同期桥都采用黑色 |
 
 [官方5页照片附录 PDF](https://www.jacar.archives.go.jp/content/item/aj12/C200008287100/raw/C11111424100.c0947120012.sinasinajihenhokushi_055.1370_01.pdf)。历史照片、地图、验收网页与截图只留本地，不提交站点仓库。
 
@@ -41,13 +42,18 @@
 
 - `Model/Model_BeishaheBridge.glb`：一座完好桥，标准glTF Y-up，X为桥梁局部横轴、Z沿桥轴由北端指向南端，单位米；原点在桥中心枕木顶。X/Z本身不是地理正东／正南，地图放置须使用上面的现代示意变换。支承轴总长280米，含翼墙外包长度约287.7米。
 - `Model/Data_BeishaheBridge.json`：实际GLB哈希／字节数、包围盒、实例三角数、每跨4个支座坐标、来源和创作边界。`_blender/Data_BeishaheBridgeSpec.json` 为设计尺寸输入。
-- 14个跨组共享主钢结构；每跨按咸宁现代照片的视觉类比做成9格、跨中3格带交叉杆，两端斜杆向跨中汇聚。主斜杆与端斜柱的平面内深度取0.21米，成对槽钢的横向尺寸保留；端斜柱下端内退0.09米，保持跨间120毫米结构缝。该截面是依据照片可分离的近侧杆件作的外观设计，不是原桥或对标桥实测。该排布、断面、节点以及杆件位于桁架内外哪一面均为设计推定，不能据异地照片认定北沙河原桥桁式。交叉杆端部与节点板接触，杆件穿过视觉交叉处时位于不同的横向平面；连接铆钉为实体。桥面有七组由同一构造脚本和同一材质生成的确定性木板变化，沿桥循环使用；木枕与13座中间石墩各有三组确定性UV及砌块差异；桥墩层内石块长度作受约束变化，墩角接缝避开相邻石面的遮挡，两端桥台独立。低矮半穿钢桁的轨道上方敞开，无高门架／顶横联、道路铺装或另加人行栏杆。
+- 14个跨组共享主钢结构；每跨保留既定9格、跨中3格带交叉杆的制作设计；当前只以1934《铁展》影像和1938邻桥对标低矮半穿桁架的总体轮廓，两端斜杆向跨中汇聚。主斜杆与端斜柱的平面内深度取0.21米，成对槽钢的横向尺寸保留；端斜柱下端内退0.09米，保持跨间120毫米结构缝。该截面是依据照片可分离的近侧杆件作的外观设计，不是原桥或对标桥实测。该排布、断面、节点以及杆件位于桁架内外哪一面均为设计推定，不能据异地照片认定北沙河原桥桁式。交叉杆端部与节点板接触，杆件穿过视觉交叉处时位于不同的横向平面；连接铆钉为实体。桥面有七组由同一构造脚本和同一材质生成的确定性木板变化，沿桥循环使用；木枕与13座中间石墩各有三组确定性UV及砌块差异；桥墩层内石块长度作受约束变化，墩角接缝避开相邻石面的遮挡，两端桥台独立。低矮半穿钢桁的轨道上方敞开，无高门架／顶横联、道路铺装或另加人行栏杆。
 - 两轨头内缘净距1.435米。节点 `Intact_Span01…14` 含 `Trusses / Rivets / Sleepers / SleeperEnds / DeckPlanks / DeckBearers / DeckFasteners / GuardTimbers / GuardFasteners / RailWest / RailEast / RailWear / RailMidSplice / RailMidFasteners / Bearings / BearingCastings / BearingAnchors`；`Shared_Pier / PierDamp / Cap / Abutment` 独立。连续横铺木板架在纵向托梁上，名义板宽约0.34米并有逐板变化、板缝约6毫米；板宽依据生成式构造图作设计推定。每块板在两条内侧托梁上各设一对简化实体固定件，跨墩短板也有对应固定件；模型取直径12毫米、长度71毫米，进入托梁25毫米，圆柱体与未钻孔木材有意交叠，无独立钉头或螺纹，不能当作原桥钉型或施工承载设计。轨脚和扣件周围留出局部窄槽，轨头高出板面约65毫米。扣件参照早期德国铁路资料推定为每轨座外侧两颗、内侧一颗的方头螺纹道钉及外侧钩板，杆体伸入木枕120毫米；螺纹与钻孔未建模，实体杆与未钻孔的木枕、垫板有意交叠。钉型、数量及尺寸不能认定为北沙河原桥实测。两轨外侧的低矮纵木、分段与固定方式参照地点未知的1941年同线照片推定，其跨墩短木、侧板和穿栓用于连接相邻跨。13处跨墩木面设独立实体接段、托片及螺栓，接段两端各留2毫米缝，钢桁自身保持120毫米结构缝。
 - 钢轨按1937年线路资料取名义10米轨节，跨中及墩轴处设6毫米缝、双侧夹板及四组螺栓；接头落点、缝宽、夹板及轨道截面均为设计推定。模型的螺杆与未钻孔的实体轨腹和夹板交叠，未模拟钻孔。两片桁架内外均有双排铆钉；上弦节点连接板向立杆与斜杆延伸，并以垫片接触构件，节点补充实体铆钉头。其形状参考异地公路桥，精确尺寸和排列为设计，铆钉杆与钻孔未建模。桥墩和桥台有内缩实心核心。墩帽采用四块实体帽石和下方承托核，块缝避开支座足面，形制参考生成辅助图而非原桥实测。墩底石面结合生成纹理与连续的空间色差形成不规则潮痕；受潮石块的可见面细分以避免色带，实体砌缝和实心核心保留。桥板铺法、护木、铆钉间距、连接、配色、块色及墩底污迹均非原桥实测，不代表1938年实测水位。
 - 每跨两侧各设一个固定端和一个活动端，共56个承托；固定端的弧形铸座参考生成式构造图，活动端采用三滚子与上部铸件的设计推定。每块0.52×0.48米底板设四组简化锚固件，共224组，螺杆直径26毫米，表示伸入帽石100毫米；螺杆与未钻孔的底板和石材有意交叠，没有螺纹或孔槽。墩上相邻底板实测模型间隙约40毫米，两端桥台前缘承托向桥内增加250毫米，以覆盖底板和锚固位置。类型、尺寸、颜色及连接均属设计推定，不构成原桥鉴定或工程承载设计。
-- `BeishaheTrussSteel`、`BeishaheSteel`、`BeishaheSleeper`、`BeishaheSleeperEnd`、`BeishaheDeckPlank`、`BeishahePierStone`、`BeishahePierDamp` 七套PBR共21张图嵌入GLB，供十个物理材质复用。铸座和锚固件复用已有钢面贴图并单独调暗，底板和桁架使用生成的褐灰旧钢面，轨身保留原有中性深色钢材，轨顶采用磨亮窄条金属材质；木板固定件复用轨身中性钢纹理并使用较暗色调。所选现代异地照片的颜色与生成纹理均非1938年本桥漆色证据。木纹顺各构件长轴，端纹两轴物理比例一致；桥面纹理色调及逐板色差依据生成图作创作推定，同一板的三段共用色调。干石采用保留的V2凿面源图，湿石源由V2凿面80%与生成潮痕石面20%组成；烘焙保留较大的凿痕和矿物斑块，法线起伏参数取4毫米。其纹理尺度和起伏仍是材质设计，不是原桥实测。块间纹理方向变化，灰缝由实体构件表达。桥墩石块采用各角独立宽度的实体倒角，最窄处4.5毫米；相邻面使用一致角点，避免不规则边缘裂开。石块从外表面经过实际倒角到内侧时，顶点颜色连续渐暗至原值50%，使实体竖缝在斜视下可辨；这是对遮挡的视觉近似，不是光照烘焙、原桥灰浆颜色或1938年砌石证据。ORM遮蔽与法线使用真实贴图；不增加boot或关卡贴图请求。
-- 当前V51，版本 `2026103012`，桥梁候选为1,533,144实例三角、409个网格对象、10个材质和24,312,032字节；V49相对V48增加25,648三角、28个网格对象和114,940字节，21张图继续复用。新增铸座及锚固件网格，修正底板相互重叠和端部承托不足；既有52组无关网格及381个网格节点位置已逐项比较。石块长度、错缝、墩角留距和边缘缺损仍是依据生成式构造图的设计推定。七组木板与对应固定件变化保留，尚无LOD或游戏装配，整桥进入正式关卡前须评估可见范围、合批与性能。V44 增加木板固定件时，本地相同视角短时预览采样中，单跨视角绘制调用由184增至198，桥面近景由72增至77；帧数未见明显下降，这不是游戏性能验证。V49增加对象与一个材质时，同一套本地预览光照和机位下，单跨视图绘制调用198→214，墩帽视图115→125，隔离查看固定端56→60、活动端33→37。这里只统计提交的绘制调用，不是帧率或正式游戏性能验证；整桥尚未接入正式关卡。桁架钢面三张图共365,882字节，其1024反照率与两张512数据图按RGBA展开约6 MiB，实际游戏显存与性能尚未测量。512反照率的实景近景对照更模糊，因此单独登记384 KiB纹理额度，未增加开机／关卡请求。此前版本另留OneDrive `Archive/`。
+- `BeishaheTrussSteel`、`BeishaheSteel`、`BeishaheSleeper`、`BeishaheSleeperEnd`、`BeishaheDeckPlank`、`BeishahePierStone`、`BeishahePierDamp`、`BeishaheMasonryWash` 八套PBR共24张图嵌入GLB，供十二个物理材质复用。铸座和锚固件复用已有钢面贴图并单独调暗，底板和桁架使用生成的深灰黑旧保护涂层钢面，轨身保留原有中性深色钢材，轨顶采用磨亮窄条金属材质；木板固定件复用轨身中性钢纹理并使用较暗色调。现代红褐锈色已停用；当前深色涂层按用户修正制作，同期国外工艺只能类比，仍非1938年本桥原色证据。木纹顺各构件长轴，端纹两轴物理比例一致；桥面纹理色调及逐板色差依据生成图作创作推定，同一板的三段共用色调。干石采用保留的V2凿面源图，湿石源由V2凿面80%与生成潮痕石面20%组成；烘焙保留较大的凿痕和矿物斑块，法线起伏参数取4毫米。其纹理尺度和起伏仍是材质设计，不是原桥实测。块间纹理方向变化，灰缝由实体构件表达。桥墩石块采用各角独立宽度的实体倒角，最窄处4.5毫米；相邻面使用一致角点，避免不规则边缘裂开。石块从外表面经过实际倒角到内侧时，顶点颜色连续渐暗至原值50%，使实体竖缝在斜视下可辨；这是对遮挡的视觉近似，不是光照烘焙、原桥灰浆颜色或1938年砌石证据。ORM遮蔽与法线使用真实贴图；不增加boot或关卡贴图请求。
+- 当前V52，版本 `2026103101`，为1,942,708实例三角、439个网格对象、12个材质、24张内嵌图和52,590,464字节。钢桁改为深灰黑旧涂层；墩身、墩帽及桥台补充边角磨耗、旧矿物刷层残痕、局部补刷与向下水迹。支承轴、轨距、连续桥面和跨数保留。
+- V49相对V48增加25,648三角、28个网格对象和114,940字节，21张图继续复用。新增铸座及锚固件网格，修正底板相互重叠和端部承托不足；既有52组无关网格及381个网格节点位置已逐项比较。石块长度、错缝、墩角留距和边缘缺损仍是依据生成式构造图的设计推定。七组木板与对应固定件变化保留，尚无LOD或游戏装配，整桥进入正式关卡前须评估可见范围、合批与性能。V44 增加木板固定件时，本地相同视角短时预览采样中，单跨视角绘制调用由184增至198，桥面近景由72增至77；帧数未见明显下降，这不是游戏性能验证。V49增加对象与一个材质时，同一套本地预览光照和机位下，单跨视图绘制调用198→214，墩帽视图115→125，隔离查看固定端56→60、活动端33→37。这里只统计提交的绘制调用，不是帧率或正式游戏性能验证；整桥尚未接入正式关卡。桁架钢面三张图共365,882字节，其1024反照率与两张512数据图按RGBA展开约6 MiB，实际游戏显存与性能尚未测量。512反照率的实景近景对照更模糊，因此单独登记384 KiB纹理额度，未增加开机／关卡请求。此前版本另留OneDrive `Archive/`。
 - 最新44米四孔白盒、旧浮桥、旧钢桁桥及剧情／碰撞／爆破时间线均未替换。未来接入整桥须同步处理河漫滩与关卡空间，不用非均匀缩放硬塞进局部白盒。
+
+V52新增的两类维护刷层覆盖13个中间墩及两端桥台，各支承使用不同确定性布局，旧层残痕与局部补刷不是逐墩相同复制。刷层为贴合现有石面的1.5毫米闭合薄实体，砌缝和露底区域保留；部分石角与墩帽外缘磨耗切退约26—48毫米，墩帽内侧接缝及支座承托面仍保留完整接触。新刷层PBR由保留的V5去光照石面研究另行校准，不替换原V2石材底色。石材磨耗、灰浆刷层、补刷、雨水与污迹均是用户要求下的外观设计，不证明原桥维修年代、材料品种或水位。
+
+新增维护层使用30个独立网格对象、两个材质和一套334,084字节PBR图；只为独立候选lazy层单列384 KiB额度，未改变boot／关卡请求。它约增加6 MiB未压缩纹理数据及维护层几何；当前总面数仍是独立高细节制作版，未接入正式关卡、无LOD，不能把预览表现当作游戏性能结论。
 
 V51相对V50只更新干、湿石面两张ORM贴图，58组网格、409个网格节点、10个材质设置和其余19张图的字节不变。细部AO烘焙因子由0.5调到0.15，解码遮蔽均值由约0.883升至干石0.964／湿石0.965，使浅凿痕的间接光暗纹更克制；粗糙度按同一烘焙公式小幅联动。该因子不是glTF遮蔽强度或实测物理量，石材底色、法线、逐石颜色和实体砌缝处理保留。对照先关闭法线，再单独隔离AO，确认过强的细部遮蔽是密集暗沟的主要来源；不能把关闭法线后的残余暗纹直接全归到底色。两张新的内置imagegen研究图V4／V5已保留，但新底图、去细节和整体降低底色对比度的候选未被采用，当前采用原V2底色与法线、较弱的细部遮蔽。
 
@@ -55,7 +61,7 @@ V50相对V49只调整主斜杆／端斜柱轮廓及相关连接，拓扑、409�
 
 ## 重建与源工程
 
-源文件与备份：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/Scene_BeishaheBridge.blend`。原图、生成输入和参考在同目录 `References/`；其中 `Reference_BeishaheDeckStudy.png` 为桥面构造推演，`Source_BeishaheDeckPlankV4.png` 为采用的生成木纹源图，均非历史照片。轨身钢材源图由 `Source_BeishaheSteelV2.png` 与 `Source_BeishaheSteelV3.png` 混合而成；桁架钢面源图 `Source_BeishaheSteelModernStudyV1.png` 以现代异地照片作生成参考；干石当前直接采用 `Source_BeishahePierStoneV2.png`；湿石源 `Source_BeishahePierDampMacroBlend20.png` 将它与以生成式构造图为参考的 `Source_BeishahePierDampWeatherV1.png` 混合。实拍节点类比的640像素预览与出处信息分别为 `Reference_EasleyNode640.jpg`、`Reference_EasleyNodeMetadata.json`。新生成的石面研究 `Source_BeishahePierStoneV3.png` 及同名 `.txt` 提示词保留在源目录 `References/`；该图烘焙后在实际模型上显得更均匀，未采用。生成提示词包括 `_blender/Prompts/Reference_BeishaheConstruction.txt`、`_blender/Prompts/Reference_BeishaheDeckStudy.txt` 及 `_import/Prompts/Texture_Beishahe*.txt`，均走内置imagegen。
+源文件与备份：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/Scene_BeishaheBridge.blend`。原图、生成输入和参考在同目录 `References/`；其中 `Reference_BeishaheDeckStudy.png` 为桥面构造推演，`Source_BeishaheDeckPlankV4.png` 为采用的生成木纹源图，均非历史照片。轨身钢材源图由 `Source_BeishaheSteelV2.png` 与 `Source_BeishaheSteelV3.png` 混合而成；当前桁架源图为 `Source_BeishaheDarkSteelV1.png`，不再输入现代桥图取色；旧 `Source_BeishaheSteelModernStudyV1.png` 仅归档。维护刷层源使用 `Source_BeishahePierStoneV5.png` 的细矿物纹理，经单独PBR定色成为浅灰矿物刷层；干石当前直接采用 `Source_BeishahePierStoneV2.png`；湿石源 `Source_BeishahePierDampMacroBlend20.png` 将它与以生成式构造图为参考的 `Source_BeishahePierDampWeatherV1.png` 混合。实拍节点类比的640像素预览与出处信息分别为 `Reference_EasleyNode640.jpg`、`Reference_EasleyNodeMetadata.json`。新生成的石面研究 `Source_BeishahePierStoneV3.png` 及同名 `.txt` 提示词保留在源目录 `References/`；该图烘焙后在实际模型上显得更均匀，未采用。生成提示词包括 `_blender/Prompts/Reference_BeishaheConstruction.txt`、`_blender/Prompts/Reference_BeishaheDeckStudy.txt` 及 `_import/Prompts/Texture_Beishahe*.txt`，均走内置imagegen。
 
 ```powershell
 node scripts/Script_BlenderMcp.mjs start --task BeishaheBridge
@@ -64,9 +70,9 @@ node scripts/Script_BlenderMcp.mjs stop --save
 node scripts/Script_BlenderMcp.mjs status --scan
 ```
 
-在任务独占worktree运行。脚本拒绝覆盖源目录以外的已打开工程，重新生成GLB及sidecar；使用中的文件贴图即使尚未解码也会打包进 `.blend`。当前工程实际重开后核对21张贴图均已内嵌、14跨桥面与13个受潮墩面均在；重烘的GLB与sidecar和验收版本逐字节一致。轨身钢面混合源可用 `_import/Script_PrepareBeishaheSteelSource.py --input-dir <References> --output <References>/Source_BeishaheSteelV2V3Blend40.png` 重建；当前干石直接使用保留的V2源图，湿石混合源用 `_import/Script_PrepareBeishahePierDampSource.py --input-dir <References> --output <References>/Source_BeishahePierDampMacroBlend20.png` 重建。早期60/40干石混合源及其准备脚本保留作历史研究。PBR重烘记录位于 `_import/TextureBakes/`；换电脑重新烘焙贴图时先映射到保留的源图路径。
+在任务独占worktree运行。脚本拒绝覆盖源目录以外的已打开工程，重新生成GLB及sidecar；使用中的文件贴图即使尚未解码也会打包进 `.blend`。当前工程实际重开后核对24张贴图均已内嵌、14跨桥面与13个受潮墩面均在；重烘的GLB与sidecar和验收版本逐字节一致。轨身钢面混合源可用 `_import/Script_PrepareBeishaheSteelSource.py --input-dir <References> --output <References>/Source_BeishaheSteelV2V3Blend40.png` 重建；当前干石直接使用保留的V2源图，湿石混合源用 `_import/Script_PrepareBeishahePierDampSource.py --input-dir <References> --output <References>/Source_BeishahePierDampMacroBlend20.png` 重建。早期60/40干石混合源及其准备脚本保留作历史研究。PBR重烘记录位于 `_import/TextureBakes/`；换电脑重新烘焙贴图时先映射到保留的源图路径。
 
-本轮新增内置imagegen研究图 `References/Source_BeishahePierStoneV4.png`（浅凿面材质）与 `References/Source_BeishahePierStoneV5.png`（原V2表面去光照试验），对应提示词为同名 `.txt`；原图、尺寸、哈希、完整提示词和未采用原因见源目录 `References/Data_StoneSurfaceStudiesV4V5.json`。它们只是材质研究，不是历史照片，也不进入当前GLB。当前石面浅凿痕及受潮石面机位在简洁预览页可单独查看，支持V50／V51同机位比较。源工程重开后21张图均已打包，再次重建GLB与sidecar逐字节一致。
+本轮新增内置imagegen研究图 `References/Source_BeishahePierStoneV4.png`（浅凿面材质）与 `References/Source_BeishahePierStoneV5.png`（原V2表面去光照试验），对应提示词为同名 `.txt`；原图、尺寸、哈希、完整提示词和采用说明见源目录 `References/Data_StoneSurfaceStudiesV4V5.json`。V4未采用；V5仅用作本轮维护刷层的派生纹理，基础石材仍保留V2。它们不是历史照片。当前石面浅凿痕及受潮石面机位在简洁预览页可单独查看，支持V51／V52同机位比较。源工程重开后24张图均已打包，再次重建GLB与sidecar逐字节一致。
 
 ## 验收
 
@@ -74,6 +80,8 @@ node scripts/Script_BlenderMcp.mjs status --scan
 
 本地页 `tmp/BeishaheBridge/QualityReview/index.html` 支持旧版／新版切换、整桥侧视、节点、枕木、端纹、桥墩与桥底机位、原照片及局部推演图对照。仓库LocalPreview静默预览；`Script_QualityReview.mjs` 复用静音浏览器，保持1440×960实际视口，观察图长边640，检查JSON与截图只留本地。Blender渲染留源目录 `Review/`。
 
-当前简洁入口为 `tmp/BeishaheBridge/SimpleReview/index.html`；`tmp/BeishaheBridge/FullMaterialAudit/PhotoCompare.html` 用近侧节点估计的同一比较机位切换V49／V51，保留真实两侧桁架与杆件深度，可叠加原照。页面明确隐藏其它跨与墩台，镜头、裁切和光照未标定，仅辅助观察杆件外观，不构成物理尺寸或全模型完全一致的证明。现代咸宁原照SHA-1为 `1f84a11c07cb46a9542ab2818bf0c5a3f0eb7abc`，本地图片仅裁切展示；摄影者与[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)署名随预览保留。源工程实际重开核对409网格及21张已打包图片，再用独立MCP调用重建，GLB和sidecar与本次验收版逐字节一致。
+当前简洁入口为 `tmp/BeishaheBridge/SimpleReview/index.html`；`tmp/BeishaheBridge/FullMaterialAudit/PhotoCompare.html` 用近侧节点估计的同一比较机位查看归档V49／V51，保留真实两侧桁架与杆件深度，可叠加原照。页面明确隐藏其它跨与墩台，镜头、裁切和光照未标定，仅辅助观察杆件外观，不构成物理尺寸或全模型完全一致的证明。现代咸宁原照SHA-1为 `1f84a11c07cb46a9542ab2818bf0c5a3f0eb7abc`，本地图片仅裁切展示；摄影者与[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)署名随预览保留。当前源工程实际重开核对439网格及24张已打包图片，再用独立MCP调用重建，GLB和sidecar与本次验收版逐字节一致。
+
+新增维护层由 `_blender/Script_BeishaheMasonryWeathering.py` 与规格共同重建。验收同时检查薄层封闭性、逐支承布局差异、实际厚度、颜色有效性和承托净空；钢面深色中性范围会拒绝旧版整体红褐偏色。当前简洁预览默认使用同期形制资料，现代图仅保留归档几何诊断。
 
 可验的对标范围是低桁轮廓、直上弦、斜端柱、多短跨与石墩关系，以及依用户要求补做的实体木桥面与生成式构造图对照。原图不能辨认的桥面、截面、铆钉、支座和材质按创作补足，不升级为“1938年原桥已精确复原”。

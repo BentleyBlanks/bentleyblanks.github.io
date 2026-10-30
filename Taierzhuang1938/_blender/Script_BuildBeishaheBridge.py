@@ -13,12 +13,14 @@ import json
 import math
 import os
 import random
+import runpy
 from pathlib import Path
 from mathutils import Vector
 
 HERE = Path(__file__).resolve().parent
 PROJECT = HERE.parent
 SPEC = json.loads((HERE / "Data_BeishaheBridgeSpec.json").read_text(encoding="utf-8"))
+BuildMasonryMaintenance = runpy.run_path(str(HERE / "Script_BeishaheMasonryWeathering.py"))["BuildMasonryMaintenance"]
 SOURCE = Path(os.environ.get("BEISHAHE_BRIDGE_SOURCE_DIR", "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge"))
 MODEL = PROJECT / "Model"
 SOURCE.mkdir(parents=True, exist_ok=True)
@@ -38,6 +40,7 @@ class Geometry:
         self.normals = []
         self.smoothFaces = []
         self.colors = []
+        self.masonryFaces = []
 
     def Polygon(self, points, uv=None, normals=None, uvOffset=None, grain=None, tint=None, uvTurn=0):
         start = len(self.vertices)
@@ -72,15 +75,19 @@ class Geometry:
         else:
             self.colors.extend([tint if tint is not None else (1, 1, 1, 1)] * len(points))
 
-    def Box(self, center, size, basis=None, uvOffset=None, grain=None, tint=None, uvTurn=0):
+    def Box(self, center, size, basis=None, uvOffset=None, grain=None, tint=None, uvTurn=0, masonryFace=None):
         c = Vector(center)
         axes = list(map(Vector, basis or [(1, 0, 0), (0, 1, 0), (0, 0, 1)]))
         points = [tuple(c + axes[0] * (sx * size[0] / 2) + axes[1] * (sy * size[1] / 2) + axes[2] * (sz * size[2] / 2))
                   for sx, sy, sz in [(-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1), (-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1)]]
         for face in [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (3, 7, 6, 2), (0, 4, 7, 3), (1, 2, 6, 5)]:
             self.Polygon([points[i] for i in face], uvOffset=uvOffset, grain=grain, tint=tint, uvTurn=uvTurn)
+        if masonryFace:
+            side,group,origin,uMid=masonryFace
+            ids=(0,4,7,3) if side<0 else (1,2,6,5)
+            self.masonryFaces.append(dict(points=[Vector(points[i]) for i in ids],normal=axes[0]*side,uAxis=axes[2],origin=Vector(origin),uMid=uMid,group=group,short=False,uvOffset=uvOffset,uvTurn=uvTurn,tint=tint))
 
-    def BeveledBox(self, center, size, bevel, uvOffset=None, grain=None, endGeometry=None, tint=None, uvTurn=0, surfaceGrid=None, jointShadeAxis=None, jointShadeSign=0, stoneBevelVariation=False):
+    def BeveledBox(self, center, size, bevel, uvOffset=None, grain=None, endGeometry=None, tint=None, uvTurn=0, surfaceGrid=None, jointShadeAxis=None, jointShadeSign=0, stoneBevelVariation=False, wearFace=None, stoneWearOuterX=None):
         """Six inset faces, 12 edge chamfers and 8 corners, in game metres.
 
         A distinct end-grain mesh is used on each sleeper's X end. UVs on
@@ -98,7 +105,12 @@ class Geometry:
             for sx in [-1, 1]:
                 for sy in [-1, 1]:
                     for sz in [-1, 1]:
+                        if stoneWearOuterX is not None and sx!=stoneWearOuterX:
+                            cornerBevel[(sx,sy,sz)]=b
+                            continue
                         cornerBevel[(sx,sy,sz)] = min(max(SPEC["pierStoneBevelMinimumM"], b*edgeRng.uniform(*SPEC["pierStoneBevelFactors"])), min(h)*.45)
+                        if edgeRng.random()<SPEC["pierWearCornerProbability"]:
+                            cornerBevel[(sx,sy,sz)]=min(edgeRng.uniform(*SPEC["pierWearCornerCutRangeM"]),min(h)*.45)
         def Warp(point):
             if not stoneBevelVariation:
                 return point
@@ -201,9 +213,11 @@ class Geometry:
                              uvOffset=uvOffset, grain=grain, tint=tint, uvTurn=uvTurn)
 
         x, y, z = h
+        wearFace=wearFace or ((jointShadeAxis,jointShadeSign) if jointShadeAxis else None)
         for sign in [-1, 1]:
             fx = [(sign*x, -y+b, -z+b), (sign*x, y-b, -z+b),
                   (sign*x, y-b, z-b), (sign*x, -y+b, z-b)]
+            if wearFace==("x",sign):self.masonryFaces.append(dict(points=[c+Vector(Warp(p)) for p in fx],normal=Vector((sign,0,0)),uAxis=Vector((0,0,1)),group=sign+2,short=True,uvOffset=uvOffset,uvTurn=uvTurn,tint=tint))
             if surfaceGrid and surfaceGrid[0] == "x" and surfaceGrid[1] == sign:
                 GridFace(fx, surfaceGrid[2])
             else:
@@ -212,6 +226,7 @@ class Geometry:
                   (x-b, sign*y, z-b), (-x+b, sign*y, z-b)])
             fz = [(-x+b, -y+b, sign*z), (x-b, -y+b, sign*z),
                   (x-b, y-b, sign*z), (-x+b, y-b, sign*z)]
+            if wearFace==("z",sign):self.masonryFaces.append(dict(points=[c+Vector(Warp(p)) for p in fz],normal=Vector((0,0,sign)),uAxis=Vector((1,0,0)),group=sign+6,short=False,uvOffset=uvOffset,uvTurn=uvTurn,tint=tint))
             if surfaceGrid and surfaceGrid[0] == "z" and surfaceGrid[1] == sign:
                 GridFace(fz, surfaceGrid[2])
             else:
@@ -415,7 +430,18 @@ class Geometry:
 
     def Object(self, name, material, parent=None, extras=None, tile=1, colorLayer=None):
         mesh = bpy.data.meshes.new(name)
-        mesh.from_pydata([ToBlender(p) for p in self.vertices], [], self.faces)
+        vertices,faces=self.vertices,self.faces
+        if material.name in ("BeishaheMasonryOldWash","BeishaheMasonryRewash"):
+            # Reuse shared paint-surface vertices. Loop UVs and colors keep
+            # their original order; no visible edge or layer is simplified.
+            unique,lookup,remap=[],{},[]
+            for point in vertices:
+                key=tuple(point)
+                if key not in lookup:lookup[key]=len(unique);unique.append(point)
+                remap.append(lookup[key])
+            vertices=unique
+            faces=[tuple(remap[index] for index in face) for face in faces]
+        mesh.from_pydata([ToBlender(p) for p in vertices], [], faces)
         mesh.update()
         if any(self.smoothFaces):
             for polygon, smooth in zip(mesh.polygons, self.smoothFaces):
@@ -500,6 +526,12 @@ def Material(name, texture, roughness, metal=0, normalStrength=0.25, colorLayer=
         gltfOutput.node_tree = outputGroup
         links.new(split.outputs["Red"], gltfOutput.inputs["Occlusion"])
     return mat
+
+
+def MasonryCoatingMaterial(name):
+    # Thin mineral wash retains the underlying stone grain. Its different
+    # batches and worn margins are carried by the authored vertex tint.
+    return Material(name, "BeishaheMasonryWash", .96, 0, .40, colorLayer="CoatTint")
 
 
 def PolishedRailMaterial():
@@ -1184,7 +1216,8 @@ def BuildPier(seed=1938):
         right = -capWidth / 2 + (k + 1) * capWidth / capCount - (joint / 2 if k < capCount - 1 else 0)
         offset = originalCapOffset if k == 0 else (capRng.uniform(0, 8), capRng.uniform(0, 8))
         cap.BeveledBox(((left + right) / 2, top - .1125, 0), (right - left, .225, 2.25), .012,
-                       uvOffset=offset, tint=StoneTint(capTintRng), uvTurn=capRng.randrange(4))
+                       uvOffset=offset, tint=StoneTint(capTintRng), uvTurn=capRng.randrange(4),
+                       stoneBevelVariation=k in (0,capCount-1),stoneWearOuterX=-1 if k==0 else 1)
     stone.BeveledBox((0, floor - 0.13, 0), (4.7, 0.26, 2.7), 0.018,
                      uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)), tint=StoneTint(tintRng))
     return stone, dampStone, cap
@@ -1208,9 +1241,9 @@ def BuildAbutment():
         for col in range(8):
             geo.BeveledBox((-3 + (col + 0.5) * 0.75, floor + (row + 0.5) * h, .45-forward/2), (0.735, h - .014, 1.5+forward),
                            rng.uniform(0.006, 0.014), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)), tint=StoneTint(tintRng),
-                           uvTurn=turnRng.randrange(4))
+                           uvTurn=turnRng.randrange(4), stoneBevelVariation=True, wearFace=("z",-1))
     geo.BeveledBox((0, top - .11, .45-forward/2), (6.25, .22, 1.65+forward), .018,
-                   uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)), tint=StoneTint(tintRng))
+                   uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)), tint=StoneTint(tintRng), stoneBevelVariation=True)
     # Continuous sloping wing walls, with small separately spaced stone faces.
     for side in [-1, 1]:
         start, end = (side * 2.85, 0.80), (side * 4.52, 3.70)
@@ -1239,7 +1272,8 @@ def BuildAbutment():
                     point = Vector((start[0], y0 + h / 2, start[1])) + axis * (wallLength * t) + normal * (faceSign * 0.31)
                     geo.Box(point, (0.035, h, wallLength * (t1 - t0) - 0.014),
                             basis=(normal, (0, 1, 0), axis), uvOffset=(rng.uniform(0, 8), rng.uniform(0, 8)),
-                            tint=StoneTint(tintRng), uvTurn=turnRng.randrange(4))
+                            tint=StoneTint(tintRng), uvTurn=turnRng.randrange(4),
+                            masonryFace=(faceSign,20+side*2+faceSign,(start[0],0,start[1]),wallLength/2))
     return geo
 
 
@@ -1275,6 +1309,8 @@ def Rebuild():
     deckWood = Material("BeishaheDeckTimber", "BeishaheDeckPlank", 0.90, 0, 0.90, colorLayer="DeckTint")
     stone = Material("BeishaheStone", "BeishahePierStone", 0.94, 0, 0.65, colorLayer="StoneTint")
     dampStone = Material("BeishaheStoneDamp", "BeishahePierDamp", 0.92, 0, 0.65, colorLayer="StoneTint")
+    oldWash = MasonryCoatingMaterial("BeishaheMasonryOldWash")
+    rewash = MasonryCoatingMaterial("BeishaheMasonryRewash")
     railRunning = PolishedRailMaterial()
     root = Empty("BeishaheBridge")
     root["reconstructionScope"] = SPEC["reconstructionScope"]
@@ -1329,8 +1365,11 @@ def Rebuild():
     for obj in list(templates.values()) + [obj for pair in sleeperTemplates[1:] for obj in pair] + deckTemplates[1:] + bearerTemplates[1:] + nailTemplates[1:]:
         bpy.data.objects.remove(obj, do_unlink=True)
     pierTemplates = []
+    pierFaces = []
+    maintenance = []
     for variant in range(3):
         pier, damp, cap = BuildPier(1938 + variant * 997)
+        pierFaces.append(pier.masonryFaces+damp.masonryFaces)
         pierTemplates.append((pier.Object(f"Template_Pier_{variant}", stone, tile=1.0),
                               damp.Object(f"Template_PierDamp_{variant}", dampStone, tile=1.0),
                               cap.Object(f"Template_Cap_{variant}", stone, tile=1.0)))
@@ -1343,6 +1382,12 @@ def Rebuild():
             obj.parent = root
             obj.location = ToBlender((0, 0, z))
             obj["role"], obj["supportIndex"] = role, i
+        coatings,record=BuildMasonryMaintenance(Geometry,pierFaces[(i-1)%len(pierFaces)],1938+i*2299,SPEC)
+        record.update(supportIndex=i,centerZ=z)
+        maintenance.append(record)
+        for role,geo,mat in [("MasonryOldWash",coatings[0],oldWash),("MasonryRewash",coatings[1],rewash)]:
+            obj=geo.Object(f"Shared_{role}{i:02d}",mat,root,{"role":role,"supportIndex":i,"maintenanceSeed":record["seed"]},colorLayer="CoatTint")
+            obj.location=ToBlender((0,0,z))
     for obj in [obj for pair in pierTemplates for obj in pair]:
         bpy.data.objects.remove(obj, do_unlink=True)
     transitionGeometry = BuildPierTransition(1938)
@@ -1379,6 +1424,13 @@ def Rebuild():
         obj.location = ToBlender((0, 0, side * SPEC["lengthM"] / 2))
         if side < 0:
             obj.rotation_euler[2] = math.pi
+        coatings,record=BuildMasonryMaintenance(Geometry,abut.masonryFaces,193807+side*7919,SPEC)
+        record.update(abutment=label,centerZ=side*SPEC["lengthM"]/2)
+        maintenance.append(record)
+        for role,geo,mat in [("MasonryOldWash",coatings[0],oldWash),("MasonryRewash",coatings[1],rewash)]:
+            coating=geo.Object(f"Shared_{role}{label}",mat,root,{"role":role,"abutment":label,"maintenanceSeed":record["seed"]},colorLayer="CoatTint")
+            coating.location=ToBlender((0,0,side*SPEC["lengthM"]/2))
+            if side<0:coating.rotation_euler[2]=math.pi
     # Pack every used file image, including lazily loaded images where
     # has_data is still false. Image.pack() reads the original bytes directly.
     # Otherwise the exported GLB works but the saved .blend silently relies on
@@ -1406,20 +1458,23 @@ def Rebuild():
     maxs = [max(p[i] for p in game) for i in range(3)]
     triangles = sum(sum(len(p.vertices) - 2 for p in obj.data.polygons) for obj in root.children_recursive if obj.type == "MESH")
     data = {"schemaVersion": 1, "version": SPEC["version"], "spec": SPEC, "assemblies": assemblies,
+            "masonryMaintenance": {"coatingThicknessM":SPEC["masonryCoatingThicknessM"],"cellM":SPEC["masonryCoatingCellM"],"supports":maintenance,
+                "interpretation":"Unique authored old mineral-wash remnants, partial gray rebrushing, runoff and worn stone corners. These do not establish the original bridge's maintenance history, coating type, color or water level."},
             "bounds": {"min": mins, "max": maxs, "size": [b - a for a, b in zip(mins, maxs)]}, "transitions": transitions,
             "triangles": triangles, "meshObjects": sum(o.type == "MESH" for o in root.children_recursive),
             "sourceBlend": str(SOURCE / "Scene_BeishaheBridge.blend"),
             "glbBytes": glb.stat().st_size, "glbSha256": hashlib.sha256(glb.read_bytes()).hexdigest(),
             "reconstructionScope": SPEC["reconstructionScope"], "historicalReferences": SPEC["historicalReferences"],
             "materialInterpretation": {
-                "trussBracing": "Nine panels and three central counterbraced bays are an authored visual analogy to the modern Xianning bridge photograph in the user's archive, not evidence of the 1938 Beishahe truss. Bar sections, fasteners and face assignments are designed details.",
+                "trussBracing": "Nine panels and three central counterbraced bays are authored geometry decisions. The 1934 printed Xianning image and nearby 1938 JACAR bridges support only the broad low, open-top silhouette; exact sections, nodes, fasteners and face assignments are not established for Beishahe. The modern photograph is retained only as an earlier geometric diagnostic.",
                 "trussMainMembers": "The 0.21 m in-plane main-member depth is an authored apparent-width match to isolated near-side faces in the modern Xianning photograph, checked with full 3D projection. It is not a measured historical section; the 0.09 m end-post setback preserves the structural span gap. Paired-channel transverse width, vertical members, chords, counterbars and material images remain unchanged.",
                 "trussConnections": "Extended upper gusset plates, packers and domed rivet groups are a design analogy to the 1936 Easley road bridge; their exact form and dimensions are not established for Beishahe. The rivet heads are modeled without shanks or holes.",
-                "trussFinish": "Muted brown-gray weathered truss steel is an imagegen material study guided by a modern out-of-region bridge photograph. Its paint color and corrosion are creative choices, not verified 1938 Beishahe conditions. The rail body keeps a separate neutral steel texture.",
+                "trussFinish": "Dark charcoal-gray aged protective coating is an imagegen design study selected per user direction. The modern red-brown finish is no longer used. A 1916 foreign railway-bridge coating record is a period process analogy only; the original Beishahe coating type, color and wear remain unverified. The rail body keeps its separate neutral steel texture.",
                 "pierDamp": "Irregular brown-gray and muted olive staining that fades into the dry pier is a creative weathering choice, not evidence of the 1938 waterline or site condition.",
                 "pierJointShade": "Continuous darkening over each real stone bevel and recessed side is an authored occlusion-style visual treatment. It is not a measured mortar color, a lightmap, or evidence of the 1938 bridge's masonry.",
                 "pierMasonry": "Varying stone lengths and staggered joints are an authored visual analogy to the AI construction study, not a measured masonry bond of the 1938 Beishahe bridge.",
                 "pierStoneEdges": "Unequal corner bevels and their occlusion-style shading are authored visual analogies to the rough stone edges in the AI construction study, not measured original stone damage.",
+                "masonryMaintenance": "Selected stone corners and cap edges are worn back, with unique per-support old mineral-wash remnants, partial gray rebrushing and downward runoff. Thin closed coating meshes share an authored mineral-wash PBR set derived from the retained V5 imagegen study; no original repair campaign, coating type or maintenance date is established.",
                 "pierStoneSurface": "The retained V2 imagegen stone source and a 20 percent generated weathering blend provide broad hewn marks. Fine surface occlusion is restrained with a 0.15 bake factor, preserving the existing albedo, normal maps and geometric joint shading. The PBR calibration and inferred relief are authored material choices, not measurements of the 1938 bridge.",
                 "bearings": "Fixed cast shoes, expansion rollers, baseplates, four-corner anchors and abutment support extensions are authored construction interpretations. The AI detail guides the fixed shoe's visible form; no original Beishahe bearing type, anchor dimensions or structural rating is established. Anchor shafts intentionally overlap undrilled plate and stone; threads and holes are not modeled.",
                 "pierCap": "Four individually jointed capstones with a solid inset base are an authored interpretation of an AI detail study, not evidence for the historic Beishahe pier cap.",
@@ -1471,7 +1526,7 @@ def Rebuild():
                              "interpretation": "Design inferred from an unidentified 1941 Jinpu railway bridge; not evidence for Beishahe's exact construction."},
             "materials": ["BeishaheSteel", "BeishaheRailBody", "BeishaheDeckNail", "BeishaheBearingCast", "BeishaheTimber", "BeishaheTimberEnd", "BeishaheDeckTimber", "BeishaheStone", "BeishaheStoneDamp", "BeishaheRailRunning"],
             "bakeInputs": [f"Texture_{texture}{channel}.webp" for texture in
-                           ["BeishaheSteel", "BeishaheTrussSteel", "BeishaheSleeper", "BeishaheSleeperEnd", "BeishaheDeckPlank", "BeishahePierStone", "BeishahePierDamp"]
+                           ["BeishaheSteel", "BeishaheTrussSteel", "BeishaheSleeper", "BeishaheSleeperEnd", "BeishaheDeckPlank", "BeishahePierStone", "BeishahePierDamp", "BeishaheMasonryWash"]
                            for channel in ["Base", "Normal", "Orm"]]}
     (MODEL / "Data_BeishaheBridge.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     # Source-only review scene. Camera sees genuine geometry and PBR, no generated model image.

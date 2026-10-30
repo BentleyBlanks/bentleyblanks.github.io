@@ -114,11 +114,18 @@
       "seamless": "blend", "rowFlatten": false, "flattenSigma": 0.088, "isotropic": true, "heightFromLuma": "direct"
     },
     "weatheredBridgeSteel": {
-      "label": "异地现代桥对照的褐灰色旧钢表面",
-      "mean": [0.50, 0.43, 0.42], "contrast": 0.035,
-      "lumaRange": [0.36, 0.48], "satRange": [0.12, 0.23], "stdRange": [0.025, 0.07],
-      "reliefM": 0.0012, "rough": 0.74, "roughVar": 0.06, "roughLumaK": 0.0, "ao": 0.25, "metal": 0.08,
+      "label": "深灰黑旧保护涂层钢面（候选配色推定）",
+      "mean": [0.18, 0.19, 0.20], "contrast": 0.025,
+      "lumaRange": [0.12, 0.28], "satRange": [0.0, 0.14], "stdRange": [0.012, 0.05],
+      "reliefM": 0.0009, "rough": 0.78, "roughVar": 0.06, "roughLumaK": 0.0, "ao": 0.18, "metal": 0.05,
       "seamless": "blend", "rowFlatten": true, "flattenSigma": 0.13, "isotropic": true, "heightFromLuma": "direct"
+    },
+    "agedMasonryWash": {
+      "label": "旧矿物薄刷层与局部补刷（制作纹理）",
+      "mean": [0.65, 0.625, 0.58], "contrast": 0.045,
+      "lumaRange": [0.55, 0.72], "satRange": [0.0, 0.18], "stdRange": [0.02, 0.08],
+      "reliefM": 0.002, "rough": 0.93, "roughVar": 0.04, "roughLumaK": 0.0, "ao": 0.12, "metal": 0.0,
+      "seamless": "blend", "rowFlatten": true, "flattenSigma": 0.25, "isotropic": true, "heightFromLuma": "direct"
     },
     "wornSteel": {
       "label": "旧钢铁（枪机、铁件、车体）",

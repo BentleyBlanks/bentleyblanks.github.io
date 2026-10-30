@@ -107,6 +107,9 @@ const BEISHAHE_SURFACE_ASSET_BYTES = 1982 * 1024;
 // softened close rivet/paint detail. This bounded allowance is for the
 // standalone bridge's embedded material, not an added boot or level request.
 const BEISHAHE_TRUSS_FINISH_BYTES = 384 * 1024;
+// The requested pier maintenance layers share one 334,084-byte PBR set.
+// This standalone-model allowance does not add boot or level requests.
+const BEISHAHE_MAINTENANCE_ASSET_BYTES = 384 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -124,11 +127,11 @@ export const TEXTURE_BUDGETS = Object.freeze({
     // Loaded with the title menu, never promoted into the shared boot PBR_SETS.
     // 2026-10-05: seven campaign maps + three historical papers add about 4 MB.
     // Only the selected pair is requested (< 1 MB), not the whole campaign set.
-    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES, // Also includes lossless command-room irradiance.
+    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES, // Also includes lossless command-room irradiance.
     // editor：2026-10-22 白盒编辑器河沟示意加两张 1024 反照率（泥 ~300 KB、水 ~60 KB），只在 ?editor=blockout 下载，玩家不碰；上限抬到 1 MB。
     editor: 1 * 1024 * 1024,
   }),
-  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES,
+  totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES,
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -169,6 +172,14 @@ export const TEXTURE_MANIFEST = Object.freeze([
     files: [["Texture_BeishahePierStoneBase.webp", "Base", 1024, 1024], ["Texture_BeishahePierStoneNormal.webp", "Normal", 512, 512], ["Texture_BeishahePierStoneOrm.webp", "Orm", 512, 512]],
   },
   {
+    id: "BeishaheMasonryWash", kind: "material", tier: "lazy", toneClass: "agedMasonryWash", metersPerTile: 1,
+    assetBudgetBytes: BEISHAHE_MAINTENANCE_ASSET_BYTES,
+    bake: "_import/Script_BakePbrTexture.py", bakeRecord: "_import/TextureBakes/Texture_BeishaheMasonryWash.json",
+    source: { provider: "imagegen", date: "2026-10-30", ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-39205749-fe46-4d71-bcba-0424bc1d537c", prompt: "_import/Prompts/Texture_BeishaheMasonryWash.txt", note: "由保留的V5去光照石面研究生成浅灰旧矿物刷层PBR，仅供独立桥墩维护旧化层使用；旧刷层、补刷与磨耗为制作推定，非原桥维修或涂装证据。源图留OneDrive。" },
+    consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishaheMasonryWash" }],
+    files: [["Texture_BeishaheMasonryWashBase.webp", "Base", 1024, 1024], ["Texture_BeishaheMasonryWashNormal.webp", "Normal", 512, 512], ["Texture_BeishaheMasonryWashOrm.webp", "Orm", 512, 512]],
+  },
+  {
     id: "BeishaheSteel", kind: "material", tier: "lazy", toneClass: "wornSteel",
     metersPerTile: 1,
     bake: "_import/Script_BakePbrTexture.py",
@@ -191,9 +202,9 @@ export const TEXTURE_MANIFEST = Object.freeze([
     bake: "_import/Script_BakePbrTexture.py",
     bakeRecord: "_import/TextureBakes/Texture_BeishaheTrussSteel.json",
     source: { provider: "imagegen", date: "2026-10-30",
-      ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-c9980838-7f5f-4bab-b003-8168c38fb108",
+      ref: "Codex 01a1770c-f0ab-7f00-a260-29352e71db1d; exec-efc46d68-68a2-40d4-96e6-5bdbc1f12f38",
       prompt: "_import/Prompts/Texture_BeishaheTrussSteel.txt",
-      note: "参照资料页现代异地桥照片生成的褐灰色旧钢面，供独立桥桁架和支座使用；不是北沙河原桥漆色证据。轨身沿用独立的中性钢材。源图与 .blend 留 OneDrive。" },
+      note: "按用户修正生成的深灰黑旧保护涂层钢面，供独立桥桁架和支座使用；不再采用现代照片的红褐锈色，不作为北沙河原桥漆色证据。轨身沿用独立的中性钢材。源图与 .blend 留 OneDrive。" },
     consumers: [{ file: "_blender/Script_BuildBeishaheBridge.py", token: "BeishaheTrussSteel" }],
     files: [["Texture_BeishaheTrussSteelBase.webp", "Base", 1024, 1024], ["Texture_BeishaheTrussSteelNormal.webp", "Normal", 512, 512], ["Texture_BeishaheTrussSteelOrm.webp", "Orm", 512, 512]],
   },

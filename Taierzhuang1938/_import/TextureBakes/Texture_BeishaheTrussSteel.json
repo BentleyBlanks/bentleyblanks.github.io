@@ -4,48 +4,48 @@
   "name": "BeishaheTrussSteel",
   "preset": "weatheredBridgeSteel",
   "source": {
-    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishaheSteelModernStudyV1.png",
-    "sha256": "4fe40fb2be092fd82f8e5c2b25c50239e531211952211ebb0415600c97829543",
+    "path": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/BeishaheBridge/References/Source_BeishaheDarkSteelV1.png",
+    "sha256": "81fa4fea6d9024e5e3bdc092403cc44cd820b4fb16b79c9ed3a98e3dfdc2bd7e",
     "metrics": {
       "meanSrgb": [
-        0.381,
-        0.2917,
-        0.2475
+        0.21,
+        0.2078,
+        0.2068
       ],
-      "luma": 0.3067,
-      "lumaStd": 0.0522,
-      "sat": 0.3506,
+      "luma": 0.2082,
+      "lumaStd": 0.0505,
+      "sat": 0.0155,
       "clipLow": 0.0,
       "clipHigh": 0.0,
-      "lowFreq": 0.0221
+      "lowFreq": 0.0483
     }
   },
   "heightSource": null,
   "params": {
     "mean": [
-      0.5,
-      0.43,
-      0.42
+      0.18,
+      0.19,
+      0.2
     ],
-    "contrast": 0.035,
+    "contrast": 0.025,
     "lumaRange": [
-      0.36,
-      0.48
+      0.12,
+      0.28
     ],
     "satRange": [
-      0.12,
-      0.23
+      0.0,
+      0.14
     ],
     "stdRange": [
-      0.025,
-      0.07
+      0.012,
+      0.05
     ],
-    "reliefM": 0.0012,
-    "rough": 0.74,
+    "reliefM": 0.0009,
+    "rough": 0.78,
     "roughVar": 0.06,
     "roughLumaK": 0.0,
-    "ao": 0.25,
-    "metal": 0.08,
+    "ao": 0.18,
+    "metal": 0.05,
     "seamless": "blend",
     "rowFlatten": true,
     "flattenSigma": 0.13,
@@ -56,8 +56,8 @@
     "dataSize": 512,
     "pack": "orm",
     "normalConvention": "gl",
-    "normalStrength": 0.8,
-    "toneStrength": 0.9,
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
     "keepTone": false,
     "noFlatten": false,
     "invertHeight": false,
@@ -76,46 +76,46 @@
       "file": "Texture_BeishaheTrussSteelBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 270708,
-      "sha256": "def807bad0bef37077160f4e6a517415d64ce877fec8b5b540e0d104f8ed3f5c"
+      "bytes": 154352,
+      "sha256": "1d910ddf6ec3e5112bc781babfff52fd53a0e51ea12148b878495ccf6d58c274"
     },
     {
       "channel": "Normal",
       "file": "Texture_BeishaheTrussSteelNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 43410,
-      "sha256": "c9107c529e2314bdebde4f555988dc57f193eb2716e5af976c78125c3f13e436"
+      "bytes": 35780,
+      "sha256": "b109f0e0cf54c55e4b7c1048321e883f601a5cc618b1e357c3409b8c1c476143"
     },
     {
       "channel": "Orm",
       "file": "Texture_BeishaheTrussSteelOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 51764,
-      "sha256": "59febd5a91417f65c2ac63814ae79de828e5f36d25201935d96a3930a3fcdeca"
+      "bytes": 36702,
+      "sha256": "2e219e7945dd7ad77bdadfd9507d748647e593e8c87ca4ad4fa9e8f696dbd9d1"
     }
   ],
-  "totalBytes": 365882,
+  "totalBytes": 226834,
   "metrics": {
     "meanSrgb": [
-      0.488,
-      0.4169,
-      0.4024
+      0.1808,
+      0.1899,
+      0.2
     ],
-    "luma": 0.4358,
-    "lumaStd": 0.0378,
-    "sat": 0.1754,
+    "luma": 0.1902,
+    "lumaStd": 0.0249,
+    "sat": 0.0958,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0039,
-    "seam": 0.0328,
-    "interior": 0.0332,
-    "seamRatio": 0.988,
-    "border": 0.96,
-    "swing": 0.0018,
-    "aoMean": 0.951,
-    "roughMean": 0.725,
+    "lowFreq": 0.0061,
+    "seam": 0.0223,
+    "interior": 0.0227,
+    "seamRatio": 0.979,
+    "border": 0.933,
+    "swing": 0.005,
+    "aoMean": 0.968,
+    "roughMean": 0.756,
     "texelsPerMeter": 1024.0
   },
   "gateProblems": []
