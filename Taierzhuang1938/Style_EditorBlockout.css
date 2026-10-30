@@ -773,3 +773,103 @@ body.blockoutTouch.blockoutMode #hud :is(.hudCombat, .hudState) { display: none 
   .boTouch .boMapLevel { display: none; }
   body.blockoutTouch.blockoutMode #hud .hudFps { top: max(18px, env(safe-area-inset-top)); left: max(14px, env(safe-area-inset-left)); right: auto; }
 }
+
+/* --- 白盒试玩（§17，2026-10-31） ------------------------------------------ */
+/* 卡片右上的「试玩」按钮：同预演按钮的金边；面板开着时亮 */
+.boPlayBtn { flex: 0 0 auto; margin: -3px 0 0 0; color: var(--bo-gold); border-color: #cdb77b88; background: #13140b55; }
+.boPlayBtn:hover, .boPlayBtn.on { border-color: var(--bo-gold); background: var(--bo-sel-strong); }
+.boRoot :is(.boPlayPanel, .boPlaySummary, .boPlayHud) { pointer-events: auto; }
+.boPlayTag {
+  flex: 0 0 auto; padding: 0 7px; font-size: 11.5px; line-height: 18px; letter-spacing: 0.16em;
+  color: #15130c; background: var(--bo-gold-fill);
+}
+.boPlayTag.dead, .boPlayHud.dead .boPlayTag { background: var(--bo-bad); color: #fff3ee; }
+.boPlayTag.abort { background: #a4a594; }
+.boPlayHead { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--bo-line-strong); }
+.boPlayTitle { flex: 1 1 auto; min-width: 0; font: 700 16px/1.3 var(--bo-serif); color: var(--bo-bright); letter-spacing: 0.08em; }
+.boPlayClose { flex: 0 0 auto; width: 26px; height: 26px; margin-right: -4px; color: var(--bo-text); border-color: var(--bo-edge); background: #13140b55; }
+
+/* 设置面板：卡片右边、右上工具条下面（不压关卡下拉）；不透明，地上的标签不透出来 */
+.boPlayPanel {
+  position: absolute; left: 412px; top: 66px; z-index: 5;
+  width: min(440px, calc(100vw - 440px)); padding: 12px 14px 14px 16px;
+  background: var(--bo-panel-solid);
+}
+.boPlayPresets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.boPlayPreset, .boPlayToggle {
+  padding: 3px 10px; font-size: 12px; line-height: 18px; letter-spacing: 0.06em;
+  color: var(--bo-text); border-color: var(--bo-line-strong); background: #13140b55;
+}
+.boPlayPreset:hover, .boPlayToggle:hover { border-color: #cdb77b88; }
+.boPlayToggle.on { color: var(--bo-gold); border-color: var(--bo-gold); background: var(--bo-sel-strong); }
+.boPlayRow { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 10px; align-items: center; margin: 6px 0 0; }
+.boPlayKey { color: var(--bo-faint); font-size: 12px; letter-spacing: 0.16em; }
+.boPlaySelect {
+  width: 100%; min-width: 0; height: 26px; padding: 0 6px;
+  font: 12.5px/1 var(--bo-font); color: var(--bo-bright);
+  background: #0c0d09; border: 1px solid var(--bo-edge); border-radius: 0;
+}
+.boPlaySelect:focus-visible { outline: 1px solid var(--bo-gold); outline-offset: 1px; }
+.boPlayHint { margin: 7px 0 0 54px; font: 12px/17px var(--bo-num); color: var(--bo-muted); font-variant-numeric: tabular-nums; }
+.boPlayHint.bad { color: var(--bo-bad); }
+.boPlayToggles { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0 54px; }
+.boPlayFoot { display: flex; align-items: flex-end; gap: 10px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--bo-line); }
+.boPlayNote { flex: 1 1 auto; min-width: 0; font-size: 11.5px; line-height: 1.5; color: var(--bo-faint); }
+.boPlayGo {
+  flex: 0 0 auto; padding: 4px 16px; font: 700 13px/20px var(--bo-serif); letter-spacing: 0.2em;
+  color: #15130c; background: var(--bo-gold-fill); border-color: var(--bo-gold);
+}
+.boPlayGo:hover { color: #15130c; background: var(--bo-gold-hi); }
+.boPlaySecondary { flex: 0 0 auto; padding: 4px 12px; font-size: 12.5px; line-height: 20px; color: var(--bo-text); border-color: var(--bo-edge); background: #13140b55; }
+.boPlaySecondary:hover { border-color: #cdb77b88; }
+
+/* 试玩中顶部那条：居中、右上工具条下面（不压关卡下拉）；提示条让到它下面 */
+.boPlayHud {
+  position: absolute; top: 66px; left: 50%; transform: translateX(-50%); z-index: 5;
+  width: min(620px, calc(100vw - 840px)); min-width: 360px; padding: 8px 10px 8px 12px;
+  background: var(--bo-panel-solid);
+}
+.boPlayHudTop { display: flex; align-items: center; gap: 10px; }
+.boPlayStep { flex: 0 0 auto; font: 600 13px/18px "TzUiLatin", var(--bo-num); color: var(--bo-gold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.boPlayName { flex: 1 1 auto; min-width: 0; font: 700 14px/1.3 var(--bo-serif); color: var(--bo-bright); letter-spacing: 0.08em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boPlayTime { flex: 0 0 auto; font: 12.5px/18px var(--bo-num); color: var(--bo-muted); font-variant-numeric: tabular-nums; }
+.boPlayStop { flex: 0 0 auto; height: 24px; padding: 0 9px; font-size: 12px; color: var(--bo-text); border-color: var(--bo-edge); background: #13140b55; }
+.boPlayHudBottom { display: flex; align-items: center; gap: 12px; margin-top: 5px; }
+.boPlayGoal { flex: 1 1 auto; min-width: 0; color: var(--bo-gold-text); font-weight: 700; letter-spacing: 0.04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boPlayEnemy { flex: 0 0 auto; font: 12.5px/18px var(--bo-num); color: #e7a08f; font-variant-numeric: tabular-nums; }
+body.blockoutPlay .boToasts { top: 138px; }
+/* 试玩中导航栏不响应（翻关键帧会把场上的人搅乱） */
+body.blockoutPlay .boNav { pointer-events: none !important; opacity: 0.45; }
+
+/* 小结：画面正中 */
+.boPlaySummary {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 7;
+  width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 120px); overflow: auto;
+  padding: 14px 16px 14px 18px; background: var(--bo-panel-solid);
+}
+.boPlayTotals { display: flex; gap: 22px; margin-bottom: 12px; }
+.boPlayStat { display: flex; flex-direction: column; gap: 1px; }
+.boPlayStat b { font: 600 20px/1.1 "TzUiLatin", var(--bo-num); color: var(--bo-gold); font-variant-numeric: tabular-nums; }
+.boPlayStat span { font-size: 11.5px; color: var(--bo-faint); letter-spacing: 0.16em; }
+.boPlayLog { border-top: 1px solid var(--bo-line); }
+.boPlayLogRow {
+  display: grid; grid-template-columns: 46px minmax(0, 1fr) 22px 44px 70px; column-gap: 10px; align-items: center;
+  padding: 4px 0; border-bottom: 1px solid var(--bo-line); font-size: 12.5px;
+}
+.boPlayLogNo { font: 12px/18px var(--bo-num); color: var(--bo-gold-text); }
+.boPlayLogName { color: var(--bo-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boPlayLogMode { color: var(--bo-faint); font-size: 11.5px; text-align: center; }
+.boPlayLogTime { font: 12px/18px var(--bo-num); color: var(--bo-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.boPlayLogResult { color: var(--bo-ok); font-size: 12px; text-align: right; white-space: nowrap; }
+.boPlayLogRow.bad .boPlayLogResult { color: var(--bo-bad); }
+
+@media (max-width: 1099px), (max-height: 719px) {
+  .boPlayPanel { left: 328px; width: min(400px, calc(100vw - 340px)); }
+  .boPlayHud { width: auto; min-width: 0; left: 328px; right: 12px; transform: none; }
+  body.blockoutPlay .boToasts { top: 128px; }
+}
+@media (max-width: 899px) {
+  .boPlayPanel { left: 14px; right: 14px; top: auto; bottom: 90px; width: auto; }
+  .boPlayHud { left: 14px; right: 14px; top: 104px; }
+  body.blockoutPlay .boToasts { top: 170px; }
+}

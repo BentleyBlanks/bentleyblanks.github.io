@@ -1088,8 +1088,9 @@ const debugOptions = new DebugOptions();
 /** 调试补给只补当前已有的装备，不会凭空给本关没有的枪或特殊投掷物。 */
 function EffectiveInfiniteAmmo() {
   if (typeof weaponRange !== "undefined" && weaponRange) return weaponRange.ammoMode === "infinite";
-  // 白盒关卡编辑器：只在本会话里无限弹药，不写进存档的调试选项。
-  return AllowP012InfiniteAmmo({ enabled: BLOCKOUT || debugOptions.Enabled("infiniteAmmo"),
+  // 白盒关卡编辑器：只在本会话里无限弹药，不写进存档的调试选项；试玩中按试玩面板的开关（docs/Data_EditorBlockout.md §17）。
+  const blockoutAmmo = BLOCKOUT && (blockout?.PlayOverrides?.()?.infiniteAmmo ?? true);
+  return AllowP012InfiniteAmmo({ enabled: blockoutAmmo || debugOptions.Enabled("infiniteAmmo"),
     isP012: !!p012Runtime, manualReloadCompleted: p012Runtime?.manualReloadCompleted === true });
 }
 function EffectiveInfiniteGrenades() {
@@ -1131,8 +1132,10 @@ function ApplyDebugOptions() {
   // 人物战场反应测试场同理：炸点就在人身边。
   if (REACTION_TEST) options.invincible = true;
   if (CLOTH_TEST) options.invincible = true;
-  // 白盒关卡编辑器同理（只看布设），且只改这一份拷贝，不调会落盘的 SetDebugOption。
-  if (BLOCKOUT || TOOLS_HOME) options.invincible = true;
+  // 白盒关卡编辑器同理（只看布设），且只改这一份拷贝，不调会落盘的 SetDebugOption；
+  // 试玩中（§17）按试玩面板的开关，默认不无敌。
+  if (TOOLS_HOME) options.invincible = true;
+  if (BLOCKOUT) options.invincible = blockout?.PlayOverrides?.()?.invincible ?? true;
   player?.SetDebugOptions(options);
   EnsureDebugInventory();
   return options;
@@ -3270,6 +3273,10 @@ async function Boot() {
         ReleasePointerLock();
       },
       FinishEditorSession: () => FinishEditorSession(),
+      // 白盒试玩（docs/Data_EditorBlockout.md §17）：开打时按本关携行重新领装备、回满血（撤掉还没到点的换人与阵亡卡）；
+      // 开打 / 收场时重新套一遍无敌与弹药规则（宿主读 blockout.PlayOverrides）。
+      ResetPlayer: () => { state.pendingRespawn = false; state.deathTimer = 0; hud.HideDeathCard?.(); RespawnPlayer(); },
+      ApplyDebugOptions: () => ApplyDebugOptions(),
       get battlefield() { return battlefield; },
       get player() { return player; },
       // 敌军 AI 编辑器（Script_EditorAi）读这三样：导演、投掷链、导航场。

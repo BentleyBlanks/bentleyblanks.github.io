@@ -1,0 +1,75 @@
+{
+  "schema": "tengxian-blockout-play/1",
+  "level": "FirstLevel0105",
+  "defaults": { "invincible": false, "infiniteAmmo": false, "previz": true },
+  "ranges": [
+    { "id": "all", "label": "01–05 全程", "from": "01-1", "to": "05-4", "note": "开场过场 → 拖人回身打三次 → 守机枪坑 → 沟里边打边退 → 炸车翻坡" },
+    { "id": "drag", "label": "02 拖人回身打三次", "from": "02-3", "to": "02-7", "note": "接枪之后：箱垛、台阶拐角、拐角 2 各打退一波追兵，翻坡下干沟" },
+    { "id": "pit", "label": "03 守机枪坑", "from": "03-1", "to": "03-5", "note": "逆着人流挤到坑里，顶住正面跃进、干水沟包抄和东头清沟，撤前捡那捆手榴弹" },
+    { "id": "retreat", "label": "04 沟里边打边退", "from": "04-1", "to": "04-3", "note": "拐角 1 回身顶、拐角 2 近战、退到路口" },
+    { "id": "pitToTank", "label": "03–05 守坑到炸车", "from": "03-1", "to": "05-4", "note": "03 到 05 一口气打下来" }
+  ],
+  "steps": {
+    "01-1": { "mode": "watch" },
+    "01-2": { "mode": "watch" },
+    "01-3": { "mode": "watch" },
+    "01-4": { "mode": "watch" },
+    "02-1": { "mode": "watch" },
+    "02-2": { "mode": "watch" },
+    "02-3": { "mode": "watch" },
+    "02-4": {
+      "mode": "fight", "push": ["pursuers"], "clear": { "kill": "all" },
+      "objective": "蹲在箱垛后把追兵打回去"
+    },
+    "02-5": {
+      "mode": "fight", "fresh": true, "push": ["pursuers"], "clear": { "kill": "all" },
+      "objective": "在台阶拐角探身，顺着支沟打回去"
+    },
+    "02-6": {
+      "mode": "fight", "fresh": true, "push": ["pursuers"], "clear": { "kill": "all" },
+      "objective": "在土袋后头回身打退追兵"
+    },
+    "02-7": { "mode": "move", "clear": { "reach": true }, "objective": "翻上坡顶，下到干沟" },
+    "02E-1": { "mode": "watch" },
+    "02E-2": { "mode": "watch" },
+    "03-1": { "mode": "move", "clear": { "reach": true }, "objective": "逆着人流挤到沟口的机枪坑" },
+    "03-2": { "mode": "watch" },
+    "03-3": {
+      "mode": "fight", "push": ["rush1", "rush2", "rush3", "rush4", "ditchSquad", "trenchClear"],
+      "clear": { "time": 90 }, "holdM": 3,
+      "mortar": { "from": ["IjaMortar1"], "everyS": 11, "firstS": 8, "spreadM": 8 },
+      "objective": "顶住：掷弹筒冒烟就换射位"
+    },
+    "03-4": {
+      "mode": "fight", "push": ["rush1", "rush2", "rush3", "rush4", "ditchSquad", "trenchClear"],
+      "clear": { "time": 30 }, "holdM": 3,
+      "mortar": { "from": ["IjaMortar1"], "everyS": 9, "firstS": 3, "spreadM": 7 },
+      "objective": "机枪手倒了，再顶一阵"
+    },
+    "03-5": {
+      "mode": "fight", "push": ["trenchClear", "ditchSquad"],
+      "clear": { "reach": { "x": 1.6, "z": -11.9, "r": 1.6 } }, "approach": false,
+      "mortar": { "from": ["IjaMortar1"], "everyS": 9, "firstS": 4, "spreadM": 7 },
+      "objective": "捡起坑沿外那捆手榴弹"
+    },
+    "04-1": {
+      "mode": "fight", "fresh": true, "push": ["trenchClear"], "clear": { "kill": "all" },
+      "objective": "在拐角 1 回身顶住顺沟追下来的鬼子"
+    },
+    "04-2": {
+      "mode": "fight", "fresh": true, "bayonet": true, "push": ["trenchClear"], "clear": { "kill": "all" },
+      "objective": "拐角近战：躲手榴弹，拼刺刀"
+    },
+    "04-3": {
+      "mode": "fight", "push": ["IjaTrench2", "IjaTrench3"], "keep": ["tankEscort"], "clear": { "reach": true },
+      "objective": "退到路口"
+    },
+    "05-1": { "mode": "watch" },
+    "05-2": { "mode": "watch" },
+    "05-3": { "mode": "watch" },
+    "05-4": {
+      "mode": "fight", "keep": ["tankCrew", "tankEscort"], "clear": { "reach": true },
+      "objective": "「表看了，走！」顺干沟往东"
+    }
+  }
+}

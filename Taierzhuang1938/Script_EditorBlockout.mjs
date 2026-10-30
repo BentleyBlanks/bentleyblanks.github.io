@@ -22,6 +22,9 @@
 //   手机验收（§4.5，2026-10-23，Script_EditorBlockoutTouch）：触屏设备（或 ?touch=1）加一层触屏输入 ——
 //   屏幕空处拖动转视角（宿主的 Look，同鼠标那条链）、左下摇杆走路 / 推飞行相机（TouchMove / UpdateFly 读它）、
 //   右下预演 / 飞行 / 地图大按钮、飞行中升降与加速；画面一样不动，只收界面。
+//   试玩（§17，2026-10-31，Script_EditorBlockoutPlay）：卡片「试玩」/ K 选一段关键帧开打 —— 那几帧的日军换成真 AI，
+//   玩家不再无敌、子弹有数，一步打完进下一步，打完 / 阵亡出小结；试玩中导航栏、翻关键帧、预演键、飞行都不理，
+//   摆演员前经 PuppetUnits 把变成 AI 的人摘掉，外部改了配置等试玩结束再同步。
 //
 // 界面（Script_EditorBlockoutUi）与纸面俯视图（Script_EditorBlockoutMap）只走 §4 / §4.1 的接口；
 // 全关总图上的鼠标（滚轮缩放、拖动平移、双击看全图、点关键帧）归地图模块，点选经 onMapPick 回到这里。
@@ -50,6 +53,7 @@ import { BlockoutMapEdit } from "./Script_EditorBlockoutMapEdit.mjs";
 import { BlockoutTouch, WantsTouch } from "./Script_EditorBlockoutTouch.mjs";
 import { LayoutEditSession, BuildLayoutEditExport, FormatLayoutEdit } from "./Script_EditorBlockoutLayoutEdit.mjs";
 import { BlockoutPreviz, PREVIZ_KEY } from "./Script_EditorBlockoutPreviz.mjs";
+import { BlockoutPlay, PLAY_KEY } from "./Script_EditorBlockoutPlay.mjs";
 import { BlockStandSampler } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { BuildWhiteboxWater } from "./Script_FirstLevelWhiteboxLooks.mjs";
 import { BuildCreekWater, MUD_PATCH, PaintWaterEdgeMud, WaterPrints } from "./Script_EditorBlockoutCreek.mjs";
@@ -281,24 +285,25 @@ export class EditorBlockout {
     this.markers = new BlockoutMarkers({ post: host.post, camera: host.camera, groundAt: this.standAt, labelRoot: this.labelRoot });
     this.map = new BlockoutMap();
     this.ui = new BlockoutUi(this.root, {
-      onPrev: () => { if (!this.previz?.playing) this.Prev(); },
-      onNext: () => { if (!this.previz?.playing) this.Next(); },
-      onSeek: (index) => { if (!this.previz?.playing) this.GoTo(index, { animate: index === this.index + 1 }); },
+      onPrev: () => { if (!this.Busy()) this.Prev(); },
+      onNext: () => { if (!this.Busy()) this.Next(); },
+      onSeek: (index) => { if (!this.Busy()) this.GoTo(index, { animate: index === this.index + 1 }); },
       onLevel: (id) => { this.PickMenu(id); },
       onLayer: (name, on) => { this.SetLayers({ [name]: on }); },
       onSavePose: () => { this.SavePose(); },
       onCopy: () => { this.CopySnapshot(); },
-      onReplay: () => { if (!this.previz?.playing) this.Replay(); },
+      onReplay: () => { if (!this.Busy()) this.Replay(); },
       onOpenMap: () => { this.ToggleMap(true); },
       onCloseMap: () => { this.ToggleMap(false); },
-      onMapPick: (index) => { if (!this.previz?.playing) this.GoTo(index, { animate: false }); },
-      onPreviz: () => { this.previz.Toggle(); },
+      onMapPick: (index) => { if (!this.Busy()) this.GoTo(index, { animate: false }); },
+      // 试玩中只在「看戏」那几步的预演里认预演键（= 跳过过场）
+      onPreviz: () => { if (!this.play?.locked || this.previz.playing) this.previz.Toggle(); },
       onFly: () => { this.ToggleFly(); },
     });
     this.mapEdit = new BlockoutMapEdit({
       map: this.map, head: this.ui.mapHead, before: this.ui.mapCloseButton, body: this.ui.mapBody,
       onExport: () => { this.ExportLayoutEdit(); },
-      onJump: (index) => { if (!this.previz?.playing) this.GoTo(index, { animate: false }); },
+      onJump: (index) => { if (!this.Busy()) this.GoTo(index, { animate: false }); },
       onActive: (on) => { this.ui.SetMapHint(on ? "编辑布设：拖动挪位置 · Shift 多选 / 框选 · 拖空地平移 · 不存盘，弄好导出" : ""); },
     });
     // 高级工具的独立音量（Script_EditorVolume，2026-10-20）：白盒编辑器也是高级工具里的工具，用同一份，右上角一条
@@ -310,6 +315,7 @@ export class EditorBlockout {
     }
     this.previz = new BlockoutPreviz(this);
     this.previzSignals = null;
+    this.play = new BlockoutPlay(this);
     // 手机验收（§4.5）：触屏设备或 ?touch=1 才建；画面不动，只加触屏输入与大按钮
     this.touch = WantsTouch(this.params) ? new BlockoutTouch({
       ui: this.ui,
@@ -317,7 +323,7 @@ export class EditorBlockout {
         look: (dx, dy) => this.Look(dx, dy),
         unlockAudio: () => this.UnlockAudio(),
         fly: () => this.ToggleFly(),
-        previz: () => { if (this.previz.playing || this.previz.Has()) this.previz.Toggle(); },
+        previz: () => { if (this.previz.playing || (this.previz.Has() && !this.play.locked)) this.previz.Toggle(); },
         map: () => this.ToggleMap(),
       },
     }) : null;
@@ -400,6 +406,16 @@ export class EditorBlockout {
       // 2026-10-21：能转头不能走的眼睛（eye.free）—— 给测试喂一次鼠标位移（像素，右 + / 下 +）；→ 这一帧能不能转
       Look: (dx, dy) => this.previz.Look(dx, dy),
     };
+    // 试玩（§17）：Start({from, to, settings}) 开打；Stop() 中止（出小结）；State() 现状；Close() 关小结回到编辑；Reload() 重读编排
+    this.api.Play = {
+      Start: (options) => this.play.Start(options || {}),
+      Stop: () => { this.play.Finish("abort"); return this.play.State(); },
+      State: () => this.play.State(),
+      Close: () => { this.play.CloseSummary(); this.play.ClosePanel(); return this.play.State(); },
+      Open: () => { this.play.OpenPanel(); return this.play.State(); },
+      Reload: () => this.play.Load({ force: true }),
+      Retry: (options) => { this.play.Retry(options || {}); return this.play.State(); },
+    };
   }
 
   get phase() { return BLOCKOUT_PHASES[this.levelIndex]; }
@@ -418,6 +434,7 @@ export class EditorBlockout {
     await this.LoadConfig();
     this.SetupLevel();
     await this.previz.Load({ force: true });
+    await this.play.Load({ force: true });
     // 没写 kf 时，?level= 给的是菜单行（如 FirstLevel1218_15）就从那一段第一帧开始
     const kf = this.params.get("kf") ?? BlockoutMenuRow(this.params.get("level"))?.from ?? null;
     // 「重现」链接带来的机位：落到关键帧之后再摆（地址栏里的 pose 由 ReplaceUrl 去掉，之后翻关键帧不再套用）
@@ -712,6 +729,9 @@ export class EditorBlockout {
     if (this.switching) await this.switching.catch(() => {});
     const run = (async () => {
       this.ResolvePending(false);
+      if (this.play.active) this.play.Finish("abort", { summary: false });
+      this.play.CloseSummary({ restore: false });
+      this.play.ClosePanel();
       this.previz.Stop({ restore: false });
       this.ExitFly({ quiet: true });
       this.ui.SetStatus({ state: "loading", message: "正在切换关卡", writable: !!this.writable, saveReason: this.saveReason || "" });
@@ -739,6 +759,7 @@ export class EditorBlockout {
       this.ReplaceUrl();
       this.SetupLevel();
       await this.previz.Load({ force: true });
+      await this.play.Load({ force: true });
       const start = startKf != null ? KeyframeIndex(this.doc, startKf) : 0;
       await this.GoTo(Math.max(0, start), { animate: false });
       this.PushLevels();
@@ -832,8 +853,11 @@ export class EditorBlockout {
       if (configChanged || ++this.scenePollN % BLOCKOUT_EDITOR.sceneEvery === 0) {
         if (await this.SceneChanged(levelKey)) { this.reloadScene = true; return; }
       }
-      if (!configChanged) { this.previz.Poll(); return; }
+      if (!configChanged) { this.previz.Poll(); this.play.Poll(); return; }
+      // 试玩中（含小结开着）：配置改了先不重摆（会把场上的 AI 和演员搅乱），等回到编辑后的下一次轮询再同步
+      if (this.play.locked) return;
       this.previz.Poll({ configChanged: true });
+      this.play.Poll({ configChanged: true });
       const t0 = performance.now();
       if (await this.Resync(result, { external: true })) {
         this.syncCount += 1;
@@ -910,7 +934,7 @@ export class EditorBlockout {
       promise = this.StartTransition(prevKf, kf);
     } else {
       this.unitData = new Map(kf.units.map(u => [u.id, u]));
-      this.puppets.Apply(kf.units, this._cam);
+      this.puppets.Apply(this.PuppetUnits(kf.units), this._cam);
     }
     if (this.puppets.warning) this.ui.Toast(this.puppets.warning, "warn");
     this.markers.SetPois(kf.pois);
@@ -929,6 +953,12 @@ export class EditorBlockout {
     return promise;
   }
 
+  /** 演员要摆的人：试玩中摘掉变成 AI 的、打死的（§17）。 */
+  PuppetUnits(units) { return this.play ? this.play.FilterPuppets(units) : units; }
+
+  /** 预演在播或试玩占着：导航栏、翻关键帧、重播、地图点选都不理。 */
+  Busy() { return !!this.previz?.playing || !!this.play?.locked; }
+
   Next() {
     if (!this.doc || this.index + 1 >= this.doc.keyframes.length) return Promise.resolve(false);
     return this.GoTo(this.index + 1, { animate: true });
@@ -946,16 +976,18 @@ export class EditorBlockout {
     this.ResolvePending(false);
     this.toUnitData = null;
     this.host.camera.getWorldPosition(this._cam);
-    this.puppets.Apply(prevKf.units, this._cam);
+    this.puppets.Apply(this.PuppetUnits(prevKf.units), this._cam);
     return this.StartTransition(prevKf, kf);
   }
 
   /** 播 prevKf → kf 的过渡（§5.2）；返回过渡结束时 resolve 的 Promise。 */
   StartTransition(prevKf, kf) {
-    const plan = PlanTransition(prevKf, kf);
+    // 试玩中变成 AI 的人不进过渡（两头都摘掉）
+    const fromUnits = this.PuppetUnits(prevKf.units), toUnits = this.PuppetUnits(kf.units);
+    const plan = PlanTransition({ ...prevKf, units: fromUnits }, { ...kf, units: toUnits });
     this.unitData = new Map([...prevKf.units.map(u => [u.id, u]), ...kf.units.map(u => [u.id, u])]);
     this.toUnitData = new Map(kf.units.map(u => [u.id, u]));
-    this.puppets.Transition(plan, prevKf.units, kf.units, this._cam);
+    this.puppets.Transition(plan, fromUnits, toUnits, this._cam);
     // 原地出现 / 一开始就消失的人：地环闪一下
     for (const entry of plan.units) {
       if ((entry.mode === "appear" && !entry.walkIn) || (entry.mode === "vanish" && !entry.walkOut)) {
@@ -1093,6 +1125,7 @@ export class EditorBlockout {
     this.puppets.Update(dt * (this.previz.TimeScale?.() ?? 1), this._cam);
     if (!this.puppets.transitioning && this.toUnitData) { this.unitData = this.toUnitData; this.toUnitData = null; }
     if (this.pending && !this.puppets.transitioning) this.ResolvePending(true);
+    this.play.Update(dt);
     this.UpdateTransitionBadge();
     this.UpdateFirstBake();
     this.liveUnits = this.LiveUnits();
@@ -1208,9 +1241,12 @@ export class EditorBlockout {
   }
 
   /** Script_Main 问：鼠标现在是不是归编辑器（全关总图开着时游戏不转头、不开枪、不抢锁、滚轮不换枪）。 */
-  CapturesMouse() { return this.mapOpen || !!this.previz?.playing; }
+  CapturesMouse() { return this.mapOpen || !!this.previz?.playing || !!this.play?.CapturesMouse(); }
 
   /** Script_Main 问：走动 / 姿态 / 开火的键是不是归编辑器（预演播放中玩家站在原地）。 */
+  /** 宿主读（§17）：试玩中玩家无不无敌、子弹有没有数；null = 不在试玩（编辑器照旧无敌、无限子弹）。 */
+  PlayOverrides() { return this.play?.Overrides() ?? null; }
+
   CapturesInput() { return !!this.previz?.playing || this.fly.active; }
 
   /**
@@ -1243,6 +1279,8 @@ export class EditorBlockout {
    */
   ToggleFly(on, pose) {
     const want = on === undefined ? !this.fly.active : !!on;
+    // 试玩中不让飞（玩家站着不动挨打）；小结开着也不让
+    if (want && !this.fly.active && this.play?.locked) { this.ui.Toast("试玩中不能飞行观察：先按 K 结束", "warn"); return this.FlyState(); }
     if (want && !this.fly.active) this.EnterFly(pose);
     else if (!want && this.fly.active) this.ExitFly();
     else if (want && pose) this.SetFlyPose(pose);
@@ -1450,11 +1488,19 @@ export class EditorBlockout {
       }
       // 预演：N 播 / 中断，Esc 中断；播放中翻关键帧、重播、复制位置、地图的键都不理
       if (event.code === PREVIZ_KEY && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        if (this.previz.playing || this.previz.Has()) { event.preventDefault(); this.previz.Toggle(); }
+        if (this.previz.playing || (this.previz.Has() && !this.play.locked)) { event.preventDefault(); this.previz.Toggle(); }
         return;
       }
       if (this.previz.playing) {
         if (event.code === "Escape") { event.preventDefault(); this.previz.Stop(); }
+        // 试玩里播着过场：K 照样能结束这一段
+        else if (event.code === PLAY_KEY && this.play.active && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); this.play.OnPlayKey(); }
+        return;
+      }
+      // 试玩（§17）：K 开面板 / 开打 / 中止 / 再来一遍；试玩占着时其余编辑键都不理
+      if (event.code === PLAY_KEY && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); this.play.OnPlayKey(); return; }
+      if (this.play.locked || this.play.panelOpen) {
+        if (event.code === "Escape" && !this.play.active) { event.preventDefault(); this.play.OnKey(event); }
         return;
       }
       if (event.code === "Period") { event.preventDefault(); this.Next(); }
@@ -1756,6 +1802,7 @@ export class EditorBlockout {
       syncRejected: this.syncRejected, lastSyncMs: this.lastSyncMs, staleConfig: this.staleConfig,
       revision: this.revision ?? null, saving: this.saving,
       lastPlan: this.lastPlan || null, writable: this.writable, previz: !!this.previz?.playing, fly: this.fly.active,
+      play: !!this.play?.active,
     };
   }
 
@@ -1783,6 +1830,7 @@ export class EditorBlockout {
     window.removeEventListener("blur", this.onBlur);
     document.removeEventListener("wheel", this.onWheel);
     this.ExitFly({ quiet: true });
+    this.play.Dispose();
     this.previz.Dispose();
     this.touch?.Dispose();
     this.ResolvePending(false);
