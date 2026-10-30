@@ -248,29 +248,29 @@
           "lastEdited": "2026-10-23T13:00:58.270Z"
         }
       ],
-      "materialRevision": "SurfaceV13",
+      "materialRevision": "SurfaceV14",
       "materialReviewedAt": "2026-10-30",
       "materialReview": "Model/Type89MediumTank/Data_MaterialReview.json",
-      "materialScope": "Material-only coherent satin paint, finer shallow film/cast normals and restrained steel within existing exposure masks; no new damage positions or historical assertions",
+      "materialScope": "Inferred aged coating: convex-edge/contact chips, primer, upward fading and cavity dust; geometry and articulated behavior unchanged",
       "historicalBoundaryCheckedAt": "2026-10-30",
-      "historicalBoundaryCheck": "Current Type89 Notion ledger row and parent bullet were re-fetched. Their existing inferred grain, cast texture and wear wording covers this refinement; no external content edit needed. Global and unrelated review cursors preserved.",
+      "historicalBoundaryCheck": "Current Type89 Notion ledger row and parent bullet re-fetched. Existing inferred paint, grain, cast and wear wording covers this refinement. No new historical assertion or external content edit. Global and unrelated cursors preserved.",
       "appearanceReviewStatus": "V32ActualPackedAuthorReview_DeclaredInferences",
       "notionRowSnapshots": [
         {
           "id": "3fd60335331c8194aa82f0b238084d34",
-          "lastEdited": "2026-10-29T11:21:51.161Z",
-          "scope": "Type89 appearance row/bullet only; existing inferred grain/wear boundary already covers this refinement",
+          "lastEdited": "2026-10-29T18:18:48.478Z",
+          "scope": "Type89 appearance row/bullet only; existing inferred paint/grain/cast/wear boundary covers this material refinement",
           "modified": false
         },
         {
           "id": "3fd60335331c818fa24deadb6d72ca70",
-          "lastEdited": "2026-10-29T00:03:20.194Z",
-          "scope": "Type89 appearance row/bullet only; existing inferred grain/wear boundary already covers this refinement",
+          "lastEdited": "2026-10-29T18:18:59.976Z",
+          "scope": "Type89 appearance row/bullet only; existing inferred paint/grain/cast/wear boundary covers this material refinement",
           "modified": false
         }
       ],
       "geometryRevision": "GeometryV54",
-      "runtimeSha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f"
+      "runtimeSha256": "5cc41a570eb9d580b6262aeddcffde11b41bf804a2e78f99848fca327298d49b"
     },
     {
       "asset": "KawasakiType88",

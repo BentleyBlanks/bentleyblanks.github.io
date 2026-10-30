@@ -124,7 +124,7 @@ export const EXTERNAL_GLB_STANDARDS = Object.freeze([
     note:'按用户2026-10-25指定的6万三角目标。原高源留OneDrive；未改部件双向顶点/表面误差≤0.463mm；照门缺口为游戏瞄准补件。第一人称、角色和掉落枪共用米制-Z朝向；这是唯一运行时汉阳造模型。'}),
   Object.freeze({ id: "Type89MediumTank", name: "八九式中战车乙型（馆藏外形复原）", pack: "Type89MediumTank/Model_Type89MediumTank.glb",
     sourceTriangles: 1462012, selectedGameSourceTriangles: 419856, selectedGameVisibleSourceTriangles: 417264, actualTriangles: 417130, exportRemovedZeroAreaTriangles: 132, exportTriangulationZeroAreaTriangles: 2, exportRemovedWhollyEnclosedTriangles: 2592, targetTriangles: 400000, policy: "target",
-    sourceTexture: "土浦保存车同车多机位图证；高源保留、按物理表面分区程序烘焙", runtimeTexture: "SurfaceV13：9材质25张内嵌图；4K底色/8K法线/4K ORM装甲，连贯缎面漆层、细浅铸纹与已有接触区露钢，实孔排气罩MASK",
+    sourceTexture: "土浦保存车同车多机位图证；高源保留、按物理表面分区程序烘焙", runtimeTexture: "SurfaceV14：9材质25张内嵌图；4K底色/8K法线/4K ORM装甲，细浅漆膜与铸纹、褪色失光、凸棱掉漆和接缝薄积尘，实孔排气罩MASK",
     note: "可选资产，选择后加载。米制Y-up、-Z车头；每侧81节独立履带及15轮组、整周炮塔、主炮与两挺机枪可动。400k目标/420k上限，零面积扇形与封闭内表面分别证明和记账。外形为馆藏参考；微观漆面、隐藏构造、限位、速度及门枪避让为推定，不据此认定滕县参战。" }),
   Object.freeze({ id: "NakajimaKi4", name: "九四式侦察机（同型参考复原）", pack: "NakajimaKi4/Model_NakajimaKi4.glb",
     sourceTriangles: 358399, actualTriangles: 179679, targetTriangles: 180000, policy: "target",

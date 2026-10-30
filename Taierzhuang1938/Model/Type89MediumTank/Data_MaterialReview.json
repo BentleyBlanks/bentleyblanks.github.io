@@ -1,7 +1,7 @@
 {
-  "revision": "SurfaceV13",
+  "revision": "SurfaceV14",
   "status": "AuthorReviewedForOptionalAssetIntegration",
-  "reviewedAt": "2026-10-29T17:52:16.473Z",
+  "reviewedAt": "2026-10-30T03:29:38.669Z",
   "primary": {
     "source": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
     "file": "Reference_Primary2007Original.jpg",
@@ -60,8 +60,8 @@
     }
   ],
   "profile": {
-    "revision": "SurfaceV13",
-    "scope": "Metal paint finish only; same geometry, pivots, UVs, macro normals, AO and restored-car pigment",
+    "revision": "SurfaceV14",
+    "scope": "Aged metal paint only; same geometry, pivots, UVs, normals, AO and effective opacity",
     "referenceApproach": "Type94 local material studies: coherent satin coating and selective contact abrasion. These are material-layer references, not evidence of identical historic pigment or damage.",
     "roles": {
       "Armor": {
@@ -89,72 +89,141 @@
       "neutralSteelBlend": 0.28,
       "neutralSteelGain": 1.04,
       "protectMuseumBadge": true,
-      "newDamageMask": false
+      "newDamageMask": true
+    },
+    "agingPaint": {
+      "seed": 891430,
+      "edgeExpansionM": 0.0045,
+      "primerExpansionM": 0.009,
+      "exposureSeedMetallic": 0.16,
+      "newSteelMetallic": 0.82,
+      "newSteelRoughness": 0.32,
+      "steelLinearRgb": [
+        0.12,
+        0.13,
+        0.125
+      ],
+      "primerLinearRgb": [
+        0.068,
+        0.049,
+        0.025
+      ],
+      "dustLinearRgb": [
+        0.14,
+        0.105,
+        0.055
+      ],
+      "oxideLinearRgb": [
+        0.073,
+        0.035,
+        0.014
+      ],
+      "primerStrength": 0.74,
+      "recessDustStrength": 0.32,
+      "oxideStrength": 0.22,
+      "paintFade": 0.16,
+      "upwardFade": 0.18,
+      "fadingPatchM": 0.09,
+      "paintRoughnessGain": 0.045,
+      "chalkRoughnessGain": 0.08,
+      "handlingCoatLoss": 0.22,
+      "maximumNewSteelAreaFraction": 0.08,
+      "maximumBaseChannelDelta": 96,
+      "roleProfiles": {
+        "Guard": {
+          "edgeExpansionM": 0.002,
+          "primerExpansionM": 0.005,
+          "exposureSeedMetallic": 0.16
+        }
+      },
+      "maskScope": "Broken growth around actual non-smooth manifold convex edges above18degrees and pre-existing exposed contact regions; no isolated random metal chips. Round, softly feathered masks. Rest-pose UV context gates upward fading, handled parts and lower recess dust. Original badge pixels and cutout RGB/alpha remain protected."
     },
     "historicalClassification": "Inferred appearance refinement; no factory coating, damage-location or participation claim"
   },
-  "profileSha256": "990e1eef4e6678e8299c53b08a7e2fe4ea34fec8fb954d9524cf33d08df2d951",
+  "profileSha256": "7fb3bf1edff92e7317bbefe9def1def1c1e21fbdcc63727eeb52c3d41713ced1",
   "actualFileAudits": {
     "Game": {
       "pass": true,
-      "sha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f",
-      "baselineSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
-      "checks": 163,
-      "geometryAndRigExact": true,
-      "allOtherImagePayloadsExact": true,
+      "quality": "Game",
+      "sha256": "5cc41a570eb9d580b6262aeddcffde11b41bf804a2e78f99848fca327298d49b",
+      "checks": 168,
       "imageChecks": [
         {
           "role": "Armor",
-          "ormChanges": 158588,
-          "baseChanges": 42247,
-          "maxColourDelta": 19,
+          "baseChanges": 5712913,
+          "roughChanges": 5750728,
+          "maxColourDelta": 59,
+          "newMetal": 61073,
+          "isolatedMetal": 0,
           "aoChanged": 0,
-          "opacityChanged": 0
+          "opacityChanged": 0,
+          "hiddenRgbChanged": 0,
+          "goldCount": 228,
+          "goldChanges": 0
         },
         {
           "role": "Guard",
-          "ormChanges": 29222,
-          "baseChanges": 41558,
-          "maxColourDelta": 5,
+          "baseChanges": 2315936,
+          "roughChanges": 633471,
+          "maxColourDelta": 87,
+          "newMetal": 11508,
+          "isolatedMetal": 0,
           "aoChanged": 0,
-          "opacityChanged": 0
+          "opacityChanged": 0,
+          "hiddenRgbChanged": 0,
+          "goldCount": 0,
+          "goldChanges": 0
         }
-      ]
+      ],
+      "geometryAndRigExact": true,
+      "allOtherImagePayloadsExact": true,
+      "detailedReview": "Data_PaintFinishReview.json"
     },
     "High": {
       "pass": true,
-      "sha256": "d25dda97f5a92149fa80d3bf0404adf682049ae9f64300ed0b0c27ce91483a25",
-      "baselineSha256": "3ff008c6989b2df3e7a726c7939b95bf02dbcc777aa5d9a6cd07d640db2b3642",
-      "checks": 163,
-      "geometryAndRigExact": true,
-      "allOtherImagePayloadsExact": true,
+      "quality": "High",
+      "sha256": "0901864be85007aafb1989ce291e1b6ad0d392ad1cd206b1d3433739ca4ba750",
+      "checks": 168,
       "imageChecks": [
         {
           "role": "Armor",
-          "ormChanges": 286931,
-          "baseChanges": 94547,
-          "maxColourDelta": 19,
+          "baseChanges": 5156506,
+          "roughChanges": 5240796,
+          "maxColourDelta": 45,
+          "newMetal": 42566,
+          "isolatedMetal": 0,
           "aoChanged": 0,
-          "opacityChanged": 0
+          "opacityChanged": 0,
+          "hiddenRgbChanged": 0,
+          "goldCount": 203,
+          "goldChanges": 0
         },
         {
           "role": "Guard",
-          "ormChanges": 144191,
-          "baseChanges": 325205,
-          "maxColourDelta": 11,
+          "baseChanges": 651311,
+          "roughChanges": 325301,
+          "maxColourDelta": 51,
+          "newMetal": 3034,
+          "isolatedMetal": 0,
           "aoChanged": 0,
-          "opacityChanged": 0
+          "opacityChanged": 0,
+          "hiddenRgbChanged": 0,
+          "goldCount": 0,
+          "goldChanges": 0
         }
-      ]
+      ],
+      "geometryAndRigExact": true,
+      "allOtherImagePayloadsExact": true,
+      "detailedReview": "Data_PaintFinishReview.json"
     }
   },
-  "runtimeSha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f",
+  "runtimeSha256": "5cc41a570eb9d580b6262aeddcffde11b41bf804a2e78f99848fca327298d49b",
   "scopeLimitations": [
     "Museum appearance and inferred microtexture; no original paint, factory motion-stop or hidden-construction certification.",
     "Photographic perspective and local form matching retain uncertainty; this is not a scan-identical replica.",
     "Door/gun stow linkage is a collision-cleared display reconstruction, not a verified original operating procedure."
   ],
-  "sourceManifest": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Data_PaintFinishBuild.json",
-  "sourceMaps": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Data_PaintFinishMaps.json",
+  "sourceManifest": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Data_PaintFinishBuild.json",
+  "sourceMaps": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Data_PaintFinishMaps.json",
   "paintFinishDetailedReview": "Data_PaintFinishReview.json"
 }

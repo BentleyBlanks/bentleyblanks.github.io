@@ -1,6 +1,6 @@
 {
-  "revision": "SurfaceV13",
-  "scope": "Metal paint finish only; same geometry, pivots, UVs, macro normals, AO and restored-car pigment",
+  "revision": "SurfaceV14",
+  "scope": "Aged metal paint only; same geometry, pivots, UVs, normals, AO and effective opacity",
   "referenceApproach": "Type94 local material studies: coherent satin coating and selective contact abrasion. These are material-layer references, not evidence of identical historic pigment or damage.",
   "roles": {
     "Armor": {"coatRoughnessScale": 0.78, "fineNormalScale": 0.55, "fineTileM": 0.126},
@@ -16,7 +16,34 @@
     "neutralSteelBlend": 0.28,
     "neutralSteelGain": 1.04,
     "protectMuseumBadge": true,
-    "newDamageMask": false
+    "newDamageMask": true
+  },
+  "agingPaint": {
+    "seed": 891430,
+    "edgeExpansionM": 0.0045,
+    "primerExpansionM": 0.009,
+    "exposureSeedMetallic": 0.16,
+    "newSteelMetallic": 0.82,
+    "newSteelRoughness": 0.32,
+    "steelLinearRgb": [0.12, 0.13, 0.125],
+    "primerLinearRgb": [0.068, 0.049, 0.025],
+    "dustLinearRgb": [0.14, 0.105, 0.055],
+    "oxideLinearRgb": [0.073, 0.035, 0.014],
+    "primerStrength": 0.74,
+    "recessDustStrength": 0.32,
+    "oxideStrength": 0.22,
+    "paintFade": 0.16,
+    "upwardFade": 0.18,
+    "fadingPatchM": 0.09,
+    "paintRoughnessGain": 0.045,
+    "chalkRoughnessGain": 0.08,
+    "handlingCoatLoss": 0.22,
+    "maximumNewSteelAreaFraction": 0.08,
+    "maximumBaseChannelDelta": 96,
+    "roleProfiles": {
+      "Guard": {"edgeExpansionM": 0.002, "primerExpansionM": 0.005, "exposureSeedMetallic": 0.16}
+    },
+    "maskScope": "Broken growth around actual non-smooth manifold convex edges above18degrees and pre-existing exposed contact regions; no isolated random metal chips. Round, softly feathered masks. Rest-pose UV context gates upward fading, handled parts and lower recess dust. Original badge pixels and cutout RGB/alpha remain protected."
   },
   "historicalClassification": "Inferred appearance refinement; no factory coating, damage-location or participation claim"
 }

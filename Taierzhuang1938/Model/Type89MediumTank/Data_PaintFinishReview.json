@@ -1,23 +1,26 @@
 {
-  "revision": "SurfaceV13",
-  "reviewedAt": "2026-10-29T17:52:16.473Z",
+  "revision": "SurfaceV14",
+  "reviewedAt": "2026-10-30T03:29:38.669Z",
   "status": "AuthorReviewedForOptionalAssetIntegration",
   "profile": "Data_PaintFinishProfile.json",
-  "profileSha256": "990e1eef4e6678e8299c53b08a7e2fe4ea34fec8fb954d9524cf33d08df2d951",
+  "profileSha256": "7fb3bf1edff92e7317bbefe9def1def1c1e21fbdcc63727eeb52c3d41713ced1",
   "baselineSurface": "SurfaceV12",
+  "previousPublishedSurface": "SurfaceV13",
   "referenceApproach": "Type94 local material studies: coherent satin coating and selective contact abrasion. These are material-layer references, not evidence of identical historic pigment or damage.",
   "geometryAndRigExact": true,
-  "newDamageMask": false,
+  "newDamageMask": true,
+  "wearScope": "Broken growth around actual non-smooth manifold convex edges above18degrees and pre-existing exposed contact regions; no isolated random metal chips. Round, softly feathered masks. Rest-pose UV context gates upward fading, handled parts and lower recess dust. Original badge pixels and cutout RGB/alpha remain protected.",
   "aoAndEffectiveOpacityExact": true,
-  "unwornPigmentAndMuseumBadgeProtected": true,
+  "museumBadgeProtected": true,
+  "allOther19ImagePayloadsByteExact": true,
   "audits": {
     "Game": {
       "pass": true,
-      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankGamePbr.glb",
-      "sha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f",
+      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV14Study\\Model_Type89MediumTankGamePbr.glb",
+      "sha256": "5cc41a570eb9d580b6262aeddcffde11b41bf804a2e78f99848fca327298d49b",
       "baseline": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV12Release_b24618b4\\Model_Type89MediumTankGamePbr.glb",
       "baselineSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
-      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankGameSourceExport.glb",
+      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV14Study\\Model_Type89MediumTankGameSourceExport.glb",
       "quality": "Game",
       "checks": [
         {
@@ -313,37 +316,62 @@
           "pass": true
         },
         {
-          "name": "AO and effective transparency are untouched: Armor",
+          "name": "Convex-edge context is bound to the exact retained baseline: Armor",
+          "pass": true,
+          "detail": {
+            "segments": 916
+          }
+        },
+        {
+          "name": "Aging preserves exact AO, alpha and cutout hidden RGB: Armor",
           "pass": true,
           "detail": {
             "ao": 0,
-            "opacity": 0
+            "opacity": 0,
+            "hidden": 0
           }
         },
         {
-          "name": "Roughness/metal changes remain inside pre-existing exposure: Armor",
+          "name": "New conductor exposure grows only beside actual convex edges or retained chips: Armor",
           "pass": true,
           "detail": {
-            "outside": 0,
-            "metalBounds": 0,
-            "ormChanges": 158588
+            "radius": 3,
+            "isolatedMetal": 0,
+            "conductorBounds": 0,
+            "newMetal": 61073
           }
         },
         {
-          "name": "Unworn pigment stays exact; conductor colour change is bounded: Armor",
+          "name": "New metal area remains below declared localized-wear limit: Armor",
           "pass": true,
           "detail": {
-            "colourOutside": 0,
-            "maxColourDelta": 19,
-            "baseChanges": 42247
+            "newMetal": 61073,
+            "atlasFraction": 0.0036402344703674316
           }
         },
         {
-          "name": "Coating mask follows changed conductor classification only: Armor",
+          "name": "Old pigment changes stay bounded and are visible in actual pixels: Armor",
           "pass": true,
           "detail": {
-            "coatOutside": 0,
-            "coatOther": 0
+            "baseChanges": 5712913,
+            "roughChanges": 5750728,
+            "maxColourDelta": 59
+          }
+        },
+        {
+          "name": "Weathering removes coating and retains reserved channels: Armor",
+          "pass": true,
+          "detail": {
+            "coatDirection": 0,
+            "coatReserved": 0
+          }
+        },
+        {
+          "name": "All independently detected gold badge pixels and scalar channels stay exact",
+          "pass": true,
+          "detail": {
+            "goldCount": 228,
+            "goldChanges": 0
           }
         },
         {
@@ -359,37 +387,54 @@
           "pass": true
         },
         {
-          "name": "AO and effective transparency are untouched: Guard",
+          "name": "Convex-edge context is bound to the exact retained baseline: Guard",
+          "pass": true,
+          "detail": {
+            "segments": 0
+          }
+        },
+        {
+          "name": "Aging preserves exact AO, alpha and cutout hidden RGB: Guard",
           "pass": true,
           "detail": {
             "ao": 0,
-            "opacity": 0
+            "opacity": 0,
+            "hidden": 0
           }
         },
         {
-          "name": "Roughness/metal changes remain inside pre-existing exposure: Guard",
+          "name": "New conductor exposure grows only beside actual convex edges or retained chips: Guard",
           "pass": true,
           "detail": {
-            "outside": 0,
-            "metalBounds": 0,
-            "ormChanges": 29222
+            "radius": 4,
+            "isolatedMetal": 0,
+            "conductorBounds": 0,
+            "newMetal": 11508
           }
         },
         {
-          "name": "Unworn pigment stays exact; conductor colour change is bounded: Guard",
+          "name": "New metal area remains below declared localized-wear limit: Guard",
           "pass": true,
           "detail": {
-            "colourOutside": 0,
-            "maxColourDelta": 5,
-            "baseChanges": 41558
+            "newMetal": 11508,
+            "atlasFraction": 0.010974884033203125
           }
         },
         {
-          "name": "Coating mask follows changed conductor classification only: Guard",
+          "name": "Old pigment changes stay bounded and are visible in actual pixels: Guard",
           "pass": true,
           "detail": {
-            "coatOutside": 0,
-            "coatOther": 0
+            "baseChanges": 2315936,
+            "roughChanges": 633471,
+            "maxColourDelta": 87
+          }
+        },
+        {
+          "name": "Weathering removes coating and retains reserved channels: Guard",
+          "pass": true,
+          "detail": {
+            "coatDirection": 0,
+            "coatReserved": 0
           }
         },
         {
@@ -837,32 +882,42 @@
       "imageChecks": [
         {
           "role": "Armor",
-          "ormChanges": 158588,
-          "baseChanges": 42247,
-          "maxColourDelta": 19,
+          "baseChanges": 5712913,
+          "roughChanges": 5750728,
+          "maxColourDelta": 59,
+          "newMetal": 61073,
+          "isolatedMetal": 0,
           "aoChanged": 0,
-          "opacityChanged": 0
+          "opacityChanged": 0,
+          "hiddenRgbChanged": 0,
+          "goldCount": 228,
+          "goldChanges": 0
         },
         {
           "role": "Guard",
-          "ormChanges": 29222,
-          "baseChanges": 41558,
-          "maxColourDelta": 5,
+          "baseChanges": 2315936,
+          "roughChanges": 633471,
+          "maxColourDelta": 87,
+          "newMetal": 11508,
+          "isolatedMetal": 0,
           "aoChanged": 0,
-          "opacityChanged": 0
+          "opacityChanged": 0,
+          "hiddenRgbChanged": 0,
+          "goldCount": 0,
+          "goldChanges": 0
         }
       ],
       "geometryAndRigExact": true,
       "allOtherImagePayloadsExact": true,
-      "newDamageMask": false
+      "newDamageMask": true
     },
     "High": {
       "pass": true,
-      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankHighPbr.glb",
-      "sha256": "d25dda97f5a92149fa80d3bf0404adf682049ae9f64300ed0b0c27ce91483a25",
+      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV14Study\\Model_Type89MediumTankHighPbr.glb",
+      "sha256": "0901864be85007aafb1989ce291e1b6ad0d392ad1cd206b1d3433739ca4ba750",
       "baseline": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV12Release_b24618b4\\Model_Type89MediumTankHighPbr.glb",
       "baselineSha256": "3ff008c6989b2df3e7a726c7939b95bf02dbcc777aa5d9a6cd07d640db2b3642",
-      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankHighSourceExport.glb",
+      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV14Study\\Model_Type89MediumTankHighSourceExport.glb",
       "quality": "High",
       "checks": [
         {
@@ -1158,37 +1213,62 @@
           "pass": true
         },
         {
-          "name": "AO and effective transparency are untouched: Armor",
+          "name": "Convex-edge context is bound to the exact retained baseline: Armor",
+          "pass": true,
+          "detail": {
+            "segments": 9692
+          }
+        },
+        {
+          "name": "Aging preserves exact AO, alpha and cutout hidden RGB: Armor",
           "pass": true,
           "detail": {
             "ao": 0,
-            "opacity": 0
+            "opacity": 0,
+            "hidden": 0
           }
         },
         {
-          "name": "Roughness/metal changes remain inside pre-existing exposure: Armor",
+          "name": "New conductor exposure grows only beside actual convex edges or retained chips: Armor",
           "pass": true,
           "detail": {
-            "outside": 0,
-            "metalBounds": 0,
-            "ormChanges": 286931
+            "radius": 2,
+            "isolatedMetal": 0,
+            "conductorBounds": 0,
+            "newMetal": 42566
           }
         },
         {
-          "name": "Unworn pigment stays exact; conductor colour change is bounded: Armor",
+          "name": "New metal area remains below declared localized-wear limit: Armor",
           "pass": true,
           "detail": {
-            "colourOutside": 0,
-            "maxColourDelta": 19,
-            "baseChanges": 94547
+            "newMetal": 42566,
+            "atlasFraction": 0.0025371313095092773
           }
         },
         {
-          "name": "Coating mask follows changed conductor classification only: Armor",
+          "name": "Old pigment changes stay bounded and are visible in actual pixels: Armor",
           "pass": true,
           "detail": {
-            "coatOutside": 0,
-            "coatOther": 0
+            "baseChanges": 5156506,
+            "roughChanges": 5240796,
+            "maxColourDelta": 45
+          }
+        },
+        {
+          "name": "Weathering removes coating and retains reserved channels: Armor",
+          "pass": true,
+          "detail": {
+            "coatDirection": 0,
+            "coatReserved": 0
+          }
+        },
+        {
+          "name": "All independently detected gold badge pixels and scalar channels stay exact",
+          "pass": true,
+          "detail": {
+            "goldCount": 203,
+            "goldChanges": 0
           }
         },
         {
@@ -1204,37 +1284,54 @@
           "pass": true
         },
         {
-          "name": "AO and effective transparency are untouched: Guard",
+          "name": "Convex-edge context is bound to the exact retained baseline: Guard",
+          "pass": true,
+          "detail": {
+            "segments": 0
+          }
+        },
+        {
+          "name": "Aging preserves exact AO, alpha and cutout hidden RGB: Guard",
           "pass": true,
           "detail": {
             "ao": 0,
-            "opacity": 0
+            "opacity": 0,
+            "hidden": 0
           }
         },
         {
-          "name": "Roughness/metal changes remain inside pre-existing exposure: Guard",
+          "name": "New conductor exposure grows only beside actual convex edges or retained chips: Guard",
           "pass": true,
           "detail": {
-            "outside": 0,
-            "metalBounds": 0,
-            "ormChanges": 144191
+            "radius": 2,
+            "isolatedMetal": 0,
+            "conductorBounds": 0,
+            "newMetal": 3034
           }
         },
         {
-          "name": "Unworn pigment stays exact; conductor colour change is bounded: Guard",
+          "name": "New metal area remains below declared localized-wear limit: Guard",
           "pass": true,
           "detail": {
-            "colourOutside": 0,
-            "maxColourDelta": 11,
-            "baseChanges": 325205
+            "newMetal": 3034,
+            "atlasFraction": 0.0028934478759765625
           }
         },
         {
-          "name": "Coating mask follows changed conductor classification only: Guard",
+          "name": "Old pigment changes stay bounded and are visible in actual pixels: Guard",
           "pass": true,
           "detail": {
-            "coatOutside": 0,
-            "coatOther": 0
+            "baseChanges": 651311,
+            "roughChanges": 325301,
+            "maxColourDelta": 51
+          }
+        },
+        {
+          "name": "Weathering removes coating and retains reserved channels: Guard",
+          "pass": true,
+          "detail": {
+            "coatDirection": 0,
+            "coatReserved": 0
           }
         },
         {
@@ -1682,36 +1779,46 @@
       "imageChecks": [
         {
           "role": "Armor",
-          "ormChanges": 286931,
-          "baseChanges": 94547,
-          "maxColourDelta": 19,
+          "baseChanges": 5156506,
+          "roughChanges": 5240796,
+          "maxColourDelta": 45,
+          "newMetal": 42566,
+          "isolatedMetal": 0,
           "aoChanged": 0,
-          "opacityChanged": 0
+          "opacityChanged": 0,
+          "hiddenRgbChanged": 0,
+          "goldCount": 203,
+          "goldChanges": 0
         },
         {
           "role": "Guard",
-          "ormChanges": 144191,
-          "baseChanges": 325205,
-          "maxColourDelta": 11,
+          "baseChanges": 651311,
+          "roughChanges": 325301,
+          "maxColourDelta": 51,
+          "newMetal": 3034,
+          "isolatedMetal": 0,
           "aoChanged": 0,
-          "opacityChanged": 0
+          "opacityChanged": 0,
+          "hiddenRgbChanged": 0,
+          "goldCount": 0,
+          "goldChanges": 0
         }
       ],
       "geometryAndRigExact": true,
       "allOtherImagePayloadsExact": true,
-      "newDamageMask": false
+      "newDamageMask": true
     }
   },
-  "comparison": "Same geometry/camera/projection/exposure/light; final viewport and detail images retained locally",
+  "comparison": "V13/V14; same geometry/camera/projection/exposure/light. Final viewport and detail images retained locally",
   "rows": [
     {
       "quality": "Game",
-      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankGamePbr.glb",
-      "sha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f",
-      "bytes": 88407696,
-      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Scene_Type89MediumTankGamePbr.blend",
-      "sourceSha256": "2dca8600177316b96326831407fecee0dded595e9cde2e72e38b9b24a99e4297",
-      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankGameSourceExport.glb",
+      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV14Study\\Model_Type89MediumTankGamePbr.glb",
+      "sha256": "5cc41a570eb9d580b6262aeddcffde11b41bf804a2e78f99848fca327298d49b",
+      "bytes": 90942948,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Scene_Type89MediumTankGamePbr.blend",
+      "sourceSha256": "736a1affaac7f81a37908e2edecf1557b2cc95eae049c1c3f25430b081b4f655",
+      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV14Study\\Model_Type89MediumTankGameSourceExport.glb",
       "baseline": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV12Release_b24618b4\\Model_Type89MediumTankGamePbr.glb",
       "baselineSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
       "geometryBufferViewsExact": true,
@@ -1721,9 +1828,9 @@
           "role": "Armor",
           "label": "Base",
           "image": 4,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameArmorBase.png",
-          "sha256": "bd82bca0d79a0335d992275c5dcf45fa423ce261555edc033c8ebf39a0cf64f9",
-          "bytes": 4788488,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameArmorBase.png",
+          "sha256": "6803f8b90388cf37679618a38cdf4107e8fe31913341028c86db367199b40840",
+          "bytes": 5438578,
           "mime": "image/webp",
           "opacityPreserved": false
         },
@@ -1731,9 +1838,9 @@
           "role": "Armor",
           "label": "Orm",
           "image": 3,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameArmorPoseOrm.png",
-          "sha256": "a41c6a3b3f0aab290bd572010a492e7bb9310aa9e2a425f8bcd5f12da2b04c02",
-          "bytes": 10536868,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameArmorPoseOrm.png",
+          "sha256": "94c767bd1398cc967d0d0bdaa7bf4f8d0517305305b925da330227256728a407",
+          "bytes": 11085402,
           "mime": "image/webp",
           "opacityPreserved": false
         },
@@ -1741,9 +1848,9 @@
           "role": "Armor",
           "label": "MicroCoatData",
           "image": 0,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameArmorMicroCoat.png",
-          "sha256": "e18de5576b28fc584d7397ace06dc80cfcccaa654fbf367beda52a92dc1445f8",
-          "bytes": 6410794,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameArmorMicroCoat.png",
+          "sha256": "b7043d1589098b295937ca66bbc489d681ed5832fb4eb05d475d9f766fde226e",
+          "bytes": 6997300,
           "mime": "image/webp",
           "opacityPreserved": false
         },
@@ -1751,9 +1858,9 @@
           "role": "Guard",
           "label": "Base",
           "image": 15,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameGuardBase.png",
-          "sha256": "ad09ce6f89e7e4424c7ca1a22e4056da7be438aa54648de0b567daf96d54acf1",
-          "bytes": 3845172,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameGuardBase.png",
+          "sha256": "6e6c0e867daa4f81359cadb1b0aec48c9a61a48fc9024b5064537b14f92c92f0",
+          "bytes": 4282013,
           "mime": "image/png",
           "opacityPreserved": true
         },
@@ -1761,9 +1868,9 @@
           "role": "Guard",
           "label": "Orm",
           "image": 14,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameGuardOrm.png",
-          "sha256": "56ffcb1cb1a34555d15d3349e4cd4434c1ae6e91e709f7abc6a953e93476edab",
-          "bytes": 603010,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameGuardOrm.png",
+          "sha256": "f2ab47928f23eb1a40dd910426516b94f89041c7980254f219b712beff102d7b",
+          "bytes": 736808,
           "mime": "image/webp",
           "opacityPreserved": false
         },
@@ -1771,9 +1878,9 @@
           "role": "Guard",
           "label": "MicroCoatData",
           "image": 12,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\Game\\Finished\\Texture_Type89GameGuardMicroCoat.png",
-          "sha256": "2b9329c52d2a4fba63edda36e4201ecc2d50160156b83afb4ad6acef4182ad4b",
-          "bytes": 397046,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameGuardMicroCoat.png",
+          "sha256": "3926f968635d007f23ae97b54650fc41bed50be2401b2176d8d2eee802f53e1f",
+          "bytes": 576526,
           "mime": "image/webp",
           "opacityPreserved": false
         }
@@ -1781,12 +1888,12 @@
     },
     {
       "quality": "High",
-      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankHighPbr.glb",
-      "sha256": "d25dda97f5a92149fa80d3bf0404adf682049ae9f64300ed0b0c27ce91483a25",
-      "bytes": 185734760,
-      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Scene_Type89MediumTankHighPbr.blend",
-      "sourceSha256": "5fb01da1146581447cb2adc53e8e52636eec3a45f7884b4f5e90e8e9e9d7d2dc",
-      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV13Study\\Model_Type89MediumTankHighSourceExport.glb",
+      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV14Study\\Model_Type89MediumTankHighPbr.glb",
+      "sha256": "0901864be85007aafb1989ce291e1b6ad0d392ad1cd206b1d3433739ca4ba750",
+      "bytes": 189377124,
+      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Scene_Type89MediumTankHighPbr.blend",
+      "sourceSha256": "f84f9b6c069118bba42d181f66b4d243833ea790167889d72ae2fcce778cb02e",
+      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV14Study\\Model_Type89MediumTankHighSourceExport.glb",
       "baseline": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV12Release_b24618b4\\Model_Type89MediumTankHighPbr.glb",
       "baselineSha256": "3ff008c6989b2df3e7a726c7939b95bf02dbcc777aa5d9a6cd07d640db2b3642",
       "geometryBufferViewsExact": true,
@@ -1796,9 +1903,9 @@
           "role": "Armor",
           "label": "Base",
           "image": 4,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighArmorBase.png",
-          "sha256": "6603f1fcdc295d67c2492d06196c974e7bf1c6fa00fad8534e75950ba12742fd",
-          "bytes": 6832941,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\High\\Finished\\Texture_Type89HighArmorBase.png",
+          "sha256": "27d31dc0d5910c91cc10cb50c2d8ef59a1cbcfb3bf6ab2eab08713ba438aca5b",
+          "bytes": 8202542,
           "mime": "image/png",
           "opacityPreserved": false
         },
@@ -1806,9 +1913,9 @@
           "role": "Armor",
           "label": "Orm",
           "image": 3,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighArmorPoseOrm.png",
-          "sha256": "161579c2c90f77aad5ea44d79052467439376b6511e8502f4dcbe958d8d5f485",
-          "bytes": 19332442,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\High\\Finished\\Texture_Type89HighArmorPoseOrm.png",
+          "sha256": "af9e3b29ae5810376d7c6d8b836a0c301ad856733063f2733415e2235be6b973",
+          "bytes": 20097405,
           "mime": "image/png",
           "opacityPreserved": false
         },
@@ -1816,9 +1923,9 @@
           "role": "Armor",
           "label": "MicroCoatData",
           "image": 0,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighArmorMicroCoat.png",
-          "sha256": "8a94dde9a9d13bcccc40181f3b718a8a9476d4180771f7641dfb7597c1b5bc2b",
-          "bytes": 10956341,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\High\\Finished\\Texture_Type89HighArmorMicroCoat.png",
+          "sha256": "cdd66da182a047fa02450278126a000a0d25cbc9e683bd47a2a24f6b4867ad71",
+          "bytes": 12015343,
           "mime": "image/png",
           "opacityPreserved": false
         },
@@ -1826,9 +1933,9 @@
           "role": "Guard",
           "label": "Base",
           "image": 15,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighGuardBase.png",
-          "sha256": "dce0bfe223124c850e2b9f9411c1597862e37482b2ad37a867710ec36e77f7ef",
-          "bytes": 2552411,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\High\\Finished\\Texture_Type89HighGuardBase.png",
+          "sha256": "76f43381e2df9f2cc95270907085921392653094b5a74dd14084342f4df56679",
+          "bytes": 2754269,
           "mime": "image/png",
           "opacityPreserved": true
         },
@@ -1836,9 +1943,9 @@
           "role": "Guard",
           "label": "Orm",
           "image": 14,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighGuardOrm.png",
-          "sha256": "c710844c16a9ee65c636967b7e084eeb62f874e6717b4cc06c39fb2ea6e2fc1c",
-          "bytes": 1461193,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\High\\Finished\\Texture_Type89HighGuardOrm.png",
+          "sha256": "f7f7d86aee3c8294fb87de94e22a6fac6b9fd16b2998a38b41ddee902c04827b",
+          "bytes": 1566405,
           "mime": "image/png",
           "opacityPreserved": false
         },
@@ -1846,9 +1953,9 @@
           "role": "Guard",
           "label": "MicroCoatData",
           "image": 12,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV13\\Maps\\High\\Finished\\Texture_Type89HighGuardMicroCoat.png",
-          "sha256": "2c0162a4939d66b05e271ee366e1524c9d16fe1a751bde244329e8669b1412c7",
-          "bytes": 962618,
+          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\High\\Finished\\Texture_Type89HighGuardMicroCoat.png",
+          "sha256": "ccc6bdf4539a9fc3380a04a213a35529bcfd99a792e948a29023701fca04d17f",
+          "bytes": 1104345,
           "mime": "image/png",
           "opacityPreserved": false
         }

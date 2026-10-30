@@ -469,7 +469,8 @@ Check(imageCache.size===(layeredSurface?25:21)&&g.materials.length===(layeredSur
 const paintFinish=g.nodes.find(node=>node.name==='Model_Type89MediumTank')?.extras?.paintFinish;
 if(paintFinish){
   const bytes=fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_PaintFinishProfile.json')),profile=JSON.parse(bytes);
-  Check(paintFinish.profileSha256===createHash('sha256').update(bytes).digest('hex')&&paintFinish.newDamageMask===false,'The delivered paint refinement matches its reproducible profile and retained exposure masks');
+  Check(paintFinish.profileSha256===createHash('sha256').update(bytes).digest('hex')&&paintFinish.newDamageMask===profile.contactWear.newDamageMask,'The delivered paint refinement matches its reproducible profile and declared exposure-mask scope');
+  if(profile.agingPaint)Check(profile.contactWear.newDamageMask===true&&profile.agingPaint.edgeExpansionM<=.01&&profile.agingPaint.maximumNewSteelAreaFraction<=.08&&profile.contactWear.protectMuseumBadge===true,'Aging uses bounded edge growth and protects the museum badge');
   for(const[role,settings]of Object.entries(profile.roles)){
     const material=g.materials.find(m=>m.name==='Material_Type89Game'+role),coat=material?.extensions?.KHR_materials_clearcoat,fine=role==='CastArmor'?material?.normalTexture:coat?.clearcoatNormalTexture;
     Check(Math.abs(coat?.clearcoatRoughnessFactor-settings.coatRoughnessScale)<1e-6&&Math.abs(fine?.scale-settings.fineNormalScale)<1e-6,'Actual paint/cast finish is the declared refined physical material: '+role);
