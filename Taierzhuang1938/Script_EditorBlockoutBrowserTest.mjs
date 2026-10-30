@@ -1058,10 +1058,11 @@ try {
     out.stOff = { layer: Bl.State().layers.stations, drawn: Bl.Stats().markers.stations, labels: Bl.Labels().stations.length };
     document.querySelector('.boLayer[data-layer="stations"]').click(); await Frame();
     out.stOn = { drawn: Bl.Stats().markers.stations };
-    // 标签三档：点一下 → 全部（无名的人也有字），再点 → 关，再点 → 有名字的。09-5 画面里的人都有名字，换到 08-3 站着看主街（沟里 / 街上有无名的走着的伤员）
+    // 标签三档：点一下 → 全部（无名的人也有字），再点 → 关，再点 → 有名字的。09-5 画面里的人都有名字，换到 08-3 站在坡道上朝东看路沟东半截
+    // （沟里全是无名的走着的伤员和担架；第十版 10-30 起朝南看主街那一幅里有名字的人多了、避让会把无名的字挤掉）
     await Bl.GoTo("08-3", { animate: false });
     const kf83 = Bl.Config().keyframes.find(k => k.id === "08-3");
-    Bl.PlacePlayer({ ...kf83.player, stance: "stand", pitchDeg: -4 });
+    Bl.PlacePlayer({ ...kf83.player, yawDeg: -90, stance: "stand", pitchDeg: -6 });
     await Frame(); await Frame();
     const named = Bl.Stats().markers.unitLabels;
     document.querySelector('.boLayer[data-layer="labels"]').click(); await Frame();
@@ -1069,7 +1070,8 @@ try {
     document.querySelector('.boLayer[data-layer="labels"]').click(); await Frame();
     out.off = { layer: Bl.State().layers.labels, unitLabels: Bl.Stats().markers.unitLabels, cls: document.querySelector('.boLayer[data-layer="labels"]').className };
     document.querySelector('.boLayer[data-layer="labels"]').click(); await Frame();
-    out.named = { layer: Bl.State().layers.labels, unitLabels: Bl.Stats().markers.unitLabels, before: named, texts: Bl.Labels().units.filter(t => /^(国军|日军|百姓|伤员|担架)/.test(t)) };
+    // 「有名字的」档里只许出现真名：头一副担架的名字就叫「担架」（关键帧单位 name），不算兜底文字
+    out.named = { layer: Bl.State().layers.labels, unitLabels: Bl.Stats().markers.unitLabels, before: named, texts: Bl.Labels().units.filter(t => /^(国军|日军|百姓|伤员|担架)/.test(t) && !kf83.units.some(u => u.name === t)) };
     out.stored = JSON.parse(localStorage.getItem("tengxian1938_blockout_layers") || "null");
     return out;
   });

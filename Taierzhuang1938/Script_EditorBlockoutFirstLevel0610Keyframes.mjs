@@ -21,6 +21,10 @@
 //     09-1 刚进院门、09-2 / 09-3 在 EM2 院里、09-4 踩柴垛搭人梯翻 z 435 那道墙、09-5 落在 EM3 北屋西边的空地上、09-6 / 09-7 蹲在 EM3 南门（pocket 北门）后头——
 //     门外就是墙角那伙鬼子；09-7 末隔墙甩两颗手榴弹、撞开门（EastGateBurst）贴身砍；10-1 班长三人在 pocket 里。正面留人吸火：坡道上三个打一枪换个窝（09 每帧换一次窝），
 //     Escort2 留在大车后头时不时冒头打一枪。站位全程不在三个枪眼和墙角哨的视线里（L0610_EAST_YARD_ROUTE；KeyframesTest 逐帧核）。
+//   · 第十版（2026-10-30，用户当天定的剧本）：刘文财跟顺子一起走巷子（班长有意让他跟着）；日军「尖兵分队约 15 人」：老耿家 9（机枪组 3 + 分队长 + 东西两间各 1 + 路口墙角 2 + 灶屋 1）+ 搜人的 6
+//     （街坊家 4 + 隔壁院 WA1 2）；07-4 远处东北道尽头一长溜人马带驮炮的牲口；10 东头还有人陆续来。我方死人只死无名的：Squad3（08-3 坡道上被枪眼打死）、Bearer01（08-3 沟里的担架员）、
+//     Escort1（09-7 墙角被鬼子临死甩出的手榴弹炸死）、Bearer02（10-3 掷弹筒落在胡同口）、Escort2（10-4 石碾边脖子中枪）、出村的路上又倒两个担架员；何有田胳膊挨一刺刀（轻伤）、排长挂彩、
+//     顺子 10-5 被炮掀翻。有名字的人（班长、何有田、刘文财、幺娃、顺子、老耿、妮儿）一个都不死。09 末端枪眼在 09-7 一口气打完（EastGateBurst 从 09-7 起），分队长带两个从东间窗洞翻出去。
 //
 // 走位：同一个人在相邻关键帧里 id 不变；生成时按村里的路网（凹路、路沟、街口坡道、主街、丁字路口、东街、巷子、L4、街坊家、夹道、本家院、
 // 老耿家、便门 / 狗洞、窄胡同、绕路的院子、北边院子链）自动排 path，不让人直线穿墙；野地里的人走直线。只在新帧出现的人写 path 起点「走进来」，只在旧帧的人写 intent「走出去」。
@@ -371,6 +375,11 @@ const NRA = {
   Officer: { name: "后送队带队的排长", kind: "officer", role: "convoyLeader" },
   Escort1: { name: "后送队的兵", role: "convoyGuard", group: "convoy" },
   Escort2: { name: "后送队的兵", role: "convoyGuard", group: "convoy" },
+  // 第十版（10-30）：死在路上的担架员（无名）
+  Bearer01: { name: "沟里倒在杠子边的担架员", role: "bearer", group: "convoy" },
+  Bearer02: { name: "胡同口被掷弹筒打死的担架员", role: "bearer", group: "convoy" },
+  Bearer03: { name: "出村的路上倒下的担架员", role: "bearer", group: "convoy" },
+  Bearer04: { name: "出村的路上倒下的担架员", role: "bearer", group: "convoy" },
 };
 const N = (id, at, o = {}) => U(id, "nra", at, { ...(NRA[id] || {}), ...o });
 const CIV = {
@@ -399,6 +408,16 @@ const IJA = {
   CellarIja2: { name: "拿刺刀的", role: "bayonet", group: "cellar" },
   CellarIja3: { name: "拖人的", role: "rifleman", group: "cellar" },
   CellarIja4: { name: "翻东西的", role: "looter", group: "cellar" },
+  // 第十版（10-30）：街坊家隔壁那院（WA1，窄夹道东边的小排房院）里搜人的两个：09-2 踹门、吼、响一枪；09-3 扛着抢来的东西从窄夹道小跑过去；09-4 跟着去路口
+  NextDoorIja1: { name: "隔壁院搜人的（踹门的）", role: "rifleman", group: "nextDoor" },
+  NextDoorIja2: { name: "隔壁院搜人的", role: "looter", group: "nextDoor" },
+  // 第十版：10-3 一组冲路口空地被机枪扫倒的；10 东头大路上陆续来的
+  ChargeIja1: { name: "冲路口空地被扫倒的", role: "rifleman", group: "east" },
+  ChargeIja2: { role: "rifleman", group: "east" },
+  ChargeIja3: { role: "rifleman", group: "east" },
+  FarIja1: { name: "东头大路上陆续来的", role: "rifleman", group: "east" },
+  FarIja2: { role: "rifleman", group: "east" },
+  FarIja3: { role: "rifleman", group: "east" },
   EastOfficer: { name: "喊来的小队的军官", role: "officer", group: "east" },
   EastMg1: { name: "土地庙后的轻机枪", role: "machineGun", weapon: "Type11", group: "east" },
   EastMg2: { name: "轻机枪副射手", role: "loader", group: "east" },
@@ -416,8 +435,13 @@ const IJA = {
   RoadIja7: { role: "rifleman", group: "road" },
   // 第九版（10-24）：08-1 从庄子东北角的墙后头冒出来朝逃出来的村民打一梭子的（露一下就缩回去，08-2 起不再摆）
   NeCornerIja: { name: "东北角墙后打了一梭子的（露一下就缩回去）", role: "rifleman", group: "ne" },
+  // 第十版（10-30）07-4 末：再往远看，东北那条道尽头一长溜人马往这边来，扬着土，有骡马驮着炮（大队）
+  ColumnIja1: { name: "东北道尽头一长溜人马（大队）的头", role: "rifleman", group: "column" },
 };
+for (let i = 2; i <= 10; i++) IJA[`ColumnIja${i}`] = { role: "rifleman", group: "column" };
 const J = (id, at, o = {}) => U(id, "ija", at, { ...(IJA[id] || {}), ...o });
+/** 大队里驮炮的牲口（kind animal、draft horse）。 */
+const MULE = (id, at, o = {}) => U(id, "ija", at, { name: "驮着炮的骡马", kind: "animal", group: "column", ...o });
 
 // 走位速度（10-22 用户：别像散步）
 const RUN = 3.2, IJA_RUN = 3.6, TROT = 1.9, CREEP = 1.0, NIER_RUN = 2.6, CART_RUN = 2.0;
@@ -484,19 +508,63 @@ const EAST_ROUTE = Object.freeze({
 });
 const EAST_TRIO = ["Luo", "HeYoutian", "Escort1"];
 const POCKET_GATE_AT = Pt(EYR.pocketGate.x, EYR.pocketGate.z);
-/** 08-4 起坡道上四个压枪眼的「打一枪换个窝」（第九版：Escort2 也在坡道上，顺子的射击位 08-4 起空出来了）：每帧换一次窝 */
-const SHOOTER_IDS = ["Yaowa", "Squad3", "LiuWencai", "Escort2"];
-// 四个射击位从西到东：player / Yaowa / Squad3 / LiuWencai；每帧相邻两个人换一次窝（只有那两个人动，爬过去不穿别人）
+/**
+ * 08-4 起坡道上压枪眼的「打一枪换个窝」（第十版 10-30：只剩幺娃和 Escort2 两个——Squad3 08-3 死在他的射击位上、刘文财跟顺子走巷子了）：每帧至少一个人换窝。
+ * 四个射击位从西到东：player / Yaowa / Squad3（尸体趴在这儿，不再是窝）/ LiuWencai。
+ */
+const SHOOTER_IDS = ["Yaowa", "Escort2"];
 const SHOOTER_SLOTS_09 = Object.freeze({
-  "08-4": { Escort2: "player", Yaowa: "Yaowa", Squad3: "Squad3", LiuWencai: "LiuWencai" },
-  "09-1": { Yaowa: "player", Escort2: "Yaowa", Squad3: "Squad3", LiuWencai: "LiuWencai" },
-  "09-2": { Yaowa: "player", Squad3: "Yaowa", Escort2: "Squad3", LiuWencai: "LiuWencai" },
-  "09-3": { Yaowa: "player", Squad3: "Yaowa", LiuWencai: "Squad3", Escort2: "LiuWencai" },
-  "09-4": { Squad3: "player", Yaowa: "Yaowa", LiuWencai: "Squad3", Escort2: "LiuWencai" },
-  "09-5": { Squad3: "player", LiuWencai: "Yaowa", Yaowa: "Squad3", Escort2: "LiuWencai" },
-  "09-6": { Squad3: "player", LiuWencai: "Yaowa", Escort2: "Squad3", Yaowa: "LiuWencai" },
-  "09-7": { LiuWencai: "player", Squad3: "Yaowa", Escort2: "Squad3", Yaowa: "LiuWencai" },
+  "08-4": { Yaowa: "Yaowa", Escort2: "player" },
+  "09-1": { Yaowa: "player", Escort2: "LiuWencai" },
+  "09-2": { Yaowa: "Yaowa", Escort2: "LiuWencai" },
+  "09-3": { Yaowa: "player", Escort2: "LiuWencai" },
+  "09-4": { Yaowa: "Yaowa", Escort2: "player" },
+  "09-5": { Yaowa: "Yaowa", Escort2: "LiuWencai" },
+  "09-6": { Yaowa: "player", Escort2: "LiuWencai" },
+  "09-7": { Yaowa: "Yaowa", Escort2: "player" },
 });
+// 第十版（10-30）死人躺的地方（都是无名的；死了以后每一帧都躺在原处）
+const SQUAD3_DEAD = SHOOTER.Squad3;                                            // 08-3 冒头久了被枪眼一梭打死，脸朝下栽在坡道上的射击位
+const BEARER1_DEAD = Pt(112.65, 381.45);                                      // 08-3 沟东半截两副担架之间、杠子边倒下的担架员
+const WALKER4_DEAD = Pt(104.9, 381.3);                                        // 08-3 妮儿身边中枪的伤兵（车尾和排长之间）
+const ESCORT1_DEAD = Pt(106.4, 458.9);                                        // 09-7 pocket 北门里：鬼子临死甩出的手榴弹
+const BEARER2_DEAD = Pt(106.8, 469.3);                                        // 10-3 掷弹筒一发落在胡同口
+const ESCORT2_DEAD = Pt(112.3, 466.3);                                        // 10-4 石碾边脖子中枪，倒在碾子的底座上
+const BEARER3_DEAD = Pt(113.2, 546.0), BEARER4_DEAD = Pt(121.2, 546.6);       // 10-6 出村南口外路沟边
+const Dead = (id, at, yaw, o = {}) => N(id, at, { down: true, yaw, straight: true, ...o });
+/** 已经死了的无名的（按帧累加）。 */
+const DeadSoFar = (kfId) => {
+  const n = Number(kfId.replace("-", "."));
+  const out = [];
+  if (n >= 8.3) out.push(Dead("Squad3", SQUAD3_DEAD, 180, { stance: "prone", guess: true }), Dead("Bearer01", BEARER1_DEAD, -60), N("Walker04", WALKER4_DEAD, { role: "walkingWounded", group: "convoy", down: true, yaw: 160, straight: true, name: "妮儿身边中枪的伤兵" }));
+  if (n >= 9.7) out.push(Dead("Escort1", ESCORT1_DEAD, 20, { name: "后送队的兵（墙角被手榴弹炸死）" }));
+  if (n >= 10.3) out.push(Dead("Bearer02", BEARER2_DEAD, 120));
+  if (n >= 10.4) out.push(Dead("Escort2", ESCORT2_DEAD, -100, { name: "后送队的兵（石碾边脖子中枪）", ...(kfId === "10-4" ? { path: [Pt(108.6, 466.9), Pt(110.8, 465.8), ESCORT2_DEAD] } : {}) }));
+  if (n >= 10.6) out.push(Dead("Bearer03", BEARER3_DEAD, 30), Dead("Bearer04", BEARER4_DEAD, -40));
+  return out;
+};
+/** 刘文财（第十版跟顺子走巷子）每帧的站位：08-4 巷子口里顺子身后；09 一路在顺子身边 */
+const LIU_ROUTE = Object.freeze({
+  "08-4": Pt(ALLEY_X + 0.5, 386.4),
+});
+/** 隔壁院 WA1（x 64…72.25、z 424.25…444，院门在西墙 z 441.5 朝窄夹道）里搜人的两个 */
+const WA1_YARD = Object.freeze({ Ija1: Pt(67.0, 431.4), Ija2: Pt(69.6, 433.2), door: Pt(68.2, 429.5), gateIn: Pt(64.8, 441.5), gateOut: Pt(62.9, 441.5) });
+/**
+ * 07-4 末远处那一长溜（大队）：东北道（L0610_EAST_ROAD）尽头 (300,320) 再往东北顺着道的方向排出去 0…24 m（道只画到 (300,320)；边界 x 320 / z 120 以内），
+ * 十个兵两列、三匹驮炮的骡马夹在中间；离凹路尽头直起腰的眼睛约 205–225 m（说明里的五六百米在场景边界内摆不下，摆到能看见的最远处，见报告）。
+ */
+const ROAD_END = L0610_EAST_ROAD.line[L0610_EAST_ROAD.line.length - 1], ROAD_PREV = L0610_EAST_ROAD.line[L0610_EAST_ROAD.line.length - 2];
+const ROAD_DIR = (() => { const dx = ROAD_END.x - ROAD_PREV.x, dz = ROAD_END.z - ROAD_PREV.z, n = Math.hypot(dx, dz); return { x: dx / n, z: dz / n }; })();
+const RoadBeyond = (s, lat = 0) => Pt(ROAD_END.x + ROAD_DIR.x * s - ROAD_DIR.z * lat, ROAD_END.z + ROAD_DIR.z * s + ROAD_DIR.x * lat);
+const FarColumn = () => {
+  const out = [];
+  for (let i = 1; i <= 10; i++) {
+    const s = 1.0 + (i - 1) * 2.4, lat = i % 2 ? 0.7 : -0.7;
+    out.push(J(`ColumnIja${i}`, RoadBeyond(s, lat), { face: RoadBeyond(s - 6, lat), straight: true, guess: i !== 1, speed: 1.4, intent: [RoadBeyond(s - 10, lat), RoadPointAtX(292, lat)] }));
+  }
+  [[4.2, 0], [12.4, 0], [20.6, 0]].forEach(([s, lat], k) => out.push(MULE(`PackMule${k + 1}`, RoadBeyond(s, lat), { face: RoadBeyond(s - 6, lat), straight: true, guess: true, speed: 1.4, intent: [RoadBeyond(s - 10, lat)] })));
+  return out;
+};
 
 // 后送队：07 贴西坎停成一长溜 z 190…315（担架 11 副 + 冬瓜那副、走着的伤员 16、架人的 4）
 const COLUMN_FROM_Z = 190, COLUMN_TO_Z = 315, COLUMN_SLOTS = 28, COLUMN_LAT = -1.25;
@@ -590,7 +658,7 @@ function ConvoyRunning() {
   return out;
 }
 /** 10-5 / 10-6 后送队出了村南口，缩在村口外的路沟里等着（两列担架搁在地上、走着的伤员蹲两边）。 */
-function ConvoyAtExit({ dongguaBearers = 0 } = {}) {
+function ConvoyAtExit({ dongguaBearers = 0, withOfficer = false } = {}) {
   const out = [];
   out.push(...DongguaOnLitter(Pt(EXIT_X + 0.1, 546.0), { bearers: dongguaBearers, yaw: 180 }));
   for (let k = 0; k < 6; k++) {
@@ -606,7 +674,7 @@ function ConvoyAtExit({ dongguaBearers = 0 } = {}) {
   out.push(N("Helper03", Pt(114.3, 558.4), { role: "helper", group: "convoy", yaw: 180, stance: "crouch", speed: 2.0 }));
   out.push(N("Helper04", Pt(120.0, 558.9), { role: "helper", group: "convoy", yaw: 180, stance: "crouch", speed: 2.0 }));
   out.push(N("Medic", Pt(117.1, 548.7), { face: Pt(EXIT_X + 0.1, 546.0), stance: "crouch", speed: RUN }));
-  out.push(N("Officer", Pt(115.3, 559.3), { face: Pt(117, 545), kind: "officer", speed: RUN }));
+  if (withOfficer) out.push(N("Officer", Pt(115.3, 559.3), { face: Pt(117, 545), kind: "officer", speed: RUN }));   // 第十版（10-30）：排长挂了彩跟着小队走，10-5 / 10-6 不在这儿
   return out;
 }
 
@@ -629,8 +697,19 @@ const EastProbe = ({ pulledBack = false } = {}) => [
   J("EastIja12", JOG_LP1, { role: "rifleman", group: "east", stance: "crouch", aim: true, yaw: 90, straight: true, name: "第一道弯枪眼里的" }),
   J("EastIja13", JOG_LP2, { role: "rifleman", group: "east", stance: "crouch", aim: true, yaw: 90, straight: true, name: "第一道弯枪眼里的" }),
   J("EastOfficer", OFFICER_HIDE, { stance: "crouch", face: Pt(180, 458), straight: true, name: "喊来的小队的军官（过了弯，看不见）" }),
-  J("EastIja14", Pt(PB.EN3aGate.x, PB.EN3aGate.z + 1.3), { role: "rifleman", group: "east", stance: "crouch", face: Pt(180, 458), straight: true, guess: true, name: "过了弯等着的下一拨" }),
-  J("EastIja15", Pt(PB.EN3bGate.x, PB.EN3bGate.z + 1.3), { role: "rifleman", group: "east", stance: "crouch", face: Pt(180, 458), straight: true, guess: true }),
+  ...FarArrivals(),
+];
+/** 第十版（10-30）：东头大路上陆续来的几个（东街东头 x 226…232，弯着腰往西走；10-2 起每帧往西挪几步） */
+const FarArrivals = (shift = 0) => [
+  J("FarIja1", Pt(226.4 - shift, 464.2), { stance: "crouch", face: Pt(200, EAST_Z), straight: true, speed: IJA_RUN, guess: true }),
+  J("FarIja2", Pt(229.0 - shift, 465.8), { stance: "crouch", face: Pt(200, EAST_Z), straight: true, speed: IJA_RUN, guess: true }),
+  J("FarIja3", Pt(231.6 - shift, 464.6), { stance: "crouch", face: Pt(200, EAST_Z), straight: true, speed: IJA_RUN, guess: true }),
+];
+/** 第十版：10-3 一组冲路口空地被机枪扫倒的三个（东街口、石碾东边） */
+const ChargeDown = () => [
+  J("ChargeIja1", Pt(113.0, 463.6), { down: true, yaw: 70, straight: true }),
+  J("ChargeIja2", Pt(116.2, 465.9), { down: true, yaw: 100, straight: true }),
+  J("ChargeIja3", Pt(118.4, 464.3), { down: true, yaw: 60, straight: true }),
 ];
 /** 10-2 两个正从第一道弯往土地庙跑的；10-3 起缩在土地庙后头 */
 const EastRunners = ({ atShrine = false } = {}) => [
@@ -669,8 +748,8 @@ const EastRetreated = () => [
   J("EastIja12", JOG_LP1, { role: "rifleman", group: "east", stance: "crouch", yaw: 90, straight: true }),
   J("EastIja13", JOG_LP2, { role: "rifleman", group: "east", stance: "crouch", yaw: 90, straight: true }),
   J("EastOfficer", OFFICER_HIDE, { stance: "crouch", face: Pt(180, 458), straight: true }),
-  J("EastIja14", Pt(PB.EN3aGate.x, PB.EN3aGate.z + 1.3), { role: "rifleman", group: "east", stance: "crouch", face: Pt(180, 458), straight: true, guess: true }),
-  J("EastIja15", Pt(PB.EN3bGate.x, PB.EN3bGate.z + 1.3), { role: "rifleman", group: "east", stance: "crouch", face: Pt(180, 458), straight: true, guess: true }),
+  ...FarArrivals(6).map((u) => ({ ...u, yawDeg: -90 })),
+  ...ChargeDown(),
   J("EastMg1", Pt(199.6, 457.4), { stance: "crouch", yaw: -90, speed: IJA_RUN }),
   J("EastMg2", Pt(201.2, 458.8), { stance: "crouch", yaw: -90, speed: IJA_RUN }),
   ...MortarTeam(),
@@ -896,7 +975,7 @@ function Keyframes() {
     player: { x: p74.x, z: p74.z, yawDeg: 150, pitchDeg: 2, stance: "crouch" },
     what: "三架日机高高地往南飞过（去炸县城），路上的人全往坎底下缩；妮儿最后一个趴下。路爬出洼地，庄子东头冒着烟。",
     next: { text: "到村口路沟", x: DITCH_08.Luo.x, z: DITCH_08.Luo.z, radiusM: 3 },
-    how: ["全程第一人称：蹲着跟班长的后背顺凹路跑，排长喊「飞机！贴到坎！」", "顺子半蹲贴在东坎根，飞机过头顶那 10 s 能转头不能走；老耿拽着驴往坎边靠", "妮儿是看见别人都趴下才抬头，这时飞机已经在头顶", "班长「起来！走！」全班弯腰顺凹路往前跑，凹路越走越浅，直起腰先看庄子：冒烟的都在东头（塌了角的房、一两处草顶着火），枪声也从东头一阵一阵传来，夹着听不清的日本话", "再看东北角：道上最后几个鬼子离了大路，从土炮楼那边弯着腰斜穿麦地往庄子东北角钻（100–120 m，认得出是人）", "到村口路沟，班长回头压手「趴倒！」"],
+    how: ["全程第一人称：蹲着跟班长的后背顺凹路跑，排长喊「飞机！贴到坎！」", "顺子半蹲贴在东坎根，飞机过头顶那 10 s 能转头不能走；老耿拽着驴往坎边靠", "妮儿是看见别人都趴下才抬头，这时飞机已经在头顶", "班长「起来！走！」全班弯腰顺凹路往前跑，凹路越走越浅，直起腰先看庄子：冒烟的都在东头（塌了角的房、一两处草顶着火），枪声也从东头一阵一阵传来，夹着听不清的日本话", "再看东北角：道上最后几个鬼子离了大路，从土炮楼那边弯着腰斜穿麦地往庄子东北角钻（100–120 m，认得出是人）", "再往远看：东北那条道尽头还有一长溜人马往这边来，扬着土，有骡马驮着炮——是大队（第十版 10-30；离眼睛二百多米，场景边界内摆不到五六百米）", "到村口路沟，班长回头压手「趴倒！」"],
     notes: `不能走的约 30 s 第一人称段，关键帧只摆趴下那一拍：顺子半蹲在东坎根 (${p74.x},${p74.z})，小队、后送队全体 prone；老耿蹲在驴边；妮儿还坐在车尾（ride），她听不见，预演里看见别人都趴了才从车尾滑下来在车边扑倒（最后一个）。飞机是预演里的 aircraft 轨：三架 Ki-30 离地约 400 m 往南去炸县城，不下来、不开枪；它们看见了这里的人，13 低空扫射的就是它们炸完回去、再一次出动来的。第九版（10-24）：四个鬼子（占了老耿家那伙的尾巴）已经离了大路，在庄子北边的麦地里 x 212…219、z 362…371，离凹路尽头 (100,378) 112…120 m，弯着腰奔东北角的土炮楼去；凹路里蹲着看不见，末段直起腰才看得见。08-1 从东北角墙后打村民那一梭子就是他们打的。`,
     signals: [SIG.cartDeparted],
     units: [
@@ -908,8 +987,9 @@ function Keyframes() {
       N("Medic", LZ(DONGGUA_SLOT.z + 1.6, COLUMN_LAT + 0.9), { yaw: 180, stance: "prone" }),
       ...CartAhead(p74.z, 6.5, { stance: "crouch" }),
       ...FieldWalkers(FIELD_IJA_074),
+      ...FarColumn(),
     ],
-    pois: [POI.villageMouth("objective"), POI.ditch("landmark"), POI.eastRoad(), Poi("NeCorner", "庄子东北角的土炮楼（鬼子斜穿麦地往那儿钻）", "danger", TOWER_NW, 4)],
+    pois: [POI.villageMouth("objective"), POI.ditch("landmark"), POI.eastRoad(), Poi("NeCorner", "庄子东北角的土炮楼（鬼子斜穿麦地往那儿钻）", "danger", TOWER_NW, 4), Poi("FarColumn", "东北道尽头一长溜人马（大队，骡马驮着炮）", "danger", RoadBeyond(12, 0), 10)],
   });
 
   // ======================= 08 村口 =======================
@@ -940,17 +1020,16 @@ function Keyframes() {
     C("Villager5", V5_IN, { stance: "crouch", face: Pt(V5_IN.x, V5_IN.z - 3), climb: true, speed: 2.9,
       ...(arriving ? { from: [Off(DITCH_GATE_IN, 0.3, 0.2), Off(DITCH_GATE_OUT, 0.3, 0.1)], fromStraight: true } : { intent: [Pt(120.3, 381.2)] }) }),
   ];
-  /** 北屋里的八个：机枪组三个守堂屋枪眼，分队长在后头，东西两间枪眼各两个（一个趴枪眼、一个递弹）。 */
+  /** 北屋里的六个（第十版 10-30：尖兵分队约 15 人，老耿家 9）：机枪组三个守堂屋枪眼，分队长在后头，东西两间枪眼各一个兵。 */
   const HouseIja = ({ mgArc = MG_ARC, mgFace = LOOPHOLE, heads = 0, without = [] } = {}) => [
     J("MgGunner", MG_AT, { yaw: heads || 0, stance: "crouch", aim: true, arc: mgArc, face: heads ? undefined : mgFace }),
     J("MgLoader", MG_LOADER_AT, { yaw: heads || 0, stance: "crouch" }),
     J("MgThird", MG_THIRD_AT, { yaw: heads || 0, stance: "crouch" }),
     J("Leader", LEADER_AT, { yaw: heads || 0, aim: !heads }),
     J("Rifle1", RIFLE_W_AT, { yaw: 0, stance: "crouch", aim: true }),
-    J("Rifle2", RIFLE_W2_AT, { yaw: heads || 0 }),
     J("Rifle3", RIFLE_E_AT, { yaw: 0, stance: "crouch", aim: true }),
-    J("Rifle4", RIFLE_E2_AT, { yaw: heads || 0 }),
   ].filter((u) => !without.includes(u.id));
+  void RIFLE_W2_AT; void RIFLE_E2_AT;
   const CornerIja = ({ runnerGone = false } = {}) => [
     J("CornerIja1", CORNER1_AT, { stance: "crouch", aim: true, face: Pt(MAIN_X, 440) }),
     ...(runnerGone ? [] : [J("CornerIja2", CORNER2_AT, { stance: "crouch", face: Pt(MAIN_X, 440) })]),
@@ -969,6 +1048,25 @@ function Keyframes() {
     J("CellarIja4", Pt(75.2, 462.6), { face: CELLAR }),
     ...FamilyInCellar(),
   ];
+  /**
+   * 隔壁院 WA1 里搜人的两个（第十版 10-30）：08 / 09-1 在院里翻；09-2 一个踹屋门、一个端枪（吼、响一枪）；09-3 扛着东西从院门出来、顺窄夹道往 L4 小跑（从西配房的豁口看得见）；
+   * 09-4 起跟搜窖那伙一道去了路口墙角（CornerSix）。进出院门的那段标 through（院门是关着的门扇，白盒不开）。
+   */
+  const NextDoorIja = (phase) => {
+    if (phase === "08" || phase === "09-1") return [
+      J("NextDoorIja1", WA1_YARD.Ija1, { face: WA1_YARD.door, straight: true }),
+      J("NextDoorIja2", WA1_YARD.Ija2, { face: Pt(70.5, 436.0), straight: true }),
+    ];
+    if (phase === "09-2") return [
+      J("NextDoorIja1", Pt(68.2, 430.9), { face: WA1_YARD.door, straight: true, name: "隔壁院踹屋门的" }),
+      J("NextDoorIja2", Pt(69.9, 432.6), { face: WA1_YARD.door, aim: true, straight: true, name: "隔壁院端着枪的（响了一枪）" }),
+    ];
+    if (phase === "09-3") return [   // 扛着抢来的东西出了院门顺窄夹道往 L4 小跑：正经过西配房豁口外头（x 63）
+      J("NextDoorIja1", Pt(A5_X, 452.4), { face: Pt(A5_X, 468), path: [Pt(68.2, 430.9), WA1_YARD.gateIn, WA1_YARD.gateOut, Pt(A5_X, 452.4)], through: true, speed: IJA_RUN, name: "扛着抢来的东西小跑过去的" }),
+      J("NextDoorIja2", Pt(A5_X, 448.6), { face: Pt(A5_X, 468), path: [Pt(69.9, 432.6), WA1_YARD.gateIn, WA1_YARD.gateOut, Pt(A5_X, 448.6)], through: true, speed: IJA_RUN, name: "扛着抢来的东西小跑过去的" }),
+    ];
+    return [];
+  };
   const MillMan = () => [C("MillOldMan", MILL_MAN, { down: true, yaw: 60 })];
   /** 街口坡道上趴着压枪眼的：幺娃、Squad3、刘文财（顺子是玩家）；08-4 起 Escort2 也趴上来（四个）。slots：打一枪换个窝（谁趴哪个射击位） */
   const Shooters08 = (faces = {}, slots = {}, ids = ["Yaowa", "Squad3", "LiuWencai"]) => ids.map((id) => { const at = SHOOTER[slots[id] || id]; return N(id, at, {
@@ -995,7 +1093,7 @@ function Keyframes() {
     next: { text: "看清怎么过" },
     how: ["趴在路沟南沿上顺着主街看到尽头：老耿家北屋后墙上凿的枪眼，机枪从那里打出来", "后送队和车缩在路沟东半截，小队在西半截", "一个村民从庄子东北角跑出来（六七十米外），顺庄子北墙根、路沟北沿往西跑；东北角土炮楼的墙后冒出一两个鬼子打来一梭子，土在他脚后跟溅起一串，不往沟里打；那人露一下就缩回去了", "他扑进路沟东半截，手脚并用爬到坡道边，冲班长喘着说「东头……过来的……进庄了……」，边说边往东指", "两个从主街东边院门冲上街被打倒；两个从北边后门钻出来溜进沟东半截——班长看了那道后门一眼（记住了）", "老耿只说一句：那是俺家……狗日的占了俺家", "东北道上远远还有两三个鬼子在往庄里走"],
     notes: `趴在街口坡道上半截 (${P08.x},${P08.z})（眼刚高过街面）：主街只有 6 m 宽，趴在 x < 97 的沟沿上视线被主街西墙北头挡死，所以四个压枪眼的人都在街口。`
-      + "鬼子 08 已在老耿家：北屋机枪组 3 守堂屋枪眼、分队长 + 东西两间枪眼 4 个兵、路口墙角 2、灶屋 1；街坊家搜窖 4（一家人还在窖里）。一共 15 个，没有人在房顶上。"
+      + "鬼子 08 已在老耿家（尖兵分队约 15 人，第十版 10-30）：北屋机枪组 3 守堂屋枪眼、分队长 + 东西两间枪眼各 1 个兵、路口墙角 2、灶屋 1（老耿家 9）；后头挨家搜人的 6：街坊家搜窖 4（一家人还在窖里）、隔壁院 WA1 2。没有人在房顶上。"
       + `村民走岔路（10-21 用户；第九版 10-24 巷子那边不再有人）：Villager2 / 3 从 (${MAIN_EAST_GATE2.x},${MAIN_EAST_GATE2.z}) 那道院门冲上街被打倒；Villager1 从庄子北墙根外 (${V1_START.x},${V1_START.z}) 顺北墙、路沟北沿往西跑、在 (${V1_DIVE.x},${V1_DIVE.z}) 扑进沟、爬到 (${V1_IN.x},${V1_IN.z})；Villager4 / 5 从路沟后门 (${DITCH_GATE_OUT.x},${SY.eastOfMain.box.minZ}) 下到沟东半截。`
       + `东北角那一梭子是 07-4 斜穿麦地那伙打的：NeCornerIja 在土炮楼西北角外 (${NE_CORNER_IJA.x},${NE_CORNER_IJA.z}) 露一下就缩回去（08-2 起不摆）；从坡道趴着看，这一点擦着主街东侧院子北墙的东头，刚看得见。`,
     signals: [SIG.cartDeparted],
@@ -1003,7 +1101,7 @@ function Keyframes() {
       ...Shooters08(), ...DitchParty08(),
       ...Villagers08({ arriving: true }),
       J("NeCornerIja", NE_CORNER_IJA, { stance: "crouch", aim: true, face: Pt(118, 378), straight: true, intent: [Pt(TOWER_NW.x - 2.0, TOWER_NW.z - 2.5)] }),
-      ...HouseIja(), ...CornerIja(), ...KitchenIja(), ...CellarGroup08(), ...MillMan(),
+      ...HouseIja(), ...CornerIja(), ...KitchenIja(), ...CellarGroup08(), ...MillMan(), ...NextDoorIja("08"),
       ...ConvoyInDitch(),
       ...RoadWalkers(ROAD_IJA_08),
     ],
@@ -1021,7 +1119,7 @@ function Keyframes() {
     units: [
       ...Shooters08({ Yaowa: DITCH_08.Luo }), ...DitchParty08({ Luo: DITCH_08.Geng, Geng: DITCH_08.Luo, Officer: DITCH_08.Luo }),
       ...Villagers08(),
-      ...HouseIja(), ...CornerIja(), ...KitchenIja(), ...CellarGroup08(), ...MillMan(),
+      ...HouseIja(), ...CornerIja(), ...KitchenIja(), ...CellarGroup08(), ...MillMan(), ...NextDoorIja("08"),
       ...ConvoyInDitch(),
       ...RoadWalkers(ROAD_IJA_08),
     ],
@@ -1042,55 +1140,59 @@ function Keyframes() {
     N("Medic", DITCH_08.Medic, { stance: "crouch", face: DITCH_08.DongguaLitter, speed: RUN }),
     C("Geng", DITCH_08.Geng, { face: gengFace, speed: 2.0 }),
   ];
+  // 墙角在主街东边的院墙后头，街口看不见；他出墙角先横过路口（主街那 6 m 宽的口子里露 1–2 s，幺娃才看得见喊「跑了一个」）再拐进东街（第十版 10-30：挪到 08-3）
+  const RUNNER_PATH = [CORNER2_AT, Pt(102.4, 461.8), Pt(99.4, 464.6), Pt(103.8, 466.6), Pt(109.4, 465.4), Pt(112.4, 465.0), Pt(116.4, 465.1)];
   Add({
-    id: "08-3", ...s08, name: "压枪眼",
+    id: "08-3", ...s08, name: "压枪眼·死了第一个人",
     player: { x: P08.x, z: P08.z, yawDeg: 180, pitchDeg: -1, stance: "prone" },
-    what: "玩家趴在街口坡道上朝枪眼打，枪眼一梭打沟沿。末了机枪扫到沟里：妮儿身边一个伤兵中枪，血溅了她一脸，她缩在沟底不动了。",
-    next: { text: "一直压" },
-    how: ["机枪一梭打沟沿：玩家一打，枪眼就回一梭；一停火它就找别的目标", "班长四人蹲在坡道脚下，不动（第九版：不往大车摸了）", "没有台词", "这一段教会玩家：这边一打，枪眼就回一梭", "拍末机枪回过来一梭扫到沟里：妮儿身边一个伤兵中枪，血溅了她一脸，她缩在沟底不动了"],
-    notes: `枪眼 (${LOOPHOLE.x},${LOOPHOLE.z})：0.5 m 厚的墙上 0.3 m 的洞，只能朝正面 ±30° 打；机枪的射界只罩得住主街和街口坡道。班长四人在坡道脚下 (${LUO_WAIT.Luo.x},${LUO_WAIT.Luo.z}) 一带蹲着。伤兵中枪在这一拍末（预演里演），08-4 起 Walker04 倒着。`,
+    what: "朝枪眼打，枪眼回一梭。坡道上一个兵冒头久了，一梭子过来脸朝下栽回沟里——我们死的第一个人。机枪扫进沟：担架员倒在杠子边，妮儿身边的伤兵中枪。墙角一个鬼子跑了。",
+    next: { text: "一直压；赶在他们的人来之前端了枪眼" },
+    how: ["机枪一梭打沟沿：玩家一打，枪眼就回一梭；一停火它就找别的目标", "班长四人蹲在坡道脚下，不动", "这一段教会玩家：这边一打，枪眼就回一梭", "坡道上一个兵（Squad3）冒头冒得久了，一梭子过来，脸朝下栽回沟里，没再动——这一段我们死的第一个人", "机枪回过来一梭扫进路沟东半截：一个抬担架的倒在杠子边；妮儿身边一个伤兵中枪，血溅了她一脸，她缩在沟底不动。沟里有人喊：又打着一个！", "墙角一个鬼子猫着腰穿过路口往东跑；幺娃：跑了一个！往东边跑了！班长：喊人去了。要赶在他们的人来之前，把那个枪眼端了！"],
+    notes: `枪眼 (${LOOPHOLE.x},${LOOPHOLE.z})：0.5 m 厚的墙上 0.3 m 的洞，只能朝正面 ±30° 打；机枪的射界只罩得住主街和街口坡道。班长四人在坡道脚下 (${LUO_WAIT.Luo.x},${LUO_WAIT.Luo.z}) 一带蹲着。第十版（10-30）这一拍死三个无名的：Squad3 栽在他的射击位 (${SQUAD3_DEAD.x},${SQUAD3_DEAD.z})、担架员 Bearer01 倒在沟东半截杠子边 (${BEARER1_DEAD.x},${BEARER1_DEAD.z})、伤兵 Walker04 倒在妮儿身边 (${WALKER4_DEAD.x},${WALKER4_DEAD.z})；之后每一帧都躺在原处。跑去喊人的 CornerIja2 顺 RUNNER_PATH 横过路口拐进东街（08-4 起不摆）。`,
     signals: [SIG.cartDeparted],
     units: [
-      ...Shooters08(), ...LuoWait(), ...DitchRest08(),
-      C("Nier", DITCH_08.Nier, { stance: "crouch", face: DITCH_08.Geng, speed: NIER_RUN }),
+      ...Shooters08({}, {}, ["Yaowa", "LiuWencai"]), ...LuoWait(), ...DitchRest08(),
+      ...DeadSoFar("08-3"),
+      C("Nier", DITCH_08.Nier, { stance: "crouch", face: WALKER4_DEAD, speed: NIER_RUN }),
       ...Villagers08().filter((u) => !u.id.match(/Villager[45]/)),
-      ...HouseIja(), ...CornerIja(), ...KitchenIja(), ...CellarGroup08(), ...MillMan(),
-      ...ConvoyInDitch(),
+      ...HouseIja(), ...CornerIja({ runnerGone: true }),
+      J("CornerIja2", RUNNER_PATH[6], { face: Pt(146, EAST_Z), path: RUNNER_PATH, intent: [Pt(PB.EN1Gate.x, EAST_Z), PB.EN1Gate, Pt(PB.EN1Gate.x, PB.EN1Gate.z - 2)], speed: 4.0, name: "跑去东街喊人的" }),
+      ...KitchenIja(), ...CellarGroup08(), ...MillMan(), ...NextDoorIja("08"),
+      ...ConvoyInDitch().filter((u) => u.id !== "Walker04"),
     ],
-    pois: [POI.loophole("danger"), POI.corner("danger"), POI.ditch("landmark"), POI.alleyMouth("landmark")],
+    pois: [POI.loophole("danger"), POI.corner("danger"), Poi("Squad3Dead", "死了的那个兵（坡道上）", "poi", SQUAD3_DEAD, 1.2), Poi("RunnerIja", "跑去喊人的鬼子", "danger", RUNNER_PATH[6], 1.5), POI.ditch("landmark"), POI.alleyMouth("landmark")],
   });
 
-  // 08-4（第九版 10-24 定计）：班长瞄一眼后门一句话定计（有田穿院子、顺儿走巷子、哪个先到哪个先打）；班长带何有田、Escort1 爬上南沿钻 EM1 的后门；
-  // 顺子顺沟南沿往西爬到巷子口、拐进巷子（约 5 s 不能操作，刘文财嘟囔「让他一个人走？」被「闭嘴！压到枪眼！」堵回去），进巷子十来米交还操作；
-  // 身后老耿喊「妮儿！」、幺娃拽他：妮儿趁乱溜出沟顺沟底往西、爬上南沿跟着钻进巷子（玩家只听得见）；墙角一个鬼子出路口往东跑去喊人
+  // 08-4（第十版 10-30 定计）：班长瞄一眼后门，招手把人叫拢，压着嗓子一口气说完（枪眼只朝前打，屁股后头是空的；有田穿院子；文财跟顺儿走巷子；摸到屁股后头之前哪个都不准放枪），
+  // 转向坡道「幺娃，你们打一阵歇一阵，把他们的人往前头拉！」；刘文财看了顺子一眼「……晓得」→ 班长带何有田、Escort1 爬上南沿钻 EM1 的后门；坡道上剩幺娃和 Escort2；
+  // 顺子和刘文财顺沟南沿往西爬到巷子口、拐进巷子（约 5 s 不能操作），十来米后交还操作；身后老耿喊「妮儿！」、幺娃拽他：妮儿趁乱溜出沟跟着钻进巷子（玩家只听得见）
   const p84 = Pt(ALLEY_X, 388.6);
   const nier84 = Pt(ALLEY_X + 0.4, 384.0);                                   // 巷子口里（顺子身后 4.6 m，默认视线朝南看不见她）
+  const liu84 = LIU_ROUTE["08-4"];                                            // 刘文财在顺子身后两步（妮儿在他身后）
   const geng84 = Pt(102.0, 382.3);
-  // 墙角在主街东边的院墙后头，街口看不见；他出墙角先横过路口（主街那 6 m 宽的口子里露 1–2 s，幺娃才看得见喊「跑了一个」）再拐进东街
-const RUNNER_PATH = [CORNER2_AT, Pt(102.4, 461.8), Pt(99.4, 464.6), Pt(103.8, 466.6), Pt(109.4, 465.4), Pt(112.4, 465.0), Pt(116.4, 465.1)];
   /** 08-4 末班长三人在路沟南沿下、后门跟前（从坡道脚下顺沟底过去，爬上南沿钻门：标 climb） */
   const BackGateParty = () => EAST_TRIO.map((id) => N(id, BACK_GATE_PARTY[id], { stance: "crouch", face: Pt(EYR.backGate.x, EYR.backGate.z), climb: true, speed: RUN }));
   Add({
     id: "08-4", ...s08, name: "班长定计·分三拨",
     player: { x: p84.x, z: p84.z, yawDeg: 180, pitchDeg: -2, stance: "crouch" },
-    what: "班长瞄一眼后门：有田跟老子穿院子，顺儿走巷子摸到他屁股后头，哪个先到哪个先打！顺子爬进巷子；妮儿趁乱跟了进去。",
+    what: "班长：枪眼只朝前打，屁股后头是空的。有田穿院子；文财跟顺儿走巷子，摸到屁股后头之前都不准放枪。顺子和刘文财爬进巷子；妮儿趁乱跟了进去。",
     next: { text: "顺巷子往里摸", x: A3_X, z: A2_Z + 2, radiusM: 2 },
-    how: ["班长瞄了一眼那道后门，一句话定计：压到枪眼！有田，跟老子穿院子。顺儿，你走巷子，摸到他屁股后头。哪个先到哪个先打！", "班长带何有田和一个后送队的兵顺沟底往东、爬上南沿猫腰钻进后门进 EM1；坡道上留幺娃、刘文财、Squad3 和另一个兵接着压枪眼（打一枪挪一下窝）", "顺子顺沟南沿往西爬到巷子口、拐进巷子（约 5 s 不能操作）；刘文财在后头嘟囔：让他一个人走？……班长头也不回：闭嘴！压到枪眼！", "进巷子十来米交还操作（能转头不能走）。身后听见老耿喊「妮儿！妮儿——！」、幺娃「老人家你不要命了嗦！」：妮儿趁乱溜出沟，顺沟底往西、爬上南沿，跟着钻进了巷子（看不见，只听得见）", "幺娃又喊：跑了一个！往东边跑了！墙角一个鬼子出路口往东跑", "大车后头没有人了：班长那一路不上主街"],
-    notes: `顺子交还操作的地方 (${p84.x},${p84.z})：巷子口往里几米。妮儿从车尾 (${DITCH_08.Nier.x},${DITCH_08.Nier.z}) 顺沟底往西、在 x 80 爬上南沿（标 climb），这一帧刚到巷子口里 (${nier84.x},${nier84.z})、在顺子身后；09-1 她从后头追上他。班长、何有田、Escort1 在路沟南沿下后门跟前 (${BACK_GATE_PARTY.Luo.x},${BACK_GATE_PARTY.Luo.z}) 一带、要钻 (${EYR.backGate.x},${EYR.backGate.z}) 那道后门进 EM1（班长那一路见 09 各帧）；Escort2 趴上坡道、补顺子空出来的射击位。老耿爬出沟被幺娃拽回之后蹲在沟沿下，幺娃爬回自己的射击位。`,
+    how: ["班长瞄了一眼那道后门，招手把人叫拢，压着嗓子一口气说完：枪眼只朝前打，屁股后头是空的。有田，跟老子穿院子；文财，你跟到顺儿走巷子。摸到他屁股后头之前，哪个都不准放枪", "转向坡道：幺娃，你们打一阵歇一阵，把他们的人往前头拉！刘文财看了顺子一眼：……晓得", "班长带何有田和一个后送队的兵顺沟底往东、爬上南沿猫腰钻进后门进 EM1；坡道上只剩幺娃和另一个后送队的兵压枪眼（打一枪挪一下窝；Squad3 的尸体还趴在他的射击位上）", "顺子和刘文财顺沟南沿往西爬到巷子口、拐进巷子（约 5 s 不能操作），进巷子十来米交还操作（能转头不能走）", "身后听见老耿喊「妮儿！妮儿——！」、幺娃「老人家你不要命了嗦！」：妮儿趁乱溜出沟，顺沟底往西、爬上南沿，跟着钻进了巷子（看不见，只听得见）", "大车后头没有人了：班长那一路不上主街"],
+    notes: `顺子交还操作的地方 (${p84.x},${p84.z})：巷子口往里几米；刘文财在他身后 (${liu84.x},${liu84.z})。妮儿从车尾 (${DITCH_08.Nier.x},${DITCH_08.Nier.z}) 顺沟底往西、在 x 80 爬上南沿（标 climb），这一帧刚到巷子口里 (${nier84.x},${nier84.z})、在两人身后；09-1 她从后头追上来。班长、何有田、Escort1 在路沟南沿下后门跟前 (${BACK_GATE_PARTY.Luo.x},${BACK_GATE_PARTY.Luo.z}) 一带、要钻 (${EYR.backGate.x},${EYR.backGate.z}) 那道后门进 EM1（班长那一路见 09 各帧）；Escort2 趴上坡道、补顺子空出来的射击位。老耿爬出沟被幺娃拽回之后蹲在沟沿下，幺娃爬回自己的射击位。`,
     signals: [SIG.cartDeparted],
     units: [
       C("Nier", nier84, { yaw: 180, stance: "crouch", speed: NIER_RUN, path: [DITCH_08.Nier, Pt(90, 380.6), Pt(ALLEY_X + 0.4, DT.z), nier84], intent: [Pt(ALLEY_X, 392), Pt(ALLEY_X, 398), Pt(A3_X, A2_Z)], climb: true }),
+      N("LiuWencai", liu84, { yaw: 180, stance: "crouch", speed: RUN, path: [SHOOTER.LiuWencai, Pt(97.0, 381.4), Pt(84, 380.6), Pt(ALLEY_X + 0.5, DT.z), liu84], climb: true, name: "刘文财（跟顺子走巷子）" }),
       ...Shooters08({}, SHOOTER_SLOTS_09["08-4"], SHOOTER_IDS),
       ...BackGateParty(), ...DitchRest08(Pt(ALLEY_X, DT.z)).filter((u) => u.id !== "Geng"),
       C("Geng", geng84, { stance: "crouch", face: Pt(ALLEY_X, PL.alleyMouth.z), climb: true, speed: 2.0 }),
-      N("Walker04", Pt(108.6 + 1.85 * 3, 379.15), { role: "walkingWounded", group: "convoy", down: true, yaw: 180, name: "妮儿身边中枪的伤兵" }),
+      ...DeadSoFar("08-4"),
       ...Villagers08().filter((u) => !u.id.match(/Villager[45]/)),
       ...HouseIja(), ...CornerIja({ runnerGone: true }),
-      J("CornerIja2", RUNNER_PATH[6], { face: Pt(146, EAST_Z), path: RUNNER_PATH, intent: [Pt(PB.EN1Gate.x, EAST_Z), PB.EN1Gate, Pt(PB.EN1Gate.x, PB.EN1Gate.z - 2)], speed: 4.0, name: "跑去东街喊人的" }),
-      ...KitchenIja(), ...CellarGroup08(), ...MillMan(),
+      ...KitchenIja(), ...CellarGroup08(), ...MillMan(), ...NextDoorIja("08"),
       ...ConvoyInDitch().filter((u) => u.id !== "Walker04"),
     ],
-    pois: [POI.alleyMouth("landmark"), Poi("NierFollows", "妮儿（巷子口里，跟着进来了）", "poi", nier84, 1.5), Poi("RunnerIja", "跑去喊人的鬼子", "danger", RUNNER_PATH[6], 1.5), POI.loophole("danger"), Poi("BackGate", "班长那一路进的后门", "objective", Pt(EYR.backGate.x, EYR.backGate.z), 1.2)],
+    pois: [POI.alleyMouth("landmark"), Poi("NierFollows", "妮儿（巷子口里，跟着进来了）", "poi", nier84, 1.5), Poi("LiuWithYou", "刘文财（跟着走巷子）", "poi", liu84, 1.2), POI.loophole("danger"), Poi("BackGate", "班长那一路进的后门", "objective", Pt(EYR.backGate.x, EYR.backGate.z), 1.2)],
   });
 
   // ======================= 09 摸进老耿家 =======================
@@ -1118,18 +1220,20 @@ const RUNNER_PATH = [CORNER2_AT, Pt(102.4, 461.8), Pt(99.4, 464.6), Pt(103.8, 46
     "09-4": "班长三人这时在翻 EM2 / EM3 之间那道墙：踩柴垛、踩肩膀，班长先上，再把人拉上去（人梯）",
     "09-5": "班长三人这时已翻进 EM3，蹲在北屋西边那条空地上往南摸",
     "09-6": "班长三人这时蹲在 EM3 南墙的院门后头，门外就是路口墙角那伙鬼子；等顺子那头一响",
-    "09-7": "班长三人这时蹲在 EM3 南门后头，手榴弹攥在手里：灶屋这头一响，隔墙甩两颗进墙角，撞开门贴身砍",
+    "09-7": "班长三人这时已经动手：北屋这头一响，隔墙甩两颗手榴弹进墙角，撞开门抡大刀冲进去——墙角一个鬼子临死甩出的手榴弹炸死了门口的 Escort1，何有田胳膊挨了一刺刀",
   };
   const EastRoutePoi = (kfId) => Poi("LuoRoute", "班长三人（班长那一路）", "poi", EAST_ROUTE[kfId].Luo, 1.5);
-  /** 09 街口的仗一直打着：坡道上四个压枪眼的（每帧换个窝）、班长那一路的三个、沟底的其他人、后送队；大车后头没人了 */
+  /** 09 街口的仗一直打着：坡道上两个压枪眼的（每帧换个窝；Squad3 的尸体趴在原处）、班长那一路的三个、沟底的其他人、后送队；大车后头没人了 */
   const StreetFight09 = (kfId) => [
-    ...Shooters08({}, SHOOTER_SLOTS_09[kfId], SHOOTER_IDS), ...EastRouteTrio(kfId),
+    ...Shooters08({}, SHOOTER_SLOTS_09[kfId], SHOOTER_IDS), ...(kfId === "09-7" ? [] : EastRouteTrio(kfId)),
     ...DitchRest08(Pt(ALLEY_X, DT.z)).filter((u) => u.id !== "Geng"),
     C("Geng", Pt(101.5, 380.8), { stance: "crouch", face: Pt(ALLEY_X, DT.z), speed: 2.0 }),
-    N("Walker04", Pt(108.6 + 1.85 * 3, 379.15), { role: "walkingWounded", group: "convoy", down: true, yaw: 180 }),
+    ...DeadSoFar(kfId),
     ...ConvoyInDitch().filter((u) => u.id !== "Walker04"),
     ...Villagers08().filter((u) => !u.id.match(/Villager[45]/)),
   ];
+  /** 刘文财（第十版 10-30 跟顺子走巷子）：09 每帧在顺子身边；09-5 趴在狗洞西边（钻不过去退出来）；09-7 在北屋东间 */
+  const Liu09 = (at, o = {}) => N("LiuWencai", at, { stance: "crouch", speed: RUN, ...o });
   const House09 = (o = {}) => [...HouseIja({ mgArc: ArcTo(MG_AT, CART_HIDE, 5, 6), mgFace: CART_HIDE, ...o }), ...CornerIja({ runnerGone: true })];
   const CellarShout = () => [
     J("CellarIja1", Pt(72.6, 458.0), { face: CELLAR, name: "拎手榴弹在窖口吼的" }),
@@ -1143,18 +1247,20 @@ const RUNNER_PATH = [CORNER2_AT, Pt(102.4, 461.8), Pt(99.4, 464.6), Pt(103.8, 46
   const WEST_STUB = ST.alleyWestStub, STUB_RUBBLE = L0610_RUBBLE_WEST;
   const p91 = Pt(STUB_RUBBLE.x + STUB_RUBBLE.w / 2 + 0.75, A2_Z + 0.1);        // 瓦砾跟前（瓦砾东沿往东 0.75 m，身子不进块）
   const nier91 = Pt(p91.x + 1.5, A2_Z + 0.35);                                // 他身后一步半（拽衣角）
+  const liu91 = Pt(p91.x + 2.7, A2_Z - 0.35);                                 // 刘文财蹲在妮儿后头
   Add({
     id: "09-1", ...s09, name: "死胡同·妮儿追上来",
     player: { x: p91.x, z: p91.z, yawDeg: 90, pitchDeg: -6, stance: "crouch" },
-    what: "顺子拐进往西那条巷子，两步就被塌墙堵死。身后有人拽他衣角：妮儿，脸上糊着血，自己追上来的。她摇头，攥住他的手往南带。",
+    what: "拐进往西那条巷子，两步就被塌墙堵死。妮儿追上来拽衣角、摇头，攥住顺子的手往南带。刘文财：跟到个女娃子走？顺子：她屋就在那头。",
     next: { text: "跟她往南", x: A3_X, z: A2_Z + 7, radiusM: 2 },
-    how: ["一个人往里摸，第一道弯直着拐进往西那条巷子，走到头：塌墙的瓦砾堵死了", "身后有人拽他衣角——回头是妮儿，脸上还糊着那个伤兵的血，整个人在抖；她是自己追上来的", "她朝他摇头，攥住他的手往回拽、往南带：她知道回家的路，这条才是唯一通到老耿家的路", "领着她的时候顺子手上没枪（枪背在背上），两人一路拉着手走", "街口那边一直在打：坡道上四个替两路吸着火", EastRouteHow["09-1"]],
-    notes: `玩家 (${p91.x},${p91.z}) 在往西那条死胡同（${WEST_STUB.name}，x ${WEST_STUB.from}…${WEST_STUB.to}、z ${WEST_STUB.c}）里、瓦砾 ${STUB_RUBBLE.id} 东沿跟前，面朝西；妮儿 (${nier91.x},${nier91.z}) 在他身后。09 一路走 L0610_ROUTE：第一道弯往西 → 往南 → 第二道弯往西 → 街坊家西墙外的窄夹道 → L4。`,
+    how: ["顺子在前、刘文财在后往里摸，第一道弯直着拐进往西那条巷子，走到头：塌墙的瓦砾堵死了", "身后有人拽他衣角——回头是妮儿，脸上还糊着那个伤兵的血，整个人在抖；她是自己追上来的", "她朝他摇头，攥住他的手往回拽、往南带：她知道回家的路，这条才是唯一通到老耿家的路", "刘文财压着嗓子：跟到个女娃子走？顺子：她屋就在那头。（两句新台词，第十版 10-30）", "领着她的时候顺子手上没枪（枪背在背上），两人一路拉着手走；刘文财端着枪跟在后头两步", "街口那边一直在打：坡道上两个替两路吸着火", EastRouteHow["09-1"]],
+    notes: `玩家 (${p91.x},${p91.z}) 在往西那条死胡同（${WEST_STUB.name}，x ${WEST_STUB.from}…${WEST_STUB.to}、z ${WEST_STUB.c}）里、瓦砾 ${STUB_RUBBLE.id} 东沿跟前，面朝西；妮儿 (${nier91.x},${nier91.z}) 在他身后，刘文财 (${liu91.x},${liu91.z}) 在妮儿后头。09 一路走 L0610_ROUTE：第一道弯往西 → 往南 → 第二道弯往西 → 街坊家西墙外的窄夹道 → L4。`,
     signals: [SIG.cartDeparted],
     units: [
       C("Nier", nier91, { face: p91, stance: "crouch", speed: NIER_RUN, path: [nier84, Pt(ALLEY_X, 392), Pt(ALLEY_X + 0.2, A2_Z - 0.4), Pt(73.0, A2_Z + 0.3), nier91], intent: [Pt(A3_X, A2_Z + 2), Pt(A3_X, A4_Z)] }),
+      Liu09(liu91, { face: nier91 }),
       ...StreetFight09("09-1"),
-      ...House09(), ...KitchenIja(), ...CellarGroup08(), ...MillMan(),
+      ...House09(), ...KitchenIja(), ...CellarGroup08(), ...MillMan(), ...NextDoorIja("09-1"),
     ],
     pois: [Poi("NierHere", "妮儿（追上来了）", "objective", nier91, 1.2), Poi("WestStub", "往西的死胡同（塌墙堵死）", "danger", Pt(STUB_RUBBLE.x, STUB_RUBBLE.z), 2), POI.jiefangGate("landmark"), EastRoutePoi("09-1")],
   });
@@ -1164,20 +1270,22 @@ const RUNNER_PATH = [CORNER2_AT, Pt(102.4, 461.8), Pt(99.4, 464.6), Pt(103.8, 46
   // 空间表的 glimpse (66.5,469.2) 正对门洞往北看，门缝里看不到偏东的窖口（见报告）
   const p92 = (() => { const d = Dist(JF_GATE, CELLAR); return Pt(JF_GATE.x - (CELLAR.x - JF_GATE.x) / d, JF_GATE.z - (CELLAR.z - JF_GATE.z) / d); })();
   const nier92 = Pt(p92.x - 1.0, p92.z + 0.7);
+  const liu92 = Pt(p92.x + 1.1, L4_Z + 0.4);
   Add({
     id: "09-2", ...s09, name: "一眼瞥见",
     player: { x: p92.x, z: p92.z, yawDeg: Yaw(p92, CELLAR), pitchDeg: -2, stance: "crouch" },
-    what: "路过街坊家半掩的院门，一眼瞥见院里：一个鬼子拎着手榴弹冲窖口吼「出来！」，地底下有人哭。两人缩回墙根。",
+    what: "路过街坊家半掩的院门，瞥见院里：鬼子拎着手榴弹冲窖口吼「出来！」，地底下有人哭。隔壁院也在踹门、有人喊、响了一枪。三个人缩回墙根。",
     next: { text: "跟她绕到西边", x: PL.jiefangBreach.x - 0.8, z: PL.jiefangBreach.z, radiusM: 1.5 },
-    how: ["拉着手走过 L4，街坊家西南角的院门半掩着，门缝里一眼看见院当中的窖口", "鬼子拎着手榴弹吼「出来！」「都出来！快点！」，地底下有人在哭", "不在门口停：两人缩回墙根，妮儿拽他绕到西边窄夹道", "这是惨剧的第一下，只瞥见一眼", EastRouteHow["09-2"]],
-    notes: `瞥见的站点 (${p92.x},${p92.z}) 在 L4 上、院门 (${JF_GATE.x},${JF_GATE.z}) 外；门扇斜开，门缝对着窖口 (${CELLAR.x},${CELLAR.z})（${R1(Dist(p92, CELLAR))} m，场景生成器核过这条视线）。`,
+    how: ["拉着手走过 L4，街坊家西南角的院门半掩着，门缝里一眼看见院当中的窖口", "鬼子拎着手榴弹吼「出来！」「都出来！快点！」，地底下有人在哭", "隔壁院子（街坊家北边那院）也在踹门、有人喊，响了一枪：那边还有两个搜人的（第十版 10-30）", "不在门口停：三个人缩回墙根，妮儿拽他绕到西边窄夹道", "这是惨剧的第一下，只瞥见一眼", EastRouteHow["09-2"]],
+    notes: `瞥见的站点 (${p92.x},${p92.z}) 在 L4 上、院门 (${JF_GATE.x},${JF_GATE.z}) 外；门扇斜开，门缝对着窖口 (${CELLAR.x},${CELLAR.z})（${R1(Dist(p92, CELLAR))} m，场景生成器核过这条视线）。刘文财 (${liu92.x},${liu92.z}) 蹲在他东边。隔壁院 = WA1（x 64…72.25、z 424.25…444，院门在西墙 z 441.5 朝窄夹道）：两个搜人的在院里踹屋门。`,
     signals: [SIG.cartDeparted],
     units: [
       C("Nier", nier92, { stance: "crouch", face: p92, speed: NIER_RUN }),
+      Liu09(liu92, { face: JF_GATE }),
       ...StreetFight09("09-2"),
-      ...House09(), ...KitchenIja(), ...CellarShout(), ...MillMan(),
+      ...House09(), ...KitchenIja(), ...CellarShout(), ...MillMan(), ...NextDoorIja("09-2"),
     ],
-    pois: [POI.jiefangGate("poi"), POI.cellar("danger"), POI.jiefangBreach("objective"), EastRoutePoi("09-2")],
+    pois: [POI.jiefangGate("poi"), POI.cellar("danger"), Poi("NextDoor", "隔壁院（踹门、喊、一枪）", "danger", Pt(68.2, 431), 3), POI.jiefangBreach("objective"), EastRoutePoi("09-2")],
   });
 
   // 09-3：从西配房西北角的豁口钻进黑屋，缩到窗下隔着破窗户纸看院子：汉子一出来就被刺刀捅倒，媳妇被拖进北屋，石磨上绑着老汉；妮儿认出街坊呜咽，按键捂嘴
@@ -1185,6 +1293,7 @@ const RUNNER_PATH = [CORNER2_AT, Pt(102.4, 461.8), Pt(99.4, 464.6), Pt(103.8, 46
   // 眼睛在窗（墙中线）后 0.95 m = 墙面后 0.6 m（窗台 0.9 高，身子不能顶在台上）、对着窖口
   const windowEye = (() => { const d = Dist(WINDOW, CELLAR), k = JF.westWing.eyeBackM + 0.35; return Pt(WINDOW.x - k * (CELLAR.x - WINDOW.x) / d, WINDOW.z - k * (CELLAR.z - WINDOW.z) / d); })();
   const nier93 = Pt(windowEye.x - 0.7, windowEye.z + 0.9);
+  const liu93 = Pt(65.0, 451.2);      // 刘文财蹲在豁口里边（西墙 z 449.25…450.75 没了）往窄夹道看：隔壁那两个从这儿小跑过去
   const MAN_BODY = Pt(75.0, 460.8);   // 汉子从东沿爬出来站直就被捅倒（和窖口几乎在窗后那只眼的同一条线上：窗只有 0.9 m 宽）
   const CellarOut = () => [
     J("CellarIja1", Pt(73.3, 458.2), { face: CELLAR, name: "拎手榴弹在窖口晃的" }),
@@ -1198,311 +1307,338 @@ const RUNNER_PATH = [CORNER2_AT, Pt(102.4, 461.8), Pt(99.4, 464.6), Pt(103.8, 46
   Add({
     id: "09-3", ...s09, name: "豁口·窗户纸·捂嘴",
     player: { x: windowEye.x, z: windowEye.z, yawDeg: Yaw(windowEye, CELLAR), pitchDeg: -4, stance: "crouch" },
-    what: "窗户纸后头：鬼子拎着手榴弹在窖口晃，一家人举手往外爬，汉子刚出来就被刺刀捅倒。妮儿认出街坊，呜咽——按键捂嘴。",
-    next: { text: "缩到大缸后头", x: PL.jiefangVat.x - 0.8, z: PL.jiefangVat.z - 0.5, radiusM: 1.2 },
-    how: ["妮儿拽他绕到西边窄夹道，从西配房塌掉的西北角钻进黑屋，缩到窗下隔着破窗户纸看院子", "一个鬼子拎着手榴弹在窖口晃，窖里一家举手往外爬：汉子、年轻媳妇、抱襁褓的老太太；汉子一出来就被刺刀捅倒", "媳妇被拖进北屋（只听声音）；石磨上绑着早死的老汉", "妮儿认出街坊、呜咽；屏幕弹按键：捂住她的嘴（第一人称看得见自己的手指，上面露着她瞪大的眼睛）", "没按到不判失败：外头正好响一梭机枪盖过去", EastRouteHow["09-3"]],
-    notes: `豁口 (${PL.jiefangBreach.x},${PL.jiefangBreach.z})（西墙 z ${JF.westWing.breach.z}…${JF.westWing.breach.zTo}、北墙 x ${JF.westWing.box.minX + 0.25}…${JF.westWing.breach.xTo} 没了，地上一摊矮瓦砾）；眼在窗 (${WINDOW.x},${WINDOW.z}) 后 ${JF.westWing.eyeBackM} m、对着窖口（${R1(Dist(windowEye, CELLAR))} m，石磨 ${R1(Dist(windowEye, MILL))} m），蹲着眼高 1.2 在窗台 ${JF.westWing.window.sillH} 之上。`,
+    what: "窗户纸后头：鬼子在窖口晃手榴弹，一家人举手往外爬，汉子刚出来就被捅倒。刘文财蹲在豁口边：隔壁还有。妮儿呜咽——按住键捂嘴，手占着，拦不住。",
+    next: { text: "捂住她，看着" },
+    how: ["妮儿拽他绕到西边窄夹道，从西配房塌掉的西北角钻进黑屋，缩到窗下隔着破窗户纸看院子", "一个鬼子拎着手榴弹在窖口晃，窖里一家举手往外爬：汉子、年轻媳妇、抱襁褓的老太太；汉子一出来就被刺刀捅倒", "媳妇被拖进北屋（只听声音）；石磨上绑着早死的老汉", "刘文财蹲在豁口边：豁口外窄夹道里两个鬼子扛着抢来的东西小跑过去（隔壁那两个往外搬东西又回去）；他冲顺子指那面墙，压着嗓子：隔壁还有", "妮儿认出街坊、呜咽；屏幕弹按键：按住捂她的嘴（第一人称看得见自己的手指，上面露着她瞪大的眼睛）；手占着，暴行全程拦不住", "松手她哭出声、院里一个鬼子扭头朝西配房看一眼，再捂紧；不判失败。（第十版 10-30：删掉了鬼子朝西配房走来探头、缩大缸后那一拍）", EastRouteHow["09-3"]],
+    notes: `豁口 (${PL.jiefangBreach.x},${PL.jiefangBreach.z})（西墙 z ${JF.westWing.breach.z}…${JF.westWing.breach.zTo}、北墙 x ${JF.westWing.box.minX + 0.25}…${JF.westWing.breach.xTo} 没了，地上一摊矮瓦砾）；眼在窗 (${WINDOW.x},${WINDOW.z}) 后 ${JF.westWing.eyeBackM} m、对着窖口（${R1(Dist(windowEye, CELLAR))} m，石磨 ${R1(Dist(windowEye, MILL))} m），蹲着眼高 1.2 在窗台 ${JF.westWing.window.sillH} 之上。刘文财 (${liu93.x},${liu93.z}) 蹲在豁口里边往窄夹道看；隔壁那两个这一拍在窄夹道 x ${A5_X} 上往 L4 小跑。`,
     signals: [SIG.cartDeparted],
     units: [
       C("Nier", nier93, { stance: "crouch", face: CELLAR, speed: NIER_RUN, path: [Pt(A5_X, L4_Z), Pt(A5_X, 450), Pt(65.2, 450.6), nier93], through: true }),
+      Liu09(liu93, { face: Pt(A5_X - 0.5, 452), path: [liu92, Pt(A5_X, L4_Z), Pt(A5_X, 450), liu93], through: true }),
       ...StreetFight09("09-3"),
-      ...House09(), ...KitchenIja(), ...CellarOut(), ...MillMan(),
+      ...House09(), ...KitchenIja(), ...CellarOut(), ...MillMan(), ...NextDoorIja("09-3"),
     ],
-    pois: [POI.jiefangWindow("poi"), POI.cellar("danger"), POI.mill(), POI.jiefangVat("objective"), EastRoutePoi("09-3")],
+    pois: [POI.jiefangWindow("poi"), POI.cellar("danger"), POI.mill(), Poi("NextDoorPass", "隔壁那两个（扛着东西从窄夹道过）", "danger", Pt(A5_X, 450.5), 2), EastRoutePoi("09-3")],
   });
 
-  // 09-4：一个日军朝西配房走来翻东西，两人缩到大缸后头；他推门刚探进头，街上枪声一下子密了（班长在吸火），丁字路口吹哨；院里的赶紧了结：
-  // 婴儿被挑起甩在窖沿，老太太往窖里爬，手榴弹磕钢盔扔进窖（CellarBlast）；探头的扭头走了，四个人出院门顺 L4 往东跑去路口
-  const VAT = Pt(JF.westWing.vat.x, JF.westWing.vat.z);
-  const p94 = Pt(66.4, 449.7);
-  const nier94 = Pt(65.5, 449.9);
-  const peek94 = Pt(JF.westWing.box.maxX - 0.3, JF.westWing.door.z);   // 推开门把头探进门洞里（门洞 1 m 宽，身子还在门里）
-  const CORNER_RALLY = [Pt(106.4, 459.2), Pt(107.4, 461.9), Pt(105.0, 460.0), Pt(108.8, 463.2)];   // 搜窖的四个到了路口墙角以后的站位
+  // 09-4（第十版 10-30）哨子·一刀：街上枪声一下子密了（坡道照班长说的打紧了），路口吹哨；院里了结（挑襁褓、手榴弹扔窖 CellarBlast）；三个拎枪出院门往路口，隔壁两个也跟着跑；
+  // 院里只剩一个，钻进院门边的门房（南屋西头）翻东西，背朝院子。刘文财抽刺刀先猫腰过去，顺子松开妮儿跟上：这一刀不干净——顺子从背后抡大刀砍偏在肩上，鬼子嚎一声扭过身，
+  // 两人扭在一起，刘文财扑上来补一刺刀。关键帧摆的是扭打那一拍
+  const GATEHOUSE = Pt(JF.nanwu.box.minX - 0.55, 465.6);                 // 门房 = 南屋西头（白盒南屋是实心块，人蹲在它西山墙根的门口翻东西，背朝院子）
+  const p94 = Pt(GATEHOUSE.x - 0.7, GATEHOUSE.z - 0.6);
+  const nier94 = Pt(JF.westWing.box.maxX + 1.3, JF.westWing.door.z + 0.6);   // 留在西配房门外墙根
+  const liu94 = Pt(GATEHOUSE.x - 1.3, GATEHOUSE.z + 0.7);
+  const CORNER_RALLY = [Pt(106.4, 459.2), Pt(107.4, 461.9), Pt(105.0, 460.0), Pt(108.8, 463.2), Pt(105.6, 462.4)];   // 搜人的五个到了路口墙角以后的站位（+ 守着的 CornerIja1 = 六个）
+  const JF_GATE_IN = Pt(JF.gate.x, JF.gate.z - 1.3);
+  const TO_CORNER = (end) => [Pt(70.5, 462.0), Pt(68.8, 464.6), JF_GATE_IN, ...StreetRoute(JF_GATE_IN, end)];   // 院子西南角 → 院门 → L4 → 丁字路口 → pocket（沿路网）
   const CellarMurder = () => [
-    J("CellarIja1", Pt(73.5, 458.3), { yaw: 180, name: "磕钢盔扔手榴弹的", to: [Pt(JF.gate.x, JF.gate.z - 1.3), Pt(JF.gate.x, L4_Z), Pt(80, L4_Z), CORNER_RALLY[0]], speed: IJA_RUN }),
-    J("CellarIja2", Pt(75.0, 462.1), { face: CELLAR, aim: true, name: "挑襁褓的", to: [Pt(JF.gate.x, JF.gate.z - 1.3), Pt(JF.gate.x, L4_Z), Pt(80, L4_Z), CORNER_RALLY[1]], speed: IJA_RUN }),
-    J("CellarIja3", Pt(73.9, 450.6), { yaw: 180, name: "拖完人回来的", to: [Pt(JF.gate.x, JF.gate.z - 1.3), Pt(JF.gate.x, L4_Z), Pt(80, L4_Z), CORNER_RALLY[2]], speed: IJA_RUN }),
-    J("CellarIja4", peek94, { face: VAT, name: "探进西配房的（嗯？）", to: [Pt(JF.gate.x, JF.gate.z - 1.3), Pt(JF.gate.x, L4_Z), Pt(80, L4_Z), CORNER_RALLY[3]], speed: IJA_RUN }),
+    J("CellarIja1", CORNER_RALLY[0], { stance: "crouch", aim: true, face: Pt(MAIN_X, 440), name: "磕钢盔扔手榴弹的（去了路口）", path: [Pt(73.5, 458.3), ...TO_CORNER(CORNER_RALLY[0])], speed: IJA_RUN }),
+    J("CellarIja2", CORNER_RALLY[1], { stance: "crouch", aim: true, face: Pt(MAIN_X, 440), name: "挑襁褓的（去了路口）", path: [Pt(75.0, 462.1), ...TO_CORNER(CORNER_RALLY[1])], speed: IJA_RUN }),
+    J("CellarIja3", CORNER_RALLY[2], { stance: "crouch", face: Pt(MAIN_X, 440), name: "拖完人回来的（去了路口）", path: [Pt(73.9, 450.6), ...TO_CORNER(CORNER_RALLY[2])], speed: IJA_RUN }),
+    J("CellarIja4", GATEHOUSE, { face: p94, aim: true, name: "留在门房翻东西的（被砍偏了，扭过身来）", path: [Pt(70.6, 462.8), Pt(71.2, 464.4), GATEHOUSE], speed: IJA_RUN }),
+    J("NextDoorIja1", CORNER_RALLY[3], { stance: "crouch", aim: true, face: Pt(MAIN_X, 440), name: "隔壁院搜人的（跟着去了路口）", path: [Pt(A5_X, 452.4), ...StreetRoute(Pt(A5_X, 452.4), CORNER_RALLY[3])], speed: IJA_RUN }),
+    J("NextDoorIja2", CORNER_RALLY[4], { stance: "crouch", face: Pt(MAIN_X, 440), name: "隔壁院搜人的（跟着去了路口）", path: [Pt(A5_X, 448.6), ...StreetRoute(Pt(A5_X, 448.6), CORNER_RALLY[4])], speed: IJA_RUN }),
     C("CellarMan", MAN_BODY, { down: true, yaw: 100 }),
     C("CellarWife", Pt(74.0, 447.3), { down: true, yaw: 90, name: "年轻媳妇（拖进北屋）" }),
-    C("CellarGranny", Pt(73.0, 461.7), { stance: "crouch", face: CELLAR, climb: true, name: "老太太（往窖里爬）" }),
+    C("CellarGranny", Off(CELLAR, 0, 0.2), { down: true, yaw: 0, name: "老太太（炸在窖里）", climb: true, through: true }),
   ];
   Add({
-    id: "09-4", ...s09, name: "大缸·哨子",
-    player: { x: p94.x, z: p94.z, yawDeg: Yaw(p94, peek94), pitchDeg: -2, stance: "crouch" },
-    what: "一个鬼子朝西配房走来翻东西，两人缩到大缸后头。他推门刚探进头，街上枪声一下子密了，路口吹哨；院里的赶紧了结，扭头走了。",
+    id: "09-4", ...s09, name: "哨子·一刀",
+    player: { x: p94.x, z: p94.z, yawDeg: Yaw(p94, GATEHOUSE), pitchDeg: 4, stance: "crouch" },
+    what: "街上枪声密了，路口吹哨；院里了结。五个拎枪出院门往路口，只剩一个钻进门房翻东西。刘文财先猫过去；顺子一刀砍偏在肩上，扭在一起，刘文财补一刺刀。",
     next: { text: "穿院子去本家院", x: PL.benjiaGate.x, z: PL.benjiaGate.z + 1.2, radiusM: 2 },
-    how: ["一个鬼子朝西配房走来，两人缩到西北角的大缸后头", "他推门刚探进头（嗯？），街上枪声一下子密了：坡道上那三个在吸火；丁字路口那边吹哨", "院里的赶紧了结：婴儿被一刺刀扎穿挑起甩在窖沿；老太太往窖里爬，手榴弹往钢盔上一磕扔进窖，闷响（CellarBlast）", "探头的扭头走了。四个人拎枪出院门、顺 L4 胡同往东跑去丁字路口支援", EastRouteHow["09-4"]],
-    notes: `大缸 (${VAT.x},${VAT.z}) 在西配房西北角墙根、豁口旁边；门在东墙 z ${JF.westWing.door.z}，探头的站在门外 (${peek94.x},${peek94.z})，从门到缸 ${R1(Dist(peek94, VAT))} m。CellarBlast 从这一帧起为真（窖口冒烟、盖板飞开）。婴儿只是老太太怀里的包袱，不单独建人。`,
+    how: ["前头街上枪声一下子密了（坡道照班长说的打紧了），丁字路口那边吹哨", "院里的赶紧了结：婴儿被一刺刀扎穿挑起甩在窖沿；老太太往窖里爬，手榴弹往钢盔上一磕扔进窖，闷响（CellarBlast）", "三个拎枪出院门顺 L4 往东跑去丁字路口；隔壁那两个也跟着跑", "院里只剩一个，钻进院门边的门房（南屋西头）翻东西，背朝院子", "刘文财抽刺刀、看顺子一眼、朝门房偏头，先猫腰过去；顺子松开妮儿跟上（妮儿留在西配房门外）", "这一刀不干净：顺子从背后抡大刀砍偏在肩上，鬼子嚎一声扭过身，两人扭在一起，刘文财扑上来补一刺刀。两人蹲着喘，顺子手抖", "玩家若开枪：五个招回来、院里院外围着打，多半死、从进西配房前重来；打出去了灶屋那个有防备（硬打支线不演）", EastRouteHow["09-4"]],
+    notes: `门房 = 街坊家南屋（x ${JF.nanwu.box.minX}…${JF.nanwu.box.maxX}、z ${JF.nanwu.box.minZ}…${JF.nanwu.box.maxZ}）西头，离院门 (${JF.gate.x},${JF.gate.z}) 五米多；白盒南屋是实心块，人蹲在它西山墙根的门口 (${GATEHOUSE.x},${GATEHOUSE.z}) 翻东西。顺子 (${p94.x},${p94.z}) 从背后砍、刘文财 (${liu94.x},${liu94.z}) 补刺刀；妮儿 (${nier94.x},${nier94.z}) 留在西配房门外。CellarBlast 从这一帧起为真（窖口冒烟、盖板飞开）。婴儿只是老太太怀里的包袱，不单独建人。第十版（10-30）：删掉了探头 / 大缸那一拍。`,
     signals: [SIG.cartDeparted, SIG.cellarBlast],
     units: [
-      C("Nier", nier94, { stance: "crouch", face: peek94, speed: NIER_RUN }),
+      C("Nier", nier94, { stance: "crouch", face: p94, speed: NIER_RUN, path: [nier93, Pt(JF.westWing.box.maxX - 1.3, JF.westWing.door.z), nier94] }),
+      Liu09(liu94, { face: GATEHOUSE, aim: true, path: [liu93, Pt(JF.westWing.box.maxX - 1.3, JF.westWing.door.z), Pt(JF.westWing.box.maxX + 1.3, JF.westWing.door.z), Pt(69.6, 462.8), liu94] }),
       ...StreetFight09("09-4"),
       ...House09(), ...KitchenIja(), ...CellarMurder(), ...MillMan(),
     ],
-    pois: [POI.jiefangVat("poi"), Poi("Peeker", "探进西配房的鬼子", "danger", peek94, 1.5), POI.cellar("danger"), POI.benjiaGate("objective"), EastRoutePoi("09-4")],
+    pois: [Poi("Gatehouse", "门房（留下翻东西的那个）", "danger", GATEHOUSE, 1.5), POI.cellar("danger"), POI.corner("danger"), POI.benjiaGate("objective"), EastRoutePoi("09-4")],
   });
 
-  // 09-5：两人穿过院子（妮儿在窖口僵住，顺子拽着走），出院门往西、顺夹道到本家院，妮儿钻狗洞，从老耿家那边拔开便门放顺子进来
+  // 09-5：穿院子（妮儿在窖口僵住，顺子拽着走），出院门往西、顺夹道到本家院；便门从老耿家那边闩死；刘文财趴下钻狗洞肩膀卡住退出来骂一句；妮儿推开他自己钻过去拔门闩
   const p95 = SIDE_OUT;
   const nier95 = Pt(SIDE_IN.x - 0.2, SIDE_IN.z - 0.6);
-  /** 搜窖的四个到了路口墙角（和 House09 里留下的那个 CornerIja1 凑成五个） */
-  const CORNER_FIVE = () => [
+  const liu95 = Pt(91.1, 473.3);                                              // 狗洞西边（本家院这头），刚退出来
+  /** 搜人的五个到了路口墙角（和 House09 里留下的那个 CornerIja1 凑成六个） */
+  const CORNER_SIX = () => [
     J("CellarIja1", CORNER_RALLY[0], { stance: "crouch", aim: true, face: Pt(MAIN_X, 440) }),
     J("CellarIja2", CORNER_RALLY[1], { stance: "crouch", aim: true, face: Pt(MAIN_X, 440) }),
     J("CellarIja3", CORNER_RALLY[2], { stance: "crouch", face: Pt(MAIN_X, 440) }),
-    J("CellarIja4", CORNER_RALLY[3], { stance: "crouch", face: Pt(MAIN_X, 440) }),
+    J("NextDoorIja1", CORNER_RALLY[3], { stance: "crouch", aim: true, face: Pt(MAIN_X, 440) }),
+    J("NextDoorIja2", CORNER_RALLY[4], { stance: "crouch", face: Pt(MAIN_X, 440) }),
   ];
   const JiefangBodies = () => [
     C("CellarMan", MAN_BODY, { down: true, yaw: 100 }),
     C("CellarWife", Pt(74.0, 447.3), { down: true, yaw: 90 }),
     C("CellarGranny", Off(CELLAR, 0, 0.2), { down: true, yaw: 0, name: "老太太（炸在窖里）", climb: true, through: true }),
+    J("CellarIja4", Pt(GATEHOUSE.x - 0.2, GATEHOUSE.z + 0.3), { down: true, yaw: 60, name: "门房里被砍死的", straight: true }),
     ...MillMan(),
   ];
   Add({
     id: "09-5", ...s09, name: "狗洞·便门",
     player: { x: p95.x, z: p95.z, yawDeg: -90, pitchDeg: -6, stance: "crouch" },
-    what: "穿院子、出院门，顺夹道到本家院。妮儿钻进墙根的狗洞，从老耿家那边拔开便门，放顺子进来。",
+    what: "穿院子、出院门，顺夹道到本家院。便门闩死了。刘文财钻狗洞卡住肩膀退出来骂一句；妮儿推开他自己钻过去拔门闩。墙外有人跑过，三人贴墙不动。",
     next: { text: "进便门", x: SIDE_IN.x + 0.6, z: SIDE_IN.z, radiusM: 1.2 },
-    how: ["两人穿过街坊家院子（妮儿在窖口僵住，顺子拽着走），出半掩的院门，L4 往西几步，南北夹道往南到本家院的院门（敞着）", "本家院空了：人跑的时候没顾上关门", "共用墙上的狗洞 0.45 m 宽、0.4 m 高，她从小就这么钻；大人钻不过", "顺子蹲在便门外等；门闩从老耿家那边拔开（SideGateOpen）", EastRouteHow["09-5"]],
-    notes: `便门 (${PL.sideGate.x},${PL.sideGate.z})、狗洞 (${PL.dogHole.x},${PL.dogHole.z}) 都在共用墙 x ${G.sharedWall.x} 上。妮儿钻狗洞：本家院里绕过东厢房北头、钻洞（标 through），落在老耿家北屋西边那条窄地上，再沿北屋南墙与灶屋北墙之间 1 m 的夹缝到院子、拔门闩。`,
+    how: ["三人穿过街坊家院子（妮儿在窖口僵住，顺子拽着走），出半掩的院门，L4 往西几步，南北夹道往南到本家院的院门（敞着）", "本家院空了：人跑的时候没顾上关门。便门从老耿家那边闩死", "刘文财趴下钻狗洞（0.45 m 宽、0.4 m 高），肩膀卡住，退出来骂一句；妮儿推开他自己钻过去——她从小就这么钻", "她拔门闩时墙外胡同里有人跑过、脚步在墙外停一下又跑远，三人贴墙不动；东头哨子声和喊声一阵比一阵近（喊人的快回来了）", "门闩从老耿家那边拔开（SideGateOpen）", EastRouteHow["09-5"]],
+    notes: `便门 (${PL.sideGate.x},${PL.sideGate.z})、狗洞 (${PL.dogHole.x},${PL.dogHole.z}) 都在共用墙 x ${G.sharedWall.x} 上。刘文财 (${liu95.x},${liu95.z}) 在狗洞西边刚退出来。妮儿钻狗洞：本家院里绕过东厢房北头、钻洞（标 through），落在老耿家北屋西边那条窄地上，再沿北屋南墙与灶屋北墙之间 1 m 的夹缝到院子、拔门闩。`,
     signals: [SIG.cartDeparted, SIG.cellarBlast, SIG.sideGateOpen],
     units: [
       C("Nier", nier95, { stance: "crouch", face: SIDE_IN, through: true, speed: NIER_RUN, path: [nier94, ...StreetRoute(nier94, Pt(84.5, 484.6)), Pt(86.6, 484.2), Pt(86.6, 476.0), Pt(90.3, 475.8), Pt(91.2, 473.4), Pt(92.9, G.dogHole.z), Pt(94.0, 475.5), Pt(96.8, 475.5), Pt(97.0, 480.0), Pt(97.0, 483.2), nier95] }),
+      Liu09(liu95, { face: Pt(G.sharedWall.x, G.dogHole.z), path: [liu94, ...StreetRoute(liu94, Pt(84.5, 484.6)), Pt(86.6, 484.2), Pt(86.6, 476.0), Pt(90.3, 475.8), liu95] }),
       ...StreetFight09("09-5"),
-      ...House09(), ...KitchenIja(), ...CORNER_FIVE(), ...JiefangBodies(),
+      ...House09(), ...KitchenIja(), ...CORNER_SIX(), ...JiefangBodies(),
     ],
     pois: [POI.dogHole("poi"), POI.sideGate("objective"), POI.benjiaGate("landmark"), EastRoutePoi("09-5")],
   });
 
-  // 09-6：老耿家后院没人；堂屋门朝南开着，门里是机枪组后背，十几步远。贴西墙往堂屋门摸，得先过灶屋门口；机枪响一梭挪一段，一安静就停
+  // 09-6：后院没人；堂屋门里机枪组的后背；灶屋那个背对门蹲在灶台边往嘴里塞东西 → 顺子摸过去从背后一刀（悄悄解决）；刘文财在灶屋门外盯着堂屋
   const p96 = Pt(98.6, 484.4);
   const nier96 = Pt(97.5, 485.0);
+  const liu96 = Pt(99.9, 485.1);
+  const KITCHEN_SQUAT = Pt(94.4, 477.9);                                      // 灶屋那个背对门蹲在灶台边往嘴里塞东西
   Add({
-    id: "09-6", ...s09, name: "屁股对到老子",
+    id: "09-6", ...s09, name: "屁股对到老子·灶屋一刀",
     player: { x: p96.x, z: p96.z, yawDeg: Yaw(p96, MG_AT), pitchDeg: -2, stance: "crouch" },
-    what: "老耿家后院没人。堂屋门朝南开着，门里是机枪组的后背，十几步远。顺子：……狗日的，屁股对到老子。",
+    what: "后院没人。堂屋门里是机枪组的后背：……狗日的，屁股对到老子。灶屋那个背对门蹲在灶台边往嘴里塞东西——顺子摸过去从背后一刀。",
     next: { text: "贴西墙往堂屋门摸", x: KITCHEN_OUT.x + 1.2, z: KITCHEN_OUT.z + 1.2, radiusM: 1.5 },
-    how: ["进了便门往院里看：院子空的，堂屋门朝南敞着，门里就是机枪组的后背，正朝街上打", "顺子：……狗日的，屁股对到老子", "带着她贴西墙往堂屋门摸，得先过灶屋门口", "机枪响一梭挪一段，一安静就停（08 自己打出来的节奏）", EastRouteHow["09-6"]],
-    notes: `便门里 (${SIDE_IN.x},${SIDE_IN.z}) 到堂屋门 (${PL.tangwuDoor.x},${PL.tangwuDoor.z}) ${R1(Dist(SIDE_IN, PL.tangwuDoor))} m；门洞 1.2 m 宽，机枪手正对门后 3.5 m，从院子南墙根 x 97.8…102.2 那一截才看得进门里的后背，所以看见的站点在 (${p96.x},${p96.z})（场景生成器 / 测试核这条视线）。`,
+    how: ["进了便门往院里看：院子空的，堂屋门朝南敞着，门里就是机枪组的后背，正朝街上打", "顺子：……狗日的，屁股对到老子", "灶屋那个背对门蹲在灶台边往嘴里塞东西：顺子摸过去从背后一刀，悄悄解决（预演演这一支）；刘文财在灶屋门外盯着堂屋", "被发现那一支（关键帧说明）：他扑倒顺子、玩家连按往外推、妮儿咬手腕；动静传到北屋就得在屋里打", "机枪响一梭挪一段，一安静就停（08 自己打出来的节奏）", EastRouteHow["09-6"]],
+    notes: `便门里 (${SIDE_IN.x},${SIDE_IN.z}) 到堂屋门 (${PL.tangwuDoor.x},${PL.tangwuDoor.z}) ${R1(Dist(SIDE_IN, PL.tangwuDoor))} m；门洞 1.2 m 宽，机枪手正对门后 3.5 m，从院子南墙根 x 97.8…102.2 那一截才看得进门里的后背，所以看见的站点在 (${p96.x},${p96.z})（场景生成器 / 测试核这条视线）。灶屋那个 (${KITCHEN_SQUAT.x},${KITCHEN_SQUAT.z}) 蹲在灶台 (${G.stove.x},${G.stove.z}) 边背对门；刘文财 (${liu96.x},${liu96.z})。`,
     signals: [SIG.cartDeparted, SIG.cellarBlast, SIG.sideGateOpen],
     units: [
       C("Nier", nier96, { stance: "crouch", face: p96, speed: NIER_RUN }),
+      Liu09(liu96, { face: TANGWU_OUT, aim: true, path: [liu95, Pt(90.3, 475.8), Pt(86.6, 476.0), Pt(86.6, 484.2), Pt(90.7, 484.6), Pt(93.3, 484.6), liu96], through: true }),
       ...StreetFight09("09-6"),
-      ...House09(), ...KitchenIja(), ...CORNER_FIVE(), ...JiefangBodies(),
+      ...House09(), J("KitchenIja", KITCHEN_SQUAT, { yaw: 90, stance: "crouch", name: "灶屋里背对门蹲着往嘴里塞东西的" }), ...CORNER_SIX(), ...JiefangBodies(),
     ],
     pois: [POI.tangwuDoor("poi"), POI.loophole("danger"), POI.kitchenDoor("objective"), EastRoutePoi("09-6")],
   });
 
-  // 09-7：快到灶屋门口，妮儿的弹壳罐掉地哗啦一声；灶屋里的鬼子扑出来，把顺子撞进灶屋、翻倒在灶台边用刺刀往下压；妮儿咬他握枪的手腕；拔刀砍两刀。
-  // 动静传到北屋，东西两间递弹的两个过来看，在灶屋门口撞个正着：在屋里打
-  const PIN = Pt(93.9, 478.0), PIN_YAW = -135;
-  const p97 = Pt(94.7, 478.8);
-  const nier97 = Pt(93.6, 479.4);
+  // 09-7（第十版 10-30，约 90 s 一口气）端枪眼：顺子、刘文财贴堂屋门两边从背后开打，机枪还在往街上扫那两三秒先撂倒机枪手和压弹的；东西两间扭过身；分队长往院里甩手榴弹，院墙塌一截、满院土；
+  // 屋里一间间打；一个鬼子从烟里扑出来撞翻顺子、刺刀往下压，妮儿从门外摸进来咬他手腕（VilBiteWrist），顺子翻身抽大刀砍；同一时刻墙外路口「轰、轰」：班长隔墙两颗手榴弹、EastGateBurst 撞门「杀——！」
+  // 三人抡大刀冲进墙角；墙角一个鬼子临死甩出一颗手榴弹，Escort1 扑倒在门口死了；何有田胳膊挨一刺刀；分队长带剩下两个从东间窗洞翻出去往东街跑。关键帧摆的是被扑倒、妮儿咬手腕那一拍
+  const PIN = Pt(96.8, 473.4), PIN_YAW = -150;                               // 北屋西间：鬼子骑在顺子身上
+  const p97 = Pt(97.5, 474.0);
+  const nier97 = Pt(96.1, 474.3);
+  const liu97 = Pt(103.4, 473.6);                                             // 东间：顾不上这边
+  /** 09-7 起北屋里倒下的机枪组三个 + 灶屋里那个（西间那个 Rifle1 这一拍还骑在顺子身上，10-1 起倒在 PIN） */
+  const HouseDown = () => [
+    J("MgGunner", Pt(100.3, 471.8), { down: true, yaw: 0, weapon: "Type11" }),
+    J("MgLoader", Pt(98.5, 472.7), { down: true, yaw: 20 }),
+    J("MgThird", Pt(101.8, 472.4), { down: true, yaw: -30 }),
+    J("KitchenIja", KITCHEN_SQUAT, { down: true, yaw: 90, name: "灶屋里被从背后一刀解决的" }),
+  ];
+  /** 09-7 末墙角倒下的三个（两个挨了手榴弹、一个被班长砍倒） */
+  const CornerDown = () => [
+    J("CornerIja1", Pt(108.0, 460.8), { down: true, yaw: 0, name: "墙角守着的（挨了手榴弹，临死甩出一颗）" }),
+    J("NextDoorIja1", Pt(108.9, 462.6), { down: true, yaw: 30, name: "隔壁院搜人的（挨了手榴弹）" }),
+    J("CellarIja3", Pt(105.4, 460.0), { down: true, yaw: 40, name: "拖人的（被班长砍倒）" }),
+  ];
+  const LUO_POCKET = () => [
+    N("Luo", EYR.inPocket.Luo, { face: Pt(109, 464), weapon: "Dadao", speed: RUN, climb: true, through: true }),
+    N("HeYoutian", EYR.inPocket.HeYoutian, { stance: "crouch", face: Pt(EYR.inPocket.HeYoutian.x + 3, EYR.inPocket.HeYoutian.z + 1), speed: RUN, climb: true, through: true, name: "何有田（胳膊挨了一刺刀）" }),
+  ];
   Add({
-    id: "09-7", ...s09, name: "灶屋",
+    id: "09-7", ...s09, name: "端枪眼",
     player: { x: p97.x, z: p97.z, yawDeg: Yaw(p97, PIN), pitchDeg: 38, stance: "prone" },
-    what: "弹壳罐掉地。灶屋里的鬼子扑出来把顺子撞进灶屋，翻倒在灶台边用刺刀往下压；妮儿一口咬在他握枪的手腕上。北屋过来两个。",
-    next: { text: "拔刀", x: KITCHEN_OUT.x, z: KITCHEN_OUT.z, radiusM: 1.5 },
-    how: ["快到灶屋门口，妮儿的弹壳罐掉地哗啦一声", "灶屋里看后院的鬼子嘴里塞着东西扑出来，把顺子撞进灶屋、翻倒在灶台边，刺刀往下压：玩家连按往外推", "妮儿摸进来一口咬住他握枪的手腕（过场正常速度，不放慢）；鬼子惨叫、手一松；屏幕弹一个键「拔刀」，顺子从左肩抽大刀砍两刀", "妮儿嘴边沾血蹲在灶台边发抖；动静传到北屋，两个鬼子过来看，在灶屋门口撞个正着：在屋里打", EastRouteHow["09-7"]],
-    notes: `倒地仰视：卧姿机位朝上看（pitch +38）。灶屋 x ${G.zaowu.box.minX}…${G.zaowu.box.maxX}、z ${G.zaowu.box.minZ}…${G.zaowu.box.maxZ}，灶台 (${G.stove.x},${G.stove.z})；鬼子骑在顺子身上 (${PIN.x},${PIN.z})、妮儿在他右手边。北屋过来的是东西两间递弹的两个（Rifle2 / Rifle4），机枪组这帧朝南扭头。罐子没有体块。`,
-    signals: [SIG.cartDeparted, SIG.cellarBlast, SIG.sideGateOpen],
+    what: "从背后先打机枪组；分队长扔手榴弹，满院土；一间间打。一个鬼子扑翻顺子，妮儿咬他手腕。墙外轰轰两声、班长撞门抡大刀冲进墙角，Escort1 被炸死。分队长翻窗跑。",
+    next: { text: "东边来人了，去石碾", x: PRONE_AT_ROLLER.x, z: PRONE_AT_ROLLER.z, radiusM: 2 },
+    how: ["顺子、刘文财贴堂屋门两边，从背后开打：机枪还在往街上扫的那两三秒先撂倒机枪手和压弹的；东西两间扭过身", "分队长往院里甩手榴弹，院墙塌一截、满院土（烟 / 尘）；屋里一间间打（门框、炕沿、水缸）", "西间那个从烟里扑出来撞翻顺子、刺刀往下压，刘文财在另一间顾不上；妮儿从门外摸进来咬他手腕（VilBiteWrist），顺子翻身抽大刀砍", "同一时刻墙外路口「轰、轰」：班长隔墙两颗手榴弹、撞门（EastGateBurst）「杀——！」三人抡大刀冲进墙角；墙角一个鬼子临死甩出一颗手榴弹，后送队的兵（Escort1）扑倒在门口死了；何有田胳膊挨一刺刀", "分队长带东间那个从东间窗洞翻出去往东街跑；机枪哑了（MgSilenced 从 10-1 起）", "约 90 s 一口气，要乱、要快"],
+    notes: `倒地仰视：卧姿机位朝上看（pitch +38）。北屋 x ${G.beiwu.box.minX}…${G.beiwu.box.maxX}、z ${G.beiwu.box.minZ}…${G.beiwu.box.maxZ}；鬼子（Rifle1，西间枪眼那个）骑在顺子身上 (${PIN.x},${PIN.z})、妮儿 (${nier97.x},${nier97.z}) 在他右手边；刘文财 (${liu97.x},${liu97.z}) 在东间。第十版（10-30）：扑倒 / 咬手腕从灶屋挪到北屋；灶屋那个 09-6 已悄悄解决；老耿家一共 9 个鬼子（机枪组 3 + 分队长 + 东西两间各 1 + 墙角 2 + 灶屋 1）。EastGateBurst 从这一帧起：班长、何有田在 pocket 里，Escort1 死在门口 (${ESCORT1_DEAD.x},${ESCORT1_DEAD.z})；墙角六个倒三个（CornerIja1、NextDoorIja1 挨手榴弹，CellarIja3 被砍），CellarIja1 / CellarIja2 / NextDoorIja2 往东街跑；分队长 Leader 带东间的 Rifle3 从东间窗洞翻出去（标 climb）。`,
+    signals: [SIG.cartDeparted, SIG.cellarBlast, SIG.sideGateOpen, SIG.eastGateBurst],
     units: [
-      J("KitchenIja", PIN, { yaw: PIN_YAW, aim: true, name: "灶屋里的鬼子（刺刀压着顺子）" }),
-      C("Nier", nier97, { stance: "crouch", face: PIN, speed: NIER_RUN }),
+      J("Rifle1", PIN, { yaw: PIN_YAW, aim: true, name: "西间枪眼那个（从烟里扑出来，刺刀压着顺子）" }),
+      C("Nier", nier97, { stance: "crouch", face: PIN, speed: NIER_RUN, path: [nier96, Pt(97.0, 480.0), Pt(97.6, 476.4), TANGWU_OUT, Pt(100, 474.2), nier97] }),
+      Liu09(liu97, { face: RIFLE_E_AT, aim: true, stance: "stand", path: [liu96, TANGWU_OUT, Pt(100, 474.2), liu97] }),
       ...StreetFight09("09-7"),
-      ...House09({ heads: 180, without: ["Rifle2", "Rifle4"] }),
-      J("Rifle2", Pt(100.2, 476.4), { face: KITCHEN_OUT, aim: true, to: [KITCHEN_OUT], speed: IJA_RUN, name: "北屋过来看的（どうした！）" }),
-      J("Rifle4", Pt(101.5, 477.6), { face: KITCHEN_OUT, aim: true, to: [Pt(KITCHEN_OUT.x + 1.4, KITCHEN_OUT.z - 0.4)], speed: IJA_RUN, name: "北屋过来看的" }),
-      ...KitchenIja().filter(() => false),
-      ...CORNER_FIVE(), ...JiefangBodies(),
+      ...HouseDown(),
+      J("Leader", Pt(104.2, 468.6), { face: Pt(112, 465.5), speed: IJA_RUN, climb: true, through: true, name: "分队长（从东间窗洞翻出去往东街跑）", path: [LEADER_AT, Pt(RIFLE_E_AT.x, 469.4), Pt(104.2, 468.6)] }),
+      J("Rifle3", Pt(106.6, 466.4), { face: Pt(114, 465.3), speed: IJA_RUN, climb: true, through: true, name: "东间的（翻窗跑了）", path: [RIFLE_E_AT, Pt(RIFLE_E_AT.x, 469.4), Pt(106.6, 466.4)] }),
+      ...LUO_POCKET(), ...CornerDown(),
+      J("CellarIja1", Pt(109.6, 464.6), { face: PB.EN1Gate, speed: IJA_RUN, intent: [PB.EN1Gate], name: "往东街跑的" }),
+      J("CellarIja2", Pt(111.8, 465.6), { face: PB.EN1Gate, speed: IJA_RUN, intent: [PB.EN1Gate], name: "往东街跑的" }),
+      J("NextDoorIja2", Pt(114.0, 464.8), { face: PB.EN1Gate, speed: IJA_RUN, intent: [PB.EN1Gate], name: "往东街跑的" }),
+      ...JiefangBodies(),
     ],
-    pois: [POI.kitchenDoor("poi"), POI.tangwuDoor("objective"), POI.loophole("danger"), EastRoutePoi("09-7")],
+    pois: [POI.tangwuDoor("poi"), POI.loophole("poi"), POI.corner("danger"), Poi("Escort1Dead", "后送队的兵（门口被炸死）", "poi", ESCORT1_DEAD, 1.2), POI.roller("objective")],
   });
 
   // ======================= 10 背后打掉机枪，守路口，被炮撵出庄子 =======================
   const s10 = { stage: 10, stageTitle: "背后打掉机枪，守路口，被炮撵出庄子" };
   const p101 = Pt(99.8, 474.3);
-  const nier10 = Pt(97.9, 480.6);   // 蹲在灶屋门外
-  /** 10-1 起北屋里倒下的六个 + 灶屋里倒下的三个 */
-  const HouseDown = () => [
-    J("MgGunner", Pt(100.3, 471.8), { down: true, yaw: 0, weapon: "Type11" }),
-    J("MgLoader", Pt(98.5, 472.7), { down: true, yaw: 20 }),
-    J("MgThird", Pt(101.8, 472.4), { down: true, yaw: -30 }),
-    J("Leader", Pt(101.6, 473.9), { down: true, yaw: 30 }),
-    J("Rifle1", Pt(96.7, 472.2), { down: true, yaw: 10 }),
-    J("Rifle3", Pt(102.3, 474.1), { down: true, yaw: -10 }),
-    J("KitchenIja", PIN, { down: true, yaw: 0 }),
-    J("Rifle2", Pt(95.1, 480.6), { down: true, yaw: 60, name: "北屋过来看的（死在灶屋里）" }),
-    J("Rifle4", Pt(96.9, 479.0), { down: true, yaw: -80, name: "北屋过来看的（死在灶屋门口）" }),
-  ];
-  const CornerDown = () => [
-    J("CornerIja1", Pt(108.0, 460.8), { down: true, yaw: 0 }),
-    J("CellarIja3", Pt(105.4, 460.0), { down: true, yaw: 40 }),
-  ];
+  const nier10 = Pt(96.3, 474.4);   // 10-1 起蹲在北屋西间（咬完手腕那儿）
+  /** 10-1 起北屋里倒下的机枪组三个 + 灶屋里那个 + 被妮儿咬了手腕、被顺子砍倒的 Rifle1 */
+  const HouseAllDown = () => [...HouseDown(), J("Rifle1", PIN, { down: true, yaw: 0, name: "扑倒顺子的（被妮儿咬了手腕、被砍倒）" })];
+  /** 09-7 末从北屋东间窗洞翻出去、从墙角跑掉的五个：10-1 在东街上往街北第一个院跑 */
+  const FLED_101 = [["Leader", 113.2, 464.4, "分队长（翻窗跑了）"], ["Rifle3", 115.8, 465.6, "翻窗跑了的"], ["CellarIja1", 120.8, 465.6, "从墙角跑的"], ["CellarIja2", 122.9, 464.6, "从墙角跑的"], ["NextDoorIja2", 125.2, 465.2, "从墙角跑的"]];
   Add({
-    id: "10-1", ...s10, name: "背后打",
-    player: { x: p101.x, z: p101.z, yawDeg: Yaw(p101, MG_AT), pitchDeg: -2, stance: "stand" },
-    what: "从灶屋出来顺屋檐摸到堂屋门冲进北屋，从背后开打，先打机枪组。机枪一哑，班长在路口墙角冲坡道上吼：冲！",
+    id: "10-1", ...s10, name: "会合",
+    player: { x: p101.x, z: p101.z, yawDeg: Yaw(p101, TANGWU_OUT), pitchDeg: -2, stance: "stand" },
+    what: "机枪哑了。班长在墙角冲坡道吼：机枪哑了！冲！日你先人冲啊！幺娃和后送队的兵顺主街冲上来，两路在路口会合。班长看一眼门口倒着的 Escort1，不说话。",
     next: { text: "东边来人了，去石碾", x: PRONE_AT_ROLLER.x, z: PRONE_AT_ROLLER.z, radiusM: 2 },
-    how: ["北屋还剩六个：机枪组三个守堂屋枪眼，分队长和两个兵趴东西两间的枪眼，全朝北打", "灶屋那头一响，班长三人隔墙甩两颗手榴弹进路口墙角、撞开门（EastGateBurst）抡大刀冲进去：墙角五个手榴弹倒一个、砍倒一个，三个往东街跑", "顺子从背后开打，先打机枪组。机枪一哑（MgSilenced），班长在墙角里扭头冲坡道上吼：机枪哑了！冲！日你先人冲啊！坡道上那四个顺主街冲上来（大车后头没有人）", "两路在丁字路口会合：顺子从东间枪眼看得见墙角里的班长三人", "MgSilenced：枪眼后头那挺枪没了（10-2 出现在石碾后）"],
-    notes: "MgSilenced、EastGateBurst 从这一帧起：北屋六个全倒；墙角五个倒两个（守着的那个挨了手榴弹、拖人的那个被班长砍倒），三个往东街跑；班长三人在 pocket 里（班长手里是大刀）。妮儿留在灶屋门口蹲着。东间枪眼正对着路口墙角（±17° 以内），顺子打完机枪组从那儿看见墙角里的班长。第九版：Escort2 也是从坡道上冲上来的。",
+    how: ["北屋里倒着机枪组三个 + 扑倒顺子被砍倒的西间那个，灶屋里一个；分队长带东间那个翻窗跑了，墙角跑了三个", "机枪一哑（MgSilenced），班长在墙角里扭头冲坡道上吼：机枪哑了！冲！日你先人冲啊！坡道上的幺娃和后送队的兵顺主街冲上来（大车后头没有人）", "两路在丁字路口会合：顺子从东间枪眼看得见墙角里的班长和何有田（胳膊挨了一刺刀），门口倒着 Escort1——班长看一眼，不说话", "MgSilenced：枪眼后头那挺枪没了（10-2 出现在石碾后）"],
+    notes: `MgSilenced 从这一帧起（EastGateBurst 从 09-7 起）：北屋机枪组三个 + 扑倒顺子的 Rifle1 + 灶屋那个全倒；墙角倒三个；跑掉五个（Leader / Rifle3 翻窗，CellarIja1 / CellarIja2 / NextDoorIja2 从墙角）正顺东街往街北第一个院跑。班长、何有田在 pocket 里（班长手里是大刀），Escort1 死在门口 (${ESCORT1_DEAD.x},${ESCORT1_DEAD.z})。妮儿蹲在北屋西间；刘文财在东间。东间枪眼正对着路口墙角（±17° 以内）。Squad3 的尸体还趴在坡道上。`,
     signals: [SIG.cartDeparted, SIG.cellarBlast, SIG.sideGateOpen, SIG.eastGateBurst, SIG.mgSilenced],
     units: [
-      ...HouseDown(), ...CornerDown(),
-      J("CellarIja1", Pt(114.6, 464.8), { face: PB.EN1Gate, speed: IJA_RUN, intent: [PB.EN1Gate, Pt(PB.EN1Gate.x + 1.0, PB.EN1Gate.z - 2.4)], name: "往东街跑的" }),
-      J("CellarIja2", Pt(117.8, 465.4), { face: PB.EN1Gate, speed: IJA_RUN, intent: [PB.EN1Gate, Pt(PB.EN1Gate.x - 1.0, PB.EN1Gate.z - 2.0)], name: "往东街跑的" }),
-      J("CellarIja4", Pt(112.0, 464.0), { face: PB.EN1Gate, speed: IJA_RUN, intent: [Pt(121.6, 465.2)], name: "往东街跑的" }),
-      C("Nier", nier10, { stance: "crouch", face: TANGWU_OUT, speed: NIER_RUN }),
-      ...EastRouteTrio("10-1"),
+      ...HouseAllDown(), ...CornerDown(),
+      ...FLED_101.map(([id, x, z, name]) => J(id, Pt(x, z), { face: PB.EN1Gate, speed: IJA_RUN, intent: [PB.EN1Gate, Pt(PB.EN1Gate.x + (x % 2 ? 1 : -1), PB.EN1Gate.z - 2.2)], name })),
+      C("Nier", nier10, { stance: "crouch", face: p101, speed: NIER_RUN }),
+      Liu09(liu97, { face: Pt(109, 464), aim: true, stance: "stand" }),
+      ...LUO_POCKET(),
       N("Escort2", Pt(98.3, 397.2), { yaw: 180, aim: true, speed: RUN, name: "坡道上冲上来的后送队的兵" }),
       N("Yaowa", Pt(99.4, 392.0), { yaw: 180, speed: RUN }),
-      N("LiuWencai", Pt(101.6, 389.5), { yaw: 180, speed: RUN }),
-      N("Squad3", Pt(100.3, 394.5), { yaw: 180, guess: true, speed: RUN }),
       ...DitchRest08(LOOPHOLE).filter((u) => !["Officer", "Medic", "Geng"].includes(u.id)),
       N("Officer", DITCH_08.Officer, { stance: "crouch", face: LOOPHOLE, kind: "officer", speed: RUN }),
       N("Medic", DITCH_08.Medic, { stance: "crouch", face: DITCH_08.DongguaLitter, speed: RUN }),
       C("Geng", Pt(101.5, 380.8), { stance: "crouch", face: LOOPHOLE, speed: 2.0 }),
-      N("Walker04", Pt(108.6 + 1.85 * 3, 379.15), { role: "walkingWounded", group: "convoy", down: true, yaw: 180 }),
+      ...DeadSoFar("10-1"),
       ...ConvoyInDitch().filter((u) => u.id !== "Walker04"),
       ...Villagers08().filter((u) => !u.id.match(/Villager[45]/)),
       ...JiefangBodies(),
     ],
-    pois: [POI.loophole("poi"), POI.roller("objective"), POI.tangwuDoor("landmark"), POI.eastSide()],
+    pois: [POI.loophole("poi"), POI.roller("objective"), POI.tangwuDoor("landmark"), Poi("Escort1Dead", "后送队的兵（门口被炸死）", "poi", ESCORT1_DEAD, 1.2), POI.eastSide()],
   });
 
   // 10-2：守路口·试探：班长「调过来！朝东打！」缴来的十一年式拖到石碾后朝东。喊来的小队不往街上硬冲：两三人一组从街北院门冲出来、跑几步扑进下一个门洞；
   // 街南后墙的豁子和枪眼里打冷枪。班长喊方位：「左手第二道门！」「右边墙豁子！」
-  const Corner10 = ({ yaowa = Pt(107.2, 466.4), yaowaFace = PRONE_AT_ROLLER, liu = CORNER_S, liuFace = Pt(200, EAST_Z), squad1 = Pt(96.2, 462.4), squad1Face = Pt(180, EAST_Z) } = {}) => [
+  // 第十版（10-30）：Escort1 死在 09-7、Squad3 死在 08-3，10 守路口的是班长、刘文财、幺娃、何有田、Escort2、Squad1、Squad2 + 排长
+  const Corner10 = ({ yaowa = Pt(107.2, 466.4), yaowaFace = PRONE_AT_ROLLER, liu = CORNER_S, liuFace = Pt(200, EAST_Z), squad1 = Pt(96.2, 462.4), squad1Face = Pt(180, EAST_Z), escort2 = Pt(105.4, 467.2) } = {}) => [
     N("Luo", CORNER_N, { stance: "crouch", aim: true, face: Pt(190, EAST_Z), speed: RUN }),
     N("LiuWencai", liu, { stance: "crouch", aim: true, face: liuFace, speed: RUN }),
     N("Yaowa", yaowa, { stance: "crouch", face: yaowaFace, speed: RUN }),
-    N("Escort1", Pt(106.6, 464.6), { stance: "crouch", face: Pt(EAST_FROM, EAST_Z), guess: true, speed: RUN }),
-    N("Escort2", Pt(105.4, 467.2), { stance: "crouch", face: Pt(EAST_FROM, EAST_Z), guess: true, speed: RUN }),
-    N("Squad3", Pt(107.4, 462.2), { stance: "crouch", guess: true, face: Pt(180, EAST_Z), speed: RUN }),
+    ...(escort2 ? [N("Escort2", escort2, { stance: "crouch", face: Pt(EAST_FROM, EAST_Z), guess: true, speed: RUN })] : []),
     N("Squad1", squad1, { stance: "crouch", aim: true, face: squad1Face, guess: true, speed: RUN }),
     N("Squad2", Pt(94.6, 465.0), { stance: "crouch", yaw: 0, guess: true, speed: RUN }),
   ];
-  const Street10Rest = () => [
-    N("Officer", Pt(100.4, 404), { face: MOUTH, kind: "officer", speed: RUN }),
+  const Street10Rest = (kfId) => [
     N("Medic", DITCH_08.Medic, { stance: "crouch", face: DITCH_08.DongguaLitter, speed: RUN }),
     C("Geng", Pt(100.6, 408), { face: Pt(100, 460), speed: 2.0 }),
-    N("Walker04", Pt(108.6 + 1.85 * 3, 379.15), { role: "walkingWounded", group: "convoy", down: true, yaw: 180 }),
+    ...DeadSoFar(kfId),
     ...ConvoyInDitch().filter((u) => u.id !== "Walker04"),
     ...Villagers08().filter((u) => !u.id.match(/Villager[45]/)),
   ];
-  const FledEast = ({ cellar4Down = true } = {}) => [
-    J("CellarIja1", Pt(147.4, 460.6), { stance: "crouch", face: Pt(146.5, 464), speed: IJA_RUN, name: "跑进街北第一个院的" }),
-    J("CellarIja2", Pt(145.6, 461.2), { stance: "crouch", face: Pt(146.5, 464), speed: IJA_RUN }),
-    J("CellarIja4", Pt(121.6, 465.2), cellar4Down ? { down: true, yaw: -80, straight: true, name: "跑到半道被机枪扫倒的" } : { face: PB.EN1Gate, speed: IJA_RUN }),
+  /** 跑掉的五个：四个跑进了街北第一个院，东间那个（Rifle3）跑到半道被机枪扫倒 */
+  const FledEast = () => [
+    J("Leader", Pt(147.4, 460.6), { stance: "crouch", face: Pt(146.5, 464), speed: IJA_RUN, name: "分队长（跑进街北第一个院的）" }),
+    J("CellarIja1", Pt(148.8, 462.2), { stance: "crouch", face: Pt(146.5, 464), speed: IJA_RUN }),
+    J("CellarIja2", Pt(146.4, 459.3), { stance: "crouch", face: Pt(146.5, 464), speed: IJA_RUN }),
+    J("NextDoorIja2", Pt(148.6, 459.4), { stance: "crouch", face: Pt(146.5, 464), speed: IJA_RUN }),
+    J("Rifle3", Pt(121.6, 465.2), { down: true, yaw: -80, straight: true, name: "跑到半道被机枪扫倒的" }),
   ];
-  const HouseAfter = () => [...HouseDown(), ...CornerDown(), C("Nier", nier10, { stance: "crouch", face: TANGWU_OUT, speed: NIER_RUN }), ...JiefangBodies()];
+  const HouseAfter = (nierAt = nier10) => [...HouseAllDown(), ...CornerDown(), C("Nier", nierAt, { stance: "crouch", face: TANGWU_OUT, speed: NIER_RUN }), ...JiefangBodies()];
   Add({
     id: "10-2", ...s10, name: "守路口·试探",
     player: { x: PRONE_AT_ROLLER.x, z: PRONE_AT_ROLLER.z, yawDeg: -90, pitchDeg: 0, stance: "prone" },
-    what: "班长：调过来！朝东打！缴来的十一年式拖到石碾后朝东。鬼子不硬冲：两三人一组从街北院门冲出来扑进下一个门洞，街南豁子里打冷枪。",
-    next: { text: "压住路口" },
-    how: ["弹斗一次装六个五发桥夹，三十发；子弹只有机枪组身上那些", "喊来的小队约 45 人（两个轻机枪分队 + 一个掷弹筒分队），不往街上硬冲：两三人一组从街北院门冲出来、跑几步扑进下一个门洞", "街南后墙的豁子和第一道弯正面墙上的枪眼里打冷枪", "班长蹲在东街口北角喊方位：左手第二道门！右边墙豁子！", "过了第一道弯石碾看不见：军官和下一拨在那头"],
+    what: "班长：调过来！朝东打！缴来的十一年式拖到石碾后朝东。后面一个分队 + 掷弹筒组不硬冲：一换弹斗（压六个桥夹，好几秒）他们就跳一个门洞。担架开始过胡同。",
+    next: { text: "压住路口（担架过去了 0 / 12）" },
+    how: ["弹斗一次装六个五发桥夹，三十发；子弹只有机枪组身上那些。一换弹斗（好几秒）他们就跳一个门洞", "跑掉的那几个把后面一个分队带上来了 + 掷弹筒组（看得见 15–20 个）；再往东大路上还有人陆续来。不往街上硬冲：两三人一组从街北院门冲出来、跑几步扑进下一个门洞", "街南后墙的豁子和第一道弯正面墙上的枪眼里打冷枪", "班长蹲在东街口北角喊方位：左手第二道门！右边墙豁子！担架过胡同！", "后送队同时贴石碾背后一副副拐进窄胡同；屏幕说明字带「担架过去了 n / 12」", "过了第一道弯石碾看不见：军官在那头"],
     notes: `石碾 (${PL.roller.x},${PL.roller.z})，趴在它西北 2.2 m 顺着东街看到第一道弯 (${PL.eastJog1.x},${PL.eastJog1.z})（场景生成器核过）。门洞 / 豁子 / 枪眼 / 庙 / 垛按 L0610_EAST_STREET.probes 摆人：街北第一个院门 ${R1(Dist(ROLLER, PB.EN1Gate))} m、场院口 ${R1(Dist(ROLLER, PB.FarmOpen))} m、南侧两个豁子 ${R1(Dist(ROLLER, PB.ES2Breach))} / ${R1(Dist(ROLLER, PB.ES3Breach))} m、第一道弯枪眼 ${R1(Dist(ROLLER, PB.JogLoophole1))} m。`
-      + "编辑器玩家拿的还是汉阳造（loadout 固定），石碾后那挺枪用随信号体块 RollerMg 表示。何有田在北屋拆机枪组的子弹袋。白盒摆看得见的 14 个 + 过了弯的 3 个。",
+      + "编辑器玩家拿的还是汉阳造（loadout 固定），石碾后那挺枪用随信号体块 RollerMg 表示。何有田（胳膊挨了一刺刀）在北屋拆机枪组的子弹袋。第十版（10-30）：东街摆后面那个分队看得见的 13 个 + 过了弯的军官 + 东头陆续来的 3 个；跑掉的四个在街北第一个院里，东间那个（Rifle3）倒在半道。",
     signals: [SIG.cartDeparted, SIG.cellarBlast, SIG.sideGateOpen, SIG.eastGateBurst, SIG.mgSilenced],
     units: [
       ...Corner10(),
-      N("HeYoutian", Pt(99.2, 473.6), { stance: "crouch", face: Pt(100.3, 471.8), speed: RUN }),
-      ...Street10Rest(),
+      N("HeYoutian", Pt(99.2, 473.6), { stance: "crouch", face: Pt(100.3, 471.8), speed: RUN, name: "何有田（胳膊挨了一刺刀）" }),
+      N("Officer", Pt(101.6, 465.4), { face: Pt(MAIN_X, 440), kind: "officer", speed: RUN }),
+      ...Street10Rest("10-2"),
       ...EastProbe(), ...EastRunners(), ...FledEast(),
       ...HouseAfter(),
     ],
-    pois: [POI.roller("poi"), Poi("EN1Gate", "左手第二道门（街北院门）", "danger", PB.EN1Gate, 1.5), Poi("ES2Breach", "右边墙豁子", "danger", PB.ES2Breach, 1.5), POI.eastJog1("danger"), POI.shrine("danger")],
+    pois: [POI.roller("poi"), Poi("EN1Gate", "左手第二道门（街北院门）", "danger", PB.EN1Gate, 1.5), Poi("ES2Breach", "右边墙豁子", "danger", PB.ES2Breach, 1.5), POI.eastJog1("danger"), POI.shrine("danger"), POI.laneMouth("poi")],
   });
 
   // 10-3：掷弹筒·北边抄：土地庙后一挺轻机枪压过来；场院麦秸垛后「嘭」，掷弹筒找石碾，一发比一发近；北边院子「咣、咣」砸门往西挪（NorthYardGatesBroken），
   // 要从石碾背后西北角钻出来；班长「左手院子！文财、幺娃，给老子堵到！」弹斗快空、掷弹筒落到石碾跟前，班长「幺娃，接到！」幺娃滚过来接过机枪
-  const p103 = Pt(109.3, 468.0);
   const liu104 = Pt(105.2, 461.4), squad1_104 = Pt(103.8, 462.0);
+  const ESCORT2_104 = Pt(108.6, 466.9);   // Escort2 蹲在顺子（石碾后）旁边
   Add({
-    id: "10-3", ...s10, name: "掷弹筒·北边抄",
-    player: { x: p103.x, z: p103.z, yawDeg: -90, pitchDeg: 0, stance: "crouch" },
-    what: "土地庙后一挺轻机枪压过来，麦秸垛后「嘭」掷弹筒找石碾；北边院子砸门往西挪。班长：左手院子！堵到！弹斗快空：幺娃，接到！",
-    next: { text: "后送队上来了" },
-    how: ["土地庙后一挺轻机枪压过来，子弹打在石碾上", "场院麦秸垛后「嘭」一声，掷弹筒开始找石碾，一发比一发近", "北边院子「咣、咣」砸门往西挪（NorthYardGatesBroken），要从石碾背后西北角钻出来；班长：左手院子！文财、幺娃，给老子堵到！", "弹斗快空、掷弹筒落到石碾跟前；班长：幺娃，接到！幺娃滚过来接过机枪，顺子退到石碾南边"],
-    notes: `轻机枪缩在土地庙 (${SHRINE.x},${SHRINE.z}) 东北边 (${MG_HIDE.x},${MG_HIDE.z})；掷弹筒组 3 人在麦秸垛 (${PL.strawStack.x},${PL.strawStack.z}) 南边 (${MORTAR_HIDE.x},${MORTAR_HIDE.z})（场院西隔墙挡着，从石碾看不见，只听得见「嘭」、看得见冒上来的烟）。院子链：场院西隔墙的门 (${NC.farmyardDoor.x},${NC.farmyardDoor.z}) → 北侧第一个院西墙的门 (${NC.yard1Door.x},${NC.yard1Door.z}) → 北角北墙的院门 (${NC.pocketGate.x},${NC.pocketGate.z})，出来正好在石碾西北、背后。幺娃接过机枪趴在石碾后，刘文财和 Squad1 堵北角口。`,
+    id: "10-3", ...s10, name: "掷弹筒·机枪掉头",
+    player: { x: PRONE_AT_ROLLER.x, z: PRONE_AT_ROLLER.z, yawDeg: Yaw(PRONE_AT_ROLLER, POCKET_GATE), pitchDeg: 0, stance: "prone" },
+    what: "掷弹筒找石碾，一发落在胡同口打死一个抬担架的；一组冲路口空地被扫倒。北边院子一道道砸门越来越近、门洞冒土：顺子把机枪掉头对准石碾西北角那道院门，门一破就扫进去。",
+    next: { text: "压住路口（担架过去了 4 / 12）" },
+    how: ["土地庙后一挺轻机枪压过来，子弹打在石碾上", "场院麦秸垛后「嘭」一声，掷弹筒开始找石碾，一发比一发近；一发落在胡同口，打死一个抬担架的", "一组冲路口空地（东街口）被机枪扫倒", "北边院子「咣、咣」砸门一道道往西挪（NorthYardGatesBroken）、越来越近，门洞冒土；班长：左手院子！文财、幺娃，给老子堵到！", "顺子把机枪掉头对准石碾西北角那道院门，门一破就扫进去（预演里演）", "担架一副副过胡同：屏幕说明字「担架过去了 n / 12」"],
+    notes: `轻机枪缩在土地庙 (${SHRINE.x},${SHRINE.z}) 东北边 (${MG_HIDE.x},${MG_HIDE.z})；掷弹筒组 3 人在麦秸垛 (${PL.strawStack.x},${PL.strawStack.z}) 南边 (${MORTAR_HIDE.x},${MORTAR_HIDE.z})（场院西隔墙挡着，从石碾看不见，只听得见「嘭」、看得见冒上来的烟）。院子链：场院西隔墙的门 (${NC.farmyardDoor.x},${NC.farmyardDoor.z}) → 北侧第一个院西墙的门 (${NC.yard1Door.x},${NC.yard1Door.z}) → 北角北墙的院门 (${NC.pocketGate.x},${NC.pocketGate.z})，出来正好在石碾西北、背后。顺子趴在石碾后把机枪掉头对准那道院门；刘文财和 Squad1 堵北角口。第十版（10-30）：掷弹筒打死的担架员 Bearer02 倒在胡同口 (${BEARER2_DEAD.x},${BEARER2_DEAD.z})；冲路口空地被扫倒的三个倒在东街口。`,
     signals: [SIG.cartDeparted, SIG.cellarBlast, SIG.sideGateOpen, SIG.eastGateBurst, SIG.mgSilenced, SIG.northYardGatesBroken],
     units: [
-      ...Corner10({ yaowa: PRONE_AT_ROLLER, liu: liu104, liuFace: POCKET_GATE, squad1: squad1_104, squad1Face: POCKET_GATE }).map((u) => (u.id === "Yaowa" ? { ...u, stance: "prone", aim: true, weapon: "Type11", yawDeg: -90, arc: { halfDeg: 8, rangeM: 120 } } : u.id === "LiuWencai" ? { ...u, aim: true } : u)),
-      N("HeYoutian", Pt(110.0, 464.6), { stance: "crouch", face: PRONE_AT_ROLLER, speed: RUN }),
-      ...Street10Rest(),
-      ...EastProbe({ pulledBack: true }), ...EastRunners({ atShrine: true }), ...ShrineMg(), ...MortarTeam(), ...NorthChain(), ...FledEast(),
+      ...Corner10({ yaowa: Pt(107.2, 466.4), liu: liu104, liuFace: POCKET_GATE, squad1: squad1_104, squad1Face: POCKET_GATE, escort2: ESCORT2_104 }).map((u) => (u.id === "LiuWencai" ? { ...u, aim: true } : u)),
+      N("HeYoutian", Pt(109.2, 467.8), { stance: "crouch", face: PRONE_AT_ROLLER, speed: RUN, name: "何有田（胳膊挨了一刺刀，在石碾西南递子弹袋）" }),   // 第十版：不能站在石碾后的眼睛到北角院门那条线上（机枪掉头那一拍会挡住画面）
+      N("Officer", Pt(101.6, 465.4), { face: Pt(MAIN_X, 440), kind: "officer", speed: RUN }),
+      ...Street10Rest("10-3"),
+      ...EastProbe({ pulledBack: true }), ...EastRunners({ atShrine: true }), ...ShrineMg(), ...MortarTeam(), ...NorthChain(), ...FledEast(), ...ChargeDown(),
       ...HouseAfter(),
     ],
-    pois: [POI.shrine("danger"), POI.farmyard("danger"), POI.pocket("danger"), POI.roller("poi")],
+    pois: [POI.shrine("danger"), POI.farmyard("danger"), POI.pocket("danger"), POI.roller("poi"), Poi("Bearer2Dead", "胡同口被掷弹筒打死的担架员", "poi", BEARER2_DEAD, 1.2)],
   });
 
   // 10-4：后送队过胡同：后送队顺主街跑到路口，贴着石碾背后一副一副拐进窄胡同往南；老耿赶着车过来，妮儿从老耿家院门跑出来抱住他的腿；
   // 老耿往院里看一眼地上的人、看一眼顺子，什么也没说，拽着驴进胡同
-  const p104 = Pt(109.4, 469.3);
   const cart104 = Pt(LANE1_X, 478.4), geng104 = Pt(LANE1_X + 0.1, 481.4), nier104 = Pt(LANE1_X + 0.1, 482.3);
+  const p104 = Pt(110.2, 466.0);   // 幺娃接过机枪以后顺子退到石碾西边的街面上站着（拿回自己的枪）；石碾南边 z > 466.75 是东街南墙，站不得
   Add({
-    id: "10-4", ...s10, name: "后送队过胡同",
-    player: { x: p104.x, z: p104.z, yawDeg: 180, pitchDeg: -4, stance: "stand" },
-    what: "后送队顺主街跑到路口，贴着石碾背后一副一副拐进窄胡同往南。老耿赶着车进胡同，妮儿从院门跑出来抱住他的腿。",
-    next: { text: "守住，等后送队过完" },
-    how: ["后送队顺主街跑到路口，贴着石碾背后一副一副拐进窄胡同（老耿家东墙外）往南；担架小跑", "老耿赶着车过来进胡同（驴车在窄胡同里挤一点能过）", "妮儿从老耿家院门（东墙靠南）跑出来抱住他的腿", "老耿往院里看一眼地上的人、看一眼顺子，什么也没说，拽着驴进胡同", "幺娃在石碾后的机枪上顶着，刘文财堵北角口"],
-    notes: `顺子站在窄胡同口 (${p104.x},${p104.z}) 朝南看着担架一副一副拐进去；车 (${cart104.x},${cart104.z}) 在胡同里、老耿 (${geng104.x},${geng104.z}) 在驴头边、妮儿从院门 (${PL.gengGate.x},${PL.gengGate.z}) 出来抱住他的腿。后送队按弧长排在主街 → 路口 → 胡同这条线上（冬瓜那副在最前头、车后面）。`,
+    id: "10-4", ...s10, name: "后送队过胡同·Escort2 死",
+    player: { x: p104.x, z: p104.z, yawDeg: -90, pitchDeg: 0, stance: "stand" },
+    what: "后送队贴着石碾背后一副一副拐进窄胡同；老耿赶车进胡同，妮儿扑过去抱他的腿。顺子旁边的后送队兵脖子中枪倒在石碾上；排长胳膊中枪。弹斗快空：幺娃，接到！",
+    next: { text: "守住，等后送队过完（担架过去了 9 / 12）" },
+    how: ["后送队顺主街跑到路口，贴着石碾背后一副一副拐进窄胡同（老耿家东墙外）往南；担架小跑，抬的人少了、伤轻的自己架着走", "老耿赶着车过来进胡同（驴车在窄胡同里挤一点能过）；妮儿从老耿家院门（东墙靠南）跑出来抱住他的腿；老耿往院里看一眼地上的人、看一眼顺子，什么也没说，拽着驴进胡同", "顺子在石碾后的机枪上顶着；旁边的后送队兵（Escort2）脖子中枪，倒在石碾上；排长胳膊中枪", "弹斗快空：班长「幺娃，接到！」幺娃滚过来接过机枪，顺子退到石碾南边拿回自己的枪", "刘文财和 Squad1 堵北角口；屏幕说明字「担架过去了 n / 12」"],
+    notes: `关键帧摆的是「幺娃，接到！」之后：幺娃趴在石碾后 (${PRONE_AT_ROLLER.x},${PRONE_AT_ROLLER.z}) 的机枪上，顺子退到石碾南边 (${p104.x},${p104.z}) 站着拿回自己的枪；Escort2 倒在碾子底座上 (${ESCORT2_DEAD.x},${ESCORT2_DEAD.z})。车 (${cart104.x},${cart104.z}) 在胡同里、老耿 (${geng104.x},${geng104.z}) 在驴头边、妮儿从院门 (${PL.gengGate.x},${PL.gengGate.z}) 出来抱住他的腿。后送队按弧长排在主街 → 路口 → 胡同这条线上（冬瓜那副在最前头、车后面）。排长（胳膊中枪）蹲在路口西边。`,
     signals: [SIG.cartDeparted, SIG.cellarBlast, SIG.sideGateOpen, SIG.eastGateBurst, SIG.mgSilenced, SIG.northYardGatesBroken],
     units: [
       N("Luo", CORNER_N, { stance: "crouch", aim: true, face: Pt(190, EAST_Z), speed: RUN }),
-      N("Yaowa", PRONE_AT_ROLLER, { stance: "prone", aim: true, weapon: "Type11", yaw: -90, arc: { halfDeg: 8, rangeM: 120 }, speed: RUN }),
+      N("Yaowa", PRONE_AT_ROLLER, { stance: "prone", aim: true, weapon: "Type11", yaw: -90, arc: { halfDeg: 8, rangeM: 120 }, speed: RUN, name: "幺娃（接过机枪）", path: [Pt(107.2, 466.4), ESCORT2_104, Pt(110.4, 465.9), PRONE_AT_ROLLER] }),
       N("LiuWencai", liu104, { stance: "crouch", aim: true, face: POCKET_GATE, speed: RUN }),
       N("Squad1", squad1_104, { stance: "crouch", aim: true, face: POCKET_GATE, guess: true, speed: RUN }),
-      N("HeYoutian", Pt(110.0, 464.6), { stance: "crouch", face: PRONE_AT_ROLLER, speed: RUN }),
-      N("Squad3", Pt(107.4, 462.2), { stance: "crouch", guess: true, face: Pt(180, EAST_Z), speed: RUN }),
-      N("Escort1", Pt(104.6, 467.6), { face: Pt(100, 458), guess: true, speed: RUN }),
-      N("Escort2", Pt(106.4, 468.8), { face: Pt(LANE1_X, 472), guess: true, speed: RUN }),
+      N("HeYoutian", Pt(110.0, 464.6), { stance: "crouch", face: PRONE_AT_ROLLER, speed: RUN, name: "何有田（胳膊挨了一刺刀）" }),
       N("Squad2", Pt(99.6, 466.2), { face: Pt(100, 455), guess: true, speed: RUN }),
-      ...ConvoyRunning(),
+      ...ConvoyRunning().filter((u) => u.id !== "Walker04"),
       N("Medic", Pt(103.4, 468.9), { stance: "crouch", face: Pt(LANE1_X, 474.5), speed: RUN }),
-      N("Officer", Pt(101.6, 465.4), { face: Pt(MAIN_X, 440), kind: "officer", speed: RUN }),
+      N("Officer", Pt(101.6, 465.4), { stance: "crouch", face: Pt(MAIN_X, 440), kind: "officer", speed: RUN, name: "排长（胳膊中枪）" }),
       C("GengCart", cart104, { yaw: 180, speed: CART_RUN }),
       C("Geng", geng104, { face: nier104, speed: 2.0 }),
-      C("Nier", nier104, { stance: "crouch", face: geng104, speed: NIER_RUN, path: [nier10, Pt(101.6, 483.4), GATE_IN, GATE_OUT, nier104] }),
-      ...EastProbe({ pulledBack: true }), ...EastRunners({ atShrine: true }), ...ShrineMg(), ...MortarTeam(), ...NorthChain(), ...FledEast(),
-      ...HouseDown(), ...CornerDown(), ...JiefangBodies(),
+      C("Nier", nier104, { stance: "crouch", face: geng104, speed: NIER_RUN, path: [nier10, Pt(100, 474.2), TANGWU_OUT, Pt(101.6, 483.4), GATE_IN, GATE_OUT, nier104] }),
+      ...EastProbe({ pulledBack: true }), ...EastRunners({ atShrine: true }), ...ShrineMg(), ...MortarTeam(), ...NorthChain(), ...FledEast(), ...ChargeDown(),
+      ...HouseAllDown(), ...CornerDown(), ...JiefangBodies(),
+      ...DeadSoFar("10-4"),
       ...Villagers08().filter((u) => !u.id.match(/Villager[45]/)),
     ],
-    pois: [POI.laneMouth("poi"), POI.gengGate("poi"), POI.roller("landmark"), POI.pocket("danger")],
+    pois: [POI.laneMouth("poi"), POI.gengGate("poi"), POI.roller("landmark"), Poi("Escort2Dead", "后送队的兵（脖子中枪，倒在石碾上）", "poi", ESCORT2_DEAD, 1.2), POI.pocket("danger")],
   });
 
   // 10-5：炮·撤：试几次攻不上来，东街那头吹哨，日军全退；静两三秒。班长「炮！进屋！」第一排炮落在石碾和路口（BarrageHit），耳鸣。
   // 班长「撤！走胡同！跟斗老子！」大家从北屋冲进院子往院门跑；幺娃路过灶屋把枪栓扔进水缸；何有田蹲在院门框边往门缝里卡手榴弹：「滚！表挡事！」
-  const p105 = Pt(103.2, 480.8);
+  // 10-5（第十版 10-30）挨炮：鬼子吹哨、门洞里枪口火全停、往东缩，静两三秒 → 第一发炮落在石碾边，顺子被气浪掀出去好几步（镜头猛地往后抛、翻滚落地、震屏、闪白、耳鸣、黑一阵白一阵），枪脱手
+  // → 班长的脸凑到跟前（仰看）「顺儿！……还能动不？起来！撤——走胡同！」一把拽起来；「枪就在脚边：按 F 弯腰捡回来」→ 第二、三发落，北屋塌一角、草顶着火；幺娃卸枪栓扔水缸；何有田在院门卡手榴弹。
+  // 关键帧摆的是被掀翻在地、班长凑到跟前那一拍
+  const p105 = Pt(105.6, 467.6);                                             // 从石碾西南被掀到这儿（约 6 m），仰面躺着
+  const luo105 = Pt(104.9, 466.6);                                            // 班长蹲在他头边
+  const LOOSE_GUN = Pt(106.4, 467.9);                                         // 枪脱手，掉在脚边
   Add({
-    id: "10-5", ...s10, name: "炮·撤",
-    player: { x: p105.x, z: p105.z, yawDeg: Yaw(p105, GATE_IN), pitchDeg: -2, stance: "stand" },
-    what: "东街那头吹哨，鬼子全退；静两三秒。班长：炮！进屋！第一排炮落在石碾和路口。撤！走胡同！何有田在院门框边卡手榴弹：滚！表挡事！",
-    next: { text: "出院门进胡同", x: GATE_OUT.x, z: GATE_OUT.z + 1.5, radiusM: 1.5 },
-    how: ["试几次攻不上来，东街那头吹哨，日军全退；静两三秒", "班长：炮！进屋！第一排炮落在石碾和路口（BarrageHit：北屋塌一角、石碾旁新瓦砾、草顶着火），耳鸣", "班长：撤！走胡同！跟斗老子！大家从北屋冲进院子往院门跑", "幺娃路过灶屋把枪栓扔进水缸；何有田蹲在院门框边往门缝里卡手榴弹，只有几秒：滚！表挡事！"],
-    notes: `BarrageHit 从这一帧起：北屋东间（x ≥ ${G.beiwu.collapseFromX}）后墙和房顶塌下来、石碾旁一堆新瓦砾；草顶着火没做体块（预演用烟事件）。全班在院子里往院门 (${GATE_IN.x},${GATE_IN.z}) 跑；后送队已出村南口缩在路沟里等着。鬼子都退到第一道弯那头 / 北侧第一个院里（看不见）。`,
+    id: "10-5", ...s10, name: "挨炮",
+    player: { x: p105.x, z: p105.z, yawDeg: Yaw(p105, luo105), pitchDeg: 30, stance: "prone" },
+    what: "鬼子吹哨、枪口火全停、往东缩，静两三秒——第一发炮落在石碾边，顺子被掀出去好几步，枪脱手。班长的脸凑到跟前：顺儿！还能动不？起来！撤——走胡同！",
+    next: { text: "枪就在脚边：按 F 弯腰捡回来；出院门进胡同", x: GATE_OUT.x, z: GATE_OUT.z + 1.5, radiusM: 1.5 },
+    how: ["试几次攻不上来，东街那头吹哨，门洞里枪口火全停、往东缩；静两三秒（≥ 2 s）", "第一发炮落在石碾边（BarrageHit：石碾旁新瓦砾），顺子被气浪掀出去好几步：第一人称镜头猛地往后抛、翻滚落地、震屏、闪白、耳鸣、黑一阵白一阵；枪脱手", "班长的脸凑到跟前（仰看班长），隔着耳鸣喊：顺儿！……还能动不？起来！撤——走胡同！一把拽起来", "屏幕说明字：枪就在脚边——按 F 弯腰捡回来（正片的冲击波掀人 / 枪脱手是另一套系统，白盒只用镜头和震屏 / 闪白 / 黑屏 / 耳鸣演）", "第二、三发落：北屋塌一角、草顶着火；幺娃卸了机枪的枪栓扔进水缸；何有田蹲在院门框边往门缝里卡手榴弹：滚！表挡事！", "排长挨了弹片，刘文财架着他先进胡同；（第十版 10-30：删掉了旧的「炮！进屋！」）"],
+    notes: `BarrageHit 从这一帧起：北屋东间（x ≥ ${G.beiwu.collapseFromX}）后墙和房顶塌下来、石碾旁一堆新瓦砾；草顶着火没做体块（预演用烟事件）。顺子被掀到 (${p105.x},${p105.z}) 仰面躺着，班长蹲在 (${luo105.x},${luo105.z}) 凑到跟前；枪掉在 (${LOOSE_GUN.x},${LOOSE_GUN.z})。幺娃带着机枪进了院子在水缸 (${G.vat.x},${G.vat.z}) 边卸枪栓；何有田在院门里 (${GATE_IN.x},${GATE_IN.z}) 卡手榴弹；刘文财架着挨了弹片的排长、Squad1 / Squad2 在胡同里往南。后送队已出村南口缩在路沟里等着。鬼子都退到第一道弯那头 / 北侧第一个院里（看不见）。Escort2 的尸体还在石碾边。`,
     signals: [SIG.cartDeparted, SIG.cellarBlast, SIG.sideGateOpen, SIG.eastGateBurst, SIG.mgSilenced, SIG.northYardGatesBroken, SIG.barrageHit],
     units: [
-      N("Luo", Pt(106.4, 483.0), { face: Pt(101, 480), speed: RUN }),
-      N("HeYoutian", Pt(107.3, 484.5), { stance: "crouch", face: Pt(108, 483.5), speed: RUN }),
-      N("Yaowa", Pt(98.3, 482.4), { face: Pt(G.vat.x, G.vat.z), speed: RUN }),
-      N("LiuWencai", Pt(104.8, 482.0), { face: GATE_IN, speed: RUN }),
-      N("Squad1", Pt(102.0, 483.6), { face: GATE_IN, guess: true, speed: RUN }),
-      N("Squad2", Pt(100.4, 481.9), { face: GATE_IN, guess: true, speed: RUN }),
-      N("Squad3", Pt(105.6, 478.9), { face: GATE_IN, guess: true, speed: RUN }),
-      N("Escort1", Pt(101.4, 478.2), { face: GATE_IN, speed: RUN }),
-      N("Escort2", Pt(104.4, 479.6), { face: GATE_IN, speed: RUN }),
-      ...ConvoyAtExit({ dongguaBearers: 2 }),
+      N("Luo", luo105, { stance: "crouch", face: p105, speed: RUN }),
+      N("HeYoutian", Pt(107.3, 484.5), { stance: "crouch", face: Pt(108, 483.5), speed: RUN, name: "何有田（胳膊缠着布，卡手榴弹）" }),
+      N("Yaowa", Pt(98.3, 482.4), { face: Pt(G.vat.x, G.vat.z), weapon: "Type11", speed: RUN, name: "幺娃（卸枪栓扔水缸）" }),
+      N("LiuWencai", Pt(108.6, 473.0), { face: Pt(LANE1_X, 480), speed: RUN, name: "刘文财（架着排长）" }),
+      N("Officer", Pt(109.4, 473.3), { stance: "crouch", face: Pt(LANE1_X, 480), kind: "officer", speed: RUN, name: "排长（挨了弹片）" }),
+      N("Squad1", Pt(109.0, 475.6), { face: Pt(LANE1_X, 482), guess: true, speed: RUN }),
+      N("Squad2", Pt(109.1, 477.4), { face: Pt(LANE1_X, 484), guess: true, speed: RUN }),
+      ...ConvoyAtExit({ dongguaBearers: 2 }).filter((u) => u.id !== "Walker04"),
       C("GengCart", Pt(111.4, 558.6), { face: Pt(98, 566), speed: CART_RUN }),
       C("Geng", Pt(110.0, 559.6), { face: Pt(98, 566), speed: 2.0 }),
       C("Nier", Pt(109.4, 558.0), { stance: "crouch", face: Pt(110.0, 559.6), speed: NIER_RUN }),
       ...EastRetreated(),
-      ...HouseDown(), ...CornerDown(), ...JiefangBodies(),
+      ...HouseAllDown(), ...CornerDown(), ...JiefangBodies(),
+      ...DeadSoFar("10-5"),
       ...Villagers08().filter((u) => !u.id.match(/Villager[45]/)),
     ],
-    pois: [POI.gengGate("objective"), POI.roller("danger"), POI.kitchenDoor("poi"), POI.laneMouth("landmark")],
+    pois: [Poi("LooseGun", "枪（掉在脚边：按 F 捡）", "objective", LOOSE_GUN, 1.0), POI.gengGate("poi"), POI.roller("danger"), POI.kitchenDoor("poi"), POI.laneMouth("landmark")],
   });
 
   // 10-6：炮里撤：窄胡同拐几道弯，炮一排比一排近追着人跑。班长跑最前，每个拐角先到、回身招手；前头一发砸塌院墙堵死胡同（LaneWallCollapse）：
@@ -1513,27 +1649,26 @@ const RUNNER_PATH = [CORNER2_AT, Pt(102.4, 461.8), Pt(99.4, 464.6), Pt(103.8, 46
   Add({
     id: "10-6", ...s10, name: "炮里撤",
     player: { x: p106.x, z: p106.z, yawDeg: -90, pitchDeg: 14, stance: "crouch" },
-    what: "炮一排比一排近追着人跑。前头一发砸塌院墙堵死胡同：过不去！翻墙！班长踩柴垛上墙翻进院子，回身把人一个个拽上去。",
+    what: "炮一排比一排近追着人跑。前头一发砸塌院墙堵死胡同：过不去！翻墙！班长踩柴垛上墙翻进院子，回身拽人。幺娃和刘文财一边一个架着挨了弹片的排长跑。",
     next: { text: "翻墙，穿院子出村", x: SLN.detourYard.inside.x, z: SLN.detourYard.inside.z, radiusM: 2 },
-    how: ["窄胡同拐几道弯，炮一排比一排近追着人跑；班长跑最前，每个拐角先到、回身招手，边跑边喊（炮！趴倒！起来！跑！莫停！莫回头！这边！）", "前头一发砸塌院墙堵死胡同（LaneWallCollapse）：过不去！翻墙！先踩墙根柴垛爬上墙头、翻进旁边院子、回身把人一个个拽上去", "跟班长摸街的后送队两个兵里一个挨了弹片，两人一边一个架着他跑", "穿院子从那家院门出来接上胡同；班长：往那棵大槐树跑！过了槐树就是村口！出村南口，后送队缩在路沟里等着", "10-6 全程跑"],
-    notes: `塌墙处 (${PL.laneCollapse.x},${PL.laneCollapse.z})：WD2 的东墙 x ${SLN.collapse.wallX}、z ${SLN.collapse.fromZ}…${SLN.collapse.toZ} 倒进胡同；柴垛 (${PL.climbPile.x},${PL.climbPile.z}) 1.2 高贴着东边那院的西墙，从 (${SLN.climb.from.x},${SLN.climb.from.z}) 踩上去翻到 (${SLN.climb.to.x},${SLN.climb.to.z})，穿院子从西南角的院门 (${PL.detourGate.x},${PL.detourGate.z}) 出来接回胡同。大槐树还没进空间表：先用 POI 标在村南口外 (${BIG_LOCUST.x},${BIG_LOCUST.z})（见报告）。`,
+    how: ["窄胡同拐几道弯，炮一排比一排近追着人跑；班长跑最前，每个拐角先到、回身招手，边跑边喊（炮！趴倒！起来！跑！莫停！莫回头！这边！）", "前头一发砸塌院墙堵死胡同（LaneWallCollapse）：过不去！翻墙！先踩墙根柴垛爬上墙头、翻进旁边院子、回身把人一个个拽上去", "排长挨了弹片，幺娃和刘文财一边一个架着他跑（第十版 10-30：原来是后送队的兵挨弹片——那两个兵都死了）", "穿院子从那家院门出来接上胡同；班长：往那棵大槐树跑！过了槐树就是村口！出村南口，后送队缩在路沟里等着：抬担架的死了好几个，担架上的人比抬的人多", "班长：顺儿、文财，你两个帮到车！（接 11）", "10-6 全程跑"],
+    notes: `塌墙处 (${PL.laneCollapse.x},${PL.laneCollapse.z})：WD2 的东墙 x ${SLN.collapse.wallX}、z ${SLN.collapse.fromZ}…${SLN.collapse.toZ} 倒进胡同；柴垛 (${PL.climbPile.x},${PL.climbPile.z}) 1.2 高贴着东边那院的西墙，从 (${SLN.climb.from.x},${SLN.climb.from.z}) 踩上去翻到 (${SLN.climb.to.x},${SLN.climb.to.z})，穿院子从西南角的院门 (${PL.detourGate.x},${PL.detourGate.z}) 出来接回胡同。大槐树还没进空间表：先用 POI 标在村南口外 (${BIG_LOCUST.x},${BIG_LOCUST.z})（见报告）。胡同只有 1.5 m 宽，架着排长的幺娃、刘文财一前一后。出村的路上又倒了两个担架员（Bearer03 / Bearer04，村南口外路沟边）。`,
     signals: [SIG.cartDeparted, SIG.cellarBlast, SIG.sideGateOpen, SIG.eastGateBurst, SIG.mgSilenced, SIG.northYardGatesBroken, SIG.barrageHit, SIG.laneWallCollapse],
     units: [
       N("Luo", luo106, { stance: "crouch", face: p106, climb: true, through: true, speed: RUN, intent: [Pt(SLN.detourYard.inside.x, SLN.detourYard.inside.z), Pt(SLN.detourYard.gateOut.x + 1.3, SLN.detourYard.gateOut.z), Pt(LANE3_X, SLN.detourYard.gateOut.z), Pt(LANE3_X, 521), Pt(EXIT_X, 521), Pt(EXIT_X, 545)] }),
-      N("LiuWencai", Pt(113.3, 498.6), { stance: "crouch", face: p106, speed: RUN }),
-      N("Squad1", Pt(113.2, 496.8), { stance: "crouch", face: Pt(113.3, 498.6), guess: true, speed: RUN }),
-      N("Squad3", Pt(111.6, 495.2), { stance: "crouch", face: Pt(113.2, 496.8), guess: true, speed: RUN }),
-      N("Escort2", Pt(109.3, 492.6), { face: Pt(LANE1_X, 495), speed: RUN, name: "挨了弹片的后送队的兵" }),
-      N("Escort1", Pt(109.3, 491.5), { face: Pt(LANE1_X, 495), speed: RUN, name: "架着伤的那个跑的" }),
-      N("Squad2", Pt(109.2, 493.7), { face: Pt(LANE1_X, 495), guess: true, speed: RUN }),
-      N("Yaowa", Pt(109.3, 489.6), { face: Pt(LANE1_X, 495), speed: RUN }),
-      N("HeYoutian", Pt(109.2, 487.4), { face: Pt(LANE1_X, 495), speed: RUN }),
-      ...ConvoyAtExit(),
+      N("Squad1", Pt(113.3, 498.6), { stance: "crouch", face: p106, guess: true, speed: RUN }),
+      N("HeYoutian", Pt(113.2, 496.8), { stance: "crouch", face: Pt(113.3, 498.6), speed: RUN, name: "何有田（胳膊缠着布）" }),
+      N("Officer", Pt(109.3, 492.6), { stance: "crouch", face: Pt(LANE1_X, 495), kind: "officer", speed: RUN, name: "排长（挨了弹片，被架着）" }),
+      N("Yaowa", Pt(109.0, 491.6), { face: Pt(LANE1_X, 495), speed: RUN, name: "幺娃（架着排长）" }),
+      N("LiuWencai", Pt(109.5, 493.6), { face: Pt(LANE1_X, 495), speed: RUN, name: "刘文财（架着排长）" }),
+      N("Squad2", Pt(109.2, 489.8), { face: Pt(LANE1_X, 495), guess: true, speed: RUN }),
+      ...ConvoyAtExit().filter((u) => u.id !== "Walker04"),
       C("GengCart", Pt(111.4, 558.6), { face: Pt(98, 566), speed: CART_RUN }),
       C("Geng", Pt(110.0, 559.6), { face: Pt(98, 566), speed: 2.0 }),
       C("Nier", Pt(109.4, 558.0), { stance: "crouch", face: Pt(110.0, 559.6), speed: NIER_RUN }),
       ...EastRetreated(),
-      ...HouseDown(), ...CornerDown(), ...JiefangBodies(),
+      ...HouseAllDown(), ...CornerDown(), ...JiefangBodies(),
+      ...DeadSoFar("10-6"),
       ...Villagers08().filter((u) => !u.id.match(/Villager[45]/)),
     ],
     pois: [POI.laneCollapse("danger"), POI.climbPile("objective"), POI.detourGate("poi"), POI.bigLocust(), POI.villageSouth("landmark")],
