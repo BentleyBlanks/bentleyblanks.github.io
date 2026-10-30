@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "version": "2026103010",
+  "version": "2026103011",
   "spec": {
     "schemaVersion": 1,
-    "version": "2026103010",
+    "version": "2026103011",
     "name": "BeishaheBridge",
     "units": "m",
     "coordinateSystem": "Local glTF axes: X transverse to bridge, Y up, Z along bridge from its north end toward its south end; origin at bridge center, sleeper top Y=0. X and Z are not geographic east and south until a placement transform is applied.",
@@ -17,6 +17,8 @@
       4,
       5
     ],
+    "trussMainMemberDepthM": 0.21,
+    "trussEndPostSetbackM": 0.09,
     "trussUpperGussetDepthM": 0.34,
     "trussUpperGussetMaxHalfWidthM": 0.36,
     "trussCenterOffsetM": 1.85,
@@ -92,8 +94,13 @@
       },
       {
         "id": "Xianning76Modern",
-        "url": "https://app.notion.com/p/3eb60335331c81fda6dfe38153bcec45",
-        "supports": "The modern Xianning bridge photograph in the user's archive is an out-of-region visual analogy for the central crossed braces and end-bay diagonals. The photograph's original attribution and date remain unverified; its members do not establish the Beishahe bridge's historical truss pattern."
+        "url": "https://commons.wikimedia.org/wiki/File:20241228-粤汉铁路湘鄂段咸宁第七十六号钢桥.jpg",
+        "author": "Saigyouji-Noriko",
+        "dateAsCatalogued": "2024-12-28",
+        "license": "CC BY-SA 4.0",
+        "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "fileSha1": "1f84a11c07cb46a9542ab2818bf0c5a3f0eb7abc",
+        "supports": "The author's Wikimedia Commons upload is byte-identical to the photograph in the user's archive (SHA-1 verified). Its nine-panel layout, central crossed braces and visible main-member widths are a modern out-of-region visual analogy. The catalogue date is not independently established by EXIF or field records; the photograph does not establish the Beishahe bridge's historical truss pattern, dimensions, finish or condition."
       },
       {
         "id": "JinpuRail1937",
@@ -755,7 +762,7 @@
   "meshObjects": 409,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\BeishaheBridge\\Scene_BeishaheBridge.blend",
   "glbBytes": 24500752,
-  "glbSha256": "47e476d4f7b1b713c8f46f87814e645905b8e0796078a6e67fd6ced8cfa82385",
+  "glbSha256": "0990292b791594f7f7c011298ca77296c580768574e8b960526ffb75b3355789",
   "reconstructionScope": "Independent intact bridge candidate. Its 280 m length follows the present-day crossing/floodplain scale, not a proven 1938 bridge length. Fourteen 20 m spans, all member sections, the transverse timber deck and support layout, pier dimensions, deck elevation, damp staining, weathering and colors are authored design; none establishes the appearance or water level in March 1938. The 44 m compressed FirstLevel1218 blockout and legacy pontoon bridge are not replaced.",
   "historicalReferences": [
     {
@@ -777,8 +784,13 @@
     },
     {
       "id": "Xianning76Modern",
-      "url": "https://app.notion.com/p/3eb60335331c81fda6dfe38153bcec45",
-      "supports": "The modern Xianning bridge photograph in the user's archive is an out-of-region visual analogy for the central crossed braces and end-bay diagonals. The photograph's original attribution and date remain unverified; its members do not establish the Beishahe bridge's historical truss pattern."
+      "url": "https://commons.wikimedia.org/wiki/File:20241228-粤汉铁路湘鄂段咸宁第七十六号钢桥.jpg",
+      "author": "Saigyouji-Noriko",
+      "dateAsCatalogued": "2024-12-28",
+      "license": "CC BY-SA 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "fileSha1": "1f84a11c07cb46a9542ab2818bf0c5a3f0eb7abc",
+      "supports": "The author's Wikimedia Commons upload is byte-identical to the photograph in the user's archive (SHA-1 verified). Its nine-panel layout, central crossed braces and visible main-member widths are a modern out-of-region visual analogy. The catalogue date is not independently established by EXIF or field records; the photograph does not establish the Beishahe bridge's historical truss pattern, dimensions, finish or condition."
     },
     {
       "id": "JinpuRail1937",
@@ -814,6 +826,7 @@
   ],
   "materialInterpretation": {
     "trussBracing": "Nine panels and three central counterbraced bays are an authored visual analogy to the modern Xianning bridge photograph in the user's archive, not evidence of the 1938 Beishahe truss. Bar sections, fasteners and face assignments are designed details.",
+    "trussMainMembers": "The 0.21 m in-plane main-member depth is an authored apparent-width match to isolated near-side faces in the modern Xianning photograph, checked with full 3D projection. It is not a measured historical section; the 0.09 m end-post setback preserves the structural span gap. Paired-channel transverse width, vertical members, chords, counterbars and material images remain unchanged.",
     "trussConnections": "Extended upper gusset plates, packers and domed rivet groups are a design analogy to the 1936 Easley road bridge; their exact form and dimensions are not established for Beishahe. The rivet heads are modeled without shanks or holes.",
     "trussFinish": "Muted brown-gray weathered truss steel is an imagegen material study guided by a modern out-of-region bridge photograph. Its paint color and corrosion are creative choices, not verified 1938 Beishahe conditions. The rail body keeps a separate neutral steel texture.",
     "pierDamp": "Irregular brown-gray and muted olive staining that fades into the dry pier is a creative weathering choice, not evidence of the 1938 waterline or site condition.",

@@ -803,6 +803,8 @@ def BuildSpan():
     zs = [-length / 2 + i * step for i in range(n + 1)]
     y0, y1 = SPEC["trussBottomY"], SPEC["trussTopY"]
     halfW = SPEC["trussCenterOffsetM"]
+    mainDepth = SPEC["trussMainMemberDepthM"]
+    endSetback = SPEC["trussEndPostSetbackM"]
     steel, fasteners, west, east, shoes, railWear, railMidSplice, railMidFasteners = [Geometry() for _ in range(8)]
     count = math.ceil(length / SPEC["sleeperSpacingM"])
     timber, endTimber = BuildSleepers(length, count, 1938)
@@ -835,14 +837,14 @@ def BuildSpan():
             steel.Box((x + faceSign * 0.130, y1, 0), (0.02, 0.16, zs[-2] - zs[1]))
         for k in range(n):
             if k == 0:
-                a, b = (x, y0, zs[0] + .06), (x, y1, zs[1])
+                a, b = (x, y0, zs[0] + endSetback), (x, y1, zs[1])
             elif k == n - 1:
-                a, b = (x, y1, zs[-2]), (x, y0, zs[-1] - .06)
+                a, b = (x, y1, zs[-2]), (x, y0, zs[-1] - endSetback)
             elif k <= n // 2:
                 a, b = (x, y1, zs[k]), (x, y0, zs[k + 1])
             else:
                 a, b = (x, y0, zs[k]), (x, y1, zs[k + 1])
-            BuiltMember(a, b, 0.11, 0.15)
+            BuiltMember(a, b, 0.11, mainDepth)
             va, vb = Vector(a), Vector(b)
             top, bottom = (va, vb) if abs(va.y-y1)<.001 else (vb, va)
             topIndex = round((top.z + length/2) / step)
@@ -1411,6 +1413,7 @@ def Rebuild():
             "reconstructionScope": SPEC["reconstructionScope"], "historicalReferences": SPEC["historicalReferences"],
             "materialInterpretation": {
                 "trussBracing": "Nine panels and three central counterbraced bays are an authored visual analogy to the modern Xianning bridge photograph in the user's archive, not evidence of the 1938 Beishahe truss. Bar sections, fasteners and face assignments are designed details.",
+                "trussMainMembers": "The 0.21 m in-plane main-member depth is an authored apparent-width match to isolated near-side faces in the modern Xianning photograph, checked with full 3D projection. It is not a measured historical section; the 0.09 m end-post setback preserves the structural span gap. Paired-channel transverse width, vertical members, chords, counterbars and material images remain unchanged.",
                 "trussConnections": "Extended upper gusset plates, packers and domed rivet groups are a design analogy to the 1936 Easley road bridge; their exact form and dimensions are not established for Beishahe. The rivet heads are modeled without shanks or holes.",
                 "trussFinish": "Muted brown-gray weathered truss steel is an imagegen material study guided by a modern out-of-region bridge photograph. Its paint color and corrosion are creative choices, not verified 1938 Beishahe conditions. The rail body keeps a separate neutral steel texture.",
                 "pierDamp": "Irregular brown-gray and muted olive staining that fades into the dry pier is a creative weathering choice, not evidence of the 1938 waterline or site condition.",

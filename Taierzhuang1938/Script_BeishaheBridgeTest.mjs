@@ -1048,6 +1048,18 @@ for(let i=0;i<spec.spanCount;i++){
 const allTrusses=ByRole('Trusses');
 Check(allTrusses.length===spec.spanCount&&new Set(allTrusses.map(p=>p.node.mesh)).size===1,'All spans reuse the same truss mesh');
 Check(spec.panelsPerSpan===9&&Array.isArray(spec.trussCounterPanelIndices)&&spec.trussCounterPanelIndices.join(',')==='3,4,5','The chosen nine-panel comparison design identifies its three counterbraced bays');
+// The reference-led correction must widen the actual main-member silhouette,
+// while preserving the paired channels and the existing expansion gap.
+{
+  Check(/authored apparent-width match/i.test(data.materialInterpretation?.trussMainMembers??'')&&/not a measured historical section/i.test(data.materialInterpretation.trussMainMembers),'Main-member appearance remains a design analogy, not a historical section measurement');
+  const span=spec.spanCount-1,length=spec.spanPitchM-spec.expansionGapM,step=length/spec.panelsPerSpan;
+  const center=-spec.lengthM/2+spec.spanPitchM*(span+.5),height=spec.trussTopY-spec.trussBottomY,axisLength=Math.hypot(step,height);
+  const y=(spec.trussTopY+spec.trussBottomY)/2,z=center-length/2+7.5*step,trusses=ByRole('Trusses',span);
+  for(const side of [-1,1])for(const normalSign of [-1,1])for(const offset of [.095,.125]){
+    const hit=Hits(trusses,new THREE.Vector3(side*(spec.trussCenterOffsetM+.5),y+normalSign*offset*step/axisLength,z-normalSign*offset*height/axisLength),new THREE.Vector3(-side,0,0),1);
+    Check((hit.length>0)===(offset<.1),'Actual isolated main diagonal has the corrected silhouette without an oversized section',{side,normalSign,offset,hits:hit.length});
+  }
+}
 {
   const span=spec.spanCount-1,center=-spec.lengthM/2+spec.spanPitchM*(span+.5),length=spec.spanPitchM-spec.expansionGapM,step=length/spec.panelsPerSpan;
   const trusses=ByRole('Trusses',span),rivets=ByRole('Rivets',span);

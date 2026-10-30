@@ -114,7 +114,16 @@
         "notionLedgerLastEdited": "2026-10-30T12:23:54.252Z",
         "notionParentLastEdited": "2026-10-30T12:26:01.529Z"
       },
-      "acceptanceScope": "Historical-boundary synchronization only; no claim that the model has completed visual matching or runtime acceptance."
+      "acceptanceScope": "Historical-boundary synchronization only; no claim that the model has completed visual matching or runtime acceptance.",
+      "memberReview20261030": {
+        "version": "2026103011",
+        "decision": "Main-member apparent width is compared against isolated near-side faces of the modern Xianning photograph, retaining full 3D channel depth. The 0.21 m in-plane depth and 0.09 m end-post setback remain authored dimensions; no physical original section or historical finish is established. Unreliable earlier mixed-edge registration was rejected.",
+        "source": "https://commons.wikimedia.org/wiki/File:20241228-粤汉铁路湘鄂段咸宁第七十六号钢桥.jpg",
+        "sourceReview": "Opened the photographer's Wikimedia Commons file page: Saigyouji-Noriko, own work, date catalogued 2024-12-28, CC BY-SA 4.0. Local full-size reference SHA-1 1f84a11c07cb46a9542ab2818bf0c5a3f0eb7abc matches the original file. Catalogue date is not independently validated by EXIF or field records.",
+        "notionReview": "Only the existing creative bridge row and dated status note changed; 115 rows retained, bridge row index 84 only. Parent bullet and player-facing HistoryAndCreation text name the inferred section. Categories, source indices, global review anchors and unrelated page cursors stay unchanged.",
+        "notionLedgerLastEdited": "2026-10-30T14:04:53.779Z",
+        "notionParentLastEdited": "2026-10-30T14:04:55.686Z"
+      }
     },
     {
       "asset": "FlareEffects",
