@@ -38,7 +38,8 @@ import { FIRST_LEVEL_SPEAKING_CAST } from "./Data_FirstLevelSpeakingCast.mjs";
 import { CharacterClipModelId } from "./Data_CharacterSelection.mjs";
 import { BlockStandSampler, PrevizSignalsAt, NormalizeBlockoutPreviz, SamplePrevizCamera, SamplePrevizAircraft, PREVIZ_SLOWMO } from "./Script_EditorBlockoutPrevizPlan.mjs";
 import { BLOCKOUT_PREVIZ_CLIP_LIBRARIES } from "./Data_BlockoutPrevizClips.mjs";
-import { LanePointAtZ } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
+import { LanePointAtZ, L0610_ALLEY_WINDOWS as AW } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
+import { BACK_WINDOW } from "./Script_EditorBlockoutFirstLevel0610Keyframes.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const Load = f => JSON.parse(readFileSync(join(HERE, f), "utf8"));
@@ -922,24 +923,64 @@ function DesignChecks(doc, norm, config, layout, errors, table = { village: null
     if (cling && LineT(s, "LiuGirlLeads.01") !== undefined && LineT(s, "LiuGirlLeads.01") < cling.t + 1.0) errors.push("09-1：刘文财那句要在妮儿拽衣角之后");
     if (!ClipKey(s, "LiuWencai", "PvCrouchTalkRifle")) errors.push("09-1：刘文财说话时蹲着（PvCrouchTalkRifle）");
   }
+  // 09-2（第十一版 10-31）夹道：两处后窗底下蹲着过（≈ 30 s）：后窗 A 前刘文财先蹲下回头压手（PvCrouchPointL）、眼睛蹲在窗下站点看窗洞、屋里那个的头晃（站 / 蹲切换）、
+  // 三人蹲着从窗下挪过去；路上切镜；隔墙听见窖口吼 / 哭；后窗 B 前刘文财又压手，窗里那个踹门（gateSmash 在 WY4）、吼（NextDoorShout）、开一枪（muzzle）；眼睛钉在关键帧站点
   {
     const s = Seq("09-2");
-    if (Moves(s).length < 5) errors.push("09-2：拉着手走巷子四道弯要分几段（from/to 机位 ≥ 5）");
-    if (!HasLine(s, "CellarShout.01") || !HasLine(s, "CellarShout.02")) errors.push("09-2：门口要听见窖口的鬼子吼「出来」");
-    // 第十版：隔壁院（WA1，x 64…72、z 424…444）也在踹门、有人喊、响了一枪
-    const WA1 = { minX: 63, maxX: 73, minZ: 423, maxZ: 445 };
-    const InWA1 = p => p && p.x >= WA1.minX && p.x <= WA1.maxX && p.z >= WA1.minZ && p.z <= WA1.maxZ;
-    const smash = Sfx(s, "gateSmash").find(e => InWA1(e)), nd = LineT(s, "NextDoorShout.01"), ndShot = s.events.find(e => e.type === "muzzle" && /^NextDoorIja/.test(e.actor));
-    if (!smash || !ClipKey(s, "NextDoorIja1", "VilIjaGateSmash")) errors.push("09-2：隔壁院要有踹门（gateSmash 在 WA1 院里 + VilIjaGateSmash）");
-    if (nd === undefined || !InWA1(PosAt("09-2", s, "NextDoorIja1", nd))) errors.push("09-2：隔壁院要有人喊（NextDoorShout.01，人在 WA1 院里）");
-    if (!ndShot || !InWA1(PosAt("09-2", s, ndShot.actor, ndShot.t))) errors.push("09-2：隔壁院要响一枪（NextDoorIja 的 muzzle，人在 WA1 院里）");
-    if (nd !== undefined && (LineT(s, "CellarShout.01") === undefined || nd < LineT(s, "CellarShout.01"))) errors.push("09-2：先瞥见窖口的鬼子吼，再听见隔壁");
-    if (!Has(s, "caption", e => /隔壁/.test(e.text))) errors.push("09-2：隔壁院的事要有说明字");
+    const kf = config.keyframes.find(k => k.id === "09-2");
+    const WIN_A = { x: AW.A.x, z: AW.A.z }, WIN_B = { x: AW.B.x, z: AW.B.z }, EYE_A = AW.A.stand, EYE_B = kf.player;
+    if (s.durationS < 25 || s.durationS > 35) errors.push(`09-2：目标 25–35 s，现在 ${s.durationS} s`);
+    if (Moves(s).length < 3) errors.push("09-2：窗下和隔墙听那几段要挪眼睛（from/to 机位 ≥ 3）");
+    const eyes = Eyes(s);
+    if (eyes.length < 5) errors.push("09-2：路上要用切镜跳过去（定镜 ≥ 5）");
+    for (const c of eyes) if (c.eye.stance !== "crouch") errors.push(`09-2：窗下 / 路上眼睛都蹲着，@${c.t} 是 ${c.eye.stance}`);
+    const atA = eyes.find(c => Near(c.eye, EYE_A, 0.4)), atB = eyes.filter(c => Near(c.eye, EYE_B, 0.4));
+    if (!atA || atA.dur < 2.0) errors.push("09-2：后窗 A 底下的站点要有一条 ≥ 2 s 的定镜（蹲着看窗洞）");
+    if (!atB.length) errors.push("09-2：后窗 B 底下（关键帧站点）要有定镜");
+    const LookAt = (c, p) => c.eye.look ? Near(c.eye.look, p, 0.6) : Math.abs(((Math.atan2(-(p.x - c.eye.x), -(p.z - c.eye.z)) * 180 / Math.PI) - c.eye.yawDeg + 540) % 360 - 180) < 20;
+    if (atA && !LookAt(atA, WIN_A)) errors.push("09-2：后窗 A 底下那条定镜要看着窗洞");
+    if (atB.length && !atB.some(c => LookAt(c, WIN_B))) errors.push("09-2：后窗 B 底下的定镜要看着窗洞");
+    // 刘文财在两处窗前先蹲下、回头压手（PvCrouchPointL、面朝顺子），都在眼睛到窗下之前 / 同时
+    const liuSignals = Keys(s, "LiuWencai").filter(k => k.clip === "PvCrouchPointL");
+    if (liuSignals.length < 2) errors.push("09-2：刘文财要在两处窗前各压一次手（PvCrouchPointL ≥ 2）");
+    if (atA && liuSignals.length && liuSignals[0].t > atA.t + 0.5) errors.push("09-2：后窗 A：刘文财先压手，眼睛才停到窗下");
+    if (atB.length && liuSignals.length >= 2 && liuSignals[1].t > atB[0].t + 0.5) errors.push("09-2：后窗 B：刘文财先压手，眼睛才停到窗下");
+    if (PosKeys(s, "LiuWencai").some(k => k.stance && k.stance !== "crouch")) errors.push("09-2：刘文财全程蹲着");
+    // 后窗 A 屋里那个（NextDoorIja2）在翻箱子：眼睛看窗洞那会儿他在屋里，有站 / 蹲切换（头在窗洞里晃）
+    const InHouse = (p, h) => p && p.x > h.minX && p.x < h.maxX && p.z > h.minZ && p.z < h.maxZ;
+    if (atA) {
+      if (!InHouse(PosAt("09-2", s, "NextDoorIja2", atA.t + 0.5), AW.A.house)) errors.push("09-2：眼睛看后窗 A 时屋里要有那个翻箱子的（NextDoorIja2 在 WM1 西厢房里）");
+      const bob = Keys(s, "NextDoorIja2").filter(k => k.t >= 0 && k.t <= atA.t + atA.dur && k.stance);
+      if (!bob.some(k => k.stance === "stand") || !bob.some(k => k.stance === "crouch")) errors.push("09-2：翻箱子的那个要站起来又蹲下（头在窗洞里晃）");
+    }
+    // 10-31 协调人：眼睛停在窗前那几秒，屋里那个要正站着、离窗那面墙的里墙面约 1 m（蹲着的眼从窗洞里看得见头和肩）
+    const StandingAt = (id, c, at) => Keys(s, id).some(k => k.stance === "stand" && k.t >= c.t - 0.6 && k.t <= c.t + c.dur - 0.8 && Near(PosAt("09-2", s, id, k.t + 0.1), at, 0.3));
+    if (atA && !StandingAt("NextDoorIja2", atA, AW.A.inside)) errors.push(`09-2：眼睛停在后窗 A 前时翻箱子的那个要在 (${AW.A.inside.x},${AW.A.inside.z}) 站起来`);
+    if (atB.length && !StandingAt("NextDoorIja1", atB[0], AW.B.inside)) errors.push(`09-2：眼睛停在后窗 B 前时屋里那个要在窗下墙根 (${AW.B.inside.x},${AW.B.inside.z}) 站起来`);
+    if (!Has(s, "caption", e => /窗/.test(e.text) && /蹲/.test(e.text))) errors.push("09-2：说明字要讲「窗里有鬼子，蹲着过」");
+    if (!Has(s, "caption", e => /压手/.test(e.text))) errors.push("09-2：刘文财回头压手要有说明字");
+    // 隔墙听见：窖口的鬼子吼「出来」、地底下哭两遍（从窖口放），眼睛在窄夹道里（x≈63、z 435…450）
+    if (!HasLine(s, "CellarShout.01") || !HasLine(s, "CellarShout.02")) errors.push("09-2：窄夹道里要隔墙听见窖口的鬼子吼「出来」");
     if (Sfx(s, "cellarSob").length < 2 || Sfx(s, "cellarSob").some(e => !Near(e, CELLAR, 0.3))) errors.push("09-2：地底下的哭声从窖口放两遍");
     const shout = LineT(s, "CellarShout.01");
-    const eye = Eyes(s).filter(c => c.t <= (shout ?? 0) + 0.01).at(-1);
-    if (!eye || !Near(eye.eye, config.keyframes.find(k => k.id === "09-2").player, 0.4)) errors.push("09-2：鬼子吼的时候眼睛在门口瞥见的站点上");
-    if (!Has(s, "caption", e => /不在门口停/.test(e.text)) || !Has(s, "caption", e => /墙根/.test(e.text))) errors.push("09-2：说明字：不在门口停、缩回墙根");
+    const eyeAtShout = eyes.filter(c => c.t <= (shout ?? 0) + 0.01).at(-1);
+    if (!eyeAtShout || Math.abs(eyeAtShout.eye.x - 63) > 1.0 || eyeAtShout.eye.z < 435 || eyeAtShout.eye.z > 450) errors.push(`09-2：鬼子吼「出来」时眼睛在窄夹道里（隔墙听），实际 (${eyeAtShout?.eye?.x}, ${eyeAtShout?.eye?.z})`);
+    if (!Has(s, "caption", e => /隔着墙|隔墙/.test(e.text))) errors.push("09-2：隔墙听见要有说明字");
+    // 后窗 B：隔壁院（WY4，x 40…62、z 445…467.5）那个踹门（gateSmash 在 WY4 里 + VilIjaGateSmash）、吼（NextDoorShout.01，人在 B 屋里）、开一枪（muzzle，人在 B 屋里）；吼在窖口那句之后
+    const WY4 = { minX: 40, maxX: 62.3, minZ: 445, maxZ: 467.5 };
+    const InWY4 = p => p && p.x >= WY4.minX && p.x <= WY4.maxX && p.z >= WY4.minZ && p.z <= WY4.maxZ;
+    const smash = Sfx(s, "gateSmash").find(e => InWY4(e)), nd = LineT(s, "NextDoorShout.01"), ndShot = s.events.find(e => e.type === "muzzle" && /^NextDoorIja/.test(e.actor));
+    if (!smash || !ClipKey(s, "NextDoorIja1", "VilIjaGateSmash")) errors.push("09-2：后窗 B 屋里要有踹门（gateSmash 在隔壁院 WY4 里 + VilIjaGateSmash）");
+    if (nd === undefined || !InHouse(PosAt("09-2", s, "NextDoorIja1", nd), AW.B.house)) errors.push("09-2：后窗 B 屋里要有人吼（NextDoorShout.01，人在 WY4 东厢房里）");
+    if (!ndShot || !InHouse(PosAt("09-2", s, ndShot.actor, ndShot.t), AW.B.house)) errors.push("09-2：后窗 B 屋里要响一枪（NextDoorIja 的 muzzle，人在 WY4 东厢房里）");
+    if (nd !== undefined && (shout === undefined || nd < shout)) errors.push("09-2：先隔墙听见窖口的鬼子吼，再到后窗 B 听见隔壁");
+    if (nd !== undefined) { const e = eyes.filter(c => c.t <= nd + 0.01).at(-1); if (!e || !Near(e.eye, EYE_B, 0.4)) errors.push("09-2：隔壁那个吼的时候眼睛在后窗 B 底下的关键帧站点上"); }
+    if (ndShot && ndShot.t < (nd ?? 0)) errors.push("09-2：先踹门吼，再开枪");
+    if (!Has(s, "caption", e => /隔壁/.test(e.text))) errors.push("09-2：隔壁院的事要有说明字");
+    if (!Has(s, "caption", e => /豁口/.test(e.text))) errors.push("09-2：末尾要点出窗下就是豁口（接 09-3）");
+    if (Has(s, "caption", e => /不在门口停|缩回墙根|半掩/.test(e.text))) errors.push("09-2：不再有门口瞥见 / 缩回墙根那一拍的说明字");
+    // 远处枪声的节奏照旧：坡道上一打一回、机枪一梭一梭
+    if (!Has(s, "sfx", e => e.name === "mgBurstFar") || s.events.filter(e => e.type === "sfx" && e.name === "rifleShot").length < 3) errors.push("09-2：远处枪声的节奏要留着（坡道一打一回、机枪一梭一梭）");
   }
   // 09-3：眼睛在西配房里窗后（x < 67.75）看院子；汉子爬出 → 被捅（成对）；媳妇被拖（成对）；老太太爬出；妮儿呜咽 + 捂嘴说明字；没按到那句
   {
@@ -953,7 +994,9 @@ function DesignChecks(doc, norm, config, layout, errors, table = { village: null
     if (!Has(s, "caption", e => /豁口/.test(e.text))) errors.push("09-3：从西北角豁口钻进去要有说明字");
     // 刘文财蹲在豁口里边：隔壁那两个扛着东西从窄夹道（x≈63）小跑过去，他指墙「隔壁还有」（压着嗓子）
     const ndRun = ["NextDoorIja1", "NextDoorIja2"].map(id => PosKeys(s, id).filter(k => k.move === "run" && Math.abs(k.x - 63) < 1.2 && k.z > 440 && k.z < 469));
-    if (ndRun.some(r => r.length < 2)) errors.push("09-3：隔壁那两个要扛着东西顺窄夹道（x≈63）小跑过去再跑回来（每人 ≥ 2 个 run 键）");
+    if (ndRun.some(r => r.length < 2)) errors.push("09-3：隔壁那两个要背着东西从 L4 拐进窄夹道（x≈63）往北跑过豁口外、停在北边那院门口（每人 ≥ 2 个 run 键）");
+    for (const id of ["NextDoorIja1", "NextDoorIja2"]) { const r = PosKeys(s, id).filter(k => k.move === "run"); if (r.length >= 2 && !(r[0].z > r.at(-1).z && r.at(-1).z < 446 && r.at(-1).z > 440)) errors.push(`09-3：${id} 要往北跑、停在 WA1 院门口（z 440…446），实际到 (${r.at(-1)?.x}, ${r.at(-1)?.z})`); }
+    if (!ClipKey(s, "NextDoorIja1", "VilIjaGateSmash") || !Sfx(s, "gateSmash").some(e => Math.abs(e.x - 63.5) < 1.5 && Math.abs(e.z - 441.5) < 1.5)) errors.push("09-3：到了北边那院（WA1）门口要踹门（VilIjaGateSmash + gateSmash 在 WA1 院门）");
     const nextDoor = LineT(s, "LiuNextDoor.01");
     if (nextDoor === undefined) errors.push("09-3：刘文财要说「隔壁还有」");
     else {
@@ -1207,9 +1250,19 @@ function DesignChecks(doc, norm, config, layout, errors, table = { village: null
       if (Keys(s6, "HeYoutian").some(k => k.state === "down")) errors.push("09-7：何有田只是挨了一刀，不死");
       for (const id of ["CellarIja1", "CellarIja2", "NextDoorIja2"]) if (!PosKeys(s6, id).some(k => k.move === "run" && k.x > 108.5)) errors.push(`09-7：${id} 要往东街跑`);
       for (const id of ["Leader", "Rifle3"]) {
-        const c = ClipKey(s6, id, "VilIjaClimbWall");
-        if (!c || !InBeiwu(PosAt("09-7", s6, id, c.t))) errors.push(`09-7：${id} 要从东间窗洞翻出去（VilIjaClimbWall，根在北屋里）`);
-        if (!PosKeys(s6, id).some(k => k.t > (c?.t ?? Infinity) && k.z < 470)) errors.push(`09-7：${id} 翻出去以后要在墙外往东街跑`);
+        // 第十一版（10-31 协调人）：不用爬墙片段（库里没有对得上 0.9 窗台的）——在窗里蹲下、蹲着从窗洞挪到窗外（人一直在窗洞高度里）、那 0.7 s 镜头切开看别处、再站起来跑
+        if (ClipKey(s6, id, "VilIjaClimbWall")) errors.push(`09-7：${id} 别用 VilIjaClimbWall 翻 0.9 m 的窗台（人会挂到窗洞上方的墙面上）`);
+        const c = Keys(s6, id).find(k => k.stance === "crouch" && k.t > 30);
+        const at = c && PosAt("09-7", s6, id, c.t);
+        if (!c || !at || !InBeiwu(at) || Math.abs(at.x - BACK_WINDOW.x) > 0.5 || at.z - BACK_WINDOW.z > 1.6) errors.push(`09-7：${id} 要在东间后窗 (${BACK_WINDOW.x},${BACK_WINDOW.z}) 里头跟前蹲下，实际 (${at?.x}, ${at?.z})`);
+        const out = c && PosKeys(s6, id).find(k => k.t > c.t && k.z < BACK_WINDOW.z && k.stance === "crouch");
+        if (!out || Math.abs(out.x - BACK_WINDOW.x) > 0.5 || BACK_WINDOW.z - out.z > 1.0 || out.t - c.t > 1.5) errors.push(`09-7：${id} 要蹲着从窗洞挪到窗外正对面（x ±0.5、墙外 ≤ 1 m、蹲下后 ≤ 1.5 s），实际 (${out?.x}, ${out?.z}) @${out?.t}`);
+        if (out) {
+          const mid = out.t - 0.35, cam = [...s6.camera].filter(k => k.t <= mid + 0.01).sort((p, q) => p.t - q.t).at(-1);
+          if (!cam || !cam.eye || !cam.eye.look?.actor) errors.push(`09-7：${id} 过窗台那一下（@${mid.toFixed(2)}）镜头要切开看人（眼睛 look 是演员锚），实际 ${JSON.stringify(cam?.eye?.look ?? cam?.eye?.yawDeg)}`);
+          if (!Keys(s6, id).some(k => k.t > out.t && k.t < out.t + 0.6 && k.stance === "stand")) errors.push(`09-7：${id} 出了窗要站起来跑`);
+        }
+        if (!PosKeys(s6, id).some(k => k.t > (out?.t ?? Infinity) && k.z < 470 && k.move === "run")) errors.push(`09-7：${id} 出窗以后要在墙外往东街跑`);
         if (Keys(s6, id).some(k => k.state === "down")) errors.push(`09-7：${id} 跑了，不死`);
       }
       if (blasts.length) { const eye = [...s6.camera].filter(c => c.t <= blasts[0].t + 0.01).at(-1); const p = eye?.eye || eye?.to || eye?.from; if (!p || InPocket(p) || p.x < 95 || p.x > 105 || p.z < 470 || p.z > 486) errors.push("09-7：墙角爆炸那一刻眼睛要还在北屋 / 老耿家院里（听得见、看不见）"); }

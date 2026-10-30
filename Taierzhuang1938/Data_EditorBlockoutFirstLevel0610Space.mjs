@@ -68,6 +68,16 @@
 //     核心院子（老耿家、街坊家、本家院和戏里要用的院子）这一轮不斜：09 的路线、枪眼、门洞都得跟着重摆，风险太大。
 //   · 非住人的房子与设施：关帝庙（兼村塾，WM2 那院改的）、杂货铺（EM1 临街一间）、村外小庙（东北大道边、门砖封死半塌）、土炮楼（NE4 东北角）、
 //     浇地井 3 口 + 吃水井 4 口、每个住人的院子一个茅圈（ToiletFor / L0610_NAMED_TOILETS：离院门最远又不压房子的角）、场院 2 处、菜园、取土坑积水、粪堆。
+//
+// 第十一版（2026-10-31，用户「白盒里没有把必要的一路上的房子的窗户做出来……不看窗户不知道日军在哪里、不知道蹲下走路的必要性；超级长的一段路……节奏垮掉」）：
+//   · 唯一那条路去掉 09-2 的折返：窄夹道 x 63 走到 z 448 就拐进西配房的豁口（原来为了在街坊家门口瞥一眼要多走到 L4 再折回来，68 s 两边是墙）。
+//     街坊家半掩的院门和门缝的视线保留（09-4 / 09-5 出院门时还经过）。
+//   · 一路上两处「蹲着过窗」（L0610_ALLEY_WINDOWS）：A = WM1 的西厢房挪到后墙贴巷子（x 72.25…76.25），后墙上一扇后窗（z 412，宽 0.7、窗台 1.2、窗顶 1.8）；
+//     B = WY4 的东厢房挪到后墙贴窄夹道（x 58…62、z 445.5…452），后墙上一扇后窗（z 448，尺寸同 A）。两间屋都空心。窗台 1.2：蹲着（眼 1.05）在窗台下、站着（1.6）露头。
+//     隔壁院从 WA1 改成 WY4（街坊家的西邻）：搜人的那两个一个在 A 屋翻东西、一个在 B 屋踹门开枪；人数不加。
+//   · 开窗（白盒留空洞 + 窗台 / 过梁）：老耿家北屋东间后窗（x 104.3，宽 0.8、窗台 0.9、窗顶 1.8：09-7 分队长从这里翻出去）、北屋南墙东西两间各一扇（宽 1.2、窗台 0.9、窗顶 1.8）、
+//     灶屋东窗（z 478，宽 0.8、窗台 0.9、窗顶 1.6：09-6 从窗里看得见蹲在灶台边吃东西的那个）、街坊家北屋南墙东西两间各一扇（宽 1.0、窗台 0.9、窗顶 1.8）。
+//     街坊家南屋（09-4 一刀那间门房）做成空心、门朝院子。
 // ===========================================================================
 
 import {
@@ -79,7 +89,7 @@ export { PointAlong, PointBeside, LineLength };
 
 export const L0610_LEVEL_KEY = "FirstLevel0610";
 export const L0610_TITLE = "第一关 06–10 · 耿家庄（新剧本白盒）";
-export const L0610_VERSION = "2026-10-24 第八版空间（弯河汊子 + 苇子洼 / 凹路缓弯 / 拼块的田 / 林坟树 / 驿道与田间小路 / 院子斜摆与折线胡同 / 关帝庙 杂货铺 小庙 土炮楼 井 茅圈 场院）+ 班长那一路（第九版：后门进 EM1、EM1 / EM2 豁口）";
+export const L0610_VERSION = "2026-10-24 第八版空间（弯河汊子 + 苇子洼 / 凹路缓弯 / 拼块的田 / 林坟树 / 驿道与田间小路 / 院子斜摆与折线胡同 / 关帝庙 杂货铺 小庙 土炮楼 井 茅圈 场院）+ 班长那一路（第九版：后门进 EM1、EM1 / EM2 豁口）+ 第十一版（2026-10-31：一路的窗户、09-2 不再折返）";
 
 /** 场地范围与高度网格（0.5 m 一格，与 0105 一样）。只烘干沟以北到坡顶那一截当背景，前沿不烘。 */
 export const L0610_BOUNDS = Object.freeze({ minX: -20, maxX: 320, minZ: 120, maxZ: 560 });
@@ -509,10 +519,21 @@ export const L0610_GENG = F({
       F({ x: 96.6, z: 470, h: 1.1, who: "rifleWest", name: "西间枪眼" }),
       F({ x: 103.4, z: 470, h: 1.1, who: "rifleEast", name: "东间枪眼" }),
     ]),
+    // 第十一版（10-31）的窗（白盒留空洞 + 窗台 / 过梁）：
+    //   东间后窗（北墙 z 470、x 104.3，宽 0.8、窗台 0.9、窗顶 1.8）：09-7 分队长和跟他跑的那个从这扇窗翻出去往东街跑（人翻得出去：宽 ≥ 0.7、窗台 ≤ 1.0）；在东间塌掉的那段墙上，随 BarrageHit 一起塌；
+    //   南窗两扇（南墙 z 475：西间 x 96.6、东间 x 103.4，宽 1.2、窗台 0.9、窗顶 1.8）：09-6 从后院看得见屋里步枪手的背影。
+    backWindow: F({ wall: "N", x: 104.3, w: 0.8, sillH: 0.9, topH: 1.8, name: "北屋东间后窗（分队长翻出去的）" }),
+    southWindows: F([
+      F({ wall: "S", x: 96.6, w: 1.2, sillH: 0.9, topH: 1.8, name: "北屋西间南窗" }),
+      F({ wall: "S", x: 103.4, w: 1.2, sillH: 0.9, topH: 1.8, name: "北屋东间南窗" }),
+    ]),
     collapseFromX: 102.6,                                        // BarrageHit：东间（x ≥ 102.6）的后墙与房顶塌下来
   }),
   frontRoom: F({ box: Box(95, 105, 470, 475), roofH: 3.5, parapetH: 0.35 }),   // 旧名字 = 北屋
-  zaowu: F({ box: Box(92, 96, 476, 482.6), roofH: 3.0, door: F({ z: 479.3, w: 1.0 }) }),   // 灶屋两间，门在东墙朝院子
+  zaowu: F({ box: Box(92, 96, 476, 482.6), roofH: 3.0, door: F({ z: 479.3, w: 1.0 }),   // 灶屋两间，门在东墙朝院子
+    window: F({ wall: "E", z: 478.0, w: 0.8, sillH: 0.9, topH: 1.6, name: "灶屋东窗" }),    // 第十一版：门北边的小窗，09-6 从窗里看得见蹲在灶台边吃东西的那个
+    peep: P(97.9, 478.3),                                                                     // 09-6 从灶屋东窗往里看的站点（蹲着 1.05）
+  }),
   kitchen: F({ box: Box(92, 96, 476, 482.6), roofH: 3.0, door: F({ z: 479.3, w: 1.0 }) }),  // 旧名字 = 灶屋
   gate: F({ wall: "E", x: 108, z: 483.5, w: 1.5, topH: 2.0, leaf: "open" }),  // 院门：东南角、开在东墙上，朝东墙外的窄胡同；门扇敞着
   yard: F({
@@ -544,7 +565,10 @@ export const L0610_GENG = F({
 export const L0610_JIEFANG = F({
   name: "街坊家", box: Box(64, 84, 444, 467.5), kind: "siheyuan",
   gate: F({ wall: "S", x: 66.5, z: 467.5, w: 1.5, topH: 2.0, leaf: "ajar" }),          // 西南角、开在南墙上，门外是 L4；门扇斜开
-  beiwu: F({ box: Box(69, 79, 444, 449), roofH: 3.2, hollow: true, door: F({ x: 74, w: 1.2 }) }),   // 三间北屋（媳妇被拖进去）：空心，堂屋门朝南
+  beiwu: F({ box: Box(69, 79, 444, 449), roofH: 3.2, hollow: true, door: F({ x: 74, w: 1.2 }),   // 三间北屋（媳妇被拖进去）：空心，堂屋门朝南
+    // 第十一版：南墙东西两间各一扇窗（宽 1.0、窗台 0.9、窗顶 1.8）：媳妇被拖进去后屋里的动静从窗里透出来
+    windows: F([F({ wall: "S", x: 71.2, w: 1.0, sillH: 0.9, topH: 1.8, name: "街坊家北屋西间南窗" }), F({ wall: "S", x: 76.8, w: 1.0, sillH: 0.9, topH: 1.8, name: "街坊家北屋东间南窗" })]),
+  }),
   westWing: F({
     box: Box(64, 68, 449, 456), roofH: 3.0, hollow: true,
     breach: F({ z: 449.25, zTo: 450.75, xTo: 65.6, rubbleH: 0.45 }),   // 西北角挨过炮塌了：西墙 z 449.25…450.75、北墙 x 64.25…65.6 没了，地上一摊矮瓦砾
@@ -554,14 +578,15 @@ export const L0610_JIEFANG = F({
     eyeBackM: 0.6,                                                      // 从窗洞往外看：眼睛在窗后 0.6 m、对着要看的东西（生成器算）
   }),
   eastWing: F({ box: Box(80, 84, 450, 456.5), roofH: 3.0 }),
-  nanwu: F({ box: Box(72, 82, 463.5, 467.5), roofH: 3.0 }),            // 三间南屋（挪到 x 72 起：半掩的门缝里才看得见窖口）
+  // 三间南屋（挪到 x 72 起：半掩的门缝里才看得见窖口）。第十一版：空心、门朝院子开在西头（西头这一间就是 09-4 一刀那间门房，挨着院门）
+  nanwu: F({ box: Box(72, 82, 463.5, 467.5), roofH: 3.0, hollow: true, door: F({ wall: "N", x: 73.0, w: 1.0 }), gatehouse: P(73.0, 465.5) }),
   cellar: F({ x: 73.5, z: 460.5, floorW: 1.6, wallM: 0.15, depth: L0610_HEIGHTS.cellarDepth, mouth: 1.2, rimH: 0.15 }),   // 地瓜窖（院当中偏南）
   cellarLid: F({ x: 75.3, z: 462.0, w: 1.3, d: 1.3, t: 0.08, ry: 0.35 }),
   cellarLidBlown: F({ x: 76.9, z: 458.4, ry: 1.1 }),
   mill: F({ x: 77.0, z: 457.0, baseW: 1.5, baseH: 0.4, stoneW: 1.1, stoneH: 0.35 }),   // 石磨（绑着老汉）
   pisserOffset: P(1.4, -2.3),                                           // 看守站在窖口东北
   tree: P(71.0, 451.2),                                                 // 北屋前的石榴
-  glimpse: P(65.8, 468.2),                                              // 09 在 L4 上从半掩的门缝斜着瞥见院里窖口的站点（关键帧 09-2 用这个点；正对门洞往北看不到偏东的窖口）
+  glimpse: P(65.8, 468.2),                                              // L4 上从半掩的门缝斜着看得见院里窖口的站点（正对门洞往北看不到偏东的窖口）。第十一版起 09-2 不再折返到这里，只是 09-4 / 09-5 出院门时经过；场景生成器还核这条门缝视线
 });
 
 // 本家院（老耿的本家，四合院，x 76…92、z 470…490，跟老耿家共用 x 92 那道墙）。
@@ -591,6 +616,22 @@ export const L0610_NEIGHBOR = F({
 // gate: { wall: "N"|"S"|"E"|"W", c（沿墙的坐标）, w, leaf: "closed"|"open"|null }；houses: [{ id, box, h? }]（北屋在前）；fences: 哪几面是矮篱（菜园）。
 const Y = (id, name, kind, box, gate, houses, extra = {}) => F({ id, name, kind, box, gate, houses: F(houses.map((h) => F(h))), ...extra });
 const Hs = (box, h) => ({ box, h });
+/**
+ * 第十一版（10-31）一路上两处「蹲着过窗」：厢房挪到后墙就是院墙（贴胡同那面），后墙上开一扇后窗，屋子空心。
+ *   A：巷子往南那截（x 71）东边 WM1 的西厢房，后墙 = 院墙 x 72.25，窗中心 z 412；屋里一个鬼子（NextDoorIja2）在木箱跟前翻东西，窗里看得见他上半身晃。
+ *   B：窄夹道（x 63）西边 WY4 的东厢房（WY4 = 街坊家的西邻 = 剧本说的「隔壁院」），后墙 = 院墙 x 62，窗中心 z 448：顺子顺 x 63 走到 z 448 再拐进豁口，正从窗下过；
+ *      屋里另一个（NextDoorIja1）踹里屋的门、吼、开那一枪。
+ * 窗台 1.2：蹲着（眼 1.05）自己的头在窗台下、站着（1.6）露头；窗宽 0.7。stand 是场景生成器核视线用的路线上的站点（离墙 1.25 m）；inside 是屋里那个鬼子站的地方——
+ * 挪到离窗那面墙的里墙面约 1 m（10-31 协调人：蹲着眼 1.05、离墙 1.25 m 往上看，屋里离墙 1 m、头 1.5–1.7 的人，窗洞里看得见头和肩；胸口 1.2 以下还是被窗台挡）。
+ */
+export const L0610_ALLEY_WINDOWS = F({
+  A: F({ id: "AlleyWindowA", name: "巷子东墙上的后窗 A（WM1 西厢房）", yard: "WM1", house: Box(72.25, 76.25, 409, 415.5), wall: "W", x: 72.25, z: 412, w: 0.7, sillH: 1.2, topH: 1.8,
+    door: F({ wall: "E", z: 412.25, w: 1.0 }), stand: P(71.0, 411.5), inside: P(73.55, 412.3), chest: F({ x: 72.95, z: 412.3, ry: 1.5708 }) }),   // 木箱贴在窗下那面墙根（里墙面 72.5 → 箱子 72.65…73.25）
+  B: F({ id: "AlleyWindowB", name: "窄夹道西墙上的后窗 B（隔壁院 WY4 东厢房）", yard: "WY4", house: Box(58, 62, 445.5, 452), wall: "E", x: 62, z: 448, w: 0.7, sillH: 1.2, topH: 1.8,
+    door: F({ wall: "W", z: 448.75, w: 1.0 }), stand: P(63.2, 447.6), inside: P(60.8, 448.2) }),
+});
+const AW = L0610_ALLEY_WINDOWS;
+const AlleyWindowHouse = (w, h) => ({ box: w.house, h, hollow: true, door: w.door, windows: [{ wall: w.wall, [w.wall === "N" || w.wall === "S" ? "x" : "z"]: w.wall === "N" || w.wall === "S" ? w.x : w.z, w: w.w, sillH: w.sillH, topH: w.topH }] });
 export const L0610_YARDS = F([
   // --- 北边：路沟南沿到巷子第一道弯（后墙错开：WN1 到 401.25、WN1b / WN2 到 398.75） ---
   Y("WN1", "村北西头的半面槽院", "banmian", Box(40, 52, 385, 401.25), F({ wall: "E", c: 400, w: 1.5, leaf: "closed" }), [Hs(Box(42.5, 49.1, 385.5, 390.5), 3.2), Hs(Box(47.5, 51.5, 393, 399.5), 3.0)], { tree: P(44, 395) }),
@@ -602,11 +643,13 @@ export const L0610_YARDS = F([
   Y("WY2a", "西头的四合院", "siheyuan", Box(40, 56, 401.25, 421.75), F({ wall: "N", c: 54, w: 1.5, leaf: "closed" }), [Hs(Box(43, 53, 401.75, 406.75), 3.2), Hs(Box(40.5, 44.5, 409.5, 416), 3.0), Hs(Box(51.5, 55.5, 409.5, 416), 3.0), Hs(Box(43, 53, 417.5, 421.25), 3.0)], { tree: P(48, 408.5) }),
   Y("WY2b", "巷子西边的半面槽院", "banmian", Box(56, 69.75, 401.25, 421.75), F({ wall: "E", c: 419, w: 1.5, leaf: "closed" }), [Hs(Box(58, 68, 402, 407), 3.2), Hs(Box(56.5, 60.5, 409, 415.5), 3.0)]),
   // 富户：几院相连的大四合院（主街西边），门朝主街；08-1 之前这院没人
-  Y("WM1", "主街西边的大四合院（富户）", "siheyuan", Box(72.25, 96.75, 401.25, 421.75), F({ wall: "E", c: 418.5, w: 1.5, leaf: "open" }), [Hs(Box(76, 92.6, 402, 407), 3.5), Hs(Box(72.75, 76.75, 409, 415.5), 3.0), Hs(Box(91.5, 95.5, 409, 415.5), 3.0), Hs(Box(78, 88, 417.5, 421.25), 3.0)], { tree: P(83, 410.5) }),
+  // 第十一版：西厢房挪到后墙贴巷子（x 72.25…76.25）、空心、后墙上后窗 A（L0610_ALLEY_WINDOWS.A）
+  Y("WM1", "主街西边的大四合院（富户）", "siheyuan", Box(72.25, 96.75, 401.25, 421.75), F({ wall: "E", c: 418.5, w: 1.5, leaf: "open" }), [Hs(Box(76, 92.6, 402, 407), 3.5), AlleyWindowHouse(AW.A, 3.0), Hs(Box(91.5, 95.5, 409, 415.5), 3.0), Hs(Box(78, 88, 417.5, 421.25), 3.0)], { tree: P(83, 410.5) }),
   // --- 巷子第二道弯以南到 L4 ---
   Y("WY3", "西边的排房院（塌了一角）", "paifang", Box(40, 62, 421.75, 445), F({ wall: "E", c: 443, w: 1.5, leaf: "closed" }), [Hs(Box(44, 60.5, 422.25, 427.25), 3.2)], { tree: P(48, 437) }),
   Y("WA1", "窄夹道东边的小排房院（两间）", "paifang", Box(64, 72.25, 424.25, 444), F({ wall: "W", c: 441.5, w: 1.2, leaf: "closed" }), [Hs(Box(65, 71.5, 425, 429.5), 3.0)]),
-  Y("WY4", "西南的四合院", "siheyuan", Box(40, 62, 445, 467.5), F({ wall: "S", c: 61, w: 1.5, leaf: "closed" }), [Hs(Box(46, 56, 445.5, 450.5), 3.2), Hs(Box(40.5, 44.5, 452.5, 459), 3.0), Hs(Box(57.5, 61.5, 452.5, 459), 3.0), Hs(Box(46, 56, 463, 467), 3.0)], { tree: P(50.5, 456) }),
+  // 第十一版：隔壁院（街坊家的西邻）。东厢房挪到后墙贴窄夹道（x 58…62、z 445.5…452）、空心、后墙上后窗 B（L0610_ALLEY_WINDOWS.B）；院门照旧关着（泛洪只许走唯一那条路）
+  Y("WY4", "西南的四合院（隔壁院）", "siheyuan", Box(40, 62, 445, 467.5), F({ wall: "S", c: 61, w: 1.5, leaf: "closed" }), [Hs(Box(46, 56, 445.5, 450.5), 3.2), Hs(Box(40.5, 44.5, 452.5, 459), 3.0), AlleyWindowHouse(AW.B, 3.0), Hs(Box(46, 56, 463, 467), 3.0)], { tree: P(50.5, 456) }),
   // 第八版：主街西边这院改成关帝庙（兼村塾）——北边三间正殿（空心、门朝南没门扇，殿里课桌与香案见 L0610_TEMPLE）；院墙、院门照旧朝主街
   Y("WM2", "关帝庙（兼村塾）", "temple", Box(72.25, 96.75, 421.75, 444), F({ wall: "E", c: 442.5, w: 1.5, leaf: "closed" }), [{ id: "TempleHall", box: Box(79, 90, 422.25, 428), h: 3.8, hollow: true, door: { wall: "S", x: 84.5, w: 1.4 } }], { tree: P(84, 433), wallH: 2.4 }),
   Y("WM3", "路口西北角的半面槽院", "banmian", Box(84, 96.75, 444, 467.5), F({ wall: "S", c: 86, w: 1.5, leaf: "closed" }), [Hs(Box(85.5, 95.5, 444.5, 449.5), 3.2), Hs(Box(84.5, 88.5, 452, 458.5), 3.0)], { notch: Box(92, 96.75, 458, 467.5) }),   // 东南角被丁字路口切掉
@@ -908,9 +951,9 @@ export const L0610_FILL_YARDS = F({
 // 顺子和妮儿那条唯一的路：巷子口 → 老耿家灶屋门口（按段标 seg）。
 export const L0610_ROUTE = F({
   segments: F([
-    F({ seg: "alley", name: "巷子口下到夹道、拐四道弯到街坊家西墙外", line: Line([80, 384], [80, 400], [71, 400], [71, 423], [63, 423], [63, 448]) }),
-    F({ seg: "glimpse", name: "沿窄夹道到 L4、在街坊家半掩的门口瞥见院里", line: Line([63, 448], [63, 468.75], [66.5, 468.75]) }),
-    F({ seg: "breach", name: "回头从西配房塌掉的西北角钻进去", line: Line([66.5, 468.75], [63, 468.75], [63, 450], [65.2, 450], [66.6, 451.6]) }),
+    // 第十一版（10-31）：不再折返到 L4 的门口瞥一眼——两处后窗（A z 412 / B z 448）在这一段上，窄夹道走到 z 448 就拐进豁口
+    F({ seg: "alley", name: "巷子口下到夹道、拐四道弯、窄夹道到后窗 B 底下（路上两处蹲着过窗）", line: Line([80, 384], [80, 400], [71, 400], [71, 423], [63, 423], [63, 448]) }),
+    F({ seg: "breach", name: "从西配房塌掉的西北角钻进去", line: Line([63, 448], [63, 450], [65.2, 450], [66.6, 451.6]) }),
     F({ seg: "passage", name: "出西南角院门、L4 往西几步、南北夹道往南", line: Line([66.6, 451.6], [66.6, 455], [68.8, 455], [68.8, 466.3], [66.5, 466.3], [66.5, 468.75], [75, 468.75], [75, 491], [78.5, 491]) }),
     F({ seg: "benjia", name: "本家院：院门进、穿院子到共用墙的便门", line: Line([78.5, 491], [78.5, 488.4], [84.5, 484.6], [90.7, 484.6]) }),
     F({ seg: "dogHole", name: "狗洞（只有妮儿钻得过；大人走便门）", line: Line([90.7, 484.6], [90.7, 473], [93.3, 473]) }),
@@ -939,6 +982,7 @@ export const L0610_PROP_KINDS = F({
   Bandage: F({ w: 0.35, d: 0.25, h: 0.04, semantic: "plaster", name: "扔下的绷带" }),
   Canteen: F({ w: 0.18, d: 0.1, h: 0.22, semantic: "metal", name: "空水壶" }),
   AmmoBox: F({ w: 0.5, d: 0.34, h: 0.3, semantic: "timber", name: "弹药箱" }),
+  Chest: F({ w: 1.0, d: 0.6, h: 0.7, semantic: "timber", name: "木箱（衣箱）" }),   // 第十一版：后窗 A 那间屋里被翻的箱子
 });
 const Prop = (id, x, z, ry = 0) => F({ id, kind: id.split("_")[0], x, z, ry });
 export const L0610_PROPS = F([
@@ -958,6 +1002,8 @@ export const L0610_PROPS = F([
   // 班长那一路（10-24）：EM2 院里房前的水缸、EM3 北屋西边空地上的水缸（蹲着能藏人；翻墙的柴垛是 L0610_EAST_YARD_ROUTE.climb.pile，场景生成器单出）
   Prop("WaterVat_EM2", 108.4, 418.0), Prop("WaterVat_EM3", 104.1, 447.0),
   Prop("Haystack_W2", 56, 436, 0.1), Prop("WaterVat_W3", 66, 412),
+  // 第十一版：后窗 A 那间屋（WM1 西厢房）里被翻的木箱——窗里看得见鬼子弯腰在它跟前翻
+  Prop("Chest_A", L0610_ALLEY_WINDOWS.A.chest.x, L0610_ALLEY_WINDOWS.A.chest.z, L0610_ALLEY_WINDOWS.A.chest.ry),
   // 村南
   Prop("Haystack_B1", 86, 540, 0), Prop("WaterVat_B1", 124.6, 540.6), Prop("Haystack_B2", 100.6, 515.6, 0.2),
   // 空宅基 / 菜园边的粪堆
@@ -1014,6 +1060,16 @@ export const L0610_PLACES = F({
   pocketGate: F({ name: "路口东北角那院的南门（班长蹲门后）", x: 106.5, z: 458 }),
   eastRoadView: F({ name: "东北进庄的道（看得见的那一段）", x: 272, z: 388 }),
   l4Mouth: F({ name: "L4 东头（接丁字路口）", x: 92, z: 468.75 }),
+  // 第十一版（10-31）的窗与门房
+  alleyWindowA: F({ name: L0610_ALLEY_WINDOWS.A.name, x: L0610_ALLEY_WINDOWS.A.x, z: L0610_ALLEY_WINDOWS.A.z }),
+  alleyWindowB: F({ name: L0610_ALLEY_WINDOWS.B.name, x: L0610_ALLEY_WINDOWS.B.x, z: L0610_ALLEY_WINDOWS.B.z }),
+  gengBackWindow: F({ name: L0610_GENG.beiwu.backWindow.name, x: L0610_GENG.beiwu.backWindow.x, z: L0610_GENG.beiwu.box.minZ }),
+  gengSouthWindowWest: F({ name: L0610_GENG.beiwu.southWindows[0].name, x: L0610_GENG.beiwu.southWindows[0].x, z: L0610_GENG.beiwu.box.maxZ }),
+  gengSouthWindowEast: F({ name: L0610_GENG.beiwu.southWindows[1].name, x: L0610_GENG.beiwu.southWindows[1].x, z: L0610_GENG.beiwu.box.maxZ }),
+  kitchenWindow: F({ name: L0610_GENG.zaowu.window.name, x: L0610_GENG.zaowu.box.maxX, z: L0610_GENG.zaowu.window.z }),
+  jiefangSouthWindowWest: F({ name: L0610_JIEFANG.beiwu.windows[0].name, x: L0610_JIEFANG.beiwu.windows[0].x, z: L0610_JIEFANG.beiwu.box.maxZ }),
+  jiefangSouthWindowEast: F({ name: L0610_JIEFANG.beiwu.windows[1].name, x: L0610_JIEFANG.beiwu.windows[1].x, z: L0610_JIEFANG.beiwu.box.maxZ }),
+  jiefangGatehouse: F({ name: "街坊家门房（南屋西头，09-4 一刀那间）", x: L0610_JIEFANG.nanwu.gatehouse.x, z: L0610_JIEFANG.nanwu.gatehouse.z }),
   jiefangGate: F({ name: "街坊家院门（半掩）", x: L0610_JIEFANG.gate.x, z: L0610_JIEFANG.gate.z }),
   jiefangBreach: F({ name: "街坊家西配房塌掉的西北角（豁口）", x: 64.2, z: 450 }),
   jiefangWindow: F({ name: "西配房朝院子的窗洞", x: 68, z: L0610_JIEFANG.westWing.window.z }),

@@ -1186,6 +1186,14 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
   - **台词与配音**（`Data_EditorBlockoutFirstLevel0610Lines.mjs` 第七版）：新抽 15 场（DitchHit、LuoBeforeHelp、LuoSplitsUp 重写、LuoToRamp、LiuKnows、LiuGirlLeads、ShunziHerHome、NextDoorShout、LiuNextDoor、GatehouseHowl、LeaderBehind、BeiwuLunge、BeiwuBitten、LuoPullsUp、LuoHelpCart），4 场重抽（DitchHit 削波、LiuKnows / LiuGirlLeads 多念一句、LuoToRamp 前两次把提示词念了出来）；删 LiuMutters、LuoShutUp、DoorPeek、KitchenLunge / KitchenBitten / KitchenCheck、LuoShellsIn。口型轨重烘 85 条。
   - **测试**：KeyframesTest / PrevizTest 按新口径重写（人数 15、有名字的不死、死者按帧累加、刘文财那一路、10-5 静 ≥ 2 s / 抛镜 ≥ 2 m / 耳鸣里那句 / 捡枪字）；`Script_EditorBlockoutBrowserTest.mjs` 一条旧断言改站坡道朝东看沟东半截。截图 `_shots/Rev0610_20261030/`（不进仓库）。
   - **还没做的**：远处大队只到二百来米；09-7 没到 90 s；哨子、墙外脚步没有专门的声音（用远处日语吼、低音量落土顶）；门房要真进屋得改场景。
+- **第十一版：一路的窗户与 09-2 夹道（2026-10-31）**：用户「白盒里没有把必要的一路上的房子的窗户做出来……不看窗户不知道日军在哪里、不知道蹲下走路的必要性；超级长的一段路……节奏垮掉」。
+  - **路线**：`L0610_ROUTE` 删 `glimpse` 段（原来为了在街坊家门口瞥一眼要走到 L4 再折回豁口），窄夹道走到 z 448 就拐进西配房豁口；全程 227 → 182.5 m。门缝视线保留（09-4/09-5 出院门时经过）。
+  - **一路两处蹲着过窗**（`L0610_ALLEY_WINDOWS`）：A = WM1 西厢房挪到后墙贴巷子（x 72.25…76.25），后窗 z 412；B = 隔壁院 WY4 东厢房挪到后墙贴窄夹道（x 58…62、z 445.5…452），后窗 z 448；都宽 0.7、窗台 1.2、窗顶 1.8，屋子空心。屋里的人离里墙面约 1 m：蹲着（眼高 1.05）看得见他站起来时的头肩，看不见胸口；站着整个上半身都看得见（SceneTest / KeyframesTest 核）。
+  - **隔壁两个**：隔壁院从 WA1 改成 WY4，人数不加（尖兵还是 15）。一个在 A 屋窗下翻木箱（`Chest_A`），一个在 B 屋窗下翻东西、再踹门开那一枪；09-3 两人从 L4 拐进窄夹道往北跑过豁口外，去踹 WA1 的院门；09-4 吹哨后去路口。
+  - **预演 09-2**：68.6 s → 34.4 s。刘文财挤到前头，在窗前蹲下、回头压手（PvCrouchPointL）→ 定镜看窗洞，屋里那个站起来 → 蹲着挪过去 → 三次切镜跳过路 → 窄夹道里隔墙听窖口吼、窖里哭 → 窗 B 前又压手 → 屋里人站起、踹门、吼、一枪。眼睛全程蹲着。
+  - **开窗**（白盒留洞 + 窗台 / 过梁，`HollowHouse` 支持 `windows: []`，旧 `window` 兼容）：老耿家北屋东间后窗 x 104.3（宽 0.8、窗台 0.9，在塌墙段上随 BarrageHit 一起塌）；北屋南窗两扇 x 96.6 / 103.4（09-6 在院里看得见西间步枪手）；灶屋东窗 z 478（09-6 摸过去之前从窗里看见灶台边那个）；街坊家北屋南窗两扇 x 71.2 / 76.8；街坊家南屋（门房）空心、门朝院子开在西头，09-4 站位没动。地图加 9 个地标。
+  - **09-7 翻后窗**：分队长、Rifle3 跑到窗里蹲下、蹲着挪到窗台跟前，过墙那 0.5 m 用切（镜头切开看刘文财 0.9 s），落在窗外正对面墙根再站起来跑；库里没有对得上 0.9 m 窗台的翻越片段（PvClimbOutTrench 撑 1.4 m、VilHandsUpClimbOut 从窖底爬），不用 VilIjaClimbWall（会挂在墙面上方）。
+  - **测试**：0610 四个、PrevizPlanTest、ConfigTest、1218 三个、0105 三个、PrevizRuntimeBrowserTest 43/43、BrowserTest 149/149、MapTest 60/60、ModuleGraphTest 全过。1218 借的老耿家体块要那边重烘 scene.json 才带新窗（已告诉 12–18 的会话）。白盒 JSON 带 `?t=` no-store 取，不用抬缓存戳。
 
 ## 16. 11–18 新剧本白盒（关卡键 `FirstLevel1218`，2026-10-26 第三版：北沙河村）
 

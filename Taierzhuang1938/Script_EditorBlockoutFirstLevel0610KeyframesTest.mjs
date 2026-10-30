@@ -7,7 +7,7 @@
 // 07 妮儿挂在车尾沿上（ride）、别的帧不挂；后送队够多（07 贴西坎、08 起缩在路沟东半截与凹路末段、10-4 顺主街拐进窄胡同、10-5 起出了村南口）；冬瓜一直躺在自己的担架上；
 // 日军人数前后对得上（08 开头 15 个：北屋 8、墙角 2、搜窖 4、灶屋 1；08-4 墙角一个跑了；09-7 灶屋 1 + 北屋来的 2 死在灶屋；10-1 北屋 6 全倒、墙角倒 2 跑 3）；
 // 08 四个压枪眼的人趴在街口坡道上都看得见堂屋枪眼后的机枪手、08-3 班长四人蹲在坡道脚下没动、08-4 妮儿钻进巷子 / 班长四人到大车后头 / 一个鬼子往东街跑；
-// 09 顺子和妮儿一路拉着手走唯一的那条路（每帧两人不超过 2 m、都在路线 3 m 内、09 都是蹲着）、09-2 门口瞥见窖口、09-3 窗后看得见窖口和被捅倒的汉子、09-4 探头的在西配房门口、
+// 09 顺子和妮儿一路拉着手走唯一的那条路（每帧两人不超过 2 m、都在路线 3 m 内、09 都是蹲着）、09-2 蹲在后窗 B 底下（第十一版 10-31：不再折返到门口瞥一眼；搜人的两个各在后窗 A / B 的屋里）、09-3 窗后看得见窖口和被捅倒的汉子、
 // 09-5 妮儿钻狗洞拔便门、09-6 从院子南墙根看得见堂屋门里机枪手的后背、09-7 灶屋里倒地仰视 + 北屋来的两个；10-1 背后打掉六个、10-2 石碾后看得见街上的鬼子 / 看不见过了弯的军官、
 // 10-3 掷弹筒藏着 / 幺娃接过机枪 / 抄北边的在院子链里、10-4 后送队贴着石碾拐进窄胡同 + 妮儿抱腿、10-5 炮来了全班在院里往院门跑、10-6 塌墙 + 柴垛翻墙 + 后送队在村南口外；
 // 10-22 用户：挨着枪的移动一律跑（08–10 里每一次 ≥ 2 m 的移动 speedMps ≥ 1.9，百姓除外；09 潜行蹲着）。
@@ -25,7 +25,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { ValidateBlockout, NormalizeBlockout } from "./Script_EditorBlockoutConfig.mjs";
 import { FIRST_LEVEL_SPEAKING_CAST } from "./Data_FirstLevelSpeakingCast.mjs";
-import { BuildFirstLevel0610Config, StreetRoute, LoadSceneLayout, StandSampler, FirstLevel0610Issues, RoadPointAtX, BIG_LOCUST } from "./Script_EditorBlockoutFirstLevel0610Keyframes.mjs";
+import { BuildFirstLevel0610Config, StreetRoute, LoadSceneLayout, StandSampler, FirstLevel0610Issues, RoadPointAtX, BIG_LOCUST, BACK_WINDOW } from "./Script_EditorBlockoutFirstLevel0610Keyframes.mjs";
+import { L0610_ALLEY_WINDOWS as AW } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 import { BlockSight, SolidBlocks, BlockCenterY } from "./Script_EditorBlockoutFirstLevel0610Scene.mjs";
 import {
   L0610_BOUNDS as B, L0610_PLACES as P, L0610_GENG as G, L0610_JIEFANG as JF, L0610_BENJIA as BJ, L0610_EAST_STREET as ES, L0610_SOUTH_LANE as SLN,
@@ -178,7 +179,8 @@ const NEXTDOOR_IDS = ["NextDoorIja1", "NextDoorIja2"];
   for (const uid of ["Rifle2", "Rifle4"]) for (const id of IDS) assert.ok(!Unit(id, uid), `${id} 没有 ${uid}（东西两间各一个）`);
   assert.equal(ija.filter((u) => ["house", "corner"].includes(u.group)).length, 9, "08-1 老耿家那伙 9 个（北屋 6 + 墙角 2 + 灶屋 1）");
   assert.equal(ija.filter((u) => ["cellar", "nextDoor"].includes(u.group)).length, 6, "08-1 后头搜人的 6 个（街坊家 4 + 隔壁院 2）");
-  for (const uid of NEXTDOOR_IDS) assert.ok(InBox(Unit("08-1", uid), yardBox("WA1"), -0.3), `08-1 ${uid} 在隔壁院 WA1 里`);
+  // 第十一版（10-31）：搜人的那两个一个在后窗 B 那间屋（隔壁院 WY4 的东厢房）、一个在后窗 A 那间屋（WM1 的西厢房）
+  assert.ok(InBox(Unit("08-1", "NextDoorIja1"), AW.B.house, -0.3) && InBox(Unit("08-1", "NextDoorIja2"), AW.A.house, -0.3), "08-1 搜人的两个：一个在后窗 B 的屋里（隔壁院 WY4 东厢房）、一个在后窗 A 的屋里（WM1 西厢房）");
   // 第九版：东北角墙后打一梭子的那个（土炮楼西北角外、庄子北墙 z 388 的北边、主街以东远处），露一下就缩回去：只在 08-1
   const ne = Unit("08-1", "NeCornerIja");
   assert.ok(ne && ne.group === "ne" && ne.aim && ne.x > 200 && ne.z < 388 && ne.intent?.length, `08-1 东北角墙后要有一个打一梭子的鬼子 (${ne?.x},${ne?.z})`);
@@ -317,9 +319,16 @@ for (const id of ["09-1", "09-2", "09-3", "09-4", "09-5", "09-6"]) {
   else if (id === "09-4") assert.ok(InBox(pl, JF.box, -0.3) && InBox(liu, JF.box, -0.3) && RouteDist(nier) <= 3.0, "09-4 顺子、刘文财在街坊家院里（门房前），妮儿在西配房门外的路线上");
   else assert.ok(RouteDist(pl) <= 3.0 && RouteDist(nier) <= 3.0 && RouteDist(liu) <= 3.5, `${id} 三人都在唯一那条路（L0610_ROUTE）3 m 内：顺子 ${RouteDist(pl).toFixed(1)} / 妮儿 ${RouteDist(nier).toFixed(1)} / 刘文财 ${RouteDist(liu).toFixed(1)}`);
 }
-// 第十版：隔壁院 WA1 的两个：09-1 / 09-2 在院里、09-3 在窄夹道（x≈63）上往 L4 小跑、09-4 起在 pocket
-for (const id of ["09-1", "09-2"]) for (const uid of NEXTDOOR_IDS) assert.ok(InBox(Unit(id, uid), yardBox("WA1"), -0.3), `${id} ${uid} 在隔壁院 WA1 里`);
-for (const uid of NEXTDOOR_IDS) { const u = Unit("09-3", uid); assert.ok(Math.abs(u.x - ST.alleyA5.c) < 0.5 && u.z > 444 && u.z < 468 && u.path?.length >= 3 && u.speedMps >= 3, `09-3 ${uid} 扛着东西在窄夹道上小跑 (${u.x},${u.z})`); }
+// 第十一版（10-31）：搜人的两个——09-1 一个在后窗 B 的屋里（隔壁院 WY4 东厢房）、一个在后窗 A 的屋里（WM1 西厢房）；09-2 B 那个还在屋里（踹门、开枪），A 那个翻完出了屋、在 WM1 院里要绕回隔壁院；
+// 09-3 两个在窄夹道（x≈63）上跑过豁口外、停在北边那院 WA1 的院门口；09-4 起在 pocket。两人的来路要接得上（有显式 path、速度是跑）
+assert.ok(InBox(Unit("09-1", "NextDoorIja1"), AW.B.house, -0.3) && InBox(Unit("09-1", "NextDoorIja2"), AW.A.house, -0.3), "09-1 搜人的两个各在后窗 B / A 的屋里");
+assert.ok(InBox(Unit("09-2", "NextDoorIja1"), AW.B.house, -0.3) && Unit("09-2", "NextDoorIja1").aim, "09-2 踹门开枪的那个在后窗 B 的屋里（端着枪）");
+{ const u = Unit("09-2", "NextDoorIja2"); assert.ok(InBox(u, yardBox("WM1"), -0.3) && !InBox(u, AW.A.house, 0.3) && u.path?.some((p) => InBox(p, AW.A.house, -0.3)) && u.speedMps >= 3, `09-2 翻箱子的那个已出了后窗 A 的屋、在 WM1 院里（来路从屋里起）(${u.x},${u.z})`); }
+for (const uid of NEXTDOOR_IDS) {
+  const u = Unit("09-3", uid);
+  assert.ok(Math.abs(u.x - ST.alleyA5.c) < 0.5 && u.z > 440 && u.z < 452 && u.path?.length >= 3 && u.speedMps >= 3, `09-3 ${uid} 背着东西在窄夹道上跑过豁口外、停在北边那院门口 (${u.x},${u.z})`);
+  assert.ok(u.path.some((p) => Math.abs(p.x - ST.alleyA5.c) < 0.5 && p.z > 466) && DistXZ(u.path[0], Unit("09-2", uid)) < 0.3, `09-3 ${uid} 的来路从 09-2 的位置起、经窄夹道南口 (L4) 往北`);
+}
 for (const id of ["09-4", "09-5", "09-6"]) for (const uid of NEXTDOOR_IDS) assert.ok(InBox(Unit(id, uid), ST.pocket.box, 0.6) && Unit(id, uid).state !== "down", `${id} ${uid} 跟着到了路口墙角`);
 {
   // 第九版：09-1 顺子直着拐进往西那条死胡同（alleyWestStub），走到瓦砾跟前被堵死；妮儿在他身后追上来
@@ -329,7 +338,17 @@ for (const id of ["09-4", "09-5", "09-6"]) for (const uid of NEXTDOOR_IDS) asser
   assert.ok(pl.x - (rubble.x + rubble.w / 2) < 1.5, "09-1 玩家离瓦砾东沿不到 1.5 m（走到头了）");
   assert.ok(nier.x > pl.x + 0.6 && Math.abs(nier.z - stub.c) < 0.8 && nier.path?.length >= 3 && nier.path[0].z < 386, "09-1 妮儿在顺子身后（东边），来路从巷子口追上来");
 }
-assert.ok(DistXZ(KF("09-2").player, JF.glimpse) < 1.5 && KF("09-2").player.z > JF.gate.z + 0.5 && KF("09-2").player.z < JF.gate.z + 2.2, "09-2 玩家在街坊家门口（L4 上、门洞外 1 m 左右）瞥见");
+{
+  // 第十一版（10-31）09-2：玩家蹲在后窗 B 底下（路线上、离墙 1 m 多）、面朝窗；刘文财在前头（豁口口上）回头压手、妮儿拉着手在身边；不再折返到 L4 的门口
+  const pl = KF("09-2").player, liu = Unit("09-2", "LiuWencai"), nier = Unit("09-2", "Nier");
+  assert.ok(DistXZ(pl, AW.B.stand) < 0.3 && pl.stance === "crouch" && Math.abs(pl.yawDeg - 90) < 30, `09-2 玩家蹲在后窗 B 底下、面朝窗 (${pl.x},${pl.z},${pl.yawDeg})`);
+  assert.ok(Math.abs(pl.x - AW.B.x) >= 1.0 && Math.abs(pl.x - AW.B.x) <= 1.6 && Math.abs(pl.z - AW.B.z) <= 1.0, "09-2 玩家离后窗 B 那面墙 1…1.6 m、在窗口正对面");
+  assert.ok(liu.z > pl.z + 1.0 && liu.z <= 450.6 && Math.abs(liu.x - ST.alleyA5.c) < 0.5 && Math.abs(liu.yawDeg) < 30, `09-2 刘文财在前头（豁口口上）回头 (${liu.x},${liu.z},${liu.yawDeg})`);
+  assert.ok(nier.z > pl.z && nier.z < liu.z, "09-2 妮儿在顺子和刘文财之间");
+  assert.ok(pl.z < JF.gate.z - 15 && !KF("09-2").pois.some((p) => p.id === "JiefangGate"), "09-2 不再走到 L4 的门口瞥一眼");
+  assert.ok(KF("09-2").pois.some((p) => p.id === "WindowA" && DistXZ(p, { x: AW.A.x, z: AW.A.z }) < 0.1) && KF("09-2").pois.some((p) => p.id === "WindowB" && DistXZ(p, { x: AW.B.x, z: AW.B.z }) < 0.1), "09-2 两处后窗都标了 POI");
+  assert.ok(/窗/.test(KF("09-2").what) && /蹲/.test(KF("09-2").what), "09-2 说明字提到窗和蹲着过");
+}
 {
   const pl = KF("09-3").player;
   assert.ok(InBox(pl, JF.westWing.box, -0.25), "09-3 玩家在西配房里");
@@ -376,7 +395,15 @@ assert.ok(KF("09-6").player.x > 97.6 && KF("09-6").player.x < 102.4 && KF("09-6"
   assert.ok(Unit("09-7", "Rifle1").aim && Unit("09-7", "Rifle1").state !== "down" && DistXZ(Unit("09-7", "Rifle1"), pl) < 1.5 && DistXZ(Unit("09-7", "Nier"), Unit("09-7", "Rifle1")) < 2.0 && InBox(Unit("09-7", "Nier"), G.beiwu.box), "09-7 Rifle1 压着顺子、妮儿在北屋里咬手腕");
   for (const uid of ["MgGunner", "MgLoader", "MgThird", "KitchenIja"]) assert.equal(Unit("09-7", uid).state, "down", `09-7 ${uid} 倒了`);
   assert.ok(InBox(Unit("09-7", "KitchenIja"), G.zaowu.box) && DistXZ(Unit("09-7", "KitchenIja"), Unit("09-6", "KitchenIja")) < 0.1, "09-7 灶屋那个倒在 09-6 蹲的地方");
-  for (const uid of ["Leader", "Rifle3"]) { const u = Unit("09-7", uid); assert.ok(u.state !== "down" && !InBox(u, G.beiwu.box) && u.z < G.beiwu.box.minZ && u.x > 103 && u.path?.length >= 2 && u.speedMps >= 3, `09-7 ${uid} 从东间窗洞翻出去往东街跑 (${u.x},${u.z})`); }
+  for (const uid of ["Leader", "Rifle3"]) {
+    const u = Unit("09-7", uid);
+    assert.ok(u.state !== "down" && !InBox(u, G.beiwu.box) && u.z < G.beiwu.box.minZ && u.x > 103 && u.path?.length >= 2 && u.speedMps >= 3, `09-7 ${uid} 从东间窗洞翻出去往东街跑 (${u.x},${u.z})`);
+    // 第十一版：来路穿东间后墙新开的后窗（x 104.3）——屋里一点、墙外一点都在窗洞中心 ±0.5 内，中间那一段正穿过窗洞；不穿别处的墙
+    const SegD = (p, a, b) => { const dx = b.x - a.x, dz = b.z - a.z, l2 = dx * dx + dz * dz; const t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / l2)) : 0; return Math.hypot(p.x - a.x - dx * t, p.z - a.z - dz * t); };
+    const crossing = u.path.slice(1).map((p, i) => [u.path[i], p]).find(([a, b]) => a.z > G.beiwu.box.minZ && b.z < G.beiwu.box.minZ);
+    assert.ok(crossing && SegD(BACK_WINDOW, crossing[0], crossing[1]) <= 0.5 && Math.abs(crossing[0].x - BACK_WINDOW.x) <= 0.5 && Math.abs(crossing[1].x - BACK_WINDOW.x) <= 0.5, `09-7 ${uid} 的来路要从东间后窗 (${BACK_WINDOW.x},${BACK_WINDOW.z}) 穿出去：${JSON.stringify(crossing)}`);
+    assert.ok(u.path.filter((p) => p.z > G.beiwu.box.minZ).every((p) => InBox(p, G.beiwu.box, -0.2)), `09-7 ${uid} 翻窗前的来路都在北屋里`);
+  }
   assert.ok(InBox(Unit("09-7", "LiuWencai"), G.beiwu.box) && Unit("09-7", "LiuWencai").x > 101 && Unit("09-7", "LiuWencai").aim, "09-7 刘文财在东间顾不上这边");
   assert.equal(KF("09-7").units.filter((u) => u.side === "ija" && u.state !== "down" && InBox(u, G.beiwu.box)).length, 1, "09-7 北屋里活着的只剩压着顺子那个");
   for (const uid of ["CornerIja1", "NextDoorIja1", "CellarIja3"]) assert.ok(Unit("09-7", uid).state === "down" && InBox(Unit("09-7", uid), ST.pocket.box, 0.6), `09-7 墙角的 ${uid} 倒了`);
@@ -579,7 +606,19 @@ assert.equal(Sight("08-1", Unit("08-1", "Villager1"), 0.9), null, "08-1 坡道�
   }
   assert.ok(visibleM / (runner.speedMps || 4) >= 1.0, `08-3 喊人的鬼子从幺娃趴的地方只看得见 ${(visibleM / (runner.speedMps || 4)).toFixed(2)} s（要 ≥ 1.0）`);
 }
-assert.equal(Sight("09-2", Unit("09-2", "CellarIja1"), 1.4), null, "09-2 门口瞥见窖口的鬼子");
+{
+  // 第十一版 09-2：蹲在后窗 B 底下的站点——站着（1.6）看得进屋里那个鬼子（头 1.5），蹲着（关键帧的姿势，1.05）被窗台 1.2 挡住
+  const pl = KF("09-2").player, man = Unit("09-2", "NextDoorIja1");
+  assert.equal(SightFrom("09-2", pl, 1.6, man, 1.5), null, "09-2 后窗 B 底下站着要看得进屋里那个鬼子");
+  // 10-31 协调人：屋里的人挪到离里墙面约 1 m——蹲着（1.05）看得见他站起来的头（1.55），胸口（1.2）还是被窗台挡
+  assert.equal(SightFrom("09-2", pl, 1.05, man, 1.55), null, "09-2 蹲着（1.05）要看得见后窗 B 屋里那个站起来的头（1.55）");
+  const sill = SightFrom("09-2", pl, 1.05, man, 1.2);
+  assert.ok(sill && /WindowSill/.test(sill.id), `09-2 蹲着（1.05）看屋里那个的胸口（1.2）要被窗台挡（${sill?.id || "看得见！"}）`);
+  const plA = AW.A.stand, manA = Unit("09-1", "NextDoorIja2");
+  assert.equal(SightFrom("09-1", plA, 1.6, manA, 1.5), null, "后窗 A 底下站着要看得进屋里翻箱子的那个");
+  assert.equal(SightFrom("09-1", plA, 1.05, manA, 1.55), null, "后窗 A 底下蹲着要看得见翻箱子那个站起来的头（1.55）");
+  assert.ok(/WindowSill/.test(SightFrom("09-1", plA, 1.05, manA, 1.2)?.id || ""), "后窗 A 底下蹲着看他胸口要被窗台挡住");
+}
 assert.equal(Sight("09-3", P.cellar, 1.0), null, "09-3 窗户纸后头要看得见窖口");
 assert.equal(Sight("09-3", Unit("09-3", "CellarMan"), 0.5), null, "09-3 窗户纸后头要看得见被捅倒的汉子");
 assert.equal(Sight("09-4", Unit("09-4", "CellarIja4"), 1.0), null, "09-4 门房前看得见背朝院子翻东西的那个");
@@ -614,7 +653,7 @@ if (fs.existsSync(file)) {
   const onDisk = JSON.parse(fs.readFileSync(file, "utf8"));
   if (Strip({ ...onDisk, source: { ...onDisk.source, commit: "test" } }) !== Strip(a)) console.log("提示：Blockout/FirstLevel0610.json 与生成器输出不同（手改过，或没重新 export）");
   // 盘上的 JSON 没有生成器的内部标记（躺在担架上 / 爬坎 / 翻墙 / 钻狗洞），按手改的口径查只该多报这几类
-  const known = /Donggua 站在 LitterDonggua|Cellar(Man|Wife|Granny) 的走位|Nier 的走位穿过 (DogHoleLintel|SharedWall|GengBeiwu|GengZaowu|JiefangBreach|JiefangWestWing)|Nier 的走位在|Geng 的走位在|Villager[145] 的走位在|Officer 的走位在|Luo 的走位(穿过 (Wall_z114p5|ClimbPile|House_DY)|在)|(Luo|HeYoutian|Escort1) 的走位(穿过 (Wall_x435|EastClimbPile)|在)|Granny 的走位穿过 CellarSmoke|LiuWencai 的走位穿过 (JiefangW|JiefangBreach|SharedWall|GengBeiwu|GengZaowu)|NextDoorIja[12] 的走位穿过 Gate_WA1_Leaf|(Leader|Rifle3|Rifle4) 的走位穿过 (GengBeiwuNorthEast|GengLoopholeLintel_rifleEast)/;
+  const known = /Donggua 站在 LitterDonggua|Cellar(Man|Wife|Granny) 的走位|Nier 的走位穿过 (DogHoleLintel|SharedWall|GengBeiwu|GengZaowu|JiefangBreach|JiefangWestWing)|Nier 的走位在|Geng 的走位在|Villager[145] 的走位在|Officer 的走位在|Luo 的走位(穿过 (Wall_z114p5|ClimbPile|House_DY)|在)|(Luo|HeYoutian|Escort1) 的走位(穿过 (Wall_x435|EastClimbPile)|在)|Granny 的走位穿过 CellarSmoke|LiuWencai 的走位穿过 (JiefangW|JiefangBreach|SharedWall|GengBeiwu|GengZaowu)|NextDoorIja[12] 的走位穿过 Gate_(WA1|WY4)_Leaf|(Leader|Rifle3|Rifle4) 的走位穿过 (GengBeiwuNorthEast|GengLoopholeLintel_rifleEast|GengBackWindowLintel)/;   // 第十一版：隔壁院 WY4 关着的院门（标 through）、东间后窗的过梁（1.8 高，翻窗时头顶过）
   const extra = FirstLevel0610Issues(onDisk, { scene }).filter((line) => !known.test(line));
   assert.deepEqual(extra, [], `盘上的 JSON 多报了：\n  ${extra.join("\n  ")}`);
 }

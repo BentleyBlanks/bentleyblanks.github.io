@@ -30,7 +30,7 @@ import {
   L0610_LEVEL_KEY, L0610_BOUNDS, L0610_CELL_M, L0610_HEIGHTS, L0610_PLAIN_PROFILE, L0610_LANE, L0610_DITCH, L0610_RIVER, L0610_VILLAGE,
   L0610_STREETS, L0610_GENG, L0610_JIEFANG, L0610_BENJIA, L0610_YARDS, L0610_RUBBLE, L0610_SOUTH_LANE, L0610_EAST_STREET, L0610_ROUTE, L0610_TREES,
   L0610_EAST_ROAD, L0610_PROP_KINDS, L0610_PROPS, L0610_COLLAPSED_HOUSES, L0610_SIGNALS, L0610_PLACES, L0610_SPAWN, L0610_FROM_0105, L0610_MOUTH_SHOOTERS,
-  L0610_FALLEN_WALLS, L0610_EAST_YARD_ROUTE, LineLength, Station, LanePointAtZ,
+  L0610_FALLEN_WALLS, L0610_EAST_YARD_ROUTE, L0610_ALLEY_WINDOWS, LineLength, Station, LanePointAtZ,
   // 第八版
   L0610_LANE_SIDE, L0610_ROADS, L0610_FOOTPATHS, L0610_FIELD_ZONES, L0610_FIELDS, L0610_FIELD_RIDGE, L0610_GROVES, L0610_FIELD_GRAVES, L0610_FIELD_TREES, L0610_EDGE_CLUMPS,
   L0610_THRESHING, L0610_OUTER_GARDENS, L0610_OUTER_POND, L0610_OUTER_DUNG, L0610_FARMSTEADS, L0610_WELLS, L0610_FIELD_SHRINE, L0610_WATCHTOWER, L0610_TEMPLE, L0610_SHOP, L0610_TOILET,
@@ -39,6 +39,7 @@ import {
 
 export { SightBlock, L0610_MOUTH_SHOOTERS };
 const EYR = L0610_EAST_YARD_ROUTE;
+const AW = L0610_ALLEY_WINDOWS;
 export const L0610_SCENE_GENERATOR = "Script_EditorBlockoutCli.mjs scene FirstLevel0610";
 
 const H = L0610_HEIGHTS;
@@ -564,8 +565,15 @@ function Side(box, wall) {
     default: return { axis: "z", fixed: box.maxX, from: box.minZ, to: box.maxZ };
   }
 }
-/** 空心房：四面墙进总表（门 / 窗 / 枪眼 / 豁口留洞），平顶、过梁、窗台另出。 */
-function HollowHouse(plan, out, id, box, h, sample, { door = null, loopholes = [], breach = null, window = null } = {}) {
+/** 一扇窗：洞 + 窗台 + 过梁。tag 给块 id 的后缀（第一扇不带序号，老 id 不变）。 */
+function Window(plan, out, id, box, win, h, sample, tag = "") {
+  const s = Side(box, win.wall), c = win.wall === "N" || win.wall === "S" ? win.x : win.z;
+  plan.Cut(s.axis, s.fixed, c - win.w / 2, c + win.w / 2);
+  Sill(out, `${id}_WindowSill${tag}`, s.axis, s.fixed, c - win.w / 2, c + win.w / 2, win.sillH, { window: true });
+  Lintel(out, `${id}_WindowLintel${tag}`, s.axis, s.fixed, c - win.w / 2, c + win.w / 2, win.topH, h, sample, WALL, { window: true });
+}
+/** 空心房：四面墙进总表（门 / 窗 / 枪眼 / 豁口留洞），平顶、过梁、窗台另出。windows: [] 几扇都行；旧的 window（一扇）照旧认。 */
+function HollowHouse(plan, out, id, box, h, sample, { door = null, loopholes = [], breach = null, window = null, windows = [] } = {}) {
   for (const w of ["N", "S", "W", "E"]) { const s = Side(box, w); plan.Add(s.axis, s.fixed, s.from, s.to, h, `${id}_${w}`); }
   if (door) {
     const s = Side(box, door.wall);
@@ -586,12 +594,7 @@ function HollowHouse(plan, out, id, box, h, sample, { door = null, loopholes = [
     Sill(out, `${id}_BreachSill`, s.axis, s.fixed, c - breach.w / 2, c + breach.w / 2, breach.sillH, { breach: true });
     Lintel(out, `${id}_BreachLintel`, s.axis, s.fixed, c - breach.w / 2, c + breach.w / 2, breach.topH ?? V.doorTopH, h, sample, WALL, { breach: true });
   }
-  if (window) {
-    const s = Side(box, window.wall), c = window.wall === "N" || window.wall === "S" ? window.x : window.z;
-    plan.Cut(s.axis, s.fixed, c - window.w / 2, c + window.w / 2);
-    Sill(out, `${id}_WindowSill`, s.axis, s.fixed, c - window.w / 2, c + window.w / 2, window.sillH, { window: true });
-    Lintel(out, `${id}_WindowLintel`, s.axis, s.fixed, c - window.w / 2, c + window.w / 2, window.topH, h, sample, WALL, { window: true });
-  }
+  [...(window ? [window] : []), ...windows].forEach((win, i) => Window(plan, out, id, box, win, h, sample, i ? String(i + 1) : ""));
   Slab(out, `${id}_Roof`, box, h, sample);
 }
 
@@ -632,7 +635,7 @@ function YardBlocks(plan, out, gates, y, sample) {
     if (h.hollow) {
       const lps = (h.loopholes || []).map((lp) => ({ wall: "N", x: lp.x }));
       HollowHouse(plan, out, id, h.box, h.h, sample, { loopholes: lps, breach: h.breach ? { wall: "N", x: h.breach.x, w: h.breach.w, sillH: h.breach.sillH } : null,
-        door: h.door || { wall: "S", x: (h.box.minX + h.box.maxX) / 2, w: V.doorW }, window: h.window || null });
+        door: h.door || { wall: "S", x: (h.box.minX + h.box.maxX) / 2, w: V.doorW }, window: h.window || null, windows: h.windows || [] });
     } else if (L0610_COLLAPSED_HOUSES.includes(id)) CollapsedHouse(out, id, h.box, h.h);
     else House(out, id, h.box, h.h);
   });
@@ -708,10 +711,26 @@ function GengBlocks(plan, blocks, gates, sample) {
     Sill(list, `GengLoopholeSill_${lp.who}`, "x", BW.box.minZ, from, to, LH.sillH, extra);
     Lintel(list, `GengLoopholeLintel_${lp.who}`, "x", BW.box.minZ, from, to, LH.topH, roomH, sample, WALL, extra);
   }
-  // 东间后墙（枪眼两边的两截）随 BarrageHit 消失
-  const eastLp = BW.loopholes.find((lp) => lp.x >= cx);
-  const eRuns = eastLp ? [[cx, eastLp.x - LH.w / 2], [eastLp.x + LH.w / 2, BW.box.maxX]] : [[cx, BW.box.maxX]];
+  // 东间后墙（枪眼、后窗两边的几截）随 BarrageHit 消失；后窗（第十一版：分队长翻出去的那扇，x 104.3、宽 0.8、窗台 0.9、窗顶 1.8）的窗台 / 过梁也跟着塌
+  const eastLp = BW.loopholes.find((lp) => lp.x >= cx), BWin = BW.backWindow;
+  const holes = [...(eastLp ? [[eastLp.x - LH.w / 2, eastLp.x + LH.w / 2]] : []), ...(BWin && BWin.x >= cx ? [[BWin.x - BWin.w / 2, BWin.x + BWin.w / 2]] : [])].sort((p, q) => p[0] - q[0]);
+  const eRuns = [];
+  let runFrom = cx;
+  for (const [a, b] of holes) { if (a - runFrom > 0.049) eRuns.push([runFrom, a]); runFrom = b; }
+  if (BW.box.maxX - runFrom > 0.049) eRuns.push([runFrom, BW.box.maxX]);
   eRuns.forEach(([a, b], i) => gates.push(Block(`GengBeiwuNorthEast_${i + 1}`, (a + b) / 2, BW.box.minZ, b - a, T, roomH, WALL, { signal: SIG.barrageHit })));
+  if (BWin) {
+    const list = BWin.x >= cx ? gates : blocks, extra = BWin.x >= cx ? { window: true, signal: SIG.barrageHit } : { window: true };
+    if (BWin.x < cx) plan.Cut("x", BW.box.minZ, BWin.x - BWin.w / 2, BWin.x + BWin.w / 2);
+    Sill(list, "GengBackWindowSill", "x", BW.box.minZ, BWin.x - BWin.w / 2, BWin.x + BWin.w / 2, BWin.sillH, extra);
+    Lintel(list, "GengBackWindowLintel", "x", BW.box.minZ, BWin.x - BWin.w / 2, BWin.x + BWin.w / 2, BWin.topH, roomH, sample, WALL, extra);
+  }
+  // 南墙上东西两间各一扇窗（第十一版）：09-6 在后院看得见屋里步枪手的背影
+  (BW.southWindows || []).forEach((win, i) => {
+    plan.Cut("x", BW.box.maxZ, win.x - win.w / 2, win.x + win.w / 2);
+    Sill(blocks, `GengSouthWindowSill${i + 1}`, "x", BW.box.maxZ, win.x - win.w / 2, win.x + win.w / 2, win.sillH, { window: true });
+    Lintel(blocks, `GengSouthWindowLintel${i + 1}`, "x", BW.box.maxZ, win.x - win.w / 2, win.x + win.w / 2, win.topH, roomH, sample, WALL, { window: true });
+  });
   Slab(blocks, "GengBeiwuRoofWest", { minX: BW.box.minX, maxX: cx, minZ: BW.box.minZ, maxZ: BW.box.maxZ }, roomH, sample);
   Slab(gates, "GengBeiwuRoofEast", { minX: cx, maxX: BW.box.maxX, minZ: BW.box.minZ, maxZ: BW.box.maxZ }, roomH, sample, 0.2, { signal: SIG.barrageHit });
   const roofTop = sample((BW.box.minX + BW.box.maxX) / 2, (BW.box.minZ + BW.box.maxZ) / 2) + roomH;
@@ -727,7 +746,7 @@ function GengBlocks(plan, blocks, gates, sample) {
   gates.push(Block("RollerRubble", 111.0, 461.6, 2.0, 1.6, 1.0, EARTH, { ry: -0.4, prop: "Rubble", appearSignal: SIG.barrageHit }));
 
   // --- 灶屋两间（西屋，门朝东）：空心 + 平顶；灶台、案板；门口的水缸 ---
-  HollowHouse(plan, blocks, "GengZaowu", K.box, K.roofH, sample, { door: { wall: "E", z: K.door.z, w: K.door.w } });
+  HollowHouse(plan, blocks, "GengZaowu", K.box, K.roofH, sample, { door: { wall: "E", z: K.door.z, w: K.door.w }, windows: K.window ? [K.window] : [] });   // 第十一版：门北边一扇东窗
   blocks.push(Block("KitchenStove", G.stove.x, G.stove.z, G.stove.w, G.stove.d, G.stove.h, EARTH));
   blocks.push(Block("KitchenBoard", G.board.x, G.board.z, G.board.w, G.board.d, G.board.h, WOOD));
   const vat = L0610_PROP_KINDS.WaterVat;
@@ -745,7 +764,7 @@ function JiefangBlocks(plan, blocks, gates, sample) {
   Lintel(blocks, "JiefangGateLintel", "x", C.maxZ, GT.x - GT.w / 2, GT.x + GT.w / 2, GT.topH, V.wallH, sample);
   AjarGate(blocks, "JiefangGateLeaf", "x", C.maxZ, GT.x, GT.w, 1);
   // 北屋（空心，堂屋门朝南）
-  HollowHouse(plan, blocks, "JiefangBeiwu", J.beiwu.box, J.beiwu.roofH, sample, { door: { wall: "S", x: J.beiwu.door.x, w: J.beiwu.door.w } });
+  HollowHouse(plan, blocks, "JiefangBeiwu", J.beiwu.box, J.beiwu.roofH, sample, { door: { wall: "S", x: J.beiwu.door.x, w: J.beiwu.door.w }, windows: J.beiwu.windows || [] });   // 第十一版：南墙两扇窗
   // 西配房：西墙 = 院子西墙；西北角塌了（西墙 z 449.25…450.75、北墙 x 64.25…65.6 没了），地上一摊矮瓦砾；东墙窗洞 + 门
   const WW = J.westWing, BR = WW.breach;
   HollowHouse(plan, blocks, "JiefangWestWing", WW.box, WW.roofH, sample, {
@@ -759,7 +778,9 @@ function JiefangBlocks(plan, blocks, gates, sample) {
   const vat = L0610_PROP_KINDS.WaterVat;
   blocks.push(Block("JiefangWingVat", WW.vat.x, WW.vat.z, 0.9, 0.9, 1.0, vat.semantic, { prop: "WaterVat" }));
   House(blocks, "JiefangEastWing", J.eastWing.box, J.eastWing.roofH);
-  House(blocks, "JiefangNanwu", J.nanwu.box, J.nanwu.roofH);
+  // 南屋（第十一版：空心、门朝院子开在西头——西头这间就是 09-4 一刀那间门房）
+  if (J.nanwu.hollow) HollowHouse(plan, blocks, "JiefangNanwu", J.nanwu.box, J.nanwu.roofH, sample, { door: { wall: J.nanwu.door.wall, x: J.nanwu.door.x, w: J.nanwu.door.w } });
+  else House(blocks, "JiefangNanwu", J.nanwu.box, J.nanwu.roofH);
   // 地瓜窖：窖沿矮块贴着坑口外沿（坑心外 1.2…1.4 m）、掀开的盖板；炸了以后盖板飞开、窖口冒烟
   const rimOff = CELLAR.floorW / 2 + L0610_CELL_M, rimLen = (rimOff + 0.1) * 2;
   blocks.push(Block("CellarRimNorth", CELLAR.x, CELLAR.z - rimOff, rimLen, 0.2, CELLAR.rimH, WOOD));
@@ -1399,6 +1420,14 @@ export function L0610Landmarks(sample) {
     L("LmJiefangWindow", PL.jiefangWindow.name, "window", WW.box.maxX, WW.window.z, { ...Size(T, WW.window.w, WW.window.topH - WW.window.sillH), y: R2(sample(WW.box.maxX, WW.window.z) + (WW.window.sillH + WW.window.topH) / 2), note: "从窗洞看窖口（9.7 m）和石磨" }),
     L("LmJiefangVat", PL.jiefangVat.name, "prop", WW.vat.x, WW.vat.z, { ...Size(0.9, 0.9, 1.0), note: "藏人的大缸" }),
     L("LmJiefangBeiwuDoor", PL.jiefangBeiwuDoor.name, "door", J.beiwu.door.x, J.beiwu.box.maxZ, { ...DoorX(J.beiwu.door.w), note: "媳妇被拖进去" }),
+    // 第十一版（10-31）：一路的窗户与门房
+    L("LmAlleyWindowA", PL.alleyWindowA.name, "window", AW.A.x, AW.A.z, { ...Size(T, AW.A.w, AW.A.topH - AW.A.sillH), y: R2(sample(AW.A.x, AW.A.z) + (AW.A.sillH + AW.A.topH) / 2), note: "窗台 1.2：站着露头、蹲着过。屋里一个鬼子在翻箱子" }),
+    L("LmAlleyWindowB", PL.alleyWindowB.name, "window", AW.B.x, AW.B.z, { ...Size(T, AW.B.w, AW.B.topH - AW.B.sillH), y: R2(sample(AW.B.x, AW.B.z) + (AW.B.sillH + AW.B.topH) / 2), note: "窗台 1.2：蹲着过。屋里一个鬼子踹门、开了一枪；窗下就是豁口" }),
+    ...J.beiwu.windows.map((w, i) => L(`LmJiefangSouthWindow${i + 1}`, w.name, "window", w.x, J.beiwu.box.maxZ, { ...Size(w.w, T, w.topH - w.sillH), y: R2(sample(w.x, J.beiwu.box.maxZ) + (w.sillH + w.topH) / 2), note: "媳妇被拖进去后屋里的动静从窗里透出来" })),
+    L("LmJiefangGatehouse", PL.jiefangGatehouse.name, "door", J.nanwu.door.x, J.nanwu.box.minZ, { ...DoorX(J.nanwu.door.w), note: "南屋空心、门朝院子；09-4 留下翻东西的那个蹲在它西山墙根" }),
+    L("LmGengBackWindow", PL.gengBackWindow.name, "window", BW.backWindow.x, BW.box.minZ, { ...Size(BW.backWindow.w, T, BW.backWindow.topH - BW.backWindow.sillH), y: R2(sample(BW.backWindow.x, BW.box.minZ) + (BW.backWindow.sillH + BW.backWindow.topH) / 2), note: "宽 0.8、窗台 0.9：09-7 分队长带一个从这里翻出去往东街跑；随 BarrageHit 塌" }),
+    ...BW.southWindows.map((w, i) => L(`LmGengSouthWindow${i + 1}`, w.name, "window", w.x, BW.box.maxZ, { ...Size(w.w, T, w.topH - w.sillH), y: R2(sample(w.x, BW.box.maxZ) + (w.sillH + w.topH) / 2), note: "09-6 从后院看得见屋里步枪手的背影" })),
+    L("LmKitchenWindow", PL.kitchenWindow.name, "window", K.box.maxX, K.window.z, { ...Size(T, K.window.w, K.window.topH - K.window.sillH), y: R2(sample(K.box.maxX, K.window.z) + (K.window.sillH + K.window.topH) / 2), note: "09-6 摸过去之前从窗里看得见蹲在灶台边吃东西的那个" }),
     L("LmCellar", PL.cellar.name, "pit", J.cellar.x, J.cellar.z, { ...Size(J.cellar.floorW, J.cellar.floorW, J.cellar.depth), y: cellarY, note: "深 2 m，一家人藏在里头" }),
     L("LmMill", PL.mill.name, "prop", M.x, M.z, { ...Size(M.baseW, M.baseW, M.baseH + M.stoneH), note: "绑着老汉" }),
     L("LmBenjiaGate", PL.benjiaGate.name, "door", B.gate.x, B.box.maxZ, DoorX(B.gate.w)),
@@ -1551,9 +1580,24 @@ export function L0610SightChecks(scene, sample) {
   const gateToBeiwuDoor = BlockSight(base, sample, eyeGate, { x: J.beiwu.door.x, z: J.beiwu.box.maxZ + 0.6, eye: 1.0 })?.id ?? null;
   const laneEye = { x: ST.alleyA5.c, z: 450, eye: 1.5 };
   const laneToCellar = BlockSight(base, sample, laneEye, cellarT)?.id ?? null;
-  // 关键帧 09-2 的站点（L0610_JIEFANG.glimpse，站着 1.5）斜着从门洞里看窖口：门扇 / 南屋都不许挡
+  // L4 上门缝的站点（L0610_JIEFANG.glimpse，站着 1.5）斜着从门洞里看窖口：门扇 / 南屋都不许挡（第十一版起 09-2 不再走到这儿，09-4 / 09-5 出院门经过；门缝的视线保留）
   const glimpseEye = { x: J.glimpse.x, z: J.glimpse.z, eye: 1.5 };
   const glimpseToCellar = BlockSight(base, sample, glimpseEye, cellarT)?.id ?? null;
+  // ⑤b 第十一版：两处后窗（A / B）——路线上站着（1.6）看得进屋里那个鬼子（站着的头 1.5）；蹲着（1.05）他站起来时的头（1.55）也看得见（人离里墙面约 1 m），胸口（1.2）被窗台挡
+  const alleyWindows = Object.fromEntries(Object.entries(AW).map(([k, w]) => {
+    const man = { x: w.inside.x, z: w.inside.z, eye: 1.5 }, head = { ...man, eye: 1.55 }, chest = { ...man, eye: 1.2 };
+    const eyeStand = { x: w.stand.x, z: w.stand.z, eye: 1.6 }, eyeCrouch = { x: w.stand.x, z: w.stand.z, eye: 1.05 };
+    return [k, {
+      stand: BlockSight(base, sample, eyeStand, man)?.id ?? null,
+      crouchHead: BlockSight(base, sample, eyeCrouch, head)?.id ?? null,
+      crouchChest: BlockSight(base, sample, eyeCrouch, chest)?.id ?? null,
+    }];
+  }));
+  // ⑤c 灶屋东窗：09-6 的站点（蹲着 1.05）从窗里看得见蹲在灶台边的那个（蹲着的头 1.0）；后院南墙根 (98.6,484.4) 蹲着从北屋西间南窗看得见西间枪眼后蹲着的步枪手（头 1.1）
+  const K = G.zaowu;
+  const kitchenSquat = { x: 94.4, z: 477.9, eye: 1.0 };
+  const kitchenWindowToSquat = BlockSight(base, sample, { x: K.peep.x, z: K.peep.z, eye: 1.05 }, kitchenSquat)?.id ?? null;
+  const southWindowToRifle = BlockSight(base, sample, { x: 98.6, z: 484.4, eye: 1.05 }, { x: G.rifleWestPost.x, z: G.rifleWestPost.z, eye: 1.1 })?.id ?? null;
   // 窄胡同里望大槐树树冠（离地 8 m）：拐进出村那截以后 (117,523) 与 (117,532)，蹲着 1.2；院墙不挡
   //（塌墙那截 x 113.25 里 2.2 m 的墙贴着脸，37 m 外的树冠要仰 10° 以上才露头，从那里看不见，拐过第三道弯才看得见）
   const BL = L0610_PLACES.bigLocust;
@@ -1583,6 +1627,7 @@ export function L0610SightChecks(scene, sample) {
   return {
     shooterToLoophole, loopholeToMouth, mouthToLoophole, loopholeGround, loopholeToAlley, loopholeToCartHide,
     windowToCellar, windowToMill, gateToCellar, gateToBeiwuDoor, laneToCellar, glimpseToCellar, laneToLocust, probes, rollerToJog, mgHideToRoller, eastRoad,
+    alleyWindows, kitchenWindowToSquat, southWindowToRifle,
     eyes: { windowCellar: eyeWindowCellar, windowMill: eyeWindowMill, gate: eyeGate, prone, behindCart, laneMouth, proneShooter, laneEye },
   };
 }
@@ -1808,5 +1853,8 @@ export async function BuildFirstLevel0610Scene({ commit = "", generatedAt = "", 
   notes.push(`视线：西配房窗洞→窖口 ${s.windowToCellar ? `被 ${s.windowToCellar} 挡` : "看得见"} · →石磨 ${s.windowToMill ? `被 ${s.windowToMill} 挡` : "看得见"} · 半掩的门缝→窖口 ${s.gateToCellar ? `被 ${s.gateToCellar} 挡` : "看得见"}`
     + ` · 夹道里→窖口 ${s.laneToCellar ? `被 ${s.laneToCellar} 挡` : "看得见"} · 石碾后→探头点 ${s.probes.map((p) => `${p.id} ${p.dist}m/${p.deg}° ${p.block ? `被 ${p.block} 挡` : "看得见"}`).join(" / ")}`);
   notes.push(`视线：凹路尽头蹲着→东北道 ${s.eastRoad.laneMouth.filter((r) => !r.block).length}/${s.eastRoad.laneMouth.length} 点块不挡 · 街口坡道趴着→东北道 ${s.eastRoad.ramp.filter((r) => !r.block).length}/${s.eastRoad.ramp.length} 点块不挡`);
+  const WinNote = (w) => `站着 ${w.stand ? `被 ${w.stand} 挡` : "看得见屋里的人"} / 蹲着看他的头 ${w.crouchHead ? `被 ${w.crouchHead} 挡！` : "看得见"} / 蹲着看他的胸口 ${w.crouchChest ? `被 ${w.crouchChest} 挡` : "看得见！"}`;
+  notes.push(`第十一版的窗：后窗 A ${WinNote(s.alleyWindows.A)} · 后窗 B ${WinNote(s.alleyWindows.B)}`
+    + ` · 灶屋东窗→灶台边蹲着的 ${s.kitchenWindowToSquat ? `被 ${s.kitchenWindowToSquat} 挡` : "看得见"} · 后院→北屋西间南窗里的步枪手 ${s.southWindowToRifle ? `被 ${s.southWindowToRifle} 挡` : "看得见"} · 唯一的路 ${R2(L0610_ROUTE.segments.reduce((n, seg) => n + LineLength(seg.line), 0))} m（第十版 227 m）`);
   return scene;
 }

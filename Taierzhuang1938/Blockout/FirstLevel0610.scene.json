@@ -3,9 +3,9 @@
   "level": "FirstLevel0610",
   "source": {
     "generator": "Script_EditorBlockoutCli.mjs scene FirstLevel0610",
-    "generatedAt": "2026-10-23T21:12:44.763Z",
-    "commit": "261822ac50aead3eea8227411f76c96bb60d16f4",
-    "notes": "06–10 新剧本白盒（2026-10-24 第八版空间）：锚点 Data_EditorBlockoutFirstLevel0610Space；高度 0.5 m 网格（-2.7…3.81 m）；z<205 逐点等于 FirstLevel0105 的地面，往南：凹路南段（几道缓弯、两边坎高低不一）、村口路沟（西头通进河汊子）、河汊子（天然的弯河：凸岸泥滩、苇子洼、西来小沟；沟底 1 m 深的水）、拼块的田（田埂烘进高度场）、林里的坟头、老驿道 / 往东邻庄的大道 / 田间小路、场院与独院压平、庄东北的取土坑；耿家庄（整村压平 +0.3、胡同 / 街 / 路口压低 12 cm、街坊家的地瓜窖与村西的取土坑平底开挖）、东北进庄的道；体块：按县志重摆的 64 个院子（四合院 / 半面槽院 / 排房院混着、夹菜园空地与水坑；共墙只画一道），老耿家半面槽院（北屋三间空心、后墙三个枪眼、灶屋两间、东墙院门）、街坊家（北屋空心、西配房塌掉的西北角 / 窗洞 / 大缸、地瓜窖、石磨、半掩的院门）、本家院（共用墙上的狗洞 / 便门）、拐四道弯的巷子与瓦砾堵死的岔路、往南拐三道弯的窄胡同（塌墙处、柴垛、绕路院子）、拐两道弯的东街（门洞 / 枪眼 / 豁口 / 土地庙 / 麦秸垛）、各片错开的小巷与死胡同、塌了一角的房子、倒在胡同里的墙、菜园空宅基粪堆、零散的树、日常摆件、0105 的南岸枯树；gates：CartDeparted / SideGateOpen / CellarBlast / EastGateBurst / MgSilenced / NorthYardGatesBroken / BarrageHit / LaneWallCollapse；landmarks：107 个地标。"
+    "generatedAt": "2026-10-30T18:13:26.034Z",
+    "commit": "b1ec40e3af03d20084fb60bd66649bd9c1f8f94d",
+    "notes": "06–10 新剧本白盒（2026-10-24 第八版空间）：锚点 Data_EditorBlockoutFirstLevel0610Space；高度 0.5 m 网格（-2.7…3.81 m）；z<205 逐点等于 FirstLevel0105 的地面，往南：凹路南段（几道缓弯、两边坎高低不一）、村口路沟（西头通进河汊子）、河汊子（天然的弯河：凸岸泥滩、苇子洼、西来小沟；沟底 1 m 深的水）、拼块的田（田埂烘进高度场）、林里的坟头、老驿道 / 往东邻庄的大道 / 田间小路、场院与独院压平、庄东北的取土坑；耿家庄（整村压平 +0.3、胡同 / 街 / 路口压低 12 cm、街坊家的地瓜窖与村西的取土坑平底开挖）、东北进庄的道；体块：按县志重摆的 64 个院子（四合院 / 半面槽院 / 排房院混着、夹菜园空地与水坑；共墙只画一道），老耿家半面槽院（北屋三间空心、后墙三个枪眼、灶屋两间、东墙院门）、街坊家（北屋空心、西配房塌掉的西北角 / 窗洞 / 大缸、地瓜窖、石磨、半掩的院门）、本家院（共用墙上的狗洞 / 便门）、拐四道弯的巷子与瓦砾堵死的岔路、往南拐三道弯的窄胡同（塌墙处、柴垛、绕路院子）、拐两道弯的东街（门洞 / 枪眼 / 豁口 / 土地庙 / 麦秸垛）、各片错开的小巷与死胡同、塌了一角的房子、倒在胡同里的墙、菜园空宅基粪堆、零散的树、日常摆件、0105 的南岸枯树；gates：CartDeparted / SideGateOpen / CellarBlast / EastGateBurst / MgSilenced / NorthYardGatesBroken / BarrageHit / LaneWallCollapse；landmarks：115 个地标。"
   },
   "bounds": {
     "minX": -20,
@@ -140,6 +140,56 @@
       "loophole": true
     },
     {
+      "id": "GengSouthWindowSill1",
+      "x": 96.6,
+      "z": 475,
+      "w": 1.2,
+      "d": 0.5,
+      "h": 0.9,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "window": true
+    },
+    {
+      "id": "GengSouthWindowLintel1",
+      "x": 96.6,
+      "z": 475,
+      "w": 1.2,
+      "d": 0.5,
+      "h": 1.7,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "y": 2.95,
+      "window": true
+    },
+    {
+      "id": "GengSouthWindowSill2",
+      "x": 103.4,
+      "z": 475,
+      "w": 1.2,
+      "d": 0.5,
+      "h": 0.9,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "window": true
+    },
+    {
+      "id": "GengSouthWindowLintel2",
+      "x": 103.4,
+      "z": 475,
+      "w": 1.2,
+      "d": 0.5,
+      "h": 1.7,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "y": 2.95,
+      "window": true
+    },
+    {
       "id": "GengBeiwuRoofWest",
       "x": 98.8,
       "z": 472.5,
@@ -174,6 +224,31 @@
       "semantic": "plaster",
       "solid": true,
       "y": 2.8
+    },
+    {
+      "id": "GengZaowu_WindowSill",
+      "x": 96,
+      "z": 478,
+      "w": 0.5,
+      "d": 0.8,
+      "h": 0.9,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "window": true
+    },
+    {
+      "id": "GengZaowu_WindowLintel",
+      "x": 96,
+      "z": 478,
+      "w": 0.5,
+      "d": 0.8,
+      "h": 1.4,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "y": 2.6,
+      "window": true
     },
     {
       "id": "GengZaowu_Roof",
@@ -268,6 +343,56 @@
       "semantic": "plaster",
       "solid": true,
       "y": 2.9
+    },
+    {
+      "id": "JiefangBeiwu_WindowSill",
+      "x": 71.2,
+      "z": 449,
+      "w": 1,
+      "d": 0.5,
+      "h": 0.9,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "window": true
+    },
+    {
+      "id": "JiefangBeiwu_WindowLintel",
+      "x": 71.2,
+      "z": 449,
+      "w": 1,
+      "d": 0.5,
+      "h": 1.4,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "y": 2.8,
+      "window": true
+    },
+    {
+      "id": "JiefangBeiwu_WindowSill2",
+      "x": 76.8,
+      "z": 449,
+      "w": 1,
+      "d": 0.5,
+      "h": 0.9,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "window": true
+    },
+    {
+      "id": "JiefangBeiwu_WindowLintel2",
+      "x": 76.8,
+      "z": 449,
+      "w": 1,
+      "d": 0.5,
+      "h": 1.4,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "y": 2.8,
+      "window": true
     },
     {
       "id": "JiefangBeiwu_Roof",
@@ -381,16 +506,28 @@
       "house": true
     },
     {
-      "id": "JiefangNanwu",
+      "id": "JiefangNanwu_DoorLintel",
+      "x": 73,
+      "z": 463.5,
+      "w": 1,
+      "d": 0.5,
+      "h": 1,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "y": 2.8
+    },
+    {
+      "id": "JiefangNanwu_Roof",
       "x": 77,
       "z": 465.5,
       "w": 10,
       "d": 4,
-      "h": 3,
+      "h": 0.2,
       "ry": 0,
-      "semantic": "structure",
+      "semantic": "roof",
       "solid": true,
-      "house": true
+      "y": 3.2
     },
     {
       "id": "CellarRimNorth",
@@ -1352,16 +1489,53 @@
       "house": true
     },
     {
-      "id": "House_WM1_2",
-      "x": 74.75,
+      "id": "House_WM1_2_DoorLintel",
+      "x": 76.25,
+      "z": 412.25,
+      "w": 0.5,
+      "d": 1,
+      "h": 1,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "y": 2.8
+    },
+    {
+      "id": "House_WM1_2_WindowSill",
+      "x": 72.25,
+      "z": 412,
+      "w": 0.5,
+      "d": 0.7,
+      "h": 1.2,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "window": true
+    },
+    {
+      "id": "House_WM1_2_WindowLintel",
+      "x": 72.25,
+      "z": 412,
+      "w": 0.5,
+      "d": 0.7,
+      "h": 1.2,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "y": 2.67,
+      "window": true
+    },
+    {
+      "id": "House_WM1_2_Roof",
+      "x": 74.25,
       "z": 412.25,
       "w": 4,
       "d": 6.5,
-      "h": 3,
+      "h": 0.2,
       "ry": 0,
-      "semantic": "structure",
+      "semantic": "roof",
       "solid": true,
-      "house": true
+      "y": 3.2
     },
     {
       "id": "House_WM1_3",
@@ -1679,16 +1853,53 @@
       "house": true
     },
     {
-      "id": "House_WY4_3",
-      "x": 59.5,
-      "z": 455.75,
+      "id": "House_WY4_3_DoorLintel",
+      "x": 58,
+      "z": 448.75,
+      "w": 0.5,
+      "d": 1,
+      "h": 1,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "y": 2.8
+    },
+    {
+      "id": "House_WY4_3_WindowSill",
+      "x": 62,
+      "z": 448,
+      "w": 0.5,
+      "d": 0.7,
+      "h": 1.2,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "window": true
+    },
+    {
+      "id": "House_WY4_3_WindowLintel",
+      "x": 62,
+      "z": 448,
+      "w": 0.5,
+      "d": 0.7,
+      "h": 1.2,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "y": 2.7,
+      "window": true
+    },
+    {
+      "id": "House_WY4_3_Roof",
+      "x": 60,
+      "z": 448.75,
       "w": 4,
       "d": 6.5,
-      "h": 3,
+      "h": 0.2,
       "ry": 0,
-      "semantic": "structure",
+      "semantic": "roof",
       "solid": true,
-      "house": true
+      "y": 3.2
     },
     {
       "id": "House_WY4_4",
@@ -9293,6 +9504,17 @@
       "solid": true
     },
     {
+      "id": "House_WM1_2_N_1",
+      "x": 74.25,
+      "z": 409,
+      "w": 4,
+      "d": 0.5,
+      "h": 3,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
       "id": "Wall_x410_1",
       "x": 103.43,
       "z": 410,
@@ -9310,6 +9532,17 @@
       "w": 12.35,
       "d": 0.5,
       "h": 2.2,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "House_WM1_2_S_1",
+      "x": 74.25,
+      "z": 415.5,
+      "w": 4,
+      "d": 0.5,
+      "h": 3,
       "ry": 0,
       "semantic": "plaster",
       "solid": true
@@ -9469,6 +9702,17 @@
       "solid": true
     },
     {
+      "id": "House_WY4_3_N_1",
+      "x": 60,
+      "z": 445.5,
+      "w": 4,
+      "d": 0.5,
+      "h": 3,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
       "id": "JiefangWestWing_N_1",
       "x": 66.8,
       "z": 449,
@@ -9481,9 +9725,9 @@
     },
     {
       "id": "JiefangBeiwu_S_2",
-      "x": 71.2,
+      "x": 69.85,
       "z": 449,
-      "w": 4.4,
+      "w": 1.7,
       "d": 0.5,
       "h": 3.2,
       "ry": 0,
@@ -9492,11 +9736,44 @@
     },
     {
       "id": "JiefangBeiwu_S_3",
-      "x": 76.8,
+      "x": 72.55,
       "z": 449,
-      "w": 4.4,
+      "w": 1.7,
       "d": 0.5,
       "h": 3.2,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "JiefangBeiwu_S_4",
+      "x": 75.45,
+      "z": 449,
+      "w": 1.7,
+      "d": 0.5,
+      "h": 3.2,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "JiefangBeiwu_S_5",
+      "x": 78.15,
+      "z": 449,
+      "w": 1.7,
+      "d": 0.5,
+      "h": 3.2,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "House_WY4_3_S_1",
+      "x": 60,
+      "z": 452,
+      "w": 4,
+      "d": 0.5,
+      "h": 3,
       "ry": 0,
       "semantic": "plaster",
       "solid": true
@@ -9667,6 +9944,28 @@
       "solid": true
     },
     {
+      "id": "JiefangNanwu_N_1",
+      "x": 72.25,
+      "z": 463.5,
+      "w": 0.5,
+      "d": 0.5,
+      "h": 3,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "JiefangNanwu_N_2",
+      "x": 77.75,
+      "z": 463.5,
+      "w": 8.5,
+      "d": 0.5,
+      "h": 3,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
       "id": "Wall_x467_1",
       "x": 125,
       "z": 467,
@@ -9800,9 +10099,9 @@
     },
     {
       "id": "JiefangS_4",
-      "x": 76.25,
+      "x": 69.63,
       "z": 467.5,
-      "w": 18,
+      "w": 4.75,
       "d": 0.5,
       "h": 2.2,
       "ry": 0,
@@ -9810,7 +10109,29 @@
       "solid": true
     },
     {
-      "id": "Wall_x467p5_5",
+      "id": "JiefangS_5",
+      "x": 77,
+      "z": 467.5,
+      "w": 10,
+      "d": 0.5,
+      "h": 3,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "JiefangS_6",
+      "x": 83.63,
+      "z": 467.5,
+      "w": 3.25,
+      "d": 0.5,
+      "h": 2.2,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "Wall_x467p5_7",
       "x": 89.38,
       "z": 467.5,
       "w": 5.25,
@@ -9954,9 +10275,9 @@
     },
     {
       "id": "GengBeiwuSouth_1",
-      "x": 97.2,
+      "x": 95.5,
       "z": 475,
-      "w": 4.4,
+      "w": 1,
       "d": 0.5,
       "h": 3.5,
       "ry": 0,
@@ -9965,9 +10286,31 @@
     },
     {
       "id": "GengBeiwuSouth_2",
-      "x": 102.8,
+      "x": 98.3,
       "z": 475,
-      "w": 4.4,
+      "w": 2.2,
+      "d": 0.5,
+      "h": 3.5,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "GengBeiwuSouth_3",
+      "x": 101.7,
+      "z": 475,
+      "w": 2.2,
+      "d": 0.5,
+      "h": 3.5,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "GengBeiwuSouth_4",
+      "x": 104.5,
+      "z": 475,
+      "w": 1,
       "d": 0.5,
       "h": 3.5,
       "ry": 0,
@@ -10977,6 +11320,28 @@
       "solid": true
     },
     {
+      "id": "House_WY4_3_W_1",
+      "x": 58,
+      "z": 446.88,
+      "w": 0.5,
+      "d": 2.75,
+      "h": 3,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "House_WY4_3_W_2",
+      "x": 58,
+      "z": 450.63,
+      "w": 0.5,
+      "d": 2.75,
+      "h": 3,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
       "id": "Wall_z61_1",
       "x": 61,
       "z": 391.88,
@@ -11001,9 +11366,42 @@
     {
       "id": "Wall_z62_2",
       "x": 62,
-      "z": 455.75,
+      "z": 444.63,
       "w": 0.5,
-      "d": 24,
+      "d": 1.75,
+      "h": 2.2,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "House_WY4_3_E_3",
+      "x": 62,
+      "z": 446.58,
+      "w": 0.5,
+      "d": 2.15,
+      "h": 3,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "House_WY4_3_E_4",
+      "x": 62,
+      "z": 450.18,
+      "w": 0.5,
+      "d": 3.65,
+      "h": 3,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "Wall_z62_5",
+      "x": 62,
+      "z": 459.88,
+      "w": 0.5,
+      "d": 15.75,
       "h": 2.2,
       "ry": 0,
       "semantic": "plaster",
@@ -11153,18 +11551,62 @@
       "solid": true
     },
     {
+      "id": "JiefangNanwu_W_1",
+      "x": 72,
+      "z": 465.5,
+      "w": 0.5,
+      "d": 4,
+      "h": 3,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
       "id": "Wall_z72p25_1",
       "x": 72.25,
-      "z": 411.38,
+      "z": 405,
       "w": 0.5,
-      "d": 20.75,
+      "d": 8,
       "h": 2.2,
       "ry": 0,
       "semantic": "plaster",
       "solid": true
     },
     {
-      "id": "Wall_z72p25_2",
+      "id": "House_WM1_2_W_2",
+      "x": 72.25,
+      "z": 410.33,
+      "w": 0.5,
+      "d": 2.65,
+      "h": 3,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "House_WM1_2_W_3",
+      "x": 72.25,
+      "z": 413.93,
+      "w": 0.5,
+      "d": 3.15,
+      "h": 3,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "Wall_z72p25_4",
+      "x": 72.25,
+      "z": 418.63,
+      "w": 0.5,
+      "d": 6.25,
+      "h": 2.2,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "Wall_z72p25_5",
       "x": 72.25,
       "z": 432.88,
       "w": 0.5,
@@ -11203,6 +11645,28 @@
       "w": 0.5,
       "d": 37.25,
       "h": 2.2,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "House_WM1_2_E_1",
+      "x": 76.25,
+      "z": 410.38,
+      "w": 0.5,
+      "d": 2.75,
+      "h": 3,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "House_WM1_2_E_2",
+      "x": 76.25,
+      "z": 414.13,
+      "w": 0.5,
+      "d": 2.75,
+      "h": 3,
       "ry": 0,
       "semantic": "plaster",
       "solid": true
@@ -11258,6 +11722,17 @@
       "w": 0.5,
       "d": 2.4,
       "h": 2.2,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "JiefangNanwu_E_1",
+      "x": 82,
+      "z": 465.5,
+      "w": 0.5,
+      "d": 4,
+      "h": 3,
       "ry": 0,
       "semantic": "plaster",
       "solid": true
@@ -11375,9 +11850,9 @@
     {
       "id": "GengZaowu_E_1",
       "x": 96,
-      "z": 477.4,
+      "z": 476.8,
       "w": 0.5,
-      "d": 2.8,
+      "d": 1.6,
       "h": 3,
       "ry": 0,
       "semantic": "plaster",
@@ -11385,6 +11860,17 @@
     },
     {
       "id": "GengZaowu_E_2",
+      "x": 96,
+      "z": 478.6,
+      "w": 0.5,
+      "d": 0.4,
+      "h": 3,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true
+    },
+    {
+      "id": "GengZaowu_E_3",
       "x": 96,
       "z": 481.2,
       "w": 0.5,
@@ -15645,6 +16131,18 @@
       "prop": "WaterVat"
     },
     {
+      "id": "Chest_A",
+      "x": 72.95,
+      "z": 412.3,
+      "w": 1,
+      "d": 0.6,
+      "h": 0.7,
+      "ry": 1.571,
+      "semantic": "timber",
+      "solid": true,
+      "prop": "Chest"
+    },
+    {
       "id": "Haystack_B1",
       "x": 86,
       "z": 540,
@@ -16307,14 +16805,53 @@
     },
     {
       "id": "GengBeiwuNorthEast_2",
-      "x": 104.28,
+      "x": 103.73,
       "z": 470,
-      "w": 1.45,
+      "w": 0.35,
       "d": 0.5,
       "h": 3.5,
       "ry": 0,
       "semantic": "plaster",
       "solid": true,
+      "signal": "BarrageHit"
+    },
+    {
+      "id": "GengBeiwuNorthEast_3",
+      "x": 104.85,
+      "z": 470,
+      "w": 0.3,
+      "d": 0.5,
+      "h": 3.5,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "signal": "BarrageHit"
+    },
+    {
+      "id": "GengBackWindowSill",
+      "x": 104.3,
+      "z": 470,
+      "w": 0.8,
+      "d": 0.5,
+      "h": 0.9,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "window": true,
+      "signal": "BarrageHit"
+    },
+    {
+      "id": "GengBackWindowLintel",
+      "x": 104.3,
+      "z": 470,
+      "w": 0.8,
+      "d": 0.5,
+      "h": 1.7,
+      "ry": 0,
+      "semantic": "plaster",
+      "solid": true,
+      "y": 2.89,
+      "window": true,
       "signal": "BarrageHit"
     },
     {
@@ -16778,29 +17315,20 @@
       "x": 80,
       "z": 384,
       "radiusM": 1.2,
-      "note": "巷子口下到夹道、拐四道弯到街坊家西墙外"
+      "note": "巷子口下到夹道、拐四道弯、窄夹道到后窗 B 底下（路上两处蹲着过窗）"
     },
     {
-      "id": "LmRoute_glimpse",
-      "name": "唯一的路·第 2 段 glimpse",
+      "id": "LmRoute_breach",
+      "name": "唯一的路·第 2 段 breach",
       "kind": "place",
       "x": 63,
       "z": 448,
       "radiusM": 1.2,
-      "note": "沿窄夹道到 L4、在街坊家半掩的门口瞥见院里"
-    },
-    {
-      "id": "LmRoute_breach",
-      "name": "唯一的路·第 3 段 breach",
-      "kind": "place",
-      "x": 66.5,
-      "z": 468.75,
-      "radiusM": 1.2,
-      "note": "回头从西配房塌掉的西北角钻进去"
+      "note": "从西配房塌掉的西北角钻进去"
     },
     {
       "id": "LmRoute_passage",
-      "name": "唯一的路·第 4 段 passage",
+      "name": "唯一的路·第 3 段 passage",
       "kind": "place",
       "x": 66.6,
       "z": 451.6,
@@ -16809,7 +17337,7 @@
     },
     {
       "id": "LmRoute_benjia",
-      "name": "唯一的路·第 5 段 benjia",
+      "name": "唯一的路·第 4 段 benjia",
       "kind": "place",
       "x": 78.5,
       "z": 491,
@@ -16818,7 +17346,7 @@
     },
     {
       "id": "LmRoute_dogHole",
-      "name": "唯一的路·第 6 段 dogHole",
+      "name": "唯一的路·第 5 段 dogHole",
       "kind": "place",
       "x": 90.7,
       "z": 484.6,
@@ -16827,7 +17355,7 @@
     },
     {
       "id": "LmRoute_gengYard",
-      "name": "唯一的路·第 7 段 gengYard",
+      "name": "唯一的路·第 6 段 gengYard",
       "kind": "place",
       "x": 90.7,
       "z": 484.6,
@@ -16889,6 +17417,113 @@
       "d": 0.5,
       "h": 2,
       "note": "媳妇被拖进去"
+    },
+    {
+      "id": "LmAlleyWindowA",
+      "name": "巷子东墙上的后窗 A（WM1 西厢房）",
+      "kind": "window",
+      "x": 72.25,
+      "z": 412,
+      "w": 0.5,
+      "d": 0.7,
+      "h": 0.6,
+      "y": 1.77,
+      "note": "窗台 1.2：站着露头、蹲着过。屋里一个鬼子在翻箱子"
+    },
+    {
+      "id": "LmAlleyWindowB",
+      "name": "窄夹道西墙上的后窗 B（隔壁院 WY4 东厢房）",
+      "kind": "window",
+      "x": 62,
+      "z": 448,
+      "w": 0.5,
+      "d": 0.7,
+      "h": 0.6,
+      "y": 1.8,
+      "note": "窗台 1.2：蹲着过。屋里一个鬼子踹门、开了一枪；窗下就是豁口"
+    },
+    {
+      "id": "LmJiefangSouthWindow1",
+      "name": "街坊家北屋西间南窗",
+      "kind": "window",
+      "x": 71.2,
+      "z": 449,
+      "w": 1,
+      "d": 0.5,
+      "h": 0.9,
+      "y": 1.65,
+      "note": "媳妇被拖进去后屋里的动静从窗里透出来"
+    },
+    {
+      "id": "LmJiefangSouthWindow2",
+      "name": "街坊家北屋东间南窗",
+      "kind": "window",
+      "x": 76.8,
+      "z": 449,
+      "w": 1,
+      "d": 0.5,
+      "h": 0.9,
+      "y": 1.65,
+      "note": "媳妇被拖进去后屋里的动静从窗里透出来"
+    },
+    {
+      "id": "LmJiefangGatehouse",
+      "name": "街坊家门房（南屋西头，09-4 一刀那间）",
+      "kind": "door",
+      "x": 73,
+      "z": 463.5,
+      "w": 1,
+      "d": 0.5,
+      "h": 2,
+      "note": "南屋空心、门朝院子；09-4 留下翻东西的那个蹲在它西山墙根"
+    },
+    {
+      "id": "LmGengBackWindow",
+      "name": "北屋东间后窗（分队长翻出去的）",
+      "kind": "window",
+      "x": 104.3,
+      "z": 470,
+      "w": 0.8,
+      "d": 0.5,
+      "h": 0.9,
+      "y": 1.59,
+      "note": "宽 0.8、窗台 0.9：09-7 分队长带一个从这里翻出去往东街跑；随 BarrageHit 塌"
+    },
+    {
+      "id": "LmGengSouthWindow1",
+      "name": "北屋西间南窗",
+      "kind": "window",
+      "x": 96.6,
+      "z": 475,
+      "w": 1.2,
+      "d": 0.5,
+      "h": 0.9,
+      "y": 1.65,
+      "note": "09-6 从后院看得见屋里步枪手的背影"
+    },
+    {
+      "id": "LmGengSouthWindow2",
+      "name": "北屋东间南窗",
+      "kind": "window",
+      "x": 103.4,
+      "z": 475,
+      "w": 1.2,
+      "d": 0.5,
+      "h": 0.9,
+      "y": 1.65,
+      "note": "09-6 从后院看得见屋里步枪手的背影"
+    },
+    {
+      "id": "LmKitchenWindow",
+      "name": "灶屋东窗",
+      "kind": "window",
+      "x": 96,
+      "z": 478,
+      "w": 0.5,
+      "d": 0.8,
+      "h": 0.7,
+      "y": 1.55,
+      "note": "09-6 摸过去之前从窗里看得见蹲在灶台边吃东西的那个"
     },
     {
       "id": "LmCellar",
@@ -17833,11 +18468,15 @@
         },
         {
           "x": 63,
-          "z": 468.75
+          "z": 450
         },
         {
-          "x": 66.5,
-          "z": 468.75
+          "x": 65.2,
+          "z": 450
+        },
+        {
+          "x": 66.6,
+          "z": 451.6
         }
       ],
       [

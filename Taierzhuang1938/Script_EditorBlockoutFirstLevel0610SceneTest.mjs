@@ -12,6 +12,8 @@
 //   · 街坊家：西配房窗洞后看得见窖口与石磨、半掩的门缝里看得见窖口、夹道里看不见窖口；窖口离窗洞 8…10 m；
 //   · 随信号体块与七个信号齐全（BarrageHit / LaneWallCollapse 新加，BackVatMoved / BackDoorOpen 删了）；地标 ≥ 40、七种 kind、过校验、都在场地里。
 // 关键帧里的人不落进墙 / 房子（门洞过梁、磨盘底座这类不挡人的块不算），关键帧已按第六版重排。
+// 第十一版（2026-10-31，一路的窗户）：两处后窗 A / B 都在（位置、窗台 1.2 ±0.05），路线上站着看得进屋里的人、蹲着被窗台挡住；老耿家北屋东间后窗人能穿（宽 ≥ 0.7、窗台 ≤ 1.0）、
+//   北屋南窗两扇、灶屋东窗、街坊家北屋南窗两扇都在；唯一那条路没有 09-2 的折返（比第十版 227 m 短 ≥ 35 m）；灶屋东窗 / 北屋南窗的两条新视线通；街坊家南屋空心、门朝院子；旧的视线结论全过。
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -27,7 +29,7 @@ import {
   L0610_PLACES as P, L0610_HEIGHTS as H, L0610_VILLAGE as V, L0610_GENG as G, L0610_JIEFANG as J, L0610_BENJIA as B, L0610_STREETS as ST, L0610_SIGNALS as SIG, L0610_FROM_0105,
   L0610_DITCH as DT, L0610_RIVER as RV, L0610_EAST_ROAD as ER, L0610_BOUNDS, L0610_YARDS, L0610_RUBBLE, L0610_SOUTH_LANE as SL, L0610_EAST_STREET as ES, L0610_ROUTE, L0610_LANES,
   L0610_EAST_YARD_ROUTE, L0610_LANE, L0610_ROADS, L0610_FOOTPATHS, L0610_FIELDS, L0610_GROVES, L0610_FIELD_TREES, L0610_WELLS, L0610_LOCKED_YARDS, L0610_YARD_POSE, L0610_LANE_PATHS,
-  L0610_FARMSTEADS, L0610_TOILET, L0610_FIELD_GRAVES, RiverAtZ, YardPose, YardCorners, YardGateWorld, PathNearest, PointInPoly, LanePointAtZ,
+  L0610_FARMSTEADS, L0610_TOILET, L0610_FIELD_GRAVES, L0610_ALLEY_WINDOWS, RiverAtZ, YardPose, YardCorners, YardGateWorld, PathNearest, PointInPoly, LanePointAtZ, LineLength,
 } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
 
 const opts = { commit: "test", generatedAt: "2026-10-22T00:00:00.000Z" };
@@ -214,13 +216,13 @@ const WallRun = (axis, fixed, from, to, what, list = solids) => { for (let s = f
   Near(mg.x, ST.main.c, 0.01, "机枪在堂屋枪眼上"); Near(mg.z, BW.box.minZ, 0.01, "机枪在后墙上");
   // 堂屋门朝南开在院里；灶屋门在东墙朝院子；院门洞敞着、过梁 2.0
   assert.ok(!Solid(BW.tangwuDoor.x, BW.box.maxZ) && Solid(BW.tangwuDoor.x - 1.2, BW.box.maxZ), "堂屋门在南墙上");
-  assert.ok(!Solid(K.box.maxX, K.door.z) && Solid(K.box.maxX, K.door.z - 1.2), "灶屋门在东墙上");
+  assert.ok(!Solid(K.box.maxX, K.door.z) && Solid(K.box.maxX, K.door.z + 1.2), "灶屋门在东墙上（门南边是墙；门北边 0.4 m 外是第十一版的东窗）");
   assert.ok(!Solid(G.box.maxX, G.gate.z) && Solid(G.box.maxX, G.gate.z - 1.5) && Solid(G.box.maxX, G.gate.z + 1.5), "院门洞敞着、两边是墙");
   assert.ok(!solids.some((blk) => blk.gate && Intersects(blk, { minX: G.box.maxX + T / 2 + 0.6, maxX: G.box.maxX + 1.6, minZ: G.gate.z - 0.6, maxZ: G.gate.z + 0.6 })), "院门扇不堵胡同");
   // 炮轰：东间后墙与房顶随 BarrageHit 没了，塌下来的土出现
   const after = SolidBlocks(a, [SIG.barrageHit]);
   assert.ok(!after.some((blk) => blk.id === "GengBeiwuRoofEast") && after.some((blk) => blk.id === "GengCollapseRubble"), "炮轰后东间房顶没了、土堆出来了");
-  assert.ok(!Solid(104.5, BW.box.minZ, after) && Solid(104.5, BW.box.minZ), "炮轰后东间后墙缺了一块");
+  assert.ok(!Solid(102.9, BW.box.minZ, after) && Solid(102.9, BW.box.minZ), "炮轰后东间后墙缺了一块（x 102.9：塌墙段里枪眼西边那一截；x 104.5 第十一版起是后窗）");
   // 狗洞大人钻不过（口子 0.4…0.5、过梁下沿 ≤ 0.5）、便门洞 ≥ 0.95
   const shared = a.blocks.filter((x) => x.id.startsWith("SharedWall_")).sort((p, q) => p.z - q.z);
   assert.ok(shared.length >= 3, "共用墙拆成几段");
@@ -246,7 +248,7 @@ assert.equal(s.windowToMill, null, `西配房窗洞后要看得见石磨：被 $
 assert.equal(s.gateToCellar, null, `半掩的门缝里要看得见窖口：被 ${s.gateToCellar} 挡`);
 assert.equal(s.gateToBeiwuDoor, null, `半掩的门缝里要看得见堂屋门口：被 ${s.gateToBeiwuDoor} 挡`);
 assert.notEqual(s.laneToCellar, null, "夹道里（墙外）看不见窖口");
-assert.equal(s.glimpseToCellar, null, `09-2 的站点 (${J.glimpse.x},${J.glimpse.z}) 从门洞里要瞥得见窖口：被 ${s.glimpseToCellar} 挡`);
+assert.equal(s.glimpseToCellar, null, `L4 上门缝的站点 (${J.glimpse.x},${J.glimpse.z})（09-4 / 09-5 出院门经过）从门洞里要看得见窖口：被 ${s.glimpseToCellar} 挡`);
 for (const b2 of s.laneToLocust) assert.equal(b2, null, `窄胡同第三道弯以南要望得见村南口外的大槐树树冠：被 ${b2} 挡`);
 {
   const BL = P.bigLocust, locust = byId.get("BigLocust");
@@ -264,6 +266,73 @@ assert.ok(s.eyes.gate.z > J.box.maxZ, "门缝的眼位在 L4 里");
 }
 // 村口（蹲着 1.2）→ 枪眼这条线上不能有摆件
 assert.equal(BlockSight(solids, sample, { x: 100, z: 385, eye: 1.2 }, { x: ST.main.c, z: G.beiwu.box.minZ, eye: 1.1 }), null, "村口到枪眼的视线被摆件挡了");
+
+// --- 第十一版（10-31）：一路的窗户 ---
+{
+  const AW = L0610_ALLEY_WINDOWS, BW = G.beiwu, K = G.zaowu;
+  /** 墙上一个洞：洞里只有窗台 + 过梁，窗台 sillH、过梁下沿 topH（±0.05）。axis "x" = 洞开在东西向的墙上（fixed 是 z）。 */
+  const WindowHole = (what, axis, fixed, c, w, sillH, topH, list = solids) => {
+    const box = axis === "x" ? { minX: c - w / 2 + 0.03, maxX: c + w / 2 - 0.03, minZ: fixed - 0.3, maxZ: fixed + 0.3 } : { minX: fixed - 0.3, maxX: fixed + 0.3, minZ: c - w / 2 + 0.03, maxZ: c + w / 2 - 0.03 };
+    const inHole = list.filter((blk) => Intersects(blk, box) && !/Roof|Parapet/.test(blk.id) && !blk.prop);
+    const sill = inHole.find((blk) => !Number.isFinite(blk.y)), lintel = inHole.find((blk) => Number.isFinite(blk.y));
+    const g = axis === "x" ? sample(c, fixed) : sample(fixed, c);
+    assert.ok(sill && /WindowSill/.test(sill.id) && Math.abs(sill.h - sillH) <= 0.05, `${what}：窗台要 ${sillH} 高（${sill ? `${sill.id} ${sill.h}` : "没有窗台"}）`);
+    assert.ok(lintel && /WindowLintel/.test(lintel.id) && Math.abs(BlockCenterY(lintel, sample) - lintel.h / 2 - g - topH) <= 0.08, `${what}：过梁下沿要 ${topH}（${lintel?.id}）`);
+    assert.equal(inHole.length, 2, `${what}：洞里只有窗台和过梁（${inHole.map((x) => x.id).join(",")}）`);
+    const along = axis === "x" ? (v) => Solid(v, fixed) : (v) => Solid(fixed, v);
+    assert.ok(along(c - w / 2 - 0.3) && along(c + w / 2 + 0.3), `${what}：窗两边是墙`);
+    return { sill, lintel };
+  };
+  // 后窗 A / B：窗台 1.2、宽 0.7；厢房的后墙就是院墙（贴胡同那面）；屋子空心（有顶、门朝院子）
+  for (const [k, w] of Object.entries(AW)) {
+    const y = L0610_YARDS.find((yy) => yy.id === w.yard), house = y.houses.find((h) => h.box === w.house);
+    assert.ok(house && house.hollow && house.windows?.length === 1, `后窗 ${k}：${w.yard} 的厢房要空心、带一扇窗`);
+    assert.ok(w.wall === "W" ? Math.abs(w.house.minX - y.box.minX) < 0.01 && Math.abs(w.x - y.box.minX) < 0.01 : Math.abs(w.house.maxX - y.box.maxX) < 0.01 && Math.abs(w.x - y.box.maxX) < 0.01, `后窗 ${k}：厢房后墙就是院墙、窗开在院墙那面`);
+    assert.ok(w.z > w.house.minZ + 0.5 && w.z < w.house.maxZ - 0.5, `后窗 ${k} 在厢房后墙的范围里`);
+    Near(w.sillH, 1.2, 0.01, `后窗 ${k} 窗台 1.2`); assert.ok(w.w >= 0.6 && w.w <= 0.8, `后窗 ${k} 宽约 0.7`);
+    WindowHole(`后窗 ${k}`, "z", w.x, w.z, w.w, w.sillH, w.topH);
+    const idx = y.houses.indexOf(house) + 1;
+    assert.ok(byId.has(`House_${w.yard}_${idx}_Roof`) && byId.has(`House_${w.yard}_${idx}_WindowSill`) && byId.has(`House_${w.yard}_${idx}_DoorLintel`), `后窗 ${k} 那间屋要有顶、窗台、门过梁`);
+    // 路线上的站点：站着（1.6）看得进屋里站着的人（头 1.5），蹲着（1.05）被窗台挡住
+    assert.ok(L0610_ROUTE.segments.some((seg) => seg.line.some((p, i) => i > 0 && (() => { const a = seg.line[i - 1]; const dx = p.x - a.x, dz = p.z - a.z, l2 = dx * dx + dz * dz; const t = l2 ? Math.max(0, Math.min(1, ((w.stand.x - a.x) * dx + (w.stand.z - a.z) * dz) / l2)) : 0; return Math.hypot(w.stand.x - a.x - dx * t, w.stand.z - a.z - dz * t) <= 0.5; })())), `后窗 ${k} 的站点 (${w.stand.x},${w.stand.z}) 要在唯一那条路上（≤ 0.5 m）`);
+    assert.equal(s.alleyWindows[k].stand, null, `后窗 ${k}：路线上站着要看得进屋里的人：被 ${s.alleyWindows[k].stand} 挡`);
+    // 屋里那个离窗那面墙的里墙面约 1 m：蹲着（1.05）看得见他站起来时的头（1.55），胸口（1.2）被窗台挡（10-31 协调人：第一人称蹲着要看得见头肩）
+    const wallFace = w.wall === "W" ? w.x + T / 2 : w.x - T / 2;
+    assert.ok(Math.abs(w.inside.x - wallFace) >= 0.85 && Math.abs(w.inside.x - wallFace) <= 1.1, `后窗 ${k} 屋里那个离里墙面 ${Math.abs(w.inside.x - wallFace).toFixed(2)} m（要 0.9–1.0）`);
+    assert.equal(s.alleyWindows[k].crouchHead, null, `后窗 ${k}：路线上蹲着（1.05）要看得见屋里那个站起来的头（1.55）：被 ${s.alleyWindows[k].crouchHead} 挡`);
+    assert.ok(s.alleyWindows[k].crouchChest && /WindowSill/.test(s.alleyWindows[k].crouchChest), `后窗 ${k}：蹲着（1.05）看他的胸口（1.2）要被窗台挡：${s.alleyWindows[k].crouchChest || "看得见！"}`);
+    assert.ok(byId.has(w.inside && `House_${w.yard}_${idx}_Roof`) && w.inside.x > w.house.minX + 0.4 && w.inside.x < w.house.maxX - 0.4 && w.inside.z > w.house.minZ + 0.4 && w.inside.z < w.house.maxZ - 0.4, `后窗 ${k} 屋里那个鬼子站在屋里`);
+  }
+  { const ch = byId.get("Chest_A"); assert.ok(ch && ch.x > AW.A.house.minX + T / 2 + 0.3 && ch.x < AW.A.x + 1.2 && Math.abs(ch.z - AW.A.z) < 0.6, "后窗 A 那间屋里有被翻的木箱、贴在窗下那面墙根"); }
+  // 老耿家北屋：东间后窗人能穿（宽 ≥ 0.7、窗台 ≤ 1.0），在塌墙那段上随 BarrageHit 一起没了；南窗两扇；灶屋东窗
+  const bw = BW.backWindow;
+  assert.ok(bw.w >= 0.7 && bw.sillH <= 1.0 && bw.topH - bw.sillH >= 0.8, `东间后窗 ${bw.w} 宽、窗台 ${bw.sillH}：人要翻得出去`);
+  assert.ok(bw.x >= BW.collapseFromX && bw.x + bw.w / 2 < BW.box.maxX - 0.2 && Math.abs(bw.x - bw.w / 2 - (BW.loopholes.find((lp) => lp.who === "rifleEast").x + V.loophole.w / 2)) >= 0.3, "东间后窗在东间枪眼东边、跟枪眼和墙角之间各留一截墙");
+  const back = WindowHole("东间后窗", "x", BW.box.minZ, bw.x, bw.w, bw.sillH, bw.topH);
+  assert.equal(back.sill.signal, SIG.barrageHit, "东间后窗的窗台随 BarrageHit 塌");
+  assert.ok(!SolidBlocks(a, [SIG.barrageHit]).some((blk) => /GengBackWindow/.test(blk.id)), "炮轰后东间后窗没了（那段墙塌了）");
+  assert.equal(BW.southWindows.length, 2);
+  BW.southWindows.forEach((w, i) => { assert.ok(Math.abs(w.x - BW.loopholes[i + 1].x) < 0.01, `北屋南窗 ${i + 1} 正对着那一间的枪眼（x ${w.x}）`); Near(w.sillH, 0.9, 0.01, "南窗窗台 0.9"); WindowHole(`北屋南窗 ${i + 1}`, "x", BW.box.maxZ, w.x, w.w, w.sillH, w.topH); });
+  assert.ok(!Solid(BW.tangwuDoor.x, BW.box.maxZ) && Solid(BW.tangwuDoor.x + 1.0, BW.box.maxZ) && Solid(BW.tangwuDoor.x - 1.0, BW.box.maxZ), "堂屋门两边还是墙（南窗没开到门上）");
+  assert.ok(K.window.wall === "E" && K.window.z < K.door.z - K.door.w / 2 - K.window.w / 2 && K.window.z > K.box.minZ + 0.6, "灶屋东窗在门北边、同一面墙上");
+  WindowHole("灶屋东窗", "z", K.box.maxX, K.window.z, K.window.w, K.window.sillH, K.window.topH);
+  assert.equal(s.kitchenWindowToSquat, null, `09-6 的站点 (${K.peep.x},${K.peep.z}) 蹲着从灶屋东窗要看得见蹲在灶台边的那个：被 ${s.kitchenWindowToSquat} 挡`);
+  assert.equal(s.southWindowToRifle, null, `后院南墙根蹲着从北屋西间南窗要看得见西间枪眼后的步枪手：被 ${s.southWindowToRifle} 挡`);
+  // 街坊家：北屋南窗两扇、门房（南屋）空心门朝院子
+  assert.equal(J.beiwu.windows.length, 2);
+  J.beiwu.windows.forEach((w, i) => { Near(w.sillH, 0.9, 0.01, "街坊家南窗窗台 0.9"); WindowHole(`街坊家北屋南窗 ${i + 1}`, "x", J.beiwu.box.maxZ, w.x, w.w, w.sillH, w.topH); });
+  assert.ok(!Solid(J.beiwu.door.x, J.beiwu.box.maxZ) && Solid(J.beiwu.door.x + 1.0, J.beiwu.box.maxZ) && Solid(J.beiwu.door.x - 1.0, J.beiwu.box.maxZ), "街坊家堂屋门两边还是墙");
+  assert.ok(J.nanwu.hollow && J.nanwu.door.wall === "N" && byId.has("JiefangNanwu_Roof") && byId.has("JiefangNanwu_DoorLintel"), "街坊家南屋（门房）空心、门朝院子");
+  assert.ok(!Solid(J.nanwu.door.x, J.nanwu.box.minZ) && Solid(J.nanwu.door.x + 1.2, J.nanwu.box.minZ) && Solid(J.nanwu.box.minX + 1.0, J.nanwu.box.maxZ), "门房的门洞敞着、别的墙是实的");
+  assert.ok(Math.abs(J.nanwu.gatehouse.x - J.nanwu.door.x) < 1.0 && J.nanwu.gatehouse.x - J.nanwu.box.minX <= 3.5, "门房 = 南屋西头挨着院门那一间");
+  // 唯一那条路：没有 09-2 的折返，比第十版（227 m）短 ≥ 35 m；窄夹道走到 z 448 就拐进豁口；两处后窗都在路线上
+  const routeLen = L0610_ROUTE.segments.reduce((n, seg) => n + LineLength(seg.line), 0);
+  assert.ok(!L0610_ROUTE.segments.some((seg) => seg.seg === "glimpse"), "路线不再有 glimpse 折返段");
+  assert.ok(routeLen <= 227 - 35, `路线总长 ${routeLen.toFixed(1)} m，要比第十版 227 m 短 ≥ 35 m`);
+  const breach = L0610_ROUTE.segments.find((seg) => seg.seg === "breach");
+  assert.ok(breach.line[0].x === 63 && breach.line[0].z === 448 && breach.line.every((p) => p.z <= 452), "breach 段从 (63,448) 直接拐进豁口，不往南多走");
+  assert.ok(!L0610_ROUTE.segments.flatMap((seg) => seg.line).some((p) => p.x === 63 && p.z > 452), "路线上 x 63 的点都在 z 452 以北（不再走到 L4 再折回）");
+}
 
 // --- 只有一条路：泛洪 ---
 const RunBox = (r, pad = 0) => (r.axis === "z" ? { minX: r.c - r.halfW - pad, maxX: r.c + r.halfW + pad, minZ: r.from - pad, maxZ: r.to + pad } : { minX: r.from - pad, maxX: r.to + pad, minZ: r.c - r.halfW - pad, maxZ: r.c + r.halfW + pad });
@@ -715,7 +784,11 @@ function NearestPtOn(line, p) { return { x: p.x, z: p.z }; }
     "堂屋枪眼（机枪）", "西间枪眼", "东间枪眼", P.tangwuDoor.name, P.kitchenDoor.name, P.gengGate.name, P.dogHole.name, P.sideGate.name,
     P.jiefangGate.name, P.jiefangBreach.name, P.jiefangWindow.name, P.jiefangVat.name, P.cellar.name, P.mill.name, P.benjiaGate.name,
     P.roller.name, ES.farmyard.name, ES.strawStack.name, ES.shrine.name, "院门①（场院西隔墙）", "院门②（北侧第一个院西墙）", "院门③（路口东北角那院南墙）", P.southClimb.name, P.eastEnd.name,
-    "河汊子", P.villageSouth.name, P.laneCollapse.name, P.climbPile.name, P.detourGate.name, P.eastRoadView.name, P.alleyBackGate.name, P.ditchBackGate.name, P.mainEastGate.name, P.pond.name, ST.l4.name];
+    "河汊子", P.villageSouth.name, P.laneCollapse.name, P.climbPile.name, P.detourGate.name, P.eastRoadView.name, P.alleyBackGate.name, P.ditchBackGate.name, P.mainEastGate.name, P.pond.name, ST.l4.name,
+    // 第十一版：一路的窗户与门房
+    P.alleyWindowA.name, P.alleyWindowB.name, P.gengBackWindow.name, P.gengSouthWindowWest.name, P.gengSouthWindowEast.name, P.kitchenWindow.name, P.jiefangSouthWindowWest.name, P.jiefangSouthWindowEast.name, P.jiefangGatehouse.name];
+  for (const name of [P.alleyWindowA.name, P.alleyWindowB.name, P.gengBackWindow.name, P.kitchenWindow.name]) assert.equal(byName.get(name)?.kind, "window", `地标「${name}」是 window`);
+  assert.ok(!lms.some((lm) => /glimpse/.test(lm.id)), "指向 glimpse 段的路线地标没了");
   for (const name of NEED) assert.ok(byName.has(name), `缺地标「${name}」`);
   const Bd = a.bounds;
   for (const lm of lms) {
