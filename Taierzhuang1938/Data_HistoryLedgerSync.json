@@ -341,6 +341,21 @@
       "currentRelease": "20261030CurrentWearV106-43969e24",
       "currentReleaseContract": "Model/Type94Tankette/Data_ReleaseV106.json",
       "externalNotionCursorsAdvanced": false
+    },
+    {
+      "asset": "IsuzuType94Truck",
+      "date": "2026-10-30",
+      "scope": "Only IsuzuType94Truck material ageing and publication boundary;unrelated narrative pages and global review cursor preserved",
+      "notionPages": [
+        "3fd60335331c8194aa82f0b238084d34",
+        "3fd60335331c818fa24deadb6d72ca70"
+      ],
+      "notionLastEdited": {
+        "3fd60335331c8194aa82f0b238084d34": "2026-10-30T04:42:27.833Z",
+        "3fd60335331c818fa24deadb6d72ca70": "2026-10-30T04:42:29.462Z"
+      },
+      "assetContract": "Model/IsuzuType94Truck/Data_IsuzuType94Truck.json",
+      "note": "V79canvas accepted by user;localized metal rust/contact abrasion and lower-body grime remain artistic reconstruction,not exact1938damage evidence. User requested publication after this round."
     }
   ],
   "notionPages": [

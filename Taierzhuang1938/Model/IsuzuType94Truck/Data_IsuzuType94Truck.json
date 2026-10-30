@@ -1,0 +1,3640 @@
+{
+  "schemaVersion": 1,
+  "assetId": "IsuzuType94Truck",
+  "displayName": "九四式六轮普通货车",
+  "version": "20261030LocalizedMetalWearV80Candidate",
+  "status": "TechnicalCandidate_StrictReferenceAcceptancePending",
+  "referenceAccepted": false,
+  "acceptanceScope": "Closed front-quarter period photo is the primary appearance comparison; generated material board guides surface detail. Factory dimensions retained. Does not establish historical chassis identity, unseen construction, exact paint or user approval",
+  "configuration": "Complete three-axle6x4 ordinary cargo truck with six road wheels, symmetric headlamps and one side spare. Front-quarter historical photograph is primary; production photograph is secondary assembly evidence. Concealed spare carrier remains reconstruction.",
+  "appearanceReferenceSelection": {
+    "selectedByUser": "2026-10-25",
+    "primary": "Reference_HistoricalFront.jpg",
+    "defaultBonnetClosed": true,
+    "productionPhotoRole": "Secondary assembly/proportion reference; not the primary appearance acceptance target",
+    "materialBoard": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\IsuzuType94Truck\\References\\Reference_MaterialHistoricStudyV35.png",
+    "materialBoardRole": "User-requested built-in imagegen guidance for enamel,canvas,rubber and coated wood; generated geometry and exact historic pigment are not authoritative",
+    "geometryCorrectionPending": [
+      "Front-quarter camera, cab/front/canvas global silhouette and variant details"
+    ]
+  },
+  "units": "metres",
+  "facingAxis": "-Z",
+  "upAxis": "+Y",
+  "enamelMetalResponse": {
+    "version": 78,
+    "roughnessFactor": 1,
+    "clearcoatFactor": 0.28,
+    "clearcoatRoughnessFactor": 0.55,
+    "clearcoatRoughnessUsesPaintOrm": true,
+    "intactPaintMetallic": 0,
+    "exposedChipMetallicFromOrm": false,
+    "contactSteelUsesSeparateMaterial": true,
+    "selectedPigmentDirectionRetained": true,
+    "coatNormalShared": true,
+    "scope": "Continuous satin enamel without tiled cloud dirt or scattered conductive scratches; existing contact wear uses separate steel regions. Spatial dirt/fading is linear vertex albedo; no baked light. Wear history and microscopic scales are artistic reconstruction."
+  },
+  "serviceWeathering": {
+    "version": 80,
+    "severity": "MediumServiceWearWithVisibleLocalizedRust",
+    "space": "Closed rest-space; follows each rigid part during animation",
+    "method": "Tiling worn PBR plus standard linear COLOR_0 albedo multipliers",
+    "effects": [
+      "lower-body road grime",
+      "dry wheel dust",
+      "canvas hem staining and rain trails",
+      "uneven exposed-surface fading",
+      "coated timber wear",
+      "polished contact steel",
+      "uneven canvas bleaching,set-fold stains and worn hems"
+    ],
+    "lightingBaked": false,
+    "historicallyMeasured": false,
+    "scope": "User-requested artistic service wear and abrasion; not damage evidence for a particular truck or battle"
+  },
+  "metalWearLayers": {
+    "version": 80,
+    "layer": "Visible contact abrasion and broken oxidation along rolled wing lips",
+    "baseLinear": [
+      0.48,
+      0.5,
+      0.52,
+      1
+    ],
+    "roughnessMultiplierOnSteelOrm": 0.45,
+    "geometryChangedByPartition": false,
+    "rustBaseSrgb8": [
+      102,
+      59,
+      32
+    ],
+    "rustTrianglesPerRuntimeWing": 8,
+    "lipRustUvScale": 3.75,
+    "scope": "Artistic service wear at contact patches,bonnet seams,hinges and rolled edges;contact-patch enlargement belongs to the PBR source recipe,not this material partition. Not measured historical damage."
+  },
+  "bareSteelResponse": {
+    "version": 77,
+    "baseSrgb8": [
+      156,
+      153,
+      142
+    ],
+    "tarnishSrgb8": [
+      116,
+      113,
+      102
+    ],
+    "roughnessNominal": 0.32,
+    "metallic": 1,
+    "normalScratchSourceRetained": true,
+    "scope": "Tarnished conductor interpretation with rest-space grime; not measured historical alloy or oxidation state."
+  },
+  "cabGlazing": {
+    "declared": {
+      "baseColorLinear": [
+        0.96,
+        0.985,
+        0.975,
+        1
+      ],
+      "roughness": 0.035,
+      "transmission": 1,
+      "ior": 1.52,
+      "scope": "Cab glazing only;headlamp sheet retains its independent alpha optical approximation. Clear-glass appearance interpretation,not historical laboratory measurements."
+    },
+    "actualMaterial": {
+      "doubleSided": true,
+      "extensions": {
+        "KHR_materials_transmission": {
+          "transmissionFactor": 1
+        },
+        "KHR_materials_ior": {
+          "ior": 1.5199999809265137
+        }
+      },
+      "name": "Material_IsuzuGlass",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.9599999785423279,
+          0.9850000143051147,
+          0.9750000238418579,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 0.03500000014901161
+      }
+    },
+    "exactHistoricalSpecificationProven": false
+  },
+  "cabRoofSourceLod": {
+    "metrics": {
+      "sourceTriangles": 2240,
+      "runtimeTriangles": 1124,
+      "sourceRows": 17,
+      "sourceColumns": 33,
+      "retainedRows": [
+        0,
+        1,
+        2,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "initialVerticesPerSkin": 282,
+      "retainedVerticesPerSkin": 282,
+      "refinedSourceVertexIndices": [],
+      "forcedSourceEdgesPerSkin": [
+        6,
+        6
+      ],
+      "refinementHistory": [
+        {
+          "verticesPerSkin": 282,
+          "triangles": 1124,
+          "maximumPositionM": 0.00003177285485258367,
+          "maximumNormalBoundDegrees": 8.375510084032266,
+          "forcedEdgesPerSkin": [
+            0,
+            0
+          ]
+        },
+        {
+          "verticesPerSkin": 282,
+          "triangles": 1124,
+          "maximumPositionM": 0.00003177285485258367,
+          "maximumNormalBoundDegrees": 8.372772991128095,
+          "forcedEdgesPerSkin": [
+            0,
+            3
+          ]
+        },
+        {
+          "verticesPerSkin": 282,
+          "triangles": 1124,
+          "maximumPositionM": 0.00003177285485258367,
+          "maximumNormalBoundDegrees": 8.331221937158002,
+          "forcedEdgesPerSkin": [
+            0,
+            6
+          ]
+        },
+        {
+          "verticesPerSkin": 282,
+          "triangles": 1124,
+          "maximumPositionM": 0.00003177285485258367,
+          "maximumNormalBoundDegrees": 8.31601527201141,
+          "forcedEdgesPerSkin": [
+            3,
+            6
+          ]
+        },
+        {
+          "verticesPerSkin": 282,
+          "triangles": 1124,
+          "maximumPositionM": 0.00003177285485258367,
+          "maximumNormalBoundDegrees": 0.16203367938680366,
+          "forcedEdgesPerSkin": [
+            6,
+            6
+          ]
+        }
+      ],
+      "sourceBoundaryVerticesPerSkin": 96,
+      "allSourceBoundaryAndSidewallTrianglesRetained": true,
+      "sourceSplitNormalDegrees": 0,
+      "sourceSplitUvError": 0,
+      "skinBounds": [
+        {
+          "overlapPolygons": 1870,
+          "maximumPositionBoundM": 4.915124923727108e-7,
+          "maximumUvBound": 1.3328003749250113e-7,
+          "maximumNormalAngleBoundDegrees": 0.16203367938680366,
+          "maximumSampleNormalDegrees": 0.1398823142225008,
+          "maximumParameterCoverageError": 4.76837158203125e-7,
+          "worstNormalSourceTriangle": [
+            330,
+            331,
+            364
+          ],
+          "worstPositionSourceTriangle": [
+            382,
+            414,
+            381
+          ],
+          "method": "Exact common refinement in source-grid parameter space. Position/UV and unnormalised normal-difference norms attain maxima at overlap vertices;normal angle bound uses a positive interpolation-cone norm lower bound. Float arithmetic and declared tolerances apply."
+        },
+        {
+          "overlapPolygons": 1881,
+          "maximumPositionBoundM": 0.00003177285485258367,
+          "maximumUvBound": 1.3328003749250113e-7,
+          "maximumNormalAngleBoundDegrees": 0.16096127838678065,
+          "maximumSampleNormalDegrees": 0.14265252956010954,
+          "maximumParameterCoverageError": 4.76837158203125e-7,
+          "worstNormalSourceTriangle": [
+            924,
+            958,
+            925
+          ],
+          "worstPositionSourceTriangle": [
+            938,
+            972,
+            939
+          ],
+          "method": "Exact common refinement in source-grid parameter space. Position/UV and unnormalised normal-difference norms attain maxima at overlap vertices;normal angle bound uses a positive interpolation-cone norm lower bound. Float arithmetic and declared tolerances apply."
+        }
+      ],
+      "positionToleranceM": 0.0005,
+      "normalToleranceDegrees": 2,
+      "passed": true
+    },
+    "actualImportedChecks": {
+      "unmappedCorners": 0,
+      "sourceSidewallTrianglesRetained": true,
+      "sourceBoundaryRetained": true,
+      "skinBounds": [
+        {
+          "overlapPolygons": 1870,
+          "maximumPositionBoundM": 4.915124923727108e-7,
+          "maximumUvBound": 1.4901161193847656e-7,
+          "maximumNormalAngleBoundDegrees": 0.16052834098624194,
+          "maximumSampleNormalDegrees": 0.14803752007085635,
+          "maximumParameterCoverageError": 4.76837158203125e-7,
+          "worstNormalSourceTriangle": [
+            362,
+            394,
+            361
+          ],
+          "worstPositionSourceTriangle": [
+            382,
+            414,
+            381
+          ],
+          "method": "Exact common refinement in source-grid parameter space. Position/UV and unnormalised normal-difference norms attain maxima at overlap vertices;normal angle bound uses a positive interpolation-cone norm lower bound. Float arithmetic and declared tolerances apply."
+        },
+        {
+          "overlapPolygons": 1881,
+          "maximumPositionBoundM": 0.00003177285485258367,
+          "maximumUvBound": 1.6858739404357614e-7,
+          "maximumNormalAngleBoundDegrees": 0.15944009816664162,
+          "maximumSampleNormalDegrees": 0.14670980866944258,
+          "maximumParameterCoverageError": 4.76837158203125e-7,
+          "worstNormalSourceTriangle": [
+            891,
+            925,
+            892
+          ],
+          "worstPositionSourceTriangle": [
+            938,
+            972,
+            939
+          ],
+          "method": "Exact common refinement in source-grid parameter space. Position/UV and unnormalised normal-difference norms attain maxima at overlap vertices;normal angle bound uses a positive interpolation-cone norm lower bound. Float arithmetic and declared tolerances apply."
+        }
+      ]
+    },
+    "sourceGeometryRetained": true,
+    "exactHistoricalRoofProfileProven": false
+  },
+  "canvasHeaderFolds": {
+    "parametersMetres": [
+      [
+        0.75,
+        -0.18,
+        -0.025,
+        0.05
+      ],
+      [
+        0.66,
+        -0.03,
+        -0.018,
+        0.045
+      ],
+      [
+        0.42,
+        -0.25,
+        -0.016,
+        0.06
+      ]
+    ],
+    "maximumCreaseFieldDisplacementM": 0.015953163128910045,
+    "sourceBoundaryPinned": true,
+    "evidence": "Selected600x345primary front-header diagonal crease hypotheses. All four source-grid boundaries and rolled-curtain/corner attachments retained. Exact16mmmaximum surface relief,hidden side and tailoring reconstructed; not recovered historical cloth dimensions or illumination.",
+    "runtimeSampling": {
+      "sourceTriangles": 2856,
+      "runtimeTriangles": 1496,
+      "skins": [
+        {
+          "layer": 0,
+          "triangles": 600,
+          "vertices": 375,
+          "sourceBoundaryVerticesRetained": 148
+        },
+        {
+          "layer": 1,
+          "triangles": 600,
+          "vertices": 375,
+          "sourceBoundaryVerticesRetained": 148
+        }
+      ],
+      "sourceRimTrianglesRetained": 296,
+      "sourceCornerNormalInputsRetained": true,
+      "method": "Independent open-skin collapse with protected source perimeter,followed by exact full-source thickness rim. No cross-skin normal projection;actual GLB quality is separately verified."
+    },
+    "actualImportedSurface": {
+      "topology": {
+        "triangles": 1496,
+        "vertices": 750,
+        "sourceBoundaryVertices": 296,
+        "missingSourceBoundaryVertices": 0,
+        "sourceRimTrianglesRetained": 296,
+        "nonManifoldEdges": 0,
+        "euler": 2,
+        "signedVolumeM3": 0.001732250418749708
+      },
+      "surface": {
+        "sourceTriangles": 2856,
+        "runtimeTriangles": 1496,
+        "highToLow": {
+          "samples": 11424,
+          "maximumPositionDifferenceM": 0.00045000898535363376,
+          "position95M": 0.00011046559666283429,
+          "meanPositionDifferenceM": 0.000028916990704387554,
+          "normal95Degrees": 4.51809030812751,
+          "maximumNormalDegrees": 17.932958779097373,
+          "maximumPositionSample": {
+            "pointBlenderM": [
+              0.8149687051773071,
+              -0.26930826902389526,
+              2.5200963020324707
+            ],
+            "nearestPointBlenderM": [
+              0.8149186372756958,
+              -0.26972365379333496,
+              2.519930601119995
+            ],
+            "targetTriangle": 397
+          }
+        },
+        "lowToHigh": {
+          "samples": 5984,
+          "maximumPositionDifferenceM": 0.0003848892811220139,
+          "position95M": 0.00011756914318539202,
+          "meanPositionDifferenceM": 0.000024493271070684675,
+          "normal95Degrees": 5.437830775156733,
+          "maximumNormalDegrees": 22.277222053508527,
+          "maximumPositionSample": {
+            "pointBlenderM": [
+              0.8106023073196411,
+              -0.2697555124759674,
+              2.521313428878784
+            ],
+            "nearestPointBlenderM": [
+              0.8106421232223511,
+              -0.26940348744392395,
+              2.5214638710021973
+            ],
+            "targetTriangle": 1682
+          }
+        },
+        "scope": "Actual source and actual GLB header triangle-centre plus three interior barycentric samples, both directions. Nearest surface with matching geometric facing (dot>0.2) distinguishes the two3mm-separated skins. Interpolated authored corner normals. Sampled errors only, not a continuous bound or photographic acceptance."
+      },
+      "positionSampleLimitM": 0.0006,
+      "normal95LimitDegrees": 6,
+      "normalMaximumLimitDegrees": 25,
+      "continuousErrorBoundClaimed": false
+    },
+    "exactHistoricalTailoringProven": false
+  },
+  "wheelHardwareSourceLod": {
+    "fullSourceNuts": 48,
+    "trianglesPerNut": 20,
+    "fullSourceHexCovers": 6,
+    "hexCoverCornerRadiusM": 0.056,
+    "hexCoverPhaseDegrees": 30,
+    "hexCoverEvidence": "1936manual scan09front/rear central outlines measured at approximately56.8/55.1mmcorner radius relative to34x6tyres.56mmcommon radius,six flats and drawing phase are reconstruction;cap function,photo variant and axial depth unproven.",
+    "sampledBosses": {
+      "Wheel_FrontLeft_Hub": {
+        "sourceTriangles": 188,
+        "runtimeTriangles": 60,
+        "sourceCircumference": 48,
+        "retainedCircumference": 16,
+        "maximumCrossSectionDifferenceBoundM": 0.0017463936523010105,
+        "sourceAxialBoundsRetained": true,
+        "sourceNormalsAndCornerUvsSampled": true
+      },
+      "Wheel_FrontLeft_HubCap": {
+        "sourceTriangles": 20,
+        "runtimeTriangles": 20,
+        "sourceCornerRadiusM": 0.056,
+        "sourceCircumference": 6,
+        "retainedCircumference": 6,
+        "maximumCrossSectionDifferenceBoundM": 0,
+        "sourceAxialBoundsRetained": true,
+        "sourceNormalsAndCornerUvsSampled": true,
+        "outline": "Full source six-flat central cover;scan-derived size,not printed manufacturing dimension"
+      },
+      "Wheel_FrontRight_Hub": {
+        "sourceTriangles": 188,
+        "runtimeTriangles": 60,
+        "sourceCircumference": 48,
+        "retainedCircumference": 16,
+        "maximumCrossSectionDifferenceBoundM": 0.0017463936523010105,
+        "sourceAxialBoundsRetained": true,
+        "sourceNormalsAndCornerUvsSampled": true
+      },
+      "Wheel_FrontRight_HubCap": {
+        "sourceTriangles": 20,
+        "runtimeTriangles": 20,
+        "sourceCornerRadiusM": 0.056,
+        "sourceCircumference": 6,
+        "retainedCircumference": 6,
+        "maximumCrossSectionDifferenceBoundM": 0,
+        "sourceAxialBoundsRetained": true,
+        "sourceNormalsAndCornerUvsSampled": true,
+        "outline": "Full source six-flat central cover;scan-derived size,not printed manufacturing dimension"
+      },
+      "Wheel_Rear1Left_Hub": {
+        "sourceTriangles": 188,
+        "runtimeTriangles": 60,
+        "sourceCircumference": 48,
+        "retainedCircumference": 16,
+        "maximumCrossSectionDifferenceBoundM": 0.0017463942718177249,
+        "sourceAxialBoundsRetained": true,
+        "sourceNormalsAndCornerUvsSampled": true
+      },
+      "Wheel_Rear1Left_HubCap": {
+        "sourceTriangles": 20,
+        "runtimeTriangles": 20,
+        "sourceCornerRadiusM": 0.056,
+        "sourceCircumference": 6,
+        "retainedCircumference": 6,
+        "maximumCrossSectionDifferenceBoundM": 0,
+        "sourceAxialBoundsRetained": true,
+        "sourceNormalsAndCornerUvsSampled": true,
+        "outline": "Full source six-flat central cover;scan-derived size,not printed manufacturing dimension"
+      },
+      "Wheel_Rear1Right_Hub": {
+        "sourceTriangles": 188,
+        "runtimeTriangles": 60,
+        "sourceCircumference": 48,
+        "retainedCircumference": 16,
+        "maximumCrossSectionDifferenceBoundM": 0.0017463942718177249,
+        "sourceAxialBoundsRetained": true,
+        "sourceNormalsAndCornerUvsSampled": true
+      },
+      "Wheel_Rear1Right_HubCap": {
+        "sourceTriangles": 20,
+        "runtimeTriangles": 20,
+        "sourceCornerRadiusM": 0.056,
+        "sourceCircumference": 6,
+        "retainedCircumference": 6,
+        "maximumCrossSectionDifferenceBoundM": 0,
+        "sourceAxialBoundsRetained": true,
+        "sourceNormalsAndCornerUvsSampled": true,
+        "outline": "Full source six-flat central cover;scan-derived size,not printed manufacturing dimension"
+      },
+      "Wheel_Rear2Left_Hub": {
+        "sourceTriangles": 188,
+        "runtimeTriangles": 60,
+        "sourceCircumference": 48,
+        "retainedCircumference": 16,
+        "maximumCrossSectionDifferenceBoundM": 0.001746398671774579,
+        "sourceAxialBoundsRetained": true,
+        "sourceNormalsAndCornerUvsSampled": true
+      },
+      "Wheel_Rear2Left_HubCap": {
+        "sourceTriangles": 20,
+        "runtimeTriangles": 20,
+        "sourceCornerRadiusM": 0.056,
+        "sourceCircumference": 6,
+        "retainedCircumference": 6,
+        "maximumCrossSectionDifferenceBoundM": 0,
+        "sourceAxialBoundsRetained": true,
+        "sourceNormalsAndCornerUvsSampled": true,
+        "outline": "Full source six-flat central cover;scan-derived size,not printed manufacturing dimension"
+      },
+      "Wheel_Rear2Right_Hub": {
+        "sourceTriangles": 188,
+        "runtimeTriangles": 60,
+        "sourceCircumference": 48,
+        "retainedCircumference": 16,
+        "maximumCrossSectionDifferenceBoundM": 0.001746398671774579,
+        "sourceAxialBoundsRetained": true,
+        "sourceNormalsAndCornerUvsSampled": true
+      },
+      "Wheel_Rear2Right_HubCap": {
+        "sourceTriangles": 20,
+        "runtimeTriangles": 20,
+        "sourceCornerRadiusM": 0.056,
+        "sourceCircumference": 6,
+        "retainedCircumference": 6,
+        "maximumCrossSectionDifferenceBoundM": 0,
+        "sourceAxialBoundsRetained": true,
+        "sourceNormalsAndCornerUvsSampled": true,
+        "outline": "Full source six-flat central cover;scan-derived size,not printed manufacturing dimension"
+      }
+    },
+    "actualImportedSummary": {
+      "parts": 60,
+      "maximumSourceNormalDegrees": 0,
+      "maximumSourceUvError": 2.384185791015625e-7
+    },
+    "sourceGeometryRetained": true,
+    "historicalFastenerDimensionsProven": false
+  },
+  "wheelNutSeats": {
+    "profileMetres": [
+      0.09144000000000001,
+      0.09690225563909773,
+      0.09144000000000001,
+      0.14750676691729322,
+      0.067056,
+      0.15181353383458643,
+      0.057912000000000005,
+      0.13566315789473682
+    ],
+    "evidence": "Six reconstructed hub mounting collars bridge existing hub cylinders to unchanged nut backs. Flat support annulus and concealed hub engagement correct a27mm source gap; this profile is not a factory measurement. Tyres,outer rims,perforated pressings,hubs,caps,nut positions and unhubbed side spare retained.",
+    "runtimeProfileSegments": [
+      8,
+      8,
+      8,
+      8
+    ],
+    "analyticParts": [
+      "Wheel_FrontLeft_InnerDisc",
+      "Wheel_FrontRight_InnerDisc",
+      "Wheel_Rear1Left_InnerDisc",
+      "Wheel_Rear1Right_InnerDisc",
+      "Wheel_Rear2Left_InnerDisc",
+      "Wheel_Rear2Right_InnerDisc"
+    ],
+    "sampling": "Current high-source4ring80station profiles sampled at8stations per ring with source corner normals/UVs.45degreeboundaries preserve physical projection seams. Temporary procedural shallow-collar proxies isolate unrelated global-budget collapse; only current sampled collars enter final runtime.",
+    "nutAxialParts": [
+      "Wheel_FrontLeft_Lug0",
+      "Wheel_FrontLeft_Lug1",
+      "Wheel_FrontLeft_Lug2",
+      "Wheel_FrontLeft_Lug3",
+      "Wheel_FrontLeft_Lug4",
+      "Wheel_FrontLeft_Lug5",
+      "Wheel_FrontLeft_Lug6",
+      "Wheel_FrontLeft_Lug7",
+      "Wheel_FrontRight_Lug0",
+      "Wheel_FrontRight_Lug1",
+      "Wheel_FrontRight_Lug2",
+      "Wheel_FrontRight_Lug3",
+      "Wheel_FrontRight_Lug4",
+      "Wheel_FrontRight_Lug5",
+      "Wheel_FrontRight_Lug6",
+      "Wheel_FrontRight_Lug7",
+      "Wheel_Rear1Left_Lug0",
+      "Wheel_Rear1Left_Lug1",
+      "Wheel_Rear1Left_Lug2",
+      "Wheel_Rear1Left_Lug3",
+      "Wheel_Rear1Left_Lug4",
+      "Wheel_Rear1Left_Lug5",
+      "Wheel_Rear1Left_Lug6",
+      "Wheel_Rear1Left_Lug7",
+      "Wheel_Rear1Right_Lug0",
+      "Wheel_Rear1Right_Lug1",
+      "Wheel_Rear1Right_Lug2",
+      "Wheel_Rear1Right_Lug3",
+      "Wheel_Rear1Right_Lug4",
+      "Wheel_Rear1Right_Lug5",
+      "Wheel_Rear1Right_Lug6",
+      "Wheel_Rear1Right_Lug7",
+      "Wheel_Rear2Left_Lug0",
+      "Wheel_Rear2Left_Lug1",
+      "Wheel_Rear2Left_Lug2",
+      "Wheel_Rear2Left_Lug3",
+      "Wheel_Rear2Left_Lug4",
+      "Wheel_Rear2Left_Lug5",
+      "Wheel_Rear2Left_Lug6",
+      "Wheel_Rear2Left_Lug7",
+      "Wheel_Rear2Right_Lug0",
+      "Wheel_Rear2Right_Lug1",
+      "Wheel_Rear2Right_Lug2",
+      "Wheel_Rear2Right_Lug3",
+      "Wheel_Rear2Right_Lug4",
+      "Wheel_Rear2Right_Lug5",
+      "Wheel_Rear2Right_Lug6",
+      "Wheel_Rear2Right_Lug7"
+    ],
+    "nutAxialMethod": "Full evaluated current high-source closed12vertex20triangle hexagonal prisms;positions,corner normals and UVs copied after global budget reduction. No axial-only repair.",
+    "actualImportedChecks": {
+      "nuts": 48,
+      "backFootprintSamples": 336,
+      "maximumSupportGapM": 1.1060386896112606e-7,
+      "collarsReachingHubs": 6,
+      "outwardCollars": 6,
+      "runtimeContactAllowanceM": 0.002,
+      "passed": true,
+      "scope": "Actual imported triangle footprints and BVH support/hub contact. The2mmruntime construction limit is retained; axial bounds are repaired from current high source. Independent source/runtime contacts are also checked at1micrometre. No nut or hub is excluded from this gate.",
+      "detailReport": "Local Data_ReimportVerification.json, regenerated by the canonical rebuild"
+    },
+    "historicalProfileProven": false
+  },
+  "stableRuntimeParts": {
+    "names": [
+      "Cabin_Bpost-1",
+      "Cabin_Bpost1",
+      "RearFender_RolledLip1",
+      "RunningBoard_TreadRib-13",
+      "Rear2_CoverBolt5",
+      "Rear2_CoverBolt7"
+    ],
+    "postExportNames": [
+      "Rear2_CoverBolt5",
+      "Rear2_CoverBolt7"
+    ],
+    "baselineSha256": "e1d443fa2ecc63d548f34a099d8918fccf824ac5842c3dfaacfc3d674288e7fa",
+    "recipe": "Data_StableRuntimeParts.json",
+    "purpose": "Retain unchanged-source verified derived islands after merged budget reduction; source fingerprints reject stale reuse",
+    "packaging": "Game blend is the pre-packaging derivative. Clean script restores declared post-export islands and removes float32-collapsed faces; verified Reimport blend contains the actual packaged GLB geometry."
+  },
+  "frontWingProfile": {
+    "foreStartRadians": 0.55,
+    "foreRadiusM": 0.7213868740271536,
+    "foreLipCentreYM": 2.435,
+    "foreTaperM": 0.055,
+    "innerForeExtraXM": 0.12,
+    "innerForeSetbackYM": 0.1,
+    "innerForeDropZM": 0.03,
+    "evidence": "Primary-photo outer leading tip and1936factory frontal photograph support short wings with recessed/dished inner corners.55mm outer fore-tip taper blends to zero at unchanged1.900m crown width;120mm inner narrowing,100mm setback and30mm dish retained. These are photo reconstruction parameters,not factory pressing dimensions; camera remains uncalibrated.",
+    "actualPackagedChecks": {
+      "minimumForeHeightM": 0.7828131914138794,
+      "minimumOuterLipHeightM": 0.8094052672386169,
+      "bumperTopM": 0.665,
+      "maximumForeYM": 2.4417357444763184,
+      "endpointErrorsM": [
+        5.960464477539063e-8,
+        5.960464477539063e-8
+      ],
+      "endpointCentresBlenderM": {
+        "1": [
+          0.8871983289718628,
+          2.434999942779541,
+          0.8137214183807373
+        ],
+        "-1": [
+          -0.8871983289718628,
+          2.434999942779541,
+          0.8137214183807373
+        ]
+      },
+      "farLipPixel": [
+        555.6655379377801,
+        208.64666665679013
+      ],
+      "observedFarLipPixel": [
+        553,
+        207
+      ],
+      "errorPx": 3.1331459551590046,
+      "annotationUncertaintyPx": 3,
+      "innerEndpointCentresBlenderM": {
+        "1": [
+          0.4638298749923706,
+          2.334280490875244,
+          0.7832672595977783
+        ],
+        "-1": [
+          -0.4638298749923706,
+          2.334280490875244,
+          0.7832672595977783
+        ]
+      },
+      "innerEndpointErrorsM": [
+        0.0009001242196884817,
+        0.0009001242196884817
+      ],
+      "nearInnerPixel": [
+        350.22050301228194,
+        205.9695570993691
+      ],
+      "observedNearInnerPixel": [
+        353,
+        207
+      ],
+      "nearInnerErrorPx": 2.964357616110851,
+      "nearInnerAnnotationUncertaintyPx": 4,
+      "cameraCalibrated": false,
+      "factoryPressingDimensionsProven": false,
+      "scope": "Actual delivered sheets, unchanged outer rolled lips and recessed/dished inner corners. Visible near inner tip guided by primary photo; hidden far inner seam is not an observed calibration point. Exact pressing and camera remain reconstructed; no whole-model acceptance."
+    },
+    "wholeReferenceAccepted": false
+  },
+  "primaryReferencePose": {
+    "restSteeringDegrees": 0,
+    "comparisonSteerInnerDegrees": 12,
+    "evidence": "Visible near lower tyre arcs,far tyre outer arc and near tandem arcs inform a joint camera/steering hypothesis. Axle spacing/tracks and nominal tyres held fixed; caps,bright blobs,axle-shadow-contaminated rows and road lines excluded.12degreeinner reference steering is inferred,not a factory angle. Exported rest pose remains straight.",
+    "observationRecipe": "Data_PrimaryReferenceFit.json",
+    "cameraCalibrated": false,
+    "historicalSteeringAngleMeasured": false,
+    "wholeReferenceAccepted": false
+  },
+  "farMirrorPose": {
+    "yawDegrees": 32,
+    "normalBlender": [
+      -0.5299192070960999,
+      0.8480481505393982,
+      0
+    ],
+    "assumedDriverEyeBlenderM": [
+      0.41999998688697815,
+      0.2817142903804779,
+      1.909999966621399
+    ],
+    "historicalConfigurationProven": false,
+    "actualPackagedChecks": {
+      "centreBlenderM": [
+        -1.0149996280670166,
+        0.9361431002616882,
+        1.9899998903274536
+      ],
+      "yawDegrees": 32,
+      "capNormalBlender": [
+        -0.5299192070960999,
+        0.8480481505393982,
+        0
+      ],
+      "radiusRangeM": [
+        0.05999982122344029,
+        0.06000019081173353
+      ],
+      "caseHalfThicknessM": 0.008600144879892468,
+      "stalkTipErrorM": 1.3328003749250113e-7,
+      "stalkTipAxialDistanceM": 0.005209386051973297,
+      "stalkTipRadialDistanceM": 0.015348900308468501,
+      "assumedEyePointBlenderM": [
+        0.41999998688697815,
+        0.2817142903804779,
+        1.909999966621399
+      ],
+      "reflectedSceneDirection": [
+        -0.02587747573852539,
+        -0.9983806610107422,
+        0.050658226013183594
+      ],
+      "historicalConfigurationProven": false,
+      "scope": "Actual delivered circle and stalk geometry; eye point and32degree adjustment are reconstruction parameters, not historical measurements or whole-photo acceptance."
+    }
+  },
+  "primaryDoorSill": {
+    "foreLiftParameterM": 0.14,
+    "evidence": "Closed primary side-window lower-channel hypothesis; only door pressing, inner trim and moving window frame change. Windscreen, cowl, hinges, roof and hidden-side correspondence retain separate evidence limits.",
+    "actualPackagedChecks": {
+      "foreCentreBlenderM": [
+        0.7763055562973022,
+        0.88359135389328,
+        1.5700582265853882
+      ],
+      "forePixel": [
+        205.8700565273649,
+        113.70982343386129
+      ],
+      "observedForePixel": [
+        210,
+        115
+      ],
+      "errorPx": 4.3267757809915075,
+      "annotationUncertaintyPx": 4,
+      "reconstructionLiftM": 0.14,
+      "rearJunctionOccluded": true,
+      "farGlassLowerCornerUsed": false,
+      "wholeReferenceAccepted": false,
+      "scope": "One visible near-side moving-sill junction in600x345primary. Fixed cowl,front windscreen,roof,hinges and photographed hidden rear corner do not supply invented annotations."
+    },
+    "wholeReferenceAccepted": false
+  },
+  "primaryFrontReconstruction": {
+    "evidence": "Closed-front-quarter photo-guided front revision; symmetric lamps and unchanged factory chassis anchors. Lamp spacing,bumper width,fore-tip pressing and camera/crop/steering remain reconstruction; exact variant and optics unproven",
+    "lampCentreTrackM": 0.938,
+    "lampOuterDiameterM": 0.24609223374112613,
+    "manufacturerDrawingApproximation": {
+      "centreTrackM": 0.9569,
+      "diameterM": 0.2184,
+      "printedDimensions": false
+    },
+    "frontWingCrownLiftM": 0.18,
+    "bumperWidthM": 1.58,
+    "bumperCentreHeightM": 0.62,
+    "frontBonnetCrownM": 1.48,
+    "radiatorHeightCorrectionM": -0.09,
+    "starForwardM": 0.06,
+    "exactHistoricalVariantProven": false,
+    "cameraCalibrated": false
+  },
+  "surfaceReconstruction": {
+    "smoothingPolicy": "Preserve authored polygon smooth/flat flags through merge and budget reduction; custom corner normals retained",
+    "mirrorHeadDropM": 0.04,
+    "mirrorStalkRadiusM": 0.008,
+    "nearMirrorHeadInsetM": 0.04,
+    "mirrorEvidence": "Near head/stalk retained from primary. Far mount and presence remain inferred;32degree head yaw removes the parallel front-facing disc hypothesis and gives a rearward view from a reconstructed eye point. No exact historical angle or mirror-count certification.",
+    "actualPlaneChecks": {
+      "parts": {
+        "Cargo_FloorPlank0": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19782350757194625,
+          "triangles": 12
+        },
+        "Cargo_FloorPlank12": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19782350757194625,
+          "triangles": 12
+        },
+        "Cargo_FrontBoard2": {
+          "planeSamples": 6,
+          "maximumDeviationDeg": 0.19281449969864173,
+          "triangles": 10
+        },
+        "Cargo_FloorPlank9": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19782350757194625,
+          "triangles": 12
+        },
+        "Cargo_SidePlank-1_0": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19382665722055112,
+          "triangles": 12
+        },
+        "Mirror_GlassLeft": {
+          "planeSamples": 180,
+          "maximumDeviationDeg": 0.024228320780105533,
+          "triangles": 124
+        },
+        "Cargo_FloorPlank11": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19782350757194625,
+          "triangles": 12
+        },
+        "Cargo_FloorPlank6": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19782350757194625,
+          "triangles": 12
+        },
+        "Tailgate_Plank1": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19382665722055112,
+          "triangles": 12
+        },
+        "Cargo_SidePlank-1_1": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19281449969864173,
+          "triangles": 12
+        },
+        "Cargo_FloorPlank8": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19782350757194625,
+          "triangles": 12
+        },
+        "Cargo_FrontBoard3": {
+          "planeSamples": 6,
+          "maximumDeviationDeg": 0.19281449969864173,
+          "triangles": 10
+        },
+        "Cargo_FrontBoard0": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19382665722055112,
+          "triangles": 12
+        },
+        "Cargo_SidePlank1_1": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19382665722055112,
+          "triangles": 12
+        },
+        "Cargo_SidePlank-1_2": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19382665722055112,
+          "triangles": 12
+        },
+        "Mirror_BackRight": {
+          "planeSamples": 180,
+          "maximumDeviationDeg": 0,
+          "triangles": 124
+        },
+        "Cargo_SidePlank1_2": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19382665722055112,
+          "triangles": 12
+        },
+        "Mirror_GlassRight": {
+          "planeSamples": 180,
+          "maximumDeviationDeg": 0,
+          "triangles": 124
+        },
+        "Cargo_FloorPlank4": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19782350757194625,
+          "triangles": 12
+        },
+        "Tailgate_Plank0": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19382665722055112,
+          "triangles": 12
+        },
+        "Cargo_FloorPlank3": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19782350757194625,
+          "triangles": 12
+        },
+        "Cargo_FloorPlank7": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19782350757194625,
+          "triangles": 12
+        },
+        "Cargo_FrontBoard1": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19382665722055112,
+          "triangles": 12
+        },
+        "Mirror_BackLeft": {
+          "planeSamples": 180,
+          "maximumDeviationDeg": 0.019782341029446364,
+          "triangles": 124
+        },
+        "Cargo_FloorPlank10": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19782350757194625,
+          "triangles": 12
+        },
+        "Tailgate_Plank2": {
+          "planeSamples": 6,
+          "maximumDeviationDeg": 0.19281449969864173,
+          "triangles": 10
+        },
+        "Cargo_FloorPlank1": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19782350757194625,
+          "triangles": 12
+        },
+        "Cargo_FloorPlank5": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19782350757194625,
+          "triangles": 12
+        },
+        "Cargo_SidePlank1_0": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19382665722055112,
+          "triangles": 12
+        },
+        "Cargo_FloorPlank2": {
+          "planeSamples": 12,
+          "maximumDeviationDeg": 0.19782350757194625,
+          "triangles": 12
+        }
+      },
+      "mirrorParts": 4,
+      "woodParts": 26,
+      "geometryAndImageAcceptanceEstablished": false
+    },
+    "exactHistoricalMirrorDimensionsProven": false
+  },
+  "radiatorReconstruction": {
+    "crownEvidence": "Original1936 front/side/plan distinguish continuous exterior crown, twin inner openings and flat cap; exact curves and dimensions reconstructed",
+    "capDiameterM": 0.086,
+    "capThicknessM": 0.017,
+    "capCentreBlender": [
+      0,
+      2.3,
+      1.547
+    ],
+    "serviceSaddleEvidence": "Factory closed nose informs crown and flat cap; saddle split, neck clearance and concealed hose routing inferred, actual full motion checked separately",
+    "serviceStationY": 2.244398823529412,
+    "serviceSeamGapM": 0.003,
+    "neckHoleRadiusM": 0.025,
+    "coolantTankConnectionM": [
+      0,
+      2.256999969482422,
+      1.3849999904632568
+    ],
+    "actualPackagedChecks": {
+      "holes": [
+        {
+          "name": "Nose_ServiceSaddle-1",
+          "minimumNeckAxisRadiusM": 0.02499872046638276,
+          "neckSurfaceIntersections": 0
+        },
+        {
+          "name": "Nose_ServiceSaddle1",
+          "minimumNeckAxisRadiusM": 0.024998720466359585,
+          "neckSurfaceIntersections": 0
+        }
+      ],
+      "cap": {
+        "min": [
+          -0.0430000014603138,
+          2.256999969482422,
+          1.5389999151229858
+        ],
+        "max": [
+          0.0430000014603138,
+          2.3429999351501465,
+          1.555999994277954
+        ]
+      },
+      "hose": {
+        "min": [
+          -0.015051683411002159,
+          1.971276044845581,
+          1.3574999570846558
+        ],
+        "max": [
+          0.1513453871011734,
+          2.2788281440734863,
+          1.437368631362915
+        ]
+      },
+      "tank": {
+        "min": [
+          -0.2068965584039688,
+          2.2300000190734863,
+          1.3399999141693115
+        ],
+        "max": [
+          0.2068965584039688,
+          2.3299999237060547,
+          1.4199999570846558
+        ]
+      },
+      "hoseTerminalSurfaceGapM": 0,
+      "crownTopM": 1.5449999570846558,
+      "centreTopM": 1.5449999570846558,
+      "constructionAndDimensionsInferred": true
+    },
+    "exactHistoricalHardwareProven": false
+  },
+  "primaryCanvasProfile": {
+    "mode": "Upper assembly-compression restoration and rear rake; lower skirt/cargo unchanged",
+    "extraForeRearM": [
+      0.07,
+      0.2
+    ],
+    "maximumSourceLiftM": 0.34954837413324946,
+    "sourceMainTopM": 2.89453387260437,
+    "evidence": "Visible primary front-quarter roof/shoulder silhouette; exact height, bow section and tailoring reconstructed. Not a new factory overall-height specification.",
+    "actualPackagedChecks": {
+      "actualMainTopM": 2.89453387260437,
+      "sourceMainTopM": 2.89453387260437,
+      "bowHeights": [
+        {
+          "name": "Cargo_CanvasBow-0.7666666666666666",
+          "minZ": 1.5247265100479126,
+          "maxZ": 2.794938564300537
+        },
+        {
+          "name": "Cargo_CanvasBow-1.6933333333333334",
+          "minZ": 1.5247265100479126,
+          "maxZ": 2.8380253314971924
+        },
+        {
+          "name": "Cargo_CanvasBow-2.6199999999999997",
+          "minZ": 1.5247265100479126,
+          "maxZ": 2.8811120986938477
+        },
+        {
+          "name": "Cargo_CanvasBow0.16",
+          "minZ": 1.5247265100479126,
+          "maxZ": 2.7542552947998047
+        }
+      ],
+      "factoryOverallCoverHeightProven": false,
+      "wholeReferenceAccepted": false
+    },
+    "factoryOverallCoverHeightProven": false,
+    "lowerSkirtCargoAndChassisRetained": true
+  },
+  "files": {
+    "runtime": "Model_IsuzuType94Truck.glb",
+    "sha256": "1d19078a615ca3113d27f87879ffe7946649ec8f57d9b9e4e1e1743ad2320f74",
+    "bytes": 73625712,
+    "highSource": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/IsuzuType94Truck/Scene_IsuzuType94Truck.blend",
+    "gameSource": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/IsuzuType94Truck/Scene_IsuzuType94TruckGame.blend",
+    "highGlb": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/IsuzuType94Truck/Exports/Model_IsuzuType94TruckHigh.glb",
+    "references": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/IsuzuType94Truck/References",
+    "rebuild": "../../_blender/Script_IsuzuType94TruckRebuild.mjs"
+  },
+  "geometry": {
+    "runtimeTriangles": 79970,
+    "meshes": 85,
+    "highSourceEvaluatedTriangles": 253424,
+    "boundsM": {
+      "min": [
+        -1.0704399347305298,
+        0.000020503997802734375,
+        -2.447999954223633
+      ],
+      "max": [
+        1.034999966621399,
+        2.9021151065826416,
+        2.9519999027252197
+      ]
+    },
+    "dimensionsIncludingMirrorsM": [
+      2.1054399013519287,
+      2.902094602584839,
+      5.3999998569488525
+    ],
+    "bodyWidthExcludingMirrorsM": 1.9473999738693237,
+    "fixedBodyWidthBelowMirrorsM": 1.899999976158142,
+    "looseCanvasAndBindingsWidthM": 2.0397812128067017,
+    "vehicleTriangleLimit": 80000,
+    "trackedSourceParts": 1120,
+    "partTrackingAttribute": "_SOURCE_PART_ID"
+  },
+  "factoryAnchorsM": {
+    "length": 5.4,
+    "bodyWidth": 1.9,
+    "cabHeight": 2.25,
+    "frontToFirstRearAxle": 2.8,
+    "tandemAxleSpacing": 1.1,
+    "frontTrack": 1.5,
+    "rearTrack": 1.45,
+    "rearAxleClearance": 0.28,
+    "cargoInnerWidthApprox": 1.75,
+    "cargoWoodenSideDepthApprox": 0.45,
+    "nominalTyreDiameter": 0.8636,
+    "nominalTyreSection": 0.1524
+  },
+  "photographicBodyM": {
+    "cargoFront": -0.35,
+    "cargoRear": -2.947,
+    "completeDesignExtent": 5.4,
+    "cargoHeightAdjustment": 0.04,
+    "canopyUpperHeightAdjustment": -0.03,
+    "manualNominalOverallLength": 5.4,
+    "nominalLengthConflict": false,
+    "evidence": "Legacy production-photo rear body fit with unchanged axle/tyre anchors. Front bumper2.448m + rear tailgate bolt2.952m gives nominal5.400m extent. These reconstructed skin values do not establish the current primary front-quarter photo variant or global visual match."
+  },
+  "referencePose": {
+    "role": "Secondary production/assembly inspection pose; the current primary photograph uses closed bonnet and a separate initial camera hypothesis",
+    "topOpenDegrees": 23.38,
+    "sideOutwardFoldDegrees": 131.36,
+    "steerInnerDegrees": 16,
+    "cameraLocationBlender": [
+      9.206558945812747,
+      7.199037546820066,
+      0.7101724024734355
+    ],
+    "cameraTargetBlender": [
+      1.6450328819905113,
+      1.4536783547661836,
+      0.9634930301747016
+    ],
+    "lensMm": 68.97640203785065,
+    "rollDegrees": -1.4982668252879088,
+    "principalPointPixels": [
+      347.48289911704575,
+      249.55055332194243
+    ],
+    "cameraEvidence": "Legacy inferred pinhole view for600x410production-photo comparison only. It is not the current600x345front-quarter primary-camera calibration."
+  },
+  "sideSpare": {
+    "centreBlenderM": [
+      0.87,
+      0.45,
+      1.07
+    ],
+    "tyreDesignation": "34x6; matches six road tyres",
+    "parent": "Door_Right",
+    "roadWheels": 6,
+    "spares": 1,
+    "independentRollingMotion": false,
+    "carrierHistoricallyProven": false,
+    "rimFace": "Inward bowl, reversed about vertical axis; same centre and nominal tyre/rim sizes",
+    "mountEvidence": "Primary and supplementary period photos support a recessed spare face. Coupled spindle,pad,locking bar,nut and four fixing pins rebuilt for actual contact. Exact factory hardware,bowl depth and bright-ring position unproven.",
+    "refittedCarrierParts": [
+      "SpareCarrier_Spindle",
+      "SpareCarrier_CentreSeat",
+      "SpareCarrier_LockingBar",
+      "SpareCarrier_LockingNut",
+      "SpareCarrier_BackplateRivet-0.12-0.08",
+      "SpareCarrier_BackplateRivet-0.120.08",
+      "SpareCarrier_BackplateRivet0.12-0.08",
+      "SpareCarrier_BackplateRivet0.120.08"
+    ],
+    "runtimeCollarStations": 16,
+    "runtimeBarAndNutContactFitM": 0.00038444995880126953,
+    "runtimeContactMethod": "Sixteen-station current-source collar;actual evaluated low locking-bar back feet ray-seated with at most1mm rigid axial offset. Nut follows bar;physical steel UVs refreshed only on these two parts. Source hardware retained.",
+    "actualPackagedChecks": {
+      "passed": true,
+      "dimensions": {
+        "centreBlenderM": [
+          0.8699999451637268,
+          0.45000001788139343,
+          1.0700000524520874
+        ],
+        "maximumTyreRadiusM": 0.43180011384674477,
+        "tyreWidthM": 0.15240013599395752
+      },
+      "mountPins": [
+        {
+          "name": "SpareCarrier_BackplateRivet-0.12-0.08",
+          "doorSkinAxialOverlapM": 0.006999969482421875
+        },
+        {
+          "name": "SpareCarrier_BackplateRivet-0.120.08",
+          "doorSkinAxialOverlapM": 0.006999969482421875
+        },
+        {
+          "name": "SpareCarrier_BackplateRivet0.12-0.08",
+          "doorSkinAxialOverlapM": 0.006999969482421875
+        },
+        {
+          "name": "SpareCarrier_BackplateRivet0.120.08",
+          "doorSkinAxialOverlapM": 0.006999969482421875
+        }
+      ],
+      "mount": {
+        "passed": true,
+        "meanPressingAxialOffsetM": -0.06312578512976563,
+        "unintendedIntersections": [],
+        "connections": [
+          {
+            "from": "Backplate",
+            "to": "Spindle",
+            "axialOverlapM": 0.001272737979888916,
+            "passed": true
+          },
+          {
+            "from": "Spindle",
+            "to": "CentreSeat",
+            "axialOverlapM": 0.01202380657196045,
+            "passed": true
+          },
+          {
+            "from": "CentreSeat",
+            "to": "LockingBar",
+            "axialOverlapM": 0.0027760863304138184,
+            "passed": true
+          },
+          {
+            "from": "LockingBar",
+            "to": "LockingNut",
+            "axialOverlapM": 0,
+            "passed": true
+          }
+        ],
+        "barSupport": {
+          "samples": 16,
+          "minimumGapM": 0,
+          "maximumGapM": 0
+        },
+        "historicalHardwareProven": false
+      },
+      "sampledPoses": 121,
+      "surfaceQueries": 3267,
+      "collisions": [],
+      "mountingHistoricallyProven": false,
+      "scope": "Actual packaged geometry and actual DoorsOpen tracks. Inferred carrier/door fixing overlaps are intended; tyre and rim have no own-door contact exclusion. Reversed rim/carrier contacts measured separately in closed pose. BonnetOpen sweep independently includes the spare as a fixed obstacle."
+    },
+    "evidence": "Period primary/supplementary photographs show a recessed spare face. Reversed mounting and coupled carrier are reconstructed;complete exported door/bonnet motion and actual carrier contacts checked. Bright-ring correspondence and exact factory hardware remain open."
+  },
+  "wheelDiscPressing": {
+    "method": "Continuous welded axisymmetric pressing with eight actual oval holes, explicit sheet walls and analytic front normals; protected through runtime LOD",
+    "discs": 7,
+    "ovalHolesPerDisc": 8,
+    "runtimeTopologyProtected": true,
+    "exactHistoricalProfileProven": false,
+    "actualPackagedChecks": {
+      "discs": [
+        {
+          "name": "SpareWheel_PerforatedDisc",
+          "vertices": 240,
+          "triangles": 512,
+          "connectedComponents": 1,
+          "nonManifoldEdges": 0,
+          "eulerCharacteristic": -16,
+          "frontTriangles": 136,
+          "backTriangles": 136,
+          "frontBoundaryLoopVertices": [
+            8,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            16
+          ],
+          "ovalOpenings": 8,
+          "maximumFrontNormalErrorDegrees": 0.03956468118525214,
+          "maximumFrontNormalTiltDegrees": 3.2063174525563305,
+          "ventPatterns": [
+            {
+              "pitchRadiusM": 0.21800002455714623,
+              "radialSemiaxisM": 0.02349999241212847,
+              "tangentialSemiaxisM": 0.03550006756725913,
+              "majorAxisFromTangentDegrees": 0.000031331137958514596,
+              "expandedSourceEllipseMaximumResidual": 0.000012706114367322385
+            },
+            {
+              "pitchRadiusM": 0.2180000220629602,
+              "radialSemiaxisM": 0.023499998874512942,
+              "tangentialSemiaxisM": 0.03549999910744928,
+              "majorAxisFromTangentDegrees": 0.000020691944206647556,
+              "expandedSourceEllipseMaximumResidual": 0.000006750827567181261
+            },
+            {
+              "pitchRadiusM": 0.21799993776927948,
+              "radialSemiaxisM": 0.023499992136811657,
+              "tangentialSemiaxisM": 0.035500008374974384,
+              "majorAxisFromTangentDegrees": 0.000024006042851928844,
+              "expandedSourceEllipseMaximumResidual": 0.000014322237439134966
+            },
+            {
+              "pitchRadiusM": 0.21800005435943604,
+              "radialSemiaxisM": 0.023500024883670746,
+              "tangentialSemiaxisM": 0.035499983791066975,
+              "majorAxisFromTangentDegrees": 1.8519702753385742e-10,
+              "expandedSourceEllipseMaximumResidual": 0.000012111105166523473
+            },
+            {
+              "pitchRadiusM": 0.21800011396408284,
+              "radialSemiaxisM": 0.023500032668124195,
+              "tangentialSemiaxisM": 0.035500029837909515,
+              "majorAxisFromTangentDegrees": 0.000007833197878532154,
+              "expandedSourceEllipseMaximumResidual": 0.000010277890776455578
+            },
+            {
+              "pitchRadiusM": 0.21800012743009065,
+              "radialSemiaxisM": 0.023499960193853177,
+              "tangentialSemiaxisM": 0.03550005122299331,
+              "majorAxisFromTangentDegrees": 0.000014704791185547464,
+              "expandedSourceEllipseMaximumResidual": 0.000021122243889726278
+            },
+            {
+              "pitchRadiusM": 0.2180000431363855,
+              "radialSemiaxisM": 0.023500012832637595,
+              "tangentialSemiaxisM": 0.03549998658019065,
+              "majorAxisFromTangentDegrees": 0.000015771552190463664,
+              "expandedSourceEllipseMaximumResidual": 0.000007468652652997676
+            },
+            {
+              "pitchRadiusM": 0.21799996495250146,
+              "radialSemiaxisM": 0.02349999493944347,
+              "tangentialSemiaxisM": 0.03550006756648557,
+              "majorAxisFromTangentDegrees": 0.00003133114768229612,
+              "expandedSourceEllipseMaximumResidual": 0.000006329431611273861
+            }
+          ]
+        },
+        {
+          "name": "Wheel_FrontLeft_PerforatedDisc",
+          "vertices": 240,
+          "triangles": 512,
+          "connectedComponents": 1,
+          "nonManifoldEdges": 0,
+          "eulerCharacteristic": -16,
+          "frontTriangles": 136,
+          "backTriangles": 136,
+          "frontBoundaryLoopVertices": [
+            8,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            16
+          ],
+          "ovalOpenings": 8,
+          "maximumFrontNormalErrorDegrees": 0.03426402083239251,
+          "maximumFrontNormalTiltDegrees": 3.20613427207539,
+          "ventPatterns": [
+            {
+              "pitchRadiusM": 0.21799993515014648,
+              "radialSemiaxisM": 0.023499947102686915,
+              "tangentialSemiaxisM": 0.03550002040572842,
+              "majorAxisFromTangentDegrees": 2.31494239105008e-10,
+              "expandedSourceEllipseMaximumResidual": 0.000014716430979277995
+            },
+            {
+              "pitchRadiusM": 0.21800008528325843,
+              "radialSemiaxisM": 0.02349998500881044,
+              "tangentialSemiaxisM": 0.03550003182573046,
+              "majorAxisFromTangentDegrees": 0.00009232964490188023,
+              "expandedSourceEllipseMaximumResidual": 0.000009624337285463191
+            },
+            {
+              "pitchRadiusM": 0.21799997991614836,
+              "radialSemiaxisM": 0.023499989809754936,
+              "tangentialSemiaxisM": 0.03549997701217408,
+              "majorAxisFromTangentDegrees": 0.00008300959032589231,
+              "expandedSourceEllipseMaximumResidual": 0.000016012225054318208
+            },
+            {
+              "pitchRadiusM": 0.21799993515014648,
+              "radialSemiaxisM": 0.02350001058660441,
+              "tangentialSemiaxisM": 0.03549999224780365,
+              "majorAxisFromTangentDegrees": 3.7039338940859296e-10,
+              "expandedSourceEllipseMaximumResidual": 0.000009376782588388366
+            },
+            {
+              "pitchRadiusM": 0.21800000965595245,
+              "radialSemiaxisM": 0.023500000167486945,
+              "tangentialSemiaxisM": 0.03550001177748291,
+              "majorAxisFromTangentDegrees": 2.3149525488239805e-11,
+              "expandedSourceEllipseMaximumResidual": 0.000006005742411829829
+            },
+            {
+              "pitchRadiusM": 0.21800010635667352,
+              "radialSemiaxisM": 0.02350001100939003,
+              "tangentialSemiaxisM": 0.035500050433971996,
+              "majorAxisFromTangentDegrees": 0.00010075824140675422,
+              "expandedSourceEllipseMaximumResidual": 0.000016482257366723374
+            },
+            {
+              "pitchRadiusM": 0.21800008528325843,
+              "radialSemiaxisM": 0.023500023562642573,
+              "tangentialSemiaxisM": 0.035500028074595506,
+              "majorAxisFromTangentDegrees": 0.00014861101865748375,
+              "expandedSourceEllipseMaximumResidual": 0.000016349367369716816
+            },
+            {
+              "pitchRadiusM": 0.21800005435943806,
+              "radialSemiaxisM": 0.02349990937571205,
+              "tangentialSemiaxisM": 0.035500020405736625,
+              "majorAxisFromTangentDegrees": 0.000007833524657912187,
+              "expandedSourceEllipseMaximumResidual": 0.00003392379875188922
+            }
+          ]
+        },
+        {
+          "name": "Wheel_FrontRight_PerforatedDisc",
+          "vertices": 240,
+          "triangles": 512,
+          "connectedComponents": 1,
+          "nonManifoldEdges": 0,
+          "eulerCharacteristic": -16,
+          "frontTriangles": 136,
+          "backTriangles": 136,
+          "frontBoundaryLoopVertices": [
+            8,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            16
+          ],
+          "ovalOpenings": 8,
+          "maximumFrontNormalErrorDegrees": 0.03956468118525214,
+          "maximumFrontNormalTiltDegrees": 3.2063174525563305,
+          "ventPatterns": [
+            {
+              "pitchRadiusM": 0.21800005435943604,
+              "radialSemiaxisM": 0.023499947101713103,
+              "tangentialSemiaxisM": 0.03550002040572842,
+              "majorAxisFromTangentDegrees": 4.62988478180086e-11,
+              "expandedSourceEllipseMaximumResidual": 0.000005083668201288916
+            },
+            {
+              "pitchRadiusM": 0.2180001695770125,
+              "radialSemiaxisM": 0.02349999619602552,
+              "tangentialSemiaxisM": 0.03550002346726725,
+              "majorAxisFromTangentDegrees": 0.00011818595626823591,
+              "expandedSourceEllipseMaximumResidual": 0.000017925823135644947
+            },
+            {
+              "pitchRadiusM": 0.21800010635667352,
+              "radialSemiaxisM": 0.023499990232127854,
+              "tangentialSemiaxisM": 0.03549997841129775,
+              "majorAxisFromTangentDegrees": 0.0000256480739255629,
+              "expandedSourceEllipseMaximumResidual": 0.000009299640200577386
+            },
+            {
+              "pitchRadiusM": 0.21799993515014648,
+              "radialSemiaxisM": 0.02350001058660441,
+              "tangentialSemiaxisM": 0.03549999224773918,
+              "majorAxisFromTangentDegrees": 3.7039338941098734e-10,
+              "expandedSourceEllipseMaximumResidual": 0.000009376782588388366
+            },
+            {
+              "pitchRadiusM": 0.21800002455714623,
+              "radialSemiaxisM": 0.023500000167504094,
+              "tangentialSemiaxisM": 0.0355000117775497,
+              "majorAxisFromTangentDegrees": 0.00003133132418398046,
+              "expandedSourceEllipseMaximumResidual": 0.000006005744061177154
+            },
+            {
+              "pitchRadiusM": 0.21799993776927948,
+              "radialSemiaxisM": 0.023500010855862875,
+              "tangentialSemiaxisM": 0.035500050169417395,
+              "majorAxisFromTangentDegrees": 0.00005638668164654191,
+              "expandedSourceEllipseMaximumResidual": 0.000014033920162859204
+            },
+            {
+              "pitchRadiusM": 0.2179999166958481,
+              "radialSemiaxisM": 0.02349999608181221,
+              "tangentialSemiaxisM": 0.035499981168674165,
+              "majorAxisFromTangentDegrees": 0.00008091701380700512,
+              "expandedSourceEllipseMaximumResidual": 0.000012849807321302364
+            },
+            {
+              "pitchRadiusM": 0.21800005435943806,
+              "radialSemiaxisM": 0.023499964612843136,
+              "tangentialSemiaxisM": 0.035500020405736625,
+              "majorAxisFromTangentDegrees": 0.000007833246837462524,
+              "expandedSourceEllipseMaximumResidual": 0.000018146136484098463
+            }
+          ]
+        },
+        {
+          "name": "Wheel_Rear1Left_PerforatedDisc",
+          "vertices": 240,
+          "triangles": 512,
+          "connectedComponents": 1,
+          "nonManifoldEdges": 0,
+          "eulerCharacteristic": -16,
+          "frontTriangles": 136,
+          "backTriangles": 136,
+          "frontBoundaryLoopVertices": [
+            8,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            16
+          ],
+          "ovalOpenings": 8,
+          "maximumFrontNormalErrorDegrees": 0.03426402083239251,
+          "maximumFrontNormalTiltDegrees": 3.20613427207539,
+          "ventPatterns": [
+            {
+              "pitchRadiusM": 0.21800017356872559,
+              "radialSemiaxisM": 0.023499947102686915,
+              "tangentialSemiaxisM": 0.03550002040572842,
+              "majorAxisFromTangentDegrees": 2.31494239105008e-10,
+              "expandedSourceEllipseMaximumResidual": 0.000014716430979277995
+            },
+            {
+              "pitchRadiusM": 0.21800000098953698,
+              "radialSemiaxisM": 0.023499959308450148,
+              "tangentialSemiaxisM": 0.035500024786700765,
+              "majorAxisFromTangentDegrees": 2.7523669233724937e-8,
+              "expandedSourceEllipseMaximumResidual": 0.000009982903539373922
+            },
+            {
+              "pitchRadiusM": 0.2180000642098128,
+              "radialSemiaxisM": 0.023499997810534225,
+              "tangentialSemiaxisM": 0.03550001168707771,
+              "majorAxisFromTangentDegrees": 0.00006187153800562412,
+              "expandedSourceEllipseMaximumResidual": 0.000010617606377771871
+            },
+            {
+              "pitchRadiusM": 0.21799993515015464,
+              "radialSemiaxisM": 0.023500010586606414,
+              "tangentialSemiaxisM": 0.03550006513372709,
+              "majorAxisFromTangentDegrees": 0.000015665112987251787,
+              "expandedSourceEllipseMaximumResidual": 0.000009376784579462338
+            },
+            {
+              "pitchRadiusM": 0.21800000965598504,
+              "radialSemiaxisM": 0.023500000167494966,
+              "tangentialSemiaxisM": 0.035500065133922225,
+              "majorAxisFromTangentDegrees": 0.000031331142603703614,
+              "expandedSourceEllipseMaximumResidual": 0.000008620457183416974
+            },
+            {
+              "pitchRadiusM": 0.2180000220629602,
+              "radialSemiaxisM": 0.02350000844931466,
+              "tangentialSemiaxisM": 0.03550003414993941,
+              "majorAxisFromTangentDegrees": 0.000033220564765491254,
+              "expandedSourceEllipseMaximumResidual": 0.000004779960419032392
+            },
+            {
+              "pitchRadiusM": 0.21800000098953698,
+              "radialSemiaxisM": 0.02350000227721252,
+              "tangentialSemiaxisM": 0.035499993004681464,
+              "majorAxisFromTangentDegrees": 0.000020968863522119824,
+              "expandedSourceEllipseMaximumResidual": 0.000004190122766978277
+            },
+            {
+              "pitchRadiusM": 0.21799999475479329,
+              "radialSemiaxisM": 0.02350000504885147,
+              "tangentialSemiaxisM": 0.035500020405736625,
+              "majorAxisFromTangentDegrees": 0.000007832693825527609,
+              "expandedSourceEllipseMaximumResidual": 0.000004918289276290011
+            }
+          ]
+        },
+        {
+          "name": "Wheel_Rear1Right_PerforatedDisc",
+          "vertices": 240,
+          "triangles": 512,
+          "connectedComponents": 1,
+          "nonManifoldEdges": 0,
+          "eulerCharacteristic": -16,
+          "frontTriangles": 136,
+          "backTriangles": 136,
+          "frontBoundaryLoopVertices": [
+            8,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            16
+          ],
+          "ovalOpenings": 8,
+          "maximumFrontNormalErrorDegrees": 0.03426402083239251,
+          "maximumFrontNormalTiltDegrees": 3.2063174525563305,
+          "ventPatterns": [
+            {
+              "pitchRadiusM": 0.21800017356872559,
+              "radialSemiaxisM": 0.023499947102686915,
+              "tangentialSemiaxisM": 0.03550002040572842,
+              "majorAxisFromTangentDegrees": 2.31494239105008e-10,
+              "expandedSourceEllipseMaximumResidual": 0.000014716430979277995
+            },
+            {
+              "pitchRadiusM": 0.21800000098953698,
+              "radialSemiaxisM": 0.023499959308450148,
+              "tangentialSemiaxisM": 0.035500024786700765,
+              "majorAxisFromTangentDegrees": 2.7523669233724937e-8,
+              "expandedSourceEllipseMaximumResidual": 0.000009982903539373922
+            },
+            {
+              "pitchRadiusM": 0.2180000220629602,
+              "radialSemiaxisM": 0.023499999397247617,
+              "tangentialSemiaxisM": 0.03550001364772808,
+              "majorAxisFromTangentDegrees": 0.00007447773212641124,
+              "expandedSourceEllipseMaximumResidual": 0.000008451840306511471
+            },
+            {
+              "pitchRadiusM": 0.21799993515017907,
+              "radialSemiaxisM": 0.02350001058661243,
+              "tangentialSemiaxisM": 0.035500065133922225,
+              "majorAxisFromTangentDegrees": 0.000031330225555668354,
+              "expandedSourceEllipseMaximumResidual": 0.000010309805721142595
+            },
+            {
+              "pitchRadiusM": 0.21800002455711365,
+              "radialSemiaxisM": 0.023500000167496073,
+              "tangentialSemiaxisM": 0.03550006513359758,
+              "majorAxisFromTangentDegrees": 2.3149401623135957e-11,
+              "expandedSourceEllipseMaximumResidual": 0.000006005742800407887
+            },
+            {
+              "pitchRadiusM": 0.2180000220629602,
+              "radialSemiaxisM": 0.02350000844931466,
+              "tangentialSemiaxisM": 0.03550003414993941,
+              "majorAxisFromTangentDegrees": 0.000033220564765491254,
+              "expandedSourceEllipseMaximumResidual": 0.000004779960419032392
+            },
+            {
+              "pitchRadiusM": 0.21800004313639362,
+              "radialSemiaxisM": 0.02350000196805534,
+              "tangentialSemiaxisM": 0.035499992684987,
+              "majorAxisFromTangentDegrees": 0.000009288669374747503,
+              "expandedSourceEllipseMaximumResidual": 0.000008052721922613415
+            },
+            {
+              "pitchRadiusM": 0.21800005435943806,
+              "radialSemiaxisM": 0.02350000504885147,
+              "tangentialSemiaxisM": 0.035500020405736625,
+              "majorAxisFromTangentDegrees": 0.00000783287644938468,
+              "expandedSourceEllipseMaximumResidual": 0.000005034309244589252
+            }
+          ]
+        },
+        {
+          "name": "Wheel_Rear2Left_PerforatedDisc",
+          "vertices": 240,
+          "triangles": 512,
+          "connectedComponents": 1,
+          "nonManifoldEdges": 0,
+          "eulerCharacteristic": -16,
+          "frontTriangles": 136,
+          "backTriangles": 136,
+          "frontBoundaryLoopVertices": [
+            8,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            16
+          ],
+          "ovalOpenings": 8,
+          "maximumFrontNormalErrorDegrees": 0.03426402083239251,
+          "maximumFrontNormalTiltDegrees": 3.20613427207539,
+          "ventPatterns": [
+            {
+              "pitchRadiusM": 0.2180004119873047,
+              "radialSemiaxisM": 0.023499964618295996,
+              "tangentialSemiaxisM": 0.03550002040572842,
+              "majorAxisFromTangentDegrees": 6.481846231711553e-10,
+              "expandedSourceEllipseMaximumResidual": 0.00003398180735525447
+            },
+            {
+              "pitchRadiusM": 0.21800019065041942,
+              "radialSemiaxisM": 0.02350005108388185,
+              "tangentialSemiaxisM": 0.035499973738547505,
+              "majorAxisFromTangentDegrees": 0.00007398879316523824,
+              "expandedSourceEllipseMaximumResidual": 0.000015762737282321027
+            },
+            {
+              "pitchRadiusM": 0.21800019065041942,
+              "radialSemiaxisM": 0.02350001934277185,
+              "tangentialSemiaxisM": 0.035499935010380214,
+              "majorAxisFromTangentDegrees": 0.00007235413987411288,
+              "expandedSourceEllipseMaximumResidual": 0.00002326882998260338
+            },
+            {
+              "pitchRadiusM": 0.21800000965595245,
+              "radialSemiaxisM": 0.023500000167486945,
+              "tangentialSemiaxisM": 0.0355000456040766,
+              "majorAxisFromTangentDegrees": 0,
+              "expandedSourceEllipseMaximumResidual": 0.000008218551464045376
+            },
+            {
+              "pitchRadiusM": 0.21799993515014648,
+              "radialSemiaxisM": 0.02350001058660441,
+              "tangentialSemiaxisM": 0.0355000456040766,
+              "majorAxisFromTangentDegrees": 3.703914075514137e-10,
+              "expandedSourceEllipseMaximumResidual": 0.000010711712480127034
+            },
+            {
+              "pitchRadiusM": 0.21799993776927948,
+              "radialSemiaxisM": 0.023500007405050115,
+              "tangentialSemiaxisM": 0.03550003444522505,
+              "majorAxisFromTangentDegrees": 0.000004650470916988982,
+              "expandedSourceEllipseMaximumResidual": 0.000005146678686118733
+            },
+            {
+              "pitchRadiusM": 0.21800000098953698,
+              "radialSemiaxisM": 0.023499994364222503,
+              "tangentialSemiaxisM": 0.035499972833904006,
+              "majorAxisFromTangentDegrees": 0.00009137827329442662,
+              "expandedSourceEllipseMaximumResidual": 0.000008218771756496324
+            },
+            {
+              "pitchRadiusM": 0.21800005435943806,
+              "radialSemiaxisM": 0.02349996461225885,
+              "tangentialSemiaxisM": 0.035500020405736625,
+              "majorAxisFromTangentDegrees": 0.00000783315423935542,
+              "expandedSourceEllipseMaximumResidual": 0.000014658421777613562
+            }
+          ]
+        },
+        {
+          "name": "Wheel_Rear2Right_PerforatedDisc",
+          "vertices": 240,
+          "triangles": 512,
+          "connectedComponents": 1,
+          "nonManifoldEdges": 0,
+          "eulerCharacteristic": -16,
+          "frontTriangles": 136,
+          "backTriangles": 136,
+          "frontBoundaryLoopVertices": [
+            8,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            12,
+            16
+          ],
+          "ovalOpenings": 8,
+          "maximumFrontNormalErrorDegrees": 0.03426402083239251,
+          "maximumFrontNormalTiltDegrees": 3.2066227301281587,
+          "ventPatterns": [
+            {
+              "pitchRadiusM": 0.2180004119873047,
+              "radialSemiaxisM": 0.023499964618295996,
+              "tangentialSemiaxisM": 0.03550002040572842,
+              "majorAxisFromTangentDegrees": 6.481846231711553e-10,
+              "expandedSourceEllipseMaximumResidual": 0.00003398180735525447
+            },
+            {
+              "pitchRadiusM": 0.21800019065041942,
+              "radialSemiaxisM": 0.02350005108388185,
+              "tangentialSemiaxisM": 0.035499973738547505,
+              "majorAxisFromTangentDegrees": 0.00007398879316523824,
+              "expandedSourceEllipseMaximumResidual": 0.000015762737282321027
+            },
+            {
+              "pitchRadiusM": 0.2180000220629602,
+              "radialSemiaxisM": 0.023500018978784315,
+              "tangentialSemiaxisM": 0.0354999335286714,
+              "majorAxisFromTangentDegrees": 0.00011845596546276604,
+              "expandedSourceEllipseMaximumResidual": 0.000008029054651137457
+            },
+            {
+              "pitchRadiusM": 0.21800000965595245,
+              "radialSemiaxisM": 0.023500000167486945,
+              "tangentialSemiaxisM": 0.0355000456040766,
+              "majorAxisFromTangentDegrees": 0,
+              "expandedSourceEllipseMaximumResidual": 0.000008218551464045376
+            },
+            {
+              "pitchRadiusM": 0.21799993515014648,
+              "radialSemiaxisM": 0.02350001058660441,
+              "tangentialSemiaxisM": 0.0355000456040766,
+              "majorAxisFromTangentDegrees": 3.703914075514137e-10,
+              "expandedSourceEllipseMaximumResidual": 0.000010711712480127034
+            },
+            {
+              "pitchRadiusM": 0.2180000220629602,
+              "radialSemiaxisM": 0.023500006955582298,
+              "tangentialSemiaxisM": 0.0355000331729894,
+              "majorAxisFromTangentDegrees": 0.000027573185157960858,
+              "expandedSourceEllipseMaximumResidual": 0.000012216186479729885
+            },
+            {
+              "pitchRadiusM": 0.21800000098953698,
+              "radialSemiaxisM": 0.023499994364222503,
+              "tangentialSemiaxisM": 0.035499972833904006,
+              "majorAxisFromTangentDegrees": 0.00009137827329442662,
+              "expandedSourceEllipseMaximumResidual": 0.000008218771756496324
+            },
+            {
+              "pitchRadiusM": 0.2180001735687276,
+              "radialSemiaxisM": 0.023499964614011715,
+              "tangentialSemiaxisM": 0.035500020405736625,
+              "majorAxisFromTangentDegrees": 0.000007833520575663471,
+              "expandedSourceEllipseMaximumResidual": 0.000024291135157894495
+            }
+          ]
+        }
+      ],
+      "historicalPressingProfileProven": false,
+      "scope": "Actual packaged triangles welded by1micrometre positions for topology only; imported corner normals retain the same0.2degreefield bound.512triangle pressings retain8physical tunnels,12station minimax tangential apertures,concealed16station outer edge and8station collar-matched centre. High-source24station contour and runtime12station contours share drawing-derived pitch/semiaxes. Not historical tooling measurements."
+    },
+    "ventPattern": {
+      "pitchRadiusM": 0.218,
+      "radialSemiaxisM": 0.0235,
+      "tangentialSemiaxisM": 0.0355,
+      "evidence": "1936factory manual scan09:16front/rear drawing outlines have tangential major axes and pitch/tyre radius approximately0.50. Dimensions here are draw-derived reconstruction,not printed factory measurements; rim,tyre,nuts,hub and axial profile retained.",
+      "dimensionsPrintedInFactoryManual": false
+    },
+    "evidence": "1936manual front/rear elevations support eight tangential oval openings and approximate drawing-plane proportions. Continuous sheet,shallow axial profile and thickness remain reconstructed."
+  },
+  "wheelFastenerClocking": {
+    "roadWheels": 6,
+    "nutsPerWheel": 8,
+    "relativePhaseDegrees": 22.5,
+    "evidence": "1936factory overall drawing, scan09: front and rear side elevations show eight wheel nuts halfway between eight ventilation openings.22.5degrees is the reconstructed half-pitch of the evenly spaced8+8patterns, not a printed angle or a photographed wheel roll phase. Rim/hub dimensions and axial profile remain inferred.",
+    "actualPackagedChecks": {
+      "expectedHalfPitchDegrees": 22.5,
+      "lodToleranceDegrees": 2.5,
+      "factoryEvidence": "1936overall drawing,front and rear side elevations,scan09",
+      "exactHistoricalAnglePrinted": false,
+      "scope": "Nut centres from actual exported part bounds; ventilation centres from actual12vertex aperture boundary loops. Relative pattern only, independent of wheel roll phase.",
+      "wheels": [
+        {
+          "wheel": "Wheel_FrontLeft",
+          "nuts": 8,
+          "vents": 8,
+          "maximumHalfPitchErrorDegrees": 0.00004132603314133121
+        },
+        {
+          "wheel": "Wheel_FrontRight",
+          "nuts": 8,
+          "vents": 8,
+          "maximumHalfPitchErrorDegrees": 0.00006348046886017755
+        },
+        {
+          "wheel": "Wheel_Rear1Left",
+          "nuts": 8,
+          "vents": 8,
+          "maximumHalfPitchErrorDegrees": 0.00005135017578794532
+        },
+        {
+          "wheel": "Wheel_Rear1Right",
+          "nuts": 8,
+          "vents": 8,
+          "maximumHalfPitchErrorDegrees": 0.000040272947217090405
+        },
+        {
+          "wheel": "Wheel_Rear2Left",
+          "nuts": 8,
+          "vents": 8,
+          "maximumHalfPitchErrorDegrees": 0.00007180435481046743
+        },
+        {
+          "wheel": "Wheel_Rear2Right",
+          "nuts": 8,
+          "vents": 8,
+          "maximumHalfPitchErrorDegrees": 0.00007180435481046743
+        }
+      ]
+    },
+    "exactHistoricalAnglePrinted": false,
+    "photoWheelRollPhaseProven": false
+  },
+  "rimRuntimeSampling": {
+    "rims": 7,
+    "profileSegments": [
+      24,
+      24,
+      24,
+      32,
+      32,
+      24,
+      24,
+      24
+    ],
+    "method": "Current high-source vertices,smooth corner normals and source-face corner UVs sampled at24/32uniform circumferential stations,all8axial/radial profile rows retained; source projection boundaries preserved; installed after merged budget collapse. High-source geometry unchanged; exact historical rim section remains inferred.",
+    "sourceGeometryUnchanged": true,
+    "actualPackagedChecks": {
+      "rims": [
+        {
+          "name": "SpareWheel_Rim",
+          "triangles": 416,
+          "vertices": 208,
+          "profileStationVertices": [
+            24,
+            24,
+            24,
+            32,
+            32,
+            24,
+            24,
+            24
+          ],
+          "maximumProfileStationErrorM": 1.3625315587178495e-7,
+          "maximumAngularGapErrorDegrees": 0.00002725143687420939,
+          "maximumCircumferentialNormalTiltDegrees": 0.014590973885374857,
+          "nonManifoldEdges": 0,
+          "eulerCharacteristic": 0,
+          "connected": true
+        },
+        {
+          "name": "Wheel_FrontLeft_Rim",
+          "triangles": 416,
+          "vertices": 208,
+          "profileStationVertices": [
+            24,
+            24,
+            24,
+            32,
+            32,
+            24,
+            24,
+            24
+          ],
+          "maximumProfileStationErrorM": 3.5187821494420285e-7,
+          "maximumAngularGapErrorDegrees": 0.000038225158039750795,
+          "maximumCircumferentialNormalTiltDegrees": 0.017239201320526067,
+          "nonManifoldEdges": 0,
+          "eulerCharacteristic": 0,
+          "connected": true
+        },
+        {
+          "name": "Wheel_FrontRight_Rim",
+          "triangles": 416,
+          "vertices": 208,
+          "profileStationVertices": [
+            24,
+            24,
+            24,
+            32,
+            32,
+            24,
+            24,
+            24
+          ],
+          "maximumProfileStationErrorM": 1.8458347455682067e-7,
+          "maximumAngularGapErrorDegrees": 0.00003640971906193613,
+          "maximumCircumferentialNormalTiltDegrees": 0.014044674539772409,
+          "nonManifoldEdges": 0,
+          "eulerCharacteristic": 0,
+          "connected": true
+        },
+        {
+          "name": "Wheel_Rear1Left_Rim",
+          "triangles": 416,
+          "vertices": 208,
+          "profileStationVertices": [
+            24,
+            24,
+            24,
+            32,
+            32,
+            24,
+            24,
+            24
+          ],
+          "maximumProfileStationErrorM": 1.2464572981452593e-7,
+          "maximumAngularGapErrorDegrees": 0.00003640971905660706,
+          "maximumCircumferentialNormalTiltDegrees": 0.011392524236175528,
+          "nonManifoldEdges": 0,
+          "eulerCharacteristic": 0,
+          "connected": true
+        },
+        {
+          "name": "Wheel_Rear1Right_Rim",
+          "triangles": 416,
+          "vertices": 208,
+          "profileStationVertices": [
+            24,
+            24,
+            24,
+            32,
+            32,
+            24,
+            24,
+            24
+          ],
+          "maximumProfileStationErrorM": 1.2464572981452593e-7,
+          "maximumAngularGapErrorDegrees": 0.00003640971905660706,
+          "maximumCircumferentialNormalTiltDegrees": 0.011344902136474995,
+          "nonManifoldEdges": 0,
+          "eulerCharacteristic": 0,
+          "connected": true
+        },
+        {
+          "name": "Wheel_Rear2Left_Rim",
+          "triangles": 416,
+          "vertices": 208,
+          "profileStationVertices": [
+            24,
+            24,
+            24,
+            32,
+            32,
+            24,
+            24,
+            24
+          ],
+          "maximumProfileStationErrorM": 2.799651355104514e-7,
+          "maximumAngularGapErrorDegrees": 0.000049276740943682285,
+          "maximumCircumferentialNormalTiltDegrees": 0.010876068788545799,
+          "nonManifoldEdges": 0,
+          "eulerCharacteristic": 0,
+          "connected": true
+        },
+        {
+          "name": "Wheel_Rear2Right_Rim",
+          "triangles": 416,
+          "vertices": 208,
+          "profileStationVertices": [
+            24,
+            24,
+            24,
+            32,
+            32,
+            24,
+            24,
+            24
+          ],
+          "maximumProfileStationErrorM": 2.799651355104514e-7,
+          "maximumAngularGapErrorDegrees": 0.000049276740943682285,
+          "maximumCircumferentialNormalTiltDegrees": 0.011409657023796212,
+          "nonManifoldEdges": 0,
+          "eulerCharacteristic": 0,
+          "connected": true
+        }
+      ],
+      "profileSegments": [
+        24,
+        24,
+        24,
+        32,
+        32,
+        24,
+        24,
+        24
+      ],
+      "historicalSectionProven": false,
+      "scope": "Actual delivered triangles and corner normals.20micrometre source-station tolerance and0.05degreecircumferential normal bound are LOD fidelity checks,not historical manufacturing tolerances."
+    },
+    "historicalSectionProven": false
+  },
+  "primaryCabProfile": {
+    "roofReliefM": [
+      0.085,
+      0.04,
+      0.02
+    ],
+    "upperWindowLiftM": 0.12,
+    "evidence": "Closed front-quarter hard-cab silhouette; shallower roof and taller upper frames reconstructed.2.250mmaximum retained; exact profile and camera not independently measured.",
+    "coping": [
+      {
+        "name": "Cabin_Apost-1",
+        "verticesCoped": 4,
+        "maximumTrimM": 0.0014072914123532954,
+        "outsideFootprintQueries": 0
+      },
+      {
+        "name": "Cabin_Apost1",
+        "verticesCoped": 4,
+        "maximumTrimM": 0.0014072914123532954,
+        "outsideFootprintQueries": 0
+      },
+      {
+        "name": "Cabin_Bpost-1",
+        "verticesCoped": 12,
+        "maximumTrimM": 0.009098913192748803,
+        "outsideFootprintQueries": 0
+      },
+      {
+        "name": "Cabin_Bpost1",
+        "verticesCoped": 12,
+        "maximumTrimM": 0.009098913192748803,
+        "outsideFootprintQueries": 0
+      },
+      {
+        "name": "Cabin_RearUpperLeft",
+        "verticesCoped": 4,
+        "maximumTrimM": 0.0210305709838865,
+        "outsideFootprintQueries": 2
+      },
+      {
+        "name": "Cabin_RearUpperRight",
+        "verticesCoped": 4,
+        "maximumTrimM": 0.0210305709838865,
+        "outsideFootprintQueries": 2
+      },
+      {
+        "name": "Cabin_RearWindowTop",
+        "verticesCoped": 4,
+        "maximumTrimM": 0.05254187774658181,
+        "outsideFootprintQueries": 4
+      },
+      {
+        "name": "Windshield_CenterPost",
+        "verticesCoped": 8,
+        "maximumTrimM": 0.04237427902221658,
+        "outsideFootprintQueries": 0
+      }
+    ],
+    "copingEvidence": "Fixed pillar/rear-wall ends fitted beneath evaluated roof.2mmassembly allowance and nearest-edge fallback for hidden rear framing are reconstructed, not factory joinery measurements.",
+    "maximumCabHeightM": 2.25,
+    "camera": {
+      "positionBlender": [
+        3.4544020392720944,
+        7.5249575579067205,
+        0.1835406937489481
+      ],
+      "targetBlender": [
+        1.1841114766847056,
+        0.02894883718095631,
+        1.8131523101256621
+      ],
+      "lensMm": 60.282808321893924,
+      "rollDegrees": 0.7515795712757953,
+      "principalPointPixels": [
+        117.81971576462536,
+        99.35291160468394
+      ],
+      "calibrated": false
+    },
+    "actualPackagedChecks": {
+      "roofMaximumM": 2.25,
+      "allCabStructureMaximumM": 2.25,
+      "cornerNearestSurfaceGapsM": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "actualRoofFrontCornersPx": [
+        [
+          207.70672237497178,
+          23.41898088024601
+        ],
+        [
+          397.8849681507991,
+          42.428701498058885
+        ]
+      ],
+      "baselineV37RmsPx": 13.186459774891484,
+      "currentRmsPx": 5.206871138779738,
+      "primaryCameraCalibrated": false,
+      "wholeReferenceAcceptance": false,
+      "observationsApproximate": true
+    },
+    "wholeReferenceAccepted": false,
+    "legacyAssemblyCabAndOcclusionChecks": "Retained as explicit secondary diagnostics with actual pass/fail; no longer gate primary closed-profile reconstruction"
+  },
+  "tyreDesignation": "34 x 6 inches, factory manual section 98; geometric nominal rolling radius 0.4318m",
+  "wheelSurfaceLod": {
+    "sourceBaseOverlapM": 0.0015,
+    "sourceBaseEvidence": "High-source base corners conform to actual carcass with1.5mmconstruction overlap. Top corners,nominal34x6envelope and inferred54x3pattern retained; exact historical tread mould unproven.",
+    "method": "Current-source13profile28station carcasses;162closed six-triangle lugs per wheel with exact high-source top corners and supported internal apex;seven continuous512triangle eight-hole pressings with12station minimax apertures,16station concealed outer edge and8station collar-matched centre. Four support tubes use bounded0.5mm/2degree ring subsets and physical UVs. High source retained; exact historical tooling unproven.",
+    "parts": [
+      "Cabin_CamberedRoof",
+      "Canvas_FrontHeaderValance",
+      "Cargo_CanvasBow-0.7666666666666666",
+      "Cargo_CanvasBow-1.6933333333333334",
+      "Cargo_CanvasBow-2.6199999999999997",
+      "Cargo_CanvasBow0.16",
+      "SpareWheel_InnerDisc",
+      "SpareWheel_PerforatedDisc",
+      "SpareWheel_TreadLugs",
+      "SpareWheel_Tyre",
+      "Wheel_FrontLeft_Hub",
+      "Wheel_FrontLeft_HubCap",
+      "Wheel_FrontLeft_Lug0",
+      "Wheel_FrontLeft_Lug1",
+      "Wheel_FrontLeft_Lug2",
+      "Wheel_FrontLeft_Lug3",
+      "Wheel_FrontLeft_Lug4",
+      "Wheel_FrontLeft_Lug5",
+      "Wheel_FrontLeft_Lug6",
+      "Wheel_FrontLeft_Lug7",
+      "Wheel_FrontLeft_PerforatedDisc",
+      "Wheel_FrontLeft_TreadLugs",
+      "Wheel_FrontLeft_Tyre",
+      "Wheel_FrontRight_Hub",
+      "Wheel_FrontRight_HubCap",
+      "Wheel_FrontRight_Lug0",
+      "Wheel_FrontRight_Lug1",
+      "Wheel_FrontRight_Lug2",
+      "Wheel_FrontRight_Lug3",
+      "Wheel_FrontRight_Lug4",
+      "Wheel_FrontRight_Lug5",
+      "Wheel_FrontRight_Lug6",
+      "Wheel_FrontRight_Lug7",
+      "Wheel_FrontRight_PerforatedDisc",
+      "Wheel_FrontRight_TreadLugs",
+      "Wheel_FrontRight_Tyre",
+      "Wheel_Rear1Left_Hub",
+      "Wheel_Rear1Left_HubCap",
+      "Wheel_Rear1Left_Lug0",
+      "Wheel_Rear1Left_Lug1",
+      "Wheel_Rear1Left_Lug2",
+      "Wheel_Rear1Left_Lug3",
+      "Wheel_Rear1Left_Lug4",
+      "Wheel_Rear1Left_Lug5",
+      "Wheel_Rear1Left_Lug6",
+      "Wheel_Rear1Left_Lug7",
+      "Wheel_Rear1Left_PerforatedDisc",
+      "Wheel_Rear1Left_TreadLugs",
+      "Wheel_Rear1Left_Tyre",
+      "Wheel_Rear1Right_Hub",
+      "Wheel_Rear1Right_HubCap",
+      "Wheel_Rear1Right_Lug0",
+      "Wheel_Rear1Right_Lug1",
+      "Wheel_Rear1Right_Lug2",
+      "Wheel_Rear1Right_Lug3",
+      "Wheel_Rear1Right_Lug4",
+      "Wheel_Rear1Right_Lug5",
+      "Wheel_Rear1Right_Lug6",
+      "Wheel_Rear1Right_Lug7",
+      "Wheel_Rear1Right_PerforatedDisc",
+      "Wheel_Rear1Right_TreadLugs",
+      "Wheel_Rear1Right_Tyre",
+      "Wheel_Rear2Left_Hub",
+      "Wheel_Rear2Left_HubCap",
+      "Wheel_Rear2Left_Lug0",
+      "Wheel_Rear2Left_Lug1",
+      "Wheel_Rear2Left_Lug2",
+      "Wheel_Rear2Left_Lug3",
+      "Wheel_Rear2Left_Lug4",
+      "Wheel_Rear2Left_Lug5",
+      "Wheel_Rear2Left_Lug6",
+      "Wheel_Rear2Left_Lug7",
+      "Wheel_Rear2Left_PerforatedDisc",
+      "Wheel_Rear2Left_TreadLugs",
+      "Wheel_Rear2Left_Tyre",
+      "Wheel_Rear2Right_Hub",
+      "Wheel_Rear2Right_HubCap",
+      "Wheel_Rear2Right_Lug0",
+      "Wheel_Rear2Right_Lug1",
+      "Wheel_Rear2Right_Lug2",
+      "Wheel_Rear2Right_Lug3",
+      "Wheel_Rear2Right_Lug4",
+      "Wheel_Rear2Right_Lug5",
+      "Wheel_Rear2Right_Lug6",
+      "Wheel_Rear2Right_Lug7",
+      "Wheel_Rear2Right_PerforatedDisc",
+      "Wheel_Rear2Right_TreadLugs",
+      "Wheel_Rear2Right_Tyre"
+    ],
+    "tubeSampling": {
+      "Cargo_CanvasBow-0.7666666666666666": {
+        "sourceRows": 85,
+        "retainedRows": [
+          0,
+          1,
+          6,
+          12,
+          13,
+          17,
+          18,
+          19,
+          20,
+          23,
+          24,
+          25,
+          29,
+          30,
+          31,
+          35,
+          36,
+          37,
+          42,
+          47,
+          48,
+          49,
+          53,
+          54,
+          55,
+          59,
+          60,
+          61,
+          64,
+          65,
+          66,
+          67,
+          69,
+          72,
+          78,
+          83,
+          84
+        ],
+        "maximumPositionErrorM": 0.0004001773060368791,
+        "maximumNormalErrorDegrees": 1.7709512976864867,
+        "positionToleranceM": 0.0005,
+        "normalToleranceDegrees": 2,
+        "uvMethod": "Physical cross-section perimeter and source centreline arc length;0.75m tile. Source UVs remain untouched."
+      },
+      "Cargo_CanvasBow-1.6933333333333334": {
+        "sourceRows": 85,
+        "retainedRows": [
+          0,
+          1,
+          6,
+          12,
+          14,
+          17,
+          18,
+          19,
+          20,
+          23,
+          24,
+          25,
+          29,
+          30,
+          31,
+          35,
+          36,
+          37,
+          42,
+          47,
+          48,
+          49,
+          53,
+          54,
+          55,
+          59,
+          60,
+          61,
+          64,
+          65,
+          66,
+          67,
+          69,
+          72,
+          78,
+          83,
+          84
+        ],
+        "maximumPositionErrorM": 0.00045789780219341887,
+        "maximumNormalErrorDegrees": 1.7653431557320414,
+        "positionToleranceM": 0.0005,
+        "normalToleranceDegrees": 2,
+        "uvMethod": "Physical cross-section perimeter and source centreline arc length;0.75m tile. Source UVs remain untouched."
+      },
+      "Cargo_CanvasBow-2.6199999999999997": {
+        "sourceRows": 85,
+        "retainedRows": [
+          0,
+          1,
+          6,
+          12,
+          14,
+          17,
+          18,
+          19,
+          20,
+          23,
+          24,
+          25,
+          26,
+          29,
+          30,
+          31,
+          35,
+          36,
+          37,
+          42,
+          47,
+          48,
+          49,
+          53,
+          54,
+          55,
+          56,
+          59,
+          60,
+          61,
+          64,
+          65,
+          66,
+          67,
+          69,
+          72,
+          78,
+          83,
+          84
+        ],
+        "maximumPositionErrorM": 0.00045592963947245626,
+        "maximumNormalErrorDegrees": 1.759753074378079,
+        "positionToleranceM": 0.0005,
+        "normalToleranceDegrees": 2,
+        "uvMethod": "Physical cross-section perimeter and source centreline arc length;0.75m tile. Source UVs remain untouched."
+      },
+      "Cargo_CanvasBow0.16": {
+        "sourceRows": 85,
+        "retainedRows": [
+          0,
+          1,
+          6,
+          12,
+          17,
+          18,
+          19,
+          20,
+          23,
+          24,
+          25,
+          29,
+          30,
+          31,
+          35,
+          36,
+          37,
+          42,
+          47,
+          48,
+          49,
+          53,
+          54,
+          55,
+          59,
+          60,
+          61,
+          64,
+          65,
+          66,
+          67,
+          72,
+          78,
+          83,
+          84
+        ],
+        "maximumPositionErrorM": 0.00046312219331926625,
+        "maximumNormalErrorDegrees": 1.8984610375105204,
+        "positionToleranceM": 0.0005,
+        "normalToleranceDegrees": 2,
+        "uvMethod": "Physical cross-section perimeter and source centreline arc length;0.75m tile. Source UVs remain untouched."
+      }
+    },
+    "actualImported": {
+      "wheels": [
+        {
+          "wheel": "SpareWheel",
+          "carcassTriangles": 728,
+          "profileStations": [
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28
+          ],
+          "carcassProfileErrorM": 1.6008281351602777e-7,
+          "treadBlocks": 162,
+          "treadTriangles": 972,
+          "minimumBlockVolumeM3": 0.0000010977800813568213,
+          "minimumApexGapM": -0.001500117778778079,
+          "maximumApexGapM": -0.0014998830854892758
+        },
+        {
+          "wheel": "Wheel_FrontLeft",
+          "carcassTriangles": 728,
+          "profileStations": [
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28
+          ],
+          "carcassProfileErrorM": 4.649460979900325e-7,
+          "treadBlocks": 162,
+          "treadTriangles": 972,
+          "minimumBlockVolumeM3": 0.0000010978027969639943,
+          "minimumApexGapM": -0.0015001997351646451,
+          "maximumApexGapM": -0.001499633491039279
+        },
+        {
+          "wheel": "Wheel_FrontRight",
+          "carcassTriangles": 728,
+          "profileStations": [
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28
+          ],
+          "carcassProfileErrorM": 2.2747638979452884e-7,
+          "treadBlocks": 162,
+          "treadTriangles": 972,
+          "minimumBlockVolumeM3": 0.0000010978027969639943,
+          "minimumApexGapM": -0.0015001848340034513,
+          "maximumApexGapM": -0.0014998011291027097
+        },
+        {
+          "wheel": "Wheel_Rear1Left",
+          "carcassTriangles": 728,
+          "profileStations": [
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28
+          ],
+          "carcassProfileErrorM": 1.0124262020226751e-7,
+          "treadBlocks": 162,
+          "treadTriangles": 972,
+          "minimumBlockVolumeM3": 0.0000010977913558196661,
+          "minimumApexGapM": -0.0015001215040683774,
+          "maximumApexGapM": -0.001499924063682559
+        },
+        {
+          "wheel": "Wheel_Rear1Right",
+          "carcassTriangles": 728,
+          "profileStations": [
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28
+          ],
+          "carcassProfileErrorM": 1.0124262020226751e-7,
+          "treadBlocks": 162,
+          "treadTriangles": 972,
+          "minimumBlockVolumeM3": 0.0000010977913558196661,
+          "minimumApexGapM": -0.0015001215040683774,
+          "maximumApexGapM": -0.0014999203383922605
+        },
+        {
+          "wheel": "Wheel_Rear2Left",
+          "carcassTriangles": 728,
+          "profileStations": [
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28
+          ],
+          "carcassProfileErrorM": 2.1612951813560676e-7,
+          "treadBlocks": 162,
+          "treadTriangles": 972,
+          "minimumBlockVolumeM3": 0.000001097801531457776,
+          "minimumApexGapM": -0.0015002034604549436,
+          "maximumApexGapM": -0.0014997862279415158
+        },
+        {
+          "wheel": "Wheel_Rear2Right",
+          "carcassTriangles": 728,
+          "profileStations": [
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28,
+            28
+          ],
+          "carcassProfileErrorM": 2.1612951813560676e-7,
+          "treadBlocks": 162,
+          "treadTriangles": 972,
+          "minimumBlockVolumeM3": 0.000001097801531457776,
+          "minimumApexGapM": -0.0015002034604549436,
+          "maximumApexGapM": -0.0014997415244579343
+        }
+      ],
+      "spareCollarSignedVolumeM3": 0.00019412548473004185
+    },
+    "historicalTreadMouldProven": false,
+    "wholeReferenceAccepted": false
+  },
+  "rig": {
+    "type": "Independent rigid nodes; no merged dead model",
+    "movableNodes": [
+      {
+        "name": "Door_Left",
+        "axis": "Y"
+      },
+      {
+        "name": "Door_Right",
+        "axis": "Y"
+      },
+      {
+        "name": "HoodSide_Left",
+        "axis": "-Z"
+      },
+      {
+        "name": "Hood_Left",
+        "axis": "-Z"
+      },
+      {
+        "name": "HoodSide_Right",
+        "axis": "-Z"
+      },
+      {
+        "name": "Hood_Right",
+        "axis": "-Z"
+      },
+      {
+        "name": "RearCheek_Left",
+        "axis": "Y"
+      },
+      {
+        "name": "RearCheek_Right",
+        "axis": "Y"
+      },
+      {
+        "name": "Wheel_FrontLeft",
+        "axis": "X"
+      },
+      {
+        "name": "Steer_Left",
+        "axis": "Y"
+      },
+      {
+        "name": "Wheel_FrontRight",
+        "axis": "X"
+      },
+      {
+        "name": "Steer_Right",
+        "axis": "Y"
+      },
+      {
+        "name": "SteeringTieRod",
+        "axis": "Y"
+      },
+      {
+        "name": "SteeringWheel",
+        "axis": "Y"
+      },
+      {
+        "name": "Tailgate",
+        "axis": "X"
+      },
+      {
+        "name": "Wheel_Rear1Left",
+        "axis": "X"
+      },
+      {
+        "name": "Wheel_Rear1Right",
+        "axis": "X"
+      },
+      {
+        "name": "Wheel_Rear2Left",
+        "axis": "X"
+      },
+      {
+        "name": "Wheel_Rear2Right",
+        "axis": "X"
+      }
+    ],
+    "animations": [
+      {
+        "name": "DoorsOpen",
+        "channels": 2,
+        "durationS": 2.0333333015441895
+      },
+      {
+        "name": "BonnetOpen",
+        "channels": 6,
+        "durationS": 2.0333333015441895
+      },
+      {
+        "name": "SteerLeft",
+        "channels": 5,
+        "durationS": 2.0333333015441895
+      },
+      {
+        "name": "Drive2M",
+        "channels": 6,
+        "durationS": 2.0333333015441895
+      },
+      {
+        "name": "TailgateOpen",
+        "channels": 1,
+        "durationS": 2.0333333015441895
+      }
+    ],
+    "drive": "Forward local -Z; wheel X angle = -distance / 0.4318",
+    "steering": "Inboard kingpins and fixed-length 1.2m tie rod; reconstructed 16.5:1 steering wheel ratio"
+  },
+  "pbr": {
+    "wheelPaintColourRelation": "Current selected khaki-olive pigment: wheel rims share body Base/Normal/ORM and colour factor; geometric shading supplies tonal contrast. Exact historical pigment remains unproven.",
+    "sets": [
+      "Paint",
+      "Canvas",
+      "Wood",
+      "Rubber",
+      "Chassis",
+      "Steel",
+      "Leather",
+      "Rust"
+    ],
+    "imageCount": 24,
+    "resolution": [
+      2048,
+      2048
+    ],
+    "packing": "Base=sRGB; Normal=OpenGL tangent-space, non-colour; ORM R=occlusion/G=roughness/B=metallic, non-colour",
+    "runtimeEncoding": "Lossless WebP in GLB, EXT_texture_webp",
+    "microdetail": "Physical-scale spray finish, woven canvas relief, coated wood grain, tyre mould grain/abrasion, bare-metal scratches and leather pebbling",
+    "wear": "User-requested medium service wear: dusty/scored paint with primer and steel cores, larger existing contact chips, lower-body grime, dusty rubber, faded/stained canvas and worn timber. Artistic wear pattern, not wear measured from the primary photograph."
+  },
+  "frontBumperReconstruction": {
+    "centreHeightM": 0.62,
+    "bladeHeightM": 0.09,
+    "towEyeLiftM": 0.1,
+    "actualImportedChecks": {
+      "heightM": 0.09000003337860107,
+      "centreM": 0.6200000047683716,
+      "mountContacts": [
+        {
+          "side": -1,
+          "mountBladeOverlapM": [
+            0.07461535930633545,
+            0.019807815551757812,
+            0.07230770587921143
+          ],
+          "mountRailOverlapM": [
+            0.06807687878608704,
+            0.2146153450012207,
+            0.07461535930633545
+          ],
+          "eyeEntersBlade": true
+        },
+        {
+          "side": 1,
+          "mountBladeOverlapM": [
+            0.07461535930633545,
+            0.019807815551757812,
+            0.07230770587921143
+          ],
+          "mountRailOverlapM": [
+            0.06807687878608704,
+            0.2146153450012207,
+            0.07461535930633545
+          ],
+          "eyeEntersBlade": true
+        }
+      ],
+      "rivetBackGapsM": [
+        -0.0002999305725097656,
+        -0.0002999305725097656,
+        -0.0002999305725097656,
+        -0.0002999305725097656
+      ],
+      "chipSamples": 150,
+      "maximumChipSurfaceDistanceM": 0.00030017050448805094
+    },
+    "evidence": "Original front blade upper/lower contrast edges at fixed camera,width and longitudinal extent.90mm blade height and mounting/eye contact reconstruction, not printed factory component dimensions.",
+    "factoryComponentDimensionsProven": false
+  },
+  "rearMudguardReconstruction": {
+    "heightOffsetM": 0.09,
+    "cargoReliefM": 0.002,
+    "copingPairs": [
+      {
+        "fender": "RearFender_-1",
+        "cargo": "Cargo_FloorPlank0"
+      },
+      {
+        "fender": "RearFender_-1",
+        "cargo": "Cargo_FloorPlank1"
+      },
+      {
+        "fender": "RearFender_-1",
+        "cargo": "Cargo_FloorPlank2"
+      },
+      {
+        "fender": "RearFender_-1",
+        "cargo": "Cargo_LongitudinalBeam-0.58"
+      },
+      {
+        "fender": "RearFender_-1",
+        "cargo": "Cargo_RopeHook-1-0.7133333333333334"
+      },
+      {
+        "fender": "RearFender_-1",
+        "cargo": "Cargo_RopeHook-1-1.6716666666666669"
+      },
+      {
+        "fender": "RearFender_-1",
+        "cargo": "Cargo_SteelUpright-1-0.7133333333333334"
+      },
+      {
+        "fender": "RearFender_-1",
+        "cargo": "Cargo_SteelUpright-1-1.6716666666666669"
+      },
+      {
+        "fender": "RearFender_1",
+        "cargo": "Cargo_FloorPlank10"
+      },
+      {
+        "fender": "RearFender_1",
+        "cargo": "Cargo_FloorPlank11"
+      },
+      {
+        "fender": "RearFender_1",
+        "cargo": "Cargo_FloorPlank12"
+      },
+      {
+        "fender": "RearFender_1",
+        "cargo": "Cargo_LongitudinalBeam0.58"
+      },
+      {
+        "fender": "RearFender_1",
+        "cargo": "Cargo_RopeHook1-0.7133333333333334"
+      },
+      {
+        "fender": "RearFender_1",
+        "cargo": "Cargo_RopeHook1-1.6716666666666669"
+      },
+      {
+        "fender": "RearFender_1",
+        "cargo": "Cargo_SteelUpright1-0.7133333333333334"
+      },
+      {
+        "fender": "RearFender_1",
+        "cargo": "Cargo_SteelUpright1-1.6716666666666669"
+      },
+      {
+        "fender": "RearFender_RolledLip-1",
+        "cargo": "Cargo_RopeHook-1-0.7133333333333334"
+      },
+      {
+        "fender": "RearFender_RolledLip-1",
+        "cargo": "Cargo_RopeHook-1-1.6716666666666669"
+      },
+      {
+        "fender": "RearFender_RolledLip-1",
+        "cargo": "Cargo_SteelUpright-1-0.7133333333333334"
+      },
+      {
+        "fender": "RearFender_RolledLip-1",
+        "cargo": "Cargo_SteelUpright-1-1.6716666666666669"
+      },
+      {
+        "fender": "RearFender_RolledLip1",
+        "cargo": "Cargo_RopeHook1-0.7133333333333334"
+      },
+      {
+        "fender": "RearFender_RolledLip1",
+        "cargo": "Cargo_RopeHook1-1.6716666666666669"
+      },
+      {
+        "fender": "RearFender_RolledLip1",
+        "cargo": "Cargo_SteelUpright1-0.7133333333333334"
+      },
+      {
+        "fender": "RearFender_RolledLip1",
+        "cargo": "Cargo_SteelUpright1-1.6716666666666669"
+      }
+    ],
+    "actualImportedChecks": {
+      "guardParts": 6,
+      "cargoParts": 100,
+      "surfaceQueries": 600,
+      "collisions": [],
+      "crownHeightsM": {
+        "RearFender_RolledLip-1": 1.0691566467285156,
+        "RearFender_RolledLip1": 1.0688221454620361
+      },
+      "scope": "Actual reimported game triangles and source-part IDs. Hidden cutbacks are reconstruction; no cargo member or other visible vehicle part is removed."
+    },
+    "evidence": "Original600x410 rear curved-lip bands; radii, width, axles and camera retained.90mm height correction and hidden cargo copings reconstructed, not factory manufacturing dimensions.",
+    "factoryJoineryProven": false
+  },
+  "cabRoofContact": {
+    "actualImportedDoorRoofClearance": {
+      "movingFrames": 6,
+      "movingDoorParts": 28,
+      "canvasParts": 76,
+      "bowParts": 4,
+      "fixedMirrorParts": 6,
+      "sampledPoses": 121,
+      "surfaceQueries": 3388,
+      "collisions": [],
+      "scope": "Actual imported complete doors and DoorsOpen tracks vs roof, metal headers, fixed cowl collar, all canvas skins, sewn details, eyelets, lashings, support bows and all fixed mirror heads/stalks; intended rubber weatherseal contact excluded"
+    },
+    "construction": "Reconstructed side/front metal headers and thin rubber weatherseals; two planar front panes; moving upper window frames remain separate from roof",
+    "factoryFasteningProven": false
+  },
+  "wearSurfacePlacement": {
+    "reconstructed": true,
+    "sourceAndRuntimeFittedSeparately": true,
+    "surfaceOffsetM": 0.0003,
+    "patches": 52,
+    "repositionedExistingPatches": 42,
+    "alreadySeatedBumperPatchesRetained": 10,
+    "evidence": "Existing restrained wear/oxide patches fitted to actual high-source and final reduced support surfaces separately; oxide remains an inferred material treatment,not a measured historical corrosion map. Ten already-seated bumper chips retained.",
+    "actualImportedChecks": {
+      "patches": 52,
+      "passed": true,
+      "groups": [
+        {
+          "group": "DoorContact",
+          "patches": 10,
+          "samples": 120,
+          "missingSamples": 0,
+          "minimumSignedGapM": 0.0002999362349510176,
+          "maximumSignedGapM": 0.0003000777959823592,
+          "passed": true
+        },
+        {
+          "group": "RunningBoard",
+          "patches": 16,
+          "samples": 192,
+          "missingSamples": 0,
+          "minimumSignedGapM": 0.00029994368553161455,
+          "maximumSignedGapM": 0.0003000479936599715,
+          "passed": true
+        },
+        {
+          "group": "Bumper",
+          "patches": 10,
+          "samples": 120,
+          "missingSamples": 0,
+          "minimumSignedGapM": 0.0003000852465629561,
+          "maximumSignedGapM": 0.000300092697143553,
+          "passed": true
+        },
+        {
+          "group": "RearHinge",
+          "patches": 8,
+          "samples": 96,
+          "missingSamples": 0,
+          "minimumSignedGapM": 0.00029957115650176835,
+          "maximumSignedGapM": 0.00030026406049728227,
+          "passed": true
+        },
+        {
+          "group": "BonnetSeam",
+          "patches": 8,
+          "samples": 96,
+          "missingSamples": 0,
+          "minimumSignedGapM": 0.0002999064326286299,
+          "maximumSignedGapM": 0.0003001150488853438,
+          "passed": true
+        }
+      ],
+      "scope": "Actual imported vertices and triangle centroids,outward-axis support rays. Rendering/construction offset only; neither exact historical corrosion placement nor full material/reference acceptance.",
+      "detailReport": "Local Data_ReimportVerification.json; detailed support rays remain local"
+    },
+    "historicalCorrosionMapProven": false
+  },
+  "canopyBowContact": {
+    "actualImportedChecks": {
+      "clothParts": [
+        "Canvas_FrontCornerFold-1",
+        "Canvas_FrontCornerFold1",
+        "Canvas_FrontRolledCurtain",
+        "Canvas_FrontRollTie-0.58",
+        "Canvas_FrontRollTie0",
+        "Canvas_FrontRollTie0.58",
+        "Canvas_MainCover",
+        "Canvas_FrontHeaderValance"
+      ],
+      "clothTriangles": 11380,
+      "supportBows": 4,
+      "bowTriangles": 2352,
+      "collisions": [],
+      "scope": "All actual imported main cloth, valance, rolled curtain, roll ties, corner folds and support-bow surfaces; no contact or height region excluded"
+    },
+    "adjustedSourceVertices": 1016,
+    "maximumSourceOutwardM": 0.022093787250328126,
+    "targetClearanceM": 0.003,
+    "method": "Real bow/cloth surface rays after body and lip fitting; shared sewn-piece displacement field",
+    "historicalToleranceProven": false
+  },
+  "canopyDiagonalFolds": {
+    "depthM": 0.045,
+    "evidence": "Main-sheet diagonal gravity/tie creases follow primary-photo window hems; exact depth and hidden-side repetition reconstructed. Free window flaps are authored separately from this main-sheet tension field.",
+    "freeWindowFlapsIndependent": true,
+    "exactDepthHistoricallyMeasured": false
+  },
+  "canopyClosureContours": {
+    "lowerAdjustmentsM": [
+      [
+        0,
+        0
+      ],
+      [
+        -0.01,
+        -0.019
+      ],
+      [
+        0.074,
+        -0.021
+      ]
+    ],
+    "frontOutwardReliefM": 0.003,
+    "primaryShiftsBlenderM": [
+      [
+        0,
+        0.095,
+        -0.162
+      ],
+      [
+        0,
+        0.3,
+        -0.183
+      ],
+      [
+        0,
+        0.222,
+        -0.196
+      ]
+    ],
+    "primaryFreeExtraM": [
+      0,
+      0.006,
+      0.012
+    ],
+    "primaryObservationRecipe": "Data_PrimaryReferenceFit.json#primaryCanvasClosures",
+    "evidence": "Primary600x345complete closure outline hypotheses replace assembly-photo positions for all three skins/hems. Actual main-cloth rays preserve top support; rear free portion has12mm additional reconstructed outward clearance, fading at the top. Placement and hidden-side mirroring are inferred,not factory tailoring measurements.",
+    "actualImportedChecks": {
+      "closures": [
+        {
+          "index": 0,
+          "expectedBoundsPixels": [
+            118,
+            59,
+            138,
+            107
+          ],
+          "actualBoundsPixels": [
+            117.92009577576962,
+            58.88902013384408,
+            138.356090533712,
+            107.61072687309309
+          ],
+          "rmsPx": 0.360030900569383,
+          "maximumPx": 0.6107268730930855,
+          "usedSourceParts": 4
+        },
+        {
+          "index": 1,
+          "expectedBoundsPixels": [
+            101,
+            77,
+            123,
+            118
+          ],
+          "actualBoundsPixels": [
+            99.75667559439955,
+            76.83535058586872,
+            122.30735475474918,
+            120.08981197218537
+          ],
+          "rmsPx": 1.266889549447125,
+          "maximumPx": 2.089811972185373,
+          "usedSourceParts": 4
+        },
+        {
+          "index": 2,
+          "expectedBoundsPixels": [
+            71,
+            95,
+            92,
+            132
+          ],
+          "actualBoundsPixels": [
+            72.40448156113317,
+            94.97422144534781,
+            91.36273558736784,
+            132.76297369405387
+          ],
+          "rmsPx": 0.8604457825552748,
+          "maximumPx": 1.4044815611331671,
+          "usedSourceParts": 4
+        }
+      ],
+      "sourcePhoto": "Reference_HistoricalFront.jpg",
+      "role": "Primary visible outline hypothesis,not calibrated tailoring or whole-reference acceptance",
+      "scope": "Actual near skins and all three hems projected in the primary camera; four bound coordinates per panel. Width,height and hidden seam identity remain inferred.",
+      "legacyAssemblyRegression": {
+        "closures": [
+          {
+            "index": 1,
+            "samples": 5,
+            "missingProjectionColumns": [
+              161,
+              176
+            ],
+            "rmsPx": null,
+            "maximumPx": null,
+            "rows": [
+              {
+                "x": 161,
+                "observedY": 154,
+                "actualY": null,
+                "errorPx": null
+              },
+              {
+                "x": 176,
+                "observedY": 154,
+                "actualY": null,
+                "errorPx": null
+              },
+              {
+                "x": 181,
+                "observedY": 154,
+                "actualY": 168.89512075257085,
+                "errorPx": 14.895120752570847
+              },
+              {
+                "x": 186,
+                "observedY": 154,
+                "actualY": 168.84763601760199,
+                "errorPx": 14.847636017601985
+              },
+              {
+                "x": 191,
+                "observedY": 155,
+                "actualY": 169.3140609350911,
+                "errorPx": 14.314060935091106
+              }
+            ],
+            "legacyWouldPass": false
+          },
+          {
+            "index": 2,
+            "samples": 6,
+            "missingProjectionColumns": [
+              107
+            ],
+            "rmsPx": null,
+            "maximumPx": null,
+            "rows": [
+              {
+                "x": 107,
+                "observedY": 158,
+                "actualY": null,
+                "errorPx": null
+              },
+              {
+                "x": 112,
+                "observedY": 157,
+                "actualY": 173.1197943273701,
+                "errorPx": 16.1197943273701
+              },
+              {
+                "x": 117,
+                "observedY": 157,
+                "actualY": 173.42451975575568,
+                "errorPx": 16.424519755755682
+              },
+              {
+                "x": 122,
+                "observedY": 157,
+                "actualY": 173.87931513304923,
+                "errorPx": 16.879315133049232
+              },
+              {
+                "x": 127,
+                "observedY": 157,
+                "actualY": 174.3247829176992,
+                "errorPx": 17.324782917699196
+              },
+              {
+                "x": 132,
+                "observedY": 155,
+                "actualY": 174.25179592552269,
+                "errorPx": 19.251795925522686
+              }
+            ],
+            "legacyWouldPass": false
+          }
+        ],
+        "sourcePhoto": "Reference_Production.jpg",
+        "role": "Auxiliary unchanged-panel regression only; not primary appearance acceptance",
+        "scope": "Actual imported source-part triangles and11legacy lower-hem samples; unchanged2pxRMS/3pxmaximum. Current primary appearance and unseen tailoring remain separately reviewed."
+      },
+      "historicalTailoringMeasured": false
+    },
+    "actualImportedMainClearance": {
+      "closures": 6,
+      "mainTriangles": 8424,
+      "collisions": [],
+      "scope": "All six actual imported closure skins vs full main cloth surface; no seam, height or contact area excluded. Thin-hem clearances are reconstruction."
+    },
+    "historicalTailoringProven": false
+  },
+  "canopyFrontMouth": {
+    "openingWidthM": 1.56,
+    "curtainEdgeRawZ": 2.37,
+    "curtainSagM": 0.005,
+    "curtainTiltM": -0.055,
+    "cornerFoldDepthM": 0.03,
+    "frontSupportSetbackM": 0.025,
+    "evidence": "Original600x410 positive valance-to-dark-mouth edge; narrower roll and unequal suspension heights reconstructed. Hidden folds and ties are not factory tailoring measurements.",
+    "historicalTailoringProven": false
+  },
+  "canopyLowerOverlap": {
+    "actualImportedClothCargo": {
+      "clothParts": 21,
+      "cargoParts": 100,
+      "surfaceQueries": 2100,
+      "collisions": [],
+      "scope": "Actual main cloth, binding hem, sewn reinforcements and front corner folds vs cargo. Eyelets and lashings intentionally attach to mounting pieces; cloth queries have no contact exception."
+    },
+    "frontDropM": 0,
+    "primaryHemLiftRearForeM": [
+      0.05,
+      0.03
+    ],
+    "primaryObservationRecipe": "Data_PrimaryReferenceFit.json#primaryCanvasHem",
+    "outerTargetM": 0.9775,
+    "lateralCompression": 0.2,
+    "evidence": "Primary600x345cloth/cargo boundary replaces the auxiliary assembly-photo120mmfore drop.50/30mmrear/fore lift before lower fade exposes the unchanged upper rail; sewn reinforcements and rigid eyelets move with the skirt,lash lower anchors retained. Six visible boundary rows have3..4pxannotation uncertainty; exact tailoring and hidden side remain reconstruction.",
+    "nominalFixedFrameWidthM": 1.9,
+    "looseEnvelopeMeasuredSeparately": true,
+    "historicalTailoringProven": false
+  },
+  "canopyFrontBoundary": {
+    "clothLipExtensionM": 0.2,
+    "heightRangeM": [
+      2.34,
+      2.64
+    ],
+    "blendLengthM": 0.35,
+    "steelFrontBowRetained": false,
+    "actualImportedFlapSupport": {
+      "closures": [
+        {
+          "name": "Canvas_SideClosure-1_1",
+          "upperEdgePoints": 5,
+          "unsupported": 0
+        },
+        {
+          "name": "Canvas_SideClosure-1_2",
+          "upperEdgePoints": 5,
+          "unsupported": 0
+        },
+        {
+          "name": "Canvas_SideClosure1_1",
+          "upperEdgePoints": 5,
+          "unsupported": 0
+        },
+        {
+          "name": "Canvas_SideClosure1_2",
+          "upperEdgePoints": 4,
+          "unsupported": 0
+        },
+        {
+          "name": "Canvas_SideClosure-1_0",
+          "upperEdgePoints": 10,
+          "unsupported": 0
+        },
+        {
+          "name": "Canvas_SideClosure1_0",
+          "upperEdgePoints": 10,
+          "unsupported": 0
+        }
+      ],
+      "upperEdgeSamples": 39,
+      "unsupported": 0,
+      "passed": true,
+      "scope": "Actual imported upper flap attachment edges vs main cloth. Detailed ray records remain local."
+    },
+    "evidence": "Primary-photo cloth margin ahead of foremost flap; main cloth extended without moving the fitted flap. Seam allowance and loose lip reconstructed.",
+    "historicalSeamAllowanceProven": false
+  },
+  "cowlJunction": {
+    "rearBonnetCrownM": 1.63,
+    "frontBonnetCrownM": 1.48,
+    "collarRearY": 0.951200008392334,
+    "collarRearZ": 1.6161999702453613,
+    "collarForeY": 1.008,
+    "actualImportedChecksPassed": true,
+    "internalBulkhead": "Chassis coating; outer collar retains body enamel",
+    "evidence": "Fixed painted collar between actual lower windshield seal and bonnet rear profile;1.630m crown, panel thickness and junction details reconstructed. Internal bulkhead uses chassis coating.",
+    "historicalDimensionsProven": false
+  },
+  "engineAssembly": {
+    "fanBladeCount": 6,
+    "actualImportedChecks": {
+      "blades": [
+        {
+          "name": "Engine_FanBlade0",
+          "minimumRadiusM": 0.044999914169311594,
+          "maximumRadiusM": 0.21013744354248054
+        },
+        {
+          "name": "Engine_FanBlade1",
+          "minimumRadiusM": 0.044999994741182,
+          "maximumRadiusM": 0.2101373999460922
+        },
+        {
+          "name": "Engine_FanBlade2",
+          "minimumRadiusM": 0.04500003765652616,
+          "maximumRadiusM": 0.21013743149831543
+        },
+        {
+          "name": "Engine_FanBlade3",
+          "minimumRadiusM": 0.04499999999999993,
+          "maximumRadiusM": 0.21013741016387932
+        },
+        {
+          "name": "Engine_FanBlade4",
+          "minimumRadiusM": 0.04500003765652617,
+          "maximumRadiusM": 0.2101374428614364
+        },
+        {
+          "name": "Engine_FanBlade5",
+          "minimumRadiusM": 0.044999994741182,
+          "maximumRadiusM": 0.21013738858297126
+        }
+      ],
+      "overlappingBladePairs": [],
+      "dynamoSpansNativeY": {
+        "Engine_Dynamo": [
+          1.8679986000061035,
+          2.036001682281494
+        ],
+        "Engine_DynamoShaft": [
+          2.02099871635437,
+          2.1230010986328125
+        ],
+        "Engine_DynamoPulley": [
+          2.1049864292144775,
+          2.135012626647949
+        ]
+      },
+      "fanBeltNonManifoldEdges": 0,
+      "coolantFanSweptGapM": 0.01761670289815176,
+      "historicalEngineDimensionsProven": false
+    },
+    "evidence": "Factory two-sided photographs show six separate fan paddles and inform cast manifold envelope, crossed ignition wiring and front-drive parts; passages, installed dimensions, exact routing and unseen details reconstructed.",
+    "historicalInstallationDimensionsProven": false
+  },
+  "canopySurface": {
+    "version": 79,
+    "profile": "Dry aged heavy cotton with uneven bleaching,fold stains,runoff and worn lower hems",
+    "baseAndOrmTileM": 2.5,
+    "normalTileM": 0.04,
+    "macroSourceBlurPixels": 1.25,
+    "macroContrast": 1,
+    "macroSourceWeaveSuppressed": true,
+    "filmReferences": [
+      "https://www.imcdb.org/v059051.html",
+      "https://www.imcdb.org/v074865.html",
+      "https://www.imcdb.org/v702024.html"
+    ],
+    "filmScope": "Cloth behaviour and surface-age reference only;not Japanese dimensions,pigment measurements or tailoring",
+    "sameTypeReference": "https://www.ww2technik.de/sites/inf/tansport/typ94.htm",
+    "historicalWearMeasured": false
+  },
+  "finishSelection": {
+    "confirmedByUser": true,
+    "confirmedScope": "Low-saturation khaki-olive palette direction only",
+    "selectionFile": "Data_MaterialSelection.json",
+    "bakeTimeConfirmationFlag": true,
+    "date": "2026-10-25",
+    "target": "Low-saturation khaki-olive historical reconstruction candidate; exact1938Type94colour unproven",
+    "previousUserSelection": "Museum yellow-green gloss was selected2026-10-24; user subsequently requested historical colour research and confirmed khaki-olive2026-10-25",
+    "wholeModelApproved": false,
+    "clearcoatFactor": 0.28,
+    "clearcoatRoughnessFactor": 0.55,
+    "clearcoatRoughnessUsesPaintOrm": true,
+    "paintMicrorelief": "Authored6micrometre fine enamel peel and1.5micrometre paint flow RMS terms; no coarse sheet waviness, tiled cloud dirt or random conductive scars in the continuous coating. Existing separate steel contact regions and rest-space vertex dirt retain localized wear. Physical scales are reconstruction, not historical measurements.",
+    "headlampOptics": "Independent open bucket, annular rim, concave metallic reflector, bulb and convex fluted thin glass; alpha0.13, no screen-space refraction; real-time optical approximation"
+  },
+  "reconstructionScope": "同型外形复原与兵站车型候选，不是已确认的滕县参战车辆。当前低饱和卡其橄榄色是历史复原候选；1942年战时概述提到普通卡车多为沙卡其，但不能证明1938年九四式的精确原色。生成图仅指导材质，内饰、隐藏结构、部分尺度、机盖机构及检修运动仍为推定。",
+  "historicalReferences": [
+    {
+      "url": "https://app.notion.com/p/40260335331c8122aa44d9dd136b418e",
+      "role": "User-selected model reference page"
+    },
+    {
+      "url": "https://www.ww2technik.de/sites/inf/tansport/typ94.htm",
+      "role": "User-selected primary closed front-quarter historical appearance photo; exact date/chassis identity unproven"
+    },
+    {
+      "url": "https://commons.wikimedia.org/wiki/File:Typ_94_6rad_lkw_endfertigung.jpg",
+      "role": "Secondary production/assembly reference; Commons labels1935, date/chassis identity not independently established"
+    },
+    {
+      "url": "https://dl.ndl.go.jp/pid/1053975",
+      "role": "1936 factory manual; original NDL scans for dimensions, chassis, engine and tyre designation"
+    },
+    {
+      "url": "https://www.motorcar-museum.jp/2019/05/03/2486/",
+      "role": "Confirms museum truck is a four-wheel conversion; excluded from axle/body proportions"
+    },
+    {
+      "url": "https://www.lonesentry.com/manuals/japanese-warfare/camouflage.html",
+      "role": "Transcription of U.S.MIS Information Bulletin16,20May1942,sectionVIII31: ordinary trucks usually sandy khaki. General contemporary observation, not a1938Type94paint chip or proof of exact hue."
+    }
+  ],
+  "technicalValidation": {
+    "actualPackagedGlbReimportPassed": true,
+    "motionAuditMatchesDeliveredBytes": false,
+    "motionAuditChecks": 0,
+    "motionAuditFailed": null,
+    "photoBodyAuditMatchesDeliveredBytes": false,
+    "photoBodyAuditChecks": 0,
+    "photoBodyAuditFailed": null,
+    "photoCabAuditMatchesDeliveredBytes": false,
+    "photoCabAuditChecks": 0,
+    "photoCabAuditFailed": null,
+    "surfaceSourcePixelsMatchDeliveredBytes": true,
+    "surfaceSourceAuditChecks": 62,
+    "notes": "Technical and landmark checks are supplemented by a separate whole-model visual audit; they do not establish historical engineering identity. Detailed reports and screenshots are local only."
+  },
+  "bonnetReconstruction": {
+    "fixedRearRawY": [
+      1.26,
+      1.3
+    ],
+    "rearCheekReferenceDegrees": 70,
+    "rearCheekAxisOutwardM": 0.007,
+    "rearCheekSkinOutwardM": 0.003,
+    "rearCheekInsetM": 0.004,
+    "rearCheekWaypoints": [
+      0,
+      0,
+      0.1,
+      20,
+      0.31666666666666665,
+      20,
+      0.5,
+      70,
+      1,
+      70
+    ],
+    "rearCheekEvidence": "Independent rear plain service leaves are a mechanically tested photographic reconstruction; no surviving factory hinge drawing was found. Not historical hardware certification.",
+    "rearCheekFrontReliefM": 0.125,
+    "referenceTopOpenDegrees": 23.38,
+    "referenceSideOutwardFoldDegrees": 131.36,
+    "radiatorHeightCorrectionM": -0.09,
+    "radiatorRearwardCorrectionM": 0.03,
+    "radiatorWidthScale": 0.689655172413793,
+    "headlightHeightCorrectionM": 0.04659748335532808,
+    "headlightForwardCorrectionM": 0.20711164990165098,
+    "headlightCentreTrackM": 0.938,
+    "lampScale": 0.9765564830997069,
+    "crossbarHeightCorrectionM": 0.085,
+    "hoodFrontWidthM": 0.64,
+    "hoodRearY": 1.01,
+    "hoodLengthM": 1.3299999999999998,
+    "inspectionWaypointsTimeTopSide": [
+      0,
+      0,
+      0,
+      0.1,
+      25,
+      -30,
+      0.13333333333333333,
+      35,
+      -40,
+      0.18333333333333332,
+      50,
+      -50,
+      0.2833333333333333,
+      80,
+      -65,
+      0.3,
+      85,
+      -65,
+      0.31666666666666665,
+      90,
+      -60,
+      0.5,
+      90,
+      -60,
+      1,
+      23.38,
+      131.36
+    ],
+    "actualGameClearance": {
+      "validPartLabels": true,
+      "trackedSourceParts": 1120,
+      "deliveredParts": 1120,
+      "staticParts": 986,
+      "movingSkins": 8,
+      "sampledPoses": 121,
+      "surfaceQueries": 968,
+      "rearCowlQueries": 242,
+      "movingPairQueries": 2662,
+      "sameSideCheekQueries": 726,
+      "collisions": [],
+      "scope": "Actual imported eight skins and six-node BonnetOpen tracks. Original main-leaf fixed mating panels excluded; new rear cheeks additionally tested against all fixed rear scuttle/shoulder surfaces and same-side main leaves. Opposite-side checks retained; only original top-top10mm centre hinge mate excluded."
+    },
+    "method": "Current primary front-quarter reconstruction retains factory chassis anchors and the fixed rear cowl. Lamp sizes/spacing, raised wings and nose profile follow photographic constraints; exact front variant and dimensions remain inferred. Four main sheet-edge hinges lift and counterfold; two inferred rear service leaves hinge outward while the main leaves are held high, then the main leaves return to the photographed pose. Their shortened visible rear boundary follows continuous photo edges; the fixed cowl stays in place. Source-part labels survive LOD and export, enabling collision checks on actual imported game triangles and animation. The rear relief, cowl and exact historical hardware/operation remain inferred; whole-model reference matching is still pending.",
+    "imagegenRole": "Four local built-in study sheets. The latest explores rear transition curvature but still has inconsistent projections and hinge relationships; no generated dimensions or hinge diagram was treated as historical evidence or directly traced engineering."
+  },
+  "engineReconstruction": {
+    "fanBladeCount": 6,
+    "coolantHoseDiameterM": 0.045,
+    "accessoryEvidence": "Factory two-sided photographs show six separate fan paddles and inform cast manifold envelope, crossed ignition wiring and front-drive parts; passages, installed dimensions, exact routing and unseen details reconstructed.",
+    "airCleanerBottomM": 1.24,
+    "airCleanerTopM": 1.456,
+    "airCleanerTopTrimM": 0.004,
+    "evidence": "Factory two-sided engine photographs inform flat side-valve head and accessory arrangement; actual installed sizes and routing remain reconstruction",
+    "longitudinalPhotoScale": 1.2,
+    "cabInteriorFloorAdjustmentM": 0.2,
+    "notes": "V22 refines the cast C-return manifold, crossed ignition leads, timing cover, closed fan belt, dynamo shaft and six separate photo-supported fan paddles; coolant routing, rear coupling housing, starter, valve-chamber cover, transmission support, interior tunnel and controls are modeled; hidden installation details are not claimed as proven factory specifications."
+  },
+  "unverifiedDetails": [
+    "The asset matches factory nominal5.400m overall; exact photographed chassis identity and hidden body construction remain unproven.",
+    "Bonnet joint hardware, plain rear-apron attachment and precise inspection trajectory remain reconstruction; visible opening and occlusion have been checked.",
+    "Unseen opposite-side canvas closures, rear curtain, cab interior, engine installation dimensions, loaded tyre profile, steering limits/ratio and small fastenings remain inferred.",
+    "Monochrome references do not establish paint/canvas/upholstery hues, optical properties or exact wear. This does not identify a particular truck at Tengxian."
+  ],
+  "remainingReferenceWork": [
+    "Whole-model visual acceptance and editable-source completion audit remain to be recorded against the current bytes."
+  ]
+}

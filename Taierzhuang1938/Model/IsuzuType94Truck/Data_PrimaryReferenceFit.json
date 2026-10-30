@@ -1,0 +1,305 @@
+{
+  "schemaVersion": 3,
+  "assetId": "IsuzuType94Truck",
+  "primaryReference": {
+    "file": "Reference_HistoricalFront.jpg",
+    "pixels": [
+      600,
+      345
+    ],
+    "sha256": "b53cb0ccb3587fec592858db7057dd407c42d7727e26d412c66a06cffd2044f8",
+    "url": "https://www.ww2technik.de/sites/inf/tansport/typ94.htm"
+  },
+  "baselineRuntimeSha256": "194baa2e75be246f596a1f9c701f6d5f2b60b4d3438a6254bf661548eef1af33",
+  "referenceSteerInnerDegrees": 12,
+  "referencePoseHistoricallyMeasured": false,
+  "camera": {
+    "cameraLocationBlender": [
+      3.4544020392720944,
+      7.5249575579067205,
+      0.1835406937489481
+    ],
+    "cameraTargetBlender": [
+      1.1841114766847056,
+      0.02894883718095631,
+      1.8131523101256621
+    ],
+    "lensMm": 60.282808321893924,
+    "rollDegrees": 0.7515795712757953,
+    "principalPointPixels": [
+      117.81971576462536,
+      99.35291160468394
+    ]
+  },
+  "cameraCalibrated": false,
+  "visibleWheelArcs": [
+    {
+      "wheel": "Wheel_FrontLeft",
+      "side": "R",
+      "y": 250,
+      "x": 534,
+      "uncertaintyPx": 4
+    },
+    {
+      "wheel": "Wheel_FrontLeft",
+      "side": "R",
+      "y": 260,
+      "x": 535,
+      "uncertaintyPx": 3
+    },
+    {
+      "wheel": "Wheel_FrontLeft",
+      "side": "R",
+      "y": 270,
+      "x": 535,
+      "uncertaintyPx": 3
+    },
+    {
+      "wheel": "Wheel_FrontLeft",
+      "side": "R",
+      "y": 280,
+      "x": 535,
+      "uncertaintyPx": 2
+    },
+    {
+      "wheel": "Wheel_FrontLeft",
+      "side": "R",
+      "y": 310,
+      "x": 529,
+      "uncertaintyPx": 2
+    },
+    {
+      "wheel": "Wheel_FrontLeft",
+      "side": "R",
+      "y": 320,
+      "x": 523,
+      "uncertaintyPx": 2
+    },
+    {
+      "wheel": "Wheel_FrontLeft",
+      "side": "R",
+      "y": 328,
+      "x": 517,
+      "uncertaintyPx": 2
+    },
+    {
+      "wheel": "Wheel_FrontRight",
+      "side": "R",
+      "y": 300,
+      "x": 317,
+      "uncertaintyPx": 4
+    },
+    {
+      "wheel": "Wheel_FrontRight",
+      "side": "R",
+      "y": 310,
+      "x": 313,
+      "uncertaintyPx": 3
+    },
+    {
+      "wheel": "Wheel_FrontRight",
+      "side": "R",
+      "y": 320,
+      "x": 306,
+      "uncertaintyPx": 3
+    },
+    {
+      "wheel": "Wheel_FrontRight",
+      "side": "L",
+      "y": 312,
+      "x": 228,
+      "uncertaintyPx": 3
+    },
+    {
+      "wheel": "Wheel_FrontRight",
+      "side": "L",
+      "y": 318,
+      "x": 233,
+      "uncertaintyPx": 3
+    },
+    {
+      "wheel": "Wheel_Rear1Right",
+      "side": "R",
+      "y": 306,
+      "x": 151,
+      "uncertaintyPx": 3
+    },
+    {
+      "wheel": "Wheel_Rear1Right",
+      "side": "R",
+      "y": 312,
+      "x": 150,
+      "uncertaintyPx": 3
+    },
+    {
+      "wheel": "Wheel_Rear1Right",
+      "side": "R",
+      "y": 318,
+      "x": 148,
+      "uncertaintyPx": 3
+    },
+    {
+      "wheel": "Wheel_Rear2Right",
+      "side": "L",
+      "y": 306,
+      "x": 81,
+      "uncertaintyPx": 5
+    },
+    {
+      "wheel": "Wheel_Rear2Right",
+      "side": "L",
+      "y": 318,
+      "x": 85,
+      "uncertaintyPx": 4
+    },
+    {
+      "wheel": "Wheel_Rear2Right",
+      "side": "L",
+      "y": 324,
+      "x": 87,
+      "uncertaintyPx": 4
+    }
+  ],
+  "excluded": [
+    "Near tyre upper-right rows:connected chassis/axle shadow,not a standalone tyre edge.",
+    "Far row300and near row328:road-line contamination.",
+    "Hidden far outboard hub cap and all ambiguous bright blobs.",
+    "Roof legacy217,26point:inner/outer eave identity not precise enough for a geometry change."
+  ],
+  "acceptanceCriteria": {
+    "maximumNormalizedRms": 1,
+    "maximumNormalizedError": 2,
+    "meaning": "Declared2..5pixel boundary uncertainty; not historical manufacturing/camera precision."
+  },
+  "roundedFrontReconstruction": {
+    "frontForeTaperM": 0.055,
+    "bumperWidthM": 1.58,
+    "lampCentreTrackM": 0.938,
+    "nearMirrorHeadInsetM": 0.04,
+    "foreLipYM": 2.435,
+    "note": "Inferred photo/body parameters. Fore taper fades to zero at retained1.900mcrown width; factory chassis/tyres,cab height,cargo/canvas,all axes and rest steering unchanged."
+  },
+  "bodyReviewLimit": "Whole silhouette/material/occlusion review remains required. Wheel-arc score is not full-reference acceptance or user approval.",
+  "primaryCanvasHem": {
+    "part": "Canvas_LowerBoundHem1",
+    "referenceSha256": "b53cb0ccb3587fec592858db7057dd407c42d7727e26d412c66a06cffd2044f8",
+    "visiblePoints": [
+      {
+        "x": 61,
+        "y": 170,
+        "uncertaintyPx": 3
+      },
+      {
+        "x": 66,
+        "y": 167,
+        "uncertaintyPx": 3
+      },
+      {
+        "x": 72,
+        "y": 165,
+        "uncertaintyPx": 3
+      },
+      {
+        "x": 79,
+        "y": 158,
+        "uncertaintyPx": 4
+      },
+      {
+        "x": 110,
+        "y": 147,
+        "uncertaintyPx": 3
+      },
+      {
+        "x": 118,
+        "y": 143,
+        "uncertaintyPx": 3
+      }
+    ],
+    "boundaryMeaning": "Visible lower cloth/upper cargo boundary; seam thickness and rail-edge identity included in pixel uncertainty",
+    "excluded": [
+      "Mid-bay86..102px:strong diagonal folds produce multiple plausible edges",
+      "126..133px:spare/fore-corner occlusion",
+      "Lower bright cargo-board and mudguard lines are not cloth hems"
+    ],
+    "acceptanceCriteria": {
+      "maximumNormalizedRms": 1,
+      "maximumNormalizedError": 2
+    },
+    "reconstructedLiftRearForeM": [
+      0.05,
+      0.03
+    ],
+    "previousAssemblyForeDropM": 0.12,
+    "historicalTailoringMeasured": false,
+    "wholeReferenceAccepted": false,
+    "lowerLashingAnchorLockBandM": [
+      0.012,
+      0.16
+    ]
+  },
+  "primaryCanvasClosures": {
+    "referenceSha256": "b53cb0ccb3587fec592858db7057dd407c42d7727e26d412c66a06cffd2044f8",
+    "nearPanels": [
+      {
+        "index": 0,
+        "boundsPixels": [
+          118,
+          59,
+          138,
+          107
+        ],
+        "maximumRmsPx": 2,
+        "maximumCoordinateErrorPx": 3
+      },
+      {
+        "index": 1,
+        "boundsPixels": [
+          101,
+          77,
+          123,
+          118
+        ],
+        "maximumRmsPx": 2,
+        "maximumCoordinateErrorPx": 3
+      },
+      {
+        "index": 2,
+        "boundsPixels": [
+          71,
+          95,
+          92,
+          132
+        ],
+        "maximumRmsPx": 2,
+        "maximumCoordinateErrorPx": 3
+      }
+    ],
+    "observationMeaning": "Approximate complete visible cloth/hem outline positions selected from primary-photo boundary hypotheses; seams and shadows remain partly ambiguous",
+    "reconstructedShiftsBlenderM": [
+      [
+        0,
+        0.095,
+        -0.162
+      ],
+      [
+        0,
+        0.3,
+        -0.183
+      ],
+      [
+        0,
+        0.222,
+        -0.196
+      ]
+    ],
+    "freeEdgeExtraOutwardM": [
+      0,
+      0.006,
+      0.012
+    ],
+    "source": "Reference_HistoricalFront.jpg",
+    "factoryPanelPositionsMeasured": false,
+    "hiddenSideMirroredInference": true,
+    "wholeReferenceAccepted": false
+  }
+}

@@ -1,0 +1,158 @@
+// Verify real decoded export pixels against the current authored source files.
+// This catches stale packed Blender images and unsupported colour multipliers.
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+import sharp from 'sharp';
+import {LoadGlb,ReadAccessor,ReadAccessorInt,PoseScene} from '../_import/Script_LugouGlbPose.mjs';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
+const source='C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/IsuzuType94Truck/Textures';
+const fileIndex=process.argv.indexOf('--file');
+if(fileIndex>=0&&!process.argv[fileIndex+1])throw new Error('--file requires an existing GLB path');
+const file=fileIndex<0?path.join(root,'Taierzhuang1938/Model/IsuzuType94Truck/Model_IsuzuType94Truck.glb'):path.resolve(process.argv[fileIndex+1]);
+const glb=LoadGlb(file),g=glb.json,checks=[];
+const Hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
+for(const image of g.images){
+ const view=g.bufferViews[image.bufferView],exported=glb.bin.subarray(view.byteOffset||0,(view.byteOffset||0)+view.byteLength);
+ const sourceFile=path.join(source,image.name.replace(/\.(png|webp)$/i,'')+'.png');
+ const original=await fs.readFile(sourceFile);
+ const a=await sharp(exported).removeAlpha().raw().toBuffer({resolveWithObject:true});
+ const b=await sharp(original).removeAlpha().raw().toBuffer({resolveWithObject:true});
+ checks.push({name:'Actual decoded pixels match current source: '+image.name,passed:a.info.width===b.info.width&&a.info.height===b.info.height&&a.data.equals(b.data),width:a.info.width,height:a.info.height,exportedPixelSha256:Hash(a.data),sourcePixelSha256:Hash(b.data)});
+}
+checks.push({name:'Complete eight PBR sets retain24 source images',passed:g.images.length===24});
+const wheel=g.materials.find(m=>m.name==='Material_IsuzuWheelPaint');
+const factor=wheel?.pbrMetallicRoughness?.baseColorFactor||[1,1,1,1];
+const bodyPaint=g.materials.find(m=>m.name==='Material_IsuzuPaint'),bodyFactor=bodyPaint?.pbrMetallicRoughness?.baseColorFactor||[1,1,1,1];
+checks.push({name:'Wheel paint matches the current body pigment without added dark tint',passed:!!wheel&&!!bodyPaint&&factor.every((v,i)=>Math.abs(v-bodyFactor[i])<1e-6)&&factor[3]===1,actual:{wheel:factor,body:bodyFactor}});
+function TextureIdentity(info){const texture=g.textures?.[info?.index];if(!texture)return null;return{image:texture.extensions?.EXT_texture_webp?.source??texture.source,sampler:g.samplers?.[texture.sampler]??null,texCoord:info.texCoord??0,transform:info.extensions?.KHR_texture_transform??null};}
+const sameTexture=(a,b)=>a&&b&&JSON.stringify(TextureIdentity(a))===JSON.stringify(TextureIdentity(b));
+const usedMaterials=new Set(g.meshes.flatMap(mesh=>mesh.primitives.map(p=>p.material))),pbrBindings=[...usedMaterials].filter(i=>/^Material_Isuzu(?:Paint|WheelPaint|Chassis|Steel|AbradedSteel|Rubber|Canvas|Wood|Leather|Rust|LipRust|Reflector)$/.test(g.materials[i]?.name)).map(index=>{
+ const material=g.materials[index],maps=[material.pbrMetallicRoughness?.baseColorTexture,material.normalTexture,material.occlusionTexture,material.pbrMetallicRoughness?.metallicRoughnessTexture],identities=maps.map(TextureIdentity),consumers=g.meshes.flatMap(mesh=>mesh.primitives.filter(p=>p.material===index).map(p=>({mesh:mesh.name,attributes:p.attributes})));
+ // The existing reflector deliberately uses a constant metal colour and
+ // Steel Normal/ORM maps. Every other textured surface has a Base map.
+ const reflector=material.name==='Material_IsuzuReflector',abraded=material.name==='Material_IsuzuAbradedSteel',required=reflector||abraded?identities.slice(1):identities,steel=g.materials.find(m=>m.name==='Material_IsuzuSteel');
+ const declaredReflector=!reflector||(!maps[0]&&[.75,.78,.76,1].every((v,i)=>Math.abs(v-(material.pbrMetallicRoughness?.baseColorFactor?.[i]??-1))<1e-6)&&sameTexture(maps[1],steel?.normalTexture)&&sameTexture(maps[3],steel?.pbrMetallicRoughness?.metallicRoughnessTexture));
+ const declaredAbrasion=!abraded||(!maps[0]&&[.48,.50,.52,1].every((v,i)=>Math.abs(v-(material.pbrMetallicRoughness?.baseColorFactor?.[i]??-1))<1e-6)&&sameTexture(maps[1],steel?.normalTexture)&&sameTexture(maps[3],steel?.pbrMetallicRoughness?.metallicRoughnessTexture));
+ const complete=required.every(id=>id&&Number.isInteger(id.image)&&id.image>=0&&id.image<g.images.length&&consumers.every(c=>c.attributes['TEXCOORD_'+id.texCoord]!==undefined))&&sameTexture(maps[2],maps[3])&&declaredReflector&&declaredAbrasion;
+ return{index,name:material.name,complete,textures:identities,meshes:consumers.map(c=>c.mesh)};
+});
+checks.push({name:'Every actually used PBR material retains its declared base input Normal and packed ORM bindings',passed:pbrBindings.length===12&&pbrBindings.every(row=>row.complete),actual:pbrBindings});
+checks.push({name:'Wheel and body share the same paint Base Normal and ORM source textures',passed:!!wheel&&!!bodyPaint&&['baseColorTexture','metallicRoughnessTexture'].every(k=>sameTexture(wheel.pbrMetallicRoughness?.[k],bodyPaint.pbrMetallicRoughness?.[k]))&&sameTexture(wheel.normalTexture,bodyPaint.normalTexture)&&sameTexture(wheel.occlusionTexture,bodyPaint.occlusionTexture),actual:{bodyBase:TextureIdentity(bodyPaint?.pbrMetallicRoughness?.baseColorTexture),wheelBase:TextureIdentity(wheel?.pbrMetallicRoughness?.baseColorTexture)}});
+const lamp=g.materials.find(m=>m.name==='Material_IsuzuLight');
+const lampTransmission=lamp?.extensions?.KHR_materials_transmission?.transmissionFactor||0;
+checks.push({name:'Bulb and rear diffuser remain opaque',passed:!!lamp&&lampTransmission===0,actual:lampTransmission});
+const lampGlass=g.materials.find(m=>m.name==='Material_IsuzuLampGlass'),reflector=g.materials.find(m=>m.name==='Material_IsuzuReflector');
+checks.push({name:'Independent lamp sheet exports thin transparent glass without refraction',passed:lampGlass?.alphaMode==='BLEND'&&Math.abs((lampGlass?.pbrMetallicRoughness?.baseColorFactor?.[3]||0)-.13)<1e-5&&!(lampGlass?.extensions?.KHR_materials_transmission?.transmissionFactor),actual:lampGlass});
+const cabGlass=g.materials.find(m=>m.name==='Material_IsuzuGlass'),cabPbr=cabGlass?.pbrMetallicRoughness,cabTransmission=cabGlass?.extensions?.KHR_materials_transmission?.transmissionFactor,cabIor=cabGlass?.extensions?.KHR_materials_ior?.ior;
+checks.push({name:'Actual cab glazing uses clear dielectric transmission separately from lamp alpha glass',passed:!!cabGlass&&(cabGlass.alphaMode??'OPAQUE')==='OPAQUE'&&cabTransmission>.999&&(cabPbr?.metallicFactor??1)===0&&cabPbr.roughnessFactor<=.04&&cabPbr.baseColorFactor.slice(0,3).every(v=>v>=.94&&v<=1)&&cabPbr.baseColorFactor[3]===1&&Math.abs(cabIor-1.52)<1e-5,actual:{cabPbr,transmission:cabTransmission,ior:cabIor,alphaMode:cabGlass?.alphaMode??'OPAQUE'}});
+checks.push({name:'Separate reflector retains concave metallic response',passed:!!reflector&&(reflector.pbrMetallicRoughness.metallicFactor??1)>.85&&reflector.pbrMetallicRoughness.roughnessFactor<.4,actual:reflector?.pbrMetallicRoughness});
+const finish=g.nodes.find(n=>n.name==='IsuzuType94Truck')?.extras?.FinishChoice;
+const declaredEnamel=g.nodes.find(n=>n.name==='IsuzuType94Truck')?.extras?.EnamelMetalResponseJson;
+const enamelResponse=declaredEnamel?JSON.parse(declaredEnamel):null;
+const coatTarget=enamelResponse?[enamelResponse.clearcoatFactor,enamelResponse.clearcoatRoughnessFactor]:finish==='HistoricalKhakiOliveCandidate'?[.18,.22]:[.45,.08];
+for(const name of ['Material_IsuzuPaint','Material_IsuzuWheelPaint']){const coat=g.materials.find(m=>m.name===name)?.extensions?.KHR_materials_clearcoat;checks.push({name:'Current declared enamel profile clearcoat: '+name,passed:Math.abs((coat?.clearcoatFactor||0)-coatTarget[0])<1e-5&&Math.abs((coat?.clearcoatRoughnessFactor||0)-coatTarget[1])<1e-5,expected:{finish:finish||'LegacyMuseumGloss',clearcoatFactor:coatTarget[0],clearcoatRoughnessFactor:coatTarget[1]},actual:coat});}
+checks.push({name:'Body and wheel enamel coats retain the same physical normal map as their paint base',passed:[bodyPaint,wheel].every(m=>sameTexture(m?.normalTexture,m?.extensions?.KHR_materials_clearcoat?.clearcoatNormalTexture)),actual:[bodyPaint,wheel].map(m=>({name:m?.name,baseNormal:TextureIdentity(m?.normalTexture),coatNormal:TextureIdentity(m?.extensions?.KHR_materials_clearcoat?.clearcoatNormalTexture)}))});
+checks.push({name:'Enamel clearcoat roughness follows the authored paint ORM instead of a uniform gloss layer',passed:enamelResponse?.clearcoatRoughnessUsesPaintOrm===true&&[bodyPaint,wheel].every(m=>sameTexture(m?.pbrMetallicRoughness?.metallicRoughnessTexture,m?.extensions?.KHR_materials_clearcoat?.clearcoatRoughnessTexture)),actual:[bodyPaint,wheel].map(m=>({name:m?.name,paintRoughness:TextureIdentity(m?.pbrMetallicRoughness?.metallicRoughnessTexture),coatRoughness:TextureIdentity(m?.extensions?.KHR_materials_clearcoat?.clearcoatRoughnessTexture)}))});
+const serviceProfile=JSON.parse(g.nodes.find(n=>n.name==='IsuzuType94Truck')?.extras?.ServiceWeatheringJson||'null'),dirtScene=new PoseScene(glb);dirtScene.Apply(0,0);
+const dirtRows=[],dirtBuckets={paintUpper:[],paintLower:[],canvasRoof:[],canvasHem:[]},clothReds={},clothPartNames=g.nodes.find(n=>n.name==='IsuzuType94Truck').extras.SourcePartNames;
+for(let i=0;i<dirtScene.nodes.length;i++){
+ const node=dirtScene.nodes[i];if(node.mesh===undefined)continue;const matrix=dirtScene.world[i];
+ for(const primitive of g.meshes[node.mesh].primitives){
+  const material=g.materials[primitive.material]?.name;if(!/^Material_Isuzu(?:Paint|WheelPaint|Canvas|Wood|Rubber|Chassis|Steel|AbradedSteel)$/.test(material))continue;
+  const position=ReadAccessor(glb,primitive.attributes.POSITION).data,info=primitive.attributes.COLOR_0===undefined?null:ReadAccessor(glb,primitive.attributes.COLOR_0),color=info?.data,clothIds=material==='Material_IsuzuCanvas'?ReadAccessor(glb,primitive.attributes._SOURCE_PART_ID).data:null;
+  let valid=!!color&&color.length===position.length/3*4,minimum=1,maximum=0;
+  if(valid)for(let k=0;k<color.length;k+=4){for(let j=0;j<3;j++){valid&&=Number.isFinite(color[k+j])&&color[k+j]>=0&&color[k+j]<=1;minimum=Math.min(minimum,color[k+j]);maximum=Math.max(maximum,color[k+j])}valid&&=Math.abs(color[k+3]-1)<1e-6;
+   const p=k/4*3,z=matrix[1]*position[p]+matrix[5]*position[p+1]+matrix[9]*position[p+2]+matrix[13];
+   if(material==='Material_IsuzuPaint'){if(z>1.8)dirtBuckets.paintUpper.push(color[k]);if(z<.95)dirtBuckets.paintLower.push(color[k])}
+   if(material==='Material_IsuzuCanvas'){if(z>2.65)dirtBuckets.canvasRoof.push(color[k]);if(z<1.65)dirtBuckets.canvasHem.push(color[k]);const part=clothPartNames[Math.round(clothIds[k/4])];(clothReds[part]??=[]).push(color[k]);}
+  }
+  dirtRows.push({node:node.name,material,valid,minimum,maximum,vertices:position.length/3});
+ }
+}
+checks.push({name:'Every weathered primitive exports complete finite linear RGBA vertex albedo',passed:serviceProfile?.version===80&&dirtRows.length>50&&dirtRows.every(r=>r.valid)&&dirtRows.some(r=>r.maximum-r.minimum>.1),actual:{profile:serviceProfile,primitives:dirtRows}});
+const Mean=a=>a.reduce((s,v)=>s+v,0)/a.length,bucketMeans=Object.fromEntries(Object.entries(dirtBuckets).map(([n,v])=>[n,{samples:v.length,mean:Mean(v)}]));
+checks.push({name:'Actual service dirt is stronger on lower body and canvas hem than upper surfaces',passed:Object.values(bucketMeans).every(b=>b.samples>20&&Number.isFinite(b.mean))&&bucketMeans.paintUpper.mean-bucketMeans.paintLower.mean>.05&&bucketMeans.canvasRoof.mean-bucketMeans.canvasHem.mean>.05,actual:bucketMeans});
+const mainCloth=(clothReds.Canvas_MainCover||[]).sort((a,b)=>a-b),clothSpread=mainCloth.length?mainCloth[Math.floor(mainCloth.length*.95)]-mainCloth[Math.floor(mainCloth.length*.05)]:0;
+const canvasMaterial=g.materials.find(m=>m.name==='Material_IsuzuCanvas'),canvasImage=g.images[TextureIdentity(canvasMaterial.pbrMetallicRoughness.metallicRoughnessTexture).image],canvasView=g.bufferViews[canvasImage.bufferView],canvasPixels=await sharp(glb.bin.subarray(canvasView.byteOffset??0,(canvasView.byteOffset??0)+canvasView.byteLength)).removeAlpha().raw().toBuffer();let clothRoughness=0,clothMetal=0;
+const canvasBaseInfo=TextureIdentity(canvasMaterial.pbrMetallicRoughness.baseColorTexture),canvasNormalInfo=TextureIdentity(canvasMaterial.normalTexture),canvasOrmInfo=TextureIdentity(canvasMaterial.pbrMetallicRoughness.metallicRoughnessTexture),canvasBaseImage=g.images[canvasBaseInfo.image],canvasBaseView=g.bufferViews[canvasBaseImage.bufferView],canvasBasePixels=await sharp(glb.bin.subarray(canvasBaseView.byteOffset??0,(canvasBaseView.byteOffset??0)+canvasBaseView.byteLength)).removeAlpha().raw().toBuffer(),clothLuma=[];
+for(let i=0;i<canvasBasePixels.length;i+=3)clothLuma.push(.2126*canvasBasePixels[i]+.7152*canvasBasePixels[i+1]+.0722*canvasBasePixels[i+2]);clothLuma.sort((a,b)=>a-b);const clothTextureSpread=clothLuma[Math.floor(clothLuma.length*.95)]-clothLuma[Math.floor(clothLuma.length*.05)];
+checks.push({name:'Main canvas combines restrained macro age marks and lower-hem dirt instead of a uniform tint or coarse overcontrast',passed:mainCloth.length>1000&&clothSpread>.15&&clothTextureSpread>15&&clothTextureSpread<35,actual:{samples:mainCloth.length,redMultiplierP95MinusP05:clothSpread,textureSrgbLumaP95MinusP05:clothTextureSpread,scope:'Age-only macro pigment/soil texture plus linear regional dirt;fine fibres remain in4cm Normal. Range describes the reviewed artistic target,not measured historical age;rendered review remains required'}});
+const canvasStudy=g.nodes.find(n=>n.name==='IsuzuType94Truck')?.extras;
+checks.push({name:'Canvas uses the reviewed age-only macro source without oversized woven-grid albedo',passed:canvasStudy?.CanvasMacroSourceSha256==='0a809765bf95c43bd8f01833464d54ad7746945afded4db617f599beeb5bcef6'&&JSON.parse(canvasStudy?.CanvasSurfaceStudyJson||'null')?.version===79,actual:{sourceSha256:canvasStudy?.CanvasMacroSourceSha256,study:JSON.parse(canvasStudy?.CanvasSurfaceStudyJson||'null'),scope:'Source identity and provenance;visual absence of coarse grid is reviewed in actual rendered closeups,not inferred from this hash'}});
+const macroScale=info=>info.transform?.scale?.every(v=>Math.abs(v-.016)<1e-6),normalScale=canvasNormalInfo.transform?.scale||[1,1];
+checks.push({name:'Canvas macro Base and ORM use2.5m scale while cotton Normal keeps4cm scale',passed:macroScale(canvasBaseInfo)&&macroScale(canvasOrmInfo)&&normalScale.every(v=>Math.abs(v-1)<1e-6)&&JSON.stringify(canvasBaseInfo.transform)===JSON.stringify(canvasOrmInfo.transform),actual:{base:canvasBaseInfo.transform,orm:canvasOrmInfo.transform,normal:canvasNormalInfo.transform,coordinateBasisM:.04}});
+for(let i=0;i<canvasPixels.length;i+=3){clothRoughness+=canvasPixels[i+1]/255;clothMetal=Math.max(clothMetal,canvasPixels[i+2])}clothRoughness/=canvasPixels.length/3;
+checks.push({name:'Worn heavy cotton remains dry rough and nonconductive in exported ORM',passed:clothRoughness>.90&&clothMetal===0,actual:{meanRoughness:clothRoughness,maximumMetallicByte:clothMetal}});
+const abrasionIndex=g.materials.findIndex(m=>m.name==='Material_IsuzuAbradedSteel'),abrasion=g.materials[abrasionIndex],partNames=g.nodes.find(n=>n.name==='IsuzuType94Truck').extras.SourcePartNames,abrasionParts=new Set();let abrasionTriangles=0;
+for(const mesh of g.meshes)for(const primitive of mesh.primitives)if(primitive.material===abrasionIndex){const ids=ReadAccessor(glb,primitive.attributes._SOURCE_PART_ID).data,indices=ReadAccessorInt(glb,primitive.indices).data;abrasionTriangles+=indices.length/3;for(const i of indices)abrasionParts.add(partNames[Math.round(ids[i])]);}
+checks.push({name:'Actual rubbed steel is confined to36contact patches and both existing rolled wing lips',passed:abrasionParts.size===38&&[...abrasionParts].every(n=>n.startsWith('Wear_')||n.startsWith('FrontFender_RolledLip'))&&abrasionTriangles===188&&Math.abs((abrasion?.pbrMetallicRoughness?.roughnessFactor??0)-.45)<1e-5&&(abrasion?.pbrMetallicRoughness?.metallicFactor??1)===1,actual:{parts:[...abrasionParts],triangles:abrasionTriangles,pbr:abrasion?.pbrMetallicRoughness}});
+const lipRustIndex=g.materials.findIndex(m=>m.name==='Material_IsuzuLipRust'),lipRust=g.materials[lipRustIndex],lipRustParts=new Set();let lipRustTriangles=0;
+for(const mesh of g.meshes)for(const primitive of mesh.primitives)if(primitive.material===lipRustIndex){const ids=ReadAccessor(glb,primitive.attributes._SOURCE_PART_ID).data,indices=ReadAccessorInt(glb,primitive.indices).data;lipRustTriangles+=indices.length/3;for(const i of indices)lipRustParts.add(partNames[Math.round(ids[i])]);}
+const lipMaps=[lipRust?.pbrMetallicRoughness?.baseColorTexture,lipRust?.normalTexture,lipRust?.pbrMetallicRoughness?.metallicRoughnessTexture,lipRust?.occlusionTexture].map(TextureIdentity);
+checks.push({name:'Localized lip corrosion stays on16existing wing triangles with correct20cm oxide scale',passed:lipRustParts.size===2&&[...lipRustParts].every(n=>n.startsWith('FrontFender_RolledLip'))&&lipRustTriangles===16&&lipMaps.every(t=>t?.transform?.scale?.every(v=>Math.abs(v-3.75)<1e-6)&&Math.abs((t.transform.offset?.[1]??0)+2.75)<1e-6),actual:{parts:[...lipRustParts],triangles:lipRustTriangles,maps:lipMaps}});
+const rustMaterial=g.materials.find(m=>m.name==='Material_IsuzuRust'),rustBase=g.images[TextureIdentity(rustMaterial.pbrMetallicRoughness.baseColorTexture).image],rustBaseView=g.bufferViews[rustBase.bufferView],rustBasePixels=await sharp(glb.bin.subarray(rustBaseView.byteOffset??0,(rustBaseView.byteOffset??0)+rustBaseView.byteLength)).removeAlpha().raw().toBuffer(),rustOrm=g.images[TextureIdentity(rustMaterial.pbrMetallicRoughness.metallicRoughnessTexture).image],rustOrmView=g.bufferViews[rustOrm.bufferView],rustOrmPixels=await sharp(glb.bin.subarray(rustOrmView.byteOffset??0,(rustOrmView.byteOffset??0)+rustOrmView.byteLength)).removeAlpha().raw().toBuffer(),rustMean=[0,0,0];let rustMetalMaximum=0;
+for(let i=0;i<rustBasePixels.length;i+=3)for(let c=0;c<3;c++)rustMean[c]+=rustBasePixels[i+c];for(let c=0;c<3;c++)rustMean[c]/=rustBasePixels.length/3;for(let i=2;i<rustOrmPixels.length;i+=3)rustMetalMaximum=Math.max(rustMetalMaximum,rustOrmPixels[i]);
+checks.push({name:'Visible local oxide is warm brown and nonconductive independently of intact paint',passed:rustMean[0]>90&&rustMean[0]<120&&rustMean[0]>1.6*rustMean[1]&&rustMean[1]>1.6*rustMean[2]&&rustMetalMaximum===0,actual:{meanRustSrgb8:rustMean,maximumMetallicByte:rustMetalMaximum,scope:'Authored visible service corrosion,not measured historic oxidation'}});
+const paintOrmImage=g.images[TextureIdentity(bodyPaint.pbrMetallicRoughness.metallicRoughnessTexture).image],paintOrmView=g.bufferViews[paintOrmImage.bufferView],paintPixels=await sharp(glb.bin.subarray(paintOrmView.byteOffset??0,(paintOrmView.byteOffset??0)+paintOrmView.byteLength)).removeAlpha().raw().toBuffer();let exposed=0,core=0,coreRoughness=0,intact=0,intactRoughness=0;
+for(let i=0;i<paintPixels.length;i+=3){const green=paintPixels[i+1]/255,blue=paintPixels[i+2]/255;if(blue>.5)exposed++;if(blue>.9){core++;coreRoughness+=green}if(blue<.05){intact++;intactRoughness+=green}}
+let paintVariance=0;const paintMean=intactRoughness/intact;
+for(let i=0;i<paintPixels.length;i+=3)if(paintPixels[i+2]/255<.05)paintVariance+=(paintPixels[i+1]/255-paintMean)**2;
+const metalResponse={exposedPercent:exposed/(paintPixels.length/3)*100,corePixels:core,coreMeanRoughness:core?coreRoughness/core:null,intactMeanRoughness:paintMean,intactRoughnessStd:Math.sqrt(paintVariance/intact)};
+checks.push({name:'Continuous enamel is dielectric with coherent satin roughness; exposed contact steel stays separate',passed:metalResponse.exposedPercent===0&&core===0&&metalResponse.intactMeanRoughness>.32&&metalResponse.intactMeanRoughness<.42&&metalResponse.intactRoughnessStd<.012&&enamelResponse?.contactSteelUsesSeparateMaterial===true,actual:metalResponse});
+const paintBaseImage=g.images[TextureIdentity(bodyPaint.pbrMetallicRoughness.baseColorTexture).image],paintBaseView=g.bufferViews[paintBaseImage.bufferView],paintBasePixels=await sharp(glb.bin.subarray(paintBaseView.byteOffset??0,(paintBaseView.byteOffset??0)+paintBaseView.byteLength)).removeAlpha().raw().toBuffer(),pigmentMean=[0,0,0],pigmentLuma=[];
+for(let i=0;i<paintBasePixels.length;i+=3){for(let c=0;c<3;c++)pigmentMean[c]+=paintBasePixels[i+c];pigmentLuma.push(.2126*paintBasePixels[i]+.7152*paintBasePixels[i+1]+.0722*paintBasePixels[i+2])}
+for(let c=0;c<3;c++)pigmentMean[c]/=paintBasePixels.length/3;pigmentLuma.sort((a,b)=>a-b);const pigmentSpread=pigmentLuma[Math.floor(pigmentLuma.length*.95)]-pigmentLuma[Math.floor(pigmentLuma.length*.05)];
+checks.push({name:'Continuous paint retains the selected median pigment without repeating cloud blotches',passed:pigmentMean.every((v,i)=>Math.abs(v-[123,122,92][i])<1)&&pigmentSpread<2,actual:{meanSrgb8:pigmentMean,lumaP95MinusP05:pigmentSpread,scope:'Continuous coating texture only;localized contact wear and lower-body dirt are separately retained;rendered review still required'}});
+// Geometry may be round while its regenerated UVs jump to another projection.
+// Compare actual exported rim/collar corners with the independently exported high
+// source, then require every new triangle to retain one physical UV projection.
+function RimCorners(input,high){
+ const scene=new PoseScene(input);scene.Apply(0,0);const names=input.json.nodes.find(n=>n.name==='IsuzuType94Truck').extras.SourcePartNames,parts={};
+ for(let i=0;i<scene.nodes.length;i++){const node=scene.nodes[i];if(node.mesh===undefined)continue;const m=scene.world[i];
+  for(const primitive of input.json.meshes[node.mesh].primitives){const p=ReadAccessor(input,primitive.attributes.POSITION).data,n=ReadAccessor(input,primitive.attributes.NORMAL).data,uv=ReadAccessor(input,primitive.attributes.TEXCOORD_0).data,ids=high?null:ReadAccessor(input,primitive.attributes._SOURCE_PART_ID).data,index=ReadAccessorInt(input,primitive.indices).data;
+   for(let t=0;t<index.length;t+=3){const name=high?node.name:names[Math.round(ids[index[t]])];if(!/^(Wheel_(Front|Rear[12])(Left|Right)|SpareWheel)_Rim$/.test(name)&&!/^Wheel_(Front|Rear[12])(Left|Right)_InnerDisc$/.test(name))continue;const face=[];
+    for(const j of index.slice(t,t+3)){const point=[m[0]*p[j*3]+m[4]*p[j*3+1]+m[8]*p[j*3+2]+m[12],m[1]*p[j*3]+m[5]*p[j*3+1]+m[9]*p[j*3+2]+m[13],m[2]*p[j*3]+m[6]*p[j*3+1]+m[10]*p[j*3+2]+m[14]],normal=[m[0]*n[j*3]+m[4]*n[j*3+1]+m[8]*n[j*3+2],m[1]*n[j*3]+m[5]*n[j*3+1]+m[9]*n[j*3+2],m[2]*n[j*3]+m[6]*n[j*3+1]+m[10]*n[j*3+2]],length=Math.hypot(...normal);face.push({point,normal:normal.map(v=>v/length),uv:[uv[j*2],uv[j*2+1]]});}
+    (parts[name]??=[]).push(face);
+   }
+  }
+ }
+ return parts;
+}
+const highRims=RimCorners(LoadGlb(path.join(path.dirname(source),'Exports/Model_IsuzuType94TruckHigh.glb')),true),runtimeRims=RimCorners(glb,false);
+if(Object.keys(highRims).length!==13||Object.keys(runtimeRims).length!==13)throw new Error('Seven source/runtime rims and six collars required for surface comparison');
+for(const [name,faces]of Object.entries(runtimeRims)){
+ const bins=new Map(),Key=a=>a.join(',');for(const r of highRims[name].flat()){const key=Key(r.point.map(v=>Math.round(v*1e6)));(bins.get(key)||bins.set(key,[]).get(key)).push(r)}
+ let missing=0,maxDistance=0,maxNormal=0,maxUv=0,maxProjection=0;
+ for(const face of faces){
+  for(const r of face){const base=r.point.map(v=>Math.round(v*1e6)),near=[];for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++)for(const s of bins.get(Key([base[0]+x,base[1]+y,base[2]+z]))||[])if(Math.hypot(...r.point.map((v,k)=>v-s.point[k]))<1e-6)near.push(s);
+   if(!near.length){missing++;continue}maxDistance=Math.max(maxDistance,Math.min(...near.map(s=>Math.hypot(...r.point.map((v,k)=>v-s.point[k])))));maxNormal=Math.max(maxNormal,Math.min(...near.map(s=>Math.acos(Math.max(-1,Math.min(1,r.normal.reduce((sum,v,k)=>sum+v*s.normal[k],0))))*180/Math.PI)));maxUv=Math.max(maxUv,Math.min(...near.map(s=>Math.max(...r.uv.map((v,k)=>Math.abs(v-s.uv[k]))))));
+  }
+  const errors=[0,0,0];for(const r of face){const [x,z,minusY]=r.point,y=-minusY,projections=[[y/.75,1-z/.75],[x/.75,1-z/.75],[x/.75,1-y/.75]];for(let axis=0;axis<3;axis++)errors[axis]=Math.max(errors[axis],...r.uv.map((v,k)=>Math.abs(v-projections[axis][k])))}maxProjection=Math.max(maxProjection,Math.min(...errors));
+ }
+ const collar=name.endsWith('_InnerDisc'),actual={triangles:faces.length,missingSourceCorners:missing,maximumSourceSampleDistanceM:maxDistance,maximumSourceNormalErrorDegrees:maxNormal,maximumSourceUvError:maxUv,maximumSingleProjectionUvError:maxProjection};checks.push({name:'Actual analytical '+(collar?'collar':'rim')+' corners retain high-source normals UVs and physical projection: '+name,passed:faces.length===(collar?64:416)&&!missing&&maxDistance<1e-6&&maxNormal<.05&&maxUv<1e-5&&maxProjection<1e-5,actual});
+}
+const primary=JSON.parse(await fs.readFile(path.join(root,'Taierzhuang1938/Model/IsuzuType94Truck/Data_PrimaryReferenceFit.json'),'utf8')),camera=g.nodes.find(n=>n.name==='IsuzuType94Truck').extras,referenceScene=new PoseScene(glb),steerClip=referenceScene.AnimationIndex('SteerLeft');
+if(steerClip<0)throw new Error('Primary tyre-arc comparison requires actual exported steering animation');
+referenceScene.Apply(steerClip,referenceScene.animations[steerClip].duration*primary.referenceSteerInnerDegrees/26);
+const Unit=a=>{const length=Math.hypot(...a);return a.map(v=>v/length)},Dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0),Cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],c=camera.PrimaryCameraLocationBlender,f=Unit(camera.PrimaryCameraTargetBlender.map((v,i)=>v-c[i])),r0=Unit(Cross(f,[0,0,1])),u0=Cross(r0,f),roll=camera.PrimaryCameraRollDegrees*Math.PI/180,r=r0.map((v,i)=>Math.cos(roll)*v+Math.sin(roll)*u0[i]),u=u0.map((v,i)=>-Math.sin(roll)*r0[i]+Math.cos(roll)*v),focal=camera.PrimaryCameraLensMm*600/36,pp=camera.PrimaryCameraPrincipalPointPixels,clouds={};
+for(let i=0;i<referenceScene.nodes.length;i++){const node=referenceScene.nodes[i];if(node.mesh===undefined)continue;const m=referenceScene.world[i];for(const primitive of g.meshes[node.mesh].primitives){const p=ReadAccessor(glb,primitive.attributes.POSITION).data,ids=ReadAccessor(glb,primitive.attributes._SOURCE_PART_ID).data,index=ReadAccessorInt(glb,primitive.indices).data;for(const j of new Set(index)){const name=camera.SourcePartNames[Math.round(ids[j])],match=/^(Wheel_(Front|Rear[12])(Left|Right))_(Tyre|TreadLugs)$/.exec(name);if(!match)continue;const point=[m[0]*p[j*3]+m[4]*p[j*3+1]+m[8]*p[j*3+2]+m[12],-(m[2]*p[j*3]+m[6]*p[j*3+1]+m[10]*p[j*3+2]+m[14]),m[1]*p[j*3]+m[5]*p[j*3+1]+m[9]*p[j*3+2]+m[13]],a=point.map((v,i)=>v-c[i]),z=Dot(a,f);(clouds[match[1]]??=[]).push([pp[0]+focal*Dot(a,r)/z,pp[1]-focal*Dot(a,u)/z]);}}}
+function ConvexHull(points){const p=points.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]),lo=[],hi=[],cross=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);for(const v of p){while(lo.length>1&&cross(lo.at(-2),lo.at(-1),v)<=0)lo.pop();lo.push(v)}for(const v of p.reverse()){while(hi.length>1&&cross(hi.at(-2),hi.at(-1),v)<=0)hi.pop();hi.push(v)}return lo.slice(0,-1).concat(hi.slice(0,-1))}
+const hulls=Object.fromEntries(Object.entries(clouds).map(([n,p])=>[n,ConvexHull(p)])),arcRows=primary.visibleWheelArcs.map(observed=>{const hull=hulls[observed.wheel],xs=[];for(let i=0;i<hull.length;i++){const a=hull[i],b=hull[(i+1)%hull.length];if(observed.y>=Math.min(a[1],b[1])&&observed.y<=Math.max(a[1],b[1])&&Math.abs(b[1]-a[1])>1e-9)xs.push(a[0]+(observed.y-a[1])*(b[0]-a[0])/(b[1]-a[1]))}const actual=xs.length?(observed.side==='R'?Math.max(...xs):Math.min(...xs)):1e6,error=actual-observed.x;return{...observed,actualX:actual,errorPx:error,normalizedError:error/observed.uncertaintyPx}}),rms=Math.sqrt(arcRows.reduce((s,r)=>s+r.normalizedError*r.normalizedError,0)/arcRows.length),maximum=Math.max(...arcRows.map(r=>Math.abs(r.normalizedError))),poseMatches=Math.abs((camera.PrimaryReferenceSteerInnerDegrees??0)-primary.referenceSteerInnerDegrees)<1e-6;
+checks.push({name:'Actual reference steering tyre arcs agree with declared primary-photo uncertainty',passed:poseMatches&&arcRows.length===18&&rms<primary.acceptanceCriteria.maximumNormalizedRms&&maximum<primary.acceptanceCriteria.maximumNormalizedError,actual:{referenceSteerInnerDegrees:primary.referenceSteerInnerDegrees,poseDeclarationMatches:poseMatches,normalizedRms:rms,maximumNormalizedError:maximum,rows:arcRows,scope:'Visible convex tyre arcs only; axle shadows,road lines,hidden caps and ambiguous blobs excluded. Does not establish camera calibration or whole-reference acceptance.'}});
+const hemRecipe=primary.primaryCanvasHem;
+if(!hemRecipe)throw new Error('Primary cloth/cargo boundary observations are required');
+const hemFaces=[],ProjectHem=point=>{const a=point.map((v,i)=>v-c[i]),z=Dot(a,f);return[pp[0]+focal*Dot(a,r)/z,pp[1]-focal*Dot(a,u)/z]};
+for(let i=0;i<referenceScene.nodes.length;i++){
+ const node=referenceScene.nodes[i];if(node.mesh===undefined)continue;const m=referenceScene.world[i];
+ for(const primitive of g.meshes[node.mesh].primitives){const p=ReadAccessor(glb,primitive.attributes.POSITION).data,ids=ReadAccessor(glb,primitive.attributes._SOURCE_PART_ID).data,index=ReadAccessorInt(glb,primitive.indices).data;
+  for(let j=0;j<index.length;j+=3){if(camera.SourcePartNames[Math.round(ids[index[j]])]!==hemRecipe.part)continue;hemFaces.push(Array.from(index.slice(j,j+3),k=>ProjectHem([m[0]*p[k*3]+m[4]*p[k*3+1]+m[8]*p[k*3+2]+m[12],-(m[2]*p[k*3]+m[6]*p[k*3+1]+m[10]*p[k*3+2]+m[14]),m[1]*p[k*3]+m[5]*p[k*3+1]+m[9]*p[k*3+2]+m[13]])))}
+ }
+}
+const hemRows=hemRecipe.visiblePoints.map(observed=>{const ys=[];for(const face of hemFaces)for(let i=0;i<3;i++){const a=face[i],b=face[(i+1)%3];if(Math.abs(a[0]-b[0])>1e-10&&observed.x>=Math.min(a[0],b[0])&&observed.x<=Math.max(a[0],b[0]))ys.push(a[1]+(observed.x-a[0])*(b[1]-a[1])/(b[0]-a[0]))}const actual=ys.length?(Math.min(...ys)+Math.max(...ys))/2:1e6,error=actual-observed.y;return{...observed,actualY:actual,errorPx:error,normalizedError:error/observed.uncertaintyPx}}),hemRms=Math.sqrt(hemRows.reduce((sum,r)=>sum+r.normalizedError*r.normalizedError,0)/hemRows.length),hemMaximum=Math.max(...hemRows.map(r=>Math.abs(r.normalizedError))),hemDeclaration=hemRecipe.referenceSha256===primary.primaryReference.sha256&&camera.PrimaryCanvasHemLiftRearForeM?.every((v,i)=>Math.abs(v-hemRecipe.reconstructedLiftRearForeM[i])<1e-6)&&camera.CanvasLowerOverlapFrontDropM===0;
+checks.push({name:'Actual lower cloth boundary agrees with primary-photo visible rows',passed:hemDeclaration&&hemRows.length===6&&hemRms<hemRecipe.acceptanceCriteria.maximumNormalizedRms&&hemMaximum<hemRecipe.acceptanceCriteria.maximumNormalizedError,actual:{declarationMatches:!!hemDeclaration,normalizedRms:hemRms,maximumNormalizedError:hemMaximum,rows:hemRows,scope:'Actual near hem tube centre at six visible cloth/cargo boundary columns. Mid-bay folds and spare-occluded rows excluded;3..4pxidentity/edge uncertainty. Does not establish full cloth or whole-reference acceptance.'}});
+const report={sha256:Hash(glb.buffer),checks,failed:checks.filter(c=>!c.passed),establishesVisualAcceptance:false};
+await fs.writeFile(path.join(root,'tmp/IsuzuType94Truck/Data_SurfaceSourceAudit.json'),JSON.stringify(report,null,2));
+console.log(JSON.stringify({sha256:report.sha256,checks:checks.length,failed:report.failed.map(c=>({name:c.name,actual:c.actual}))}));
+if(report.failed.length)process.exitCode=1;

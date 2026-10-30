@@ -679,5 +679,26 @@ const mouth=Center(hanYangMouth),butt=Center(hanYangButt);
 Check(hanYangMouth.length>20&&hanYangButt.length>20&&mouth[2]<-.99&&butt[2]>.23
   &&Math.abs(mouth[0])<.001&&mouth[1]>.03&&mouth[1]<.05,
   'HanYang173R 真实枪口与托底点云确认米制、Y-up、枪口-Z',JSON.stringify({mouth,butt}));
+{
+const truckFile=path.join(projectDir,"Model/IsuzuType94Truck/Model_IsuzuType94Truck.glb");
+const truck=LoadGlb(truckFile),truckSpec=JSON.parse(fs.readFileSync(path.join(projectDir,"Model/IsuzuType94Truck/Data_IsuzuType94Truck.json"),"utf8"));
+const truckCloud=GlbPoints(truckFile),truckLamps=GlbPoints(truckFile,"IsuzuType94Truck_LampGlass"),truckTail=GlbPoints(truckFile,"Tailgate_Wood");
+const truckTriangles=truck.json.meshes.flatMap(m=>m.primitives).reduce((sum,p)=>sum+truck.json.accessors[p.indices].count/3,0);
+Check(truckLamps.length>500&&truckTail.length>20&&truckLamps.reduce((sum,p)=>sum+p[2],0)/truckLamps.length< -1.5&&truckTail.reduce((sum,p)=>sum+p[2],0)/truckTail.length>2.5,
+ "九四式货车实际车灯顶点云在 -Z、尾板顶点云在 +Z");
+const truckMin=[0,1,2].map(axis=>truckCloud.reduce((value,p)=>Math.min(value,p[axis]),Infinity)),truckMax=[0,1,2].map(axis=>truckCloud.reduce((value,p)=>Math.max(value,p[axis]),-Infinity));
+Check(Math.abs(truckMin[1])<.0002&&Math.abs(truckMax[2]-truckMin[2]-5.400)<.003&&truckSpec.facingAxis==="-Z"&&truckSpec.upAxis==="+Y"&&truckSpec.photographicBodyM?.nominalLengthConflict===false&&truckSpec.factoryAnchorsM.length===5.4,
+ "九四式货车米制 Y-up、轮底零高；实际完整长匹配原厂标称5.400m",truckMin.map((v,i)=>(truckMax[i]-v).toFixed(5)).join(" / "));
+Check(truckTriangles===truckSpec.geometry.runtimeTriangles&&truckTriangles<=80000,"九四式货车完整派生版在 80k 内，源工程独立保留",String(truckTriangles));
+Check(["Drive2M","DoorsOpen","BonnetOpen","TailgateOpen","SteerLeft"].every(name=>truck.json.animations.some(a=>a.name===name))&&truck.json.images.length===24,
+ "九四式货车五条必要验收动画与24张PBR图齐备");
+const truckParents=new Map();truck.json.nodes.forEach((node,i)=>(node.children||[]).forEach(child=>truckParents.set(child,i)));
+function TruckWorld(i){const local=NodeMatrix(truck.json.nodes[i]);return truckParents.has(i)?Mat4Mul(TruckWorld(truckParents.get(i)),local):local}
+const TruckHub=name=>TruckWorld(truck.json.nodes.findIndex(n=>n.name===name));
+const frontLeft=TruckHub("Wheel_FrontLeft"),frontRight=TruckHub("Wheel_FrontRight"),rearOne=TruckHub("Wheel_Rear1Left"),rearTwo=TruckHub("Wheel_Rear2Left");
+Check(Math.abs(frontRight[12]-frontLeft[12]-1.5)<.00001&&Math.abs(rearOne[14]-frontLeft[14]-2.8)<.00001&&Math.abs(rearTwo[14]-rearOne[14]-1.1)<.00001,
+ "九四式货车真实轮轴节点保持1.5m前轮距、2.8+1.1m轴距");
+}
+
 if (failed) { console.log(`FAIL ModelFacingTest: ${failed} 项`); process.exit(1); }
 console.log("PASS ModelFacingTest: 飞机/战车朝向及独立布料米制/绑定方向均通过几何复量");

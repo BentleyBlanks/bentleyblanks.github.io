@@ -1,0 +1,58 @@
+{
+  "version": "20261026MaterialV41Candidate",
+  "runtimeSha256": "4c15e762d3e60bddf17dfc0396fa779092eba9ad47124b2ba927fc41f874dc56",
+  "palette": {
+    "confirmedByUser": true,
+    "scope": "Low-saturation khaki-olive palette direction only",
+    "wholeModelApproval": false,
+    "exactHistoricalColourProven": false
+  },
+  "canvasSource": {
+    "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\IsuzuType94Truck\\References\\Texture_IsuzuCanvasWeaveSourceV41.png",
+    "sha256": "6f0f43be8544e8e9ff418791c7fbbac4db24f2edbaf6b669dc95832d6a056707",
+    "generator": "built-in imagegen",
+    "date": "2026-10-26",
+    "promptFile": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\IsuzuType94Truck\\References\\Data_ImagegenCanvasPromptV41.txt",
+    "tileM": 0.04,
+    "nominalYarnPitchM": 0.0006,
+    "heightRmsM": 0.000043772541267679434,
+    "heightPeakToPeakM": 0.00020445729744399165,
+    "sourceScaleAndReliefAreAuthored": true,
+    "baseToneMetrics": {
+      "meanSrgb": [
+        0.3842,
+        0.3803,
+        0.3058
+      ],
+      "luma": 0.3568,
+      "lumaStd": 0.0109,
+      "sat": 0.2041,
+      "clipLow": 0,
+      "clipHigh": 0,
+      "lowFreq": 0
+    },
+    "baseTileMetrics": {
+      "seam": 0,
+      "interior": 0.0031,
+      "seamRatio": 0,
+      "border": 0.841,
+      "swing": 0.0024
+    }
+  },
+  "mainCoverUv": {
+    "centreZM": 1.9,
+    "radiusM": 0.82
+  },
+  "yarnPitchVariesGentlyWithCurvature": true,
+  "paintMicrorelief": "Authored isotropic enamel peel, approximately5micrometres RMS; source board guides response, not historical paint measurements",
+  "methods": {
+    "canvas": "Shared Script_BakePbrTexture.py helpers: periodic low-frequency flatten, edge weld, bandpass microrelief, restrained local albedo;40mm UV period projected after runtime modifiers, continuous cylindrical projection on main cover",
+    "paint": "Deterministic isotropic microrelief,5micrometres RMS, roughness0.38; clearcoat0.18/0.22 retained"
+  },
+  "prompt": "Data_CanvasWeavePromptV41.txt",
+  "sourceMaps": 24,
+  "changedMaps": 6,
+  "unchangedMaps": 18,
+  "wholeModelAccepted": false,
+  "localOnly": true
+}

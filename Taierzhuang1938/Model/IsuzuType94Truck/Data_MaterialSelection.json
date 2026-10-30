@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "profile": "HistoricalKhakiOliveCandidate",
+  "confirmedByUser": true,
+  "confirmedDate": "2026-10-25",
+  "confirmedScope": "Low-saturation khaki-olive palette direction only",
+  "userChoice": "低饱和卡其橄榄色（历史复原方向，推荐）",
+  "historicalExactColourProven": false,
+  "wholeModelApproved": false,
+  "note": "This sidecar records the later human palette decision. Older GLB extras describe bake-time state; they do not override this selection or approve geometry, texture quality or an exact historical colour chip."
+}
