@@ -1592,7 +1592,7 @@ await Step(8);
 const props = await page.evaluate(() => {
   const T = window.Taierzhuang;
   const active = T.editor.active;
-  active.SetPalette("Barricade");
+  active.SetPalette("SandbagPlug");
   const SetSlider = (control, value) => {
     const input = control.root.querySelector("input");
     input.value = String(value);
@@ -1618,7 +1618,7 @@ const props = await page.evaluate(() => {
   };
 });
 Check("构件库用独立摄影棚预览正片构件",
-  props.id === "props" && props.studio && props.selected === "Barricade"
+  props.id === "props" && props.studio && props.selected === "SandbagPlug"
     && props.loaded && props.meshes > 0, JSON.stringify(props));
 Check("构件库预览器不混入关卡布设或地形面板",
   props.sections.includes("全部可布设构件") && props.sections.includes("预览相机")
@@ -1676,13 +1676,9 @@ for (const spec of [
   });
 }
 
-await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  active.SetPalette("RoomBlock");
-  active.SetDamageState("original");
-});
+await page.evaluate(() => window.Taierzhuang.editor.active.SetPalette("RoomBlock"));
 await Step(2);
-const damageOriginal = await page.evaluate(() => {
+const roomBlockPreview = await page.evaluate(() => {
   const active = window.Taierzhuang.editor.active;
   const textures = [];
   active.previewRoot.traverse((node) => {
@@ -1690,216 +1686,18 @@ const damageOriginal = await page.evaluate(() => {
     if (src) textures.push(src);
   });
   return {
-    state: active.preview?.damageState,
-    facts: active.facts.root.textContent,
+    loaded: active.preview?.loaded,
+    meshes: active.preview?.meshes || 0,
     texture: textures.find((src) => src.includes("Texture_BrickWallBase")) || "",
     anchor: active.previewRoot.userData.previewAnchor,
-    position: active.previewRoot.position.toArray(),
-    camera: {
-      target: active.host.studio.orbit.target.toArray(),
-      distance: active.host.studio.orbit.dist,
-      yaw: active.host.studio.orbit.yaw,
-      pitch: active.host.studio.orbit.pitch,
-    },
+    sections: [...active.panel.root.querySelectorAll(".edSection > .h")].map((node) => node.textContent),
   };
 });
-Check("构件库原始态保留正式房屋基模与砖材",
-  damageOriginal.state === "original" && damageOriginal.facts.includes("原始状态")
-    && !!damageOriginal.texture,
-  JSON.stringify(damageOriginal));
-await page.screenshot({
-  path: path.join(projectDir, "_shots", "editor_prop_damage_original.png"),
-});
-
-await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  active.SetDamageState("shellDamaged");
-});
-await Step(2);
-const damageEarly = await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  const textures = [];
-  active.previewRoot.traverse((node) => {
-    const src = node.material?.map?.image?.currentSrc || node.material?.map?.image?.src;
-    if (src) textures.push(src);
-  });
-  return {
-    state: active.preview?.damageState,
-    detail: active.preview?.damageDetail,
-    sectionHidden: active.damageSection.parentElement.hidden,
-    facts: active.facts.root.textContent,
-    texture: textures.find((src) => src.includes("Texture_BuildingDamageEarlyBase")) || "",
-    anchor: active.previewRoot.userData.previewAnchor,
-    position: active.previewRoot.position.toArray(),
-    camera: {
-      target: active.host.studio.orbit.target.toArray(),
-      distance: active.host.studio.orbit.dist,
-      yaw: active.host.studio.orbit.yaw,
-      pitch: active.host.studio.orbit.pitch,
-    },
-  };
-});
-Check("构件库可即时预览炮击初损建模态",
-  damageEarly.state === "shellDamaged" && !damageEarly.sectionHidden
-    && damageEarly.facts.includes("炮击初损") && !!damageEarly.texture
-    && damageEarly.detail?.stage === "early"
-    && damageEarly.detail?.impactMarks === 2
-    && damageEarly.detail?.fractureBricks === 20
-    && damageEarly.detail?.crackSegments === 20
-    && damageEarly.detail?.looseBricks === 14
-    && damageEarly.detail?.exposedBeams === 0
-    && damageEarly.detail?.roofFragments === 6,
-  JSON.stringify(damageEarly));
-await page.screenshot({
-  path: path.join(projectDir, "_shots", "editor_prop_damage_early.png"),
-});
-
-await page.evaluate(() => window.Taierzhuang.editor.active.SetDamageState("severeDamage"));
-await Step(2);
-const damageSevere = await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  const textures = [];
-  active.previewRoot.traverse((node) => {
-    const src = node.material?.map?.image?.currentSrc || node.material?.map?.image?.src;
-    if (src) textures.push(src);
-  });
-  return {
-    state: active.preview?.damageState,
-    detail: active.preview?.damageDetail,
-    facts: active.facts.root.textContent,
-    texture: textures.find((src) => src.includes("Texture_BuildingDamageSevereBase")) || "",
-    anchor: active.previewRoot.userData.previewAnchor,
-    position: active.previewRoot.position.toArray(),
-    camera: {
-      target: active.host.studio.orbit.target.toArray(),
-      distance: active.host.studio.orbit.dist,
-      yaw: active.host.studio.orbit.yaw,
-      pitch: active.host.studio.orbit.pitch,
-    },
-  };
-});
-Check("构件库可即时预览严重破坏建模态",
-  damageSevere.state === "severeDamage" && damageSevere.facts.includes("严重破坏")
-    && !!damageSevere.texture
-    && damageSevere.detail?.impactMarks === 4
-    && damageSevere.detail?.fractureBricks === 56
-    && damageSevere.detail?.crackSegments === 84
-    && damageSevere.detail?.looseBricks === 34
-    && damageSevere.detail?.exposedBeams === 3
-    && damageSevere.detail?.roofFragments === 22,
-  JSON.stringify(damageSevere));
-Check("同源建筑三档共用布设 pivot 且切换不重取景",
-  damageOriginal.anchor === "placementPivot"
-    && damageEarly.anchor === "placementPivot"
-    && damageSevere.anchor === "placementPivot"
-    && JSON.stringify(damageOriginal.position) === JSON.stringify([0, 0, 0])
-    && JSON.stringify(damageEarly.position) === JSON.stringify(damageOriginal.position)
-    && JSON.stringify(damageSevere.position) === JSON.stringify(damageOriginal.position)
-    && JSON.stringify(damageEarly.camera) === JSON.stringify(damageOriginal.camera)
-    && JSON.stringify(damageSevere.camera) === JSON.stringify(damageOriginal.camera),
-  JSON.stringify({ original: damageOriginal, early: damageEarly, severe: damageSevere }));
-await page.screenshot({
-  path: path.join(projectDir, "_shots", "editor_prop_damage_severe.png"),
-});
-for (const angle of [
-  { name: "side", radians: Math.PI / 2 },
-  { name: "rear", radians: Math.PI },
-]) {
-  await page.evaluate((radians) => {
-    window.Taierzhuang.editor.active.previewRoot.rotation.y = radians;
-  }, angle.radians);
-  await Step(1);
-  await page.screenshot({
-    path: path.join(projectDir, "_shots", `editor_prop_damage_severe_${angle.name}.png`),
-  });
-}
-await page.evaluate(() => {
-  window.Taierzhuang.editor.active.previewRoot.rotation.y = 0;
-});
-await Step(1);
-
-const damagePivotAudit = await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  return active.entries.filter((entry) => entry.damageStates).map((entry) => {
-    active.SetPalette(entry.id);
-    const cameraBefore = {
-      target: active.host.studio.orbit.target.toArray(),
-      distance: active.host.studio.orbit.dist,
-    };
-    const states = {};
-    for (const state of ["original", "shellDamaged", "severeDamage"]) {
-      active.SetDamageState(state);
-      states[state] = {
-        anchor: active.previewRoot.userData.previewAnchor,
-        position: active.previewRoot.position.toArray(),
-        camera: {
-          target: active.host.studio.orbit.target.toArray(),
-          distance: active.host.studio.orbit.dist,
-        },
-      };
-    }
-    return { id: entry.id, cameraBefore, states };
-  });
-});
-const driftingDamageEntries = damagePivotAudit.filter((entry) => Object.values(entry.states)
-  .some((state) => state.anchor !== "placementPivot"
-    || JSON.stringify(state.position) !== JSON.stringify([0, 0, 0])
-    || JSON.stringify(state.camera) !== JSON.stringify(entry.cameraBefore)));
-Check("全部战损建筑和地标三档都锁定同一世界原点",
-  damagePivotAudit.length >= 10 && driftingDamageEntries.length === 0,
-  JSON.stringify(driftingDamageEntries));
-
-const textureLineage = await page.evaluate(async () => {
-  const Load = async (name) => {
-    const img = new Image();
-    img.src = new URL(`./Texture/${name}`, location.href).href;
-    await img.decode();
-    const canvas = document.createElement("canvas");
-    canvas.width = 512; canvas.height = 512;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    ctx.drawImage(img, 0, 0, 512, 512);
-    return ctx.getImageData(0, 0, 512, 512).data;
-  };
-  const [base, early, severe] = await Promise.all([
-    Load("Texture_BrickWallBase.webp"),
-    Load("Texture_BuildingDamageEarlyBase.webp"),
-    Load("Texture_BuildingDamageSevereBase.webp"),
-  ]);
-  const regions = [
-    [0.30, 0.32, 0.22, 0.19], [0.68, 0.66, 0.22, 0.19],
-    [0.55, 0.25, 0.19, 0.17], [0.35, 0.80, 0.19, 0.17],
-  ];
-  let earlyDiff = 0, severeDiff = 0, samples = 0;
-  for (let y = 0; y < 512; y += 4) {
-    for (let x = 0; x < 512; x += 4) {
-      const inside = regions.some(([cx, cy, rx, ry]) => {
-        const dx = x / 512 - cx, dy = y / 512 - cy;
-        return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) < 1;
-      });
-      if (inside) continue;
-      const p = (y * 512 + x) * 4;
-      for (let c = 0; c < 3; c += 1) {
-        earlyDiff += Math.abs(base[p + c] - early[p + c]);
-        severeDiff += Math.abs(base[p + c] - severe[p + c]);
-        samples += 1;
-      }
-    }
-  }
-  return { early: earlyDiff / samples, severe: severeDiff / samples };
-});
-Check("两档贴图在爆点之外逐像素沿用原始砖材",
-  textureLineage.early < 8 && textureLineage.severe < 8,
-  `early=${textureLineage.early.toFixed(2)} severe=${textureLineage.severe.toFixed(2)}`);
-
-await page.evaluate(() => window.Taierzhuang.editor.active.SetPalette("Paifang"));
-await Step(1);
-const damageUnavailable = await page.evaluate(() => ({
-  selected: window.Taierzhuang.editor.active.paletteId,
-  hidden: window.Taierzhuang.editor.active.damageSection.parentElement.hidden,
-}));
-Check("没有真实战损生成逻辑的地标不显示伪变体",
-  damageUnavailable.selected === "Paifang" && damageUnavailable.hidden,
-  JSON.stringify(damageUnavailable));
+// 2026-11-01 删了「炮击初损 / 严重破坏」两档战损态：房屋照常用正式砖材，面板里不再有战损切换。
+Check("构件库房屋用正式砖材且不再有战损切换",
+  roomBlockPreview.loaded && roomBlockPreview.meshes > 0 && !!roomBlockPreview.texture
+    && roomBlockPreview.anchor === "boundsCenter" && !roomBlockPreview.sections.includes("建模状态"),
+  JSON.stringify(roomBlockPreview));
 
 await page.evaluate(() => window.Taierzhuang.editor.active.SetPalette("External_cart"));
 await Step(6);

@@ -2,12 +2,14 @@
 //
 // ## 这里有什么
 //   · PLACEABLE            可放置条目：Script_World 里已封装的程序化构件（院落、门楼、牌坊、警报楼、
-//                          沙包、防空洞、寨墙段…）、Script_Landmark_* 注册表地标、Model/*.tzm 模型、
+//                          沙包封门、防空洞…）、Script_Landmark_* 注册表地标、Model/*.tzm 模型、
 //                          场景特效；每条写明用得上哪几个参数（uses）与出厂参数（defaults）；
 //   · MODEL_PLACEABLE      tzm 里能当道具摆的那几个模型 id（人物不进表，车辆进）；
 //   · PLACEABLE_CATEGORIES 分类顺序；
-//   · BuildPlaceableVisual 用正片同一套生成器（BuildSink / InstantiateModel）建一个条目的可见节点；
-//   · BUILDING_DAMAGE_*    建筑与地标的三档离散战损态（原始 / 炮击初损 / 严重破坏）。
+//   · BuildPlaceableVisual 用正片同一套生成器（BuildSink / InstantiateModel）建一个条目的可见节点。
+//
+// 2026-11-01 删掉了只在这里用、正片与旧章都不建的寨墙段、沙包路障、天主堂（旧通用版）、清真寺，
+// 以及建筑「炮击初损 / 严重破坏」两档战损态（含专属 PBR 与近景细节层）；git 历史里还在。
 //
 // ## 来历与用途
 // 原先住在场景关卡编辑器（Script_EditorScene）里；2026-10-31 用户要求删掉旧的场景关卡 / 地形 /
@@ -20,10 +22,9 @@
 
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
 import {
-  BuildSink, AddTree, AddPole, AddWell, AddMillstone, AddWaterVat, AddBarricade,
-  AddCompound, AddRoomBlock, AddGatehouse, AddRampart, AddDugout, AddPaifang,
-  AddAlarmTower, AddSquareFort, AddChurch, AddMosque, AddSandbagPlug,
-  AddBuildingDamageDetails,
+  BuildSink, AddTree, AddPole, AddWell, AddMillstone, AddWaterVat,
+  AddCompound, AddRoomBlock, AddGatehouse, AddDugout, AddPaifang,
+  AddAlarmTower, AddSquareFort, AddSandbagPlug,
 } from "./Script_World.mjs";
 import { FlushWallInstances } from "./Script_WallSpline.mjs";
 import { LANDMARK_BUILDERS, MakeFeatureHost } from "./Script_LandmarkRegistry.mjs";
@@ -33,62 +34,6 @@ import { MESHES, MeshIds } from "./Data_Meshes.mjs";
 import { InstantiateModel } from "./Script_MeshLoad.mjs";
 import { SCENE_EFFECTS } from "./Script_Vfx.mjs";
 
-
-/**
- * 建筑/地标预建模的离散战损态。原始态保留该构件自己的历史缺省 damage；后两档
- * 同时换几何损伤参数与专属 imagegen PBR，预览与场景布设共走 BuildPlaceableVisual。
- */
-export const BUILDING_DAMAGE_STATES = Object.freeze({
-  original: Object.freeze({ id: "original", label: "原始状态", damage: null, burnt: false, material: null, detail: null }),
-  // 三档必须读成同一栋建筑的时间序列：不换砖型、不换全局焦色，也不在初损时改掉屋脊。
-  shellDamaged: Object.freeze({ id: "shellDamaged", label: "炮击初损", damage: 0.38, burnt: false,
-    material: "BuildingDamageEarly", detail: "early", profile: "early" }),
-  severeDamage: Object.freeze({ id: "severeDamage", label: "严重破坏", damage: 0.72, burnt: false,
-    material: "BuildingDamageSevere", detail: "severe", profile: "severe" }),
-});
-export const BUILDING_DAMAGE_STATE_OPTIONS = Object.freeze(
-  Object.values(BUILDING_DAMAGE_STATES).map(({ id: value, label }) => Object.freeze({ value, label })),
-);
-
-const BUILDING_DAMAGE_SURFACES = new Set([
-  "BrickWall", "BrickWallSooty", "HouseBrick", "Adobe", "CityBrickWorn",
-  "GateBrick", "GateBrickWorn", "PrisonWall", "StationBrick", "TemplePlaster",
-  "ChurchPlaster", "SchoolBrick", "ChimneyBrick",
-]);
-
-export function SupportsBuildingDamageStates(entry) {
-  return Boolean(entry && entry.damageStates);
-}
-
-export function ResolveBuildingDamageState(entry, item = {}) {
-  if (!SupportsBuildingDamageStates(entry)) return null;
-  return BUILDING_DAMAGE_STATES[item.damageState] || BUILDING_DAMAGE_STATES.original;
-}
-
-function DamageMaterialResolver(state, library) {
-  if (!state || !state.material) return ResolveTengxianMaterial;
-  return (name, targetLibrary = library) => ResolveTengxianMaterial(
-    BUILDING_DAMAGE_SURFACES.has(name) ? state.material : name,
-    targetLibrary,
-  );
-}
-
-function DamageDetailDimensions(sink, entry, item) {
-  let colliderHeight = 0;
-  let colliderWidth = 0;
-  let colliderDepth = 0;
-  for (const collider of sink.colliders) {
-    colliderHeight = Math.max(colliderHeight, collider.max?.[1] || 0);
-    colliderWidth = Math.max(colliderWidth, (collider.max?.[0] || 0) - (collider.min?.[0] || 0));
-    colliderDepth = Math.max(colliderDepth, (collider.max?.[2] || 0) - (collider.min?.[2] || 0));
-  }
-  const gateWidth = entry.id === "Gatehouse" ? Number(item.w || 1.5) + 1.2 : 0;
-  return {
-    width: Math.max(2.4, gateWidth, Number(item.w) || 0, colliderWidth || 0),
-    depth: Math.max(1.0, Number(item.d) || 0, Math.min(colliderDepth || 0, 28), gateWidth ? 1.1 : 0),
-    height: Math.max(2.4, Number(item.h) || 0, colliderHeight || 0),
-  };
-}
 
 /**
  * 可放置的东西。
@@ -119,13 +64,6 @@ export const PLACEABLE = [
     build: (sink, it) => AddWaterVat(sink, it.x, it.z, it.seed),
   },
   {
-    id: "Barricade", name: "沙包路障", cat: "工事", uses: ["ry", "w", "h"],
-    defaults: { w: 5, h: 1.15 },
-    build: (sink, it) => AddBarricade(sink, {
-      x: it.x, z: it.z, ry: it.ry, length: it.w, height: it.h, seed: it.seed,
-    }),
-  },
-  {
     id: "SandbagPlug", name: "沙包封门", cat: "工事", uses: ["ry", "w", "h"],
     defaults: { w: 3.8, h: 2.6 },
     build: (sink, it) => AddSandbagPlug(sink, {
@@ -141,14 +79,7 @@ export const PLACEABLE = [
     }),
   },
   {
-    id: "Rampart", name: "寨墙段", cat: "工事", uses: ["ry", "w", "h", "d"],
-    defaults: { w: 24, h: 4.0, d: 2.2 },
-    build: (sink, it) => AddRampart(sink, {
-      x: it.x, z: it.z, ry: it.ry, length: it.w, height: it.h, thickness: it.d, seed: it.seed,
-    }),
-  },
-  {
-    id: "Compound", name: "四合院", cat: "建筑", damageStates: true,
+    id: "Compound", name: "四合院", cat: "建筑",
     uses: ["ry", "w", "d", "damage"],
     defaults: { w: 16, d: 14, damage: 0.2 },
     build: (sink, it) => AddCompound(sink, {
@@ -157,7 +88,7 @@ export const PLACEABLE = [
     }),
   },
   {
-    id: "RoomBlock", name: "房屋（单体）", cat: "建筑", damageStates: true,
+    id: "RoomBlock", name: "房屋（单体）", cat: "建筑",
     uses: ["ry", "w", "d", "h", "damage"],
     defaults: { w: 9, d: 6, h: 3.0, damage: 0.15 },
     build: (sink, it) => AddRoomBlock(sink, {
@@ -167,7 +98,7 @@ export const PLACEABLE = [
     }),
   },
   {
-    id: "Gatehouse", name: "院门楼", cat: "建筑", damageStates: true,
+    id: "Gatehouse", name: "院门楼", cat: "建筑",
     uses: ["ry", "w", "damage"],
     defaults: { w: 1.5, damage: 0.1 },
     build: (sink, it) => AddGatehouse(sink, {
@@ -190,27 +121,11 @@ export const PLACEABLE = [
     }),
   },
   {
-    id: "SquareFort", name: "方形炮楼院", cat: "地标", damageStates: true,
+    id: "SquareFort", name: "方形炮楼院", cat: "地标",
     uses: ["ry", "w", "d", "damage"],
     defaults: { w: 32, d: 32, damage: 0.3 },
     build: (sink, it) => AddSquareFort(sink, {
       x: it.x, z: it.z, ry: it.ry, w: it.w, d: it.d, damage: it.damage, seed: it.seed,
-    }),
-  },
-  {
-    id: "Church", name: "天主堂", cat: "地标", damageStates: true,
-    uses: ["ry", "w", "d", "h", "damage"],
-    defaults: { w: 11, d: 24, h: 16, damage: 0.15 },
-    build: (sink, it) => AddChurch(sink, {
-      x: it.x, z: it.z, ry: it.ry, nave: [it.w, it.d], towerH: it.h,
-      seed: it.seed, damage: it.damage, damageProfile: it.damageProfile,
-    }),
-  },
-  {
-    id: "Mosque", name: "清真寺", cat: "地标", damageStates: true,
-    uses: ["ry", "damage"], defaults: { damage: 0.4 },
-    build: (sink, it) => AddMosque(sink, {
-      x: it.x, z: it.z, ry: it.ry, seed: it.seed, damage: it.damage,
     }),
   },
 ];
@@ -232,7 +147,7 @@ const REGISTRY_PLACEABLE = [
 ];
 for (const [pid, name, kind, defaults] of REGISTRY_PLACEABLE) {
   PLACEABLE.push({
-    id: pid, name, cat: "地标", damageStates: true,
+    id: pid, name, cat: "地标",
     uses: ["ry", "w", "d", "damage"], defaults,
     build: (sink, it) => LANDMARK_BUILDERS[kind](
       MakeFeatureHost(sink),
@@ -242,14 +157,14 @@ for (const [pid, name, kind, defaults] of REGISTRY_PLACEABLE) {
 }
 // 西关两件带专属参数的：车站（h 无用）与电灯厂（h=烟囱高）。
 PLACEABLE.push({
-  id: "Station", name: "车站", cat: "地标", damageStates: true,
+  id: "Station", name: "车站", cat: "地标",
   uses: ["ry", "w", "d"], defaults: { w: 34, d: 12, damage: 0.2 },
   build: (sink, it) => LANDMARK_BUILDERS.station(
     MakeFeatureHost(sink), { id: `edit${it.seed}`, x: it.x, z: it.z, w: it.w, d: it.d },
     { damage: it.damage ?? 0.2, burnt: Boolean(it.burnt), ry: it.ry }),
 });
 PLACEABLE.push({
-  id: "PowerPlant", name: "电灯厂", cat: "地标", damageStates: true,
+  id: "PowerPlant", name: "电灯厂", cat: "地标",
   uses: ["ry", "w", "d", "h"], defaults: { w: 30, d: 18, h: 22, damage: 0.2 },
   build: (sink, it) => LANDMARK_BUILDERS.powerPlant(
     MakeFeatureHost(sink),
@@ -311,23 +226,10 @@ export function BuildPlaceableVisual(target, entry, item, {
     return { loaded: true, colliders: [], meshes };
   }
 
-  const damageState = ResolveBuildingDamageState(entry, item);
-  const buildItem = damageState && damageState.damage != null
-    ? { ...item, damage: damageState.damage, burnt: damageState.burnt,
-      damageProfile: damageState.profile }
-    : item;
-  const resolve = DamageMaterialResolver(damageState, library);
+  const resolve = ResolveTengxianMaterial;
   const sink = new BuildSink();
-  let damageDetail = null;
   try {
-    entry.build(sink, buildItem);
-    if (damageState?.detail) {
-      damageDetail = AddBuildingDamageDetails(sink, {
-        x: buildItem.x, z: buildItem.z, ry: buildItem.ry,
-        ...DamageDetailDimensions(sink, entry, buildItem),
-        seed: `${buildItem.seed}:${entry.id}`, stage: damageState.detail,
-      });
-    }
+    entry.build(sink, item);
   } catch (error) {
     console.warn(`[PlaceableCatalog] ${entry.id} 建不出来：${String(error).slice(0, 160)}`);
   }
@@ -336,10 +238,7 @@ export function BuildPlaceableVisual(target, entry, item, {
   for (const mesh of flushed) ownedGeometries.push(mesh.geometry);
   let meshes = 0;
   target.traverse((node) => { if (node.isMesh) meshes += 1; });
-  return {
-    loaded: true, colliders: sink.colliders, meshes,
-    damageState: damageState?.id || null, damageDetail,
-  };
+  return { loaded: true, colliders: sink.colliders, meshes };
 }
 
 /**
@@ -347,7 +246,7 @@ export function BuildPlaceableVisual(target, entry, item, {
  *
  * TengxianCity 有自己的 FlushProps（沙包走 InstancedMesh、瓦砾堆走另一个），
  * 那一份和城的生命周期绑在一起，这里不能借。**不展开的后果不是难看，是消失** ——
- * AddBarricade 整条沙包墙都在 props 里，不展开的话点了「沙包路障」什么也不出现。
+ * AddSandbagPlug 整堵沙包都在 props 里，不展开的话点了「沙包封门」什么也不出现。
  */
 export function FlushSinkProps(sink, target, library, owned,
   resolve = ResolveTengxianMaterial, externalModels = new Map()) {

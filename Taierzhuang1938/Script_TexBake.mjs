@@ -759,12 +759,6 @@ export const RECIPES = WithGrime({
   // 上一轮就是这么"改了等于没改"。这里按传进来的档位翻倍，低配档跟着降。
   BrickWall: (s) => BakeBrickWall(Wide(s), { seed: 101, rowsPerTile: 20 }),
   BrickWallSooty: (s) => BakeBrickWall(Wide(s), { seed: 137, rowsPerTile: 20, damage: 0.6, sootiness: 0.95 }),
-  // 构件库离散战损态的 imagegen PBR 兜底。正式图缺失时仍保留相同的
-  // “初阶崩裂 / 严重破坏”层级，不让编辑器因为一张贴图 404 回到同一张完好墙。
-  BuildingDamageEarly: (s) => BakeBrickWall(Wide(s),
-    { seed: 101, rowsPerTile: 20, damage: 0.26, sootiness: 0.12 }),
-  BuildingDamageSevere: (s) => BakeBrickWall(Wide(s),
-    { seed: 101, rowsPerTile: 20, damage: 0.56, sootiness: 0.28 }),
   Adobe: (s) => BakeAdobe(s ?? 512, { seed: 211 }),
   // 滕县城墙的三套 ImageGen PBR 在启动时覆盖这些同步兜底。独立命名避免把
   // 民居青砖、土坯房和普通院落条石一起换成军事城墙尺度的纹理。

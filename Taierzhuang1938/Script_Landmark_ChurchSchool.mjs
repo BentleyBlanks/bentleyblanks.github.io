@@ -45,7 +45,7 @@ import { AddYardWallRing } from "./Script_YardWall.mjs";
 //
 // 本文件统一用**与 PlaceGeometry 的 ry 一致**的那一套：
 //   局部 +x → 世界 (cos ry, -sin ry)，局部 +z → 世界 (sin ry, cos ry)
-// 也就是 Script_World.AddChurch / AddDoorReveal 用的那一套（three 的 rotateY 语义）。
+// 也就是 Script_World.AddDoorReveal 用的那一套（three 的 rotateY 语义）。
 // 注意 AddCompound / AddRoomBlock / AddFeatureRoom 用的是 z 取反的另一套 —— 本文件
 // 不调用它们，避免两套约定混用后房子朝向被镜像。
 // 约定：局部 +z 是**正面**（ry=0 时朝世界 +z，即城南方向；坐北朝南）。

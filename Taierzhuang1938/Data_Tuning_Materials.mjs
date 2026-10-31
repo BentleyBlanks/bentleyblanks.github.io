@@ -346,8 +346,6 @@ export const SURFACE_RECIPES = {
   // ——— 砖 / 石 / 土：全场面积最大的表面，POM 收益最高 ———
   BrickWall: { pomDepth: 0.016, detailWeight: 0.55, detailTile: 8, grime: 0.55 },
   BrickWallSooty: { pomDepth: 0.016, detailWeight: 0.55, detailTile: 8, grime: 0.75 },
-  BuildingDamageEarly: { pomDepth: 0.018, detailWeight: 0.55, detailTile: 8, grime: 0.6 },
-  BuildingDamageSevere: { pomDepth: 0.020, detailWeight: 0.6, detailTile: 8, grime: 0.7 },
   CityWallBrickPbr: { pomDepth: 0.022, detailWeight: 0.5, detailTile: 7, grime: 0.6 },
   CityWallCorePbr: { pomDepth: 0.018, detailWeight: 0.65, detailTile: 9, grime: 0.5 },
   CityWallStonePbr: { pomDepth: 0.020, detailWeight: 0.5, detailTile: 7, grime: 0.45 },

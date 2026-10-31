@@ -472,16 +472,9 @@ Battlefield Pack 24 件、Chinese Life 16 件与无叶乔木三变体，共 44 �
 `Script_AssetStandardsTest.mjs` 同时核对两边、
 `Model/Data_ModelIndex.json` 构建元数据、import map 与编辑器分类，防止面数表悄悄过期。
 
-建筑与地标如果登记了预建模战损，会额外出现「建模状态」三选一：原始状态保留构件自己的
-历史缺省；「炮击初损」统一使用中等 `damage` 与 `BuildingDamageEarly` PBR；「严重破坏」
-使用高 `damage`、焦烧语义与 `BuildingDamageSevere` PBR。三档仍调用同一个正式生成器，
-切换时几何、残砖、碰撞定义和表面贴图一起重建；牌坊、警报楼、外部 GLB 等没有真实战损
-生成逻辑的条目不显示这栏，不能用换色冒充建模变体。
-
-两档另外共用 `Script_World.AddBuildingDamageDetails` 的确定性近景构件层：初损有内陷弹着面、
-缺砖冲击圈、放射裂缝和墙脚落砖；严重档在此基础上增加更大的缺口、逐皮墙角残砖、斜落断梁
-与散瓦。它们仍进入 `BuildSink` 的既有材质桶，不按碎砖逐件建 Mesh；房屋本体的严重档还会
-拿掉一侧窗间墙并同步取消那段碰撞，门楼和教堂则分别出现断门额、残塔与外露锥顶木架。
+2026-11-01 删掉了构件库里只在这里用、正片和旧章都不建的条目：寨墙段、沙包路障、天主堂（旧通用版）、
+清真寺，以及建筑与地标的「炮击初损 / 严重破坏」两档预建模战损（`BuildingDamageEarly/Severe` PBR 与
+`AddBuildingDamageDetails` 近景细节层）。建筑仍按各自的 `damage` 参数出破损轮廓；要找回旧实现看 git 历史。
 
 ### 生活用具 / 工事 PCG `Script_EditorPropPcg.mjs`
 
@@ -930,7 +923,7 @@ Actor，桶早就建好（所以被藏）；城里那几关的日军几乎全在
 ### 构件目录与出图机位（2026-10-31）
 
 - `Script_PlaceableCatalog.mjs`：可放置构件总表（`PLACEABLE` / `MODEL_PLACEABLE` / `PLACEABLE_CATEGORIES`、`BuildPlaceableVisual`、
-  `BUILDING_DAMAGE_*`、`FlushSinkProps`），从已删的场景关卡编辑器里原样搬出；构件库预览用它，以后的新场景编辑器也复用它当资产目录。
+  `FlushSinkProps`），从已删的场景关卡编辑器里原样搬出；构件库预览用它，以后的新场景编辑器也复用它当资产目录。
 - `Script_EditorShotCamera.mjs`（id `shotCamera`，不进菜单）：采样点编辑器删除后留下的最小一块 ——
   出图脚本与几支浏览器测试用 `Debug.OpenEditor("shotCamera")` 暂停玩法、接管相机、藏视图模型，再调 `ApplyPose` 摆镜头
   （位姿口径：`y` 绝对高度，缺省取 地高 + `h`；没写 `fov` 取画质档出厂值，没写 `far` 取 620 m）。

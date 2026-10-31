@@ -40,7 +40,7 @@ const LEGACY_IDS = new Set([
   "WeaponSteelV2", "WeaponWoodV2", "Type89", "Grenade", "HandcartWood", "WoodCrate",
   "TreeBark", "BrickWall", "CityWallBrick", "CityWallCore", "CityWallStone", "CraterScorched",
   "MissionSoil", "PloughedSoil", "Ground", "RoofTile", "GateBrick", "GatePaintedWood",
-  "GateRoofTile", "Sandbag", "WattleFence", "BrickWallSooty", "BuildingDamageEarly", "BuildingDamageSevere",
+  "GateRoofTile", "Sandbag", "WattleFence", "BrickWallSooty",
   "Adobe", "Stone", "WellStone", "Millstone", "WaterVat", "StationBrick",
   "PrisonBrick", "TemplePlaster", "CarriageBenchWood", "CarriageFloorSteel", "CarriageCeilingSteel", "Lugouqiao",
   "TrenchStone", "TrenchMudHeight", "BunkerPoster", "ShopDoorPbr",

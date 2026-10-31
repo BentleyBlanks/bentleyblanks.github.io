@@ -53,7 +53,7 @@ import { BuildEastMapBlockSteps } from "./Script_Landmark_EastMapBlocks.mjs";
 import {
   BuildSink, AddCityWall, AddBastion, AddCornerTower, AddCityRamp, AddDugout,
   AddLoopholes, AddGateComplex, AddYamen, AddPaifang, AddAlarmTower, AddSquareFort,
-  AddChurch, AddPagoda, AddCompound, AddRoomBlock, AddHardMountainRoof,
+  AddPagoda, AddCompound, AddRoomBlock, AddHardMountainRoof,
   AddTree, AddSandbagEmplacement, AddWell,
   AddCypress, AddPoplar, AddOrchardTree,
 } from "./Script_World.mjs";
@@ -113,10 +113,6 @@ const MATERIAL_MAP = {
   // 民居一套（鲁南：青砖 + 淡色过墙石交织，平原段大量土坯 + 麦秸泥）
   BrickWall: { recipe: "BrickWall", color: 0xe8ecf2 },
   BrickWallSooty: { recipe: "BrickWallSooty", color: 0xdfe2e6 },
-  // 构件库预建模的两档离散战损面。几何仍由各建筑/地标正式生成器按 damage
-  // 生成，这两项只负责把同一档的弹孔、剥落与焦痕统一到对应 imagegen PBR。
-  BuildingDamageEarly: { recipe: "BuildingDamageEarly", color: 0xe8ecf2, roughness: 1.0, normalScale: 0.88 },
-  BuildingDamageSevere: { recipe: "BuildingDamageSevere", color: 0xe8ecf2, roughness: 1.0, normalScale: 1.0 },
   HouseBrick: { recipe: "BrickWall", color: 0xe8ecf2 },
   CrossStone: { recipe: "Stone", color: 0xfbfaf6 },
   Stone: { recipe: "Stone", color: 0xfbfaf6 },
@@ -256,8 +252,8 @@ function MoatBulge(along, side = null) {
 /**
  * 濠外需要**找平到城内地坪高度（y=0）**的几块地。
  *
- * 由来是工程的：鲁南民居那一整套构件（AddCompound / AddRoomBlock / AddChurch /
- * AddPaifang）全部以 y=0 起砌、没有 baseY 参数，而濠外原野压在 -1.2 m。
+ * 由来是工程的：鲁南民居那一整套构件（AddCompound / AddRoomBlock / AddPaifang）
+ *全部以 y=0 起砌、没有 baseY 参数，而濠外原野压在 -1.2 m。
  * 与其给每个构件加一个参数、再在每个调用点算一次地高，不如把它们脚下的地找平 ——
  * 关厢与南关本来也是与城同高的一片附郭街区，不是坡上的房子。
  * feather 是过渡带宽度：1.2 m 的高差摊在十几米上，看不出台阶。

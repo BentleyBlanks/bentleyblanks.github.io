@@ -698,30 +698,6 @@ export const TEXTURE_MANIFEST = Object.freeze([
     ],
   },
   {
-    id: "BuildingDamageEarly", kind: "material", tier: "boot",
-    bake: "_import/BuildWeaponPbr.py",
-    source: { provider: "imagegen", date: "2026-08-29" },
-    consumers: [{ file: "Script_Main.mjs", token: "Texture_BuildingDamageEarly" }],
-    legacy: "imagegen 源图与提示词未入库（2026-08 BuildWeaponPbr 批次）；重生时走 Script_BakePbrTexture 并补记录",
-    files: [
-      ["Texture_BuildingDamageEarlyBase.webp", "Base", 512, 512],
-      ["Texture_BuildingDamageEarlyNormal.webp", "Normal", 512, 512],
-      ["Texture_BuildingDamageEarlyOrm.webp", "Orm", 512, 512],
-    ],
-  },
-  {
-    id: "BuildingDamageSevere", kind: "material", tier: "boot",
-    bake: "_import/BuildWeaponPbr.py",
-    source: { provider: "imagegen", date: "2026-08-29" },
-    consumers: [{ file: "Script_Main.mjs", token: "Texture_BuildingDamageSevere" }],
-    legacy: "imagegen 源图与提示词未入库（2026-08 BuildWeaponPbr 批次）；重生时走 Script_BakePbrTexture 并补记录",
-    files: [
-      ["Texture_BuildingDamageSevereBase.webp", "Base", 512, 512],
-      ["Texture_BuildingDamageSevereNormal.webp", "Normal", 512, 512],
-      ["Texture_BuildingDamageSevereOrm.webp", "Orm", 512, 512],
-    ],
-  },
-  {
     id: "Adobe", kind: "material", tier: "boot",
     bake: "_import/BuildWeaponPbr.py",
     source: { provider: "imagegen", date: "2026-08-22" },

@@ -12,7 +12,7 @@
 | --- | --- |
 | 第一关有碰撞/掩体契约的体块 | 体块照常写进 Layout，id 登记进 `IsMissionSandbagBlock`（`Data_FirstLevelMissionFortifications`），外壳由标准模型分层填满 |
 | 布景（无碰撞）的一段袋墙 | `SandbagRunPlacements`（开场 01–03 的洞内墙、沟沿压顶都走它） |
-| 城区街垒 / 堵门 / 掩体 | `Script_World.AddBarricade / AddSandbagPlug / AddSandbagEmplacement`，底层自动带 `groundRow` |
+| 城区街垒 / 堵门 / 掩体 | `Script_World.AddSandbagPlug / AddSandbagEmplacement`，底层自动带 `groundRow` |
 | 手摆单件、PCG | ExternalProps 摆位 `asset: "battlefieldSandbag0N"`，不写 `y` 就自动贴地 |
 | 过场道具 | `{ kind: "sandbag", size: [w,h,d], pos, ry }`，size 是占的盒子，高过 0.6 m 自动码成袋墙 |
 

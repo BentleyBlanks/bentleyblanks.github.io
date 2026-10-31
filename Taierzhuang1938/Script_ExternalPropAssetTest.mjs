@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  BuildSink, AddBarricade, AddSandbagPlug, AddSandbagEmplacement,
+  BuildSink, AddSandbagPlug, AddSandbagEmplacement,
   EXTERNAL_SANDBAG_ASSET_IDS, EXTERNAL_SANDBAG_METRICS, EXTERNAL_SANDBAG_PACKING,
   AddTree, AddPoplar, AddOrchardTree,
   EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
@@ -435,8 +435,6 @@ function GeneratedSandbags(build) {
 }
 
 for (const [label, build, tag] of [
-  ["barricade", (sink) => AddBarricade(sink,
-    { x: 4, z: -7, ry: 0.3, length: 5, height: 1.15, seed: "asset-test-bar" }), "barricade"],
   ["sandbag plug", (sink) => AddSandbagPlug(sink,
     { x: -3, z: 6, ry: -0.2, openW: 3.8, openH: 2.6, depth: 2.4,
       mode: "partial", seed: "asset-test-plug" }), "sandbagPlug"],

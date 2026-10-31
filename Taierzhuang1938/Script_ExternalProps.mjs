@@ -868,7 +868,7 @@ export async function AddExternalProps({
   // 城内每户布设（Script_TownDressing）+ 按院落 / 防区规则生成的视觉 PCG。后两层
   // 都跨关共位 —— 城是同一座城；PCG 还用 cell-local seed 保证同一院落不换摆法。
   // generatedPlacements 是 Script_World 构建器产出的沙袋组合；它只负责画面，
-  // 碰撞仍由 AddBarricade/AddSandbagPlug/AddSandbagEmplacement 的整段盒负责。
+  // 碰撞仍由 AddSandbagPlug/AddSandbagEmplacement 的整段盒负责。
   const handPlacements = placementsOnly ? [...placementsOnly] : [...PlacementsFor(phaseId), ...TownDressingFor(bounds)];
   const pcg = placementsOnly ? { placements: [], stats: null, errors: [] } : GeneratePropPcg(pcgDocument, {
     bounds, cells, blockers, groundAt,

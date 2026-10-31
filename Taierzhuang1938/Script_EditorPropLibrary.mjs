@@ -9,7 +9,6 @@ import {
 } from "./Script_EditorUi.mjs";
 import {
   PLACEABLE, PLACEABLE_CATEGORIES, MODEL_PLACEABLE, BuildPlaceableVisual,
-  BUILDING_DAMAGE_STATES, BUILDING_DAMAGE_STATE_OPTIONS, SupportsBuildingDamageStates,
 } from "./Script_PlaceableCatalog.mjs";
 import { MESHES, MeshUrl } from "./Data_Meshes.mjs";
 import { OPTIONAL_VEHICLE_ASSETS } from "./Data_VehicleAssets.mjs";
@@ -40,7 +39,6 @@ export class PropLibraryEditor {
     this.categories = PLACEABLE_CATEGORIES.filter((category) => category !== "特效");
     this.cat = this.categories[0];
     this.paletteId = this.entries[0] ? this.entries[0].id : null;
-    this.damageState = "original";
     this.modelDocs = new Map();
     this.externalModels = new Map();
     this.ownedGeometries = [];
@@ -84,10 +82,6 @@ export class PropLibraryEditor {
       (value) => { this.cat = value; this.FillPalette(); });
     this.palette = ListBox(library, { height: 250, onPick: (id) => this.SetPalette(id) });
     this.FillPalette();
-
-    this.damageSection = Section(body, "建模状态");
-    this.damageChips = Chips(this.damageSection, BUILDING_DAMAGE_STATE_OPTIONS, this.damageState,
-      (value) => this.SetDamageState(value));
 
     this.vehicleSection = Section(body, "战车可动件演示");
     this.vehicleSection.parentElement.hidden = true;
@@ -147,15 +141,6 @@ export class PropLibraryEditor {
     this.ShowSelected();
   }
 
-  SetDamageState(value) {
-    if (!BUILDING_DAMAGE_STATES[value]) return;
-    this.damageState = value;
-    if (this.damageChips) this.damageChips.Set(value);
-    // 战损是同一件场景构件的替换态，不是换展品。切换时必须保留镜头，
-    // 否则包围盒随瓦砾改变后自动重取景，会让固定在同一布设点的墙体看似漂移。
-    this.ShowSelected({ preserveCamera: true });
-  }
-
   StepSelection(direction) {
     if (!this.entries.length) return;
     const current = Math.max(0, this.entries.findIndex((entry) => entry.id === this.paletteId));
@@ -195,17 +180,14 @@ export class PropLibraryEditor {
     this.preview = null;
   }
 
-  async ShowSelected({ preserveCamera = false } = {}) {
+  async ShowSelected() {
     if (!this.host.studio.Active) return;
     const token = ++this.previewToken;
     this.ClearPreview();
     const entry = this.Entry(this.paletteId);
     if (!entry) return;
-    const supportsDamage = SupportsBuildingDamageStates(entry);
-    if (this.damageSection) this.damageSection.parentElement.hidden = !supportsDamage;
     const item = {
       id: 0, type: entry.id, x: 0, z: 0, ry: 0, seed: `preview_${entry.id}`,
-      damageState: supportsDamage ? this.damageState : "original",
       ...(entry.defaults || {}),
     };
     const root = new THREE.Group();
@@ -253,22 +235,14 @@ export class PropLibraryEditor {
     }
     const box = new THREE.Box3().setFromObject(root);
     if (!box.isEmpty()) {
-      if (supportsDamage) {
-        // 正片生成器约定 item.x / item.z 是构件的布设 pivot，且从局部 y=0 起砌。
-        // 三档战损的洞口、坍墙和瓦砾会改变各自包围盒，绝不能再按当前包围盒居中；
-        // 否则每次切换都会把整座建筑（尤其院墙）平移到另一个世界坐标。
-        root.position.set(0, 0, 0);
-        root.userData.previewAnchor = "placementPivot";
-      } else {
-        const center = box.getCenter(new THREE.Vector3());
-        root.position.x -= center.x;
-        root.position.z -= center.z;
-        root.position.y -= box.min.y;
-        root.userData.previewAnchor = "boundsCenter";
-      }
+      const center = box.getCenter(new THREE.Vector3());
+      root.position.x -= center.x;
+      root.position.z -= center.z;
+      root.position.y -= box.min.y;
+      root.userData.previewAnchor = "boundsCenter";
     }
     root.updateMatrixWorld(true);
-    if (!preserveCamera) this.FramePreview();
+    this.FramePreview();
     this.RefreshFacts(entry, new THREE.Box3().setFromObject(root));
   }
 
@@ -319,19 +293,6 @@ export class PropLibraryEditor {
     this.facts.Set("来源", entry.external ? entry.url
       : (entry.model ? `Model/Model_${entry.model}.tzm.json` : "Script_World 程序化"));
     this.facts.Set("参数", (entry.uses || []).join(" / ") || "固定尺寸");
-    const damageState = SupportsBuildingDamageStates(entry)
-      ? BUILDING_DAMAGE_STATES[this.damageState] : null;
-    this.facts.Set("建模状态", damageState ? damageState.label : "无战损变体",
-      damageState && damageState.id !== "original" ? "good" : "");
-    this.facts.Set("战损贴图", damageState?.material
-      ? `Texture_${damageState.material}{Base,Normal,Orm}.webp` : "沿用原始材质");
-    const detail = this.preview?.damageDetail;
-    this.facts.Set("近景破坏细节", detail
-      ? `${detail.impactMarks} 处冲击面 · ${detail.fractureBricks} 块断砖 · `
-        + `${detail.crackSegments} 段裂缝 · ${detail.looseBricks} 块落砖`
-        + (detail.exposedBeams ? ` · ${detail.exposedBeams} 根断梁 · ${detail.roofFragments} 片散瓦` : "")
-      : "无附加战损构件",
-    detail ? "good" : "");
     this.facts.Set("网格", this.preview ? this.preview.meshes : 0);
     this.facts.Set("碰撞盒定义", this.preview ? this.preview.colliders.length : 0);
     this.facts.Set("包围尺寸", size
