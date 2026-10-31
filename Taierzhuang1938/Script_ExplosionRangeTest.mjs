@@ -91,6 +91,22 @@ try {
     `point-blank blast leaves the invincible tester untouched: ${JSON.stringify(result.invincible)}`);
   assert.ok(result.invincible.suppression > 0, "suppression still lands so the blast is felt");
   console.log("PASS explosion range tester is invincible");
+  // Prop blast targets (ammo crates etc., Script_BlastTargets) are fed straight by Combat.Blast:
+  // a real combat blast must reach a registered target in range and leave one 60 m away alone.
+  result.blastTargets = await page.evaluate(async () => {
+    const t = window.Taierzhuang, { BLAST_TARGETS } = await import("./Script_BlastTargets.mjs");
+    BLAST_TARGETS.Clear();
+    const at = t.player.position.clone(); at.x += 3; at.z += 3; const fired = [];
+    for (const [id, x, z] of [["test_near", at.x, at.z], ["test_far", at.x + 60, at.z + 60]]) {
+      BLAST_TARGETS.Register({ id, tag: "test", x, y: at.y, z, hp: 40, OnDestroyed: (info) => fired.push(info.id) });
+    }
+    t.combat.Blast(at, 6, 400, "launcher", null, false, null, "Grenade");
+    BLAST_TARGETS.Clear("test");
+    return { fired, left: BLAST_TARGETS.Count };
+  });
+  assert.deepEqual(result.blastTargets, { fired: ["test_near"], left: 0 },
+    "Combat.Blast reaches the prop blast-target registry (near hit, far untouched, cleared by tag)");
+  console.log("PASS combat blast reaches prop blast targets");
   result.vehicles = [];
   for (const vehicle of EXPLOSION_VEHICLES) {
     const sample = await page.evaluate((id) => {

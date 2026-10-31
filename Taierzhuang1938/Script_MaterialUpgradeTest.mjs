@@ -79,9 +79,9 @@ Check(shadingSource.includes("reflect(-geometryViewDir, geometryNormal)")
 Check(shadingSource.includes("vec3 sknDelta = (sknScatter - vec3(clamp(sknNdL, 0.0, 1.0)))")
   && shadingSource.includes("reflectedLight.directDiffuse += BRDF_Lambert(material.diffuseColor) * sknDelta;"),
 "皮肤散射加的是「预积分 − Lambert」的差，不替换整项");
-Check(/\.\.\.\(Array\.isArray\(shading\) \? shading : \[shading\]\),\s*\n\s*MakeDestructionPatch\(destruction\)/
+Check(/\.\.\.\(Array\.isArray\(shading\) \? shading : \[shading\]\),\s*\]\.filter\(Boolean\)/
   .test(patchSource) && patchSource.indexOf("MakeGiPatch(gi)") < patchSource.indexOf("Array.isArray(shading)"),
-"补丁顺序：AO → GI → 材质着色 → 破口");
+"补丁顺序：AO → GI → 材质着色（链尾）");
 Check(patchSource.includes("#include <normal_fragment_maps>"),
   "锚点表里登记了新增的 <normal_fragment_maps>");
 Check(materialsSource.includes("THREE.MeshStandardMaterial.prototype.copy.call(upgraded, source);")

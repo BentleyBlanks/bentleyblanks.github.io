@@ -23,8 +23,8 @@ export const PACK = Object.freeze({
 });
 
 /**
- * `tag` 用的都是 Data_Destruction.TAG_PROFILE 与 Script_Main.SURFACE_BY_TAG
- * **两张表里都已经登记过**的键，没有新编：
+ * `tag` 用的都是 Script_Main.SURFACE_BY_TAG（及已删的破坏系统曾用的同一套 tag 表）
+ * **里已经登记过**的键，没有新编：
  *   householdCrock  = lightMasonry / brick —— 陶缸脆，打碎出砖灰不是木屑
  *   householdBasket = wood / wood         —— 荆条筐、簸箕、斗笠
  *   householdWoodpile = wood / wood       —— 柴垛

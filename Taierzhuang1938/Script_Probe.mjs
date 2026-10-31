@@ -130,7 +130,6 @@ async function Boot() {
           else if (material) material.needsUpdate = true;
         });
         for (const material of library.materials.values()) material.needsUpdate = true;
-        for (const material of library.staticMaterials.values()) material.needsUpdate = true;
       }
       return changed;
     },

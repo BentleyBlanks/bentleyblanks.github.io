@@ -24,6 +24,7 @@ import { GRENADE_RETURN, ExplosiveIdFor } from "./Data_Explosives.mjs";
 import { BlastExposure, BlastBearing, ChargeKgFor } from "./Script_BlastExposure.mjs";
 import { ShellVisuals } from "./Script_ShellVisual.mjs";
 import { T } from "./Script_Text.mjs";
+import { BLAST_TARGETS } from "./Script_BlastTargets.mjs";
 // 白刃劈中了哪一段：纯几何（实际高度与方向命中的肢段），断肢规则层要它当 shapeId。
 import { PickMeleeShape } from "./Script_Dismemberment.mjs";
 import { MELEE_RULES } from "./Data_MeleeCombat.mjs";
@@ -80,7 +81,7 @@ class Projectile {
 
 export class CombatSystem {
   /**
-   * @param {object} host { battlefield, ai, vfx, audio, lights, player, library, scene, story, destruction }
+   * @param {object} host { battlefield, ai, vfx, audio, lights, player, library, scene, story }
    */
   constructor(host) {
     this.host = host;
@@ -766,12 +767,9 @@ export class CombatSystem {
   Blast(position, radius, damage, kind, hurtSide = null, byPlayer = false, onHit = null, explosiveId = kind, ownerId = null, options = null) {
     this.host.onBlast?.({position:position.clone(),radius,damage,kind,hurtSide,byPlayer,explosiveId,ownerId});
     if (this.host.vfx) this.host.vfx.Explosion(position, { radius, kind, explosiveId, incoming: options?.incoming ?? null });
-    // 先改场景拓扑、再算人物遮挡：爆压把墙打穿的同一瞬间，洞口后面的人应该吃到
-    // 剩余冲击，而不是等下一颗弹。Destruction.Blast 内部会把同一次爆炸批量提交，
-    // 空间散列与导航只重建一次。
-    if (this.host.destruction) {
-      this.host.destruction.Blast(position, radius, damage, { kind });
-    }
+    // 摆点层摆下的可炸物件（弹药箱等，Script_BlastTargets）认领这一次爆炸。
+    // 场景几何破坏系统 2026-10-31 已删，这是它原来 Blast 里留给玩法的那一行。
+    BLAST_TARGETS.Blast(position, radius, damage, kind);
     this.host.battlefield.deformation?.ApplyBlast(position, explosiveId);
     this.host.battlefield.breakableTrees?.Blast(position, radius, damage);
     const bf = this.host.battlefield;

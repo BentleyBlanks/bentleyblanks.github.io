@@ -3,14 +3,13 @@ import * as THREE from 'three';
 import {BuildSink,AddHardMountainRoof} from './Script_World.mjs';
 import {FlareSurfaceIndex} from './Script_FlareSurfaces.mjs';
 import {FlareDirector,MakeFlareHost} from './Script_Flare.mjs';
-import {MakeDestructionUniforms} from './Script_Destruction.mjs';
 let checks=0;const Check=(ok,message)=>{assert.ok(ok,message);checks++;};
 function Build(options={}){
- const scene=new THREE.Scene(),root=new THREE.Group(),sink=new BuildSink(),damage=MakeDestructionUniforms();scene.add(root);
+ const scene=new THREE.Scene(),root=new THREE.Group(),sink=new BuildSink();scene.add(root);
  AddHardMountainRoof(sink,{x:0,z:0,width:10,depth:6,eaveY:3,ridgeY:5,ry:.24,seed:'FlareRoofProbe',rafters:true,...options});
- const library={Get:name=>new THREE.MeshBasicMaterial({name,side:THREE.DoubleSide}),destruction:damage};
+ const library={Get:name=>new THREE.MeshBasicMaterial({name,side:THREE.DoubleSide})};
  sink.Flush(root,library);const index=new FlareSurfaceIndex(scene,library);index.Refresh();
- return {scene,root,index,damage,library,Dispose(){index.Clear();root.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});}};
+ return {scene,root,index,library,Dispose(){index.Clear();root.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});}};
 }
 for(const options of [{},{ruined:'partial'},{burnt:true}]){
  const rig=Build(options),ray=new THREE.Raycaster(),roofMeshes=rig.index.meshes;
@@ -31,10 +30,7 @@ for(const options of [{},{ruined:'partial'},{burnt:true}]){
 }
 {
  const rig=Build(),from={x:.2,y:12,z:.2},to={x:.2,y:-1,z:.2},hit=rig.index.TraceSegment(from,to);
- rig.damage.count.value=1;rig.damage.centers.value[0].set(hit.point.x,hit.point.y,hit.point.z,1);
- rig.damage.halves.value[0].set(1,2,1,0);rig.damage.metas.value[0].set(1,0,0,0);
- Check(!rig.index.TraceSegment(from,to),'Rendered fracture opening also removes the support surface');
- rig.damage.enabled.value=0;Check(!!rig.index.TraceSegment(from,to),'Disabling damage restores the original surface');
+ Check(!!hit,'Fixture hits intact roof region');
  const director=new FlareDirector(MakeFlareHost({vfx:{flareSurfaces:rig.index},Battlefield:()=>({GroundHeight:()=>0})}));
  director.LaunchFlare({preset:'Illumination',from:{x:-12,z:0},at:{x:0,z:0},driftMS:0,swayM:0});
  const f=director.flares[0];Check(f.landing.surface==='solid'&&f.landing.position.y>3,'Production host lands on a visible roof even without a gameplay roof collider');

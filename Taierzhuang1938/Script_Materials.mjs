@@ -13,7 +13,7 @@ import { TextureBaker } from "./Script_TextureBaker.mjs";
 import { TextureImportOf, MobileTextureImportOf, ApplyTextureImport, PrepareImportedTexture, LoadKtxTexture, ResolveTextureImportUrl } from "./Script_TextureImports.mjs";
 import { SSR } from "./Data_Tuning_Graphics.mjs";
 import {
-  ApplyPatches, IndirectLightingPatches, MakeDestructionPatch, FoldOrmMaps, PatchesOf,
+  ApplyPatches, IndirectLightingPatches, FoldOrmMaps, PatchesOf,
 } from "./Script_MaterialPatches.mjs";
 import { MakeMaterialShadingPatch, MakeShadingFeatures } from "./Script_MaterialShading.mjs";
 import {
@@ -162,10 +162,9 @@ function SsrEligible(minRoughness) {
  *          建材质的入口都按 `transparent` 分流。
  *   着色 —— POM / 细节法线 / 微阴影 / 地平线镜面遮蔽 / 皮肤预积分散射。
  *          补丁由 MaterialLibrary._ShadingPatch 造好后传进来（模块反向 import 会成环）。
- *   破口 —— 主材质 / 静态克隆 / 阴影深度三条链共用同一份 OBB。
  */
 export function InjectIndirectLighting(material,
-  { ssao = null, gi = null, ssr = null, destruction = null, shading = null, surface = null } = {}) {
+  { ssao = null, gi = null, ssr = null, shading = null, surface = null } = {}) {
   // 半透明材质一律不挂 SSR：补丁要占用 gl_FragColor.a。这里再兜一次底，
   // 调用点漏判也不会把混合搞坏。
   const ssrUniforms = material.transparent ? null : ssr;
@@ -176,9 +175,8 @@ export function InjectIndirectLighting(material,
   material.userData.ssaoUniforms = ssao;
   material.userData.giUniforms = gi;
   material.userData.ssrUniforms = ssrUniforms;
-  material.userData.destructionUniforms = destruction;
   ApplyPatches(material, IndirectLightingPatches({
-    orm, ssao, gi, ssr: ssrUniforms, destruction, shading, surface,
+    orm, ssao, gi, ssr: ssrUniforms, shading, surface,
   }));
   // 布尔标记只给运行时取证与幂等接入用。不要把 uniforms 包塞进新标记：
   // 里面有 Texture，material.clone()/toJSON 会为每个人刷一屏“Unable to serialize”。
@@ -237,15 +235,6 @@ export function ClassifyExternalMaterial(name) {
   return null;
 }
 
-/** 阴影深度也裁同一批洞；否则墙已经穿了，太阳底下还留一块完整墙影。 */
-function MakeDestructionDepthMaterial(uniforms) {
-  const material = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
-  ApplyPatches(material, [MakeDestructionPatch(uniforms, {
-    key: "damageDepth:" + uniforms.maxVolumes,
-  })]);
-  return material;
-}
-
 /** 兼容旧调用点：只挂 AO。 */
 export function InjectScreenSpaceAo(material, aoUniforms) {
   return InjectIndirectLighting(material, { ssao: aoUniforms });
@@ -257,8 +246,7 @@ export function InjectScreenSpaceAo(material, aoUniforms) {
  */
 export class MaterialLibrary {
   constructor(renderer,
-    { textureSize = 512, ssao = null, gi = null, ssr = null,
-      destruction = null, shading = null } = {}) {
+    { textureSize = 512, ssao = null, gi = null, ssr = null, shading = null } = {}) {
     this.renderer = renderer;
     this.textureSize = textureSize;
     // 小件（布、钢、沙包、木梁）一直是 256；ultra 把基准抬到 1024 时它们跟着翻一档。
@@ -269,7 +257,6 @@ export class MaterialLibrary {
     this.gi = gi;             // MakeGiUniforms() 那一包，与 ProbeVolume 共用同一批对象
     // SsrPass.SurfaceUniforms 那一包（SSR 关档时是 null，材质连补丁都不编）
     this.ssr = ssr;
-    this.destruction = destruction;
     // MakeMaterialShadingUniforms() 那一包（POM / 细节法线 / 微阴影 / 地平线 / 皮肤）。
     // 与 ssao / gi 同一个模式：全场共用一份，调一根旋钮全场生效。
     this.shading = shading;
@@ -279,13 +266,9 @@ export class MaterialLibrary {
     this.upgradedExternal = new Map();
     this.baked = new Map();   // name -> { albedo, normal, orm }（three 纹理）
     this.materials = new Map();
-    // 演员也会复用 BrickWall / WoodBeam 的底材，不能把破口 shader 直接挂到底材上，
-    // 否则人走过洞口时身体也会被裁掉。Static() 只给 BuildSink 的场景网格克隆一份。
-    this.staticMaterials = new Map();
     // 外部 GLB 的材质由加载器缓存并在多个蒙皮实例之间共享。WeakSet 既保证只注入
     // 一次，也不把这些材质变成 MaterialLibrary 的所有物（Dispose 时不能替资产卸载）。
     this.externalPbrMaterials = new WeakSet();
-    this.staticDepthMaterial = destruction ? MakeDestructionDepthMaterial(destruction) : null;
   }
 
   /**
@@ -752,13 +735,13 @@ export class MaterialLibrary {
   }
 
   /**
-   * 统一的注入口：ORM 三合一 / AO / GI / SSR / 着色升级 /（可选）破口，
+   * 统一的注入口：ORM 三合一 / AO / GI / SSR / 着色升级，
    * 顺序由补丁注册表定（`IndirectLightingPatches`）。
    *
    * `ssr` 不传就用库里那一包；传 null 表示这份材质**不编 SSR**
    * （粗糙度下界超过 SSR 上限，见 `SsrEligible`）。
    */
-  _Inject(material, { destruction = null, ssr = undefined, surface = null } = {}) {
+  _Inject(material, { ssr = undefined, surface = null } = {}) {
     // ORM 三合一先做：它决定材质自带的遮蔽还在不在 `aoMap` 上（摘掉之后
     // 微阴影要改读补丁声明的 gMaterialAo），而着色特性里那一位要跟着走。
     // 幂等 —— 二次注入取回同一份描述子。
@@ -770,9 +753,9 @@ export class MaterialLibrary {
     const ssrPack = ssr === undefined ? this.ssr : ssr;
     // Folding removes metalnessMap/aoMap, so its replacement must also run in
     // unlit-feature previews and low quality, even without screen-space effects.
-    if (!orm && !this.ssao && !this.gi && !ssrPack && !shading && !destruction && !surface) return material;
+    if (!orm && !this.ssao && !this.gi && !ssrPack && !shading && !surface) return material;
     return InjectIndirectLighting(material, {
-      ssao: this.ssao, gi: this.gi, ssr: ssrPack, destruction, shading, surface,
+      ssao: this.ssao, gi: this.gi, ssr: ssrPack, shading, surface,
     });
   }
 
@@ -809,35 +792,11 @@ export class MaterialLibrary {
     return material;
   }
 
-  /** 把普通底材变成“只用于静态布景”的可裁切版本；同一底材始终复用同一克隆。 */
-  Static(material) {
-    if (!this.destruction || !material) return material;
-    const key = material.uuid;
-    if (this.staticMaterials.has(key)) return this.staticMaterials.get(key);
-    const clone = material.clone();
-    clone.name = `${material.name || material.type}_DestructibleStatic`;
-    // userData 是 JSON 深拷的，materialShadingSurface（四个数字）与 ormUniforms
-    // 原样跟过来了，所以静态克隆与底材编的是同一路补丁、同一份 cache key ——
-    // 不然场景里同一块砖会出现「能打穿的那面有视差、不能打穿的那面没有」。
-    // SSR 也跟底材的判定走：底材没挂（太糙）的话可裁切克隆也不该挂，
-    // 否则同一块墙的完整版与破口版会是两套采样器预算。
-    this._Inject(clone, {
-      destruction: this.destruction,
-      ssr: material.userData.ssrUniforms ? this.ssr : null,
-    });
-    this.staticMaterials.set(key, clone);
-    return clone;
-  }
-
-  StaticDepth() { return this.staticDepthMaterial; }
-
   Dispose() {
     for (const set of this.baked.values()) {
       set.albedo.dispose(); set.normal.dispose(); set.orm.dispose();
     }
     for (const m of this.materials.values()) m.dispose();
-    for (const m of this.staticMaterials.values()) m.dispose();
-    if (this.staticDepthMaterial) this.staticDepthMaterial.dispose();
     // 换类出来的那些 MeshPhysicalMaterial 是本库造的，跟着还；源材质属于资产
     // 加载器（外部 GLB 在多个关卡之间复用），一个都不许碰。
     for (const [source, upgraded] of this.upgradedExternal) {
@@ -849,6 +808,5 @@ export class MaterialLibrary {
     this.shadingMapsReady = false;
     this.baked.clear();
     this.materials.clear();
-    this.staticMaterials.clear();
   }
 }

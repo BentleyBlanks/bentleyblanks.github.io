@@ -171,7 +171,7 @@ vendor 在 `vendor/rapier/build/rapier.module.mjs`（2.8 MB，wasm 用 base64 �
 除了"整堵墙横在轴上"这种量得出机理的情形，剩下的波动是 AI 决策的蝴蝶效应。
 判据只认两条讲得出道理的：**不压进既有院墙、不横在目标与目标之间的连线上**。
 
-顺带对齐的一张表：`Data_Destruction.TAG_PROFILE` 与 `Script_Main.SURFACE_BY_TAG`
+顺带对齐的一张表：（已删的）`Data_Destruction.TAG_PROFILE` 与 `Script_Main.SURFACE_BY_TAG`
 以前都漏了生活层与城外层新编的 tag（`householdWoodpile` / `householdCart` /
 `streetStall` / `fence` / `sandbagEmplacement` / `fieldBank` / `dirt`），
 于是打柴垛出砖灰、打沙袋工事按砖墙算血量、连 tag 就叫 `dirt` 的土坎也出砖灰。

@@ -26,7 +26,7 @@
 //     也只会平移 0。
 //
 // 【tag 按工作包口径一律 "prop"、栅栏形制用 "fence"。】仓库里其实还有四个更贴切、
-// 且 Data_Destruction 与 Script_Main.SURFACE_BY_TAG 两张表都已登记的 tag，
+// 且 Script_Main.SURFACE_BY_TAG 已登记的 tag，
 // 换上去能让打击音与碎屑对上，改动是四行：
 //     ryCeramicVat    prop → householdCrock  （lightMasonry：陶缸，脆但不是木头）
 //     ryHayStack      prop → villageStraw    （straw）

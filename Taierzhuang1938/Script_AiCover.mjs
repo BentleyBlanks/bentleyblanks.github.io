@@ -338,8 +338,7 @@ export class CoverRegistry {
   // ------------------------------------------------------------- 表的生命周期
 
   /**
-   * 重建整张表。破坏系统炸墙之后 `Script_Destruction` 会 filter `battlefield.covers`
-   * （Script_Destruction.mjs:936），把新数组交回这里。
+   * 重建整张表。`battlefield.covers` 换成新数组之后（原来的墙体破坏系统炸墙时就这样换）交回这里。
    *
    * 占用表按 **id** 保留：掩体还在，占它的人就还占着；掩体没了才释放。
    * 保护侧记忆（faceSign）也按 id 保留 —— 墙塌了一段，人躲的还是原来那一面。

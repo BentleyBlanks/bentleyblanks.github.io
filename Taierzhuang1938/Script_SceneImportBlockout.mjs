@@ -33,6 +33,7 @@ const SEGMENTS = Object.freeze([
 const SAME_OBJECT_M = 20;
 export const STAGE_0105_DONE = "Stage0105Done";
 const DEG = 180 / Math.PI;
+const Round4 = (v) => Number(v.toFixed(4));
 const BLOCK_TOP_KEYS = new Set(["id", "x", "z", "w", "d", "h", "ry", "semantic", "solid", "y", "visual", "tag", "noClimb", "standOn", "cover", "signal", "appearSignal"]);
 
 function Args() {
@@ -90,10 +91,11 @@ function BlockToObject(block, group, report) {
   if (!material) throw new Error(`体块 ${block.id} 的 semantic ${block.semantic} 没有对应的白盒材质（Data_SceneAssets）`);
   const meta = {};
   for (const [k, v] of Object.entries(block)) if (!BLOCK_TOP_KEYS.has(k)) meta[k] = v;
+  // 底面高与角度收到万分位（y − h/2、弧度换角度会留下 -0.040000000000000036 这种尾巴）
   return {
     id: block.id, asset: "Whitebox/Box", material,
-    pos: [block.x, Number.isFinite(block.y) ? block.y - block.h / 2 : null, block.z],
-    ...(block.ry ? { yawDeg: block.ry * DEG } : {}),
+    pos: [block.x, Number.isFinite(block.y) ? Round4(block.y - block.h / 2) : null, block.z],
+    ...(block.ry ? { yawDeg: Round4(block.ry * DEG) } : {}),
     size: [block.w, block.h, block.d],
     ...(block.solid === false ? { solid: false } : {}),
     ...(block.visual === false ? { visual: false } : {}),
@@ -210,7 +212,7 @@ export function ImportFirstLevelWhitebox({ rev = null } = {}) {
     const kindAsset = { box: "Backdrop/Box", blob: "Backdrop/Blob", hill: "Backdrop/Hill", tree: "Backdrop/Tree" };
     for (const shape of bd.shapes || []) {
       const { id, kind, x, z, ry, ...params } = shape;
-      objects.push({ id, asset: kindAsset[kind], pos: [x, null, z], ...(ry ? { yawDeg: ry * DEG } : {}), layer: "backdrop", group: "远景", params });
+      objects.push({ id, asset: kindAsset[kind], pos: [x, null, z], ...(ry ? { yawDeg: Round4(ry * DEG) } : {}), layer: "backdrop", group: "远景", params });
     }
     backdrop = { far: bd.far, ground: { ...bd.ground }, ...(bd.haze ? { haze: { ...bd.haze } } : {}), paint: bd.paint || [], siteBounds: { ...backdropSeg.doc.bounds } };
     report.push(`远景：${backdropSeg.short} 的 ${(bd.shapes || []).length} 个远景物件进 objects（layer backdrop），${(bd.paint || []).length} 项远景涂色`);

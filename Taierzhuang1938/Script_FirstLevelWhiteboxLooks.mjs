@@ -38,7 +38,7 @@ const SrgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1
  * 拷 userData 时每份都会刷一行「Unable to serialize Texture」。克隆前先摘下、克隆完放回；
  * 克隆体随后由 InjectSurface 重新挂上同一批包。
  */
-const UNIFORM_PACKS = ["ssaoUniforms", "giUniforms", "ssrUniforms", "destructionUniforms"];
+const UNIFORM_PACKS = ["ssaoUniforms", "giUniforms", "ssrUniforms"];
 function CloneLibraryMaterial(base) {
   const kept = {};
   for (const key of UNIFORM_PACKS) if (key in base.userData) { kept[key] = base.userData[key]; delete base.userData[key]; }

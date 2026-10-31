@@ -175,7 +175,7 @@ function AuditInPage(options) {
   const out = [];
   let scanned = 0;
   for (const box of bf.colliders) {
-    if (!box || box.destroyed) continue;
+    if (!box) continue;
     const h = box.h || [(box.max[0] - box.min[0]) / 2, (box.max[1] - box.min[1]) / 2, (box.max[2] - box.min[2]) / 2];
     const c = box.c || [(box.min[0] + box.max[0]) / 2, (box.min[1] + box.max[1]) / 2, (box.min[2] + box.max[2]) / 2];
     const ry = box.ry || 0;

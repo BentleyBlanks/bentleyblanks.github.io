@@ -32,8 +32,6 @@
     "test:taierzhuang1938:actorbatch": "node Taierzhuang1938/Script_ActorBatchTest.mjs",
     "test:taierzhuang1938:physics": "node Taierzhuang1938/Script_PhysicsTest.mjs",
     "test:taierzhuang1938:ai": "node Taierzhuang1938/Script_AiBehaviorTest.mjs",
-    "test:taierzhuang1938:destruction": "node Taierzhuang1938/Script_DestructionTest.mjs",
-    "test:taierzhuang1938:destructionEditor": "node Taierzhuang1938/Script_DestructionEditorTest.mjs",
     "test:taierzhuang1938:jump": "node Taierzhuang1938/Script_JumpTest.mjs",
     "test:taierzhuang1938:bootpaper": "node Taierzhuang1938/Script_BootPaperTest.mjs",
     "test:tunnelBell1942": "node TunnelBell1942/Script_SmokeTest.mjs",

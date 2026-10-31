@@ -8,8 +8,7 @@
 // （建参数对象 + 拼缓存键）。车厢机位实测每帧 96 次，占 `getParameters` 总数 117 的八成。
 //
 // 给这三类各一份自己的深度材质，每份只被同一种对象用，那一位就不再翻。
-// 普通 Mesh 不挂，继续吃 three 的 `_depthMaterial`（`BuildSink` 的可破坏静态件
-// 另有 `library.StaticDepth()`，那一只同样只被普通 Mesh 用，不冲突）。
+// 普通 Mesh 不挂，继续吃 three 的 `_depthMaterial`。
 //
 // **画面不变**：three 仍然在每次 draw 之前把对象自己材质的 map / alphaMap /
 // alphaTest / side / displacementMap 抄到返回的那只深度材质上，抄的时机与内容

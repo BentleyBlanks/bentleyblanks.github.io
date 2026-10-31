@@ -8,7 +8,7 @@
 //   · 多辆同时存在（Type89Tank 模型每辆现造一份几何；材质共用，履带材质每辆克隆一份挂滚动补丁）；
 //   · 碰撞盒 tag 是 `farBankTank`，**不进 battlefield.colliders**、不叫 `missionTank`
 //     （否则子弹命中会转进 03–05 的 tankRuntime.OnBulletHit）；只进 physics（子弹与视线射线打得到）；
-//   · 不用 Type89Damage：傀儡不可摧毁 —— 碰撞记录带 destruction.profile "structural"、surface "metal"。
+//   · 不用 Type89Damage：傀儡不可摧毁 —— 碰撞记录带 surface "metal"。
 // 挂在 view.root（任务白盒根）之下：开机预热画一帧的隐藏组会把它们的着色器一起编好。
 // 声音只留两样：一个共用的 TankAudio 实例（发动机循环跟最近的一辆、炮口声给每辆的炮击用）。
 // ===========================================================================
@@ -73,7 +73,7 @@ export class FarBankTankView {
     const muzzle = model.nodes.get("gunMuzzle");
     if (muzzle) { gunRecoil.add(muzzle); muzzle.position.sub(trunnion); }
     const collider = { min: [0, 0, 0], max: [0, 0, 0], c: [0, 0, 0], h: [...HALF], tag: "farBankTank", ry: 0,
-      surface: "metal", destruction: { profile: "structural" } };
+      surface: "metal" };
     const entry = { id, group, model, turret, gun, gunRecoil, trackScroll, collider, registered: false,
       fx: { dust: [null, null], exhaust: null, puff: null, puffAt: -Infinity }, key: "" };
     this.entries.set(id, entry);

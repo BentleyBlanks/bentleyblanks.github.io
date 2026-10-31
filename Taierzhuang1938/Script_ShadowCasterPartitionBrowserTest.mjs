@@ -18,9 +18,8 @@ try {
   const report = await page.evaluate(async () => {
     const T = await import("three");
     const { ShadowCasterBatch, InstallShadowCasterBatch } = await import("/Taierzhuang1938/Script_ShadowCasterBatch.mjs");
-    const { ApplyPatches, MakeDestructionPatch } = await import("/Taierzhuang1938/Script_MaterialPatches.mjs");
+    const { ApplyPatches, MakePatch } = await import("/Taierzhuang1938/Script_MaterialPatches.mjs");
     const { CloneShadedMaterial } = await import("/Taierzhuang1938/Script_Materials.mjs");
-    const { MakeDestructionUniforms } = await import("/Taierzhuang1938/Script_Destruction.mjs");
     const renderer = new T.WebGLRenderer({ canvas: document.querySelector("canvas"), antialias: false });
     renderer.setSize(320, 180, false); renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.BasicShadowMap;
     renderer.debug.checkShaderErrors = true;
@@ -29,9 +28,24 @@ try {
     const material = new T.MeshBasicMaterial(), geometry = new T.BoxGeometry(192, .5, 192, 48, 1, 48);
     const roof = new T.Mesh(geometry, material); roof.castShadow = true;
     roof.position.set(2000, 12, 0); roof.rotation.set(.015, .173, -.021); roof.scale.set(1.03, 1.2, .97); scene.add(roof);
-    const damage = MakeDestructionUniforms(1); damage.count.value = 1;
-    damage.centers.value[0].set(2000, 12, 0, 1); damage.halves.value[0].set(14, 8, 10, 0); damage.metas.value[0].set(1, 0, 0, 0);
-    const depth = new T.MeshDepthMaterial(); ApplyPatches(depth, [MakeDestructionPatch(damage)]);
+    // A patched custom depth material that cuts a world-space hole (stands in for any per-material depth patch).
+    const hole = { center: { value: new T.Vector3(2000, 12, 0) }, half: { value: new T.Vector3(14, 8, 10) }, on: { value: 1 } };
+    const depth = new T.MeshDepthMaterial();
+    ApplyPatches(depth, [MakePatch({
+      key: "partitionHole1", preservesPosition: true,
+      uniforms: (u) => { u.uHoleCenter = hole.center; u.uHoleHalf = hole.half; u.uHoleOn = hole.on; },
+      vertex: [
+        ["#include <common>", "varying vec3 vHolePos;"],
+        ["#include <project_vertex>", [
+          "{ vec4 w = vec4(transformed, 1.0);", "#ifdef USE_BATCHING", "w = batchingMatrix * w;", "#endif",
+          "#ifdef USE_INSTANCING", "w = instanceMatrix * w;", "#endif", "vHolePos = (modelMatrix * w).xyz; }",
+        ].join("\n")],
+      ],
+      fragment: [
+        ["#include <common>", ["varying vec3 vHolePos;", "uniform vec3 uHoleCenter;", "uniform vec3 uHoleHalf;", "uniform float uHoleOn;"].join("\n")],
+        ["#include <clipping_planes_fragment>", "if (uHoleOn > 0.5) { vec3 d = vHolePos - uHoleCenter; if (abs(d.y) <= uHoleHalf.y && length(d.xz / uHoleHalf.xz) <= 0.85) discard; }"],
+      ],
+    })]);
     const tuning = { enabled: true, settleFrames: 30, cooldownFrames: 240, rescanFrames: 60, joinBudgetMs: 1.5,
       minInstanceCapacity: 1, minVertexCapacity: 1, reserveScale: 1, localChunkSize: 48, localChunkMinTriangles: 1024 };
     const batch = new ShadowCasterBatch(scene, { tuning, cloneDepthMaterial: CloneShadedMaterial });
@@ -63,7 +77,7 @@ try {
     const cases = [];
     for (const kind of ["orthographic", "perspective", "orthographic-edge"]) {
       const orthographic = kind.startsWith("orthographic"), edge = kind.endsWith("edge");
-      damage.centers.value[0].set(edge ? 2070 : 2000, 12, edge ? 70 : 0, 1);
+      hole.center.value.set(edge ? 2070 : 2000, 12, edge ? 70 : 0);
       const light = orthographic ? new T.DirectionalLight() : new T.SpotLight(0xffffff, 1, 300, .9);
       light.position.set(edge ? 2081 : 2011, 110, edge ? 91 : 21); light.target.position.set(edge ? 2070 : 2000, 0, edge ? 70 : 0); scene.add(light, light.target); light.castShadow = true;
       light.shadow.mapSize.set(256, 256); light.shadow.camera.near = 1; light.shadow.camera.far = 300;
@@ -80,7 +94,7 @@ try {
         batch.bypass = true; const source = Read(light); batch.bypass = false;
         const identity = Compare(chunks, whole), sourceComparison = Compare(chunks, source), baselineSourceComparison = Compare(whole, source);
         let filled = null;
-        if (mode === "hole") { damage.count.value = 0; filled = Compare(Read(light), chunks); damage.count.value = 1; }
+        if (mode === "hole") { hole.on.value = 0; filled = Compare(Read(light), chunks); hole.on.value = 1; }
         const group = batch.records.get(roof).group;
         group.mesh.onBeforeShadow(renderer, null, camera, light.shadow.camera, group.mesh.geometry, group.mesh.customDepthMaterial);
         const submittedIndices = Array.from(group.mesh._multiDrawCounts).slice(0, group.mesh._multiDrawCount).reduce((sum, count) => sum + count, 0);
@@ -104,7 +118,7 @@ try {
     assert.equal(test.sourceComparison.coverageChanged, 0, `${label}: standalone coverage must match`);
     assert.deepEqual(test.sourceComparison, test.baselineSourceComparison, `${label}: standalone difference must be identical to the existing whole batch`);
     if (test.kind.endsWith("edge")) assert.ok(test.submittedIndices > 0 && test.submittedIndices < test.originalIndices, `${label}: exact native depth while rejecting out-of-frustum chunks`);
-    if (test.filled) assert.ok(test.filled.changed > 200, `${label}: live shared damage uniforms must actually open the hole`);
+    if (test.filled) assert.ok(test.filled.changed > 200, `${label}: live hole uniforms must actually open the hole`);
   }
   console.log("PASS ShadowCasterPartitionBrowserTest", JSON.stringify({ cases: report.cases.length,
     changedDepthPixels: report.cases.reduce((sum, test) => sum + test.identity.changed, 0),

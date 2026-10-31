@@ -153,7 +153,6 @@ import { MainMenu, Progress } from "./Script_Menu.mjs";
 import { CommandRoom } from "./Script_CommandRoom.mjs";
 import { CommandRoomPreview } from "./Script_CommandRoomPreview.mjs";
 import { DebugOptions } from "./Script_DebugOptions.mjs";
-import { DestructionSystem, MakeDestructionUniforms } from "./Script_Destruction.mjs";
 import { FrameProfiler } from "./Script_Profiler.mjs";
 import { FrameDebugger } from "./Script_FrameDebugger.mjs";
 import { FrameDebugAgent } from "./Script_FrameDebugAgent.mjs";
@@ -548,12 +547,9 @@ const camera = new THREE.PerspectiveCamera(CAMERA.baseFovDeg,
   window.innerWidth / window.innerHeight, 0.06, 620);
 camera.rotation.order = "YXZ";
 
-// 破口 uniform 同时喂主材质、阴影与深度法线预通道，三条链必须是一只洞。
-const destructionUniforms = MakeDestructionUniforms();
 const trailFocus = new THREE.Vector3();
 const post = new PostPipeline(renderer, {
   width: window.innerWidth, height: window.innerHeight, quality: QUALITY,
-  destruction: destructionUniforms,
   whitebox: WHITEBOX_CONFIG,
 });
 // AO / SSIL 的材质端 uniform 包。**构造与同步都走 Script_PostGtao 的共用工厂**
@@ -729,7 +725,6 @@ const library = new MaterialLibrary(renderer, {
   textureSize: post.preset.materialTexture || (QUALITY === "low" ? 256 : 512),
   ssao, gi: GI_ON ? giUniforms : null,
   ssr: ssrUniforms,
-  destruction: destructionUniforms,
   shading: shadingUniforms,
 });
 // 阴影趟静态投影体合批（Script_ShadowCasterBatch 头注）：一动不动的普通投影网格收进 BatchedMesh，
@@ -951,7 +946,6 @@ let actorFactory = null;
 let actorBatch = null;
 let story = null;
 let combat = null;
-let destruction = null;
 let interact = null;
 // 负重状态机（担架/药箱/门板…）。规则在 Script_Carry，这里只接线。
 let carry = null;
@@ -1542,10 +1536,8 @@ async function Boot() {
   // 没有它，AI 在这座四合院城里就是直奔一堵院墙（见 Script_Navigation 的账）。
   navGrid = MakeNavGrid(battlefield);
   const nav = navGrid;
-  destruction = new DestructionSystem(scene, library, destructionUniforms, { vfx, audio });
-  destruction.SetWorld(battlefield, physics, navGrid);
   ai = new AiDirector({
-    battlefield, actorFactory, scene, vfx, audio, player, nav, physics, destruction, audioWiring,
+    battlefield, actorFactory, scene, vfx, audio, player, nav, physics, audioWiring,
     // AI 的弹着与玩家子弹查同一张表面表（碰撞盒自带 surface → SURFACE_BY_TAG → 兜底）。
     impactSurface: ImpactSurface,
     // 剖析器只用来打 ai/* 子桶标记（关着时是一次布尔检查）；AI 不读它任何状态。
@@ -1886,7 +1878,7 @@ async function Boot() {
     restoreSky: () => RestoreLevelSky(),
   });
   combat = new CombatSystem({
-    battlefield, ai, vfx, audio, lights, player, library, scene, story, physics, destruction, grenadeAsset,
+    battlefield, ai, vfx, audio, lights, player, library, scene, story, physics, grenadeAsset,
     audioWiring,
     // 玩家自己的手榴弹/集束/呼来的迫击炮炸中人时的回执（见 ConfirmHit）。
     // 一次爆炸只回一条，Combat.Blast 那边已经并好了。
@@ -2348,7 +2340,7 @@ async function Boot() {
     // （Script_AudioWiringTest 换探针世界之前必须先把 1 m 网格缓存清掉）。
     audioWiring,
     get meleeCombat() { return meleeCombat; },
-    story, combat, destruction, interact, carry, emplacement, wheel, strafe, flare, telegraph,
+    story, combat, interact, carry, emplacement, wheel, strafe, flare, telegraph,
     companion, checkpoint, setpieces,
     // 机队实例：出图脚本要能给任意一架摆手动姿态，核对模型机头朝向。
     get aircraft() { return aircraft; },
@@ -2693,22 +2685,6 @@ async function Boot() {
           villageArchetypes: { ...battlefield.outfield.stats.villageArchetypes },
         } : null,
       }),
-      /** 破坏层取证：可破坏/承重数量、破口、常驻残骸与拓扑重建次数。 */
-      Destruction: () => destruction ? destruction.Stats() : null,
-      /** 冒烟靶场用：走正式材质耐久与拓扑链，不绕过破坏系统。 */
-      DamageCollider: (box, energy = 1000, kind = "shell", normal = null) => {
-        if (!destruction || !box) return null;
-        const c = box.c || [
-          (box.min[0] + box.max[0]) * 0.5,
-          (box.min[1] + box.max[1]) * 0.5,
-          (box.min[2] + box.max[2]) * 0.5,
-        ];
-        const n = normal || { x: 0, y: 0, z: 1 };
-        const point = { x: c[0], y: c[1], z: c[2] };
-        const result = destruction.Hit(box, point, energy, { kind, normal: n });
-        destruction.Update(player.position);
-        return { ...result, stats: destruction.Stats() };
-      },
       /** 从某点朝某方向打一条射线（斜墙/空气墙的取证）。 */
       Ray: (ox, oy, oz, dx, dy, dz, maxDist = 60, terrain = false) => {
         const d = Math.hypot(dx, dy, dz) || 1;
@@ -3209,7 +3185,7 @@ async function Boot() {
   // 不许在这里把当时那一份拷进去（拷了就是「编辑器指着上一关那座城」）。
   editor = CreateDevTools({
     renderer, scene, camera, canvas, library, lights, post, vfx,
-    actorFactory, viewmodel, audio, cutscene, destruction, profiler,
+    actorFactory, viewmodel, audio, cutscene, profiler,
     shot: !!SHOT,
     ReleasePointerLock,
     ReturnToMainMenu: TOOLS_HOME ? ReturnToTitlePage : MENU_AT_BOOT ? () => OpenMenu() : null,
@@ -3590,7 +3566,6 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   weaponRange?.Dispose();
   weaponRange = null;
   aircraft?.SetPhase(phase);
-  if (destruction) destruction.Clear();
   explosionRange?.Dispose(); explosionRange = null;
   ClearExternalProps();
   if(phase.whitebox?.p012)ClearTrimProps(scene);
@@ -3675,7 +3650,6 @@ async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
   // 炸断的树（焦黑树桩 / 倒下的树冠）同理，第一次炸树不现编。
   battlefield.breakableTrees?.Warm();
   BuildPhysics();
-  if (destruction) destruction.SetWorld(battlefield, physics, null);
 }
 
 /**
@@ -3995,7 +3969,6 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
     ClearRuntime();
     await BuildField(phase, SetBootStep, 0, 1);
     navGrid = MakeNavGrid(battlefield);
-    destruction.SetWorld(battlefield, physics, navGrid);
     ai.ctx.battlefield = battlefield;
     ai.ctx.physics = physics;
     ai.ctx.nav = navGrid;
@@ -5121,7 +5094,7 @@ async function WarmStaticShadowBatch(phase) {
   report.temporaryShadow = !!temporary;
   report.csmMapsBefore = csm.lights.map(light => light.shadow.map?.uuid ?? null);
   const warmedBefore = new Set(shadowCasterBatch.warmedDepth), rendered = new Set(), depths = new Map();
-  const proxy = shadowCasterBatch.WarmProxy([library.StaticDepth()].filter(Boolean));
+  const proxy = shadowCasterBatch.WarmProxy();
   proxy.name = "ShadowBatchBootWarmProxy";
   proxy.position.set(player.position.x, player.position.y + 1, player.position.z);
   const meshes = new Set();
@@ -5337,7 +5310,7 @@ async function WarmLevel(phase) {
     if (openingProxy) proxy.add(openingProxy);
     // 阴影趟静态投影体合批的批次版深度程序（共用批次深度 + BuildSink 破口裁切那只的克隆）：
     // 只有真跑阴影趟才编，不预热的话开局半秒收满成员那一帧现编。
-    const casterBatchProxy = shadowCasterBatch.WarmProxy([library.StaticDepth()].filter(Boolean));
+    const casterBatchProxy = shadowCasterBatch.WarmProxy();
     proxy.add(casterBatchProxy);
     // 人物 GLB 材质的**非蒙皮**变体：背枪 / 担架伤员 / 遗体这类刚体网格复用同一份材质，
     // program 缓存键不同（无 skinning）。实测车厢里第一次出现背枪时一个物理材质 program
@@ -8447,7 +8420,7 @@ const BULLET_DRAG_K = 0.0025;   // 二次阻力系数，/m。见上方推导。
 // householdCart / streetStall / fence / villageStraw / sandbagEmplacement /
 // fieldBank / dirt 这些 tag，一个都没进这张表 —— 打柴垛出砖灰、打沙袋工事出砖灰、
 // 打土坎（tag 就叫 dirt）也出砖灰。这一轮给生活家什与下载来的布景补碰撞盒时
-// 顺手对齐，键与 Data_Destruction.TAG_PROFILE 保持同一套；以后新加 tag 两边一起加。
+// 顺手对齐，键与 （已删的破坏系统曾用的）tag 表 保持同一套；以后新加 tag 两边一起加。
 const SURFACE_BY_TAG = {
   barricade: "sandbag", sandbagPlug: "sandbag", sandbagEmplacement: "sandbag",
   prop: "wood", balk: "wood", bridge: "wood", platform: "wood",
@@ -8868,11 +8841,6 @@ function TryFire(dt, returningGrenade = false) {
     // 跳弹：打在硬面上四分之一的概率削飞出去。种子跟着射击序号走（不是 Math.random）——
     // 逐轮录音比对要可复现，与曳光按 playerShots 取模是同一条理由。
     audioWiring.Ricochet(_hitPoint, surface, state.playerShots);
-    // 子弹不再只留贴花：同一位置持续受击会按砖／木／土耐久形成真实破口。
-    // 解析地表的虚拟记录不在破坏层里（它没有可替换的 Rapier 盒）。
-    if (destruction && shot.wall.box && shot.wall.box.tag !== "dirt") {
-      destruction.Hit(shot.wall.box, _hitPoint, weapon.damage, { kind: "bullet", normal: n });
-    }
   }
   // 【2026-08-20】曳光**按比例出**，不是每发都出。
   //
@@ -8998,9 +8966,6 @@ function FireEmplacedShot(shot) {
     if (tankHit) missionRuntime?.OnTankHit?.(_hitPoint.clone(), player.position.clone());
     audio.Play(IMPACT_CUE[surface] || "impactBrick", { position: _hitPoint.clone(), volume: 0.5 });
     audioWiring.Ricochet(_hitPoint, surface, shot.index);
-    if (destruction && result.wall.box && result.wall.box.tag !== "dirt") {
-      destruction.Hit(result.wall.box, _hitPoint, shot.damage, { kind: "bullet", normal: n });
-    }
   }
   // 机枪**每发都出曳光**（与步枪 1/5 是两条账）：满场只有靠它才读得出
   // 压制火力从哪个方向来，这也是「封住两侧院门」看得见的那一半。
@@ -9819,9 +9784,6 @@ function Frame(dt, render = true) {
   // 死亡判定之前** —— 它打得倒玩家，排在后面那一类死法会被整帧吞掉
   // （与手榴弹/掷弹筒同一笔账，见死亡判定那段注释）。
   strafe?.Update(dt);
-  // 枪弹／爆炸可能在这一帧刚开出新洞。渲染前把离玩家最近的破口流进材质，
-  // 物理结果则已经在 Hit/Blast 的同一调用里立即生效。
-  if (destruction) destruction.Update(player.position, dt);
   // 炮坑的地表碎块：爆炸那一帧只改地形与碰撞，半埋的土块石块摊到随后一两帧铺
   // （一块 ~12k 顶点，是爆炸链里最贵也最不怕晚一帧的一项）。
   battlefield?.deformation?.Update();
@@ -10674,7 +10636,6 @@ function RecompileAllMaterials() {
     if (Array.isArray(material)) material.forEach(Mark); else Mark(material);
   });
   for (const material of library.materials.values()) Mark(material);
-  for (const material of library.staticMaterials.values()) Mark(material);
   for (const material of library.upgradedExternal.values()) Mark(material);
 }
 
@@ -10804,7 +10765,6 @@ function ApplyGraphics() {
         if (Array.isArray(material)) material.forEach(Recompile); else Recompile(material);
       });
       for (const material of library.materials.values()) Recompile(material);
-      for (const material of library.staticMaterials.values()) Recompile(material);
     }
     if (gi) {
       gi.enabled = wantGi;

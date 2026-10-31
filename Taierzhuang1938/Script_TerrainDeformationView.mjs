@@ -360,7 +360,7 @@ export class TerrainDeformationView {
     // Foundations and elevated walkable objects remain supported; characters are
     // dynamic and never enter this static mask. Open soil between them deforms.
     for (const b of this.field.NearbyColliders(x, z, margin + 1)) {
-      if (b.destroyed || b.terrain) continue;
+      if (b.terrain) continue;
       if (b.min[1] > y + 1.5 || b.max[1] < y - 0.1) continue;
       if (x > b.min[0] - margin && x < b.max[0] + margin && z > b.min[2] - margin && z < b.max[2] + margin) return false;
     }
@@ -412,7 +412,6 @@ export class TerrainDeformationView {
       geometry.setIndex([0, 1, 2, 2, 1, 3]);
       const mesh = new THREE.Mesh(geometry, material); mesh.name = `TerrainWarm_${i}`;
       mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
-      if (this.debris.materials.includes(material)) mesh.customDepthMaterial = this.debris.library.StaticDepth();
       mesh.position.set((b.minX + b.maxX) * 0.5, -500, (b.minZ + b.maxZ) * 0.5);
       mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.userData.terrainWarm = true;
       if (material === this.material) mesh.userData.whiteboxTerrain = true;

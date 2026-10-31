@@ -215,13 +215,13 @@ export class WhiteboxSceneRenderer {
           alphaToCoverage: !!source.alphaToCoverage } : {}),
       });
       // White material still receives explicitly enabled lighting; surface texture,
-      // blood/weather/POM patches are excluded. Destruction holes remain functional.
+      // blood/weather/POM patches are excluded.
       const c = this.config;
       const lighting = c.ssao || c.ssil || c.ssr || c.gi || c.clusteredLights
         || c.shadows || c.contactShadows || c.interiorSky;
       const retained = (PatchesOf(source) || []).filter((patch) => {
         const key = typeof patch.key === "function" ? patch.key() : patch.key;
-        return /^destruction/.test(key) || (lighting && /^(gtao|gi\d|csm|ssr|clust)/.test(key));
+        return lighting && /^(gtao|gi\d|csm|ssr|clust)/.test(key);
       });
       ApplyPatches(material, water ? [MakeWhiteboxWaterPatch()]
         : [cutout ? (cardTexture ? (source.map ? MakeWhiteboxCardTexturePatch() : null) : MakeWhiteboxCardPatch(c)) : null,

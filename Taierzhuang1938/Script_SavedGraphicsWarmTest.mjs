@@ -76,7 +76,6 @@ try {
     };
     T.scene.traverse((object) => { for (const material of [object.material].flat()) Check(material); });
     for (const material of T.library.materials.values()) Check(material);
-    for (const material of T.library.staticMaterials.values()) Check(material);
     T.player.SetDebugOptions({ invincible: true });
     T.state.grenades = Math.max(T.state.grenades, 2);
     T.profiler.Enable();

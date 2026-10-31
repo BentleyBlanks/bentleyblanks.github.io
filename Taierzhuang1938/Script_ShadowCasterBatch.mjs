@@ -26,8 +26,8 @@
 //   4. **逐帧对账**：成员的上述任何一项一变、castShadow 被关、被藏、长出子节点、被摘出场景，
 //      当帧踢出合批（删掉它那个实例），冷却 cooldownFrames 帧再考虑。所以任何时刻每个静态
 //      投影体要么在一份和它完全一致的合批里，要么自己在投影。
-//   5. 深度材质：成员自带 customDepthMaterial（BuildSink 可破坏静态件的破口裁切那只）的，
-//      合批用它的**克隆**（CloneShadedMaterial：同一份破口 uniform，补丁已处理 USE_BATCHING）；
+//   5. 深度材质：成员自带 customDepthMaterial 的，
+//      合批用它的**克隆**（CloneShadedMaterial：补丁已处理 USE_BATCHING）；
 //      没有的，合批挂 Script_ShadowDepth 的共用批次深度材质。克隆是为了不让同一只材质在
 //      普通 Mesh 与 BatchedMesh 之间翻种类（getProgram 风暴，见 Script_ShadowDepth 头注）。
 //

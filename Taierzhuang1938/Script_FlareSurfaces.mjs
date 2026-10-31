@@ -1,26 +1,7 @@
 // Read-only queries of roof-bearing batches, including tiles and wall caps.
 // Structural tags select batches; ALL their visible triangles can support cloth.
 // No new gameplay colliders or draws.
-// Roof holes use the same fracture data and current cut uniforms as rendering.
 import * as THREE from 'three';
-import {FRACTURE_PATTERNS,FRACTURE_SEGMENT_COUNT} from './Data_FracturePatterns.mjs';
-
-function CutAt(p,u){
- if(!u||u.enabled.value<.5)return false;
- for(let i=0;i<u.count.value;i++){
-  const c=u.centers.value[i],h=u.halves.value[i],m=u.metas.value[i];
-  const dx=p.x-c.x,dy=p.y-c.y,dz=p.z-c.z,x=dx*c.w-dz*h.w,z=dx*h.w+dz*c.w;
-  let a,b,d,half;
-  if(m.x<.5){a=z/Math.max(h.z,.0001);b=dy/Math.max(h.y,.0001);d=x;half=h.x;}
-  else if(m.x<1.5){a=x/Math.max(h.x,.0001);b=z/Math.max(h.z,.0001);d=dy;half=h.y;}
-  else{a=x/Math.max(h.x,.0001);b=dy/Math.max(h.y,.0001);d=z;half=h.z;}
-  if(Math.abs(d)>half)continue;
-  const pattern=FRACTURE_PATTERNS[Math.max(0,Math.round(m.y))];let radius=.85;
-  if(pattern){let s=((Math.atan2(b,a)-pattern.angleOffset)/(Math.PI*2)%1+1)%1*FRACTURE_SEGMENT_COUNT;
-   const k=Math.floor(s),f=s-k,w=f*f*(3-2*f);radius=pattern.radii[k]*(1-w)+pattern.radii[(k+1)%FRACTURE_SEGMENT_COUNT]*w;}
-  if(Math.hypot(a,b)<=radius)return true;
- }return false;
-}
 
 export class FlareSurfaceIndex {
  constructor(scene,library){this.scene=scene;this.library=library;this.cellSize=8;this.ray=new THREE.Ray();this.a=new THREE.Vector3();this.b=new THREE.Vector3();this.c=new THREE.Vector3();this.hit=new THREE.Vector3();this.normal=new THREE.Vector3();this.edge=new THREE.Vector3();this.Clear();}
@@ -75,7 +56,7 @@ export class FlareSurfaceIndex {
     const hit=side===THREE.BackSide?this.ray.intersectTriangle(this.c,this.b,this.a,true,this.hit)
       :this.ray.intersectTriangle(this.a,this.b,this.c,side!==THREE.DoubleSide,this.hit);
     if(!hit)continue;
-    const distance=this.hit.distanceTo(this.ray.origin);if(distance>bestDistance||CutAt(this.hit,this.library?.destruction))continue;
+    const distance=this.hit.distanceTo(this.ray.origin);if(distance>bestDistance)continue;
     this.normal.subVectors(this.b,this.a).cross(this.edge.subVectors(this.c,this.a)).normalize();if(this.normal.dot(this.ray.direction)>0)this.normal.negate();
     bestDistance=distance;best={fraction:Math.min(1,distance/length),point:{x:this.hit.x,y:this.hit.y,z:this.hit.z},normal:this.normal.toArray(),surface:'solid'};
    }

@@ -84,7 +84,7 @@ function NormalizeAt(path, item) {
  *   coverEvery    每几个模块插一个掩体点（坝墙的账：逐段插会灌满掩体表）
  *   coverMinH     低于 height×此比例的残段不给碰撞/掩体（人直接跨过去）
  *   coverSign     掩体朝向：+1 = 路径法向 n=(tz,-tx)，-1 = 反向
- *   tag           碰撞 tag（决定破坏 profile，见 Data_Destruction.TAG_PROFILE）
+ *   tag           碰撞 tag（决定表面材质与打击声，见 Script_Main.SURFACE_BY_TAG）
  *
  * @returns {{ path, modules, colliders, covers, fallenRuns, stats }}
  *   modules   [{ s, x, z, y, yaw, roll, sx, sy, sz, variant, tint:[r,g,b],

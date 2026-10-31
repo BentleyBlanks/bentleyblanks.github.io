@@ -5,7 +5,7 @@
 // 加一个补丁的流程在 §1.11）。跨系统契约见项目 AGENTS.md 第 11 条。
 //
 // 三条硬线，改这个文件之前先看：
-//   · **现役顺序固定 表面 / ORM → AO → GI → CSM → SSR → 簇光 → 材质着色 → 破口**
+//   · **现役顺序固定 表面 / ORM → AO → GI → CSM → SSR → 簇光 → 材质着色**
 //     （「表面」是接管反照率/法线/粗糙度的那一路，现役只有分层地形
 //     `Script_TerrainMaterial`；它与 ORM 互斥：地形材质上不挂 roughnessMap）
 //     （见本文件末尾的 `IndirectLightingPatches`，每一条为什么排在那儿都写了）。
@@ -36,7 +36,7 @@
 //   vertex:   [["#include <common>", `varying vec3 vFoo;`]],
 //   defines:  { USE_SSR: "" },
 // });
-// ApplyPatches(material, [ScreenSpaceInputs, Ssao, Gi, Ssr, Destruction]);
+// ApplyPatches(material, [ScreenSpaceInputs, Ssao, Gi, Ssr]);
 // ```
 // `vertex` / `fragment` 也可以是 `(shader) => [[anchor, glsl], ...]` 的函数 ——
 // 内容依赖运行时开关（GI 的采样层就是）时必须用函数，**编译那一刻现读**。
@@ -55,7 +55,7 @@
 // | `#include <lights_fragment_maps>` | 片元 | `iblIrradiance`（漫反射 IBL，量纲 = π×辐射亮度）、`radiance`（镜面 IBL）、`irradiance`。**替换天空 IBL 就在这儿**。 |
 // | `#include <aomap_fragment>` | 片元 | `reflectedLight.{direct,indirect}{Diffuse,Specular}` 都已累加完，`aoMap` 也乘过。**SSAO 实际压间接光的位置**；再往后就是加总。 |
 // | `#include <lights_fragment_end>` | 片元 | 全部光照累加完、**`<aomap_fragment>` 之前**（r185 的片元 main 里顺序就是 end → aomap）。要压直射项就挂这儿：挂到 aomap 后面的话 GI 调试视图 10/11 抓到的是没压过的值。 |
-// | `#include <clipping_planes_fragment>` | 片元 | 最早能 `discard` 的地方（破口裁切用它）。 |
+// | `#include <clipping_planes_fragment>` | 片元 | 最早能 `discard` 的地方。 |
 // | `#include <dithering_fragment>` | 片元 | `gl_FragColor` 已成型。整帧覆盖输出（调试假彩色）用它。 |
 //
 // 三条不许破：
@@ -67,7 +67,6 @@
 //     不要整段替换 —— 多个补丁挂同一个锚点时按注册顺序拼接。
 
 import { GI_SAMPLE_GLSL, BindGiUniforms } from "./Script_Gi.mjs";
-import { BindDestructionUniforms, DestructionShaderGlsl } from "./Script_Destruction.mjs";
 import {
   CLUSTER_COMMON_GLSL, ClusterLoopGlsl, BindClusterUniforms, GetActiveClusteredLights,
 } from "./Script_ClusteredLights.mjs";
@@ -247,7 +246,7 @@ export function PatchKeysOf(material) {
 
 // ===========================================================================
 // 现役补丁：ORM 三合一 / 屏幕空间 AO+SSIL / 探针体 GI（含三态与全部调试视图）/
-// 屏幕空间反射 / 簇状局部光 / 破口裁切。
+// 屏幕空间反射 / 簇状局部光。（破口裁切补丁随场景破坏系统 2026-10-31 一并删除。）
 // AO 与 GI 是 2026-09 帧图重构从 `Script_Materials.InjectIndirectLighting`
 // 原样搬来的，GLSL 一个字没改（拼接顺序与空白有差异，编译结果相同）。
 // ===========================================================================
@@ -749,44 +748,6 @@ export function MakeSsrPatch(ssr) {
 }
 
 /**
- * 破口裁切。主材质、静态克隆与阴影深度材质三条链共用同一份 OBB + 断裂图案，
- * 少接一条就会出现「墙已经穿了，太阳底下还留一块完整墙影」这类不自洽。
- *
- * 世界坐标必须自己传：静态合批网格分区之后 modelMatrix 通常是单位阵，但编辑器
- * 与过场会真的移动整棵节点，拿 vViewPosition 反推会错。
- */
-export function MakeDestructionPatch(destruction, { key = "destruction1" } = {}) {
-  if (!destruction) return null;
-  return MakePatch({
-    key,
-    preservesPosition: true,
-    uniforms: (uniforms) => { BindDestructionUniforms(uniforms, destruction); },
-    vertex: [
-      ["#include <common>", /* glsl */`
-        varying vec3 vDamageWorldPos;`],
-      ["#include <project_vertex>", /* glsl */`
-        {
-          vec4 damageWorld = vec4(transformed, 1.0);
-          #ifdef USE_BATCHING
-            damageWorld = batchingMatrix * damageWorld;
-          #endif
-          #ifdef USE_INSTANCING
-            damageWorld = instanceMatrix * damageWorld;
-          #endif
-          vDamageWorldPos = (modelMatrix * damageWorld).xyz;
-        }`],
-    ],
-    fragment: [
-      ["#include <common>", /* glsl */`
-        varying vec3 vDamageWorldPos;
-${DestructionShaderGlsl(destruction.maxVolumes)}`],
-      ["#include <clipping_planes_fragment>", /* glsl */`
-        ApplyDamageVolumes(vDamageWorldPos);`],
-    ],
-  });
-}
-
-/**
  * 贴图 u 向滚动（第一关战车履带，2026-09-23 战车包）。只在 `<uv_vertex>` 之后给已经算好的
  * 各贴图 uv 加偏移，不动几何（运动矢量照旧由 matrixWorld 历史出，契约第 12 条）、不加采样器。
  * `state` 是调用方持有的 `{ value: THREE.Vector2 }`：x = 整条履带的行进偏移（随车速累积），
@@ -1048,7 +1009,7 @@ export function MakeWhiteboxWeatherPatch(shared, strength = 1, peel = null) {
 }
 
 /**
- * 现役间接光补丁组：顺序固定 **ORM → AO → GI → CSM → SSR → 簇光 → 破口**。
+ * 现役间接光补丁组：顺序固定 **ORM → AO → GI → CSM → SSR → 簇光 → 材质着色**。
  * 新补丁插在哪儿要想清楚：
  *   · ORM 三合一排**最前**：它把材质自带的遮蔽（烘进贴图的小尺度细节）乘进
  *     `indirectDiffuse`，等价于三方 `aomap_fragment` chunk 原来的位置；
@@ -1067,7 +1028,7 @@ export function MakeWhiteboxWeatherPatch(shared, strength = 1, peel = null) {
  *     接屏幕空间接触阴影那张全屏图，以及把调试视图 9 改读级联可见度。
  */
 export function IndirectLightingPatches({
-  orm = null, ssao = null, gi = null, ssr = null, destruction = null, shading = null, surface = null,
+  orm = null, ssao = null, gi = null, ssr = null, shading = null, surface = null,
 } = {}) {
   return [
     // 表面补丁（分层地形）占 ORM 的位置：材质自带的反照率/法线/粗糙度/遮蔽由它写，
@@ -1084,9 +1045,7 @@ export function IndirectLightingPatches({
     // 材质着色升级（POM / 细节法线 / 微阴影 / 地平线镜面遮蔽 / 皮肤预积分）。
     // 补丁由 `Script_MaterialShading.MakeMaterialShadingPatch` 造好后传进来 ——
     // 那个模块要 `MakePatch`，从这里反向 import 会成环。
-    // 位置固定在 **簇光之后、破口之前**：它改的是表面本身（uv / 法线 / 直射项），
-    // 破口只做裁切；反过来排会让被裁掉的像素还白算一遍视差。
+    // 位置固定在 **簇光之后**，是现役补丁链的最后一环。
     ...(Array.isArray(shading) ? shading : [shading]),
-    MakeDestructionPatch(destruction),
   ].filter(Boolean);
 }

@@ -125,10 +125,8 @@ Script_YardWall     「一圈矩形院墙」这一种用法的门面（局部坐
 - 实例化网格吃 GI 的唯一保证是 `Script_Materials.InjectIndirectLighting` 的
   USE_INSTANCING 分支（vGiWorldPos 重算）—— **只许用 library 出的共享材质**。
 - 几何在每次建关时新烘（宿主 Dispose 会 dispose mesh.geometry，跨关缓存会被销毁）。
-- **实例化材质不吃破口 OBB 裁切**（那是 `library.Static` 合并网格的通道）。
-  围墙类 tag 的运行时破坏当前关着（`GAMEPLAY_DESTRUCTION_ENABLED=false`）；
-  破坏预览编辑器里凿这些墙只掉碰撞不掉画面 —— 已知让步，真要开运行时破坏，
-  要给 wallInstances 补「按碰撞盒把实例矩阵置零」的通道。
+- ~~实例化材质不吃破口 OBB 裁切~~：整套场景破坏系统已于 2026-10-31 用户要求删除，这条让步随之作废（以后真要做运行时破坏，
+  要给 wallInstances 补「按碰撞盒把实例矩阵置零」的通道）。
 
 ## 未迁移的墙（例外清单，别当成漏了）
 

@@ -371,7 +371,7 @@ try{
   &&result.corridorGrenadeEscape.held&&result.corridorGrenadeEscape.prone,
   'a blocked corridor uses shorter steps away, never crosses the grenade, and holds emergency control at the dead end');
  assert.ok(result.realBlastShield.shielded&&result.realBlastShield.before===result.realBlastShield.after,
-  'predicted rally-wall shielding agrees with real grenade damage after destruction resolves');
+  'predicted rally-wall shielding agrees with real grenade damage after the blast resolves');
  assert.ok(result.realCorridorGrenade.health>0&&result.realCorridorGrenade.distance>9
   &&result.realCorridorGrenade.squad.every(a=>a.alive&&a.health>0),
   'the wounded escort survives the recorded rolling grenade on the actual curved Support trench without crossing it');

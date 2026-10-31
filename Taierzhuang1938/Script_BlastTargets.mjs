@@ -10,31 +10,30 @@
 //   「现在的箱子是交互点 + 搬运态，场上没有一只掷弹筒打得中的实体。
 //     要它得先有一类『可被伤害的场景物件』，那是 destruction 层的活。」
 //
-// destruction 那一层管的是**场景几何**（碰撞盒 → 耐久 → 破口 → 碎片 → 重烘导航），
-// 它认的是 battlefield.colliders 里的盒子。摆点层摆的那几件东西
+// 当时设想由 destruction 层（场景几何破坏系统，2026-10-31 已整套删除）管这件事，它认的是
+// battlefield.colliders 里的盒子。摆点层摆的那几件东西
 //（Script_Main 的 MakeSetpieceProp）**故意不进碰撞、不进导航、不进流送** ——
 // 它们是看的，不是撞的。于是两边谁也够不着谁：
 //   · 让摆件进碰撞 = 把「同一个院子越来越破」那条运行时轻量摆件口变成布设层，
 //   · 让摆点层自己算爆炸 = 第二套伤害判定（摆点层三条纪律的第二条明令禁止）。
 //
-// 这张表就是两边中间那一格：**destruction 报事实，摆点层认领后果。**
-//   · `Script_Destruction.Blast()` 每炸一次，把（位置、半径、能量、种类）喂进来；
+// 这张表就是爆炸与摆点层中间那一格：**爆炸报事实，摆点层认领后果。**
+//   · `Script_Combat.Blast()` 每炸一次，把（位置、半径、能量、种类）喂进来；
 //   · 摆点层在 Setup 里 `Register` 自己摆的那几件，在回调里决定「炸了之后怎样」。
 // 表本身不知道什么是弹药箱，也不放烟、不扣血 —— 那都是认领方的事。
 //
 // ── 为什么不是一个注入的 host 回调 ──────────────────────────────────────────
-// 因为两头都不在装配层手里：DestructionSystem 由 Script_Main 建、
-// MissionSetpieceDirector 也由 Script_Main 建，但两者的窄接口里都没有对方。
-// 走一张**纯模块级登记表**的代价是一个共享单例；换来的是 destruction 不必知道
+// 因为两头都不在装配层手里：CombatSystem 与 MissionSetpieceDirector 都由 Script_Main 建，
+// 但两者的窄接口里都没有对方。
+// 走一张**纯模块级登记表**的代价是一个共享单例；换来的是战斗层不必知道
 // 有摆点层这回事，摆点层也不必 import three（`Script_MissionSetpiecesTest`
 // 仍然是纯 Node、毫秒级）。清账的责任在登记方：一律带 `tag`，换关按 tag 清。
 
 /**
  * 数只在这里（AGENTS 硬规矩 12）。
  *
- * reachScale   有效外沿相对爆炸半径的倍数。**照抄 Script_Destruction.Blast 的
- *              `radius * 1.25`** —— 一只箱子与它旁边那堵墙该在同一次爆炸里
- *              同时被算到，两处用不同的外沿就会出现「墙破了、贴着墙的箱子没事」。
+ * reachScale   有效外沿相对爆炸半径的倍数。**沿用原来
+ *              墙体破坏系统 Blast 的 `radius * 1.25`**（该系统已删）。
  * bulletScale  子弹直接打中时的伤害折扣（步枪打不炸一箱手榴弹，但打多了会）。
  * defaultHp    一件物件的默认耐久。一发掷弹筒（Data_Battle 的 launcher damage）
  *              足够一次打穿，一颗手榴弹在三米外不够。
@@ -131,12 +130,12 @@ export class BlastTargetRegistry {
   }
 
   /**
-   * 一次爆炸。**由 Script_Destruction.Blast 调**，别的地方不要调
+   * 一次爆炸。**由 Script_Combat.Blast 调**，别的地方不要调
    * —— 两处调等于同一次爆炸算两遍伤害。
    *
    * @param {{x:number,y?:number,z:number}} position
-   * @param {number} radius  爆炸半径（与 destruction 同一个参数）
-   * @param {number} energy  爆炸能量（与 destruction 同一个参数）
+   * @param {number} radius  爆炸半径
+   * @param {number} energy  爆炸能量
    * @param {string} kind    "grenade" / "shell" / "launcher" / "tank" / "bullet"
    * @returns {{hit:number, destroyed:string[]}}
    */
@@ -178,7 +177,7 @@ export class BlastTargetRegistry {
 
   _Safe(fn, info, where) {
     if (!fn) return;
-    // 认领方的回调炸了不该把一次爆炸带走（destruction 还要接着改拓扑）。
+    // 认领方的回调炸了不该把一次爆炸带走（爆炸后面还有别的结算要接着走）。
     try { fn(info); } catch (err) {
       this.log.push({ where, why: String((err && err.message) || err) });
     }

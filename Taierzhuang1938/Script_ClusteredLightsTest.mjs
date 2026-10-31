@@ -225,8 +225,8 @@ const patchSource = fs.readFileSync(path.join(projectDir, "Script_MaterialPatche
 const patchOrder = patchSource.slice(patchSource.indexOf("export function IndirectLightingPatches"))
   .split(String.fromCharCode(10)).filter((line) => !line.trim().startsWith("//"))
   .join(String.fromCharCode(10));
-Check(/MakeOrmPatch\(orm\),\s*MakeSsaoPatch\(ssao\),\s*MakeGiPatch\(gi\),\s*(?:MakeCsmPatch\([^;]*?\),\s*)?(?:MakeSsrPatch\(ssr\),\s*)?MakeClusteredLightsPatch\(\),\s*(?:\.\.\.\(Array\.isArray\(shading\)[^;]*?\),\s*)?MakeDestructionPatch/.test(patchOrder),
-  "补丁注册顺序：ORM → AO → GI → (CSM) → (SSR) → 簇光 → (材质着色) → 破口");
+Check(/MakeOrmPatch\(orm\),\s*MakeSsaoPatch\(ssao\),\s*MakeGiPatch\(gi\),\s*(?:MakeCsmPatch\([^;]*?\),\s*)?(?:MakeSsrPatch\(ssr\),\s*)?MakeClusteredLightsPatch\(\),\s*(?:\.\.\.\(Array\.isArray\(shading\)[^;]*?\),\s*)?\]\.filter/.test(patchOrder),
+  "补丁注册顺序：ORM → AO → GI → (CSM) → (SSR) → 簇光 → (材质着色)");
 const clusterSource = fs.readFileSync(path.join(projectDir, "Script_ClusteredLights.mjs"), "utf8");
 // 2026-09 集成期三张表合并成一张 RGBA32F（采样器预算）：整数那两段贴着 float
 // 的位型存，着色端 `floatBitsToUint` 取回。锁两条：只剩一个采样器；

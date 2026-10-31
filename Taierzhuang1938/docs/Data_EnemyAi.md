@@ -214,7 +214,7 @@ export function NormalizeCover(raw) → { id, x, z, height, nx, nz, tall:boolean
 
 export class CoverRegistry {
   constructor(rawCovers, host);
-  Rebuild(rawCovers);                    // 破坏后重建（Script_Destruction 会 filter battlefield.covers）
+  Rebuild(rawCovers);                    // 掩体表换新数组后重建（原来的破坏系统会 filter battlefield.covers，该系统已于 2026-10-31 用户要求删除）
   Count();
   Claim(coverId, soldierId) → boolean;   // 已被别人占则 false
   Release(soldierId);

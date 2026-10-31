@@ -15,7 +15,7 @@
 //   只许 import Script_World / Script_Geo / Script_Noise / Script_LivedInProps /
 //   Script_RoadPath / Script_RoadSpline（样条道路公共层）/ three；
 //   **严禁 import Script_TengxianCity（循环依赖）与 Data_Tengxian（尺寸走 f）**。
-//   碰撞：一律经 sink.Solid（tag 见 Data_Destruction.TAG_PROFILE，未注册默认 masonry）。
+//   碰撞：一律经 sink.Solid（tag 见 Script_Main.SURFACE_BY_TAG）。
 //
 // 批次A 用血踩出来的三条坑（后续工作包必读）：
 //   ① 两套局部坐标系相差 180°：`PlaceGeometry(ry)` / `AddDoorReveal` 的局部 +z 在

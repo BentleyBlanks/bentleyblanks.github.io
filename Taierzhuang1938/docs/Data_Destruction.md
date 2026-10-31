@@ -1,5 +1,7 @@
 # 场景破坏系统
 
+> **已删除（2026-10-31 用户要求删除）**：`Script_Destruction.mjs`、`Data_Destruction.mjs`、`Data_FracturePatterns.mjs`、`Script_FractureBake.mjs`、`Script_EditorDestruction.mjs`、破口裁切材质补丁、预通道破口 uniform、`Script_DestructionTest` / `Script_DestructionEditorTest` / `Script_FractureBakeTest` 都已不在仓库里（正片里它一直关着，从没真的拆过墙）。保留的玩法部分只有可炸物件登记表 `Script_BlastTargets.mjs`，现由 `Script_Combat.Blast` 直接喂。以下为历史记录。
+
 ## 目标
 
 七个战斗场景共用一套局部破坏：承重结构保持关卡骨架，其余有碰撞的墙面、女墙、东寨墙、木桥与站台楼板、临时工事、道具、坟头、田坎和路基都能被枪弹或爆炸逐步破坏。破坏结果必须同时影响画面、Rapier 碰撞、射线遮挡、爆炸遮蔽、AI 掩体与导航。

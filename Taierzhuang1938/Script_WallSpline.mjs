@@ -17,11 +17,8 @@
 // 不许另配自定义材质。逐实例色走 instanceColor（r185 下 instanceColor 自动
 // 定义 USE_COLOR，材质不用开 vertexColors）。
 //
-// ## 已知让步
-// 实例化材质不吃破口 OBB 裁切（那是 library.Static 合并网格的通道）。
-// 围墙类 tag（zhaiWall / villageStoneWall / villageCourtyard）的运行时破坏
-// 当前本来就关着（Data_Destruction.GAMEPLAY_DESTRUCTION_ENABLED = false），
-// 破坏预览编辑器里凿这些墙会只掉碰撞不掉画面 —— 账记在 docs/Data_WallSpline.md。
+// ## 说明
+// 场景几何破坏系统（破口 OBB 裁切）2026-10-31 已整套删除，围墙不再有「只掉碰撞不掉画面」这类让步。
 
 import * as THREE from "three";
 import {

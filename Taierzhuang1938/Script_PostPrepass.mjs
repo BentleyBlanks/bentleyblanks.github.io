@@ -60,7 +60,6 @@
 // 任何一处错都是静默全黑。消费方要 textureLod 的话在自己那一轮再换。
 
 import * as THREE from "three";
-import { BindDestructionUniforms, DestructionShaderGlsl } from "./Script_Destruction.mjs";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
 import { TerrainBlendUniforms, TERRAIN_BLEND_GLSL } from './Script_TerrainBlend.mjs';
 import { TRENCH_SURFACE } from './Data_TrenchSurface.mjs';
@@ -182,9 +181,9 @@ export function MarkForegroundPrepass(root) {
 //     第二个 out 要么冲突要么永远写不出去。
 // 非 Raw 材质本来就永远是 `#version 300 es`，`#include <chunk>` 与 `varying` 照常可用。
 // ---------------------------------------------------------------------------
-function MakeNormalDepthMaterial(destruction = null, { velocity = false, shared = null } = {}) {
+function MakeNormalDepthMaterial({ velocity = false, shared = null } = {}) {
   // shared：按物体种类分份的变体（Script_OverrideVariants）。着色器源码与基础材质逐字相同（program 缓存
-  // 命中，不编译），uniform 对象、破口开关、前景深度这些「钩子改的」状态全部共用基础材质的那一份。
+  // 命中，不编译），uniform 对象、前景深度这些「钩子改的」状态全部共用基础材质的那一份。
   const uniforms = shared ? shared.uniforms : {
     uTerrainBlendValid: { value: 0 },
     uTerrainBlendNormalDepth: TerrainBlendUniforms.uTerrainBlendNormalDepth,
@@ -206,8 +205,6 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false, shared 
     uniforms.uVelocityValid = { value: 0 };
     uniforms.uVelocityClamp = { value: VELOCITY.clampUv };
   }
-  const damageEnabled = shared ? shared.userData.damageObjectEnabled : { value: 0 };
-  if (destruction && !shared) BindDestructionUniforms(uniforms, destruction, damageEnabled);
   const velocityVertex = velocity ? /* glsl */`
         {
           // 世界坐标自己算：实例化 / 合批 / 蒙皮的矩阵顺序照抄 <project_vertex>。
@@ -279,7 +276,6 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false, shared 
           return mat4(c0, c1, c2, c3);
         }
       #endif` : ""}
-      ${destruction ? "varying vec3 vDamageWorldPos;" : ""}
       void main() {
         vCutoutUv=(uCutoutTransform*vec3(uv,1.0)).xy;
         #include <batching_vertex>
@@ -298,15 +294,6 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false, shared 
         vViewDepth = -mvPosition.z;
         vContactViewPosition=-mvPosition.xyz;
         ${velocityVertex}
-        ${destruction ? `
-        vec4 damageWorld = vec4(transformed, 1.0);
-        #ifdef USE_BATCHING
-          damageWorld = batchingMatrix * damageWorld;
-        #endif
-        #ifdef USE_INSTANCING
-          damageWorld = instanceMatrix * damageWorld;
-        #endif
-        vDamageWorldPos = (modelMatrix * damageWorld).xyz;` : ""}
       }
     `,
     fragmentShader: /* glsl */`
@@ -325,13 +312,10 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false, shared 
       uniform float uVelocityClamp;
       varying vec4 vCurClip;
       varying vec4 vPrevClip;` : ""}
-      ${destruction ? `varying vec3 vDamageWorldPos;
-${DestructionShaderGlsl(destruction.maxVolumes)}` : ""}
       layout(location = 0) out vec4 oNormalDepth;
       ${velocity ? "layout(location = 1) out vec4 oVelocity;" : ""}
       void main() {
         if(uCutoutTest>0.0 && texture(uCutoutMap,vCutoutUv).a*uCutoutOpacity<uCutoutTest)discard;
-        ${destruction ? "ApplyDamageVolumes(vDamageWorldPos);" : ""}
         vec3 n = normalize(vViewNormal);
         if (!gl_FrontFacing) n = -n;
         if(uTerrainBlendValid>.5 && uForegroundDepth<=0.0){
@@ -355,14 +339,11 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}` : ""}
     `,
     side: THREE.FrontSide,
   });
-  // BuildSink 的静态网格会在自己的 onBeforeRender/onAfterRender 里只为这一 draw
-  // 打开裁切。演员、枪、碎片共用 overrideMaterial，但不会被破口 OBB 切掉。
-  if (destruction) material.userData.damageObjectEnabled = damageEnabled;
   // 同一套「按 draw 开关」的手法给第一人称用（MarkForegroundPrepass 读这个）。
   material.userData.foregroundDepth = uniforms.uForegroundDepth;
   material.userData.velocity = velocity;
   if (shared) {
-    // 钩子（破口裁切 / 速度矩阵 / 前景深度）把「下一 draw 要重传 uniform」写在基础材质上，three 在
+    // 钩子（速度矩阵 / 前景深度）把「下一 draw 要重传 uniform」写在基础材质上，three 在
     // 变体上读：让两边是同一位，不然这一 draw 的改动会被落下。
     Object.defineProperty(material, "uniformsNeedUpdate", {
       configurable: true,
@@ -407,17 +388,16 @@ void main() {
  *   `hzb`               { source, texture, levels, sizes, mipCount, size }
  */
 export class PrepassPass {
-  constructor(pipeline, { destruction = null } = {}) {
+  constructor(pipeline) {
     this.name = "prepass";
     this.pipeline = pipeline;
-    this.destruction = destruction;
     this.velocityEnabled = !!(pipeline.preset.velocity && pipeline.hdrCapable);
     this.hzbEnabled = !!(pipeline.preset.hzb && pipeline.hdrCapable);
-    this.material = MakeNormalDepthMaterial(destruction, { velocity: this.velocityEnabled });
+    this.material = MakeNormalDepthMaterial({ velocity: this.velocityEnabled });
     // 蒙皮 / 实例 / 批次各一份自己的覆盖材质，只在 renderBufferDirect 那一步换人（Script_OverrideVariants 抬头）：
     // 共用一只的话 PrepassOpaqueSort 排好序之后一帧仍翻 4 次程序（getProgram）。
     this.variants = new OverrideVariants(this.material, (base) =>
-      MakeNormalDepthMaterial(destruction, { velocity: this.velocityEnabled, shared: base }));
+      MakeNormalDepthMaterial({ velocity: this.velocityEnabled, shared: base }));
     this.target = null;
     this.hzbLevels = [];
     this.hzb = null;
@@ -947,7 +927,7 @@ export class PrepassPass {
 /**
  * Compatibility/diagnostic marker for existing callers. Ordinary rigid meshes
  * are tracked automatically by PrepassPass, including unmarked new props.
- * Never replace object hooks: destruction and foreground rendering own them.
+ * Never replace object hooks: foreground rendering owns them.
  */
 export function MarkDynamicPrepass(object) {
   if (!object || !object.isMesh || object.userData.prepassDynamic) return object;

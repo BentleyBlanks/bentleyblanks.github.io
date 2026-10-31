@@ -128,7 +128,7 @@ export class NavGrid {
     for (; i < colliders.length; i += 1) {
       if (budgetMs !== Infinity && ((i - start) & 31) === 31 && performance.now() - t0 > budgetMs) return i;
       const box = colliders[i];
-      if (!box || box.destroyed) continue;
+      if (!box) continue;
       const cx = (box.min[0] + box.max[0]) * 0.5;
       const cz = (box.min[2] + box.max[2]) * 0.5;
       const ground = Ground.call(battlefield, cx, cz);

@@ -2,8 +2,7 @@
 // Script_FirstLevelFrontBreakables.mjs —— 第一关 03–05 前沿「炮打掩体、一截截打掉」的可破坏体块
 //
 // 口径：docs/Data_FirstLevel0105Refactor20260923Contract.md §2 第 7 条（战车包）。
-// 全局 GAMEPLAY_DESTRUCTION_ENABLED 仍是 false：这里不走通用破坏（那套会改导航与承重），
-// 只做**数据驱动的分段体块**：每个可破坏物预先建好每一段状态的网格，炮弹落在近旁就
+// 通用的墙体几何破坏系统 2026-10-31 已整套删除（此前也一直关着）：这里只做**数据驱动的分段体块**：每个可破坏物预先建好每一段状态的网格，炮弹落在近旁就
 // 切到下一段 —— 换可见性 + 物理 AddSolid/RemoveSolid，碎块走 VFX 池。
 //
 // 数据格式（Space 包的 Data_FirstLevelFrontBreakables.mjs 经 SpaceBreakableSpecs 换成这个格式；旧的临时数据已删）：

@@ -215,9 +215,9 @@ function MarketStorage(label, node, material = "WoodCrate") {
 /**
  * 资产表。
  *
- * `tag` 决定三件事，全部照 Data_Destruction 的 TAG_PROFILE 与 Script_Main 的
- * SURFACE_BY_TAG 走：吃多少火力、打上去出什么屑、出什么声。用的都是**那两张表
- * 里已经有的 tag**，别为这一层新编一套。
+ * `tag` 决定三件事，全部照 Script_Main 的 SURFACE_BY_TAG 等表走
+ * （已删的破坏系统曾用的 TAG_PROFILE 同一套键）：吃多少火力、打上去出什么屑、出什么声。
+ * 用的都是**表里已经有的 tag**，别为这一层新编一套。
  *
  * `solid: false` = 确实不该挡人的那一类。**目前一件都没有** —— 留着这个口子是
  * 因为下一个下载来的布景很可能是墙上的爬藤或者地上的车辙。

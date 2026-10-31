@@ -140,7 +140,7 @@ const OUTPUT_DOMAIN_PASSES = new Set([
 ]);
 
 export class PostPipeline {
-  constructor(renderer, { width, height, quality = "high", destruction = null, whitebox = null } = {}) {
+  constructor(renderer, { width, height, quality = "high", whitebox = null } = {}) {
     this.renderer = renderer;
     this.quality = POST_QUALITY_KEYS.includes(quality) ? quality : "high";
     this.preset = MakeQualityPreset(this.quality);
@@ -229,7 +229,7 @@ export class PostPipeline {
     // 脚印与痕迹（docs/Data_TerrainTrails.md）：世界空间的环形痕迹靶，地形材质在 main（与 terrainBlend 的捕获）里采。
     this.terrainTrailsPass = new TerrainTrailsPass(this);
     this.flareShadowsPass = new FlareShadowsPass(this);
-    this.prepassPass = new PrepassPass(this, { destruction });
+    this.prepassPass = new PrepassPass(this);
     this.staticInstances = new StaticInstanceCulling(renderer);
     this.prepassPass.instanceCulling = this.staticInstances;
     this.ssrPass = new SsrPass(this);

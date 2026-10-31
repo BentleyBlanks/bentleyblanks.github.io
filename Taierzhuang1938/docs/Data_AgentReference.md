@@ -573,9 +573,8 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 - 先读：`docs/Data_Traversal.md`。
 
 ### 破坏
-- `Script_Destruction.mjs` —— 统一场景破坏：离线预破碎 + 运行时代理，**一次爆炸只重建一次拓扑**。
-  模板由 `Script_FractureBake.mjs` 固定种子离线生成，产物在 `Data_FracturePatterns.mjs`，
-  运行时只读。先读：`docs/Data_Destruction.md`。
+- 场景几何破坏系统（`Script_Destruction` / `Data_Destruction` / `Data_FracturePatterns` / `Script_FractureBake`）与破坏预览编辑器已于 2026-10-31 用户要求删除；
+  留下的玩法部分是可炸物件登记表 `Script_BlastTargets.mjs`（`Script_Combat.Blast` 直接喂它）。历史口径见 `docs/Data_Destruction.md`。
 
 ### 音频
 
@@ -801,7 +800,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 
 **现状口径（改对应系统前必读）**：
 - `Data_TechRenderPipeline.md`（渲染管线唯一现状文档）、`Data_TechPhysics.md`、
-  `Data_TestTiers.md`、`Data_Destruction.md`、`Data_EditorSuite.md`、`Data_AudioAssets.md`、
+  `Data_TestTiers.md`、`Data_EditorSuite.md`、`Data_AudioAssets.md`、
   `Data_AudioEngine.md`、`Data_AudioWiring.md`。
 - `Data_FirstLevelRebuildAcceptance.md` —— 新版第一关来源、范围决定和验收；`Data_MissionDesign.md` 保留线性剧情设计背景，涉及旧章节的内容须结合当前入口核对；`Data_Traversal.md` —— 通行高度阶梯。
 - `Data_Bayonet.md`、`Data_PlayerDamage.md`、`Data_GunFeelReview.md`（枪感相关改动或专项审查时使用）、

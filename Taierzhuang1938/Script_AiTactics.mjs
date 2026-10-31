@@ -593,7 +593,7 @@ export class TacticsDirector {
     };
   }
 
-  /** 掩体表被重建（Script_Destruction 炸掉一段墙）之后换一张。 */
+  /** 掩体表被重建之后换一张。 */
   SetCoverRegistry(registry) { this.coverRegistry = registry || null; }
 
   Time() {

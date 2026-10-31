@@ -7,12 +7,11 @@
 // 材质的差别在这里根本不存在，逐块提交只是在付每个 draw 的固定 CPU 开销（≈ 7 µs）。
 // 做法照抄阴影趟那一份（Script_ShadowCasterBatch 头注）：
 //   1. **只收真静态的**：普通不透明叶子 Mesh（非蒙皮 / 实例 / 批次），覆盖材质换得掉、没有镂空贴图、
-//      不半透明、不在 skipNormalDepth / 距离上限 / 前景那几类里，矩阵行列式为正，自己没有别的逐 draw 钩子
-//      （BuildSink 的破口裁切钩子 `userData.prepassDamageHook` 例外：整批一起开裁切与逐件开是同一回事），
+//      不半透明、不在 skipNormalDepth / 距离上限 / 前景那几类里，矩阵行列式为正，自己没有任何逐 draw 钩子，
 //      且连续 settleFrames 帧矩阵、整条父链可见性、几何（position / normal / index 版本）、材质（对象、版本、
 //      地形融合接收标记）都没变。
 //   2. 收进去：合批里加一份只带 position + normal 的几何（同一份几何只加一次）+ 一个实例（矩阵 = matrixWorld），
-//      按「破口裁切 × 地形融合接收」分组。**成员自己的任何属性都不改**。
+//      按「地形融合接收」分组。**成员自己的任何属性都不改**。
 //   3. **只在预通道那一刻换人**：PrepassPass.Render 里把合批打开、成员藏起，画完还原。阴影烘焙恰好发生在
 //      同一次 renderer.render 里面（预通道是本帧第一次出画），所以 InstallPrepassStaticBatch 再包一层
 //      `shadowMap.render`：烘之前把成员原样还回来，阴影趟看到的与没有本模块时一模一样。
@@ -42,16 +41,6 @@ function UnderForeground(object) {
   return false;
 }
 
-// 与 Script_World.Flush 里 BuildSink 静态件的钩子同一件事：只为这一 draw 打开覆盖材质的破口裁切。
-function DamageOn(_renderer, _scene, _camera, _geometry, material) {
-  const enabled = material?.userData?.damageObjectEnabled;
-  if (enabled) enabled.value = 1;
-}
-function DamageOff(_renderer, _scene, _camera, _geometry, material) {
-  const enabled = material?.userData?.damageObjectEnabled;
-  if (enabled) enabled.value = 0;
-}
-
 /** 这只对象的形状能不能进合批（不看它此刻动不动）。 */
 export function PrepassBatchable(object) {
   if (!object.isMesh || object.isSkinnedMesh || object.isInstancedMesh || object.isBatchedMesh) return false;
@@ -61,7 +50,7 @@ export function PrepassBatchable(object) {
   if ((Number(data.normalDepthMaxDistance) || 0) > 0) return false;
   if ((object.layers.mask & 1) === 0) return false;
   const hooked = object.onBeforeRender !== DEFAULT_BEFORE_RENDER || object.onAfterRender !== DEFAULT_AFTER_RENDER;
-  if (hooked && !data.prepassDamageHook) return false;
+  if (hooked) return false;
   const material = object.material;
   if (!material || Array.isArray(material) || !material.visible || material.allowOverride === false) return false;
   if (material.transparent || material.wireframe) return false;
@@ -233,7 +222,7 @@ export class PrepassStaticBatch {
       if (shown && !front && !this.records.has(object) && PrepassBatchable(object)) {
         const rec = { object, state: CANDIDATE, stable: 0, until: 0, matrix: new Float64Array(16),
           geometry: null, positionVersion: 0, normalVersion: 0, indexVersion: 0, material: null, materialVersion: 0,
-          terrainBlend: false, damage: false, group: null, instanceId: -1, geometryEntry: null, slot: -1 };
+          terrainBlend: false, group: null, instanceId: -1, geometryEntry: null, slot: -1 };
         this._Snapshot(rec);
         this.records.set(object, rec);
       }
@@ -270,7 +259,6 @@ export class PrepassStaticBatch {
     rec.material = material;
     rec.materialVersion = material?.version ?? 0;
     rec.terrainBlend = !!material?.userData?.terrainBlendReceiver;
-    rec.damage = !!object.userData?.prepassDamageHook;
   }
 
   _Changed(rec) {
@@ -286,7 +274,6 @@ export class PrepassStaticBatch {
     if (material !== rec.material) return true;
     if ((material?.version ?? 0) !== rec.materialVersion) return true;
     if (!!material?.userData?.terrainBlendReceiver !== rec.terrainBlend) return true;
-    if (!!object.userData?.prepassDamageHook !== rec.damage) return true;
     return false;
   }
 
@@ -360,7 +347,7 @@ export class PrepassStaticBatch {
     this.stats.members = this.stats.candidates = this.stats.groups = 0;
   }
 
-  _GroupKey(rec) { return `${rec.damage ? 1 : 0}|${rec.terrainBlend ? 1 : 0}`; }
+  _GroupKey(rec) { return rec.terrainBlend ? "blend" : "plain"; }
 
   /** 建组时按眼下登记在册的同组总量一次留够（同一份几何只算一次）。 */
   _Demand(key) {
@@ -403,15 +390,6 @@ export class PrepassStaticBatch {
     mesh.perObjectFrustumCulled = true;
     mesh.sortObjects = false;
     mesh.matrixAutoUpdate = false;
-    if (rec.damage) {
-      // BatchedMesh 自己的 onBeforeRender 做逐成员剔除，不能覆盖掉，接在它后面。
-      const cull = THREE.BatchedMesh.prototype.onBeforeRender;
-      mesh.onBeforeRender = function (renderer, scene, camera, geometry, overrideMaterial, drawGroup) {
-        cull.call(this, renderer, scene, camera, geometry, overrideMaterial, drawGroup);
-        DamageOn(renderer, scene, camera, geometry, overrideMaterial);
-      };
-      mesh.onAfterRender = DamageOff;
-    }
     this.root.add(mesh);
     group = { key, mesh, members: 0, objects: [], recs: [], geometries: new Map() };
     this.groups.set(key, group);

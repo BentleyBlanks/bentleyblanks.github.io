@@ -47,6 +47,10 @@ import { HandleTextureImportRequest } from "../Taierzhuang1938/Script_TextureImp
 //   GET  /__blockout/status → { writable, root, revisions: { <Level>: sha1 | null } }
 //   POST /__blockout/save   { level, doc, revision } → 写 Taierzhuang1938/Blockout/<Level>.json
 import { BLOCKOUT_LEVEL_KEYS, BLOCKOUT_CONFIG_FILE_RE, BlockoutConfigPath, ValidateBlockout } from "../Taierzhuang1938/Script_EditorBlockoutConfig.mjs";
+// 场景编辑器的存盘（Taierzhuang1938/docs/Data_Scene.md）。同白盒那套闸，只认 SCENE_IDS 里的场景、只写场景 JSON（高度图 v1 不开放写）：
+//   GET  /__scene/status → { writable, root, revisions: { <SceneId>: sha1 | null } }
+//   POST /__scene/save   { scene, doc, revision } → 写 Taierzhuang1938/Scenes/<SceneId>/Scene_<SceneId>.json
+import { SCENE_IDS, SCENE_FILE_RE, SceneRepoPath, ValidateScene, FormatSceneJson } from "../Taierzhuang1938/Script_SceneDoc.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "..");
@@ -414,6 +418,18 @@ function CreateServer(rootDir, context) {
       return;
     }
 
+    if (route === "/__scene/status" || route === "/__scene/save") {
+      try {
+        if (route === "/__scene/status") SendSceneStatus(request, response, rootDir);
+        else await HandleSceneSave(request, response, rootDir);
+      } catch (error) {
+        console.error(`  ${route} 出错：${error?.stack || error}`);
+        if (!response.headersSent) SendJson(response, 500, { ok: false, error: `存档口内部出错：${String(error?.message || error).slice(0, 200)}` });
+        else if (!response.writableEnded) response.end();
+      }
+      return;
+    }
+
     if (request.method !== "GET" && request.method !== "HEAD") { response.writeHead(405).end(); return; }
     const filePath = path.join(rootDir, route);
     if (!filePath.startsWith(rootDir)) { response.writeHead(403).end(); return; }
@@ -762,6 +778,70 @@ async function HandleBlockoutSave(request, response, rootDir) {
   });
 }
 
+// -------------------------------------------- 场景保存（只在本地）
+//
+// 场景编辑器（Taierzhuang1938/docs/Data_Scene.md §6）存场景 JSON。闸与 /__blockout/save 一样（本机 Host、同源、application/json、
+// 版本号 = 读场景时那份原始字节的 sha1，对不上 409）；场景 id 只认 SCENE_IDS，拼出的路径再过 SCENE_FILE_RE；
+// ValidateScene 不过 → 400；文件按 FormatSceneJson 写（大数组一行一项），与转换脚本、编辑器同一个写法。body ≤ 16 MB。
+const SCENE_BODY_LIMIT = 16 * 1024 * 1024;
+
+function SendSceneStatus(request, response, rootDir) {
+  if (request.method !== "GET" && request.method !== "HEAD") { SendJson(response, 405, { ok: false, error: "只收 GET" }); return; }
+  const revisions = {};
+  for (const id of SCENE_IDS) {
+    try { revisions[id] = BlockoutRevision(path.join(rootDir, SceneRepoPath(id))); } catch { revisions[id] = null; }
+  }
+  const writable = IsLocalPage(request);
+  SendJson(response, 200, { writable, root: rootDir, revisions, ...(writable ? {} : { reason: "只有在本机用 localhost / 127.0.0.1 打开时才能存盘" }) });
+}
+
+async function HandleSceneSave(request, response, rootDir) {
+  const Reject = (status, error, extra = {}) => SendJson(response, status, { ok: false, error, ...extra });
+  if (request.method !== "POST") { Reject(405, "只收 POST"); return; }
+  if (!IsLocalPage(request)) { Reject(403, "只接受本机 localhost / 127.0.0.1 的请求"); return; }
+  if (!String(request.headers["content-type"] || "").toLowerCase().startsWith("application/json")) { Reject(415, "Content-Type 必须是 application/json"); return; }
+  if (!IsSameOrigin(request)) { Reject(403, "只接受同源页面的请求"); return; }
+  let body;
+  try { body = await ReadBody(request, SCENE_BODY_LIMIT); } catch (error) { Reject(413, error.message); return; }
+  let payload;
+  try { payload = JSON.parse(body); } catch { Reject(400, "body 不是 JSON"); return; }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) { Reject(400, "body 要是 { scene, doc, revision }"); return; }
+  const sceneId = typeof payload.scene === "string" ? payload.scene : "";
+  const relative = SceneRepoPath(sceneId);
+  if (!SCENE_IDS.includes(sceneId) || !SCENE_FILE_RE.test(relative)) { Reject(403, `scene 只能是 ${SCENE_IDS.join(" / ")}`); return; }
+  const filePath = path.resolve(rootDir, relative);
+  if (filePath !== path.join(rootDir, relative) || !filePath.startsWith(rootDir + path.sep)) { Reject(403, "路径不在服务根之下"); return; }
+  const { revision, doc } = payload;
+  if (revision !== null && typeof revision !== "string") { Reject(400, "revision 要是上次读到的版本号（文件还不存在时写 null）"); return; }
+  let check;
+  let text;
+  try {
+    check = ValidateScene(doc);
+    if (!check.ok) { Reject(400, "场景不合规", { details: check.errors.slice(0, 50), warnings: check.warnings }); return; }
+    if (doc.id !== sceneId) { Reject(400, `场景里的 id 是 ${doc.id}，和请求的 ${sceneId} 不是一回事`); return; }
+    text = FormatSceneJson(doc);
+  } catch (error) {
+    Reject(400, "场景没法校验或写回（多半是嵌套太深）", { details: [`${error?.name || "Error"}：${String(error?.message || error).slice(0, 200)}`] });
+    return;
+  }
+  let current;
+  try { current = BlockoutRevision(filePath); } catch (error) { Reject(500, String(error?.message || error)); return; }
+  if (revision !== current) {
+    Reject(409, current === null ? "盘上已经没有这个文件，按新文件保存要带 revision: null" : "场景已在别处改过（版本号对不上），先重新读取再保存", { revision: current });
+    return;
+  }
+  try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    WriteAtomic(filePath, text);
+  } catch (error) {
+    try { fs.rmSync(`${filePath}.tmp`, { force: true }); } catch { /* 清不掉就算了，报错里有原因 */ }
+    Reject(500, String(error?.message || error));
+    return;
+  }
+  console.log(`  /__scene/save ${relative}：${doc.objects.length} 个物件`);
+  SendJson(response, 200, { ok: true, scene: sceneId, file: relative, revision: createHash("sha1").update(text, "utf8").digest("hex"), warnings: check.warnings });
+}
+
 function LanAddresses(port) {
   const urls = [];
   for (const list of Object.values(os.networkInterfaces())) {
@@ -840,7 +920,10 @@ const HELP = `本地预览服 —— 按线上同款路径把整棵树跑在 127
 白盒关卡配置保存口（白盒关卡编辑器，只在本机 localhost / 127.0.0.1 上可写）：GET /__blockout/status；POST /__blockout/save
   { level: "FirstLevel", doc: {...}, revision: "<读配置时那份原始字节的 sha1；必填，文件还不存在时写 null>" }
   过 ValidateBlockout 后原子写 Taierzhuang1938/Blockout/<Level>.json（body ≤ 4 MB）；版本号对不上回 409（带当前版本号，
-  先重新读取再存），坏 JSON / 校验不过 / 嵌套太深回 400，任何拒绝都不落盘。`;
+  先重新读取再存），坏 JSON / 校验不过 / 嵌套太深回 400，任何拒绝都不落盘。
+场景保存口（场景编辑器，只在本机 localhost / 127.0.0.1 上可写）：GET /__scene/status；POST /__scene/save
+  { scene: "FirstLevelWhitebox", doc: {...}, revision: "<读场景时那份原始字节的 sha1>" }
+  过 ValidateScene 后按场景文件的写法原子写 Taierzhuang1938/Scenes/<Id>/Scene_<Id>.json（body ≤ 16 MB）；其余同上。`;
 
 async function Main() {
   const args = process.argv.slice(2);

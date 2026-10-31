@@ -151,7 +151,6 @@ function CloneOwnedMaterial(material) {
       ssao: clone.userData.ssaoUniforms || null,
       gi: clone.userData.giUniforms || null,
       ssr: null,
-      destruction: clone.userData.destructionUniforms || null,
     }));
   }
   return clone;

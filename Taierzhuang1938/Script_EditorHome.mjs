@@ -10,7 +10,7 @@ import { PHASES } from "./Data_Battle.mjs";
 import { SandboxUrl } from "./Data_StartupRouting.mjs";
 
 /** 编辑一关真实场景的工具：首页上点它们要先选关卡。 */
-const CHAPTER_TOOLS = new Set(["splines", "propPcg", "destruction"]);
+const CHAPTER_TOOLS = new Set(["splines", "propPcg"]);
 
 /** 某个工具要先载入什么。返回 null = 不用载入，直接开。 */
 export function HomeLevelChoices(toolId, href) {

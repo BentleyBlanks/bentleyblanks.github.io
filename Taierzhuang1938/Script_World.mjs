@@ -20,7 +20,6 @@ import {
   MakeBox, MakePlane, MergeGeometries, PlaceGeometry, CarveCraters,
   MakeRubbleField, MakeInstanced, TILE_METERS, BRICK_UV_GRID,
 } from "./Script_Geo.mjs";
-import { ColliderDestructionData } from "./Data_Destruction.mjs";
 import { SANDBAG_ASSET_IDS, SANDBAG_METRICS } from "./Data_SandbagStandard.mjs";
 import { AddCourtyardLife } from "./Script_LivedInProps.mjs";
 
@@ -92,7 +91,6 @@ export class BuildSink {
       ry,
       tag,
       ...(surface ? { surface } : {}),
-      destruction: ColliderDestructionData(tag),
     });
   }
 
@@ -122,27 +120,9 @@ export class BuildSink {
       const bar = key.indexOf("|");
       const name = bar < 0 ? key : key.slice(bar + 1);
       const baseMaterial = pick(name, library);
-      const mesh = new THREE.Mesh(geometry,
-        typeof library.Static === "function" ? library.Static(baseMaterial) : baseMaterial);
+      const mesh = new THREE.Mesh(geometry, baseMaterial);
       mesh.castShadow = castShadow;
       mesh.receiveShadow = receiveShadow;
-      // 主材质把洞裁掉，阴影 pass 也必须吃同一只 OBB；否则破口仍投一块完整墙影。
-      if (castShadow && typeof library.StaticDepth === "function") {
-        mesh.customDepthMaterial = library.StaticDepth();
-      }
-      // 深度法线预通道用 scene.overrideMaterial。那一趟所有物体共用一份材质，
-      // 必须只在本只静态网格 draw 的前后开关裁切；不复位的话，随后经过洞口的演员
-      // 会在预通道里缺一块，主画面却完整，SSAO/雾就出现人形黑边。
-      mesh.onBeforeRender = (_renderer, _scene, _camera, _geometry, material) => {
-        const enabled = material && material.userData && material.userData.damageObjectEnabled;
-        if (enabled) enabled.value = 1;
-      };
-      mesh.onAfterRender = (_renderer, _scene, _camera, _geometry, material) => {
-        const enabled = material && material.userData && material.userData.damageObjectEnabled;
-        if (enabled) enabled.value = 0;
-      };
-      // 预通道静态合批认得这一对钩子（Script_PrepassStaticBatch）：整批一起开裁切与逐件开等价。
-      mesh.userData.prepassDamageHook = true;
       mesh.name = `Static_${key}`;
       scene.add(mesh);
       meshes.push(mesh);

@@ -147,6 +147,7 @@ const afterGear = await page.evaluate(() => {
     squadMarch: !!document.querySelector('#edRoot .edMenuBar [data-editor="squadMarch"]'),
     facial: !!document.querySelector('#edRoot .edMenuBar [data-editor="facial"]'),
     textures: !!document.querySelector('#edRoot .edMenuBar [data-editor="textures"]'),
+    sceneEditor: !!document.querySelector('#edRoot .edMenuBar [data-editor="sceneEditor"]'),
     orchestration: !!document.querySelector('#edRoot .edMenuBar [data-editor="orchestration"]'),
     blockout: !!document.querySelector('#edRoot .edMenuBar [data-editor="blockout"]'),
     // 设置三页不在高级工具里；Debug工具在菜单栏右侧自己的下拉里（2026-10-22），不混进编辑器条目
@@ -160,12 +161,12 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出高级工具", afterGear.panelOpen && afterGear.capturing && afterGear.barVisible && afterGear.emptyInspector,
   `进游戏时指针锁=${locked}`);
-// 菜单栏：游戏 + 六个工具菜单 + 右侧 Debug工具；十三个互斥编辑器 + 关卡编排 + 第一人称持枪移动检查（叠加层，2026-10-23）
-// + 贴图管理 + 白盒关卡编辑器（整页跳转入口）= 17 个条目（2026-10-31 删了场景关卡 / 地形 / 完整场景预览 / 采样点；
+// 菜单栏：游戏 + 六个工具菜单 + 右侧 Debug工具；十二个互斥编辑器 + 关卡编排 + 第一人称持枪移动检查（叠加层，2026-10-23）
+// + 贴图管理 + 场景编辑器（独立窗口，2026-10-31 加）+ 白盒关卡编辑器（整页跳转入口）= 17 个条目（2026-10-31 删了场景关卡 / 地形 / 完整场景预览 / 采样点 / 可破坏场景；
 // 出图机位 shotCamera 是不进菜单的测试工具，不计入）
 Check("菜单栏列出全部编辑器入口", afterGear.entries === 17
   && afterGear.menus.join(",") === "游戏,场景,关卡,角色,武器,特效与声音,资产,Debug工具"
-  && afterGear.squadMarch && afterGear.facial && afterGear.textures && afterGear.orchestration && afterGear.blockout,
+  && afterGear.squadMarch && afterGear.facial && afterGear.textures && afterGear.sceneEditor && afterGear.orchestration && afterGear.blockout,
   `条目=${afterGear.entries}，菜单=${afterGear.menus.join("/")}，白盒关卡编辑器=${afterGear.blockout}`);
 Check("设置三页不在高级工具里", !afterGear.settingsInBar);
 Check("Debug工具七项在音量条旁的下拉里，不混进编辑器条目",

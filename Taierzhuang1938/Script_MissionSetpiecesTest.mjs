@@ -132,7 +132,7 @@ function FakeCarry() {
   return carry;
 }
 
-/** 一次爆炸（走的就是 Script_Destruction.Blast 里那一行）。 */
+/** 一次爆炸（走的就是 Script_Combat.Blast 里那一行 BLAST_TARGETS.Blast）。 */
 function Boom(x, z, radius = 6, energy = 400, kind = "launcher") {
   return BLAST_TARGETS.Blast({ x, y: 0, z }, radius, energy, kind);
 }

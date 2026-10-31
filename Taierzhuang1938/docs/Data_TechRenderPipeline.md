@@ -2430,7 +2430,7 @@ define，热切不重编译视模材质；滤波半径按米给（默认 6 mm）
 * **只收深度程序预热过的成员**：批次版深度程序只有阴影趟真跑才编，而且按 flipSided / doubleSided
   分变体。`WarmProxy()` 给共用批次深度与场上每只自定义深度材质（BuildSink 破口裁切那只的克隆、其它）
   各造三种面的一实例代理；没登记进 `warmedDepth` 的一律不收，宁可少合一件也不在游戏中途现编。
-* 破口裁切：成员的 `library.StaticDepth()` 在合批里用 `CloneShadedMaterial` 克隆（同一份破口 uniform，
+* （破口裁切与 `library.StaticDepth()` 已于 2026-10-31 用户要求删除，以下为历史记录）破口裁切：成员的 `library.StaticDepth()` 在合批里用 `CloneShadedMaterial` 克隆（同一份破口 uniform，
   补丁已处理 `USE_BATCHING`），克隆是为了不让同一只深度材质在普通 Mesh 与 BatchedMesh 之间翻种类
   （§17.12 那条 getProgram 风暴）。
 * 镜像件（matrixWorld 行列式 ≤ 0）不收：绕序要逐件翻，一整批只有一个 frontFace。
@@ -5416,7 +5416,7 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs --tiers       # phase=2 的 dra
   draw 之前把对象自己材质的 map / alphaMap / alphaTest / side / displacementMap 抄到
   返回的那只深度材质上，多只共用一份就是「最后写的赢」—— 那正是今天共用
   `_depthMaterial` 的行为。程序也不会变多（program 缓存按参数键找，这三份深度程序本来
-  就各有一个）。`BuildSink` 的可破坏静态件继续吃 `library.StaticDepth()`，它同样只被
+  就各有一个）。`BuildSink` 的可破坏静态件继续吃 `library.StaticDepth()`（已删，2026-10-31 用户要求删除），它同样只被
   普通 Mesh 用，不冲突。
 
 **验收**：逐 pass 的 draw 与三角一个不差（main 535 / prepass 414 / shadow 332，三角

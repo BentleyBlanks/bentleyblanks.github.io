@@ -823,7 +823,7 @@ export class AiDirector {
     this.aiHost = host;
     this.perception = new PerceptionModel(host);
     this.covers = new CoverRegistry(this.ctx.battlefield?.covers || [], host);
-    /** `battlefield.covers` 换了引用（Destruction filter 之后）就重建注册表。 */
+    /** `battlefield.covers` 换了引用（掩体表被重建之后）就重建注册表。 */
     this.coversSource = this.ctx.battlefield?.covers || null;
     this.shooting = new ShootingModel(host);
     this.tactics = new TacticsDirector(host, this.covers);
@@ -1145,8 +1145,7 @@ export class AiDirector {
 
   /** 每秒汇总两侧重心与当前任务路标；随后统一更新小队意图。 */
   UpdateFront() {
-    // 掩体表被炸掉一段之后 `Script_Destruction` 会**换掉整个数组**（filter 出新的一份），
-    // 所以按引用比就能认出来。旧表里那些贴在洞口上的点必须作废 ——
+    // 掩体表被重建（换成新的一份数组）时按引用比就能认出来（原来的墙体破坏系统就是这么换表的）。旧表里那些贴在洞口上的点必须作废 ——
     // 不重建的话人会蹲在一堵已经不存在的墙后面。
     const covers = this.ctx.battlefield?.covers;
     if (covers && covers !== this.coversSource) {
@@ -5236,12 +5235,11 @@ export class AiDirector {
       // 不再是围着瞄点撒的一团各向同性随机数（那个数跟枪、跟距离都没关系）。
       const bf = this.ctx.battlefield;
       const h = bf?.Raycast ? bf.Raycast(fromV, dir, dist + 6) : null;
-      let p = null, normal = null, surface = "dirt", box = null;
+      let p = null, normal = null, surface = "dirt";
       if (h) {
         p = fromV.clone().addScaledVector(dir, h.t);
         normal = new THREE.Vector3(h.normal[0], h.normal[1], h.normal[2]);
         surface = this.ImpactSurface(h.box);
-        box = h.box;
       } else if (bf?.GroundHeight) {
         // 土坎顶与平地是高度函数，不在默认射线世界里。打地暂时与打土共用 impactDirt。
         p = fromV.clone().addScaledVector(dir, dist);
@@ -5256,12 +5254,6 @@ export class AiDirector {
       if (p) {
         if (vfx) vfx.Impact(p, normal, surface, { weaponKind: s.weapon.kind });
         this.ctx.audioWiring?.AiBulletImpact(p, surface, s.fireSequence);
-        // AI 的流弹也走同一份局部耐久。这里仍只在“真的打到静态碰撞体”时记伤，
-        // 概率命中人物的那一支不会凭空再穿过去伤一堵墙。
-        if (this.ctx.destruction && box) {
-          this.ctx.destruction.Hit(box, p, s.weapon.damage,
-            { kind: "bullet", normal });
-        }
       }
     }
   }

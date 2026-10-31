@@ -45,7 +45,6 @@ import { AssetStandardsEditor } from "./Script_EditorAssetStandards.mjs";
 import { PropPcgEditor } from "./Script_EditorPropPcg.mjs";
 import { SplineEditor } from "./Script_EditorSplines.mjs";
 import { ShotCameraEditor } from "./Script_EditorShotCamera.mjs";
-import { DestructionEditor } from "./Script_EditorDestruction.mjs";
 import { DebugRenderingEditor } from "./Script_EditorDebugRendering.mjs";
 import { WorldInfoEditor } from "./Script_EditorWorldInfo.mjs";
 import { PlayerStateEditor } from "./Script_EditorPlayerState.mjs";
@@ -56,13 +55,14 @@ import { OrchestrationEditor } from "./Script_EditorOrchestration.mjs";
 import { SquadMarchEditor } from "./Script_EditorSquadMarch.mjs";
 import { TextureEditor } from "./Script_EditorTextures.mjs";
 import { BlockoutEntry } from "./Script_EditorBlockoutEntry.mjs";
+import { SceneEditorEntry } from "./Script_EditorSceneEntry.mjs";
 import { ToolsHome } from "./Script_EditorHome.mjs";
 import { LoadToolsVolume, ToolsVolumeControl, ToolsVolumeLevel } from "./Script_EditorVolume.mjs";
 
 /** 互斥编辑器：接管画面（多数还接管相机），任何时候只有一个活着。 */
 const EDITORS = [
   ActorEditor, FacialEditor, SquadMarchEditor, WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor, TimelineEditor,
-  PropLibraryEditor, AssetStandardsEditor, PropPcgEditor, SplineEditor, DestructionEditor,
+  PropLibraryEditor, AssetStandardsEditor, PropPcgEditor, SplineEditor,
   // 出图脚本与测试用的定镜小工具（不在任何菜单里，见 Script_EditorShotCamera 文件头）
   ShotCameraEditor,
 ];
@@ -87,7 +87,8 @@ const DEBUG_WINDOW_TOOLS = new Set([ProfilerEditor.id, FrameDebuggerEditor.id, W
  * 带 window 标记的项打开的是独立窗口，条目后缀 ↗。
  */
 const TOOL_MENUS = [
-  { id: "scene", label: "场景", items: [SplineEditor, PropPcgEditor, DestructionEditor] },
+  // 场景编辑器打开独立窗口 SceneEditor.html（摆 Scenes/ 场景文件，docs/Data_Scene.md §6），同贴图管理不进互斥表。
+  { id: "scene", label: "场景", items: [SceneEditorEntry, SplineEditor, PropPcgEditor] },
   // 白盒关卡编辑器只是一个跳转入口（整页换成 ?editor=blockout），同贴图管理一样不进互斥表。
   { id: "level", label: "关卡", items: [BlockoutEntry, OrchestrationEditor, TimelineEditor, SquadMarchEditor] },
   { id: "character", label: "角色", items: [ActorEditor, FacialEditor] },
@@ -95,7 +96,7 @@ const TOOL_MENUS = [
   { id: "media", label: "特效与声音", items: [VfxEditor, AudioEditor] },
   { id: "assets", label: "资产", items: [PropLibraryEditor, AssetStandardsEditor, TextureEditor] },
 ];
-const WINDOW_TOOLS = new Set([OrchestrationEditor.id, TextureEditor.id]);
+const WINDOW_TOOLS = new Set([OrchestrationEditor.id, TextureEditor.id, SceneEditorEntry.id]);
 
 export class EditorSuite {
   /**
@@ -159,7 +160,7 @@ export class EditorSuite {
       // 机队同理走取值器（白盒预演的飞机借它的模型克隆）
       get aircraft() { return host.game.aircraft ?? null; },
       actorFactory: host.actorFactory, viewmodel: host.viewmodel,
-      audio: host.audio, cutscene: host.cutscene, destruction: host.destruction,
+      audio: host.audio, cutscene: host.cutscene,
       game: host.game,
       studio: suite.studio, flycam: suite.flycam, viewport: suite.viewport,
       // 摄影棚要额外藏的东西：视图模型挂在相机上，而相机是豁免的
@@ -511,7 +512,7 @@ export class EditorSuite {
 
   /** 菜单栏里点一项。当前开着的那项再点一次 = 关掉它。 */
   Toggle(id) {
-    if (id === TextureEditor.id || id === BlockoutEntry.id) return this.Open(id);
+    if (id === TextureEditor.id || id === SceneEditorEntry.id || id === BlockoutEntry.id) return this.Open(id);
     // 工具首页没有关卡：场景类工具先回首页问「载入哪一关」
     if (this.home?.NeedsLevel(id)) {
       if (this.active) this.CloseTool();
@@ -603,6 +604,10 @@ export class EditorSuite {
   Open(id) {
     if (id === TextureEditor.id) {
       try { return TextureEditor.Open(); }
+      catch (error) { this.SetHint(error.message); return null; }
+    }
+    if (id === SceneEditorEntry.id) {
+      try { return SceneEditorEntry.Open(); }
       catch (error) { this.SetHint(error.message); return null; }
     }
     // 白盒关卡编辑器：整页跳到 ?editor=blockout；已经在里面就什么也不做（按钮亮着表示当前项）。

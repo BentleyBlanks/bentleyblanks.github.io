@@ -94,7 +94,6 @@ npm 根入口也已拆档：`npm test` 只调度 Git 改动命中的游戏项目
 | NeckDeathTest | 敌军喉咙窒息哽咽的规则层（纯 Node，毫秒级） |
 | HitReactionTest | 受击物理反应规则层：冲量分配符号与比例、弹簧稳定 / 限位 / 休眠、死亡包络归零、方向死亡选择、Soldier 接线（纯 Node，毫秒级；口径 [受击物理反应](Data_HitReaction.md)） |
 | HitReactionBrowserTest | 受击物理反应真引擎（NRA + IJA 真实 GLB，约 2 分钟）：骨骼世界角度对契约 §4、方向死亡 16 向、无 hit 老路、`?hitreact=0`、复用清零、30 人每帧耗时；`--require-library` 强制动作库四族，`--report` 打印全部实测值 |
-| FractureBakeTest | 预破碎离线数据 |
 | CutsceneControlTest | 过场导演机位与生命周期 |
 | GeoTest / RoadPathTest / WallPlanTest | 几何快路、道路与围墙规划契约；其中 GeoTest 需浏览器，只在门禁档运行 |
 | BootTest | 七片切片开机冒烟（序章 + 六片暂时废弃场景）、WebGL 健康、draw call/triangles 红线；prepush 按渲染/关卡风险触发 |
@@ -110,14 +109,14 @@ npm 根入口也已拆档：`npm test` 只调度 Git 改动命中的游戏项目
 |---|---|
 | firstLevel | 纯 Node：FirstLevelMissionTest、MissionGatesTest、FirstLevelSpaceTest、FirstLevelMissionTopologyTest、FirstLevelFrontTest（1–7）、FirstLevelMidTest（8–14）、FirstLevelEndTest（15–18）、FirstLevelVoiceTest、FirstLevelLeaderGuideTest、MissionOrchestrationFilterTest。浏览器（prepush）：FirstLevelMissionBrowserTest（`--campaign`，分段 `--stage-from=8\|11\|15\|18 --stage-jumps` / `--stage-to=7`）、FirstLevelMissionStageJumpTest、FirstLevelMachineGunTest、FirstLevelMachineGunCutsceneTest、FirstLevelFrontPresenceTest、FirstLevelFrontRouteBrowserTest、FirstLevelCasualtyBrowserTest、FirstLevelLeaderGuideBrowserTest、CarriagePropVelocityTest |
 | firstLevelTail | 两个分段浏览器夹具：FirstLevelMissionStageRegroupTest（`--stage-from=15`）、FirstLevelMissionStageTailTest（`--stage-from=18`） |
-| terrain | HeightmapVerify → JieheTerrain → TengxianLayout → Physics → Jump → Destruction |
-| physics | Physics → Collider → Jump → Destruction → FractureBake |
+| terrain | HeightmapVerify → JieheTerrain → TengxianLayout → Physics → Jump |
+| physics | Physics → Collider → Jump |
 | combat | Damage → GunFeel → FixedCenterAim → ReticleCalibration → SprintCrosshair → SprintViewmodel → FpsArm → SprintMelee → Bayonet → Range → MeleeQte |
 | ai | AiBehavior、Visibility |
 | hud | HudPrompt、HudPromptBrowser |
 | audio / voice | AudioTest / VoiceTest |
 | menu | MenuTest、BootPaperTest |
-| editor | EditorTest、DestructionEditorTest |
+| editor | EditorTest |
 | cutscene | CutsceneControl、ActorPose |
 | render | 渲染子系统专项（下表）→ ActorBatch → PropInstancing → ExternalPropAsset → TownDressing → EastSuburbBlocks → EastSuburbNav → WestDistrictCoverage → WestSuburbBlocks → WestStation → DressingProbe → RespawnShaderWarm（换人 / 人物模型号首次进画面不现编着色器）；另提示相关 Tier 2 |
 | perf | 不自动跑机器敏感测试，只提示 Tier 2 |

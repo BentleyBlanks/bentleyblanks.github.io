@@ -99,10 +99,10 @@ export class CraterDebris {
     this.baseMaterial = library.Get(library.baked.has("CraterScorched") ? "CraterScorched" : "Ground",
       { normalScale: 0.65, roughness: 1, metalness: 0, aoIntensity: 0.65 });
     this.baseMaterial.vertexColors = true;
-    this.material = library.Static(this.baseMaterial);
+    this.material = this.baseMaterial;
     this.stoneMaterial = library.Get("Stone", { color: 0x80776a, normalScale: 0.7, roughness: 1, metalness: 0 });
     this.stoneMaterial.vertexColors = true;
-    this.materials = [this.material, library.Static(this.stoneMaterial)];
+    this.materials = [this.material, this.stoneMaterial];
   }
   Update(key, tx, tz, soilWear, latticeWidth) {
     this.Remove(key);
