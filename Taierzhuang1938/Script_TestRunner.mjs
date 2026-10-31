@@ -386,11 +386,7 @@ export const testDefs = {
   AiGrenadeEvadeBrowserTest: { file: "Script_AiGrenadeEvadeBrowserTest.mjs", timeoutMs: 300000, desc: "日军躲手榴弹：落地才反应、冲出杀伤圈/来不及扑倒、躲时不开枪、守点的人也躲并回位、伤亡开关对照" },
   AiBrainGraphTest: { file: "Script_AiBrainGraphTest.mjs", desc: "敌军 AI 行为图：节点=STATE、边两端存在、表键可解析、任务=TASK（纯 Node，毫秒级）" },
   TuningWriterTest: { file: "Script_TuningWriterTest.mjs", desc: "调参表改写器：按花括号层级只改那一个数字、注释格式不动（纯 Node，毫秒级）" },
-  MissionNotesTest: { file: "Script_MissionNotesTest.mjs", desc: "关卡编排批注：schema/快照/漂移/交接文本 + /__notes 保存端点的四道闸（纯 Node，秒级）" },
-  MissionOrchestrationFilterTest: { file: "Script_MissionOrchestrationFilterTest.mjs", desc: "关卡编排分类查看：只看某一组 / 按状态武器行为筛人 / 六个预设 / 敌军布设表与 CSV（纯 Node，毫秒级）" },
   AiEditorTest: { file: "Script_AiEditorTest.mjs", timeoutMs: 300000, desc: "敌军 AI 编辑器：六个分节、世界叠加进出还干净、滑杆热改、重置/复制/保存退化、行为图节点数" },
-  OrchestrationMapTest: { file: "Script_OrchestrationMapTest.mjs", timeoutMs: 300000, desc: "关卡编排俯视图：各阶段数像素（敌人色随阶段变、路线色不为 0）、PickAt 点得中成员、ToPng、圈选/移动工具回调、Dispose 后不再回调" },
-  OrchestrationEditorTest: { file: "Script_OrchestrationEditorTest.mjs", timeoutMs: 300000, desc: "关卡编排工作台：入口/三栏与时间轴、要求事实与 flow 一致、实时玩家点、阶段状态、反查、批注退化到 localStorage、交接文本、关窗还干净" },
   EditorBlockoutConfigTest: { file: "Script_EditorBlockoutConfigTest.mjs", desc: "白盒关卡编辑器配置：格式校验、朝向换算、过渡规划、生成器可复现、提交的配置里玩家点与单位不在实心块里、过渡路线不穿墙（纯 Node，秒级）" },
   SceneDocTest: { file: "Script_SceneDocTest.mjs", desc: "场景文件（Scenes/<Id>）：校验、资产 / 材质编号、高度图编解码与裁块、物件转体块、priorSignals / futureSignals、第一关三段各取一块过白盒校验（纯 Node，十几秒）" },
   SceneEditModelTest: { file: "Script_SceneEditModelTest.mjs", desc: "场景编辑器数据层：移动 / 旋转 / 改字段 / 加 / 复制 / 删 / 改名、撤销重做、未保存标记、精度收口、导出过校验（纯 Node，秒级）" },
@@ -689,7 +685,7 @@ export const browserTests = new Set([
   'ProneCrawlTest', 'ActorLocomotionTest', 'BackRifleRunTest', 'RifleShoulderMarchTest', 'MeleeAnimationTest', 'DadaoSwingTest', 'FpsDadaoProjectionTest','GrenadeThrowTest', 'InfantryAnimationTest', 'DeathCollapseTest',
   "HitReactionBrowserTest", "NeckDeathBrowserTest",
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
-  "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutTouchBrowserTest", "EditorFirstPersonMotionBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest", "EditorBlockoutBlanketClothBrowserTest", "EditorBlockoutPlayBrowserTest", "SceneEditorBrowserTest",
+  "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutTouchBrowserTest", "EditorFirstPersonMotionBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest", "EditorBlockoutBlanketClothBrowserTest", "EditorBlockoutPlayBrowserTest", "SceneEditorBrowserTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPaperTest", "BootInteractionTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsSleeveTest", "FpsHandContactTest", "FpsReloadMechanicsTest", "FpsReloadClearanceTest", "HanYangReloadClearanceTest", "FpsGripEditorTest",
@@ -739,7 +735,6 @@ export const tier0Fast = [
   "AiTacticsTest",
   "AiBrainGraphTest",
   "TuningWriterTest",
-  "MissionNotesTest",
   "FirstPersonGaitTest",
   "EditorBlockoutConfigTest",
   "SceneDocTest",
@@ -940,7 +935,7 @@ export const domains = {
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
   menu: { label: "主菜单/加载画面", tests: ["MenuStartupTest", "ToolsHomeTest", "AboutBrowserTest", "FirstLevelP012DebugTest", "MenuTest", "CommandRoomBrowserTest", "CommandRoomPublicationTest", "CommandRoomPreviewTest", "MenuPresentationTest", "DeathMenuTest", "PlayerDeathTest", "BootPaperTest", "BootPaperPbrTest", "BootInteractionTest"] },
-  editor: { label: "第一人称检查/PCG/资产规范/构件库", tests: ["DevToolsIsolationTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "EditorBlockoutConfigTest", "SceneDocTest", "SceneEditModelTest", "SceneSaveTest", "SceneEditorBrowserTest", "EditorBlockoutSaveTest", "EditorBlockoutPrevizPlanTest", "EditorBlockoutFirstLevel0105SceneTest", "EditorBlockoutFirstLevel0105KeyframesTest", "EditorBlockoutFirstLevel0105PrevizTest", "EditorBlockoutFirstLevel0610SceneTest", "EditorBlockoutFirstLevel0610KeyframesTest", "EditorBlockoutFirstLevel0610PrevizTest", "EditorBlockoutMarkerRulesTest", "EditorBlockoutLayoutEditTest", "EditorBlockoutFirstLevel1218SceneTest", "EditorBlockoutFirstLevel1218KeyframesTest", "EditorBlockoutFirstLevel1218PrevizTest", "PrevizVillageClipsTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutTouchBrowserTest", "EditorFirstPersonMotionBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "EditorBlockoutPlayPlanTest", "EditorBlockoutPlayBrowserTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "TrenchEditorTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
+  editor: { label: "第一人称检查/PCG/资产规范/构件库", tests: ["DevToolsIsolationTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "EditorBlockoutConfigTest", "SceneDocTest", "SceneEditModelTest", "SceneSaveTest", "SceneEditorBrowserTest", "EditorBlockoutSaveTest", "EditorBlockoutPrevizPlanTest", "EditorBlockoutFirstLevel0105SceneTest", "EditorBlockoutFirstLevel0105KeyframesTest", "EditorBlockoutFirstLevel0105PrevizTest", "EditorBlockoutFirstLevel0610SceneTest", "EditorBlockoutFirstLevel0610KeyframesTest", "EditorBlockoutFirstLevel0610PrevizTest", "EditorBlockoutMarkerRulesTest", "EditorBlockoutLayoutEditTest", "EditorBlockoutFirstLevel1218SceneTest", "EditorBlockoutFirstLevel1218KeyframesTest", "EditorBlockoutFirstLevel1218PrevizTest", "PrevizVillageClipsTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutTouchBrowserTest", "EditorFirstPersonMotionBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "EditorBlockoutPlayPlanTest", "EditorBlockoutPlayBrowserTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "TrenchEditorTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
@@ -1154,13 +1149,8 @@ const changedDomainRules = [
   { domain: "ai", pattern: /Data_AiBrainGraph|Script_AiProbeScene/i },
   // 调参表改写器只被本地预览的保存口与编辑器测试用：改了跑 editor 域（TuningWriterTest）。
   { domain: "editor", pattern: /Script_TuningWriter/i },
-  // 关卡编排的批注层（schema / CLI）与它存下来的草稿：批注是编辑器工作台的产物，
-  // notes.json 里没有任何游戏数据，但它的形状被保存端点与 CLI 共用，改了要跑 MissionNotesTest。
-  { domain: "editor", pattern: /Script_MissionNotes|Notes\/[A-Za-z0-9]+\/notes\.json/i },
   { domain: "editor", pattern: /Script_EditorWorldInfo|Script_WorldInfoEditorTest/i },
   { domain: "editor", pattern: /Script_EditorPlayerState|Script_PlayerStateEditorTest/i },
-  // 关卡编排工作台本体与它的俯视图：改了跑 editor 域（OrchestrationEditorTest / OrchestrationMapTest）。
-  { domain: "editor", pattern: /Script_EditorOrchestration|Script_Orchestration.*Test/i },
   // 白盒关卡编辑器（docs/Data_EditorBlockout.md）：按关卡存的配置与场景文件、生成器、存档口测试。
   // 配置里没有游戏数据（改它不影响正式关卡），但编辑器与生成器读它，改了跑 editor 域。
   { domain: "editor", pattern: /Blockout\/|Script_EditorBlockout|Data_EditorBlockout/i },
@@ -1170,9 +1160,8 @@ const changedDomainRules = [
   { domain: "editor", pattern: /Animation\/Previz[A-Za-z0-9]+\/|Data_BlockoutPrevizClips/i },
   // 村子占位库的源脚本、烘焙入口与门禁（_import/Script_PrevizVillage*.py、Script_PrevizVillageClipsTest）。
   { domain: "editor", pattern: /PrevizVillage/i },
-  // 「分类查看」的纯模型（工作台的分类树与敌军布设表都读它）与那张图标登记表
-  // （俯视图与面板共用，连同 Texture/Editor 下的 PNG）：改了跑 editor 域。
-  { domain: "editor", pattern: /Script_MissionOrchestrationFilter|Data_OrchestrationIcons|Texture\/Editor\//i },
+  // Texture/Editor 下是只有编辑器读的贴图（白盒编辑器的河沟底图）：改了跑 editor 域。
+  { domain: "editor", pattern: /Texture\/Editor\//i },
   // 壕沟规划层与预览几何没有 Editor 字样，但「场景样条PCG」面板读的就是它们
   // （滑杆推 SetTrenchPresetOverride、预览调 CompileTrenchNetwork）——
   // 改 TRENCH_PRESETS 不跑 TrenchEditorTest，面板那一路会静默过期。

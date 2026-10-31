@@ -1,4 +1,4 @@
-// 枪械放大准心校准专项：真实 ADS FOV、弹道中心、像素拖拽与退出还原。
+// 放大准心校准专项（2026-10-31 起在「第一人称持枪检查」里）：真实 ADS FOV、弹道中心、像素拖拽与退出还原。
 // 用法：node Taierzhuang1938/Script_ReticleCalibrationTest.mjs
 
 import path from "node:path";
@@ -34,7 +34,7 @@ try {
   const result = await page.evaluate(() => {
     const T = window.Taierzhuang;
     const original = { fov: T.camera.fov, weapon: T.viewmodel.weaponId };
-    const editor = T.editor.Open("weapon");
+    const editor = T.editor.Open("firstPerson");
     editor.SetWeapon("Zb26");
     editor.EnterCalibration();
     T.StepFrames(18);
@@ -50,7 +50,7 @@ try {
       offset: T.viewmodel.GetIronSightOffsetPixels(),
       output: editor.calibrationOutput.value,
     };
-    editor.SetMode("bench");
+    editor.SetView("inspect");
     const hidden = !document.querySelector(".edCross")?.classList.contains("on");
     T.editor.Close();
     const restored = { fov: T.camera.fov, weapon: T.viewmodel.weaponId };
@@ -65,7 +65,7 @@ try {
     result.adjusted.offset.x === 10 && result.adjusted.offset.y === 5
       && result.adjusted.output.includes("Zb26: { x: 10, y: 5 }"),
     JSON.stringify(result.adjusted));
-  Check("离开第一人称后标记收起", result.hidden);
+  Check("切到外部检查后标记收起", result.hidden);
   Check("退出编辑器后 FOV 与玩家枪械还原",
     result.restored.fov === result.original.fov && result.restored.weapon === result.original.weapon,
     JSON.stringify({ before: result.original, after: result.restored }));

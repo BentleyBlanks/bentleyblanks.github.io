@@ -9,13 +9,16 @@
 //   武器挂点（TZM 节点；程序化兜底时读运行时 mount）、IK 目标坐标系、真实掌心 grip。
 // 掌心与 IK 目标间的连线/残差只能说明“解算有没有追到目标”；它不能替代人眼判断
 // 目标本身是否合理。退出时必须把父节点、局部变换、玩家武器和刺刀状态原样还回去。
+//
+// 第一人称的一切检查都在这里（2026-10-31 起「枪械」编辑器只剩台架）：上刺刀预览、
+// 连续开火与「放大准心校准」也从枪械编辑器搬了过来，不再两处各有一套动作按钮。
 
 import * as THREE from "three";
 import {
   Panel, Section, Slider, Chips, Toggle, Button, ButtonRow, Facts, Note, ListBox, TextArea,
 } from "./Script_EditorUi.mjs";
 import { WEAPONS, WeaponShelved } from "./Data_Weapons.mjs";
-import { WEAPON_MESH_BY_ID, WEAPON_MESH_VARIANTS } from "./Data_Meshes.mjs";
+import { WEAPON_MESH_BY_ID, WEAPON_MESH_VARIANTS, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
 import { FPS_ANIMATION_LABELS } from "./Data_FpsSkeletalAnimation.mjs";
 
 const MOUNT_NAMES = Object.freeze(["muzzle", "gripR", "gripL", "sight", "magazine"]);
@@ -63,7 +66,19 @@ function CanAction(weapon, action) {
   if (action === "reload") return !!weapon.reloadKind && !!weapon.reloadTimeS;
   if (action === "throw") return weapon.kind === "throwable";
   if (action === "melee") return weapon.kind !== "throwable";
+  if (action === "auto") return !!weapon.rpm && CanAction(weapon, "fire");
   return false;
+}
+
+/** 只有真正有照门/准星的火器才显示弹道校准，刀与手榴弹没有这条轴线。 */
+function CanCalibrate(id) {
+  const kind = WEAPONS[id]?.kind;
+  return kind === "boltRifle" || kind === "lmg" || kind === "pistol";
+}
+
+/** 可切换预览的刺刀必须既有规则支持，也有可挂到枪口的独立模型。 */
+function CanPreviewBayonet(id) {
+  return !!(WEAPONS[id]?.bayonet && BAYONET_MESH_BY_WEAPON[id]);
 }
 
 // 程序动作（白刃等）没有 Blender 骨骼片段，姿势由 Viewmodel 的动作时钟逐帧算出来。
@@ -127,7 +142,7 @@ function RestoreTransform(object, saved) {
 export class FirstPersonEditor {
   static id = "firstPerson";
   static label = "第一人称持枪检查";
-  static hint = "枪/手榴弹切换、玩家/外部视角、真实挂点与骨骼残差";
+  static hint = "枪/手榴弹切换、玩家/外部视角、真实挂点与骨骼残差、准心校准";
 
   constructor(host) {
     this.host = host;
@@ -154,6 +169,11 @@ export class FirstPersonEditor {
     this.refreshTimer = 0;
     this.saved = null;
     this.actionPreview = null;
+    this.bayonetPreview = false;
+    this.autoFire = false;
+    this.fireTimer = 0;
+    this.calibration = true;
+    this.calibrationByWeapon = new Map();
   }
 
   Enter(root) {
@@ -255,6 +275,46 @@ export class FirstPersonEditor {
       melee: Button(actions, "白刃", () => this.Trigger("melee")),
       throw: Button(actions, "投掷", () => this.Trigger("throw")),
     };
+    const extras = document.createElement("div");
+    extras.className = "edBtns";
+    pose.appendChild(extras);
+    this.autoFireToggle = Toggle(extras, "连续开火", false, (on) => {
+      this.autoFire = on;
+      this.fireTimer = 0;
+    });
+    this.bayonetToggle = Toggle(extras, "上刺刀预览", false, (on) => {
+      this.bayonetPreview = on;
+      this.ApplyBayonetPreview();
+    });
+
+    const calibration = Section(body, "放大准心校准");
+    this.calibrationSection = calibration.parentElement;
+    const calibrationButtons = document.createElement("div");
+    calibrationButtons.className = "edBtns";
+    calibration.appendChild(calibrationButtons);
+    this.calibrationToggle = Toggle(calibrationButtons, "显示真实弹道点", true, (on) => {
+      this.calibration = on;
+      this.UpdateCalibrationView();
+    });
+    this.offsetXSlider = Slider(calibration, {
+      label: "横向 X", min: -32, max: 32, step: 0.5, value: 0,
+      format: (v) => `${v > 0 ? "+" : ""}${v.toFixed(1)} px`,
+      onInput: () => this.ApplyCalibrationFromUi(),
+    });
+    this.offsetYSlider = Slider(calibration, {
+      label: "纵向 Y", min: -32, max: 32, step: 0.5, value: 0,
+      format: (v) => `${v > 0 ? "+" : ""}${v.toFixed(1)} px`,
+      onInput: () => this.ApplyCalibrationFromUi(),
+    });
+    ButtonRow(calibration, [
+      { label: "进入校准", onClick: () => this.EnterCalibration() },
+      { label: "归零", onClick: () => this.SetCalibration(0, 0) },
+      { label: "恢复预设", onClick: () => this.ResetCalibration() },
+      { label: "复制配置", onClick: () => this.CopyCalibration() },
+    ]);
+    this.calibrationOutput = TextArea(calibration, { rows: 3 });
+    this.calibrationOutput.readOnly = true;
+    Note(calibration, "玩家视角下拖动画面，让准星尖对齐红十字；Y 正值向上。");
 
     const timeline = Section(body, "骨骼动画时间轴");
     this.animationSelect = document.createElement("select");
@@ -425,8 +485,16 @@ export class FirstPersonEditor {
     }
     this.list?.Select(id);
     this.time = 0;
+    // 刺刀预览按装备算，换一件就收起；校准覆盖本轮按武器记着，换回来接着用。
+    this.bayonetPreview = false;
+    this.bayonetToggle?.Set(false);
+    this.ApplyBayonetPreview();
+    const savedOffset = this.calibrationByWeapon.get(id);
+    if (savedOffset) this.host.viewmodel.SetIronSightOffsetPixels(savedOffset.x, savedOffset.y);
     this.RebuildMountSources();
     this.RefreshActions();
+    this.RefreshCalibrationUi();
+    this.UpdateCalibrationView();
     this.RefreshAnimationList();
     this.RefreshFacts(true);
     return true;
@@ -458,6 +526,7 @@ export class FirstPersonEditor {
     }
     viewmodel.root.visible = true;
     this.ApplyDiagnosticVisibility();
+    this.UpdateCalibrationView();
     this.RefreshFacts(true);
     return true;
   }
@@ -488,7 +557,8 @@ export class FirstPersonEditor {
     this.sprint = value === "sprint" ? 1 : 0;
     this.poseChips?.Set(value);
     this.adsSlider?.Set(this.ads);
-    this.SetStudioFov(this.PlayerFov());
+    if (this.view === "player") this.SetStudioFov(this.PlayerFov());
+    this.RefreshCalibrationOutput();
     return true;
   }
 
@@ -523,6 +593,106 @@ export class FirstPersonEditor {
     for (const [action, button] of Object.entries(this.actionButtons || {})) {
       button.hidden = !CanAction(weapon, action);
     }
+    const canAutoFire = CanAction(weapon, "auto");
+    if (this.autoFireToggle) this.autoFireToggle.root.hidden = !canAutoFire;
+    if (!canAutoFire && this.autoFire) {
+      this.autoFire = false;
+      this.autoFireToggle?.Set(false);
+    }
+    if (this.bayonetToggle) this.bayonetToggle.root.hidden = !CanPreviewBayonet(this.weaponId);
+    if (this.calibrationSection) this.calibrationSection.hidden = !CanCalibrate(this.weaponId);
+  }
+
+  ApplyBayonetPreview() {
+    this.host.viewmodel?.SetBayonetFixed?.(this.bayonetPreview && CanPreviewBayonet(this.weaponId));
+  }
+
+  // ---------------------------------------------------------------- 放大准心校准
+  // 红十字是枪口真实弹道在屏幕上的固定中心；拖画面或 X/Y 滑杆移动铁瞄，直到准星尖与红十字重合。
+  // 读数按 900p 基准像素。覆盖只活在编辑器这一轮里：退出时 Viewmodel.Equip 会清掉它，
+  // 正片「准心、弹道、机械瞄具共用屏幕中心」的规则不受影响。
+
+  EnterCalibration() {
+    if (!CanCalibrate(this.weaponId)) return false;
+    this.calibration = true;
+    this.calibrationToggle?.Set(true);
+    this.SetView("player");
+    this.SetPose("ads");
+    this.UpdateCalibrationView();
+    return true;
+  }
+
+  ApplyCalibrationFromUi() {
+    if (!this.offsetXSlider || !this.offsetYSlider) return;
+    this.SetCalibration(this.offsetXSlider.Value(), this.offsetYSlider.Value(), false);
+  }
+
+  SetCalibration(x, y, syncUi = true) {
+    const viewmodel = this.host.viewmodel;
+    if (!viewmodel || !CanCalibrate(this.weaponId)) return;
+    const ClampPixel = (value) => Math.max(-32, Math.min(32, Number(value) || 0));
+    const value = { x: ClampPixel(x), y: ClampPixel(y) };
+    this.calibrationByWeapon.set(this.weaponId, value);
+    if (viewmodel.weaponId === this.weaponId) viewmodel.SetIronSightOffsetPixels(value.x, value.y);
+    if (syncUi) {
+      this.offsetXSlider?.Set(value.x);
+      this.offsetYSlider?.Set(value.y);
+    }
+    this.RefreshCalibrationOutput();
+  }
+
+  ResetCalibration() {
+    const viewmodel = this.host.viewmodel;
+    if (!viewmodel || !CanCalibrate(this.weaponId)) return;
+    this.calibrationByWeapon.delete(this.weaponId);
+    const value = viewmodel.weaponId === this.weaponId ? viewmodel.ResetIronSightOffsetPixels() : { x: 0, y: 0 };
+    this.offsetXSlider?.Set(value.x);
+    this.offsetYSlider?.Set(value.y);
+    this.RefreshCalibrationOutput();
+  }
+
+  RefreshCalibrationUi() {
+    if (!this.offsetXSlider) return;
+    const value = this.calibrationByWeapon.get(this.weaponId) || { x: 0, y: 0 };
+    this.offsetXSlider.Set(value.x);
+    this.offsetYSlider.Set(value.y);
+    this.RefreshCalibrationOutput();
+  }
+
+  RefreshCalibrationOutput() {
+    if (!this.calibrationOutput) return;
+    if (!CanCalibrate(this.weaponId)) {
+      this.calibrationOutput.value = "此条目没有可校准的第一人称机械瞄具";
+      return;
+    }
+    const value = this.calibrationByWeapon.get(this.weaponId) || { x: 0, y: 0 };
+    this.calibrationOutput.value = `${this.weaponId}: { x: ${value.x}, y: ${value.y} },\n`
+      + `ADS FOV: ${this.PlayerFov().toFixed(2)}°\n`
+      + `说明: X 正值向右，Y 正值向上`;
+  }
+
+  async CopyCalibration() {
+    this.RefreshCalibrationOutput();
+    const text = this.calibrationOutput.value.split("\n")[0];
+    try {
+      await navigator.clipboard.writeText(text);
+      this.host.SetHint(`已复制 ${text}`);
+    } catch {
+      this.calibrationOutput.focus();
+      this.calibrationOutput.select();
+      this.host.SetHint("浏览器未授权剪贴板，配置已选中，请按 Ctrl+C");
+    }
+  }
+
+  /** 红十字只在玩家视角下出：外部检查的机位不是玩家眼睛，弹道中心在那里没有意义。 */
+  CalibrationActive() {
+    return this.calibration && this.view === "player" && CanCalibrate(this.weaponId);
+  }
+
+  UpdateCalibrationView() {
+    const active = this.CalibrationActive();
+    this.host.SetCrosshair(active, active ? "calibration" : "");
+    this.RefreshCalibrationOutput();
   }
 
   RefreshAnimationList() {
@@ -930,7 +1100,13 @@ export class FirstPersonEditor {
   }
 
   OnDrag(dx, dy, button) {
-    if (this.view === "inspect") this.studio.Drag(dx, dy, button);
+    if (this.view === "inspect") { this.studio.Drag(dx, dy, button); return; }
+    // 玩家视角下左键拖 = 挪铁瞄（900p 基准像素，按当前画布高度换算）
+    if (button === 0 && this.CalibrationActive()) {
+      const current = this.calibrationByWeapon.get(this.weaponId) || { x: 0, y: 0 };
+      const scale = 900 / Math.max(1, this.host.canvas.clientHeight || 900);
+      this.SetCalibration(current.x + dx * scale, current.y - dy * scale);
+    }
   }
 
   OnWheel(delta) {
@@ -957,6 +1133,13 @@ export class FirstPersonEditor {
       }
     }
     if (preview) this.HoldActionPreview();
+    if (this.autoFire && CanAction(WEAPONS[this.weaponId], "auto")) {
+      this.fireTimer -= dt;
+      if (this.fireTimer <= 0) {
+        this.fireTimer = Math.max(0.08, WEAPONS[this.weaponId].fireIntervalS || 1.2);
+        this.Trigger("fire");
+      }
+    }
     this.StepViewmodel(dt);
     this.RefreshAnimationTimeline();
     this.UpdateDiagnostics();

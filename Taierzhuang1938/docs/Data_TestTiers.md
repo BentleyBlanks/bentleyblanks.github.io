@@ -107,7 +107,7 @@ npm 根入口也已拆档：`npm test` 只调度 Git 改动命中的游戏项目
 
 | 领域 | 自动探针 |
 |---|---|
-| firstLevel | 纯 Node：FirstLevelMissionTest、MissionGatesTest、FirstLevelSpaceTest、FirstLevelMissionTopologyTest、FirstLevelFrontTest（1–7）、FirstLevelMidTest（8–14）、FirstLevelEndTest（15–18）、FirstLevelVoiceTest、FirstLevelLeaderGuideTest、MissionOrchestrationFilterTest。浏览器（prepush）：FirstLevelMissionBrowserTest（`--campaign`，分段 `--stage-from=8\|11\|15\|18 --stage-jumps` / `--stage-to=7`）、FirstLevelMissionStageJumpTest、FirstLevelMachineGunTest、FirstLevelMachineGunCutsceneTest、FirstLevelFrontPresenceTest、FirstLevelFrontRouteBrowserTest、FirstLevelCasualtyBrowserTest、FirstLevelLeaderGuideBrowserTest、CarriagePropVelocityTest |
+| firstLevel | 纯 Node：FirstLevelMissionTest、MissionGatesTest、FirstLevelSpaceTest、FirstLevelMissionTopologyTest、FirstLevelFrontTest（1–7）、FirstLevelMidTest（8–14）、FirstLevelEndTest（15–18）、FirstLevelVoiceTest、FirstLevelLeaderGuideTest。浏览器（prepush）：FirstLevelMissionBrowserTest（`--campaign`，分段 `--stage-from=8\|11\|15\|18 --stage-jumps` / `--stage-to=7`）、FirstLevelMissionStageJumpTest、FirstLevelMachineGunTest、FirstLevelMachineGunCutsceneTest、FirstLevelFrontPresenceTest、FirstLevelFrontRouteBrowserTest、FirstLevelCasualtyBrowserTest、FirstLevelLeaderGuideBrowserTest、CarriagePropVelocityTest |
 | firstLevelTail | 两个分段浏览器夹具：FirstLevelMissionStageRegroupTest（`--stage-from=15`）、FirstLevelMissionStageTailTest（`--stage-from=18`） |
 | terrain | HeightmapVerify → JieheTerrain → TengxianLayout → Physics → Jump |
 | physics | Physics → Collider → Jump |

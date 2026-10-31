@@ -13,8 +13,8 @@
 //   node Taierzhuang1938/Script_WeaponShot.mjs [输出目录] [--only=Zb26,Type38] [--flat] [--fp]
 //        [--debug=normal|baseColor|roughness|metalness]
 //   --flat 换成无贴图纯色材质出一份对照 —— 「贴图到底有没有比纯色强」只能这么比。
-//   --fp   拍第一人称那一份（腰射 / 开镜 / 开火 / 拉栓）。第一人称与台架是**两套
-//          几何**（见 Script_EditorWeapon 抬头），台架改好了不等于手里那把也对。
+//   --fp   拍第一人称那一份（腰射 / 开镜 / 开火 / 拉栓），走「第一人称持枪检查」的玩家视角。第一人称与台架是
+//          **两套几何**（见 Script_Viewmodel），台架改好了不等于手里那把也对。
 //   --reload 拍全枪械换弹：腰射/ADS起手两行，各四个机械关键帧；附同名JSON投影轨迹。
 //   --reload-times=.285,.42,.50,.78 指定四个装填时刻；--base-url=http://127.0.0.1:8099 复用本地预览。
 //   --reload-motion 另存正常时钟的连续原始帧；--reload-rounds=3 检查有余弹的装填。
@@ -102,14 +102,13 @@ await page.evaluate(() => window.Taierzhuang.Debug.OpenEditor("weapon"));
 await page.evaluate(() => window.Taierzhuang.StepFrames(10));
 
 // 面板与 HUD 挡住展台就白拍了。出图期间整个 DOM 层收掉，只留 canvas。
-await page.addStyleTag({ content: ".edPanel, .edGear, .edMenuBar, #hud, .hud { display: none !important; }" });
+await page.addStyleTag({ content: ".edPanel, .edGear, .edMenuBar, .edFpsMountHud, .edFpsLegend, .edCross, #hud, .hud { display: none !important; }" });
 
 const Sheet = async (entry) => page.evaluate(async ({ w, flatMode }) => {
   const T = window.Taierzhuang;
   const THREE = await import("./vendor/three/build/three.module.js");
-  const editor = T.editor.active;
+  const editor = T.editor.ActiveId === "weapon" ? T.editor.active : T.editor.Open("weapon");
   editor.spin = false;
-  editor.SetMode("bench");
   editor.SetWeapon(w.id, w.variant || 0);
   T.StepFrames(2);
 
@@ -188,8 +187,12 @@ const Sheet = async (entry) => page.evaluate(async ({ w, flatMode }) => {
 /** 第一人称四格：腰射 / 开镜 / 开火那一帧 / 拉栓中。 */
 const FpSheet = async (entry) => page.evaluate(async ({ w }) => {
   const T = window.Taierzhuang;
-  const editor = T.editor.active;
-  editor.SetMode("fp");
+  const editor = (() => {
+    // 第一人称那一份在「第一人称持枪检查」：玩家视角、收起挂点/骨骼标记与校准红十字，只拍正片画面
+    const fp = T.editor.ActiveId === "firstPerson" ? T.editor.active : T.editor.Open("firstPerson");
+    fp.SetView("player"); fp.SetAnimationClean(true); fp.calibration = false; fp.UpdateCalibrationView();
+    return fp;
+  })();
   editor.SetWeapon(w.id, w.variant || 0);
   T.StepFrames(30);                     // 让开镜/换枪的弹簧稳下来
 
@@ -221,8 +224,12 @@ const FpSheet = async (entry) => page.evaluate(async ({ w }) => {
 }, { w: entry });
 
 const ReloadSheet = async (entry) => page.evaluate(async ({ w, times, motionCapture, remainingRounds }) => {
-  const T = window.Taierzhuang, editor = T.editor.active;
-  editor.SetMode("fp");
+  const T = window.Taierzhuang, editor = (() => {
+    // 第一人称那一份在「第一人称持枪检查」：玩家视角、收起挂点/骨骼标记与校准红十字，只拍正片画面
+    const fp = T.editor.ActiveId === "firstPerson" ? T.editor.active : T.editor.Open("firstPerson");
+    fp.SetView("player"); fp.SetAnimationClean(true); fp.calibration = false; fp.UpdateCalibrationView();
+    return fp;
+  })();
   const src = document.getElementById("view");
   const cw = 640, ch = 360;
   const sheet = document.createElement("canvas");

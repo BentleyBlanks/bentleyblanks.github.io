@@ -694,7 +694,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 | 测试 | 类型 | 内容 |
 | --- | --- | --- |
 | `Script_EditorBlockoutConfigTest.mjs` | 纯 node | 校验器正反例；`NormalizeBlockout` 缺省值与 yaw 换算（三种来源各一例钉死）；`PlanTransition` 四种 mode、时长夹取、路径采样；两份提交的配置与场景文件通过校验；生成器两次输出除 `generatedAt` 外逐字相同；每个关键帧玩家点在关卡边界内、不在实心块里；单位不在实心块里（超出只报警告并列出） |
-| `Script_EditorBlockoutSaveTest.mjs` | 纯 node | 起真 LocalPreview（`--root=<临时目录>`）：status 可写、save 写对文件、各种拒绝（坏 level、`..`、超大、坏文档、GET、错误 Content-Type、外来 Origin / Host、revision 不符）零字节落盘、无 `.tmp` 残留、仓库里的 `Blockout/` 前后逐字节相同；`/__notes/status`、`/__tuning/status` 仍正常 |
+| `Script_EditorBlockoutSaveTest.mjs` | 纯 node | 起真 LocalPreview（`--root=<临时目录>`）：status 可写、save 写对文件、各种拒绝（坏 level、`..`、超大、坏文档、GET、错误 Content-Type、外来 Origin / Host、revision 不符）零字节落盘、无 `.tmp` 残留、仓库里的 `Blockout/` 前后逐字节相同；`/__tuning/status` 仍正常 |
 | `Script_EditorBlockoutLayoutEditTest.mjs`（2026-10-21） | 纯 node | 编辑布设的改动记录与导出（§4.4）：from / to、挪回原处就删、整组平移吸附挪动量、撤销 / 重做 / 取消、标记、`Reconcile`、导出排序与文字、`数据：` 行往返 |
 | `Script_EditorBlockoutMapEditBrowserTest.mjs`（2026-10-21） | 浏览器（游戏） | 0610 08-1 上真鼠标走一遍编辑布设（§4.4 门禁那条）；截图与导出文字存 `_shots/EditorBlockoutMapEdit/` |
 | `Script_EditorBlockoutMapTest.mjs` | 浏览器（临时 harness 页） | 纸面底色、块脚印、旋转块、等高线、各阵营标记颜色按像素数计（不看 `.visible`）；小地图以玩家为中心；全关总图缩放 / 平移 / 关键帧拾取 |

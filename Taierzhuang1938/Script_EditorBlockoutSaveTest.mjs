@@ -7,7 +7,7 @@
 //
 // 起一次真的 `Script_LocalPreview --root=<临时目录>`（里面放 Blockout/ 与配置模块的副本），验证：
 //   ① status：本机可写、版本号 = 盘上原始字节的 sha1、外来 Host 报不可写；
-//   ② 别的口没受影响：/__preview/ping、/__notes/status、/__tuning/status、静态读配置；
+//   ② 别的口没受影响：/__preview/ping、/__tuning/status、静态读配置；
 //   ③ 保存：写对文件（2 空格缩进 + 末尾换行）、回新版本号、新建文件只认 revision: null；
 //   ④ 拒绝：坏 level / `..` / 超大 body / 坏配置 / 嵌套 20 万层（服务不能挂）/ GET / 错 Content-Type /
 //      外来 Origin / 外来 Host / 版本号不符……每一条之后盘上逐字节不变、没有 .tmp；
@@ -196,8 +196,6 @@ try {
   {
     const ping = await Request(port, { route: "/__preview/ping" });
     Check(ping.json?.app === "BlanksLocalPreview" && path.resolve(ping.json.root) === path.resolve(serveRoot), "索引页 ping 没受影响");
-    const notes = await Request(port, { route: "/__notes/status" });
-    Check(notes.status === 200 && notes.json?.writable === true, `批注口没被新路由挤掉：${JSON.stringify(notes.json)}`);
     const tuning = await Request(port, { route: "/__tuning/status" });
     Check(tuning.status === 200 && tuning.json?.writable === true, `调参口没被新路由挤掉：${JSON.stringify(tuning.json)}`);
     const page = await Request(port, { route: "/index.html" });
@@ -206,7 +204,7 @@ try {
     Check(config.status === 200 && /application\/json/.test(config.headers["content-type"])
       && Buffer.compare(config.raw, fs.readFileSync(fileOf("FirstLevel"))) === 0,
       "编辑器读配置走的静态路由照旧（逐字节等于盘上的文件）");
-    console.log("ok  ② /__preview/ping、/__notes/status、/__tuning/status、静态读配置都照旧");
+    console.log("ok  ② /__preview/ping、/__tuning/status、静态读配置都照旧");
   }
 
   // ============================================================ ③ 保存

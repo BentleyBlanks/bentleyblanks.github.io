@@ -192,7 +192,7 @@
 - 公开阶段 9（内部步骤 `Melee`）是**灶屋—连屋近战**：玩家先进灶屋，担架队停在 08 的遮挡里**不进屋**。**进门遭伏击（2026-09-28 用户要求，照 COD5 万岁冲锋）**：`MeleeLead` 藏在灶屋—连屋过道西段，玩家跨进过道就扑上来撞翻、压刀，屏幕只剩一个 F 环，按上反刺、漏掉被捅死回灶屋重来；冲锋途中被打死就不进 QTE。编排 `Script_FirstLevelKitchenAmbush`（纯规则）+ `Script_FirstLevelVillageBlock`（副作用），数值 `MID_TUNING.kitchenAmbush`，口径 [Mid 册 09](docs/Data_FirstLevelMid20260919.md)，闸门 `Script_FirstLevelMidTest`、`--campaign --stage-jumps --stage-from=8`。其余三人那一拍收尾后才从东巷进来，贴上身走共用白刃僵持。通过条件仍只有 `meleeResolved`。**旧的屋内伏击拍（老周挨刀、两名担架员阵亡）仍下线**，[屋内伏击](docs/Data_FirstLevelRoomAmbush.md) 只作历史记录。
 - 第一关罗班长负责实体带路与停点等候，HUD 按 COD WWII / WaW 单人战役约定显示唯一跟随或任务标记；新增可重复短命令不能抢断剧情对白。编排、台词与验收见[罗班长任务引导](docs/Data_FirstLevelLeaderGuide.md)；原有战壕掩护门与搬运职责优先。
 - 正式菜单以 `Data_Menu.CAMPAIGN_ENTRIES` 为准：第一关可玩，第二关到终章为标注“未完成”的占位，点击提示“敬请期待”。旧序章及旧章节不恢复进菜单；`?phase=N` / `Debug.StartLevel` 只建原切片，不装旧剧本、摆点或换关。每次只建当前切片，换章拆除重建。
-- 第一关的编排（哪一步放哪些人、什么条件过关、组怎么激活）**是表不是脚本**：`Data_FirstLevelMissionGates.mjs` 的四张表 + `Data_FirstLevelMission*`，运行时只读表；用户的现场意见走「关卡编排」工作台存进 `Taierzhuang1938/Notes/<Level>/notes.json`（进仓库，agent 用 `Script_MissionNotesCli.mjs` 读与结案），改完跑 `Script_MissionGatesTest.mjs`。口径见 [关卡编排工作台](docs/Data_MissionOrchestration.md)。
+- 第一关的编排（哪一步放哪些人、什么条件过关、组怎么激活）**是表不是脚本**：`Data_FirstLevelMissionGates.mjs` 的四张表 + `Data_FirstLevelMission*`，运行时只读表；改完跑 `Script_MissionGatesTest.mjs`。口径见 [第一关编排表与编排模型](docs/Data_MissionOrchestration.md)（关卡编排工作台 2026-10-31 已删，排关卡用白盒关卡编辑器）。
 - `?whitebox=p012-archive` 是旧 P0–P2 的开发回归夹具，旧资产与组件契约继续保留。旧任务表、旧 Notion 摘录和旧通关结果不能替代新版需求与验收；任务涉及哪条入口，就核对对应运行时及测试。新需求在当前任务授权范围内同步数据、消费方和文档，不按旧提案自行恢复已废弃内容。
 
 - **通用匍匐移动与贴地（2026-09-27）**：共用 Blender 循环、位移时钟、四肢独立接地及远景六帧循环，见 [匍匐动作](docs/Data_ProneCrawl.md)；验收 `Script_ProneCrawlTest`。

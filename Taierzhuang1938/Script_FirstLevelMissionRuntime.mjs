@@ -52,7 +52,7 @@ import {
   MISSION_SUPPLIES,
 } from "./Data_FirstLevelMissionLayout.mjs";
 // 编排表（Data_FirstLevelMissionGates）：按步骤生成哪些组、对白记哪些事实、
-// 每个事实门的点与半径。运行时与关卡编排工作台共用同一份口径。
+// 每个事实门的点与半径。运行时与编排模型（Script_MissionOrchestration）共用同一份口径。
 import {
   MISSION_STEP_SPAWNS,
   MISSION_ENCOUNTER_ACTIVATION,

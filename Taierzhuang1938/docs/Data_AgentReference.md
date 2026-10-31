@@ -750,12 +750,10 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
   ShotCamera = 出图脚本与测试用的定镜小工具（不进菜单，`Debug.OpenEditor("shotCamera")` + `ApplyPose`）；
   构件目录在 `Script_PlaceableCatalog.mjs`（构件库预览用它，以后的新场景编辑器也复用）。场景关卡 / 地形 / 完整场景预览 / 采样点四个工具已于 2026-10-31 用户要求删除；
   FirstPerson = 正片 Viewmodel 的装备切换、玩家/外部检查视角、武器挂点/IK 目标/真实掌心与骨骼残差可视化，只读不写姿态表；
-  DebugRendering、Profiler、Frame Debugger、WorldInfo、玩家状态、敌军 AI 是菜单 设置 → Debug工具 里的叠加层，关卡编排在高级工具「关卡」菜单；
+  DebugRendering、Profiler、Frame Debugger、WorldInfo、玩家状态、敌军 AI 是菜单 设置 → Debug工具 里的叠加层；
   都可叠加且不接管相机、不暂停玩法。高级工具 = 顶部菜单栏 + 右侧 Inspector；整组开发工具只经 Script_DevTools / Data_DevTools
   两个边界模块进来，打包可剔除（docs/Data_EditorSuite.md「开发工具隔离与打包剔除」）。
-  关卡编排（Orchestration）独立窗口显示第一关的真实编排：流程（18 阶段/27 步骤 + 要求事实实时勾）、
-  真实比例俯视图（按阶段看敌我布局与触发圈）、设计/实际两行时间轴、现场批注 → 交给 agent；
-  口径 `docs/Data_MissionOrchestration.md`，回归口 `Script_OrchestrationEditorTest.mjs` / `Script_OrchestrationMapTest.mjs`。
+  关卡编排工作台已于 2026-10-31 用户要求删除（排关卡用白盒关卡编辑器）；编排表与模型口径见 `docs/Data_MissionOrchestration.md`。
   白盒关卡编辑器（Blockout）是独立模式而不是面板：`?editor=blockout&level=FirstLevel`（高级工具菜单栏「关卡」菜单第一项也能进；关卡表与总控经 `Script_DevTools` 边界取），
   不起任务运行时与过场，按关键帧摆敌我（独立演员，不进 AI）、画射界 / 去向 / POI，纸面小地图 + 可缩放全关总图，导航栏切关键帧；
   每关一份 `Blockout/<Level>.json`（第二关另有 `.scene.json` 场景），外部改动 2 s 内同步，生成器 `Script_EditorBlockoutCli.mjs`；

@@ -51,7 +51,6 @@ import { PlayerStateEditor } from "./Script_EditorPlayerState.mjs";
 import { ProfilerEditor } from "./Script_EditorProfiler.mjs";
 import { FrameDebuggerEditor } from "./Script_EditorFrameDebugger.mjs";
 import { AiEditor } from "./Script_EditorAi.mjs";
-import { OrchestrationEditor } from "./Script_EditorOrchestration.mjs";
 import { SquadMarchEditor } from "./Script_EditorSquadMarch.mjs";
 import { TextureEditor } from "./Script_EditorTextures.mjs";
 import { BlockoutEntry } from "./Script_EditorBlockoutEntry.mjs";
@@ -68,16 +67,14 @@ const EDITORS = [
 ];
 // 叠加层：不接管相机、不参与互斥，可以叠在任意一个编辑器上，也可以关掉菜单回去边打边看。
 // 渲染调试只读地观察后处理靶；性能剖析甚至要求玩法照跑（量的就是战斗中的帧），读数在独立窗口里。
-// 关卡编排工作台也是叠加层：独立窗口里的 2D 俯视图 + 流程/时间轴，
-// 既不碰 three 场景也不接管相机，「边打边看走到哪一步」正是它的主用例。
 // 第一人称持枪移动检查（2026-10-23）也是叠加层：玩法照跑、外部机位边走边看，所以不能是暂停玩法的互斥编辑器；
-// 它是在「武器」菜单里找的东西，同关卡编排一样不进 Debug工具 列表。
-const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, FrameDebuggerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor, OrchestrationEditor,
+// 它是在「武器」菜单里找的东西，不进 Debug工具 列表。
+const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, FrameDebuggerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor,
   FirstPersonMotionEditor];
-// 「Debug工具」= 除关卡编排外的叠加层，外加 FPS 显示（Data_DevTools.DEBUG_TOOL_IDS 定顺序）。两处入口开关同一份状态：
+// 「Debug工具」= 除第一人称持枪移动检查外的叠加层，外加 FPS 显示（Data_DevTools.DEBUG_TOOL_IDS 定顺序）。两处入口开关同一份状态：
 // 菜单 设置 → Debug工具，和高级工具菜单栏右侧、音量条旁边的「Debug工具」下拉（2026-10-22，用户：高级工具里也要能开
-// Profiler / Debug Rendering / Frame Debugger）。关卡编排语义上仍是叠加层，但人找它时想的是「我要编关卡」，放在「关卡」菜单。
-const DEBUG_OVERLAYS = OVERLAYS.filter((editor) => editor !== OrchestrationEditor && editor !== FirstPersonMotionEditor);
+// Profiler / Debug Rendering / Frame Debugger）。
+const DEBUG_OVERLAYS = OVERLAYS.filter((editor) => editor !== FirstPersonMotionEditor);
 // Debug工具里弹独立浏览器窗口的几项，下拉条目后缀 ↗（同 WINDOW_TOOLS）
 const DEBUG_WINDOW_TOOLS = new Set([ProfilerEditor.id, FrameDebuggerEditor.id, WorldInfoEditor.id, PlayerStateEditor.id]);
 
@@ -90,13 +87,13 @@ const TOOL_MENUS = [
   // 场景编辑器打开独立窗口 SceneEditor.html（摆 Scenes/ 场景文件，docs/Data_Scene.md §6），同贴图管理不进互斥表。
   { id: "scene", label: "场景", items: [SceneEditorEntry, SplineEditor, PropPcgEditor] },
   // 白盒关卡编辑器只是一个跳转入口（整页换成 ?editor=blockout），同贴图管理一样不进互斥表。
-  { id: "level", label: "关卡", items: [BlockoutEntry, OrchestrationEditor, TimelineEditor, SquadMarchEditor] },
+  { id: "level", label: "关卡", items: [BlockoutEntry, TimelineEditor, SquadMarchEditor] },
   { id: "character", label: "角色", items: [ActorEditor, FacialEditor] },
   { id: "weapon", label: "武器", items: [WeaponEditor, FirstPersonEditor, FirstPersonMotionEditor] },
   { id: "media", label: "特效与声音", items: [VfxEditor, AudioEditor] },
   { id: "assets", label: "资产", items: [PropLibraryEditor, AssetStandardsEditor, TextureEditor] },
 ];
-const WINDOW_TOOLS = new Set([OrchestrationEditor.id, TextureEditor.id, SceneEditorEntry.id]);
+const WINDOW_TOOLS = new Set([TextureEditor.id, SceneEditorEntry.id]);
 
 export class EditorSuite {
   /**
@@ -178,7 +175,6 @@ export class EditorSuite {
       CloseWorldInfo: () => suite.CloseOverlay(WorldInfoEditor.id),
       ClosePlayerState: () => suite.CloseOverlay(PlayerStateEditor.id),
       CloseAi: () => suite.CloseOverlay(AiEditor.id),
-      CloseOrchestration: () => suite.CloseOverlay(OrchestrationEditor.id),
       CloseFirstPersonMotion: () => suite.CloseOverlay(FirstPersonMotionEditor.id),
     };
   }
@@ -658,7 +654,7 @@ export class EditorSuite {
   }
 
   /**
-   * 退出高级工具。keepOnClose 的叠加层（Debug工具那几个、关卡编排）不收：
+   * 退出高级工具。keepOnClose 的叠加层（Debug工具那几个、第一人称持枪移动检查）不收：
    * 它们看的、量的就是战斗中的帧，「关掉回去打」正是主用例 —— 运行时才复现的
    * 渲染 bug（第一人称手上的黑块）只能开着调试视图边打边看。要停：设置 → Debug工具
    * 里再点一次、叉掉浮窗，或 all=true（套件销毁时）。

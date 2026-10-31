@@ -148,7 +148,7 @@ const afterGear = await page.evaluate(() => {
     facial: !!document.querySelector('#edRoot .edMenuBar [data-editor="facial"]'),
     textures: !!document.querySelector('#edRoot .edMenuBar [data-editor="textures"]'),
     sceneEditor: !!document.querySelector('#edRoot .edMenuBar [data-editor="sceneEditor"]'),
-    orchestration: !!document.querySelector('#edRoot .edMenuBar [data-editor="orchestration"]'),
+    orchestration: !!document.querySelector('#edRoot [data-editor="orchestration"]'),
     blockout: !!document.querySelector('#edRoot .edMenuBar [data-editor="blockout"]'),
     // 设置三页不在高级工具里；Debug工具在菜单栏右侧自己的下拉里（2026-10-22），不混进编辑器条目
     settingsInBar: ["graphics", "sound", "controls"].some((id) => document.querySelector(`#edRoot [data-editor="${id}"]`)),
@@ -161,12 +161,12 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出高级工具", afterGear.panelOpen && afterGear.capturing && afterGear.barVisible && afterGear.emptyInspector,
   `进游戏时指针锁=${locked}`);
-// 菜单栏：游戏 + 六个工具菜单 + 右侧 Debug工具；十二个互斥编辑器 + 关卡编排 + 第一人称持枪移动检查（叠加层，2026-10-23）
-// + 贴图管理 + 场景编辑器（独立窗口，2026-10-31 加）+ 白盒关卡编辑器（整页跳转入口）= 17 个条目（2026-10-31 删了场景关卡 / 地形 / 完整场景预览 / 采样点 / 可破坏场景；
+// 菜单栏：游戏 + 六个工具菜单 + 右侧 Debug工具；十二个互斥编辑器 + 第一人称持枪移动检查（叠加层，2026-10-23）
+// + 贴图管理 + 场景编辑器（独立窗口，2026-10-31 加）+ 白盒关卡编辑器（整页跳转入口）= 16 个条目（2026-10-31 删了场景关卡 / 地形 / 完整场景预览 / 采样点 / 可破坏场景 / 关卡编排；
 // 出图机位 shotCamera 是不进菜单的测试工具，不计入）
-Check("菜单栏列出全部编辑器入口", afterGear.entries === 17
+Check("菜单栏列出全部编辑器入口", afterGear.entries === 16
   && afterGear.menus.join(",") === "游戏,场景,关卡,角色,武器,特效与声音,资产,Debug工具"
-  && afterGear.squadMarch && afterGear.facial && afterGear.textures && afterGear.sceneEditor && afterGear.orchestration && afterGear.blockout,
+  && afterGear.squadMarch && afterGear.facial && afterGear.textures && afterGear.sceneEditor && !afterGear.orchestration && afterGear.blockout,
   `条目=${afterGear.entries}，菜单=${afterGear.menus.join("/")}，白盒关卡编辑器=${afterGear.blockout}`);
 Check("设置三页不在高级工具里", !afterGear.settingsInBar);
 Check("Debug工具七项在音量条旁的下拉里，不混进编辑器条目",
@@ -1314,26 +1314,14 @@ const weapon = await page.evaluate(async () => {
   const editor = window.Taierzhuang.editor;
   const active = editor.active;
   const out = { id: editor.ActiveId };
-  out.viewLabels = Array.from(active.viewChips.root.querySelectorAll(".edChip"), (node) => node.textContent);
+  // 2026-10-31 起只剩台架：第一人称视图、动作按钮与准心校准都在「第一人称持枪检查」
+  out.benchOnly = !active.viewChips && !active.actionButtons && !active.calibrationSection;
   active.SetWeapon("Zb26");
   window.Taierzhuang.StepFrames(10);
   out.bench = !!active.benchGroup;
   out.benchMeshes = active.benchGroup ? active.benchGroup.children.length : 0;
-  active.SetMode("fp");
-  window.Taierzhuang.StepFrames(10);
-  out.fp = window.Taierzhuang.viewmodel.weaponId === "Zb26";
-  out.fpVisible = window.Taierzhuang.viewmodel.root.visible;
-  // 第一人称这一档必须换回正片的 55°。摄影棚默认的 42°（85 mm 等效，为的是
-  // 看模型不畸变）比它窄三成，而视图模型的位姿全是按 55° 摆的 —— 用 42° 看，
-  // 枪整个掉到画框外，这一栏只剩地面。**「可见」不等于「看得见枪」。**
-  out.fpFov = window.Taierzhuang.camera.fov;
-  active.Trigger("fire");
-  active.Trigger("reload");
-  window.Taierzhuang.StepFrames(20);
-  out.busy = typeof window.Taierzhuang.viewmodel.IsBusy === "function";
-  // 中正式有刺刀预览：台架与第一人称都切换真实独立模型；捷克式没有刺刀，
-  // 控件及投掷动作都不能留下可点的空壳。
-  active.SetMode("bench");
+  out.viewmodelHidden = !window.Taierzhuang.viewmodel.root.visible;
+  // 中正式有刺刀预览：台架切换真实独立模型；捷克式没有刺刀，控件不能留下可点的空壳。
   active.SetWeapon("ZhongZheng");
   window.Taierzhuang.StepFrames(10);
   out.spinDefaultOff = !active.spin;
@@ -1341,20 +1329,10 @@ const weapon = await page.evaluate(async () => {
   out.benchBayonetBefore = !!active.benchBayonet && !active.benchBayonet.visible;
   active.bayonetToggle.root.click();
   out.benchBayonetAfter = !!active.benchBayonet?.visible;
-  active.SetMode("fp");
-  window.Taierzhuang.StepFrames(10);
-  out.fpBayonetAfter = !!window.Taierzhuang.viewmodel.rig?.parts?.bayonet?.visible;
   active.SetWeapon("Zb26");
   window.Taierzhuang.StepFrames(10);
   out.unsupportedBayonetHidden = active.bayonetToggle.root.hidden;
-  out.unsupportedThrowHidden = active.actionButtons.throw.hidden;
-  out.unsupportedMeleeVisible = !active.actionButtons.melee.hidden;
-  active.SetWeapon("Grenade");
-  window.Taierzhuang.StepFrames(10);
-  out.grenadeThrowVisible = !active.actionButtons.throw.hidden;
-  out.grenadeMeleeHidden = active.actionButtons.melee.hidden;
   const THREE = await import("./vendor/three/build/three.module.js");
-  active.SetMode("bench");
   out.deployedPoses = {};
   for (const id of ["Type92Hmg", "MediumMortar"]) {
     active.SetWeapon(id);
@@ -1380,31 +1358,60 @@ const weapon = await page.evaluate(async () => {
   const swordSpan = new THREE.Box3().setFromObject(active.benchGroup).getSize(new THREE.Vector3());
   out.swordInspectionPose = swordSpan.x > swordSpan.y * 5;
   // 两辆战车已有 .tzm；车辆走整棵关节树并落地，不能再按旧规则当成“无几何”。
-  active.SetMode("bench");
   active.SetWeapon("Type89Tank");
   window.Taierzhuang.StepFrames(10);
   out.tankOk = active.benchGroup !== null && active.vehicleNodes !== null;
   out.benchFov = window.Taierzhuang.camera.fov;
+
+  // 第一人称那一份在「第一人称持枪检查」：刺刀预览、动作按钮按装备过滤、玩家视角用正片 55°。
+  const fp = editor.Open("firstPerson");
+  fp.SetWeapon("ZhongZheng");
+  window.Taierzhuang.StepFrames(10);
+  // 摄影棚默认的 42°（85 mm 等效）比正片窄三成，而视图模型的位姿全是按 55° 摆的 ——
+  // 用 42° 看，枪整个掉到画框外。**「可见」不等于「看得见枪」。**
+  out.fpFov = window.Taierzhuang.camera.fov;
+  out.fpBayonetToggleVisible = !fp.bayonetToggle.root.hidden;
+  fp.bayonetToggle.root.click();
+  window.Taierzhuang.StepFrames(4);
+  out.fpBayonetAfter = !!window.Taierzhuang.viewmodel.rig?.parts?.bayonet?.visible;
+  fp.SetWeapon("Zb26");
+  window.Taierzhuang.StepFrames(10);
+  out.fpBayonetResetOnSwitch = !window.Taierzhuang.viewmodel.bayonetFixed;
+  out.unsupportedBayonetHiddenFp = fp.bayonetToggle.root.hidden;
+  out.unsupportedThrowHidden = fp.actionButtons.throw.hidden;
+  out.unsupportedMeleeVisible = !fp.actionButtons.melee.hidden;
+  out.zb26AutoFireVisible = !fp.autoFireToggle.root.hidden;
+  out.zb26CalibrationVisible = !fp.calibrationSection.hidden;
+  fp.SetWeapon("Grenade");
+  window.Taierzhuang.StepFrames(10);
+  out.grenadeThrowVisible = !fp.actionButtons.throw.hidden;
+  out.grenadeMeleeHidden = fp.actionButtons.melee.hidden;
+  out.grenadeCalibrationHidden = fp.calibrationSection.hidden;
+  editor.Open("weapon");
+  window.Taierzhuang.StepFrames(4);
   return out;
 });
-Check("枪械编辑器台架 / 第一人称视图", weapon.id === "weapon" && weapon.bench && weapon.fp,
-  `台架网格=${weapon.benchMeshes} fp可见=${weapon.fpVisible}`);
-Check("枪械编辑器不再保留无调校用途的手持视图",
-  weapon.viewLabels.length === 2 && !weapon.viewLabels.includes("手持"), weapon.viewLabels.join(" / "));
-Check("第一人称换回正片镜头、台架换回 85 mm",
+Check("枪械编辑器只剩台架（第一人称视图、动作与准心校准已并入第一人称持枪检查）",
+  weapon.id === "weapon" && weapon.bench && weapon.benchOnly && weapon.viewmodelHidden,
+  `台架网格=${weapon.benchMeshes} 只剩台架=${weapon.benchOnly} 视模藏起=${weapon.viewmodelHidden}`);
+Check("第一人称持枪检查用正片镜头、台架换回 85 mm",
   weapon.fpFov === 55 && weapon.benchFov === 42,
   `fp=${weapon.fpFov}° 台架=${weapon.benchFov}°`);
 Check("车辆条目按完整关节树建落地台架", weapon.tankOk);
 Check("枪械编辑器默认不自转", weapon.spinDefaultOff);
-Check("刺刀预览只给支持的枪，并在台架 / 第一人称都切换真实模型",
-  weapon.bayonetToggleVisible && weapon.benchBayonetBefore && weapon.benchBayonetAfter && weapon.fpBayonetAfter,
+Check("刺刀预览只给支持的枪，并在台架 / 第一人称持枪检查都切换真实模型",
+  weapon.bayonetToggleVisible && weapon.benchBayonetBefore && weapon.benchBayonetAfter
+    && weapon.fpBayonetToggleVisible && weapon.fpBayonetAfter && weapon.fpBayonetResetOnSwitch,
   JSON.stringify({
     toggle: weapon.bayonetToggleVisible, benchBefore: weapon.benchBayonetBefore,
-    benchAfter: weapon.benchBayonetAfter, fpAfter: weapon.fpBayonetAfter,
+    benchAfter: weapon.benchBayonetAfter, fpToggle: weapon.fpBayonetToggleVisible,
+    fpAfter: weapon.fpBayonetAfter, fpReset: weapon.fpBayonetResetOnSwitch,
   }));
-Check("不支持刺刀 / 投掷的枪不显示无效选项，仍保留有效白刃",
-  weapon.unsupportedBayonetHidden && weapon.unsupportedThrowHidden && weapon.unsupportedMeleeVisible);
-Check("手榴弹只显示投掷，不显示白刃", weapon.grenadeThrowVisible && weapon.grenadeMeleeHidden);
+Check("不支持刺刀 / 投掷的枪不显示无效选项，仍保留有效白刃；捷克式有连发与准心校准",
+  weapon.unsupportedBayonetHidden && weapon.unsupportedBayonetHiddenFp && weapon.unsupportedThrowHidden
+    && weapon.unsupportedMeleeVisible && weapon.zb26AutoFireVisible && weapon.zb26CalibrationVisible);
+Check("手榴弹只显示投掷，不显示白刃与准心校准",
+  weapon.grenadeThrowVisible && weapon.grenadeMeleeHidden && weapon.grenadeCalibrationHidden);
 const deployed = weapon.deployedPoses;
 Check("两件架设武器逐件校姿并按最终包围盒落地",
   Object.values(deployed).every((entry) => entry.grounded)

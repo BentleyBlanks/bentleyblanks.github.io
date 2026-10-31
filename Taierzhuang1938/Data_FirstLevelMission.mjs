@@ -283,7 +283,7 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   // 机枪趴到门楼北侧的翻车后头顺着车路往接运场里扫；两个人拐进西巷绕到守线左手、
   // 钻进西北残屋；三个人穿门楼进空场，逐段躲到断墙、墙土、翻车、草垛后头。
   transfer: [
-    // 沿短巷错成两排、相邻 4.5–5 m（关卡编排工作台整关视野下不并成一簇，组把手找得到空位）。
+    // 沿短巷错成两排、相邻 4.5–5 m（整关俯视下不并成一簇）。
     { id: "TransferGunner", x: 70.9, z: 39.2, weapon: "Type11", hold: true },
     { id: "TransferRifleA", x: 57.4, z: 39.3 },
     { id: "TransferRifleB", x: 53.2, z: 39.3 },

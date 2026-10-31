@@ -2,7 +2,7 @@
 // Data_FirstLevelMissionGates.mjs —— 第一关《往南的路》的编排表（纯数据，零 three）
 //
 // 2026.09.19 重构（docs/Data_FirstLevelRebuild20260919Contract.md）：27 个内部步骤。
-// 这一份是运行时与关卡编排工作台**共用的同一份口径**：
+// 这一份是运行时与编排模型（Script_MissionOrchestration：白盒编辑器、CLI）**共用的同一份口径**：
 //
 //   1. MISSION_STEP_SPAWNS         —— 进某个内部步骤时按表生成哪些遭遇组；
 //   2. MISSION_ENCOUNTER_ACTIVATION—— 每个遭遇组怎么出现 / 什么时候解除待命或苏醒；

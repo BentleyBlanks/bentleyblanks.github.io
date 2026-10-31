@@ -15,7 +15,7 @@
 //   fallback  下载失败且没有同名程序化配方时，把哪一套已有材质借给 name（开机套名或 RECIPES 名）
 //   flipY     默认 true（平铺 PBR）；恢复 glTF 作者 UV atlas 时 false（见 Script_Materials._WrapTexture）
 
-/** 关卡 id 与 Notes/<Level>/、关卡编排工作台同一套（第一关 = "FirstLevel"）。 */
+/** 关卡 id 与任务运行时同一套（第一关 = "FirstLevel"）。 */
 export const LEVEL_TEXTURE_SETS = Object.freeze({
   // 阶段 B（2026-09-28 3A 迭代）各包往这里加条目；现有贴图的加载时机不在此表管理。
   FirstLevel: Object.freeze([
