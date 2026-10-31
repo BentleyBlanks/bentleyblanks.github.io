@@ -1,13 +1,13 @@
 // Script_TextGather.mjs — 内容文本的翻译清单导出（纯 Node CLI，毫秒级，不进浏览器模块图）。
 //
 // ── 它是干什么的 ────────────────────────────────────────────────────────────
-// 章节台词、过场分镜、史料卡、口令是**考据过的原稿**，本体留在各 Data_Mission* /
-// Data_Cutscene* / Data_History / Data_Voice 里不搬家（docs/Data_TextAndTuning.md §3）。
+// 章节台词、史料卡、口令是**考据过的原稿**，本体留在各 Data_Mission* /
+// Data_History / Data_Voice 里不搬家（docs/Data_TextAndTuning.md §3）。
 // 多语言走「按 id 覆盖」：语言表里写 `content.<id>`，运行时 `Localize(id, 原稿)` 命中就换。
 // 这个脚本把全部内容文本按**同一套 id** 导出成一份清单，翻译人员只看清单，
 // 不需要打开任何 .mjs。
 //
-// **id 只写在 Script_TextIds.mjs 一处**，运行时（Script_Story / Script_Cutscene）与这里
+// **id 只写在 Script_TextIds.mjs 一处**，运行时（Script_Story）与这里
 // 共用它。两边各写一份 id 生成，第一次改口径就会分叉，而分叉的表现是「译文静默不生效」：
 // 画面上是原文，控制台干净，没有任何报错。
 //
@@ -40,7 +40,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  LEVELS, CUTSCENES, CUTSCENE_ORDER, CAST, MENU, CREDITS, CHAPTERS,
+  LEVELS, CAST, MENU, CREDITS, CHAPTERS,
 } from "./Data_TengxianScript.mjs";
 import { HISTORY_NOTES, BATTLE_TIMELINE, EPILOGUE_LINES } from "./Data_History.mjs";
 import { HistoryCodexContent } from "./Data_HistoryCodex.mjs";
@@ -52,7 +52,6 @@ import { MISSION_DIALOGUE,MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDia
 import { FirstLevelStageTextId,FirstLevelVoiceTextId,FirstLevelCastTextId } from "./Script_TextIds.mjs";
 import {
   BeatTextId, BeatSubId, LevelObjectiveId, LevelObjectiveStepId, LevelBriefId, LevelFieldId, CastNameId,
-  ShotTextId, CutsceneTitleId, CardTitleId, CardTextId, TallyRowId, TallyClosingId, NoteTextId,
   HistoryCardId, TimelineId, EpilogueLineId, VoiceLineId, MenuLineId, CreditsLineId, WeaponNameId,
 } from "./Script_TextIds.mjs";
 
@@ -113,7 +112,6 @@ for(const cue of MISSION_DIALOGUE)cue.lines.forEach((line,index)=>Add({id:FirstL
 for(const [id,person] of Object.entries(MISSION_VOICE_CAST))Add({id:FirstLevelCastTextId(id),text:person[0],who:id,source:'Data_FirstLevelMissionDialogue'});
 for(const field of ['label','date','place'])Add({id:LevelFieldId(FIRST_LEVEL_MISSION_PHASE.id,field),text:FIRST_LEVEL_MISSION_PHASE[field],source:'Data_FirstLevelMission'});
 FIRST_LEVEL_MISSION_PHASE.brief.forEach((text,index)=>Add({id:LevelBriefId(FIRST_LEVEL_MISSION_PHASE.id,index),text,source:'Data_FirstLevelMission'}));
-// CAST 在 Data_TengxianScript 载入时已经把各过场自带的 people 并进来了，所以这一遍是全的。
 for (const [id, person] of Object.entries(CAST)) {
   Add({ id: CastNameId(id), text: person.short || person.name, source: "CAST", who: id });
 }
@@ -128,8 +126,6 @@ const chapterFileOf = (levelId) => {
 for (const level of LEVELS) {
   const source = `${chapterFileOf(level.id)} · ${level.id}`;
   (level.beats || []).forEach((beat, index) => {
-    // cutscene 型 beat 只带一个过场 id，没有台词。
-    if (beat.type === "cutscene") return;
     const id = BeatTextId(level.id, beat, index);
     Add({ id, text: beat.text, who: beat.who, source, tier: beat.tier, voice: beat.voice || null });
     Add({ id: BeatSubId(id), text: beat.sub, who: beat.who, source, tier: beat.tier });
@@ -146,52 +142,6 @@ for (const level of LEVELS) {
   // 选章 / 简报卡 / 暂停菜单显示的三个标量字段（Script_Menu.PhaseText 与 Script_Hud.ShowBrief 已接钩子）。
   for (const field of ["label", "date", "place"]) {
     Add({ id: LevelFieldId(level.id, field), text: level[field], source });
-  }
-}
-
-// --- 过场：字幕 / 台词 / 地图标注 / 标题 / 卡片 / 结算 -----------------------
-function GatherCard(cutId, field, card, source) {
-  if (!card) return;
-  Add({ id: CardTitleId(cutId, field), text: card.title, source });
-  (card.lines || []).forEach((line, i) => {
-    const id = CardTextId(cutId, field, i);
-    Add({ id, text: line.text, who: line.who, source, tier: line.tier });
-    if (typeof line.small === "string") Add({ id: NoteTextId(id), text: line.small, source, tier: line.tier });
-  });
-}
-
-for (const cutId of CUTSCENE_ORDER) {
-  const cut = CUTSCENES[cutId];
-  if (!cut) continue;
-  const source = `CUTSCENES · ${cutId}`;
-  Add({ id: CutsceneTitleId(cutId), text: cut.title, source });
-  for (const shot of cut.shots || []) {
-    (shot.subs || []).forEach((sub, i) => {
-      const id = ShotTextId(cutId, shot.n, "sub", i);
-      Add({ id, text: sub.text, source, tier: sub.tier, voice: sub.voiceCue ?? sub.voice ?? null });
-      if (typeof sub.small === "string") Add({ id: NoteTextId(id), text: sub.small, source, tier: sub.tier });
-    });
-    (shot.lines || []).forEach((line, i) => {
-      Add({ id: ShotTextId(cutId, shot.n, "line", i), text: line.text, who: line.who,
-        source, tier: line.tier, voice: line.voiceCue ?? line.voice ?? null });
-    });
-    (shot.mapCard?.markers || []).forEach((marker, i) => {
-      Add({ id: ShotTextId(cutId, shot.n, "map", i), text: marker?.label, source });
-    });
-  }
-  GatherCard(cutId, "skipCard", cut.skipCard, source);
-  GatherCard(cutId, "epilogueCard", cut.epilogueCard, source);
-  if (cut.tally) {
-    (cut.tally.rows || []).forEach((row, i) => {
-      Add({ id: TallyRowId(cutId, i, "label"), text: row.label, source, tier: row.tier });
-      Add({ id: TallyRowId(cutId, i, "value"), text: row.value, source, tier: row.tier });
-      Add({ id: TallyRowId(cutId, i, "note"), text: row.note, source, tier: row.tier });
-    });
-    (cut.tally.closing || []).forEach((line, i) => {
-      const id = TallyClosingId(cutId, i);
-      Add({ id, text: line.text, source, tier: line.tier });
-      if (typeof line.small === "string") Add({ id: NoteTextId(id), text: line.small, source, tier: line.tier });
-    });
   }
 }
 

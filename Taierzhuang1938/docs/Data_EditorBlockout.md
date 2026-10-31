@@ -1000,6 +1000,7 @@ FlyPose(pose)                // 飞行中把相机摆到任意机位
 
 - 飞机与慢动作的运行时（2026-10-19）：飞机在 `Script_EditorBlockoutPrevizAircraft.mjs`（借 `editorHost.aircraft`——`Script_Main` 的 `game.aircraft` 取值器、`Script_Editor.editorHost` 转出——的 `AcquireClone` / `ReleaseClone`，自己的组标 `whiteboxCharacter` 所以白盒画质里保留贴图；引擎声 `audio.Play("planeDrone")` 起一条 voice 后每帧 `MoveVoice` 搬到机身、离场 / 中断 `StopVoice` 淡出；`audio=0` 时只画不响）。慢动作在 `Script_EditorBlockoutPreviz.Update`：`run.t += dt × PrevizTimeScale(seq, run.t)`，总控把 `dt × previz.TimeScale()` 喂给演员层（`BlockoutPuppets.Update`），所以人物步态 / 片段 / 动画时钟一起慢；卡片的秒数前写「慢 ×0.3」。`Previz.State()` 多给 `timeScale`、`wallT`（墙上已播秒数）、`aircraft[]`（每架的机型 / 可见 / 位置 / 模型有没有载进来）、`missingModels`。模型还没载进来（机队异步下载）那一帧跳过、下一帧再试。
 - 门禁：`Script_EditorBlockoutPrevizRuntimeBrowserTest.mjs`（§10）。
+- Timeline（2026-10-31，[编辑器套件](Data_EditorSuite.md)「Timeline 过场」）：`UseSource(doc)` 把播放器的数据换成一份 Timeline（`Timeline/<Id>.timeline.json` 的子序列），`null` 还回本关预演文件；换源期间预演按钮 / N 键 / `Debug.Blockout.Previz` 都播那一份，`State().source` 为 true。`Pause()` 停在当前这一秒（Timeline 的暂停）。`?timeline=<Id>` 开机就打开底部 Timeline 面板，接口 `Debug.Blockout.Timeline`。
 
 ### 14.3 音效别名（`sfx.name`）
 

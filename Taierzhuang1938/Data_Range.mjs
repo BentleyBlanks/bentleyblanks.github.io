@@ -76,8 +76,6 @@ export const RANGE_PHASE = {
     "步枪位试开枪与开镜，投弹位试手榴弹，白刃位试大刀与刺刀（X 上刺刀）。木桩兵不还手，倒了自己会站回来。",
   ],
   story: RANGE_LEVEL_ID,          // 没有剧本，Story 会打一条 warn，属预期
-  cutsceneIn: null,
-  cutsceneOut: null,
   objectives: ["步枪位：开枪与开镜", "投弹位：手榴弹", "白刃位：大刀与刺刀"],
   mechanic: "靶场沙盒：不换关、不结算，木桩兵自动复位。",
   nraPool: 9999,

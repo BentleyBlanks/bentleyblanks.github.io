@@ -24,7 +24,7 @@ export const CLOTH_RANGE_PHASE = Object.freeze({
   id: CLOTH_RANGE_ID, sandbox: true, sandboxKey: "cloth", sandboxGlyph: "布",
   date: "布料实验", label: "布料模拟测试场", place: "九件布料 · 材质与吸血对比",
   sky: "testSceneDay", ambience: "overcast", music: null, minutes: 600,
-  story: CLOTH_RANGE_ID, cutsceneIn: null, cutsceneOut: null,
+  story: CLOTH_RANGE_ID,
   brief: ["九件布料独立对比：厚棉被、棉门帘、锦旗、四种材质样片，以及薄单被与毛巾吸血样片。参数只在本场景生效，不改现有布料。",
     "前排四件对比材质，后排两件对比吸血、洇染与背面渗透。拖动画面转动观察，滚轮缩放；用面板注入、持续供血、掀角、折叠或暂停单步。"],
   objectives: ["对比布料的厚度、垂坠、运动与吸血洇染"],

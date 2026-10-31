@@ -48,7 +48,7 @@ await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeo
 const clockEvidence = await page.evaluate(async () => {
   const T = window.Taierzhuang, before = T.state.elapsed;
   await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  return { manual: T.Debug.Preview().manualStep, before, after: T.state.elapsed };
+  return { manual: T.state.manualStep, before, after: T.state.elapsed };
 });
 Check("测试时钟由 StepFrames 独占，真实动画帧不偷跑世界",
   clockEvidence.manual && clockEvidence.after === clockEvidence.before, JSON.stringify(clockEvidence));

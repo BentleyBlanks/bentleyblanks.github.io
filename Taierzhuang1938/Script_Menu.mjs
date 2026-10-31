@@ -1294,9 +1294,7 @@ export class MainMenu {
   }
 
   /**
-   * 进一章。**选章默认不播过场**：那条是「挑一章来打」的入口，
-   * 每次都先看一分多钟的出川会把它变成看片入口。战役入口才播（Activate）。
-   * 例外见下面 cutsceneOnly 那一段。
+   * 进一章。
    *
    * 沙盒条目走另一条路：靶场是**整表替换**（PHASE_TABLE 只剩它一关），
    * 当场换不过去，只能重载页面 —— 交给 host.PlaySandbox。
@@ -1315,11 +1313,7 @@ export class MainMenu {
     if (this.sandboxMode) { this.host.ExitSandbox?.(); return; }
     this.busy = true;
     this.host.Unlock?.();
-    // **过场承载章（序章）必须播**：它整章就是那一场过场，不建自己的切片。
-    // 按选章的默认「不播过场」进去，玩家会落在上一片切片上、一个人都没有，
-    // 而本章什么也不会发生 —— 那不是「跳过演出」，是掉进一个空场。
-    const cutsceneOnly = !!this.entries[index]?.cutsceneOnly;
-    Promise.resolve(this.host.Play(index, { cutscenes: cutsceneOnly, ...opts }))
+    Promise.resolve(this.host.Play(index, opts))
       .catch((error) => { console.error("[Menu] 进章失败", error); })
       .finally(() => { this.busy = false; });
   }

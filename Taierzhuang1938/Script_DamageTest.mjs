@@ -20,7 +20,7 @@
 // 2026-08-29 集成批 INT3a：取样章从 `?phase=0` 换到 `?phase=1`
 //
 // **为什么必须换：`phase=0` 现在是零敌人的过场章。** 任务流程重制之后
-// `Data_Battle.PHASES[0]` 是 `CH0_Chuchuan`（序章·出川，`cutsceneOnly: true`、
+// `Data_Battle.PHASES[0]` 是 `CH0_Chuchuan`（序章·出川，
 // `ijaPool: 0`、`ijaSpawn: []`、玩家手上连枪都没有）。靶场第一步就是
 // 「从场上挑三个活着的日本兵」，在那一关挑到的是**零个** ——
 // 于是射击周期 `cycle` 算出来是 NaN，`while (elapsed < seconds)` 一轮都不进，

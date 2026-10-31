@@ -58,7 +58,7 @@ import { MAX_WAIT, PACING, VOICE_HOLD, SUBTITLE, BEAT_SECONDS, PARSE_AT, WHISTLE
 // 现在改成：每个 Data_MissionChX.mjs 自己导出 `EVENTS`，这里照它建表。
 // 七章的 EVENTS 是三批人分别写的，字段名不统一（这是事实，不是疏忽）：
 //   C1  { name, stage, what, signal, fallback }        兜底式在 fallback
-//   C3  { event, what, signal, predicate, moveBeats, cutscene }
+//   C3  { event, what, signal, predicate, moveBeats }
 //   C4  { name, stage, signal, cue, note }             兜底式在 cue
 //   C5  { id, when, nowAt, mechanic }                  **没有兜底式**
 //   C6  { id, when, anchorBeat, fallback, note }
@@ -171,29 +171,23 @@ const SUPPLEMENT_CUES = {};
 
 /** 关卡钉住时放行换关用的信号名。章节数据里写 mechanics.pinFinalZone 才生效。 */
 export const CHAPTER_RELEASE_SIGNAL = "ChapterRelease";
-/** `CHAPTER.cutsceneMid` 写成字符串时默认挂的信号名（写成对象可以自己指定 signal）。 */
-export const MID_CUTSCENE_SIGNAL = "ChapterMidCutscene";
 
 /**
  * 按七章的 EVENTS 建判定表。
  *
- * @param {Array} chapters CHAPTER_EVENTS（Data_TengxianScript 汇总的
- *   `[{ levelId, events, cutsceneMid }]`）
- * @returns {{cues:object, cutscenes:object, report:Array}}
+ * @param {Array} chapters CHAPTER_EVENTS（Data_TengxianScript 汇总的 `[{ levelId, events }]`）
+ * @returns {{cues:object, report:Array}}
  *   cues       levelId → { 事件名: (ctx)=>boolean }
- *   cutscenes  levelId → { 事件名: 过场 id }（Signal 到这一条时请求宿主播过场）
  *   report     每条事件的来源与判据成色，给测试与排障看
  */
 export function BuildLevelCues(chapters = CHAPTER_EVENTS) {
   const cues = {};
-  const cutscenes = {};
   const report = [];
   for (const chapter of chapters || []) {
     const levelId = chapter && chapter.levelId;
     if (!levelId) continue;
     const events = Array.isArray(chapter.events) ? chapter.events : [];
     const table = cues[levelId] || (cues[levelId] = {});
-    const cutTable = cutscenes[levelId] || (cutscenes[levelId] = {});
     events.forEach((entry, index) => {
       if (!entry) return;
       let name = null;
@@ -210,46 +204,26 @@ export function BuildLevelCues(chapters = CHAPTER_EVENTS) {
       const share = (index + 1) / (events.length + 1);
       const spread = (c) => c.levelTime > c.levelSeconds * share;
       table[name] = parsed || spread;
-      if (typeof entry.cutscene === "string" && entry.cutscene) cutTable[name] = entry.cutscene;
       report.push({
         levelId, name, index,
         kind: parsed ? "declared" : (source ? "unparsed" : "spread"),
         share: parsed ? null : +share.toFixed(3),
         source: typeof source === "string" ? source : null,
-        cutscene: cutTable[name] || null,
       });
     });
     // 章节没导出 / 漏登记的补丁（只填空）
     for (const [name, test] of Object.entries(SUPPLEMENT_CUES[levelId] || {})) {
       if (table[name]) continue;
       table[name] = test;
-      report.push({ levelId, name, index: -1, kind: "supplement", share: null, source: null, cutscene: null });
-    }
-    // CHAPTER.cutsceneMid：关**中**播的过场。字符串形式挂在默认信号上，
-    // 对象形式可以自己指定挂哪一条信号（CH5 的转身该挂 TurnedBack）。
-    const mid = chapter.cutsceneMid;
-    if (mid) {
-      const id = typeof mid === "string" ? mid : mid.id;
-      const signal = (typeof mid === "object" && mid.signal) || MID_CUTSCENE_SIGNAL;
-      if (id) {
-        cutTable[signal] = id;
-        if (!table[signal]) {
-          // cutsceneMid 挂的那条信号**不给时刻兜底**：关中过场必须由事实推
-          //（真转身了才播），时刻表推出来的转身会在玩家还在城门口时抢镜头。
-          table[signal] = () => false;
-        }
-        report.push({ levelId, name: signal, index: -1, kind: "cutsceneMid", share: null, source: null, cutscene: id });
-      }
+      report.push({ levelId, name, index: -1, kind: "supplement", share: null, source: null });
     }
   }
-  return { cues, cutscenes, report };
+  return { cues, report };
 }
 
 const BUILT = BuildLevelCues();
 /** 七章的事件判定表（由各章 EVENTS 自动构建，见上）。 */
 export const LEVEL_CUES = BUILT.cues;
-/** 事件名 → 关中过场 id。Signal 到这一条时请求宿主播（见 StoryDirector.Signal）。 */
-export const SIGNAL_CUTSCENES = BUILT.cutscenes;
 /** 构建报告：哪些事件有章节自己的判据、哪些吃了均匀兜底。测试与排障读它。 */
 export const CUE_BUILD_REPORT = BUILT.report;
 
@@ -294,12 +268,6 @@ export class StoryDirector {
     this.voiceLocate = null;       // (who) => {x,y,z}|null，宿主用来定位说话人
     this.voiceStop = null;         // () => void，换关时掐掉上一句
     this.voiceLog = [];            // 取证：每条 voiced beat 到底播没播出来
-    // --- 关中过场（可选，没接线就是「跳过这一拍，剧本照走」）---
-    this.cutscenePlay = null;      // (id) => Promise|any|null，宿主播一场并交还控制权
-    this.cutsceneHold = false;     // 宿主正在播 —— 这期间不推剧本
-    this.cutsceneFired = new Set();// 本关已经播过的关中过场（同一场只播一次）
-    this.cutsceneLog = [];         // 取证：请求过哪几场、播没播出来
-    this.signalCutscenes = null;   // 本关的 事件名 → 过场 id
     this.flushLog = null;          // 上一次 FlushTail 倒了什么、跳过了什么
   }
 
@@ -357,54 +325,6 @@ export class StoryDirector {
     return dur > 0 ? dur : 0;
   }
 
-  /**
-   * 接上关中过场通道。宿主给一个「把这一场播出来」的回调，Story 只负责报时机。
-   *
-   * 与 AttachVoice 同一条理由：**「相机、控制权、指针锁归谁」不是叙事层的事。**
-   * 宿主那边是 Script_Main 的 RunCutscene —— 它会夺走控制权、掐掉战斗输入、
-   * 播完再还回来；Esc 跳过与字幕补卡由 CutsceneDirector 自己管，与关首过场同一条路。
-   *
-   * @param {Function} play `(id) => Promise|any|null`。返回 Promise 时剧本推进
-   *   会等它 resolve；返回别的（测试桩）就当同步播完。返回 null = 没这场，
-   *   记一笔然后**继续演**（不许因为少一场过场把剧本卡死）。
-   */
-  AttachCutscene(play) {
-    this.cutscenePlay = typeof play === "function" ? play : null;
-    return !!this.cutscenePlay;
-  }
-
-  /** 请求宿主播一场关中过场。返回「有没有真的交出去」。 */
-  _RunCutscene(id, source) {
-    if (!id) return false;
-    if (this.cutsceneFired.has(id)) return false;
-    this.cutsceneFired.add(id);
-    const entry = { id, source, at: +this.levelTime.toFixed(2), played: false };
-    this.cutsceneLog.push(entry);
-    if (!this.cutscenePlay) return false;
-    let result = null;
-    this.cutsceneHold = true;
-    try {
-      result = this.cutscenePlay(id);
-    } catch (err) {
-      this.cutsceneHold = false;
-      entry.error = String((err && err.message) || err);
-      return false;
-    }
-    if (result === null || result === undefined || result === false) {
-      // 宿主说「没这场」：别把剧本挂在一场不存在的过场上。
-      this.cutsceneHold = false;
-      return false;
-    }
-    entry.played = true;
-    if (typeof result.then === "function") {
-      const release = () => { this.cutsceneHold = false; };
-      result.then(release, release);
-    } else {
-      this.cutsceneHold = false;
-    }
-    return true;
-  }
-
   /** 换关：装载这一关的全部 beats。 */
   BeginLevel(levelId, options = {}) {
     // 上一关最后一句可能还在响：切黑两秒之后它会盖在新关第一句上面。
@@ -449,28 +369,16 @@ export class StoryDirector {
     this.fightCooldown = 0;
     this.pushed.clear();
     this.cued.clear();
-    this.cutsceneFired.clear();
-    this.cutsceneLog = [];
-    this.cutsceneHold = false;
     this.flushLog = null;
-    this.signalCutscenes = SIGNAL_CUTSCENES[levelId] || null;
     this.objectiveText = level ? Localize(LevelObjectiveId(levelId), level.objective) : null;
     return this.queue.length;
   }
 
-  /**
-   * 规则层主动推一条事件（真发生过的事优先于时刻表）。
-   *
-   * 顺带负责**信号 → 关中过场**：本关的 SIGNAL_CUTSCENES 里登记过这个名字的，
-   * 推到就请求宿主播那一场。这是 `{type:"cutscene"}` beat 的等价入口 ——
-   * 玩法系统只知道「事情发生了」，不该也去关心「这一拍要不要播过场」。
-   */
+  /** 规则层主动推一条事件（真发生过的事优先于时刻表）。 */
   Signal(name) {
     if (!name) return false;
     if (this.p012Immediate?.length && !this.p012SignalTimes.has(name)) this.p012SignalTimes.set(name, this.levelTime);
     this.pushed.add(name);
-    const id = this.signalCutscenes && this.signalCutscenes[name];
-    if (id) return this._RunCutscene(id, `signal:${name}`);
     return false;
   }
 
@@ -530,11 +438,6 @@ export class StoryDirector {
     return !!name && (this.pushed.has(name) || this.cued.has(name));
   }
 
-  /** 本关请求过的关中过场（取证：请求了几场、播出来几场）。 */
-  get MidCutscenes() { return this.cutsceneLog.slice(); }
-  /** 宿主正在播关中过场 —— 这期间剧本不推进。 */
-  get CutsceneHold() { return this.cutsceneHold; }
-
   /** 交火状态：装配层每帧按身边有没有在开枪的敌人喂进来。 */
   SetFighting(fighting) {
     if (fighting && !this.inFight && this.fightCooldown <= 0) {
@@ -573,10 +476,6 @@ export class StoryDirector {
   }
 
   Update(dt, ctx = {}) {
-    // 关中过场期间**整条剧本停摆**：关内时钟、间隔、等待一律不走。
-    // 不停的话八秒的转身过场里会攒下三四条「到点了」的 beat，播完一口气全甩出来。
-    // （装配层的 Frame 在过场分支里本来就 return 了，这一道是给别的宿主与测试的保险。）
-    if (this.cutsceneHold) return;
     this.levelTime += dt;
     this.sinceLast += dt;
     this.beatWait += dt;
@@ -709,8 +608,6 @@ export class StoryDirector {
         this.index += 1;
         continue;
       }
-      // 关中过场不许在关末补播：镜头这时候要交给关末过场，两场叠在一起谁都看不成。
-      if (beat.type === "cutscene") { this.index += 1; continue; }
       this.Play(beat, true);
       played.push({ type: beat.type, text: beat.text || "" });
       this.index += 1;
@@ -793,14 +690,6 @@ export class StoryDirector {
         break;
       case "objective":
         this.objectiveText = Localize(beat.textId, beat.text);
-        break;
-      // cutscene：**关中**过场。`{ at, type:"cutscene", id:"CS_x" }`。
-      // 派发到它时请求宿主播那一场 —— 宿主负责夺控制权、掐战斗输入、播完还回来；
-      // Esc 跳过与字幕补卡的语义与关首过场完全一致（同一个 CutsceneDirector）。
-      // 没接线 / 没这场时只记一笔，剧本照走：少一场过场不该把一关卡死。
-      case "cutscene":
-        this._RunCutscene(beat.id || beat.cutscene || beat.text, `beat:${beat.at || "?"}`);
-        this.sinceLast = 0;
         break;
       default:
         break;

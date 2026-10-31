@@ -59,6 +59,7 @@ import { DressAsWhitebox, MakeWhiteboxWaterMaterial } from "./Script_WhiteboxMat
 import { BuildCreekWater, MUD_PATCH, PaintWaterEdgeMud, WaterPrints } from "./Script_EditorBlockoutCreek.mjs";
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
 import { STANCE } from "./Data_Tuning_Player.mjs";
+import { TimelinePanel } from "./Script_EditorTimeline.mjs";
 
 const DEG = Math.PI / 180;
 /** 打开全关总图时短边大约看多少米（玩家附近一片，不是全图）。 */
@@ -326,6 +327,8 @@ export class EditorBlockout {
     }
     this.previz = new BlockoutPreviz(this);
     this.previzSignals = null;
+    // Timeline 过场面板（docs/Data_EditorSuite.md「Timeline 过场」）：?timeline=<Id> 时开机就打开；它驱动的是上面这一个预演播放器
+    this.timeline = new TimelinePanel(this);
     this.play = new BlockoutPlay(this);
     // 手机验收（§4.5）：触屏设备或 ?touch=1 才建；画面不动，只加触屏输入与大按钮
     this.touch = WantsTouch(this.params) ? new BlockoutTouch({
@@ -417,6 +420,8 @@ export class EditorBlockout {
       // 2026-10-21：能转头不能走的眼睛（eye.free）—— 给测试喂一次鼠标位移（像素，右 + / 下 +）；→ 这一帧能不能转
       Look: (dx, dy) => this.previz.Look(dx, dy),
     };
+    // Timeline（docs/Data_EditorSuite.md）：List / Open / Close / State / Play / Pause / Seek / Step / StepShot / Reload / Layout / Tracks
+    this.api.Timeline = this.timeline.api;
     // 试玩（§17）：Start({from, to, settings}) 开打；Stop() 中止（出小结）；State() 现状；Close() 关小结回到编辑；Reload() 重读编排
     this.api.Play = {
       Start: async (options) => { await this.play.Want(); return this.play.Start(options || {}); },
@@ -461,6 +466,8 @@ export class EditorBlockout {
     }
     this.ready = true;
     this.pollTimer = setInterval(() => { this.Poll(); }, BLOCKOUT_EDITOR.pollS * 1000);
+    const timelineId = this.params.get("timeline");
+    if (timelineId) this.timeline.Open(timelineId).catch((error) => console.error("[Blockout] Timeline 打不开", error));
     // 存档口只问一次：界面要写明「这里能不能直接存」。
     this.store.Status().then(status => {
       this.writable = status.writable;
@@ -1136,6 +1143,7 @@ export class EditorBlockout {
     if (locked !== this.locked) { this.locked = locked; this.ui.SetInteractive(!locked); }
     // 预演先摆这一帧的演员状态，演员层再按它出姿势；慢动作里演员的动画 dt 跟预演时钟一起缩（TimeScale < 1）
     this.previz.Update(dt);
+    this.timeline.Update(dt);
     this.UpdateFly(dt);
     this.UpdatePosedStance();
     this.trees.Sync(game.battlefield.layout);

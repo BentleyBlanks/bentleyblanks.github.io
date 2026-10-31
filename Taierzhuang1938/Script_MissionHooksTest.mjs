@@ -1,7 +1,7 @@
 // Script_MissionHooksTest.mjs —— 任务流程重制 · 集成批 INT1/INT2 的引擎钩子回归。
 //
 // **纯 Node，毫秒级。** 覆盖五件原语：
-//   1. 关中过场 beat（`{type:"cutscene"}`）与 `story.Signal→过场` 的等价入口；
+//   1. 剧本派发（Signal / Signalled、FlushTail）；关中过场通道 2026-10-31 随 CutsceneDirector 删除；
 //   2. LEVEL_CUES 从七章 EVENTS 自动构建（三种字段名、三种判据字段、缺判据的均匀兜底）；
 //   3. 具名同伴（默认名册推导、Locate、缺席/倒下/脱离跟随、预算上限）；
 //   4. 脚本检查点（Save / Rewind：回到数秒前，不扣兵员池、不走死亡换人卡）；
@@ -16,10 +16,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 import {
-  StoryDirector, LEVEL_CUES, SIGNAL_CUTSCENES, CUE_BUILD_REPORT,
-  ParsePredicate, BuildLevelCues, CHAPTER_RELEASE_SIGNAL, MID_CUTSCENE_SIGNAL,
+  StoryDirector, LEVEL_CUES, CUE_BUILD_REPORT,
+  ParsePredicate, BuildLevelCues, CHAPTER_RELEASE_SIGNAL,
 } from "./Script_Story.mjs";
-import { LEVELS, CHAPTERS, CUTSCENES, FindLevel } from "./Data_TengxianScript.mjs";
+import { LEVELS, CHAPTERS, FindLevel } from "./Data_TengxianScript.mjs";
 import {
   CompanionDirector, COMPANION_CAST, RosterFromBeats, MAX_COMPANIONS, IsCompanionCast,
   DEFAULT_PLAYER_CAST,
@@ -27,7 +27,6 @@ import {
 import { CheckpointRecorder, CHECKPOINT_TUNING } from "./Script_Checkpoint.mjs";
 
 const MainSource = fs.readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8");
-const AssemblySource = fs.readFileSync(new URL("./Data_TengxianScript.mjs", import.meta.url), "utf8");
 
 const failures = [];
 let checks = 0;
@@ -72,8 +71,7 @@ for (const level of LEVELS) {
   Check(`LEVEL_CUES 有 ${level.id} 这一条`, !!LEVEL_CUES[level.id]);
 }
 for (const [levelId, want] of Object.entries(EXPECT_EVENTS)) {
-  // CH5 多出来的那一条是 cutsceneMid 挂的信号（ChapterMidCutscene），不算事件线。
-  const names = Object.keys(LEVEL_CUES[levelId] || {}).filter((n) => n !== MID_CUTSCENE_SIGNAL);
+  const names = Object.keys(LEVEL_CUES[levelId] || {});
   Check(`${levelId} 的事件条数是 ${want}`, names.length === want, `实际 ${names.length}：${names.join(",")}`);
 }
 // 三种名字字段（name / event / id）都认得出来
@@ -157,36 +155,8 @@ Check("空章节表不炸", BuildLevelCues([]).report.length === 0
   && BuildLevelCues([{ levelId: "X", events: [] }]).cues.X !== undefined);
 
 // ===========================================================================
-// 2) 关中过场：beat 原语 + Signal 等价入口
+// 2) 剧本派发
 // ===========================================================================
-
-// 注册表里的每一个 id 都得真的存在 —— 打错字的后果是"关卡中段什么都不播"。
-for (const [levelId, table] of Object.entries(SIGNAL_CUTSCENES)) {
-  for (const [name, id] of Object.entries(table)) {
-    Check(`${levelId}.${name} 指的过场 ${id} 已注册`, !!CUTSCENES[id]);
-  }
-}
-// 真表里现在没有关中过场（第二到终章废弃）；三种挂法用合成数据验，机制没删。
-Check("SIGNAL_CUTSCENES 现在是空表（没有章节挂关中过场）",
-  Object.values(SIGNAL_CUTSCENES).every((table) => Object.keys(table).length === 0),
-  JSON.stringify(SIGNAL_CUTSCENES));
-Check("EVENTS 条目的 cutscene 字段与 cutsceneMid 的对象写法都挂得上", (() => {
-  const built = BuildLevelCues([{ levelId: "W", events: [{ id: "E1", cutscene: "CS_A" }],
-    cutsceneMid: { id: "CS_B", signal: "S2" } }]);
-  return built.cutscenes.W?.E1 === "CS_A" && built.cutscenes.W?.S2 === "CS_B"
-    && !built.cutscenes.W?.[MID_CUTSCENE_SIGNAL];
-})());
-// 挂默认信号的写法（字符串形式）仍然认。
-Check("cutsceneMid 的字符串写法挂默认信号", (() => {
-  const built = BuildLevelCues([{ levelId: "X", events: [], cutsceneMid: "CS_TestMid" }]);
-  return built.cutscenes.X[MID_CUTSCENE_SIGNAL] === "CS_TestMid"
-    && built.cues.X[MID_CUTSCENE_SIGNAL]({ levelTime: 1e9, levelSeconds: 1 }) === false;
-})());
-
-// 组装层的三道校验必须在源码里（数据错了要在开机就炸，不是玩到一半才发现）
-Check("组装层校验 beats 里的 cutscene 类型", /beat\.type !== "cutscene"/.test(AssemblySource));
-Check("组装层校验关中过场 id 已注册", /引用了没注册的过场/.test(AssemblySource)
-  && /cutsceneMid/.test(AssemblySource));
 
 // --- beat 派发 -------------------------------------------------------------
 function MakeStory(levelId, beats) {
@@ -200,83 +170,14 @@ function MakeStory(levelId, beats) {
 }
 const CTX = { zone: null, objectiveIndex: 0, objectiveCount: 7, levelSeconds: 1200, pool: 40 };
 
-// ① 没接线：记一笔，剧本照走（少一场过场不许把一关卡死）
-{
-  const { story } = MakeStory("CH1_NanLu", [
-    { at: "delay:0.1", type: "cutscene", id: "CS_TestMid" },
-    { at: "delay:0.1", type: "objective", text: "返回最后火力点" },
-  ]);
-  story.Update(0.5, CTX);
-  story.Update(2.5, CTX);
-  Check("没接线时关中过场只记一笔，不阻塞剧本", story.Remaining === 0
-    && story.MidCutscenes.length === 1 && story.MidCutscenes[0].played === false
-    && story.ObjectiveText === "返回最后火力点");
-}
-// ② 接了线：宿主播的期间剧本停摆，播完接着走
-{
-  const { story } = MakeStory("CH1_NanLu", [
-    { at: "delay:0.1", type: "cutscene", id: "CS_TestMid" },
-    { at: "delay:0.1", type: "objective", text: "返回最后火力点" },
-  ]);
-  const asked = [];
-  let release = null;
-  story.AttachCutscene((id) => { asked.push(id); return new Promise((r) => { release = r; }); });
-  story.Update(0.5, CTX);
-  Check("beat 派发到宿主", asked.length === 1 && asked[0] === "CS_TestMid");
-  Check("宿主在播时剧本停摆", story.CutsceneHold === true);
-  const timeBefore = story.levelTime;
-  story.Update(30, CTX);
-  Check("停摆期间关内时钟也不走（否则八秒过场里会攒下一堆到点的台词）",
-    story.levelTime === timeBefore && story.ObjectiveText !== "返回最后火力点");
-  release({ id: "CS_TestMid", skipped: false });
-  await Promise.resolve();
-  await Promise.resolve();
-  Check("播完解除停摆", story.CutsceneHold === false);
-  story.Update(2.5, CTX);
-  Check("播完之后剧本接着走", story.ObjectiveText === "返回最后火力点");
-}
-// ③ Signal 等价入口：现在没有章节挂关中过场，只验 Signalled 与「不请求过场」
+// Signal：推过的事件 Signalled 报得出
 {
   const { story } = MakeStory("CH1_NanLu", [{ at: "delay:99", type: "objective", text: "x" }]);
-  const asked = [];
-  story.AttachCutscene((id) => { asked.push(id); return true; });
   story.Signal("EscortCall");
   story.Signal("EscortCall");
-  Check("Signal 到没挂过场的事件不请求过场", asked.length === 0 && story.MidCutscenes.length === 0, asked.join(","));
   Check("Signalled 报得出推过的事件", story.Signalled("EscortCall") === true
     && story.Signalled("没推过的") === false);
-  Check("宿主同步返回时不留停摆（测试桩不会把剧本挂死）", story.CutsceneHold === false);
 }
-// ④ 宿主说「没这场」时不挂死
-{
-  const { story } = MakeStory("CH1_NanLu", [
-    { at: "delay:0.1", type: "cutscene", id: "CS_TestMid" },
-    { at: "delay:0.1", type: "objective", text: "下一条" },
-  ]);
-  story.AttachCutscene(() => null);
-  story.Update(0.5, CTX);
-  Check("宿主回 null 时不进停摆", story.CutsceneHold === false);
-  story.Update(2.5, CTX);
-  Check("宿主回 null 时剧本照走", story.ObjectiveText === "下一条");
-}
-// ⑤ 宿主抛异常也不许把剧本带走
-{
-  const { story } = MakeStory("CH1_NanLu", [
-    { at: "delay:0.1", type: "cutscene", id: "CS_TestMid" },
-    { at: "delay:0.1", type: "objective", text: "下一条" },
-  ]);
-  story.AttachCutscene(() => { throw new Error("宿主炸了"); });
-  story.Update(0.5, CTX);
-  story.Update(2.5, CTX);
-  Check("宿主抛异常时留痕并继续演", story.CutsceneHold === false
-    && story.MidCutscenes[0].error === "宿主炸了" && story.ObjectiveText === "下一条");
-}
-// ⑥ 关中过场走的必须是与关首过场同一条 RunCutscene（Esc 跳过与字幕补卡才一致）
-Check("装配层的关中过场复用 RunCutscene", /function PlayMidCutscene\(id\)[\s\S]{0,900}?return RunCutscene\(id\);/.test(MainSource));
-Check("装配层把关中过场接进了 story", /story\.AttachCutscene\(/.test(MainSource));
-Check("装配层导出了 PlayMidCutscene 宿主 API", /\n\s*PlayMidCutscene,/.test(MainSource));
-Check("关中过场不许与换关/另一场叠着播",
-  /if \(cutscene\.Playing \|\| state\.advancing\) return null;/.test(MainSource));
 
 // --- FlushTail：只倒旁白的既有行为保留，但要留痕且不再无限吞对白 ------------
 {
@@ -299,16 +200,6 @@ Check("关中过场不许与换关/另一场叠着播",
   const n = story.FlushTail();
   Check("FlushTail 照旧把 objective/narration 倒出来", n === 2
     && story.flushLog.played.length === 2 && story.ObjectiveText === "目标");
-}
-{
-  const asked = [];
-  const { story } = MakeStory("CH1_NanLu", [
-    { at: "delay:99", type: "cutscene", id: "CS_TestMid" },
-    { at: "end", type: "narration", text: "收场" },
-  ]);
-  story.AttachCutscene((id) => { asked.push(id); return true; });
-  story.FlushTail();
-  Check("FlushTail 不在关末补播关中过场（镜头这时候归关末过场）", asked.length === 0);
 }
 
 // ===========================================================================
@@ -516,7 +407,7 @@ Check("装配层把 Companion 接进了 story 的 locate 参数",
   /locate: \(who\) => \(companion \? companion\.Locate\(who\) : null\)/.test(MainSource));
 Check("同伴排在撒兵之前（这样兵力预算是自动扣的，不是额外加人）", (() => {
   const a = MainSource.indexOf("companion.BeginLevel(contentId");
-  const b = MainSource.indexOf("else if (!PREVIEW && !cutsceneOnly) SeedSoldiers(phase);");
+  const b = MainSource.indexOf("  else SeedSoldiers(phase);");
   return a > 0 && b > 0 && a < b;
 })());
 Check("同伴每帧排在 ai.Update 之前（goal 要在这一帧的 Think 之前写进去）", (() => {
@@ -636,6 +527,6 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(`任务流程钩子回归全过（${checks} 条）：`
-  + "关中过场 beat / Signal→过场、LEVEL_CUES 自动构建、具名同伴 Locate 与三条剧本指令、"
+  + "剧本派发、LEVEL_CUES 自动构建、具名同伴 Locate 与三条剧本指令、"
   + "脚本检查点倒带、钉关原语。");
 assert.ok(true);

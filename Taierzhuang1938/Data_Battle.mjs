@@ -83,11 +83,8 @@ export const ZONES = Object.fromEntries(
  *         不是空地中央 —— 所以出生点写死在第一个路标的后方，不再随机找空地。
  *         出生点前方三米必须走得通，BootTest 的 spawnRun 是那道闸。
  * fieldFrom
- *         借别章的切片建场（序章那种「过场承载章」用）。BuildField 拿它去查
+ *         借别章的切片建场（序章没有自己的切片，借第一章的）。BuildField 拿它去查
  *         OUTFIELD_SCENES / 外部布设 / tzm 饰件三张按 levelId 分组的表。
- * cutsceneOnly
- *         这一章不建自己的切片、不撒兵、不 Respawn：进章即播 cutsceneIn，
- *         播完自动进下一章（见 Script_Main.EnterLevel）。
  * cameraFar
  *         相机远平面（米）。不写就用 620。
  *         这是**唯一一个不会动场景内容**的 draw call 旋钮：雾在两三百米外
@@ -139,11 +136,6 @@ export const PHASES = LEVELS.map((level, index) => {
     minutes: level.minutes,
     brief: level.brief,
     story: level.id,                 // 叙事层直接按章节 id 装载，不再有翻译表
-    cutsceneIn: level.cutsceneIn || null,
-    cutsceneOut: level.cutsceneOut || null,
-    // 关中过场：判定与派发全在 Script_Story（SIGNAL_CUTSCENES），装配层不直接读它，
-    // 带过来只是为了让选章/编辑器能列出「这一章有几场过场」。
-    cutsceneMid: level.cutsceneMid || null,
     objectives: level.objectives,
     mechanic: level.mechanic,
     mechanics: level.mechanics,

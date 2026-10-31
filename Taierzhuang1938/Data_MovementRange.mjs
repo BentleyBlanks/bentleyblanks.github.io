@@ -30,7 +30,7 @@ export const MOVEMENT_RANGE_PHASE = {
   id: MOVEMENT_RANGE_ID, sandbox: true, sandboxKey: 'movement', sandboxGlyph: '跃',
   date: '操作白盒', label: '操作交互测试场', place: '跳跃 / 跑跳 / 翻越 / 蹲行 / 匍匐',
   sky: 'testSceneDay', music: null, minutes: 600, story: MOVEMENT_RANGE_ID,
-  cutsceneIn: null, cutsceneOut: null,
+ 
   brief: ['五个工位共用正式角色控制器。白盒刻度单位为米，高度以脚底为零点。',
     'Home 复位并恢复体力；PageUp / PageDown 切换工位。右侧记录本次与会话最佳实测成绩。'],
   objectives: ['自由测试操作'], mechanic: 'Space 跳跃 / 翻越；Shift 冲刺；C 蹲起；Z 趴下。',

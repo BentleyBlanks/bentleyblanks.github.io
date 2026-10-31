@@ -43,13 +43,13 @@ let failed = 0;
 // 章节之后，序号与内容的对应整个错位 —— 改成从数据层现取 id）。
 const { PHASES } = await import("./Data_Battle.mjs");
 const LEVEL_IDS = PHASES.map((p) => p.id);
-// 序章是过场承载章：它借第一章的切片开机（tuning.fieldFrom），场上不撒兵。
-const CUTSCENE_ONLY = new Set(PHASES.filter((p) => p.cutsceneOnly).map((p) => p.id));
+// 序章借第一章的切片开机（tuning.fieldFrom），场上没有日军（ijaPool 0）。
+const NO_ENEMY = new Set(PHASES.filter((p) => p.ijaPool === 0).map((p) => p.id));
 
 // 七章各启一次：每章换天光、换切片，是不同的 shader 分支组合与不同的几何量
 for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
   const levelId = LEVEL_IDS[phase];
-  const cutsceneOnly = CUTSCENE_ONLY.has(levelId);
+  const noEnemy = NO_ENEMY.has(levelId);
   problems.length = 0;
   const url = `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=${phase}&quality=high&scale=small`;
   let health = null;
@@ -399,7 +399,7 @@ for (const phase of [0, 1, 2, 3, 4, 5, 6]) {
     // 可供枚举不是材质缺失。完整火力出现后的接线由 FirstLevelWhiteboxBrowserTest 锁定，
     // 其余六章仍照旧在开机帧检查双方材质。
     const scriptedQuiet = !!PHASES[phase].whitebox?.firstContact;
-    if (!cutsceneOnly && !scriptedQuiet && health.readableIjaMaterials < 2) {
+    if (!noEnemy && !scriptedQuiet && health.readableIjaMaterials < 2) {
       bad.push(`日军远景辨识材质未接全 count=${health.readableIjaMaterials}`);
     }
     const expectedSprites = {

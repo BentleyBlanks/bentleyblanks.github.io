@@ -816,15 +816,12 @@ function BeginCh1RailPass(s) {
 export const SETPIECES = {
 
   // =========================================================================
-  // 序章｜出川 —— 整章是过场承载章，摆点层无事可做。
-  //
-  // 车厢是过场自带的布景，底下那片地皮上没有战线（EnterLevel 的 cutsceneOnly
-  // 分支既不 Respawn 也不撒兵）。这里留一条空记录而不是不写 —— 「这一章故意
-  // 没有摆点」与「忘了写」在代码里必须长得不一样。
+  // 序章｜出川 —— 整章原是一场过场（2026-10-31 删除），现在是暂时废弃场景，摆点层无事可做。
+  // 这里留一条空记录而不是不写 —— 「这一章故意没有摆点」与「忘了写」在代码里必须长得不一样。
   // =========================================================================
   CH0_Chuchuan: {
     id: "CH0_Chuchuan",
-    note: "过场承载章：车厢、兵站、逃跑计划三段全在 CS_Chuchuan 里。", // @text-ok note 是给读表的人看的注记，不上屏
+    note: "暂时废弃场景：原来整章是出川过场，已删除。", // @text-ok note 是给读表的人看的注记，不上屏
     Setup() {},
   },
 
@@ -1319,7 +1316,6 @@ export const SETPIECES = {
  *
  * 演出
  *   Hint(text, seconds) / Say(who, text, seconds) / PlaySfx(name, opts)
- *   PlayCutscene(id)                 关中过场（= window.Taierzhuang.PlayMidCutscene）
  *   SetCombatBed(on, fadeS)          交火声床整层淡入/淡出（三关声音先行段）
  *   Firewall(spec) / Shell(spec) / OpenGate(id) / SilenceCoverFire(on)
  *   VolleyThrow(spec)                让一片友军同时投弹（二关「甩！」）

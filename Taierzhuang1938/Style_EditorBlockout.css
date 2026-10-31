@@ -596,6 +596,67 @@ body.blockoutPreviz #hud { visibility: hidden !important; }
   .boPrevizCaption { bottom: 140px; }
 }
 
+/* --- Timeline 过场面板（Script_EditorTimeline，docs/Data_EditorSuite.md「Timeline 过场」） ----------------------
+   底部一条：头一行走带，下面「段 / 镜头 / 台词 / 事件」四条轨，整条时间轴铺满一屏宽。
+   面板开着时导航栏与小地图让开（Timeline 就是这时候的导航），字幕抬到面板上面。 */
+.boTimeline {
+  position: absolute; left: 16px; right: 16px; bottom: 16px; pointer-events: auto;
+  background: var(--bo-panel); border: 1px solid var(--bo-edge); box-shadow: 0 20px 50px #0009;
+}
+.boRoot.boTimelineOpen :is(.boNav, .boMini) { display: none; }
+.boRoot.boTimelineOpen .boPrevizSubs { bottom: 186px; }
+.boRoot.boTimelineOpen .boPrevizCaption { bottom: 250px; }
+.tlHead { display: flex; align-items: center; gap: 14px; height: 34px; padding-right: 6px; border-bottom: 1px solid var(--bo-line-strong); }
+.tlName {
+  align-self: stretch; display: flex; align-items: center; padding: 0 14px 0 12px;
+  border-left: 2px solid var(--bo-gold); background: var(--bo-sel);
+  font: 15px/1 var(--bo-serif); color: var(--bo-bright); letter-spacing: 0.16em;
+}
+.tlTitle { color: var(--bo-muted); font-size: 12px; letter-spacing: 0.08em; white-space: nowrap; }
+.tlSeg { flex: 1 1 auto; min-width: 0; color: var(--bo-gold-text); font-size: 12px; letter-spacing: 0.06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tlTransport { display: flex; gap: 2px; }
+.tlBtn {
+  width: 30px; height: 26px; padding: 0; border: 0; border-left: 2px solid transparent; border-radius: 0;
+  background: transparent; color: var(--bo-text); font: 14px/1 var(--bo-font); cursor: pointer;
+}
+.tlBtn:hover { background: var(--bo-sel-strong); border-left-color: var(--bo-gold); color: var(--bo-bright); }
+.tlTime { min-width: 148px; text-align: right; font: 12px/1 var(--bo-num); color: var(--bo-bright); letter-spacing: 0.04em; }
+.tlStatus { color: var(--bo-faint); font-size: 11px; letter-spacing: 0.08em; white-space: nowrap; cursor: default; }
+.tlStatus.bad { color: var(--bo-bad); }
+.tlClose { color: var(--bo-muted); }
+.tlBody { display: grid; grid-template-columns: 58px 1fr; padding: 6px 14px 10px 0; }
+.tlLabels { display: flex; flex-direction: column; }
+.tlLabel { height: 21px; padding-right: 12px; text-align: right; font-size: 11px; line-height: 21px; letter-spacing: 0.14em; color: var(--bo-faint); }
+.tlLabel:first-child { height: 16px; line-height: 16px; }
+.tlLanes { position: relative; cursor: pointer; touch-action: none; }
+.tlRuler { position: relative; height: 16px; border-bottom: 1px solid var(--bo-line); }
+.tlTick { position: absolute; bottom: 0; width: 1px; height: 4px; background: var(--bo-line-strong); }
+.tlTick.major { height: 8px; background: #c1bdab88; }
+.tlTick b { position: absolute; left: 4px; bottom: 3px; font: 10px/1 var(--bo-num); font-weight: 400; color: var(--bo-faint); white-space: nowrap; }
+.tlLane { position: relative; height: 18px; margin-top: 3px; background: #ffffff05; }
+.tlItem {
+  position: absolute; top: 2px; bottom: 2px; min-width: 2px; overflow: hidden; white-space: nowrap;
+  font-size: 11px; line-height: 14px;
+}
+.tlItem.segItem { top: 0; bottom: 0; line-height: 18px; padding-left: 7px; background: var(--bo-sel-strong); border-left: 2px solid var(--bo-gold); color: var(--bo-gold-text); letter-spacing: 0.05em; }
+.tlItem.shotItem { background: #c1bdab2a; border-left: 1px solid #c1bdab99; }
+.tlItem.shotItem.alt { background: #c1bdab16; }
+.tlItem.shotItem.move { background: #86c9dc2a; border-left-color: var(--bo-sync); }
+.tlItem.lineItem { background: #e6cb913d; border-left: 1px solid var(--bo-gold); }
+.tlItem.lineItem.bad { background: #d6604a55; border-left-color: var(--bo-bad); }
+.tlItem.eventItem.range { background: #86c9dc26; border-left: 1px solid var(--bo-sync); }
+.tlItem.eventItem.mark { width: 2px; top: 3px; bottom: 3px; background: var(--bo-sync); }
+.tlItem.ev-black.range { background: #000000a8; border-left-color: #c1bdab66; }
+.tlItem.ev-flash.range { background: #fffdf640; border-left-color: #fffdf6; }
+.tlItem.ev-explosion, .tlItem.ev-shake.range { background: #d6604a66; border-left-color: var(--bo-bad); }
+.tlItem.ev-explosion.mark { background: var(--bo-bad); }
+.tlItem.ev-signal.mark { background: var(--bo-gold); }
+.tlItem.ev-sfx.mark { background: #aaa99b; }
+.tlItem.ev-slowmo { background: #8fca7a2a; border-left: 1px solid var(--bo-ok); }
+.tlItem:hover { filter: brightness(1.45); }
+.tlPlayhead { position: absolute; top: 0; bottom: 0; width: 1px; margin-left: -0.5px; background: var(--bo-gold-hi); pointer-events: none; box-shadow: 0 0 4px #ffe0a180; }
+.tlPlayhead::before { content: ""; position: absolute; top: 0; left: -4px; width: 9px; height: 7px; background: var(--bo-gold-hi); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+
 /* --- 手机验收（§4.5，2026-10-23，Script_EditorBlockoutTouch） ------------------------------
    触屏层开着时（根上 boTouch、body 上 blockoutTouch）只动界面，游戏画面一样不动（枪、手、画质照 PC）：
    卡片收成一行（点标题展开）、右上「图层」按钮收起关卡下拉 / 图层开关 / 音量、小地图让位给左下摇杆、

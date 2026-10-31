@@ -99,7 +99,7 @@ export const WEAPON_RANGE_PHASE = {
   sky: "testSceneDay", music: null, minutes: 600,
   brief: ["出生前方长桌按 F 领取枪械。所有枪械无限弹药；静靶在左、动靶在右。",
     "蓝色圆点是测距原点：各靶与圆点的水平直线距离为 10–200 米。移动靶沿等距圆弧往返。"],
-  story: WEAPON_RANGE_LEVEL_ID, cutsceneIn: null, cutsceneOut: null,
+  story: WEAPON_RANGE_LEVEL_ID,
   objectives: ["长桌领取枪械", "蓝色测距点试射 · 静靶 / 动靶"],
   mechanic: "真实枪械与命中链；无限弹药，目标倒地后自动复位。",
   nraPool: 9999, poolGain: 0, ijaPool: 9999, ijaPressure: 0, ijaSpawn: [], ijaSupport: [],

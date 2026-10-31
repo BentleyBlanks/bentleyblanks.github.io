@@ -60,7 +60,7 @@ import { LoadToolsVolume, ToolsVolumeControl, ToolsVolumeLevel } from "./Script_
 
 /** 互斥编辑器：接管画面（多数还接管相机），任何时候只有一个活着。 */
 const EDITORS = [
-  ActorEditor, FacialEditor, SquadMarchEditor, WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor, TimelineEditor,
+  ActorEditor, FacialEditor, SquadMarchEditor, WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor,
   PropLibraryEditor, AssetStandardsEditor, PropPcgEditor, SplineEditor,
   // 出图脚本与测试用的定镜小工具（不在任何菜单里，见 Script_EditorShotCamera 文件头）
   ShotCameraEditor,
@@ -157,7 +157,7 @@ export class EditorSuite {
       // 机队同理走取值器（白盒预演的飞机借它的模型克隆）
       get aircraft() { return host.game.aircraft ?? null; },
       actorFactory: host.actorFactory, viewmodel: host.viewmodel,
-      audio: host.audio, cutscene: host.cutscene,
+      audio: host.audio,
       game: host.game,
       studio: suite.studio, flycam: suite.flycam, viewport: suite.viewport,
       // 摄影棚要额外藏的东西：视图模型挂在相机上，而相机是豁免的
@@ -508,7 +508,7 @@ export class EditorSuite {
 
   /** 菜单栏里点一项。当前开着的那项再点一次 = 关掉它。 */
   Toggle(id) {
-    if (id === TextureEditor.id || id === SceneEditorEntry.id || id === BlockoutEntry.id) return this.Open(id);
+    if (id === TextureEditor.id || id === SceneEditorEntry.id || id === BlockoutEntry.id || id === TimelineEditor.id) return this.Open(id);
     // 工具首页没有关卡：场景类工具先回首页问「载入哪一关」
     if (this.home?.NeedsLevel(id)) {
       if (this.active) this.CloseTool();
@@ -609,6 +609,11 @@ export class EditorSuite {
     // 白盒关卡编辑器：整页跳到 ?editor=blockout；已经在里面就什么也不做（按钮亮着表示当前项）。
     if (id === BlockoutEntry.id) {
       try { return BlockoutEntry.Open(); }
+      catch (error) { this.SetHint(error.message); return null; }
+    }
+    // Timeline 过场：同上是跳转入口（白盒编辑器 + 底部 Timeline 面板）；已经在白盒编辑器里就只开面板。
+    if (id === TimelineEditor.id) {
+      try { return TimelineEditor.Open(); }
       catch (error) { this.SetHint(error.message); return null; }
     }
     if (OVERLAYS.some((editor) => editor.id === id)) return this.ToggleOverlay(id);
@@ -739,16 +744,12 @@ export class EditorSuite {
         return;
       }
       if (event.code === "Escape" && this.Capturing) {
-        // 过场正在播的时候 Esc 归过场（跳过），别顺手把编辑器也关了
-        const playing = this.host.cutscene && this.host.cutscene.Playing;
-        if (!playing) {
-          // 工具首页上开着某个工具：Esc 先回首页，首页上再按才回主菜单
-          if (this.home && this.active) this.CloseTool();
-          else this.TogglePanel(false);
-          event.preventDefault();
-          // 暂停菜单也监听 Esc；设置关掉后不能让同一次按键继续穿透成「恢复战斗」。
-          event.stopImmediatePropagation();
-        }
+        // 工具首页上开着某个工具：Esc 先回首页，首页上再按才回主菜单
+        if (this.home && this.active) this.CloseTool();
+        else this.TogglePanel(false);
+        event.preventDefault();
+        // 暂停菜单也监听 Esc；设置关掉后不能让同一次按键继续穿透成「恢复战斗」。
+        event.stopImmediatePropagation();
         return;
       }
       if (this.active && this.active.cameraMode === "fly") this.flycam.keys.add(event.code);

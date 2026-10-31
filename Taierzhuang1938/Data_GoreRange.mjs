@@ -110,7 +110,7 @@ export const GORE_RANGE_PHASE = Object.freeze({
   id: GORE_RANGE_ID, sandbox: true, sandboxKey: "gore", sandboxGlyph: "肢",
   date: "断肢白盒", label: "断肢测试场", place: "枪线 · 炸坑 · 刀桩 · 观察台",
   sky: "testSceneDay", ambience: "overcast", music: null, minutes: 600,
-  story: GORE_RANGE_ID, cutsceneIn: null, cutsceneOut: null,
+  story: GORE_RANGE_ID,
   brief: ["四个工位共用正式伤害链：枪线两排在十米与二十五米，炸坑一圈六个木桩标着一二三米环，刀桩三个站在台上。",
     "左上角面板可以开「下一发必断」、按肢体直接卸一段、重置木桩、引爆炸坑和放慢到零点二倍速。"],
   objectives: ["自由测试断肢"],

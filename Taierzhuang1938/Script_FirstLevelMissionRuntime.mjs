@@ -299,7 +299,7 @@ export class FirstLevelMissionRuntime {
     this.bunkerRifle = this.SpawnMissionRifle?.(P.bunker.rifle) ?? null;
     this.flow.Start();
     this.voiceReady = this.voice.Load().then(()=>{
-      if (host.stageJump != null) ApplyFirstLevelStageJump(this, host.stageJump, { midCutscenes: !!host.stageJumpMidCutscenes });
+      if (host.stageJump != null) ApplyFirstLevelStageJump(this, host.stageJump);
       this.musicInitializing = false;
       this.UpdateMusic();
       this.SaveCheckpoint();

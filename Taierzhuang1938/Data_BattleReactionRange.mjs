@@ -78,7 +78,7 @@ export const BATTLE_REACTION_RANGE_PHASE = Object.freeze({
   id: BATTLE_REACTION_RANGE_ID, sandbox: true, sandboxKey: "reactions", sandboxGlyph: "震",
   date: "反应测试", label: "人物战场反应测试场", place: "壕沟 · 近爆 · 第一人称反应 · 耳鸣",
   sky: "testSceneDay", ambience: "overcast", music: null, minutes: 600,
-  story: BATTLE_REACTION_RANGE_ID, cutsceneIn: null, cutsceneOut: null,
+  story: BATTLE_REACTION_RANGE_ID,
   brief: ["和炮击扬尘测试场同一片黄土地：一道锯齿形射击壕、交通壕与后方横沟，沟外是弃土垄。你站在射击壕里。",
     "左侧面板选弹种、距离和方位，在你身边引爆：看人怎么眨眼闭眼、扭头避开、低头缩身、手臂收枪，听耳鸣怎么起来又怎么退。"],
   objectives: ["测试第一人称近爆反应"],

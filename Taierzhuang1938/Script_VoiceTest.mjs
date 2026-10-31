@@ -109,100 +109,9 @@ Object.assign(r, await page.evaluate(() => {
   };
 }));
 
-// ---------------------------------------------------------------------------
-// 序章（CS_Chuchuan）的配音契约 —— 2026-08-29 集成批 INT3a 按新序章重定标
-//
-// 这四条原来钉在**旧序章**上：42 s / 六镜 / 18 句对白压成 11 个 `prologue_*` cue /
-// 1:08—1:30 的八句班长动员由一条连续 SeedAudio 场景文件承载。
-// 任务流程重制把序章整段换掉了（docs/Data_MissionRemake.md §1）：
-// 现在是 166.5 s / 九镜 / **31 句**，说话的全是有名有姓的 CAST，
-// 走 `ch0_*` 章节语音通道（行本体在 Data_MissionCh0.mjs，由 Data_Voice 拼进总表）。
-// 那 11 条 prologue_* 行已经从 VOICE_LINES 里退役（mp3 留档在盘上）。
-//
-// 重写时守的是**新序章的设计不变量**，不是把旧数字换成新数字：
-//   · 每一句都有 voiceCue，且每个 voiceCue 在总表里认得出来（写错 key = 静默丢台词）；
-//   · 屏幕上的说话人与声库里那一行的 who 必须是同一个人（挑错人 = 别人的嗓子）；
-//   · 31 条全部烘出了音频（序章是正片第一分钟，不许靠纯字幕降级过关）；
-//   · 三档交付（常态/急喊/耳语）都真的用上了 —— 顺子那段咬耳朵是靠**音量差**
-//     让玩家知道「现在不能出声」的，全刷成常态就白做了；
-//   · 剧情语音是**单槽**，后一句会顶掉前一句：踩得太多就是有人被切掉半句。
-// 时间轴结构（九镜、秒数和、固定演出 ≤45 s）由 Script_CutsceneControlTest 守。
-// ---------------------------------------------------------------------------
-const prologue = await page.evaluate(async () => {
-  const mod = await import("./Data_Voice.mjs");
-  const cutMod = await import("./Data_CutsceneChuchuan.mjs");
-  const bank = new Map([...window.Taierzhuang.audio.voiceBank.values()].map((e) => [e.key, e]));
-  const rows = new Map(mod.VOICE_LINES.map((line) => [line.key, line]));
-  const spoken = [];
-  for (const shot of cutMod.CS_Chuchuan.shots) {
-    for (const line of shot.lines || []) {
-      const row = rows.get(line.voiceCue) || null;
-      const loaded = bank.get(line.voiceCue) || null;
-      spoken.push({
-        shot: shot.n, at: line.at, subSeconds: line.seconds, who: line.who,
-        cue: line.voiceCue || null,
-        row: row ? { who: row.who, kind: row.kind, chapter: row.chapter, delivery: row.delivery, dur: row.dur } : null,
-        duration: loaded ? loaded.duration : 0,
-      });
-    }
-  }
-  return {
-    spoken,
-    orphanRows: mod.VOICE_LINES.filter((line) => /^prologue_/.test(line.key)).map((line) => line.key),
-    // 资产留档：行删了，人工试听选定的 take 仍在盘上（旧序章 CS_ChuchuanLegacy 也留着）。
-    legacyAssetAlive: (await fetch("Audio/AudioSfx_PrologueVoiceMotivation_04.mp3", { method: "GET" })).ok,
-  };
-});
-const spoken = prologue.spoken;
-const noCue = spoken.filter((line) => !line.cue);
-const unknownCue = spoken.filter((line) => line.cue && !line.row);
-const wrongChannel = spoken.filter((line) => line.row
-  && (line.row.kind !== "story" || line.row.chapter !== 0 || !/^ch0_/.test(line.cue)));
-const wrongSpeaker = spoken.filter((line) => line.row && line.row.who !== line.who);
-Check("序章每一句都有 voiceCue，且每个 cue 都能在总表里认出来（走 ch0_* 章节通道）",
-  spoken.length === 31 && !noCue.length && !unknownCue.length && !wrongChannel.length && !wrongSpeaker.length,
-  `${spoken.length} 句`
-  + (noCue.length ? `；${noCue.length} 句没有 cue` : "")
-  + (unknownCue.length ? `；总表里没有：${unknownCue.map((l) => l.cue).join(" ")}` : "")
-  + (wrongChannel.length ? `；走错通道：${wrongChannel.map((l) => l.cue).join(" ")}` : "")
-  + (wrongSpeaker.length ? `；说话人对不上：${wrongSpeaker.map((l) => `${l.cue}(屏上 ${l.who}/表里 ${l.row.who})`).join(" ")}` : ""));
-
-const unbaked = spoken.filter((line) => !(line.duration > 0));
-Check("序章 31 条台词全部烘出了音频（正片第一分钟不许靠纯字幕降级过关）",
-  unbaked.length === 0,
-  unbaked.length ? `还没烘：${unbaked.map((l) => l.cue).join(" ")}`
-    : `最长 ${Math.max(...spoken.map((l) => l.duration)).toFixed(2)}s / 最短 ${Math.min(...spoken.map((l) => l.duration)).toFixed(2)}s`);
-
-const deliveries = spoken.reduce((acc, line) => {
-  if (line.row) acc[line.row.delivery] = (acc[line.row.delivery] || 0) + 1;
-  return acc;
-}, {});
-Check("序章三档交付都用上了（顺子那段耳语靠音量差说话，全刷成常态就白做了）",
-  ["normal", "shout", "whisper"].every((kind) => (deliveries[kind] || 0) >= 3),
-  JSON.stringify(deliveries));
-
-// 单槽：后一句起播会顶掉前一句。策划上允许搭一点（换气抢话），
-// 但踩进去超过 0.35 s（约一个字）就是真的把上一句切掉了。
-const OVERLAP_LIMIT_S = 0.35;
-const overlaps = [];
-for (const shot of new Set(spoken.map((line) => line.shot))) {
-  const inShot = spoken.filter((line) => line.shot === shot);
-  for (let i = 1; i < inShot.length; i += 1) {
-    const gap = inShot[i].at - (inShot[i - 1].at + inShot[i - 1].duration);
-    if (gap < -OVERLAP_LIMIT_S) overlaps.push(`${inShot[i - 1].cue}→${inShot[i].cue} 叠 ${(-gap).toFixed(2)}s`);
-  }
-}
-Check("序章没有一句被下一句踩掉（剧情语音是单槽，新的顶掉旧的）",
-  overlaps.length === 0, overlaps.length ? overlaps.join(" / ") : `全部 31 句依次说完（容差 ${OVERLAP_LIMIT_S}s）`);
-
-Check("旧序章那 11 条 prologue_* 已从总表退役，音频资产仍留档",
-  prologue.orphanRows.length === 0 && prologue.legacyAssetAlive,
-  prologue.orphanRows.length ? `总表里还剩：${prologue.orphanRows.join(" ")}`
-    : `总表零条；Audio/AudioSfx_PrologueVoice*.mp3 ${prologue.legacyAssetAlive ? "仍在盘上" : "**已经不见了**"}`);
-
 // 章节剧情台词是**先写词、后烘音**的：内容批把台词写进 Data_MissionChX.mjs 之后，
 // 到烘焙之前那段时间里，它们必然 404。那不是回归，是设计好的降级（纯字幕）——
-// 所以这里把两类错误分开算：战斗口令一条都不许丢，剧情台词（含序章那 31 句）只报数。
+// 所以这里把两类错误分开算：战斗口令一条都不许丢，剧情台词只报数。
 const storyLoad = await page.evaluate(async () => {
   const mod = await import("./Data_Voice.mjs");
   const A = window.Taierzhuang.audio;
@@ -431,7 +340,7 @@ const storyChan = await page.evaluate(async () => {
 
   d.AttachVoice(({ key, who, position }) => { played.push({ key, who, position }); return { duration: 3.0 }; },
     (who) => ({ x: 1, y: 2, z: 3, who }));
-  d.Play({ type: "line", who: "shunzi", text: "晓得。", voice: "ch0_shunzi_01" }, false);
+  d.Play({ type: "line", who: "shunzi", text: "晓得。", voice: "ch1_shunzi_05" }, false);
   const voiced = { subtitle: said.at(-1).seconds, hold: d.sinceLast, log: d.voiceLog.slice() };
 
   // 没接线：纯字幕，默认时长，绝不抛
@@ -450,7 +359,7 @@ const storyChan = await page.evaluate(async () => {
   };
 });
 Check("beat.voice 会把 key 与说话人交给宿主（定位说话人是宿主的事，不是叙事层的）",
-  storyChan.calls.length === 1 && storyChan.calls[0].key === "ch0_shunzi_01"
+  storyChan.calls.length === 1 && storyChan.calls[0].key === "ch1_shunzi_05"
   && storyChan.calls[0].who === "shunzi" && storyChan.calls[0].position?.x === 1,
   JSON.stringify(storyChan.calls));
 Check("字幕跟着语音走：3.0 s 的台词字幕不早于音频结束（line 默认 4.2 s，取长者）",

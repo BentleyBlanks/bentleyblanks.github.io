@@ -130,7 +130,6 @@ import { AudioEngine } from "./Script_Audio.mjs";
 import { AudioWiring, WeaponClassOf } from "./Script_AudioWiring.mjs";
 import { Hud, ContextualActionPrompts, CrosshairGeometry } from "./Script_Hud.mjs";
 import { StoryDirector, CHAPTER_RELEASE_SIGNAL } from "./Script_Story.mjs";
-import { CutsceneDirector } from "./Script_Cutscene.mjs";
 import { CombatSystem } from "./Script_Combat.mjs";
 import { LoadGrenadeAsset, CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { LoadStretcherAsset, CreateStretcherGeometry } from "./Script_StretcherAsset.mjs";
@@ -183,7 +182,6 @@ import {
 } from "./Data_Weapons.mjs";
 import { WEAPON_MESH_VARIANTS, WEAPON_MESH_BY_ID } from "./Data_Meshes.mjs";
 import { PHASES, REINFORCE, ORDERS, SCALE_PRESETS, WORLD, COMBAT, DIFFICULTY, EPILOGUE, NAME_POOL } from "./Data_Battle.mjs";
-import { CUTSCENES } from "./Data_TengxianScript.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { Clamp, Clamp01, HashString, Mulberry32 } from "./Script_Noise.mjs";
 // 玩家可见文本一律走这里（表在 Data_Text_Hud / Data_Text_Boot / Data_Text_Menu）。
@@ -210,7 +208,6 @@ function BootStartLabel() {
   if (REACTION_TEST) return T("boot.start.reactionRange");
   if (CLOTH_TEST) return T("boot.start.clothRange");
   if (GORE_TEST) return T("boot.start.goreRange");
-  if (PREVIEW) return T("boot.start.preview");
   return T("boot.start.play");
 }
 
@@ -284,13 +281,6 @@ const EDITOR_PARAM = params.get("editor");
 // 关卡表也是开发工具的一部分，经 Script_DevTools 边界取；剔除开发工具的包里它是空表，?editor=blockout 不生效。
 const BLOCKOUT_PHASES = EDITOR_PARAM === "blockout" ? BlockoutPhases() : [];
 const BLOCKOUT = BLOCKOUT_PHASES.length > 0;
-// 新版序章是一个**独立预览**：它只展示车厢时间轴，不把下车后的未完玩法
-// 硬接到旧界河。稳定入口固定为 ?preview=CS_Chuchuan；其它 query 仍走正片。
-const PREVIEW_ID = params.get("preview") === "CS_Chuchuan" ? "CS_Chuchuan" : null;
-const PREVIEW = !!PREVIEW_ID;
-// 从主页面的「新版序章预览」链接进入时直接开播，不能再让玩家在加载完成后
-// 面对第二颗同义按钮。保留不带 autoplay 的地址作为审片/音频解锁回退入口。
-const PREVIEW_AUTOPLAY = PREVIEW && params.get("autoplay") === "1";
 /**
  * 玩法测试靶场（?range=1）：人机共同测试用的独立沙盒（docs/Data_TestRange.md）。
  * 实现方式是**整表替换**：PHASE_TABLE 在靶场模式下只有 RANGE_PHASE 一关，
@@ -361,7 +351,7 @@ const FULL_SCENE = PHASE_PARAM === "fullscene";
  * 不建任何关卡，只铺一块空地让引擎跑起来，画面由工具首页盖住，等人自己选工具
  * （Data_ToolsHome 文件头）。给了 phase / whitebox 等关卡参数时仍是老规矩：先建那一关再开工具。
  */
-const TOOLS_HOME = DEV_TOOLS_ENABLED && EDITOR_PARAM === "tools" && !SHOT && !PREVIEW && PHASE_PARAM === null
+const TOOLS_HOME = DEV_TOOLS_ENABLED && EDITOR_PARAM === "tools" && !SHOT && PHASE_PARAM === null
   && !(MOVEMENT_RANGE || EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || GORE_TEST || IMPACT_TEST || REACTION_TEST || CLOTH_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE || BLOCKOUT);
 const SANDBOX = MOVEMENT_RANGE || EXPLOSION_TEST || WEAPON_RANGE || RANGE || MELEE_TEST || GORE_TEST || IMPACT_TEST || REACTION_TEST || CLOTH_TEST || FIRST_LEVEL_P012_WHITEBOX || JIEHE || BLOCKOUT || TOOLS_HOME;
 const PHASE_TABLE = TOOLS_HOME ? [TOOLS_HOME_PHASE] : BLOCKOUT ? BLOCKOUT_PHASES : MOVEMENT_RANGE ? [MOVEMENT_RANGE_PHASE] : EXPLOSION_TEST ? [EXPLOSION_RANGE_PHASE] : WEAPON_RANGE ? [WEAPON_RANGE_PHASE] : RANGE ? [RANGE_PHASE]
@@ -380,7 +370,7 @@ const PHASE_TABLE = TOOLS_HOME ? [TOOLS_HOME_PHASE] : BLOCKOUT ? BLOCKOUT_PHASES
 // 在无头/禁音浏览器里留下悬挂的加载与定时器。
 const AUDIO_ENABLED = !CLOTH_TEST && !SHOT && params.get("audio") !== "0";
 // 截图工具显式打开手动步进后，页面 rAF 不得偷偷推进过场；普通出图模式仍
-// 保留原有的自动循环，只有 Script_CutsceneShot 传 manual=1 才启用此闸。
+// 保留原有的自动循环，只有出图 / 浏览器测试传 manual=1 才启用此闸。
 const MANUAL_STEP = params.get("manual") === "1";
 // 出图专用的两个常驻输入：开镜（E 组唯一能验的镜头）与开火（枪口焰/曳光/抛壳）。
 // 必须在 ReadKeys **之后**盖上去 —— 直接写 player.ads 会在下一帧被
@@ -395,7 +385,7 @@ const SHOT_FIRE = !!(SHOT && params.get("fire"));
  * 三个冒烟脚本（PlayTest / EditorTest / VoiceTest）点的都是 #bootStart 那颗按钮，
  * 出图脚本连点都不点，直接 StepFrames。菜单只服务真人。
  */
-const MENU_ON = !SHOT && !PREVIEW && !BLOCKOUT && params.get("menu") !== "0";
+const MENU_ON = !SHOT && !BLOCKOUT && params.get("menu") !== "0";
 /**
  * 开机要不要**打开**主菜单。靶场（?range=1）里菜单照建不误 —— Esc 暂停、设置、
  * 调试选项与「退出靶场」都挂在它上面 —— 但开机不开：靶场是「进页面就是这片场地」，
@@ -649,7 +639,7 @@ function ProfilerFrameState() {
   if (menu?.open && menu.mode === "failure") return "failure";
   if (UiCapturing()) return "editor";
   if (state.menu && menu && menu.live) return "menu";
-  if (cutscene && cutscene.Playing) return "cutscene";
+  if (state.cutscene) return "cutscene";
   if (!state.running) return "paused";
   return "play";
 }
@@ -797,14 +787,6 @@ const state = {
   // 预编译着色器的那一段（见 WarmupShaders）：加载画面盖着屏幕，这几帧一律不出画。
   // 出画就等于把还没编完的 program 全部同步逼出来，而那正是这一步要摊开的账。
   warming: false,
-  // 预览不属于可玩关卡：完成后停在片尾，不自动启动旧 L0 的 AI/战斗。
-  preview: PREVIEW,
-  previewId: PREVIEW_ID,
-  previewDone: false,
-  previewPlaying: false,
-  previewError: null,
-  previewHandoffShown: false,
-  previewHandoffCount: 0,
   manualStep: MANUAL_STEP,
   // 菜单态：主菜单开着（开机那一次或从暂停回来）。running 与它互斥 ——
   // 菜单在跑运镜时玩法必须整个停摆，否则玩家会在看菜单的时候被打死。
@@ -839,7 +821,7 @@ const state = {
   objectiveBlockedReason: null, // 白盒关卡事实门未满足时的取证，不另加屏幕说明。
   levelSeconds: 0,            // 本关的配置时长（秒）
   advancing: false,           // 正在换关（建城是分帧的，期间不许再触发一次）
-  cutscene: null,             // 正在播的过场 id；非 null 时玩家没有控制权
+  cutscene: null,             // 脚本镜头夺走控制权时的 id（CaptureControl）；非 null 时玩家没有控制权
   // 钉住当前关（只给测试用）：剧本长跑要在**一关之内**按出厂时长推满，
   // 不许中途自动换关 —— 换关会重置剧本队列，量到的就不是这一关的剧本了。
   pinned: false,
@@ -850,7 +832,6 @@ const state = {
   pinFinalZone: false,
   chapterReleased: false,
   chapterReleaseAt: 0,        // 放行时的关内秒数（取证：是被信号放的还是被保险丝放的）
-  cutscenesPlayed: [],        // 播过/跳过的过场，通关冒烟看这张表
   // 摆点层记下的**同一局之内**的场景事实（拆过几块门板、罗班长倒下了）。
   // 不进存档 —— 它们是场景状态，不是进度。取证口在 Debug.Setpieces。
   setpieceFacts: {},
@@ -959,7 +940,12 @@ let jumpSoundCount = 0;
 /** 机枪位的世界模型：id -> { root, nodes }。摆点建、换关拆。 */
 const emplacementViews = new Map();
 let identify = null;
-let cutscene = null;
+/** 夺走 / 交还玩家控制权（Boot 里接好，见 CaptureControl）。 */
+let CaptureControl = () => {};
+let ReleaseControl = () => {};
+/** 换天光 / 还原本关天光（Boot 里接成 ApplySkyPreset / RestoreLevelSky；任务层在 EnterLevel 那段闭包里拿不到它们）。 */
+let ApplySkyOverride = () => false;
+let RestoreSkyOverride = () => {};
 // 天空机群是纯视觉层：它跨关复用模型，换关时只更新航线中心。
 let aircraft = null;
 // 日机扫射航线（第一关阶段五/六/八）。规则与数值全在 Script_AircraftStrafe，
@@ -994,8 +980,8 @@ let setpieces = null;
 // 脚本安排的无敌窗口（四关罗班长救顺子那 4—6 秒）。到时刻为止，玩家被打倒
 // 不走死亡链路而是走检查点倒带 —— 固定事件里死掉会把那一段整个跳过去。
 let scriptInvulnUntil = 0;
-// 正在播的过场自带的天空预设名（cut.sky）；null = 按本关的天空走。
-let cutsceneSky = null;
+// 临时换上的天空预设名（第一关关尾夜行军、环境编辑器）；null = 按本关的天空走。
+let skyOverride = null;
 // 编辑器套件（高级工具 + Debug工具）。Boot 末尾才建 —— 它拿的是活引用。
 // 出图与两个冒烟里它照样建，只是整棵 DOM 被 .off 藏起来（截图里不许有它）。
 // 剔除开发工具的包里它恒为 null，下面每一处都按「没有」处理。
@@ -1273,13 +1259,10 @@ async function Boot() {
       albedo: "./Texture/Texture_TemplePlasterBase.webp?v=1",
       normal: "./Texture/Texture_TemplePlasterNormal.webp?v=1",
       orm: "./Texture/Texture_TemplePlasterOrm.webp?v=1" },
-    // 出川车厢那三套。**曾经是 1254px PNG，一家占掉整张表 71% 的字节**
-    //（28 MB / 39 MB），因为它们是全项目唯一没走 512px WebP 那条烘焙线的贴图。
-    // 而车厢是按世界尺寸平铺的（一张图铺 1 m，见 Script_Cutscene.TILE_BY_RECIPE），
+    // 车厢那三套（原为出川车厢做，现在浮桥 / 铁路桥的木板与钢件也用）。**曾经是 1254px PNG，
+    // 一家占掉整张表 71% 的字节**（28 MB / 39 MB）；按世界尺寸平铺（一张图铺 1 m），
     // 512px 就是每米 512 个纹素，多出来的分辨率任何机位都采样不到。
     // 现在走 _import/Script_BakeCarriagePbr.py 降采样出的 WebP：21 MB → 0.37 MB。
-    // 顺带摘掉了 CarriageWallSteel —— Data_CutsceneChuchuan 里一次都没 mat 引用它
-    //（端墙实测渲成纯黑之后早就改走 WoodStock/Adobe），却一直每次开机下 6.5 MB。
     { name: "CarriageBenchWood",
       albedo: "./Texture/Texture_CarriageBenchWoodBase.webp?v=car512",
       normal: "./Texture/Texture_CarriageBenchWoodNormal.webp?v=car512",
@@ -1793,16 +1776,13 @@ async function Boot() {
     locate: (who) => (companion ? companion.Locate(who) : null),
     stop: () => audio.StopStoryVoice(),
   });
-  // 关中过场：Story 报时机，装配层夺控制权、播、还回来（与关首过场同一条路）。
-  story.AttachCutscene((id) => PlayMidCutscene(id));
   /**
    * 换天光。套预设 = 天空着色器 + Global SH 强度 + 平行光三件一起换，
-   * 少一件就是「天是夜的、地是白天的」。过场（cut.sky）与采样点出图
-   *（夜战关里的关厢建筑要按白天记录）走的是同一条，不许各写一份。
+   * 少一件就是「天是夜的、地是白天的」。第一关关尾夜行军与环境编辑器走的是同一条，不许各写一份。
    */
   function ApplySkyPreset(name) {
     if (!SKY_PRESETS[name]) return false;
-    cutsceneSky = name;
+    skyOverride = name;
     const preset = sky.Apply(name);
     sky.BakeEnvironment(scene);
     lights.ApplyPreset(preset, sky.sunDirection);
@@ -1810,53 +1790,43 @@ async function Boot() {
   }
   /** 还原成本关自己的天光。 */
   function RestoreLevelSky() {
-    if (!cutsceneSky) return;
-    cutsceneSky = null;
+    if (!skyOverride) return;
+    skyOverride = null;
     const preset = sky.Apply(PHASE_TABLE[state.phaseIndex].sky);
     sky.BakeEnvironment(scene);
     lights.ApplyPreset(preset, sky.sunDirection);
   }
+  ApplySkyOverride = ApplySkyPreset;
+  RestoreSkyOverride = RestoreLevelSky;
 
-  // 过场导演。onCapture/onRelease 是夺走与交还玩家控制权的钩子：
-  // 过场期间 Frame() 只跑 director.Update 与渲染，玩法一律停摆
-  //（不停的话玩家会在看电影的时候被打死，而且指针锁还在，鼠标会转动相机）。
-  cutscene = new CutsceneDirector({
-    camera, scene, hud, audio, actorFactory, library, root: hudRoot,
-    onCapture: (cut) => {
-      state.cutscene = cut.id;
-      router?.SetSuppressed(true);
-      // 过场拥有自己的 Look；释放玩家锁避免浏览器吞掉 Esc，结束时再请求。
-      ReleasePointerLock();
-      input.fire = false; input.ads = false; input.forward = 0; input.strafe = 0;
-      input.lookX = 0; input.lookY = 0; input.sprint = false; input.breathHold = false;
-      // 按住 F 的那一下断在这儿。过场期间输入被 SetSuppressed 掐掉，松手边沿永远到不了 ——
-      // 不主动断的话，进度环会一直亮着「按住中」挂在过场画面上。
-      interact?.CancelHold("cutscene");
-      // 机枪的扳机同理：过场期间输入被掐掉，松手边沿到不了，不主动断的话
-      // 过场一结束枪会自己接着响一梭。
-      emplacement?.SetFire(false);
-      emplacement?.EndClear();
-      hud?.SetInteractProgress(null);
-      // 玩家手里的枪挂在相机下：不藏的话每一镜右下角都趴着一支带刺刀的步枪，
-      // 五个分镜 agent 全靠把 look 点推到 45 m 外抬高近平面来切它 —— 这里一行就够。
-      if (viewmodel && viewmodel.root) viewmodel.root.visible = false;
-    },
-    onRelease: () => {
-      state.cutscene = null;
-      router?.SetSuppressed(false);
-      // 过场里抬着东西的话（第一关接替担架那一段就是），枪该继续收着。
-      if (viewmodel && viewmodel.root) viewmodel.root.visible = !carry?.Blocking;
-      if (state.running && !state.menu) RequestPointerLock();
-    },
-    // 就地演的关中过场按 `cut.groundSnap` 问这一只钩子要真实地面（跨系统契约 5：
-    // 地面只由共享采样器决定）。独立布景的场不走它，数据里的 y 原样生效。
-    groundAt: (x, z) => battlefield?.GroundHeight(x, z) ?? 0,
-    // 过场自带的天空：出川是阴天、长官部是夜里 —— 不能沿用上一关的拂晓。
-    // 套预设 = 天空着色器 + Global SH 强度 + 平行光三件一起换，少一件就是
-    // 「天是夜的、地是白天的」。RenderScene 的后期参数按 cutsceneSky 走。
-    applySky: (name) => ApplySkyPreset(name),
-    restoreSky: () => RestoreLevelSky(),
-  });
+  /**
+   * 夺走 / 交还玩家控制权（第一关零号阶段的脚本镜头用）。夺走期间 state.cutscene 非 null，
+   * 玩法输入一律闸掉（Frame 与各 CanUse 都认它），玩家不会在看镜头的时候被打死，
+   * 指针锁也先放掉，鼠标不会去转被接管的相机。
+   */
+  CaptureControl = (id) => {
+    state.cutscene = id || "scripted";
+    router?.SetSuppressed(true);
+    ReleasePointerLock();
+    input.fire = false; input.ads = false; input.forward = 0; input.strafe = 0;
+    input.lookX = 0; input.lookY = 0; input.sprint = false; input.breathHold = false;
+    // 按住 F 的那一下断在这儿。期间输入被 SetSuppressed 掐掉，松手边沿永远到不了 ——
+    // 不主动断的话，进度环会一直亮着「按住中」。
+    interact?.CancelHold("cutscene");
+    // 机枪的扳机同理：不主动断的话交还控制权时枪会自己接着响一梭。
+    emplacement?.SetFire(false);
+    emplacement?.EndClear();
+    hud?.SetInteractProgress(null);
+    // 玩家手里的枪挂在相机下，不藏的话每个镜头右下角都趴着一支步枪。
+    if (viewmodel && viewmodel.root) viewmodel.root.visible = false;
+  };
+  ReleaseControl = () => {
+    state.cutscene = null;
+    router?.SetSuppressed(false);
+    // 抬着东西的话（第一关接替担架那一段就是），枪该继续收着。
+    if (viewmodel && viewmodel.root) viewmodel.root.visible = !carry?.Blocking;
+    if (state.running && !state.menu) RequestPointerLock();
+  };
   combat = new CombatSystem({
     battlefield, ai, vfx, audio, lights, player, library, scene, story, physics, grenadeAsset,
     audioWiring,
@@ -2061,8 +2031,6 @@ async function Boot() {
     PlaySfx: (name, opts = {}) => audio.Play(name, opts.position
       ? { ...opts, position: new THREE.Vector3(opts.position.x, opts.position.y ?? 0, opts.position.z) }
       : opts),
-    // 关中过场：与 story 的 `type:"cutscene"` beat 走同一个实现。
-    PlayCutscene: (id) => PlayMidCutscene(id),
 
     // 这一片还有几个活着的日军。「缺口清空了没有」这类判据只认它，不认时钟。
     EnemiesNear: (x, z, r) => {
@@ -2285,7 +2253,7 @@ async function Boot() {
   } catch (error) {
     console.warn("[Main] 预热前套用存档画质失败（退回编辑器建好后再套）", error);
   }
-  await EnterLevel(state.phaseIndex, { initial: true, cutscenes: false, stageJump:FIRST_LEVEL_STAGE_START });
+  await EnterLevel(state.phaseIndex, { initial: true, stageJump:FIRST_LEVEL_STAGE_START });
   state.ready = true;
   bootStart.disabled = false;
   bootStart.textContent = BootStartLabel();
@@ -2328,9 +2296,6 @@ async function Boot() {
     get meleeAnimationsLoaded() { return MeleeAnimationsLoaded(); },
     LoadMeleeAnimations,
     StepFrames, JumpToPhase: JumpToLevel, AdvanceLevel,
-    // 关中过场的宿主 API（story.Signal→过场 的等价入口）。玩法系统批直接调它，
-    // 或者走 story.Signal("<名字>") 让登记表去派发 —— 两条路同一个实现。
-    PlayMidCutscene,
     // FrameProfileTest 的 GI 消融走设置面板同一条路（graphics.gi + ApplyGraphics）
     graphics, ApplyGraphics, autoQuality, GraphicsProfile: graphicsProfileApi,
     // 通关冒烟用的口子：直接驱动动作，不必去合成键盘事件
@@ -2775,7 +2740,7 @@ async function Boot() {
       P012: () => missionRuntime?.State() || p012Flow?.State() || null,
       FirstLevelMission: () => missionRuntime?.State() || null,
       FirstLevelStages: () => FIRST_LEVEL_STAGES.map(stage => ({...stage,current:missionRuntime?.flow.phase.id===stage.id})),
-      FirstLevelJump: (value, opts) => JumpFirstLevelStage(value, opts),
+      FirstLevelJump: (value) => JumpFirstLevelStage(value),
       // 性能取证与专项测试直接读运行时对象（敌人表、事实、列队）；不是玩法入口。
       FirstLevelMissionRuntime: () => missionRuntime || null,
       P012Progress: () => p012Debug.State(),
@@ -2813,38 +2778,6 @@ async function Boot() {
       Firewalls: () => state.firewalls.map((w) => ({
         id: w.id, until: +w.until.toFixed(1), damagePlayer: w.damagePlayer, smoke: w.smoke.length,
       })),
-      // --- 过场的取证口 ---
-      PlayCutscene: (id) => RunCutscene(id),
-      PlayMidCutscene: (id) => PlayMidCutscene(id),
-      MidCutscenes: () => (story ? story.MidCutscenes : []),
-      SkipCutscene: () => { if (cutscene) cutscene.Skip(); return !!cutscene; },
-      Cutscene: () => ({
-        playing: cutscene ? cutscene.Playing : false,
-        current: cutscene ? cutscene.CurrentId : null,
-        time: cutscene ? cutscene.Time : 0,
-        headLook: cutscene ? cutscene.AllowsLook : false,
-        look: cutscene ? cutscene.Look : { yaw: 0, pitch: 0 },
-        played: state.cutscenesPlayed.slice(),
-        log: cutscene ? cutscene.log.slice(-40) : [],
-      }),
-      // 出图工具默认保持 neutralLook（确定性取证）；明确传 yaw/pitch 时才打开
-      // 头部视线覆盖。SetLook 自带数据范围钳制，所以命令行不会把相机转飞。
-      SetCutsceneLook: (yaw = 0, pitch = 0) => {
-        if (!cutscene || !cutscene.Playing) return null;
-        cutscene.SetNeutralLook(false);
-        return cutscene.SetLook(yaw, pitch);
-      },
-      Preview: () => ({
-        active: PREVIEW,
-        id: PREVIEW_ID,
-        playing: state.previewPlaying,
-        done: state.previewDone,
-        handoff: state.previewHandoffShown ? T("boot.preview.handoff") : null,
-        handoffCount: state.previewHandoffCount,
-        aiAlive: ai ? ai.soldiers.filter((s) => s.alive).length : 0,
-        error: state.previewError,
-        manualStep: MANUAL_STEP,
-      }),
       // --- 枪感第 2 轮的取证口 ---
       // 顿挫量、冲刺闸门、sway 输入。四条方子有没有真的接上只能从这里读。
       GunFeel: () => ({
@@ -2926,7 +2859,6 @@ async function Boot() {
   Object.defineProperty(window.Taierzhuang, "battlefield", { get: () => battlefield });
   Object.defineProperty(window.Taierzhuang, "physics", { get: () => physics });
   Object.defineProperty(window.Taierzhuang, "nav", { get: () => navGrid });
-  Object.defineProperty(window.Taierzhuang, "cutscene", { get: () => cutscene });
 
   // 别名：全局名沿用 Taierzhuang 是为了不动出图脚本与两个冒烟（三处都按它取运行时），
   // 但这个项目现在是滕县，新写的东西一律用 window.Tengxian。**两个名字是同一个对象。**
@@ -3160,12 +3092,12 @@ async function Boot() {
   }
 
   // --- 编辑器套件 ---------------------------------------------------------
-  // 建在最后：六个编辑器要的东西（材质库、人物工厂、视图模型、过场导演、城、破坏系统）
+  // 建在最后：编辑器要的东西（材质库、人物工厂、视图模型、城）
   // 到这一步才齐。battlefield 每换一关都是新的一份，所以走取值器交出去，
   // 不许在这里把当时那一份拷进去（拷了就是「编辑器指着上一关那座城」）。
   editor = CreateDevTools({
     renderer, scene, camera, canvas, library, lights, post, vfx,
-    actorFactory, viewmodel, audio, cutscene, profiler,
+    actorFactory, viewmodel, audio, profiler,
     shot: !!SHOT,
     ReleasePointerLock,
     ReturnToMainMenu: TOOLS_HOME ? ReturnToTitlePage : MENU_AT_BOOT ? () => OpenMenu() : null,
@@ -3184,19 +3116,15 @@ async function Boot() {
       get gi() { return gi; }, get firstPersonSelfShadow() { return firstPersonSelfShadow; },
       // 物理同理走取值器：换关重建 PhysicsWorld，Debug Rendering 的碰撞体线框要跟着换
       get physics() { return physics; },
-      // 这里原来挂着 `OpenProloguePreview`（旧场景编辑器「关卡切片」列表第一条跳去
-      // `?preview=CS_Chuchuan`），序章 2026-09-07 起退出选章，连同 `sceneMode`（旧完整场景
-      // 预览读的视图名）2026-10-31 一并摘掉。`?preview=CS_Chuchuan` 这条 URL 本身仍然管用 ——
-      // 审片、Script_CutsceneShot 出图都直接 goto。
       ApplyEnvironment: (name) => ApplySkyPreset(name),
       GetEnvironmentState: () => ({
-        name: cutsceneSky || PHASE_TABLE[state.phaseIndex].sky,
-        override: !!cutsceneSky,
+        name: skyOverride || PHASE_TABLE[state.phaseIndex].sky,
+        override: !!skyOverride,
       }),
       RestoreEnvironmentState: (snapshot) => {
         if (snapshot?.override && snapshot.name) ApplySkyPreset(snapshot.name);
         else {
-          cutsceneSky = null;
+          skyOverride = null;
           const preset = sky.Apply(PHASE_TABLE[state.phaseIndex].sky);
           sky.BakeEnvironment(scene);
           lights.ApplyPreset(preset, sky.sunDirection);
@@ -3346,8 +3274,8 @@ async function Boot() {
       // 它不在 PHASES 里，PHASE_TABLE 在 ?range=1 下是整表替换的（见文件头那段
       // 注释与 docs/Data_TestRange.md）—— 当场换表要把已经建好的世界、兵员池、
       // 携行与七关口径一起翻一遍，重载一次比那条路诚实得多。
-      // 玩家可见的测试场景集中保留核心玩法入口。界河与过场仍可通过
-      // ?jiehe=1 / ?preview=... 直达，供自动化与内部验收使用，不再混入选章。
+      // 玩家可见的测试场景集中保留核心玩法入口。界河仍可通过
+      // ?jiehe=1 直达，供自动化与内部验收使用，不再混入选章。
       // P0/P1/P2 白盒不在这一组：它已是正式章节组里的「第一关」（CAMPAIGN_ENTRIES[0]）。
       sandboxes: [MOVEMENT_RANGE_PHASE, WEAPON_RANGE_PHASE, RANGE_PHASE, EXPLOSION_RANGE_PHASE, MELEE_QTE_PHASE, GORE_RANGE_PHASE, SHELL_IMPACT_RANGE_PHASE, BATTLE_REACTION_RANGE_PHASE, CLOTH_RANGE_PHASE],
       sandboxMode: MOVEMENT_RANGE ? "movement" : WEAPON_RANGE ? "weapons" : EXPLOSION_TEST ? "explosions" : RANGE ? "range" : MELEE_TEST ? "melee"
@@ -3380,7 +3308,7 @@ async function Boot() {
       P012NextProgress: () => p012Debug.Next(),
       DebugOptions: () => debugOptions.Get(),
       FirstLevelStages: () => FIRST_LEVEL_STAGES.map(stage => ({...stage,current:missionRuntime?.flow.phase.id===stage.id})),
-      FirstLevelJump: value => JumpFirstLevelStage(value, { midCutscenes: true }),
+      FirstLevelJump: value => JumpFirstLevelStage(value),
       SetDebugOption: (id, enabled) => SetDebugOption(id, enabled),
       CheckpointStatus,
       ContinueCheckpoint,
@@ -3404,8 +3332,8 @@ async function Boot() {
     window.Taierzhuang.Debug.MenuShow = (mode) => menu.Show(mode);
     window.Taierzhuang.Debug.MenuPlay = (index, opts) => menu.Play(index, opts);
     // 开发入口：按 PHASES 序号直接进旧七章的切片（选章已不列它们；MenuTest 的暂停/设置
-    // 那几节要一个在跑的关）。不播过场。
-    window.Taierzhuang.Debug.StartLevel = (index, opts = {}) => StartLevel(index, { cutscenes: false, ...opts });
+    // 那几节要一个在跑的关）。
+    window.Taierzhuang.Debug.StartLevel = (index, opts = {}) => StartLevel(index, opts);
     window.Taierzhuang.Debug.Pause = () => PauseGame();
     window.Taierzhuang.Debug.ResetProgress = () => { Progress.Reset(); };
     window.Taierzhuang.Debug.DebugOptions = () => debugOptions.Get();
@@ -3418,8 +3346,7 @@ async function Boot() {
     }
   }
 
-  if (SHOT || FIRST_LEVEL_STAGE_START || (!PREVIEW && PHASE_PARAM !== null && params.get("autoplay") === "1")) StartRun();
-  else if (PREVIEW_AUTOPLAY) StartPreview({ unlockAudio: false });
+  if (SHOT || FIRST_LEVEL_STAGE_START || (PHASE_PARAM !== null && params.get("autoplay") === "1")) StartRun();
   if (EDITOR_PARAM === "tools" && !SHOT && editor) {
     menu?.Close(); state.menu = false; ShowBoot(false);
     // 工具首页背后没有主菜单的活场景：退出时整页回标题菜单（FinishEditorSession）。
@@ -3517,10 +3444,8 @@ function GoToSandbox(key, options = {}) {
 /**
  * 这一片切片按哪个 id 取内容。
  *
- * 常态就是章节自己的 id；**过场承载章（序章）借下一章的切片** ——
- * 它自己不建场（EnterLevel 里 cutsceneOnly 那一支直接跳过 BuildField），
- * 但 ?phase=0 直跳、开机冒烟与出图仍然要有一片地皮才起得来引擎，
- * 那时就照 tuning.fieldFrom 去查三张按 levelId 分组的表：
+ * 常态就是章节自己的 id；**序章没有自己的切片，借第一章的** ——
+ * ?phase=0 直跳、开机冒烟与出图照 tuning.fieldFrom 去查三张按 levelId 分组的表：
  * OUTFIELD_SCENES（城外内容）、PLACEMENTS（外部 GLB 布景）、TRIM_PLACEMENTS（tzm 饰件）。
  * 口径见 Data_MissionCh0.mjs 头注。
  */
@@ -3914,34 +3839,20 @@ function ClearRuntime() {
  * 进一章。**这是异步的** —— 建一片切片要分帧走完，不然主线程会卡死几秒，
  * 浏览器直接判成无响应。期间 state.ready = false，Frame() 只走渲染。
  *
- * **过场承载章（phase.cutsceneOnly，现在只有序章）**走一条短路：
- * 播完 cutsceneIn 就直接接下一章，中间**不建切片、不撒兵、不 Respawn**——
- * 车厢是过场自带的 standalone 布景，底下铺的是哪一片它不关心，
- * 而重建一片要十几秒，纯属让玩家对着加载条等一场自己不需要的场景。
- * （开机直跳 ?phase=0 那一支例外：那时 Boot 已经按 fieldFrom 建好了地皮，
- * 引擎要有个地方站，所以 initial 分支照常 Respawn。）
- *
  * @param {number} index
- * @param {object} opts initial 开机那一次（战场已经建好，别重建）；
- *                      cutscenes 要不要播过场（出图与自检模式一律不播，保证镜头可复现；
- *                      过场的临时布景有近三百个网格，另在过场检查里验）
+ * @param {object} opts initial 开机那一次（战场已经建好，别重建）
  */
-async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump = null, stageJumpMidCutscenes = false } = {}) {
+async function EnterLevel(index, { initial = false, stageJump = null } = {}) {
   if (frameDebugger.frozen || frameDebugger.state === "armed") frameDebugger.Resume();
   state.advancing = true;
   state.phaseIndex = Clamp(index, 0, PHASE_TABLE.length - 1);
   const phase = PHASE_TABLE[state.phaseIndex];
-  const cutsceneOnly = !!phase.cutsceneOnly;
   // 暂时废弃场景（Data_TengxianScript.DEPRECATED_CHAPTER_IDS）：只建场 ——
   // 不装剧本、不摆点、不出具名同伴、不换关。切片、撒兵与 HUD 照常，
   // 所以从选章仍然进得去，站在那片城里看得见东西；只是没有任务内容。
   const deprecated = !!phase.deprecated;
 
-  // --- 关前过场 ---
-  // 盖加载画面：关前过场的布景是当场建的，预热要几秒（序章那一场最重）。
-  if (cutscenes && phase.cutsceneIn) await RunCutscene(phase.cutsceneIn, { loading: true });
-
-  if (!initial && !cutsceneOnly) {
+  if (!initial) {
     state.ready = false;
     ShowBoot(true);
     bootStart.disabled = true;
@@ -4035,12 +3946,12 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
 
   // 过场承载章：不 Respawn、不撒兵、不挂烟柱 —— 车厢是过场自带的布景，
   // 底下那片地皮上不该有一条战线在后台开火消耗票池。
-  if (!cutsceneOnly || initial) RespawnPlayer(true);
+  RespawnPlayer(true);
   // 具名同伴**排在撒兵之前**：SeedSoldiers 的 CountNear("nra",40) 与
   // CountSide("nra") 都会把他们数进去，于是撒兵自动少撒同样多 ——
   // 场上活人总数一个没多，开机红线（drawCalls / triangles）不受影响。
   // 名册默认从本章 beats 的 who 推导（该章说过话的战斗员自动在场），INT2 按章精修。
-  if (!MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !GORE_TEST && !IMPACT_TEST && !REACTION_TEST && !CLOTH_TEST && !BLOCKOUT && !TOOLS_HOME && !PREVIEW && !cutsceneOnly && !deprecated && companion) {
+  if (!MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !GORE_TEST && !IMPACT_TEST && !REACTION_TEST && !CLOTH_TEST && !BLOCKOUT && !TOOLS_HOME && !deprecated && companion) {
     companion.BeginLevel(contentId, {
       // 名册**优先走章节数据点名**（INT2 起七章都写了 roster）；没写才由 beats 推。
       // 推导只收「该章说过话的战斗员」—— 军医、参谋、师长这些 combatant:false 的人
@@ -4064,7 +3975,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   // 章节摆点：**排在具名同伴之后**（罗班长要先站出来，摆点层才拿得到他的句柄），
   // 也排在 SeedSoldiers 之前（后送队要从 nra 名额里出人，撒兵才会自动少撒同样多）。
   // 靶场／白刃训练场／预览／过场承载章都不摆；第一关白盒有正式第一章内容。
-  if (!phase.whitebox?.fullMission && !MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !GORE_TEST && !IMPACT_TEST && !REACTION_TEST && !CLOTH_TEST && !BLOCKOUT && !TOOLS_HOME && !PREVIEW && !cutsceneOnly && !deprecated && setpieces) {
+  if (!phase.whitebox?.fullMission && !MOVEMENT_RANGE && !EXPLOSION_TEST && !WEAPON_RANGE && !RANGE && !MELEE_TEST && !GORE_TEST && !IMPACT_TEST && !REACTION_TEST && !CLOTH_TEST && !BLOCKOUT && !TOOLS_HOME && !deprecated && setpieces) {
     setpieces.BeginLevel(contentId, phase);
   }
   interact.Clear("P012");
@@ -4288,7 +4199,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
       // 同上：啸声在 Combat.FireShell 里，摆在落点上按飞行时间延迟。
       return combat.FireShell(from,at,{...options,kind:"Shell75",radius:7,damage:0});
     },
-    Capture: cut => cutscene.onCapture(cut), Release: () => {input.lookX=0;input.lookY=0;cutscene.onRelease();},
+    Capture: cut => CaptureControl(cut?.id), Release: () => {input.lookX=0;input.lookY=0;ReleaseControl();},
     Player:()=>player, Guide:()=>companion.Handle("luo"), Signal:name=>story.Signal(name), Signalled:name=>story.Signalled(name)});
   p012Flow = phase.whitebox?.p012 && !phase.whitebox?.fullMission ? new FirstLevelP012Director({
     PlayerPosition:()=>player.position, Hint:(text,seconds)=>hud.Hint(text,seconds),
@@ -4421,7 +4332,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   missionRuntime?.Dispose();
   missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
     flare,
-    scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,stageJump,stageJumpMidCutscenes,viewmodel,
+    scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,stageJump,viewmodel,
     // 只用来打 story/mission/* 子桶标记；没有它就静默不记（测试夹具不传也照跑）。
     profiler,
     FireVehicleBullet,
@@ -4440,16 +4351,10 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
     // instant: the rifle is already in his hands on screen (02's hand-over: Luo gave it to him in the cutscene) -- no draw.
     RestoreRifle:({instant=false}={})=>{if(!IsGunSlot(state.activeSlot))SwitchSlot(LastGunSlot());SyncMissionHands({instant});viewmodel.root.visible=!carry?.Blocking;},
     Control:active=>{state.missionControl=active;state.cooking=null;state.cook=0;input.fire=false;input.ads=false;},
-    // 关中过场：与关首/关末走同一条 RunCutscene（夺控制权、掐输入、Esc 跳过、
-    // 播完还回来）。任务层只报「该播了」，不自己当导演。
-    PlayMidCutscene:id=>PlayMidCutscene(id),
-    // 换关还没收尾（EnterLevel 里 await 着的那几帧照样在跑 Update）时 PlayMidCutscene 必回 null；
-    // 任务层据此先不记「看过」，等建完再触发。
     LevelLoading:()=>state.advancing,
     // 关尾夜行军：黑屏里换夜间天空，退出/重试时还原本关自己的天光。
-    // 天光那两个函数在另一段闭包里，装配层统一走过场导演挂的同一对钩子。
-    ApplySky:name=>cutscene?.applySky?.(name)??false,
-    RestoreSky:()=>cutscene?.restoreSky?.(),
+    ApplySky:name=>ApplySkyOverride(name),
+    RestoreSky:()=>RestoreSkyOverride(),
     Complete:()=>{Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,0);ShowPauseMenu();menu.OpenSandboxComplete();},
     MissionFailure:castId=>{ShowPauseMenu();menu.OpenSandboxFailure(false,{castId,restartOnly:true});},
   }) : null;
@@ -4552,7 +4457,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   else if (BLOCKOUT) { state.pinned = true; }
   // 高级工具首页：空地，不撒兵（Data_ToolsHome）。
   else if (TOOLS_HOME) { state.pinned = true; }
-  else if (!PREVIEW && !cutsceneOnly) SeedSoldiers(phase);
+  else SeedSoldiers(phase);
   SeedSmokeColumns(phase);
   // 进关先打一个检查点：第一拍就被击倒时也有地方可退。
   checkpoint?.Reset("enterLevel");
@@ -4567,27 +4472,24 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
 
   // 人物材质预热（见 WarmActorShaders 的抬头）：加载画面还盖着，在这里把全阵营
   // 每个模型号的 program 先编出来，换人 / 某个模型号第一次进画面就不再冻那一两秒。
-  // 过场承载章不撒兵、预览不进玩法，两条都跳过。
-  if (!cutsceneOnly && !PREVIEW) {
-    try {
-      await WarmActorShaders(phase,
-        (label, progress) => SetBootStep(label, BootProgress(BOOT.progress.warmActors, progress)));
-    } catch (error) {
-      console.warn("[Main] 人物材质预热失败（退回用到时现编）", error);
-    }
+  try {
+    await WarmActorShaders(phase,
+      (label, progress) => SetBootStep(label, BootProgress(BOOT.progress.warmActors, progress)));
+  } catch (error) {
+    console.warn("[Main] 人物材质预热失败（退回用到时现编）", error);
   }
 
   // 关卡预热（2026-09-08）：人物对象池 + 进关后才首见的着色器。人物预热只盖住通用人物；
   // 第一关实测名册人物的布料在车厢头几秒现编（960 ms 一帧）、第一人称枪模与自阴影在进阵地时
   // （766 ms）、手榴弹在第一次投掷时（391 ms）。全部挪到加载画面后面付掉。
   state.shadowBatchWarm = null;
-  if (!cutsceneOnly && !PREVIEW && phase.whitebox?.fullMission) {
+  if (phase.whitebox?.fullMission) {
     try {
       await WarmLevel(phase);
     } catch (error) {
       console.warn("[Main] 关卡预热失败（退回用到时现编）", error);
     }
-  } else if (!cutsceneOnly && !PREVIEW) {
+  } else {
     // Legacy world chapters do not run the first-level weapon/actor warmup.
     // Their static shadow batches still need real depth programs before joining.
     try {
@@ -4602,18 +4504,11 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
     bootStart.textContent = BootStartLabel();
   }
   // 这一片切片是哪一章的。菜单靠它决定用哪一组机位，StartLevel 靠它决定要不要重建。
-  // **借片的章不改它**：地皮还是上一次建的那一片，改了菜单会去取一组不存在的机位。
-  if (!cutsceneOnly || initial) state.builtPhase = state.phaseIndex;
+  state.builtPhase = state.phaseIndex;
   // Build the read-only roof query while loading, not on the first visible flare.
   vfx.flareSurfaces.Refresh();
   state.ready = true;
   state.advancing = false;
-  // 过场承载章的收尾：过场播完就接下一章。放在 advancing 清掉之后 ——
-  // AdvanceLevel 开头那道 `if (state.advancing) return` 会把它整个吞掉。
-  // 出图/自检（cutscenes=false）不接，那两条路要的是「停在这一章可复现」。
-  if (cutsceneOnly && cutscenes && !initial && state.phaseIndex < PHASE_TABLE.length - 1) {
-    return AdvanceLevel({ cutscenes });
-  }
   return state.phaseIndex;
 }
 
@@ -5507,116 +5402,6 @@ async function WarmLevel(phase) {
   return report;
 }
 
-/** WarmCutscene 的场次号（见那里的注释）。 */
-let warmSeq = 0;
-
-/**
- * 过场开演前的预热：布景已经建好（Play 的 hold 把时间轴按在 0），
- * 这里把它的着色器编出来再放行。
- *
- * `loading = true` 时把加载画面盖上去 —— 从菜单进的那几条（战役入口、选章、
- * 过场预览）要等好几秒，那几秒必须有进度条；关中过场不盖，那条路上不该弹出加载页。
- */
-async function WarmCutscene({ loading }) {
-  // 谁是**当前**这一场的预热。上一场被 Esc 掐掉、或者两场叠着来的时候，
-  // 旧的那一趟还挂在 await 上；收工时它不许去动加载画面和 state.warming
-  //（不然会把新一场的加载画面当场收掉）。
-  const token = ++warmSeq;
-  const id = cutscene.CurrentId;
-  const savedLabel = bootStart.textContent;
-  const savedDisabled = bootStart.disabled;
-  if (loading) {
-    ShowBoot(true);
-    bootStart.disabled = true;
-    bootStart.textContent = "……";
-    SetBootStep(T("boot.step.dressSet"), BOOT.warm.dressSet);
-  }
-  state.warming = true;
-  try {
-    await WarmupShaders(cutscene.SetRoot, loading ? SetBootStep : null,
-      // 按 Esc 跳过（Skip 会放开 held）、这一场已经收了、或者换了一场 —— 都就地收工。
-      () => warmSeq !== token || !cutscene.Playing || !cutscene.Held || cutscene.CurrentId !== id);
-  } finally {
-    if (warmSeq === token) {
-      state.warming = false;
-      if (loading) {
-        ShowBoot(false);
-        bootStart.textContent = savedLabel;
-        bootStart.disabled = savedDisabled;
-      }
-    }
-  }
-}
-
-/**
- * 播一场过场并等它播完（或被 Esc 跳过后卡片读完）。
- * 播过场期间玩家没有控制权，指针锁也要放掉 —— 不放的话鼠标还在转相机，
- * 而相机已经被过场接管，玩家会看到画面在自己抖。
- *
- * **开演前一定先预热着色器**（见 WarmCutscene）：布景是当场建的，不预热的话
- * 第一帧要同步编几十个 program，画面冻十几秒而时间轴照走。
- *
- * @param {string} id
- * @param {object} opts loading：预热那几秒要不要盖加载画面（关卡边界上的过场要）
- */
-async function RunCutscene(id, { loading = false } = {}) {
-  if (!cutscene) return null;
-  // 出图与手动步进那两条路**不预热**：那里时钟是外面的（StepFrames 一调就推帧），
-  // 按住时间轴等一段异步预热的话，出图脚本会对着停在第 0 秒的画面连拍 N 张。
-  // 那两条路也不在乎卡顿，它们要的是可复现。
-  const warm = !SHOT && !MANUAL_STEP;
-  const pending = cutscene.Play(id, { poolOut: state.nraPool, neutralLook: SHOT, hold: warm });
-  // 先挂一只空 catch：预热那几秒里若 Play 已经被别的场收掉（aborted），
-  // 没人接的 rejection 会先被浏览器报成 unhandledrejection。真正的错还是从下面 await 抛。
-  pending.catch(() => {});
-  if (warm) {
-    try {
-      await WarmCutscene({ loading });
-    } finally {
-      cutscene.Release();
-    }
-  }
-  const result = await pending;
-  state.cutscenesPlayed.push({ id, skipped: !!result.skipped });
-  // 新版序章的终点是一个可复现的交接提示，不是旧 L0 的开战入口。
-  // 正常播完、Esc 跳过、失焦收口都只会经过这里一次。
-  if (PREVIEW && id === PREVIEW_ID && !state.previewHandoffShown) {
-    const task = T("boot.preview.handoff");
-    state.previewHandoffShown = true;
-    state.previewHandoffCount += 1;
-    state.storyObjective = task;
-    hud.SetObjective(task, state.nraPool, null);
-    hud.Say(null, task, 4.2, "objective");
-    ShowPreviewTerminal(task);
-    state.previewDone = true;
-    state.previewPlaying = false;
-    state.running = false;
-    // 即使未来有人给预览页加了一个普通帧，也不能让旧 L0 的 AI 在片尾启动。
-    if (ai) ai.Dispose();
-    ReleasePointerLock();
-  }
-  return result;
-}
-
-/**
- * 播一场**关中**过场（`{type:"cutscene"}` beat 与 `story.Signal→过场` 的落点）。
- *
- * 与关首/关末过场走的是同一个 RunCutscene：夺控制权、掐战斗输入、放指针锁、
- * 收枪、播完还回来；Esc 跳过与字幕补卡的语义因此**天然一致**（同一个导演）。
- * Story 那边靠这个 Promise 停住剧本推进（见 StoryDirector.cutsceneHold）。
- *
- * 三种情况直接回 null 且不报错（都是正常状态，不许把一关卡死）：
- *   · 过场系统还没建起来（出图/预览的某些路径）；
- *   · 已经在播一场了（不许两场叠着播）；
- *   · 正在换关（镜头这时候归 AdvanceLevel）。
- */
-function PlayMidCutscene(id) {
-  if (!id || !cutscene) return null;
-  if (cutscene.Playing || state.advancing) return null;
-  if (!CUTSCENES[id]) { console.warn("没有这场关中过场：", id); return null; }
-  return RunCutscene(id);
-}
-
 /**
  * 章节钉住时，等这条信号才放行换关（名字见 Script_Story.CHAPTER_RELEASE_SIGNAL）。
  * 数与理由在 Data_Tuning_Main.PACING；这里留一个名字是因为
@@ -5624,30 +5409,26 @@ function PlayMidCutscene(id) {
  */
 const PIN_RELEASE_GRACE_S = PACING.pinReleaseGraceS;
 
-/** 换下一关。关末过场 -> 下一关关前过场 -> 建切片。 */
-async function AdvanceLevel(opts = {}) {
+/** 换下一关：建下一章的切片。 */
+async function AdvanceLevel() {
   // The gun laboratory has no campaign completion, including explicit debug calls.
   if (MOVEMENT_RANGE || WEAPON_RANGE || EXPLOSION_TEST || GORE_TEST || IMPACT_TEST || REACTION_TEST || CLOTH_TEST || BLOCKOUT || TOOLS_HOME) return state.phaseIndex;
   if (state.advancing) return state.phaseIndex;
   // 走到这里就算这一关过了：菜单的「继续」与选章里的「已通过」都读这条
   Progress.MarkCleared(PHASE_TABLE[state.phaseIndex].id, state.phaseIndex);
   const phase = PHASE_TABLE[state.phaseIndex];
-  const cutscenes = opts.cutscenes ?? !SHOT;
-  state.advancing = true;
   // 关末那几条还没播的旁白先倒出来，别跟着关卡一起消失
   story.FlushTail();
-  if (cutscenes && phase.cutsceneOut) await RunCutscene(phase.cutsceneOut, { loading: true });
-  state.advancing = false;
   if (state.phaseIndex >= PHASE_TABLE.length - 1) { EndBattle("breakout"); return state.phaseIndex; }
   // 下一章是暂时废弃场景：正片在这儿收口，不把玩家送进一片没有任务的城。
   if (PHASE_TABLE[state.phaseIndex + 1]?.deprecated) { EndOfficialCampaign(phase); return state.phaseIndex; }
-  return EnterLevel(state.phaseIndex + 1, { cutscenes });
+  return EnterLevel(state.phaseIndex + 1);
 }
 
-/** 调试口：直接跳到某一关（不播过场）。出图与自检走这条。 */
+/** 调试口：直接跳到某一关。出图与自检走这条。 */
 function JumpToLevel(index) {
   if (frameDebugger.frozen || frameDebugger.state === "armed") frameDebugger.Resume();
-  return EnterLevel(index, { cutscenes: false });
+  return EnterLevel(index);
 }
 
 // ---------------------------------------------------------------------------
@@ -5805,7 +5586,7 @@ function MeleeSnapshot() {
  *
  * 默认选点：挂在**还没走到的那几个路标**上 —— 前面在烧，那是你要去的方向。
  * 排掉 45 m 以内的：烟柱底盘半径十几米，长在脸上就是一堵灰墙。
- * 序章（过场承载章）与靶场不挂。
+ * 靶场不挂。
  */
 function SeedSmokeColumns(phase) {
   // Authored distant fires remain at the same world positions between objectives.
@@ -5814,7 +5595,7 @@ function SeedSmokeColumns(phase) {
     && state.smokeHandles.every(handle => vfx.smokeSources.has(handle))) return;
   for (const handle of state.smokeHandles) vfx.RemoveSmokeSource(handle);
   state.smokeHandles.length = 0;
-  if (phase.cutsceneOnly || (phase.sandbox && !phase.smokeColumns)) return;
+  if (phase.sandbox && !phase.smokeColumns) return;
 
   if (phase.smokeColumns) {
     for (const column of phase.smokeColumns) {
@@ -6742,59 +6523,6 @@ function OnPointerLockChange() {
   }
 }
 
-function ShowPreviewTerminal(task) {
-  let terminal = document.getElementById("previewTerminal");
-  if (!terminal) {
-    terminal = document.createElement("div");
-    terminal.id = "previewTerminal";
-    terminal.className = "previewTerminal";
-    hudRoot.appendChild(terminal);
-  }
-  terminal.innerHTML = `<div class="title">${T("boot.preview.title")}</div>`
-    + `<div class="task">${task}</div>`
-    + `<div class="note">${T("boot.preview.note")}</div>`;
-  terminal.classList.add("on");
-  // _Finish() 按正片契约解除 cinematic；预览终点重新锁回 cinematic，
-  // 只留下这个明确的终点卡，不露血量、武器、命令栏等战斗 HUD。
-  hud.SetCinematic(true);
-}
-
-/**
- * 新版《序章｜出川》的稳定开发入口。
- *
- * 预览页不进主菜单、不抢指针锁，也不把车厢的下车动作解释成旧 L0 的
- * 开战；片尾只显示一次「跟随通信排。」并停住。这样在《断线》完成前，
- * 新内容可以独立审片而不会制造一个假的玩法接缝。
- */
-function StartPreview({ unlockAudio = true } = {}) {
-  if (!PREVIEW_ID || !cutscene || state.previewPlaying || state.previewDone) return false;
-  state.menu = false;
-  state.running = false;
-  state.previewPlaying = true;
-  state.previewDone = false;
-  state.previewError = null;
-  // WebAudio 必须在真人手势内解锁。预览页保留一次「播放序章」点击，
-  // 点击后两分钟时间轴仍完全自动推进；直接在 Boot() 尾部自动起播会让
-  // Chrome / Safari 把上下文留在 suspended，结果是画面正常而全段静音。
-  // 顶层页面跳转不会保留原链接点击的 WebAudio user activation。自动播放的
-  // 入口优先保证画面立刻进入；玩家第一次在画面内点击时仍会照常解锁音频。
-  if (unlockAudio) audio.Unlock();
-  ReleasePointerLock();
-  if (ai) ai.Dispose();
-  ShowBoot(false);
-  const pending = RunCutscene(PREVIEW_ID, { loading: true });
-  pending.catch((error) => {
-    // 预览入口必须在无音频、低画质或数据错误时稳定收口；把错误留在调试口，
-    // 不让一个未处理 rejection 把页面的后续控制器拖死。
-    state.previewPlaying = false;
-    state.previewDone = true;
-    state.previewError = String(error && error.message ? error.message : error);
-    state.running = false;
-    if (ai) ai.Dispose();
-  });
-  return true;
-}
-
 function StartRun() {
   // Direct whitebox links also warm the deferred body clips after boot.
   LoadMeleeAnimations();
@@ -6804,26 +6532,9 @@ function StartRun() {
   if (CLOTH_TEST) { hudRoot.style.display = "none"; clothRange?.UpdateCamera(0); return; }
   if (SHOT) return;
   audio.Unlock();
-  // 开场过场。EnterLevel(initial) 是按 cutscenes:false 建的场（开机不能夺控制权），
-  // 所以第一关的 cutsceneIn（默认是 Legacy 出川）在玩家点击时再播。
-  // 这里在玩家按下「进城」的那一下补播：点击本身就是音频与指针锁要的那次用户手势。
-  // 调试入口（?phase=N 直跳某关、?intro=0）不播开场 —— 冒烟测试点完「进城」就要拿到
-  // 指针锁与键盘，过场一夺控制权它们全挂。玩家正常打开页面没有这些参数。
-  const phase = PHASE_TABLE[state.phaseIndex];
-  const wantIntro = !params.has("phase") && params.get("intro") !== "0";
-  const intro = wantIntro && phase && phase.cutsceneIn;
-  if (intro && !state.cutscenesPlayed.some((c) => c.id === intro)) {
-    RunCutscene(intro, { loading: true });   // 播完 RunCutscene 自己会把指针锁要回来
-    return;
-  }
   RequestPointerLock();
 }
-bootStart.addEventListener("click", PREVIEW ? StartPreview : StartRun);
-// URL 跳转后的自动开播没有可继承的用户手势；下一次在画面内点按时补解锁，
-// 让序章不因音频策略停在加载页，也不要求玩家额外回去点启动按钮。
-if (PREVIEW_AUTOPLAY) {
-  document.addEventListener("pointerdown", () => audio.Unlock(), { once: true });
-}
+bootStart.addEventListener("click", StartRun);
 
 // ---------------------------------------------------------------------------
 // 主菜单：开机进这里，游戏中按 Esc 也回这里
@@ -6924,7 +6635,7 @@ function FinishEditorSession() {
  * 相同时走 EnterLevel 的 initial 分支 —— 那一支只重置关卡状态（剧本、兵、出生点），
  * 不碰几何。
  */
-async function StartLevel(index, { cutscenes = false, stageJump = null, stageJumpMidCutscenes = false } = {}) {
+async function StartLevel(index, { stageJump = null } = {}) {
   if (!menu || state.advancing) return state.phaseIndex;
   const target = Clamp(index, 0, PHASE_TABLE.length - 1);
   CloseMenu();
@@ -6937,26 +6648,22 @@ async function StartLevel(index, { cutscenes = false, stageJump = null, stageJum
   hud.HideEpilogue();
   hud.HideDeathCard();
   const sameSlice = state.builtPhase === target;
-  await EnterLevel(target, { initial: sameSlice && stageJump == null, cutscenes, stageJump, stageJumpMidCutscenes });
-  // 序章播完发现后面全是暂时废弃场景时，EnterLevel 已经把主菜单重新打开
-  //（EndOfficialCampaign）——这时不许再 StartRun，否则菜单开着、玩法却在底下跑。
+  await EnterLevel(target, { initial: sameSlice && stageJump == null, stageJump });
+  // EnterLevel 把主菜单重新打开了（EndOfficialCampaign）时不许再 StartRun，否则菜单开着、玩法却在底下跑。
   if (state.menu) return target;
   StartRun();
   return target;
 }
 
-/**
- * 第一关阶段跳转。`midCutscenes`：落点那一段的关中过场照播（菜单里的「阶段跳转」传 true ——
- * 人跳到 04 就是冲着那一段去的）；测试夹具走 Debug.FirstLevelJump，默认跳过，免得被导演扣住。
- */
-async function JumpFirstLevelStage(value, { midCutscenes = false } = {}) {
+/** 第一关阶段跳转（菜单里的「阶段跳转」与测试夹具 Debug.FirstLevelJump）。 */
+async function JumpFirstLevelStage(value) {
   if (frameDebugger.frozen || frameDebugger.state === "armed") frameDebugger.Resume();
   const stage = ResolveFirstLevelStage(value);
   if (state.advancing) throw new Error("Level loading is already in progress");
   const index = PHASE_TABLE.findIndex(phase => phase.whitebox?.fullMission);
   if (index < 0) return {navigating:true,phaseNumber:stage.number,phaseId:stage.id,
     url:GoToSandbox("firstLevelP012Whitebox",{stage:stage.id})};
-  await StartLevel(index, {cutscenes:false,stageJump:stage.id,stageJumpMidCutscenes:midCutscenes});
+  await StartLevel(index, { stageJump: stage.id });
   return missionRuntime.State();
 }
 
@@ -7335,7 +7042,7 @@ const router = new InputRouter({
     if (frameDebugger.frozen) return;
     if(missionRuntime?.controls)return;
     if (missionRuntime?.ReceivingFood && (["crouch","prone","traverse"].includes(action) || action.startsWith("stance:"))) return;
-    if (state.cutscene) return; // 过场只由 CutsceneDirector 接收 Look/Esc
+    if (state.cutscene) return; // 脚本镜头夺走控制权期间不吃键位动作
     if (!state.ready) return;
     // 编辑器开着就把整张键位表闸掉。不闸的话在编辑器里按 R 会真的去装填、
     // 滚滚轮会真的切枪 —— 而这两件事在暂停的世界里做，退出编辑器时状态已经错了。
@@ -7448,14 +7155,9 @@ document.addEventListener("keyup", (event) => {
 
 document.addEventListener("mousemove", (e) => {
   if (altMouseFree) return;
-  // 尖刺闸门排在所有消费者之前：过场的 headLook、轮盘的指向、玩法的转头，
+  // 尖刺闸门排在所有消费者之前：轮盘的指向、玩法的转头，
   // 吃到一个上千像素的假位移都会跳（见 AcceptLookMotion 的注释）。
   if (!AcceptLookMotion(e.movementX || 0, e.movementY || 0)) return;
-  // headLook 是过场唯一开放的连续输入；不要求玩家锁住指针，避免 Esc 被浏览器吞掉。
-  if (cutscene && cutscene.Playing) {
-    if (cutscene.AllowsLook) cutscene.AddLook(e.movementX, e.movementY);
-    return;
-  }
   if (state.cutscene) return;
   // 轮盘开着的时候鼠标是在选格子，不是在转头。
   // 这条**不查指针锁**：轮盘只要一个方向向量，而 movementX/Y 在锁与不锁下都送达
@@ -9356,17 +9058,7 @@ function Frame(dt, render = true) {
   // 所以暂停/过场时 View() 停在原地不动，那一架就钉在航线上不再前进。
   aircraft?.Update(state.elapsed, strafe?.View() ?? null);
 
-  // 预览片尾是终点，不是一个隐藏的 L0 游戏循环。即便调试/测试继续调用
-  // StepFrames，也只保留静态画面，不再推进玩家、剧本或 AI。
-  if (PREVIEW && state.previewDone && !(cutscene && cutscene.Playing)) {
-    if (render) RenderScene(dt);
-    return;
-  }
-
-  // 编辑器接管：与过场同一条通道 —— 玩法全停，只推编辑器与画面。
-  // **必须排在过场那一条之前**：Timeline 编辑器要自己按走带的步长推
-  // cutscene.Update（暂停、0.25 倍速、拖进度条全靠它），排在后面的话
-  // 过场每帧会被推两次，走带上的速度与暂停一个都不生效。
+  // 编辑器接管：玩法全停，只推编辑器与画面。
   if (UiCapturing()) {
     settings?.Update(dt);
     editor?.Update(dt);
@@ -9375,7 +9067,7 @@ function Frame(dt, render = true) {
       if(render)commandRoom.Render();
       return;
     }
-    // 阴影框跟着**编辑器相机**走。与过场那一条同一笔账：编辑器的自由飞行
+    // 阴影框跟着**编辑器相机**走：编辑器的自由飞行
     // 会把镜头带到离玩家几百米的地方，而阴影框留在玩家脚下 = 那一片一个
     // 影子都没有（画面上是「东西浮在地上」）。采样点出图全走这条分支。
     camera.getWorldDirection(_forward);
@@ -9397,22 +9089,6 @@ function Frame(dt, render = true) {
     combat?.Update(dt,{phase:PHASE_TABLE[state.phaseIndex]});
     camera.getWorldDirection(_forward);lights.UpdateShadowFrustum(camera.position,_forward);
     if(render)RenderScene(dt);
-    return;
-  }
-  // 过场期间：只推过场与画面，玩法全停。
-  // 不停的话玩家会在看电影的时候被打死，而且 AI 会照常往前走 ——
-  // 过场结束时战场已经不是过场开始时那个战场了。
-  if (cutscene && cutscene.Playing) {
-    cutscene.Update(dt);
-    // 天、灯、烟尘还要活着：云在飘、火光在闪、常驻烟柱在冒 —— 这些不归玩法管。
-    // 阴影框要跟着**过场相机**走，不能留在玩家脚下：独立布景在两千米外，
-    // 阴影框留在城里等于整场布景没有阴影（看上去就是「人浮在地上」）。
-    sky.Update(state.elapsed);
-    lights.Update(dt, state.elapsed, camera.position);
-    if (vfx) vfx.Update(dt, camera, state.elapsed);
-    camera.getWorldDirection(_forward);
-    lights.UpdateShadowFrustum(camera.position, _forward);
-    if (render) RenderScene(dt);
     return;
   }
   // 建切片期间（换关）也只走画面：碰撞盒表正在被换掉，规则层这时候查什么都是错的
@@ -10223,7 +9899,7 @@ function RenderSceneContent(dt) {
   sky.mesh.position.copy(camera.position);
   // 过场可以自带天空（cut.sky）：正在播的过场套了预设就按它的后期参数走，
   // 否则按本关的。夜战预设 exposure 3.6、白天 0.5，抄错一档整帧就黑/就白。
-  const skyName = cutsceneSky || phase.sky;
+  const skyName = skyOverride || phase.sky;
   const preset = SKY_PRESETS[skyName] || SKY_PRESETS[phase.sky];
   // 粒子层要与合成 pass 共用同一份雾：它不进深度法线预通道，合成 pass 那趟
   // 又明写"深度 0 的天空不吃雾"，于是背景是天空的粒子像素一点雾都吃不到 ——
@@ -10334,7 +10010,7 @@ function RenderSceneContent(dt) {
     skyPreset: skyName,
     // 逐关锚点：`smokyDay` 被三关共用，而三关出生机位的实测亮度差 0.38 EV。
     // 过场自带天空时不传（镜头已经不在这一关的出生点上，锚点对不上）。
-    exposureAnchor: cutsceneSky ? null : phase.id,
+    exposureAnchor: skyOverride ? null : phase.id,
     dt,
     bloom: preset.bloom * graphics.bloom,
     // 泛光阈值是**每时段**的（缺省 1.18 = 出厂常数；目前只有 dawn 写了值）。
@@ -10505,12 +10181,6 @@ window.addEventListener("blur", () => {
   escapeHeld = false;   // 失焦时按着的 Esc 收不到 keyup
   interact?.CancelHold("blur");
   ReleasePointerLock();
-  // 预览没有玩家控制权；失焦时直接走一次与 Esc 相同的收口路径，避免
-  // 标签页隐藏后留下一个永远占着相机/字幕层的 Promise。
-  if (PREVIEW && cutscene && cutscene.Playing) {
-    cutscene.Skip();
-    cutscene.Update(99);
-  }
 });
 window.addEventListener("pagehide", ReleasePointerLock);
 // 标签页切到后台也放掉：blur 管的是窗口失焦，visibilitychange 管的是标签切换 /
@@ -10522,7 +10192,7 @@ document.addEventListener("visibilitychange", () => {
 document.addEventListener("keydown", (event) => {
   // 按住不放的自动重复不算再按一次：否则暂停 / 继续会跟着重复频率来回翻。
   if (event.key !== "Escape" || event.repeat) return;
-  // 过场里 Esc 是"跳过"，交给 CutsceneDirector 自己的监听；这里只管游戏中的退出
+  // 脚本镜头夺走控制权期间 Esc 不暂停（镜头放完自己交还）；这里只管游戏中的退出
   if (state.cutscene) return;
   // 有菜单时 Esc 是「暂停」：ER2 也是这个键。菜单自己那份 Esc 管的是面板返回，
   // 两边不会打架 —— 它只在 menu.open 时响应，这里只在游戏中响应。
@@ -10539,7 +10209,7 @@ function Loop(now) {
   requestAnimationFrame(Loop);
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  // Script_CutsceneShot 的 manual=1 是一个明确的时钟所有权切换：只允许
+  // 出图脚本的 manual=1 是一个明确的时钟所有权切换：只允许
   // window.Taierzhuang.StepFrames() 推进，不能让 rAF 在两次截图之间偷偷加
   // 时间。普通 ?shot 页面不带 manual，仍按实时循环运行。
   frameDebugger.Poll();
@@ -10573,14 +10243,9 @@ function LoopStep(dt) {
     MenuFrame(dt);
     return;
   }
-  // 过场没有自己的帧驱动，全靠 Frame() 里那条 cutscene 分支推。
-  // 而从主菜单进关时 state.running 还是 false（要等过场播完才 StartRun）——
-  // 不放行的话「开始」会卡死在关前过场里：过场在等一个永远不来的帧，
-  // 而 StartRun 在等过场结束。关卡之间那条路之所以没暴露这个坑，
-  // 是因为换关时玩家还在游戏里，state.running 一直是 true。
   // 从主菜单或暂停菜单打开编辑器时 running 都是 false；仍要让编辑器更新，
   // 否则切片重建完成后的 GroundHeight、碰撞和地形网格无法重新挂载。
-  if (!state.running && !(cutscene && cutscene.Playing) && !UiCapturing()) return;
+  if (!state.running && !UiCapturing()) return;
   Frame(dt);
 }
 requestAnimationFrame(Loop);

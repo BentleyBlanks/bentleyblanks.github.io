@@ -4,7 +4,7 @@ export const MELEE_QTE_PHASE = Object.freeze({
   id: MELEE_QTE_LEVEL_ID, sandbox: true, sandboxKey: "melee", sandboxGlyph: "刃",
   date: "机制实验场", label: "白刃战 · 大刀与刺刀", place: "独立战斗测试", sky: "testSceneDay", ambience: "overcast", music: null, minutes: 600,
   brief: ["左键轻点攻击，长按松开重击；右键瞬时拨挡；贴身 F 推架。", "僵持与倒地压制时连续按 F。成功后自行移动和攻击。"],
-  story: MELEE_QTE_LEVEL_ID, cutsceneIn: null, cutsceneOut: null,
+  story: MELEE_QTE_LEVEL_ID,
   objectives: ["前排 F 开始，后排靠近开始", "各排从左到右分别为一／二／三名对手"],
   mechanic: "自由白刃战：大刀一对一／二／三、刺刀对刺刀、F推架、站立与倒地抵抗。",
   nraPool: 9999, poolGain: 0, ijaPool: 9999, ijaPressure: 0, ijaSpawn: [], ijaSupport: [],

@@ -225,7 +225,7 @@ export const SHELL_IMPACT_RANGE_PHASE = Object.freeze({
   id: SHELL_IMPACT_RANGE_ID, sandbox: true, sandboxKey: "impacts", sandboxGlyph: "尘",
   date: "扬尘测试", label: "炮击扬尘测试场", place: "壕沟 · 弹种 · 落点 · 观察机位",
   sky: "testSceneDay", ambience: "overcast", music: null, minutes: 600,
-  story: SHELL_IMPACT_RANGE_ID, cutsceneIn: null, cutsceneOut: null,
+  story: SHELL_IMPACT_RANGE_ID,
   brief: ["一片黄土地上有一道锯齿形射击壕、一条交通壕、一个三岔口和一小段短支沟，沟外是弃土垄，另有两座混凝土堡垒与散落的桶、箱。",
     "左侧面板选弹种与落点，发射或齐射；每一发都走正式的炮击链：打出炮弹、落地起爆、挖坑。可暂停、单步、放慢，机位可飞到任意处看尘怎么起来、怎么散。"],
   objectives: ["观察炮弹落地扬尘"],

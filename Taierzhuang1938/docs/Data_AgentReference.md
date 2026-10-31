@@ -16,7 +16,6 @@
 
 ```powershell
 node Taierzhuang1938/Script_ShotTest.mjs                        # 正片固定镜头（--probe / --only=名字）
-node Taierzhuang1938/Script_CutsceneShot.mjs                    # 过场：播一场，指定秒数各落一张
 node Taierzhuang1938/Script_DressingShot.mjs --phase=5 --x=...  # 布设自验：任意机位拍当前城
 node Taierzhuang1938/Script_WeaponShot.mjs                      # 枪械台架四宫格（近距离穿模只有它拍得出）
 node Taierzhuang1938/Script_TzmShot.mjs --id Type89Tank         # TZM 三视图；姿态图 Script_ActorPoseShot.mjs
@@ -327,7 +326,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
   （把「城」翻译成规则层认得的「战场」）；`Script_JieheField.mjs` 是界河**独立场景**，
   不是城的切片（入口 `?jiehe=1`）。
 - **章节数据一章一个文件**：`Data_MissionCh0…6.mjs` 各导出 `CHAPTER`（史料字段 + zones +
-  beats + `tuning`）与 `VOICE_LINES`，序章过场在 `Data_CutsceneChuchuan.mjs`（第一关到终章的 `Data_CutsceneCh1–6.mjs` 已随章节废弃删除）。
+  beats + `tuning`）与 `VOICE_LINES`（过场数据 `Data_Cutscene*.mjs` 2026-10-31 全部删除）。
   `Data_TengxianScript.mjs` 与 `Data_Battle.mjs` 只是**组装层**，自己不再写关表；
   分层校验（打法字段不许摊在 CHAPTER 顶层、zones 数 == objectives 数、zone id 全局唯一、
   路标必须落在本章切片内）在 Data_TengxianScript 的组装处执行。
@@ -594,23 +593,15 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 - 2026-09-11 引擎/近距爆炸替换、持续试听停止及四首车厢配乐候选见 [车厢音频修订](Data_CarriageAudioReview.md)。
 
 ### 过场 / 剧情
-- `Script_Cutscene.mjs` —— 实机演出；只有用户点名的几场夺控制权，战斗内演出不夺。
-  分镜数据在 `Data_Cutscene*.mjs`，纯 Node 自检 `Script_CutsceneCheck.mjs`。
-  `trigger` 三种写法：`beforeLevel:` / `afterLevel:` / `duringLevel:`（关中，格式由
-  `ValidateCutscene` 硬查）。就地演在正片战场上的场写 `groundSnap: true`，演员的 y 是
-  离地高度，真实地面由 `groundAt` 钩子问共享采样器要。
-- `Script_CutscenePerformance.mjs` —— 过场演员的**作者动作层**：cast 轨道关键帧写 `perform:"<ClipId>"`
-  就从该关键帧起播 Blender 烘的原骨架动作（`Animation/MachineGunCaptives/`，机枪点位那场川军被俘十条）。
-  采样按「过场时间 − t0」定位，拖时间轴/跳过/补卡都确定性一致；未知 id 警告一次后退回 POSE_CLIPS。
-  口径在 `docs/Data_CutsceneRedo.md` §1.3，烘焙脚本 `_import/Script_MachineGunCaptivesBake.py`，
-  门禁 `Script_MachineGunCaptivesAnimationTest.mjs`，资产说明 `Animation/MachineGunCaptives/Data_MachineGunCaptivesAnimation.md`。
-- 关中过场《空地上的三个人》`CS_MachineGunCaptives`（`Data_CutsceneMachineGunCaptives.mjs`）：
-  **2026-09-19 起任务不再触发它**（主题由 01 掩蔽部门外那一拍承担），资产、数据与过场自身的回归全保留。
-  回归口 `Script_FirstLevelMachineGunCutsceneTest.mjs`（断言任务不触发 + 过场自身仍可直接播）与
-  `Script_MachineGunCutsceneAudioTest.mjs`；口径 [docs/Data_MachineGunCaptivesCutscene.md](Data_MachineGunCaptivesCutscene.md)。
-  出图白盒关的过场用 `Script_CutsceneShot.mjs --whitebox=p012`（或数据里的 `shotWhitebox`）。
+- **Timeline 过场**（2026-10-31 起，取代已删的 `Script_Cutscene.mjs` / `Data_Cutscene*.mjs`）：数据 `Timeline/<Id>.timeline.json`
+  （子序列 = 白盒预演段，字段口径 `docs/Data_EditorBlockout.md` §14.1），规则 `Script_TimelinePlan.mjs`（纯 Node），
+  面板 `Script_EditorTimeline.mjs`（白盒编辑器底部，驱动 `Script_EditorBlockoutPreviz` 那一个播放器）。
+  命令行 `node Taierzhuang1938/Script_TimelineCli.mjs list|show|check|sync|new`；浏览器 `window.Tengxian.Debug.Blockout.Timeline`。
+  门禁 `Script_TimelineTest.mjs`（纯 Node）、`Script_TimelineBrowserTest.mjs`。口径见 [编辑器套件](Data_EditorSuite.md)「Timeline 过场」。
+- `Script_CutscenePerformance.mjs` —— 作者动作层（`perform:"<ClipId>"` 从关键帧起播 Blender 烘的原骨架动作），
+  现在只剩开场分镜导演与集结处救护在用；俘虏动作库 `Animation/MachineGunCaptives/` 开场借用其中十一条。
 - `Script_Story.mjs` —— 保留章节目标、台词和分镜的派发接口；当前第一关任务由 `FirstLevelMission` 系列推进，旧章节与归档 P012 按各自入口保留共享组件回归。史实注记卡 `Data_History.mjs`，
-  编剧红线在 `Data_Script.mjs` 头注与 `docs/Data_HistoryQuotes.md`。先读 `docs/Data_CutsceneRedo.md`。
+  编剧红线在 `Data_Script.mjs` 头注与 `docs/Data_HistoryQuotes.md`。
 
 ### 玩家文本 / 调参表（数据驱动）
 - 玩家可见文本一律 `Script_Text.T("domain.key")`，表在 `Data_Text_<Domain>.mjs`，`Data_Locale_zhCN.mjs` 拼成基准语言；内容原稿（台词 / 分镜 / 史料 / 武器名 / 关卡字段）留在数据文件，显示时经 `Localize(id, text)`，id 口径只在 `Script_TextIds.mjs`；翻译清单 `node Script_TextGather.mjs`。手感 / 平衡 / 节奏数在 `Data_Tuning_<System>.mjs`（Player / Ai / Audio / Combat / Interact / Hud / Main / Menu / Story / Cutscene / P012）。

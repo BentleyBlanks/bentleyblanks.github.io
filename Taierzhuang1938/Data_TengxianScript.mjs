@@ -1,4 +1,4 @@
-// 《滕县 1938》剧本 —— 七章的目标链、节拍、台词、人物表，与全部过场的分镜。
+// 《滕县 1938》剧本 —— 七章的目标链、节拍、台词与人物表。
 //
 // **纯数据，不许 import three**（Node 里要能直接 import：自检、导词表、
 // 考据比对都读这一份；一旦沾上 three，命令行工具就得拖起整个渲染库）。
@@ -8,12 +8,13 @@
 //
 //   七章各自一个文件：Data_MissionCh0.mjs … Data_MissionCh6.mjs，
 //   每份导出 CHAPTER（史料字段 + zones + beats + tuning 打法字段）与 VOICE_LINES。
-//   这里只做三件事：
+//   这里只做两件事：
 //     1. 把七份 CHAPTER 的**史料层**摊成 LEVELS（打法字段一个都不带过来 ——
 //        它们由 Data_Battle.mjs 从同一份 CHAPTER.tuning 取，两边不重叠，
 //        「改了剧本忘了改关卡表」这类错在结构上就发生不了）；
-//     2. 汇总过场（旧五场保留但从正片流程脱钩，新六章各自一份占位）；
-//     3. 汇总人物表与推定值登记表。
+//     2. 汇总人物表与推定值登记表。
+//   旧的分镜式过场（序章出川、第一关《空地上的三个人》与旧战役五场）连同播放它们的
+//   CutsceneDirector 2026-10-31 一并删除（git 历史里有）；以后的过场走 Timeline（docs/Data_EditorSuite.md）。
 //   施工口径：docs/Data_MissionRemake.md（唯一口径，§10 是工程契约）。
 //
 //   旧七关（L0_Jiehe … L6_Beimen）的关表与台词整份删除，git 历史里有。
@@ -31,8 +32,8 @@
 //      → 3/18 午前后枪声停止。**不许为关卡节奏挪动任何一天。**
 //   2. 必败。玩家是二等兵，能改变的只有「这一小时守不守得住」。
 //      不设翻盘分支、不设隐藏结局、不设「守住滕县」的成就。
-//   3. **不演王铭章举枪自尽**（理由见 CUTSCENES.CS_WangMingzhang 的长注释，
-//      那段注释是写给以后想「纠正」回去的人看的，别删）。
+//   3. **不演王铭章举枪自尽**（理由写在已删除的 Data_CutsceneWangMingzhang.mjs 头注里，
+//      git 历史可查；那段注释是写给以后想「纠正」回去的人看的）。
 //   4. 汤恩伯那一场只呈现命令与时间，不下判决。全场无角色开口。
 //   5. 称谓：官对兵「弟兄们」；兵对官按职务（师长／团长／营长／连长）。
 //      **禁「师座」「军座」，禁「同志们」。** 日军不把「八格牙路」当口头禅，
@@ -198,17 +199,17 @@ const CHAPTER_IDS = [
  *   · 选章**不再列出**它们（连同序章：序章要并进第一关）。玩家看到的正式章节组是
  *     Data_Menu.CAMPAIGN_ENTRIES —— 第一关 = P0/P1/P2 白盒，第二关到终章只占位「敬请期待」；
  *   · 从 ?phase=N 开发入口进章只建场、不装剧本、不摆点、不换关（Script_Main.EnterLevel 按这条旗标短路）；
- *   · ?phase=0 的序章过场播完不接第一关，回主菜单；
- *   · OFFICIAL_LEVEL_COUNT 只数 PHASES 前面没打标的章（现在是序章那 1 章），菜单进度不再按它算。
+ *   · OFFICIAL_LEVEL_COUNT 只数 PHASES 前面没打标的章（2026-10-31 起一章都没有），菜单进度不再按它算。
  * 第一关的章节内容（Data_MissionCh1 的 beats / EVENTS / VOICE_LINES）**没有删**：
  * 第一关（Data_FirstLevelP012Whitebox，contentId = CH1_NanLu）仍从那里取人物与台词。
  * 第二到终章的内容已清空成骨架（各文件头注）。
  */
 export const DEPRECATED_CHAPTER_IDS = Object.freeze([
-  "CH1_NanLu", "CH2_Shouliudan", "CH3_Jiuhusuo", "CH4_DongguanYe", "CH5_Chengqiang", "CH6_Zuihou",
+  // 序章 2026-10-31 随出川过场一起退出（整章内容就是那一场过场）。
+  "CH0_Chuchuan", "CH1_NanLu", "CH2_Shouliudan", "CH3_Jiuhusuo", "CH4_DongguanYe", "CH5_Chengqiang", "CH6_Zuihou",
 ]);
 export function IsDeprecatedChapter(id) { return DEPRECATED_CHAPTER_IDS.includes(id); }
-/** 正式章节数：LEVELS 前面连续的、没打 deprecated 标的那几章（现在只有序章）。 */
+/** 正式章节数：LEVELS 前面连续的、没打 deprecated 标的那几章（现在一章都没有）。 */
 export const OFFICIAL_LEVEL_COUNT = (() => {
   let n = 0;
   while (n < CHAPTER_IDS.length && !IsDeprecatedChapter(CHAPTER_IDS[n])) n += 1;
@@ -227,7 +228,7 @@ export const OFFICIAL_LEVEL_COUNT = (() => {
 const TUNING_ONLY_KEYS = [
   "bounds", "spawn", "ijaPressure", "ijaSpawn", "ijaSupport", "ijaForce", "ijaPool",
   "loadout", "loadoutOverride", "cameraFar", "detailRadius", "midRadius",
-  "nightRaid", "disarmed", "spotter", "corridorGun", "scavengeRifle", "fieldFrom", "cutsceneOnly",
+  "nightRaid", "disarmed", "spotter", "corridorGun", "scavengeRifle", "fieldFrom",
 ];
 
 const seenZoneIds = new Set();
@@ -271,7 +272,6 @@ for (let i = 0; i < CHAPTERS.length; i += 1) {
  *   event:名字         规则层派发的事件（判定表在 Script_Story.LEVEL_CUES）
  *   delay:秒           上一条之后过多久
  * type：title / line / shout / narration / objective / note / hint / system / env
- *   ／ cutscene（关中过场：`{ at, type:"cutscene", id:"CS_x" }`，id 必须已注册）
  *
  * pool（城里还站着的人）是**推定**的关卡数值，登记在 PRESUMED_STAGING.poolCurve。
  */
@@ -284,7 +284,7 @@ export const LEVELS = CHAPTERS.map((c) => ({
   date: c.date,
   clock: c.clock,
   sky: c.sky,
-  // 环境音档与天空档不同名时由章自己指定（序章的车厢就是这种情形）。
+  // 环境音档与天空档不同名时由章自己指定。
   ambience: c.ambience || null,
   music: c.music || null,
   minutes: c.minutes,
@@ -295,13 +295,6 @@ export const LEVELS = CHAPTERS.map((c) => ({
   mechanic: c.mechanic || MechanicSummary(c),
   mechanics: c.mechanics || {},
   brief: c.brief,
-  cutsceneIn: c.cutsceneIn || null,
-  cutsceneOut: c.cutsceneOut || null,
-  // 关**中**过场（2026-08-28 集成批 INT1）。两种写法：
-  //   "CS_x"                        挂在默认信号 ChapterMidCutscene 上
-  //   { id:"CS_x", signal:"名字" }   挂在指定信号上（CH5 的转身该挂 TurnedBack）
-  // 判定与派发在 Script_Story（SIGNAL_CUTSCENES）；这一层只负责传下去与查注册。
-  cutsceneMid: c.cutsceneMid || null,
   // 这一章玩家演的是谁（CAST id）。六章是顺子，终章 §7 明写「玩家＝小秦」。
   // 装配层把它传给 CompanionDirector.BeginLevel —— **玩家自己不进名册**，
   // 否则终章场上会有两个小秦（一个是你，一个站你旁边）。
@@ -335,123 +328,19 @@ export const CHAPTER_VOICE_LINES = CHAPTER_MODULES.flatMap((m) => m.VOICE_LINES 
  * 这里不做字段归一：七章的 EVENTS 是三批人分别写的，名字字段有 name/event/id
  * 三种、判据字段有 fallback/predicate/cue 三种（还有一章一条都没写）。
  * 归一化的规矩属于叙事层（Script_Story.BuildLevelCues），
- * 这一层只负责**把它们凑齐**并带上 cutsceneMid —— 数据层不猜语义。
+ * 这一层只负责**把它们凑齐** —— 数据层不猜语义。
  *
- * 没有导出 EVENTS 的章给空数组：那不是错误（序章整章是过场，没有事件线）。
+ * 没有导出 EVENTS 的章给空数组：那不是错误（序章没有事件线）。
  */
 export const CHAPTER_EVENTS = CHAPTERS.map((chapter, index) => ({
   levelId: chapter.id,
   events: Array.isArray(CHAPTER_MODULES[index].EVENTS) ? CHAPTER_MODULES[index].EVENTS : [],
-  cutsceneMid: chapter.cutsceneMid || null,
 }));
-
-// ===========================================================================
-// 过场
-// ===========================================================================
-//
-// 两组：
-//   · **正片**用的 CS_Chuchuan（序章车厢）。第一关到终章的 CS_Ch1_* … CS_Ch6_*
-//     随章节废弃一起删除（2026-09-06，Data_CutsceneCh1–6.mjs 在 git 历史里）；
-//   · **旧战役五场**（CS_ChuchuanLegacy / CS_LiZongrenTang / CS_LastWire /
-//     CS_WangMingzhang / CS_BeimenBreakout）——从正片流程脱钩，但文件与注册保留：
-//     它们里面的分镜手法、史实注记与「不演王铭章举枪自尽」那段长注释是资产，
-//     删掉等于把账一起删掉。过场预览页与编辑器时间轴仍列它们。
-//
-// 分镜数据结构（Script_Cutscene.mjs 是唯一消费者）：
-//
-//   setOrigin  [x,y,z]  这一场布景的世界原点。standalone 的场自带布景，
-//                       坐标写局部值；发生在滕县城里的场把 setOrigin 设为
-//                       [0,0,0]，坐标直接就是 Data_Tengxian 的世界坐标。
-//   props      [{ kind, size, pos, ry, rx, mat|color, emissive, track }]
-//              过场专用的一次性道具（桌子、电台、土袋、烟囱……）。
-//              静态场景里已经有的东西不要在这里重复建。
-//   cast       [{ id, kind, weapon, seed, track:[{t,pos,ry,state}] }]
-//              t 是**过场全局时间**（秒），不是镜内时间 —— 跨镜连贯的动作
-//              （一行人一直在走）写一条轨就行，不用按镜切碎。
-//   shots      [{ n, seconds, focalMm, camera, subs, lines, sfx, flash, black }]
-//              camera.from/to 是机位，look/lookTo 是被摄物；只给 from/look
-//              就是固定机位。ease 见 Script_Cutscene 的 EASINGS。
-//              **focalMm 是 35 mm 等效焦距**，Script_Cutscene 换算成垂直 FOV，
-//              分镜表上写多少这里就写多少，不许直接写 fov 度数。
-//
-// 时长是硬约束：设计书给了每场的总秒数与每镜秒数，shots 的 seconds 之和
-// 必须等于 seconds。Script_Cutscene 的 ValidateCutscene() 会核对，对不上就抛。
-
-import { CS_Chuchuan, CS_ChuchuanLegacy } from "./Data_CutsceneChuchuan.mjs";
-import { CS_LiZongrenTang } from "./Data_CutsceneLiZongrenTang.mjs";
-import { CS_LastWire } from "./Data_CutsceneLastWire.mjs";
-import { CS_WangMingzhang } from "./Data_CutsceneWangMingzhang.mjs";
-import { CS_BeimenBreakout } from "./Data_CutsceneBeimenBreakout.mjs";
-import { CS_MachineGunCaptives } from "./Data_CutsceneMachineGunCaptives.mjs";
-
-/** 正片的过场：只剩序章的 CS_Chuchuan（Data_CutsceneChuchuan.mjs）。 */
-export const CHAPTER_CUTSCENES = [CS_Chuchuan];
-
-/**
- * 新第一关（?whitebox=p012）的**关中**过场。
- *
- * 它们不挂在 LEVELS 的 cutsceneIn/Out/Mid 上 —— 第一关走的是
- * `Script_FirstLevelMissionRuntime` 自己的阶段机，条件由那一层判定，播放仍然经
- * 装配层的 PlayMidCutscene（与关首/关末同一条 RunCutscene）。这里只负责注册：
- * `PlayMidCutscene` 认 CUTSCENES 的键，没注册就只在控制台留一行警告，画面上
- * 什么都不发生。trigger 写 `duringLevel:<关卡 id>`（Script_CutsceneCheck 硬查格式）。
- */
-export const MISSION_CUTSCENES = [CS_MachineGunCaptives];
-
-/** 旧战役五场：从正片流程脱钩，仅留预览入口与留档。 */
-export const LEGACY_CUTSCENES = [
-  CS_ChuchuanLegacy, CS_LiZongrenTang, CS_LastWire, CS_WangMingzhang, CS_BeimenBreakout,
-];
-
-export const CUTSCENES = Object.fromEntries(
-  [...CHAPTER_CUTSCENES, ...MISSION_CUTSCENES, ...LEGACY_CUTSCENES].map((cut) => [cut.id, cut]));
-
-// 章表引用的过场必须真的注册过 —— 打错一个字的后果是「关末什么都不播」，
-// 静默且只在真跑到那一关时才看得见。
-//
-// 三个入口一起查：关首（cutsceneIn）、关末（cutsceneOut）、关中（cutsceneMid
-// 与 beats 里的 `{type:"cutscene"}`）。关中那两条尤其要查 —— 它们在关卡中段
-// 才派发，打错字要玩到一半才发现，而那时画面上什么都不会发生。
-for (const level of LEVELS) {
-  const midId = typeof level.cutsceneMid === "string" ? level.cutsceneMid
-    : (level.cutsceneMid && level.cutsceneMid.id) || null;
-  if (level.cutsceneMid && !midId) {
-    throw new Error(`Data_TengxianScript: ${level.id} 的 cutsceneMid 既不是过场 id 也没有 id 字段`);
-  }
-  for (const id of [level.cutsceneIn, level.cutsceneOut, midId]) {
-    if (id && !CUTSCENES[id]) throw new Error(`Data_TengxianScript: ${level.id} 引用了没注册的过场 ${id}`);
-  }
-  for (const beat of level.beats || []) {
-    if (beat.type !== "cutscene") continue;
-    const id = beat.id || beat.cutscene || null;
-    if (!id) throw new Error(`Data_TengxianScript: ${level.id} 有一条 type:"cutscene" 的 beat 没写 id（at=${beat.at}）`);
-    if (!CUTSCENES[id]) throw new Error(`Data_TengxianScript: ${level.id} 的 beat（at=${beat.at}）引用了没注册的过场 ${id}`);
-  }
-}
-
-// 各场自带的人物表条目并进 CAST（过场文件不许反过来 import CAST，会成环）。
-for (const cut of Object.values(CUTSCENES)) {
-  for (const [id, person] of Object.entries(cut.people || {})) {
-    if (!CAST[id]) CAST[id] = person;
-  }
-}
-
-/** 按 id 取一场过场。 */
-export function FindCutscene(id) {
-  return CUTSCENES[id] || null;
-}
 
 /** 按 id 取一关。 */
 export function FindLevel(id) {
   return LEVELS.find((l) => l.id === id) || null;
 }
-
-/** 过场的播放顺序（给预览页与编辑器时间轴用）：先正片（序章）、再第一关关中、后旧五场。 */
-export const CUTSCENE_ORDER = [
-  ...CHAPTER_CUTSCENES.map((cut) => cut.id),
-  ...MISSION_CUTSCENES.map((cut) => cut.id),
-  ...LEGACY_CUTSCENES.map((cut) => cut.id),
-];
 
 // ===========================================================================
 // 菜单与关于页
@@ -504,7 +393,7 @@ export const CREDITS = [
  * **游戏内任何文本（字幕、图鉴、UI）都不许说成史实**。
  *
  * 城的几何推定登记在 Data_Tengxian.mjs 的 PRESUMED；这里只登记「演出层」
- * 新引入的推定 —— 关卡数值、过场机位、人物设定。
+ * 新引入的推定 —— 关卡数值、人物设定。
  */
 export const PRESUMED_STAGING = [
   { id: "playerIdentity", value: "谢长顺 / 四川三台 / 十八岁 / 727 团 3 营 9 连二等兵",
@@ -521,9 +410,6 @@ export const PRESUMED_STAGING = [
     note: "王铭章师部原设城外电灯厂，16 日接死守命令后迁入城内；**城内具体位置无载**，选点为推定" },
   { id: "cutsceneCameras", value: "全部过场的机位世界坐标",
     note: "分镜表给的是机位高度、俯仰角、焦距与被摄物，**世界坐标全部是本实现推定的**。改机位不算改史实，但改「谁在画面里、他在做什么」算" },
-  // 过场侧的推定（机位坐标、随行人数、布景位置……）各场自己登记在
-  // Data_Cutscene*.mjs 的 presumed 数组里，这里汇总 —— 一场一个文件，并行改不互踩。
-  ...Object.values(CUTSCENES).flatMap((cut) => cut.presumed || []),
 ];
 
 /** 按 id 查推定条目，给 UI 的「这是推定值」角标用。 */

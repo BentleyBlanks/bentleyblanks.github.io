@@ -638,8 +638,6 @@ export function MakeBlockoutPhase(level) {
     ambience: null,
     music: null,
     minutes: 600,
-    cutsceneIn: null,
-    cutsceneOut: null,
     brief: [],
     bounds,
     spawn,

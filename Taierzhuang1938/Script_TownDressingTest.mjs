@@ -16,7 +16,7 @@
 //   7  地标与公共院落的保留区（w/d 半径 +2 m）不进 —— 那是地标构建器的地盘。
 //   8  目标连线不挡：所在章相邻目标（含出生点→首目标）的连线 3 m 内，
 //      不摆最大边长 > 1.4 m 的实心件（L2 东关排屋停摆事故的教训）。
-//      两处不判：**过场承载章**（cutsceneOnly，玩家一步不走）与**片区包**
+//      两处不判：**序章**（三个路标是原车厢过场的锚点，玩家一步不走）与**片区包**
 //      （quarter，按规则 9 一定在院墙里头）—— 理由逐条写在代码那儿。
 //   9  分区各守其土：片区包（quarter）的每一件都要完整落进某一格院子
 //      （格子四边收 0.55 m 当院墙）；街道包（street）贴街肩、不进院子；
@@ -123,11 +123,10 @@ const blockerRects = [
 // 切片主要落在城墙以内的那几章。这一组只驱动一条「不红只报」的提示，不影响成败。
 // （旧关号 L4/L5/L6 已经摘掉：2026-08-29 重跑过 dump，户口册里的 phase id 全是新章。）
 const cityPhaseIds = new Set(["CH3_Jiuhusuo", "CH5_Chengqiang", "CH6_Zuihou"]);
-// 规则 8 只对**玩家真的会走过去**的章成立。序章是过场承载章（cutsceneOnly：
-// 不建自己的切片、不撒兵、进章即播过场），它那条「目标连线」是车厢/月台/车门
-// 三个过场锚点的连线，玩家一步都不走 —— 拿它去判西关的木料堆挡不挡路，
-// 挡的是一条不存在的路。
-const walkedPhaseIds = new Set(PHASES.filter((phase) => !phase.cutsceneOnly).map((phase) => phase.id));
+// 规则 8 只对**玩家真的会走过去**的章成立。序章那条「目标连线」是车厢/月台/车门
+// 三个原过场锚点的连线（过场 2026-10-31 已删），玩家一步都不走 —— 拿它去判西关的
+// 木料堆挡不挡路，挡的是一条不存在的路。
+const walkedPhaseIds = new Set(PHASES.filter((phase) => phase.id !== "CH0_Chuchuan").map((phase) => phase.id));
 const segmentsByPhase = data.phases.filter((phase) => walkedPhaseIds.has(phase.id)).map((phase) => {
   const points = [{ x: phase.spawn.x, z: phase.spawn.z }, ...phase.zones];
   const segments = [];

@@ -122,7 +122,7 @@ export const SKY_EXPOSURE = {
   // 2026-09-28 集成试过 evUp 1.0：灶屋 09 只从 27 抬到 33，室外沟里的 SB03 却从 71 冲到 92（分镜 56）—— 退回 0.6。
   firstLevelBattleDay: { logLum: null, evBias: 0, evUp: 0.6, evDown: 0.25 },
   // 第一关关尾夜行军（Script_Sky.firstLevelNight）：钳位照抄夜战（同一条「不许把夜拉成白天」的口径）。
-  // 过场式换天（cutsceneSky）不传逐关锚点，这一档只测不调。
+  // 临时换天（Script_Main 的 skyOverride）不传逐关锚点，这一档只测不调。
   firstLevelNight: { logLum: null, evBias: 0, evUp: 0.6, evDown: 0.8 },
   // 下面这些不在正片七关的出生机位上（过场自带天空、白盒、编辑器、靶场），
   // 没有可复现的「默认机位」可标定，一律留 null = 只测量不作用。

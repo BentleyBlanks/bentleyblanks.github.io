@@ -1569,104 +1569,18 @@ Check("每个配方都有分类与说明", undescribed.length === 0,
   undescribed.length ? `漏了：${undescribed.join(", ")}` : "");
 
 // ---------------------------------------------------------------------------
-// 6) Timeline 编辑器
+// 6) Timeline 编辑器：菜单里那一项是跳转入口（整页换成白盒编辑器 + Timeline 面板），
+//    这里只验它在菜单里、跳的地址对；面板本身由 Script_TimelineBrowserTest 在白盒页里验。
 // ---------------------------------------------------------------------------
-await ClickTool("timeline");
-await Step(10);
-const timeline = await page.evaluate(() => {
-  const editor = window.Taierzhuang.editor;
-  const active = editor.active;
-  const out = { id: editor.ActiveId, cuts: [], audioSeek: null, rapidShot: null };
-  const ids = ["CS_Chuchuan", "CS_ChuchuanLegacy", "CS_LiZongrenTang", "CS_LastWire", "CS_WangMingzhang", "CS_BeimenBreakout"];
-  for (const id of ids) {
-    active.SelectCut(id);
-    active.Seek(6.0);
-    window.Taierzhuang.StepFrames(4);
-    out.cuts.push({
-      id,
-      playing: window.Taierzhuang.cutscene.Playing,
-      time: Number(window.Taierzhuang.cutscene.Time.toFixed(2)),
-      shot: active.shotIndex,
-    });
-    active.Stop();
-  }
-  // 静音快进后，目标时刻仍在持续的对白应从对应采样点接回，而不是从头播或没声。
-  // **取样口径跟着新序章走**（2026-08-29）：旧序章那条 `prologue_young_dispatch_01`
-  // 已经不在 CS_Chuchuan 里，照旧钉着它 Seek(9.2) 读到的永远是 null。
-  // 新序章镜 1 的第一句是 `ch0_liuwencai_01`（shot 1 局部 2.2 s，镜 1 从 0 起算），
-  // 把它的时长临时改成 4 s 再拖到 2.8 s —— 目标时刻落在这一句的中段，
-  // 应当从 0.6 s 这个采样点接回。**别改成「拖到某个整数秒再看谁在响」**：
-  // 判据必须是「这一句、这个偏移」，不然换一条台词的 at 就悄悄失效了。
-  active.SelectCut("CS_Chuchuan");
-  const SEEK_CUE = "ch0_liuwencai_01";
-  const SEEK_AT = 2.8;                       // = 台词 at 2.2 + 期望偏移 0.6
-  const audio = window.Taierzhuang.audio;
-  const originalPlay = audio.Play;
-  const originalStopVoice = audio.StopVoice;
-  const originalVoice = audio.voiceBank.get(SEEK_CUE);
-  const calls = [];
-  audio.voiceBank.set(SEEK_CUE, { ...(originalVoice || {}), duration: 4 });
-  audio.Play = function(name, opts = {}) {
-    calls.push({ name, offset: Number(opts.offset || 0) });
-    return { nodes: [], duration: Math.max(0, 4 - Number(opts.offset || 0)) };
-  };
-  audio.StopVoice = () => true;
-  try {
-    active.Seek(SEEK_AT);
-    out.audioSeek = calls.findLast((entry) => entry.name === `voice.${SEEK_CUE}`) || null;
-  } finally {
-    active.Stop();
-    audio.Play = originalPlay;
-    audio.StopVoice = originalStopVoice;
-    if (originalVoice) audio.voiceBank.set(SEEK_CUE, originalVoice);
-    else audio.voiceBank.delete(SEEK_CUE);
-  }
-
-  // 连点三次必须连过三镜；不能依赖下一帧才更新的 UI shotIndex。
-  active.Seek(0.1);
-  active.StepShot(1);
-  active.StepShot(1);
-  active.StepShot(1);
-  out.rapidShot = { shot: active.shotIndex, time: window.Taierzhuang.cutscene.Time };
-  active.Stop();
-  return out;
+const timelineEntry = await page.evaluate(async () => {
+  const { TimelineEditor } = await import("./Script_EditorTimeline.mjs");
+  const item = !!document.querySelector(`#edRoot [data-editor="timeline"]`);
+  return { item, url: TimelineEditor.Url("http://x/Taierzhuang1938/?editor=tools&audio=0") };
 });
-Check("Timeline 打开", timeline.id === "timeline");
-const seekOk = timeline.cuts.every((c) => c.playing && Math.abs(c.time - 6.0) < 0.4);
-Check("六场（含新版与 Legacy）都能拖到 6.0 s", seekOk,
-  timeline.cuts.map((c) => `${c.id}=${c.time}`).join(" "));
-Check("Timeline 跳转会同步到对白采样位置",
-  timeline.audioSeek?.name === "voice.ch0_liuwencai_01"
-    && Math.abs(timeline.audioSeek.offset - 0.6) < 0.05,
-  JSON.stringify(timeline.audioSeek));
-Check("快速连续切镜不会重复卡在同一镜", timeline.rapidShot?.shot === 3,
-  JSON.stringify(timeline.rapidShot));
-const stopped = await page.evaluate(() => window.Taierzhuang.cutscene.Playing);
-Check("停下来之后过场不再占着相机", stopped === false);
-
-// 序章 headLook 即使没有指针锁也会吃 mousemove；Alt 必须临时把鼠标完整还出来。
-await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  active.SelectCut("CS_Chuchuan");
-  active.Seek(9.2);
-  window.Taierzhuang.cutscene.SetNeutralLook(false);
-});
-await page.keyboard.down("Alt");
-const altMouse = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const before = { ...T.cutscene.Look };
-  const event = new MouseEvent("mousemove", { bubbles: true });
-  Object.defineProperty(event, "movementX", { value: 120 });
-  Object.defineProperty(event, "movementY", { value: -80 });
-  document.dispatchEvent(event);
-  return { before, after: { ...T.cutscene.Look }, lock: T.Debug.PointerLock() };
-});
-await page.keyboard.up("Alt");
-Check("Timeline 按住 Alt 会释放鼠标并暂停序章视线",
-  altMouse.lock.mouseFree && !altMouse.lock.locked
-    && altMouse.before.yaw === altMouse.after.yaw && altMouse.before.pitch === altMouse.after.pitch,
-  JSON.stringify(altMouse));
-await page.evaluate(() => window.Taierzhuang.editor.active.Stop());
+Check("Timeline 入口在菜单里、跳到白盒编辑器并带上 timeline 参数",
+  timelineEntry.item && /editor=blockout/.test(timelineEntry.url) && /timeline=/.test(timelineEntry.url)
+    && /audio=0/.test(timelineEntry.url),
+  JSON.stringify(timelineEntry));
 
 // ---------------------------------------------------------------------------
 // 6c) 构件库预览器
@@ -2082,107 +1996,6 @@ const shot = await page.evaluate(() => ({
 }));
 Check("出图模式下编辑器不可见但 API 还在",
   shot.hidden && !shot.gearVisible && shot.api);
-
-// ---------------------------------------------------------------------------
-// 10) 序章预览（URL 直达）：独立收口、单次交接、无旧 L0 AI
-// ---------------------------------------------------------------------------
-// 加载画面上**不许**再挂序章入口。序章 2026-09-06 起退出选章、要并进第一关；
-// 原来 #bootFoot 里那条「新版序章预览（开发）」链接 2026-09-07 摘掉，玩家看得见的
-// 入口一条都不指向已退出正片的内容。这一条守住它不被顺手加回来 ——
-// 下面整节验的预览起播与收口全部走 `?preview=CS_Chuchuan` 直达，不依赖任何按钮。
-// 走 evaluate 而不是 getAttribute：后者对**不存在**的选择器要等满默认超时才 reject，
-// 一条「东西不在」的断言不该花三十秒。
-const previewHref = await page.evaluate(() =>
-  document.getElementById("bootPreview")?.getAttribute("href") ?? null);
-Check("加载画面上不再挂序章预览入口", previewHref === null, `href=${previewHref}`);
-
-// Esc 跳过之后要把**补出来的卡片**也读完才算收口（`cardHold`，出川那张 8.4 s）。
-// 原来写的 500 帧 = 8.33 s，比卡片还短 —— 能不能过全看那一刻真实 rAF 多插了几帧，
-// 是一枚硬币。这里按卡片时长留足余量（12 s）。
-const SKIP_CARD_FRAMES = 720;
-
-async function PreviewPage(query = "?preview=CS_Chuchuan") {
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/${query}`,
-    { waitUntil: "load", timeout: 120000 });
-  await page.waitForFunction(() => window.Taierzhuang !== undefined
-    && window.Taierzhuang.state.ready, null, { timeout: 240000 });
-  await page.click("#bootStart");
-  await page.waitForFunction(() => window.Taierzhuang.Debug.Preview().playing,
-    null, { timeout: 30000 });
-  // 起播之后还有一段着色器预热（Script_Main.WarmupShaders）：布景已经建好、
-  // 时间轴被按住（`Held`），屏幕上盖着加载画面。这一段几秒到几十秒不等（看机器
-  // 与驱动的着色器缓存），期间 StepFrames 一帧都推不动 —— 不等它放开就往下推，
-  // 片子还停在第 0 秒，后面每一条都会假红。
-  await page.waitForFunction(() => !window.Taierzhuang.cutscene?.Held,
-    null, { timeout: 240000 });
-}
-
-await PreviewPage();
-const previewStart = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  return {
-    preview: T.Debug.Preview(), cut: T.Debug.Cutscene(),
-    ai: T.ai.soldiers.filter((s) => s.alive).length,
-    audioState: T.audio.ctx ? T.audio.ctx.state : null,
-  };
-});
-Check("新版预览点击播放后自动推进且不提前启动旧 L0 AI",
-  previewStart.preview.active && previewStart.cut.current === "CS_Chuchuan"
-    && previewStart.cut.playing && previewStart.ai === 0 && previewStart.audioState === "running",
-  `cut=${previewStart.cut.current} playing=${previewStart.cut.playing} ai=${previewStart.ai} audio=${previewStart.audioState}`);
-
-await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  // 片长以正在播的 cut.seconds 为准（CHUCHUAN_END 会随排片调整），
-  // 硬编码 Notion 定稿秒数在片长变化时会假红；末尾垫 8 帧余量。
-  T.StepFrames(Math.ceil(T.cutscene.cut.seconds * 60) + 8, 1 / 60, false);
-});
-await page.waitForTimeout(10);
-const previewDone = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const p = T.Debug.Preview();
-  return { ...p, spoken: T.Debug.Spoken().filter((s) => s === "跟随通信排。").length,
-    cutPlaying: T.Debug.Cutscene().playing };
-});
-Check("新版预览正常完成后只交接一次并停在终点",
-  previewDone.done && previewDone.handoffCount === 1 && previewDone.spoken === 1
-    && !previewDone.cutPlaying && previewDone.aiAlive === 0,
-  `done=${previewDone.done} handoff=${previewDone.handoffCount} spoken=${previewDone.spoken} ai=${previewDone.aiAlive}`);
-
-await PreviewPage();
-await page.evaluate(() => window.Taierzhuang.Debug.SkipCutscene());
-await page.evaluate((n) => window.Taierzhuang.StepFrames(n, 1 / 60, false), SKIP_CARD_FRAMES);
-await page.waitForTimeout(10);
-const previewSkipped = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const p = T.Debug.Preview();
-  return { ...p, spoken: T.Debug.Spoken().filter((s) => s === "跟随通信排。").length,
-    cutPlaying: T.Debug.Cutscene().playing };
-});
-Check("新版预览 Esc 跳过仍只交接一次并稳定收口",
-  previewSkipped.done && previewSkipped.handoffCount === 1 && previewSkipped.spoken === 1
-    && !previewSkipped.cutPlaying && previewSkipped.aiAlive === 0,
-  `done=${previewSkipped.done} handoff=${previewSkipped.handoffCount} spoken=${previewSkipped.spoken}`);
-
-await PreviewPage("?preview=CS_Chuchuan&quality=low&audio=0");
-const silentLowStart = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const p = T.Debug.Preview();
-  T.Debug.SkipCutscene();
-  return { p, audio: !!T.audio.ctx };
-});
-await page.evaluate((n) => window.Taierzhuang.StepFrames(n, 1 / 60, false), SKIP_CARD_FRAMES);
-const silentLow = { ...silentLowStart,
-  done: await page.evaluate(() => window.Taierzhuang.Debug.Preview().done) };
-Check("低画质/无音频预览可起播并收口", silentLow.p.playing
-  && !silentLow.audio && silentLow.done, JSON.stringify(silentLow));
-
-await PreviewPage();
-await page.evaluate(() => window.dispatchEvent(new Event("blur")));
-await page.evaluate((n) => window.Taierzhuang.StepFrames(n, 1 / 60, false), SKIP_CARD_FRAMES);
-const blurred = await page.evaluate(() => window.Taierzhuang.Debug.Preview());
-Check("预览失焦走跳过收口且不启动旧战斗", blurred.done && !blurred.playing
-  && blurred.aiAlive === 0, JSON.stringify(blurred));
 
 // ---------------------------------------------------------------------------
 // 12) 主菜单 → 高级工具编辑器

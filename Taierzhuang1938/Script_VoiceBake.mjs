@@ -17,7 +17,7 @@
 //
 // 旧序章那一档（`line.prologue` / `--prologue` / PROLOGUE_ROLE_PROMPTS）2026-08-29
 // 随 11 条 `prologue_*` 行一起删了：新序章的车厢对白是 `kind:"story"` 的章节台词
-// （Data_MissionCh0），走的是下面那条剧情分支。Data_Voice 里 `prologue` 为真的行
+// （Data_MissionCh0，2026-10-31 随序章过场删除），走的是下面那条剧情分支。Data_Voice 里 `prologue` 为真的行
 // 现在是 0 条，留着那三处只会让下一个人以为还有一条独立通道。
 //
 // ## 章节剧情台词（2026-08-28 任务流程重制）
@@ -374,20 +374,6 @@ const CAST_VOICE_PROMPTS = {
   ija_gunso: "日本陆军军曹，三十岁上下的成年日本男性。声音硬、方正、带操典训练出来的"
     + "断句节奏，命令短促，情绪压在纪律下面；逼问俘虏时是冷的，不是狂躁的。"
     + "**不要**抗日神剧式的夸张咆哮或滑稽腔。",
-  // --- 第一关关中过场《空地上的三个人》（Data_CutsceneMachineGunCaptives）-----
-  ija_hei: "日本陆军一等兵，二十出头的成年日本男性。声音比军曹年轻、位置靠前、"
-    + "带点没见过世面的兴奋；对跪着的人说话时是居高临下的轻慢，不是愤怒。"
-    + "**不要**抗日神剧式的咆哮，**不要**滑稽腔，也不要把轻慢演成大笑。",
-  captive_old: "被俘的川军老兵，四十岁上下的四川男性，被打倒在地上。嗓子粗、哑、"
-    + "有胸腔底子，此刻是趴着说话：气息被身体压着，一个字一个字往外挤。"
-    + "语气是硬的、平的，不是喊出来的 —— 他知道自己活不成了，所以不求人。"
-    + "**每个字都要实实在在地发出声来**：正常对话的音量，只是没有力气把它送远，"
-    + "**绝对不许做成气声、耳语或者只有呼吸的低语**（那样的 take 会被当成静音整段削掉）。"
-    + "**不要**慷慨激昂，不要拔高，不要临终颤音。",
-  captive_young: "被俘的川军新兵，十八九岁的四川少年男性，跪在地上求活。已经变声但"
-    + "很年轻的男声，偏亮偏细；此刻吓得气息发抖，声音发虚、句子中间要吸气，"
-    + "越说越小。是压着哭腔在讲道理，不是嚎啕。"
-    + "**不要**做成儿童声或女声，不要做成号哭，也不要平静地念台词。",
 };
 
 /**
@@ -559,11 +545,6 @@ function SourceFileOf(key) {
   const m = /^ch([0-6])_/.exec(key);
   const files = [];
   if (m) files.push(path.join(HERE, `Data_MissionCh${m[1]}.mjs`));
-  // 过场自带的台词行住在 `Data_Cutscene*.mjs`（词与它出现的那一秒同住一个文件）。
-  // 不挂这一条的话，烘完只会打印「dur 没找到，没写回」，而时长悄悄留在 0。
-  for (const name of fs.readdirSync(HERE)) {
-    if (/^Data_Cutscene[A-Za-z0-9]*\.mjs$/.test(name)) files.push(path.join(HERE, name));
-  }
   files.push(VOICE_TABLE);
   return files.filter((f) => fs.existsSync(f));
 }

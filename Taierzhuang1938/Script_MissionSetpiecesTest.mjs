@@ -27,7 +27,7 @@ import {
 } from "./Script_MissionSetpieces.mjs";
 import { BLAST_TARGETS } from "./Script_BlastTargets.mjs";
 import { FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelP012Whitebox.mjs";
-import { LEVELS, CHAPTERS, CHAPTER_EVENTS, CUTSCENES, FindLevel } from "./Data_TengxianScript.mjs";
+import { LEVELS, CHAPTERS, CHAPTER_EVENTS, FindLevel } from "./Data_TengxianScript.mjs";
 import { LEVEL_CUES } from "./Script_Story.mjs";
 
 const MainSource = fs.readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8");
@@ -97,7 +97,6 @@ function FakeHost(overrides = {}) {
     Hint: (t) => calls.push(["Hint", t]),
     Say: (w, t) => calls.push(["Say", w, t]),
     PlaySfx: (n) => calls.push(["PlaySfx", n]),
-    PlayCutscene: (id) => { calls.push(["PlayCutscene", id]); return true; },
     ...overrides,
   };
   return host;
@@ -414,7 +413,6 @@ Check("换关清摆点（交互点、后送队、运行时道具）",
   /setpieces\?\.Reset\("levelChange"\);/.test(MainSource)
   && /ClearSetpieceProps\(\);/.test(MainSource));
 Check("取证口在", /Setpieces: \(\) => \(setpieces \? setpieces\.State\(\) : null\),/.test(MainSource));
-Check("关中过场走的是同一个 PlayMidCutscene", /PlayCutscene: \(id\) => PlayMidCutscene\(id\),/.test(MainSource));
 Check("固定事件那几秒被打倒走的是检查点倒带，不是死亡链路",
   /state\.elapsed < scriptInvulnUntil/.test(MainSource) && /checkpoint\?\.Rewind\(2\.0\)/.test(MainSource));
 Check("火墙对玩家有伤害（它是封路，不是单向道具）",

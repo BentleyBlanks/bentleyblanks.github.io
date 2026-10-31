@@ -1,6 +1,6 @@
 // Gameplay and explicit developer views retain their original entry contracts.
 export function IsMenuStartup(params) {
-  return params.get('menu') !== '0' && !['phase', 'shot', 'preview', 'editor', 'range', 'movement',
+  return params.get('menu') !== '0' && !['phase', 'shot', 'editor', 'range', 'movement',
     'explosions', 'weapons', 'melee', 'gore', 'impacts', 'reactions', 'cloth', 'whitebox', 'jiehe', 'missionStage', 'poseTest'].some(key => params.has(key));
 }
 

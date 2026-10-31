@@ -10,10 +10,10 @@ import { FRONT_BATTLE_TUNING as FB } from "./Data_Tuning_FirstLevelFront.mjs";
 // Called once on a fresh runtime, after the shared level restart has cleared all
 // combat, controls, destruction and actors. Backward jumps cannot retain future facts.
 // 2026.09.19 重构：18 个公开阶段按新 27 步重写（契约 §1）。
-export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false } = {}) {
+export function ApplyFirstLevelStageJump(runtime, value) {
   const r = runtime, saved = BuildFirstLevelCheckpoint(value), n = saved.phase.number;
   r.debugStart = {number:n,id:saved.phase.id};
-  // 夜天空是模块级的（Script_Main 的 cutsceneSky），重建切片不会把它放下 ——
+  // 夜天空是模块级的（Script_Main 的 skyOverride），重建切片不会把它放下 ——
   // 从 18 的夜行军跳回白天那几步，不还原就会得到「夜的天、白天的地」。
   // 空间那一侧（浮桥被炸段、北门夜景片）跟着事实自己退回去，见 MISSION_SCENARIO_SIGNALS。
   r.RestoreSky?.();

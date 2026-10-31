@@ -132,9 +132,8 @@
 //     text: "这些人都没枪了……" }
 import { VOICE_LINES as CH0_LINES } from "./Data_MissionCh0.mjs";
 import { VOICE_LINES as CH1_LINES } from "./Data_MissionCh1.mjs";
-// 第一关的**关中过场**自带台词（行本体与分镜同住一个文件，改一句词与改它出现的
-// 那一秒是同一次编辑）。走的仍是 ch1_* 章节语音通道，所以在这里并进第一章。
-import { VOICE_LINES as CS_MACHINE_GUN_CAPTIVES_LINES } from "./Data_CutsceneMachineGunCaptives.mjs";
+// 序章（ch0_*）只剩第一关 P012 白盒借用的一句；其余 30 句与第一关关中过场《空地上的三个人》的台词
+// 2026-10-31 随那两场过场一起删除，行本体与音频都在 git 历史里。
 // 第二到终章（2026-09-06 暂时废弃）：VOICE_LINES 已清空、vo_ch2_*–AudioVoice_Ch6*.mp3 已删，
 // 这里不再拼接它们。第一章的行仍在 —— P0/P1/P2 白盒按 contentId = CH1_NanLu 播它们。
 
@@ -162,9 +161,6 @@ export const STORY_CAST_IDS = [
   "shunzi", "luo", "yaowa", "heyoutian", "liuwencai", "xiaoqin", "zhaodegui",
   "paizhang", "junyi", "s124", "danjiayuan", "shangbing", "junguan", "canmou",
   "wangmingzhang", "ija_gunso",
-  // 第一关关中过场《空地上的三个人》新增的三个人（Data_CutsceneMachineGunCaptives）。
-  // `ija_` 打头的一律走日语分支：text 必须是纯假名（见下面的拼表体检）。
-  "captive_old", "captive_young", "ija_hei",
 ];
 
 /** 日方角色：台词走日语分支，录音文本必须是纯假名。id 前缀就是判据。 */
@@ -193,25 +189,8 @@ export const VOICE_DELIVERY_MIX = {
 };
 export const STORY_DELIVERIES = Object.keys(VOICE_DELIVERY_MIX);
 
-// ## 2026-08-29：11 条 prologue_* 行已从本表删除（任务流程重制 · 集成批 INT3a）
-//
-// 那批行（`prologue_young_dispatch_*` / `_old_wound_*` / `_machine_gunner_*` /
-// `_rifleman_01` / `_motivation_01` / `_external_officer_01`，18 句对白压成 11 个 cue）
-// 是**旧序章**的资产。旧序章讲的是「无名观察者 + 班长动员问答」，
-// 2026-08-28 的任务流程重制把它整段换掉了（docs/Data_MissionRemake.md §1）：
-// 新序章是 166.5 s / 九镜 / 31 句，说话的人全部是有名有姓的 CAST
-//（顺子、罗班长、幺娃、何有田、刘文才、军官），走 `ch0_*` 章节语音通道
-//（行本体在 `Data_MissionCh0.mjs` 的 VOICE_LINES，由下面的拼表并进来）。
-//
-// 也就是说这 11 行**没有任何一处再引用**：`Data_CutsceneChuchuan.CS_Chuchuan` 的
-// 31 个 voiceCue 一个都不是它们，`Bark` 按 kind 挑也挑不到 `kind: "prologue"`。
-// 留在表里的唯一效果是 `LoadVoices` 每次开机白解 11 个再也不会被播的文件，
-// 并让「序章 18 句 / 11 个 cue」那几条断言继续按一份废弃的时间轴验收。
-//
-// **音频文件一个都没删**：`Audio/AudioSfx_PrologueVoice*.mp3`（13 个，含
-// Motivation 的三次试摇）仍在盘上。它们是人工试听过的 SeedAudio take，
-// 重新生成不可复现；旧序章 `CS_ChuchuanLegacy` 也仍在 `Data_CutsceneChuchuan.mjs`
-// 里留档。哪天要回看旧序章，把这几行贴回来就行。
+// 旧序章的 11 条 prologue_* 行 2026-08-29 删除；2026-10-31 连同留档的
+// Audio/AudioSfx_PrologueVoice*.mp3 一起清掉（旧序章过场已删，git 历史里都有）。
 
 const BATTLE_LINES = [
   { key: "rally_bayonet",   kind: "rally",  file: "AudioVoice_RallyBayonet.mp3", dur: 2.36,  role: "老兵",    pitch: -4,                  text: "刺刀上起！跟到我杀！" },
@@ -427,7 +406,8 @@ function MergeChapter(lines, chapter, seen, out) {
 const CHAPTER_LINES = [];
 {
   const seen = new Set(BATTLE_LINES.map((l) => l.key));
-  const chapters = [CH0_LINES, [...CH1_LINES, ...CS_MACHINE_GUN_CAPTIVES_LINES]];
+  // 下标就是章号。
+  const chapters = [CH0_LINES, CH1_LINES];
   for (let i = 0; i < chapters.length; i += 1) MergeChapter(chapters[i], i, seen, CHAPTER_LINES);
 }
 

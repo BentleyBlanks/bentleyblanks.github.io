@@ -310,7 +310,6 @@ const mainSource = fs.readFileSync(path.join(here, "Script_Main.mjs"), "utf8");
 // 扫源码的那几条断言跟着搬到这份表上。
 const hitboxProfile = fs.readFileSync(path.join(here, "Data_CharacterHitbox.mjs"), "utf8");
 const actor = fs.readFileSync(path.join(here, "Script_Actor.mjs"), "utf8");
-const cutscene = fs.readFileSync(path.join(here, "Script_Cutscene.mjs"), "utf8");
 const main = fs.readFileSync(path.join(here, "Script_Main.mjs"), "utf8");
 const editor = fs.readFileSync(path.join(here, "Script_EditorActor.mjs"), "utf8");
 const bakePowerShell = fs.readFileSync(path.join(here, "_import", "Script_BakeLugouCharacters.ps1"), "utf8");
@@ -359,10 +358,6 @@ assert.match(actor, /this\.proceduralHitboxes\s*=\s*\[/,
   "procedural civilian and fallback models have segmented hitboxes");
 assert.match(actor, /capsule\("head", this\.neck, this\.eyes/,
   "procedural head uses neck-to-eye proxy instead of fallback torso sphere");
-assert.match(cutscene, /protagonist:\s*spec\.firstPerson\s*===\s*true[\s\S]*?modelVariant:\s*spec\.firstPerson\s*===\s*true\s*\?\s*1/,
-  "first-person protagonist requests Nra02");
-assert.match(cutscene, /characterRig\?\.SetHeadVisible\(false\)/,
-  "first-person protagonist hides only its skinned head bone");
 assert.doesNotMatch(main, /shot\.dist\s*<\s*40[\s\S]{0,100}head/, "head hit is not rolled after impact");
 assert.match(runtime, /LUGOU_ANIMATION_PROFILE_BY_KIND/, "runtime owns the character-action compatibility ledger");
 assert.match(runtime, /LUGOU_PLAYBACK_CLIP_ALIASES[\s\S]*?CrouchIdle:\s*"RifleIdle"/,

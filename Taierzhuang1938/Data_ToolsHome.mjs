@@ -17,7 +17,7 @@ export const TOOLS_HOME_PHASE = Object.freeze({
   id: TOOLS_HOME_ID, sandbox: true, sandboxKey: "tools",
   date: "开发工具", label: "高级工具", place: "工具首页",
   sky: "testSceneDay", ambience: "overcast", music: null, minutes: 600,
-  story: TOOLS_HOME_ID, cutsceneIn: null, cutsceneOut: null,
+  story: TOOLS_HOME_ID,
   brief: [], objectives: [], mechanic: "",
   nraPool: 9999, poolGain: 0, ijaPool: 0, ijaPressure: 0, ijaSpawn: [], ijaSupport: [],
   ijaForce: { lmgEvery: 13, hmgTeams: 0, engineers: false, armor: 0, motorTransport: "rearOnly" },

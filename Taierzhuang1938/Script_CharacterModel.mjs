@@ -240,7 +240,7 @@ export function DefaultLugouAnimationId(kind) {
  *
  * 2026-09-10：StandFireCrouch 的低高度来自缩短的骨骼平移，不能证明卧姿正确。
  * FullSizeProneClip 在运行时用正常比例参考姿态替换它；ActorPoseTest 另验骨长与前后展开。
- * 回归口在 Script_CutscenePoseTest.mjs：它按这张表逐条量高度，
+ * 回归口原在 Script_CutscenePoseTest.mjs（2026-10-31 随过场删除）：它按这张表逐条量高度，
  * 换一批动作资产（或重烘）把姿态换了位置，那条测试会先红。
  *
  * ---------------------------------------------------------------------------

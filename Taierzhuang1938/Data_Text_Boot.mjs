@@ -33,12 +33,6 @@ export const TEXT = Object.freeze({
   "boot.start.impactRange": "进入炮击扬尘测试场",
   "boot.start.reactionRange": "进入人物战场反应测试场",
   "boot.start.goreRange": "进入断肢测试场",
-  "boot.start.preview": "播放序章",
-
-  // --- 序章预览（?preview=CS_Chuchuan）的收尾终端 ---------------------------
-  "boot.preview.title": "序章预览结束",
-  "boot.preview.note": "等待《断线》接手 · 预览不会启动界河战斗",
-  "boot.preview.handoff": "跟随通信排。",
 
   "boot.error.startFailed": "启动失败：{message}",
 

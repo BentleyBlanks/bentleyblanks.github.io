@@ -64,8 +64,6 @@ export const OVERVIEW_PHASE = Object.freeze({
     "Script_ShotTest 的 Z 系列都站在这一片上。",
   ]),
   story: OVERVIEW_LEVEL_ID,          // 没有剧本，Story 会打一条 warn，属预期
-  cutsceneIn: null,
-  cutsceneOut: null,
   objectives: Object.freeze(["无 —— 这一片不打仗"]),
   mechanic: "出图/自检切片：不撒日军、不结算、不换关。",
   nraPool: 9999,
@@ -129,8 +127,6 @@ export const FULL_SCENE_PHASE = Object.freeze({
     "开发专用：只用来巡场、Spline 与环境取证；章节仍按各自切片工作。",
   ]),
   story: FULL_SCENE_LEVEL_ID,
-  cutsceneIn: null,
-  cutsceneOut: null,
   objectives: Object.freeze(["无 —— 只读巡场，不编辑任务关卡"]),
   mechanic: "完整县城切片：不撒兵、不结算、不换关。",
   nraPool: 9999,
@@ -193,8 +189,6 @@ export const JIEHE_SANDBOX_PHASE = Object.freeze({
     "这片地退出了正片流程，资产一件没删。走两步就能看出高差读不读得出来、下切通道挡不挡得住弹。",
   ]),
   story: JIEHE_LEVEL_ID,             // 没有剧本，Story 会打一条 warn，属预期
-  cutsceneIn: null,
-  cutsceneOut: null,
   objectives: Object.freeze(["南岸一线", "土坎", "北沙河"]),
   mechanic: "地形白盒：不撒日军、不结算、不换关。",
   // 简报那三句：靶场那套默认词（工位 / 木桩兵）在这儿一句都不成立。

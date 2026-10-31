@@ -55,8 +55,6 @@ export const CHAPTER = {
     loadout: "L3_WhiteTowel",
   },
   beats: [],
-  cutsceneIn: null,
-  cutsceneOut: null,
 };
 
 /** 本章已无剧情台词（废弃场景）。留空数组：Data_Voice 与组装层按空表拼接。 */

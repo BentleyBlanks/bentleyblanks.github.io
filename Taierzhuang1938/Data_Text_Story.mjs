@@ -27,7 +27,6 @@ export const TEXT = Object.freeze({
  */
 export const GATED_MODULES = Object.freeze([
   "Script_Story.mjs",
-  "Script_Cutscene.mjs",
   "Script_Audio.mjs",
   "Script_Checkpoint.mjs",
 ]);

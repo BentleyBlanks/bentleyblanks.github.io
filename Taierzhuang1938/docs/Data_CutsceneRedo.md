@@ -1,5 +1,7 @@
 # 五场过场重做 · 施工单（2026-08-20）
 
+> **已删除（2026-10-31 用户：注册在 CutsceneDirector 上的 7 场都过时了）**：本页说的过场数据、`Script_Cutscene.mjs` 播放器与它的出图 / 自检 / 测试已全部删除（git 历史可查）。以下为历史记录。过场预览改走 Timeline，见 [编辑器套件](Data_EditorSuite.md)「Timeline 过场」。
+
 > **Notion 2026-08-24 定稿状态**：新版 `CS_Chuchuan`（102 s，车厢内
 > headLook）内容完成，当前只作为独立预览入口发布：
 > `Taierzhuang1938/?preview=CS_Chuchuan`。正片默认 `开始游戏 / L0_Jiehe`

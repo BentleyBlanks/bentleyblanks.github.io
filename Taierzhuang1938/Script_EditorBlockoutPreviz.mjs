@@ -113,6 +113,8 @@ export class BlockoutPreviz {
     // 镜头：缺省切镜（运镜直接切到落幅，§14.2）；?previzCamera=move 看照写的运镜
     this.cameraMode = editor.params?.get?.("previzCamera") === "move" ? "move" : "cut";
     this.doc = null;          // 归一化后的预演
+    this.source = null;       // Timeline 换上来的数据源（UseSource）；有它时一切按它播，本关的预演文件照常轮询但不用
+    this.fileVoice = null;    // 本关预演文件写的台词清单地址（换源结束时还回去）
     this.text = null;         // 原文（轮询比对）
     this.levelKey = null;
     this.present = false;     // 这一关有没有预演文件
@@ -258,8 +260,9 @@ export class BlockoutPreviz {
       this.editor.OnPrevizStatus?.();
       return this.present;
     }
-    await this.LoadVoiceManifest(result.doc?.voice);
-    const check = ValidateBlockoutPreviz(result.doc, { config: this.editor.doc, voice: this.voice });
+    this.fileVoice = result.doc?.voice ?? null;
+    if (!this.source) await this.LoadVoiceManifest(this.fileVoice);
+    const check = ValidateBlockoutPreviz(result.doc, { config: this.editor.doc, voice: this.source ? null : this.voice });
     this.validation = check;
     if (!check.ok) console.warn(`[BlockoutPreviz] ${levelKey}.previz.json 有 ${check.errors.length} 处错误：`, check.errors.slice(0, 6));
     // 有错也照播能播的（坏的轨道在取样里被跳过），错误进状态
@@ -317,7 +320,8 @@ export class BlockoutPreviz {
 
   Sequence(idOrIndex) {
     const id = this.KeyframeId(idOrIndex);
-    return id && this.doc ? PrevizSequenceFor(this.doc, id) : null;
+    const doc = this.ActiveDoc;
+    return id && doc ? PrevizSequenceFor(doc, id) : null;
   }
 
   Has(idOrIndex) { return !!this.Sequence(idOrIndex); }
@@ -434,7 +438,7 @@ export class BlockoutPreviz {
     }
     // 2026-10-20：这一段用到的 url 音效先解码进声库（读不到只警告一次）
     jobs.push(this.LoadUrlCues(seq.events.filter(e => e.type === "sfx" && PREVIZ_SFX[e.name]?.url).map(e => e.name)));
-    const faceUrl = this.doc?.faceTracks;
+    const faceUrl = this.ActiveDoc?.faceTracks;
     if (faceUrl && !this.faceTracksLoaded.has(faceUrl)) {
       this.faceTracksLoaded.add(faceUrl);
       jobs.push(LoadFaceTracks(new URL(faceUrl, location.href).href).catch(() => 0));
@@ -517,6 +521,30 @@ export class BlockoutPreviz {
     if (!this.run) return false;
     this.run.paused = false;
     return true;
+  }
+
+  /** 停在这一秒（Timeline 的暂停）；Resume 接着播。正在说的那句掐掉（Seek 也是这么做的）。 */
+  Pause() {
+    if (!this.run) return false;
+    this.run.paused = true;
+    this.dialogue?.StopAll();
+    return true;
+  }
+
+  /** 现在按哪一份播：Timeline 换上来的源，或本关自己的预演文件。 */
+  get ActiveDoc() { return this.source || this.doc; }
+
+  /**
+   * Timeline 换数据源（Script_EditorTimeline）：doc 是一份预演形状的文档（Script_TimelinePlan.TimelineAsPreviz），
+   * null = 还回本关自己的预演文件。换源期间关键帧卡片上的预演按钮、N 键、Debug.Blockout.Previz 都播这一份；
+   * 播放器本身一行不变（Timeline 不另写播放器）。台词清单跟着换。
+   */
+  async UseSource(doc) {
+    if (this.run) this.Stop({ restore: false });
+    this.source = doc ? NormalizeBlockoutPreviz(doc) : null;
+    await this.LoadVoiceManifest(doc ? doc.voice : this.fileVoice);
+    this.editor.OnPrevizStatus?.();
+    return !!this.source;
   }
 
   Toggle() { if (this.run) this.Stop(); else if (this.Has()) this.Play(); }
@@ -936,7 +964,7 @@ export class BlockoutPreviz {
       present: this.present, playing: !!run, paused: !!run?.paused, keyframe: run?.seq.keyframe ?? null, title: run?.seq.title ?? null,
       t: run ? +run.t.toFixed(3) : 0, durationS: run ? +run.durationS.toFixed(3) : 0, then: run?.seq.then ?? null,
       cameraMode: this.cameraMode,
-      sequences: this.doc ? this.doc.sequences.map(s => s.keyframe) : [], lines, subtitles: this.elSubs.hidden ? [] : [...this.elSubs.querySelectorAll(".boPrevizText")].map(e => e.textContent),
+      sequences: this.ActiveDoc ? this.ActiveDoc.sequences.map(s => s.keyframe) : [], source: !!this.source, lines, subtitles: this.elSubs.hidden ? [] : [...this.elSubs.querySelectorAll(".boPrevizText")].map(e => e.textContent),
       camera: this.lastCamera && run ? { ...this.lastCamera, position: { ...this.lastCamera.position } } : null,
       missingClips: [...this.missingClips], missingLines: [...this.missingLines], missingSfx: [...this.missingSfx],
       errors: this.validation?.errors?.slice(0, 20) ?? [], warnings: this.validation?.warnings?.length ?? 0,

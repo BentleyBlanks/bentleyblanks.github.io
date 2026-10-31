@@ -169,7 +169,7 @@ TAA 开放当前帧权重、抖动幅度和锐化；GI 开放采样偏移、反�
 
 所以 `EditorSuite.RefreshStatus()` 在 `Capturing` 变化时调 `audio.SetPaused()`，
 它只停**背景层**（环境床 + 音乐），不 `suspend` 整个 `AudioContext`：
-音效编辑器要在暂停时试听，Timeline 要听得见过场自己的音效。已经在飞的一次性音
+音效编辑器要在暂停时试听，Timeline 要听得见预演里的台词与音效。已经在飞的一次性音
 （最长两秒的尾巴）让它响完，硬掐会「咔」一声。
 
 一处容易漏的接缝：音效编辑器 `Exit()` 会把环境床与音乐还原成进来时那一份，
@@ -180,9 +180,8 @@ TAA 开放当前帧权重、抖动幅度和锐化；GI 开放采样偏移、反�
 
 ## 打开编辑器 = 暂停玩法
 
-与过场同一条通道。`Script_Main.Frame()` 看到 `editor.Capturing` 就只走
-`editor.Update` + `RenderScene`，玩家、AI、特效、剧本全停。**这一条排在过场那一条之前**
-—— Timeline 编辑器要自己按走带的步长推 `cutscene.Update`，排在后面过场会被推两次。
+`Script_Main.Frame()` 看到 `editor.Capturing` 就只走
+`editor.Update` + `RenderScene`，玩家、AI、特效、剧本全停。
 
 同时做三件善后：交还指针锁、收起 HUD（`body.edHideHud`，过场自己的 `.csRoot` 留着）、
 把键位路由闸掉（`OnAction` / `Guard` 里判 `editor.Capturing`；不闸的话在编辑器里按 R
@@ -339,17 +338,41 @@ FOV 按正片相同的 `adsFovScale` 收窄。红十字是枪口真实弹道在�
 
 环境床与音乐是常驻的，退出编辑器时会还原成进来时那一份。
 
-### Timeline 过场 `Script_EditorTimeline.mjs`
+### Timeline 过场 `Script_EditorTimeline.mjs`（2026-10-31 重做）
 
-驱动的**就是正片那一个 `CutsceneDirector`**，只把 `Update` 的步长接到走带上 ——
-另写一个预览器等于把那条时间轴抄第二遍，抄漏一条就会「预览里对、正片里不对」。
+**旧版已删**：原来的 Timeline 驱动 `CutsceneDirector` 播 7 场分镜式过场（序章《出川》、第一关关中
+《空地上的三个人》、旧战役五场）。2026-10-31 用户：7 场都过时了，连同播放器、`?preview=` 页、
+关首 / 关末 / 关中过场入口一起删掉（第一关正片早就一场都不播了）。
 
-回拨靠重放：director 的时间只能往前（字幕靠 `prevTime→time` 的跨越触发、`fired` 是 Set），
-所以「拖到 12.4 秒」= 从头 `Play` 再用 1/60 步长快进过去。快进时把 `director.audio`
-摘掉，否则拖一次进度条会把整场的枪声一次性放出来。
+**现在**：一个融合 UE Sequencer / Unity Timeline 思路、**以 agent 为主、人为辅**的过场时间轴。
 
-自检栏读 `ValidateCutscene`，另外自己算一条**轨道最快速度**：两个关键帧之间跨太远
-就是「演员以几十米每秒横穿画面」（`hidden` 的那一段是故意瞬移，不算）。
+- **数据**：`Timeline/<Id>.timeline.json`（schema `tengxian-timeline/1`），登记在
+  `Script_TimelinePlan.TIMELINES`。一份 Timeline = 按顺序首尾相接的几段**子序列**
+  （Sequencer 的 Shot / Unity 的 Control Clip）；每段就是一段白盒预演（字段口径
+  [白盒编辑器 §14.1](Data_EditorBlockout.md)：镜头轨、演员键、台词、事件、飞机、慢动作），从自己那个关键帧的布设起播。
+  现有一份 `FirstLevelOpening` = 第一关开场 01-1…01-4（4 段 170.25 s）的**拷贝**：测试用，改它不动
+  `Blockout/FirstLevel0105.previz.json`；`copiedFrom` 记着从哪儿拷的，`sync` 照它重新拷（覆盖本地改动）。
+- **不另写播放器**：播、停、拖、逐帧全走白盒编辑器里那一个预演播放器（`Script_EditorBlockoutPreviz`）。
+  面板用 `UseSource(doc)` 把它的数据换成 Timeline 那份，按主时间轴调 `Play / Seek / Pause / Resume`；
+  预演的 Seek 是确定性求值，拖到 41.2 s 就是那一帧。跨段时先从那一段的关键帧起播再 Seek；
+  播放中一段播完自动接下一段。关掉面板 `UseSource(null)` 还回本关自己的预演文件。
+- **入口**：高级工具 → 关卡 → Timeline 过场。它和白盒关卡编辑器一样是跳转入口：整页换成
+  `?editor=blockout&level=<关卡>&timeline=<Id>`；已经在白盒编辑器里就只开面板。
+- **界面**（人用，越简单越好）：白盒编辑器底部一条面板，导航栏与小地图让开。头一行：名字、当前段、
+  走带（回到开头 / 上一镜 / 上一帧 / 播放暂停 / 下一帧 / 下一镜）、时码 `mm:ss:ff`（30 帧）、核对状态、关闭；
+  下面四条轨：**段**（子序列）/ **镜头**（每条 camera 一格，运镜保留的 `keepMove` 标蓝）/ **台词**（一句一条，长度 = 录音时长）/
+  **事件**（白光、黑场、说明字、烟、震屏、慢动作画成区间，爆炸、音效、信号画成竖标）。点格子跳到格子开头，点空处或拖动跳到那一秒；
+  悬停看时刻、内容和数据位置（`sequences[i].camera[j]`）。键：空格播放 / 暂停，`,` `.` 逐帧，Shift+`,` `.` 上一镜 / 下一镜，Home / End。
+- **不做**：片段混合 / 淡入淡出叠片（两套播放器都不混合，画出来就和实际对不上）、曲线编辑器（机位只有起幅→落幅 + 缓动，
+  游戏里几乎不做镜头动画）、多层子序列嵌套、拍摄记录与渲染出片（出图已有）。第一版只看不改，改内容改文件。
+- **agent 用法**：
+  - 命令行 `node Taierzhuang1938/Script_TimelineCli.mjs list | show [Id] [--segment=01-2] | check [Id] | sync [Id] | new <Id> --from=<Level> --keyframes=a,b,c`。
+    `show` 按主时间轴列每段的镜头 / 台词 / 事件和数据位置；`check` 对着关卡配置与台词清单核对。
+  - 改内容直接改 `Timeline/<Id>.timeline.json`，开着的面板 2 s 内重读并回到刚才那一秒。
+  - 浏览器 `window.Tengxian.Debug.Blockout.Timeline`：`List / Open / Close / State / Play / Pause / Seek(t) / Step(frames) / StepShot(±1) / Reload / Layout / Tracks`；
+    `State()` 给主时间轴秒数、时码、当前段与段内秒数、当前镜、正在说的台词、字幕、机位、核对结果与缺的动作 / 台词 / 音效。
+- **门禁**：`Script_TimelineTest.mjs`（纯 Node，tier0Fast）、`Script_TimelineBrowserTest.mjs`（实机：开机打开、各轨格数、Seek 与预演播放器一致且确定、
+  逐帧 / 下一镜、播放 / 暂停 / 跨段接播、按钮与点轨道、改文件重读、关掉还原）。
 
 ### 场景关卡 `Script_EditorScene.mjs`
 

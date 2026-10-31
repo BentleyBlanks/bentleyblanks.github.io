@@ -39,7 +39,7 @@ try{
   // This fixture drops the player straight onto the seat, which is exactly the
   // 2026.09.19 重构（契约 §2）：04 不再由任务触发关中过场《空地上的三个人》，
   // 所以这里也不用再拿 captivesWitnessed 把导演挡在门外。不触发这一条由
-  // Script_FirstLevelMachineGunCutsceneTest 的 A 段守。
+  // 原由 Script_FirstLevelMachineGunCutsceneTest 的 A 段守（04 过场 2026-10-31 删除）。
  });
  const before=await Receipt("RifleForceExhausted");
  assert.ok(!before.soldiers.some(a=>a.encounter==="machineGun"),"rifle stage cannot spend the machine-gun attack early");
